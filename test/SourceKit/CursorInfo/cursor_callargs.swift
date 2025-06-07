@@ -6,6 +6,7 @@ class C1 {
 var c1 = C1(passInt: 0, andThis: 0)
 c1.meth(0, passFloat: 0)
 
+// REQUIRES: swift_swift_parser
 // RUN: %sourcekitd-test -req=cursor -pos=6:11 %s -- %s | %FileCheck -check-prefix=CHECK-CLASS %s
 // CHECK-CLASS: source.lang.swift.ref.class (2:7-2:9)
 // CHECK-CLASS: s:15cursor_callargs2C1C

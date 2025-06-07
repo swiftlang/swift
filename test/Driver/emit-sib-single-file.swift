@@ -1,3 +1,5 @@
+// REQUIRES: updating_for_owned_nonescaping_closures
+
 // RUN: %target-build-swift -Onone -emit-sib %s -o %t.sib
 // RUN: %target-build-swift %t.sib -o %t
 // RUN: %target-codesign %t

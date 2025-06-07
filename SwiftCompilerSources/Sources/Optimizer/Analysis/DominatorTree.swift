@@ -13,13 +13,13 @@
 import SIL
 import OptimizerBridging
 
-public struct DominatorTree {
+struct DominatorTree {
   let bridged: BridgedDomTree
 }
 
 extension BasicBlock {
   func dominates(_ other: BasicBlock, _ domTree: DominatorTree) -> Bool {
-    DominatorTree_dominates(domTree.bridged, self.bridged, other.bridged) != 0
+    domTree.bridged.dominates(self.bridged, other.bridged)
   }
   
   func strictlyDominates(_ other: BasicBlock, _ domTree: DominatorTree) -> Bool {

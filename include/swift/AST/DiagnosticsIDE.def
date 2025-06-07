@@ -15,17 +15,6 @@
 
 //===----------------------------------------------------------------------===//
 
-ERROR(ide_async_in_nonasync_context, none,
-      "async %0 used in a context that does not support concurrency",
-      (StringRef))
-
-// NOTE: This is WARNING because this is emitted for cross actor references with
-// non-'Sendable' types. That is optionally ('-warn-concurrency') warning in
-// Swift 5.5.
-WARNING(ide_cross_actor_reference_swift5, none,
-        "actor-isolated %0 should only be referenced from inside the actor",
-        (StringRef))
-
 WARNING(ide_has_async_alternative, none,
         "%0 has an async alternative that should be preferred in an async "
         "context", (StringRef))
@@ -38,17 +27,18 @@ NOTE(ide_redundant_import_indirect, none,
      "module %0 is already imported via another module import", (StringRef))
 
 WARNING(ide_availability_softdeprecated, Deprecation,
-        "%select{getter for |setter for |}0%1 will be deprecated"
-        " in %select{a future version|%select{a future version of %3|%3 %5}4}2"
-        "%select{|: %6}6",
-        (unsigned, DeclName, bool, StringRef, bool, llvm::VersionTuple,
+        "%0 will be deprecated"
+        " in %select{a future version|%select{a future version of %2|%2 %4}3}1"
+        "%select{|: %5}5",
+        (const ValueDecl *, bool, AvailabilityDomain, bool, AvailabilityRange,
          StringRef))
 
 WARNING(ide_availability_softdeprecated_rename, Deprecation,
-        "%select{getter for |setter for |}0%1 will be deprecated"
-        " in %select{a future version|%select{a future version of %3|%3 %5}4}2"
-        ": renamed to '%6'",
-        (unsigned, DeclName, bool, StringRef, bool, llvm::VersionTuple, StringRef))
+        "%0 will be deprecated"
+        " in %select{a future version|%select{a future version of %2|%2 %4}3}1"
+        ": renamed to '%5'",
+        (const ValueDecl *, bool, AvailabilityDomain, bool, AvailabilityRange,
+         StringRef))
 
 WARNING(ide_recursive_accessor_reference,none,
         "attempting to %select{access|modify}1 %0 within its own "

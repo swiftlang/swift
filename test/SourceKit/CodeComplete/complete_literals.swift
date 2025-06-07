@@ -43,9 +43,20 @@ func foo(_ x: Int) {
 }
 
 // RUN: %complete-test -tok=EXPR1 %s -raw | %FileCheck %s -check-prefix=LITERALS
-// RUN: %complete-test -tok=EXPR2 %s -raw | %FileCheck %s -check-prefix=LITERALS
+// RUN: %complete-test -tok=EXPR2 %s -raw | %FileCheck %s -check-prefix=LITERALS_PLUS
+// RUN: %complete-test -tok=EXPR2 %s -raw | %FileCheck %s -check-prefix=LITERALS_PLUS_NOT
 let x1 = #^EXPR1^#
 x1 + #^EXPR2^#
+// LITERALS_PLUS: key.kind: source.lang.swift.literal.integer
+// LITERALS_PLUS: key.kind: source.lang.swift.literal.string
+// LITERALS_PLUS: key.sourcetext: "\"<#{{.*}}#>\""
+// LITERALS_PLUS: key.kind: source.lang.swift.literal.array
+// LITERALS_PLUS: key.sourcetext: "[<#{{.*}}#>]"
+
+// LITERALS_PLUS_NOT-NOT: key.kind: source.lang.swift.literal.boolean
+// LITERALS_PLUS_NOT-NOT: key.kind: source.lang.swift.literal.dictionary
+// LITERALS_PLUS_NOT-NOT: key.kind: source.lang.swift.literal.tuple
+// LITERALS_PLUS_NOT-NOT: key.kind: source.lang.swift.literal.nil
 
 // RUN: %complete-test -tok=EXPR3 %s -raw | %FileCheck %s -check-prefix=LITERAL_BOOL
 if #^EXPR3^# { }

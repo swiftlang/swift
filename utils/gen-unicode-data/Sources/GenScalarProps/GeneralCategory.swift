@@ -35,9 +35,9 @@ enum GeneralCategory: String {
   case currencySymbol = "Sc"
   case modifierSymbol = "Sk"
   case otherSymbol = "So"
-  case spaceSeperator = "Zs"
-  case lineSeperator = "Zl"
-  case paragraphSeperator = "Zp"
+  case spaceSeparator = "Zs"
+  case lineSeparator = "Zl"
+  case paragraphSeparator = "Zp"
   case control = "Cc"
   case format = "Cf"
   case surrogate = "Cs"
@@ -90,11 +90,11 @@ enum GeneralCategory: String {
       return 20
     case .otherSymbol:
       return 21
-    case .spaceSeperator:
+    case .spaceSeparator:
       return 22
-    case .lineSeperator:
+    case .lineSeparator:
       return 23
-    case .paragraphSeperator:
+    case .paragraphSeparator:
       return 24
     case .control:
       return 25
@@ -153,6 +153,12 @@ func emitGeneralCategory(
   _ data: [(ClosedRange<UInt32>, GeneralCategory)],
   into result: inout String
 ) {
+  result += """
+  #define GENERAL_CATEGORY_COUNT \(data.count)
+
+
+  """
+
   emitCollection(
     data,
     name: "_swift_stdlib_generalCategory",
@@ -172,7 +178,7 @@ func emitGeneralCategory(
 }
 
 func generateGeneralCategory(into result: inout String) {
-  let derivedGeneralCategory = readFile("Data/DerivedGeneralCategory.txt")
+  let derivedGeneralCategory = readFile("Data/16/DerivedGeneralCategory.txt")
   
   var data: [(ClosedRange<UInt32>, GeneralCategory)] = []
   

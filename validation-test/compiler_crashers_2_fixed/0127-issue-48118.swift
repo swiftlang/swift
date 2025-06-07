@@ -1,5 +1,4 @@
-// RUN: not %target-swift-frontend %s -typecheck
-// REQUIRES: asserts
+// RUN: %target-typecheck-verify-swift
 
 // https://github.com/apple/swift/issues/48118
 
@@ -18,7 +17,7 @@ public protocol P {
     func f4(_ x: Context)
 }
 
-public extension P {
+extension P {
     public func f1(_ x: Context, _ y: PA) {
     }
     public func f2(_ x: Context, _ y: PB) {
@@ -35,6 +34,6 @@ public struct S: P {
 
     public func f1(_ x: Context, _ y: PA) {
     }
-    public func f2(_ x: Context, _ y: PB) {
+    public func f2(_ x: Context, _ y: PB) { // expected-error {{reference to invalid type alias 'Context' of type 'S'}}
     }
 }

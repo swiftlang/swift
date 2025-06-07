@@ -4,6 +4,13 @@
 @inline(__always)
 func always_inline_callee() {}
 
+// CHECK-LABEL: sil hidden [always_inline] [ossa] @$s13inline_always11testClosureyyF
+@inline(__always)
+func testClosure() {
+  // CHECK-LABEL: sil private [always_inline] [ossa] @$s13inline_always11testClosureyyFyycfU_
+  _ = { }
+}
+
 protocol AlwaysInline {
   func alwaysInlined()
 }

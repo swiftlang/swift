@@ -24,6 +24,7 @@
 #include "FormalEvaluation.h"
 #include "SILGenFunction.h"
 #include "Scope.h"
+#include "swift/Basic/Assertions.h"
 
 namespace swift {
 namespace Lowering {
@@ -105,6 +106,7 @@ public:
     CoroutineAccessorKind,      // coroutine accessor
     ValueKind,                  // random base pointer as an lvalue
     PhysicalKeyPathApplicationKind, // applying a key path
+    BorrowValueKind,            // load_borrow the base rvalue for a projection
 
     // Logical LValue kinds
     GetterSetterKind,           // property or subscript getter/setter
@@ -114,6 +116,8 @@ public:
     WritebackPseudoKind,        // a fake component to customize writeback
     OpenNonOpaqueExistentialKind,  // opened class or metatype existential
     LogicalKeyPathApplicationKind, // applying a key path
+    InitAccessorKind,           // init accessor
+    
     // Translation LValue kinds (a subtype of logical)
     OrigToSubstKind,            // generic type substitution
     SubstToOrigKind,            // generic type substitution
@@ -208,21 +212,21 @@ public:
 /// The only operation on this component is `project`.
 class PhysicalPathComponent : public PathComponent {
   virtual void _anchor() override;
-  Optional<ActorIsolation> ActorIso;
+  std::optional<ActorIsolation> ActorIso;
 
 protected:
   PhysicalPathComponent(LValueTypeData typeData, KindTy Kind,
-                        Optional<ActorIsolation> actorIso = None)
-    : PathComponent(typeData, Kind), ActorIso(actorIso) {
+                        std::optional<ActorIsolation> actorIso = std::nullopt)
+      : PathComponent(typeData, Kind), ActorIso(actorIso) {
     assert(isPhysical() && "PhysicalPathComponent Kind isn't physical");
   }
 
 public:
   /// Obtains and consumes the actor-isolation required for any loads of
   /// this component.
-  Optional<ActorIsolation> takeActorIsolation() {
-    Optional<ActorIsolation> current = ActorIso;
-    ActorIso = None;
+  std::optional<ActorIsolation> takeActorIsolation() {
+    std::optional<ActorIsolation> current = ActorIso;
+    ActorIso = std::nullopt;
     return current;
   }
 
@@ -287,7 +291,7 @@ public:
   };
 
   /// Get the storage accessed by this component.
-  virtual Optional<AccessStorage> getAccessStorage() const = 0;
+  virtual std::optional<AccessStorage> getAccessStorage() const = 0;
 
   /// Perform a writeback on the property.
   ///
@@ -317,8 +321,8 @@ protected:
   }
 
 public:
-  Optional<AccessStorage> getAccessStorage() const override {
-    return None;
+  std::optional<AccessStorage> getAccessStorage() const override {
+    return std::nullopt;
   }
 
   RValue get(SILGenFunction &SGF, SILLocation loc,
@@ -366,7 +370,7 @@ public:
                          CanType substFormalType);
 
   static LValue forAddress(SGFAccessKind accessKind, ManagedValue address,
-                           Optional<SILAccessEnforcement> enforcement,
+                           std::optional<SILAccessEnforcement> enforcement,
                            AbstractionPattern origFormalType,
                            CanType substFormalType);
 
@@ -425,7 +429,7 @@ public:
   }
 
   /// Pop the last component off this LValue unsafely. Validates that the
-  /// component is of kind \p kind as a sanity check.
+  /// component is of kind \p kind as a soundness check.
   ///
   /// Please be careful when using this!
   void unsafelyDropLastComponent(PathComponent::KindTy kind) & {
@@ -445,13 +449,11 @@ public:
   // given actor's isolation domain. If the indicator is not present, that
   // only means that a switch does not need to be emitted during the access.
 
-  void addNonMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
-                                VarDecl *var, SubstitutionMap subs,
-                                LValueOptions options,
-                                SGFAccessKind accessKind,
-                                AccessStrategy strategy,
-                                CanType formalRValueType,
-                                Optional<ActorIsolation> actorIso = None);
+  void addNonMemberVarComponent(
+      SILGenFunction &SGF, SILLocation loc, VarDecl *var, SubstitutionMap subs,
+      LValueOptions options, SGFAccessKind accessKind, AccessStrategy strategy,
+      CanType formalRValueType,
+      std::optional<ActorIsolation> actorIso = std::nullopt);
 
   /// Add a member component to the access path of this lvalue.
   void addMemberComponent(SILGenFunction &SGF, SILLocation loc,
@@ -465,29 +467,21 @@ public:
                           PreparedArguments &&indices,
                           ArgumentList *argListForDiagnostics);
 
-  void addMemberVarComponent(SILGenFunction &SGF, SILLocation loc,
-                             VarDecl *var,
-                             SubstitutionMap subs,
-                             LValueOptions options,
-                             bool isSuper,
-                             SGFAccessKind accessKind,
-                             AccessStrategy accessStrategy,
-                             CanType formalRValueType,
-                             bool isOnSelf = false,
-                             Optional<ActorIsolation> actorIso = None);
+  void
+  addMemberVarComponent(SILGenFunction &SGF, SILLocation loc, VarDecl *var,
+                        SubstitutionMap subs, LValueOptions options,
+                        bool isSuper, SGFAccessKind accessKind,
+                        AccessStrategy accessStrategy, CanType formalRValueType,
+                        bool isOnSelf = false,
+                        std::optional<ActorIsolation> actorIso = std::nullopt);
 
-  void addMemberSubscriptComponent(SILGenFunction &SGF, SILLocation loc,
-                                   SubscriptDecl *subscript,
-                                   SubstitutionMap subs,
-                                   LValueOptions options,
-                                   bool isSuper,
-                                   SGFAccessKind accessKind,
-                                   AccessStrategy accessStrategy,
-                                   CanType formalRValueType,
-                                   PreparedArguments &&indices,
-                                   ArgumentList *argListForDiagnostics,
-                                   bool isOnSelfParameter = false,
-                                   Optional<ActorIsolation> actorIso = None);
+  void addMemberSubscriptComponent(
+      SILGenFunction &SGF, SILLocation loc, SubscriptDecl *subscript,
+      SubstitutionMap subs, LValueOptions options, bool isSuper,
+      SGFAccessKind accessKind, AccessStrategy accessStrategy,
+      CanType formalRValueType, PreparedArguments &&indices,
+      ArgumentList *argListForDiagnostics, bool isOnSelfParameter = false,
+      std::optional<ActorIsolation> actorIso = std::nullopt);
 
   /// Add a subst-to-orig reabstraction component.  That is, given
   /// that this l-value trafficks in values following the substituted
@@ -537,7 +531,7 @@ public:
                                  SGFAccessKind selfAccess,
                                  SGFAccessKind otherAccess);
 
-  void dump() const;
+  SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os, unsigned indent = 0) const;
 };
   
@@ -637,6 +631,25 @@ struct LLVM_LIBRARY_VISIBILITY UnenforcedFormalAccess : FormalAccess {
   void emitEndAccess(SILGenFunction &SGF);
 
   // Only called at the end formal evaluation scope. End this access.
+  void finishImpl(SILGenFunction &SGF) override;
+};
+
+// A formal access that keeps an LValue alive across an expression that uses an
+// unsafe pointer into that LValue. This supports emitLValueToPointer, which
+// handles InoutToPointerExpr. This formal access is nested within whatever
+// formal access is needed for the LValue itself and emits a fix_lifetime
+// instruction after the apply.
+struct LLVM_LIBRARY_VISIBILITY LValueToPointerFormalAccess : FormalAccess {
+  static SILValue enter(SILGenFunction &SGF, SILLocation loc, SILValue address);
+
+  SILValue address;
+
+  LValueToPointerFormalAccess(SILLocation loc, SILValue address,
+                              CleanupHandle cleanup)
+    : FormalAccess(sizeof(*this), FormalAccess::Unenforced, loc, cleanup),
+    address(address) {}
+
+  // Only called at the end formal evaluation scope. Emit fix_lifetime.
   void finishImpl(SILGenFunction &SGF) override;
 };
 

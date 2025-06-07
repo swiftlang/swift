@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -redundant-load-elim | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -redundant-load-elimination | %FileCheck %s
 // TODO : Add a version with semantic-arc-opts when #34971 is landed or DCE is enabled on OSSA
 
 // REQUIRES: swift_in_compiler
@@ -130,6 +130,18 @@ struct F {
 
 }
 
+protocol P {}
+
+struct ExistentialIntPair {
+  var p: P
+  var x: Int
+}
+
+public struct S {
+  var e: Optional<String>
+}
+
+
 sil_global @total : $Int32
 
 sil @use : $@convention(thin) (Builtin.Int32) -> ()
@@ -139,6 +151,7 @@ sil @use_2_64 : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> ()
 sil @use_a : $@convention(thin) (A) -> ()
 sil @use_twofield : $@convention(thin) (TwoField) -> ()
 sil @init_twofield : $@convention(thin) (@thin TwoField.Type) -> TwoField
+sil @consumeB : $@convention(thin) (@owned B) -> ()
 
 // We have a bug in the old projection code which this test case exposes.
 // Make sure its handled properly in the new projection.
@@ -218,43 +231,6 @@ bb0(%0 : @owned $AB):
   apply %22(%3) : $@convention(thin) (Int) -> ()
   apply %22(%5) : $@convention(thin) (Int) -> ()
   return %5 : $Int
-}
-
-// Check that we don't crash if the address is an unchecked_addr_cast.
-// CHECK-LABEL: sil [ossa] @test_unchecked_addr_cast :
-// CHECK-NOT: = load
-// CHECK-LABEL: } // end sil function 'test_unchecked_addr_cast'
-sil [ossa] @test_unchecked_addr_cast : $@convention(thin) (@inout A, A) -> A {
-bb0(%0 : $*A, %1 : $A):
-  %2 = unchecked_addr_cast %0 : $*A to $*A
-  store %1 to [trivial] %2 : $*A
-  %l1 = load [trivial] %2 : $*A
-  return %l1 : $A
-}
-
-// Multi-BB version of the previous test.
-// CHECK-LABEL: sil [ossa] @test_forwarding_ignoring_unchecked_addr_cast2 : $@convention(thin) (@inout A, A, A) -> A {
-// CHECK: bb1
-// CHECK-NOT: = load
-// CHECK: cond_br
-// CHECK-LABEL: } // end sil function 'test_forwarding_ignoring_unchecked_addr_cast2'
-sil [ossa] @test_forwarding_ignoring_unchecked_addr_cast2 : $@convention(thin) (@inout A, A, A) -> A {
-bb0(%0 : $*A, %1 : $A, %2: $A):
-  %3 = unchecked_addr_cast %0 : $*A to $*A
-  store %1 to [trivial] %3 : $*A
-  br bb1
-
-bb1:
-  %5 = load [trivial] %3 : $*A
-  %6 = load [trivial] %3 : $*A
-  store %2 to [trivial] %3 : $*A
-  cond_br undef, bb1a, bb2
-
-bb1a:
-  br bb1
-
-bb2:
-  return %5 : $A
 }
 
 // CHECK-LABEL: sil [ossa] @test_read_dependence_allows_forwarding_multi_bb_1 : $@convention(thin) (@inout A, A) -> A {
@@ -352,10 +328,13 @@ bb0(%0 : $Agg1):
 }
 
 // CHECK-LABEL: sil [ossa] @store_promotion :
-// CHECK: store
-// CHECK-NEXT: destroy_addr
-// CHECK-NEXT: destroy_value
-// CHECK-NEXT: destroy_value
+// CHECK:         %1 = alloc_box
+// CHECK-NEXT:    project_box
+// CHECK-NEXT:    [[C:%.*]] = copy_value %0
+// CHECK-NEXT:    destroy_value [[C]]
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    destroy_value %1
+// CHECK-NEXT:    tuple
 // CHECK-LABEL: } // end sil function 'store_promotion'
 sil [ossa] @store_promotion : $@convention(thin) (@owned B) -> () {
 bb0(%0 : @owned $B):
@@ -880,11 +859,11 @@ bb2:
 
 // Make sure we form a single SILArgument.
 //
-// CHECK-LABEL: single_silargument_agg_in_one_block :
-// CHECK: bb3([[ARG:%.*]] : $TwoField):
+// CHECK-LABEL: silargument_agg_in_one_block :
+// CHECK: bb3([[ARG1:%.*]] : $Int, [[ARG2:%.*]] : $Int):
 // CHECK-NOT: = load
-// CHECK-LABEL: } // end sil function 'single_silargument_agg_in_one_block'
-sil hidden [ossa] @single_silargument_agg_in_one_block : $@convention(thin) (Bool) -> () {
+// CHECK-LABEL: } // end sil function 'silargument_agg_in_one_block'
+sil hidden [ossa] @silargument_agg_in_one_block : $@convention(thin) (Bool) -> () {
 bb0(%0 : $Bool):
   %1 = alloc_stack $TwoField, var, name "x"
   cond_br undef, bb1, bb2
@@ -969,11 +948,13 @@ bb9:
 // in bb9 and bb10.
 //
 // CHECK-LABEL: reuse_silargument_multiple_bb_forwarding :
-// CHECK: bb8([[ARG:%.*]] : $Int)
-// CHECK: bb9
-// CHECK-NOT: = load
-// CHECK: bb10
-// CHECK-NOT: = load
+// CHECK:       bb10:
+// CHECK-NOT:     load
+// CHECK:         apply {{%[0-9]+}}(%3)
+// CHECK:         br bb11(%3 : $Int)
+// CHECK:       bb11([[A:%[0-9]+]] : $Int)
+// CHECK-NOT:     load
+// CHECK:         return [[A]]
 // CHECK-LABEL: } // end sil function 'reuse_silargument_multiple_bb_forwarding'
 sil hidden [ossa] @reuse_silargument_multiple_bb_forwarding : $@convention(thin) (Bool) -> Int {
 bb0(%0 : $Bool):
@@ -1009,22 +990,22 @@ bb6:
   br bb8
 
 bb7:
-  br bb10
+  br bb11
 
 bb8:
-  cond_br undef, bb9, bb8a
-
-bb8a:
- br bb10
+  cond_br undef, bb10, bb9
 
 bb9:
+ br bb11
+
+bb10:
   %21 = struct_element_addr %1 : $*TwoField, #TwoField.a
   %22 = load [trivial] %21 : $*Int
   %23 = function_ref @use_Int : $@convention(thin) (Int) -> ()
   %24 = apply %23(%22) : $@convention(thin) (Int) -> ()
-  br bb10
+  br bb11
 
-bb10:
+bb11:
   %26 = struct_element_addr %1 : $*TwoField, #TwoField.a
   %27 = load [trivial] %26 : $*Int
   dealloc_stack %1 : $*TwoField
@@ -1295,6 +1276,39 @@ bb0(%0 : $*Builtin.Int64, %1 : @guaranteed $Builtin.NativeObject):
   return %6 : $(Builtin.Int64, Builtin.Int64)
 }
 
+// CHECK-LABEL: sil [ossa] @insert_mark_dependence :
+// CHECK:         mark_dependence
+// CHECK:         [[MD:%.*]] = mark_dependence %0 : $B on %1
+// CHECK:         return [[MD]]
+// CHECK-LABEL: } // end sil function 'insert_mark_dependence'
+sil [ossa] @insert_mark_dependence : $@convention(thin) (@owned B, @guaranteed B) -> @owned B {
+bb0(%0 : @owned $B, %1 : @guaranteed $B):
+  %2 = alloc_stack $B
+  store %0 to [init] %2
+  %4 = mark_dependence %2 on %1
+  %5 = load [take] %4
+  dealloc_stack %2
+  return %5
+}
+
+// CHECK-LABEL: sil [ossa] @insert_two_mark_dependences :
+// CHECK:         mark_dependence
+// CHECK:         mark_dependence
+// CHECK:         [[MD1:%.*]] = mark_dependence %0 : $B on %1
+// CHECK:         [[MD2:%.*]] = mark_dependence [[MD1]] : $B on %2
+// CHECK:         return [[MD2]]
+// CHECK-LABEL: } // end sil function 'insert_two_mark_dependences'
+sil [ossa] @insert_two_mark_dependences : $@convention(thin) (@owned B, @guaranteed B, @guaranteed B) -> @owned B {
+bb0(%0 : @owned $B, %1 : @guaranteed $B, %2 : @guaranteed $B):
+  %3 = alloc_stack $B
+  store %0 to [init] %3
+  %5 = mark_dependence %3 on %1
+  %6 = mark_dependence %5 on %2
+  %7 = load [take] %6
+  dealloc_stack %3
+  return %7
+}
+
 // CHECK-LABEL: sil [ossa] @dont_crash_on_index_addr_projection :
 // CHECK-LABEL: } // end sil function 'dont_crash_on_index_addr_projection'
 sil [ossa] @dont_crash_on_index_addr_projection : $@convention(thin) (Builtin.RawPointer) -> (Int, Int, Int, Int) {
@@ -1318,6 +1332,38 @@ bb0(%0 : $Builtin.RawPointer):
   %15 = load [trivial] %14 : $*Int
   %99 = tuple (%6 : $Int, %9 : $Int, %12 : $Int, %15 : $Int)
   return %99 : $(Int, Int, Int, Int)
+}
+
+// CHECK-LABEL: sil [ossa] @non_const_index :
+// CHECK:         [[L:%.*]] = load
+// CHECK-NOT:     load
+// CHECK:         tuple ([[L]] : $Int, [[L]] : $Int)
+// CHECK-LABEL: } // end sil function 'non_const_index'
+sil [ossa] @non_const_index : $@convention(thin) (@guaranteed B, Builtin.Word) -> (Int, Int) {
+bb0(%0 : @guaranteed $B, %1 : $Builtin.Word):
+  %2 = ref_tail_addr %0 : $B, $Int
+  %3 = index_addr %2 : $*Int, %1 : $Builtin.Word
+  %4 = load [trivial] %3 : $*Int
+  %5 = load [trivial] %3 : $*Int
+  %6 = tuple (%4 : $Int, %5 : $Int)
+  return %6 : $(Int, Int)
+}
+
+// CHECK-LABEL: sil [ossa] @non_const_index_aliasing :
+// CHECK:         [[L1:%.*]] = load
+// CHECK:         store
+// CHECK:         [[L2:%.*]] = load
+// CHECK:         tuple ([[L1]] : $Int, [[L2]] : $Int)
+// CHECK-LABEL: } // end sil function 'non_const_index_aliasing'
+sil [ossa] @non_const_index_aliasing : $@convention(thin) (@guaranteed B, Builtin.Word, Int) -> (Int, Int) {
+bb0(%0 : @guaranteed $B, %1 : $Builtin.Word, %2 : $Int):
+  %3 = ref_tail_addr %0 : $B, $Int
+  %4 = index_addr %3 : $*Int, %1 : $Builtin.Word
+  %5 = load [trivial] %3 : $*Int
+  store %2 to [trivial] %4: $*Int
+  %7 = load [trivial] %3 : $*Int
+  %8 = tuple (%5 : $Int, %7 : $Int)
+  return %8 : $(Int, Int)
 }
 
 sil [ossa] @overwrite_int : $@convention(thin) (@inout Int, Int) -> ()
@@ -1389,10 +1435,28 @@ bb0:
   store %3 to [trivial] %4 : $*Int32
   %5 = load [trivial] %4 : $*Int32
   end_borrow %borrow1 : $AX
-  set_deallocating %1 : $AX
-  dealloc_ref %1 : $AX
+  %6 = begin_dealloc_ref %1 : $AX of %1 : $AX
+  dealloc_ref %6 : $AX
   dealloc_stack_ref %1 : $AX
   return %5 : $Int32
+}
+
+// CHECK-LABEL: sil [ossa] @ignore_begin_access :
+// CHECK:         return %0
+// CHECK-LABEL: } // end sil function 'ignore_begin_access'
+sil [ossa] @ignore_begin_access : $@convention(thin) (Int, Int, @inout TwoField) -> Int {
+bb0(%0 : $Int, %1 : $Int, %2 : $*TwoField):
+  %3 = begin_access [modify] [static] %2
+  %4 = struct_element_addr %3, #TwoField.a
+  store %0 to [trivial] %4
+  end_access %3
+  %7 = begin_access [modify] [static] %2
+  %8 = struct_element_addr %7, #TwoField.b
+  store %0 to [trivial] %8
+  end_access %7
+  %11 = struct_element_addr %2, #TwoField.a
+  %12 = load [trivial] %11
+  return %12
 }
 
 // CHECK: sil @tbaa_class_alias_nonclass
@@ -1414,13 +1478,12 @@ bb0(%0 : $B, %1 : $*Agg1):
   return %10 : $()
 }
 
-// TODO: When RLE uses TBAA it should remove the second load.
-//
-// CHECK: sil @tbaa_struct
-// CHECK: load
-// CHECK: store
-// CHECK: load
-// CHECK: return
+// CHECK-LABEL: sil @tbaa_struct
+// CHECK:         [[L:%.*]] = load
+// CHECK:         store
+// CHECK-NOT:     load
+// CHECK:         tuple ([[L]] : $A, [[L]] : $A)
+// CHECK:       } // end sil function 'tbaa_struct'
 sil @tbaa_struct : $@convention(thin) (Builtin.RawPointer, A2) -> (A, A) {
 bb0(%0 : $Builtin.RawPointer, %1 : $A2):
   %2 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*A
@@ -1434,7 +1497,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $A2):
 
 // TODO: Even with TBAA, RLE should not remove the second load.
 //
-// CHECK: sil @tbaa_bind_memory
+// CHECK-LABEL: sil @tbaa_bind_memory
 // CHECK: load
 // CHECK: bind_memory
 // CHECK: store
@@ -1477,3 +1540,239 @@ bb0(%0 : $Builtin.RawPointer, %1 : $A2):
   %30 = tuple(%3 : $A, %20 : $A)
   return %30 : $(A, A)
 }
+
+// CHECK-LABEL: sil [ossa] @store_trivial_load_non_trivial_enum
+// CHECK:         %0 = enum $Optional<B>, #Optional.none!enumelt
+// CHECK-NOT:     store 
+// CHECK-NOT:     load 
+// CHECK:         return %0
+// CHECK-LABEL: } // end sil function 'store_trivial_load_non_trivial_enum'
+sil [ossa] @store_trivial_load_non_trivial_enum : $@convention(thin) () -> @owned Optional<B> {
+bb0:
+  %0 = enum $Optional<B>, #Optional.none!enumelt
+  %1 = alloc_stack $Optional<B>
+  store %0 to [trivial] %1 : $*Optional<B>
+  %3 = load [take] %1 : $*Optional<B>
+  dealloc_stack %1 : $*Optional<B>
+  return %3 : $Optional<B>
+}
+
+// CHECK-LABEL: sil [ossa] @dont_take_in_borrow_scope :
+// CHECK:         load [copy]
+// CHECK:         end_borrow
+// CHECK:         load [take]
+// CHECK-LABEL: } // end sil function 'dont_take_in_borrow_scope'
+sil [ossa] @dont_take_in_borrow_scope : $@convention(thin) (@in B) -> () {
+bb0(%0 : $*B):
+  %1 = load_borrow %0 : $*B
+  %2 = load [copy] %0 : $*B
+  %3 = function_ref @consumeB : $@convention(thin) (@owned B) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@owned B) -> ()
+  end_borrow %1 : $B
+  %6 = load [take] %0 : $*B
+  %7 = apply %3(%6) : $@convention(thin) (@owned B) -> ()
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @copy_in_borrow_scope :
+// CHECK:         load [copy]
+// CHECK:         copy_value
+// CHECK:         end_borrow
+// CHECK-NOT:     load
+// CHECK-LABEL: } // end sil function 'copy_in_borrow_scope'
+sil [ossa] @copy_in_borrow_scope : $@convention(thin) (@inout B) -> () {
+bb0(%0 : $*B):
+  %1 = load_borrow %0 : $*B
+  %2 = load [copy] %0 : $*B
+  %3 = function_ref @consumeB : $@convention(thin) (@owned B) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@owned B) -> ()
+  end_borrow %1 : $B
+  %6 = load [copy] %0 : $*B
+  %7 = apply %3(%6) : $@convention(thin) (@owned B) -> ()
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @copy_addr_copy_init :
+// CHECK:         [[LD:%.*]] = load [copy] %0
+// CHECK-NEXT:    [[C:%.*]] = copy_value [[LD]]
+// CHECK-NEXT:    store [[LD]] to [init] %1
+// CHECK:         return [[C]]
+// CHECK-LABEL: } // end sil function 'copy_addr_copy_init'
+sil [ossa] @copy_addr_copy_init : $@convention(thin) (@in_guaranteed B, @inout B) -> @owned B {
+bb0(%0 : $*B, %1 : $*B):
+  destroy_addr %1
+  copy_addr %0 to [init] %1
+  %3 = load [copy] %1
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @copy_addr_copy_assign :
+// CHECK:         [[LD:%.*]] = load [copy] %0
+// CHECK-NEXT:    [[C:%.*]] = copy_value [[LD]]
+// CHECK-NEXT:    store [[LD]] to [assign] %1
+// CHECK:         return [[C]]
+// CHECK-LABEL: } // end sil function 'copy_addr_copy_assign'
+sil [ossa] @copy_addr_copy_assign : $@convention(thin) (@in_guaranteed B, @inout B) -> @owned B {
+bb0(%0 : $*B, %1 : $*B):
+  copy_addr %0 to %1
+  %3 = load [copy] %1
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @copy_addr_take_init :
+// CHECK:         [[LD:%.*]] = load [take] %0
+// CHECK-NEXT:    [[C:%.*]] = copy_value [[LD]]
+// CHECK-NEXT:    store [[LD]] to [init] %1
+// CHECK:         return [[C]]
+// CHECK-LABEL: } // end sil function 'copy_addr_take_init'
+sil [ossa] @copy_addr_take_init : $@convention(thin) (@in B, @inout B) -> @owned B {
+bb0(%0 : $*B, %1 : $*B):
+  destroy_addr %1
+  copy_addr [take] %0 to [init] %1
+  %3 = load [copy] %1
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @copy_addr_take_assign :
+// CHECK:         [[LD:%.*]] = load [take] %0
+// CHECK-NEXT:    [[C:%.*]] = copy_value [[LD]]
+// CHECK-NEXT:    store [[LD]] to [assign] %1
+// CHECK:         return [[C]]
+// CHECK-LABEL: } // end sil function 'copy_addr_take_assign'
+sil [ossa] @copy_addr_take_assign : $@convention(thin) (@in B, @inout B) -> @owned B {
+bb0(%0 : $*B, %1 : $*B):
+  copy_addr [take] %0 to %1
+  %3 = load [copy] %1
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @copy_addr_load_take :
+// CHECK:         [[LD:%.*]] = load [copy]
+// CHECK-NOT:     copy_addr
+// CHECK:         return [[LD]]
+// CHECK-LABEL: } // end sil function 'copy_addr_load_take'
+sil [ossa] @copy_addr_load_take : $@convention(thin) (@in_guaranteed B) -> @owned B {
+bb0(%0 : $*B):
+  %1 = alloc_stack $B
+  copy_addr %0 to [init] %1
+  %3 = load [take] %1
+  dealloc_stack %1
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @copy_addr_projection :
+// CHECK:         [[LD:%.*]] = load [trivial] %0
+// CHECK-NEXT:    [[A:%.*]] = struct_extract [[LD]]
+// CHECK-NEXT:    store [[LD]] to [trivial] %1
+// CHECK:         return [[A]]
+// CHECK-LABEL: } // end sil function 'copy_addr_projection'
+sil [ossa] @copy_addr_projection : $@convention(thin) (@in_guaranteed TwoField, @inout TwoField) -> Int {
+bb0(%0 : $*TwoField, %1 : $*TwoField):
+  copy_addr %0 to %1
+  %3 = struct_element_addr %1, #TwoField.a
+  %4 = load [trivial] %3
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @copy_addr_aggregate :
+// CHECK:         [[A_ADDR:%.*]] = struct_element_addr %2 : $*TwoField, #TwoField.a
+// CHECK:         [[A:%.*]] = load [trivial] %0
+// CHECK:         store [[A]] to [trivial] [[A_ADDR]]
+// CHECK:         [[B_ADDR:%.*]] = struct_element_addr %2 : $*TwoField, #TwoField.b
+// CHECK:         [[B:%.*]] = load [trivial] %1
+// CHECK:         store [[B]] to [trivial] [[B_ADDR]]
+// CHECK:         [[R:%.*]] = struct $TwoField ([[A]] : $Int, [[B]] : $Int)
+// CHECK:         return [[R]]
+// CHECK-LABEL: } // end sil function 'copy_addr_aggregate'
+sil [ossa] @copy_addr_aggregate : $@convention(thin) (@in_guaranteed Int, @in_guaranteed Int, @inout TwoField) -> TwoField {
+bb0(%0 : $*Int, %1 : $*Int, %2 : $*TwoField):
+  %3 = struct_element_addr %2, #TwoField.a
+  copy_addr %0 to %3
+  %5 = struct_element_addr %2, #TwoField.b
+  copy_addr %1 to %5
+  %4 = load [trivial] %2
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @copy_addr_not_loadable :
+// CHECK:         copy_addr
+// CHECK:         load
+// CHECK-LABEL: } // end sil function 'copy_addr_not_loadable'
+sil [ossa] @copy_addr_not_loadable : $@convention(thin) (@in_guaranteed ExistentialIntPair, @inout ExistentialIntPair) -> Int {
+bb0(%0 : $*ExistentialIntPair, %1 : $*ExistentialIntPair):
+  copy_addr %0 to %1
+  %3 = struct_element_addr %1, #ExistentialIntPair.x
+  %4 = load [trivial] %3
+  return %4
+}
+
+sil @returns_tuple : $@convention(thin) () -> (Int64, @out UInt64)
+
+// CHECK-LABEL: sil [ossa] @aliasing_apply_with_direct_and_indirect_result :
+// CHECK:         apply
+// CHECK:         [[L:%.*]] = load
+// CHECK:         return [[L]]
+// CHECK-LABEL: } // end sil function 'aliasing_apply_with_direct_and_indirect_result'
+sil [ossa] @aliasing_apply_with_direct_and_indirect_result : $@convention(thin) (UInt64) -> UInt64 {
+bb0(%0 : $UInt64):
+  %4 = alloc_stack $UInt64
+  store %0 to [trivial] %4
+  %11 = function_ref @returns_tuple : $@convention(thin) () -> (Int64, @out UInt64)
+  %12 = apply %11(%4) : $@convention(thin) () -> (Int64, @out UInt64)
+  %13 = load [trivial] %4
+  dealloc_stack %4
+  return %13
+}
+
+// CHECK-LABEL: sil [ossa] @struct_of_optional_none :
+// CHECK:         [[E:%.*]] = enum
+// CHECK:         [[S:%.*]] = struct $S ([[E]] : $Optional<String>)
+// CHECK:         [[F:%.*]] = struct_extract [[S]] : $S, #S.e
+// CHECK:         return [[F]]
+// CHECK-LABEL: } // end sil function 'struct_of_optional_none'
+sil [ossa] @struct_of_optional_none : $@convention(thin) () -> @owned Optional<String> {
+bb0:
+  %0 = enum $Optional<String>, #Optional.none!enumelt
+  %1 = struct $S (%0)
+  %2 = alloc_stack $S
+  store %1 to [init] %2
+  %4 = struct_element_addr %2, #S.e
+  %5 = load [take] %4
+  dealloc_stack %2
+  return %5
+}
+
+// CHECK-LABEL: sil [ossa] @tuple_of_optional_none :
+// CHECK:         [[E:%.*]] = enum
+// CHECK:         [[T:%.*]] = tuple ([[E]] : $Optional<String>, %0 : $Int)
+// CHECK:         [[F:%.*]] = tuple_extract [[T]] : $(Optional<String>, Int), 0
+// CHECK:         return [[F]]
+// CHECK-LABEL: } // end sil function 'tuple_of_optional_none'
+sil [ossa] @tuple_of_optional_none : $@convention(thin) (Int) -> @owned Optional<String> {
+bb0(%0 : $Int):
+  %1 = enum $Optional<String>, #Optional.none!enumelt
+  %2 = tuple (%1, %0)
+  %3 = alloc_stack $(Optional<String>, Int)
+  store %2 to [init] %3
+  %5 = tuple_element_addr %3, 0
+  %6 = load [take] %5
+  dealloc_stack %3
+  return %6
+}
+
+// CHECK-LABEL: sil [ossa] @vector :
+// CHECK:         return %1
+// CHECK-LABEL: } // end sil function 'vector'
+sil [ossa] @vector : $@convention(thin) (@inout Builtin.FixedArray<10, Int>, Int, Int) -> Int {
+bb0(%0 : $*Builtin.FixedArray<10, Int>, %1 : $Int, %2 : $Int):
+  %3 = vector_base_addr %0
+  %4 = integer_literal $Builtin.Word, 1
+  %5 = index_addr %3, %4
+  store %1 to [trivial] %5
+  store %2 to [trivial] %3
+  %6 = load [trivial] %5
+  return %6
+}
+

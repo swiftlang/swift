@@ -16,13 +16,16 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Builtins.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/Reachability.h"
 #include "swift/SILOptimizer/Analysis/VisitBarrierAccessScopes.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
@@ -167,7 +170,8 @@ public:
   Dataflow(Context const &context, Usage const &uses, DeinitBarriers &barriers)
       : context(context), uses(uses), barriers(barriers),
         result(&context.function),
-        reachability(&context.function, context.defBlock, *this, result) {}
+        reachability(Reachability::untilInitialBlock(
+            &context.function, context.defBlock, *this, result)) {}
   Dataflow(Dataflow const &) = delete;
   Dataflow &operator=(Dataflow const &) = delete;
 
@@ -208,6 +212,10 @@ private:
   void visitBarrierPhi(SILBasicBlock *block) { barriers.phis.push_back(block); }
 
   void visitBarrierBlock(SILBasicBlock *block) {
+    barriers.blocks.push_back(block);
+  }
+
+  void visitInitialBlock(SILBasicBlock *block) {
     barriers.blocks.push_back(block);
   }
 };
@@ -288,8 +296,8 @@ Dataflow::Effect Dataflow::effectForPhi(SILBasicBlock *block) {
 }
 
 /// Finds end_access instructions which are barriers to hoisting because the
-/// access scopes they contain barriers to hoisting.  Hoisting end_borrows into
-/// such access scopes could introduce exclusivity violations.
+/// access scopes they end contain barriers to hoisting.  Hoisting end_borrows
+/// into such access scopes could introduce exclusivity violations.
 ///
 /// Implements BarrierAccessScopeFinder::Visitor
 class BarrierAccessScopeFinder final {
@@ -489,3 +497,32 @@ bool swift::shrinkBorrowScope(
                                      calleeAnalysis);
   return ShrinkBorrowScope::run(context);
 }
+
+namespace swift::test {
+// Arguments:
+// - BeginBorrowInst - the introducer for the scope to shrink
+// Dumps:
+// - DELETED:  <<instruction deleted>>
+static FunctionTest ShrinkBorrowScopeTest(
+    "shrink_borrow_scope", [](auto &function, auto &arguments, auto &test) {
+      auto instruction = arguments.takeValue();
+      auto *bbi = cast<BeginBorrowInst>(instruction);
+      auto *analysis = test.template getAnalysis<BasicCalleeAnalysis>();
+      SmallVector<CopyValueInst *, 4> modifiedCopyValueInsts;
+      InstructionDeleter deleter(
+          InstModCallbacks().onDelete([&](auto *instruction) {
+            llvm::outs() << "DELETED:\n";
+            instruction->print(llvm::outs());
+            instruction->eraseFromParent();
+
+          }));
+      auto shrunk =
+          shrinkBorrowScope(*bbi, deleter, analysis, modifiedCopyValueInsts);
+      auto *shrunkString = shrunk ? "shrunk" : "did not shrink";
+      llvm::outs() << "Result: " << shrunkString << "\n";
+      llvm::outs() << "Rewrote the following copies:\n";
+      for (auto *cvi : modifiedCopyValueInsts) {
+        cvi->print(llvm::outs());
+      }
+    });
+} // namespace swift::test

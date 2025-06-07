@@ -1,0 +1,86 @@
+\documentclass[../generics]{subfiles}
+
+\begin{document}
+
+\chapter{Substitution Algebra}\label{notation summary}
+
+This is a \index{$\otimes$}summary of the algebra we used to describe various operations on types, substitution maps, and conformances. See \ChapRef{substmaps}, \ChapRef{conformances}, and \ChapRef{conformance paths}.
+
+\begin{tabbing}
+XXXXXXXX \= XXXXXXXXXXXXXXX \= XXXX \= XXXXXXX \= \kill
+$G$, $H$, $I$, \ldots \> Generic signatures \> \> $\Sigma$, $\Sigma_1$, \ldots \> Substitution maps \\
+\tT \> Type parameter \> \> \tX \> Interface type\\
+\ttgp{d}{i} \> Generic parameter \> \> $\NormalConf$ \> Normal conformance\\
+$d$ \> \index{nominal type declaration!summary}Nominal type declaration \> \> $\XP$ \> Specialized conformance\\
+$\tXd$ \> \index{declared interface type!summary}Declared interface type of $d$ \> \> $\TP$ \> Abstract conformance\\[\medskipamount]
+\IndexSet{type}{\TypeObj{G}}$\TypeObj{G}$ \> All valid \index{interface type!summary}interface types for $G$\\
+\IndexSet{sub}{\SubMapObj{G}{H}}$\SubMapObj{G}{H}$ \> \index{substitution map!summary}Substitution maps with \index{input generic signature!summary}input signature $G$ and \index{output generic signature!summary}output signature $H$\\
+\IndexSet{conf}{\ConfObj{G}}$\ConfObj{G}$ \> \index{conformance}Conformances with output generic signature $G$\\
+\IndexSet{req}{\ReqObj{G}}$\ReqObj{G}$ \> \index{requirement}Requirements containing interface types of $G$\\[\bigskipamount]
+$\TypeObj{G}\otimes\SubMapObj{G}{H}\rightarrow\TypeObj{H}$ \> \> \index{type substitution!summary}Type substitution \` \ChapRef{substmaps}\\
+$\SubMapObj{G}{H}\otimes\SubMapObj{H}{I}\rightarrow\SubMapObj{G}{I}$ \> \> \index{substitution map composition!summary}Substitution map composition \` \SecRef{submapcomposition}\\
+$\ConfObj{G}\otimes\SubMapObj{G}{H}\rightarrow\ConfObj{H}$ \> \> \index{conformance substitution map!summary}Conformance substitution \` \SecRef{conformance subst}\\
+$\ReqObj{G}\otimes\SubMapObj{G}{H}\rightarrow\ReqObj{H}$ \> \> \index{substituted requirement!summary}Requirement substitution \` \SecRef{checking generic arguments}
+\end{tabbing}
+
+\paragraph{Substitution maps.} A substitution map $\Sigma\in\SubMapObj{G}{H}$ consists of an array of \index{replacement type!summary}types from $\TypeObj{H}$, and an array of \index{root conformance!summary}conformances from $\ConfObj{H}$. If \tX\ is a generic nominal type, then $\tX=\tXd\otimes\Sigma$ for some nominal type declaration~$d$ and substitution map~$\Sigma$ (\SecRef{contextsubstmap}).
+
+\begin{tabbing}
+XXXXXXXXXXXXXXXXXXXX \= \kill
+For each generic parameter \ttgp{d}{i} and root abstract conformance $\TP$ of $G$:\\
+\qquad $\ttgp{d}{i} \otimes \Sigma = \ttgp{d}{i} \otimes\SubstMap{\ldots,\,\SubstType{\ttgp{d}{i}}{X},\,\ldots} = \tX$\\
+\qquad $\TP \otimes \Sigma = \TP \otimes \SubstMap{\ldots,\,\SubstConf{T}{X}{P},\,\ldots} = \XP$ \` \SecRef{conformance subst}\\[\medskipamount]
+Substitution map composition:\\
+\qquad $\tX \otimes (\Sigma_1 \otimes \Sigma_2) = (\tX \otimes \Sigma_1) \otimes \Sigma_2$ \\
+\qquad $\Sigma_1 \otimes (\Sigma_2 \otimes \Sigma_3) = (\Sigma_1 \otimes \Sigma_2) \otimes \Sigma_3$\\[\medskipamount]
+Identity substitution map:\\
+\qquad $\tX \otimes 1_G = \tX$ \> for all $\tX\in\TypeObj{G}$\\
+\qquad $\XP \otimes 1_G = \XP$ \> for all $\XP\in\ConfObj{G}$\\
+\qquad $1_G \otimes \Sigma = \Sigma \otimes 1_H = \Sigma$ \> for all $\Sigma\in\SubMapObj{G}{H}$
+\end{tabbing}
+
+\paragraph{Conformances.} A normal conformance $\NormalConf$ declares a series of \index{type witness!summary}type witnesses and \index{associated conformance!summary}associated conformances. If $\tX=\tXd\otimes\Sigma$, then $\XP$ is a specialized conformance formed from the normal conformance $\NormalConf$ with substitution map $\Sigma$.
+
+\begin{tabbing}
+XXXXXXXXX \= XXXXXXXXXXXXXXX \= X \= XXXXXXXXX \= \kill
+\IndexSet{proto}{\ProtoObj}$\ProtoObj$ \> \index{protocol declaration!summary}All protocol declarations\\
+\IndexSet{assoctype}{\AssocTypeObj{P}}$\AssocTypeObj{P}$ \> \index{associated type declaration!summary}Associated types declared in \tP\\
+\IndexSet{assocconf}{\AssocConfObj{P}}$\AssocConfObj{P}$ \> \index{associated conformance requirement!summary}Associated conformance requirements declared in \tP\\
+\IndexSet{confp}{\ConfPObj{P}{G}}$\ConfPObj{P}{G}$ \> Conformances to \tP\ with output generic signature $G$\\[\medskipamount]
+$\PP$ \> A protocol\\
+$\AssocType{P}{A}$ \> An associated type declaration\\
+$\SelfUQ$ \> An associated conformance requirement\\
+\texttt{T.[P]A} \> Dependent member type \\
+$\Sigma_{\XP}$ \> \index{protocol substitution map!summary}Protocol substitution map $\SubstMapC{\SubstType{\rT}{X}}{\SubstConf{\rT}{X}{P}}$\\[\bigskipamount]
+$\ProtoObj\otimes\TypeObj{G}\rightarrow\ConfObj{G}$ \> \> \index{global conformance lookup!summary}Global conformance lookup \` \SecRef{conformance lookup}\\
+$\AssocTypeObj{P}\otimes\ConfPObj{P}{G}\rightarrow\TypeObj{G}$ \> \> \index{type witness!summary}Type witness projection \` \SecRef{type witnesses}\\
+$\AssocConfObj{P}\otimes\ConfPObj{P}{G}\rightarrow\ConfObj{G}$ \> \> \index{associated conformance projection!summary}Associated conformance proj. \` \SecRef{associated conformances}\\[\bigskipamount]
+Global conformance lookup:\\
+\qquad $\PP \otimes \tXd := \NormalConf$\\
+\qquad $\PP \otimes (\tXd \otimes \Sigma) := \NormalConf \otimes \Sigma$\\
+\qquad $\PP \otimes \tT := \TP$\\
+\qquad $(\PP \otimes \tT) \otimes \Sigma = \PP \otimes (\tT \otimes \Sigma)$ \` \SecRef{abstract conformances}\\[\medskipamount]
+Specialized conformance substitution:\\
+\qquad $(\tXd \otimes \Sigma_1) \otimes \Sigma_2 := \tXd \otimes (\Sigma_1 \otimes \Sigma_2)$\\[\medskipamount]
+For each $\APA \in \AssocTypeObj{P}$:\\
+\qquad $\APA\otimes \NormalConf := \text{declared in source}$\\
+\qquad $\APA\otimes (\NormalConf\otimes \Sigma) := (\APA\otimes \NormalConf) \otimes \Sigma$\\
+\qquad $\AssocType{P}{A} \otimes \TP := \texttt{T.[P]A}$ \` \SecRef{abstract conformances}\\[\medskipamount]
+For each $\SelfUQ \in \AssocConfObj{P}$:\\
+\qquad $\SelfUQ\otimes \NormalConf := \PQ \otimes \SelfU \otimes \Sigma_{\NormalConf}$\\
+\qquad $\SelfUQ\otimes (\NormalConf \otimes \Sigma) := (\SelfUQ \otimes \NormalConf) \otimes \Sigma$\\
+\qquad $\SelfUQ \otimes \TP := \ConfReq{T.U}{Q}$\\[\medskipamount]
+Dependent member types:\\
+\qquad $\texttt{T.[P]A} \otimes \Sigma := \AssocType{P}{A} \otimes (\TP \otimes \Sigma)$ \` \SecRef{abstract conformances}\\[\medskipamount]
+Local conformance lookup:\\
+\qquad $\TP \otimes \Sigma :=
+\AssocConf{Self.$\texttt{U}_n$}{$\texttt{P}_n$}
+\otimes
+\cdots
+\otimes
+\AssocConf{Self.$\texttt{U}_1$}{$\texttt{P}_1$}
+\otimes
+\ConfReq{$\tT_0$}{$\texttt{P}_0$} \otimes \Sigma$ \` \ChapRef{conformance paths}
+\end{tabbing}
+
+\end{document}

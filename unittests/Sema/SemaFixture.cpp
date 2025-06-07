@@ -29,9 +29,9 @@ using namespace swift::unittest;
 using namespace swift::constraints::inference;
 
 SemaTest::SemaTest()
-    : Context(*ASTContext::get(LangOpts, TypeCheckerOpts, SILOpts,
-                               SearchPathOpts, ClangImporterOpts,
-                               SymbolGraphOpts, SourceMgr, Diags)) {
+    : Context(*ASTContext::get(
+          LangOpts, TypeCheckerOpts, SILOpts, SearchPathOpts, ClangImporterOpts,
+          SymbolGraphOpts, CASOpts, SerializationOpts, SourceMgr, Diags)) {
   INITIALIZE_LLVM();
 
   registerParseRequestFunctions(Context.evaluator);
@@ -44,19 +44,18 @@ SemaTest::SemaTest()
   auto *stdlib = Context.getStdlibModule(/*loadIfAbsent=*/true);
   assert(stdlib && "Failed to load standard library");
 
-  auto *module =
-      ModuleDecl::create(Context.getIdentifier("SemaTests"), Context);
+  DC = ModuleDecl::create(Context.getIdentifier("SemaTests"), Context,
+                          [&](ModuleDecl *M, auto addFile) {
+    auto bufferID = Context.SourceMgr.addMemBufferCopy("// nothing\n");
+    MainFile = new (Context) SourceFile(*M, SourceFileKind::Main, bufferID);
 
-  MainFile = new (Context) SourceFile(*module, SourceFileKind::Main,
-                                      /*buffer=*/None);
+    AttributedImport<ImportedModule> stdlibImport{
+        {ImportPath::Access(), stdlib},
+        /*options=*/{}};
 
-  AttributedImport<ImportedModule> stdlibImport{{ImportPath::Access(), stdlib},
-                                                /*options=*/{}};
-
-  MainFile->setImports(stdlibImport);
-  module->addFile(*MainFile);
-
-  DC = module;
+    MainFile->setImports(stdlibImport);
+    addFile(MainFile);
+  });
 }
 
 Type SemaTest::getStdlibType(StringRef name) const {
@@ -127,24 +126,25 @@ ProtocolType *SemaTest::createProtocol(llvm::StringRef protocolName,
 
 BindingSet SemaTest::inferBindings(ConstraintSystem &cs,
                                    TypeVariableType *typeVar) {
-  llvm::SmallDenseMap<TypeVariableType *, BindingSet> cache;
-
   for (auto *typeVar : cs.getTypeVariables()) {
+    auto &node = cs.getConstraintGraph()[typeVar];
+    node.resetBindingSet();
+
     if (!typeVar->getImpl().hasRepresentativeOrFixed())
-      cache.insert({typeVar, cs.getBindingsFor(typeVar, /*finalize=*/false)});
+      node.initBindingSet();
   }
 
   for (auto *typeVar : cs.getTypeVariables()) {
-    auto cachedBindings = cache.find(typeVar);
-    if (cachedBindings == cache.end())
+    auto &node = cs.getConstraintGraph()[typeVar];
+    if (!node.hasBindingSet())
       continue;
 
-    auto &bindings = cachedBindings->getSecond();
-    bindings.inferTransitiveProtocolRequirements(cache);
-    bindings.finalize(cache);
+    auto &bindings = node.getBindingSet();
+    bindings.inferTransitiveProtocolRequirements();
+    bindings.finalize(/*transitive=*/true);
   }
 
-  auto result = cache.find(typeVar);
-  assert(result != cache.end());
-  return result->second;
+  auto &node = cs.getConstraintGraph()[typeVar];
+  ASSERT(node.hasBindingSet());
+  return node.getBindingSet();
 }

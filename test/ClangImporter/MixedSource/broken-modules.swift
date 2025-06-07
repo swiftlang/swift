@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
 
-// RUN: not %target-swift-frontend -enable-objc-interop -typecheck %/s -I %S/Inputs/broken-modules/ -enable-source-import -show-diagnostics-after-fatal -o /dev/null 2>&1 | %FileCheck -check-prefix CHECK -check-prefix CLANG-CHECK %s
+// RUN: not %target-swift-frontend -enable-objc-interop -typecheck %/s -I %S/Inputs/broken-modules/ -enable-source-import -show-diagnostics-after-fatal -diagnostic-style llvm -o /dev/null 2>&1 | %FileCheck -check-prefix CHECK -check-prefix CLANG-CHECK %s
 
-// RUN: not %target-swift-frontend -typecheck %/s -enable-objc-interop -import-objc-header %S/Inputs/broken-modules/BrokenClangModule.h -enable-source-import -o /dev/null 2>&1 | %FileCheck -check-prefix CHECK-BRIDGING-HEADER -check-prefix CLANG-CHECK %s
+// RUN: not %target-swift-frontend -typecheck %/s -enable-objc-interop -import-objc-header %S/Inputs/broken-modules/BrokenClangModule.h -enable-source-import -diagnostic-style llvm -o /dev/null 2>&1 | %FileCheck -check-prefix CHECK-BRIDGING-HEADER -check-prefix CLANG-CHECK %s
 
-// RUN: not %target-swift-frontend -typecheck %s -enable-objc-interop -import-objc-header %S/../../Inputs/empty.swift 2>&1 | %FileCheck -check-prefix=EMPTY-HEADER %s
+// RUN: not %target-swift-frontend -typecheck %s -enable-objc-interop -import-objc-header %S/../../Inputs/empty.swift -diagnostic-style llvm 2>&1 | %FileCheck -check-prefix=EMPTY-HEADER %s
 
 // EMPTY-HEADER-NOT: header
 

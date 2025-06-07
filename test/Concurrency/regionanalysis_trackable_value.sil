@@ -1,0 +1,684 @@
+// RUN: %target-sil-opt -module-name infer --test-runner %s 2>&1 | %FileCheck %s
+
+// REQUIRES: concurrency
+// REQUIRES: asserts
+
+// PLEASE READ THIS!
+//
+// This test is specifically meant to test how we look through underlying
+// objects for region analysis.
+
+sil_stage raw
+
+import Swift
+import Builtin
+import _Concurrency
+
+////////////////////////
+// MARK: Declarations //
+////////////////////////
+
+class NonSendableKlass {
+}
+
+class SendableKlass : @unchecked Sendable {
+}
+
+struct Struct2 {
+  let nsLet: NonSendableKlass
+  let sLet: SendableKlass
+  var nsVar: NonSendableKlass
+  var sVar: SendableKlass
+}
+
+struct Struct {
+  let nsLet: NonSendableKlass
+  let sLet: SendableKlass
+  var nsVar: NonSendableKlass
+  var sVar: SendableKlass
+
+  let struct2Let: Struct2
+  var struct2Var: Struct2
+
+  let sStruct: SendableStruct
+}
+
+struct SendableStruct : @unchecked Sendable {
+  let nsLet: NonSendableKlass
+}
+
+class NonSendableKlassWithState {
+  let sLet: Struct
+  var sVar: Struct
+  let recurseLet: NonSendableKlassWithState?
+  var recurseVar: NonSendableKlassWithState?
+}
+
+actor Custom {}
+
+enum MyEnum<T> {
+    case none
+    indirect case some(NonSendableKlass)
+    case some2(T)
+}
+
+sil @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+sil @useNonSendableKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
+sil @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+sil @constructStruct : $@convention(thin) () -> @owned Struct
+sil @constructSendableStruct : $@convention(thin) () -> @owned SendableStruct
+
+sil @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+
+/////////////////
+// MARK: Tests //
+/////////////////
+
+// CHECK-LABEL: begin running test 1 of 1 on allocbox_direct_access: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %2 = alloc_box ${ var NonSendableKlass }
+// CHECK: end running test 1 of 1 on allocbox_direct_access: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @allocbox_direct_access : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %f = function_ref @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+  %c = apply %f() : $@convention(thin) () -> @owned NonSendableKlass
+  %a = alloc_box ${ var NonSendableKlass }
+  %ab = begin_borrow %a
+  %p = project_box %ab, 0
+  store %c to [init] %p : $*NonSendableKlass
+
+  debug_value [trace] %p
+
+  end_borrow %ab
+  destroy_value %a
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on allocbox_access_struct_field_nonsendable_let: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %2 = alloc_box ${ var Struct }
+// CHECK: end running test 1 of 1 on allocbox_access_struct_field_nonsendable_let: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @allocbox_access_struct_field_nonsendable_let : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %f = function_ref @constructStruct : $@convention(thin) () -> @owned Struct
+  %c = apply %f() : $@convention(thin) () -> @owned Struct
+  %a = alloc_box ${ var Struct }
+  %ab = begin_borrow %a
+  %p = project_box %ab, 0
+  store %c to [init] %p : $*Struct
+
+  %nsLet = struct_element_addr %p : $*Struct, #Struct.nsLet
+  debug_value [trace] %nsLet
+
+  end_borrow %ab
+  destroy_value %a
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on allocbox_access_struct_field_nonsendable_var: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %2 = alloc_box ${ var Struct }
+// CHECK: end running test 1 of 1 on allocbox_access_struct_field_nonsendable_var: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @allocbox_access_struct_field_nonsendable_var : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %f = function_ref @constructStruct : $@convention(thin) () -> @owned Struct
+  %c = apply %f() : $@convention(thin) () -> @owned Struct
+  %a = alloc_box ${ var Struct }
+  %ab = begin_borrow %a
+  %p = project_box %ab, 0
+  store %c to [init] %p : $*Struct
+
+  %nsVar = struct_element_addr %p : $*Struct, #Struct.nsVar
+  debug_value [trace] %nsVar
+
+  end_borrow %ab
+  destroy_value %a
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on allocbox_access_struct_field_sendable_let: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %6 = struct_element_addr %4 : $*Struct, #Struct.sLet
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %2 = alloc_box ${ var Struct }
+// CHECK: end running test 1 of 1 on allocbox_access_struct_field_sendable_let: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @allocbox_access_struct_field_sendable_let : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %f = function_ref @constructStruct : $@convention(thin) () -> @owned Struct
+  %c = apply %f() : $@convention(thin) () -> @owned Struct
+  %a = alloc_box ${ var Struct }
+  %ab = begin_borrow %a
+  %p = project_box %ab, 0
+  store %c to [init] %p : $*Struct
+
+  %addr = struct_element_addr %p : $*Struct, #Struct.sLet
+  debug_value [trace] %addr
+
+  end_borrow %ab
+  destroy_value %a
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on allocbox_access_struct_field_sendable_var: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %6 = struct_element_addr %4 : $*Struct, #Struct.sVar
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %2 = alloc_box ${ var Struct }
+// CHECK: end running test 1 of 1 on allocbox_access_struct_field_sendable_var: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @allocbox_access_struct_field_sendable_var : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %f = function_ref @constructStruct : $@convention(thin) () -> @owned Struct
+  %c = apply %f() : $@convention(thin) () -> @owned Struct
+  %a = alloc_box ${ var Struct }
+  %ab = begin_borrow %a
+  %p = project_box %ab, 0
+  store %c to [init] %p : $*Struct
+
+  %addr = struct_element_addr %p : $*Struct, #Struct.sVar
+  debug_value [trace] %addr
+
+  end_borrow %ab
+  destroy_value %a
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on allocbox_access_struct_field_let_grandfield_nonsendable_let: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %2 = alloc_box ${ var Struct }
+// CHECK: end running test 1 of 1 on allocbox_access_struct_field_let_grandfield_nonsendable_let: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @allocbox_access_struct_field_let_grandfield_nonsendable_let : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %f = function_ref @constructStruct : $@convention(thin) () -> @owned Struct
+  %c = apply %f() : $@convention(thin) () -> @owned Struct
+  %a = alloc_box ${ var Struct }
+  %ab = begin_borrow %a
+  %p = project_box %ab, 0
+  store %c to [init] %p : $*Struct
+
+  %s2 = struct_element_addr %p : $*Struct, #Struct.struct2Let
+  %nsLet = struct_element_addr %s2 : $*Struct2, #Struct2.nsLet
+
+  debug_value [trace] %nsLet
+
+  end_borrow %ab
+  destroy_value %a
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on allocbox_access_struct_field_let_grandfield_nonsendable_var: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %2 = alloc_box ${ var Struct }
+// CHECK: end running test 1 of 1 on allocbox_access_struct_field_let_grandfield_nonsendable_var: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @allocbox_access_struct_field_let_grandfield_nonsendable_var : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %f = function_ref @constructStruct : $@convention(thin) () -> @owned Struct
+  %c = apply %f() : $@convention(thin) () -> @owned Struct
+  %a = alloc_box ${ var Struct }
+  %ab = begin_borrow %a
+  %p = project_box %ab, 0
+  store %c to [init] %p
+
+  %s2 = struct_element_addr %p : $*Struct, #Struct.struct2Let
+  %nsVar = struct_element_addr %s2 : $*Struct2, #Struct2.nsVar
+  debug_value [trace] %nsVar
+
+  end_borrow %ab
+  destroy_value %a
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on allocbox_access_struct_field_let_grandfield_sendable_let: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %7 = struct_element_addr %6 : $*Struct2, #Struct2.sLet
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %2 = alloc_box ${ var Struct }
+// CHECK: end running test 1 of 1 on allocbox_access_struct_field_let_grandfield_sendable_let: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @allocbox_access_struct_field_let_grandfield_sendable_let : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %f = function_ref @constructStruct : $@convention(thin) () -> @owned Struct
+  %c = apply %f() : $@convention(thin) () -> @owned Struct
+  %a = alloc_box ${ var Struct }
+  %ab = begin_borrow %a
+  %p = project_box %ab, 0
+  store %c to [init] %p : $*Struct
+
+  %s2 = struct_element_addr %p : $*Struct, #Struct.struct2Let
+  %addr = struct_element_addr %s2 : $*Struct2, #Struct2.sLet
+  debug_value [trace] %addr
+
+  end_borrow %ab
+  destroy_value %a
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on allocbox_access_struct_field_let_grandfield_sendable_var: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %7 = struct_element_addr %6 : $*Struct2, #Struct2.sVar
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %2 = alloc_box ${ var Struct }
+// CHECK: end running test 1 of 1 on allocbox_access_struct_field_let_grandfield_sendable_var: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @allocbox_access_struct_field_let_grandfield_sendable_var : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %f = function_ref @constructStruct : $@convention(thin) () -> @owned Struct
+  %c = apply %f() : $@convention(thin) () -> @owned Struct
+  %a = alloc_box ${ var Struct }
+  %ab = begin_borrow %a
+  %p = project_box %ab, 0
+  store %c to [init] %p : $*Struct
+
+  %s2 = struct_element_addr %p : $*Struct, #Struct.struct2Let
+  %addr = struct_element_addr %s2 : $*Struct2, #Struct2.sVar
+  debug_value [trace] %addr
+
+  end_borrow %ab
+  destroy_value %a
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on allocbox_access_struct_field_var_grandfield_nonsendable_let: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %2 = alloc_box ${ var Struct }
+// CHECK: end running test 1 of 1 on allocbox_access_struct_field_var_grandfield_nonsendable_let: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @allocbox_access_struct_field_var_grandfield_nonsendable_let : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %f = function_ref @constructStruct : $@convention(thin) () -> @owned Struct
+  %c = apply %f() : $@convention(thin) () -> @owned Struct
+  %a = alloc_box ${ var Struct }
+  %ab = begin_borrow %a
+  %p = project_box %ab, 0
+  store %c to [init] %p : $*Struct
+
+  %s2 = struct_element_addr %p : $*Struct, #Struct.struct2Var
+  %nsLet = struct_element_addr %s2 : $*Struct2, #Struct2.nsLet
+
+  debug_value [trace] %nsLet
+
+  end_borrow %ab
+  destroy_value %a
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on allocbox_access_struct_field_var_grandfield_nonsendable_var: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %2 = alloc_box ${ var Struct }
+// CHECK: end running test 1 of 1 on allocbox_access_struct_field_var_grandfield_nonsendable_var: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @allocbox_access_struct_field_var_grandfield_nonsendable_var : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %f = function_ref @constructStruct : $@convention(thin) () -> @owned Struct
+  %c = apply %f() : $@convention(thin) () -> @owned Struct
+  %a = alloc_box ${ var Struct }
+  %ab = begin_borrow %a
+  %p = project_box %ab, 0
+  store %c to [init] %p
+
+  %s2 = struct_element_addr %p : $*Struct, #Struct.struct2Var
+  %nsVar = struct_element_addr %s2 : $*Struct2, #Struct2.nsVar
+  debug_value [trace] %nsVar
+
+  end_borrow %ab
+  destroy_value %a
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on allocbox_access_struct_field_var_grandfield_sendable_let: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %7 = struct_element_addr %6 : $*Struct2, #Struct2.sLet
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %2 = alloc_box ${ var Struct }
+// CHECK: end running test 1 of 1 on allocbox_access_struct_field_var_grandfield_sendable_let: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @allocbox_access_struct_field_var_grandfield_sendable_let : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %f = function_ref @constructStruct : $@convention(thin) () -> @owned Struct
+  %c = apply %f() : $@convention(thin) () -> @owned Struct
+  %a = alloc_box ${ var Struct }
+  %ab = begin_borrow %a
+  %p = project_box %ab, 0
+  store %c to [init] %p : $*Struct
+
+  %s2 = struct_element_addr %p : $*Struct, #Struct.struct2Var
+  %addr = struct_element_addr %s2 : $*Struct2, #Struct2.sLet
+  debug_value [trace] %addr
+
+  end_borrow %ab
+  destroy_value %a
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on allocbox_access_struct_field_var_grandfield_sendable_var: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %7 = struct_element_addr %6 : $*Struct2, #Struct2.sVar
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %2 = alloc_box ${ var Struct }
+// CHECK: end running test 1 of 1 on allocbox_access_struct_field_var_grandfield_sendable_var: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @allocbox_access_struct_field_var_grandfield_sendable_var : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %f = function_ref @constructStruct : $@convention(thin) () -> @owned Struct
+  %c = apply %f() : $@convention(thin) () -> @owned Struct
+  %a = alloc_box ${ var Struct }
+  %ab = begin_borrow %a
+  %p = project_box %ab, 0
+  store %c to [init] %p : $*Struct
+
+  %s2 = struct_element_addr %p : $*Struct, #Struct.struct2Var
+  %addr = struct_element_addr %s2 : $*Struct2, #Struct2.sVar
+  debug_value [trace] %addr
+
+  end_borrow %ab
+  destroy_value %a
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on allocbox_access_sendable_struct_field_let: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %6 = struct_element_addr %4 : $*SendableStruct, #SendableStruct.nsLet
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %2 = alloc_box ${ var SendableStruct }
+// CHECK: end running test 1 of 1 on allocbox_access_sendable_struct_field_let: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @allocbox_access_sendable_struct_field_let : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %f = function_ref @constructSendableStruct : $@convention(thin) () -> @owned SendableStruct
+  %c = apply %f() : $@convention(thin) () -> @owned SendableStruct
+  %a = alloc_box ${ var SendableStruct }
+  %ab = begin_borrow %a
+  %p = project_box %ab, 0
+  store %c to [init] %p
+
+  %s2 = struct_element_addr %p : $*SendableStruct, #SendableStruct.nsLet
+  debug_value [trace] %s2
+
+  end_borrow %ab
+  destroy_value %a
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on allocbox_access_sendable_struct_field_let_2: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %4 = struct_element_addr %2 : $*SendableStruct, #SendableStruct.nsLet
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %2 = alloc_stack $SendableStruct
+// CHECK: end running test 1 of 1 on allocbox_access_sendable_struct_field_let_2: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @allocbox_access_sendable_struct_field_let_2 : $@convention(thin) () -> () {
+bb0:
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %f = function_ref @constructSendableStruct : $@convention(thin) () -> @owned SendableStruct
+  %c = apply %f() : $@convention(thin) () -> @owned SendableStruct
+  %a = alloc_stack $SendableStruct
+  store %c to [init] %a
+
+  %s2 = struct_element_addr %a : $*SendableStruct, #SendableStruct.nsLet
+  debug_value [trace] %s2
+
+  destroy_addr %a
+  dealloc_stack %a
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on class_lookthrough_test: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %6 = ref_element_addr %5 : $NonSendableKlassWithState, #NonSendableKlassWithState.sLet
+// CHECK: end running test 1 of 1 on class_lookthrough_test: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @class_lookthrough_test : $@convention(thin) (@owned NonSendableKlassWithState) -> () {
+bb0(%0 : @owned $NonSendableKlassWithState):
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %a = alloc_box ${ var NonSendableKlassWithState }
+  %ab = begin_borrow %a
+  %p = project_box %ab, 0
+  store %0 to [init] %p : $*NonSendableKlassWithState
+
+  %p2 = load_borrow %p
+  %s = ref_element_addr %p2 : $NonSendableKlassWithState, #NonSendableKlassWithState.sLet
+  debug_value [trace] %s
+  end_borrow %p2
+
+  end_borrow %ab
+  destroy_value %a
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// We model unchecked_enum_data as an assign, so we do not look through it. The
+// result of this is that we consider it a separate value (even though we could
+// cheat potentially).
+//
+// CHECK-LABEL: begin running test 1 of 1 on class_lookthrough_test_2: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK:    Rep Value:   %6 = ref_element_addr %5 : $NonSendableKlassWithState, #NonSendableKlassWithState.recurseLet
+// CHECK: end running test 1 of 1 on class_lookthrough_test_2: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @class_lookthrough_test_2 : $@convention(thin) (@owned NonSendableKlassWithState) -> () {
+bb0(%0 : @owned $NonSendableKlassWithState):
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %a = alloc_box ${ var NonSendableKlassWithState }
+  %ab = begin_borrow %a
+  %p = project_box %ab, 0
+  store %0 to [init] %p : $*NonSendableKlassWithState
+
+  %p2 = load_borrow %p
+  %s = ref_element_addr %p2 : $NonSendableKlassWithState, #NonSendableKlassWithState.recurseLet
+  %s2 = load_borrow %s
+  %s3 = unchecked_enum_data %s2 : $Optional<NonSendableKlassWithState>, #Optional.some!enumelt
+  debug_value [trace] %s3
+  end_borrow %s2
+  end_borrow %p2
+
+  end_borrow %ab
+  destroy_value %a
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// We always stop at ref_element_addr since it is a base of a value.
+//
+// CHECK-LABEL: begin running test 1 of 1 on class_lookthrough_test_3: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK:   Rep Value:   %9 = ref_element_addr %8 : $NonSendableKlassWithState, #NonSendableKlassWithState.sLet
+// CHECK: end running test 1 of 1 on class_lookthrough_test_3: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @class_lookthrough_test_3 : $@convention(thin) (@owned NonSendableKlassWithState) -> () {
+bb0(%0 : @owned $NonSendableKlassWithState):
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %a = alloc_box ${ var NonSendableKlassWithState }
+  %ab = begin_borrow %a
+  %p = project_box %ab, 0
+  store %0 to [init] %p : $*NonSendableKlassWithState
+
+  %p2 = load_borrow %p
+  %s = ref_element_addr %p2 : $NonSendableKlassWithState, #NonSendableKlassWithState.recurseLet
+  %s2 = load_borrow %s
+  %s3 = unchecked_enum_data %s2 : $Optional<NonSendableKlassWithState>, #Optional.some!enumelt
+  %s4 = ref_element_addr %s3 : $NonSendableKlassWithState, #NonSendableKlassWithState.sLet
+  debug_value [trace] %s4
+  end_borrow %s2
+  end_borrow %p2
+
+  end_borrow %ab
+  destroy_value %a
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on actor_deinit_test: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %2 = unchecked_ref_cast %0 : $Custom to $Builtin.NativeObject
+// CHECK: end running test 1 of 1 on actor_deinit_test: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @actor_deinit_test : $@convention(thin) (@guaranteed Custom) -> @owned Builtin.NativeObject {
+bb0(%0 : @guaranteed $Custom):
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %2 = builtin "destroyDefaultActor"(%0) : $()
+  %3 = unchecked_ref_cast %0 to $Builtin.NativeObject
+  %4 = unchecked_ownership_conversion %3, @guaranteed to @owned
+  debug_value [trace] %3
+  return %4
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on project_box_loadable_test_case: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: task-isolated].
+// CHECK:    Rep Value: %0 = argument of bb0 : $*{ var NonSendableKlass }
+// CHECK: end running test 1 of 1 on project_box_loadable_test_case: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @project_box_loadable_test_case : $@convention(thin) @async (@in { var NonSendableKlass }) -> () {
+bb0(%0 : $*{ var NonSendableKlass }):
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %1 = load [take] %0
+  %2 = project_box %1, 0
+  // function_ref transferIndirect
+  %3 = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %4 = apply [callee_isolation=nonisolated] [caller_isolation=global_actor] %3<NonSendableKlass>(%2) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  debug_value [trace] %2
+  destroy_value %1
+  %6 = tuple ()
+  return %6
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on deep_value_test: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: task-isolated].
+// CHECK:     Rep Value: %0 = argument of bb0 : $*{ var { var NonSendableKlass } }
+// CHECK: end running test 1 of 1 on deep_value_test: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @deep_value_test : $@convention(thin) @async (@in_guaranteed { var { var NonSendableKlass }  }) -> () {
+bb0(%0 : $*{ var { var NonSendableKlass } }):
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %1 = load_borrow %0
+  %2 = project_box %1, 0
+  %3 = load_borrow %2
+  %4 = project_box %3, 0
+  // function_ref transferIndirect
+  %func = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  apply [callee_isolation=nonisolated] [caller_isolation=global_actor] %func<NonSendableKlass>(%4) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  debug_value [trace] %4
+  end_borrow %3
+  end_borrow %1
+  %6 = tuple ()
+  return %6
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on deep_base_test: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %5 = struct_element_addr %4 : $*Struct2, #Struct2.sLet
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: yes][is_sendable: no][region_value_kind: task-isolated].
+// CHECK:     Rep Value: %0 = argument of bb0 : $*{ var { var Struct2 } }
+// CHECK: end running test 1 of 1 on deep_base_test: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @deep_base_test : $@convention(thin) @async (@in_guaranteed { var { var Struct2 }  }) -> () {
+bb0(%0 : $*{ var { var Struct2 } }):
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %1 = load_borrow %0
+  %2 = project_box %1, 0
+  %3 = load_borrow %2
+  %4 = project_box %3, 0
+  %5 = struct_element_addr %4 : $*Struct2, #Struct2.sLet
+  // function_ref transferIndirect
+  %func = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  apply [callee_isolation=nonisolated] [caller_isolation=global_actor] %func<SendableKlass>(%5) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  debug_value [trace] %5
+  end_borrow %3
+  end_borrow %1
+  %6 = tuple ()
+  return %6
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on alloc_stack_test: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %3 = struct_element_addr %1 : $*Struct2, #Struct2.sLet
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %1 = alloc_stack $Struct2
+// CHECK: end running test 1 of 1 on alloc_stack_test: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @alloc_stack_test : $@convention(thin) @async (@owned Struct2) -> () {
+bb0(%0 : @owned $Struct2):
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %1 = alloc_stack $Struct2, let
+  store %0 to [init] %1
+
+  %5 = struct_element_addr %1 : $*Struct2, #Struct2.sLet
+  %func = function_ref @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  apply [callee_isolation=nonisolated] [caller_isolation=global_actor] %func<SendableKlass>(%5) : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  debug_value [trace] %5
+
+  destroy_addr %1
+  dealloc_stack %1
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on indirect_enum_load_take: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK:   Rep Value:   %1 = alloc_stack $MyEnum<T>
+// CHECK: end running test 1 of 1 on indirect_enum_load_take: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @indirect_enum_load_take : $@convention(thin) @async <T> (@in_guaranteed MyEnum<T>) -> () {
+bb0(%0 : $*MyEnum<T>):
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %1 = alloc_stack $MyEnum<T>
+  copy_addr %0 to [init] %1
+  switch_enum_addr %1, case #MyEnum.some!enumelt: bb1, default bb2
+
+bb1:
+  %2 = unchecked_take_enum_data_addr %1, #MyEnum.some!enumelt
+  %3 = load [take] %2
+  %4 = project_box %3, 0
+  %5 = load_borrow %4
+  %6 = copy_value %5
+  debug_value [trace] %5
+  %7 = move_value [var_decl] %6
+  debug_value %5, let, name "x"
+  destroy_value %7
+  end_borrow %5
+  destroy_value %3
+  dealloc_stack %1
+  br bb3
+
+bb2:
+  destroy_addr %1
+  dealloc_stack %1
+  br bb3
+
+bb3:
+  %9999 = tuple ()
+  return %9999 : $()
+}

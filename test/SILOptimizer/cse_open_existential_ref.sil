@@ -1,0 +1,139 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -cse -o %t.sil
+// RUN: %FileCheck %s -check-prefix=CHECK_ID < %t.sil
+// RUN: %FileCheck %s -check-prefix=CHECK_OPT < %t.sil
+
+import Builtin
+import Swift
+
+class Class {}
+
+protocol P : Class {}
+
+sil @blackhole : $@convention(thin) <T> (@guaranteed T) -> ()
+
+// CHECK-LABEL: sil @test_direct_use_with_dependent_result
+// CHECK_ID-NOT: 00000000-0000-0000-0000-000000000002
+// CHECK_OPT: bb0(
+// CHECK_OPT-NEXT: // function_ref
+// CHECK_OPT-NEXT: function_ref @blackhole
+// CHECK_OPT-NEXT: open_existential_ref
+// CHECK_OPT-NEXT: apply
+// CHECK_OPT-NEXT: enum
+// CHECK_OPT-NEXT: apply
+// CHECK_OPT-NEXT: tuple
+// CHECK_OPT-NEXT: return
+// CHECK: } // end sil function 'test_direct_use_with_dependent_result'
+sil @test_direct_use_with_dependent_result : $@convention(thin) (@guaranteed any P) -> () {
+bb0(%p : $any P):
+  %blackhole = function_ref @blackhole : $@convention(thin) <τ_0_0> (@guaranteed τ_0_0) -> ()
+
+  %opened1 = open_existential_ref %p : $any P to $@opened("00000000-0000-0000-0000-000000000001", any P) Self
+  // Don't let the first opened existential get optimized away.
+  %void1 = apply %blackhole<@opened("00000000-0000-0000-0000-000000000001", any P) Self>(%opened1) : $@convention(thin) <τ_0_0> (@guaranteed τ_0_0) -> ()
+
+  %opened2 = open_existential_ref %p : $any P to $@opened("00000000-0000-0000-0000-000000000002", any P) Self
+  %optional = enum $Optional<@opened("00000000-0000-0000-0000-000000000002", any P) Self>, #Optional.some!enumelt, %opened2 : $@opened("00000000-0000-0000-0000-000000000002", any P) Self
+  // Don't let the optional get optimized away.
+  %void2 = apply %blackhole<Optional<@opened("00000000-0000-0000-0000-000000000002", any P) Self>>(%optional) : $@convention(thin) <τ_0_0> (@guaranteed τ_0_0) -> ()
+
+  %result = tuple ()
+  return %result : $()
+}
+
+// CHECK-LABEL: sil @test_use_chain_beginning_with_type_dependent_operand
+// CHECK_ID-NOT: 00000000-0000-0000-0000-000000000004
+// CHECK_OPT: bb0(
+// CHECK_OPT-NEXT: // function_ref
+// CHECK_OPT-NEXT: function_ref @blackhole
+// CHECK_OPT-NEXT: open_existential_ref
+// CHECK_OPT-NEXT: apply
+// CHECK_OPT-NEXT: unchecked_ref_cast
+// CHECK_OPT-NEXT: enum
+// CHECK_OPT-NEXT: = enum
+// CHECK_OPT-NEXT: apply
+// CHECK_OPT-NEXT: tuple
+// CHECK_OPT-NEXT: return
+// CHECK: } // end sil function 'test_use_chain_beginning_with_type_dependent_operand'
+sil @test_use_chain_beginning_with_type_dependent_operand: $@convention(thin) (@guaranteed any P, @guaranteed Class) -> () {
+bb0(%p : $any P, %class : $Class):
+  %blackhole = function_ref @blackhole : $@convention(thin) <τ_0_0> (@guaranteed τ_0_0) -> ()
+
+  %opened1 = open_existential_ref %p : $any P to $@opened("00000000-0000-0000-0000-000000000003", any P) Self
+  // Don't let the first opened existential get optimized away.
+  %void1 = apply %blackhole<@opened("00000000-0000-0000-0000-000000000003", any P) Self>(%opened1) : $@convention(thin) <τ_0_0> (@guaranteed τ_0_0) -> ()
+
+  %opened2 = open_existential_ref %p : $any P to $@opened("00000000-0000-0000-0000-000000000004", any P) Self
+  %refcast = unchecked_ref_cast %class : $Class to $@opened("00000000-0000-0000-0000-000000000004", any P) Self
+  %optional4 = enum $Optional<@opened("00000000-0000-0000-0000-000000000004", any P) Self>, #Optional.some!enumelt, %refcast : $@opened("00000000-0000-0000-0000-000000000004", any P) Self
+  %optional5 = enum $Optional<Optional<@opened("00000000-0000-0000-0000-000000000004", any P) Self>>, #Optional.some!enumelt, %optional4 : $Optional<@opened("00000000-0000-0000-0000-000000000004", any P) Self>
+  %void2 = apply %blackhole<Optional<Optional<@opened("00000000-0000-0000-0000-000000000004", any P) Self>>>(%optional5) : $@convention(thin) <τ_0_0> (@guaranteed τ_0_0) -> ()
+
+  %result = tuple ()
+  return %result : $()
+}
+
+// CHECK-LABEL: sil @test_use_chain_beginning_with_dependent_result
+// CHECK_ID-NOT: 00000000-0000-0000-0000-000000000006
+// CHECK_OPT: bb0(
+// CHECK_OPT-NEXT: // function_ref
+// CHECK_OPT-NEXT: function_ref @blackhole
+// CHECK_OPT-NEXT: open_existential_ref
+// CHECK_OPT-NEXT: apply
+// CHECK_OPT-NEXT: enum
+// CHECK_OPT-NEXT: = enum
+// CHECK_OPT-NEXT: = enum
+// CHECK_OPT-NEXT: apply
+// CHECK_OPT-NEXT: tuple
+// CHECK_OPT-NEXT: return
+// CHECK: } // end sil function 'test_use_chain_beginning_with_dependent_result'
+sil @test_use_chain_beginning_with_dependent_result: $@convention(thin) (@guaranteed any P) -> () {
+bb0(%p : $any P):
+  %blackhole = function_ref @blackhole : $@convention(thin) <τ_0_0> (@guaranteed τ_0_0) -> ()
+
+  %opened1 = open_existential_ref %p : $any P to $@opened("00000000-0000-0000-0000-000000000005", any P) Self
+  // Don't let the first opened existential get optimized away.
+  %void1 = apply %blackhole<@opened("00000000-0000-0000-0000-000000000005", any P) Self>(%opened1) : $@convention(thin) <τ_0_0> (@guaranteed τ_0_0) -> ()
+
+  %opened2 = open_existential_ref %p : $any P to $@opened("00000000-0000-0000-0000-000000000006", any P) Self
+  %optional1 = enum $Optional<@opened("00000000-0000-0000-0000-000000000006", any P) Self>, #Optional.some!enumelt, %opened2 : $@opened("00000000-0000-0000-0000-000000000006", any P) Self
+  %optional2 = enum $Optional<Optional<@opened("00000000-0000-0000-0000-000000000006", any P) Self>>, #Optional.some!enumelt, %optional1 : $Optional<@opened("00000000-0000-0000-0000-000000000006", any P) Self>
+  %optional3 = enum $Optional<Optional<Optional<@opened("00000000-0000-0000-0000-000000000006", any P) Self>>>, #Optional.some!enumelt, %optional2 : $Optional<Optional<@opened("00000000-0000-0000-0000-000000000006", any P) Self>>
+  %void2 = apply %blackhole<Optional<Optional<Optional<@opened("00000000-0000-0000-0000-000000000006", any P) Self>>>>(%optional3) : $@convention(thin) <τ_0_0> (@guaranteed τ_0_0) -> ()
+
+  %result = tuple ()
+  return %result : $()
+}
+
+// CHECK-LABEL: sil @test_terminator_inst_indirect_use
+// CHECK_ID-NOT: 00000000-0000-0000-0000-000000000008
+// CHECK_OPT: bb0(
+// CHECK_OPT-NEXT: // function_ref
+// CHECK_OPT-NEXT: function_ref @blackhole
+// CHECK_OPT-NEXT: open_existential_ref
+// CHECK_OPT-NEXT: apply
+// CHECK_OPT-NEXT: unchecked_ref_cast
+// CHECK_OPT-NEXT: br bb1
+// CHECK_OPT-EMPTY:
+// CHECK_OPT-NEXT: //
+// CHECK_OPT-NEXT: bb1(
+// CHECK_OPT-NEXT: apply
+// CHECK_OPT-NEXT: tuple
+// CHECK_OPT-NEXT: return
+// CHECK: } // end sil function 'test_terminator_inst_indirect_use'
+sil @test_terminator_inst_indirect_use : $@convention(thin) (@guaranteed any P, @guaranteed Class) -> () {
+bb0(%p : $any P, %class : $Class):
+  %blackhole = function_ref @blackhole : $@convention(thin) <τ_0_0> (@guaranteed τ_0_0) -> ()
+
+  %opened1 = open_existential_ref %p : $any P to $@opened("00000000-0000-0000-0000-000000000007", any P) Self
+  // Don't let the first opened existential get optimized away.
+  %void1 = apply %blackhole<@opened("00000000-0000-0000-0000-000000000007", any P) Self>(%opened1) : $@convention(thin) <τ_0_0> (@guaranteed τ_0_0) -> ()
+
+  %opened2 = open_existential_ref %p : $any P to $@opened("00000000-0000-0000-0000-000000000008", any P) Self
+  %refcast = unchecked_ref_cast %class : $Class to $@opened("00000000-0000-0000-0000-000000000008", any P) Self
+  br bb1(%refcast : $@opened("00000000-0000-0000-0000-000000000008", any P) Self)
+
+bb1(%arg : $@opened("00000000-0000-0000-0000-000000000008", any P) Self):
+  %void2 = apply %blackhole<@opened("00000000-0000-0000-0000-000000000008", any P) Self>(%arg) : $@convention(thin) <τ_0_0> (@guaranteed τ_0_0) -> ()
+  %result = tuple ()
+  return %result : $()
+}

@@ -31,6 +31,7 @@ __all__ = [
     'DARWIN_DEPLOYMENT_VERSION_IOS',
     'DARWIN_DEPLOYMENT_VERSION_TVOS',
     'DARWIN_DEPLOYMENT_VERSION_WATCHOS',
+    'DARWIN_DEPLOYMENT_VERSION_XROS',
     'UNIX_INSTALL_PREFIX',
     'DARWIN_INSTALL_PREFIX',
     'LLVM_MAX_PARALLEL_LTO_LINK_JOBS',
@@ -46,15 +47,18 @@ BUILD_VARIANT = 'Debug'
 CMAKE_GENERATOR = 'Ninja'
 
 COMPILER_VENDOR = 'none'
-SWIFT_USER_VISIBLE_VERSION = Version('5.9')
-CLANG_USER_VISIBLE_VERSION = Version('13.0.0')
+SWIFT_USER_VISIBLE_VERSION = Version('6.2')
+CLANG_USER_VISIBLE_VERSION = Version('17.0.0')
 SWIFT_ANALYZE_CODE_COVERAGE = 'false'
 
 DARWIN_XCRUN_TOOLCHAIN = 'default'
-DARWIN_DEPLOYMENT_VERSION_OSX = '10.9'
-DARWIN_DEPLOYMENT_VERSION_IOS = '7.0'
-DARWIN_DEPLOYMENT_VERSION_TVOS = '9.0'
-DARWIN_DEPLOYMENT_VERSION_WATCHOS = '2.0'
+DARWIN_DEPLOYMENT_VERSION_OSX = '13.0'
+DARWIN_DEPLOYMENT_VERSION_IOS = '16.0'
+DARWIN_DEPLOYMENT_VERSION_TVOS = '16.0'
+# FIXME: 9.0 would be the aligned watchOS version, but is held back to keep
+# support for armv7k (dropped in 9) and i386 simulator (dropped in 7)
+DARWIN_DEPLOYMENT_VERSION_WATCHOS = '6.0'
+DARWIN_DEPLOYMENT_VERSION_XROS = '1.0'
 
 UNIX_INSTALL_PREFIX = '/usr'
 DARWIN_INSTALL_PREFIX = ('/Applications/Xcode.app/Contents/Developer/'
@@ -118,12 +122,13 @@ def llvm_install_components():
     """Convenience function for getting the default llvm install components for
     platforms.
     """
+    # llvm build product will take care of replacing compiler-rt with
+    # builtins,runtimes if need be
     components = ['llvm-ar', 'llvm-cov', 'llvm-profdata', 'IndexStore', 'clang',
-                  'clang-resource-headers', 'compiler-rt', 'clangd']
+                  'clang-resource-headers', 'compiler-rt', 'clangd', 'LTO',
+                  'lld']
     if os.sys.platform == 'darwin':
         components.extend(['dsymutil'])
-    else:
-        components.extend(['lld'])
     return ';'.join(components)
 
 

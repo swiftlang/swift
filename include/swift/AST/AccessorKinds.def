@@ -73,6 +73,14 @@
 #define COROUTINE_ACCESSOR(ID, KEYWORD) OPAQUE_ACCESSOR(ID, KEYWORD)
 #endif
 
+/// EXPERIMENTAL_COROUTINE_ACCESSOR(ID, KEYWORD, FEATURE)
+///   The given coroutine accessor is experimental.
+///
+///   Defaults to COROUTINE_ACCESSOR(ID, KEYWORD)
+#ifndef EXPERIMENTAL_COROUTINE_ACCESSOR
+#define EXPERIMENTAL_COROUTINE_ACCESSOR(ID, KEYWORD, FEATURE) COROUTINE_ACCESSOR(ID, KEYWORD)
+#endif
+
 /// ANY_ADDRESSOR(ID, KEYWORD)
 ///   The given keyword corresponds to an addressor of the given kind.
 ///
@@ -100,9 +108,12 @@
   ANY_ADDRESSOR(ID, KEYWORD)
 #endif
 
-// Suppress entries for accessors which can't be written in source code.
-#ifndef SUPPRESS_ARTIFICIAL_ACCESSORS
-#define SUPPRESS_ARTIFICIAL_ACCESSORS 0
+/// INIT_ACCESSOR(ID, KEYWORD)
+///   The given accessor is an init accessor.
+///
+///   Defaults to SINGLETON_ACCESSOR(ID, KEYWORD).
+#ifndef INIT_ACCESSOR
+#define INIT_ACCESSOR(ID, KEYWORD) SINGLETON_ACCESSOR(ID, KEYWORD)
 #endif
 
 /// This is a getter: a function that is called when a value is loaded
@@ -112,6 +123,18 @@
 /// always be synthesized.  However, this will not be true when
 /// move-only types are introduced.
 OBJC_ACCESSOR(Get, get)
+
+/// This is a "distributed thunk" getter, that is used for a "distributed var"
+/// 'get { ... }' accessor.
+///
+/// A distributed thunk is mangled as it's Storage's name.
+/// This is never invoked directly by user code, but whenever making calls on
+/// a distributed actor and the target is not known to be local, we invoke the
+/// thunk. This is equivalent to a `distributed_thunk' FuncDecl of a
+/// 'distributed func'.
+///
+/// For the most part, its behavior is exactly the same as a normal getter.
+OBJC_ACCESSOR(DistributedGet, _distributed_get)
 
 /// This is a setter: a function that is called when a value is assigned
 /// to the storage.  It takes a value of the storage type as its
@@ -130,6 +153,14 @@ OBJC_ACCESSOR(Set, set)
 /// one can always be synthesized (even if the storage type is move-only).
 COROUTINE_ACCESSOR(Read, _read)
 
+/// This is a read accessor: a yield-once coroutine which is called when a
+/// value is loaded from the storage, like a getter, but which works
+/// by yielding a borrowed value of the storage type.
+///
+/// If the storage is not implemented with a read accessor then
+/// one can always be synthesized (even if the storage type is move-only).
+EXPERIMENTAL_COROUTINE_ACCESSOR(Read2, read, CoroutineAccessors)
+
 /// This is a modify accessor: a yield-once coroutine which is called when a
 /// the storage is modified which works by yielding an inout value
 /// of the storage type.
@@ -137,6 +168,14 @@ COROUTINE_ACCESSOR(Read, _read)
 /// If the storage is not implemented with a modify accessor then
 /// one can be synthesized if the storage is mutable at all.
 COROUTINE_ACCESSOR(Modify, _modify)
+
+/// This is a modify accessor: a yield-once coroutine which is called when a
+/// the storage is modified which works by yielding an inout value
+/// of the storage type.
+///
+/// If the storage is not implemented with a modify accessor then
+/// one can be synthesized if the storage is mutable at all.
+EXPERIMENTAL_COROUTINE_ACCESSOR(Modify2, modify, CoroutineAccessors)
 
 /// This is a willSet observer: a function which "decorates" an
 /// underlying assignment operation by being called prior to the
@@ -174,17 +213,23 @@ IMMUTABLE_ADDRESSOR(Address, unsafeAddress)
 /// of the type).
 MUTABLE_ADDRESSOR(MutableAddress, unsafeMutableAddress)
 
+/// This is an init accessor: a function that is called when DI
+/// re-writes assignment to initialization.
+INIT_ACCESSOR(Init, init)
+
 #ifdef LAST_ACCESSOR
-LAST_ACCESSOR(MutableAddress)
+LAST_ACCESSOR(Init)
 #undef LAST_ACCESSOR
 #endif
 
+#undef INIT_ACCESSOR
 #undef IMMUTABLE_ADDRESSOR
 #undef MUTABLE_ADDRESSOR
 #undef ANY_ADDRESSOR
 #undef OBJC_ACCESSOR
 #undef OPAQUE_ACCESSOR
 #undef COROUTINE_ACCESSOR
+#undef EXPERIMENTAL_COROUTINE_ACCESSOR
 #undef OBSERVING_ACCESSOR
 #undef SINGLETON_ACCESSOR
 #undef ACCESSOR

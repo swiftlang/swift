@@ -129,6 +129,19 @@ public:
       return asImpl().visitDifferentTypeStructure(type1, type2);
     return asImpl().visit(type1.getElementType(), type2.getElementType());
   }
+  
+  bool visitBuiltinUnboundGenericType(CanBuiltinUnboundGenericType type1,
+                                      CanBuiltinUnboundGenericType type2) {
+    return asImpl().visitDifferentTypeStructure(type1, type2);
+  }
+  
+  bool visitBuiltinFixedArrayType(CanBuiltinFixedArrayType type1,
+                                  CanBuiltinFixedArrayType type2) {
+    if (asImpl().visit(type1->getSize(), type2->getSize())) {
+      return true;
+    }
+    return asImpl().visit(type1->getElementType(), type2->getElementType());
+  }
 
   bool visitPackType(CanPackType type1, CanPackType type2) {
     return visitComponentArray(type1, type2,
@@ -147,6 +160,11 @@ public:
   bool visitPackExpansionType(CanPackExpansionType type1,
                               CanPackExpansionType type2) {
     return asImpl().visit(type1.getPatternType(), type2.getPatternType());
+  }
+
+  bool visitPackElementType(CanPackElementType type1,
+                            CanPackElementType type2) {
+    return asImpl().visit(type1.getPackType(), type2.getPackType());
   }
 
   bool visitTupleType(CanTupleType type1, CanTupleType type2) {
@@ -286,7 +304,7 @@ public:
   bool visitComponent(CanType type1, CanType type2,
                       SILParameterInfo param1, SILParameterInfo param2) {
     if (param1.getConvention() != param2.getConvention() ||
-        param1.getDifferentiability() != param2.getDifferentiability())
+        !param1.getOptions().containsOnly(param2.getOptions()))
       return asImpl().visitDifferentTypeStructure(type1, type2);
 
     return asImpl().visit(param1.getInterfaceType(),
@@ -379,6 +397,10 @@ public:
     return false;
   }
 
+  bool visitIntegerType(CanIntegerType type1, CanIntegerType type2) {
+    return asImpl().visitDifferentTypeStructure(type1, type2);
+  }
+
   bool visitOptSubstitutionMap(CanType type1, CanType type2,
                                SubstitutionMap subs1, SubstitutionMap subs2) {
     if ((bool) subs1 != (bool) subs2)
@@ -405,6 +427,7 @@ private:
     return asImpl().visit(CanType(componentType1), CanType(componentType2));
   }
 
+protected:
   template <class T>
   bool visitComponentArray(CanType type1, CanType type2, T array1, T array2) {
     if (array1.size() != array2.size())

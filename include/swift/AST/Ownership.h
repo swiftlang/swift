@@ -118,15 +118,23 @@ optionalityOf(ReferenceOwnership ownership) {
 }
 
 /// Different kinds of value ownership supported by Swift.
+///
+/// The order of these constants is significant. Ascending order indicates
+/// stricter requirements on the value to be used with the given ownership
+/// kind: any value can be accessed with a shared borrow (so long as there
+/// are no exclusive accesses overlapping). An exclusive `inout` borrow is
+/// only possible for mutable values which the caller already has exclusive
+/// access to or ownership of. Consumption of an owned value requires sole
+/// ownership of that value.
 enum class ValueOwnership : uint8_t {
   /// the context-dependent default ownership (sometimes shared,
   /// sometimes owned)
   Default,
-  /// an 'inout' mutating pointer-like value
-  InOut,
-  /// a '__shared' non-mutating pointer-like value
+  /// a 'borrowing' nonexclusive, usually nonmutating borrow
   Shared,
-  /// an '__owned' value
+  /// an 'inout' exclusive, mutating borrow
+  InOut,
+  /// a 'consuming' ownership transfer
   Owned,
 
   Last_Kind = Owned
@@ -134,6 +142,27 @@ enum class ValueOwnership : uint8_t {
 enum : unsigned { NumValueOwnershipBits =
   countBitsUsed(static_cast<unsigned>(ValueOwnership::Last_Kind)) };
 
+enum class ParameterOwnership : uint8_t;
+
+/// Map a `ValueOwnership` to the corresponding ABI-stable constant used by
+/// runtime metadata.
+ParameterOwnership asParameterOwnership(ValueOwnership o);
+/// Map an ABI-stable ownership identifier to a `ValueOwnership`.
+ValueOwnership asValueOwnership(ParameterOwnership o);
+
+static inline llvm::StringRef getOwnershipSpelling(ValueOwnership ownership) {
+  switch (ownership) {
+  case ValueOwnership::Default:
+    return "";
+  case ValueOwnership::InOut:
+    return "inout";
+  case ValueOwnership::Shared:
+    return "borrowing";
+  case ValueOwnership::Owned:
+    return "consuming";
+  }
+  llvm_unreachable("Invalid ValueOwnership");
+}
 } // end namespace swift
 
 #endif

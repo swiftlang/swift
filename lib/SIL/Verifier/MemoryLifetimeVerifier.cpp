@@ -11,8 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-memory-lifetime-verifier"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/MemoryLocations.h"
 #include "swift/SIL/BitDataflow.h"
+#include "swift/SIL/CalleeCache.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/ApplySite.h"
@@ -40,18 +42,20 @@ class MemoryLifetimeVerifier {
   using BlockState = BitDataflow::BlockState;
 
   SILFunction *function;
+  CalleeCache *calleeCache;
   MemoryLocations locations;
 
   /// alloc_stack memory locations which are used for store_borrow.
   Bits storeBorrowLocations;
 
-  /// Returns true if the enum location \p locIdx can be proven to hold a
-  /// hold a trivial value (e non-payload case) at \p atInst.
-  bool isEnumTrivialAt(int locIdx, SILInstruction *atInst);
+  /// Returns true if the location \p locIdx can be proven to hold a
+  /// hold a trivial value (e.g. non-payload case or thin function) at
+  /// \p atInst.
+  bool isValueTrivialAt(int locIdx, SILInstruction *atInst);
 
   /// Returns true if an instruction in the range between \p start and \p end
   /// stores a trivial enum case into the enum location \p loc.
-  bool storesTrivialEnum(int locIdx,
+  bool storesTrivialValue(int locIdx,
                          SILBasicBlock::reverse_iterator start,
                          SILBasicBlock::reverse_iterator end);
 
@@ -67,7 +71,7 @@ class MemoryLifetimeVerifier {
 
   /// Issue an error if any bit in \p wrongBits is set.
   void require(const Bits &wrongBits, const Twine &complaint,
-               SILInstruction *where, bool excludeTrivialEnums = false);
+               SILInstruction *where, bool excludeTrivialValues = false);
 
   /// Require that all the subLocation bits of the location, associated with
   /// \p addr, are clear in \p bits.
@@ -76,6 +80,10 @@ class MemoryLifetimeVerifier {
   /// Require that all the subLocation bits of the location, associated with
   /// \p addr, are set in \p bits.
   void requireBitsSet(const Bits &bits, SILValue addr, SILInstruction *where);
+
+  void requireBitsSetForArgument(const Bits &bits, Operand *argOp);
+
+  bool applyMayRead(Operand *argOp, SILValue addr);
 
   bool isStoreBorrowLocation(SILValue addr) {
     auto *loc = locations.getLocation(addr);
@@ -132,19 +140,19 @@ class MemoryLifetimeVerifier {
   }
 
 public:
-  MemoryLifetimeVerifier(SILFunction *function) :
-    function(function), locations(/*handleNonTrivialProjections*/ true,
-                                  /*handleTrivialLocations*/ true) {}
+  MemoryLifetimeVerifier(SILFunction *function, CalleeCache *calleeCache) :
+    function(function),
+    calleeCache(calleeCache),
+    locations(/*handleNonTrivialProjections*/ true,
+              /*handleTrivialLocations*/ true) {}
 
   /// The main entry point to verify the lifetime of all memory locations in
   /// the function.
   void verify();
 };
 
-bool MemoryLifetimeVerifier::isEnumTrivialAt(int locIdx,
+bool MemoryLifetimeVerifier::isValueTrivialAt(int locIdx,
                                              SILInstruction *atInst) {
-  const Location *rootLoc = locations.getRootLocation(locIdx);
-  SILBasicBlock *rootBlock = rootLoc->representativeValue->getParentBlock();
   SILBasicBlock *startBlock = atInst->getParent();
   
   // Start at atInst an walk up the control flow.
@@ -152,16 +160,13 @@ bool MemoryLifetimeVerifier::isEnumTrivialAt(int locIdx,
   while (SILBasicBlock *block = worklist.pop()) {
     auto start = (block == atInst->getParent() ? atInst->getReverseIterator()
                                                : block->rbegin());
-    if (storesTrivialEnum(locIdx, start, block->rend())) {
+    if (storesTrivialValue(locIdx, start, block->rend())) {
       // Stop at trivial stores to the enum.
       continue;
     }
-    if (block == rootBlock) {
-      // We reached the block where the memory location is defined. So we cannot
-      // prove that the enum contains a non-payload case.
+    if (block == function->getEntryBlock()) {
       return false;
     }
-    assert(block != function->getEntryBlock());
     for (SILBasicBlock *pred : block->getPredecessorBlocks()) {
       // Stop walking to the predecessor if block is a non-payload successor
       // of a switch_enum/switch_enum_addr.
@@ -188,21 +193,25 @@ static bool injectsNoPayloadCase(InjectEnumAddrInst *IEAI) {
   return elemType.isEmpty(*function);
 }
 
-bool MemoryLifetimeVerifier::storesTrivialEnum(int locIdx,
+bool MemoryLifetimeVerifier::storesTrivialValue(int locIdx,
                         SILBasicBlock::reverse_iterator start,
                         SILBasicBlock::reverse_iterator end) {
   for (SILInstruction &inst : make_range(start, end)) {
     if (auto *IEI = dyn_cast<InjectEnumAddrInst>(&inst)) {
       const Location *loc = locations.getLocation(IEI->getOperand());
       if (loc && loc->isSubLocation(locIdx))
-        return isTrivialEnumElem(IEI->getElement(), IEI->getOperand()->getType(),
+        return isTrivialEnumElem(IEI->getElement(),
+                                 IEI->getOperand()->getType(),
                                  function);
     }
     if (auto *SI = dyn_cast<StoreInst>(&inst)) {
       const Location *loc = locations.getLocation(SI->getDest());
-      if (loc && loc->isSubLocation(locIdx) &&
-          SI->getSrc()->getType().isOrHasEnum()) {
-        return SI->getOwnershipQualifier() == StoreOwnershipQualifier::Trivial;
+      if (loc && loc->isSubLocation(locIdx)) {
+        auto ty = SI->getSrc()->getType();
+        if (ty.isOrHasEnum() || ty.isFunction()) {
+          return
+            SI->getOwnershipQualifier() == StoreOwnershipQualifier::Trivial;
+        }
       }
     }
   }
@@ -220,6 +229,13 @@ bool MemoryLifetimeVerifier::isTrivialEnumSuccessor(SILBasicBlock *block,
   } else if (auto *switchEnumAddr = dyn_cast<SwitchEnumAddrInst>(term)) {
     elem = switchEnumAddr->getUniqueCaseForDestination(succ);
     enumTy = switchEnumAddr->getOperand()->getType();
+  } else if (auto *switchValue = dyn_cast<SwitchValueInst>(term)) {
+    auto destCase = switchValue->getUniqueCaseForDestination(succ);
+    assert(destCase.has_value());
+    auto caseValue =
+        cast<IntegerLiteralInst>(switchValue->getCase(*destCase).first);
+    auto testValue = dyn_cast<IntegerLiteralInst>(switchValue->getOperand());
+    return testValue ? testValue->getValue() != caseValue->getValue() : true;
   } else {
     return false;
   }
@@ -243,9 +259,10 @@ void MemoryLifetimeVerifier::reportError(const Twine &complaint,
   if (DontAbortOnMemoryLifetimeErrors)
     return;
 
-  llvm::errs() << "in function:\n";
-  function->print(llvm::errs());
-  abort();
+  ABORT([&](auto &out) {
+    out << "in function:\n";
+    function->print(out);
+  });
 }
 
 void MemoryLifetimeVerifier::require(const Bits &wrongBits,
@@ -253,7 +270,7 @@ void MemoryLifetimeVerifier::require(const Bits &wrongBits,
                                 bool excludeTrivialEnums) {
   for (int errorLocIdx = wrongBits.find_first(); errorLocIdx >= 0;
        errorLocIdx = wrongBits.find_next(errorLocIdx)) {
-    if (!excludeTrivialEnums || !isEnumTrivialAt(errorLocIdx, where))
+    if (!excludeTrivialEnums || !isValueTrivialAt(errorLocIdx, where))
       reportError(complaint, errorLocIdx, where);
   }
 }
@@ -272,6 +289,45 @@ void MemoryLifetimeVerifier::requireBitsSet(const Bits &bits, SILValue addr,
     require(~bits & loc->subLocations,
             "memory is not initialized, but should be", where);
   }
+}
+
+void MemoryLifetimeVerifier::requireBitsSetForArgument(const Bits &bits, Operand *argOp) {
+  if (auto *loc = locations.getLocation(argOp->get())) {
+    Bits missingBits = ~bits & loc->subLocations;
+    for (int errorLocIdx = missingBits.find_first(); errorLocIdx >= 0;
+         errorLocIdx = missingBits.find_next(errorLocIdx)) {
+      auto *errorLoc = locations.getLocation(errorLocIdx);
+
+      if (applyMayRead(argOp, errorLoc->representativeValue)) {
+        reportError("memory is not initialized, but should be",
+                    errorLocIdx, argOp->getUser());
+      }
+    }
+  }
+}
+
+bool MemoryLifetimeVerifier::applyMayRead(Operand *argOp, SILValue addr) {
+  // Conservatively assume that a partial_apply does _not_ read an argument.
+  if (isa<PartialApplyInst>(argOp->getUser()))
+    return false;
+  
+  FullApplySite as(argOp->getUser());
+  CalleeList callees;
+  if (calleeCache) {
+    callees = calleeCache->getCalleeList(as);
+    if (callees.isIncomplete())
+      return true;
+  } else if (auto *callee = as.getReferencedFunctionOrNull()) {
+    callees = CalleeList(callee);
+  } else {
+    return false;
+  }
+
+  for (SILFunction *callee : callees) {
+    if (callee->argumentMayRead(argOp, addr))
+      return true;
+  }
+  return false;
 }
 
 void MemoryLifetimeVerifier::requireNoStoreBorrowLocation(
@@ -384,6 +440,15 @@ void MemoryLifetimeVerifier::initDataflowInBlock(SILBasicBlock *block,
         }
         break;
       }
+      case SILInstructionKind::TupleAddrConstructorInst: {
+        auto *taci = cast<TupleAddrConstructorInst>(&I);
+        for (SILValue elt : taci->getElements()) {
+          if (elt->getType().isAddress())
+            killBits(state, elt);
+        }
+        genBits(state, taci->getDest());
+        break;
+      }
       case SILInstructionKind::DestroyAddrInst:
       case SILInstructionKind::DeallocStackInst:
         killBits(state, I.getOperand(0));
@@ -402,7 +467,7 @@ void MemoryLifetimeVerifier::initDataflowInBlock(SILBasicBlock *block,
         ApplySite AS(&I);
         for (Operand &op : I.getAllOperands()) {
           if (AS.isArgumentOperand(op)) {
-            setFuncOperandBits(state, op, AS.getArgumentOperandConvention(op),
+            setFuncOperandBits(state, op, AS.getCaptureConvention(op),
                               isa<TryApplyInst>(&I));
           }
         }
@@ -463,16 +528,24 @@ void MemoryLifetimeVerifier::setBitsOfPredecessor(Bits &getSet, Bits &killSet,
 
   TermInst *term = pred->getTerminator();
   if (auto *tai = dyn_cast<TryApplyInst>(term)) {
-    // @out results of try_apply are only valid in the normal-block, but not in
-    // the throw-block.
-    if (tai->getNormalBB() != block)
-      return;
-
     FullApplySite FAS(tai);
-    for (Operand &op : tai->getAllOperands()) {
-      if (FAS.isArgumentOperand(op) &&
-          FAS.getArgumentConvention(op) == SILArgumentConvention::Indirect_Out) {
-        locations.genBits(getSet, killSet, op.get());
+
+    if (block == tai->getNormalBB()) {
+      // @out results of try_apply are only valid in the normal-block.
+      for (Operand &op : tai->getAllOperands()) {
+        if (FAS.isArgumentOperand(op) &&
+            FAS.isIndirectResultOperand(op)) {
+          locations.genBits(getSet, killSet, op.get());
+        }
+      }
+    } else {
+      // @error_indirect results of try_apply are only valid in the error-block.
+      assert(block == tai->getErrorBB());
+      for (Operand &op : tai->getAllOperands()) {
+        if (FAS.isArgumentOperand(op) &&
+            FAS.isIndirectErrorResultOperand(op)) {
+          locations.genBits(getSet, killSet, op.get());
+        }
       }
     }
   } else if (auto *castInst = dyn_cast<CheckedCastAddrBranchInst>(term)) {
@@ -498,6 +571,7 @@ void MemoryLifetimeVerifier::setFuncOperandBits(BlockState &state, Operand &op,
                                         SILArgumentConvention convention,
                                         bool isTryApply) {
   switch (convention) {
+    case SILArgumentConvention::Indirect_In_CXX:
     case SILArgumentConvention::Indirect_In:
       killBits(state, op.get());
       break;
@@ -536,7 +610,12 @@ void MemoryLifetimeVerifier::checkFunction(BitDataflow &dataFlow) {
       locations.setBits(expectedThrowBits, funcArg);
       break;
     case SILArgumentConvention::Indirect_Out:
-      locations.setBits(expectedReturnBits, funcArg);
+      if (funcArg->isIndirectErrorResult()) {
+        locations.setBits(expectedThrowBits, funcArg);
+      } else {
+        assert(funcArg->isIndirectResult());
+        locations.setBits(expectedReturnBits, funcArg);
+      }
       break;
     default:
       break;
@@ -654,11 +733,15 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
       case SILInstructionKind::InjectEnumAddrInst: {
         auto *IEAI = cast<InjectEnumAddrInst>(&I);
         int enumIdx = locations.getLocationIdx(IEAI->getOperand());
-        if (enumIdx >= 0 && injectsNoPayloadCase(IEAI)) {
-          // Again, an injected no-payload case is treated like a "full"
-          // initialization. See initDataflowInBlock().
-          requireBitsClear(bits & nonTrivialLocations, IEAI->getOperand(), &I);
-          locations.setBits(bits, IEAI->getOperand());
+        if (enumIdx >= 0) {
+          if (injectsNoPayloadCase(IEAI)) {
+            // Again, an injected no-payload case is treated like a "full"
+            // initialization. See initDataflowInBlock().
+            requireBitsClear(bits & nonTrivialLocations, IEAI->getOperand(), &I);
+            locations.setBits(bits, IEAI->getOperand());
+          } else {
+            requireBitsSet(bits, IEAI->getOperand(), &I);
+          }
         }
         requireNoStoreBorrowLocation(IEAI->getOperand(), &I);
         break;
@@ -684,19 +767,23 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
         // an alloc_stack), which don't have any `op_deref` in its
         // di-expression, because that memory doesn't need to be initialized
         // when `debug_value` is referencing it.
-        if (cast<DebugValueInst>(&I)->hasAddrVal() &&
-            cast<DebugValueInst>(&I)->exprStartsWithDeref())
+        if (!DebugValueInst::hasAddrVal(&I))
           requireBitsSet(bits, I.getOperand(0), &I);
         break;
       case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
         // Note that despite the name, unchecked_take_enum_data_addr does _not_
         // "take" the payload of the Swift.Optional enum. This is a terrible
         // hack in SIL.
-        SILValue enumAddr = cast<UncheckedTakeEnumDataAddrInst>(&I)->getOperand();
-        int enumIdx = locations.getLocationIdx(enumAddr);
-        if (enumIdx >= 0)
-          requireBitsSet(bits, enumAddr, &I);
-        requireNoStoreBorrowLocation(enumAddr, &I);
+        auto enumInst = cast<UncheckedTakeEnumDataAddrInst>(&I);
+        // For some enums, projecting the enum data requires masking out
+        // embedded tag bits, which invalidates the value as an enum.
+        if (enumInst->isDestructive()) {
+          SILValue enumAddr = enumInst->getOperand();
+          int enumIdx = locations.getLocationIdx(enumAddr);
+          if (enumIdx >= 0)
+            requireBitsSet(bits, enumAddr, &I);
+          requireNoStoreBorrowLocation(enumAddr, &I);
+        }
         break;
       }
       case SILInstructionKind::DestroyAddrInst: {
@@ -712,7 +799,9 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
           requireBitsSet(bits, sbi->getDest(), &I);
           locations.clearBits(bits, sbi->getDest());
         } else if (auto *lbi = dyn_cast<LoadBorrowInst>(ebi->getOperand())) {
-          requireBitsSet(bits, lbi->getOperand(), &I);
+          if (!lbi->isUnchecked()) {
+            requireBitsSet(bits, lbi->getOperand(), &I);
+          }
         }
         break;
       }
@@ -739,7 +828,7 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
         ApplySite AS(&I);
         for (Operand &op : I.getAllOperands()) {
           if (AS.isArgumentOperand(op))
-            checkFuncArgument(bits, op, AS.getArgumentOperandConvention(op), &I);
+            checkFuncArgument(bits, op, AS.getCaptureConvention(op), &I);
         }
         break;
       }
@@ -773,10 +862,10 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
               fnType->getYields()[index].getConvention());
           if (argConv.isIndirectConvention()) {
             if (argConv.isInoutConvention() ||
-                argConv.isGuaranteedConvention()) {
+                argConv.isGuaranteedConventionInCaller()) {
               requireBitsSet(bits | ~nonTrivialLocations, yieldedValues[index],
                              &I);
-            } else if (argConv.isOwnedConvention()) {
+            } else if (argConv.isOwnedConventionInCaller()) {
               requireBitsClear(bits & nonTrivialLocations, yieldedValues[index],
                                &I);
             }
@@ -801,6 +890,20 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
         locations.clearBits(bits, opVal);
         break;
       }
+      case SILInstructionKind::MarkDependenceInst:
+      case SILInstructionKind::MarkDependenceAddrInst: {
+        auto mdi = MarkDependenceInstruction(&I);
+        if (mdi.getBase()->getType().isAddress() &&
+            // In case the mark_dependence is used for a closure it might be that the base
+            // is "self" in an initializer and "self" is not fully initialized, yet.
+            (!mdi.getType() || !mdi.getType().isFunction())) {
+          requireBitsSet(bits, mdi.getBase(), &I);
+        }
+        // TODO: check that the base operand is alive during the whole lifetime
+        // of the value operand. This requires treating all transitive uses of
+        // 'mdi' as uses of 'base' (including copies for non-Escapable types).
+        break;
+      }
       default:
         break;
     }
@@ -814,8 +917,9 @@ void MemoryLifetimeVerifier::checkFuncArgument(Bits &bits, Operand &argumentOp,
     requireNoStoreBorrowLocation(argumentOp.get(), applyInst);
   
   switch (argumentConvention) {
+    case SILArgumentConvention::Indirect_In_CXX:
     case SILArgumentConvention::Indirect_In:
-      requireBitsSet(bits, argumentOp.get(), applyInst);
+      requireBitsSetForArgument(bits, &argumentOp);
       locations.clearBits(bits, argumentOp.get());
       break;
     case SILArgumentConvention::Indirect_Out:
@@ -825,7 +929,7 @@ void MemoryLifetimeVerifier::checkFuncArgument(Bits &bits, Operand &argumentOp,
       break;
     case SILArgumentConvention::Indirect_In_Guaranteed:
     case SILArgumentConvention::Indirect_Inout:
-      requireBitsSet(bits, argumentOp.get(), applyInst);
+      requireBitsSetForArgument(bits, &argumentOp);
       break;
     case SILArgumentConvention::Indirect_InoutAliasable:
       // We don't require any locations to be initialized for a partial_apply
@@ -834,7 +938,7 @@ void MemoryLifetimeVerifier::checkFuncArgument(Bits &bits, Operand &argumentOp,
       // closures capture the whole "self". When this is done in an initializer
       // it can happen that not all fields of "self" are initialized, yet.
       if (!isa<PartialApplyInst>(applyInst))
-        requireBitsSet(bits, argumentOp.get(), applyInst);
+        requireBitsSetForArgument(bits, &argumentOp);
       break;
     case SILArgumentConvention::Direct_Owned:
     case SILArgumentConvention::Direct_Unowned:
@@ -870,7 +974,7 @@ void MemoryLifetimeVerifier::verify() {
 
 } // anonymous namespace
 
-void SILFunction::verifyMemoryLifetime() {
-  MemoryLifetimeVerifier verifier(this);
+void SILFunction::verifyMemoryLifetime(CalleeCache *calleeCache) {
+  MemoryLifetimeVerifier verifier(this, calleeCache);
   verifier.verify();
 }

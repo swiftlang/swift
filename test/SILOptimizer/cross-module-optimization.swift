@@ -18,6 +18,7 @@
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
 
 // REQUIRES: executable_test
+// REQUIRES: swift_in_compiler
 
 // Second test: check if CMO really imports the SIL of functions in other modules.
 
@@ -32,19 +33,19 @@ import Test
 func testNestedTypes() {
   let c = Container()
 
-  // CHECK-OUTPUT [Test.Container.Base]
+  // CHECK-OUTPUT: [Test.Container.Base]
   // CHECK-OUTPUT: 27
   // CHECK-SIL-DAG: sil shared [noinline] @$s4Test9ContainerV9testclassyxxlFSi_Tg5
   print(c.testclass(27))
-  // CHECK-OUTPUT [Test.Container.Base]
+  // CHECK-OUTPUT: [Test.Container.Base]
   // CHECK-OUTPUT: 27
   // CHECK-SIL-DAG: sil public_external {{.*}} @$s4Test9ContainerV13testclass_genyxxlF
   print(c.testclass_gen(27))
-  // CHECK-OUTPUT [Test.PE<Swift.Int>.B(27)]
+  // CHECK-OUTPUT: [Test.PE<Swift.Int>.B(27)]
   // CHECK-OUTPUT: 27
   // CHECK-SIL-DAG: sil shared [noinline] @$s4Test9ContainerV8testenumyxxlFSi_Tg5
   print(c.testenum(27))
-  // CHECK-OUTPUT [Test.PE<Swift.Int>.B(27)]
+  // CHECK-OUTPUT: [Test.PE<Swift.Int>.B(27)]
   // CHECK-OUTPUT: 27
   // CHECK-SIL-DAG: sil public_external {{.*}} @$s4Test9ContainerV12testenum_genyxxlF
   print(c.testenum_gen(27))
@@ -79,14 +80,14 @@ class DerivedFromOpen<T> : OpenClass<T> { }
 
 func testProtocolsAndClasses() {
   // CHECK-OUTPUT: false
-  // CHECK-SIL-DAG: sil shared [noinline] @$s4Test20checkIfClassConformsyyxlFSi_Tg5
+  // CHECK-SIL-DAG: sil shared [noinline] @$s4Test20checkIfClassConformsyyxlFSi_Ttg5
   checkIfClassConforms(27)
   // CHECK-OUTPUT: false
   // CHECK-SIL-DAG: sil public_external {{.*}} @$s4Test24checkIfClassConforms_genyyxlF
   checkIfClassConforms_gen(27)
   // CHECK-OUTPUT: 123
   // CHECK-OUTPUT: 1234
-  // CHECK-SIL-DAG: sil shared [noinline] @$s4Test7callFooyyxlFSi_Tg5
+  // CHECK-SIL-DAG: sil shared [noinline] @$s4Test7callFooyyxlFSi_Ttg5
   // CHECK-SIL-DAG: sil [{{.*}}] @$s4Test19printFooExistential33_{{.*}} : $@convention(thin)
   callFoo(27)
   // CHECK-OUTPUT: 123
@@ -164,6 +165,16 @@ func testImplementationOnly() {
   // CHECK-SIL2: } // end sil function '$s4Main22testImplementationOnlyyyF'
 }
 
+@inline(never)
+func testPrivateVar() {
+  // CHECK-OUTPUT: {{[0-9]+}}
+  print(getRandom())
+}
+
+func testKeyPathAccess() -> KeyPath<StructWithInternal, Int> {
+  return getKP()
+}
+
 testNestedTypes()
 testClass()
 testError()
@@ -174,4 +185,5 @@ testKeypath()
 testMisc()
 testGlobal()
 testImplementationOnly()
-
+testPrivateVar()
+testKeyPathAccess()

@@ -43,6 +43,7 @@ namespace clang {
 }
 
 namespace swift {
+enum class CoroAllocatorKind : uint8_t;
 namespace irgen {
   class Address;
   class Alignment;
@@ -121,6 +122,15 @@ namespace irgen {
                                            CanSILFunctionType substitutedType,
                                            SubstitutionMap substitutionMap);
 
+  struct CombinedResultAndErrorType {
+    llvm::Type *combinedTy;
+    llvm::SmallVector<unsigned, 2> errorValueMapping;
+  };
+  CombinedResultAndErrorType
+  combineResultAndTypedErrorType(const IRGenModule &IGM,
+                                 const NativeConventionSchema &resultSchema,
+                                 const NativeConventionSchema &errorSchema);
+
   /// Given an async function, get the pointer to the function to be called and
   /// the size of the context to be allocated.
   ///
@@ -130,13 +140,15 @@ namespace irgen {
   ///               be returned for it.
   ///
   /// \return {function, size}
-  std::pair<llvm::Value *, llvm::Value *> getAsyncFunctionAndSize(
-      IRGenFunction &IGF, SILFunctionTypeRepresentation representation,
-      FunctionPointer functionPointer, llvm::Value *thickContext,
-      std::pair<bool, bool> values = {true, true});
-  llvm::CallingConv::ID expandCallingConv(IRGenModule &IGM,
-                                     SILFunctionTypeRepresentation convention,
-                                     bool isAsync);
+  std::pair<llvm::Value *, llvm::Value *>
+  getAsyncFunctionAndSize(IRGenFunction &IGF, FunctionPointer functionPointer,
+                          std::pair<bool, bool> values = {true, true});
+  std::pair<llvm::Value *, llvm::Value *>
+  getCoroFunctionAndSize(IRGenFunction &IGF, FunctionPointer functionPointer,
+                         std::pair<bool, bool> values = {true, true});
+  llvm::CallingConv::ID
+  expandCallingConv(IRGenModule &IGM, SILFunctionTypeRepresentation convention,
+                    bool isAsync, bool isCalleeAllocatedCoro);
 
   Signature emitCastOfFunctionPointer(IRGenFunction &IGF, llvm::Value *&fnPtr,
                                       CanSILFunctionType fnType,
@@ -208,25 +220,28 @@ namespace irgen {
                               CanSILFunctionType coroutineType,
                               NativeCCEntryPointArgumentEmission &emission);
 
+  llvm::Value *
+  emitYieldOnce2CoroutineAllocator(IRGenFunction &IGF,
+                                   std::optional<CoroAllocatorKind> kind);
+  StackAddress emitAllocYieldOnce2CoroutineFrame(IRGenFunction &IGF,
+                                                 llvm::Value *size);
+  void emitDeallocYieldOnce2CoroutineFrame(IRGenFunction &IGF,
+                                           StackAddress allocation);
+  void
+  emitYieldOnce2CoroutineEntry(IRGenFunction &IGF, LinkEntity coroFunction,
+                               CanSILFunctionType coroutineType,
+                               NativeCCEntryPointArgumentEmission &emission);
+  void emitYieldOnce2CoroutineEntry(IRGenFunction &IGF,
+                                    CanSILFunctionType fnType,
+                                    llvm::Value *buffer, llvm::Value *allocator,
+                                    llvm::GlobalVariable *cfp);
+
   Address emitAllocYieldManyCoroutineBuffer(IRGenFunction &IGF);
   void emitDeallocYieldManyCoroutineBuffer(IRGenFunction &IGF, Address buffer);
   void
   emitYieldManyCoroutineEntry(IRGenFunction &IGF,
                               CanSILFunctionType coroutineType,
                               NativeCCEntryPointArgumentEmission &emission);
-
-  void emitTaskCancel(IRGenFunction &IGF, llvm::Value *task);
-
-  /// Emit a call to swift_task_create[_f] with the given flags, options, and
-  /// task function.
-  llvm::Value *emitTaskCreate(
-    IRGenFunction &IGF,
-    llvm::Value *flags,
-    llvm::Value *taskGroup,
-    llvm::Value *futureResultType,
-    llvm::Value *taskFunction,
-    llvm::Value *localContextInfo,
-    SubstitutionMap subs);
 
   /// Allocate task local storage for the provided dynamic size.
   Address emitAllocAsyncContext(IRGenFunction &IGF, llvm::Value *sizeValue);
@@ -239,6 +254,9 @@ namespace irgen {
                               const AsyncContextLayout &layout,
                               LinkEntity asyncFunction,
                               unsigned asyncContextIndex);
+
+  StackAddress emitAllocCoroStaticFrame(IRGenFunction &IGF, llvm::Value *size);
+  void emitDeallocCoroStaticFrame(IRGenFunction &IGF, StackAddress frame);
 
   /// Yield the given values from the current continuation.
   ///
@@ -254,25 +272,39 @@ namespace irgen {
 
   void emitAsyncReturn(
       IRGenFunction &IGF, AsyncContextLayout &layout, CanSILFunctionType fnType,
-      Optional<ArrayRef<llvm::Value *>> nativeResultArgs = llvm::None);
+      std::optional<ArrayRef<llvm::Value *>> nativeResultArgs = std::nullopt);
 
   void emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &layout,
                        SILType funcResultTypeInContext,
                        CanSILFunctionType fnType, Explosion &result,
                        Explosion &error);
+  void emitYieldOnceCoroutineResult(IRGenFunction &IGF, Explosion &result,
+                                    SILType funcResultType, SILType returnResultType);
 
-  Address emitAutoDiffCreateLinearMapContext(
-      IRGenFunction &IGF, llvm::Value *topLevelSubcontextSize);
+  Address emitAutoDiffCreateLinearMapContextWithType(
+      IRGenFunction &IGF, llvm::Value *topLevelSubcontextMetatype);
+
   Address emitAutoDiffProjectTopLevelSubcontext(
       IRGenFunction &IGF, Address context);
-  Address emitAutoDiffAllocateSubcontext(
-      IRGenFunction &IGF, Address context, llvm::Value *size);
+
+  Address
+  emitAutoDiffAllocateSubcontextWithType(IRGenFunction &IGF, Address context,
+                                         llvm::Value *subcontextMetatype);
 
   FunctionPointer getFunctionPointerForDispatchCall(IRGenModule &IGM,
                                                     const FunctionPointer &fn);
   void forwardAsyncCallResult(IRGenFunction &IGF, CanSILFunctionType fnType,
                               AsyncContextLayout &layout, llvm::CallInst *call);
 
+  /// Converts a value for direct error return.
+  llvm::Value *convertForDirectError(IRGenFunction &IGF, llvm::Value *value,
+                                     llvm::Type *toTy, bool forExtraction);
+
+  void buildDirectError(IRGenFunction &IGF,
+                        const CombinedResultAndErrorType &combined,
+                        const NativeConventionSchema &errorSchema,
+                        SILType silErrorTy, Explosion &errorResult,
+                        bool forAsync, Explosion &out);
 } // end namespace irgen
 } // end namespace swift
 

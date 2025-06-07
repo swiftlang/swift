@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/CodeCompletionString.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
 
 using namespace swift;
@@ -30,7 +31,7 @@ CodeCompletionString::create(llvm::BumpPtrAllocator &Allocator,
   return new (CCSMem) CodeCompletionString(Chunks);
 }
 
-Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
+std::optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
     bool includeLeadingPunctuation) const {
   for (auto i : indices(getChunks())) {
     const Chunk &C = getChunks()[i];
@@ -104,12 +105,13 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex(
       llvm_unreachable("should have already extracted the text");
     }
   }
-  return None;
+  return std::nullopt;
 }
 
 StringRef
 CodeCompletionString::getFirstTextChunk(bool includeLeadingPunctuation) const {
-  Optional<unsigned> Idx = getFirstTextChunkIndex(includeLeadingPunctuation);
+  std::optional<unsigned> Idx =
+      getFirstTextChunkIndex(includeLeadingPunctuation);
   if (Idx.has_value())
     return getChunks()[*Idx].getText();
   return StringRef();

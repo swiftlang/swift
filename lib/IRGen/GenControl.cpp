@@ -18,6 +18,7 @@
 #include "llvm/IR/Function.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 using namespace irgen;
@@ -28,7 +29,7 @@ void IRBuilder::emitBlock(llvm::BasicBlock *BB) {
   assert(ClearedIP == nullptr);
   llvm::BasicBlock *CurBB = GetInsertBlock();
   assert(CurBB && "current insertion point is invalid");
-  CurBB->getParent()->getBasicBlockList().insertAfter(CurBB->getIterator(), BB);
+  CurBB->getParent()->insert(std::next(CurBB->getIterator()), BB);
   IRBuilderBase::SetInsertPoint(BB);
 }
 

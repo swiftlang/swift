@@ -1,0 +1,95 @@
+//===--- wasi-libc.modulemap.gyb ------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2020 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+module SwiftWASILibc [system] {
+  header "stdc-predef.h"
+  header "features.h"
+
+  // C standard library
+  header "complex.h"
+  header "ctype.h"
+  header "errno.h"
+  header "fenv.h"
+  header "inttypes.h"
+  header "locale.h"
+  header "math.h"
+  header "stdio.h"
+  header "stdlib.h"
+  header "string.h"
+  header "time.h"
+
+  // POSIX
+  header "arpa/inet.h"
+  header "cpio.h"
+  header "dirent.h"
+  header "fcntl.h"
+  header "fmtmsg.h"
+  header "fnmatch.h"
+  header "ftw.h"
+  header "glob.h"
+  header "iconv.h"
+  header "ifaddrs.h"
+  header "langinfo.h"
+  header "libgen.h"
+  header "monetary.h"
+  header "netinet/in.h"
+  header "netinet/tcp.h"
+  header "nl_types.h"
+  header "poll.h"
+  header "regex.h"
+  header "sched.h"
+  header "search.h"
+  header "semaphore.h"
+  header "strings.h"
+  header "sys/file.h"
+  header "sys/ioctl.h"
+  header "sys/select.h"
+  header "sys/socket.h"
+  header "sys/stat.h"
+  header "sys/time.h"
+  header "sys/types.h"
+  header "sys/uio.h"
+  header "sys/un.h"
+  header "sys/utsname.h"
+  header "sysexits.h"
+  header "tar.h"
+  header "unistd.h"
+  header "utime.h"
+
+  // WASI specific
+  header "wasi/api.h"
+  export *
+}
+
+module wasi_emulated_mman {
+  header "sys/mman.h"
+  link "wasi-emulated-mman"
+  export *
+}
+
+module wasi_emulated_process_clock {
+  header "sys/times.h"
+  header "sys/resource.h"
+  link "wasi-emulated-process-clocks"
+  export *
+}
+
+module wasi_emulated_signal {
+  header "signal.h"
+  link "wasi-emulated-signal"
+  export *
+}
+
+module wasi_pthread {
+  header "pthread.h"
+  export *
+}

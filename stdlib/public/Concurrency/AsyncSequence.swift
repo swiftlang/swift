@@ -72,13 +72,18 @@ import Swift
 ///     // Prints "Odd Even Odd Even Odd Even Odd Even Odd Even "
 ///
 @available(SwiftStdlib 5.1, *)
-@rethrows
-public protocol AsyncSequence {
+public protocol AsyncSequence<Element, Failure> {
   /// The type of asynchronous iterator that produces elements of this
   /// asynchronous sequence.
   associatedtype AsyncIterator: AsyncIteratorProtocol where AsyncIterator.Element == Element
   /// The type of element produced by this asynchronous sequence.
   associatedtype Element
+
+  /// The type of errors produced when iteration over the sequence fails.
+  @available(SwiftStdlib 6.0, *)
+  associatedtype Failure: Error = any Error
+      where AsyncIterator.Failure == Failure
+
   /// Creates the asynchronous iterator that produces elements of this
   /// asynchronous sequence.
   ///
@@ -142,8 +147,9 @@ extension AsyncSequence {
   /// elements of an entire sequence. For example, you can use this method on a
   /// sequence of numbers to find their sum or product.
   ///
-  /// The `nextPartialResult` closure executes sequentially with an accumulating
-  /// value initialized to `initialResult` and each element of the sequence.
+  /// The `updateAccumulatingResult` closure executes sequentially with an
+  /// accumulating value initialized to `initialResult` and each element of the
+  /// sequence.
   ///
   /// Prefer this method over `reduce(_:_:)` for efficiency when the result is
   /// a copy-on-write type, for example an `Array` or `Dictionary`.
@@ -152,10 +158,10 @@ extension AsyncSequence {
   ///   - initialResult: The value to use as the initial accumulating value.
   ///     The `nextPartialResult` closure receives `initialResult` the first
   ///     time the closure executes.
-  ///   - nextPartialResult: A closure that combines an accumulating value and
-  ///     an element of the asynchronous sequence into a new accumulating value,
-  ///     for use in the next call of the `nextPartialResult` closure or
-  ///     returned to the caller.
+  ///   - updateAccumulatingResult: A closure that combines an accumulating
+  ///     value and an element of the asynchronous sequence into a new
+  ///     accumulating value, for use in the next call of the
+  ///     `nextPartialResult` closure or returned to the caller.
   /// - Returns: The final accumulated value. If the sequence has no elements,
   ///   the result is `initialResult`.
   @inlinable

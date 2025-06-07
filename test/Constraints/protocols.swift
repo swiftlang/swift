@@ -546,3 +546,42 @@ _ = P_61517(false) // expected-error{{type 'any P_61517' cannot be instantiated}
 
 _ = P_61517.init() // expected-error{{type 'any P_61517' cannot be instantiated}}
 _ = P_61517.init(false) // expected-error{{type 'any P_61517' cannot be instantiated}}
+
+@_marker
+protocol Marker {}
+
+do {
+  class C : Fooable, Error {
+    func foo() {}
+  }
+
+  struct Other {}
+
+  func overloaded() -> C & Marker {
+    fatalError()
+  }
+
+  func overloaded() -> Other {
+    fatalError()
+  }
+
+  func isFooable<T: Fooable>(_: T) {}
+
+  isFooable(overloaded()) // Ok
+
+  func isError<T: Error>(_: T) {}
+
+  isError(overloaded()) // Ok
+
+  func isFooableError<T: Fooable & Error>(_: T) {}
+
+  isFooableError(overloaded()) // Ok
+}
+
+do {
+  func takesFooables(_: [any Fooable]) {}
+
+  func test(v: String) {
+    takesFooables([v]) // expected-error {{cannot convert value of type 'String' to expected element type 'any Fooable'}}
+  }
+}

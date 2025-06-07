@@ -54,7 +54,8 @@ The following statistics can be recorded:
 
   * For SILFunctions: the number of SIL basic blocks for each SILFunction, the
     number of SIL instructions, the number of SILInstructions of a specific
-    kind (e.g. a number of alloc_ref instructions)
+    kind (e.g. a number of alloc_ref instructions), the number of debug
+    variables
 
   * For SILModules: the number of SIL basic blocks in the SILModule, the number
     of SIL instructions, the number of SILFunctions, the number of
@@ -117,6 +118,16 @@ can use a comma-separated list of instructions as a value of the option,
 e.g. `-Xllvm -sil-stats-only-instructions=alloc_ref,alloc_stack`. If you need to
 collect stats about all kinds of SIL instructions, you can use this syntax: 
 `-Xllvm -sil-stats-only-instructions=all`.
+
+### Debug variable level counters
+A different type of counter is the lost debug variables counter. It is enabled
+by using the `-Xllvm -sil-stats-lost-variables` command-line option. It only
+tracks statistics about lost variables in SILFunctions. It is not enabled by
+any other command-line option, but can be combined with the others. It is not
+compatible with thresholds, it always counts lost variables. Note that it does
+not track the number of debug variables: it counts the number of debug variables
+that were present, but aren't anymore. If a variable changes location or scope,
+which is not allowed, it will be counted as lost.
 
 ## Configuring which counters changes should be recorded
 
@@ -181,9 +192,9 @@ And for counter stats it looks like this:
   * `function_history` corresponds to the verbose mode of function
     counters collection, when changes to the SILFunction counters are logged 
     unconditionally, without any on-line filtering.
-* `CounterName` is typically one of `block`, `inst`, `function`, `memory`, 
-   or `inst_instruction_name` if you collect counters for specific kinds of SIL
-   instructions.
+* `CounterName` is typically one of `block`, `inst`, `function`, `memory`,
+   `lostvars`, or `inst_instruction_name` if you collect counters for specific
+   kinds of SIL instructions.
 * `Symbol` is e.g. the name of a function
 * `StageName` is the name of the current optimizer pipeline stage
 * `TransformName` is the name of the current optimizer transformation/pass
@@ -191,6 +202,14 @@ And for counter stats it looks like this:
 * `TransformPassNumber` is the optimizer pass number. It is useful if you 
    want to reproduce the result later using 
    `-Xllvm -sil-opt-pass-count -Xllvm TransformPassNumber`
+
+## Extract Lost Variables per Pass
+
+For lost variables, there is a script to output a CSV with only the amount of
+lost variables per pass. You can then easily open the resulting CSV in Numbers
+to make graphs.
+
+`utils/process-stats-lost-variables csv_file_with_counters > csv_aggregate`
 
 ## Storing the produced statistics into a database
 
@@ -345,4 +364,3 @@ from Counters C where C.counter = 'inst' and C.kind = 'module'
 group by Stage
 order by sum(C.Delta);
 ```
-

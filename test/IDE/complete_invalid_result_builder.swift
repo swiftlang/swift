@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
+// RUN: %batch-code-completion
 
 enum Either<T,U> { case first(T), second(U) }
 indirect enum ResultBuilderTerm<Expression> {
@@ -54,7 +54,5 @@ test {
   }
 }
 
-// MYENUM_MEMBERS: Begin completions
 // MYENUM_MEMBERS-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: a[#MyEnum#]; name=a
 // MYENUM_MEMBERS-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: b[#MyEnum#]; name=b
-// MYENUM_MEMBERS: End completions 

@@ -63,7 +63,7 @@ importer::getNonNullArgs(const clang::Decl *decl,
   return result;
 }
 
-Optional<const clang::Decl *>
+std::optional<const clang::Decl *>
 importer::getDefinitionForClangTypeDecl(const clang::Decl *D) {
   if (auto OID = dyn_cast<clang::ObjCInterfaceDecl>(D))
     return OID->getDefinition();
@@ -74,7 +74,7 @@ importer::getDefinitionForClangTypeDecl(const clang::Decl *D) {
   if (auto OPD = dyn_cast<clang::ObjCProtocolDecl>(D))
     return OPD->getDefinition();
 
-  return None;
+  return std::nullopt;
 }
 
 static bool isInLocalScope(const clang::Decl *D) {
@@ -103,7 +103,7 @@ importer::getFirstNonLocalDecl(const clang::Decl *D) {
   return *iter;
 }
 
-Optional<clang::Module *>
+std::optional<clang::Module *>
 importer::getClangSubmoduleForDecl(const clang::Decl *D,
                                    bool allowForwardDeclaration) {
   const clang::Decl *actual = nullptr;
@@ -113,7 +113,7 @@ importer::getClangSubmoduleForDecl(const clang::Decl *D,
   if (auto maybeDefinition = getDefinitionForClangTypeDecl(D)) {
     actual = maybeDefinition.value();
     if (!actual && !allowForwardDeclaration)
-      return None;
+      return std::nullopt;
   }
 
   if (!actual)
@@ -204,7 +204,7 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
       if (isCollectionName(name)) {
         if (auto ptrType = type->getAs<clang::PointerType>()) {
           return OmissionTypeName(
-              name, None,
+              name, std::nullopt,
               getClangTypeNameForOmission(ctx, ptrType->getPointeeType()).Name);
         }
       }
@@ -218,7 +218,7 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
     // For array types, convert the element type and treat this an as array.
     if (auto arrayType = dyn_cast<clang::ArrayType>(typePtr)) {
       return OmissionTypeName(
-          "Array", None,
+          "Array", std::nullopt,
           getClangTypeNameForOmission(ctx, arrayType->getElementType()).Name);
     }
 
@@ -264,17 +264,18 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
         unsigned lastWordSize = camel_case::getLastWord(className).size();
         StringRef elementName =
             className.substr(0, className.size() - lastWordSize);
-        return OmissionTypeName(className, None, elementName);
+        return OmissionTypeName(className, std::nullopt, elementName);
       }
 
       // If we don't have type arguments, the collection element type
       // is "Object".
       auto typeArgs = objcObjectPtr->getTypeArgs();
       if (typeArgs.empty())
-        return OmissionTypeName(className, None, "Object");
+        return OmissionTypeName(className, std::nullopt, "Object");
 
       return OmissionTypeName(
-          className, None, getClangTypeNameForOmission(ctx, typeArgs[0]).Name);
+          className, std::nullopt,
+          getClangTypeNameForOmission(ctx, typeArgs[0]).Name);
     }
 
     // Objective-C "id" type.
@@ -363,6 +364,7 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
     case clang::BuiltinType::Overload:
     case clang::BuiltinType::PseudoObject:
     case clang::BuiltinType::UnknownAny:
+    case clang::BuiltinType::UnresolvedTemplate:
       return OmissionTypeName();
 
     // FIXME: Types that can be mapped, but aren't yet.
@@ -406,66 +408,22 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
     case clang::BuiltinType::ObjCSel:
       return OmissionTypeName();
 
-    // OpenCL types that don't have Swift equivalents.
-    case clang::BuiltinType::OCLImage1dRO:
-    case clang::BuiltinType::OCLImage1dRW:
-    case clang::BuiltinType::OCLImage1dWO:
-    case clang::BuiltinType::OCLImage1dArrayRO:
-    case clang::BuiltinType::OCLImage1dArrayRW:
-    case clang::BuiltinType::OCLImage1dArrayWO:
-    case clang::BuiltinType::OCLImage1dBufferRO:
-    case clang::BuiltinType::OCLImage1dBufferRW:
-    case clang::BuiltinType::OCLImage1dBufferWO:
-    case clang::BuiltinType::OCLImage2dRO:
-    case clang::BuiltinType::OCLImage2dRW:
-    case clang::BuiltinType::OCLImage2dWO:
-    case clang::BuiltinType::OCLImage2dArrayRO:
-    case clang::BuiltinType::OCLImage2dArrayRW:
-    case clang::BuiltinType::OCLImage2dArrayWO:
-    case clang::BuiltinType::OCLImage2dDepthRO:
-    case clang::BuiltinType::OCLImage2dDepthRW:
-    case clang::BuiltinType::OCLImage2dDepthWO:
-    case clang::BuiltinType::OCLImage2dArrayDepthRO:
-    case clang::BuiltinType::OCLImage2dArrayDepthRW:
-    case clang::BuiltinType::OCLImage2dArrayDepthWO:
-    case clang::BuiltinType::OCLImage2dMSAARO:
-    case clang::BuiltinType::OCLImage2dMSAARW:
-    case clang::BuiltinType::OCLImage2dMSAAWO:
-    case clang::BuiltinType::OCLImage2dArrayMSAARO:
-    case clang::BuiltinType::OCLImage2dArrayMSAARW:
-    case clang::BuiltinType::OCLImage2dArrayMSAAWO:
-    case clang::BuiltinType::OCLImage2dMSAADepthRO:
-    case clang::BuiltinType::OCLImage2dMSAADepthRW:
-    case clang::BuiltinType::OCLImage2dMSAADepthWO:
-    case clang::BuiltinType::OCLImage2dArrayMSAADepthRO:
-    case clang::BuiltinType::OCLImage2dArrayMSAADepthRW:
-    case clang::BuiltinType::OCLImage2dArrayMSAADepthWO:
-    case clang::BuiltinType::OCLImage3dRO:
-    case clang::BuiltinType::OCLImage3dRW:
-    case clang::BuiltinType::OCLImage3dWO:
-    case clang::BuiltinType::OCLSampler:
-    case clang::BuiltinType::OCLEvent:
-    case clang::BuiltinType::OCLClkEvent:
-    case clang::BuiltinType::OCLQueue:
-    case clang::BuiltinType::OCLReserveID:
-    case clang::BuiltinType::OCLIntelSubgroupAVCMcePayload:
-    case clang::BuiltinType::OCLIntelSubgroupAVCImePayload:
-    case clang::BuiltinType::OCLIntelSubgroupAVCRefPayload:
-    case clang::BuiltinType::OCLIntelSubgroupAVCSicPayload:
-    case clang::BuiltinType::OCLIntelSubgroupAVCMceResult:
-    case clang::BuiltinType::OCLIntelSubgroupAVCImeResult:
-    case clang::BuiltinType::OCLIntelSubgroupAVCRefResult:
-    case clang::BuiltinType::OCLIntelSubgroupAVCSicResult:
-    case clang::BuiltinType::OCLIntelSubgroupAVCImeResultSingleRefStreamout:
-    case clang::BuiltinType::OCLIntelSubgroupAVCImeResultDualRefStreamout:
-    case clang::BuiltinType::OCLIntelSubgroupAVCImeSingleRefStreamin:
-    case clang::BuiltinType::OCLIntelSubgroupAVCImeDualRefStreamin:
-      return OmissionTypeName();
-
     // OpenMP types that don't have Swift equivalents.
-    case clang::BuiltinType::OMPArraySection:
+    case clang::BuiltinType::ArraySection:
     case clang::BuiltinType::OMPArrayShaping:
     case clang::BuiltinType::OMPIterator:
+      return OmissionTypeName();
+
+    // OpenCL builtin types that don't have Swift equivalents.
+    case clang::BuiltinType::OCLClkEvent:
+    case clang::BuiltinType::OCLEvent:
+    case clang::BuiltinType::OCLSampler:
+    case clang::BuiltinType::OCLQueue:
+    case clang::BuiltinType::OCLReserveID:
+#define IMAGE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
+#include "clang/Basic/OpenCLImageTypes.def"
+#define EXT_OPAQUE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
+#include "clang/Basic/OpenCLExtensionTypes.def"
       return OmissionTypeName();
 
     // ARM SVE builtin types that don't have Swift equivalents.
@@ -474,13 +432,23 @@ OmissionTypeName importer::getClangTypeNameForOmission(clang::ASTContext &ctx,
       return OmissionTypeName();
 
     // PPC MMA builtin types that don't have Swift equivalents.
-#define PPC_VECTOR_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
+#define PPC_VECTOR_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
 #include "clang/Basic/PPCTypes.def"
       return OmissionTypeName();
 
     // RISC-V V builtin types that don't have Swift equivalents.
-#define RVV_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
+#define RVV_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
 #include "clang/Basic/RISCVVTypes.def"
+      return OmissionTypeName();
+
+    // WASM builtin types that don't have Swift equivalents.
+#define WASM_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
+#include "clang/Basic/WebAssemblyReferenceTypes.def"
+      return OmissionTypeName();
+
+    // AMDGPU builtins that don't have Swift equivalents.
+#define AMDGPU_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
+#include "clang/Basic/AMDGPUTypes.def"
       return OmissionTypeName();
     }
   }
@@ -554,7 +522,9 @@ clang::TypedefNameDecl *importer::findSwiftNewtype(const clang::NamedDecl *decl,
     clang::LookupResult lookupResult(clangSema, notificationName,
                                      clang::SourceLocation(),
                                      clang::Sema::LookupOrdinaryName);
-    if (!clangSema.LookupName(lookupResult, nullptr))
+    if (!clangSema.LookupQualifiedName(
+            lookupResult,
+            /*LookupCtx*/ clangSema.getASTContext().getTranslationUnitDecl()))
       return nullptr;
     auto nsDecl = lookupResult.getAsSingle<clang::TypedefNameDecl>();
     if (!nsDecl)
@@ -580,6 +550,13 @@ bool importer::isNSString(const clang::Type *type) {
 
 bool importer::isNSString(clang::QualType qt) {
   return qt.getTypePtrOrNull() && isNSString(qt.getTypePtrOrNull());
+}
+
+bool importer::isNSNotificationName(clang::QualType type) {
+  if (auto *typealias = type->getAs<clang::TypedefType>()) {
+    return typealias->getDecl()->getName() == "NSNotificationName";
+  }
+  return false;
 }
 
 bool importer::isNSNotificationGlobal(const clang::NamedDecl *decl) {
@@ -677,7 +654,7 @@ importer::shouldImportPropertyAsAccessors(const clang::ObjCPropertyDecl *prop) {
   // These appear as both properties and methods in ObjC and should be
   // imported as methods into Swift, as a sort of least-common-denominator
   // compromise.
-  if (!prop->getName().startswith("accessibility"))
+  if (!prop->getName().starts_with("accessibility"))
     return false;
   if (isAccessibilityConformingContext(prop->getDeclContext()))
     return true;
@@ -748,11 +725,9 @@ bool importer::isUnavailableInSwift(
 
 OptionalTypeKind importer::getParamOptionality(const clang::ParmVarDecl *param,
                                                bool knownNonNull) {
-  auto &clangCtx = param->getASTContext();
-
   // If nullability is available on the type, use it.
   clang::QualType paramTy = param->getType();
-  if (auto nullability = paramTy->getNullability(clangCtx)) {
+  if (auto nullability = paramTy->getNullability()) {
     return translateNullability(*nullability);
   }
 
@@ -763,7 +738,7 @@ OptionalTypeKind importer::getParamOptionality(const clang::ParmVarDecl *param,
   // Check for the 'static' annotation on C arrays.
   if (const auto *DT = dyn_cast<clang::DecayedType>(paramTy))
     if (const auto *AT = DT->getOriginalType()->getAsArrayTypeUnsafe())
-      if (AT->getSizeModifier() == clang::ArrayType::Static)
+      if (AT->getSizeModifier() == clang::ArraySizeModifier::Static)
         return OTK_None;
 
   // Default to implicitly unwrapped optionals.

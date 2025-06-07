@@ -34,6 +34,24 @@ func expectEqualWithTolerance<T>(_ expected: TestLiteralType, _ actual: T,
 #if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
 %end
 
+%for Other in ['Float', 'Double', 'Float80']:
+%if Other == 'Float80':
+#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+%end
+
+FloatingPointDerivativeTests.test("${Self}.init(_:${Other})") {
+  expectEqual(1, gradient(at: ${Other}(4), of: ${Self}.init(_:)))
+  expectEqual(10, pullback(at: ${Other}(4), of: ${Self}.init(_:))(${Self}(10)))
+
+  expectEqual(1, derivative(at: ${Other}(4), of: ${Self}.init(_:)))
+  expectEqual(10, differential(at: ${Other}(4), of: ${Self}.init(_:))(${Other}(10)))
+}
+
+%if Other == 'Float80':
+#endif
+%end
+%end # for Other in ['Float', 'Double', 'Float80']:
+
 FloatingPointDerivativeTests.test("${Self}.+") {
   expectEqual((1, 1), gradient(at: ${Self}(4), ${Self}(5), of: +))
   expectEqual((10, 10), pullback(at: ${Self}(4), ${Self}(5), of: +)(${Self}(10)))

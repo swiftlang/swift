@@ -1,0 +1,19 @@
+module Root {
+  header "Root.h"
+  export *
+}
+
+module Branch {
+  header "Branch.h"
+  export *
+}
+
+module Leaf {
+  header "Leaf.h"
+  export *
+}
+
+module Fruit {
+  header "Fruit.h"
+  export *
+}

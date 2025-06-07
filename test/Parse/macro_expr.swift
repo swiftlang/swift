@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse -enable-experimental-feature Macros -verify %s
+// RUN: %target-swift-frontend -parse -verify %s
 
 #macro
 
@@ -29,9 +29,23 @@ _ = #trailing(x, y, z) {
 }
 
 _ = #another {
-  // expected-error @+1 {{expected a macro identifier for a pound literal expression}}
+  // expected-error @+1 {{expected a macro identifier}}
   #-
 }
 
 // expected-error @+1 {{expected a macro identifier for a pound literal expression}}
 _ = #()
+
+do {
+  _ = # // expected-error {{expected a macro identifier for a pound literal expression}}
+  name()
+}
+do {
+  _ = # macro() // expected-error {{extraneous whitespace between '#' and macro name is not permitted}} {{8-9=}}
+}
+do {
+  _ = #public()
+}
+do {
+  _ = # public() // expected-error {{expected a macro identifier for a pound literal expression}}
+}

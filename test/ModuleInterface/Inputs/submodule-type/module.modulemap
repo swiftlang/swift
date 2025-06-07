@@ -1,0 +1,8 @@
+module HasSubmodule {
+  header "HasSubmodule.h"
+  export *
+  explicit module Submodule {
+    header "Submodule.h"
+    export *
+  }
+}

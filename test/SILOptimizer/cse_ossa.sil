@@ -1,4 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -cse | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -update-borrowed-from -cse | %FileCheck %s
+
 sil_stage canonical
 
 import Builtin
@@ -565,13 +566,8 @@ sil [ossa] @sil_string_different_encodings : $@convention(thin) () -> Builtin.Wo
 }
 
 // CHECK-LABEL: sil [ossa] @raw_idx_cse :
-// CHECK: integer_literal
-// CHECK-NEXT: index_raw_pointer
-// CHECK-NEXT: pointer_to_address
-// CHECK-NEXT: load
-// CHECK-NEXT: load
-// CHECK-NEXT: apply
-// CHECK-NEXT: tuple
+// CHECK: pointer_to_address
+// CHECK: pointer_to_address
 // CHECK-LABEL: } // end sil function 'raw_idx_cse'
 sil [ossa] @raw_idx_cse: $@convention(thin) (Builtin.RawPointer) -> () {
 bb0(%0 : $Builtin.RawPointer):
@@ -1091,10 +1087,8 @@ bb0(%0 : @guaranteed $Proto & Ping):
 sil [ossa] [global_init] @$s4test10testGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
 
 // CHECK-LABEL: sil [ossa] @cse_global_init :
-// CHECK:   [[P:%[0-9]+]] = apply
-// CHECK:   [[A:%[0-9]+]] = pointer_to_address [[P]]
-// CHECK:   begin_access [modify] [dynamic] [no_nested_conflict] [[A]]
-// CHECK:   begin_access [read] [dynamic] [no_nested_conflict] [[A]]
+// CHECK:   pointer_to_address
+// CHECK:   pointer_to_address
 // CHECK: // end sil function 'cse_global_init'
 sil [ossa] @cse_global_init : $@convention(thin) () -> Int64 {
 bb0:
@@ -1186,7 +1180,7 @@ bb0:
 
 // CHECK-LABEL: sil [ossa] @cse_mark_dependence2 :
 // CHECK: mark_dependence
-// CHECK-NOT: mark_dependence
+// CHECK: mark_dependence
 // CHECK-LABEL: } // end sil function 'cse_mark_dependence2'
 sil [ossa] @cse_mark_dependence2 : $@convention(thin) (@inout Builtin.Int64, @guaranteed Builtin.NativeObject) -> (Builtin.Int64, Builtin.Int64) {
 bb0(%0 : $*Builtin.Int64, %1 : @guaranteed $Builtin.NativeObject):
@@ -1333,5 +1327,27 @@ exit(%proj : @guaranteed $C, %borrow : @guaranteed $S, %owned_s_2 : @owned $S):
     end_borrow %borrow : $S
     destroy_value %owned_s_2 : $S
     return %copy : $C
+}
+
+// CHECK-LABEL: sil [ossa] @type_value_test : {{.*}} {
+// CHECK:         type_value
+// CHECK-NOT:     type_value
+// CHECK-LABEL: } // end sil function 'type_value_test'
+sil [ossa] @type_value_test : $@convention(thin) <let N : Int> (@in_guaranteed InlineArray<N, Int>, Int) -> () {
+bb0(%0 : $*InlineArray<N, Int>, %1 : $Int):
+  %2 = integer_literal $Builtin.Int64, 0
+  %3 = type_value $Int for N
+  %4 = struct_extract %1, #Int._value
+  %5 = struct_extract %3, #Int._value
+  %6 = builtin "cmp_slt_Int64"(%4, %2) : $Builtin.Int1
+  cond_fail %6, "Index out of bounds"
+  %8 = integer_literal $Builtin.Int64, 0
+  %9 = type_value $Int for N
+  %10 = struct_extract %1, #Int._value
+  %11 = struct_extract %9, #Int._value
+  %12 = builtin "cmp_slt_Int64"(%10, %8) : $Builtin.Int1
+  cond_fail %12, "Index out of bounds"
+  %14 = tuple ()
+  return %14
 }
 

@@ -60,11 +60,9 @@ protected:
 public:
   /// Construct the union with a value of the given type, which must
   /// (ignoring references) be one of the declared members of the union.
-  template <class T>
-  TaggedUnionBase(T &&value,
-                  typename std::enable_if<
-                    TaggedUnionImpl::is_member_constructible<Members, T>(),
-                    TaggedUnionImpl::Empty>::type = {}) {
+  template <class T,
+            typename = std::enable_if_t<TaggedUnionImpl::is_member_constructible<Members, T>()> >
+  TaggedUnionBase(T &&value) {
     using TargetType = TaggedUnionImpl::simplify_member_type<T>;
     TheKind = StorageType::template kindForMember<TargetType>();
     Storage.template emplace<TargetType>(TheKind, std::forward<T>(value));
@@ -156,11 +154,9 @@ protected:
   TaggedUnionBase(typename super::Kind kind) : super(kind) {}
 
 public:
-  template <class T>
-  TaggedUnionBase(T &&value,
-                  typename std::enable_if<
-                    TaggedUnionImpl::is_member_constructible<Members, T>(),
-                    TaggedUnionImpl::Empty>::type = {})
+  template <class T,
+            typename = std::enable_if_t<TaggedUnionImpl::is_member_constructible<Members, T>()> >
+  TaggedUnionBase(T &&value)
     : super(std::forward<T>(value)) {}
 
   // We want to either define or delete all the special members.
@@ -237,11 +233,9 @@ protected:
   }
 
 public:
-  template <class T>
-  TaggedUnionBase(T &&value,
-                  typename std::enable_if<
-                    TaggedUnionImpl::is_member_constructible<Members, T>(),
-                    TaggedUnionImpl::Empty>::type = {})
+  template <class T,
+            typename = std::enable_if_t<TaggedUnionImpl::is_member_constructible<Members, T>()> >
+  TaggedUnionBase(T &&value)
     : super(std::forward<T>(value)) {}
 
   /// Construct the union in the empty state.

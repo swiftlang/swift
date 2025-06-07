@@ -30,13 +30,25 @@ public struct DeprecatedAnnotations: MyProto {}
 // CHECK: [
 // CHECK-NEXT:  {
 // CHECK-NEXT:    "typeName": "ExtractAnnotations.Annotations",
+// CHECK-NEXT:    "mangledTypeName": "18ExtractAnnotations0B0V",
 // CHECK-NEXT:    "kind": "struct",
 // CHECK-NEXT:    "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractAnnotations.swift",
 // CHECK-NEXT:    "line": 9,
+// CHECK-NEXT:    "conformances": [
+// CHECK-NEXT:      "ExtractAnnotations.MyProto"
+// CHECK-NEXT:    ],
+// CHECK-NEXT:    "allConformances": [
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "protocolName": "ExtractAnnotations.MyProto"
+// CHECK-NEXT:        "conformanceDefiningModule": "ExtractAnnotations"
+// CHECK-NEXT:      }
+// CHECK-NEXT:    ],
+// CHECK-NEXT:    "associatedTypeAliases": [],
 // CHECK-NEXT:    "properties": [
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "available1",
 // CHECK-NEXT:        "type": "Swift.String",
+// CHECK-NEXT:        "mangledTypeName": "n/a - deprecated",
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "true",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractAnnotations.swift",
@@ -61,6 +73,7 @@ public struct DeprecatedAnnotations: MyProto {}
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "deprecated1",
 // CHECK-NEXT:        "type": "Swift.String",
+// CHECK-NEXT:        "mangledTypeName": "n/a - deprecated",
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "true",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractAnnotations.swift",
@@ -85,6 +98,7 @@ public struct DeprecatedAnnotations: MyProto {}
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "renamed1",
 // CHECK-NEXT:        "type": "Swift.String",
+// CHECK-NEXT:        "mangledTypeName": "n/a - deprecated",
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "true",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractAnnotations.swift",
@@ -104,6 +118,7 @@ public struct DeprecatedAnnotations: MyProto {}
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "introduced1",
 // CHECK-NEXT:        "type": "Swift.String",
+// CHECK-NEXT:        "mangledTypeName": "n/a - deprecated",
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "true",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractAnnotations.swift",
@@ -123,9 +138,20 @@ public struct DeprecatedAnnotations: MyProto {}
 // CHECK-NEXT:  },
 // CHECK-NEXT:  {
 // CHECK-NEXT:    "typeName": "ExtractAnnotations.DeprecatedAnnotations",
+// CHECK-NEXT:    "mangledTypeName": "18ExtractAnnotations010DeprecatedB0V",
 // CHECK-NEXT:    "kind": "struct",
 // CHECK-NEXT:    "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractAnnotations.swift",
 // CHECK-NEXT:    "line": 28,
+// CHECK-NEXT:    "conformances": [
+// CHECK-NEXT:      "ExtractAnnotations.MyProto"
+// CHECK-NEXT:    ],
+// CHECK-NEXT:    "allConformances": [
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "protocolName": "ExtractAnnotations.MyProto"
+// CHECK-NEXT:        "conformanceDefiningModule": "ExtractAnnotations"
+// CHECK-NEXT:      }
+// CHECK-NEXT:    ],
+// CHECK-NEXT:    "associatedTypeAliases": [],
 // CHECK-NEXT:    "properties": [],
 // CHECK-NEXT:    "availabilityAttributes": [
 // CHECK-NEXT:      {
@@ -157,3 +183,4 @@ public struct DeprecatedAnnotations: MyProto {}
 // CHECK-NEXT:    ]
 // CHECK-NEXT:  }
 // CHECK-NEXT:]
+

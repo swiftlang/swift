@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/USRGeneration.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Parse/Token.h"
 #include "DeclarationFragmentPrinter.h"
 #include "SymbolGraphASTWalker.h"
@@ -136,7 +137,13 @@ void DeclarationFragmentPrinter::printStructurePre(PrintStructureKind Kind,
 void DeclarationFragmentPrinter::printTypeRef(Type T, const TypeDecl *RefTo,
     Identifier Name,
     PrintNameContext NameContext) {
-  openFragment(FragmentKind::TypeIdentifier);
+  if (Kind != FragmentKind::Attribute) {
+    openFragment(FragmentKind::TypeIdentifier);
+  } else {
+    // create a separate fragment so that only the attribute name is linkable
+    closeFragment();
+    openFragment(FragmentKind::Attribute);
+  }
   printText(Name.str());
   USR.clear();
 
@@ -148,7 +155,7 @@ void DeclarationFragmentPrinter::printTypeRef(Type T, const TypeDecl *RefTo,
       }
     }
 
-    if (T->isTypeParameter()) {
+    if (T->isTypeParameter() && T->getKind() != TypeKind::DependentMember) {
       ShouldLink = false;
     }
   }
@@ -183,9 +190,17 @@ void DeclarationFragmentPrinter::printAbridgedType(const GenericTypeDecl *TD,
       case DeclKind::Protocol:
         printText(getTokenText(tok::kw_protocol));
         break;
-      case DeclKind::Class:
-        printText(getTokenText(tok::kw_class));
-        break;
+      case DeclKind::Class: {
+        auto *refDecl = cast<ClassDecl>(TD);
+        if (refDecl->isExplicitDistributedActor()) {
+          printText("distributed actor");
+        } else if (refDecl->isExplicitActor()) {
+          printText("actor");
+        } else {
+          printText(getTokenText(tok::kw_class));
+        }
+      break;
+      }
       case DeclKind::TypeAlias:
         printText(getTokenText(tok::kw_typealias));
         break;

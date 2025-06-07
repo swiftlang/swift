@@ -36,3 +36,23 @@ repeat {
 // CHECK: repeat {
 // CHECK:   b += 1
 // CHECK: } while b < 10
+
+var p = (17 > 7 ? true : false)
+// CHECK: @_hasInitialValue internal var p: Bool = (17 > 7 ? true : false)
+
+var x: Int = 3
+var y: Bool = x is Int
+// CHECK: @_hasInitialValue internal var y: Bool = x is Int
+
+enum SomeError: Error {
+  case errorType
+}
+
+func someThrowingFunc() throws -> SomeError {
+  throw SomeError.errorType
+}
+
+var tryExpr = try? someThrowingFunc()
+// CHECK: @_hasInitialValue internal var tryExpr: SomeError? = try? someThrowingFunc()
+
+var tryForceExpr = try! someThrowingFunc()

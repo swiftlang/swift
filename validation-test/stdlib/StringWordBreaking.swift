@@ -29,7 +29,7 @@ let StringWordBreaking = TestSuite("StringWordBreaking")
 // }
 
 extension String {
-  @available(SwiftStdlib 5.7, *)
+  @available(SwiftStdlib 5.9, *)
   var _words: [String] {
     var result: [String] = []
 
@@ -48,7 +48,7 @@ extension String {
     return result
   }
 
-  @available(SwiftStdlib 5.7, *)
+  @available(SwiftStdlib 5.9, *)
   var _wordsBackwards: [String] {
     var result: [String] = []
 
@@ -68,7 +68,7 @@ extension String {
   }
 }
 
-if #available(SwiftStdlib 5.7, *) {
+if #available(SwiftStdlib 6.1, *) {
   StringWordBreaking.test("word breaking") {
     for wordBreakTest in wordBreakTests {
       expectEqual(
@@ -79,6 +79,39 @@ if #available(SwiftStdlib 5.7, *) {
         wordBreakTest.1.reversed(),
         wordBreakTest.0._wordsBackwards,
         "string: \(String(reflecting: wordBreakTest.0))")
+    }
+  }
+}
+
+// rdar://116652595
+//
+// We were accidentally hanging when rounding word indices for some concoctions of
+// strings. In particular, where we had a pair of scalars create a constraint
+// for the preceding pair, but the preceding extend rules were not taking the
+// constraint into consideration.
+if #available(SwiftStdlib 5.10, *) {
+  StringWordBreaking.test("word breaking backward extend constraints") {
+    let strs = ["日\u{FE0F}:X ", "👨‍👨‍👧‍👦\u{FE0F}:X ", "⛔️:X ", "⛔️·X ", "⛔️：X "]
+    let strWords = [
+      ["日\u{FE0F}", ":", "X", " "],
+      ["👨‍👨‍👧‍👦\u{FE0F}", ":", "X", " "],
+      ["⛔️", ":", "X", " "],
+      ["⛔️", "·", "X", " "],
+      ["⛔️", "：", "X", " "]
+    ]
+
+    for (str, words) in zip(strs, strWords) {
+      expectEqual(
+        words,
+        str._words,
+        "string: \(String(reflecting: str))"
+      )
+
+      expectEqual(
+        words.reversed(),
+        str._wordsBackwards,
+        "string: \(String(reflecting: str))"
+      )
     }
   }
 }
@@ -135,7 +168,7 @@ func getUTF16Array(from string: String) -> [UInt16] {
   return result
 }
 
-if #available(SwiftStdlib 5.7, *) {
+if #available(SwiftStdlib 6.1, *) {
   StringWordBreaking.test("word breaking foreign") {
     for wordBreakTest in wordBreakTests {
       let foreignTest = NonContiguousNSString(

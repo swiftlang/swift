@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -sil-combine-disable-alloc-stack-opts | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -sil-combine-disable-alloc-stack-opts | %FileCheck %s
 
 // This file tests routines in SILCombinerMiscVisitors.cpp
 
@@ -11,6 +11,10 @@ import Builtin
 //////////////////
 
 class Klass {}
+
+struct S {
+  var a: Klass
+}
 
 sil @nativeobject_guaranteed_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 
@@ -61,94 +65,6 @@ bb0(%0 : $Klass):
   return %9999 : $()
 }
 
-// Unused alloc-ref elim
-
-// CHECK-LABEL: sil @remove_unused_alloc_ref :
-// CHECK-NOT: alloc_ref
-// CHECK-NOT: dealloc_ref
-// CHECK: } // end sil function 'remove_unused_alloc_ref'
-sil @remove_unused_alloc_ref : $@convention(thin) () -> () {
-bb0:
-  %1 = alloc_ref $Klass
-  dealloc_ref %1 : $Klass
-  %3 = tuple ()
-  return %3 : $()
-}
-
-// CHECK-LABEL: sil [ossa] @remove_unused_alloc_ref_ossa :
-// CHECK-NOT: alloc_ref
-// CHECK-NOT: dealloc_ref
-// CHECK: } // end sil function 'remove_unused_alloc_ref_ossa'
-sil [ossa] @remove_unused_alloc_ref_ossa : $@convention(thin) () -> () {
-bb0:
-  %1 = alloc_ref $Klass
-  dealloc_ref %1 : $Klass
-  %3 = tuple ()
-  return %3 : $()
-}
-
-// CHECK-LABEL: sil @remove_unused_alloc_ref_stack :
-// CHECK-NOT: alloc_ref
-// CHECK-NOT: set_deallocating
-// CHECK-NOT: dealloc_ref
-// CHECK: } // end sil function 'remove_unused_alloc_ref_stack'
-sil @remove_unused_alloc_ref_stack : $@convention(thin) () -> () {
-bb0:
-  %1 = alloc_ref [stack] $Klass
-  set_deallocating %1 : $Klass
-  dealloc_stack_ref %1 : $Klass
-  %3 = tuple ()
-  return %3 : $()
-}
-
-// CHECK-LABEL: sil [ossa] @remove_unused_alloc_ref_stack_ossa :
-// CHECK-NOT: alloc_ref
-// CHECK-NOT: set_deallocating
-// CHECK-NOT: dealloc_ref
-// CHECK: } // end sil function 'remove_unused_alloc_ref_stack_ossa'
-sil [ossa] @remove_unused_alloc_ref_stack_ossa : $@convention(thin) () -> () {
-bb0:
-  %1 = alloc_ref [stack] $Klass
-  set_deallocating %1 : $Klass
-  dealloc_ref %1 : $Klass
-  dealloc_stack_ref %1 : $Klass
-  %3 = tuple ()
-  return %3 : $()
-}
-
-// CHECK-LABEL: sil @remove_unused_alloc_ref_fixlifetime :
-// CHECK-NOT: alloc_ref
-// CHECK-NOT: set_deallocating
-// CHECK-NOT: dealloc_ref
-// CHECK-NOT: fix_lifetime
-// CHECK: } // end sil function 'remove_unused_alloc_ref_fixlifetime'
-sil @remove_unused_alloc_ref_fixlifetime : $@convention(thin) () -> () {
-bb0:
-  %1 = alloc_ref [stack] $Klass
-  set_deallocating %1 : $Klass
-  fix_lifetime %1 : $Klass
-  dealloc_stack_ref %1 : $Klass
-  %3 = tuple ()
-  return %3 : $()
-}
-
-// CHECK-LABEL: sil [ossa] @remove_unused_alloc_ref_fixlifetime_ossa :
-// CHECK-NOT: alloc_ref
-// CHECK-NOT: set_deallocating
-// CHECK-NOT: dealloc_ref
-// CHECK-NOT: fix_lifetime
-// CHECK: } // end sil function 'remove_unused_alloc_ref_fixlifetime_ossa'
-sil [ossa] @remove_unused_alloc_ref_fixlifetime_ossa : $@convention(thin) () -> () {
-bb0:
-  %1 = alloc_ref [stack] $Klass
-  set_deallocating %1 : $Klass
-  fix_lifetime %1 : $Klass
-  dealloc_ref %1 : $Klass
-  dealloc_stack_ref %1 : $Klass
-  %3 = tuple ()
-  return %3 : $()
-}
-
 // We should have a single load [copy] here.
 //
 // CHECK-LABEL: sil [ossa] @remove_loadcopy_with_only_destroy_users : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> () {
@@ -184,3 +100,22 @@ bb0(%0 : $*Builtin.NativeObject):
   %9999 = tuple()
   return %9999 : $()
 }
+
+// CHECK-LABEL: sil [ossa] @test_updating_borrowed_from :
+// CHECK:         borrowed {{.*}} from (%0 : $S)
+// CHECK-LABEL: } // end sil function 'test_updating_borrowed_from'
+sil [ossa] @test_updating_borrowed_from : $@convention(thin) (@guaranteed S) -> () {
+bb0(%0 : @guaranteed $S):
+  %1 = destructure_struct %0 : $S
+  %2 = copy_value %1 : $Klass
+  %3 = begin_borrow %2 : $Klass
+  br bb1(%3 : $Klass)
+
+bb1(%5 : @reborrow $Klass):
+  %6 = borrowed %5 : $Klass from (%2 : $Klass)
+  end_borrow %6 : $Klass
+  destroy_value %2 : $Klass
+  %9 = tuple ()
+  return %9 : $()
+}
+

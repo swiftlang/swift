@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift -disable-availability-checking
 
 protocol P { }
 
@@ -21,7 +21,7 @@ extension Array: Q where Element: P, Element: Equatable {
   func takesA(_: Element) {}
 }
 
-extension Set: Q where Element: P, Element: Equatable { // expected-warning {{redundant conformance constraint 'Element' : 'Equatable'}}
+extension Set: Q where Element: P, Element: Equatable {
   func f() -> Element {
     return first!
   }
@@ -106,7 +106,7 @@ func testPrimaries(
   takePrimaryCollections(setOfStrings, setOfInts)
   takePrimaryCollections(setOfStrings, arrayOfInts)
   _ = takeMatchedPrimaryCollections(arrayOfInts, setOfInts)
-  _ = takeMatchedPrimaryCollections(arrayOfInts, setOfStrings) // expected-error{{type of expression is ambiguous without more context}}
+  _ = takeMatchedPrimaryCollections(arrayOfInts, setOfStrings) // expected-error{{type of expression is ambiguous without a type annotation}}
 }
 
 
@@ -131,3 +131,18 @@ struct I61387_1 {
     }
   }
 }
+
+// However, it's fine if the inferred type of a closure refers to opaque parameters from the outer scope.
+public func combinator<T>(_: T, _: ((T) -> ()) -> ()) {}
+
+public func closureWithOpaqueParameterInConsumingPosition(p: some Any) {
+  // Single-expression
+  combinator(p) { $0(p) }
+
+  // Multi-expression
+  combinator(p) { fn in
+    let result: () = fn(p)
+    return result
+  }
+}
+

@@ -27,7 +27,7 @@ testHasOption(llvm::opt::OptTable &table, options::ID id,
               const std::unordered_set<std::string> &optionSet) {
   if (table.getOption(id).hasFlag(swift::options::FrontendOption)) {
     auto name = table.getOptionName(id);
-    if (strlen(name) > 0) {
+    if (!name.empty() && name[0] != '\0') {
       auto nameStr = std::string(name);
       bool setContainsOption = optionSet.find(nameStr) != optionSet.end();
       EXPECT_EQ(setContainsOption, true) << "Missing Option: " << nameStr;
@@ -45,9 +45,9 @@ TEST_F(ScanTest, TestHasArgumentQuery) {
     optionSet.insert(std::string(data, option.length));
   }
   swiftscan_string_set_dispose(supported_args_set);
-#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM,  \
-               HELPTEXT, METAVAR, VALUES)                                      \
-  testHasOption(*table, swift::options::OPT_##ID, optionSet);
+#define OPTION(...)                                                            \
+  testHasOption(*table, swift::options::LLVM_MAKE_OPT_ID(__VA_ARGS__),         \
+                optionSet);
 #include "swift/Option/Options.inc"
 #undef OPTION
 }

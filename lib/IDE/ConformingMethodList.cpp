@@ -13,11 +13,15 @@
 #include "swift/IDE/ConformingMethodList.h"
 #include "ExprContextAnalysis.h"
 #include "swift/AST/ASTDemangler.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/IDE/TypeCheckCompletionCallback.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "swift/Sema/ConstraintSystem.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 
@@ -25,11 +29,12 @@ using namespace swift;
 using namespace ide;
 
 namespace {
-class ConformingMethodListCallbacks : public IDEInspectionCallbacks {
+class ConformingMethodListCallbacks : public CodeCompletionCallbacks,
+                                      public DoneParsingCallback {
   ArrayRef<const char *> ExpectedTypeNames;
   ConformingMethodListConsumer &Consumer;
   SourceLoc Loc;
-  Expr *ParsedExpr = nullptr;
+  CodeCompletionExpr *CCExpr = nullptr;
   DeclContext *CurDeclContext = nullptr;
 
   void getMatchingMethods(Type T,
@@ -40,13 +45,13 @@ public:
   ConformingMethodListCallbacks(Parser &P,
                                 ArrayRef<const char *> ExpectedTypeNames,
                                 ConformingMethodListConsumer &Consumer)
-      : IDEInspectionCallbacks(P), ExpectedTypeNames(ExpectedTypeNames),
-        Consumer(Consumer) {}
+      : CodeCompletionCallbacks(P), DoneParsingCallback(),
+        ExpectedTypeNames(ExpectedTypeNames), Consumer(Consumer) {}
 
   // Only handle callbacks for suffix completions.
   // {
   void completeDotExpr(CodeCompletionExpr *E, SourceLoc DotLoc) override;
-  void completePostfixExpr(Expr *E, bool hasSpace) override;
+  void completePostfixExpr(CodeCompletionExpr *E, bool hasSpace) override;
   // }
 
   void doneParsing(SourceFile *SrcFile) override;
@@ -55,46 +60,81 @@ public:
 void ConformingMethodListCallbacks::completeDotExpr(CodeCompletionExpr *E,
                                                     SourceLoc DotLoc) {
   CurDeclContext = P.CurDeclContext;
-  ParsedExpr = E->getBase();
+  CCExpr = E;
 }
 
-void ConformingMethodListCallbacks::completePostfixExpr(Expr *E,
+void ConformingMethodListCallbacks::completePostfixExpr(CodeCompletionExpr *E,
                                                         bool hasSpace) {
   CurDeclContext = P.CurDeclContext;
-  ParsedExpr = E;
+  CCExpr = E;
 }
 
+class ConformingMethodListCallback : public TypeCheckCompletionCallback {
+public:
+  struct Result {
+    Type Ty;
+
+    /// Types of variables that were determined in the solution that produced
+    /// this result. This in particular includes parameters of closures that
+    /// were type-checked with the code completion expression.
+    llvm::SmallDenseMap<const VarDecl *, Type> SolutionSpecificVarTypes;
+  };
+private:
+  CodeCompletionExpr *CCExpr;
+
+  SmallVector<Result> Results;
+
+  void sawSolutionImpl(const constraints::Solution &S) override {
+    if (!S.hasType(CCExpr->getBase())) {
+      return;
+    }
+    if (Type T = getTypeForCompletion(S, CCExpr->getBase())) {
+      llvm::SmallDenseMap<const VarDecl *, Type> SolutionSpecificVarTypes;
+      getSolutionSpecificVarTypes(S, SolutionSpecificVarTypes);
+      Results.push_back({T, SolutionSpecificVarTypes});
+    }
+  }
+
+public:
+  ConformingMethodListCallback(CodeCompletionExpr *CCExpr) : CCExpr(CCExpr) {}
+
+  ArrayRef<Result> getResults() const { return Results; }
+};
+
 void ConformingMethodListCallbacks::doneParsing(SourceFile *SrcFile) {
-  if (!ParsedExpr)
+  if (!CCExpr || !CCExpr->getBase())
     return;
 
-  typeCheckContextAt(TypeCheckASTNodeAtLocContext::declContext(CurDeclContext),
-                     ParsedExpr->getLoc());
-
-  Type T = ParsedExpr->getType();
-
-  // Type check the expression if needed.
-  if (!T || T->is<ErrorType>()) {
-    ConcreteDeclRef ReferencedDecl = nullptr;
-    auto optT = getTypeOfCompletionContextExpr(P.Context, CurDeclContext,
-                                               CompletionTypeCheckKind::Normal,
-                                               ParsedExpr, ReferencedDecl);
-    if (!optT)
-      return;
-    T = *optT;
+  ConformingMethodListCallback TypeCheckCallback(CCExpr);
+  {
+    llvm::SaveAndRestore<TypeCheckCompletionCallback *> CompletionCollector(
+        Context.CompletionCallback, &TypeCheckCallback);
+    typeCheckContextAt(
+        TypeCheckASTNodeAtLocContext::declContext(CurDeclContext),
+        CCExpr->getLoc());
   }
+
+  if (TypeCheckCallback.getResults().size() != 1) {
+    // Either no results or results were ambiguous, which we cannot handle.
+    return;
+  }
+  auto Res = TypeCheckCallback.getResults()[0];
+  Type T = Res.Ty;
+  WithSolutionSpecificVarTypesRAII VarType(Res.SolutionSpecificVarTypes);
 
   if (!T || T->is<ErrorType>() || T->is<UnresolvedType>())
     return;
 
   T = T->getRValueType();
-  if (T->hasArchetype())
-    T = T->mapTypeOutOfContext();
 
   // If there are no (instance) members for this type, bail.
   if (!T->mayHaveMembers() || T->is<ModuleType>()) {
     return;
   }
+
+  auto interfaceTy = T;
+  if (T->hasArchetype())
+    interfaceTy = interfaceTy->mapTypeOutOfContext();
 
   llvm::SmallPtrSet<ProtocolDecl*, 8> expectedProtocols;
   for (auto Name: ExpectedTypeNames) {
@@ -104,7 +144,7 @@ void ConformingMethodListCallbacks::doneParsing(SourceFile *SrcFile) {
   }
 
   // Collect the matching methods.
-  ConformingMethodListResult result(CurDeclContext, T);
+  ConformingMethodListResult result(CurDeclContext, interfaceTy);
   getMatchingMethods(T, expectedProtocols, result.Members);
 
   Consumer.handleResult(result);
@@ -116,8 +156,6 @@ void ConformingMethodListCallbacks::getMatchingMethods(
   assert(T->mayHaveMembers() && !T->is<ModuleType>());
 
   class LocalConsumer : public VisibleDeclConsumer {
-    ModuleDecl *CurModule;
-
     /// The type of the parsed expression.
     Type T;
 
@@ -136,14 +174,25 @@ void ConformingMethodListCallbacks::getMatchingMethods(
       if (FD->isStatic() || FD->isOperator())
         return false;
 
-      auto resultTy = T->getTypeOfMember(CurModule, FD,
-                                         FD->getResultInterfaceType());
+      assert(!T->hasTypeParameter());
+
+      // T may contain primary archetypes from some fixed generic signature G.
+      // This might be unrelated to the generic signature of FD. However if
+      // FD has a generic parameter of its own and it returns a type containing
+      // that parameter, we want to map it to the corresponding archetype
+      // from the generic environment of FD, because all we do with the
+      // resulting type is check conformance. If the conformance is conditional,
+      // we might run into trouble with really complicated cases but the fake
+      // archetype setup will mostly work.
+      auto substitutions = T->getMemberSubstitutionMap(
+          FD, FD->getGenericEnvironment());
+      auto resultTy =  FD->getResultInterfaceType().subst(substitutions);
       if (resultTy->is<ErrorType>())
         return false;
 
       // The return type conforms to any of the requested protocols.
       for (auto Proto : ExpectedTypes) {
-        if (CurModule->conformsToProtocol(resultTy, Proto))
+        if (checkConformance(resultTy, Proto))
           return true;
       }
 
@@ -154,8 +203,7 @@ void ConformingMethodListCallbacks::getMatchingMethods(
     LocalConsumer(DeclContext *DC, Type T,
                   llvm::SmallPtrSetImpl<ProtocolDecl*> &expectedTypes,
                   SmallVectorImpl<ValueDecl *> &result)
-        : CurModule(DC->getParentModule()), T(T), ExpectedTypes(expectedTypes),
-          Result(result) {}
+        : T(T), ExpectedTypes(expectedTypes), Result(result) {}
 
     void foundDecl(ValueDecl *VD, DeclVisibilityKind reason,
                    DynamicLookupInfo) override {
@@ -165,7 +213,8 @@ void ConformingMethodListCallbacks::getMatchingMethods(
 
   } LocalConsumer(CurDeclContext, T, expectedTypes, result);
 
-  lookupVisibleMemberDecls(LocalConsumer, MetatypeType::get(T), CurDeclContext,
+  lookupVisibleMemberDecls(LocalConsumer, MetatypeType::get(T),
+                           Loc, CurDeclContext,
                            /*includeInstanceMembers=*/false,
                            /*includeDerivedRequirements*/false,
                            /*includeProtocolExtensionMembers*/true);
@@ -190,8 +239,10 @@ swift::ide::makeConformingMethodListCallbacksFactory(
         ConformingMethodListConsumer &Consumer)
         : ExpectedTypeNames(ExpectedTypeNames), Consumer(Consumer) {}
 
-    IDEInspectionCallbacks *createIDEInspectionCallbacks(Parser &P) override {
-      return new ConformingMethodListCallbacks(P, ExpectedTypeNames, Consumer);
+    Callbacks createCallbacks(Parser &P) override {
+      auto Callback = std::make_shared<ConformingMethodListCallbacks>(
+          P, ExpectedTypeNames, Consumer);
+      return {Callback, Callback};
     }
   };
 

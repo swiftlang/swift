@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/swift-primitive-functions-c-bridging.swift -typecheck -module-name Functions -clang-header-expose-decls=all-public -emit-clang-header-path %t/functions.h
+// RUN: %target-swift-frontend %S/swift-primitive-functions-c-bridging.swift -module-name Functions -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/functions.h
 
 // RUN: %target-interop-build-clang -c %s -I %t -o %t/swift-functions-execution.o
 // RUN: %target-interop-build-swift %S/swift-primitive-functions-c-bridging.swift -o %t/swift-functions-execution -Xlinker %t/swift-functions-execution.o -module-name Functions -Xfrontend -entry-point-function-name -Xfrontend swiftMain
@@ -22,7 +22,11 @@ int main() {
   // passThroughCChar
   VERIFY_PASSTHROUGH_VALUE($s9Functions16passThroughCCharys4Int8VADF, 'a');
   // passThroughCWideChar
+#if defined(_WIN32)
+  VERIFY_PASSTHROUGH_VALUE($s9Functions20passThroughCWideCharys6UInt16VADF, 'a');
+#else
   VERIFY_PASSTHROUGH_VALUE($s9Functions20passThroughCWideCharys7UnicodeO6ScalarVAFF, 'a');
+#endif
   // passThroughCChar16
   VERIFY_PASSTHROUGH_VALUE($s9Functions18passThroughCChar16ys6UInt16VADF, 0xFE1);
   // passThroughCChar32
@@ -47,7 +51,7 @@ int main() {
   VERIFY_PASSTHROUGH_VALUE($s9Functions024passThroughCUnsignedLongE0ys6UInt64VADF, 0xFFFFFFFF);
 
   // passThrougCFloat
-  VERIFY_PASSTHROUGH_VALUE($s9Functions16passThrougCFloatyS2fF, 1.0f);
+  VERIFY_PASSTHROUGH_VALUE($s9Functions17passThroughCFloatyS2fF, 1.0f);
   // passThroughCDouble
   VERIFY_PASSTHROUGH_VALUE($s9Functions18passThroughCDoubleyS2dF, 42.125f);
 

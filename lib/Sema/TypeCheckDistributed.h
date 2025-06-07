@@ -35,7 +35,7 @@ class NominalTypeDecl;
 /******************************************************************************/
 
 // Diagnose an error if the Distributed module is not loaded.
-bool ensureDistributedModuleLoaded(Decl *decl);
+bool ensureDistributedModuleLoaded(const ValueDecl *decl);
 
 /// Check for illegal property declarations (e.g. re-declaring transport or id)
 void checkDistributedActorProperties(const NominalTypeDecl *decl);

@@ -52,7 +52,7 @@ private:
   // Set calling convention of the call instruction using
   // the same calling convention as the callee function.
   // This ensures that they are always compatible.
-  void setCallingConvUsingCallee(llvm::CallInst *Call) {
+  void setCallingConvUsingCallee(llvm::CallBase *Call) {
     auto CalleeFn = Call->getCalledFunction();
     if (CalleeFn) {
       auto CC = CalleeFn->getCallingConv();
@@ -222,6 +222,19 @@ public:
                    base.getAlignment().alignmentAtOffset(eltSize * index));
   }
 
+  /// Given a pointer to an array element, GEP to the array element
+  /// N elements past it.  The type is not changed.
+  Address CreateArrayGEP(Address base, llvm::Value *index, Size eltSize,
+                         const llvm::Twine &name = "") {
+    auto addr = CreateInBoundsGEP(base.getElementType(),
+                                  base.getAddress(), index, name);
+    // Given that Alignment doesn't remember offset alignment,
+    // the alignment at index 1 should be conservatively correct for
+    // any element in the array.
+    return Address(addr, base.getElementType(),
+                   base.getAlignment().alignmentAtOffset(eltSize));
+  }
+
   /// Given an i8*, GEP to N bytes past it.
   Address CreateConstByteArrayGEP(Address base, Size offset,
                                   const llvm::Twine &name = "") {
@@ -260,6 +273,13 @@ public:
         dest.getAddress(), llvm::MaybeAlign(dest.getAlignment().getValue()),
         src.getAddress(), llvm::MaybeAlign(src.getAlignment().getValue()),
         size.getValue());
+  }
+
+  llvm::CallInst *CreateMemCpy(Address dest, Address src, llvm::Value *size) {
+    return CreateMemCpy(dest.getAddress(),
+                        llvm::MaybeAlign(dest.getAlignment().getValue()),
+                        src.getAddress(),
+                        llvm::MaybeAlign(src.getAlignment().getValue()), size);
   }
 
   using IRBuilderBase::CreateMemSet;
@@ -324,6 +344,22 @@ public:
     return Call;
   }
 
+  llvm::InvokeInst *
+  createInvoke(llvm::FunctionType *fTy, llvm::Constant *callee,
+               ArrayRef<llvm::Value *> args, llvm::BasicBlock *invokeNormalDest,
+               llvm::BasicBlock *invokeUnwindDest, const Twine &name = "") {
+    assert((!DebugInfo || getCurrentDebugLocation()) && "no debugloc on call");
+    auto call = IRBuilderBase::CreateInvoke(fTy, callee, invokeNormalDest,
+                                            invokeUnwindDest, args, name);
+    setCallingConvUsingCallee(call);
+    return call;
+  }
+
+  llvm::CallBase *CreateCallOrInvoke(const FunctionPointer &fn,
+                                     ArrayRef<llvm::Value *> args,
+                                     llvm::BasicBlock *invokeNormalDest,
+                                     llvm::BasicBlock *invokeUnwindDest);
+
   llvm::CallInst *CreateCall(const FunctionPointer &fn,
                              ArrayRef<llvm::Value *> args);
 
@@ -373,6 +409,11 @@ public:
                                {value, expected},
                                name);
   }
+
+  // Creates an @llvm.expect.i1 call, where the value should be an i1 type.
+  llvm::CallInst *CreateExpectCond(IRGenModule &IGM,
+                                   llvm::Value *value,
+                                   bool expectedValue, const Twine &name = "");
 
   /// Call the trap intrinsic. If optimizations are enabled, an inline asm
   /// gadget is emitted before the trap. The gadget inhibits transforms which

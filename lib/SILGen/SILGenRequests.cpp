@@ -15,6 +15,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/Subsystems.h"
 
@@ -51,7 +52,7 @@ evaluator::DependencySource ASTLoweringRequest::readDependencySource(
   auto &desc = std::get<0>(getStorage());
 
   // We don't track dependencies in whole-module mode.
-  if (auto *mod = desc.context.dyn_cast<ModuleDecl *>()) {
+  if (desc.context.is<ModuleDecl *>()) {
     return nullptr;
   }
 
@@ -62,7 +63,7 @@ evaluator::DependencySource ASTLoweringRequest::readDependencySource(
 ArrayRef<FileUnit *> ASTLoweringDescriptor::getFilesToEmit() const {
   // If we have a specific set of SILDeclRefs to emit, we don't emit any whole
   // files.
-  if (refsToEmit)
+  if (SourcesToEmit)
     return {};
 
   if (auto *mod = context.dyn_cast<ModuleDecl *>())
@@ -70,7 +71,7 @@ ArrayRef<FileUnit *> ASTLoweringDescriptor::getFilesToEmit() const {
 
   // For a single file, we can form an ArrayRef that points at its storage in
   // the union.
-  return llvm::makeArrayRef(*context.getAddrOfPtr1());
+  return llvm::ArrayRef(*context.getAddrOfPtr1());
 }
 
 SourceFile *ASTLoweringDescriptor::getSourceFileToParse() const {

@@ -13,6 +13,9 @@
 #ifndef SWIFT_RULE_H
 #define SWIFT_RULE_H
 
+#include "swift/Basic/Assertions.h"
+#include <optional>
+
 #include "Symbol.h"
 #include "Term.h"
 
@@ -34,14 +37,6 @@ class RewriteContext;
 class Rule final {
   Term LHS;
   Term RHS;
-
-  /// The written requirement ID, which can be used to index into the
-  /// \c WrittenRequirements array in the rewrite system to retrieve
-  /// the structural requirement.
-  ///
-  /// This uses a biased representation where an ID of 0 means 'no ID',
-  /// otherwise the value is the actual ID plus one.
-  unsigned RequirementID : 16;
 
   /// A 'permanent' rule cannot be deleted by homotopy reduction. These
   /// do not correspond to generic requirements and are re-added when the
@@ -93,7 +88,6 @@ class Rule final {
 public:
   Rule(Term lhs, Term rhs)
       : LHS(lhs), RHS(rhs) {
-    RequirementID = 0;
     Permanent = false;
     Explicit = false;
     LHSSimplified = false;
@@ -108,22 +102,7 @@ public:
   const Term &getLHS() const { return LHS; }
   const Term &getRHS() const { return RHS; }
 
-  Optional<unsigned> getRequirementID() const {
-    if (RequirementID == 0)
-      return None;
-    else
-      return RequirementID - 1;
-  }
-
-  void setRequirementID(Optional<unsigned> requirementID) {
-    assert(!Frozen);
-    if (!requirementID)
-      RequirementID = 0;
-    else
-      RequirementID = *requirementID + 1;
-  }
-
-  Optional<Symbol> isPropertyRule() const;
+  std::optional<Symbol> isPropertyRule() const;
 
   const ProtocolDecl *isProtocolConformanceRule() const;
 
@@ -134,6 +113,8 @@ public:
   bool isProtocolRefinementRule(RewriteContext &ctx) const;
 
   bool isCircularConformanceRule() const;
+
+  bool isSameElementRule() const;
 
   /// See above for an explanation of these predicates.
   bool isPermanent() const {
@@ -172,50 +153,50 @@ public:
     return Frozen;
   }
 
-  bool containsUnresolvedSymbols() const {
-    return (LHS.containsUnresolvedSymbols() ||
-            RHS.containsUnresolvedSymbols());
+  bool containsNameSymbols() const {
+    return (LHS.containsNameSymbols() ||
+            RHS.containsNameSymbols());
   }
 
-  Optional<Identifier> isProtocolTypeAliasRule() const;
+  std::optional<Identifier> isProtocolTypeAliasRule() const;
 
   bool isDerivedFromConcreteProtocolTypeAliasRule() const;
 
   void markLHSSimplified() {
-    assert(!Frozen);
-    assert(!LHSSimplified);
+    ASSERT(!Frozen);
+    ASSERT(!LHSSimplified);
     LHSSimplified = true;
   }
 
   void markRHSSimplified() {
-    assert(!Frozen);
-    assert(!RHSSimplified);
+    ASSERT(!Frozen);
+    ASSERT(!RHSSimplified);
     RHSSimplified = true;
   }
 
   void markSubstitutionSimplified() {
-    assert(!Frozen);
-    assert(!SubstitutionSimplified);
+    ASSERT(!Frozen);
+    ASSERT(!SubstitutionSimplified);
     SubstitutionSimplified = true;
   }
 
   void markPermanent() {
-    assert(!Frozen);
-    assert(!Explicit && !Permanent &&
+    ASSERT(!Frozen);
+    ASSERT(!Explicit && !Permanent &&
            "Permanent and explicit are mutually exclusive");
     Permanent = true;
   }
 
   void markExplicit() {
-    assert(!Frozen);
-    assert(!Explicit && !Permanent &&
+    ASSERT(!Frozen);
+    ASSERT(!Explicit && !Permanent &&
            "Permanent and explicit are mutually exclusive");
     Explicit = true;
   }
 
   void markRedundant() {
-    assert(!Frozen);
-    assert(!Redundant);
+    ASSERT(!Frozen);
+    ASSERT(!Redundant);
     Redundant = true;
   }
 
@@ -224,21 +205,20 @@ public:
     if (Conflicting)
       return;
 
-    assert(!Frozen);
-    assert(!Permanent && "Permanent rule should not conflict with anything");
+    ASSERT(!Frozen);
+    ASSERT(!Permanent && "Permanent rule should not conflict with anything");
     Conflicting = true;
   }
 
   void markRecursive() {
-    assert(!Frozen);
-    assert(!Permanent && "Permanent rule should not be recursive");
-    assert(!Recursive);
+    ASSERT(!Frozen);
+    ASSERT(!Permanent && "Permanent rule should not be recursive");
+    ASSERT(!Recursive);
     Recursive = true;
   }
 
   void freeze() {
     Redundant = false;
-    RequirementID = 0;
     Frozen = true;
   }
 
@@ -246,7 +226,7 @@ public:
 
   unsigned getNesting() const;
 
-  Optional<int> compare(const Rule &other, RewriteContext &ctx) const;
+  std::optional<int> compare(const Rule &other, RewriteContext &ctx) const;
 
   void dump(llvm::raw_ostream &out) const;
 

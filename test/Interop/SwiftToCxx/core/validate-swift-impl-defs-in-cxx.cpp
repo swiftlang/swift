@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/swift-impl-defs-in-cxx.swift -typecheck -module-name Core -clang-header-expose-decls=all-public -emit-clang-header-path %t/core.h
+// RUN: %target-swift-frontend %S/swift-impl-defs-in-cxx.swift -module-name Core -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/core.h
 
 // RUN: %target-interop-build-clangxx -std=c++17 -c %s -I %t -o %t/swift-core-validation.o
 // RUN: %target-interop-build-clangxx -std=c++20 -c %s -I %t -o %t/swift-core-validation.o

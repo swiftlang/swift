@@ -1,6 +1,6 @@
 // SIL.
 // RUN: %target-swift-frontend -parse-as-library -module-name A \
-// RUN:      -Xllvm -sil-print-debuginfo %s -g -O -o - -emit-sil \
+// RUN:      -Xllvm -sil-print-types -Xllvm -sil-print-debuginfo %s -g -O -o - -emit-sil \
 // RUN:    | %FileCheck %s --check-prefix=SIL
 // IR.
 // RUN: %target-swift-frontend -parse-as-library -module-name A \
@@ -31,13 +31,11 @@ func yes() -> Bool { return true }
 }
 
 // SIL: sil_scope [[F:.*]] { {{.*}}parent @$s1A1CC1fyyqd__lF
-// SIL: sil_scope [[F1:.*]] { {{.*}}parent [[F]] }
-// SIL: sil_scope [[F1G:.*]] { loc "f.swift":2:5 parent [[F1]] }
+// SIL: sil_scope [[F1G:.*]] { loc "f.swift":2:5 parent [[F]] }
 // SIL: sil_scope [[F1G1:.*]] { loc "g.swift":2:3 {{.*}}inlined_at [[F1G]] }
 // SIL: sil_scope [[F1G3:.*]] { loc "g.swift":3:5 {{.*}}inlined_at [[F1G]] }
 // SIL: sil_scope [[F1G3H:.*]] { loc "h.swift":1:24
 // SIL-SAME:                     parent @{{.*}}1h{{.*}} inlined_at [[F1G3]] }
-// SIL: sil_scope [[F1G3H1:.*]] { {{.*}} parent [[F1G3H]] inlined_at [[F1G3]] }
 
 #sourceLocation(file: "C.swift", line: 1)
 public class C<R> {
@@ -46,15 +44,17 @@ public class C<R> {
 
   // SIL-LABEL: // C.f<A>(_:)
   // IR-LABEL: define {{.*}} @"$s1A1CC1fyyqd__lF"
+  // IR-SAME: %[[ARG_0:.*]], {{.*}} %[[ARG_S:.*]],
 #sourceLocation(file: "f.swift", line: 1)
   public func f<S>(_ s: S) {
     // SIL: debug_value %0 : $*S, let, name "s", argno 1, expr op_deref, {{.*}} scope [[F]]
     // SIL: function_ref {{.*}}yes{{.*}} scope [[F1G1]]
-    // SIL: function_ref {{.*}}use{{.*}} scope [[F1G3H1]]
-    // IR: dbg.value(metadata %swift.type* %S, metadata ![[MD_1_0:[0-9]+]]
-    // IR: dbg.value(metadata %swift.opaque* %0, metadata ![[S:[0-9]+]]
-    // IR: dbg.value(metadata %swift.opaque* %0, metadata ![[GS_T:[0-9]+]]
-    // IR: dbg.value(metadata %swift.opaque* %0, metadata ![[GS_U:[0-9]+]]
+    // SIL: function_ref {{.*}}use{{.*}} scope [[F1G3H]]
+    // IR: #dbg_value(ptr %[[ARG_S]], ![[MD_1_0:[0-9]+]]
+    // IR: %[[RS_PAIR:.*]] = alloca i8, i{{.*}} %
+    // IR: #dbg_value(ptr %[[ARG_0]], ![[S:[0-9]+]]
+    // IR: #dbg_value(ptr %[[ARG_0]], ![[GS_T:[0-9]+]]
+    // IR: #dbg_value(ptr %[[ARG_0]], ![[GS_U:[0-9]+]]
     // IR: call {{.*}}3use
 #sourceLocation(file: "f.swift", line: 2)
     g(s)
@@ -63,27 +63,27 @@ public class C<R> {
     // ref_element_addr in that removed block is left with a single
     // debug_value use, so they are both deleted. This means we have
     // no debug value for "t" in the call to `g(r)`.
-    //   dbg.value({{.*}}, metadata ![[GR_T:[0-9]+]]
+    //   dbg_value({{.*}}, ![[GR_T:[0-9]+]]
 
-    // IR: dbg.value({{.*}}, metadata ![[GR_U:[0-9]+]]
+    // IR: #dbg_value({{.*}}, ![[GR_U:[0-9]+]], !DIExp
     // IR: call {{.*}}3use
 #sourceLocation(file: "f.swift", line: 3)
     g(r)
-    // IR: dbg.value({{.*}}, metadata ![[GRS_T:[0-9]+]]
-    // IR: dbg.value({{.*}}, metadata ![[GRS_U:[0-9]+]]
+    // IR: #dbg_value(ptr %[[RS_PAIR]], ![[GRS_T:[0-9]+]],
+    // IR: #dbg_value(ptr %[[RS_PAIR]], ![[GRS_U:[0-9]+]],
     // IR: call {{.*}}3use
 #sourceLocation(file: "f.swift", line: 4)
     g((r, s))
-    // Note to maintainers: the relative order of the constant dbg.values here
+    // Note to maintainers: the relative order of the constant dbg_values here
     // seem to flip back and forth.
-    // IR: dbg.value({{.*}}, metadata ![[GI_U:[0-9]+]]
-    // IR: dbg.value({{.*}}, metadata ![[GI_T:[0-9]+]]
-    // IR: call {{.*}}3use
+    // IR: #dbg_value(i{{.*}} 0, ![[GI_U:[0-9]+]]
+    // IR: #dbg_value(i{{.*}} 0, ![[GI_T:[0-9]+]]
+    // IR: call {{.*}}3use{{.*}}(i{{.*}} 0)
 #sourceLocation(file: "f.swift", line: 5)
     g(Int(0))
-    // IR: dbg.value({{.*}}, metadata ![[GB_U:[0-9]+]]
-    // IR: dbg.value({{.*}}, metadata ![[GB_T:[0-9]+]]
-    // IR: call {{.*}}3use
+    // IR: #dbg_value(i1 false, ![[GB_U:[0-9]+]]
+    // IR: #dbg_value(i1 false, ![[GB_T:[0-9]+]]
+    // IR: call {{.*}}3use{{.*}}(i1 false)
 #sourceLocation(file: "f.swift", line: 6)
     g(false)
   }
@@ -95,30 +95,30 @@ public class C<R> {
 // IR: ![[LET_BOOL:[0-9]+]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[BOOL]])
 // IR: ![[INT:[0-9]+]] = !DICompositeType({{.*}}name: "Int"
 // IR: ![[LET_INT:[0-9]+]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[INT]])
-// IR: ![[TAU_0_0:[0-9]+]] = {{.*}}DW_TAG_structure_type, name: "$sxD",
-// IR: ![[LET_TAU_0_0:[0-9]+]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[TAU_0_0]])
-// IR: ![[TAU_1_0:[0-9]+]] = {{.*}}DW_TAG_structure_type, name: "$sqd__D",
-// IR: ![[MD_1_0]] = !DILocalVariable(name: "$\CF\84_1_0"
-// IR: ![[S]] = !DILocalVariable(name: "s", {{.*}} type: ![[LET_TAU_1_0:[0-9]+]]
-// IR: ![[LET_TAU_1_0]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[TAU_1_0]])
-// IR: ![[GS_T]] = !DILocalVariable(name: "t", {{.*}} scope: ![[SP_GS_T:[0-9]+]], {{.*}} type: ![[LET_TAU_1_0]])
-// IR: ![[SP_GS_T]] = {{.*}}linkageName: "$s1A1gyyxlFqd___Ti5"
-// IR: ![[GS_U]] = !DILocalVariable(name: "u", {{.*}} scope: ![[SP_GS_U:[0-9]+]], {{.*}} type: ![[LET_TAU_1_0]])
-// IR: ![[SP_GS_U]] = {{.*}}linkageName: "$s1A1hyyxlFqd___Ti5"
+// IR-DAG: ![[TAU_0_0:[0-9]+]] = {{.*}}DW_TAG_structure_type, name: "$sxD", file
+// IR-DAG: ![[LET_TAU_0_0:[0-9]+]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[TAU_0_0]])
+// IR-DAG: ![[TAU_1_0:[0-9]+]] = {{.*}}DW_TAG_structure_type, name: "$sqd__D", file
+// IR-DAG: ![[MD_1_0]] = !DILocalVariable(name: "$\CF\84_1_0"
+// IR-DAG: ![[GRS_T]] = !DILocalVariable(name: "t", {{.*}} scope: ![[SP_GRS_T:[0-9]+]], {{.*}}type: ![[LET_TUPLE:[0-9]+]]
+// IR-DAG: ![[SP_GRS_T]] = {{.*}}linkageName: "$s1A1gyyxlFx_qd__t_Ti5"
+// IR-DAG: ![[GRS_U]] = !DILocalVariable(name: "u", {{.*}} scope: ![[SP_GRS_U:[0-9]+]], {{.*}}type: ![[LET_TUPLE:[0-9]+]]
+// IR-DAG: ![[SP_GRS_U]] = {{.*}}linkageName: "$s1A1hyyxlFx_qd__t_Ti5"
+// IR-DAG: ![[LET_TUPLE]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[TUPLE:[0-9]+]])
+// IR-DAG: ![[TUPLE]] = {{.*}}DW_TAG_structure_type, name: "$sx_qd__tD"
+// IR-DAG: ![[S]] = !DILocalVariable(name: "s", {{.*}} type: ![[LET_TAU_1_0:[0-9]+]]
+// IR-DAG: ![[LET_TAU_1_0]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[TAU_1_0]])
+// IR-DAG: ![[GS_T]] = !DILocalVariable(name: "t", {{.*}} scope: ![[SP_GS_T:[0-9]+]], {{.*}} type: ![[LET_TAU_1_0]])
+// IR-DAG: ![[SP_GS_T]] = {{.*}}linkageName: "$s1A1gyyxlFqd___Ti5"
+// IR-DAG: ![[GS_U]] = !DILocalVariable(name: "u", {{.*}} scope: ![[SP_GS_U:[0-9]+]], {{.*}} type: ![[LET_TAU_1_0]])
+// IR-DAG: ![[SP_GS_U]] = {{.*}}linkageName: "$s1A1hyyxlFqd___Ti5"
 
 // Debug info for this variable is removed. See the note above the call to g(r).
 //   ![[GR_T]] = !DILocalVariable(name: "t", {{.*}} scope: ![[SP_GR_T:[0-9]+]], {{.*}}type: ![[LET_TAU_0_0]])
 // S has the same generic parameter numbering s T and U.
 //   ![[SP_GR_T]] = {{.*}}linkageName: "$s1A1gyyxlF"
 
-// IR: ![[GR_U]] = !DILocalVariable(name: "u", {{.*}} scope: ![[SP_GR_U:[0-9]+]], {{.*}}type: ![[LET_TAU_0_0]])
-// IR: ![[SP_GR_U]] = {{.*}}linkageName: "$s1A1hyyxlF"
-// IR: ![[GRS_T]] = !DILocalVariable(name: "t", {{.*}} scope: ![[SP_GRS_T:[0-9]+]], {{.*}}type: ![[LET_TUPLE:[0-9]+]]
-// IR: ![[SP_GRS_T]] = {{.*}}linkageName: "$s1A1gyyxlFx_qd__t_Ti5"
-// IR: ![[LET_TUPLE]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[TUPLE:[0-9]+]])
-// IR: ![[TUPLE]] = {{.*}}DW_TAG_structure_type, name: "$sx_qd__tD"
-// IR: ![[GRS_U]] = !DILocalVariable(name: "u", {{.*}} scope: ![[SP_GRS_U:[0-9]+]], {{.*}}type: ![[LET_TUPLE]]
-// IR: ![[SP_GRS_U]] = {{.*}}linkageName: "$s1A1hyyxlFx_qd__t_Ti5"
+// IR-DAG: ![[GR_U]] = !DILocalVariable(name: "u", {{.*}} scope: ![[SP_GR_U:[0-9]+]], {{.*}}type: ![[LET_TAU_0_0]])
+// IR-DAG: ![[SP_GR_U]] = {{.*}}linkageName: "$s1A1hyyxlF"
 // IR-DAG: ![[GI_T]] = !DILocalVariable(name: "t", {{.*}} scope: ![[SP_GI_G:[0-9]+]], {{.*}}type: ![[LET_INT]])
 // IR-DAG: ![[SP_GI_G]] = {{.*}}linkageName: "$s1A1gyyxlFSi_Tg5"
 // IR-DAG: ![[GI_U]] = !DILocalVariable(name: "u", {{.*}} scope: ![[SP_GI_U:[0-9]+]], {{.*}}type: ![[LET_INT]])

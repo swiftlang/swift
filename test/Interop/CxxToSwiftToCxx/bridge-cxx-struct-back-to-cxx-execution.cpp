@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -parse-as-library %platform-module-dir/Swift.swiftmodule/%module-target-triple.swiftinterface -enable-library-evolution -disable-objc-attr-requires-foundation-module -typecheck -module-name Swift -parse-stdlib -enable-experimental-cxx-interop -emit-clang-header-path %t/Swift.h  -experimental-skip-all-function-bodies
+// RUN: %target-swift-frontend -parse-as-library %platform-module-dir/Swift.swiftmodule/%module-target-triple.swiftinterface -enable-library-evolution -disable-objc-attr-requires-foundation-module -typecheck -module-name Swift -parse-stdlib -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr -emit-clang-header-path %t/Swift.h  -experimental-skip-all-function-bodies -enable-experimental-feature LifetimeDependence
 
 // RUN: %target-swift-frontend -typecheck %t/use-cxx-types.swift -typecheck -module-name UseCxx -emit-clang-header-path %t/UseCxx.h -I %t -enable-experimental-cxx-interop -clang-header-expose-decls=all-public
 
@@ -12,6 +12,7 @@
 // RUN: %target-run %t/swift-cxx-execution | %FileCheck %s
 
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_LifetimeDependence
 
 //--- header.h
 
@@ -150,18 +151,18 @@ int main() {
 // CHECK-NEXT: move NonTrivialTemplate
 // CHECK-NEXT: ~NonTrivialTemplate
 // CHECK-NEXT: copy NonTrivialTemplate
-// CHECK-NEXT: __CxxTemplateInst18NonTrivialTemplateI7TrivialE(x: __C.Trivial(x: 42, y: -942))
+// CHECK-NEXT: NonTrivialTemplate<Trivial>(x: __C.Trivial(x: 42, y: -942))
 // CHECK-NEXT: ~NonTrivialTemplate
 // CHECK-NEXT: ~NonTrivialTemplate
 // CHECK-NEXT: done non trivial
 // CHECK-NEXT: copy NonTrivialTemplate
-// CHECK-NEXT: GENERIC __CxxTemplateInst18NonTrivialTemplateI7TrivialE(x: __C.Trivial(x: 42, y: -1884))
+// CHECK-NEXT: GENERIC NonTrivialTemplate<Trivial>(x: __C.Trivial(x: 42, y: -1884))
 // CHECK-NEXT: ~NonTrivialTemplate
 // CHECK-NEXT: copy NonTrivialTemplate
 // CHECK-NEXT: move NonTrivialTemplate
 // CHECK-NEXT: ~NonTrivialTemplate
 // CHECK-NEXT: copy NonTrivialTemplate
-// CHECK-NEXT: __CxxTemplateInst18NonTrivialTemplateI7TrivialE(x: __C.Trivial(x: 42, y: -1884))
+// CHECK-NEXT: NonTrivialTemplate<Trivial>(x: __C.Trivial(x: 42, y: -1884))
 // CHECK-NEXT: ~NonTrivialTemplate
 // CHECK-NEXT: ~NonTrivialTemplate
 // CHECK-NEXT: secondon non trivial

@@ -13,14 +13,15 @@
 #ifndef SWIFT_AST_PRINTOPTIONS_H
 #define SWIFT_AST_PRINTOPTIONS_H
 
-#include "swift/Basic/STLExtras.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/TypeOrExtensionDecl.h"
-#include "llvm/ADT/Optional.h"
+#include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallSet.h"
+#include "llvm/ADT/STLExtras.h"
 #include <limits.h>
+#include <optional>
 #include <vector>
 
 namespace swift {
@@ -36,7 +37,9 @@ class TypeBase;
 class DeclContext;
 class Type;
 class ModuleDecl;
-enum DeclAttrKind : unsigned;
+enum class DeclAttrKind : unsigned;
+class DeclAttribute;
+class CustomAttr;
 class SynthesizedExtensionAnalyzer;
 struct PrintOptions;
 class SILPrintContext;
@@ -70,15 +73,15 @@ public:
                   CloseExtension(CloseExtension),
                   CloseNominal(CloseNominal) {}
 
-  bool shouldOpenExtension(const Decl *D) {
+  bool shouldOpenExtension(const Decl *D) const {
     return D != Target || OpenExtension;
   }
 
-  bool shouldCloseExtension(const Decl *D) {
+  bool shouldCloseExtension(const Decl *D) const {
     return D != Target || CloseExtension;
   }
 
-  bool shouldCloseNominal(const Decl *D) {
+  bool shouldCloseNominal(const Decl *D) const {
     return D != Target || CloseNominal;
   }
 };
@@ -90,20 +93,23 @@ class AnyAttrKind {
 
 public:
   AnyAttrKind(TypeAttrKind K) : kind(static_cast<unsigned>(K)), isType(1) {
-    static_assert(TAK_Count < UINT_MAX, "TypeAttrKind is > 31 bits");
+    static_assert(NumTypeAttrKinds < UINT_MAX, "TypeAttrKind is > 31 bits");
   }
   AnyAttrKind(DeclAttrKind K) : kind(static_cast<unsigned>(K)), isType(0) {
-    static_assert(DAK_Count < UINT_MAX, "DeclAttrKind is > 31 bits");
+    static_assert(NumDeclAttrKinds < UINT_MAX, "DeclAttrKind is > 31 bits");
   }
-  AnyAttrKind() : kind(TAK_Count), isType(1) {}
+  AnyAttrKind() : kind(NumTypeAttrKinds), isType(1) {}
 
-  /// Returns the TypeAttrKind, or TAK_Count if this is not a type attribute.
-  TypeAttrKind type() const {
-    return isType ? static_cast<TypeAttrKind>(kind) : TAK_Count;
+  /// Returns the TypeAttrKind.
+  std::optional<TypeAttrKind> type() const {
+    if (!isType || kind == NumTypeAttrKinds) return {};
+    return static_cast<TypeAttrKind>(kind);
   }
-  /// Returns the DeclAttrKind, or DAK_Count if this is not a decl attribute.
-  DeclAttrKind decl() const {
-    return isType ? DAK_Count : static_cast<DeclAttrKind>(kind);
+  /// Returns the DeclAttrKind.
+  std::optional<DeclAttrKind> decl() const {
+    if (isType || kind == NumDeclAttrKinds)
+      return {};
+    return static_cast<DeclAttrKind>(kind);
   }
 
   bool operator==(AnyAttrKind K) const {
@@ -122,7 +128,39 @@ struct ShouldPrintChecker {
 ///
 /// A default-constructed PrintOptions is suitable for printing to users;
 /// there are also factory methods for specific use cases.
+///
+/// The value semantics of PrintOptions are a little messed up. We generally
+/// pass around options by const reference in order to (1) make it
+/// easier to pass in temporaries and (2) discourage direct local mutation
+/// in favor of the OverrideScope system below. However, that override
+/// system assumes that PrintOptions objects are always actually mutable.
 struct PrintOptions {
+
+  /// Explicitly copy these print options. You should generally aim to
+  /// avoid doing this, especially in deeply-embedded code, because
+  /// PrintOptions is a relatively heavyweight type (and is likely to
+  /// only get more heavyweight). Instead, try to use OverrideScope.
+  PrintOptions clone() const { return *this; }
+
+  /// Allow move construction and assignment. We don't expect to
+  /// actually use these much, but there isn't too much harm from
+  /// them.
+  PrintOptions(PrintOptions &&) = default;
+  PrintOptions &operator=(PrintOptions &&) = default;
+
+private:
+  /// Disallow implicit copying, but make it available privately for the
+  /// use of clone().
+  PrintOptions(const PrintOptions &) = default;
+
+  /// Disallow copy assignment completely, which we don't even need
+  /// privately.
+  PrintOptions &operator=(const PrintOptions &) = delete;
+
+public:
+  // defined later in this file
+  class OverrideScope;
+
   /// The indentation width.
   unsigned Indent = 2;
 
@@ -137,6 +175,9 @@ struct PrintOptions {
 
   /// Whether to print *any* accessors on properties.
   bool PrintPropertyAccessors = true;
+
+  /// Use \c let for a read-only computed property.
+  bool InferPropertyIntroducerFromAccessors = false;
 
   /// Whether to print *any* accessors on subscript.
   bool PrintSubscriptAccessors = true;
@@ -167,6 +208,10 @@ struct PrintOptions {
   /// Whether to print the bodies of accessors in protocol context.
   bool PrintAccessorBodiesInProtocols = false;
 
+  /// Whether to print the parameter list of accessors like \c set . (Even when
+  /// \c true , parameters marked implicit still won't be printed.)
+  bool PrintExplicitAccessorParameters = true;
+
   /// Whether to print type definitions.
   bool TypeDefinitions = false;
 
@@ -182,6 +227,25 @@ struct PrintOptions {
 
   /// Whether to print enum raw value expressions.
   EnumRawValueMode EnumRawValues = EnumRawValueMode::Skip;
+
+  enum class InterfaceMode : uint8_t {
+    Public, // prints public/inlinable decls
+    Private, // prints SPI and public/inlinable decls
+    Package // prints package, SPI, and public/inlinable decls
+  };
+
+  InterfaceMode InterfaceContentKind = InterfaceMode::Private;
+
+  bool printPublicInterface() const {
+    return InterfaceContentKind == InterfaceMode::Public;
+  }
+  bool printPackageInterface() const {
+    return InterfaceContentKind == InterfaceMode::Package;
+  }
+
+  void setInterfaceMode(InterfaceMode mode) {
+    InterfaceContentKind = mode;
+  }
 
   /// Whether to prefer printing TypeReprs instead of Types,
   /// if a TypeRepr is available.  This allows us to print the original
@@ -210,8 +274,18 @@ struct PrintOptions {
   /// \see FileUnit::getExportedModuleName
   bool UseExportedModuleNames = false;
 
+  /// If true, printed module names will use the "public" (for documentation)
+  /// name, which may be different from the regular name.
+  ///
+  /// \see FileUnit::getPublicModuleName
+  bool UsePublicModuleNames = false;
+
   /// Use the original module name to qualify a symbol.
   bool UseOriginallyDefinedInModuleNames = false;
+
+  /// Add a `@_silgen_name` attribute to each function that
+  /// is compatible with one that specifies its mangled name.
+  bool PrintSyntheticSILGenName = false;
 
   /// Print Swift.Array and Swift.Optional with sugared syntax
   /// ([] and ?), even if there are no sugar type nodes.
@@ -250,12 +324,16 @@ struct PrintOptions {
 
   bool SkipSwiftPrivateClangDecls = false;
 
-  /// Whether to skip internal stdlib declarations.
-  bool SkipPrivateStdlibDecls = false;
+  /// Whether to skip underscored declarations from system modules.
+  bool SkipPrivateSystemDecls = false;
 
-  /// Whether to skip underscored stdlib protocols.
+  /// Whether to skip underscored protocols from system modules.
   /// Protocols marked with @_show_in_interface are still printed.
-  bool SkipUnderscoredStdlibProtocols = false;
+  bool SkipUnderscoredSystemProtocols = false;
+
+  /// Whether to skip unsafe C++ class methods that were renamed
+  /// (e.g. __fooUnsafe). See IsSafeUseOfCxxDecl.
+  bool SkipUnsafeCXXMethods = false;
 
   /// Whether to skip extensions that don't add protocols or no members.
   bool SkipEmptyExtensionDecls = true;
@@ -272,6 +350,10 @@ struct PrintOptions {
   /// Whether to skip printing 'import' declarations.
   bool SkipImports = false;
 
+  /// Whether to skip over the C++ inline namespace when printing its members or
+  /// when printing it out as a qualifier.
+  bool SkipInlineCXXNamespace = false;
+
   /// Whether to skip printing overrides and witnesses for
   /// protocol requirements.
   bool SkipOverrides = false;
@@ -285,21 +367,11 @@ struct PrintOptions {
 
   bool PrintImplicitAttrs = true;
 
-  /// Whether to print the \c each keyword for pack archetypes.
-  bool PrintExplicitEach = false;
-
-  /// Whether to print the \c any keyword for existential
-  /// types.
-  bool PrintExplicitAny = false;
-
   /// Whether to desugar the constraint for an existential type.
   bool DesugarExistentialConstraint = false;
 
   /// Whether to skip keywords with a prefix of underscore such as __consuming.
   bool SkipUnderscoredKeywords = false;
-
-  // Print SPI attributes and decls that are visible only as SPI.
-  bool PrintSPIs = true;
 
   /// Prints type variables and unresolved types in an expanded notation suitable
   /// for debugging.
@@ -311,12 +383,20 @@ struct PrintOptions {
   /// Whether to print generic requirements in a where clause.
   bool PrintGenericRequirements = true;
 
-  /// Whether to print the real layout name instead of AnyObject
-  /// for class layout
-  bool PrintClassLayoutName = false;
+  /// Whether to print generic signatures with inverse requirements (ie,
+  /// ~Copyable noting the absence of Copyable) or the internal desugared form
+  /// (where the implicit Copyable conformance is spelled explicitly).
+  bool PrintInverseRequirements = false;
 
-  /// Suppress emitting @available(*, noasync)
-  bool SuppressNoAsyncAvailabilityAttr = false;
+  /// Whether to print the internal layout name instead of AnyObject, etc.
+  bool PrintInternalLayoutName = false;
+
+  /// Suppress emitting isolated or async deinit, and emit open containing class
+  /// as public
+  bool SuppressIsolatedDeinit = false;
+
+  /// Whether to print the \c{/*not inherited*/} comment on factory initializers.
+  bool PrintFactoryInitializerComment = true;
 
   /// How to print opaque return types.
   enum class OpaqueReturnTypePrintingMode {
@@ -342,10 +422,34 @@ struct PrintOptions {
   /// prevent printing from doing "extra" work.
   bool PrintCurrentMembersOnly = false;
 
+  /// Whether to suppress printing of custom attributes that are expanded macros.
+  bool SuppressExpandedMacros = true;
+
+  /// Suppress the @isolated(any) attribute.
+  bool SuppressIsolatedAny = false;
+
+  /// Suppress 'isolated' and '#isolation' on isolated parameters with optional type.
+  bool SuppressOptionalIsolatedParams = false;
+
+  /// Suppress 'sending' on arguments and results.
+  bool SuppressSendingArgsAndResults = false;
+
+  /// Suppress printing of '~Proto' for suppressible, non-invertible protocols.
+  bool SuppressConformanceSuppression = false;
+
+  /// Replace BitwiseCopyable with _BitwiseCopyable.
+  bool SuppressBitwiseCopyable = false;
+
+  /// Suppress modify/read accessors.
+  bool SuppressCoroutineAccessors = false;
+
   /// List of attribute kinds that should not be printed.
-  std::vector<AnyAttrKind> ExcludeAttrList = {DAK_Transparent, DAK_Effects,
-                                              DAK_FixedLayout,
-                                              DAK_ShowInInterface};
+  std::vector<AnyAttrKind> ExcludeAttrList = {
+      DeclAttrKind::Transparent, DeclAttrKind::Effects,
+      DeclAttrKind::FixedLayout, DeclAttrKind::ShowInInterface,
+  };
+
+  std::vector<CustomAttr *> ExcludeCustomAttrList = {};
 
   /// List of attribute kinds that should be printed exclusively.
   /// Empty means allow all.
@@ -393,9 +497,6 @@ struct PrintOptions {
   /// Print all decls that have at least this level of access.
   AccessLevel AccessFilter = AccessLevel::Private;
 
-  /// Print IfConfigDecls.
-  bool PrintIfConfig = true;
-
   /// Whether we are printing for sil.
   bool PrintForSIL = false;
 
@@ -403,7 +504,7 @@ struct PrintOptions {
   bool PrintInSILBody = false;
 
   /// Whether to use an empty line to separate two members in a single decl.
-  bool EmptyLineBetweenMembers = false;
+  bool EmptyLineBetweenDecls = false;
 
   /// Whether to print empty members of a declaration on a single line, e.g.:
   /// ```
@@ -458,9 +559,6 @@ struct PrintOptions {
   /// (e.g. the overridden method in the superclass) if such comment is found.
   bool PrintDocumentationComments = false;
 
-  /// Whether to print regular comments from clang module headers.
-  bool PrintRegularClangComments = false;
-
   /// When true, printing interface from a source file will print the original
   /// source text for applicable declarations, in order to preserve the
   /// formatting.
@@ -469,6 +567,9 @@ struct PrintOptions {
   /// When printing a type alias type, whether print the underlying type instead
   /// of the alias.
   bool PrintTypeAliasUnderlyingType = false;
+
+  /// Print the definition of a macro, e.g. `= #externalMacro(...)`.
+  bool PrintMacroDefinitions = true;
 
   /// Use aliases when printing references to modules to avoid ambiguities
   /// with types sharing a name with a module.
@@ -503,7 +604,7 @@ struct PrintOptions {
   ModuleDecl *CurrentModule = nullptr;
 
   /// The information for converting archetypes to specialized types.
-  llvm::Optional<TypeTransformContext> TransformContext;
+  std::optional<TypeTransformContext> TransformContext;
 
   /// Whether to display (Clang-)imported module names;
   bool QualifyImportedTypes = false;
@@ -529,12 +630,12 @@ struct PrintOptions {
   /// compilers that might parse the result.
   bool PrintCompatibilityFeatureChecks = false;
 
-  /// Whether to print @_specialize attributes that have an availability
-  /// parameter.
-  bool PrintSpecializeAttributeWithAvailability = true;
-
   /// Whether to always desugar array types from `[base_type]` to `Array<base_type>`
   bool AlwaysDesugarArraySliceTypes = false;
+
+  /// Whether to always desugar inline array types from
+  /// `[<count> of <element>]` to `InlineArray<count, element>`
+  bool AlwaysDesugarInlineArrayTypes = false;
 
   /// Whether to always desugar dictionary types
   /// from `[key_type:value_type]` to `Dictionary<key_type,value_type>`
@@ -542,6 +643,12 @@ struct PrintOptions {
 
   /// Whether to always desugar optional types from `base_type?` to `Optional<base_type>`
   bool AlwaysDesugarOptionalTypes = false;
+
+  /// Whether to always print explicit `Pack{...}` around pack
+  /// types.
+  ///
+  /// This is set to \c false for diagnostic arguments.
+  bool PrintExplicitPackTypes = true;
 
   /// \see ShouldQualifyNestedDeclarations
   enum class QualifyNestedDeclarations {
@@ -555,12 +662,6 @@ struct PrintOptions {
   /// part of the context).
   QualifyNestedDeclarations ShouldQualifyNestedDeclarations =
       QualifyNestedDeclarations::Never;
-
-  /// If true, we print a protocol's primary associated types using the
-  /// primary associated type syntax: protocol Foo<Type1, ...>.
-  ///
-  /// If false, we print them as ordinary associated types.
-  bool PrintPrimaryAssociatedTypes = true;
 
   /// If this is not \c nullptr then function bodies (including accessors
   /// and constructors) will be printed by this function.
@@ -581,13 +682,14 @@ struct PrintOptions {
     return false;
   }
 
+  bool excludeAttr(const DeclAttribute *DA) const;
+
   /// Retrieve the set of options for verbose printing to users.
   static PrintOptions printVerbose() {
     PrintOptions result;
     result.TypeDefinitions = true;
     result.VarInitializers = true;
     result.PrintDocumentationComments = true;
-    result.PrintRegularClangComments = true;
     result.PrintLongAttrsOnSeparateLines = true;
     result.AlwaysTryPrintParameterLabels = true;
     return result;
@@ -596,7 +698,7 @@ struct PrintOptions {
   /// The print options used for formatting diagnostic arguments.
   static PrintOptions forDiagnosticArguments() {
     PrintOptions result;
-    result.PrintExplicitAny = true;
+    result.PrintExplicitPackTypes = false;
     return result;
   }
 
@@ -610,13 +712,12 @@ struct PrintOptions {
     result.SynthesizeSugarOnTypes = true;
     result.PrintUserInaccessibleAttrs = false;
     result.PrintImplicitAttrs = false;
-    result.ExcludeAttrList.push_back(DAK_Exported);
-    result.ExcludeAttrList.push_back(DAK_Inline);
-    result.ExcludeAttrList.push_back(DAK_Optimize);
-    result.ExcludeAttrList.push_back(DAK_Rethrows);
+    result.ExcludeAttrList.push_back(DeclAttrKind::Exported);
+    result.ExcludeAttrList.push_back(DeclAttrKind::Inline);
+    result.ExcludeAttrList.push_back(DeclAttrKind::Optimize);
+    result.ExcludeAttrList.push_back(DeclAttrKind::Rethrows);
     result.PrintOverrideKeyword = false;
     result.AccessFilter = accessFilter;
-    result.PrintIfConfig = false;
     result.ShouldQualifyNestedDeclarations =
         QualifyNestedDeclarations::TypesOnly;
     result.PrintDocumentationComments = false;
@@ -634,10 +735,12 @@ struct PrintOptions {
     result.SkipUnavailable = true;
     result.SkipImplicit = true;
     result.SkipSwiftPrivateClangDecls = true;
-    result.SkipPrivateStdlibDecls = true;
-    result.SkipUnderscoredStdlibProtocols = true;
-    result.SkipDeinit = true;
-    result.EmptyLineBetweenMembers = true;
+    result.SkipPrivateSystemDecls = true;
+    result.SkipUnderscoredSystemProtocols = true;
+    result.SkipUnsafeCXXMethods = true;
+    result.SkipDeinit = false; // Deinit may have isolation attributes, which
+                               // are part of the interface
+    result.EmptyLineBetweenDecls = true;
     result.CascadeDocComment = true;
     result.ShouldQualifyNestedDeclarations =
         QualifyNestedDeclarations::Always;
@@ -646,6 +749,8 @@ struct PrintOptions {
     result.EnumRawValues = EnumRawValueMode::PrintObjCOnly;
     result.MapCrossImportOverlaysToDeclaringModule = true;
     result.PrintCurrentMembersOnly = false;
+    result.SuppressExpandedMacros = true;
+    result.UsePublicModuleNames = true;
     return result;
   }
 
@@ -661,7 +766,7 @@ struct PrintOptions {
   static PrintOptions printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
                                               bool preferTypeRepr,
                                               bool printFullConvention,
-                                              bool printSPIs,
+                                              InterfaceMode interfaceMode,
                                               bool useExportedModuleNames,
                                               bool aliasModuleNames,
                                               llvm::SmallSet<StringRef, 4>
@@ -677,6 +782,8 @@ struct PrintOptions {
   void setBaseType(Type T);
 
   void initForSynthesizedExtension(TypeOrExtensionDecl D);
+  void initForSynthesizedExtensionInScope(TypeOrExtensionDecl D,
+                                          OverrideScope &scope) const;
 
   void clearSynthesizedExtension();
 
@@ -687,19 +794,12 @@ struct PrintOptions {
     return CurrentPrintabilityChecker->shouldPrint(P, *this);
   }
 
-  /// Retrieve the print options that are suitable to print the testable interface.
-  static PrintOptions printTestableInterface(bool printFullConvention) {
-    PrintOptions result = printInterface(printFullConvention);
-    result.AccessFilter = AccessLevel::Internal;
-    return result;
-  }
-
   /// Retrieve the print options that are suitable to print interface for a
   /// swift file.
   static PrintOptions printSwiftFileInterface(bool printFullConvention) {
     PrintOptions result = printInterface(printFullConvention);
     result.AccessFilter = AccessLevel::Internal;
-    result.EmptyLineBetweenMembers = true;
+    result.EmptyLineBetweenDecls = true;
     return result;
   }
 
@@ -713,7 +813,6 @@ struct PrintOptions {
   static PrintOptions printQualifiedSILType() {
     PrintOptions result = PrintOptions::printSIL();
     result.FullyQualifiedTypesIfAmbiguous = true;
-    result.PrintExplicitAny = true;
     return result;
   }
 
@@ -730,7 +829,7 @@ struct PrintOptions {
   static PrintOptions printDeclarations() {
     PrintOptions result = printVerbose();
     result.ExcludeAttrList.clear();
-    result.ExcludeAttrList.push_back(DAK_FixedLayout);
+    result.ExcludeAttrList.push_back(DeclAttrKind::FixedLayout);
     result.PrintStorageRepresentationAttrs = true;
     result.AbstractAccessors = false;
     result.PrintAccess = true;
@@ -748,8 +847,9 @@ struct PrintOptions {
     PO.PrintFunctionRepresentationAttrs =
       PrintOptions::FunctionRepresentationMode::None;
     PO.PrintDocumentationComments = false;
-    PO.ExcludeAttrList.push_back(DAK_Available);
-    PO.SkipPrivateStdlibDecls = true;
+    PO.ExcludeAttrList.push_back(DeclAttrKind::Available);
+    PO.SkipPrivateSystemDecls = true;
+    PO.SkipUnsafeCXXMethods = true;
     PO.ExplodeEnumCaseDecls = true;
     PO.ShouldQualifyNestedDeclarations = QualifyNestedDeclarations::TypesOnly;
     PO.PrintParameterSpecifiers = true;
@@ -758,7 +858,87 @@ struct PrintOptions {
     PO.AlwaysTryPrintParameterLabels = true;
     return PO;
   }
+
+  /// An RAII scope for performing temporary adjustments to a PrintOptions
+  /// object. Even with the abstraction inherent in this design, this can
+  /// be significantly cheaper than copying the options just to modify a few
+  /// fields.
+  ///
+  /// At its core, this is just a stack of arbitrary functions to run
+  /// when the scope is destroyed.
+  class OverrideScope {
+  public:
+    /// The mutable options exposed by the scope. Generally, you should not
+    /// access this directly.
+    PrintOptions &Options;
+
+  private:
+    /// A stack of finalizer functions, each of which generally undoes some
+    /// change that was made to the options.
+    SmallVector<std::function<void(PrintOptions &)>, 4> Finalizers;
+
+  public:
+    OverrideScope(const PrintOptions &options)
+      : Options(const_cast<PrintOptions &>(options)) {}
+
+    // Disallow all copies and moves.
+    OverrideScope(const OverrideScope &scope) = delete;
+    OverrideScope &operator=(const OverrideScope &scope) = delete;
+
+    ~OverrideScope() {
+      // Run the finalizers in the opposite order that they were added.
+      for (auto &finalizer : llvm::reverse(Finalizers)) {
+        finalizer(Options);
+      }
+    }
+
+    template <class Fn>
+    void addFinalizer(Fn &&fn) {
+      Finalizers.emplace_back(std::move(fn));
+    }
+
+    void addExcludedAttr(AnyAttrKind kind) {
+      Options.ExcludeAttrList.push_back(kind);
+      addFinalizer([](PrintOptions &options) {
+        options.ExcludeAttrList.pop_back();
+      });
+    }
+  };
 };
-}
+
+/// Override a print option within an OverrideScope. Does a check to see if
+/// the new value is the same as the old before actually doing anything, so
+/// it only works if the type provides ==.
+///
+/// Signature is:
+///   void (OverrideScope &scope, <FIELD NAME>, T &&newValue)
+#define OVERRIDE_PRINT_OPTION(SCOPE, FIELD_NAME, VALUE)                     \
+  do {                                                                      \
+    auto _newValue = (VALUE);                                               \
+    if ((SCOPE).Options.FIELD_NAME != _newValue) {                          \
+      auto finalizer =                                                      \
+        [_oldValue=(SCOPE).Options.FIELD_NAME](PrintOptions &opts) {        \
+          opts.FIELD_NAME = _oldValue;                                      \
+        };                                                                  \
+      (SCOPE).Options.FIELD_NAME = std::move(_newValue);                    \
+      (SCOPE).addFinalizer(std::move(finalizer));                           \
+    }                                                                       \
+  } while(0)
+
+/// Override a print option within an OverrideScope. Works for any type.
+///
+/// Signature is:
+///   void (OverrideScope &scope, <FIELD NAME>, T &&newValue)
+#define OVERRIDE_PRINT_OPTION_UNCONDITIONAL(SCOPE, FIELD_NAME, VALUE)       \
+  do {                                                                      \
+    auto finalizer =                                                        \
+      [_oldValue=(SCOPE).Options.FIELD_NAME](PrintOptions &opts) {          \
+        opts.FIELD_NAME = _oldValue;                                        \
+      };                                                                    \
+    (SCOPE).Options.FIELD_NAME = (VALUE);                                   \
+    (SCOPE).addFinalizer(std::move(finalizer));                             \
+  } while(0)
+
+} // end namespace swift
 
 #endif // LLVM_SWIFT_AST_PRINTOPTIONS_H

@@ -1,5 +1,10 @@
-// RUN: %target-typecheck-verify-swift  -disable-availability-checking
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
+
 // REQUIRES: concurrency
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 protocol P: Actor {
   func f()
@@ -25,13 +30,17 @@ func from_isolated_existential2(_ x: isolated any P) async {
 
 func from_nonisolated(_ x: any P) async {
   await x.f()
-  x.prop += 1 // expected-error {{actor-isolated property 'prop' can not be mutated from a non-isolated context}}
-  x.prop = 100 // expected-error {{actor-isolated property 'prop' can not be mutated from a non-isolated context}}
+  x.prop += 1 // expected-error {{actor-isolated property 'prop' can not be mutated from a nonisolated context}}
+  // expected-note@-1 {{consider declaring an isolated method on 'P' to perform the mutation}}
+  x.prop = 100 // expected-error {{actor-isolated property 'prop' can not be mutated from a nonisolated context}}
+  // expected-note@-1 {{consider declaring an isolated method on 'P' to perform the mutation}}
 }
 
 func from_concrete(_ x: A) async {
-  x.prop += 1 // expected-error {{actor-isolated property 'prop' can not be mutated from a non-isolated context}}
-  x.prop = 100 // expected-error {{actor-isolated property 'prop' can not be mutated from a non-isolated context}}
+  x.prop += 1 // expected-error {{actor-isolated property 'prop' can not be mutated from a nonisolated context}}
+  // expected-note@-1 {{consider declaring an isolated method on 'A' to perform the mutation}}
+  x.prop = 100 // expected-error {{actor-isolated property 'prop' can not be mutated from a nonisolated context}}
+  // expected-note@-1 {{consider declaring an isolated method on 'A' to perform the mutation}}
 }
 
 func from_isolated_concrete(_ x: isolated A) async {
@@ -44,11 +53,12 @@ func from_isolated_concrete(_ x: isolated A) async {
 actor Act {
     var i = 0 // expected-note {{mutation of this property is only permitted within the actor}}
 }
-let act = Act()
+nonisolated let act = Act()
 
 func bad() async {
-    // expected-warning@+2 {{no 'async' operations occur within 'await' expression}}
-    // expected-error@+1 {{actor-isolated property 'i' can not be mutated from a non-isolated context}}
+    // expected-warning@+3 {{no 'async' operations occur within 'await' expression}}
+    // expected-error@+2 {{actor-isolated property 'i' can not be mutated from a nonisolated context}}
+    // expected-note@+1 {{consider declaring an isolated method on 'Act' to perform the mutation}}
     await act.i = 666
 }
 
@@ -58,12 +68,14 @@ protocol Proto: Actor {
 extension Act: Proto {}
 
 func good() async {
-    // expected-warning@+2 {{no 'async' operations occur within 'await' expression}}
-    // expected-error@+1 {{actor-isolated property 'i' can not be mutated from a non-isolated context}}
+    // expected-warning@+3 {{no 'async' operations occur within 'await' expression}}
+    // expected-error@+2 {{actor-isolated property 'i' can not be mutated from a nonisolated context}}
+    // expected-note@+1 {{consider declaring an isolated method on 'Proto' to perform the mutation}}
     await (act as any Proto).i = 42
     let aIndirect: any Proto = act
 
-    // expected-warning@+2 {{no 'async' operations occur within 'await' expression}}
-    // expected-error@+1 {{actor-isolated property 'i' can not be mutated from a non-isolated context}}
+    // expected-warning@+3 {{no 'async' operations occur within 'await' expression}}
+    // expected-error@+2 {{actor-isolated property 'i' can not be mutated from a nonisolated context}}
+    // expected-note@+1 {{consider declaring an isolated method on 'Proto' to perform the mutation}}
     await aIndirect.i = 777
 }

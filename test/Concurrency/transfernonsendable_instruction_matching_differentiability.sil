@@ -1,0 +1,163 @@
+// RUN: %target-sil-opt -send-non-sendable -strict-concurrency=complete %s -verify -o /dev/null
+
+// REQUIRES: concurrency
+// REQUIRES: asserts
+// REQUIRES: differentiable_programming
+
+sil_stage raw
+
+import Swift
+import Builtin
+import _Differentiation
+
+////////////////////////
+// MARK: Declarations //
+////////////////////////
+
+class NonSendableKlass {}
+
+sil @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+sil @useNonSendableKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
+sil @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
+
+final class SendableKlass : Sendable {}
+
+sil @transferSendableKlass : $@convention(thin) @async (@guaranteed SendableKlass) -> ()
+sil @constructSendableKlass : $@convention(thin) () -> @owned SendableKlass
+
+final class KlassContainingKlasses {
+  let nsImmutable : NonSendableKlass
+  var nsMutable : NonSendableKlass
+  let sImmutable : SendableKlass
+  var sMutable : SendableKlass
+}
+
+sil @transferKlassContainingKlasses : $@convention(thin) @async (@guaranteed KlassContainingKlasses) -> ()
+sil @useKlassContainingKlasses : $@convention(thin) (@guaranteed KlassContainingKlasses) -> ()
+sil @constructKlassContainingKlasses : $@convention(thin) () -> @owned KlassContainingKlasses
+
+struct NonSendableMoveOnlyStruct: ~Copyable {
+  var ns: NonSendableKlass
+
+  deinit
+}
+
+sil @constructMoveOnlyStruct : $@convention(thin) () -> @owned NonSendableMoveOnlyStruct
+sil @transferMoveOnlyStruct : $@convention(thin) @async (@guaranteed NonSendableMoveOnlyStruct) -> ()
+
+struct NonSendableStruct {
+  var ns: NonSendableKlass
+}
+
+sil @constructStruct : $@convention(thin) () -> @owned NonSendableStruct
+sil @transferStruct : $@convention(thin) @async (@guaranteed NonSendableStruct) -> ()
+
+sil @transferRawPointer : $@convention(thin) @async (Builtin.RawPointer) -> ()
+sil @useRawPointer : $@convention(thin) (Builtin.RawPointer) -> ()
+sil @initRawPointer : $@convention(thin) () -> Builtin.RawPointer
+
+sil @transferIndirect : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+sil @useIndirect : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+sil @initIndirect : $@convention(thin) <T> () -> @out T
+
+enum FakeOptional<T> {
+case none
+case some(T)
+}
+
+sil @getLinearFunction : $@convention(thin) () -> @owned @differentiable(_linear) @callee_guaranteed (Float) -> Float
+sil @transferLinearFunction : $@async @convention(thin) (@guaranteed @differentiable(_linear) @callee_guaranteed (Float) -> Float) -> ()
+sil @getDifferentiableFunction : $@convention(thin) () -> @owned @differentiable(reverse) @callee_guaranteed (Float) -> Float
+sil @transferDifferentiableFunction : $@async @convention(thin) (@guaranteed @differentiable(reverse) @callee_guaranteed (Float) -> Float) -> ()
+sil @getFunction : $@convention(thin) () -> @owned @callee_guaranteed (Float) -> Float
+sil @useFunction : $@convention(thin) (@guaranteed @callee_guaranteed (Float) -> Float) -> ()
+sil @transferFunction : $@async @convention(thin) (@guaranteed @callee_guaranteed (Float) -> Float) -> ()
+
+/////////////////
+// MARK: Tests //
+/////////////////
+
+sil [ossa] @linear_function_extract_test : $@async @convention(thin) () -> () {
+bb0:
+  %init = function_ref @getLinearFunction : $@convention(thin) () -> @owned @differentiable(_linear) @callee_guaranteed (Float) -> Float
+  %0 = apply %init() : $@convention(thin) () -> @owned @differentiable(_linear) @callee_guaranteed (Float) -> Float
+
+  %transfer = function_ref @transferLinearFunction : $@async @convention(thin) (@guaranteed @differentiable(_linear) @callee_guaranteed (Float) -> Float) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transfer(%0) : $@async @convention(thin) (@guaranteed @differentiable(_linear) @callee_guaranteed (Float) -> Float) -> () // expected-warning {{}}
+  // expected-note @-1 {{}}
+
+  // No error since this is just look through.
+  %1 = begin_borrow %0 : $@differentiable(_linear) @callee_guaranteed (Float) -> Float
+  %2 = linear_function_extract [original] %1 : $@differentiable(_linear) @callee_guaranteed (Float) -> Float
+  %f = function_ref @useFunction : $@convention(thin) (@guaranteed @callee_guaranteed (Float) -> Float) -> ()
+  apply %f(%2) : $@convention(thin) (@guaranteed @callee_guaranteed (Float) -> Float) -> () // expected-note {{access can happen concurrently}}
+  end_borrow %1 : $@differentiable(_linear) @callee_guaranteed (Float) -> Float
+  destroy_value %0 : $@differentiable(_linear) @callee_guaranteed (Float) -> Float
+
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @differentiable_function_extract_test : $@async @convention(thin) () -> () {
+bb0:
+  %init = function_ref @getDifferentiableFunction : $@convention(thin) () -> @owned @differentiable(reverse) @callee_guaranteed (Float) -> Float
+  %0 = apply %init() : $@convention(thin) () -> @owned @differentiable(reverse) @callee_guaranteed (Float) -> Float
+
+  %transfer = function_ref @transferDifferentiableFunction : $@async @convention(thin) (@guaranteed @differentiable(reverse) @callee_guaranteed (Float) -> Float) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transfer(%0) : $@async @convention(thin) (@guaranteed @differentiable(reverse) @callee_guaranteed (Float) -> Float) -> () // expected-warning {{}}
+  // expected-note @-1 {{}}
+
+  // No error since this is just look through.
+  %1 = begin_borrow %0 : $@differentiable(reverse) @callee_guaranteed (Float) -> Float
+  %2 = differentiable_function_extract [original] %1 : $@differentiable(reverse) @callee_guaranteed (Float) -> Float
+  %f = function_ref @useFunction : $@convention(thin) (@guaranteed @callee_guaranteed (Float) -> Float) -> ()
+  apply %f(%2) : $@convention(thin) (@guaranteed @callee_guaranteed (Float) -> Float) -> () // expected-note {{access can happen concurrently}}
+  end_borrow %1 : $@differentiable(reverse) @callee_guaranteed (Float) -> Float
+  destroy_value %0 : $@differentiable(reverse) @callee_guaranteed (Float) -> Float
+
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @linear_function_test : $@async @convention(thin) () -> () {
+bb0:
+  %0 = function_ref @getFunction : $@convention(thin) () -> @owned @callee_guaranteed (Float) -> Float
+  %1 = apply %0() : $@convention(thin) () -> @owned @callee_guaranteed (Float) -> Float
+
+  %transfer = function_ref @transferFunction : $@async @convention(thin) (@guaranteed @callee_guaranteed (Float) -> Float) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transfer(%1) : $@async @convention(thin) (@guaranteed @callee_guaranteed (Float) -> Float) -> () // expected-warning {{}}
+  // expected-note @-1 {{}}
+
+  %2 = begin_borrow %1 : $@callee_guaranteed (Float) -> Float
+  %3 = linear_function [parameters 0] %2 : $@callee_guaranteed (Float) -> Float // expected-note {{access can happen concurrently}}
+
+  end_borrow %2 : $@callee_guaranteed (Float) -> Float
+  destroy_value %1 : $@callee_guaranteed (Float) -> Float
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil @derivative : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+sil @vjp : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+
+// differentiable_function [parameters 0] [results 0] [[ORIG_FN]] : $@convention(thin) (Float) -> Float with_derivative {undef : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float), [[VJP_FN]] : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)}
+sil [ossa] @differentiable_function_test : $@async @convention(thin) () -> () {
+bb0:
+  %0 = function_ref @getFunction : $@convention(thin) () -> @owned @callee_guaranteed (Float) -> Float
+  %1 = apply %0() : $@convention(thin) () -> @owned @callee_guaranteed (Float) -> Float
+
+  %transfer = function_ref @transferFunction : $@async @convention(thin) (@guaranteed @callee_guaranteed (Float) -> Float) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %transfer(%1) : $@async @convention(thin) (@guaranteed @callee_guaranteed (Float) -> Float) -> () // expected-warning {{}}
+  // expected-note @-1 {{}}
+
+  %derivative = function_ref @derivative : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+  %vjp = function_ref @vjp : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
+  %2 = begin_borrow %1 : $@callee_guaranteed (Float) -> Float
+  %3 = differentiable_function [parameters 0] [results 0] %2 : $@callee_guaranteed (Float) -> Float with_derivative {%derivative : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float), %vjp : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)} // expected-note {{access can happen concurrently}}
+
+  end_borrow %2 : $@callee_guaranteed (Float) -> Float
+  destroy_value %1 : $@callee_guaranteed (Float) -> Float
+
+  %9999 = tuple ()
+  return %9999 : $()
+}

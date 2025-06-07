@@ -3,10 +3,11 @@
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
 
-// REQUIRES: rdar104762037
-
 // UNSUPPORTED: back_deployment_runtime
-// UNSUPPORTED: OS=linux-gnu
+// UNSUPPORTED: freestanding
+
+// FIXME: enable discarding taskgroup on windows; rdar://104762037
+// UNSUPPORTED: OS=windows-msvc
 
 actor Waiter {
   let until: Int
@@ -84,9 +85,24 @@ func test_discardingTaskGroup_neverConsume(sleepBeforeGroupWaitAll: Duration) as
   print("all tasks: \(allTasks)")
 }
 
+func test_discardingTaskGroup_bigReturn() async {
+  print(">>> \(#function)")
+
+  // Test returning a very large value to ensure we don't overflow memory.
+  let array = await withDiscardingTaskGroup { group in
+    group.addTask {}
+    try? await Task.sleep(until: .now + .milliseconds(100), clock: .continuous)
+    return InlineArray<32768, Int>(repeating: 12345)
+  }
+
+  // CHECK: Huge return value produced: 12345 12345
+  print("Huge return value produced:", array[0], array[32767])
+}
+
 @main struct Main {
   static func main() async {
     await test_discardingTaskGroup_neverConsume()
     await test_discardingTaskGroup_neverConsume(sleepBeforeGroupWaitAll: .milliseconds(500))
+    await test_discardingTaskGroup_bigReturn()
   }
 }

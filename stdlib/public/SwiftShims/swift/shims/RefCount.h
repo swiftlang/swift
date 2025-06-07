@@ -33,40 +33,40 @@ typedef InlineRefCountsPlaceholder InlineRefCounts;
 #include <stdint.h>
 #include <assert.h>
 
+#include "HeapObject.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/Runtime/Atomic.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/Heap.h"
 
-
 /*
-  An object conceptually has three refcounts. These refcounts 
+  An object conceptually has three refcounts. These refcounts
   are stored either "inline" in the field following the isa
   or in a "side table entry" pointed to by the field following the isa.
-  
-  The strong RC counts strong references to the object. When the strong RC 
-  reaches zero the object is deinited, unowned reference reads become errors, 
+
+  The strong RC counts strong references to the object. When the strong RC
+  reaches zero the object is deinited, unowned reference reads become errors,
   and weak reference reads become nil. The strong RC is stored as an extra
   count: when the physical field is 0 the logical value is 1.
 
-  The unowned RC counts unowned references to the object. The unowned RC 
-  also has an extra +1 on behalf of the strong references; this +1 is 
-  decremented after deinit completes. When the unowned RC reaches zero 
+  The unowned RC counts unowned references to the object. The unowned RC
+  also has an extra +1 on behalf of the strong references; this +1 is
+  decremented after deinit completes. When the unowned RC reaches zero
   the object's allocation is freed.
 
-  The weak RC counts weak references to the object. The weak RC also has an 
-  extra +1 on behalf of the unowned references; this +1 is decremented 
-  after the object's allocation is freed. When the weak RC reaches zero 
+  The weak RC counts weak references to the object. The weak RC also has an
+  extra +1 on behalf of the unowned references; this +1 is decremented
+  after the object's allocation is freed. When the weak RC reaches zero
   the object's side table entry is freed.
 
   Objects initially start with no side table. They can gain a side table when:
-  * a weak reference is formed 
+  * a weak reference is formed
   and pending future implementation:
   * strong RC or unowned RC overflows (inline RCs will be small on 32-bit)
   * associated object storage is needed on an object
   * etc
-  Gaining a side table entry is a one-way operation; an object with a side 
+  Gaining a side table entry is a one-way operation; an object with a side
   table entry never loses it. This prevents some thread races.
 
   Strong and unowned variables point at the object.
@@ -92,7 +92,7 @@ typedef InlineRefCountsPlaceholder InlineRefCounts;
       atomic<SideTableRefCountBits> {
         strong RC + unowned RC + weak RC + flags
       }
-    }   
+    }
   }
 
   InlineRefCounts and SideTableRefCounts share some implementation
@@ -101,10 +101,10 @@ typedef InlineRefCountsPlaceholder InlineRefCounts;
   InlineRefCountBits and SideTableRefCountBits share some implementation
   via RefCountBitsT<bool>.
 
-  In general: The InlineRefCounts implementation tries to perform the 
-  operation inline. If the object has a side table it calls the 
-  HeapObjectSideTableEntry implementation which in turn calls the 
-  SideTableRefCounts implementation. 
+  In general: The InlineRefCounts implementation tries to perform the
+  operation inline. If the object has a side table it calls the
+  HeapObjectSideTableEntry implementation which in turn calls the
+  SideTableRefCounts implementation.
   Downside: this code is a bit twisted.
   Upside: this code has less duplication than it might otherwise
 
@@ -115,11 +115,11 @@ typedef InlineRefCountsPlaceholder InlineRefCounts;
   The object is alive.
   Object's refcounts are initialized as 1 strong, 1 unowned, 1 weak.
   No side table. No weak RC storage.
-  Strong variable operations work normally. 
+  Strong variable operations work normally.
   Unowned variable operations work normally.
   Weak variable load can't happen.
   Weak variable store adds the side table, becoming LIVE with side table.
-  When the strong RC reaches zero deinit() is called and the object 
+  When the strong RC reaches zero deinit() is called and the object
     becomes DEINITING.
 
   LIVE with side table
@@ -133,14 +133,14 @@ typedef InlineRefCountsPlaceholder InlineRefCounts;
   Unowned variable store works normally.
   Weak variable load can't happen.
   Weak variable store stores nil.
-  When deinit() completes, the generated code calls swift_deallocObject. 
-    swift_deallocObject calls canBeFreedNow() checking for the fast path 
-    of no weak or unowned references. 
-    If canBeFreedNow() the object is freed and it becomes DEAD. 
+  When deinit() completes, the generated code calls swift_deallocObject.
+    swift_deallocObject calls canBeFreedNow() checking for the fast path
+    of no weak or unowned references.
+    If canBeFreedNow() the object is freed and it becomes DEAD.
     Otherwise, it decrements the unowned RC and the object becomes DEINITED.
 
   DEINITING with side table
-  Weak variable load returns nil. 
+  Weak variable load returns nil.
   Weak variable store stores nil.
   canBeFreedNow() is always false, so it never transitions directly to DEAD.
   Everything else is the same as DEINITING.
@@ -156,7 +156,7 @@ typedef InlineRefCountsPlaceholder InlineRefCounts;
   DEINITED with side table
   Weak variable load returns nil.
   Weak variable store can't happen.
-  When the unowned RC reaches zero, the object is freed, the weak RC is 
+  When the unowned RC reaches zero, the object is freed, the weak RC is
     decremented, and the object becomes FREED.
   Everything else is the same as DEINITED.
 
@@ -169,7 +169,7 @@ typedef InlineRefCountsPlaceholder InlineRefCounts;
   Unowned variable operations can't happen.
   Weak variable load returns nil.
   Weak variable store can't happen.
-  When the weak RC reaches zero, the side table entry is freed and 
+  When the weak RC reaches zero, the side table entry is freed and
     the object becomes DEAD.
 
   DEAD
@@ -397,7 +397,7 @@ class RefCountBitsT {
   bool isOverflowingUnownedRefCount(uint32_t oldValue, uint32_t inc) const {
     auto newValue = getUnownedRefCount();
     return newValue != oldValue + inc ||
-      newValue == Offsets::UnownedRefCountMask;
+      newValue == Offsets::UnownedRefCountMask >> Offsets::UnownedRefCountShift;
   }
 
   SWIFT_ALWAYS_INLINE
@@ -466,11 +466,16 @@ class RefCountBitsT {
     }
     else {
       // this is out-of-line and not the same layout as inline newbits.
-      // Copy field-by-field.
-      copyFieldFrom(newbits, UnownedRefCount);
-      copyFieldFrom(newbits, IsDeiniting);
-      copyFieldFrom(newbits, StrongExtraRefCount);
-      copyFieldFrom(newbits, UseSlowRC);
+      // Copy field-by-field. If it's immortal, just set that.
+      if (newbits.isImmortal(false)) {
+        setField(IsImmortal, Offsets::IsImmortalMask);
+      } else {
+        copyFieldFrom(newbits, PureSwiftDealloc);
+        copyFieldFrom(newbits, UnownedRefCount);
+        copyFieldFrom(newbits, IsDeiniting);
+        copyFieldFrom(newbits, StrongExtraRefCount);
+        copyFieldFrom(newbits, UseSlowRC);
+      }
     }
   }
 
@@ -576,6 +581,12 @@ class RefCountBitsT {
                "releasing reference whose refcount is already zero");
     }
 #endif
+
+    // If we're decrementing by more than 1, then this underflow might end up
+    // subtracting away an existing 1 in UseSlowRC. Check that separately. This
+    // check should be constant folded away for the swift_release case.
+    if (dec > 1 && getUseSlowRC())
+      return false;
 
     // This deliberately underflows by borrowing from the UseSlowRC field.
     bits -= BitsType(dec) << Offsets::StrongExtraRefCountShift;
@@ -807,8 +818,8 @@ class RefCounts {
   HeapObject *increment(uint32_t inc = 1) {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     
-    // constant propagation will remove this in swift_retain, it should only
-    // be present in swift_retain_n
+    // Constant propagation will remove this in swift_retain, it should only
+    // be present in swift_retain_n.
     if (inc != 1 && oldbits.isImmortal(true)) {
       return getHeapObject();
     }
@@ -831,8 +842,8 @@ class RefCounts {
   void incrementNonAtomic(uint32_t inc = 1) {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     
-    // constant propagation will remove this in swift_retain, it should only
-    // be present in swift_retain_n
+    // Constant propagation will remove this in swift_retain, it should only
+    // be present in swift_retain_n.
     if (inc != 1 && oldbits.isImmortal(true)) {
       return;
     }
@@ -910,7 +921,7 @@ class RefCounts {
   // Non-atomically release the last strong reference and mark the
   // object as deiniting.
   //
-  // Precondition: the reference count must be 1
+  // Precondition: the reference count must be 1.
   SWIFT_ALWAYS_INLINE
   void decrementFromOneNonAtomic() {
     auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
@@ -1002,8 +1013,8 @@ class RefCounts {
   bool doDecrementSlow(RefCountBits oldbits, uint32_t dec) {
     RefCountBits newbits;
     
-    // constant propagation will remove this in swift_release, it should only
-    // be present in swift_release_n
+    // Constant propagation will remove this in swift_release, it should only
+    // be present in swift_release_n.
     if (dec != 1 && oldbits.isImmortal(true)) {
       return false;
     }
@@ -1051,8 +1062,8 @@ class RefCounts {
     bool deinitNow;
     auto newbits = oldbits;
     
-    // constant propagation will remove this in swift_release, it should only
-    // be present in swift_release_n
+    // Constant propagation will remove this in swift_release, it should only
+    // be present in swift_release_n.
     if (dec != 1 && oldbits.isImmortal(true)) {
       return false;
     }
@@ -1099,8 +1110,8 @@ class RefCounts {
     auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
     RefCountBits newbits;
     
-    // constant propagation will remove this in swift_release, it should only
-    // be present in swift_release_n
+    // Constant propagation will remove this in swift_release, it should only
+    // be present in swift_release_n.
     if (dec != 1 && oldbits.isImmortal(true)) {
       return false;
     }
@@ -1301,6 +1312,8 @@ class RefCounts {
     return refCounts.load(std::memory_order_relaxed).getBitsValue();
   }
 
+  void dump() const;
+
   private:
   HeapObject *getHeapObject();
   
@@ -1500,6 +1513,10 @@ class HeapObjectSideTableEntry {
     immutableCOWBuffer = immutable;
   }
 #endif
+
+  void dumpRefCounts() {
+    refCounts.dump();
+  }
 };
 
 

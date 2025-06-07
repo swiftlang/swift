@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all -loop-rotate %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all -loop-rotate %s | %FileCheck %s
 
 // Declare this SIL to be canonical because some tests break raw SIL
 // conventions. e.g. address-type block args. -enforce-exclusivity=none is also
@@ -18,6 +18,7 @@ class Bar {
   @objc func foo_objc()
 }
 
+sil [ossa] @getBar : $@convention(thin) () -> @owned Bar
 sil [ossa] @_TFC4main3Bar3foofS0_FT_T_ : $@convention(method) (@guaranteed Bar) -> ()
 sil [ossa] @_TFC4main3Bar3boofS0_FT_T_ : $@convention(method) (@guaranteed Bar) -> Int64
 sil [ossa] @_TFC4main3Bar3foo_objcfS0_FT_T_ : $@convention(objc_method) (Bar) -> ()
@@ -78,6 +79,58 @@ bb2:
   br bb1(%21 : $Builtin.Int32, %14 : $Builtin.Int32, %26: $Bar, %31 : $<τ_0_0> { var τ_0_0 } <Bool>)
 
 bb3:
+  destroy_value %26 : $Bar
+  destroy_value %31 : $<τ_0_0> { var τ_0_0 } <Bool>
+  %23 = struct $Int32 (%4 : $Builtin.Int32)
+  return %23 : $Int32
+}
+
+// CHECK-LABEL: sil [ossa] @dont_rotate_multi_exit_loop :
+// CHECK:       bb1({{.*}}):
+// CHECK:         cond_br %{{.*}}, bb4, bb2
+// CHECK:       bb2:
+// CHECK:         cond_br undef, bb3, bb5
+// CHECK:       bb6:
+// CHECK:         return
+// CHECK-NOT:   bb7
+// CHECK:       } // end sil function 'dont_rotate_multi_exit_loop'
+sil [ossa] @dont_rotate_multi_exit_loop : $@convention(thin) (Int32, @owned Bar) -> Int32 {
+bb0(%0 : $Int32, %25: @owned $Bar):
+  %1 = struct_extract %0 : $Int32, #Int32._value
+  %2 = integer_literal $Builtin.Int32, 0
+  %30 = alloc_box $<τ_0_0> { var τ_0_0 } <Bool>
+  %30a = project_box %30 : $<τ_0_0> { var τ_0_0 } <Bool>, 0
+  br bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32, %25: $Bar, %30 : $<τ_0_0> { var τ_0_0 } <Bool>)
+
+bb1(%4 : $Builtin.Int32, %5 : $Builtin.Int32, %26: @owned $Bar, %31 : @owned $<τ_0_0> { var τ_0_0 } <Bool>):
+  %24 = class_method %26 : $Bar, #Bar.foo : (Bar) -> () -> (), $@convention(method) (@guaranteed Bar) -> () // user: %6
+  %27 = apply %24(%26) : $@convention(method) (@guaranteed Bar) -> ()
+  %6 = struct $Int32 (%5 : $Builtin.Int32)
+  %8 = builtin "cmp_eq_Word"(%5 : $Builtin.Int32, %1 : $Builtin.Int32) : $Builtin.Int1
+  cond_br %8, bb4, bb2
+
+bb2:
+  %10 = integer_literal $Builtin.Int32, 1
+  %12 = integer_literal $Builtin.Int1, -1
+  %13 = builtin "sadd_with_overflow_Word"(%5 : $Builtin.Int32, %10 : $Builtin.Int32, %12 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %14 = tuple_extract %13 : $(Builtin.Int32, Builtin.Int1), 0
+  %15 = enum $Optional<Int32>, #Optional.some!enumelt, %6 : $Int32
+  %16 = unchecked_enum_data %15 : $Optional<Int32>, #Optional.some!enumelt
+  %17 = struct_extract %16 : $Int32, #Int32._value
+  %19 = integer_literal $Builtin.Int1, -1
+  %20 = builtin "sadd_with_overflow_Word"(%4 : $Builtin.Int32, %17 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %21 = tuple_extract %20 : $(Builtin.Int32, Builtin.Int1), 0
+  cond_br undef, bb3, bb5
+bb3:
+  br bb1(%21 : $Builtin.Int32, %14 : $Builtin.Int32, %26: $Bar, %31 : $<τ_0_0> { var τ_0_0 } <Bool>)
+
+bb4:
+  br bb6
+
+bb5:
+  br bb6
+
+bb6:
   destroy_value %26 : $Bar
   destroy_value %31 : $<τ_0_0> { var τ_0_0 } <Bool>
   %23 = struct $Int32 (%4 : $Builtin.Int32)
@@ -352,49 +405,6 @@ bb0(%a0 : $Int32):
   return %t1 : $()
 }
 
-// Test the SSA Updater utility: replaceBBArgWithCast().
-//
-// CHECK-LABEL: sil [ossa] @struct_arg :
-// CHECK: bb0:
-// CHECK:  cond_br
-// CHECK: bb1:
-// CHECK:  br bb3
-// CHECK: bb3({{%.*}} : $Builtin.Int32, [[WORD:%.*]] : $Builtin.Int32
-// CHECK:  [[STRUCT:%[0-9]+]] = struct $Int32 ([[WORD]]
-// CHECK:  apply {{.*}}([[STRUCT]])
-// CHECK:  cond_br
-// CHECK: bb6({{.*}}):
-// CHECK:  return
-// CHECK-LABEL: } // end sil function 'struct_arg'
-sil [ossa] @struct_arg : $@convention(thin) () -> () {
-bb0:
-  %c0 = integer_literal $Builtin.Int32, 0
-  %c100 = integer_literal $Builtin.Int32, 100
-  br bb1(%c0 : $Builtin.Int32, %c0 : $Builtin.Int32)
-
-bb1(%a1 : $Builtin.Int32, %a0 : $Builtin.Int32):
-  %s0 = struct $Int32 (%a0 : $Builtin.Int32)
-  %z1 = builtin "cmp_eq_Word"(%a0 : $Builtin.Int32, %c100 : $Builtin.Int32) : $Builtin.Int1
-  cond_br %z1, bb2, bb3
-
-bb3:
-  %c1 = integer_literal $Builtin.Int32, 1
-  %z2 = integer_literal $Builtin.Int1, 0
-  %d1 = builtin "sadd_with_overflow_Word"(%a0 : $Builtin.Int32, %c1 : $Builtin.Int32, %z2 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
-  %t1 = tuple_extract %d1 : $(Builtin.Int32, Builtin.Int1), 0
-  %d2 = builtin "sadd_with_overflow_Word"(%a1 : $Builtin.Int32, %c1 : $Builtin.Int32, %z2 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
-  %t2 = tuple_extract %d2 : $(Builtin.Int32, Builtin.Int1), 0
-  %f1 = function_ref @readInt : $@convention(thin) (Int32) -> ()
-  %l1 = apply %f1(%s0) : $@convention(thin) (Int32) -> ()
-  br bb1(%t2 : $Builtin.Int32, %t1 : $Builtin.Int32)
-
-bb2:
-  %14 = struct $Int32 (%a1 : $Builtin.Int32)
-  %t3 = tuple ()
-  return %t3 : $()
-
-}
-
 // Test LoopRotate insertBackedgeBlock.
 //
 // CHECK-LABEL: sil [ossa] @insert_backedge_block :
@@ -465,6 +475,7 @@ bb1:
   cond_br %0, bb1a, bb2
 
 bb1a:
+  %t = tuple(%0 : $Builtin.Int1, %0 : $Builtin.Int1)
   br bb1
 
 bb2:
@@ -524,20 +535,26 @@ bb4:
   return %1 : $Builtin.RawPointer
 }
 
-// CHECK-LABEL: sil [ossa] @looprotate_copy :
+// CHECK-LABEL: sil [ossa] @looprotate_copy_move_borrow :
 // CHECK: bb0(%0 : $Int32, %1 : @guaranteed $Bar):
 // CHECK: copy_value
+// CHECK: move_value
+// CHECK: begin_borrow
 // CHECK: cond_br {{.*}}, bb2, bb1
 // CHECK: copy_value
-// CHECK-LABEL: } // end sil function 'looprotate_copy'
-sil [ossa] @looprotate_copy : $@convention(thin) (Int32, @guaranteed Bar) -> Int32 {
+// CHECK: move_value
+// CHECK: begin_borrow
+// CHECK-LABEL: } // end sil function 'looprotate_copy_move_borrow'
+sil [ossa] @looprotate_copy_move_borrow : $@convention(thin) (Int32, @guaranteed Bar) -> Int32 {
 bb0(%0 : $Int32, %1 : @guaranteed $Bar):
   %2 = struct_extract %0 : $Int32, #Int32._value
   %3 = integer_literal $Builtin.Int32, 0
   br bb1(%2 : $Builtin.Int32, %3 : $Builtin.Int32)
 
 bb1(%5 : $Builtin.Int32, %6 : $Builtin.Int32):
-  %7 = copy_value %1 : $Bar
+  %c = copy_value %1 : $Bar
+  %m = move_value %c : $Bar
+  %7 = begin_borrow %m : $Bar
   %8 = class_method %7 : $Bar, #Bar.foo : (Bar) -> () -> (), $@convention(method) (@guaranteed Bar) -> ()
   %9 = apply %8(%7) : $@convention(method) (@guaranteed Bar) -> ()
   %10 = struct $Int32 (%6 : $Builtin.Int32)
@@ -545,7 +562,8 @@ bb1(%5 : $Builtin.Int32, %6 : $Builtin.Int32):
   cond_br %11, bb3, bb2
 
 bb2:
-  destroy_value %7 : $Bar
+  end_borrow %7 : $Bar
+  destroy_value %m : $Bar
   %14 = integer_literal $Builtin.Int32, 1
   %15 = integer_literal $Builtin.Int1, -1
   %16 = builtin "sadd_with_overflow_Word"(%6 : $Builtin.Int32, %14 : $Builtin.Int32, %15 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
@@ -559,8 +577,176 @@ bb2:
   br bb1(%23 : $Builtin.Int32, %17 : $Builtin.Int32)
 
 bb3:
-  destroy_value %7 : $Bar
+  end_borrow %7 : $Bar
+  destroy_value %m : $Bar
   %26 = struct $Int32 (%5 : $Builtin.Int32)
   return %26 : $Int32
+}
+
+// Make sure that no unnecessary phis are inserted which would cause an ownership error.
+// CHECK-LABEL: sil [ossa] @test_ssa_updater_owned :
+// CHECK:         begin_borrow
+// CHECK-NOT:   bb({{.*@owned.*}}):
+// CHECK:         end_borrow
+// CHECK-LABEL: } // end sil function 'test_ssa_updater_owned'
+sil [ossa] @test_ssa_updater_owned : $@convention(thin) (@owned String, @guaranteed String) -> () {
+bb0(%0 : @owned $String, %1 : @guaranteed $String):
+  %2 = integer_literal $Builtin.Int64, 0
+  br bb1(%0, %2)
+
+bb1(%4 : @owned $String, %5 : $Builtin.Int64):
+  cond_br undef, bb14, bb2
+
+bb2:
+  %7 = integer_literal $Builtin.Int64, 1
+  %8 = begin_borrow %4
+  cond_br undef, bb4, bb3
+
+bb3:
+  br bb5
+
+bb4:
+  cond_br undef, bb7, bb8
+
+bb5:
+  cond_br undef, bb10, bb6
+
+bb6:
+  br bb9
+
+bb7:
+  br bb9
+
+bb8:
+  br bb12
+
+bb9:
+  br bb11
+
+bb10:
+  br bb11
+
+bb11:
+  end_borrow %8
+  destroy_value %4
+  br bb13
+
+bb12:
+  end_borrow %8
+  destroy_value [dead_end] %4
+  unreachable 
+
+bb13:
+  %24 = copy_value %1
+  br bb1(%24, %7)
+
+bb14:
+  destroy_value %4
+  %27 = tuple ()
+  return %27
+}
+
+// Make sure that no unnecessary phis are inserted which would cause an ownership error.
+// CHECK-LABEL: sil [ossa] @test_ssa_updater_guaranteed :
+// CHECK:         begin_borrow
+// CHECK:         begin_borrow
+// CHECK-NOT:   bb({{.*@reborrow.*}}):
+// CHECK:         end_borrow
+// CHECK-LABEL: } // end sil function 'test_ssa_updater_guaranteed'
+sil [ossa] @test_ssa_updater_guaranteed : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  %2 = integer_literal $Builtin.Int64, 0
+  %3 = begin_borrow %0
+  br bb1(%3, %2)
+
+bb1(%4 : @reborrow $String, %5 : $Builtin.Int64):
+  %6 = borrowed %4 from (%0)
+  cond_br undef, bb14, bb2
+
+bb2:
+  %7 = integer_literal $Builtin.Int64, 1
+  %8 = begin_borrow %6
+  cond_br undef, bb4, bb3
+
+bb3:
+  br bb5
+
+bb4:
+  cond_br undef, bb7, bb8
+
+bb5:
+  cond_br undef, bb10, bb6
+
+bb6:
+  br bb9
+
+bb7:
+  br bb9
+
+bb8:
+  br bb12
+
+bb9:
+  br bb11
+
+bb10:
+  br bb11
+
+bb11:
+  end_borrow %8
+  end_borrow %6
+  br bb13
+
+bb12:
+  end_borrow %8
+  end_borrow %6
+  destroy_value [dead_end] %0
+  unreachable 
+
+bb13:
+  %24 = begin_borrow %0
+  br bb1(%24, %7)
+
+bb14:
+  end_borrow %6
+  destroy_value %0
+  %27 = tuple ()
+  return %27
+}
+
+// Incomplete liveranges in dead-end exit blocks can cause a missing phi in the rotated loop.
+// CHECK-LABEL: sil [ossa] @incomplete_liverange_in_dead_end_exit :
+// CHECK:       bb1:
+// CHECK:         apply
+// CHECK:       bb2:
+// CHECK-LABEL: } // end sil function 'incomplete_liverange_in_dead_end_exit'
+sil [ossa] @incomplete_liverange_in_dead_end_exit : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  %1 = function_ref @getBar : $@convention(thin) () -> @owned Bar
+  %2 = apply %1() : $@convention(thin) () -> @owned Bar
+  %3 = begin_borrow %2
+  cond_br undef, bb3, bb2
+
+bb2:
+  br bb4
+
+bb3:
+  end_borrow %3
+  unreachable
+
+bb4:
+  end_borrow %3
+  destroy_value %2
+  cond_br undef, bb6, bb5
+
+bb5:
+  br bb1
+
+bb6:
+  %12 = tuple ()
+  return %12
 }
 

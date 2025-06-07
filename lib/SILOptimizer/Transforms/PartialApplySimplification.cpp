@@ -33,6 +33,7 @@
 
 #include "llvm/Support/Debug.h"
 #include "llvm/ADT/Statistic.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/TypeSubstCloner.h"
@@ -179,6 +180,7 @@ static bool isSimplePartialApply(SILModule &M,
     
     // +1 arguments need a thunk to stage a copy for the callee to consume.
     case ParameterConvention::Direct_Owned:
+    case ParameterConvention::Indirect_In_CXX:
     case ParameterConvention::Indirect_In:
       return false;
     }
@@ -391,8 +393,9 @@ rewriteKnownCalleeConventionOnly(SILFunction *callee,
     case ApplySiteKind::PartialApplyInst: {
       auto pa = cast<PartialApplyInst>(site.getInstruction());
       newInst = B.createPartialApply(loc, fr, site.getSubstitutionMap(), args,
-                                 pa->getFunctionType()->getCalleeConvention(),
-                                 pa->isOnStack());
+                                     pa->getCalleeConvention(),
+                                     pa->getResultIsolation(),
+                                     pa->isOnStack());
       break;
     }
     case ApplySiteKind::ApplyInst:
@@ -453,6 +456,7 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
     case ParameterConvention::Direct_Unowned:
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_In_Guaranteed:
+    case ParameterConvention::Indirect_In_CXX:
     case ParameterConvention::Pack_Guaranteed:
     case ParameterConvention::Pack_Owned:
       boxFields.push_back(SILField(param.getInterfaceType(), /*mutable*/false));
@@ -606,6 +610,7 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
           // Load a copy of the value from the box.
           projectedArg = B.createLoad(loc, proj, LoadOwnershipQualifier::Copy);
           break;
+        case ParameterConvention::Indirect_In_CXX:
         case ParameterConvention::Indirect_In: {
           // Allocate space for a copy of the value that can be consumed by the
           // function body. We'll need to deallocate the stack slot after the
@@ -652,6 +657,7 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
           projectedArg = B.createLoad(loc, proj, LoadOwnershipQualifier::Unqualified);
           B.createRetainValue(loc, projectedArg, Atomicity::Atomic);
           break;
+        case ParameterConvention::Indirect_In_CXX:
         case ParameterConvention::Indirect_In: {
           // Allocate space for a copy of the value that can be consumed by the
           // function body. We'll need to deallocate the stack slot after the
@@ -752,11 +758,10 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
       // Continue emitting code to populate the context.
       B.setInsertionPoint(contextAlloc->getNextInstruction());
     } else {
-      contextBuffer = B.createAllocBox(loc,
-                                       contextStorageTy.castTo<SILBoxType>(),
-                                       /*debug variable*/ None,
-                                       /*dynamic lifetime*/ false,
-                                       /*reflection*/ true);
+      contextBuffer = B.createAllocBox(
+          loc, contextStorageTy.castTo<SILBoxType>(),
+          /*debug variable*/ std::nullopt, DoesNotHaveDynamicLifetime,
+          /*reflection*/ true);
       contextProj = B.createProjectBox(loc, contextBuffer, 0);
     }
     
@@ -776,7 +781,7 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
       }
       auto param = partiallyAppliedParams[i];
 
-      switch (auto conv = param.getConvention()) {
+      switch (param.getConvention()) {
       case ParameterConvention::Direct_Owned:
       case ParameterConvention::Direct_Unowned:
       case ParameterConvention::Direct_Guaranteed:
@@ -790,6 +795,7 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
           
       case ParameterConvention::Indirect_In_Guaranteed:
       case ParameterConvention::Indirect_In:
+      case ParameterConvention::Indirect_In_CXX:
         // Move the value from its current memory location to the box.
         B.createCopyAddr(loc, arg, proj, IsTake, IsInitialization);
         break;
@@ -822,6 +828,8 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
     SILInstruction *newInst;
     switch (site.getKind()) {
     case ApplySiteKind::PartialApplyInst: {
+      auto oldPA = cast<PartialApplyInst>(site.getInstruction());
+      auto paIsolation = oldPA->getResultIsolation();
       auto paConvention = isNoEscape ? ParameterConvention::Direct_Guaranteed
                                      : contextParam.getConvention();
       auto paOnStack = isNoEscape ? PartialApplyInst::OnStack
@@ -830,6 +838,7 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
                                      site.getSubstitutionMap(),
                                      newArgs,
                                      paConvention,
+                                     paIsolation,
                                      paOnStack);
       assert(isSimplePartialApply(newPA)
              && "partial apply wasn't simple after transformation?");

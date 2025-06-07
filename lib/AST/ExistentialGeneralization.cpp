@@ -20,6 +20,7 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/ADT/DenseMap.h"
 
 using namespace swift;
@@ -56,7 +57,8 @@ public:
     // Finish the signature.
     auto sig = buildGenericSignature(ctx, GenericSignature(),
                                      addedParameters,
-                                     addedRequirements);
+                                     addedRequirements,
+                                     /*allowInverses=*/false);
 
     // TODO: minimize the signature by removing redundant generic
     // parameters.
@@ -66,10 +68,11 @@ public:
       assert(it != substTypes.end());
       return it->second;
     };
-    auto lookupConformance = [&](CanType dependentType,
-                                 Type conformingReplacementType,
+    auto lookupConformance = [&](InFlightSubstitution &IFS,
+                                 Type dependentType,
                                  ProtocolDecl *conformedProtocol) {
-      auto it = substConformances.find({dependentType, conformedProtocol});
+      auto it = substConformances.find(
+          {dependentType->getCanonicalType(), conformedProtocol});
       assert(it != substConformances.end());
       return it->second;
     };
@@ -79,7 +82,6 @@ public:
 private:
   Type visitProtocolType(CanProtocolType type) {
     // Simple protocol types have no sub-structure.
-    assert(!type.getParent());
     return type;
   }
 
@@ -107,6 +109,7 @@ private:
       newMembers.push_back(generalizeStructure(origMember));
     }
     return ProtocolCompositionType::get(ctx, newMembers,
+                                        origType->getInverses(),
                                         origType->hasExplicitAnyObject());
   }
 
@@ -158,6 +161,8 @@ private:
   NO_PRESERVABLE_STRUCTURE(Module)
   NO_PRESERVABLE_STRUCTURE(Pack)
   NO_PRESERVABLE_STRUCTURE(PackExpansion)
+  NO_PRESERVABLE_STRUCTURE(PackElement)
+  NO_PRESERVABLE_STRUCTURE(Integer)
 #undef NO_PRESERVABLE_STRUCTURE
 
   // These types simply shouldn't appear in types that we generalize at all.
@@ -182,8 +187,7 @@ private:
   /// Generalize the generic arguments of the given generic type.s
   Type generalizeGenericArguments(NominalTypeDecl *decl, CanType type) {
     assert(decl->isGenericContext());
-    auto origSubs = type->getContextSubstitutionMap(decl->getModuleContext(),
-                                                    decl);
+    auto origSubs = type->getContextSubstitutionMap(decl);
 
     // Generalize all of the arguments.
     auto origArgs = origSubs.getReplacementTypes();
@@ -192,35 +196,37 @@ private:
       newArgs.push_back(generalizeComponentType(CanType(origArg)));
     }
 
+    auto origSig = origSubs.getGenericSignature();
+
     // Generalize all of the conformances.
     // TODO: for abstract requirements, we might not generalize all
     // arguments, and we may need to leave corresponding conformances
     // concrete.
     SmallVector<ProtocolConformanceRef, 4> newConformances;
-    auto origConformances = origSubs.getConformances();
-    for (auto origConformance: origConformances) {
+    for (const auto &req : origSig.getRequirements()) {
+      if (req.getKind() != RequirementKind::Conformance)
+        continue;
       newConformances.push_back(
-        ProtocolConformanceRef(origConformance.getRequirement()));
+          ProtocolConformanceRef::forAbstract(req.getFirstType(),
+                                              req.getProtocolDecl()));
     }
 
-    auto origSig = origSubs.getGenericSignature();
     auto newSubs = SubstitutionMap::get(origSig, newArgs, newConformances);
 
     // Add any conformance requirements to the generic signature and
     // remember the conformances we generalized.
-    if (!origConformances.empty()) {
-      size_t i = 0;
-      for (auto &origReq: origSig.getRequirements()) {
-        if (origReq.getKind() != RequirementKind::Conformance) continue;
-        auto origConformance = origConformances[i++];
+    auto origConformances = origSubs.getConformances();
+    size_t i = 0;
+    for (auto &origReq: origSig.getRequirements()) {
+      if (origReq.getKind() != RequirementKind::Conformance) continue;
+      auto origConformance = origConformances[i++];
 
-        auto newReq = origReq.subst(newSubs);
-        addedRequirements.push_back(newReq);
+      auto newReq = origReq.subst(newSubs);
+      addedRequirements.push_back(newReq);
 
-        substConformances.insert({{newReq.getFirstType()->getCanonicalType(),
-                                   newReq.getProtocolDecl()},
-                                  origConformance});
-      }
+      substConformances.insert({{newReq.getFirstType()->getCanonicalType(),
+                                 newReq.getProtocolDecl()},
+                                origConformance});
     }
 
     // Build the new type.
@@ -230,13 +236,14 @@ private:
   /// Generalize the given type by preserving its top-level structure
   /// but generalizing its component types.
   Type generalizeComponentTypes(CanType type) {
-    return type.transformRec([&](TypeBase *componentType) -> Optional<Type> {
-      // Ignore the top level.
-      if (componentType == type.getPointer())
-        return None;
+    return type.transformRec(
+        [&](TypeBase *componentType) -> std::optional<Type> {
+          // Ignore the top level.
+          if (componentType == type.getPointer())
+            return std::nullopt;
 
-      return generalizeComponentType(CanType(componentType));
-    });
+          return generalizeComponentType(CanType(componentType));
+        });
   }
 
   Type generalizeComponentType(CanType origArg) {
@@ -250,10 +257,9 @@ private:
 
     // Create a new generalization type parameter and record the
     // substitution.
-    auto newParam = GenericTypeParamType::get(/*sequence*/ false,
-                                              /*depth*/ 0,
-                                              /*index*/ substTypes.size(),
-                                              ctx);
+    auto newParam = GenericTypeParamType::getType(/*depth*/ 0,
+                                                  /*index*/ substTypes.size(),
+                                                  ctx);
     addedParameters.push_back(newParam);
 
     substTypes.insert({CanType(newParam), origArg});

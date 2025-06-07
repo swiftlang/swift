@@ -1,7 +1,6 @@
-// RUN: %target-typecheck-verify-swift -swift-version 6 -disable-availability-checking -warn-concurrency
-// REQUIRES: concurrency
+// RUN: %target-swift-frontend -swift-version 6 -target %target-swift-5.1-abi-triple -strict-concurrency=complete -emit-sil -o /dev/null -verify %s
 
-// REQUIRES: asserts
+// REQUIRES: concurrency
 
 @globalActor
 actor GlobalActor {

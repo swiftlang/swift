@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Module.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -32,7 +33,7 @@ static bool shouldHaveSkippedFunction(const SILFunction &F) {
   // First, we only care about functions that haven't been marked serialized.
   // If they've been marked serialized, they will end up in the final module
   // and we needed to SILGen them.
-  if (F.isSerialized())
+  if (F.isAnySerialized())
     return false;
 
   // Next, we're looking for functions that shouldn't have a body, but do. If
@@ -66,19 +67,22 @@ static bool shouldHaveSkippedFunction(const SILFunction &F) {
   if (isa<DestructorDecl>(func) || isa<ConstructorDecl>(func))
     return false;
 
-  // See DeclChecker::shouldSkipBodyTypechecking. Can't skip didSet for now.
+  // Some AccessorDecls can't be skipped (see IsFunctionBodySkippedRequest).
   if (auto *AD = dyn_cast<AccessorDecl>(func)) {
     if (AD->getAccessorKind() == AccessorKind::DidSet)
       return false;
+
+    if (AD->hasForcedStaticDispatch())
+      return false;
   }
 
-  // Functions with @_backDeploy may be copied into the client, so they
+  // Functions with @backDeployed may be copied into the client, so they
   // shouldn't be skipped. The SILFunction that may be copied into the client
   // should be serialized and therefore is already handled above. However, a
   // second resilient SILFunction is also emitted for back deployed functions.
   // Since the body of the function as written was not skipped, it's expected
   // that we see the SILFunction for the resilient copy here.
-  if (func->isBackDeployed())
+  if (func->hasBackDeployedAttr())
     return false;
 
   // If none of those conditions trip, then this is something that _should_

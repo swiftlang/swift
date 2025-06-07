@@ -14,9 +14,11 @@
 
 #include "llvm/ADT/DepthFirstIterator.h"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
+#include "swift/SILOptimizer/Analysis/IsSelfRecursiveAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
@@ -108,29 +110,29 @@ void LoopCloner::cloneLoop() {
 /// Determine the number of iterations the loop is at most executed. The loop
 /// might contain early exits so this is the maximum if no early exits are
 /// taken.
-static Optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
-                                              SILBasicBlock *Preheader,
-                                              SILBasicBlock *Header,
-                                              SILBasicBlock *Latch) {
+static std::optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
+                                                   SILBasicBlock *Preheader,
+                                                   SILBasicBlock *Header,
+                                                   SILBasicBlock *Latch) {
 
   // Skip a split backedge.
   SILBasicBlock *OrigLatch = Latch;
   if (!Loop->isLoopExiting(Latch) &&
       !(Latch = Latch->getSinglePredecessorBlock()))
-    return None;
+    return std::nullopt;
   if (!Loop->isLoopExiting(Latch))
-    return None;
+    return std::nullopt;
 
  // Get the loop exit condition.
   auto *CondBr = dyn_cast<CondBranchInst>(Latch->getTerminator());
   if (!CondBr)
-    return None;
+    return std::nullopt;
 
   // Match an add 1 recurrence.
 
   auto *Cmp = dyn_cast<BuiltinInst>(CondBr->getCondition());
   if (!Cmp)
-    return None;
+    return std::nullopt;
 
   unsigned Adjust = 0;
   SILBasicBlock *Exit = CondBr->getTrueBB();
@@ -151,46 +153,56 @@ static Optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
       Exit = CondBr->getFalseBB();
       break;
     default:
-      return None;
+      return std::nullopt;
   }
 
   if (Loop->contains(Exit))
-    return None;
+    return std::nullopt;
 
   auto *End = dyn_cast<IntegerLiteralInst>(Cmp->getArguments()[1]);
   if (!End)
-    return None;
+    return std::nullopt;
 
   SILValue RecNext = Cmp->getArguments()[0];
   SILPhiArgument *RecArg;
+
+  // Match signed add with overflow, unsigned add with overflow and
+  // add without overflow.
   if (!match(RecNext, m_TupleExtractOperation(
                           m_ApplyInst(BuiltinValueKind::SAddOver,
                                       m_SILPhiArgument(RecArg), m_One()),
-                          0)))
-    return None;
+                          0)) &&
+      !match(RecNext, m_TupleExtractOperation(
+                          m_ApplyInst(BuiltinValueKind::UAddOver,
+                                      m_SILPhiArgument(RecArg), m_One()),
+                          0)) &&
+      !match(RecNext, m_ApplyInst(BuiltinValueKind::Add,
+                                      m_SILPhiArgument(RecArg), m_One()))) {
+    return std::nullopt;
+  }
 
   if (RecArg->getParent() != Header)
-    return None;
+    return std::nullopt;
 
   auto *Start = dyn_cast_or_null<IntegerLiteralInst>(
       RecArg->getIncomingPhiValue(Preheader));
   if (!Start)
-    return None;
+    return std::nullopt;
 
   if (RecNext != RecArg->getIncomingPhiValue(OrigLatch))
-    return None;
+    return std::nullopt;
 
   auto StartVal = Start->getValue();
   auto EndVal = End->getValue();
   if (StartVal.sgt(EndVal))
-    return None;
+    return std::nullopt;
 
   auto Dist = EndVal - StartVal;
   if (Dist.getBitWidth() > 64)
-    return None;
+    return std::nullopt;
 
   if (Dist == 0)
-    return None;
+    return std::nullopt;
 
   return Dist.getZExtValue() + Adjust;
 }
@@ -198,7 +210,8 @@ static Optional<uint64_t> getMaxLoopTripCount(SILLoop *Loop,
 /// Check whether we can duplicate the instructions in the loop and use a
 /// heuristic that looks at the trip count and the cost of the instructions in
 /// the loop to determine whether we should unroll this loop.
-static bool canAndShouldUnrollLoop(SILLoop *Loop, uint64_t TripCount) {
+static bool canAndShouldUnrollLoop(SILLoop *Loop, uint64_t TripCount,
+                                   IsSelfRecursiveAnalysis *SRA) {
   assert(Loop->getSubLoops().empty() && "Expect innermost loops");
   if (TripCount > 32)
     return false;
@@ -220,7 +233,7 @@ static bool canAndShouldUnrollLoop(SILLoop *Loop, uint64_t TripCount) {
         ++Cost;
       if (auto AI = FullApplySite::isa(&Inst)) {
         auto Callee = AI.getCalleeFunction();
-        if (Callee && getEligibleFunction(AI, InlineSelection::Everything)) {
+        if (Callee && getEligibleFunction(AI, InlineSelection::Everything, SRA)) {
           // If callee is rather big and potentially inlinable, it may be better
           // not to unroll, so that the body of the callee can be inlined later.
           Cost += Callee->size() * InsnsPerBB;
@@ -351,7 +364,7 @@ void LoopCloner::collectLoopLiveOutValues(
 }
 
 static void
-updateSSA(SILModule &M, SILLoop *Loop,
+updateSSA(SILFunction *Fn, SILLoop *Loop,
           DenseMap<SILValue, SmallVector<SILValue, 8>> &LoopLiveOutValues) {
   SILSSAUpdater SSAUp;
   for (auto &MapEntry : LoopLiveOutValues) {
@@ -362,7 +375,7 @@ updateSSA(SILModule &M, SILLoop *Loop,
       if (!Loop->contains(Use->getUser()->getParent()))
         UseList.push_back(UseWrapper(Use));
     // Update SSA of use with the available values.
-    SSAUp.initialize(OrigValue->getType(), OrigValue->getOwnershipKind());
+    SSAUp.initialize(Fn, OrigValue->getType(), OrigValue->getOwnershipKind());
     SSAUp.addAvailableValue(OrigValue->getParentBlock(), OrigValue);
     for (auto NewValue : MapEntry.second)
       SSAUp.addAvailableValue(NewValue->getParentBlock(), NewValue);
@@ -375,14 +388,13 @@ updateSSA(SILModule &M, SILLoop *Loop,
 
 /// Try to fully unroll the loop if we can determine the trip count and the trip
 /// count is below a threshold.
-static bool tryToUnrollLoop(SILLoop *Loop) {
+static bool tryToUnrollLoop(SILLoop *Loop, IsSelfRecursiveAnalysis *SRA) {
   assert(Loop->getSubLoops().empty() && "Expecting innermost loops");
 
   LLVM_DEBUG(llvm::dbgs() << "Trying to unroll loop : \n" << *Loop);
   auto *Preheader = Loop->getLoopPreheader();
   if (!Preheader)
     return false;
-  SILModule &M = Preheader->getParent()->getModule();
 
   auto *Latch = Loop->getLoopLatch();
   if (!Latch)
@@ -390,14 +402,14 @@ static bool tryToUnrollLoop(SILLoop *Loop) {
 
   auto *Header = Loop->getHeader();
 
-  Optional<uint64_t> MaxTripCount =
+  std::optional<uint64_t> MaxTripCount =
       getMaxLoopTripCount(Loop, Preheader, Header, Latch);
   if (!MaxTripCount) {
     LLVM_DEBUG(llvm::dbgs() << "Not unrolling, did not find trip count\n");
     return false;
   }
 
-  if (!canAndShouldUnrollLoop(Loop, MaxTripCount.value())) {
+  if (!canAndShouldUnrollLoop(Loop, MaxTripCount.value(), SRA)) {
     LLVM_DEBUG(llvm::dbgs() << "Not unrolling, exceeds cost threshold\n");
     return false;
   }
@@ -461,7 +473,7 @@ static bool tryToUnrollLoop(SILLoop *Loop) {
   }
 
   // Fixup SSA form for loop values used outside the loop.
-  updateSSA(M, Loop, LoopLiveOutValues);
+  updateSSA(Loop->getFunction(), Loop, LoopLiveOutValues);
   return true;
 }
 
@@ -477,9 +489,14 @@ class LoopUnrolling : public SILFunctionTransform {
     bool Changed = false;
     auto *Fun = getFunction();
     SILLoopInfo *LoopInfo = PM->getAnalysis<SILLoopAnalysis>()->get(Fun);
+    IsSelfRecursiveAnalysis *SRA = PM->getAnalysis<IsSelfRecursiveAnalysis>();
+
+    LLVM_DEBUG(llvm::dbgs() << "Loop Unroll running on function : "
+                            << Fun->getName() << "\n");
 
     // Collect innermost loops.
     SmallVector<SILLoop *, 16> InnermostLoops;
+
     for (auto *Loop : *LoopInfo) {
       SmallVector<SILLoop *, 8> Worklist;
       Worklist.push_back(Loop);
@@ -493,15 +510,14 @@ class LoopUnrolling : public SILFunctionTransform {
       }
     }
 
-    if (InnermostLoops.empty())
+    if (InnermostLoops.empty()) {
+      LLVM_DEBUG(llvm::dbgs() << "No innermost loops\n");
       return;
-
-    LLVM_DEBUG(llvm::dbgs() << "Loop Unroll running on function : "
-                            << Fun->getName() << "\n");
+    }
 
     // Try to unroll innermost loops.
     for (auto *Loop : InnermostLoops)
-      Changed |= tryToUnrollLoop(Loop);
+      Changed |= tryToUnrollLoop(Loop, SRA);
 
     if (Changed) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);

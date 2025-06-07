@@ -29,7 +29,7 @@ bb0:
   %2 = partial_apply [callee_guaranteed] [on_stack] %1(%0) : $@convention(thin) (@owned Str, @guaranteed KeyPath<Str, C>) -> @owned C
   %4 = function_ref @calleeWithKeypath : $@convention(thin) (@noescape @callee_guaranteed (@owned Str) -> @owned C) -> ()
   %5 = apply %4(%2) : $@convention(thin) (@noescape @callee_guaranteed (@owned Str) -> @owned C) -> ()
-  dealloc_stack %2 : $@noescape @callee_guaranteed (@owned Str) -> @owned C
+  destroy_value %2 : $@noescape @callee_guaranteed (@owned Str) -> @owned C
   destroy_value %0 : $KeyPath<Str, C>
   %7 = tuple ()
   return %7 : $()

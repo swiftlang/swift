@@ -62,7 +62,7 @@ struct OverrideSection {
 };
 
 OverrideSection RuntimeOverrides
-    __attribute__((section("__DATA,__swift58_hooks"))) = {
+    __attribute__((section("__DATA," COMPATIBILITY_OVERRIDE_SECTION_NAME_swiftRuntime))) = {
         0,
 #define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs) \
   name ## Override,
@@ -175,6 +175,16 @@ TEST_F(CompatibilityOverrideRuntimeTest,
 
 TEST_F(CompatibilityOverrideRuntimeTest, test_swift_conformsToProtocol) {
   auto Result = swift_conformsToProtocol(nullptr, nullptr);
+  ASSERT_EQ(Result, nullptr);
+}
+
+TEST_F(CompatibilityOverrideRuntimeTest, test_swift_conformsToProtocol2) {
+  auto Result = swift_conformsToProtocol2(nullptr, nullptr);
+  ASSERT_EQ(Result, nullptr);
+}
+
+TEST_F(CompatibilityOverrideRuntimeTest, test_swift_conformsToProtocolCommon) {
+  auto Result = swift_conformsToProtocolCommon(nullptr, nullptr);
   ASSERT_EQ(Result, nullptr);
 }
 

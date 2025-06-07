@@ -1,0 +1,23 @@
+source.edit.kind.active:
+  7:6-7:9 source.refactoring.range.kind.basename
+  7:10-7:11 source.refactoring.range.kind.decl-argument-label arg-index=0
+  7:11-7:11 source.refactoring.range.kind.parameter-and-whitespace arg-index=0
+source.edit.kind.active:
+  17:17-17:20 source.refactoring.range.kind.basename
+  17:21-17:22 source.refactoring.range.kind.call-argument-label arg-index=0
+  17:22-17:24 source.refactoring.range.kind.call-argument-colon arg-index=0
+source.edit.kind.active:
+  18:17-18:20 source.refactoring.range.kind.basename
+source.edit.kind.string:
+  22:12-22:15 source.refactoring.range.kind.basename
+source.edit.kind.unknown:
+source.edit.kind.unknown:
+source.edit.kind.unknown:
+source.edit.kind.string:
+  26:17-26:20 source.refactoring.range.kind.basename
+source.edit.kind.active:
+  26:23-26:26 source.refactoring.range.kind.basename
+  26:27-26:28 source.refactoring.range.kind.call-argument-label arg-index=0
+  26:28-26:29 source.refactoring.range.kind.call-argument-colon arg-index=0
+source.edit.kind.string:
+  26:33-26:36 source.refactoring.range.kind.basename

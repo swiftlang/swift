@@ -1,4 +1,6 @@
-// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all -semantic-arc-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -module-name Swift -enable-sil-verify-all -semantic-arc-opts %s | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 
@@ -262,43 +264,6 @@ bb3:
   return %9999 : $()
 }
 
-// Simple in_guaranteed argument load_copy.
-// CHECK-LABEL: sil [ossa] @load_copy_from_in_guaranteed : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> () {
-// CHECK: bb0([[ARG:%.*]] :
-// CHECK: load_borrow
-// CHECK: load_borrow
-// CHECK: load [copy]
-// CHECK: } // end sil function 'load_copy_from_in_guaranteed'
-sil [ossa] @load_copy_from_in_guaranteed : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> () {
-bb0(%0 : $*Builtin.NativeObject):
-  %g = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  // Simple same bb.
-  %1 = load [copy] %0 : $*Builtin.NativeObject
-  apply %g(%1) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  destroy_value %1 : $Builtin.NativeObject
-
-  // Diamond.
-  %2 = load [copy] %0 : $*Builtin.NativeObject
-  cond_br undef, bb1, bb2
-
-bb1:
-  apply %g(%2) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  destroy_value %2 : $Builtin.NativeObject
-  br bb3
-
-bb2:
-  destroy_value %2 : $Builtin.NativeObject
-  br bb3
-
-bb3:
-  // Consuming use blocks.
-  %3 = load [copy] %0 : $*Builtin.NativeObject
-  %4 = function_ref @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
-  apply %4(%3) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
-  %9999 = tuple()
-  return %9999 : $()
-}
-
 // CHECK-LABEL: sil [ossa] @destructure_test : $@convention(thin) (@guaranteed StructMemberTest) -> Builtin.Int32 {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $StructMemberTest):
 // CHECK:   [[EXT:%.*]] = struct_extract [[ARG]]
@@ -393,65 +358,13 @@ bb0(%0 : @guaranteed $(Klass, MyInt)):
   return %4 : $Builtin.Int32
 }
 
-// CHECK-LABEL: sil [ossa] @switch_enum_test_loadcopy_no_default : $@convention(thin) (@owned FakeOptional<Builtin.NativeObject>) -> () {
-// CHECK-NOT: load [copy]
-// CHECK: load_borrow
-// CHECK-NOT: load [copy]
-// CHECK: } // end sil function 'switch_enum_test_loadcopy_no_default'
-sil [ossa] @switch_enum_test_loadcopy_no_default : $@convention(thin) (@owned FakeOptional<Builtin.NativeObject>) -> () {
-bb0(%0 : @owned $FakeOptional<Builtin.NativeObject>):
-  %0a = alloc_stack $FakeOptional<Builtin.NativeObject>
-  store %0 to [init] %0a : $*FakeOptional<Builtin.NativeObject>
-  %1 = load [copy] %0a : $*FakeOptional<Builtin.NativeObject>
-  switch_enum %1 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
-
-bb1(%2 : @owned $Builtin.NativeObject):
-  destroy_value %2 : $Builtin.NativeObject
-  br bb3
-
-bb2:
-  br bb3
-
-bb3:
-  destroy_addr %0a : $*FakeOptional<Builtin.NativeObject>
-  dealloc_stack %0a : $*FakeOptional<Builtin.NativeObject>
-  %9999 = tuple()
-  return %9999 : $()
-}
-
-// CHECK-LABEL: sil [ossa] @switch_enum_test_loadcopy_with_default : $@convention(thin) (@owned FakeOptional<Builtin.NativeObject>) -> () {
-// CHECK-NOT: load [copy]
-// CHECK: load_borrow
-// CHECK-NOT: load [copy]
-// CHECK: } // end sil function 'switch_enum_test_loadcopy_with_default'
-sil [ossa] @switch_enum_test_loadcopy_with_default : $@convention(thin) (@owned FakeOptional<Builtin.NativeObject>) -> () {
-bb0(%0 : @owned $FakeOptional<Builtin.NativeObject>):
-  %0a = alloc_stack $FakeOptional<Builtin.NativeObject>
-  store %0 to [init] %0a : $*FakeOptional<Builtin.NativeObject>
-  %1 = load [copy] %0a : $*FakeOptional<Builtin.NativeObject>
-  switch_enum %1 : $FakeOptional<Builtin.NativeObject>, case #FakeOptional.some!enumelt: bb1, default bb2
-
-bb1(%2 : @owned $Builtin.NativeObject):
-  destroy_value %2 : $Builtin.NativeObject
-  br bb3
-
-bb2:
-  br bb3
-
-bb3:
-  destroy_addr %0a : $*FakeOptional<Builtin.NativeObject>
-  dealloc_stack %0a : $*FakeOptional<Builtin.NativeObject>
-  %9999 = tuple()
-  return %9999 : $()
-}
-
 // ============================================================================
 // Test SemanticARC phi optimization. canEliminatePhi must recognize
 // terminators with multiple operands.
 
 // CHECK-LABEL: sil [ossa] @testTypeDependentCheckCast : $@convention(thin) (@guaranteed Klass, @thick @dynamic_self Klass.Type) -> () {
 // CHECK: bb0(%0 : @guaranteed $Klass, %1 : $@thick @dynamic_self Klass.Type):
-// CHECK:   checked_cast_br %0 : $Klass to @dynamic_self Klass, bb1, bb2 // type-defs: %1; id: %2
+// CHECK:   checked_cast_br Klass in %0 : $Klass to @dynamic_self Klass, bb1, bb2 // type-defs: %1; id: %2
 //
 // CHECK: bb1([[CAST:%.*]] : @guaranteed $Klass):
 // CHECK:   [[SOME:%.*]] = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, [[CAST]] : $Klass
@@ -462,7 +375,8 @@ bb3:
 // CHECK-NEXT: br bb3([[NONE]] : $FakeOptional<Klass>)
 //
 // CHECK: bb3([[PHI:%.*]] : @guaranteed $FakeOptional<Klass>):
-// CHECK:   switch_enum [[PHI]] : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb5, case #FakeOptional.none!enumelt: bb4
+// CHECK:   [[BF:%.*]] = borrowed [[PHI]]
+// CHECK:   switch_enum [[BF]] : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb5, case #FakeOptional.none!enumelt: bb4
 //
 // CHECK: bb4:
 // CHECK-NEXT: br bb6
@@ -473,7 +387,7 @@ bb3:
 sil [ossa] @testTypeDependentCheckCast : $@convention(thin) (@guaranteed Klass, @thick @dynamic_self Klass.Type) -> () {
 bb0(%0 : @guaranteed $Klass, %1 : $@thick @dynamic_self Klass.Type):
   %2 = copy_value %0 : $Klass
-  checked_cast_br %2 : $Klass to @dynamic_self Klass, bb1, bb2
+  checked_cast_br Klass in %2 : $Klass to @dynamic_self Klass, bb1, bb2
 
 bb1(%4 : @owned $Klass):
   %5 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %4 : $Klass

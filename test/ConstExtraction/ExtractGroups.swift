@@ -38,13 +38,25 @@ extension String: Foo {}
 // CHECK: [
 // CHECK-NEXT:  {
 // CHECK-NEXT:    "typeName": "ExtractGroups.Arrays",
+// CHECK-NEXT:    "mangledTypeName": "13ExtractGroups6ArraysV",
 // CHECK-NEXT:    "kind": "struct",
 // CHECK-NEXT:    "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
 // CHECK-NEXT:    "line": 9,
+// CHECK-NEXT:    "conformances": [
+// CHECK-NEXT:      "ExtractGroups.MyProto"
+// CHECK-NEXT:    ],
+// CHECK-NEXT:    "allConformances": [
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "protocolName": "ExtractGroups.MyProto"
+// CHECK-NEXT:        "conformanceDefiningModule": "ExtractGroups"
+// CHECK-NEXT:      }
+// CHECK-NEXT:    ],
+// CHECK-NEXT:    "associatedTypeAliases": [],
 // CHECK-NEXT:    "properties": [
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "array1",
 // CHECK-NEXT:        "type": "Swift.Array<Swift.Int>",
+// CHECK-NEXT:        "mangledTypeName": "n/a - deprecated",
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
@@ -67,7 +79,8 @@ extension String: Foo {}
 // CHECK-NEXT:      },
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "array2",
-// CHECK-NEXT:        "type": "Swift.Array<ExtractGroups.Foo>",
+// CHECK-NEXT:        "type": "Swift.Array<any ExtractGroups.Foo>",
+// CHECK-NEXT:        "mangledTypeName": "n/a - deprecated",
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
@@ -94,6 +107,7 @@ extension String: Foo {}
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "array3",
 // CHECK-NEXT:        "type": "Swift.Array<ExtractGroups.Bar>",
+// CHECK-NEXT:        "mangledTypeName": "n/a - deprecated",
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
@@ -113,13 +127,25 @@ extension String: Foo {}
 // CHECK-NEXT:  },
 // CHECK-NEXT:  {
 // CHECK-NEXT:    "typeName": "ExtractGroups.Dictionaries",
+// CHECK-NEXT:    "mangledTypeName": "13ExtractGroups12DictionariesV",
 // CHECK-NEXT:    "kind": "struct",
 // CHECK-NEXT:    "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
 // CHECK-NEXT:    "line": 15,
+// CHECK-NEXT:    "conformances": [
+// CHECK-NEXT:      "ExtractGroups.MyProto"
+// CHECK-NEXT:    ],
+// CHECK-NEXT:    "allConformances": [
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "protocolName": "ExtractGroups.MyProto"
+// CHECK-NEXT:        "conformanceDefiningModule": "ExtractGroups"
+// CHECK-NEXT:      }
+// CHECK-NEXT:    ],
+// CHECK-NEXT:    "associatedTypeAliases": [],
 // CHECK-NEXT:    "properties": [
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "dict1",
 // CHECK-NEXT:        "type": "Swift.Dictionary<Swift.String, Swift.Int>",
+// CHECK-NEXT:        "mangledTypeName": "n/a - deprecated",
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
@@ -161,6 +187,7 @@ extension String: Foo {}
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "dict2",
 // CHECK-NEXT:        "type": "Swift.Dictionary<Swift.Int, Swift.Array<Swift.String>>",
+// CHECK-NEXT:        "mangledTypeName": "n/a - deprecated",
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
@@ -209,7 +236,8 @@ extension String: Foo {}
 // CHECK-NEXT:      },
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "dict3",
-// CHECK-NEXT:        "type": "Swift.Dictionary<Swift.String, ExtractGroups.Foo>",
+// CHECK-NEXT:        "type": "Swift.Dictionary<Swift.String, any ExtractGroups.Foo>",
+// CHECK-NEXT:        "mangledTypeName": "n/a - deprecated",
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
@@ -245,13 +273,25 @@ extension String: Foo {}
 // CHECK-NEXT:  },
 // CHECK-NEXT:  {
 // CHECK-NEXT:    "typeName": "ExtractGroups.Tuples",
+// CHECK-NEXT:    "mangledTypeName": "13ExtractGroups6TuplesV",
 // CHECK-NEXT:    "kind": "struct",
 // CHECK-NEXT:    "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
 // CHECK-NEXT:    "line": 27,
+// CHECK-NEXT:    "conformances": [
+// CHECK-NEXT:      "ExtractGroups.MyProto"
+// CHECK-NEXT:    ],
+// CHECK-NEXT:    "allConformances": [
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "protocolName": "ExtractGroups.MyProto"
+// CHECK-NEXT:        "conformanceDefiningModule": "ExtractGroups"
+// CHECK-NEXT:      }
+// CHECK-NEXT:    ],
+// CHECK-NEXT:    "associatedTypeAliases": [],
 // CHECK-NEXT:    "properties": [
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "tuple1",
 // CHECK-NEXT:        "type": "(Swift.String, ExtractGroups.Bar)",
+// CHECK-NEXT:        "mangledTypeName": "n/a - deprecated",        
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
@@ -276,6 +316,7 @@ extension String: Foo {}
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "tuple2",
 // CHECK-NEXT:        "type": "(lat: Swift.Float, lng: Swift.Float)",
+// CHECK-NEXT:        "mangledTypeName": "n/a - deprecated",        
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",
@@ -298,7 +339,8 @@ extension String: Foo {}
 // CHECK-NEXT:      },
 // CHECK-NEXT:      {
 // CHECK-NEXT:        "label": "tuple3",
-// CHECK-NEXT:        "type": "Swift.Void",
+// CHECK-NEXT:        "type": "()",
+// CHECK-NEXT:        "mangledTypeName": "n/a - deprecated",
 // CHECK-NEXT:        "isStatic": "false",
 // CHECK-NEXT:        "isComputed": "false",
 // CHECK-NEXT:        "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractGroups.swift",

@@ -1,4 +1,4 @@
-//===--- DeclSynthesizer.h - Synthesize helper Swift decls ------*- C++ -*-===//
+//===--- SwiftDeclSynthesizer.h - Synthesize helper Swift decls -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -17,6 +17,8 @@
 #include "swift/ClangImporter/ClangImporter.h"
 
 namespace swift {
+
+class CallExpr;
 
 enum class MakeStructRawValuedFlags {
   /// whether to also create an unlabeled init
@@ -42,6 +44,14 @@ inline AccessLevel getOverridableAccessLevel(const DeclContext *dc) {
   return (dc->getSelfClassDecl() ? AccessLevel::Open : AccessLevel::Public);
 }
 
+enum class ReferenceReturnTypeBehaviorForBaseMethodSynthesis {
+  KeepReference,
+  RemoveReference,
+  RemoveReferenceIfPointer,
+};
+
+enum class ForwardingMethodKind { Base, Virtual };
+
 class SwiftDeclSynthesizer {
 private:
   ClangImporter::Implementation &ImporterImpl;
@@ -49,6 +59,8 @@ private:
 public:
   explicit SwiftDeclSynthesizer(ClangImporter::Implementation &Impl)
       : ImporterImpl(Impl) {}
+  explicit SwiftDeclSynthesizer(ClangImporter *importer)
+      : ImporterImpl(importer->Impl) {}
 
   /// Create a typedpattern(namedpattern(decl))
   static Pattern *createTypedNamedPattern(VarDecl *decl);
@@ -60,18 +72,9 @@ public:
                        VarDecl::Introducer introducer, bool isImplicit,
                        AccessLevel access, AccessLevel setterAccess);
 
-  /// Create a new named constant with the given value.
-  ///
-  /// \param name The name of the constant.
-  /// \param dc The declaration context into which the name will be introduced.
-  /// \param type The type of the named constant.
-  /// \param value The value of the named constant.
-  /// \param convertKind How to convert the constant to the given type.
-  /// \param isStatic Whether the constant should be a static member of \p dc.
-  ValueDecl *createConstant(Identifier name, DeclContext *dc, Type type,
-                            const clang::APValue &value,
-                            ConstantConvertKind convertKind, bool isStatic,
-                            ClangNode ClangN);
+  /// Create a reinterpretCast from the `exprType`, to the `givenType`.
+  static Expr *synthesizeReturnReinterpretCast(ASTContext &ctx, Type givenType,
+                                               Type exprType, Expr *baseExpr);
 
   /// Create a new named constant with the given value.
   ///
@@ -81,9 +84,25 @@ public:
   /// \param value The value of the named constant.
   /// \param convertKind How to convert the constant to the given type.
   /// \param isStatic Whether the constant should be a static member of \p dc.
+  /// \param access What access level should be given to the constant.
+  ValueDecl *createConstant(Identifier name, DeclContext *dc, Type type,
+                            const clang::APValue &value,
+                            ConstantConvertKind convertKind, bool isStatic,
+                            ClangNode ClangN, AccessLevel access);
+
+  /// Create a new named constant with the given value.
+  ///
+  /// \param name The name of the constant.
+  /// \param dc The declaration context into which the name will be introduced.
+  /// \param type The type of the named constant.
+  /// \param value The value of the named constant.
+  /// \param convertKind How to convert the constant to the given type.
+  /// \param isStatic Whether the constant should be a static member of \p dc.
+  /// \param access What access level should be given to the constant.
   ValueDecl *createConstant(Identifier name, DeclContext *dc, Type type,
                             StringRef value, ConstantConvertKind convertKind,
-                            bool isStatic, ClangNode ClangN);
+                            bool isStatic, ClangNode ClangN,
+                            AccessLevel access);
 
   /// Create a new named constant using the given expression.
   ///
@@ -93,9 +112,11 @@ public:
   /// \param valueExpr An expression to use as the value of the constant.
   /// \param convertKind How to convert the constant to the given type.
   /// \param isStatic Whether the constant should be a static member of \p dc.
+  /// \param access What access level should be given to the constant.
   ValueDecl *createConstant(Identifier name, DeclContext *dc, Type type,
                             Expr *valueExpr, ConstantConvertKind convertKind,
-                            bool isStatic, ClangNode ClangN);
+                            bool isStatic, ClangNode ClangN,
+                            AccessLevel access);
 
   /// Create a default constructor that initializes a struct to zero.
   ConstructorDecl *createDefaultConstructor(NominalTypeDecl *structDecl);
@@ -275,19 +296,50 @@ public:
   /// Given an imported C++ dereference operator (`operator*()`), create a
   /// `pointee` computed property.
   ///
-  /// \param dereferenceFunc function returning `Unsafe(Mutable)?Pointer<T>`
+  /// \param getter function returning `UnsafePointer<T>`
+  /// \param setter function returning `UnsafeMutablePointer<T>`
   /// \return computed property declaration
-  VarDecl *makeDereferencedPointeeProperty(FuncDecl *dereferenceFunc);
+  VarDecl *makeDereferencedPointeeProperty(FuncDecl *getter, FuncDecl *setter);
 
   /// Given a C++ pre-increment operator (`operator++()`). create a non-mutating
   /// function `successor() -> Self`.
   FuncDecl *makeSuccessorFunc(FuncDecl *incrementFunc);
 
   FuncDecl *makeOperator(FuncDecl *operatorMethod,
-                         clang::CXXMethodDecl *clangOperator);
+                         clang::OverloadedOperatorKind opKind);
+  
+  // Synthesize a C++ method that invokes the method from the base
+  // class. This lets Clang take care of the cast from the derived class
+  // to the base class during the invocation of the method.
+  clang::CXXMethodDecl *synthesizeCXXForwardingMethod(
+      const clang::CXXRecordDecl *derivedClass,
+      const clang::CXXRecordDecl *baseClass, const clang::CXXMethodDecl *method,
+      ForwardingMethodKind forwardingMethodKind,
+      ReferenceReturnTypeBehaviorForBaseMethodSynthesis
+          referenceReturnTypeBehavior =
+              ReferenceReturnTypeBehaviorForBaseMethodSynthesis::KeepReference,
+      bool forceConstQualifier = false);
+
+  /// Given an overload of a C++ virtual method on a reference type, create a
+  /// method that dispatches the call dynamically.
+  FuncDecl *makeVirtualMethod(const clang::CXXMethodDecl *clangMethodDecl);
+
+  FuncDecl *makeInstanceToStaticOperatorCallMethod(
+      const clang::CXXMethodDecl *clangMethodDecl);
 
   VarDecl *makeComputedPropertyFromCXXMethods(FuncDecl *getter,
                                               FuncDecl *setter);
+
+  CallExpr *makeDefaultArgument(const clang::ParmVarDecl *param,
+                                const swift::Type &swiftParamTy,
+                                SourceLoc paramLoc);
+
+  /// Synthesize a static factory method for a C++ foreign reference type,
+  /// returning a `CXXMethodDecl*` or `nullptr` if the required constructor or
+  /// allocation function is not found.
+  llvm::SmallVector<clang::CXXMethodDecl *, 4>
+  synthesizeStaticFactoryForCXXForeignRef(
+      const clang::CXXRecordDecl *cxxRecordDecl);
 
 private:
   Type getConstantLiteralType(Type type, ConstantConvertKind convertKind);

@@ -46,6 +46,7 @@
 
 STMT(Brace, Stmt)
 STMT(Return, Stmt)
+STMT(Then, Stmt)
 STMT(Yield, Stmt)
 STMT(Defer, Stmt)
 ABSTRACT_STMT(Labeled, Stmt)
@@ -66,6 +67,7 @@ STMT(Continue, Stmt)
 STMT(Fallthrough, Stmt)
 STMT(Fail, Stmt)
 STMT(Throw, Stmt)
+STMT(Discard, Stmt)
 STMT(PoundAssert, Stmt)
 LAST_STMT(PoundAssert)
 

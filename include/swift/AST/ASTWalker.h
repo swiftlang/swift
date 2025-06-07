@@ -14,17 +14,20 @@
 #define SWIFT_AST_ASTWALKER_H
 
 #include "swift/Basic/LLVM.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerUnion.h"
+#include <optional>
 #include <utility>
 
 namespace swift {
 
+class Argument;
 class ArgumentList;
 class Decl;
 class Expr;
 class ClosureExpr;
+class CustomAttr;
 class ModuleDecl;
+class PackageUnit;
 class Stmt;
 class Pattern;
 class TypeRepr;
@@ -44,11 +47,19 @@ enum class SemaReferenceKind : uint8_t {
 
 struct ReferenceMetaData {
   SemaReferenceKind Kind;
-  llvm::Optional<AccessKind> AccKind;
+  std::optional<AccessKind> AccKind;
   bool isImplicit = false;
-  ReferenceMetaData(SemaReferenceKind Kind, llvm::Optional<AccessKind> AccKind,
-                    bool isImplicit = false)
-      : Kind(Kind), AccKind(AccKind), isImplicit(isImplicit) {}
+  bool isImplicitCtorType = false;
+
+  /// When non-none, this is a custom attribute reference.
+  std::optional<std::pair<const CustomAttr *, Decl *>> CustomAttrRef;
+
+  ReferenceMetaData(SemaReferenceKind Kind, std::optional<AccessKind> AccKind,
+                    bool isImplicit = false,
+                    std::optional<std::pair<const CustomAttr *, Decl *>>
+                        customAttrRef = std::nullopt)
+      : Kind(Kind), AccKind(AccKind), isImplicit(isImplicit),
+        CustomAttrRef(customAttrRef) {}
 };
 
 /// Specifies how the initialization expression of a \c lazy variable should be
@@ -70,11 +81,63 @@ enum class LazyInitializerWalking {
   InAccessor
 };
 
+/// Specifies the behavior for walking a macro expansion, whether we want to
+/// see the macro arguments, the expansion, or both.
+enum class MacroWalking {
+  /// Walk into the expansion of the macro, to see the semantic effect of
+  /// the macro expansion.
+  Expansion,
+
+  /// Walk into the arguments of the macro as written in the source code.
+  ///
+  /// The actual arguments walked may not make it into the program itself,
+  /// because they can be translated by the macro in arbitrary ways.
+  Arguments,
+
+  /// Walk into both the arguments of the macro as written in the source code
+  /// and also the macro expansion.
+  ArgumentsAndExpansion,
+
+  /// Don't walk into macros.
+  None
+};
+
+/// A scheme for walking a `QualifiedIdentTypeRepr`.
+enum class QualifiedIdentTypeReprWalkingScheme {
+  /// Walk in source order, such that each subsequent dot-separated component is
+  /// a child of the previous one. For example, walk `A.B<T.U>.C` like so
+  /// (top-down order):
+  ///
+  /// ```
+  /// A
+  /// ╰─B
+  ///   ├─T
+  ///   │ ╰─U
+  ///   ╰─C
+  /// ```
+  SourceOrderRecursive,
+
+  /// Walk in AST order (that is, according to how member type
+  /// representations are modeled in the AST, such that each previous
+  /// dot-separated component is a child of the subsequent one), base before
+  /// generic arguments. For example, walk `A.B<T.U>.C` like so
+  /// (top-down order):
+  ///
+  /// ```
+  /// C
+  /// ╰─B
+  ///   ├─A
+  ///   ╰─U
+  ///     ╰─T
+  /// ```
+  ASTOrderRecursive
+};
+
 /// An abstract class used to traverse an AST.
 class ASTWalker {
 public:
   enum class ParentKind {
-    Module, Decl, Stmt, Expr, Pattern, TypeRepr
+    Package, Module, Decl, Stmt, Expr, Pattern, TypeRepr
   };
 
   class ParentTy {
@@ -82,6 +145,7 @@ public:
     void *Ptr = nullptr;
 
   public:
+    ParentTy(PackageUnit *Pkg) : Kind(ParentKind::Package), Ptr(Pkg) {}
     ParentTy(ModuleDecl *Mod) : Kind(ParentKind::Module), Ptr(Mod) {}
     ParentTy(Decl *D) : Kind(ParentKind::Decl), Ptr(D) {}
     ParentTy(Stmt *S) : Kind(ParentKind::Stmt), Ptr(S) {}
@@ -96,6 +160,10 @@ public:
       return Kind;
     }
 
+    PackageUnit *getAsPackage() const {
+      return Kind == ParentKind::Package ? static_cast<PackageUnit*>(Ptr)
+                                        : nullptr;
+    }
     ModuleDecl *getAsModule() const {
       return Kind == ParentKind::Module ? static_cast<ModuleDecl*>(Ptr)
                                         : nullptr;
@@ -125,23 +193,24 @@ public:
 
     // The 'Action' set of types, which do not take a payload.
     struct ContinueWalkAction {};
-    struct SkipChildrenIfWalkAction { bool Cond; };
+    struct SkipChildrenIfWalkAction { bool Cond; bool SkipPostWalk; };
     struct StopIfWalkAction { bool Cond; };
     struct StopWalkAction {};
 
     // The 'Result' set of types, which do take a payload.
     template <typename T>
     struct ContinueWalkResult {
+      ContinueWalkAction Action;
       T Value;
     };
     template <typename T>
     struct SkipChildrenIfWalkResult {
-      bool Cond;
+      SkipChildrenIfWalkAction Action;
       T Value;
     };
     template <typename T>
     struct StopIfWalkResult {
-      bool Cond;
+      StopIfWalkAction Action;
       T Value;
     };
   };
@@ -174,15 +243,23 @@ public:
     /// Continue the current walk, replacing the current node with \p node.
     template <typename T>
     static _Detail::ContinueWalkResult<T> Continue(T node) {
-      return {std::move(node)};
+      return {Continue(), std::move(node)};
     }
 
     /// Continue the current walk, replacing the current node with \p node.
-    /// However, skip visiting the children of \p node, and instead resume the
-    /// walk of the parent node.
+    /// However, skip visiting the children of \p node, and resume at its
+    /// post-walk.
     template <typename T>
     static _Detail::SkipChildrenIfWalkResult<T> SkipChildren(T node) {
       return SkipChildrenIf(true, std::move(node));
+    }
+
+    /// Similar to \c Action::SkipChildren, but also skips the call to the
+    /// post-visitation method.
+    template <typename T>
+    static _Detail::SkipChildrenIfWalkResult<T>
+    SkipNode(T node) {
+      return SkipNodeIf(true, std::move(node));
     }
 
     /// If \p cond is true, this is equivalent to \c Action::SkipChildren(node).
@@ -190,7 +267,15 @@ public:
     template <typename T>
     static _Detail::SkipChildrenIfWalkResult<T>
     SkipChildrenIf(bool cond, T node) {
-      return {cond, std::move(node)};
+      return {SkipChildrenIf(cond), std::move(node)};
+    }
+
+    /// If \p cond is true, this is equivalent to \c Action::SkipNode(node).
+    /// Otherwise, it is equivalent to \c Action::Continue(node).
+    template <typename T>
+    static _Detail::SkipChildrenIfWalkResult<T>
+    SkipNodeIf(bool cond, T node) {
+      return {SkipNodeIf(cond), std::move(node)};
     }
 
     /// If \p cond is true, this is equivalent to \c Action::Continue(node).
@@ -201,32 +286,60 @@ public:
       return SkipChildrenIf(!cond, std::move(node));
     }
 
+    /// If \p cond is true, this is equivalent to \c Action::Continue(node).
+    /// Otherwise, it is equivalent to \c Action::SkipNode(node).
+    template <typename T>
+    static _Detail::SkipChildrenIfWalkResult<T>
+    VisitNodeIf(bool cond, T node) {
+      return SkipNodeIf(!cond, std::move(node));
+    }
+
     /// If \p cond is true, this is equivalent to \c Action::Stop().
     /// Otherwise, it is equivalent to \c Action::Continue(node).
     template <typename T>
     static _Detail::StopIfWalkResult<T> StopIf(bool cond, T node) {
-      return {cond, std::move(node)};
+      return {StopIf(cond), std::move(node)};
     }
 
     /// Continue the current walk.
     static _Detail::ContinueWalkAction Continue() { return {}; }
 
     /// Continue the current walk, but do not visit the children of the current
-    /// node. Instead, resume at the parent's post-walk.
+    /// node, resuming at its post-walk.
     static _Detail::SkipChildrenIfWalkAction SkipChildren() {
       return SkipChildrenIf(true);
+    }
+
+    /// Similar to \c Action::SkipChildren, but also skips the call to the
+    /// post-visitation method.
+    static _Detail::SkipChildrenIfWalkAction SkipNode() {
+      return SkipNodeIf(true);
     }
 
     /// If \p cond is true, this is equivalent to \c Action::SkipChildren().
     /// Otherwise, it is equivalent to \c Action::Continue().
     static _Detail::SkipChildrenIfWalkAction SkipChildrenIf(bool cond) {
-      return {cond};
+      return {cond, /*SkipPostWalk*/ false};
+    }
+
+    /// If \p cond is true, this is equivalent to \c Action::SkipNode().
+    /// Otherwise, it is equivalent to \c Action::Continue().
+    static _Detail::SkipChildrenIfWalkAction
+    SkipNodeIf(bool cond) {
+      return {cond, /*SkipPostWalk*/ true};
     }
 
     /// If \p cond is true, this is equivalent to \c Action::Continue().
     /// Otherwise, it is equivalent to \c Action::SkipChildren().
     static _Detail::SkipChildrenIfWalkAction VisitChildrenIf(bool cond) {
       return SkipChildrenIf(!cond);
+    }
+
+    /// If \p cond is true, this is equivalent to \c Action::Continue().
+    /// Otherwise, it is equivalent to \c Action::SkipNode().
+    static _Detail::SkipChildrenIfWalkAction
+    VisitNodeIf(bool cond) {
+      return SkipNodeIf(!cond);
     }
 
     /// Terminate the walk, returning without visiting any other nodes.
@@ -242,16 +355,19 @@ public:
   /// A pre-visitation action for AST nodes that do not support being replaced
   /// while walking.
   struct PreWalkAction {
-    enum Kind { Stop, SkipChildren, Continue };
+    enum Kind { Stop, SkipChildren, SkipNode, Continue };
     Kind Action;
-
-    PreWalkAction(Kind action) : Action(action) {}
 
     PreWalkAction(_Detail::ContinueWalkAction) : Action(Continue) {}
     PreWalkAction(_Detail::StopWalkAction) : Action(Stop) {}
 
-    PreWalkAction(_Detail::SkipChildrenIfWalkAction action)
-        : Action(action.Cond ? SkipChildren : Continue) {}
+    PreWalkAction(_Detail::SkipChildrenIfWalkAction action) {
+      if (action.Cond) {
+        Action = action.SkipPostWalk ? SkipNode : SkipChildren;
+      } else {
+        Action = Continue;
+      }
+    }
 
     PreWalkAction(_Detail::StopIfWalkAction action)
         : Action(action.Cond ? Stop : Continue) {}
@@ -264,8 +380,6 @@ public:
   struct PostWalkAction {
     enum Kind { Stop, Continue };
     Kind Action;
-
-    PostWalkAction(Kind action) : Action(action) {}
 
     PostWalkAction(_Detail::ContinueWalkAction) : Action(Continue) {}
     PostWalkAction(_Detail::StopWalkAction) : Action(Stop) {}
@@ -282,7 +396,7 @@ public:
   template <typename T>
   struct PreWalkResult {
     PreWalkAction Action;
-    Optional<T> Value;
+    std::optional<T> Value;
 
     template <typename U,
               typename std::enable_if<std::is_convertible<U, T>::value>::type
@@ -302,21 +416,18 @@ public:
 
     template <typename U>
     PreWalkResult(_Detail::ContinueWalkResult<U> Result)
-        : Action(PreWalkAction::Continue), Value(std::move(Result.Value)) {}
+        : Action(Result.Action), Value(std::move(Result.Value)) {}
 
     template <typename U>
     PreWalkResult(_Detail::SkipChildrenIfWalkResult<U> Result)
-        : Action(Result.Cond ? PreWalkAction::SkipChildren
-                             : PreWalkAction::Continue),
-          Value(std::move(Result.Value)) {}
+        : Action(Result.Action), Value(std::move(Result.Value)) {}
 
     template <typename U>
     PreWalkResult(_Detail::StopIfWalkResult<U> Result)
-        : Action(Result.Cond ? PreWalkAction::Stop : PreWalkAction::Continue),
-          Value(std::move(Result.Value)) {}
+        : Action(Result.Action), Value(std::move(Result.Value)) {}
 
-    PreWalkResult(_Detail::StopWalkAction)
-        : Action(PreWalkAction::Stop), Value(None) {}
+    PreWalkResult(_Detail::StopWalkAction Action)
+        : Action(Action), Value(std::nullopt) {}
   };
 
   /// Do not construct directly, use \c Action::<action> instead.
@@ -327,7 +438,7 @@ public:
   template <typename T>
   struct PostWalkResult {
     PostWalkAction Action;
-    Optional<T> Value;
+    std::optional<T> Value;
 
     template <typename U,
               typename std::enable_if<std::is_convertible<U, T>::value>::type
@@ -347,15 +458,14 @@ public:
 
     template <typename U>
     PostWalkResult(_Detail::ContinueWalkResult<U> Result)
-        : Action(PostWalkAction::Continue), Value(std::move(Result.Value)) {}
+        : Action(Result.Action), Value(std::move(Result.Value)) {}
 
     template <typename U>
     PostWalkResult(_Detail::StopIfWalkResult<U> Result)
-        : Action(Result.Cond ? PostWalkAction::Stop : PostWalkAction::Continue),
-          Value(std::move(Result.Value)) {}
+        : Action(Result.Action), Value(std::move(Result.Value)) {}
 
-    PostWalkResult(_Detail::StopWalkAction)
-        : Action(PostWalkAction::Stop), Value(None) {}
+    PostWalkResult(_Detail::StopWalkAction Action)
+        : Action(Action), Value(std::nullopt) {}
   };
 
   /// This method is called when first visiting an expression
@@ -483,9 +593,22 @@ public:
     return Action::Continue();
   }
 
+  /// This method configures how to walk `QualifiedIdentTypeRepr` nodes.
+  virtual QualifiedIdentTypeReprWalkingScheme
+  getQualifiedIdentTypeReprWalkingScheme() const {
+    return QualifiedIdentTypeReprWalkingScheme::ASTOrderRecursive;
+  }
+
   /// This method configures whether the walker should explore into the generic
   /// params in AbstractFunctionDecl and NominalTypeDecl.
   virtual bool shouldWalkIntoGenericParams() { return false; }
+
+  /// Whether the walker should walk into any attached CustomAttrs.
+  virtual bool shouldWalkIntoCustomAttrs() const {
+    // Default to false currently since some walkers don't handle this case
+    // well.
+    return false;
+  }
 
   /// This method configures how the walker should walk the initializers of
   /// lazy variables. These initializers are semantically different from other
@@ -495,14 +618,32 @@ public:
     return LazyInitializerWalking::InPatternBinding;
   }
 
-  /// This method configures whether the walker should visit the body of a
-  /// closure that was checked separately from its enclosing expression.
-  ///
-  /// For work that is performed for every top-level expression, this should
-  /// be overridden to return false, to avoid duplicating work or visiting
-  /// bodies of closures that have not yet been type checked.
-  virtual bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *) {
-    return true;
+  /// This method configures how the walker should walk into uses of macros.
+  virtual MacroWalking getMacroWalkingBehavior() const {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
+
+  /// This method determines whether the given declaration should be
+  /// considered to be in a macro expansion context. It can be configured
+  /// by subclasses.
+  virtual bool isDeclInMacroExpansion(Decl *decl) const;
+
+  /// Determine whether we should walk macro arguments (as they appear in
+  /// source) and the expansion (which is semantically part of the program).
+  std::pair<bool, bool> shouldWalkMacroArgumentsAndExpansion() const {
+    switch (getMacroWalkingBehavior()) {
+    case MacroWalking::Expansion:
+      return std::make_pair(false, true);
+
+    case MacroWalking::Arguments:
+      return std::make_pair(true, false);
+
+    case MacroWalking::ArgumentsAndExpansion:
+      return std::make_pair(true, true);
+
+    case MacroWalking::None:
+      return std::make_pair(false, false);
+    }
   }
 
   /// This method configures whether the walker should visit the body of a
@@ -512,11 +653,6 @@ public:
   /// This method configures whether the walker should visit the underlying
   /// value of a property wrapper placeholder.
   virtual bool shouldWalkIntoPropertyWrapperPlaceholderValue() { return true; }
-
-  /// This method configures whether the walker should visit the capture
-  /// initializer expressions within a capture list directly, rather than
-  /// walking the declarations.
-  virtual bool shouldWalkCaptureInitializerExpressions() { return false; }
 
   /// This method configures whether the walker should exhibit the legacy
   /// behavior where accessors appear as peers of their storage, rather
@@ -531,6 +667,10 @@ public:
   ///
   /// TODO: Consider changing this to false by default.
   virtual bool shouldWalkSerializedTopLevelInternalDecls() { return true; }
+
+  /// Whether to walk into the definition of a \c MacroDecl if it hasn't been
+  /// type-checked yet.
+  virtual bool shouldWalkIntoUncheckedMacroDefinitions() { return false; }
 
   /// walkToParameterListPre - This method is called when first visiting a
   /// ParameterList, before walking into its parameters.
@@ -578,6 +718,27 @@ public:
   virtual PostWalkResult<ArgumentList *>
   walkToArgumentListPost(ArgumentList *ArgList) {
     return Action::Continue(ArgList);
+  }
+
+  /// This method is called when first visiting an argument in an argument list,
+  /// before walking into its expression.
+  ///
+  /// \param Arg The argument to walk.
+  ///
+  /// \returns The walking action to perform.
+  ///
+  /// The default implementation returns \c Action::Continue().
+  virtual PreWalkAction walkToArgumentPre(const Argument &Arg) {
+    return Action::Continue();
+  }
+
+  /// This method is called after visiting an argument in an argument list.
+  ///
+  /// \returns The walking action to perform.
+  ///
+  /// The default implementation returns \c Action::Continue().
+  virtual PostWalkAction walkToArgumentPost(const Argument &Arg) {
+    return Action::Continue();
   }
 
 protected:

@@ -13,6 +13,7 @@
 /// A value that has a custom representation in `AnyHashable`.
 ///
 /// `Self` should also conform to `Hashable`.
+@_unavailableInEmbedded
 public protocol _HasCustomAnyHashableRepresentation {
   /// Returns a custom representation of `self` as `AnyHashable`.
   /// If returns nil, the default representation is used.
@@ -38,6 +39,7 @@ public protocol _HasCustomAnyHashableRepresentation {
 }
 
 @usableFromInline
+@_unavailableInEmbedded
 internal protocol _AnyHashableBox {
   var _canonicalBox: _AnyHashableBox { get }
 
@@ -56,12 +58,14 @@ internal protocol _AnyHashableBox {
   func _downCastConditional<T>(into result: UnsafeMutablePointer<T>) -> Bool
 }
 
+@_unavailableInEmbedded
 extension _AnyHashableBox {
   var _canonicalBox: _AnyHashableBox {
     return self
   }
 }
 
+@_unavailableInEmbedded
 internal struct _ConcreteHashableBox<Base: Hashable>: _AnyHashableBox {
   internal var _baseHashable: Base
 
@@ -99,7 +103,7 @@ internal struct _ConcreteHashableBox<Base: Hashable>: _AnyHashableBox {
   internal
   func _downCastConditional<T>(into result: UnsafeMutablePointer<T>) -> Bool {
     guard let value = _baseHashable as? T else { return false }
-    result.initialize(to: value)
+    unsafe result.initialize(to: value)
     return true
   }
 }
@@ -135,6 +139,7 @@ internal struct _ConcreteHashableBox<Base: Hashable>: _AnyHashableBox {
 /// compatible hashes, as the hash encoding that it uses may change between any
 /// two releases of the standard library.
 @frozen
+@_unavailableInEmbedded
 public struct AnyHashable {
   internal var _box: _AnyHashableBox
 
@@ -146,6 +151,7 @@ public struct AnyHashable {
   ///
   /// - Parameter base: A hashable value to wrap.
   @_specialize(where H == String)
+  @_unavailableInEmbedded
   public init<H: Hashable>(_ base: H) {
     if H.self == String.self {
       self.init(_box: _ConcreteHashableBox(base))
@@ -159,8 +165,8 @@ public struct AnyHashable {
     }
 
     self.init(_box: _ConcreteHashableBox(false)) // Dummy value
-    _withUnprotectedUnsafeMutablePointer(to: &self) {
-      _makeAnyHashableUpcastingToHashableBaseType(
+    unsafe _withUnprotectedUnsafeMutablePointer(to: &self) {
+      unsafe _makeAnyHashableUpcastingToHashableBaseType(
         base,
         storingResultInto: $0)
     }
@@ -191,13 +197,13 @@ public struct AnyHashable {
   internal
   func _downCastConditional<T>(into result: UnsafeMutablePointer<T>) -> Bool {
     // Attempt the downcast.
-    if _box._downCastConditional(into: result) { return true }
+    if unsafe _box._downCastConditional(into: result) { return true }
 
     #if _runtime(_ObjC)
     // Bridge to Objective-C and then attempt the cast from there.
     // FIXME: This should also work without the Objective-C runtime.
     if let value = _bridgeAnythingToObjectiveC(_box._base) as? T {
-      result.initialize(to: value)
+      unsafe result.initialize(to: value)
       return true
     }
     #endif
@@ -206,6 +212,10 @@ public struct AnyHashable {
   }
 }
 
+@available(*, unavailable)
+extension AnyHashable: Sendable {}
+
+@_unavailableInEmbedded
 extension AnyHashable: Equatable {
   /// Returns a Boolean value indicating whether two type-erased hashable
   /// instances wrap the same value.
@@ -234,6 +244,7 @@ extension AnyHashable: Equatable {
   }
 }
 
+@_unavailableInEmbedded
 extension AnyHashable: Hashable {
   public var hashValue: Int {
     return _box._canonicalBox._hashValue
@@ -248,12 +259,14 @@ extension AnyHashable: Hashable {
   }
 }
 
+@_unavailableInEmbedded
 extension AnyHashable: CustomStringConvertible {
   public var description: String {
     return String(describing: base)
   }
 }
 
+@_unavailableInEmbedded
 extension AnyHashable: CustomDebugStringConvertible {
   public var debugDescription: String {
     return "AnyHashable(" + String(reflecting: base) + ")"
@@ -270,10 +283,12 @@ extension AnyHashable: CustomReflectable {
 }
 #endif
 
+@_unavailableInEmbedded
 @available(SwiftStdlib 5.5, *)
 extension AnyHashable: _HasCustomAnyHashableRepresentation {
 }
 
+@_unavailableInEmbedded
 extension AnyHashable {
   @_alwaysEmitIntoClient
   public __consuming func _toCustomAnyHashable() -> AnyHashable? {
@@ -288,21 +303,24 @@ extension AnyHashable {
 /// conformance, if it exists.
 /// Called by AnyHashableSupport.cpp.
 @_silgen_name("_swift_makeAnyHashableUsingDefaultRepresentation")
+@_unavailableInEmbedded
 internal func _makeAnyHashableUsingDefaultRepresentation<H: Hashable>(
   of value: H,
   storingResultInto result: UnsafeMutablePointer<AnyHashable>
 ) {
-  result.pointee = AnyHashable(_usingDefaultRepresentationOf: value)
+  unsafe result.pointee = AnyHashable(_usingDefaultRepresentationOf: value)
 }
 
 /// Provided by AnyHashable.cpp.
 @_silgen_name("_swift_makeAnyHashableUpcastingToHashableBaseType")
+@_unavailableInEmbedded
 internal func _makeAnyHashableUpcastingToHashableBaseType<H: Hashable>(
   _ value: H,
   storingResultInto result: UnsafeMutablePointer<AnyHashable>
 )
 
 @inlinable
+@_unavailableInEmbedded
 public // COMPILER_INTRINSIC
 func _convertToAnyHashable<H: Hashable>(_ value: H) -> AnyHashable {
   return AnyHashable(value)
@@ -310,18 +328,20 @@ func _convertToAnyHashable<H: Hashable>(_ value: H) -> AnyHashable {
 
 /// Called by the casting machinery.
 @_silgen_name("_swift_convertToAnyHashableIndirect")
+@_unavailableInEmbedded
 internal func _convertToAnyHashableIndirect<H: Hashable>(
   _ value: H,
   _ target: UnsafeMutablePointer<AnyHashable>
 ) {
-  target.initialize(to: AnyHashable(value))
+  unsafe target.initialize(to: AnyHashable(value))
 }
 
 /// Called by the casting machinery.
 @_silgen_name("_swift_anyHashableDownCastConditionalIndirect")
+@_unavailableInEmbedded
 internal func _anyHashableDownCastConditionalIndirect<T>(
   _ value: UnsafePointer<AnyHashable>,
   _ target: UnsafeMutablePointer<T>
 ) -> Bool {
-  return value.pointee._downCastConditional(into: target)
+  return unsafe value.pointee._downCastConditional(into: target)
 }

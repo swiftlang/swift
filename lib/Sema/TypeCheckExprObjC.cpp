@@ -16,18 +16,20 @@
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
 #include "TypoCorrection.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
 
 using namespace swift;
 
-Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
-                                                 KeyPathExpr *expr,
-                                                 bool requireResultType) {
+std::optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
+                                                      KeyPathExpr *expr,
+                                                      bool requireResultType) {
   // TODO: Native keypaths
   assert(expr->isObjC() && "native keypaths not type-checked this way");
   
   // If there is already a semantic expression, do nothing.
-  if (expr->getObjCStringLiteralExpr() && !requireResultType) return None;
+  if (expr->getObjCStringLiteralExpr() && !requireResultType)
+    return std::nullopt;
 
   // ObjC #keyPath only makes sense when we have the Objective-C runtime.
   auto &Context = dc->getASTContext();
@@ -38,7 +40,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     expr->setObjCStringLiteralExpr(
       new (Context) StringLiteralExpr("", expr->getSourceRange(),
                                       /*Implicit=*/true));
-    return None;
+    return std::nullopt;
   }
 
   // The key path string we're forming.
@@ -207,7 +209,8 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     case KeyPathExpr::Component::Kind::CodeCompletion:
       continue;
 
-    case KeyPathExpr::Component::Kind::UnresolvedProperty:
+    case KeyPathExpr::Component::Kind::UnresolvedMember:
+    case KeyPathExpr::Component::Kind::UnresolvedApply:
       break;
     case KeyPathExpr::Component::Kind::UnresolvedSubscript:
     case KeyPathExpr::Component::Kind::OptionalChain:
@@ -218,8 +221,9 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
                      (unsigned)kind);
       continue;
     case KeyPathExpr::Component::Kind::OptionalWrap:
-    case KeyPathExpr::Component::Kind::Property:
+    case KeyPathExpr::Component::Kind::Member:
     case KeyPathExpr::Component::Kind::Subscript:
+    case KeyPathExpr::Component::Kind::Apply:
     case KeyPathExpr::Component::Kind::DictionaryKey:
       llvm_unreachable("already resolved!");
     }
@@ -285,7 +289,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     if (lookup.size() > 1) {
       lookup.filter([&](LookupResultEntry result, bool isOuter) -> bool {
           // Drop unavailable candidates.
-          if (result.getValueDecl()->getAttrs().isUnavailable(Context))
+          if (result.getValueDecl()->isUnavailable())
             return false;
 
           // Drop non-property, non-type candidates.
@@ -312,7 +316,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
 
       for (auto result : lookup) {
         diags.diagnose(result.getValueDecl(), diag::decl_declared_here,
-                       result.getValueDecl()->getName());
+                       result.getValueDecl());
       }
       isInvalid = true;
       break;
@@ -329,8 +333,8 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
       // Updates currentType
       updateState(/*isProperty=*/true, varTy);
 
-      auto resolved = KeyPathExpr::Component::forProperty(varRef, currentType,
-                                                          componentNameLoc);
+      auto resolved = KeyPathExpr::Component::forMember(varRef, currentType,
+                                                        componentNameLoc);
       resolvedComponents.push_back(resolved);
 
       // Check that the property is @objc.
@@ -338,25 +342,8 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
         diags.diagnose(componentNameLoc, diag::expr_keypath_non_objc_property,
                        var->getName());
         if (var->getLoc().isValid() && var->getDeclContext()->isTypeContext()) {
-          diags.diagnose(var, diag::make_decl_objc,
-                         var->getDescriptiveKind())
-            .fixItInsert(var->getAttributeInsertionLoc(false),
-                         "@objc ");
-        }
-      } else if (auto attr = var->getAttrs().getAttribute<ObjCAttr>()) {
-        // If this attribute was inferred based on deprecated Swift 3 rules,
-        // complain.
-        if (attr->isSwift3Inferred() &&
-            Context.LangOpts.WarnSwift3ObjCInference ==
-              Swift3ObjCInferenceWarnings::Minimal) {
-          auto *parent = var->getDeclContext()->getSelfNominalTypeDecl();
-          diags.diagnose(componentNameLoc,
-                         diag::expr_keypath_swift3_objc_inference,
-                         var->getName(),
-                         parent->getName());
-          diags.diagnose(var, diag::make_decl_objc, var->getDescriptiveKind())
-            .fixItInsert(var->getAttributeInsertionLoc(false),
-                         "@objc ");
+          diags.diagnose(var, diag::make_decl_objc, var)
+              .fixItInsert(var->getAttributeInsertionLoc(false), "@objc ");
         }
       } else {
         // FIXME: Warn about non-KVC-compliant getter/setter names?
@@ -387,8 +374,9 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
 
       Type newType;
       if (lookupType && !lookupType->isAnyObject()) {
-        newType = lookupType->getTypeOfMember(dc->getParentModule(), type,
-                                              type->getDeclaredInterfaceType());
+        newType = type->getDeclaredInterfaceType().subst(
+            lookupType->getContextSubstitutionMap(
+                type->getDeclContext()));
       } else {
         newType = type->getDeclaredInterfaceType();
       }
@@ -402,16 +390,15 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
 
       // Resolve this component to the type we found.
       auto typeRef = ConcreteDeclRef(type);
-      auto resolved = KeyPathExpr::Component::forProperty(typeRef, currentType,
-                                                          componentNameLoc);
+      auto resolved = KeyPathExpr::Component::forMember(typeRef, currentType,
+                                                        componentNameLoc);
       resolvedComponents.push_back(resolved);
 
       continue;
     }
 
     // Declarations that cannot be part of a key-path.
-    diags.diagnose(componentNameLoc, diag::expr_keypath_not_property,
-                   found->getDescriptiveKind(), found->getName(),
+    diags.diagnose(componentNameLoc, diag::expr_keypath_not_property, found,
                    /*isForDynamicKeyPathMemberLookup=*/false);
     isInvalid = true;
     break;
@@ -434,6 +421,7 @@ Optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
                                       /*Implicit=*/true));
   }
 
-  if (!currentType) return None;
+  if (!currentType)
+    return std::nullopt;
   return currentType;
 }

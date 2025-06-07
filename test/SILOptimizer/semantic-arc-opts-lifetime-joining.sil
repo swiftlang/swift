@@ -1,5 +1,7 @@
-// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all -semantic-arc-opts -sil-semantic-arc-peepholes-lifetime-joining %s | %FileCheck %s
-// REQUIRES: swift_stdlib_asserts
+// RUN: %target-sil-opt -sil-print-types -module-name Swift -enable-sil-verify-all -semantic-arc-opts -sil-semantic-arc-peepholes-lifetime-joining %s | %FileCheck %s
+//
+// Enabling specific ARC opts requires an asserts build.
+// REQUIRES: asserts
 
 // NOTE: Some of our tests here depend on borrow elimination /not/ running!
 // Please do not add it to clean up the IR like we did in
@@ -14,6 +16,13 @@ import Builtin
 //////////////////
 
 typealias AnyObject = Builtin.AnyObject
+
+struct Bool {
+  var value : Builtin.Int1
+}
+
+sil @closureCapturesBool : $@convention(thin) (@guaranteed { var Bool }) -> ()
+sil @closureArgumentEscapes : $@convention(thin) (@owned @callee_guaranteed () -> ()) -> ()
 
 enum MyNever {}
 enum FakeOptional<T> {
@@ -106,6 +115,13 @@ struct NativeObjectWrapper {
 }
 
 sil @owned_user_object_pair : $@convention(thin) (@owned NativeObjectPair) -> ()
+
+class X {}
+struct S {}
+
+sil @getX : $@convention(thin) () -> @owned X
+sil @getS : $@convention(thin) (@owned X) -> @out S
+sil @loadWeakX_from : $@convention(thin) (@in_guaranteed S) -> @owned FakeOptional<X>
 
 ///////////
 // Tests //
@@ -883,3 +899,82 @@ bb3(%result : @owned $FakeOptional<Builtin.NativeObject>):
   dealloc_stack %allocStack : $*Builtin.NativeObject
   return %result : $FakeOptional<Builtin.NativeObject>
 }
+
+// Don't do this optimization:
+//   Eliminate borrowed copy with useless lifetime:
+//   %5 = copy_value %0 : ${ var Bool }
+//
+// CHECK: sil hidden [ossa] @testCapturedSingleDestroyCopy : $@convention(thin) () -> Bool {
+// CHECK:   load [trivial] %{{.*}} : $*Bool
+// CHECK:   destroy_value %0 : ${ var Bool }
+sil hidden [ossa] @testCapturedSingleDestroyCopy : $@convention(thin) () -> Bool {
+bb0:
+  // var test = false
+  %0 = alloc_box ${ var Bool }, var, name "test"
+  %1 = project_box %0 : ${ var Bool }, 0
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = struct $Bool (%2 : $Builtin.Int1)
+  store %3 to [trivial] %1 : $*Bool
+
+  // capture test in an escaping closure
+  %5 = copy_value %0 : ${ var Bool }
+  %6 = function_ref @closureCapturesBool : $@convention(thin) (@guaranteed { var Bool }) -> ()
+  %7 = partial_apply [callee_guaranteed] %6(%5) : $@convention(thin) (@guaranteed { var Bool }) -> ()
+  %8 = function_ref @closureArgumentEscapes : $@convention(thin) (@owned @callee_guaranteed () -> ()) -> ()
+  %9 = apply %8(%7) : $@convention(thin) (@owned @callee_guaranteed () -> ()) -> ()
+
+  // return test
+  %10 = begin_access [read] [dynamic] %1 : $*Bool
+  %11 = load [trivial] %10 : $*Bool
+  end_access %10 : $*Bool
+  destroy_value %0 : ${ var Bool }
+  return %11 : $Bool
+}
+
+// Don't do this optimization:
+//   Eliminate copy of lexical value which ends after lifetime of copy IF there
+//   may be deinit barriers between the final consume and the copy.
+//
+// CHECK-LABEL: sil [ossa] @testDestroyedLexicalValue : {{.*}} {
+// CHECK:         [[GET:%[^,]+]] = function_ref @getX
+// CHECK:         [[X:%[^,]+]] = apply [[GET]]()
+// CHECK:         [[MX:%[^,]+]] = move_value [lexical] [[X]]
+// CHECK:         destroy_value [[MX]] : $X
+// CHECK-LABEL: } // end sil function 'testDestroyedLexicalValue'
+sil [ossa] @testDestroyedLexicalValue : $@convention(thin) () -> @owned FakeOptional<X> {
+bb0:
+  %getX = function_ref @getX : $@convention(thin) () -> @owned X
+  %x = apply %getX() : $@convention(thin) () -> @owned X
+  %mx = move_value [lexical] %x : $X
+  %a = alloc_stack [lexical] $S, let, name "s"
+  %c = copy_value %mx : $X
+  %getS = function_ref @getS : $@convention(thin) (@owned X) -> @out S
+  %s = apply %getS(%a, %c) : $@convention(thin) (@owned X) -> @out S
+  %loadWeakX_from = function_ref @loadWeakX_from : $@convention(thin) (@in_guaranteed S) -> @owned FakeOptional<X>
+  %o = apply %loadWeakX_from(%a) : $@convention(thin) (@in_guaranteed S) -> @owned FakeOptional<X>
+  // ^^^^^ Deinit barrier
+  destroy_addr %a : $*S
+  dealloc_stack %a : $*S
+  destroy_value %mx : $X
+  return %o : $FakeOptional<X>
+}
+
+// CHECK-LABEL: sil [ossa] @testDestroyedLexicalValueNoBarriers : {{.*}} {
+// CHECK-NOT:     destroy_value
+// CHECK-LABEL: } // end sil function 'testDestroyedLexicalValueNoBarriers'
+sil [ossa] @testDestroyedLexicalValueNoBarriers : $@convention(thin) () -> () {
+bb0:
+  %getX = function_ref @getX : $@convention(thin) () -> @owned X
+  %x = apply %getX() : $@convention(thin) () -> @owned X
+  %mx = move_value [lexical] %x : $X
+  %a = alloc_stack [lexical] $S, let, name "s"
+  %c = copy_value %mx : $X
+  %getS = function_ref @getS : $@convention(thin) (@owned X) -> @out S
+  %s = apply %getS(%a, %c) : $@convention(thin) (@owned X) -> @out S
+  destroy_addr %a : $*S
+  dealloc_stack %a : $*S
+  destroy_value %mx : $X
+  %r = tuple ()
+  return %r : $()
+}
+

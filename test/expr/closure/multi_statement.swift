@@ -307,7 +307,7 @@ func test_pattern_matches_only_cases() {
   }
 }
 
-// rdar://91225620 - type of expression is ambiguous without more context in closure
+// rdar://91225620 - type of expression is ambiguous without a type annotation in closure
 func test_wrapped_var_without_initializer() {
   @propertyWrapper
   struct Wrapper {
@@ -336,9 +336,10 @@ func test_unknown_refs_in_tilde_operator() {
   enum E {
   }
 
-  let _: (E) -> Void = { // expected-error {{unable to infer closure type in the current context}}
+  let _: (E) -> Void = {
     if case .test(unknown) = $0 {
       // expected-error@-1 2 {{cannot find 'unknown' in scope}}
+      // expected-error@-2 {{type 'E' has no member 'test'}}
     }
   }
 }
@@ -648,5 +649,73 @@ func test_that_closures_are_attempted_in_order() {
       return true
     }
     return false
+  }
+}
+
+func test_use_of_concrete_params_in_for_condition() {
+  struct S {
+    var cond: Bool
+  }
+
+  func test(_: (S) -> Void) {}
+
+  test { data in
+    for i in 0...10 where !data.cond { // Ok
+      print(i)
+    }
+  }
+}
+
+// https://github.com/apple/swift/issues/63455
+func test_recursive_var_reference_in_multistatement_closure() {
+  struct MyStruct {
+    func someMethod() {}
+  }
+
+  func takeClosure(_ x: () -> Void) {}
+
+  func test(optionalInt: Int?, themes: MyStruct?) {
+    takeClosure {
+      let int = optionalInt { // expected-error {{cannot call value of non-function type 'Int?'}}
+        print(int)
+      }
+    }
+
+    takeClosure {
+      let theme = themes?.someMethod() { // expected-error {{extra trailing closure passed in call}}
+        _ = theme
+      }
+    }
+
+    takeClosure {
+      let theme = themes?.filter({ $0 }) { // expected-error {{value of type 'MyStruct' has no member 'filter'}}
+        _ = theme
+      }
+    }
+  }
+}
+
+// https://github.com/apple/swift/issues/67363
+func test_result_builder_in_member_chaining() {
+  @resultBuilder
+  struct Builder {
+    static func buildBlock<T>(_: T) -> Int { 42 }
+  }
+
+  struct Test {
+    static func test<T>(fn: () -> T) -> T {
+      fn()
+    }
+
+    func builder(@Builder _: () -> Int) {}
+  }
+
+  Test.test {
+    let test = Test()
+    return test
+  // FIXME: This call should type-check, currently closure is resolved before overload of `builder` is picked.
+  }.builder { // expected-error {{cannot convert value of type '()' to closure result type 'Int'}}
+    let result = ""
+    result
   }
 }

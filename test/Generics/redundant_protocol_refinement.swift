@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift
 // RUN: %target-swift-frontend -typecheck -debug-generic-signatures %s 2>&1 | %FileCheck %s
 
 // CHECK-LABEL: redundant_protocol_refinement.(file).Base@
@@ -12,7 +12,6 @@ protocol Middle : Base {}
 // CHECK-LABEL: redundant_protocol_refinement.(file).Derived@
 // CHECK-LABEL: Requirement signature: <Self where Self : Middle>
 protocol Derived : Middle, Base {}
-// expected-warning@-1 {{redundant conformance constraint 'Self' : 'Base'}}
 
 // CHECK-LABEL: redundant_protocol_refinement.(file).Derived2@
 // CHECK-LABEL: Requirement signature: <Self where Self : Middle>
@@ -21,7 +20,6 @@ protocol Derived2 : Middle {}
 // CHECK-LABEL: redundant_protocol_refinement.(file).MoreDerived@
 // CHECK-LABEL: Requirement signature: <Self where Self : Derived2>
 protocol MoreDerived : Derived2, Base {}
-// expected-warning@-1 {{redundant conformance constraint 'Self' : 'Base'}}
 
 protocol P1 {}
 

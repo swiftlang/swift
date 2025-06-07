@@ -7,5 +7,5 @@ import Foundation
 }
 
 class ApplicationTracker: NSObject, Tracker {
-    func track(event: String) {} // expected-error {{satisfying a throwing @objc method with a non-throwing method is not supported}}
+    func track(event: String) {} // expected-error {{satisfying a throwing '@objc' method with a non-throwing method is not supported}}
 }

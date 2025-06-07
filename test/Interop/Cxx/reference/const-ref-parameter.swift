@@ -34,7 +34,7 @@ func testFunction() {
 // CHECK-IDE-TEST: mutating func doOtherThing(_ options: OptionsStruct) -> Float
 
 
-// RUN: %target-swift-frontend -c -enable-experimental-cxx-interop -enable-objc-interop -I %S/Inputs %s -emit-silgen -o - | %FileCheck %s
+// RUN: %target-swift-frontend -c -enable-experimental-cxx-interop -enable-objc-interop -I %S/Inputs %s -Xllvm -sil-print-types -emit-silgen -o - | %FileCheck %s
 
 // CHECK: [[FN1:%[0-9]+]] = function_ref @$sSo19OptionsConsumerObjCC7optionsABSo0A6StructV_tcfC : $@convention(method) (OptionsStruct, @thick OptionsConsumerObjC.Type) -> @owned OptionsConsumerObjC
 // CHECK-NEXT: apply [[FN1]]
@@ -52,9 +52,9 @@ func testFunction() {
 // CHECK-NEXT: apply [[FN4]]
 // CHECK-SAME: : $@convention(objc_method) (@in_guaranteed OptionsStruct, @objc_metatype OptionsConsumerObjC.Type) -> Int32
 
-// CHECK: [[FN5:%[0-9]+]] = function_ref @_ZN18OptionsConsumerCxxC1ERK13OptionsStruct : $@convention(c) (OptionsStruct) -> @out OptionsConsumerCxx
+// CHECK: [[FN5:%[0-9]+]] = function_ref @_ZN18OptionsConsumerCxxC1ERK13OptionsStruct : $@convention(c) (@in_guaranteed OptionsStruct) -> @out OptionsConsumerCxx
 // CHECK-NEXT: apply [[FN5]]
-// CHECK-SAME: : $@convention(c) (OptionsStruct) -> @out OptionsConsumerCxx
+// CHECK-SAME: : $@convention(c) (@in_guaranteed OptionsStruct) -> @out OptionsConsumerCxx
 
 // CHECK: [[FN6:%[0-9]+]] = function_ref @_ZN18OptionsConsumerCxx12doOtherThingERK13OptionsStruct : $@convention(cxx_method) (@in_guaranteed OptionsStruct, @inout OptionsConsumerCxx) -> Float
 // CHECK-NEXT: apply [[FN6]]

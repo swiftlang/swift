@@ -1,5 +1,10 @@
-// RUN: %target-swift-frontend -emit-sil -O %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -O %s | %FileCheck %s
 // REQUIRES: swift_in_compiler
+
+// Checks for inlining depends on code-size but cow check adds some
+// amount of extra code
+// UNSUPPORTED: array_cow_checks
+
 import _Differentiation
 
 @_silgen_name("blackHole")
@@ -87,14 +92,10 @@ func test_gradient_float_loop() {
 }
 
 // Check whether `apply`s are inlined.
-// Currently, the VJP is inlined but the pullback is not.
 // CHECK-LABEL: sil hidden @test_gradient_float_loop : $@convention(thin) () -> ()
-// CHECK: [[PB_FN_REF:%.*]] = function_ref @{{.*}}24test_gradient_float_loopyyFS2fcfU_TJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float)
-// CHECK: [[GRADIENT_RESULT:%.*]] = apply [[PB_FN_REF]]
-// CHECK: [[EXTRACT:%.*]] = tuple_extract [[GRADIENT_RESULT]]
-// CHECK: [[GRADIENT_RESULT2:%.*]] = apply [[EXTRACT]]
+// CHECK:  = function_ref @${{.*24test_gradient_float_loopyyFS2fcfU_TJrSpSr|sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_}}
 // CHECK: [[FN_REF:%.*]] = function_ref @$s9blackHoleSf_Tg5 : $@convention(thin) (Float) -> Float
-// CHECK-NEXT: apply [[FN_REF:%.*]]([[GRADIENT_RESULT2]])
+// CHECK-NEXT: apply [[FN_REF:%.*]]
 // CHECK-NOT: apply
 // CHECK-LABEL: } // end sil function 'test_gradient_float_loop'
 func array_loop(_ array: [Float]) -> Float {

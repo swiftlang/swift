@@ -294,7 +294,7 @@ class BrowserViewController: UIViewController {
             self.displayedPopoverController = nil
         }
 
-        // If we are displying a private tab, hide any elements in the tab that we wouldn't want shown
+        // If we are displaying a private tab, hide any elements in the tab that we wouldn't want shown
         // when the app is in the home switcher
         guard let privateTab = tabManager.selectedTab, privateTab.isPrivate else {
             return
@@ -459,7 +459,7 @@ class BrowserViewController: UIViewController {
         assert(!Thread.current.isMainThread, "This must be called in the background.")
         self.profile.queue.getQueuedTabs() >>== { cursor in
 
-            // This assumes that the DB returns rows in some kind of sane order.
+            // This assumes that the DB returns rows in some kind of sound order.
             // It does in practice, so WFM.
             if cursor.count > 0 {
 
@@ -1104,7 +1104,7 @@ class BrowserViewController: UIViewController {
                 postLocationChangeNotificationForTab(tab, navigation: navigation)
 
                 // Fire the readability check. This is here and not in the pageShow event handler in ReaderMode.js anymore
-                // because that event wil not always fire due to unreliable page caching. This will either let us know that
+                // because that event will not always fire due to unreliable page caching. This will either let us know that
                 // the currently loaded page can be turned into reading mode or if the page already is in reading mode. We
                 // ignore the result because we are being called back asynchronous when the readermode status changes.
                 webView.evaluateJavaScript("\(ReaderModeNamespace).checkReadability()", completionHandler: nil)

@@ -11,12 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "optimize-hop-to-executor"
+#include "swift/SIL/ApplySite.h"
+#include "swift/SIL/MemAccessUtils.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
-#include "swift/SIL/ApplySite.h"
-#include "swift/SIL/MemoryLocations.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SIL/MemAccessUtils.h"
 
 using namespace swift;
 
@@ -330,6 +330,39 @@ bool OptimizeHopToExecutor::needsExecutor(SILInstruction *inst) {
   }
   if (auto *copy = dyn_cast<CopyAddrInst>(inst)) {
     return isGlobalMemory(copy->getSrc()) || isGlobalMemory(copy->getDest());
+  }
+  // Certain builtins have memory effects that are known to not depend on
+  // the current executor.
+  if (auto builtin = dyn_cast<BuiltinInst>(inst)) {
+    if (auto kind = builtin->getBuiltinKind()) {
+      switch (*kind) {
+      // The initialization of the default actor header isn't
+      // executor-dependent, and it's important to recognize here because
+      // we really want to eliminate the initial hop to the generic executor
+      // in async actor initializers.
+      //
+      // Now, we can't safely hop to the actor before its initialization is
+      // complete, and that includes the default-actor header.  But this
+      // optimization pass never causes us to hop to an executor *earlier*
+      // than we would have otherwise.  If we wanted to do that, we'd need
+      // to have some way to ensure we don't skip over the initialization of
+      // the stored properties as well, which is important even for default
+      // actors because the mechanics of destroying an incomplete object don't
+      // account for it being a "zombie" current executor in the runtime.
+      case BuiltinValueKind::InitializeDefaultActor:
+        return false;
+      default:
+        break;
+      }
+    }
+  }
+  // BeginBorrowInst and EndBorrowInst currently have
+  // MemoryBehavior::MayHaveSideEffects.  Fixing that is tracked by
+  // rdar://111875527.  These instructions only have effects in the sense of
+  // memory dependencies, which aren't relevant for hop_to_executor
+  // elimination.
+  if (isa<BeginBorrowInst>(inst) || isa<EndBorrowInst>(inst)) {
+    return false;
   }
   return inst->mayReadOrWriteMemory();
 }

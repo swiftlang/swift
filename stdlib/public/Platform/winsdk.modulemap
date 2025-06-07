@@ -48,6 +48,12 @@ module WinSDK [system] {
       export *
     }
 
+    // api-ms-win-appmodel-runtime-l1
+    module appmodel {
+      header "appmodel.h"
+      export *
+    }
+
     // api-ms-win-core-errhandling-l1-1-0.dll
     module errhandling {
       header "errhandlingapi.h"
@@ -225,6 +231,13 @@ module WinSDK [system] {
 
       link "xinput.lib"
     }
+    
+    module DirectInput8 {
+      header "dinput.h"
+      export *
+
+      link "dinput8.lib"
+    }
 
     link "dxguid.lib"
   }
@@ -232,6 +245,12 @@ module WinSDK [system] {
   // FIXME(compnerd) this is a hack for the HWND typedef for DbgHelp
   module __DirectX {
     header "directmanipulation.h"
+    export *
+  }
+
+  module DDE {
+    header "dde.h"
+    header "ddeml.h"
     export *
   }
 
@@ -272,6 +291,13 @@ module WinSDK [system] {
     }
   }
 
+  module LZ32 {
+    header "LZExpand.h"
+    export *
+
+    link "Lz32.Lib"
+  }
+
   module Multimedia {
     module DigitalVideo {
       header "Digitalv.h"
@@ -304,6 +330,8 @@ module WinSDK [system] {
   }
 
   module Security {
+    header "../shared/sddl.h"
+
     module AuthZ {
       header "AuthZ.h"
       export *
@@ -373,8 +401,14 @@ module WinSDK [system] {
     }
   }
 
+  module OLE {
+    header "ole2.h"
+    export *
+  }
+
   module OLE32 {
     header "oaidl.h"
+    header "oleauto.h"
     export *
 
     link "OleAut32.Lib"
@@ -442,10 +476,27 @@ module WinSDK [system] {
     }
   }
 
+  module URLMonikers {
+    header "urlmon.h"
+    export *
+    link "Urlmon.Lib"
+  }
+
   module User {
     header "WinUser.h"
     export *
     link "User32.Lib"
+  }
+
+  module UserEnv {
+    header "UserEnv.h"
+    export *
+    link "UserEnv.Lib"
+  }
+
+  module WER {
+    header "WerApi.h"
+    export *
   }
 
   module WIC {
@@ -458,6 +509,13 @@ module WinSDK [system] {
   module WinBase {
     header "winbase.h"
     export *
+  }
+
+  module WinCred {
+    header "wincred.h"
+    export *
+
+    link "AdvAPI32.lib"
   }
 
   module WinDNS {

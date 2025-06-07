@@ -36,7 +36,7 @@ func basictest() {
 
   var x4 : Bool = true
   var x5 : Bool =
-        4 // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+        4 // expected-error {{cannot convert value of type 'Int' to specified type 'Bool'}}
 
   //var x6 : Float = 4+5
 
@@ -297,7 +297,7 @@ func fib(_ n: Int) -> Int {
 
 // FIXME: Should warn about integer constants being too large <rdar://problem/14070127>
 var
-   il_a: Bool = 4  // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+   il_a: Bool = 4  // expected-error {{cannot convert value of type 'Int' to specified type 'Bool'}}
 var il_b: Int8
    = 123123
 var il_c: Int8 = 4  // ok
@@ -619,8 +619,8 @@ class C {
 }
 
 _ = C(3) // expected-error {{missing argument label 'other:' in call}}
-// expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'C?'}}
-_ = C(other: 3) // expected-error {{cannot convert value of type 'Int' to expected argument type 'C?'}}
+// expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'C'}}
+_ = C(other: 3) // expected-error {{cannot convert value of type 'Int' to expected argument type 'C'}}
 
 //===----------------------------------------------------------------------===//
 // Unary Operators
@@ -749,7 +749,6 @@ func invalidDictionaryLiteral() {
 
 [4].joined(separator: [1])
 // expected-error@-1 {{no exact matches in call to instance method 'joined'}}
-// expected-note@-2 {{found candidate with type '(String) -> String'}}
 // There is one more note here - candidate requires that 'Int' conform to 'Sequence' (requirement specified as 'Self.Element' : 'Sequence') pointing to Sequence extension
 
 [4].joined(separator: [[[1]]])
@@ -759,15 +758,15 @@ func invalidDictionaryLiteral() {
 //===----------------------------------------------------------------------===//
 // nil/metatype comparisons
 //===----------------------------------------------------------------------===//
-_ = Int.self == nil  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'nil' always returns false}}
-_ = nil == Int.self  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'nil' always returns false}}
-_ = Int.self != nil  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'nil' always returns true}}
-_ = nil != Int.self  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'nil' always returns true}}
+_ = Int.self == nil  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'nil' always returns false}}
+_ = nil == Int.self  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'nil' always returns false}}
+_ = Int.self != nil  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'nil' always returns true}}
+_ = nil != Int.self  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'nil' always returns true}}
 
-_ = Int.self == .none  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'Optional.none' always returns false}}
-_ = .none == Int.self  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'Optional.none' always returns false}}
-_ = Int.self != .none  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'Optional.none' always returns true}}
-_ = .none != Int.self  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'Optional.none' always returns true}}
+_ = Int.self == .none  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'Optional.none' always returns false}}
+_ = .none == Int.self  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'Optional.none' always returns false}}
+_ = Int.self != .none  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'Optional.none' always returns true}}
+_ = .none != Int.self  // expected-warning {{comparing non-optional value of type 'any (~Copyable & ~Escapable).Type' to 'Optional.none' always returns true}}
 
 // <rdar://problem/19032294> Disallow postfix ? when not chaining
 func testOptionalChaining(_ a : Int?, b : Int!, c : Int??) {
@@ -795,14 +794,14 @@ func testNilCoalescePrecedence(cond: Bool, a: Int?, r: ClosedRange<Int>?) {
 
   // ?? should have lower precedence than range and arithmetic operators.
   let r1 = r ?? (0...42) // ok
-  let r2 = (r ?? 0)...42 // not ok: expected-error {{binary operator '??' cannot be applied to operands of type 'ClosedRange<Int>?' and 'Int'}}
+  let r2 = (r ?? 0)...42 // not ok: expected-error {{cannot convert value of type 'ClosedRange<Int>?' to expected argument type 'Int?'}}
   let r3 = r ?? 0...42 // parses as the first one, not the second.
   
   
   // <rdar://problem/27457457> [Type checker] Diagnose unsavory optional injections
   // Accidental optional injection for ??.
   let i = 42
-  _ = i ?? 17 // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'Int', so the right side is never used}} {{9-15=}}
+  _ = i ?? 17 // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'Int', so the right side is never used}} {{8-14=}}
 }
 
 // <rdar://problem/19772570> Parsing of as and ?? regressed
@@ -869,7 +868,7 @@ func r20802757(_ z: inout Int = &g20802757) { // expected-error {{cannot provide
   print(z)
 }
 
-_ = _.foo // expected-error {{type placeholder not allowed here}} expected-error {{could not infer type for placeholder}}
+_ = _.foo // expected-error {{type placeholder not allowed here}}
 
 // <rdar://problem/22211854> wrong arg list crashing sourcekit
 func r22211854() {
@@ -952,3 +951,7 @@ let _ = "foo \(42 /*
 // expected-error @-3 {{cannot find ')' to match opening '(' in string interpolation}} expected-error @-3 {{unterminated string literal}}
 // expected-error @-2 {{expected expression}}
 // expected-error @-3 {{unterminated string literal}}
+
+// https://github.com/apple/swift/issues/66192
+func I66192(_: Int) {}
+I66192(true ? "yes" : "no") // expected-error{{cannot convert value of type 'String' to expected argument type 'Int'}}

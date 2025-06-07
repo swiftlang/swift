@@ -90,18 +90,51 @@ unwrapExistential(const Metadata *T, OpaqueValue *Value) {
   // TODO: Should look through existential metatypes too, but it doesn't
   // really matter yet since we don't have any special mirror behavior for
   // concrete metatypes yet.
-  while (T->getKind() == MetadataKind::Existential) {
-    auto *existential
-      = static_cast<const ExistentialTypeMetadata *>(T);
-
-    // Unwrap the existential container.
-    T = existential->getDynamicType(Value);
-    Value = existential->projectValue(Value);
-
-    // Existential containers can end up nested in some cases due to generic
-    // abstraction barriers.  Repeat in case we have a nested existential.
+  for (;;) {
+    switch (T->getKind()) {
+    case MetadataKind::Existential: {
+      auto *existential
+	= static_cast<const ExistentialTypeMetadata *>(T);
+      T = existential->getDynamicType(Value);
+      Value = existential->projectValue(Value);
+      break;
+    }
+    case MetadataKind::ExtendedExistential: {
+      auto *existential
+	= static_cast<const ExtendedExistentialTypeMetadata *>(T);
+      switch (existential->Shape->Flags.getSpecialKind()) {
+      case ExtendedExistentialTypeShape::SpecialKind::None: {
+	auto opaqueContainer =
+	  reinterpret_cast<OpaqueExistentialContainer *>(Value);
+	T = opaqueContainer->Type;
+	Value = const_cast<OpaqueValue *>(opaqueContainer->projectValue());
+	break;
+      }
+      case ExtendedExistentialTypeShape::SpecialKind::Class: {
+	auto classContainer =
+	  reinterpret_cast<ClassExistentialContainer *>(Value);
+	T = swift_getObjectType((HeapObject *)classContainer->Value);
+	Value = reinterpret_cast<OpaqueValue *>(&classContainer->Value);
+	break;
+      }
+      case ExtendedExistentialTypeShape::SpecialKind::Metatype: {
+	auto srcExistentialContainer =
+	  reinterpret_cast<ExistentialMetatypeContainer *>(Value);
+	T = swift_getMetatypeMetadata(srcExistentialContainer->Value);
+	Value = reinterpret_cast<OpaqueValue *>(&srcExistentialContainer->Value);
+	break;
+      }
+      case ExtendedExistentialTypeShape::SpecialKind::ExplicitLayout: {
+	swift_unreachable("Extended Existential with explicit layout not supported");
+	break;
+      }
+      }
+      break;
+    }
+    default:
+      return std::make_tuple(T, Value);
+    }
   }
-  return std::make_tuple(T, Value);
 }
 
 static void copyWeakFieldContents(OpaqueValue *destContainer, const Metadata *type, OpaqueValue *fieldData) {
@@ -137,6 +170,29 @@ static AnyReturn copyFieldContents(OpaqueValue *fieldData,
   outValue.Type = type;
   auto ownership = fieldType.getReferenceOwnership();
   auto *destContainer = type->allocateBoxForExistentialIn(&outValue.Buffer);
+
+  // If the field's type is a thin metatype, then there's no actual data at
+  // fieldData, and we need to obtain the metatype value from the field type.
+  if (auto *metatype = dyn_cast<MetatypeMetadata>(type)) {
+    switch (metatype->InstanceType->getKind()) {
+    case MetadataKind::Struct:
+    case MetadataKind::Enum:
+    case MetadataKind::Optional:
+    case MetadataKind::Tuple:
+    case MetadataKind::Function:
+    case MetadataKind::Existential: {
+      // These kinds don't have subtypes and thus have thin representations.
+      auto asOpaque = const_cast<OpaqueValue *>(
+          reinterpret_cast<const OpaqueValue *>(&metatype->InstanceType));
+      type->vw_initializeWithCopy(destContainer, asOpaque);
+      return AnyReturn(outValue);
+    }
+
+    default:
+      // Other kinds have subtypes and will not have a thin representation.
+      break;
+    }
+  }
 
   if (ownership.isStrong()) {
     type->vw_initializeWithCopy(destContainer, fieldData);
@@ -379,7 +435,7 @@ getFieldAt(const Metadata *base, unsigned index) {
   auto result = swift_getTypeByMangledName(
       MetadataState::Complete, typeName, substitutions.getGenericArgs(),
       [&substitutions](unsigned depth, unsigned index) {
-        return substitutions.getMetadata(depth, index);
+        return substitutions.getMetadata(depth, index).Ptr;
       },
       [&substitutions](const Metadata *type, unsigned index) {
         return substitutions.getWitnessTable(type, index);
@@ -1118,7 +1174,11 @@ SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
 const char *swift_keyPath_copySymbolName(void *address) {
   if (auto info = SymbolInfo::lookup(address)) {
     if (info->getSymbolName()) {
+#if defined(_WIN32)
+      return _strdup(info->getSymbolName());
+#else
       return strdup(info->getSymbolName());
+#endif
     }
   }
   return nullptr;
@@ -1136,9 +1196,12 @@ SWIFT_RUNTIME_STDLIB_INTERNAL const
   std::string mangledName = keyPathSourceString(name, length);
   if (mangledName == "") {
     return 0;
-  } else {
-    return strdup(mangledName.c_str());
   }
+#if defined(_WIN32)
+  return _strdup(mangledName.c_str());
+#else
+  return strdup(mangledName.c_str());
+#endif
 }
 
 #endif  // SWIFT_ENABLE_REFLECTION

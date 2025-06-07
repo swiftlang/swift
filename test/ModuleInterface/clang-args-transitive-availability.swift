@@ -5,22 +5,19 @@
 // received the TANGERINE macro
 // RUN: %target-swift-frontend -typecheck -strict-implicit-module-context %s -I %S/Inputs/macro-only-module -Xcc -DTANGERINE=1 -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import
 
-// RUN: %target-swift-frontend -scan-dependencies -strict-implicit-module-context %s -o %t/deps.json -I %S/Inputs/macro-only-module -Xcc -DTANGERINE=1 -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import
+// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -strict-implicit-module-context %s -o %t/deps.json -I %S/Inputs/macro-only-module -Xcc -DTANGERINE=1 -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import
+// RUN: %validate-json %t/deps.json &>/dev/null
 // RUN: %FileCheck %s < %t/deps.json
 
 import ImportsMacroSpecificClangModule
 
 // CHECK:      "directDependencies": [
-// CHECK-NEXT:        {
 // CHECK-DAG:          "swift": "ImportsMacroSpecificClangModule"
-// CHECK-NEXT:        },
-// CHECK-NEXT:        {
 // CHECK-DAG:          "swift": "Swift"
-// CHECK-NEXT:        },
-// CHECK-NEXT:        {
 // CHECK-DAG:          "swift": "SwiftOnoneSupport"
-// CHECK-NEXT:        }
-// CHECK-NEXT:      ],
+
+// Additional occurence in source-imported dependencies field
+//CHECK:      "swift": "ImportsMacroSpecificClangModule"
 
 //CHECK:      "swift": "ImportsMacroSpecificClangModule"
 //CHECK-NEXT:    },
@@ -30,7 +27,22 @@ import ImportsMacroSpecificClangModule
 //CHECK-NEXT:      ],
 //CHECK-NEXT:      "directDependencies": [
 //CHECK-NEXT:        {
-//CHECK-NEXT:          "clang": "OnlyWithMacro"
+//CHECK-NEXT:          "swift": "SubImportsMacroSpecificClangModule"
+//CHECK-NEXT:        },
+//CHECK-NEXT:        {
+//CHECK-NEXT:          "swift": "SwiftOnoneSupport"
+
+//CHECK:      "swift": "SubImportsMacroSpecificClangModule"
+//CHECK-NEXT:    },
+//CHECK-NEXT:    {
+//CHECK-NEXT:      "modulePath": "{{.*}}{{/|\\}}SubImportsMacroSpecificClangModule-{{.*}}.swiftmodule",
+//CHECK-NEXT:      "sourceFiles": [
+//CHECK-NEXT:      ],
+//CHECK-NEXT:      "directDependencies": [
+//CHECK-NEXT:        {
+//CHECK-DAG:          "clang": "OnlyWithMacro"
+//CHECK-DAG:          "swift": "SwiftOnoneSupport"
+//CHECK-NEXT:        }
 
 // CHECK:      "clang": "OnlyWithMacro"
 // CHECK-NEXT:    },
@@ -39,13 +51,14 @@ import ImportsMacroSpecificClangModule
 // CHECK-NEXT:      "sourceFiles": [
 // CHECK-DAG:        "{{.*}}OnlyWithMacro.h"
 // CHECK-DAG:        "{{.*}}module.modulemap"
-// CHECK-NEXT:      ],
+// CHECK:           ],
 // CHECK-NEXT:      "directDependencies": [
 // CHECK-NEXT:      ],
-// CHECK-NEXT:      "details": {
+// CHECK-NEXT:      "linkLibraries": [
+// CHECK:           "details": {
 // CHECK-NEXT:        "clang": {
 // CHECK-NEXT:          "moduleMapPath": "{{.*}}module.modulemap",
 // CHECK-NEXT:          "contextHash": "{{.*}}",
 // CHECK-NEXT:          "commandLine": [
 
-// CHECK:                  "TANGERINE=1",
+// CHECK:                  "TANGERINE=1"

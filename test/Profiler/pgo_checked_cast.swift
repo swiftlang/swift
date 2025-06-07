@@ -2,22 +2,19 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -profile-generate -Xfrontend -disable-incremental-llvm-codegen -module-name pgo_checked_cast -o %t/main
 
-// This unusual use of 'sh' allows the path of the profraw file to be
-// substituted by %target-run.
 // RUN: %target-codesign %t/main
-// RUN: %target-run sh -c 'env LLVM_PROFILE_FILE=$1 $2' -- %t/default.profraw %t/main
+// RUN: env %env-LLVM_PROFILE_FILE=%t/default.profraw %target-run %t/main
 
 // RUN: %llvm-profdata merge %t/default.profraw -o %t/default.profdata
-// RUN: %target-swift-frontend %s -Xllvm -sil-full-demangle -profile-use=%t/default.profdata -emit-sorted-sil -emit-sil -module-name pgo_checked_cast -o - | %FileCheck %s --check-prefix=SIL
+// RUN: %target-swift-frontend %s -Xllvm -sil-full-demangle -profile-use=%t/default.profdata -emit-sorted-sil -Xllvm -sil-print-types -emit-sil -module-name pgo_checked_cast -o - | %FileCheck %s --check-prefix=SIL
 // need to lower checked_cast_addr_br(addr) into IR for this
 // %target-swift-frontend %s -Xllvm -sil-full-demangle -profile-use=%t/default.profdata -emit-ir -module-name pgo_checked_cast -o - | %FileCheck %s --check-prefix=IR
-// RUN: %target-swift-frontend %s -Xllvm -sil-full-demangle -profile-use=%t/default.profdata -O -emit-sorted-sil -emit-sil -module-name pgo_checked_cast -o - | %FileCheck %s --check-prefix=SIL-OPT
+// RUN: %target-swift-frontend %s -Xllvm -sil-full-demangle -profile-use=%t/default.profdata -O -emit-sorted-sil -Xllvm -sil-print-types -emit-sil -module-name pgo_checked_cast -o - | %FileCheck %s --check-prefix=SIL-OPT
 // need to lower checked_cast_addr_br(addr) into IR for this
 // %target-swift-frontend %s -Xllvm -sil-full-demangle -profile-use=%t/default.profdata -O -emit-ir -module-name pgo_checked_cast -o - | %FileCheck %s --check-prefix=IR-OPT
 
 // REQUIRES: profile_runtime
 // REQUIRES: executable_test
-// REQUIRES: OS=macosx
 
 // SIL-LABEL: // pgo_checked_cast.check1<A>(Any, A) -> A
 // SIL-LABEL: sil @$s16pgo_checked_cast6check1yxyp_xtlF : $@convention(thin) <T> (@in_guaranteed Any, @in_guaranteed T) -> @out T !function_entry_count(5001) {
@@ -42,10 +39,10 @@ public class D : C {}
 // IR-LABEL: define swiftcc i32 @$s6pgo_checked_cast6guess1s5Int32VAD1x_tF
 // IR-OPT-LABEL: define swiftcc i32 @$s6pgo_checked_cast6guess1s5Int32VAD1x_tF
 public func check2(_ a : B) -> Int32 {
-  // SIL: checked_cast_br %0 : $B to D, {{.*}}, {{.*}} !true_count(5000)
-  // SIL: checked_cast_br %0 : $B to C, {{.*}}, {{.*}} !true_count(2)
-  // SIL-OPT: checked_cast_br %0 : $B to D, {{.*}}, {{.*}} !true_count(5000)
-  // SIL-OPT: checked_cast_br %0 : $B to C, {{.*}}, {{.*}} !true_count(2)
+  // SIL: checked_cast_br B in %0 : $B to D, {{.*}}, {{.*}} !true_count(5000)
+  // SIL: checked_cast_br B in %0 : $B to C, {{.*}}, {{.*}} !true_count(2)
+  // SIL-OPT: checked_cast_br B in %0 : $B to D, {{.*}}, {{.*}} !true_count(5000)
+  // SIL-OPT: checked_cast_br B in %0 : $B to C, {{.*}}, {{.*}} !true_count(2)
   switch a {
     case is D:
       return 42

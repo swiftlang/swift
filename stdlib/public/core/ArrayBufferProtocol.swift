@@ -76,26 +76,44 @@ where Indices == Range<Int> {
   /// Returns a `_SliceBuffer` containing the elements in `bounds`.
   subscript(bounds: Range<Int>) -> _SliceBuffer<Element> { get }
 
+  // Superseded by the typed-throws version of this function, but retained
+  // for ABI reasons.
+  func withUnsafeBufferPointer<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R
+
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
   /// underlying contiguous storage.  If no such storage exists, it is
   /// created on-demand.
-  func withUnsafeBufferPointer<R>(
-    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  @available(SwiftStdlib 6.1, *)
+  func withUnsafeBufferPointer<R, E>(
+    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R
+
+  // Superseded by the typed-throws version of this function, but retained
+  // for ABI reasons.
+  mutating func withUnsafeMutableBufferPointer<R>(
+    _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R
 
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
   /// over the underlying contiguous storage.
   ///
   /// - Precondition: Such contiguous storage exists or the buffer is empty.
-  mutating func withUnsafeMutableBufferPointer<R>(
-    _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
-  ) rethrows -> R
+  @available(SwiftStdlib 6.1, *)
+  mutating func withUnsafeMutableBufferPointer<R, E>(
+    _ body: (UnsafeMutableBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R
 
   /// The number of elements the buffer stores.
   override var count: Int { get set }
 
   /// The number of elements the buffer can store without reallocation.
   var capacity: Int { get }
+
+  #if $Embedded
+  typealias AnyObject = Builtin.NativeObject
+  #endif
 
   /// An object that keeps the elements stored in this buffer alive.
   var owner: AnyObject { get }
@@ -122,7 +140,7 @@ where Indices == Range<Int> {
 extension _ArrayBufferProtocol {
   @inlinable
   internal var subscriptBaseAddress: UnsafeMutablePointer<Element> {
-    return firstElementAddress
+    return unsafe firstElementAddress
   }
 
   // Make sure the compiler does not inline _copyBuffer to reduce code size.
@@ -132,7 +150,7 @@ extension _ArrayBufferProtocol {
   internal init(copying buffer: Self) {
     let newBuffer = _ContiguousArrayBuffer<Element>(
       _uninitializedCount: buffer.count, minimumCapacity: buffer.count)
-    buffer._copyContents(
+    unsafe buffer._copyContents(
       subRange: buffer.indices,
       initializing: newBuffer.firstElementAddress)
     self = Self( _buffer: newBuffer, shiftedToStartIndex: buffer.startIndex)
@@ -145,75 +163,44 @@ extension _ArrayBufferProtocol {
     elementsOf newValues: __owned C
   ) where C: Collection, C.Element == Element {
     _internalInvariant(startIndex == 0, "_SliceBuffer should override this function.")
-    let oldCount = self.count
+    let elements = unsafe self.firstElementAddress
+
+    // erase all the elements we're replacing to create a hole
+    let holeStart = unsafe elements + subrange.lowerBound
+    let holeEnd = unsafe holeStart + newCount
     let eraseCount = subrange.count
+    unsafe holeStart.deinitialize(count: eraseCount)
 
     let growth = newCount - eraseCount
-    // This check will prevent storing a 0 count to the empty array singleton.
+
     if growth != 0 {
-      self.count = oldCount + growth
+      let tailStart = unsafe elements + subrange.upperBound
+      let tailCount = self.count - subrange.upperBound
+      unsafe holeEnd.moveInitialize(from: tailStart, count: tailCount)
+      self.count += growth
     }
 
-    let elements = self.subscriptBaseAddress
-    let oldTailIndex = subrange.upperBound
-    let oldTailStart = elements + oldTailIndex
-    let newTailIndex = oldTailIndex + growth
-    let newTailStart = oldTailStart + growth
-    let tailCount = oldCount - subrange.upperBound
-
-    if growth > 0 {
-      // Slide the tail part of the buffer forwards, in reverse order
-      // so as not to self-clobber.
-      newTailStart.moveInitialize(from: oldTailStart, count: tailCount)
-
-      // Update the original subrange
-      var i = newValues.startIndex
-      for j in subrange {
-        elements[j] = newValues[i]
-        newValues.formIndex(after: &i)
+    // don't use UnsafeMutableBufferPointer.initialize(fromContentsOf:)
+    // since it behaves differently on collections that misreport count,
+    // and breaks validation tests for those usecases / potentially
+    // breaks ABI guarantees.
+    if newCount > 0 {
+      let done: Void? = newValues.withContiguousStorageIfAvailable {
+        _precondition(
+          $0.count == newCount,
+          "invalid Collection: count differed in successive traversals"
+        )
+        unsafe holeStart.initialize(from: $0.baseAddress!, count: newCount)
       }
-      // Initialize the hole left by sliding the tail forward
-      for j in oldTailIndex..<newTailIndex {
-        (elements + j).initialize(to: newValues[i])
-        newValues.formIndex(after: &i)
-      }
-      _expectEnd(of: newValues, is: i)
-    }
-    else { // We're not growing the buffer
-      // Assign all the new elements into the start of the subrange
-      var i = subrange.lowerBound
-      var j = newValues.startIndex
-      for _ in 0..<newCount {
-        elements[i] = newValues[j]
-        i += 1
-        newValues.formIndex(after: &j)
-      }
-      _expectEnd(of: newValues, is: j)
-
-      // If the size didn't change, we're done.
-      if growth == 0 {
-        return
-      }
-
-      // Move the tail backward to cover the shrinkage.
-      let shrinkage = -growth
-      if tailCount > shrinkage {   // If the tail length exceeds the shrinkage
-
-        // Update the rest of the replaced range with the first
-        // part of the tail.
-        newTailStart.moveUpdate(from: oldTailStart, count: shrinkage)
-
-        // Slide the rest of the tail back
-        oldTailStart.moveInitialize(
-          from: oldTailStart + shrinkage, count: tailCount - shrinkage)
-      }
-      else {                      // Tail fits within erased elements
-        // Update the start of the replaced range with the tail
-        newTailStart.moveUpdate(from: oldTailStart, count: tailCount)
-
-        // Destroy elements remaining after the tail in subrange
-        (newTailStart + tailCount).deinitialize(
-          count: shrinkage - tailCount)
+      if done == nil {
+        var place = unsafe holeStart
+        var i = newValues.startIndex
+        while unsafe place < holeEnd {
+          unsafe place.initialize(to: newValues[i])
+          unsafe place += 1
+          newValues.formIndex(after: &i)
+        }
+        _expectEnd(of: newValues, is: i)
       }
     }
   }

@@ -37,15 +37,15 @@ public:
 
   /// Returns the Objective-C type name and nullability for the given Swift
   /// primitive type declaration, or \c None if no such type name exists.
-  Optional<ClangTypeInfo> getKnownObjCTypeInfo(const TypeDecl *typeDecl);
+  std::optional<ClangTypeInfo> getKnownObjCTypeInfo(const TypeDecl *typeDecl);
 
   /// Returns the C type name and nullability for the given Swift
   /// primitive type declaration, or \c None if no such type name exists.
-  Optional<ClangTypeInfo> getKnownCTypeInfo(const TypeDecl *typeDecl);
+  std::optional<ClangTypeInfo> getKnownCTypeInfo(const TypeDecl *typeDecl);
 
   /// Returns the C++ type name and nullability for the given Swift
   /// primitive type declaration, or \c None if no such type name exists.
-  Optional<ClangTypeInfo> getKnownCxxTypeInfo(const TypeDecl *typeDecl);
+  std::optional<ClangTypeInfo> getKnownCxxTypeInfo(const TypeDecl *typeDecl);
 
 private:
   void initialize(ASTContext &ctx);
@@ -54,9 +54,9 @@ private:
     // The Objective-C name of the Swift type.
     StringRef objcName;
     // The C name of the Swift type.
-    Optional<StringRef> cName;
+    std::optional<StringRef> cName;
     // The C++ name of the Swift type.
-    Optional<StringRef> cxxName;
+    std::optional<StringRef> cxxName;
     bool canBeNullable;
   };
 

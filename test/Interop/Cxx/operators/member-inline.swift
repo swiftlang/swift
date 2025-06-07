@@ -1,4 +1,6 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=swift-5.9)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=swift-6)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=upcoming-swift)
 //
 // REQUIRES: executable_test
 
@@ -7,7 +9,6 @@ import StdlibUnittest
 
 var OperatorsTestSuite = TestSuite("Operators")
 
-#if !os(Windows)    // https://github.com/apple/swift/issues/55575
 OperatorsTestSuite.test("LoadableIntWrapper.minus (inline)") {
   var lhs = LoadableIntWrapper(value: 42)
   let rhs = LoadableIntWrapper(value: 23)
@@ -25,7 +26,6 @@ OperatorsTestSuite.test("AddressOnlyIntWrapper.minus") {
 
    expectEqual(19, result.value)
 }
-#endif
 
 OperatorsTestSuite.test("LoadableIntWrapper.equal (inline)") {
   let lhs = LoadableIntWrapper(value: 42)
@@ -85,6 +85,15 @@ OperatorsTestSuite.test("LoadableIntWrapper.successor() (inline)") {
   expectEqual(42, wrapper.value)
 }
 
+OperatorsTestSuite.test("IntWrapperInNamespace.equal (inline)") {
+  let lhs = NS.IntWrapperInNamespace(value: 42)
+  let rhs = NS.IntWrapperInNamespace(value: 42)
+
+  let result = lhs == rhs
+
+  expectTrue(result)
+}
+
 OperatorsTestSuite.test("TemplatedWithFriendOperator.equal (inline)") {
   let lhs = TemplatedWithFriendOperatorSpec()
   let rhs = TemplatedWithFriendOperatorSpec()
@@ -94,14 +103,12 @@ OperatorsTestSuite.test("TemplatedWithFriendOperator.equal (inline)") {
   expectTrue(result)
 }
 
-#if !os(Windows)    // https://github.com/apple/swift/issues/55575
 OperatorsTestSuite.test("LoadableBoolWrapper.exclaim (inline)") {
   var wrapper = LoadableBoolWrapper(value: true)
 
   let resultExclaim = !wrapper
   expectEqual(false, resultExclaim.value)
 }
-#endif
 
 OperatorsTestSuite.test("AddressOnlyIntWrapper.call (inline)") {
   var wrapper = AddressOnlyIntWrapper(42)
@@ -267,7 +274,6 @@ OperatorsTestSuite.test("DifferentTypesArrayByVal.subscript (inline)") {
   expectEqual(1.5.rounded(.up), resultDouble.rounded(.up))
 }
 
-#if !os(Windows)    // https://github.com/apple/swift/issues/55575
 OperatorsTestSuite.test("NonTrivialArrayByVal.subscript (inline)") {
   var arr = NonTrivialArrayByVal()
   let NonTrivialByVal = arr[0];
@@ -295,7 +301,6 @@ OperatorsTestSuite.test("DerivedFromNonTrivialArrayByVal.subscript (inline, base
   expectEqual(5, NonTrivialByVal.e)
   expectEqual(6, NonTrivialByVal.f)
 }
-#endif
 
 OperatorsTestSuite.test("PtrByVal.subscript (inline)") {
   var arr = PtrByVal()
@@ -349,6 +354,9 @@ OperatorsTestSuite.test("Iterator.pointee") {
   var iter = Iterator()
   let res = iter.pointee
   expectEqual(123, res)
+
+  iter.pointee = 456
+  expectEqual(456, iter.pointee)
 }
 
 OperatorsTestSuite.test("ConstIterator.pointee") {
@@ -361,6 +369,105 @@ OperatorsTestSuite.test("ConstIteratorByVal.pointee") {
   let iter = ConstIteratorByVal()
   let res = iter.pointee
   expectEqual(456, res)
+}
+
+OperatorsTestSuite.test("AmbiguousOperatorStar.pointee") {
+  let stars = AmbiguousOperatorStar()
+  let res = stars.pointee
+  expectEqual(567, res)
+}
+
+OperatorsTestSuite.test("AmbiguousOperatorStar2.pointee") {
+  let stars = AmbiguousOperatorStar2()
+  let res = stars.pointee
+  expectEqual(678, res)
+}
+
+OperatorsTestSuite.test("DerivedFromConstIterator.pointee") {
+  let stars = DerivedFromConstIterator()
+  let res = stars.pointee
+  expectEqual(234, res)
+}
+
+OperatorsTestSuite.test("SubscriptSetterConst") {
+  var setterConst = SubscriptSetterConst()
+  setterConst[0] = 10
+}
+
+OperatorsTestSuite.test("SubscriptUnnamedParameter") {
+  let unnamed = SubscriptUnnamedParameter()
+  expectEqual(123, unnamed[0])
+  expectEqual(123, unnamed[321])
+}
+
+OperatorsTestSuite.test("SubscriptUnnamedParameterReadWrite") {
+  var unnamed = SubscriptUnnamedParameterReadWrite()
+  expectEqual(0, unnamed[0])
+  expectEqual(0, unnamed[321])
+
+  unnamed[456] = 456
+  expectEqual(456, unnamed[0])
+  expectEqual(456, unnamed[321])
+}
+
+OperatorsTestSuite.test("DerivedFromConstIteratorPrivatelyWithUsingDecl.pointee") {
+  let stars = DerivedFromConstIteratorPrivatelyWithUsingDecl()
+  let res = stars.pointee
+  expectEqual(234, res)
+}
+
+OperatorsTestSuite.test("DerivedFromAmbiguousOperatorStarPrivatelyWithUsingDecl.pointee") {
+  let stars = DerivedFromAmbiguousOperatorStarPrivatelyWithUsingDecl()
+  let res = stars.pointee
+  expectEqual(567, res)
+}
+
+OperatorsTestSuite.test("DerivedFromLoadableIntWrapperWithUsingDecl") {
+  var d = DerivedFromLoadableIntWrapperWithUsingDecl()
+  d.setValue(123)
+  var d1 = LoadableIntWrapper()
+  d1.value = 543
+  d += d1
+  expectEqual(666, d.getValue())
+}
+
+OperatorsTestSuite.test("HasOperatorCallWithDefaultArg.call") {
+  let h = HasOperatorCallWithDefaultArg(value: 321)
+  let res = h(123)
+  expectEqual(444, res)
+}
+
+OperatorsTestSuite.test("HasStaticOperatorCallBase.call") {
+  let h = HasStaticOperatorCallBase()
+  let res = h(1)
+  expectEqual(43, res)
+}
+
+OperatorsTestSuite.test("HasStaticOperatorCallBase2.call") {
+  let m = NonTrivial()
+  let h = HasStaticOperatorCallBaseNonTrivial()
+  let res = h(m)
+  expectEqual(48, res)
+}
+
+OperatorsTestSuite.test("HasStaticOperatorCallDerived.call") {
+  let h = HasStaticOperatorCallDerived()
+  let res = h(0)
+  expectEqual(42, res)
+}
+
+OperatorsTestSuite.test("HasStaticOperatorCallWithConstOperator.call") {
+  let h = HasStaticOperatorCallWithConstOperator()
+  let res = h(10)
+  expectEqual(9, res)
+  let res2 = h(3, 5)
+  expectEqual(8, res2)
+}
+
+OperatorsTestSuite.test("UnnamedParameterInOperator.equal") {
+  let lhs = ClassWithOperatorEqualsParamUnnamed()
+  let rhs = ClassWithOperatorEqualsParamUnnamed()
+  expectFalse(lhs == rhs)
 }
 
 runAllTests()

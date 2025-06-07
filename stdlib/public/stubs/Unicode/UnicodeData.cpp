@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/shims/UnicodeData.h"
-#include <limits>
+#include <stdint.h>
 
 // Every 4 byte chunks of data that we need to hash (in this case only ever
 // scalars and levels who are all uint32), we need to calculate K. At the end
@@ -73,7 +73,7 @@ __swift_intptr_t _swift_stdlib_getMphIdx(__swift_uint32_t scalar,
       // within each bit array every 512 bits. Say our level (bit array)
       // contains 16 uint64 integers to represent all of the required bits.
       // There would be a total of 1024 bits, so our rankings for this level
-      // would contain two values for precomputed counted bits for both halfs
+      // would contain two values for precomputed counted bits for both halves
       // of this bit array (1024 / 512 = 2).
       auto rank = ranks[i][idx / 512];
 
@@ -103,56 +103,149 @@ __swift_intptr_t _swift_stdlib_getMphIdx(__swift_uint32_t scalar,
   return resultIdx;
 }
 
+// A scalar bit array is represented using a combination of quick look bit
+// arrays and specific bit arrays expanding these quick look arrays. There's
+// usually a few data structures accompanying these bit arrays like ranks, data
+// indices, and an actual data array.
+//
+// The bit arrays are constructed to look somewhat like the following:
+//
+//     [quickLookSize, {uint64 * quickLookSize}, {5 * uint64}, {5 * uint64},
+//      {5 * uint64}...]
+//
+// where the number of {5 * uint64} (a specific bit array) is equal to the
+// number of bits turned on within the {uint64 * quickLookSize}. This can be
+// easily calculated using the passed in ranks arrays who looks like the
+// following:
+//
+//     [{uint16 * quickLookSize}, {5 * uint16}, {5 * uint16}, {5 * uint16}...]
+//
+// which is the same exact scheme as the bit arrays. Ranks contain the number of
+// previously turned on bits according their respectful {}. For instance, each
+// chunk, {5 * uint16}, begins with 0x0 and continuously grows as the number of
+// bits within the chunk turn on. An example sequence of this looks like:
+// [0x0, 0x0, 0x30, 0x70, 0xB0] where the first uint64 obviously doesn't have a
+// previous uint64 to look at, so its rank is 0. The second uint64's rank will
+// be the number of bits turned on in the first uint64, which in this case is
+// also 0. The third uint64's rank is 0x30 meaning there were 48 bits turned on
+// from the first uint64 through the second uint64.
 __swift_intptr_t _swift_stdlib_getScalarBitArrayIdx(__swift_uint32_t scalar,
                                               const __swift_uint64_t *bitArrays,
                                               const __swift_uint16_t *ranks) {
+  // Chunk size indicates the number of scalars in a singular bit in our quick
+  // look arrays. Currently, a chunk consists of 272 scalars being represented
+  // in a bit. 0x110000 represents the maximum scalar value that Unicode will
+  // never go over (or at least promised to never go over), 0x10FFFF, plus 1.
+  // There are 64 bit arrays allocated for the quick look search and within
+  // each bit array is an allocated 64 bits (8 bytes). Assuming the whole quick
+  // search array is allocated and used, this would mean 512 bytes are used
+  // solely for these arrays.
   auto chunkSize = 0x110000 / 64 / 64;
+
+  // Our base is the specific bit in the context of all of the bit arrays that
+  // holds our scalar. Considering there are 64 bit arrays of 64 bits, that
+  // would mean there are 64 * 64 = 4096 total bits to represent all scalars.
   auto base = scalar / chunkSize;
+
+  // Index is our specific bit array that holds our bit.
   auto idx = base / 64;
+
+  // Chunk bit is the specific bit within the bit array for our scalar.
   auto chunkBit = base % 64;
-  
+
+  // At the beginning our bit arrays is a number indicating the number of
+  // actually implemented quick look bit arrays. We do this to save a little bit
+  // of code size for bit arrays towards the end that usually contain no
+  // properties, thus their bit arrays are most likely 0 or null.
   auto quickLookSize = bitArrays[0];
-  
+
   // If our chunk index is larger than the quick look indices, then it means
   // our scalar appears in chunks who are all 0 and trailing.
   if ((__swift_uint64_t) idx > quickLookSize - 1) {
-    return std::numeric_limits<__swift_intptr_t>::max();
+    return INTPTR_MAX;
   }
-  
+
+  // Our scalar actually exists in a quick look bit array that was implemented.
   auto quickLook = bitArrays[idx + 1];
-  
+
+  // If the quick look array has our chunk bit not set, that means all 272
+  // (chunkSize) of the scalars being represented have no property and ours is
+  // one of them.
   if ((quickLook & ((__swift_uint64_t) 1 << chunkBit)) == 0) {
-    return std::numeric_limits<__swift_intptr_t>::max();
+    return INTPTR_MAX;
   }
-  
+
   // Ok, our scalar failed the quick look check. Go lookup our scalar in the
-  // chunk specific bit array.
+  // chunk specific bit array. Ranks keeps track of the previous bit array's
+  // number of non zero bits and is iterative.
+  //
+  // For example, [1, 3, 10] are bit arrays who have certain number of bits
+  // turned on. The generated ranks array would look like [0, 1, 3] because
+  // the first value, 1, does not have any previous bit array to look at so its
+  // number of ranks are 0. 3 on the other hand will see its rank value as 1
+  // because the previous value had 1 bit turned on. 10 will see 3 because it is
+  // seeing both 1 and 3's number of turned on bits (3 has 2 bits on and
+  // 1 + 2 = 3).
   auto chunkRank = ranks[idx];
-  
+
+  // If our specific bit within the chunk isn't the first bit, then count the
+  // number of bits turned on preceding our chunk bit.
   if (chunkBit != 0) {
     chunkRank += __builtin_popcountll(quickLook << (64 - chunkBit));
   }
-  
+
+  // Each bit that is turned on in the quick look arrays is given a bit array
+  // that consists of 5 64 bit integers (5 * 64 = 320 which is enough to house
+  // at least 272 specific bits dedicated to each scalar within a chunk). Our
+  // specific chunk's array is located at:
+  // 1 (quick look count)
+  // +
+  // quickLookSize (number of actually implemented quick look arrays)
+  // +
+  // chunkRank * 5 (where chunkRank is the total number of bits turned on
+  // before ours and each chunk is given 5 uint64s)
   auto chunkBA = bitArrays + 1 + quickLookSize + (chunkRank * 5);
-  
+
+  // Our overall bit represents the bit within 0 - 271 (272 total, our
+  // chunkSize) that houses our scalar.
   auto scalarOverallBit = scalar - (base * chunkSize);
+
+  // And our specific bit here represents the bit that houses our scalar inside
+  // a specific uint64 in our overall bit array.
   auto scalarSpecificBit = scalarOverallBit % 64;
+
+  // Our word here is the index into the chunk's bit array to grab the specific
+  // uint64 who houses a bit representing our scalar.
   auto scalarWord = scalarOverallBit / 64;
-  
+
   auto chunkWord = chunkBA[scalarWord];
-  
-  // If our scalar specifically is not turned on, then we're done.
+
+  // If our scalar specifically is not turned on within our chunk's bit array,
+  // then we know for sure that our scalar does not inhibit this property.
   if ((chunkWord & ((__swift_uint64_t) 1 << scalarSpecificBit)) == 0) {
-    return std::numeric_limits<__swift_intptr_t>::max();
+    return INTPTR_MAX;
   }
-  
+
+  // Otherwise, this scalar does have whatever property this scalar array is
+  // representing. Our ranks also holds bit information for a chunk's bit array,
+  // so each chunk is given 5 uint16 in our ranks to count its own bits.
   auto scalarRank = ranks[quickLookSize + (chunkRank * 5) + scalarWord];
-  
+
+  // Again, if our scalar isn't the first bit in its uint64, then count the
+  // proceeding number of bits turned on in our uint64.
   if (scalarSpecificBit != 0) {
     scalarRank += __builtin_popcountll(chunkWord << (64 - scalarSpecificBit));
   }
-  
+
+  // In our last uint64 in our bit array, there is an index into our data index
+  // array. Because we only need 272 bits for the scalars, any remaining bits
+  // can be used for essentially whatever. 5 * 64 bits = 320 bits and we only
+  // allocate 16 bits in the last uint64 for the remaining scalars
+  // (4 * 64 bits = 256 + 16 = 272 (chunkSize)) leaving us with 48 spare bits.
   auto chunkDataIdx = chunkBA[4] >> 16;
 
+  // Finally, our index (or rather whatever value is stored in our spare bits)
+  // is simply the start of our chunk's index plus the specific rank for our
+  // scalar.
   return chunkDataIdx + scalarRank;
 }

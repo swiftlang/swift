@@ -1,7 +1,7 @@
-// RUN: %target-swiftc_driver -O -Rpass-missed=sil-assembly-vision-remark-gen -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xfrontend -enable-copy-propagation -emit-sil %s -o /dev/null -Xfrontend -verify -Xfrontend -enable-lexical-borrow-scopes=false
+// RUN: %target-swiftc_driver -O -Rpass-missed=sil-assembly-vision-remark-gen -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xfrontend -enable-copy-propagation -emit-sil %s -o /dev/null -Xfrontend -verify
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swiftc_driver -wmo -O -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xfrontend -enable-copy-propagation -emit-sil -save-optimization-record=yaml  -save-optimization-record-path %t/note.yaml -Xfrontend -enable-lexical-borrow-scopes=false %s -o /dev/null && %FileCheck --input-file=%t/note.yaml %s
+// RUN: %target-swiftc_driver -wmo -O -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xfrontend -enable-copy-propagation -emit-sil -save-optimization-record=yaml  -save-optimization-record-path %t/note.yaml %s -o /dev/null && %FileCheck --input-file=%t/note.yaml %s
 
 // REQUIRES: optimized_stdlib,swift_stdlib_no_asserts
 // REQUIRES: swift_in_compiler
@@ -83,8 +83,8 @@ public func getGlobal() -> Klass {
 // CHECK: --- !Missed
 // CHECK-NEXT: Pass:            sil-assembly-vision-remark-gen
 // CHECK-NEXT: Name:            sil.memory
-// CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift',
-// CHECK-NEXT:                    Line: [[# @LINE + 23]], Column: 11 }
+// CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift', 
+// CHECK-NEXT:                    Line: [[# @LINE + 51 ]], Column: 11 }
 // CHECK-NEXT: Function:        'useGlobal()'
 // CHECK-NEXT: Args:
 // CHECK-NEXT:   - String:          'heap allocated ref of type '''
@@ -94,13 +94,41 @@ public func getGlobal() -> Klass {
 // CHECK-NEXT: --- !Missed
 // CHECK-NEXT: Pass:            sil-assembly-vision-remark-gen
 // CHECK-NEXT: Name:            sil.memory
-// CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift',
-// CHECK-NEXT:                    Line: [[# @LINE + 12]], Column: 12 }
+// CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift', 
+// CHECK-NEXT:                    Line: [[# @LINE + 40 ]], Column: 5 }
+// CHECK-NEXT: Function:        'useGlobal()'
+// CHECK-NEXT: Args:
+// CHECK-NEXT:   - String:          'retain of type '''
+// CHECK-NEXT:   - ValueType:       Klass
+// CHECK-NEXT:   - String:          ''''
+// CHECK-NEXT:   - InferredValue:   'of ''x'''
+// CHECK-NEXT:     DebugLoc:        { File: '{{.*}}basic_yaml.swift', 
+// CHECK-NEXT:                        Line: [[# @LINE + 29 ]], Column: 9 }
+// CHECK-NEXT: ...
+// CHECK-NEXT: --- !Missed
+// CHECK-NEXT: Pass:            sil-assembly-vision-remark-gen
+// CHECK-NEXT: Name:            sil.memory
+// CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift', 
+// CHECK-NEXT:                    Line: [[# @LINE + 26 ]], Column: 12 }
 // CHECK-NEXT: Function:        'useGlobal()'
 // CHECK-NEXT: Args:
 // CHECK-NEXT:   - String:          'release of type '''
 // CHECK-NEXT:   - ValueType:
 // CHECK-NEXT:   - String:          ''''
+// CHECK-NEXT: ...
+// CHECK-NEXT: --- !Missed
+// CHECK-NEXT: Pass:            sil-assembly-vision-remark-gen
+// CHECK-NEXT: Name:            sil.memory
+// CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift', 
+// CHECK-NEXT:                    Line: [[# @LINE + 15 ]], Column: 12 }
+// CHECK-NEXT: Function:        'useGlobal()'
+// CHECK-NEXT: Args:
+// CHECK-NEXT:   - String:          'release of type '''
+// CHECK-NEXT:   - ValueType:       Klass
+// CHECK-NEXT:   - String:          ''''
+// CHECK-NEXT:   - InferredValue:   'of ''x'''
+// CHECK-NEXT:     DebugLoc:        { File: '{{.*}}basic_yaml.swift', 
+// CHECK-NEXT:                        Line: [[# @LINE + 4 ]], Column: 9 }
 // CHECK-NEXT: ...
 
 public func useGlobal() {
@@ -109,5 +137,9 @@ public func useGlobal() {
     // releases are the end of the print.
     print(x) // expected-remark @:11 {{heap allocated ref of type}}
              // We test the type emission above since FileCheck can handle regex.
-             // expected-remark @-2:12 {{release of type}}
+             // expected-remark @-2:5 {{retain of type}}
+             // expected-note @-6 {{of 'x'}}
+             // expected-remark @-4:12 {{release of type}}
+             // expected-remark @-5:12 {{release of type}}
+             // expected-note @-9 {{of 'x'}}
 }

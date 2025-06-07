@@ -38,18 +38,20 @@ public func testVTableBuilding(user: User) {
   // for the vtable slot for 'lastMethod()'. If the layout here
   // changes, please check that offset is still correct.
   // CHECK-IR-NOT: ret
-  // CHECK-IR-objc: getelementptr inbounds void (%T3Lib4UserC*)*, void (%T3Lib4UserC*)** %{{[0-9]+}}, {{i64 28|i32 31}}
-  // CHECK-IR-native: getelementptr inbounds void (%T3Lib4UserC*)*, void (%T3Lib4UserC*)** %{{[0-9]+}}, {{i64 25|i32 28}}
+  // CHECK-IR-objc: getelementptr inbounds ptr, ptr %{{[0-9]+}}, {{i64 28|i32 31}}
+  // CHECK-IR-native: getelementptr inbounds ptr, ptr %{{[0-9]+}}, {{i64 25|i32 28}}
   user.lastMethod()
 } // CHECK-IR: ret void
 
 #if VERIFY
 let _: String = useAssoc(ImportedType.self) // expected-error {{cannot convert value of type 'Int32?' to specified type 'String'}}
-let _: Bool? = useAssoc(ImportedType.self) // expected-error {{cannot convert value of type 'Int32?' to specified type 'Bool?'}}
+let _: Bool? = useAssoc(ImportedType.self) // expected-error {{cannot assign value of type 'Int32?' to type 'Bool?'}}
+// expected-note@-1 {{arguments to generic parameter 'Wrapped' ('Int32' and 'Bool') are expected to be equal}}
 let _: Int32? = useAssoc(ImportedType.self)
 
 let _: String = useAssoc(AnotherType.self) // expected-error {{cannot convert value of type 'AnotherType.Assoc?' (aka 'Optional<Int32>') to specified type 'String'}}
-let _: Bool? = useAssoc(AnotherType.self) // expected-error {{cannot convert value of type 'AnotherType.Assoc?' (aka 'Optional<Int32>') to specified type 'Bool?'}}
+let _: Bool? = useAssoc(AnotherType.self) // expected-error {{cannot assign value of type 'AnotherType.Assoc?' (aka 'Optional<Int32>') to type 'Bool?'}}
+// expected-note@-1 {{arguments to generic parameter 'Wrapped' ('AnotherType.Assoc' (aka 'Int32') and 'Bool') are expected to be equal}}
 let _: Int32? = useAssoc(AnotherType.self)
 
 let _ = wrapped // expected-error {{cannot find 'wrapped' in scope}}

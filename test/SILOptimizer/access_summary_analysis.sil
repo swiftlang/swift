@@ -485,6 +485,22 @@ bb0(%0 : $*Int, %1 : $*Int, %2 : $*Int):
   return %9999 : $()
 }
 
+// Look through moves.
+// CHECK-LABEL: @partialApplyFollowedByConvertFunctionWithMove
+// CHECK-NEXT: ([modify], [], [read])
+sil private [ossa] @partialApplyFollowedByConvertFunctionWithMove : $@convention(thin) (@inout_aliasable Int, @inout_aliasable Int, @inout_aliasable Int) -> () {
+bb0(%0 : $*Int, %1 : $*Int, %2 : $*Int):
+  %3 = function_ref @hasThreeCapturesAndTakesArgument : $@convention(thin) (Int, @inout_aliasable Int, @inout_aliasable Int, @inout_aliasable Int) -> ()
+  %4 = partial_apply %3(%0, %1, %2) : $@convention(thin) (Int, @inout_aliasable Int, @inout_aliasable Int, @inout_aliasable Int) -> ()
+  %5 = convert_function %4 : $@callee_owned (Int) -> () to $@callee_owned (Int) -> @error Error
+  %6 = move_value %5 : $@callee_owned (Int) -> @error Error
+  %7 = function_ref @takesGuaranteedNoEscapeClosureTakingArgumentThrowing : $@convention(thin) (@guaranteed @callee_owned (Int) -> @error Error) -> ()
+  %8 = apply %7(%6) : $@convention(thin) (@guaranteed @callee_owned (Int) -> @error Error) -> ()
+  destroy_value %6 : $@callee_owned (Int) -> @error Error
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
 sil @use : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
 sil @subject : $@convention(thin) (Builtin.Int64) -> ()
 
@@ -499,8 +515,44 @@ entry:
   %n2 = mark_dependence %n : $@noescape @callee_guaranteed () -> () on %e : $@callee_guaranteed () -> ()
   %f2 = function_ref @use : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
   apply %f2(%n2) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %n2 : $@noescape @callee_guaranteed () -> ()
   end_borrow %b : $@callee_guaranteed () -> ()
   destroy_value %e : $@callee_guaranteed () -> ()
+  %t = tuple ()
+  return %t : $()
+}
+
+sil [ossa] @asyncIntClosure : $@convention(thin) @async (@inout_aliasable Builtin.Int64) -> (@out Builtin.Int64, @error any Error) {
+bb0(%0 : $*Builtin.Int64, %1: $*Builtin.Int64):
+  %2 = begin_access [modify] [unknown] %0 : $*Builtin.Int64
+  %3 = load [trivial] %1 : $*Builtin.Int64
+  assign %3 to %2 : $*Builtin.Int64
+  end_access %2 : $*Builtin.Int64
+  %4 = tuple ()
+  return %4 : $()
+}
+
+sil @swift_asyncLet_finish : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+
+// CHECK-LABEL: @partial_apply_asynclet
+sil [ossa] @partial_apply_asynclet : $@convention(thin) @async (@inout_aliasable Builtin.Int64) -> () {
+bb0(%0 : $*Builtin.Int64):
+  %i = alloc_stack $Builtin.Int64
+  %p = address_to_pointer %i : $*Builtin.Int64 to $Builtin.RawPointer
+  %o = enum $Optional<Builtin.RawPointer>, #Optional.none!enumelt
+  %x = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+  %f = function_ref @asyncIntClosure : $@convention(thin) @async (@inout_aliasable Builtin.Int64) -> (@out Builtin.Int64, @error any Error)
+  %e = partial_apply [callee_guaranteed] %f(%0) : $@convention(thin) @async (@inout_aliasable Builtin.Int64) -> (@out Builtin.Int64, @error any Error)
+  %a = convert_function %e : $@async @callee_guaranteed () -> (@out Builtin.Int64, @error any Error) to $@async @callee_guaranteed @substituted <τ_0_0> () -> (@sil_sending @out τ_0_0, @error any Error) for <Builtin.Int64>
+  %n = convert_escape_to_noescape [not_guaranteed] %a : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@sil_sending @out τ_0_0, @error any Error) for <Builtin.Int64> to $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> (@sil_sending @out τ_0_0, @error any Error) for <Builtin.Int64>
+  %sl = builtin "startAsyncLetWithLocalBuffer"<Builtin.Int64>(%o : $Optional<Builtin.RawPointer>, %n : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> (@sil_sending @out τ_0_0, @error any Error) for <Builtin.Int64>, %p : $Builtin.RawPointer) : $Builtin.RawPointer
+  %fn = function_ref @swift_asyncLet_finish : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+  %ap = apply %fn(%sl, %p) : $@convention(thin) @async (Builtin.RawPointer, Builtin.RawPointer) -> ()
+  hop_to_executor %x : $Optional<Builtin.Executor>
+  %el = builtin "endAsyncLetLifetime"(%sl : $Builtin.RawPointer) : $()
+  destroy_value %n : $@noescape @async @callee_guaranteed @substituted <τ_0_0> () -> (@sil_sending @out τ_0_0, @error any Error) for <Builtin.Int64>
+  destroy_value %a : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@sil_sending @out τ_0_0, @error any Error) for <Builtin.Int64>
+  dealloc_stack %i : $*Builtin.Int64
   %t = tuple ()
   return %t : $()
 }

@@ -12,7 +12,7 @@
 
 #include "ToolChains.h"
 
-#include "swift/Basic/Dwarf.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
@@ -71,10 +71,36 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
     llvm_unreachable("invalid link kind");
   }
 
+  // Check to see whether we need to use lld as the linker.
+  auto requiresLLD = [&]{
+    if (const Arg *A = context.Args.getLastArg(options::OPT_use_ld)) {
+      return llvm::StringSwitch<bool>(A->getValue())
+        .Cases("lld", "lld.exe", "lld-link", "lld-link.exe", true)
+        .Default(false);
+    }
+    // Force to use lld for LTO on Windows because we don't support link LTO or
+    // something else except for lld LTO at this time.
+    if (context.OI.LTOVariant != OutputInfo::LTOKind::None) {
+      return true;
+    }
+    // Profiling currently relies on the ability to emit duplicate weak
+    // symbols across translation units and having the linker coalesce them.
+    // Unfortunately link.exe does not support this, so require lld-link
+    // for now, which supports the behavior via a flag.
+    // TODO: Once we've changed coverage to no longer rely on emitting
+    // duplicate weak symbols (rdar://131295678), we can remove this.
+    if (context.Args.getLastArg(options::OPT_profile_generate)) {
+      return true;
+    }
+    return false;
+  }();
+
   // Select the linker to use.
   std::string Linker;
   if (const Arg *A = context.Args.getLastArg(options::OPT_use_ld)) {
     Linker = A->getValue();
+  } else if (requiresLLD) {
+    Linker = "lld";
   }
 
   switch (context.OI.LTOVariant) {
@@ -86,12 +112,6 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
     break;
   case OutputInfo::LTOKind::None:
     break;
-  }
-
-  if (Linker.empty() && context.OI.LTOVariant != OutputInfo::LTOKind::None) {
-    // Force to use lld for LTO on Windows because we don't support link LTO or
-    // something else except for lld LTO at this time.
-    Linker = "lld";
   }
 
   if (!Linker.empty())
@@ -124,14 +144,16 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
                                                    getTriple().getArchName()));
   }
 
-  SmallString<128> SharedResourceDirPath;
-  getResourceDirPath(SharedResourceDirPath, context.Args, /*Shared=*/true);
+  if (!context.Args.hasArg(options::OPT_nostartfiles)) {
+    SmallString<128> SharedResourceDirPath;
+    getResourceDirPath(SharedResourceDirPath, context.Args, /*Shared=*/true);
 
-  SmallString<128> swiftrtPath = SharedResourceDirPath;
-  llvm::sys::path::append(swiftrtPath,
-                          swift::getMajorArchitectureName(getTriple()));
-  llvm::sys::path::append(swiftrtPath, "swiftrt.obj");
-  Arguments.push_back(context.Args.MakeArgString(swiftrtPath));
+    SmallString<128> swiftrtPath = SharedResourceDirPath;
+    llvm::sys::path::append(swiftrtPath,
+                            swift::getMajorArchitectureName(getTriple()));
+    llvm::sys::path::append(swiftrtPath, "swiftrt.obj");
+    Arguments.push_back(context.Args.MakeArgString(swiftrtPath));
+  }
 
   addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                          file_types::TY_Object);
@@ -154,13 +176,6 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
     Arguments.push_back(context.Args.MakeArgString(context.OI.SDKPath));
   }
 
-  // Link against the desired C++ standard library.
-  if (const Arg *A =
-      context.Args.getLastArg(options::OPT_experimental_cxx_stdlib)) {
-    Arguments.push_back(context.Args.MakeArgString(
-        Twine("-stdlib=") + A->getValue()));
-  }
-
   if (job.getKind() == LinkKind::Executable) {
     if (context.OI.SelectedSanitizers & SanitizerKind::Address)
       addLinkRuntimeLib(context.Args, Arguments,
@@ -176,6 +191,14 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
     Arguments.push_back(context.Args.MakeArgString(
         Twine({"-include:", llvm::getInstrProfRuntimeHookVarName()})));
     Arguments.push_back(context.Args.MakeArgString("-lclang_rt.profile"));
+
+    // FIXME(rdar://131295678): Currently profiling requires the ability to
+    // emit duplicate weak symbols. Assuming we're using lld, pass
+    // -lld-allow-duplicate-weak to enable this behavior.
+    if (requiresLLD) {
+      Arguments.push_back("-Xlinker");
+      Arguments.push_back("-lld-allow-duplicate-weak");
+    }
   }
 
   context.Args.AddAllArgs(Arguments, options::OPT_Xlinker);

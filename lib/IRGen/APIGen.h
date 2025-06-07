@@ -15,12 +15,12 @@
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/BitmaskEnum.h"
 #include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
-#include "llvm/ADT/Triple.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Error.h"
+#include "llvm/TargetParser/Triple.h"
+#include <optional>
 
 namespace llvm {
 class raw_ostream;

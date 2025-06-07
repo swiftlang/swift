@@ -20,6 +20,7 @@
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -27,6 +28,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ProtocolConformanceRef.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILDeclRef.h"
@@ -54,18 +56,19 @@ static SILValue emitActorPropertyReference(
 /// \param value the value to use when initializing the property.
 static void initializeProperty(SILGenFunction &SGF, SILLocation loc,
                                SILValue actorSelf,
-                               VarDecl* prop, SILValue value) {
+                               VarDecl* prop, SILValue value,
+                               IsTake_t isTake) {
   Type formalType = SGF.F.mapTypeIntoContext(prop->getInterfaceType());
   SILType loweredType = SGF.getLoweredType(formalType);
 
   auto fieldAddr = emitActorPropertyReference(SGF, loc, actorSelf, prop);
 
   if (loweredType.isAddressOnly(SGF.F)) {
-    SGF.B.createCopyAddr(loc, value, fieldAddr, IsNotTake, IsInitialization);
+    SGF.B.createCopyAddr(loc, value, fieldAddr, isTake, IsInitialization);
   } else {
     if (value->getType().isAddress()) {
       SGF.emitSemanticLoadInto(loc, value, SGF.F.getTypeLowering(value->getType()),
-          fieldAddr, SGF.getTypeLowering(loweredType), IsTake, IsInitialization);
+          fieldAddr, SGF.getTypeLowering(loweredType), isTake, IsInitialization);
     } else {
       value = SGF.B.emitCopyValueOperation(loc, value);
       SGF.B.emitStoreValueOperation(
@@ -87,28 +90,36 @@ static void initializeProperty(SILGenFunction &SGF, SILLocation loc,
 /// }
 /// \endverbatim
 void SILGenFunction::emitDistributedIfRemoteBranch(SILLocation Loc,
-                                                   ManagedValue selfValue,
+                                                   SILValue selfValue,
                                                    Type selfTy,
                                                    SILBasicBlock *isRemoteBB,
                                                    SILBasicBlock *isLocalBB) {
   ASTContext &ctx = getASTContext();
 
-  FuncDecl *isRemoteFn = ctx.getIsRemoteDistributedActor();
-  assert(isRemoteFn && "Could not find 'is remote' function, is the "
-                       "'Distributed' module available?");
+  SILValue isRemoteResultUnwrapped;
+  {
+    FullExpr CleanupScope(Cleanups, CleanupLocation(Loc));
+    ManagedValue borrowedSelf = emitManagedBeginBorrow(Loc, selfValue);
 
-  ManagedValue selfAnyObject = B.createInitExistentialRef(
-      Loc,
-      /*existentialType=*/getLoweredType(ctx.getAnyObjectType()),
-      /*formalConcreteType=*/selfValue.getType().getASTType(),
-      selfValue, {});
-  auto result = emitApplyOfLibraryIntrinsic(
-      Loc, isRemoteFn, SubstitutionMap(), {selfAnyObject}, SGFContext());
+    FuncDecl *isRemoteFn = ctx.getIsRemoteDistributedActor();
+    assert(isRemoteFn && "Could not find 'is remote' function, is the "
+                         "'Distributed' module available?");
 
-  SILValue isRemoteResult = std::move(result).forwardAsSingleValue(*this, Loc);
-  SILValue isRemoteResultUnwrapped =
-      emitUnwrapIntegerResult(Loc, isRemoteResult);
+    auto conformances = collectExistentialConformances(
+        selfTy->getCanonicalType(), ctx.getAnyObjectType());
 
+    ManagedValue selfAnyObject = B.createInitExistentialRef(
+        Loc,
+        /*existentialType=*/getLoweredType(ctx.getAnyObjectType()),
+        /*formalConcreteType=*/selfTy->getCanonicalType(), borrowedSelf,
+        conformances);
+    auto result = emitApplyOfLibraryIntrinsic(
+        Loc, isRemoteFn, SubstitutionMap(), {selfAnyObject}, SGFContext());
+
+    SILValue isRemoteResult =
+        std::move(result).forwardAsSingleValue(*this, Loc);
+    isRemoteResultUnwrapped = emitUnwrapIntegerResult(Loc, isRemoteResult);
+  }
   B.createCondBranch(Loc, isRemoteResultUnwrapped, isRemoteBB, isLocalBB);
 }
 
@@ -116,7 +127,6 @@ void SILGenFunction::emitDistributedIfRemoteBranch(SILLocation Loc,
 // MARK: local instance initialization
 
 static SILArgument *findFirstDistributedActorSystemArg(SILFunction &F) {
-  auto *module = F.getModule().getSwiftModule();
   auto &C = F.getASTContext();
 
   auto *DAS = C.getDistributedActorSystemDecl();
@@ -127,8 +137,7 @@ static SILArgument *findFirstDistributedActorSystemArg(SILFunction &F) {
     Type argTy = arg->getType().getASTType();
     auto argDecl = arg->getDecl();
 
-    auto conformsToSystem =
-        module->lookupConformance(argDecl->getInterfaceType(), DAS);
+    auto conformsToSystem = lookupConformance(argDecl->getInterfaceType(), DAS);
 
     // Is it a protocol that conforms to DistributedActorSystem?
     if (argTy->isEqual(systemTy) || conformsToSystem) {
@@ -136,7 +145,7 @@ static SILArgument *findFirstDistributedActorSystemArg(SILFunction &F) {
     }
 
     // Is it some specific DistributedActorSystem?
-    auto result = module->lookupConformance(argTy, DAS);
+    auto result = lookupConformance(argTy, DAS);
     if (!result.isInvalid()) {
       return arg;
     }
@@ -152,10 +161,10 @@ static SILArgument *findFirstDistributedActorSystemArg(SILFunction &F) {
 /// For the initialization of a local distributed actor instance, emits code to
 /// initialize the instance's stored property corresponding to the system.
 static void emitActorSystemInit(SILGenFunction &SGF,
-                                        ConstructorDecl *ctor,
-                                        SILLocation loc,
-                                        ManagedValue actorSelf,
-                                        SILValue systemValue) {
+                                ConstructorDecl *ctor,
+                                SILLocation loc,
+                                ManagedValue actorSelf,
+                                SILValue systemValue) {
   assert(ctor->isImplicit() && "unexpected explicit dist actor init");
   assert(ctor->isDesignatedInit());
 
@@ -166,9 +175,8 @@ static void emitActorSystemInit(SILGenFunction &SGF,
   // exactly one ActorSystem-conforming argument to the constructor,
   // so we grab the first one from the params.
   VarDecl *var = classDecl->getDistributedActorSystemProperty();
-  assert(var);
-      
-  initializeProperty(SGF, loc, actorSelf.getValue(), var, systemValue);
+
+  initializeProperty(SGF, loc, actorSelf.getValue(), var, systemValue, IsNotTake);
 }
 
 /// Emits the distributed actor's identity (`id`) initialization.
@@ -209,7 +217,7 @@ void SILGenFunction::emitDistActorIdentityInit(ConstructorDecl *ctor,
       { temp, selfMetatypeValue });
 
   // --- initialize the property.
-  initializeProperty(*this, loc, borrowedSelfArg, var, temp);
+  initializeProperty(*this, loc, borrowedSelfArg, var, temp, IsTake);
 }
 
 // TODO(distributed): rename to DistributedActorID
@@ -269,6 +277,34 @@ void InitializeDistActorIdentity::dump(SILGenFunction &) const {
                << "State: " << getState()
                << "\n";
 #endif
+}
+
+bool SILGenFunction::shouldReplaceConstantForApplyWithDistributedThunk(
+    FuncDecl *func) const {
+  auto isDistributedFuncOrAccessor =
+      func->isDistributed();
+  if (auto acc = dyn_cast<AccessorDecl>(func)) {
+    isDistributedFuncOrAccessor =
+        acc->getStorage()->isDistributed();
+  }
+
+  if (!isDistributedFuncOrAccessor)
+    return false;
+
+  // If we are inside a distributed thunk, we want to call the "real" method,
+  // in order to avoid infinitely recursively calling the thunk from itself.
+  if (F.isDistributed() && F.isThunk())
+    return false;
+
+  // If caller and called func are isolated to the same (distributed) actor,
+  // (i.e. we are "inside the distributed actor"), there is no need to call
+  // the thunk.
+  if (isSameActorIsolated(func, FunctionDC))
+    return false;
+
+  // In all other situations, we may have to replace the called function,
+  // depending on isolation (to be checked in SILGenApply).
+  return true;
 }
 
 void SILGenFunction::emitDistributedActorImplicitPropertyInits(
@@ -371,7 +407,7 @@ void SILGenFunction::emitDistributedActorFactory(FuncDecl *fd) { // TODO(distrib
   SILArgument *actorSystemArg = F.getArgument(1);
 
   SILValue selfArgValue = F.getSelfArgument();
-  ManagedValue selfArg = ManagedValue::forUnmanaged(selfArgValue);
+  ManagedValue selfArg = ManagedValue::forBorrowedObjectRValue(selfArgValue);
 
   // type: SpecificDistributedActor.Type
   auto selfArgType = selfArg.getType().getASTType();
@@ -443,14 +479,16 @@ void SILGenFunction::emitDistributedActorFactory(FuncDecl *fd) { // TODO(distrib
     loc.markAutoGenerated();
     auto *dc = fd->getDeclContext();
     auto classDecl = dc->getSelfClassDecl();
-    
+
     initializeProperty(*this, loc, remote,
                        classDecl->getDistributedActorIDProperty(),
-                       idArg);
+                       idArg,
+                       IsNotTake);
 
     initializeProperty(*this, loc, remote,
                        classDecl->getDistributedActorSystemProperty(),
-                       actorSystemArg);
+                       actorSystemArg,
+                       IsNotTake);
 
     // ==== Branch to return the fully initialized remote instance
     B.createBranch(loc, returnBB, {remote});
@@ -477,6 +515,8 @@ void SILGenFunction::emitDistributedActorFactory(FuncDecl *fd) { // TODO(distrib
         OwnershipKind::Owned);
 
     Cleanups.emitCleanupsForReturn(CleanupLocation(loc), IsForUnwind);
+
+    // FIXME: typed throws
     B.createThrow(loc, error);
   }
 }
@@ -505,101 +545,4 @@ void SILGenFunction::emitDistributedActorSystemResignIDCall(
       systemRef,
       SILType(),
       { idRef });
-}
-
-void
-SILGenFunction::emitConditionalResignIdentityCall(SILLocation loc,
-                                                  ClassDecl *actorDecl,
-                                                  ManagedValue actorSelf,
-                                                  SILBasicBlock *continueBB,
-                                                  SILBasicBlock *finishBB) {
-  assert(actorDecl->isDistributedActor() &&
-         "only distributed actors have actorSystem lifecycle hooks in deinit");
-  assert(continueBB && finishBB &&
-         "need valid continue and finish basic blocks");
-
-  auto selfTy = F.mapTypeIntoContext(actorDecl->getDeclaredInterfaceType());
-
-  // we only system.resignID if we are a local actor,
-  // and thus the address was created by system.assignID.
-  auto isRemoteBB = createBasicBlock("isRemoteBB");
-  auto isLocalBB = createBasicBlock("isLocalBB");
-
-  // if __isRemoteActor(self) {
-  //   ...
-  // } else {
-  //   ...
-  // }
-  emitDistributedIfRemoteBranch(loc,
-                                actorSelf, selfTy,
-                                /*if remote*/isRemoteBB,
-                                /*if local*/isLocalBB);
-
-  // if remote, return early; the user defined deinit should not run.
-  {
-    B.emitBlock(isRemoteBB);
-    B.createBranch(loc, finishBB);
-  }
-
-  // if local, resign identity.
-  {
-    B.emitBlock(isLocalBB);
-
-    emitDistributedActorSystemResignIDCall(loc, actorDecl, actorSelf);
-    
-    B.createBranch(loc, continueBB);
-  }
-}
-
-/******************************************************************************/
-/******************* DISTRIBUTED DEINIT: class memberwise destruction *********/
-/******************************************************************************/
-
-void SILGenFunction::emitDistributedActorClassMemberDestruction(
-    SILLocation cleanupLoc, ManagedValue selfValue, ClassDecl *cd,
-    SILBasicBlock *normalMemberDestroyBB,
-    SILBasicBlock *remoteMemberDestroyBB,
-    SILBasicBlock *finishBB) {
-  auto selfTy = cd->getDeclaredInterfaceType();
-
-  Scope scope(Cleanups, CleanupLocation(cleanupLoc));
-
-  auto isLocalBB = createBasicBlock("isLocalBB");
-
-  // if __isRemoteActor(self) {
-  //   ...
-  // } else {
-  //   ...
-  // }
-  emitDistributedIfRemoteBranch(cleanupLoc,
-                                selfValue, selfTy,
-                                /*if remote*/remoteMemberDestroyBB,
-                                /*if local*/isLocalBB);
-
-  // // if __isRemoteActor(self)
-  // {
-  //  // destroy only self.id and self.actorSystem
-  // }
-  {
-    B.emitBlock(remoteMemberDestroyBB);
-
-    for (VarDecl *vd : cd->getStoredProperties()) {
-      if (getActorIsolation(vd) == ActorIsolation::ActorInstance)
-        continue;
-
-      destroyClassMember(cleanupLoc, selfValue, vd);
-    }
-
-    B.createBranch(cleanupLoc, finishBB);
-  }
-
-  // // else (local distributed actor)
-  // {
-  //   <continue normal deinit>
-  // }
-  {
-    B.emitBlock(isLocalBB);
-
-    B.createBranch(cleanupLoc, normalMemberDestroyBB);
-  }
 }

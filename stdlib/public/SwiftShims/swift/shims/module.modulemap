@@ -1,6 +1,8 @@
 module SwiftShims {
   header "AssertionReporting.h"
   header "CoreFoundationShims.h"
+  header "ObjCShims.h"
+  header "EmbeddedShims.h"
   header "FoundationShims.h"
   header "GlobalObjects.h"
   header "HeapObject.h"
@@ -16,6 +18,7 @@ module SwiftShims {
   header "SwiftStddef.h"
   header "SwiftStdint.h"
   header "System.h"
+  header "Target.h"
   header "ThreadLocalStorage.h"
   header "UnicodeData.h"
   header "Visibility.h"
@@ -31,7 +34,7 @@ module SwiftOverlayShims {
   export *
 }
 
-module _SwiftRuntimeShims {
-  header "_SwiftRuntime.h"
+module _SynchronizationShims {
+  header "_SynchronizationShims.h"
   export *
 }

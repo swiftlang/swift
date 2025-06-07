@@ -15,18 +15,16 @@ protocol FooEvenMoreRefinedProtocol : FooRefinedProtocol {}
 struct FooStruct : FooMoreRefinedProtocol {
   var instanceProperty: Int { return 0 }
 }
-// FOO_OBJECT_DOT: Begin completions
-// FOO_OBJECT_DOT-NEXT: Keyword[self]/CurrNominal: self[#FooStruct#]; name=self
-// FOO_OBJECT_DOT-NEXT: Decl[InstanceVar]/CurrNominal:      instanceProperty[#Int#]
-// FOO_OBJECT_DOT-NEXT: End completions
+// FOO_OBJECT_DOT: Begin completions, 2 items
+// FOO_OBJECT_DOT-DAG: Keyword[self]/CurrNominal: self[#FooStruct#]; name=self
+// FOO_OBJECT_DOT-DAG: Decl[InstanceVar]/CurrNominal:      instanceProperty[#Int#]
 
 struct BarStruct : FooEvenMoreRefinedProtocol {
   var instanceProperty: Int { return 0 }
 }
-// BAR_OBJECT_DOT: Begin completions
-// BAR_OBJECT_DOT-NEXT: Keyword[self]/CurrNominal: self[#BarStruct#]; name=self
-// BAR_OBJECT_DOT-NEXT: Decl[InstanceVar]/CurrNominal:      instanceProperty[#Int#]
-// BAR_OBJECT_DOT-NEXT: End completions
+// BAR_OBJECT_DOT: Begin completions, 2 items
+// BAR_OBJECT_DOT-DAG: Keyword[self]/CurrNominal: self[#BarStruct#]; name=self
+// BAR_OBJECT_DOT-DAG: Decl[InstanceVar]/CurrNominal:      instanceProperty[#Int#]
 
 func test(a: FooStruct) {
   a.#^FOO_OBJECT_DOT_1^#
@@ -47,10 +45,8 @@ extension ObservableConvertibleType {
         return CatchSequence.#^CATCHSEQUENCE_DOT^#
     }
 }
-// CATCHSEQUENCE_DOT: Begin completions
 // CATCHSEQUENCE_DOT-DAG: Keyword[self]/CurrNominal:          self[#CatchSequence<_>.Type#]; name=self
 // CATCHSEQUENCE_DOT-DAG: Keyword/CurrNominal:                Type[#CatchSequence<_>.Type#]; name=Type
 // CATCHSEQUENCE_DOT-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init()[#CatchSequence<_>#]; name=init()
 // CATCHSEQUENCE_DOT-DAG: Decl[StaticMethod]/Super/TypeRelation[Convertible]: catchError()[#Observable<CatchSequence<_>.T>#]; name=catchError()
-// CATCHSEQUENCE_DOT-DAG: Decl[TypeAlias]/Super:              T[#T#]; name=T
-// CATCHSEQUENCE_DOT: End completions
+// CATCHSEQUENCE_DOT-DAG: Decl[TypeAlias]/Super: T[#Observable<_.Element.T>.T#]; name=T

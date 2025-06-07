@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx10.50
+// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx50
 
 // REQUIRES: concurrency
 // REQUIRES: OS=macosx
@@ -9,8 +9,8 @@ actor SomeActor {}
   static let shared = SomeActor()
 }
 
-@available(macOS 10.51, *)
-@globalActor struct Available10_51GA {
+@available(macOS 51, *)
+@globalActor struct Available51GA {
   static let shared = SomeActor()
 }
 
@@ -22,12 +22,12 @@ actor SomeActor {}
 @AlwaysAvailableGA
 struct AlwaysAvailableWithAlwaysAvailableGA {}
 
-@Available10_51GA // expected-error {{'Available10_51GA' is only available in macOS 10.51 or newer}}
-struct AlwaysAvailableWithAvailable10_51GA {} // expected-note {{add @available attribute to enclosing struct}}
+@Available51GA // expected-error {{'Available51GA' is only available in macOS 51 or newer}}
+struct AlwaysAvailableWithAvailable51GA {} // expected-note {{add '@available' attribute to enclosing struct}}
 
-@available(macOS 10.51, *)
-@Available10_51GA
-struct Always10_51WithAvailable10_51GA {}
+@available(macOS 51, *)
+@Available51GA
+struct Always51WithAvailable51GA {}
 
 @UnavailableGA // expected-error {{'UnavailableGA' is unavailable}}
 struct AlwaysAvailableWithUnavailableGA {}

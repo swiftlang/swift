@@ -1,0 +1,154 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -cleanup-debug-steps -sil-print-debuginfo | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+import Swift
+import Builtin
+
+sil @f : $@convention(thin) () -> ()
+
+// CHECK-LABEL: sil @remove_after_previous_location
+// CHECK-NOT:     debug_step
+// CHECK:       } // end sil function 'remove_after_previous_location'
+sil @remove_after_previous_location : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @f : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> (), loc "a.swift":1:2
+  debug_step, loc "a.swift":1:2
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_remove_after_previous_location
+// CHECK:         debug_step
+// CHECK:       } // end sil function 'dont_remove_after_previous_location'
+sil @dont_remove_after_previous_location : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @f : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> (), loc "a.swift":1:2
+  %r = tuple (), loc "a.swift":27:2 
+  debug_step, loc "a.swift":1:2
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @remove_two_after_previous_location
+// CHECK-NOT:     debug_step
+// CHECK:       } // end sil function 'remove_two_after_previous_location'
+sil @remove_two_after_previous_location : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @f : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> (), loc "a.swift":1:2
+  debug_step, loc "a.swift":1:2
+  debug_step, loc "a.swift":1:2
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @remove_before_next_location
+// CHECK-NOT:     debug_step
+// CHECK:       } // end sil function 'remove_before_next_location'
+sil @remove_before_next_location : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @f : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> ()
+  debug_step, loc "a.swift":1:2
+  %r = tuple (), loc "<compiler-generated>":0:0
+  return %r : $(), loc "a.swift":1:2
+}
+
+// CHECK-LABEL: sil @dont_remove_before_next_location
+// CHECK:         debug_step
+// CHECK:       } // end sil function 'dont_remove_before_next_location'
+sil @dont_remove_before_next_location : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @f : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> ()
+  debug_step, loc "a.swift":1:2
+  %r = tuple (), loc "a.swift":27:2 
+  return %r : $(), loc "a.swift":1:2
+}
+
+// CHECK-LABEL: sil @remove_two_before_next_location
+// CHECK-NOT:     debug_step
+// CHECK:       } // end sil function 'remove_two_before_next_location'
+sil @remove_two_before_next_location : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @f : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> ()
+  debug_step, loc "a.swift":1:2
+  debug_step, loc "a.swift":1:2
+  %r = tuple (), loc "<compiler-generated>":0:0
+  return %r : $(), loc "a.swift":1:2
+}
+
+// CHECK-LABEL: sil @remove_null_location
+// CHECK-NOT:     debug_step
+// CHECK:       } // end sil function 'remove_null_location'
+sil @remove_null_location : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @f : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> ()
+  debug_step, loc "<compiler-generated>":0:0
+  %r = tuple ()
+  return %r : $(), loc "a.swift":1:2
+}
+// CHECK-LABEL: sil @dont_remove_one
+// CHECK:     debug_step
+// CHECK:       } // end sil function 'dont_remove_one'
+sil @dont_remove_one : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @f : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> ()
+  debug_step, loc "a.swift":1:2
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @replace_three_with_one
+// CHECK:         apply
+// CHECK-NEXT:    debug_step , loc "a.swift":1:2
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'replace_three_with_one'
+sil @replace_three_with_one : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @f : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> ()
+  debug_step, loc "a.swift":1:2
+  debug_step, loc "a.swift":1:2
+  debug_step, loc "a.swift":1:2
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @replace_three_with_two
+// CHECK:         apply
+// CHECK-NEXT:    debug_step , loc "a.swift":1:2
+// CHECK-NEXT:    debug_step , loc "a.swift":2:3
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'replace_three_with_two'
+sil @replace_three_with_two : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @f : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> ()
+  debug_step, loc "a.swift":1:2
+  debug_step, loc "a.swift":2:3
+  debug_step, loc "a.swift":2:3
+  %r = tuple ()
+  return %r : $()
+}
+
+
+// CHECK-LABEL: sil @dont_remove_two
+// CHECK:         debug_step
+// CHECK-NEXT:    debug_step
+// CHECK:       } // end sil function 'dont_remove_two'
+sil @dont_remove_two : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @f : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> ()
+  debug_step, loc "a.swift":1:2
+  debug_step, loc "a.swift":2:3
+  %r = tuple ()
+  return %r : $()
+}
+

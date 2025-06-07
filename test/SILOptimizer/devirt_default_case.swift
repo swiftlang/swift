@@ -1,6 +1,6 @@
 
-// RUN: %target-swift-frontend -enable-spec-devirt -O -module-name devirt_default_case -emit-sil %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-NORMAL %s
-// RUN: %target-swift-frontend -enable-spec-devirt -O -module-name devirt_default_case -emit-sil -enable-testing %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-TESTABLE %s
+// RUN: %target-swift-frontend -enable-spec-devirt -O -module-name devirt_default_case -Xllvm -sil-print-types -emit-sil %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-NORMAL %s
+// RUN: %target-swift-frontend -enable-spec-devirt -O -module-name devirt_default_case -Xllvm -sil-print-types -emit-sil -enable-testing %s | %FileCheck -check-prefix=CHECK -check-prefix=CHECK-TESTABLE %s
 
 @_silgen_name("action")
 func action(_ n:Int) -> ()
@@ -171,8 +171,8 @@ func check_static_class_devirt(_ c: C6) -> Int {
 // Check that C.bar() and D.bar() are devirtualized.
 //
 // CHECK-LABEL: sil{{( hidden)?}} [noinline] @$s19devirt_default_case019check_static_class_A0ySiAA2C6CF
-// CHECK: checked_cast_br [exact] %0 : $C6 to C6
-// CHECK: checked_cast_br [exact] %0 : $C6 to D6
+// CHECK: checked_cast_br [exact] C6 in %0 : $C6 to C6
+// CHECK: checked_cast_br [exact] C6 in %0 : $C6 to D6
 // CHECK: class_method
 // CHECK: } // end sil function '$s19devirt_default_case019check_static_class_A0ySiAA2C6CF'
   return c.bar() 

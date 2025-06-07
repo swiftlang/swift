@@ -1,25 +1,17 @@
-import SwiftOnoneSupport
-
 func %%% (lhs: Int, rhs: Int) -> Int
-
 postfix func =-> (lhs: Int) -> Int
-
 postfix func => (lhs: Int) -> Int
-
 struct BarGenericSwiftStruct1<T> {
   init(t: T)
   func bar1InstanceFunc()
 }
-
 struct BarGenericSwiftStruct2<T, U> where T : BarProtocol {
   init(t: T, u: U)
   func bar2InstanceFunc()
 }
-
 protocol BarProtocol {
   func instanceFunc()
 }
-
 /// FooSwiftStruct Aaa.
 /**
  * Bbb.
@@ -36,7 +28,6 @@ struct FooSwiftStruct {
   func fooInstanceFunc()
   init()
 }
-
 /// rdar://18457785
 enum MyQuickLookObject {
   /// A rectangle.
@@ -44,23 +35,14 @@ enum MyQuickLookObject {
   /// Uses explicit coordinates to avoid coupling a particular Cocoa type.
   case Rectangle(Float64, Float64, Float64, Float64)
 }
-
 var globalVar: Int
-
 func hiddenImport()
-
-func overlayedFoo()
-
+func overlaidFoo()
 func visibleImport()
-
 precedencegroup High {
   associativity: left
   higherThan: BitwiseShiftPrecedence
 }
-
 infix operator %%% : High
-
 postfix operator =>
-
 postfix operator =->
-

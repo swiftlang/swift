@@ -29,7 +29,7 @@ namespace llvm {
 
 namespace swift {
   class AssociatedConformance;
-  class AssociatedType;
+  class AssociatedTypeDecl;
   class CanType;
   class FuncDecl;
   enum class MetadataState : size_t;
@@ -73,6 +73,10 @@ namespace irgen {
                                          SILDeclRef member,
                                          ProtocolConformanceRef conformance);
 
+  llvm::Value *emitAssociatedConformanceValue(IRGenFunction &IGF,
+                                              llvm::Value *wtable,
+                                              const AssociatedConformance &conf);
+
   /// Compute the index into a witness table for a resilient protocol given
   /// a reference to a descriptor of one of the requirements in that witness
   /// table.
@@ -86,11 +90,11 @@ namespace irgen {
   ///
   /// \param parentMetadata - the type metadata for T
   /// \param wtable - the witness table witnessing the conformance of T to P
-  /// \param associatedType - the declaration of X; a member of P
+  /// \param assocType - the declaration of X; a member of P
   MetadataResponse emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
                                                  llvm::Value *parentMetadata,
                                                  llvm::Value *wtable,
-                                                 AssociatedType associatedType,
+                                                 AssociatedTypeDecl *assocType,
                                                  DynamicMetadataRequest request);
 
   // Return the offset one should do on a witness table pointer to retrieve the
@@ -111,6 +115,7 @@ namespace irgen {
     unsigned numShapes;
     unsigned numTypeMetadataPtrs;
     unsigned numWitnessTablePtrs;
+    unsigned numValues;
   };
 
   /// Add the witness parameters necessary for calling a function with
@@ -198,7 +203,7 @@ namespace irgen {
                                    ProtocolConformanceRef conformance);
 
   using GenericParamFulfillmentCallback =
-    llvm::function_ref<void(CanType genericParamType,
+    llvm::function_ref<void(GenericRequirement req,
                             const MetadataSource &source,
                             const MetadataPath &path)>;
 

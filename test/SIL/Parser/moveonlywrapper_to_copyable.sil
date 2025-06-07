@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all=true %s | %target-sil-opt -enable-objc-interop -enable-sil-verify-all=true | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enable-sil-verify-all=true %s | %target-sil-opt -sil-print-types -enable-objc-interop -enable-sil-verify-all=true | %FileCheck %s
 
 sil_stage raw
 

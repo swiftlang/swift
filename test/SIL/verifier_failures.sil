@@ -1,20 +1,70 @@
 // RUN: %target-sil-opt -emit-sorted-sil -verify-continue-on-failure -o /dev/null %s 2>&1 | %FileCheck %s
+
 // REQUIRES: asserts
 
 sil_stage canonical
 
 import Builtin
-import Swift
-import SwiftShims
 
 class C {}
 
-// CHECK:      Begin Error in function end_borrow_1_addr_alloc_stack
-// CHECK-NEXT: SIL verification failed: end_borrow of an address not produced by store_borrow
+protocol Error {}
+
+// CHECK-LABEL: Begin Error in function end_borrow_1_addr_alloc_stack
+// CHECK:       SIL verification failed: end_borrow of an address not produced by store_borrow
+// CHECK-LABEL: End Error in function end_borrow_1_addr_alloc_stack
 sil [ossa] @end_borrow_1_addr_alloc_stack : $@convention(thin) () -> () {
   %addr = alloc_stack $C
   end_borrow %addr : $*C
   dealloc_stack %addr : $*C
   %retval = tuple ()
   return %retval : $()
+}
+
+// CHECK-LABEL: Begin Error in function destroy_value_dead_end
+// CHECK:       SIL verification failed: a dead_end destroy_value must be in a dead-end block
+// CHECK:       Verifying instruction:
+// CHECK:            [[ARGUMENT:%[^,]+]] = argument
+// CHECK:       ->   destroy_value [dead_end] [[ARGUMENT]]
+// CHECK-LABEL: End Error in function destroy_value_dead_end
+sil [ossa] @destroy_value_dead_end : $@convention(thin) (@owned C) -> () {
+entry(%c : @owned $C):
+  destroy_value [dead_end] %c : $C
+  %retval = tuple()
+  return %retval : $()
+}
+
+// CHECK-LABEL: Begin Error in function dealloc_box_dead_end
+// CHECK:       SIL verification failed: a dead_end dealloc_box must be in a dead-end block
+// CHECK:       Verifying instruction:
+// CHECK:            [[BOX:%[^,]+]] = alloc_box
+// CHECK:       ->   dealloc_box [dead_end] [[BOX]]
+// CHECK-LABEL: End Error in function dealloc_box_dead_end
+sil [ossa] @dealloc_box_dead_end : $@convention(thin) () -> () {
+  %b = alloc_box ${ var C }
+  dealloc_box [dead_end] %b : ${ var C }
+  %retval = tuple()
+  return %retval : $()
+}
+
+// CHECK-LABEL: Begin Error in function abort_apply_callee_allocated_coro
+// CHECK:       SIL verification failed: abort_apply of callee-allocated yield-once coroutine!?
+// CHECK:       Verifying instruction:
+// CHECK:          ({{%[^,]+}}, **[[TOKEN:%[^,]+]]**, {{%[^,]+}}) = begin_apply
+// CHECK:       ->   abort_apply [[TOKEN]]
+// CHECK-LABEL: End Error in function abort_apply_callee_allocated_coro
+sil [ossa] @abort_apply_callee_allocated_coro : $@convention(thin) () -> (@error any Error) {
+entry:
+  (%value, %token, %allocation) = begin_apply undef() : $@yield_once_2 @convention(thin) () -> @yields @in_guaranteed ()
+  try_apply undef() : $@convention(thin) () -> @error any Error, normal success, error failure
+
+success(%val : $()):
+  end_apply %token as $()
+  dealloc_stack %allocation : $*Builtin.SILToken
+  return undef : $()
+
+failure(%error : @owned $any Error):
+  abort_apply %token
+  dealloc_stack %allocation : $*Builtin.SILToken
+  throw %error : $any Error
 }

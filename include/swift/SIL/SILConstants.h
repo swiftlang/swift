@@ -260,6 +260,9 @@ private:
     /// This value is represented with an inline integer representation.
     RK_IntegerInline,
 
+    /// This value is represented with a bump-pointer allocated APFloat.
+    RK_FloatingPoint,
+
     /// This value is represented with a bump-pointer allocated char array
     /// representing a UTF-8 encoded string.
     RK_String,
@@ -304,6 +307,10 @@ private:
     /// When this SymbolicValue is of "Integer" kind, this pointer stores
     /// the words of the APInt value it holds.
     uint64_t *integer;
+
+    /// When this SymbolicValue is of "FloatingPoint" kind, this
+    /// pointer stoes information about its APFloat value
+    APFloat *floatingPoint;
 
     /// This holds the bits of an integer for an inline representation.
     uint64_t integerInline;
@@ -389,6 +396,9 @@ public:
 
     /// This is an integer constant.
     Integer,
+
+    /// This is a floating point constant.
+    FloatingPoint,
 
     /// String values may have SIL type of Builtin.RawPointer or Builtin.Word
     /// type.
@@ -480,8 +490,12 @@ public:
   static SymbolicValue getInteger(const APInt &value,
                                   SymbolicValueAllocator &allocator);
 
+  static SymbolicValue getFloat(const APFloat &value,
+                                SymbolicValueAllocator &allocator);
+
   APInt getIntegerValue() const;
   unsigned getIntegerValueBitWidth() const;
+  APFloat getFloatValue() const;
 
   /// Returns a SymbolicValue representing a UTF-8 encoded string.
   static SymbolicValue getString(StringRef string,
@@ -574,11 +588,12 @@ public:
   /// arguments along with their symbolic values when available.
   /// \param allocator the allocator to use for storing the contents of this
   /// symbolic value.
-  static SymbolicValue makeClosure(
-      SILFunction *target,
-      ArrayRef<std::pair<SILValue, Optional<SymbolicValue>>> capturedArguments,
-      SubstitutionMap substMap, SingleValueInstruction *closureInst,
-      SymbolicValueAllocator &allocator);
+  static SymbolicValue
+  makeClosure(SILFunction *target,
+              ArrayRef<std::pair<SILValue, std::optional<SymbolicValue>>>
+                  capturedArguments,
+              SubstitutionMap substMap, SingleValueInstruction *closureInst,
+              SymbolicValueAllocator &allocator);
 
   SymbolicClosure *getClosure() const {
     assert(getKind() == Closure);
@@ -670,7 +685,8 @@ private:
   void operator=(const SymbolicValueMemoryObject &) = delete;
 };
 
-using SymbolicClosureArgument = std::pair<SILValue, Optional<SymbolicValue>>;
+using SymbolicClosureArgument =
+    std::pair<SILValue, std::optional<SymbolicValue>>;
 
 /// Representation of a symbolic closure. A symbolic closure consists of a
 /// SILFunction and an array of SIL values, corresponding to the captured

@@ -39,18 +39,16 @@ func func1() {
   // CHECK: define hidden swiftcc void @"$s4main5func1yyF"()
   let o: MyClass = MyDerivedClass()
   o.foo()
-  // CHECK:  [[SLOT:%.*]] = getelementptr inbounds void (%T4main7MyClassC*)*, void (%T4main7MyClassC*)** {{.*}}, {{i64|i32}} {{.*}}
-  // CHECK:  [[SLOTASPTR:%.*]] = bitcast void (%T4main7MyClassC*)** [[SLOT]] to i8*
-  // CHECK:  call { i8*, i1 } @llvm.type.checked.load(i8* [[SLOTASPTR]], i32 0, metadata !"$s4main7MyClassC3fooyyFTq")
+  // CHECK:  [[SLOT:%.*]] = getelementptr inbounds ptr, ptr {{.*}}, {{i64|i32}} {{.*}}
+  // CHECK:  call { ptr, i1 } @llvm.type.checked.load(ptr [[SLOT]], i32 0, metadata !"$s4main7MyClassC3fooyyFTq")
 }
 
 func func2() {
   // CHECK: define hidden swiftcc void @"$s4main5func2yyF"()
   let o: MyDerivedClass = MyDerivedClass()
   o.foo()
-  // CHECK:  [[SLOT:%.*]] = getelementptr inbounds void (%T4main14MyDerivedClassC*)*, void (%T4main14MyDerivedClassC*)** {{.*}}, {{i64|i32}} {{.*}}
-  // CHECK:  [[SLOTASPTR:%.*]] = bitcast void (%T4main14MyDerivedClassC*)** [[SLOT]] to i8*
-  // CHECK:  call { i8*, i1 } @llvm.type.checked.load(i8* [[SLOTASPTR]], i32 0, metadata !"$s4main7MyClassC3fooyyFTq")
+  // CHECK:  [[SLOT:%.*]] = getelementptr inbounds ptr, ptr {{.*}}, {{i64|i32}} {{.*}}
+  // CHECK:  call { ptr, i1 } @llvm.type.checked.load(ptr [[SLOT]], i32 0, metadata !"$s4main7MyClassC3fooyyFTq")
 }
 
 // CHECK-64: !0 = !{i64 56, !"$s4main7MyClassC3fooyyFTq"}
@@ -58,10 +56,10 @@ func func2() {
 // CHECK-64: !2 = !{i64 72, !"$s4main7MyClassCACycfCTq"}
 // CHECK-64: !3 = !{i64 1, i64 56, i64 76}
 // CHECK-64: !4 = !{}
-// CHECK-64: !5 = !{i64 72, !"$s4main7MyClassC3fooyyFTq"}
-// CHECK-64: !6 = !{i64 80, !"$s4main7MyClassC3baryyFTq"}
-// CHECK-64: !7 = !{i64 88, !"$s4main7MyClassCACycfCTq"}
-// CHECK-64: !8 = !{i64 1, i64 72, i64 92}
+// CHECK-64: !5 = !{i64 80, !"$s4main7MyClassC3fooyyFTq"}
+// CHECK-64: !6 = !{i64 88, !"$s4main7MyClassC3baryyFTq"}
+// CHECK-64: !7 = !{i64 96, !"$s4main7MyClassCACycfCTq"}
+// CHECK-64: !8 = !{i64 1, i64 80, i64 100}
 // CHECK-64: !9 = !{i64 68, !"$s4main7MyClassC3baryyFTq"}
 // CHECK-64: !10 = !{i64 80, !"$s4main7MyClassCACycfCTq"}
 // CHECK-64: !11 = !{i64 1, i64 56, i64 84}
@@ -71,10 +69,10 @@ func func2() {
 // CHECK-32: !2 = !{i64 72, !"$s4main7MyClassCACycfCTq"}
 // CHECK-32: !3 = !{i64 1, i64 56, i64 76}
 // CHECK-32: !4 = !{}
-// CHECK-32: !5 = !{i64 48, !"$s4main7MyClassC3fooyyFTq"}
-// CHECK-32: !6 = !{i64 52, !"$s4main7MyClassC3baryyFTq"}
-// CHECK-32: !7 = !{i64 56, !"$s4main7MyClassCACycfCTq"}
-// CHECK-32: !8 = !{i64 1, i64 48, i64 60}
+// CHECK-32: !5 = !{i64 52, !"$s4main7MyClassC3fooyyFTq"}
+// CHECK-32: !6 = !{i64 56, !"$s4main7MyClassC3baryyFTq"}
+// CHECK-32: !7 = !{i64 60, !"$s4main7MyClassCACycfCTq"}
+// CHECK-32: !8 = !{i64 1, i64 52, i64 64}
 // CHECK-32: !9 = !{i64 68, !"$s4main7MyClassC3baryyFTq"}
 // CHECK-32: !10 = !{i64 80, !"$s4main7MyClassCACycfCTq"}
 // CHECK-32: !11 = !{i64 1, i64 56, i64 84}

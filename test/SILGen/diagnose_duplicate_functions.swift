@@ -1,7 +1,7 @@
 // RUN: %target-swift-emit-silgen %s -o /dev/null -verify
 
 @_silgen_name("foo")
-func a(_ x: Int) -> Int {
+func a(_ x: Int) -> Int { // expected-note {{other definition here}}
   return x
 }
 
@@ -11,7 +11,7 @@ func b(_ x: Int) -> Int { // expected-error {{multiple definitions of symbol 'fo
 }
 
 @_cdecl("bar")
-func c(_ x: Int) -> Int {
+func c(_ x: Int) -> Int { // expected-note {{other definition here}}
   return x
 }
 

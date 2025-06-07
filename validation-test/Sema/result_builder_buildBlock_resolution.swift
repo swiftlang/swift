@@ -1,9 +1,7 @@
 // RUN: %target-typecheck-verify-swift
-// RUN: %target-typecheck-verify-swift -I %t -enable-experimental-feature ResultBuilderASTTransform
+// RUN: %target-typecheck-verify-swift -I %t
 
-// This test verifies that `buildBlock` is type-checked together with enclosing context,
-// which means that it's not captured into separate variable but rather used directly and
-// contextual information can impact overload resolution.
+// ! - Based on the result builders proposal `buildBlock` shouldn't be type-checked together with `buildOptional`.
 
 protocol ActionIdentifier: Hashable {
 }
@@ -13,12 +11,12 @@ struct ActionLookup<Identifier: ActionIdentifier> {
 }
 
 @resultBuilder
-enum ActionLookupBuilder<Identifier: ActionIdentifier> {
-  static func buildBlock<Identifier: ActionIdentifier>(_ components: [ActionLookup<Identifier>]...) -> ActionLookup<Identifier> {
+enum ActionLookupBuilder<Identifier: ActionIdentifier> { // expected-note 3{{'Identifier' previously declared here}}
+  static func buildBlock<Identifier: ActionIdentifier>(_ components: [ActionLookup<Identifier>]...) -> ActionLookup<Identifier> { // expected-warning {{generic parameter 'Identifier' shadows generic parameter from outer scope with the same name; this is an error in the Swift 6 language mode}} expected-note {{found this candidate}}
     fatalError()
   }
 
-  static func buildBlock<Identifier: ActionIdentifier>(_ components: [ActionLookup<Identifier>]...) -> [ActionLookup<Identifier>] {
+  static func buildBlock<Identifier: ActionIdentifier>(_ components: [ActionLookup<Identifier>]...) -> [ActionLookup<Identifier>] { // expected-warning {{generic parameter 'Identifier' shadows generic parameter from outer scope with the same name; this is an error in the Swift 6 language mode}} expected-note {{found this candidate}}
     []
   }
 
@@ -26,7 +24,7 @@ enum ActionLookupBuilder<Identifier: ActionIdentifier> {
     []
   }
 
-  static func buildOptional<Identifier: ActionIdentifier>(_ component: [ActionLookup<Identifier>]?) -> [ActionLookup<Identifier>] {
+  static func buildOptional<Identifier: ActionIdentifier>(_ component: [ActionLookup<Identifier>]?) -> [ActionLookup<Identifier>] { // expected-warning {{generic parameter 'Identifier' shadows generic parameter from outer scope with the same name; this is an error in the Swift 6 language mode}}
     []
   }
 }
@@ -43,7 +41,8 @@ enum ActionType: String, ActionIdentifier, CaseIterable {
         ActionTypeLookup(
             .download
         )
-        if true { // If condition is needed to make sure that `buildOptional` affects `buildBlock` resolution.
+        if true { // If condition without else is needed to make sure that `buildOptional` affects `buildBlock` resolution.
+          // expected-error@-1 {{ambiguous use of 'buildBlock'}}
             ActionTypeLookup(
                 .upload
             )

@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
 
 // Make sure we do not call the getter to get the oldValue and pass it to didSet
 // when the didSet does not reference the oldValue in its body.
@@ -20,7 +20,7 @@ let foo = Foo(value: "Hello")
 // Foo.value.setter //
 
 // CHECK-LABEL: sil hidden [ossa] @$s35didset_oldvalue_not_accessed_silgen3FooC5valuexvs : $@convention(method) <T> (@in T, @guaranteed Foo<T>) -> ()
-// CHECK: debug_value [[VALUE:%.*]] : $*T, let, name "value", argno {{[0-9+]}}, {{.*}} expr op_deref
+// CHECK: debug_value [[VALUE:%.*]] : $*T, let, name "value", argno {{[0-9+]}}, expr op_deref
 // CHECK-NEXT: debug_value [[SELF:%.*]] : $Foo<T>, let, name "self", argno {{[0-9+]}}
 // CHECK-NEXT: [[ALLOC_STACK:%.*]] = alloc_stack $T
 // CHECK-NEXT: copy_addr [[VALUE]] to [init] [[ALLOC_STACK]] : $*T

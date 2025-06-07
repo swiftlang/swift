@@ -15,181 +15,54 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeCheckMacros.h"
+#include "../AST/InlinableText.h"
+#include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/ASTNode.h"
+#include "swift/AST/ASTPrinter.h"
+#include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/NameLookupRequests.h"
+#include "swift/AST/FreestandingMacroExpansion.h"
 #include "swift/AST/MacroDefinition.h"
+#include "swift/AST/NameLookupRequests.h"
+#include "swift/AST/PluginLoader.h"
+#include "swift/AST/PluginRegistry.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/Basic/BasicBridging.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/Lazy.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Bridging/ASTGen.h"
+#include "swift/Bridging/MacroEvaluation.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "swift/Subsystems.h"
+#include "llvm/Config/config.h"
 
 using namespace swift;
 
-extern "C" void *swift_ASTGen_resolveMacroType(const void *macroType);
-
-extern "C" void swift_ASTGen_destroyMacro(void *macro);
-
-extern "C" ptrdiff_t swift_ASTGen_expandFreestandingMacro(
-    void *diagEngine, void *macro,
-    const char *discriminator,
-    ptrdiff_t discriminatorLength,
-    void *sourceFile,
-    const void *sourceLocation,
-    const char **evaluatedSource, ptrdiff_t *evaluatedSourceLength);
-
-extern "C" ptrdiff_t swift_ASTGen_expandAttachedMacro(
-    void *diagEngine, void *macro,
-    uint32_t rawMacroRole,
-    void *customAttrSourceFile,
-    const void *customAttrSourceLocation,
-    void *declarationSourceFile,
-    const void *declarationSourceLocation,
-    void *parentDeclSourceFile,
-    const void *parentDeclSourceLocation,
-    const char **evaluatedSource,
-    ptrdiff_t *evaluatedSourceLength
-);
-
-/// Produce the mangled name for the nominal type descriptor of a type
-/// referenced by its module and type name.
-static std::string mangledNameForTypeMetadataAccessor(
-    StringRef moduleName, StringRef typeName, Node::Kind typeKind) {
-  using namespace Demangle;
-
-  //  kind=Global
-  //    kind=NominalTypeDescriptor
-  //      kind=Type
-  //        kind=Structure|Enum|Class
-  //          kind=Module, text=moduleName
-  //          kind=Identifier, text=typeName
-  Demangle::Demangler D;
-  auto *global = D.createNode(Node::Kind::Global);
-  {
-    auto *nominalDescriptor =
-        D.createNode(Node::Kind::TypeMetadataAccessFunction);
-    {
-      auto *type = D.createNode(Node::Kind::Type);
-      {
-        auto *module = D.createNode(Node::Kind::Module, moduleName);
-        auto *identifier = D.createNode(Node::Kind::Identifier, typeName);
-        auto *structNode = D.createNode(typeKind);
-        structNode->addChild(module, D);
-        structNode->addChild(identifier, D);
-        type->addChild(structNode, D);
-      }
-      nominalDescriptor->addChild(type, D);
-    }
-    global->addChild(nominalDescriptor, D);
-  }
-
-  auto mangleResult = mangleNode(global);
-  assert(mangleResult.isSuccess());
-  return mangleResult.result();
-}
-
-#if SWIFT_SWIFT_PARSER
-/// Look for macro's type metadata given its external module and type name.
-static void const *lookupMacroTypeMetadataByExternalName(
-    ASTContext &ctx, StringRef moduleName, StringRef typeName) {
-  // Look up the type metadata accessor as a struct, enum, or class.
-  const Demangle::Node::Kind typeKinds[] = {
-    Demangle::Node::Kind::Structure,
-    Demangle::Node::Kind::Enum,
-    Demangle::Node::Kind::Class
-  };
-
-  void *accessorAddr = nullptr;
-  for (auto typeKind : typeKinds) {
-    auto symbolName = mangledNameForTypeMetadataAccessor(
-                                                         moduleName, typeName, typeKind);
-    accessorAddr = ctx.getAddressOfSymbol(symbolName.c_str());
-    if (accessorAddr)
-      break;
-  }
-
-  if (!accessorAddr)
-    return nullptr;
-
-  // Call the accessor to form type metadata.
-  using MetadataAccessFunc = const void *(MetadataRequest);
-  auto accessor = reinterpret_cast<MetadataAccessFunc*>(accessorAddr);
-  return accessor(MetadataRequest(MetadataState::Complete));
-}
-#endif
-
-/// Handle the "A.B" spelling of an external macro definition, from early
-/// pitches of the expression-macros proposal, which is also used as the syntax
-/// for builtin macro definitions.
-///
-/// \returns The macro definition if the pattern is recognized, or \c None
-/// otherwise.
-static Optional<MacroDefinition> handleOldStyleOrBuiltinMacroDefinition(
-    ASTContext &ctx, Expr *expr
-) {
-  auto memberExpr = dyn_cast<UnresolvedDotExpr>(expr);
-  if (!memberExpr)
-    return None;
-
-  Expr *base = memberExpr->getBase();
-  auto baseDeclRef = dyn_cast<UnresolvedDeclRefExpr>(base);
-  if (!baseDeclRef)
-    return None;
-
-  if (memberExpr->getName().isSpecial() ||
-      baseDeclRef->getName().isSpecial())
-    return None;
-
-  Identifier moduleName = baseDeclRef->getName().getBaseIdentifier();
-  Identifier typeName = memberExpr->getName().getBaseIdentifier();
-
-  // If this is a reference to the builtin module, check if it's a known
-  // builtin macro.
-  if (moduleName.str().equals("Builtin") && ctx.SILOpts.ParseStdlib) {
-    if (typeName.str() == "ExternalMacro") {
-      return MacroDefinition::forBuiltin(BuiltinMacroKind::ExternalMacro);
-    }
-
-    ctx.Diags.diagnose(
-        memberExpr->getLoc(), diag::macro_definition_unknown_builtin,
-        typeName
-    );
-
-    return MacroDefinition::forInvalid();
-  }
-
-  std::string newCode;
-  {
-    llvm::raw_string_ostream out(newCode);
-    out << "#externalMacro(module: \"" << moduleName << "\", type: \""
-        << typeName << "\")";
-  }
-
-  ctx.Diags.diagnose(
-      memberExpr->getLoc(), diag::macro_definition_old_style
-  ).fixItReplace(memberExpr->getSourceRange(), newCode);
-
-  return MacroDefinition::forExternal(moduleName, typeName);
-}
-
 /// Translate an argument provided as a string literal into an identifier,
 /// or return \c None and emit an error if it cannot be done.
-Optional<Identifier> getIdentifierFromStringLiteralArgument(
+std::optional<Identifier> getIdentifierFromStringLiteralArgument(
     ASTContext &ctx, MacroExpansionExpr *expansion, unsigned index) {
   auto argList = expansion->getArgs();
 
   // If there's no argument here, an error was diagnosed elsewhere.
   if (!argList || index >= argList->size()) {
-    return None;
+    return std::nullopt;
   }
 
   auto arg = argList->getExpr(index);
@@ -199,7 +72,7 @@ Optional<Identifier> getIdentifierFromStringLiteralArgument(
         arg->getLoc(), diag::external_macro_arg_not_type_name, index
     );
 
-    return None;
+    return std::nullopt;
   }
 
 
@@ -209,38 +82,107 @@ Optional<Identifier> getIdentifierFromStringLiteralArgument(
         arg->getLoc(), diag::external_macro_arg_not_type_name, index
     );
 
-    return None;
+    return std::nullopt;
   }
 
   return ctx.getIdentifier(contents);
 }
 
+/// For a macro expansion expression that is known to be #externalMacro,
+/// handle the definition.
+#if SWIFT_BUILD_SWIFT_SYNTAX
+static MacroDefinition  handleExternalMacroDefinition(
+    ASTContext &ctx, MacroExpansionExpr *expansion) {
+  // Dig out the module and type name.
+  auto moduleName = getIdentifierFromStringLiteralArgument(ctx, expansion, 0);
+  if (!moduleName) {
+    return MacroDefinition::forInvalid();
+  }
+
+  auto typeName = getIdentifierFromStringLiteralArgument(ctx, expansion, 1);
+  if (!typeName) {
+    return MacroDefinition::forInvalid();
+  }
+
+  return MacroDefinition::forExternal(*moduleName, *typeName);
+}
+#endif // SWIFT_BUILD_SWIFT_SYNTAX
+
 MacroDefinition MacroDefinitionRequest::evaluate(
     Evaluator &evaluator, MacroDecl *macro
 ) const {
-  ASTContext &ctx = macro->getASTContext();
-
   // If no definition was provided, the macro is... undefined, of course.
   auto definition = macro->definition;
   if (!definition)
     return MacroDefinition::forUndefined();
 
-  // Recognize the "A.B" spelling of external macro definitions from early
-  // pitches of the feature. This spelling is also used for builtin macro
-  // definitions.
-  if (auto oldStyleOrBuiltinResult =
-          handleOldStyleOrBuiltinMacroDefinition(ctx, definition)) {
-    return *oldStyleOrBuiltinResult;
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  ASTContext &ctx = macro->getASTContext();
+  auto sourceFile = macro->getParentSourceFile();
+
+  BridgedStringRef externalMacroName{nullptr, 0};
+  ptrdiff_t *replacements = nullptr;
+  ptrdiff_t numReplacements = 0;
+  ptrdiff_t *genericReplacements = nullptr;
+  ptrdiff_t numGenericReplacements = 0;
+
+  // Parse 'macro' decl in swift_Macros_checkMacroDefinition.
+  // NOTE: We don't use source->getExportedSourceFile() because it parses the
+  // entire source buffer, which we don't want. Usually 'macro' decl is not in
+  // the same file as the expansion, so we only want to parse only the decl.
+  // FIXME: When we migrate to SwiftParser, use the parsed syntax tree.
+  auto &SM = ctx.SourceMgr;
+  StringRef sourceFileText =
+      SM.getEntireTextForBuffer(sourceFile->getBufferID());
+  StringRef macroDeclText =
+      SM.extractText(Lexer::getCharSourceRangeFromSourceRange(
+          SM, macro->getSourceRange()));
+
+  auto checkResult = swift_Macros_checkMacroDefinition(
+      &ctx.Diags, sourceFileText, macroDeclText, &externalMacroName,
+      &replacements, &numReplacements, &genericReplacements,
+      &numGenericReplacements);
+
+  // Clean up after the call.
+  SWIFT_DEFER {
+    swift_ASTGen_freeBridgedString(externalMacroName);
+    swift_Macros_freeExpansionReplacements(replacements, numReplacements);
+    // swift_Macros_freeExpansionGenericReplacements(genericReplacements, numGenericReplacements); // FIXME: !!!!!!
+  };
+
+  if (checkResult < 0 && ctx.CompletionCallback) {
+    // If the macro failed to check and we are in code completion mode, pretend
+    // it's an arbitrary macro. This allows us to get call argument completions
+    // inside `#externalMacro`.
+    checkResult = BridgedMacroDefinitionKind::BridgedExpandedMacro;
   }
 
-  // At this point, we must have a macro expansion expression.
-  auto expansion = dyn_cast<MacroExpansionExpr>(definition);
-  if (!expansion) {
-    ctx.Diags.diagnose(
-        definition->getLoc(), diag::macro_definition_not_expansion
-    );
-
+  if (checkResult < 0)
     return MacroDefinition::forInvalid();
+
+  switch (static_cast<BridgedMacroDefinitionKind>(checkResult)) {
+  case BridgedExpandedMacro:
+    // Handle expanded macros below.
+    break;
+
+  case BridgedExternalMacro: {
+    // An external macro described as ModuleName.TypeName. Get both identifiers.
+    assert(!replacements && "External macro doesn't have replacements");
+    assert(!genericReplacements && "External macro doesn't have genericReplacements");
+    StringRef externalMacroStr = externalMacroName.unbridged();
+    StringRef externalModuleName, externalTypeName;
+    std::tie(externalModuleName, externalTypeName) = externalMacroStr.split('.');
+
+    Identifier moduleName = ctx.getIdentifier(externalModuleName);
+    Identifier typeName = ctx.getIdentifier(externalTypeName);
+    return MacroDefinition::forExternal(moduleName, typeName);
+  }
+
+  case BridgedBuiltinExternalMacro:
+    return MacroDefinition::forBuiltin(BuiltinMacroKind::ExternalMacro);
+
+  case BridgedBuiltinIsolationMacro:
+    return MacroDefinition::forBuiltin(BuiltinMacroKind::IsolationMacro);
   }
 
   // Type-check the macro expansion.
@@ -259,68 +201,250 @@ MacroDefinition MacroDefinitionRequest::evaluate(
   if (!typeCheckedType)
     return MacroDefinition::forInvalid();
 
+  // If the expanded macro was one of the magic literal expressions
+  // (like #file), there's nothing to expand.
+  if (isa<MagicIdentifierLiteralExpr>(definition)) {
+    StringRef expansionText = externalMacroName.unbridged();
+    return MacroDefinition::forExpanded(ctx, expansionText, { }, { });
+  }
+
   // Dig out the macro that was expanded.
+  auto expansion = cast<MacroExpansionExpr>(definition);
   auto expandedMacro =
       dyn_cast_or_null<MacroDecl>(expansion->getMacroRef().getDecl());
   if (!expandedMacro)
     return MacroDefinition::forInvalid();
 
-  // FIXME: Only external macros are supported at this point.
+  // Handle external macros after type-checking.
   auto builtinKind = expandedMacro->getBuiltinKind();
-  if (builtinKind != BuiltinMacroKind::ExternalMacro) {
-    ctx.Diags.diagnose(
-        definition->getLoc(), diag::macro_definition_unsupported
-    );
+  if (builtinKind == BuiltinMacroKind::ExternalMacro)
+    return handleExternalMacroDefinition(ctx, expansion);
 
-    return MacroDefinition::forInvalid();
+  // Expansion string text.
+  StringRef expansionText = externalMacroName.unbridged();
+
+  // Copy over the replacements.
+  SmallVector<ExpandedMacroReplacement, 2> replacementsVec;
+  for (unsigned i: range(0, numReplacements)) {
+    replacementsVec.push_back(
+        { static_cast<unsigned>(replacements[3*i]),
+          static_cast<unsigned>(replacements[3*i+1]),
+          static_cast<unsigned>(replacements[3*i+2])});
+  }
+  // Copy over the genericReplacements.
+  SmallVector<ExpandedMacroReplacement, 2> genericReplacementsVec;
+  for (unsigned i: range(0, numGenericReplacements)) {
+    genericReplacementsVec.push_back(
+        { static_cast<unsigned>(genericReplacements[3*i]),
+          static_cast<unsigned>(genericReplacements[3*i+1]),
+          static_cast<unsigned>(genericReplacements[3*i+2])});
   }
 
-  // Dig out the module and type name.
-  auto moduleName = getIdentifierFromStringLiteralArgument(ctx, expansion, 0);
-  if (!moduleName) {
-    return MacroDefinition::forInvalid();
+  return MacroDefinition::forExpanded(ctx, expansionText, replacementsVec, genericReplacementsVec);
+#else
+  macro->diagnose(diag::macro_unsupported);
+  return MacroDefinition::forInvalid();
+#endif
+}
+
+static llvm::Expected<CompilerPlugin *>
+initializePlugin(ASTContext &ctx, CompilerPlugin *plugin, StringRef libraryPath,
+                 Identifier moduleName) {
+  // Lock the plugin while initializing.
+  // Note that 'executablePlugin' can be shared between multiple ASTContext.
+  plugin->lock();
+  SWIFT_DEFER { plugin->unlock(); };
+
+  // FIXME: Ideally this should be done right after invoking the plugin.
+  // But plugin loading is in libAST and it can't link ASTGen symbols.
+  if (!plugin->isInitialized()) {
+#if SWIFT_BUILD_SWIFT_SYNTAX
+    if (!swift_Macros_initializePlugin(plugin, &ctx.Diags)) {
+      return llvm::createStringError(llvm::inconvertibleErrorCode(),
+                                     "'%s' produced malformed response",
+                                     plugin->getPath().data());
+    }
+
+    // Resend the compiler capability on reconnect.
+    auto *callback = new std::function<void(void)>([plugin]() {
+      (void)swift_Macros_initializePlugin(plugin, /*diags=*/nullptr);
+    });
+    plugin->addOnReconnect(callback);
+
+    plugin->setCleanup([plugin, callback] {
+      swift_Macros_deinitializePlugin(plugin);
+      delete callback;
+    });
+#endif
   }
 
-  auto typeName = getIdentifierFromStringLiteralArgument(ctx, expansion, 1);
-  if (!typeName) {
-    return MacroDefinition::forInvalid();
+  // If this is a plugin server, load the library.
+  if (!libraryPath.empty()) {
+#if SWIFT_BUILD_SWIFT_SYNTAX
+    llvm::SmallString<128> resolvedLibraryPath;
+    auto fs = ctx.CASOpts.HasImmutableFileSystem
+                  ? llvm::vfs::getRealFileSystem()
+                  : ctx.SourceMgr.getFileSystem();
+    if (auto err = fs->getRealPath(libraryPath, resolvedLibraryPath)) {
+      return llvm::createStringError(err, err.message());
+    }
+
+    std::string resolvedLibraryPathStr(resolvedLibraryPath);
+    std::string moduleNameStr(moduleName.str());
+
+    BridgedStringRef bridgedErrorOut{nullptr, 0};
+    bool loaded = swift_Macros_pluginServerLoadLibraryPlugin(
+        plugin, resolvedLibraryPathStr.c_str(), moduleNameStr.c_str(),
+        &bridgedErrorOut);
+
+    auto errorOut = bridgedErrorOut.unbridged();
+    if (!loaded) {
+      SWIFT_DEFER { swift_ASTGen_freeBridgedString(errorOut); };
+      return llvm::createStringError(
+          llvm::inconvertibleErrorCode(),
+          "failed to load library plugin '%s' in plugin server '%s'; %s",
+          resolvedLibraryPathStr.c_str(), plugin->getPath().data(),
+          errorOut.data());
+    }
+
+    assert(errorOut.data() == nullptr);
+
+    // Set a callback to load the library again on reconnections.
+    auto *callback = new std::function<void(void)>(
+        [plugin, resolvedLibraryPathStr, moduleNameStr]() {
+          (void)swift_Macros_pluginServerLoadLibraryPlugin(
+              plugin, resolvedLibraryPathStr.c_str(), moduleNameStr.c_str(),
+              /*errorOut=*/nullptr);
+        });
+    plugin->addOnReconnect(callback);
+
+    // Remove the callback and deallocate it when this ASTContext is destructed.
+    ctx.addCleanup([plugin, callback]() {
+      plugin->removeOnReconnect(callback);
+      delete callback;
+    });
+#endif
   }
 
-  return MacroDefinition::forExternal(*moduleName, *typeName);
+  return plugin;
+}
+
+CompilerPluginLoadResult
+CompilerPluginLoadRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
+                                    Identifier moduleName) const {
+  PluginLoader &loader = ctx->getPluginLoader();
+  const auto &entry = loader.lookupPluginByModuleName(moduleName);
+
+  SmallString<0> errorMessage;
+
+  if (!entry.executablePath.empty()) {
+    llvm::Expected<CompilerPlugin *> plugin =
+        loader.loadExecutablePlugin(entry.executablePath);
+    if (plugin) {
+      if (ctx->LangOpts.EnableMacroLoadingRemarks) {
+        unsigned tag = entry.libraryPath.empty() ? 1 : 2;
+        ctx->Diags.diagnose(SourceLoc(), diag::macro_loaded, moduleName, tag,
+                            entry.executablePath, entry.libraryPath);
+      }
+
+      plugin =
+          initializePlugin(*ctx, plugin.get(), entry.libraryPath, moduleName);
+    }
+    if (plugin)
+      return plugin.get();
+    llvm::handleAllErrors(plugin.takeError(),
+                          [&](const llvm::ErrorInfoBase &err) {
+                            if (!errorMessage.empty())
+                              errorMessage += ", ";
+                            errorMessage += err.message();
+                          });
+  } else if (!entry.libraryPath.empty()) {
+
+    llvm::Expected<CompilerPlugin *> plugins = loader.getInProcessPlugins();
+    if (plugins) {
+      plugins =
+          initializePlugin(*ctx, plugins.get(), entry.libraryPath, moduleName);
+      if (plugins) {
+        if (ctx->LangOpts.EnableMacroLoadingRemarks) {
+          ctx->Diags.diagnose(SourceLoc(), diag::macro_loaded, moduleName, 0,
+                              entry.libraryPath, StringRef());
+        }
+        return plugins.get();
+      }
+    }
+
+    if (!plugins) {
+      llvm::handleAllErrors(plugins.takeError(),
+                            [&](const llvm::ErrorInfoBase &err) {
+                              if (!errorMessage.empty())
+                                errorMessage += ", ";
+                              errorMessage += err.message();
+                            });
+    }
+  }
+  if (!errorMessage.empty()) {
+    NullTerminatedStringRef err(errorMessage, *ctx);
+    return CompilerPluginLoadResult::error(err);
+  } else {
+    NullTerminatedStringRef errMsg(
+        "plugin for module '" + moduleName.str() + "' not found", *ctx);
+    return CompilerPluginLoadResult::error(errMsg);
+  }
+}
+
+static ExternalMacroDefinition resolveExternalMacro(ASTContext &ctx,
+                                                    CompilerPlugin *plugin,
+                                                    Identifier moduleName,
+                                                    Identifier typeName) {
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  if (auto *macro = swift_Macros_resolveExternalMacro(moduleName.get(),
+                                                      typeName.get(), plugin)) {
+    // Make sure we clean up after the macro.
+    ctx.addCleanup([macro]() { swift_Macros_destroyExternalMacro(macro); });
+    return ExternalMacroDefinition::success(macro);
+  }
+  // NOTE: this is not reachable because executable macro resolution always
+  // succeeds.
+  NullTerminatedStringRef err("'" + moduleName.str() + "." + typeName.str() +
+                                  "' could not be found in executable plugin" +
+                                  StringRef(plugin->getPath()),
+                              ctx);
+  return ExternalMacroDefinition::error(err);
+#endif
+  return ExternalMacroDefinition::error(
+      "the current compiler was not built with macro support");
 }
 
 ExternalMacroDefinition
-ExternalMacroDefinitionRequest::evaluate(
-    Evaluator &evaluator, ASTContext *ctx,
-    Identifier moduleName, Identifier typeName
-) const {
-#if SWIFT_SWIFT_PARSER
-  /// Look for the type metadata given the external module and type names.
-  auto macroMetatype = lookupMacroTypeMetadataByExternalName(
-      *ctx, moduleName.str(), typeName.str());
-  if (macroMetatype) {
-    // Check whether the macro metatype is in-process.
-    if (auto inProcess = swift_ASTGen_resolveMacroType(macroMetatype)) {
-      // Make sure we clean up after the macro.
-      ctx->addCleanup([inProcess]() {
-        swift_ASTGen_destroyMacro(inProcess);
-      });
+ExternalMacroDefinitionRequest::evaluate(Evaluator &evaluator, ASTContext *ctx,
+                                         Identifier moduleName,
+                                         Identifier typeName) const {
+  // Try to load a plugin module from the plugin search paths. If it
+  // succeeds, resolve in-process from that plugin
+  CompilerPluginLoadRequest loadRequest{ctx, moduleName};
+  CompilerPluginLoadResult loaded = evaluateOrDefault(
+      evaluator, loadRequest, CompilerPluginLoadResult::error("request error"));
 
-      return ExternalMacroDefinition{inProcess};
-    }
+  if (auto plugin = loaded.get()) {
+    return resolveExternalMacro(*ctx, plugin, moduleName, typeName);
   }
-#endif
 
-  return ExternalMacroDefinition{nullptr};
+  return ExternalMacroDefinition::error(loaded.getErrorMessage());
 }
 
 /// Adjust the given mangled name for a macro expansion to produce a valid
 /// buffer name.
 static std::string adjustMacroExpansionBufferName(StringRef name) {
+  if (name.empty()) {
+    return "<macro-expansion>";
+  }
   std::string result;
-  if (name.startswith(MANGLING_PREFIX_STR)) {
+  if (name.starts_with(MANGLING_PREFIX_STR)) {
     result += MACRO_EXPANSION_BUFFER_MANGLING_PREFIX;
     name = name.drop_front(StringRef(MANGLING_PREFIX_STR).size());
+  } else if (name.starts_with(MANGLING_PREFIX_EMBEDDED_STR)) {
+    result += MACRO_EXPANSION_BUFFER_MANGLING_PREFIX;
+    name = name.drop_front(StringRef(MANGLING_PREFIX_EMBEDDED_STR).size());
   }
 
   result += name;
@@ -328,30 +452,275 @@ static std::string adjustMacroExpansionBufferName(StringRef name) {
   return result;
 }
 
-bool ExpandMemberAttributeMacros::evaluate(Evaluator &evaluator,
-                                           Decl *decl) const {
-  auto *parentDecl = decl->getDeclContext()->getAsDecl();
-  if (!parentDecl)
-    return false;
+std::optional<unsigned>
+ExpandMacroExpansionExprRequest::evaluate(Evaluator &evaluator,
+                                          MacroExpansionExpr *mee) const {
+  ConcreteDeclRef macroRef = mee->getMacroRef();
+  assert(macroRef && isa<MacroDecl>(macroRef.getDecl()) &&
+         "MacroRef should be set before expansion");
 
-  bool addedAttributes = false;
-  parentDecl->forEachAttachedMacro(MacroRole::MemberAttribute,
-      [&](CustomAttr *attr, MacroDecl *macro) {
-        addedAttributes |= expandAttributes(attr, macro, decl);
-      });
+  auto *macro = cast<MacroDecl>(macroRef.getDecl());
+  if (macro->getMacroRoles().contains(MacroRole::Expression)) {
+    return expandMacroExpr(mee);
+  }
+  // For a non-expression macro, expand it as a declaration.
+  else if (macro->getMacroRoles().contains(MacroRole::Declaration) ||
+           macro->getMacroRoles().contains(MacroRole::CodeItem)) {
+    if (!mee->getSubstituteDecl()) {
+      (void)mee->createSubstituteDecl();
+    }
+    // Return the expanded buffer ID.
+    return evaluateOrDefault(
+        evaluator, ExpandMacroExpansionDeclRequest(mee->getSubstituteDecl()),
+        std::nullopt);
+  }
 
-  return addedAttributes;
+  // Other macro roles may also be encountered here, as they use
+  // `MacroExpansionExpr` for resolution. In those cases, do not expand.
+  return std::nullopt;
 }
 
-bool ExpandSynthesizedMemberMacroRequest::evaluate(Evaluator &evaluator,
-                                                   Decl *decl) const {
-  bool synthesizedMembers = false;
-  decl->forEachAttachedMacro(MacroRole::Member,
+ArrayRef<unsigned> ExpandMemberAttributeMacros::evaluate(Evaluator &evaluator,
+                                                         Decl *decl) const {
+  if (decl->isImplicit())
+    return { };
+
+  // Member attribute macros do not apply to accessors.
+  if (isa<AccessorDecl>(decl))
+    return { };
+
+  // Member attribute macros do not apply to macro-expanded members.
+  if (decl->isInMacroExpansionInContext())
+    return { };
+
+  auto *parentDecl = decl->getDeclContext()->getAsDecl();
+  if (!parentDecl || !isa<IterableDeclContext>(parentDecl))
+    return { };
+
+  if (isa<PatternBindingDecl>(decl))
+    return { };
+
+  SmallVector<unsigned, 2> bufferIDs;
+  parentDecl->forEachAttachedMacro(MacroRole::MemberAttribute,
       [&](CustomAttr *attr, MacroDecl *macro) {
-        synthesizedMembers |= expandMembers(attr, macro, decl);
+        if (auto bufferID = expandAttributes(attr, macro, decl))
+          bufferIDs.push_back(*bufferID);
       });
 
-  return synthesizedMembers;
+  return parentDecl->getASTContext().AllocateCopy(bufferIDs);
+}
+
+ArrayRef<unsigned> ExpandSynthesizedMemberMacroRequest::evaluate(
+    Evaluator &evaluator, Decl *decl
+) const {
+  SmallVector<unsigned, 2> bufferIDs;
+  decl->forEachAttachedMacro(MacroRole::Member,
+      [&](CustomAttr *attr, MacroDecl *macro) {
+        if (auto bufferID = expandMembers(attr, macro, decl))
+          bufferIDs.push_back(*bufferID);
+      });
+
+  return decl->getASTContext().AllocateCopy(bufferIDs);
+}
+
+ArrayRef<unsigned>
+ExpandPeerMacroRequest::evaluate(Evaluator &evaluator, Decl *decl) const {
+  SmallVector<unsigned, 2> bufferIDs;
+  decl->forEachAttachedMacro(MacroRole::Peer,
+      [&](CustomAttr *attr, MacroDecl *macro) {
+        if (auto bufferID = expandPeers(attr, macro, decl))
+          bufferIDs.push_back(*bufferID);
+      });
+
+  return decl->getASTContext().AllocateCopy(bufferIDs);
+}
+
+static Identifier makeIdentifier(ASTContext &ctx, StringRef name) {
+  return ctx.getIdentifier(name);
+}
+
+static Identifier makeIdentifier(ASTContext &ctx, std::nullptr_t) {
+  return Identifier();
+}
+
+bool swift::isInvalidAttachedMacro(MacroRole role,
+                                   Decl *attachedTo) {
+  switch (role) {
+#define FREESTANDING_MACRO_ROLE(Name, Description) case MacroRole::Name:
+#define ATTACHED_MACRO_ROLE(Name, Description, MangledChar)
+#include "swift/Basic/MacroRoles.def"
+    llvm_unreachable("Invalid macro role for attached macro");
+
+  case MacroRole::Accessor:
+    // Only var decls and subscripts have accessors.
+    if (isa<AbstractStorageDecl>(attachedTo) && !isa<ParamDecl>(attachedTo))
+      return false;
+
+    break;
+
+  case MacroRole::MemberAttribute:
+  case MacroRole::Member:
+    // Nominal types and extensions can have members.
+    if (isa<NominalTypeDecl>(attachedTo) || isa<ExtensionDecl>(attachedTo))
+      return false;
+
+    break;
+
+  case MacroRole::Peer:
+    // Peer macros are allowed on everything except parameters.
+    if (!isa<ParamDecl>(attachedTo))
+      return false;
+
+    break;
+
+  case MacroRole::Conformance:
+  case MacroRole::Extension:
+    // Only primary declarations of nominal types
+    if (isa<NominalTypeDecl>(attachedTo))
+      return false;
+
+    break;
+
+  case MacroRole::Preamble:
+  case MacroRole::Body:
+    // Only function declarations.
+    if (isa<AbstractFunctionDecl>(attachedTo))
+      return false;
+
+    break;
+  }
+
+  return true;
+}
+
+static void diagnoseInvalidDecl(Decl *decl,
+                                MacroDecl *macro,
+                                llvm::function_ref<bool(DeclName)> coversName) {
+  auto &ctx = decl->getASTContext();
+
+  // Diagnose invalid declaration kinds.
+  if (isa<ImportDecl>(decl) ||
+      isa<OperatorDecl>(decl) ||
+      isa<PrecedenceGroupDecl>(decl) ||
+      isa<MacroDecl>(decl) ||
+      isa<ExtensionDecl>(decl) ||
+      isa<UsingDecl>(decl)) {
+    decl->diagnose(diag::invalid_decl_in_macro_expansion, decl);
+    decl->setInvalid();
+
+    if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
+      extension->setExtendedNominal(nullptr);
+    }
+
+    return;
+  }
+
+  // Diagnose `@main` types.
+  if (auto *mainAttr = decl->getAttrs().getAttribute<MainTypeAttr>()) {
+    ctx.Diags.diagnose(mainAttr->getLocation(),
+                       diag::invalid_main_type_in_macro_expansion);
+    mainAttr->setInvalid();
+  }
+
+  // Diagnose default literal type overrides.
+  if (auto *typeAlias = dyn_cast<TypeAliasDecl>(decl)) {
+    auto name = typeAlias->getBaseIdentifier();
+#define EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(_, __, typeName,   \
+                                                supportsOverride)    \
+    if (supportsOverride && name == makeIdentifier(ctx, typeName)) { \
+      typeAlias->diagnose(diag::literal_type_in_macro_expansion,     \
+                          makeIdentifier(ctx, typeName));            \
+      typeAlias->setInvalid();                                       \
+      return;                                                        \
+    }
+#include "swift/AST/KnownProtocols.def"
+#undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
+  }
+
+  // Diagnose value decls with names not covered by the macro
+  if (auto *value = dyn_cast<ValueDecl>(decl)) {
+    auto name = value->getName();
+
+    // Unique names are always permitted.
+    if (MacroDecl::isUniqueMacroName(name.getBaseName().userFacingName()))
+      return;
+
+    if (coversName(name)) {
+      return;
+    }
+
+    value->diagnose(diag::invalid_macro_introduced_name,
+                    name, macro->getBaseName());
+  }
+}
+
+/// Diagnose macro expansions that produce any of the following declarations:
+///   - Import declarations
+///   - Operator and precedence group declarations
+///   - Macro declarations
+///   - Extensions
+///   - Types with `@main` attributes
+///   - Top-level default literal type overrides
+///   - Value decls with names not covered by the macro declaration.
+static void validateMacroExpansion(SourceFile *expansionBuffer,
+                                   MacroDecl *macro,
+                                   ValueDecl *attachedTo,
+                                   MacroRole role) {
+  // Gather macro-introduced names
+  llvm::SmallVector<DeclName, 2> introducedNames;
+  macro->getIntroducedNames(role, attachedTo, introducedNames);
+
+  llvm::SmallDenseSet<DeclName, 2> introducedNameSet(
+      introducedNames.begin(), introducedNames.end());
+
+  auto coversName = [&](DeclName name) -> bool {
+    return (introducedNameSet.count(name) ||
+            introducedNameSet.count(name.getBaseName()) ||
+            introducedNameSet.count(MacroDecl::getArbitraryName()));
+  };
+
+  for (auto item : expansionBuffer->getTopLevelItems()) {
+    auto &ctx = expansionBuffer->getASTContext();
+    auto *decl = item.dyn_cast<Decl *>();
+    if (!decl) {
+      if (role != MacroRole::CodeItem &&
+          role != MacroRole::Preamble &&
+          role != MacroRole::Body) {
+        ctx.Diags.diagnose(item.getStartLoc(),
+                           diag::expected_macro_expansion_decls);
+      }
+
+      continue;
+    }
+
+    // Certain macro roles can generate special declarations.
+    if (isa<AccessorDecl>(decl) && role == MacroRole::Accessor) {
+      auto *var = dyn_cast<VarDecl>(attachedTo);
+      if (var && var->isLet()) {
+        ctx.Diags.diagnose(var->getLoc(),
+                           diag::let_accessor_expansion)
+          .warnUntilSwiftVersion(6);
+      }
+
+      continue;
+    }
+
+    if (isa<ExtensionDecl>(decl) && role == MacroRole::Conformance) {
+      continue;
+    }
+
+    if (role == MacroRole::Extension) {
+      auto *extension = dyn_cast<ExtensionDecl>(decl);
+
+      for (auto *member : extension->getMembers()) {
+        diagnoseInvalidDecl(member, macro, coversName);
+      }
+
+      continue;
+    }
+
+    diagnoseInvalidDecl(decl, macro, coversName);
+  }
 }
 
 /// Determine whether the given source file is from an expansion of the given
@@ -369,16 +738,11 @@ static bool isFromExpansionOfMacro(SourceFile *sourceFile, MacroDecl *macro,
         return true;
     } else if (auto expansionDecl = dyn_cast_or_null<MacroExpansionDecl>(
             expansion.dyn_cast<Decl *>())) {
-      // FIXME: Update once MacroExpansionDecl has a proper macro reference
-      // in it.
-      if (expansionDecl->getMacro().getFullName() == macro->getName())
+      if (expansionDecl->getMacroRef().getDecl() == macro)
         return true;
     } else if (auto *macroAttr = sourceFile->getAttachedMacroAttribute()) {
       auto *decl = expansion.dyn_cast<Decl *>();
-      auto &ctx = decl->getASTContext();
-      auto *macroDecl = evaluateOrDefault(ctx.evaluator,
-          ResolveMacroRequest{macroAttr, role, decl->getDeclContext()},
-          nullptr);
+      auto *macroDecl = decl->getResolvedMacro(macroAttr);
       if (!macroDecl)
         return false;
 
@@ -394,28 +758,377 @@ static bool isFromExpansionOfMacro(SourceFile *sourceFile, MacroDecl *macro,
   return false;
 }
 
-Expr *swift::expandMacroExpr(
-    DeclContext *dc, Expr *expr, ConcreteDeclRef macroRef, Type expandedType
-) {
+/// Expand a macro definition.
+static std::string expandMacroDefinition(
+    ExpandedMacroDefinition def, MacroDecl *macro,
+    SubstitutionMap subs,
+    ArgumentList *args) {
+  ASTContext &ctx = macro->getASTContext();
+
+  std::string expandedResult;
+
+  StringRef originalText = def.getExpansionText();
+
+  unsigned startIdx = 0;
+  unsigned replacementsIdx = 0;
+  unsigned genericReplacementsIdx = 0;
+  auto totalReplacementsCount =
+      def.getReplacements().size() + def.getGenericReplacements().size();
+
+  while (replacementsIdx + genericReplacementsIdx < totalReplacementsCount) {
+    ExpandedMacroReplacement replacement;
+    bool isExpressionReplacement = true;
+
+    // Pick the "next" replacement, in order as they appear in the source text
+    auto canPickExpressionReplacement = replacementsIdx < def.getReplacements().size();
+    auto canPickGenericReplacement = genericReplacementsIdx < def.getGenericReplacements().size();
+    if (canPickExpressionReplacement && canPickGenericReplacement) {
+      auto expressionReplacement = def.getReplacements()[replacementsIdx];
+      auto genericReplacement =
+          def.getGenericReplacements()[genericReplacementsIdx];
+      isExpressionReplacement =
+          expressionReplacement.startOffset < genericReplacement.startOffset;
+      replacement =
+          isExpressionReplacement ? expressionReplacement : genericReplacement;
+    } else if (canPickExpressionReplacement) {
+      isExpressionReplacement = true;
+      replacement = def.getReplacements()[replacementsIdx];
+    } else if (canPickGenericReplacement) {
+      isExpressionReplacement = false;
+      replacement = def.getGenericReplacements()[replacementsIdx];
+    } else {
+      assert(false && "should always select a requirement explicitly rather "
+                      "than fall through");
+    }
+
+    replacementsIdx += isExpressionReplacement ? 1 : 0;
+    genericReplacementsIdx += isExpressionReplacement ? 0 : 1;
+
+    // Add the original text up to the first replacement.
+    expandedResult.append(originalText.begin() + startIdx,
+                          originalText.begin() + replacement.startOffset);
+
+    // Add the replacement text.
+    if (isExpressionReplacement) {
+      auto argExpr = args->getArgExprs()[replacement.parameterIndex];
+      SmallString<32> argTextBuffer;
+      auto argText = extractInlinableText(ctx, argExpr, argTextBuffer);
+      expandedResult.append(argText);
+    } else {
+      auto typeArgType = subs.getReplacementTypes()[replacement.parameterIndex];
+      std::string typeNameString;
+      llvm::raw_string_ostream os(typeNameString);
+      typeArgType.print(os);
+      expandedResult.append(typeNameString);
+    }
+
+    // Update the starting position.
+    startIdx = replacement.endOffset;
+  }
+
+  // Add the remaining text.
+  expandedResult.append(
+      originalText.begin() + startIdx,
+      originalText.end());
+
+  return expandedResult;
+}
+
+static GeneratedSourceInfo::Kind getGeneratedSourceInfoKind(MacroRole role) {
+  switch (role) {
+#define MACRO_ROLE(Name, Description)                 \
+  case MacroRole::Name:                               \
+    return GeneratedSourceInfo::Name##MacroExpansion;
+#include "swift/Basic/MacroRoles.def"
+  }
+}
+
+// If this storage declaration is a variable with an explicit initializer,
+// return the range from the `=` to the end of the explicit initializer.
+static std::optional<SourceRange>
+getExplicitInitializerRange(AbstractStorageDecl *storage) {
+  auto var = dyn_cast<VarDecl>(storage);
+  if (!var)
+    return std::nullopt;
+
+  auto pattern = var->getParentPatternBinding();
+  if (!pattern)
+    return std::nullopt;
+
+  unsigned index = pattern->getPatternEntryIndexForVarDecl(var);
+  SourceLoc equalLoc = pattern->getEqualLoc(index);
+  SourceRange initRange = pattern->getOriginalInitRange(index);
+  if (equalLoc.isInvalid() || initRange.End.isInvalid())
+    return std::nullopt;
+
+  return SourceRange(equalLoc, initRange.End);
+}
+
+/// Compute the original source range for expanding a preamble macro.
+static CharSourceRange getPreambleMacroOriginalRange(AbstractFunctionDecl *fn) {
+  ASTContext &ctx = fn->getASTContext();
+
+  SourceLoc insertionLoc;
+
+  // If there is a body macro, start at the beginning of it.
+  if (auto bodyBufferID = evaluateOrDefault(
+          ctx.evaluator, ExpandBodyMacroRequest{fn}, std::nullopt)) {
+    insertionLoc = ctx.SourceMgr.getRangeForBuffer(*bodyBufferID).getStart();
+  } else {
+    // If there is a parsed body, start at the beginning of it.
+    SourceRange range = fn->getBodySourceRange();
+    if (range.isValid()) {
+      insertionLoc = range.Start;
+    } else {
+      insertionLoc = fn->getEndLoc();
+    }
+  }
+
+  return CharSourceRange(insertionLoc, 0);
+}
+
+static CharSourceRange getExpansionInsertionRange(MacroRole role,
+                                                  ASTNode target,
+                                                  SourceManager &sourceMgr) {
+  switch (role) {
+  case MacroRole::Accessor: {
+    auto storage = cast<AbstractStorageDecl>(target.get<Decl *>());
+    auto bracesRange = storage->getBracesRange();
+
+    // Compute the location where the accessors will be added.
+    if (bracesRange.Start.isValid()) {
+      // We have braces already, so insert them inside the leading '{'.
+      return CharSourceRange(
+          Lexer::getLocForEndOfToken(sourceMgr, bracesRange.Start), 0);
+    } else if (auto initRange = getExplicitInitializerRange(storage)) {
+      // The accessor had an initializer, so the initializer (including
+      // the `=`) is replaced by the accessors.
+      return Lexer::getCharSourceRangeFromSourceRange(sourceMgr, *initRange);
+    } else {
+      // The accessors go at the end.
+      SourceLoc endLoc = storage->getEndLoc();
+      if (auto var = dyn_cast<VarDecl>(storage)) {
+        if (auto pattern = var->getParentPattern())
+          endLoc = pattern->getEndLoc();
+      }
+
+      return CharSourceRange(Lexer::getLocForEndOfToken(sourceMgr, endLoc), 0);
+    }
+  }
+  case MacroRole::MemberAttribute: {
+    SourceLoc startLoc;
+    if (auto valueDecl = dyn_cast<ValueDecl>(target.get<Decl *>()))
+      startLoc = valueDecl->getAttributeInsertionLoc(/*forModifier=*/true);
+    else
+      startLoc = target.getStartLoc();
+
+    return CharSourceRange(startLoc, 0);
+  }
+  case MacroRole::Member: {
+    // Semantically, we insert members right before the closing brace.
+    SourceLoc rightBraceLoc;
+    if (auto nominal = dyn_cast<NominalTypeDecl>(target.get<Decl *>())) {
+      rightBraceLoc = nominal->getBraces().End;
+    } else {
+      auto ext = cast<ExtensionDecl>(target.get<Decl *>());
+      rightBraceLoc = ext->getBraces().End;
+    }
+
+    return CharSourceRange(rightBraceLoc, 0);
+  }
+  case MacroRole::Peer: {
+    SourceLoc endLoc = target.getEndLoc();
+    if (auto var = dyn_cast<VarDecl>(target.get<Decl *>())) {
+      if (auto binding = var->getParentPatternBinding())
+        endLoc = binding->getEndLoc();
+    }
+    SourceLoc afterDeclLoc = Lexer::getLocForEndOfToken(sourceMgr, endLoc);
+    return CharSourceRange(afterDeclLoc, 0);
+    break;
+  }
+
+  case MacroRole::Conformance: {
+    SourceLoc afterDeclLoc =
+        Lexer::getLocForEndOfToken(sourceMgr, target.getEndLoc());
+    return CharSourceRange(afterDeclLoc, 0);
+  }
+
+  case MacroRole::Extension: {
+    // Extensions are expanded at the top-level.
+    auto *NTD = cast<NominalTypeDecl>(target.get<Decl *>());
+    auto *topLevelDecl = NTD->getTopmostDeclarationDeclContext();
+
+    SourceLoc afterDeclLoc =
+        Lexer::getLocForEndOfToken(sourceMgr, topLevelDecl->getEndLoc());
+    return CharSourceRange(afterDeclLoc, 0);
+  }
+
+  case MacroRole::Preamble: {
+    if (auto fn = dyn_cast<AbstractFunctionDecl>(target.get<Decl *>())) {
+      return getPreambleMacroOriginalRange(fn);
+    }
+
+    return CharSourceRange(Lexer::getLocForEndOfToken(sourceMgr, target.getEndLoc()), 0);
+  }
+
+  case MacroRole::Body: {
+    if (auto *expr = target.dyn_cast<Expr *>()) {
+      ASSERT(isa<ClosureExpr>(expr));
+
+      auto *closure = cast<ClosureExpr>(expr);
+      // A closure body macro expansion replaces the full source
+      // range of the closure body starting from `in` and ending right
+      // before the closing brace.
+      return Lexer::getCharSourceRangeFromSourceRange(
+          sourceMgr, SourceRange(Lexer::getLocForEndOfToken(
+                                     sourceMgr, closure->getInLoc()),
+                                 closure->getEndLoc()));
+    }
+
+    // If the function has a body, that's what's being replaced.
+    auto *AFD = cast<AbstractFunctionDecl>(target.get<Decl *>());
+    if (auto range = AFD->getBodySourceRange())
+      return Lexer::getCharSourceRangeFromSourceRange(sourceMgr, range);
+
+    // Otherwise we have no body, just use the end of the decl.
+    SourceLoc afterDeclLoc =
+        Lexer::getLocForEndOfToken(sourceMgr, target.getEndLoc());
+    return CharSourceRange(afterDeclLoc, 0);
+  }
+
+  case MacroRole::Expression:
+  case MacroRole::Declaration:
+  case MacroRole::CodeItem:
+    return Lexer::getCharSourceRangeFromSourceRange(sourceMgr,
+                                                    target.getSourceRange());
+  }
+  llvm_unreachable("unhandled MacroRole");
+}
+
+static SourceFile *
+createMacroSourceFile(std::unique_ptr<llvm::MemoryBuffer> buffer,
+                      MacroRole role, ASTNode target, DeclContext *dc,
+                      CustomAttr *attr) {
   ASTContext &ctx = dc->getASTContext();
   SourceManager &sourceMgr = ctx.SourceMgr;
 
+  // Dump macro expansions to standard output, if requested.
+  if (ctx.LangOpts.DumpMacroExpansions) {
+    llvm::errs() << buffer->getBufferIdentifier()
+                 << "\n------------------------------\n"
+                 << buffer->getBuffer()
+                 << "\n------------------------------\n";
+  }
+
+  CharSourceRange generatedOriginalSourceRange =
+      getExpansionInsertionRange(role, target, sourceMgr);
+  GeneratedSourceInfo::Kind generatedSourceKind =
+      getGeneratedSourceInfoKind(role);
+
+  /// Retrieve the macro name for a generated source info that represents
+  /// a macro expansion.
+  llvm::SmallString<64> macroName;
+  if (attr)
+    cast<DeclRefTypeRepr>(attr->getTypeRepr())
+        ->getNameRef()
+        .getFullName()
+        .getString(macroName);
+  else if (auto expansionExpr =
+               dyn_cast_or_null<MacroExpansionExpr>(target.dyn_cast<Expr *>()))
+    expansionExpr->getMacroName().getFullName().getString(macroName);
+  else if (auto expansionDecl =
+               dyn_cast_or_null<MacroExpansionDecl>(target.get<Decl *>()))
+    expansionDecl->getMacroName().getFullName().getString(macroName);
+
+  // Create a new source buffer with the contents of the expanded macro.
+  unsigned macroBufferID = sourceMgr.addNewSourceBuffer(std::move(buffer));
+  auto macroBufferRange = sourceMgr.getRangeForBuffer(macroBufferID);
+  GeneratedSourceInfo sourceInfo{generatedSourceKind,
+                                 generatedOriginalSourceRange,
+                                 macroBufferRange,
+                                 target.getOpaqueValue(),
+                                 dc,
+                                 attr,
+                                 macroName.c_str()
+  };
+  sourceMgr.setGeneratedSourceInfo(macroBufferID, sourceInfo);
+
+  // Create a source file to hold the macro buffer. This is automatically
+  // registered with the enclosing module.
+  auto macroSourceFile = new (ctx) SourceFile(
+      *dc->getParentModule(), SourceFileKind::MacroExpansion, macroBufferID,
+      /*parsingOpts=*/{}, /*isPrimary=*/false);
+  if (auto parentSourceFile = dc->getParentSourceFile())
+    macroSourceFile->setImports(parentSourceFile->getImports());
+  else if (auto clangModuleUnit =
+               dyn_cast<ClangModuleUnit>(dc->getModuleScopeContext())) {
+    auto clangModule = clangModuleUnit->getParentModule();
+    performImportResolutionForClangMacroBuffer(*macroSourceFile, clangModule);
+  }
+  return macroSourceFile;
+}
+
+#if SWIFT_BUILD_SWIFT_SYNTAX
+static uint8_t getRawMacroRole(MacroRole role) {
+  switch (role) {
+  case MacroRole::Expression: return 0;
+  case MacroRole::Declaration: return 1;
+  case MacroRole::Accessor: return 2;
+  case MacroRole::MemberAttribute: return 3;
+  case MacroRole::Member: return 4;
+  case MacroRole::Peer: return 5;
+  case MacroRole::CodeItem: return 7;
+  // Use the same raw macro role for conformance and extension
+  // in ASTGen.
+  case MacroRole::Conformance:
+  case MacroRole::Extension: return 8;
+  case MacroRole::Preamble: return 9;
+  case MacroRole::Body: return 10;
+  }
+}
+#endif // SWIFT_BUILD_SWIFT_SYNTAX
+
+/// Evaluate the given freestanding macro expansion.
+static SourceFile *
+evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
+                          StringRef discriminatorStr = "") {
+  auto *dc = expansion->getDeclContext();
+  ASTContext &ctx = dc->getASTContext();
+  SourceLoc loc = expansion->getPoundLoc();
+
   auto moduleDecl = dc->getParentModule();
-  auto sourceFile = moduleDecl->getSourceFileContainingLocation(expr->getLoc());
+  auto sourceFile = moduleDecl->getSourceFileContainingLocation(loc);
   if (!sourceFile)
     return nullptr;
 
-  // Evaluate the macro.
-  NullTerminatedStringRef evaluatedSource;
+  MacroDecl *macro = cast<MacroDecl>(expansion->getMacroRef().getDecl());
+  auto macroRoles = macro->getMacroRoles();
+  assert(macroRoles.contains(MacroRole::Expression) ||
+         macroRoles.contains(MacroRole::Declaration) ||
+         macroRoles.contains(MacroRole::CodeItem));
 
-  MacroDecl *macro = cast<MacroDecl>(macroRef.getDecl());
-
-  if (isFromExpansionOfMacro(sourceFile, macro, MacroRole::Expression)) {
-    ctx.Diags.diagnose(expr->getLoc(), diag::macro_recursive, macro->getName());
+  if (isFromExpansionOfMacro(sourceFile, macro, MacroRole::Expression) ||
+      isFromExpansionOfMacro(sourceFile, macro, MacroRole::Declaration) ||
+      isFromExpansionOfMacro(sourceFile, macro, MacroRole::CodeItem)) {
+    ctx.Diags.diagnose(loc, diag::macro_recursive, macro->getName());
     return nullptr;
   }
 
-  std::string discriminator;
+  // Evaluate the macro.
+  std::unique_ptr<llvm::MemoryBuffer> evaluatedSource;
+
+  /// The discriminator used for the macro.
+  LazyValue<std::string> discriminator([&]() -> std::string {
+    if (!discriminatorStr.empty())
+      return discriminatorStr.str();
+#if SWIFT_BUILD_SWIFT_SYNTAX
+    Mangle::ASTMangler mangler(macro->getASTContext());
+    return mangler.mangleMacroExpansion(expansion);
+#else
+    return "";
+#endif
+  });
+
   auto macroDef = macro->getDefinition();
   switch (macroDef.kind) {
   case MacroDefinition::Kind::Undefined:
@@ -426,120 +1139,161 @@ Expr *swift::expandMacroExpr(
   case MacroDefinition::Kind::Builtin: {
     switch (macroDef.getBuiltinKind()) {
     case BuiltinMacroKind::ExternalMacro:
-        ctx.Diags.diagnose(
-            expr->getLoc(), diag::external_macro_outside_macro_definition);
+      ctx.Diags.diagnose(loc, diag::external_macro_outside_macro_definition);
       return nullptr;
+
+    case BuiltinMacroKind::IsolationMacro: {
+      // Create a buffer with "nil" plus a bunch of scratch space. This
+      // will be populated much later.
+      std::string scratchSpace = "nil";
+      scratchSpace.append(125, ' ');
+      evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
+          scratchSpace,
+          adjustMacroExpansionBufferName(*discriminator));
+      break;
     }
+    }
+    break;
+  }
+
+  case MacroDefinition::Kind::Expanded: {
+    // Expand the definition with the given arguments.
+    auto result = expandMacroDefinition(macroDef.getExpanded(), macro,
+                                        expansion->getMacroRef().getSubstitutions(),
+                                        expansion->getArgs());
+    evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
+        result, adjustMacroExpansionBufferName(*discriminator));
+    break;
   }
 
   case MacroDefinition::Kind::External: {
     // Retrieve the external definition of the macro.
     auto external = macroDef.getExternalMacro();
-    ExternalMacroDefinitionRequest request{
-      &ctx, external.moduleName, external.macroTypeName
-    };
-    auto externalDef = evaluateOrDefault(
-        ctx.evaluator, request, ExternalMacroDefinition()
-    );
-    if (!externalDef.opaqueHandle) {
-      ctx.Diags.diagnose(
-         expr->getLoc(), diag::external_macro_not_found,
-         external.moduleName.str(),
-         external.macroTypeName.str(),
-         macro->getName()
-      );
-      macro->diagnose(diag::decl_declared_here, macro->getName());
+    ExternalMacroDefinitionRequest request{&ctx, external.moduleName,
+                                           external.macroTypeName};
+    auto externalDef =
+        evaluateOrDefault(ctx.evaluator, request,
+                          ExternalMacroDefinition::error("request error"));
+    if (externalDef.isError()) {
+      ctx.Diags.diagnose(loc, diag::external_macro_not_found,
+                         external.moduleName.str(),
+                         external.macroTypeName.str(), macro->getName(),
+                         externalDef.getErrorMessage());
+      macro->diagnose(diag::decl_declared_here, macro);
       return nullptr;
     }
 
-    // Make sure macros are enabled before we expand.
-    if (!ctx.LangOpts.hasFeature(Feature::Macros)) {
-      ctx.Diags.diagnose(expr->getLoc(), diag::macro_experimental);
+    // Code item macros require `CodeItemMacros` feature flag.
+    if (macroRoles.contains(MacroRole::CodeItem) &&
+        !ctx.LangOpts.hasFeature(Feature::CodeItemMacros)) {
+      ctx.Diags.diagnose(loc, diag::macro_experimental, "code item",
+                         "CodeItemMacros");
       return nullptr;
     }
 
-#if SWIFT_SWIFT_PARSER
-    PrettyStackTraceExpr debugStack(ctx, "expanding macro", expr);
+#if SWIFT_BUILD_SWIFT_SYNTAX
+    // Only one freestanding macro role is permitted, so look at the roles to
+    // figure out which one to use.
+    MacroRole macroRole =
+      macroRoles.contains(MacroRole::Expression) ? MacroRole::Expression
+      : macroRoles.contains(MacroRole::Declaration) ? MacroRole::Declaration
+      : MacroRole::CodeItem;
+
+    PrettyStackTraceFreestandingMacroExpansion debugStack(
+        "expanding freestanding macro", expansion);
 
     // Builtin macros are handled via ASTGen.
-    auto astGenSourceFile = sourceFile->exportedSourceFile;
+    auto *astGenSourceFile = sourceFile->getExportedSourceFile();
     if (!astGenSourceFile)
       return nullptr;
 
-    if (auto expansionExpr = dyn_cast<MacroExpansionExpr>(expr)) {
-      Mangle::ASTMangler mangler;
-      discriminator = mangler.mangleMacroExpansion(expansionExpr);
-    }
-
-    const char *evaluatedSourceAddress;
-    ptrdiff_t evaluatedSourceLength;
-    swift_ASTGen_expandFreestandingMacro(
-        &ctx.Diags,
-        externalDef.opaqueHandle,
-        discriminator.data(), discriminator.size(),
-        astGenSourceFile, expr->getStartLoc().getOpaquePointerValue(),
-        &evaluatedSourceAddress, &evaluatedSourceLength);
-    if (!evaluatedSourceAddress)
+    BridgedStringRef evaluatedSourceOut{nullptr, 0};
+    assert(!externalDef.isError());
+    swift_Macros_expandFreestandingMacro(
+        &ctx.Diags, externalDef.get(), discriminator->c_str(),
+        getRawMacroRole(macroRole), astGenSourceFile,
+        expansion->getSourceRange().Start.getOpaquePointerValue(),
+        &evaluatedSourceOut);
+    if (!evaluatedSourceOut.unbridged().data())
       return nullptr;
-    evaluatedSource = NullTerminatedStringRef(evaluatedSourceAddress,
-                                              (size_t)evaluatedSourceLength);
+    evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
+        evaluatedSourceOut.unbridged(),
+        adjustMacroExpansionBufferName(*discriminator));
+    swift_ASTGen_freeBridgedString(evaluatedSourceOut);
     break;
 #else
-    ctx.Diags.diagnose(expr->getLoc(), diag::macro_unsupported);
+    ctx.Diags.diagnose(loc, diag::macro_unsupported);
     return nullptr;
 #endif
   }
   }
 
-  // Figure out a reasonable name for the macro expansion buffer.
-  std::string bufferName;
-  if (discriminator.empty())
-    bufferName = "macro-expansion";
-  else {
-    bufferName = adjustMacroExpansionBufferName(discriminator);
-  }
+  return createMacroSourceFile(std::move(evaluatedSource),
+                               isa<MacroExpansionDecl>(expansion)
+                                   ? MacroRole::Declaration
+                                   : MacroRole::Expression,
+                               expansion->getASTNode(), dc,
+                               /*attr=*/nullptr);
+}
 
-  // Dump macro expansions to standard output, if requested.
-  if (ctx.LangOpts.DumpMacroExpansions) {
-    llvm::errs() << bufferName << " as " << expandedType.getString()
-      << "\n------------------------------\n"
-      << evaluatedSource
-      << "\n------------------------------\n";
-  }
+std::optional<unsigned> swift::expandMacroExpr(MacroExpansionExpr *mee) {
+  SourceFile *macroSourceFile = ::evaluateFreestandingMacro(mee);
+  if (!macroSourceFile)
+    return std::nullopt;
 
-  // Create a new source buffer with the contents of the expanded macro.
-  auto macroBuffer =
-      llvm::MemoryBuffer::getMemBufferCopy(evaluatedSource, bufferName);
-  unsigned macroBufferID = sourceMgr.addNewSourceBuffer(std::move(macroBuffer));
+  DeclContext *dc = mee->getDeclContext();
+  ASTContext &ctx = dc->getASTContext();
+  SourceManager &sourceMgr = ctx.SourceMgr;
+
+  auto macroBufferID = macroSourceFile->getBufferID();
   auto macroBufferRange = sourceMgr.getRangeForBuffer(macroBufferID);
-  GeneratedSourceInfo sourceInfo{
-    GeneratedSourceInfo::ExpressionMacroExpansion,
-    expr->getSourceRange(),
-    SourceRange(macroBufferRange.getStart(), macroBufferRange.getEnd()),
-    ASTNode(expr).getOpaqueValue(),
-    dc
-  };
-  sourceMgr.setGeneratedSourceInfo(macroBufferID, sourceInfo);
-  free((void*)evaluatedSource.data());
 
-  // Create a source file to hold the macro buffer. This is automatically
-  // registered with the enclosing module.
-  auto macroSourceFile = new (ctx) SourceFile(
-      *dc->getParentModule(), SourceFileKind::MacroExpansion, macroBufferID,
-      /*parsingOpts=*/{}, /*isPrimary=*/false);
-  macroSourceFile->setImports(sourceFile->getImports());
-
-  // Retrieve the parsed expression from the list of top-level items.
-  auto topLevelItems = macroSourceFile->getTopLevelItems();
+  // Handle builtin macro definitions by producing the expression we
+  // need without parsing the buffer.
+  auto expandedType = mee->getType();
   Expr *expandedExpr = nullptr;
-  if (topLevelItems.size() == 1) {
-    expandedExpr = topLevelItems.front().dyn_cast<Expr *>();
+  auto macro = cast<MacroDecl>(mee->getMacroRef().getDecl());
+  switch (auto definition = macro->getDefinition()) {
+  case MacroDefinition::Kind::Expanded:
+  case MacroDefinition::Kind::External:
+  case MacroDefinition::Kind::Invalid:
+  case MacroDefinition::Kind::Undefined:
+    break;
+
+  case MacroDefinition::Kind::Builtin:
+    switch (definition.getBuiltinKind()) {
+    case BuiltinMacroKind::ExternalMacro:
+      break;
+
+    case BuiltinMacroKind::IsolationMacro:
+      expandedExpr = new (ctx) CurrentContextIsolationExpr(
+          macroBufferRange.getStart(), expandedType);
+      break;
+    }
+  }
+
+  if (!expandedExpr) {
+    // Parse the macro source file and retrieve the parsed expression
+    // from the list of top-level items.
+    auto topLevelItems = macroSourceFile->getTopLevelItems();
+    if (topLevelItems.size() != 1) {
+      ctx.Diags.diagnose(
+          macroBufferRange.getStart(), diag::expected_macro_expansion_expr);
+      return macroBufferID;
+    }
+
+    auto codeItem = topLevelItems.front();
+    if (auto *expr = codeItem.dyn_cast<Expr *>())
+      expandedExpr = expr;
+  } else {
+    // We produced the expanded expression via a builtin macro above,
+    // so there is nothing more we need to do.
   }
 
   if (!expandedExpr) {
     ctx.Diags.diagnose(
         macroBufferRange.getStart(), diag::expected_macro_expansion_expr);
-    return nullptr;
+    return macroBufferID;
   }
 
   // Type-check the expanded expression.
@@ -556,192 +1310,170 @@ Expr *swift::expandMacroExpr(
   Type realExpandedType = TypeChecker::typeCheckExpression(
       expandedExpr, dc, contextualType);
   if (!realExpandedType)
-    return nullptr;
+    return macroBufferID;
 
   assert((expandedType->isEqual(realExpandedType) ||
           realExpandedType->hasError()) &&
          "Type checking changed the result type?");
-  return expandedExpr;
+
+  mee->setRewritten(expandedExpr);
+
+  return macroBufferID;
 }
 
-/// Expands the given macro expansion declaration and type-check the result.
-bool swift::expandFreestandingDeclarationMacro(
-    MacroExpansionDecl *med, SmallVectorImpl<Decl *> &results) {
-  auto *dc = med->getDeclContext();
-  ASTContext &ctx = dc->getASTContext();
-  SourceManager &sourceMgr = ctx.SourceMgr;
-
-  auto moduleDecl = dc->getParentModule();
-  auto sourceFile = moduleDecl->getSourceFileContainingLocation(med->getLoc());
-  if (!sourceFile)
-    return false;
-
-  // Evaluate the macro.
-  NullTerminatedStringRef evaluatedSource;
+/// Expands the given macro expansion declaration.
+std::optional<unsigned>
+swift::expandFreestandingMacro(MacroExpansionDecl *med) {
+  SourceFile *macroSourceFile = ::evaluateFreestandingMacro(med);
+  if (!macroSourceFile)
+    return std::nullopt;
 
   MacroDecl *macro = cast<MacroDecl>(med->getMacroRef().getDecl());
-  assert(macro->getMacroRoles()
-             .contains(MacroRole::Declaration));
+  auto macroRoles = macro->getMacroRoles();
+  assert(macroRoles.contains(MacroRole::Declaration) ||
+         macroRoles.contains(MacroRole::CodeItem));
+  DeclContext *dc = med->getDeclContext();
 
-  if (isFromExpansionOfMacro(sourceFile, macro, MacroRole::Declaration)) {
-    med->diagnose(diag::macro_recursive, macro->getName());
-    return false;
-  }
-
-  auto macroDef = macro->getDefinition();
-  switch (macroDef.kind) {
-  case MacroDefinition::Kind::Undefined:
-  case MacroDefinition::Kind::Invalid:
-    // Already diagnosed as an error elsewhere.
-    return false;
-
-  case MacroDefinition::Kind::Builtin: {
-    switch (macroDef.getBuiltinKind()) {
-    case BuiltinMacroKind::ExternalMacro:
-      // FIXME: Error here.
-      return false;
-    }
-  }
-
-  case MacroDefinition::Kind::External: {
-    // Retrieve the external definition of the macro.
-    auto external = macroDef.getExternalMacro();
-    ExternalMacroDefinitionRequest request{
-        &ctx, external.moduleName, external.macroTypeName
-    };
-    auto externalDef = evaluateOrDefault(
-        ctx.evaluator, request, ExternalMacroDefinition()
-    );
-    if (!externalDef.opaqueHandle) {
-      med->diagnose(diag::external_macro_not_found,
-                    external.moduleName.str(),
-                    external.macroTypeName.str(),
-                    macro->getName()
-      );
-      macro->diagnose(diag::decl_declared_here, macro->getName());
-      return false;
-    }
-
-    // Make sure macros are enabled before we expand.
-    if (!ctx.LangOpts.hasFeature(Feature::Macros)) {
-      med->diagnose(diag::macro_experimental);
-      return false;
-    }
-
-#if SWIFT_SWIFT_PARSER
-    PrettyStackTraceDecl debugStack("expanding declaration macro", med);
-
-    // Builtin macros are handled via ASTGen.
-    auto astGenSourceFile = sourceFile->exportedSourceFile;
-    if (!astGenSourceFile)
-      return false;
-
-    Mangle::ASTMangler mangler;
-    auto discriminator = mangler.mangleMacroExpansion(med);
-
-    const char *evaluatedSourceAddress;
-    ptrdiff_t evaluatedSourceLength;
-    swift_ASTGen_expandFreestandingMacro(
-        &ctx.Diags,
-        externalDef.opaqueHandle,
-        discriminator.data(), discriminator.size(),
-        astGenSourceFile, med->getStartLoc().getOpaquePointerValue(),
-        &evaluatedSourceAddress, &evaluatedSourceLength);
-    if (!evaluatedSourceAddress)
-      return false;
-    evaluatedSource = NullTerminatedStringRef(evaluatedSourceAddress,
-                                              (size_t)evaluatedSourceLength);
-    break;
-#else
-    med->diagnose(diag::macro_unsupported);
-    return false;
-#endif
-  }
-  }
-
-  // Figure out a reasonable name for the macro expansion buffer.
-  std::string bufferName;
-  {
-    Mangle::ASTMangler mangler;
-    bufferName = adjustMacroExpansionBufferName(
-        mangler.mangleMacroExpansion(med));
-  }
-
-  // Dump macro expansions to standard output, if requested.
-  if (ctx.LangOpts.DumpMacroExpansions) {
-    llvm::errs() << bufferName
-                 << "\n------------------------------\n"
-                 << evaluatedSource
-                 << "\n------------------------------\n";
-  }
-
-  // Create a new source buffer with the contents of the expanded macro.
-  auto macroBuffer =
-      llvm::MemoryBuffer::getMemBufferCopy(evaluatedSource, bufferName);
-  unsigned macroBufferID = sourceMgr.addNewSourceBuffer(std::move(macroBuffer));
-  auto macroBufferRange = sourceMgr.getRangeForBuffer(macroBufferID);
-  GeneratedSourceInfo sourceInfo{
-      GeneratedSourceInfo::FreestandingDeclMacroExpansion,
-      med->getSourceRange(),
-      SourceRange(macroBufferRange.getStart(), macroBufferRange.getEnd()),
-      ASTNode(med).getOpaqueValue(),
-      dc
-  };
-  sourceMgr.setGeneratedSourceInfo(macroBufferID, sourceInfo);
-  free((void*)evaluatedSource.data());
-
-  // Create a source file to hold the macro buffer. This is automatically
-  // registered with the enclosing module.
-  auto macroSourceFile = new (ctx) SourceFile(
-      *dc->getParentModule(), SourceFileKind::MacroExpansion, macroBufferID,
-      /*parsingOpts=*/{}, /*isPrimary=*/false);
-  macroSourceFile->setImports(sourceFile->getImports());
+  validateMacroExpansion(macroSourceFile, macro,
+                         /*attachedTo*/nullptr,
+                         macroRoles.contains(MacroRole::Declaration) ?
+                             MacroRole::Declaration :
+                             MacroRole::CodeItem);
 
   PrettyStackTraceDecl debugStack(
       "type checking expanded declaration macro", med);
 
-  // Retrieve the parsed declarations from the list of top-level items.
   auto topLevelItems = macroSourceFile->getTopLevelItems();
   for (auto item : topLevelItems) {
-    auto *decl = item.dyn_cast<Decl *>();
-    if (!decl) {
-      ctx.Diags.diagnose(
-          macroBufferRange.getStart(), diag::expected_macro_expansion_decls);
-      return false;
-    }
-    decl->setDeclContext(dc);
-    TypeChecker::typeCheckDecl(decl);
-    results.push_back(decl);
+    if (auto *decl = item.dyn_cast<Decl *>())
+      decl->setDeclContext(dc);
   }
-  return true;
+  return macroSourceFile->getBufferID();
 }
 
-void swift::expandAccessors(
-    AbstractStorageDecl *storage, CustomAttr *attr, MacroDecl *macro
-) {
-  auto *dc = storage->getInnermostDeclContext();
+static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
+                                         CustomAttr *attr,
+                                         bool passParentContext, MacroRole role,
+                                         ArrayRef<ProtocolDecl *> conformances = {},
+                                         StringRef discriminatorStr = "") {
+  DeclContext *dc;
+  if (role == MacroRole::Peer) {
+    dc = attachedTo->getDeclContext();
+  } else if (role == MacroRole::Conformance || role == MacroRole::Extension) {
+    // Conformance macros always expand to extensions at file-scope.
+    dc = attachedTo->getDeclContext()->getParentSourceFile();
+  } else {
+    dc = attachedTo->getInnermostDeclContext();
+  }
+
+  // FIXME: compatibility hack for the transition from property wrapper
+  // to macro for TaskLocal.
+  //
+  // VarDecls with `@_projectedValueProperty` have already had the property
+  // wrapper transform applied. This only impacts swiftinterfaces, and if
+  // a swiftinterface was produced against a Concurrency library that does
+  // not declare TaskLocal as a macro, we need to ignore the macro to avoid
+  // producing duplicate declarations. This is only needed temporarily until
+  // all swiftinterfaces have been built against the Concurrency library
+  // containing the new macro declaration.
+  if (auto *var = dyn_cast<VarDecl>(attachedTo)) {
+    if (var->getAttrs().getAttribute<ProjectedValuePropertyAttr>()) {
+      return nullptr;
+    }
+  }
+
+  // Macros are so spectacularly not valid in an `@abi` attribute that we cannot
+  // even attempt to expand them.
+  if (!ABIRoleInfo(attachedTo).providesAPI()) {
+    return nullptr;
+  }
+
   ASTContext &ctx = dc->getASTContext();
-  SourceManager &sourceMgr = ctx.SourceMgr;
 
   auto moduleDecl = dc->getParentModule();
 
   auto attrSourceFile =
     moduleDecl->getSourceFileContainingLocation(attr->AtLoc);
   if (!attrSourceFile)
-    return;
+    return nullptr;
 
-  auto declSourceFile =
-      moduleDecl->getSourceFileContainingLocation(storage->getStartLoc());
+  // If the declaration comes from a Clang module,
+  // pretty-print the declaration and use that location.
+  SourceLoc attachedToLoc = attachedTo->getLoc();
+  bool isPrettyPrintedDecl = false;
+  if (isa<ClangModuleUnit>(dc->getModuleScopeContext())) {
+    isPrettyPrintedDecl = true;
+    attachedToLoc = evaluateOrDefault(
+        ctx.evaluator, PrettyPrintDeclRequest{attachedTo}, SourceLoc());
+  }
+
+  SourceFile *declSourceFile =
+      moduleDecl->getSourceFileContainingLocation(attachedToLoc);
   if (!declSourceFile)
-    return;
+    return nullptr;
+
+  Decl *parentDecl = nullptr;
+  SourceFile *parentDeclSourceFile = nullptr;
+  if (passParentContext) {
+    parentDecl = attachedTo->getDeclContext()->getAsDecl();
+    if (!parentDecl)
+      return nullptr;
+
+    parentDeclSourceFile =
+      moduleDecl->getSourceFileContainingLocation(parentDecl->getLoc());
+    if (!parentDeclSourceFile)
+      return nullptr;
+  }
+
+  if (isFromExpansionOfMacro(attrSourceFile, macro, role) ||
+      isFromExpansionOfMacro(declSourceFile, macro, role) ||
+      isFromExpansionOfMacro(parentDeclSourceFile, macro, role)) {
+    attachedTo->diagnose(diag::macro_recursive, macro->getName());
+    return nullptr;
+  }
 
   // Evaluate the macro.
-  NullTerminatedStringRef evaluatedSource;
+  std::unique_ptr<llvm::MemoryBuffer> evaluatedSource;
 
-  if (isFromExpansionOfMacro(attrSourceFile, macro, MacroRole::Accessor) ||
-      isFromExpansionOfMacro(declSourceFile, macro, MacroRole::Accessor)) {
-    storage->diagnose(diag::macro_recursive, macro->getName());
-    return;
+  /// The discriminator used for the macro.
+  LazyValue<std::string> discriminator([&]() -> std::string {
+    if (!discriminatorStr.empty())
+      return discriminatorStr.str();
+#if SWIFT_BUILD_SWIFT_SYNTAX
+    Mangle::ASTMangler mangler(attachedTo->getASTContext());
+    return mangler.mangleAttachedMacroExpansion(attachedTo, attr, role);
+#else
+    return "";
+#endif
+  });
+
+  std::string extendedType;
+  {
+    llvm::raw_string_ostream OS(extendedType);
+    if (role == MacroRole::Extension || role == MacroRole::Conformance) {
+      auto *nominal = dyn_cast<NominalTypeDecl>(attachedTo);
+      PrintOptions options;
+      options.FullyQualifiedExtendedTypesIfAmbiguous = true;
+      nominal->getDeclaredType()->print(OS, options);
+    } else {
+      OS << "";
+    }
+  }
+
+  std::string conformanceList;
+  {
+    llvm::raw_string_ostream OS(conformanceList);
+    if (role == MacroRole::Extension || role == MacroRole::Member) {
+      llvm::interleave(
+          conformances,
+          [&](const ProtocolDecl *protocol) {
+            protocol->getDeclaredType()->print(OS);
+          },
+          [&] { OS << ", "; }
+      );
+    } else {
+      OS << "";
+    }
   }
 
   auto macroDef = macro->getDefinition();
@@ -749,14 +1481,26 @@ void swift::expandAccessors(
   case MacroDefinition::Kind::Undefined:
   case MacroDefinition::Kind::Invalid:
     // Already diagnosed as an error elsewhere.
-    return;
+    return nullptr;
 
   case MacroDefinition::Kind::Builtin: {
     switch (macroDef.getBuiltinKind()) {
     case BuiltinMacroKind::ExternalMacro:
+    case BuiltinMacroKind::IsolationMacro:
       // FIXME: Error here.
-      return;
+      return nullptr;
     }
+  }
+
+  case MacroDefinition::Kind::Expanded: {
+    // Expand the definition with the given arguments.
+    auto result = expandMacroDefinition(
+        macroDef.getExpanded(), macro,
+        /*genericArgs=*/{}, // attached macros don't have generic parameters
+        attr->getArgs());
+    evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
+        result, adjustMacroExpansionBufferName(*discriminator));
+    break;
   }
 
   case MacroDefinition::Kind::External: {
@@ -765,541 +1509,870 @@ void swift::expandAccessors(
     ExternalMacroDefinitionRequest request{
         &ctx, external.moduleName, external.macroTypeName
     };
-    auto externalDef = evaluateOrDefault(
-        ctx.evaluator, request, ExternalMacroDefinition()
-    );
-    if (!externalDef.opaqueHandle) {
-      storage->diagnose(diag::external_macro_not_found,
-                        external.moduleName.str(),
-                        external.macroTypeName.str(),
-                        macro->getName()
-      );
-      macro->diagnose(diag::decl_declared_here, macro->getName());
-      return;
+    auto externalDef =
+        evaluateOrDefault(ctx.evaluator, request,
+                          ExternalMacroDefinition::error("failed request"));
+    if (externalDef.isError()) {
+      attachedTo->diagnose(diag::external_macro_not_found,
+                           external.moduleName.str(),
+                           external.macroTypeName.str(), macro->getName(),
+                           externalDef.getErrorMessage());
+      macro->diagnose(diag::decl_declared_here, macro);
+      return nullptr;
     }
 
-    // Make sure macros are enabled before we expand.
-    if (!ctx.LangOpts.hasFeature(Feature::Macros)) {
-      storage->diagnose(diag::macro_experimental);
-      return;
-    }
+#if SWIFT_BUILD_SWIFT_SYNTAX
+    PrettyStackTraceDecl debugStack("expanding attached macro", attachedTo);
 
-#if SWIFT_SWIFT_PARSER
-    PrettyStackTraceDecl debugStack("expanding accessor macro", storage);
-
-    auto astGenAttrSourceFile = attrSourceFile->exportedSourceFile;
+    auto *astGenAttrSourceFile = attrSourceFile->getExportedSourceFile();
     if (!astGenAttrSourceFile)
-      return;
+      return nullptr;
 
-    auto astGenDeclSourceFile = declSourceFile->exportedSourceFile;
+    auto *astGenDeclSourceFile = declSourceFile->getExportedSourceFile();
     if (!astGenDeclSourceFile)
-      return;
+      return nullptr;
 
-    Decl *searchDecl = storage;
-    if (auto var = dyn_cast<VarDecl>(storage))
+    void *astGenParentDeclSourceFile = nullptr;
+    const void *parentDeclLoc = nullptr;
+    if (passParentContext) {
+      astGenParentDeclSourceFile =
+          parentDeclSourceFile->getExportedSourceFile();
+      if (!astGenParentDeclSourceFile)
+        return nullptr;
+
+      parentDeclLoc = parentDecl->getStartLoc().getOpaquePointerValue();
+    }
+
+    Decl *searchDecl = attachedTo;
+    if (auto var = dyn_cast<VarDecl>(attachedTo))
       searchDecl = var->getParentPatternBinding();
 
-    const char *evaluatedSourceAddress;
-    ptrdiff_t evaluatedSourceLength;
-    swift_ASTGen_expandAttachedMacro(
-        &ctx.Diags,
-        externalDef.opaqueHandle,
-        static_cast<uint32_t>(MacroRole::Accessor),
+    auto startLoc = searchDecl->getStartLoc();
+    if (isPrettyPrintedDecl) {
+      startLoc = attachedToLoc;
+    }
+
+    BridgedStringRef evaluatedSourceOut{nullptr, 0};
+    assert(!externalDef.isError());
+    swift_Macros_expandAttachedMacro(
+        &ctx.Diags, externalDef.get(), discriminator->c_str(),
+        extendedType.c_str(), conformanceList.c_str(), getRawMacroRole(role),
         astGenAttrSourceFile, attr->AtLoc.getOpaquePointerValue(),
-        astGenDeclSourceFile, searchDecl->getStartLoc().getOpaquePointerValue(),
-        /*parentDeclSourceFile*/nullptr, /*parentDeclLoc*/nullptr,
-        &evaluatedSourceAddress, &evaluatedSourceLength);
-    if (!evaluatedSourceAddress)
-      return;
-    evaluatedSource = NullTerminatedStringRef(evaluatedSourceAddress,
-                                              (size_t)evaluatedSourceLength);
+        astGenDeclSourceFile, startLoc.getOpaquePointerValue(),
+        astGenParentDeclSourceFile, parentDeclLoc, &evaluatedSourceOut);
+    if (!evaluatedSourceOut.unbridged().data())
+      return nullptr;
+    evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
+        evaluatedSourceOut.unbridged(),
+        adjustMacroExpansionBufferName(*discriminator));
+    swift_ASTGen_freeBridgedString(evaluatedSourceOut);
     break;
 #else
-    storage->diagnose(diag::macro_unsupported);
-    return;
+    attachedTo->diagnose(diag::macro_unsupported);
+    return nullptr;
 #endif
   }
   }
 
-  // Figure out a reasonable name for the macro expansion buffer.
-  std::string bufferName;
-  {
-    llvm::raw_string_ostream out(bufferName);
+  SourceFile *macroSourceFile = createMacroSourceFile(
+      std::move(evaluatedSource), role, attachedTo, dc, attr);
 
-    out << "macro:" << storage->getName()
-        << "@" << macro->getName().getBaseName();
-    if (auto bufferID = declSourceFile->getBufferID()) {
-      unsigned startLine, startColumn;
-      std::tie(startLine, startColumn) =
-          sourceMgr.getLineAndColumnInBuffer(storage->getStartLoc(), *bufferID);
+  validateMacroExpansion(macroSourceFile, macro,
+                         dyn_cast<ValueDecl>(attachedTo), role);
+  return macroSourceFile;
+}
 
-      SourceLoc endLoc =
-          Lexer::getLocForEndOfToken(sourceMgr, storage->getEndLoc());
-      unsigned endLine, endColumn;
-      std::tie(endLine, endColumn) =
-          sourceMgr.getLineAndColumnInBuffer(endLoc, *bufferID);
+static SourceFile *evaluateAttachedMacro(MacroDecl *macro,
+                                         ClosureExpr *attachedTo,
+                                         CustomAttr *attr,
+                                         MacroRole role,
+                                         StringRef discriminatorStr = "") {
+  assert(role == MacroRole::Body);
 
-      out << ":" << sourceMgr.getIdentifierForBuffer(*bufferID) << ":"
-          << startLine << ":" << startColumn
-          << "-" << endLine << ":" << endColumn;
+  DeclContext *dc = attachedTo;
+  ASTContext &ctx = dc->getASTContext();
+  auto moduleDecl = dc->getParentModule();
+
+  auto attrSourceFile =
+    moduleDecl->getSourceFileContainingLocation(attr->AtLoc);
+  if (!attrSourceFile)
+    return nullptr;
+
+  SourceLoc attachedToLoc = attachedTo->getLoc();
+  SourceFile *closureSourceFile =
+      moduleDecl->getSourceFileContainingLocation(attachedToLoc);
+  if (!closureSourceFile)
+    return nullptr;
+
+  if (isFromExpansionOfMacro(attrSourceFile, macro, role) ||
+      isFromExpansionOfMacro(closureSourceFile, macro, role)) {
+    ctx.Diags.diagnose(attr->getLocation(),
+                       diag::macro_recursive,
+                       macro->getName());
+    return nullptr;
+  }
+
+  // Evaluate the macro.
+  std::unique_ptr<llvm::MemoryBuffer> evaluatedSource;
+
+  /// The discriminator used for the macro.
+  LazyValue<std::string> discriminator([&]() -> std::string {
+    if (!discriminatorStr.empty())
+      return discriminatorStr.str();
+#if SWIFT_BUILD_SWIFT_SYNTAX
+    Mangle::ASTMangler mangler(attachedTo->getASTContext());
+    return mangler.mangleAttachedMacroExpansion(
+        attachedTo, attr, macro);
+#else
+    return "";
+#endif
+  });
+
+  auto macroDef = macro->getDefinition();
+  switch (macroDef.kind) {
+  case MacroDefinition::Kind::Undefined:
+  case MacroDefinition::Kind::Invalid:
+    // Already diagnosed as an error elsewhere.
+    return nullptr;
+
+  case MacroDefinition::Kind::Builtin: {
+    switch (macroDef.getBuiltinKind()) {
+    case BuiltinMacroKind::ExternalMacro:
+    case BuiltinMacroKind::IsolationMacro:
+      // FIXME: Error here.
+      return nullptr;
     }
   }
 
-  // Dump macro expansions to standard output, if requested.
-  if (ctx.LangOpts.DumpMacroExpansions) {
-    llvm::errs() << bufferName
-                 << "\n------------------------------\n"
-                 << evaluatedSource
-                 << "\n------------------------------\n";
+  case MacroDefinition::Kind::Expanded: {
+    // Expand the definition with the given arguments.
+    auto result = expandMacroDefinition(
+        macroDef.getExpanded(), macro,
+        /*genericArgs=*/{}, // attached macros don't have generic parameters
+        attr->getArgs());
+    evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
+        result, adjustMacroExpansionBufferName(*discriminator));
+    break;
   }
 
-  // Create a new source buffer with the contents of the expanded macro.
-  auto macroBuffer =
-      llvm::MemoryBuffer::getMemBufferCopy(evaluatedSource, bufferName);
-  unsigned macroBufferID = sourceMgr.addNewSourceBuffer(std::move(macroBuffer));
-  auto macroBufferRange = sourceMgr.getRangeForBuffer(macroBufferID);
-  GeneratedSourceInfo sourceInfo{
-      GeneratedSourceInfo::AccessorMacroExpansion,
-      storage->getEndLoc(),
-      SourceRange(macroBufferRange.getStart(), macroBufferRange.getEnd()),
-      ASTNode(storage).getOpaqueValue(),
-      dc,
-      attr
-  };
-  sourceMgr.setGeneratedSourceInfo(macroBufferID, sourceInfo);
-  free((void*)evaluatedSource.data());
+  case MacroDefinition::Kind::External: {
+    // Retrieve the external definition of the macro.
+    auto external = macroDef.getExternalMacro();
+    ExternalMacroDefinitionRequest request{
+        &ctx, external.moduleName, external.macroTypeName
+    };
+    auto externalDef =
+        evaluateOrDefault(ctx.evaluator, request,
+                          ExternalMacroDefinition::error("failed request"));
+    if (externalDef.isError()) {
+      ctx.Diags.diagnose(attr->getLocation(),
+                         diag::external_macro_not_found,
+                         external.moduleName.str(),
+                         external.macroTypeName.str(), macro->getName(),
+                         externalDef.getErrorMessage());
+      macro->diagnose(diag::decl_declared_here, macro);
+      return nullptr;
+    }
 
-  // Create a source file to hold the macro buffer. This is automatically
-  // registered with the enclosing module.
-  auto macroSourceFile = new (ctx) SourceFile(
-      *dc->getParentModule(), SourceFileKind::MacroExpansion, macroBufferID,
-      /*parsingOpts=*/{}, /*isPrimary=*/false);
-  macroSourceFile->setImports(declSourceFile->getImports());
+#if SWIFT_BUILD_SWIFT_SYNTAX
+    PrettyStackTraceExpr debugStack(
+      ctx, "expanding attached macro", attachedTo);
+
+    auto *astGenAttrSourceFile = attrSourceFile->getExportedSourceFile();
+    if (!astGenAttrSourceFile)
+      return nullptr;
+
+    auto *astGenClosureSourceFile = closureSourceFile->getExportedSourceFile();
+    if (!astGenClosureSourceFile)
+      return nullptr;
+
+    auto startLoc = attachedTo->getStartLoc();
+    BridgedStringRef evaluatedSourceOut{nullptr, 0};
+    assert(!externalDef.isError());
+    swift_Macros_expandAttachedMacro(
+        &ctx.Diags, externalDef.get(), discriminator->c_str(),
+        "", "", getRawMacroRole(role),
+        astGenAttrSourceFile, attr->AtLoc.getOpaquePointerValue(),
+        astGenClosureSourceFile, startLoc.getOpaquePointerValue(),
+        /*parentDeclSourceFile*/nullptr, /*parentDeclLoc*/nullptr,
+        &evaluatedSourceOut);
+    if (!evaluatedSourceOut.unbridged().data())
+      return nullptr;
+    evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
+        evaluatedSourceOut.unbridged(),
+        adjustMacroExpansionBufferName(*discriminator));
+    swift_ASTGen_freeBridgedString(evaluatedSourceOut);
+    break;
+#else
+    ctx.Diags.diagnose(attachedTo->getLoc(),
+                       diag::macro_unsupported);
+    return nullptr;
+#endif
+  }
+  }
+
+  SourceFile *macroSourceFile = createMacroSourceFile(
+      std::move(evaluatedSource), role, attachedTo, dc, attr);
+
+  return macroSourceFile;
+}
+
+bool swift::accessorMacroOnlyIntroducesObservers(
+    MacroDecl *macro,
+    const MacroRoleAttr *attr
+) {
+  // Will this macro introduce observers?
+  bool foundObserver = false;
+  for (auto name : attr->getNames()) {
+    if (name.getKind() == MacroIntroducedDeclNameKind::Named &&
+        (name.getName().getBaseName().userFacingName() == "willSet" ||
+         name.getName().getBaseName().userFacingName() == "didSet" ||
+         name.getName().getBaseName().isConstructor())) {
+      foundObserver = true;
+    } else {
+      // Introduces something other than an observer.
+      return false;
+    }
+  }
+
+  if (foundObserver)
+    return true;
+
+  // WORKAROUND: Older versions of the Observation library make
+  // `ObservationIgnored` an accessor macro that implies that it makes a
+  // stored property computed. Override that, because we know it produces
+  // nothing.
+  if (macro->getName().getBaseName().userFacingName() == "ObservationIgnored") {
+    return true;
+  }
+
+  return false;
+}
+
+bool swift::accessorMacroIntroducesInitAccessor(
+    MacroDecl *macro, const MacroRoleAttr *attr
+) {
+  for (auto name : attr->getNames()) {
+    if (name.getKind() == MacroIntroducedDeclNameKind::Named &&
+        (name.getName().getBaseName().isConstructor()))
+      return true;
+  }
+
+  return false;
+}
+
+std::optional<unsigned> swift::expandAccessors(AbstractStorageDecl *storage,
+                                               CustomAttr *attr,
+                                               MacroDecl *macro) {
+  if (auto var = dyn_cast<VarDecl>(storage)) {
+    // Check that the variable is part of a single-variable pattern.
+    auto binding = var->getParentPatternBinding();
+    if (binding && binding->getSingleVar() != var) {
+      var->diagnose(diag::accessor_macro_not_single_var, macro->getName());
+      return std::nullopt;
+    }
+  }
+
+  // Evaluate the macro.
+  auto macroSourceFile =
+      ::evaluateAttachedMacro(macro, storage, attr,
+                              /*passParentContext=*/false, MacroRole::Accessor);
+  if (!macroSourceFile)
+    return std::nullopt;
 
   PrettyStackTraceDecl debugStack(
-      "type checking expanded declaration macro", storage);
+      "type checking expanded accessor macro", storage);
 
   // Trigger parsing of the sequence of accessor declarations. This has the
   // side effect of registering those accessor declarations with the storage
   // declaration, so there is nothing further to do.
-  (void)macroSourceFile->getTopLevelItems();
+  AccessorDecl *foundNonObservingAccessor = nullptr;
+  AccessorDecl *foundNonObservingAccessorInMacro = nullptr;
+  AccessorDecl *foundInitAccessor = nullptr;
+  for (auto accessor : storage->getAllAccessors()) {
+    if (accessor->isInitAccessor()) {
+      if (!foundInitAccessor)
+        foundInitAccessor = accessor;
+      continue;
+    }
+
+    if (!accessor->isObservingAccessor()) {
+      if (!foundNonObservingAccessor)
+        foundNonObservingAccessor = accessor;
+
+      if (!foundNonObservingAccessorInMacro &&
+          accessor->isInMacroExpansionInContext())
+        foundNonObservingAccessorInMacro = accessor;
+    }
+  }
+
+  auto roleAttr = macro->getMacroRoleAttr(MacroRole::Accessor);
+  bool expectObservers = accessorMacroOnlyIntroducesObservers(macro, roleAttr);
+  if (foundNonObservingAccessorInMacro) {
+    // If any non-observing accessor was added, mark the initializer as
+    // subsumed unless it has init accessor, because the initializer in
+    // such cases could be used for memberwise initialization.
+    if (auto var = dyn_cast<VarDecl>(storage)) {
+      if (auto binding = var->getParentPatternBinding();
+          !var->getAccessor(AccessorKind::Init)) {
+        unsigned index = binding->getPatternEntryIndexForVarDecl(var);
+        binding->setInitializerSubsumed(index);
+      }
+    }
+
+    // Also remove didSet and willSet, because they are subsumed by a
+    // macro expansion that turns a stored property into a computed one.
+    if (auto accessor = storage->getParsedAccessor(AccessorKind::WillSet))
+      storage->removeAccessor(accessor);
+    if (auto accessor = storage->getParsedAccessor(AccessorKind::DidSet))
+      storage->removeAccessor(accessor);
+  }
+
+  // If the macro told us to expect only observing accessors, but the macro
+  // produced a non-observing accessor, it could have converted a stored
+  // property into a computed one without telling us pre-expansion. Produce
+  // an error to prevent this.
+  if (expectObservers && foundNonObservingAccessorInMacro) {
+    storage->diagnose(diag::macro_nonobserver_unexpected_in_expansion, macro,
+                      foundNonObservingAccessorInMacro);
+  }
+
+  // We expected to get a non-observing accessor, but there isn't one (from
+  // the macro or elsewhere), meaning that we counted on this macro to make
+  // this stored property into a a computed property... but it didn't.
+  // Produce an error.
+  if (!expectObservers && !foundNonObservingAccessor) {
+    storage->diagnose(
+        diag::macro_nonobserving_accessor_missing_from_expansion,
+        macro->getName());
+  }
+
+  // 'init' accessors must be documented in the macro role attribute.
+  if (foundInitAccessor &&
+      !accessorMacroIntroducesInitAccessor(macro, roleAttr)) {
+    storage->diagnose(
+        diag::macro_init_accessor_not_documented, macro->getName());
+    // FIXME: Add the appropriate "names: named(init)".
+  }
+
+  return macroSourceFile->getBufferID();
 }
 
-// FIXME: Almost entirely duplicated code from `expandAccessors`.
-// Factor this out into an `expandAttachedMacro` function, with
-// arguments for the PrettyStackTrace string, 'attachedTo' decl, etc.
-bool swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member) {
-  auto *dc = member->getInnermostDeclContext();
-  ASTContext &ctx = dc->getASTContext();
-  SourceManager &sourceMgr = ctx.SourceMgr;
+ArrayRef<unsigned> ExpandAccessorMacros::evaluate(
+    Evaluator &evaluator, AbstractStorageDecl *storage
+) const {
+  llvm::SmallVector<unsigned, 1> bufferIDs;
+  storage->forEachAttachedMacro(MacroRole::Accessor,
+      [&](CustomAttr *customAttr, MacroDecl *macro) {
+        if (auto bufferID = expandAccessors(
+                storage, customAttr, macro))
+          bufferIDs.push_back(*bufferID);
+      });
 
-  auto moduleDecl = dc->getParentModule();
+  return storage->getASTContext().AllocateCopy(bufferIDs);
+}
 
-  auto attrSourceFile =
-    moduleDecl->getSourceFileContainingLocation(attr->AtLoc);
-  if (!attrSourceFile)
-    return false;
+ArrayRef<unsigned> ExpandPreambleMacroRequest::evaluate(
+    Evaluator &evaluator, AbstractFunctionDecl *fn) const {
+  llvm::SmallVector<unsigned, 1> bufferIDs;
+  fn->forEachAttachedMacro(MacroRole::Preamble,
+      [&](CustomAttr *customAttr, MacroDecl *macro) {
+        auto macroSourceFile = ::evaluateAttachedMacro(
+            macro, fn, customAttr, false, MacroRole::Preamble);
+        if (!macroSourceFile)
+          return;
 
-  auto declSourceFile =
-      moduleDecl->getSourceFileContainingLocation(member->getStartLoc());
-  if (!declSourceFile)
-    return false;
+        bufferIDs.push_back(macroSourceFile->getBufferID());
+      });
 
-  Decl *parentDecl = member->getDeclContext()->getAsDecl();
-  if (!parentDecl)
-    return false;
+  std::reverse(bufferIDs.begin(), bufferIDs.end());
+  return fn->getASTContext().AllocateCopy(bufferIDs);
+}
 
-  auto parentDeclSourceFile =
-    moduleDecl->getSourceFileContainingLocation(parentDecl->getLoc());
-  if (!parentDeclSourceFile)
-    return false;
+std::optional<unsigned>
+ExpandBodyMacroRequest::evaluate(Evaluator &evaluator,
+                                 AnyFunctionRef fn) const {
+  auto *dc = fn.getAsDeclContext();
+  auto &ctx = dc->getASTContext();
+  std::optional<unsigned> bufferID;
+  fn.forEachAttachedMacro(
+      MacroRole::Body,
+      [&](CustomAttr *customAttr, MacroDecl *macro) {
+        // FIXME: Should we complain if we already expanded a body macro?
+        if (bufferID)
+          return;
 
+        // '@Task' is gated behind the 'ConcurrencySyntaxSugar'
+        // experimental feature.
+        if (macro->getParentModule()->getName().is("_Concurrency") &&
+            macro->getBaseIdentifier().is("Task") &&
+            !ctx.LangOpts.hasFeature(Feature::ConcurrencySyntaxSugar)) {
+          ctx.Diags.diagnose(
+              customAttr->getLocation(),
+              diag::experimental_macro,
+              macro->getName());
+          return;
+        }
+
+        SourceFile * macroSourceFile = nullptr;
+        if (auto *fnDecl = fn.getAbstractFunctionDecl()) {
+          macroSourceFile = ::evaluateAttachedMacro(
+              macro, fnDecl, customAttr, false, MacroRole::Body);
+        } else if (auto *closure =
+            dyn_cast_or_null<ClosureExpr>(fn.getAbstractClosureExpr())) {
+          macroSourceFile = ::evaluateAttachedMacro(
+              macro, closure, customAttr, MacroRole::Body);
+        }
+
+        if (!macroSourceFile)
+          return;
+
+        bufferID = macroSourceFile->getBufferID();
+      });
+
+  return bufferID;
+}
+
+std::optional<unsigned>
+swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member) {
   // Evaluate the macro.
-  NullTerminatedStringRef evaluatedSource;
-
-  if (isFromExpansionOfMacro(attrSourceFile, macro, MacroRole::MemberAttribute) ||
-      isFromExpansionOfMacro(declSourceFile, macro, MacroRole::MemberAttribute)) {
-    member->diagnose(diag::macro_recursive, macro->getName());
-    return false;
-  }
-
-  auto macroDef = macro->getDefinition();
-  switch (macroDef.kind) {
-  case MacroDefinition::Kind::Undefined:
-  case MacroDefinition::Kind::Invalid:
-    // Already diagnosed as an error elsewhere.
-    return false;
-
-  case MacroDefinition::Kind::Builtin: {
-    switch (macroDef.getBuiltinKind()) {
-    case BuiltinMacroKind::ExternalMacro:
-      // FIXME: Error here.
-      return false;
-    }
-  }
-
-  case MacroDefinition::Kind::External: {
-    // Retrieve the external definition of the macro.
-    auto external = macroDef.getExternalMacro();
-    ExternalMacroDefinitionRequest request{
-        &ctx, external.moduleName, external.macroTypeName
-    };
-    auto externalDef = evaluateOrDefault(
-        ctx.evaluator, request, ExternalMacroDefinition()
-    );
-    if (!externalDef.opaqueHandle) {
-      member->diagnose(diag::external_macro_not_found,
-                        external.moduleName.str(),
-                        external.macroTypeName.str(),
-                        macro->getName()
-      );
-      macro->diagnose(diag::decl_declared_here, macro->getName());
-      return false;
-    }
-
-    // Make sure macros are enabled before we expand.
-    if (!ctx.LangOpts.hasFeature(Feature::Macros)) {
-      member->diagnose(diag::macro_experimental);
-      return false;
-    }
-
-#if SWIFT_SWIFT_PARSER
-    PrettyStackTraceDecl debugStack("expanding attribute macro", member);
-
-    auto astGenAttrSourceFile = attrSourceFile->exportedSourceFile;
-    if (!astGenAttrSourceFile)
-      return false;
-
-    auto astGenDeclSourceFile = declSourceFile->exportedSourceFile;
-    if (!astGenDeclSourceFile)
-      return false;
-
-    auto astGenParentDeclSourceFile = parentDeclSourceFile->exportedSourceFile;
-    if (!astGenParentDeclSourceFile)
-      return false;
-
-    Decl *searchDecl = member;
-    if (auto *var = dyn_cast<VarDecl>(member))
-      searchDecl = var->getParentPatternBinding();
-
-    const char *evaluatedSourceAddress;
-    ptrdiff_t evaluatedSourceLength;
-    swift_ASTGen_expandAttachedMacro(
-        &ctx.Diags,
-        externalDef.opaqueHandle,
-        static_cast<uint32_t>(MacroRole::MemberAttribute),
-        astGenAttrSourceFile, attr->AtLoc.getOpaquePointerValue(),
-        astGenDeclSourceFile, searchDecl->getStartLoc().getOpaquePointerValue(),
-        astGenParentDeclSourceFile, parentDecl->getStartLoc().getOpaquePointerValue(),
-        &evaluatedSourceAddress, &evaluatedSourceLength);
-    if (!evaluatedSourceAddress)
-      return false;
-    evaluatedSource = NullTerminatedStringRef(evaluatedSourceAddress,
-                                              (size_t)evaluatedSourceLength);
-    break;
-#else
-    member->diagnose(diag::macro_unsupported);
-    return false;
-#endif
-  }
-  }
-
-  // Figure out a reasonable name for the macro expansion buffer.
-  std::string bufferName;
-  {
-    llvm::raw_string_ostream out(bufferName);
-
-    out << "macro:" // << member->getDescriptiveK()
-        << "@" << macro->getName().getBaseName();
-    if (auto bufferID = declSourceFile->getBufferID()) {
-      unsigned startLine, startColumn;
-      std::tie(startLine, startColumn) =
-          sourceMgr.getLineAndColumnInBuffer(member->getStartLoc(), *bufferID);
-
-      SourceLoc endLoc =
-          Lexer::getLocForEndOfToken(sourceMgr, member->getEndLoc());
-      unsigned endLine, endColumn;
-      std::tie(endLine, endColumn) =
-          sourceMgr.getLineAndColumnInBuffer(endLoc, *bufferID);
-
-      out << ":" << sourceMgr.getIdentifierForBuffer(*bufferID) << ":"
-          << startLine << ":" << startColumn
-          << "-" << endLine << ":" << endColumn;
-    }
-  }
-
-  // Dump macro expansions to standard output, if requested.
-  if (ctx.LangOpts.DumpMacroExpansions) {
-    llvm::errs() << bufferName
-                 << "\n------------------------------\n"
-                 << evaluatedSource
-                 << "\n------------------------------\n";
-  }
-
-  // Create a new source buffer with the contents of the expanded macro.
-  auto macroBuffer =
-      llvm::MemoryBuffer::getMemBufferCopy(evaluatedSource, bufferName);
-  unsigned macroBufferID = sourceMgr.addNewSourceBuffer(std::move(macroBuffer));
-  auto macroBufferRange = sourceMgr.getRangeForBuffer(macroBufferID);
-  GeneratedSourceInfo sourceInfo{
-      GeneratedSourceInfo::MemberAttributeMacroExpansion,
-      member->getEndLoc(),
-      SourceRange(macroBufferRange.getStart(), macroBufferRange.getEnd()),
-      ASTNode(member).getOpaqueValue(),
-      dc,
-      attr
-  };
-  sourceMgr.setGeneratedSourceInfo(macroBufferID, sourceInfo);
-  free((void*)evaluatedSource.data());
-
-  // Create a source file to hold the macro buffer. This is automatically
-  // registered with the enclosing module.
-  auto macroSourceFile = new (ctx) SourceFile(
-      *dc->getParentModule(), SourceFileKind::MacroExpansion, macroBufferID,
-      /*parsingOpts=*/{}, /*isPrimary=*/false);
-  macroSourceFile->setImports(declSourceFile->getImports());
+  auto macroSourceFile = ::evaluateAttachedMacro(macro, member, attr,
+                                                 /*passParentContext=*/true,
+                                                 MacroRole::MemberAttribute);
+  if (!macroSourceFile)
+    return std::nullopt;
 
   PrettyStackTraceDecl debugStack(
       "type checking expanded declaration macro", member);
 
-  bool addedAttributes = false;
   auto topLevelDecls = macroSourceFile->getTopLevelDecls();
   for (auto decl : topLevelDecls) {
-    // FIXME: We want to type check decl attributes applied to
-    // the real declaration, ideally by appending the new attributes
-    // to the result and changing TypeChecker::checkDeclAttributes
-    // to use the semantic attribute list.
-    decl->setDeclContext(dc);
-    TypeChecker::typeCheckDecl(decl);
-
     // Add the new attributes to the semantic attribute list.
-    for (auto *attr : decl->getAttrs()) {
-      addedAttributes = true;
+    SmallVector<DeclAttribute *, 2> attrs(decl->getAttrs().begin(),
+                                          decl->getAttrs().end());
+    for (auto *attr : attrs) {
       member->getAttrs().add(attr);
     }
   }
 
-  return addedAttributes;
+  return macroSourceFile->getBufferID();
 }
 
-bool swift::expandMembers(CustomAttr *attr, MacroDecl *macro, Decl *decl) {
-  auto *dc = decl->getInnermostDeclContext();
-  ASTContext &ctx = dc->getASTContext();
-  SourceManager &sourceMgr = ctx.SourceMgr;
-  auto moduleDecl = dc->getParentModule();
+// Collect the protocol conformances that the macro asked about but were
+// not already present on the declaration.
+static TinyPtrVector<ProtocolDecl *> getIntroducedConformances(
+    NominalTypeDecl *nominal, MacroRole role, MacroDecl *macro,
+    SmallVectorImpl<ProtocolDecl *> *potentialConformances = nullptr) {
+  SmallVector<ProtocolDecl *, 2> potentialConformancesBuffer;
+  if (!potentialConformances)
+    potentialConformances = &potentialConformancesBuffer;
+  macro->getIntroducedConformances(nominal, role, *potentialConformances);
 
-  auto attrSourceFile =
-    moduleDecl->getSourceFileContainingLocation(attr->AtLoc);
-  if (!attrSourceFile)
-    return false;
+  TinyPtrVector<ProtocolDecl *> introducedConformances;
+  for (auto protocol : *potentialConformances) {
+    SmallVector<ProtocolConformance *, 2> existingConformances;
+    nominal->lookupConformance(protocol, existingConformances);
 
-  auto declSourceFile =
-      moduleDecl->getSourceFileContainingLocation(decl->getStartLoc());
-  if (!declSourceFile)
-    return false;
+    bool hasExistingConformance = llvm::any_of(
+        existingConformances,
+        [&](ProtocolConformance *conformance) {
+          // The conformance is coming from a macro expansion, so ignore it.
+          if (conformance->getSourceKind() ==
+                ConformanceEntryKind::PreMacroExpansion)
+            return false;
+
+          // Check whether the conformance comes from an extension defined by
+          // a macro.
+          if (auto conformingExt =
+                  dyn_cast<ExtensionDecl>(conformance->getDeclContext())) {
+            if (conformingExt->isInMacroExpansionInContext())
+              return false;
+          }
+
+          return true;
+        });
+
+    if (!hasExistingConformance) {
+      introducedConformances.push_back(protocol);
+    }
+  }
+
+  return introducedConformances;
+}
+
+std::optional<unsigned> swift::expandMembers(CustomAttr *attr, MacroDecl *macro,
+                                             Decl *decl) {
+  auto nominal = dyn_cast<NominalTypeDecl>(decl);
+  if (!nominal) {
+    auto ext = dyn_cast<ExtensionDecl>(decl);
+    if (!ext)
+      return std::nullopt;
+
+    nominal = ext->getExtendedNominal();
+    if (!nominal)
+      return std::nullopt;
+  }
+  auto introducedConformances = getIntroducedConformances(
+      nominal, MacroRole::Member, macro);
 
   // Evaluate the macro.
-  NullTerminatedStringRef evaluatedSource;
-
-  if (isFromExpansionOfMacro(attrSourceFile, macro, MacroRole::Member) ||
-      isFromExpansionOfMacro(declSourceFile, macro, MacroRole::Member)) {
-    decl->diagnose(diag::macro_recursive, macro->getName());
-    return false;
-  }
-
-  auto macroDef = macro->getDefinition();
-  switch (macroDef.kind) {
-  case MacroDefinition::Kind::Undefined:
-  case MacroDefinition::Kind::Invalid:
-    // Already diagnosed as an error elsewhere.
-    return false;
-
-  case MacroDefinition::Kind::Builtin: {
-    switch (macroDef.getBuiltinKind()) {
-    case BuiltinMacroKind::ExternalMacro:
-      // FIXME: Error here.
-      return false;
-    }
-  }
-
-  case MacroDefinition::Kind::External: {
-    // Retrieve the external definition of the macro.
-    auto external = macroDef.getExternalMacro();
-    ExternalMacroDefinitionRequest request{
-        &ctx, external.moduleName, external.macroTypeName
-    };
-    auto externalDef = evaluateOrDefault(
-        ctx.evaluator, request, ExternalMacroDefinition()
-    );
-    if (!externalDef.opaqueHandle) {
-      decl->diagnose(diag::external_macro_not_found,
-                     external.moduleName.str(),
-                     external.macroTypeName.str(),
-                     macro->getName()
-      );
-      macro->diagnose(diag::decl_declared_here, macro->getName());
-      return false;
-    }
-
-    // Make sure macros are enabled before we expand.
-    if (!ctx.LangOpts.hasFeature(Feature::Macros)) {
-      decl->diagnose(diag::macro_experimental);
-      return false;
-    }
-
-#if SWIFT_SWIFT_PARSER
-    PrettyStackTraceDecl debugStack("expanding attribute macro", decl);
-
-    auto astGenAttrSourceFile = attrSourceFile->exportedSourceFile;
-    if (!astGenAttrSourceFile)
-      return false;
-
-    auto astGenDeclSourceFile = declSourceFile->exportedSourceFile;
-    if (!astGenDeclSourceFile)
-      return false;
-
-    const char *evaluatedSourceAddress;
-    ptrdiff_t evaluatedSourceLength;
-    swift_ASTGen_expandAttachedMacro(
-        &ctx.Diags,
-        externalDef.opaqueHandle,
-        static_cast<uint32_t>(MacroRole::Member),
-        astGenAttrSourceFile, attr->AtLoc.getOpaquePointerValue(),
-        astGenDeclSourceFile, decl->getStartLoc().getOpaquePointerValue(),
-        /*parentDeclSourceFile*/nullptr, /*parentDeclLoc*/nullptr,
-        &evaluatedSourceAddress, &evaluatedSourceLength);
-    if (!evaluatedSourceAddress)
-      return false;
-    evaluatedSource = NullTerminatedStringRef(evaluatedSourceAddress,
-                                              (size_t)evaluatedSourceLength);
-    break;
-#else
-    decl->diagnose(diag::macro_unsupported);
-    return false;
-#endif
-  }
-  }
-
-  // Figure out a reasonable name for the macro expansion buffer.
-  std::string bufferName;
-  {
-    llvm::raw_string_ostream out(bufferName);
-
-    out << "macro:"
-        << "@" << macro->getName().getBaseName();
-    if (auto bufferID = declSourceFile->getBufferID()) {
-      unsigned startLine, startColumn;
-      std::tie(startLine, startColumn) =
-          sourceMgr.getLineAndColumnInBuffer(decl->getStartLoc(), *bufferID);
-
-      SourceLoc endLoc =
-          Lexer::getLocForEndOfToken(sourceMgr, decl->getEndLoc());
-      unsigned endLine, endColumn;
-      std::tie(endLine, endColumn) =
-          sourceMgr.getLineAndColumnInBuffer(endLoc, *bufferID);
-
-      out << ":" << sourceMgr.getIdentifierForBuffer(*bufferID) << ":"
-          << startLine << ":" << startColumn
-          << "-" << endLine << ":" << endColumn;
-    }
-  }
-
-  // Dump macro expansions to standard output, if requested.
-  if (ctx.LangOpts.DumpMacroExpansions) {
-    llvm::errs() << bufferName
-                 << "\n------------------------------\n"
-                 << evaluatedSource
-                 << "\n------------------------------\n";
-  }
-
-  // Create a new source buffer with the contents of the expanded macro.
-  auto macroBuffer =
-      llvm::MemoryBuffer::getMemBufferCopy(evaluatedSource, bufferName);
-  unsigned macroBufferID = sourceMgr.addNewSourceBuffer(std::move(macroBuffer));
-  auto macroBufferRange = sourceMgr.getRangeForBuffer(macroBufferID);
-  GeneratedSourceInfo sourceInfo{
-      GeneratedSourceInfo::MemberMacroExpansion,
-      decl->getEndLoc(),
-      SourceRange(macroBufferRange.getStart(), macroBufferRange.getEnd()),
-      ASTNode(decl).getOpaqueValue(),
-      dc,
-      attr
-  };
-  sourceMgr.setGeneratedSourceInfo(macroBufferID, sourceInfo);
-  free((void*)evaluatedSource.data());
-
-  // Create a source file to hold the macro buffer. This is automatically
-  // registered with the enclosing module.
-  auto macroSourceFile = new (ctx) SourceFile(
-      *dc->getParentModule(), SourceFileKind::MacroExpansion, macroBufferID,
-      /*parsingOpts=*/{}, /*isPrimary=*/false);
-  macroSourceFile->setImports(declSourceFile->getImports());
+  auto macroSourceFile =
+      ::evaluateAttachedMacro(macro, decl, attr,
+                              /*passParentContext=*/false, MacroRole::Member,
+                              introducedConformances);
+  if (!macroSourceFile)
+    return std::nullopt;
 
   PrettyStackTraceDecl debugStack(
       "type checking expanded declaration macro", decl);
 
-  bool synthesizedMembers = false;
   auto topLevelDecls = macroSourceFile->getTopLevelDecls();
   for (auto member : topLevelDecls) {
     // Note that synthesized members are not considered implicit. They have
     // proper source ranges that should be validated, and ASTScope does not
     // expand implicit scopes to the parent scope tree.
-    member->setDeclContext(decl->getInnermostDeclContext());
 
     if (auto *nominal = dyn_cast<NominalTypeDecl>(decl)) {
       nominal->addMember(member);
     } else if (auto *extension = dyn_cast<ExtensionDecl>(decl)) {
       extension->addMember(member);
     }
-
-    synthesizedMembers = true;
   }
 
-  return synthesizedMembers;
+  return macroSourceFile->getBufferID();
 }
 
-MacroDecl *
-ResolveMacroRequest::evaluate(Evaluator &evaluator,
-                              UnresolvedMacroReference macroRef,
-                              MacroRoles roles,
-                              DeclContext *dc) const {
-  auto &ctx = dc->getASTContext();
-  auto foundMacros = TypeChecker::lookupMacros(
-      dc, macroRef.getMacroName(), SourceLoc(), roles);
-  if (foundMacros.empty())
-    return nullptr;
+std::optional<unsigned> swift::expandPeers(CustomAttr *attr, MacroDecl *macro,
+                                           Decl *decl) {
+  auto macroSourceFile =
+      ::evaluateAttachedMacro(macro, decl, attr,
+                              /*passParentContext=*/false, MacroRole::Peer);
+  if (!macroSourceFile)
+    return std::nullopt;
 
-  // Extract macro arguments, or create an empty list.
-  auto *args = macroRef.getArgs();
-  if (!args)
-    args = ArgumentList::createImplicit(ctx, {});
+  PrettyStackTraceDecl debugStack("applying expanded peer macro", decl);
+  return macroSourceFile->getBufferID();
+}
 
-  // Form an `OverloadedDeclRefExpr` with the filtered lookup result above
-  // to ensure @freestanding macros are not considered in overload resolution.
-  FunctionRefKind functionRefKind = FunctionRefKind::SingleApply;
-  SmallVector<ValueDecl *> valueDecls;
-  for (auto *macro : foundMacros)
-    valueDecls.push_back(macro);
-  Expr *callee = new (ctx) OverloadedDeclRefExpr(
-      valueDecls, macroRef.getMacroNameLoc(), functionRefKind,
-      /*implicit*/true);
-  auto genArgs = macroRef.getGenericArgs();
-  if (!genArgs.empty()) {
-    auto genArgsRange = macroRef.getGenericArgsRange();
-    callee = UnresolvedSpecializeExpr::create(
-        ctx, callee, genArgsRange.Start, genArgs, genArgsRange.End);
+ArrayRef<unsigned>
+ExpandExtensionMacros::evaluate(Evaluator &evaluator,
+                                NominalTypeDecl *nominal) const {
+  SmallVector<unsigned, 2> bufferIDs;
+  for (auto customAttrConst :
+       nominal->getExpandedAttrs().getAttributes<CustomAttr>()) {
+    auto customAttr = const_cast<CustomAttr *>(customAttrConst);
+    auto *macro = nominal->getResolvedMacro(customAttr);
+
+    if (!macro)
+      continue;
+
+    // Prefer the extension role
+    MacroRole role;
+    if (macro->getMacroRoles().contains(MacroRole::Extension)) {
+      role = MacroRole::Extension;
+    } else if (macro->getMacroRoles().contains(MacroRole::Conformance)) {
+      role = MacroRole::Conformance;
+    } else {
+      continue;
+    }
+
+    if (auto bufferID = expandExtensions(customAttr, macro,
+                                         role, nominal))
+      bufferIDs.push_back(*bufferID);
   }
-  auto *call = CallExpr::createImplicit(ctx, callee, args);
 
-  Expr *result = call;
-  TypeChecker::typeCheckExpression(result, dc);
+  return nominal->getASTContext().AllocateCopy(bufferIDs);
+}
 
-  if (auto *fn = dyn_cast<DeclRefExpr>(call->getFn()))
-    if (auto *macro = dyn_cast<MacroDecl>(fn->getDecl()))
-      return macro;
+std::optional<unsigned> swift::expandExtensions(CustomAttr *attr,
+                                                MacroDecl *macro,
+                                                MacroRole role,
+                                                NominalTypeDecl *nominal) {
+  if (nominal->getLocalContext()) {
+    nominal->diagnose(diag::local_extension_macro);
+    return std::nullopt;
+  }
+
+  SmallVector<ProtocolDecl *, 2> potentialConformances;
+  auto introducedConformances = getIntroducedConformances(
+      nominal, MacroRole::Extension, macro, &potentialConformances);
+  auto macroSourceFile = ::evaluateAttachedMacro(macro, nominal, attr,
+                                                 /*passParentContext=*/false,
+                                                 role, introducedConformances);
+
+  if (!macroSourceFile)
+    return std::nullopt;
+
+  PrettyStackTraceDecl debugStack(
+      "applying expanded extension macro", nominal);
+
+  auto topLevelDecls = macroSourceFile->getTopLevelDecls();
+  for (auto *decl : topLevelDecls) {
+    auto *extension = dyn_cast<ExtensionDecl>(decl);
+    if (!extension)
+      continue;
+
+    // Bind the extension to the original nominal type.
+    extension->setExtendedNominal(nominal);
+    nominal->addExtension(extension);
+
+    // Most other macro-generated declarations are visited through calling
+    // 'visitAuxiliaryDecls' on the original declaration the macro is attached
+    // to. We don't do this for macro-generated extensions, because the
+    // extension is not a peer of the original declaration. Instead of
+    // requiring all callers of 'visitAuxiliaryDecls' to understand the
+    // hoisting behavior of macro-generated extensions, we make the
+    // extension accessible through 'getTopLevelDecls()'.
+    if (auto file = dyn_cast<FileUnit>(
+            decl->getDeclContext()->getModuleScopeContext()))
+      file->getOrCreateSynthesizedFile().addTopLevelDecl(extension);
+
+    // Don't validate documented conformances for the 'conformance' role.
+    if (role == MacroRole::Conformance)
+      continue;
+
+    // Extension macros can only add conformances that are documented by
+    // the `@attached(extension)` attribute.
+    auto inheritedTypes = extension->getInherited();
+    for (auto i : inheritedTypes.getIndices()) {
+      auto constraint =
+          TypeResolution::forInterface(
+              extension,
+              TypeResolverContext::Inherited,
+              /*unboundTyOpener*/ nullptr,
+              /*placeholderHandler*/ nullptr,
+              /*packElementOpener*/ nullptr)
+          .resolveType(inheritedTypes.getTypeRepr(i));
+
+      // Already diagnosed or will be diagnosed later.
+      if (constraint->is<ErrorType>() || !constraint->isConstraintType())
+        continue;
+
+      std::function<bool(Type)> isUndocumentedConformance =
+          [&](Type constraint) -> bool {
+            if (auto *proto = constraint->getAs<ParameterizedProtocolType>())
+              return !llvm::is_contained(potentialConformances,
+                                         proto->getProtocol());
+
+            if (auto *proto = constraint->getAs<ProtocolType>())
+              return !llvm::is_contained(potentialConformances,
+                                         proto->getDecl());
+
+            return llvm::any_of(
+                constraint->castTo<ProtocolCompositionType>()->getMembers(),
+                isUndocumentedConformance);
+          };
+
+      if (isUndocumentedConformance(constraint)) {
+        extension->diagnose(
+            diag::undocumented_conformance_in_expansion,
+            constraint, macro->getBaseName());
+
+        extension->setInvalid();
+      }
+    }
+  }
+
+  return macroSourceFile->getBufferID();
+}
+
+/// Emits an error and returns \c true if the maro reference may
+/// introduce arbitrary names at global scope.
+static bool diagnoseArbitraryGlobalNames(DeclContext *dc,
+                                         UnresolvedMacroReference macroRef,
+                                         MacroRole macroRole) {
+  auto &ctx = dc->getASTContext();
+  assert(macroRole == MacroRole::Declaration ||
+         macroRole == MacroRole::Peer);
+
+  if (!dc->isModuleScopeContext())
+    return false;
+
+  bool isInvalid = false;
+  namelookup::forEachPotentialResolvedMacro(
+      dc, macroRef.getMacroName(), macroRole,
+      [&](MacroDecl *decl, const MacroRoleAttr *attr) {
+        if (!isInvalid &&
+            attr->hasNameKind(MacroIntroducedDeclNameKind::Arbitrary)) {
+          ctx.Diags.diagnose(macroRef.getSigilLoc(),
+                             diag::global_arbitrary_name,
+                             getMacroRoleString(macroRole));
+          isInvalid = true;
+
+          // If this is an attached macro, mark the attribute as invalid
+          // to avoid diagnosing an unknown attribute later.
+          if (auto *attr = macroRef.getAttr()) {
+            attr->setInvalid();
+          }
+        }
+      });
+
+  return isInvalid;
+}
+
+ConcreteDeclRef ResolveMacroRequest::evaluate(Evaluator &evaluator,
+                                              UnresolvedMacroReference macroRef,
+                                              DeclContext *dc) const {
+  // Macro expressions and declarations have their own stored macro
+  // reference. Use it if it's there.
+  if (auto *expansion = macroRef.getFreestanding()) {
+    if (auto ref = expansion->getMacroRef())
+      return ref;
+  }
+
+  auto &ctx = dc->getASTContext();
+  auto roles = macroRef.getMacroRoles();
+
+  // When a macro is not found for a custom attribute, it may be a non-macro.
+  // So bail out to prevent diagnostics from the contraint system.
+  if (macroRef.getAttr()) {
+    auto foundMacros = namelookup::lookupMacros(dc, macroRef.getModuleName(),
+                                                macroRef.getMacroName(), roles);
+    if (foundMacros.empty())
+      return ConcreteDeclRef();
+  }
+
+  // Freestanding and peer macros applied at top-level scope cannot introduce
+  // arbitrary names. Introducing arbitrary names means that any lookup
+  // into this scope must expand the macro. This is a problem, because
+  // resolving the macro can invoke type checking other declarations, e.g.
+  // anything that the macro arguments depend on. If _anything_ the macro
+  // depends on performs name unqualified name lookup, e.g. type resolution,
+  // we'll get circularity errors. It's better to prevent this by banning
+  // these macros at global scope if any of the macro candidates introduce
+  // arbitrary names.
+  if (diagnoseArbitraryGlobalNames(dc, macroRef, MacroRole::Declaration) ||
+      diagnoseArbitraryGlobalNames(dc, macroRef, MacroRole::Peer))
+    return ConcreteDeclRef();
+
+  // If we already have a MacroExpansionExpr, use that. Otherwise,
+  // create one.
+  MacroExpansionExpr *macroExpansion;
+  if (auto *expansion = macroRef.getFreestanding()) {
+    if (auto *expr = dyn_cast<MacroExpansionExpr>(expansion)) {
+      macroExpansion = expr;
+    } else {
+      macroExpansion = new (ctx) MacroExpansionExpr(
+          dc, expansion->getExpansionInfo(), roles);
+    }
+  } else {
+    if (isa<ClosureExpr>(dc) && roles.contains(MacroRole::Body)) {
+      // The closures are type-checked after macros are expanded
+      // which means that macro cannot reference any declarations
+      // from inner or outer closures as its arguments.
+      //
+      // For example:
+      // `_: (Int) -> Void = { x in { @Macro(x) in ... }() }`
+      //
+      // `x` is not going to be type-checked at macro expansion
+      // time and cannot be referenced by `@Macro`.
+      //
+      // Let's walk up declaration contexts until we find first
+      // non-closure one. This means that we can support a local
+      // declaration that is defined inside of a closure because
+      // they are separately checked after outer ones are already
+      // processed.
+      while ((dc = dc->getParent())) {
+        if (!isa<AbstractClosureExpr>(dc))
+          break;
+      }
+    }
+
+    SourceRange genericArgsRange = macroRef.getGenericArgsRange();
+    macroExpansion = MacroExpansionExpr::create(
+      dc, macroRef.getSigilLoc(),
+      macroRef.getModuleName(), macroRef.getModuleNameLoc(),
+      macroRef.getMacroName(), macroRef.getMacroNameLoc(),
+      genericArgsRange.Start,
+      macroRef.getGenericArgs(), genericArgsRange.End,
+      macroRef.getArgs(), roles);
+  }
+
+  Expr *result = macroExpansion;
+  TypeChecker::typeCheckExpression(
+      result, dc, {}, TypeCheckExprFlags::DisableMacroExpansions);
 
   // If we couldn't resolve a macro decl, the attribute is invalid.
-  if (auto *attr = macroRef.getAttr())
-    attr->setInvalid();
-  return nullptr;
+  if (!macroExpansion->getMacroRef() && macroRef.getAttr())
+    macroRef.getAttr()->setInvalid();
+
+  // Macro expressions and declarations have their own stored macro
+  // reference. If we got a reference, store it there, too.
+  // FIXME: This duplication of state is really unfortunate.
+  if (auto ref = macroExpansion->getMacroRef()) {
+    if (auto *expansion = macroRef.getFreestanding()) {
+      expansion->setMacroRef(ref);
+    }
+  }
+
+  return macroExpansion->getMacroRef();
+}
+
+ArrayRef<Type>
+ResolveMacroConformances::evaluate(Evaluator &evaluator,
+                                   const MacroRoleAttr *attr,
+                                   const Decl *decl) const {
+  auto *dc = decl->getDeclContext();
+  auto &ctx = dc->getASTContext();
+
+  SmallVector<Type, 2> protocols;
+  for (Expr *&expr : const_cast<MacroRoleAttr *>(attr)->getConformances()) {
+    using namespace constraints;
+    auto target = SyntacticElementTarget(expr, dc, CTP_Unused, Type(),
+                                         /*isDiscarded=*/true);
+    if (ConstraintSystem::preCheckTarget(target))
+      continue;
+    auto *typeExpr = dyn_cast<TypeExpr>(target.getAsExpr());
+    if (!typeExpr) {
+      ctx.Diags.diagnose(expr->getStartLoc(), diag::expected_type);
+      continue;
+    }
+    expr = typeExpr;
+
+    if (auto *typeRepr = typeExpr->getTypeRepr()) {
+      auto resolved =
+          TypeResolution::forInterface(
+              dc, TypeResolverContext::GenericRequirement,
+              /*unboundTyOpener*/ nullptr,
+              /*placeholderHandler*/ nullptr,
+              /*packElementOpener*/ nullptr)
+          .resolveType(typeRepr);
+
+      if (resolved->is<ErrorType>())
+        continue;
+
+      if (!resolved->isConstraintType()) {
+        diagnoseAndRemoveAttr(
+            decl, attr,
+            diag::extension_macro_invalid_conformance,
+            resolved);
+        continue;
+      }
+
+      typeExpr->setType(MetatypeType::get(resolved));
+      protocols.push_back(resolved);
+    } else {
+      // If there's no type repr, we already have a resolved instance
+      // type, e.g. because the type expr was deserialized.
+      protocols.push_back(typeExpr->getInstanceType());
+    }
+  }
+
+  return ctx.AllocateCopy(protocols);
+}
+
+// MARK: for IDE.
+
+SourceFile *swift::evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
+                                         CustomAttr *attr,
+                                         bool passParentContext, MacroRole role,
+                                         StringRef discriminator) {
+  return ::evaluateAttachedMacro(macro, attachedTo, attr, passParentContext,
+                                 role, {}, discriminator);
+}
+
+SourceFile *
+swift::evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
+                                 StringRef discriminator) {
+  return ::evaluateFreestandingMacro(expansion, discriminator);
 }

@@ -112,5 +112,38 @@ _swift_stdlib_dyld_is_objc_constant_string(const void *addr) {
           && SWIFT_RUNTIME_WEAK_USE(_dyld_is_objc_constant(dyld_objc_string_kind, addr))) ? 1 : 0;
 }
 
+typedef const void * _Nullable (*createIndirectTaggedImplPtr)(id,
+                                            SEL,
+                                            const _swift_shims_UInt8 * _Nonnull,
+                                            _swift_shims_CFIndex);
+static swift_once_t lookUpIndirectTaggedStringCreationOnce;
+static createIndirectTaggedImplPtr createIndirectTaggedString;
+static Class indirectTaggedStringClass;
+
+static void lookUpIndirectTaggedStringCreationOnceImpl(void *ctxt) {
+  Class cls = objc_lookUpClass("NSIndirectTaggedPointerString");
+  if (!cls) return;
+  SEL sel = @selector(newIndirectTaggedNSStringWithConstantNullTerminatedASCIIBytes_:length_:);
+  Method m = class_getClassMethod(cls, sel);
+  if (!m) return;
+  createIndirectTaggedString = (createIndirectTaggedImplPtr)method_getImplementation(m);
+  indirectTaggedStringClass = cls;
+}
+
+SWIFT_RUNTIME_STDLIB_API
+const void *
+_swift_stdlib_CreateIndirectTaggedPointerString(const __swift_uint8_t *bytes,
+                                                _swift_shims_CFIndex len) {
+  swift_once(&lookUpIndirectTaggedStringCreationOnce,
+             lookUpIndirectTaggedStringCreationOnceImpl,
+             nullptr);
+  
+  if (indirectTaggedStringClass) {
+    SEL sel = @selector(newIndirectTaggedNSStringWithConstantNullTerminatedASCIIBytes_:length_:);
+    return createIndirectTaggedString(indirectTaggedStringClass, sel, bytes, len);
+  }
+  return NULL;
+}
+
 #endif
 

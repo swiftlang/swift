@@ -106,8 +106,8 @@ class OuterGenericClass<T> {
   }
 
   class Middle {
-    class Inner1<T> {}
-    class Inner2<T> : Middle where T: Inner1<Int> {}
+    class Inner1<U> {}
+    class Inner2<U> : Middle where U: Inner1<Int> {}
   }
 }
 
@@ -205,7 +205,7 @@ struct GS<T> { //expected-note {{arguments to generic parameter 'T' ('T' and 'In
     }
   }
 
-  struct NestedGeneric<U> { // expected-note{{generic type 'NestedGeneric' declared here}}
+  struct NestedGeneric<U> { // expected-note{{generic struct 'NestedGeneric' declared here}}
     func fff() -> (GS, NestedGeneric) {
       let gs = GS()
       let ns = NestedGeneric()

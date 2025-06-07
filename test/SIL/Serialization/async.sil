@@ -1,7 +1,7 @@
 // First parse this and then emit a *.sib. Then read in the *.sib, then recreate
 // RUN: %empty-directory(%t)
-// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name async
-// RUN: %target-sil-opt %t/tmp.sib -module-name async | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %s -emit-sib -o %t/tmp.sib -module-name async
+// RUN: %target-sil-opt -sil-print-types %t/tmp.sib -module-name async | %FileCheck %s
 // REQUIRES: concurrency
 
 import Builtin

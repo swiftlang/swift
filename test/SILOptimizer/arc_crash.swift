@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -O %s -parse-as-library -emit-sil -enforce-exclusivity=none -Xllvm -sil-disable-pass=function-signature-opts | %FileCheck %s
+// RUN: %target-swift-frontend -O %s -parse-as-library -Xllvm -sil-print-types -emit-sil -enforce-exclusivity=none -Xllvm -sil-disable-pass=function-signature-opts | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
 
 // Test ARC optimizations on source level tests that have been
 // miscompiled and crash (e.g. because of use-after-free).
@@ -32,7 +34,8 @@ func useNode(n: Base) -> Int {
 
 // CHECK-LABEL: sil [noinline] @$s9arc_crash14testMayReleaseAA4BaseCyF : $@convention(thin) () -> @owned Base {
 // CHECK:   [[BASE:%.*]] = alloc_ref $Base
-// CHECK:   strong_retain [[BASE]] : $Base
+// CHECK:   [[EI:%.*]] = end_init_let_ref [[BASE]]
+// CHECK:   strong_retain [[EI]] : $Base
 // CHECK:   apply %{{.*}} : $@convention(thin) (@owned Queue) -> ()
 // CHECK-LABEL: } // end sil function '$s9arc_crash14testMayReleaseAA4BaseCyF'
 @inline(never)

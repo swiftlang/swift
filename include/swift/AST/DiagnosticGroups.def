@@ -1,0 +1,73 @@
+//===--- DiagnosticGroups.def - Diagnostic Groups ---------------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2024 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+//  This file defines diagnostic groups and links between them.
+//
+//  The GROUP(Name, Filename) macro is used to define each diagnostic group.
+//  These groups are used to associate documentation with particular set of
+//  diagnostics and also to provide more control over whether the warnings
+//  in the group are escalated to errors (via the -Wwarning and -Werror flags.)
+//  A given warning or error can be associated with a diagnostic group by using
+//  GROUPED_WARNING or GROUPED_ERROR, respectively. New warnings and errors
+//  should be introduced along with groups to improve documentation.
+//
+//    - Name: the name of the group that will be shown in diagnostic messages
+//      (e.g., StrictMemorySafety) and used in command-line options like
+//      -Wwarning and -Werror. Once assigned, the group name for a particular
+//      diagnostic should not be changed, because it will affect existing users
+//      of the command-line flags.
+//    - Filename: the name of the file that provides documentation for this
+//      diagnostic group. There should be a corresponding Markdown file in
+//      userdocs/diagnostics providing short-form documentation that helps
+//      explain the diagnostic and how to resolve the problem.
+//
+//===----------------------------------------------------------------------===//
+
+#define DEFINE_DIAGNOSTIC_GROUPS_MACROS
+#include "swift/AST/DefineDiagnosticGroupsMacros.h"
+
+// GROUP(Name, DocsFile)
+// GROUP_LINK(Parent, Child)
+
+GROUP(no_group, "")
+
+GROUP(ActorIsolatedCall, "actor-isolated-call")
+GROUP(ClangDeclarationImport, "clang-declaration-import")
+GROUP(ConformanceIsolation, "conformance-isolation")
+GROUP(DeprecatedDeclaration, "deprecated-declaration")
+GROUP(DynamicCallable, "dynamic-callable-requirements")
+GROUP(ErrorInFutureSwiftVersion, "error-in-future-swift-version")
+GROUP(ExistentialAny, "existential-any")
+GROUP(ExistentialMemberAccess, "existential-member-access-limitations")
+GROUP(IsolatedConformances, "isolated-conformances")
+GROUP(MemberImportVisibility, "member-import-visibility")
+GROUP(MultipleInheritance, "multiple-inheritance")
+GROUP(MutableGlobalVariable, "mutable-global-variable")
+GROUP(NominalTypes, "nominal-types")
+GROUP(NonisolatedNonsendingByDefault, "nonisolated-nonsending-by-default")
+GROUP(OpaqueTypeInference, "opaque-type-inference")
+GROUP(PreconcurrencyImport, "preconcurrency-import")
+GROUP(PropertyWrappers, "property-wrapper-requirements")
+GROUP(ProtocolTypeNonConformance, "protocol-type-non-conformance")
+GROUP(ResultBuilderMethods, "result-builder-methods")
+GROUP(SendableClosureCaptures, "sendable-closure-captures")
+GROUP(SendableMetatypes, "sendable-metatypes")
+GROUP(SendingRisksDataRace, "sending-risks-data-race")
+GROUP(StrictLanguageFeatures, "strict-language-features")
+GROUP(StrictMemorySafety, "strict-memory-safety")
+GROUP(StringInterpolationConformance, "string-interpolation-conformance")
+GROUP(TemporaryPointers, "temporary-pointers")
+GROUP(TrailingClosureMatching, "trailing-closure-matching")
+GROUP(UnknownWarningGroup, "unknown-warning-group")
+
+#define UNDEFINE_DIAGNOSTIC_GROUPS_MACROS
+#include "swift/AST/DefineDiagnosticGroupsMacros.h"

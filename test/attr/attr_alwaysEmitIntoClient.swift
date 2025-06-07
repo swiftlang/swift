@@ -16,3 +16,30 @@ public func publicFunction() {}
   versionedFunction()
   publicFunction()
 }
+
+public struct TestInitAccessors {
+  var _x: Int
+
+  public var x: Int {
+    @storageRestrictions(initializes: _x)
+    init { // expected-note 2 {{init accessor for property 'x' is not '@usableFromInline' or public}}
+      self._x = newValue
+    }
+
+    get {
+      self._x
+    }
+
+     set {}
+   }
+
+   @_alwaysEmitIntoClient
+   public init(x: Int) {
+     self.x = 0 // expected-error {{init accessor for property 'x' is internal and cannot be referenced from an '@_alwaysEmitIntoClient' function}}
+   }
+
+   @inlinable
+   public init() {
+     self.x = 0 // expected-error {{init accessor for property 'x' is internal and cannot be referenced from an '@inlinable' function}}
+   }
+}

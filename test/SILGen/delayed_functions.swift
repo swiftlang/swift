@@ -10,7 +10,7 @@
 // WHOLEMOD-LABEL: sil hidden [ossa] @$s17delayed_functions3fooSiyF : $@convention(thin) () -> Int
 func foo() -> Int { 5 }
 
-// Cannot delay property intializers that contain user code.
+// Cannot delay property initializers that contain user code.
 struct R {
   // variable initialization expression of R.i
   // SINGLE-LABEL: sil hidden [transparent] [ossa] @$s17delayed_functions1RV1iSivpfi : $@convention(thin) () -> Int

@@ -19,6 +19,7 @@
 #include "swift/SILOptimizer/Differentiation/ADContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 
 using llvm::DenseMap;
@@ -128,7 +129,7 @@ void ADContext::cleanUp() {
 DifferentiableFunctionInst *ADContext::createDifferentiableFunction(
     SILBuilder &builder, SILLocation loc, IndexSubset *parameterIndices,
     IndexSubset *resultIndices, SILValue original,
-    Optional<std::pair<SILValue, SILValue>> derivativeFunctions) {
+    std::optional<std::pair<SILValue, SILValue>> derivativeFunctions) {
   auto *dfi = builder.createDifferentiableFunction(
       loc, parameterIndices, resultIndices, original, derivativeFunctions);
   processedDifferentiableFunctionInsts.erase(dfi);
@@ -137,7 +138,7 @@ DifferentiableFunctionInst *ADContext::createDifferentiableFunction(
 
 LinearFunctionInst *ADContext::createLinearFunction(
     SILBuilder &builder, SILLocation loc, IndexSubset *parameterIndices,
-    SILValue original, Optional<SILValue> transposeFunction) {
+    SILValue original, std::optional<SILValue> transposeFunction) {
   auto *lfi = builder.createLinearFunction(loc, parameterIndices, original,
                                            transposeFunction);
   processedLinearFunctionInsts.erase(lfi);

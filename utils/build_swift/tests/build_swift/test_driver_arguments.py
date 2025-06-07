@@ -478,6 +478,15 @@ class TestDriverArgumentParser(
         with self.assertRaises(ParserError):
             self.parse_default_args([option_string, '0.0.0.1'])
 
+    def test_option_use_linker(self):
+        option_string = '--use-linker'
+
+        self.parse_default_args([option_string, 'lld'])
+        self.parse_default_args([option_string, 'gold'])
+
+        with self.assertRaises(ParserError):
+            self.parse_default_args([option_string, 'foo'])
+
     def test_option_swift_user_visible_version(self):
         option_string = '--swift-user-visible-version'
 
@@ -506,6 +515,10 @@ class TestDriverArgumentParser(
         with self.assertRaises(ValueError):
             self.parse_default_args(['--watchos-all'])
 
+    def test_swift_stdlib_strict_availability(self):
+        self.parse_default_args('--swift-stdlib-strict-availability')
+        self.parse_default_args('--no-swift-stdlib-strict-availability')
+
     # -------------------------------------------------------------------------
     # Implied defaults tests
 
@@ -533,8 +546,8 @@ class TestDriverArgumentParser(
 
         self.assertEqual(namespace.cmark_build_variant, 'Debug')
         self.assertEqual(namespace.foundation_build_variant, 'Debug')
+        self.assertEqual(namespace.foundation_tests_build_variant, 'Debug')
         self.assertEqual(namespace.libdispatch_build_variant, 'Debug')
-        self.assertEqual(namespace.libicu_build_variant, 'Debug')
         self.assertEqual(namespace.lldb_build_variant, 'Debug')
         self.assertEqual(namespace.llvm_build_variant, 'Debug')
         self.assertEqual(namespace.swift_build_variant, 'Debug')
@@ -640,11 +653,3 @@ class TestDriverArgumentParser(
     def test_implied_defaults_swift_disable_dead_stripping(self):
         namespace = self.parse_default_args(['--swift-disable-dead-stripping'])
         self.assertTrue(namespace.swift_disable_dead_stripping)
-
-    def test_implied_defaults_xcode(self):
-        namespace = self.parse_default_args(['--xcode'])
-        self.assertEqual(namespace.cmake_generator, 'Xcode')
-        self.assertEqual(namespace.build_variant, 'MinSizeRel')
-        self.assertTrue(namespace.skip_build)
-        self.assertFalse(namespace.build_early_swift_driver)
-        self.assertFalse(namespace.build_early_swiftsyntax)

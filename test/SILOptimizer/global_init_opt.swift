@@ -1,9 +1,14 @@
-// RUN: %target-swift-frontend -parse-as-library -O -module-name=test %s -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -O -import-objc-header %S/Inputs/bitfield.h -module-name=test %s -Xllvm -sil-print-types -emit-sil | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
 
 var gg: Int = {
   print("gg init")
   return 27
 }()
+
+// Test that the compiler doesn't crash with a global C bitfield.
+var bitfield = S(a: 0, b: 0)
 
 // CHECK-LABEL: sil @$s4test3cseSiyF
 // CHECK:   builtin "once"

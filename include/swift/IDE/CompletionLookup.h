@@ -105,6 +105,9 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
     TypeInDeclContext,
     ImportFromModule,
     GenericRequirement,
+
+    /// Look up stored properties within a type.
+    StoredProperty,
   };
 
   LookupKind Kind;
@@ -131,13 +134,12 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
   bool CanCurrDeclContextHandleAsync = false;
   /// Actor isolations that were determined during constraint solving but that
   /// haven't been saved to the AST.
-  llvm::DenseMap<AbstractClosureExpr *, ClosureActorIsolation>
+  llvm::DenseMap<AbstractClosureExpr *, ActorIsolation>
       ClosureActorIsolations;
   bool HaveDot = false;
   bool IsUnwrappedOptional = false;
   SourceLoc DotLoc;
   bool NeedLeadingDot = false;
-  bool NeedLeadingMacroPound = false;
 
   bool NeedOptionalUnwrap = false;
   unsigned NumBytesToEraseForOptionalUnwrap = 0;
@@ -164,7 +166,7 @@ class CompletionLookup final : public swift::VisibleDeclConsumer {
   /// Innermost method that the code completion point is in.
   const AbstractFunctionDecl *CurrentMethod = nullptr;
 
-  Optional<SemanticContextKind> ForcedSemanticContext = None;
+  std::optional<SemanticContextKind> ForcedSemanticContext = std::nullopt;
   bool IsUnresolvedMember = false;
 
 public:
@@ -183,56 +185,35 @@ private:
   /// \p selfTy must be a \c Self type of the context.
   static bool canBeUsedAsRequirementFirstType(Type selfTy, TypeAliasDecl *TAD);
 
+  /// Retrieve the type to use as the base for a member completion.
+  Type getMemberBaseType() const {
+    return BaseType ? BaseType : ExprType;
+  }
+
 public:
   struct RequestedResultsTy {
     const ModuleDecl *TheModule;
-    bool OnlyTypes;
-    bool OnlyPrecedenceGroups;
-    bool OnlyMacros;
+    CodeCompletionFilter Filter;
     bool NeedLeadingDot;
-    bool NeedPound;
-    bool IncludeModuleQualifier;
 
-    static RequestedResultsTy fromModule(const ModuleDecl *TheModule) {
-      return {TheModule, false, false, false, false, false, true};
+    static RequestedResultsTy fromModule(const ModuleDecl *mod,
+                                         CodeCompletionFilter filter) {
+      return {mod, filter, /*NeedLeadingDot=*/false};
     }
 
-    RequestedResultsTy onlyTypes() const {
-      return {TheModule, true, false, false, NeedLeadingDot, false,
-              IncludeModuleQualifier};
+    static RequestedResultsTy topLevelResults(CodeCompletionFilter filter) {
+      return {nullptr, filter, /*NeedLeadingDot=*/false};
     }
 
-    RequestedResultsTy onlyPrecedenceGroups() const {
-      assert(!OnlyTypes && "onlyTypes() already includes precedence groups");
-      return {TheModule, false, true, false, false, false, true};
-    }
-
-    RequestedResultsTy onlyMacros(bool needPound) const {
-      return {TheModule, false, false, true, false, needPound, false};
-    }
-
-    RequestedResultsTy needLeadingDot(bool NeedDot) const {
-      return {TheModule, OnlyTypes, OnlyPrecedenceGroups, OnlyMacros, NeedDot,
-              NeedPound, IncludeModuleQualifier};
-    }
-
-    RequestedResultsTy withModuleQualifier(bool IncludeModule) const {
-      return {TheModule, OnlyTypes, OnlyPrecedenceGroups, OnlyMacros,
-              NeedLeadingDot, NeedPound, IncludeModule};
-    }
-
-    static RequestedResultsTy toplevelResults() {
-      return {nullptr, false, false, false, false, true, true};
+    RequestedResultsTy needLeadingDot(bool needDot) const {
+      return {TheModule, Filter, needDot};
     }
 
     friend bool operator==(const RequestedResultsTy &LHS,
                            const RequestedResultsTy &RHS) {
-      return LHS.TheModule == RHS.TheModule && LHS.OnlyTypes == RHS.OnlyTypes &&
-             LHS.OnlyPrecedenceGroups == RHS.OnlyPrecedenceGroups &&
-             LHS.OnlyMacros == RHS.OnlyMacros &&
-             LHS.NeedLeadingDot == RHS.NeedLeadingDot &&
-             LHS.NeedPound == RHS.NeedPound &&
-             LHS.IncludeModuleQualifier == RHS.IncludeModuleQualifier;
+      return LHS.TheModule == RHS.TheModule &&
+             LHS.Filter.containsOnly(RHS.Filter) &&
+             LHS.NeedLeadingDot == RHS.NeedLeadingDot;
     }
   };
 
@@ -258,11 +239,9 @@ public:
   void setIsStaticMetatype(bool value) { IsStaticMetatype = value; }
 
   void setExpectedTypes(
-      ArrayRef<Type> Types, bool isImplicitSingleExpressionReturn,
-      bool preferNonVoid = false,
+      ArrayRef<Type> Types, bool isImpliedResult, bool preferNonVoid = false,
       OptionSet<CustomAttributeKind> expectedCustomAttributeKinds = {}) {
-    expectedTypeContext.setIsImplicitSingleExpressionReturn(
-        isImplicitSingleExpressionReturn);
+    expectedTypeContext.setIsImpliedResult(isImpliedResult);
     expectedTypeContext.setPreferNonVoid(preferNonVoid);
     expectedTypeContext.setPossibleTypes(Types);
     expectedTypeContext.setExpectedCustomAttributeKinds(
@@ -280,7 +259,7 @@ public:
   }
 
   void setClosureActorIsolations(
-      llvm::DenseMap<AbstractClosureExpr *, ClosureActorIsolation>
+      llvm::DenseMap<AbstractClosureExpr *, ActorIsolation>
           ClosureActorIsolations) {
     this->ClosureActorIsolations = ClosureActorIsolations;
   }
@@ -293,8 +272,8 @@ public:
     if (expectedTypeContext.empty() &&
         !expectedTypeContext.getPreferNonVoid()) {
       return CodeCompletionContext::TypeContextKind::None;
-    } else if (expectedTypeContext.isImplicitSingleExpressionReturn()) {
-      return CodeCompletionContext::TypeContextKind::SingleExpressionBody;
+    } else if (expectedTypeContext.isImpliedResult()) {
+      return CodeCompletionContext::TypeContextKind::Implied;
     } else {
       return CodeCompletionContext::TypeContextKind::Required;
     }
@@ -330,7 +309,7 @@ public:
   void includeInstanceMembers() { IncludeInstanceMembers = true; }
 
   bool isHiddenModuleName(Identifier Name) {
-    return (Name.str().startswith("_") || Name == Ctx.SwiftShimsModuleName ||
+    return (Name.hasUnderscoredNaming() || Name == Ctx.SwiftShimsModuleName ||
             Name.str() == SWIFT_ONONE_SUPPORT);
   }
 
@@ -340,10 +319,13 @@ public:
   void collectImportedModules(llvm::StringSet<> &directImportedModules,
                               llvm::StringSet<> &allImportedModules);
 
-  void addModuleName(ModuleDecl *MD,
-                     Optional<ContextualNotRecommendedReason> R = None);
+  void
+  addModuleName(ModuleDecl *MD,
+                std::optional<ContextualNotRecommendedReason> R = std::nullopt);
 
   void addImportModuleNames();
+
+  void addUsingSpecifiers();
 
   SemanticContextKind getSemanticContext(const Decl *D,
                                          DeclVisibilityKind Reason,
@@ -351,8 +333,16 @@ public:
 
   bool isUnresolvedMemberIdealType(Type Ty);
 
+  /// Creates a \c CodeCompletionResultBuilder in this lookup’s sink and sets
+  /// the current expected type context in it
+  CodeCompletionResultBuilder
+  makeResultBuilder(CodeCompletionResultKind kind,
+                    SemanticContextKind semanticContext) const;
+
   void addValueBaseName(CodeCompletionResultBuilder &Builder,
                         DeclBaseName Name);
+
+  void addIdentifier(CodeCompletionResultBuilder &Builder, Identifier Name);
 
   void addLeadingDot(CodeCompletionResultBuilder &Builder);
 
@@ -379,7 +369,7 @@ public:
 
   void analyzeActorIsolation(
       const ValueDecl *VD, Type T, bool &implicitlyAsync,
-      Optional<ContextualNotRecommendedReason> &NotRecommended);
+      std::optional<ContextualNotRecommendedReason> &NotRecommended);
 
   void addVarDeclRef(const VarDecl *VD, DeclVisibilityKind Reason,
                      DynamicLookupInfo dynamicLookupInfo);
@@ -410,7 +400,7 @@ public:
                                    const AbstractFunctionDecl *AFD,
                                    bool forceAsync = false);
 
-  void addPoundAvailable(Optional<StmtKind> ParentKind);
+  void addPoundAvailable(std::optional<StmtKind> ParentKind);
 
   void addPoundSelector(bool needPound);
 
@@ -420,11 +410,11 @@ public:
 
   void addSubscriptCallPattern(
       const AnyFunctionType *AFT, const SubscriptDecl *SD,
-      const Optional<SemanticContextKind> SemanticContext = None);
+      const std::optional<SemanticContextKind> SemanticContext = std::nullopt);
 
   void addFunctionCallPattern(
       const AnyFunctionType *AFT, const AbstractFunctionDecl *AFD = nullptr,
-      const Optional<SemanticContextKind> SemanticContext = None);
+      const std::optional<SemanticContextKind> SemanticContext = std::nullopt);
 
   bool isImplicitlyCurriedInstanceMethod(const AbstractFunctionDecl *FD);
 
@@ -433,8 +423,8 @@ public:
 
   void addConstructorCall(const ConstructorDecl *CD, DeclVisibilityKind Reason,
                           DynamicLookupInfo dynamicLookupInfo,
-                          Optional<Type> BaseType, Optional<Type> Result,
-                          bool IsOnType = true,
+                          std::optional<Type> BaseType,
+                          std::optional<Type> Result, bool IsOnType = true,
                           Identifier addName = Identifier());
 
   void addConstructorCallsForType(Type type, Identifier name,
@@ -446,6 +436,9 @@ public:
 
   void addNominalTypeRef(const NominalTypeDecl *NTD, DeclVisibilityKind Reason,
                          DynamicLookupInfo dynamicLookupInfo);
+
+  Type getTypeAliasType(const TypeAliasDecl *TAD,
+                        DynamicLookupInfo dynamicLookupInfo);
 
   void addTypeAliasRef(const TypeAliasDecl *TAD, DeclVisibilityKind Reason,
                        DynamicLookupInfo dynamicLookupInfo);
@@ -460,9 +453,15 @@ public:
 
   void addPrecedenceGroupRef(PrecedenceGroupDecl *PGD);
 
+  /// Add a builtin member reference pattern. This is used for members that
+  /// do not have associated decls, e.g tuple access and '.isolation'.
+  void addBuiltinMemberRef(StringRef Name, Type TypeAnnotation);
+
   void addEnumElementRef(const EnumElementDecl *EED, DeclVisibilityKind Reason,
                          DynamicLookupInfo dynamicLookupInfo,
                          bool HasTypeContext);
+  void addMacroCallArguments(const MacroDecl *MD, DeclVisibilityKind Reason,
+                             bool forTrivialTrailingClosure = false);
   void addMacroExpansion(const MacroDecl *MD, DeclVisibilityKind Reason);
 
   void addKeyword(
@@ -476,8 +475,8 @@ public:
       CodeCompletionKeywordKind KeyKind = CodeCompletionKeywordKind::None,
       CodeCompletionFlair flair = {});
 
-  void addDeclAttrParamKeyword(StringRef Name, StringRef Annotation,
-                               bool NeedSpecify);
+  void addDeclAttrParamKeyword(StringRef Name, ArrayRef<StringRef> Parameters,
+                               StringRef Annotation, bool NeedSpecify);
 
   void addDeclAttrKeyword(StringRef Name, StringRef Annotation);
 
@@ -488,13 +487,17 @@ public:
                                          DynamicLookupInfo dynamicLookupInfo);
 
 private:
+  /// Normalize the type for 'isDupelicate' check.
+  Type normalizeTypeForDuplicationCheck(Type Ty);
+
   /// Returns true if duplicate checking is enabled (via
   /// \c shouldCheckForDuplicates) and this decl + type combination has been
   /// checked previously. Returns false otherwise.
   bool isDuplicate(const ValueDecl *D, Type Ty) {
     if (!CheckForDuplicates)
       return false;
-    return !PreviouslySeen.insert({D, Ty}).second;
+    return !PreviouslySeen.insert({D, normalizeTypeForDuplicationCheck(Ty)})
+                .second;
   }
 
   /// Returns true if duplicate checking is enabled (via
@@ -504,7 +507,8 @@ private:
     if (!CheckForDuplicates)
       return false;
     Type Ty = getTypeOfMember(D, dynamicLookupInfo);
-    return !PreviouslySeen.insert({D, Ty}).second;
+    return !PreviouslySeen.insert({D, normalizeTypeForDuplicationCheck(Ty)})
+                .second;
   }
 
 public:
@@ -520,11 +524,14 @@ public:
 
   bool tryTupleExprCompletions(Type ExprType);
 
+  /// Try add the completion for '.isolation' for @isolated(any) function types.
+  void tryFunctionIsolationCompletion(Type ExprType);
+
   bool tryFunctionCallCompletions(
       Type ExprType, const ValueDecl *VD,
-      Optional<SemanticContextKind> SemanticContext = None);
+      std::optional<SemanticContextKind> SemanticContext = std::nullopt);
 
-  bool tryModuleCompletions(Type ExprType, bool TypesOnly = false);
+  bool tryModuleCompletions(Type ExprType, CodeCompletionFilter Filter);
 
   /// If the given ExprType is optional, this adds completions for the unwrapped
   /// type.
@@ -534,7 +541,17 @@ public:
 
   void getPostfixKeywordCompletions(Type ExprType, Expr *ParsedExpr);
 
-  void getValueExprCompletions(Type ExprType, ValueDecl *VD = nullptr);
+  /// Add code completion results after an expression of type \p ExprType.
+  /// This includes members as well as call patterns if \p ExprType is a
+  /// function type.
+  /// If \p IsDeclUnapplied is \c true, we are completing after a refernce to
+  /// \p VD that hasn't been called yet. Thus, \p VD has type \p ExprType and we
+  /// can use \p VD to enrich call pattern completions of \p ExprType.
+  void getValueExprCompletions(Type ExprType, ValueDecl *VD = nullptr,
+                               bool IsDeclUnapplied = false);
+
+  /// Add completions for stored properties of \p D.
+  void getStoredPropertyCompletions(const NominalTypeDecl *D);
 
   void collectOperators(SmallVectorImpl<OperatorDecl *> &results);
 
@@ -542,30 +559,19 @@ public:
 
   void addPostfixOperatorCompletion(OperatorDecl *op, Type resultType);
 
-  void tryPostfixOperator(Expr *expr, PostfixOperatorDecl *op);
-
-  void addAssignmentOperator(Type RHSType, Type resultType);
+  void addAssignmentOperator(Type RHSType);
 
   void addInfixOperatorCompletion(OperatorDecl *op, Type resultType,
                                   Type RHSType);
 
-  void tryInfixOperatorCompletion(Expr *foldedExpr, InfixOperatorDecl *op);
-
-  Expr *typeCheckLeadingSequence(Expr *LHS, ArrayRef<Expr *> leadingSequence);
-
-  void getOperatorCompletions(Expr *LHS, ArrayRef<Expr *> leadingSequence);
-
   void addTypeRelationFromProtocol(CodeCompletionResultBuilder &builder,
                                    CodeCompletionLiteralKind kind);
-
-  /// Add '#file', '#line', et at.
-  void addPoundLiteralCompletions(bool needPound);
 
   void addValueLiteralCompletions();
 
   void addObjCPoundKeywordCompletions(bool needPound);
 
-  void getMacroCompletions(bool needPound);
+  void getMacroCompletions(CodeCompletionMacroRoles roles);
 
   struct FilteredDeclConsumer : public swift::VisibleDeclConsumer {
     swift::VisibleDeclConsumer &Consumer;
@@ -601,23 +607,27 @@ public:
 
   void getTypeCompletions(Type BaseType);
 
+  /// Add completions for types that can appear after a \c ~ prefix.
+  void getInvertedTypeCompletions();
+
   void getGenericRequirementCompletions(DeclContext *DC,
                                         SourceLoc CodeCompletionLoc);
 
   static bool canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
-                                    bool IsConcurrencyEnabled,
-                                    Optional<DeclKind> DK);
+                                    const LangOptions &langOpts,
+                                    std::optional<DeclKind> DK, StringRef Name);
 
-  void getAttributeDeclCompletions(bool IsInSil, Optional<DeclKind> DK);
+  void getAttributeDeclCompletions(bool IsInSil, std::optional<DeclKind> DK);
 
-  void getAttributeDeclParamCompletions(DeclAttrKind AttrKind, int ParamIndex);
+  void getAttributeDeclParamCompletions(ParameterizedDeclAttributeKind AttrKind,
+                                        int ParamIndex, bool HasLabel);
 
-  void getTypeAttributeKeywordCompletions();
+  void getTypeAttributeKeywordCompletions(CompletionKind completionKind);
 
   void collectPrecedenceGroups();
 
   void getPrecedenceGroupCompletions(
-      IDEInspectionCallbacks::PrecedenceGroupCompletionKind SK);
+      CodeCompletionCallbacks::PrecedenceGroupCompletionKind SK);
 
   void getPoundAvailablePlatformCompletions();
 
@@ -629,7 +639,7 @@ public:
   void getTypeCompletionsInDeclContext(SourceLoc Loc,
                                        bool ModuleQualifier = true);
 
-  void getToplevelCompletions(bool OnlyTypes, bool OnlyMacros);
+  void getToplevelCompletions(CodeCompletionFilter Filter);
 
   void lookupExternalModuleDecls(const ModuleDecl *TheModule,
                                  ArrayRef<std::string> AccessPath,
@@ -648,18 +658,15 @@ using RequestedResultsTy = swift::ide::CompletionLookup::RequestedResultsTy;
 template <>
 struct DenseMapInfo<RequestedResultsTy> {
   static inline RequestedResultsTy getEmptyKey() {
-    return {DenseMapInfo<swift::ModuleDecl *>::getEmptyKey(), false, false,
-            false, false, false, false};
+    return {DenseMapInfo<swift::ModuleDecl *>::getEmptyKey(), {}, false};
   }
   static inline RequestedResultsTy getTombstoneKey() {
-    return {DenseMapInfo<swift::ModuleDecl *>::getTombstoneKey(), false, false,
-            false, false, false, false};
+    return {DenseMapInfo<swift::ModuleDecl *>::getTombstoneKey(), {}, false};
   }
   static unsigned getHashValue(const RequestedResultsTy &Val) {
     return hash_combine(
         DenseMapInfo<swift::ModuleDecl *>::getHashValue(Val.TheModule),
-        Val.OnlyTypes, Val.OnlyPrecedenceGroups, Val.OnlyMacros,
-        Val.NeedLeadingDot, Val.NeedPound, Val.IncludeModuleQualifier);
+        Val.Filter.toRaw(), Val.NeedLeadingDot);
   }
   static bool isEqual(const RequestedResultsTy &LHS,
                       const RequestedResultsTy &RHS) {

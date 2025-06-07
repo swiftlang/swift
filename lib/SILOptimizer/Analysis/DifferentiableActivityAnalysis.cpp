@@ -15,6 +15,7 @@
 #include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
 #include "swift/SILOptimizer/Differentiation/Common.h"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
@@ -81,6 +82,8 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
       s << val << '\n';
   });
   // Outputs are indirect result buffers and return values, count `m`.
+  // For the purposes of differentiation, we consider yields to be results as
+  // well
   collectAllFormalResultsInTypeOrder(function, outputValues);
   LLVM_DEBUG({
     auto &s = getADDebugStream();
@@ -138,8 +141,8 @@ void DifferentiableActivityInfo::propagateVaried(
     if (isVaried(operand->get(), i)) {
       for (auto indRes : applySite.getIndirectSILResults())
         propagateVariedInwardsThroughProjections(indRes, i);
-      for (auto inoutArg : applySite.getInoutArguments())
-        propagateVariedInwardsThroughProjections(inoutArg, i);
+      for (auto semresArg : applySite.getAutoDiffSemanticResultArguments())
+        propagateVariedInwardsThroughProjections(semresArg, i);
       // Propagate variedness to apply site direct results.
       forEachApplyDirectResult(applySite, [&](SILValue directResult) {
         setVariedAndPropagateToUsers(directResult, i);
@@ -231,13 +234,13 @@ void DifferentiableActivityInfo::propagateVaried(
 
 /// Returns the accessor kind of the given SIL function, if it is a lowered
 /// accessor. Otherwise, return `None`.
-static Optional<AccessorKind> getAccessorKind(SILFunction *fn) {
+static std::optional<AccessorKind> getAccessorKind(SILFunction *fn) {
   auto *dc = fn->getDeclContext();
   if (!dc)
-    return None;
+    return std::nullopt;
   auto *accessor = dyn_cast_or_null<AccessorDecl>(dc->getAsDecl());
   if (!accessor)
-    return None;
+    return std::nullopt;
   return accessor->getAccessorKind();
 }
 
@@ -270,10 +273,10 @@ void DifferentiableActivityInfo::propagateVariedInwardsThroughProjections(
     // the `inout` argument is a safe over-approximation but not always true.
     if (auto *bai = dyn_cast<BeginApplyInst>(inst)) {
       if (auto *calleeFn = bai->getCalleeFunction()) {
-        if (getAccessorKind(calleeFn) == AccessorKind::Modify) {
+        auto kind = getAccessorKind(calleeFn);
+        if (kind && isYieldingMutableAccessor(*kind))
           for (auto inoutArg : bai->getInoutArguments())
             propagateVariedInwardsThroughProjections(inoutArg, i);
-        }
       }
     }
     return;
@@ -303,15 +306,28 @@ void DifferentiableActivityInfo::setUsefulAndPropagateToOperands(
     return;
   }
   setUseful(value, dependentVariableIndex);
+
   // If the given value is a basic block argument, propagate usefulness to
   // incoming values.
   if (auto *bbArg = dyn_cast<SILPhiArgument>(value)) {
     SmallVector<SILValue, 4> incomingValues;
-    bbArg->getSingleTerminatorOperands(incomingValues);
-    for (auto incomingValue : incomingValues)
-      setUsefulAndPropagateToOperands(incomingValue, dependentVariableIndex);
-    return;
+    if (bbArg->getSingleTerminatorOperands(incomingValues)) {
+      for (auto incomingValue : incomingValues)
+        setUsefulAndPropagateToOperands(incomingValue, dependentVariableIndex);
+      return;
+    }
+
+    if (bbArg->isTerminatorResult()) {
+      if (TryApplyInst *tai = dyn_cast<TryApplyInst>(bbArg->getTerminatorForResult())) {
+        propagateUseful(tai, dependentVariableIndex);
+        return;
+      }
+      llvm::report_fatal_error("unknown terminator with result");
+    }
+
+    llvm::report_fatal_error("do not know how to handle this incoming bb argument");
   }
+  
   auto *inst = value->getDefiningInstruction();
   if (!inst)
     return;
@@ -335,10 +351,12 @@ void DifferentiableActivityInfo::propagateUseful(
     // Note: the assumption that yielded addresses are always a projection into
     // the `inout` argument is a safe over-approximation but not always true.
     if (auto *bai = dyn_cast<BeginApplyInst>(inst)) {
-      if (auto *calleeFn = bai->getCalleeFunction())
-        if (getAccessorKind(calleeFn) == AccessorKind::Modify)
+      if (auto *calleeFn = bai->getCalleeFunction()) {
+        auto kind = getAccessorKind(calleeFn);
+        if (kind && isYieldingMutableAccessor(*kind))
           for (auto yield : bai->getYieldedValues())
             setUsefulAndPropagateToOperands(yield, i);
+      }
     }
     // Propagate usefulness through apply site arguments.
     for (auto arg : applySite.getArgumentsWithoutIndirectResults())
@@ -398,7 +416,7 @@ void DifferentiableActivityInfo::propagateUsefulThroughAddress(
       SKIP_NODERIVATIVE(RefElementAddr)
 #undef SKIP_NODERIVATIVE
       if (Projection::isAddressProjection(res) || isa<BeginAccessInst>(res) ||
-          isa<BeginBorrowInst>(res))
+          isa<BeginBorrowInst>(res) || isa<InitEnumDataAddrInst>(res))
         propagateUsefulThroughAddress(res, dependentVariableIndex);
     }
   }
@@ -419,12 +437,15 @@ void DifferentiableActivityInfo::setUsefulThroughArrayInitialization(
       continue;
     // The second tuple field of the return value is the `RawPointer`.
     for (auto use : dti->getResult(1)->getUses()) {
-      // The `RawPointer` passes through a `pointer_to_address`. That
-      // instruction's first use is a `store` whose source is useful; its
+      // The `RawPointer` passes through a `mark_dependence(pointer_to_address`.
+      // That instruction's first use is a `store` whose source is useful; its
       // subsequent uses are `index_addr`s whose only use is a useful `store`.
-      auto *ptai = dyn_cast<PointerToAddressInst>(use->getUser());
-      assert(ptai && "Expected `pointer_to_address` user for uninitialized "
-                     "array intrinsic");
+      auto *mdi = dyn_cast<MarkDependenceInst>(use->getUser());
+      assert(
+          mdi &&
+          "Expected a mark_dependence user for uninitialized array intrinsic.");
+      auto *ptai = dyn_cast<PointerToAddressInst>(getSingleNonDebugUser(mdi));
+      assert(ptai && "Expected a pointer_to_address.");
       setUseful(ptai, dependentVariableIndex);
       // Propagate usefulness through array element addresses:
       // `pointer_to_address` and `index_addr` instructions.

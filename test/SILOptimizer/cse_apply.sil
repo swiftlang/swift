@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -compute-side-effects -cse | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -compute-side-effects -cse | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
@@ -126,7 +126,7 @@ bb0(%0 : $Int64):
   return %14 : $Int64
 }
 
-//CHECK-LABEL: sil @dont_cse_retain_only_apply
+//CHECK-LABEL: sil @dont_cse_retain_only_apply :
 //CHECK: %{{[0-9]+}} = apply
 //CHECK: %{{[0-9]+}} = apply
 //CHECK: return
@@ -139,5 +139,47 @@ bb0:
   strong_release %a2 : $XX
   %r = tuple()
   return %r : $()
+}
+
+sil @get_tuple : $@convention(thin) () -> (@owned XX, Int) {
+[global: ]
+}
+
+//CHECK-LABEL: sil @dont_cse_retain_only_apply2 :
+//CHECK:         %{{[0-9]+}} = apply %0
+//CHECK:         %{{[0-9]+}} = apply %0
+//CHECK:       } // end sil function 'dont_cse_retain_only_apply2'
+sil @dont_cse_retain_only_apply2 : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @get_tuple : $@convention(thin) () -> (@owned XX, Int)
+  %1 = apply %0() : $@convention(thin) () -> (@owned XX, Int)
+  %2 = tuple_extract %1 : $(XX, Int), 0
+  release_value %2 : $XX
+  %4 = apply %0() : $@convention(thin) () -> (@owned XX, Int)
+  %5 = tuple_extract %4 : $(XX, Int), 0
+  release_value %5 : $XX
+  %6 = tuple ()
+  return %6 : $()
+}
+
+sil @get_trivial_tuple : $@convention(thin) () -> (Int, Int) {
+[global: ]
+}
+
+//CHECK-LABEL: sil @cse_apply_with_trivial_result :
+//CHECK:         [[R:%.*]] = apply %0
+//CHECK-NEXT:    [[I:%.*]] = tuple_extract [[R]] : $(Int, Int), 0
+//CHECK-NEXT:    [[T:%.*]] = tuple ([[I]] : $Int, [[I]] : $Int)
+//CHECK-NEXT:    return [[T]]
+//CHECK:       } // end sil function 'cse_apply_with_trivial_result'
+sil @cse_apply_with_trivial_result : $@convention(thin) () -> (Int, Int) {
+bb0:
+  %0 = function_ref @get_trivial_tuple : $@convention(thin) () -> (Int, Int)
+  %1 = apply %0() : $@convention(thin) () -> (Int, Int)
+  %2 = tuple_extract %1 : $(Int, Int), 0
+  %4 = apply %0() : $@convention(thin) () -> (Int, Int)
+  %5 = tuple_extract %4 : $(Int, Int), 0
+  %6 = tuple (%2 : $Int, %5 : $Int)
+  return %6 : $(Int, Int)
 }
 

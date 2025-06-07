@@ -21,10 +21,11 @@
 
 // NOTE: Most of these includes are for CTypeIDZone.def and DefineTypeIDZone.h.
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/TinyPtrVector.h"
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 

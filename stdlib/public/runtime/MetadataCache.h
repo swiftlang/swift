@@ -22,14 +22,18 @@
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
 
+#include <atomic>
 #include <condition_variable>
-#include <thread>
+#include <optional>
+#include <tuple>
 
 #ifndef SWIFT_DEBUG_RUNTIME
 #define SWIFT_DEBUG_RUNTIME 0
 #endif
 
 namespace swift {
+
+RelativeWitnessTable *lookThroughOptionalConditionalWitnessTable(const RelativeWitnessTable *);
 
 #if !SWIFT_STDLIB_PASSTHROUGH_METADATA_ALLOCATOR
 
@@ -42,6 +46,11 @@ public:
   MetadataAllocator() = delete;
 
   void Reset() {}
+
+  /// Get the location of the allocator's initial statically allocated pool.
+  /// The return values are start and size. If there is no statically allocated
+  /// pool, the return values are NULL, 0.
+  static std::tuple<const void *, size_t> InitialPoolLocation();
 
   SWIFT_RETURNS_NONNULL SWIFT_NODISCARD
   void *Allocate(size_t size, size_t alignment);
@@ -64,6 +73,9 @@ public:
 class MetadataAllocator {
 public:
   MetadataAllocator(uint16_t tag) {}
+  static std::tuple<const void *, size_t> InitialPoolLocation() {
+    return {nullptr, 0};
+  }
   SWIFT_RETURNS_NONNULL SWIFT_NODISCARD
   void *Allocate(size_t size, size_t alignment) {
     if (alignment < sizeof(void*)) alignment = sizeof(void*);
@@ -172,7 +184,8 @@ class LockingConcurrentMapStorage {
   // TargetGenericMetadataInstantiationCache::PrivateData. On 32-bit archs, that
   // space is not large enough to accommodate a Mutex along with everything
   // else. There, use a SmallMutex to squeeze into the available space.
-  using MutexTy = std::conditional_t<sizeof(void *) == 8, Mutex, SmallMutex>;
+  using MutexTy = std::conditional_t<sizeof(void *) == 8 && sizeof(Mutex) <= 56,
+                                     Mutex, SmallMutex>;
   StableAddressConcurrentReadableHashMap<EntryType,
                                          TaggedMetadataAllocator<Tag>, MutexTy>
       Map;
@@ -294,9 +307,10 @@ public:
 
   /// If an entry already exists, await it; otherwise report failure.
   template <class KeyType, class... ArgTys>
-  llvm::Optional<Status> tryAwaitExisting(KeyType key, ArgTys &&... args) {
+  std::optional<Status> tryAwaitExisting(KeyType key, ArgTys &&...args) {
     EntryType *entry = Storage.find(key);
-    if (!entry) return None;
+    if (!entry)
+      return std::nullopt;
     return entry->await(Storage.getConcurrency(),
                         std::forward<ArgTys>(args)...);
   }
@@ -378,8 +392,8 @@ public:
   }
 
   template <class... ArgTys>
-  llvm::Optional<Status> beginAllocation(WaitQueue::Worker &worker,
-                                         ArgTys &&... args) {
+  std::optional<Status> beginAllocation(WaitQueue::Worker &worker,
+                                        ArgTys &&...args) {
 
     // Delegate to the implementation class.
     ValueType origValue =
@@ -409,28 +423,87 @@ template<typename Runtime>
 struct GenericSignatureLayout {
   uint16_t NumKeyParameters = 0;
   uint16_t NumWitnessTables = 0;
+  uint16_t NumPacks = 0;
+  uint16_t NumShapeClasses = 0;
+  const GenericPackShapeDescriptor *PackShapeDescriptors = nullptr;
 
-  GenericSignatureLayout(const RuntimeGenericSignature<Runtime> &sig) {
+  GenericSignatureLayout(const RuntimeGenericSignature<Runtime> &sig)
+    : NumPacks(sig.getGenericPackShapeHeader().NumPacks),
+      NumShapeClasses(sig.getGenericPackShapeHeader().NumShapeClasses),
+      PackShapeDescriptors(sig.getGenericPackShapeDescriptors().data()) {
+
+#ifndef NDEBUG
+    unsigned packIdx = 0;
+#endif
+
     for (const auto &gp : sig.getParams()) {
-      if (gp.hasKeyArgument())
+      if (gp.hasKeyArgument()) {
+#ifndef NDEBUG
+        if (gp.getKind() == GenericParamKind::TypePack) {
+          assert(packIdx < NumPacks);
+          assert(PackShapeDescriptors[packIdx].Kind
+                 == GenericPackKind::Metadata);
+          assert(PackShapeDescriptors[packIdx].Index
+                 == NumShapeClasses + NumKeyParameters);
+          assert(PackShapeDescriptors[packIdx].ShapeClass
+                 < NumShapeClasses);
+          ++packIdx;
+        }
+#endif
+
         ++NumKeyParameters;
+      }
     }
     for (const auto &reqt : sig.getRequirements()) {
       if (reqt.Flags.hasKeyArgument() &&
-          reqt.getKind() == GenericRequirementKind::Protocol)
+          reqt.getKind() == GenericRequirementKind::Protocol) {
+#ifndef NDEBUG
+        if (reqt.getFlags().isPackRequirement()) {
+          assert(packIdx < NumPacks);
+          assert(PackShapeDescriptors[packIdx].Kind
+                 == GenericPackKind::WitnessTable);
+          assert(PackShapeDescriptors[packIdx].Index
+                 == NumShapeClasses + NumKeyParameters + NumWitnessTables);
+          assert(PackShapeDescriptors[packIdx].ShapeClass
+                 < NumShapeClasses);
+          ++packIdx;
+        }
+#endif
+
         ++NumWitnessTables;
+      }
     }
+
+#ifndef NDEBUG
+    assert(packIdx == NumPacks);
+#endif
   }
 
   size_t sizeInWords() const {
-    return NumKeyParameters + NumWitnessTables;
+    return NumShapeClasses + NumKeyParameters + NumWitnessTables;
   }
 
   friend bool operator==(const GenericSignatureLayout<Runtime> &lhs,
                          const GenericSignatureLayout<Runtime> &rhs) {
-    return lhs.NumKeyParameters == rhs.NumKeyParameters &&
-           lhs.NumWitnessTables == rhs.NumWitnessTables;
+    if (lhs.NumKeyParameters != rhs.NumKeyParameters ||
+        lhs.NumWitnessTables != rhs.NumWitnessTables ||
+        lhs.NumShapeClasses != rhs.NumShapeClasses ||
+        lhs.NumPacks != rhs.NumPacks) {
+      return false;
+    }
+
+    for (unsigned i = 0; i < lhs.NumPacks; ++i) {
+      const auto &lhsElt = lhs.PackShapeDescriptors[i];
+      const auto &rhsElt = rhs.PackShapeDescriptors[i];
+      if (lhsElt.Kind != rhsElt.Kind ||
+          lhsElt.Index != rhsElt.Index ||
+          lhsElt.ShapeClass != rhsElt.ShapeClass)
+        return false;
+    }
+
+    return true;
   }
+
   friend bool operator!=(const GenericSignatureLayout<Runtime> &lhs,
                          const GenericSignatureLayout<Runtime> &rhs) {
     return !(lhs == rhs);
@@ -443,67 +516,90 @@ class MetadataCacheKey {
   GenericSignatureLayout<InProcess> Layout;
   uint32_t Hash;
 
+public:
   /// Compare two witness tables, which may involving checking the
   /// contents of their conformance descriptors.
-  static int compareWitnessTables(const WitnessTable *awt,
-                                  const WitnessTable *bwt) {
+  static bool areWitnessTablesEqual(const WitnessTable *awt,
+                                    const WitnessTable *bwt) {
     if (awt == bwt)
-      return 0;
+      return true;
 #if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
-    auto *aDescription =
-      reinterpret_cast<const RelativeWitnessTable*>(awt)->getDescription();
-    auto *bDescription =
-      reinterpret_cast<const RelativeWitnessTable*>(bwt)->getDescription();
+    auto *aDescription = lookThroughOptionalConditionalWitnessTable(
+      reinterpret_cast<const RelativeWitnessTable*>(awt))->getDescription();
+    auto *bDescription = lookThroughOptionalConditionalWitnessTable(
+      reinterpret_cast<const RelativeWitnessTable*>(bwt))->getDescription();
 #else
     auto *aDescription = awt->getDescription();
     auto *bDescription = bwt->getDescription();
 #endif
-    return compareProtocolConformanceDescriptors(aDescription, bDescription);
+    return areConformanceDescriptorsEqual(aDescription, bDescription);
   }
 
-public:
+  static void installGenericArguments(uint16_t numKeyArguments, uint16_t numPacks,
+                                      const GenericPackShapeDescriptor *packShapeDescriptors,
+                                      const void **dst, const void * const *src);
+
   /// Compare two conformance descriptors, checking their contents if necessary.
-  static int compareProtocolConformanceDescriptors(
+  static bool areConformanceDescriptorsEqual(
       const ProtocolConformanceDescriptor *aDescription,
       const ProtocolConformanceDescriptor *bDescription) {
     if (aDescription == bDescription)
-      return 0;
+      return true;
 
     if (!aDescription->isSynthesizedNonUnique() ||
         !bDescription->isSynthesizedNonUnique())
-      return comparePointers(aDescription, bDescription);
+      return aDescription == bDescription;
 
     auto aType = aDescription->getCanonicalTypeMetadata();
     auto bType = bDescription->getCanonicalTypeMetadata();
     if (!aType || !bType)
-      return comparePointers(aDescription, bDescription);
+      return aDescription == bDescription;
 
-    if (int result = comparePointers(aType, bType))
-      return result;
-
-    return comparePointers(aDescription->getProtocol(),
-                           bDescription->getProtocol());
+    return (aType == bType &&
+            aDescription->getProtocol() == bDescription->getProtocol());
   }
 
 private:
-  /// Compare the content from two keys.
-  static int compareContent(const void *const *adata, const void *const *bdata,
-                            const GenericSignatureLayout<InProcess> &layout) {
-    // Compare generic arguments for key parameters.
-    for (unsigned i = 0; i != layout.NumKeyParameters; ++i) {
-      if (auto result = comparePointers(*adata++, *bdata++))
-        return result;
+  static bool areMetadataPacksEqual(const void *lhsPtr,
+                                    const void *rhsPtr,
+                                    uintptr_t count) {
+    MetadataPackPointer lhs(lhsPtr);
+    MetadataPackPointer rhs(rhsPtr);
+
+    // lhs is the user-supplied key, which might be on the stack.
+    // rhs is the stored key in the cache.
+    assert(rhs.getLifetime() == PackLifetime::OnHeap);
+
+    auto *lhsElt = lhs.getElements();
+    auto *rhsElt = rhs.getElements();
+
+    for (uintptr_t i = 0; i < count; ++i) {
+      if (lhsElt[i] != rhsElt[i])
+        return false;
     }
 
-    // Compare witness tables.
-    for (unsigned i = 0; i != layout.NumWitnessTables; ++i) {
-      if (auto result =
-              compareWitnessTables((const WitnessTable *)*adata++,
-                                   (const WitnessTable *)*bdata++))
-        return result;
+    return true;
+  }
+
+  static bool areWitnessTablePacksEqual(const void *lhsPtr,
+                                        const void *rhsPtr,
+                                        uintptr_t count) {
+    WitnessTablePackPointer lhs(lhsPtr);
+    WitnessTablePackPointer rhs(rhsPtr);
+
+    // lhs is the user-supplied key, which might be on the stack.
+    // rhs is the stored key in the cache.
+    assert(rhs.getLifetime() == PackLifetime::OnHeap);
+
+    auto *lhsElt = lhs.getElements();
+    auto *rhsElt = rhs.getElements();
+
+    for (uintptr_t i = 0; i < count; ++i) {
+      if (!areWitnessTablesEqual(lhsElt[i], rhsElt[i]))
+        return false;
     }
 
-    return 0;
+    return true;
   }
 
 public:
@@ -515,39 +611,96 @@ public:
                    const void *const *data, uint32_t hash)
       : Data(data), Layout(layout), Hash(hash) {}
 
-  bool operator==(MetadataCacheKey rhs) const {
+  bool operator==(const MetadataCacheKey &rhs) const {
     // Compare the hashes.
     if (hash() != rhs.hash()) return false;
 
-    // Compare the sizes.
+    // Fast path the case where they're bytewise identical. That's nearly always
+    // the case if the hashes are the same, and we can skip the slower deep
+    // comparison.
+    auto *adata = begin();
+    auto *bdata = rhs.begin();
+
+    auto asize = (uintptr_t)end() - (uintptr_t)adata;
+    auto bsize = (uintptr_t)rhs.end() - (uintptr_t)bdata;
+
+    // If sizes don't match, they can never be equal.
+    if (asize != bsize)
+      return false;
+
+    // If sizes match, see if the bytes match. If they do, then the contents
+    // must necessarily match. Otherwise do a deep comparison.
+    if (memcmp(adata, bdata, asize) == 0)
+      return true;
+
+    // Compare the layouts.
     if (Layout != rhs.Layout) return false;
 
     // Compare the content.
-    return compareContent(begin(), rhs.begin(), Layout) == 0;
-  }
+    const uintptr_t *packCounts = reinterpret_cast<const uintptr_t *>(adata);
 
-  int compare(const MetadataCacheKey &rhs) const {
-    // Compare the hashes.
-    if (auto hashComparison = compareIntegers(Hash, rhs.Hash)) {
-      return hashComparison;
+    unsigned argIdx = 0;
+
+    // Compare pack lengths for shape classes.
+    for (unsigned i = 0; i != Layout.NumShapeClasses; ++i) {
+      if (adata[argIdx] != bdata[argIdx])
+        return false;
+
+      ++argIdx;
     }
 
-    // Compare the # of key parameters.
-    if (auto keyParamsComparison =
-            compareIntegers(Layout.NumKeyParameters,
-                            rhs.Layout.NumKeyParameters)) {
-      return keyParamsComparison;
+    auto *packs = Layout.PackShapeDescriptors;
+    unsigned packIdx = 0;
+
+    // Compare generic arguments for key parameters.
+    for (unsigned i = 0; i != Layout.NumKeyParameters; ++i) {
+      // Is this entry a metadata pack?
+      if (packIdx < Layout.NumPacks &&
+          packs[packIdx].Kind == GenericPackKind::Metadata &&
+          argIdx == packs[packIdx].Index) {
+        assert(packs[packIdx].ShapeClass < Layout.NumShapeClasses);
+        uintptr_t count = packCounts[packs[packIdx].ShapeClass];
+
+        if (!areMetadataPacksEqual(adata[argIdx], bdata[argIdx], count))
+          return false;
+
+        ++packIdx;
+        ++argIdx;
+        continue;
+      }
+
+      if (adata[argIdx] != bdata[argIdx])
+        return false;
+
+      ++argIdx;
     }
 
-    // Compare the # of witness tables.
-    if (auto witnessTablesComparison =
-            compareIntegers(Layout.NumWitnessTables,
-                            rhs.Layout.NumWitnessTables)) {
-      return witnessTablesComparison;
+    // Compare witness tables.
+    for (unsigned i = 0; i != Layout.NumWitnessTables; ++i) {
+      // Is this entry a witness table pack?
+      if (packIdx < Layout.NumPacks &&
+          packs[packIdx].Kind == GenericPackKind::WitnessTable &&
+          argIdx == packs[packIdx].Index) {
+        assert(packs[packIdx].ShapeClass < Layout.NumShapeClasses);
+        uintptr_t count = packCounts[packs[packIdx].ShapeClass];
+
+        if (!areWitnessTablePacksEqual(adata[argIdx], bdata[argIdx], count))
+          return false;
+
+        ++packIdx;
+        ++argIdx;
+        continue;
+      }
+
+      if (!areWitnessTablesEqual((const WitnessTable *)adata[argIdx],
+                                 (const WitnessTable *)bdata[argIdx]))
+        return false;
+
+      ++argIdx;
     }
 
-    // Compare the content.
-    return compareContent(begin(), rhs.begin(), Layout);
+    assert(packIdx == Layout.NumPacks && "Missed a pack");
+    return true;
   }
 
   uint32_t hash() const {
@@ -565,23 +718,52 @@ public:
   unsigned size() const { return Layout.sizeInWords(); }
 
   void installInto(const void **buffer) const {
-    // FIXME: variadic-parameter-packs
-    memcpy(buffer, Data, size() * sizeof(const void *));
+    MetadataCacheKey::installGenericArguments(
+        Layout.sizeInWords(),
+        Layout.NumPacks,
+        Layout.PackShapeDescriptors,
+        buffer, Data);
   }
 
 private:
   uint32_t computeHash() const {
     size_t H = 0x56ba80d1u * Layout.NumKeyParameters;
-    for (unsigned index = 0; index != Layout.NumKeyParameters; ++index) {
-      H = (H >> 10) | (H << ((sizeof(size_t) * 8) - 10));
-      H ^= (reinterpret_cast<size_t>(Data[index])
-            ^ (reinterpret_cast<size_t>(Data[index]) >> 19));
+
+    auto *packs = Layout.PackShapeDescriptors;
+    unsigned packIdx = 0;
+
+    auto update = [&H](uintptr_t value) {
+      H = (H >> 10) | (H << ((sizeof(uintptr_t) * 8) - 10));
+      H ^= (value ^ (value >> 19));
+    };
+
+    // FIXME: The first NumShapeClasses entries are pack counts;
+    // incorporate them into the hash
+    for (unsigned i = Layout.NumShapeClasses,
+                  e = Layout.NumShapeClasses + Layout.NumKeyParameters;
+         i != e; ++i) {
+      // Is this entry a metadata pack?
+      if (packIdx < Layout.NumPacks &&
+          packs[packIdx].Kind == GenericPackKind::Metadata &&
+          i == packs[packIdx].Index) {
+        assert(packs[packIdx].ShapeClass < Layout.NumShapeClasses);
+        auto count = reinterpret_cast<uintptr_t>(Data[packs[packIdx].ShapeClass]);
+        ++packIdx;
+
+        MetadataPackPointer pack(Data[i]);
+        for (unsigned j = 0; j < count; ++j)
+          update(reinterpret_cast<uintptr_t>(pack.getElements()[j]));
+
+        continue;
+      }
+
+      update(reinterpret_cast<uintptr_t>(Data[i]));
     }
 
     H *= 0x27d4eb2d;
 
     // Rotate right by 10 and then truncate to 32 bits.
-    return uint32_t((H >> 10) | (H << ((sizeof(size_t) * 8) - 10)));
+    return uint32_t((H >> 10) | (H << ((sizeof(uintptr_t) * 8) - 10)));
   }
 };
 
@@ -971,9 +1153,9 @@ public:
 
   /// Perform the allocation operation.
   template <class... Args>
-  llvm::Optional<Status> beginAllocation(MetadataWaitQueue::Worker &worker,
-                                         MetadataRequest request,
-                                         Args &&... args) {
+  std::optional<Status> beginAllocation(MetadataWaitQueue::Worker &worker,
+                                        MetadataRequest request,
+                                        Args &&...args) {
     // Returning a non-None value here will preempt initialization, so we
     // should only do it if we're reached PrivateMetadataState::Complete.
 
@@ -995,7 +1177,7 @@ public:
 
       // Otherwise, go directly to the initialization phase.
       assert(worker.isWorkerThread());
-      return None;
+      return std::nullopt;
     }
 
     assert(worker.isWorkerThread());
@@ -1039,7 +1221,7 @@ public:
       verifyMangledNameRoundtrip(value);
 #endif
 
-    return None;
+    return std::nullopt;
   }
 
   template <class... Args>
@@ -1054,7 +1236,8 @@ public:
                              MetadataRequest request, Args &&...args) {
     // Note that we ignore the extra arguments; those are just for the
     // constructor and allocation.
-    return doInitialization(worker, request);
+    auto result = doInitialization(worker, request);
+    return result;
   }
 
 private:

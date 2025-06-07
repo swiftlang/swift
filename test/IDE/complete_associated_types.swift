@@ -204,9 +204,7 @@ func testStruct3(a: StructWithAssociatedTypes) {
 // STRUCT_INSTANCE-DAG: Decl[InstanceMethod]/CurrNominal:   deduceBarBaseD()[#Int#]
 // STRUCT_INSTANCE-DAG: Decl[InstanceMethod]/CurrNominal:   deduceBarD()[#Int#]
 // STRUCT_INSTANCE-DAG: Keyword[self]/CurrNominal: self[#StructWithAssociatedTypes#]; name=self
-// STRUCT_INSTANCE: End completions
 
-// STRUCT_TYPES: Begin completions
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .DefaultedTypeCommonA[#Int#]{{; name=.+$}}
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .DefaultedTypeCommonD[#Int#]{{; name=.+$}}
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .DeducedTypeCommonA[#Int#]{{; name=.+$}}
@@ -231,7 +229,6 @@ func testStruct3(a: StructWithAssociatedTypes) {
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooBaseDeducedTypeC[#Int#]{{; name=.+$}}
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooBaseDeducedTypeD[#Int#]{{; name=.+$}}
 // STRUCT_TYPES-DAG: Decl[TypeAlias]/CurrNominal:       .FooBaseDefaultedTypeC[#Double#]{{; name=.+$}}
-// STRUCT_TYPES: End completions
 
 class DerivedFromClassWithAssociatedTypes : ClassWithAssociatedTypes {
   func test() {
@@ -243,7 +240,6 @@ class MoreDerivedFromClassWithAssociatedTypes : DerivedFromClassWithAssociatedTy
     #^ASSOCIATED_TYPES_UNQUAL_2^#
   }
 }
-// ASSOCIATED_TYPES_UNQUAL: Begin completions
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: DefaultedTypeCommonA[#Int#]{{; name=.+$}}
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: DefaultedTypeCommonD[#Int#]{{; name=.+$}}
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: DeducedTypeCommonA[#Int#]{{; name=.+$}}
@@ -268,7 +264,6 @@ class MoreDerivedFromClassWithAssociatedTypes : DerivedFromClassWithAssociatedTy
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooBaseDeducedTypeB[#Int#]{{; name=.+$}}
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooBaseDeducedTypeC[#Int#]{{; name=.+$}}
 // ASSOCIATED_TYPES_UNQUAL-DAG: Decl[TypeAlias]/Super: FooBaseDeducedTypeD[#Int#]{{; name=.+$}}
-// ASSOCIATED_TYPES_UNQUAL: End completions
 
 struct StructWithBrokenConformance : FooProtocolWithAssociatedTypes {
   // Does not conform.
@@ -308,7 +303,6 @@ func testBrokenConformances1() {
 // BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooBaseB({#(self): StructWithBrokenConformance#})[#() -> StructWithBrokenConformance.FooBaseDeducedTypeB#]{{; name=.+$}}
 // BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooBaseC({#(self): StructWithBrokenConformance#})[#() -> StructWithBrokenConformance.FooBaseDeducedTypeC#]{{; name=.+$}}
 // BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooBaseD({#(self): StructWithBrokenConformance#})[#() -> StructWithBrokenConformance.FooBaseDeducedTypeD#]{{; name=.+$}}
-// BROKEN_CONFORMANCE_1: End completions
 
 
 protocol MyProto {
@@ -340,11 +334,7 @@ struct A<T>: MyProto {
       (a, (b, c)) = #^BROKEN_CONFORMANCE_ASSIGNABLE^#
     }
 }
-// BROKEN_CONFORMANCE_UNASSIGNABLE: Begin completions
 // BROKEN_CONFORMANCE_UNASSIGNABLE: Decl[InstanceMethod]/Super:         first()[#MyProto.Element#]; name=first()
-// BROKEN_CONFORMANCE_UNASSIGNABLE: End completions
 
-// BROKEN_CONFORMANCE_ASSIGNABLE: Begin completions
 // BROKEN_CONFORMANCE_ASSIGNABLE-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: exact[#(Int, (Int, Int))#]; name=exact
 // BROKEN_CONFORMANCE_ASSIGNABLE-DAG: Decl[InstanceVar]/Super/TypeRelation[Convertible]: matches[#(Int, (Int, Int))#]; name=matches
-// BROKEN_CONFORMANCE_ASSIGNABLE: End completions

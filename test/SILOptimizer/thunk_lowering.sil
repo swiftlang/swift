@@ -1,0 +1,920 @@
+// RUN: %target-sil-opt -sil-print-types -sil-thunk-lowering %s | %FileCheck %s
+
+// REQUIRES: asserts
+
+sil_stage lowered
+
+import Swift
+
+////////////////////////
+// MARK: Declarations //
+////////////////////////
+
+class Klass {}
+
+sil @noparam_noreturn_callee : $@convention(thin) () -> ()
+sil @oneparam_noreturn_callee : $@convention(thin) (@owned Klass) -> ()
+sil @twoparam_noreturn_callee : $@convention(thin) (@owned Klass, @owned Klass) -> ()
+
+sil @noparam_oneresult_callee : $@convention(thin) () -> @owned Klass
+sil @oneparam_oneresult_callee : $@convention(thin) (@owned Klass) -> @owned Klass
+sil @twoparam_oneresult_callee : $@convention(thin) (@owned Klass, @owned Klass) -> @owned Klass
+
+sil @generic_noparam_noreturn_callee : $@convention(thin) <T> () -> ()
+sil @generic_oneparam_noreturn_callee : $@convention(thin) <T> (@in T) -> ()
+sil @generic_twoparam_noreturn_callee : $@convention(thin) <T> (@in T, @in T) -> ()
+
+sil @generic_noparam_oneresult_callee : $@convention(thin) <T> () -> @out T
+sil @generic_oneparam_oneresult_callee : $@convention(thin) <T> (@in T) -> @out T
+sil @generic_twoparam_oneresult_callee : $@convention(thin) <T> (@in T, @in T) -> @out T
+
+sil @generic_mixed_twoparam_oneresult_callee : $@convention(thin) <T> (@in T, @in T) -> (@out T, @owned Klass)
+sil @generic_mixed_2_twoparam_oneresult_callee : $@convention(thin) <T> (@in T, @in T) -> (@owned Klass, @out T, @owned Klass)
+
+sil @throws_noparam_noreturn_callee : $@convention(thin) () -> @error Error
+sil @throws_oneparam_noreturn_callee : $@convention(thin) (@owned Klass) -> @error Error
+sil @throws_twoparam_noreturn_callee : $@convention(thin) (@owned Klass, @owned Klass) -> @error Error
+
+sil @throws_noparam_oneresult_callee : $@convention(thin) () -> (@owned Klass, @error Error)
+sil @throws_oneparam_oneresult_callee : $@convention(thin) (@owned Klass) -> (@owned Klass, @error Error)
+sil @throws_twoparam_oneresult_callee : $@convention(thin) (@owned Klass, @owned Klass) -> (@owned Klass, @error Error)
+
+sil @throws_noparam_tworesult_callee : $@convention(thin) () -> (@owned Klass, @owned Klass, @error Error)
+sil @throws_oneparam_tworesult_callee : $@convention(thin) (@owned Klass) -> (@owned Klass, @owned Klass, @error Error)
+sil @throws_twoparam_tworesult_callee : $@convention(thin) (@owned Klass, @owned Klass) -> (@owned Klass, @owned Klass, @error Error)
+
+sil @generic_throws_noparam_noreturn_callee : $@convention(thin) <T> () -> @error Error
+sil @generic_throws_oneparam_noreturn_callee : $@convention(thin) <T> (@in T) -> @error Error
+sil @generic_throws_twoparam_noreturn_callee : $@convention(thin) <T> (@in T, @in T) -> @error Error
+
+sil @generic_throws_noparam_oneresult_callee : $@convention(thin) <T> () -> (@out T, @error Error)
+sil @generic_throws_oneparam_oneresult_callee : $@convention(thin) <T> (@in T) -> (@out T, @error Error)
+sil @generic_throws_twoparam_oneresult_callee : $@convention(thin) <T> (@in T, @in T) -> (@out T, @error Error)
+
+sil @generic_throws_twoparam_mixedresults_callee : $@convention(thin) <T> (@in T, @in T) -> (@out T, @owned Klass, @out T, @error Error)
+sil @generic_throws_twoparam_mixedresults_2_callee : $@convention(thin) <T> (@in T, @in T) -> (@owned Klass, @out T, @owned Klass, @out T, @error Error)
+
+sil @async_noparam_noreturn_callee : $@convention(thin) @async () -> ()
+
+sil @yield_noparam_twoyield_callee : $@yield_once @convention(thin) () -> (@yields Klass, @yields Klass)
+sil @generic_yield_noparam_twoyield_callee : $@yield_once @convention(thin) <τ_0_0> () -> (@yields Klass, @yields τ_0_0, @yields Klass, @yields τ_0_0)
+sil @generic_yield_noparam_mixedyieldreturn_callee : $@yield_once @convention(thin) <τ_0_0> () -> (@yields Klass, @owned Klass, @yields τ_0_0, @yields Klass, @out τ_0_0, @yields τ_0_0, @owned Klass)
+
+/////////////////////////////////////
+// MARK: Unique Function Name Test //
+/////////////////////////////////////
+
+// Make sure that we come up with unique names in each function (which we hack
+// by just adding a counter).
+//
+// CHECK-LABEL: sil @double_thunk_test : $@convention(thin) () -> () {
+// CHECK: [[FUNC:%.*]] = function_ref @noparam_noreturn_callee :
+// CHECK: [[THUNK:%.*]] = function_ref @double_thunk_testTTI :
+// CHECK: [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[FUNC]]) :
+// CHECK: apply [[THUNKED_FUNC]]() :
+// CHECK: [[THUNK:%.*]] = function_ref @double_thunk_testTTI :
+// CHECK: [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[FUNC]]) :
+// CHECK: apply [[THUNKED_FUNC]]() :
+// CHECK: } // end sil function 'double_thunk_test'
+sil @double_thunk_test : $@convention(thin) () -> () {
+  %0 = function_ref @noparam_noreturn_callee : $@convention(thin) () -> ()
+  %1 = thunk [identity] %0() : $@convention(thin) () -> ()
+  apply %1() : $@callee_guaranteed () -> ()
+  %2 = thunk [identity] %0() : $@convention(thin) () -> ()
+  apply %2() : $@callee_guaranteed () -> ()
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+/////////////////////////////////////////////
+// MARK: Direct Loadable Types Apply Tests //
+/////////////////////////////////////////////
+
+// CHECK-LABEL: sil shared [thunk] @thunk_lowering_noparam_noresultTTI : $@convention(thin) (@guaranteed @convention(thin) () -> ()) -> () {
+// CHECK:bb0([[ARG:%.*]] : $@convention(thin) () -> ()):
+// CHECK:  apply [[ARG]]() : $@convention(thin) () -> ()
+// CHECK: } // end sil function 'thunk_lowering_noparam_noresultTTI'
+
+// CHECK-LABEL: sil @thunk_lowering_noparam_noresult : $@convention(thin) () -> () {
+// CHECK: [[FUNC:%.*]] = function_ref @noparam_noreturn_callee :
+// CHECK: [[THUNK:%.*]] = function_ref @thunk_lowering_noparam_noresultTTI :
+// CHECK: [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[FUNC]]) :
+// CHECK: apply [[THUNKED_FUNC]]() :
+// CHECK: } // end sil function 'thunk_lowering_noparam_noresult'
+sil @thunk_lowering_noparam_noresult : $@convention(thin) () -> () {
+  %0 = function_ref @noparam_noreturn_callee : $@convention(thin) () -> ()
+  %1 = thunk [identity] %0() : $@convention(thin) () -> ()
+  apply %1() : $@callee_guaranteed () -> ()
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @thunk_lowering_oneparam_noresult : $@convention(thin) (@owned Klass) -> () {
+// CHECK: bb0([[ARG:%.*]] : $Klass):
+// CHECK: [[FUNC:%.*]] = function_ref @oneparam_noreturn_callee :
+// CHECK: [[THUNK:%.*]] = function_ref @thunk_lowering_oneparam_noresultTTI :
+// CHECK: [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[FUNC]]) :
+// CHECK: apply [[THUNKED_FUNC]]([[ARG]]) :
+// CHECK: } // end sil function 'thunk_lowering_oneparam_noresult'
+sil @thunk_lowering_oneparam_noresult : $@convention(thin) (@owned Klass) -> () {
+bb0(%arg : $Klass):
+  %0 = function_ref @oneparam_noreturn_callee : $@convention(thin) (@owned Klass) -> ()
+  %1 = thunk [identity] %0() : $@convention(thin) (@owned Klass) -> ()
+  apply %1(%arg) : $@callee_guaranteed (@owned Klass) -> ()
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @thunk_lowering_twoparam_noresult : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+// CHECK: bb0([[ARG:%.*]] : $Klass, [[ARG2:%.*]] : $Klass):
+// CHECK: [[FUNC:%.*]] = function_ref @twoparam_noreturn_callee :
+// CHECK: [[THUNK:%.*]] = function_ref @thunk_lowering_twoparam_noresultTTI :
+// CHECK: [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[FUNC]]) :
+// CHECK: apply [[THUNKED_FUNC]]([[ARG]], [[ARG2]]) :
+// CHECK: } // end sil function 'thunk_lowering_twoparam_noresult'
+sil @thunk_lowering_twoparam_noresult : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%arg : $Klass, %arg2 : $Klass):
+  %0 = function_ref @twoparam_noreturn_callee : $@convention(thin) (@owned Klass, @owned Klass) -> ()
+  %1 = thunk [identity] %0() : $@convention(thin) (@owned Klass, @owned Klass) -> ()
+  apply %1(%arg, %arg2) : $@callee_guaranteed (@owned Klass, @owned Klass) -> ()
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @thunk_lowering_noparam_oneresult : $@convention(thin) () -> @owned Klass {
+// CHECK: [[FUNC:%.*]] = function_ref @noparam_oneresult_callee :
+// CHECK: [[THUNK:%.*]] = function_ref @thunk_lowering_noparam_oneresultTTI :
+// CHECK: [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[FUNC]]) :
+// CHECK: [[RESULT:%.*]] = apply [[THUNKED_FUNC]]() :
+// CHECK: return [[RESULT]]
+// CHECK: } // end sil function 'thunk_lowering_noparam_oneresult'
+sil @thunk_lowering_noparam_oneresult : $@convention(thin) () -> @owned Klass {
+  %0 = function_ref @noparam_oneresult_callee : $@convention(thin) () -> @owned Klass
+  %1 = thunk [identity] %0() : $@convention(thin) () -> @owned Klass
+  %2 = apply %1() : $@callee_guaranteed () -> @owned Klass
+  return %2 : $Klass
+}
+
+// CHECK-LABEL: sil @thunk_lowering_oneparam_oneresult : $@convention(thin) (@owned Klass) -> @owned Klass {
+// CHECK: bb0([[ARG:%.*]] : $Klass):
+// CHECK: [[FUNC:%.*]] = function_ref @oneparam_oneresult_callee :
+// CHECK: [[THUNK:%.*]] = function_ref @thunk_lowering_oneparam_oneresultTTI :
+// CHECK: [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[FUNC]]) :
+// CHECK: [[RESULT:%.*]] = apply [[THUNKED_FUNC]]([[ARG]]) :
+// CHECK: return [[RESULT]]
+// CHECK: } // end sil function 'thunk_lowering_oneparam_oneresult'
+sil @thunk_lowering_oneparam_oneresult : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%arg : $Klass):
+  %0 = function_ref @oneparam_oneresult_callee : $@convention(thin) (@owned Klass) -> @owned Klass
+  %1 = thunk [identity] %0() : $@convention(thin) (@owned Klass) -> @owned Klass
+  %2 = apply %1(%arg) : $@callee_guaranteed (@owned Klass) -> @owned Klass
+  return %2 : $Klass
+}
+
+// CHECK-LABEL: sil @thunk_lowering_twoparam_oneresult : $@convention(thin) (@owned Klass, @owned Klass) -> @owned Klass {
+// CHECK: bb0([[ARG:%.*]] : $Klass, [[ARG2:%.*]] : $Klass):
+// CHECK: [[FUNC:%.*]] = function_ref @twoparam_oneresult_callee :
+// CHECK: [[THUNK:%.*]] = function_ref @thunk_lowering_twoparam_oneresultTTI :
+// CHECK: [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[FUNC]]) :
+// CHECK: [[RESULT:%.*]] = apply [[THUNKED_FUNC]]([[ARG]], [[ARG2]]) :
+// CHECK: return [[RESULT]]
+// CHECK: } // end sil function 'thunk_lowering_twoparam_oneresult'
+sil @thunk_lowering_twoparam_oneresult : $@convention(thin) (@owned Klass, @owned Klass) -> @owned Klass {
+bb0(%arg : $Klass, %arg2 : $Klass):
+  %0 = function_ref @twoparam_oneresult_callee : $@convention(thin) (@owned Klass, @owned Klass) -> @owned Klass
+  %1 = thunk [identity] %0() : $@convention(thin) (@owned Klass, @owned Klass) -> @owned Klass
+  %2 = apply %1(%arg, %arg2) : $@callee_guaranteed (@owned Klass, @owned Klass) -> @owned Klass
+  return %2 : $Klass
+}
+
+///////////////////////////////
+// MARK: Generic Apply Tests //
+///////////////////////////////
+
+// CHECK-LABEL: sil @thunk_lowering_generic_noparam_noresult : $@convention(thin) <T> () -> () {
+// CHECK: [[FUNC:%.*]] = function_ref @generic_noparam_noreturn_callee :
+// CHECK: [[THUNK:%.*]] = function_ref @thunk_lowering_generic_noparam_noresultTTI :
+// CHECK: [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]<T>([[FUNC]]) :
+// CHECK: apply [[THUNKED_FUNC]]() :
+// CHECK: } // end sil function 'thunk_lowering_generic_noparam_noresult'
+sil @thunk_lowering_generic_noparam_noresult : $@convention(thin) <T> () -> () {
+  %0 = function_ref @generic_noparam_noreturn_callee : $@convention(thin) <τ_0_0> () -> ()
+  %1 = thunk [identity] %0<T>() : $@convention(thin) <τ_0_0> () -> ()
+  apply %1() : $@callee_guaranteed () -> ()
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @thunk_lowering_generic_oneparam_noresult : $@convention(thin) <T> (@in T) -> () {
+// CHECK: bb0([[ARG:%.*]] : $*T):
+// CHECK: [[FUNC:%.*]] = function_ref @generic_oneparam_noreturn_callee :
+// CHECK: [[THUNK:%.*]] = function_ref @thunk_lowering_generic_oneparam_noresultTTI :
+// CHECK: [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]<T>([[FUNC]]) :
+// CHECK: apply [[THUNKED_FUNC]]([[ARG]]) :
+// CHECK: } // end sil function 'thunk_lowering_generic_oneparam_noresult'
+sil @thunk_lowering_generic_oneparam_noresult : $@convention(thin) <T> (@in T) -> () {
+bb0(%arg : $*T):
+  %0 = function_ref @generic_oneparam_noreturn_callee : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+  %1 = thunk [identity] %0<T>() : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
+  apply %1(%arg) : $@callee_guaranteed (@in T) -> ()
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @thunk_lowering_generic_twoparam_noresult : $@convention(thin) <T> (@in T, @in T) -> () {
+// CHECK: bb0([[ARG:%.*]] : $*T, [[ARG2:%.*]] : $*T):
+// CHECK: [[FUNC:%.*]] = function_ref @generic_twoparam_noreturn_callee :
+// CHECK: [[THUNK:%.*]] = function_ref @thunk_lowering_generic_twoparam_noresultTTI :
+// CHECK: [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]<T>([[FUNC]]) :
+// CHECK: apply [[THUNKED_FUNC]]([[ARG]], [[ARG2]]) :
+// CHECK: } // end sil function 'thunk_lowering_generic_twoparam_noresult'
+sil @thunk_lowering_generic_twoparam_noresult : $@convention(thin) <T> (@in T, @in T) -> () {
+bb0(%arg : $*T, %arg2 : $*T):
+  %0 = function_ref @generic_twoparam_noreturn_callee : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> ()
+  %1 = thunk [identity] %0<T>() : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> ()
+  apply %1(%arg, %arg2) : $@callee_guaranteed (@in T, @in T) -> ()
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @thunk_lowering_generic_noparam_oneresult : $@convention(thin) <T> () -> @out T {
+// CHECK: bb0([[RESULT:%.*]] : $*T):
+// CHECK: [[FUNC:%.*]] = function_ref @generic_noparam_oneresult_callee :
+// CHECK: [[THUNK:%.*]] = function_ref @thunk_lowering_generic_noparam_oneresultTTI :
+// CHECK: [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]<T>([[FUNC]]) :
+// CHECK: apply [[THUNKED_FUNC]]([[RESULT]]) :
+// CHECK: } // end sil function 'thunk_lowering_generic_noparam_oneresult'
+sil @thunk_lowering_generic_noparam_oneresult : $@convention(thin) <T> () -> @out T {
+bb0(%result : $*T):
+  %0 = function_ref @generic_noparam_oneresult_callee : $@convention(thin) <τ_0_0> () -> @out τ_0_0
+  %1 = thunk [identity] %0<T>() : $@convention(thin) <τ_0_0> () -> @out τ_0_0
+  %2 = apply %1(%result) : $@callee_guaranteed () -> @out T
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @thunk_lowering_generic_oneparam_oneresult : $@convention(thin) <T> (@in T) -> @out T {
+// CHECK: bb0([[RESULT:%.*]] : $*T, [[ARG:%.*]] : $*T):
+// CHECK: [[FUNC:%.*]] = function_ref @generic_oneparam_oneresult_callee :
+// CHECK: [[THUNK:%.*]] = function_ref @thunk_lowering_generic_oneparam_oneresultTTI :
+// CHECK: [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]<T>([[FUNC]]) :
+// CHECK: [[THUNKED_FUNC]]([[RESULT]], [[ARG]]) :
+// CHECK: } // end sil function 'thunk_lowering_generic_oneparam_oneresult'
+sil @thunk_lowering_generic_oneparam_oneresult : $@convention(thin) <T> (@in T) -> @out T {
+bb0(%result : $*T, %arg : $*T):
+  %0 = function_ref @generic_oneparam_oneresult_callee : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+  %1 = thunk [identity] %0<T>() : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @out τ_0_0
+  %2 = apply %1(%result, %arg) : $@callee_guaranteed (@in T) -> @out T
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @thunk_lowering_generic_twoparam_oneresult : $@convention(thin) <T> (@in T, @in T) -> @out T {
+// CHECK: bb0([[RESULT:%.*]] : $*T, [[ARG:%.*]] : $*T, [[ARG2:%.*]] : $*T):
+// CHECK: [[FUNC:%.*]] = function_ref @generic_twoparam_oneresult_callee :
+// CHECK: [[THUNK:%.*]] = function_ref @thunk_lowering_generic_twoparam_oneresultTTI :
+// CHECK: [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]<T>([[FUNC]]) :
+// CHECK: apply [[THUNKED_FUNC]]([[RESULT]], [[ARG]], [[ARG2]]) :
+// CHECK: } // end sil function 'thunk_lowering_generic_twoparam_oneresult'
+sil @thunk_lowering_generic_twoparam_oneresult : $@convention(thin) <T> (@in T, @in T) -> @out T {
+bb0(%result : $*T, %arg : $*T, %arg2 : $*T):
+  %0 = function_ref @generic_twoparam_oneresult_callee : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> @out τ_0_0
+  %1 = thunk [identity] %0<T>() : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> @out τ_0_0
+  apply %1(%result, %arg, %arg2) : $@callee_guaranteed (@in T, @in T) -> @out T
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @thunk_lowering_generic_twoparam_oneresult_substituted_params : $@convention(thin) <T> (@in T, @in T) -> @out T {
+// CHECK: bb0([[RESULT:%.*]] : $*T, [[ARG:%.*]] : $*T, [[ARG2:%.*]] : $*T):
+// CHECK: [[FUNC:%.*]] = function_ref @generic_twoparam_oneresult_callee :
+// CHECK: [[THUNK:%.*]] = function_ref @thunk_lowering_generic_twoparam_oneresult_substituted_paramsTTI :
+// CHECK: [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]<T>([[FUNC]]) :
+// CHECK: [[CONVERT_TO_SUB_FORM_FUNC:%.*]] = convert_function [[THUNKED_FUNC]] :
+// CHECK: apply [[CONVERT_TO_SUB_FORM_FUNC]]([[RESULT]], [[ARG]], [[ARG2]]) :
+// CHECK: } // end sil function 'thunk_lowering_generic_twoparam_oneresult_substituted_params'
+sil @thunk_lowering_generic_twoparam_oneresult_substituted_params : $@convention(thin) <T> (@in T, @in T) -> @out T {
+bb0(%result : $*T, %arg : $*T, %arg2 : $*T):
+  %0 = function_ref @generic_twoparam_oneresult_callee : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> @out τ_0_0
+  %1 = thunk [identity] %0<T>() : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> @out τ_0_0
+  %2 = convert_function %1 : $@callee_guaranteed (@in T, @in T) -> @out T to $@callee_guaranteed @substituted <τ_0_0> (@in τ_0_0, @in τ_0_0) -> @out τ_0_0 for <T>
+  apply %2(%result, %arg, %arg2) : $@callee_guaranteed @substituted <τ_0_0> (@in τ_0_0, @in τ_0_0) -> @out τ_0_0 for <T>
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @thunk_lowering_generic_mixed_twoparam_oneresult : $@convention(thin) <T> (@in T, @in T) -> (@out T, @owned Klass) {
+// CHECK: bb0([[INDIRECT_RESULT:%.*]] : $*T, [[ARG:%.*]] : $*T, [[ARG2:%.*]] : $*T):
+// CHECK: [[FUNC:%.*]] = function_ref @generic_mixed_twoparam_oneresult_callee :
+// CHECK: [[THUNK:%.*]] = function_ref @thunk_lowering_generic_mixed_twoparam_oneresultTTI :
+// CHECK: [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]<T>([[FUNC]]) :
+// CHECK: [[DIRECT_RESULT:%.*]] = apply [[THUNKED_FUNC]]([[INDIRECT_RESULT]], [[ARG]], [[ARG2]]) :
+// CHECK: return [[DIRECT_RESULT]] :
+// CHECK: } // end sil function 'thunk_lowering_generic_mixed_twoparam_oneresult'
+sil @thunk_lowering_generic_mixed_twoparam_oneresult : $@convention(thin) <T> (@in T, @in T) -> (@out T, @owned Klass) {
+bb0(%result : $*T, %arg : $*T, %arg2 : $*T):
+  %0 = function_ref @generic_mixed_twoparam_oneresult_callee : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> (@out τ_0_0, @owned Klass)
+  %1 = thunk [identity] %0<T>() : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> (@out τ_0_0, @owned Klass)
+  %2 = apply %1(%result, %arg, %arg2) : $@callee_guaranteed (@in T, @in T) -> (@out T, @owned Klass)
+  return %2 : $Klass
+}
+
+// CHECK-LABEL: sil shared [thunk] @thunk_lowering_generic_mixed_2_twoparam_oneresultTTI : $@convention(thin) <T> (@in T, @in T, @guaranteed @convention(thin) <T> (@in T, @in T) -> (@owned Klass, @out T, @owned Klass)) -> (@owned Klass, @out T, @owned Klass) {
+// CHECK: bb0([[INDIRECT_RESULT:%.*]] : $*T, [[ARG1:%.*]] : $*T, [[ARG2:%.*]] : $*T, [[THUNKED_FUNC:%.*]] : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> (@owned Klass, @out τ_0_0, @owned Klass)):
+// CHECK: [[DIRECT_RESULT:%.*]] = apply [[THUNKED_FUNC]]<T>([[INDIRECT_RESULT]], [[ARG1]], [[ARG2]]) :
+// CHECK: return [[DIRECT_RESULT]]
+// CHECK: } // end sil function 'thunk_lowering_generic_mixed_2_twoparam_oneresultTTI'
+
+// CHECK-LABEL: sil @thunk_lowering_generic_mixed_2_twoparam_oneresult : $@convention(thin) <T> (@in T, @in T) -> (@owned Klass, @out T, @owned Klass) {
+// CHECK: bb0([[INDIRECT_RESULT:%.*]] : $*T, [[ARG:%.*]] : $*T, [[ARG2:%.*]] : $*T):
+// CHECK: [[FUNC:%.*]] = function_ref @generic_mixed_2_twoparam_oneresult_callee :
+// CHECK: [[THUNK:%.*]] = function_ref @thunk_lowering_generic_mixed_2_twoparam_oneresultTTI :
+// CHECK: [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]<T>([[FUNC]]) :
+// CHECK: [[DIRECT_RESULT:%.*]] = apply [[THUNKED_FUNC]]([[INDIRECT_RESULT]], [[ARG]], [[ARG2]]) :
+// CHECK: return [[DIRECT_RESULT]]
+// CHECK: } // end sil function 'thunk_lowering_generic_mixed_2_twoparam_oneresult'
+sil @thunk_lowering_generic_mixed_2_twoparam_oneresult : $@convention(thin) <T> (@in T, @in T) -> (@owned Klass, @out T, @owned Klass) {
+bb0(%result : $*T, %arg : $*T, %arg2 : $*T):
+  %0 = function_ref @generic_mixed_2_twoparam_oneresult_callee : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> (@owned Klass, @out τ_0_0, @owned Klass)
+  %1 = thunk [identity] %0<T>() : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> (@owned Klass, @out τ_0_0, @owned Klass)
+  %2 = apply %1(%result, %arg, %arg2) : $@callee_guaranteed (@in T, @in T) -> (@owned Klass, @out T, @owned Klass)
+  return %2 : $(Klass, Klass)
+}
+
+////////////////////////////////////
+// MARK: Loadable Try Apply Tests //
+////////////////////////////////////
+
+// CHECK-LABEL: sil shared [thunk] @thunk_lowering_throws_noparam_noreturn_calleeTTI : $@convention(thin) (@guaranteed @convention(thin) () -> @error any Error) -> @error any Error {
+// CHECK: bb0([[FUNC:%.*]] : $@convention(thin) () -> @error any Error):
+// CHECK:  try_apply [[FUNC]]() : $@convention(thin) () -> @error any Error, normal bb1, error bb2
+//
+// CHECK: bb1({{%.*}} : $()):
+// CHECK: return
+//
+// CHECK: bb2([[ERROR:%.*]] : $any Error):
+// CHECK:   throw [[ERROR]] :
+// CHECK: } // end sil function 'thunk_lowering_throws_noparam_noreturn_calleeTTI'
+
+// CHECK-LABEL: sil @thunk_lowering_throws_noparam_noreturn_callee : $@convention(thin) () -> @error any Error {
+// CHECK: [[FUNC:%.*]] = function_ref @throws_noparam_noreturn_callee :
+// CHECK: [[THUNK:%.*]] = function_ref @thunk_lowering_throws_noparam_noreturn_calleeTTI :
+// CHECK: [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[FUNC]]) :
+// CHECK: try_apply [[THUNKED_FUNC]]() :
+// CHECK: } // end sil function 'thunk_lowering_throws_noparam_noreturn_callee'
+sil @thunk_lowering_throws_noparam_noreturn_callee : $@convention(thin) () -> @error Error {
+bb0:
+  %0 = function_ref @throws_noparam_noreturn_callee : $@convention(thin) () -> @error Error
+  %1 = thunk [identity] %0() : $@convention(thin) () -> @error Error
+  try_apply %1() : $@callee_guaranteed () -> @error Error, normal bb1, error bb2
+
+bb1(%value : $()):
+  %9999 = tuple ()
+  return %9999 : $()
+
+bb2(%error: $Error):
+  throw %error : $Error
+}
+
+// CHECK-LABEL: sil shared [thunk] @thunk_lowering_throws_oneparam_noreturn_calleeTTI : $@convention(thin) (@owned Klass, @guaranteed @convention(thin) (@owned Klass) -> @error any Error) -> @error any Error {
+// CHECK: bb0([[ARG:%.*]] : $Klass, [[FUNC:%.*]] : $@convention(thin) (@owned Klass) -> @error any Error):
+// CHECK:  try_apply [[FUNC]]([[ARG]]) : $@convention(thin) (@owned Klass) -> @error any Error, normal bb1, error bb2
+//
+// CHECK: bb1({{%.*}} : $()):
+// CHECK: return
+//
+// CHECK: bb2([[ERROR:%.*]] : $any Error):
+// CHECK:   throw [[ERROR]] :
+// CHECK: } // end sil function 'thunk_lowering_throws_oneparam_noreturn_calleeTTI'
+
+// CHECK-LABEL: sil @thunk_lowering_throws_oneparam_noreturn_callee : $@convention(thin) (@owned Klass) -> @error any Error {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK: [[FUNC:%.*]] = function_ref @throws_oneparam_noreturn_callee :
+// CHECK: [[THUNK:%.*]] = function_ref @thunk_lowering_throws_oneparam_noreturn_calleeTTI :
+// CHECK: [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[FUNC]]) :
+// CHECK: try_apply [[THUNKED_FUNC]]([[ARG]]) :
+// CHECK: } // end sil function 'thunk_lowering_throws_oneparam_noreturn_callee'
+sil @thunk_lowering_throws_oneparam_noreturn_callee : $@convention(thin) (@owned Klass) -> @error Error {
+bb0(%arg : $Klass):
+  %0 = function_ref @throws_oneparam_noreturn_callee : $@convention(thin) (@owned Klass) -> @error Error
+  %1 = thunk [identity] %0() : $@convention(thin) (@owned Klass) -> @error Error
+  try_apply %1(%arg) : $@callee_guaranteed (@owned Klass) -> @error Error, normal bb1, error bb2
+
+bb1(%value : $()):
+  %9999 = tuple ()
+  return %9999 : $()
+
+bb2(%error: $Error):
+  throw %error : $Error
+}
+
+// CHECK-LABEL: sil shared [thunk] @thunk_lowering_throws_twoparam_noreturn_calleeTTI : $@convention(thin) (@owned Klass, @owned Klass, @guaranteed @convention(thin) (@owned Klass, @owned Klass) -> @error any Error) -> @error any Error {
+// CHECK: bb0([[ARG:%.*]] : $Klass, [[ARG2:%.*]] : $Klass, [[FUNC:%.*]] : $@convention(thin) (@owned Klass, @owned Klass) -> @error any Error):
+// CHECK:  try_apply [[FUNC]]([[ARG]], [[ARG2]]) :
+//
+// CHECK: bb1({{%.*}} : $()):
+// CHECK: return
+//
+// CHECK: bb2([[ERROR:%.*]] : $any Error):
+// CHECK:   throw [[ERROR]] :
+// CHECK: } // end sil function 'thunk_lowering_throws_twoparam_noreturn_calleeTTI'
+
+// CHECK-LABEL: sil @thunk_lowering_throws_twoparam_noreturn_callee : $@convention(thin) (@owned Klass, @owned Klass) -> @error any Error {
+// CHECK: bb0([[ARG:%.*]] : $Klass, [[ARG2:%.*]] : $Klass):
+// CHECK: [[FUNC:%.*]] = function_ref @throws_twoparam_noreturn_callee :
+// CHECK: [[THUNK:%.*]] = function_ref @thunk_lowering_throws_twoparam_noreturn_calleeTTI :
+// CHECK: [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[FUNC]]) :
+// CHECK: try_apply [[THUNKED_FUNC]]([[ARG]], [[ARG2]]) :
+// CHECK: } // end sil function 'thunk_lowering_throws_twoparam_noreturn_callee'
+sil @thunk_lowering_throws_twoparam_noreturn_callee : $@convention(thin) (@owned Klass, @owned Klass) -> @error Error {
+bb0(%arg : $Klass, %arg2 : $Klass):
+  %0 = function_ref @throws_twoparam_noreturn_callee : $@convention(thin) (@owned Klass, @owned Klass) -> @error Error
+  %1 = thunk [identity] %0() : $@convention(thin) (@owned Klass, @owned Klass) -> @error Error
+  try_apply %1(%arg, %arg2) : $@callee_guaranteed (@owned Klass, @owned Klass) -> @error Error, normal bb1, error bb2
+
+bb1(%value : $()):
+  %9999 = tuple ()
+  return %9999 : $()
+
+bb2(%error: $Error):
+  throw %error : $Error
+}
+
+// CHECK-LABEL: sil shared [thunk] @thunk_lowering_throws_noparam_oneresult_calleeTTI : $@convention(thin) (@guaranteed @convention(thin) () -> (@owned Klass, @error any Error)) -> (@owned Klass, @error any Error) {
+// CHECK: bb0([[FUNC:%.*]] : $@convention(thin) () -> (@owned Klass, @error any Error)):
+// CHECK:  try_apply [[FUNC]]() : $@convention(thin) () -> (@owned Klass, @error any Error), normal bb1, error bb2
+//
+// CHECK: bb1([[DIRECT_RESULT:%.*]] : $Klass)
+// CHECK: return [[DIRECT_RESULT]] : $Klass
+//
+// CHECK: bb2([[ERROR:%.*]] : $any Error):
+// CHECK:   throw [[ERROR]] :
+// CHECK: } // end sil function 'thunk_lowering_throws_noparam_oneresult_calleeTTI'
+
+// CHECK-LABEL: sil @thunk_lowering_throws_noparam_oneresult_callee : $@convention(thin) () -> (@owned Klass, @error any Error) {
+// CHECK: [[FUNC:%.*]] = function_ref @throws_noparam_oneresult_callee :
+// CHECK: [[THUNK:%.*]] = function_ref @thunk_lowering_throws_noparam_oneresult_calleeTTI :
+// CHECK: [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[FUNC]]) :
+// CHECK: try_apply [[THUNKED_FUNC]]() :
+// CHECK: } // end sil function 'thunk_lowering_throws_noparam_oneresult_callee'
+sil @thunk_lowering_throws_noparam_oneresult_callee : $@convention(thin) () -> (@owned Klass, @error Error) {
+bb0:
+  %0 = function_ref @throws_noparam_oneresult_callee : $@convention(thin) () -> (@owned Klass, @error Error)
+  %1 = thunk [identity] %0() : $@convention(thin) () -> (@owned Klass, @error Error)
+  try_apply %1() : $@callee_guaranteed () -> (@owned Klass, @error Error), normal bb1, error bb2
+
+bb1(%value : $Klass):
+  return %value : $Klass
+
+bb2(%error: $Error):
+  throw %error : $Error
+}
+
+// CHECK-LABEL: sil shared [thunk] @thunk_lowering_throws_oneparam_oneresult_calleeTTI : $@convention(thin) (@owned Klass, @guaranteed @convention(thin) (@owned Klass) -> (@owned Klass, @error any Error)) -> (@owned Klass, @error any Error) {
+// CHECK: bb0([[ARG:%.*]] : $Klass, [[FUNC:%.*]] : $@convention(thin) (@owned Klass) -> (@owned Klass, @error any Error)):
+// CHECK:  try_apply [[FUNC]]([[ARG]]) : $@convention(thin) (@owned Klass) -> (@owned Klass, @error any Error), normal bb1, error bb2
+//
+// CHECK: bb1([[DIRECT_RESULT:%.*]] : $Klass)
+// CHECK: return [[DIRECT_RESULT]] : $Klass
+//
+// CHECK: bb2([[ERROR:%.*]] : $any Error):
+// CHECK:   throw [[ERROR]] :
+// CHECK: } // end sil function 'thunk_lowering_throws_oneparam_oneresult_calleeTTI'
+
+// CHECK-LABEL: sil @thunk_lowering_throws_oneparam_oneresult_callee : $@convention(thin) (@owned Klass) -> (@owned Klass, @error any Error) {
+// CHECK: bb0([[ARG:%.*]] : $Klass):
+// CHECK: [[FUNC:%.*]] = function_ref @throws_oneparam_oneresult_callee :
+// CHECK: [[THUNK:%.*]] = function_ref @thunk_lowering_throws_oneparam_oneresult_calleeTTI :
+// CHECK: [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[FUNC]]) :
+// CHECK: try_apply [[THUNKED_FUNC]]([[ARG]]) :
+// CHECK: } // end sil function 'thunk_lowering_throws_oneparam_oneresult_callee'
+sil @thunk_lowering_throws_oneparam_oneresult_callee : $@convention(thin) (@owned Klass) -> (@owned Klass, @error Error) {
+bb0(%arg : $Klass):
+  %0 = function_ref @throws_oneparam_oneresult_callee : $@convention(thin) (@owned Klass) -> (@owned Klass, @error Error)
+  %1 = thunk [identity] %0() : $@convention(thin) (@owned Klass) -> (@owned Klass, @error Error)
+  try_apply %1(%arg) : $@callee_guaranteed (@owned Klass) -> (@owned Klass, @error Error), normal bb1, error bb2
+
+bb1(%value : $Klass):
+  return %value : $Klass
+
+bb2(%error: $Error):
+  throw %error : $Error
+}
+
+// CHECK-LABEL: sil shared [thunk] @thunk_lowering_throws_twoparam_oneresult_calleeTTI : $@convention(thin) (@owned Klass, @owned Klass, @guaranteed @convention(thin) (@owned Klass, @owned Klass) -> (@owned Klass, @error any Error)) -> (@owned Klass, @error any Error) {
+// CHECK: bb0([[ARG:%.*]] : $Klass, [[ARG2:%.*]] : $Klass, [[FUNC:%.*]] : $@convention(thin) (@owned Klass, @owned Klass) -> (@owned Klass, @error any Error)):
+// CHECK:  try_apply [[FUNC]]([[ARG]], [[ARG2]]) : $@convention(thin) (@owned Klass, @owned Klass) -> (@owned Klass, @error any Error), normal bb1, error bb2
+//
+// CHECK: bb1([[DIRECT_RESULT:%.*]] : $Klass)
+// CHECK: return [[DIRECT_RESULT]] : $Klass
+//
+// CHECK: bb2([[ERROR:%.*]] : $any Error):
+// CHECK:   throw [[ERROR]] :
+// CHECK: } // end sil function 'thunk_lowering_throws_twoparam_oneresult_calleeTTI'
+
+// CHECK-LABEL: sil @thunk_lowering_throws_twoparam_oneresult_callee : $@convention(thin) (@owned Klass, @owned Klass) -> (@owned Klass, @error any Error) {
+// CHECK: bb0([[ARG:%.*]] : $Klass, [[ARG2:%.*]] : $Klass):
+// CHECK: [[FUNC:%.*]] = function_ref @throws_twoparam_oneresult_callee :
+// CHECK: [[THUNK:%.*]] = function_ref @thunk_lowering_throws_twoparam_oneresult_calleeTTI :
+// CHECK: [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[FUNC]]) :
+// CHECK: try_apply [[THUNKED_FUNC]]([[ARG]], [[ARG2]]) :
+// CHECK: } // end sil function 'thunk_lowering_throws_twoparam_oneresult_callee'
+sil @thunk_lowering_throws_twoparam_oneresult_callee : $@convention(thin) (@owned Klass, @owned Klass) -> (@owned Klass, @error Error) {
+bb0(%arg : $Klass, %arg2 : $Klass):
+  %0 = function_ref @throws_twoparam_oneresult_callee : $@convention(thin) (@owned Klass, @owned Klass) -> (@owned Klass, @error Error)
+  %1 = thunk [identity] %0() : $@convention(thin) (@owned Klass, @owned Klass) -> (@owned Klass, @error Error)
+  try_apply %1(%arg, %arg2) : $@callee_guaranteed (@owned Klass, @owned Klass) -> (@owned Klass, @error Error), normal bb1, error bb2
+
+bb1(%value : $Klass):
+  return %value : $Klass
+
+bb2(%error: $Error):
+  throw %error : $Error
+}
+
+///////////////////////////////////
+// MARK: Generic Try Apply Tests //
+///////////////////////////////////
+
+// CHECK-LABEL: sil shared [thunk] @thunk_lowering_generic_throws_noparam_noreturn_calleeTTI : $@convention(thin) <T> (@guaranteed @convention(thin) <T> () -> @error any Error) -> @error any Error {
+// CHECK: bb0([[FUNC:%.*]] : $@convention(thin) <τ_0_0> () -> @error any Error):
+// CHECK:  try_apply [[FUNC]]<T>() : $@convention(thin) <τ_0_0> () -> @error any Error, normal bb1, error bb2
+//
+// CHECK: bb1({{%.*}} : $()):
+// CHECK: return
+//
+// CHECK: bb2([[ERROR:%.*]] : $any Error):
+// CHECK:   throw [[ERROR]] :
+// CHECK: } // end sil function 'thunk_lowering_generic_throws_noparam_noreturn_calleeTTI'
+
+// CHECK-LABEL: sil @thunk_lowering_generic_throws_noparam_noreturn_callee : $@convention(thin) <T> () -> @error any Error {
+// CHECK: [[FUNC:%.*]] = function_ref @generic_throws_noparam_noreturn_callee :
+// CHECK: [[THUNK:%.*]] = function_ref @thunk_lowering_generic_throws_noparam_noreturn_calleeTTI :
+// CHECK: [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]<T>([[FUNC]]) :
+// CHECK: try_apply [[THUNKED_FUNC]]() :
+// CHECK: } // end sil function 'thunk_lowering_generic_throws_noparam_noreturn_callee'
+sil @thunk_lowering_generic_throws_noparam_noreturn_callee : $@convention(thin) <T> () -> @error Error {
+bb0:
+  %0 = function_ref @generic_throws_noparam_noreturn_callee : $@convention(thin) <τ_0_0> () -> @error Error
+  %1 = thunk [identity] %0<T>() : $@convention(thin) <τ_0_0> () -> @error Error
+  try_apply %1() : $@callee_guaranteed () -> @error Error, normal bb1, error bb2
+
+bb1(%value : $()):
+  %9999 = tuple ()
+  return %9999 : $()
+
+bb2(%error: $Error):
+  throw %error : $Error
+}
+
+// CHECK-LABEL: sil shared [thunk] @thunk_lowering_generic_throws_oneparam_noreturn_calleeTTI : $@convention(thin) <T> (@in T, @guaranteed @convention(thin) <T> (@in T) -> @error any Error) -> @error any Error {
+// CHECK: bb0([[ARG:%.*]] : $*T, [[FUNC:%.*]] : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @error any Error):
+// CHECK:  try_apply [[FUNC]]<T>([[ARG]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @error any Error, normal bb1, error bb2
+//
+// CHECK: bb1({{%.*}} : $()):
+// CHECK: return
+//
+// CHECK: bb2([[ERROR:%.*]] : $any Error):
+// CHECK:   throw [[ERROR]] :
+// CHECK: } // end sil function 'thunk_lowering_generic_throws_oneparam_noreturn_calleeTTI'
+
+// CHECK-LABEL: sil @thunk_lowering_generic_throws_oneparam_noreturn_callee : $@convention(thin) <T> (@in T) -> @error any Error {
+// CHECK: bb0([[ARG:%.*]] :
+// CHECK: [[FUNC:%.*]] = function_ref @generic_throws_oneparam_noreturn_callee :
+// CHECK: [[THUNK:%.*]] = function_ref @thunk_lowering_generic_throws_oneparam_noreturn_calleeTTI :
+// CHECK: [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]<T>([[FUNC]]) :
+// CHECK: try_apply [[THUNKED_FUNC]]([[ARG]]) :
+// CHECK: } // end sil function 'thunk_lowering_generic_throws_oneparam_noreturn_callee'
+sil @thunk_lowering_generic_throws_oneparam_noreturn_callee : $@convention(thin) <T> (@in T) -> @error Error {
+bb0(%arg : $*T):
+  %0 = function_ref @generic_throws_oneparam_noreturn_callee : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @error Error
+  %1 = thunk [identity] %0<T>() : $@convention(thin) <τ_0_0> (@in τ_0_0) -> @error Error
+  try_apply %1(%arg) : $@callee_guaranteed (@in T) -> @error Error, normal bb1, error bb2
+
+bb1(%value : $()):
+  %9999 = tuple ()
+  return %9999 : $()
+
+bb2(%error: $Error):
+  throw %error : $Error
+}
+
+// CHECK-LABEL: sil shared [thunk] @thunk_lowering_generic_throws_twoparam_noreturn_calleeTTI : $@convention(thin) <T> (@in T, @in T, @guaranteed @convention(thin) <T> (@in T, @in T) -> @error any Error) -> @error any Error {
+// CHECK: bb0([[ARG:%.*]] : $*T, [[ARG2:%.*]] : $*T, [[FUNC:%.*]] : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> @error any Error):
+// CHECK:  try_apply [[FUNC]]<T>([[ARG]], [[ARG2]]) :
+//
+// CHECK: bb1({{%.*}} : $()):
+// CHECK: return
+//
+// CHECK: bb2([[ERROR:%.*]] : $any Error):
+// CHECK:   throw [[ERROR]] :
+// CHECK: } // end sil function 'thunk_lowering_generic_throws_twoparam_noreturn_calleeTTI'
+
+// CHECK-LABEL: sil @thunk_lowering_generic_throws_twoparam_noreturn_callee : $@convention(thin) <T> (@in T, @in T) -> @error any Error {
+// CHECK: bb0([[ARG:%.*]] : $*T, [[ARG2:%.*]] : $*T):
+// CHECK: [[FUNC:%.*]] = function_ref @generic_throws_twoparam_noreturn_callee :
+// CHECK: [[THUNK:%.*]] = function_ref @thunk_lowering_generic_throws_twoparam_noreturn_calleeTTI :
+// CHECK: [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]<T>([[FUNC]]) :
+// CHECK: try_apply [[THUNKED_FUNC]]([[ARG]], [[ARG2]]) :
+// CHECK: } // end sil function 'thunk_lowering_generic_throws_twoparam_noreturn_callee'
+sil @thunk_lowering_generic_throws_twoparam_noreturn_callee : $@convention(thin) <T> (@in T, @in T) -> @error Error {
+bb0(%arg : $*T, %arg2 : $*T):
+  %0 = function_ref @generic_throws_twoparam_noreturn_callee : $@convention(thin) <T> (@in T, @in T) -> @error Error
+  %1 = thunk [identity] %0<T>() : $@convention(thin) <T> (@in T, @in T) -> @error Error
+  try_apply %1(%arg, %arg2) : $@callee_guaranteed (@in T, @in T) -> @error Error, normal bb1, error bb2
+
+bb1(%value : $()):
+  %9999 = tuple ()
+  return %9999 : $()
+
+bb2(%error: $Error):
+  throw %error : $Error
+}
+
+// CHECK-LABEL: sil shared [thunk] @thunk_lowering_generic_throws_noparam_oneresult_calleeTTI : $@convention(thin) <T> (@guaranteed @convention(thin) <T> () -> (@out T, @error any Error)) -> (@out T, @error any Error) {
+// CHECK: bb0([[INDIRECT_RESULT:%.*]] : $*T, [[FUNC:%.*]] : $@convention(thin) <τ_0_0> () -> (@out τ_0_0, @error any Error)):
+// CHECK:  try_apply [[FUNC]]<T>([[INDIRECT_RESULT]]) : $@convention(thin) <τ_0_0> () -> (@out τ_0_0, @error any Error), normal bb1, error bb2
+//
+// CHECK: bb1([[RESULT:%.*]] : $()):
+// CHECK: return
+//
+// CHECK: bb2([[ERROR:%.*]] : $any Error):
+// CHECK:   throw [[ERROR]] :
+// CHECK: } // end sil function 'thunk_lowering_generic_throws_noparam_oneresult_calleeTTI'
+
+// CHECK-LABEL: sil @thunk_lowering_generic_throws_noparam_oneresult_callee : $@convention(thin) <T> () -> (@out T, @error any Error) {
+// CHECK: bb0([[INDIRECT_RESULT:%.*]] :
+// CHECK: [[FUNC:%.*]] = function_ref @generic_throws_noparam_oneresult_callee :
+// CHECK: [[THUNK:%.*]] = function_ref @thunk_lowering_generic_throws_noparam_oneresult_calleeTTI :
+// CHECK: [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]<T>([[FUNC]]) :
+// CHECK: try_apply [[THUNKED_FUNC]]([[INDIRECT_RESULT]]) :
+// CHECK: } // end sil function 'thunk_lowering_generic_throws_noparam_oneresult_callee'
+sil @thunk_lowering_generic_throws_noparam_oneresult_callee : $@convention(thin) <T> () -> (@out T, @error Error) {
+bb0(%result : $*T):
+  %0 = function_ref @generic_throws_noparam_oneresult_callee : $@convention(thin) <τ_0_0> () -> (@out τ_0_0, @error Error)
+  %1 = thunk [identity] %0<T>() : $@convention(thin) <τ_0_0> () -> (@out τ_0_0, @error Error)
+  try_apply %1(%result) : $@callee_guaranteed () -> (@out T, @error Error), normal bb1, error bb2
+
+bb1(%value : $()):
+  return %value : $()
+
+bb2(%error: $Error):
+  throw %error : $Error
+}
+
+// CHECK-LABEL: sil shared [thunk] @thunk_lowering_generic_throws_oneparam_oneresult_calleeTTI : $@convention(thin) <T> (@in T, @guaranteed @convention(thin) <T> (@in T) -> (@out T, @error any Error)) -> (@out T, @error any Error) {
+// CHECK: bb0([[INDIRECT_RESULT:%.*]] : $*T, [[ARG:%.*]] : $*T, [[FUNC:%.*]] : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @error any Error)):
+// CHECK:  try_apply [[FUNC]]<T>([[INDIRECT_RESULT]], [[ARG]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> (@out τ_0_0, @error any Error), normal bb1, error bb2
+//
+// CHECK: bb1({{%.*}} : $()):
+// CHECK: return
+//
+// CHECK: bb2([[ERROR:%.*]] : $any Error):
+// CHECK:   throw [[ERROR]] :
+// CHECK: } // end sil function 'thunk_lowering_generic_throws_oneparam_oneresult_calleeTTI'
+
+// CHECK-LABEL: sil @thunk_lowering_generic_throws_oneparam_oneresult_callee : $@convention(thin) <T> (@in T) -> (@out T, @error any Error) {
+// CHECK: bb0([[RESULT:%.*]] : $*T, [[ARG:%.*]] : $*T):
+// CHECK: [[FUNC:%.*]] = function_ref @generic_throws_oneparam_oneresult_callee :
+// CHECK: [[THUNK:%.*]] = function_ref @thunk_lowering_generic_throws_oneparam_oneresult_calleeTTI :
+// CHECK: [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]<T>([[FUNC]]) :
+// CHECK: try_apply [[THUNKED_FUNC]]([[RESULT]], [[ARG]]) :
+// CHECK: } // end sil function 'thunk_lowering_generic_throws_oneparam_oneresult_callee'
+sil @thunk_lowering_generic_throws_oneparam_oneresult_callee : $@convention(thin) <T> (@in T) -> (@out T, @error Error) {
+bb0(%result : $*T, %arg : $*T):
+  %0 = function_ref @generic_throws_oneparam_oneresult_callee : $@convention(thin) <T> (@in T) -> (@out T, @error Error)
+  %1 = thunk [identity] %0<T>() : $@convention(thin) <T> (@in T) -> (@out T, @error Error)
+  try_apply %1(%result, %arg) : $@callee_guaranteed (@in T) -> (@out T, @error Error), normal bb1, error bb2
+
+bb1(%value : $()):
+  return %value : $()
+
+bb2(%error: $Error):
+  throw %error : $Error
+}
+
+// CHECK-LABEL: sil shared [thunk] @thunk_lowering_generic_throws_twoparam_oneresult_calleeTTI : $@convention(thin) <T> (@in T, @in T, @guaranteed @convention(thin) <T> (@in T, @in T) -> (@out T, @error any Error)) -> (@out T, @error any Error) {
+// CHECK: bb0([[INDIRECT_RESULT:%.*]] : $*T, [[ARG:%.*]] : $*T, [[ARG2:%.*]] : $*T, [[FUNC:%.*]] : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> (@out τ_0_0, @error any Error)):
+// CHECK:  try_apply [[FUNC]]<T>([[INDIRECT_RESULT]], [[ARG]], [[ARG2]]) : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> (@out τ_0_0, @error any Error), normal bb1, error bb2
+//
+// CHECK: bb1({{%.*}} : $()):
+// CHECK: return
+//
+// CHECK: bb2([[ERROR:%.*]] : $any Error):
+// CHECK:   throw [[ERROR]] :
+// CHECK: } // end sil function 'thunk_lowering_generic_throws_twoparam_oneresult_calleeTTI'
+
+// CHECK-LABEL: sil @thunk_lowering_generic_throws_twoparam_oneresult_callee : $@convention(thin) <T> (@in T, @in T) -> (@out T, @error any Error) {
+// CHECK: bb0([[INDIRECT_RESULT:%.*]] : $*T, [[ARG:%.*]] : $*T, [[ARG2:%.*]] : $*T):
+// CHECK: [[FUNC:%.*]] = function_ref @generic_throws_twoparam_oneresult_callee :
+// CHECK: [[THUNK:%.*]] = function_ref @thunk_lowering_generic_throws_twoparam_oneresult_calleeTTI :
+// CHECK: [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]<T>([[FUNC]]) :
+// CHECK: try_apply [[THUNKED_FUNC]]([[INDIRECT_RESULT]], [[ARG]], [[ARG2]]) :
+// CHECK: } // end sil function 'thunk_lowering_generic_throws_twoparam_oneresult_callee'
+sil @thunk_lowering_generic_throws_twoparam_oneresult_callee : $@convention(thin) <T> (@in T, @in T) -> (@out T, @error Error) {
+bb0(%result : $*T, %arg : $*T, %arg2 : $*T):
+  %0 = function_ref @generic_throws_twoparam_oneresult_callee : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> (@out τ_0_0, @error Error)
+  %1 = thunk [identity] %0<T>() : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> (@out τ_0_0, @error Error)
+  try_apply %1(%result, %arg, %arg2) : $@callee_guaranteed (@in T, @in T) -> (@out T, @error Error), normal bb1, error bb2
+
+bb1(%value : $()):
+  return %value : $()
+
+bb2(%error: $Error):
+  throw %error : $Error
+}
+
+// CHECK-LABEL: sil shared [thunk] @thunk_lowering_generic_throws_twoparam_mixedresults_calleeTTI : $@convention(thin) <T> (@in T, @in T, @guaranteed @convention(thin) <T> (@in T, @in T) -> (@out T, @owned Klass, @out T, @error any Error)) -> (@out T, @owned Klass, @out T, @error any Error) {
+// CHECK: bb0([[INDIRECT_RESULT:%.*]] : $*T, [[INDIRECT_RESULT_2:%.*]] : $*T, [[ARG:%.*]] : $*T, [[ARG2:%.*]] : $*T, [[FUNC:%.*]] : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> (@out τ_0_0, @owned Klass, @out τ_0_0, @error any Error)):
+// CHECK:  try_apply [[FUNC]]<T>([[INDIRECT_RESULT]], [[INDIRECT_RESULT_2]], [[ARG]], [[ARG2]]) : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> (@out τ_0_0, @owned Klass, @out τ_0_0, @error any Error), normal bb1, error bb2
+//
+// CHECK: bb1([[RESULT:%.*]] : $Klass):
+// CHECK: return [[RESULT]]
+//
+// CHECK: bb2([[ERROR:%.*]] : $any Error):
+// CHECK:   throw [[ERROR]] :
+// CHECK: } // end sil function 'thunk_lowering_generic_throws_twoparam_mixedresults_calleeTTI'
+
+// CHECK-LABEL: sil @thunk_lowering_generic_throws_twoparam_mixedresults_callee : $@convention(thin) <T> (@in T, @in T) -> (@out T, @owned Klass, @out T, @error any Error) {
+// CHECK: bb0([[INDIRECT_RESULT:%.*]] : $*T, [[INDIRECT_RESULT_2:%.*]] : $*T, [[ARG:%.*]] : $*T, [[ARG2:%.*]] : $*T):
+// CHECK: [[FUNC:%.*]] = function_ref @generic_throws_twoparam_mixedresults_callee :
+// CHECK: [[THUNK:%.*]] = function_ref @thunk_lowering_generic_throws_twoparam_mixedresults_calleeTTI :
+// CHECK: [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]<T>([[FUNC]]) :
+// CHECK: try_apply [[THUNKED_FUNC]]([[INDIRECT_RESULT]], [[INDIRECT_RESULT_2]], [[ARG]], [[ARG2]]) :
+// CHECK: } // end sil function 'thunk_lowering_generic_throws_twoparam_mixedresults_callee'
+sil @thunk_lowering_generic_throws_twoparam_mixedresults_callee : $@convention(thin) <T> (@in T, @in T) -> (@out T, @owned Klass, @out T, @error Error) {
+bb0(%result : $*T, %result2 : $*T, %arg : $*T, %arg2 : $*T):
+  %0 = function_ref @generic_throws_twoparam_mixedresults_callee : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> (@out τ_0_0, @owned Klass, @out τ_0_0, @error Error)
+  %1 = thunk [identity] %0<T>() : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> (@out τ_0_0, @owned Klass, @out τ_0_0, @error Error)
+  try_apply %1(%result, %result2, %arg, %arg2) : $@callee_guaranteed (@in T, @in T) -> (@out T, @owned Klass, @out T, @error Error), normal bb1, error bb2
+
+bb1(%value : $Klass):
+  return %value : $Klass
+
+bb2(%error: $Error):
+  throw %error : $Error
+}
+
+// CHECK-LABEL: sil shared [thunk] @thunk_lowering_generic_throws_twoparam_mixedresults_2_calleeTTI : $@convention(thin) <T> (@in T, @in T, @guaranteed @convention(thin) <T> (@in T, @in T) -> (@owned Klass, @out T, @owned Klass, @out T, @error any Error)) -> (@owned Klass, @out T, @owned Klass, @out T, @error any Error) {
+// CHECK: bb0([[INDIRECT_RESULT:%.*]] : $*T, [[INDIRECT_RESULT_2:%.*]] : $*T, [[ARG:%.*]] : $*T, [[ARG2:%.*]] : $*T, [[FUNC:%.*]] : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> (@owned Klass, @out τ_0_0, @owned Klass, @out τ_0_0, @error any Error)):
+// CHECK:  try_apply [[FUNC]]<T>([[INDIRECT_RESULT]], [[INDIRECT_RESULT_2]], [[ARG]], [[ARG2]]) : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> (@owned Klass, @out τ_0_0, @owned Klass, @out τ_0_0, @error any Error), normal bb1, error bb2
+//
+// CHECK: bb1([[RESULT:%.*]] : $(Klass, Klass)):
+// CHECK: return [[RESULT]]
+//
+// CHECK: bb2([[ERROR:%.*]] : $any Error):
+// CHECK:   throw [[ERROR]] :
+// CHECK: } // end sil function 'thunk_lowering_generic_throws_twoparam_mixedresults_2_calleeTTI'
+
+// CHECK-LABEL: sil @thunk_lowering_generic_throws_twoparam_mixedresults_2_callee : $@convention(thin) <T> (@in T, @in T) -> (@owned Klass, @out T, @owned Klass, @out T, @error any Error) {
+// CHECK: bb0([[INDIRECT_RESULT:%.*]] : $*T, [[INDIRECT_RESULT_2:%.*]] : $*T, [[ARG:%.*]] : $*T, [[ARG2:%.*]] : $*T):
+// CHECK: [[FUNC:%.*]] = function_ref @generic_throws_twoparam_mixedresults_2_callee :
+// CHECK: [[THUNK:%.*]] = function_ref @thunk_lowering_generic_throws_twoparam_mixedresults_2_calleeTTI :
+// CHECK: [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]<T>([[FUNC]]) :
+// CHECK: try_apply [[THUNKED_FUNC]]([[INDIRECT_RESULT]], [[INDIRECT_RESULT_2]], [[ARG]], [[ARG2]]) :
+// CHECK: } // end sil function 'thunk_lowering_generic_throws_twoparam_mixedresults_2_callee'
+sil @thunk_lowering_generic_throws_twoparam_mixedresults_2_callee : $@convention(thin) <T> (@in T, @in T) -> (@owned Klass, @out T, @owned Klass, @out T, @error Error) {
+bb0(%result : $*T, %result2 : $*T, %arg : $*T, %arg2 : $*T):
+  %0 = function_ref @generic_throws_twoparam_mixedresults_2_callee : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> (@owned Klass, @out τ_0_0, @owned Klass, @out τ_0_0, @error Error)
+  %1 = thunk [identity] %0<T>() : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> (@owned Klass, @out τ_0_0, @owned Klass, @out τ_0_0, @error Error)
+  try_apply %1(%result, %result2, %arg, %arg2) : $@callee_guaranteed (@in T, @in T) -> (@owned Klass, @out T, @owned Klass, @out T, @error Error), normal bb1, error bb2
+
+bb1(%value : $(Klass, Klass)):
+  return %value : $(Klass, Klass)
+
+bb2(%error: $Error):
+  throw %error : $Error
+}
+
+///////////////////////
+// MARK: Async Tests //
+///////////////////////
+
+// CHECK-LABEL: sil shared [thunk] @thunk_lowering_async_noparam_noresultTTI : $@convention(thin) @async (@guaranteed @convention(thin) @async () -> ()) -> () {
+// CHECK:bb0([[ARG:%.*]] : $@convention(thin) @async () -> ()):
+// CHECK:  apply [[ARG]]() : $@convention(thin) @async () -> ()
+// CHECK: } // end sil function 'thunk_lowering_async_noparam_noresultTTI'
+
+// CHECK-LABEL: sil @thunk_lowering_async_noparam_noresult : $@convention(thin) @async () -> () {
+// CHECK: [[FUNC:%.*]] = function_ref @async_noparam_noreturn_callee :
+// CHECK: [[THUNK:%.*]] = function_ref @thunk_lowering_async_noparam_noresultTTI :
+// CHECK: [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[FUNC]]) :
+// CHECK: apply [[THUNKED_FUNC]]() :
+// CHECK: } // end sil function 'thunk_lowering_async_noparam_noresult'
+sil @thunk_lowering_async_noparam_noresult : $@convention(thin) @async () -> () {
+  %0 = function_ref @async_noparam_noreturn_callee : $@convention(thin) @async () -> ()
+  %1 = thunk [identity] %0() : $@convention(thin) @async () -> ()
+  apply %1() : $@callee_guaranteed @async () -> ()
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+///////////////////////
+// MARK: Yield Tests //
+///////////////////////
+
+// CHECK-LABEL: sil shared [thunk] @thunk_lowering_yield_testTTI : $@yield_once @convention(thin) (@guaranteed @yield_once @convention(thin) () -> (@yields Klass, @yields Klass)) -> (@yields Klass, @yields Klass) {
+// CHECK: bb0([[FUNC:%.*]] : $@yield_once @convention(thin) () -> (@yields Klass, @yields Klass)):
+// CHECK:  ([[RESULT1:%.*]], [[RESULT2:%.*]], [[TOKEN:%.*]]) = begin_apply [[FUNC]]() : $@yield_once @convention(thin) () -> (@yields Klass, @yields Klass)
+// CHECK:  yield ([[RESULT1]] : $Klass, [[RESULT2]] : $Klass), resume bb1, unwind bb2
+//
+// CHECK: bb1:
+// CHECK:   [[RESULT:%.*]] = end_apply [[TOKEN]] as $()
+// CHECK:   return [[RESULT]] : $()
+//
+// CHECK: bb2:
+// CHECK:   abort_apply [[TOKEN]]
+// CHECK:   unwind
+// CHECK:  } // end sil function 'thunk_lowering_yield_testTTI'
+
+// CHECK-LABEL: sil @thunk_lowering_yield_test : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK:   [[FUNC:%.*]] = function_ref @yield_noparam_twoyield_callee :
+// CHECK:   [[THUNK:%.*]] = function_ref @thunk_lowering_yield_testTTI :
+// CHECK:   [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[FUNC]]) :
+// CHECK:   ({{%.*}}, {{%.*}}, [[TOKEN:%.*]]) = begin_apply [[THUNKED_FUNC:%.*]]() :
+// CHECK:   end_apply [[TOKEN]]
+// CHECK: } // end sil function 'thunk_lowering_yield_test'
+sil @thunk_lowering_yield_test : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @yield_noparam_twoyield_callee : $@yield_once @convention(thin) () -> (@yields Klass, @yields Klass)
+  %1 = thunk [identity] %0() : $@yield_once @convention(thin) () -> (@yields Klass, @yields Klass)
+  (%result1, %result2, %tag) =  begin_apply %1() : $@yield_once @callee_guaranteed () -> (@yields Klass, @yields Klass)
+  debug_value %result1 : $Klass
+  debug_value %result2 : $Klass
+  end_apply %tag as $()
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil shared [thunk] @generic_thunk_lowering_yield_test_2TTI : $@yield_once @convention(thin) <T> (@guaranteed @yield_once @convention(thin) <T> () -> (@yields Klass, @yields T, @yields Klass, @yields T)) -> (@yields Klass, @yields T, @yields Klass, @yields T) {
+// CHECK: bb0([[FUNC:%.*]] : $@yield_once @convention(thin) <τ_0_0> () -> (@yields Klass, @yields τ_0_0, @yields Klass, @yields τ_0_0)):
+// CHECK:  ([[RESULT1:%.*]], [[RESULT2:%.*]], [[RESULT3:%.*]], [[RESULT4:%.*]], [[TOKEN:%.*]]) = begin_apply [[FUNC]]<T>() : $@yield_once @convention(thin) <τ_0_0> () -> (@yields Klass, @yields τ_0_0, @yields Klass, @yields τ_0_0)
+// CHECK:  yield ([[RESULT1]] : $Klass, [[RESULT2]] : $T, [[RESULT3]] : $Klass, [[RESULT4]] : $T), resume bb1, unwind bb2
+//
+// CHECK: bb1:
+// CHECK:   end_apply [[TOKEN]] as $()
+// CHECK:   return
+//
+// CHECK: bb2:
+// CHECK:   abort_apply [[TOKEN]]
+// CHECK:   unwind
+// CHECK:  } // end sil function 'generic_thunk_lowering_yield_test_2TTI'
+
+// CHECK-LABEL: sil @generic_thunk_lowering_yield_test_2 : $@convention(thin) <T> () -> () {
+// CHECK: bb0:
+// CHECK:   [[FUNC:%.*]] = function_ref @generic_yield_noparam_twoyield_callee :
+// CHECK:   [[THUNK:%.*]] = function_ref @generic_thunk_lowering_yield_test_2TTI :
+// CHECK:   [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]<T>([[FUNC]]) :
+// CHECK:   ({{%.*}}, {{%.*}}, {{%.*}}, {{%.*}}, [[TOKEN:%.*]]) = begin_apply [[THUNKED_FUNC:%.*]]() :
+// CHECK:   end_apply [[TOKEN]]
+// CHECK: } // end sil function 'generic_thunk_lowering_yield_test_2'
+sil @generic_thunk_lowering_yield_test_2 : $@convention(thin) <T> () -> () {
+bb0:
+  %0 = function_ref @generic_yield_noparam_twoyield_callee : $@yield_once @convention(thin) <τ_0_0> () -> (@yields Klass, @yields τ_0_0, @yields Klass, @yields τ_0_0)
+  %1 = thunk [identity] %0<T>() : $@yield_once @convention(thin) <τ_0_0> () -> (@yields Klass, @yields τ_0_0, @yields Klass, @yields τ_0_0)
+  (%result1, %result2, %result3, %result4, %tag) = begin_apply %1() : $@yield_once @callee_guaranteed @substituted <τ_0_0 where τ_0_0 : Copyable, τ_0_0 : Escapable> () -> (@yields Klass, @yields τ_0_0, @yields Klass, @yields τ_0_0) for <T>
+  debug_value %result1 : $Klass
+  debug_value %result2 : $T
+  debug_value %result3 : $Klass
+  debug_value %result4 : $T
+  end_apply %tag as $()
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil shared [thunk] @generic_thunk_lowering_yield_test_mixedTTI : $@yield_once @convention(thin) <T> (@guaranteed @yield_once @convention(thin) <T> () -> (@yields Klass, @yields T, @yields Klass, @yields T, @owned Klass, @out T, @owned Klass)) -> (@yields Klass, @yields T, @yields Klass, @yields T, @owned Klass, @out T, @owned Klass) {
+// CHECK: bb0([[INDIRECT_RESULT:%.*]] : $*T, [[FUNC:%.*]] : $@yield_once @convention(thin) <τ_0_0> () -> (@yields Klass, @yields τ_0_0, @yields Klass, @yields τ_0_0, @owned Klass, @out τ_0_0, @owned Klass)):
+// CHECK:  ([[RESULT1:%.*]], [[RESULT2:%.*]], [[RESULT3:%.*]], [[RESULT4:%.*]], [[TOKEN:%.*]]) = begin_apply [[FUNC]]<T>([[INDIRECT_RESULT]]) : $@yield_once @convention(thin) <τ_0_0> () -> (@yields Klass, @yields τ_0_0, @yields Klass, @yields τ_0_0, @owned Klass, @out τ_0_0, @owned Klass)
+// CHECK:  yield ([[RESULT1]] : $Klass, [[RESULT2]] : $T, [[RESULT3]] : $Klass, [[RESULT4]] : $T), resume bb1, unwind bb2
+//
+// CHECK: bb1:
+// CHECK:   [[DIRECT_RESULT:%.*]] = end_apply [[TOKEN]] as $(Klass, Klass)
+// CHECK:   return [[DIRECT_RESULT]]
+//
+// CHECK: bb2:
+// CHECK:   abort_apply [[TOKEN]]
+// CHECK:   unwind
+// CHECK:  } // end sil function 'generic_thunk_lowering_yield_test_mixedTTI'
+
+// CHECK-LABEL: sil @generic_thunk_lowering_yield_test_mixed : $@convention(thin) <T> () -> (@out T, @owned Klass, @owned Klass) {
+// CHECK: bb0([[RESULT:%.*]] : $*T):
+// CHECK:   [[FUNC:%.*]] = function_ref @generic_yield_noparam_mixedyieldreturn_callee : $@yield_once @convention(thin) <τ_0_0> () -> (@yields Klass, @yields τ_0_0, @yields Klass, @yields τ_0_0, @owned Klass, @out τ_0_0, @owned Klass)
+// CHECK:   [[THUNK:%.*]] = function_ref @generic_thunk_lowering_yield_test_mixedTTI :
+// CHECK:   [[THUNKED_FUNC:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]<T>([[FUNC]]) :
+// CHECK:   ({{%.*}}, {{%.*}}, {{%.*}}, {{%.*}}, [[TOKEN:%.*]]) = begin_apply [[THUNKED_FUNC:%.*]]([[INDIRECT_RESULT]]) :
+// CHECK:   [[DIRECT_RESULT:%.*]] = end_apply [[TOKEN]]
+// CHECK:   return [[DIRECT_RESULT]]
+// CHECK: } // end sil function 'generic_thunk_lowering_yield_test_mixed'
+sil @generic_thunk_lowering_yield_test_mixed : $@convention(thin) <T> () -> (@out T, @owned Klass, @owned Klass) {
+bb0(%result : $*T):
+  %0 = function_ref @generic_yield_noparam_mixedyieldreturn_callee : $@yield_once @convention(thin) <τ_0_0> () -> (@yields Klass, @owned Klass, @yields τ_0_0, @yields Klass, @out τ_0_0, @yields τ_0_0, @owned Klass)
+  %1 = thunk [identity] %0<T>() : $@yield_once @convention(thin) <τ_0_0> () -> (@yields Klass, @owned Klass, @yields τ_0_0, @yields Klass, @out τ_0_0, @yields τ_0_0, @owned Klass)
+  (%yield1, %yield2, %yield3, %yield4, %tag) = begin_apply %1(%result) : $@yield_once @callee_guaranteed @substituted <τ_0_0 where τ_0_0 : Copyable, τ_0_0 : Escapable> () -> (@yields Klass, @yields τ_0_0, @yields Klass, @yields τ_0_0, @owned Klass, @out τ_0_0, @owned Klass) for <T>
+  debug_value %yield1 : $Klass
+  debug_value %yield2 : $T
+  debug_value %yield3 : $Klass
+  debug_value %yield4 : $T
+  %directResult = end_apply %tag as $(Klass, Klass)
+  return %directResult : $(Klass, Klass)
+}

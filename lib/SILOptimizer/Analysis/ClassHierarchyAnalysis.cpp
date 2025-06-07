@@ -19,7 +19,13 @@
 
 using namespace swift;
 
-void ClassHierarchyAnalysis::init() {
+// FIXME: This could be implemented as a request.
+void ClassHierarchyAnalysis::populateDirectSubclassesCacheIfNecessary() {
+  if (DirectSubclassesCache.has_value())
+    return;
+
+  DirectSubclassesCache.emplace();
+
   auto module = M->getSwiftModule();
 
   // For each class declaration in our V-table list:
@@ -42,7 +48,7 @@ void ClassHierarchyAnalysis::init() {
       // Find the superclass's list of direct subclasses.  If it's non-empty,
       // we've previously walked up to the class, so there's no reason to keep
       // walking from this point.
-      auto &list = DirectSubclassesCache[super];
+      auto &list = (*DirectSubclassesCache)[super];
       bool shouldVisitSuper = list.empty();
 
       // Check whether C is already in the list, which can happen

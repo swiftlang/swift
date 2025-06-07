@@ -10,12 +10,17 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/Support/JSON.h"
-#include "llvm/Support/Path.h"
+#include "swift/SymbolGraphGen/SymbolGraphGen.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/FileSystem.h"
+#include "swift/AST/Import.h"
+#include "swift/AST/Module.h"
+#include "swift/AST/NameLookup.h"
 #include "swift/Sema/IDETypeChecking.h"
-#include "swift/SymbolGraphGen/SymbolGraphGen.h"
+#include "clang/Basic/Module.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/JSON.h"
+#include "llvm/Support/Path.h"
 
 #include "SymbolGraphASTWalker.h"
 
@@ -26,25 +31,29 @@ namespace {
 int serializeSymbolGraph(SymbolGraph &SG,
                          const SymbolGraphOptions &Options) {
   SmallString<256> FileName;
-  FileName.append(SG.M.getNameStr());
+  FileName.append(getFullModuleName(&SG.M));
   if (SG.ExtendedModule.has_value()) {
     FileName.push_back('@');
-    FileName.append(SG.ExtendedModule.value()->getNameStr());
+//    FileName.append(SG.ExtendedModule.value()->getNameStr());
+    FileName.append(getFullModuleName(SG.ExtendedModule.value()));
   } else if (SG.DeclaringModule.has_value()) {
     // Treat cross-import overlay modules as "extensions" of their declaring module
     FileName.push_back('@');
-    FileName.append(SG.DeclaringModule.value()->getNameStr());
+//    FileName.append(SG.DeclaringModule.value()->getNameStr());
+    FileName.append(getFullModuleName(SG.DeclaringModule.value()));
   }
   FileName.append(".symbols.json");
 
   SmallString<1024> OutputPath(Options.OutputDir);
   llvm::sys::path::append(OutputPath, FileName);
 
-  return withOutputFile(SG.M.getASTContext().Diags, OutputPath, [&](raw_ostream &OS) {
-    llvm::json::OStream J(OS, Options.PrettyPrint ? 2 : 0);
-    SG.serialize(J);
-    return false;
-  });
+  return withOutputPath(
+      SG.M.getASTContext().Diags, SG.M.getASTContext().getOutputBackend(),
+      OutputPath, [&](raw_ostream &OS) {
+        llvm::json::OStream J(OS, Options.PrettyPrint ? 2 : 0);
+        SG.serialize(J);
+        return false;
+      });
 }
 
 } // end anonymous namespace
@@ -52,25 +61,78 @@ int serializeSymbolGraph(SymbolGraph &SG,
 // MARK: - Main Entry Point
 
 /// Emit a symbol graph JSON file for a `ModuleDecl`.
-int
-symbolgraphgen::emitSymbolGraphForModule(ModuleDecl *M,
-                                         const SymbolGraphOptions &Options) {
-  SmallVector<Decl *, 64> ModuleDecls;
-  swift::getTopLevelDeclsForDisplay(M, ModuleDecls, /*recursive*/true);
-  
-  SmallPtrSet<ModuleDecl *, 4> ExportedImportedModules;
-  llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> QualifiedImports;
-  auto shouldIncludeImport = [&](AttributedImport<ImportedModule> import) {
-    auto docVisibility = import.docVisibility.value_or(AccessLevel::Public);
-    return docVisibility >= Options.MinimumAccessLevel;
+int symbolgraphgen::emitSymbolGraphForModule(
+    ModuleDecl *M, const SymbolGraphOptions &Options) {
+  ModuleDecl::ImportCollector importCollector(Options.MinimumAccessLevel);
+
+  SmallPtrSet<const clang::Module *, 2> ExportedClangModules = {};
+  SmallPtrSet<const clang::Module *, 2> WildcardExportClangModules = {};
+  if (const auto *ClangModule = M->findUnderlyingClangModule()) {
+    // Scan through the Clang module's exports and collect them for later
+    // handling
+    for (auto ClangExport : ClangModule->Exports) {
+      if (ClangExport.getInt()) {
+        // Blanket exports are represented as a true boolean tag
+        if (const auto *ExportParent = ClangExport.getPointer()) {
+          // If a pointer is present, this is a scoped blanket export, like
+          // `export Submodule.*`
+          WildcardExportClangModules.insert(ExportParent);
+        } else {
+          // Otherwise it represents a full blanket `export *`
+          WildcardExportClangModules.insert(ClangModule);
+        }
+      } else if (!ClangExport.getInt() && ClangExport.getPointer()) {
+        // This is an explicit `export Submodule`
+        ExportedClangModules.insert(ClangExport.getPointer());
+      }
+    }
+
+    if (ExportedClangModules.empty() && WildcardExportClangModules.empty()) {
+      // HACK: In the absence of an explicit export declaration, export all of the submodules.
+      WildcardExportClangModules.insert(ClangModule);
+    }
+  }
+
+  auto importFilter = [&Options, &WildcardExportClangModules,
+                       &ExportedClangModules](const ModuleDecl *module) {
+    if (!module)
+      return false;
+
+    if (const auto *ClangModule = module->findUnderlyingClangModule()) {
+      if (ExportedClangModules.contains(ClangModule)) {
+        return true;
+      }
+
+      for (const auto *ClangParent : WildcardExportClangModules) {
+        if (ClangModule->isSubModuleOf(ClangParent))
+          return true;
+      }
+    }
+
+    if (Options.AllowedReexportedModules.has_value())
+      for (const auto &allowedModuleName : *Options.AllowedReexportedModules)
+        if (allowedModuleName == module->getNameStr())
+          return true;
+
+    return false;
   };
-  swift::collectParsedExportedImports(M, ExportedImportedModules, QualifiedImports, shouldIncludeImport);
+
+  if (Options.AllowedReexportedModules.has_value() ||
+      !WildcardExportClangModules.empty() || !ExportedClangModules.empty())
+    importCollector.importFilter = std::move(importFilter);
+
+  SmallVector<Decl *, 64> ModuleDecls;
+  swift::getTopLevelDeclsForDisplay(
+      M, ModuleDecls, [&importCollector](ModuleDecl *M, SmallVectorImpl<Decl *> &results) {
+        M->getDisplayDeclsRecursivelyAndImports(results, importCollector);
+      });
 
   if (Options.PrintMessages)
     llvm::errs() << ModuleDecls.size()
         << " top-level declarations in this module.\n";
-    
-  SymbolGraphASTWalker Walker(*M, ExportedImportedModules, QualifiedImports, Options);
+
+  SymbolGraphASTWalker Walker(*M, importCollector.imports,
+                              importCollector.qualifiedImports, Options);
 
   for (auto *Decl : ModuleDecls) {
     Walker.walk(Decl);
@@ -107,10 +169,9 @@ printSymbolGraphForDecl(const ValueDecl *D, Type BaseTy,
 
   llvm::json::OStream JOS(OS, Options.PrettyPrint ? 2 : 0);
   ModuleDecl *MD = D->getModuleContext();
-  llvm::SmallDenseMap<ModuleDecl *, SmallPtrSet<Decl *, 4>, 4> QualifiedImports;
-  SymbolGraphASTWalker Walker(*MD, {}, QualifiedImports, Options);
+  SymbolGraphASTWalker Walker(*MD, Options);
   markup::MarkupContext MarkupCtx;
-  SymbolGraph Graph(Walker, *MD, None, MarkupCtx, None,
+  SymbolGraph Graph(Walker, *MD, std::nullopt, MarkupCtx, std::nullopt,
                     /*IsForSingleNode=*/true);
   NominalTypeDecl *NTD = InSynthesizedExtension
       ? BaseTy->getAnyNominal()

@@ -108,6 +108,7 @@
 // ===---------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "let-properties-opt"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
@@ -239,7 +240,8 @@ void LetPropertiesOpt::optimizeLetPropertyAccess(VarDecl *Property,
     return;
 
   auto *Ty = dyn_cast<NominalTypeDecl>(Property->getDeclContext());
-  if (SkipTypeProcessing.count(Ty))
+  // Ty is null for properties declared inside an extension of an ObjC type.
+  if (!Ty || SkipTypeProcessing.count(Ty))
     return;
 
   LLVM_DEBUG(llvm::dbgs() << "Replacing access to property '" << *Property

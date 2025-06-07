@@ -1,7 +1,10 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -target %target-cpu-apple-macosx12 %s -o %t/linking_direct
-// RUN: %target-build-swift -target %target-cpu-apple-macosx11 %s -o %t/linking_rpath
-// RUN: %target-build-swift -target %target-cpu-apple-macosx10.10 %s -o %t/linking_rpath_old
+// RUN: %target-build-swift -target %target-cpu-apple-macosx12 %s -o %t/linking_direct 2>&1 | %FileCheck -allow-empty -check-prefix CHECK-BUILD-ERRORS %s
+// RUN: %target-build-swift -target %target-cpu-apple-macosx11 %s -o %t/linking_rpath 2>&1 | %FileCheck -allow-empty -check-prefix CHECK-BUILD-ERRORS %s
+// RUN: %target-build-swift -target %target-cpu-apple-macosx10.15 %s -o %t/linking_rpath_old 2>&1 | %FileCheck -allow-empty -check-prefix CHECK-BUILD-ERRORS %s
+
+// Make sure the linker didn't emit any version mismatch warnings.
+// CHECK-BUILD-ERRORS-NOT: was built for newer 'macOS' version
 
 // RUN: otool -L %t/linking_direct | %FileCheck -check-prefix CHECK-DIRECT %s
 // RUN: otool -L %t/linking_rpath | %FileCheck -check-prefix CHECK-RPATH %s

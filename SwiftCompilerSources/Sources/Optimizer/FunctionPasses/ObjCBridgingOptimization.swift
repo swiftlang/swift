@@ -31,7 +31,7 @@ import SIL
 ///   br continue_bb(%5)
 /// continue_bb(%bridgedOptionalSwiftValue):
 /// ```
-let objCBridgingOptimization = FunctionPass(name: "objc-bridging-opt", {
+let objCBridgingOptimization = FunctionPass(name: "objc-bridging-opt") {
   (function: Function, context: FunctionPassContext) in
 
   if !function.hasOwnership { return }
@@ -54,7 +54,7 @@ let objCBridgingOptimization = FunctionPass(name: "objc-bridging-opt", {
       }
     }
   }
-})
+}
 
 //===----------------------------------------------------------------------===//
 //                      Top-level optimization functions
@@ -84,7 +84,7 @@ private func optimizeOptionalBridging(forArgumentOf block: BasicBlock,
   }
 
   // Check for the first ObjC -> swift bridging operation.
-  let swiftValue = lookThroughOwnershipInsts(swiftValueSwitch.enumOp)
+  let swiftValue = swiftValueSwitch.enumOp.lookThoughOwnershipInstructions
   guard let originalObjCValueSwitch = isOptionalBridging(of: swiftValue, isBridging: isBridgeToSwiftCall) else {
     return true
   }
@@ -126,7 +126,7 @@ private func optimizeNonOptionalBridging(_ apply: ApplyInst,
     return true
   }
 
-  let swiftValue = lookThroughOwnershipInsts(bridgeToObjcCall.arguments[0])
+  let swiftValue = bridgeToObjcCall.arguments[0].lookThoughOwnershipInstructions
 
   // Handle the first case: the ObjC -> swift bridging operation is optional and the swift -> ObjC
   // bridging is within a test for Optional.some, e.g.
@@ -152,8 +152,7 @@ private func optimizeNonOptionalBridging(_ apply: ApplyInst,
     let replacement = builder.createUncheckedEnumData(enum: optionalReplacement,
                                                       caseIndex: someCase,
                                                       resultType: bridgeToObjcCall.type)
-    bridgeToObjcCall.uses.replaceAll(with: replacement, context)
-    context.erase(instruction: bridgeToObjcCall)
+    bridgeToObjcCall.replace(with: replacement, context)
     return true
   }
 
@@ -185,9 +184,9 @@ private func optimizeNonOptionalBridging(_ apply: ApplyInst,
   // empty value.
   // Create the needed blocks of the `switch_enum` CFG diamond.
   let origBlock = bridgeToSwiftCall.parentBlock
-  let someBlock = context.splitBlock(at: bridgeToSwiftCall)
-  let noneBlock = context.splitBlock(at: bridgeToSwiftCall)
-  let continueBlock = context.splitBlock(at: bridgeToSwiftCall)
+  let someBlock = context.splitBlock(before: bridgeToSwiftCall)
+  let noneBlock = context.splitBlock(before: bridgeToSwiftCall)
+  let continueBlock = context.splitBlock(before: bridgeToSwiftCall)
 
 
   let builder = Builder(atEndOf: origBlock, location: bridgeToSwiftCall.location, context)
@@ -211,16 +210,15 @@ private func optimizeNonOptionalBridging(_ apply: ApplyInst,
 
   // In the some-case just forward the original NSString.
   let objCType = emptyObjCValue.type
-  let forwardedValue = someBlock.addBlockArgument(type: objCType, ownership: .owned, context)
+  let forwardedValue = someBlock.addArgument(type: objCType, ownership: .owned, context)
   let someBuilder = Builder(atEndOf: someBlock, location: bridgeToSwiftCall.location, context)
   someBuilder.createBranch(to: continueBlock, arguments: [forwardedValue])
 
-  let s = continueBlock.addBlockArgument(type: objCType, ownership: .owned, context)
+  let s = continueBlock.addArgument(type: objCType, ownership: .owned, context)
   
   // Now replace the bridged value with the original value in the destination block.
   let replacement = s.makeAvailable(in: bridgeToObjcCall.parentBlock, context)
-  bridgeToObjcCall.uses.replaceAll(with: replacement, context)
-  context.erase(instruction: bridgeToObjcCall)
+  bridgeToObjcCall.replace(with: replacement, context)
   return true
 }
 
@@ -232,26 +230,17 @@ private func optimizeNonOptionalBridging(_ apply: ApplyInst,
 private func removeBridgingCodeInPredecessors(of block: BasicBlock, _ context: FunctionPassContext) {
   for pred in block.predecessors {
     let branch = pred.terminator as! BranchInst
-    let builder = Builder(after: branch, context)
+    let builder = Builder(atEndOf: branch.parentBlock, location: branch.location, context)
     builder.createBranch(to: block)
     
     let en = branch.operands[0].value as! EnumInst
     context.erase(instruction: branch)
-    let op = en.operand
+    let payload = en.payload
     context.erase(instruction: en)
-    if let bridgingCall = op {
+    if let bridgingCall = payload {
       context.erase(instruction: bridgingCall as! ApplyInst)
     }
   }
-}
-
-private func lookThroughOwnershipInsts(_ value: Value) -> Value {
-  // Looks like it's sufficient to support begin_borrow for now.
-  // TODO: add copy_value if needed.
-  if let bbi = value as? BeginBorrowInst {
-    return bbi.operand
-  }
-  return value
 }
 
 /// Checks for an optional bridging `switch_enum` diamond.
@@ -269,16 +258,13 @@ private func lookThroughOwnershipInsts(_ value: Value) -> Value {
 /// continue_bb(%value):         // passed value
 /// ```
 private func isOptionalBridging(of value: Value, isBridging: (Value) -> ApplyInst?) -> SwitchEnumInst? {
-  guard let arg = value as? BlockArgument,
-        arg.isPhiArgument else {
-    return nil
-  }
+  guard let phi = Phi(value) else { return nil }
   
   var noneSwitch: SwitchEnumInst?
   var someSwitch: SwitchEnumInst?
   
   // Check if one incoming value is the none-case and the other is the some-case.
-  for incomingVal in arg.incomingPhiValues {
+  for incomingVal in phi.incomingValues {
     // In both branches, the result must be an `enum` which is passed to the
     // continue_bb's phi-argument.
     guard let enumInst = incomingVal as? EnumInst,
@@ -286,10 +272,10 @@ private func isOptionalBridging(of value: Value, isBridging: (Value) -> ApplyIns
           singleEnumUse.instruction is BranchInst else {
       return nil
     }
-    if let enumOp = enumInst.operand {
+    if let payload = enumInst.payload {
       // The some-case
       if someSwitch != nil { return nil }
-      guard let bridgingCall = isBridging(enumOp),
+      guard let bridgingCall = isBridging(payload),
             bridgingCall.uses.isSingleUse else {
         return nil
       }
@@ -298,8 +284,8 @@ private func isOptionalBridging(of value: Value, isBridging: (Value) -> ApplyIns
       // If it's an ObjC -> Swift bridging call the argument is wrapped into an optional enum.
       if callArgument.type.isEnum {
         guard let sourceEnum = callArgument as? EnumInst,
-              let sourceEnumOp = sourceEnum.operand,
-              let (se, someCase) = isPayloadOfSwitchEnum(sourceEnumOp),
+              let sourcePayload = sourceEnum.payload,
+              let (se, someCase) = isPayloadOfSwitchEnum(sourcePayload),
               enumInst.caseIndex == someCase,
               sourceEnum.caseIndex == someCase,
               sourceEnum.type == se.enumOp.type else {
@@ -335,10 +321,9 @@ private func isOptionalBridging(of value: Value, isBridging: (Value) -> ApplyIns
 /// Returns the `switch_enum` together with the enum case index, if `value` is
 /// the payload block argument of the `switch_enum`.
 private func isPayloadOfSwitchEnum(_ value: Value) -> (SwitchEnumInst, case: Int)? {
-  if let payloadArg = value as? BlockArgument,
-     let pred = payloadArg.parentBlock.singlePredecessor,
-     let se = pred.terminator as? SwitchEnumInst,
-     let caseIdx = se.getUniqueCase(forSuccessor: payloadArg.parentBlock) {
+  if let payloadArg = TerminatorResult(value),
+     let se = payloadArg.terminator as? SwitchEnumInst,
+     let caseIdx = se.getUniqueCase(forSuccessor: payloadArg.successor) {
     return (se, caseIdx)
   }
   return nil
@@ -363,7 +348,7 @@ func isBridgeToSwiftCall(_ value: Value) -> ApplyInst? {
     return nil
   }
   guard bridgingCall.arguments.count == 2,
-        bridgingCall.getArgumentConvention(calleeArgIndex: 0) == .directGuaranteed else {
+        bridgingCall.calleeArgumentConventions[0] == .directGuaranteed else {
     return nil
   }
   return bridgingCall
@@ -375,7 +360,7 @@ func isBridgeToObjcCall(_ value: Value) -> ApplyInst? {
         let bridgingFunc = bridgingCall.referencedFunction,
         bridgingFunc.hasSemanticsAttribute("convertToObjectiveC"),
         bridgingCall.arguments.count == 1,
-        bridgingCall.getArgumentConvention(calleeArgIndex: 0) == .directGuaranteed else {
+        bridgingCall.calleeArgumentConventions[0] == .directGuaranteed else {
     return nil
   }
   return bridgingCall

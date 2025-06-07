@@ -261,23 +261,23 @@ protocol SubProto: BaseProto {}
   func copy() -> Any
 }
 
-struct FullyGeneric<Foo> {} // expected-note 13 {{'Foo' declared as parameter to type 'FullyGeneric'}} expected-note 1 {{generic type 'FullyGeneric' declared here}}
+struct FullyGeneric<Foo> {} // expected-note 13 {{'Foo' declared as parameter to type 'FullyGeneric'}} expected-note 1 {{generic struct 'FullyGeneric' declared here}}
 
-struct AnyClassBound<Foo: AnyObject> {} // expected-note {{'Foo' declared as parameter to type 'AnyClassBound'}} expected-note {{generic type 'AnyClassBound' declared here}}
+struct AnyClassBound<Foo: AnyObject> {} // expected-note {{'Foo' declared as parameter to type 'AnyClassBound'}} expected-note {{generic struct 'AnyClassBound' declared here}}
 // expected-note@-1{{requirement specified as 'Foo' : 'AnyObject'}}
 struct AnyClassBound2<Foo> where Foo: AnyObject {} // expected-note {{'Foo' declared as parameter to type 'AnyClassBound2'}}
 // expected-note@-1{{requirement specified as 'Foo' : 'AnyObject' [with Foo = Any]}}
 
-struct ProtoBound<Foo: SubProto> {} // expected-note {{'Foo' declared as parameter to type 'ProtoBound'}} expected-note {{generic type 'ProtoBound' declared here}}
+struct ProtoBound<Foo: SubProto> {} // expected-note {{'Foo' declared as parameter to type 'ProtoBound'}} expected-note {{generic struct 'ProtoBound' declared here}}
 struct ProtoBound2<Foo> where Foo: SubProto {} // expected-note {{'Foo' declared as parameter to type 'ProtoBound2'}}
 
-struct ObjCProtoBound<Foo: NSCopyish> {} // expected-note {{'Foo' declared as parameter to type 'ObjCProtoBound'}} expected-note {{generic type 'ObjCProtoBound' declared here}}
+struct ObjCProtoBound<Foo: NSCopyish> {} // expected-note {{'Foo' declared as parameter to type 'ObjCProtoBound'}} expected-note {{generic struct 'ObjCProtoBound' declared here}}
 struct ObjCProtoBound2<Foo> where Foo: NSCopyish {} // expected-note {{'Foo' declared as parameter to type 'ObjCProtoBound2'}}
 
-struct ClassBound<Foo: X> {} // expected-note {{generic type 'ClassBound' declared here}}
-struct ClassBound2<Foo> where Foo: X {} // expected-note {{generic type 'ClassBound2' declared here}}
+struct ClassBound<Foo: X> {} // expected-note {{generic struct 'ClassBound' declared here}}
+struct ClassBound2<Foo> where Foo: X {} // expected-note {{generic struct 'ClassBound2' declared here}}
 
-struct ProtosBound<Foo> where Foo: SubProto & NSCopyish {} // expected-note {{'Foo' declared as parameter to type 'ProtosBound'}} expected-note {{generic type 'ProtosBound' declared here}}
+struct ProtosBound<Foo> where Foo: SubProto & NSCopyish {} // expected-note {{'Foo' declared as parameter to type 'ProtosBound'}} expected-note {{generic struct 'ProtosBound' declared here}}
 struct ProtosBound2<Foo: SubProto & NSCopyish> {} // expected-note {{'Foo' declared as parameter to type 'ProtosBound2'}}
 struct ProtosBound3<Foo: SubProto> where Foo: NSCopyish {} // expected-note {{'Foo' declared as parameter to type 'ProtosBound3'}}
 
@@ -508,11 +508,12 @@ public struct S5 {
 
 // rdar://problem/24329052 - QoI: call argument archetypes not lining up leads to ambiguity errors
 
-struct S_24329052<T> { // expected-note {{generic parameter 'T' of generic struct 'S_24329052' declared here}}
+struct S_24329052<T> { // expected-note {{generic parameter 'T' of generic struct 'S_24329052' declared here}} expected-note {{'T' previously declared here}}
   var foo: (T) -> Void
   // expected-note@+1 {{generic parameter 'T' of instance method 'bar(_:)' declared here}}
   func bar<T>(_ v: T) { foo(v) }
   // expected-error@-1 {{cannot convert value of type 'T' (generic parameter of instance method 'bar(_:)') to expected argument type 'T' (generic parameter of generic struct 'S_24329052')}}
+  // expected-warning@-2 {{generic parameter 'T' shadows generic parameter from outer scope with the same name; this is an error in the Swift 6 language mode}}
 }
 
 extension Sequence {
@@ -880,7 +881,7 @@ func test_ternary_operator_with_regular_conformance_to_literal_protocol() {
 // rdar://78623338 - crash due to leftover inactive constraints
 func rdar78623338() {
   func any<T : Sequence>(_ sequence: T) -> AnySequence<T.Element> {
-    // expected-note@-1 {{required by local function 'any' where 'T' = '() -> ReversedCollection<(ClosedRange<Int>)>'}}
+    // expected-note@-1 {{required by local function 'any' where 'T' = '() -> ReversedCollection<ClosedRange<Int>>'}}
     AnySequence(sequence.makeIterator)
   }
 
@@ -888,7 +889,7 @@ func rdar78623338() {
     any(0...3),
     // TODO: It should be possible to suggest making a call to `reserved` here but we don't have machinery to do so
     //       at the moment because there is no way to go from a requirement to the underlying argument/parameter location.
-    any((1...3).reversed) // expected-error {{type '() -> ReversedCollection<(ClosedRange<Int>)>' cannot conform to 'Sequence'}}
+    any((1...3).reversed) // expected-error {{type '() -> ReversedCollection<ClosedRange<Int>>' cannot conform to 'Sequence'}}
     // expected-note@-1 {{only concrete types such as structs, enums and classes can conform to protocols}}
   ]
 }
@@ -943,7 +944,7 @@ do {
   struct Outer<T: P_eaf0300ff7a> {
     struct Inner<U> {}
 
-    func container<T>() -> Inner<T> {
+    func container<V>() -> Inner<V> {
       return Inner()
     }
   }
@@ -1016,6 +1017,7 @@ func test_requirement_failures_in_ambiguous_context() {
   func f1<T: Equatable>(_: T, _: T) {} // expected-note {{where 'T' = 'A'}}
 
   f1(A(), B()) // expected-error {{local function 'f1' requires that 'A' conform to 'Equatable'}}
+  // expected-error@-1 {{cannot convert value of type 'B' to expected argument type 'A'}}
 
   func f2<T: P_56173, U: P_56173>(_: T, _: U) {}
   // expected-note@-1 {{candidate requires that 'B' conform to 'P_56173' (requirement specified as 'U' : 'P_56173')}}
@@ -1030,4 +1032,58 @@ func test_requirement_failures_in_ambiguous_context() {
   // expected-note@-1 {{candidate requires that 'A' conform to 'Q_56173' (requirement specified as 'U' : 'Q_56173')}}
 
   f3(A()) // expected-error {{no exact matches in call to local function 'f3'}}
+}
+
+// rdar://106054263 - failed to produce a diagnostic upon generic argument mismatch
+func test_mismatches_with_dependent_member_generic_arguments() {
+  struct Binding<T, U> {}
+  // expected-note@-1 {{arguments to generic parameter 'T' ('Double?' and 'Data.SomeAssociated') are expected to be equal}}
+  // expected-note@-2 {{arguments to generic parameter 'U' ('Int' and 'Data.SomeAssociated') are expected to be equal}}
+
+  struct Data : SomeProtocol {
+    typealias SomeAssociated = String
+  }
+
+  func test1<T: SomeProtocol>(_: Binding<T.SomeAssociated, T.SomeAssociated>, _: T) where T.SomeAssociated == String {
+  }
+
+  func test2<T: SomeProtocol>(_: Optional<T.SomeAssociated>, _: T) where T.SomeAssociated == String {
+  }
+
+  test1(Binding<Double?, Int>(), Data())
+  // expected-error@-1 {{cannot convert value of type 'Binding<Double?, Int>' to expected argument type 'Binding<Data.SomeAssociated, Data.SomeAssociated>'}}
+
+  test2(Optional<Int>(nil), Data())
+  // expected-error@-1 {{cannot convert value of type 'Optional<Int>' to expected argument type 'Optional<Data.SomeAssociated>'}}
+  // expected-note@-2 {{arguments to generic parameter 'Wrapped' ('Int' and 'Data.SomeAssociated') are expected to be equal}}
+}
+
+extension Dictionary where Value == Any { // expected-note {{where 'Value' = 'any P'}}
+  func compute() {}
+}
+
+do {
+  struct S {
+    var test: [String: any P] = [:]
+  }
+
+  func test_existential_mismatch(s: S) {
+    s.test.compute()
+    // expected-error@-1 {{referencing instance method 'compute()' on 'Dictionary' requires the types 'any P' and 'Any' be equivalent}}
+  }
+}
+
+// https://github.com/swiftlang/swift/issues/77003
+do {
+  func f<T, U>(_: T.Type, _ fn: (T) -> U?, _: (U) -> ()) {}
+
+  struct Task<E> {
+    init(_: () -> ()) where E == Never {}
+    init(_: () throws -> ()) where E == Error {}
+  }
+
+  func test(x: Int?.Type) {
+      // Note that it's important that Task stays unused, using `_ = ` changes constraint generation behavior.
+      f(x, { $0 }, { _ in Task {} }) // expected-warning {{result of 'Task<E>' initializer is unused}}
+  }
 }

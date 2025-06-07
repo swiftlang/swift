@@ -17,10 +17,15 @@
 #include "swift/AST/LinkLibrary.h"
 #include "swift/AST/Module.h"
 #include "swift/Serialization/Validation.h"
+#include "llvm/ADT/bit.h"
 #include "llvm/Bitstream/BitstreamReader.h"
 
 namespace llvm {
   template <typename Info> class OnDiskIterableChainedHashTable;
+}
+
+namespace swift {
+enum class ModuleLoadingBehavior;
 }
 
 namespace swift {
@@ -61,10 +66,20 @@ class ModuleFileSharedCore {
   /// The canonical name of the SDK the module was built with.
   StringRef SDKName;
 
+  /// Version string of the SDK against which the module was built.
+  StringRef SDKVersion;
+
   /// The name of the module interface this module was compiled from.
   ///
   /// Empty if this module didn't come from an interface file.
   StringRef ModuleInterfacePath;
+
+  /// true if this module interface was serialized relative to the SDK path.
+  bool IsModuleInterfaceSDKRelative = false;
+
+  /// The module interface path if this module is adjacent to such an interface
+  /// or it was itself compiled from an interface. Empty otherwise.
+  StringRef CorrespondingInterfacePath;
 
   /// The Swift compatibility version in use when this module was built.
   version::Version CompatibilityVersion;
@@ -88,6 +103,14 @@ class ModuleFileSharedCore {
   /// Module name to use when referenced in clients module interfaces.
   StringRef ModuleExportAsName;
 
+  /// Name to use in public facing diagnostics and documentation.
+  StringRef PublicModuleName;
+
+  /// The version of the Swift compiler used to produce swiftinterface
+  /// this module is based on. This is the most precise version possible
+  /// - a compiler tag or version if this is a development compiler.
+  version::Version SwiftInterfaceCompilerVersion;
+
   /// \c true if this module has incremental dependency information.
   bool HasIncrementalInfo = false;
 
@@ -106,12 +129,12 @@ public:
 
   private:
     using ImportFilterKind = ModuleDecl::ImportFilterKind;
-    const unsigned RawImportControl : 2;
+    const unsigned RawImportControl : 3;
     const unsigned IsHeader : 1;
     const unsigned IsScoped : 1;
 
     static unsigned rawControlFromKind(ImportFilterKind importKind) {
-      return llvm::countTrailingZeros(static_cast<unsigned>(importKind));
+      return llvm::countr_zero(static_cast<unsigned>(importKind));
     }
     ImportFilterKind getImportControl() const {
       return static_cast<ImportFilterKind>(1 << RawImportControl);
@@ -124,7 +147,7 @@ public:
           RawImportControl(rawControlFromKind(importControl)),
           IsHeader(isHeader),
           IsScoped(isScoped) {
-      assert(llvm::countPopulation(static_cast<unsigned>(importControl)) == 1 &&
+      assert(llvm::popcount(static_cast<unsigned>(importControl)) == 1 &&
              "must be a particular filter option, not a bitset");
       assert(getImportControl() == importControl && "not enough bits");
     }
@@ -146,6 +169,12 @@ public:
     bool isImplementationOnly() const {
       return getImportControl() == ImportFilterKind::ImplementationOnly;
     }
+    bool isInternalOrBelow() const {
+      return getImportControl() == ImportFilterKind::InternalOrBelow;
+    }
+    bool isPackageOnly() const {
+      return getImportControl() == ImportFilterKind::PackageOnly;
+    }
 
     bool isHeader() const { return IsHeader; }
     bool isScoped() const { return IsScoped; }
@@ -162,6 +191,9 @@ private:
   /// This is not intended for use by frameworks, but may show up in debug
   /// modules.
   std::vector<serialization::SearchPath> SearchPaths;
+
+  /// The external macro plugins from the macro definition inside the module.
+  SmallVector<ExternalMacroPlugin, 4> MacroModuleNames;
 
   /// Info for the (lone) imported header for this module.
   struct {
@@ -209,6 +241,12 @@ private:
 
   /// Protocol conformances referenced by this module.
   ArrayRef<RawBitOffset> Conformances;
+
+  /// Abstract conformances referenced by this module.
+  ArrayRef<RawBitOffset> AbstractConformances;
+
+  /// Pack conformances referenced by this module.
+  ArrayRef<RawBitOffset> PackConformances;
 
   /// SILLayouts referenced by this module.
   ArrayRef<RawBitOffset> SILLayouts;
@@ -345,6 +383,9 @@ private:
     /// Whether this module was built with -experimental-hermetic-seal-at-link.
     unsigned HasHermeticSealAtLink : 1;
 
+    /// Whether this module was built with embedded Swift.
+    unsigned IsEmbeddedSwiftModule : 1;
+
     /// Whether this module file is compiled with '-enable-testing'.
     unsigned IsTestable : 1;
 
@@ -364,8 +405,24 @@ private:
     /// \c true if this module was built with complete checking for concurrency.
     unsigned IsConcurrencyChecked: 1;
 
+    /// Whether this module is built with C++ interoperability enabled.
+    unsigned HasCxxInteroperability : 1;
+
+    /// Whether this module uses the platform default C++ stdlib, or an
+    /// overridden C++ stdlib.
+    unsigned CXXStdlibKind : 8;
+
+    /// Whether this module is built with -allow-non-resilient-access.
+    unsigned AllowNonResilientAccess : 1;
+
+    /// Whether this module is built with -package-cmo.
+    unsigned SerializePackageEnabled : 1;
+
+    /// Whether this module enabled strict memory safety.
+    unsigned StrictMemorySafety : 1;
+
     // Explicitly pad out to the next word boundary.
-    unsigned : 4;
+    unsigned : 2;
   } Bits = {};
   static_assert(sizeof(ModuleBits) <= 8, "The bit set should be small");
 
@@ -384,7 +441,9 @@ private:
       std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
       std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
       std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
-      bool isFramework, bool requiresOSSAModules, StringRef requiredSDK,
+      bool isFramework,
+      bool requiresOSSAModules,
+      StringRef requiredSDK,
       serialization::ValidationInfo &info, PathObfuscator &pathRecoverer);
 
   /// Change the status of the current module.
@@ -516,7 +575,7 @@ public:
   /// \returns Whether the module was successfully loaded, or what went wrong
   ///          if it was not.
   static serialization::ValidationInfo
-  load(StringRef moduleInterfacePath,
+  load(StringRef moduleInterfacePath, StringRef moduleInterfaceSourcePath,
        std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
        std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
        std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
@@ -527,11 +586,17 @@ public:
     auto *core = new ModuleFileSharedCore(
         std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
         std::move(moduleSourceInfoInputBuffer), isFramework,
-        requiresOSSAModules, requiredSDK, info, pathRecoverer);
+        requiresOSSAModules, requiredSDK, info,
+        pathRecoverer);
     if (!moduleInterfacePath.empty()) {
       ArrayRef<char> path;
       core->allocateBuffer(path, moduleInterfacePath);
       core->ModuleInterfacePath = StringRef(path.data(), path.size());
+    }
+    if (!moduleInterfaceSourcePath.empty()) {
+      ArrayRef<char> path;
+      core->allocateBuffer(path, moduleInterfaceSourcePath);
+      core->CorrespondingInterfacePath = StringRef(path.data(), path.size());
     }
     theModule.reset(core);
     return info;
@@ -539,7 +604,7 @@ public:
 
   /// Outputs information useful for diagnostics to \p out
   void outputDiagnosticInfo(llvm::raw_ostream &os) const;
-  
+
   // Out of line to avoid instantiation OnDiskChainedHashTable here.
   ~ModuleFileSharedCore();
 
@@ -548,10 +613,58 @@ public:
     return Name;
   }
 
+  StringRef getModulePackageName() const {
+    return ModulePackageName;
+  }
+
+  /// Is the module built with testing enabled?
+  bool isTestable() const {
+     return Bits.IsTestable;
+   }
+
+  /// Whether the module is resilient. ('-enable-library-evolution')
+  ResilienceStrategy getResilienceStrategy() const {
+    return ResilienceStrategy(Bits.ResilienceStrategy);
+  }
+
   /// Returns the list of modules this module depends on.
   ArrayRef<Dependency> getDependencies() const {
     return Dependencies;
   }
+
+  /// Returns the list of modules this module depends on.
+  ArrayRef<LinkLibrary> getLinkLibraries() const {
+    return LinkLibraries;
+  }
+
+  /// Does this module correspond to a framework.
+  bool isFramework() const {
+    return Bits.IsFramework;
+  }
+
+  /// Does this module correspond to a static archive.
+  bool isStaticLibrary() const {
+    return Bits.IsStaticLibrary;
+  }
+
+  llvm::VersionTuple getUserModuleVersion() const {
+    return UserModuleVersion;
+  }
+
+  /// Get external macro names.
+  ArrayRef<ExternalMacroPlugin> getExternalMacros() const {
+    return MacroModuleNames;
+  }
+
+  /// Get embedded bridging header.
+  std::string getEmbeddedHeader() const {
+    // Don't include the '\0' in the end.
+    return importedHeaderInfo.contents.drop_back().str();
+  }
+
+  /// If the module-defining `.swiftinterface` file is an SDK-relative path,
+  /// resolve it to be absolute to the specified SDK.
+  std::string resolveModuleDefiningFilePath(const StringRef SDKPath) const;
 
   /// Returns \c true if this module file contains a section with incremental
   /// information.
@@ -565,6 +678,28 @@ public:
   bool hasSourceInfo() const;
 
   bool isConcurrencyChecked() const { return Bits.IsConcurrencyChecked; }
+
+  bool strictMemorySafety() const { return Bits.StrictMemorySafety; }
+
+  /// How should \p dependency be loaded for a transitive import via \c this?
+  ///
+  /// If \p importNonPublicDependencies, more transitive dependencies
+  /// should try to be loaded as they can be useful in debugging.
+  ///
+  /// If \p isPartialModule, transitive dependencies should be loaded as we're
+  /// in merge-module mode.
+  ///
+  /// If \p packageName is set, transitive package dependencies are loaded if
+  /// loaded from the same package.
+  ///
+  /// If \p forTestable, get the desired loading behavior for a @testable
+  /// import. Reports non-public dependencies as required for a testable
+  /// client so it can access internal details, which in turn can reference
+  /// those non-public dependencies.
+  ModuleLoadingBehavior getTransitiveLoadingBehavior(
+      const Dependency &dependency, bool importNonPublicDependencies,
+      bool isPartialModule, StringRef packageName,
+      bool resolveInPackageModuleDependencies, bool forTestable) const;
 };
 
 template <typename T, typename RawData>
@@ -575,8 +710,7 @@ void ModuleFileSharedCore::allocateBuffer(MutableArrayRef<T> &buffer,
     return;
 
   void *rawBuffer = Allocator.Allocate(sizeof(T) * rawData.size(), alignof(T));
-  buffer = llvm::makeMutableArrayRef(static_cast<T *>(rawBuffer),
-                                     rawData.size());
+  buffer = llvm::MutableArrayRef(static_cast<T *>(rawBuffer), rawData.size());
   std::uninitialized_copy(rawData.begin(), rawData.end(), buffer.begin());
 }
 

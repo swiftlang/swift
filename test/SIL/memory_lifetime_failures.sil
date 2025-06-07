@@ -1,5 +1,6 @@
-// RUN: %target-sil-opt -dont-abort-on-memory-lifetime-errors -o /dev/null %s 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -disable-swift-verification -dont-abort-on-memory-lifetime-errors -o /dev/null %s 2>&1 | %FileCheck %s
 // REQUIRES: asserts
+// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 
@@ -260,7 +261,7 @@ sil [ossa] @test_non_escaping_closure : $@convention(thin) (@in T) -> () {
 bb0(%0 :  $*T):
   %func = function_ref @closure : $@convention(thin) (@in_guaranteed T) -> ()
   %pa = partial_apply [callee_guaranteed] [on_stack] %func(%0) : $@convention(thin) (@in_guaranteed T) -> ()
-  dealloc_stack %pa : $@noescape @callee_guaranteed () -> () 
+  destroy_value %pa : $@noescape @callee_guaranteed () -> () 
   %res = tuple ()
   return %res : $()
 }
@@ -361,7 +362,6 @@ bb0(%0 :  @guaranteed $Optional<T>):
   return %res : $()
 }
 
-// CHECK: SIL memory lifetime failure in @test_store_borrow_take_enum: store-borrow location cannot be written
 sil [ossa] @test_store_borrow_take_enum : $@convention(thin) (@guaranteed Optional<T>) -> () {
 bb0(%0 :  @guaranteed $Optional<T>):
   %s = alloc_stack $Optional<T>
@@ -663,7 +663,7 @@ bb0(%0 : $*Optional<String>):
 sil [ossa] @begin_apply_in_no_destroy : $@convention(thin) () -> () {
 entry:
   (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @in U
-  end_apply %token
+  end_apply %token as $()
   %retval = tuple ()
   return %retval : $()
 }
@@ -672,7 +672,7 @@ entry:
 sil [ossa] @begin_apply_in_use_after_end_apply : $@convention(thin) () -> () {
 entry:
   (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @in U
-  end_apply %token
+  end_apply %token as $()
   apply undef<Inner>(%instance) : $@convention(thin) <U> (@in U) -> ()
   %retval = tuple ()
   return %retval : $()
@@ -682,7 +682,7 @@ entry:
 sil [ossa] @begin_apply_in_constant_no_destroy : $@convention(thin) () -> () {
 entry:
   (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @in_constant U
-  end_apply %token
+  end_apply %token as $()
   %retval = tuple ()
   return %retval : $()
 }
@@ -691,7 +691,7 @@ entry:
 sil [ossa] @begin_apply_in_constant_use_after_end_apply : $@convention(thin) () -> () {
 entry:
   (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @in_constant U
-  end_apply %token
+  end_apply %token as $()
   apply undef<Inner>(%instance) : $@convention(thin) <U> (@in_constant U) -> ()
   %retval = tuple ()
   return %retval : $()
@@ -702,7 +702,7 @@ sil [ossa] @begin_apply_in_guaranteed_destroy : $@convention(thin) () -> () {
 entry:
   (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @in_guaranteed U
   destroy_addr %instance : $*Inner
-  end_apply %token
+  end_apply %token as $()
   %retval = tuple ()
   return %retval : $()
 }
@@ -711,7 +711,7 @@ entry:
 sil [ossa] @begin_apply_in_guaranteed_use_after_end_apply : $@convention(thin) () -> () {
 entry:
   (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @in_guaranteed U
-  end_apply %token
+  end_apply %token as $()
   apply undef<Inner>(%instance) : $@convention(thin) <U> (@in_guaranteed U) -> ()
   %retval = tuple ()
   return %retval : $()
@@ -722,7 +722,7 @@ sil [ossa] @begin_apply_inout_destroy : $@convention(thin) () -> () {
 entry:
   (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @inout U
   destroy_addr %instance : $*Inner
-  end_apply %token
+  end_apply %token as $()
   %retval = tuple ()
   return %retval : $()
 }
@@ -731,7 +731,7 @@ entry:
 sil [ossa] @begin_apply_inout_use_after_end_apply : $@convention(thin) () -> () {
 entry:
   (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @inout U
-  end_apply %token
+  end_apply %token as $()
   apply undef<Inner>(%instance) : $@convention(thin) <U> (@inout U) -> ()
   %retval = tuple ()
   return %retval : $()
@@ -742,7 +742,7 @@ sil [ossa] @begin_apply_inout_aliasable_destroy : $@convention(thin) () -> () {
 entry:
   (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @inout_aliasable U
   destroy_addr %instance : $*Inner
-  end_apply %token
+  end_apply %token as $()
   %retval = tuple ()
   return %retval : $()
 }
@@ -751,8 +751,94 @@ entry:
 sil [ossa] @begin_apply_inout_aliasable_use_after_end_apply : $@convention(thin) () -> () {
 entry:
   (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @inout_aliasable U
-  end_apply %token
+  end_apply %token as $()
   apply undef<Inner>(%instance) : $@convention(thin) <U> (@inout_aliasable U) -> ()
   %retval = tuple ()
   return %retval : $()
+}
+
+// CHECK: SIL memory lifetime failure in @begin_apply_inout_destroy: memory is not initialized, but should be
+sil [ossa] @begin_apply_inout_no_destroy : $@convention(thin) () -> () {
+entry:
+  (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @inout U
+  end_apply %token as $()
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK: SIL memory lifetime failure in @begin_apply_inout_aliasable_destroy: memory is not initialized, but should be
+sil [ossa] @begin_apply_inout_aliasable_no_destroy : $@convention(thin) () -> () {
+entry:
+  (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @inout_aliasable U
+  end_apply %token as $()
+  %retval = tuple ()
+  return %retval : $()
+}
+
+sil @read_inner_b : $@convention(thin) (@in_guaranteed Inner) -> () {
+[%0: read s0]
+}
+
+// CHECK: SIL memory lifetime failure in @test_partial_read_in_argument: memory is not initialized, but should be
+sil [ossa] @test_partial_read_in_argument : $@convention(thin) (@in Inner) -> () {
+bb0(%0: $*Inner):
+  %1 = struct_element_addr %0 : $*Inner, #Inner.a
+  destroy_addr %1 : $*T
+  %3 = function_ref @read_inner_b : $@convention(thin) (@in_guaranteed Inner) -> ()
+  %4 = apply %3(%0) : $@convention(thin) (@in_guaranteed Inner) -> ()
+  %5 = struct_element_addr %0 : $*Inner, #Inner.b
+  destroy_addr %5 : $*T
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK: SIL memory lifetime failure in @mark_dependence_uninit_base: memory is not initialized, but should be
+sil [ossa] @mark_dependence_uninit_base : $@convention(thin) (@owned T, @owned Inner) -> @owned Inner {
+bb0(%0 : @owned $T, %1 : @owned $Inner):
+  %2 = alloc_stack $T
+  store %0 to [init] %2
+  %4 = alloc_stack $Inner
+  store %1 to [init] %4
+  destroy_addr %2
+  %6 = mark_dependence %4 on %2
+  %7 = begin_access [read] [dynamic] %6
+  %8 = load [take] %7
+  end_access %7
+  dealloc_stack %4
+  dealloc_stack %2
+  return %8
+}
+
+sil @initfn : $@convention(thin) () -> @out T 
+
+// CHECK: SIL memory lifetime failure in @inject_enum_case: memory is not initialized, but should be
+sil [ossa] @inject_enum_case : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Optional<T>
+  %1 = function_ref @initfn : $@convention(thin) () -> @out T 
+  %2 = init_enum_data_addr %0, #Optional.some!enumelt 
+  %3 = apply %1(%2) : $@convention(thin) () -> @out T
+  destroy_addr %0
+  inject_enum_addr %0, #Optional.some!enumelt
+  dealloc_stack %0
+  %10 = tuple ()                                  
+  return %10                                      
+} 
+
+
+// CHECK: SIL memory lifetime failure in @mark_dependence_addr_uninit_base: memory is not initialized, but should be
+sil [ossa] @mark_dependence_addr_uninit_base : $@convention(thin) (@owned T, @owned Inner) -> @owned Inner {
+bb0(%0 : @owned $T, %1 : @owned $Inner):
+  %2 = alloc_stack $T
+  store %0 to [init] %2
+  %4 = alloc_stack $Inner
+  store %1 to [init] %4
+  destroy_addr %2
+  mark_dependence %4 on %2
+  %7 = begin_access [read] [dynamic] %4
+  %8 = load [take] %7
+  end_access %7
+  dealloc_stack %4
+  dealloc_stack %2
+  return %8
 }

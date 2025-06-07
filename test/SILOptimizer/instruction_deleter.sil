@@ -1,0 +1,59 @@
+// RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+
+import Swift
+
+struct MOS : ~Copyable {}
+
+sil @getMOS : $() -> (@owned MOS)
+sil @barrier : $() -> ()
+
+class C {}
+
+sil @get : $<T> () -> (@out T)
+
+// CHECK-LABEL: begin running test {{.*}} on dontDeleteDeadMoveOnlyValue
+// CHECK:       Deleting-if-dead {{.*}} move_value
+// CHECK:       deleteIfDead returned 0
+// CHECK-LABEL: sil [ossa] @dontDeleteDeadMoveOnlyValue : {{.*}} {
+// CHECK:         [[GET:%[^,]+]] = function_ref @getMOS
+// CHECK:         [[BARRIER:%[^,]+]] = function_ref @barrier
+// CHECK:         [[MOS:%[^,]+]] = apply [[GET]]()
+// CHECK:         [[MOV:%[^,]+]] = move_value [[MOS]]
+// CHECK:         apply [[BARRIER]]()
+// CHECK:         destroy_value [[MOV]]
+// CHECK-LABEL: } // end sil function 'dontDeleteDeadMoveOnlyValue'
+// CHECK-LABEL: end running test {{.*}} on dontDeleteDeadMoveOnlyValue
+sil [ossa] @dontDeleteDeadMoveOnlyValue : $() -> () {
+  %get = function_ref @getMOS : $@convention(thin) () -> (@owned MOS)
+  %barrier = function_ref @barrier : $@convention(thin) () -> ()
+  %mos = apply %get() : $@convention(thin) () -> (@owned MOS)
+  specify_test "deleter_delete_if_dead @instruction"
+  %mov = move_value %mos : $MOS
+  apply %barrier() : $@convention(thin) () -> ()
+  destroy_value %mov : $MOS
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on doDeleteLoadTake
+// CHECK:       Deleting-if-dead   {{%[^,]+}} = load [take]
+// CHECK:       deleteIfDead returned 1
+// CHECK-LABEL: sil [ossa] @doDeleteLoadTake : {{.*}} {
+// CHECK:         [[STACK:%[^,]+]] = alloc_stack $C
+// CHECK:         [[GET:%[^,]+]] = function_ref @get
+// CHECK:         apply [[GET]]<C>([[STACK]])
+// CHECK:         destroy_addr [[STACK]]
+// CHECK:         dealloc_stack [[STACK]]
+// CHECK-LABEL: } // end sil function 'doDeleteLoadTake'
+// CHECK-LABEL: end running test {{.*}} on doDeleteLoadTake
+sil [ossa] @doDeleteLoadTake : $() -> () {
+  %stack = alloc_stack $C
+  %get = function_ref @get : $@convention(thin) <T> () -> (@out T)
+  apply %get<C>(%stack) : $@convention(thin) <T> () -> (@out T)
+  specify_test "deleter_delete_if_dead @instruction"
+  %c = load [take] %stack : $*C
+  destroy_value %c : $C
+  dealloc_stack %stack : $*C
+  %retval = tuple ()
+  return %retval : $()
+}

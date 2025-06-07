@@ -9,11 +9,12 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+
 import Swift
-@_implementationOnly import _SwiftConcurrencyShims
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 5.1, *)
+@_unavailableInEmbedded
 extension Task where Success == Never, Failure == Never {
   @available(*, deprecated, renamed: "Task.sleep(nanoseconds:)")
   /// Suspends the current task for at least the given duration
@@ -26,6 +27,20 @@ extension Task where Success == Never, Failure == Never {
       let job = _taskCreateNullaryContinuationJob(
           priority: Int(Task.currentPriority.rawValue),
           continuation: continuation)
+
+      if #available(StdlibDeploymentTarget 6.2, *) {
+        #if !$Embedded
+        if let executor = Task.currentSchedulableExecutor {
+          executor.enqueue(ExecutorJob(context: job),
+                           after: .nanoseconds(duration),
+                           clock: .continuous)
+          return
+        }
+        #endif
+      }
+
+      // If there is no current schedulable executor, fall back to
+      // _enqueueJobGlobalWithDelay()
       _enqueueJobGlobalWithDelay(duration, job)
     }
   }
@@ -35,7 +50,7 @@ extension Task where Success == Never, Failure == Never {
   typealias SleepContinuation = UnsafeContinuation<(), Error>
 
   /// Describes the state of a sleep() operation.
-  enum SleepState {
+  @unsafe enum SleepState {
     /// The sleep continuation has not yet begun.
     case notStarted
 
@@ -57,21 +72,21 @@ extension Task where Success == Never, Failure == Never {
       case 0:
         let continuationBits = UInt(word) & ~0x03
         if continuationBits == 0 {
-          self = .notStarted
+          unsafe self = unsafe .notStarted
         } else {
-          let continuation = unsafeBitCast(
+          let continuation = unsafe unsafeBitCast(
             continuationBits, to: SleepContinuation.self)
-          self = .activeContinuation(continuation)
+          unsafe self = unsafe .activeContinuation(continuation)
         }
 
       case 1:
-        self = .finished
+        unsafe self = unsafe .finished
 
       case 2:
-        self = .cancelled
+        unsafe self = unsafe .cancelled
 
       case 3:
-        self = .cancelledBeforeStarted
+        unsafe self = unsafe .cancelledBeforeStarted
 
       default:
         fatalError("Bitmask failure")
@@ -80,17 +95,17 @@ extension Task where Success == Never, Failure == Never {
 
     /// Decode sleep state by loading from the given pointer
     init(loading wordPtr: UnsafeMutablePointer<Builtin.Word>) {
-      self.init(word: Builtin.atomicload_seqcst_Word(wordPtr._rawValue))
+      unsafe self.init(word: Builtin.atomicload_seqcst_Word(wordPtr._rawValue))
     }
 
     /// Encode sleep state into a word of storage.
     var word: UInt {
-      switch self {
+      switch unsafe self {
       case .notStarted:
         return 0
 
       case .activeContinuation(let continuation):
-        let continuationBits = unsafeBitCast(continuation, to: UInt.self)
+        let continuationBits = unsafe unsafeBitCast(continuation, to: UInt.self)
         return continuationBits
 
       case .finished:
@@ -105,27 +120,57 @@ extension Task where Success == Never, Failure == Never {
     }
   }
 
+  /// A simple wrapper for a pointer to heap allocated storage of a `SleepState`
+  /// value. This wrapper is `Sendable` because it facilitates atomic load and
+  /// exchange operations on the underlying storage. However, this wrapper is also
+  /// _unsafe_ because the owner must manually deallocate the token once it is no
+  /// longer needed.
+  @unsafe struct UnsafeSleepStateToken: @unchecked Sendable {
+    let wordPtr: UnsafeMutablePointer<Builtin.Word>
+
+    /// Allocates the underlying storage and sets the value to `.notStarted`.
+    init() {
+      unsafe wordPtr = .allocate(capacity: 1)
+      unsafe Builtin.atomicstore_seqcst_Word(
+          wordPtr._rawValue, SleepState.notStarted.word._builtinWordValue)
+    }
+
+    /// Atomically loads the current state.
+    func load() -> SleepState {
+      return unsafe SleepState(word: Builtin.atomicload_seqcst_Word(wordPtr._rawValue))
+    }
+
+    /// Attempts to atomically set the stored value to `desired` if the current
+    /// value is equal to `expected`. Returns true if the exchange was successful.
+    func exchange(expected: SleepState, desired: SleepState) -> Bool {
+      let (_, won) = unsafe Builtin.cmpxchg_seqcst_seqcst_Word(
+          wordPtr._rawValue,
+          expected.word._builtinWordValue,
+          desired.word._builtinWordValue)
+      return Bool(_builtinBooleanLiteral: won)
+    }
+
+    /// Deallocates the underlying storage.
+    func deallocate() {
+      unsafe wordPtr.deallocate()
+    }
+  }
+
   /// Called when the sleep(nanoseconds:) operation woke up without being
   /// canceled.
-  static func onSleepWake(
-      _ wordPtr: UnsafeMutablePointer<Builtin.Word>
-  ) {
+  static func onSleepWake(_ token: UnsafeSleepStateToken) {
     while true {
-      let state = SleepState(loading: wordPtr)
-      switch state {
+      let state = unsafe token.load()
+      switch unsafe state {
       case .notStarted:
         fatalError("Cannot wake before we even started")
 
       case .activeContinuation(let continuation):
         // We have an active continuation, so try to transition to the
         // "finished" state.
-        let (_, won) = Builtin.cmpxchg_seqcst_seqcst_Word(
-            wordPtr._rawValue,
-            state.word._builtinWordValue,
-            SleepState.finished.word._builtinWordValue)
-        if Bool(_builtinBooleanLiteral: won) {
+        if unsafe token.exchange(expected: state, desired: .finished) {
           // The sleep finished, so invoke the continuation: we're done.
-          continuation.resume()
+          unsafe continuation.resume()
           return
         }
 
@@ -137,9 +182,9 @@ extension Task where Success == Never, Failure == Never {
 
       case .cancelled:
         // The task was cancelled, which means the continuation was
-        // called by the cancellation handler. We need to deallocate the flag
-        // word, because it was left over for this task to complete.
-        wordPtr.deallocate()
+        // called by the cancellation handler. We need to deallocate the token
+        // because it was left over for this task to complete.
+        unsafe token.deallocate()
         return
 
       case .cancelledBeforeStarted:
@@ -151,20 +196,14 @@ extension Task where Success == Never, Failure == Never {
 
   /// Called when the sleep(nanoseconds:) operation has been canceled before
   /// the sleep completed.
-  static func onSleepCancel(
-      _ wordPtr: UnsafeMutablePointer<Builtin.Word>
-  ) {
+  static func onSleepCancel(_ token: UnsafeSleepStateToken) {
     while true {
-      let state = SleepState(loading: wordPtr)
-      switch state {
+      let state = unsafe token.load()
+      switch unsafe state {
       case .notStarted:
         // We haven't started yet, so try to transition to the cancelled-before
         // started state.
-        let (_, won) = Builtin.cmpxchg_seqcst_seqcst_Word(
-            wordPtr._rawValue,
-            state.word._builtinWordValue,
-            SleepState.cancelledBeforeStarted.word._builtinWordValue)
-        if Bool(_builtinBooleanLiteral: won) {
+        if unsafe token.exchange(expected: state, desired: .cancelledBeforeStarted) {
           return
         }
 
@@ -174,14 +213,10 @@ extension Task where Success == Never, Failure == Never {
       case .activeContinuation(let continuation):
         // We have an active continuation, so try to transition to the
         // "cancelled" state.
-        let (_, won) = Builtin.cmpxchg_seqcst_seqcst_Word(
-            wordPtr._rawValue,
-            state.word._builtinWordValue,
-            SleepState.cancelled.word._builtinWordValue)
-        if Bool(_builtinBooleanLiteral: won) {
+        if unsafe token.exchange(expected: state, desired: .cancelled) {
           // We recorded the task cancellation before the sleep finished, so
           // invoke the continuation with the cancellation error.
-          continuation.resume(throwing: _Concurrency.CancellationError())
+          unsafe continuation.resume(throwing: _Concurrency.CancellationError())
           return
         }
 
@@ -203,33 +238,22 @@ extension Task where Success == Never, Failure == Never {
   ///
   /// This function doesn't block the underlying thread.
   public static func sleep(nanoseconds duration: UInt64) async throws {
-    // Allocate storage for the storage word.
-    let wordPtr = UnsafeMutablePointer<Builtin.Word>.allocate(capacity: 1)
-
-    // Initialize the flag word to "not started", which means the continuation
-    // has neither been created nor completed.
-    Builtin.atomicstore_seqcst_Word(
-        wordPtr._rawValue, SleepState.notStarted.word._builtinWordValue)
+    // Create a token which will initially have the value "not started", which
+    // means the continuation has neither been created nor completed.
+    let token = unsafe UnsafeSleepStateToken()
 
     do {
       // Install a cancellation handler to resume the continuation by
       // throwing CancellationError.
       try await withTaskCancellationHandler {
-        let _: () = try await withUnsafeThrowingContinuation { continuation in
+        let _: () = try unsafe await withUnsafeThrowingContinuation { continuation in
           while true {
-            let state = SleepState(loading: wordPtr)
-            switch state {
+            let state = unsafe token.load()
+            switch unsafe state {
             case .notStarted:
-              // The word that describes the active continuation state.
-              let continuationWord =
-                SleepState.activeContinuation(continuation).word
-
-              // Try to swap in the continuation word.
-              let (_, won) = Builtin.cmpxchg_seqcst_seqcst_Word(
-                  wordPtr._rawValue,
-                  state.word._builtinWordValue,
-                  continuationWord._builtinWordValue)
-              if !Bool(_builtinBooleanLiteral: won) {
+              // Try to swap in the continuation state.
+              let newState = unsafe SleepState.activeContinuation(continuation)
+              if unsafe !token.exchange(expected: state, desired: newState) {
                 // Keep trying!
                 continue
               }
@@ -240,12 +264,28 @@ extension Task where Success == Never, Failure == Never {
               let sleepTaskFlags = taskCreateFlags(
                 priority: nil, isChildTask: false, copyTaskLocals: false,
                 inheritContext: false, enqueueJob: false,
-                addPendingGroupTaskUnconditionally: false)
+                addPendingGroupTaskUnconditionally: false,
+                isDiscardingTask: false, isSynchronousStart: false)
               let (sleepTask, _) = Builtin.createAsyncTask(sleepTaskFlags) {
-                onSleepWake(wordPtr)
+                unsafe onSleepWake(token)
               }
-              _enqueueJobGlobalWithDelay(
-                  duration, Builtin.convertTaskToJob(sleepTask))
+
+              let job = Builtin.convertTaskToJob(sleepTask)
+
+              if #available(StdlibDeploymentTarget 6.2, *) {
+                #if !$Embedded
+                if let executor = Task.currentSchedulableExecutor {
+                  executor.enqueue(ExecutorJob(context: job),
+                                   after: .nanoseconds(duration),
+                                   clock: .continuous)
+                  return
+                }
+                #endif
+              }
+
+              // If there is no current schedulable executor, fall back to
+              // _enqueueJobGlobalWithDelay()
+              _enqueueJobGlobalWithDelay(duration, job)
               return
 
             case .activeContinuation, .finished:
@@ -257,18 +297,18 @@ extension Task where Success == Never, Failure == Never {
             case .cancelledBeforeStarted:
               // Finish the continuation normally. We'll throw later, after
               // we clean up.
-              continuation.resume()
+              unsafe continuation.resume()
               return
           }
         }
         }
       } onCancel: {
-        onSleepCancel(wordPtr)
+        unsafe onSleepCancel(token)
       }
 
       // Determine whether we got cancelled before we even started.
       let cancelledBeforeStarted: Bool
-      switch SleepState(loading: wordPtr) {
+      switch unsafe token.load() {
       case .notStarted, .activeContinuation, .cancelled:
         fatalError("Invalid state for non-cancelled sleep task")
 
@@ -281,7 +321,7 @@ extension Task where Success == Never, Failure == Never {
 
       // We got here without being cancelled, so deallocate the storage for
       // the flag word and continuation.
-      wordPtr.deallocate()
+      unsafe token.deallocate()
 
       // If we got cancelled before we even started, through the cancellation
       // error now.

@@ -69,19 +69,15 @@ enum class DebugFlags : unsigned {
   /// Print debug output from the concrete contraction pre-processing pass.
   ConcreteContraction = (1<<15),
 
-  /// Print debug output from propagating explicit requirement
-  /// IDs from redundant rules.
-  PropagateRequirementIDs = (1<<16),
-
   /// Print a trace of requirement machines constructed and how long each took.
-  Timers = (1<<17),
+  Timers = (1<<16),
 
   /// Print conflicting rules.
-  ConflictingRules = (1<<18),
+  ConflictingRules = (1<<17),
 
   /// Print debug output from concrete equivalence class splitting during
   /// minimization.
-  SplitConcreteEquivalenceClass = (1<<19),
+  SplitConcreteEquivalenceClass = (1<<18),
 };
 
 using DebugOptions = OptionSet<DebugFlags>;

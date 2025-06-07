@@ -2,10 +2,10 @@
 // RUN: %target-typecheck-verify-swift -enable-testing -swift-version 4 -disable-objc-attr-requires-foundation-module -enable-objc-interop
 
 @usableFromInline private func privateVersioned() {}
-// expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal declarations, but 'privateVersioned()' is private}}
+// expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal or package declarations, but global function 'privateVersioned()' is private}}
 
 @usableFromInline fileprivate func fileprivateVersioned() {}
-// expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal declarations, but 'fileprivateVersioned()' is fileprivate}}
+// expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal or package declarations, but global function 'fileprivateVersioned()' is fileprivate}}
 
 @usableFromInline internal func internalVersioned() {}
 // OK
@@ -14,11 +14,11 @@
 // OK
 
 @usableFromInline public func publicVersioned() {}
-// expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal declarations, but 'publicVersioned()' is public}}
+// expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal or package declarations, but global function 'publicVersioned()' is public}}
 
 internal class InternalClass {
   @usableFromInline public func publicVersioned() {}
-  // expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal declarations, but 'publicVersioned()' is public}}
+  // expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal or package declarations, but instance method 'publicVersioned()' is public}}
 }
 
 fileprivate class filePrivateClass {

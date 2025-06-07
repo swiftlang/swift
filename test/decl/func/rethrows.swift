@@ -22,7 +22,7 @@ protocol P {
   func rhf(_ f: () throws -> ()) rethrows // expected-note {{protocol requires}}
 }
 
-struct T0 : P { // expected-error {{type 'T0' does not conform to protocol 'P'}}
+struct T0 : P { // expected-error {{type 'T0' does not conform to protocol 'P'}} expected-note {{add stubs for conformance}}
   func tf() throws {}
   func nf() throws {} // expected-note {{candidate throws, but protocol does not allow it}}
 
@@ -40,7 +40,7 @@ struct T1 : P {
   func rhf(_ f: () throws -> ()) {}
 }
 
-struct T2 : P { // expected-error {{type 'T2' does not conform to protocol 'P'}}
+struct T2 : P { // expected-error {{type 'T2' does not conform to protocol 'P'}} expected-note {{add stubs for conformance}}
   func tf() {}
   func nf() {}
 
@@ -468,7 +468,7 @@ func testThrowsInCatchInRethrows(_ fn: () throws -> Void) rethrows {
   }
 }
 
-// Sanity-check that throwing in catch blocks behaves as expected outside of
+// Soundness-check that throwing in catch blocks behaves as expected outside of
 // rethrows functions
 
 func testThrowsInCatch(_ fn: () throws -> Void) {
@@ -658,4 +658,33 @@ protocol P1 {
 
 func open(p: any P1, s: any Sequence) throws {
   _ = p.test(s).map(\.id)
+}
+
+// Rethrows checking and parameter packs, oh my.
+func rethrowsWithParameterPacks<each Arg>(_ arguments: repeat each Arg, body: () throws -> Void) rethrows { }
+
+enum MyError: Error {
+case fail
+}
+
+func testRethrowsWithParameterPacks() throws {
+  try rethrowsWithParameterPacks { throw MyError.fail }
+  rethrowsWithParameterPacks { }
+
+  try rethrowsWithParameterPacks(1) { throw MyError.fail }
+  rethrowsWithParameterPacks(1) { }
+
+  try rethrowsWithParameterPacks(1, "hello") { throw MyError.fail }
+  rethrowsWithParameterPacks(1, "hello") { }
+
+  rethrowsWithParameterPacks { throw MyError.fail }
+  // expected-error@-1{{call can throw but is not marked with 'try'}}
+  // expected-note@-2{{call is to 'rethrows' function, but argument function can throw}}
+}
+
+// Rethrows checking with the original parameter type providing the cues.
+func takesArbitraryAndRethrows<T>(_ value: T, body: () throws -> Void) rethrows { }
+
+func testArbitraryAndRethrows() {
+  takesArbitraryAndRethrows(throwingFunc) { }
 }

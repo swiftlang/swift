@@ -7,3 +7,20 @@ module AmbiguousMethods {
   header "ambiguous_methods.h"
   requires cplusplus
 }
+
+module UnsafeProjections {
+  header "unsafe-projections.h"
+  requires cplusplus
+  
+  export *
+}
+
+module SRetWinARM64 {
+  header "sret-win-arm64.h"
+  requires cplusplus
+}
+
+module InRegSRet {
+  header "inreg-sret.h"
+  requires cplusplus
+}

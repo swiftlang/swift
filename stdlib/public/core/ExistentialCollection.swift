@@ -90,6 +90,9 @@ public struct AnyIterator<Element> {
   }
 }
 
+@available(*, unavailable)
+extension AnyIterator: Sendable {}
+
 extension AnyIterator: IteratorProtocol {
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.
@@ -120,6 +123,9 @@ internal struct _ClosureBasedIterator<Element>: IteratorProtocol {
   internal func next() -> Element? { return _body() }
 }
 
+@available(*, unavailable)
+extension _ClosureBasedIterator: Sendable {}
+
 @_fixed_layout
 @usableFromInline
 internal class _AnyIteratorBoxBase<Element>: IteratorProtocol {
@@ -138,6 +144,9 @@ internal class _AnyIteratorBoxBase<Element>: IteratorProtocol {
   @inlinable // FIXME(sil-serialize-all)
   internal func next() -> Element? { _abstract() }
 }
+
+@available(*, unavailable)
+extension _AnyIteratorBoxBase: Sendable {}
 
 @_fixed_layout
 @usableFromInline
@@ -175,7 +184,7 @@ internal class _AnySequenceBox<Element> {
   @inlinable
   internal func _map<T>(
     _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
+  ) throws -> [T] {
     _abstract()
   }
 
@@ -250,6 +259,9 @@ internal class _AnySequenceBox<Element> {
     _abstract()
   }
 }
+
+@available(*, unavailable)
+extension _AnySequenceBox: Sendable {}
 
 @_fixed_layout
 @usableFromInline
@@ -525,8 +537,8 @@ internal final class _SequenceBox<S: Sequence>: _AnySequenceBox<S.Element> {
   @inlinable
   internal override func _map<T>(
     _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
-    return try _base.map(transform)
+  ) throws -> [T] {
+    try _base.map(transform)
   }
   @inlinable
   internal override func _filter(
@@ -554,7 +566,7 @@ internal final class _SequenceBox<S: Sequence>: _AnySequenceBox<S.Element> {
   internal override func __copyContents(
     initializing buf: UnsafeMutableBufferPointer<Element>
   ) -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
-    let (it,idx) = _base._copyContents(initializing: buf)
+    let (it,idx) = unsafe _base._copyContents(initializing: buf)
     return (AnyIterator(it),idx)
   }
 
@@ -618,8 +630,8 @@ internal final class _CollectionBox<S: Collection>: _AnyCollectionBox<S.Element>
   @inlinable
   internal override func _map<T>(
     _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
-    return try _base.map(transform)
+  ) throws -> [T] {
+    try _base.map(transform)
   }
   @inlinable
   internal override func _filter(
@@ -647,7 +659,7 @@ internal final class _CollectionBox<S: Collection>: _AnyCollectionBox<S.Element>
   internal override func __copyContents(
     initializing buf: UnsafeMutableBufferPointer<Element>
   ) -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
-    let (it,idx) = _base._copyContents(initializing: buf)
+    let (it,idx) = unsafe _base._copyContents(initializing: buf)
     return (AnyIterator(it),idx)
   }
 
@@ -813,8 +825,8 @@ internal final class _BidirectionalCollectionBox<S: BidirectionalCollection>
   @inlinable
   internal override func _map<T>(
     _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
-    return try _base.map(transform)
+  ) throws -> [T] {
+    try _base.map(transform)
   }
   @inlinable
   internal override func _filter(
@@ -842,7 +854,7 @@ internal final class _BidirectionalCollectionBox<S: BidirectionalCollection>
   internal override func __copyContents(
     initializing buf: UnsafeMutableBufferPointer<Element>
   ) -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
-    let (it,idx) = _base._copyContents(initializing: buf)
+    let (it,idx) = unsafe _base._copyContents(initializing: buf)
     return (AnyIterator(it),idx)
   }
 
@@ -1026,8 +1038,8 @@ internal final class _RandomAccessCollectionBox<S: RandomAccessCollection>
   @inlinable
   internal override func _map<T>(
     _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
-    return try _base.map(transform)
+  ) throws -> [T] {
+    try _base.map(transform)
   }
   @inlinable
   internal override func _filter(
@@ -1055,7 +1067,7 @@ internal final class _RandomAccessCollectionBox<S: RandomAccessCollection>
   internal override func __copyContents(
     initializing buf: UnsafeMutableBufferPointer<Element>
   ) -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
-    let (it,idx) = _base._copyContents(initializing: buf)
+    let (it,idx) = unsafe _base._copyContents(initializing: buf)
     return (AnyIterator(it),idx)
   }
 
@@ -1230,7 +1242,12 @@ internal struct _ClosureBasedSequence<Iterator: IteratorProtocol> {
   }
 }
 
+@available(*, unavailable)
+extension _ClosureBasedSequence: Sendable {}
+
 extension _ClosureBasedSequence: Sequence {
+  public typealias Element = Iterator.Element
+
   @inlinable
   internal func makeIterator() -> Iterator {
     return _makeUnderlyingIterator()
@@ -1261,6 +1278,9 @@ public struct AnySequence<Element> {
     self._box = _box
   }
 }
+
+@available(*, unavailable)
+extension AnySequence: Sendable {}
 
 extension  AnySequence: Sequence {
   public typealias Iterator = AnyIterator<Element>
@@ -1303,10 +1323,27 @@ extension AnySequence {
   }
 
   @inlinable
-  public func map<T>(
+  @_alwaysEmitIntoClient
+  public func map<T, E>(
+    _ transform: (Element) throws(E) -> T
+  ) throws(E) -> [T] {
+    do {
+      return try _box._map(transform)
+    } catch {
+      throw error as! E
+    }
+  }
+
+  // ABI-only entrypoint for the rethrows version of map, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @usableFromInline
+  @_silgen_name("$ss11AnySequenceV3mapySayqd__Gqd__xKXEKlF")
+  func __rethrows_map<T>(
     _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
-    return try _box._map(transform)
+  ) throws -> [T] {
+    try map(transform)
   }
 
   @inlinable
@@ -1356,11 +1393,12 @@ extension AnySequence {
   public __consuming func _copyContents(
     initializing buf: UnsafeMutableBufferPointer<Element>
   ) -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
-    let (it,idx) = _box.__copyContents(initializing: buf)
+    let (it,idx) = unsafe _box.__copyContents(initializing: buf)
     return (AnyIterator(it),idx)
   }
 }
 
+@_unavailableInEmbedded
 extension AnyCollection {
   /// Returns an iterator over the elements of this collection.
   @inline(__always)
@@ -1389,10 +1427,27 @@ extension AnyCollection {
   }
 
   @inlinable
-  public func map<T>(
+  @_alwaysEmitIntoClient
+  public func map<T, E>(
+    _ transform: (Element) throws(E) -> T
+  ) throws(E) -> [T] {
+    do {
+      return try _box._map(transform)
+    } catch {
+      throw error as! E
+    }
+  }
+
+  // ABI-only entrypoint for the rethrows version of map, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @usableFromInline
+  @_silgen_name("$ss13AnyCollectionV3mapySayqd__Gqd__xKXEKlF")
+  func __rethrows_map<T>(
     _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
-    return try _box._map(transform)
+  ) throws -> [T] {
+    try map(transform)
   }
 
   @inlinable
@@ -1444,11 +1499,12 @@ extension AnyCollection {
   public __consuming func _copyContents(
     initializing buf: UnsafeMutableBufferPointer<Element>
   ) -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
-    let (it,idx) = _box.__copyContents(initializing: buf)
+    let (it,idx) = unsafe _box.__copyContents(initializing: buf)
     return (AnyIterator(it),idx)
   }
 }
 
+@_unavailableInEmbedded
 extension AnyBidirectionalCollection {
   /// Returns an iterator over the elements of this collection.
   @inline(__always)
@@ -1481,10 +1537,27 @@ extension AnyBidirectionalCollection {
   }
 
   @inlinable
-  public func map<T>(
+  @_alwaysEmitIntoClient
+  public func map<T, E>(
+    _ transform: (Element) throws(E) -> T
+  ) throws(E) -> [T] {
+    do {
+      return try _box._map(transform)
+    } catch {
+      throw error as! E
+    }
+  }
+
+  // ABI-only entrypoint for the rethrows version of map, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @usableFromInline
+  @_silgen_name("$ss26AnyBidirectionalCollectionV3mapySayqd__Gqd__xKXEKlF")
+  func __rethrows_map<T>(
     _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
-    return try _box._map(transform)
+  ) throws -> [T] {
+    try map(transform)
   }
 
   @inlinable
@@ -1538,11 +1611,12 @@ extension AnyBidirectionalCollection {
   public __consuming func _copyContents(
     initializing buf: UnsafeMutableBufferPointer<Element>
   ) -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
-    let (it,idx) = _box.__copyContents(initializing: buf)
+    let (it,idx) = unsafe _box.__copyContents(initializing: buf)
     return (AnyIterator(it),idx)
   }
 }
 
+@_unavailableInEmbedded
 extension AnyRandomAccessCollection {
   /// Returns an iterator over the elements of this collection.
   @inline(__always)
@@ -1575,10 +1649,27 @@ extension AnyRandomAccessCollection {
   }
 
   @inlinable
-  public func map<T>(
+  @_alwaysEmitIntoClient
+  public func map<T, E>(
+    _ transform: (Element) throws(E) -> T
+  ) throws(E) -> [T] {
+    do {
+      return try _box._map(transform)
+    } catch {
+      throw error as! E
+    }
+  }
+
+  // ABI-only entrypoint for the rethrows version of map, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @usableFromInline
+  @_silgen_name("$ss25AnyRandomAccessCollectionV3mapySayqd__Gqd__xKXEKlF")
+  func __rethrows_map<T>(
     _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
-    return try _box._map(transform)
+  ) throws -> [T] {
+    try map(transform)
   }
 
   @inlinable
@@ -1632,7 +1723,7 @@ extension AnyRandomAccessCollection {
   public __consuming func _copyContents(
     initializing buf: UnsafeMutableBufferPointer<Element>
   ) -> (AnyIterator<Element>,UnsafeMutableBufferPointer<Element>.Index) {
-    let (it,idx) = _box.__copyContents(initializing: buf)
+    let (it,idx) = unsafe _box.__copyContents(initializing: buf)
     return (AnyIterator(it),idx)
   }
 }
@@ -1664,7 +1755,7 @@ internal final class _IndexBox<BaseIndex: Comparable>: _AnyIndexBox {
 
   @inlinable
   internal func _unsafeUnbox(_ other: _AnyIndexBox) -> BaseIndex {
-    return unsafeDowncast(other, to: _IndexBox.self)._base
+    return unsafe unsafeDowncast(other, to: _IndexBox.self)._base
   }
 
   @inlinable
@@ -1688,8 +1779,12 @@ internal final class _IndexBox<BaseIndex: Comparable>: _AnyIndexBox {
   }
 }
 
+@available(*, unavailable)
+extension _IndexBox: Sendable {}
+
 /// A wrapper over an underlying index that hides the specific underlying type.
 @frozen
+@_unavailableInEmbedded
 public struct AnyIndex {
   @usableFromInline
   internal var _box: _AnyIndexBox
@@ -1711,6 +1806,10 @@ public struct AnyIndex {
   }
 }
 
+@available(*, unavailable)
+extension AnyIndex: Sendable {}
+
+@_unavailableInEmbedded
 extension AnyIndex: Comparable {
   /// Returns a Boolean value indicating whether two indices wrap equal
   /// underlying indices.
@@ -1758,6 +1857,7 @@ protocol _AnyCollectionProtocol: Collection {
 /// same `Element` type, hiding the specifics of the underlying
 /// collection.
 @frozen
+@_unavailableInEmbedded
 public struct AnyCollection<Element> {
   @usableFromInline
   internal let _box: _AnyCollectionBox<Element>
@@ -1768,6 +1868,10 @@ public struct AnyCollection<Element> {
   }
 }
 
+@available(*, unavailable)
+extension AnyCollection: Sendable {}
+
+@_unavailableInEmbedded
 extension AnyCollection: Collection {
   public typealias Indices = DefaultIndices<AnyCollection>
   public typealias Iterator = AnyIterator<Element>
@@ -1959,6 +2063,7 @@ extension AnyCollection: Collection {
   }
 }
 
+@_unavailableInEmbedded
 extension AnyCollection: _AnyCollectionProtocol {
   /// Uniquely identifies the stored underlying collection.
   @inlinable
@@ -1975,6 +2080,7 @@ extension AnyCollection: _AnyCollectionProtocol {
 /// same `Element` type, hiding the specifics of the underlying
 /// collection.
 @frozen
+@_unavailableInEmbedded
 public struct AnyBidirectionalCollection<Element> {
   @usableFromInline
   internal let _box: _AnyBidirectionalCollectionBox<Element>
@@ -1985,6 +2091,10 @@ public struct AnyBidirectionalCollection<Element> {
   }
 }
 
+@available(*, unavailable)
+extension AnyBidirectionalCollection: Sendable {}
+
+@_unavailableInEmbedded
 extension AnyBidirectionalCollection: BidirectionalCollection {
   public typealias Indices = DefaultIndices<AnyBidirectionalCollection>
   public typealias Iterator = AnyIterator<Element>
@@ -2184,6 +2294,7 @@ extension AnyBidirectionalCollection: BidirectionalCollection {
   }
 }
 
+@_unavailableInEmbedded
 extension AnyBidirectionalCollection: _AnyCollectionProtocol {
   /// Uniquely identifies the stored underlying collection.
   @inlinable
@@ -2200,6 +2311,7 @@ extension AnyBidirectionalCollection: _AnyCollectionProtocol {
 /// same `Element` type, hiding the specifics of the underlying
 /// collection.
 @frozen
+@_unavailableInEmbedded
 public struct AnyRandomAccessCollection<Element> {
   @usableFromInline
   internal let _box: _AnyRandomAccessCollectionBox<Element>
@@ -2210,6 +2322,10 @@ public struct AnyRandomAccessCollection<Element> {
   }
 }
 
+@available(*, unavailable)
+extension AnyRandomAccessCollection: Sendable {}
+
+@_unavailableInEmbedded
 extension AnyRandomAccessCollection: RandomAccessCollection {
   public typealias Indices = DefaultIndices<AnyRandomAccessCollection>
   public typealias Iterator = AnyIterator<Element>
@@ -2398,6 +2514,7 @@ extension AnyRandomAccessCollection: RandomAccessCollection {
   }
 }
 
+@_unavailableInEmbedded
 extension AnyRandomAccessCollection: _AnyCollectionProtocol {
   /// Uniquely identifies the stored underlying collection.
   @inlinable

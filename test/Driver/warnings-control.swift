@@ -2,8 +2,14 @@
 // RUN: not %target-swiftc_driver -warnings-as-errors %s 2>&1 | %FileCheck -check-prefix=WERR %s
 // RUN: not %target-swiftc_driver -suppress-warnings %s 2>&1 | %FileCheck -check-prefix=NOWARN %s
 
-// RUN: not %target-swiftc_driver -suppress-warnings -warnings-as-errors %s 2>&1 | %FileCheck -check-prefix=FLAGS_CONFLICT %s
-// FLAGS_CONFLICT: error: conflicting options '-warnings-as-errors' and '-suppress-warnings'
+// RUN: not %target-swiftc_driver -suppress-warnings -warnings-as-errors %s 2>&1 | %FileCheck -check-prefix=FLAGS_CONFLICT_WAE %s
+// FLAGS_CONFLICT_WAE: error: conflicting options '-warnings-as-errors' and '-suppress-warnings'
+
+// RUN: not %target-swiftc_driver -suppress-warnings -Wwarning test %s 2>&1 | %FileCheck -check-prefix=FLAGS_CONFLICT_WW %s
+// FLAGS_CONFLICT_WW: error: conflicting options '-Wwarning' and '-suppress-warnings'
+
+// RUN: not %target-swiftc_driver -suppress-warnings -Werror test  %s 2>&1 | %FileCheck -check-prefix=FLAGS_CONFLICT_WE %s
+// FLAGS_CONFLICT_WE: error: conflicting options '-Werror' and '-suppress-warnings'
 
 func foo() -> Int {
 	let x = 1

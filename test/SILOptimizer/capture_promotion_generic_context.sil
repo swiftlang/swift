@@ -1,8 +1,9 @@
-// RUN: %target-swift-frontend -emit-sil -O -Xllvm -sil-fso-enable-generics=false %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -O -Xllvm -sil-fso-enable-generics=false %s | %FileCheck %s
 
 sil_stage raw
 
 import Builtin
+import Swift
 
 typealias Int = Builtin.Int32
 
@@ -108,10 +109,10 @@ exit:
 // closure is invoked.
 // CHECK-LABEL: sil {{.*}}@call_generic_promotable_box_from_different_generic2 :
 // CHECK:       bb0(%0 : $*R<T>, %1 : $*E<(R<U>) -> Builtin.Int32>, %2 : $*Builtin.Int32):
-// CHECK:         %3 = load %1 : $*E<(R<U>) -> Builtin.Int32>
 // CHECK:         [[F:%.*]] = function_ref @$s23generic_promotable_box2Tf2nnni_n : $@convention(thin) <τ_0_0> (@in_guaranteed R<τ_0_0>, @in_guaranteed Builtin.Int32, @guaranteed E<(R<τ_0_0>) -> Builtin.Int32>) -> @out Builtin.Int32
-// CHECK-NEXT:    [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[F]]<U>(%2, %3)
-// CHECK-NEXT:    retain_value %3
+// CHECK:         %4 = load %1 : $*E<(R<U>) -> Builtin.Int32>
+// CHECK-NEXT:    [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[F]]<U>(%2, %4)
+// CHECK-NEXT:    retain_value %4
 // CHECK-NEXT:    return [[CLOSURE]]
 // CHECK: } // end sil function 'call_generic_promotable_box_from_different_generic2'
 sil [ossa] @call_generic_promotable_box_from_different_generic2 : $@convention(thin) <T, U: P> (@in_guaranteed R<T>, @in_guaranteed E<(R<U>)->Int>, @in Int) -> @owned @callee_guaranteed (@in_guaranteed R<U>) -> @out Int {

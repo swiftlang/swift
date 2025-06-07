@@ -8,6 +8,7 @@
 
 import multiprocessing
 import os
+import platform
 
 import android.adb.commands
 
@@ -56,20 +57,21 @@ def _apply_default_arguments(args):
        args.lldb_build_with_xcode is not None:
         args.build_lldb = True
 
+    # Build libc++ if fully static Linux was specified.
+    if args.build_linux_static and args.build_libcxx is None:
+        args.build_libcxx = True
+
+    # Previewing the stdlib docs requires building them.
+    if args.preview_stdlib_docs:
+        args.build_stdlib_docs = True
+
     # Set the default CMake generator.
     if args.cmake_generator is None:
         args.cmake_generator = 'Ninja'
-    elif args.cmake_generator == 'Xcode':
-        # Building with Xcode is deprecated.
-        args.skip_build = True
-        args.build_early_swift_driver = False
-        args.build_early_swiftsyntax = False
 
     # Set the default build variant.
     if args.build_variant is None:
-        args.build_variant = (
-            'MinSizeRel' if args.cmake_generator == 'Xcode' else 'Debug'
-        )
+        args.build_variant = 'Debug'
 
     if args.llvm_build_variant is None:
         args.llvm_build_variant = args.build_variant
@@ -92,11 +94,11 @@ def _apply_default_arguments(args):
     if args.foundation_build_variant is None:
         args.foundation_build_variant = args.build_variant
 
+    if args.foundation_tests_build_variant is None:
+        args.foundation_tests_build_variant = args.build_variant
+
     if args.libdispatch_build_variant is None:
         args.libdispatch_build_variant = args.build_variant
-
-    if args.libicu_build_variant is None:
-        args.libicu_build_variant = args.build_variant
 
     if args.libxml2_build_variant is None:
         args.libxml2_build_variant = args.build_variant
@@ -130,6 +132,9 @@ def _apply_default_arguments(args):
     if args.lldb_assertions is None:
         args.lldb_assertions = args.assertions
 
+    if args.swift_stdlib_strict_availability is None:
+        args.swift_stdlib_strict_availability = False
+
     # --ios-all etc are not supported by open-source Swift.
     if args.ios_all:
         raise ValueError('error: --ios-all is unavailable in open-source '
@@ -142,6 +147,10 @@ def _apply_default_arguments(args):
     if args.watchos_all:
         raise ValueError('error: --watchos-all is unavailable in open-source '
                          'Swift.\nUse --watchos to skip watchOS device tests.')
+
+    if args.xros_all:
+        raise ValueError('error: --xros-all is unavailable in open-source '
+                         'Swift.\nUse --xros to skip xrOS device tests.')
 
     # --skip-{ios,tvos,watchos} or --skip-build-{ios,tvos,watchos} are
     # merely shorthands for --skip-build-{**os}-{device,simulator}
@@ -156,6 +165,10 @@ def _apply_default_arguments(args):
     if not args.watchos or not args.build_watchos:
         args.build_watchos_device = False
         args.build_watchos_simulator = False
+
+    if not args.xros or not args.build_xros:
+        args.build_xros_device = False
+        args.build_xros_simulator = False
 
     if not args.android or not args.build_android:
         args.build_android = False
@@ -193,22 +206,24 @@ def _apply_default_arguments(args):
     # If none of tests specified skip swift stdlib test on all platforms
     if not args.test and not args.validation_test and not args.long_test:
         args.test_linux = False
+        args.test_linux_static = False
         args.test_freebsd = False
         args.test_cygwin = False
         args.test_osx = False
         args.test_ios = False
         args.test_tvos = False
         args.test_watchos = False
+        args.test_xros = False
         args.test_android = False
         args.test_cmark = False
         args.test_swiftpm = False
+        args.test_foundation = False
         args.test_swift_driver = False
         args.test_swiftsyntax = False
         args.test_indexstoredb = False
         args.test_sourcekitlsp = False
         args.test_skstresstester = False
         args.test_swiftformat = False
-        args.test_swiftevolve = False
         args.test_toolchainbenchmarks = False
         args.test_swiftdocc = False
 
@@ -231,6 +246,11 @@ def _apply_default_arguments(args):
     if not args.test_watchos:
         args.test_watchos_host = False
         args.test_watchos_simulator = False
+    # --skip-test-xros is merely a shorthand for host and simulator
+    # --tests.
+    if not args.test_xros:
+        args.test_xros_host = False
+        args.test_xros_simulator = False
 
     # --skip-build-{ios,tvos,watchos}-{device,simulator} implies
     # --skip-test-{ios,tvos,watchos}-{host,simulator}
@@ -249,6 +269,11 @@ def _apply_default_arguments(args):
     if not args.build_watchos_simulator:
         args.test_watchos_simulator = False
 
+    if not args.build_xros_device:
+        args.test_xros_host = False
+    if not args.build_xros_simulator:
+        args.test_xros_simulator = False
+
     if not args.build_android:
         # If building natively on an Android host, allow running the test suite
         # without the NDK config.
@@ -264,6 +289,7 @@ def _apply_default_arguments(args):
         args.test_ios_host = False
         args.test_tvos_host = False
         args.test_watchos_host = False
+        args.test_xros_host = False
         args.test_android_host = False
 
 
@@ -346,6 +372,15 @@ def create_argument_parser():
     option('--skip-watchos', store_false('watchos'),
            help='set to skip everything watchOS-related')
 
+    option('--xros', toggle_true,
+           help='also build for xrOS, but disallow tests that require an '
+                'xrOS device')
+    option('--xros-all', toggle_true('xros_all'),
+           help='also build for Apple xrOS, and allow all Apple xrOS '
+                'tests')
+    option('--skip-xros', store_false('xros'),
+           help='set to skip everything xrOS-related')
+
     option('--maccatalyst', toggle_true,
            help='Enable building Swift with macCatalyst support')
 
@@ -406,6 +441,14 @@ def create_argument_parser():
                 'list "module_regexp;flag". Can be called multiple times to '
                 'add multiple such module_regexp flag pairs. All semicolons '
                 'in flags must be escaped with a "\\"')
+    option('--swift-debuginfo-non-lto-args', append,
+           # We cannot set the default value directly here,
+           # since it will be prepended to any option the user provides.
+           default=None,
+           help='Compilation flags to use when building the swift compiler '
+                ' in debug or debug info mode. Does not apply when building with '
+                ' LTO. Defaults to the default value of the CMake cache variable '
+                ' SWIFT_DEBUGINFO_NON_LTO_ARGS for Swift.')
 
     option('--host-cc', store_path(executable=True),
            help='the absolute path to CC, the "clang" compiler for the host '
@@ -452,6 +495,12 @@ def create_argument_parser():
            help='enable sanitizer coverage for swift tools. Necessary for '
                 'fuzzing swiftc')
 
+    option('--swift-enable-backtracing', toggle_true,
+           default=True,
+           help='enable backtracing support')
+    option('--swift-runtime-fixed-backtracer-path', store,
+           help='if set, provide a fixed path for the Swift backtracer')
+
     option('--compiler-vendor', store,
            choices=['none', 'apple'],
            default=defaults.COMPILER_VENDOR,
@@ -492,6 +541,10 @@ def create_argument_parser():
            default=defaults.DARWIN_DEPLOYMENT_VERSION_WATCHOS,
            metavar='MAJOR.MINOR',
            help='minimum deployment target version for watchOS')
+    option('--darwin-deployment-version-xros', store,
+           default=defaults.DARWIN_DEPLOYMENT_VERSION_XROS,
+           metavar='MAJOR.MINOR',
+           help='minimum deployment target version for xrOS')
 
     option('--extra-cmake-options', append,
            type=argparse.ShellSplitType(),
@@ -545,12 +598,24 @@ def create_argument_parser():
                 'will get little benefit from it (e.g. tools for '
                 'bootstrapping or debugging Swift)')
 
+    option('--extra-swift-cmake-options', append,
+           type=argparse.ShellSplitType(),
+           help='Pass additional CMake options to the Swift build. '
+                'Can be passed multiple times to add multiple options.',
+           default=[])
+
     option('--dsymutil-jobs', store_int,
            default=defaults.DSYMUTIL_JOBS,
            metavar='COUNT',
            help='the maximum number of parallel dsymutil jobs to use when '
                 'extracting symbols. Tweak with caution, since dsymutil '
                 'is memory intensive.')
+    option('--extra-dsymutil-args', append,
+           type=argparse.ShellSplitType(),
+           help='Pass through extra options to dsymutil when extracting '
+                'symbols, in the form of comma separated options '
+                'like "--verbose,--verify-dwarf=none". Can '
+                'be called multiple times to add multiple such options.')
 
     option('--disable-guaranteed-normal-arguments', store_true,
            help='Disable guaranteed normal arguments')
@@ -567,6 +632,9 @@ def create_argument_parser():
            metavar='LITARGS',
            help='lit args to use when testing')
 
+    option('--color-in-tests', toggle_true, default=True,
+           help='Enable color output in lit tests')
+
     option('--coverage-db', store_path,
            help='coverage database to use when prioritizing testing')
 
@@ -575,11 +643,17 @@ def create_argument_parser():
            help='A semi-colon split list of llvm components to install')
 
     option('--bootstrapping', store('bootstrapping_mode'),
-           choices=['off', 'hosttools', 'bootstrapping', 'bootstrapping-with-hostlibs'],
+           choices=['hosttools', 'bootstrapping', 'bootstrapping-with-hostlibs'],
            help='The bootstrapping build mode for swift compiler modules. '
-                'Available modes: `off`, `hosttools`, `bootstrapping`, '
+                'Available modes: `hosttools`, `bootstrapping`, '
                 '`bootstrapping-with-hostlibs`, `crosscompile`, and '
                 '`crosscompile-with-hostlibs`')
+
+    option('--use-linker', store('use_linker'),
+           choices=['gold', 'lld'],
+           default=None,
+           metavar='USE_LINKER',
+           help='Choose the default linker to use when compiling LLVM/Swift')
 
     # -------------------------------------------------------------------------
     in_group('Host and cross-compilation targets')
@@ -641,6 +715,9 @@ def create_argument_parser():
     option('--swift-freestanding-is-darwin', toggle_true,
            help='True if the freestanding platform is a Darwin one.')
 
+    option('--enable-new-runtime-build', toggle_true,
+           help='True to enable the new runtime build.')
+
     # -------------------------------------------------------------------------
     in_group('Options to select projects')
 
@@ -652,9 +729,6 @@ def create_argument_parser():
 
     option(['-b', '--llbuild'], toggle_true('build_llbuild'),
            help='build llbuild')
-
-    option(['--back-deploy-concurrency'], toggle_true('build_backdeployconcurrency'),
-           help='build back-deployment support for concurrency')
 
     option('--install-llvm', toggle_true,
            help='install llvm')
@@ -672,6 +746,9 @@ def create_argument_parser():
     option(['--install-swiftpm'], toggle_true('install_swiftpm'),
            help='install swiftpm')
 
+    option(['--install-static-linux-config'], toggle_true,
+           help='install static-linux config files for Clang')
+
     option(['--swiftsyntax'], toggle_true('build_swiftsyntax'),
            help='build swiftSyntax')
 
@@ -684,9 +761,6 @@ def create_argument_parser():
 
     option(['--swiftformat'], toggle_true('build_swiftformat'),
            help='build swift-format')
-
-    option(['--swiftevolve'], toggle_true('build_swiftevolve'),
-           help='build the swift-evolve tool')
 
     option(['--swift-driver'], toggle_true('build_swift_driver'),
            help='build swift-driver')
@@ -706,15 +780,28 @@ def create_argument_parser():
     option('--test-sourcekit-lsp-sanitize-all',
            toggle_true('test_sourcekitlsp_sanitize_all'),
            help='run sourcekit-lsp tests under all sanitizers')
+    option('--sourcekit-lsp-verify-generated-files',
+           toggle_true('sourcekitlsp_verify_generated_files'),
+           help='set to verify that the generated files in the source tree ' +
+                'match the ones that would be generated from current main')
+    option('--sourcekit-lsp-lint',
+           toggle_true('sourcekitlsp_lint'),
+           help='verify that sourcekit-lsp Source code is formatted correctly')
     option('--install-swiftsyntax', toggle_true('install_swiftsyntax'),
            help='install SwiftSyntax')
     option('--swiftsyntax-verify-generated-files',
            toggle_true('swiftsyntax_verify_generated_files'),
-           help='set to verify that the generated files in the source tree '
+           help='set to verify that the generated files in the source tree ' +
                 'match the ones that would be generated from current main')
-    option('--swiftsyntax-lint',
-           toggle_true('swiftsyntax_lint'),
-           help='verify that swift-syntax Source code is formatted correctly')
+    option('--swiftsyntax-enable-test-fuzzing',
+           toggle_true('swiftsyntax_enable_test_fuzzing'),
+           help='set to modify test cases in SwiftParserTest to check for ' +
+                'round-trip failures and assertion failures')
+    option('--swiftsyntax-enable-rawsyntax-validation',
+           toggle_true('swiftsyntax_enable_rawsyntax_validation'),
+           help='set to validate that RawSyntax layout nodes contain children of ' +
+                'the expected types and that RawSyntax tokens have the expected ' +
+                'token kinds')
     option(['--install-sourcekit-lsp'], toggle_true('install_sourcekitlsp'),
            help='install SourceKitLSP')
     option(['--install-swiftformat'], toggle_true('install_swiftformat'),
@@ -723,8 +810,6 @@ def create_argument_parser():
            help='install the SourceKit stress tester')
     option(['--install-swift-driver'], toggle_true('install_swift_driver'),
            help='install new Swift driver')
-    option(['--install-swiftevolve'], toggle_true('install_swiftevolve'),
-           help='install SwiftEvolve')
     option(['--install-swiftdocc'], toggle_true('install_swiftdocc'),
            help='install Swift DocC')
     option(['--toolchain-benchmarks'],
@@ -735,6 +820,24 @@ def create_argument_parser():
            toggle_true('build_swift_inspect'),
            help='build SwiftInspect using swiftpm against the just built '
                 'toolchain')
+    option(['--build-minimal-stdlib'], toggle_true('build_minimalstdlib'),
+           help='build the \'minimal\' freestanding stdlib variant into a '
+                'separate build directory ')
+    option(['--build-wasm-stdlib'], toggle_true('build_wasmstdlib'),
+           help='build the stdlib for WebAssembly target into a'
+                'separate build directory ')
+    option(['--wasmkit'], toggle_true('build_wasmkit'),
+           help='build WasmKit')
+
+    option('--swift-testing', toggle_true('build_swift_testing'),
+           help='build Swift Testing')
+    option('--install-swift-testing', toggle_true('install_swift_testing'),
+           help='install Swift Testing')
+    option('--swift-testing-macros', toggle_true('build_swift_testing_macros'),
+           help='build Swift Testing macro plugin')
+    option('--install-swift-testing-macros',
+           toggle_true('install_swift_testing_macros'),
+           help='install Swift Testing macro plugin')
 
     option('--xctest', toggle_true('build_xctest'),
            help='build xctest')
@@ -744,9 +847,6 @@ def create_argument_parser():
 
     option('--libdispatch', toggle_true('build_libdispatch'),
            help='build libdispatch')
-
-    option('--libicu', toggle_true('build_libicu'),
-           help='build libicu')
 
     option('--static-libxml2', toggle_true('build_libxml2'), default=False,
            help='build static libxml2')
@@ -764,10 +864,12 @@ def create_argument_parser():
            help='install playground support')
 
     option('--build-ninja', toggle_true,
-           help='build the Ninja tool')
+           help='build the Ninja tool [deprecated: Ninja is built when necessary]')
 
-    option(['--build-lld'], toggle_true('build_lld'),
+    option(['--build-lld'], toggle_true('build_lld'), default=True,
            help='build lld as part of llvm')
+    option(['--skip-build-lld'], toggle_false('build_lld'),
+           help='skip building lld as part of llvm')
 
     option('--skip-build-clang-tools-extra',
            toggle_false('build_clang_tools_extra'),
@@ -865,13 +967,15 @@ def create_argument_parser():
            const='Debug',
            help='build the Debug variant of Foundation')
 
+    option('--foundation-tests-build-type', store('foundation_tests_build_variant'),
+           choices=['Debug', 'Release'],
+           default=None,
+           help='build the Foundation tests in a certain variant '
+                '(Debug builds much faster)')
+
     option('--debug-libdispatch', store('libdispatch_build_variant'),
            const='Debug',
            help='build the Debug variant of libdispatch')
-
-    option('--debug-libicu', store('libicu_build_variant'),
-           const='Debug',
-           help='build the Debug variant of libicu')
 
     option('--debug-libxml2', store('libxml2_build_variant'),
            const='Debug',
@@ -943,6 +1047,14 @@ def create_argument_parser():
            const=False,
            help='disable assertions in llbuild')
 
+    option('--swift-stdlib-strict-availability', store,
+           const=True,
+           help='enable strict availability checking in the Swift standard library (you want this OFF for CI or at-desk builds)')
+    option('--no-swift-stdlib-strict-availability',
+           store('swift_stdlib_strict_availability'),
+           const=False,
+           help='disable strict availability checking in the Swift standard library (you want this OFF for CI or at-desk builds)')
+
     # -------------------------------------------------------------------------
     in_group('Select the CMake generator')
 
@@ -954,9 +1066,11 @@ def create_argument_parser():
     option(['-m', '--make'], store('cmake_generator'),
            const='Unix Makefiles',
            help="use CMake's Makefile generator (%(default)s by default)")
+
+    # Xcode generation is no longer supported, leave the option so we can
+    # inform the user.
     option(['-x', '--xcode'], store('cmake_generator'),
-           const='Xcode',
-           help="use CMake's Xcode generator (%(default)s by default)")
+           const='Xcode', help=argparse.SUPPRESS)
 
     # -------------------------------------------------------------------------
     in_group('Run tests')
@@ -1040,6 +1154,8 @@ def create_argument_parser():
            help='skip testing Swift stdlibs for Mac OS X')
     option('--skip-test-linux', toggle_false('test_linux'),
            help='skip testing Swift stdlibs for Linux')
+    option('--skip-test-linux-static', toggle_false('test_linux_static'),
+           help='skip testing Swift stdlibs for fully static Linux')
     option('--skip-test-freebsd', toggle_false('test_freebsd'),
            help='skip testing Swift stdlibs for FreeBSD')
     option('--skip-test-cygwin', toggle_false('test_cygwin'),
@@ -1056,7 +1172,7 @@ def create_argument_parser():
            help='build static variants of the Swift standard library')
 
     option('--build-swift-dynamic-sdk-overlay', toggle_true,
-           default=True,
+           default=platform.system() != "Darwin",
            help='build dynamic variants of the Swift SDK overlay')
 
     option('--build-swift-static-sdk-overlay', toggle_true,
@@ -1068,16 +1184,48 @@ def create_argument_parser():
     option('--build-swift-stdlib-static-print', toggle_true,
            help='Build constant-folding print() support')
 
+    option('--build-embedded-stdlib', toggle_true,
+           default=True,
+           help='Build embedded stdlib')
+
+    option('--build-embedded-stdlib-cross-compiling', toggle_true,
+           help='Build embedded stdlib for cross-compiling targets.')
+
     option('--build-swift-stdlib-unicode-data', toggle_true,
            default=True,
            help='Include Unicode data in the standard library.'
                 'Note: required for full String functionality')
 
+    option('--build-stdlib-docs', toggle_true,
+           default=False,
+           help='Build documentation for the standard library.'
+                'Note: this builds Swift-DocC to perform the docs build.')
+    option('--preview-stdlib-docs', toggle_true,
+           default=False,
+           help='Build and preview standard library documentation with Swift-DocC.'
+                'Note: this builds Swift-DocC to perform the docs build.')
+
+    option('--build-swift-clang-overlays', toggle_true,
+           default=True,
+           help='Build Swift overlays for the clang builtin modules')
+
+    option('--build-swift-remote-mirror', toggle_true,
+           default=True,
+           help='Build Remote Mirror')
+
+    option('--build-swift-libexec', toggle_true,
+           default=True,
+           help='build auxiliary executables')
+
     option(['-S', '--skip-build'], store_true,
            help='generate build directory only without building')
 
+    option('--build-linux-static', toggle_true,
+           help='build Swift stdlibs for fully static Linux')
+
     option('--skip-build-linux', toggle_false('build_linux'),
            help='skip building Swift stdlibs for Linux')
+
     option('--skip-build-freebsd', toggle_false('build_freebsd'),
            help='skip building Swift stdlibs for FreeBSD')
     option('--skip-build-cygwin', toggle_false('build_cygwin'),
@@ -1113,6 +1261,16 @@ def create_argument_parser():
            help='skip building Swift stdlibs for watchOS simulator '
                 '(i.e. build devices only)')
 
+    option('--skip-build-xros', toggle_false('build_xros'),
+           help='skip building Swift stdlibs for xrOS')
+    option('--skip-build-xros-device', toggle_false('build_xros_device'),
+           help='skip building Swift stdlibs for xrOS devices '
+                '(i.e. build simulators only)')
+    option('--skip-build-xros-simulator',
+           toggle_false('build_xros_simulator'),
+           help='skip building Swift stdlibs for xrOS simulator '
+                '(i.e. build devices only)')
+
     option('--skip-build-android', toggle_false('build_android'),
            help='skip building Swift stdlibs for Android')
 
@@ -1141,10 +1299,6 @@ def create_argument_parser():
     option('--skip-test-ios-simulator',
            toggle_false('test_ios_simulator'),
            help='skip testing iOS simulator targets')
-    option('--skip-test-watchos-32bit-simulator',
-           toggle_false('test_watchos_32bit_simulator'),
-           default=False,
-           help='skip testing watchOS 32 bit simulator targets')
     option('--skip-test-ios-host',
            toggle_false('test_ios_host'),
            help='skip testing iOS device targets on the host machine (the '
@@ -1174,6 +1328,17 @@ def create_argument_parser():
            help='skip testing watchOS device targets on the host machine (the '
                 'watch itself)')
 
+    option('--skip-test-xros',
+           toggle_false('test_xros'),
+           help='skip testing all xrOS targets. Equivalent to specifying both '
+                '--skip-test-xros-simulator and --skip-test-xros-host')
+    option('--skip-test-xros-simulator',
+           toggle_false('test_xros_simulator'),
+           help='skip testing xrOS simulator targets')
+    option('--skip-test-xros-host',
+           toggle_false('test_xros_host'),
+           help='skip testing xrOS device targets on the host machine')
+
     option('--skip-test-android',
            toggle_false('test_android'),
            help='skip testing all Android targets.')
@@ -1199,9 +1364,12 @@ def create_argument_parser():
     option('--skip-clean-swift-driver', toggle_false('clean_swift_driver'),
            help='skip cleaning up Swift driver')
     option('--skip-test-cmark', toggle_false('test_cmark'),
+           default=False,
            help='skip testing cmark')
     option('--skip-test-swiftpm', toggle_false('test_swiftpm'),
            help='skip testing swiftpm')
+    option('--skip-test-foundation', toggle_false('test_foundation'),
+           help='skip testing Foundation')
     option('--skip-test-swift-driver', toggle_false('test_swift_driver'),
            help='skip testing Swift driver')
     option('--skip-test-swiftsyntax', toggle_false('test_swiftsyntax'),
@@ -1217,8 +1385,6 @@ def create_argument_parser():
            help='skip testing the SourceKit Stress tester')
     option('--skip-test-swiftformat', toggle_false('test_swiftformat'),
            help='skip testing swift-format')
-    option('--skip-test-swiftevolve', toggle_false('test_swiftevolve'),
-           help='skip testing SwiftEvolve')
     option('--skip-test-toolchain-benchmarks',
            toggle_false('test_toolchainbenchmarks'),
            help='skip testing toolchain benchmarks')
@@ -1227,6 +1393,8 @@ def create_argument_parser():
            help='skip testing swift_inspect')
     option('--skip-test-swiftdocc', toggle_false('test_swiftdocc'),
            help='skip testing swift-docc')
+    option('--skip-test-wasm-stdlib', toggle_false('test_wasmstdlib'),
+           help='skip testing stdlib for WebAssembly')
 
     # -------------------------------------------------------------------------
     in_group('Build settings specific for LLVM')
@@ -1235,7 +1403,7 @@ def create_argument_parser():
            help='enable building llvm using modules')
 
     option('--llvm-targets-to-build', store,
-           default='X86;ARM;AArch64;PowerPC;SystemZ;Mips',
+           default='X86;ARM;AArch64;PowerPC;SystemZ;Mips;RISCV;WebAssembly;AVR',
            help='LLVM target generators to build')
 
     option('--llvm-ninja-targets', append,
@@ -1261,6 +1429,18 @@ def create_argument_parser():
            help='CMake options used for llvm in the form of comma '
                 'separated options "-DCMAKE_VAR1=YES,-DCMAKE_VAR2=/tmp". Can '
                 'be called multiple times to add multiple such options.')
+    option('--extra-llvm-cmake-options', append,
+           type=argparse.ShellSplitType(),
+           help='Pass additional CMake options to the LLVM build. '
+                'Can be passed multiple times to add multiple options. '
+                'These are the last arguments passed to CMake and can override '
+                'existing options.',
+           default=[])
+
+    option('--llvm-build-compiler-rt-with-use-runtimes', toggle_true, default=True,
+           help='Switch to LLVM_ENABLE_RUNTIMES as the mechanism to build compiler-rt'
+                'It will become the default with LLVM 21, this flag is '
+                'meant to stage its introduction and account for edge cases')
 
     # -------------------------------------------------------------------------
     in_group('Build settings for Android')
@@ -1283,10 +1463,32 @@ def create_argument_parser():
 
     option('--android-arch', store,
            choices=['armv7', 'aarch64', 'x86_64'],
-           default='armv7',
+           default='aarch64',
            help='The target architecture when building for Android. '
                 'Currently, only armv7, aarch64, and x86_64 are supported. '
                 '%(default)s is the default.')
+
+    # -------------------------------------------------------------------------
+    in_group('Build settings for Linux')
+
+    option('--linux-archs', store,
+           type=argparse.ShellSplitType(),
+           default=None,
+           help='Comma-separated list of architectures to use when '
+           'building for Linux.')
+
+    # -------------------------------------------------------------------------
+    in_group('Build settings for fully static Linux')
+
+    option('--musl-path', store_path,
+           default='/usr/local/musl',
+           help='The path to the Musl headers and libraries.')
+
+    option('--linux-static-archs', store,
+           type=argparse.ShellSplitType(),
+           default=['x86_64', 'aarch64'],
+           help='Comma-separated list of architectures to use when '
+           'building for fully static Linux.')
 
     # -------------------------------------------------------------------------
     in_group('Experimental language features')
@@ -1295,9 +1497,16 @@ def create_argument_parser():
            default=True,
            help='Enable experimental Swift differentiable programming.')
 
-    option('--enable-experimental-concurrency', toggle_true,
-           default=True,
+    option('--enable-experimental-concurrency', toggle_true, default=True,
            help='Enable experimental Swift concurrency model.')
+
+    option('--enable-experimental-cxx-interop', toggle_true,
+           default=True,
+           help='Enable experimental C++ interop.')
+
+    option('--enable-cxx-interop-swift-bridging-header', toggle_true,
+           default=True,
+           help='Ship the <swift/bridging> header for C++ interop')
 
     option('--enable-experimental-distributed', toggle_true,
            default=True,
@@ -1307,9 +1516,25 @@ def create_argument_parser():
            default=True,
            help='Enable experimental Swift string processing.')
 
-    option('--enable-experimental-reflection', toggle_true,
+    option('--enable-experimental-observation', toggle_true,
            default=True,
-           help='Enable experimental Swift reflection.')
+           help='Enable experimental Swift observation.')
+
+    option('--enable-synchronization', toggle_true,
+           default=True,
+           help='Enable Swift Synchronization.')
+
+    option('--enable-volatile', toggle_true,
+           default=True,
+           help='Enable Volatile module.')
+
+    option('--enable-runtime-module', toggle_true,
+           default=True,
+           help='Enable Runtime module.')
+
+    option('--enable-experimental-parser-validation', toggle_true,
+           default=True,
+           help='Enable experimental Swift Parser validation by default.')
 
     # -------------------------------------------------------------------------
     in_group('Unsupported options')
@@ -1418,7 +1643,6 @@ SWIFT_SOURCE_ROOT: a directory containing the source for LLVM, Clang, Swift.
                      /swift-corelibs-xctest      (optional)
                      /swift-corelibs-foundation  (optional)
                      /swift-corelibs-libdispatch (optional)
-                     /icu                        (optional)
                      /libxml2                    (optional)
                      /zlib                       (optional)
                      /curl                       (optional)
@@ -1484,10 +1708,6 @@ To run OS X and iOS tests that don't require a device:
 To use 'make' instead of 'ninja', use '-m':
 
   [~/src/s]$ ./swift/utils/build-script -m -R
-
-To create Xcode projects that can build Swift, use '-x':
-
-  [~/src/s]$ ./swift/utils/build-script -x -R
 
 Preset mode in build-script
 ---------------------------

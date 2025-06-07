@@ -2,10 +2,10 @@
 // RUN: %target-typecheck-verify-swift -enable-testing -swift-version 4.2 -disable-objc-attr-requires-foundation-module -enable-objc-interop
 
 @usableFromInline private func privateVersioned() {}
-// expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal declarations, but 'privateVersioned()' is private}}
+// expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal or package declarations, but global function 'privateVersioned()' is private}}
 
 @usableFromInline fileprivate func fileprivateVersioned() {}
-// expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal declarations, but 'fileprivateVersioned()' is fileprivate}}
+// expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal or package declarations, but global function 'fileprivateVersioned()' is fileprivate}}
 
 @usableFromInline internal func internalVersioned() {}
 // OK
@@ -14,12 +14,12 @@
 // OK
 
 @usableFromInline public func publicVersioned() {}
-// expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal declarations, but 'publicVersioned()' is public}}
+// expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal or package declarations, but global function 'publicVersioned()' is public}}
 
 internal class InternalClass {
   // expected-note@-1 2{{type declared here}}
   @usableFromInline public func publicVersioned() {}
-  // expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal declarations, but 'publicVersioned()' is public}}
+  // expected-error@-1 {{'@usableFromInline' attribute can only be applied to internal or package declarations, but instance method 'publicVersioned()' is public}}
 }
 
 fileprivate class filePrivateClass {
@@ -119,7 +119,7 @@ where T : InternalProtocol,
 
 @usableFromInline
 protocol BadProtocol : InternalProtocol {
-  // expected-warning@-1 {{protocol refined by '@usableFromInline' protocol should be '@usableForInline' or public}}
+  // expected-warning@-1 {{protocol refined by '@usableFromInline' protocol should be '@usableFromInline' or public}}
   associatedtype X : InternalProtocol
   // expected-warning@-1 {{type referenced from a requirement of an associated type in a '@usableFromInline' protocol should be '@usableFromInline' or public}}
   associatedtype Y = InternalStruct
@@ -128,7 +128,7 @@ protocol BadProtocol : InternalProtocol {
 
 @usableFromInline
 protocol AnotherBadProtocol where Self.T : InternalProtocol {
-  // expected-warning@-1 {{protocol used by '@usableFromInline' protocol should be '@usableForInline' or public}}
+  // expected-warning@-1 {{protocol used by '@usableFromInline' protocol should be '@usableFromInline' or public}}
   associatedtype T
 }
 

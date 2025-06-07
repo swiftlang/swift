@@ -77,7 +77,7 @@ protocol CP2 : class { }
 
 // Teach the compiler that String is @objc-friendly without importing
 // Foundation.
-extension String: _ObjectiveCBridgeable {
+extension String: @retroactive _ObjectiveCBridgeable {
   @_semantics("convertToObjectiveC") public func _bridgeToObjectiveC() -> AnyObject { fatalError() }
   public static func _forceBridgeFromObjectiveC(_ x: AnyObject, result: inout String?) { fatalError() }
   public static func _conditionallyBridgeFromObjectiveC(_ x: AnyObject, result: inout String?) -> Bool { fatalError() }
@@ -102,14 +102,14 @@ extension String: _ObjectiveCBridgeable {
   @IBAction func action6a(_: Any!) {}
 
   // Protocol types
-  @IBAction func action7(_: P1) {} // expected-error{{method cannot be marked @IBAction because the type of the parameter cannot be represented in Objective-C}} expected-note{{protocol-constrained type containing protocol 'P1' cannot be represented in Objective-C}}
-  @IBAction func action8(_: CP1) {} // expected-error{{method cannot be marked @IBAction because the type of the parameter cannot be represented in Objective-C}} expected-note{{protocol-constrained type containing protocol 'CP1' cannot be represented in Objective-C}}
+  @IBAction func action7(_: P1) {} // expected-error{{method cannot be marked '@IBAction' because the type of the parameter cannot be represented in Objective-C}} expected-note{{protocol-constrained type containing protocol 'P1' cannot be represented in Objective-C}}
+  @IBAction func action8(_: CP1) {} // expected-error{{method cannot be marked '@IBAction' because the type of the parameter cannot be represented in Objective-C}} expected-note{{protocol-constrained type containing protocol 'CP1' cannot be represented in Objective-C}}
   @IBAction func action9(_: OP1) {}
-  @IBAction func action10(_: P1?) {} // expected-error{{method cannot be marked @IBAction because the type of the parameter cannot be represented in Objective-C}}
-  @IBAction func action11(_: CP1?) {} // expected-error{{method cannot be marked @IBAction because the type of the parameter cannot be represented in Objective-C}}
+  @IBAction func action10(_: P1?) {} // expected-error{{method cannot be marked '@IBAction' because the type of the parameter cannot be represented in Objective-C}}
+  @IBAction func action11(_: CP1?) {} // expected-error{{method cannot be marked '@IBAction' because the type of the parameter cannot be represented in Objective-C}}
   @IBAction func action12(_: OP1?) {}
-  @IBAction func action13(_: P1!) {} // expected-error{{method cannot be marked @IBAction because the type of the parameter cannot be represented in Objective-C}}
-  @IBAction func action14(_: CP1!) {} // expected-error{{method cannot be marked @IBAction because the type of the parameter cannot be represented in Objective-C}}
+  @IBAction func action13(_: P1!) {} // expected-error{{method cannot be marked '@IBAction' because the type of the parameter cannot be represented in Objective-C}}
+  @IBAction func action14(_: CP1!) {} // expected-error{{method cannot be marked '@IBAction' because the type of the parameter cannot be represented in Objective-C}}
   @IBAction func action15(_: OP1!) {}
 
   // Class metatype
@@ -123,26 +123,26 @@ extension String: _ObjectiveCBridgeable {
   @IBAction func action20(_: AnyClass!) {}
 
   // Protocol types
-  @IBAction func action21(_: P1.Type) {} // expected-error{{method cannot be marked @IBAction because the type of the parameter cannot be represented in Objective-C}}
-  @IBAction func action22(_: CP1.Type) {} // expected-error{{method cannot be marked @IBAction because the type of the parameter cannot be represented in Objective-C}}
+  @IBAction func action21(_: P1.Type) {} // expected-error{{method cannot be marked '@IBAction' because the type of the parameter cannot be represented in Objective-C}}
+  @IBAction func action22(_: CP1.Type) {} // expected-error{{method cannot be marked '@IBAction' because the type of the parameter cannot be represented in Objective-C}}
   @IBAction func action23(_: OP1.Type) {}
-  @IBAction func action24(_: P1.Type?) {} // expected-error{{method cannot be marked @IBAction because the type of the parameter cannot be represented in Objective-C}}
-  @IBAction func action25(_: CP1.Type?) {} // expected-error{{method cannot be marked @IBAction because the type of the parameter cannot be represented in Objective-C}}
+  @IBAction func action24(_: P1.Type?) {} // expected-error{{method cannot be marked '@IBAction' because the type of the parameter cannot be represented in Objective-C}}
+  @IBAction func action25(_: CP1.Type?) {} // expected-error{{method cannot be marked '@IBAction' because the type of the parameter cannot be represented in Objective-C}}
   @IBAction func action26(_: OP1.Type?) {}
-  @IBAction func action27(_: P1.Type!) {} // expected-error{{method cannot be marked @IBAction because the type of the parameter cannot be represented in Objective-C}}
-  @IBAction func action28(_: CP1.Type!) {} // expected-error{{method cannot be marked @IBAction because the type of the parameter cannot be represented in Objective-C}}
+  @IBAction func action27(_: P1.Type!) {} // expected-error{{method cannot be marked '@IBAction' because the type of the parameter cannot be represented in Objective-C}}
+  @IBAction func action28(_: CP1.Type!) {} // expected-error{{method cannot be marked '@IBAction' because the type of the parameter cannot be represented in Objective-C}}
   @IBAction func action29(_: OP1.Type!) {}
 
   // Structs representable in Objective-C
   @IBAction func action32(_: Int) {}
-  @IBAction func action33(_: Int?) {} // expected-error{{method cannot be marked @IBAction because the type of the parameter cannot be represented in Objective-C}}
+  @IBAction func action33(_: Int?) {} // expected-error{{method cannot be marked '@IBAction' because the type of the parameter cannot be represented in Objective-C}}
 
   @IBAction func action34(_: String) {}
   @IBAction func action35(_: String?) {}
 
   // Other bad cases
-  @IBAction func action30(_: S) {} // expected-error{{method cannot be marked @IBAction because the type of the parameter cannot be represented in Objective-C}} expected-note{{Swift structs cannot be represented in Objective-C}}
-  @IBAction func action31(_: E) {} // expected-error{{method cannot be marked @IBAction because the type of the parameter cannot be represented in Objective-C}} expected-note{{non-'@objc' enums cannot be represented in Objective-C}}
+  @IBAction func action30(_: S) {} // expected-error{{method cannot be marked '@IBAction' because the type of the parameter cannot be represented in Objective-C}} expected-note{{Swift structs cannot be represented in Objective-C}}
+  @IBAction func action31(_: E) {} // expected-error{{method cannot be marked '@IBAction' because the type of the parameter cannot be represented in Objective-C}} expected-note{{non-'@objc' enums cannot be represented in Objective-C}}
 
   init() { }
 }

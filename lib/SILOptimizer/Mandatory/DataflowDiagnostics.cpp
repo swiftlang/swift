@@ -16,6 +16,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILConstants.h"
 #include "swift/SIL/SILFunction.h"
@@ -68,10 +69,9 @@ static void diagnoseMissingReturn(const UnreachableInst *UI,
           Context.Diags.diagnose(expr->getStartLoc(),
                                  diag::missing_return_closure, ResTy);
         } else {
-          auto *DC = FLoc.getAsDeclContext();
-          assert(DC && DC->getAsDecl() && "not a declaration?");
+          auto *FD = FLoc.castToASTNode<AbstractFunctionDecl>();
           Context.Diags.diagnose(expr->getStartLoc(), diag::missing_return_decl,
-                                 ResTy, DC->getAsDecl()->getDescriptiveKind());
+                                 ResTy, FD);
         }
         Context.Diags
             .diagnose(expr->getStartLoc(), diag::missing_return_last_expr_note)
@@ -88,12 +88,10 @@ static void diagnoseMissingReturn(const UnreachableInst *UI,
                                : diag::missing_return_closure;
     diagnose(Context, L.getEndSourceLoc(), diagID, ResTy);
   } else {
-    auto *DC = FLoc.getAsDeclContext();
-    assert(DC && DC->getAsDecl() && "not a declaration?");
+    auto *FD = FLoc.castToASTNode<AbstractFunctionDecl>();
     auto diagID = isNoReturnFn ? diag::missing_never_call_decl
                                : diag::missing_return_decl;
-    diagnose(Context, L.getEndSourceLoc(), diagID, ResTy,
-             DC->getAsDecl()->getDescriptiveKind());
+    diagnose(Context, L.getEndSourceLoc(), diagID, ResTy, FD);
   }
 }
 
@@ -180,7 +178,7 @@ static void diagnosePoundAssert(const SILInstruction *I,
   APInt intValue = value.getIntegerValue();
   assert(intValue.getBitWidth() == 1 &&
          "sema prevents non-int1 #assert condition");
-  if (intValue.isNullValue()) {
+  if (intValue.isZero()) {
     auto *message = cast<StringLiteralInst>(builtinInst->getArguments()[1]);
     StringRef messageValue = message->getValue();
     if (messageValue.empty())

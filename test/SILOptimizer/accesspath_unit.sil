@@ -1,0 +1,179 @@
+// RUN: %target-sil-opt -sil-print-types -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+
+import Swift
+
+struct S {}
+
+class Klass {
+  var f: S
+}
+
+struct S2 {
+  var f: S
+  var k: Klass
+}
+
+sil_global hidden @globalKlass : $Klass
+sil_global hidden @globalStruct : $S2
+
+// CHECK-LABEL: begin running test 1 of 2 on testRefElement: accesspath with: @trace[0]
+// CHECK: [[P1:%.*]] = ref_element_addr %0 : $Klass, #Klass.f
+// CHECK: [[A1:%.*]] = begin_access [read] [dynamic] [[P1]] : $*S
+// CHECK: [[P2:%.*]] = ref_element_addr %0 : $Klass, #Klass.f
+// CHECK: [[A2:%.*]] = begin_access [read] [dynamic] [[P2]] : $*S
+// CHECK: Access path for:  [[P1]] = ref_element_addr %0 : $Klass, #Klass.f
+// CHECK-NEXT: base: [[P1]] = ref_element_addr %0 : $Klass, #Klass.f
+// CHECK-NEXT: Exact Use:   %{{.*}} = load [trivial] [[A1]] : $*S
+// CHECK-NEXT: Exact Use:   end_access [[A1]] : $*S
+// CHECK: end running test 1 of 2 on testRefElement: accesspath with: @trace[0]
+
+// CHECK-LABEL: begin running test 2 of 2 on testRefElement: accesspath with: @trace[1]
+// CHECK: [[P1:%.*]] = ref_element_addr %0 : $Klass, #Klass.f
+// CHECK: [[A1:%.*]] = begin_access [read] [dynamic] [[P1]] : $*S
+// CHECK: [[P2:%.*]] = ref_element_addr %0 : $Klass, #Klass.f
+// CHECK: [[A2:%.*]] = begin_access [read] [dynamic] [[P2]] : $*S
+// CHECK: Access path for:  [[P2]] = ref_element_addr %0 : $Klass, #Klass.f
+// CHECK: base: [[P2]] = ref_element_addr %0 : $Klass, #Klass.f
+// CHECK-NEXT: Exact Use:   %{{.*}} = load [trivial] [[A2]] : $*S
+// CHECK-NEXT: Exact Use:   end_access [[A2]] : $*S
+// CHECK: end running test 2 of 2 on testRefElement: accesspath with: @trace[1]
+sil hidden [ossa] @testRefElement : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  specify_test "accesspath @trace[0]"
+  %p1 = ref_element_addr %0 : $Klass, #Klass.f
+  debug_value [trace] %p1 : $*S
+  %a1 = begin_access [read] [dynamic] %p1 : $*S
+  %l1 = load [trivial] %a1 : $*S
+  end_access %a1 : $*S
+  specify_test "accesspath @trace[1]"
+  %p2 = ref_element_addr %0 : $Klass, #Klass.f
+  debug_value [trace] %p2 : $*S
+  %a2 = begin_access [read] [dynamic] %p2 : $*S
+  %l2 = load [trivial] %a2 : $*S
+  end_access %a2 : $*S
+  %99 = tuple ()
+  return %99 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 2 on testGlobalAddrKlass: accesspath with: @trace[0]
+// CHECK: [[P1:%.*]] = global_addr @globalKlass : $*Klass
+// CHECK: [[A1:%.*]] = begin_access [read] [dynamic] [[P1]] : $*Klass
+// CHECK: [[P2:%.*]] = global_addr @globalKlass : $*Klass
+// CHECK: [[A2:%.*]] = begin_access [read] [dynamic] [[P2]] : $*Klass
+// CHECK: Access path for:  [[P1]] = global_addr @globalKlass : $*Klass
+// CHECK: base:  [[P1]] = global_addr @globalKlass : $*Klass
+// CHECK-NEXT: Exact Use:   %{{.*}} = load_borrow [[A1]]
+// CHECK-NEXT: Exact Use:   end_access [[A1]]
+// CHECK: end running test 1 of 2 on testGlobalAddrKlass: accesspath with: @trace[0]
+
+// CHECK-LABEL: begin running test 2 of 2 on testGlobalAddrKlass: accesspath with: @trace[1]
+// CHECK: [[P1:%.*]] = global_addr @globalKlass : $*Klass
+// CHECK: [[A1:%.*]] = begin_access [read] [dynamic] [[P1]] : $*Klass
+// CHECK: [[P2:%.*]] = global_addr @globalKlass : $*Klass
+// CHECK: [[A2:%.*]] = begin_access [read] [dynamic] [[P2]] : $*Klass
+// CHECK: Access path for:  [[P2]] = global_addr @globalKlass : $*Klass
+// CHECK: base:  [[P2]] = global_addr @globalKlass : $*Klass
+// CHECK-NEXT: Exact Use:   %{{.*}} = load_borrow [[A2]]
+// CHECK-NEXT: Exact Use:   end_access [[A2]]
+// CHECK: end running test 2 of 2 on testGlobalAddrKlass: accesspath with: @trace[1]
+sil [ossa] @testGlobalAddrKlass : $@convention(thin) () -> () {
+bb0:
+  specify_test "accesspath @trace[0]"
+  %p1 = global_addr @globalKlass : $*Klass
+  debug_value [trace] %p1 : $*Klass
+  %a1 = begin_access [read] [dynamic] %p1 : $*Klass
+  %l1 = load_borrow %a1 : $*Klass
+  end_borrow %l1 : $Klass
+  end_access %a1 : $*Klass
+
+  specify_test "accesspath @trace[1]"
+  %p2 = global_addr @globalKlass : $*Klass
+  debug_value [trace] %p2 : $*Klass
+  %a2 = begin_access [read] [dynamic] %p2 : $*Klass
+  %l2 = load_borrow %a2 : $*Klass
+  end_borrow %l2 : $Klass
+  end_access %a2 : $*Klass
+
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 3 on testGlobalAddrStruct: accesspath with: @trace[0]
+// CHECK: [[P1:%.*]] = global_addr @globalStruct
+// CHECK: [[A1:%.*]] = begin_access [read] [dynamic] [[P1]]
+// CHECK: [[P2:%.*]] = global_addr @globalStruct
+// CHECK: [[A2:%.*]] = begin_access [read] [dynamic] [[P2]]
+// CHECK: [[GEP2:%.*]] = struct_element_addr [[A2]]
+// CHECK: [[P3:%.*]] = global_addr @globalStruct
+// CHECK: [[A3:%.*]] = begin_access [read] [dynamic] [[P3]]
+// CHECK: [[GEP3:%.*]] = struct_element_addr [[A3]]
+// CHECK: Access path for:  [[P1]] = global_addr @globalStruct
+// CHECK: base:  [[P1]] = global_addr @globalStruct
+// CHECK-NEXT: Exact Use:   %{{.*}} = load_borrow [[A1]]
+// CHECK-NEXT: Exact Use:   end_access [[A1]]
+// CHECK: end running test 1 of 3 on testGlobalAddrStruct: accesspath with: @trace[0]
+
+// CHECK-LABEL: begin running test 2 of 3 on testGlobalAddrStruct: accesspath with: @trace[1]
+// CHECK: [[P1:%.*]] = global_addr @globalStruct
+// CHECK: [[A1:%.*]] = begin_access [read] [dynamic] [[P1]]
+// CHECK: [[P2:%.*]] = global_addr @globalStruct
+// CHECK: [[A2:%.*]] = begin_access [read] [dynamic] [[P2]]
+// CHECK: [[GEP2:%.*]] = struct_element_addr [[A2]]
+// CHECK: [[P3:%.*]] = global_addr @globalStruct
+// CHECK: [[A3:%.*]] = begin_access [read] [dynamic] [[P3]]
+// CHECK: [[GEP3:%.*]] = struct_element_addr [[A3]]
+// CHECK: Access path for:  [[P2]] = global_addr @globalStruct
+// CHECK: base:  [[P2]] = global_addr @globalStruct
+// CHECK-NEXT: Inner Use:   %{{.*}} = load_borrow [[GEP2]]
+// CHECK-NEXT: Exact Use:   end_access [[A2]]
+// CHECK: end running test 2 of 3 on testGlobalAddrStruct: accesspath with: @trace[1]
+
+// CHECK-LABEL: begin running test 3 of 3 on testGlobalAddrStruct: accesspath with: @trace[2]
+// CHECK: [[P1:%.*]] = global_addr @globalStruct
+// CHECK: [[A1:%.*]] = begin_access [read] [dynamic] [[P1]]
+// CHECK: [[P2:%.*]] = global_addr @globalStruct
+// CHECK: [[A2:%.*]] = begin_access [read] [dynamic] [[P2]]
+// CHECK: [[GEP2:%.*]] = struct_element_addr [[A2]]
+// CHECK: [[P3:%.*]] = global_addr @globalStruct
+// CHECK: [[A3:%.*]] = begin_access [read] [dynamic] [[P3]]
+// CHECK: [[GEP3:%.*]] = struct_element_addr [[A3]]
+// CHECK: Access path for:  [[P3]] = global_addr @globalStruct
+// CHECK: base:  [[P3]] = global_addr @globalStruct
+// CHECK-NEXT: Inner Use:   %{{.*}} = load_borrow [[GEP3]]
+// CHECK-NEXT: Exact Use:   end_access [[A3]]
+// CHECK: end running test 3 of 3 on testGlobalAddrStruct: accesspath with: @trace[2]
+sil [ossa] @testGlobalAddrStruct : $@convention(thin) () -> () {
+bb0:
+  specify_test "accesspath @trace[0]"
+  %p3 = global_addr @globalStruct : $*S2
+  debug_value [trace] %p3 : $*S2
+  %a3 = begin_access [read] [dynamic] %p3 : $*S2
+  %l3 = load_borrow %a3 : $*S2
+  end_borrow %l3 : $S2
+  end_access %a3 : $*S2
+
+  specify_test "accesspath @trace[1]"
+  %p4 = global_addr @globalStruct : $*S2
+  debug_value [trace] %p4 : $*S2
+  %a4 = begin_access [read] [dynamic] %p4 : $*S2
+  %gep4 = struct_element_addr %a4 : $*S2, #S2.k
+  %l4 = load_borrow %gep4 : $*Klass
+  end_borrow %l4 : $Klass
+  end_access %a4 : $*S2
+
+  specify_test "accesspath @trace[2]"
+  %p5 = global_addr @globalStruct : $*S2
+  debug_value [trace] %p5 : $*S2
+  %a5 = begin_access [read] [dynamic] %p5 : $*S2
+  %gep5 = struct_element_addr %a5 : $*S2, #S2.k
+  %l5 = load_borrow %gep5 : $*Klass
+  end_borrow %l5 : $Klass
+  end_access %a5 : $*S2
+
+  %9999 = tuple()
+  return %9999 : $()
+}

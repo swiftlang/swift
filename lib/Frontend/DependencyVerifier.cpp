@@ -20,6 +20,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Frontend/DiagnosticVerifier.h"
@@ -148,6 +149,9 @@ struct Obligation {
   public:
     Key() = delete;
 
+  private:
+    Key(StringRef Name, Expectation::Kind Kind) : Name(Name), Kind(Kind) {}
+
   public:
     static Key forNegative(StringRef name) {
       return Key{name, Expectation::Kind::Negative};
@@ -188,7 +192,7 @@ struct Obligation {
       }
       static bool isEqual(const Obligation::Key &LHS,
                           const Obligation::Key &RHS) {
-        return LHS.Name.equals(RHS.Name) && LHS.Kind == RHS.Kind;
+        return LHS.Name == RHS.Name && LHS.Kind == RHS.Kind;
       }
     };
   };
@@ -320,13 +324,7 @@ private:
 
 bool DependencyVerifier::parseExpectations(
     const SourceFile *SF, std::vector<Expectation> &Expectations) {
-  const auto MaybeBufferID = SF->getBufferID();
-  if (!MaybeBufferID) {
-    llvm::errs() << "source file has no buffer: " << SF->getFilename();
-    return true;
-  }
-
-  const auto BufferID = MaybeBufferID.value();
+  const auto BufferID = SF->getBufferID();
   const CharSourceRange EntireRange = SM.getRangeForBuffer(BufferID);
   const StringRef InputFile = SM.extractText(EntireRange);
 
@@ -480,7 +478,7 @@ bool DependencyVerifier::verifyNegativeExpectations(
 
 bool DependencyVerifier::diagnoseUnfulfilledObligations(
     const SourceFile *SF, ObligationMap &Obligations) {
-  CharSourceRange EntireRange = SM.getRangeForBuffer(*SF->getBufferID());
+  CharSourceRange EntireRange = SM.getRangeForBuffer(SF->getBufferID());
   StringRef InputFile = SM.extractText(EntireRange);
   auto &diags = SF->getASTContext().Diags;
   auto &Ctx = SF->getASTContext();

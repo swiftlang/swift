@@ -1,5 +1,4 @@
 // RUN: %target-typecheck-verify-swift -swift-version 6
-// REQUIRES: asserts
 
 func forwardMatch1(
   a: Int = 0, b: Int = 17, closure1: (Int) -> Int = { $0 }, c: Int = 42,

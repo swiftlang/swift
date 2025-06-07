@@ -14,7 +14,7 @@ import TestModule
 // UNSUPPORTED: CPU=armv7 && OS=ios
 // UNSUPPORTED: CPU=armv7s && OS=ios
 
-// CHECK: @"$sytN" = external{{( dllimport)?}} global %swift.full_type
+// CHECK: @"$sytN" = external{{( dllimport)?}} global %swift.full_existential_type
 
 // CHECK-NOT: @"$s4main5ValueOySiGMf"
 
@@ -30,10 +30,11 @@ func consume<T>(_ t: T) {
 }
 
 // CHECK: define hidden swiftcc void @"$s4main4doityyF"() #{{[0-9]+}} {
-// CHECK:   [[DEMANGLED_TYPE:%[0-9]+]] = call %swift.type* @__swift_instantiateConcreteTypeFromMangledName({ i32, i32 }* @"$s4main5ValueOyS2i10TestModule1PAAyHCg_GMD") #{{[0-9]+}}
+// CHECK:      [[DEMANGLED_TYPE:%[0-9]+]] = call ptr @__swift_instantiateConcreteTypeFromMangledName(
+// CHECK-SAME:     $s4main5ValueOyS2i10TestModule1PAAyHCg_GMD
 // CHECK:   call swiftcc void @"$s4main7consumeyyxlF"(
-// CHECK-SAME:     %swift.opaque* noalias nocapture %{{[0-9]+}}, 
-// CHECK-SAME:     %swift.type* [[DEMANGLED_TYPE]]
+// CHECK-SAME:     ptr noalias %{{[0-9]+}}, 
+// CHECK-SAME:     ptr [[DEMANGLED_TYPE]]
 // CHECK-SAME:   )
 // CHECK: }
 func doit() {
@@ -41,19 +42,14 @@ func doit() {
 }
 doit()
 
-// CHECK: ; Function Attrs: noinline nounwind readnone
-// CHECK: define hidden swiftcc %swift.metadata_response @"$s4main5ValueOMa"([[INT]] %0, %swift.type* %1, i8** %2) #{{[0-9]+}} {{(section)?.*}}{
+// CHECK: ; Function Attrs: noinline nounwind memory(none)
+// CHECK: define hidden swiftcc %swift.metadata_response @"$s4main5ValueOMa"([[INT]] %0, ptr %1, ptr %2) #{{[0-9]+}} {{(section)?.*}}{
 // CHECK: entry:
-// CHECK:   [[ERASED_TYPE:%[0-9]+]] = bitcast %swift.type* %1 to i8*
-// CHECK:   [[ERASED_TABLE:%[0-9]+]] = bitcast i8** %2 to i8*
-// CHECK:   {{%[0-9]+}} = call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata(
+// CHECK:      call swiftcc %swift.metadata_response @__swift_instantiateGenericMetadata(
 // CHECK-SAME:     [[INT]] %0, 
-// CHECK-SAME:     i8* [[ERASED_TYPE]], 
-// CHECK-SAME:     i8* [[ERASED_TABLE]], 
-// CHECK-SAME:     i8* undef, 
-// CHECK-SAME:     %swift.type_descriptor* bitcast (
-// CHECK-SAME:       {{.*}}$s4main5ValueOMn{{.*}} to %swift.type_descriptor*
-// CHECK-SAME:     )
-// CHECK-SAME:   )
+// CHECK-SAME:     ptr %1, 
+// CHECK-SAME:     ptr %2, 
+// CHECK-SAME:     ptr undef, 
+// CHECK-SAME:     $s4main5ValueOMn
 // CHECK:   ret %swift.metadata_response {{%[0-9]+}}
 // CHECK: }

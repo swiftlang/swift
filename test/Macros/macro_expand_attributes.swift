@@ -1,15 +1,16 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-build-swift -I %swift-host-lib-dir -L %swift-host-lib-dir -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
-// RUNx: %target-swift-frontend -dump-ast -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir %s -module-name MacroUser 2>&1 | %FileCheck --check-prefix CHECK-AST %s
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir -module-name MacroUser -DTEST_DIAGNOSTICS -swift-version 5
-// RUN: %target-build-swift -enable-experimental-feature Macros -load-plugin-library %t/%target-library-name(MacroDefinition) -I %swift-host-lib-dir -L %swift-host-lib-dir %s -o %t/main -module-name MacroUser -swift-version 5
-// RUN: %target-run %t/main | %FileCheck %s
-// REQUIRES: executable_test
+// REQUIRES: swift_swift_parser, executable_test
 
-// FIXME: Swift parser is not enabled on Linux CI yet.
-// REQUIRES: OS=macosx
+// RUN: %empty-directory(%t)
+// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
+// RUN: %target-typecheck-verify-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -swift-version 5
+// RUN: %target-build-swift -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) %s -o %t/main -module-name MacroUser -swift-version 5
+// RUN: %target-codesign %t/main
+// RUN: %target-run %t/main | %FileCheck %s
 
 @attached(memberAttribute) macro wrapAllProperties() = #externalMacro(module: "MacroDefinition", type: "WrapAllProperties")
+
+@attached(memberAttribute)
+public macro wrapStoredProperties(_ attributeName: String) = #externalMacro(module: "MacroDefinition", type: "WrapStoredPropertiesMacro")
 
 @propertyWrapper
 struct Wrapper<T> {
@@ -99,3 +100,66 @@ _ = c.y
 c.x = 10
 // CHECK: writing to key-path
 c.y = 100
+
+// Use the "wrapStoredProperties" macro to deprecate all of the stored
+// properties.
+@wrapStoredProperties(#"available(*, deprecated, message: "hands off my data")"#)
+struct OldStorage {
+  var x: Int
+}
+
+// The deprecation warning below comes from the deprecation attribute
+// introduced by @wrapStoredProperties on OldStorage.
+_ = OldStorage(x: 5).x   // expected-warning{{'x' is deprecated: hands off my data}}
+
+@wrapStoredProperties(#"available(*, deprecated, message: "hands off my data")"#)
+class C2: P {
+  var x: Int = 0
+  var y: Int = 0
+
+  var squareOfLength: Int {
+    return x*x + y*y // expected-warning 4{{hands off my data}}
+  }
+
+  var blah: Int { squareOfLength }
+}
+
+@attached(member, names: named(expandedMember))
+macro AddMember() = #externalMacro(module: "MacroDefinition", type: "SingleMemberMacro")
+
+@AddMember
+@wrapAllProperties
+struct TestExpansionOrder {
+  var originalMember: Int = 10
+}
+
+var expansionOrder = TestExpansionOrder()
+
+// CHECK-NOT: setting 27
+expansionOrder.expandedMember = 27
+
+// CHECK: setting 28
+expansionOrder.originalMember = 28
+
+#if TEST_DIAGNOSTICS
+@wrapAllProperties
+typealias A = Int
+// expected-error@-2{{'memberAttribute' macro cannot be attached to type alias ('A')}}
+
+@wrapAllProperties
+func noMembers() {}
+// expected-error@-2{{'memberAttribute' macro cannot be attached to global function ('noMembers')}}
+#endif
+
+@attached(memberAttribute)
+public macro AddMemberPeers() = #externalMacro(module: "MacroDefinition", type: "AddMemberPeersMacro")
+
+@attached(peer, names: suffixed(_special))
+public macro _AddPeer() = #externalMacro(module: "MacroDefinition", type: "_AddPeerMacro")
+
+@AddMemberPeers
+struct User {
+    var name: String {
+        "mario"
+    }
+}

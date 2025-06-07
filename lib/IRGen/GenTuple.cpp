@@ -20,10 +20,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/Basic/Mangler.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -36,6 +39,7 @@
 #include "Explosion.h"
 #include "IndirectTypeInfo.h"
 #include "NonFixedTypeInfo.h"
+#include "ResilientTypeInfo.h"
 
 #include "GenTuple.h"
 
@@ -43,6 +47,33 @@
 
 using namespace swift;
 using namespace irgen;
+
+namespace {
+  /// A type implementation for tuple types with a dynamic number of
+  /// elements, that is, that contain pack expansion types. For now,
+  /// these are completely abstract.
+  class DynamicTupleTypeInfo
+      : public ResilientTypeInfo<DynamicTupleTypeInfo>
+  {
+  public:
+    DynamicTupleTypeInfo(llvm::Type *T,
+                         IsCopyable_t copyable)
+      : ResilientTypeInfo(T, copyable, IsABIAccessible) {}
+
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
+      return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
+    }
+  };
+} // end anonymous namespace
+
+const TypeInfo *
+TypeConverter::convertDynamicTupleType(IsCopyable_t copyable) {
+  llvm::Type *storageType = IGM.OpaqueTy;
+  return new DynamicTupleTypeInfo(storageType, copyable);
+}
 
 namespace {
   class TupleFieldInfo : public RecordField<TupleFieldInfo> {
@@ -73,22 +104,36 @@ namespace {
   /// Project a tuple offset from a tuple metadata structure.
   static llvm::Value *loadTupleOffsetFromMetadata(IRGenFunction &IGF,
                                                   llvm::Value *metadata,
-                                                  unsigned index) {
+                                                  llvm::Value *index) {
     auto asTuple = IGF.Builder.CreateBitCast(metadata,
                                              IGF.IGM.TupleTypeMetadataPtrTy);
 
     llvm::Value *indices[] = {
-      IGF.IGM.getSize(Size(0)),                   // (*tupleType)
-      llvm::ConstantInt::get(IGF.IGM.Int32Ty, 3), //   .Elements
-      IGF.IGM.getSize(Size(index)),               //     [index]
-      llvm::ConstantInt::get(IGF.IGM.Int32Ty, 1)  //       .Offset
+        IGF.IGM.getSize(Size(0)),                   // (*tupleType)
+        llvm::ConstantInt::get(IGF.IGM.Int32Ty, 3), //   .Elements
+        index,                                      //     [index]
+        llvm::ConstantInt::get(IGF.IGM.Int32Ty, 1)  //       .Offset
     };
     auto slot = IGF.Builder.CreateInBoundsGEP(IGF.IGM.TupleTypeMetadataTy,
                                               asTuple, indices);
 
-    return IGF.Builder.CreateLoad(
-        slot, IGF.IGM.Int32Ty, IGF.IGM.getPointerAlignment(),
-        metadata->getName() + "." + Twine(index) + ".offset");
+    std::string name;
+    if (auto *constantIndex = dyn_cast<llvm::ConstantInt>(index))
+      name = (metadata->getName() + "." +
+              Twine(constantIndex->getValue().getLimitedValue()) + ".offset")
+                .str();
+    else
+      name = (metadata->getName() + ".dynamic.offset").str();
+
+    return IGF.Builder.CreateLoad(slot, IGF.IGM.Int32Ty,
+                                  IGF.IGM.getPointerAlignment(), name);
+  }
+
+  static llvm::Value *loadTupleOffsetFromMetadata(IRGenFunction &IGF,
+                                                  llvm::Value *metadata,
+                                                  unsigned index) {
+    return loadTupleOffsetFromMetadata(IGF, metadata,
+                                       IGF.IGM.getSize(Size(index)));
   }
 
   /// Adapter for tuple types.
@@ -146,8 +191,8 @@ namespace {
     }
 
     /// Return the statically-known offset of the given element.
-    Optional<Size> getFixedElementOffset(IRGenModule &IGM,
-                                         unsigned fieldNo) const {
+    std::optional<Size> getFixedElementOffset(IRGenModule &IGM,
+                                              unsigned fieldNo) const {
       const TupleFieldInfo &field = asImpl().getFields()[fieldNo];
       switch (field.getKind()) {
       case ElementLayout::Kind::Empty:
@@ -157,16 +202,16 @@ namespace {
       case ElementLayout::Kind::InitialNonFixedSize:
         return Size(0);
       case ElementLayout::Kind::NonFixed:
-        return None;
+        return std::nullopt;
       }
       llvm_unreachable("bad element layout kind");
     }
 
-    Optional<unsigned> getElementStructIndex(IRGenModule &IGM,
-                                             unsigned fieldNo) const {
+    std::optional<unsigned> getElementStructIndex(IRGenModule &IGM,
+                                                  unsigned fieldNo) const {
       const TupleFieldInfo &field = asImpl().getFields()[fieldNo];
       if (field.isEmpty())
-        return None;
+        return std::nullopt;
       return field.getStructIndex();
     }
 
@@ -212,14 +257,20 @@ namespace {
   public:
     // FIXME: Spare bits between tuple elements.
     LoadableTupleTypeInfo(ArrayRef<TupleFieldInfo> fields,
+                          FieldsAreABIAccessible_t areFieldsABIAccessible,
                           unsigned explosionSize,
                           llvm::Type *ty,
                           Size size, SpareBitVector &&spareBits,
-                          Alignment align, IsPOD_t isPOD,
-                          IsFixedSize_t alwaysFixedSize)
-      : TupleTypeInfoBase(fields, explosionSize,
-                          ty, size, std::move(spareBits), align, isPOD,
-                          alwaysFixedSize)
+                          Alignment align,
+                          IsTriviallyDestroyable_t isTriviallyDestroyable,
+                          IsCopyable_t isCopyable,
+                          IsFixedSize_t alwaysFixedSize,
+                          IsABIAccessible_t isABIAccessible)
+      : TupleTypeInfoBase(fields, explosionSize, areFieldsABIAccessible,
+                          ty, size, std::move(spareBits), align,
+                          isTriviallyDestroyable,
+                          isCopyable,
+                          alwaysFixedSize, isABIAccessible)
       {}
 
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
@@ -231,9 +282,11 @@ namespace {
       }
     }
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
-      if (!IGM.getOptions().ForceStructTypeLayouts) {
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
+      if (!useStructLayouts) {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
       if (getFields().empty()) {
@@ -244,19 +297,20 @@ namespace {
       for (auto &field : getFields()) {
         auto fieldTy = field.getType(IGM, T);
         fields.push_back(
-            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy));
+            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy, useStructLayouts));
       }
-      if (fields.size() == 1) {
-        return fields[0];
-      }
-      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1);
+      // if (fields.size() == 1) {
+      //   return fields[0];
+      // }
+      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(
+          fields, T, getBestKnownAlignment().getValue(), *this);
     }
 
-    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
-      return None;
+    std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF) const {
+      return std::nullopt;
     }
-    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
-      return None;
+    std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
+      return std::nullopt;
     }
   };
 
@@ -268,17 +322,25 @@ namespace {
   {
   public:
     // FIXME: Spare bits between tuple elements.
-    FixedTupleTypeInfo(ArrayRef<TupleFieldInfo> fields, llvm::Type *ty,
+    FixedTupleTypeInfo(ArrayRef<TupleFieldInfo> fields,
+                       FieldsAreABIAccessible_t areFieldsABIAccessible,
+                       llvm::Type *ty,
                        Size size, SpareBitVector &&spareBits, Alignment align,
-                       IsPOD_t isPOD, IsBitwiseTakable_t isBT,
-                       IsFixedSize_t alwaysFixedSize)
-      : TupleTypeInfoBase(fields, ty, size, std::move(spareBits), align,
-                          isPOD, isBT, alwaysFixedSize)
+                       IsTriviallyDestroyable_t isTriviallyDestroyable,
+                       IsBitwiseTakable_t isBT,
+                       IsCopyable_t isCopyable,
+                       IsFixedSize_t alwaysFixedSize,
+                       IsABIAccessible_t isABIAccessible)
+      : TupleTypeInfoBase(fields, areFieldsABIAccessible, ty, size, std::move(spareBits), align,
+                          isTriviallyDestroyable, isBT, isCopyable,
+                          alwaysFixedSize, isABIAccessible)
     {}
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
-      if (!IGM.getOptions().ForceStructTypeLayouts) {
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
+      if (!useStructLayouts) {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
       if (getFields().empty()) {
@@ -289,20 +351,21 @@ namespace {
       for (auto &field : getFields()) {
         auto fieldTy = field.getType(IGM, T);
         fields.push_back(
-            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy));
+            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy, useStructLayouts));
       }
-      if (fields.size() == 1) {
-        return fields[0];
-      }
+      // if (fields.size() == 1) {
+      //   return fields[0];
+      // }
 
-      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1);
+      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(
+          fields, T, getBestKnownAlignment().getValue(), *this);
     }
 
-    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
-      return None;
+    std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF) const {
+      return std::nullopt;
     }
-    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
-      return None;
+    std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
+      return std::nullopt;
     }
   };
 
@@ -332,19 +395,24 @@ namespace {
     NonFixedTupleTypeInfo(ArrayRef<TupleFieldInfo> fields,
                           FieldsAreABIAccessible_t fieldsABIAccessible,
                           llvm::Type *T,
-                          Alignment minAlign, IsPOD_t isPOD,
+                          Alignment minAlign, IsTriviallyDestroyable_t isTriviallyDestroyable,
                           IsBitwiseTakable_t isBT,
+                          IsCopyable_t isCopyable,
                           IsABIAccessible_t tupleAccessible)
       : TupleTypeInfoBase(fields, fieldsABIAccessible,
-                          T, minAlign, isPOD, isBT, tupleAccessible) {}
+                          T, minAlign, isTriviallyDestroyable, isBT, isCopyable,
+                          tupleAccessible) {
+      }
 
     TupleNonFixedOffsets getNonFixedOffsets(IRGenFunction &IGF,
                                             SILType T) const {
       return TupleNonFixedOffsets(T);
     }
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
       if (!areFieldsABIAccessible()) {
         return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
       }
@@ -353,18 +421,19 @@ namespace {
       for (auto &field : asImpl().getFields()) {
         auto fieldTy = field.getType(IGM, T);
         fields.push_back(
-            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy));
+            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy, useStructLayouts));
       }
 
       if (fields.empty()) {
         return IGM.typeLayoutCache.getEmptyEntry();
       }
 
-      if (fields.size() == 1) {
-        return fields[0];
-      }
+      // if (fields.size() == 1) {
+      //   return fields[0];
+      // }
 
-      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1);
+      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(
+          fields, T, getBestKnownAlignment().getValue(), *this);
     }
 
     llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
@@ -401,25 +470,35 @@ namespace {
       : RecordTypeBuilder(IGM), TheTuple(theTuple) {}
 
     FixedTupleTypeInfo *createFixed(ArrayRef<TupleFieldInfo> fields,
+                                    FieldsAreABIAccessible_t areFieldsABIAccessible,
                                     StructLayout &&layout) {
-      return FixedTupleTypeInfo::create(fields, layout.getType(),
+      IsABIAccessible_t isABIAccessible = IsABIAccessible_t(areFieldsABIAccessible);
+      return FixedTupleTypeInfo::create(fields, areFieldsABIAccessible,
+                                        layout.getType(),
                                         layout.getSize(),
                                         std::move(layout.getSpareBits()),
                                         layout.getAlignment(),
-                                        layout.isPOD(),
+                                        layout.isTriviallyDestroyable(),
                                         layout.isBitwiseTakable(),
-                                        layout.isAlwaysFixedSize());
+                                        layout.isCopyable(),
+                                        layout.isAlwaysFixedSize(),
+                                        isABIAccessible);
     }
 
     LoadableTupleTypeInfo *createLoadable(ArrayRef<TupleFieldInfo> fields,
+                                          FieldsAreABIAccessible_t areFieldsABIAccessible,
                                           StructLayout &&layout,
                                           unsigned explosionSize) {
-      return LoadableTupleTypeInfo::create(fields, explosionSize,
+      IsABIAccessible_t isABIAccessible = IsABIAccessible_t(areFieldsABIAccessible);
+      return LoadableTupleTypeInfo::create(fields, areFieldsABIAccessible,
+                                           explosionSize,
                                            layout.getType(), layout.getSize(),
                                            std::move(layout.getSpareBits()),
                                            layout.getAlignment(),
-                                           layout.isPOD(),
-                                           layout.isAlwaysFixedSize());
+                                           layout.isTriviallyDestroyable(),
+                                           layout.isCopyable(),
+                                           layout.isAlwaysFixedSize(),
+                                           isABIAccessible);
     }
 
     NonFixedTupleTypeInfo *createNonFixed(ArrayRef<TupleFieldInfo> fields,
@@ -430,8 +509,9 @@ namespace {
       return NonFixedTupleTypeInfo::create(fields, fieldsAccessible,
                                            layout.getType(),
                                            layout.getAlignment(),
-                                           layout.isPOD(),
+                                           layout.isTriviallyDestroyable(),
                                            layout.isBitwiseTakable(),
+                                           layout.isCopyable(),
                                            tupleAccessible);
     }
 
@@ -448,13 +528,25 @@ namespace {
     }
 
     StructLayout performLayout(ArrayRef<const TypeInfo *> fieldTypes) {
-      return StructLayout(IGM, /*decl=*/nullptr, LayoutKind::NonHeapObject,
+      return StructLayout(IGM, /*type=*/std::nullopt, LayoutKind::NonHeapObject,
                           LayoutStrategy::Universal, fieldTypes);
     }
   };
 } // end anonymous namespace
 
 const TypeInfo *TypeConverter::convertTupleType(TupleType *tuple) {
+  if (tuple->containsPackExpansionType()) {
+    auto *bitwiseCopyableProtocol =
+        IGM.getSwiftModule()->getASTContext().getProtocol(
+            KnownProtocolKind::BitwiseCopyable);
+    if (bitwiseCopyableProtocol && checkConformance(
+                                       tuple, bitwiseCopyableProtocol)) {
+      return BitwiseCopyableTypeInfo::create(IGM.OpaqueTy, IsABIAccessible);
+    }
+    // FIXME: Figure out if its copyable at least
+    return &getDynamicTupleTypeInfo(IsCopyable);
+  }
+
   TupleTypeBuilder builder(IGM, SILType::getPrimitiveAddressType(CanType(tuple)));
   return builder.layout(tuple->getElements());
 }
@@ -489,15 +581,147 @@ Address irgen::projectTupleElementAddress(IRGenFunction &IGF,
                  tupleType, fieldNo);
 }
 
-Optional<Size> irgen::getFixedTupleElementOffset(IRGenModule &IGM,
-                                                 SILType tupleType,
-                                                 unsigned fieldNo) {
+Address irgen::projectTupleElementAddressByDynamicIndex(IRGenFunction &IGF,
+                                                        Address tuple,
+                                                        SILType tupleType,
+                                                        llvm::Value *index,
+                                                        SILType elementType) {
+  auto *metadata = IGF.emitTypeMetadataRefForLayout(tupleType);
+
+
+  llvm::BasicBlock *trueBB = nullptr, *falseBB = nullptr, *restBB = nullptr;
+  llvm::BasicBlock *unwrappedBB = nullptr;
+  llvm::Value *unwrappedOffset = nullptr;
+
+  auto loweredTupleType = tupleType.castTo<TupleType>();
+  if (loweredTupleType->getNumScalarElements() <= 1) {
+    ConditionalDominanceScope scope(IGF);
+
+    // Test if the runtime length of the pack type is exactly 1.
+    CanPackType packType = loweredTupleType.getInducedPackType();
+    auto *shapeExpression = IGF.emitPackShapeExpression(packType);
+  
+    auto *one = llvm::ConstantInt::get(IGF.IGM.SizeTy, 1);
+    auto *isOne = IGF.Builder.CreateICmpEQ(shapeExpression, one);
+
+    trueBB = IGF.createBasicBlock("vanishing-tuple");
+    falseBB = IGF.createBasicBlock("actual-tuple");
+
+    IGF.Builder.CreateCondBr(isOne, trueBB, falseBB);
+
+    IGF.Builder.emitBlock(trueBB);
+
+    // If the length is 1, the offset is just zero.
+    unwrappedBB = IGF.Builder.GetInsertBlock();
+    unwrappedOffset = llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0);
+
+    restBB = IGF.createBasicBlock("tuple-rest");
+    IGF.Builder.CreateBr(restBB);
+
+    IGF.Builder.emitBlock(falseBB);
+  }
+
+  llvm::Value *tupleOffset = nullptr;
+  llvm::BasicBlock *tupleBB = nullptr;
+
+  {
+    ConditionalDominanceScope scope(IGF);
+    tupleOffset = loadTupleOffsetFromMetadata(IGF, metadata, index);
+
+    tupleBB = IGF.Builder.GetInsertBlock();
+  }
+
+  // Control flow join with the one-element case.
+  llvm::Value *result = nullptr;
+  if (unwrappedOffset != nullptr) {
+    IGF.Builder.CreateBr(restBB);
+    IGF.Builder.emitBlock(restBB);
+
+    auto *phi = IGF.Builder.CreatePHI(IGF.IGM.Int32Ty, 2);
+    phi->addIncoming(unwrappedOffset, unwrappedBB);
+    phi->addIncoming(tupleOffset, tupleBB);
+
+    result = phi;
+  } else {
+    result = tupleOffset;
+  }
+
+  auto *gep =
+      IGF.emitByteOffsetGEP(tuple.getAddress(), result, IGF.IGM.OpaqueTy);
+  auto elementAddress = Address(gep, IGF.IGM.OpaqueTy,
+                                IGF.IGM.getPointerAlignment());
+  return IGF.Builder.CreateElementBitCast(elementAddress,
+                                          IGF.IGM.getStorageType(elementType));
+}
+
+std::optional<Size> irgen::getFixedTupleElementOffset(IRGenModule &IGM,
+                                                      SILType tupleType,
+                                                      unsigned fieldNo) {
   // Macro happens to work with IGM, too.
   FOR_TUPLE_IMPL(IGM, tupleType, getFixedElementOffset, fieldNo);
 }
 
-Optional<unsigned> irgen::getPhysicalTupleElementStructIndex(IRGenModule &IGM,
-                                                             SILType tupleType,
-                                                             unsigned fieldNo) {
+std::optional<unsigned>
+irgen::getPhysicalTupleElementStructIndex(IRGenModule &IGM, SILType tupleType,
+                                          unsigned fieldNo) {
   FOR_TUPLE_IMPL(IGM, tupleType, getElementStructIndex, fieldNo);
+}
+
+/// Emit a string encoding the labels in the given tuple type.
+llvm::Constant *irgen::getTupleLabelsString(IRGenModule &IGM,
+                                            CanTupleType type) {
+  bool hasLabels = false;
+  llvm::SmallString<128> buffer;
+  for (auto &elt : type->getElements()) {
+    if (elt.hasName()) {
+      hasLabels = true;
+      Identifier name = elt.getName();
+      if (name.mustAlwaysBeEscaped()) {
+        Mangle::Mangler::appendRawIdentifierForRuntime(name.str(), buffer);
+      } else {
+        buffer.append(name.str());
+      }
+    }
+
+    // Each label is space-terminated.
+    buffer += ' ';
+  }
+
+  // If there are no labels, use a null pointer.
+  if (!hasLabels) {
+    return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+  }
+
+  // Otherwise, create a new string literal.
+  // This method implicitly adds a null terminator.
+  return IGM.getAddrOfGlobalString(buffer);
+}
+
+llvm::Value *irgen::emitTupleTypeMetadataLength(IRGenFunction &IGF,
+                                                llvm::Value *metadata) {
+  llvm::Value *indices[] = {
+      IGF.IGM.getSize(Size(0)),                   // (*tupleType)
+      llvm::ConstantInt::get(IGF.IGM.Int32Ty, 1)  //   .NumElements
+  };
+  auto slot = IGF.Builder.CreateInBoundsGEP(IGF.IGM.TupleTypeMetadataTy,
+                                            metadata, indices);
+
+  return IGF.Builder.CreateLoad(slot, IGF.IGM.SizeTy,
+                                IGF.IGM.getPointerAlignment());
+}
+
+llvm::Value *irgen::emitTupleTypeMetadataElementType(IRGenFunction &IGF,
+                                                     llvm::Value *metadata,
+                                                     llvm::Value *index) {
+  llvm::Value *indices[] = {
+      IGF.IGM.getSize(Size(0)),                   // (*tupleType)
+      llvm::ConstantInt::get(IGF.IGM.Int32Ty, 3), //   .Elements
+      index,                                      //     [index]
+      llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0)  //       .Metadata
+  };
+  auto slot = IGF.Builder.CreateInBoundsGEP(IGF.IGM.TupleTypeMetadataTy,
+                                            metadata, indices);
+
+  return IGF.Builder.CreateLoad(slot, IGF.IGM.SizeTy,
+                                IGF.IGM.getPointerAlignment());
 }

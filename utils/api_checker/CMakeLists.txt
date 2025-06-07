@@ -16,14 +16,9 @@ set(SWIFTLIB_DIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/lib/swift")
 set(dest "${SWIFTLIB_DIR}/${framework}")
 set(source "${CMAKE_CURRENT_SOURCE_DIR}/${framework}")
 
-if(CMAKE_SYSTEM_NAME STREQUAL Windows)
-    set(CMAKE_SYMLINK_COMMAND copy)
-else()
-    set(CMAKE_SYMLINK_COMMAND create_symlink)
-endif()
 add_custom_command(OUTPUT "${dest}"
                    DEPENDS "${source}"
-                   COMMAND "${CMAKE_COMMAND}" "-E" "${CMAKE_SYMLINK_COMMAND}" "${source}" "${dest}"
+                   COMMAND "${CMAKE_COMMAND}" "-E" "${SWIFT_COPY_OR_SYMLINK}" "${source}" "${dest}"
                    COMMENT "Symlinking ABI checker baseline data to ${dest}")
 add_custom_target("symlink_abi_checker_data" ALL
                   DEPENDS "${dest}"

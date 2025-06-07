@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -O -I %t -emit-sil -emit-verbose-sil -o - \
+// RUN: %target-swift-frontend %s -O -I %t -Xllvm -sil-print-types -emit-sil -emit-verbose-sil -o - \
 // RUN:    | %FileCheck %s --check-prefix=CHECK-SIL
 // RUN: %target-swift-frontend %s -O -I %t -emit-ir -g -o - | %FileCheck %s
 
@@ -33,19 +33,18 @@ public func f(_ i : Int) -> Int { // 301
 
 // CHECK: define {{.*}}@"$s9inlinedAt1fyS2iF"({{.*}})
 // CHECK-NOT: ret
-// CHECK: @llvm.dbg.value
-// CHECK: @llvm.dbg.value
-// CHECK: @llvm.dbg.value({{.*}}), !dbg ![[L1:.*]]
+// CHECK: #dbg_value
+// CHECK: #dbg_value
+// CHECK: #dbg_value({{.*}}), ![[L1:.*]])
 
 // CHECK: ![[F:.*]] = distinct !DISubprogram(name: "f",
 // CHECK: ![[G:.*]] = distinct !DISubprogram(name: "g",
 
-// CHECK: ![[L3:.*]] = !DILocation(line: 302, column: 10,
-// CHECK-SAME:                     scope: ![[F:.*]])
-// CHECK: ![[G1:[0-9]+]] = distinct !DILexicalBlock(scope: ![[G]],
+// CHECK: ![[L3:.*]] = distinct !DILocation(line: 302, column: 10,
+// CHECK-SAME:                              scope: ![[F:.*]])
 // CHECK: ![[H:.*]] = distinct !DISubprogram(name: "h",
 // CHECK: ![[L1]] = !DILocation(line: 101, column: 8, scope: ![[H]],
 // CHECK-SAME:                  inlinedAt: ![[L2:.*]])
-// CHECK: ![[L2]] = !DILocation(line: 203, column: 10, scope: ![[G1]],
-// CHECK-SAME:                  inlinedAt: ![[L3]])
+// CHECK: ![[L2]] = distinct !DILocation(line: 203, column: 10, scope: ![[G]],
+// CHECK-SAME:                           inlinedAt: ![[L3]])
 

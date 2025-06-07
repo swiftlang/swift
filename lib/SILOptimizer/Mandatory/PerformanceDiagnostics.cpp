@@ -26,6 +26,41 @@ using namespace swift;
 
 namespace {
 
+class PrettyStackTracePerformanceDiagnostics
+  : public llvm::PrettyStackTraceEntry {
+  const SILNode *node;
+  const char *action;
+
+public:
+  PrettyStackTracePerformanceDiagnostics(const char *action, SILNodePointer node)
+    : node(node), action(action) {}
+
+  virtual void print(llvm::raw_ostream &OS) const override {
+    OS << "While " << action << " -- visiting node ";
+    node->print(OS);
+    
+    if (auto inst = dyn_cast<SILInstruction>(node)) {
+      OS << "While visiting instruction in function ";
+      inst->getFunction()->print(OS);
+    }
+  }
+};
+
+class PrettyStackTraceSILGlobal
+  : public llvm::PrettyStackTraceEntry {
+  const SILGlobalVariable *node;
+  const char *action;
+
+public:
+    PrettyStackTraceSILGlobal(const char *action, SILGlobalVariable *node)
+    : node(node), action(action) {}
+
+  virtual void print(llvm::raw_ostream &OS) const override {
+    OS << "While " << action << " -- visiting node ";
+    node->print(OS);
+  }
+};
+
 /// Issues performance diagnostics for functions which are annotated with
 /// performance annotations, like @_noLocks, @_noAllocation.
 ///
@@ -122,15 +157,22 @@ bool PerformanceDiagnostics::visitFunction(SILFunction *function,
   if (!function->isDefinition())
     return false;
 
-  ReachingReturnBlocks rrBlocks(function);
-  NonErrorHandlingBlocks neBlocks(function);
-                                       
   for (SILBasicBlock &block : *function) {
-    if (!rrBlocks.reachesReturn(&block) || !neBlocks.isNonErrorHandling(&block))
+    // Exclude fatal-error blocks.
+    if (isa<UnreachableInst>(block.getTerminator()))
       continue;
+
     for (SILInstruction &inst : block) {
-      if (visitInst(&inst, perfConstr, parentLoc))
+      if (visitInst(&inst, perfConstr, parentLoc)) {
+        if (inst.getLoc().getSourceLoc().isInvalid()) {
+          auto demangledName = Demangle::demangleSymbolAsString(
+              inst.getFunction()->getName(),
+              Demangle::DemangleOptions::SimplifiedUIDemangleOptions());
+          llvm::errs() << "in function " << demangledName << "\n";
+        }
+        LLVM_DEBUG(llvm::dbgs() << inst << *inst.getFunction());
         return true;
+      }
 
       if (auto as = FullApplySite::isa(&inst)) {
         if (isEffectFreeArraySemanticCall(&inst))
@@ -156,6 +198,9 @@ bool PerformanceDiagnostics::visitFunction(SILFunction *function,
         if (visitCallee(&inst, bca->getCalleeList(as), perfConstr, parentLoc))
           return true;
       } else if (auto *bi = dyn_cast<BuiltinInst>(&inst)) {
+        PrettyStackTracePerformanceDiagnostics stackTrace(
+            "visitFunction::BuiltinInst (once, once with context)", &inst);
+
         switch (bi->getBuiltinInfo().ID) {
           case BuiltinValueKind::Once:
           case BuiltinValueKind::OnceWithContext:
@@ -215,11 +260,22 @@ bool PerformanceDiagnostics::checkClosureValue(SILValue closure,
       closure = pai->getCallee();
     } else if (auto *tfi = dyn_cast<ThinToThickFunctionInst>(closure)) {
       closure = tfi->getOperand();
+    } else if (auto *cp = dyn_cast<CopyValueInst>(closure)) {
+      closure = cp->getOperand();
+    } else if (auto *bb = dyn_cast<BeginBorrowInst>(closure)) {
+      closure = bb->getOperand();
+    } else if (auto *cv = dyn_cast<ConvertFunctionInst>(closure)) {
+      closure = cv->getOperand();
+    } else if (auto *md = dyn_cast<MarkDependenceInst>(closure)) {
+      closure = md->getValue();
     } else if (acceptFunctionArgs && isa<SILFunctionArgument>(closure)) {
       // We can assume that a function closure argument is already checked at
       // the call site.
       return false;
     } else {
+      PrettyStackTracePerformanceDiagnostics stackTrace(
+          "validating closure (function ref, callee) - unknown callee", callInst);
+
       diagnose(LocWithParent(callInst->getLoc().getSourceLoc(), parentLoc), diag::performance_unknown_callees);
       return true;
     }
@@ -243,6 +299,8 @@ bool PerformanceDiagnostics::visitCallee(SILInstruction *callInst,
     loc = parentLoc;
 
   if (callees.isIncomplete()) {
+    PrettyStackTracePerformanceDiagnostics stackTrace("incomplete", callInst);
+
     diagnose(*loc, diag::performance_unknown_callees);
     return true;
   }
@@ -257,6 +315,8 @@ bool PerformanceDiagnostics::visitCallee(SILInstruction *callInst,
       return false;
 
     if (!callee->isDefinition()) {
+      PrettyStackTracePerformanceDiagnostics stackTrace("incomplete", callInst);
+
       diagnose(*loc, diag::performance_callee_unavailable);
       return true;
     }
@@ -289,6 +349,15 @@ static bool metatypeUsesAreNotRelevant(MetatypeInst *mt) {
           break;
       }
     }
+    if (auto *apply = dyn_cast<ApplyInst>(use->getUser())) {
+      if (auto *callee = apply->getReferencedFunctionOrNull()) {
+        // Exclude `Swift._diagnoseUnexpectedEnumCaseValue<A, B>(type: A.Type, rawValue: B) -> Swift.Never`
+        // It's a fatal error function, used for imported C enums.
+        if (callee->getName() == "$ss32_diagnoseUnexpectedEnumCaseValue4type03rawE0s5NeverOxm_q_tr0_lF") {
+          continue;
+        }
+      }
+    }
     return false;
   }
   return true;
@@ -300,10 +369,40 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
   SILType impactType;
   RuntimeEffect impact = getRuntimeEffect(inst, impactType);
   LocWithParent loc(inst->getLoc().getSourceLoc(), parentLoc);
-  
+
+  if (perfConstr == PerformanceConstraints::NoExistentials &&
+      ((impact & RuntimeEffect::Existential) ||
+       (impact & RuntimeEffect::ExistentialClassBound))) {
+    PrettyStackTracePerformanceDiagnostics stackTrace("existential", inst);
+    if (impactType) {
+      diagnose(loc, diag::perf_diag_existential_type, impactType.getASTType());
+    } else {
+      diagnose(loc, diag::perf_diag_existential);
+    }
+    return true;
+  }
+
+  if ((perfConstr == PerformanceConstraints::NoObjCBridging ||
+       perfConstr == PerformanceConstraints::NoAllocation ||
+       perfConstr == PerformanceConstraints::NoLocks) &&
+      (impact & RuntimeEffect::ObjectiveC)) {
+    PrettyStackTracePerformanceDiagnostics stackTrace(
+        "found objc effect", inst);
+
+    diagnose(loc, diag::performance_objectivec);
+    return true;
+  }
+
+  if (perfConstr == PerformanceConstraints::None ||
+      perfConstr == PerformanceConstraints::NoExistentials ||
+      perfConstr == PerformanceConstraints::NoObjCBridging)
+    return false;
+
   if (impact & RuntimeEffect::Casting) {
     // TODO: be more specific on casting.
     // E.g. distinguish locking and allocating dynamic casts, etc.
+    PrettyStackTracePerformanceDiagnostics stackTrace("bad cast", inst);
+
     diagnose(loc, diag::performance_dynamic_casting);
     return true;
   }
@@ -313,14 +412,21 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
   
     // Try to give a good error message by looking which type of code it is.
     switch (inst->getKind()) {
-    case SILInstructionKind::KeyPathInst:
+    case SILInstructionKind::KeyPathInst: {
+      PrettyStackTracePerformanceDiagnostics stackTrace("key path", inst);
       diagnose(loc, diag::performance_metadata, "using KeyPath");
       break;
+    }
     case SILInstructionKind::AllocGlobalInst:
-    case SILInstructionKind::GlobalValueInst:
+    case SILInstructionKind::GlobalValueInst: {
+      PrettyStackTracePerformanceDiagnostics stackTrace(
+            "AllocGlobalInst | GlobalValueInst", inst);
       diagnose(loc, diag::performance_metadata, "global or static variables");
       break;
+    }
     case SILInstructionKind::PartialApplyInst: {
+      PrettyStackTracePerformanceDiagnostics stackTrace(
+          "PartialApplyInst", inst);
       diagnose(loc, diag::performance_metadata,
                "generic closures or local functions");
       break;
@@ -328,27 +434,40 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
     case SILInstructionKind::ApplyInst:
     case SILInstructionKind::TryApplyInst:
     case SILInstructionKind::BeginApplyInst: {
+      PrettyStackTracePerformanceDiagnostics stackTrace(
+          "ApplyInst | TryApplyInst | BeginApplyInst", inst);
       diagnose(loc, diag::performance_metadata, "generic function calls");
       break;
     }
     case SILInstructionKind::MetatypeInst:
       if (metatypeUsesAreNotRelevant(cast<MetatypeInst>(inst)))
-        break;
+        return false;
       LLVM_FALLTHROUGH;
     default:
       // We didn't recognize the instruction, so try to give an error message
       // based on the involved type.
       if (impactType) {
+        PrettyStackTracePerformanceDiagnostics stackTrace(
+            "impactType (unrecognized instruction)", inst);
         diagnose(loc, diag::performance_metadata_type, impactType.getASTType());
         break;
       }
       // The default error message.
+      PrettyStackTracePerformanceDiagnostics stackTrace(
+          "default error (fallthrough, unknown inst)", inst);
       diagnose(loc, diag::performance_metadata, "this code pattern");
       break;
     }
     return true;
   }
+  
+  if (perfConstr == PerformanceConstraints::NoRuntime)
+    return false;
+  
   if (impact & RuntimeEffect::Allocating) {
+    PrettyStackTracePerformanceDiagnostics stackTrace(
+        "found allocation effect", inst);
+
     switch (inst->getKind()) {
     case SILInstructionKind::BeginApplyInst:
       // Not all begin_applys necessarily allocate. But it's difficult to
@@ -369,6 +488,9 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
     return true;
   }
   if (impact & RuntimeEffect::Deallocating) {
+    PrettyStackTracePerformanceDiagnostics stackTrace(
+        "found deallocation effect", inst);
+
     if (impactType) {
       switch (inst->getKind()) {
       case SILInstructionKind::StoreInst:
@@ -388,15 +510,14 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
     diagnose(loc, diag::performance_deallocating, "this code pattern");
     return true;
   }
-  if (impact & RuntimeEffect::ObjectiveC) {
-    diagnose(loc, diag::performance_objectivec);
-    return true;
-  }
 
   if (perfConstr == PerformanceConstraints::NoAllocation)
     return false;
 
   // Handle locking-only effects.
+  
+  PrettyStackTracePerformanceDiagnostics stackTrace(
+      "found locking or ref counting effect", inst);
 
   if (impact & RuntimeEffect::Locking) {
     if (inst->getFunction()->isGlobalInit()) {
@@ -441,7 +562,7 @@ void PerformanceDiagnostics::checkNonAnnotatedFunction(SILFunction *function) {
   }
 }
 
-void PerformanceDiagnostics::diagnose(LocWithParent loc, Diagnostic &&D) {
+void PerformanceDiagnostics::diagnose(LocWithParent loc, Diagnostic &&D) {  
   // Start with a valid location in the call tree.
   LocWithParent *validLoc = &loc;
   while (!validLoc->loc.isValid() && validLoc->parent) {
@@ -473,7 +594,36 @@ private:
   void run() override {
     SILModule *module = getModule();
 
+    // Skip all performance diagnostics if asked. This is used from
+    // SourceKit to avoid reporting false positives when WMO is turned off for
+    // indexing purposes.
+    if (!module->getOptions().EnableWMORequiredDiagnostics) return;
+
     PerformanceDiagnostics diagnoser(*module, getAnalysis<BasicCalleeAnalysis>());
+
+    // Check that @_section, @_silgen_name is only on constant globals
+    for (SILGlobalVariable &g : module->getSILGlobals()) {
+      if (!g.getStaticInitializerValue() && g.mustBeInitializedStatically()) {
+        PrettyStackTraceSILGlobal stackTrace(
+            "global inst", &g);
+
+        auto *decl = g.getDecl();
+        if (g.getSectionAttr()) {
+          module->getASTContext().Diags.diagnose(
+            g.getDecl()->getLoc(), diag::bad_attr_on_non_const_global,
+            "@_section");
+        } else if (decl && g.isDefinition() &&
+                   decl->getAttrs().hasAttribute<SILGenNameAttr>()) {
+          module->getASTContext().Diags.diagnose(
+            g.getDecl()->getLoc(), diag::bad_attr_on_non_const_global,
+            "@_silgen_name");
+        } else {
+          module->getASTContext().Diags.diagnose(
+            g.getDecl()->getLoc(), diag::global_must_be_compile_time_const);
+        }
+      }
+    }
+
     bool annotatedFunctionsFound = false;
 
     for (SILFunction &function : *module) {
@@ -483,13 +633,6 @@ private:
         // Don't rerun diagnostics on deserialized functions.
         if (function.wasDeserializedCanonical())
           continue;
-
-        if (!module->getOptions().EnablePerformanceAnnotations) {
-          module->getASTContext().Diags.diagnose(
-            function.getLocation().getSourceLoc(),
-            diag::performance_annotations_not_enabled);
-          return;
-        }
 
         diagnoser.visitFunction(&function, function.getPerfConstraints());
       }

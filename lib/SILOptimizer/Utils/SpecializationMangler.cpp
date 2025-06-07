@@ -14,6 +14,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/MD5Stream.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/SILGlobalVariable.h"
@@ -37,10 +38,9 @@ std::string PartialSpecializationMangler::mangle() {
 //                      Function Signature Optimizations
 //===----------------------------------------------------------------------===//
 
-FunctionSignatureSpecializationMangler::
-FunctionSignatureSpecializationMangler(Demangle::SpecializationPass P,
-                                       IsSerialized_t Serialized, SILFunction *F)
-  : SpecializationMangler(P, Serialized, F) {
+FunctionSignatureSpecializationMangler::FunctionSignatureSpecializationMangler(ASTContext &Ctx,
+    Demangle::SpecializationPass P, SerializedKind_t Serialized, SILFunction *F)
+    : SpecializationMangler(Ctx, P, Serialized, F) {
   for (unsigned i = 0, e = F->getConventions().getNumSILArguments(); i != e;
        ++i) {
     (void)i;
@@ -124,6 +124,13 @@ setReturnValueOwnedToUnowned() {
 }
 
 void
+FunctionSignatureSpecializationMangler::
+setRemovedEffect(EffectKind effect) {
+  assert(effect == EffectKind::Async && "unimplemented effect kind!");
+  RemovedEffects |= effect;
+}
+
+void
 FunctionSignatureSpecializationMangler::mangleConstantProp(SILInstruction *constInst) {
   // Append the prefix for constant propagation 'p'.
   ArgOpBuffer << 'p';
@@ -173,6 +180,7 @@ FunctionSignatureSpecializationMangler::mangleConstantProp(SILInstruction *const
     switch (SLI->getEncoding()) {
       case StringLiteralInst::Encoding::Bytes: ArgOpBuffer << 'B'; break;
       case StringLiteralInst::Encoding::UTF8: ArgOpBuffer << 'b'; break;
+      case StringLiteralInst::Encoding::UTF8_OSLOG: ArgOpBuffer << 'o'; break;
       case StringLiteralInst::Encoding::ObjCSelector: ArgOpBuffer << 'c'; break;
     }
     break;

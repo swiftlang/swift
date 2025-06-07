@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/ScopedAddressUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
@@ -90,7 +91,7 @@ bool PartialApplyCombiner::copyArgsToTemporaries(
   if (argsToHandle.empty() && storeBorrowsToHandle.empty()) {
     return true;
   }
-  // Also include all destroys in the liferange for the arguments.
+  // Also include all destroys in the liverange for the arguments.
   // This is needed for later processing in tryDeleteDeadClosure: in case the
   // pai gets dead after this optimization, tryDeleteDeadClosure relies on
   // that we already copied the pai arguments to extend their lifetimes until
@@ -98,7 +99,7 @@ bool PartialApplyCombiner::copyArgsToTemporaries(
   collectDestroys(pai, paiUses);
 
   ValueLifetimeAnalysis vla(pai,
-                            llvm::makeArrayRef(paiUses.begin(), paiUses.end()));
+                            llvm::ArrayRef(paiUses.begin(), paiUses.end()));
   ValueLifetimeAnalysis::Frontier partialApplyFrontier;
 
   // Computing the frontier may fail if the frontier is located on a critical
@@ -106,6 +107,14 @@ bool PartialApplyCombiner::copyArgsToTemporaries(
   if (!vla.computeFrontier(partialApplyFrontier,
                            ValueLifetimeAnalysis::DontModifyCFG)) {
     return false;
+  }
+
+  // We must not introduce copies for move only types.
+  // TODO: in OSSA, instead of bailing, it's possible to keep the arguments
+  //       alive without the need of copies.
+  for (Operand *argOp : argsToHandle) {
+    if (argOp->get()->getType().isMoveOnly())
+      return false;
   }
 
   for (Operand *argOp : argsToHandle) {
@@ -173,7 +182,7 @@ void PartialApplyCombiner::processSingleApply(FullApplySite paiAI) {
       arg = argToTmpCopy.lookup(arg);
 
     if (paramInfo[paramInfo.size() - partialApplyArgs.size() + i]
-            .isConsumed()) {
+            .isConsumedInCaller()) {
       // Copy the argument as the callee may consume it.
       if (arg->getType().isAddress()) {
         auto *ASI = builder.createAllocStack(pai->getLoc(), arg->getType());
@@ -198,6 +207,10 @@ void PartialApplyCombiner::processSingleApply(FullApplySite paiAI) {
     builder.createTryApply(paiAI.getLoc(), callee, subs, argList,
                            tai->getNormalBB(), tai->getErrorBB(),
                            tai->getApplyOptions());
+  } else if (auto *bai = dyn_cast<BeginApplyInst>(paiAI)) {
+    auto *newBAI = builder.createBeginApply(paiAI.getLoc(), callee, subs,
+                                            argList, bai->getApplyOptions());
+    callbacks.replaceAllInstUsesPairwiseWith(bai, newBAI);
   } else {
     auto *apply = cast<ApplyInst>(paiAI);
     auto *newAI = builder.createApply(paiAI.getLoc(), callee, subs, argList,
@@ -239,10 +252,11 @@ bool PartialApplyCombiner::combine() {
     auto *use = worklist.pop_back_val();
     auto *user = use->getUser();
 
-    // Recurse through copy_value
-    if (isa<CopyValueInst>(user) || isa<BeginBorrowInst>(user)) {
-      for (auto *copyUse : cast<SingleValueInstruction>(user)->getUses())
-        worklist.push_back(copyUse);
+    // Recurse through ownership instructions.
+    if (isa<CopyValueInst>(user) || isa<BeginBorrowInst>(user) ||
+        isa<MoveValueInst>(user)) {
+      for (auto *ownershipUse : cast<SingleValueInstruction>(user)->getUses())
+        worklist.push_back(ownershipUse);
       continue;
     }
 

@@ -1,4 +1,6 @@
-// RUN: %target-sil-opt -unit-test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -update-borrowed-from -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 
@@ -20,7 +22,7 @@ struct PairC {
   var second: C
 }
 
-// CHECK-LABEL: testSelfLoop: ssa-liveness
+// CHECK-LABEL: testSelfLoop: ssa_liveness
 // CHECK: SSA lifetime analysis:   [[V:%.*]] = copy_value %0 : $C
 // CHECK: bb1: LiveOut
 // CHECK: bb2: LiveWithin
@@ -34,7 +36,7 @@ bb0(%0 : @guaranteed $C):
 bb1(%1 : @owned $C):
   destroy_value %1 : $C
   %2 = copy_value %0 : $C
-  test_specification "ssa-liveness @trace[0]"
+  specify_test "ssa_liveness @trace[0]"
   debug_value [trace] %2 : $C
   br bb2
 
@@ -46,7 +48,7 @@ bb3:
   return %99 : $()
 }
 
-// CHECK-LABEL: testSelfKill: ssa-liveness
+// CHECK-LABEL: testSelfKill: ssa_liveness
 // CHECK:SSA lifetime analysis:   [[V:%.*]] = move_value %1 : $C
 // CHECK: bb1: LiveOut
 // CHECK: bb2: LiveWithin
@@ -59,7 +61,7 @@ bb0:
 
 bb1(%1 : @owned $C):
   %2 = move_value %1 : $C
-  test_specification "ssa-liveness @trace[0]"
+  specify_test "ssa_liveness @trace[0]"
   debug_value [trace] %2 : $C
   br bb2
 
@@ -77,10 +79,10 @@ bb3:
 //
 // This live range is not dominated by the original borrow.
 //
-// CHECK-LABEL: testReborrow: multidef-liveness
+// CHECK-LABEL: testReborrow: multidef_liveness
 // CHECK: MultiDef lifetime analysis:
-// CHECK:   def:   [[B:%.*]] = begin_borrow %0 : $C
-// CHECK:   def:   [[RB:%.*]] = argument of bb3 : $C
+// CHECK:   def value:   [[B:%.*]] = begin_borrow %0 : $C
+// CHECK:   def value:   [[RB:%.*]] = borrowed {{.*}} from (%0 : $C)
 // CHECK-NEXT: bb2: LiveWithin
 // CHECK-NEXT: bb3: LiveWithin
 // CHECK-NEXT: lifetime-ending user:   br bb3([[B]] : $C)
@@ -97,7 +99,7 @@ bb1:
 
 bb2:
   %borrow2 = begin_borrow %0 : $C
-  test_specification "multidef-liveness @trace[0] @trace[1]"
+  specify_test "multidef_liveness @trace[0] @trace[1]"
   debug_value [trace] %borrow2 : $C
   br bb3(%borrow2 : $C)
 
@@ -112,7 +114,7 @@ bb4:
   return %99 : $()
 }
 
-// CHECK-LABEL: testGuaranteedForwarding: ssa-liveness
+// CHECK-LABEL: testGuaranteedForwarding: ssa_liveness
 // CHECK: SSA lifetime analysis:   [[C:%.*]] = unchecked_ref_cast %{{.*}} : $D to $C
 // CHECK: bb0: LiveWithin
 // CHECK: regular user: %{{.*}} = load [copy]
@@ -121,7 +123,7 @@ sil [ossa] @testGuaranteedForwarding : $@convention(thin) (@owned D) -> () {
 bb0(%0 : @owned $D):
   %borrow0 = begin_borrow %0 : $D
   %c = unchecked_ref_cast %borrow0 : $D to $C
-  test_specification "ssa-liveness @trace[0]"
+  specify_test "ssa_liveness @trace[0]"
   debug_value [trace] %c : $C
   %d = unchecked_ref_cast %c : $C to $D
   %f = ref_element_addr %d : $D, #D.object
@@ -133,28 +135,28 @@ bb0(%0 : @owned $D):
   return %99 : $()
 }
 
-// CHECK-LABEL: testGuaranteedResult: ssa-liveness
+// CHECK-LABEL: testGuaranteedResult: ssa_liveness
 // CHECK: SSA lifetime analysis: %0 = argument of bb0 : $D
 // CHECK: bb0: LiveWithin
-// CHECK: last user:   end_apply
+// CHECK: last user: %{{.*}} = end_apply
 sil [ossa] @testGuaranteedResult : $@convention(thin) (@guaranteed D) -> () {
 bb0(%0 : @guaranteed $D):
-  test_specification "ssa-liveness @argument[0]"
+  specify_test "ssa_liveness @argument[0]"
   %2 = class_method %0 : $D, #D.borrowed!read : (D) -> () -> (), $@yield_once @convention(method) (@guaranteed D) -> @yields @guaranteed C
   (%3, %4) = begin_apply %2(%0) : $@yield_once @convention(method) (@guaranteed D) -> @yields @guaranteed C
-  end_apply %4
+  end_apply %4 as $()
   %99 = tuple()
   return %99 : $()
 }
 
-// CHECK-LABEL: testScopedAddress: ssa-liveness
+// CHECK-LABEL: testScopedAddress: ssa_liveness
 // CHECK: SSA lifetime analysis: %{{.*}} = ref_element_addr %0
 // CHECK: bb0: LiveWithin
 // CHECK: last user: end_access
 sil [ossa] @testScopedAddress : $@convention(thin) (@guaranteed D) -> () {
 bb0(%0 : @guaranteed $D):
   %f = ref_element_addr %0 : $D, #D.object
-  test_specification "ssa-liveness @trace[0]"
+  specify_test "ssa_liveness @trace[0]"
   debug_value [trace] %f : $*C
   %access = begin_access [read] [static] %f : $*C
   %o = load [copy] %access : $*C
@@ -164,13 +166,13 @@ bb0(%0 : @guaranteed $D):
   return %99 : $()
 }
 
-// CHECK-LABEL: testDeadAddress: ssa-liveness
+// CHECK-LABEL: testDeadAddress: ssa_liveness
 // CHECK: SSA lifetime analysis: %0 = argument of bb0 : $D
 // CHECK: bb0: LiveWithin
 // CHECK: last user: %{{.*}} = ref_element_addr
 sil [ossa] @testDeadAddress : $@convention(thin) (@guaranteed D) -> () {
 bb0(%0 : @guaranteed $D):
-  test_specification "ssa-liveness @argument[0]"
+  specify_test "ssa_liveness @argument[0]"
   %f = ref_element_addr %0 : $D, #D.object
   %99 = tuple()
   return %99 : $()
@@ -178,17 +180,17 @@ bb0(%0 : @guaranteed $D):
 
 // A LiveOut block with a non-SSA def, bb0, has no liveness boundary.
 //
-// CHECK-LABEL: testMultiDefLiveOutNoBoundary: multidef-liveness
+// CHECK-LABEL: testMultiDefLiveOutNoBoundary: multidef_liveness
 // CHECK: MultiDef lifetime analysis:
-// CHECK:   def: [[CP0:%.*]] = copy_value %0 : $C
-// CHECK:   def: %{{.*}} = copy_value %0 : $C
-// CHECK:   def: %{{.*}} = move_value [[CP0]] : $C
-// CHECK:   def: %{{.*}} = argument of bb4 : $C
-// CHECK-NEXT: bb0: LiveOut,
-// CHECK-NEXT: bb2: LiveWithin,
-// CHECK-NEXT: bb3: LiveWithin,
-// CHECK-NEXT: bb4: LiveWithin,
-// CHECK-NEXT: bb1: LiveWithin,
+// CHECK:   def value: [[CP0:%.*]] = copy_value %0 : $C
+// CHECK:   def value: %{{.*}} = copy_value %0 : $C
+// CHECK:   def value: %{{.*}} = move_value [[CP0]] : $C
+// CHECK:   def value: %{{.*}} = argument of bb4 : $C
+// CHECK-NEXT: bb0: LiveOut
+// CHECK-NEXT: bb2: LiveWithin
+// CHECK-NEXT: bb3: LiveWithin
+// CHECK-NEXT: bb4: LiveWithin
+// CHECK-NEXT: bb1: LiveWithin
 // CHECK: last user:   br bb4
 // CHECK-NEXT: last user:   br bb4
 // CHECK-NEXT: last user:   %{{.*}} = move_value [[CP0]] : $C
@@ -197,7 +199,7 @@ bb0(%0 : @guaranteed $D):
 sil [ossa] @testMultiDefLiveOutNoBoundary : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
   %copy0 = copy_value %0 : $C
-  test_specification "multidef-liveness @trace[0] @trace[1] @trace[2] @trace[3]"
+  specify_test "multidef_liveness @trace[0] @trace[1] @trace[2] @trace[3]"
   debug_value [trace] %copy0 : $C
   cond_br undef, bb1, bb3
 
@@ -222,23 +224,17 @@ bb4(%phi : @owned $C):
   return %99 : $()
 }
 
-// A dead (ref_element_addr) projection is treated like a pointer
-// escape for convenience. Make sure the pointer escape bubbles up
-// through the phi and casts.
-//
-// CHECK-LABEL: testSSADeadRefElementAddr: ssa-liveness
+// CHECK-LABEL: testSSADeadRefElementAddr: ssa_liveness
 // CHECK: SSA lifetime analysis: %0 = argument of bb0 : $C
-// CHECK-NEXT: Incomplete liveness: Escaping address
-// CHECK-NEXT: bb0: LiveOut,
-// CHECK-NEXT: bb2: LiveOut,
-// CHECK-NEXT: bb3: LiveWithin,
-// CHECK-NEXT: bb1: LiveOut,
-// CHECK: last user:
-// CHECK-SAME: ref_element_addr %6 : $D, #D.object
-// CHECK-NEXT-LABEL: end running test 1 of 1 on testSSADeadRefElementAddr: ssa-liveness
+// CHECK-NEXT: bb0: LiveOut
+// CHECK-NEXT: bb3: LiveWithin
+// CHECK-NEXT: bb2: LiveOut
+// CHECK-NEXT: bb1: LiveOut
+// CHECK: ref_element_addr %7 : $D, #D.object
+// CHECK: end running test 1 of 1 on testSSADeadRefElementAddr: ssa_liveness
 sil [ossa] @testSSADeadRefElementAddr : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
-  test_specification "ssa-liveness @argument[0]"
+  specify_test "ssa_liveness @argument[0]"
   cond_br undef, bb1, bb2
 
 bb1:
@@ -257,14 +253,18 @@ bb3(%phi : @guaranteed $D):
 
 // One of the uses is a reborrowed inner borrow scope.
 //
-// CHECK-LABEL: testSSAInnerReborrowedPhi: ssa-liveness
+// CHECK-LABEL: testSSAInnerReborrowedPhi: ssa_liveness
 // CHECK: SSA lifetime analysis: %0 = argument of bb0 : $C
 // CHECK-NEXT: Incomplete liveness: Reborrowed inner scope
-// CHECK-NEXT: bb0: LiveWithin,
-// CHECK-NEXT: dead def: %0 = argument of bb0 : $C
+// CHECK-NEXT: bb0: LiveOut
+// CHECK-NEXT: bb1: LiveWithin
+// CHECK-NEXT: regular user:   end_borrow %{{.*}} : $C
+// CHECK-NEXT: regular user:   br bb1(%{{.*}} : $C, %{{.*}} : $PairC)
+// CHECK-NEXT: last user:   end_borrow %{{.*}} : $C
+// CHECK-NEXT: end running
 sil [ossa] @testSSAInnerReborrowedPhi : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
-  test_specification "ssa-liveness @argument[0]"
+  specify_test "ssa_liveness @argument[0]"
   %borrow0 = begin_borrow %0 : $C
   %aggregate = struct $PairC(%borrow0 : $C, %borrow0 : $C)
   br bb1(%borrow0 : $C, %aggregate : $PairC)
@@ -286,19 +286,18 @@ bb1(%reborrow : @guaranteed $C, %phi : @guaranteed $PairC):
 // by default. Only the client can tell that a particular guaranteed phi
 // should actually extend liveness if it has no uses.
 //
-// CHECK-LABEL: testSSADeadGuaranteedPhi: ssa-liveness
+// CHECK-LABEL: testSSADeadGuaranteedPhi: ssa_liveness
 // CHECK: SSA lifetime analysis: %0 = argument of bb0 : $C
-// CHECK-NEXT: bb0: LiveOut,
-// CHECK-NEXT: bb2: LiveWithin,
-// CHECK-NEXT: bb1: LiveWithin,
+// CHECK-NEXT: bb0: LiveOut
+// CHECK-NEXT: bb3: LiveWithin
+// CHECK-NEXT: bb2: LiveOut
+// CHECK-NEXT: bb1: LiveOut
 // CHECK-NEXT: regular user
-// CHECK: last user:
-// CHECK-SAME: br bb3
-// CHECK-NEXT: last user:   br bb3
+// CHECK: last user:   %7 = borrowed %6 : $D from (%0 : $C)
 // CHECK-NEXT: end running
 sil [ossa] @testSSADeadGuaranteedPhi : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
-  test_specification "ssa-liveness @argument[0]"
+  specify_test "ssa_liveness @argument[0]"
   cond_br undef, bb1, bb2
 
 bb1:
@@ -316,12 +315,13 @@ bb3(%deadPhi : @guaranteed $D):
 
 // The phi is part of the guaranteed argument's simple live range.
 //
-// CHECK-LABEL: testSSADominatedPhi: ssa-liveness
+// CHECK-LABEL: testSSADominatedPhi: ssa_liveness
 // CHECK: SSA lifetime analysis: %0 = argument of bb0 : $C
-// CHECK-NEXT: bb0: LiveOut,
-// CHECK-NEXT: bb2: LiveOut,
-// CHECK-NEXT: bb3: LiveWithin,
-// CHECK-NEXT: bb1: LiveOut,
+// CHECK-NEXT: bb0: LiveOut
+// CHECK-NEXT: bb3: LiveWithin
+// CHECK-NEXT: bb2: LiveOut
+// CHECK-NEXT: bb1: LiveOut
+// CHECK-NEXT: regular user:   %{{.*}} = borrowed %6 : $D from (%0 : $C)
 // CHECK-NEXT: regular user:   %{{.*}} = unchecked_ref_cast %0 : $C to $D
 // CHECK-NEXT: regular user:   br bb3
 // CHECK-NEXT: regular user:   %{{.*}} = load
@@ -331,7 +331,7 @@ bb3(%deadPhi : @guaranteed $D):
 // CHECK-NEXT: end running
 sil [ossa] @testSSADominatedPhi : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
-  test_specification "ssa-liveness @argument[0]"
+  specify_test "ssa_liveness @argument[0]"
   cond_br undef, bb1, bb2
 
 bb1:
@@ -352,15 +352,15 @@ bb3(%phi : @guaranteed $D):
 
 // The phi is part of the guaranteed argument's simple live range.
 //
-// CHECK-LABEL: testSSAPartialDominatedPhi: ssa-liveness
+// CHECK-LABEL: testSSAPartialDominatedPhi: ssa_liveness
 // CHECK: SSA lifetime analysis: %0 = argument of bb0 : $C
-// CHECK-NEXT: bb0: LiveOut,
-// CHECK-NEXT: bb1: LiveWithin,
+// CHECK-NEXT: bb0: LiveOut
+// CHECK-NEXT: bb1: LiveWithin
 // CHECK: last user:
 // CHECK-SAME: load
 sil [ossa] @testSSAPartialDominatedPhi : $@convention(thin) (@guaranteed C, @guaranteed C) -> () {
 bb0(%0 : @guaranteed $C, %1 : @guaranteed $C):
-  test_specification "ssa-liveness @argument[0]"
+  specify_test "ssa_liveness @argument[0]"
   %borrow1 = begin_borrow %1 : $C
   %aggregate = struct $PairC(%0 : $C, %borrow1 : $C)
   br bb1(%borrow1 : $C, %aggregate : $PairC)
@@ -379,17 +379,17 @@ bb1(%reborrow : @guaranteed $C, %phi : @guaranteed $PairC):
 // The phi is protected by an outer adjacent reborrow. It is not part
 // of the guaranteed argument's simple live range. 
 //
-// CHECK-LABEL: testSSAReborrowedPhi: ssa-liveness
+// CHECK-LABEL: testSSAReborrowedPhi: ssa_liveness
 // CHECK: SSA lifetime analysis: %{{.*}} = begin_borrow
-// CHECK-NEXT: bb0: LiveWithin,
-// CHECK-NEXT: regular user: br bb1
+// CHECK-NEXT: bb0: LiveWithin
+// CHECK-NEXT: lifetime-ending user: br bb1
 // CHECK-NEXT: regular user: %{{.*}} = struct
 // CHECK-NEXT: last user: br bb1
 // CHECK-NEXT: end running
 sil [ossa] @testSSAReborrowedPhi : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
   %borrow = begin_borrow %0 : $C
-  test_specification "ssa-liveness @trace[0]"
+  specify_test "ssa_liveness @trace[0]"
   debug_value [trace] %borrow : $C
   %aggregate = struct $PairC(%borrow : $C, %borrow : $C)
   br bb1(%borrow : $C, %aggregate : $PairC)
@@ -409,7 +409,7 @@ bb1(%reborrow : @guaranteed $C, %phi : @guaranteed $PairC):
 //
 sil [ossa] @testSSALongForwardingChain : $@convention(thin) (@guaranteed C) -> () {
 bb0(%0 : @guaranteed $C):
-  test_specification "ssa-liveness @argument[0]"
+  specify_test "ssa_liveness @argument[0]"
   %s0 = struct $PairC(%0 : $C, %0 : $C)
   %s0a = struct_extract %s0 : $PairC, #PairC.first
   %s0b = struct_extract %s0 : $PairC, #PairC.second
@@ -502,4 +502,44 @@ bb0(%0 : @guaranteed $C):
   %s29b = struct_extract %s29 : $PairC, #PairC.second
   %99 = tuple()
   return %99 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on testMultiDefUseAddressReinit
+// CHECK: MultiDef lifetime analysis:
+// CHECK:   def instruction:   store %{{.*}} to [init] [[ADR:%.*]] : $*C
+// CHECK:   def instruction:   store %0 to [init] [[ADR]] : $*C
+// CHECK: bb0: LiveOut
+// CHECK: bb1: LiveWithin
+// CHECK: regular user: %{{.*}} = load [copy] [[ADR]] : $*C
+// CHECK: last user:    %{{.*}} = load [copy] [[ADR]] : $*C
+// CHECK: boundary edge: bb2
+// CHECK: dead def:   store %0 to [init] %1 : $*C
+// CHECK-LABEL: end running test 1 of 1 on testMultiDefUseAddressReinit
+sil [ossa] @testMultiDefUseAddressReinit : $@convention(thin) (@owned C) -> () {
+bb0(%0: @owned $C):
+  %1 = alloc_stack $C
+  %2 = copy_value %0 : $C
+  specify_test """
+                     multidefuse_liveness defs: @instruction @block[1].instruction[2]
+                     uses: @block[1].instruction[0]
+                     """
+  store %2 to [init] %1 : $*C
+  cond_br undef, bb1, bb2
+
+bb1:
+  %5 = load [copy] %1 : $*C
+  destroy_addr %1 : $*C
+  store %0 to [init] %1 : $*C
+  destroy_value %5 : $C
+  br bb3
+
+bb2:
+  destroy_value %0 : $C
+  br bb3
+
+bb3:
+  destroy_addr %1 : $*C
+  dealloc_stack %1 : $*C
+  %9999 = tuple ()
+  return %9999 : $()
 }

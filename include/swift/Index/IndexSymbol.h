@@ -65,6 +65,7 @@ struct IndexSymbol : IndexRelation {
   SmallVector<IndexRelation, 3> Relations;
   unsigned line = 0;
   unsigned column = 0;
+  ValueDecl *originalDecl = nullptr;
 
   IndexSymbol() = default;
 

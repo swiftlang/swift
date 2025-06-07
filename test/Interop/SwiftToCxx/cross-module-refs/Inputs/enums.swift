@@ -1,6 +1,11 @@
+
+public struct IntTuple {
+    let values: (Int64, Int64, Int64, Int64, Int64, Int64)
+}
+
 // Large enum passed indirectly.
 public enum LargeEnum {
-    case A(x1: Int64, x2: Int64, x3: Int64, x4: Int64, x5: Int64)
+    case A(IntTuple)
     case B
 }
 

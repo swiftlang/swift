@@ -10,12 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/ScopedAddressUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 
@@ -105,8 +107,33 @@ AddressUseKind ScopedAddressValue::computeTransitiveLiveness(
   return updateTransitiveLiveness(liveness);
 }
 
-AddressUseKind
-ScopedAddressValue::updateTransitiveLiveness(PrunedLiveness &liveness) const {
+namespace swift::test {
+// Arguments:
+// - SILValue: value to a analyze
+// Dumps:
+// - the liveness result and boundary
+static FunctionTest ScopedAddressLivenessTest(
+    "scoped_address_liveness", [](auto &function, auto &arguments, auto &test) {
+      auto value = arguments.takeValue();
+      assert(!arguments.hasUntaken());
+      llvm::outs() << "Scoped address analysis: " << value;
+
+      ScopedAddressValue scopedAddress(value);
+      assert(scopedAddress);
+
+      SmallVector<SILBasicBlock *, 8> discoveredBlocks;
+      SSAPrunedLiveness liveness(value->getFunction(), &discoveredBlocks);
+      scopedAddress.computeTransitiveLiveness(liveness);
+      liveness.print(llvm::outs());
+
+      PrunedLivenessBoundary boundary;
+      liveness.computeBoundary(boundary);
+      boundary.print(llvm::outs());
+    });
+} // end namespace swift::test
+
+AddressUseKind ScopedAddressValue::updateTransitiveLiveness(
+    SSAPrunedLiveness &liveness) const {
   SmallVector<Operand *, 4> uses;
   // Collect all uses that need to be enclosed by the scope.
   auto addressKind = findTransitiveUsesForAddress(value, &uses);
@@ -124,16 +151,15 @@ ScopedAddressValue::updateTransitiveLiveness(PrunedLiveness &liveness) const {
   return addressKind;
 }
 
-void ScopedAddressValue::createScopeEnd(SILBasicBlock::iterator insertPt,
-                                        SILLocation loc) const {
+SILInstruction *
+ScopedAddressValue::createScopeEnd(SILBasicBlock::iterator insertPt,
+                                   SILLocation loc) const {
   switch (kind) {
   case ScopedAddressValueKind::StoreBorrow: {
-    SILBuilderWithScope(insertPt).createEndBorrow(loc, value);
-    return;
+    return SILBuilderWithScope(insertPt).createEndBorrow(loc, value);
   }
   case ScopedAddressValueKind::BeginAccess: {
-    SILBuilderWithScope(insertPt).createEndAccess(loc, value, false);
-    return;
+    return SILBuilderWithScope(insertPt).createEndAccess(loc, value, false);
   }
   case ScopedAddressValueKind::Invalid:
     llvm_unreachable("Using invalid case?!");
@@ -175,7 +201,8 @@ bool swift::hasOtherStoreBorrowsInLifetime(StoreBorrowInst *storeBorrow,
 
   for (auto *otherStoreBorrow : otherStoreBorrows) {
     // Return true, if otherStoreBorrow was in \p storeBorrow's scope
-    if (liveness->isWithinBoundary(otherStoreBorrow)) {
+    if (liveness->isWithinBoundary(otherStoreBorrow,
+                                   /*deadEndBlocks=*/nullptr)) {
       return true;
     }
   }

@@ -1,11 +1,11 @@
 enum Foo {
-  case primary(with: Int)
+  case <base>first</base>(<arglabel index=0>associated</arglabel><param index=0></param>: Int)
   case second
 }
 
 func test() {
-  let _ = Foo.primary(with: 1)
-  let _ = Foo.primary
+  let _ = Foo.<base>first</base>(<callarg index=0>associated</callarg><callcolon index=0>: </callcolon>1)
+  let _ = Foo.<base>first</base>
   let _ = Foo.second
 }
 

@@ -1,7 +1,7 @@
 
-// RUN: %target-swift-emit-silgen -module-name nested_generics -Xllvm -sil-full-demangle  -parse-as-library %s | %FileCheck %s
-// RUN: %target-swift-emit-sil -module-name nested_generics -Xllvm -sil-full-demangle -parse-as-library %s > /dev/null
-// RUN: %target-swift-emit-sil -module-name nested_generics -Xllvm -sil-full-demangle -O -parse-as-library %s > /dev/null
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name nested_generics -Xllvm -sil-full-demangle  -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -module-name nested_generics -Xllvm -sil-full-demangle -parse-as-library %s > /dev/null
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -module-name nested_generics -Xllvm -sil-full-demangle -O -parse-as-library %s > /dev/null
 // RUN: %target-swift-emit-ir -module-name nested_generics -Xllvm -sil-full-demangle -parse-as-library %s > /dev/null
 
 // TODO:
@@ -220,6 +220,20 @@ class OuterRing<T> {
 class SubclassOfInner<T, U> : OuterRing<T>.InnerRing<U> {
   override func method<V>(t: T, u: U, v: V) -> (T, U, V) {
     return super.method(t: t, u: u, v: v)
+  }
+}
+
+// Reduced from some code in Doggie.  rdar://107642925
+struct LocalGenericFunc<Element> {
+  var address: UnsafeMutablePointer<Element>
+  init(address: UnsafeMutablePointer<Element>) {
+    self.address = address
+  }
+
+  mutating func foo() {
+    func helper<S: Sequence>(_ newElements: S) where S.Element == Element {
+      let buffer = address
+    }
   }
 }
 

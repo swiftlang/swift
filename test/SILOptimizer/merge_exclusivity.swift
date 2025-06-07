@@ -1,5 +1,6 @@
-// RUN: %target-swift-frontend -O -enforce-exclusivity=checked -emit-sil  -primary-file %s | %FileCheck %s --check-prefix=TESTSIL
+// RUN: %target-swift-frontend -O -enforce-exclusivity=checked -Xllvm -sil-disable-pass=redundant-load-elimination -Xllvm -sil-print-types -emit-sil  -primary-file %s | %FileCheck %s --check-prefix=TESTSIL
 // REQUIRES: optimized_stdlib,asserts
+// REQUIRES: swift_stdlib_no_asserts
 // REQUIRES: PTRSIZE=64
 
 public var check: UInt64 = 0
@@ -377,8 +378,7 @@ private struct EscapedTransform<T>: WriteProt {
 
 // TESTSIL-LABEL: sil [noinline] @$s17merge_exclusivity14run_MergeTest9yySiF : $@convention(thin)
 // TESTSIL: [[REFADDR:%.*]] = ref_element_addr {{.*}} : $StreamClass, #StreamClass.buffer
-// TESTSIL-NEXT: [[B1:%.*]] = begin_access [modify] [{{.*}}] [no_nested_conflict] [[REFADDR]]
-// TESTSIL: end_access [[B1]]
+// TESTSIL-NEXT: store {{.*}} to [[REFADDR]]
 // TESTSIL: [[BCONF:%.*]] = begin_access [modify] [{{.*}}] [[REFADDR]]
 // TESTSIL: end_access [[BCONF]]
 // TESTSIL: [[BCONF:%.*]] = begin_access [modify] [{{.*}}] [[REFADDR]]

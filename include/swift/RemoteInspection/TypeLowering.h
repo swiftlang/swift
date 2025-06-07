@@ -23,6 +23,8 @@
 #include "llvm/Support/Casting.h"
 #include "swift/Remote/MetadataReader.h"
 #include "swift/Remote/TypeInfoProvider.h"
+#include "swift/RemoteInspection/BitMask.h"
+#include "swift/RemoteInspection/DescriptorFinder.h"
 
 #include <memory>
 
@@ -33,6 +35,7 @@ using llvm::cast;
 using llvm::dyn_cast;
 using remote::RemoteRef;
 
+class TypeConverter;
 class TypeRef;
 class TypeRefBuilder;
 class BuiltinTypeDescriptor;
@@ -114,6 +117,7 @@ enum class TypeInfoKind : unsigned {
   Reference,
   Invalid,
   Enum,
+  Array,
 };
 
 class TypeInfo {
@@ -157,6 +161,11 @@ public:
     return false;
   }
 
+  // Calculate and return the spare bit mask for this type
+  virtual BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const {
+    return BitMask::zeroMask(getSize());
+  }
+
   virtual ~TypeInfo() { }
 };
 
@@ -174,7 +183,19 @@ class BuiltinTypeInfo : public TypeInfo {
 
 public:
   explicit BuiltinTypeInfo(TypeRefBuilder &builder,
-                           RemoteRef<BuiltinTypeDescriptor> descriptor);
+                           BuiltinTypeDescriptorBase &descriptor);
+
+  explicit BuiltinTypeInfo(unsigned Size, unsigned Alignment, unsigned Stride,
+                           unsigned NumExtraInhabitants, bool BitwiseTakable);
+  /// Construct an empty builtin type info.
+  BuiltinTypeInfo()
+      : TypeInfo(TypeInfoKind::Builtin,
+                 /*Size=*/0,
+                 /*Alignment=*/1,
+                 /*Stride=*/1,
+                 /*ExtraInhabitants=*/0,
+                 /*BitwiseTakable=*/true),
+        Name("") {}
 
   const std::string &getMangledTypeName() const {
     return Name;
@@ -183,6 +204,8 @@ public:
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
                                 remote::RemoteAddress address,
                                 int *extraInhabitantIndex) const override;
+
+  BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override;
 
   static bool classof(const TypeInfo *TI) {
     return TI->getKind() == TypeInfoKind::Builtin;
@@ -210,6 +233,8 @@ public:
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
                                 remote::RemoteAddress address,
                                 int *index) const override;
+
+  BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override;
 
   static bool classof(const TypeInfo *TI) {
     return TI->getKind() == TypeInfoKind::Record;
@@ -319,8 +344,28 @@ public:
     return reader.readHeapObjectExtraInhabitantIndex(address, extraInhabitantIndex);
   }
 
+  BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override;
+
   static bool classof(const TypeInfo *TI) {
     return TI->getKind() == TypeInfoKind::Reference;
+  }
+};
+
+/// Array based layouts like Builtin.FixedArray<N, T>
+class ArrayTypeInfo : public TypeInfo {
+  const TypeInfo *ElementTI;
+
+public:
+  explicit ArrayTypeInfo(intptr_t size, const TypeInfo *elementTI);
+
+  bool readExtraInhabitantIndex(remote::MemoryReader &reader,
+                                remote::RemoteAddress address,
+                                int *extraInhabitantIndex) const override;
+
+  BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override;
+  const TypeInfo *getElementTypeInfo() const { return ElementTI; }
+  static bool classof(const TypeInfo *TI) {
+    return TI->getKind() == TypeInfoKind::Array;
   }
 };
 
@@ -328,7 +373,7 @@ public:
 class TypeConverter {
   TypeRefBuilder &Builder;
   std::vector<std::unique_ptr<const TypeInfo>> Pool;
-  llvm::DenseMap<std::pair<const TypeRef *, remote::TypeInfoProvider *>,
+  llvm::DenseMap<std::pair<const TypeRef *, remote::TypeInfoProvider::IdType>,
                  const TypeInfo *> Cache;
   llvm::DenseSet<const TypeRef *> RecursionCheck;
   llvm::DenseMap<std::pair<unsigned, unsigned>,
@@ -343,6 +388,7 @@ class TypeConverter {
   const TypeInfo *ThinFunctionTI = nullptr;
   const TypeInfo *ThickFunctionTI = nullptr;
   const TypeInfo *AnyMetatypeTI = nullptr;
+  const TypeInfo *DefaultActorStorageTI = nullptr;
   const TypeInfo *EmptyTI = nullptr;
 
 public:
@@ -367,7 +413,7 @@ public:
   /// class.
   ///
   /// Not cached.
-  const TypeInfo *
+  const RecordTypeInfo *
   getClassInstanceTypeInfo(const TypeRef *TR, unsigned start,
                            remote::TypeInfoProvider *ExternalTypeInfo);
 
@@ -400,6 +446,8 @@ private:
   const TypeInfo *getThinFunctionTypeInfo();
   const TypeInfo *getThickFunctionTypeInfo();
   const TypeInfo *getAnyMetatypeTypeInfo();
+  const TypeInfo *getDefaultActorStorageTypeInfo();
+  const TypeInfo *getRawUnsafeContinuationTypeInfo();
   const TypeInfo *getEmptyTypeInfo();
 
   template <typename TypeInfoTy, typename... Args>

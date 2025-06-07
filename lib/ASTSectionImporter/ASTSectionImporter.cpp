@@ -18,7 +18,7 @@
 #include "swift/ASTSectionImporter/ASTSectionImporter.h"
 #include "../Serialization/ModuleFormat.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/Basic/Dwarf.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/Validation.h"
 #include "llvm/Support/Debug.h"
@@ -26,27 +26,56 @@
 
 using namespace swift;
 
-bool swift::parseASTSection(MemoryBufferSerializedModuleLoader &Loader,
-                            StringRef buf,
-                            SmallVectorImpl<std::string> &foundModules) {
-  if (!serialization::isSerializedAST(buf))
-    return false;
+std::string ASTSectionParseError::toString() const {
+  std::string S;
+  llvm::raw_string_ostream SS(S);
+  SS << serialization::StatusToString(Error);
+  if (!ErrorMessage.empty())
+    SS << ": " << ErrorMessage;
+  return SS.str();
+}
 
+void ASTSectionParseError::log(raw_ostream &OS) const { OS << toString(); }
+
+std::error_code ASTSectionParseError::convertToErrorCode() const {
+  llvm_unreachable("Function not implemented.");
+}
+
+char ASTSectionParseError::ID;
+
+llvm::Expected<SmallVector<std::string, 4>>
+swift::parseASTSection(MemoryBufferSerializedModuleLoader &Loader,
+                       StringRef buf,
+                       const llvm::Triple &filter) {
+  if (!serialization::isSerializedAST(buf))
+    return llvm::make_error<ASTSectionParseError>(
+        serialization::Status::Malformed);
+
+  SmallVector<std::string, 4> foundModules;
+  bool haveFilter = filter.getOS() != llvm::Triple::UnknownOS &&
+                   filter.getArch() != llvm::Triple::UnknownArch;
   // An AST section consists of one or more AST modules, optionally with
   // headers. Iterate over all AST modules.
   while (!buf.empty()) {
     auto info = serialization::validateSerializedAST(
-        buf, Loader.isRequiredOSSAModules(), /*requiredSDK*/ StringRef(),
-        /*requiresRevisionMatch*/ false);
+        buf, Loader.isRequiredOSSAModules(),
+        /*requiredSDK*/StringRef());
 
     assert(info.name.size() < (2 << 10) && "name failed sanity check");
 
+    std::string error;
+    llvm::raw_string_ostream errs(error);
     if (info.status == serialization::Status::Valid) {
       assert(info.bytes != 0);
-      if (!info.name.empty()) {
+      bool selected = true;
+      if (haveFilter) {
+        llvm::Triple moduleTriple(info.targetTriple);
+        selected = serialization::areCompatible(moduleTriple, filter);
+      }
+      if (!info.name.empty() && selected) {
         StringRef moduleData = buf.substr(0, info.bytes);
         std::unique_ptr<llvm::MemoryBuffer> bitstream(
-          llvm::MemoryBuffer::getMemBuffer(moduleData, info.name, false));
+            llvm::MemoryBuffer::getMemBuffer(moduleData, info.name, false));
 
         // Register the memory buffer.
         Loader.registerMemoryBuffer(info.name, std::move(bitstream),
@@ -54,23 +83,38 @@ bool swift::parseASTSection(MemoryBufferSerializedModuleLoader &Loader,
         foundModules.push_back(info.name.str());
       }
     } else {
-      llvm::dbgs() << "Unable to load module";
+      errs << "Unable to load module";
       if (!info.name.empty())
-        llvm::dbgs() << " '" << info.name << '\'';
-      llvm::dbgs() << ".\n";
+        errs << " '" << info.name << '\'';
+      errs << ".";
     }
 
     if (info.bytes == 0)
-      return false;
+      return llvm::make_error<ASTSectionParseError>(info.status, errs.str());
 
     if (info.bytes > buf.size()) {
-      llvm::dbgs() << "AST section too small.\n";
-      return false;
+      errs << "AST section too small.";
+      return llvm::make_error<ASTSectionParseError>(
+          serialization::Status::Malformed, errs.str());
     }
 
     buf = buf.substr(
       llvm::alignTo(info.bytes, swift::serialization::SWIFTMODULE_ALIGNMENT));
   }
 
+  return foundModules;
+}
+
+bool swift::parseASTSection(MemoryBufferSerializedModuleLoader &Loader,
+                            StringRef buf,
+                            const llvm::Triple &filter,
+                            SmallVectorImpl<std::string> &foundModules) {
+  auto Result = parseASTSection(Loader, buf, filter);
+  if (auto E = Result.takeError()) {
+    llvm::dbgs() << toString(std::move(E));
+    return false;
+  }
+  for (auto m : *Result)
+    foundModules.push_back(m);
   return true;
 }

@@ -21,8 +21,8 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/Host.h"
 #include "llvm/Support/StringSaver.h"
+#include "llvm/TargetParser/Host.h"
 
 using namespace swift;
 using namespace swift::driver;
@@ -59,7 +59,7 @@ static void removeSupplementaryOutputs(llvm::opt::ArgList &ArgList) {
 }
 
 bool swift::driver::getSingleFrontendInvocationFromDriverArguments(
-    ArrayRef<const char *> Argv, DiagnosticEngine &Diags,
+    StringRef DriverPath, ArrayRef<const char *> Argv, DiagnosticEngine &Diags,
     llvm::function_ref<bool(ArrayRef<const char *> FrontendArgs)> Action,
     bool ForceNoOutputs) {
   SmallVector<const char *, 16> Args;
@@ -87,7 +87,7 @@ bool swift::driver::getSingleFrontendInvocationFromDriverArguments(
   ExpandResponseFilesWithRetry(Saver, Args);
 
   // Force the driver into batch mode by specifying "swiftc" as the name.
-  Driver TheDriver("swiftc", "swiftc", Args, Diags);
+  Driver TheDriver(DriverPath, "swiftc", Args, Diags);
 
   // Don't check for the existence of input files, since the user of the
   // CompilerInvocation may wish to remap inputs to source buffers.
@@ -141,5 +141,5 @@ bool swift::driver::getSingleFrontendInvocationFromDriverArguments(
   }
 
   const llvm::opt::ArgStringList &BaseFrontendArgs = Cmd->getArguments();
-  return Action(llvm::makeArrayRef(BaseFrontendArgs).drop_front());
+  return Action(llvm::ArrayRef(BaseFrontendArgs).drop_front());
 }

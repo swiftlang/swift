@@ -62,29 +62,19 @@ func testAnyObject8(a: AnyObject) {
   (a as? ObjcClass)#^OPT_CAST_AS_RESULT_1^#
 }
 
-// UN_OPT_NO_DOT_INT: Begin completions
 // UN_OPT_NO_DOT_INT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: ?.nonzeroBitCount[#Int#]{{; name=.+$}}
-// UN_OPT_NO_DOT_INT: End completions
 
-// UN_OPT_DOT_INT: Begin completions
 // UN_OPT_DOT_INT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem/Erase[1]: ?.nonzeroBitCount[#Int#]{{; name=.+$}}
-// UN_OPT_DOT_INT: End completions
 
-// OBJCCLASS_MEMBERS_NO_DOT: Begin completions
-// OBJCCLASS_MEMBERS_NO_DOT-NEXT: Decl[InstanceVar]/CurrNominal:    .instanceVar[#Int#]
-// OBJCCLASS_MEMBERS_NO_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: .instanceFunc()[#ObjcClass#]
+// OBJCCLASS_MEMBERS_NO_DOT-DAG: Decl[InstanceVar]/CurrNominal:    .instanceVar[#Int#]
+// OBJCCLASS_MEMBERS_NO_DOT-DAG: Decl[InstanceMethod]/CurrNominal: .instanceFunc()[#ObjcClass#]
 // OBJCCLASS_MEMBERS_NO_DOT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: === {#AnyObject?#}[#Bool#]
 // OBJCCLASS_MEMBERS_NO_DOT-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem: !== {#AnyObject?#}[#Bool#]
-// OBJCCLASS_MEMBERS_NO_DOT-NEXT: Keyword[self]/CurrNominal: .self[#ObjcClass#]; name=self
-// OBJCCLASS_MEMBERS_NO_DOT-NEXT: End completions
+// OBJCCLASS_MEMBERS_NO_DOT-DAG: Keyword[self]/CurrNominal: .self[#ObjcClass#]; name=self
 
-// OBJCCLASS_MEMBERS_DOT: Begin completions
-// OBJCCLASS_MEMBERS_DOT-NEXT: Keyword[self]/CurrNominal: self[#ObjcClass#]; name=self
-// OBJCCLASS_MEMBERS_DOT-NEXT: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]
-// OBJCCLASS_MEMBERS_DOT-NEXT: Decl[InstanceMethod]/CurrNominal: instanceFunc()[#ObjcClass#]
-// OBJCCLASS_MEMBERS_DOT-NEXT: End completions
+// OBJCCLASS_MEMBERS_DOT-DAG: Keyword[self]/CurrNominal: self[#ObjcClass#]; name=self
+// OBJCCLASS_MEMBERS_DOT-DAG: Decl[InstanceVar]/CurrNominal:    instanceVar[#Int#]
+// OBJCCLASS_MEMBERS_DOT-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc()[#ObjcClass#]
 
-// OPT_NO_DOT_OBJCCLASS: Begin completions
 // OPT_NO_DOT_OBJCCLASS-DAG: Decl[InstanceVar]/CurrNominal:    ?.instanceVar[#Int#]{{; name=.+$}}
 // OPT_NO_DOT_OBJCCLASS-DAG: Decl[InstanceMethod]/CurrNominal: ?.instanceFunc()[#ObjcClass#]{{; name=.+$}}
-// OPT_NO_DOT_OBJCCLASS: End completions

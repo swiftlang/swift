@@ -2,6 +2,11 @@
 // REQUIRES: executable_test
 // REQUIRES: reflection
 
+// These tests verify fixes in >5.9 Swift, and will
+// fail if run against earlier standard library versions.
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
 //
 // Tests for the non-Foundation API of String
 //
@@ -293,22 +298,7 @@ StringTests.test("LosslessStringConvertible") {
   checkLosslessStringConvertible(comparisonTests.map { $0.rhs })
 }
 
-// Mark the test cases that are expected to fail in checkHasPrefixHasSuffix
-
-let substringTests = tests.map {
-  (test: ComparisonTest) -> ComparisonTest in
-  switch (test.expectedUnicodeCollation, test.lhs, test.rhs) {
-
-  case (.gt, "\r\n", "\n"):
-    return test.replacingPredicate(.objCRuntime(
-      "blocked on rdar://problem/19036555"))
-
-  default:
-    return test
-  }
-}
-
-for test in substringTests {
+for test in tests {
   StringTests.test("hasPrefix,hasSuffix: line \(test.loc.line)")
     .skip(.nativeRuntime(
         "String.has{Prefix,Suffix} defined when _runtime(_ObjC)"))
@@ -342,6 +332,7 @@ StringTests.test("SameTypeComparisons") {
   expectFalse(xs != xs)
 }
 
+#if !os(WASI)
 StringTests.test("CompareStringsWithUnpairedSurrogates")
   .xfail(
     .always("<rdar://problem/18029104> Strings referring to underlying " +
@@ -357,6 +348,7 @@ StringTests.test("CompareStringsWithUnpairedSurrogates")
     ]
   )
 }
+#endif
 
 StringTests.test("[String].joined() -> String") {
   let s = ["hello", "world"].joined()
@@ -504,6 +496,41 @@ StringTests.test("Regression/radar-87371813") {
   expectEqual(s1, s3)
   expectEqual(s1.hashValue, s2.hashValue)
   expectEqual(s2.hashValue, s3.hashValue)
+}
+
+StringTests.test("_isIdentical(to:)") {
+  let a = "Hello"
+  let b = "Hello"
+  expectTrue(a._isIdentical(to: a))
+  expectTrue(b._isIdentical(to: b))
+  expectTrue(a._isIdentical(to: b)) // Both small ASCII strings
+  expectTrue(b._isIdentical(to: a))
+
+  let c = "Cafe\u{301}"
+  let d = "Cafe\u{301}"
+  let e = "Café"
+  expectTrue(c._isIdentical(to: d))
+  expectTrue(d._isIdentical(to: c))
+  expectFalse(c._isIdentical(to: e))
+  expectFalse(d._isIdentical(to: e))
+
+  let f = String(repeating: "foo", count: 1000)
+  let g = String(repeating: "foo", count: 1000)
+  expectEqual(f, g)
+  expectFalse(f._isIdentical(to: g)) // Two large, distinct native strings
+  expectTrue(f._isIdentical(to: f))
+  expectTrue(g._isIdentical(to: g))
+}
+
+StringTests.test("hasPrefix/hasSuffix vs Character boundaries") {
+  // https://github.com/apple/swift/issues/67427
+  let s1 = "\r\n"
+  let s2 = "\r\n" + "cafe" + "\r\n"
+
+  expectFalse(s1.hasPrefix("\r"))
+  expectFalse(s1.hasSuffix("\n"))
+  expectFalse(s2.hasPrefix("\r"))
+  expectFalse(s2.hasSuffix("\n"))
 }
 
 runAllTests()

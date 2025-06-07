@@ -1,6 +1,6 @@
 
-// RUN: %target-swift-emit-silgen -module-name constrained_extensions -primary-file %s | %FileCheck %s
-// RUN: %target-swift-emit-sil -module-name constrained_extensions -O -primary-file %s > /dev/null
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name constrained_extensions -primary-file %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -module-name constrained_extensions -O -primary-file %s > /dev/null
 // RUN: %target-swift-emit-ir -module-name constrained_extensions -primary-file %s > /dev/null
 
 extension Array where Element == Int {
@@ -240,3 +240,22 @@ extension S<Int> {
     }
   }
 }
+
+// https://github.com/swiftlang/swift/issues/74648
+
+protocol HasX {
+  var x: Int { get set }
+}
+
+extension S: HasX where T == Int {
+  var x: Int {
+    get { 3 }
+    set { }
+  }
+}
+
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s22constrained_extensions1SVyxGAA4HasXAASiRszlAaEP1xSivMTW : $@yield_once @convention(witness_method: HasX) @substituted <τ_0_0> (@inout τ_0_0) -> @yields @inout Int for <S<Int>> {
+// CHECK: [[WITNESS_FN:%.*]] = function_ref @$s22constrained_extensions1SVAASiRszlE1xSivM : $@yield_once @convention(method) (@inout S<Int>) -> @yields @inout Int
+// CHECK: begin_apply [[WITNESS_FN]](%0) : $@yield_once @convention(method) (@inout S<Int>) -> @yields @inout Int
+// CHECK: yield
+// CHECK: unwind

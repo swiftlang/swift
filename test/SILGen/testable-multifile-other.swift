@@ -4,9 +4,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module %S/Inputs/TestableMultifileHelper.swift -enable-testing -o %t
 
-// RUN: %target-swift-emit-silgen -I %t %s %S/testable-multifile.swift -module-name main | %FileCheck %s
-// RUN: %target-swift-emit-silgen -I %t %S/testable-multifile.swift %s -module-name main | %FileCheck %s
-// RUN: %target-swift-emit-silgen -I %t -primary-file %s %S/testable-multifile.swift -module-name main | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -I %t %s %S/testable-multifile.swift -module-name main | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -I %t %S/testable-multifile.swift %s -module-name main | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -I %t -primary-file %s %S/testable-multifile.swift -module-name main | %FileCheck %s
 
 // Just make sure we don't crash later on.
 // RUN: %target-swift-emit-ir -I %t -primary-file %s %S/testable-multifile.swift -module-name main -o /dev/null

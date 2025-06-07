@@ -1,0 +1,54 @@
+// RUN: %target-sil-opt %s | %target-sil-opt -sil-print-no-uses | %FileCheck %s
+
+// REQUIRES: PTRSIZE=64
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+sil_global hidden @$s3nix2ggSSvp : $String
+
+class C {
+  @_hasStorage var a: Builtin.Int64
+  @_hasStorage var b: Builtin.Int64
+}
+
+sil_global [let] @gc : $C = {
+  %0 = integer_literal $Builtin.Int64, 0
+  %1 = integer_literal $Builtin.Int64, 1
+  %2 = integer_literal $Builtin.Int64, 2
+  %3 = integer_literal $Builtin.Int64, 3
+  // CHECK: %initval = object $C (%0, %1, [tail_elems] %2, %3)
+  %initval = object $C (%0, %1, [tail_elems] %2, %3)
+}
+
+sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+[%1: noescape **]
+[global: read,write,copy,deinit_barrier]
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+  alloc_global @$s3nix2ggSSvp
+  %3 = global_addr @$s3nix2ggSSvp : $*String
+  %4 = integer_literal $Builtin.Int64, 0
+  br bb1
+
+bb2:
+  // CHECK: struct $String (%{{[0-9]+}} : $_StringGuts)
+  %10 = struct $String (%9 : $_StringGuts)
+  // CHECK: store %{{[0-9]+}} to %{{[0-9]+$}}
+  store %10 to %3 : $*String
+  %12 = integer_literal $Builtin.Int32, 0
+  %13 = struct $Int32 (%12 : $Builtin.Int32)
+  return %13 : $Int32
+
+bb1:
+  %5 = integer_literal $Builtin.Int64, -2305843009213693952
+  // CHECK: struct $UInt64 (%{{[0-9]+}})
+  // CHECK-NOT: user:
+  %6 = struct $UInt64 (%4 : $Builtin.Int64)
+  %7 = value_to_bridge_object %5 : $Builtin.Int64
+  %8 = struct $_StringObject (%6 : $UInt64, %7 : $Builtin.BridgeObject)
+  %9 = struct $_StringGuts (%8 : $_StringObject)
+  br bb2
+}

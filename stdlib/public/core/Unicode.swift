@@ -303,14 +303,14 @@ extension Unicode.UTF8: UnicodeCodec {
   public static func _nullCodeUnitOffset(
     in input: UnsafePointer<CodeUnit>
   ) -> Int {
-    return Int(_swift_stdlib_strlen_unsigned(input))
+    return unsafe Int(_swift_stdlib_strlen_unsigned(input))
   }
   // Support parsing C strings as-if they are UTF8 strings.
   @inlinable
   public static func _nullCodeUnitOffset(
     in input: UnsafePointer<CChar>
   ) -> Int {
-    return Int(_swift_stdlib_strlen(input))
+    return unsafe Int(_swift_stdlib_strlen(input))
   }
 }
 
@@ -585,6 +585,7 @@ public func transcode<
     }
     OutputEncoding.encodedReplacementCharacter.forEach(processCodeUnit)
   }
+  fatalError()
 }
 
 /// Instances of conforming types are used in internal `String`
@@ -649,7 +650,7 @@ extension UnicodeCodec {
     in input: UnsafePointer<CodeUnit>
   ) -> Int {
     var length = 0
-    while input[length] != 0 {
+    while unsafe input[length] != 0 {
       length += 1
     }
     return length
@@ -672,5 +673,4 @@ public func transcode<Input, InputEncoding, OutputEncoding>(
 
 /// A namespace for Unicode utilities.
 @frozen
-public enum Unicode {}
-
+public enum Unicode : ~BitwiseCopyable {}

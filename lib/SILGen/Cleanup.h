@@ -17,6 +17,7 @@
 #ifndef SWIFT_SILGEN_CLEANUP_H
 #define SWIFT_SILGEN_CLEANUP_H
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/DiverseStack.h"
 #include "swift/SIL/SILLocation.h"
@@ -159,7 +160,7 @@ typedef DiverseStackImpl<Cleanup>::stable_iterator CleanupHandle;
 class LLVM_LIBRARY_VISIBILITY CleanupManager {
   friend class Scope;
   friend class CleanupCloner;
-
+  
   SILGenFunction &SGF;
 
   /// Stack - Currently active cleanups in this scope tree.
@@ -176,7 +177,6 @@ class LLVM_LIBRARY_VISIBILITY CleanupManager {
   /// we can only reap the cleanup stack up to the innermost depth
   /// that we've handed out as a Scope.
   Scope *innermostScope = nullptr;
-  FormalEvaluationScope *innermostFormalScope = nullptr;
 
   void popTopDeadCleanups();
   void emitCleanups(CleanupsDepth depth, CleanupLocation l,
@@ -219,6 +219,17 @@ public:
   /// \param branchLoc  The location of the branch instruction.
   /// \param args       Arguments to pass to the destination block.
   void emitBranchAndCleanups(JumpDest dest, SILLocation branchLoc,
+                             ArrayRef<SILValue> args = {},
+                             ForUnwind_t forUnwind = NotForUnwind);
+
+  /// Emit a branch to the given jump destination,
+  /// threading out through any cleanups we need to run. This does not pop the
+  /// cleanup stack.
+  ///
+  /// \param dest       The destination scope and block.
+  /// \param branchLoc  The location of the branch instruction.
+  /// \param args       Arguments to pass to the destination block.
+  void emitCleanupsForBranch(JumpDest dest, SILLocation branchLoc,
                              ArrayRef<SILValue> args = {},
                              ForUnwind_t forUnwind = NotForUnwind);
 
@@ -289,11 +300,16 @@ public:
   /// Verify that the given cleanup handle is valid.
   void checkIterator(CleanupHandle handle) const;
 
+  void endNoncopyablePatternMatchBorrow(CleanupsDepth depth, CleanupLocation l,
+                                        bool finalEndBorrow = false);
+
 private:
   // Look up the flags and optionally the writeback address associated with the
   // cleanup at \p depth. If
-  std::tuple<Cleanup::Flags, Optional<SILValue>>
+  std::tuple<Cleanup::Flags, std::optional<SILValue>>
   getFlagsAndWritebackBuffer(CleanupHandle depth);
+
+  bool isFormalAccessCleanup(CleanupHandle depth);
 };
 
 /// An RAII object that allows the state of a cleanup to be
@@ -327,7 +343,7 @@ private:
 /// writeback buffers.
 class CleanupCloner {
   SILGenFunction &SGF;
-  Optional<SILValue> writebackBuffer;
+  std::optional<SILValue> writebackBuffer;
   bool hasCleanup;
   bool isLValue;
   bool isFormalAccess;
@@ -337,6 +353,21 @@ public:
   CleanupCloner(SILGenBuilder &builder, const ManagedValue &mv);
 
   ManagedValue clone(SILValue value) const;
+
+  ManagedValue cloneForTuplePackExpansionComponent(SILValue value,
+                                                   CanPackType inducedPackType,
+                                                   unsigned componentIndex) const;
+
+  ManagedValue cloneForPackPackExpansionComponent(SILValue packAddr,
+                                                  CanPackType formalPackType,
+                                                  unsigned componentIndex) const;
+
+  ManagedValue cloneForRemainingPackComponents(SILValue packAddr,
+                                               CanPackType formalPackType,
+                                               unsigned firstComponentIndex) const;
+  ManagedValue cloneForRemainingTupleComponents(SILValue tupleAddr,
+                                                CanPackType inducedPackType,
+                                                unsigned firstComponentIndex) const;
 
   static void
   getClonersForRValue(SILGenFunction &SGF, const RValue &rvalue,

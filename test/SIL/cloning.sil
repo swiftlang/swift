@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -inline %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -inline %s | %FileCheck %s
 
 // Check cloning of instructions.
 
@@ -28,10 +28,14 @@ bb0:
   return %2 : $()
 }
 
-sil [ossa] [always_inline] @callee_begin_borrow_lexical : $@convention(thin) () -> () {
+sil [ossa] [always_inline] @callee_begin_borrow : $@convention(thin) () -> () {
   %instance = alloc_ref $X
   %guaranteed_c = begin_borrow [lexical] %instance : $X
   end_borrow %guaranteed_c : $X
+  %guaranteed_c2 = begin_borrow [pointer_escape] %instance : $X
+  end_borrow %guaranteed_c2 : $X
+  %guaranteed_c3 = begin_borrow [var_decl] %instance : $X
+  end_borrow %guaranteed_c3 : $X
   destroy_value %instance : $X
   %res = tuple ()
   return %res : $()
@@ -39,10 +43,73 @@ sil [ossa] [always_inline] @callee_begin_borrow_lexical : $@convention(thin) () 
 
 // CHECK-LABEL: sil [ossa] @caller_begin_borrow_lexical
 // CHECK: begin_borrow [lexical]
+// CHECK: begin_borrow [pointer_escape]
+// CHECK: begin_borrow [var_decl]
 // CHECK-LABEL: } // end sil function 'caller_begin_borrow_lexical'
 sil [ossa] @caller_begin_borrow_lexical : $@convention(thin) () -> () {
-  %callee_begin_borrow_lexical = function_ref @callee_begin_borrow_lexical : $@convention(thin) () -> ()
+  %callee_begin_borrow_lexical = function_ref @callee_begin_borrow : $@convention(thin) () -> ()
   %res = apply %callee_begin_borrow_lexical() : $@convention(thin) () -> ()
+  return %res : $()
+}
+
+sil [ossa] [always_inline] @callee_alloc_box : $@convention(thin) () -> () {
+  %b1 = alloc_box ${ var X }
+  dealloc_box %b1 : ${ var X }
+  %b2 = alloc_box [dynamic_lifetime] ${ var X }
+  dealloc_box %b2 : ${ var X }
+  %b3 = alloc_box [reflection] ${ var X }
+  dealloc_box %b3 : ${ var X }
+  %b4 = alloc_box [pointer_escape] ${ var X }
+  dealloc_box %b4 : ${ var X }
+  %b5 = alloc_box [moveable_value_debuginfo] ${ var X }
+  dealloc_box %b5 : ${ var X }
+  %b6 = alloc_box [dynamic_lifetime] [reflection] ${ var X }
+  dealloc_box %b6 : ${ var X }
+  %b7 = alloc_box [dynamic_lifetime] [pointer_escape] ${ var X }
+  dealloc_box %b7 : ${ var X }
+  %b8 = alloc_box [dynamic_lifetime] [moveable_value_debuginfo] ${ var X }
+  dealloc_box %b8 : ${ var X }
+  %b9 = alloc_box [reflection] [pointer_escape] ${ var X }
+  dealloc_box %b9 : ${ var X }
+  %b10 = alloc_box [reflection] [moveable_value_debuginfo] ${ var X }
+  dealloc_box %b10 : ${ var X }
+  %b11 = alloc_box [pointer_escape] [moveable_value_debuginfo] ${ var X }
+  dealloc_box %b11 : ${ var X }
+  %b12 = alloc_box [reflection] [pointer_escape] [moveable_value_debuginfo] ${ var X }
+  dealloc_box %b12 : ${ var X }
+  %b13 = alloc_box [dynamic_lifetime] [pointer_escape] [moveable_value_debuginfo] ${ var X }
+  dealloc_box %b13 : ${ var X }
+  %b14 = alloc_box [dynamic_lifetime] [reflection] [moveable_value_debuginfo] ${ var X }
+  dealloc_box %b14 : ${ var X }
+  %b15 = alloc_box [dynamic_lifetime] [reflection] [pointer_escape] ${ var X }
+  dealloc_box %b15 : ${ var X }
+  %b16 = alloc_box [dynamic_lifetime] [reflection] [pointer_escape] [moveable_value_debuginfo] ${ var X }
+  dealloc_box %b16 : ${ var X }
+  %res = tuple ()
+  return %res : $()
+}
+
+// CHECK-LABEL: sil [ossa] @caller_alloc_box{{.*}} {
+// CHECK:         alloc_box
+// CHECK:         alloc_box [dynamic_lifetime]
+// CHECK:         alloc_box [reflection]
+// CHECK:         alloc_box [pointer_escape]
+// CHECK:         alloc_box [moveable_value_debuginfo]
+// CHECK:         alloc_box [dynamic_lifetime] [reflection]
+// CHECK:         alloc_box [dynamic_lifetime] [pointer_escape]
+// CHECK:         alloc_box [dynamic_lifetime] [moveable_value_debuginfo]
+// CHECK:         alloc_box [reflection] [pointer_escape]
+// CHECK:         alloc_box [reflection] [moveable_value_debuginfo]
+// CHECK:         alloc_box [pointer_escape] [moveable_value_debuginfo]
+// CHECK:         alloc_box [reflection] [pointer_escape] [moveable_value_debuginfo]
+// CHECK:         alloc_box [dynamic_lifetime] [pointer_escape] [moveable_value_debuginfo]
+// CHECK:         alloc_box [dynamic_lifetime] [reflection] [moveable_value_debuginfo]
+// CHECK:         alloc_box [dynamic_lifetime] [reflection] [pointer_escape]
+// CHECK:         alloc_box [dynamic_lifetime] [reflection] [pointer_escape] [moveable_value_debuginfo]
+// CHECK-LABEL: } // end sil function 'caller_alloc_box'
+sil [ossa] @caller_alloc_box : $@convention(thin) () -> () {
+  %callee = function_ref @callee_alloc_box : $@convention(thin) () -> ()
+  %res = apply %callee() : $@convention(thin) () -> ()
   return %res : $()
 }
 
@@ -53,8 +120,16 @@ sil [ossa] @callee_alloc_stack : $@convention(thin) () -> () {
   dealloc_stack %instance2 : $*Builtin.NativeObject
   %instance3 = alloc_stack [lexical] $Builtin.NativeObject
   dealloc_stack %instance3 : $*Builtin.NativeObject
-  %instance4 = alloc_stack [dynamic_lifetime] [lexical] $Builtin.NativeObject
+  %instance5 = alloc_stack [var_decl] $Builtin.NativeObject
+  dealloc_stack %instance5 : $*Builtin.NativeObject
+  %instance4 = alloc_stack [lexical] [dynamic_lifetime] $Builtin.NativeObject
   dealloc_stack %instance4 : $*Builtin.NativeObject
+  %instance6 = alloc_stack [dynamic_lifetime] [var_decl] $Builtin.NativeObject
+  dealloc_stack %instance6 : $*Builtin.NativeObject
+  %instance7 = alloc_stack [lexical] [var_decl] $Builtin.NativeObject
+  dealloc_stack %instance7 : $*Builtin.NativeObject
+  %instance8 = alloc_stack [lexical] [var_decl] [dynamic_lifetime] $Builtin.NativeObject
+  dealloc_stack %instance8 : $*Builtin.NativeObject
   %res = tuple ()
   return %res : $()
 }
@@ -63,7 +138,11 @@ sil [ossa] @callee_alloc_stack : $@convention(thin) () -> () {
 // CHECK: alloc_stack
 // CHECK: alloc_stack [dynamic_lifetime]
 // CHECK: alloc_stack [lexical]
+// CHECK: alloc_stack [var_decl]
 // CHECK: alloc_stack [dynamic_lifetime] [lexical]
+// CHECK: alloc_stack [dynamic_lifetime] [var_decl]
+// CHECK: alloc_stack [lexical] [var_decl]
+// CHECK: alloc_stack [dynamic_lifetime] [lexical] [var_decl]
 // CHECK-LABEL: } // end sil function 'caller_alloc_stack_lexical'
 sil [ossa] @caller_alloc_stack_lexical : $@convention(thin) () -> () {
   %callee_alloc_stack = function_ref @callee_alloc_stack : $@convention(thin) () -> ()
@@ -77,7 +156,9 @@ entry(%0 : @owned $Builtin.NativeObject):
   %2 = move_value [allows_diagnostics] %1 : $Builtin.NativeObject
   %3 = move_value [lexical] %2 : $Builtin.NativeObject
   %4 = move_value [allows_diagnostics] [lexical] %3 : $Builtin.NativeObject
-  return %4 : $Builtin.NativeObject
+  %5 = move_value [pointer_escape] %4 : $Builtin.NativeObject
+  %6 = move_value [var_decl] %5 : $Builtin.NativeObject
+  return %6 : $Builtin.NativeObject
 }
 
 // CHECK-LABEL: sil [ossa] @caller_move_value {{.*}} {
@@ -86,7 +167,9 @@ entry(%0 : @owned $Builtin.NativeObject):
 // CHECK:       [[REGISTER_2:%[^,]+]] = move_value [allows_diagnostics] [[REGISTER_1]]
 // CHECK:       [[REGISTER_3:%[^,]+]] = move_value [lexical] [[REGISTER_2]]
 // CHECK:       [[REGISTER_4:%[^,]+]] = move_value [allows_diagnostics] [lexical] [[REGISTER_3]]
-// CHECK:       return [[REGISTER_4]]
+// CHECK:       [[REGISTER_5:%[^,]+]] = move_value [pointer_escape] [[REGISTER_4]]
+// CHECK:       [[REGISTER_6:%[^,]+]] = move_value [var_decl] [[REGISTER_5]]
+// CHECK:       return [[REGISTER_6]]
 // CHECK-LABEL: } // end sil function 'caller_move_value'
 sil [ossa] @caller_move_value : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
 entry(%0 : @owned $Builtin.NativeObject):
@@ -108,18 +191,118 @@ entry(%0 : @owned $X):
   return %res : $X
 }
 
-// CHECK-LABEL: sil [ossa] @caller_test_specification : {{.*}} {
-// CHECK:         test_specification "foo bar baz"
-// CHECK-LABEL: } // end sil function 'caller_test_specification'
-sil [always_inline] [ossa] @callee_test_specification : $@convention(thin) () -> () {
+// CHECK-LABEL: sil [ossa] @caller_specify_test : {{.*}} {
+// CHECK:         specify_test "foo bar baz"
+// CHECK-LABEL: } // end sil function 'caller_specify_test'
+sil [always_inline] [ossa] @callee_specify_test : $@convention(thin) () -> () {
 entry:
-  test_specification "foo bar baz"
+  specify_test "foo bar baz"
   %retval = tuple ()
   return %retval : $()
 }
 
-sil [ossa] @caller_test_specification : $@convention(thin) () -> () {
-  %callee = function_ref @callee_test_specification : $@convention(thin) () -> ()
+sil [ossa] @caller_specify_test : $@convention(thin) () -> () {
+  %callee = function_ref @callee_specify_test : $@convention(thin) () -> ()
   %retval = apply %callee() : $@convention(thin) () -> ()
   return %retval : $()
+}
+
+
+// CHECK-LABEL: sil [ossa] @caller_extend_lifetime : {{.*}} {
+// CHECK:       bb0([[O:%[^,]+]] :
+// CHECK:         extend_lifetime [[O]]
+// CHECK-LABEL: } // end sil function 'caller_extend_lifetime'
+sil [always_inline] [ossa] @callee_extend_lifetime : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+entry(%o : @owned $Builtin.NativeObject):
+  br loop
+loop:
+  extend_lifetime %o : $Builtin.NativeObject
+  br loop
+}
+
+sil [ossa] @caller_extend_lifetime : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+entry(%o : @owned $Builtin.NativeObject):
+  %callee = function_ref @callee_extend_lifetime : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  %retval = apply %callee(%o) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  return %retval : $()
+}
+
+sil [ossa] [always_inline] @callee_destroy_value : $@convention(thin) (@owned X) -> () {
+entry(%x : @owned $X):
+  cond_br undef, good, bad
+good:
+  cond_br undef, gleft, gright
+gleft:
+  destroy_value %x : $X
+  br exit
+gright:
+  destroy_value [poison] %x : $X
+  br exit
+exit:
+  %retval = tuple()
+  return %retval : $()
+bad:
+  cond_br undef, bleft, bright
+bleft:
+  destroy_value [dead_end] %x : $X
+  unreachable
+bright:
+  destroy_value [poison] [dead_end] %x : $X
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @caller_destroy_value : {{.*}} {
+// CHECK:         destroy_value
+// CHECK:         destroy_value [poison]
+// CHECK:         destroy_value [dead_end]
+// CHECK:         destroy_value [poison] [dead_end]
+// CHECK-LABEL: } // end sil function 'caller_destroy_value'
+sil [ossa] @caller_destroy_value : $@convention(thin) (@owned X) -> () {
+entry(%x : @owned $X):
+  %callee = function_ref @callee_destroy_value : $@convention(thin) (@owned X) -> ()
+  %res = apply %callee(%x) : $@convention(thin) (@owned X) -> ()
+  return %res : $()
+}
+
+sil [ossa] [always_inline] @callee_dealloc_box : $@convention(thin) () -> () {
+entry:
+  %b = alloc_box ${ var X }
+  cond_br undef, exit, die
+
+exit:
+  dealloc_box %b : ${ var X }
+  %retval = tuple()
+  return %retval : $()
+
+die:
+  dealloc_box [dead_end] %b : ${ var X }
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @caller_dealloc_box : {{.*}} {
+// CHECK:         dealloc_box
+// CHECK:         dealloc_box [dead_end]
+// CHECK-LABEL: } // end sil function 'caller_dealloc_box'
+sil [ossa] @caller_dealloc_box : $@convention(thin) () -> () {
+entry:
+  %callee = function_ref @callee_dealloc_box : $@convention(thin) () -> ()
+  %res = apply %callee() : $@convention(thin) () -> ()
+  return %res : $()
+}
+
+sil [transparent] [ossa] @getSize : $@convention(thin) <Type> (@thick Type.Type) -> Builtin.Word {
+bb0(%ty : $@thick Type.Type):
+  %size = builtin "sizeof"<Type>() : $Builtin.Word
+  return %size : $Builtin.Word
+}
+
+// CHECK-LABEL: sil [ossa] @callee_builtin_type_dep_operand : {{.*}} {
+// CHECK:         open_existential_metatype
+// CHECK-LABEL: } // end sil function 'callee_builtin_type_dep_operand'
+sil [ossa] @callee_builtin_type_dep_operand : $@convention(thin) (@thick any Any.Type) -> Builtin.Word {
+bb0(%0 : $@thick any Any.Type):
+  %ty = open_existential_metatype %0 : $@thick any Any.Type to $@thick (@opened("00000000-0000-0000-0000-000000000000", Any) Self).Type
+  %getSize = function_ref @getSize : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Word
+  %retval = apply %getSize<@opened("00000000-0000-0000-0000-000000000000", Any) Self>(%ty) : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Word
+  return %retval : $Builtin.Word
 }

@@ -58,3 +58,10 @@ module LocalSystemModule [system] { }
 
 @testable import LocalSystemModule // expected-error {{module 'LocalSystemModule' was not compiled for testing}}
 // expected-remark @-1 {{LocalSystemModule.swiftinterface}}
+// expected-remark @-2 {{'LocalSystemModule' has a required transitive dependency on 'LocalSystemModule'}}
+// expected-remark @-3 {{'LocalSystemModule' has a required transitive dependency on 'Swift'}}
+// expected-remark @-4 {{'LocalSystemModule' has a required transitive dependency on 'SwiftOnoneSupport'}}
+// expected-remark @-5 {{'LocalSystemModule' has a required transitive dependency on '_Concurrency'}}
+// expected-remark @-6 {{'LocalSystemModule' has a required transitive dependency on '_StringProcessing'}}
+// expected-remark @-7 {{'LocalSystemModule' has a required transitive dependency on '_SwiftConcurrencyShims'}}
+

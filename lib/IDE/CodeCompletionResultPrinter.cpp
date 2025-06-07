@@ -13,6 +13,7 @@
 #include "swift/IDE/CodeCompletionResultPrinter.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/Markup/XMLUtils.h"
@@ -516,8 +517,7 @@ static void printCodeCompletionResultFilterName(
       case ChunkKind::CallArgumentColon:
       case ChunkKind::ParameterDeclColon:
         // Since we don't add the type, also don't add the space after ':'.
-        if (shouldPrint)
-          OS << ":";
+        OS << ":";
         ++i;
         continue;
       case ChunkKind::Text:

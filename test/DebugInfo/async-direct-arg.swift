@@ -1,22 +1,27 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - \
-// RUN:    -module-name a  -disable-availability-checking \
+// RUN:    -module-name a  -target %target-swift-5.1-abi-triple \
 // RUN:    -parse-as-library | %FileCheck %s --check-prefix=CHECK
 // REQUIRES: concurrency
+// REQUIRES: CPU=x86_64 || CPU=arm64
 
-// REQUIRES: rdar74588568
 
 // Test that x is described as a direct dbg.declare of the incoming function
 // argument.
 
-// CHECK-LABEL: define {{.*}} void @"$s1a3fibyS2iYF.resume.0"
-// CHECK: call void @llvm.dbg.declare
-// CHECK: call void @llvm.dbg.declare
-// CHECK: call void @llvm.dbg.declare(metadata {{.*}}%0, metadata ![[X0:[0-9]+]], {{.*}}!DIExpression(DW_OP
-// CHECK-LABEL: define {{.*}} void @"$s1a3fibyS2iYF.resume.1"
-// FIXME: call void @llvm.dbg.declare(metadata {{.*}}%0, metadata ![[X1:[0-9]+]], {{.*}}!DIExpression(DW_OP
+// CHECK-LABEL: define {{.*}} void @"$s1a3fibyS2iYaFTY0_"
+// CHECK-SAME:    (ptr swiftasync %[[ARG:.*]])
+// CHECK: #dbg_declare(ptr %[[ARG]], {{.*}}, !DIExpression(DW_OP_LLVM_entry_value
+// CHECK: #dbg_declare(ptr %[[ARG]], {{.*}}, !DIExpression(DW_OP_LLVM_entry_value
+// CHECK: #dbg_declare(ptr %[[ARG]], ![[X0:[0-9]+]], !DIExpression(DW_OP_LLVM_entry_value
+
+// CHECK-LABEL: define {{.*}} void @"$s1a3fibyS2iYaFTY2_"
+// CHECK-SAME:    (ptr swiftasync %[[ARG:.*]])
+// CHECK: #dbg_declare(ptr %[[ARG]], {{.*}}, !DIExpression(DW_OP_LLVM_entry_value
+// CHECK: #dbg_declare(ptr %[[ARG]], {{.*}}, !DIExpression(DW_OP_LLVM_entry_value
+// CHECK: #dbg_declare(ptr %[[ARG]], ![[X1:[0-9]+]], !DIExpression(DW_OP_LLVM_entry_value
 
 // CHECK: ![[X0]] = !DILocalVariable(name: "x"
-// FIXME: ![[X1]] = !DILocalVariable(name: "x"
+// CHECK: ![[X1]] = !DILocalVariable(name: "x"
 func fib(_ x: Int) async -> Int {
   if x <= 1 { return 1 }
   let a = await fib(x - 1)

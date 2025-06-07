@@ -1,0 +1,19 @@
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
+
+// REQUIRES: OS=macosx || OS=ios || OS=watchos
+
+// CHECK: [[U8_0:@.*]] = private unnamed_addr constant [8 x i8] c"help\09me\00", section "__TEXT,__oslogstring,cstring_literals"
+
+sil_stage canonical
+
+import Builtin
+
+sil @oslog_utf8_literal : $@convention(thin) () -> Builtin.RawPointer {
+bb0:
+  %0 = string_literal oslog "help\tme"
+  return %0 : $Builtin.RawPointer
+}
+// CHECK: define swiftcc ptr @oslog_utf8_literal() {{.*}} {
+// CHECK:   ret ptr [[U8_0]]
+
+

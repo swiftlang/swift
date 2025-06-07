@@ -29,7 +29,7 @@ class DataWrapper {
     var pointer: UnsafeMutableRawBufferPointer
 
     init(count: Int) {
-        pointer = UnsafeMutableRawBufferPointer.allocate(byteCount: count, alignment: MemoryLayout<Int>.alignment)
+        pointer = UnsafeMutableRawBufferPointer.allocate(byteCount: count * MemoryLayout<Int>.stride, alignment: MemoryLayout<Int>.alignment)
     }
 
     var bytes: UnsafeMutableRawBufferPointer { return pointer }
@@ -43,7 +43,7 @@ var fileHandleMap: [Int32 : String] = [:]
 
 func openTheFile(_ path: String) -> Int32 {
   let fd: Int32 = 42
-  assert(fileHandleMap[fd] == nil)
+  precondition(fileHandleMap[fd] == nil)
   fileHandleMap[fd] = path
   return fd
 }
@@ -53,7 +53,7 @@ func closeTheFile(_ fd: Int32) {
 }
 
 func writeToTheFile(_ fd: Int32) {
-  assert(fileHandleMap[fd] != nil)
+  precondition(fileHandleMap[fd] != nil)
 }
 
 class FileHandleWrapper {

@@ -298,14 +298,6 @@ code for the target that is not the build machine:
 
   Add ``REQUIRES: executable_test`` to the test.
 
-* ``%target-run-simple-swift``: build a one-file Swift program and run it on
-  the target machine.
-
-  Use this substitution for executable tests that don't require special
-  compiler arguments.
-
-  Add ``REQUIRES: executable_test`` to the test.
-
 * ``%target-run-stdlib-swift``: like ``%target-run-simple-swift`` with
   ``-parse-stdlib -Xfrontend -disable-access-control``.
 
@@ -489,6 +481,11 @@ Other substitutions:
   directory exists and is empty.  Equivalent to
   ``rm -rf directory-name && mkdir -p directory-name``.
 
+* ``%host_sdk%``, ``%host_triple%``: Host SDK path and triple for '-target'.
+  These can be used for build host tools/libraries in test cases.
+
+* ``%host-swift-build``: Build swift tools/libraries for the host.
+
 When writing a test where output (or IR, SIL) depends on the bitness of the
 target CPU, use this pattern::
 
@@ -543,6 +540,27 @@ FIXME: full list.
 
 * ``XFAIL: linux``: tests that need to be adapted for Linux, for example parts
   that depend on Objective-C interop need to be split out.
+
+#### Features ``REQUIRES: swift_feature_...``
+
+Each of the Swift compiler features defined in `include/swift/Basic/Features.def`
+will get a LLVM Lit feature prefixing `swift_feature_` to the feature name
+automatically. The LLVM Lit features will be available only in those
+configurations where the compiler supports the given feature, and will not be
+available when the compiler does not support the feature. This means that
+standard language features and upcoming features will always be available,
+while experimental features will only be available when the compiler supports
+them.
+
+For every test that uses `--enable-experimental-feature` or
+`--enable-upcoming-feature` add a `REQUIRES: swift_feature_...` for each of the
+used features. The `Misc/verify-swift-feature-testing.test-sh` will check that
+every test with those command line arguments have the necessary `REQUIRES:` and
+fail otherwise.
+
+Do NOT add `REQUIRES: asserts` for experimental features anymore. The correct
+usage of `REQUIRES: swift_feature_...` will take care of testing the feature as
+it evolves from experimental, to upcoming, to language feature.
 
 #### Feature ``REQUIRES: executable_test``
 

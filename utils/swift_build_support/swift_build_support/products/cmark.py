@@ -90,10 +90,6 @@ class CMark(cmake_product.CMakeProduct):
         """
         executable_target = 'api_test'
         results_targets = ['test']
-        if self.args.cmake_generator == 'Xcode':
-            # Xcode generator uses "RUN_TESTS" instead of "test".
-            results_targets = ['RUN_TESTS']
-
         test_env = {
             "CTEST_OUTPUT_ON_FAILURE": "ON"
         }

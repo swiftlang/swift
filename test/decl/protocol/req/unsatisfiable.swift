@@ -5,15 +5,17 @@ protocol P {
   associatedtype B
 
   func f<T: P>(_: T) where T.A == Self.A, T.A == Self.B // expected-error{{instance method requirement 'f' cannot add constraint 'Self.A == Self.B' on 'Self'}}
-  // expected-note@-1 {{protocol requires function 'f' with type '<T> (T) -> ()'; do you want to add a stub?}}
+  // expected-note@-1 {{protocol requires function 'f' with type '<T> (T) -> ()'}}
 }
 
 extension P {
   func f<T: P>(_: T) where T.A == Self.A, T.A == Self.B { }
-  // expected-note@-1 {{candidate would match if 'X' was the same type as 'X.B' (aka 'Int')}}
+  // expected-note@-1 {{candidate would match if 'X.A' (aka 'X') was the same type as 'X.B' (aka 'Int')}}
 }
 
-struct X : P { // expected-error {{type 'X' does not conform to protocol 'P'}}
+struct X : P { 
+  // expected-error@-1 {{type 'X' does not conform to protocol 'P'}}
+  // expected-note@-2 {{add stubs for conformance}}
   typealias A = X
   typealias B = Int
 }
@@ -65,18 +67,33 @@ protocol P6 {
 
   func foo() where T == U
   // expected-error@-1 {{instance method requirement 'foo()' cannot add constraint 'Self.T == Self.U' on 'Self'}}
-  // expected-note@-2 {{protocol requires function 'foo()' with type '() -> ()'; do you want to add a stub?}}
+  // expected-note@-2 {{protocol requires function 'foo()' with type '() -> ()'}}
 }
 
 struct S2 : P6 {
   // expected-error@-1 {{type 'S2' does not conform to protocol 'P6'}}
+  // expected-note@-2 {{add stubs for conformance}}
   typealias T = Int
   typealias U = String
 
   func foo() {}
-  // expected-note@-1 {{candidate has non-matching type '() -> ()'}}
+  // expected-note@-1 {{candidate would match if 'S2.T' (aka 'Int') was the same type as 'S2.U' (aka 'String')}}
 
   // FIXME: This error is bogus and should be omitted on account of the protocol requirement itself
   // being invalid.
 }
 
+// This used to emit a diagnostic with a canonical type in it.
+protocol P7 {
+  associatedtype A
+  func f() // expected-note {{protocol requires function 'f()' with type '() -> ()'}}
+}
+
+extension P7 where A: Equatable {
+  func f() {} // expected-note {{candidate would match if 'C7<T>.A' (aka 'T') conformed to 'Equatable'}}
+}
+
+class C7<T>: P7 { // expected-error {{type 'C7<T>' does not conform to protocol 'P7'}}
+// expected-note@-1 {{add stubs for conformance}}
+  typealias A = T
+}

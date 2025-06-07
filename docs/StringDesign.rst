@@ -540,7 +540,7 @@ programmers well; so, why does Swift have its own string type?
 * C strings had to stay around for performance reasons and
   interoperability
 
-Want performance of C, sane semantics of C++ strings, and high-level
+Want performance of C, sound semantics of C++ strings, and high-level
 goodness of ObjC.
 
    The design of ``NSString`` is *very* different from the string

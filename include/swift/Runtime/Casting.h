@@ -239,10 +239,52 @@ const Metadata *swift_getObjectType(HeapObject *object);
 /// \param type The metadata for the type for which to do the conformance
 ///             check.
 /// \param protocol The protocol descriptor for the protocol to check
-///                 conformance for.
+///                 conformance for. This pointer does not have ptrauth applied.
 SWIFT_RUNTIME_EXPORT
 const WitnessTable *swift_conformsToProtocol(const Metadata *type,
-                                            const ProtocolDescriptor *protocol);
+                                             const void *protocol);
+
+/// Check whether a type conforms to a given native Swift protocol. Identical to
+/// swift_conformsToProtocol, except that the protocol parameter has a ptrauth
+/// signature on ARM64e that is signed with a process independent key.
+SWIFT_RUNTIME_EXPORT
+const WitnessTable *
+swift_conformsToProtocol2(const Metadata *type,
+                          const ProtocolDescriptor *protocol);
+
+/// Check whether a type conforms to a given native Swift protocol. Identical to
+/// swift_conformsToProtocol, except that the protocol parameter has a ptrauth
+/// signature on ARM64e that is signed with a process dependent key.
+SWIFT_RUNTIME_EXPORT
+const WitnessTable *
+swift_conformsToProtocolCommon(const Metadata *type,
+                               const ProtocolDescriptor *protocol);
+
+/// The size of the ConformanceExecutionContext structure.
+SWIFT_RUNTIME_EXPORT
+size_t swift_ConformanceExecutionContextSize;
+
+/// Check whether a type conforms to a given native Swift protocol. This
+/// is similar to swift_conformsToProtocolCommon, but allows the caller to
+/// either capture the execution context (in *context).
+SWIFT_RUNTIME_EXPORT
+const WitnessTable *
+swift_conformsToProtocolWithExecutionContext(
+    const Metadata *type,
+    const ProtocolDescriptor *protocol,
+    ConformanceExecutionContext *context);
+
+/// Determine whether this function is being executed within the execution
+/// context for a conformance. For example, if the conformance is
+/// isolated to a given global actor, checks whether this code is running on
+/// that global actor's executor.
+///
+/// The context should have been filled in by
+/// swift_conformsToProtocolWithExecutionContext.
+SWIFT_RUNTIME_EXPORT
+bool swift_isInConformanceExecutionContext(
+    const Metadata *type,
+    const ConformanceExecutionContext *context);
 
 } // end namespace swift
 

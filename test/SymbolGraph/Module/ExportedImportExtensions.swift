@@ -1,9 +1,15 @@
 // RUN: %empty-directory(%t)
+// RUN: %empty-directory(%t/module-generated)
 // RUN: %target-swift-frontend %S/Inputs/ExportedImportExtensions/A.swift -module-name A -emit-module -emit-module-path %t/A.swiftmodule
 // RUN: %target-swift-frontend %S/Inputs/ExportedImportExtensions/B.swift -module-name B -emit-module -emit-module-path %t/B.swiftmodule -I %t
-// RUN: %target-swift-frontend %s -module-name ExportedImportExtensions -emit-module -emit-module-path /dev/null -I %t -emit-symbol-graph -emit-symbol-graph-dir %t/ -emit-extension-block-symbols
+// RUN: %target-swift-frontend %s -module-name ExportedImportExtensions -emit-module -emit-module-path \
+// RUN:     %t/ExportedImportExtensions.swiftmodule -I %t -emit-symbol-graph -emit-symbol-graph-dir %t/ -emit-extension-block-symbols
 // RUN: %FileCheck %s --input-file %t/ExportedImportExtensions.symbols.json
+// RUN: %target-swift-symbolgraph-extract -module-name ExportedImportExtensions -I %t -output-dir %t/module-generated/ \
+// RUN:     -emit-extension-block-symbols -experimental-allowed-reexported-modules=A,B
+// RUN: %FileCheck %s --input-file %t/module-generated/ExportedImportExtensions.symbols.json
 // RUN: ls %t | %FileCheck %s --check-prefix FILES
+// RUN: ls %t/module-generated/ | %FileCheck %s --check-prefix FILES
 
 @_exported import A
 @_exported import B
@@ -44,9 +50,6 @@ extension SymbolFromB: P {
 // CHECK-DAG: "precise":"s:1B11SymbolFromBV24ExportedImportExtensionsE12pRequirementyyF"
 // CHECK-DAG: {"kind":"memberOf","source":"s:1B11SymbolFromBV24ExportedImportExtensionsE12pRequirementyyF","target":"s:1B11SymbolFromBV","targetFallback":"B.SymbolFromB","sourceOrigin":{"identifier":"s:24ExportedImportExtensions1PP12pRequirementyyF","displayName":"P.pRequirement()"}}
 // CHECK-DAG: {"kind":"conformsTo","source":"s:1B11SymbolFromBV","target":"s:24ExportedImportExtensions1PP"}
-
-// FIXME: Symbols from `@_exported import` do not get emitted when using swift-symbolgraph-extract
-// This is tracked by https://github.com/apple/swift-docc/issues/179.
 
 // FILES-NOT: ExportedImportExtensions@A.symbols.json
 // FILES-NOT: ExportedImportExtensions@B.symbols.json

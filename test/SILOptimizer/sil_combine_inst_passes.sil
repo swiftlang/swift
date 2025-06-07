@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -simplification | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
@@ -48,6 +48,17 @@ bb0(%0 : @owned $Buffer):
   return %t : $(Builtin.Int1, Buffer)
 }
 
+// CHECK-LABEL: sil [ossa] @dont_remove_end_begin_cow_pair3
+// CHECK:   end_cow_mutation
+// CHECK:   begin_cow_mutation
+// CHECK: } // end sil function 'dont_remove_end_begin_cow_pair3'
+sil [ossa] @dont_remove_end_begin_cow_pair3 : $@convention(thin) (@owned Buffer) -> @owned Buffer {
+bb0(%0 : @owned $Buffer):
+  %e = end_cow_mutation [keep_unique] %0 : $Buffer
+  (%u, %b) = begin_cow_mutation %e : $Buffer
+  return %b : $Buffer
+}
+
 // CHECK-LABEL: sil [ossa] @remove_begin_end_cow_pair
 // CHECK-NOT: end_cow_mutation
 // CHECK-NOT: begin_cow_mutation
@@ -87,6 +98,16 @@ bb0(%0 : @owned $Buffer):
   return %t : $(Builtin.Int1, Buffer)
 }
 
+// CHECK-LABEL: sil [ossa] @dont_remove_begin_end_cow_pair3
+// CHECK:   begin_cow_mutation
+// CHECK:   end_cow_mutation
+// CHECK: } // end sil function 'dont_remove_begin_end_cow_pair3'
+sil [ossa] @dont_remove_begin_end_cow_pair3 : $@convention(thin) (@owned Buffer) -> @owned Buffer {
+bb0(%0 : @owned $Buffer):
+  (%u, %b) = begin_cow_mutation %0 : $Buffer
+  %e = end_cow_mutation [keep_unique] %b : $Buffer
+  return %e : $Buffer
+}
 // CHECK-LABEL: sil @optimize_empty_cow_singleton
 // CHECK:   [[I:%[0-9]+]] = integer_literal $Builtin.Int1, 0
 // CHECK:   begin_cow_mutation
@@ -127,3 +148,21 @@ bb0:
   return %16 : $Int
 }
 
+// CHECK-LABEL: sil [ossa] @test_dead_borrowed_from
+// CHECK:         borrowed {{.*}} from
+// CHECK:       } // end sil function 'test_dead_borrowed_from'
+sil [ossa] @test_dead_borrowed_from : $@convention(thin) (@guaranteed Buffer, @guaranteed Buffer) -> () {
+bb0(%0 : @guaranteed $Buffer, %1 : @guaranteed $Buffer):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%0 : $Buffer)
+
+bb2:
+  br bb3(%1 : $Buffer)
+
+bb3(%9 : @guaranteed $Buffer):
+  %10 = borrowed %9 : $Buffer from (%1 : $Buffer)
+  %r = tuple ()
+  return %r : $()
+}

@@ -70,6 +70,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-rr-code-motion"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
@@ -140,6 +141,8 @@ struct BlockState {
 /// code motion procedure should be.
 class CodeMotionContext {
 protected:
+  SILFunctionTransform *parentTransform;
+
   /// Dataflow needs multiple iteration to converge. If this is false, then we
   /// do not need to generate the genset or killset, i.e. we can simply do 1
   /// pessimistic data flow iteration.
@@ -184,7 +187,7 @@ protected:
 #ifndef NDEBUG
   // SILPrintContext is used to print block IDs in RPO order.
   // It is optional so only the final insertion point interference is printed.
-  Optional<SILPrintContext> printCtx;
+  std::optional<SILPrintContext> printCtx;
 #endif
 
   /// Return the rc-identity root of the SILValue.
@@ -202,11 +205,13 @@ protected:
 
 public:
   /// Constructor.
-  CodeMotionContext(llvm::SpecificBumpPtrAllocator<BlockState> &BPA,
+  CodeMotionContext(SILFunctionTransform *parentTransform,
+                    llvm::SpecificBumpPtrAllocator<BlockState> &BPA,
                     SILFunction *F,
                     PostOrderFunctionInfo *PO, AliasAnalysis *AA,
                     RCIdentityFunctionInfo *RCFI)
-    : MultiIteration(true), BPA(BPA), F(F), PO(PO), AA(AA), RCFI(RCFI),
+    : parentTransform(parentTransform),
+      MultiIteration(true), BPA(BPA), F(F), PO(PO), AA(AA), RCFI(RCFI),
       InterestBlocks(F) {}
 
   /// virtual destructor.
@@ -254,6 +259,17 @@ bool CodeMotionContext::run() {
   // Initialize the data flow.
   initializeCodeMotionDataFlow();
 
+  if (RCRootVault.size() > 500) {
+    // Emergency exit to avoid bad compile time problems in rare corner cases.
+    // This limit is more than enough for "real world" code.
+    // Even large functions have < 100 locations.
+    // But in some corner cases - especially in generated code - we can run
+    // into quadratic complexity for large functions.
+    // TODO: eventually the ARCCodeMotion passes will be replaced by OSSA
+    //       optimizations which shouldn't have this problem.
+    return false;
+  }
+
   // Converge the BBSetOut with iterative data flow.
   if (MultiIteration) {
     initializeCodeMotionBBMaxSet();
@@ -299,23 +315,28 @@ public:
 
 /// RetainCodeMotionContext - Context to perform retain code motion.
 class RetainCodeMotionContext : public CodeMotionContext {
-  /// All the retain block state for all the basic blocks in the function. 
+  /// All the retain block state for all the basic blocks in the function.
   BasicBlockData<RetainBlockState> BlockStates;
+
+  InstructionSet retainInstructions;
 
   ProgramTerminationFunctionInfo PTFI;
 
+  bool isRetain(SILInstruction *inst) const {
+    return retainInstructions.contains(inst);
+  }
   /// Return true if the instruction blocks the Ptr to be moved further.
   bool mayBlockCodeMotion(SILInstruction *II, SILValue Ptr) override {
     // NOTE: If more checks are to be added, place the most expensive in the
     // end, this function is called many times.
     //
     // These terminator instructions block.
-    if (isa<ReturnInst>(II) || isa<ThrowInst>(II) || isa<UnwindInst>(II) ||
-        isa<UnreachableInst>(II))
+    if (isa<ReturnInst>(II) || isa<ThrowInst>(II) || isa<ThrowAddrInst>(II) ||
+        isa<UnwindInst>(II) || isa<UnreachableInst>(II))
       return true;
     // Identical RC root blocks code motion, we will be able to move this retain
     // further once we move the blocking retain.
-    if (isRetainInstruction(II) && getRCRoot(II) == Ptr) {
+    if (isRetain(II) && getRCRoot(II) == Ptr) {
       LLVM_DEBUG(if (printCtx) llvm::dbgs()
                  << "Retain " << Ptr << "  at matching retain " << *II);
       return true;
@@ -342,17 +363,19 @@ class RetainCodeMotionContext : public CodeMotionContext {
     if (&*I->getParent()->begin() == I)
       return nullptr;
     auto Prev = &*std::prev(SILBasicBlock::iterator(I));
-    if (isRetainInstruction(Prev) && getRCRoot(Prev) == Root)
+    if (isRetain(Prev) && getRCRoot(Prev) == Root)
       return Prev;
     return nullptr;
   }
 
 public:
   /// Constructor.
-  RetainCodeMotionContext(llvm::SpecificBumpPtrAllocator<BlockState> &BPA,
+  RetainCodeMotionContext(SILFunctionTransform *parentTransform,
+                          llvm::SpecificBumpPtrAllocator<BlockState> &BPA,
                           SILFunction *F, PostOrderFunctionInfo *PO,
                           AliasAnalysis *AA, RCIdentityFunctionInfo *RCFI)
-      : CodeMotionContext(BPA, F, PO, AA, RCFI), BlockStates(F), PTFI(F) {}
+      : CodeMotionContext(parentTransform, BPA, F, PO, AA, RCFI),
+        BlockStates(F), retainInstructions(F), PTFI(F) {}
 
   /// virtual destructor.
   ~RetainCodeMotionContext() override {}
@@ -408,6 +431,9 @@ void RetainCodeMotionContext::initializeCodeMotionDataFlow() {
     for (auto &II : BB) {
       if (!isRetainInstruction(&II))
         continue;
+      if (!parentTransform->continueWithNextSubpassRun(&II))
+        continue;
+      retainInstructions.insert(&II);
       RCInstructions.insert(&II);
       SILValue Root = getRCRoot(&II);
       if (RCRootIndex.find(Root) != RCRootIndex.end())
@@ -446,7 +472,7 @@ void RetainCodeMotionContext::initializeCodeMotionBBMaxSet() {
    // NOTE: this is a conservative approximation, because some retains may be
    // blocked before it reaches this block.
    for (auto &II : *BB) {
-      if (!isRetainInstruction(&II))
+      if (!isRetain(&II))
         continue;
       State.BBMaxSet.set(RCRootIndex[getRCRoot(&II)]);
     }
@@ -468,7 +494,7 @@ void RetainCodeMotionContext::computeCodeMotionGenKillSet() {
         State.BBGenSet.reset(i);
       }
       // If this is a retain instruction, it also generates.
-      if (isRetainInstruction(&I)) {
+      if (isRetain(&I)) {
         unsigned idx = RCRootIndex[getRCRoot(&I)];
         State.BBGenSet.set(idx);
         assert(State.BBKillSet.test(idx) && "Killset computed incorrectly");
@@ -611,7 +637,7 @@ void RetainCodeMotionContext::computeCodeMotionInsertPoints() {
       }
 
       // If this is a retain instruction, it also generates.
-      if (isRetainInstruction(&*I)) {
+      if (isRetain(&*I)) {
         S.BBSetIn.set(RCRootIndex[getRCRoot(&*I)]);
       }
     }
@@ -657,8 +683,6 @@ public:
 
 /// ReleaseCodeMotionContext - Context to perform release code motion.
 class ReleaseCodeMotionContext : public CodeMotionContext {
-  SILFunctionTransform *parentTransform;
-
   /// All the release block state for all the basic blocks in the function.
   BasicBlockData<ReleaseBlockState> BlockStates;
 
@@ -719,8 +743,7 @@ public:
                            AliasAnalysis *AA, RCIdentityFunctionInfo *RCFI,
                            bool FreezeEpilogueReleases,
                            ConsumedArgToEpilogueReleaseMatcher &ERM)
-      : CodeMotionContext(BPA, F, PO, AA, RCFI),
-        parentTransform(parentTransform),
+      : CodeMotionContext(parentTransform, BPA, F, PO, AA, RCFI),
         BlockStates(F),
         releaseInstructions(F),
         FreezeEpilogueReleases(FreezeEpilogueReleases), ERM(ERM) {}
@@ -1221,7 +1244,7 @@ public:
       // Run release hoisting.
       InstChanged |= RelCM.run();
     } else {
-      RetainCodeMotionContext RetCM(BPA, F, PO, AA, RCFI);
+      RetainCodeMotionContext RetCM(this, BPA, F, PO, AA, RCFI);
       // Run retain sinking.
       InstChanged |= RetCM.run();
       // Eliminate any retains that are right before program termination

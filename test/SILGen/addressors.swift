@@ -1,6 +1,6 @@
 
-// RUN: %target-swift-emit-sil -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -parse-stdlib %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -parse-stdlib %s | %FileCheck %s -check-prefix=SILGEN
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -parse-stdlib %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -parse-stdlib %s | %FileCheck %s -check-prefix=SILGEN
 // RUN: %target-swift-emit-ir -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -parse-stdlib %s
 
 // This test includes some calls to transparent stdlib functions.
@@ -46,14 +46,20 @@ struct A {
 // CHECK:   [[BASE:%.*]] = load [[T0]] : $*UnsafeMutablePointer<Int32>
 // CHECK:   return [[BASE]] : $UnsafeMutablePointer<Int32>
 
+// SILGEN-LABEL: sil hidden [ossa] @$s10addressors5test0yyF : $@convention(thin) () -> () {
 // CHECK-LABEL: sil hidden @$s10addressors5test0yyF : $@convention(thin) () -> () {
 func test0() {
-// CHECK: [[A:%.*]] = alloc_stack $A
+// CHECK: [[A:%.*]] = alloc_stack [var_decl] $A
 // CHECK: [[T1:%.*]] = metatype $@thin A.Type
 // CHECK: [[T0:%.*]] = function_ref @$s10addressors1AV{{[_0-9a-zA-Z]*}}fC
 // CHECK: [[AVAL:%.*]] = apply [[T0]]([[T1]]) 
 // CHECK: store [[AVAL]] to [[A]]
   var a = A()
+
+// SILGEN: [[ACCESS:%.*]] = begin_access [read] [unknown] %{{.*}} : $*A
+// SILGEN: [[LD:%.*]] = load [trivial] [[ACCESS]] : $*A
+// SILGEN: [[T3:%.*]] = pointer_to_address %{{.*}} : $Builtin.RawPointer to [strict] $*Int32
+// SILGEN: [[MD:%.*]] = mark_dependence [unresolved] [[T3]] : $*Int32 on [[LD]] : $A
 
 // CHECK: [[T0:%.*]] = function_ref @$s10addressors1AVys5Int32VAEcilu :
 // CHECK: [[T1:%.*]] = apply [[T0]]({{%.*}}, [[AVAL]])
@@ -68,7 +74,8 @@ func test0() {
 // CHECK: [[T1:%.*]] = apply [[T0]]({{%.*}}, [[WRITE]])
 // CHECK: [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<Int32>, #UnsafeMutablePointer._rawValue
 // CHECK: [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*Int32
-// CHECK: [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[T3]] : $*Int32
+// CHECK: [[MD:%.*]] = mark_dependence [nonescaping] [[T3]] : $*Int32 on [[WRITE]] : $*A
+// CHECK: [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[MD]] : $*Int32
 // CHECK: load
 // CHECK: sadd_with_overflow_Int{{32|64}}
 // CHECK: store {{%.*}} to [[ACCESS]]
@@ -79,7 +86,8 @@ func test0() {
 // CHECK: [[T1:%.*]] = apply [[T0]]({{%.*}}, [[WRITE]])
 // CHECK: [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<Int32>, #UnsafeMutablePointer._rawValue
 // CHECK: [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*Int32
-// CHECK: [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[T3]] : $*Int32
+// CHECK: [[MD:%.*]] = mark_dependence [nonescaping] [[T3]] : $*Int32 on [[WRITE]] : $*A
+// CHECK: [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[MD]] : $*Int32
 // CHECK: store {{%.*}} to [[ACCESS]]
   a[3] = 6
 }
@@ -147,7 +155,8 @@ struct B : Subscriptable {
 // CHECK:   [[PTR:%.*]] = apply [[T0]]([[INDEX]], [[WRITE]])
 // CHECK:   [[T0:%.*]] = struct_extract [[PTR]] : $UnsafeMutablePointer<Int32>,
 // CHECK:   [[ADDR:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to [strict] $*Int32
-// CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[ADDR]] : $*Int32
+// CHECK:   [[MD:%.*]] = mark_dependence [nonescaping] [[ADDR]] : $*Int32 on [[WRITE]] : $*B
+// CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[MD]] : $*Int32
 // Accept either of struct_extract+load or load+struct_element_addr.
 // CHECK:   load
 // CHECK:   [[T1:%.*]] = builtin "or_Int32"
@@ -176,7 +185,8 @@ func test_carray(_ array: inout CArray<(Int32) -> Int32>) -> Int32 {
 // CHECK:   [[T1:%.*]] = apply [[T0]]<(Int32) -> Int32>({{%.*}}, [[WRITE]])
 // CHECK:   [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<(Int32) -> Int32>, #UnsafeMutablePointer._rawValue
 // CHECK:   [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Int32, Int32>
-// CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[T3]]
+// CHECK:   [[MD:%.*]] = mark_dependence [nonescaping] [[T3]] : $*@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Int32, Int32> on [[WRITE]] : $*CArray<(Int32) -> Int32>
+// CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[MD]]
 // CHECK:   store {{%.*}} to [[ACCESS]] :
   array[0] = id_int
 
@@ -186,6 +196,7 @@ func test_carray(_ array: inout CArray<(Int32) -> Int32>) -> Int32 {
 // CHECK:   [[T2:%.*]] = apply [[T1]]<(Int32) -> Int32>({{%.*}}, [[T0]])
 // CHECK:   [[T3:%.*]] = struct_extract [[T2]] : $UnsafePointer<(Int32) -> Int32>, #UnsafePointer._rawValue
 // CHECK:   [[T4:%.*]] = pointer_to_address [[T3]] : $Builtin.RawPointer to [strict] $*@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Int32, Int32>
+// (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Int32, Int32> on [[T0]] : $CArray<(Int32) -> Int32>
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [unsafe] [[T4]]
 // CHECK:   [[T5:%.*]] = load [[ACCESS]]
   return array[1](5)
@@ -209,7 +220,8 @@ struct D : Subscriptable {
 // SILGEN:   [[PTR:%.*]] = apply [[T0]]([[I]], [[ACCESS]])
 // SILGEN:   [[T0:%.*]] = struct_extract [[PTR]] : $UnsafeMutablePointer<Int32>,
 // SILGEN:   [[ADDR:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to [strict] $*Int32
-// SILGEN:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[ADDR]] : $*Int32
+// SILGEN:   [[MD:%.*]] = mark_dependence [unresolved] [[ADDR]] : $*Int32 on %6 : $*D
+// SILGEN:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[MD]] : $*Int32
 // SILGEN:   assign [[VALUE]] to [[ACCESS]] : $*Int32
 
 // SILGEN-LABEL: sil hidden [transparent] [ossa] @$s10addressors1DVys5Int32VAEciM
@@ -219,7 +231,8 @@ struct D : Subscriptable {
 // SILGEN:   [[PTR:%.*]] = apply [[T0]]([[I]], [[SELF_ACCESS]])
 // SILGEN:   [[ADDR_TMP:%.*]] = struct_extract [[PTR]] : $UnsafeMutablePointer<Int32>,
 // SILGEN:   [[ADDR:%.*]] = pointer_to_address [[ADDR_TMP]]
-// SILGEN:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[ADDR]]
+// SILGEN:   [[MD:%.*]] = mark_dependence [unresolved] [[ADDR]] : $*Int32 on [[SELF_ACCESS]] : $*D
+// SILGEN:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[MD]]
 // SILGEN:   yield [[ACCESS]]
 // SILGEN:   end_access [[ACCESS]]
 
@@ -236,7 +249,8 @@ func test_d(_ array: inout D) -> Int32 {
 // CHECK:   [[T1:%.*]] = apply [[T0]]({{%.*}}, [[WRITE]])
 // CHECK:   [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<Int32>,
 // CHECK:   [[ADDR:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*Int32
-// CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[ADDR]] : $*Int32
+// CHECK:   [[MD:%.*]] = mark_dependence [nonescaping] [[ADDR]] : $*Int32 on [[WRITE]] : $*D
+// CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[MD]] : $*Int32
 // CHECK:   store [[V]] to [[ACCESS]] : $*Int32
   array[0] = make_int()
 
@@ -245,7 +259,8 @@ func test_d(_ array: inout D) -> Int32 {
 // CHECK:   [[T1:%.*]] = apply [[T0]]({{%.*}}, [[WRITE]])
 // CHECK:   [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<Int32>,
 // CHECK:   [[ADDR:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to [strict] $*Int32
-// CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[ADDR]] : $*Int32
+// CHECK:   [[MD:%.*]] = mark_dependence [nonescaping] [[ADDR]] : $*Int32 on [[WRITE]] : $*D
+// CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[MD]] : $*Int32
 // CHECK:   [[FN:%.*]] = function_ref @$s10addressors14take_int_inoutyys5Int32VzF
 // CHECK:   apply [[FN]]([[ACCESS]])
   take_int_inout(&array[1])

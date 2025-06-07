@@ -156,7 +156,7 @@ func twelve() {
   twelve_helper { (a, b) in // expected-error {{invalid conversion from throwing function of type '(Int, Int) throws -> ()' to non-throwing function type '(Int, Int) -> ()'}}
     do {
       try thrower()
-    } catch Twelve.Payload(a...b) {
+    } catch Twelve.Payload(a...b) { // expected-error {{pattern of type 'Twelve' does not conform to expected match type 'Error'}}
     }
   }
 }
@@ -169,7 +169,8 @@ func thirteen() {
   thirteen_helper { (a) in // expected-error {{invalid conversion from throwing function of type '(Thirteen) throws -> ()' to non-throwing function type '(Thirteen) -> ()'}}
     do {
       try thrower()
-    } catch a {
+      // FIXME: Bad diagnostic (https://github.com/apple/swift/issues/63459)
+    } catch a { // expected-error {{binary operator '~=' cannot be applied to two 'any Error' operands}}
     }
   }
 }

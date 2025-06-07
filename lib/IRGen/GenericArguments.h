@@ -1,4 +1,4 @@
-//===--- MetadataRequest.cpp - IR generation for metadata requests --------===//
+//===--- GenericArguments.h - IR generation for metadata requests ---------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -59,23 +59,12 @@ struct GenericArguments {
   void collectTypes(IRGenModule &IGM,
                     const GenericTypeRequirements &requirements) {
     for (auto &requirement : requirements.getRequirements()) {
-      switch (requirement.getKind()) {
-      case GenericRequirement::Kind::Shape:
-        Types.push_back(IGM.SizeTy);
-        break;
-      case GenericRequirement::Kind::Metadata:
-        Types.push_back(IGM.TypeMetadataPtrTy);
-        break;
-      case GenericRequirement::Kind::WitnessTable:
-        Types.push_back(IGM.WitnessTablePtrTy);
-        break;
-      }
+      Types.push_back(requirement.getType(IGM));
     }
   }
 
   void collect(IRGenFunction &IGF, CanType type) {
-    auto decl = type.getNominalOrBoundGenericNominal();
-    auto subs = type->getContextSubstitutionMap(IGF.IGM.getSwiftModule(), decl);
+    auto subs = type->getContextSubstitutionMap();
     collect(IGF, subs);
   }
 
@@ -84,7 +73,7 @@ struct GenericArguments {
 
     for (auto requirement : requirements.getRequirements()) {
       Values.push_back(emitGenericRequirementFromSubstitutions(
-          IGF, requirement, subs, MetadataState::Abstract));
+          IGF, requirement, MetadataState::Abstract, subs));
     }
 
     collectTypes(IGF.IGM, requirements);

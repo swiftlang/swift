@@ -22,15 +22,17 @@ namespace swift {
 /// Describes the context of a macro expansion for the purpose of
 /// computing macro expansion discriminators.
 struct MacroDiscriminatorContext
-    : public llvm::PointerUnion<DeclContext *, MacroExpansionExpr *,
-                                MacroExpansionDecl *> {
+    : public llvm::PointerUnion<DeclContext *, FreestandingMacroExpansion *> {
   using PointerUnion::PointerUnion;
 
-  static MacroDiscriminatorContext getParentOf(MacroExpansionExpr *expansion);
-  static MacroDiscriminatorContext getParentOf(MacroExpansionDecl *expansion);
+  static MacroDiscriminatorContext getParentOf(FreestandingMacroExpansion *expansion);
   static MacroDiscriminatorContext getParentOf(
       SourceLoc loc, DeclContext *origDC
   );
+
+  /// Return the innermost declaration context that is suitable for
+  /// use in identifying a macro.
+  static DeclContext *getInnermostMacroContext(DeclContext *dc);
 };
 
 }

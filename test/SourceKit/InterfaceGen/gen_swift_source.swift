@@ -7,7 +7,7 @@
 // RUN: %diff -u %s.response %t.response
 
 // RUN: %sourcekitd-test -req=interface-gen-open %S/Inputs/Foo2.swift -- %S/Inputs/Foo2.swift -target %target-triple %clang-importer-sdk-nosource -I %t \
-// RUN: == -req=cursor -pos=18:49 | %FileCheck -check-prefix=CHECK1 %s
+// RUN: == -req=cursor -pos=17:49 | %FileCheck -check-prefix=CHECK1 %s
 // The cursor points to 'FooOverlayClassBase' inside the list of base classes, see 'gen_swift_source.swift.response'
 
 // CHECK1: FooOverlayClassBase

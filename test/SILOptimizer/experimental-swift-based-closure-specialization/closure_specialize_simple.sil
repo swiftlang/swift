@@ -1,0 +1,292 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -experimental-swift-based-closure-specialization %s | %FileCheck %s
+// XFAIL: *
+
+import Builtin
+import Swift
+
+sil @simple_partial_apply_fun : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
+
+// CHECK-LABEL: sil shared @$s27simple_partial_apply_caller0a1_b1_C4_funBi1_Tf1c_n : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
+// CHECK: bb0([[CAPTURED_ARG:%.*]] : $Builtin.Int1):
+// CHECK: [[CLOSED_OVER_FUN:%.*]] = function_ref @simple_partial_apply_fun :
+// CHECK: [[NEW_PAI:%.*]] = partial_apply [[CLOSED_OVER_FUN]]
+// CHECK: strong_release [[NEW_PAI]]
+sil @simple_partial_apply_caller : $@convention(thin) (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $@callee_owned (Builtin.Int1) -> Builtin.Int1):
+  br bb1
+
+bb1:
+  %1 = integer_literal $Builtin.Int1, 0
+  // We cannot do anything here for now but in the future I think we should try
+  // to handle this in closure specialization potentially.
+  %2 = apply %0(%1) : $@callee_owned (Builtin.Int1) -> Builtin.Int1
+  strong_release %0 : $@callee_owned (Builtin.Int1) -> Builtin.Int1
+  cond_br undef, bb1, bb2
+
+bb2:
+  return %2 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil shared @$s37simple_partial_apply_2nd_level_caller0a1_b1_C4_funBi1_Tf1c_n : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
+// CHECK: bb0([[CAPTURED_ARG:%.*]] : $Builtin.Int1):
+// CHECK: [[SPECIALIZED_CALLEE:%.*]] = function_ref @$s27simple_partial_apply_caller0a1_b1_C4_funBi1_Tf1c_n  :
+// CHECK: [[RET:%.*]]= apply [[SPECIALIZED_CALLEE]]([[CAPTURED_ARG]])
+// CHECK: return [[RET]]
+sil @simple_partial_apply_2nd_level_caller : $@convention(thin) (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $@callee_owned (Builtin.Int1) -> Builtin.Int1):
+  br bb1
+
+bb1:
+  %1 = function_ref @simple_partial_apply_caller : $@convention(thin) (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1
+  %2 = apply %1(%0) : $@convention(thin) (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1
+  cond_br undef, bb1, bb2
+
+bb2:
+  return %2 : $Builtin.Int1
+}
+sil @simple_partial_apply_caller_decl : $@convention(thin) (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1
+
+sil @simple_multiple_partial_apply_caller : $@convention(thin) (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1, @owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $@callee_owned (Builtin.Int1) -> Builtin.Int1, %1 : $@callee_owned (Builtin.Int1) -> Builtin.Int1):
+  br bb1
+
+bb1:
+  %2 = integer_literal $Builtin.Int1, 0
+  // We cannot do anything here for now but in the future I think we should try
+  // to handle this in closure specialization potentially.
+  apply %0(%2) : $@callee_owned (Builtin.Int1) -> Builtin.Int1
+  strong_release %0 : $@callee_owned (Builtin.Int1) -> Builtin.Int1
+  apply %1(%2) : $@callee_owned (Builtin.Int1) -> Builtin.Int1
+  strong_release %1 : $@callee_owned (Builtin.Int1) -> Builtin.Int1
+  cond_br undef, bb1, bb2
+
+bb2:
+  return %2 : $Builtin.Int1
+}
+
+sil @simple_partial_apply_fun2 : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
+sil @simple_partial_apply_caller2 : $@convention(thin) (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $@callee_owned (Builtin.Int1) -> Builtin.Int1):
+  br bb1
+
+bb1:
+  %1 = integer_literal $Builtin.Int1, 0
+  // We cannot do anything here for now but in the future I think we should try
+  // to handle this in closure specialization potentially.
+  %2 = apply %0(%1) : $@callee_owned (Builtin.Int1) -> Builtin.Int1
+  strong_release %0 : $@callee_owned (Builtin.Int1) -> Builtin.Int1
+  cond_br undef, bb1, bb2
+
+bb2:
+  return %2 : $Builtin.Int1
+}
+
+
+sil @indirect_parameter_partial_apply_fun : $@convention(thin) (@in Builtin.Int1, Builtin.Int1, @in Builtin.Int1) -> @out Builtin.Int1
+
+sil @indirect_parameter_partial_apply_caller1 : $@convention(thin) (@callee_owned (@in Builtin.Int1, Builtin.Int1, @in Builtin.Int1) -> @out Builtin.Int1) -> () {
+bb0(%0 : $@callee_owned (@in Builtin.Int1, Builtin.Int1, @in Builtin.Int1) -> @out Builtin.Int1):
+  br bb1
+
+bb1:
+  %1 = alloc_stack $Builtin.Int1
+  %2 = integer_literal $Builtin.Int1, 0
+  apply %0(%1, %1, %2, %1) : $@callee_owned (@in Builtin.Int1, Builtin.Int1, @in Builtin.Int1) -> @out Builtin.Int1
+  dealloc_stack %1 : $*Builtin.Int1
+  cond_br undef, bb1, bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @indirect_parameter_partial_apply_caller2 : $@convention(thin) (@callee_owned (@in Builtin.Int1, Builtin.Int1) -> @out Builtin.Int1) -> () {
+bb0(%0 : $@callee_owned (@in Builtin.Int1, Builtin.Int1) -> @out Builtin.Int1):
+  br bb1
+
+bb1:
+  %1 = alloc_stack $Builtin.Int1
+  %2 = integer_literal $Builtin.Int1, 0
+  apply %0(%1, %1, %2) : $@callee_owned (@in Builtin.Int1, Builtin.Int1) -> @out Builtin.Int1
+  dealloc_stack %1 : $*Builtin.Int1
+  cond_br undef, bb1, bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @indirect_parameter_partial_apply_caller3 : $@convention(thin) (@callee_owned (@in Builtin.Int1) -> @out Builtin.Int1) -> () {
+bb0(%0 : $@callee_owned (@in Builtin.Int1) -> @out Builtin.Int1):
+  br bb1
+
+bb1:
+  %1 = alloc_stack $Builtin.Int1
+  apply %0(%1, %1) : $@callee_owned (@in Builtin.Int1) -> @out Builtin.Int1
+  dealloc_stack %1 : $*Builtin.Int1
+  cond_br undef, bb1, bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @indirect_parameter_partial_apply_caller4 : $@convention(thin) (@callee_owned () -> @out Builtin.Int1) -> () {
+bb0(%0 : $@callee_owned () -> @out Builtin.Int1):
+  br bb1
+
+bb1:
+  %1 = alloc_stack $Builtin.Int1
+  apply %0(%1) : $@callee_owned () -> @out Builtin.Int1
+  dealloc_stack %1 : $*Builtin.Int1
+  cond_br undef, bb1, bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @indirect_parameter_partial_apply_caller5 : $@convention(thin) (@callee_owned () -> ()) -> () {
+bb0(%0 : $@callee_owned () -> ()):
+  br bb1
+
+bb1:
+  apply %0() : $@callee_owned () -> ()
+  cond_br undef, bb1, bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @indirect_parameter_partial_apply_caller6 : $@convention(thin) (@callee_owned () -> @out Builtin.Int1) -> @out Builtin.Int1 {
+bb0(%1 : $*Builtin.Int1, %0 : $@callee_owned () -> @out Builtin.Int1):
+  br bb1
+
+bb1:
+  apply %0(%1) : $@callee_owned () -> @out Builtin.Int1
+  cond_br undef, bb1, bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil @indirect_parameter_partial_apply_caller7 : $@convention(thin) (@callee_owned () -> @out Builtin.Int1) -> @out (Builtin.Int1, Builtin.Int1) {
+bb0(%1 : $*(Builtin.Int1, Builtin.Int1), %0 : $@callee_owned () -> @out Builtin.Int1):
+  br bb1
+
+bb1:
+  %2 = alloc_stack $Builtin.Int1
+  %3 = alloc_stack $Builtin.Int1
+  apply %0(%2) : $@callee_owned () -> @out Builtin.Int1
+  apply %0(%3) : $@callee_owned () -> @out Builtin.Int1
+  %4 = load %2: $*Builtin.Int1
+  %5 = load %3: $*Builtin.Int1
+  %6 = tuple(%4 : $Builtin.Int1, %5: $Builtin.Int1)
+  store %6 to %1 : $*(Builtin.Int1, Builtin.Int1)
+  dealloc_stack %3: $*Builtin.Int1
+  dealloc_stack %2: $*Builtin.Int1
+  cond_br undef, bb1, bb2
+
+bb2:
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil @loop_driver : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> () {
+// CHECK-DAG: [[SPECIALIZED_FUN:%.*]] = function_ref @$s27simple_partial_apply_caller0a1_b1_C4_funBi1_Tf1c_n : $@convention(thin) (Builtin.Int1) -> Builtin.Int1
+// CHECK-DAG: [[SPECIALIZED_FUN2:%.*]] = function_ref @$s37simple_partial_apply_2nd_level_caller0a1_b1_C4_funBi1_Tf1c_n : $@convention(thin) (Builtin.Int1) -> Builtin.Int1
+// CHECK: apply [[SPECIALIZED_FUN]]
+// CHECK: apply [[SPECIALIZED_FUN2]]
+
+// We can't call this one b/c it is just a declaration.
+// CHECK: [[UNSPECIALIZED_FUN_DECL:%.*]] = function_ref @simple_partial_apply_caller_decl : $@convention(thin) (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1
+// CHECK: apply [[UNSPECIALIZED_FUN_DECL]]
+
+// We handle closures with indirect results.
+// CHECK: [[CLOSUREFUN:%.*]] = function_ref @indirect_parameter_partial_apply_fun
+// CHECK-NOT: partial_apply [[CLOSUREFUN]]()
+// CHECK: [[INLINEDCLOSURE_CALLER1:%.*]] = function_ref @$s40indirect_parameter_partial_apply_caller10a1_b1_c1_D4_funTf1c_n
+// CHECK-NOT: partial_apply [[CLOSUREFUN]]()
+
+// We don't handle captured indirect @in and @in_guaranteed parameters yet.
+// CHECK: [[CLOSURE2:%.*]] = partial_apply [[CLOSUREFUN]](%{{.*}})
+// CHECK: [[CLOSURE3:%.*]] = partial_apply [[CLOSUREFUN]](%{{.*}})
+// CHECK: [[CLOSURE4:%.*]] = partial_apply [[CLOSUREFUN]](%{{.*}})
+
+// CHECK:  [[CALLER1:%.*]] = function_ref @indirect_parameter_partial_apply_caller1
+// CHECK:  [[CALLER2:%.*]] = function_ref @indirect_parameter_partial_apply_caller2
+// CHECK:  [[CALLER3:%.*]] = function_ref @indirect_parameter_partial_apply_caller3
+// CHECK:  [[CALLER4:%.*]] = function_ref @indirect_parameter_partial_apply_caller4
+
+// Closure with indirect result but no captured indirect parameter.
+// CHECK-NOT: apply [[CALLER1]]
+// apply [[INLINEDCLOSURE_CALLER1]]()
+// CHECK-NOT: apply [[CALLER1]]
+
+// Closures with captured indirect parameters.
+// apply [[CALLER2]]([[CLOSURE2]])
+// apply [[CALLER3]]([[CLOSURE3]])
+// apply [[CALLER4]]([[CLOSURE4]])
+
+// CHECK: return
+sil @loop_driver : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
+  %2 = function_ref @simple_partial_apply_fun : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
+  %3 = partial_apply %2(%0) : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
+  %4 = function_ref @simple_partial_apply_caller : $@convention(thin) (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1
+  %5 = apply %4(%3) : $@convention(thin) (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1
+
+  %51 = function_ref @simple_partial_apply_2nd_level_caller : $@convention(thin) (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1
+  %52 = apply %51(%3) : $@convention(thin) (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1
+
+  %6 = partial_apply %2(%0) : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
+  %7 = function_ref @simple_partial_apply_caller_decl : $@convention(thin) (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1
+  %8 = apply %7(%6) : $@convention(thin) (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1
+
+  %9 = alloc_stack $Builtin.Int1
+
+  %10 = function_ref @indirect_parameter_partial_apply_fun : $@convention(thin) (@in Builtin.Int1, Builtin.Int1, @in Builtin.Int1) -> @out Builtin.Int1
+  %11 = partial_apply %10() : $@convention(thin) (@in Builtin.Int1, Builtin.Int1, @in Builtin.Int1) -> @out Builtin.Int1
+  %12 = partial_apply %10(%9) : $@convention(thin) (@in Builtin.Int1, Builtin.Int1, @in Builtin.Int1) -> @out Builtin.Int1
+  %13 = partial_apply %10(%1, %9) : $@convention(thin) (@in Builtin.Int1, Builtin.Int1, @in Builtin.Int1) -> @out Builtin.Int1
+  %14 = partial_apply %10(%9, %1, %9) : $@convention(thin) (@in Builtin.Int1, Builtin.Int1, @in Builtin.Int1) -> @out Builtin.Int1
+
+  %16 = function_ref @indirect_parameter_partial_apply_caller1 : $@convention(thin) (@callee_owned (@in Builtin.Int1, Builtin.Int1, @in Builtin.Int1) -> @out Builtin.Int1) -> ()
+  %17 = function_ref @indirect_parameter_partial_apply_caller2 : $@convention(thin) (@callee_owned (@in Builtin.Int1, Builtin.Int1) -> @out Builtin.Int1) -> ()
+  %18 = function_ref @indirect_parameter_partial_apply_caller3 : $@convention(thin) (@callee_owned (@in Builtin.Int1) -> @out Builtin.Int1) -> ()
+  %19 = function_ref @indirect_parameter_partial_apply_caller4 : $@convention(thin) (@callee_owned () -> @out Builtin.Int1) -> ()
+  %20 = function_ref @indirect_parameter_partial_apply_caller5 : $@convention(thin) (@callee_owned () -> ()) -> ()
+
+  apply %16(%11) : $@convention(thin) (@callee_owned (@in Builtin.Int1, Builtin.Int1, @in Builtin.Int1) -> @out Builtin.Int1) -> ()
+  apply %17(%12) : $@convention(thin) (@callee_owned (@in Builtin.Int1, Builtin.Int1) -> @out Builtin.Int1) -> ()
+  apply %18(%13) : $@convention(thin) (@callee_owned (@in Builtin.Int1) -> @out Builtin.Int1) -> ()
+  apply %19(%14) : $@convention(thin) (@callee_owned () -> @out Builtin.Int1) -> ()
+
+  // Make sure we handle when we already have an out parameter correctly.
+  %21 = alloc_stack $(Builtin.Int1, Builtin.Int1)
+  %22 = function_ref @indirect_parameter_partial_apply_caller6 : $@convention(thin) (@callee_owned () -> @out Builtin.Int1) -> @out Builtin.Int1
+  %23 = function_ref @indirect_parameter_partial_apply_caller7 : $@convention(thin) (@callee_owned () -> @out Builtin.Int1) -> @out (Builtin.Int1, Builtin.Int1)
+  %24 = partial_apply %10(%9, %1, %9) : $@convention(thin) (@in Builtin.Int1, Builtin.Int1, @in Builtin.Int1) -> @out Builtin.Int1
+  %25 = partial_apply %10(%9, %1, %9) : $@convention(thin) (@in Builtin.Int1, Builtin.Int1, @in Builtin.Int1) -> @out Builtin.Int1
+  apply %22(%9, %24) : $@convention(thin) (@callee_owned () -> @out Builtin.Int1) -> @out Builtin.Int1
+  apply %23(%21, %25) : $@convention(thin) (@callee_owned () -> @out Builtin.Int1) -> @out (Builtin.Int1, Builtin.Int1)
+
+  dealloc_stack %21 : $*(Builtin.Int1, Builtin.Int1)
+  dealloc_stack %9 : $*Builtin.Int1
+
+  %26 = partial_apply %2(%0) : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
+  %27 = partial_apply %2(%0) : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
+  %28 = function_ref @simple_multiple_partial_apply_caller : $@convention(thin) (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1, @owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1
+  %29 = apply %28(%26, %27) : $@convention(thin) (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1, @owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1
+
+  %30 = function_ref @simple_partial_apply_fun2 : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
+  %31 = partial_apply %30(%1) : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1
+  %32 = function_ref @simple_partial_apply_caller2 : $@convention(thin) (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1
+  %33 = apply %32(%31) : $@convention(thin) (@owned @callee_owned (Builtin.Int1) -> Builtin.Int1) -> Builtin.Int1
+
+
+  %9999 = tuple()
+  return %9999 : $()
+}

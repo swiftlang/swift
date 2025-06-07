@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir -Onone -enable-copy-propagation -enable-lexical-borrow-scopes=false | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -Onone -enable-copy-propagation | %FileCheck %s -DINT=i%target-ptrsize
 //
 // This test is currently disabled because mandatory copy propagation
 // is not part of the pipeline. It may be re-added to the pipeline,

@@ -13,7 +13,9 @@
 #ifndef SWIFT_SIL_UTILS_GENERICSPECIALIZATIONMANGLER_H
 #define SWIFT_SIL_UTILS_GENERICSPECIALIZATIONMANGLER_H
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/Effects.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/SIL/SILFunction.h"
@@ -36,7 +38,7 @@ protected:
   /// The specialization pass.
   SpecializationPass Pass;
 
-  IsSerialized_t Serialized;
+  swift::SerializedKind_t Serialized;
 
   /// The original function which is specialized.
   SILFunction *Function;
@@ -45,15 +47,18 @@ protected:
   llvm::SmallVector<char, 32> ArgOpStorage;
   llvm::raw_svector_ostream ArgOpBuffer;
 
+  // Effects that are removed from the original function in this specialization.
+  PossibleEffects RemovedEffects;
+
 protected:
-  SpecializationMangler(SpecializationPass P, IsSerialized_t Serialized,
+  SpecializationMangler(ASTContext &Ctx, SpecializationPass P, swift::SerializedKind_t Serialized,
                         SILFunction *F)
-      : Pass(P), Serialized(Serialized), Function(F),
+      : ASTMangler(Ctx), Pass(P), Serialized(Serialized), Function(F),
         ArgOpBuffer(ArgOpStorage) {}
 
-  SpecializationMangler(SpecializationPass P, IsSerialized_t Serialized,
+  SpecializationMangler(ASTContext &Ctx, SpecializationPass P, swift::SerializedKind_t Serialized,
                         std::string functionName)
-      : Pass(P), Serialized(Serialized), Function(nullptr),
+      : ASTMangler(Ctx), Pass(P), Serialized(Serialized), Function(nullptr),
         FunctionName(functionName), ArgOpBuffer(ArgOpStorage) {}
 
   void beginMangling();
@@ -69,8 +74,8 @@ protected:
 // The mangler for specialized generic functions.
 class GenericSpecializationMangler : public SpecializationMangler {
 
-  GenericSpecializationMangler(std::string origFuncName)
-      : SpecializationMangler(SpecializationPass::GenericSpecializer,
+  GenericSpecializationMangler(ASTContext &Ctx, std::string origFuncName)
+      : SpecializationMangler(Ctx, SpecializationPass::GenericSpecializer,
                               IsNotSerialized, origFuncName) {}
 
   GenericSignature getGenericSignature() {
@@ -83,12 +88,15 @@ class GenericSpecializationMangler : public SpecializationMangler {
   std::string manglePrespecialized(GenericSignature sig,
                                       SubstitutionMap subs);
 
+  void appendRemovedParams(const SmallBitVector &paramsRemoved);
+
 public:
-  GenericSpecializationMangler(SILFunction *F, IsSerialized_t Serialized)
-      : SpecializationMangler(SpecializationPass::GenericSpecializer,
+  GenericSpecializationMangler(ASTContext &Ctx, SILFunction *F, swift::SerializedKind_t Serialized)
+      : SpecializationMangler(Ctx, SpecializationPass::GenericSpecializer,
                               Serialized, F) {}
 
-  std::string mangleNotReabstracted(SubstitutionMap subs);
+  std::string mangleNotReabstracted(SubstitutionMap subs,
+                                    const SmallBitVector &paramsRemoved = SmallBitVector());
 
   /// Mangle a generic specialization with re-abstracted parameters.
   ///
@@ -98,11 +106,11 @@ public:
   /// This is the default for generic specializations.
   ///
   /// \param alternativeMangling   true for specialized functions with a
-  ///                              differet resilience expansion.
+  ///                              different resilience expansion.
   /// \param metatyeParamsRemoved  true if non-generic metatype parameters are
   ///                              removed in the specialized function.
   std::string mangleReabstracted(SubstitutionMap subs, bool alternativeMangling,
-                                 bool metatyeParamsRemoved = false);
+                                 const SmallBitVector &paramsRemoved = SmallBitVector());
 
   std::string mangleForDebugInfo(GenericSignature sig, SubstitutionMap subs,
                                  bool forInlining);
@@ -111,7 +119,7 @@ public:
     return manglePrespecialized(getGenericSignature(), subs);
   }
                                     
-  static std::string manglePrespecialization(std::string unspecializedName,
+  static std::string manglePrespecialization(ASTContext &Ctx, std::string unspecializedName,
                                              GenericSignature genericSig,
                                              GenericSignature specializedSig);
 };

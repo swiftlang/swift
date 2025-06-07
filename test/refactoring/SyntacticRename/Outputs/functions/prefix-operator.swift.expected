@@ -32,12 +32,12 @@ class AStruct {
         return AStruct()
     }
 
-    static prefix func /*prefix-operator:def*/+ (theStruct: AStruct) -> AStruct {
+    static prefix func /*prefix-operator:def*/<base>-</base> (struct: AStruct) -> AStruct {
         return AStruct()
     }
 }
 
-let aStruct = /*prefix-operator:call*/+AStruct() /*infix-operator:call*/+ AStruct()
+let aStruct = /*prefix-operator:call*/<base>-</base>AStruct() /*infix-operator:call*/+ AStruct()
 /*no-args:call*/aFunc()
 /*param-label:call*/aFunc(a: 2)
 /*arg-label:call*/aFunc(b: /*no-args:call*/aFunc() * /*no-args:call*/aFunc())

@@ -1,22 +1,23 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple
 
 enum Either<T,U> {
   case first(T)
   case second(U)
 }
 
-@resultBuilder
-struct TupleBuilder { // expected-note {{struct 'TupleBuilder' declared here}}
+// expected-note @+2 {{add 'buildArray(_:)' to the result builder 'TupleBuilder' to add support for 'for'..'in' loops}}
+// expected-note @+1 2 {{struct 'TupleBuilder' declared here}}
+@resultBuilder struct TupleBuilder {
   static func buildBlock() -> () { }
-  
+
   static func buildBlock<T1>(_ t1: T1) -> T1 {
     return t1
   }
-  
+
   static func buildBlock<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2) {
     return (t1, t2)
   }
-  
+
   static func buildBlock<T1, T2, T3>(_ t1: T1, _ t2: T2, _ t3: T3)
       -> (T1, T2, T3) {
     return (t1, t2, t3)
@@ -50,15 +51,15 @@ struct TupleBuilderWithoutIf { // expected-note 3{{struct 'TupleBuilderWithoutIf
   // expected-note@-2{{add 'buildEither(first:)' and 'buildEither(second:)' to the result builder 'TupleBuilderWithoutIf' to add support for 'if'-'else' and 'switch'}}
   // expected-note@-3{{add 'buildArray(_:)' to the result builder 'TupleBuilderWithoutIf' to add support for 'for'..'in' loops}}
   static func buildBlock() -> () { }
-  
+
   static func buildBlock<T1>(_ t1: T1) -> T1 {
     return t1
   }
-  
+
   static func buildBlock<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2) {
     return (t1, t2)
   }
-  
+
   static func buildBlock<T1, T2, T3>(_ t1: T1, _ t2: T2, _ t3: T3)
       -> (T1, T2, T3) {
     return (t1, t2, t3)
@@ -78,7 +79,7 @@ struct TupleBuilderWithoutIf { // expected-note 3{{struct 'TupleBuilderWithoutIf
   static func buildDo<T>(_ value: T) -> T { return value }
 }
 
-func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) { // expected-note 2{{in call to function 'tuplify(_:body:)'}}
+func tuplify<T>(_ cond: Bool, @TupleBuilder body: (Bool) -> T) { // expected-note 2{{'tuplify(_:body:)' declared here}}
   print(body(cond))
 }
 
@@ -88,9 +89,9 @@ func tuplifyWithoutIf<T>(_ cond: Bool, @TupleBuilderWithoutIf body: (Bool) -> T)
 
 func testDiags() {
   // For loop
-  tuplify(true) { _ in // expected-error {{generic parameter 'T' could not be inferred}}
+  tuplify(true) { _ in
     17
-    for c in name {
+    for c in name { // expected-error {{closure containing control flow statement cannot be used with result builder 'TupleBuilder'}}
     // expected-error@-1 {{cannot find 'name' in scope}}
     }
   }
@@ -151,7 +152,7 @@ func overloadedTuplify<T>(_ cond: Bool, @TupleBuilderWithoutIf body: (Bool) -> T
 func testOverloading(name: String) {
   let a1 = overloadedTuplify(true) { b in
     if b {
-      "Hello, \(name)" 
+      "Hello, \(name)"
     }
   }
 
@@ -170,7 +171,7 @@ func testOverloading(name: String) {
       $0 ? "Hello, \(name)" : "Goodbye"
       42
       if $0 {
-        "Hello, \(name)" 
+        "Hello, \(name)"
       }
     }
   }
@@ -270,7 +271,7 @@ func erroneous_53751(x: Int) {
       if b {
         acceptInt(0) { }
       }
-    }).domap(0) // expected-error{{value of type '()?' has no member 'domap'}}
+    }).domap(0) // expected-error{{value of type 'Optional<()>' has no member 'domap'}}
   }
 }
 
@@ -299,8 +300,8 @@ struct MyTuplifiedStruct {
 
   @TupleBuilder var computed: some Any { // expected-note{{remove the attribute to explicitly disable the result builder}}{{3-17=}}
     if condition {
+      // expected-note@+1 {{remove 'return' statements to apply the result builder}}{{7-14=}}{{+2:12-19=}}
       return 17 // expected-warning{{application of result builder 'TupleBuilder' disabled by explicit 'return' statement}}
-      // expected-note@-1{{remove 'return' statements to apply the result builder}}{{7-14=}}{{12-19=}}
     } else {
            return 42
     }
@@ -312,9 +313,9 @@ func acceptMetatype<T>(_: T.Type) -> Bool { true }
 
 func syntacticUses<T>(_: T) {
   tuplify(true) { x in
-    if x && acceptMetatype(T) { // expected-error{{expected member name or constructor call after type name}}
+    if x && acceptMetatype(T) { // expected-error{{expected member name or initializer call after type name}}
       // expected-note@-1{{use '.self' to reference the type object}}
-      acceptMetatype(T) // expected-error{{expected member name or constructor call after type name}}
+      acceptMetatype(T) // expected-error{{expected member name or initializer call after type name}}
       // expected-note@-1{{use '.self' to reference the type object}}
     }
   }
@@ -454,7 +455,7 @@ func testNonExhaustiveSwitch(e: E) {
 // rdar://problem/59856491
 struct TestConstraintGenerationErrors {
   @TupleBuilder var buildTupleFnBody: String {
-    let a = nil // There is no diagnostic here because next line fails to pre-check, so body is invalid
+    let a = nil // expected-error {{'nil' requires a contextual type}}
     String(nothing) // expected-error {{cannot find 'nothing' in scope}}
   }
 
@@ -464,7 +465,7 @@ struct TestConstraintGenerationErrors {
   }
 
   func buildTupleClosure() {
-    tuplify(true) { _ in // expected-error {{generic parameter 'T' could not be inferred}}
+    tuplify(true) { _ in
       let a = nothing // expected-error {{cannot find 'nothing' in scope}}
       String(nothing) // expected-error {{cannot find 'nothing' in scope}}
     }
@@ -542,15 +543,15 @@ func testCaseVarTypes(e: E3) {
 @resultBuilder
 struct WrapperBuilder {
   static func buildBlock() -> () { }
-  
+
   static func buildBlock<T1>(_ t1: T1) -> T1 {
     return t1
   }
-  
+
   static func buildBlock<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2) {
     return (t1, t2)
   }
-  
+
   static func buildBlock<T1, T2, T3>(_ t1: T1, _ t2: T2, _ t3: T3)
       -> (T1, T2, T3) {
     return (t1, t2, t3)
@@ -622,25 +623,47 @@ func wrapperifyInfer<T, U>(_ cond: Bool, @WrapperBuilder body: (U) -> T) -> T {
 }
 
 let intValue = 17
-wrapperifyInfer(true) { x in // expected-error{{unable to infer type of a closure parameter 'x' in the current context}}
+_ = wrapperifyInfer(true) { x in // Ok
   intValue + x
 }
 
 struct DoesNotConform {}
 
+struct List<C> {
+  typealias T = C
+
+  init(@TupleBuilder _: () -> C) {}
+}
+
+extension List: P where C: P {}
+
 struct MyView {
-  @TupleBuilder var value: some P { // expected-error {{return type of property 'value' requires that 'DoesNotConform' conform to 'P'}}
-    // expected-note@-1 {{opaque return type declared here}}
-    DoesNotConform()
+  struct Conforms : P {
+    typealias T = Void
   }
 
-  @TupleBuilder func test() -> some P { // expected-error {{return type of instance method 'test()' requires that 'DoesNotConform' conform to 'P'}}
+  @TupleBuilder var value: some P {
     // expected-note@-1 {{opaque return type declared here}}
-    DoesNotConform()
+    DoesNotConform() // expected-error {{return type of property 'value' requires that 'DoesNotConform' conform to 'P'}}
+  }
+
+  @TupleBuilder var nestedFailures: some P {
+    // expected-note@-1 {{opaque return type declared here}}
+    List {
+      List {
+        DoesNotConform()
+        // expected-error@-1 {{return type of property 'nestedFailures' requires that 'DoesNotConform' conform to 'P'}}
+      }
+    }
+  }
+
+  @TupleBuilder func test() -> some P {
+    // expected-note@-1 {{opaque return type declared here}}
+    DoesNotConform() // expected-error {{return type of instance method 'test()' requires that 'DoesNotConform' conform to 'P'}}
   }
 
   @TupleBuilder var emptySwitch: some P {
-    switch Optional.some(1) { // expected-error {{'switch' statement body must have at least one 'case' or 'default' block; do you want to add a default case?}}
+    switch Optional.some(1) { // expected-error {{'switch' statement body must have at least one 'case' or 'default' block; add a default case}}
     }
   }
 
@@ -658,8 +681,6 @@ struct MyView {
   }
 
   @TupleBuilder var invalidCaseWithoutDot: some P {
-  // expected-error@-1 {{return type of property 'invalidCaseWithoutDot' requires that 'Either<Int, Int>' conform to 'P'}}
-  // expected-note@-2 {{opaque return type declared here}}
     switch Optional.some(1) {
     case none: 42 // expected-error {{cannot find 'none' in scope}}
     case .some(let x):
@@ -723,7 +744,7 @@ struct TuplifiedStructWithInvalidClosure {
 
   @TupleBuilder var errorsDiagnosedByParser: some Any {
     if let _ = condition {
-      tuplify { _ in
+      tuplify { _ in // expected-error {{missing argument for parameter #1 in call}}
         self. // expected-error {{expected member name following '.'}}
       }
       42
@@ -732,7 +753,7 @@ struct TuplifiedStructWithInvalidClosure {
 
   @TupleBuilder var nestedErrorsDiagnosedByParser: some Any {
     tuplify(true) { _ in
-      tuplify { _ in
+      tuplify { _ in // expected-error {{missing argument for parameter #1 in call}}
         self. // expected-error {{expected member name following '.'}}
       }
       42
@@ -838,7 +859,7 @@ func test_rdar89742267() {
     @Builder var body: S {
       switch entry {
       case .listen: S()
-      case nil: S() // expected-warning {{type 'Hey' is not optional, value can never be nil; this is an error in Swift 6}}
+      case nil: S() // expected-warning {{type 'Hey' is not optional, value can never be nil; this is an error in the Swift 6 language mode}}
       default: S()
       }
     }
@@ -997,6 +1018,64 @@ func test_requirement_failure_in_buildBlock() {
         A()
         B()
       }
+    }
+  }
+}
+
+func test_partially_resolved_closure_params() {
+  struct S<T> {
+    var a: String = ""
+  }
+
+  func test<T>(@TupleBuilder _: (S<T>) -> T) { // expected-note {{in call to function 'test'}}
+  }
+
+  test { // expected-error {{generic parameter 'T' could not be inferred}}
+    $0.a
+    42
+  }
+}
+
+func testMissingElementInEmptyBuilder() {
+  @resultBuilder
+  struct SingleElementBuilder {
+    static func buildBlock<T>(_ x: T) -> T { x }
+    // expected-note@-1 2{{'buildBlock' declared here}}
+  }
+
+  func test1(@SingleElementBuilder fn: () -> Int) {}
+  test1 {}
+  // expected-error@-1 {{expected expression of type 'Int' in result builder 'SingleElementBuilder'}} {{10-10=<#T##Int#>}}
+
+  @SingleElementBuilder
+  func test2() -> Int {}
+  // expected-error@-1 {{expected expression of type 'Int' in result builder 'SingleElementBuilder'}} {{24-24=<#T##Int#>}}
+}
+
+// https://github.com/swiftlang/swift/issues/77453
+func testNoDuplicateStmtDiags() {
+  @resultBuilder
+  struct Builder {
+    static func buildBlock<T>(_ components: T...) -> T {
+      components.first!
+    }
+    static func buildEither<T>(first component: T) -> T {
+      component
+    }
+    static func buildEither<T>(second component: T) -> T {
+      component
+    }
+  }
+
+  func takesClosure(_ fn: () -> Void) -> Int? { nil }
+
+  @Builder
+  func foo() -> Int {
+    if let x = takesClosure {} {
+      // expected-warning@-1 {{trailing closure in this context is confusable with the body of the statement}}
+      x
+    } else {
+      1
     }
   }
 }

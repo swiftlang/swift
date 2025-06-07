@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -453,9 +453,6 @@ extension RangeReplaceableCollection {
   @inlinable
   public mutating func append<S: Sequence>(contentsOf newElements: __owned S)
     where S.Element == Element {
-
-    let approximateCapacity = self.count + newElements.underestimatedCount
-    self.reserveCapacity(approximateCapacity)
     for element in newElements {
       append(element)
     }
@@ -1178,3 +1175,98 @@ extension RangeReplaceableCollection {
     self = try filter { try !shouldBeRemoved($0) }
   }
 }
+
+#if !$Embedded
+extension RangeReplaceableCollection {
+  /// Removes the elements at the given indices.
+  ///
+  /// For example, this code sample finds the indices of all the vowel
+  /// characters in the string, and then removes those characters.
+  ///
+  ///     var str = "The rain in Spain stays mainly in the plain."
+  ///     let vowels: Set<Character> = ["a", "e", "i", "o", "u"]
+  ///     let vowelIndices = str.indices(where: { vowels.contains($0) })
+  ///
+  ///     str.removeSubranges(vowelIndices)
+  ///     // str == "Th rn n Spn stys mnly n th pln."
+  ///
+  /// - Parameter subranges: The indices of the elements to remove.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  @available(SwiftStdlib 6.0, *)
+  @inlinable
+  public mutating func removeSubranges(_ subranges: RangeSet<Index>) {
+    guard !subranges.isEmpty else {
+      return
+    }
+    
+    let inversion = subranges._inverted(within: self)
+    var result = Self()
+    for range in inversion.ranges {
+      result.append(contentsOf: self[range])
+    }
+    self = result
+  }
+}
+
+extension MutableCollection where Self: RangeReplaceableCollection {
+  /// Removes the elements at the given indices.
+  ///
+  /// For example, this code sample finds the indices of all the negative
+  /// numbers in the array, and then removes those values.
+  ///
+  ///     var numbers = [5, 7, -3, -8, 11, 2, -1, 6]
+  ///     let negativeIndices = numbers.indices(where: { $0 < 0 })
+  ///
+  ///     numbers.removeSubranges(negativeIndices)
+  ///     // numbers == [5, 7, 11, 2, 6]
+  ///
+  /// - Parameter subranges: The indices of the elements to remove.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  @available(SwiftStdlib 6.0, *)
+  @inlinable
+  public mutating func removeSubranges(_ subranges: RangeSet<Index>) {
+    guard let firstRange = subranges.ranges.first else {
+      return
+    }
+    
+    var endOfElementsToKeep = firstRange.lowerBound
+    var firstUnprocessed = firstRange.upperBound
+    
+    // This performs a half-stable partition based on the ranges in
+    // `indices`. At all times, the collection is divided into three
+    // regions:
+    //
+    // - `self[..<endOfElementsToKeep]` contains only elements that will
+    //   remain in the collection after this method call.
+    // - `self[endOfElementsToKeep..<firstUnprocessed]` contains only
+    //   elements that will be removed.
+    // - `self[firstUnprocessed...]` contains a mix of elements to remain
+    //   and elements to be removed.
+    //
+    // Each iteration of this loop moves the elements that are _between_
+    // two ranges to remove from the third region to the first region.
+    for range in subranges.ranges.dropFirst() {
+      let nextLow = range.lowerBound
+      while firstUnprocessed != nextLow {
+        swapAt(endOfElementsToKeep, firstUnprocessed)
+        formIndex(after: &endOfElementsToKeep)
+        formIndex(after: &firstUnprocessed)
+      }
+      
+      firstUnprocessed = range.upperBound
+    }
+    
+    // After dealing with all the ranges in `subranges`, move the elements
+    // that are still in the third region down to the first.
+    while firstUnprocessed != endIndex {
+      swapAt(endOfElementsToKeep, firstUnprocessed)
+      formIndex(after: &endOfElementsToKeep)
+      formIndex(after: &firstUnprocessed)
+    }
+    
+    removeSubrange(endOfElementsToKeep..<endIndex)
+  }
+}
+#endif

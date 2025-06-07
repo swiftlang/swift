@@ -11,6 +11,7 @@ module B {
 module C [system] {
   header "C.h"
   export *
+  link framework "nonSwiftyLibC"
 }
 
 module D {
@@ -40,5 +41,28 @@ module I {
 
 module X {
   header "X.h"
+  export *
+}
+module X_Private {
+  header "X_Private.h"
+  export *
+}
+module Y {
+  header "Y.h"
+  export *
+  explicit module Private {
+    header "Y_Private.h"
+  }
+}
+module ClangModuleWithOverlayedDep {
+  header "ClangModuleWithOverlayedDep.h"
+  export *
+}
+module CycleClangMiddle {
+  header "CycleClangMiddle.h"
+  export *
+}
+module CycleOverlay {
+  header "CycleOverlay.h"
   export *
 }

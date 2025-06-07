@@ -1,7 +1,12 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk)  -disable-availability-checking -typecheck -verify -import-objc-header %S/Inputs/Delegate.h -enable-experimental-feature SendableCompletionHandlers %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk)  -target %target-swift-5.1-abi-triple -emit-sil -o /dev/null -verify -import-objc-header %S/Inputs/Delegate.h -enable-experimental-feature SendableCompletionHandlers %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk)  -target %target-swift-5.1-abi-triple -emit-sil -o /dev/null -verify -import-objc-header %S/Inputs/Delegate.h -enable-experimental-feature SendableCompletionHandlers %s -strict-concurrency=targeted
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk)  -target %target-swift-5.1-abi-triple -emit-sil -o /dev/null -verify -import-objc-header %S/Inputs/Delegate.h -enable-experimental-feature SendableCompletionHandlers %s -strict-concurrency=complete
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk)  -target %target-swift-5.1-abi-triple -emit-sil -o /dev/null -verify -import-objc-header %S/Inputs/Delegate.h -enable-experimental-feature SendableCompletionHandlers %s -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
+
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
-// REQUIRES: asserts
+// REQUIRES: swift_feature_RegionBasedIsolation
+// REQUIRES: swift_feature_SendableCompletionHandlers
 
 // overload resolution should pick sync version in a sync context
 func syncContext() {
@@ -38,10 +43,10 @@ func asyncWithAwait() async {
 // completion handler's implicit `@Sendable` isn't respected.
 extension Delegate {
   nonisolated func makeRequest(_ req: Request??, completionHandler: (() -> Void)? = nil) {
-    // expected-note@-1 {{parameter 'completionHandler' is implicitly non-sendable}}
+    // expected-note@-1 {{parameter 'completionHandler' is implicitly non-Sendable}}
     if let req = (req ?? nil) {
       makeRequest1(req, completionHandler: completionHandler)
-      // expected-warning@-1 {{passing non-sendable parameter 'completionHandler' to function expecting a @Sendable closure}}
+      // expected-warning@-1 {{passing non-Sendable parameter 'completionHandler' to function expecting a '@Sendable' closure}}
     }
   }
 }
@@ -53,7 +58,7 @@ extension Delegate {
   func handle(_ req: Request, with delegate: Delegate) {
     delegate.makeRequest1(req) {
       self.finish()
-      // expected-warning@-1 {{call to main actor-isolated instance method 'finish()' in a synchronous nonisolated context; this is an error in Swift 6}}
+      // expected-warning@-1 {{call to main actor-isolated instance method 'finish()' in a synchronous nonisolated context; this is an error in the Swift 6 language mode}}
     }
   }
 }

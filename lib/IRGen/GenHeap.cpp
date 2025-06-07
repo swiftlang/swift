@@ -23,6 +23,7 @@
 #include "llvm/IR/GlobalVariable.h"
 #include "llvm/IR/Intrinsics.h"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
@@ -34,6 +35,7 @@
 #include "ConstantBuilder.h"
 #include "Explosion.h"
 #include "GenClass.h"
+#include "GenMeta.h"
 #include "GenPointerAuth.h"
 #include "GenProto.h"
 #include "GenType.h"
@@ -56,9 +58,11 @@ namespace {
                                 FixedTypeInfo> { \
     llvm::PointerIntPair<llvm::Type*, 1, bool> ValueTypeAndIsOptional; \
   public: \
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, \
-                                        SILType T) const override { \
-      if (!IGM.getOptions().ForceStructTypeLayouts) { \
+    TypeLayoutEntry \
+    *buildTypeLayoutEntry(IRGenModule &IGM, \
+                          SILType T, \
+                          bool useStructLayouts) const override { \
+      if (!useStructLayouts) { \
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T); \
       } \
       return IGM.typeLayoutCache.getOrCreateScalarEntry( \
@@ -70,7 +74,7 @@ namespace {
                                     SpareBitVector &&spareBits, \
                                     bool isOptional) \
       : IndirectTypeInfo(type, size, std::move(spareBits), alignment, \
-                         IsNotPOD, IsNotBitwiseTakable, IsFixedSize), \
+                         IsNotTriviallyDestroyable, IsNotBitwiseTakable, IsCopyable, IsFixedSize, IsABIAccessible), \
         ValueTypeAndIsOptional(valueType, isOptional) {} \
     void initializeWithCopy(IRGenFunction &IGF, Address destAddr, \
                             Address srcAddr, SILType T, \
@@ -79,7 +83,7 @@ namespace {
     } \
     void initializeWithTake(IRGenFunction &IGF, Address destAddr, \
                             Address srcAddr, SILType T, \
-                            bool isOutlined) const override { \
+                            bool isOutlined, bool zeroizeIfSensitive) const override { \
       IGF.emit##Nativeness##Name##TakeInit(destAddr, srcAddr); \
     } \
     void assignWithCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr, \
@@ -145,12 +149,16 @@ namespace {
                                               SpareBitVector &&spareBits, \
                                               bool isOptional) \
       : SingleScalarTypeInfo(type, size, std::move(spareBits), \
-                             alignment, IsNotPOD, IsFixedSize), \
+                             alignment, IsNotTriviallyDestroyable, \
+                             IsCopyable, \
+                             IsFixedSize, IsABIAccessible), \
         ValueTypeAndIsOptional(valueType, isOptional) {} \
-    enum { IsScalarPOD = false }; \
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, \
-                                          SILType T) const override { \
-      if (!IGM.getOptions().ForceStructTypeLayouts) { \
+    enum { IsScalarTriviallyDestroyable = false }; \
+    TypeLayoutEntry \
+    *buildTypeLayoutEntry(IRGenModule &IGM, \
+                          SILType T, \
+                          bool useStructLayouts) const override { \
+      if (!useStructLayouts) { \
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T); \
       } \
       return IGM.typeLayoutCache.getOrCreateScalarEntry( \
@@ -267,7 +275,7 @@ HeapLayout::HeapLayout(IRGenModule &IGM, LayoutStrategy strategy,
                        ArrayRef<const TypeInfo *> fieldTypeInfos,
                        llvm::StructType *typeToFill,
                        NecessaryBindings &&bindings, unsigned bindingsIndex)
-    : StructLayout(IGM, /*decl=*/nullptr, LayoutKind::HeapObject, strategy,
+    : StructLayout(IGM, /*type=*/std::nullopt, LayoutKind::HeapObject, strategy,
                    fieldTypeInfos, typeToFill),
       ElementTypes(fieldTypes.begin(), fieldTypes.end()),
       Bindings(std::move(bindings)), BindingsIndex(bindingsIndex) {
@@ -437,7 +445,7 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
     // The type metadata bindings should be at a fixed offset, so we can pass
     // None for NonFixedOffsets. If we didn't, we'd have a chicken-egg problem.
     auto bindingsAddr = layout.getElement(layout.getBindingsIndex())
-                            .project(IGF, structAddr, None);
+                            .project(IGF, structAddr, std::nullopt);
     layout.getBindings().restore(IGF, bindingsAddr, MetadataState::Complete);
   }
 
@@ -448,7 +456,7 @@ static llvm::Function *createDtorFn(IRGenModule &IGM,
   for (unsigned i : indices(layout.getElements())) {
     auto &field = layout.getElement(i);
     auto fieldTy = layout.getElementTypes()[i];
-    if (field.isPOD())
+    if (field.isTriviallyDestroyable())
       continue;
 
     field.getType().destroy(
@@ -492,6 +500,22 @@ static llvm::Constant *buildPrivateMetadata(IRGenModule &IGM,
                                             MetadataKind kind) {
   // Build the fields of the private metadata.
   ConstantInitBuilder builder(IGM);
+
+  // In embedded Swift, heap objects have a different, simple(r) layout:
+  // superclass pointer + destructor.
+  if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+    auto fields = builder.beginStruct();
+    fields.addNullPointer(IGM.Int8PtrTy);
+    fields.addSignedPointer(dtorFn,
+                            IGM.getOptions().PointerAuth.HeapDestructors,
+                            PointerAuthEntity::Special::HeapDestructor);
+
+    llvm::GlobalVariable *var = fields.finishAndCreateGlobal(
+        "metadata", IGM.getPointerAlignment(), /*constant*/ true,
+        llvm::GlobalVariable::PrivateLinkage);
+    return var;
+  }
+
   auto fields = builder.beginStruct(IGM.FullBoxMetadataStructTy);
 
   fields.addSignedPointer(dtorFn, IGM.getOptions().PointerAuth.HeapDestructors,
@@ -544,8 +568,10 @@ llvm::Value *IRGenFunction::emitUnmanagedAlloc(const HeapLayout &layout,
                                                const llvm::Twine &name,
                                            llvm::Constant *captureDescriptor,
                                            const HeapNonFixedOffsets *offsets) {
-  if (layout.isKnownEmpty())
+  if (layout.isKnownEmpty()
+      && layout.isTriviallyDestroyable()) {
     return IGM.RefCountedNull;
+  }
 
   llvm::Value *metadata = layout.getPrivateMetadata(IGM, captureDescriptor);
   llvm::Value *size, *alignMask;
@@ -690,7 +716,7 @@ APInt IRGenModule::getReferenceStorageExtraInhabitantMask(
   case ReferenceCounting::Error:
     llvm_unreachable("Unsupported reference-counting style");
   }
-  return APInt::getAllOnesValue(getPointerSize().getValueInBits());
+  return APInt::getAllOnes(getPointerSize().getValueInBits());
 }
 
 llvm::Value *IRGenFunction::getReferenceStorageExtraInhabitantIndex(Address src,
@@ -1253,7 +1279,7 @@ llvm::Constant *IRGenModule::getFixLifetimeFn() {
                                          llvm::GlobalValue::PrivateLinkage,
                                          "__swift_fixLifetime",
                                          &Module);
-  assert(fixLifetime->getName().equals("__swift_fixLifetime")
+  assert(fixLifetime->getName() == "__swift_fixLifetime"
          && "fixLifetime symbol name got mangled?!");
   // Don't inline the function, so it stays as a signal to the ARC passes.
   // The ARC passes will remove references to the function when they're
@@ -1278,8 +1304,8 @@ FunctionPointer IRGenModule::getFixedClassInitializationFn() {
   if (ObjCInterop) {
     // In new enough ObjC runtimes, objc_opt_self provides a direct fast path
     // to realize a class.
-    if (getAvailabilityContext()
-         .isContainedIn(Context.getSwift51Availability())) {
+    if (getAvailabilityRange().isContainedIn(
+            Context.getSwift51Availability())) {
       fn = getObjCOptSelfFunctionPointer();
     }
     // Otherwise, the Swift runtime always provides a `get
@@ -1360,7 +1386,7 @@ llvm::Value *IRGenFunction::emitLoadRefcountedPtr(Address addr,
 llvm::Value *IRGenFunction::
 emitIsUniqueCall(llvm::Value *value, ReferenceCounting style, SourceLoc loc, bool isNonNull) {
   FunctionPointer fn;
-  bool nonObjC = !IGM.getAvailabilityContext().isContainedIn(
+  bool nonObjC = !IGM.getAvailabilityRange().isContainedIn(
       IGM.Context.getObjCIsUniquelyReferencedAvailability());
   switch (style) {
   case ReferenceCounting::Native: {
@@ -1446,7 +1472,7 @@ public:
 
   /// Allocate a box of the given type.
   virtual OwnedAddress
-  allocate(IRGenFunction &IGF, SILType boxedType, GenericEnvironment *env,
+  allocate(IRGenFunction &IGF, GenericEnvironment *env, SILBoxType *box,
            const llvm::Twine &name) const = 0;
 
   /// Deallocate an uninitialized box.
@@ -1464,8 +1490,11 @@ public:
   EmptyBoxTypeInfo(IRGenModule &IGM) : BoxTypeInfo(IGM) {}
 
   OwnedAddress
-  allocate(IRGenFunction &IGF, SILType boxedType, GenericEnvironment *env,
+  allocate(IRGenFunction &IGF, GenericEnvironment *env, SILBoxType *box,
            const llvm::Twine &name) const override {
+    auto boxedType = getSILBoxFieldType(
+          IGF.IGM.getMaximalTypeExpansionContext(),
+          box, IGF.IGM.getSILModule().Types, 0);
     return OwnedAddress(IGF.getTypeInfo(boxedType).getUndefAddress(),
                         IGF.emitAllocEmptyBoxCall());
   }
@@ -1489,8 +1518,11 @@ public:
   NonFixedBoxTypeInfo(IRGenModule &IGM) : BoxTypeInfo(IGM) {}
 
   OwnedAddress
-  allocate(IRGenFunction &IGF, SILType boxedType, GenericEnvironment *env,
+  allocate(IRGenFunction &IGF, GenericEnvironment *env, SILBoxType *boxType,
            const llvm::Twine &name) const override {
+    auto boxedType = getSILBoxFieldType(
+          IGF.IGM.getMaximalTypeExpansionContext(),
+          boxType, IGF.IGM.getSILModule().Types, 0);
     auto &ti = IGF.getTypeInfo(boxedType);
     // Use the runtime to allocate a box of the appropriate size.
     auto metadata = IGF.emitTypeMetadataRefForLayout(boxedType);
@@ -1528,14 +1560,18 @@ public:
   FixedBoxTypeInfoBase(IRGenModule &IGM, HeapLayout &&layout)
     : BoxTypeInfo(IGM), layout(std::move(layout))
   {
-    // Empty layouts should always use EmptyBoxTypeInfo instead
-    assert(!layout.isKnownEmpty());
+    // Trivial empty layouts should always use EmptyBoxTypeInfo instead
+    assert(!layout.isKnownEmpty()
+           || !layout.isTriviallyDestroyable());
   }
 
   OwnedAddress
-  allocate(IRGenFunction &IGF, SILType boxedType, GenericEnvironment *env,
+  allocate(IRGenFunction &IGF, GenericEnvironment *env, SILBoxType *box,
            const llvm::Twine &name)
   const override {
+    auto boxedType = getSILBoxFieldType(
+          IGF.IGM.getMaximalTypeExpansionContext(),
+          box, IGF.IGM.getSILModule().Types, 0);
     // Allocate a new object using the layout.
     auto boxedInterfaceType = boxedType;
     if (env) {
@@ -1546,21 +1582,34 @@ public:
       // FIXME: This seems wrong. We used to just mangle opened archetypes as
       // their interface type. Let's make that explicit now.
       auto astType = boxedInterfaceType.getASTType();
-      astType = astType.transformRec([](Type t) -> Optional<Type> {
-        if (auto *openedExistential = t->getAs<OpenedArchetypeType>())
-          return openedExistential->getInterfaceType();
-        return None;
-      })->getCanonicalType();
+      astType =
+          astType
+              .transformRec([](Type t) -> std::optional<Type> {
+                if (auto *openedExistential = t->getAs<ExistentialArchetypeType>()) {
+                  auto &ctx = openedExistential->getASTContext();
+                  return ctx.TheSelfType;
+                }
+                return std::nullopt;
+              })
+              ->getCanonicalType();
       boxedInterfaceType = SILType::getPrimitiveType(
           astType, boxedInterfaceType.getCategory());
     }
-
+    
     auto boxDescriptor = IGF.IGM.getAddrOfBoxDescriptor(
         boxedInterfaceType,
         env ? env->getGenericSignature().getCanonicalSignature()
             : CanGenericSignature());
     llvm::Value *allocation = IGF.emitUnmanagedAlloc(layout, name,
                                                      boxDescriptor);
+    // Store metadata for the necessary bindings if present.
+    if (layout.hasBindings()) {
+      auto allocationAddr = layout.emitCastTo(IGF, allocation);
+      auto bindingsAddr = layout.getElement(layout.getBindingsIndex())
+        .project(IGF, allocationAddr, nullptr);
+      layout.getBindings().save(IGF, bindingsAddr, box->getSubstitutions());
+    }
+
     Address rawAddr = project(IGF, allocation, boxedType);
     return {rawAddr, allocation};
   }
@@ -1578,7 +1627,7 @@ public:
   project(IRGenFunction &IGF, llvm::Value *box, SILType boxedType)
   const override {
     Address rawAddr = layout.emitCastTo(IGF, box);
-    rawAddr = layout.getElement(0).project(IGF, rawAddr, None);
+    rawAddr = layout.getElement(0).project(IGF, rawAddr, std::nullopt);
     auto &ti = IGF.getTypeInfo(boxedType);
     return IGF.Builder.CreateElementBitCast(rawAddr, ti.getStorageType());
   }
@@ -1610,22 +1659,87 @@ public:
 
 /// Implementation of a box for a specific type.
 class FixedBoxTypeInfo final : public FixedBoxTypeInfoBase {
+  static SILType getFieldType(IRGenModule &IGM, SILBoxType *T) {
+    return getSILBoxFieldType(IGM.getMaximalTypeExpansionContext(),
+                              T, IGM.getSILModule().Types, 0);
+  }
+  
+  static HeapLayout getHeapLayout(IRGenModule &IGM, SILBoxType *T) {
+    SmallVector<SILType> fieldTypes;
+    fieldTypes.push_back(getFieldType(IGM, T));
+    
+    auto bindings = NecessaryBindings::forFixedBox(IGM, T);
+    unsigned bindingsIndex = 0;
+    SmallVector<const TypeInfo *, 4> fields;
+    fields.push_back(&IGM.getTypeInfo(fieldTypes[0]));
+    
+    if (!bindings.empty()) {
+      bindingsIndex = 1;
+      auto bindingsSize = bindings.getBufferSize(IGM);
+      auto &bindingsTI = IGM.getOpaqueStorageTypeInfo(bindingsSize,
+                                                    IGM.getPointerAlignment());
+      fieldTypes.push_back(SILType());
+      fields.push_back(&bindingsTI);
+    }
+    
+    return HeapLayout(IGM, LayoutStrategy::Optimal,
+                      fieldTypes, fields,
+                      /* type to fill */ nullptr,
+                      std::move(bindings), bindingsIndex);
+  }
+
 public:
-  FixedBoxTypeInfo(IRGenModule &IGM, SILType T)
-    : FixedBoxTypeInfoBase(IGM,
-       HeapLayout(IGM, LayoutStrategy::Optimal, T, &IGM.getTypeInfo(T)))
+  FixedBoxTypeInfo(IRGenModule &IGM, SILBoxType *T)
+    : FixedBoxTypeInfoBase(IGM, getHeapLayout(IGM, T))
   {}
 };
 
 } // end anonymous namespace
+
+NecessaryBindings
+NecessaryBindings::forFixedBox(IRGenModule &IGM, SILBoxType *box) {
+  // Don't need to bind metadata if the type is concrete.
+  if (!box->hasArchetype() && !box->hasTypeParameter()) {
+    return {};
+  }
+
+  auto fieldTy = getSILBoxFieldType(IGM.getMaximalTypeExpansionContext(),
+                                    box, IGM.getSILModule().Types, 0);
+  auto fieldTI = cast<FixedTypeInfo>(&IGM.getTypeInfo(fieldTy));
+
+  // If the type is trivially destroyable, or it's fixed-layout and copyable,
+  // then we can always destroy it without binding type metadata.
+  if (fieldTI->isTriviallyDestroyable(ResilienceExpansion::Maximal)
+      || fieldTI->isCopyable(ResilienceExpansion::Maximal)) {
+    return {};
+  }
+
+  NecessaryBindings bindings(box->getSubstitutions(),
+                             /*no escape*/ false);
+
+  // Collect bindings needed by a deinit-shaped function.
+  auto deinitParam = SILParameterInfo(
+    box->getLayout()->getFields()[0].getLoweredType(),
+    ParameterConvention::Indirect_In);
+  auto deinitFnTy = SILFunctionType::get(box->getLayout()->getGenericSignature(),
+                                         SILExtInfo(),
+                                         SILCoroutineKind::None,
+                                         ParameterConvention::Direct_Guaranteed,
+                                         deinitParam,
+                                         {}, {}, std::nullopt,
+                                         {}, {}, IGM.Context);
+  bindings.computeBindings(IGM, deinitFnTy, /*consider param sources*/ false);
+  return bindings;
+}
 
 const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
   // We can share a type info for all dynamic-sized heap metadata.
   // TODO: Multi-field boxes
   assert(T->getLayout()->getFields().size() == 1
          && "multi-field boxes not implemented yet");
-  auto &eltTI = IGM.getTypeInfoForLowered(getSILBoxFieldLoweredType(
-      IGM.getMaximalTypeExpansionContext(), T, IGM.getSILModule().Types, 0));
+  auto eltTy = getSILBoxFieldLoweredType(
+    IGM.getMaximalTypeExpansionContext(), T, IGM.getSILModule().Types, 0);
+  auto &eltTI = IGM.getTypeInfoForLowered(eltTy);
   if (!eltTI.isFixedSize()) {
     if (!NonFixedBoxTI)
       NonFixedBoxTI = new NonFixedBoxTypeInfo(IGM);
@@ -1635,19 +1749,24 @@ const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
   // For fixed-sized types, we can emit concrete box metadata.
   auto &fixedTI = cast<FixedTypeInfo>(eltTI);
 
-  // Because we assume in enum's that payloads with a Builtin.NativeReference
+  // Because we assume in enums that payloads with a Builtin.NativeReference
   // which is also the type for indirect enum cases have extra inhabitants of
   // pointers we can't have a nil pointer as a representation for an empty box
   // type -- nil conflicts with the extra inhabitants. We return a static
   // singleton empty box object instead.
-  if (fixedTI.isKnownEmpty(ResilienceExpansion::Maximal)) {
+  //
+  // (If the box needs no storage, but the type still carries a deinit,
+  // then we still need to trigger that deinit when the box is freed.)
+  if (fixedTI.isKnownEmpty(ResilienceExpansion::Maximal)
+      && fixedTI.isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
     if (!EmptyBoxTI)
       EmptyBoxTI = new EmptyBoxTypeInfo(IGM);
     return EmptyBoxTI;
   }
 
   // We can share box info for all similarly-shaped POD types.
-  if (fixedTI.isPOD(ResilienceExpansion::Maximal)) {
+  if (fixedTI.isTriviallyDestroyable(ResilienceExpansion::Maximal)
+      && fixedTI.isCopyable(ResilienceExpansion::Maximal)) {
     auto stride = fixedTI.getFixedStride();
     auto align = fixedTI.getFixedAlignment();
     auto foundPOD = PODBoxTI.find({stride.getValue(),align.getValue()});
@@ -1673,9 +1792,8 @@ const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
   // Produce a tailored box metadata for the type.
   assert(T->getLayout()->getFields().size() == 1
          && "multi-field boxes not implemented yet");
-  return new FixedBoxTypeInfo(
-      IGM, getSILBoxFieldType(IGM.getMaximalTypeExpansionContext(),
-                              T, IGM.getSILModule().Types, 0));
+  
+  return new FixedBoxTypeInfo(IGM, T);
 }
 
 OwnedAddress
@@ -1685,12 +1803,7 @@ irgen::emitAllocateBox(IRGenFunction &IGF, CanSILBoxType boxType,
   auto &boxTI = IGF.getTypeInfoForLowered(boxType).as<BoxTypeInfo>();
   assert(boxType->getLayout()->getFields().size() == 1
          && "multi-field boxes not implemented yet");
-  return boxTI.allocate(
-      IGF,
-      getSILBoxFieldType(
-          IGF.IGM.getMaximalTypeExpansionContext(),
-          boxType, IGF.IGM.getSILModule().Types, 0),
-      env, name);
+  return boxTI.allocate(IGF, env, boxType, name);
 }
 
 void irgen::emitDeallocateBox(IRGenFunction &IGF,
@@ -1723,7 +1836,7 @@ Address irgen::emitAllocateExistentialBoxInBuffer(
   // Get a box for the boxed value.
   auto boxType = SILBoxType::get(boxedType.getASTType());
   auto &boxTI = IGF.getTypeInfoForLowered(boxType).as<BoxTypeInfo>();
-  OwnedAddress owned = boxTI.allocate(IGF, boxedType, env, name);
+  OwnedAddress owned = boxTI.allocate(IGF, env, boxType, name);
   Explosion box;
   box.add(owned.getOwner());
   boxTI.initialize(IGF, box,
@@ -1818,6 +1931,9 @@ llvm::Value *IRGenFunction::getDynamicSelfMetadata() {
                             cast<llvm::Instruction>(SelfValue)))
                       : CurFn->getEntryBlock().begin();
   Builder.SetInsertPoint(&CurFn->getEntryBlock(), insertPt);
+  // Do not inherit the debug location of this insertion point, it could be
+  // anything (e.g. the location of a dbg.declare).
+  Builder.SetCurrentDebugLocation(llvm::DebugLoc());
 
   switch (SelfKind) {
   case SwiftMetatype:
@@ -1830,7 +1946,6 @@ llvm::Value *IRGenFunction::getDynamicSelfMetadata() {
     SelfValue = emitDynamicTypeOfHeapObject(*this, SelfValue,
                                 MetatypeRepresentation::Thick,
                                 SILType::getPrimitiveObjectType(SelfType),
-                                GenericSignature(),
                                 /*allow artificial*/ false);
     SelfKind = SwiftMetatype;
     break;
@@ -1895,12 +2010,11 @@ static llvm::Value *emitLoadOfHeapMetadataRef(IRGenFunction &IGF,
 llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
                                                      llvm::Value *object,
                                                      CanType objectType,
-                                                     GenericSignature sig,
                                                      bool suppressCast) {
   ClassDecl *theClass = objectType.getClassOrBoundGenericClass();
   if ((theClass && isKnownNotTaggedPointer(IGF.IGM, theClass)) ||
       !IGF.IGM.ObjCInterop) {
-    auto isaEncoding = getIsaEncodingForType(IGF.IGM, objectType, sig);
+    auto isaEncoding = getIsaEncodingForType(IGF.IGM, objectType);
     return emitLoadOfHeapMetadataRef(IGF, object, isaEncoding, suppressCast);
   }
 
@@ -1911,11 +2025,9 @@ llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
 llvm::Value *irgen::emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
                                                      llvm::Value *object,
                                                      SILType objectType,
-                                                     GenericSignature sig,
                                                      bool suppressCast) {
   return emitHeapMetadataRefForHeapObject(IGF, object,
                                           objectType.getASTType(),
-                                          sig,
                                           suppressCast);
 }
 
@@ -1970,9 +2082,9 @@ emitHeapMetadataRefForUnknownHeapObject(IRGenFunction &IGF,
   auto metadata = IGF.Builder.CreateCall(
       IGF.IGM.getGetObjectClassFunctionPointer(), object);
   metadata->setName(object->getName() + ".Type");
-  metadata->setCallingConv(llvm::CallingConv::C);
+  metadata->setCallingConv(IGF.IGM.getOptions().PlatformCCallingConvention);
   metadata->setDoesNotThrow();
-  metadata->addFnAttr(llvm::Attribute::ReadOnly);
+  metadata->setOnlyReadsMemory();
   return metadata;
 }
 
@@ -1982,10 +2094,9 @@ llvm::Value *irgen::emitDynamicTypeOfHeapObject(IRGenFunction &IGF,
                                                 llvm::Value *object,
                                                 MetatypeRepresentation repr,
                                                 SILType objectType,
-                                                GenericSignature sig,
                                                 bool allowArtificialSubclasses){
   switch (auto isaEncoding =
-            getIsaEncodingForType(IGF.IGM, objectType.getASTType(), sig)) {
+            getIsaEncodingForType(IGF.IGM, objectType.getASTType())) {
   case IsaEncoding::Pointer:
     // Directly load the isa pointer from a pure Swift class.
     return emitLoadOfHeapMetadataRef(IGF, object, isaEncoding,
@@ -2012,8 +2123,7 @@ llvm::Value *irgen::emitDynamicTypeOfHeapObject(IRGenFunction &IGF,
 
 /// What isa encoding mechanism does a type have?
 IsaEncoding irgen::getIsaEncodingForType(IRGenModule &IGM,
-                                         CanType type,
-                                         GenericSignature outerSignature) {
+                                         CanType type) {
   if (!IGM.ObjCInterop) return IsaEncoding::Pointer;
 
   // This needs to be kept up-to-date with hasKnownSwiftMetadata.
@@ -2029,15 +2139,13 @@ IsaEncoding irgen::getIsaEncodingForType(IRGenModule &IGM,
   // Existentials use the encoding of the enclosed dynamic type.
   if (type->isAnyExistentialType()) {
     return getIsaEncodingForType(
-        IGM, OpenedArchetypeType::getAny(type, outerSignature),
-        outerSignature);
+        IGM, ExistentialArchetypeType::getAny(type)->getCanonicalType());
   }
 
   if (auto archetype = dyn_cast<ArchetypeType>(type)) {
     // If we have a concrete superclass constraint, just recurse.
     if (auto superclass = archetype->getSuperclass()) {
-      return getIsaEncodingForType(IGM, superclass->getCanonicalType(),
-                                   outerSignature);
+      return getIsaEncodingForType(IGM, superclass->getCanonicalType());
     }
 
     // Otherwise, we must just have a class constraint.  Use the

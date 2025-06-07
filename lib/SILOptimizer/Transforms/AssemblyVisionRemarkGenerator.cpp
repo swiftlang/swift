@@ -156,6 +156,9 @@ void ValueToDeclInferrer::printAccessPath(llvm::raw_string_ostream &stream) {
 
     // WARNING: This must be kept insync with isSupportedProjection!
     switch (proj.getKind()) {
+    case ProjectionKind::BlockStorageCast:
+      stream << "project_block_storage<" << proj.getCastType(baseType) << ">";
+      continue;
     case ProjectionKind::Upcast:
       stream << "upcast<" << proj.getCastType(baseType) << ">";
       continue;
@@ -204,6 +207,7 @@ static SingleValueInstruction *isSupportedProjection(Projection p, SILValue v) {
   switch (p.getKind()) {
   case ProjectionKind::Upcast:
   case ProjectionKind::RefCast:
+  case ProjectionKind::BlockStorageCast:
   case ProjectionKind::BitwiseCast:
   case ProjectionKind::Struct:
   case ProjectionKind::Tuple:
@@ -447,6 +451,14 @@ bool ValueToDeclInferrer::infer(
     rcfi.visitRCUses(value, [&](Operand *use) {
       foundDeclFromUse |= valueUseInferrer.findDecls(use, value);
     });
+
+    for (Operand *use : value->getUses()) {
+      if (auto *eir = dyn_cast<EndInitLetRefInst>(use->getUser())) {
+        rcfi.visitRCUses(eir, [&](Operand *use) {
+          foundDeclFromUse |= valueUseInferrer.findDecls(use, value);
+        });
+      }
+    }
 
     // At this point, we could not infer any argument. See if we can look up the
     // def-use graph and come up with a good location after looking through

@@ -40,7 +40,8 @@ class ProtocolDecl;
 
 enum class EffectKind : uint8_t {
   Throws = 1 << 0,
-  Async  = 1 << 1
+  Async  = 1 << 1,
+  Unsafe = 1 << 2,
 };
 using PossibleEffects = OptionSet<EffectKind>;
 
@@ -86,6 +87,11 @@ enum class PolymorphicEffectKind : uint8_t {
   ///
   /// This is the conformance-based 'rethrows' /'reasync' case.
   ByConformance,
+
+  /// The function is only permitted to be `rethrows` because it depends
+  /// on a conformance to `AsyncSequence` or `AsyncIteratorProtocol`,
+  /// which historically were "@rethrows" protocols.
+  AsyncSequenceRethrows,
 
   /// The function has this effect unconditionally.
   ///

@@ -8,36 +8,25 @@
 // UNSUPPORTED: CPU=armv7s && OS=ios
 
 //      CHECK: @"$s6Module11OneArgumentVyAA7IntegerVAeA1P4mainyHCg_GMN" = linkonce_odr hidden constant <{
-// CHECK-SAME:   i8**,
+// CHECK-SAME:   ptr,
 // CHECK-SAME:   [[INT]],
-// CHECK-SAME:   %swift.type_descriptor*,
-// CHECK-SAME:   %swift.type*,
-// CHECK-SAME:   i8**,
+// CHECK-SAME:   ptr,
+// CHECK-SAME:   ptr,
+// CHECK-SAME:   ptr,
 // CHECK-SAME:   i32,
 // CHECK-SAME:   i32,
 // CHECK-SAME:   i64
 // CHECK-SAME: }> <{
-//           :   i8** getelementptr inbounds (
+//           :   ptr getelementptr inbounds (
 //           :     %swift.vwtable,
-//           :     %swift.vwtable* @"
-// CHECK-SAME:       $s6Module11OneArgumentVyAA7IntegerVAeA1P4mainyHCg_GWV
-//           :     ",
+// CHECK-SAME:     $s6Module11OneArgumentVyAA7IntegerVAeA1P4mainyHCg_GWV
 //           :     i32 0,
 //           :     i32 0
 //           :   ),
 // CHECK-SAME:   [[INT]] 512,
 // CHECK-SAME:   $s6Module11OneArgumentVMn
-// CHECK-SAME:   %swift.type* @"$s6Module7IntegerVN",
-// CHECK-SAME:   i8** getelementptr inbounds (
-// CHECK-SAME:     [
-// CHECK-SAME:       1 x i8*
-// CHECK-SAME:     ],
-// CHECK-SAME:     [
-// CHECK-SAME:       1 x i8*
-// CHECK-SAME:     ]* @"$s6Module7IntegerVAA1P4mainWP",
-// CHECK-SAME:     i32 0,
-// CHECK-SAME:     i32 0
-// CHECK-SAME:   ),
+// CHECK-SAME:   $s6Module7IntegerVN
+// CHECK-SAME:   $s6Module7IntegerVAA1P4mainWP
 // CHECK-SAME:   i32 0,
 // CHECK-SAME:   i32 {{8|4}},
 // CHECK-SAME:   i64 1
@@ -61,29 +50,18 @@ struct AnotherArgument {
 //      CHECK: define hidden swiftcc void @"$s4main4doityyF"() #{{[0-9]+}} {
 //      CHECK:   [[CANONICALIZED_METADATA_RESPONSE:%[0-9]+]] = call swiftcc %swift.metadata_response @swift_getCanonicalSpecializedMetadata(
 // CHECK-SAME:     [[INT]] 0,
-// CHECK-SAME:     %swift.type* getelementptr inbounds (
+// CHECK-SAME:     ptr getelementptr inbounds (
 // CHECK-SAME:       %swift.full_type,
-// CHECK-SAME:       %swift.full_type* bitcast (
-// CHECK-SAME:         <{
-// CHECK-SAME:           i8**,
-// CHECK-SAME:           [[INT]],
-// CHECK-SAME:           %swift.type_descriptor*,
-// CHECK-SAME:           %swift.type*,
-// CHECK-SAME:           i8**,
-// CHECK-SAME:           i32,
-// CHECK-SAME:           i32,
-// CHECK-SAME:           i64
-// CHECK-SAME:         }>* @"$s6Module11OneArgumentVyAA7IntegerVAeA1P4mainyHCg_GMN" to %swift.full_type*
-// CHECK-SAME:       ),
+// CHECK-SAME:       $s6Module11OneArgumentVyAA7IntegerVAeA1P4mainyHCg_GMN
 // CHECK-SAME:       i32 0,
-// CHECK-SAME:       i32 1
+// CHECK-SAME:       i32 2
 // CHECK-SAME:     ),
-// CHECK-SAME:     %swift.type** @"$s6Module11OneArgumentVyAA7IntegerVAeA1P4mainyHCg_GMJ"
+// CHECK-SAME:     $s6Module11OneArgumentVyAA7IntegerVAeA1P4mainyHCg_GMJ
 // CHECK-SAME:   )
 // CHECK-NEXT:   [[CANONICALIZED_METADATA:%[0-9]+]] = extractvalue %swift.metadata_response [[CANONICALIZED_METADATA_RESPONSE]], 0
 // CHECK-NEXT:   call swiftcc void @"$s4main7consumeyyxlF"(
-// CHECK-SAME:     %swift.opaque* noalias nocapture {{%[0-9]+}}, 
-// CHECK-SAME:     %swift.type* [[CANONICALIZED_METADATA]]
+// CHECK-SAME:     ptr noalias {{%[0-9]+}}, 
+// CHECK-SAME:     ptr [[CANONICALIZED_METADATA]]
 // CHECK-SAME:   )
 //      CHECK: }
 func doit() {

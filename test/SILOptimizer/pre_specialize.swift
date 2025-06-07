@@ -111,11 +111,11 @@ public func usePrespecializedThrowsEntryPoints() throws {
   consume(try publicPrespecializedThrows(SomeData()))
 }
 
-// OPT-macosx: sil [available 10.50] @$s14pre_specialize40usePrespecializedEntryPointsAvailabilityyyF : $@convention(thin) () -> () {
+// OPT-macosx: sil [available 50] @$s14pre_specialize40usePrespecializedEntryPointsAvailabilityyyF : $@convention(thin) () -> () {
 // OPT-macosx:  [[F1:%.*]] = function_ref @$s22pre_specialized_module20publicPrespecializedyyxlFAA8SomeDataV_Ts5 : $@convention(thin) (SomeData) -> ()
 // OPT-macosx:  apply [[F1]](
 // OPT-macosx: } // end sil function '$s14pre_specialize40usePrespecializedEntryPointsAvailabilityyyF'
-@available(macOS 10.50, *)
+@available(macOS 50, *)
 public func usePrespecializedEntryPointsAvailability() {
   publicPrespecialized(SomeData())
 }

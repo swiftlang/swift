@@ -32,17 +32,17 @@ class PartialSpecializationMangler : public SpecializationMangler {
   bool isReAbstracted;
   
 public:
-  PartialSpecializationMangler(SILFunction *F,
+  PartialSpecializationMangler(ASTContext &Ctx, SILFunction *F,
                                CanSILFunctionType SpecializedFnTy,
-                               IsSerialized_t Serialized, bool isReAbstracted)
-      : SpecializationMangler(SpecializationPass::GenericSpecializer,
+                               swift::SerializedKind_t Serialized, bool isReAbstracted)
+      : SpecializationMangler(Ctx, SpecializationPass::GenericSpecializer,
                               Serialized, F),
         SpecializedFnTy(SpecializedFnTy), isReAbstracted(isReAbstracted) {}
 
   std::string mangle();
 };
 
-// The mangler for functions where arguments are specialized.
+// The mangler for functions where arguments or effects are specialized.
 class FunctionSignatureSpecializationMangler : public SpecializationMangler {
 
   using ReturnValueModifierIntBase = uint16_t;
@@ -92,9 +92,10 @@ class FunctionSignatureSpecializationMangler : public SpecializationMangler {
   ReturnValueModifierIntBase ReturnValue;
 
 public:
-  FunctionSignatureSpecializationMangler(SpecializationPass Pass,
-                                         IsSerialized_t Serialized,
+  FunctionSignatureSpecializationMangler(ASTContext &Ctx, SpecializationPass Pass,
+                                         swift::SerializedKind_t Serialized,
                                          SILFunction *F);
+  // For arguments / return values
   void setArgumentConstantProp(unsigned OrigArgIdx, SILInstruction *constInst);
   void appendStringAsIdentifier(StringRef str);
 
@@ -110,6 +111,9 @@ public:
   void setArgumentBoxToStack(unsigned OrigArgIdx);
   void setArgumentInOutToOut(unsigned OrigArgIdx);
   void setReturnValueOwnedToUnowned();
+
+  // For effects
+  void setRemovedEffect(EffectKind effect);
 
   std::string mangle();
   

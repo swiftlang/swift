@@ -1,4 +1,6 @@
-// RUN: %target-swift-emit-sil -I %S/Inputs -enable-experimental-cxx-interop %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -I %S/Inputs -enable-experimental-cxx-interop %s | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
 
 // CHECK: // clang name: WithStaticMember::staticMember
 // CHECK: sil_global public_external @{{_ZN16WithStaticMember12staticMemberE|\?staticMember@WithStaticMember@@2HA}} : $Int32
@@ -22,7 +24,8 @@ func writeStaticMember() {
 
 // CHECK: sil hidden @$s4main17writeStaticMemberyyF : $@convention(thin) () -> ()
 // CHECK: [[ADDR:%.*]] = global_addr @{{_ZN16WithStaticMember12staticMemberE|\?staticMember@WithStaticMember@@2HA}} : $*Int32
-// CHECK: [[INT:%.*]] = struct $Int32 (%2 : $Builtin.Int32)
+// CHECK: [[LIT:%.*]] = integer_literal $Builtin.Int32, -1
+// CHECK: [[INT:%.*]] = struct $Int32 ([[LIT]] : $Builtin.Int32)
 // CHECK: [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[ADDR]] : $*Int32
 // CHECK: store [[INT]] to [[ACCESS]] : $*Int32
 
@@ -53,9 +56,10 @@ func readDefinedConstMember() -> CInt {
 }
 
 // CHECK: sil hidden @$s4main22readDefinedConstMembers5Int32VyF : $@convention(thin) () -> Int32
-// CHECK: [[ADDR:%.*]] = global_addr @{{_ZN21WithConstStaticMember7definedE|\?defined@WithConstStaticMember@@2HB}} : $*Int32
-// CHECK: [[VALUE:%.*]] = load [[ADDR]] : $*Int32
-// CHECK: return [[VALUE]] : $Int32
+// CHECK: [[VALUE:%.*]] = integer_literal $Builtin.Int32, 48
+// CHECK: [[STRUCT:%.*]] = struct $Int32 ([[VALUE]] : $Builtin.Int32)
+// CHECK: return [[STRUCT]] : $Int32
+
 func readDefinedOutOfLineConstMember() -> CInt {
   return WithConstStaticMember.definedOutOfLine
 }

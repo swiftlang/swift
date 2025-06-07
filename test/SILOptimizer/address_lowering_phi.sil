@@ -1,10 +1,12 @@
-// RUN: %target-sil-opt -address-lowering -enable-sil-opaque-values -emit-sorted-sil -module-name Swift -sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -address-lowering -enable-sil-opaque-values -emit-sorted-sil -module-name Swift -sil-verify-all %s | %FileCheck %s
 //
 // Test the PhiStorageOptimizer within the AddressLowering pass.
 
 import Builtin
 
 sil_stage raw
+
+protocol Error {}
 
 typealias AnyObject = Builtin.AnyObject
 typealias Int = Builtin.Int64
@@ -30,6 +32,10 @@ enum OuterEnum<T> {
   case inner(InnerEnum<T>, AnyObject)
 }
 
+struct Box<T> {
+  var t: T
+}
+
 struct InnerStruct<T> {
   var t: T
   var object: AnyObject
@@ -37,6 +43,11 @@ struct InnerStruct<T> {
 struct OuterStruct<T> {
   var inner: InnerStruct<T>
   var object: AnyObject
+}
+
+struct Pair<T> {
+  var x: T
+  var y: T
 }
 
 sil [ossa] @getOut : $@convention(thin) <T> () -> @out T
@@ -74,6 +85,129 @@ bb2:
 // %15
 bb3(%15 : @owned $T):
   return %15 : $T
+}
+
+// Double use projection without interference.
+// CHECK-LABEL: sil [ossa] @f011_testBBArgSelect_useProjection : $@convention(thin) <T> () -> () {
+// CHECK:         [[STACK:%[^,]+]] = alloc_stack $Optional<T>
+// CHECK:         cond_br undef, [[RIGHT:bb[0-9]+]], [[LEFT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK:         [[LEFT_ADDR:%[^,]+]] = init_enum_data_addr [[STACK]]
+// CHECK:         apply {{%[^,]+}}<T>([[LEFT_ADDR]])
+// CHECK:         inject_enum_addr [[STACK]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[RIGHT]]:
+// CHECK:         [[RIGHT_ADDR:%[^,]+]] = init_enum_data_addr [[STACK]]
+// CHECK:         apply {{%[^,]+}}<T>([[RIGHT_ADDR]])
+// CHECK:         inject_enum_addr [[STACK]]
+// CHECK:         br [[EXIT]]
+// CHECK:       [[EXIT]]:
+// CHECK:         destroy_addr [[STACK]]
+// CHECK:         dealloc_stack [[STACK]]
+// CHECK-LABEL: } // end sil function 'f011_testBBArgSelect_useProjection'
+sil [ossa] @f011_testBBArgSelect_useProjection : $@convention(thin) <T> () -> () {
+entry:
+  %get = function_ref @getOut : $@convention(thin) <τ_0_0>() -> @out τ_0_0
+  cond_br undef, left, right
+left:
+  %left = apply %get<T>() : $@convention(thin) <T> () -> (@out T)
+  %forward = enum $Optional<T>, #Optional.some, %left : $T
+  br exit(%forward : $Optional<T>)
+right:
+  %right = apply %get<T>() : $@convention(thin) <T> () -> (@out T)
+  %backward = enum $Optional<T>, #Optional.some, %right : $T
+  br exit(%backward : $Optional<T>)
+exit(%box : @owned $Optional<T>):
+  destroy_value %box : $Optional<T>
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Double use projection + interference.
+// CHECK-LABEL: sil [ossa] @f012_testBBArgSelect_useProjection_oneInterference : $@convention(thin) <T> () -> () {
+// CHECK:         [[LEFT_OUTER:%[^,]+]] = alloc_stack $Optional<T>
+// CHECK:         [[LEFT_ADDR:%[^,]+]] = init_enum_data_addr [[LEFT_OUTER]]
+// CHECK:         apply {{%[^,]+}}<T>([[LEFT_ADDR]])
+// CHECK:         [[PHI_ADDR:%[^,]+]] = alloc_stack $Optional<T>
+// CHECK:         [[RIGHT_ADDR:%[^,]+]] = init_enum_data_addr [[PHI_ADDR]]
+// CHECK:         apply {{%[^,]+}}<T>([[RIGHT_ADDR]])
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[RIGHT]]:
+// CHECK:         destroy_addr [[LEFT_ADDR]]
+// CHECK:         inject_enum_addr [[PHI_ADDR]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK:         destroy_addr [[RIGHT_ADDR]]
+// CHECK:         inject_enum_addr [[LEFT_OUTER]]
+// CHECK:         copy_addr [take] [[LEFT_OUTER]] to [init] [[PHI_ADDR]]
+// CHECK:         br [[EXIT]]
+// CHECK:       [[EXIT]]:
+// CHECK:         destroy_addr [[PHI_ADDR]]
+// CHECK:         dealloc_stack [[PHI_ADDR]]
+// CHECK:         dealloc_stack [[LEFT_OUTER]]
+// CHECK-LABEL: } // end sil function 'f012_testBBArgSelect_useProjection_oneInterference'
+sil [ossa] @f012_testBBArgSelect_useProjection_oneInterference : $@convention(thin) <T> () -> () {
+entry:
+  %get = function_ref @getOut : $@convention(thin) <τ_0_0>() -> @out τ_0_0
+  %left = apply %get<T>() : $@convention(thin) <T> () -> (@out T)
+  %right = apply %get<T>() : $@convention(thin) <T> () -> (@out T)
+  cond_br undef, left, right
+left:
+  destroy_value %right : $T
+  %forward = enum $Optional<T>, #Optional.some, %left : $T
+  br exit(%forward : $Optional<T>)
+right:
+  destroy_value %left : $T
+  %backward = enum $Optional<T>, #Optional.some, %right : $T
+  br exit(%backward : $Optional<T>)
+exit(%box : @owned $Optional<T>):
+  destroy_value %box : $Optional<T>
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @f013_testBBArgSelect_useProjections_interference : {{.*}} {
+// CHECK:         [[S2_ADDR:%[^,]+]] = alloc_stack $Box<T>
+// CHECK:         [[PHI_ADDR:%[^,]+]] = alloc_stack $Box<T>
+// CHECK:         [[T_ADDR:%[^,]+]] = struct_element_addr [[PHI_ADDR]] : $*Box<T>, #Box.t
+// CHECK:         apply undef<T>([[T_ADDR]])
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[RIGHT]]:
+// CHECK:         br [[MERGE:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK:         [[S2_FIELD_ADDR:%[^,]+]] = struct_element_addr [[S2_ADDR]] : $*Box<T>, #Box.t
+// CHECK:         copy_addr [take] [[T_ADDR]] to [init] [[S2_FIELD_ADDR]]
+// CHECK:         copy_addr [take] [[S2_ADDR]] to [init] [[PHI_ADDR]]
+// CHECK:         br [[MERGE]]
+// CHECK:       [[MERGE]]:
+// CHECK:         apply undef<Box<T>>([[PHI_ADDR]])
+// CHECK:         destroy_addr [[PHI_ADDR]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]:
+// CHECK:         dealloc_stack [[PHI_ADDR]]
+// CHECK:         dealloc_stack [[S2_ADDR]]
+// CHECK-LABEL: } // end sil function 'f013_testBBArgSelect_useProjections_interference'
+sil [ossa] @f013_testBBArgSelect_useProjections_interference : $@convention(thin) <T> () -> () {
+entry:
+  %t = apply undef<T>() : $@convention(thin) <T> () -> (@out T)
+  cond_br undef, left, right
+
+left:
+  %s2 = struct $Box<T>(%t : $T)
+  br merge(%s2 : $Box<T>)
+
+right:
+  %s = struct $Box<T>(%t : $T)
+  br merge(%s : $Box<T>)
+
+merge(%tb : @owned $Box<T>):
+  apply undef<Box<T>>(%tb) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  destroy_value %tb : $Box<T>
+  br exit
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
 }
 
 // One projection from incoming values. One interference.
@@ -206,9 +340,9 @@ bb3(%arg0 : @owned $T, %arg1 : @owned $T):
 //
 // CHECK-LABEL: sil [ossa] @f060_testInoutSwap : $@convention(thin) <T> (@inout T, @inout T) -> () {
 // CHECK: bb0(%0 : $*T, %1 : $*T):
-// CHECK:   [[ALLOC0:%.*]] = alloc_stack $T
 // CHECK:   [[ALLOC1:%.*]] = alloc_stack $T
 // CHECK:   copy_addr [take] %0 to [init] [[ALLOC1]] : $*T
+// CHECK:   [[ALLOC0:%.*]] = alloc_stack $T
 // CHECK:   copy_addr [take] %1 to [init] [[ALLOC0]] : $*T
 // CHECK:   cond_br undef, bb2, bb1
 // CHECK: bb1:
@@ -223,8 +357,8 @@ bb3(%arg0 : @owned $T, %arg1 : @owned $T):
 // CHECK: bb3:
 // CHECK:   copy_addr [take] [[ALLOC0]] to [init] %0 : $*T
 // CHECK:   copy_addr [take] [[ALLOC1]] to [init] %1 : $*T
-// CHECK:   dealloc_stack [[ALLOC1]] : $*T
 // CHECK:   dealloc_stack [[ALLOC0]] : $*T
+// CHECK:   dealloc_stack [[ALLOC1]] : $*T
 // CHECK-LABEL: } // end sil function 'f060_testInoutSwap'
 sil [ossa] @f060_testInoutSwap : $@convention(thin) <T> (@inout T, @inout T) -> () {
 bb0(%0 : $*T, %1 : $*T):
@@ -259,36 +393,36 @@ bb3(%phi0 : @owned $T, %phi1 : @owned $T):
 // CHECK: bb1:
 // CHECK:   [[A1OADR:%.*]] = struct_element_addr [[ALLOCA]] : $*SRef<T>, #SRef.object
 // CHECK:   [[A1O:%.*]] = load [take] [[A1OADR]] : $*AnyObject
-// CHECK:   [[A1EADR:%.*]] = struct_element_addr [[ALLOCA]] : $*SRef<T>, #SRef.element
 // CHECK:   [[B1OADR:%.*]] = struct_element_addr [[ALLOCB]] : $*SRef<T>, #SRef.object
 // CHECK:   [[B1O:%.*]] = load [take] [[B1OADR]] : $*AnyObject
-// CHECK:   [[B1EADR:%.*]] = struct_element_addr [[ALLOCB]] : $*SRef<T>, #SRef.element
 // CHECK:   destroy_value [[B1O]] : $AnyObject
 // CHECK:   [[CP1:%.*]] = copy_value [[A1O]] : $AnyObject
 // CHECK:   [[SA1EADR:%.*]] = struct_element_addr [[ALLOCSA]] : $*SRef<T>, #SRef.element
+// CHECK:   [[A1EADR:%.*]] = struct_element_addr [[ALLOCA]] : $*SRef<T>, #SRef.element
 // CHECK:   copy_addr [take] [[A1EADR]] to [init] [[SA1EADR]] : $*T
 // CHECK:   [[SB1EADR:%.*]] = struct_element_addr [[ALLOCSB]] : $*SRef<T>, #SRef.element
+// CHECK:   [[B1EADR:%.*]] = struct_element_addr [[ALLOCB]] : $*SRef<T>, #SRef.element
 // CHECK:   copy_addr [take] [[B1EADR]] to [init] [[SB1EADR]] : $*T
 // CHECK:   br bb3([[A1O]] : $AnyObject, [[CP1]] : $AnyObject)
 // CHECK: bb2:
 // CHECK:   [[A2OADR:%.*]] = struct_element_addr [[ALLOCA]] : $*SRef<T>, #SRef.object
 // CHECK:   [[A2O:%.*]] = load [take] [[A2OADR]] : $*AnyObject
-// CHECK:   [[A2EADR:%.*]] = struct_element_addr [[ALLOCA]] : $*SRef<T>, #SRef.element
 // CHECK:   [[B2OADR:%.*]] = struct_element_addr [[ALLOCB]] : $*SRef<T>, #SRef.object
 // CHECK:   [[B2O:%.*]] = load [take] [[B2OADR]] : $*AnyObject
-// CHECK:   [[B2EADR:%.*]] = struct_element_addr [[ALLOCB]] : $*SRef<T>, #SRef.element
 // CHECK:   destroy_value [[B2O]] : $AnyObject
 // CHECK:   [[CP2:%.*]] = copy_value [[A2O]] : $AnyObject
 // CHECK:   [[SB2EADR:%.*]] = struct_element_addr [[ALLOCSB]] : $*SRef<T>, #SRef.element
+// CHECK:   [[A2EADR:%.*]] = struct_element_addr [[ALLOCA]] : $*SRef<T>, #SRef.element
 // CHECK:   copy_addr [take] [[A2EADR]] to [init] [[SB2EADR]] : $*T
 // CHECK:   [[SA2EADR:%.*]] = struct_element_addr [[ALLOCSA]] : $*SRef<T>, #SRef.element
+// CHECK:   [[B2EADR:%.*]] = struct_element_addr [[ALLOCB]] : $*SRef<T>, #SRef.element
 // CHECK:   copy_addr [take] [[B2EADR]] to [init] [[SA2EADR]] : $*T
 // CHECK:   br bb3([[A2O]] : $AnyObject, [[CP2]] : $AnyObject)
 // CHECK: bb3([[PHI0:%.*]] : @owned $AnyObject, [[PHI1:%.*]] : @owned $AnyObject):
 // CHECK:   [[SA3EADR:%.*]] = struct_element_addr [[ALLOCSA]] : $*SRef<T>, #SRef.object
 // CHECK:   store [[PHI0]] to [init] [[SA3EADR]] : $*AnyObject
-// CHECK:   [[SA3EADR:%.*]] = struct_element_addr [[ALLOCSB]] : $*SRef<T>, #SRef.object
-// CHECK:   store [[PHI1]] to [init] [[SA3EADR]] : $*AnyObject
+// CHECK:   [[SB3EADR:%.*]] = struct_element_addr [[ALLOCSB]] : $*SRef<T>, #SRef.object
+// CHECK:   store [[PHI1]] to [init] [[SB3EADR]] : $*AnyObject
 // CHECK:   copy_addr [take] [[ALLOCSA]] to [init] %0 : $*SRef<T>
 // CHECK:   copy_addr [take] [[ALLOCSB]] to [init] %1 : $*SRef<T>
 // CHECK-LABEL: } // end sil function 'f070_testInoutFieldSwap'
@@ -332,7 +466,6 @@ bb3(%phio0 : @owned $AnyObject, %phio1 : @owned $AnyObject, %phie0 : @owned $T, 
 // CHECK:   [[TUPLE1_1:%.*]] = tuple_element_addr [[TUPLE1]] : $*(T, AnyObject), 1
 // CHECK:   store %3 to [init] [[TUPLE1_1]] : $*AnyObject
 // CHECK:   inject_enum_addr [[INNER1]] : $*InnerEnum<T>, #InnerEnum.payload!enumelt
-// CHECK:   copy_addr [take] [[INNER1]] to [init] [[PHI6:%.*]] : $*InnerEnum<T>
 // CHECK:   br bb6
 // CHECK: bb2:
 // CHECK:   cond_br undef, bb4, bb3
@@ -351,12 +484,11 @@ bb3(%phio0 : @owned $AnyObject, %phio1 : @owned $AnyObject, %phie0 : @owned $T, 
 // CHECK:   [[TUPLE5_1:%.*]] = tuple_element_addr [[TUPLE5]] : $*(T, AnyObject), 1
 // CHECK:   store %3 to [init] [[TUPLE5_1]] : $*AnyObject
 // CHECK:   inject_enum_addr [[INNER5]] : $*InnerEnum<T>, #InnerEnum.payload!enumelt
-// CHECK:   copy_addr [take] [[INNER5]] to [init] [[PHI6:%.*]] : $*InnerEnum<T>
 // CHECK:   br bb6
 // CHECK: bb6:
 // CHECK:   [[TUPLE6:%.*]] = init_enum_data_addr %0 : $*OuterEnum<T>, #OuterEnum.inner!enumelt
 // CHECK:   [[TUPLE6_0:%.*]] = tuple_element_addr [[TUPLE6]] : $*(InnerEnum<T>, AnyObject), 0
-// CHECK:   copy_addr [take] [[PHI6]] to [init] [[TUPLE6_0]] : $*InnerEnum<T>
+// CHECK:   copy_addr [take] [[INNER1]] to [init] [[TUPLE6_0]] : $*InnerEnum<T>
 // CHECK:   [[TUPLE6_1:%.*]] = tuple_element_addr [[TUPLE6]] : $*(InnerEnum<T>, AnyObject), 1
 // CHECK:   store %4 to [init] [[TUPLE6_1]] : $*AnyObject
 // CHECK:   inject_enum_addr %0 : $*OuterEnum<T>, #OuterEnum.inner!enumelt
@@ -505,7 +637,7 @@ merge(%34 : @owned $Value):
 
 // CHECK-LABEL: sil [ossa] @f105_phi_into_tuple : {{.*}} {
 // CHECK:         [[STORAGE:%[^,]+]] = alloc_stack $(Self, Builtin.Int1)          
-// CHECK:         [[SELF_ADDR:%[^,]+]] = tuple_element_addr [[STORAGE]]
+// CHECK:         [[SELF_ADDR:%[^,]+]] = tuple_element_addr [[STORAGE]] : {{.*}}, 0
 // CHECK:         apply {{%[^,]+}}<Self>([[SELF_ADDR]])
 // CHECK-LABEL: } // end sil function 'f105_phi_into_tuple'
 sil [ossa] @f105_phi_into_tuple : $@convention(thin) <Self> () -> () {
@@ -533,6 +665,493 @@ right:
   br exit(%instance : $T, %s : $S)
 exit(%instance_2 : @owned $T, %s_2 : $S):
   destroy_value %instance_2 : $T
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Check behavior of non-coalesceable single incoming phi.
+// CHECK-LABEL: sil [ossa] @f120_single_phi_argument_forwarded_function_argument : {{.*}} {
+// CHECK:       bb0([[T:%[^,]+]] :
+// CHECK:         [[STORAGE:%[^,]+]] = alloc_stack
+// CHECK:         copy_addr [take] [[T]] to [init] [[STORAGE]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]:
+// CHECK:         destroy_addr [[STORAGE]]
+// CHECK:         dealloc_stack [[STORAGE]]
+// CHECK-LABEL: } // end sil function 'f120_single_phi_argument_forwarded_function_argument'
+sil [ossa]@f120_single_phi_argument_forwarded_function_argument : $@convention(thin) <T> (@in T) -> () {
+entry(%t : @owned $T):
+  br exit(%t : $T)
+
+exit(%t2 : @owned $T):
+  destroy_value %t2 : $T
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @f121_single_phi_argument_forwarded_function_argument_returned : {{.*}} {
+// CHECK:       bb0([[OUT:%[^,]+]] :
+// CHECK-SAME:      [[IN:%[^,]+]] :
+// CHECK:         copy_addr [take] [[IN]] to [init] [[OUT]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]:
+// CHECK-LABEL: } // end sil function 'f121_single_phi_argument_forwarded_function_argument_returned'
+sil [ossa]@f121_single_phi_argument_forwarded_function_argument_returned : $@convention(thin) <T> (@in T) -> @out T {
+entry(%t : @owned $T):
+  br exit(%t : $T)
+
+exit(%t2 : @owned $T):
+  return %t2 : $T
+}
+
+// CHECK-LABEL: sil [ossa] @f122_single_phi_argument_destructure : $@convention(thin) <T> () -> () {
+// CHECK:         [[PHI_ADDR:%[^,]+]] = alloc_stack $T
+// CHECK:         [[BOX_ADDR:%[^,]+]] = alloc_stack $Box<T>
+// CHECK:         apply undef<T>([[BOX_ADDR]])
+// CHECK:         [[T_ADDR:%[^,]+]] = struct_element_addr [[BOX_ADDR]] : $*Box<T>, #Box.t
+// CHECK:         copy_addr [take] [[T_ADDR]] to [init] [[PHI_ADDR]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]:
+// CHECK:         destroy_addr [[PHI_ADDR]]
+// CHECK:         dealloc_stack [[BOX_ADDR]]
+// CHECK:         dealloc_stack [[PHI_ADDR]]
+// CHECK-LABEL: } // end sil function 'f122_single_phi_argument_destructure'
+sil [ossa]@f122_single_phi_argument_destructure : $@convention(thin) <T> () -> () {
+entry:
+  %box = apply undef<T>() : $@convention(thin) <T> () -> (@out Box<T>)
+  %t = destructure_struct %box : $Box<T>
+  br exit(%t : $T)
+
+exit(%t2 : @owned $T):
+  destroy_value %t2 : $T
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @f130_single_phi_use_of_phi {{.*}} {
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $Box<T>
+// CHECK:         [[T_ADDR:%[^,]+]] = struct_element_addr [[ADDR]] : $*Box<T>, #Box.t
+// CHECK:         apply undef<T>([[T_ADDR]])
+// CHECK:         br [[FAKE_MERGE1:bb[0-9]+]]
+// CHECK:       [[FAKE_MERGE1]]:
+// CHECK:         [[T_ADDR_2:%[^,]+]] = struct_element_addr [[ADDR]] : $*Box<T>, #Box.t
+// CHECK:         apply undef<T>([[T_ADDR_2]])
+// CHECK:         br [[FAKE_MERGE2:bb[0-9]+]]
+// CHECK:       [[FAKE_MERGE2]]:
+// CHECK:         apply undef<Box<T>>([[ADDR]])
+// CHECK:         destroy_addr [[ADDR]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]:
+// CHECK:         dealloc_stack [[ADDR]]
+// CHECK-LABEL: } // end sil function 'f130_single_phi_use_of_phi'
+sil [ossa] @f130_single_phi_use_of_phi : $@convention(thin) <T> () -> () {
+entry:
+  %t = apply undef<T>() : $@convention(thin) <T> () -> (@out T)
+  br fakeMerge1(%t : $T)
+
+fakeMerge1(%tp : @owned $T):
+  apply undef<T>(%tp) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %box = struct $Box<T>(%tp : $T)
+  br fakeMerge2(%box : $Box<T>)
+
+fakeMerge2(%boxp : @owned $Box<T>):
+  apply undef<Box<T>>(%boxp) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  destroy_value %boxp : $Box<T>
+  br exit
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @f131_single_phi_use_of_phi_interference : {{.*}} {
+// CHECK:         [[BOXP_ADDR:%[^,]+]] = alloc_stack $Box<T>
+// CHECK:         [[T_ADDR:%[^,]+]] = struct_element_addr [[BOXP_ADDR]] : $*Box<T>, #Box.t
+// CHECK:         apply undef<T>([[T_ADDR]])
+// CHECK:         br [[FAKE_MERGE:bb[0-9]+]]
+// CHECK:       [[FAKE_MERGE]]:
+// CHECK:         [[T_ADDR_2:%[^,]+]] = struct_element_addr [[BOXP_ADDR]] : $*Box<T>, #Box.t
+// CHECK:         apply undef<T>([[T_ADDR_2]])
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[RIGHT]]:
+// CHECK:         [[BOX_2_ADDR:%[^,]+]] = alloc_stack $Box<T>
+// CHECK:         apply undef<Box<T>>([[BOX_2_ADDR]])
+// CHECK:         destroy_addr [[BOXP_ADDR]]
+// CHECK:         copy_addr [take] [[BOX_2_ADDR]] to [init] [[BOXP_ADDR]]
+// CHECK:         dealloc_stack [[BOX_2_ADDR]]
+// CHECK:         br [[MERGE:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK:         br [[MERGE]]
+// CHECK:       [[MERGE]]:
+// CHECK:         apply undef<Box<T>>([[BOXP_ADDR]])
+// CHECK:         destroy_addr [[BOXP_ADDR]]
+// CHECK:         dealloc_stack [[BOXP_ADDR]]
+// CHECK-LABEL: } // end sil function 'f131_single_phi_use_of_phi_interference'
+sil [ossa] @f131_single_phi_use_of_phi_interference : $@convention(thin) <T> () -> () {
+entry:
+  %t = apply undef<T>() : $@convention(thin) <T> () -> (@out T)
+  br fakeMerge1(%t : $T)
+
+fakeMerge1(%tp : @owned $T):
+  apply undef<T>(%tp) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %box = struct $Box<T>(%tp : $T)
+  cond_br undef, left, right
+
+right:
+  %box2 = apply undef<Box<T>>() : $@convention(thin) <T> () -> (@out T)
+  destroy_value %box : $Box<T>
+  br merge2(%box2 : $Box<T>)
+
+left:
+  br merge2(%box : $Box<T>)
+
+merge2(%boxp : @owned $Box<T>):
+  apply undef<Box<T>>(%boxp) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  destroy_value %boxp : $Box<T>
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @f140_interfering_use_projection : {{.*}} {
+// CHECK:         [[S2_ADDR:%[^,]+]] = alloc_stack $Pair<T>
+// CHECK:         [[T2_ADDR:%[^,]+]] = struct_element_addr [[S2_ADDR]] : $*Pair<T>, #Pair.y
+// CHECK:         apply undef<T>([[T2_ADDR]])
+// CHECK:         [[PHI_ADDR:%[^,]+]] = alloc_stack $Pair<T>
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[RIGHT]]:
+// CHECK:         apply undef<Pair<T>>([[PHI_ADDR]])
+// CHECK:         destroy_addr [[T2_ADDR]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK:         [[T1_ADDR:%[^,]+]] = struct_element_addr [[S2_ADDR]] : $*Pair<T>, #Pair.x
+// CHECK:         apply undef<T>([[T1_ADDR]])
+// CHECK:         copy_addr [take] [[S2_ADDR]] to [init] [[PHI_ADDR]]
+// CHECK:         br [[EXIT]]
+// CHECK:       [[EXIT]]:
+// CHECK:         destroy_addr [[PHI_ADDR]]
+// CHECK:         dealloc_stack [[PHI_ADDR]]
+// CHECK:         dealloc_stack [[S2_ADDR]]
+// CHECK-LABEL: } // end sil function 'f140_interfering_use_projection'
+sil [ossa] @f140_interfering_use_projection : $@convention(thin) <T> () -> () {
+entry:
+  %t2 = apply undef<T>() : $@convention(thin) <T> () -> (@out T)
+  cond_br undef, left, right
+
+left:
+  %t1 = apply undef<T>() : $@convention(thin) <T> () -> (@out T)
+  %s2 = struct $Pair<T>(%t1 : $T, %t2 : $T)
+  br merge(%s2 : $Pair<T>)
+
+right:
+  %s1 = apply undef<Pair<T>>() : $@convention(thin) <T> () -> (@out T)
+  destroy_value %t2 : $T
+  br merge(%s1 : $Pair<T>)
+
+merge(%sp : @owned $Pair<T>):
+  destroy_value %sp : $Pair<T>
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Incoming value is the root of a chain of projections: 
+//     storage <- use <- use <- def
+//                ^^^    ^^^    ^^^
+//                %s projects out of %s2's storage
+//                       ^^^    ^^^
+//                       %box projects out of %s's storage
+//                              ^^^
+//                              %t projects out of %box's storage
+// There is no interference (and only one incoming phi.)
+// CHECK-LABEL: sil [ossa] @f150_incoming_use_use_def_no_interference : {{.*}} {
+// CHECK:         [[PHI_ADDR:%[^,]+]] = alloc_stack $Box<Box<Box<T>>>
+// CHECK:         [[S_ADDR:%[^,]+]] = struct_element_addr [[PHI_ADDR]] : $*Box<Box<Box<T>>>, #Box.t
+// CHECK:         [[BOX_ADDR:%[^,]+]] = struct_element_addr [[S_ADDR]] : $*Box<Box<T>>, #Box.t
+// CHECK:         apply undef<Box<T>>([[BOX_ADDR]])
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[RIGHT]]:
+// CHECK:         br [[FAKE_MERGE:bb[0-9]+]]
+// CHECK:       [[FAKE_MERGE]]:
+// CHECK:         apply undef<Box<Box<Box<T>>>>([[PHI_ADDR]])
+// CHECK:         destroy_addr [[PHI_ADDR]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK:         [[T_ADDR:%[^,]+]] = struct_element_addr [[BOX_ADDR]] : $*Box<T>, #Box.t
+// CHECK:         destroy_addr [[T_ADDR]]
+// CHECK:         br [[EXIT]]
+// CHECK:       [[EXIT]]:
+// CHECK:         dealloc_stack [[PHI_ADDR]]
+// CHECK-LABEL: } // end sil function 'f150_incoming_use_use_def_no_interference'
+sil [ossa] @f150_incoming_use_use_def_no_interference : $@convention(thin) <T> () -> () {
+entry:
+  %box = apply undef<Box<T>>() : $@convention(thin) <T> () -> (@out T)
+  cond_br undef, left, right
+
+left:
+  %t = destructure_struct %box : $Box<T>
+  destroy_value %t : $T
+  br exit
+
+right:
+  %s = struct $Box<Box<T>>(%box : $Box<T>)
+  %s2 = struct $Box<Box<Box<T>>>(%s : $Box<Box<T>>)
+  br fakeMerge(%s2 : $Box<Box<Box<T>>>)
+
+fakeMerge(%tb : @owned $Box<Box<Box<T>>>):
+  apply undef<Box<Box<Box<T>>>>(%tb) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  destroy_value %tb : $Box<Box<Box<T>>>
+  br exit
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Incoming value is the root of a chain of projections: 
+//     storage <- use <- use <- def
+//                ^^^    ^^^    ^^^
+//                %s projects out of %s2's storage
+//                       ^^^    ^^^
+//                       %box projects out of %s's storage
+//                              ^^^
+//                              %t projects out of %box's storage
+// There is interference of the _def_ projection (which can only be detected by
+// adding its uses to liveness:
+//   %t is destroyed in ^left2
+//   %s3 is defined in ^left2
+// TODO: When doing per-instruction rather than per-block liveness, this test
+//       will no longer have interference.  At that point, move the
+//       destroy_value %t below the subsequent apply to reintroduce interference
+//       and duplicate this test.
+// CHECK-LABEL: sil [ossa] @f160_incoming_use_use_def_interference : {{.*}} {
+// CHECK:         [[PHI_ADDR:%[^,]+]] = alloc_stack $Box<Box<Box<T>>>
+// CHECK:         [[S_ADDR:%[^,]+]] = struct_element_addr [[PHI_ADDR]] : $*Box<Box<Box<T>>>, #Box.t
+// CHECK:         [[BOX_ADDR:%[^,]+]] = struct_element_addr [[S_ADDR]] : $*Box<Box<T>>, #Box.t
+// CHECK:         apply undef<Box<T>>([[BOX_ADDR]])
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[RIGHT]]:
+// CHECK:         br [[MERGE:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK:         br [[LEFT2:bb[0-9]+]]
+// CHECK:       [[LEFT2]]:
+// CHECK:         [[S3_ADDR:%[^,]+]] = alloc_stack $Box<Box<Box<T>>>
+// CHECK:         [[T_ADDR:%[^,]+]] = struct_element_addr [[BOX_ADDR]] : $*Box<T>, #Box.t
+// CHECK:         destroy_addr [[T_ADDR]]
+// CHECK:         apply undef<Box<Box<Box<T>>>>([[S3_ADDR]])
+// CHECK:         copy_addr [take] [[S3_ADDR]] to [init] [[PHI_ADDR]] : $*Box<Box<Box<T>>>
+// CHECK:         dealloc_stack [[S3_ADDR]]
+// CHECK:         br [[MERGE:bb[0-9]+]]
+// CHECK:       [[MERGE]]:
+// CHECK:         apply undef<Box<Box<Box<T>>>>([[PHI_ADDR]])
+// CHECK:         destroy_addr [[PHI_ADDR]]
+// CHECK:         dealloc_stack [[PHI_ADDR]]
+// CHECK-LABEL: } // end sil function 'f160_incoming_use_use_def_interference'
+sil [ossa] @f160_incoming_use_use_def_interference : $@convention(thin) <T> () -> () {
+entry:
+  %box = apply undef<Box<T>>() : $@convention(thin) <T> () -> (@out T)
+  cond_br undef, left, right
+
+left:
+  %t = destructure_struct %box : $Box<T>
+  br left2
+
+left2:
+  destroy_value %t : $T
+  %s3 = apply undef<Box<Box<Box<T>>>>() : $@convention(thin) <T> () -> (@out T)
+  br merge(%s3 : $Box<Box<Box<T>>>)
+
+right:
+  %s = struct $Box<Box<T>>(%box : $Box<T>)
+  %s2 = struct $Box<Box<Box<T>>>(%s : $Box<Box<T>>)
+  br merge(%s2 : $Box<Box<Box<T>>>)
+
+merge(%tb : @owned $Box<Box<Box<T>>>):
+  apply undef<Box<Box<Box<T>>>>(%tb) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  destroy_value %tb : $Box<Box<Box<T>>>
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Incoming phi.
+// TODO: Coalesce in this case.
+// CHECK-LABEL: sil [ossa] @f170_incoming_phi_no_interference : {{.*}} {
+// CHECK:         [[T_ADDR:%[^,]+]] = alloc_stack $T
+// CHECK:         apply undef<T>([[T_ADDR]])
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[RIGHT]]:
+// CHECK:         br [[FAKE_MERGE_1:bb[0-9]+]]
+// CHECK:       [[FAKE_MERGE_1]]:
+// CHECK:         [[TP_ADDR:%[^,]+]] = alloc_stack $T
+// CHECK:         apply undef<T>([[T_ADDR]])
+// CHECK:         copy_addr [take] [[T_ADDR]] to [init] [[TP_ADDR]]
+// CHECK:         br [[FAKE_MERGE_2:bb[0-9]+]]
+// CHECK:       [[FAKE_MERGE_2]]:
+// CHECK:         apply undef<T>([[TP_ADDR]])
+// CHECK:         destroy_addr [[TP_ADDR]]
+// CHECK:         dealloc_stack [[TP_ADDR]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK:         destroy_addr [[T_ADDR]]
+// CHECK:         br [[EXIT]]
+// CHECK:       [[EXIT]]:
+// CHECK:         dealloc_stack [[T_ADDR]]
+// CHECK-LABEL: } // end sil function 'f170_incoming_phi_no_interference'
+sil [ossa] @f170_incoming_phi_no_interference : $@convention(thin) <T> () -> () {
+entry:
+  %t = apply undef<T>() : $@convention(thin) <T> () -> (@out T)
+  cond_br undef, left, right
+
+left:
+  destroy_value %t : $T
+  br exit
+
+right:
+  br fakeMerge1(%t : $T)
+
+fakeMerge1(%tp : @owned $T):
+  apply undef<T>(%tp) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  br fakeMerge2(%tp : $T)
+
+fakeMerge2(%tpp : @owned $T):
+  apply undef<T>(%tpp) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  destroy_value %tpp : $T
+  br exit
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @f180_incoming_terminator_results : {{.*}} {
+// CHECK:       bb0(%0 :
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[RIGHT]]:
+// CHECK:         try_apply undef<T>(%0)
+// CHECK-SAME:        normal [[RIGHT_SUCCESS:bb[0-9]+]], error [[RIGHT_FAILURE:bb[0-9]+]]
+// CHECK:       [[RIGHT_FAILURE]]({{%[^,]+}} : @owned $any Error):
+// CHECK:         unreachable
+// CHECK:       [[RIGHT_SUCCESS]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK:         try_apply undef<T>(%0)
+// CHECK-SAME:        normal [[LEFT_SUCCESS:bb[0-9]+]], error [[LEFT_FAILURE:bb[0-9]+]]
+// CHECK:       [[LEFT_FAILURE]]({{%[^,]+}} : @owned $any Error):
+// CHECK:         unreachable
+// CHECK:       [[LEFT_SUCCESS]]
+// CHECK:         br [[EXIT]]
+// CHECK:       [[EXIT]]:
+// CHECK-LABEL: } // end sil function 'f180_incoming_terminator_results'
+sil [ossa] @f180_incoming_terminator_results : $@convention(thin) <T> () -> (@out T) {
+entry:
+  cond_br undef, left, right
+
+left:
+  try_apply undef<T>() : $@convention(thin) <T> () -> (@out T, @error any Error), normal left_success, error left_failure
+
+left_success(%lt : @owned $T):
+  br exit(%lt : $T)
+
+left_failure(%lerror : @owned $any Error):
+  unreachable
+
+right:
+  try_apply undef<T>() : $@convention(thin) <T> () -> (@out T, @error any Error), normal right_success, error right_failure
+
+right_success(%rt : @owned $T):
+  br exit(%rt : $T)
+
+exit(%tp : @owned $T):
+  return %tp : $T
+
+right_failure(%rerror : @owned $any Error):
+  unreachable
+}
+
+// Verify that LCA for `%agg` is correctly determined to be `parent` so that the
+// backwards walk when determining the liveness contribution from `%v` stops at
+// `%trouble2`, that there is only a single `alloc_stack`.
+// CHECK-LABEL: sil [ossa] @f190_vexing_incoming_def_projection : {{.*}} {
+// CHECK:         [[P_ADDR:%[^,]+]] = alloc_stack $Box<Box<T>>
+// CHECK-NOT:     alloc_stack
+// CHECK:         apply undef<Box<Box<T>>>([[P_ADDR]])
+// CHECK:         cond_br undef, [[OKAY:bb[0-9]+]], [[TROUBLE:bb[0-9]+]]
+// CHECK:       [[TROUBLE]]:
+// CHECK:         destroy_addr [[P_ADDR]]
+// CHECK:         br [[TROUBLE2:bb[0-9]+]]
+// CHECK:       [[TROUBLE2]]:
+// CHECK:         [[V_ADDR:%[^,]+]] = struct_element_addr [[P_ADDR]]
+// CHECK:         apply undef<Box<T>>([[V_ADDR]])
+// CHECK:         cond_br undef, [[PARENT:bb[0-9]+]], [[OTHER:bb[0-9]+]]
+// CHECK:       [[OTHER]]:
+// CHECK:         destroy_addr [[V_ADDR]]
+// CHECK:         br [[OTHER2:bb[0-9]+]]
+// CHECK:       [[OTHER2]]:
+// CHECK:         apply undef<Box<Box<T>>>([[P_ADDR]])
+// CHECK:         br [[MERGE:bb[0-9]+]]
+// CHECK:       [[PARENT]]:
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[RIGHT]]:
+// CHECK:         br [[MERGE]]
+// CHECK:       [[LEFT]]:
+// CHECK:         [[T_ADDR:%[^,]+]] = struct_element_addr [[V_ADDR]]
+// CHECK:         destroy_addr [[T_ADDR]]
+// CHECK:         br [[LEFT2:bb[0-9]+]]
+// CHECK:       [[LEFT2]]:
+// CHECK:         apply undef<Box<Box<T>>>([[P_ADDR]])
+// CHECK:         br [[MERGE]]
+// CHECK:       [[OKAY]]:
+// CHECK:         br [[MERGE]]
+// CHECK:       [[MERGE]]:
+// CHECK:         destroy_addr [[P_ADDR]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]:
+// CHECK:         dealloc_stack [[P_ADDR]]
+// CHECK-LABEL: } // end sil function 'f190_vexing_incoming_def_projection'
+sil [ossa] @f190_vexing_incoming_def_projection : $@convention(thin) <T> () -> () {
+entry:
+  %agg4 = apply undef<Box<Box<T>>>() : $@convention(thin) <T> () -> (@out T)
+  cond_br undef, okay, trouble
+
+okay:
+  br merge(%agg4 : $Box<Box<T>>)
+
+
+trouble:
+  destroy_value %agg4 : $Box<Box<T>>
+  br trouble2
+
+trouble2:
+  %v = apply undef<Box<T>>() : $@convention(thin) <T> () -> (@out T)
+  cond_br undef, parent, other
+
+parent:
+  cond_br undef, left, right
+
+left:
+  %t = destructure_struct %v : $Box<T>
+  destroy_value %t : $T
+  br left2
+
+left2:
+  %agg2 = apply undef<Box<Box<T>>>() : $@convention(thin) <T> () -> (@out T)
+  br merge(%agg2 : $Box<Box<T>>)
+
+right:
+  %agg = struct $Box<Box<T>>(%v : $Box<T>)
+  br merge(%agg : $Box<Box<T>>)
+
+other:
+  destroy_value %v : $Box<T>
+  br other2
+
+other2:
+  %agg3 = apply undef<Box<Box<T>>>() : $@convention(thin) <T> () -> (@out T)
+  br merge(%agg3 : $Box<Box<T>>)
+
+merge(%p : @owned $Box<Box<T>>):
+  destroy_value %p : $Box<Box<T>>
+  br exit
+
+exit:
   %retval = tuple ()
   return %retval : $()
 }

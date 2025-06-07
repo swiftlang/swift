@@ -25,18 +25,19 @@ case 1 + 2:
 case square(9):
   ()
 
-// 'var' and 'let' patterns.
+// 'var', 'let', and 'inout' patterns.
 case var a:
   a = 1
 case let a:
   a = 1         // expected-error {{cannot assign}}
+case inout a: // expected-error {{'inout' may only be used on parameters}} expected-error {{'is' keyword required to pattern match against type name}}
+  a = 1 // expected-error {{cannot find 'a' in scope}}
 case var var a: // expected-error {{'var' cannot appear nested inside another 'var' or 'let' pattern}}
   a += 1
 case var let a: // expected-error {{'let' cannot appear nested inside another 'var' or 'let' pattern}}
   print(a, terminator: "")
 case var (var b): // expected-error {{'var' cannot appear nested inside another 'var'}}
   b += 1
-
 // 'Any' pattern.
 case _:
   ()
@@ -47,7 +48,7 @@ case 1 + (_): // expected-error{{'_' can only appear in a pattern or on the left
 }
 
 switch (x,x) {
-case (var a, var a): // expected-error {{invalid redeclaration of 'a'}} expected-note {{'a' previously declared here}} expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}} expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}}
+case (var a, var a): // expected-error {{invalid redeclaration of 'a'}} expected-note {{'a' previously declared here}}
   fallthrough
 case _: // expected-warning {{case is already handled by previous patterns; consider removing it}}
   ()
@@ -55,7 +56,7 @@ case _: // expected-warning {{case is already handled by previous patterns; cons
 
 var e : Any = 0
 
-switch e { // expected-error {{switch must be exhaustive}} expected-note{{do you want to add a default clause?}}
+switch e { // expected-error {{switch must be exhaustive}} expected-note{{add a default clause}}
 // 'is' pattern.
 case is Int,
      is A<Int>,
@@ -120,9 +121,8 @@ if case let .Naught(value1, value2, value3) = n {} // expected-error{{pattern wi
                                                    // expected-note@-1 {{remove associated values to make the pattern match}} {{20-44=}}
 
 
-
 switch n {
-case Foo.A: // expected-error{{enum case 'A' is not a member of type 'Voluntary<Int>'}}
+case Foo.A: // expected-error{{pattern of type 'Foo' cannot match 'Voluntary<Int>'}}
   ()
 case Voluntary<Int>.Naught,
      Voluntary<Int>.Naught(), // expected-error {{pattern with associated values does not match enum case 'Naught'}}
@@ -142,7 +142,7 @@ case Voluntary<Int>.Mere,
   ()
 case .Twain,
      .Twain(_), // expected-warning {{enum case 'Twain' has 2 associated values; matching them as a tuple is deprecated}}
-                // expected-note@-69 {{'Twain' declared here}}
+                // expected-note@-68 {{'Twain' declared here}}
      .Twain(_, _),
      .Twain(_, _, _): // expected-error{{tuple pattern has the wrong length for tuple type '(Int, Int)'}}
   ()
@@ -166,6 +166,7 @@ struct ContainsEnum {
     switch n { // expected-error {{switch must be exhaustive}}
     // expected-note@-1 {{missing case: '.Mere(_)'}}
     // expected-note@-2 {{missing case: '.Twain(_, _)'}}
+    // expected-note@-3 {{add missing cases}}
     case ContainsEnum.Possible<Int>.Naught,
          ContainsEnum.Possible.Naught, // expected-warning {{case is already handled by previous patterns; consider removing it}}
          Possible<Int>.Naught, // expected-warning {{case is already handled by previous patterns; consider removing it}}
@@ -180,6 +181,7 @@ func nonmemberAccessesMemberType(_ n: ContainsEnum.Possible<Int>) {
   switch n { // expected-error {{switch must be exhaustive}}
   // expected-note@-1 {{missing case: '.Mere(_)'}}
   // expected-note@-2 {{missing case: '.Twain(_, _)'}}
+  // expected-note@-3 {{add missing cases}}
   case ContainsEnum.Possible<Int>.Naught,
        .Naught: // expected-warning {{case is already handled by previous patterns; consider removing it}}
     ()
@@ -307,8 +309,7 @@ do {
   while case let _ as [Derived] = arr {}
   // expected-warning@-1 {{'let' pattern has no effect; sub-pattern didn't bind any variables}}
 
-  // FIXME: https://github.com/apple/swift/issues/61850
-  // expected-warning@+1 {{heterogeneous collection literal could only be inferred to '[[Base]]'; add explicit type annotation if this is intentional}}
+  // https://github.com/apple/swift/issues/61850
   for case _ as [Derived] in [arr] {}
 
   if case is [Derived] = arr {}
@@ -365,3 +366,51 @@ let (responseObject: Int?) = op1
 // expected-error @-1 {{expected ',' separator}} {{25-25=,}}
 // expected-error @-2 {{expected pattern}}
 // expected-error @-3 {{cannot convert value of type 'Int?' to specified type '(responseObject: _)'}}
+
+enum E<T> {
+  case e(T)
+}
+
+// rdar://108738034 - Make sure we don't treat 'E' as a binding, but can treat
+// 'y' as a binding
+func testNonBinding1(_ x: E<Int>) -> Int {
+  if case let E<Int>.e(y) = x { y } else { 0 }
+}
+
+func testNonBinding2(_ e: E<Int>) -> Int {
+  switch e {
+  case let E<Int>.e(y):
+    y
+  }
+}
+
+// In this case, 'y' should be an identifier, but 'z' is a binding.
+func testNonBinding3(_ x: (Int, Int), y: [Int]) -> Int {
+  if case let (y[0], z) = x { z } else { 0 }
+}
+
+func testNonBinding4(_ x: (Int, Int), y: [Int]) -> Int {
+  switch x {
+  case let (y[0], z):
+    z
+  default:
+    0
+  }
+}
+
+func testNonBinding5(_ x: Int, y: [Int]) {
+  // We treat 'z' here as a binding, which is invalid.
+  if case let y[z] = x {} // expected-error {{pattern variable binding cannot appear in an expression}}
+}
+
+func testNonBinding6(y: [Int], z: Int) -> Int {
+  switch 0 {
+  // We treat 'z' here as a binding, which is invalid.
+  case let y[z]: // expected-error 2{{pattern variable binding cannot appear in an expression}}
+    z
+  case y[z]: // This is fine
+    0
+  default:
+    0
+  }
+}

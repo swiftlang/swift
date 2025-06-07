@@ -1,8 +1,8 @@
-#ifndef TEST_INTEROP_CXX_STDLIB_INPUTS_STD_STRING_H
-#define TEST_INTEROP_CXX_STDLIB_INPUTS_STD_STRING_H
-
 #include <string>
 
-using CxxString = std::string;
+struct HasMethodThatReturnsString {
+  int value = 111;
+  std::string getString() const { return std::to_string(value); }
+};
 
-#endif // TEST_INTEROP_CXX_STDLIB_INPUTS_STD_STRING_H
+inline std::string takesStringWithDefaultArg(std::string s = "abc") { return s; }

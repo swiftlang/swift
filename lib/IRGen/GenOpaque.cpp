@@ -25,6 +25,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/IRGen/ValueWitness.h"
 #include "swift/SIL/TypeLowering.h"
 
@@ -182,7 +183,9 @@ static llvm::AttributeList getValueWitnessAttrs(IRGenModule &IGM,
     return attrs.addParamAttribute(ctx, 0, llvm::Attribute::NoAlias);
 
   case ValueWitness::GetEnumTagSinglePayload:
-    return attrs.addFnAttribute(ctx, llvm::Attribute::ReadOnly)
+    return attrs
+        .addFnAttribute(ctx, llvm::Attribute::getWithMemoryEffects(
+                                 ctx, llvm::MemoryEffects::readOnly()))
         .addParamAttribute(ctx, 0, llvm::Attribute::NoAlias);
 
   // These have two arguments and they don't alias each other.
@@ -459,6 +462,7 @@ static FunctionPointer emitLoadOfValueWitnessFunction(IRGenFunction &IGF,
                                     IGF.getOptions().PointerAuth.ValueWitnesses,
                                         slot, index);
 
+  witness->setName(getValueWitnessName(index));
   return FunctionPointer::createSigned(FunctionPointer::Kind::Function, witness,
                                        authInfo, signature);
 }
@@ -578,8 +582,11 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
     // MaximumAlignment.
     byteCount = alignUpToMaximumAlignment(IGM.SizeTy, byteCount);
     auto address = emitTaskAlloc(byteCount, align);
-    return {address, address.getAddress()};
-  // In coroutines, call llvm.coro.alloca.alloc.
+    auto stackAddress = StackAddress{address, address.getAddress()};
+    stackAddress = stackAddress.withAddress(
+        Builder.CreateElementBitCast(stackAddress.getAddress(), eltTy));
+    return stackAddress;
+    // In coroutines, call llvm.coro.alloca.alloc.
   } else if (isCoroutine()) {
     // NOTE: llvm does not support dynamic allocas in coroutines.
 
@@ -603,7 +610,11 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
     auto ptr = Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_alloca_get,
                                            {allocToken});
 
-    return {Address(ptr, IGM.Int8Ty, align), allocToken};
+    auto stackAddress =
+        StackAddress{Address(ptr, IGM.Int8Ty, align), allocToken};
+    stackAddress = stackAddress.withAddress(
+        Builder.CreateElementBitCast(stackAddress.getAddress(), eltTy));
+    return stackAddress;
   }
 
   // Otherwise, use a dynamic alloca.
@@ -613,8 +624,9 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
   // executed more than once).
   bool isInEntryBlock = (Builder.GetInsertBlock() == &*CurFn->begin());
   if (!isInEntryBlock) {
-    stackRestorePoint =
-        Builder.CreateIntrinsicCall(llvm::Intrinsic::stacksave, {}, "spsave");
+    stackRestorePoint = Builder.CreateIntrinsicCall(
+        llvm::Intrinsic::stacksave,
+        {IGM.DataLayout.getAllocaPtrType(IGM.getLLVMContext())}, {}, "spsave");
   }
 
   // Emit the dynamic alloca.
@@ -631,9 +643,15 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
 /// Deallocate dynamic alloca's memory if requested by restoring the stack
 /// location before the dynamic alloca's call.
 void IRGenFunction::emitDeallocateDynamicAlloca(StackAddress address,
-                                                bool allowTaskDealloc) {
+                                                bool allowTaskDealloc,
+                                                bool useTaskDeallocThrough) {
   // Async function use taskDealloc.
   if (allowTaskDealloc && isAsync() && address.getAddress().isValid()) {
+    if (useTaskDeallocThrough) {
+      emitTaskDeallocThrough(
+          Address(address.getExtraInfo(), IGM.Int8Ty, address.getAlignment()));
+      return;
+    }
     emitTaskDealloc(
         Address(address.getExtraInfo(), IGM.Int8Ty, address.getAlignment()));
     return;
@@ -646,7 +664,14 @@ void IRGenFunction::emitDeallocateDynamicAlloca(StackAddress address,
     // NOTE: llvm does not support dynamic allocas in coroutines.
 
     auto allocToken = address.getExtraInfo();
-    assert(allocToken && "dynamic alloca in coroutine without alloc token?");
+    if (!allocToken) {
+#ifndef NDEBUG
+      auto *alloca = cast<llvm::AllocaInst>(address.getAddress().getAddress());
+      assert(isa<llvm::ConstantInt>(alloca->getArraySize()) &&
+             "Dynamic alloca without a token?!");
+#endif
+      return;
+    }
     Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_alloca_free, allocToken);
     return;
   }
@@ -654,7 +679,8 @@ void IRGenFunction::emitDeallocateDynamicAlloca(StackAddress address,
   auto savedSP = address.getExtraInfo();
   if (savedSP == nullptr)
     return;
-  Builder.CreateIntrinsicCall(llvm::Intrinsic::stackrestore, savedSP);
+  Builder.CreateIntrinsicCall(llvm::Intrinsic::stackrestore,
+                              {savedSP->getType()}, {savedSP});
 }
 
 /// Emit a call to do an 'initializeArrayWithCopy' operation.
@@ -840,7 +866,7 @@ getGetEnumTagSinglePayloadTrampolineFn(IRGenModule &IGM) {
       true /*noinline*/);
 
   // This function is readonly.
-  cast<llvm::Function>(func)->addFnAttr(llvm::Attribute::ReadOnly);
+  cast<llvm::Function>(func)->setOnlyReadsMemory();
   return func;
 }
 
@@ -965,13 +991,13 @@ llvm::Value *irgen::emitLoadOfAlignmentMask(IRGenFunction &IGF, SILType T) {
   return emitAlignMaskFromFlags(IGF, flags);
 }
 
-/// Load the 'isPOD' valueWitness from the given table as an i1.
-llvm::Value *irgen::emitLoadOfIsPOD(IRGenFunction &IGF, SILType T) {
+/// Load the 'isTriviallyDestroyable' valueWitness from the given table as an i1.
+llvm::Value *irgen::emitLoadOfIsTriviallyDestroyable(IRGenFunction &IGF, SILType T) {
   auto flags = IGF.emitValueWitnessValue(T, ValueWitness::Flags);
   auto mask = IGF.IGM.getInt32(ValueWitnessFlags::IsNonPOD);
   auto masked = IGF.Builder.CreateAnd(flags, mask);
   return IGF.Builder.CreateICmpEQ(masked, IGF.IGM.getInt32(0),
-                                  flags->getName() + ".isPOD");
+                                  flags->getName() + ".isTriviallyDestroyable");
 }
 
 /// Load the 'isBitwiseTakable' valueWitness from the given table as an i1.

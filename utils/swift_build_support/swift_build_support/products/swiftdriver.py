@@ -16,7 +16,6 @@ from . import cmark
 from . import foundation
 from . import libcxx
 from . import libdispatch
-from . import libicu
 from . import llbuild
 from . import llvm
 from . import product
@@ -51,7 +50,6 @@ class SwiftDriver(product.Product):
         return [cmark.CMark,
                 llvm.LLVM,
                 libcxx.LibCXX,
-                libicu.LibICU,
                 swift.Swift,
                 libdispatch.LibDispatch,
                 foundation.Foundation,
@@ -92,10 +90,6 @@ def run_build_script_helper(action, host_target, product, args):
     dispatch_build_dir = os.path.join(
         build_root, '%s-%s' % ('libdispatch', host_target))
 
-    # Pass Foundation directory down if we built it
-    foundation_build_dir = os.path.join(
-        build_root, '%s-%s' % ('foundation', host_target))
-
     # Pass the swift lit tests if we're testing and the Swift tests were built
     swift_build_dir = os.path.join(
         build_root, 'swift-{}'.format(host_target))
@@ -118,10 +112,6 @@ def run_build_script_helper(action, host_target, product, args):
         helper_cmd += [
             '--dispatch-build-dir', dispatch_build_dir
         ]
-    if os.path.exists(foundation_build_dir):
-        helper_cmd += [
-            '--foundation-build-dir', foundation_build_dir
-        ]
     if os.path.exists(lit_test_dir) and action == 'test':
         helper_cmd += [
             '--lit-test-dir', lit_test_dir
@@ -142,6 +132,10 @@ def run_build_script_helper(action, host_target, product, args):
                     host_target).platform.swiftpm_config(
                     args, output_dir=build_toolchain_path,
                     swift_toolchain=toolchain_path, resource_path=resource_dir)]
+
+    if args.enable_asan:
+        helper_cmd.append('--enable-asan')
+
     if args.verbose_build:
         helper_cmd.append('--verbose')
 

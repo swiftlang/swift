@@ -1,5 +1,4 @@
 // RUN: %target-typecheck-verify-swift -swift-version 6
-// REQUIRES: asserts
 
 internal typealias InternalAlias = Int // expected-note 2 {{type alias 'InternalAlias' is not '@usableFromInline' or public}}
 

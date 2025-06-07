@@ -1,9 +1,12 @@
-// RUN: %target-sil-opt -sil-move-only-object-checker -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all -move-only-diagnostics-silently-emit-diagnostics %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-move-only-object-checker -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all -move-only-diagnostics-silently-emit-diagnostics %s | %FileCheck %s
+
+// REQUIRES: swift_feature_MoveOnlyClasses
 
 sil_stage raw
 
-@_moveOnly
-class Klass {}
+import Swift
+
+class Klass: ~Copyable {}
 
 sil @classUseMoveOnlyWithoutEscaping : $@convention(thin) (@guaranteed Klass) -> ()
 
@@ -17,23 +20,23 @@ sil @classUseMoveOnlyWithoutEscaping : $@convention(thin) (@guaranteed Klass) ->
 sil [ossa] @chainErrorTest : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
   %1 = copy_value %0 : $Klass
-  %2 = mark_must_check [no_copy] %1 : $Klass
+  %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $Klass
   debug_value %2 : $Klass, let, name "x", argno 1
   %4 = copy_value %2 : $Klass
   %5 = move_value [lexical] %4 : $Klass
-  %6 = mark_must_check [no_implicit_copy] %5 : $Klass
+  %6 = mark_unresolved_non_copyable_value [consumable_and_assignable] %5 : $Klass
   debug_value %6 : $Klass, let, name "x2"
   %8 = copy_value %6 : $Klass
   %9 = move_value [lexical] %8 : $Klass
-  %10 = mark_must_check [no_implicit_copy] %9 : $Klass
+  %10 = mark_unresolved_non_copyable_value [consumable_and_assignable] %9 : $Klass
   debug_value %10 : $Klass, let, name "y2"
   %12 = copy_value %10 : $Klass
   %13 = move_value [lexical] %12 : $Klass
-  %14 = mark_must_check [no_implicit_copy] %13 : $Klass
+  %14 = mark_unresolved_non_copyable_value [consumable_and_assignable] %13 : $Klass
   debug_value %14 : $Klass, let, name "k2"
   %16 = copy_value %6 : $Klass
   %17 = move_value [lexical] %16 : $Klass
-  %18 = mark_must_check [no_implicit_copy] %17 : $Klass
+  %18 = mark_unresolved_non_copyable_value [consumable_and_assignable] %17 : $Klass
   debug_value %18 : $Klass, let, name "k3"
   %20 = copy_value %18 : $Klass
   %21 = move_value %20 : $Klass

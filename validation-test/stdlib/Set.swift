@@ -16,6 +16,7 @@ import Foundation
 
 extension Set {
   func _rawIdentifier() -> Int {
+    _blackHole(self)
     return unsafeBitCast(self, to: Int.self)
   }
 }
@@ -284,7 +285,7 @@ SetTestSuite.test("AssociatedTypes") {
 
 SetTestSuite.test("sizeof") {
   var s = Set(["Hello", "world"])
-#if arch(i386) || arch(arm) || arch(arm64_32)
+#if _pointerBitWidth(_32)
   expectEqual(4, MemoryLayout.size(ofValue: s))
 #else
   expectEqual(8, MemoryLayout.size(ofValue: s))

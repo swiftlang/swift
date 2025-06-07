@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend %s -O -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend %s -O -Xllvm -sil-print-types -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend %s -O -Xllvm -sil-print-types -enable-ossa-modules -emit-sil | %FileCheck %s
 
 func curry<T1, T2, T3, T4>(_ f: @escaping (T1, T2, T3) -> T4) -> (T1) -> (T2) -> (T3) -> T4 {
   return { x in { y in { z in f(x, y, z) } } }
@@ -35,3 +36,9 @@ public func test_compose_closure() -> Int32 {
   return gs
 }
 
+// CHECK-LABEL: sil @$s12sil_combine122remove_partial_applies_3key5valueySDySSSiGSgz_SSSitF :
+// CHECK-NOT:     partial_apply
+// CHECK:       } // end sil function '$s12sil_combine122remove_partial_applies_3key5valueySDySSSiGSgz_SSSitF'
+public func remove_partial_applies(_ dict: inout [String: Int]?, key: String, value: Int) {
+  dict?[key, default: value] = value 
+}

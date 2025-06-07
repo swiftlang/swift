@@ -1,0 +1,66 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -early-codemotion -retain-sinking -enable-experimental-feature MoveOnlyEnumDeinits | %FileCheck %s
+
+// REQUIRES: swift_feature_MoveOnlyEnumDeinits
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+struct FileDescriptor: ~Copyable {
+  var fd: Builtin.Int64
+
+  init(fd: Builtin.Int64)
+  deinit
+}
+
+enum MaybeFileDescriptor: ~Copyable {
+  case some(FileDescriptor)
+  case nothing
+
+  consuming func discard() { discard self }
+
+  deinit
+}
+
+struct CS {
+  let c: AnyObject
+}
+
+public struct S : ~Copyable {
+  var a: CS
+}
+
+// Test that a release_value is not replaced for a enum-with-deinit.
+// Doing so would forget the deinit.
+//
+// CHECK-LABEL: sil hidden [noinline] @testEnumDeinit : $@convention(thin) () -> () {
+// CHECK:   release_value %{{.*}} : $MaybeFileDescriptor
+// CHECK-LABEL: } // end sil function 'testEnumDeinit'
+sil hidden [noinline] @testEnumDeinit : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 0
+  %26 = struct $FileDescriptor (%0 : $Builtin.Int64)
+  %38 = enum $MaybeFileDescriptor, #MaybeFileDescriptor.some!enumelt, %26 : $FileDescriptor
+  release_value %38 : $MaybeFileDescriptor
+  %42 = tuple ()
+  return %42 : $()
+}
+
+sil @useCS : $@convention(thin) (@guaranteed CS) -> ()
+
+// CHECK-LABEL: sil @testRCroot :
+// CHECK-NOT:     retain_value %{{[0-9]*}} : $S 
+// CHECK:       } // end sil function 'testRCroot'
+sil @testRCroot : $@convention(method) (@guaranteed S) -> () {
+bb0(%0 : $S):
+  %2 = struct_extract %0 : $S, #S.a
+  %3 = struct_extract %2 : $CS, #CS.c
+  strong_retain %3 : $AnyObject
+  %5 = function_ref @useCS : $@convention(thin) (@guaranteed CS) -> ()
+  %6 = apply %5(%2) : $@convention(thin) (@guaranteed CS) -> ()
+  release_value %0 : $S
+  %9 = tuple ()
+  return %9 : $()
+}
+

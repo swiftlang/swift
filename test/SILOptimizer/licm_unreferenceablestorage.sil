@@ -1,0 +1,49 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -licm | %FileCheck %s
+
+// REQUIRES: objc_interop
+
+//--- input.sil
+sil_stage canonical
+
+import Builtin
+import Swift
+import Foundation
+
+typealias Mantissa = (UInt16, UInt16, UInt16, UInt16, UInt16, UInt16, UInt16, UInt16)
+
+// CHECK-LABEL: sil @struct_extract_from_decimal : {{.*}} {
+// CHECK:       bb0([[POINTER:%[^,]+]] :
+// CHECK-SAME:      [[NEW_MANTISSA:%[^,]+]] :
+// CHECK:       [[ADDR:%[^,]+]] = pointer_to_address [[POINTER]]
+// CHECK:       [[A_ADDR:%[^,]+]] = struct_element_addr [[ADDR]]
+// CHECK-SAME:      #Decimal._mantissa
+// CHECK:       br [[BODY:bb[0-9]+]]
+// CHECK:     [[BODY]]:
+// CHECK:       [[VALUE_2:%[^,]+]] = load [[ADDR]] : $*Decimal
+// CHECK:       [[MANTISSA:%[^,]+]] = struct_extract [[VALUE_2]]
+// CHECK-SAME:      #Decimal._mantissa
+// CHECK:       store [[NEW_MANTISSA]] to [[A_ADDR]]
+// CHECK:       cond_br undef, [[BACKEDGE:bb[0-9]+]], [[EXIT:bb[0-9]+]]
+// CHECK:     [[BACKEDGE]]:
+// CHECK:       br [[BODY]]
+// CHECK:     [[EXIT]]:
+// CHECK:       return [[MANTISSA]]
+// CHECK-LABEL: } // end sil function 'struct_extract_from_decimal'
+sil @struct_extract_from_decimal : $@convention(thin) (Builtin.RawPointer, Mantissa) -> (Mantissa) {
+bb0(%pointer : $Builtin.RawPointer, %newMantissa : $Mantissa):
+  %addr = pointer_to_address %pointer : $Builtin.RawPointer to $*Decimal
+  br bb1
+
+bb1:
+  %value2 = load %addr : $*Decimal
+  %a = struct_extract %value2 : $Decimal, #Decimal._mantissa
+  %a_addr = struct_element_addr %addr : $*Decimal, #Decimal._mantissa
+  store %newMantissa to %a_addr : $*Mantissa
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  return %a : $Mantissa
+}

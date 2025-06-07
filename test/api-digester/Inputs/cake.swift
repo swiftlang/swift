@@ -52,8 +52,6 @@ public struct fixedLayoutStruct {
   public var a = 1
   private var b = 2 { didSet {} willSet(value) {} }
   var c = 3
-  @available(*, unavailable)
-  public let unavailableProperty = 1
 }
 
 extension Int: P1 { public func bar() {} }
@@ -87,7 +85,7 @@ public protocol PSub: PSuper {
 public let GlobalVar = 1
 
 public extension P1 {
-  static func +(lhs: P1, rhs: P1) -> P1 { return lhs }
+  static func +(lhs: Self, rhs: Self) -> Self { return lhs }
 }
 
 infix operator ..*..

@@ -1,10 +1,12 @@
-// RUN: %target-sil-opt -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -sil-lexical-lifetime-eliminator %s -enable-sil-verify-all | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -sil-lexical-lifetime-eliminator %s -enable-sil-verify-all | %FileCheck %s
 
 sil_stage raw
 
 import Builtin
 
 class Klass {}
+
+sil @getKlass : $() -> (@owned Klass)
 
 // CHECK-LABEL: sil [ossa] @lexical_lifetime_object : $@convention(thin) (@owned Klass) -> () {
 // CHECK: bb0(%0 : @owned $Klass):
@@ -21,6 +23,19 @@ bb0(%0 : @owned $Klass):
   destroy_value %0 : $Klass
   %9999 = tuple()
   return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @lexical_lifetime_move : {{.*}} {
+// CHECK-NOT: move_value [lexical]
+// CHECK:     move_value
+// CHECK-LABEL: } // end sil function 'lexical_lifetime_move'
+sil [ossa] @lexical_lifetime_move : $@convention(thin) () -> () {
+  %getKlass = function_ref @getKlass : $@convention(thin) () -> (@owned Klass)
+  %instance = apply %getKlass() : $@convention(thin) () -> (@owned Klass) 
+  %lifetime = move_value [lexical] %instance : $Klass
+  destroy_value %lifetime : $Klass
+  %retval = tuple ()
+  return %retval : $()
 }
 
 // CHECK-LABEL: sil [ossa] @lexical_lifetime_address : $@convention(thin) (@in Klass) -> () {

@@ -38,8 +38,6 @@ BUILTIN_CAST_OPERATION(PtrToInt, "ptrtoint", "n")
 BUILTIN_CAST_OPERATION(IntToPtr, "inttoptr", "n")
 BUILTIN_CAST_OPERATION(BitCast , "bitcast",  "n")
 
-#undef BUILTIN_CAST_OPERATION
-
 /// Cast-or-bitcast operations have type T1 -> T2.
 /// T1 and T2 may be the same size, unlike the corresponding true casts.
 #ifndef BUILTIN_CAST_OR_BITCAST_OPERATION
@@ -48,7 +46,6 @@ BUILTIN_CAST_OPERATION(BitCast , "bitcast",  "n")
 BUILTIN_CAST_OR_BITCAST_OPERATION(TruncOrBitCast, "truncOrBitCast", "n")
 BUILTIN_CAST_OR_BITCAST_OPERATION(ZExtOrBitCast,  "zextOrBitCast",  "n")
 BUILTIN_CAST_OR_BITCAST_OPERATION(SExtOrBitCast,  "sextOrBitCast",  "n")
-#undef BUILTIN_CAST_OR_BITCAST_OPERATION
 
 /// Binary operations have type (T,T) -> T.
 ///
@@ -139,11 +136,6 @@ BUILTIN_BINARY_OPERATION_ALL(URem,    urem,     "n", Integer)
 BUILTIN_BINARY_OPERATION_ALL(FRem,    frem,     "n", FloatOrVector)
 BUILTIN_BINARY_OPERATION_ALL(Xor,     xor,      "n", IntegerOrVector)
 BUILTIN_BINARY_OPERATION_OVERLOADED_STATIC(Expect, "int_expect", "n", Integer)
-#undef BUILTIN_BINARY_OPERATION_ALL
-#undef BUILTIN_BINARY_OPERATION_POLYMORPHIC
-#undef BUILTIN_BINARY_OPERATION_OVERLOADED_STATIC
-#undef BUILTIN_BINARY_OPERATION_GENERIC_HELPER_STR
-#undef BUILTIN_BINARY_OPERATION
 
 /// These builtins are analogous the similarly named llvm intrinsics. The
 /// difference between the two is that these are not expected to overflow,
@@ -165,7 +157,6 @@ BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(SMulOver,
                                        "smul_with_overflow", Mul, "n", Integer)
 BUILTIN_BINARY_OPERATION_WITH_OVERFLOW(UMulOver,
                                        "umul_with_overflow", Mul, "n", Integer)
-#undef BUILTIN_BINARY_OPERATION_WITH_OVERFLOW
 
 /// Unary operations have type (T) -> T.
 #ifndef BUILTIN_UNARY_OPERATION
@@ -184,8 +175,8 @@ BUILTIN_UNARY_OPERATION(FNeg, "fneg", "n", FloatOrVector)
 BUILTIN_UNARY_OPERATION(AssumeNonNegative, "assumeNonNegative", "n", Integer)
 // It only works on i1.
 BUILTIN_UNARY_OPERATION(AssumeTrue, "assume", "", Integer)
-
-#undef BUILTIN_UNARY_OPERATION
+// Converts poison/undef to an indeterminate but valid value.
+BUILTIN_UNARY_OPERATION(Freeze, "freeze", "n", IntegerOrVector)
 
 // Binary predicates have type (T,T) -> i1 or (T, T) -> Vector<i1> for scalars
 // and vectors, respectively.
@@ -217,7 +208,6 @@ BUILTIN_BINARY_PREDICATE(FCMP_ULT, "fcmp_ult", "n", FloatOrVector)
 BUILTIN_BINARY_PREDICATE(FCMP_ULE, "fcmp_ule", "n", FloatOrVector)
 BUILTIN_BINARY_PREDICATE(FCMP_UNE, "fcmp_une", "n", FloatOrVector)
 BUILTIN_BINARY_PREDICATE(FCMP_UNO, "fcmp_uno", "n", FloatOrVector)
-#undef BUILTIN_BINARY_PREDICATE
 
 // BUILTIN_SIL_OPERATION - Operations that can be lowered to SIL instructions.
 // These have various types.
@@ -260,6 +250,12 @@ BUILTIN_SIL_OPERATION(Assign, "assign", Special)
 
 /// Init has type (T, Builtin.RawPointer) -> ()
 BUILTIN_SIL_OPERATION(Init, "initialize", Special)
+
+/// StoreRaw has type (T, Builtin.RawPointer) -> ()
+/// Stores a T to raw memory.
+/// Its address does not adhere to strict aliasing.
+/// See also LoadRaw.
+BUILTIN_SIL_OPERATION(StoreRaw, "storeRaw", Special)
 
 /// CastToNativeObject has type (T) -> Builtin.NativeObject.
 ///
@@ -521,14 +517,14 @@ BUILTIN_SIL_OPERATION(ApplyDerivative, "applyDerivative", Special)
 /// applyTranspose
 BUILTIN_SIL_OPERATION(ApplyTranspose, "applyTranspose", Special)
 
-/// withUnsafeContinuation<T> : (Builtin.RawUnsafeContinuation -> ()) async -> T
+/// withUnsafeContinuation<T> : (Builtin.RawUnsafeContinuation -> ()) async -> sending T
 ///
 /// Unsafely capture the current continuation and pass it to the given
 /// function value. Returns a value of type T when the continuation is
 /// resumed.
 BUILTIN_SIL_OPERATION(WithUnsafeContinuation, "withUnsafeContinuation", Special)
 
-/// withUnsafeThrowingContinuation<T> : (Builtin.RawUnsafeContinuation -> ()) async throws -> T
+/// withUnsafeThrowingContinuation<T> : (Builtin.RawUnsafeContinuation -> ()) async throws -> sending T
 ///
 /// Unsafely capture the current continuation and pass it to the given
 /// function value. Returns a value of type T or throws an error when
@@ -538,7 +534,10 @@ BUILTIN_SIL_OPERATION(WithUnsafeThrowingContinuation, "withUnsafeThrowingContinu
 /// Force the current task to be rescheduled on the specified actor.
 BUILTIN_SIL_OPERATION(HopToActor, "hopToActor", None)
 
-#undef BUILTIN_SIL_OPERATION
+/// packLength: <each T>(_: repeat each T) -> Int
+///
+/// Returns the number of items in a pack.
+BUILTIN_SIL_OPERATION(PackLength, "packLength", Special)
 
 // BUILTIN_RUNTIME_CALL - A call into a runtime function.
 // These functions accept a single argument of any type.
@@ -557,8 +556,6 @@ BUILTIN_RUNTIME_CALL(ErrorInMain, "errorInMain", "")
 /// This builtin takes a metatype and returns true if the metatype's
 /// nominal type is Optional.
 BUILTIN_RUNTIME_CALL(IsOptionalType, "isOptional", "")
-
-#undef BUILTIN_RUNTIME_CALL
 
 // BUILTIN_MISC_OPERATION - Miscellaneous operations without a unifying class.
 // These have various types.
@@ -585,7 +582,8 @@ BUILTIN_MISC_OPERATION(IsConcrete, "isConcrete", "n", Special)
 /// IsBitwiseTakable has type T.Type -> Bool
 BUILTIN_MISC_OPERATION(IsBitwiseTakable, "isbitwisetakable", "n", Special)
 
-/// IsSameMetatype has type (Any.Type, Any.Type) -> Bool
+/// IsSameMetatype has type
+/// (any (~Copyable & ~Escapable).Type, any (~Copyable & ~Escapable).Type) -> Bool
 BUILTIN_MISC_OPERATION(IsSameMetatype, "is_same_metatype", "n", Special)
 
 /// AllocRaw has type (Int, Int) -> Builtin.RawPointer
@@ -629,6 +627,10 @@ BUILTIN_MISC_OPERATION(DeallocRaw, "deallocRaw", "", Special)
 /// is not known at compile time, MaximumAlignment is assumed.
 BUILTIN_MISC_OPERATION(StackAlloc, "stackAlloc", "", Special)
 
+/// Like `stackAlloc`, but doesn't set the `[stack_protection]` flag on its
+/// containing function.
+BUILTIN_MISC_OPERATION(UnprotectedStackAlloc, "unprotectedStackAlloc", "", Special)
+
 /// StackDealloc has type (Builtin.RawPointer) -> ()
 ///
 /// Parameters: address.
@@ -636,6 +638,11 @@ BUILTIN_MISC_OPERATION(StackAlloc, "stackAlloc", "", Special)
 /// The range starting at `address`, previously allocated with
 /// Builtin.stackAlloc(), is deallocated from the stack.
 BUILTIN_MISC_OPERATION(StackDealloc, "stackDealloc", "", Special)
+
+// Obsolete: only there to be able to read old Swift.interface files which still
+// contain the builtin.
+/// allocVector<Element>(Element.Type, Builtin.Word) -> Builtin.RawPointer
+BUILTIN_MISC_OPERATION(AllocVector, "allocVector", "", Special)
 
 /// Fence has type () -> ().
 BUILTIN_MISC_OPERATION(Fence, "fence", "", None)
@@ -665,6 +672,13 @@ BUILTIN_MISC_OPERATION(ExtractElement, "extractelement", "n", Special)
 
 /// InsertElement has type (Vector<N, T>, T, Int32) -> Vector<N, T>.
 BUILTIN_MISC_OPERATION(InsertElement, "insertelement", "n", Special)
+
+/// Select has type either
+///   (VecN<Int1>, VecN<T>, VecN<T>) -> VecN<T>
+/// or
+///   (Int1, T, T) -> T
+/// T must be trivial.
+BUILTIN_MISC_OPERATION(Select, "select", "n", Special)
 
 // Shufflevector has type (VecN<T>, VecN<T>, VecM<Int32>) -> VecM<T>
 BUILTIN_MISC_OPERATION(ShuffleVector, "shufflevector", "n", Special)
@@ -713,9 +727,6 @@ BUILTIN_MISC_OPERATION(IsNegative, "isNegative", "n", Special)
 /// (_ value: Builtin.IntLiteral, _ index: Builtin.Word) -> Builtin.Word
 BUILTIN_MISC_OPERATION(WordAtIndex, "wordAtIndex", "n", Special)
 
-/// zeroInitializer has type <T> () -> T
-BUILTIN_MISC_OPERATION(ZeroInitializer, "zeroInitializer", "n", Special)
-
 /// once has type (Builtin.RawPointer, (Builtin.RawPointer) -> ())
 BUILTIN_MISC_OPERATION(Once, "once", "", Special)
 /// onceWithContext has type (Builtin.RawPointer, (Builtin.RawPointer) -> (), Builtin.RawPointer)
@@ -752,9 +763,6 @@ BUILTIN_MISC_OPERATION(COWBufferForReading, "COWBufferForReading", "n", Special)
 // getObjCTypeEncoding has type <T> T.Type -> RawPointer
 BUILTIN_MISC_OPERATION(GetObjCTypeEncoding, "getObjCTypeEncoding", "n", Special)
 
-// Swift3ImplicitObjCEntrypoint has type () -> ()
-BUILTIN_MISC_OPERATION(Swift3ImplicitObjCEntrypoint, "swift3ImplicitObjCEntrypoint", "", Special)
-
 /// willThrow: Error -> ()
 BUILTIN_MISC_OPERATION(WillThrow, "willThrow", "", Special)
 
@@ -770,7 +778,11 @@ BUILTIN_MISC_OPERATION(InitializeDefaultActor, "initializeDefaultActor", "", Spe
 /// Destroy the default-actor instance in a default actor object.
 BUILTIN_MISC_OPERATION(DestroyDefaultActor, "destroyDefaultActor", "", Special)
 
-/// Allocate a "proxy" for a distributed remote actor.  TODO(distributed) change the name of this to create throughout.
+/// Initialize the extra storage state of a non-default distributed actor object.
+BUILTIN_MISC_OPERATION(InitializeNonDefaultDistributedActor,
+                       "initializeNonDefaultDistributedActor", "", Special)
+
+/// Allocate a "proxy" for a distributed remote actor.
 BUILTIN_MISC_OPERATION(InitializeDistributedRemoteActor,
                        "initializeDistributedRemoteActor", "", Special)
 
@@ -781,6 +793,12 @@ BUILTIN_MISC_OPERATION(ResumeNonThrowingContinuationReturning,
 /// targetOSVersionAtLeast has type (Builtin.Int32, Builtin.Int32, Builtin.Int32) -> Builtin.Int32
 BUILTIN_MISC_OPERATION(TargetOSVersionAtLeast, "targetOSVersionAtLeast", "n", Special)
 
+/// targetVariantOSVersionAtLeast has type (Builtin.Int32, Builtin.Int32, Builtin.Int32) -> Builtin.Int32
+BUILTIN_MISC_OPERATION(TargetVariantOSVersionAtLeast, "targetVariantOSVersionAtLeast", "n", Special)
+
+/// targetOSVersionOrVariantOSVersionAtLeast has type (Builtin.UInt32, Builtin.UInt32, Builtin.UInt32, Builtin.UInt32, Builtin.UInt32, Builtin.UInt32) -> Builtin.UInt32
+BUILTIN_MISC_OPERATION(TargetOSVersionOrVariantOSVersionAtLeast, "targetOSVersionOrVariantOSVersionAtLeast", "n", Special)
+
 /// Resume a throwing continuation normally with the given result.
 BUILTIN_MISC_OPERATION(ResumeThrowingContinuationReturning,
                        "resumeThrowingContinuationReturning", "", Special)
@@ -788,36 +806,6 @@ BUILTIN_MISC_OPERATION(ResumeThrowingContinuationReturning,
 /// Resume a throwing continuation abnormally with the given error.
 BUILTIN_MISC_OPERATION(ResumeThrowingContinuationThrowing,
                        "resumeThrowingContinuationThrowing", "", Special)
-
-/// Create a task group.
-BUILTIN_MISC_OPERATION(CreateTaskGroup,
-                       "createTaskGroup", "", Special)
-
-/// Create a task group, with options.
-BUILTIN_MISC_OPERATION(CreateTaskGroupWithFlags,
-                       "createTaskGroupWithFlags", "", Special)
-
-/// Destroy a task group.
-BUILTIN_MISC_OPERATION(DestroyTaskGroup,
-                       "destroyTaskGroup", "", Special)
-
-/// A builtin that can only be called from a transparent generic function. Takes
-/// two operands, the first operand the result address, the second operand the
-/// input address. Transforms into
-///
-///   %input = load [take] %inputAddr
-///   %result = explicit_copy_value %input
-///   store %result to [init] %resultAddr
-///   store %input to [init] %inputAddr
-///
-/// transparently inlined into a caller that has the generic of the callee
-/// specialized into a loadable type. If the transparent inlining does not
-/// specialize the type (due to being inlined into a non-generic context, the
-/// SILVerifier will abort).
-///
-/// Illegal to call except for in Swift._copy in the stdlib. This is enforced by
-/// the SILVerifier.
-BUILTIN_MISC_OPERATION(Copy, "copy", "", Special)
 
 /// Unchecked pointer alignment assertion. Allows the compiler to assume
 /// alignment of the pointer to emit more efficient code.
@@ -859,9 +847,17 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(Strideof, "strideof", "n", Special)
 /// Alignof has type T.Type -> Int
 BUILTIN_MISC_OPERATION_WITH_SILGEN(Alignof, "alignof", "n", Special)
 
+/// zeroInitializer has type <T> () -> T, but the SIL builtin has its
+/// own rules.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(ZeroInitializer, "zeroInitializer", "n", Special)
+
+/// Like `zeroInitializer`, but does not actually initialize the memory.
+/// It only indicates to mandatory passes that the memory is going to be initialized.
+BUILTIN_MISC_OPERATION(PrepareInitialization, "prepareInitialization", "n", Special)
+
 // getCurrentExecutor: () async -> Builtin.Executor?
 //
-// Retrieve the ExecutorRef on which the current asynchronous
+// Retrieve the SerialExecutorRef on which the current asynchronous
 // function is executing, or nil if the function isn't running
 // anywhere in particular.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(GetCurrentExecutor, "getCurrentExecutor", "", Special)
@@ -881,7 +877,7 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(GetCurrentAsyncTask, "getCurrentAsyncTask", "
 BUILTIN_MISC_OPERATION_WITH_SILGEN(CancelAsyncTask, "cancelAsyncTask", "", Special)
 
 /// startAsyncLet()<T>: (
-///     __owned @Sendable @escaping () async throws -> T
+///     __owned @escaping () async throws -> sending T
 /// ) -> Builtin.RawPointer
 ///
 /// DEPRECATED. startAsyncLetWithLocalBuffer is used instead.
@@ -891,7 +887,7 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(CancelAsyncTask, "cancelAsyncTask", "", Speci
 BUILTIN_MISC_OPERATION(StartAsyncLet, "startAsyncLet", "", Special)
 
 /// startAsyncLetWithLocalBuffer()<T>: (
-///     __owned @Sendable @escaping () async throws -> T,
+///     __owned @escaping () async throws -> sending T,
 ///     _ resultBuf: Builtin.RawPointer
 /// ) -> Builtin.RawPointer
 ///
@@ -911,6 +907,25 @@ BUILTIN_MISC_OPERATION(StartAsyncLetWithLocalBuffer, "startAsyncLetWithLocalBuff
 ///
 /// This is only supported under the task-to-thread concurrency model.
 BUILTIN_MISC_OPERATION(TaskRunInline, "taskRunInline", "", Special)
+
+/// flowSensitiveSelfIsolation<T: Actor>(_ actor: T) -> (any Actor)?
+///
+/// Used only in actor initializers, this builtin lowers to either 'actor'
+/// (wrapped in an optional) or 'nil' depending on whether 'self' has been
+/// initialized at this point. 'actor' is always an alias for the 'self'
+/// being initialized.
+BUILTIN_MISC_OPERATION(FlowSensitiveSelfIsolation, "flowSensitiveSelfIsolation", "", Special)
+
+/// flowSensitiveDistributedSelfIsolation<T: DistributedActor>(
+///   _ actor: T
+/// ) -> (any Actor)?
+///
+/// Used only in distributed actor initializers, this builtin lowers to either
+/// 'actor.asLocalActor' or 'nil' depending on whether 'self' has been
+/// initialized at this point. 'actor' is always an alias for the 'self'
+/// being initialized.
+BUILTIN_MISC_OPERATION(FlowSensitiveDistributedSelfIsolation,
+                       "flowSensitiveDistributedSelfIsolation", "", Special)
 
 /// endAsyncLet(): (Builtin.RawPointer) -> Void
 ///
@@ -949,26 +964,108 @@ BUILTIN_MISC_OPERATION(AddressOfBorrowOpaque, "addressOfBorrowOpaque", "", Speci
 /// AddressLowering.
 BUILTIN_MISC_OPERATION(UnprotectedAddressOfBorrowOpaque, "unprotectedAddressOfBorrowOpaque", "", Special)
 
+/// createTask<T>(flags: Int,
+///               initialSerialExecutor: (Builtin.Executor)? = nil,
+///               taskGroup: Builtin.RawPointer? = nil,
+///               initialTaskExecutorDeprecated: (Builtin.Executor)? = nil,
+///               initialTaskExecutorOwned: (any TaskExecutor)? = nil,
+///               operation: sending @escaping () async throws -> T)
+///  -> Builtin.NativeObject, Builtin.RawPointer)
+///
+/// Create a new task.
+BUILTIN_SIL_OPERATION(CreateTask, "createTask", Special)
+
+/// createDiscardingTask(flags: Int,
+///                      initialSerialExecutor: (Builtin.Executor)? = nil,
+///                      taskGroup: Builtin.RawPointer? = nil,
+///                      initialTaskExecutor: (Builtin.Executor)? = nil,
+///                      operation: sending @escaping () async throws -> ())
+///  -> (Builtin.NativeObject, Builtin.RawPointer)
+///
+/// Create a new discarding task.
+BUILTIN_SIL_OPERATION(CreateDiscardingTask, "createDiscardingTask", Special)
+
 /// createAsyncTask(): (
 ///     Int,                            // task-creation flags
-///     @escaping () async throws -> T  // function
+///     sending @escaping () async throws -> T  // function
 /// ) -> Builtin.NativeObject
 ///
-/// Create a new asynchronous task, given flags, options, and a function to
-/// execute.
+/// Legacy spelling of:
+///   createTask(flags: $0, operation: $1)
 BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTask,
-    "createAsyncTask", "", Special)
+                                   "createAsyncTask", "", Special)
 
 /// createAsyncTaskInGroup(): (
 ///     Int,                            // flags
 ///     Builtin.RawPointer,             // group
-///     @escaping () async throws -> T  // function
+///     sending @escaping () async throws -> T  // function
 /// ) -> Builtin.NativeObject
 ///
-/// Create a new asynchronous task future, given flags, a parent task,
-/// task group and a function to execute.
-BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskInGroup,
-    "createAsyncTaskInGroup", "", Special)
+/// Legacy spelling of:
+///   createTask(flags: $0, taskGroup: $1, operation: $2)
+BUILTIN_SIL_OPERATION(CreateAsyncTaskInGroup,
+                      "createAsyncTaskInGroup", Special)
+
+/// createAsyncDiscardingTaskInGroup(): (
+///     Int,                               // flags
+///     Builtin.RawPointer,                // group
+///     sending @escaping () async throws -> Void  // function
+/// ) -> Builtin.NativeObject
+///
+/// Legacy spelling of:
+///   createDiscardingTask(flags: $0, taskGroup: $1, operation: $2)
+BUILTIN_SIL_OPERATION(CreateAsyncDiscardingTaskInGroup,
+                      "createAsyncDiscardingTaskInGroup", Special)
+
+/// createAsyncTaskWithExecutor(): (
+///     Int,                            // flags
+///     Builtin.Executor,               // executor
+///     sending @escaping () async throws -> T  // function
+/// ) -> Builtin.NativeObject
+///
+/// Legacy spelling of:
+///   createTask(flags: $0, initialTaskExecutor: $1, operation: $2)
+BUILTIN_SIL_OPERATION(CreateAsyncTaskWithExecutor,
+                      "createAsyncTaskWithExecutor", Special)
+
+/// createAsyncTaskInGroupWithExecutor(): (
+///     Int,                            // flags
+///     Builtin.RawPointer,             // group
+///     Builtin.Executor,               // executor
+///     sending @escaping () async throws -> T  // function
+/// ) -> Builtin.NativeObject
+///
+/// Legacy spelling of:
+///   createTask(flags: $0, taskGroup: $1, initialTaskExecutor: $2, operation: $3)
+BUILTIN_SIL_OPERATION(CreateAsyncTaskInGroupWithExecutor,
+                      "createAsyncTaskInGroupWithExecutor", Special)
+
+/// createAsyncDiscardingTaskInGroupWithExecutor(): (
+///     Int,                               // flags
+///     Builtin.RawPointer,                // group
+///     Builtin.Executor,                  // executor
+///     sending @escaping () async throws -> Void  // function
+/// ) -> Builtin.NativeObject
+///
+/// Legacy spelling of:
+///   createDiscardingTask(flags: $0, taskGroup: $1, initialTaskExecutor: $2,
+///                        operation: $3)
+BUILTIN_SIL_OPERATION(CreateAsyncDiscardingTaskInGroupWithExecutor,
+                      "createAsyncDiscardingTaskInGroupWithExecutor", Special)
+
+/// Build a Builtin.Executor value from an "ordinary" task executor
+/// reference.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildOrdinaryTaskExecutorRef,
+    "buildOrdinaryTaskExecutorRef", "n", Special)
+
+/// Create a task group.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateTaskGroup, "createTaskGroup", "", Special)
+
+/// Create a task group, with options.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateTaskGroupWithFlags, "createTaskGroupWithFlags", "", Special)
+
+/// Destroy a task group.
+BUILTIN_MISC_OPERATION(DestroyTaskGroup, "destroyTaskGroup", "", Special)
 
 /// globalStringTablePointer has type String -> Builtin.RawPointer.
 /// It returns an immortal, global string table pointer for strings constructed
@@ -977,19 +1074,24 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(CreateAsyncTaskInGroup,
 /// is a pure value and therefore we can consider it as readnone).
 BUILTIN_MISC_OPERATION_WITH_SILGEN(GlobalStringTablePointer, "globalStringTablePointer", "n", Special)
 
-// autoDiffCreateLinearMapContext: (Builtin.Word) -> Builtin.NativeObject
-BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffCreateLinearMapContext, "autoDiffCreateLinearMapContext", "n", Special)
+// autoDiffCreateLinearMapContextWithType: (T.Type) -> Builtin.NativeObject
+BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffCreateLinearMapContextWithType, "autoDiffCreateLinearMapContextWithType", "", Special)
 
 // autoDiffProjectTopLevelSubcontext: (Builtin.NativeObject) -> Builtin.RawPointer
 BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffProjectTopLevelSubcontext, "autoDiffProjectTopLevelSubcontext", "n", Special)
 
-// autoDiffAllocateSubcontext: (Builtin.NativeObject, Builtin.Word) -> Builtin.RawPointer
-BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffAllocateSubcontext, "autoDiffAllocateSubcontext", "", Special)
+// autoDiffAllocateSubcontextWithType: (Builtin.NativeObject, T.Type) -> Builtin.RawPointer
+BUILTIN_MISC_OPERATION_WITH_SILGEN(AutoDiffAllocateSubcontextWithType, "autoDiffAllocateSubcontextWithType", "", Special)
 
 /// Build a Builtin.Executor value from an "ordinary" serial executor
 /// reference.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildOrdinarySerialExecutorRef,
                                    "buildOrdinarySerialExecutorRef", "n", Special)
+
+/// Build a Builtin.Executor value from an "complex equality" serial executor
+/// reference.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildComplexEqualitySerialExecutorRef,
+                                   "buildComplexEqualitySerialExecutorRef", "n", Special)
 
 /// Build a Builtin.Executor value from a default actor reference.
 BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildDefaultActorExecutorRef,
@@ -999,9 +1101,53 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildDefaultActorExecutorRef,
 BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildMainActorExecutorRef,
                                    "buildMainActorExecutorRef", "n", Special)
 
-#undef BUILTIN_MISC_OPERATION_WITH_SILGEN
+/// extractFunctionIsolation: <T>(_: T) -> (any Actor)?
+///
+/// Returns the isolation of a value, which must be an @isolated(any)
+/// function type.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(ExtractFunctionIsolation,
+                                   "extractFunctionIsolation", "", Special)
 
-#undef BUILTIN_MISC_OPERATION
+/// getEnumTag: <T>(_: T) -> Builtin.Int32
+///
+/// Given a dynamic generic value, unsafely assume it is an enum type and call
+/// the getEnumTag vwt function.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(GetEnumTag, "getEnumTag", "", Special)
+
+/// injectEnumTag: <T>(_: inout T, _: Builtin.Int32) -> ()
+///
+/// Given a dynamic inout generic value, unsafely assume it is an enum type and
+/// inject the given tag into it.
+///
+/// Note: This assume that either 1. the given tag has no payload or 2. the
+/// tag's payload is already initialized with the given source.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(InjectEnumTag, "injectEnumTag", "", Special)
+
+/// distributedActorAsAnyActor: <DA: DistributedActor>(_: DA) -> any Actor
+///
+/// For a given distributed actor that is known to be local, extract an
+/// `any Actor` existential that refers to the local actor.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(DistributedActorAsAnyActor, "distributedActorAsAnyActor", "n", Special)
+
+/// addressOfRawLayout: <T: ~Copyable>(_: borrowing T) -> Builtin.RawPointer
+///
+/// Returns a raw pointer to the address of the raw layout type. This address is
+/// only valid during a borrow access of the raw layout type or until the value
+/// is either moved or consumed.
+///
+/// Note: The purpose of this builtin is to get an opaque pointer to the address
+/// of the raw layout type. We explicitly do not want the optimizer looking into
+/// this pointer or address thereof to start assuming things about mutability or
+/// immutability. This builtin _must_ persist throughout all of SIL and must be
+/// lowered away at IRGen, no sooner.
+BUILTIN_MISC_OPERATION_WITH_SILGEN(AddressOfRawLayout, "addressOfRawLayout", "n", Special)
+
+/// emplace<T>((Builtin.RawPointer) -> Void) -> T
+///
+/// Passes a pointer to an uninitialized result value to the given function,
+/// which must initialize the memory before finishing execution. The value in
+/// memory becomes the result of the call.
+BUILTIN_SIL_OPERATION(Emplace, "emplace", Special)
 
 /// Builtins for instrumentation added by sanitizers during SILGen.
 #ifndef BUILTIN_SANITIZER_OPERATION
@@ -1012,8 +1158,6 @@ BUILTIN_MISC_OPERATION_WITH_SILGEN(BuildMainActorExecutorRef,
 /// TSanInoutAccess has type (T) -> ()
 BUILTIN_SANITIZER_OPERATION(TSanInoutAccess, "tsanInoutAccess", "")
 
-#undef BUILTIN_SANITIZER_OPERATION
-
 /// Builtins for compile-time type-checking operations used for unit testing.
 #ifndef BUILTIN_TYPE_CHECKER_OPERATION
 #define BUILTIN_TYPE_CHECKER_OPERATION(Id, Name) BUILTIN(Id, #Name, "n")
@@ -1023,8 +1167,6 @@ BUILTIN_TYPE_CHECKER_OPERATION(TypeJoin, type_join)
 BUILTIN_TYPE_CHECKER_OPERATION(TypeJoinInout, type_join_inout)
 BUILTIN_TYPE_CHECKER_OPERATION(TypeJoinMeta, type_join_meta)
 BUILTIN_TYPE_CHECKER_OPERATION(TriggerFallbackDiagnostic, trigger_fallback_diagnostic)
-
-#undef BUILTIN_TYPE_CHECKER_OPERATION
 
 // BUILTIN_TYPE_TRAIT_OPERATION - Compile-time type trait operations.
 #ifndef BUILTIN_TYPE_TRAIT_OPERATION
@@ -1039,5 +1181,20 @@ BUILTIN_TYPE_CHECKER_OPERATION(TriggerFallbackDiagnostic, trigger_fallback_diagn
 BUILTIN_TYPE_TRAIT_OPERATION(CanBeObjCClass, canBeClass)
 
 #undef BUILTIN_TYPE_TRAIT_OPERATION
-
+#undef BUILTIN_UNARY_OPERATION
+#undef BUILTIN_BINARY_PREDICATE
+#undef BUILTIN_RUNTIME_CALL
+#undef BUILTIN_MISC_OPERATION_WITH_SILGEN
+#undef BUILTIN_MISC_OPERATION
+#undef BUILTIN_SANITIZER_OPERATION
+#undef BUILTIN_TYPE_CHECKER_OPERATION
+#undef BUILTIN_BINARY_OPERATION_WITH_OVERFLOW
+#undef BUILTIN_BINARY_OPERATION_ALL
+#undef BUILTIN_BINARY_OPERATION_POLYMORPHIC
+#undef BUILTIN_BINARY_OPERATION_OVERLOADED_STATIC
+#undef BUILTIN_BINARY_OPERATION_GENERIC_HELPER_STR
+#undef BUILTIN_BINARY_OPERATION
+#undef BUILTIN_CAST_OPERATION
+#undef BUILTIN_CAST_OR_BITCAST_OPERATION
+#undef BUILTIN_SIL_OPERATION
 #undef BUILTIN

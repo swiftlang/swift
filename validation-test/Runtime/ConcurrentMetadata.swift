@@ -1,6 +1,5 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
-// UNSUPPORTED: single_threaded_runtime
 // UNSUPPORTED: threading_none
 
 // Exercise the metadata cache from multiple threads to shake out any

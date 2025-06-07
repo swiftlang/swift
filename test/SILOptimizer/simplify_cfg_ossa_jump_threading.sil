@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -unit-test-runner -sil-infinite-jump-threading-budget %s 2>&1 
+// RUN: %target-sil-opt -test-runner -sil-infinite-jump-threading-budget %s 2>&1 | %FileCheck %s
 
 import Builtin
 import Swift
@@ -16,9 +16,14 @@ enum FakeOptional<T> {
 
 sil @get_klass : $@convention(thin) () -> @owned Klass
 
+// This test is not optimized because the dest bb of the branch has a single predecessor
+// CHECK-LABEL: sil [ossa] @test_simplify_switch_enum_jump_threading1 :
+// CHECK: switch_enum
+// CHECK-NOT: switch_enum
+// CHECK-LABEL: } // end sil function 'test_simplify_switch_enum_jump_threading1'
 sil [ossa] @test_simplify_switch_enum_jump_threading1 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
-  test_specification "simplify-cfg-try-jump-threading @instruction[1]"
+  specify_test "simplify_cfg_try_jump_threading @instruction[1]"
   %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
   br bb1(%1 : $FakeOptional<Klass>)
 
@@ -37,18 +42,21 @@ bb4:
   return %t : $()
 }
 
-
+// CHECK-LABEL: sil [ossa] @test_simplify_switch_enum_jump_threading2 :
+// CHECK: switch_enum
+// CHECK: switch_enum
+// CHECK-LABEL: } // end sil function 'test_simplify_switch_enum_jump_threading2'
 sil [ossa] @test_simplify_switch_enum_jump_threading2 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
   cond_br undef, bb1, bb2
 
 bb1:
-  test_specification "simplify-cfg-try-jump-threading @instruction[2]"
+  specify_test "simplify_cfg_try_jump_threading @instruction[2]"
   %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
   br bb3(%1 : $FakeOptional<Klass>)
 
 bb2:
-  test_specification "simplify-cfg-try-jump-threading @instruction[5]"
+  specify_test "simplify_cfg_try_jump_threading @instruction[5]"
   destroy_value %0 : $Klass
   %2 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
   br bb3(%2 : $FakeOptional<Klass>)
@@ -68,6 +76,10 @@ bb6:
   return %t : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_simplify_switch_enum_jump_threading3 :
+// CHECK: select_enum
+// CHECK: select_enum
+// CHECK-LABEL: } // end sil function 'test_simplify_switch_enum_jump_threading3'
 sil [ossa] @test_simplify_switch_enum_jump_threading3 : $@convention(thin) (@owned Klass) -> Builtin.Int1 {
 bb0(%0 : @owned $Klass):
   %t = integer_literal $Builtin.Int1, 1
@@ -75,7 +87,7 @@ bb0(%0 : @owned $Klass):
   cond_br undef, bb1, bb2
 
 bb1:
-  test_specification "simplify-cfg-try-jump-threading @instruction[4]"
+  specify_test "simplify_cfg_try_jump_threading @instruction[4]"
   %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
   br bb3(%1 : $FakeOptional<Klass>)
 
@@ -93,9 +105,13 @@ bb4:
   return %4 : $Builtin.Int1
 }
 
+// CHECK-LABEL: sil [ossa] @test_jump_thread_ref_ele_loop : $@convention(thin) () -> () {
+// CHECK: begin_borrow
+// CHECK: begin_borrow
+// CHECK-LABEL: } // end sil function 'test_jump_thread_ref_ele_loop'
 sil [ossa] @test_jump_thread_ref_ele_loop : $@convention(thin) () -> () {
 bb0:
-  test_specification "simplify-cfg-try-jump-threading @instruction[3]"
+  specify_test "simplify_cfg_try_jump_threading @instruction[3]"
   %f = function_ref @get_klass : $@convention(thin) () -> @owned Klass
   cond_br undef, bb1, bb2
 
@@ -128,12 +144,16 @@ bb5:
   return %z : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_jump_thread_checked_cast_value :
+// CHECK: checked_cast_br
+// CHECK: checked_cast_br
+// CHECK-LABEL: } // end sil function 'test_jump_thread_checked_cast_value'
 sil [ossa] @test_jump_thread_checked_cast_value : $@convention(thin) (@owned AnyKlass, @owned AnyKlass) -> () {
 bb0(%0 : @owned $AnyKlass, %1 : @owned $AnyKlass):
   cond_br undef, bb1, bb2
 
 bb1:
-  test_specification "simplify-cfg-try-jump-threading @instruction[2]"
+  specify_test "simplify_cfg_try_jump_threading @instruction[2]"
   %2 = copy_value %0 : $AnyKlass
   br bb6(%2 : $AnyKlass)
 
@@ -144,7 +164,7 @@ bb2:
 bb6(%4 : @owned $AnyKlass):
   destroy_value %0 : $AnyKlass
   destroy_value %1 : $AnyKlass
-  checked_cast_br %4 : $AnyKlass to Klass, bb7, bb8
+  checked_cast_br AnyKlass in %4 : $AnyKlass to Klass, bb7, bb8
 
 bb7(%k : @owned $Klass):
   destroy_value %k : $Klass
@@ -157,4 +177,144 @@ bb8(%fail : @owned $AnyKlass):
 bb9:
   %999 = tuple ()
   return %999 : $()
+}
+
+// Partial apply cannot be cloned, even in OSSA. OSSA lowering does
+// not know how to allocate for multiple partial applies.
+//
+// rdar://119768691 (OwnershipModelEliminator triggers assertion when
+// lowering certain [on_stack] partial_applys in certain
+// circumstances)
+
+sil @test_simple_jump_thread_clone_partial_apply_closure : $@convention(thin) (@inout_aliasable Klass) -> ()
+sil @test_simple_jump_thread_clone_partial_apply_take_closure : $@convention(thin) (@noescape @callee_guaranteed () ->()) -> ()
+
+// CHECK-LABEL: sil [ossa] @test_simple_jump_thread_clone_partial_apply : $@convention(thin) (@owned Klass, @inout Klass) -> Builtin.Int1 {
+// CHECK: bb{{.*}}(%{{.*}} : @owned $FakeOptional<Klass>):
+// CHECK: partial_apply [callee_guaranteed]
+// CHECK-NEXT: mark_dependence
+// CHECK-NEXT: begin_borrow [lexical]
+// CHECK-NOT: partial_apply [callee_guaranteed]
+// CHECK-NOT: begin_borrow
+// CHECK-LABEL: } // end sil function 'test_simple_jump_thread_clone_partial_apply'
+sil [ossa] @test_simple_jump_thread_clone_partial_apply : $@convention(thin) (@owned Klass, @inout Klass) -> Builtin.Int1 {
+bb0(%0 : @owned $Klass, %1 : $*Klass):
+  %t = integer_literal $Builtin.Int1, 1
+  %f = integer_literal $Builtin.Int1, 0
+  cond_br undef, bb1, bb2
+
+bb1:
+  specify_test "simplify_cfg_try_jump_threading @instruction[4]"
+  %2 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
+  br bb3(%2 : $FakeOptional<Klass>)
+
+bb2:
+  destroy_value %0 : $Klass
+  %3 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  br bb3(%3 : $FakeOptional<Klass>)
+
+bb3(%4 : @owned $FakeOptional<Klass>):
+  %5 = select_enum %4 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: %t, case #FakeOptional.none!enumelt: %f : $Builtin.Int1
+  %6 = function_ref @test_simple_jump_thread_clone_partial_apply_closure : $@convention(thin) (@inout_aliasable Klass) -> ()
+  %7 = partial_apply [callee_guaranteed] [on_stack] %6(%1) : $@convention(thin) (@inout_aliasable Klass) -> ()
+  %8 = mark_dependence %7 : $@noescape @callee_guaranteed () ->() on %1 : $*Klass
+  %9 = begin_borrow [lexical] %8 : $@noescape @callee_guaranteed () ->()
+  br bb4
+
+bb4:
+  %func = function_ref @test_simple_jump_thread_clone_partial_apply_take_closure : $@convention(thin) (@noescape @callee_guaranteed () ->()) -> ()
+  %call = apply %func(%9) : $@convention(thin) (@noescape @callee_guaranteed () ->()) -> ()
+  end_borrow %9 : $@noescape @callee_guaranteed () ->()
+  destroy_value %8 : $@noescape @callee_guaranteed () ->()
+  destroy_value %4 : $FakeOptional<Klass>
+  return %5 : $Builtin.Int1
+}
+
+sil_global @my_global : $S
+
+sil @globalinit_func11 :  $@convention(thin) () -> ()
+
+struct S {
+}
+
+// This test is not optimized because the dest bb of the branch has a single predecessor
+// CHECK-LABEL: sil [ossa] @test_simplify_switch_enum_jump_threading_sil_token :
+// CHECK: switch_enum
+// CHECK-NOT: switch_enum
+// CHECK-LABEL: } // end sil function 'test_simplify_switch_enum_jump_threading_sil_token'
+sil [ossa] @test_simplify_switch_enum_jump_threading_sil_token : $@convention(thin) (@owned Klass, Builtin.RawPointer) -> () {
+bb0(%0 : @owned $Klass, %1 : $Builtin.RawPointer):
+  cond_br undef, bb1, bb2
+
+bb1:
+  specify_test "simplify_cfg_try_jump_threading @instruction[2]"
+  %s = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
+  br bb3(%s : $FakeOptional<Klass>)
+
+bb2:
+  destroy_value %0 : $Klass
+  %n = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  br bb3(%n : $FakeOptional<Klass>)
+
+bb3(%3 : @owned $FakeOptional<Klass>):
+  %f = function_ref @globalinit_func11 : $@convention(thin) () -> ()
+  %b = builtin "once"(%1 : $Builtin.RawPointer, %f : $@convention(thin) () -> ()) : $Builtin.SILToken 
+  %g = global_addr @my_global : $*S depends_on %b
+  switch_enum %3 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb5, case #FakeOptional.none!enumelt: bb4
+
+bb4:
+  br bb6
+
+bb5(%6 : @owned $Klass):
+  %ld = load [trivial] %g : $*S
+  apply undef(%ld) : $@convention(thin) (S) -> () 
+  destroy_value %6 : $Klass
+  br bb6
+
+bb6:
+  %t = tuple ()
+  return %t : $()
+}
+
+sil @_swift_stdlib_isNSString : $@convention(c) (AnyObject) -> UInt8
+
+// Ensure no crash in compiler
+sil hidden [ossa] @test_clone_destroy_none : $@convention(thin) (@guaranteed AnyObject) -> Bool {
+bb0(%0 : @guaranteed $AnyObject):
+  %3 = enum $Optional<(utf16Length: Int, asciiContentsPointer: UnsafePointer<UInt8>, untaggedCocoa: AnyObject)>, #Optional.none!enumelt
+  %4 = begin_borrow %3 : $Optional<(utf16Length: Int, asciiContentsPointer: UnsafePointer<UInt8>, untaggedCocoa: AnyObject)>
+  switch_enum %4 : $Optional<(utf16Length: Int, asciiContentsPointer: UnsafePointer<UInt8>, untaggedCocoa: AnyObject)>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%6 : @guaranteed $(utf16Length: Int, asciiContentsPointer: UnsafePointer<UInt8>, untaggedCocoa: AnyObject)):
+  end_borrow %4 : $Optional<(utf16Length: Int, asciiContentsPointer: UnsafePointer<UInt8>, untaggedCocoa: AnyObject)>
+  %8 = integer_literal $Builtin.Int1, -1
+  br bb3(%8 : $Builtin.Int1)
+
+bb2:
+  end_borrow %4 : $Optional<(utf16Length: Int, asciiContentsPointer: UnsafePointer<UInt8>, untaggedCocoa: AnyObject)>
+  %11 = integer_literal $Builtin.Int1, 0
+  br bb3(%11 : $Builtin.Int1)
+
+bb3(%13 : $Builtin.Int1):
+  destroy_value %3 : $Optional<(utf16Length: Int, asciiContentsPointer: UnsafePointer<UInt8>, untaggedCocoa: AnyObject)>
+  cond_br %13, bb4, bb5
+
+bb4:
+  %16 = integer_literal $Builtin.Int1, -1
+  %17 = struct $Bool (%16 : $Builtin.Int1)
+  br bb6(%17 : $Bool)
+
+bb5:
+  %19 = function_ref @_swift_stdlib_isNSString : $@convention(c) (AnyObject) -> UInt8
+  %20 = apply %19(%0) : $@convention(c) (AnyObject) -> UInt8
+  %21 = integer_literal $Builtin.Int8, 0
+  %22 = struct_extract %20 : $UInt8, #UInt8._value
+  %23 = builtin "cmp_eq_Int8"(%22 : $Builtin.Int8, %21 : $Builtin.Int8) : $Builtin.Int1
+  %24 = integer_literal $Builtin.Int1, -1
+  %25 = builtin "xor_Int1"(%23 : $Builtin.Int1, %24 : $Builtin.Int1) : $Builtin.Int1
+  %26 = struct $Bool (%25 : $Builtin.Int1)
+  br bb6(%26 : $Bool)
+
+bb6(%28 : $Bool):
+  return %28 : $Bool
 }

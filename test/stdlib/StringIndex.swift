@@ -234,7 +234,8 @@ suite.test("String.Index(_:within) / Range<String.Index>(_:in:)") {
 
       expectEqual(strRange, substrRange)
       guard strLB != nil && strUB != nil else {
-        expectNil(strRange)
+        // TODO: rdar://112643333
+        //expectNil(strRange)
         continue
       }
       expectEqual(strRange, Range(uncheckedBounds: (strLB!, strUB!)))
@@ -1012,23 +1013,22 @@ suite.test("UTF-16 breadcrumbs") {
     c̵̛̘̥̮̙̥̟̘̝͙̤̮͉͔̭̺̺̅̀̽̒̽̏̊̆͒͌̂͌̌̓̈́̐̔̿̂͑͠͝͝ͅ\#
     """#
 
-  print(string.utf16.count)
   let indices = Array(string.utf16.indices) + [string.utf16.endIndex]
   for i in 0 ..< indices.count {
     for j in 0 ..< indices.count {
       let distance = string.utf16.distance(from: indices[i], to: indices[j])
       expectEqual(distance, j - i,
         """
-        i: \(i), indices[i]: \(indices[i]._description)
-        j: \(j), indices[j]: \(indices[j]._description)
+        i: \(i), indices[i]: \(indices[i])
+        j: \(j), indices[j]: \(indices[j])
         """)
 
       let target = string.utf16.index(indices[i], offsetBy: j - i)
       expectEqual(target, indices[j],
         """
-        i: \(i), indices[i]: \(indices[i]._description)
-        j: \(j), indices[j]: \(indices[j]._description)
-        target: \(target._description)
+        i: \(i), indices[i]: \(indices[i])
+        j: \(j), indices[j]: \(indices[j])
+        target: \(target)
         """)
     }
   }
@@ -1135,9 +1135,9 @@ if #available(SwiftStdlib 5.8, *) {
       let actual = string._index(roundingDown: index)
       expectEqual(actual, expected,
         """
-        index: \(index._description)
-        actual: \(actual._description)
-        expected: \(expected._description)
+        index: \(index)
+        actual: \(actual)
+        expected: \(expected)
         """)
     }
   }
@@ -1153,9 +1153,9 @@ suite.test("String index rounding/Scalars")
     let actual = string.unicodeScalars._index(roundingDown: index)
     expectEqual(actual, expected,
       """
-      index: \(index._description)
-      actual: \(actual._description)
-      expected: \(expected._description)
+      index: \(index)
+      actual: \(actual)
+      expected: \(expected)
       """)
   }
 }
@@ -1179,9 +1179,9 @@ suite.test("String index rounding/UTF-16")
     let actual = string.utf16._index(roundingDown: index)
     expectEqual(actual, expected,
       """
-      index: \(index._description)
-      actual: \(actual._description)
-      expected: \(expected._description)
+      index: \(index)
+      actual: \(actual)
+      expected: \(expected)
       """)
   }
 }
@@ -1204,9 +1204,81 @@ suite.test("String index rounding/UTF-8")
     let actual = string.utf8._index(roundingDown: index)
     expectEqual(actual, expected,
       """
-      index: \(index._description)
-      actual: \(actual._description)
-      expected: \(expected._description)
+      index: \(index)
+      actual: \(actual)
+      expected: \(expected)
       """)
   }
 }
+
+if #available(SwiftStdlib 6.1, *) {
+  suite.test("String index printing (native)") {
+    let str = "nai\u{308}ve 🪻"
+
+    let utf8Indices = [
+      "0[any]", "1[utf8]", "2[utf8]", "3[utf8]", "4[utf8]", "5[utf8]",
+      "6[utf8]", "7[utf8]", "8[utf8]", "9[utf8]", "10[utf8]", "11[utf8]"
+    ]
+    expectEqual(str.utf8.indices.map { "\($0)" }, utf8Indices)
+
+    let utf16Indices = [
+      "0[any]", "1[utf8]", "2[utf8]", "3[utf8]", "5[utf8]", "6[utf8]",
+      "7[utf8]", "8[utf8]", "8[utf8]+1"
+    ]
+    expectEqual(str.utf16.indices.map { "\($0)" }, utf16Indices)
+
+    let scalarIndices = [
+      "0[any]", "1[utf8]", "2[utf8]", "3[utf8]", "5[utf8]", "6[utf8]",
+      "7[utf8]", "8[utf8]"
+    ]
+    expectEqual(str.unicodeScalars.indices.map { "\($0)" }, scalarIndices)
+
+    let characterIndices = [
+      "0[any]", "1[utf8]", "2[utf8]", "5[utf8]", "6[utf8]", "7[utf8]", "8[utf8]"
+    ]
+    expectEqual(str.indices.map { "\($0)" }, characterIndices)
+  }
+}
+
+suite.test("String index debugDescription backdeployment") {
+  // Note: no availability check
+  let str = "i\u{308}"
+  expectEqual(str.startIndex.debugDescription, "0[any]")
+  expectEqual(str.endIndex.debugDescription, "3[utf8]")
+}
+
+
+#if _runtime(_ObjC)
+if #available(SwiftStdlib 6.1, *) {
+  suite.test("String index printing (bridged Cocoa)") {
+    let utf16 = Array("nai\u{308}ve 🪻".utf16)
+    let nsstr = NSString(characters: utf16, length: utf16.count)
+    let str = nsstr as String
+
+    let utf8Indices = [
+      "0[any]", "1[utf16]", "2[utf16]", "3[utf16]", "3[utf16]+1", "4[utf16]",
+      "5[utf16]", "6[utf16]", "7[utf16]", "7[utf16]+1", "7[utf16]+2",
+      "7[utf16]+3"
+    ]
+    expectEqual(str.utf8.indices.map { "\($0)" }, utf8Indices)
+
+    let utf16Indices = [
+      "0[any]", "1[utf16]", "2[utf16]", "3[utf16]", "4[utf16]", "5[utf16]",
+      "6[utf16]", "7[utf16]", "8[utf16]"
+    ]
+    expectEqual(str.utf16.indices.map { "\($0)" }, utf16Indices)
+
+    let scalarIndices = [
+      "0[any]", "1[utf16]", "2[utf16]", "3[utf16]", "4[utf16]", "5[utf16]",
+      "6[utf16]", "7[utf16]"
+    ]
+    expectEqual(str.unicodeScalars.indices.map { "\($0)" }, scalarIndices)
+
+    let characterIndices = [
+      "0[any]", "1[utf16]", "2[utf16]", "4[utf16]", "5[utf16]", "6[utf16]",
+      "7[utf16]"
+    ]
+    expectEqual(str.indices.map { "\($0)" }, characterIndices)
+  }
+}
+#endif

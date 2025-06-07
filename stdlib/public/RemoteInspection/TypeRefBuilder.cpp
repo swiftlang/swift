@@ -19,10 +19,10 @@
 
 #include "swift/RemoteInspection/TypeRefBuilder.h"
 #include "swift/Demangling/Demangle.h"
+#include "swift/Remote/MetadataReader.h"
 #include "swift/RemoteInspection/Records.h"
 #include "swift/RemoteInspection/TypeLowering.h"
 #include "swift/RemoteInspection/TypeRef.h"
-#include "swift/Remote/MetadataReader.h"
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -37,17 +37,83 @@ TypeRefBuilder::decodeMangledType(Node *node, bool forRequirement) {
       .getType();
 }
 
-RemoteRef<char> TypeRefBuilder::readTypeRef(uint64_t remoteAddr) {
+std::optional<std::reference_wrapper<const ReflectionInfo>>
+TypeRefBuilder::ReflectionTypeDescriptorFinder::
+    findReflectionInfoWithTypeRefContainingAddress(uint64_t remoteAddr) {
+  // Update ReflectionInfoIndexesSortedByTypeReferenceRange if necessary.
+  if (ReflectionInfoIndexesSortedByTypeReferenceRange.size() !=
+      ReflectionInfos.size()) {
+    for (size_t reflectionInfoIndex =
+             ReflectionInfoIndexesSortedByTypeReferenceRange.size();
+         reflectionInfoIndex < ReflectionInfos.size(); reflectionInfoIndex++) {
+      ReflectionInfoIndexesSortedByTypeReferenceRange.push_back(
+          (uint32_t)reflectionInfoIndex);
+    }
+
+    std::sort(
+        ReflectionInfoIndexesSortedByTypeReferenceRange.begin(),
+        ReflectionInfoIndexesSortedByTypeReferenceRange.end(),
+        [&](uint32_t ReflectionInfoIndexA, uint32_t ReflectionInfoIndexB) {
+          uint64_t typeReferenceAStart = ReflectionInfos[ReflectionInfoIndexA]
+                                             .TypeReference.startAddress()
+                                             .getAddressData();
+          uint64_t typeReferenceBStart = ReflectionInfos[ReflectionInfoIndexB]
+                                             .TypeReference.startAddress()
+                                             .getAddressData();
+
+          return typeReferenceAStart < typeReferenceBStart;
+        });
+  }
+
+  // Use std::lower_bound() to search
+  // ReflectionInfoIndexesSortedByTypeReferenceRange for a ReflectionInfo whose
+  // TypeReference contains remoteAddr.
+  const auto possiblyMatchingReflectionInfoIndex = std::lower_bound(
+      ReflectionInfoIndexesSortedByTypeReferenceRange.begin(),
+      ReflectionInfoIndexesSortedByTypeReferenceRange.end(), remoteAddr,
+      [&](uint32_t ReflectionInfoIndex, uint64_t remoteAddr) {
+        return ReflectionInfos[ReflectionInfoIndex]
+                   .TypeReference.endAddress()
+                   .getAddressData() <= remoteAddr;
+      });
+
+  if (possiblyMatchingReflectionInfoIndex ==
+      ReflectionInfoIndexesSortedByTypeReferenceRange.end()) {
+    // There is no ReflectionInfo whose TypeReference ends before remoteAddr.
+    return std::nullopt;
+  }
+
+  const ReflectionInfo &possiblyMatchingReflectionInfo =
+      ReflectionInfos[*possiblyMatchingReflectionInfoIndex];
+  if (!possiblyMatchingReflectionInfo.TypeReference.containsRemoteAddress(
+          remoteAddr, 1)) {
+    // possiblyMatchingTypeReference ends before remoteAddr, but it doesn't
+    // contain remoteAddr.
+    return std::nullopt;
+  }
+
+  // possiblyMatchingTypeReference contains remoteAddr.
+  return possiblyMatchingReflectionInfo;
+}
+
+RemoteRef<char> TypeRefBuilder::ReflectionTypeDescriptorFinder::readTypeRef(
+    uint64_t remoteAddr) {
   // The remote address should point into one of the TypeRef or
   // ReflectionString references we already read out of the images.
   RemoteRef<char> foundTypeRef;
   RemoteRef<void> limitAddress;
+
+  const auto infoWithTypeReferenceContainingAddress =
+      findReflectionInfoWithTypeRefContainingAddress(remoteAddr);
+  if (infoWithTypeReferenceContainingAddress.has_value()) {
+    foundTypeRef = infoWithTypeReferenceContainingAddress->get()
+                       .TypeReference.getRemoteRef<char>(remoteAddr);
+    limitAddress = infoWithTypeReferenceContainingAddress->get()
+                       .TypeReference.endAddress();
+    goto found_type_ref;
+  }
+
   for (auto &info : ReflectionInfos) {
-    if (info.TypeReference.containsRemoteAddress(remoteAddr, 1)) {
-      foundTypeRef = info.TypeReference.getRemoteRef<char>(remoteAddr);
-      limitAddress = info.TypeReference.endAddress();
-      goto found_type_ref;
-    }
     if (info.ReflectionString.containsRemoteAddress(remoteAddr, 1)) {
       foundTypeRef = info.ReflectionString.getRemoteRef<char>(remoteAddr);
       limitAddress = info.ReflectionString.endAddress();
@@ -55,7 +121,7 @@ RemoteRef<char> TypeRefBuilder::readTypeRef(uint64_t remoteAddr) {
     }
   }
   // TODO: Try using MetadataReader to read the string here?
-  
+
   // Invalid type ref pointer.
   return nullptr;
 
@@ -63,73 +129,91 @@ found_type_ref:
   // Make sure there's a valid mangled string within the bounds of the
   // section.
   for (auto i = foundTypeRef;
-       i.getAddressData() < limitAddress.getAddressData(); ) {
+       i.getAddressData() < limitAddress.getAddressData();) {
     auto c = *i.getLocalBuffer();
     if (c == '\0')
       goto valid_type_ref;
-      
+
     if (c >= '\1' && c <= '\x17')
       i = i.atByteOffset(5);
     else if (c >= '\x18' && c <= '\x1F') {
-      i = i.atByteOffset(PointerSize + 1);
+      i = i.atByteOffset(Builder.PointerSize + 1);
     } else {
       i = i.atByteOffset(1);
     }
   }
-  
+
   // Unterminated string.
   return nullptr;
-  
+
 valid_type_ref:
   // Look past the $s prefix if the string has one.
   auto localStr = foundTypeRef.getLocalBuffer();
   if (localStr[0] == '$' && localStr[1] == 's') {
     foundTypeRef = foundTypeRef.atByteOffset(2);
   }
-  
+
   return foundTypeRef;
 }
 
 /// Load and normalize a mangled name so it can be matched with string equality.
-llvm::Optional<std::string>
-TypeRefBuilder::normalizeReflectionName(RemoteRef<char> reflectionName) {
+std::optional<std::string>
+TypeRefBuilder::ReflectionTypeDescriptorFinder::normalizeReflectionName(
+    RemoteRef<char> reflectionName) {
+  const auto reflectionNameRemoteAddress = reflectionName.getAddressData();
+
+  if (const auto found =
+          NormalizedReflectionNameCache.find(reflectionNameRemoteAddress);
+      found != NormalizedReflectionNameCache.end()) {
+    return found->second;
+  }
+
+  TypeRefBuilder::ScopedNodeFactoryCheckpoint checkpoint(&Builder);
   // Remangle the reflection name to resolve symbolic references.
-  if (auto node = demangleTypeRef(reflectionName,
+  if (auto node =
+          Builder.demangleTypeRef(reflectionName,
                                   /*useOpaqueTypeSymbolicReferences*/ false)) {
     switch (node->getKind()) {
     case Node::Kind::TypeSymbolicReference:
     case Node::Kind::ProtocolSymbolicReference:
     case Node::Kind::OpaqueTypeDescriptorSymbolicReference:
       // Symbolic references cannot be mangled, return a failure.
+      NormalizedReflectionNameCache.insert(std::make_pair(
+          reflectionNameRemoteAddress, std::optional<std::string>()));
       return {};
     default:
-      auto mangling = mangleNode(node);
-      clearNodeFactory();
+      auto mangling = mangleNode(node, Mangle::ManglingFlavor::Default);
       if (!mangling.isSuccess()) {
+        NormalizedReflectionNameCache.insert(std::make_pair(
+            reflectionNameRemoteAddress, std::optional<std::string>()));
         return {};
       }
+      NormalizedReflectionNameCache.insert(
+          std::make_pair(reflectionNameRemoteAddress, mangling.result()));
       return std::move(mangling.result());
     }
   }
 
   // Fall back to the raw string.
-  return getTypeRefString(reflectionName).str();
+  const auto manglingResult = Builder.getTypeRefString(reflectionName).str();
+  NormalizedReflectionNameCache.insert(
+      std::make_pair(reflectionNameRemoteAddress, manglingResult));
+  return std::move(manglingResult);
 }
 
 /// Determine whether the given reflection protocol name matches.
-bool
-TypeRefBuilder::reflectionNameMatches(RemoteRef<char> reflectionName,
-                                      StringRef searchName) {
+bool TypeRefBuilder::ReflectionTypeDescriptorFinder::reflectionNameMatches(
+    RemoteRef<char> reflectionName, StringRef searchName) {
   auto normalized = normalizeReflectionName(reflectionName);
   if (!normalized)
     return false;
-  return searchName.equals(*normalized);
+  return searchName == *normalized;
 }
 
-const TypeRef * TypeRefBuilder::
-lookupTypeWitness(const std::string &MangledTypeName,
-                  const std::string &Member,
-                  const StringRef Protocol) {
+const TypeRef *
+TypeRefBuilder::ReflectionTypeDescriptorFinder::lookupTypeWitness(
+    const std::string &MangledTypeName, const std::string &Member,
+    const StringRef Protocol) {
   TypeRefID key;
   key.addString(MangledTypeName);
   key.addString(Member);
@@ -143,27 +227,29 @@ lookupTypeWitness(const std::string &MangledTypeName,
   for (auto &Info : ReflectionInfos) {
     for (auto AssocTyDescriptor : Info.AssociatedType) {
       if (!reflectionNameMatches(
-          readTypeRef(AssocTyDescriptor, AssocTyDescriptor->ConformingTypeName),
-          MangledTypeName))
+              readTypeRef(AssocTyDescriptor,
+                          AssocTyDescriptor->ConformingTypeName),
+              MangledTypeName))
         continue;
 
       if (!reflectionNameMatches(
-            readTypeRef(AssocTyDescriptor, AssocTyDescriptor->ProtocolTypeName),
-            Protocol))
+              readTypeRef(AssocTyDescriptor,
+                          AssocTyDescriptor->ProtocolTypeName),
+              Protocol))
         continue;
 
       for (auto &AssocTyRef : *AssocTyDescriptor.getLocalBuffer()) {
         auto AssocTy = AssocTyDescriptor.getField(AssocTyRef);
         if (Member.compare(
-                getTypeRefString(readTypeRef(AssocTy, AssocTy->Name)).str()) !=
-            0)
+                Builder.getTypeRefString(readTypeRef(AssocTy, AssocTy->Name))
+                    .str()) != 0)
           continue;
 
-        auto SubstitutedTypeName = readTypeRef(AssocTy,
-                                               AssocTy->SubstitutedTypeName);
-        auto Demangled = demangleTypeRef(SubstitutedTypeName);
-        auto *TypeWitness = decodeMangledType(Demangled);
-        clearNodeFactory();
+        TypeRefBuilder::ScopedNodeFactoryCheckpoint checkpoint(&Builder);
+        auto SubstitutedTypeName =
+            readTypeRef(AssocTy, AssocTy->SubstitutedTypeName);
+        auto Demangled = Builder.demangleTypeRef(SubstitutedTypeName);
+        auto *TypeWitness = Builder.decodeMangledType(Demangled);
 
         AssociatedTypeCache.insert(std::make_pair(key, TypeWitness));
         return TypeWitness;
@@ -174,16 +260,16 @@ lookupTypeWitness(const std::string &MangledTypeName,
 }
 
 const TypeRef *TypeRefBuilder::lookupSuperclass(const TypeRef *TR) {
-  const auto &FD = getFieldTypeInfo(TR);
+  const auto &FD = getFieldDescriptor(TR);
   if (FD == nullptr)
     return nullptr;
 
-  if (!FD->hasSuperclass())
+  if (!FD->HasSuperClass)
     return nullptr;
 
-  auto Demangled = demangleTypeRef(readTypeRef(FD, FD->Superclass));
+  ScopedNodeFactoryCheckpoint checkpoint(this);
+  auto Demangled = FD->demangleSuperclass();
   auto Unsubstituted = decodeMangledType(Demangled);
-  clearNodeFactory();
   if (!Unsubstituted)
     return nullptr;
 
@@ -193,7 +279,7 @@ const TypeRef *TypeRefBuilder::lookupSuperclass(const TypeRef *TR) {
   return Unsubstituted->subst(*this, *SubstMap);
 }
 
-static llvm::Optional<StringRef> FindOutermostModuleName(NodePointer Node) {
+static std::optional<StringRef> FindOutermostModuleName(NodePointer Node) {
   if (!Node)
     return {};
   // Breadth first search until we find the module name so we find the outermost
@@ -216,8 +302,8 @@ static llvm::Optional<StringRef> FindOutermostModuleName(NodePointer Node) {
   return {};
 }
 
-void TypeRefBuilder::populateFieldTypeInfoCacheWithReflectionAtIndex(
-    size_t Index) {
+void TypeRefBuilder::ReflectionTypeDescriptorFinder::
+    populateFieldTypeInfoCacheWithReflectionAtIndex(size_t Index) {
   if (ProcessedReflectionInfoIndexes.contains(Index))
     return;
 
@@ -244,26 +330,27 @@ void TypeRefBuilder::populateFieldTypeInfoCacheWithReflectionAtIndex(
   ProcessedReflectionInfoIndexes.insert(Index);
 }
 
-llvm::Optional<RemoteRef<FieldDescriptor>>
-TypeRefBuilder::findFieldDescriptorAtIndex(
+std::optional<RemoteRef<FieldDescriptor>>
+TypeRefBuilder::ReflectionTypeDescriptorFinder::findFieldDescriptorAtIndex(
     size_t Index, const std::string &MangledName) {
   populateFieldTypeInfoCacheWithReflectionAtIndex(Index);
   auto Found = FieldTypeInfoCache.find(MangledName);
   if (Found != FieldTypeInfoCache.end()) {
     return Found->second;
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
-llvm::Optional<RemoteRef<FieldDescriptor>>
-TypeRefBuilder::getFieldDescriptorFromExternalCache(
-    const std::string &MangledName) {
+std::optional<RemoteRef<FieldDescriptor>>
+TypeRefBuilder::ReflectionTypeDescriptorFinder::
+    getFieldDescriptorFromExternalCache(const std::string &MangledName) {
   if (!ExternalTypeRefCache)
-    return llvm::None;
+    return std::nullopt;
 
-  if (auto Locator = ExternalTypeRefCache->getFieldDescriptorLocator(MangledName)) {
+  if (auto Locator =
+          ExternalTypeRefCache->getFieldDescriptorLocator(MangledName)) {
     if (Locator->InfoID >= ReflectionInfos.size())
-      return llvm::None;
+      return std::nullopt;
 
     auto &Field = ReflectionInfos[Locator->InfoID].Field;
     auto Addr = Field.startAddress().getAddressData() + Locator->Offset;
@@ -287,10 +374,12 @@ TypeRefBuilder::getFieldDescriptorFromExternalCache(
     if (Found != FieldTypeInfoCache.end())
       return Found->second;
   }
-  return llvm::None;
+  return std::nullopt;
 }
 
-RemoteRef<FieldDescriptor> TypeRefBuilder::getFieldTypeInfo(const TypeRef *TR) {
+RemoteRef<FieldDescriptor>
+TypeRefBuilder::ReflectionTypeDescriptorFinder::getFieldTypeInfo(
+    const TypeRef *TR) {
   const std::string *MangledName;
   NodePointer Node;
   Demangler Dem;
@@ -316,7 +405,7 @@ RemoteRef<FieldDescriptor> TypeRefBuilder::getFieldTypeInfo(const TypeRef *TR) {
   auto ModuleName = FindOutermostModuleName(Node);
   // If we couldn't find a module name or the type is imported (__C module) we
   // don't any useful information on which image to look for the type.
-  if (ModuleName && !ModuleName->equals("__C")) {
+  if (ModuleName && ModuleName != "__C") {
     for (size_t i = 0; i < ReflectionInfos.size(); ++i) {
       // If the external cache already has the contents of this reflection info,
       // and the previous lookup in the cache failed, then the field descriptor
@@ -331,8 +420,8 @@ RemoteRef<FieldDescriptor> TypeRefBuilder::getFieldTypeInfo(const TypeRef *TR) {
     }
   }
 
-  // On failure, fill out the cache, ReflectionInfo by ReflectionInfo,
-  // until we find the field descriptor we're looking for.
+  // If the heuristic didn't work, iterate over every reflection info
+  // that the external cache hasn't processed.
   for (size_t i = 0; i < ReflectionInfos.size(); ++i) {
     if (ExternalTypeRefCache && ExternalTypeRefCache->isReflectionInfoCached(i))
       continue;
@@ -340,53 +429,130 @@ RemoteRef<FieldDescriptor> TypeRefBuilder::getFieldTypeInfo(const TypeRef *TR) {
       return *FD;
   }
 
+  // If we still haven't found the field descriptor go over every reflection
+  // info, even the ones the external cache supposedly processed.
+  // TODO: if we find the field descriptor here there is a bug somewhere (most
+  // likely on the external cache). Log this somehow.
+  for (size_t i = 0; i < ReflectionInfos.size(); ++i)
+    if (auto FD = findFieldDescriptorAtIndex(i, *MangledName))
+      return *FD;
+
+  return nullptr;
+}
+
+namespace {
+// A field record implementation that wraps a reflection field record.
+class FieldRecordImpl : public FieldRecordBase {
+  RemoteRef<const FieldRecord> Field;
+  TypeRefBuilder &Builder;
+
+public:
+  FieldRecordImpl(RemoteRef<const FieldRecord> FR, TypeRefBuilder &Builder)
+      : FieldRecordBase(FR->isIndirectCase(), FR->isVar(),
+                             FR->hasMangledTypeName()),
+        Field(FR), Builder(Builder) {}
+
+  ~FieldRecordImpl() override {}
+
+  StringRef getFieldName() override {
+    return Builder.getTypeRefString(
+        Builder.readTypeRef(Field, Field->FieldName));
+  }
+    
+  NodePointer getDemangledTypeName() override {
+    return Builder.demangleTypeRef(
+        Builder.readTypeRef(Field, Field->MangledTypeName));
+  }
+};
+
+/// A field descriptor implementation that wraps a reflection field
+/// descriptor.
+class FieldDescriptorImpl : public FieldDescriptorBase {
+  RemoteRef<FieldDescriptor> FD;
+  TypeRefBuilder &Builder;
+
+public:
+  FieldDescriptorImpl(RemoteRef<FieldDescriptor> FD, TypeRefBuilder &Builder)
+      : FieldDescriptorBase(FD->Kind, FD->hasSuperclass()), FD(FD),
+        Builder(Builder) {}
+
+  ~FieldDescriptorImpl() override {}
+
+  NodePointer demangleSuperclass() override {
+    return Builder.demangleTypeRef(Builder.readTypeRef(FD, FD->Superclass));
+  }
+
+  std::vector<std::unique_ptr<FieldRecordBase>> getFieldRecords() override {
+    std::vector<std::unique_ptr<FieldRecordBase>> FieldRecords;
+    for (auto &FieldRef : *FD.getLocalBuffer()) {
+      FieldRecords.emplace_back(
+          std::make_unique<FieldRecordImpl>(FD.getField(FieldRef), Builder));
+    }
+    return FieldRecords;
+  }
+};
+} // namespace
+
+std::unique_ptr<FieldDescriptorBase>
+TypeRefBuilder::ReflectionTypeDescriptorFinder::getFieldDescriptor(
+    const TypeRef *TR) {
+  if (auto FDI = getFieldTypeInfo(TR))
+    return std::make_unique<FieldDescriptorImpl>(FDI, Builder);
+  return nullptr;
+}
+
+std::unique_ptr<FieldDescriptorBase>
+TypeRefBuilder::getFieldDescriptor(const TypeRef *TR) {
+  for (auto DF : getDescriptorFinders())
+    if (auto descriptor = DF->getFieldDescriptor(TR))
+      return descriptor;
   return nullptr;
 }
 
 bool TypeRefBuilder::getFieldTypeRefs(
-    const TypeRef *TR, RemoteRef<FieldDescriptor> FD,
+    const TypeRef *TR, FieldDescriptorBase &FD,
     remote::TypeInfoProvider *ExternalTypeInfo,
     std::vector<FieldTypeInfo> &Fields) {
-  if (FD == nullptr)
-    return false;
-
   auto Subs = TR->getSubstMap();
   if (!Subs)
     return false;
 
   int FieldValue = -1;
-  for (auto &FieldRef : *FD.getLocalBuffer()) {
-    auto Field = FD.getField(FieldRef);
-    
-    auto FieldName = getTypeRefString(readTypeRef(Field, Field->FieldName));
+  for (auto &Field : FD.getFieldRecords()) {
+    auto FieldName = Field->getFieldName();
     FieldValue += 1;
 
     // Empty cases of enums do not have a type
-    if (FD->isEnum() && !Field->hasMangledTypeName()) {
-      Fields.push_back(FieldTypeInfo::forEmptyCase(FieldName.str(), FieldValue));
+    if (FD.isEnum() && !Field->HasMangledTypeName) {
+      Fields.push_back(
+          FieldTypeInfo::forEmptyCase(FieldName.str(), FieldValue));
       continue;
     }
 
-    auto Demangled = demangleTypeRef(readTypeRef(Field,Field->MangledTypeName));
+    ScopedNodeFactoryCheckpoint checkpoint(this);
+    auto Demangled = Field->getDemangledTypeName();
     auto Unsubstituted = decodeMangledType(Demangled);
-    clearNodeFactory();
     if (!Unsubstituted)
       return false;
 
-    auto Substituted = Unsubstituted->subst(*this, *Subs);
+    // We need this for enums; an enum case "is generic" if any generic type
+    // parameter substitutions occurred on the payload.  E.g.,
+    // `case a([T?])` is generic, but `case a([Int?])` is not.
+    bool IsGeneric = !Unsubstituted->isConcrete();
+    auto Substituted = (IsGeneric ? Unsubstituted->subst(*this, *Subs)
+                                  : Unsubstituted);
+    bool IsIndirect = FD.isEnum() && Field->IsIndirectCase;
 
-    if (FD->isEnum() && Field->isIndirectCase()) {
-      Fields.push_back(FieldTypeInfo::forIndirectCase(FieldName.str(), FieldValue, Substituted));
-      continue;
-    }
-
-    Fields.push_back(FieldTypeInfo::forField(FieldName.str(), FieldValue, Substituted));
+    auto FieldTI = FieldTypeInfo(FieldName.str(), FieldValue, Substituted,
+                                 IsIndirect, IsGeneric);
+    Fields.push_back(FieldTI);
   }
   return true;
 }
 
 RemoteRef<BuiltinTypeDescriptor>
-TypeRefBuilder::getBuiltinTypeInfo(const TypeRef *TR) {
+TypeRefBuilder::ReflectionTypeDescriptorFinder::getBuiltinTypeInfo(
+    const TypeRef *TR) {
   std::string MangledName;
   if (auto B = dyn_cast<BuiltinTypeRef>(TR))
     MangledName = B->getMangledName();
@@ -397,8 +563,12 @@ TypeRefBuilder::getBuiltinTypeInfo(const TypeRef *TR) {
   else
     return nullptr;
 
-  for (auto Info : ReflectionInfos) {
-    for (auto BuiltinTypeDescriptor : Info.Builtin) {
+  for (; NormalizedReflectionNameCacheLastReflectionInfoCache <
+         ReflectionInfos.size();
+       NormalizedReflectionNameCacheLastReflectionInfoCache++) {
+    for (auto BuiltinTypeDescriptor :
+         ReflectionInfos[NormalizedReflectionNameCacheLastReflectionInfoCache]
+             .Builtin) {
       if (BuiltinTypeDescriptor->Stride <= 0)
         continue;
       if (!BuiltinTypeDescriptor->hasMangledTypeName())
@@ -412,18 +582,111 @@ TypeRefBuilder::getBuiltinTypeInfo(const TypeRef *TR) {
         continue;
 
       auto CandidateMangledName =
-        readTypeRef(BuiltinTypeDescriptor, BuiltinTypeDescriptor->TypeName);
-      if (!reflectionNameMatches(CandidateMangledName, MangledName))
-        continue;
-      return BuiltinTypeDescriptor;
+          readTypeRef(BuiltinTypeDescriptor, BuiltinTypeDescriptor->TypeName);
+      auto CandidateNormalizedName =
+          normalizeReflectionName(CandidateMangledName);
+      if (CandidateNormalizedName) {
+        BuiltInTypeDescriptorCache.insert(
+            std::make_pair(*CandidateNormalizedName, BuiltinTypeDescriptor));
+      }
     }
+  }
+
+  if (const auto found = BuiltInTypeDescriptorCache.find(MangledName);
+      found != BuiltInTypeDescriptorCache.end()) {
+    return found->second;
   }
 
   return nullptr;
 }
 
+namespace {
+/// A builtin type descriptor implementation that wraps a reflection builtin
+/// type descriptor.
+class BuiltinTypeDescriptorImpl : public BuiltinTypeDescriptorBase {
+  RemoteRef<BuiltinTypeDescriptor> BTD;
+  TypeRefBuilder &Builder;
+
+public:
+  BuiltinTypeDescriptorImpl(RemoteRef<BuiltinTypeDescriptor> BTD,
+                            TypeRefBuilder &Builder)
+      : BuiltinTypeDescriptorBase(BTD->Size, BTD->getAlignment(),
+                                       BTD->Stride, BTD->NumExtraInhabitants,
+                                       BTD->isBitwiseTakable()),
+        BTD(BTD), Builder(Builder) {}
+
+  ~BuiltinTypeDescriptorImpl() override {}
+
+  StringRef getMangledTypeName() override {
+    return Builder.getTypeRefString(Builder.readTypeRef(BTD, BTD->TypeName));
+  };
+};
+} // namespace
+
+std::unique_ptr<BuiltinTypeDescriptorBase>
+TypeRefBuilder::ReflectionTypeDescriptorFinder::getBuiltinTypeDescriptor(
+    const TypeRef *TR) {
+  if (auto BTI = getBuiltinTypeInfo(TR))
+    return std::make_unique<BuiltinTypeDescriptorImpl>(BTI, Builder);
+  return nullptr;
+}
+
+std::unique_ptr<BuiltinTypeDescriptorBase>
+TypeRefBuilder::getBuiltinTypeDescriptor(const TypeRef *TR) {
+  for (auto *DF : getDescriptorFinders())
+    if (auto descriptor = DF->getBuiltinTypeDescriptor(TR))
+      return descriptor;
+
+  return nullptr;
+}
+
+namespace {
+/// A builtin type descriptor implementation that wraps a reflection builtin
+/// type descriptor.
+class MultiPayloadEnumDescriptorImpl : public MultiPayloadEnumDescriptorBase {
+  RemoteRef<MultiPayloadEnumDescriptor> MPED;
+  TypeRefBuilder &Builder;
+
+public:
+  MultiPayloadEnumDescriptorImpl(RemoteRef<MultiPayloadEnumDescriptor> MPED,
+                                 TypeRefBuilder &Builder)
+      : MultiPayloadEnumDescriptorBase(), MPED(MPED), Builder(Builder) {}
+
+  ~MultiPayloadEnumDescriptorImpl() override {}
+
+  StringRef getMangledTypeName() override {
+    return Builder.getTypeRefString(Builder.readTypeRef(MPED, MPED->TypeName));
+  };
+
+  uint32_t getContentsSizeInWords() const override {
+    return MPED->getContentsSizeInWords();
+  }
+
+  size_t getSizeInBytes() const override { return MPED->getSizeInBytes(); }
+
+  uint32_t getFlags() const override { return MPED->getFlags(); }
+
+  bool usesPayloadSpareBits() const override {
+    return MPED->usesPayloadSpareBits();
+  }
+
+  uint32_t getPayloadSpareBitMaskByteOffset() const override {
+    return MPED->getPayloadSpareBitMaskByteOffset();
+  }
+
+  uint32_t getPayloadSpareBitMaskByteCount() const override {
+    return MPED->getPayloadSpareBitMaskByteCount();
+  }
+
+  const uint8_t *getPayloadSpareBits() const override {
+    return MPED->getPayloadSpareBits();
+  }
+};
+} // namespace
+  
 RemoteRef<MultiPayloadEnumDescriptor>
-TypeRefBuilder::getMultiPayloadEnumInfo(const TypeRef *TR) {
+TypeRefBuilder::ReflectionTypeDescriptorFinder::getMultiPayloadEnumInfo(
+    const TypeRef *TR) {
   std::string MangledName;
   if (auto B = dyn_cast<BuiltinTypeRef>(TR))
     MangledName = B->getMangledName();
@@ -437,23 +700,27 @@ TypeRefBuilder::getMultiPayloadEnumInfo(const TypeRef *TR) {
   for (auto Info : ReflectionInfos) {
     for (auto MultiPayloadEnumDescriptor : Info.MultiPayloadEnum) {
 
-      // Assert that descriptor size is sane...
+      // Assert that descriptor size is sound...
       assert(MultiPayloadEnumDescriptor->getContentsSizeInWords() >= 1);
       // We're limited to 64k of spare bits mask...
       assert(MultiPayloadEnumDescriptor->getContentsSizeInWords() < 16384);
       assert(MultiPayloadEnumDescriptor->getSizeInBytes() ==
              4 + MultiPayloadEnumDescriptor->getContentsSizeInWords() * 4);
       // Must have a non-empty spare bits mask iff spare bits are used...
-      assert(MultiPayloadEnumDescriptor->usesPayloadSpareBits()
-             == (MultiPayloadEnumDescriptor->getPayloadSpareBitMaskByteCount() != 0));
+      assert(
+          MultiPayloadEnumDescriptor->usesPayloadSpareBits() ==
+          (MultiPayloadEnumDescriptor->getPayloadSpareBitMaskByteCount() != 0));
       // BitMask must fit within the advertised size...
       if (MultiPayloadEnumDescriptor->usesPayloadSpareBits()) {
-        assert(MultiPayloadEnumDescriptor->getContentsSizeInWords()
-               >= 2 + (MultiPayloadEnumDescriptor->getPayloadSpareBitMaskByteCount() + 3) / 4);
+        assert(
+            MultiPayloadEnumDescriptor->getContentsSizeInWords() >=
+            2 + (MultiPayloadEnumDescriptor->getPayloadSpareBitMaskByteCount() +
+                 3) /
+                    4);
       }
 
-      auto CandidateMangledName =
-        readTypeRef(MultiPayloadEnumDescriptor, MultiPayloadEnumDescriptor->TypeName);
+      auto CandidateMangledName = readTypeRef(
+          MultiPayloadEnumDescriptor, MultiPayloadEnumDescriptor->TypeName);
       if (!reflectionNameMatches(CandidateMangledName, MangledName))
         continue;
       return MultiPayloadEnumDescriptor;
@@ -463,33 +730,61 @@ TypeRefBuilder::getMultiPayloadEnumInfo(const TypeRef *TR) {
   return nullptr;
 }
 
-RemoteRef<CaptureDescriptor>
-TypeRefBuilder::getCaptureDescriptor(uint64_t RemoteAddress) {
-  for (auto Info : ReflectionInfos) {
-    for (auto CD : Info.Capture) {
-      if (RemoteAddress == CD.getAddressData()) {
-        return CD;
-      }
-    }
-  }
+std::unique_ptr<MultiPayloadEnumDescriptorBase>
+TypeRefBuilder::ReflectionTypeDescriptorFinder::getMultiPayloadEnumDescriptor(
+    const TypeRef *TR) {
+  if (auto BTI = getMultiPayloadEnumInfo(TR))
+    return std::make_unique<MultiPayloadEnumDescriptorImpl>(BTI, Builder);
+  return nullptr;
+}
+
+std::unique_ptr<MultiPayloadEnumDescriptorBase>
+TypeRefBuilder::getMultiPayloadEnumDescriptor(const TypeRef *TR) {
+  for (auto *DF : getDescriptorFinders())
+    if (auto descriptor = DF->getMultiPayloadEnumDescriptor(TR))
+      return descriptor;
 
   return nullptr;
 }
 
+RemoteRef<CaptureDescriptor>
+TypeRefBuilder::ReflectionTypeDescriptorFinder::getCaptureDescriptor(
+    uint64_t RemoteAddress) {
+
+  for (; CaptureDescriptorsByAddressLastReflectionInfoCache <
+         ReflectionInfos.size();
+       CaptureDescriptorsByAddressLastReflectionInfoCache++) {
+    for (const auto &CD :
+         ReflectionInfos[CaptureDescriptorsByAddressLastReflectionInfoCache]
+             .Capture) {
+      CaptureDescriptorsByAddress.emplace(
+          std::make_pair(CD.getAddressData(), CD));
+    }
+  }
+
+  const auto found = CaptureDescriptorsByAddress.find(RemoteAddress);
+  if (found == CaptureDescriptorsByAddress.end()) {
+    return nullptr;
+  }
+
+  return found->second;
+}
+
 /// Get the unsubstituted capture types for a closure context.
 ClosureContextInfo
-TypeRefBuilder::getClosureContextInfo(RemoteRef<CaptureDescriptor> CD) {
+TypeRefBuilder::ReflectionTypeDescriptorFinder::getClosureContextInfo(
+    RemoteRef<CaptureDescriptor> CD) {
   ClosureContextInfo Info;
 
   for (auto i = CD->capture_begin(), e = CD->capture_end(); i != e; ++i) {
     const TypeRef *TR = nullptr;
     auto CR = CD.getField(*i);
-    
+
     if (CR->hasMangledTypeName()) {
+      TypeRefBuilder::ScopedNodeFactoryCheckpoint checkpoint(&Builder);
       auto MangledName = readTypeRef(CR, CR->MangledTypeName);
-      auto DemangleTree = demangleTypeRef(MangledName);
-      TR = decodeMangledType(DemangleTree);
-      clearNodeFactory();
+      auto DemangleTree = Builder.demangleTypeRef(MangledName);
+      TR = Builder.decodeMangledType(DemangleTree);
     }
     Info.CaptureTypes.push_back(TR);
   }
@@ -497,18 +792,18 @@ TypeRefBuilder::getClosureContextInfo(RemoteRef<CaptureDescriptor> CD) {
   for (auto i = CD->source_begin(), e = CD->source_end(); i != e; ++i) {
     const TypeRef *TR = nullptr;
     auto MSR = CD.getField(*i);
-    
+
     if (MSR->hasMangledTypeName()) {
+      TypeRefBuilder::ScopedNodeFactoryCheckpoint checkpoint(&Builder);
       auto MangledName = readTypeRef(MSR, MSR->MangledTypeName);
-      auto DemangleTree = demangleTypeRef(MangledName);
-      TR = decodeMangledType(DemangleTree);
-      clearNodeFactory();
+      auto DemangleTree = Builder.demangleTypeRef(MangledName);
+      TR = Builder.decodeMangledType(DemangleTree);
     }
 
     const MetadataSource *MS = nullptr;
     if (MSR->hasMangledMetadataSource()) {
-      auto MangledMetadataSource =
-        getTypeRefString(readTypeRef(MSR, MSR->MangledMetadataSource));
+      auto MangledMetadataSource = Builder.getTypeRefString(
+          readTypeRef(MSR, MSR->MangledMetadataSource));
       MS = MetadataSource::decode(MSB, MangledMetadataSource.str());
     }
 
@@ -524,17 +819,17 @@ TypeRefBuilder::getClosureContextInfo(RemoteRef<CaptureDescriptor> CD) {
 /// Dumping reflection metadata
 ///
 
-void TypeRefBuilder::dumpTypeRef(RemoteRef<char> MangledName,
-                                 std::ostream &stream, bool printTypeName) {
-  auto DemangleTree = demangleTypeRef(MangledName);
+void TypeRefBuilder::ReflectionTypeDescriptorFinder::dumpTypeRef(
+    RemoteRef<char> MangledName, std::ostream &stream, bool printTypeName) {
+  TypeRefBuilder::ScopedNodeFactoryCheckpoint checkpoint(&Builder);
+  auto DemangleTree = Builder.demangleTypeRef(MangledName);
   auto TypeName = nodeToString(DemangleTree);
   stream << TypeName << "\n";
-  auto Result = swift::Demangle::decodeMangledType(*this, DemangleTree);
-  clearNodeFactory();
+  auto Result = swift::Demangle::decodeMangledType(Builder, DemangleTree);
   if (Result.isError()) {
     auto *Error = Result.getError();
     char *ErrorStr = Error->copyErrorString();
-    auto str = getTypeRefString(MangledName);
+    auto str = Builder.getTypeRefString(MangledName);
     stream << "!!! Invalid typeref: " << str.str() << " - " << ErrorStr << "\n";
     Error->freeErrorString(ErrorStr);
     return;
@@ -544,18 +839,22 @@ void TypeRefBuilder::dumpTypeRef(RemoteRef<char> MangledName,
   stream << "\n";
 }
 
-FieldTypeCollectionResult TypeRefBuilder::collectFieldTypes(
-    llvm::Optional<std::string> forMangledTypeName) {
+FieldTypeCollectionResult
+TypeRefBuilder::ReflectionTypeDescriptorFinder::collectFieldTypes(
+    std::optional<std::string> forMangledTypeName) {
   FieldTypeCollectionResult result;
   for (const auto &sections : ReflectionInfos) {
     for (auto descriptor : sections.Field) {
-      auto typeRef = readTypeRef(descriptor, descriptor->MangledTypeName);
-      auto typeName = nodeToString(demangleTypeRef(typeRef));
-      auto optionalMangledTypeName = normalizeReflectionName(typeRef);
-      clearNodeFactory();
+      std::optional<std::string> optionalMangledTypeName;
+      std::string typeName;
+      {
+        TypeRefBuilder::ScopedNodeFactoryCheckpoint checkpoint(&Builder);
+        auto typeRef = readTypeRef(descriptor, descriptor->MangledTypeName);
+        typeName = nodeToString(Builder.demangleTypeRef(typeRef));
+        optionalMangledTypeName = normalizeReflectionName(typeRef);
+      }
       if (optionalMangledTypeName.has_value()) {
-        auto mangledTypeName =
-          optionalMangledTypeName.value();
+        auto mangledTypeName = optionalMangledTypeName.value();
         if (forMangledTypeName.has_value()) {
           if (mangledTypeName != forMangledTypeName.value())
             continue;
@@ -565,7 +864,8 @@ FieldTypeCollectionResult TypeRefBuilder::collectFieldTypes(
         std::vector<EnumCaseInfo> enumCases;
         for (auto &fieldRef : *descriptor.getLocalBuffer()) {
           auto field = descriptor.getField(fieldRef);
-          auto fieldName = getTypeRefString(readTypeRef(field, field->FieldName));
+          auto fieldName =
+              Builder.getTypeRefString(readTypeRef(field, field->FieldName));
           if (field->hasMangledTypeName()) {
             std::string mangledFieldTypeName =
                 std::string(field->MangledTypeName);
@@ -575,7 +875,7 @@ FieldTypeCollectionResult TypeRefBuilder::collectFieldTypes(
             if (optionalMangledfieldTypeName.has_value()) {
               mangledFieldTypeName = optionalMangledfieldTypeName.value();
             }
-            auto fieldTypeDemangleTree = demangleTypeRef(fieldTypeRef);
+            auto fieldTypeDemangleTree = Builder.demangleTypeRef(fieldTypeRef);
             auto fieldTypeName = nodeToString(fieldTypeDemangleTree);
             std::stringstream OS;
             dumpTypeRef(fieldTypeRef, OS);
@@ -586,8 +886,8 @@ FieldTypeCollectionResult TypeRefBuilder::collectFieldTypes(
             enumCases.emplace_back(EnumCaseInfo{fieldName.str()});
           }
         }
-        result.FieldInfos.emplace_back(FieldMetadata{
-            mangledTypeName, typeName, properties, enumCases});
+        result.FieldInfos.emplace_back(
+            FieldMetadata{mangledTypeName, typeName, properties, enumCases});
       }
     }
   }
@@ -595,9 +895,10 @@ FieldTypeCollectionResult TypeRefBuilder::collectFieldTypes(
   return result;
 }
 
-void TypeRefBuilder::dumpFieldSection(std::ostream &stream) {
+void TypeRefBuilder::ReflectionTypeDescriptorFinder::dumpFieldSection(
+    std::ostream &stream) {
   auto fieldInfoCollectionResult =
-      collectFieldTypes(llvm::Optional<std::string>());
+      collectFieldTypes(std::optional<std::string>());
   for (const auto &info : fieldInfoCollectionResult.FieldInfos) {
     stream << info.FullyQualifiedName << "\n";
     for (size_t i = 0; i < info.FullyQualifiedName.size(); ++i)
@@ -615,13 +916,14 @@ void TypeRefBuilder::dumpFieldSection(std::ostream &stream) {
   }
 }
 
-void TypeRefBuilder::dumpBuiltinTypeSection(std::ostream &stream) {
+void TypeRefBuilder::ReflectionTypeDescriptorFinder::dumpBuiltinTypeSection(
+    std::ostream &stream) {
   for (const auto &sections : ReflectionInfos) {
     for (auto descriptor : sections.Builtin) {
-      auto typeNode =
-          demangleTypeRef(readTypeRef(descriptor, descriptor->TypeName));
+      TypeRefBuilder::ScopedNodeFactoryCheckpoint checkpoint(&Builder);
+      auto typeNode = Builder.demangleTypeRef(
+          readTypeRef(descriptor, descriptor->TypeName));
       auto typeName = nodeToString(typeNode);
-      clearNodeFactory();
 
       stream << "\n- " << typeName << ":\n";
       stream << "Size: " << descriptor->Size << "\n";
@@ -658,7 +960,8 @@ void ClosureContextInfo::dump(std::ostream &stream) const {
   stream << "\n";
 }
 
-void TypeRefBuilder::dumpCaptureSection(std::ostream &stream) {
+void TypeRefBuilder::ReflectionTypeDescriptorFinder::dumpCaptureSection(
+    std::ostream &stream) {
   for (const auto &sections : ReflectionInfos) {
     for (const auto descriptor : sections.Capture) {
       auto info = getClosureContextInfo(descriptor);
@@ -667,13 +970,14 @@ void TypeRefBuilder::dumpCaptureSection(std::ostream &stream) {
   }
 }
 
-void TypeRefBuilder::dumpMultiPayloadEnumSection(std::ostream &stream) {
+void TypeRefBuilder::ReflectionTypeDescriptorFinder::
+    dumpMultiPayloadEnumSection(std::ostream &stream) {
   for (const auto &sections : ReflectionInfos) {
     for (const auto descriptor : sections.MultiPayloadEnum) {
-      auto typeNode =
-          demangleTypeRef(readTypeRef(descriptor, descriptor->TypeName));
+      TypeRefBuilder::ScopedNodeFactoryCheckpoint checkpoint(&Builder);
+      auto typeNode = Builder.demangleTypeRef(
+          readTypeRef(descriptor, descriptor->TypeName));
       auto typeName = nodeToString(typeNode);
-      clearNodeFactory();
 
       stream << "\n- " << typeName << ":\n";
       stream << "  Descriptor Size: " << descriptor->getSizeInBytes() << "\n";
@@ -692,7 +996,7 @@ void TypeRefBuilder::dumpMultiPayloadEnumSection(std::ostream &stream) {
         }
         const uint8_t *p = descriptor->getPayloadSpareBits();
         for (unsigned i = 0; i < maskBytes; i++) {
-          stream << std::hex << std::setw(2) << std::setfill('0') << p[i];
+          stream << std::hex << std::setw(2) << std::setfill('0') << (int)p[i];
         }
         stream << std::dec << "\n";
       }

@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen -module-name dynamic_lookup -enable-objc-interop -parse-as-library -disable-objc-attr-requires-foundation-module -disable-availability-checking %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen -module-name dynamic_lookup -enable-objc-interop -parse-as-library -disable-objc-attr-requires-foundation-module -disable-availability-checking  %s | %FileCheck %s --check-prefix=GUARANTEED
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name dynamic_lookup -enable-objc-interop -parse-as-library -disable-objc-attr-requires-foundation-module -disable-availability-checking %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name dynamic_lookup -enable-objc-interop -parse-as-library -disable-objc-attr-requires-foundation-module -disable-availability-checking  %s | %FileCheck %s --check-prefix=GUARANTEED
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
@@ -54,7 +54,7 @@ func direct_to_static_method(_ obj: AnyObject) {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $AnyObject):
   var obj = obj
   // CHECK: [[OBJBOX:%[0-9]+]] = alloc_box ${ var AnyObject }
-  // CHECK: [[OBJLIFETIME:%[^,]+]] = begin_borrow [lexical] [[OBJBOX]]
+  // CHECK: [[OBJLIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[OBJBOX]]
   // CHECK-NEXT: [[PBOBJ:%[0-9]+]] = project_box [[OBJLIFETIME]]
   // CHECK: [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK: store [[ARG_COPY]] to [init] [[PBOBJ]] : $*AnyObject
@@ -76,12 +76,12 @@ func opt_to_class(_ obj: AnyObject) {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $AnyObject):
   var obj = obj
   // CHECK:   [[EXISTBOX:%[0-9]+]] = alloc_box ${ var AnyObject } 
-  // CHECK:   [[EXISTLIFETIME:%[^,]+]] = begin_borrow [lexical] [[EXISTBOX]]
+  // CHECK:   [[EXISTLIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[EXISTBOX]]
   // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[EXISTLIFETIME]]
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK:   store [[ARG_COPY]] to [init] [[PBOBJ]]
   // CHECK:   [[OPTBOX:%[0-9]+]] = alloc_box ${ var Optional<@callee_guaranteed () -> ()> }
-  // CHECK:   [[OPTLIFETIME:%[^,]+]] = begin_borrow [lexical] [[OPTBOX]]
+  // CHECK:   [[OPTLIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[OPTBOX]]
   // CHECK:   [[PBOPT:%.*]] = project_box [[OPTLIFETIME]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
   // CHECK:   [[EXISTVAL:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
@@ -148,12 +148,12 @@ func opt_to_static_method(_ obj: AnyObject) {
   var obj = obj
   // CHECK: bb0([[OBJ:%[0-9]+]] : @guaranteed $AnyObject):
   // CHECK:   [[OBJBOX:%[0-9]+]] = alloc_box ${ var AnyObject }
-  // CHECK:   [[OBJLIFETIME:%[^,]+]] = begin_borrow [lexical] [[OBJBOX]]
+  // CHECK:   [[OBJLIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[OBJBOX]]
   // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJLIFETIME]]
   // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
   // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
   // CHECK:   [[OPTBOX:%[0-9]+]] = alloc_box ${ var Optional<@callee_guaranteed () -> ()> }
-  // CHECK:   [[OPTLIFETIME:%[^,]+]] = begin_borrow [lexical] [[OPTBOX]]
+  // CHECK:   [[OPTLIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[OPTBOX]]
   // CHECK:   [[PBO:%.*]] = project_box [[OPTLIFETIME]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
   // CHECK:   [[OBJCOPY:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
@@ -170,12 +170,13 @@ func opt_to_property(_ obj: AnyObject) {
   var obj = obj
   // CHECK: bb0([[OBJ:%[0-9]+]] : @guaranteed $AnyObject):
   // CHECK:   [[OBJ_BOX:%[0-9]+]] = alloc_box ${ var AnyObject }
-  // CHECK:   [[OBJ_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[OBJ_BOX]]
+  // CHECK:   [[OBJ_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[OBJ_BOX]]
   // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_LIFETIME]]
   // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
   // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
   // CHECK:   [[INT_BOX:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK:   project_box [[INT_BOX]]
+  // CHECK:   [[INT_LIFETIME:%.*]] = begin_borrow [var_decl] [[INT_BOX]]
+  // CHECK:   project_box [[INT_LIFETIME]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
   // CHECK:   [[OBJ:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
   // CHECK:   [[RAWOBJ_SELF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject
@@ -200,12 +201,13 @@ func opt_to_property(_ obj: AnyObject) {
 // GUARANTEED-LABEL: sil hidden [ossa] @$s14dynamic_lookup15opt_to_property{{[_0-9a-zA-Z]*}}F
   // GUARANTEED: bb0([[OBJ:%[0-9]+]] : @guaranteed $AnyObject):
   // GUARANTEED:   [[OBJ_BOX:%[0-9]+]] = alloc_box ${ var AnyObject }
-  // GUARANTEED:   [[OBJ_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[OBJ_BOX]]
+  // GUARANTEED:   [[OBJ_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[OBJ_BOX]]
   // GUARANTEED:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_LIFETIME]]
   // GUARANTEED:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
   // GUARANTEED:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
   // GUARANTEED:   [[INT_BOX:%[0-9]+]] = alloc_box ${ var Int }
-  // GUARANTEED:   project_box [[INT_BOX]]
+  // GUARANTEED:   [[INT_LIFETIME:%.*]] = begin_borrow [var_decl] [[INT_BOX]]
+  // GUARANTEED:   project_box [[INT_LIFETIME]]
   // GUARANTEED:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
   // GUARANTEED:   [[OBJ:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
   // GUARANTEED:   [[RAWOBJ_SELF:%[0-9]+]] = open_existential_ref [[OBJ]] : $AnyObject
@@ -230,12 +232,13 @@ func direct_to_subscript(_ obj: AnyObject, i: Int) {
   var i = i
   // CHECK: bb0([[OBJ:%[0-9]+]] : @guaranteed $AnyObject, [[I:%[0-9]+]] : $Int):
   // CHECK:   [[OBJ_BOX:%[0-9]+]] = alloc_box ${ var AnyObject }
-  // CHECK:   [[OBJ_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[OBJ_BOX]]
+  // CHECK:   [[OBJ_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[OBJ_BOX]]
   // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_LIFETIME]]
   // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
   // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
   // CHECK:   [[I_BOX:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK:   [[PBI:%.*]] = project_box [[I_BOX]]
+  // CHECK:   [[I_LIFETIME:%.*]] = begin_borrow [var_decl] [[I_BOX]]
+  // CHECK:   [[PBI:%.*]] = project_box [[I_LIFETIME]]
   // CHECK:   store [[I]] to [trivial] [[PBI]] : $*Int
   // CHECK:   alloc_box ${ var Int }
   // CHECK:   project_box
@@ -265,12 +268,13 @@ func direct_to_subscript(_ obj: AnyObject, i: Int) {
 // GUARANTEED-LABEL: sil hidden [ossa] @$s14dynamic_lookup19direct_to_subscript{{[_0-9a-zA-Z]*}}F
   // GUARANTEED: bb0([[OBJ:%[0-9]+]] : @guaranteed $AnyObject, [[I:%[0-9]+]] : $Int):
   // GUARANTEED:   [[OBJ_BOX:%[0-9]+]] = alloc_box ${ var AnyObject }
-  // GUARANTEED:   [[OBJ_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[OBJ_BOX]]
+  // GUARANTEED:   [[OBJ_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[OBJ_BOX]]
   // GUARANTEED:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_LIFETIME]]
   // GUARANTEED:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
   // GUARANTEED:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
   // GUARANTEED:   [[I_BOX:%[0-9]+]] = alloc_box ${ var Int }
-  // GUARANTEED:   [[PBI:%.*]] = project_box [[I_BOX]]
+  // GUARANTEED:   [[I_LIFETIME:%.*]] = begin_borrow [var_decl] [[I_BOX]]
+  // GUARANTEED:   [[PBI:%.*]] = project_box [[I_LIFETIME]]
   // GUARANTEED:   store [[I]] to [trivial] [[PBI]] : $*Int
   // GUARANTEED:   alloc_box ${ var Int }
   // GUARANTEED:   project_box
@@ -300,12 +304,13 @@ func opt_to_subscript(_ obj: AnyObject, i: Int) {
   var i = i
   // CHECK: bb0([[OBJ:%[0-9]+]] : @guaranteed $AnyObject, [[I:%[0-9]+]] : $Int):
   // CHECK:   [[OBJ_BOX:%[0-9]+]] = alloc_box ${ var AnyObject }
-  // CHECK:   [[OBJ_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[OBJ_BOX]]
+  // CHECK:   [[OBJ_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[OBJ_BOX]]
   // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_LIFETIME]]
   // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
   // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
   // CHECK:   [[I_BOX:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK:   [[PBI:%.*]] = project_box [[I_BOX]]
+  // CHECK:   [[I_LIFETIME:%.*]] = begin_borrow [var_decl] [[I_BOX]]
+  // CHECK:   [[PBI:%.*]] = project_box [[I_LIFETIME]]
   // CHECK:   store [[I]] to [trivial] [[PBI]] : $*Int
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PBOBJ]]
   // CHECK:   [[OBJ:%[0-9]+]] = load [copy] [[READ]] : $*AnyObject
@@ -334,7 +339,7 @@ func downcast(_ obj: AnyObject) -> X {
   var obj = obj
   // CHECK: bb0([[OBJ:%[0-9]+]] : @guaranteed $AnyObject):
   // CHECK:   [[OBJ_BOX:%[0-9]+]] = alloc_box ${ var AnyObject }
-  // CHECK:   [[OBJ_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[OBJ_BOX]]
+  // CHECK:   [[OBJ_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[OBJ_BOX]]
   // CHECK:   [[PBOBJ:%[0-9]+]] = project_box [[OBJ_LIFETIME]]
   // CHECK:   [[OBJ_COPY:%.*]] = copy_value [[OBJ]]
   // CHECK:   store [[OBJ_COPY]] to [init] [[PBOBJ]] : $*AnyObject
@@ -403,26 +408,4 @@ func testAnyObjectWithDefault(_ x: AnyObject) {
   // CHECK: [[METHOD:%[0-9]+]] = objc_method [[OPENEDX:%[0-9]+]] : $@opened("{{.*}}", AnyObject) Self, #X.hasDefaultParam!foreign : (X) -> (Int) -> (), $@convention(objc_method) (Int, @opened("{{.*}}", AnyObject) Self) -> ()
   // CHECK: apply [[METHOD]]([[DEFARG]], [[OPENEDX]])
   x.hasDefaultParam()
-}
-
-
-// rdar://97646309 -- lookup and direct call of an optional global-actor constrained method would crash in SILGen
-@MainActor
-@objc protocol OptionalMemberLookups {
-  @objc optional func generateMaybe() async
-}
-
-extension OptionalMemberLookups {
-  // CHECK-LABEL: sil hidden [ossa] @$s14dynamic_lookup21OptionalMemberLookupsPAAE19testForceDirectCallyyYaF
-  // CHECK:         [[SELF:%[0-9]+]] = copy_value {{.*}} : $Self
-  // CHECK:         [[METH:%[0-9]+]] = objc_method {{.*}} : $Self, #OptionalMemberLookups.generateMaybe!foreign : <Self where Self : OptionalMemberLookups> (Self) -> () async -> (), $@convention(objc_method) (@convention(block) () -> (), Self) -> ()
-  // CHECK:         = function_ref @$sIeyB_yt14dynamic_lookup21OptionalMemberLookupsRzlTz_ : $@convention(c) @pseudogeneric <τ_0_0 where τ_0_0 : OptionalMemberLookups> (@inout_aliasable @block_storage UnsafeContinuation<(), Never>) -> ()
-  // CHECK:         [[BLOCK:%[0-9]+]] = init_block_storage_header {{.*}} : $*@block_storage UnsafeContinuation<(), Never>
-  // CHECK:         = apply [[METH]]([[BLOCK]], [[SELF]]) : $@convention(objc_method) (@convention(block) () -> (), Self) -> ()
-  // CHECK:         await_async_continuation {{.*}} : $Builtin.RawUnsafeContinuation, resume bb1
-  // CHECK:         hop_to_executor {{.*}} : $MainActor
-  // CHECK:        } // end sil function '$s14dynamic_lookup21OptionalMemberLookupsPAAE19testForceDirectCallyyYaF'
-  func testForceDirectCall() async -> Void {
-    await self.generateMaybe!()
-  }
 }

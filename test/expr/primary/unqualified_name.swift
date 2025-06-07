@@ -46,7 +46,7 @@ struct S0 {
 }
 
 // Determine context from type.
-let s0_static: S0 = .f3(_:y:z:)(0, y: 0, z: 0)
+let s0_static: S0 = .f3(_:y:z:)(0, 0, 0)
 
 class C0 {
   init(x: Int, y: Int, z: Int) { }

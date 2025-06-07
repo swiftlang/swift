@@ -64,16 +64,16 @@ case _ where x % 2 == 0,
   x = 1
 case var y where y % 2 == 0:
   x = y + 1
-case _ where 0: // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+case _ where 0: // expected-error {{integer literal value '0' cannot be used as a boolean; did you mean 'false'?}}
   x = 0
 default:
   x = 1
 }
 
 // Multiple cases per case block
-switch x { // expected-error {{switch must be exhaustive}} expected-note{{do you want to add a default clause?}}
+switch x { // expected-error {{switch must be exhaustive}} expected-note{{add a default clause}}
 case 0: // expected-error {{'case' label in a 'switch' must have at least one executable statement}} {{8-8= break}}
-case 1:
+case 1, case 2: // expected-error {{extraneous 'case' keyword in pattern}} {{9-14=}}
   x = 0
 }
 
@@ -83,7 +83,7 @@ default:
   x = 0
 }
 
-switch x { // expected-error {{switch must be exhaustive}} expected-note{{do you want to add a default clause?}}
+switch x { // expected-error {{switch must be exhaustive}} expected-note{{add a default clause}}
 case 0:
   x = 0
 case 1: // expected-error {{'case' label in a 'switch' must have at least one executable statement}} {{8-8= break}}
@@ -95,7 +95,7 @@ case 0:
 default: // expected-error {{'default' label in a 'switch' must have at least one executable statement}} {{9-9= break}}
 }
 
-switch x { // expected-error {{switch must be exhaustive}} expected-note{{do you want to add a default clause?}}
+switch x { // expected-error {{switch must be exhaustive}} expected-note{{add a default clause}}
 case 0:
   ; // expected-error {{';' statements are not allowed}} {{3-5=}}
 case 1:
@@ -142,22 +142,22 @@ default: // expected-error{{additional 'case' blocks cannot appear after the 'de
   x = 0
 }
 
-switch x { // expected-error {{switch must be exhaustive}} expected-note{{do you want to add a default clause?}}
+switch x { // expected-error {{switch must be exhaustive}} expected-note{{add a default clause}}
 default where x == 0: // expected-error{{'default' cannot be used with a 'where' guard expression}}
   x = 0
 }
 
-switch x { // expected-error {{switch must be exhaustive}} expected-note{{do you want to add a default clause?}}
+switch x { // expected-error {{switch must be exhaustive}} expected-note{{add a default clause}}
 case 0: // expected-error {{'case' label in a 'switch' must have at least one executable statement}} {{8-8= break}}
 }
 
-switch x { // expected-error {{switch must be exhaustive}} expected-note{{do you want to add a default clause?}}
+switch x { // expected-error {{switch must be exhaustive}} expected-note{{add a default clause}}
 case 0: // expected-error{{'case' label in a 'switch' must have at least one executable statement}} {{8-8= break}}
 case 1:
   x = 0
 }
 
-switch x { // expected-error {{switch must be exhaustive}} expected-note{{do you want to add a default clause?}}
+switch x { // expected-error {{switch must be exhaustive}} expected-note{{add a default clause}}
 case 0:
   x = 0
 case 1: // expected-error{{'case' label in a 'switch' must have at least one executable statement}} {{8-8= break}}
@@ -299,7 +299,7 @@ func patternVarDiffMutability(x: Int, y: Double) {
 }
 
 func test_label(x : Int) {
-Gronk: // expected-error {{switch must be exhaustive}} expected-note{{do you want to add a default clause?}}
+Gronk: // expected-error {{switch must be exhaustive}} expected-note{{add a default clause}}
   switch x {
   case 42: return
   }
@@ -637,7 +637,7 @@ func testReturnBeforeIncompleteUnknownDefault() {
 }
 
 func testReturnBeforeIncompleteUnknownDefault2() {
-  switch x { // expected-error {{switch must be exhaustive}} expected-note {{do you want to add a default clause?}}
+  switch x { // expected-error {{switch must be exhaustive}} expected-note {{add a default clause}}
   case 1:
     return
   @unknown // expected-error {{unknown attribute 'unknown'}}

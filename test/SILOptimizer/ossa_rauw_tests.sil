@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -optimized-mandatory-combine -sil-mandatory-combine-enable-canon-and-simple-dce -semantic-arc-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -update-borrowed-from -sil-combine -semantic-arc-opts %s | %FileCheck %s
 
 // Make sure that we can perform all of these RAUW without producing ARC traffic
 // that semantic arc opts can't eliminate.
@@ -189,23 +189,21 @@ bb0(%0 : @owned $Klass):
 // CHECK-NOT: destroy_value
 //
 // CHECK: bb2:
-// CHECK-NEXT: [[COPY:%.*]] = copy_value [[ARG]]
 // CHECK-NEXT: cond_br undef, bb3, bb4
 //
 // CHECK: bb3:
-// CHECK-NEXT: destroy_value [[COPY]]
 // CHECK-NEXT: br bb2
 //
 // CHECK: bb4:
-// CHECK-NEXT: [[ENUM_SOME_RESULT:%.*]] = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, [[COPY]]
+// CHECK-NEXT: [[ENUM_SOME_RESULT:%.*]] = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, [[ARG]]
 // CHECK-NEXT: br bb6([[ENUM_SOME_RESULT]] : $FakeOptional<Klass>)
 //
 // CHECK: bb5:
+// CHECK-NEXT: destroy_value [[ARG]]
 // CHECK-NEXT: [[ENUM_NONE_RESULT:%.*]] = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
 // CHECK-NEXT: br bb6([[ENUM_NONE_RESULT]] :
 //
 // CHECK: bb6([[RESULT:%.*]] : @owned $FakeOptional<Klass>):
-// CHECK-NEXT: destroy_value [[ARG]]
 // CHECK-NEXT: return [[RESULT]]
 // CHECK: } // end sil function 'unowned_to_owned_rauw_loop'
 sil [ossa] @unowned_to_owned_rauw_loop : $@convention(thin) (@owned Klass) -> @owned FakeOptional<Klass> {
@@ -258,19 +256,18 @@ bb0(%0 : @guaranteed $Klass):
 // CHECK-NOT: destroy_value
 //
 // CHECK: bb2:
-// CHECK-NEXT: [[COPY:%.*]] = copy_value [[ARG]]
 // CHECK-NEXT: cond_br undef, bb3, bb4
 //
 // CHECK: bb3:
-// CHECK-NEXT: destroy_value [[COPY]]
 // CHECK-NEXT: br bb2
 //
 // CHECK: bb4:
-// CHECK-NEXT: [[ENUM_SOME_RESULT:%.*]] = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, [[COPY]]
-// CHECK-NEXT: br bb6([[ENUM_SOME_RESULT]] : $FakeOptional<Klass>)
+// CHECK-NEXT: [[ENUM_SOME_RESULT:%.*]] = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0
+// CHECK-NEXT: [[COPY:%.*]] = copy_value [[ENUM_SOME_RESULT]]
+// CHECK-NEXT: br bb6([[COPY]] : $FakeOptional<Klass>)
 //
 // CHECK: bb5:
-// CHECK-NEXT: [[ENUM_NONE_RESULT:%.*]] = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt // user: %10
+// CHECK-NEXT: [[ENUM_NONE_RESULT:%.*]] = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
 // CHECK-NEXT: br bb6([[ENUM_NONE_RESULT]] :
 //
 // CHECK: bb6([[RESULT:%.*]] : @owned $FakeOptional<Klass>):
@@ -340,7 +337,6 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
 // CHECK-LABEL: sil [ossa] @unowned_to_guaranteed_rauw_2b : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Klass {
 // CHECK: bb0(
 // CHECK-NEXT: unchecked_ref_cast
-// CHECK-NEXT: unchecked_ownership_conversion
 // CHECK-NEXT: return
 // CHECK: } // end sil function 'unowned_to_guaranteed_rauw_2b'
 sil [ossa] @unowned_to_guaranteed_rauw_2b : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Klass {
@@ -721,13 +717,11 @@ bb0(%0 : @owned $Klass):
   return %3 : $Klass
 }
 
-// In this case, we need to perform the interior pointer lifetime extension.
-//
-// CHECK-LABEL: sil [ossa] @interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext : $@convention(thin) (@owned Klass) -> @owned Klass {
-// CHECK-NOT: address_to_pointer
-// CHECK-NOT: pointer_to_address
-// CHECK: } // end sil function 'interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext'
-sil [ossa] @interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext : $@convention(thin) (@owned Klass) -> @owned Klass {
+// CHECK-LABEL: sil [ossa] @invalid_use_after_lifetime1 :
+// CHECK:         address_to_pointer
+// CHECK:         pointer_to_address
+// CHECK:       } // end sil function 'invalid_use_after_lifetime1'
+sil [ossa] @invalid_use_after_lifetime1 : $@convention(thin) (@owned Klass) -> @owned Klass {
 bb0(%0 : @owned $Klass):
   %0a = begin_borrow %0 : $Klass
   %0b = ref_element_addr %0a : $Klass, #Klass.field
@@ -739,11 +733,11 @@ bb0(%0 : @owned $Klass):
   return %3 : $Klass
 }
 
-// CHECK-LABEL: sil [ossa] @interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_with_proj : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
-// CHECK-NOT: address_to_pointer
-// CHECK-NOT: pointer_to_address
-// CHECK: } // end sil function 'interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_with_proj'
-sil [ossa] @interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_with_proj : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
+// CHECK-LABEL: sil [ossa] @invalid_use_after_lifetime2 :
+// CHECK:         address_to_pointer
+// CHECK:         pointer_to_address
+// CHECK:       } // end sil function 'invalid_use_after_lifetime2'
+sil [ossa] @invalid_use_after_lifetime2 : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
 bb0(%0 : @owned $Klass):
   %0a = begin_borrow %0 : $Klass
   %0b = ref_element_addr %0a : $Klass, #Klass.structField
@@ -756,32 +750,12 @@ bb0(%0 : @owned $Klass):
   return %3 : $Builtin.NativeObject
 }
 
-// Make sure we inserted everything in the right places rather than using the
-// ownership verifier.
-//
-// CHECK-LABEL: sil [ossa] @interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_with_proj_2 : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
-// CHECK: bb0([[ARG:%.*]] : @owned
-// CHECK-NEXT: br bb1
-//
-// CHECK: bb1:
-// CHECK-NEXT: br bb2
-//
-// CHECK: bb2:
-// CHECK-NEXT: [[BORROWED_ARG:%.*]] = begin_borrow [[ARG]]
-// CHECK-NEXT: [[NEW_INT_PTR:%.*]] = ref_element_addr [[BORROWED_ARG]]
-// CHECK-NEXT: [[NEW_GEP:%.*]] = struct_element_addr [[NEW_INT_PTR]]
-// CHECK-NEXT: br bb3
-//
-// CHECK: bb3:
-// CHECK-NEXT: br bb4
-//
-// CHECK: bb4:
-// CHECK-NEXT: [[RESULT:%.*]] = load [copy] [[NEW_GEP]] :
-// CHECK-NEXT: end_borrow [[BORROWED_ARG]]
-// CHECK-NEXT: destroy_value [[ARG]]
-// CHECK-NEXT: return [[RESULT]]
-// CHECK-NEXT: } // end sil function 'interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_with_proj_2'
-sil [ossa] @interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_with_proj_2 : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
+// CHECK-LABEL: sil [ossa] @invalid_use_after_lifetime3 :
+// CHECK:       bb2:
+// CHECK-NEXT:    address_to_pointer
+// CHECK-NEXT:    pointer_to_address
+// CHECK:       } // end sil function 'invalid_use_after_lifetime3'
+sil [ossa] @invalid_use_after_lifetime3 : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
 bb0(%0 : @owned $Klass):
   %0a = begin_borrow %0 : $Klass
   br bb1
@@ -806,41 +780,12 @@ bb4:
   return %3 : $Builtin.NativeObject
 }
 
-// Make sure we inserted everything in the right places rather than using the
-// ownership verifier given we can't eliminate the underlying RAUW.
-//
-// CHECK-LABEL: sil [ossa] @interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_with_proj_3 : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
-// CHECK: bb0([[ARG:%.*]] : @owned
-// CHECK-NEXT: [[ORIGINAL_BORROW:%.*]] = begin_borrow [[ARG]]
-// CHECK-NEXT: [[COPIED_ARG:%.*]] = copy_value [[ORIGINAL_BORROW]]
-// CHECK-NEXT: br bb1
-//
-// CHECK: bb1:
-// CHECK-NEXT: [[OLD_INT_PTR:%.*]] = ref_element_addr
-// CHECK-NEXT: [[OLD_GEP:%.*]] = struct_element_addr [[OLD_INT_PTR]]
-// CHECK-NEXT: br bb2
-//
-// CHECK: bb2:
-// CHECK-NEXT: // function_ref
-// CHECK-NEXT: [[USER:%.*]] = function_ref @
-// CHECK-NEXT: apply [[USER]]([[OLD_GEP]])
-// CHECK-NEXT: [[BORROWED_COPIED_ARG:%.*]] = begin_borrow [[COPIED_ARG]]
-// CHECK-NEXT: [[NEW_INT_PTR:%.*]] = ref_element_addr [[BORROWED_COPIED_ARG]]
-// CHECK-NEXT: [[NEW_GEP:%.*]] = struct_element_addr [[NEW_INT_PTR]]
-// CHECK-NEXT: br bb3
-//
-// CHECK: bb3:
-// CHECK-NEXT: end_borrow [[ORIGINAL_BORROW]]
-// CHECK-NEXT: br bb4
-//
-// CHECK: bb4:
-// CHECK-NEXT: [[RESULT:%.*]] = load [copy] [[NEW_GEP]]
-// CHECK-NEXT: end_borrow [[BORROWED_COPIED_ARG]]
-// CHECK-NEXT: destroy_value [[COPIED_ARG]]
-// CHECK-NEXT: destroy_value [[ARG]]
-// CHECK-NEXT: return [[RESULT]]
-// CHECK-NEXT: } // end sil function 'interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_with_proj_3'
-sil [ossa] @interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_with_proj_3 : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
+// CHECK-LABEL: sil [ossa] @invalid_use_after_lifetime4 :
+// CHECK:         apply
+// CHECK-NEXT:    address_to_pointer
+// CHECK-NEXT:    pointer_to_address
+// CHECK:       } // end sil function 'invalid_use_after_lifetime4'
+sil [ossa] @invalid_use_after_lifetime4 : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
 bb0(%0 : @owned $Klass):
   %0a = begin_borrow %0 : $Klass
   br bb1
@@ -867,11 +812,12 @@ bb4:
   return %3 : $Builtin.NativeObject
 }
 
-// CHECK-LABEL: sil [ossa] @interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_loop_1 : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
-// CHECK-NOT: address_to_pointer
-// CHECK-NOT: pointer_to_address
-// CHECK: } // end sil function 'interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_loop_1'
-sil [ossa] @interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_loop_1 : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
+// CHECK-LABEL: sil [ossa] @invalid_use_after_lifetime5 :
+// CHECK:         apply
+// CHECK-NEXT:    address_to_pointer
+// CHECK-NEXT:    pointer_to_address
+// CHECK:       } // end sil function 'invalid_use_after_lifetime5'
+sil [ossa] @invalid_use_after_lifetime5 : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
 bb0(%0 : @owned $Klass):
   %0a = begin_borrow %0 : $Klass
   br bb1
@@ -882,23 +828,23 @@ bb1:
   br bb2
 
 bb2:
-  br bbLoop
+  br bb3
 
-bbLoop:
+bb3:
   %f = function_ref @inguaranteed_nativeobject_user : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
   apply %f(%0c) : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
   %1 = address_to_pointer %0c : $*Builtin.NativeObject to $Builtin.RawPointer
   %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
-  cond_br undef, bbBackEdge, bb3
-
-bbBackEdge:
-  br bbLoop
-
-bb3:
-  end_borrow %0a : $Klass
-  br bb4
+  cond_br undef, bb4, bb5
 
 bb4:
+  br bb3
+
+bb5:
+  end_borrow %0a : $Klass
+  br bb6
+
+bb6:
   %3 = load [copy] %2 : $*Builtin.NativeObject
   destroy_value %0 : $Klass
   return %3 : $Builtin.NativeObject
@@ -919,37 +865,38 @@ bb1:
   br bb2
 
 bb2:
-  br bbLoop
+  br bb3
 
-bbLoop:
+bb3:
   %f = function_ref @inguaranteed_nativeobject_user : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
   apply %f(%0c) : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
   %1 = address_to_pointer %0c : $*Builtin.NativeObject to $Builtin.RawPointer
   %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
-  br bbLoop2
-
-bbLoop2:
-  %3 = load [copy] %2 : $*Builtin.NativeObject
-  cond_br undef, bbBackEdge, bb3
-
-bbBackEdge:
-  destroy_value %3 : $Builtin.NativeObject
-  br bbLoop
-
-bb3:
-  end_borrow %0a : $Klass
   br bb4
 
 bb4:
+  %3 = load [copy] %2 : $*Builtin.NativeObject
+  cond_br undef, bb5, bb6
+
+bb5:
+  destroy_value %3 : $Builtin.NativeObject
+  br bb3
+
+bb6:
+  end_borrow %0a : $Klass
+  br bb7
+
+bb7:
   destroy_value %0 : $Klass
   return %3 : $Builtin.NativeObject
 }
 
-// CHECK-LABEL: sil [ossa] @interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_loop_3 : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
-// CHECK-NOT: address_to_pointer
-// CHECK-NOT: pointer_to_address
-// CHECK: } // end sil function 'interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_loop_3'
-sil [ossa] @interior_pointer_lifetime_extension_int_ptr_need_lifetime_ext_loop_3 : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
+// CHECK-LABEL: sil [ossa] @invalid_use_after_lifetime6 :
+// CHECK:         apply
+// CHECK-NEXT:    address_to_pointer
+// CHECK-NEXT:    pointer_to_address
+// CHECK:       } // end sil function 'invalid_use_after_lifetime6'
+sil [ossa] @invalid_use_after_lifetime6 : $@convention(thin) (@owned Klass) -> @owned Builtin.NativeObject {
 bb0(%0 : @owned $Klass):
   %0a = begin_borrow %0 : $Klass
   br bb1
@@ -958,34 +905,34 @@ bb1:
   br bb2
 
 bb2:
-  br bbLoop(%0a : $Klass, undef : $Klass)
+  br bb3(%0a : $Klass, undef : $Klass)
 
-bbLoop(%arg : @guaranteed $Klass, %base : @owned $Klass):
+bb3(%arg : @guaranteed $Klass, %base : @owned $Klass):
   %0b = ref_element_addr %arg : $Klass, #Klass.structField
   %0c = struct_element_addr %0b : $*NativeObjectWrapper, #NativeObjectWrapper.obj
-  br bbLoop2
+  br bb4
 
-bbLoop2:
+bb4:
   %f = function_ref @inguaranteed_nativeobject_user : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
   apply %f(%0c) : $@convention(thin) (@in_guaranteed Builtin.NativeObject) -> ()
   %1 = address_to_pointer %0c : $*Builtin.NativeObject to $Builtin.RawPointer
   %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Builtin.NativeObject
-  br bbLoop3
+  br bb5
 
-bbLoop3:
+bb5:
   end_borrow %arg : $Klass
   destroy_value %base : $Klass
   %3 = load [copy] %2 : $*Builtin.NativeObject
-  cond_br undef, bbBackEdge, bb3
+  cond_br undef, bb6, bb7
 
-bbBackEdge:
+bb6:
   destroy_value %3 : $Builtin.NativeObject
-  br bbLoop(undef : $Klass, undef : $Klass)
+  br bb3(undef : $Klass, undef : $Klass)
 
-bb3:
-  br bb4
+bb7:
+  br bb8
 
-bb4:
+bb8:
   destroy_value %0 : $Klass
   return %3 : $Builtin.NativeObject
 }

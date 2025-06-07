@@ -247,8 +247,8 @@ extension MutableCollection where Self: RandomAccessCollection {
     by areInIncreasingOrder: (Element, Element) throws -> Bool
   ) rethrows {
     let didSortUnsafeBuffer: Void? =
-      try withContiguousMutableStorageIfAvailable { buffer in
-        try buffer._stableSortImpl(by: areInIncreasingOrder)
+      try unsafe withContiguousMutableStorageIfAvailable { buffer in
+        try unsafe buffer._stableSortImpl(by: areInIncreasingOrder)
       }
     if didSortUnsafeBuffer == nil {
       // Fallback since we can't use an unsafe buffer: sort into an outside
@@ -351,19 +351,19 @@ internal func _merge<Element>(
   buffer: UnsafeMutablePointer<Element>,
   by areInIncreasingOrder: (Element, Element) throws -> Bool
 ) rethrows -> Bool {
-  let lowCount = mid - low
-  let highCount = high - mid
+  let lowCount = unsafe mid - low
+  let highCount = unsafe high - mid
   
-  var destLow = low         // Lower bound of uninitialized storage
-  var bufferLow = buffer    // Lower bound of the initialized buffer
-  var bufferHigh = buffer   // Upper bound of the initialized buffer
+  var destLow = unsafe low         // Lower bound of uninitialized storage
+  var bufferLow = unsafe buffer    // Lower bound of the initialized buffer
+  var bufferHigh = unsafe buffer   // Upper bound of the initialized buffer
 
   // When we exit the merge, move any remaining elements from the buffer back
   // into `destLow` (aka the collection we're sorting). The buffer can have
   // remaining elements if `areIncreasingOrder` throws, or more likely if the
   // merge runs out of elements from the array before exhausting the buffer.
   defer {
-    destLow.moveInitialize(from: bufferLow, count: bufferHigh - bufferLow)
+    unsafe destLow.moveInitialize(from: bufferLow, count: bufferHigh - bufferLow)
   }
   
   if lowCount < highCount {
@@ -380,24 +380,24 @@ internal func _merge<Element>(
     // Buffer:  [4, 4, 7, 8, 9, x, ...]
     //           ^              ^
     //        bufferLow     bufferHigh
-    buffer.moveInitialize(from: low, count: lowCount)
-    bufferHigh = bufferLow + lowCount
+    unsafe buffer.moveInitialize(from: low, count: lowCount)
+    unsafe bufferHigh = unsafe bufferLow + lowCount
     
-    var srcLow = mid
+    var srcLow = unsafe mid
 
     // Each iteration moves the element that compares lower into `destLow`,
     // preferring the buffer when equal to maintain stability. Elements are
     // moved from either `bufferLow` or `srcLow`, with those pointers
     // incrementing as elements are moved.
-    while bufferLow < bufferHigh && srcLow < high {
-      if try areInIncreasingOrder(srcLow.pointee, bufferLow.pointee) {
-        destLow.moveInitialize(from: srcLow, count: 1)
-        srcLow += 1
+    while unsafe bufferLow < bufferHigh && srcLow < high {
+      if try unsafe areInIncreasingOrder(srcLow.pointee, bufferLow.pointee) {
+        unsafe destLow.moveInitialize(from: srcLow, count: 1)
+        unsafe srcLow += 1
       } else {
-        destLow.moveInitialize(from: bufferLow, count: 1)
-        bufferLow += 1
+        unsafe destLow.moveInitialize(from: bufferLow, count: 1)
+        unsafe bufferLow += 1
       }
-      destLow += 1
+      unsafe destLow += 1
     }
   } else {
     // Move the higher group of elements into the buffer, then traverse from
@@ -413,12 +413,12 @@ internal func _merge<Element>(
     // Buffer:                     [8, 8, 10, 12, 15, x, ...]
     //                              ^                 ^
     //                          bufferLow         bufferHigh
-    buffer.moveInitialize(from: mid, count: highCount)
-    bufferHigh = bufferLow + highCount
+    unsafe buffer.moveInitialize(from: mid, count: highCount)
+    unsafe bufferHigh = unsafe bufferLow + highCount
     
-    var destHigh = high
-    var srcHigh = mid
-    destLow = mid
+    var destHigh = unsafe high
+    var srcHigh = unsafe mid
+    unsafe destLow = unsafe mid
 
     // Each iteration moves the element that compares higher into `destHigh`,
     // preferring the buffer when equal to maintain stability. Elements are
@@ -427,20 +427,20 @@ internal func _merge<Element>(
     //
     // Note: At the start of each iteration, each `...High` pointer points one
     // past the element they're referring to.
-    while bufferHigh > bufferLow && srcHigh > low {
-      destHigh -= 1
-      if try areInIncreasingOrder(
+    while unsafe bufferHigh > bufferLow && srcHigh > low {
+      unsafe destHigh -= 1
+      if try unsafe areInIncreasingOrder(
         (bufferHigh - 1).pointee, (srcHigh - 1).pointee
       ) {
-        srcHigh -= 1
-        destHigh.moveInitialize(from: srcHigh, count: 1)
+        unsafe srcHigh -= 1
+        unsafe destHigh.moveInitialize(from: srcHigh, count: 1)
         
         // Moved an element from the lower initialized portion to the upper,
         // sorted, initialized portion, so `destLow` moves down one.
-        destLow -= 1
+        unsafe destLow -= 1
       } else {
-        bufferHigh -= 1
-        destHigh.moveInitialize(from: bufferHigh, count: 1)
+        unsafe bufferHigh -= 1
+        unsafe destHigh.moveInitialize(from: bufferHigh, count: 1)
       }
     }
   }
@@ -535,7 +535,7 @@ extension UnsafeMutableBufferPointer {
     let middle = runs[i].lowerBound
     let high = runs[i].upperBound
     
-    try _merge(
+    try unsafe _merge(
       low: baseAddress! + low,
       mid: baseAddress! + middle,
       high: baseAddress! + high,
@@ -620,7 +620,7 @@ extension UnsafeMutableBufferPointer {
       }
       
       // Merge the runs at `i` and `i - 1`.
-      try _mergeRuns(
+      try unsafe _mergeRuns(
         &runs, at: lastIndex, buffer: buffer, by: areInIncreasingOrder)
     }
 
@@ -646,7 +646,7 @@ extension UnsafeMutableBufferPointer {
     by areInIncreasingOrder: (Element, Element) throws -> Bool
   ) rethrows -> Bool {
     while runs.count > 1 {
-      try _mergeRuns(
+      try unsafe _mergeRuns(
         &runs, at: runs.count - 1, buffer: buffer, by: areInIncreasingOrder)
     }
 
@@ -664,7 +664,7 @@ extension UnsafeMutableBufferPointer {
   ) rethrows {
     let minimumRunLength = _minimumMergeRunLength(count)
     if count <= minimumRunLength {
-      try _insertionSort(
+      try unsafe _insertionSort(
         within: startIndex..<endIndex, by: areInIncreasingOrder)
       return
     }
@@ -675,7 +675,7 @@ extension UnsafeMutableBufferPointer {
     //
     // There's no need to set the initialized count within the initializing
     // closure, since the buffer is guaranteed to be uninitialized at exit.
-    _ = try Array<Element>(_unsafeUninitializedCapacity: count / 2) {
+    _ = try unsafe Array<Element>(_unsafeUninitializedCapacity: count / 2) {
       buffer, _ in
       var runs: [Range<Index>] = []
       
@@ -683,16 +683,16 @@ extension UnsafeMutableBufferPointer {
       while start < endIndex {
         // Find the next consecutive run, reversing it if necessary.
         var (end, descending) =
-          try _findNextRun(in: self, from: start, by: areInIncreasingOrder)
+          unsafe try _findNextRun(in: self, from: start, by: areInIncreasingOrder)
         if descending {
-          _reverse(within: start..<end)
+          unsafe _reverse(within: start..<end)
         }
         
         // If the current run is shorter than the minimum length, use the
         // insertion sort to extend it.
         if end < endIndex && end - start < minimumRunLength {
           let newEnd = Swift.min(endIndex, start + minimumRunLength)
-          try _insertionSort(
+          try unsafe _insertionSort(
             within: start..<newEnd, sortedEnd: end, by: areInIncreasingOrder)
           end = newEnd
         }
@@ -700,12 +700,12 @@ extension UnsafeMutableBufferPointer {
         // Append this run and merge down as needed to maintain the `runs`
         // invariants.
         runs.append(start..<end)
-        try _mergeTopRuns(
+        try unsafe _mergeTopRuns(
           &runs, buffer: buffer.baseAddress!, by: areInIncreasingOrder)
         start = end
       }
       
-      try _finalizeRuns(
+      try unsafe _finalizeRuns(
         &runs, buffer: buffer.baseAddress!, by: areInIncreasingOrder)
       _internalInvariant(runs.count == 1, "Didn't complete final merge")
     }

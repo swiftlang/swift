@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-sil -verify %s -warn-redundant-requirements | %FileCheck %s -check-prefix=CHECK-SIL
+// RUN: %target-swift-emit-sil -verify %s | %FileCheck %s -check-prefix=CHECK-SIL
 
 import _Differentiation
 
@@ -51,12 +51,12 @@ func foo<T>(_ x: Wrapper<T>) {
 
 // Test case where associated derivative function's requirements are met.
 extension Wrapper where Scalar : Numeric {
-  @differentiable(reverse, wrt: self where Scalar : Differentiable & FloatingPoint) // expected-warning {{redundant conformance constraint 'Scalar' : 'Differentiable'}}
+  @differentiable(reverse, wrt: self where Scalar : Differentiable & FloatingPoint) 
   func mean() -> Wrapper {
     return self
   }
 
-  @differentiable(reverse, wrt: self where Scalar : Differentiable & FloatingPoint) // expected-warning {{redundant conformance constraint 'Scalar' : 'Differentiable'}}
+  @differentiable(reverse, wrt: self where Scalar : Differentiable & FloatingPoint)
   func variance() -> Wrapper {
     return mean() // ok
   }
@@ -249,27 +249,6 @@ extension TF_682_Proto where Self : Differentiable,
     return (lhs, { v in (v, v) })
   }
 }
-
-// NOTE(TF-1208): Differentiation regression due to changes in curry thunk generation.
-/*
-// TF-688: Test generic curry thunk cloning.
-public struct TF_688_Struct<Scalar> {
-  var x: Scalar
-}
-extension TF_688_Struct: Differentiable where Scalar: Differentiable {
-  @differentiable(reverse)
-  public static func id(x: Self) -> Self {
-    return x
-  }
-}
-@differentiable(reverse, wrt: x)
-public func TF_688<Scalar: Differentiable>(
-  _ x: TF_688_Struct<Scalar>,
-  reduction: @differentiable(reverse) (TF_688_Struct<Scalar>) -> TF_688_Struct<Scalar> = TF_688_Struct.id
-) -> TF_688_Struct<Scalar> {
-  reduction(x)
-}
-*/
 
 // TF-697: Test generic requirements of generated derivative function.
 protocol TF_697_Module: Differentiable {

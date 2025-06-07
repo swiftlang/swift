@@ -1,7 +1,7 @@
 // REQUIRES: objc_interop
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -Xcc -fmodule-map-file=%S/Inputs/custom-modules/module.map -Xcc -I%S/Inputs/custom-modules/./header_subdirectory/ -I%S/Inputs/custom-modules/ -emit-objc-header-path %t/textual-imports.h -emit-clang-header-nonmodular-includes %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -emit-objc-header-path %t/textual-imports.h -Xcc -fmodule-map-file=%S/Inputs/custom-modules/module.modulemap -Xcc -I%S/Inputs/custom-modules/./header_subdirectory/ -I%S/Inputs/custom-modules/ -emit-clang-header-nonmodular-includes %s
 // RUN: %FileCheck %s < %t/textual-imports.h
 
 // The period in the provided include directory above should not break the system.
@@ -14,6 +14,8 @@ public class Bar : Baz {}
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Watimport-in-framework-header"
 // CHECK-NEXT: #endif
 // CHECK-NEXT: @import EmitClangHeaderNonmodularIncludesStressTest;
-// CHECK-NEXT: #else
-// CHECK: #import <header-regular.h>
+// CHECK-NEXT: #elif defined(__OBJC__)
+// CHECK-NEXT: #import <header-regular.h>
+// CHECK: #else
+// CHECK-NEXT: #include <header-regular.h>
 // CHECK: #endif

@@ -1,5 +1,4 @@
-// RUN: %target-swift-emit-silgen -swift-version 6 -Xllvm -sil-full-demangle -parse-as-library -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck %s
-// REQUIRES: asserts
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 6 -Xllvm -sil-full-demangle -parse-as-library -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck %s
 
 class Kitty {
   var age: Int = 5 {

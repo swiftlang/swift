@@ -16,6 +16,7 @@
 
 @usableFromInline
 internal protocol _HasContiguousBytes {
+  @safe
   func withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R
   ) rethrows -> R
@@ -41,40 +42,44 @@ extension Array: _HasContiguousBytes {
   }
 }
 extension ContiguousArray: _HasContiguousBytes {}
-extension UnsafeBufferPointer: _HasContiguousBytes {
+extension UnsafeBufferPointer: @unsafe _HasContiguousBytes {
   @inlinable @inline(__always)
+  @safe
+  func withUnsafeBytes<R>(
+    _ body: (UnsafeRawBufferPointer) throws -> R
+  ) rethrows -> R {
+    let ptr = unsafe UnsafeRawPointer(self.baseAddress)
+    let len = self.count &* MemoryLayout<Element>.stride
+    return try unsafe body(UnsafeRawBufferPointer(start: ptr, count: len))
+  }
+}
+extension UnsafeMutableBufferPointer: @unsafe _HasContiguousBytes {
+  @inlinable @inline(__always)
+  @safe
   func withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R
   ) rethrows -> R {
     let ptr = UnsafeRawPointer(self.baseAddress)
     let len = self.count &* MemoryLayout<Element>.stride
-    return try body(UnsafeRawBufferPointer(start: ptr, count: len))
+    return try unsafe body(UnsafeRawBufferPointer(start: ptr, count: len))
   }
 }
-extension UnsafeMutableBufferPointer: _HasContiguousBytes {
+extension UnsafeRawBufferPointer: @unsafe _HasContiguousBytes {
   @inlinable @inline(__always)
+  @safe
   func withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R
   ) rethrows -> R {
-    let ptr = UnsafeRawPointer(self.baseAddress)
-    let len = self.count &* MemoryLayout<Element>.stride
-    return try body(UnsafeRawBufferPointer(start: ptr, count: len))
+    return try unsafe body(self)
   }
 }
-extension UnsafeRawBufferPointer: _HasContiguousBytes {
+extension UnsafeMutableRawBufferPointer: @unsafe _HasContiguousBytes {
   @inlinable @inline(__always)
+  @safe
   func withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R
   ) rethrows -> R {
-    return try body(self)
-  }
-}
-extension UnsafeMutableRawBufferPointer: _HasContiguousBytes {
-  @inlinable @inline(__always)
-  func withUnsafeBytes<R>(
-    _ body: (UnsafeRawBufferPointer) throws -> R
-  ) rethrows -> R {
-    return try body(UnsafeRawBufferPointer(self))
+    return try unsafe body(UnsafeRawBufferPointer(self))
   }
 }
 extension String: _HasContiguousBytes {
@@ -84,11 +89,12 @@ extension String: _HasContiguousBytes {
   }
 
   @inlinable @inline(__always)
+  @safe
   internal func withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R
   ) rethrows -> R {
     var copy = self
-    return try copy.withUTF8 { return try body(UnsafeRawBufferPointer($0)) }
+    return try copy.withUTF8 { return try unsafe body(UnsafeRawBufferPointer($0)) }
   }
 }
 extension Substring: _HasContiguousBytes {
@@ -98,10 +104,11 @@ extension Substring: _HasContiguousBytes {
   }
 
   @inlinable @inline(__always)
+  @safe
   internal func withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R
   ) rethrows -> R {
     var copy = self
-    return try copy.withUTF8 { return try body(UnsafeRawBufferPointer($0)) }
+    return try copy.withUTF8 { return try unsafe body(UnsafeRawBufferPointer($0)) }
   }
 }

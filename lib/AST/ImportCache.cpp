@@ -21,21 +21,29 @@
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 using namespace namelookup;
 
 ImportSet::ImportSet(bool hasHeaderImportModule,
                      ArrayRef<ImportedModule> topLevelImports,
-                     ArrayRef<ImportedModule> transitiveImports)
+                     ArrayRef<ImportedModule> transitiveImports,
+                     ArrayRef<ImportedModule> transitiveSwiftOnlyImports)
   : HasHeaderImportModule(hasHeaderImportModule),
     NumTopLevelImports(topLevelImports.size()),
-    NumTransitiveImports(transitiveImports.size()) {
+    NumTransitiveImports(transitiveImports.size()),
+    NumTransitiveSwiftOnlyImports(transitiveSwiftOnlyImports.size()) {
   auto buffer = getTrailingObjects<ImportedModule>();
   std::uninitialized_copy(topLevelImports.begin(), topLevelImports.end(),
                           buffer);
   std::uninitialized_copy(transitiveImports.begin(), transitiveImports.end(),
                           buffer + topLevelImports.size());
+  std::uninitialized_copy(transitiveSwiftOnlyImports.begin(),
+                          transitiveSwiftOnlyImports.end(),
+                          buffer + topLevelImports.size() +
+                          transitiveImports.size());
 
 #ifndef NDEBUG
   llvm::SmallDenseSet<ImportedModule, 8> unique;
@@ -44,6 +52,15 @@ ImportSet::ImportSet(bool hasHeaderImportModule,
     assert(result && "Duplicate imports in import set");
   }
   for (auto import : transitiveImports) {
+    auto result = unique.insert(import).second;
+    assert(result && "Duplicate imports in import set");
+  }
+
+  unique.clear();
+  for (auto import : topLevelImports) {
+    unique.insert(import);
+  }
+  for (auto import : transitiveSwiftOnlyImports) {
     auto result = unique.insert(import).second;
     assert(result && "Duplicate imports in import set");
   }
@@ -82,10 +99,14 @@ void ImportSet::dump() const {
 }
 
 static void collectExports(ImportedModule next,
-                           SmallVectorImpl<ImportedModule> &stack) {
+                           SmallVectorImpl<ImportedModule> &stack,
+                           bool onlySwiftExports) {
   SmallVector<ImportedModule, 4> exports;
   next.importedModule->getImportedModulesForLookup(exports);
   for (auto exported : exports) {
+    if (onlySwiftExports && exported.importedModule->isNonSwiftModule())
+      continue;
+
     if (next.accessPath.empty())
       stack.push_back(exported);
     else if (exported.accessPath.empty()) {
@@ -135,7 +156,7 @@ ImportCache::getImportSet(ASTContext &ctx,
 
   SmallVector<ImportedModule, 4> stack;
   for (auto next : topLevelImports) {
-    collectExports(next, stack);
+    collectExports(next, stack, /*onlySwiftExports*/false);
   }
 
   while (!stack.empty()) {
@@ -148,7 +169,26 @@ ImportCache::getImportSet(ASTContext &ctx,
     if (next.importedModule == headerImportModule)
       hasHeaderImportModule = true;
 
-    collectExports(next, stack);
+    collectExports(next, stack, /*onlySwiftExports*/false);
+  }
+
+  // Now collect transitive imports through Swift reexported imports only.
+  SmallVector<ImportedModule, 4> transitiveSwiftOnlyImports;
+  visited.clear();
+  stack.clear();
+  for (auto next : topLevelImports) {
+    if (!visited.insert(next).second)
+      continue;
+    collectExports(next, stack, /*onlySwiftExports*/true);
+  }
+
+  while (!stack.empty()) {
+    auto next = stack.pop_back_val();
+    if (!visited.insert(next).second)
+      continue;
+
+    transitiveSwiftOnlyImports.push_back(next);
+    collectExports(next, stack, /*onlySwiftExports*/true);
   }
 
   // Find the insert position again, in case the above traversal invalidated
@@ -157,12 +197,15 @@ ImportCache::getImportSet(ASTContext &ctx,
   if (ImportSet *result = ImportSets.FindNodeOrInsertPos(ID, InsertPos))
     return *result;
   
-  size_t bytes = ImportSet::totalSizeToAlloc<ImportedModule>(topLevelImports.size() + transitiveImports.size());
+  size_t bytes = ImportSet::totalSizeToAlloc<ImportedModule>(
+                            topLevelImports.size() + transitiveImports.size() +
+                            transitiveSwiftOnlyImports.size());
   void *mem = ctx.Allocate(bytes, alignof(ImportSet), AllocationArena::Permanent);
 
   auto *result = new (mem) ImportSet(hasHeaderImportModule,
                                      topLevelImports,
-                                     transitiveImports);
+                                     transitiveImports,
+                                     transitiveSwiftOnlyImports);
   ImportSets.InsertNode(result, InsertPos);
 
   return *result;
@@ -195,8 +238,9 @@ ImportSet &ImportCache::getImportSet(const DeclContext *dc) {
     file->getImportedModules(imports,
                              {ModuleDecl::ImportFilterKind::Default,
                               ModuleDecl::ImportFilterKind::ImplementationOnly,
-                              ModuleDecl::ImportFilterKind::SPIOnly,
-                              ModuleDecl::ImportFilterKind::SPIAccessControl});
+                              ModuleDecl::ImportFilterKind::InternalOrBelow,
+                              ModuleDecl::ImportFilterKind::PackageOnly,
+                              ModuleDecl::ImportFilterKind::SPIOnly});
   }
 
   auto &result = getImportSet(ctx, imports);
@@ -248,6 +292,36 @@ ImportCache::getAllVisibleAccessPaths(const ModuleDecl *mod,
   return result;
 }
 
+bool ImportCache::isImportedByViaSwiftOnly(const ModuleDecl *mod,
+                                           const DeclContext *dc) {
+  dc = dc->getModuleScopeContext();
+  if (dc->getParentModule()->isNonSwiftModule())
+    return false;
+
+  auto &ctx = mod->getASTContext();
+  auto key = std::make_pair(mod, dc);
+  auto found = SwiftOnlyCache.find(key);
+  if (found != SwiftOnlyCache.end()) {
+    if (ctx.Stats)
+      ++ctx.Stats->getFrontendCounters().ModuleVisibilityCacheHit;
+    return found->second;
+  }
+
+  if (ctx.Stats)
+    ++ctx.Stats->getFrontendCounters().ModuleVisibilityCacheMiss;
+
+  bool result = false;
+  for (auto next : getImportSet(dc).getTransitiveSwiftOnlyImports()) {
+    if (next.importedModule == mod) {
+      result = true;
+      break;
+    }
+  }
+
+  SwiftOnlyCache[key] = result;
+  return result;
+}
+
 ArrayRef<ImportPath::Access>
 ImportCache::getAllAccessPathsNotShadowedBy(const ModuleDecl *mod,
                                             const ModuleDecl *other,
@@ -280,8 +354,9 @@ ImportCache::getAllAccessPathsNotShadowedBy(const ModuleDecl *mod,
     file->getImportedModules(stack,
                              {ModuleDecl::ImportFilterKind::Default,
                               ModuleDecl::ImportFilterKind::ImplementationOnly,
-                              ModuleDecl::ImportFilterKind::SPIOnly,
-                              ModuleDecl::ImportFilterKind::SPIAccessControl});
+                              ModuleDecl::ImportFilterKind::InternalOrBelow,
+                              ModuleDecl::ImportFilterKind::PackageOnly,
+                              ModuleDecl::ImportFilterKind::SPIOnly});
   }
 
   SmallVector<ImportPath::Access, 4> accessPaths;
@@ -305,7 +380,7 @@ ImportCache::getAllAccessPathsNotShadowedBy(const ModuleDecl *mod,
         accessPaths.push_back(next.accessPath);
     }
 
-    collectExports(next, stack);
+    collectExports(next, stack, /*onlySwiftExports*/false);
   }
 
   auto result = allocateArray(ctx, accessPaths);
@@ -317,4 +392,67 @@ ArrayRef<ImportedModule>
 swift::namelookup::getAllImports(const DeclContext *dc) {
   return dc->getASTContext().getImportCache().getImportSet(dc)
     .getAllImports();
+}
+
+ArrayRef<ModuleDecl *> ImportCache::allocateArray(
+    ASTContext &ctx,
+    llvm::SetVector<ModuleDecl *> &results) {
+  if (results.empty())
+    return {};
+  else
+    return ctx.AllocateCopy(results.getArrayRef());
+}
+
+ArrayRef<ModuleDecl *>
+ImportCache::getWeakImports(const ModuleDecl *mod) {
+  auto found = WeakCache.find(mod);
+  if (found != WeakCache.end())
+    return found->second;
+
+  llvm::SetVector<ModuleDecl *> result;
+
+  for (auto file : mod->getFiles()) {
+    auto *sf = dyn_cast<SourceFile>(file);
+    // Other kinds of file units, like serialized modules, can just use this
+    // default implementation since the @_weakLinked attribute is not
+    // transitive. If module C is imported @_weakLinked by module B, that does
+    // not imply that module A imports module C @_weakLinked if it imports
+    // module B.
+    if (!sf)
+      continue;
+
+    for (auto &import : sf->getImports()) {
+      if (!import.options.contains(ImportFlags::WeakLinked))
+        continue;
+
+      ModuleDecl *importedModule = import.module.importedModule;
+      result.insert(importedModule);
+
+      // Only explicit re-exports of a weak-linked module are themselves
+      // weak-linked.
+      //
+      // // Module A
+      // @_weakLinked import B
+      //
+      // // Module B
+      // @_exported import C
+      SmallVector<ImportedModule, 4> reexportedModules;
+      importedModule->getImportedModules(
+          reexportedModules, ModuleDecl::ImportFilterKind::Exported);
+      for (auto reexportedModule : reexportedModules) {
+        result.insert(reexportedModule.importedModule);
+      }
+    }
+  }
+
+  auto resultArray = allocateArray(mod->getASTContext(), result);
+  WeakCache[mod] = resultArray;
+  return resultArray;
+}
+
+bool ImportCache::isWeakImportedBy(const ModuleDecl *mod,
+                                   const ModuleDecl *from) {
+  auto weakImports = getWeakImports(from);
+  return std::find(weakImports.begin(), weakImports.end(), mod)
+      != weakImports.end();
 }

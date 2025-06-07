@@ -51,6 +51,8 @@ ERROR(extra_tokens_conditional_compilation_directive,none,
       "extra tokens following conditional compilation directive", ())
 ERROR(unexpected_rbrace_in_conditional_compilation_block,none,
       "unexpected '}' in conditional compilation block", ())
+ERROR(ifconfig_unexpectedtoken,none,
+      "unexpected tokens in '#if' body", ())
 ERROR(unexpected_if_following_else_compilation_directive,none,
       "unexpected 'if' keyword following '#else' conditional compilation "
       "directive; did you mean '#elseif'?",
@@ -226,6 +228,9 @@ ERROR(let_cannot_be_addressed_property,none,
 ERROR(disallowed_var_multiple_getset,none,
       "'var' declarations with multiple variables cannot have explicit"
       " getters/setters", ())
+ERROR(stub_decl_cannot_have_body,none,
+      "stub %kindonly0 cannot have body",
+      (const Decl *))
 
 ERROR(disallowed_init,none,
       "initial value is not allowed here", ())
@@ -251,13 +256,10 @@ ERROR(enum_case_dot_prefix,none,
 ERROR(static_var_decl_global_scope,none,
       "%select{%error|static properties|class properties}0 may only be declared on a type",
       (StaticSpellingKind))
-ERROR(unexpected_curly_braces_in_decl, none,
-      "unexpected '{' in declaration", ())
-ERROR(missing_accessor_return_decl,none,
-      "missing return in %select{accessor|subscript}0 expected to return %1",
-      (bool, TypeRepr*))
 ERROR(expected_getset_in_protocol,none,
       "expected get or set in a protocol property", ())
+ERROR(expected_getreadset_in_protocol,none,
+      "expected get, read, or set in a protocol property", ())
 ERROR(unexpected_getset_implementation_in_protocol,none,
       "protocol property %0 cannot have a default implementation specified "
       "here; use extension instead", (StringRef))
@@ -308,6 +310,9 @@ ERROR(observing_accessor_in_subscript,none,
       "%select{'willSet'|'didSet'}0 is not allowed in subscripts", (unsigned))
 ERROR(getset_cannot_be_implied,none,
       "variable with implied type cannot have implied getter/setter", ())
+ERROR(accessor_requires_coroutine_accessors,none,
+      "%0 is only valid when experimental feature coroutine accessors is enabled",
+      (StringRef))
 
 // Import
 ERROR(decl_expected_module_name,none,
@@ -410,8 +415,6 @@ ERROR(subscript_without_get,none,
       "subscript declarations must have a getter", ())
 
 // initializer
-ERROR(invalid_nested_init,none,
-      "missing '%select{super.|self.}0' at initializer invocation", (bool))
 ERROR(initializer_decl_wrong_scope,none,
       "initializers may only be declared within a type", ())
 ERROR(expected_lparen_initializer,PointsToFirstBadToken,
@@ -422,8 +425,10 @@ ERROR(initializer_result_type,PointsToFirstBadToken,
       "initializers cannot have a result type", ())
 
 // Destructor
-ERROR(destructor_decl_outside_class,none,
-      "deinitializers may only be declared within a class or actor", ())
+ERROR(destructor_decl_outside_class_or_noncopyable,none,
+      "deinitializers may only be declared within a class, actor, or noncopyable type", ())
+ERROR(destructor_decl_on_noncopyable_enum,none,
+      "deinitializers are not yet supported on noncopyable enums", ())
 ERROR(expected_lbrace_destructor,PointsToFirstBadToken,
       "expected '{' for deinitializer", ())
 ERROR(destructor_has_name,PointsToFirstBadToken,
@@ -457,7 +462,8 @@ ERROR(operator_decl_no_fixity,none,
       "operator must be declared as 'prefix', 'postfix', or 'infix'", ())
 ERROR(operator_decl_expected_precedencegroup, none,
       "expected precedence group name after ':' in operator declaration", ())
-
+ERROR(operator_decl_should_not_contain_other_attributes, none, 
+      "unexpected attribute %0 in operator declaration", (DeclAttribute))
 WARNING(operator_decl_remove_designated_types,none,
         "designated types are no longer used by the compiler; please remove "
         "the designated type list from this operator declaration", ())
@@ -491,7 +497,7 @@ ERROR(expected_precedencegroup_relation,none,
 ERROR(expected_sil_keyword,none,
       "expected SIL keyword", ())
 ERROR(inout_not_attribute, none,
-      "@inout is no longer an attribute", ())
+      "'inout' is no longer an attribute", ())
 ERROR(only_allowed_in_sil,none,
       "'%0' only allowed in SIL modules", (StringRef))
 ERROR(expected_sil_type,none,
@@ -514,7 +520,7 @@ ERROR(silfunc_and_silarg_have_incompatible_sil_value_ownership,none,
       "Function type specifies: '@%0'. SIL argument specifies: '@%1'.",
       (StringRef, StringRef))
 ERROR(sil_arg_both_lexical_and_eagerMove,none,
-      "Function argument is annotated both @_eagerMove and @_noEagerMove, "
+      "Function argument is annotated both '@_eagerMove' and '@_noEagerMove', "
       "but these are incompatible alternatives", ())
 ERROR(expected_sil_colon,none,
       "expected ':' before %0", (StringRef))
@@ -537,7 +543,7 @@ ERROR(expected_sil_profiler_counter_total,none,
       "expected profiler counter total", ())
 ERROR(expected_sil_profiler_counter_hash,none,
       "expected profiler counter hash", ())
-ERROR(expected_sil_test_specification_body,none,
+ERROR(expected_sil_specify_test_body,none,
       "expected a string consisting of the space-separated test arguments", ())
 
 // SIL Values
@@ -549,6 +555,8 @@ ERROR(sil_value_def_type_mismatch,none,
       "value '%0' used with mismatching type %1 (expected %2)", (StringRef, Type, Type))
 ERROR(sil_use_of_undefined_value,none,
       "use of undefined value '%0'", (StringRef))
+ERROR(sil_forward_ref_value_needs_type,none,
+      "forward-referenced value '%0' needs a type annotation", (StringRef))
 NOTE(sil_prior_reference,none,
      "prior reference was here", ())
 
@@ -598,7 +606,11 @@ ERROR(sil_ref_inst_wrong_field,none,
 ERROR(sil_invalid_instr_operands,none,
       "invalid instruction operands", ())
 ERROR(sil_operand_not_address,none,
-      "%0 operand of '%1' must have address type", (StringRef, StringRef))
+      "%0 of '%1' must have address type", (StringRef, StringRef))
+ERROR(sil_operand_not_object,none,
+      "%0 of '%1' must have object type", (StringRef, StringRef))
+ERROR(sil_operand_has_incorrect_moveonlywrapped,none,
+      "%0 of '%1' %select{must|must not}2 be of moveonlywrapped type", (StringRef, StringRef, unsigned))
 ERROR(sil_operand_not_ref_storage_address,none,
       "%0 operand of '%1' must have address of %2 type",
       (StringRef, StringRef, ReferenceOwnership))
@@ -663,12 +675,10 @@ ERROR(sil_keypath_index_operand_type_conflict,none,
 ERROR(sil_keypath_no_use_of_operand_in_pattern,none,
       "operand %0 is not referenced by any component in the pattern",
       (unsigned))
-ERROR(sil_movevalue_invalid_optional_attribute,none,
-      "Optional attribute '[%0]' can not be applied to move_value", (StringRef))
 ERROR(sil_markmustcheck_invalid_attribute,none,
       "Attribute '[%0]' can not be applied to mark_value_as_moveonly", (StringRef))
 ERROR(sil_markmustcheck_requires_attribute,none,
-      "mark_must_check requires an attribute like 'noImplicitCopy'", ())
+      "mark_unresolved_non_copyable_value requires an attribute like 'noImplicitCopy'", ())
 ERROR(sil_moveonlytocopyable_invalid_attribute,none,
       "Attribute '[%0]' can not be applied to moveonlywrapper_to_copyable", (StringRef))
 ERROR(sil_moveonlytocopyable_requires_attribute,none,
@@ -677,6 +687,7 @@ ERROR(expected_generic_signature,none,
       "expected a generic signature", ())
 ERROR(sil_expected_uuid,none,
       "expected a UUID string literal", ())
+NOTE(sil_previous_instruction,none, "previous instruction", ())
 
 // SIL Basic Blocks
 ERROR(expected_sil_block_name,none,
@@ -725,8 +736,6 @@ ERROR(sil_vtable_expect_rsquare,none,
       "expected ']' after vtable entry kind", ())
 
 // SIL MoveOnlyDeinit
-ERROR(expected_sil_moveonlydeinit_colon,none,
-      "expected ':' in a MoveOnlyDeinit entry", ())
 ERROR(sil_moveonlydeinit_func_not_found,none,
       "sil function not found %0", (Identifier))
 ERROR(sil_moveonlydeinit_nominal_not_found,none,
@@ -753,6 +762,14 @@ ERROR(sil_witness_assoc_conf_not_found,none,
       "sil associated type path for conformance not found %0", (StringRef))
 ERROR(sil_witness_protocol_conformance_not_found,none,
       "sil protocol conformance not found", ())
+
+// SIL default override table
+ERROR(sil_default_override_func_not_found,none,
+      "sil function not found %0", (Identifier))
+ERROR(sil_default_override_class_not_found,none,
+      "sil class not found %0", (Identifier))
+ERROR(sil_default_override_decl_not_class,none,
+      "sil decl found for %0 is not a class", (Identifier))
 
 // SIL differentiability witnesses
 ERROR(sil_diff_witness_expected_token,PointsToFirstBadToken,
@@ -869,6 +886,10 @@ NOTE(subscript_array_element_fix_it_add_comma, none, "add a separator between "
 NOTE(subscript_array_element_fix_it_remove_space, none,
      "remove the space between the elements to silence this warning", ())
 
+// Inline Array
+ERROR(expected_rsquare_inline_array,none,
+      "expected ']' in inline array type", ())
+
 // Tuple Types
 ERROR(expected_rparen_tuple_type_list,none,
       "expected ')' at end of tuple list", ())
@@ -888,7 +909,7 @@ ERROR(expected_rangle_protocol,PointsToFirstBadToken,
       "expected '>' to complete protocol-constrained type", ())
 
 ERROR(deprecated_protocol_composition,none,
-      "'protocol<...>' composition syntax has been removed; join the protocols using '&'", ())
+      "'protocol<...>' composition syntax has been removed; join the type constraints using '&'", ())
 ERROR(deprecated_protocol_composition_single,none,
       "'protocol<...>' composition syntax has been removed and is not needed here", ())
 ERROR(deprecated_any_composition,none,
@@ -905,6 +926,8 @@ ERROR(sil_box_expected_r_brace,none,
       "expected '}' to complete SIL box field type list", ())
 ERROR(sil_box_expected_r_angle,none,
       "expected '>' to complete SIL box generic argument list", ())
+ERROR(sil_box_expected,none,
+      "%0 expects its operand to be of SIL box field type", (StringRef))
 
 // SIL function types
 ERROR(sil_function_subst_expected_l_angle,none,
@@ -963,12 +986,19 @@ ERROR(no_default_arg_closure,none,
 ERROR(no_default_arg_curried,none,
       "default arguments are not allowed in curried parameter lists", ())
 ERROR(var_pattern_in_var,none,
-      "'%select{var|let}0' cannot appear nested inside another 'var' or "
+      "'%select{let||var}0' cannot appear nested inside another 'var' or "
       "'let' pattern", (unsigned))
+ERROR(var_pattern_in_var_inout,none,
+      "'%select{let|inout|var}0' cannot appear nested inside another 'var', "
+      "'let', or 'inout' pattern", (unsigned))
 ERROR(extra_var_in_multiple_pattern_list,none,
       "%0 must be bound in every pattern", (Identifier))
 ERROR(let_pattern_in_immutable_context,none,
       "'let' pattern cannot appear nested in an already immutable context", ())
+WARNING(borrowing_syntax_change,none,
+        "'borrowing' in pattern matches is deprecated; use 'let'", ())
+ERROR(borrowing_subpattern_unsupported,none,
+      "'borrowing' pattern modifier must be directly applied to pattern variable name", ())
 ERROR(specifier_must_have_type,none,
       "%0 arguments must have a type specified", (StringRef))
 ERROR(expected_rparen_parameter,PointsToFirstBadToken,
@@ -985,7 +1015,7 @@ ERROR(parameter_specifier_as_attr_disallowed,none,
       "'%0' before a parameter name is not allowed, place it before the parameter type instead",
       (StringRef))
 ERROR(parameter_specifier_repeated,none,
-      "parameter must not have multiple '__owned', 'inout', or '__shared' specifiers", ())
+      "parameter may have at most one of the 'inout', 'borrowing', or 'consuming' specifiers", ())
 WARNING(parameter_let_var_as_attr,none,
       "'%0' in this position is interpreted as an argument label",
       (StringRef))
@@ -1000,8 +1030,6 @@ ERROR(parameter_operator_keyword_argument,none,
 
 ERROR(parameter_unnamed,none,
       "unnamed parameters must be written with the empty name '_'", ())
-WARNING(parameter_unnamed_warn,none,
-        "unnamed parameters must be written with the empty name '_'", ())
 
 ERROR(parameter_curry_syntax_removed,none,
       "cannot have more than one parameter list", ())
@@ -1069,6 +1097,10 @@ NOTE(indent_expression_to_silence,none,
 // Throw Statement
 ERROR(expected_expr_throw,PointsToFirstBadToken,
       "expected expression in 'throw' statement", ())
+
+// Discard Statement
+ERROR(expected_expr_discard,PointsToFirstBadToken,
+      "expected expression in 'discard' statement", ())
 
 // Await/Async
 ERROR(expected_await_not_async,none,
@@ -1163,10 +1195,13 @@ ERROR(expected_catch_where_expr,PointsToFirstBadToken,
 ERROR(docatch_not_trycatch,PointsToFirstBadToken,
       "the 'do' keyword is used to specify a 'catch' region",
       ())
+ERROR(do_throws_without_catch,none,
+      "a 'do' statement with a 'throws' clause must have at least one 'catch'",
+      ())
 
 // C-Style For Stmt
 ERROR(c_style_for_stmt_removed,none,
-      "C-style for statement has been removed in Swift 3", ())
+      "C-style for statement was removed in Swift 3", ())
 
 // For-each Stmt
 ERROR(expected_foreach_in,PointsToFirstBadToken,
@@ -1199,6 +1234,8 @@ ERROR(expected_case_where_expr,PointsToFirstBadToken,
       "expected expression for 'where' guard of 'case'", ())
 ERROR(expected_case_colon,PointsToFirstBadToken,
       "expected ':' after '%0'", (StringRef))
+ERROR(extra_case_keyword,none,
+      "extraneous 'case' keyword in pattern", ())
 ERROR(default_with_where,none,
       "'default' cannot be used with a 'where' guard expression",
       ())
@@ -1209,8 +1246,9 @@ ERROR(case_stmt_without_body,none,
 // 'try' on statements
 ERROR(try_on_stmt,none,
       "'try' cannot be used with '%0'", (StringRef))
-ERROR(try_on_return_throw_yield,none,
-      "'try' must be placed on the %select{returned|thrown|yielded}0 expression",
+ERROR(try_must_come_after_stmt,none,
+      "'try' must be placed on the %select{returned|thrown|yielded|produced}0 "
+      "expression",
       (unsigned))
 ERROR(try_on_var_let,none,
       "'try' must be placed on the initial value expression", ())
@@ -1261,6 +1299,8 @@ ERROR(anon_closure_tuple_param_destructuring,none,
       "closure tuple parameter does not support destructuring", ())
 ERROR(expected_closure_parameter_name,none,
       "expected the name of a closure parameter", ())
+ERROR(nonisolated_closure_parameter_parentheses,none,
+      "the parameter list of a 'nonisolated' closure requires parentheses", ())
 ERROR(expected_capture_specifier,none,
       "expected 'weak', 'unowned', or no specifier in capture list", ())
 ERROR(expected_capture_specifier_name,none,
@@ -1305,13 +1345,6 @@ ERROR(expected_identifier_after_dot_expr,none,
 ERROR(expected_identifier_after_super_dot_expr,
       PointsToFirstBadToken,
       "expected identifier or 'init' after super '.' expression", ())
-ERROR(expected_dot_or_subscript_after_super,PointsToFirstBadToken,
-      "expected '.' or '[' after 'super'", ())
-ERROR(super_in_closure_with_capture,none,
-      "using 'super' in a closure where 'self' is explicitly captured is "
-      "not yet supported", ())
-NOTE(super_in_closure_with_capture_here,none,
-     "'self' explicitly captured here", ())
 
 WARNING(await_before_try,none, "'try' must precede 'await'", ())
 
@@ -1331,6 +1364,8 @@ ERROR(expected_rparen_expr_list,none,
 ERROR(expected_rsquare_expr_list,none,
       "expected ']' in expression list", ())
 
+ERROR(expected_label_before_colon,none, "expected argument label before colon", ())
+
 // Array literal expressions
 ERROR(expected_rsquare_array_expr,PointsToFirstBadToken,
       "expected ']' in container literal expression", ())
@@ -1339,10 +1374,6 @@ ERROR(expected_rsquare_array_expr,PointsToFirstBadToken,
 ERROR(expected_arg_list_in_object_literal,PointsToFirstBadToken,
       "expected argument list in object literal", ())
 
-// Unknown pound expression.
-ERROR(unknown_pound_expr,none,
-      "use of unknown directive '#%0'", (StringRef))
-
 // Ternary expressions
 ERROR(expected_expr_after_ternary_question,none,
       "expected expression after '?' in ternary expression", ())
@@ -1350,14 +1381,29 @@ ERROR(expected_colon_after_ternary_question,none,
       "expected ':' after '? ...' in ternary expression", ())
 ERROR(expected_expr_after_ternary_colon,none,
       "expected expression after '? ... :' in ternary expression", ())
-ERROR(expected_expr_after_try, none,
-      "expected expression after 'try'", ())
 ERROR(expected_expr_after_await, none,
       "expected expression after 'await'", ())
+ERROR(expected_expr_after_unsafe, none,
+      "expected expression after 'unsafe'", ())
 ERROR(expected_expr_after_move, none,
-      "expected expression after '_move'", ())
+      "expected expression after 'consume'", ())
+ERROR(expected_expr_after_copy, none,
+      "expected expression after 'copy'", ())
 ERROR(expected_expr_after_borrow, none,
       "expected expression after '_borrow'", ())
+ERROR(expected_expr_after_each, none,
+      "expected expression after 'each'", ())
+ERROR(expected_expr_after_repeat, none,
+      "expected expression after 'repeat'", ())
+ERROR(expected_expr_after_then,none,
+      "expected expression after 'then'", ())
+
+WARNING(unindented_code_after_then,none,
+        "expression following 'then' is treated as an argument of "
+        "the 'then'", ())
+
+WARNING(move_consume_final_spelling, none,
+        "'_move' has been renamed to 'consume', and the '_move' spelling will be removed shortly", ())
 
 // Cast expressions
 ERROR(expected_type_after_is,none,
@@ -1434,8 +1480,19 @@ ERROR(duplicate_attribute,none,
       "duplicate %select{attribute|modifier}0", (bool))
 NOTE(previous_attribute,none,
      "%select{attribute|modifier}0 already specified here", (bool))
-ERROR(mutually_exclusive_attrs,none,
-      "'%0' contradicts previous %select{attribute|modifier}2 '%1'", (StringRef, StringRef, bool))
+ERROR(multiple_access_level_modifiers,none,
+      "multiple incompatible access-level modifiers specified", ())
+NOTE(previous_access_level_modifier,none,
+     "previous modifier specified here", ())
+ERROR(mutually_exclusive_decl_attrs,none,
+      "%0 contradicts previous %select{attribute|modifier}2 %1",
+      (DeclAttribute, DeclAttribute, bool))
+ERROR(mutually_exclusive_type_attrs,none,
+      "%0 contradicts previous %1",
+      (const TypeAttribute *, const TypeAttribute *))
+ERROR(mutually_exclusive_attr_names,none,
+      "'%0' contradicts previous %select{attribute|modifier}2 '%1'",
+      (StringRef, StringRef, bool))
 
 ERROR(invalid_infix_on_func,none,
       "'infix' modifier is not required or allowed on func declarations", ())
@@ -1453,6 +1510,13 @@ ERROR(type_attribute_applied_to_decl,none,
 ERROR(decl_attribute_applied_to_type,none,
       "attribute can only be applied to declarations, not types", ())
 
+
+ERROR(attr_extra_whitespace_after_at,PointsToFirstBadToken,
+      "extraneous whitespace between '@' and attribute name", ())
+
+ERROR(attr_extra_whitespace_before_lparen,PointsToFirstBadToken,
+      "extraneous whitespace between attribute name and '('", ())
+
 ERROR(attr_expected_lparen,none,
 "expected '(' in '%0' %select{attribute|modifier}1", (StringRef, bool))
 
@@ -1467,9 +1531,6 @@ ERROR(attr_expected_comma,none,
 
 ERROR(attr_expected_string_literal,none,
 "expected string literal in '%0' attribute", (StringRef))
-
-ERROR(attr_expected_integer_literal,none,
-"expected integer literal in '%0' attribute", (StringRef))
 
 ERROR(attr_expected_option_such_as,none,
       "expected '%0' option such as '%1'", (StringRef, StringRef))
@@ -1490,9 +1551,6 @@ ERROR(attr_expected_colon_after_label,none,
 ERROR(alignment_must_be_positive_integer,none,
       "alignment value must be a positive integer literal", ())
 
-ERROR(attr_only_at_non_local_scope, none,
-      "attribute '%0' can only be used in a non-local scope", (StringRef))
-
 // Access control
 ERROR(attr_access_expected_set,none,
       "expected 'set' as subject of '%0' modifier", (StringRef))
@@ -1509,7 +1567,14 @@ WARNING(attr_renamed_to_modifier_warning, none,
 ERROR(attr_name_close_match, none,
       "no attribute named '@%0'; did you mean '@%1'?", (StringRef, StringRef))
 ERROR(attr_unsupported_on_target, none,
+      "attribute %0 is unsupported on target '%1'", (DeclAttribute, StringRef))
+ERROR(attr_name_unsupported_on_target, none,
       "attribute '%0' is unsupported on target '%1'", (StringRef, StringRef))
+
+// abi attribute
+ERROR(attr_abi_incompatible_kind,none,
+      "cannot use %0 in '@abi'",
+      (DescriptiveDeclKind))
 
 // availability
 ERROR(attr_availability_platform,none,
@@ -1540,20 +1605,6 @@ ERROR(attr_availability_expected_equal,none,
 ERROR(attr_availability_expected_version,none,
       "expected version number in '%0' attribute", (StringRef))
 
-WARNING(attr_availability_platform_agnostic_expected_option,none,
-      "expected 'introduced', 'deprecated', or 'obsoleted' in '%0' attribute "
-      "for platform '%1'", (StringRef, StringRef))
-WARNING(attr_availability_platform_agnostic_expected_deprecated_version,none,
-      "expected version number with 'deprecated' in '%0' attribute for "
-      "platform '%1'", (StringRef, StringRef))
-WARNING(attr_availability_platform_agnostic_infeasible_option,none,
-      "'%0' cannot be used in '%1' attribute for platform '%2'",
-      (StringRef, StringRef, StringRef))
-
-WARNING(attr_availability_nonspecific_platform_unexpected_version,none,
-      "unexpected version number in '%0' attribute for non-specific platform "
-      "'*'", (StringRef))
-
 WARNING(attr_availability_wildcard_ignored,none,
         "* as platform name has no effect in '%0' attribute", (StringRef))
 
@@ -1581,22 +1632,22 @@ ERROR(attr_availability_duplicate,none,
 
 // originallyDefinedIn
 ERROR(originally_defined_in_missing_rparen,none,
-      "expected ')' in @_originallyDefinedIn argument list", ())
+      "expected ')' in '@_originallyDefinedIn' argument list", ())
 
 ERROR(originally_defined_in_need_original_module_name,none,
       "expected 'module: \"original\"' in the first argument to "
-      "@_originallyDefinedIn", ())
+      "'@_originallyDefinedIn'", ())
 
 ERROR(originally_defined_in_need_nonempty_module_name,none,
-      "original module name cannot be empty in @_originallyDefinedIn", ())
+      "original module name cannot be empty in '@_originallyDefinedIn'", ())
 
 // backDeploy
 ERROR(attr_back_deploy_expected_before_label,none,
-      "expected 'before:' in '@_backDeploy' attribute", ())
+      "expected 'before:' in '@backDeployed' attribute", ())
 ERROR(attr_back_deploy_expected_colon_after_before,none,
-      "expected ':' after 'before' in '@_backDeploy' attribute", ())
+      "expected ':' after 'before' in '@backDeployed' attribute", ())
 ERROR(attr_back_deploy_missing_rparen,none,
-      "expected ')' in '@_backDeploy' argument list", ())
+      "expected ')' in '@backDeployed' argument list", ())
 
 // convention
 ERROR(convention_attribute_expected_lparen,none,
@@ -1619,34 +1670,49 @@ ERROR(convention_attribute_witness_method_expected_protocol,none,
 
 // objc
 ERROR(attr_objc_missing_colon,none,
-      "missing ':' after selector piece in @objc attribute", ())
+      "missing ':' after selector piece in '@objc'", ())
 ERROR(attr_objc_expected_rparen,none,
-      "expected ')' after name for @objc", ())
+      "expected ')' after name for '@objc'", ())
 ERROR(attr_objc_empty_name,none,
-      "expected name within parentheses of @objc attribute", ())
+      "expected name within parentheses of '@objc'", ())
 
 ERROR(attr_dynamic_replacement_expected_rparen,none,
-      "expected ')' after function name for @_dynamicReplacement", ())
+      "expected ')' after function name for '@_dynamicReplacement'", ())
 ERROR(attr_dynamic_replacement_expected_function,none,
-      "expected a function name in @_dynamicReplacement(for:)", ())
+      "expected a function name in '@_dynamicReplacement(for:)'", ())
 ERROR(attr_dynamic_replacement_expected_for,none,
       "expected 'for' in '_dynamicReplacement' attribute", ())
 ERROR(attr_dynamic_replacement_expected_colon,none,
-      "expected ':' after @_dynamicReplacement(for", ())
+      "expected ':' after '@_dynamicReplacement(for'", ())
 
 ERROR(attr_type_eraser_expected_type_name,none,
-      "expected a type name in @_typeEraser()", ())
+      "expected a type name in '@_typeEraser()'", ())
 ERROR(attr_type_eraser_expected_rparen,none,
-      "expected ')' after type name for @_typeEraser", ())
+      "expected ')' after type name for '@_typeEraser'", ())
+
+ERROR(expected_thrown_error_type,none,
+      "expected thrown error type after 'throws('", ())
+ERROR(expected_rparen_after_thrown_error_type,none,
+      "expected ')' after thrown error type", ())
+ERROR(rethrows_with_thrown_error,none,
+      "'rethrows' cannot be combined with a specific thrown error type", ())
+
+ERROR(attr_isolated_expected_lparen,none,
+      "expected '(' after '@isolated'; did you mean the 'isolated' modifier?",
+      ())
+ERROR(attr_isolated_expected_rparen,none,
+      "expected ')' after isolation kind", ())
+ERROR(attr_isolated_expected_kind,none,
+      "expected 'any' as the isolation kind", ())
 
 ERROR(attr_private_import_expected_rparen,none,
-      "expected ')' after function name for @_private", ())
+      "expected ')' after function name for '@_private'", ())
 ERROR(attr_private_import_expected_sourcefile, none,
       "expected 'sourceFile' in '_private' attribute", ())
 ERROR(attr_private_import_expected_sourcefile_name,none,
-      "expected a source file name in @_private(sourceFile:)", ())
+      "expected a source file name in '@_private(sourceFile:)'", ())
 ERROR(attr_private_import_expected_colon,none,
-      "expected ':' after @_private(sourceFile", ())
+      "expected ':' after '@_private(sourceFile'", ())
 
 // opened
 ERROR(opened_attribute_expected_lparen,none,
@@ -1655,6 +1721,16 @@ ERROR(opened_attribute_id_value,none,
       "known id for 'opened' attribute must be a UUID string", ())
 ERROR(opened_attribute_expected_rparen,none,
       "expected ')' after id value for 'opened' attribute", ())
+
+// pack_element
+ERROR(pack_element_attribute_expected_lparen,none,
+      "expected '(' after 'pack_element' attribute", ())
+ERROR(pack_element_attribute_expected_rparen,none,
+      "expected ')' after id value for 'pack_element' attribute", ())
+ERROR(multiple_open_pack_element,none,
+      "multiple 'open_pack_element' instructions with same UUID", ())
+ERROR(opened_shape_class_not_pack_param,none,
+      "shape class type must be a pack type parameter", ())
 
 // unowned
 ERROR(attr_unowned_invalid_specifier,none,
@@ -1670,22 +1746,26 @@ ERROR(attr_warn_unused_result_expected_rparen,none,
 
 // _specialize
 ERROR(attr_specialize_missing_colon,none,
-      "missing ':' after %0 in '_specialize' attribute", (StringRef))
+      "missing ':' after %0 in %select{'_specialize'|'specialized'}1 attribute", (StringRef, bool))
 
 ERROR(attr_specialize_missing_comma,none,
-      "missing ',' in '_specialize' attribute", ())
+      "missing ',' in %select{'_specialize'|'specialized'}0 attribute", (bool))
 
 ERROR(attr_specialize_unknown_parameter_name,none,
-      "unknown parameter %0 in '_specialize attribute'", (StringRef))
+      "unknown parameter %0 in %select{'_specialize'|'specialized'}1 attribute", (StringRef, bool))
+ERROR(attr_specialize_unsupported_parameter_name,none,
+      "unsupported parameter %0 in 'specialized attribute'", (StringRef))
 
 ERROR(attr_specialize_expected_bool_value,none,
-      "expected a boolean true or false value in '_specialize' attribute", ())
+      "expected a boolean true or false value in %select{'_specialize'|'specialized'}0 attribute", (bool))
 
 ERROR(attr_specialize_missing_parameter_label_or_where_clause,none,
       "expected a parameter label or a where clause in '_specialize' attribute", ())
+ERROR(attr_specialized_missing_where_clause,none,
+      "expected a where clause in 'specialized' attribute", ())
 
 ERROR(attr_specialize_parameter_already_defined,none,
-      "parameter '%0' was already defined in '_specialize' attribute", (StringRef))
+      "parameter '%0' was already defined in %select{'_specialize'|'specialized'}1 attribute", (StringRef, bool))
 
 ERROR(attr_specialize_expected_partial_or_full,none,
       "expected 'partial' or 'full' as values of the 'kind' parameter in '_specialize' attribute", ())
@@ -1706,8 +1786,6 @@ ERROR(attr_differentiable_kind_not_supported,PointsToFirstBadToken,
       "unsupported differentiability kind '%0'; only 'reverse' is supported", (StringRef))
 ERROR(attr_differentiable_unknown_kind,PointsToFirstBadToken,
       "unknown differentiability kind '%0'; only 'reverse' is supported", (StringRef))
-ERROR(attr_differentiable_expected_parameter_list,PointsToFirstBadToken,
-      "expected a list of parameters to differentiate with respect to", ())
 ERROR(attr_differentiable_use_wrt_not_withrespectto,none,
       "use 'wrt:' to specify parameters to differentiate with respect to", ())
 ERROR(attr_differentiable_expected_label,none,
@@ -1757,24 +1835,20 @@ ERROR(sil_inst_autodiff_expected_function_type_operand,PointsToFirstBadToken,
 ERROR(sil_inst_autodiff_expected_differentiability_witness_kind,PointsToFirstBadToken,
       "expected a differentiability witness kind, which can be one of '[jvp]', "
       "'[vjp]', or '[transpose]'", ())
-ERROR(sil_inst_autodiff_invalid_witness_generic_signature,PointsToFirstBadToken,
-      "expected witness_generic signature '%0' does not have same generic "
-      "parameters as original function generic signature '%1'",
-      (StringRef, StringRef))
 
 WARNING(warn_attr_unsafe_removed,none,
-        "'%0' attribute has been removed in favor of @preconcurrency",
+        "'%0' attribute has been removed in favor of '@preconcurrency'",
         (StringRef))
 
 // _documentation
 ERROR(documentation_attr_expected_argument,none,
-      "@_documentation attribute expected 'visibility' or 'metadata' argument",
+      "'_documentation' attribute expected 'visibility' or 'metadata' argument",
       ())
 ERROR(documentation_attr_unknown_argument,none,
       "unknown argument '%0', expected 'visibility' or 'metadata'",
       (StringRef))
 ERROR(documentation_attr_expected_access_level,none,
-      "@_documentation attribute's 'visibility' argument expected an access level",
+      "'_documentation' attribute's 'visibility' argument expected an access level",
       ())
 ERROR(documentation_attr_unknown_access_level,none,
       "unknown visibility '%0', expected an access level keyword",
@@ -1782,11 +1856,26 @@ ERROR(documentation_attr_unknown_access_level,none,
 ERROR(documentation_attr_duplicate_visibility,none,
       "cannot give more than one visibility to the same item", ())
 ERROR(documentation_attr_metadata_expected_text,none,
-      "@_documentation attribute's 'metadata' argument expected an identifier or "
+      "'_documentation' attribute's 'metadata' argument expected an identifier or "
       "quoted string",
       ())
 ERROR(documentation_attr_duplicate_metadata,none,
       "cannot give more than one metadata argument to the same item", ())
+
+ERROR(attr_rawlayout_expected_label,none,
+      "expected %0 argument to '@_rawLayout'", (StringRef))
+ERROR(attr_rawlayout_expected_integer_size,none,
+      "expected integer literal size in '@_rawLayout'", ())
+ERROR(attr_rawlayout_expected_integer_alignment,none,
+      "expected integer literal alignment in '@_rawLayout'", ())
+ERROR(attr_rawlayout_expected_params,none,
+      "expected %1 argument after %0 argument in '@_rawLayout'", (StringRef, StringRef))
+
+ERROR(attr_extern_expected_label,none,
+      "expected %0 argument to '@_extern'", (StringRef))
+
+ERROR(attr_expected_feature_name,none,
+      "expected feature name in '@%0'", (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics
@@ -1838,7 +1927,7 @@ ERROR(platform_condition_expected_argument,none,
       "expected argument to platform condition",
       ())
 ERROR(platform_condition_expected_one_argument,none,
-      "expected only one argument to platform condition",
+      "expected only one unlabeled argument to platform condition",
       ())
 ERROR(unsupported_platform_runtime_condition_argument,none,
       "unexpected argument for the '_runtime' condition; "
@@ -1905,13 +1994,6 @@ ERROR(avail_query_expected_version_number,PointsToFirstBadToken,
 ERROR(avail_query_expected_rparen,PointsToFirstBadToken,
       "expected ')' in availability query", ())
 
-WARNING(avail_query_unrecognized_platform_name,
-        PointsToFirstBadToken, "unrecognized platform name %0", (Identifier))
-WARNING(avail_query_suggest_platform_name,
-        PointsToFirstBadToken, "unrecognized platform name %0;"
-        " did you mean '%1'?",
-        (Identifier, StringRef))
-
 ERROR(avail_query_disallowed_operator, PointsToFirstBadToken,
       "'%0' cannot be used in an availability condition", (StringRef))
 
@@ -1924,24 +2006,6 @@ NOTE(avail_query_meant_introduced,PointsToFirstBadToken,
 
 ERROR(avail_query_version_comparison_not_needed,
       none,"version comparison not needed", ())
-
-ERROR(availability_query_wildcard_required, none,
-      "must handle potential future platforms with '*'", ())
-
-ERROR(unavailability_query_wildcard_not_required, none,
-      "platform wildcard '*' is always implicit in #unavailable", ())
-
-ERROR(availability_must_occur_alone, none,
-      "'%0' version-availability must be specified alone", (StringRef))
-
-ERROR(pound_available_swift_not_allowed, none,
-      "Swift language version checks not allowed in %0(...)", (StringRef))
-
-ERROR(pound_available_package_description_not_allowed, none,
-      "PackageDescription version checks not allowed in %0(...)", (StringRef))
-
-ERROR(availability_query_repeated_platform, none,
-      "version for '%0' already specified", (StringRef))
 
 ERROR(availability_cannot_be_mixed,none,
       "#available and #unavailable cannot be in the same statement", ())
@@ -1973,38 +2037,12 @@ ERROR(attr_requires_concurrency, none,
 
 ERROR(associatedtype_cannot_be_variadic,none,
       "associated types cannot be variadic", ())
-
-//------------------------------------------------------------------------------
-// MARK: syntax parsing diagnostics
-//------------------------------------------------------------------------------
-ERROR(unknown_syntax_entity, PointsToFirstBadToken,
-      "unknown %0 syntax exists in the source", (StringRef))
-
-//------------------------------------------------------------------------------
-// MARK: multiple trailing closures diagnostics
-//------------------------------------------------------------------------------
-ERROR(expected_argument_label_followed_by_closure_literal,none,
-      "expected an argument label followed by a closure literal", ())
-ERROR(expected_closure_literal,none,
-      "expected a closure literal", ())
-
-ERROR(expected_multiple_closures_block_rbrace,none,
-      "expected '}' at the end of a trailing closures block", ())
-
-//------------------------------------------------------------------------------
-// MARK: diagnostics emitted by Swift libraries
-//------------------------------------------------------------------------------
-
-ERROR(foreign_diagnostic,none,
-      "%0", (StringRef))
+ERROR(type_parameter_pack_ellipsis,none,
+      "ellipsis operator cannot be used with a type parameter pack", ())
 
 //------------------------------------------------------------------------------
 // MARK: macros
 //------------------------------------------------------------------------------
-ERROR(expected_macro_value_type,PointsToFirstBadToken,
-      "expected macro value type following ':'", ())
-ERROR(no_default_arg_macro,none,
-      "default arguments are not allowed in macros", ())
 ERROR(expected_lparen_macro,PointsToFirstBadToken,
       "expected '(' for macro parameters or ':' for a value-like macro", ())
 ERROR(expected_type_macro_result,PointsToFirstBadToken,
@@ -2016,48 +2054,147 @@ ERROR(macro_expansion_expr_expected_macro_identifier,PointsToFirstBadToken,
       "expected a macro identifier for a pound literal expression", ())
 ERROR(macro_expansion_decl_expected_macro_identifier,PointsToFirstBadToken,
       "expected a macro identifier for a pound literal declaration", ())
-
-ERROR(declaration_attr_expected_kind,PointsToFirstBadToken,
-      "expected a declaration macro kind ('freestanding' or 'attached')", ())
+ERROR(extra_whitespace_macro_expansion_identifier,PointsToFirstBadToken,
+      "extraneous whitespace between '#' and macro name is not permitted", ())
 
 ERROR(macro_role_attr_expected_kind,PointsToFirstBadToken,
       "expected %select{a freestanding|an attached}0 macro role such as "
       "%select{'expression'|'accessor'}0", (bool))
+ERROR(macro_role_attr_expected_attached_kind,PointsToFirstBadToken,
+      "expected an attached macro role such as 'peer'", ())
+ERROR(macro_role_attr_expected_freestanding_kind,PointsToFirstBadToken,
+      "expected a freestanding macro role such as 'expression'", ())
 ERROR(macro_role_syntax_mismatch,PointsToFirstBadToken,
-      "expected %select{a freestanding|an attached}0 macro cannot have "
-      "the %1 role", (bool, Identifier))
+      "%select{a freestanding|an attached}0 macro cannot have the %1 role",
+      (bool, Identifier))
 ERROR(macro_attribute_unknown_label,PointsToFirstBadToken,
-      "@%select{freestanding|attached}0 has no argument with label %1",
+      "'@%select{freestanding|attached}0' has no argument with label %1",
       (bool, Identifier))
 ERROR(macro_attribute_duplicate_label,PointsToFirstBadToken,
-      "@%select{freestanding|attached}0 already has an argument with "
-      "label %1", (bool, Identifier))
-ERROR(macro_attribute_missing_label,PointsToFirstBadToken,
-      "@%select{freestanding|attached}0 argument is missing label '%1'",
+      "'@%select{freestanding|attached}0' already has an argument with "
+      "label %1", (bool, StringRef))
+ERROR(macro_attribute_missing_label,none,
+      "'@%select{freestanding|attached}0' argument is missing label '%1'",
       (bool, StringRef))
 ERROR(macro_attribute_unknown_name_kind,PointsToFirstBadToken,
       "unknown introduced name kind %0", (Identifier))
 ERROR(macro_attribute_unknown_argument_form,PointsToFirstBadToken,
-      "introduced name argument should be an identifier", ())
+      "introduced name argument should be a name", ())
 ERROR(macro_attribute_introduced_name_requires_argument,PointsToFirstBadToken,
       "introduced name kind %0 requires a single argument '(name)'", (Identifier))
 ERROR(macro_attribute_introduced_name_requires_no_argument,PointsToFirstBadToken,
       "introduced name kind %0 must not have an argument", (Identifier))
 WARNING(macro_expression_attribute_removed,PointsToFirstBadToken,
-      "@expression has been removed in favor of @freestanding(expression)", ())
+      "'@expression' has been removed in favor of '@freestanding(expression)'",
+      ())
 
 ERROR(unexpected_attribute_expansion,PointsToFirstBadToken,
-      "unexpected token '%0' in expanded attribute list'",
+      "unexpected token '%0' in expanded attribute list",
       (StringRef))
 ERROR(unexpected_member_expansion,PointsToFirstBadToken,
-      "unexpected token '%0' in expanded member list'",
+      "unexpected token '%0' in expanded member list",
       (StringRef))
+ERROR(extra_tokens_after_expression,PointsToFirstBadToken,
+      "extra tokens after expression in macro expansion", ())
 
 ERROR(parser_round_trip_error,none,
       "source file did not round-trip through the new Swift parser", ())
 ERROR(parser_new_parser_errors,none,
       "new Swift parser generated errors for code that C++ parser accepted",
        ())
+
+// MARK: Reference Binding Diagnostics
+ERROR(sil_markuncheckedreferencebinding_requires_attribute,none,
+      "mark_unchecked_reference_binding requires an attribute like [inout]", ())
+ERROR(sil_markuncheckedreferencebinding_invalid_attribute,none,
+      "Attribute '[%0]' can not be applied to mark_unchecked_reference_binding", (StringRef))
+
+//------------------------------------------------------------------------------
+// MARK: Init accessors
+//------------------------------------------------------------------------------
+
+ERROR(init_accessor_is_not_on_property,none,
+      "init accessors could only be associated with properties",
+      ())
+
+ERROR(init_accessor_is_not_in_the_primary_declaration,none,
+      "init accessors cannot be declared in an extension",
+      ())
+
+ERROR(missing_storage_restrictions_attr_label,none,
+      "missing label in '@storageRestrictions'", ())
+
+ERROR(invalid_storage_restrictions_attr_label,none,
+      "unexpected label %0 in '@storageRestrictions'", (Identifier))
+
+ERROR(duplicate_storage_restrictions_attr_label,none,
+      "duplicate label %0 in '@storageRestrictions'", (Identifier))
+
+ERROR(storage_restrictions_attr_expected_name,none,
+      "expected property name in '@storageRestrictions' list", ())
+
+ERROR(requires_experimental_feature, none,
+      "'%0' %select{attribute|parameter specifier}1 is only valid when experimental feature "
+      "%2 is enabled",
+      (StringRef, bool, StringRef))
+
+//------------------------------------------------------------------------------
+// MARK: Lifetime dependence
+//------------------------------------------------------------------------------
+
+ERROR(expected_lparen_after_lifetime_dependence, PointsToFirstBadToken,
+      "expected '(' after lifetime dependence specifier", ())
+
+ERROR(expected_identifier_or_index_or_self_after_lifetime_dependence,
+      PointsToFirstBadToken,
+      "expected identifier, index or self in lifetime dependence specifier",
+      ())
+
+ERROR(expected_rparen_after_lifetime_dependence, PointsToFirstBadToken,
+      "expected ')' after parameter list in lifetime dependence specifier", ())
+
+ERROR(expected_param_index_lifetime_dependence, PointsToFirstBadToken,
+      "expected unsigned parameter index in lifetime dependence specifier", ())
+
+ERROR(lifetime_dependence_invalid_init_return, PointsToFirstBadToken,
+      "expected Self return type for initializers with lifetime dependence "
+      "specifiers",
+      ())
+
+ERROR(sending_before_parameter_specifier,none,
+      "'sending' must be placed after specifier '%0'", (StringRef))
+ERROR(sending_repeated,none,
+      "parameter may have at most one 'sending' specifier", ())
+ERROR(sending_cannot_be_used_with_borrowing,none,
+      "'%0' cannot be used together with 'borrowing'", (StringRef))
+
+ERROR(sil_thunkinst_failed_to_parse_kind,none,
+      "'%0' is not a valid thunk kind supported by ThunkInst", (StringRef))
+
+ERROR(sil_failed_to_parse_sil_optional,none,
+      "Expected SIL optional value of the form '[' NAME ']'", ())
+
+//------------------------------------------------------------------------------
+// MARK: nonisolated(nonsending)
+//------------------------------------------------------------------------------
+
+ERROR(nonisolated_nonsending_expected_lparen,PointsToFirstBadToken,
+      "expected '(' following 'nonisolated'", ())
+ERROR(nonisolated_nonsending_incorrect_modifier,PointsToFirstBadToken,
+      "expected 'nonsending' in modifier", ())
+ERROR(nonisolated_nonsending_expected_rparen,PointsToFirstBadToken,
+      "expected ')' after 'nonisolated' modifier", ())
+ERROR(nonisolated_nonsending_repeated,none,
+      "parameter may have at most one 'nonisolated(nonsending)' specifier", ())
+
+//------------------------------------------------------------------------------
+// MARK: using @<attribute> or using <identifier>
+//------------------------------------------------------------------------------
+ERROR(using_decl_invalid_specifier,PointsToFirstBadToken,
+      "default isolation can only be set to '@MainActor' or 'nonisolated'",
+      ())
+ERROR(experimental_using_decl_disabled,PointsToFirstBadToken,
+      "'using' is an experimental feature that is currently disabled", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

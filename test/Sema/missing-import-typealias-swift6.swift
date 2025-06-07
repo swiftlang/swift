@@ -9,8 +9,6 @@
 
 // RUN: %target-swift-frontend -typecheck -verify %t/UsesAliasesNoImport.swift -enable-library-evolution -I %t -swift-version 6
 
-// REQUIRES: asserts
-
 // This test is a simplified version of missing-import-typealias.swift that
 // verifies errors are emitted instead of warnings in Swift 6.
 
@@ -28,8 +26,8 @@ public typealias ClazzAlias = Clazz
 
 //--- UsesAliasesNoImport.swift
 
-import Aliases
+public import Aliases
 
-// expected-error@+1 {{'ClazzAlias' aliases 'Original.Clazz' and cannot be used here because 'Original' was not imported by this file}}
+// expected-error@+1 {{'ClazzAlias' aliases 'Original.Clazz' and cannot be used in a public or '@usableFromInline' conformance because 'Original' was not imported by this file}}
 public class InheritsFromClazzAlias: ClazzAlias {}
 

@@ -1,22 +1,169 @@
-// RUN: %target-sil-opt -unit-test-runner %s 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -test-runner %s 2>&1 | %FileCheck %s
 
-// CHECK: begin running test 1 of {{[^,]+}} on last_uses_merge_points: dump-function
+// CHECK: begin running test 1 of {{[^,]+}} on last_uses_merge_points: dump_function
 // CHECK: [[REGISTER_3:%[^,]+]] = tuple ()
 // CHECK: return [[REGISTER_3]]
-// CHECK: end running test 1 of {{[^,]+}} on last_uses_merge_points: dump-function
-// CHECK: begin running test 2 of {{[^,]+}} on last_uses_merge_points: pruned-liveness-boundary-with-list-of-last-users-insertion-points
+// CHECK: end running test 1 of {{[^,]+}} on last_uses_merge_points: dump_function
+// CHECK: begin running test 2 of {{[^,]+}} on last_uses_merge_points: pruned_liveness_boundary_with_list_of_last_users_insertion_points
 // CHECK: [[REGISTER_3]] = tuple ()
-// CHECK: end running test 2 of {{[^,]+}} on last_uses_merge_points: pruned-liveness-boundary-with-list-of-last-users-insertion-points
+// CHECK: end running test 2 of {{[^,]+}} on last_uses_merge_points: pruned_liveness_boundary_with_list_of_last_users_insertion_points
 sil [ossa] @last_uses_merge_points : $@convention(thin) () -> () {
 entry:
-  test_specification "dump-function"
-  test_specification "pruned-liveness-boundary-with-list-of-last-users-insertion-points @block[1].instruction[0] @block[2].instruction[0]"
+  specify_test "dump_function"
+  specify_test "pruned_liveness_boundary_with_list_of_last_users_insertion_points @block[1].instruction[0] @block[2].instruction[0]"
   cond_br undef, left, right
 left:
   br bottom
 right:
   br bottom
 bottom:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+struct S {}
+
+
+// CHECK-LABEL: begin running test {{.*}} on nonuse_then_nonuse_is_nonuse
+// CHECK:       non-user:   %1 = tuple ()
+// CHECK-LABEL: end running test {{.*}} on nonuse_then_nonuse_is_nonuse
+sil [ossa] @nonuse_then_nonuse_is_nonuse : $@convention(thin) () -> () {
+  %val = apply undef() : $@convention(thin) () -> (S)
+  specify_test """
+    ssa_use_liveness
+    %val
+    uses:
+      @instruction non-use
+      @instruction non-use
+  """
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on nonuse_then_ending_is_ending
+// CHECK:       lifetime-ending user:   %1 = tuple ()
+// CHECK-LABEL: end running test 1 of 1 on nonuse_then_ending_is_ending
+sil [ossa] @nonuse_then_ending_is_ending : $@convention(thin) () -> () {
+  %val = apply undef() : $@convention(thin) () -> (S)
+  specify_test """
+    ssa_use_liveness
+    %val
+    uses:
+      @instruction non-use
+      @instruction ending
+  """
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on nonuse_then_nonending_is_nonending
+// CHECK:       regular user:   %1 = tuple ()
+// CHECK-LABEL: end running test 1 of 1 on nonuse_then_nonending_is_nonending
+sil [ossa] @nonuse_then_nonending_is_nonending : $@convention(thin) () -> () {
+  %val = apply undef() : $@convention(thin) () -> (S)
+  specify_test """
+    ssa_use_liveness
+    %val
+    uses:
+      @instruction non-use
+      @instruction non-ending
+  """
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on ending_then_nonuse_is_ending
+// CHECK:       lifetime-ending user:   %1 = tuple ()
+// CHECK-LABEL: end running test {{.*}} on ending_then_nonuse_is_ending
+sil [ossa] @ending_then_nonuse_is_ending : $@convention(thin) () -> () {
+  %val = apply undef() : $@convention(thin) () -> (S)
+  specify_test """
+    ssa_use_liveness
+    %val
+    uses:
+      @instruction ending
+      @instruction non-use
+  """
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on ending_then_ending_is_ending
+// CHECK:       lifetime-ending user:   %1 = tuple ()
+// CHECK-LABEL: end running test 1 of 1 on ending_then_ending_is_ending
+sil [ossa] @ending_then_ending_is_ending : $@convention(thin) () -> () {
+  %val = apply undef() : $@convention(thin) () -> (S)
+  specify_test """
+    ssa_use_liveness
+    %val
+    uses:
+      @instruction ending
+      @instruction ending
+  """
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on ending_then_nonending_is_nonending
+// CHECK:       regular user:   %1 = tuple ()
+// CHECK-LABEL: end running test 1 of 1 on ending_then_nonending_is_nonending
+sil [ossa] @ending_then_nonending_is_nonending : $@convention(thin) () -> () {
+  %val = apply undef() : $@convention(thin) () -> (S)
+  specify_test """
+    ssa_use_liveness
+    %val
+    uses:
+      @instruction ending
+      @instruction non-ending
+  """
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on nonending_then_nonuse_is_nonending
+// CHECK:       regular user:   %1 = tuple ()
+// CHECK-LABEL: end running test {{.*}} on nonending_then_nonuse_is_nonending
+sil [ossa] @nonending_then_nonuse_is_nonending : $@convention(thin) () -> () {
+  %val = apply undef() : $@convention(thin) () -> (S)
+  specify_test """
+    ssa_use_liveness
+    %val
+    uses:
+      @instruction non-ending
+      @instruction non-use
+  """
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on nonending_then_ending_is_nonending
+// CHECK:       regular user:   %1 = tuple ()
+// CHECK-LABEL: end running test 1 of 1 on nonending_then_ending_is_nonending
+sil [ossa] @nonending_then_ending_is_nonending : $@convention(thin) () -> () {
+  %val = apply undef() : $@convention(thin) () -> (S)
+  specify_test """
+    ssa_use_liveness
+    %val
+    uses:
+      @instruction non-ending
+      @instruction ending
+  """
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on nonending_then_nonending_is_nonending
+// CHECK:       regular user:   %1 = tuple ()
+// CHECK-LABEL: end running test 1 of 1 on nonending_then_nonending_is_nonending
+sil [ossa] @nonending_then_nonending_is_nonending : $@convention(thin) () -> () {
+  %val = apply undef() : $@convention(thin) () -> (S)
+  specify_test """
+    ssa_use_liveness
+    %val
+    uses:
+      @instruction non-ending
+      @instruction non-ending
+  """
   %retval = tuple ()
   return %retval : $()
 }

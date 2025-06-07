@@ -36,11 +36,10 @@ _ = /*MyClass:unknown*/Mismatch()
 _ = /*MyClass:unknown*/MyClass()
 #endif
 
-// RUN: %empty-directory(%t.result)
-// RUN: %refactor -syntactic-rename -source-filename %s -pos="foo" -is-function-like -old-name "foo" -new-name "bar" >> %t.result/textual_foo.swift
-// RUN: diff -u %S/Outputs/textual/foo.swift.expected %t.result/textual_foo.swift
-// RUN: %refactor -syntactic-rename -source-filename %s -pos="MyClass" -is-non-protocol-type -old-name "MyClass" -new-name "YourClass" >> %t.result/textual_MyClass.swift
-// RUN: diff -u %S/Outputs/textual/MyClass.swift.expected %t.result/textual_MyClass.swift
+// REQUIRES: swift_swift_parser
 // RUN: %empty-directory(%t.ranges)
-// RUN: %refactor -find-rename-ranges -source-filename %s -pos="foo" -is-function-like -old-name "foo" >> %t.ranges/textual_foo.swift
-// RUN: diff -u %S/FindRangeOutputs/textual/foo.swift.expected %t.ranges/textual_foo.swift
+// RUN: %refactor -find-rename-ranges -source-filename %s -pos="foo" -is-function-like -old-name "foo()" >> %t.ranges/textual_foo.swift
+// RUN: diff -u %S/Outputs/textual/foo.swift.expected %t.ranges/textual_foo.swift
+// RUN: %refactor -find-rename-ranges -source-filename %s -pos="MyClass" -is-non-protocol-type -old-name "MyClass" -new-name "YourClass" >> %t.ranges/textual_MyClass.swift
+// All occcurrences of MyClass are outside of comments and string literals, so there's nothing to rename. swift-refactor indicates this by outputing empty results.
+// RUN: diff -u %t.ranges/textual_MyClass.swift -

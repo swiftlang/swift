@@ -167,6 +167,17 @@ template<typename Orig, typename Projected>
 using CastArrayRefView =
   ArrayRefView<Orig, Projected *, arrayRefViewCastHelper<Projected, Orig>>;
 
+namespace generator_details {
+template <class T> struct is_array_ref_like;
+
+template <class Orig, class Projected, Projected (&Project)(const Orig &),
+          bool AllowOrigAccess>
+struct is_array_ref_like<ArrayRefView<Orig, Projected, Project,
+                                      AllowOrigAccess>> {
+  enum { value = true };
+};
+}
+
 } // end namespace swift
 
 #endif // SWIFT_BASIC_ARRAYREFVIEW_H

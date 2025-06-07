@@ -16,6 +16,7 @@ let CopyToNativeArrayBufferTests = TestSuite("CopyToNativeArrayBufferTests")
 
 extension Array {
   func _rawIdentifier() -> Int {
+    _blackHole(self)
     return unsafeBitCast(self, to: Int.self)
   }
 }
@@ -292,7 +293,7 @@ ArrayTestSuite.test("${array_type}<TestValueTy>/subscript(_: Range<Int>)/COW")
 
 ArrayTestSuite.test("sizeof") {
   var a = [ 10, 20, 30 ]
-#if arch(i386) || arch(arm) || arch(arm64_32)
+#if _pointerBitWidth(_32)
   expectEqual(4, MemoryLayout.size(ofValue: a))
 #else
   expectEqual(8, MemoryLayout.size(ofValue: a))

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-experimental-move-only -enable-sil-verify-all -o - -sil-consume-operator-copyable-values-checker -verify %s
+// RUN: %target-sil-opt -enable-sil-verify-all -o - -sil-consume-operator-copyable-values-checker -verify %s
 
 // This file is meant for specific SIL patterns that may be hard to produce with
 // the current swift frontend but have reproduced before and we want to make
@@ -22,10 +22,10 @@ case some(T)
 sil [ossa] @useInLoopWithDestroyOutOfLoop : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
   debug_value %0 : $Klass, let, name "x", argno 1
-  %2 = begin_borrow [lexical] %0 : $Klass // expected-error {{'y' used after being moved}}
+  %2 = begin_borrow [lexical] [var_decl] %0 : $Klass // expected-error {{'y' used after consume}}
   debug_value %2 : $Klass, let, name "y"
   %4 = copy_value %2 : $Klass
-  %5 = move_value [allows_diagnostics] %4 : $Klass // expected-note {{move here}}
+  %5 = move_value [allows_diagnostics] %4 : $Klass // expected-note {{consumed here}}
   destroy_value %5 : $Klass
   br bb1
 
@@ -34,7 +34,7 @@ bb1:
 
 bb2(%58 : $Int):
   %59 = copy_value %2 : $Klass
-  %60 = begin_borrow [lexical] %59 : $Klass // expected-note {{use here}}
+  %60 = begin_borrow [lexical] [var_decl] %59 : $Klass // expected-note {{used here}}
   debug_value %60 : $Klass, let, name "m"
   end_borrow %60 : $Klass
   destroy_value %59 : $Klass

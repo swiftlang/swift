@@ -20,9 +20,9 @@
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include <optional>
 
 namespace swift {
 
@@ -156,7 +156,7 @@ public:
       // whose successors are in the region) blocks in the region only the top
       // of which was already visited.  Either way, the instructions between the
       // local gen and its kill have not yet been visited.  Visit them now.
-      auto foundLocalKill = visitBlockFromGenUntilBegin(instruction);
+      auto foundLocalKill = visitBlockFromGenThroughKill(instruction);
       assert(foundLocalKill && "local gen without local kill?!");
       (void)foundLocalKill;
     }
@@ -165,13 +165,14 @@ public:
 private:
   /// Entry points for visiting: they visit increasingly large portions of a
   /// block.
-  /// - visitBlockFromGenUntilBegin: Instructions and phi until a kill.
+  /// - visitBlockFromGenThroughKill: Instructions and phi through the first
+  ///                                 kill.
   /// - visitBlockFromGen: Instructions, phi, and begin.
   /// - visitBlock: End, instructions, phi, and begin.
 
   /// Visit instructions and phis starting from the specified gen until a kill
   /// is found.
-  bool visitBlockFromGenUntilBegin(SILInstruction *from) {
+  bool visitBlockFromGenThroughKill(SILInstruction *from) {
     assert(effects.effectForInstruction(from) == Effects::Effect::Gen());
     for (auto *instruction = from; instruction;
          instruction = instruction->getPreviousInstruction()) {
@@ -198,9 +199,21 @@ private:
         [&](SILBasicBlock *successor) { return visited.contains(successor); }));
 
     visited.insert(block);
-    bool foundLocalKill = visitBlockFromGenUntilBegin(from);
-    assert(!foundLocalKill && "found local kill for non-local gen?!");
-    (void)foundLocalKill;
+    for (auto *instruction = from; instruction;
+         instruction = instruction->getPreviousInstruction()) {
+      if (visitInstruction(instruction)) {
+        // New kills are incrementally added as access scopes are determined to
+        // be barriers.  For this reason, gens may newly be discovered to be
+        // local.  This can only happen when the kill which makes the gen local
+        // ends an access scope (i.e. is an end_access).
+        assert(isa<EndAccessInst>(instruction) &&
+               "found preexisting local kill for initially-non-local gen?!");
+        // Even so, the remainder of the block must still be visited.
+      }
+    }
+    if (block->hasPhi()) {
+      visitPhi(block);
+    }
     visitBlockBegin(block);
   }
 
@@ -259,8 +272,9 @@ private:
       }
     }
     // If any of this block's predecessors haven't already been visited, it
-    // means that they aren't in the region and consequently this block is a
-    // barrier block.
+    // means EITHER that those predecessors aren't in the region OR that a
+    // barrier was encountered when visiting some (iterative) successor of that
+    // predecessor.  Either way, this block is a barrier block as a result.
     if (llvm::any_of(block->getSuccessorBlocks(), [&](SILBasicBlock *block) {
           return !visited.contains(block);
         })) {

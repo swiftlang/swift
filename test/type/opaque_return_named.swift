@@ -3,11 +3,11 @@
 // Tests for experimental extensions to opaque return type support.
 
 func f0() -> <T> T { return () }
-func f1() -> <T, U, V> T { () } // expected-error{{cannot infer underlying type for opaque result 'T' from return expression}}
+func f1() -> <T, U, V> T { () } // expected-error{{underlying type for opaque result type 'T' could not be inferred from return expression}}
 func f2() -> <T: Collection, U: SignedInteger> T { // expected-note{{required by opaque return type of global function 'f2()'}}
   () // expected-error{{type '()' cannot conform to 'Collection'}}
   // expected-note@-1{{only concrete types such as structs, enums and classes can conform to protocols}}
-  // expected-error@-2{{cannot infer underlying type for opaque result 'T' from return expression}}
+  // expected-error@-2{{underlying type for opaque result type 'T' could not be inferred from return expression}}
 }
 
 func f4() async -> <T> T { () }

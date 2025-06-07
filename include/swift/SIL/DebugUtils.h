@@ -37,6 +37,8 @@
 #define SWIFT_SIL_DEBUGUTILS_H
 
 #include "swift/SIL/SILBasicBlock.h"
+#include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/SILInstruction.h"
 
 namespace swift {
@@ -192,6 +194,16 @@ inline Operand *getSingleDebugUse(SILValue value) {
   return *ii;
 }
 
+/// If \p value has any debug user(s), return the operand associated with some
+/// use. Otherwise, returns nullptr.
+inline Operand *getAnyDebugUse(SILValue value) {
+  auto range = getDebugUses(value);
+  auto ii = range.begin(), ie = range.end();
+  if (ii == ie)
+    return nullptr;
+  return *ii;
+}
+
 /// Erases the instruction \p I from it's parent block and deletes it, including
 /// all debug instructions which use \p I.
 /// Precondition: The instruction may only have debug instructions as uses.
@@ -237,31 +249,39 @@ bool hasNonTrivialNonDebugTransitiveUsers(
     PointerUnion<SILInstruction *, SILArgument *> V);
 
 /// A light weight abstraction on top of an instruction that carries within it
-/// information about a debug variable. This allows one to write high level code
-/// over the set of such instructions with greater correctness by using
-/// exhaustive switches, methods, and keeping it light weight by using *, ->
-/// operators to access functionality from the underlying instruction when
-/// needed.
-struct DebugVarCarryingInst {
+/// information about a VarDecl. This allows one to write high level code over
+/// the set of such instructions with greater correctness by using exhaustive
+/// switches, methods, and keeping it light weight by using *, -> operators to
+/// access functionality from the underlying instruction when eneded.
+class VarDeclCarryingInst {
+public:
   enum class Kind : uint8_t {
     Invalid = 0,
     DebugValue,
     AllocStack,
     AllocBox,
+    GlobalAddr,
+    RefElementAddr,
   };
 
+protected:
   SILInstruction *inst;
   Kind kind;
   uintptr_t spareBits : (sizeof(uintptr_t) - sizeof(Kind)) * 8;
 
-  DebugVarCarryingInst() : inst(nullptr), kind(Kind::Invalid), spareBits(0) {}
-  DebugVarCarryingInst(DebugValueInst *dvi)
+public:
+  VarDeclCarryingInst() : inst(nullptr), kind(Kind::Invalid), spareBits(0) {}
+  VarDeclCarryingInst(DebugValueInst *dvi)
       : inst(dvi), kind(Kind::DebugValue), spareBits(0) {}
-  DebugVarCarryingInst(AllocStackInst *asi)
+  VarDeclCarryingInst(AllocStackInst *asi)
       : inst(asi), kind(Kind::AllocStack), spareBits(0) {}
-  DebugVarCarryingInst(AllocBoxInst *abi)
+  VarDeclCarryingInst(AllocBoxInst *abi)
       : inst(abi), kind(Kind::AllocBox), spareBits(0) {}
-  DebugVarCarryingInst(SILInstruction *newInst)
+  VarDeclCarryingInst(GlobalAddrInst *gai)
+      : inst(gai), kind(Kind::GlobalAddr), spareBits(0) {}
+  VarDeclCarryingInst(RefElementAddrInst *reai)
+      : inst(reai), kind(Kind::RefElementAddr), spareBits(0) {}
+  VarDeclCarryingInst(SILInstruction *newInst)
       : inst(nullptr), kind(Kind::Invalid), spareBits(0) {
     switch (newInst->getKind()) {
     default:
@@ -274,6 +294,12 @@ struct DebugVarCarryingInst {
       break;
     case SILInstructionKind::AllocBoxInst:
       kind = Kind::AllocBox;
+      break;
+    case SILInstructionKind::GlobalAddrInst:
+      kind = Kind::GlobalAddr;
+      break;
+    case SILInstructionKind::RefElementAddrInst:
+      kind = Kind::RefElementAddr;
       break;
     }
     inst = newInst;
@@ -288,17 +314,22 @@ struct DebugVarCarryingInst {
   /// '->'. This keeps the wrapper light weight.
   SILInstruction *operator->() const { return inst; }
 
-  bool operator==(const DebugVarCarryingInst &other) const {
+  unsigned getSpareBits() const { return spareBits; }
+  void setSpareBits(unsigned newSpareBits) { spareBits = newSpareBits; }
+
+  bool operator==(const VarDeclCarryingInst &other) const {
     return kind == other.kind && inst == other.inst &&
            spareBits == other.spareBits;
   }
 
-  bool operator!=(const DebugVarCarryingInst &other) const {
+  bool operator!=(const VarDeclCarryingInst &other) const {
     return !(*this == other);
   }
 
   /// Add support for this struct in `if` statement.
   explicit operator bool() const { return bool(kind); }
+
+  Kind getKind() const { return kind; }
 
   VarDecl *getDecl() const {
     switch (kind) {
@@ -310,33 +341,133 @@ struct DebugVarCarryingInst {
       return cast<AllocStackInst>(inst)->getDecl();
     case Kind::AllocBox:
       return cast<AllocBoxInst>(inst)->getDecl();
+    case Kind::GlobalAddr:
+      return cast<GlobalAddrInst>(inst)->getReferencedGlobal()->getDecl();
+    case Kind::RefElementAddr:
+      return cast<RefElementAddrInst>(inst)->getField();
     }
     llvm_unreachable("covered switch");
   }
 
-  Optional<SILDebugVariable> getVarInfo() const {
-    switch (kind) {
+  /// If \p value is an alloc_stack, alloc_box use that. Otherwise, see if \p
+  /// value has a single debug user, return that. Otherwise return the invalid
+  /// VarDeclCarryingInst.
+  static VarDeclCarryingInst getFromValue(SILValue value);
+
+  StringRef getName() const {
+    assert(kind != Kind::Invalid);
+    StringRef varName = "unknown";
+    if (auto *decl = getDecl()) {
+      varName = decl->getBaseName().userFacingName();
+    }
+    return varName;
+  }
+
+  /// Take in \p inst, a potentially invalid VarDeclCarryingInst, and returns a
+  /// name for it. If we have an invalid value or don't find var info or a decl,
+  /// return "unknown".
+  ///
+  /// The reason this isn't a method is that in all the other parts of
+  /// VarDeclCarryingInst, we use Invalid to signal early error.
+  static StringRef getName(VarDeclCarryingInst inst) {
+    if (!inst)
+      return "unknown";
+    return inst.getName();
+  }
+};
+
+inline VarDeclCarryingInst VarDeclCarryingInst::getFromValue(SILValue value) {
+  if (auto *svi = dyn_cast<SingleValueInstruction>(value)) {
+    if (auto result = VarDeclCarryingInst(svi)) {
+      return result;
+    }
+  }
+
+  return VarDeclCarryingInst();
+}
+
+/// A light weight abstraction on top of an instruction that carries within it
+/// information about a debug variable. This allows one to write high level code
+/// over the set of such instructions with greater correctness by using
+/// exhaustive switches, methods, and keeping it light weight by using *, ->
+/// operators to access functionality from the underlying instruction when
+/// needed.
+struct DebugVarCarryingInst : VarDeclCarryingInst {
+#ifdef SET_TO_SUPER_ENUM_KIND
+#error "Cannot reuse this macro"
+#endif
+#define SET_TO_SUPER_ENUM_KIND(X)                                              \
+  X = std::underlying_type<VarDeclCarryingInst::Kind>::type(                   \
+      VarDeclCarryingInst::Kind::X)
+  enum class Kind : uint8_t {
+    SET_TO_SUPER_ENUM_KIND(Invalid),
+    SET_TO_SUPER_ENUM_KIND(DebugValue),
+    SET_TO_SUPER_ENUM_KIND(AllocStack),
+    SET_TO_SUPER_ENUM_KIND(AllocBox),
+  };
+#undef SET_TO_SUPER_ENUM_KIND
+  static_assert(
+      std::is_same<
+          std::underlying_type<VarDeclCarryingInst::Kind>::type,
+          std::underlying_type<DebugVarCarryingInst::Kind>::type>::value,
+      "DebugVarCarryingInst and VarDeclCarryingInst must have the "
+      "same underlying type");
+
+  DebugVarCarryingInst() : VarDeclCarryingInst() {}
+  DebugVarCarryingInst(DebugValueInst *dvi) : VarDeclCarryingInst(dvi) {}
+  DebugVarCarryingInst(AllocStackInst *asi) : VarDeclCarryingInst(asi) {}
+  DebugVarCarryingInst(AllocBoxInst *abi) : VarDeclCarryingInst(abi) {}
+  DebugVarCarryingInst(SILInstruction *newInst)
+      : VarDeclCarryingInst() {
+    switch (newInst->getKind()) {
+    default:
+      return;
+    case SILInstructionKind::DebugValueInst:
+      kind = VarDeclCarryingInst::Kind::DebugValue;
+      break;
+    case SILInstructionKind::AllocStackInst:
+      kind = VarDeclCarryingInst::Kind::AllocStack;
+      break;
+    case SILInstructionKind::AllocBoxInst:
+      kind = VarDeclCarryingInst::Kind::AllocBox;
+      break;
+    }
+    inst = newInst;
+  }
+
+  Kind getKind() const { return Kind(VarDeclCarryingInst::getKind()); }
+
+  /// Returns the debug variable information attached to the instruction.
+  ///
+  /// \param complete If true, always retrieve the complete variable with
+  /// location and scope, and the type if possible. If false, only return the
+  /// values if they are stored (if they are different from the instruction's
+  /// location, scope, and type). This should only be set to false in
+  /// SILPrinter. Incomplete var info is unpredictable, as it will sometimes
+  /// have location and scope and sometimes not.
+  std::optional<SILDebugVariable> getVarInfo(bool complete = true) const {
+    switch (getKind()) {
     case Kind::Invalid:
       llvm_unreachable("Invalid?!");
     case Kind::DebugValue:
-      return cast<DebugValueInst>(inst)->getVarInfo();
+      return cast<DebugValueInst>(**this)->getVarInfo(complete);
     case Kind::AllocStack:
-      return cast<AllocStackInst>(inst)->getVarInfo();
+      return cast<AllocStackInst>(**this)->getVarInfo(complete);
     case Kind::AllocBox:
-      return cast<AllocBoxInst>(inst)->getVarInfo();
+      return cast<AllocBoxInst>(**this)->getVarInfo(complete);
     }
     llvm_unreachable("covered switch");
   }
 
   void setDebugVarScope(const SILDebugScope *NewDS) {
-    switch (kind) {
+    switch (getKind()) {
     case Kind::Invalid:
       llvm_unreachable("Invalid?!");
     case Kind::DebugValue:
-      cast<DebugValueInst>(inst)->setDebugVarScope(NewDS);
+      cast<DebugValueInst>(**this)->setDebugVarScope(NewDS);
       break;
     case Kind::AllocStack:
-      cast<AllocStackInst>(inst)->setDebugVarScope(NewDS);
+      cast<AllocStackInst>(**this)->setDebugVarScope(NewDS);
       break;
     case Kind::AllocBox:
       llvm_unreachable("Not implemented");
@@ -344,32 +475,32 @@ struct DebugVarCarryingInst {
   }
 
   void markAsMoved() {
-    switch (kind) {
+    switch (getKind()) {
     case Kind::Invalid:
       llvm_unreachable("Invalid?!");
     case Kind::DebugValue:
-      cast<DebugValueInst>(inst)->markAsMoved();
+      cast<DebugValueInst>(**this)->setUsesMoveableValueDebugInfo();
       break;
     case Kind::AllocStack:
-      cast<AllocStackInst>(inst)->markAsMoved();
+      cast<AllocStackInst>(**this)->markUsesMoveableValueDebugInfo();
       break;
     case Kind::AllocBox:
-      llvm_unreachable("Not implemented");
+      cast<AllocBoxInst>(**this)->setUsesMoveableValueDebugInfo();
+      break;
     }
   }
 
   /// Returns true if this DebugVarCarryingInst was moved.
   bool getWasMoved() const {
-    switch (kind) {
+    switch (getKind()) {
     case Kind::Invalid:
       llvm_unreachable("Invalid?!");
     case Kind::DebugValue:
-      return cast<DebugValueInst>(inst)->getWasMoved();
+      return cast<DebugValueInst>(**this)->usesMoveableValueDebugInfo();
     case Kind::AllocStack:
-      return cast<AllocStackInst>(inst)->getWasMoved();
+      return cast<AllocStackInst>(**this)->usesMoveableValueDebugInfo();
     case Kind::AllocBox:
-      // We do not support moving alloc box today, so we always return false.
-      return false;
+      return cast<AllocBoxInst>(**this)->usesMoveableValueDebugInfo();
     }
   }
 
@@ -380,15 +511,15 @@ struct DebugVarCarryingInst {
   /// For a debug_value, we just return the actual operand, otherwise we return
   /// the pointer address.
   SILValue getOperandForDebugValueClone() const {
-    switch (kind) {
+    switch (getKind()) {
     case Kind::Invalid:
       llvm_unreachable("Invalid?!");
     case Kind::DebugValue:
-      return cast<DebugValueInst>(inst)->getOperand();
+      return cast<DebugValueInst>(**this)->getOperand();
     case Kind::AllocStack:
-      return cast<AllocStackInst>(inst);
+      return cast<AllocStackInst>(**this);
     case Kind::AllocBox:
-      llvm_unreachable("Not implemented");
+      return cast<AllocBoxInst>(**this);
     }
   }
 
@@ -396,6 +527,30 @@ struct DebugVarCarryingInst {
   /// value has a single debug user, return that. Otherwise return the invalid
   /// DebugVarCarryingInst.
   static DebugVarCarryingInst getFromValue(SILValue value);
+
+  StringRef getName() const {
+    assert(getKind() != Kind::Invalid);
+    StringRef varName = "unknown";
+    if (auto varInfo = getVarInfo()) {
+      varName = varInfo->Name;
+    } else if (auto *decl = getDecl()) {
+      varName = decl->getBaseName().userFacingName();
+    }
+    return varName;
+  }
+
+  std::optional<StringRef> maybeGetName() const {
+    assert(getKind() != Kind::Invalid);
+    if (auto varInfo = getVarInfo()) {
+      return varInfo->Name;
+    }
+
+    if (auto *decl = getDecl()) {
+      return decl->getBaseName().userFacingName();
+    }
+
+    return {};
+  }
 
   /// Take in \p inst, a potentially invalid DebugVarCarryingInst, and returns a
   /// name for it. If we have an invalid value or don't find var info or a decl,
@@ -406,31 +561,28 @@ struct DebugVarCarryingInst {
   static StringRef getName(DebugVarCarryingInst inst) {
     if (!inst)
       return "unknown";
-    StringRef varName = "unknown";
-    if (auto varInfo = inst.getVarInfo()) {
-      varName = varInfo->Name;
-    } else if (auto *decl = inst.getDecl()) {
-      varName = decl->getBaseName().userFacingName();
-    }
-    return varName;
+    return inst.getName();
   }
 };
 
-inline DebugVarCarryingInst DebugVarCarryingInst::getFromValue(SILValue value) {
-  if (isa<AllocStackInst>(value) || isa<AllocBoxInst>(value))
-    return DebugVarCarryingInst(cast<SingleValueInstruction>(value));
+static_assert(sizeof(DebugVarCarryingInst) == sizeof(VarDeclCarryingInst) &&
+                  alignof(DebugVarCarryingInst) == alignof(VarDeclCarryingInst),
+              "Expected debug var carrying inst to have the same "
+              "size/alignment/layout as VarDeclCarryingInst!");
 
-  if (auto *use = getSingleDebugUse(value))
-    return DebugVarCarryingInst(use->getUser());
-
-  return DebugVarCarryingInst();
-}
-
-/// Attempt to discover a StringRef varName for the value \p value. If we fail,
-/// we return the name "unknown".
+/// Attempt to discover a StringRef varName for the value \p value based only
+/// off of debug var information. If we fail, we return the name "unknown".
 inline StringRef getDebugVarName(SILValue value) {
   auto inst = DebugVarCarryingInst::getFromValue(value);
   return DebugVarCarryingInst::getName(inst);
+}
+
+inline StringRef getDiagnosticName(SILValue value) {
+  if (auto inst = DebugVarCarryingInst::getFromValue(value))
+    return inst.getName();
+  if (auto inst = VarDeclCarryingInst::getFromValue(value))
+    return inst.getName();
+  return "unknown";
 }
 
 } // end namespace swift

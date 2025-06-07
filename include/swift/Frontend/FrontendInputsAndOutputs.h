@@ -39,6 +39,10 @@ class FrontendInputsAndOutputs {
   llvm::StringMap<unsigned> PrimaryInputsByName;
   std::vector<unsigned> PrimaryInputsInOrder;
 
+  /// The file type for main output files. Assuming all inputs produce the
+  /// same kind of output.
+  file_types::ID PrincipalOutputType = file_types::ID::TY_INVALID;
+
   /// In Single-threaded WMO mode, all inputs are used
   /// both for importing and compiling.
   bool IsSingleThreadedWMO = false;
@@ -153,6 +157,10 @@ public:
   /// instead of just answering "batch" if there is more than one primary.
   std::string getStatsFileMangledInputName() const;
 
+  const InputFile &getFirstOutputProducingInput() const;
+
+  unsigned getIndexOfFirstOutputProducingInput() const;
+
   bool isInputPrimary(StringRef file) const;
 
   unsigned numberOfPrimaryInputsEndingWith(StringRef extension) const;
@@ -164,6 +172,7 @@ public:
   bool shouldTreatAsLLVM() const;
   bool shouldTreatAsSIL() const;
   bool shouldTreatAsModuleInterface() const;
+  bool shouldTreatAsNonPackageModuleInterface() const;
   bool shouldTreatAsObjCHeader() const;
 
   bool areAllNonPrimariesSIB() const;
@@ -189,7 +198,10 @@ private:
   void setMainAndSupplementaryOutputs(
       ArrayRef<std::string> outputFiles,
       ArrayRef<SupplementaryOutputPaths> supplementaryOutputs,
-      ArrayRef<std::string> outputFilesForIndexUnits = None);
+      ArrayRef<std::string> outputFilesForIndexUnits = {});
+  void setPrincipalOutputType(file_types::ID type) {
+    PrincipalOutputType = type;
+  }
 
 public:
   unsigned countOfInputsProducingMainOutputs() const;
@@ -197,6 +209,7 @@ public:
   bool hasInputsProducingMainOutputs() const {
     return countOfInputsProducingMainOutputs() != 0;
   }
+  file_types::ID getPrincipalOutputType() const { return PrincipalOutputType; }
 
   const InputFile &firstInputProducingOutput() const;
   const InputFile &lastInputProducingOutput() const;
@@ -247,22 +260,15 @@ public:
       llvm::function_ref<const std::string &(const SupplementaryOutputPaths &)>
           extractorFn) const;
 
-  bool hasDependenciesPath() const;
-  bool hasReferenceDependenciesPath() const;
-  bool hasClangHeaderOutputPath() const;
-  bool hasLoadedModuleTracePath() const;
-  bool hasModuleOutputPath() const;
-  bool hasModuleDocOutputPath() const;
-  bool hasModuleSourceInfoOutputPath() const;
-  bool hasModuleInterfaceOutputPath() const;
-  bool hasPrivateModuleInterfaceOutputPath() const;
-  bool hasABIDescriptorOutputPath() const;
-  bool hasConstValuesOutputPath() const;
-  bool hasModuleSemanticInfoOutputPath() const;
-  bool hasModuleSummaryOutputPath() const;
-  bool hasTBDPath() const;
-  bool hasYAMLOptRecordPath() const;
-  bool hasBitstreamOptRecordPath() const;
+#define OUTPUT(NAME, TYPE)                                                     \
+  bool has##NAME() const {                                                     \
+    return hasSupplementaryOutputPath(                                         \
+        [](const SupplementaryOutputPaths &outs) -> const std::string & {      \
+          return outs.NAME;                                                    \
+        });                                                                    \
+  }
+#include "swift/Basic/SupplementaryOutputPaths.def"
+#undef OUTPUT
 
   bool hasDependencyTrackerPath() const;
 };

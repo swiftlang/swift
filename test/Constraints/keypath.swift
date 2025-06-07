@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -typecheck -verify %S/Inputs/keypath.swift -primary-file %s
+// RUN: %target-swift-frontend -enable-experimental-feature KeyPathWithMethodMembers -typecheck -verify %S/Inputs/keypath.swift -primary-file %s
+// REQUIRES: swift_feature_KeyPathWithMethodMembers
 
 struct S {
   let i: Int
@@ -33,7 +34,7 @@ class Demo {
 
 let some = Some(keyPath: \Demo.here)
 // expected-error@-1 {{cannot convert value of type 'KeyPath<Demo, (() -> Void)?>' to expected argument type 'KeyPath<Demo, ((V) -> Void)?>'}}
-// expected-note@-2 {{arguments to generic parameter 'Value' ('(() -> Void)?' and '((V) -> Void)?') are expected to be equal}}
+// expected-note@-2 {{arguments to generic parameter 'Wrapped' ('() -> Void' and '(V) -> Void') are expected to be equal}}
 // expected-error@-3 {{generic parameter 'V' could not be inferred}}
 // expected-note@-4 {{explicitly specify the generic arguments to fix this issue}}
 
@@ -41,8 +42,10 @@ let some = Some(keyPath: \Demo.here)
 func testFunc() {
   let _: (S) -> Int = \.i
   _ = ([S]()).map(\.i)
-  _ = \S.init // expected-error {{key path cannot refer to initializer 'init()'}}
-  _ = ([S]()).map(\.init) // expected-error {{key path cannot refer to initializer 'init()'}}
+  _ = \S.Type.init
+  _ = \S.init // expected-error {{static member 'init()' cannot be used on instance of type 'S'}}
+  _ = ([S.Type]()).map(\.init)
+  _ = ([S]()).map(\.init) // expected-error {{static member 'init()' cannot be used on instance of type 'S'}}
 
   let kp = \S.i
   let _: KeyPath<S, Int> = kp // works, because type defaults to KeyPath nominal
@@ -81,8 +84,8 @@ func testVariadicKeypathAsFunc() {
 
   // These are not okay, the KeyPath should have a base that matches the
   // internal parameter type of the function, i.e (S...).
-  let _: (S...) -> Int = \S.i // expected-error {{key path value type 'S' cannot be converted to contextual type 'S...'}}
-  takesVariadicFnWithGenericRet(\S.i) // expected-error {{key path value type 'S' cannot be converted to contextual type 'S...'}}
+  let _: (S...) -> Int = \S.i // expected-error {{cannot convert key path root type 'S' to contextual type 'S...'}}
+  takesVariadicFnWithGenericRet(\S.i) // expected-error {{cannot convert key path root type 'S' to contextual type 'S...'}}
 }
 
 // rdar://problem/54322807
@@ -136,8 +139,8 @@ func test_mismatch_with_contextual_optional_result() {
     var arr: [Int] = []
   }
 
-  let _ = A(B(), keyPath: \.arr)
-  // expected-error@-1 {{key path value type '[Int]' cannot be converted to contextual type '[Int]?'}}
+  let _ = A(B(), keyPath: \.arr) // expected-error {{cannot convert value of type 'KeyPath<B, [Int]>' to expected argument type 'KeyPath<B, [Int]?>'}}
+  // expected-note@-1 {{arguments to generic parameter 'Value' ('[Int]' and '[Int]?') are expected to be equal}}
 }
 
 // https://github.com/apple/swift/issues/53581
@@ -180,6 +183,20 @@ func key_path_root_mismatch<T>(_ base: KeyPathBase?, subBase: KeyPathBaseSubtype
 
 }
 
+func key_path_value_mismatch() {
+  struct S {
+    var member: Int
+  }
+	
+  func test(_: KeyPath<S, String>) {}
+  // expected-note@-1 {{found candidate with type 'KeyPath<S, Int>'}}
+  func test(_: KeyPath<S, Float>) {}
+  // expected-note@-1 {{found candidate with type 'KeyPath<S, Int>'}}
+	
+  test(\.member)
+  // expected-error@-1 {{no exact matches in call to local function 'test'}}
+}
+
 // https://github.com/apple/swift/issues/55884
 func f_55884() {
   func f<T>(_ x: KeyPath<String?, T>) -> T { "1"[keyPath: x] }
@@ -205,4 +222,123 @@ func rdar85458997() {
 
   _ = S(\.name)
   // expected-error@-1 {{cannot infer key path type from context; consider explicitly specifying a root type}} {{10-10=<#Root#>}}
+}
+
+// https://github.com/apple/swift/issues/65965 - failed to produce correct types for key path capability mismatch
+func issue_65965() {
+  struct S {
+	  var s: String
+	  let v: String
+  }
+	
+  let refKP: ReferenceWritableKeyPath<S, String>
+  refKP = \.s
+  // expected-error@-1 {{cannot convert key path type 'WritableKeyPath<S, String>' to contextual type 'ReferenceWritableKeyPath<S, String>'}}
+
+  let writeKP: WritableKeyPath<S, String>
+  writeKP = \.v
+  // expected-error@-1 {{cannot convert key path type 'KeyPath<S, String>' to contextual type 'WritableKeyPath<S, String>'}}
+}
+
+func test_any_key_path() {
+  struct S {
+    var v: String
+  }
+  
+  var anyKP: AnyKeyPath
+  anyKP = \S.v
+  anyKP = \.v
+  // expected-error@-1 {{cannot infer key path type from context; consider explicitly specifying a root type}}
+}
+
+// rdar://problem/32101765 - Keypath diagnostics are not actionable/helpful
+func rdar32101765() {
+  struct R32101765 {
+    let prop32101765 = 0
+  }
+  
+  let _: KeyPath<R32101765, Float> = \.prop32101765
+  // expected-error@-1 {{cannot assign value of type 'KeyPath<R32101765, Int>' to type 'KeyPath<R32101765, Float>'}}
+  // expected-note@-2 {{arguments to generic parameter 'Value' ('Int' and 'Float') are expected to be equal}}
+  let _: KeyPath<R32101765, Float> = \R32101765.prop32101765
+  // expected-error@-1 {{cannot assign value of type 'KeyPath<R32101765, Int>' to type 'KeyPath<R32101765, Float>'}}
+  // expected-note@-2 {{arguments to generic parameter 'Value' ('Int' and 'Float') are expected to be equal}}
+  let _: KeyPath<R32101765, Float> = \.prop32101765.unknown
+  // expected-error@-1 {{type 'Int' has no member 'unknown'}}
+  let _: KeyPath<R32101765, Float> = \R32101765.prop32101765.unknown
+  // expected-error@-1 {{type 'Int' has no member 'unknown'}}
+}
+
+// https://github.com/apple/swift/issues/69795
+func test_invalid_argument_to_keypath_subscript() {
+  func test(x: Int) {
+    x[keyPath: 5]
+    // expected-error@-1 {{cannot use value of type 'Int' as a key path subscript index; argument must be a key path}}
+  }
+
+  let _: (Int) -> Void = {
+    let y = $0
+    y[keyPath: 5]
+    // expected-error@-1 {{cannot use value of type 'Int' as a key path subscript index; argument must be a key path}}
+  }
+
+  func ambiguous(_: (String) -> Void) {}
+  func ambiguous(_: (Int) -> Void) {}
+
+  // FIXME(diagnostic): This is not properly diagnosed in a general case and key path application is even more
+  // complicated because overloads anchored on 'SubscriptExpr -> subscript member' do not point to declarations.
+  // The diagnostic should point out that `ambiguous` is indeed ambiguous and that `5` is not a valid argument
+  // for a key path subscript.
+  ambiguous {
+    // expected-error@-1 {{type of expression is ambiguous without a type annotation}}
+    $0[keyPath: 5]
+  }
+
+  class A {
+  }
+
+  func test_invalid_existential_protocol(base: String, v: any BinaryInteger) {
+    base[keyPath: v]
+    // expected-error@-1 {{cannot use value of type 'any BinaryInteger' as a key path subscript index; argument must be a key path}}
+  }
+
+  func test_invalid_existential_composition(base: String, v: any A & BinaryInteger) {
+    base[keyPath: v]
+    // expected-error@-1 {{cannot use value of type 'A' as a key path subscript index; argument must be a key path}}
+  }
+}
+
+extension Collection {
+  func prefix<R: RangeExpression>(
+    _ range: R,
+    while predicate: ((Element) -> Bool)? = nil
+  ) -> SubSequence where R.Bound == Self.Index {
+    fatalError()
+  }
+}
+
+// https://github.com/apple/swift/issues/56393
+func keypathToFunctionWithOptional() {
+  _ = Array("").prefix(1...4, while: \.isNumber) // Ok
+}
+
+func test_new_key_path_type_requirements() {
+  struct V: ~Copyable {
+  }
+
+  struct S: ~Copyable {
+    var x: Int
+    var v: V
+  }
+
+  _ = \S.x // expected-error {{key path cannot refer to noncopyable type 'S'}}
+  _ = \S.v
+  // expected-error@-1 {{key path cannot refer to noncopyable type 'S'}}
+  // expected-error@-2 {{key path cannot refer to noncopyable type 'V'}}
+
+  func test<R>(_: KeyPath<R, Int>) {} // expected-note {{'where R: Copyable' is implicit here}}
+
+  test(\S.x)
+  // expected-error@-1 {{key path cannot refer to noncopyable type 'S'}}
+  // expected-error@-2 {{local function 'test' requires that 'S' conform to 'Copyable'}}
 }

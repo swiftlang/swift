@@ -6,6 +6,7 @@
 // RUN:   -module-name ASTPrinter -emit-module
 // RUN: %lldb-moduleimport-test -qualify-types \
 // RUN:   -type-from-mangled=%t/list %t/a.out | %FileCheck %s
+
 // This name should come out fully qualified.
 // CHECK: ClangModule.Foo
 import ClangModule

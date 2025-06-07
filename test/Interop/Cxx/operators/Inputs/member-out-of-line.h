@@ -44,4 +44,9 @@ private:
   int values[5] = { 1, 2, 3, 4, 5 };
 };
 
+struct ClassWithOperatorEqualsParamUnnamed {
+  bool operator==(const ClassWithOperatorEqualsParamUnnamed &) const;
+  bool operator!=(const ClassWithOperatorEqualsParamUnnamed &) const;
+};
+
 #endif

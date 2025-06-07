@@ -1,8 +1,11 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -emit-module-path %t/UnavailableFunction.swiftmodule -module-name UnavailableFunction -warn-concurrency %S/Inputs/UnavailableFunction.swift
-// RUN: %target-swift-frontend -typecheck -verify -I %t %s
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/UnavailableFunction.swiftmodule -module-name UnavailableFunction -strict-concurrency=complete %S/Inputs/UnavailableFunction.swift
+// RUN: %target-swift-frontend -verify -I %t %s -emit-sil -o /dev/null
+// RUN: %target-swift-frontend -verify -I %t %s -emit-sil -o /dev/null -strict-concurrency=targeted
+// RUN: %target-swift-frontend -verify -I %t %s -emit-sil -o /dev/null -strict-concurrency=complete
 
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 import UnavailableFunction
 
@@ -137,24 +140,53 @@ func asyncFunc() async { // expected-error{{asynchronous global function 'asyncF
 
 // Parsing tests
 
+// expected-error@+1 {{expected label 'message:' in '@_unavailableFromAsync' attribute}} {{24-24=message: }}
+@_unavailableFromAsync("almost right, but not quite")
+func blarp0() {}
+
+// expected-error@+1 {{expected label 'message:' in '@_unavailableFromAsync' attribute}} {{24-25=message}}
+@_unavailableFromAsync(_: "almost right, but not quite")
+func blarp0a() {}
+
 // expected-error@+2 {{expected declaration}}
-// expected-error@+1:24{{unknown option 'nope' for attribute '_unavailableFromAsync'}}
+// expected-error@+1:24{{unknown option 'nope' for attribute '_unavailableFromAsync'}} {{24-28=message}}
 @_unavailableFromAsync(nope: "almost right, but not quite")
 func blarp1() {}
 
 // expected-error@+2 {{expected declaration}}
-// expected-error@+1 {{expected ':' after label 'message'}}
+// expected-error@+1 {{expected ':' after label 'message'}} {{none}}
 @_unavailableFromAsync(message; "almost right, but not quite")
 func blarp2() {}
+
+// expected-error@+1 {{expected ':' after label 'message'}} {{31-31=:}}
+@_unavailableFromAsync(message "almost right, but not quite")
+func blarp2a() {}
 
 // expected-error@+1:31 {{'=' has been replaced with ':' in attribute arguments}}{{31-32=: }}
 @_unavailableFromAsync(message="almost right, but not quite")
 func blarp3() {}
 
 // expected-error@+2 {{expected declaration}}
-// expected-error@+1 {{expected string literal in '_unavailableFromAsync' attribute}}
+// expected-error@+1 {{expected string literal in '_unavailableFromAsync' attribute}} {{33-35="<#error message#>"}}
 @_unavailableFromAsync(message: 32)
 func blarp4() {}
+
+// expected-error@+2 {{expected declaration}}
+// expected-error@+1:24{{unknown option 'fnord' for attribute '_unavailableFromAsync'}} {{24-29=message}}
+@_unavailableFromAsync(fnord: 32)
+func blarp4a() {}
+
+// expected-error@+3 {{expected declaration}}
+// expected-error@+2 {{expected label 'message:' in '@_unavailableFromAsync' attribute}} {{24-25=message}}
+// expected-error@+1 {{expected string literal in '_unavailableFromAsync' attribute}} {{27-29="<#error message#>"}}
+@_unavailableFromAsync(_: 32)
+func blarp4b() {}
+
+// expected-error@+3 {{expected declaration}}
+// expected-error@+2 {{expected string literal in '_unavailableFromAsync' attribute}} {{24-26="<#error message#>"}}
+// expected-error@+1 {{expected label 'message:' in '@_unavailableFromAsync' attribute}} {{24-24=message: }}
+@_unavailableFromAsync(32)
+func blarp4c() {}
 
 // expected-error@+2 {{expected declaration}}
 // expected-error@+1 {{message cannot be an interpolated string}}

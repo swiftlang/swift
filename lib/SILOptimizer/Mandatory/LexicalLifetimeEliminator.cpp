@@ -22,6 +22,9 @@ class LexicalLifetimeEliminatorPass : public SILFunctionTransform {
   void run() override {
     auto *fn = getFunction();
 
+    if (fn->forceEnableLexicalLifetimes())
+      return;
+
     // If we are already canonical, we do not have any diagnostics to emit.
     if (fn->wasDeserializedCanonical())
       return;
@@ -43,7 +46,13 @@ class LexicalLifetimeEliminatorPass : public SILFunctionTransform {
           }
           continue;
         }
-
+        if (auto *mvi = dyn_cast<MoveValueInst>(&inst)) {
+          if (mvi->isLexical()) {
+            mvi->removeIsLexical();
+            madeChange = true;
+          }
+          continue;
+        }
         if (auto *asi = dyn_cast<AllocStackInst>(&inst)) {
           if (asi->isLexical()) {
             asi->removeIsLexical();

@@ -1,20 +1,25 @@
-// RUN: %target-sil-opt -unit-test-runner %s 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -test-runner %s 2>&1 | %FileCheck %s
 
 import Builtin
 import Swift
 
 class C {}
 
+struct X {}
+
 sil [ossa] @get_owned_c : $@convention(thin) () -> (@owned C)
 sil [ossa] @callee_guaranteed: $@convention(thin) (@guaranteed C) -> ()
+sil [ossa] @barrier : $@convention(thin) () -> ()
+
 
 // CHECK-LABEL: begin running test 1 of {{[^,]+}} on nohoist_over_rewritten_copy
 // CHECK-NOT: DELETED:
 // CHECK-NOT: end_borrow
+// CHECK: Result: did not shrink
 // CHECK-LABEL: end running test 1 of {{[^,]+}} on nohoist_over_rewritten_copy
 sil [ossa] @nohoist_over_rewritten_copy : $@convention(thin) () -> (@owned C, @owned C) {
 entry:
-  test_specification "shrink-borrow-scope @trace true @trace[1]"
+  specify_test "shrink_borrow_scope %lifetime"
   %get_owned_c = function_ref @get_owned_c : $@convention(thin) () -> (@owned C)
   %instance = apply %get_owned_c() : $@convention(thin) () -> (@owned C)
   %lifetime = begin_borrow [lexical] %instance : $C
@@ -28,3 +33,37 @@ entry:
   return %retval : $(C, C)
 }
 
+// CHECK-LABEL: begin running test {{.*}} on nohoist_over_access_scope_barrier_1
+// CHECK:       Result: did not shrink
+// CHECK-LABEL: end running test {{.*}} on nohoist_over_access_scope_barrier_1
+sil [ossa] @nohoist_over_access_scope_barrier_1 : $@convention(thin) (@guaranteed C, @inout X) -> () {
+entry(%c : @guaranteed $C, %addr : $*X):
+  %borrow = begin_borrow %c : $C
+  specify_test "shrink_borrow_scope %borrow"
+  %access = begin_access [modify] [dynamic] %addr : $*X
+  cond_br undef, kill_introducer, newly_local_gen
+
+kill_introducer:
+  cond_br undef, left, right
+
+left:
+  %barrier = function_ref @barrier : $@convention(thin) () -> ()
+  apply %barrier() : $@convention(thin) () -> ()
+  end_access %access : $*X
+  end_borrow %borrow : $C
+  br exit
+
+right:
+  end_access %access : $*X
+  end_borrow %borrow : $C
+  br exit
+
+newly_local_gen:
+  end_access %access : $*X
+  end_borrow %borrow : $C
+  br exit
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}

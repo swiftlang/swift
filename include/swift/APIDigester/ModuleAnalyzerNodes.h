@@ -179,7 +179,8 @@ class SDKContext {
   CheckerOptions Opts;
   std::vector<BreakingAttributeInfo> BreakingAttrs;
   // The common version of two ABI/API descriptors under comparison.
-  Optional<uint8_t> CommonVersion;
+  std::optional<uint8_t> CommonVersion;
+
 public:
   // Define the set of known identifiers.
 #define IDENTIFIER_WITH_NAME(Name, IdStr) StringRef Id_##Name = IdStr;
@@ -231,7 +232,7 @@ public:
   const CheckerOptions &getOpts() const { return Opts; }
   bool shouldIgnore(Decl *D, const Decl* Parent = nullptr) const;
   ArrayRef<BreakingAttributeInfo> getBreakingAttributeInfo() const { return BreakingAttrs; }
-  Optional<uint8_t> getFixedBinaryOrder(ValueDecl *VD) const;
+  std::optional<uint8_t> getFixedBinaryOrder(ValueDecl *VD) const;
 
   CompilerInstance &newCompilerInstance() {
     CIs.emplace_back(new CompilerInstance());
@@ -334,9 +335,11 @@ struct PlatformIntroVersion {
   StringRef ios;
   StringRef tvos;
   StringRef watchos;
+  StringRef visionos;
   StringRef swift;
   bool hasOSAvailability() const {
-    return !macos.empty() || !ios.empty() || !tvos.empty() || !watchos.empty();
+    return !macos.empty() || !ios.empty() || !tvos.empty() ||
+      !watchos.empty() || !visionos.empty();
   }
 };
 
@@ -363,7 +366,7 @@ class SDKNodeDecl: public SDKNode {
   // In ABI mode, this field is populated as a user-friendly version of GenericSig.
   // Diagnostic preferes the sugared versions if they differ as well.
   StringRef SugaredGenericSig;
-  Optional<uint8_t> FixedBinaryOrder;
+  std::optional<uint8_t> FixedBinaryOrder;
   PlatformIntroVersion introVersions;
   StringRef ObjCName;
 
@@ -381,7 +384,7 @@ public:
   swift::ReferenceOwnership getReferenceOwnership() const {
     return swift::ReferenceOwnership(ReferenceOwnership);
   }
-  bool isObjc() const { return Usr.startswith("c:"); }
+  bool isObjc() const { return Usr.starts_with("c:"); }
   static bool classof(const SDKNode *N);
   DeclKind getDeclKind() const { return DKind; }
   void printFullyQualifiedName(llvm::raw_ostream &OS) const;
@@ -393,7 +396,7 @@ public:
   bool isImplicit() const { return IsImplicit; };
   bool isStatic() const { return IsStatic; };
   bool isOverriding() const { return IsOverriding; };
-  bool isOptional() const { return hasDeclAttribute(DeclAttrKind::DAK_Optional); }
+  bool isOptional() const { return hasDeclAttribute(DeclAttrKind::Optional); }
   bool isOpen() const { return IsOpen; }
   bool isInternal() const { return IsInternal; }
   bool isABIPlaceholder() const { return IsABIPlaceholder; }
@@ -437,7 +440,7 @@ class SDKNodeRoot: public SDKNode {
   uint8_t JsonFormatVer;
 public:
   SDKNodeRoot(SDKNodeInitInfo Info);
-  static SDKNode *getInstance(SDKContext &Ctx);
+  static SDKNode *getInstance(SDKContext &Ctx, ArrayRef<ModuleDecl*> modules);
   static bool classof(const SDKNode *N);
   void registerDescendant(SDKNode *D);
   virtual void jsonize(json::Output &Out) override;
@@ -445,6 +448,7 @@ public:
   ArrayRef<SDKNodeDecl*> getDescendantsByUsr(StringRef Usr) {
     return DescendantDeclTable[Usr].getArrayRef();
   }
+  std::optional<StringRef> getSingleModuleName() const;
 };
 
 class SDKNodeType: public SDKNode {
@@ -490,7 +494,7 @@ public:
 class SDKNodeTypeFunc : public SDKNodeType {
 public:
   SDKNodeTypeFunc(SDKNodeInitInfo Info);
-  bool isEscaping() const { return hasTypeAttribute(TypeAttrKind::TAK_noescape); }
+  bool isEscaping() const { return hasTypeAttribute(TypeAttrKind::NoEscape); }
   static bool classof(const SDKNode *N);
   void diagnose(SDKNode *Right) override;
 };
@@ -534,8 +538,8 @@ public:
   ViewerIterator(const ViewerIterator& mit) : Viewer(mit.Viewer), P(mit.P) {}
   ViewerIterator& operator++();
   ViewerIterator operator++(int) {ViewerIterator tmp(*this); operator++(); return tmp;}
-  bool operator==(const ViewerIterator& rhs) {return P==rhs.P;}
-  bool operator!=(const ViewerIterator& rhs) {return P!=rhs.P;}
+  bool operator==(const ViewerIterator& rhs) const {return P==rhs.P;}
+  bool operator!=(const ViewerIterator& rhs) const {return P!=rhs.P;}
   const NodePtr& operator*() {return *P;}
 };
 
@@ -586,11 +590,11 @@ public:
     return InheritsConvenienceInitializers;
   };
 
-  Optional<SDKNodeDeclType*> getSuperclass() const;
+  std::optional<SDKNodeDeclType *> getSuperclass() const;
 
   /// Finding the node through all children, including the inherited ones,
   /// whose printed name matches with the given name.
-  Optional<SDKNodeDecl*> lookupChildByPrintedName(StringRef Name) const;
+  std::optional<SDKNodeDecl *> lookupChildByPrintedName(StringRef Name) const;
   SDKNodeType *getRawValueType() const;
   bool isConformingTo(KnownProtocolKind Kind) const;
   void jsonize(json::Output &out) override;
@@ -684,7 +688,7 @@ public:
 class SDKNodeDeclAbstractFunc : public SDKNodeDecl {
   bool IsThrowing;
   bool ReqNewWitnessTableEntry;
-  Optional<uint8_t> SelfIndex;
+  std::optional<uint8_t> SelfIndex;
 
 protected:
   SDKNodeDeclAbstractFunc(SDKNodeInitInfo Info, SDKNodeKind Kind);
@@ -693,7 +697,7 @@ public:
   bool isThrowing() const { return IsThrowing; }
   bool reqNewWitnessTableEntry() const { return ReqNewWitnessTableEntry; }
   uint8_t getSelfIndex() const { return SelfIndex.value(); }
-  Optional<uint8_t> getSelfIndexOptional() const { return SelfIndex; }
+  std::optional<uint8_t> getSelfIndexOptional() const { return SelfIndex; }
   bool hasSelfIndex() const { return SelfIndex.has_value(); }
   static bool classof(const SDKNode *N);
   virtual void jsonize(json::Output &out) override;
@@ -776,16 +780,15 @@ public:
   void visitAllRoots(SDKNodeVisitor &Visitor) {
     SDKNode::preorderVisit(RootNode, Visitor);
   }
-  SwiftDeclCollector(SDKContext &Ctx) : Ctx(Ctx),
-    RootNode(SDKNodeRoot::getInstance(Ctx)) {}
+  SwiftDeclCollector(SDKContext &Ctx, ArrayRef<ModuleDecl*> modules = {});
 
   // Construct all roots vector from a given file where a forest was
   // previously dumped.
   void deSerialize(StringRef Filename);
 
   // Serialize the content of all roots to a given file using JSON format.
-  void serialize(StringRef Filename);
-  static void serialize(StringRef Filename, SDKNode *Root, PayLoad otherInfo);
+  void serialize(llvm::raw_ostream &os);
+  static void serialize(llvm::raw_ostream &os, SDKNode *Root, PayLoad otherInfo);
 
   // After collecting decls, either from imported modules or from a previously
   // serialized JSON file, using this function to get the root of the SDK.
@@ -817,8 +820,6 @@ public:
   void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason,
                  DynamicLookupInfo dynamicLookupInfo = {}) override;
   void processDecl(Decl *D);
-public:
-  void lookupVisibleDecls(ArrayRef<ModuleDecl *> Modules);
 };
 
 void detectRename(SDKNode *L, SDKNode *R);
@@ -835,14 +836,15 @@ SDKNodeRoot *getSDKNodeRoot(SDKContext &SDKCtx,
 
 SDKNodeRoot *getEmptySDKNodeRoot(SDKContext &SDKCtx);
 
-void dumpSDKRoot(SDKNodeRoot *Root, PayLoad load, StringRef OutputFile);
-void dumpSDKRoot(SDKNodeRoot *Root, StringRef OutputFile);
+void dumpSDKRoot(SDKNodeRoot *Root, PayLoad load, llvm::raw_ostream &os);
+void dumpSDKRoot(SDKNodeRoot *Root, llvm::raw_ostream &os);
 
 int dumpSDKContent(const CompilerInvocation &InitInvoke,
                    const llvm::StringSet<> &ModuleNames,
-                   StringRef OutputFile, CheckerOptions Opts);
+                   llvm::raw_ostream &os, CheckerOptions Opts);
 
-void dumpModuleContent(ModuleDecl *MD, StringRef OutputFile, bool ABI, bool Empty);
+void dumpModuleContent(ModuleDecl *MD, llvm::raw_ostream &os, bool ABI,
+                       bool Empty);
 
 /// Mostly for testing purposes, this function de-serializes the SDK dump in
 /// dumpPath and re-serialize them to OutputPath. If the tool performs correctly,

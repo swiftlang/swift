@@ -1,0 +1,34 @@
+// RUN: %scale-test --begin 10 --end 100 --step 15 --select NumLeafScopes %s
+// REQUIRES: asserts,no_asan
+
+precedencegroup P {
+  associativity: right
+}
+
+infix operator ^^^ : P
+func ^^^ (lhs: Int, rhs: Int) -> Int { 0 }
+func ^^^ (lhs: Int8, rhs: Int8) -> Int8 { 0 }
+func ^^^ (lhs: Int16, rhs: Int16) -> Int16 { 0 }
+func ^^^ (lhs: Int32, rhs: Int32) -> Int32 { 0 }
+func ^^^ (lhs: Int64, rhs: Int64) -> Int64 { 0 }
+
+func ^^^ (lhs: UInt, rhs: UInt) -> UInt { 0 }
+func ^^^ (lhs: UInt8, rhs: UInt8) -> UInt8 { 0 }
+func ^^^ (lhs: UInt16, rhs: UInt16) -> UInt16 { 0 }
+func ^^^ (lhs: UInt32, rhs: UInt32) -> UInt32 { 0 }
+func ^^^ (lhs: UInt64, rhs: UInt64) -> UInt64 { 0 }
+
+func ^^^ (lhs: Double, rhs: Double) -> Double { 0 }
+func ^^^ (lhs: Float, rhs: Float) -> Float { 0 }
+
+// Make sure solving scales linearly with the number of branches.
+let _ = switch 0 {
+case -1:
+  0 ^^^ 1 ^^^ 2
+%for i in range(0, N):
+case ${i}:
+  3 ^^^ 4 ^^^ 5
+%end
+default:
+  1
+}

@@ -5,6 +5,9 @@ sil_stage raw
 
 import Builtin
 
+enum Never { }
+protocol Error { }
+
 enum Optional<T> {
 case some(T)
 case none

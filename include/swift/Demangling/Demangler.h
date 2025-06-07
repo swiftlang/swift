@@ -20,6 +20,7 @@
 #define SWIFT_DEMANGLING_DEMANGLER_H
 
 #include "swift/Demangling/Demangle.h"
+#include "swift/Demangling/ManglingFlavor.h"
 #include "swift/Demangling/NamespaceMacros.h"
 
 //#define NODE_FACTORY_DEBUGGING
@@ -44,16 +45,17 @@ class NodeFactory {
   /// The end of the current slab.
   char *End = nullptr;
 
-  struct Slab {
+  struct AllocatedSlab {
     // The previously allocated slab.
-    Slab *Previous;
+    AllocatedSlab *Previous;
     // Tail allocated memory starts here.
   };
   
   /// The head of the single-linked slab list.
-  Slab *CurrentSlab = nullptr;
+  AllocatedSlab *CurrentSlab = nullptr;
 
-  /// The size of the previously allocated slab.
+  /// The size of the previously allocated slab. This may NOT be the size of
+  /// CurrentSlab, in the case where a checkpoint has been popped.
   ///
   /// The slab size can only grow, even clear() does not reset the slab size.
   /// This initial size is good enough to fit most de-manglings.
@@ -65,7 +67,7 @@ class NodeFactory {
                      & ~((uintptr_t)Alignment - 1));
   }
 
-  static void freeSlabs(Slab *slab);
+  static void freeSlabs(AllocatedSlab *slab);
 
   /// If not null, the NodeFactory from which this factory borrowed free memory.
   NodeFactory *BorrowedFrom = nullptr;
@@ -148,8 +150,8 @@ public:
       // No. We have to malloc a new slab.
       // We double the slab size for each allocated slab.
       SlabSize = std::max(SlabSize * 2, ObjectSize + alignof(T));
-      size_t AllocSize = sizeof(Slab) + SlabSize;
-      Slab *newSlab = (Slab *)malloc(AllocSize);
+      size_t AllocSize = sizeof(AllocatedSlab) + SlabSize;
+      AllocatedSlab *newSlab = (AllocatedSlab *)malloc(AllocSize);
 
       // Insert the new slab in the single-linked list of slabs.
       newSlab->Previous = CurrentSlab;
@@ -205,7 +207,8 @@ public:
     if (Growth < Capacity * 2)
       Growth = Capacity * 2;
     T *NewObjects = Allocate<T>(Capacity + Growth);
-    memcpy(NewObjects, Objects, OldAllocSize);
+    if (OldAllocSize)
+      memcpy(NewObjects, Objects, OldAllocSize);
     Objects = NewObjects;
     Capacity += Growth;
   }
@@ -219,6 +222,26 @@ public:
     memcpy(copiedString, str.data(), stringSize);
     return {copiedString, str.size()};
   }
+
+  /// A checkpoint which captures the allocator's state at any given time. A
+  /// checkpoint can be popped to free all allocations made since it was made.
+  struct Checkpoint {
+    AllocatedSlab *Slab;
+    char *CurPtr;
+    char *End;
+  };
+
+  /// Create a new checkpoint with the current state of the allocator.
+  Checkpoint pushCheckpoint() const;
+
+  /// Clear all allocations made since the given checkpoint. It is
+  /// undefined behavior to pop checkpoints in an order other than the
+  /// order in which they were pushed, or to pop a checkpoint when
+  /// clear() was called after creating it. The implementation attempts
+  /// to raise a fatal error in that case, but does not guarantee it. It
+  /// is allowed to pop outer checkpoints without popping inner ones, or
+  /// to call clear() without popping existing checkpoints.
+  void popCheckpoint(Checkpoint checkpoint);
 
   /// Creates a node of kind \p K.
   NodePointer createNode(Node::Kind K);
@@ -361,6 +384,8 @@ enum class SymbolicReferenceKind : uint8_t {
   UniqueExtendedExistentialTypeShape,
   /// A symbolic reference to a non-unique extended existential type shape.
   NonUniqueExtendedExistentialTypeShape,
+  /// A symbolic reference to a objective C protocol ref.
+  ObjectiveCProtocol,
 };
 
 using SymbolicReferenceResolver_t = NodePointer (SymbolicReferenceKind,
@@ -381,6 +406,8 @@ protected:
   /// as part of the name.
   bool IsOldFunctionTypeMangling = false;
 
+  Mangle::ManglingFlavor Flavor = Mangle::ManglingFlavor::Default;
+
   Vector<NodePointer> NodeStack;
   Vector<NodePointer> Substitutions;
 
@@ -391,7 +418,7 @@ protected:
   std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver;
 
   bool nextIf(StringRef str) {
-    if (!Text.substr(Pos).startswith(str)) return false;
+    if (!Text.substr(Pos).starts_with(str)) return false;
     Pos += str.size();
     return true;
   }
@@ -530,6 +557,7 @@ protected:
   NodePointer popTuple();
   NodePointer popTypeList();
   NodePointer popPack();
+  NodePointer popSILPack();
   NodePointer popProtocol();
   NodePointer demangleBoundGenericType();
   NodePointer demangleBoundGenericArgs(NodePointer nominalType,
@@ -541,6 +569,7 @@ protected:
   NodePointer demangleInitializer();
   NodePointer demangleImplParamConvention(Node::Kind ConvKind);
   NodePointer demangleImplResultConvention(Node::Kind ConvKind);
+  NodePointer demangleImplParameterSending();
   NodePointer demangleImplParameterResultDifferentiability();
   NodePointer demangleImplFunctionType();
   NodePointer demangleClangType();
@@ -561,13 +590,17 @@ protected:
   NodePointer demangleRetroactiveProtocolConformanceRef();
   NodePointer popAnyProtocolConformance();
   NodePointer demangleConcreteProtocolConformance();
+  NodePointer demanglePackProtocolConformance();
   NodePointer popDependentProtocolConformance();
   NodePointer demangleDependentProtocolConformanceRoot();
   NodePointer demangleDependentProtocolConformanceInherited();
   NodePointer popDependentAssociatedConformance();
   NodePointer demangleDependentProtocolConformanceAssociated();
+  NodePointer demangleDependentProtocolConformanceOpaque();
   NodePointer demangleThunkOrSpecialization();
-  NodePointer demangleGenericSpecialization(Node::Kind SpecKind);
+  NodePointer demangleGenericSpecialization(Node::Kind SpecKind,
+                                            NodePointer droppedArguments);
+  NodePointer demangleGenericSpecializationWithDroppedArguments();
   NodePointer demangleFunctionSpecialization();
   NodePointer demangleFuncSpecParam(Node::Kind Kind);
   NodePointer addFuncSpecParamNumber(NodePointer Param,
@@ -607,7 +640,9 @@ protected:
 
   bool demangleBoundGenerics(Vector<NodePointer> &TypeListList,
                              NodePointer &RetroactiveConformances);
-  
+
+  NodePointer demangleIntegerType();
+
   void dump();
 
 public:

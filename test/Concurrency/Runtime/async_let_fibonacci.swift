@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library)
+// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -parse-as-library)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -29,12 +29,12 @@ func asyncFib(_ n: Int) async -> Int {
   async let second = await asyncFib(n-1)
 
   // Sleep a random amount of time waiting on the result producing a result.
-  await Task.sleep(UInt64.random(in: 0..<100) * 1_000_000)
+  try! await Task.sleep(nanoseconds: UInt64.random(in: 0..<100) * 1_000_000)
 
   let result = await first + second
 
   // Sleep a random amount of time before producing a result.
-  await Task.sleep(UInt64.random(in: 0..<100) * 1_000_000)
+  try! await Task.sleep(nanoseconds: UInt64.random(in: 0..<100) * 1_000_000)
 
   return result
 }

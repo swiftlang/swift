@@ -1,6 +1,9 @@
-// RUN: %target-typecheck-verify-swift
-// REQUIRES: concurrency
+// RUN: %target-swift-frontend -emit-sil -o /dev/null -verify %s -strict-concurrency=complete
+// RUN: %target-swift-frontend -emit-sil -o /dev/null -verify %s -strict-concurrency=complete
+// RUN: %target-swift-frontend -emit-sil -o /dev/null -verify %s -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
+// REQUIRES: concurrency
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 @Sendable func globalFunc() { }
 
@@ -17,6 +20,24 @@ actor A {
   @Sendable func fAsync() async {
     state = true
   }
+}
+
+class NonSendableC { // expected-note{{class 'NonSendableC' does not conform to the 'Sendable' protocol}}
+    var x: Int = 0
+
+    @Sendable func inc() { // expected-warning{{instance method of non-Sendable type 'NonSendableC' cannot be marked as '@Sendable'}}
+        x += 1
+    }
+}
+
+struct S<T> { // expected-note{{consider making generic parameter 'T' conform to the 'Sendable' protocol}}
+  let t: T
+
+  @Sendable func test() {} // expected-warning{{instance method of non-Sendable type 'S<T>' cannot be marked as '@Sendable'}}
+}
+
+extension S: Sendable where T: Sendable {
+  @Sendable func test2() {}
 }
 
 @available(SwiftStdlib 5.1, *)

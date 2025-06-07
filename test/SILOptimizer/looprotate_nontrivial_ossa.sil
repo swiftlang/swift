@@ -1,11 +1,10 @@
-// RUN: %target-sil-opt -loop-rotate -looprotate-single-block-loop=true %s | %FileCheck %s
+// RUN: %target-sil-opt -loop-rotate -update-borrowed-from -looprotate-single-block-loop=true -looprotate-infinite-budget %s | %FileCheck %s
 sil_stage canonical
 
 import Builtin
 import Swift
 
 class Klass {
-
 }
 
 struct BoxStruct {
@@ -174,7 +173,7 @@ bb3:
 }
 
 // CHECK-LABEL: sil [ossa] @guaranteed_phi_argument : $@convention(thin) (@owned Klass) -> () {
-// CHECK:         {{bb[0-9]+}}({{%[^,]+}} : @guaranteed $Klass):
+// CHECK:         {{bb[0-9]+}}({{%[^,]+}} : @reborrow $Klass):
 // CHECK-LABEL: } // end sil function 'guaranteed_phi_argument'
 sil [ossa] @guaranteed_phi_argument : $@convention(thin) (@owned Klass) -> () {
 entry(%instance : @owned $Klass):
@@ -203,7 +202,6 @@ exit:
 // A guaranteed value whose ownership has been forwarded must not be reborrowed. 
 //
 // CHECK-LABEL: sil [ossa] @forwarded_borrow_cant_be_reborrowed : $@convention(thin) (@owned BoxStruct) -> () {
-// CHECK-NOT:   {{bb[0-9]+}}({{%[^,]+}} : @guaranteed $BoxStruct, {{%[^,]+}} : @guaranteed $Klass):
 // CHECK-LABEL: } // end sil function 'forwarded_borrow_cant_be_reborrowed'
 sil [ossa] @forwarded_borrow_cant_be_reborrowed : $@convention(thin) (@owned BoxStruct) -> () {
 bb0(%0 : @owned $BoxStruct):
@@ -214,37 +212,72 @@ bb1:
   cond_br %2, bb2, bb3
 
 bb2:
-  br bb10
+  br bb9
 
 bb3:
   %5 = begin_borrow %0 : $BoxStruct
   %6 = struct_extract %5 : $BoxStruct, #BoxStruct.guts
   %7 = integer_literal $Builtin.Int1, 0
-  cond_br %7, bb4, bb5
+  br bb4
 
 bb4:
-  unreachable
-
-bb5:
   %10 = begin_borrow %6 : $Klass
   end_borrow %10 : $Klass
   end_borrow %5 : $BoxStruct
+  br bb5
+
+bb5:
   br bb6
 
-bb6:
-  br bb7
 
+bb6:
+  %16 = integer_literal $Builtin.Int1, -1
+  cond_br %16, bb7, bb8
 
 bb7:
-  %16 = integer_literal $Builtin.Int1, -1
-  cond_br %16, bb8, bb9
+  br bb9
 
 bb8:
-  br bb10
-
-bb9:
   br bb1
 
-bb10:
+bb9:
   unreachable
 }
+
+// Ensure no verifier error
+
+sil @foo : $@convention(thin) (@in_guaranteed UInt64, @in_guaranteed UInt64) -> (Bool, @error any Error) 
+
+sil [ossa] @looprotate_ownership_results : $@convention(thin) (Int32, @guaranteed Klass) -> Int32 {
+bb0(%0 : $Int32, %1 : @guaranteed $Klass):
+  %2 = struct_extract %0, #Int32._value
+  %3 = integer_literal $Builtin.Int32, 0
+  br bb1(%2, %3)
+
+bb1(%5 : $Builtin.Int32, %6 : $Builtin.Int32):
+  %7 = function_ref @foo : $@convention(thin) (@in_guaranteed UInt64, @in_guaranteed UInt64) -> (Bool, @error any Error) 
+  %8 = thin_to_thick_function %7 to $@noescape @callee_guaranteed (@in_guaranteed UInt64, @in_guaranteed UInt64) -> (Bool, @error any Error) 
+  %9 = convert_function %8 to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (Bool, @error any Error) for <UInt64, UInt64>, forwarding: @owned 
+  destroy_value %9
+  %11 = struct $Int32 (%6)
+  %12 = builtin "cmp_eq_Word"(%6, %2) : $Builtin.Int1
+  cond_br %12, bb3, bb2
+
+bb2:
+  %14 = integer_literal $Builtin.Int32, 1
+  %15 = integer_literal $Builtin.Int1, -1
+  %16 = builtin "sadd_with_overflow_Word"(%6, %14, %15) : $(Builtin.Int32, Builtin.Int1)
+  %17 = tuple_extract %16, 0
+  %18 = enum $Optional<Int32>, #Optional.some!enumelt, %11
+  %19 = unchecked_enum_data %18, #Optional.some!enumelt
+  %20 = struct_extract %19, #Int32._value
+  %21 = integer_literal $Builtin.Int1, -1
+  %22 = builtin "sadd_with_overflow_Word"(%5, %20, %21) : $(Builtin.Int32, Builtin.Int1)
+  %23 = tuple_extract %22, 0
+  br bb1(%23, %17)
+
+bb3:
+  %25 = struct $Int32 (%5)
+  return %25
+}
+

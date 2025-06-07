@@ -33,6 +33,7 @@
 
 #include "swift/SIL/SILInstruction.h"
 #define DEBUG_TYPE "access-enforcement-selection"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILArgument.h"
@@ -284,7 +285,8 @@ static void checkUsesOfAccess(BeginAccessInst *access) {
     auto user = use->getUser();
     assert(!isa<BeginAccessInst>(user));
     assert(!isa<PartialApplyInst>(user) ||
-           onlyUsedByAssignByWrapper(cast<PartialApplyInst>(user)));
+           onlyUsedByAssignByWrapper(cast<PartialApplyInst>(user)) ||
+           onlyUsedByAssignOrInit(cast<PartialApplyInst>(user)));
   }
 #endif
 }
@@ -294,7 +296,7 @@ void SelectEnforcement::analyzeProjection(SingleValueInstruction *projection) {
     auto user = use->getUser();
 
     // Look through mark must check.
-    if (auto *mmi = dyn_cast<MarkMustCheckInst>(user)) {
+    if (auto *mmi = dyn_cast<MarkUnresolvedNonCopyableValueInst>(user)) {
       analyzeProjection(mmi);
       continue;
     }
@@ -616,7 +618,7 @@ public:
 
 protected:
   void processFunction(SILFunction *F);
-  SourceAccess getAccessKindForBox(ProjectBoxInst *projection);
+  SourceAccess getAccessKindForBox(SILValue boxOperand);
   SourceAccess getSourceAccess(SILValue address);
   void handleApply(ApplySite apply);
   void handleAccess(BeginAccessInst *access);
@@ -681,9 +683,7 @@ processFunction(SILFunction *F) {
 #endif
 }
 
-SourceAccess
-AccessEnforcementSelection::getAccessKindForBox(ProjectBoxInst *projection) {
-  SILValue source = projection->getOperand();
+SourceAccess AccessEnforcementSelection::getAccessKindForBox(SILValue source) {
   if (auto *BBI = dyn_cast<BeginBorrowInst>(source))
     source = BBI->getOperand();
   if (auto *MUI = dyn_cast<MarkUninitializedInst>(source))
@@ -705,11 +705,25 @@ SourceAccess AccessEnforcementSelection::getSourceAccess(SILValue address) {
     return getSourceAccess(mui->getOperand());
 
   // Recurse through mark must check.
-  if (auto *mmci = dyn_cast<MarkMustCheckInst>(address))
+  if (auto *mmci = dyn_cast<MarkUnresolvedNonCopyableValueInst>(address))
     return getSourceAccess(mmci->getOperand());
 
+  // Recur through moveonlywrapper_to_copyable_addr or vice versa.
+  if (auto *m = dyn_cast<MoveOnlyWrapperToCopyableAddrInst>(address))
+    return getSourceAccess(m->getOperand());
+  if (auto *c = dyn_cast<CopyableToMoveOnlyWrapperAddrInst>(address))
+    return getSourceAccess(c->getOperand());
+
+  // Recurse through drop_deinit.
+  if (auto *ddi = dyn_cast<DropDeinitInst>(address))
+    return getSourceAccess(ddi->getOperand());
+
+  // Recurse through moveonlywrapper_to_copyable_box.
+  if (auto *m = dyn_cast<MoveOnlyWrapperToCopyableBoxInst>(address))
+    return getAccessKindForBox(m->getOperand());
+
   if (auto box = dyn_cast<ProjectBoxInst>(address))
-    return getAccessKindForBox(box);
+    return getAccessKindForBox(box->getOperand());
 
   if (auto arg = dyn_cast<SILFunctionArgument>(address)) {
     switch (arg->getArgumentConvention()) {

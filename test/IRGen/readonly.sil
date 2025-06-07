@@ -17,7 +17,7 @@ sil @XXX_ctor : $@convention(method) (@owned XXX) -> @owned XXX
 // to the LLVM read only attribute, unless IRGen can prove by analyzing
 // the function body that this function is really read only.
 
-// CHECK-NOT: ; Function Attrs: readonly
+// CHECK-NOT: ; Function Attrs:{{.*}}memory(read)
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @function_foo(
 sil [readonly] @function_foo : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
@@ -30,7 +30,7 @@ bb0(%0 : $Int):
 // to the LLVM read only attribute, unless IRGen can prove by analyzing
 // the function body that this function is really read only or read none.
 
-// CHECK-NOT: ; Function Attrs: readonly
+// CHECK-NOT: ; Function Attrs:{{.*}}memory(read)
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @function_foo2(
 sil [readnone] @function_foo2 : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
@@ -41,7 +41,7 @@ bb0(%0 : $Int):
 // There's an @owned parameter, and destructors can call arbitrary code
 // -- function is not read only at LLVM level
 
-// CHECK-NOT: ; Function Attrs: readonly
+// CHECK-NOT: ; Function Attrs:{{.*}}memory(read)
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @function_bar(
 sil [readonly] @function_bar : $@convention(thin) (@owned XXX) -> () {
 bb0(%0 : $XXX):
@@ -52,7 +52,7 @@ bb0(%0 : $XXX):
 
 // There's an @out parameter -- function is not read only at LLVM level
 
-// CHECK-NOT: ; Function Attrs: readonly
+// CHECK-NOT: ; Function Attrs:{{.*}}memory(read)
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @function_baz(
 sil [readonly] @function_baz : $@convention(thin) () -> (@out Any) {
 bb0(%0 : $*Any):

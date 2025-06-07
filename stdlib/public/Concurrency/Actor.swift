@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 import Swift
-@_implementationOnly import _SwiftConcurrencyShims
 
 /// Common marker protocol providing a shared "base" for both (local) `Actor`
 /// and (potentially remote) `DistributedActor` types.
@@ -26,16 +25,29 @@ import Swift
 /// While both local and distributed actors are conceptually "actors", there are
 /// some important isolation model differences between the two, which make it
 /// impossible for one to refine the other.
-@_marker
 @available(SwiftStdlib 5.1, *)
-public protocol AnyActor: AnyObject, Sendable {}
+@available(*, deprecated, message: "Use 'any Actor' with 'DistributedActor.asLocalActor' instead")
+@available(swift, obsoleted: 6.0, message: "Use 'any Actor' with 'DistributedActor.asLocalActor' instead")
+public typealias AnyActor = AnyObject & Sendable
 
 /// Common protocol to which all actors conform.
 ///
 /// The `Actor` protocol generalizes over all `actor` types. Actor types
 /// implicitly conform to this protocol.
+///
+/// ### Actors and SerialExecutors
+/// By default, actors execute tasks on a shared global concurrency thread pool.
+/// This pool is shared by all default actors and tasks, unless an actor or task
+/// specified a more specific executor requirement.
+///
+/// It is possible to configure an actor to use a specific ``SerialExecutor``,
+/// as well as impact the scheduling of default tasks and actors by using
+/// a ``TaskExecutor``.
+///
+/// - SeeAlso: ``SerialExecutor``
+/// - SeeAlso: ``TaskExecutor``
 @available(SwiftStdlib 5.1, *)
-public protocol Actor: AnyActor {
+public protocol Actor: AnyObject, Sendable {
 
   /// Retrieve the executor for this actor as an optimized, unowned
   /// reference.
@@ -49,6 +61,9 @@ public protocol Actor: AnyActor {
   /// eliminated, and rearranged with other work, and they may even
   /// be introduced when not strictly required.  Visible side effects
   /// are therefore strongly discouraged within this property.
+  ///
+  /// - SeeAlso: ``SerialExecutor``
+  /// - SeeAlso: ``TaskExecutor``
   nonisolated var unownedExecutor: UnownedSerialExecutor { get }
 }
 
@@ -57,6 +72,10 @@ public protocol Actor: AnyActor {
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_defaultActor_initialize")
 public func _defaultActorInitialize(_ actor: AnyObject)
+
+@available(SwiftStdlib 5.9, *)
+@_silgen_name("swift_nonDefaultDistributedActor_initialize")
+public func _nonDefaultDistributedActorInitialize(_ actor: AnyObject)
 
 /// Called to destroy the default actor instance in an actor.
 /// The implementation will call this within the actor's deinit.
@@ -68,3 +87,47 @@ public func _defaultActorDestroy(_ actor: AnyObject)
 @_silgen_name("swift_task_enqueueMainExecutor")
 @usableFromInline
 internal func _enqueueOnMain(_ job: UnownedJob)
+
+#if $Macros
+/// Produce a reference to the actor to which the enclosing code is
+/// isolated, or `nil` if the code is nonisolated.
+///
+/// If the type annotation provided for `#isolation` is not `(any Actor)?`,
+/// the type must match the enclosing actor type. If no type annotation is
+/// provided, the type defaults to `(any Actor)?`.
+@available(SwiftStdlib 5.1, *)
+@freestanding(expression)
+public macro isolation<T>() -> T = Builtin.IsolationMacro
+
+/// Wrap the function body in a new top-level task on behalf of the
+/// given actor.
+@available(SwiftStdlib 5.1, *)
+@attached(body)
+public macro Task(
+  on actor: any GlobalActor,
+  name: String? = nil,
+  priority: TaskPriority? = nil
+) =
+  #externalMacro(module: "SwiftMacros", type: "TaskMacro")
+
+/// Wrap the function body in a new top-level task on behalf of the
+/// current actor.
+@available(SwiftStdlib 5.1, *)
+@attached(body)
+public macro Task(
+  name: String? = nil,
+  priority: TaskPriority? = nil
+) =
+  #externalMacro(module: "SwiftMacros", type: "TaskMacro")
+
+#endif
+
+#if $IsolatedAny
+@_alwaysEmitIntoClient
+@available(SwiftStdlib 5.1, *)
+public func extractIsolation<each Arg, Result>(
+  _ fn: @escaping @isolated(any) (repeat each Arg) async throws -> Result
+) -> (any Actor)? {
+  return Builtin.extractFunctionIsolation(fn)
+}
+#endif

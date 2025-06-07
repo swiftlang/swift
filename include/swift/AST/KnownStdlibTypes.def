@@ -50,6 +50,8 @@ KNOWN_STDLIB_TYPE_DECL(StaticString, NominalTypeDecl, 0)
 KNOWN_STDLIB_TYPE_DECL(Substring, NominalTypeDecl, 0)
 KNOWN_STDLIB_TYPE_DECL(Array, NominalTypeDecl, 1)
 KNOWN_STDLIB_TYPE_DECL(ArraySlice, NominalTypeDecl, 1)
+KNOWN_STDLIB_TYPE_DECL(_ArrayBuffer, NominalTypeDecl, 1)
+KNOWN_STDLIB_TYPE_DECL(_ContiguousArrayBuffer, NominalTypeDecl, 1)
 KNOWN_STDLIB_TYPE_DECL(_ContiguousArrayStorage, ClassDecl, 1)
 KNOWN_STDLIB_TYPE_DECL(Set, NominalTypeDecl, 1)
 KNOWN_STDLIB_TYPE_DECL(Sequence, NominalTypeDecl, 1)
@@ -76,6 +78,7 @@ KNOWN_STDLIB_TYPE_DECL(UnsafeRawPointer, NominalTypeDecl, 0)
 KNOWN_STDLIB_TYPE_DECL(UnsafeMutablePointer, NominalTypeDecl, 1)
 KNOWN_STDLIB_TYPE_DECL(UnsafePointer, NominalTypeDecl, 1)
 KNOWN_STDLIB_TYPE_DECL(OpaquePointer, NominalTypeDecl, 0)
+KNOWN_STDLIB_TYPE_DECL(CVaListPointer, NominalTypeDecl, 0)
 KNOWN_STDLIB_TYPE_DECL(AutoreleasingUnsafeMutablePointer, NominalTypeDecl, 1)
 
 KNOWN_STDLIB_TYPE_DECL(UnsafeBufferPointer, NominalTypeDecl, 1)
@@ -95,5 +98,9 @@ KNOWN_STDLIB_TYPE_DECL(EncodingError, NominalTypeDecl, 0)
 KNOWN_STDLIB_TYPE_DECL(DecodingError, NominalTypeDecl, 0)
 
 KNOWN_STDLIB_TYPE_DECL(Result, NominalTypeDecl, 2)
+
+KNOWN_STDLIB_TYPE_DECL(InlineArray, NominalTypeDecl, 2)
+
+KNOWN_STDLIB_TYPE_DECL(MutableSpan, NominalTypeDecl, 1)
 
 #undef KNOWN_STDLIB_TYPE_DECL

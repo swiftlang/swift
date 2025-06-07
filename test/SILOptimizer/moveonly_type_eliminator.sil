@@ -1,0 +1,676 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -sil-move-only-type-eliminator  %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -sil-trivial-move-only-type-eliminator  %s | %FileCheck --check-prefix=TRIVIAL %s
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+//////////////////
+// Declarations //
+//////////////////
+
+struct Trivial {
+  var value: Builtin.Int32
+}
+
+enum FakeOptional<T> {
+case none
+case some(T)
+}
+
+struct TrivialPair {
+  var lhs: Trivial
+  var rhs: Trivial
+}
+
+sil @use_trivial : $@convention(thin) (Trivial) -> ()
+
+class Klass {
+  func foo()
+}
+
+class C {}
+
+struct KlassPair {
+  var lhs: Klass
+  var rhs: Klass
+}
+
+sil @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+
+///////////
+// Tests //
+///////////
+
+// CHECK-LABEL: sil [ossa] @simple_copy_borrow_value : $@convention(thin) (Trivial) -> () {
+// CHECK: bb0(%0 : $Trivial):
+// CHECK-NEXT: function_ref use_trivial
+// CHECK-NEXT: %1 = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
+// CHECK-NEXT: %2 = apply %1(%0) : $@convention(thin) (Trivial) -> ()
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+// CHECK-NEXT: } // end sil function 'simple_copy_borrow_value'
+
+// TRIVIAL-LABEL: sil [ossa] @simple_copy_borrow_value : $@convention(thin) (Trivial) -> () {
+// TRIVIAL: bb0(%0 : $Trivial):
+// TRIVIAL-NEXT: function_ref use_trivial
+// TRIVIAL-NEXT: %1 = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
+// TRIVIAL-NEXT: %2 = apply %1(%0) : $@convention(thin) (Trivial) -> ()
+// TRIVIAL-NEXT: tuple
+// TRIVIAL-NEXT: return
+// TRIVIAL-NEXT: } // end sil function 'simple_copy_borrow_value'
+sil [ossa] @simple_copy_borrow_value : $@convention(thin) (Trivial) -> () {
+bb0(%0 : $Trivial):
+  %1 = copyable_to_moveonlywrapper [owned] %0 : $Trivial
+  %2 = copy_value %1 : $@moveOnly Trivial
+  %3 = begin_borrow %2 : $@moveOnly Trivial
+  %4 = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
+  %5 = moveonlywrapper_to_copyable [guaranteed] %3 : $@moveOnly Trivial
+  apply %4(%5) : $@convention(thin) (Trivial) -> ()
+  end_borrow %3 : $@moveOnly Trivial
+  destroy_value %2 : $@moveOnly Trivial
+  destroy_value %1 : $@moveOnly Trivial
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @simple_load_store : $@convention(thin) (Trivial) -> () {
+// CHECK: bb0(%0 : $Trivial):
+// CHECK-NEXT: function_ref use_trivial
+// CHECK-NEXT:  %1 = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
+// CHECK-NEXT:  %2 = alloc_stack [moveable_value_debuginfo] $Trivial
+// CHECK-NEXT:  store %0 to [trivial] %2 : $*Trivial
+// CHECK-NEXT:  %4 = load [trivial] %2 : $*Trivial
+// CHECK-NEXT:  %5 = apply %1(%4) : $@convention(thin) (Trivial) -> ()
+// CHECK-NEXT:  %6 = load [trivial] %2 : $*Trivial
+// CHECK-NEXT:  %7 = apply %1(%6) : $@convention(thin) (Trivial) -> ()
+// CHECK-NEXT:  destroy_addr %2 : $*Trivial
+// CHECK-NEXT:  dealloc_stack %2 : $*Trivial
+// CHECK-NEXT:  tuple
+// CHECK-NEXT:  return
+// CHECK-NEXT: } // end sil function 'simple_load_store'
+
+// TRIVIAL-LABEL: sil [ossa] @simple_load_store : $@convention(thin) (Trivial) -> () {
+// TRIVIAL: bb0(%0 : $Trivial):
+// TRIVIAL-NEXT: function_ref use_trivial
+// TRIVIAL-NEXT:  %1 = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
+// TRIVIAL-NEXT:  %2 = alloc_stack [moveable_value_debuginfo] $Trivial
+// TRIVIAL-NEXT:  store %0 to [trivial] %2 : $*Trivial
+// TRIVIAL-NEXT:  %4 = load [trivial] %2 : $*Trivial
+// TRIVIAL-NEXT:  %5 = apply %1(%4) : $@convention(thin) (Trivial) -> ()
+// TRIVIAL-NEXT:  %6 = load [trivial] %2 : $*Trivial
+// TRIVIAL-NEXT:  %7 = apply %1(%6) : $@convention(thin) (Trivial) -> ()
+// TRIVIAL-NEXT:  destroy_addr %2 : $*Trivial
+// TRIVIAL-NEXT:  dealloc_stack %2 : $*Trivial
+// TRIVIAL-NEXT:  tuple
+// TRIVIAL-NEXT:  return
+// TRIVIAL-NEXT: } // end sil function 'simple_load_store'
+sil [ossa] @simple_load_store : $@convention(thin) (Trivial) -> () {
+bb0(%0 : $Trivial):
+  %f = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
+
+  %alloc = alloc_stack $@moveOnly Trivial
+  %1 = copyable_to_moveonlywrapper [owned] %0 : $Trivial
+  store %1 to [init] %alloc : $*@moveOnly Trivial
+  %2 = load [copy] %alloc : $*@moveOnly Trivial
+  %2a = begin_borrow %2 : $@moveOnly Trivial
+  %3 = moveonlywrapper_to_copyable [guaranteed] %2a : $@moveOnly Trivial
+  apply %f(%3) : $@convention(thin) (Trivial) -> ()
+  end_borrow %2a : $@moveOnly Trivial
+  destroy_value %2 : $@moveOnly Trivial
+
+  %4 = load_borrow %alloc : $*@moveOnly Trivial
+  %5 = moveonlywrapper_to_copyable [guaranteed] %4 : $@moveOnly Trivial
+  apply %f(%5) : $@convention(thin) (Trivial) -> ()
+  end_borrow %4 : $@moveOnly Trivial
+
+  destroy_addr %alloc : $*@moveOnly Trivial
+  dealloc_stack %alloc : $*@moveOnly Trivial
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @simple_load_storeborrow : $@convention(thin) (Trivial) -> () {
+// CHECK: bb0(%0 : $Trivial):
+// CHECK-NEXT: function_ref use_trivial
+// CHECK-NEXT:  %1 = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
+// CHECK-NEXT:  %2 = alloc_stack [moveable_value_debuginfo] $Trivial
+// CHECK-NEXT:  store %0 to [trivial] %2 : $*Trivial
+// CHECK-NEXT:  %4 = load [trivial] %2 : $*Trivial
+// CHECK-NEXT:  %5 = apply %1(%4) : $@convention(thin) (Trivial) -> ()
+// CHECK-NEXT:  %6 = load [trivial] %2 : $*Trivial
+// CHECK-NEXT:  %7 = apply %1(%6) : $@convention(thin) (Trivial) -> ()
+// CHECK-NEXT:  dealloc_stack %2 : $*Trivial
+// CHECK-NEXT:  tuple
+// CHECK-NEXT:  return
+// CHECK-NEXT: } // end sil function 'simple_load_storeborrow'
+
+// TRIVIAL-LABEL: sil [ossa] @simple_load_storeborrow : $@convention(thin) (Trivial) -> () {
+// TRIVIAL: bb0(%0 : $Trivial):
+// TRIVIAL-NEXT: function_ref use_trivial
+// TRIVIAL-NEXT:  %1 = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
+// TRIVIAL-NEXT:  %2 = alloc_stack [moveable_value_debuginfo] $Trivial
+// TRIVIAL-NEXT:  store %0 to [trivial] %2 : $*Trivial
+// TRIVIAL-NEXT:  %4 = load [trivial] %2 : $*Trivial
+// TRIVIAL-NEXT:  %5 = apply %1(%4) : $@convention(thin) (Trivial) -> ()
+// TRIVIAL-NEXT:  %6 = load [trivial] %2 : $*Trivial
+// TRIVIAL-NEXT:  %7 = apply %1(%6) : $@convention(thin) (Trivial) -> ()
+// TRIVIAL-NEXT:  dealloc_stack %2 : $*Trivial
+// TRIVIAL-NEXT:  tuple
+// TRIVIAL-NEXT:  return
+// TRIVIAL-NEXT: } // end sil function 'simple_load_storeborrow'
+sil [ossa] @simple_load_storeborrow : $@convention(thin) (Trivial) -> () {
+bb0(%0 : $Trivial):
+  %f = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
+
+  %alloc = alloc_stack $@moveOnly Trivial
+  %1 = copyable_to_moveonlywrapper [owned] %0 : $Trivial
+  %1a = begin_borrow %1 : $@moveOnly Trivial
+  %sb = store_borrow %1a to %alloc : $*@moveOnly Trivial
+  %2 = load [copy] %sb : $*@moveOnly Trivial
+  %2a = begin_borrow %2 : $@moveOnly Trivial
+  %3 = moveonlywrapper_to_copyable [guaranteed] %2a : $@moveOnly Trivial
+  apply %f(%3) : $@convention(thin) (Trivial) -> ()
+  end_borrow %2a : $@moveOnly Trivial
+  destroy_value %2 : $@moveOnly Trivial
+
+  %4 = load_borrow %sb : $*@moveOnly Trivial
+  %5 = moveonlywrapper_to_copyable [guaranteed] %4 : $@moveOnly Trivial
+  apply %f(%5) : $@convention(thin) (Trivial) -> ()
+  end_borrow %4 : $@moveOnly Trivial
+
+  end_borrow %sb : $*@moveOnly Trivial
+  end_borrow %1a : $@moveOnly Trivial
+  destroy_value %1 : $@moveOnly Trivial
+  dealloc_stack %alloc : $*@moveOnly Trivial
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @simple_struct_aggregate_usage : $@convention(thin) (Trivial, Trivial) -> TrivialPair {
+// CHECK: bb0(%0 : $Trivial, %1 : $Trivial):
+// CHECK-NEXT:   // function_ref use_trivial
+// CHECK-NEXT:   %2 = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
+// CHECK-NEXT:   %3 = struct $TrivialPair (%0 : $Trivial, %1 : $Trivial)
+// CHECK-NEXT:   %4 = struct_extract %3 : $TrivialPair, #TrivialPair.lhs
+// CHECK-NEXT:   %5 = apply %2(%4) : $@convention(thin) (Trivial) -> ()
+// CHECK-NEXT:   return %3 : $Trivial
+// CHECK: } // end sil function 'simple_struct_aggregate_usage'
+
+// TRIVIAL-LABEL: sil [ossa] @simple_struct_aggregate_usage : $@convention(thin) (Trivial, Trivial) -> TrivialPair {
+// TRIVIAL: bb0(%0 : $Trivial, %1 : $Trivial):
+// TRIVIAL-NEXT:   // function_ref use_trivial
+// TRIVIAL-NEXT:   %2 = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
+// TRIVIAL-NEXT:   %3 = struct $TrivialPair (%0 : $Trivial, %1 : $Trivial)
+// TRIVIAL-NEXT:   %4 = struct_extract %3 : $TrivialPair, #TrivialPair.lhs
+// TRIVIAL-NEXT:   %5 = apply %2(%4) : $@convention(thin) (Trivial) -> ()
+// TRIVIAL-NEXT:   return %3 : $Trivial
+// TRIVIAL: } // end sil function 'simple_struct_aggregate_usage'
+sil [ossa] @simple_struct_aggregate_usage : $@convention(thin) (Trivial, Trivial) -> TrivialPair {
+bb0(%0 : $Trivial, %1 : $Trivial):
+  %f = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
+
+  %0a = copyable_to_moveonlywrapper [owned] %0 : $Trivial
+  %1a = copyable_to_moveonlywrapper [owned] %1 : $Trivial
+  %2 = struct $@moveOnly TrivialPair (%0a : $@moveOnly Trivial, %1a : $@moveOnly Trivial)
+  %2b = begin_borrow %2 : $@moveOnly TrivialPair
+  %ext = struct_extract %2b : $@moveOnly TrivialPair, #TrivialPair.lhs
+  %extCpy = moveonlywrapper_to_copyable [guaranteed] %ext : $@moveOnly Trivial
+  apply %f(%extCpy) : $@convention(thin) (Trivial) -> ()
+  end_borrow %2b : $@moveOnly TrivialPair
+  %3 = copy_value %2 : $@moveOnly TrivialPair
+  destroy_value %2 : $@moveOnly TrivialPair
+  %result = moveonlywrapper_to_copyable [owned] %3 : $@moveOnly TrivialPair
+  return %result : $TrivialPair
+}
+
+// TODO: Tuple doesn't compose the same way. Add tuple test case!
+
+// XHECK-LABEL: sil [ossa] @simple_tuple_aggregate_usage : $@convention(thin) (Trivial, Trivial) -> TrivialPair {
+// XHECK: bb0(%0 : $Trivial, %1 : $Trivial):
+// XHECK-NEXT:   // function_ref use_trivial
+// XHECK-NEXT:   %2 = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
+// XHECK-NEXT:   %3 = tuple $TrivialPair (%0 : $Trivial, %1 : $Trivial)
+// XHECK-NEXT:   %4 = tuple_extract %3 : $TrivialPair, #TrivialPair.lhs
+// XHECK-NEXT:   %5 = apply %2(%4) : $@convention(thin) (Trivial) -> ()
+// XHECK-NEXT:   return %3 : $Trivial
+// XHECK: } // end sil function 'simple_tuple_aggregate_usage'
+/*
+sil [ossa] @simple_tuple_aggregate_usage : $@convention(thin) (Trivial, Trivial) -> TrivialPair {
+bb0(%0 : $Trivial, %1 : $Trivial):
+  %f = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
+
+  %0a = copyable_to_moveonlywrapper %0 : $Trivial
+  %1a = copyable_to_moveonlywrapper %1 : $Trivial
+  %2 = tuple (%0a : $@moveOnly Trivial, %1a : $@moveOnly Trivial)
+  %2b = begin_borrow %2 : $(@moveOnly Trivial, @moveOnly Trivial)
+  %ext = tuple_extract %2b : $(@moveOnly Trivial, @moveOnly Trivial), 0
+  %extCpy = moveonlywrapper_to_copyable [guaranteed] %ext : $@moveOnly Trivial
+  apply %f(%extCpy) : $@convention(thin) (Trivial) -> ()
+  end_borrow %2b : $(@moveOnly Trivial, @moveOnly Trivial)
+  %3 = copy_value %2 : $(@moveOnly Trivial, @moveOnly Trivial)
+  destroy_value %2 : $(@moveOnly Trivial, @moveOnly Trivial)
+  %result = moveonlywrapper_to_copyable [owned] %3 : $(@moveOnly Trivial, @moveOnly Trivial)
+  return %result : $(@moveOnly Trivial, @moveOnly Trivial)
+}
+*/
+
+// CHECK-LABEL: sil [ossa] @simple_enum_aggregate_usage : $@convention(thin) (Trivial) -> FakeOptional<Trivial> {
+// CHECK: bb0(%0 : $Trivial):
+// CHECK-NEXT:   // function_ref use_trivial
+// CHECK-NEXT:   %1 = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
+// CHECK-NEXT:   %2 = enum $FakeOptional<Trivial>, #FakeOptional.some!enumelt, %0 : $Trivial
+// CHECK-NEXT:   %3 = unchecked_enum_data %2 : $FakeOptional<Trivial>, #FakeOptional.some!enumelt
+// CHECK-NEXT:   %4 = apply %1(%3) : $@convention(thin) (Trivial) -> ()
+// CHECK-NEXT:   return %2
+// CHECK: } // end sil function 'simple_enum_aggregate_usage'
+
+// TRIVIAL-LABEL: sil [ossa] @simple_enum_aggregate_usage : $@convention(thin) (Trivial) -> FakeOptional<Trivial> {
+// TRIVIAL: bb0(%0 : $Trivial):
+// TRIVIAL-NEXT:   // function_ref use_trivial
+// TRIVIAL-NEXT:   %1 = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
+// TRIVIAL-NEXT:   %2 = enum $FakeOptional<Trivial>, #FakeOptional.some!enumelt, %0 : $Trivial
+// TRIVIAL-NEXT:   %3 = unchecked_enum_data %2 : $FakeOptional<Trivial>, #FakeOptional.some!enumelt
+// TRIVIAL-NEXT:   %4 = apply %1(%3) : $@convention(thin) (Trivial) -> ()
+// TRIVIAL-NEXT:   return %2
+// TRIVIAL: } // end sil function 'simple_enum_aggregate_usage'
+sil [ossa] @simple_enum_aggregate_usage : $@convention(thin) (Trivial) -> FakeOptional<Trivial> {
+bb0(%0 : $Trivial):
+  %f = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
+
+  %0a = copyable_to_moveonlywrapper [owned] %0 : $Trivial
+
+  %2 = enum $@moveOnly FakeOptional<Trivial>, #FakeOptional.some!enumelt, %0a : $@moveOnly Trivial
+
+  %2b = begin_borrow %2 : $@moveOnly FakeOptional<Trivial>
+  %ext = unchecked_enum_data %2b : $@moveOnly FakeOptional<Trivial>, #FakeOptional.some!enumelt
+  %extCpy = moveonlywrapper_to_copyable [guaranteed] %ext : $@moveOnly Trivial
+  apply %f(%extCpy) : $@convention(thin) (Trivial) -> ()
+  end_borrow %2b : $@moveOnly FakeOptional<Trivial>
+  %3 = copy_value %2 : $@moveOnly FakeOptional<Trivial>
+  destroy_value %2 : $@moveOnly FakeOptional<Trivial>
+  %result = moveonlywrapper_to_copyable [owned] %3 : $@moveOnly FakeOptional<Trivial>
+  return %result : $FakeOptional<Trivial>
+}
+
+// CHECK-LABEL: sil [ossa] @simple_switch_enum : $@convention(thin) (Trivial) -> FakeOptional<Trivial> {
+// CHECK: bb0(%0 : $Trivial):
+// CHECK-NOT: copyable_to_moveonlywrapper
+// CHECK-NOT: @owned
+// CHECK-NOT: @moveOnly
+// CHECK: } // end sil function 'simple_switch_enum'
+
+// TRIVIAL-LABEL: sil [ossa] @simple_switch_enum : $@convention(thin) (Trivial) -> FakeOptional<Trivial> {
+// TRIVIAL: bb0(%0 : $Trivial):
+// TRIVIAL-NOT: copyable_to_moveonlywrapper
+// TRIVIAL-NOT: @owned
+// TRIVIAL-NOT: @moveOnly
+// TRIVIAL: } // end sil function 'simple_switch_enum'
+sil [ossa] @simple_switch_enum : $@convention(thin) (Trivial) -> FakeOptional<Trivial> {
+bb0(%0 : $Trivial):
+  %f = function_ref @use_trivial : $@convention(thin) (Trivial) -> ()
+  %0a = copyable_to_moveonlywrapper [owned] %0 : $Trivial
+  debug_value %0a : $@moveOnly Trivial, let, name "foo"
+  %2 = enum $@moveOnly FakeOptional<Trivial>, #FakeOptional.some!enumelt, %0a : $@moveOnly Trivial
+
+  switch_enum %2 : $@moveOnly FakeOptional<Trivial>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1(%2Payload : @owned $@moveOnly Trivial):
+  %2b = enum $@moveOnly FakeOptional<Trivial>, #FakeOptional.some!enumelt, %2Payload : $@moveOnly Trivial
+  br bb3(%2b : $@moveOnly FakeOptional<Trivial>)
+
+bb2:
+  %2c = enum $@moveOnly FakeOptional<Trivial>, #FakeOptional.none!enumelt
+  br bb3(%2c : $@moveOnly FakeOptional<Trivial>)
+
+bb3(%result : @owned $@moveOnly FakeOptional<Trivial>):
+  %result2 = moveonlywrapper_to_copyable [owned] %result : $@moveOnly FakeOptional<Trivial>
+  return %result2 : $FakeOptional<Trivial>
+}
+
+/////////////////
+// Klass Tests //
+/////////////////
+
+// CHECK-LABEL: sil [ossa] @simple_klass_copy_borrow_value : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK: bb0(%0 : @guaranteed $Klass):
+// CHECK-NOT: @moveOnly
+// CHECK-NOT: copyable_to_moveonlywrapper
+// CHECK-NOT: moveonlywrapper_to_copyable
+// CHECK: } // end sil function 'simple_klass_copy_borrow_value'
+
+// TRIVIAL-LABEL: sil [ossa] @simple_klass_copy_borrow_value : $@convention(thin) (@guaranteed Klass) -> () {
+// TRIVIAL: bb0(%0 : @guaranteed $Klass):
+// TRIVIAL: copyable_to_moveonlywrapper
+// TRIVIAL: moveonlywrapper_to_copyable
+// TRIVIAL: } // end sil function 'simple_klass_copy_borrow_value'
+sil [ossa] @simple_klass_copy_borrow_value : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1aa = copy_value %0 : $Klass
+  %1 = copyable_to_moveonlywrapper [owned] %1aa : $Klass
+  %2 = copy_value %1 : $@moveOnly Klass
+  %3 = begin_borrow %2 : $@moveOnly Klass
+  %4 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = moveonlywrapper_to_copyable [guaranteed] %3 : $@moveOnly Klass
+  apply %4(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %3 : $@moveOnly Klass
+  destroy_value %2 : $@moveOnly Klass
+  destroy_value %1 : $@moveOnly Klass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @simple_klass_load_store : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK: bb0(%0 : @guaranteed $Klass):
+// CHECK-NOT: @moveOnly
+// CHECK-NOT: copyable_to_moveonlywrapper
+// CHECK-NOT: moveonlywrapper_to_copyable
+// CHECK: } // end sil function 'simple_klass_load_store'
+
+// TRIVIAL-LABEL: sil [ossa] @simple_klass_load_store : $@convention(thin) (@guaranteed Klass) -> () {
+// TRIVIAL: bb0(%0 : @guaranteed $Klass):
+// TRIVIAL: copyable_to_moveonlywrapper
+// TRIVIAL: moveonlywrapper_to_copyable
+// TRIVIAL: } // end sil function 'simple_klass_load_store'
+sil [ossa] @simple_klass_load_store : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+
+  %alloc = alloc_stack $@moveOnly Klass
+  %1aa = copy_value %0 : $Klass
+  %1 = copyable_to_moveonlywrapper [owned] %1aa : $Klass
+  store %1 to [init] %alloc : $*@moveOnly Klass
+  %2 = load [copy] %alloc : $*@moveOnly Klass
+  %2a = begin_borrow %2 : $@moveOnly Klass
+  %3 = moveonlywrapper_to_copyable [guaranteed] %2a : $@moveOnly Klass
+  apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %2a : $@moveOnly Klass
+  destroy_value %2 : $@moveOnly Klass
+
+  %4 = load_borrow %alloc : $*@moveOnly Klass
+  %5 = moveonlywrapper_to_copyable [guaranteed] %4 : $@moveOnly Klass
+  apply %f(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %4 : $@moveOnly Klass
+
+  destroy_addr %alloc : $*@moveOnly Klass
+  dealloc_stack %alloc : $*@moveOnly Klass
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @simple_klass_load_storeborrow : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK: bb0(%0 : @guaranteed $Klass):
+// CHECK-NOT: @moveOnly
+// CHECK-NOT: copyable_to_moveonlywrapper
+// CHECK-NOT: moveonlywrapper_to_copyable
+// CHECK: } // end sil function 'simple_klass_load_storeborrow'
+
+// TRIVIAL-LABEL: sil [ossa] @simple_klass_load_storeborrow : $@convention(thin) (@guaranteed Klass) -> () {
+// TRIVIAL: bb0(%0 : @guaranteed $Klass):
+// TRIVIAL: copyable_to_moveonlywrapper
+// TRIVIAL: moveonlywrapper_to_copyable
+// TRIVIAL: } // end sil function 'simple_klass_load_storeborrow'
+sil [ossa] @simple_klass_load_storeborrow : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+
+  %alloc = alloc_stack $@moveOnly Klass
+  %1aa = copy_value %0 : $Klass
+  %1 = copyable_to_moveonlywrapper [owned] %1aa : $Klass
+  %1a = begin_borrow %1 : $@moveOnly Klass
+  %sb = store_borrow %1a to %alloc : $*@moveOnly Klass
+  %2 = load [copy] %sb : $*@moveOnly Klass
+  %2a = begin_borrow %2 : $@moveOnly Klass
+  %3 = moveonlywrapper_to_copyable [guaranteed] %2a : $@moveOnly Klass
+  apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %2a : $@moveOnly Klass
+  destroy_value %2 : $@moveOnly Klass
+
+  %4 = load_borrow %sb : $*@moveOnly Klass
+  %5 = moveonlywrapper_to_copyable [guaranteed] %4 : $@moveOnly Klass
+  apply %f(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %4 : $@moveOnly Klass
+  end_borrow %sb : $*@moveOnly Klass
+
+  end_borrow %1a : $@moveOnly Klass
+  destroy_value %1 : $@moveOnly Klass
+  dealloc_stack %alloc : $*@moveOnly Klass
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @simple_klass_struct_aggregate_usage : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> @owned KlassPair {
+// CHECK-NOT: @moveOnly
+// CHECK-NOT: copyable_to_moveonlywrapper
+// CHECK-NOT: moveonlywrapper_to_copyable
+// CHECK: } // end sil function 'simple_klass_struct_aggregate_usage'
+
+// TRIVIAL-LABEL: sil [ossa] @simple_klass_struct_aggregate_usage : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> @owned KlassPair {
+// TRIVIAL: copyable_to_moveonlywrapper
+// TRIVIAL: moveonlywrapper_to_copyable
+// TRIVIAL: } // end sil function 'simple_klass_struct_aggregate_usage'
+sil [ossa] @simple_klass_struct_aggregate_usage : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> @owned KlassPair {
+bb0(%0 : @guaranteed $Klass, %1 : @guaranteed $Klass):
+  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %0aa = copy_value %0 : $Klass
+  %1aa = copy_value %1 : $Klass
+  %0a = copyable_to_moveonlywrapper [owned] %0aa : $Klass
+  %1a = copyable_to_moveonlywrapper [owned] %1aa : $Klass
+  %2 = struct $@moveOnly KlassPair (%0a : $@moveOnly Klass, %1a : $@moveOnly Klass)
+  %2b = begin_borrow %2 : $@moveOnly KlassPair
+  %ext = struct_extract %2b : $@moveOnly KlassPair, #KlassPair.lhs
+  %extCpy = moveonlywrapper_to_copyable [guaranteed] %ext : $@moveOnly Klass
+  apply %f(%extCpy) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %2b : $@moveOnly KlassPair
+  %3 = copy_value %2 : $@moveOnly KlassPair
+  destroy_value %2 : $@moveOnly KlassPair
+  %result = moveonlywrapper_to_copyable [owned] %3 : $@moveOnly KlassPair
+  return %result : $KlassPair
+}
+
+// TODO: Tuple doesn't compose the same way. Add tuple test case!
+
+// XHECK-LABEL: sil [ossa] @simple_klass_tuple_aggregate_usage : $@convention(thin) (Klass, Klass) -> KlassPair {
+// XHECK: bb0(%0 : $Klass, %1 : $Klass):
+// XHECK-NEXT:   // function_ref use_klass
+// XHECK-NEXT:   %2 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+// XHECK-NEXT:   %3 = tuple $KlassPair (%0 : $Klass, %1 : $Klass)
+// XHECK-NEXT:   %4 = tuple_extract %3 : $KlassPair, #KlassPair.lhs
+// XHECK-NEXT:   %5 = apply %2(%4) : $@convention(thin) (@guaranteed Klass) -> ()
+// XHECK-NEXT:   return %3 : $Klass
+// XHECK: } // end sil function 'simple_klass_tuple_aggregate_usage'
+/*
+sil [ossa] @simple_klass_tuple_aggregate_usage : $@convention(thin) (Klass, Klass) -> KlassPair {
+bb0(%0 : $Klass, %1 : $Klass):
+  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+
+  %0a = copyable_to_moveonlywrapper %0 : $Klass
+  %1a = copyable_to_moveonlywrapper %1 : $Klass
+  %2 = tuple (%0a : $@moveOnly Klass, %1a : $@moveOnly Klass)
+  %2b = begin_borrow %2 : $(@moveOnly Klass, @moveOnly Klass)
+  %ext = tuple_extract %2b : $(@moveOnly Klass, @moveOnly Klass), 0
+  %extCpy = moveonlywrapper_to_copyable [guaranteed] %ext : $@moveOnly Klass
+  apply %f(%extCpy) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %2b : $(@moveOnly Klass, @moveOnly Klass)
+  %3 = copy_value %2 : $(@moveOnly Klass, @moveOnly Klass)
+  destroy_value %2 : $(@moveOnly Klass, @moveOnly Klass)
+  %result = moveonlywrapper_to_copyable [owned] %3 : $(@moveOnly Klass, @moveOnly Klass)
+  return %result : $(@moveOnly Klass, @moveOnly Klass)
+}
+*/
+
+// CHECK-LABEL: sil [ossa] @simple_klass_enum_aggregate_usage : $@convention(thin) (@guaranteed Klass) -> @owned FakeOptional<Klass> {
+// CHECK-NOT: @moveOnly
+// CHECK-NOT: copyable_to_moveonlywrapper
+// CHECK-NOT: moveonlywrapper_to_copyable
+// CHECK: } // end sil function 'simple_klass_enum_aggregate_usage'
+
+// TRIVIAL-LABEL: sil [ossa] @simple_klass_enum_aggregate_usage : $@convention(thin) (@guaranteed Klass) -> @owned FakeOptional<Klass> {
+// TRIVIAL: copyable_to_moveonlywrapper
+// TRIVIAL: moveonlywrapper_to_copyable
+// TRIVIAL: } // end sil function 'simple_klass_enum_aggregate_usage'
+sil [ossa] @simple_klass_enum_aggregate_usage : $@convention(thin) (@guaranteed Klass) -> @owned FakeOptional<Klass> {
+bb0(%0 : @guaranteed $Klass):
+  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %0aa = copy_value %0 : $Klass
+  %0a = copyable_to_moveonlywrapper [owned] %0aa : $Klass
+
+  %2 = enum $@moveOnly FakeOptional<Klass>, #FakeOptional.some!enumelt, %0a : $@moveOnly Klass
+
+  %2b = begin_borrow %2 : $@moveOnly FakeOptional<Klass>
+  %ext = unchecked_enum_data %2b : $@moveOnly FakeOptional<Klass>, #FakeOptional.some!enumelt
+  %extCpy = moveonlywrapper_to_copyable [guaranteed] %ext : $@moveOnly Klass
+  apply %f(%extCpy) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %2b : $@moveOnly FakeOptional<Klass>
+  %3 = copy_value %2 : $@moveOnly FakeOptional<Klass>
+  destroy_value %2 : $@moveOnly FakeOptional<Klass>
+  %result = moveonlywrapper_to_copyable [owned] %3 : $@moveOnly FakeOptional<Klass>
+  return %result : $FakeOptional<Klass>
+}
+
+// CHECK-LABEL: sil [ossa] @simple_klass_switch_enum : $@convention(thin) (@guaranteed Klass) -> @owned FakeOptional<Klass> {
+// CHECK-NOT: copyable_to_moveonlywrapper
+// CHECK-NOT: moveonlywrapper_to_copyable
+// CHECK-NOT: @moveOnly
+// CHECK: } // end sil function 'simple_klass_switch_enum'
+
+// TRIVIAL-LABEL: sil [ossa] @simple_klass_switch_enum : $@convention(thin) (@guaranteed Klass) -> @owned FakeOptional<Klass> {
+// TRIVIAL: copyable_to_moveonlywrapper
+// TRIVIAL: moveonlywrapper_to_copyable
+// TRIVIAL: } // end sil function 'simple_klass_switch_enum'
+sil [ossa] @simple_klass_switch_enum : $@convention(thin) (@guaranteed Klass) -> @owned FakeOptional<Klass> {
+bb0(%0 : @guaranteed $Klass):
+  %f = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %0aa = copy_value %0 : $Klass
+  %0a = copyable_to_moveonlywrapper [owned] %0aa : $Klass
+  %notUsed = class_method %0a : $@moveOnly Klass, #Klass.foo : (Klass) -> () -> (), $@convention(method) (@guaranteed Klass) -> ()
+  debug_value %0a : $@moveOnly Klass, let, name "foo"
+  %2 = enum $@moveOnly FakeOptional<Klass>, #FakeOptional.some!enumelt, %0a : $@moveOnly Klass
+  switch_enum %2 : $@moveOnly FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1(%2Payload : @owned $@moveOnly Klass):
+  %2b = enum $@moveOnly FakeOptional<Klass>, #FakeOptional.some!enumelt, %2Payload : $@moveOnly Klass
+  br bb3(%2b : $@moveOnly FakeOptional<Klass>)
+
+bb2:
+  %2c = enum $@moveOnly FakeOptional<Klass>, #FakeOptional.none!enumelt
+  br bb3(%2c : $@moveOnly FakeOptional<Klass>)
+
+bb3(%result : @owned $@moveOnly FakeOptional<Klass>):
+  %result2 = moveonlywrapper_to_copyable [owned] %result : $@moveOnly FakeOptional<Klass>
+  return %result2 : $FakeOptional<Klass>
+}
+
+// CHECK-LABEL: sil [ossa] @debug_value_undef : {{.*}} {
+// CHECK:         debug_value [moveable_value_debuginfo] undef : $*Klass, var, name "s"
+// CHECK-LABEL: } // end sil function 'debug_value_undef'
+sil  [ossa] @debug_value_undef : $@convention(thin) (@owned Klass) -> () {
+bb0(%x : @owned $Klass):
+  %addr = alloc_stack $@moveOnly Klass
+  %unwrapped_addr = moveonlywrapper_to_copyable_addr %addr : $*@moveOnly Klass
+  store %x to [init] %unwrapped_addr : $*Klass
+  debug_value %addr : $*@moveOnly Klass, var, name "s", argno 1, expr op_deref
+  destroy_addr %addr : $*@moveOnly Klass
+  debug_value undef : $*@moveOnly Klass, var, name "s", argno 1, expr op_deref
+  dealloc_stack %addr : $*@moveOnly Klass
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// SILGen occasionally uses dealloc_box instead of destroy_value. dealloc_box is needed when we don't want to destroy
+// the contents of the box. It seems to happen with property wrappers.
+//
+// CHECK-LABEL: sil [ossa] @dealoc_box : $@convention(thin) (@owned Klass) -> () {
+// CHECK:           [[BOX:%.*]] = alloc_box [moveable_value_debuginfo] ${ var Klass }
+// CHECK:           dealloc_box [[BOX]] : ${ var Klass }
+// CHECK-LABEL: } // end sil function 'dealoc_box'
+sil [ossa] @dealoc_box : $@convention(thin) (@owned Klass) -> () {
+bb0(%x : @owned $Klass):
+  %box = alloc_box ${ var @moveOnly Klass }
+  %addr = project_box %box : ${ var @moveOnly Klass }, 0
+  %unwrapped_addr = moveonlywrapper_to_copyable_addr %addr : $*@moveOnly Klass
+  store %x to [init] %unwrapped_addr : $*Klass
+  debug_value %addr : $*@moveOnly Klass, var, name "s", argno 1, expr op_deref
+  destroy_addr %addr : $*@moveOnly Klass
+  debug_value undef : $*@moveOnly Klass, var, name "s", argno 1, expr op_deref
+  dealloc_box %box : ${ var @moveOnly Klass }
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @existential_metatype : $@convention(thin) (@guaranteed any Error) -> @thick any Error.Type {
+// CHECK:         [[EM:%.*]] = existential_metatype $@thick any Error.Type, {{%.*}} : $any Error
+// CHECK:         return [[EM]] : $@thick any Error.Type
+// CHECK-LABEL: } // end sil function 'existential_metatype'
+sil [ossa] @existential_metatype : $@convention(thin) (@guaranteed any Error) -> @thick any Error.Type {
+bb0(%x : @guaranteed $any Error):
+  %y = copyable_to_moveonlywrapper [guaranteed] %x : $any Error
+  %em = existential_metatype $@thick any Error.Type, %y : $@moveOnly (any Error)
+  debug_value %em : $@thick any Error.Type, var, name "s", argno 1, expr op_deref
+  return %em : $@thick any Error.Type
+}
+
+// CHECK-LABEL: sil [ossa] @existential_box :
+// CHECK:         %1 = open_existential_box %0 : $any Error
+// CHECK-LABEL: } // end sil function 'existential_box'
+sil [ossa] @existential_box : $@convention(thin) (@guaranteed any Error) -> () {
+bb0(%x : @guaranteed $any Error):
+  %y = copyable_to_moveonlywrapper [guaranteed] %x : $any Error
+  %o = open_existential_box %y : $@moveOnly (any Error) to $*@opened("01234567-89AB-CDEF-0123-000000000000", Error) Self
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @builtin_tsanInoutAccess : {{.*}} {
+// CHECK:         builtin "tsanInoutAccess"
+// CHECK-LABEL: } // end sil function 'builtin_tsanInoutAccess'
+sil [ossa] @builtin_tsanInoutAccess : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack $@moveOnly C, var, name "b", type $@moveOnly C
+  %6 = builtin "tsanInoutAccess"(%1 : $*@moveOnly C) : $()
+  dealloc_stack %1 : $*@moveOnly C
+  %13 = tuple ()
+  return %13 : $()
+}
+
+// Remove trivial move_value + extend_lifetime
+//
+// CHECK-LABEL: sil [ossa] @move_extend_lifetime : $@convention(thin) (@thin Trivial.Type) -> () {
+// CHECK: bb0(%0 : $@thin Trivial.Type):
+// CHECK-NOT: move_value
+// CHECK-NOT: extend_lifetime
+// CHECK-LABEL: } // end sil function 'move_extend_lifetime'
+sil [ossa] @move_extend_lifetime : $@convention(thin) (@thin Trivial.Type) -> () {
+bb0(%0 : $@thin Trivial.Type):
+  %mv = move_value [var_decl] %0 : $@thin Trivial.Type
+  extend_lifetime %mv : $@thin Trivial.Type
+  %13 = tuple ()
+  return %13 : $()
+}
+
+sil @captureType : $@convention(thin) (@thin Trivial.Type) -> ()
+sil @takeClosure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+
+// SILGen pattern binding can (incorrectly) create a local variable to hold the value a function argument. This results
+// in an extend_lifetime that directly uses the argument value. Ensure that MoveOnlyTypeEliminator erases the
+// extend_lifetime.
+//
+// CHECK-LABEL: sil [ossa] @arg_extend_lifetime : $@convention(thin) (@thin Trivial.Type) -> () {
+// CHECK-NOT: extend_lifetime
+// CHECK-LABEL: } // end sil function 'arg_extend_lifetime'
+sil [ossa] @arg_extend_lifetime : $@convention(thin) (@thin Trivial.Type) -> () {
+bb0(%0 : $@thin Trivial.Type):
+  %cf = function_ref @captureType : $@convention(thin) (@thin Trivial.Type) -> ()
+  %closure = partial_apply [callee_guaranteed] [on_stack] %cf(%0) : $@convention(thin) (@thin Trivial.Type) -> ()
+  %f = function_ref @takeClosure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %6 = apply %f(%closure) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %closure : $@noescape @callee_guaranteed () -> ()
+  extend_lifetime %0 : $@thin Trivial.Type
+  %13 = tuple ()
+  return %13 : $()
+}

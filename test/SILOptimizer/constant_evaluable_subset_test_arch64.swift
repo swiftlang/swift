@@ -16,7 +16,7 @@
 // especially performance inlining as it inlines functions such as String.+=
 // that the evaluator has special knowledge about.
 //
-// RUN: not %target-sil-opt -silgen-cleanup -diagnose-invalid-escaping-captures -diagnose-static-exclusivity -capture-promotion -access-enforcement-selection -allocbox-to-stack -noreturn-folding -definite-init -raw-sil-inst-lowering -closure-lifetime-fixup -semantic-arc-opts -destroy-hoisting -ownership-model-eliminator -mandatory-inlining -predictable-memaccess-opts -os-log-optimization -diagnostic-constant-propagation -predictable-deadalloc-elim -mandatory-arc-opts -diagnose-unreachable -diagnose-infinite-recursion -yield-once-check -dataflow-diagnostics -split-non-cond_br-critical-edges -constexpr-limit 3000 -test-constant-evaluable-subset %t/constant_evaluable_subset_test_arch64_silgen.sil > /dev/null 2> %t/error-output-mandatory
+// RUN: not %target-sil-opt -silgen-cleanup -diagnose-invalid-escaping-captures -diagnose-static-exclusivity -capture-promotion -access-enforcement-selection -allocbox-to-stack -noreturn-folding -definite-init -raw-sil-inst-lowering -closure-lifetime-fixup -semantic-arc-opts -ownership-model-eliminator -mandatory-inlining -mandatory-redundant-load-elimination -os-log-optimization -diagnostic-constant-propagation -predictable-deadalloc-elim -mandatory-arc-opts -diagnose-unreachable -diagnose-infinite-recursion -yield-once-check -dataflow-diagnostics -split-non-cond_br-critical-edges -constexpr-limit 3000 -test-constant-evaluable-subset %t/constant_evaluable_subset_test_arch64_silgen.sil > /dev/null 2> %t/error-output-mandatory
 //
 // RUN: %FileCheck %s < %t/error-output-mandatory
 
@@ -71,8 +71,7 @@ internal func interpretIntTruncations() -> Int16 {
 internal func testInvalidIntTruncations(a: Int64) -> Int8 {
   return Int8(a)
     // CHECK: note: {{.*}} Not enough bits to represent the passed value
-    // CHECK: note: operation performed during this call traps
-    // CHECK: function_ref @$sSZss17FixedWidthIntegerRzrlEyxqd__cSzRd__lufC
+    // CHECK: note: operation traps
 }
 
 @_semantics("test_driver")

@@ -121,6 +121,17 @@ public:
   /// if (auto x = getSourceRange()) { ... }
   explicit operator bool() const { return isValid(); }
 
+  /// Combine the given source ranges into the smallest contiguous SourceRange
+  /// that includes them all, ignoring any invalid ranges present.
+  static SourceRange combine(ArrayRef<SourceRange> ranges);
+
+  /// Combine the given source ranges into the smallest contiguous SourceRange
+  /// that includes them all, ignoring any invalid ranges present.
+  template <typename ...T>
+  static SourceRange combine(T... ranges) {
+    return SourceRange::combine({ranges...});
+  }
+
   /// Extend this SourceRange to the smallest continuous SourceRange that
   /// includes both this range and the other one.
   void widen(SourceRange Other);
@@ -152,6 +163,15 @@ public:
   }
 
   SWIFT_DEBUG_DUMPER(dump(const SourceManager &SM));
+
+  friend size_t hash_value(SourceRange range) {
+    return llvm::hash_combine(range.Start, range.End);
+  }
+
+  friend void simple_display(raw_ostream &OS, const SourceRange &loc) {
+    // Nothing meaningful to print.
+  }
+
 };
 
 /// A half-open character-based source range.

@@ -31,6 +31,8 @@ protocol PWorse {
 protocol Q1 {}
 protocol Q2 {}
 
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=P
+// CHECK-NEXT: Generic signature: <Self where Self : P>
 extension P {
   typealias B = (Q1 & Q2)
 }

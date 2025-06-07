@@ -79,6 +79,9 @@
 #  define OVERRIDE_PROTOCOLCONFORMANCE OVERRIDE
 #  define OVERRIDE_KEYPATH OVERRIDE
 #  define OVERRIDE_WITNESSTABLE OVERRIDE
+#  define OVERRIDE_CVW OVERRIDE
+#  define OVERRIDE_CVW_METADATA OVERRIDE
+#  define OVERRIDE_CVW_METADATA_ENUM OVERRIDE
 #else
 #  ifndef OVERRIDE_METADATALOOKUP
 #    define OVERRIDE_METADATALOOKUP(...)
@@ -103,6 +106,15 @@
 #  endif
 #  ifndef OVERRIDE_WITNESSTABLE
 #    define OVERRIDE_WITNESSTABLE(...)
+#  endif
+#  ifndef OVERRIDE_CVW
+#    define OVERRIDE_CVW(...)
+#  endif
+#  ifndef OVERRIDE_CVW_METADATA
+#    define OVERRIDE_CVW_METADATA(...)
+#  endif
+#  ifndef OVERRIDE_CVW_METADATA_ENUM
+#    define OVERRIDE_CVW_METADATA_ENUM(...)
 #  endif
 #endif
 
@@ -168,8 +180,31 @@ OVERRIDE_FOREIGN(dynamicCastForeignClassMetatypeUnconditional,
 
 OVERRIDE_PROTOCOLCONFORMANCE(conformsToProtocol, const WitnessTable *, , , swift::,
                              (const Metadata * const type,
+                              const void *protocol),
+                             (type, protocol))
+
+OVERRIDE_PROTOCOLCONFORMANCE(conformsToProtocol2, const WitnessTable *, , , swift::,
+                             (const Metadata * const type,
                               const ProtocolDescriptor *protocol),
                              (type, protocol))
+
+OVERRIDE_PROTOCOLCONFORMANCE(conformsToProtocolCommon, const WitnessTable *, , , swift::,
+                             (const Metadata * const type,
+                              const ProtocolDescriptor *protocol),
+                             (type, protocol))
+
+OVERRIDE_PROTOCOLCONFORMANCE(conformsToProtocolWithExecutionContext,
+                             const WitnessTable *, , , swift::,
+                             (const Metadata * const type,
+                              const ProtocolDescriptor *protocol,
+                              ConformanceExecutionContext *context),
+                             (type, protocol, context))
+
+OVERRIDE_PROTOCOLCONFORMANCE(isInConformanceExecutionContext,
+                             bool, , , swift::,
+                             (const Metadata * const type,
+                              const ConformanceExecutionContext *context),
+                             (type, context))
 
 OVERRIDE_KEYPATH(getKeyPath, const HeapObject *, , , swift::,
                  (const void *pattern, const void *arguments),
@@ -207,6 +242,161 @@ OVERRIDE_WITNESSTABLE(getAssociatedConformanceWitnessSlow, const WitnessTable *,
                        const ProtocolRequirement *assocConformance),
                       (wtable, conformingType, assocType, reqBase,
                                assocConformance))
+
+OVERRIDE_CVW_METADATA(cvw_allocateGenericValueMetadataWithLayoutString, ValueMetadata *,
+                      SWIFT_RUNTIME_EXPORT, , swift::,
+                      (const ValueTypeDescriptor *description,
+                       const void *arguments,
+                       const GenericValueMetadataPattern *pattern,
+                       size_t extraDataSize),
+                      (description, arguments, pattern, extraDataSize))
+
+OVERRIDE_CVW_METADATA(cvw_initStructMetadataWithLayoutString, void, SWIFT_RUNTIME_EXPORT,
+                       , swift::, (StructMetadata *structType,
+                                   StructLayoutFlags layoutFlags,
+                                   size_t numFields,
+                                   const uint8_t *const *fieldTypes,
+                                   const uint8_t *fieldTags,
+                                   uint32_t *fieldOffsets),
+                       (structType, layoutFlags, numFields, fieldTypes,
+                        fieldTags, fieldOffsets))
+
+OVERRIDE_CVW_METADATA(cvw_allocateGenericClassMetadataWithLayoutString, ClassMetadata *,
+                      SWIFT_RUNTIME_EXPORT, , swift::,
+                      (const ClassDescriptor *description,
+                       const void *arguments,
+                       const GenericClassMetadataPattern *pattern),
+                      (description, arguments, pattern))
+
+OVERRIDE_CVW_METADATA_ENUM(cvw_initEnumMetadataSingleCaseWithLayoutString, void,
+                           SWIFT_RUNTIME_EXPORT, , swift::,
+                           (EnumMetadata *self, EnumLayoutFlags layoutFlags,
+                            const Metadata *payloadType),
+                           (self, layoutFlags, payloadType))
+
+OVERRIDE_CVW_METADATA_ENUM(cvw_initEnumMetadataSinglePayloadWithLayoutString, void,
+                           SWIFT_RUNTIME_EXPORT, , swift::,
+                           (EnumMetadata *self, EnumLayoutFlags layoutFlags,
+                            const Metadata *payloadType, unsigned emptyCases),
+                           (self, layoutFlags, payloadType, emptyCases))
+
+OVERRIDE_CVW_METADATA_ENUM(cvw_initEnumMetadataMultiPayloadWithLayoutString, void,
+                           SWIFT_RUNTIME_EXPORT, , swift::,
+                           (EnumMetadata *self, EnumLayoutFlags layoutFlags,
+                            unsigned numPayloads,
+                            const Metadata * const *payloadLayouts),
+                           (self, layoutFlags, numPayloads, payloadLayouts))
+
+OVERRIDE_CVW(cvw_destroy, void, SWIFT_RUNTIME_EXPORT,
+              , swift::, (swift::OpaqueValue *address,
+                          const Metadata *metadata),
+              (address, metadata))
+
+OVERRIDE_CVW(cvw_assignWithCopy, swift::OpaqueValue *, SWIFT_RUNTIME_EXPORT,
+              , swift::, (swift::OpaqueValue *dest,
+                          swift::OpaqueValue *src,
+                          const Metadata *metadata),
+              (dest, src, metadata))
+
+OVERRIDE_CVW(cvw_assignWithTake, swift::OpaqueValue *, SWIFT_RUNTIME_EXPORT,
+              , swift::, (swift::OpaqueValue *dest,
+                          swift::OpaqueValue *src,
+                          const Metadata *metadata),
+              (dest, src, metadata))
+
+OVERRIDE_CVW(cvw_initWithCopy, swift::OpaqueValue *, SWIFT_RUNTIME_EXPORT,
+              , swift::, (swift::OpaqueValue *dest,
+                          swift::OpaqueValue *src,
+                          const Metadata *metadata),
+              (dest, src, metadata))
+
+OVERRIDE_CVW(cvw_initWithTake, swift::OpaqueValue *, SWIFT_RUNTIME_EXPORT,
+              , swift::, (swift::OpaqueValue *dest,
+                          swift::OpaqueValue *src,
+                          const Metadata *metadata),
+              (dest, src, metadata))
+
+OVERRIDE_CVW(cvw_initializeBufferWithCopyOfBuffer, swift::OpaqueValue *,
+             SWIFT_RUNTIME_EXPORT,
+              , swift::, (swift::ValueBuffer *dest,
+                          swift::ValueBuffer *src,
+                          const Metadata *metadata),
+              (dest, src, metadata))
+
+OVERRIDE_CVW(cvw_destroyMultiPayloadEnumFN, void, SWIFT_RUNTIME_EXPORT,
+              , swift::, (swift::OpaqueValue *address,
+                          const Metadata *metadata),
+              (address, metadata))
+
+OVERRIDE_CVW(cvw_assignWithCopyMultiPayloadEnumFN, swift::OpaqueValue *, SWIFT_RUNTIME_EXPORT,
+              , swift::, (swift::OpaqueValue *dest,
+                          swift::OpaqueValue *src,
+                          const Metadata *metadata),
+              (dest, src, metadata))
+
+OVERRIDE_CVW(cvw_assignWithTakeMultiPayloadEnumFN, swift::OpaqueValue *, SWIFT_RUNTIME_EXPORT,
+              , swift::, (swift::OpaqueValue *dest,
+                          swift::OpaqueValue *src,
+                          const Metadata *metadata),
+              (dest, src, metadata))
+
+OVERRIDE_CVW(cvw_initWithCopyMultiPayloadEnumFN, swift::OpaqueValue *, SWIFT_RUNTIME_EXPORT,
+              , swift::, (swift::OpaqueValue *dest,
+                          swift::OpaqueValue *src,
+                          const Metadata *metadata),
+              (dest, src, metadata))
+
+OVERRIDE_CVW(cvw_initWithTakeMultiPayloadEnumFN, swift::OpaqueValue *, SWIFT_RUNTIME_EXPORT,
+              , swift::, (swift::OpaqueValue *dest,
+                          swift::OpaqueValue *src,
+                          const Metadata *metadata),
+              (dest, src, metadata))
+
+OVERRIDE_CVW(cvw_initializeBufferWithCopyOfBufferMultiPayloadEnumFN, swift::OpaqueValue *,
+             SWIFT_RUNTIME_EXPORT,
+              , swift::, (swift::ValueBuffer *dest,
+                          swift::ValueBuffer *src,
+                          const Metadata *metadata),
+              (dest, src, metadata))
+
+OVERRIDE_CVW(cvw_enumSimple_getEnumTag, unsigned, SWIFT_RUNTIME_EXPORT,
+              , swift::, (swift::OpaqueValue *address,
+                          const Metadata *metadata),
+              (address, metadata))
+
+OVERRIDE_CVW(cvw_enumSimple_destructiveInjectEnumTag, void, SWIFT_RUNTIME_EXPORT,
+              , swift::, (swift::OpaqueValue *address,
+                          unsigned tag,
+                          const Metadata *metadata),
+              (address, tag, metadata))
+
+OVERRIDE_CVW(cvw_enumFn_getEnumTag, unsigned, SWIFT_RUNTIME_EXPORT,
+              , swift::, (swift::OpaqueValue *address,
+                          const Metadata *metadata),
+              (address, metadata))
+
+OVERRIDE_CVW(cvw_multiPayloadEnumGeneric_getEnumTag, unsigned, SWIFT_RUNTIME_EXPORT,
+              , swift::, (swift::OpaqueValue *address,
+                          const Metadata *metadata),
+              (address, metadata))
+
+OVERRIDE_CVW(cvw_multiPayloadEnumGeneric_destructiveInjectEnumTag, void, SWIFT_RUNTIME_EXPORT,
+              , swift::, (swift::OpaqueValue *address,
+                          unsigned tag,
+                          const Metadata *metadata),
+              (address, tag, metadata))
+
+OVERRIDE_CVW(cvw_singlePayloadEnumGeneric_getEnumTag, unsigned, SWIFT_RUNTIME_EXPORT,
+              , swift::, (swift::OpaqueValue *address,
+                          const Metadata *metadata),
+              (address, metadata))
+
+OVERRIDE_CVW(cvw_singlePayloadEnumGeneric_destructiveInjectEnumTag, void, SWIFT_RUNTIME_EXPORT,
+              , swift::, (swift::OpaqueValue *address,
+                          unsigned tag,
+                          const Metadata *metadata),
+              (address, tag, metadata))
+
 #if SWIFT_OBJC_INTEROP
 
 OVERRIDE_OBJC(dynamicCastObjCClass, const void *, , , swift::,
@@ -255,3 +445,6 @@ OVERRIDE_FOREIGN(dynamicCastForeignClassUnconditional, const void *, , , swift::
 #undef OVERRIDE_PROTOCOLCONFORMANCE
 #undef OVERRIDE_KEYPATH
 #undef OVERRIDE_WITNESSTABLE
+#undef OVERRIDE_CVW
+#undef OVERRIDE_CVW_METADATA
+#undef OVERRIDE_CVW_METADATA_ENUM

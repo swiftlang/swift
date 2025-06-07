@@ -21,11 +21,10 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Parse/Parser.h"
 #include "swift/Subsystems.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 
 using namespace swift;
@@ -174,7 +173,7 @@ static void toDisplayString(CodeCompletionResult *Result,
 }
 
 namespace swift {
-class REPLCodeCompletionConsumer : public SimpleCachingCodeCompletionConsumer {
+class REPLCodeCompletionConsumer : public CodeCompletionConsumer {
   REPLCompletions &Completions;
 
 public:
@@ -186,7 +185,7 @@ public:
         context.getResultSink().Results);
     for (auto Result : SortedResults) {
       std::string InsertableString = toInsertableString(Result);
-      if (StringRef(InsertableString).startswith(Completions.Prefix)) {
+      if (StringRef(InsertableString).starts_with(Completions.Prefix)) {
         llvm::SmallString<128> PrintedResult;
         {
           llvm::raw_svector_ostream OS(PrintedResult);
@@ -250,11 +249,12 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   // Create a new module and file for the code completion buffer, similar to how
   // we handle new lines of REPL input.
   auto *newModule = ModuleDecl::create(
-      Ctx.getIdentifier("REPL_Code_Completion"), Ctx, implicitImports);
-  auto &newSF =
-      *new (Ctx) SourceFile(*newModule, SourceFileKind::Main, *BufferID);
-  newModule->addFile(newSF);
+      Ctx.getIdentifier("REPL_Code_Completion"), Ctx, implicitImports,
+      [&](ModuleDecl *newModule, auto addFile) {
+    addFile(new (Ctx) SourceFile(*newModule, SourceFileKind::Main, *BufferID));
+  });
 
+  auto &newSF = newModule->getMainSourceFile();
   performImportResolution(newSF);
   bindExtensions(*newModule);
 

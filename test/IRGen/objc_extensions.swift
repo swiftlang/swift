@@ -21,12 +21,12 @@ import objc_extension_base
 // CHECK-SAME:   @_PROTOCOL__TtP15objc_extensions11NewProtocol_
 
 // CHECK-LABEL: @"_CATEGORY_Gizmo_$_objc_extensions" = internal constant
-// CHECK-SAME:   i8* getelementptr inbounds ([16 x i8], [16 x i8]* [[CATEGORY_NAME]], i64 0, i64 0),
-// CHECK-SAME:   %objc_class* @"OBJC_CLASS_$_Gizmo",
+// CHECK-SAME:   ptr [[CATEGORY_NAME]],
+// CHECK-SAME:   ptr @"OBJC_CLASS_$_Gizmo",
 // CHECK-SAME:   @"_CATEGORY_INSTANCE_METHODS_Gizmo_$_objc_extensions",
 // CHECK-SAME:   @"_CATEGORY_CLASS_METHODS_Gizmo_$_objc_extensions",
 // CHECK-SAME:   @"_CATEGORY_PROTOCOLS_Gizmo_$_objc_extensions",
-// CHECK-SAME:   i8* null
+// CHECK-SAME:   ptr null
 // CHECK-SAME: }, section "__DATA, {{.*}}", align 8
 
 @objc protocol NewProtocol {
@@ -61,12 +61,12 @@ extension Gizmo: NewProtocol {
 // CHECK: [[CATEGORY_NAME_1:@.*]] = private unnamed_addr constant [17 x i8] c"objc_extensions1\00"
 
 // CHECK: @"_CATEGORY_Gizmo_$_objc_extensions1" = internal constant
-// CHECK:   i8* getelementptr inbounds ([17 x i8], [17 x i8]* [[CATEGORY_NAME_1]], i64 0, i64 0),
-// CHECK:   %objc_class* @"OBJC_CLASS_$_Gizmo",
+// CHECK:   ptr [[CATEGORY_NAME_1]],
+// CHECK:   ptr @"OBJC_CLASS_$_Gizmo",
 // CHECK:   {{.*}} @"_CATEGORY_INSTANCE_METHODS_Gizmo_$_objc_extensions1",
 // CHECK:   {{.*}} @"_CATEGORY_CLASS_METHODS_Gizmo_$_objc_extensions1",
-// CHECK:   i8* null,
-// CHECK:   i8* null
+// CHECK:   ptr null,
+// CHECK:   ptr null
 // CHECK: }, section "__DATA, {{.*}}", align 8
 
 extension Gizmo {
@@ -74,6 +74,24 @@ extension Gizmo {
   }
 
   @objc class func brandSpankingNewClassMethod() {
+  }
+}
+
+/*
+ * Make sure that extensions of an ObjC class with `@objc(CustomName)` get the
+ * indicated category name.
+ */
+// CHECK: @"_CATEGORY_Gizmo_$_WidgetMaker" = internal constant
+// CHECK:   ptr @.str.11.WidgetMaker,
+// CHECK:   ptr @"OBJC_CLASS_$_Gizmo",
+// CHECK:   {{.*}} @"_CATEGORY_INSTANCE_METHODS_Gizmo_$_WidgetMaker",
+// CHECK:   {{.*}} ptr null,
+// CHECK:   ptr null,
+// CHECK:   ptr null
+// CHECK: }, section "__DATA, {{.*}}", align 8
+
+@objc(WidgetMaker) extension Gizmo {
+  func makeWidget() {
   }
 }
 
@@ -87,30 +105,30 @@ class Hoozit : NSObject {
 // CHECK-LABEL: @"_CATEGORY_INSTANCE_METHODS__TtC15objc_extensions6Hoozit_$_objc_extensions" = internal constant
 // CHECK:   i32 24,
 // CHECK:   i32 1,
-// CHECK:   [1 x { i8*, i8*, i8* }] [{ i8*, i8*, i8* } {
-// CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* @"\01L_selector_data(blibble)", i64 0, i64 0),
-// CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[STR:@.*]], i64 0, i64 0),
-// CHECK:     i8* bitcast (void ([[OPAQUE:%.*]]*, i8*)* @"$s15objc_extensions6HoozitC7blibbleyyFTo" to i8*)
+// CHECK:   [1 x { ptr, ptr, ptr }] [{ ptr, ptr, ptr } {
+// CHECK:     ptr @"\01L_selector_data(blibble)",
+// CHECK:     ptr [[STR:@[^,]*]],
+// CHECK:     ptr @"$s15objc_extensions6HoozitC7blibbleyyFTo"
 // CHECK:   }]
 // CHECK: }, section "__DATA, {{.*}}", align 8
 
 // CHECK-LABEL: @"_CATEGORY_CLASS_METHODS__TtC15objc_extensions6Hoozit_$_objc_extensions" = internal constant
 // CHECK:   i32 24,
 // CHECK:   i32 1,
-// CHECK:   [1 x { i8*, i8*, i8* }] [{ i8*, i8*, i8* } {
-// CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* @"\01L_selector_data(blobble)", i64 0, i64 0),
-// CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[STR]], i64 0, i64 0),
-// CHECK:     i8* bitcast (void (i8*, i8*)* @"$s15objc_extensions6HoozitC7blobbleyyFZTo" to i8*)
+// CHECK:   [1 x { ptr, ptr, ptr }] [{ ptr, ptr, ptr } {
+// CHECK:     ptr @"\01L_selector_data(blobble)",
+// CHECK:     ptr [[STR]],
+// CHECK:     ptr @"$s15objc_extensions6HoozitC7blobbleyyFZTo"
 // CHECK:   }]
 // CHECK: }, section "__DATA, {{.*}}", align 8
 
 // CHECK-LABEL: @"_CATEGORY__TtC15objc_extensions6Hoozit_$_objc_extensions" = internal constant
-// CHECK:   i8* getelementptr inbounds ([16 x i8], [16 x i8]* [[CATEGORY_NAME]], i64 0, i64 0),
-// CHECK:   %swift.type* {{.*}} @"$s15objc_extensions6HoozitCMf",
+// CHECK:   ptr [[CATEGORY_NAME]],
+// CHECK:   ptr {{.*}} @"$s15objc_extensions6HoozitCMf",
 // CHECK:   {{.*}} @"_CATEGORY_INSTANCE_METHODS__TtC15objc_extensions6Hoozit_$_objc_extensions",
 // CHECK:   {{.*}} @"_CATEGORY_CLASS_METHODS__TtC15objc_extensions6Hoozit_$_objc_extensions",
-// CHECK:   i8* null,
-// CHECK:   i8* null
+// CHECK:   ptr null,
+// CHECK:   ptr null
 // CHECK: }, section "__DATA, {{.*}}", align 8
 
 extension Hoozit {
@@ -123,10 +141,10 @@ class SwiftOnly { }
 // CHECK-LABEL: @"_CATEGORY_INSTANCE_METHODS__TtC15objc_extensions9SwiftOnly_$_objc_extensions" = internal constant
 // CHECK:   i32 24,
 // CHECK:   i32 1,
-// CHECK:   [1 x { i8*, i8*, i8* }] [{ i8*, i8*, i8* } {
-// CHECK:     i8* getelementptr inbounds ([7 x i8], [7 x i8]* @"\01L_selector_data(wibble)", i64 0, i64 0),
-// CHECK:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[STR]], i64 0, i64 0),
-// CHECK:     i8* bitcast (void (i8*, i8*)* @"$s15objc_extensions9SwiftOnlyC6wibbleyyFTo" to i8*)
+// CHECK:   [1 x { ptr, ptr, ptr }] [{ ptr, ptr, ptr } {
+// CHECK:     ptr @"\01L_selector_data(wibble)",
+// CHECK:     ptr [[STR]],
+// CHECK:     ptr @"$s15objc_extensions9SwiftOnlyC6wibbleyyFTo"
 // CHECK:   }] }, section "__DATA, {{.*}}", align 8
 extension SwiftOnly {
   @objc func wibble() { }
@@ -154,9 +172,9 @@ extension NSObject {
 
 
 // CHECK-LABEL: @"_CATEGORY__TtCC15objc_extensions5Outer5Inner_$_objc_extensions" = internal constant
-// CHECK-SAME:   i8* getelementptr inbounds ([16 x i8], [16 x i8]* [[CATEGORY_NAME]], i64 0, i64 0),
+// CHECK-SAME:   ptr [[CATEGORY_NAME]],
 // CHECK-SAME:   @"_CATEGORY_INSTANCE_METHODS__TtCC15objc_extensions5Outer5Inner_$_objc_extensions",
-// CHECK-SAME:   i8* null
+// CHECK-SAME:   ptr null
 // CHECK-SAME: }, section "__DATA, {{.*}}", align 8
 
 class Outer : NSObject {
@@ -175,7 +193,7 @@ class NSDogcow : NSObject {}
 
 // CHECK: [[NAME:@.*]] = private unnamed_addr constant [5 x i8] c"woof\00"
 // CHECK: [[ATTR:@.*]] = private unnamed_addr constant [7 x i8] c"Tq,N,D\00"
-// CHECK: @"_CATEGORY_PROPERTIES__TtC15objc_extensions8NSDogcow_$_objc_extensions" = internal constant {{.*}} [[NAME]], {{.*}} [[ATTR]], {{.*}}, section "__DATA, {{.*}}", align 8
+// CHECK: @"_CATEGORY_PROPERTIES__TtC15objc_extensions8NSDogcow_$_objc_extensions" = internal constant {{.*}} [[NAME]], {{.*}} [[ATTR]] {{.*}}, section "__DATA, {{.*}}", align 8
 extension NSDogcow {
   @NSManaged var woof: Int
 }
@@ -205,40 +223,37 @@ class SwiftSubGizmo : SwiftBaseGizmo {
  */
 extension FungingArray {
   // CHECK-LABEL: define {{.*}} @"$sSo12FungingArrayC15objc_extensionsEyAByxGxcfC"
-  // CHECK-SAME: (%objc_object* %0, %swift.type* swiftself %1)
+  // CHECK-SAME: (ptr %0, ptr swiftself %1)
   // CHECK: @__swift_instantiateConcreteTypeFromMangledName{{.*}}@"$sSo9NSFunging_pMD"{{.*}}!dbg
 
   // CHECK-LABEL: define {{.*}} @"$sSo12FungingArrayC15objc_extensionsEyAByxGxcfc"
-  // CHECK-SAME: (%objc_object* %0, %TSo12FungingArrayC* swiftself %1)
+  // CHECK-SAME: (ptr %0, ptr swiftself %1)
   // CHECK: [[ALLOCA:%[^, =]+]] = alloca %Any, align 8
   // CHECK: @__swift_instantiateConcreteTypeFromMangledName{{.*}}@"$sSo9NSFunging_pMD"{{.*}}!dbg
-  // CHECK: {{%[^, =]+}} = getelementptr inbounds %Any, %Any* [[ALLOCA]], i32 0, i32 0
-  // CHECK: [[ANYBUF:%[^, =]+]] = getelementptr inbounds %Any, %Any* [[ALLOCA]], i32 0, i32 0
+  // CHECK: {{%[^, =]+}} = getelementptr inbounds{{.*}} %Any, ptr [[ALLOCA]], i32 0, i32 0
+  // CHECK: [[ANYBUF:%[^, =]+]] = getelementptr inbounds{{.*}} %Any, ptr [[ALLOCA]], i32 0, i32 0
   // CHECK: [[BUFPTR:%[^, =]+]] = {{.*}} [[ANYBUF]]
-  // CHECK: [[BUF_0:%[^, =]+]] = {{.*}} [[BUFPTR]]
-  // CHECK: store {{.*}} %0, {{.*}} [[BUF_0]]
-  // CHECK: call swiftcc void @"$s15objc_extensions11opaquePrintyyypF"(%Any* {{.*}} [[ALLOCA]])
+  // CHECK: store {{.*}} %0, {{.*}} [[BUFPTR]]
+  // CHECK: call swiftcc void @"$s15objc_extensions11opaquePrintyyypF"(ptr {{.*}} [[ALLOCA]])
   @objc public convenience init(_ elem: Element) {
     opaquePrint(elem)
     self.init()
   }
 
   // CHECK-LABEL: define {{.*}} @"$sSo12FungingArrayC15objc_extensionsE7pinningAByxGxm_tcfC"
-  // CHECK-SAME: (%swift.type* %0, %swift.type* swiftself %1)
+  // CHECK-SAME: (ptr %0, ptr swiftself %1)
   // CHECK: @__swift_instantiateConcreteTypeFromMangledName{{.*}}@"$sSo9NSFunging_pMD"{{.*}}!dbg
 
   // CHECK-LABEL: define {{.*}} @"$sSo12FungingArrayC15objc_extensionsE7pinningAByxGxm_tcfc"
-  // CHECK-SAME: (%swift.type* %0, %TSo12FungingArrayC* swiftself %1)
+  // CHECK-SAME: (ptr %0, ptr swiftself %1)
   // CHECK: [[ALLOCA:%[^, =]+]] = alloca %Any, align 8
   // CHECK: @__swift_instantiateConcreteTypeFromMangledName{{.*}}@"$sSo9NSFunging_pMD"{{.*}}!dbg
-  // CHECK: [[OBJC_CLASS:%[^, =]+]] = call %objc_class* @swift_getObjCClassFromMetadata(%swift.type* %0)
-  // CHECK: [[OBJC_CLASS_OBJ:%[^, =]+]] = bitcast %objc_class* [[OBJC_CLASS]]
-  // CHECK: {{%[^, =]+}} = getelementptr inbounds %Any, %Any* [[ALLOCA]], i32 0, i32 0
-  // CHECK: [[ANYBUF:%[^, =]+]] = getelementptr inbounds %Any, %Any* [[ALLOCA]], i32 0, i32 0
+  // CHECK: [[OBJC_CLASS:%[^, =]+]] = call ptr @swift_getObjCClassFromMetadata(ptr %0)
+  // CHECK: {{%[^, =]+}} = getelementptr inbounds{{.*}} %Any, ptr [[ALLOCA]], i32 0, i32 0
+  // CHECK: [[ANYBUF:%[^, =]+]] = getelementptr inbounds{{.*}} %Any, ptr [[ALLOCA]], i32 0, i32 0
   // CHECK: [[BUFPTR:%[^, =]+]] = {{.*}} [[ANYBUF]]
-  // CHECK: [[BUF_0:%[^, =]+]] = {{.*}} [[BUFPTR]]
-  // CHECK: store {{.*}} [[OBJC_CLASS_OBJ]], {{.*}} [[BUF_0]]
-  // CHECK: call swiftcc void @"$s15objc_extensions11opaquePrintyyypF"(%Any* {{.*}} [[ALLOCA]])
+  // CHECK: store {{.*}} [[OBJC_CLASS]], {{.*}} [[BUFPTR]]
+  // CHECK: call swiftcc void @"$s15objc_extensions11opaquePrintyyypF"(ptr {{.*}} [[ALLOCA]])
   @objc public convenience init(pinning: Element.Type) {
     opaquePrint(pinning as AnyObject)
     self.init()

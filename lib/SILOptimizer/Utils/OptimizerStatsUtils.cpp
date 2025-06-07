@@ -68,7 +68,9 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Process.h"
-#include "swift/SIL/SILValue.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/Basic/SourceManager.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
@@ -186,6 +188,11 @@ llvm::cl::opt<bool> SILStatsFunctions(
     "sil-stats-functions", llvm::cl::init(false),
     llvm::cl::desc("Enable computation of statistics for SIL functions"));
 
+/// Dump statistics about lost debug variables.
+llvm::cl::opt<bool> SILStatsLostVariables(
+    "sil-stats-lost-variables", llvm::cl::init(false),
+    llvm::cl::desc("Dump lost debug variables stats"));
+
 /// The name of the output file for optimizer counters.
 llvm::cl::opt<std::string> SILStatsOutputFile(
     "sil-stats-output-file", llvm::cl::init(""),
@@ -269,11 +276,29 @@ llvm::cl::opt<std::string> StatsOnlyFunctionsNamePattern(
 struct FunctionStat {
   int BlockCount = 0;
   int InstCount = 0;
+  /// True when the FunctionStat is created for a SIL Function after a SIL
+  /// Optimization pass has been run on it. When it is a post optimization SIL
+  /// Function, we do not want to store anything in the InlinedAts Map in
+  /// InstCountVisitor.
+  bool NewFunc = false;
   /// Instruction counts per SILInstruction kind.
   InstructionCounts InstCounts;
 
-  FunctionStat(SILFunction *F);
+  using VarID = std::tuple<const SILDebugScope *, llvm::StringRef,
+                           unsigned, unsigned>;
+  llvm::StringSet<> VarNames;
+  llvm::DenseSet<FunctionStat::VarID> DebugVariables;
+  llvm::DenseSet<const SILDebugScope *> VisitedScope;
+  llvm::DenseMap<VarID, const SILDebugScope *> InlinedAts;
+
+  FunctionStat(SILFunction *F, bool NewFunc = false);
   FunctionStat() {}
+
+  // The DebugVariables set contains pointers to VarNames. Disallow copy.
+  FunctionStat(const FunctionStat &) = delete;
+  FunctionStat(FunctionStat &&) = default;
+  FunctionStat &operator=(const FunctionStat &) = delete;
+  FunctionStat &operator=(FunctionStat &&) = default;
 
   void print(llvm::raw_ostream &stream) const {
     stream << "FunctionStat("
@@ -281,7 +306,8 @@ struct FunctionStat {
   }
 
   bool operator==(const FunctionStat &rhs) const {
-    return BlockCount == rhs.BlockCount && InstCount == rhs.InstCount;
+    return BlockCount == rhs.BlockCount && InstCount == rhs.InstCount
+      && DebugVariables == rhs.DebugVariables;
   }
 
   bool operator!=(const FunctionStat &rhs) const { return !(*this == rhs); }
@@ -360,14 +386,29 @@ struct ModuleStat {
   bool operator!=(const ModuleStat &rhs) const { return !(*this == rhs); }
 };
 
-// A helper type to collect the stats about the number of instructions and basic
-// blocks.
+/// A helper type to collect the stats about a function (instructions, blocks,
+/// debug variables).
 struct InstCountVisitor : SILInstructionVisitor<InstCountVisitor> {
   int BlockCount = 0;
   int InstCount = 0;
+  /// True when the InstCountVisitor is created for a SIL Function after a SIL
+  /// Optimization pass has been run on it. When it is a post optimization SIL
+  /// Function, we do not want to store anything in the InlinedAts Map in
+  /// InstCountVisitor.
+  const bool &NewFunc;
   InstructionCounts &InstCounts;
 
-  InstCountVisitor(InstructionCounts &InstCounts) : InstCounts(InstCounts) {}
+  llvm::StringSet<> &VarNames;
+  llvm::DenseSet<FunctionStat::VarID> &DebugVariables;
+  llvm::DenseMap<FunctionStat::VarID, const SILDebugScope *> &InlinedAts;
+
+  InstCountVisitor(
+      InstructionCounts &InstCounts, llvm::StringSet<> &VarNames,
+      llvm::DenseSet<FunctionStat::VarID> &DebugVariables,
+      llvm::DenseMap<FunctionStat::VarID, const SILDebugScope *> &InlinedAts,
+      bool &NewFunc)
+      : NewFunc(NewFunc), InstCounts(InstCounts), VarNames(VarNames),
+        DebugVariables(DebugVariables), InlinedAts(InlinedAts) {}
 
   int getBlockCount() const {
     return BlockCount;
@@ -385,6 +426,29 @@ struct InstCountVisitor : SILInstructionVisitor<InstCountVisitor> {
   void visit(SILInstruction *I) {
     ++InstCount;
     ++InstCounts[I->getKind()];
+
+    if (!SILStatsLostVariables)
+      return;
+    // Check the debug variable.
+    DebugVarCarryingInst inst(I);
+    if (!inst)
+      return;
+    std::optional<SILDebugVariable> varInfo = inst.getVarInfo();
+    if (!varInfo)
+      return;
+
+    llvm::StringRef UniqueName = VarNames.insert(varInfo->Name).first->getKey();
+    unsigned line = 0, col = 0;
+    if (varInfo->Loc && varInfo->Loc->getSourceLoc().isValid()) {
+      std::tie(line, col) = inst->getModule().getSourceManager()
+        .getPresumedLineAndColumnForLoc(varInfo->Loc->getSourceLoc(), 0);
+    }
+    FunctionStat::VarID key(
+              varInfo->Scope ? varInfo->Scope : inst->getDebugScope(),
+              UniqueName, line, col);
+    DebugVariables.insert(key);
+    if (!NewFunc)
+      InlinedAts.try_emplace(key, varInfo->Scope->InlinedCallSite);
   }
 };
 
@@ -549,7 +613,7 @@ public:
 std::unique_ptr<llvm::raw_ostream, void(*)(llvm::raw_ostream *)>
     stats_output_stream = {nullptr, nullptr};
 
-/// Return the output streamm to be used for logging the collected statistics.
+/// Return the output stream to be used for logging the collected statistics.
 llvm::raw_ostream &stats_os() {
   // Initialize the stream if it is not initialized yet.
   if (!stats_output_stream) {
@@ -664,6 +728,87 @@ bool isFirstTimeData(int Old, int New) {
   return Old == 0 && New != Old;
 }
 
+/// Return true if \p Scope is the same as \p DbgValScope or a child scope of
+/// \p DbgValScope, return false otherwise.
+bool isScopeChildOfOrEqualTo(const SILDebugScope *Scope,
+                             const SILDebugScope *DbgValScope) {
+  llvm::DenseSet<const SILDebugScope *> VisitedScope;
+  while (Scope != nullptr) {
+    if (VisitedScope.find(Scope) == VisitedScope.end()) {
+      VisitedScope.insert(Scope);
+      if (Scope == DbgValScope) {
+        return true;
+      }
+      if (auto *S = dyn_cast<const SILDebugScope *>(Scope->Parent))
+        Scope = S;
+    } else
+      return false;
+  }
+  return false;
+}
+
+/// Return true if \p InlinedAt is the same as \p DbgValInlinedAt or part of
+/// the InlinedAt chain, return false otherwise.
+bool isInlinedAtChildOfOrEqualTo(const SILDebugScope *InlinedAt,
+                                 const SILDebugScope *DbgValInlinedAt) {
+  if (DbgValInlinedAt == InlinedAt)
+    return true;
+  if (!DbgValInlinedAt)
+    return false;
+  if (!InlinedAt)
+    return false;
+  auto *IA = InlinedAt;
+  while (IA) {
+    if (IA == DbgValInlinedAt)
+      return true;
+    IA = IA->InlinedCallSite;
+  }
+  return false;
+}
+
+int computeLostVariables(SILFunction *F, FunctionStat &Old, FunctionStat &New) {
+  unsigned LostCount = 0;
+  unsigned PrevLostCount = 0;
+  auto &OldSet = Old.DebugVariables;
+  auto &NewSet = New.DebugVariables;
+  // Find an Instruction that shares the same scope as the dropped debug_value
+  // or has a scope that is the child of the scope of the debug_value, and has
+  // an inlinedAt equal to the inlinedAt of the debug_value or it's inlinedAt
+  // chain contains the inlinedAt of the debug_value, if such an Instruction is
+  // found, debug information is dropped.
+  for (auto &Var : OldSet) {
+    if (NewSet.contains(Var))
+      continue;
+    auto &DbgValScope = std::get<0>(Var);
+    for (auto &BB : *F) {
+      for (auto &I : BB) {
+        if (!I.isDebugInstruction()) {
+          auto DbgLoc = I.getDebugLocation();
+          auto Scope = DbgLoc.getScope();
+          // If the Scope is a child of, or equal to the DbgValScope and is
+          // inlined at the Var's InlinedAt location, return true to signify
+          // that the Var has been dropped.
+          if (isScopeChildOfOrEqualTo(Scope, DbgValScope)) {
+            if (isInlinedAtChildOfOrEqualTo(Scope->InlinedCallSite,
+                                            Old.InlinedAts[Var])) {
+              // Found another instruction in the variable's scope, so there
+              // exists a break point at which the variable could be observed.
+              // Count it as dropped.
+              LostCount++;
+              break;
+            }
+          }
+        }
+      }
+      if (PrevLostCount != LostCount) {
+        PrevLostCount = LostCount;
+        break;
+      }
+    }
+  }
+  return LostCount;
+}
+
 /// Dump statistics for a SILFunction. It is only used if a user asked to
 /// produce detailed stats about transformations of SILFunctions. This
 /// information is dumped unconditionally, for each transformation that changed
@@ -710,7 +855,7 @@ void processFuncStatsChanges(SILFunction *F, FunctionStat &OldStat,
                              TransformationContext &Ctx) {
   processFuncStatHistory(F, NewStat, Ctx);
 
-  if (!SILStatsFunctions && !SILStatsDumpAll)
+  if (!SILStatsFunctions && !SILStatsLostVariables && !SILStatsDumpAll)
     return;
 
   if (OldStat == NewStat)
@@ -724,6 +869,7 @@ void processFuncStatsChanges(SILFunction *F, FunctionStat &OldStat,
   // Compute deltas.
   double DeltaBlockCount = computeDelta(OldStat.BlockCount, NewStat.BlockCount);
   double DeltaInstCount = computeDelta(OldStat.InstCount, NewStat.InstCount);
+  int LostVariables = computeLostVariables(F, OldStat, NewStat);
 
   NewLineInserter nl;
 
@@ -743,6 +889,11 @@ void processFuncStatsChanges(SILFunction *F, FunctionStat &OldStat,
     stats_os() << nl.get();
     printCounterChange("function", "inst", DeltaInstCount, OldStat.InstCount,
                        NewStat.InstCount, Ctx, F->getName());
+  }
+
+  if ((SILStatsDumpAll || SILStatsLostVariables) && LostVariables) {
+    stats_os() << nl.get();
+    printCounterValue("function", "lostvars", LostVariables, F->getName(), Ctx);
   }
 }
 
@@ -867,10 +1018,10 @@ void OptimizerStatsAnalysis::updateModuleStats(TransformationContext &Ctx) {
       auto &FuncStat = getFunctionStat(&F);
       FunctionStat NewFuncStat(&F);
       processFuncStatHistory(&F, NewFuncStat, Ctx);
-      // Update function stats.
-      FuncStat = NewFuncStat;
       // Update module stats.
       NewModStat.addFunctionStat(NewFuncStat);
+      // Update function stats.
+      FuncStat = std::move(NewFuncStat);
     }
   } else {
     // Go only over functions that were changed since the last computation.
@@ -893,12 +1044,12 @@ void OptimizerStatsAnalysis::updateModuleStats(TransformationContext &Ctx) {
       auto *F = InvalidatedFuncs.back();
       InvalidatedFuncs.pop_back();
       auto &FuncStat = getFunctionStat(F);
-      auto OldFuncStat = FuncStat;
-      FunctionStat NewFuncStat(F);
+      auto &OldFuncStat = FuncStat;
+      FunctionStat NewFuncStat(F, true);
       processFuncStatsChanges(F, OldFuncStat, NewFuncStat, Ctx);
       NewModStat.subFunctionStat(OldFuncStat);
       NewModStat.addFunctionStat(NewFuncStat);
-      FuncStat = NewFuncStat;
+      FuncStat = std::move(NewFuncStat);
     }
 
     // Process deleted functions.
@@ -906,7 +1057,7 @@ void OptimizerStatsAnalysis::updateModuleStats(TransformationContext &Ctx) {
       auto *F = DeletedFuncs.back();
       DeletedFuncs.pop_back();
       auto &FuncStat = getFunctionStat(F);
-      auto OldFuncStat = FuncStat;
+      auto &OldFuncStat = FuncStat;
       FunctionStat NewFuncStat;
       processFuncStatsChanges(F, OldFuncStat, NewFuncStat, Ctx);
       NewModStat.subFunctionStat(OldFuncStat);
@@ -919,10 +1070,10 @@ void OptimizerStatsAnalysis::updateModuleStats(TransformationContext &Ctx) {
       AddedFuncs.pop_back();
       auto &FuncStat = getFunctionStat(F);
       FunctionStat OldFuncStat;
-      FunctionStat NewFuncStat(F);
+      FunctionStat NewFuncStat(F, true);
       processFuncStatsChanges(F, OldFuncStat, NewFuncStat, Ctx);
       NewModStat.addFunctionStat(NewFuncStat);
-      FuncStat = NewFuncStat;
+      FuncStat = std::move(NewFuncStat);
     }
   }
 
@@ -938,8 +1089,8 @@ void OptimizerStatsAnalysis::updateModuleStats(TransformationContext &Ctx) {
   ModStat = NewModStat;
 }
 
-FunctionStat::FunctionStat(SILFunction *F) {
-  InstCountVisitor V(InstCounts);
+FunctionStat::FunctionStat(SILFunction *F, bool NewFunc) : NewFunc(NewFunc) {
+  InstCountVisitor V(InstCounts, VarNames, DebugVariables, InlinedAts, NewFunc);
   V.visitSILFunction(F);
   BlockCount = V.getBlockCount();
   InstCount = V.getInstCount();
@@ -957,7 +1108,8 @@ void swift::updateSILModuleStatsAfterTransform(SILModule &M,
                                                SILTransform *Transform,
                                                SILPassManager &PM,
                                                int PassNumber, int Duration) {
-  if (!SILStatsModules && !SILStatsFunctions && !SILStatsDumpAll)
+  if (!SILStatsModules && !SILStatsFunctions && !SILStatsLostVariables
+      && !SILStatsDumpAll)
     return;
   TransformationContext Ctx(M, PM, Transform, PassNumber, Duration);
   OptimizerStatsAnalysis *Stats = PM.getAnalysis<OptimizerStatsAnalysis>();

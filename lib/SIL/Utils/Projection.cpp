@@ -12,13 +12,13 @@
 
 #define DEBUG_TYPE "sil-projection"
 #include "swift/SIL/Projection.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/IndexTrie.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILUndef.h"
-#include "llvm/ADT/None.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -154,6 +154,13 @@ Projection::Projection(SingleValueInstruction *I) : Value() {
     }
     break;
   }
+  case SILInstructionKind::ProjectBlockStorageInst: {
+    auto *Ty = I->getType().getASTType().getPointer();
+    assert(Ty->isCanonical());
+    Value = ValueTy(ProjectionKind::BlockStorageCast, Ty);
+    assert(getKind() == ProjectionKind::BlockStorageCast);
+    break;
+  }
   case SILInstructionKind::UpcastInst: {
     auto *Ty = I->getType().getASTType().getPointer();
     assert(Ty->isCanonical());
@@ -199,6 +206,7 @@ SILType Projection::getType(SILType BaseType, SILModule &M,
   case ProjectionKind::Tuple:
     return BaseType.getTupleElementType(getIndex());
   case ProjectionKind::Upcast:
+  case ProjectionKind::BlockStorageCast:
   case ProjectionKind::RefCast:
   case ProjectionKind::BitwiseCast:
   case ProjectionKind::TailElems:
@@ -237,6 +245,8 @@ Projection::createObjectProjection(SILBuilder &B, SILLocation Loc,
   case ProjectionKind::TailElems:
     return nullptr;
   case ProjectionKind::Box:
+    return nullptr;
+  case ProjectionKind::BlockStorageCast:
     return nullptr;
   case ProjectionKind::Upcast:
     return B.createUpcast(Loc, Base, getCastType(BaseTy));
@@ -285,6 +295,8 @@ Projection::createAddressProjection(SILBuilder &B, SILLocation Loc,
     return B.createRefTailAddr(Loc, Base, getCastType(BaseTy));
   case ProjectionKind::Box:
     return B.createProjectBox(Loc, Base, getIndex());
+  case ProjectionKind::BlockStorageCast:
+    return B.createProjectBlockStorage(Loc, Base);
   case ProjectionKind::Upcast:
     return B.createUpcast(Loc, Base, getCastType(BaseTy));
   case ProjectionKind::RefCast:
@@ -363,8 +375,8 @@ void Projection::getFirstLevelProjections(
 //                            Projection Path
 //===----------------------------------------------------------------------===//
 
-Optional<ProjectionPath> ProjectionPath::getProjectionPath(SILValue Start,
-                                                           SILValue End) {
+std::optional<ProjectionPath> ProjectionPath::getProjectionPath(SILValue Start,
+                                                                SILValue End) {
   ProjectionPath P(Start->getType(), End->getType());
 
   // If Start == End, there is a "trivial" projection path in between the
@@ -376,10 +388,19 @@ Optional<ProjectionPath> ProjectionPath::getProjectionPath(SILValue Start,
   // and unions. This is currently only associated with structs.
   if (Start->getType().aggregateHasUnreferenceableStorage() ||
       End->getType().aggregateHasUnreferenceableStorage())
-    return None;
+    return std::nullopt;
 
   auto Iter = End;
   while (Start != Iter) {
+
+    if (auto *mvr = dyn_cast<MultipleValueInstructionResult>(Iter)) {
+      if (auto *bci = dyn_cast<BeginCOWMutationInst>(mvr->getParent())) {
+        Iter = bci->getOperand();
+        continue;
+      }
+      break;
+    }
+
     // end_cow_mutation and begin_access are not projections, but we need to be
     // able to form valid ProjectionPaths across them, otherwise optimization
     // passes like RLE/DSE cannot recognize their locations.
@@ -405,7 +426,7 @@ Optional<ProjectionPath> ProjectionPath::getProjectionPath(SILValue Start,
   // ProjectionPath never allow paths to be compared as a list of indices.
   // Only the encoded type+index pair will be compared.
   if (P.empty() || Start != Iter)
-    return None;
+    return std::nullopt;
 
   // Reverse to get a path from base to most-derived.
   std::reverse(P.Path.begin(), P.Path.end());
@@ -535,12 +556,12 @@ ProjectionPath::computeSubSeqRelation(const ProjectionPath &RHS) const {
   return SubSeqRelation_t::RHSStrictSubSeqOfLHS;
 }
 
-Optional<ProjectionPath>
+std::optional<ProjectionPath>
 ProjectionPath::removePrefix(const ProjectionPath &Path,
                              const ProjectionPath &Prefix) {
   // We can only subtract paths that have the same base.
   if (Path.BaseType != Prefix.BaseType)
-    return None;
+    return std::nullopt;
 
   // If Prefix is greater than or equal to Path in size, Prefix can not be a
   // prefix of Path. Return None.
@@ -548,10 +569,10 @@ ProjectionPath::removePrefix(const ProjectionPath &Path,
   unsigned PathSize = Path.size();
 
   if (PrefixSize >= PathSize)
-    return None;
+    return std::nullopt;
 
   // First make sure that the prefix matches.
-  Optional<ProjectionPath> P = ProjectionPath(Path.BaseType);
+  std::optional<ProjectionPath> P = ProjectionPath(Path.BaseType);
   for (unsigned i = 0; i < PrefixSize; ++i) {
     if (Path.Path[i] != Prefix.Path[i]) {
       P.reset();
@@ -589,6 +610,10 @@ void Projection::print(raw_ostream &os, SILType baseType) const {
   }
   case ProjectionKind::Box: {
     os << " Box over";
+    break;
+  }
+  case ProjectionKind::BlockStorageCast: {
+    os << "BlockStorageCast";
     break;
   }
   case ProjectionKind::Upcast: {
@@ -863,6 +888,7 @@ SILValue Projection::getOperandForAggregate(SILInstruction *I) const {
     case ProjectionKind::Class:
     case ProjectionKind::TailElems:
     case ProjectionKind::Box:
+    case ProjectionKind::BlockStorageCast:
     case ProjectionKind::Upcast:
     case ProjectionKind::RefCast:
     case ProjectionKind::BitwiseCast:
@@ -922,6 +948,7 @@ static bool isSupportedProjection(const Projection &p) {
   case ProjectionKind::Enum:
   case ProjectionKind::Box:
   case ProjectionKind::Upcast:
+  case ProjectionKind::BlockStorageCast:
   case ProjectionKind::RefCast:
   case ProjectionKind::BitwiseCast:
   case ProjectionKind::TailElems:
@@ -1218,7 +1245,7 @@ ProjectionTree::computeExplodedArgumentValueInner(SILBuilder &Builder,
     if (Iter != LeafValues.end())
       return Iter->second;
     // Return undef for dead node.
-    return SILUndef::get(Node->getType(), Builder.getFunction());
+    return SILUndef::get(Builder.getFunction(), Node->getType());
   }
 
   // This is an aggregate node, construct its value from its children

@@ -1,132 +1,129 @@
-// RUN: sed -n -e '1,/NO_ERRORS_UP_TO_HERE$/ p' %s > %t_no_errors.swift
-// RUN: %target-swift-frontend -typecheck -verify %t_no_errors.swift
+// RUN: %empty-directory(%t)
+// RUN: %empty-directory(%t/mods)
+// RUN: %empty-directory(%t/co-same)
+// RUN: %empty-directory(%t/co-across)
+// RUN: split-file %s %t --leading-lines
 
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-complete-inits-in-postfix-expr -code-completion-token=TOP_LEVEL_0 > %t
-// RUN: %FileCheck %s -check-prefix=TOP_LEVEL_0 < %t
-// RUN: %FileCheck %s -check-prefix=NEGATIVE_TOP_LEVEL_0 < %t
+// Completion in the current file/module
+// RUN: %target-swift-ide-test -batch-code-completion -code-complete-inits-in-postfix-expr -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t/co-same
 
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-complete-inits-in-postfix-expr -code-completion-token=TOP_LEVEL_1 > %t.generic
-// RUN: %FileCheck %s -check-prefix=TOP_LEVEL_0 < %t.generic
-// RUN: %FileCheck %s -check-prefix=GENERIC_PARAM_0 < %t.generic
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-complete-inits-in-postfix-expr -code-completion-token=K_QUALIFIED_0 | %FileCheck %s -check-prefix=K_QUALIFIED_0
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-complete-inits-in-postfix-expr -code-completion-token=L_QUALIFIED_0 | %FileCheck %s -check-prefix=L_QUALIFIED_0
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-complete-inits-in-postfix-expr -code-completion-token=L_QUALIFIED_0 | %FileCheck %s -check-prefix=NEGATIVE_L_QUALIFIED_0
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-complete-inits-in-postfix-expr -code-completion-token=INSIDE_L_0 | %FileCheck %s -check-prefix=INSIDE_L_0
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-complete-inits-in-postfix-expr -code-completion-token=INSIDE_M_0 | %FileCheck %s -check-prefix=INSIDE_M_0
-// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=ALIAS_CONSTRUCTOR_0 | %FileCheck %s -check-prefix=ALIAS_CONSTRUCTOR_0
+// Completion across modules
+// RUN: %target-swift-frontend -emit-module %t/InitTypes.swift -o %t/mods/
+// RUN: %target-swift-ide-test -batch-code-completion -code-complete-inits-in-postfix-expr -source-filename %t/InitUses.swift -filecheck %raw-FileCheck -completion-output-dir %t/co-across -I %t/mods -D SEPARATED
 
-struct A {
-  // implicit init()
+//--- InitTypes.swift
+public struct A {
+  public init() {}
 }
 
-struct B {
+public struct B {
   let x: A, y: A, z: A
-  // implicit init(x:,y:,z:)
+  public init(x: A, y: A, z: A) {
+    self.x = x
+    self.y = y
+    self.z = z
+  }
 }
 
-struct C {
-  init() {}
-  init(x: A) {}
-  init(y: A=A()) {}
+public struct C {
+  public init() {}
+  public init(x: A) {}
+  public init(y: A=A()) {}
 }
 
-class D {
-  // implicit init()
+public class D {
+  public init() {}
 }
-class E {
-  init(x: A) {}
+public class E {
+  public init(x: A) {}
 }
 
-class F : E {
+public class F : E {
   // inherited init(x: A)
-  convenience init() {}
+  public convenience init() {
+    self.init(x: A())
+  }
 }
 
-protocol G {
+public protocol G {
   init(x: A)
 }
 
-struct H : G {
-  init(x: A) {}
+public struct H : G {
+  public init(x: A) {}
 }
 
-protocol I : G {
+public protocol I : G {
   init(y: A)
 }
 
-typealias J = A
+public typealias J = A
 
-struct K {
-  typealias X = A
-  struct Y {}
+public struct K {
+  public typealias X = A
+  public struct Y {
+    public init() {}
+  }
 }
 
-struct L<X: G> {
-  typealias Y = X
+public struct L<X: G> {
+  public typealias Y = X
 }
 
-// NO_ERRORS_UP_TO_HERE
-
+//--- InitUses.swift
+#if SEPARATED
+import InitTypes
+#endif
 
 func testTopLevel() {
-  #^TOP_LEVEL_0^#
+  #^TOP_LEVEL_0?check=TOP_LEVEL_0;check=NEGATIVE_TOP_LEVEL_0^#
 }
-// TOP_LEVEL_0: Begin completions
-// TOP_LEVEL_0-DAG: Decl[Constructor]/CurrModule:    A()[#A#]{{; name=.+}}
-// TOP_LEVEL_0-DAG: Decl[Constructor]/CurrModule:    B({#x: A#}, {#y: A#}, {#z: A#})[#B#]{{; name=.+}}
-// TOP_LEVEL_0-DAG: Decl[Constructor]/CurrModule:    C()[#C#]{{; name=.+}}
-// TOP_LEVEL_0-DAG: Decl[Constructor]/CurrModule:    C({#x: A#})[#C#]{{; name=.+}}
-// TOP_LEVEL_0-DAG: Decl[Constructor]/CurrModule:    C({#y: A#})[#C#]{{; name=.+}}
-// TOP_LEVEL_0-DAG: Decl[Constructor]/CurrModule:    D()[#D#]{{; name=.+}}
-// TOP_LEVEL_0-DAG: Decl[Constructor]/CurrModule:    E({#x: A#})[#E#]{{; name=.+}}
-// TOP_LEVEL_0-DAG: Decl[Constructor]/CurrModule:    F({#x: A#})[#F#]{{; name=.+}}
-// TOP_LEVEL_0-DAG: Decl[Constructor]/CurrModule:    F()[#F#]{{; name=.+}}
-// TOP_LEVEL_0-DAG: Decl[Constructor]/CurrModule:    H({#x: A#})[#H#]{{; name=.+}}
-// TOP_LEVEL_0-DAG: Decl[Constructor]/CurrModule:    J()[#A#]{{; name=.+}}
-// TOP_LEVEL_0: End completions
-// NEGATIVE_TOP_LEVEL_0-NOT: Decl[Constructor]/CurrModule:    E()
-// NEGATIVE_TOP_LEVEL_0-NOT: Decl[Constructor]/CurrModule:    G(
-// NEGATIVE_TOP_LEVEL_0-NOT: Decl[Constructor]/CurrModule:    I(
+// TOP_LEVEL_0-DAG: Decl[Constructor]/{{.*}}:    A()[#A#]{{; name=.+}}
+// TOP_LEVEL_0-DAG: Decl[Constructor]/{{.*}}:    B({#x: A#}, {#y: A#}, {#z: A#})[#B#]{{; name=.+}}
+// TOP_LEVEL_0-DAG: Decl[Constructor]/{{.*}}:    C()[#C#]{{; name=.+}}
+// TOP_LEVEL_0-DAG: Decl[Constructor]/{{.*}}:    C({#x: A#})[#C#]{{; name=.+}}
+// TOP_LEVEL_0-DAG: Decl[Constructor]/{{.*}}:    C({#y: A#})[#C#]{{; name=.+}}
+// TOP_LEVEL_0-DAG: Decl[Constructor]/{{.*}}:    D()[#D#]{{; name=.+}}
+// TOP_LEVEL_0-DAG: Decl[Constructor]/{{.*}}:    E({#x: A#})[#E#]{{; name=.+}}
+// TOP_LEVEL_0-DAG: Decl[Constructor]/{{.*}}:    F({#x: A#})[#F#]{{; name=.+}}
+// TOP_LEVEL_0-DAG: Decl[Constructor]/{{.*}}:    F()[#F#]{{; name=.+}}
+// TOP_LEVEL_0-DAG: Decl[Constructor]/{{.*}}:    H({#x: A#})[#H#]{{; name=.+}}
+// TOP_LEVEL_0-DAG: Decl[Constructor]/{{.*}}:    J()[#A#]{{; name=.+}}
+// NEGATIVE_TOP_LEVEL_0-NOT: Decl[Constructor]/{{.*}}:    E()
+// NEGATIVE_TOP_LEVEL_0-NOT: Decl[Constructor]/{{.*}}:    G(
+// NEGATIVE_TOP_LEVEL_0-NOT: Decl[Constructor]/{{.*}}:    I(
 
 func testQualified0() {
   K.#^K_QUALIFIED_0^#
 }
-// K_QUALIFIED_0: Begin completions
 // K_QUALIFIED_0-DAG: Decl[Constructor]/CurrNominal:    X()[#A#]{{; name=.+}}
 // K_QUALIFIED_0-DAG: Decl[Constructor]/CurrNominal:    Y()[#K.Y#]{{; name=.+}}
-// K_QUALIFIED_0: End completions
 
 func testQualified1() {
   L.#^L_QUALIFIED_0^#
 }
-// L_QUALIFIED_0: Begin completions
+// L_QUALIFIED_0-NOT: X({#x: A#})
 // L_QUALIFIED_0-DAG: Decl[Constructor]/CurrNominal:    Y({#x: A#})[#G#]{{; name=.+}}
-// L_QUALIFIED_0: End completions
-// NEGATIVE_L_QUALIFIED_0-NOT: X({#x: A#})
 
 func testGenericParam<T: I, U: G>() {
-  #^TOP_LEVEL_1^#
+  #^TOP_LEVEL_1?check=TOP_LEVEL_0;check=GENERIC_PARAM_0^#
 }
-// GENERIC_PARAM_0: Begin completions
 // GENERIC_PARAM_0-DAG: Decl[Constructor]/Local:    T({#x: A#})[#I#]{{; name=.+}}
 // GENERIC_PARAM_0-DAG: Decl[Constructor]/Local:    T({#y: A#})[#I#]{{; name=.+}}
 // GENERIC_PARAM_0-DAG: Decl[Constructor]/Local:    U({#x: A#})[#G#]{{; name=.+}}
 // GENERIC_PARAM_0-NOT: Decl[Constructor]/Local:    U({#y
-// GENERIC_PARAM_0: End completions
 
 extension L {
   func test() {
     #^INSIDE_L_0^#
   }
 }
-// INSIDE_L_0: Begin completions
 // INSIDE_L_0-DAG: Decl[Constructor]/CurrNominal:    Y({#x: A#})[#G#]{{; name=.+}}
 
 // FIXME: <rdar://problem/20530021> Code complete generic parameters in extensions
 // INSIDE_L_0-DAG: Decl[GenericTypeParam]/Local:     X[#X#]; name=X
 // INSIDE_L_0-DAG: Decl[Constructor]/Local:          X({#x: A#})[#G#]{{; name=.+}}
 
-// INSIDE_L_0: End completions
 
 struct M<X: G> {
   typealias Y = X
@@ -134,10 +131,8 @@ struct M<X: G> {
     #^INSIDE_M_0^#
   }
 }
-// INSIDE_M_0: Begin completions
 // INSIDE_M_0-DAG: Decl[Constructor]/CurrNominal:    Y({#x: A#})[#G#]{{; name=.+}}
 // INSIDE_M_0-DAG: Decl[Constructor]/Local:          X({#x: A#})[#G#]{{; name=.+}}
-// INSIDE_M_0: End completions
 
 typealias CAlias = C
 
@@ -145,3 +140,15 @@ var CAliasInstance = CAlias(#^ALIAS_CONSTRUCTOR_0^#
 // rdar://18586415
 // ALIAS_CONSTRUCTOR_0: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#x: A#}[')'][#CAlias#];
 // ALIAS_CONSTRUCTOR_0: Decl[Constructor]/CurrNominal/Flair[ArgLabels]:      ['(']{#y: A#}[')'][#CAlias#];
+
+// https://github.com/apple/swift/issues/57916
+struct Issue57916 {
+  var a: Int
+  var b: Int {
+    get { return a }
+  }
+}
+func test57916() {
+  Issue57916(#^ISSUE_57916^#
+  // ISSUE_57916: Decl[Constructor]/CurrNominal/Flair[ArgLabels]: ['(']{#a: Int#}[')'][#Issue57916#]; name=a:
+}

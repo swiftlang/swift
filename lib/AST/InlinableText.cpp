@@ -10,12 +10,15 @@
 //
 //===----------------------------------------------------------------------===//
 #include "InlinableText.h"
+#include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/Bridging/ASTGen.h"
 #include "swift/Parse/Lexer.h"
 
 #include "llvm/ADT/SmallVector.h"
@@ -23,197 +26,139 @@
 
 using namespace swift;
 
-/// Gets the last token that exists inside this IfConfigClause, ignoring
-/// hoisted elements.
+#if SWIFT_BUILD_SWIFT_SYNTAX
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
+extern "C" BridgedStringRef
+swift_ASTGen_extractInlinableText(BridgedASTContext ctx,
+                                  BridgedStringRef sourceText);
+#pragma clang diagnostic pop
+#else
+/// Appends the textual contents of the provided source range, stripping
+/// the contents of comments that appear in the source.
 ///
-/// If the clause is the last element, this returns the beginning of the line
-/// before the parent IfConfigDecl's #endif token. Otherwise, it's the beginning
-/// of the line before the next clause's #else or #elseif token.
-static SourceLoc
-getEffectiveEndLoc(SourceManager &sourceMgr, const IfConfigClause *clause,
-                   const IfConfigDecl *decl) {
-  auto clauses = decl->getClauses();
-  if (clause == &clauses.back())
-    return Lexer::getLocForStartOfLine(sourceMgr, decl->getEndLoc());
+/// Given that comments are treated as whitespace, this also appends a
+/// space or newline (depending if the comment was multi-line and itself
+/// had newlines in the body) in place of the comment, to avoid fusing tokens
+/// together.
+static void appendRange(
+  SourceManager &sourceMgr, SourceLoc start, SourceLoc end,
+  SmallVectorImpl<char> &scratch) {
+  unsigned bufferID = sourceMgr.findBufferContainingLoc(start);
+  unsigned offset = sourceMgr.getLocOffsetInBuffer(start, bufferID);
+  unsigned endOffset = sourceMgr.getLocOffsetInBuffer(end, bufferID);
 
-  assert(clause >= clauses.begin() && clause < clauses.end() &&
-         "clauses must be contiguous");
+  // Strip comments from the chunk before adding it by re-lexing the range.
+  LangOptions FakeLangOpts;
+  Lexer lexer(FakeLangOpts, sourceMgr, bufferID, nullptr, LexerMode::Swift,
+    HashbangMode::Disallowed, CommentRetentionMode::ReturnAsTokens,
+    offset, endOffset);
 
-  auto *nextClause = clause + 1;
-  return Lexer::getLocForStartOfLine(sourceMgr, nextClause->Loc);
-}
+  SourceLoc nonCommentStart = start;
+  Token token;
 
-namespace {
+  // Re-lex the range, and skip the full text of `tok::comment` tokens.
+  while (!token.is(tok::eof)) {
+    lexer.lex(token);
 
-class IsFeatureCheck : public ASTWalker {
-public:
-  bool foundFeature = false;
+    // Skip over #sourceLocation's in the file.
+    if (token.is(tok::pound_sourceLocation)) {
 
-  PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
-    if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
-      if (unresolved->getName().getBaseName().userFacingName().startswith("$"))
-        foundFeature = true;
-    }
+      // Append the text leading up to the #sourceLocation
+      auto charRange = CharSourceRange(
+        sourceMgr, nonCommentStart, token.getLoc());
+      StringRef text = sourceMgr.extractText(charRange);
+      scratch.append(text.begin(), text.end());
 
-    if (auto call = dyn_cast<CallExpr>(expr)) {
-      if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(call->getFn())) {
-        StringRef userFacing = unresolved->getName().getBaseName()
-            .userFacingName();
-        if (userFacing == "compiler" || userFacing == "_compiler_version")
-          foundFeature = true;
+      // Skip to the right paren. We know the AST is already valid, so there's
+      // definitely a right paren.
+      while (!token.is(tok::r_paren)) {
+        lexer.lex(token);
       }
+
+      nonCommentStart = Lexer::getLocForEndOfToken(sourceMgr, token.getLoc());
     }
 
-    return Action::SkipChildrenIf(foundFeature, expr);
-  }
-};
+    if (token.is(tok::comment)) {
+      // Grab the start of the full comment token (with leading trivia as well)
+      SourceLoc commentLoc = token.getLoc();
 
-bool clauseIsFeatureCheck(Expr *cond) {
-  IsFeatureCheck checker;
-  cond->walk(checker);
-  return checker.foundFeature;
+      // Find the end of the token (with trailing trivia)
+      SourceLoc endLoc = Lexer::getLocForEndOfToken(sourceMgr, token.getLoc());
+
+      // The comment token's range includes leading/trailing whitespace, so trim
+      // whitespace and only strip the portions of the comment that are not
+      // whitespace.
+      CharSourceRange range = CharSourceRange(sourceMgr, commentLoc, endLoc);
+      StringRef fullTokenText = sourceMgr.extractText(range);
+      unsigned leadingWhitespace = fullTokenText.size() - 
+        fullTokenText.ltrim().size();
+      if (leadingWhitespace > 0) {
+        commentLoc = commentLoc.getAdvancedLoc(leadingWhitespace);
+      }
+
+      unsigned trailingWhitespace = fullTokenText.size() -
+        fullTokenText.rtrim().size();
+      if (trailingWhitespace > 0) {
+        endLoc = endLoc.getAdvancedLoc(-trailingWhitespace);
+      }
+
+      // First, extract the text up to the start of the comment, including the
+      // whitespace.
+      auto charRange = CharSourceRange(sourceMgr, nonCommentStart, commentLoc);
+      StringRef text = sourceMgr.extractText(charRange);
+      scratch.append(text.begin(), text.end());
+
+      // Next, search through the comment text to see if it's a block comment
+      // with a newline. If so we need to re-insert a newline to avoid fusing
+      // multi-line tokens together.
+      auto commentTextRange = CharSourceRange(sourceMgr, commentLoc, endLoc);
+      StringRef commentText = sourceMgr.extractText(commentTextRange);
+      bool hasNewline = commentText.find_first_of("\n\r") != StringRef::npos;
+
+      // Use a newline as a filler character if the comment itself had a newline
+      // in it.
+      char filler = hasNewline ? '\n' : ' ';
+
+      // Append a single whitespace filler character, to avoid fusing tokens.
+      scratch.push_back(filler);
+
+      // Start the next region after the contents of the comment.
+      nonCommentStart = endLoc;
+    }
+  }
+
+  if (nonCommentStart.isValid() && nonCommentStart != end) {
+    auto charRange = CharSourceRange(sourceMgr, nonCommentStart, end);
+    StringRef text = sourceMgr.extractText(charRange);
+    scratch.append(text.begin(), text.end());
+  }
 }
+#endif // SWIFT_BUILD_SWIFT_SYNTAX
 
-/// Whether any of the clauses here involves a feature check
-/// (e.g., $AsyncAwait).
-bool anyClauseIsFeatureCheck(ArrayRef<IfConfigClause> clauses) {
-  for (const auto &clause : clauses) {
-    if (Expr *cond = clause.Cond) {
-      if (clauseIsFeatureCheck(cond))
-        return true;
-    }
-  }
-
-  return false;
-}
-
-/// A walker that searches through #if declarations, finding all text that does
-/// not contribute to the final evaluated AST.
-///
-/// For example, in the following code:
-/// ```
-/// #if true
-/// print("true")
-/// #else
-/// print("false")
-/// #endif
-/// ```
-/// ExtractInactiveRanges will return the ranges (with leading newlines) of:
-/// ```
-/// #if true
-/// #else
-/// print("false")
-/// #endif
-/// ```
-/// Leaving behind just 'print("true")'s range.
-struct ExtractInactiveRanges : public ASTWalker {
-  SmallVector<CharSourceRange, 4> ranges;
-  SourceManager &sourceMgr;
-
-  explicit ExtractInactiveRanges(SourceManager &sourceMgr)
-    : sourceMgr(sourceMgr) {}
-
-  /// Adds the two SourceLocs as a CharSourceRange to the set of ignored
-  /// ranges.
-  /// \note: This assumes each of these locs is a character location, not a
-  ///        token location.
-  void addRange(SourceLoc start, SourceLoc end) {
-    auto charRange = CharSourceRange(sourceMgr, start, end);
-    ranges.push_back(charRange);
-  }
-
-  PreWalkAction walkToDeclPre(Decl *d) override {
-    auto icd = dyn_cast<IfConfigDecl>(d);
-    if (!icd)
-      return Action::Continue();
-
-    auto start = Lexer::getLocForStartOfLine(sourceMgr, icd->getStartLoc());
-    auto end = Lexer::getLocForEndOfLine(sourceMgr, icd->getEndLoc());
-
-    auto clause = icd->getActiveClause();
-
-    // If there's no active clause, add the entire #if...#endif block.
-    if (!clause) {
-      addRange(start, end);
-      return Action::SkipChildren();
-    }
-
-    // If the clause is checking for a particular feature with $ or a compiler
-    // version, keep the whole thing.
-    if (anyClauseIsFeatureCheck(icd->getClauses())) {
-      return Action::SkipChildren();
-    }
-
-    // Ignore range from beginning of '#if', '#elseif', or '#else' to the
-    // beginning of the elements of this clause.
-    auto elementsBegin = clause->Loc;
-    // If there's a condition (e.g. this isn't a '#else' block), then ignore
-    // everything up to the end of the condition.
-    if (auto cond = clause->Cond) {
-      elementsBegin = cond->getEndLoc();
-    }
-    addRange(start, Lexer::getLocForEndOfLine(sourceMgr, elementsBegin));
-
-    // Ignore range from effective end of the elements of this clause to the
-    // end of the '#endif'
-    addRange(getEffectiveEndLoc(sourceMgr, clause, icd), end);
-
-    // Walk into direct children of this node that are IfConfigDecls, because
-    // the standard walker won't walk into them.
-    for (auto &elt : clause->Elements)
-      if (elt.isDecl(DeclKind::IfConfig))
-        elt.get<Decl *>()->walk(*this);
-
-    return Action::SkipChildren();
-  }
-
-  /// Gets the ignored ranges in source order.
-  ArrayRef<CharSourceRange> getSortedRanges() {
-    std::sort(ranges.begin(), ranges.end(),
-              [&](CharSourceRange r1, CharSourceRange r2) {
-                assert(!r1.overlaps(r2) && "no overlapping ranges");
-                return sourceMgr.isBeforeInBuffer(r1.getStart(), r2.getStart());
-              });
-    return ranges;
-  }
-};
-} // end anonymous namespace
-
-StringRef swift::extractInlinableText(SourceManager &sourceMgr, ASTNode node,
+StringRef swift::extractInlinableText(ASTContext &ctx, ASTNode node,
                                       SmallVectorImpl<char> &scratch) {
-  // Extract inactive ranges from the text of the node.
-  ExtractInactiveRanges extractor(sourceMgr);
-  node.walk(extractor);
+  SourceManager &sourceMgr = ctx.SourceMgr;
 
-  // If there were no inactive ranges, then there were no #if configs.
-  // Return an unowned buffer directly into the source file.
-  if (extractor.ranges.empty()) {
-    auto range =
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  CharSourceRange sourceTextRange =
       Lexer::getCharSourceRangeFromSourceRange(
         sourceMgr, node.getSourceRange());
-    return sourceMgr.extractText(range);
-  }
+  StringRef sourceText = sourceMgr.extractText(sourceTextRange);
+  auto resultText = swift_ASTGen_extractInlinableText(ctx, sourceText);
 
-  // Begin piecing together active code ranges.
-
+  scratch.clear();
+  scratch.insert(scratch.begin(),
+                 resultText.unbridged().begin(),
+                 resultText.unbridged().end());
+  swift_ASTGen_freeBridgedString(resultText);
+  return { scratch.data(), scratch.size() };
+#else
   // Get the full start and end of the provided node, as character locations.
   SourceLoc start = node.getStartLoc();
   SourceLoc end = Lexer::getLocForEndOfToken(sourceMgr, node.getEndLoc());
-  for (auto &range : extractor.getSortedRanges()) {
-    // Add the text from the current 'start' to this ignored range's start.
-    auto charRange = CharSourceRange(sourceMgr, start, range.getStart());
-    auto chunk = sourceMgr.extractText(charRange);
-    scratch.append(chunk.begin(), chunk.end());
+  appendRange(sourceMgr, start, end, scratch);
 
-    // Set 'start' to the end of this range, effectively skipping it.
-    start = range.getEnd();
-  }
-
-  // If there's leftover unignored text, add it.
-  if (start != end) {
-    auto range = CharSourceRange(sourceMgr, start, end);
-    auto chunk = sourceMgr.extractText(range);
-    scratch.append(chunk.begin(), chunk.end());
-  }
   return { scratch.data(), scratch.size() };
+#endif
 }

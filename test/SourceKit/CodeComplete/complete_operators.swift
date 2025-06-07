@@ -37,22 +37,22 @@ func test2(x: inout MyInt) {
 // RAW: {
 // RAW:   key.kind: source.lang.swift.decl.function.operator.infix,
 // RAW:   key.name: "!=",
-// RAW:   key.sourcetext: " != <#T##MyInt#>",
 // RAW:   key.description: "!=",
 // RAW:   key.typename: "Bool",
+// RAW:   key.sourcetext: " != <#T##MyInt#>"
 // RAW: {
 // RAW:   key.kind: source.lang.swift.decl.function.operator.infix,
 // RAW:   key.name: "+",
-// RAW:   key.sourcetext: " + <#T##MyInt#>",
 // RAW:   key.description: "+",
 // RAW:   key.typename: "MyInt",
+// RAW:   key.sourcetext: " + <#T##MyInt#>"
 // RAW: },
 // RAW: {
 // RAW:   key.kind: source.lang.swift.decl.function.operator.postfix,
 // RAW:   key.name: "++",
-// RAW:   key.sourcetext: "++",
 // RAW:   key.description: "++",
 // RAW:   key.typename: "MyInt",
+// RAW:   key.sourcetext: "++"
 // RAW: },
 
 struct MyBool {

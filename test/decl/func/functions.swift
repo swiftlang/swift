@@ -129,7 +129,7 @@ func rdar16786220(inout let c: Int) -> () { // expected-warning {{'let' in this 
   c = 42
 }
 
-func multipleSpecifiers(a: inout __owned Int) {} // expected-error {{parameter must not have multiple '__owned', 'inout', or '__shared' specifiers}} {{28-34=}}
+func multipleSpecifiers(a: inout __owned Int) {} // expected-error {{parameter may have at most one of the 'inout', 'borrowing', or 'consuming' specifiers}} {{28-34=}}
 
 // <rdar://problem/17763388> ambiguous operator emits same candidate multiple times
 infix operator !!!
@@ -192,8 +192,8 @@ func bogusDestructuring() {
     func registerCallback(_ callback: @escaping (Bar?) -> Void) {}
   }
 
-  Foo().registerCallback { ([Bar]) in } // expected-warning {{unnamed parameters must be written with the empty name '_'}} {{29-29=_: }}
-  Foo().registerCallback { ([String: Bar]) in }// expected-warning {{unnamed parameters must be written with the empty name '_'}} {{29-29=_: }}
+  Foo().registerCallback { ([Bar]) in } // expected-warning {{unnamed parameters must be written with the empty name '_'; this is an error in the Swift 6 language mode}} {{29-29=_: }}
+  Foo().registerCallback { ([String: Bar]) in }// expected-warning {{unnamed parameters must be written with the empty name '_'; this is an error in the Swift 6 language mode}} {{29-29=_: }}
   Foo().registerCallback { (Bar?) in } // expected-error {{unnamed parameters must be written with the empty name '_'}}
 
 }

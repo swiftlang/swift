@@ -57,6 +57,12 @@ public:
   uint64_t allConformancesData = 0;
 };
 
+class LazyAssociatedTypeData : public LazyContextData {
+public:
+  /// The context data used for loading the default type.
+  uint64_t defaultDefinitionTypeData = 0;
+};
+
 /// Context data for protocols.
 class LazyProtocolData : public LazyIterableDeclContextData {
 public:
@@ -130,7 +136,7 @@ public:
                                   uint64_t contextData) = 0;
 
   // Returns the target parameter of the `@_specialize` attribute or null.
-  virtual ValueDecl *loadTargetFunctionDecl(const SpecializeAttr *attr,
+  virtual ValueDecl *loadTargetFunctionDecl(const AbstractSpecializeAttr *attr,
                                             uint64_t contextData) = 0;
 };
 

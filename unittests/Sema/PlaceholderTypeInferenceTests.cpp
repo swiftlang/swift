@@ -32,10 +32,12 @@ TEST_F(SemaTest, TestPlaceholderInferenceForArrayLiteral) {
   auto *namedPattern = new (Context) NamedPattern(varDecl);
   auto *typedPattern = new (Context) TypedPattern(namedPattern, arrayRepr);
 
-  auto target = SolutionApplicationTarget::forInitialization(arrayExpr, DC, arrayTy, typedPattern, /*bindPatternVarsOneWay=*/false);
+  auto target = SyntacticElementTarget::forInitialization(
+      arrayExpr, DC, arrayTy, typedPattern, /*bindPatternVarsOneWay=*/false);
 
   ConstraintSystem cs(DC, ConstraintSystemOptions());
-  cs.setContextualType(arrayExpr, {arrayRepr, arrayTy}, CTP_Initialization);
+  ContextualTypeInfo contextualInfo({arrayRepr, arrayTy}, CTP_Initialization);
+  cs.setContextualInfo(arrayExpr, contextualInfo);
   auto failed = cs.generateConstraints(target, FreeTypeVariableBinding::Disallow);
   ASSERT_FALSE(failed);
 
@@ -47,10 +49,10 @@ TEST_F(SemaTest, TestPlaceholderInferenceForArrayLiteral) {
 
   auto &solution = solutions[0];
 
-  auto eltTy = ConstraintSystem::isArrayType(solution.simplifyType(solution.getType(arrayExpr)));
-  ASSERT_TRUE(eltTy.has_value());
-  ASSERT_TRUE((*eltTy)->is<StructType>());
-  ASSERT_EQ((*eltTy)->getAs<StructType>()->getDecl(), intTypeDecl);
+  auto eltTy = solution.simplifyType(solution.getType(arrayExpr))->getArrayElementType();
+  ASSERT_TRUE(eltTy);
+  ASSERT_TRUE(eltTy->is<StructType>());
+  ASSERT_EQ(eltTy->getAs<StructType>()->getDecl(), intTypeDecl);
 }
 
 TEST_F(SemaTest, TestPlaceholderInferenceForDictionaryLiteral) {
@@ -73,10 +75,12 @@ TEST_F(SemaTest, TestPlaceholderInferenceForDictionaryLiteral) {
   auto *namedPattern = new (Context) NamedPattern(varDecl);
   auto *typedPattern = new (Context) TypedPattern(namedPattern, dictRepr);
 
-  auto target = SolutionApplicationTarget::forInitialization(dictExpr, DC, dictTy, typedPattern, /*bindPatternVarsOneWay=*/false);
+  auto target = SyntacticElementTarget::forInitialization(
+      dictExpr, DC, dictTy, typedPattern, /*bindPatternVarsOneWay=*/false);
 
   ConstraintSystem cs(DC, ConstraintSystemOptions());
-  cs.setContextualType(dictExpr, {dictRepr, dictTy}, CTP_Initialization);
+  ContextualTypeInfo contextualInfo({dictRepr, dictTy}, CTP_Initialization);
+  cs.setContextualInfo(dictExpr, contextualInfo);
   auto failed = cs.generateConstraints(target, FreeTypeVariableBinding::Disallow);
   ASSERT_FALSE(failed);
 

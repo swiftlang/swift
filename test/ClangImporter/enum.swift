@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -verify
-// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -verify -compiler-assertions
+// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -compiler-assertions 2>&1 | %FileCheck %s
 // -- Check that we can successfully round-trip.
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -D IRGEN -emit-ir -primary-file %s | %FileCheck -check-prefix=CHECK-IR %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -D IRGEN -emit-ir -primary-file %s -compiler-assertions | %FileCheck -check-prefix=CHECK-IR %s
 
 // REQUIRES: objc_interop
 
@@ -145,6 +145,27 @@ _ = NSPrefixWordBreakReorderedCustom.problemCase == .deprecatedGoodCase // expec
 _ = NSPrefixWordBreakReordered2Custom.problemCase == .goodCase
 _ = NSPrefixWordBreakReordered2Custom.problemCase == .PrefixWordBreakReordered2DeprecatedBadCase // expected-warning {{deprecated}}
 _ = NSPrefixWordBreakReordered2Custom.problemCase == .deprecatedGoodCase // expected-warning {{deprecated}}
+
+#if !IRGEN
+_ = NSPrefixWordBreakForgotToDeprecate.newName1 // expected-error {{type 'NSPrefixWordBreakForgotToDeprecate' has no case 'newName1', but it does have a case named 'PrefixWordBreakNewName1'; if 'newName1' worked before, a recent change to the underlying C enum may have affected how prefixes are stripped from its case names}}
+_ = NSPrefixWordBreakForgotToDeprecate.newName2 // expected-error {{type 'NSPrefixWordBreakForgotToDeprecate' has no case 'newName2', but it does have a case named 'PrefixWordBreakNewName2'; if 'newName2' worked before, a recent change to the underlying C enum may have affected how prefixes are stripped from its case names}}
+_ = NSPrefixWordBreakForgotToDeprecate.noMatches // expected-error {{type 'NSPrefixWordBreakForgotToDeprecate' has no member 'noMatches'}}
+
+_ = NSPrefixWordBreakInvalidWord.foo // expected-error {{type 'NSPrefixWordBreakInvalidWord' has no case 'foo', but it does have a case named 'BreakFoo'; if 'foo' worked before, a recent change to the underlying C enum may have affected how prefixes are stripped from its case names}}
+_ = NSPrefixWordBreakInvalidWord.bar // expected-error {{type 'NSPrefixWordBreakInvalidWord' has no case 'bar', but it does have a case named 'BreakBar'; if 'bar' worked before, a recent change to the underlying C enum may have affected how prefixes are stripped from its case names}}
+_ = NSPrefixWordBreakInvalidWord.noMatches // expected-error {{type 'NSPrefixWordBreakInvalidWord' has no member 'noMatches'}}
+
+_ = NSPrefixWordBreakSuffixTieBreakers.forTest1 // expected-error {{Better}}
+_ = NSPrefixWordBreakSuffixTieBreakers.forTest2 // expected-error {{Better}}
+_ = NSPrefixWordBreakSuffixTieBreakers.forTest3 // expected-error {{Better}}
+_ = NSPrefixWordBreakSuffixTieBreakers.forTest4 // expected-error {{Better}}
+_ = NSPrefixWordBreakSuffixTieBreakers.forTest5 // expected-error {{Better}}
+
+_ = [
+  .newOption1,  // expected-error {{type 'NSPrefixWordBreakOptions.ArrayLiteralElement' (aka 'NSPrefixWordBreakOptions') has no case 'newOption1', but it does have a case named 'prefixWordBreakNewOption1'; if 'newOption1' worked before, a recent change to the underlying C enum may have affected how prefixes are stripped from its case names}}
+  .newOption2,  // expected-error {{type 'NSPrefixWordBreakOptions.ArrayLiteralElement' (aka 'NSPrefixWordBreakOptions') has no case 'newOption2', but it does have a case named 'prefixWordBreakNewOption2'; if 'newOption2' worked before, a recent change to the underlying C enum may have affected how prefixes are stripped from its case names}}
+] as NSPrefixWordBreakOptions
+#endif
 
 _ = NSSwiftNameAllTheThings.Foo == .Bar
 _ = NSSwiftNameBad.`class`

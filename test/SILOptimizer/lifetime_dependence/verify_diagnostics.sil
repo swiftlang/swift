@@ -1,0 +1,248 @@
+// RUN: %target-sil-opt %s \
+// RUN:   --lifetime-dependence-diagnostics \
+// RUN:   -verify \
+// RUN:   -sil-verify-all \
+// RUN:   -module-name Swift \
+// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -o /dev/null
+
+// REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_LifetimeDependence
+
+// Verify diagnostics from the LifetimeDependenceDiagnostics pass.
+
+sil_stage raw
+
+import Builtin
+
+@_marker protocol Copyable: ~Escapable {}
+@_marker protocol Escapable: ~Copyable {}
+
+class C {}
+
+struct NE : ~Escapable {}
+
+struct NEObject : ~Escapable {
+  var c: C
+
+  @lifetime(immortal)
+  init()
+}
+
+public struct Holder {
+  var c: C
+}
+
+public struct TrivialHolder {
+  var p: Builtin.RawPointer
+}
+
+struct A {}
+
+struct NCWrapper : ~Copyable, ~Escapable {
+  @_hasStorage let a: NE { get }
+  deinit
+}
+
+sil @getNEPointer : $@convention(thin) (@guaranteed NE) -> Builtin.RawPointer
+sil @useA : $@convention(thin) (A) -> ()
+sil @makeNE : $@convention(thin) () -> @lifetime(immortal) @owned NE
+sil @makeNEObject : $@convention(thin) () -> @lifetime(immortal) @owned NEObject
+sil @useNE : $@convention(thin) (@guaranteed NE) -> ()
+sil @reborrowNE : $@convention(thin) (@guaranteed NE) -> @lifetime(borrow 0) @owned NE
+
+sil @initHolder : $@convention(thin) () -> @out Holder
+sil @getNE : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address_for_deps 0) @owned NE
+sil @getNEIndirect : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address_for_deps 0) @out NE
+
+sil @initTrivialHolder : $@convention(thin) () -> @out TrivialHolder
+sil @getTrivialNE : $@convention(thin) (@in_guaranteed TrivialHolder) -> @lifetime(borrow address_for_deps 0) @owned NE
+
+sil @makeHolder: $@convention(method) (@thin Holder.Type) -> @owned Holder // user: %6
+sil @getGeneric : $@convention(thin) <τ_0_0 where τ_0_0 : ~Escapable> (@guaranteed Holder, @thick τ_0_0.Type) -> @lifetime(borrow 0) @out τ_0_0 // user: %12
+
+// Test returning a owned dependence on a trivial value
+sil [ossa] @return_trivial_dependence : $@convention(thin) (@guaranteed C) -> @lifetime(borrow 0) @owned NE {
+entry(%0 : @guaranteed $C):
+  %zero = integer_literal $Builtin.Int1, 0
+  %makeNE = function_ref @makeNE : $@convention(thin) () -> @lifetime(immortal) @owned NE
+  %call = apply %makeNE() : $@convention(thin) () -> @lifetime(immortal) @owned NE
+  // expected-error @-1{{lifetime-dependent value escapes its scope}}
+  // expected-note  @-4{{it depends on the lifetime of this parent value}}
+  %mark = mark_dependence [unresolved] %call : $NE on %zero : $Builtin.Int1
+  return %mark // expected-note {{this use causes the lifetime-dependent value to escape}}
+}
+
+// Test returning a unowned dependence on a trivial value
+sil [ossa] @return_object_trivial_dependence : $@convention(thin) (@guaranteed C) -> @lifetime(borrow 0) @owned NEObject {
+entry(%0 : @guaranteed $C):
+  %zero = integer_literal $Builtin.Int1, 0
+  %makeNE = function_ref @makeNEObject : $@convention(thin) () -> @lifetime(immortal) @owned NEObject
+  %call = apply %makeNE() : $@convention(thin) () -> @lifetime(immortal) @owned NEObject
+  // expected-error @-1{{lifetime-dependent value escapes its scope}}
+  // expected-note  @-4{{it depends on the lifetime of this parent value}}
+  %mark = mark_dependence [unresolved] %call : $NEObject on %zero : $Builtin.Int1
+  return %mark // expected-note {{this use causes the lifetime-dependent value to escape}}
+}
+
+// OK: Test that the range initialized by a store_borrow covers dependent uses.
+sil [ossa] @testStoreBorrowRange : $@convention(thin) (@owned Holder) -> () {
+bb0(%0 : @owned $Holder):
+  %val = move_value [lexical] [var_decl] %0
+  %stk = alloc_stack $Holder
+  %sb = store_borrow %val to %stk
+  %f1 = function_ref @makeNE : $@convention(thin) () -> @lifetime(immortal) @owned NE
+  %c1 = apply %f1() : $@convention(thin) () -> @lifetime(immortal) @owned NE
+  %md = mark_dependence [unresolved] %c1 on %sb
+  %mv = move_value [var_decl] %md
+  %f2 = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
+  %c2 = apply %f2(%mv) : $@convention(thin) (@guaranteed NE) -> ()
+  destroy_value %mv
+  end_borrow %sb
+  dealloc_stack %stk
+  destroy_value %val
+  %99 = tuple ()
+  return %99
+}
+
+// Test that local variable analysis can handle an address-type mark_dependence on an address base. The drop_deinit
+// also creates an an unknown address scope, preventing diagnostics from promoting the mark_dependence to noescape.
+sil [ossa] @testMarkDepAddressProjection : $@convention(thin) (@owned NCWrapper) -> () {
+bb0(%0 : @owned $NCWrapper):
+  %1 = alloc_stack $NCWrapper, let, name "self", argno 1
+  store %0 to [init] %1
+  %3 = drop_deinit %1
+  %4 = struct_element_addr %3, #NCWrapper.a
+  %5 = load_borrow %4
+
+  %6 = function_ref @getNEPointer : $@convention(thin) (@guaranteed NE) -> Builtin.RawPointer
+  %7 = apply %6(%5) : $@convention(thin) (@guaranteed NE) -> Builtin.RawPointer
+  %8 = pointer_to_address %7 to [strict] $*A
+  %9 = mark_dependence [unresolved] %8 on %4
+  %10 = begin_access [read] [unsafe] %9
+  %11 = load [trivial] %10
+  end_access %10
+
+  %13 = function_ref @useA : $@convention(thin) (A) -> ()
+  %14 = apply %13(%11) : $@convention(thin) (A) -> ()
+  end_borrow %5
+  dealloc_stack %1
+  %17 = tuple ()
+  return %17
+}
+
+// Test that LifetimeDependence.Scope recognizes a singly-initialized alloc_stack.
+sil [ossa] @testStackInit : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] [var_decl] $Holder, let, name "v"
+  %1 = function_ref @initHolder : $@convention(thin) () -> @out Holder
+  %2 = apply %1(%0) : $@convention(thin) () -> @out Holder
+  %3 = function_ref @getNE : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %4 = apply %3(%0) : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %5 = mark_dependence [unresolved] %4 on %0
+  %6 = move_value [var_decl] %5
+  %7 = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
+  %8 = apply %7(%6) : $@convention(thin) (@guaranteed NE) -> ()
+  destroy_value %6
+  destroy_addr %0
+  dealloc_stack %0
+  %12 = tuple ()
+  return %12
+}
+
+// Test that LifetimeDependence.Scope.computeRange handles a singly-initialized alloc_stack of trivial type by treating
+// it as available for the entire function
+sil [ossa] @testTrivialStackInit : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] [var_decl] $TrivialHolder, let, name "v"
+  %1 = function_ref @initTrivialHolder : $@convention(thin) () -> @out TrivialHolder
+  %2 = apply %1(%0) : $@convention(thin) () -> @out TrivialHolder
+  %3 = function_ref @getTrivialNE : $@convention(thin) (@in_guaranteed TrivialHolder) -> @lifetime(borrow 0) @owned NE
+  %4 = apply %3(%0) : $@convention(thin) (@in_guaranteed TrivialHolder) -> @lifetime(borrow 0) @owned NE
+  %5 = mark_dependence [unresolved] %4 on %0
+  dealloc_stack %0
+  %6 = move_value [var_decl] %5
+  %7 = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
+  %8 = apply %7(%6) : $@convention(thin) (@guaranteed NE) -> ()
+  destroy_value %6
+  %12 = tuple ()
+  return %12
+}
+
+// Test that a borrowed dependency cannot inherit a copied dependency.
+sil [ossa] @testReborrow : $@convention(thin) (@guaranteed NE) -> @lifetime(copy 0) @owned NE {
+bb0(%0 : @guaranteed $NE):
+  debug_value %0, let, name "ne", argno 1
+  %2 = function_ref @reborrowNE : $@convention(thin) (@guaranteed NE) -> @lifetime(borrow 0) @owned NE
+  %3 = apply %2(%0) : $@convention(thin) (@guaranteed NE) -> @lifetime(borrow 0) @owned NE
+  // expected-error @-1{{lifetime-dependent value escapes its scope}}
+  // expected-note @-6{{it depends on the lifetime of an argument of 'testReborrow'}}
+  %4 = mark_dependence [unresolved] %3 on %0
+  return %4 // expected-note {{this use causes the lifetime-dependent value to escape}}
+}
+
+sil [ossa] @testBorrowValue : $@convention(thin) (@guaranteed NE) -> @lifetime(copy 0) @owned NE {
+bb0(%0 : @guaranteed $NE):
+  %2 = function_ref @reborrowNE : $@convention(thin) (@guaranteed NE) -> @lifetime(borrow 0) @owned NE
+  %3 = apply %2(%0) : $@convention(thin) (@guaranteed NE) -> @lifetime(borrow 0) @owned NE
+  // expected-error @-1{{lifetime-dependent value escapes its scope}}
+  // expected-note @-5{{it depends on the lifetime of an argument of 'testBorrowValue'}}
+  %4 = mark_dependence [unresolved] %3 on %0
+  return %4 // expected-note {{this use causes the lifetime-dependent value to escape}}
+}
+
+// Test a borrowed dependency on an address
+sil [ossa] @testBorrowAddress : $@convention(thin) <T where T : ~Escapable> (@thick T.Type) -> @lifetime(immortal) @out T {
+bb0(%0 : $*T, %1 : $@thick T.Type):
+  debug_value %1, let, name "type", argno 1
+  %3 = alloc_stack [lexical] [var_decl] $Holder, var, name "holder", type $Holder
+  %4 = metatype $@thin Holder.Type
+
+  %5 = function_ref @makeHolder : $@convention(method) (@thin Holder.Type) -> @owned Holder
+  %6 = apply %5(%4) : $@convention(method) (@thin Holder.Type) -> @owned Holder
+  store %6 to [init] %3
+  %8 = alloc_stack [lexical] [var_decl] $T, let, name "result"
+  // expected-error @-1{{lifetime-dependent value escapes its scope}}
+  %9 = begin_access [read] [static] %3
+  // expected-note  @-1{{it depends on this scoped access to variable}}
+  %10 = load [copy] %9
+
+  %11 = function_ref @getGeneric : $@convention(thin) <τ_0_0 where τ_0_0 : ~Escapable> (@guaranteed Holder, @thick τ_0_0.Type) -> @lifetime(borrow 0) @out τ_0_0
+  %12 = apply %11<T>(%8, %10, %1) : $@convention(thin) <τ_0_0 where τ_0_0 : ~Escapable> (@guaranteed Holder, @thick τ_0_0.Type) -> @lifetime(borrow 0) @out τ_0_0
+  mark_dependence_addr [unresolved] %8 on %9
+  destroy_value %10
+  copy_addr %8 to [init] %0
+  // expected-note @-1{{this use causes the lifetime-dependent value to escape}}
+  end_access %9
+  destroy_addr %8
+  dealloc_stack %8
+  destroy_addr %3
+  dealloc_stack %3
+  %21 = tuple ()
+  return %21
+}
+
+// Test VariableDefUseWalker: initialization with copy_addr.
+sil shared [thunk] [ossa] @testCopyInit : $@convention(thin) (@in_guaranteed Holder) -> @out NE {
+bb0(%0 : $*NE, %1 : $*Holder):
+  %2 = alloc_stack $Holder
+  copy_addr %1 to [init] %2
+  %4 = load [take] %2
+  %5 = alloc_stack $Holder
+  %6 = store_borrow %4 to %5
+  %7 = alloc_stack $NE // expected-error {{lifetime-dependent value escapes its scope}}
+  // expected-note @-8{{it depends on the lifetime of an argument of 'testCopyInit'}}
+
+  %8 = function_ref @getNEIndirect : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address_for_deps 0) @out NE
+  %9 = apply %8(%7, %6) : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address_for_deps 0) @out NE
+  mark_dependence_addr [unresolved] %7 on %6
+  %11 = load [take] %7
+  store %11 to [init] %0 // expected-note {{this use causes the lifetime-dependent value to escape}}
+  end_borrow %6
+  dealloc_stack %7
+  dealloc_stack %5
+  destroy_value %4
+  dealloc_stack %2
+  %18 = tuple ()
+  return %18
+}

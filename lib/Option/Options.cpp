@@ -19,28 +19,28 @@
 using namespace swift::options;
 using namespace llvm::opt;
 
-#define PREFIX(NAME, VALUE) static const char *const NAME[] = VALUE;
+#define PREFIX(NAME, VALUE)                                                    \
+  constexpr llvm::StringLiteral NAME##_init[] = VALUE;                         \
+  constexpr llvm::ArrayRef<llvm::StringLiteral> NAME(                          \
+      NAME##_init, std::size(NAME##_init) - 1);
 #include "swift/Option/Options.inc"
 #undef PREFIX
 
-static const OptTable::Info InfoTable[] = {
-#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM,  \
-               HELPTEXT, METAVAR, VALUES)                                      \
-  {PREFIX, NAME,  HELPTEXT,    METAVAR,     OPT_##ID,  Option::KIND##Class,    \
-   PARAM,  FLAGS, OPT_##GROUP, OPT_##ALIAS, ALIASARGS, VALUES},
+static const llvm::opt::GenericOptTable::Info InfoTable[] = {
+#define OPTION(...) LLVM_CONSTRUCT_OPT_INFO(__VA_ARGS__),
 #include "swift/Option/Options.inc"
 #undef OPTION
 };
 
 namespace {
 
-class SwiftOptTable : public OptTable {
+class SwiftOptTable : public llvm::opt::GenericOptTable {
 public:
-  SwiftOptTable() : OptTable(InfoTable) {}
+  SwiftOptTable() : GenericOptTable(InfoTable) {}
 };
 
 } // end anonymous namespace
 
 std::unique_ptr<OptTable> swift::createSwiftOptTable() {
-  return std::unique_ptr<OptTable>(new SwiftOptTable());
+  return std::unique_ptr<GenericOptTable>(new SwiftOptTable());
 }

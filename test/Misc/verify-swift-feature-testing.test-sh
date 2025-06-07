@@ -1,0 +1,156 @@
+#! /usr/bin/env python3
+# -*- python -*-
+# RUN: %{python} %s '%swift_src_root' %existing-swift-features
+
+import json
+import pathlib
+import re
+import subprocess
+import sys
+
+
+# Tests that check for the behaviour of  experimental/upcoming features, so
+# they cannot automatically be checked.
+EXCEPTIONAL_FILES = [
+    # Tests for ParserValidation not being defined in no-asserts compilers
+    pathlib.Path("test/Frontend/features/experimental-features-no-asserts.swift"),
+    # Tests for UnknownFeature not existing
+    pathlib.Path("test/Frontend/features/upcoming_feature.swift"),
+    pathlib.Path("test/Frontend/features/strict_features.swift"),
+    # Tests for ModuleInterfaceExportAs being ignored
+    pathlib.Path("test/ModuleInterface/swift-export-as.swift"),
+    # Uses the pseudo-feature AvailabilityMacro=
+    pathlib.Path("test/Sema/availability_define.swift"),
+    # Tests behavior when you try to use a feature without enabling it
+    pathlib.Path("test/attr/feature_requirement.swift"),
+    # Tests completion with features both enabled and disabled
+    pathlib.Path("test/IDE/complete_decl_attribute_feature_requirement.swift"),
+]
+
+ENABLE_FEATURE_RE = re.compile(
+    r"-enable-(?:experimental|upcoming)-feature(?:\s+-Xfrontend)?\s*([A-Za-z0-9]*)"
+)
+FEATURE_LIT_MARKER_RE = re.compile(r"swift_feature_([A-Za-z0-9]*)")
+
+
+def check_test_file(file_path, lines, existing_swift_features):
+    enabled_features = {
+        feature for line in lines for feature in ENABLE_FEATURE_RE.findall(line)
+    }
+    required_features = {
+        feature for line in lines for feature in FEATURE_LIT_MARKER_RE.findall(line)
+    }
+
+    had_error = False
+
+    # First check for unknown features.
+
+    for feature in enabled_features.difference(existing_swift_features):
+        enabled_features.remove(feature)
+
+        # Be careful to not use RUN with a colon after it or Lit will pick
+        # it up.
+        print(
+            f"{file_path}: error: unknown feature '{feature}' enabled in 'RUN"
+            + ":' line"
+        )
+        had_error = True
+
+    for feature in required_features.difference(existing_swift_features):
+        required_features.remove(feature)
+
+        # Be careful to not use REQUIRES with a colon after it or Lit will pick
+        # it up.
+        print(
+            f"{file_path}: error: unknown feature '{feature}' in 'REQUIRES"
+            + f":' line: swift_feature_{feature}"
+        )
+        had_error = True
+
+    # If the sets are equal, we're fine.
+    if enabled_features == required_features:
+        return had_error
+
+    # Then check for imbalances between required and enabled features.
+
+    for feature in enabled_features.difference(required_features):
+        # Be careful to not use REQUIRES with a colon after it or Lit will pick
+        # it up.
+        print(
+            f"{file_path}: error: file enables '{feature}' but is missing '// REQUIRES"
+            + f": swift_feature_{feature}'"
+        )
+        had_error = True
+
+    for feature in required_features.difference(enabled_features):
+        print(
+            f"{file_path}: error: file requires 'swift_feature_{feature}' but does not enable '{feature}'"
+        )
+        had_error = True
+
+    return had_error
+
+
+def find_matches(swift_src_root):
+    # Look for every `REQUIRES` line that mentions `swift_feature_` in the
+    # test directories.
+    # Look for every `RUN` line that mentions `-enable-experimental-feature` or
+    # `-enable-upcoming-feature` in the test directories.
+    output = subprocess.check_output(
+        [
+            "git",
+            "grep",
+            "--extended-regexp",
+            "--recursive",
+            # Separate paths from lines with a null char.
+            "--null",
+            "-e",
+            # Be careful to not use REQUIRES with a colon after it or Lit will
+            # pick it up.
+            "REQUIRES[:].*swift_feature_",
+            "-e",
+            # Be careful to not use RUN with a colon after it or Lit will pick
+            # it up.
+            "RUN[:].*-enable-(experimental|upcoming)-feature",
+            "test",
+            "validation-test",
+        ],
+        text=True,
+        cwd=str(swift_src_root),
+    )
+    return output.splitlines()
+
+
+def main():
+    if len(sys.argv) < 3:
+        print("Invalid number of arguments.")
+        sys.exit(1)
+
+    swift_src_root = pathlib.Path(sys.argv[1])
+    existing_swift_features = set(json.loads(sys.argv[2]))
+
+    file_paths_to_lines = dict()
+
+    # Build a dictionary that maps file paths to lists of matching lines.
+    for match in find_matches(swift_src_root):
+        # '<path><zero-byte><line>'
+        relative_file_path, line = match.split("\0")
+
+        # Skip if this is one of the exceptional files.
+        if pathlib.Path(relative_file_path) in EXCEPTIONAL_FILES:
+            continue
+
+        abs_file_path = swift_src_root / relative_file_path
+        file_paths_to_lines.setdefault(abs_file_path, list()).append(line)
+
+    had_error = False
+    for file_path, lines in file_paths_to_lines.items():
+        if check_test_file(file_path, lines, existing_swift_features):
+            had_error = True
+
+    if had_error:
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

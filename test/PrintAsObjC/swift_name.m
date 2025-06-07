@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %S/../Inputs/empty.swift -typecheck -emit-objc-header-path %t/empty.h
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %S/../Inputs/empty.swift -typecheck -verify -emit-objc-header-path %t/empty.h
 // RUN: %clang -F %clang-importer-sdk-path/frameworks -E -fobjc-arc -fmodules -isysroot %clang-importer-sdk-path -I %t %s | %FileCheck %s
 
 // REQUIRES: objc_interop

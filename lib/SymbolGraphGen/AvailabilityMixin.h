@@ -29,13 +29,13 @@ struct Availability {
   StringRef Domain;
 
   /// The domain version at which a symbol was introduced if defined.
-  Optional<llvm::VersionTuple> Introduced;
+  std::optional<llvm::VersionTuple> Introduced;
 
   /// The domain version at which a symbol was deprecated if defined.
-  Optional<llvm::VersionTuple> Deprecated;
+  std::optional<llvm::VersionTuple> Deprecated;
 
   /// The domain version at which a symbol was obsoleted if defined.
-  Optional<llvm::VersionTuple> Obsoleted;
+  std::optional<llvm::VersionTuple> Obsoleted;
 
   /// An optional message regarding a symbol's availability.
   StringRef Message;
@@ -49,7 +49,7 @@ struct Availability {
   /// If \c true, is unconditionally unavailable in this \c Domain.
   bool IsUnconditionallyUnavailable;
 
-  Availability(const AvailableAttr &AvAttr);
+  Availability(const SemanticAvailableAttr &AvAttr);
 
   /// Update this availability from a duplicate @available
   /// attribute with the same platform on the same declaration.

@@ -33,7 +33,7 @@ struct _SetBuilder<Element: Hashable> {
   public mutating func add(member: Element) {
     _precondition(_target.count < _requestedCount,
       "Can't add more members than promised")
-    _target._unsafeInsertNew(member)
+    unsafe _target._unsafeInsertNew(member)
   }
 
   @inlinable
@@ -43,3 +43,6 @@ struct _SetBuilder<Element: Hashable> {
     return Set(_native: _target)
   }
 }
+
+@available(*, unavailable)
+extension _SetBuilder: Sendable {}

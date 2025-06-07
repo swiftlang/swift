@@ -6,6 +6,4 @@ func test() {
   foo(completionHandler: #^COMPLETE^#nil)
 }
 
-// CHECK: Begin completions
 // CHECK-DAG: Literal[Nil]/None/TypeRelation[Convertible]: nil[#(@Sendable (Bool) -> Void)?#];
-// CHECK: End completions

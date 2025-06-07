@@ -15,8 +15,10 @@
 
 #include "Callee.h"
 #include "ExecutorBreadcrumb.h"
+#include "Initialization.h"
 #include "ManagedValue.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/SIL/SILLocation.h"
 #include <memory>
@@ -38,9 +40,15 @@ class CalleeTypeInfo;
 /// An abstract class for working with results.of applies.
 class ResultPlan {
 public:
-  virtual RValue finish(SILGenFunction &SGF, SILLocation loc, CanType substType,
+  virtual RValue finish(SILGenFunction &SGF, SILLocation loc,
                         ArrayRef<ManagedValue> &directResults,
                         SILValue bridgedForeignError) = 0;
+
+  virtual void finishAndAddTo(SILGenFunction &SGF, SILLocation loc,
+                              ArrayRef<ManagedValue> &directResults,
+                              SILValue bridgedForeignError,
+                              RValue &result);
+
   virtual ~ResultPlan() = default;
 
   /// Defers the emission of the given breadcrumb until \p finish is invoked.
@@ -52,13 +60,15 @@ public:
   gatherIndirectResultAddrs(SILGenFunction &SGF, SILLocation loc,
                             SmallVectorImpl<SILValue> &outList) const = 0;
 
-  virtual Optional<std::pair<ManagedValue, ManagedValue>>
+  virtual std::optional<std::pair<ManagedValue, ManagedValue>>
   emitForeignErrorArgument(SILGenFunction &SGF, SILLocation loc) {
-    return None;
+    return std::nullopt;
   }
 
-  virtual ManagedValue emitForeignAsyncCompletionHandler(
-      SILGenFunction &SGF, AbstractionPattern origFormalType, SILLocation loc) {
+  virtual ManagedValue
+  emitForeignAsyncCompletionHandler(SILGenFunction &SGF,
+                                    AbstractionPattern origFormalType,
+                                    ManagedValue self, SILLocation loc) {
     return {};
   }
 };
@@ -84,9 +94,27 @@ struct ResultPlanBuilder {
 
   ResultPlanPtr build(Initialization *emitInto, AbstractionPattern origType,
                       CanType substType);
+  ResultPlanPtr buildForScalar(Initialization *emitInto,
+                               AbstractionPattern origType,
+                               CanType substType,
+                               SILResultInfo result);
   ResultPlanPtr buildForTuple(Initialization *emitInto,
                               AbstractionPattern origType,
-                              CanTupleType substType);
+                              CanType substType);
+  ResultPlanPtr
+  buildForPackExpansion(std::optional<ArrayRef<Initialization *>> inits,
+                        AbstractionPattern origExpansionType,
+                        CanTupleEltTypeArrayRef substTypes);
+  ResultPlanPtr buildPackExpansionIntoPack(SILValue packAddr,
+                                           CanPackType formalPackType,
+                                           unsigned componentIndex,
+                                           Initialization *init,
+                                           AbstractionPattern origType);
+  ResultPlanPtr buildScalarIntoPack(SILValue packAddr,
+                                    CanPackType formalPackType,
+                                    unsigned componentIndex,
+                                    Initialization *init,
+                                    AbstractionPattern origType);
 
   static ResultPlanPtr computeResultPlan(SILGenFunction &SGF,
                                          const CalleeTypeInfo &calleeTypeInfo,

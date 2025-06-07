@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-caller-analysis"
 #include "swift/SILOptimizer/Analysis/CallerAnalysis.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILVisitor.h"
@@ -51,7 +52,7 @@ struct CallerAnalysis::ApplySiteFinderVisitor
 
 #ifndef NDEBUG
   SmallPtrSet<SILInstruction *, 8> visitedCallSites;
-  SmallSetVector<SILInstruction *, 8> callSitesThatMustBeVisited;
+  llvm::SmallSetVector<SILInstruction *, 8> callSitesThatMustBeVisited;
 #endif
 
   ApplySiteFinderVisitor(CallerAnalysis *analysis, SILFunction *callerFn)
@@ -147,7 +148,7 @@ bool CallerAnalysis::ApplySiteFinderVisitor::visitFunctionRefBaseInst(
 
   if (result.fullApplySites.size()) {
     iter.first->second.hasFullApply = true;
-    processApplySites(llvm::makeArrayRef(result.fullApplySites));
+    processApplySites(llvm::ArrayRef(result.fullApplySites));
   }
 
   if (result.partialApplySites.size()) {

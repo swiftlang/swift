@@ -1,9 +1,13 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -emit-module-path %t/StrictModule.swiftmodule -module-name StrictModule -warn-concurrency %S/Inputs/StrictModule.swift
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/StrictModule.swiftmodule -module-name StrictModule -strict-concurrency=complete %S/Inputs/StrictModule.swift
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/NonStrictModule.swiftmodule -module-name NonStrictModule %S/Inputs/NonStrictModule.swift
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -I %t
+// RUN: %target-swift-frontend -disable-availability-checking -I %t -verify -emit-sil %s -o /dev/null
+// RUN: %target-swift-frontend -disable-availability-checking -I %t -verify -emit-sil %s -o /dev/null -strict-concurrency=targeted
+// RUN: %target-swift-frontend -disable-availability-checking -I %t -verify -emit-sil %s -o /dev/null -strict-concurrency=complete
+// RUN: %target-swift-frontend -disable-availability-checking -I %t -verify -emit-sil %s -o /dev/null -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 @preconcurrency import NonStrictModule
 

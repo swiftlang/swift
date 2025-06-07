@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift
 // RUN: %target-swift-frontend -typecheck -debug-generic-signatures %s 2>&1 | %FileCheck %s
 
 protocol P {
@@ -7,22 +7,18 @@ protocol P {
 
 // Anything that mentions 'T : P' and 'U : P' minimizes to 'U : P'.
 
-// expected-warning@+1 {{redundant conformance constraint 'U' : 'P'}}
 func oneProtocol1<T, U>(_: T, _: U) where T : P, U : P, T.X == U, U.X == T {}
 // CHECK-LABEL: oneProtocol1
 // CHECK: Generic signature: <T, U where T : P, T == U.[P]X, U == T.[P]X>
 
-// expected-warning@+1 {{redundant conformance constraint 'U' : 'P'}}
 func oneProtocol2<T, U>(_: T, _: U) where U : P, T : P, T.X == U, U.X == T {}
 // CHECK-LABEL: oneProtocol2
 // CHECK: Generic signature: <T, U where T : P, T == U.[P]X, U == T.[P]X>
 
-// expected-warning@+1 {{redundant conformance constraint 'U' : 'P'}}
 func oneProtocol3<T, U>(_: T, _: U) where T : P, T.X == U, U : P, U.X == T {}
 // CHECK-LABEL: oneProtocol3
 // CHECK: Generic signature: <T, U where T : P, T == U.[P]X, U == T.[P]X>
 
-// expected-warning@+1 {{redundant conformance constraint 'U' : 'P'}}
 func oneProtocol4<T, U>(_: T, _: U) where U : P, T.X == U, T : P, U.X == T {}
 // CHECK-LABEL: oneProtocol4
 // CHECK: Generic signature: <T, U where T : P, T == U.[P]X, U == T.[P]X>
@@ -55,27 +51,22 @@ protocol P2 {
   associatedtype Y : P1
 }
 
-// expected-warning@+1 {{redundant conformance constraint 'U' : 'P2'}}
 func twoProtocols1<T, U>(_: T, _: U) where T : P1, U : P2, T.X == U, U.Y == T {}
 // CHECK-LABEL: twoProtocols1
 // CHECK: Generic signature: <T, U where T : P1, T == U.[P2]Y, U == T.[P1]X>
 
-// expected-warning@+1 {{redundant conformance constraint 'U' : 'P2'}}
 func twoProtocols2<T, U>(_: T, _: U) where U : P2, T : P1, T.X == U, U.Y == T {}
 // CHECK-LABEL: twoProtocols2
 // CHECK: Generic signature: <T, U where T : P1, T == U.[P2]Y, U == T.[P1]X>
 
-// expected-warning@+1 {{redundant conformance constraint 'U' : 'P2'}}
 func twoProtocols3<T, U>(_: T, _: U) where T : P1, T.X == U, U : P2, U.Y == T {}
 // CHECK-LABEL: twoProtocols3
 // CHECK: Generic signature: <T, U where T : P1, T == U.[P2]Y, U == T.[P1]X>
 
-// expected-warning@+1 {{redundant conformance constraint 'U' : 'P2'}}
 func twoProtocols4<T, U>(_: T, _: U) where U : P2, T.X == U, T : P1, U.Y == T {}
 // CHECK-LABEL: twoProtocols4
 // CHECK: Generic signature: <T, U where T : P1, T == U.[P2]Y, U == T.[P1]X>
 
-// expected-warning@+1 {{redundant conformance constraint 'U' : 'P2'}}
 func twoProtocols5<T, U>(_: T, _: U) where T : P1, T.X == U, U.Y == T, U : P2 {}
 // CHECK-LABEL: twoProtocols5
 // CHECK: Generic signature: <T, U where T : P1, T == U.[P2]Y, U == T.[P1]X>
@@ -91,7 +82,6 @@ func twoProtocols5<T, U>(_: T, _: U) where T : P1, T.X == U, U.Y == T, U : P2 {}
 // requirements here are redundant, the user can omit one or the other to
 // specify the result that they desire.
 
-// expected-warning@+1 {{redundant conformance constraint 'U' : 'P2'}}
 func twoProtocols6<T, U>(_: T, _: U) where U : P2, T.X == U, U.Y == T, T : P1 {}
 // CHECK-LABEL: twoProtocols6
 // CHECK: Generic signature: <T, U where T : P1, T == U.[P2]Y, U == T.[P1]X>

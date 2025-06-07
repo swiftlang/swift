@@ -22,6 +22,7 @@
 #include "swift/Basic/Debug.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/TrailingObjects.h"
+#include <optional>
 
 namespace swift {
 /// Forward declared trampoline for Expr::getType.
@@ -92,13 +93,13 @@ public:
   bool isInOut() const;
 
   /// Whether the argument is a compile-time constant value.
-  bool isConst() const;
+  bool isCompileTimeLiteral() const;
 
-  bool operator==(const Argument &other) {
+  bool operator==(const Argument &other) const {
     return LabelLoc == other.LabelLoc && Label == other.Label &&
            ArgExpr == other.ArgExpr;
   }
-  bool operator!=(const Argument &other) { return !(*this == other); }
+  bool operator!=(const Argument &other) const { return !(*this == other); }
 };
 
 /// Represents the argument list of a function call or subscript access.
@@ -139,7 +140,7 @@ class alignas(Argument) ArgumentList final
   bool HasLabelLocs : 1;
 
   ArgumentList(SourceLoc lParenLoc, SourceLoc rParenLoc, unsigned numArgs,
-               Optional<unsigned> firstTrailingClosureIndex,
+               std::optional<unsigned> firstTrailingClosureIndex,
                ArgumentList *originalArgs, bool isImplicit, bool hasLabels,
                bool hasLabelLocs)
       : LParenLoc(lParenLoc), RParenLoc(rParenLoc), NumArgs(numArgs),
@@ -220,7 +221,7 @@ public:
   /// \param arena The arena to allocate the ArgumentList in.
   static ArgumentList *
   create(ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Argument> args,
-         SourceLoc rParenLoc, Optional<unsigned> firstTrailingClosureIndex,
+         SourceLoc rParenLoc, std::optional<unsigned> firstTrailingClosureIndex,
          bool isImplicit, ArgumentList *originalArgs = nullptr,
          AllocationArena arena = AllocationArena::Permanent);
 
@@ -235,7 +236,7 @@ public:
   static ArgumentList *
   createParsed(ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Argument> args,
                SourceLoc rParenLoc,
-               Optional<unsigned> firstTrailingClosureIndex);
+               std::optional<unsigned> firstTrailingClosureIndex);
 
   /// Create a new type-checked ArgumentList from an original set of arguments.
   ///
@@ -254,17 +255,17 @@ public:
   /// \param rParenLoc The location of the closing ')'. Note that for a
   /// subscript argument list, this will be for the closing ']'.
   /// \param arena The arena to allocate the ArgumentList in.
-  static ArgumentList *
-  createImplicit(ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Argument> args,
-                 SourceLoc rParenLoc,
-                 Optional<unsigned> firstTrailingClosureIndex = None,
-                 AllocationArena arena = AllocationArena::Permanent);
+  static ArgumentList *createImplicit(
+      ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Argument> args,
+      SourceLoc rParenLoc,
+      std::optional<unsigned> firstTrailingClosureIndex = std::nullopt,
+      AllocationArena arena = AllocationArena::Permanent);
 
   /// Create a new implicit ArgumentList with a set of \p args.
-  static ArgumentList *
-  createImplicit(ASTContext &ctx, ArrayRef<Argument> args,
-                 Optional<unsigned> firstTrailingClosureIndex = None,
-                 AllocationArena arena = AllocationArena::Permanent);
+  static ArgumentList *createImplicit(
+      ASTContext &ctx, ArrayRef<Argument> args,
+      std::optional<unsigned> firstTrailingClosureIndex = std::nullopt,
+      AllocationArena arena = AllocationArena::Permanent);
 
   /// Create a new implicit ArgumentList with a single labeled argument
   /// expression.
@@ -380,10 +381,10 @@ public:
   ///
   /// Note for a type-checked argument list, this must be queried on
   /// \c getOriginalArgs instead.
-  Optional<unsigned> getFirstTrailingClosureIndex() const {
+  std::optional<unsigned> getFirstTrailingClosureIndex() const {
     assert(!HasOriginalArgs && "Query original args instead");
     if (RawFirstTrailingClosureIndex == NumArgs)
-      return None;
+      return std::nullopt;
     return RawFirstTrailingClosureIndex;
   }
 
@@ -467,11 +468,11 @@ public:
   ///
   /// Note for a type-checked argument list, this must be queried on
   /// \c getOriginalArgs instead.
-  Optional<Argument> getFirstTrailingClosure() const {
+  std::optional<Argument> getFirstTrailingClosure() const {
     assert(!HasOriginalArgs && "Query original args instead");
     auto idx = getFirstTrailingClosureIndex();
     if (!idx.has_value())
-      return None;
+      return std::nullopt;
     return get(*idx);
   }
 
@@ -525,8 +526,8 @@ public:
   /// arguments, returns its index. Otherwise returns \c None. By default this
   /// will match against semantic sub-expressions, but that may be disabled by
   /// passing \c false for \c allowSemantic.
-  Optional<unsigned> findArgumentExpr(Expr *expr,
-                                      bool allowSemantic = true) const;
+  std::optional<unsigned> findArgumentExpr(Expr *expr,
+                                           bool allowSemantic = true) const;
 
   /// Creates a TupleExpr or ParenExpr that holds the argument exprs. A
   /// ParenExpr will be returned for a single argument, otherwise a TupleExpr.

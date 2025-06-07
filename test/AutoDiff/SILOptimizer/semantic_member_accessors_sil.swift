@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -Xllvm -sil-print-after=differentiation %s -module-name null -o /dev/null 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -Xllvm -sil-print-after=differentiation %s -module-name null -o /dev/null 2>&1 | %FileCheck %s
 
 // Test differentiation of semantic member accessors:
 // - Stored property accessors.
@@ -45,7 +45,7 @@ func trigger<T: Differentiable>(_ x: T.Type) {
 // CHECK-NEXT: sil_differentiability_witness private [reverse] [parameters 0] [results 0] @$s4null6StructV1xSfvg : $@convention(method) (Struct) -> Float {
 
 // CHECK-LABEL: sil private [ossa] @$s4null7GenericV1xxvs16_Differentiation14DifferentiableRzlTJpSSpSr
-// CHECK: bb0([[ADJ_X_RESULT:%.*]] : $*τ_0_0.TangentVector, [[ADJ_SELF:%.*]] : $*Generic<τ_0_0>.TangentVector, {{.*}} : {{.*}}):
+// CHECK: bb0([[ADJ_X_RESULT:%.*]] : $*τ_0_0.TangentVector, [[ADJ_SELF:%.*]] : $*Generic<τ_0_0>.TangentVector):
 // CHECK:   [[ADJ_X_TMP:%.*]] = alloc_stack $τ_0_0.TangentVector
 // CHECK:   [[ZERO_FN:%.*]] = witness_method $τ_0_0.TangentVector, #AdditiveArithmetic.zero!getter
 // CHECK:   apply [[ZERO_FN]]<τ_0_0.TangentVector>([[ADJ_X_TMP]], {{.*}})
@@ -61,7 +61,7 @@ func trigger<T: Differentiable>(_ x: T.Type) {
 // CHECK: }
 
 // CHECK-LABEL: sil private [ossa] @$s4null7GenericV1xxvg16_Differentiation14DifferentiableRzlTJpSpSr
-// CHECK: bb0([[ADJ_SELF_RESULT:%.*]] : $*Generic<τ_0_0>.TangentVector, [[SEED:%.*]] : $*τ_0_0.TangentVector, {{.*}} : ${{.*}}):
+// CHECK: bb0([[ADJ_SELF_RESULT:%.*]] : $*Generic<τ_0_0>.TangentVector, [[SEED:%.*]] : $*τ_0_0.TangentVector):
 // CHECK:   [[ADJ_SELF_TMP:%.*]] = alloc_stack $Generic<τ_0_0>.TangentVector
 // CHECK:   [[SEED_COPY:%.*]] = alloc_stack $τ_0_0.TangentVector
 // CHECK:   copy_addr [[SEED]] to [init] [[SEED_COPY]] : $*τ_0_0.TangentVector
@@ -77,7 +77,7 @@ func trigger<T: Differentiable>(_ x: T.Type) {
 // CHECK: }
 
 // CHECK-LABEL: sil private [ossa] @$s4null6StructV1xSfvsTJpSSpSr
-// CHECK: bb0([[ADJ_SELF:%.*]] : $*Struct.TangentVector, {{.*}} : $_AD__$s4null6StructV1xSfvs_bb0__PB__src_0_wrt_0_1):
+// CHECK: bb0([[ADJ_SELF:%.*]] : $*Struct.TangentVector):
 // CHECK:   [[ADJ_X_ADDR:%.*]] = struct_element_addr [[ADJ_SELF]] : $*Struct.TangentVector, #Struct.TangentVector.x
 // CHECK:   [[ADJ_X:%.*]] = load [trivial] [[ADJ_X_ADDR]] : $*Float
 // CHECK:   [[ZERO_FN:%.*]] = witness_method $Float, #AdditiveArithmetic.zero!getter
@@ -86,7 +86,7 @@ func trigger<T: Differentiable>(_ x: T.Type) {
 // CHECK: }
 
 // CHECK-LABEL: sil private [ossa] @$s4null6StructV1xSfvgTJpSpSr
-// CHECK: bb0([[ADJ_X:%.*]] : $Float, {{.*}} : $_AD__$s4null6StructV1xSfvg_bb0__PB__src_0_wrt_0):
+// CHECK: bb0([[ADJ_X:%.*]] : $Float):
 // CHECK:   [[ADJ_Y_ADDR:%.*]] = alloc_stack $Float
 // CHECK:   [[ZERO_FN:%.*]] = witness_method $Float, #AdditiveArithmetic.zero!getter
 // CHECK:   apply [[ZERO_FN]]<Float>([[ADJ_Y_ADDR]], {{.*}})

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/StaticMirror/ObjectFileContext.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Unreachable.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/RemoteInspection/ReflectionContext.h"
@@ -90,7 +91,7 @@ void Image::scanMachO(const llvm::object::MachOObjectFile *O) {
     }
 
     // The offset from the symbol is stored at the target address.
-    uint64_t Offset;
+    uint64_t Offset = 0;
     auto OffsetContent =
         getContentsAtAddress(bind.address(), O->getBytesInAddress());
     if (OffsetContent.empty())
@@ -110,6 +111,20 @@ void Image::scanMachO(const llvm::object::MachOObjectFile *O) {
   }
   if (error) {
     llvm::consumeError(std::move(error));
+  }
+}
+
+// We only support these for AArch64, ARM and x86-64 at present
+static uint32_t getELFGlobDatRelocationType(uint32_t machine) {
+  switch (machine) {
+  case llvm::ELF::EM_AARCH64:
+    return llvm::ELF::R_AARCH64_GLOB_DAT;
+  case llvm::ELF::EM_ARM:
+    return llvm::ELF::R_ARM_GLOB_DAT;
+  case llvm::ELF::EM_X86_64:
+    return llvm::ELF::R_X86_64_GLOB_DAT;
+  default:
+    return 0;
   }
 }
 
@@ -146,6 +161,7 @@ void Image::scanELFType(const llvm::object::ELFObjectFile<ELFT> *O) {
 
   auto machine = O->getELFFile().getHeader().e_machine;
   auto relativeRelocType = llvm::object::getELFRelativeRelocationType(machine);
+  auto globDatRelocType = getELFGlobDatRelocationType(machine);
 
   for (auto &S : static_cast<const llvm::object::ELFObjectFileBase *>(O)
                      ->dynamic_relocation_sections()) {
@@ -159,6 +175,28 @@ void Image::scanELFType(const llvm::object::ELFObjectFile<ELFT> *O) {
         auto rela = O->getRela(R.getRawDataRefImpl());
         DynamicRelocations.insert(
             {R.getOffset(), {{}, HeaderAddress + rela->r_addend}});
+        continue;
+      }
+
+      // `getRelocationResolver` doesn't handle GLOB_DAT relocations, so we
+      // also have to do that ourselves.
+      if (globDatRelocType && R.getType() == globDatRelocType) {
+        auto symbol = R.getSymbol();
+        auto name = symbol->getName();
+        if (!name) {
+          llvm::consumeError(name.takeError());
+          continue;
+        }
+
+        // On x86-64, this is just S, but on other architectures it is
+        // usually S + A.
+        uint64_t addend = 0;
+        if (isRela && machine != llvm::ELF::EM_X86_64) {
+          auto rela = O->getRela(R.getRawDataRefImpl());
+          addend = rela->r_addend;
+        }
+
+        DynamicRelocations.insert({R.getOffset(), {*name, addend}});
         continue;
       }
 
@@ -431,6 +469,8 @@ bool ObjectMemoryReader::queryDataLayout(DataLayoutQueryType type,
     }
     return true;
   }
+  case DLQ_GetObjCInteropIsEnabled:
+    break;
   }
 
   return false;

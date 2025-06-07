@@ -17,6 +17,7 @@
 #include "swift/Config.h"
 #include "clang/Basic/DarwinSDKInfo.h"
 #include "llvm/ADT/StringRef.h"
+#include <optional>
 
 namespace llvm {
   class Triple;
@@ -32,7 +33,9 @@ namespace swift {
     TvOS,
     TvOSSimulator,
     WatchOS,
-    WatchOSSimulator
+    WatchOSSimulator,
+    VisionOS,
+    VisionOSSimulator
   };
 
   /// Returns true if the given triple represents iOS running in a simulator.
@@ -47,6 +50,9 @@ namespace swift {
   /// Returns true if the given triple represents a macCatalyst environment.
   bool tripleIsMacCatalystEnvironment(const llvm::Triple &triple);
 
+  /// Returns true if the given triple represents visionOS running in a simulator.
+  bool tripleIsVisionSimulator(const llvm::Triple &triple);
+
   /// Determine whether the triple infers the "simulator" environment.
   bool tripleInfersSimulatorEnvironment(const llvm::Triple &triple);
 
@@ -57,13 +63,17 @@ namespace swift {
 
   /// Returns the VersionTuple at which Swift first became available for the OS
   /// represented by `triple`.
-  const Optional<llvm::VersionTuple>
+  const std::optional<llvm::VersionTuple>
   minimumAvailableOSVersionForTriple(const llvm::Triple &triple);
 
   /// Returns true if the given triple represents an OS that has all the
   /// "built-in" ABI-stable libraries (stdlib and _Concurrency)
   /// (eg. in /usr/lib/swift).
   bool tripleRequiresRPathForSwiftLibrariesInOS(const llvm::Triple &triple);
+
+  /// Returns true if the given triple represents a version of OpenBSD
+  /// that enforces BTCFI by default.
+  bool tripleBTCFIByDefaultInOpenBSD(const llvm::Triple &triple);
 
   /// Returns the platform name for a given target triple.
   ///
@@ -106,7 +116,7 @@ namespace swift {
 
   /// Get the Swift runtime version to deploy back to, given a deployment target expressed as an
   /// LLVM target triple.
-  Optional<llvm::VersionTuple>
+  std::optional<llvm::VersionTuple>
   getSwiftRuntimeCompatibilityVersionForTarget(const llvm::Triple &Triple);
 
   /// Retrieve the target SDK version for the given SDKInfo and target triple.

@@ -86,22 +86,17 @@ struct SwiftModuleDetails: Codable {
   /// The paths of potentially ready-to-use compiled modules for the interface.
   var compiledModuleCandidates: [String]?
 
-  /// The bridging header, if any.
-  var bridgingHeaderPath: String?
-
-  /// The source files referenced by the bridging header.
-  var bridgingSourceFiles: [String]? = []
-
   /// Options to the compile command
   var commandLine: [String]? = []
 
-  /// To build a PCM to be used by this Swift module, we need to append these
-  /// arguments to the generic PCM build arguments reported from the dependency
-  /// graph.
-  var extraPcmArgs: [String]
-
   /// A flag to indicate whether or not this module is a framework.
   var isFramework: Bool
+
+   /// The bridging header info, if any.
+  var bridgingHeader: BridgingHeader?  
+
+  /// A set of Swift Overlays of Clang Module Dependencies
+  var swiftOverlayDependencies: [ModuleDependencyId]?
 }
 
 /// Details specific to Swift placeholder dependencies.
@@ -130,10 +125,6 @@ struct SwiftPrebuiltExternalModuleDetails: Codable {
 struct ClangModuleDetails: Codable {
   /// The path to the module map used to build this module.
   public var moduleMapPath: String
-
-  /// Set of PCM Arguments of depending modules which
-  /// are covered by the directDependencies info of this module
-  public var dependenciesCapturedPCMArgs: Set<[String]>?
 
   /// clang-generated context hash
   var contextHash: String

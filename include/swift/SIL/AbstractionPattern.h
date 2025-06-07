@@ -18,6 +18,7 @@
 #ifndef SWIFT_SIL_ABSTRACTIONPATTERN_H
 #define SWIFT_SIL_ABSTRACTIONPATTERN_H
 
+#include "swift/Basic/IndexedViewRange.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Types.h"
 
@@ -34,6 +35,9 @@ namespace clang {
 
 namespace swift {
 namespace Lowering {
+class FunctionParamGenerator;
+class TupleElementGenerator;
+class PackElementGenerator;
 
 /// A pattern for the abstraction of a value.
 ///
@@ -306,31 +310,40 @@ class AbstractionPattern {
         assert(errorStripsResultOptionality() == stripsResultOptionality);
       }
 
-    EncodedForeignInfo(Async_t,
-                       unsigned completionParameterIndex,
-                       Optional<unsigned> completionErrorParameterIndex,
-                       Optional<unsigned> completionErrorFlagParameterIndex,
-                       bool completionErrorFlagIsZeroOnError)
-    : Value(1
-      + (unsigned(IsAsync) - 1)
-      + (unsigned(completionParameterIndex) << AsyncCompletionParameterIndexShift)
-      + ((completionErrorParameterIndex ? *completionErrorParameterIndex + 1
-                                        : 0) << AsyncCompletionErrorParameterIndexShift)
-      + ((completionErrorFlagParameterIndex ? *completionErrorFlagParameterIndex + 1
-                                            : 0) << AsyncCompletionErrorFlagParameterIndexShift)
-      + (unsigned(completionErrorFlagIsZeroOnError) << AsyncCompletionErrorFlagParameterPolarityShift)){
+      EncodedForeignInfo(
+          Async_t, unsigned completionParameterIndex,
+          std::optional<unsigned> completionErrorParameterIndex,
+          std::optional<unsigned> completionErrorFlagParameterIndex,
+          bool completionErrorFlagIsZeroOnError)
+          : Value(1 + (unsigned(IsAsync) - 1) +
+                  (unsigned(completionParameterIndex)
+                   << AsyncCompletionParameterIndexShift) +
+                  ((completionErrorParameterIndex
+                        ? *completionErrorParameterIndex + 1
+                        : 0)
+                   << AsyncCompletionErrorParameterIndexShift) +
+                  ((completionErrorFlagParameterIndex
+                        ? *completionErrorFlagParameterIndex + 1
+                        : 0)
+                   << AsyncCompletionErrorFlagParameterIndexShift) +
+                  (unsigned(completionErrorFlagIsZeroOnError)
+                   << AsyncCompletionErrorFlagParameterPolarityShift)) {
 
-      assert(getKind() == IsAsync);
-      assert(getAsyncCompletionHandlerParamIndex() == completionParameterIndex);
-      assert(getAsyncCompletionHandlerErrorParamIndex() == completionErrorParameterIndex);
-      assert(getAsyncCompletionHandlerErrorFlagParamIndex() == completionErrorFlagParameterIndex);
-      assert(isCompletionErrorFlagZeroOnError() == completionErrorFlagIsZeroOnError);
-    }
+        assert(getKind() == IsAsync);
+        assert(getAsyncCompletionHandlerParamIndex() ==
+               completionParameterIndex);
+        assert(getAsyncCompletionHandlerErrorParamIndex() ==
+               completionErrorParameterIndex);
+        assert(getAsyncCompletionHandlerErrorFlagParamIndex() ==
+               completionErrorFlagParameterIndex);
+        assert(isCompletionErrorFlagZeroOnError() ==
+               completionErrorFlagIsZeroOnError);
+      }
 
   public:
     static EncodedForeignInfo
-    encode(const Optional<ForeignErrorConvention> &foreignError,
-           const Optional<ForeignAsyncConvention> &foreignAsync);
+    encode(const std::optional<ForeignErrorConvention> &foreignError,
+           const std::optional<ForeignAsyncConvention> &foreignAsync);
 
     bool hasValue() const { return Value != 0; }
     ForeignKind getKind() const {
@@ -360,29 +373,30 @@ class AbstractionPattern {
       return ((Value - 1) & AsyncCompletionParameterIndexMask)
         >> AsyncCompletionParameterIndexShift;
     }
-    
-    Optional<unsigned> getAsyncCompletionHandlerErrorParamIndex() const {
+
+    std::optional<unsigned> getAsyncCompletionHandlerErrorParamIndex() const {
       assert(getKind() == IsAsync);
 
       unsigned encodedValue = ((Value - 1) & AsyncCompletionErrorParameterIndexMask)
         >> AsyncCompletionErrorParameterIndexShift;
       if (encodedValue == 0) {
-        return llvm::None;
+        return std::nullopt;
       }
       return encodedValue - 1;
     }
 
-    Optional<unsigned> getAsyncCompletionHandlerErrorFlagParamIndex() const {
+    std::optional<unsigned>
+    getAsyncCompletionHandlerErrorFlagParamIndex() const {
       assert(getKind() == IsAsync);
 
       unsigned encodedValue = ((Value - 1) & AsyncCompletionErrorFlagParameterIndexMask)
         >> AsyncCompletionErrorFlagParameterIndexShift;
       if (encodedValue == 0) {
-        return llvm::None;
+        return std::nullopt;
       }
       return encodedValue - 1;
     }
-    
+
     bool isCompletionErrorFlagZeroOnError() const {
       assert(getKind() == IsAsync);
 
@@ -425,6 +439,7 @@ class AbstractionPattern {
     const void *RawTypePtr;
   };
   CanGenericSignature GenericSig;
+  SubstitutionMap GenericSubs;
 
   Kind getKind() const { return Kind(TheKind); }
 
@@ -507,45 +522,50 @@ class AbstractionPattern {
     }
   }
   
-  void initSwiftType(CanGenericSignature signature, CanType origType,
+  void initSwiftType(SubstitutionMap subs,
+                     CanGenericSignature signature,
+                     CanType origType,
                      Kind kind = Kind::Type) {
     assert(signature || !origType->hasTypeParameter());
     TheKind = unsigned(kind);
     OrigType = origType;
     GenericSig = CanGenericSignature();
+    GenericSubs = subs;
     if (OrigType->hasTypeParameter()) {
       assert(OrigType == signature.getReducedType(origType));
       GenericSig = signature;
     }
   }
 
-  void initClangType(CanGenericSignature signature,
+  void initClangType(SubstitutionMap subs, CanGenericSignature signature,
                      CanType origType, const clang::Type *clangType,
                      Kind kind = Kind::ClangType) {
-    initSwiftType(signature, origType, kind);
+    initSwiftType(subs, signature, origType, kind);
     ClangType = clangType;
   }
 
-  void initObjCMethod(CanGenericSignature signature,
+  void initObjCMethod(SubstitutionMap subs, CanGenericSignature signature,
                       CanType origType, const clang::ObjCMethodDecl *method,
                       Kind kind, EncodedForeignInfo errorInfo) {
-    initSwiftType(signature, origType, kind);
+    initSwiftType(subs, signature, origType, kind);
     ObjCMethod = method;
     OtherData = errorInfo.getOpaqueValue();
   }
 
-  void initCFunctionAsMethod(CanGenericSignature signature,
+  void initCFunctionAsMethod(SubstitutionMap subs,
+                             CanGenericSignature signature,
                              CanType origType, const clang::Type *clangType,
                              Kind kind,
                              ImportAsMemberStatus memberStatus) {
-    initClangType(signature, origType, clangType, kind);
+    initClangType(subs, signature, origType, clangType, kind);
     OtherData = memberStatus.getRawValue();
   }
 
-  void initCXXMethod(CanGenericSignature signature, CanType origType,
+  void initCXXMethod(SubstitutionMap subs,
+                     CanGenericSignature signature, CanType origType,
                      const clang::CXXMethodDecl *method, Kind kind,
                      ImportAsMemberStatus memberStatus) {
-    initSwiftType(signature, origType, kind);
+    initSwiftType(subs, signature, origType, kind);
     CXXMethod = method;
     OtherData = memberStatus.getRawValue();
   }
@@ -559,13 +579,27 @@ public:
   explicit AbstractionPattern(CanType origType)
     : AbstractionPattern(nullptr, origType) {}
   explicit AbstractionPattern(CanGenericSignature signature, CanType origType) {
-    initSwiftType(signature, origType);
+    initSwiftType(SubstitutionMap(), signature, origType);
+  }
+  explicit AbstractionPattern(SubstitutionMap subs, CanType origType) {
+    initSwiftType(subs, subs.getGenericSignature().getCanonicalSignature(),
+                  origType);
+  }
+  explicit AbstractionPattern(SubstitutionMap subs, CanGenericSignature sig,
+                              CanType origType) {
+    initSwiftType(subs, sig, origType);
   }
   explicit AbstractionPattern(CanType origType, const clang::Type *clangType)
     : AbstractionPattern(nullptr, origType, clangType) {}
   explicit AbstractionPattern(CanGenericSignature signature, CanType origType,
                               const clang::Type *clangType) {
-    initClangType(signature, origType, clangType);
+    initClangType(SubstitutionMap(), signature, origType, clangType);
+  }
+  explicit AbstractionPattern(SubstitutionMap subs,
+                              CanGenericSignature signature,
+                              CanType origType,
+                              const clang::Type *clangType) {
+    initClangType(subs, signature, origType, clangType);
   }
 
   static AbstractionPattern getOpaque() {
@@ -610,6 +644,10 @@ public:
     llvm_unreachable("Unhandled AbstractionPatternKind in switch");
   }
 
+  SubstitutionMap getGenericSubstitutions() const {
+    return GenericSubs;
+  }
+
   CanGenericSignature getGenericSignature() const {
     assert(hasGenericSignature());
     return CanGenericSignature(GenericSig);
@@ -635,12 +673,13 @@ public:
   /// corresponding to the parameters of a completion handler
   /// block of an API that was imported as async.
   static AbstractionPattern
-  getObjCCompletionHandlerArgumentsType(CanGenericSignature sig,
+  getObjCCompletionHandlerArgumentsType(SubstitutionMap subs,
+                                        CanGenericSignature sig,
                                         CanType origTupleType,
                                         const clang::Type *clangBlockType,
                                         EncodedForeignInfo foreignInfo) {
     AbstractionPattern pattern(Kind::ObjCCompletionHandlerArgumentsType);
-    pattern.initClangType(sig, origTupleType, clangBlockType,
+    pattern.initClangType(subs, sig, origTupleType, clangBlockType,
                           Kind::ObjCCompletionHandlerArgumentsType);
     pattern.OtherData = foreignInfo.getOpaqueValue();
     
@@ -650,12 +689,11 @@ public:
 public:
   /// Return an abstraction pattern for the curried type of an
   /// Objective-C method.
-  static AbstractionPattern
-  getCurriedObjCMethod(CanType origType, const clang::ObjCMethodDecl *method,
-                       const Optional<ForeignErrorConvention> &foreignError,
-                       const Optional<ForeignAsyncConvention> &foreignAsync);
+  static AbstractionPattern getCurriedObjCMethod(
+      CanType origType, const clang::ObjCMethodDecl *method,
+      const std::optional<ForeignErrorConvention> &foreignError,
+      const std::optional<ForeignAsyncConvention> &foreignAsync);
 
-  
   /// Return an abstraction pattern for the uncurried type of a C function
   /// imported as a method.
   ///
@@ -670,7 +708,8 @@ public:
                        ImportAsMemberStatus memberStatus) {
     assert(isa<AnyFunctionType>(origType));
     AbstractionPattern pattern;
-    pattern.initCFunctionAsMethod(nullptr, origType, clangType,
+    pattern.initCFunctionAsMethod(SubstitutionMap(), nullptr,
+                                  origType, clangType,
                                   Kind::CFunctionAsMethodType,
                                   memberStatus);
     return pattern;
@@ -705,7 +744,7 @@ public:
                                          ImportAsMemberStatus memberStatus) {
     assert(isa<AnyFunctionType>(origType));
     AbstractionPattern pattern;
-    pattern.initCXXMethod(nullptr, origType, method,
+    pattern.initCXXMethod(SubstitutionMap(), nullptr, origType, method,
                           Kind::CXXMethodType, memberStatus);
     return pattern;
   }
@@ -722,7 +761,7 @@ public:
                       ImportAsMemberStatus memberStatus) {
     assert(isa<AnyFunctionType>(origType));
     AbstractionPattern pattern;
-    pattern.initCXXMethod(nullptr, origType, method,
+    pattern.initCXXMethod(SubstitutionMap(), nullptr, origType, method,
                           Kind::CurriedCXXMethodType, memberStatus);
     return pattern;
   }
@@ -738,10 +777,11 @@ public:
   
   /// Return an abstraction pattern for a value that is discarded after being
   /// evaluated.
-  static AbstractionPattern
-  getDiscard(CanGenericSignature signature, CanType origType) {
+  static AbstractionPattern getDiscard(SubstitutionMap subs,
+                                       CanGenericSignature signature,
+                                       CanType origType) {
     AbstractionPattern pattern;
-    pattern.initSwiftType(signature, origType, Kind::Discard);
+    pattern.initSwiftType(subs, signature, origType, Kind::Discard);
     return pattern;
   }
   
@@ -751,7 +791,8 @@ public:
   /// Note that, for most purposes, you should lower a field's type against its
   /// *unsubstituted* interface type.
   AbstractionPattern
-  unsafeGetSubstFieldType(ValueDecl *member, CanType origMemberType) const;
+  unsafeGetSubstFieldType(ValueDecl *member, CanType origMemberType,
+                          SubstitutionMap subMap) const;
   
 private:
   /// Return an abstraction pattern for the curried type of an
@@ -761,7 +802,7 @@ private:
                        EncodedForeignInfo errorInfo) {
     assert(isa<AnyFunctionType>(origType));
     AbstractionPattern pattern;
-    pattern.initObjCMethod(nullptr, origType, method,
+    pattern.initObjCMethod(SubstitutionMap(), nullptr, origType, method,
                            Kind::CurriedObjCMethodType, errorInfo);
     return pattern;
   }
@@ -772,7 +813,8 @@ private:
                               ImportAsMemberStatus memberStatus) {
     assert(isa<AnyFunctionType>(origType));
     AbstractionPattern pattern;
-    pattern.initCFunctionAsMethod(nullptr, origType, clangType,
+    pattern.initCFunctionAsMethod(SubstitutionMap(), nullptr,
+                                  origType, clangType,
                                   Kind::CurriedCFunctionAsMethodType,
                                   memberStatus);
     return pattern;
@@ -781,13 +823,14 @@ private:
   /// Return an abstraction pattern for the partially-applied curried
   /// type of an Objective-C method.
   static AbstractionPattern
-  getPartialCurriedObjCMethod(CanGenericSignature signature,
+  getPartialCurriedObjCMethod(SubstitutionMap subs,
+                              CanGenericSignature signature,
                               CanType origType,
                               const clang::ObjCMethodDecl *method,
                               EncodedForeignInfo errorInfo) {
     assert(isa<AnyFunctionType>(origType));
     AbstractionPattern pattern;
-    pattern.initObjCMethod(signature, origType, method,
+    pattern.initObjCMethod(subs, signature, origType, method,
                            Kind::PartialCurriedObjCMethodType, errorInfo);
     return pattern;
   }
@@ -802,13 +845,14 @@ private:
   /// and the partially-applied curried type is:
   ///   (CCTemperature) -> ()
   static AbstractionPattern
-  getPartialCurriedCFunctionAsMethod(CanGenericSignature signature,
+  getPartialCurriedCFunctionAsMethod(SubstitutionMap subs,
+                                     CanGenericSignature signature,
                                      CanType origType,
                                      const clang::Type *clangType,
                                      ImportAsMemberStatus memberStatus) {
     assert(isa<AnyFunctionType>(origType));
     AbstractionPattern pattern;
-    pattern.initCFunctionAsMethod(signature, origType, clangType,
+    pattern.initCFunctionAsMethod(subs, signature, origType, clangType,
                                   Kind::PartialCurriedCFunctionAsMethodType,
                                   memberStatus);
     return pattern;
@@ -823,12 +867,13 @@ private:
   /// then the partially-applied curried type is:
   ///   (Compartment, Temperature) -> ()
   static AbstractionPattern
-  getPartialCurriedCXXMethod(CanGenericSignature signature, CanType origType,
+  getPartialCurriedCXXMethod(SubstitutionMap subs,
+                             CanGenericSignature signature, CanType origType,
                              const clang::CXXMethodDecl *method,
                              ImportAsMemberStatus memberStatus) {
     assert(isa<AnyFunctionType>(origType));
     AbstractionPattern pattern;
-    pattern.initCXXMethod(signature, origType, method,
+    pattern.initCXXMethod(subs, signature, origType, method,
                           Kind::PartialCurriedCXXMethodType, memberStatus);
     return pattern;
   }
@@ -837,8 +882,8 @@ public:
   /// Return an abstraction pattern for the type of an Objective-C method.
   static AbstractionPattern
   getObjCMethod(CanType origType, const clang::ObjCMethodDecl *method,
-                const Optional<ForeignErrorConvention> &foreignError,
-                const Optional<ForeignAsyncConvention> &foreignAsync);
+                const std::optional<ForeignErrorConvention> &foreignError,
+                const std::optional<ForeignAsyncConvention> &foreignAsync);
 
 private:
   /// Return an abstraction pattern for the uncurried type of an
@@ -848,7 +893,8 @@ private:
                 EncodedForeignInfo errorInfo) {
     assert(isa<AnyFunctionType>(origType));
     AbstractionPattern pattern;
-    pattern.initObjCMethod(nullptr, origType, method, Kind::ObjCMethodType,
+    pattern.initObjCMethod(SubstitutionMap(), nullptr,
+                           origType, method, Kind::ObjCMethodType,
                            errorInfo);
     return pattern;
   }
@@ -877,6 +923,9 @@ public:
   bool hasCachingKey() const {
     // Only the simplest Kind::Type pattern has a caching key; we
     // don't want to try to unique by Clang node.
+    //
+    // Even if we support Clang nodes someday, we *cannot* cache
+    // by the open-coded patterns like Tuple.
     return getKind() == Kind::Type || getKind() == Kind::Opaque
         || getKind() == Kind::Discard;
   }
@@ -899,10 +948,9 @@ public:
     case Kind::Discard: {
       auto type = getType();
       if (isa<DependentMemberType>(type) ||
-          isa<GenericTypeParamType>(type)) {
-        return true;
-      }
-      if (isa<ArchetypeType>(type)) {
+          isa<GenericTypeParamType>(type) ||
+          isa<PackElementType>(type) ||
+          isa<ArchetypeType>(type)) {
         return true;
       }
       return false;
@@ -921,7 +969,8 @@ public:
     case Kind::Discard: {
       auto type = getType();
       if (isa<DependentMemberType>(type) ||
-          isa<GenericTypeParamType>(type)) {
+          isa<GenericTypeParamType>(type) ||
+          isa<PackElementType>(type)) {
         return true;
       }
       if (auto archetype = dyn_cast<ArchetypeType>(type)) {
@@ -941,19 +990,34 @@ public:
     case Kind::Type:
     case Kind::ClangType:
     case Kind::Discard: {
-      return getType()->isParameterPack();
+      auto ty = getType();
+      return isa<PackArchetypeType>(ty) || ty->isParameterPack();
     }
     default:
       return false;
     }
   }
-  
+
+  bool isPackExpansion() const {
+    switch (getKind()) {
+    case Kind::Type:
+    case Kind::Discard:
+      return isa<PackExpansionType>(getType());
+    default:
+      return false;
+    }
+  }
+
   /// Is this an interface type that is subject to a concrete
   /// same-type constraint?
   bool isConcreteType() const;
 
   bool requiresClass() const;
   LayoutConstraint getLayoutConstraint() const;
+  bool conformsToKnownProtocol(
+    CanType substTy, KnownProtocolKind protocolKind) const;
+  bool isNoncopyable(CanType substTy) const;
+  bool isEscapable(CanType substTy) const;
 
   /// Return the Swift type which provides structure for this
   /// abstraction pattern.
@@ -1032,6 +1096,18 @@ public:
     llvm_unreachable("bad kind");
   }
 
+  /// Add substitutions to this pattern.
+  AbstractionPattern withSubstitutions(SubstitutionMap subs) const {
+    AbstractionPattern result = *this;
+    if (subs) {
+      // If we have a generic signature, it should match the substitutions.
+      // But in corner cases, "match" can mean that it applies to an inner
+      // local generic context, which is not something we can easily assert.
+      result.GenericSubs = subs;
+    }
+    return result;
+  }
+
   /// Return whether this abstraction pattern contains foreign type
   /// information.
   ///
@@ -1104,6 +1180,10 @@ public:
     return CXXMethod;
   }
 
+  bool isOpaqueTuple() const {
+    return getKind() == Kind::Tuple;
+  }
+
   bool isOpaqueFunctionOrOpaqueDerivativeFunction() const {
     return (getKind() == Kind::OpaqueFunction ||
             getKind() == Kind::OpaqueDerivativeFunction);
@@ -1152,9 +1232,7 @@ public:
     case Kind::Invalid:
       llvm_unreachable("querying invalid abstraction pattern!");
     case Kind::Opaque:
-      return typename CanTypeWrapperTraits<TYPE>::type();
     case Kind::Tuple:
-      return typename CanTypeWrapperTraits<TYPE>::type();
     case Kind::OpaqueFunction:
     case Kind::OpaqueDerivativeFunction:
       return typename CanTypeWrapperTraits<TYPE>::type();
@@ -1210,8 +1288,9 @@ public:
   }
 
   /// Is the given tuple type a valid substitution of this abstraction
-  /// pattern?
-  bool matchesTuple(CanTupleType substType);
+  /// pattern?  Note that the type doesn't have to be a tuple type in the
+  /// case of a vanishing tuple.
+  bool matchesTuple(CanType substType) const;
 
   bool isTuple() const {
     switch (getKind()) {
@@ -1269,9 +1348,57 @@ public:
     llvm_unreachable("bad kind");
   }
 
+  bool doesTupleContainPackExpansionType() const;
+
+  /// If this type is a tuple type that vanishes (is flattened to its
+  /// singleton non-expansion element) under the stored substitutions,
+  /// return the abstraction pattern of the surviving element.
+  ///
+  /// If the surviving element came from an expansion element, the
+  /// returned element is the pattern type of the expansion.
+  std::optional<AbstractionPattern> getVanishingTupleElementPatternType() const;
+
+  /// Does this tuple type vanish, i.e. is it flattened to a singleton
+  /// non-expansion element under substitution?
+  bool doesTupleVanish() const;
+
+  static AbstractionPattern
+  projectTupleElementType(const AbstractionPattern *base, size_t index) {
+    return base->getTupleElementType(index);
+  }
+
+  IndexedViewRange<const AbstractionPattern *, AbstractionPattern,
+                   projectTupleElementType> getTupleElementTypes() const {
+    assert(isTuple());
+    return { { this, 0 }, { this, getNumTupleElements() } };
+  }
+
+  /// Perform a parallel visitation of the elements of a tuple type,
+  /// preserving structure about where pack expansions appear in the
+  /// original type and how many elements of the substituted type they
+  /// expand to.
+  ///
+  /// This pattern must be a tuple pattern.  The substituted type may be
+  /// a non-tuple only if this is a vanshing tuple pattern.
+  void forEachTupleElement(CanType substType,
+         llvm::function_ref<void(TupleElementGenerator &element)> fn) const;
+
+  /// Perform a parallel visitation of the elements of a tuple type,
+  /// expanding the elements of the type.  This preserves the structure
+  /// of the *substituted* tuple type: it will be called once per element
+  /// of the substituted type, in order.  The original element trappings
+  /// are also provided for convenience.
+  ///
+  /// This pattern must match the substituted type, but it may be an
+  /// opaque pattern.
+  void forEachExpandedTupleElement(CanType substType,
+      llvm::function_ref<void(AbstractionPattern origEltType,
+                              CanType substEltType,
+                              const TupleTypeElt &elt)> handleElement) const;
+
   /// Is the given pack type a valid substitution of this abstraction
   /// pattern?
-  bool matchesPack(CanPackType substType);
+  bool matchesPack(CanPackType substType) const;
 
   bool isPack() const {
     switch (getKind()) {
@@ -1327,6 +1454,26 @@ public:
     llvm_unreachable("bad kind");
   }
 
+  /// Perform a parallel visitation of the elements of a pack type,
+  /// preserving structure about where pack expansions appear in the
+  /// original type and how many elements of the substituted type they
+  /// expand to.
+  ///
+  /// This pattern must be a pack pattern.
+  void forEachPackElement(CanPackType substPackType,
+         llvm::function_ref<void(PackElementGenerator &element)> fn) const;
+
+  /// Perform a parallel visitation of the elements of a pack type,
+  /// expanding the elements of the type.  This preserves the structure
+  /// of the *substituted* pack type: it will be called once per element
+  /// of the substituted type, in order.
+  ///
+  /// This pattern must match the substituted type, but it may be an
+  /// opaque pattern.
+  void forEachExpandedPackElement(CanPackType substPackType,
+      llvm::function_ref<void(AbstractionPattern origEltType,
+                              CanType substEltType)> handleElement) const;
+
   /// Given that the value being abstracted is a move only type, return the
   /// abstraction pattern with the move only bit removed.
   AbstractionPattern removingMoveOnlyWrapper() const;
@@ -1339,29 +1486,119 @@ public:
   /// the abstraction pattern for an element type.
   AbstractionPattern getTupleElementType(unsigned index) const;
 
+  /// Given that the value being abstracted is a pack element type, return
+  /// the abstraction pattern for its pack type.
+  AbstractionPattern getPackElementPackType() const;
+
   /// Given that the value being abstracted is a pack type, return
   /// the abstraction pattern for an element type.
   AbstractionPattern getPackElementType(unsigned index) const;
 
-  /// Give that the value being abstracted is a pack expansion type, return the
-  /// underlying pattern type.
+  /// Given that the value being abstracted is a pack expansion type,
+  /// return the underlying pattern type.
   AbstractionPattern getPackExpansionPatternType() const;
 
-  /// Give that the value being abstracted is a pack expansion type, return the
-  /// underlying count type.
+  /// Given that the value being abstracted is a pack expansion type,
+  /// return the underlying count type.
   AbstractionPattern getPackExpansionCountType() const;
+
+  /// Given that the value being abstracted is a pack expansion type,
+  /// return the appropriate pattern type for the given expansion
+  /// component.
+  AbstractionPattern getPackExpansionComponentType(CanType substType) const;
+  AbstractionPattern getPackExpansionComponentType(bool isExpansion) const;
+
+  /// Given that the value being abstracted is a metatype type, return
+  /// the abstraction pattern for its instance type.
+  AbstractionPattern getMetatypeInstanceType() const;
+
+  /// Given that the value being abstracted is a dynamic self type, return
+  /// the abstraction pattern for its self type.
+  AbstractionPattern getDynamicSelfSelfType() const;
+
+  /// Given that the value being abstracted is a protocol composition
+  /// type, return the abstraction pattern for one of its member types.
+  AbstractionPattern getProtocolCompositionMemberType(unsigned i) const;
+
+  /// Given that the value being abstracted is a parameterized protocol
+  /// type, return the abstraction pattern for one of its argument types.
+  AbstractionPattern getParameterizedProtocolArgType(unsigned i) const;
 
   /// Given that the value being abstracted is a function, return the
   /// abstraction pattern for its result type.
   AbstractionPattern getFunctionResultType() const;
 
+  /// Given that the value being abstracted is a function, return the
+  /// abstraction pattern for its thrown error type.
+  std::optional<AbstractionPattern> getFunctionThrownErrorType() const;
+
+  /// Utility method to adjust a thrown error pattern and thrown error type
+  /// to account for some quirks in type lowering.
+  ///
+  /// When lowered with an opaque pattern,
+  ///
+  /// - () -> () becomes () -> (),
+  /// - () throws(any Error) -> () becomes () -> (@error any Error),
+  ///
+  /// *not* () -> (@error_indirect Never) or () -> (@error_indirect any Error).
+  std::optional<std::pair<AbstractionPattern, CanType>>
+  getFunctionThrownErrorType(CanAnyFunctionType substFnInterfaceType) const;
+
+  /// For the abstraction pattern produced by `getFunctionThrownErrorType()`,
+  /// produce the effective thrown error type to be used when we don't have
+  /// a substituted error type.
+  CanType getEffectiveThrownErrorType() const;
+
   /// Given that the value being abstracted is a function type, return
   /// the abstraction pattern for one of its parameter types.
   AbstractionPattern getFunctionParamType(unsigned index) const;
 
-  /// Given that the value being abstracted is a function type, return
-  /// the number of parameters.
+  /// Given that the value being abstracted is a function type, and that
+  /// this is not an opaque abstraction pattern, return the parameter flags
+  /// for one of its parameters.
+  ParameterTypeFlags getFunctionParamFlags(unsigned index) const;
+
+  /// Given that the value being abstracted is a function type, return whether
+  /// the indicated parameter should be treated as addressable, meaning
+  /// calls should preserve the in-memory address of the argument for as
+  /// long as any dependencies may live.
+  ///
+  /// This may be true either because the type is structurally addressable for
+  /// dependencies, or because it was explicitly marked as `@_addressable`
+  /// in its declaration.
+  bool isFunctionParamAddressable(unsigned index) const;
+  
+  ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const;
+
+  /// Given that the value being abstracted is a function type, and that
+  /// this is not an opaque abstraction pattern, return the number of
+  /// parameters in the pattern.
   unsigned getNumFunctionParams() const;
+
+  /// Traverses the parameters of a function, where this is the
+  /// abstraction pattern for the function (its "original type")
+  /// and the given parameters are the substituted formal parameters.
+  /// Calls the callback once for each parameter in the abstraction
+  /// pattern.
+  ///
+  /// If this is not a function pattern, calls handleScalar for each
+  /// parameter of the substituted function type.  Note that functions
+  /// with pack expansions cannot be legally abstracted this way; it
+  /// is not possible in Swift's ABI to support this without some sort
+  /// of dynamic argument-forwarding thunk.
+  void forEachFunctionParam(AnyFunctionType::CanParamArrayRef substParams,
+                            bool ignoreFinalParam,
+    llvm::function_ref<void(FunctionParamGenerator &param)> function) const;
+
+  /// Return the start index of the given formal parameter in the lowered
+  /// parameter sequence corresponding to a function with this abstraction
+  /// pattern.
+  unsigned getLoweredParamIndex(unsigned formalIndex) const;
+
+  /// If this abstraction pattern is recursively expanded and flattened
+  /// in the normal way for parameters and results, how many values does
+  /// it correspond to?
+  unsigned getFlattenedValueCount() const;
 
   /// Given that the value being abstracted is optional, return the
   /// abstraction pattern for its object type.
@@ -1394,13 +1631,22 @@ public:
   AbstractionPattern getObjCMethodAsyncCompletionHandlerType(
                                      CanType swiftCompletionHandlerType) const;
 
+  /// Given that this is a pack expansion, return the number of components
+  /// that it should expand to.  This, and the general correctness of
+  /// traversing variadically generic tuple and function types under
+  /// substitution, relies on substitutions having been  set properly
+  /// on the abstraction pattern; without that, AbstractionPattern assumes
+  /// that every component expands to a single pack expansion component,
+  /// which will generally only work in specific situations.
+  size_t getNumPackExpandedComponents() const;
+
   /// If this pattern refers to a foreign ObjC method that was imported as 
   /// async, return the bridged-back-to-ObjC completion handler type.
   CanType getObjCMethodAsyncCompletionHandlerForeignType(
       ForeignAsyncConvention convention,
       Lowering::TypeConverter &TC
   ) const;
-  
+
   /// How values are passed or returned according to this abstraction pattern.
   enum CallingConventionKind {
     // Value is passed or returned directly as a unit.
@@ -1415,15 +1661,19 @@ public:
   /// Given that this is a pack expansion, do the pack elements need to be
   /// passed indirectly?
   bool arePackElementsPassedIndirectly(TypeConverter &TC) const;
-  
+
   /// If this abstraction pattern appears in function return position, how is
   /// the corresponding value returned?
   CallingConventionKind getResultConvention(TypeConverter &TC) const;
-  
+
   /// If this abstraction pattern appears in function parameter position, how
   /// is the corresponding value passed?
   CallingConventionKind getParameterConvention(TypeConverter &TC) const;
-  
+
+  /// If this abstraction pattern appears in function thrown error position, how
+  /// is the corresponding value passed?
+  CallingConventionKind getErrorConvention(TypeConverter &TC) const;
+
   /// Generate the abstraction pattern for lowering the substituted SIL
   /// function type for a function type matching this abstraction pattern.
   ///
@@ -1449,7 +1699,8 @@ public:
   getSubstFunctionTypePattern(CanAnyFunctionType substType,
                               TypeConverter &TC,
                               AbstractionPattern coroutineYieldOrigType,
-                              CanType coroutineYieldSubstType) const;
+                              CanType coroutineYieldSubstType,
+                              bool &unimplementable) const;
   
   void dump() const LLVM_ATTRIBUTE_USED;
   void print(raw_ostream &OS) const;

@@ -107,7 +107,7 @@ func testClassInGenericFunc<T>(t: T) {
   class A { init(t: T) {} } // expected-error {{type 'A' cannot be nested in generic function 'testClassInGenericFunc(t:)'}}
   class B : A {} // expected-error {{type 'B' cannot be nested in generic function 'testClassInGenericFunc(t:)'}}
 
-  _ = B(t: t)
+  _ = B(t: t) // expected-error {{'B' cannot be constructed because it has no accessible initializers}}
 }
 
 

@@ -1,30 +1,25 @@
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t 
+// RUN: %batch-code-completion
 // REQUIRES: concurrency
 
 // SAFE_NOTREC: Begin completions, 2 items
 // SAFE_NOTREC-DAG: Keyword[self]/CurrNominal:          self[#SafelyIsolatedCls#];
-// SAFE_NOTREC-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: method()[' async'][#Void#];
-// SAFE_NOTREC: End completions
+// SAFE_NOTREC-DAG: Decl[InstanceMethod]/CurrNominal: method()[' async'][#Void#];
 
 // UNSAFE_NOTREC: Begin completions, 2 items
 // UNSAFE_NOTREC-DAG: Keyword[self]/CurrNominal:          self[#UnsafelyIsolatedCls#];
-// UNSAFE_NOTREC-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: method()[' async'][#Void#];
-// UNSAFE_NOTREC: End completions
+// UNSAFE_NOTREC-DAG: Decl[InstanceMethod]/CurrNominal: method()[' async'][#Void#];
 
 // SAFE_OK: Begin completions, 2 items
 // SAFE_OK-DAG: Keyword[self]/CurrNominal:          self[#SafelyIsolatedCls#];
 // SAFE_OK-DAG: Decl[InstanceMethod]/CurrNominal:   method()[' async'][#Void#];
-// SAFE_OK: End completions
 
 // UNSAFE_OK: Begin completions, 2 items
 // UNSAFE_OK-DAG: Keyword[self]/CurrNominal:          self[#UnsafelyIsolatedCls#];
 // UNSAFE_OK-DAG: Decl[InstanceMethod]/CurrNominal:   method()[' async'][#Void#];
-// UNSAFE_OK: End completions
 
 // UNSAFE_OK_SYNC: Begin completions, 2 items
 // UNSAFE_OK_SYNC-DAG: Keyword[self]/CurrNominal:          self[#UnsafelyIsolatedCls#];
 // UNSAFE_OK_SYNC-DAG: Decl[InstanceMethod]/CurrNominal:   method()[#Void#];
-// UNSAFE_OK_SYNC: End completions
 
 @globalActor
 actor MyGlobalActor {

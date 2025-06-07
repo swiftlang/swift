@@ -6,12 +6,13 @@ sil_stage canonical
 
 import Builtin
 
-// CHECK-LABEL: define swiftcc %swift.refcounted* @move_value_test(
+// CHECK-LABEL: define swiftcc ptr @move_value_test(
 // CHECK-NEXT: entry:
 // CHECK-NEXT: ret
 // CHECK-NEXT: }
-sil @move_value_test : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
-bb0(%0 : $Builtin.NativeObject):
+sil [ossa] @move_value_test : $@convention(thin) (@owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : @owned $Builtin.NativeObject):
   %1 = move_value %0 : $Builtin.NativeObject
   return %1 : $Builtin.NativeObject
 }
+

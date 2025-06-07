@@ -1,0 +1,142 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -onone-simplification -simplify-instruction=checked_cast_addr_br | %FileCheck %s
+
+
+// REQUIRES: swift_in_compiler
+
+import Swift
+import Builtin
+
+class X {}
+class D: X {}
+
+struct S {
+  var x: X
+}
+
+// CHECK-LABEL: sil @same_type_take_always
+// CHECK:         copy_addr [take] %1 to [init] %0 : $*X
+// CHECK-NEXT:    br bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    tuple
+// CHECK-NEXT:    return
+// CHECK-NOT:   bb2:
+// CHECK:       } // end sil function 'same_type_take_always'
+sil @same_type_take_always : $@convention(thin) (@in X) -> @out X {
+bb0(%0 : $*X, %1 : $*X):
+  checked_cast_addr_br take_always X in %1 : $*X to X in %0 : $*X, bb1, bb2
+bb1:
+  %r = tuple()
+  return %r : $()
+bb2:
+  unreachable
+}
+
+// CHECK-LABEL: sil @same_type_take_on_success
+// CHECK:         copy_addr [take] %1 to [init] %0 : $*X
+// CHECK-NEXT:    br bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    tuple
+// CHECK-NEXT:    return
+// CHECK-NOT:   bb2:
+// CHECK:       } // end sil function 'same_type_take_on_success'
+sil @same_type_take_on_success : $@convention(thin) (@in X) -> @out X {
+bb0(%0 : $*X, %1 : $*X):
+  checked_cast_addr_br take_on_success X in %1 : $*X to X in %0 : $*X, bb1, bb2
+bb1:
+  %r = tuple()
+  return %r : $()
+bb2:
+  unreachable
+}
+
+// CHECK-LABEL: sil @same_type_copy_on_success
+// CHECK:         copy_addr %1 to [init] %0 : $*X
+// CHECK-NEXT:    br bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    tuple
+// CHECK-NEXT:    return
+// CHECK-NOT:   bb2:
+// CHECK:       } // end sil function 'same_type_copy_on_success'
+sil @same_type_copy_on_success : $@convention(thin) (@in X) -> @out X {
+bb0(%0 : $*X, %1 : $*X):
+  checked_cast_addr_br copy_on_success X in %1 : $*X to X in %0 : $*X, bb1, bb2
+bb1:
+  %r = tuple()
+  return %r : $()
+bb2:
+  unreachable
+}
+
+// CHECK-LABEL: sil @fail_with_take_always
+// CHECK:       bb0(%0 : $*S, %1 : $*String):
+// CHECK-NEXT:    destroy_addr %1 : $*String
+// CHECK-NEXT:    br bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    unreachable
+// CHECK:       } // end sil function 'fail_with_take_always'
+sil @fail_with_take_always : $@convention(thin) (@in String) -> @out S {
+bb0(%0 : $*S, %1 : $*String):
+  checked_cast_addr_br take_always String in %1 : $*String to S in %0 : $*S, bb1, bb2
+bb1:
+  %r = tuple()
+  return %r : $()
+bb2:
+  unreachable
+}
+
+// CHECK-LABEL: sil @fail_with_take_on_success
+// CHECK:       bb0(%0 : $*S, %1 : $*String):
+// CHECK-NEXT:    br bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    unreachable
+// CHECK:       } // end sil function 'fail_with_take_on_success'
+sil @fail_with_take_on_success : $@convention(thin) (@in String) -> @out S {
+bb0(%0 : $*S, %1 : $*String):
+  checked_cast_addr_br take_on_success String in %1 : $*String to S in %0 : $*S, bb1, bb2
+bb1:
+  %r = tuple()
+  return %r : $()
+bb2:
+  unreachable
+}
+
+// CHECK-LABEL: sil @fail_with_copy_on_success
+// CHECK:       bb0(%0 : $*S, %1 : $*String):
+// CHECK-NEXT:    br bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    unreachable
+// CHECK:       } // end sil function 'fail_with_copy_on_success'
+sil @fail_with_copy_on_success : $@convention(thin) (@in String) -> @out S {
+bb0(%0 : $*S, %1 : $*String):
+  checked_cast_addr_br copy_on_success String in %1 : $*String to S in %0 : $*S, bb1, bb2
+bb1:
+  %r = tuple()
+  return %r : $()
+bb2:
+  unreachable
+}
+
+// CHECK-LABEL: sil @unknown_result
+// CHECK:         checked_cast_addr_br
+// CHECK:       } // end sil function 'unknown_result'
+sil @unknown_result : $@convention(thin) (@in X) -> @out D {
+bb0(%0 : $*D, %1 : $*X):
+  checked_cast_addr_br copy_on_success X in %1 : $*X to D in %0 : $*D, bb1, bb2
+bb1:
+  %r = tuple()
+  return %r : $()
+bb2:
+  unreachable
+}
+
+// Check that we don't crash on this
+sil @success_but_different_operand_type : $@convention(thin) (@in D) -> @out X {
+bb0(%0 : $*X, %1 : $*D):
+  checked_cast_addr_br copy_on_success D in %1 : $*D to X in %0 : $*X, bb1, bb2
+bb1:
+  %r = tuple()
+  return %r : $()
+bb2:
+  unreachable
+}
+

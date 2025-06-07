@@ -1,0 +1,127 @@
+//===--- TypeAttr.def - Swift Attributes Metaprogramming --------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines macros used for macro-metaprogramming with type attributes.
+//
+//===----------------------------------------------------------------------===//
+
+// A type attribute that is both a simple type attribute and a
+// SIL type attribute (see below).  Delegates to SIL_TYPE_ATTR if that
+// is set and SIMPLE_TYPE_ATTR is not; otherwise delegates to SIMPLE_TYPE_ATTR.
+#ifndef SIMPLE_SIL_TYPE_ATTR
+#ifdef SIL_TYPE_ATTR
+#ifdef SIMPLE_TYPE_ATTR
+#error ambiguous delegation, must set SIMPLE_SIL_TYPE_ATTR explicitly
+#else
+#define SIMPLE_SIL_TYPE_ATTR(SPELLING, CLASS) SIL_TYPE_ATTR(SPELLING, CLASS)
+#endif
+#else
+#define SIMPLE_SIL_TYPE_ATTR(SPELLING, CLASS) SIMPLE_TYPE_ATTR(SPELLING, CLASS)
+#endif
+#endif
+
+// Any kind of type attribute.
+#ifndef TYPE_ATTR
+#define TYPE_ATTR(SPELLING, CLASS)
+#endif
+
+// A type attribute that is only valid in SIL mode.  Usually this means
+// that it's only valid in lowered types, but sometimes SIL files
+// also allow things in formal types that aren't normally expressible.
+#ifndef SIL_TYPE_ATTR
+#define SIL_TYPE_ATTR(SPELLING, CLASS) TYPE_ATTR(SPELLING, CLASS)
+#endif
+
+// A type attribute that's always just spelled `@identifier` in source.
+#ifndef SIMPLE_TYPE_ATTR
+#define SIMPLE_TYPE_ATTR(SPELLING, CLASS) TYPE_ATTR(SPELLING, CLASS)
+#endif
+
+#ifndef LAST_TYPE_ATTR
+#define LAST_TYPE_ATTR(CLASS)
+#endif
+
+// Type attributes
+SIMPLE_TYPE_ATTR(autoclosure, Autoclosure)
+TYPE_ATTR(convention, Convention)
+SIMPLE_TYPE_ATTR(escaping, Escaping)
+TYPE_ATTR(differentiable, Differentiable)
+SIMPLE_TYPE_ATTR(noDerivative, NoDerivative)
+SIMPLE_TYPE_ATTR(Sendable, Sendable)
+SIMPLE_TYPE_ATTR(retroactive, Retroactive)
+SIMPLE_TYPE_ATTR(unchecked, Unchecked)
+SIMPLE_TYPE_ATTR(preconcurrency, Preconcurrency)
+SIMPLE_TYPE_ATTR(unsafe, Unsafe)
+SIMPLE_TYPE_ATTR(_local, Local)
+SIMPLE_TYPE_ATTR(_noMetadata, NoMetadata)
+TYPE_ATTR(_opaqueReturnTypeOf, OpaqueReturnTypeOf)
+TYPE_ATTR(isolated, Isolated)
+SIMPLE_TYPE_ATTR(nonisolated, Nonisolated)
+SIMPLE_TYPE_ATTR(_addressable, Addressable)
+SIMPLE_TYPE_ATTR(concurrent, Concurrent)
+
+// SIL-specific attributes
+SIMPLE_SIL_TYPE_ATTR(async, Async)
+SIMPLE_SIL_TYPE_ATTR(block_storage, BlockStorage)
+SIMPLE_SIL_TYPE_ATTR(box, Box)
+SIMPLE_SIL_TYPE_ATTR(dynamic_self, DynamicSelf)
+#define REF_STORAGE(Name, name, ...) SIMPLE_SIL_TYPE_ATTR(sil_##name, SIL##Name)
+#include "swift/AST/ReferenceStorage.def"
+SIMPLE_SIL_TYPE_ATTR(error, Error)
+SIMPLE_SIL_TYPE_ATTR(error_indirect, ErrorIndirect)
+SIMPLE_SIL_TYPE_ATTR(error_unowned, ErrorUnowned)
+SIMPLE_SIL_TYPE_ATTR(out, Out)
+SIMPLE_SIL_TYPE_ATTR(direct, Direct)
+SIMPLE_SIL_TYPE_ATTR(in, In)
+SIMPLE_SIL_TYPE_ATTR(inout, Inout)
+SIMPLE_SIL_TYPE_ATTR(inout_aliasable, InoutAliasable)
+SIMPLE_SIL_TYPE_ATTR(in_guaranteed, InGuaranteed)
+SIMPLE_SIL_TYPE_ATTR(in_cxx, InCXX)
+SIMPLE_SIL_TYPE_ATTR(in_constant, InConstant)
+SIMPLE_SIL_TYPE_ATTR(noescape, NoEscape)
+SIMPLE_SIL_TYPE_ATTR(pack_owned, PackOwned)
+SIMPLE_SIL_TYPE_ATTR(pack_guaranteed, PackGuaranteed)
+SIMPLE_SIL_TYPE_ATTR(pack_inout, PackInout)
+SIMPLE_SIL_TYPE_ATTR(pack_out, PackOut)
+SIMPLE_SIL_TYPE_ATTR(owned, Owned)
+SIMPLE_SIL_TYPE_ATTR(unowned_inner_pointer, UnownedInnerPointer)
+SIMPLE_SIL_TYPE_ATTR(guaranteed, Guaranteed)
+SIMPLE_SIL_TYPE_ATTR(autoreleased, Autoreleased)
+SIMPLE_SIL_TYPE_ATTR(callee_owned, CalleeOwned)
+SIMPLE_SIL_TYPE_ATTR(callee_guaranteed, CalleeGuaranteed)
+SIMPLE_SIL_TYPE_ATTR(objc_metatype, ObjCMetatype)
+SIL_TYPE_ATTR(opened, Opened)
+SIL_TYPE_ATTR(pack_element, PackElement)
+SIMPLE_SIL_TYPE_ATTR(pseudogeneric, Pseudogeneric)
+SIMPLE_SIL_TYPE_ATTR(unimplementable, Unimplementable)
+SIMPLE_SIL_TYPE_ATTR(yields, Yields)
+SIMPLE_SIL_TYPE_ATTR(yield_once, YieldOnce)
+SIMPLE_SIL_TYPE_ATTR(yield_once_2, YieldOnce2)
+SIMPLE_SIL_TYPE_ATTR(yield_many, YieldMany)
+SIMPLE_SIL_TYPE_ATTR(captures_generics, CapturesGenerics)
+// Used at the SIL level to mark a type as moveOnly.
+SIMPLE_SIL_TYPE_ATTR(moveOnly, MoveOnly)
+SIMPLE_SIL_TYPE_ATTR(sil_isolated, SILIsolated)
+SIMPLE_SIL_TYPE_ATTR(sil_sending, SILSending)
+SIMPLE_SIL_TYPE_ATTR(sil_implicit_leading_param, SILImplicitLeadingParam)
+
+// SIL metatype attributes.
+SIMPLE_SIL_TYPE_ATTR(thin, Thin)
+SIMPLE_SIL_TYPE_ATTR(thick, Thick)
+
+LAST_TYPE_ATTR(Thick)
+
+#undef SIMPLE_SIL_TYPE_ATTR
+#undef SIMPLE_TYPE_ATTR
+#undef SIL_TYPE_ATTR
+#undef TYPE_ATTR
+#undef LAST_TYPE_ATTR

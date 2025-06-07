@@ -41,7 +41,6 @@ func testChains() {
 // UNRESOLVED_CHAIN_1-DAG: Decl[InstanceVar]/CurrNominal:      chainEnum[#ChainEnum#];
 // UNRESOLVED_CHAIN_1-DAG: Decl[InstanceVar]/CurrNominal:      chainStruct2[#ChainStruct2#];
 // UNRESOLVED_CHAIN_1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: chainStruct1Func()[#ChainStruct1#];
-// UNRESOLVED_CHAIN_1: End completions
 
 // UNRESOLVED_CHAIN_2: Begin completions, 5 items
 // UNRESOLVED_CHAIN_2-DAG: Keyword[self]/CurrNominal:          self[#ChainEnum#]; name=self
@@ -49,14 +48,12 @@ func testChains() {
 // UNRESOLVED_CHAIN_2-DAG: Decl[InstanceMethod]/CurrNominal:   chainStruct2Func()[#ChainStruct2#]; name=chainStruct2Func()
 // UNRESOLVED_CHAIN_2-DAG: Decl[InstanceVar]/CurrNominal:      hashValue[#Int#]; name=hashValue
 // UNRESOLVED_CHAIN_2-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#into: &Hasher#})[#Void#]; name=hash(into:)
-// UNRESOLVED_CHAIN_2: End completions
 
 // UNRESOLVED_CHAIN_3: Begin completions, 5 items
 // UNRESOLVED_CHAIN_3-DAG: Decl[InstanceVar]/CurrNominal:      chainStruct1[#ChainStruct1#]; name=chainStruct1
 // UNRESOLVED_CHAIN_3-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]: chainEnum[#ChainEnum#]; name=chainEnum
 // UNRESOLVED_CHAIN_3-DAG: Decl[InstanceVar]/CurrNominal:      chainStruct2[#ChainStruct2#]; name=chainStruct2
 // UNRESOLVED_CHAIN_3-DAG: Decl[InstanceMethod]/CurrNominal:   chainStruct1Func()[#ChainStruct1#]; name=chainStruct1Func()
-// UNRESOLVED_CHAIN_3: End completions
 
 class Outer {
   class Inner: Outer {
@@ -81,5 +78,4 @@ func testDoublyNestedType() {
 // DOUBLY_NESTED-DAG: Decl[StaticMethod]/CurrNominal/TypeRelation[Convertible]: makeInner()[#Outer.Inner#];
 // DOUBLY_NESTED-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init()[#Outer.Inner#];
 // DOUBLY_NESTED-DAG: Decl[Class]/Super/TypeRelation[Convertible]: Inner[#Outer.Inner#];
-// DOUBLY_NESTED: End completions
 

@@ -43,48 +43,42 @@ protected:
   TypeBase *Type = nullptr;
   /// Needed to determine the size of basic types and to determine
   /// the storage type for undefined variables.
-  llvm::Type *FragmentStorageType = nullptr;
-  Optional<Size::int_type> SizeInBits;
+  std::optional<uint32_t> NumExtraInhabitants;
   Alignment Align;
   bool DefaultAlignment = true;
   bool IsMetadataType = false;
-  bool SizeIsFragmentSize = false;
   bool IsFixedBuffer = false;
+  bool IsForwardDecl = false;
 
 public:
   DebugTypeInfo() = default;
-  DebugTypeInfo(swift::Type Ty, llvm::Type *StorageTy = nullptr,
-                Optional<Size::int_type> SizeInBits = {},
-                Alignment AlignInBytes = Alignment(1),
+  DebugTypeInfo(swift::Type Ty, Alignment AlignInBytes = Alignment(1),
                 bool HasDefaultAlignment = true, bool IsMetadataType = false,
-                bool IsFragmentTypeInfo = false, bool IsFixedBuffer = false);
+                bool IsFixedBuffer = false,
+                std::optional<uint32_t> NumExtraInhabitants = {});
 
   /// Create type for a local variable.
   static DebugTypeInfo getLocalVariable(VarDecl *Decl, swift::Type Ty,
-                                        const TypeInfo &Info,
-                                        bool IsFragmentTypeInfo);
+                                        const TypeInfo &Info, IRGenModule &IGM);
   /// Create type for global type metadata.
-  static DebugTypeInfo getGlobalMetadata(swift::Type Ty, llvm::Type *StorageTy,
-                                         Size size, Alignment align);
+  static DebugTypeInfo getGlobalMetadata(swift::Type Ty, Size size,
+                                         Alignment align);
   /// Create type for an artificial metadata variable.
-  static DebugTypeInfo getTypeMetadata(swift::Type Ty, llvm::Type *StorageTy,
-                                       Size size, Alignment align);
+  static DebugTypeInfo getTypeMetadata(swift::Type Ty, Size size,
+                                       Alignment align);
 
   /// Create a forward declaration for a type whose size is unknown.
   static DebugTypeInfo getForwardDecl(swift::Type Ty);
 
   /// Create a standalone type from a TypeInfo object.
   static DebugTypeInfo getFromTypeInfo(swift::Type Ty, const TypeInfo &Info,
-                                       bool IsFragmentTypeInfo);
+                                       IRGenModule &IGM);
   /// Global variables.
-  static DebugTypeInfo getGlobal(SILGlobalVariable *GV,
-                                 llvm::Type *StorageType, IRGenModule &IGM);
+  static DebugTypeInfo getGlobal(SILGlobalVariable *GV, IRGenModule &IGM);
   static DebugTypeInfo getGlobalFixedBuffer(SILGlobalVariable *GV,
-                                            llvm::Type *StorageType,
-                                            Size SizeInBytes, Alignment align);
+                                            Alignment align, IRGenModule &IGM);
   /// ObjC classes.
-  static DebugTypeInfo getObjCClass(ClassDecl *theClass,
-                                    llvm::Type *StorageType, Size size,
+  static DebugTypeInfo getObjCClass(ClassDecl *theClass, Size size,
                                     Alignment align);
   /// Error type.
   static DebugTypeInfo getErrorResult(swift::Type Ty, IRGenModule &IGM);
@@ -102,23 +96,15 @@ public:
     return false;
   }
 
-  llvm::Type *getFragmentStorageType() const {
-    if (SizeInBits && *SizeInBits == 0)
-      assert(FragmentStorageType && "only defined types may have a size");
-    return FragmentStorageType;
-  }
-  Optional<Size::int_type> getTypeSizeInBits() const {
-    return SizeIsFragmentSize ? llvm::None : SizeInBits;
-  }
-  Optional<Size::int_type> getRawSizeInBits() const { return SizeInBits; }
-  void setSizeInBits(Size::int_type NewSize) { SizeInBits = NewSize; }
   Alignment getAlignment() const { return Align; }
-  bool isNull() const { return Type == nullptr; }
-  bool isForwardDecl() const { return FragmentStorageType == nullptr; }
+  bool isNull() const { return !Type; }
   bool isMetadataType() const { return IsMetadataType; }
   bool hasDefaultAlignment() const { return DefaultAlignment; }
-  bool isSizeFragmentSize() const { return SizeIsFragmentSize; }
   bool isFixedBuffer() const { return IsFixedBuffer; }
+  bool isForwardDecl() const { return IsForwardDecl; }
+  std::optional<uint32_t> getNumExtraInhabitants() const {
+    return NumExtraInhabitants;
+  }
 
   bool operator==(DebugTypeInfo T) const;
   bool operator!=(DebugTypeInfo T) const;
@@ -129,22 +115,24 @@ public:
 
 /// A DebugTypeInfo with a defined size (that may be 0).
 class CompletedDebugTypeInfo : public DebugTypeInfo {
-  CompletedDebugTypeInfo(DebugTypeInfo DbgTy) : DebugTypeInfo(DbgTy) {}
+  Size::int_type SizeInBits;
+
+  CompletedDebugTypeInfo(DebugTypeInfo DbgTy, Size::int_type SizeInBits)
+    : DebugTypeInfo(DbgTy), SizeInBits(SizeInBits) {}
 
 public:
-  static Optional<CompletedDebugTypeInfo> get(DebugTypeInfo DbgTy) {
-    if (!DbgTy.getRawSizeInBits() || DbgTy.isSizeFragmentSize())
+  static std::optional<CompletedDebugTypeInfo>
+  get(DebugTypeInfo DbgTy, std::optional<Size::int_type> SizeInBits) {
+    if (!SizeInBits)
       return {};
-    return CompletedDebugTypeInfo(DbgTy);
+    return CompletedDebugTypeInfo(DbgTy, *SizeInBits);
   }
 
-  static Optional<CompletedDebugTypeInfo>
-  getFromTypeInfo(swift::Type Ty, const TypeInfo &Info) {
-    return CompletedDebugTypeInfo::get(
-        DebugTypeInfo::getFromTypeInfo(Ty, Info, /*IsFragment*/ false));
-  }
+  static std::optional<CompletedDebugTypeInfo>
+  getFromTypeInfo(swift::Type Ty, const TypeInfo &Info, IRGenModule &IGM,
+                  std::optional<Size::int_type> SizeInBits = {});
 
-  Size::int_type getSizeInBits() const { return *SizeInBits; }
+  Size::int_type getSizeInBits() const { return SizeInBits; }
 };
 
 }
@@ -159,8 +147,8 @@ template <> struct DenseMapInfo<swift::irgen::DebugTypeInfo> {
   }
   static swift::irgen::DebugTypeInfo getTombstoneKey() {
     return swift::irgen::DebugTypeInfo(
-        llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey(), nullptr, 0,
-        swift::irgen::Alignment(), false, false, false);
+        llvm::DenseMapInfo<swift::TypeBase *>::getTombstoneKey(),
+        swift::irgen::Alignment(), /* HasDefaultAlignment = */ false);
   }
   static unsigned getHashValue(swift::irgen::DebugTypeInfo Val) {
     return DenseMapInfo<swift::CanType>::getHashValue(Val.getType());

@@ -53,6 +53,7 @@ public:
     hasAccessModifier = isKeywordSpecified("private") ||
                         isKeywordSpecified("fileprivate") ||
                         isKeywordSpecified("internal") ||
+                        isKeywordSpecified("package") ||
                         isKeywordSpecified("public") ||
                         isKeywordSpecified("open");
     hasOverride = isKeywordSpecified("override");

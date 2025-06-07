@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swiftc_driver  -Xfrontend -disable-availability-checking %s -o %t/out
+// RUN: %target-swiftc_driver  -target %target-swift-5.1-abi-triple %s -o %t/out
 // RUN: %target-codesign %t/out
 // RUN: %target-run %t/out
 

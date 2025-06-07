@@ -37,3 +37,11 @@ var rhsBool = LoadableBoolWrapper(value: false)
 
 let resultAmpAmp = lhsBool && rhsBool
 let resultPipePipe = lhsBool && rhsBool
+
+let lhsRValue = RValueArithmetic(value: 123)
+let rhsRValue = RValueArithmetic(value: 146)
+let resultRValue = lhsRValue + rhsRValue // expected-error {{binary operator '+' cannot be applied to two 'RValueArithmetic' operands}}
+
+let lhsLRValue = LValueAndRValueArithmetic(value: 123)
+let rhsLRValue = LValueAndRValueArithmetic(value: 146)
+let resultLRValue = lhsLRValue + rhsLRValue

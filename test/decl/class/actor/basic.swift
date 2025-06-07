@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift  -disable-availability-checking
+// RUN: %target-typecheck-verify-swift  -target %target-swift-5.1-abi-triple
 
 // REQUIRES: concurrency
 
@@ -7,7 +7,7 @@ actor MyActor { }
 class MyActorSubclass1: MyActor { }
 // expected-error@-1{{actor types do not support inheritance}}
 // expected-error@-2{{type 'MyActorSubclass1' cannot conform to the 'Actor' protocol}}
-// expected-error@-3{{non-actor type 'MyActorSubclass1' cannot conform to the 'AnyActor' protocol}}
+// expected-warning@-3 {{non-final class 'MyActorSubclass1' cannot conform to 'Sendable'; use '@unchecked Sendable'; this is an error in the Swift 6 language mode}}
 
 actor MyActorSubclass2: MyActor { } // expected-error{{actor types do not support inheritance}}
 

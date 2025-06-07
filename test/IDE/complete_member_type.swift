@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
+// RUN: %batch-code-completion
 
 class A {
   typealias T = Int
@@ -23,22 +23,19 @@ func foo() {
 // MEMBER_INHERITED-NEXT: Decl[TypeAlias]/CurrNominal:        T[#String#]; name=T
 // MEMBER_INHERITED-NEXT: Decl[Struct]/CurrNominal:           E[#B.E#]; name=E
 // MEMBER_INHERITED-NEXT: Decl[Constructor]/CurrNominal:      init()[#B#]; name=init()
-// MEMBER_INHERITED-NEXT: End completions
 
 do {
   let _: Any.#^MEMBER_ANY_DOT^#
 
   // MEMBER_ANY_DOT-LABEL: Begin completions, 2 items
-  // MEMBER_ANY_DOT-NEXT: Keyword/None: Protocol[#Any.Protocol#]; name=Protocol
-  // MEMBER_ANY_DOT-NEXT: Keyword/None: Type[#Any.Type#]; name=Type
-  // MEMBER_ANY_DOT-NEXT: End completions
+  // MEMBER_ANY_DOT-NEXT: Keyword/None: Protocol[#(any Any).Type#]; name=Protocol
+  // MEMBER_ANY_DOT-NEXT: Keyword/None: Type[#any Any.Type#]; name=Type
 
   let _: Any#^MEMBER_ANY_NO_DOT^#
 
   // MEMBER_ANY_NO_DOT-LABEL: Begin completions, 2 items
-  // MEMBER_ANY_NO_DOT-NEXT: Keyword/None: .Protocol[#Any.Protocol#]; name=Protocol
-  // MEMBER_ANY_NO_DOT-NEXT: Keyword/None: .Type[#Any.Type#]; name=Type
-  // MEMBER_ANY_NO_DOT-NEXT: End completions
+  // MEMBER_ANY_NO_DOT-NEXT: Keyword/None: .Protocol[#(any Any).Type#]; name=Protocol
+  // MEMBER_ANY_NO_DOT-NEXT: Keyword/None: .Type[#any Any.Type#]; name=Type
 }
 
 do {
@@ -52,7 +49,6 @@ do {
   // MEMBER_DOT-LABEL: Begin completions, 2 items
   // MEMBER_DOT-NEXT: Decl[Struct]/CurrNominal: Nested[#S.Nested#]; name=Nested
   // MEMBER_DOT-NEXT: Keyword/None: Type[#{{\(?}}S{{\)?}}.Type#]; name=Type
-  // MEMBER_DOT-NEXT: End completions
 
   let _: (S)#^MEMBER_PAREN_NO_DOT^#
 
@@ -60,8 +56,7 @@ do {
   // MEMBER_PAREN_NO_DOT-NEXT: Keyword/None: async; name=async
   // MEMBER_PAREN_NO_DOT-NEXT: Keyword[throws]/None: throws; name=throws
   // MEMBER_PAREN_NO_DOT-NEXT: Decl[Struct]/CurrNominal: .Nested[#S.Nested#]; name=Nested
-  // MEMBER_PAREN_NO_DOT-NEXT: Keyword/None: .Type[#(S).Type#]; name=Type
-  // MEMBER_PAREN_NO_DOT-NEXT: End completions
+  // MEMBER_PAREN_NO_DOT-NEXT: Keyword/None: .Type[#S.Type#]; name=Type
 }
 
 do {
@@ -69,25 +64,21 @@ do {
 
   // MEMBER_META_DOT-LABEL: Begin completions, 1 items
   // MEMBER_META_DOT-NEXT: Keyword/None: Type[#Int.Type.Type#]; name=Type
-  // MEMBER_META_DOT-NEXT: End completions
 
   let _: Int.Type#^MEMBER_META_NO_DOT^#
 
   // MEMBER_META_NO_DOT-LABEL: Begin completions, 1 items
   // MEMBER_META_NO_DOT-NEXT: Keyword/None: .Type[#Int.Type.Type#]; name=Type
-  // MEMBER_META_NO_DOT-NEXT: End completions
 
   let _: Sequence.Protocol.#^MEMBER_PROTOCOL_META_DOT^#
 
   // MEMBER_PROTOCOL_META_DOT-LABEL: Begin completions, 1 items
-  // MEMBER_PROTOCOL_META_DOT-NEXT: Keyword/None: Type[#Sequence.Protocol.Type#]; name=Type
-  // MEMBER_PROTOCOL_META_DOT-NEXT: End completions
+  // MEMBER_PROTOCOL_META_DOT-NEXT: Keyword/None: Type[#(any Sequence).Type.Type#]; name=Type
 
   let _: Sequence.Protocol#^MEMBER_PROTOCOL_META_NO_DOT^#
 
   // MEMBER_PROTOCOL_META_NO_DOT-LABEL: Begin completions, 1 items
-  // MEMBER_PROTOCOL_META_NO_DOT-NEXT: Keyword/None: .Type[#Sequence.Protocol.Type#]; name=Type
-  // MEMBER_PROTOCOL_META_NO_DOT-NEXT: End completions
+  // MEMBER_PROTOCOL_META_NO_DOT-NEXT: Keyword/None: .Type[#(any Sequence).Type.Type#]; name=Type
 }
 
 extension Optional {
@@ -99,40 +90,37 @@ do {
   let _: Int!.#^SUGARED_IUOPTIONAL_MEMBER_DOT?check=OPTIONAL^#
 
   // OPTIONAL-LABEL: Begin completions, 2 items
-  // OPTIONAL-LABEL: Decl[TypeAlias]/CurrNominal: Wrappt[#Wrapped#]; name=Wrappt
+  // OPTIONAL-LABEL: Decl[TypeAlias]/CurrNominal: Wrappt[#Int#]; name=Wrappt
   // OPTIONAL-LABEL: Keyword/None: Type[#{{Optional<Int>|Int\?}}.Type#]; name=Type
-  // OPTIONAL-LABEL: End completions
 
   let _: Array<Int>.#^ARRAY_MEMBER_DOT?check=ARRAY^#
   let _: [Int].#^SUGARED_ARRAY_MEMBER_DOT?check=ARRAY^#
 
   // ARRAY-LABEL: Begin completions, 8 items
-  // ARRAY-NEXT: Decl[TypeAlias]/CurrNominal/IsSystem: Index[#Int#]; name=Index
-  // ARRAY-NEXT: Decl[TypeAlias]/CurrNominal/IsSystem: Indices[#Range<Int>#]; name=Indices
-  // ARRAY-NEXT: Decl[TypeAlias]/CurrNominal/IsSystem: Iterator[#IndexingIterator<Array<Element>>#]; name=Iterator
-  // ARRAY-NEXT: Decl[TypeAlias]/CurrNominal/IsSystem: Element[#Element#]; name=Element
-  // ARRAY-NEXT: Decl[TypeAlias]/CurrNominal/IsSystem: SubSequence[#ArraySlice<Element>#]; name=SubSequence
-  // ARRAY-NEXT: Decl[TypeAlias]/CurrNominal/IsSystem: ArrayLiteralElement[#Element#]; name=ArrayLiteralElement
-  // ARRAY-NEXT: Decl[TypeAlias]/Super/NotRecommended/IsSystem: IndexDistance[#Int#]; name=IndexDistance; diagnostics=warning:'IndexDistance' is deprecated: all index distances are now of type Int
-  // ARRAY-NEXT: Keyword/None: Type[#{{Array<Int>|\[Int\]}}.Type#]; name=Type
-  // ARRAY-NEXT: End completions
+  // ARRAY-DAG: Decl[TypeAlias]/CurrNominal/IsSystem: Index[#Int#]; name=Index
+  // ARRAY-DAG: Decl[TypeAlias]/CurrNominal/IsSystem: Indices[#Range<Int>#]; name=Indices
+  // ARRAY-DAG: Decl[TypeAlias]/CurrNominal/IsSystem: Iterator[#IndexingIterator<Array<Int>>#]; name=Iterator
+  // ARRAY-DAG: Decl[TypeAlias]/CurrNominal/IsSystem: Element[#Int#]; name=Element
+  // ARRAY-DAG: Decl[TypeAlias]/CurrNominal/IsSystem: ArrayLiteralElement[#Int#]; name=ArrayLiteralElement
+  // ARRAY-DAG: Decl[TypeAlias]/CurrNominal/IsSystem: SubSequence[#ArraySlice<Int>#]; name=SubSequence
+  // ARRAY-DAG: Decl[TypeAlias]/Super/NotRecommended/IsSystem: IndexDistance[#Int#]; name=IndexDistance; diagnostics=warning:'IndexDistance' is deprecated: all index distances are now of type Int
+  // ARRAY-DAG: Keyword/None: Type[#{{Array<Int>|\[Int\]}}.Type#]; name=Type
 
   let _: Dictionary<Int, Int>.#^DICTIONARY_MEMBER_DOT?check=DICTIONARY^#
   let _: [Int : Int].#^SUGARED_DICTIONARY_MEMBER_DOT?check=DICTIONARY^#
 
   // DICTIONARY-LABEL: Begin completions, 11 items
-  // DICTIONARY-NEXT: Decl[TypeAlias]/CurrNominal/IsSystem: Element[#(key: Key, value: Value)#]; name=Element
-  // DICTIONARY-NEXT: Decl[TypeAlias]/CurrNominal/IsSystem: SubSequence[#Slice<Dictionary<Key, Value>>#]; name=SubSequence
-  // DICTIONARY-NEXT: Decl[TypeAlias]/CurrNominal/IsSystem: Indices[#DefaultIndices<Dictionary<Key, Value>>#]; name=Indices
-  // DICTIONARY-NEXT: Decl[TypeAlias]/CurrNominal/IsSystem: Key[#Key#]; name=Key
-  // DICTIONARY-NEXT: Decl[TypeAlias]/CurrNominal/IsSystem: Value[#Value#]; name=Value
-  // DICTIONARY-NEXT: Decl[Struct]/CurrNominal/IsSystem: Keys[#Dictionary.Keys#]; name=Keys
-  // DICTIONARY-NEXT: Decl[Struct]/CurrNominal/IsSystem: Values[#Dictionary.Values#]; name=Values
-  // DICTIONARY-NEXT: Decl[Struct]/CurrNominal/IsSystem: Index[#Dictionary.Index#]; name=Index
-  // DICTIONARY-NEXT: Decl[Struct]/CurrNominal/IsSystem: Iterator[#Dictionary.Iterator#]; name=Iterator
+  // DICTIONARY-NEXT: Decl[TypeAlias]/CurrNominal/IsSystem: Element[#(key: Int, value: Int)#]; name=Element
+  // DICTIONARY-NEXT: Decl[TypeAlias]/CurrNominal/IsSystem: SubSequence[#Slice<Dictionary<Int, Int>>#]; name=SubSequence
+  // DICTIONARY-NEXT: Decl[TypeAlias]/CurrNominal/IsSystem: Indices[#DefaultIndices<Dictionary<Int, Int>>#]; name=Indices
+  // DICTIONARY-NEXT: Decl[TypeAlias]/CurrNominal/IsSystem: Key[#Int#]; name=Key
+  // DICTIONARY-NEXT: Decl[TypeAlias]/CurrNominal/IsSystem: Value[#Int#]; name=Value
+  // DICTIONARY-NEXT: Decl[Struct]/CurrNominal/IsSystem: Keys[#Dictionary<Int, Int>.Keys#]; name=Keys
+  // DICTIONARY-NEXT: Decl[Struct]/CurrNominal/IsSystem: Values[#Dictionary<Int, Int>.Values#]; name=Values
+  // DICTIONARY-NEXT: Decl[Struct]/CurrNominal/IsSystem: Index[#Dictionary<Int, Int>.Index#]; name=Index
+  // DICTIONARY-NEXT: Decl[Struct]/CurrNominal/IsSystem: Iterator[#Dictionary<Int, Int>.Iterator#]; name=Iterator
   // DICTIONARY-NEXT: Decl[TypeAlias]/Super/NotRecommended/IsSystem: IndexDistance[#Int#]; name=IndexDistance; diagnostics=warning
   // DICTIONARY-NEXT: Keyword/None: Type[#{{Dictionary<Int, Int>|\[Int : Int\]}}.Type#]; name=Type
-  // DICTIONARY-NEXT: End completions
 }
 
 do {
@@ -142,7 +130,6 @@ do {
 
   // MEMBER_TUPLE_DOT-LABEL: Begin completions, 1 items
   // MEMBER_TUPLE_DOT-NEXT: Keyword/None: Type[#({{.*}}).Type#]; name=Type
-  // MEMBER_TUPLE_DOT-NEXT: End completions
 
   let _: (Int, Int)#^MEMBER_TUPLE_NO_DOT^#
   let _: ()#^MEMBER_VOID_NO_DOT?check=MEMBER_TUPLE_NO_DOT^#
@@ -152,7 +139,6 @@ do {
   // MEMBER_TUPLE_NO_DOT-NEXT: Keyword/None: async; name=async
   // MEMBER_TUPLE_NO_DOT-NEXT: Keyword[throws]/None: throws; name=throws
   // MEMBER_TUPLE_NO_DOT-NEXT: Keyword/None: .Type[#({{.*}}).Type#]; name=Type
-  // MEMBER_TUPLE_NO_DOT-NEXT: End completions
 
   let _: (any Sequence).#^MEMBER_EXISTENTIAL_DOT^#
 
@@ -160,9 +146,8 @@ do {
   // MEMBER_EXISTENTIAL_DOT-LABEL: Begin completions, 4 items
   // MEMBER_EXISTENTIAL_DOT-NEXT: Decl[AssociatedType]/CurrNominal/IsSystem: Element; name=Element
   // MEMBER_EXISTENTIAL_DOT-NEXT: Decl[AssociatedType]/CurrNominal/IsSystem: Iterator; name=Iterator
-  // MEMBER_EXISTENTIAL_DOT-NEXT: Keyword/None: Protocol[#Sequence.Protocol#]; name=Protocol
-  // MEMBER_EXISTENTIAL_DOT-NEXT: Keyword/None: Type[#Sequence.Type#]; name=Type
-  // MEMBER_EXISTENTIAL_DOT-NEXT: End completions
+  // MEMBER_EXISTENTIAL_DOT-NEXT: Keyword/None: Protocol[#(any Sequence).Type#]; name=Protocol
+  // MEMBER_EXISTENTIAL_DOT-NEXT: Keyword/None: Type[#any Sequence.Type#]; name=Type
 
   let _: (any Sequence)#^MEMBER_EXISTENTIAL_NO_DOT^#
 
@@ -172,7 +157,13 @@ do {
   // MEMBER_EXISTENTIAL_NO_DOT-NEXT: Keyword[throws]/None: throws; name=throws
   // MEMBER_EXISTENTIAL_NO_DOT-NEXT: Decl[AssociatedType]/CurrNominal/IsSystem: .Element; name=Element
   // MEMBER_EXISTENTIAL_NO_DOT-NEXT: Decl[AssociatedType]/CurrNominal/IsSystem: .Iterator; name=Iterator
-  // MEMBER_EXISTENTIAL_NO_DOT-NEXT: Keyword/None: .Protocol[#Sequence.Protocol#]; name=Protocol
-  // MEMBER_EXISTENTIAL_NO_DOT-NEXT: Keyword/None: .Type[#Sequence.Type#]; name=Type
-  // MEMBER_EXISTENTIAL_NO_DOT-NEXT: End completions
+  // MEMBER_EXISTENTIAL_NO_DOT-NEXT: Keyword/None: .Protocol[#(any Sequence).Type#]; name=Protocol
+  // MEMBER_EXISTENTIAL_NO_DOT-NEXT: Keyword/None: .Type[#any Sequence.Type#]; name=Type
 }
+
+struct TestGenericTypealias<T, U> {
+  typealias K<V> = TestGenericTypealias<(T, U), V>
+}
+
+let _ = TestGenericTypealias<Int, String>.K<Float>.#^GENERIC_TYPEALIAS^#
+// GENERIC_TYPEALIAS-DAG: Decl[TypeAlias]/CurrNominal: K[#TestGenericTypealias<((Int, String), Float), V>#]; name=K

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s -import-objc-header %S/Inputs/foreign_to_native_inout_self_helper.h | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s -import-objc-header %S/Inputs/foreign_to_native_inout_self_helper.h | %FileCheck %s
 
 protocol FakeIterator {
   mutating func next()

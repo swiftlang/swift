@@ -29,6 +29,7 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 
 namespace llvm {
@@ -96,7 +97,7 @@ public:
   /// The mode in which the driver should invoke the frontend.
   Mode CompilerMode = Mode::StandardCompile;
 
-  Optional<MSVCRuntime> RuntimeVariant = llvm::None;
+  std::optional<MSVCRuntime> RuntimeVariant = std::nullopt;
 
   /// The output type which should be used for compile actions.
   file_types::ID CompilerOutputType = file_types::ID::TY_INVALID;
@@ -125,6 +126,9 @@ public:
   /// What kind of debug info to generate.
   IRGenDebugInfoFormat DebugInfoFormat = IRGenDebugInfoFormat::None;
 
+  /// DWARF output format version number.
+  std::optional<uint8_t> DWARFVersion;
+
   /// Whether or not the driver should generate a module.
   bool ShouldGenerateModule = false;
 
@@ -150,6 +154,8 @@ public:
 
   OptionSet<SanitizerKind> SelectedSanitizers;
 
+  unsigned SanitizerUseStableABI = 0;
+
   /// Might this sort of compile have explicit primary inputs?
   /// When running a single compile for the whole module (in other words
   /// "whole-module-optimization" mode) there must be no -primary-input's and
@@ -166,11 +172,19 @@ public:
   enum class DriverKind {
     Interactive,     // swift
     Batch,           // swiftc
+    SILOpt,          // sil-opt
+    SILFuncExtractor,// sil-func-extractor
+    SILNM,           // sil-nm
+    SILLLVMGen,      // sil-llvm-gen
+    SILPassPipelineDumper, // sil-passpipeline-dumper
+    SwiftDependencyTool,   // swift-dependency-tool
+    SwiftLLVMOpt,    // swift-llvm-opt
     AutolinkExtract, // swift-autolink-extract
-    SwiftIndent,     // swift-indent
     SymbolGraph,     // swift-symbolgraph
-    APIExtract,      // swift-api-extract
-    APIDigester      // swift-api-digester
+    APIDigester,     // swift-api-digester
+    CacheTool,       // swift-cache-tool
+    ParseTest,       // swift-parse-test
+    SynthesizeInterface,  // swift-synthesize-interface
   };
 
   class InputInfoMap;
@@ -315,16 +329,13 @@ public:
   /// \param[out] TopLevelActions The main Actions to build Jobs for.
   /// \param TC the default host tool chain.
   /// \param OI The OutputInfo for which Actions should be generated.
-  /// \param OutOfDateMap If present, information used to decide which files
-  /// need to be rebuilt.
   /// \param C The Compilation to which Actions should be added.
   void buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
                     const ToolChain &TC, const OutputInfo &OI,
-                    const InputInfoMap *OutOfDateMap,
                     Compilation &C) const;
 
   /// Construct the OutputFileMap for the driver from the given arguments.
-  Optional<OutputFileMap>
+  std::optional<OutputFileMap>
   buildOutputFileMap(const llvm::opt::DerivedArgList &Args,
                      StringRef workingDirectory) const;
 

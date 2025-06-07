@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -sil-inline-generics -enable-sil-verify-all -inline -function-signature-opts %s | %FileCheck %s
-// RUN: %target-sil-opt -sil-inline-generics -enable-sil-verify-all -inline -function-signature-opts %s | %FileCheck -check-prefix=CHECK-NEGATIVE %s
+// RUN: %target-sil-opt -sil-print-types -sil-inline-generics -enable-sil-verify-all -inline -function-signature-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -sil-inline-generics -enable-sil-verify-all -inline -function-signature-opts %s | %FileCheck -check-prefix=CHECK-NEGATIVE %s
 
 import Builtin
 import Swift
@@ -67,6 +67,8 @@ indirect public enum IndirectEnum : Hashable {
   case A
   case B(IndirectEnum)
 }
+
+struct ValueGenericType<let N: Int> {}
 
 sil @use_Int : $@convention(thin) (Int) -> ()
 sil @use_Int64 : $@convention(thin) (Int64) -> ()
@@ -1809,6 +1811,27 @@ bb0(%0 : $*T):
   return %r : $()
 }
 
+// CHECK-LABEL: sil [signature_optimized_thunk] [always_inline] @value_generic_count : $@convention(thin) <let N : Int> (ValueGenericType<N>) -> Int
+// CHECK:         function_ref @$s19value_generic_countTf4d_n : $@convention(thin) <let τ_0_0 : Int> () -> Int
+// CHECK:         apply
+// CHECK: } // end sil function 'value_generic_count'
+sil [noinline] @value_generic_count : $@convention(thin) <let N : Int> (ValueGenericType<N>) -> Int {
+bb0(%0 : $ValueGenericType<N>):
+  %1 = type_value $Int for N
+  return %1 : $Int
+}
+
+// CHECK-LABEL: sil [noinline] @value_generic_count_caller : $@convention(thin) <let N : Int> (ValueGenericType<N>) -> Int
+// CHECK:         function_ref @$s19value_generic_countTf4d_n : $@convention(thin) <let τ_0_0 : Int> () -> Int
+// CHECK:         apply
+// CHECK: } // end sil function 'value_generic_count_caller'
+sil [noinline] @value_generic_count_caller : $@convention(thin) <let N : Int> (ValueGenericType<N>) -> Int {
+bb0(%0 : $ValueGenericType<N>):
+  %1 = function_ref @value_generic_count : $@convention(thin) <let τ_0_0 : Int> (ValueGenericType<τ_0_0>) -> Int
+  %2 = apply %1<N>(%0) : $@convention(thin) <let τ_0_0 : Int> (ValueGenericType<τ_0_0>) -> Int
+  return %2 : $Int
+}
+
 // CHECK-LABEL: sil shared @$s36exploded_release_to_guaranteed_paramTf4gX_n
 // CHECK: bb0([[INPUT_ARG0:%[0-9]+]] : $Int):
 // CHECK-NOT: strong_release
@@ -1909,3 +1932,8 @@ bb0(%0 : $*T):
 // CHECK: apply
 // CHECK: end sil function '$s31generic_in_to_guaranteed_callerTf4g_n'
 
+// CHECK-LABEL: sil shared [noinline] @$s19value_generic_countTf4d_n : $@convention(thin) <let N : Int> () -> Int {
+// CHECK:         [[TYPE_VALUE:%.*]] = type_value $Int for N
+// CEHCK-NOT:     type_value $Int for @error_type N
+// CHECK-NEXT:    return [[TYPE_VALUE]] : $Int
+// CHECK-LABEL: } // end sil function '$s19value_generic_countTf4d_n'

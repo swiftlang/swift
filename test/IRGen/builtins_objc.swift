@@ -16,21 +16,21 @@ class NonObjCClass {}
 func use(_: Builtin.RawPointer)
 
 func getObjCTypeEncoding<T>(_: T) {
-  // CHECK: call swiftcc void @use({{.* i8]\*}} @.str.1.i,
+  // CHECK: call swiftcc void @use(ptr @.str.1.i)
   use(Builtin.getObjCTypeEncoding(Int32.self))
-  // CHECK: call swiftcc void @use({{.* i8]\*}} @.str.1.i
+  // CHECK: call swiftcc void @use(ptr @.str.1.i)
   use(Builtin.getObjCTypeEncoding(ObjCEnum.self))
-  // CHECK: call swiftcc void @use({{.* i8]\*}} [[CGRECT:@".str.[0-9]+.\{CGRect=[^"]*"]],
+  // CHECK: call swiftcc void @use(ptr [[CGRECT:@".str.[0-9]+.\{CGRect=[^"]*"]])
   use(Builtin.getObjCTypeEncoding(CGRect.self))
-  // CHECK: call swiftcc void @use({{.* i8]\*}} [[NSRANGE:@".str.[0-9]+.\{_NSRange=[^"]*"]],
+  // CHECK: call swiftcc void @use(ptr [[NSRANGE:@".str.[0-9]+.\{_NSRange=[^"]*"]])
   use(Builtin.getObjCTypeEncoding(NSRange.self))
-  // CHECK: call swiftcc void @use({{.* i8]\*}} @".str.1.@"
+  // CHECK: call swiftcc void @use(ptr @".str.1.@")
   use(Builtin.getObjCTypeEncoding(AnyObject.self))
-  // CHECK: call swiftcc void @use({{.* i8]\*}} @".str.1.@"
+  // CHECK: call swiftcc void @use(ptr @".str.1.@")
   use(Builtin.getObjCTypeEncoding(NSObject.self))
-  // CHECK: call swiftcc void @use({{.* i8]\*}} @".str.1.@"
+  // CHECK: call swiftcc void @use(ptr @".str.1.@")
   use(Builtin.getObjCTypeEncoding(ObjCClass.self))
-  // CHECK: call swiftcc void @use({{.* i8]\*}} @".str.1.@"
+  // CHECK: call swiftcc void @use(ptr @".str.1.@")
   use(Builtin.getObjCTypeEncoding(NonObjCClass.self))
 }
 

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -sroa %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -sroa %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -43,8 +43,6 @@ sil @use_int32 : $@convention(thin) (Builtin.Int32) -> ()
 sil @struct_with_scalar_fields : $@convention(thin) (S1) -> () {
 bb0(%0 : $S1):
   %1 = alloc_stack $S1
-  debug_value %1 : $*S1 // should not prevent the optimization
-  debug_value %1 : $*S1                // should not prevent the optimization
   store %0 to %1 : $*S1
   %2 = function_ref @use_int32 : $@convention(thin) (Builtin.Int32) -> ()
   %3 = struct_element_addr %1 : $*S1, #S1.y

@@ -7,24 +7,24 @@ struct NotObjCAble {
 
 @objc class ObjCClass {}
 
-dynamic prefix operator +!+  // expected-error{{'dynamic' modifier cannot be applied to this declaration}} {{1-9=}}
+dynamic prefix operator +!+  // expected-error{{unexpected attribute 'dynamic' in operator declaration}} {{1-9=}}
 
 class Foo {
   @objc dynamic init() {}
-  @objc dynamic init(x: NotObjCAble) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{Swift structs cannot be represented in Objective-C}}
+  @objc dynamic init(x: NotObjCAble) {} // expected-error{{initializer cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}} expected-note{{Swift structs cannot be represented in Objective-C}}
   
   @objc dynamic var x: Int
   
-  @objc dynamic var nonObjcVar: NotObjCAble // expected-error{{property cannot be marked @objc because its type cannot be represented in Objective-C}} expected-note{{Swift structs cannot be represented in Objective-C}}
+  @objc dynamic var nonObjcVar: NotObjCAble // expected-error{{property cannot be marked '@objc' because its type cannot be represented in Objective-C}} expected-note{{Swift structs cannot be represented in Objective-C}}
 
   @objc dynamic func foo(x: Int) {}
   @objc dynamic func bar(x: Int) {}
 
-  @objc dynamic func nonObjcFunc(x: NotObjCAble) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{Swift structs cannot be represented in Objective-C}}
+  @objc dynamic func nonObjcFunc(x: NotObjCAble) {} // expected-error{{method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}} expected-note{{Swift structs cannot be represented in Objective-C}}
   
   @objc dynamic subscript(x: Int) -> ObjCClass { get {} }
 
-  @objc dynamic subscript(x: Int) -> NotObjCAble { get {} } // expected-error{{subscript cannot be marked @objc because its type cannot be represented in Objective-C}} expected-note{{Swift structs cannot be represented in Objective-C}}
+  @objc dynamic subscript(x: Int) -> NotObjCAble { get {} } // expected-error{{subscript cannot be marked '@objc' because its type cannot be represented in Objective-C}} expected-note{{Swift structs cannot be represented in Objective-C}}
   
   dynamic deinit {} // expected-error{{'dynamic' modifier cannot be applied to this declaration}} {{3-11=}}
 

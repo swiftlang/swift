@@ -1,4 +1,9 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -capture-promotion | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -capture-promotion \
+// RUN: -enable-experimental-feature LifetimeDependence \
+// RUN: -module-name Swift \
+// RUN: | %FileCheck %s
+
+// REQUIRES: swift_feature_LifetimeDependence
 
 // Check to make sure that the process of promoting closure captures results in
 // a correctly cloned and modified closure function body. This test
@@ -24,6 +29,8 @@ struct Baz {
   var bar: Bar
   var x: Int
 }
+
+struct Nonescapable: ~Escapable {}
 
 sil @convert_from_integer_literal : $@convention(thin) (Builtin.Word, @thin Int.Type) -> Int
 sil @foo_allocating_init : $@convention(thin) (@thick Foo.Type) -> @owned Foo
@@ -513,4 +520,73 @@ bb0(%0 : @owned $Builtin.NativeObject):
   %3 = function_ref @capture_promotion_callee_guaranteed_box : $@convention(thin) (@guaranteed { var Builtin.NativeObject }) -> ()
   %pai = partial_apply %3(%1) : $@convention(thin) (@guaranteed { var Builtin.NativeObject }) -> ()
   return %pai : $@callee_owned () -> ()
+}
+
+sil @foo_dependence : $@convention(thin) (@guaranteed Foo) -> @lifetime(borrow 0) @owned Nonescapable
+sil @use_nonescapable : $@convention(thin) (@guaranteed Nonescapable) -> ()
+
+// Test that the pass does not crash when it sees a mark_dependence on an alloc_box base that does not have a partial_apply value.
+sil [ossa] @test_capture_promotion_mark_dependence : $@convention(thin) () -> () {
+bb0:
+  %6 = alloc_box ${ let Foo }, let, name "c"
+  %7 = begin_borrow [lexical] [var_decl] %6 : ${ let Foo }
+  %8 = project_box %7 : ${ let Foo }, 0
+  %9 = metatype $@thick Foo.Type
+
+  %12 = function_ref @foo_allocating_init : $@convention(thin) (@thick Foo.Type) -> @owned Foo
+  %13 = apply %12(%9) : $@convention(thin) (@thick Foo.Type) -> @owned Foo
+  store %13 to [init] %8 : $*Foo
+  %16 = load_borrow %8 : $*Foo
+
+  %17 = function_ref @foo_dependence : $@convention(thin) (@guaranteed Foo) -> @lifetime(borrow 0) @owned Nonescapable
+  %18 = apply %17(%16) : $@convention(thin) (@guaranteed Foo) -> @lifetime(borrow 0) @owned Nonescapable
+
+  %19 = mark_dependence [unresolved] %18 : $Nonescapable on %6 : ${ let Foo }
+  %20 = move_value [var_decl] %19 : $Nonescapable
+  end_borrow %16 : $Foo
+
+  %23 = function_ref @use_nonescapable : $@convention(thin) (@guaranteed Nonescapable) -> ()
+  %24 = apply %23(%20) : $@convention(thin) (@guaranteed Nonescapable) -> ()
+  destroy_value %20 : $Nonescapable
+  end_borrow %7 : ${ let Foo }
+
+  destroy_value %6 : ${ let Foo }
+  %28 = tuple ()
+  return %28 : $()
+}
+
+sil [ossa] @closable : $@convention(thin) (@guaranteed { var Bar }) -> Builtin.Int64 {
+entry(%box : @guaranteed ${ var Bar }):
+  %retval = integer_literal $Builtin.Int64, 0
+  return %retval : $Builtin.Int64
+}
+
+// Test that a dealloc_box is not regarded as a mutation which would obstruct promotion.
+// CHECK-LABEL: sil [ossa] @with_dealloc_box : {{.*}} {
+// CHECK:         load [copy]
+// CHECK-LABEL: } // end sil function 'with_dealloc_box'
+sil [ossa] @with_dealloc_box : $@convention(thin) (@owned Bar) -> () {
+entry(%idle_incoming : @owned $Bar):
+  %box = alloc_box ${ var Bar }
+  %box_borrow = begin_borrow [var_decl] %box : ${ var Bar }
+  %box_addr = project_box %box_borrow : ${ var Bar }, 0
+  store %idle_incoming to [init] %box_addr : $*Bar
+  %closable = function_ref @closable : $@convention(thin) (@guaranteed { var Bar }) -> Builtin.Int64
+  %box_copy = copy_value %box_borrow : ${ var Bar }
+  mark_function_escape %box_addr : $*Bar
+  %closure = partial_apply [callee_guaranteed] %closable(%box_copy) : $@convention(thin) (@guaranteed { var Bar }) -> Builtin.Int64
+  cond_br undef, exit, die
+
+die:
+  destroy_value %closure : $@callee_guaranteed () -> Builtin.Int64
+  end_borrow %box_borrow : ${ var Bar }
+  dealloc_box %box : ${ var Bar }
+  unreachable
+
+exit:
+  destroy_value %closure : $@callee_guaranteed () -> Builtin.Int64
+  end_borrow %box_borrow : ${ var Bar }
+  destroy_value %box : ${ var Bar }
+  %retval = tuple ()
+  return %retval :$()
 }

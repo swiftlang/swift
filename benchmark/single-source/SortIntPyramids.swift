@@ -37,7 +37,7 @@ let pyramidTemplate: [Int] = (1...pH) + (1...pH).reversed()
 // A^R - reversed array A, + - array concatenation operator,
 // A indices are in range 1...A.length.
 // define adjacent pyramid as A + A^R + A + A^R,
-// defne adjacent pyramid hight as A[A.length].
+// define adjacent pyramid height as A[A.length].
 
 
 // On 25% of following dataset stdlib sorting function will use heapSort.

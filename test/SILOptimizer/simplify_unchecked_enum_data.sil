@@ -1,0 +1,123 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=unchecked_enum_data | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-ONONE
+// RUN: %target-sil-opt -enable-sil-verify-all %s -simplification -simplify-instruction=unchecked_enum_data | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-O
+
+// REQUIRES: swift_in_compiler
+
+import Swift
+import Builtin
+
+enum E {
+  case A(String)
+  case B(String)
+}
+
+enum E2 {
+  case int(Int)
+  case str(String)
+}
+
+sil @useit : $@convention(thin) (@owned E2) -> ()
+
+// CHECK-LABEL: sil @forward_enum_data
+// CHECK:         return %0
+// CHECK:       } // end sil function 'forward_enum_data'
+sil @forward_enum_data : $@convention(thin) (@owned String) -> @owned String {
+bb0(%0 : $String):
+  %1 = enum $E, #E.B!enumelt, %0 : $String
+  %2 = unchecked_enum_data %1 : $E, #E.B!enumelt
+  return %2 : $String
+}
+
+// CHECK-LABEL: sil @wrong_case
+// CHECK:         %1 = enum
+// CHECK:         %2 = unchecked_enum_data %1
+// CHECK:         return %2
+// CHECK:       } // end sil function 'wrong_case'
+sil @wrong_case : $@convention(thin) (@owned String) -> @owned String {
+bb0(%0 : $String):
+  %1 = enum $E, #E.B!enumelt, %0 : $String
+  // Strictly speaking this is illegal SIL.
+  %2 = unchecked_enum_data %1 : $E, #E.A!enumelt
+  return %2 : $String
+}
+
+// CHECK-LABEL: sil [ossa] @forward_borrowed_enum_data
+// CHECK:         %1 = copy_value %0
+// CHECK:         return %1
+// CHECK:       } // end sil function 'forward_borrowed_enum_data'
+sil [ossa] @forward_borrowed_enum_data : $@convention(thin) (@guaranteed String) -> @owned String {
+bb0(%0 : @guaranteed $String):
+  %1 = enum $E, #E.B!enumelt, %0 : $String
+  %2 = unchecked_enum_data %1 : $E, #E.B!enumelt
+  %3 = copy_value %2 : $String
+  return %3 : $String
+}
+
+// CHECK-LABEL: sil [ossa] @forward_owned_enum_data :
+// CHECK:         return %0
+// CHECK:       } // end sil function 'forward_owned_enum_data'
+sil [ossa] @forward_owned_enum_data : $@convention(thin) (@owned String) -> @owned String {
+bb0(%0 : @owned $String):
+  %1 = enum $E, #E.B!enumelt, %0 : $String
+  %2 = unchecked_enum_data %1 : $E, #E.B!enumelt
+  return %2 : $String
+}
+
+// CHECK-LABEL: sil [ossa] @dont_forward_owned_enum_data_with_uses :
+// CHECK:         %1 = enum
+// CHECK:         %4 = unchecked_enum_data %1
+// CHECK:         return %4
+// CHECK:       } // end sil function 'dont_forward_owned_enum_data_with_uses'
+sil [ossa] @dont_forward_owned_enum_data_with_uses : $@convention(thin) (@owned String) -> @owned String {
+bb0(%0 : @owned $String):
+  %1 = enum $E, #E.B!enumelt, %0 : $String
+  %2 = begin_borrow %1 : $E
+  end_borrow %2 : $E
+  %4 = unchecked_enum_data %1 : $E, #E.B!enumelt
+  return %4 : $String
+}
+
+// CHECK-LABEL: sil [ossa] @forward_owned_enum_data_with_debug_use
+// CHECK-ONONE:   %1 = enum
+// CHECK-ONONE:   %3 = unchecked_enum_data %1
+// CHECK-ONONE:   return %3
+// CHECK-O:       return %0
+// CHECK:       } // end sil function 'forward_owned_enum_data_with_debug_use'
+sil [ossa] @forward_owned_enum_data_with_debug_use : $@convention(thin) (@owned String) -> @owned String {
+bb0(%0 : @owned $String):
+  %1 = enum $E, #E.B!enumelt, %0 : $String
+  debug_value %1 : $E, let, name "e"
+  %3 = unchecked_enum_data %1 : $E, #E.B!enumelt
+  return %3 : $String
+}
+
+// CHECK-LABEL: sil [ossa] @trivial_replacement
+// CHECK:       bb1({{.*}}:
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    destroy_value %2
+// CHECK:         apply {{%[0-9]+}}(%1)
+// CHECK:       } // end sil function 'trivial_replacement'
+sil [ossa] @trivial_replacement : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = enum $E2, #E2.int!enumelt, %0 : $Int
+  %2 = enum $Optional<E2>, #Optional.some!enumelt, %1 : $E2, forwarding: @owned
+  %3 = begin_borrow %2 : $Optional<E2>
+  switch_enum %3 : $Optional<E2>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%5 : @guaranteed $E2):
+  end_borrow %3 : $Optional<E2>
+  %7 = unchecked_enum_data %2 : $Optional<E2>, #Optional.some!enumelt
+  %8 = function_ref @useit : $@convention(thin) (@owned E2) -> ()
+  %9 = apply %8(%7) : $@convention(thin) (@owned E2) -> ()
+  br bb3
+  
+bb2:
+  end_borrow %3 : $Optional<E2>
+  destroy_value %2 : $Optional<E2>
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+

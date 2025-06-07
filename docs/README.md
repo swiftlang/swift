@@ -125,17 +125,21 @@ documentation, please create a thread on the Swift forums under the
     Describes how to maintain compatibility when changing the serialization
     format.
 - SIL and SIL Optimizations:
-  - [SILFunctionConventions.md](/docs/SILFunctionConventions.md):
-  - [SILMemoryAccess.md](/docs/SILMemoryAccess.md):
-  - [SILProgrammersManual.md](/docs/SILProgrammersManual.md):
-    Provides an overview of the implementation of SIL in the compiler.
+  - [SILFunctionConventions.md](/docs/SIL/SILFunctionConventions.md):
+  - [SILMemoryAccess.md](/docs/SIL/SILMemoryAccess.md):
   - [OptimizerDesign.md](/docs/OptimizerDesign.md):
     Describes the design of the optimizer pipeline.
   - [HighLevelSILOptimizations.rst](/docs/HighLevelSILOptimizations.rst):
     Describes how the optimizer understands the semantics of high-level
-    operations on [currency](/docs/Lexicon.md#currency-type) data types and 
+    operations on [currency](/docs/Lexicon.md#currency-type) data types and
     optimizes accordingly.
     Includes a thorough discussion of the `@_semantics` attribute.
+  - [HowToUpdateDebugInfo.md](/docs/HowToUpdateDebugInfo.md): A guide for SIL
+    optimization pass authors for how to properly update debug info in SIL
+    program transformations.
+- Runtime specifics:
+  - [Backtracing.rst](/docs/Backtracing.rst):
+    Describes Swift's backtracing and crash catching support.
 
 ### SourceKit subsystems
 
@@ -171,7 +175,7 @@ documentation, please create a thread on the Swift forums under the
   Documents how Swift interoperates with ObjC code and the ObjC runtime.
 - [LibraryEvolution.rst](/docs/LibraryEvolution.rst):
   Specifies what changes can be made without breaking binary compatibility.
-- [SIL.rst](/docs/SIL.rst):
+- [SIL.md](/docs/SIL/SIL.md):
   Documents the Swift Intermediate Language (SIL).
   - [TransparentAttr.md](/docs/TransparentAttr.md):
     Documents the semantics of the `@_transparent` attribute.
@@ -187,7 +191,7 @@ documentation, please create a thread on the Swift forums under the
 
 ### ABI
 
-- [CallConvSummary.rst](/docs/ABI/CallConvSummary.rst):
+- [CallingConventionSummary.rst](/docs/ABI/CallingConventionSummary.rst):
 	A concise summary of the calling conventions used for C/C++, Objective-C
 	and Swift on Apple platforms.  Contains references to source documents,
 	where further detail is required.
@@ -264,11 +268,11 @@ documentation, please create a thread on the Swift forums under the
 ### Proposals
 
 Old proposals are present in the [/docs/proposals](/docs/proposals) directory.
-More recent proposals are located in the [apple/swift-evolution][] repository.
+More recent proposals are located in the [swiftlang/swift-evolution][] repository.
 You can see the status of different proposals at
 <https://apple.github.io/swift-evolution/>.
 
-[apple/swift-evolution]: https://github.com/apple/swift-evolution
+[swiftlang/swift-evolution]: https://github.com/swiftlang/swift-evolution
 
 ### Surveys
 
@@ -314,7 +318,7 @@ The documents in this section might be worth breaking up into several documents,
 and linking one document from the other. Breaking up into components will
 provide greater clarity to contributors wanting to add new documentation.
 
-- [ARCOptimization.md](/docs/ARCOptimization.md):
+- [ARCOptimization.md](/docs/SIL/ARCOptimization.md):
   Covers how ARC optimization works, with several examples.
   TODO: Not clear if this is intended to be an explanation or a reference guide.
 - [CompilerPerformance.md](/docs/CompilerPerformance.md):
@@ -330,16 +334,19 @@ provide greater clarity to contributors wanting to add new documentation.
   It might also be valuable to introduce the tips in context, and have the
   explanation link to all the different tips.
 - [Diagnostics.md](/docs/Diagnostics.md):
-  Describes how to write diagnostic messages and associated educational notes.
+  Describes how to write diagnostic messages and associated documentation.
   TODO: Consider splitting into how-tos and recommended practices.
   For example, we could have a how-to guide on adding a new diagnostic,
   and have a recommended practices page which explains the writing style
-  for diagnostics and educational notes.
+  for diagnostics and diagnostic groups.
 - [HowSwiftImportsCAPIs.md](/docs/HowSwiftImportsCAPIs.md):
   Contains a thorough description of the mapping between C/ObjC entities and
   Swift entities.
   TODO: Not clear if this is intended to be language documentation
   (for Swift developers), an explanation or a reference guide.
+- [Modules.md](/docs/Modules.md): was written for Swift pre-1.0, but is still
+  relevant and covers behavior that's underspecified in either TSPL or the
+  language reference.
 - [OptimizerCountersAnalysis.md](/docs/OptimizerCountersAnalysis.md):
   TODO: Consider breaking up into a how-to guide
   on dumping and analyzing the counters
@@ -347,8 +354,6 @@ provide greater clarity to contributors wanting to add new documentation.
 - [Testing.md](/docs/Testing.md):
   TODO: Consider splitting into a how-to guide on writing a new test case
   and an explanation for how the compiler is tested.
-- [SwiftIndent.md](/docs/SwiftIndent.md):
-  TODO: Unclear if this is intended to be an explanation or a reference guide.
 - [Random.md](/docs/Random.md): Stub.
 
 ### Archive
@@ -362,7 +367,6 @@ provide greater clarity to contributors wanting to add new documentation.
   `@_hasMissingDesignatedInitializers`. Some of this is covered in
   [TSPL's initialization section][] but that doesn't include newly added
   attributes.
-- [Modules.rst](/docs/Modules.rst): for Swift pre-1.0.
 - [Swift3Compatibility.md](/docs/Swift3Compatibility.md):
   Discusses the Swift 3 -> Swift 4 migration.
 - [StoredAndComputedVariables.rst](/docs/StoredAndComputedVariables.rst): for Swift pre-1.0.

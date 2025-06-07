@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -temp-rvalue-opt | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -temp-rvalue-elimination | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
@@ -25,9 +25,17 @@ struct Str {
   var _value: Builtin.Int64
 }
 
+class C {
+  @_hasStorage let x: String
+}
+
+
 sil @unknown : $@convention(thin) () -> ()
 sil @load_string : $@convention(thin) (@in_guaranteed String) -> String
 sil @guaranteed_user : $@convention(thin) (@guaranteed Klass) -> ()
+sil @consume : $@convention(thin) (@owned C) -> ()
+sil @createKlass : $@convention(thin) () -> @owned Klass
+sil @initC : $@convention(thin) () -> @out C
 
 sil @inguaranteed_user_without_result : $@convention(thin) (@in_guaranteed Klass) -> () {
 bb0(%0 : $*Klass):
@@ -761,3 +769,76 @@ bb0(%0 : $Klass, %1 : $Klass):
   dealloc_stack %3 : $*String
   return %323 : $String
 }
+
+// CHECK-LABEL: sil @dont_remove_copy_from_released_object
+// CHECK:         copy_addr
+// CHECK-NEXT:    strong_release %0
+// CHECK:       } // end sil function 'dont_remove_copy_from_released_object'
+sil @dont_remove_copy_from_released_object : $@convention(thin) (@owned C) -> @owned String {
+bb0(%0 : $C):
+  %1 = ref_element_addr [immutable] %0, #C.x
+  %2 = alloc_stack $String
+  copy_addr %1 to [init] %2
+  strong_release %0
+  %5 = load %2
+  retain_value %5
+  destroy_addr %2
+  dealloc_stack %2
+  return %5
+}
+
+// CHECK-LABEL: sil @dont_remove_copy_from_consumed_object
+// CHECK:         copy_addr
+// CHECK:         apply
+// CHECK:       } // end sil function 'dont_remove_copy_from_consumed_object'
+sil @dont_remove_copy_from_consumed_object : $@convention(thin) (@owned C) -> @owned String {
+bb0(%0 : $C):
+  %1 = ref_element_addr [immutable] %0, #C.x
+  %2 = alloc_stack $String
+  copy_addr %1 to [init] %2
+  %4 = function_ref @consume : $@convention(thin) (@owned C) -> ()
+  apply %4(%0) : $@convention(thin) (@owned C) -> ()
+  %5 = load %2
+  retain_value %5
+  destroy_addr %2
+  dealloc_stack %2
+  return %5
+}
+
+// CHECK-LABEL: sil [ossa] @dont_shrink_lifetime_of_mark_dependence_base
+// CHECK:         copy_addr
+// CHECK:         apply
+// CHECK:       } // end sil function 'dont_shrink_lifetime_of_mark_dependence_base'
+sil [ossa] @dont_shrink_lifetime_of_mark_dependence_base : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $C
+  %1 = function_ref @initC : $@convention(thin) () -> @out C
+  %2 = apply %1(%0) : $@convention(thin) () -> @out C
+  %3 = alloc_stack [var_decl] $C, let, name "a"
+  copy_addr [take] %0 to [init] %3
+  %5 = function_ref @createKlass : $@convention(thin) () -> @owned Klass
+  %6 = apply %5() : $@convention(thin) () -> @owned Klass
+  %7 = mark_dependence [nonescaping] %6 on %3
+  destroy_value %7
+  destroy_addr %3
+  dealloc_stack %3
+  dealloc_stack %0
+  %12 = tuple ()
+  return %12
+}
+
+// CHECK-LABEL: sil @store_to_temp :
+// CHECK:         %1 = load %0
+// CHECK-NEXT:    return %1
+// CHECK-LABEL: } // end sil function 'store_to_temp'
+sil @store_to_temp : $@convention(thin) (@in_guaranteed Klass) -> @owned Klass {
+bb0(%0 : $*Klass):
+  %1 = load %0
+  %2 = alloc_stack $Klass
+  store %1 to %2
+  %4 = load %2
+  destroy_addr %2
+  dealloc_stack %2
+  return %4
+}
+

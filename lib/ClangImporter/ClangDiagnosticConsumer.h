@@ -23,13 +23,19 @@ namespace swift {
 class ClangDiagnosticConsumer : public clang::TextDiagnosticPrinter {
   struct LoadModuleRAII {
     ClangDiagnosticConsumer *Consumer;
+    clang::DiagnosticsEngine *Engine;
+    bool DiagEngineClearPriorToLookup;
+
   public:
     LoadModuleRAII(ClangDiagnosticConsumer &consumer,
+                   clang::DiagnosticsEngine &engine,
                    const clang::IdentifierInfo *import)
-        : Consumer(&consumer) {
+        : Consumer(&consumer), Engine(&engine) {
       assert(import);
       assert(!Consumer->CurrentImport);
+      assert(!Consumer->CurrentImportNotFound);
       Consumer->CurrentImport = import;
+      DiagEngineClearPriorToLookup = !engine.hasErrorOccurred();
     }
 
     LoadModuleRAII(LoadModuleRAII &) = delete;
@@ -45,8 +51,23 @@ class ClangDiagnosticConsumer : public clang::TextDiagnosticPrinter {
     }
 
     ~LoadModuleRAII() {
-      if (Consumer)
+      if (Consumer) {
+        // We must reset Clang's diagnostic engine here since we know that only
+        // the module lookup errors have been emitted. While the
+        // ClangDiagnosticConsumer takes care of filtering out the diagnostics
+        // from the output and from being handled by Swift's DiagnosticEngine,
+        // we must ensure to also reset Clang's DiagnosticEngine because its
+        // state is queried in later stages of compilation and errors emitted on
+        // "module_not_found" should not be counted. Use a soft reset that only
+        // clear the errors but not reset the states.
+        // FIXME: We must instead allow for module loading in Clang to fail
+        // without needing to emit a diagnostic.
+        if (Engine && Consumer->CurrentImportNotFound &&
+            DiagEngineClearPriorToLookup)
+          Engine->Reset(/*soft=*/true);
         Consumer->CurrentImport = nullptr;
+        Consumer->CurrentImportNotFound = false;
+      }
     }
   };
 
@@ -56,6 +77,7 @@ private:
   ClangImporter::Implementation &ImporterImpl;
 
   const clang::IdentifierInfo *CurrentImport = nullptr;
+  bool CurrentImportNotFound = false;
   SourceLoc DiagLoc;
   const bool DumpToStderr;
 
@@ -65,9 +87,10 @@ public:
                           bool dumpToStderr);
 
   LoadModuleRAII handleImport(const clang::IdentifierInfo *name,
+                              clang::DiagnosticsEngine &engine,
                               SourceLoc diagLoc) {
     DiagLoc = diagLoc;
-    return LoadModuleRAII(*this, name);
+    return LoadModuleRAII(*this, engine, name);
   }
 
   void HandleDiagnostic(clang::DiagnosticsEngine::Level diagLevel,

@@ -1,6 +1,5 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library %import-libdispatch) | %FileCheck %s
+// RUN: %target-run-simple-swift( -plugin-path %swift-plugin-dir -target %target-swift-5.1-abi-triple -parse-as-library %import-libdispatch) | %FileCheck %s
 
-// REQUIRES: rdar82092187
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch

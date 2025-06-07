@@ -2,5 +2,5 @@
 
 // REQUIRES: CODEGENERATOR=WebAssembly
 
-// CHECK: @"\01l_entry_point" = private constant { i32{{.*}} { i32 ptrtoint (i32 (i32, i8*)* @main to i32){{.*}} }, section "swift5_entry", align 4
+// CHECK: @"\01l_entry_point" = private constant { i32{{.*}} { i32 ptrtoint (ptr @__main_argc_argv to i32){{.*}} }, section "swift5_entry", align 4
 

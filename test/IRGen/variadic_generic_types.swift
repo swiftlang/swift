@@ -1,19 +1,14 @@
-// REQUIRES: rdar104716322
-
-// RUN: %target-swift-frontend -emit-ir -primary-file %s -enable-experimental-feature VariadicGenerics | %FileCheck %s
-
-// Because of -enable-experimental-feature VariadicGenerics
-// REQUIRES: asserts
+// RUN: %target-swift-frontend -emit-ir -primary-file %s -target %target-swift-5.9-abi-triple | %FileCheck %s
 
 // REQUIRES: PTRSIZE=64
 
-struct G<T...> {
-  // CHECK-LABEL: define hidden swiftcc void @"$s22variadic_generic_types1GV6calleeyyF"(i64 %0, %swift.type* %T)
+struct G<each T> {
+  // CHECK-LABEL: define hidden swiftcc void @"$s22variadic_generic_types1GV6calleeyyF"(i64 %0, ptr %"each T")
   // CHECK: ret void
   func callee() {}
 
-  // CHECK-LABEL: define hidden swiftcc void @"$s22variadic_generic_types1GV6calleryyF"(i64 %0, %swift.type* %T)
-  // CHECK: call swiftcc void @"$s22variadic_generic_types1GV6calleeyyF"(i64 %0, %swift.type* %T)
+  // CHECK-LABEL: define hidden swiftcc void @"$s22variadic_generic_types1GV6calleryyF"(i64 %0, ptr %"each T")
+  // CHECK: call swiftcc void @"$s22variadic_generic_types1GV6calleeyyF"(i64 %0, ptr %"each T")
   // CHECK: ret void
   func caller() {
     callee()
@@ -24,7 +19,7 @@ struct G<T...> {
   }
 
   func makeTuple2() -> (repeat Array<each T>).Type {
-    return (repeat Array<T>).self
+    return (repeat Array<each T>).self
   }
 }
 
@@ -36,3 +31,9 @@ blackHole(G<Int, String>.self)
 let g = G<Int, String, Float>()
 blackHole(g.makeTuple1())
 blackHole(g.makeTuple2())
+
+struct VariadicOptionalTuple<each V> {
+    var v: (repeat (each V)?)
+}
+
+func useVOT(_: VariadicOptionalTuple<String>) {}

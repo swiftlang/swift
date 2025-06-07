@@ -12,9 +12,12 @@
 
 #define DEBUG_TYPE "sil-sea"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Analysis/AccessStorageAnalysis.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
+#include "swift/SILOptimizer/Analysis/DestructorAnalysis.h"
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 
 using namespace swift;
@@ -75,12 +78,12 @@ static bool updateAccessKind(SILAccessKind &LHS, SILAccessKind RHS) {
   return changed;
 }
 
-static bool updateOptionalAccessKind(Optional<SILAccessKind> &LHS,
-                                     Optional<SILAccessKind> RHS) {
-  if (RHS == None)
+static bool updateOptionalAccessKind(std::optional<SILAccessKind> &LHS,
+                                     std::optional<SILAccessKind> RHS) {
+  if (RHS == std::nullopt)
     return false;
 
-  if (LHS == None) {
+  if (LHS == std::nullopt) {
     LHS = RHS;
     return true;
   }
@@ -104,7 +107,7 @@ bool StorageAccessInfo::mergeFrom(const StorageAccessInfo &RHS) {
 }
 
 bool AccessStorageResult::updateUnidentifiedAccess(SILAccessKind accessKind) {
-  if (unidentifiedAccess == None) {
+  if (unidentifiedAccess == std::nullopt) {
     unidentifiedAccess = accessKind;
     return true;
   }
@@ -172,7 +175,7 @@ bool AccessStorageResult::mergeAccesses(
     // Merge StorageAccessInfo into already-mapped AccessStorage.
     changed |= result.first->mergeFrom(otherStorageInfo);
   }
-  if (other.unidentifiedAccess != None)
+  if (other.unidentifiedAccess != std::nullopt)
     changed |= updateUnidentifiedAccess(other.unidentifiedAccess.value());
 
   return changed;
@@ -312,13 +315,16 @@ void AccessStorageResult::visitBeginAccess(B *beginAccess) {
     result.first->mergeFrom(storageAccess);
 }
 
-void AccessStorageResult::analyzeInstruction(SILInstruction *I) {
+void AccessStorageResult::analyzeInstruction(SILInstruction *I,
+                                             DestructorAnalysis *DA) {
   assert(!FullApplySite::isa(I) && "caller should merge");
 
   if (auto *BAI = dyn_cast<BeginAccessInst>(I))
     visitBeginAccess(BAI);
   else if (auto *BUAI = dyn_cast<BeginUnpairedAccessInst>(I))
     visitBeginAccess(BUAI);
+  else if (I->mayRelease() && !isDestructorSideEffectFree(I, DA))
+    setWorstEffects();
 }
 
 void StorageAccessInfo::print(raw_ostream &os) const {
@@ -334,7 +340,7 @@ void AccessStorageResult::print(raw_ostream &os) const {
   for (auto &storageAccess : storageAccessSet)
     storageAccess.print(os);
 
-  if (unidentifiedAccess != None) {
+  if (unidentifiedAccess != std::nullopt) {
     os << "  unidentified accesses: "
        << getSILAccessKindName(unidentifiedAccess.value()) << "\n";
   }
@@ -359,15 +365,15 @@ bool FunctionAccessStorage::summarizeFunction(SILFunction *F) {
   // If FunctionSideEffects can be summarized, use that information.
 
   auto b = F->getMemoryBehavior(/*observeRetains*/ false);
-  if (b == SILInstruction::MemoryBehavior::MayHaveSideEffects) {
+  if (b == MemoryBehavior::MayHaveSideEffects) {
     setWorstEffects();
     // May as well consider this a successful summary since there are no
     // instructions to visit anyway.
     return true;
   }
-  if (b >= SILInstruction::MemoryBehavior::MayWrite) {
+  if (b >= MemoryBehavior::MayWrite) {
     accessResult.setUnidentifiedAccess(SILAccessKind::Modify);
-  } else if (b == SILInstruction::MemoryBehavior::MayRead) {
+  } else if (b == MemoryBehavior::MayRead) {
     accessResult.setUnidentifiedAccess(SILAccessKind::Read);
   }
 
@@ -392,6 +398,7 @@ bool FunctionAccessStorage::summarizeCall(FullApplySite fullApply) {
 void AccessStorageAnalysis::initialize(
     SILPassManager *PM) {
   BCA = PM->getAnalysis<BasicCalleeAnalysis>();
+  DA = PM->getAnalysis<DestructorAnalysis>();
 }
 
 void AccessStorageAnalysis::invalidate() {
@@ -448,7 +455,7 @@ void AccessStorageAnalysis::analyzeFunction(
       if (auto fullApply = FullApplySite::isa(&I))
         analyzeCall(functionInfo, fullApply, bottomUpOrder, recursionDepth);
       else
-        functionInfo->functionEffects.analyzeInstruction(&I);
+        functionInfo->functionEffects.analyzeInstruction(&I, DA);
     }
   }
   LLVM_DEBUG(llvm::dbgs() << "  << finished " << F->getName() << '\n');

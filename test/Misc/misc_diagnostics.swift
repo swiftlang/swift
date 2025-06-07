@@ -26,8 +26,8 @@ let total = 15.0
 let count = 7
 let median = total / count // expected-error {{binary operator '/' cannot be applied to operands of type 'Double' and 'Int'}} expected-note {{overloads for '/' exist with these partially matching parameter lists:}}
 
-if (1) {} // expected-error{{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
-if 1 {} // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+if (1) {} // expected-error{{integer literal value '1' cannot be used as a boolean; did you mean 'true'?}} {{5-6=true}}
+if 1 {} // expected-error {{integer literal value '1' cannot be used as a boolean; did you mean 'true'?}} {{4-5=true}}
 
 var a: [String] = [1] // expected-error{{cannot convert value of type 'Int' to expected element type 'String'}}
 var b: Int = [1, 2, 3] // expected-error{{cannot convert value of type '[Int]' to specified type 'Int'}}
@@ -144,9 +144,6 @@ func test17875634() {
 func test20770032() {
   if case let 1...10 = (1, 1) { // expected-warning{{'let' pattern has no effect; sub-pattern didn't bind any variables}} {{11-15=}}
     // expected-error@-1 {{expression pattern of type 'ClosedRange<Int>' cannot match values of type '(Int, Int)'}}
-    // expected-error@-2 {{type '(Int, Int)' cannot conform to 'Equatable'}}
-    // expected-note@-3 {{only concrete types such as structs, enums and classes can conform to protocols}}
-    // expected-note@-4 {{required by operator function '~=' where 'T' = '(Int, Int)'}}
   }
 }
 

@@ -16,6 +16,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Identifier.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/raw_ostream.h"
@@ -54,6 +55,8 @@ void swift::simple_display(llvm::raw_ostream &out, DeclName name) {
 }
 
 raw_ostream &llvm::operator<<(raw_ostream &OS, DeclNameRef I) {
+  if (I.hasModuleSelector())
+    OS << I.getModuleSelector() << "::";
   OS << I.getFullName();
   return OS;
 }
@@ -77,16 +80,10 @@ raw_ostream &llvm::operator<<(raw_ostream &OS, swift::ObjCSelector S) {
   return OS;
 }
 
-bool Identifier::isOperatorSlow() const {
-  StringRef data = str();
-  auto *s = reinterpret_cast<llvm::UTF8 const *>(data.begin()),
-  *end = reinterpret_cast<llvm::UTF8 const *>(data.end());
-  llvm::UTF32 codePoint;
-  llvm::ConversionResult res =
-    llvm::convertUTF8Sequence(&s, end, &codePoint, llvm::strictConversion);
-  assert(res == llvm::conversionOK && "invalid UTF-8 in identifier?!");
-  (void)res;
-  return !empty() && isOperatorStartCodePoint(codePoint);
+bool Identifier::isOperatorSlow() const { return Lexer::isOperator(str()); }
+
+bool Identifier::mustAlwaysBeEscaped() const {
+  return Lexer::identifierMustAlwaysBeEscaped(str());
 }
 
 int Identifier::compare(Identifier other) const {
@@ -103,6 +100,11 @@ int Identifier::compare(Identifier other) const {
 }
 
 int DeclName::compare(DeclName other) const {
+  // Fast equality comparsion.
+  if (getOpaqueValue() == other.getOpaqueValue())
+    return 0;
+
+
   // Compare base names.
   if (int result = getBaseName().compare(other.getBaseName()))
     return result;
@@ -116,10 +118,13 @@ int DeclName::compare(DeclName other) const {
       return result;
   }
 
-  if (argNames.size() == otherArgNames.size())
-    return 0;
+  if (argNames.size() != otherArgNames.size())
+    return argNames.size() < otherArgNames.size() ? -1 : 1;
 
-  return argNames.size() < otherArgNames.size() ? -1 : 1;
+  // Order based on if it is compound name or not.
+  assert(isSimpleName() != other.isSimpleName() &&
+         "equality should be covered by opaque value comparsion");
+  return isSimpleName() ? -1 : 1;
 }
 
 static bool equals(ArrayRef<Identifier> idents, ArrayRef<StringRef> strings) {
@@ -205,17 +210,27 @@ void DeclNameRef::dump() const {
 }
 
 StringRef DeclNameRef::getString(llvm::SmallVectorImpl<char> &scratch,
-                             bool skipEmptyArgumentNames) const {
-  return FullName.getString(scratch, skipEmptyArgumentNames);
+                                 bool skipEmptyArgumentNames) const {
+  {
+    llvm::raw_svector_ostream out(scratch);
+    print(out, skipEmptyArgumentNames);
+  }
+
+  return StringRef(scratch.data(), scratch.size());
 }
 
-llvm::raw_ostream &DeclNameRef::print(llvm::raw_ostream &os,
-                                  bool skipEmptyArgumentNames) const {
-  return FullName.print(os, skipEmptyArgumentNames);
+llvm::raw_ostream &
+DeclNameRef::print(llvm::raw_ostream &os,
+                   bool skipEmptyArgumentNames) const {
+  if (hasModuleSelector())
+    os << getModuleSelector() << "::";
+  return getFullName().print(os, skipEmptyArgumentNames);
 }
 
 llvm::raw_ostream &DeclNameRef::printPretty(llvm::raw_ostream &os) const {
-  return FullName.printPretty(os);
+  if (hasModuleSelector())
+    os << getModuleSelector() << "::";
+  return getFullName().printPretty(os);
 }
 
 ObjCSelector::ObjCSelector(ASTContext &ctx, unsigned numArgs,
@@ -230,14 +245,15 @@ ObjCSelector::ObjCSelector(ASTContext &ctx, unsigned numArgs,
   Storage = DeclName(ctx, Identifier(), pieces);
 }
 
-llvm::Optional<ObjCSelector>
-ObjCSelector::parse(ASTContext &ctx, StringRef string) {
+std::optional<ObjCSelector> ObjCSelector::parse(ASTContext &ctx,
+                                                StringRef string) {
   // Find the first colon.
   auto colonPos = string.find(':');
 
   // If there is no colon, we have a nullary selector.
   if (colonPos == StringRef::npos) {
-    if (string.empty() || !Lexer::isIdentifier(string)) return None;
+    if (string.empty() || !Lexer::isIdentifier(string))
+      return std::nullopt;
     return ObjCSelector(ctx, 0, { ctx.getIdentifier(string) });
   }
 
@@ -248,7 +264,8 @@ ObjCSelector::parse(ASTContext &ctx, StringRef string) {
     if (piece.empty()) {
       pieces.push_back(Identifier());
     } else {
-      if (!Lexer::isIdentifier(piece)) return None;
+      if (!Lexer::isIdentifier(piece))
+        return std::nullopt;
       pieces.push_back(ctx.getIdentifier(piece));
     }
 
@@ -258,7 +275,8 @@ ObjCSelector::parse(ASTContext &ctx, StringRef string) {
   } while (colonPos != StringRef::npos);
 
   // If anything remains of the string, it's not a selector.
-  if (!string.empty()) return None;
+  if (!string.empty())
+    return std::nullopt;
 
   return ObjCSelector(ctx, pieces.size(), pieces);
 }
@@ -274,7 +292,7 @@ ObjCSelectorFamily ObjCSelector::getSelectorFamily() const {
   // Clang ARC. We're not just calling that method here because it means
   // allocating a clang::IdentifierInfo, which requires a Clang ASTContext.
   auto hasPrefix = [](StringRef text, StringRef prefix) {
-    if (!text.startswith(prefix)) return false;
+    if (!text.starts_with(prefix)) return false;
     if (text.size() == prefix.size()) return true;
     assert(text.size() > prefix.size());
     return !clang::isLowercase(text[prefix.size()]);

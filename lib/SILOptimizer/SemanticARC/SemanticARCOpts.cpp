@@ -16,10 +16,12 @@
 #include "SemanticARCOptVisitor.h"
 #include "Transforms.h"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 
 #include "llvm/Support/CommandLine.h"
 
@@ -51,7 +53,11 @@ static llvm::cl::list<ARCTransformKind> TransformsToPerform(
                    "sil-semantic-arc-owned-to-guaranteed-phi",
                    "Perform Owned To Guaranteed Phi. NOTE: Seeded by peephole "
                    "optimizer for compile time saving purposes, so run this "
-                   "after running peepholes)")),
+                   "after running peepholes)"),
+        clEnumValN(ARCTransformKind::RedundantMoveValueElim,
+                   "sil-semantic-arc-redundant-move-value-elim",
+                   "Eliminate move_value which don't change owned lifetime "
+                   "characteristics.  (Escaping, Lexical).")),
     llvm::cl::desc(
         "For testing purposes only run the specified list of semantic arc "
         "optimization. If the list is empty, we run all transforms"));
@@ -86,6 +92,7 @@ struct SemanticARCOpts : SILFunctionTransform {
       case ARCTransformKind::LoadCopyToLoadBorrowPeephole:
       case ARCTransformKind::AllPeepholes:
       case ARCTransformKind::OwnershipConversionElimPeephole:
+      case ARCTransformKind::RedundantMoveValueElim:
         // We never assume we are at fixed point when running these transforms.
         if (performPeepholesWithoutFixedPoint(visitor)) {
           invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
@@ -152,7 +159,7 @@ struct SemanticARCOpts : SILFunctionTransform {
            "verification is enabled");
 
     auto *deBlocksAnalysis = getAnalysis<DeadEndBlocksAnalysis>();
-    SemanticARCOptVisitor visitor(f, *deBlocksAnalysis->get(&f),
+    SemanticARCOptVisitor visitor(f, getPassManager(), *deBlocksAnalysis->get(&f),
                                   mandatoryOptsOnly);
 
 #ifndef NDEBUG
@@ -170,6 +177,8 @@ struct SemanticARCOpts : SILFunctionTransform {
     // converted to guaranteed, ignoring the phi, try convert those phis to be
     // guaranteed.
     if (tryConvertOwnedPhisToGuaranteedPhis(visitor.ctx)) {
+      updateAllGuaranteedPhis(getPassManager(), &f);
+
       // We return here early to save a little compile time so we do not
       // invalidate analyses redundantly.
       return invalidateAnalysis(
@@ -177,8 +186,10 @@ struct SemanticARCOpts : SILFunctionTransform {
     }
 
     // Otherwise, we only deleted instructions and did not touch phis.
-    if (didEliminateARCInsts)
+    if (didEliminateARCInsts) {
+      updateAllGuaranteedPhis(getPassManager(), &f);
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+    }
   }
 };
 

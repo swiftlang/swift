@@ -1,23 +1,25 @@
 // First parse this and then emit a *.sib. Then read in the *.sib, then recreate
 // RUN: %empty-directory(%t)
-// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name borrow
-// RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name borrow
-// RUN: %target-sil-opt %t/tmp.2.sib -module-name borrow | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %s -emit-sib -o %t/tmp.sib -module-name borrow
+// RUN: %target-sil-opt -sil-print-types %t/tmp.sib -o %t/tmp.2.sib -module-name borrow
+// RUN: %target-sil-opt -sil-print-types %t/tmp.2.sib -module-name borrow | %FileCheck %s
 
 sil_stage canonical
 
 import Builtin
 
 // CHECK-LABEL: sil [serialized] [ossa] @borrow_argument_test : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
-// CHECK: bb1([[PHIBBARG:%.*]] : @guaranteed $Builtin.NativeObject):
-// CHECK: end_borrow [[PHIBBARG]] : $Builtin.NativeObject
+// CHECK: bb1([[PHIBBARG:%.*]] : @reborrow $Builtin.NativeObject):
+// CHECK:   [[BF:%.*]] = borrowed [[PHIBBARG]] : $Builtin.NativeObject from (%0 : $Builtin.NativeObject)
+// CHECK:   end_borrow [[BF]] : $Builtin.NativeObject
 sil [serialized] [ossa] @borrow_argument_test : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
   %0a = begin_borrow %0 : $Builtin.NativeObject
   br bb1(%0a : $Builtin.NativeObject)
 
 bb1(%1 : @guaranteed $Builtin.NativeObject):
-  end_borrow %1 : $Builtin.NativeObject
+  %1f = borrowed %1 : $Builtin.NativeObject from (%0 : $Builtin.NativeObject)
+  end_borrow %1f : $Builtin.NativeObject
   %4 = tuple()
   return %4 : $()
 }

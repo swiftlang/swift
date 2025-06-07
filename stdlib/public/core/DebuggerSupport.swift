@@ -12,6 +12,70 @@
 
 import SwiftShims
 
+// Macros are disabled when Swift is built without swift-syntax.
+#if $Macros && hasAttribute(attached)
+
+/// Converts description definitions to a debugger Type Summary.
+///
+/// This macro converts compatible description implementations written in Swift
+/// to an LLDB format known as a Type Summary. A Type Summary is LLDB's
+/// equivalent to `debugDescription`, with the distinction that it does not
+/// execute code inside the debugged process. By avoiding code execution,
+/// descriptions can be produced faster, without potential side effects, and
+/// shown in situations where code execution is not performed, such as the
+/// variable list of an IDE.
+///
+/// Consider this an example. This `Team` struct has a `debugDescription` which
+/// summarizes some key details, such as the team's name. The debugger only
+/// computes this string on demand - typically via the `po` command. By applying
+/// the `DebugDescription` macro, a matching Type Summary is constructed. This
+/// allows the user to show a string like "Rams [11-2]", without executing
+/// `debugDescription`. This improves the usability, performance, and
+/// reliability of the debugging experience.
+///
+///     @DebugDescription
+///     struct Team: CustomDebugStringConvertible {
+///        var name: String
+///        var wins, losses: Int
+///
+///        var debugDescription: String {
+///            "\(name) [\(wins)-\(losses)]"
+///        }
+///     }
+///
+/// The `DebugDescription` macro supports both `debugDescription`, `description`,
+/// as well as a third option: a property named `lldbDescription`. The first
+/// two are implemented when conforming to the `CustomDebugStringConvertible`
+/// and `CustomStringConvertible` protocols. The additional `lldbDescription`
+/// property is useful when both `debugDescription` and `description` are
+/// implemented, but don't meet the requirements of the `DebugDescription`
+/// macro. If `lldbDescription` is implemented, `DebugDescription` choose it
+/// over `debugDescription` and `description`. Likewise, `debugDescription` is
+/// preferred over `description`.
+///
+/// ### Description Requirements
+///
+/// The description implementation has the following requirements:
+///
+/// * The body of the description implementation must a single string
+///   expression. String concatenation is not supported, use string interpolation
+///   instead.
+/// * String interpolation can reference stored properties only, functions calls
+///   and other arbitrary computation are not supported. Of note, conditional
+///   logic and computed properties are not supported.
+/// * Overloaded string interpolation cannot be used.
+@attached(member)
+@attached(memberAttribute)
+public macro DebugDescription() =
+  #externalMacro(module: "SwiftMacros", type: "DebugDescriptionMacro")
+
+/// Internal-only macro. See `@DebugDescription`.
+@attached(peer, names: named(_lldb_summary))
+public macro _DebugDescriptionProperty(_ debugIdentifier: String, _ computedProperties: [String]) =
+  #externalMacro(module: "SwiftMacros", type: "_DebugDescriptionPropertyMacro")
+
+#endif
+
 #if SWIFT_ENABLE_REFLECTION
 
 @frozen // namespace
@@ -66,7 +130,7 @@ public enum _DebuggerSupport {
 
   private static func asObjectAddress(_ value: Any) -> String {
     let address = checkValue(value,
-      ifClass: { return unsafeBitCast($0, to: Int.self) },
+      ifClass: { return unsafe unsafeBitCast($0, to: Int.self) },
       otherwise: { return 0 })
     return String(address, radix: 16, uppercase: false)
   }
@@ -175,7 +239,13 @@ public enum _DebuggerSupport {
       print("\(name) : ", terminator: "", to: &target)
     }
 
-    if let str = asStringRepresentation(value: value, mirror: mirror, count: count) {
+    if isRoot, let value = value as? String {
+      // We don't want to use string's debug desciprtion for 'po' because it
+      // escapes the string and prints it raw (e.g. prints "\n" instead of
+      // actually printing a newline), but only if its the root value. Otherwise,
+      // continue using the debug description.
+      print(value, terminator: "", to: &target)
+    } else if let str = asStringRepresentation(value: value, mirror: mirror, count: count) {
       print(str, terminator: "", to: &target)
     }
   
@@ -268,10 +338,38 @@ public func _stringForPrintObject(_ value: Any) -> String {
 
 public func _debuggerTestingCheckExpect(_: String, _: String) { }
 
+@_alwaysEmitIntoClient @_transparent
+internal func _withHeapObject<R>(
+  of object: AnyObject,
+  _ body: (UnsafeMutableRawPointer) -> R
+) -> R {
+  defer { _fixLifetime(object) }
+  let unmanaged = unsafe Unmanaged.passUnretained(object)
+  return unsafe body(unmanaged.toOpaque())
+}
+
+@_extern(c, "swift_retainCount") @usableFromInline
+internal func _swift_retainCount(_: UnsafeMutableRawPointer) -> Int
+@_extern(c, "swift_unownedRetainCount") @usableFromInline
+internal func _swift_unownedRetainCount(_: UnsafeMutableRawPointer) -> Int
+@_extern(c, "swift_weakRetainCount") @usableFromInline
+internal func _swift_weakRetainCount(_: UnsafeMutableRawPointer) -> Int
+
 // Utilities to get refcount(s) of class objects.
-@_silgen_name("swift_retainCount")
-public func _getRetainCount(_ Value: AnyObject) -> UInt
-@_silgen_name("swift_unownedRetainCount")
-public func _getUnownedRetainCount(_ Value: AnyObject) -> UInt
-@_silgen_name("swift_weakRetainCount")
-public func _getWeakRetainCount(_ Value: AnyObject) -> UInt
+@_alwaysEmitIntoClient
+public func _getRetainCount(_ object: AnyObject) -> UInt {
+  let count = unsafe _withHeapObject(of: object) { unsafe _swift_retainCount($0) }
+  return UInt(bitPattern: count)
+}
+
+@_alwaysEmitIntoClient
+public func _getUnownedRetainCount(_ object: AnyObject) -> UInt {
+  let count = unsafe _withHeapObject(of: object) { unsafe _swift_unownedRetainCount($0) }
+  return UInt(bitPattern: count)
+}
+
+@_alwaysEmitIntoClient
+public func _getWeakRetainCount(_ object: AnyObject) -> UInt {
+  let count = unsafe _withHeapObject(of: object) { unsafe _swift_weakRetainCount($0) }
+  return UInt(bitPattern: count)
+}

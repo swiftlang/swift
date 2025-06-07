@@ -7,7 +7,7 @@
 
 // RUN: %target-typecheck-verify-swift -enable-bare-slash-regex -disable-availability-checking -I %t
 
-// REQUIRES: swift_in_compiler
+// REQUIRES: swift_swift_parser
 
 import A
 

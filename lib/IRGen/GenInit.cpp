@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Pattern.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/IRGen/Linking.h"
@@ -43,10 +44,12 @@ void IRGenModule::emitSILGlobalVariable(SILGlobalVariable *var) {
   // variable directly, don't actually emit it; just return undef.
   if (ti.isKnownEmpty(expansion)) {
     if (DebugInfo && var->getDecl()) {
-      auto DbgTy = DebugTypeInfo::getGlobal(var, Int8Ty, *this);
-      DebugInfo->emitGlobalVariableDeclaration(
-          nullptr, var->getDecl()->getName().str(), "", DbgTy,
-          var->getLinkage() != SILLinkage::Public, SILLocation(var->getDecl()));
+      auto DbgTy = DebugTypeInfo::getGlobal(var, *this);
+      DebugInfo->emitGlobalVariableDeclaration(nullptr, var->getDecl()->getName().str(),
+                                               "", DbgTy,
+                                               var->getLinkage() != SILLinkage::Public &&
+                                               var->getLinkage() != SILLinkage::Package,
+                                               SILLocation(var->getDecl()));
     }
     return;
   }
@@ -95,5 +98,9 @@ void TemporarySet::destroyAll(IRGenFunction &IGF) const {
 
 void Temporary::destroy(IRGenFunction &IGF) const {
   auto &ti = IGF.getTypeInfo(Type);
+  if (Type.isSensitive()) {
+    llvm::Value *size = ti.getSize(IGF, Type);
+    IGF.emitClearSensitive(Addr.getAddress(), size);
+  }
   ti.deallocateStack(IGF, Addr, Type);
 }

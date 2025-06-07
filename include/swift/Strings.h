@@ -26,6 +26,9 @@ constexpr static const StringLiteral SWIFT_ONONE_SUPPORT = "SwiftOnoneSupport";
 constexpr static const StringLiteral SWIFT_CONCURRENCY_NAME = "_Concurrency";
 /// The name of the Concurrency Shims Clang module
 constexpr static const StringLiteral SWIFT_CONCURRENCY_SHIMS_NAME = "_SwiftConcurrencyShims";
+/// The unique ABI prefix that swift-syntax uses when it's built as part of the
+/// compiler.
+constexpr static const StringLiteral SWIFT_MODULE_ABI_NAME_PREFIX = "Compiler";
 /// The name of the Distributed module, which supports that extension.
 constexpr static const StringLiteral SWIFT_DISTRIBUTED_NAME = "Distributed";
 /// The name of the StringProcessing module, which supports that extension.
@@ -34,6 +37,8 @@ constexpr static const StringLiteral SWIFT_STRING_PROCESSING_NAME = "_StringProc
 constexpr static const StringLiteral SWIFT_SHIMS_NAME = "SwiftShims";
 /// The name of the CxxShim module, which contains a cxx casting utility.
 constexpr static const StringLiteral CXX_SHIM_NAME = "CxxShim";
+/// The name of the Cxx module, which contains C++ interop helper protocols.
+constexpr static const StringLiteral CXX_MODULE_NAME = "Cxx";
 /// The name of the Builtin module, which contains Builtin functions.
 constexpr static const StringLiteral BUILTIN_NAME = "Builtin";
 /// The name of the clang imported header module.
@@ -58,8 +63,14 @@ constexpr static const StringLiteral SEMANTICS_PROGRAMTERMINATION_POINT =
 constexpr static const StringLiteral SEMANTICS_DEFAULT_ACTOR =
     "defaultActor";
 
+constexpr static const StringLiteral SEMANTICS_UNAVAILABLE_CODE_REACHED =
+    "unavailable_code_reached";
+
 constexpr static const StringLiteral DEFAULT_ACTOR_STORAGE_FIELD_NAME =
     "$defaultActor";
+
+constexpr static const StringLiteral NON_DEFAULT_DISTRIBUTED_ACTOR_STORAGE_FIELD_NAME =
+    "$nonDefaultDistributedActor";
 
 /// The name of the Builtin type prefix
 constexpr static const StringLiteral BUILTIN_TYPE_NAME_PREFIX = "Builtin.";
@@ -71,6 +82,10 @@ constexpr static const StringLiteral CLANG_MODULE_DEFAULT_SPI_GROUP_NAME =
 /// The attribute name for @_spi_available
 constexpr static const StringLiteral SPI_AVAILABLE_ATTRNAME =
   "_spi_available";
+
+/// The attribute name for @_unavailableInEmbedded
+constexpr static const StringLiteral UNAVAILABLE_IN_EMBEDDED_ATTRNAME =
+    "_unavailableInEmbedded";
 
 /// A composition class containing a StringLiteral for the names of
 /// Swift builtins. The reason we use this is to ensure that we when
@@ -141,12 +156,15 @@ constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_UNSAFEVALUEBUFFER =
 /// The name of the Builtin type for Job
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_JOB = {
     "Builtin.Job"};
-/// The name of the Builtin type for ExecutorRef
+/// The name of the Builtin type for SerialExecutorRef
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_EXECUTOR = {
     "Builtin.Executor"};
 /// The name of the Builtin type for DefaultActorStorage
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_DEFAULTACTORSTORAGE = {
     "Builtin.DefaultActorStorage"};
+/// The name of the Builtin type for NonDefaultDistributedActorStorage
+constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_NONDEFAULTDISTRIBUTEDACTORSTORAGE = {
+    "Builtin.NonDefaultDistributedActorStorage"};
 /// The name of the Builtin type for UnknownObject
 ///
 /// This no longer exists as an AST-accessible type, but it's still used for
@@ -156,6 +174,8 @@ constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_UNKNOWNOBJECT = {
 /// The name of the Builtin type for Vector
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_VEC = {
     "Builtin.Vec"};
+constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_FIXEDARRAY = {
+    "Builtin.FixedArray"};
 /// The name of the Builtin type for SILToken
 constexpr static BuiltinNameStringLiteral BUILTIN_TYPE_NAME_SILTOKEN = {
     "Builtin.SILToken"};

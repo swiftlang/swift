@@ -17,8 +17,10 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/PluginLoader.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/PrettyStackTrace.h"
@@ -198,7 +200,6 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
     return false;
 
   auto *oldSF = CachedCI->getIDEInspectionFile();
-  assert(oldSF->getBufferID());
 
   auto *oldState = oldSF->getDelayedParserState();
   assert(oldState->hasIDEInspectionDelayedDeclState());
@@ -206,7 +207,7 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
 
   auto &SM = CachedCI->getSourceMgr();
   auto bufferName = ideInspectionTargetBuffer->getBufferIdentifier();
-  if (SM.getIdentifierForBuffer(*oldSF->getBufferID()) != bufferName)
+  if (SM.getIdentifierForBuffer(oldSF->getBufferID()) != bufferName)
     return false;
 
   if (shouldCheckDependencies()) {
@@ -221,7 +222,7 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
     }
 
     if (areAnyDependentFilesInvalidated(
-            *CachedCI, *FileSystem, *oldSF->getBufferID(),
+            *CachedCI, *FileSystem, oldSF->getBufferID(),
             DependencyCheckedTimestamp, InMemoryDependencyHash))
       return false;
     DependencyCheckedTimestamp = std::chrono::system_clock::now();
@@ -239,9 +240,12 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
   DiagnosticEngine tmpDiags(tmpSM);
   ClangImporterOptions clangOpts;
   symbolgraphgen::SymbolGraphOptions symbolOpts;
+  CASOptions casOpts;
+  SerializationOptions serializationOpts =
+      CachedCI->getASTContext().SerializationOpts;
   std::unique_ptr<ASTContext> tmpCtx(
       ASTContext::get(langOpts, typeckOpts, silOpts, searchPathOpts, clangOpts,
-                      symbolOpts, tmpSM, tmpDiags));
+                      symbolOpts, casOpts, serializationOpts, tmpSM, tmpDiags));
   tmpCtx->CancellationFlag = CancellationFlag;
   registerParseRequestFunctions(tmpCtx->evaluator);
   registerIDERequestFunctions(tmpCtx->evaluator);
@@ -249,10 +253,9 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
   registerClangImporterRequestFunctions(tmpCtx->evaluator);
   registerConstExtractRequestFunctions(tmpCtx->evaluator);
   registerSILGenRequestFunctions(tmpCtx->evaluator);
-  ModuleDecl *tmpM = ModuleDecl::create(Identifier(), *tmpCtx);
+  ModuleDecl *tmpM = ModuleDecl::createEmpty(Identifier(), *tmpCtx);
   SourceFile *tmpSF = new (*tmpCtx)
       SourceFile(*tmpM, oldSF->Kind, tmpBufferID, oldSF->getParsingOptions());
-  tmpM->addAuxiliaryFile(*tmpSF);
 
   // FIXME: Since we don't setup module loaders on the temporary AST context,
   // 'canImport()' conditional compilation directive always fails. That causes
@@ -346,12 +349,14 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
         newBufferID,
         GeneratedSourceInfo{
           GeneratedSourceInfo::ReplacedFunctionBody,
-          AFD->getOriginalBodySourceRange(),
-          newBodyRange,
+          Lexer::getCharSourceRangeFromSourceRange(
+              SM, AFD->getOriginalBodySourceRange()),
+          Lexer::getCharSourceRangeFromSourceRange(SM, newBodyRange),
           AFD,
           nullptr
         }
     );
+    SM.recordSourceFile(newBufferID, AFD->getParentSourceFile());
 
     AFD->setBodyToBeReparsed(newBodyRange);
     oldSF->clearScope();
@@ -384,18 +389,20 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
 
     // Create a new module and a source file using the current AST context.
     auto &Ctx = oldM->getASTContext();
-    auto *newM = ModuleDecl::createMainModule(Ctx, oldM->getName(),
-                                              oldM->getImplicitImportInfo());
+    auto *newM = ModuleDecl::createMainModule(
+        Ctx, oldM->getName(), oldM->getImplicitImportInfo(),
+        [&](ModuleDecl *newM, auto addFile) {
+      addFile(new (Ctx) SourceFile(*newM, SourceFileKind::Main, newBufferID,
+                                   oldSF->getParsingOptions()));
+    });
     newM->setABIName(oldM->getABIName());
-    auto *newSF = new (Ctx) SourceFile(*newM, SourceFileKind::Main, newBufferID,
-                                       oldSF->getParsingOptions());
-    newM->addFile(*newSF);
 
     // Tell the compiler instance we've replaced the main module.
     CachedCI->setMainModule(newM);
 
     // Re-process the whole file (parsing will be lazily triggered). Still
     // re-use imported modules.
+    auto *newSF = &newM->getMainSourceFile();
     performImportResolution(*newSF);
     bindExtensions(*newM);
 
@@ -442,7 +449,8 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
 }
 
 void IDEInspectionInstance::performNewOperation(
-    Optional<llvm::hash_code> ArgsHash, swift::CompilerInvocation &Invocation,
+    std::optional<llvm::hash_code> ArgsHash,
+    swift::CompilerInvocation &Invocation,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     llvm::MemoryBuffer *ideInspectionTargetBuffer, unsigned int Offset,
     DiagnosticConsumer *DiagC,
@@ -481,6 +489,7 @@ void IDEInspectionInstance::performNewOperation(
           InstanceSetupError));
       return;
     }
+    CI->getASTContext().getPluginLoader().setRegistry(Plugins.get());
     CI->getASTContext().CancellationFlag = CancellationFlag;
     registerIDERequestFunctions(CI->getASTContext().evaluator);
 
@@ -590,8 +599,7 @@ void swift::ide::IDEInspectionInstance::codeComplete(
     llvm::function_ref<void(CancellableResult<CodeCompleteResult>)> Callback) {
   using ResultType = CancellableResult<CodeCompleteResult>;
 
-  struct ConsumerToCallbackAdapter
-      : public SimpleCachingCodeCompletionConsumer {
+  struct ConsumerToCallbackAdapter : public CodeCompletionConsumer {
     SwiftCompletionInfo SwiftContext;
     ImportDepth ImportDep;
     std::shared_ptr<std::atomic<bool>> CancellationFlag;
@@ -826,13 +834,13 @@ void swift::ide::IDEInspectionInstance::cursorInfo(
         : ReusingASTContext(ReusingASTContext),
           CancellationFlag(CancellationFlag), Callback(Callback) {}
 
-    void handleResults(const ResolvedCursorInfo &result) override {
+    void handleResults(std::vector<ResolvedCursorInfoPtr> result) override {
       HandleResultsCalled = true;
       if (CancellationFlag &&
           CancellationFlag->load(std::memory_order_relaxed)) {
         Callback(ResultType::cancelled());
       } else {
-        Callback(ResultType::success({&result, ReusingASTContext}));
+        Callback(ResultType::success({result, ReusingASTContext}));
       }
     }
   };
@@ -842,18 +850,17 @@ void swift::ide::IDEInspectionInstance::cursorInfo(
       CancellationFlag,
       [&](CancellableResult<IDEInspectionInstanceResult> CIResult) {
         CIResult.mapAsync<CursorInfoResults>(
-            [&CancellationFlag, Offset](auto &Result, auto DeliverTransformed) {
+            [&CancellationFlag](auto &Result, auto DeliverTransformed) {
               auto &Mgr = Result.CI->getSourceMgr();
-              auto RequestedLoc = Mgr.getLocForOffset(
-                  Mgr.getIDEInspectionTargetBufferID(), Offset);
+              auto RequestedLoc = Mgr.getIDEInspectionTargetLoc();
               ConsumerToCallbackAdapter Consumer(
                   Result.DidReuseAST, CancellationFlag, DeliverTransformed);
               std::unique_ptr<IDEInspectionCallbacksFactory> callbacksFactory(
                   ide::makeCursorInfoCallbacksFactory(Consumer, RequestedLoc));
 
               if (!Result.DidFindIDEInspectionTarget) {
-                return DeliverTransformed(ResultType::success(
-                    {/*Results=*/nullptr, Result.DidReuseAST}));
+                return DeliverTransformed(
+                    ResultType::success({/*Results=*/{}, Result.DidReuseAST}));
               }
 
               performIDEInspectionSecondPass(
@@ -863,8 +870,8 @@ void swift::ide::IDEInspectionInstance::cursorInfo(
                 // pass, we didn't receive any results. To make sure Callback
                 // gets called exactly once, call it manually with no results
                 // here.
-                DeliverTransformed(ResultType::success(
-                    {/*Results=*/nullptr, Result.DidReuseAST}));
+                DeliverTransformed(
+                    ResultType::success({/*Results=*/{}, Result.DidReuseAST}));
               }
             },
             Callback);

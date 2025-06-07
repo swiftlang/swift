@@ -1,0 +1,265 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -mandatory-performance-optimizations | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+sil_global [let] @g1 : $Int32
+sil_global [let] @g2 : $Int32
+
+sil @paable : $@convention(thin) (Builtin.Int64) -> ()
+sil @moved_pai_callee : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+sil @use_closure : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+
+sil [ossa] [transparent] @partial_apply_on_stack_nesting_violator : $@convention(thin) <T> () -> () {
+    %paable = function_ref @paable : $@convention(thin) (Builtin.Int64) -> ()
+    %one = integer_literal $Builtin.Int64, 1
+    %first = partial_apply [callee_guaranteed] [on_stack] %paable(%one) : $@convention(thin) (Builtin.Int64) -> ()
+    %two = integer_literal $Builtin.Int64, 2
+    %second = partial_apply [callee_guaranteed] [on_stack] %paable(%two) : $@convention(thin) (Builtin.Int64) -> ()
+    %f = function_ref @use_closure : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+    apply %f(%first) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+    apply %f(%second) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+    // Note that the destroy_values do not occur in an order which coincides
+    // with stack disciplined dealloc_stacks.
+    destroy_value %first : $@noescape @callee_guaranteed () -> ()
+    destroy_value %second : $@noescape @callee_guaranteed () -> ()
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// Verify that when inlining partial_apply_on_stack_nesting_violator, the stack
+// nesting of the on_stack closures is fixed.
+//
+// NON_OSSA: stack nesting is not fixed until after OSSA lowering. These tests only run mandatory optimization.
+//
+// CHECK-LABEL: sil [no_locks] [perf_constraint] [ossa] @test_inline_stack_violating_ossa_func : {{.*}} {
+// CHECK:         [[PAABLE:%[^,]+]] = function_ref @paable
+// CHECK:         [[FIRST:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] [[PAABLE]]
+// CHECK:         [[SECOND:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] [[PAABLE]]
+// NON_OSSA:          dealloc_stack [[SECOND]]
+// NON_OSSA:          dealloc_stack [[FIRST]]
+// CHECK-LABEL: } // end sil function 'test_inline_stack_violating_ossa_func'
+sil [no_locks] [ossa] @test_inline_stack_violating_ossa_func : $@convention(thin) () -> () {
+    %callee = function_ref @partial_apply_on_stack_nesting_violator : $@convention(thin) <T> () -> ()
+    apply %callee<Builtin.Int64>() : $@convention(thin) <T> () -> ()
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// CHECK-LABEL: sil hidden [no_allocation] [perf_constraint] [ossa] @moved_pai : {{.*}} {
+// CHECK-NOT:     partial_apply
+// CHECK-LABEL: } // end sil function 'moved_pai'
+sil hidden [no_allocation] [ossa] @moved_pai : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %addr = alloc_stack $Builtin.Int64
+  %42 = integer_literal $Builtin.Int64, 42
+  store %42 to [trivial] %addr : $*Builtin.Int64
+  %callee = function_ref @moved_pai_callee : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %closure = partial_apply [callee_guaranteed] %callee(%addr) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %closure_lifetime = move_value [lexical] %closure : $@callee_guaranteed () -> ()
+  debug_value %closure_lifetime : $@callee_guaranteed () -> ()
+  %copy = copy_value %closure_lifetime : $@callee_guaranteed () -> ()
+  apply %copy() : $@callee_guaranteed () -> ()
+  destroy_value %copy : $@callee_guaranteed () -> ()
+  %retval = load [trivial] %addr : $*Builtin.Int64
+  destroy_value %closure_lifetime : $@callee_guaranteed () -> ()
+  dealloc_stack %addr : $*Builtin.Int64
+  return %retval : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil [no_allocation] [perf_constraint] [ossa] @deserialize_and_inline_after_devirtualize
+// CHECK-NOT:     apply
+// CHECK:       } // end sil function 'deserialize_and_inline_after_devirtualize'
+sil [no_allocation] [ossa] @deserialize_and_inline_after_devirtualize : $@convention(thin) (@in Int) -> () {
+bb0(%0 : $*Int):
+  %1 = metatype $@thick Int.Type
+  %2 = witness_method $Int, #Comparable."<" : <Self where Self : Comparable> (Self.Type) -> (Self, Self) -> Bool : $@convention(witness_method: Comparable) <τ_0_0 where τ_0_0 : Comparable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Bool
+  %3 = apply %2<Int>(%0, %0, %1) : $@convention(witness_method: Comparable) <τ_0_0 where τ_0_0 : Comparable> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_0, @thick τ_0_0.Type) -> Bool
+  %4 = tuple()
+  return %4 : $()
+}
+
+// CHECK-LABEL: sil [no_allocation] [perf_constraint] [ossa] @memopt_and_dead_alloc
+// CHECK-NOT:         alloc_stack
+// CHECK-NOT:     load
+// CHECK:         return %0
+// CHECK:       } // end sil function 'memopt_and_dead_alloc'
+sil [no_allocation] [ossa] @memopt_and_dead_alloc : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
+bb0(%0 : $Builtin.Int32):
+  %1 = alloc_stack $Builtin.Int32
+  store %0 to [trivial] %1 : $*Builtin.Int32
+  %2 = load [trivial] %1 : $*Builtin.Int32
+  dealloc_stack %1 : $*Builtin.Int32
+  return %2 : $Builtin.Int32
+}
+
+// CHECK-LABEL: sil [no_allocation] [perf_constraint] [ossa] @dead_metatype :
+// CHECK-NOT:     metatype
+// CHECK-NOT:     debug_value
+// CHECK:       } // end sil function 'dead_metatype'
+sil [no_allocation] [ossa] @dead_metatype : $@convention(thin) () -> () {
+bb0:
+  %0 = metatype $@thick Int.Type
+  debug_value %0 : $@thick Int.Type
+  %2 = tuple ()
+  return %2 : $()
+}
+sil shared [ossa] [transparent] [serialized] [thunk] [canonical] @$sSiSLsSL1loiySbx_xtFZTW : $@convention(witness_method: Comparable) (@in_guaranteed Int, @in_guaranteed Int, @thick Int.Type) -> Bool {
+bb0(%0 : $*Int, %1 : $*Int, %2 : $@thick Int.Type):
+  %3 = integer_literal $Builtin.Int1, 0
+  %4 = struct $Bool (%3 : $Builtin.Int1)
+  return %4 : $Bool
+}
+
+sil_witness_table public_external [serialized] Int: Comparable module Swift {
+  base_protocol Equatable: Int: Equatable module Swift
+  method #Comparable."<": <Self where Self : Comparable> (Self.Type) -> (Self, Self) -> Bool : @$sSiSLsSL1loiySbx_xtFZTW
+}
+
+sil [ossa] @get_int_value : $@convention(thin) () -> Int32 {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 10
+  %1 = struct $Int32 (%0 : $Builtin.Int32)
+  return %1 : $Int32
+}
+
+// CHECK-LABEL: sil [global_init_once_fn] [no_locks] [perf_constraint] [ossa] @globalinit_inline_into_init :
+// CHECK-NOT:     apply
+// CHECK:       } // end sil function 'globalinit_inline_into_init'
+sil [global_init_once_fn] [no_locks] [ossa] @globalinit_inline_into_init : $@convention(c) () -> () {
+bb0:
+  alloc_global @g1
+  %1 = global_addr @g1 : $*Int32
+  %2 = function_ref @get_int_value : $@convention(thin) () -> Int32
+  %3 = apply %2() : $@convention(thin) () -> Int32
+  store %3 to [trivial] %1 : $*Int32
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// CHECK-LABEL: sil [serialized] [global_init_once_fn] [no_locks] [perf_constraint] [ossa] @globalinit_dont_inline_non_inlinable_into_inlinable :
+// CHECK:         apply
+// CHECK:       } // end sil function 'globalinit_dont_inline_non_inlinable_into_inlinable'
+sil [serialized] [global_init_once_fn] [no_locks] [ossa] @globalinit_dont_inline_non_inlinable_into_inlinable : $@convention(c) () -> () {
+bb0:
+  alloc_global @g2
+  %1 = global_addr @g2 : $*Int32
+  %2 = function_ref @get_int_value : $@convention(thin) () -> Int32
+  %3 = apply %2() : $@convention(thin) () -> Int32
+  store %3 to [trivial] %1 : $*Int32
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// Check that we don't crash on global init-once declarations.
+
+// CHECK-LABEL: sil [global_init_once_fn] [no_locks] @external_global_init_once : $@convention(c) () -> ()
+sil [global_init_once_fn] [no_locks] [ossa] @external_global_init_once : $@convention(c) () -> ()
+
+sil [ossa] @yield_int_value : $@convention(thin) @yield_once () -> (@yields Int32) {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 10
+  %1 = struct $Int32 (%0 : $Builtin.Int32)
+  yield %1 : $Int32, resume bb1, unwind bb2
+bb1:
+  %3 = tuple ()
+  return %3 : $()
+bb2:
+  unwind
+}
+
+// CHECK-LABEL: sil [no_locks] [perf_constraint] [ossa] @inline_begin_apply :
+// CHECK-NOT:     begin_apply
+// CHECK:       } // end sil function 'inline_begin_apply'
+sil [no_locks] [ossa] @inline_begin_apply : $@convention(thin) () -> Int32 {
+bb0:
+  %0 = function_ref @yield_int_value : $@convention(thin) @yield_once () -> (@yields Int32)
+  (%1, %2) = begin_apply %0() : $@convention(thin) @yield_once () -> (@yields Int32)
+  end_apply %2 as $()
+  return %1 : $Int32
+}
+
+// CHECK-LABEL: sil [no_locks] [perf_constraint] [ossa] @dont_inline_begin_apply :
+// CHECK:         begin_apply
+// CHECK:       } // end sil function 'dont_inline_begin_apply'
+sil [no_locks] [ossa] @dont_inline_begin_apply : $@convention(thin) () -> Int32 {
+bb0:
+  %0 = function_ref @yield_int_value : $@convention(thin) @yield_once () -> (@yields Int32)
+  (%1, %2) = begin_apply %0() : $@convention(thin) @yield_once () -> (@yields Int32)
+  cond_br undef, bb1, bb2
+bb1:
+  end_apply %2 as $()
+  br bb3
+bb2:
+  end_apply %2 as $()
+  br bb3
+bb3:
+  return %1 : $Int32
+}
+
+// CHECK-LABEL: sil [no_locks] [perf_constraint] [ossa] @remove_metatype_arg :
+// CHECK:         [[F:%.*]] = function_ref @$s12metatype_argTf4dnn_n : $@convention(thin) (Int, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+// CHECK:         [[A:%.*]] = apply [[F]](%0, %1) : $@convention(thin) (Int, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+// CHECK:         return [[A]]
+// CHECK:       } // end sil function 'remove_metatype_arg'
+sil [no_locks] [ossa] @remove_metatype_arg : $@convention(thin) (Int, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : $Int, %1 : @owned $Builtin.NativeObject):
+  %3 = metatype $@thick Int.Type
+  %7 = function_ref @metatype_arg : $@convention(thin) (Int, @thick Int.Type, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  %8 = apply %7(%0, %3, %1) : $@convention(thin) (Int, @thick Int.Type, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+  return %8 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil [signature_optimized_thunk] [perf_constraint] [ossa] @metatype_arg :
+sil [ossa] @metatype_arg : $@convention(thin) (Int, @thick Int.Type, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+bb0(%0 : $Int, %1 : $@thick Int.Type, %2 : @owned $Builtin.NativeObject):
+  fix_lifetime %1 : $@thick Int.Type
+  return %2 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil [no_locks] [perf_constraint] [ossa] @remove_metatype_arg_throws :
+// CHECK:         [[F:%.*]] = function_ref @$s19metatype_arg_throwsTf4dnn_n : $@convention(thin) (Int, @owned Builtin.NativeObject) -> (@owned Builtin.NativeObject, @error any Error)
+// CHECK:         try_apply [[F]](%0, %1) : $@convention(thin) (Int, @owned Builtin.NativeObject) -> (@owned Builtin.NativeObject, @error any Error), normal bb1, error bb2
+// CHECK:       bb1([[R:%.*]] : @owned $Builtin.NativeObject):
+// CHECK:         return [[R]]
+// CHECK:       bb2([[E:%.*]] : @owned $any Error):
+// CHECK:         throw [[E]] : $any Error  
+// CHECK:       } // end sil function 'remove_metatype_arg_throws'
+sil [no_locks] [ossa] @remove_metatype_arg_throws : $@convention(thin) (Int, @owned Builtin.NativeObject) -> (@owned Builtin.NativeObject, @error any Error) {
+bb0(%0 : $Int, %1 : @owned $Builtin.NativeObject):
+  %3 = metatype $@thick Int.Type
+  %4 = function_ref @metatype_arg_throws : $@convention(thin) (Int, @thick Int.Type, @owned Builtin.NativeObject) -> (@owned Builtin.NativeObject, @error any Error)
+  try_apply %4(%0, %3, %1) : $@convention(thin) (Int, @thick Int.Type, @owned Builtin.NativeObject) -> (@owned Builtin.NativeObject, @error any Error), normal bb1, error bb2
+
+bb1(%10 : @owned $Builtin.NativeObject):
+  return %10 : $Builtin.NativeObject
+
+bb2(%13 : @owned $any Error):
+  throw %13 : $any Error
+}
+
+// CHECK-LABEL: sil [signature_optimized_thunk] [perf_constraint] [ossa] @metatype_arg_throws :
+sil [ossa] @metatype_arg_throws : $@convention(thin) (Int, @thick Int.Type, @owned Builtin.NativeObject) -> (@owned Builtin.NativeObject, @error any Error) {
+bb0(%0 : $Int, %1 : $@thick Int.Type, %2 : @owned $Builtin.NativeObject):
+  fix_lifetime %1 : $@thick Int.Type
+  return %2 : $Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil [perf_constraint] [ossa] @$s12metatype_argTf4dnn_n : $@convention(thin) (Int, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
+// CHECK:       bb0(%0 : $Int, %1 : @owned $Builtin.NativeObject):
+// CHECK:         %2 = metatype $@thick Int.Type
+// CHECK:         fix_lifetime %2 : $@thick Int.Type
+// CHECK:         return %1 : $Builtin.NativeObject
+// CHECK:       } // end sil function '$s12metatype_argTf4dnn_n'
+
+// CHECK-LABEL: sil [perf_constraint] [ossa] @$s19metatype_arg_throwsTf4dnn_n : $@convention(thin) (Int, @owned Builtin.NativeObject) -> (@owned Builtin.NativeObject, @error any Error) {
+// CHECK:       bb0(%0 : $Int, %1 : @owned $Builtin.NativeObject):
+// CHECK:         %2 = metatype $@thick Int.Type
+// CHECK:         fix_lifetime %2 : $@thick Int.Type
+// CHECK:         return %1 : $Builtin.NativeObject
+// CHECK:       } // end sil function '$s19metatype_arg_throwsTf4dnn_n'

@@ -11,7 +11,7 @@ import Foo
 // RUN: %sourcekitd-test -req=complete.cache.ondisk -cache-path=%t.ccp == \
 // RUN:     -req=complete -pos=2:1 %s -- %s -F %S/../Inputs/libIDE-mock-sdk > %t.completions2
 
-// Sanity check the results
+// Soundness check the results
 // RUN: %FileCheck %s < %t.completions1
 // RUN: %FileCheck %s < %t.completions2
 // CHECK: key.name: "FooStruct
@@ -26,22 +26,22 @@ func test2() {
   for i in 1...#^VOID_2,fooFunc^# {}
 }
 // VOID_1: key.name: "fooFuncNoreturn1()",
-// VOID_1-NEXT: key.sourcetext:
 // VOID_1-NEXT: key.description:
 // VOID_1-NEXT: key.typename: "Never",
 // VOID_1-NEXT: key.context: source.codecompletion.context.othermodule,
 // VOID_1-NEXT: key.moduleimportdepth: 1,
 // VOID_1-NEXT: key.num_bytes_to_erase: 0,
 // VOID_1-NEXT: key.substructure:
+// VOID_1: key.sourcetext:
 
 // VOID_1: key.name: "fooHelperSubFunc1(:)",
-// VOID_1-NEXT: key.sourcetext:
 // VOID_1-NEXT: key.description:
 // VOID_1-NEXT: key.typename: "Int32",
 // VOID_1-NEXT: key.context: source.codecompletion.context.othermodule,
 // VOID_1-NEXT: key.moduleimportdepth: 2,
 // VOID_1-NEXT: key.num_bytes_to_erase: 0,
 // VOID_1-NEXT: key.substructure:
+// VOID_1: key.sourcetext:
 
 func test3() {
   #^VOID_3,fooFunc^# {}

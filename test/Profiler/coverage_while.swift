@@ -123,6 +123,19 @@ func goo() {
   } while false // CHECK-DAG: [[@LINE]]:11 -> [[@LINE]]:16 : ([[RWS8]] - [[RET1]])
 }
 
-eoo()
-foo()
-goo()
+// CHECK-LABEL: sil_coverage_map {{.*}}// coverage_while.hoo
+func hoo() {       // CHECK-NEXT: [[@LINE]]:12 -> [[@LINE+5]]:2 : 0
+  var i: Int = 0
+  while (i < 10) { // CHECK-NEXT: [[@LINE]]:9 -> [[@LINE]]:17 : (0 + 1)
+    i += 1         // CHECK-NEXT: [[@LINE-1]]:18 -> [[@LINE+1]]:4 : 1
+  }                // CHECK-NEXT: [[@LINE]]:4 -> [[@LINE+1]]:2 : 0
+}
+
+// CHECK-LABEL: sil_coverage_map {{.*}}// coverage_while.ioo
+func ioo() {   // CHECK-NEXT: [[@LINE]]:12   -> [[@LINE+6]]:2  : 0
+  repeat {     // CHECK-NEXT: [[@LINE]]:10   -> [[@LINE+3]]:4  : 1
+    break      // CHECK-NEXT: [[@LINE+1]]:5  -> [[@LINE+1]]:10 : zero
+    break      // FIXME: This next region seems wrong, we exit the loop the same number of times we enter (rdar://118472537).
+  } while true // CHECK-NEXT: [[@LINE]]:4    -> [[@LINE+2]]:2  : (0 - 1)
+               // CHECK-NEXT: [[@LINE-1]]:11 -> [[@LINE-1]]:15 : zero
+}              // CHECK-NEXT: }

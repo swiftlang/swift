@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "arc-sequence-opts"
 #include "ARCBBState.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -199,11 +200,11 @@ ARCBBStateInfo::ARCBBStateInfo(SILFunction *F, PostOrderAnalysis *POA,
   }
 }
 
-llvm::Optional<ARCBBStateInfoHandle>
+std::optional<ARCBBStateInfoHandle>
 ARCBBStateInfo::getBottomUpBBHandle(SILBasicBlock *BB) {
   auto OptID = getBBID(BB);
   if (!OptID.has_value())
-    return None;
+    return std::nullopt;
 
   unsigned ID = OptID.value();
 
@@ -214,11 +215,11 @@ ARCBBStateInfo::getBottomUpBBHandle(SILBasicBlock *BB) {
                               BackedgeIter->second);
 }
 
-llvm::Optional<ARCBBStateInfoHandle>
+std::optional<ARCBBStateInfoHandle>
 ARCBBStateInfo::getTopDownBBHandle(SILBasicBlock *BB) {
   auto MaybeID = getBBID(BB);
   if (!MaybeID.has_value())
-    return None;
+    return std::nullopt;
 
   unsigned ID = MaybeID.value();
 
@@ -229,10 +230,10 @@ ARCBBStateInfo::getTopDownBBHandle(SILBasicBlock *BB) {
                               BackedgeIter->second);
 }
 
-llvm::Optional<unsigned> ARCBBStateInfo::getBBID(SILBasicBlock *BB) const {
+std::optional<unsigned> ARCBBStateInfo::getBBID(SILBasicBlock *BB) const {
   auto Iter = BBToBBIDMap.find(BB);
   if (Iter == BBToBBIDMap.end())
-    return None;
+    return std::nullopt;
   return Iter->second;
 }
 

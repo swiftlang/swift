@@ -47,9 +47,6 @@ VARIABLE(SWIFT_DEBUG_ENABLE_MALLOC_SCRIBBLE, bool, false,
 VARIABLE(SWIFT_DEBUG_ENABLE_COW_CHECKS, bool, false,
          "Enable internal checks for copy-on-write operations.")
 
-VARIABLE(SWIFT_ENABLE_ASYNC_JOB_DISPATCH_INTEGRATION, bool, true,
-         "Enable use of dispatch_async_swift_job when available.")
-
 VARIABLE(SWIFT_DEBUG_VALIDATE_UNCHECKED_CONTINUATIONS, bool, false,
          "Check for and error on double-calls of unchecked continuations.")
 
@@ -80,5 +77,65 @@ VARIABLE(SWIFT_BINARY_COMPATIBILITY_VERSION, uint32_t, 0,
 
 VARIABLE(SWIFT_DEBUG_FAILED_TYPE_LOOKUP, bool, false,
          "Enable warnings when we fail to look up a type by name.")
+
+VARIABLE(SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED_METADATA, bool, true,
+         "Enable use of metadata in prespecializations library.")
+
+VARIABLE(SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED_DESCRIPTOR_LOOKUP, bool, true,
+         "Enable use of descriptor map in prespecializations library.")
+
+VARIABLE(SWIFT_DEBUG_VALIDATE_LIB_PRESPECIALIZED_DESCRIPTOR_LOOKUP, bool, false,
+         "Validate results from the prespecializations map descriptor map by "
+         "comparing to a full scan.")
+
+VARIABLE(SWIFT_DEBUG_LIB_PRESPECIALIZED_PATH, string, "",
+         "A path to a prespecializations library to use at runtime. In order "
+         "to be used, this library must be loaded into the process by other "
+         "means (such as DYLD_INSERT_LIBRARIES) before Swift tries to use it.")
+
+VARIABLE(SWIFT_DEBUG_LIB_PRESPECIALIZED_DISABLED_PROCESSES, string, "",
+         "A colon-separated list of process names where the prespecializations "
+         "library will be forcibly disabled.")
+
+VARIABLE(SWIFT_DEBUG_LIB_PRESPECIALIZED_ENABLED_PROCESSES, string, "",
+         "A colon-separated list of process names where the prespecializations "
+         "library will be forcibly enabled. This overrides the disabled "
+         "processes list in the prespecializations library, as well as the "
+         "list in SWIFT_DEBUG_LIB_PRESPECIALIZED_DISABLED_PROCESSES.")
+
+VARIABLE(SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED_LOGGING, bool, false,
+         "Enable debug logging of prespecializations library use.")
+
+VARIABLE(SWIFT_ROOT, string, "",
+         "Overrides the root directory of the Swift installation. "
+         "This is used to locate auxiliary files relative to the runtime "
+         "itself.")
+
+VARIABLE(SWIFT_BACKTRACE, string, "",
+         "A comma-separated list of key=value pairs that controls the "
+         "crash catching and backtracing support in the runtime. "
+         "See docs/Backtracing.rst in the Swift repository for details.")
+
+VARIABLE(SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE, string, "",
+         "Allows for suppressing 'is current executor' equality check crashes. "
+         "As since Swift 6.0 checking for current executor equality, may crash "
+         "and will never return 'false' because we are calling into library "
+         "implemented SerialExecutor.checkIsolation which should crash if the "
+         "isolation is not the expected one. Some old code may rely on the "
+         "non-crashing behavior. This flag enables temporarily restoring the "
+         "legacy 'nocrash' behavior until adopting code has been adjusted. "
+         "It is possible to force the use of Swift 6.2's "
+         "isIsolatingCurrentContext instead of checkIsolated by passing "
+         " the 'isIsolatingCurrentContext' configuration value. "
+         "Legal values are: "
+         " 'legacy' (Legacy behavior), "
+         " 'swift6' (Swift 6.0-6.1 behavior)"
+         " 'isIsolatingCurrentContext' (Swift 6.2 behavior)")
+
+VARIABLE(SWIFT_DUMP_ACCESSIBLE_FUNCTIONS, bool, false,
+         "Dump a listing of all 'AccessibleFunctionRecord's upon first access. "
+         "These are used to obtain function pointers from accessible function "
+         "record names, e.g. by the Distributed runtime to invoke distributed "
+         "functions.")
 
 #undef VARIABLE

@@ -1,0 +1,23 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name Bottom -module-abi-name Top -module-interface-preserve-types-as-written
+
+import Swift
+
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+public protocol Aspect {
+  associatedtype Orientation : Bottom.Aspect
+  var orientation: Self.Orientation { get }
+}
+
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+public struct Parameter {
+}
+
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+public struct ReferencesTop {
+  @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+  public func orientation(of parameter: Bottom.Parameter) -> some Bottom.Aspect
+
+  @available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+  public typealias Orientation = @_opaqueReturnTypeOf("$s3Top13ReferencesTopV11orientation2ofQrAA9ParameterV_tF", 0) __
+}

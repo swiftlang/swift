@@ -29,8 +29,9 @@ func _isDebugAssertConfiguration() -> Bool {
   return Int32(Builtin.assert_configuration()) == 0
 }
 
-@usableFromInline @_transparent
-internal func _isReleaseAssertConfiguration() -> Bool {
+@_transparent
+public // @testable, used in _Concurrency executor preconditions
+func _isReleaseAssertConfiguration() -> Bool {
   // The values for the assert_configuration call are:
   // 0: Debug
   // 1: Release
@@ -73,7 +74,7 @@ func _isStdlibDebugChecksEnabled() -> Bool {
 internal func _fatalErrorFlags() -> UInt32 {
   // The current flags are:
   // (1 << 0): Report backtrace on fatal error
-#if os(iOS) || os(tvOS) || os(watchOS)
+#if os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
   return 0
 #else
   return _isDebugAssertConfiguration() ? 1 : 0
@@ -83,23 +84,29 @@ internal func _fatalErrorFlags() -> UInt32 {
 /// This function should be used only in the implementation of user-level
 /// assertions.
 ///
-/// This function should not be inlined because it is cold and inlining just
-/// bloats code.
+/// This function should not be inlined in desktop Swift because it is cold and
+/// inlining just bloats code. In Embedded Swift, we force inlining as this
+/// function is typically just a trap (in release configurations).
 @usableFromInline
+#if !$Embedded
 @inline(never)
+#else
+@inline(__always)
+#endif
 @_semantics("programtermination_point")
 internal func _assertionFailure(
   _ prefix: StaticString, _ message: StaticString,
   file: StaticString, line: UInt,
   flags: UInt32
 ) -> Never {
+#if !$Embedded
   prefix.withUTF8Buffer {
     (prefix) -> Void in
     message.withUTF8Buffer {
       (message) -> Void in
       file.withUTF8Buffer {
         (file) -> Void in
-        _swift_stdlib_reportFatalErrorInFile(
+        unsafe _swift_stdlib_reportFatalErrorInFile(
           prefix.baseAddress!, CInt(prefix.count),
           message.baseAddress!, CInt(message.count),
           file.baseAddress!, CInt(file.count), UInt32(line),
@@ -108,22 +115,35 @@ internal func _assertionFailure(
       }
     }
   }
+#else
+  if _isDebugAssertConfiguration() {
+    _embeddedReportFatalErrorInFile(prefix: prefix, message: message,
+      file: file, line: line)
+  }
+#endif
   Builtin.int_trap()
 }
 
 /// This function should be used only in the implementation of user-level
 /// assertions.
 ///
-/// This function should not be inlined because it is cold and inlining just
-/// bloats code.
+/// This function should not be inlined in desktop Swift because it is cold and
+/// inlining just bloats code. In Embedded Swift, we force inlining as this
+/// function is typically just a trap (in release configurations).
 @usableFromInline
+#if !$Embedded
 @inline(never)
+#else
+@_disfavoredOverload
+@inline(__always)
+#endif
 @_semantics("programtermination_point")
 internal func _assertionFailure(
   _ prefix: StaticString, _ message: String,
   file: StaticString, line: UInt,
   flags: UInt32
 ) -> Never {
+#if !$Embedded
   prefix.withUTF8Buffer {
     (prefix) -> Void in
     var message = message
@@ -131,7 +151,7 @@ internal func _assertionFailure(
       (messageUTF8) -> Void in
       file.withUTF8Buffer {
         (file) -> Void in
-        _swift_stdlib_reportFatalErrorInFile(
+        unsafe _swift_stdlib_reportFatalErrorInFile(
           prefix.baseAddress!, CInt(prefix.count),
           messageUTF8.baseAddress!, CInt(messageUTF8.count),
           file.baseAddress!, CInt(file.count), UInt32(line),
@@ -139,6 +159,14 @@ internal func _assertionFailure(
       }
     }
   }
+#else
+  if _isDebugAssertConfiguration() {
+    var message = message
+    message.withUTF8 { (messageUTF8) -> Void in
+      unsafe _embeddedReportFatalErrorInFile(prefix: prefix, message: messageUTF8, file: file, line: line)
+    }
+  }
+#endif
 
   Builtin.int_trap()
 }
@@ -146,11 +174,17 @@ internal func _assertionFailure(
 /// This function should be used only in the implementation of user-level
 /// assertions.
 ///
-/// This function should not be inlined because it is cold and inlining just
-/// bloats code.
+/// This function should not be inlined in desktop Swift because it is cold and
+/// inlining just bloats code. In Embedded Swift, we force inlining as this
+/// function is typically just a trap (in release configurations).
 @usableFromInline
+#if !$Embedded
 @inline(never)
+#else
+@inline(__always)
+#endif
 @_semantics("programtermination_point")
+@_unavailableInEmbedded
 internal func _assertionFailure(
   _ prefix: StaticString, _ message: String,
   flags: UInt32
@@ -160,7 +194,7 @@ internal func _assertionFailure(
     var message = message
     message.withUTF8 {
       (messageUTF8) -> Void in
-      _swift_stdlib_reportFatalError(
+      unsafe _swift_stdlib_reportFatalError(
         prefix.baseAddress!, CInt(prefix.count),
         messageUTF8.baseAddress!, CInt(messageUTF8.count),
         flags)
@@ -170,13 +204,34 @@ internal func _assertionFailure(
   Builtin.int_trap()
 }
 
+#if $Embedded
+@usableFromInline
+@inline(never)
+@_semantics("programtermination_point")
+internal func _assertionFailure(
+  _ prefix: StaticString, _ message: StaticString,
+  flags: UInt32
+) -> Never {
+  if _isDebugAssertConfiguration() {
+    _embeddedReportFatalError(prefix: prefix, message: message)
+  }
+
+  Builtin.int_trap()
+}
+#endif
+
 /// This function should be used only in the implementation of stdlib
 /// assertions.
 ///
-/// This function should not be inlined because it is cold and it inlining just
-/// bloats code.
+/// This function should not be inlined in desktop Swift because it is cold and
+/// inlining just bloats code. In Embedded Swift, we force inlining as this
+/// function is typically just a trap (in release configurations).
 @usableFromInline
+#if !$Embedded
 @inline(never)
+#else
+@inline(__always)
+#endif
 @_semantics("programtermination_point")
 internal func _fatalErrorMessage(
   _ prefix: StaticString, _ message: StaticString,
@@ -201,6 +256,7 @@ func _unimplementedInitializer(className: StaticString,
   // redundant parameter values (#file etc.) are eliminated, and don't leak
   // information about the user's source.
 
+#if !$Embedded
   if _isDebugAssertConfiguration() {
     className.withUTF8Buffer {
       (className) in
@@ -208,7 +264,7 @@ func _unimplementedInitializer(className: StaticString,
         (initName) in
         file.withUTF8Buffer {
           (file) in
-          _swift_stdlib_reportUnimplementedInitializerInFile(
+          unsafe _swift_stdlib_reportUnimplementedInitializerInFile(
             className.baseAddress!, CInt(className.count),
             initName.baseAddress!, CInt(initName.count),
             file.baseAddress!, CInt(file.count),
@@ -222,17 +278,21 @@ func _unimplementedInitializer(className: StaticString,
       (className) in
       initName.withUTF8Buffer {
         (initName) in
-        _swift_stdlib_reportUnimplementedInitializer(
+        unsafe _swift_stdlib_reportUnimplementedInitializer(
           className.baseAddress!, CInt(className.count),
           initName.baseAddress!, CInt(initName.count),
           /*flags:*/ 0)
       }
     }
   }
+#endif
 
   Builtin.int_trap()
 }
 
+#if !$Embedded
+
+/// Used to evaluate editor placeholders.
 public // COMPILER_INTRINSIC
 func _undefined<T>(
   _ message: @autoclosure () -> String = String(),
@@ -241,36 +301,91 @@ func _undefined<T>(
   _assertionFailure("Fatal error", message(), file: file, line: line, flags: 0)
 }
 
+#else
+
+/// Used to evaluate editor placeholders.
+public // COMPILER_INTRINSIC
+func _undefined<T>(
+  _ message: @autoclosure () -> StaticString = StaticString(),
+  file: StaticString = #file, line: UInt = #line
+) -> T {
+  _assertionFailure("Fatal error", message(), file: file, line: line, flags: 0)
+}
+
+#endif
+
 /// Called when falling off the end of a switch and the type can be represented
 /// as a raw value.
 ///
-/// This function should not be inlined because it is cold and inlining just
-/// bloats code. It doesn't take a source location because it's most important
+/// This function should not be inlined in desktop Swift because it is cold and
+/// inlining just bloats code. In Embedded Swift, we force inlining as this
+/// function is typically just a trap (in release configurations).
+///
+/// It doesn't take a source location because it's most important
 /// in release builds anyway (old apps that are run on new OSs).
+#if !$Embedded
 @inline(never)
+#else
+@inline(__always)
+#endif
 @usableFromInline // COMPILER_INTRINSIC
 internal func _diagnoseUnexpectedEnumCaseValue<SwitchedValue, RawValue>(
   type: SwitchedValue.Type,
   rawValue: RawValue
 ) -> Never {
+#if !$Embedded
   _assertionFailure("Fatal error",
                     "unexpected enum case '\(type)(rawValue: \(rawValue))'",
                     flags: _fatalErrorFlags())
+#else
+  Builtin.int_trap()
+#endif
 }
 
 /// Called when falling off the end of a switch and the value is not safe to
 /// print.
 ///
-/// This function should not be inlined because it is cold and inlining just
-/// bloats code. It doesn't take a source location because it's most important
+/// This function should not be inlined in desktop Swift because it is cold and
+/// inlining just bloats code. In Embedded Swift, we force inlining as this
+/// function is typically just a trap (in release configurations).
+///
+/// It doesn't take a source location because it's most important
 /// in release builds anyway (old apps that are run on new OSs).
+#if !$Embedded
 @inline(never)
+#else
+@inline(__always)
+#endif
 @usableFromInline // COMPILER_INTRINSIC
 internal func _diagnoseUnexpectedEnumCase<SwitchedValue>(
   type: SwitchedValue.Type
 ) -> Never {
+#if !$Embedded
   _assertionFailure(
     "Fatal error",
     "unexpected enum case while switching on value of type '\(type)'",
     flags: _fatalErrorFlags())
+#else
+  Builtin.int_trap()
+#endif
+}
+
+/// Called when a function marked `unavailable` with `@available` is invoked
+/// and the module containing the unavailable function was compiled with
+/// `-unavailable-decl-optimization=stub`.
+///
+/// This function should not be inlined in desktop Swift because it is cold and
+/// inlining just bloats code. In Embedded Swift, we force inlining as this
+/// function is typically just a trap (in release configurations).
+@backDeployed(before: SwiftStdlib 5.9)
+#if !$Embedded
+@inline(never)
+#else
+@inline(__always)
+#endif
+@_semantics("unavailable_code_reached")
+@usableFromInline // COMPILER_INTRINSIC
+internal func _diagnoseUnavailableCodeReached() -> Never {
+  _assertionFailure(
+    "Fatal error", "Unavailable code reached", flags: _fatalErrorFlags())
 }

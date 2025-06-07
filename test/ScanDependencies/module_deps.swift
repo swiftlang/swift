@@ -2,11 +2,13 @@
 // RUN: mkdir -p %t/clang-module-cache
 
 // RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -emit-dependencies -emit-dependencies-path %t/deps.d -import-objc-header %S/Inputs/CHeaders/Bridging.h -swift-version 4
-// Check the contents of the JSON output
-// RUN: %FileCheck -check-prefix CHECK_NO_CLANG_TARGET %s < %t/deps.json
+
+// RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json deps | %FileCheck --check-prefix CHECK-NO-MODULES %s --allow-empty
+// CHECK-NO-MODULES-NOT: -swift-module-file
+// CHECK-NO-MODULES-NOT: -fmodule-file
 
 // Check the contents of the JSON output
-// RUN: %FileCheck %s -check-prefix CHECK-NO-SEARCH-PATHS < %t/deps.json
+// RUN: %validate-json %t/deps.json | %FileCheck %s -check-prefix CHECK-NO-SEARCH-PATHS
 
 // Check the make-style dependencies file
 // RUN: %FileCheck %s -check-prefix CHECK-MAKE-DEPS < %t/deps.d
@@ -22,12 +24,9 @@
 
 // Ensure that round-trip serialization does not affect result
 // RUN: %target-swift-frontend -scan-dependencies -test-dependency-scan-cache-serialization -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -import-objc-header %S/Inputs/CHeaders/Bridging.h -swift-version 4
-// RUN: %FileCheck -check-prefix CHECK_NO_CLANG_TARGET %s < %t/deps.json
 
 // Ensure that scanning with `-clang-target` makes sure that Swift modules' respective PCM-dependency-build-argument sets do not contain target triples.
 // RUN: %target-swift-frontend -scan-dependencies -module-cache-path %t/clang-module-cache %s -o %t/deps_clang_target.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -import-objc-header %S/Inputs/CHeaders/Bridging.h -swift-version 4 -clang-target %target-cpu-apple-macosx10.14
-// Check the contents of the JSON output
-// RUN: %FileCheck -check-prefix CHECK_CLANG_TARGET %s < %t/deps_clang_target.json
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
@@ -57,11 +56,7 @@ import SubE
 // CHECK-DAG:     "swift": "_cross_import_E"
 // CHECK: ],
 
-// CHECK:      "extraPcmArgs": [
-// CHECK-NEXT:    "-Xcc",
-// CHECK-NEXT:    "-target",
-// CHECK-NEXT:    "-Xcc",
-// CHECK:         "-fapinotes-swift-version=4"
+// CHECK:      "contextHash":
 // CHECK-NOT: "error: cannot open Swift placeholder dependency module map from"
 // CHECK: "bridgingHeader":
 // CHECK-NEXT: "path":
@@ -103,7 +98,7 @@ import SubE
 
 // CHECK: "commandLine": [
 // CHECK-NEXT: "-frontend"
-// CHECK-NEXT: "-only-use-extra-clang-opts"
+// CHECK: "-direct-clang-cc1-module-build"
 // CHECK-NOT:  "BUILD_DIR/bin/clang"
 // CHECK:      "-Xcc"
 // CHECK-NEXT: "-resource-dir"
@@ -113,13 +108,6 @@ import SubE
 // CHECK-NEXT: "-emit-pcm",
 // CHECK-NEXT: "-module-name",
 // CHECK-NEXT: "C"
-
-// CHECK: "capturedPCMArgs": [
-// CHECK-NEXT:   [,
-// CHECK-NEXT:     "-Xcc",
-// CHECK-NEXT:     "-fapinotes-swift-version=4"
-// CHECK-NEXT:   ]
-// CHECK-NEXT: ]
 
 /// --------Swift module E
 // CHECK: "swift": "E"
@@ -162,13 +150,6 @@ import SubE
 // CHECK: "-swift-version"
 // CHECK: "5"
 // CHECK: ],
-// CHECK_NO_CLANG_TARGET: "extraPcmArgs": [
-// CHECK_NO_CLANG_TARGET-NEXT:   "-Xcc",
-// CHECK_NO_CLANG_TARGET-NEXT:   "-target",
-// CHECK_CLANG_TARGET: "extraPcmArgs": [
-// CHECK_CLANG_TARGET-NEXT:   "-Xcc",
-// CHECK_CLANG_TARGET-NEXT:   "-fapinotes-swift-version={{.*}}"
-// CHECK_CLANG_TARGET-NEXT:   ]
 
 /// --------Swift module Swift
 // CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}Swift-{{.*}}.swiftmodule",

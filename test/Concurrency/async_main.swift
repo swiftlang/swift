@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-sil -disable-availability-checking -parse-as-library %s | %FileCheck %s --check-prefix=CHECK-SIL
-// RUN: %target-build-swift  -Xfrontend -disable-availability-checking -Xfrontend -parse-as-library %s -o %t_binary
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -target %target-swift-5.1-abi-triple -parse-as-library %s | %FileCheck %s --check-prefix=CHECK-SIL
+// RUN: %target-build-swift  -target %target-swift-5.1-abi-triple -Xfrontend -parse-as-library %s -o %t_binary
 // RUN: %target-codesign %t_binary
 // RUN: %target-run %t_binary | %FileCheck %s --check-prefix=CHECK-EXEC
 
@@ -40,7 +40,7 @@ func asyncFunc() async {
 
 
 // async_Main
-// CHECK-SIL-LABEL: sil hidden @async_Main : $@convention(thin) @async () -> () {
+// CHECK-SIL-LABEL: sil private @async_Main : $@convention(thin) @async () -> () {
 // call main
 // CHECK-SIL:  %0 = metatype $@thin MyProgram.Type             // user: %2
 // CHECK-SIL-NEXT:  // function_ref static MyProgram.$main()
@@ -64,27 +64,28 @@ func asyncFunc() async {
 // CHECK-SIL-LABEL: sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 
 // CHECK-SIL:       // function_ref async_Main
-// CHECK-SIL-NEXT:  %2 = function_ref @async_Main : $@convention(thin) @async () -> ()
-// CHECK-SIL-NEXT:  %3 = integer_literal $Builtin.Int64, 2048
-// CHECK-SIL-NEXT:  %4 = struct $Int (%3 : $Builtin.Int64)
-// CHECK-SIL-NEXT:  %5 = metatype $@thick ().Type
-// CHECK-SIL-NEXT:  %6 = init_existential_metatype %5 : $@thick ().Type, $@thick any Any.Type
+// CHECK-SIL-NEXT:  [[ASYNC_MAIN_FN:%.*]] = function_ref @async_Main : $@convention(thin) @async () -> ()
+// CHECK-SIL-NEXT:  [[T0:%.*]] = integer_literal $Builtin.Int64, 2048
+// CHECK-SIL-NEXT:  [[FLAGS:%.*]] = struct $Int ([[T0]] : $Builtin.Int64)
+// CHECK-SIL-NEXT:  [[OPT_SERIAL_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+// CHECK-SIL-NEXT:  [[GROUP:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.none
+// CHECK-SIL-NEXT:  [[TASK_EXECUTOR_UNOWNED:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+// CHECK-SIL-NEXT:  [[TASK_EXECUTOR_OWNED:%.*]] = enum $Optional<any TaskExecutor>, #Optional.none
+// CHECK-SIL-NEXT:  [[TASK_NAME:%.*]] = enum $Optional<Builtin.RawPointer>, #Optional.none
 // CHECK-SIL-NEXT:  // function_ref thunk for @escaping @convention(thin) @async () -> ()
-// CHECK-SIL-NEXT:  %7 = function_ref @$sIetH_yts5Error_pIegHrzo_TR : $@convention(thin) @async (@convention(thin) @async () -> ()) -> (@out (), @error any Error)
-// CHECK-SIL-NEXT:  %8 = partial_apply [callee_guaranteed] %7(%2) : $@convention(thin) @async (@convention(thin) @async () -> ()) -> (@out (), @error any Error)
-// CHECK-SIL-NEXT:  %9 = convert_function %8 : $@async @callee_guaranteed () -> (@out (), @error any Error) to $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()>
-// CHECK-SIL-NEXT:  %10 = builtin "createAsyncTask"<()>(%4 : $Int, %6 : $@thick any Any.Type, %9 : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()>) : $(Builtin.NativeObject, Builtin.RawPointer)
-// CHECK-SIL-NEXT:  %11 = tuple_extract %10 : $(Builtin.NativeObject, Builtin.RawPointer), 0
+// CHECK-SIL-NEXT:  [[THUNK_FN:%.*]] = function_ref @$sIetH_yts5Error_pIegHrzo_TR : $@convention(thin) @async (@convention(thin) @async () -> ()) -> (@out (), @error any Error)
+// CHECK-SIL-NEXT:  [[THUNK:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]([[ASYNC_MAIN_FN]]) : $@convention(thin) @async (@convention(thin) @async () -> ()) -> (@out (), @error any Error)
+// CHECK-SIL-NEXT:  [[CONVERTED_THUNK:%.*]] = convert_function [[THUNK]] : $@async @callee_guaranteed () -> (@out (), @error any Error) to $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()>
+// CHECK-SIL-NEXT:  [[TASK_RESULT:%.*]] = builtin "createAsyncTask"<()>([[FLAGS]] : $Int, [[OPT_SERIAL_EXECUTOR]] : $Optional<Builtin.Executor>, [[GROUP]] : $Optional<Builtin.RawPointer>, [[TASK_EXECUTOR_UNOWNED]] : $Optional<Builtin.Executor>, [[TASK_EXECUTOR_OWNED]] : $Optional<any TaskExecutor>, [[TASK_NAME]] : $Optional<Builtin.RawPointer>, [[CONVERTED_THUNK]] : $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()>) : $(Builtin.NativeObject, Builtin.RawPointer)
+// CHECK-SIL-NEXT:  [[TASK:%.*]] = tuple_extract [[TASK_RESULT]] : $(Builtin.NativeObject, Builtin.RawPointer), 0
 // CHECK-SIL-NEXT:  // function_ref swift_job_run
-// CHECK-SIL-NEXT:  %12 = function_ref @swift_job_run : $@convention(thin) (UnownedJob, UnownedSerialExecutor) -> ()
-// CHECK-SIL-NEXT:  %13 = builtin "convertTaskToJob"(%11 : $Builtin.NativeObject) : $Builtin.Job
-// CHECK-SIL-NEXT:  %14 = struct $UnownedJob (%13 : $Builtin.Job)
-// CHECK-SIL-NEXT:  // function_ref swift_task_getMainExecutor
-// CHECK-SIL-NEXT:  %15 = function_ref @swift_task_getMainExecutor : $@convention(thin) () -> Builtin.Executor
-// CHECK-SIL-NEXT:  %16 = apply %15() : $@convention(thin) () -> Builtin.Executor
-// CHECK-SIL-NEXT:  %17 = struct $UnownedSerialExecutor (%16 : $Builtin.Executor)
-// CHECK-SIL-NEXT:  %18 = apply %12(%14, %17) : $@convention(thin) (UnownedJob, UnownedSerialExecutor) -> ()
+// CHECK-SIL-NEXT:  [[RUN_FN:%.*]] = function_ref @swift_job_run : $@convention(thin) (UnownedJob, UnownedSerialExecutor) -> ()
+// CHECK-SIL-NEXT:  [[RAW_JOB:%.*]] = builtin "convertTaskToJob"([[TASK]] : $Builtin.NativeObject) : $Builtin.Job
+// CHECK-SIL-NEXT:  [[JOB:%.*]] = struct $UnownedJob ([[RAW_JOB]] : $Builtin.Job)
+// CHECK-SIL-NEXT:  [[RAW_MAIN_EXECUTOR:%.*]] = builtin "buildMainActorExecutorRef"() : $Builtin.Executor
+// CHECK-SIL-NEXT:  [[MAIN_EXECUTOR:%.*]] = struct $UnownedSerialExecutor ([[RAW_MAIN_EXECUTOR]] : $Builtin.Executor)
+// CHECK-SIL-NEXT:  apply [[RUN_FN]]([[JOB]], [[MAIN_EXECUTOR]]) : $@convention(thin) (UnownedJob, UnownedSerialExecutor) -> ()
 // CHECK-SIL-NEXT:  // function_ref swift_task_asyncMainDrainQueue
-// CHECK-SIL-NEXT:  %19 = function_ref @swift_task_asyncMainDrainQueue : $@convention(thin) () -> Never
-// CHECK-SIL-NEXT:  %20 = apply %19() : $@convention(thin) () -> Never
+// CHECK-SIL-NEXT:  [[DRAIN_FN:%.*]] = function_ref @swift_task_asyncMainDrainQueue : $@convention(thin) () -> Never
+// CHECK-SIL-NEXT:  apply [[DRAIN_FN]]() : $@convention(thin) () -> Never
 // CHECK-SIL-NEXT:  unreachable

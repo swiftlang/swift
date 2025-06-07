@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -unit-test-runner %s 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -test-runner %s | %FileCheck %s
 
 class Klass {
 }
@@ -25,7 +25,7 @@ enum E2 {
 // CHECK-LABEL: } // end sil function 'test_canonicalize_switch_enum1'
 sil [ossa] @test_canonicalize_switch_enum1 : $@convention(thin) (@owned FakeOptional<Klass>) -> () {
 bb0(%0 : @owned $FakeOptional<Klass>):
-  test_specification "simplify-cfg-canonicalize-switch-enum"
+  specify_test "simplify_cfg_canonicalize_switch_enum"
   switch_enum %0 : $FakeOptional<Klass>, case #FakeOptional.none!enumelt: bb1, default bb2
 
 bb1:
@@ -45,7 +45,7 @@ bb3:
 // CHECK-LABEL: } // end sil function 'test_canonicalize_switch_enum2'
 sil [ossa] @test_canonicalize_switch_enum2 : $@convention(thin) (@owned E1) -> () {
 bb0(%0 : @owned $E1):
-  test_specification "simplify-cfg-canonicalize-switch-enum"
+  specify_test "simplify_cfg_canonicalize_switch_enum"
   switch_enum %0 : $E1, case #E1.A!enumelt: bb1, default bb2
 
 bb1(%2 : @owned $Klass):
@@ -66,7 +66,7 @@ bb3:
 // CHECK-LABEL: } // end sil function 'test_canonicalize_switch_enum3'
 sil [ossa] @test_canonicalize_switch_enum3 : $@convention(thin) (@owned E2) -> () {
 bb0(%0 : @owned $E2):
-  test_specification "simplify-cfg-canonicalize-switch-enum"
+  specify_test "simplify_cfg_canonicalize_switch_enum"
   switch_enum %0 : $E2, case #E2.A!enumelt: bb1, default bb2
 
 bb1(%2 : @owned $Klass):
@@ -87,7 +87,7 @@ bb3:
 // CHECK-LABEL: } // end sil function 'test_simplify_switch_enum1'
 sil [ossa] @test_simplify_switch_enum1 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
-  test_specification "simplify-cfg-simplify-switch-enum-block @instruction[1]"
+  specify_test "simplify_cfg_simplify_switch_enum_block @instruction[1]"
   %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
   switch_enum %1 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
@@ -108,7 +108,7 @@ bb3:
 // CHECK-LABEL: } // end sil function 'test_simplify_switch_enum2'
 sil [ossa] @test_simplify_switch_enum2 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
-  test_specification "simplify-cfg-simplify-switch-enum-block @instruction[1]"
+  specify_test "simplify_cfg_simplify_switch_enum_block @instruction[1]"
   %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
   switch_enum %1 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
@@ -128,7 +128,7 @@ bb3:
 // CHECK-LABEL: } // end sil function 'test_simplify_switch_enum3'
 sil [ossa] @test_simplify_switch_enum3 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
-  test_specification "simplify-cfg-simplify-switch-enum-block @instruction[2]"
+  specify_test "simplify_cfg_simplify_switch_enum_block @instruction[2]"
   %b = begin_borrow %0 : $Klass
   %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %b : $Klass
   switch_enum %1 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
@@ -153,7 +153,7 @@ sil @use_optional : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
 // CHECK-LABEL: } // end sil function 'test_simplify_switch_enum4'
 sil [ossa] @test_simplify_switch_enum4 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
-  test_specification "simplify-cfg-simplify-switch-enum-block @instruction[3]"
+  specify_test "simplify_cfg_simplify_switch_enum_block @instruction[3]"
   %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
   %f = function_ref @use_optional : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
   %c = apply %f(%1) : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
@@ -175,7 +175,7 @@ bb3:
 // CHECK-LABEL: } // end sil function 'test_simplify_switch_enum5'
 sil [ossa] @test_simplify_switch_enum5 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
-  test_specification "simplify-cfg-simplify-switch-enum-block @instruction[4]"
+  specify_test "simplify_cfg_simplify_switch_enum_block @instruction[4]"
   %b = begin_borrow %0 : $Klass
   %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %b : $Klass
   %f = function_ref @use_optional : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
@@ -211,7 +211,7 @@ bb2:
   br bb3(%4 : $FakeOptional<Klass>)
 
 bb3(%6 :@owned  $FakeOptional<Klass>):
-  test_specification "simplify-cfg-simplify-switch-enum-block @instruction[5]"
+  specify_test "simplify_cfg_simplify_switch_enum_block @instruction[5]"
   switch_enum %6 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb4, case #FakeOptional.none!enumelt: bb5
 
 bb4(%8 : @owned $Klass):
@@ -231,7 +231,7 @@ bb6:
 // CHECK-LABEL: } // end sil function 'test_simplify_switch_enum_unreachable1'
 sil [ossa] @test_simplify_switch_enum_unreachable1 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
-  test_specification "simplify-cfg-simplify-switch-enum-unreachable-blocks @instruction[1]"
+  specify_test "simplify_cfg_simplify_switch_enum_unreachable_blocks @instruction[1]"
   %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
   switch_enum %1 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
@@ -252,7 +252,7 @@ bb3:
 // CHECK-LABEL: } // end sil function 'test_simplify_switch_enum_unreachable2'
 sil [ossa] @test_simplify_switch_enum_unreachable2 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
-  test_specification "simplify-cfg-simplify-switch-enum-unreachable-blocks @instruction[1]"
+  specify_test "simplify_cfg_simplify_switch_enum_unreachable_blocks @instruction[1]"
   %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
   switch_enum %1 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
@@ -275,7 +275,7 @@ bb3:
 // CHECK-LABEL: } // end sil function 'test_simplify_switch_enum_unreachable3'
 sil [ossa] @test_simplify_switch_enum_unreachable3 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
-  test_specification "simplify-cfg-simplify-switch-enum-unreachable-blocks @instruction[1]"
+  specify_test "simplify_cfg_simplify_switch_enum_unreachable_blocks @instruction[1]"
   %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
   switch_enum %1 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
@@ -296,7 +296,7 @@ bb3:
 // CHECK-LABEL: } // end sil function 'test_simplify_switch_enum_unreachable4'
 sil [ossa] @test_simplify_switch_enum_unreachable4 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
-  test_specification "simplify-cfg-simplify-switch-enum-unreachable-blocks @instruction[1]"
+  specify_test "simplify_cfg_simplify_switch_enum_unreachable_blocks @instruction[1]"
   %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
   switch_enum %1 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
@@ -316,7 +316,7 @@ bb3:
 // CHECK-LABEL: } // end sil function 'test_simplify_switch_enum_unreachable5'
 sil [ossa] @test_simplify_switch_enum_unreachable5 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
-  test_specification "simplify-cfg-simplify-switch-enum-unreachable-blocks @instruction[2]"
+  specify_test "simplify_cfg_simplify_switch_enum_unreachable_blocks @instruction[2]"
   %b = begin_borrow %0 : $Klass
   %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %b : $Klass
   switch_enum %1 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
@@ -339,7 +339,7 @@ bb3:
 // CHECK-LABEL: } // end sil function 'test_simplify_switch_enum_unreachable6'
 sil [ossa] @test_simplify_switch_enum_unreachable6 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
-  test_specification "simplify-cfg-simplify-switch-enum-unreachable-blocks @instruction[1]"
+  specify_test "simplify_cfg_simplify_switch_enum_unreachable_blocks @instruction[1]"
   %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
   switch_enum %1 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
@@ -359,7 +359,7 @@ bb3:
 // CHECK-LABEL: } // end sil function 'test_simplify_switch_enum_unreachable7'
 sil [ossa] @test_simplify_switch_enum_unreachable7 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
-  test_specification "simplify-cfg-simplify-switch-enum-unreachable-blocks @instruction[2]"
+  specify_test "simplify_cfg_simplify_switch_enum_unreachable_blocks @instruction[2]"
   %b = begin_borrow %0 : $Klass
   %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %b : $Klass
   switch_enum %1 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2

@@ -11,7 +11,6 @@ import StdlibUnittest
 
 var OperatorsTestSuite = TestSuite("Operators")
 
-#if !os(Windows)    // https://github.com/apple/swift/issues/55575
 OperatorsTestSuite.test("LoadableIntWrapper.plus (out-of-line)") {
   let lhs = LoadableIntWrapper(value: 42)
   let rhs = LoadableIntWrapper(value: 23)
@@ -20,7 +19,6 @@ OperatorsTestSuite.test("LoadableIntWrapper.plus (out-of-line)") {
 
   expectEqual(65, result.value)
 }
-#endif
 
 OperatorsTestSuite.test("LoadableIntWrapper.call (out-of-line)") {
   let wrapper = LoadableIntWrapper(value: 42)
@@ -72,6 +70,13 @@ OperatorsTestSuite.test("NonTrivialIntArrayByVal.subscript (out-of-line)") {
   arr.setValueAtIndex(42, 3)
   let result5 = arr[3]
   expectEqual(42, result5)
+}
+
+OperatorsTestSuite.test("UnnamedParameterInOperator.equal") {
+  let lhs = ClassWithOperatorEqualsParamUnnamed()
+  let rhs = ClassWithOperatorEqualsParamUnnamed()
+  expectFalse(lhs == rhs)
+  expectTrue(lhs != rhs)
 }
 
 runAllTests()

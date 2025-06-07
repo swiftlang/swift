@@ -435,8 +435,7 @@ func test_force_unwrap_not_being_too_eager() {
 // rdar://problem/57097401
 func invalidOptionalChaining(a: Any) {
   a == "="? // expected-error {{cannot use optional chaining on non-optional value of type 'String'}}
-  // expected-error@-1 {{type 'Any' cannot conform to 'Equatable'}}
-  // expected-note@-2 {{requirement from conditional conformance of 'Any?' to 'Equatable'}} expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
+  // expected-error@-1 {{cannot convert value of type 'Any' to expected argument type 'String'}}
 }
 
 /// https://github.com/apple/swift/issues/54739
@@ -479,20 +478,17 @@ func rdar75146811() {
 
   var arr: [Double]! = []
 
-  test(&arr) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
+  test(&arr) // Ok
   test((&arr)) // expected-error {{'&' may only be used to pass an argument to inout parameter}}
-  // expected-error@-1 {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
-  test(&(arr)) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
+  test(&(arr)) // Ok
 
-  test_tuple(&arr, x: 0) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
+  test_tuple(&arr, x: 0) // Ok
   test_tuple((&arr), x: 0) // expected-error {{'&' may only be used to pass an argument to inout parameter}}
-  // expected-error@-1 {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
-  test_tuple(&(arr), x: 0) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
+  test_tuple(&(arr), x: 0) // Ok
 
-  test_named(x: &arr) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
+  test_named(x: &arr) // Ok
   test_named(x: (&arr)) // expected-error {{'&' may only be used to pass an argument to inout parameter}}
-  // expected-error@-1 {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
-  test_named(x: &(arr)) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
+  test_named(x: &(arr)) // Ok
 }
 
 // rdar://75514153 - Unable to produce a diagnostic for ambiguities related to use of `nil`
@@ -587,5 +583,38 @@ do {
   func passNonConformingValue(value: (any BinaryInteger)?){
     takesP(value)
     // expected-error@-1 {{argument type '(any BinaryInteger)?' does not conform to expected type 'P'}}
+  }
+}
+
+// Diagnose extraneous force unwrap in ambiguous context
+do {
+  func test(_: Int) {} // expected-note {{candidate expects value of type 'Int' for parameter #1 (got 'Double')}}
+  func test(_: String) {} // expected-note {{candidate expects value of type 'String' for parameter #1 (got 'Double')}}
+
+  var x: Double = 42
+  test(x!) // expected-error {{no exact matches in call to local function 'test'}}
+  // expected-error@-1 {{cannot force unwrap value of non-optional type 'Double'}}
+}
+
+func testExtraQuestionMark(action: () -> Void, v: Int) {
+  struct Test {
+    init(action: () -> Void) {}
+  }
+
+  Test(action: action?)
+  // expected-error@-1 {{cannot use optional chaining on non-optional value of type '() -> Void'}}
+  Test(action: v?)
+  // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type '() -> Void'}}
+  // expected-error@-2 {{cannot use optional chaining on non-optional value of type 'Int'}}
+}
+
+func testPassingOptionalChainAsWrongArgument() {
+  class Test {
+    func fn(_ asdType: String?) {
+    }
+  }
+
+  func test(test: Test, arr: [Int]?) {
+    test.fn(arr?.first) // expected-error {{cannot convert value of type 'Int?' to expected argument type 'String?'}}
   }
 }

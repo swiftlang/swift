@@ -302,9 +302,12 @@ public:
   // method to delete the given instruction.
   void eraseInstFromFunction(SILInstruction &instruction,
                              SILBasicBlock::iterator &iterator,
-                             bool addOperandsToWorklist = true) {
-    // Try to salvage debug info first.
-    swift::salvageDebugInfo(&instruction);
+                             bool addOperandsToWorklist = true,
+                             bool salvageDebugInfo = true) {
+    if (salvageDebugInfo) {
+      // Try to salvage debug info first.
+      swift::salvageDebugInfo(&instruction);
+    }
     // Then delete old debug users.
     for (auto result : instruction.getResults()) {
       while (!result->use_empty()) {
@@ -323,9 +326,11 @@ public:
   }
 
   void eraseInstFromFunction(SILInstruction &instruction,
-                             bool addOperandsToWorklist = true) {
+                             bool addOperandsToWorklist = true,
+                             bool salvageDebugInfo = true) {
     SILBasicBlock::iterator nullIter;
-    return eraseInstFromFunction(instruction, nullIter, addOperandsToWorklist);
+    return eraseInstFromFunction(instruction, nullIter, addOperandsToWorklist,
+                                 salvageDebugInfo);
   }
 
   void eraseSingleInstFromFunction(SILInstruction &instruction,
@@ -349,7 +354,7 @@ public:
 template <unsigned N>
 class SmallSILInstructionWorklist final
     : public SILInstructionWorklist<
-          llvm::SmallVector<Optional<SILInstruction *>, N>,
+          llvm::SmallVector<std::optional<SILInstruction *>, N>,
           // TODO: A DenseMap rather than a SmallDenseMap is used here to avoid
           //       running into an upstream problem with the handling of grow()
           //       when it results in rehashing and tombstone removal:
@@ -357,7 +362,7 @@ class SmallSILInstructionWorklist final
           //       https://reviews.llvm.org/D56455
           llvm::DenseMap<SILInstruction *, unsigned>> {
 public:
-  using VectorT = llvm::SmallVector<Optional<SILInstruction *>, N>;
+  using VectorT = llvm::SmallVector<std::optional<SILInstruction *>, N>;
   using MapT = llvm::DenseMap<SILInstruction *, unsigned>;
   SmallSILInstructionWorklist(const char *loggingName = "InstructionWorklist")
       : SILInstructionWorklist<VectorT, MapT>(loggingName) {}

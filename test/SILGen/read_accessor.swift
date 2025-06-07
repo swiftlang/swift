@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
 
 struct SimpleTest {
   var stored: String
@@ -112,6 +112,7 @@ struct TupleReader {
 // CHECK-NEXT:    [[TUPLE:%.*]] = load [copy] [[TEMP]]
 // CHECK-NEXT:    destructure_tuple
 // CHECK-NEXT:    destructure_tuple
+// CHECK-NEXT:    destroy_addr [[TEMP]]
 // CHECK-NEXT:    end_apply
 // CHECK-LABEL: } // end sil function '$s13read_accessor11TupleReaderV11useReadableyyF'
   func useReadable() {

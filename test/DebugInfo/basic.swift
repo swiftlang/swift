@@ -24,7 +24,7 @@
 // RUN:   | %FileCheck %s --check-prefixes CHECK,DWARF-CHECK
 // --------------------------------------------------------------------
 // Currently -gdwarf-types should give the same results as -g.
-// RUN: %target-swift-frontend %/s -emit-ir -gdwarf-types -o - \
+// RUN: %target-swift-frontend  %/s -emit-ir -gdwarf-types -o - \
 // RUN:   | %FileCheck %s --check-prefixes CHECK,DWARF-CHECK
 // --------------------------------------------------------------------
 // Verify that -g -debug-info-format=dwarf gives the same results as -g.
@@ -44,12 +44,12 @@ func foo(_ a: Int64, _ b: Int64) -> Int64 {
      var b = b
      // CHECK-DAG: ![[ALOC:.*]] = !DILocation(line: [[@LINE-3]],{{.*}} scope: ![[FOO]])
      // Check that a is the first and b is the second argument.
-     // CHECK-DAG: store i64 %0, i64* [[AADDR:.*]], align
-     // CHECK-DAG: store i64 %1, i64* [[BADDR:.*]], align
+     // CHECK-DAG: store i64 %0, ptr [[AADDR:.*]], align
+     // CHECK-DAG: store i64 %1, ptr [[BADDR:.*]], align
      // CHECK-DAG: [[AVAL:%.*]] = getelementptr inbounds {{.*}}, [[AMEM:.*]], i32 0, i32 0
      // CHECK-DAG: [[BVAL:%.*]] = getelementptr inbounds {{.*}}, [[BMEM:.*]], i32 0, i32 0
-     // CHECK-DAG: call void @llvm.dbg.declare(metadata i64* [[AADDR]], metadata ![[AARG:.*]], metadata !DIExpression()), !dbg ![[ALOC]]
-     // CHECK-DAG: call void @llvm.dbg.declare(metadata i64* [[BADDR]], metadata ![[BARG:.*]], metadata !DIExpression())
+     // CHECK-DAG: #dbg_declare(ptr [[AADDR]], ![[AARG:.*]], !DIExpression(), ![[ALOC]]
+     // CHECK-DAG: #dbg_declare(ptr [[BADDR]], ![[BARG:.*]], !DIExpression()
      // CHECK-DAG: ![[AARG]] = !DILocalVariable(name: "a", arg: 1
      // CHECK-DAG: ![[BARG]] = !DILocalVariable(name: "b", arg: 2
      if b != 0 {
@@ -60,8 +60,9 @@ func foo(_ a: Int64, _ b: Int64) -> Int64 {
        return a*b
      } else {
        // CHECK-DAG: ![[PARENT:[0-9]+]] = distinct !DILexicalBlock({{.*}} line: [[@LINE-1]]
+       // CHECK-DAG: ![[VARSCOPE:[0-9]+]] = distinct !DILexicalBlock({{.*}} line: [[@LINE+1]]
        var c: Int64 = 42
-       // CHECK-DAG: ![[CONDITION:[0-9]+]] = distinct !DILexicalBlock(scope: ![[PARENT]], {{.*}}, line: [[@LINE+1]]
+       // CHECK-DAG: ![[CONDITION:[0-9]+]] = distinct !DILexicalBlock(scope: ![[VARSCOPE]], {{.*}}, line: [[@LINE+1]]
        if a == 0 {
          // CHECK-DAG: !DILexicalBlock(scope: ![[CONDITION]], {{.*}}, line: [[@LINE-1]]
          // What about a nested scope?

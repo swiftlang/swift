@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -31,19 +31,17 @@
 /// temporal measurement component; specifically leap seconds should be 
 /// represented as an additional accessor since that is specific only to certain
 /// clock implementations.
-@available(SwiftStdlib 5.7, *)
+@available(StdlibDeploymentTarget 5.7, *)
 @frozen
 public struct Duration: Sendable {
   /// The low 64 bits of a 128-bit signed integer value counting attoseconds.
-  @usableFromInline
-  internal var _low: UInt64
+  public var _low: UInt64
 
   /// The high 64 bits of a 128-bit signed integer value counting attoseconds.
-  @usableFromInline
-  internal var _high: Int64
+  public var _high: Int64
 
   @inlinable
-  internal init(_high: Int64, low: UInt64) {
+  public init(_high: Int64, low: UInt64) {
     self._low = low
     self._high = _high
   }
@@ -88,20 +86,50 @@ public struct Duration: Sendable {
   }
 }
 
-@available(SwiftStdlib 5.7, *)
+@available(StdlibDeploymentTarget 5.7, *)
 extension Duration {
   /// The composite components of the `Duration`.
   ///
   /// This is intended for facilitating conversions to existing time types. The
   /// attoseconds value will not exceed 1e18 or be lower than -1e18.
-  @available(SwiftStdlib 5.7, *)
+  @available(StdlibDeploymentTarget 5.7, *)
   public var components: (seconds: Int64, attoseconds: Int64) {
     let (seconds, attoseconds) = _attoseconds.dividedBy1e18()
     return (Int64(seconds), Int64(attoseconds))
   }
 }
 
-@available(SwiftStdlib 5.7, *)
+@available(SwiftStdlib 6.0, *)
+extension Duration {
+  /// The number of attoseconds represented by this `Duration`.
+  ///
+  /// This property provides direct access to the underlying number of attoseconds 
+  /// that the current `Duration` represents.
+  ///
+  ///     let d = Duration.seconds(1)
+  ///     print(d.attoseconds) // 1_000_000_000_000_000_000
+  @available(SwiftStdlib 6.0, *)
+  @_alwaysEmitIntoClient
+  public var attoseconds: Int128 {
+    Int128(_low: _low, _high: _high)
+  }
+  
+  /// Construct a `Duration` from the given number of attoseconds.
+  ///
+  /// This directly constructs a `Duration` from the given number of attoseconds.
+  ///
+  ///     let d = Duration(attoseconds: 1_000_000_000_000_000_000)
+  ///     print(d) // 1.0 seconds
+  ///
+  /// - Parameter attoseconds: The total duration expressed in attoseconds.
+  @available(SwiftStdlib 6.0, *)
+  @_alwaysEmitIntoClient
+  public init(attoseconds: Int128) {
+    self.init(_high: attoseconds._high, low: attoseconds._low)
+  }
+}
+
+@available(StdlibDeploymentTarget 5.7, *)
 extension Duration {
   /// Construct a `Duration` given a number of seconds represented as a 
   /// `BinaryInteger`.
@@ -109,10 +137,31 @@ extension Duration {
   ///       let d: Duration = .seconds(77)
   ///
   /// - Returns: A `Duration` representing a given number of seconds.
-  @available(SwiftStdlib 5.7, *)
+  @available(StdlibDeploymentTarget 5.7, *)
+  @inlinable
   public static func seconds<T: BinaryInteger>(_ seconds: T) -> Duration {
-    return Duration(_attoseconds:
-      _Int128(seconds).multiplied(by: 1_000_000_000_000_000_000 as UInt64))
+    guard let high = Int64(exactly: seconds >> 64) else { fatalError() }
+    let low = UInt64(truncatingIfNeeded: seconds)
+    let lowScaled = low.multipliedFullWidth(by: 1_000_000_000_000_000_000)
+    let highScaled = high * 1_000_000_000_000_000_000
+    return Duration(_high: highScaled + Int64(lowScaled.high), low: lowScaled.low)
+  }
+  
+  /// Construct a `Duration` given a duration and scale, taking care so that
+  /// exact integer durations are preserved exactly.
+  internal init(_ duration: Double, scale: UInt64) {
+    // Split the duration into integral and fractional parts, as we need to
+    // handle them slightly differently to ensure that integer values are
+    // never rounded if `scale` is representable as Double.
+    let integralPart = duration.rounded(.towardZero)
+    let fractionalPart = duration - integralPart
+    self.init(_attoseconds:
+      // This term may trap due to overflow, but it cannot round, so if the
+      // input `seconds` is an exact integer, we get an exact integer result.
+      _Int128(integralPart).multiplied(by: scale) +
+      // This term may round, but cannot overflow.
+      _Int128((fractionalPart * Double(scale)).rounded())
+    )
   }
 
   /// Construct a `Duration` given a number of seconds represented as a 
@@ -121,9 +170,9 @@ extension Duration {
   ///       let d: Duration = .seconds(22.93)
   ///
   /// - Returns: A `Duration` representing a given number of seconds.
-  @available(SwiftStdlib 5.7, *)
+  @available(StdlibDeploymentTarget 5.7, *)
   public static func seconds(_ seconds: Double) -> Duration {
-    return Duration(_attoseconds: _Int128(seconds * 1_000_000_000_000_000_000))
+    Duration(seconds, scale: 1_000_000_000_000_000_000)
   }
 
   /// Construct a `Duration` given a number of milliseconds represented as a 
@@ -132,12 +181,16 @@ extension Duration {
   ///       let d: Duration = .milliseconds(645)
   ///
   /// - Returns: A `Duration` representing a given number of milliseconds.
-  @available(SwiftStdlib 5.7, *)
+  @available(StdlibDeploymentTarget 5.7, *)
+  @inlinable
   public static func milliseconds<T: BinaryInteger>(
     _ milliseconds: T
   ) -> Duration {
-    return Duration(_attoseconds:
-      _Int128(milliseconds).multiplied(by: 1_000_000_000_000_000 as UInt64))
+    guard let high = Int64(exactly: milliseconds >> 64) else { fatalError() }
+    let low = UInt64(truncatingIfNeeded: milliseconds)
+    let lowScaled = low.multipliedFullWidth(by: 1_000_000_000_000_000)
+    let highScaled = high * 1_000_000_000_000_000
+    return Duration(_high: highScaled + Int64(lowScaled.high), low: lowScaled.low)
   }
 
   /// Construct a `Duration` given a number of seconds milliseconds as a 
@@ -146,10 +199,9 @@ extension Duration {
   ///       let d: Duration = .milliseconds(88.3)
   ///
   /// - Returns: A `Duration` representing a given number of milliseconds.
-  @available(SwiftStdlib 5.7, *)
+  @available(StdlibDeploymentTarget 5.7, *)
   public static func milliseconds(_ milliseconds: Double) -> Duration {
-    return Duration(_attoseconds:
-      _Int128(milliseconds * 1_000_000_000_000_000))
+    Duration(milliseconds, scale: 1_000_000_000_000_000)
   }
 
   /// Construct a `Duration` given a number of microseconds represented as a 
@@ -158,12 +210,16 @@ extension Duration {
   ///       let d: Duration = .microseconds(12)
   ///
   /// - Returns: A `Duration` representing a given number of microseconds.
-  @available(SwiftStdlib 5.7, *)
+  @available(StdlibDeploymentTarget 5.7, *)
+  @inlinable
   public static func microseconds<T: BinaryInteger>(
     _ microseconds: T
   ) -> Duration {
-    return Duration(_attoseconds:
-      _Int128(microseconds).multiplied(by: 1_000_000_000_000 as UInt64))
+    guard let high = Int64(exactly: microseconds >> 64) else { fatalError() }
+    let low = UInt64(truncatingIfNeeded: microseconds)
+    let lowScaled = low.multipliedFullWidth(by: 1_000_000_000_000)
+    let highScaled = high * 1_000_000_000_000
+    return Duration(_high: highScaled + Int64(lowScaled.high), low: lowScaled.low)
   }
 
   /// Construct a `Duration` given a number of seconds microseconds as a 
@@ -172,10 +228,9 @@ extension Duration {
   ///       let d: Duration = .microseconds(382.9)
   ///
   /// - Returns: A `Duration` representing a given number of microseconds.
-  @available(SwiftStdlib 5.7, *)
+  @available(StdlibDeploymentTarget 5.7, *)
   public static func microseconds(_ microseconds: Double) -> Duration {
-    return Duration(_attoseconds:
-      _Int128(microseconds * 1_000_000_000_000))
+    Duration(microseconds, scale: 1_000_000_000_000)
   }
 
   /// Construct a `Duration` given a number of nanoseconds represented as a 
@@ -184,18 +239,34 @@ extension Duration {
   ///       let d: Duration = .nanoseconds(1929)
   ///
   /// - Returns: A `Duration` representing a given number of nanoseconds.
-  @available(SwiftStdlib 5.7, *)
+  @available(StdlibDeploymentTarget 5.7, *)
+  @inlinable
   public static func nanoseconds<T: BinaryInteger>(
     _ nanoseconds: T
   ) -> Duration {
-    return Duration(_attoseconds:
-      _Int128(nanoseconds).multiplied(by: 1_000_000_000))
+    guard let high = Int64(exactly: nanoseconds >> 64) else { fatalError() }
+    let low = UInt64(truncatingIfNeeded: nanoseconds)
+    let lowScaled = low.multipliedFullWidth(by: 1_000_000_000)
+    let highScaled = high * 1_000_000_000
+    return Duration(_high: highScaled + Int64(lowScaled.high), low: lowScaled.low)
+  }
+  
+  /// Construct a `Duration` given a number of seconds nanoseconds as a
+  /// `Double` by converting the value into the closest attosecond scale value.
+  ///
+  ///       let d: Duration = .nanoseconds(382.9)
+  ///
+  /// - Returns: A `Duration` representing a given number of nanoseconds.
+  @available(SwiftStdlib 6.2, *)
+  public static func nanoseconds(_ nanoseconds: Double) -> Duration {
+    Duration(nanoseconds, scale: 1_000_000_000)
   }
 }
 
-@available(SwiftStdlib 5.7, *)
+@available(StdlibDeploymentTarget 5.7, *)
+@_unavailableInEmbedded
 extension Duration: Codable {
-  @available(SwiftStdlib 5.7, *)
+  @available(StdlibDeploymentTarget 5.7, *)
   public init(from decoder: Decoder) throws {
     var container = try decoder.unkeyedContainer()
     let high = try container.decode(Int64.self)
@@ -203,7 +274,7 @@ extension Duration: Codable {
     self.init(_high: high, low: low)
   }
 
-  @available(SwiftStdlib 5.7, *)
+  @available(StdlibDeploymentTarget 5.7, *)
   public func encode(to encoder: Encoder) throws {
     var container = encoder.unkeyedContainer()
     try container.encode(_high)
@@ -211,111 +282,112 @@ extension Duration: Codable {
   }
 }
 
-@available(SwiftStdlib 5.7, *)
+@available(StdlibDeploymentTarget 5.7, *)
 extension Duration: Hashable {
-  @available(SwiftStdlib 5.7, *)
+  @available(StdlibDeploymentTarget 5.7, *)
   public func hash(into hasher: inout Hasher) {
     hasher.combine(_attoseconds)
   }
 }
 
-@available(SwiftStdlib 5.7, *)
+@available(StdlibDeploymentTarget 5.7, *)
 extension Duration: Equatable {
-  @available(SwiftStdlib 5.7, *)
+  @available(StdlibDeploymentTarget 5.7, *)
   public static func == (_ lhs: Duration, _ rhs: Duration) -> Bool {
     return lhs._attoseconds == rhs._attoseconds
   }
 }
 
-@available(SwiftStdlib 5.7, *)
+@available(StdlibDeploymentTarget 5.7, *)
 extension Duration: Comparable {
-  @available(SwiftStdlib 5.7, *)
+  @available(StdlibDeploymentTarget 5.7, *)
   public static func < (_ lhs: Duration, _ rhs: Duration) -> Bool {
     return lhs._attoseconds < rhs._attoseconds
   }
 }
 
-@available(SwiftStdlib 5.7, *)
+@available(StdlibDeploymentTarget 5.7, *)
 extension Duration: AdditiveArithmetic {
-  @available(SwiftStdlib 5.7, *)
+  @available(StdlibDeploymentTarget 5.7, *)
   public static var zero: Duration { Duration(_attoseconds: 0) }
 
-  @available(SwiftStdlib 5.7, *)
+  @available(StdlibDeploymentTarget 5.7, *)
   public static func + (_ lhs: Duration, _ rhs: Duration) -> Duration {
     return Duration(_attoseconds: lhs._attoseconds + rhs._attoseconds)
   }
 
-  @available(SwiftStdlib 5.7, *)
+  @available(StdlibDeploymentTarget 5.7, *)
   public static func - (_ lhs: Duration, _ rhs: Duration) -> Duration {
     return Duration(_attoseconds: lhs._attoseconds - rhs._attoseconds)
   }
 
-  @available(SwiftStdlib 5.7, *)
+  @available(StdlibDeploymentTarget 5.7, *)
   public static func += (_ lhs: inout Duration, _ rhs: Duration) {
     lhs = lhs + rhs
   }
 
-  @available(SwiftStdlib 5.7, *)
+  @available(StdlibDeploymentTarget 5.7, *)
   public static func -= (_ lhs: inout Duration, _ rhs: Duration) {
     lhs = lhs - rhs
   }
 }
 
-@available(SwiftStdlib 5.7, *)
+@available(StdlibDeploymentTarget 5.7, *)
 extension Duration {
-  @available(SwiftStdlib 5.7, *)
+  @available(StdlibDeploymentTarget 5.7, *)
   public static func / (_ lhs: Duration, _ rhs: Double) -> Duration {
     return Duration(_attoseconds:
       _Int128(Double(lhs._attoseconds) / rhs))
   }
 
-  @available(SwiftStdlib 5.7, *)
+  @available(StdlibDeploymentTarget 5.7, *)
   public static func /= (_ lhs: inout Duration, _ rhs: Double) {
     lhs = lhs / rhs
   }
 
-  @available(SwiftStdlib 5.7, *)
+  @available(StdlibDeploymentTarget 5.7, *)
   public static func / <T: BinaryInteger>(
     _ lhs: Duration, _ rhs: T
   ) -> Duration {
     Duration(_attoseconds: lhs._attoseconds / _Int128(rhs))
   }
 
-  @available(SwiftStdlib 5.7, *)
+  @available(StdlibDeploymentTarget 5.7, *)
   public static func /= <T: BinaryInteger>(_ lhs: inout Duration, _ rhs: T) {
     lhs = lhs / rhs
   }
 
-  @available(SwiftStdlib 5.7, *)
+  @available(StdlibDeploymentTarget 5.7, *)
   public static func / (_ lhs: Duration, _ rhs: Duration) -> Double {
     Double(lhs._attoseconds) / Double(rhs._attoseconds)
   }
 
-  @available(SwiftStdlib 5.7, *)
+  @available(StdlibDeploymentTarget 5.7, *)
   public static func * (_ lhs: Duration, _ rhs: Double) -> Duration {
     Duration(_attoseconds: _Int128(Double(lhs._attoseconds) * rhs))
   }
 
-  @available(SwiftStdlib 5.7, *)
+  @available(StdlibDeploymentTarget 5.7, *)
   public static func * <T: BinaryInteger>(
     _ lhs: Duration, _ rhs: T
   ) -> Duration {
     Duration(_attoseconds: lhs._attoseconds * _Int128(rhs))
   }
 
-  @available(SwiftStdlib 5.7, *)
+  @available(StdlibDeploymentTarget 5.7, *)
   public static func *= <T: BinaryInteger>(_ lhs: inout Duration, _ rhs: T) {
     lhs = lhs * rhs
   }
 }
 
-@available(SwiftStdlib 5.7, *)
+@available(StdlibDeploymentTarget 5.7, *)
+@_unavailableInEmbedded
 extension Duration: CustomStringConvertible {
-  @available(SwiftStdlib 5.7, *)
+  @available(StdlibDeploymentTarget 5.7, *)
   public var description: String {
     return (Double(_attoseconds) / 1e18).description + " seconds"
   }
 }
 
-@available(SwiftStdlib 5.7, *)
+@available(StdlibDeploymentTarget 5.7, *)
 extension Duration: DurationProtocol { }

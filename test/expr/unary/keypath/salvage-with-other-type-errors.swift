@@ -6,7 +6,7 @@
 struct P<T: K> { }
 
 struct S {
-    init<B>(_ a: P<B>) { // expected-note {{in call to initializer}}
+    init<B>(_ a: P<B>) { // expected-note {{where 'B' = 'String'}}
         fatalError()
     }
 }
@@ -27,9 +27,8 @@ struct A {
 }
 
 extension A: K {
-  static let j = S(\A.id + "id") // expected-error {{generic parameter 'B' could not be inferred}}
-  // expected-error@-1 {{binary operator '+' cannot be applied to operands of type 'KeyPath<A, String>' and 'String'}}
-  // expected-note@-2 {{overloads for '+' exist with these partially matching parameter lists: (String, String)}}
+  static let j = S(\A.id + "id")
+  // expected-error@-1 {{initializer 'init(_:)' requires that 'String' conform to 'K'}}
 }
 
 // https://github.com/apple/swift/issues/47610
@@ -44,7 +43,7 @@ struct B {
     }
 }
 func f3() {
-    B(v: "").f1(block: { _ in }).f2(keyPath: \B.v) // expected-error{{unable to infer type of a closure parameter '_' in the current context}}
+    B(v: "").f1(block: { _ in }).f2(keyPath: \B.v) // expected-error{{cannot infer type of closure parameter '_' without a type annotation}}
 }
 
 // https://github.com/apple/swift/issues/47949

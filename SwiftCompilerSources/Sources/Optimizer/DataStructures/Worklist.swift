@@ -74,3 +74,39 @@ struct Worklist<Set: IntrusiveSet> : CustomStringConvertible, NoReflectionChildr
 
 typealias BasicBlockWorklist = Worklist<BasicBlockSet>
 typealias InstructionWorklist = Worklist<InstructionSet>
+typealias SpecificInstructionWorklist<InstType: Instruction> = Worklist<SpecificInstructionSet<InstType>>
+typealias ValueWorklist = Worklist<ValueSet>
+typealias OperandWorklist = Worklist<OperandSet>
+
+extension InstructionWorklist {
+  mutating func pushPredecessors(of inst: Instruction, ignoring ignoreInst: Instruction) {
+    if let prev = inst.previous {
+      if prev != ignoreInst {
+        pushIfNotVisited(prev)
+      }
+    } else {
+      for predBlock in inst.parentBlock.predecessors {
+        let termInst = predBlock.terminator
+        if termInst != ignoreInst {
+          pushIfNotVisited(termInst)
+        }
+      }
+    }
+  }
+
+  mutating func pushSuccessors(of inst: Instruction, ignoring ignoreInst: Instruction) {
+    if let succ = inst.next {
+      if succ != ignoreInst {
+        pushIfNotVisited(succ)
+      }
+    } else {
+      for succBlock in inst.parentBlock.successors {
+        let firstInst = succBlock.instructions.first!
+        if firstInst != ignoreInst {
+          pushIfNotVisited(firstInst)
+        }
+      }
+    }
+  }
+}
+

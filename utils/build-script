@@ -96,7 +96,8 @@ def initialize_runtime_environment():
             'MACOSX_DEPLOYMENT_TARGET',
             'IPHONEOS_DEPLOYMENT_TARGET',
             'TVOS_DEPLOYMENT_TARGET',
-            'WATCHOS_DEPLOYMENT_TARGET']:
+            'WATCHOS_DEPLOYMENT_TARGET',
+            'XROS_DEPLOYMENT_TARGET']:
         os.environ.pop(v, None)
 
     # Provide a default NINJA_STATUS to format ninja output.
@@ -183,28 +184,6 @@ def tar(source, destination):
     shell.call(args + [source], stderr=shell.DEVNULL)
 
 
-def process_system_exit(e: SystemExit) -> int:
-    # According to Python's documents, `SystemExit.code` is the exit status
-    # or error message that is passed to the constructor. (Defaults to None.)
-    #
-    # This means that `SystemExit.code` is either `None`, an `int` object or
-    # a `string` object of error message.
-    if e.code is None:
-        # Fallback to 1 if there is no error code but a `SystemExit`.
-        return 1
-    try:
-        numeric_code = int(e.code)
-        return numeric_code
-    except ValueError:
-        # Fallback to 1 if it is an error message and print that message.
-        print(e)
-        return 1
-    finally:
-        # Fallback to 1 and do nothing, since there is only ValueError as
-        # expected exception.
-        return 1
-
-
 # -----------------------------------------------------------------------------
 # Argument Validation
 
@@ -229,6 +208,15 @@ def validate_arguments(toolchain, args):
         if toolchain.sccache is None:
             fatal_error(
                 "can't find sccache (please install sccache)")
+
+    # Xcode project generation is no longer supported.
+    if args.cmake_generator == "Xcode":
+        fatal_error(
+            "build-script no longer supports Xcode project generation, you "
+            "should use utils/generate-xcode instead, see "
+            "https://github.com/swiftlang/swift/blob/main/docs/HowToGuides/"
+            "GettingStarted.md#using-ninja-with-xcode for more info"
+        )
 
     if args.host_target is None or args.stdlib_deployment_targets is None:
         fatal_error("unknown operating system")
@@ -277,12 +265,13 @@ def default_stdlib_deployment_targets(args):
     if host_target is None:
         return None
 
+    targets = [host_target]
+
     # OS X build machines configure all Darwin platforms by default.
     # Put iOS native targets last so that we test them last
     # (it takes a long time).
     if host_target == StdlibDeploymentTarget.OSX.x86_64 or \
             host_target == StdlibDeploymentTarget.OSX.arm64:
-        targets = [host_target]
         if args.build_ios and args.build_ios_simulator:
             targets.extend(StdlibDeploymentTarget.iOSSimulator.targets)
         if args.build_ios and args.build_ios_device:
@@ -296,10 +285,19 @@ def default_stdlib_deployment_targets(args):
                            .AppleWatchSimulator.targets)
         if args.build_watchos and args.build_watchos_device:
             targets.extend(StdlibDeploymentTarget.AppleWatch.targets)
+        if StdlibDeploymentTarget.XROSSimulator and \
+           args.build_xros and args.build_xros_simulator:
+            targets.extend(StdlibDeploymentTarget.XROSSimulator.targets)
+        if StdlibDeploymentTarget.XROS and \
+           args.build_xros and args.build_xros_device:
+            targets.extend(StdlibDeploymentTarget.XROS.targets)
         return targets
-    else:
-        # All other machines only configure their host stdlib by default.
-        return [host_target]
+    elif host_target.platform.name == 'linux':
+        if args.build_linux_static:
+            targets.append(getattr(StdlibDeploymentTarget.Musl,
+                                   host_target.arch))
+
+    return targets
 
 
 def apply_default_arguments(toolchain, args):
@@ -312,6 +310,10 @@ def apply_default_arguments(toolchain, args):
     )
     if ninja_required and toolchain.ninja is None:
         args.build_ninja = True
+
+    # Enable test colors if we're on a tty.
+    if args.color_in_tests and sys.stdout.isatty():
+        args.lit_args += " --param color_output"
 
     # Set the default stdlib-deployment-targets, if none were provided.
     if args.stdlib_deployment_targets is None:
@@ -409,7 +411,7 @@ def apply_default_arguments(toolchain, args):
         for target in targets
         if (not target.platform.is_darwin or
             target.platform.sdk_supports_architecture(
-                target.arch, args.darwin_xcrun_toolchain))
+                target.arch, args.darwin_xcrun_toolchain, args))
     ]
 
     # Include the Darwin module-only architectures in the CMake options.
@@ -480,6 +482,13 @@ def parse_preset_args():
         help="list all presets and exit",
         action=argparse.actions.StoreTrueAction,
         nargs=argparse.Nargs.OPTIONAL)
+    parser.add_argument(
+        "--preset-vars-file",
+        help="load preset vars from the specified file",
+        metavar="PATH",
+        action="append",
+        dest="preset_vars_file_names",
+        default=[])
     parser.add_argument(
         "--distcc",
         help="use distcc",
@@ -574,6 +583,13 @@ def main_preset():
         fatal_error("missing --preset option")
 
     args.preset_substitutions = {}
+    for file in args.preset_vars_file_names:
+        if os.path.isfile(file):
+            with open(file, 'r') as f:
+                for _, line in enumerate(f):
+                    name, value = line.split("=", 1)
+                    args.preset_substitutions[name] = value.strip()
+
     for arg in args.preset_substitutions_raw:
         name, value = arg.split("=", 1)
         args.preset_substitutions[name] = value
@@ -679,16 +695,16 @@ def main_normal():
     if args.cmake is not None:
         toolchain.cmake = args.cmake
 
-    cmake = CMake(args=args, toolchain=toolchain)
-    # Check the CMake version is sufficient on Linux and build from source
-    # if not.
-    cmake_path = cmake.check_cmake_version(SWIFT_SOURCE_ROOT, SWIFT_BUILD_ROOT)
-    if cmake_path is not None:
-        toolchain.cmake = cmake_path
-        args.cmake = cmake_path
-
     # Preprocess the arguments to apply defaults.
     apply_default_arguments(toolchain, args)
+
+    cmake = CMake(args=args, toolchain=toolchain)
+    toolchain.cmake = cmake.get_cmake_path(source_root=SWIFT_SOURCE_ROOT,
+                                           build_root=SWIFT_BUILD_ROOT)
+    args.cmake = toolchain.cmake
+
+    # Create the build script invocation.
+    invocation = build_script_invocation.BuildScriptInvocation(toolchain, args)
 
     # Validate the arguments.
     validate_arguments(toolchain, args)
@@ -699,9 +715,6 @@ def main_normal():
         # --start-server will fail if the server is already running.
         # Capture the output because we don't want to see the stats.
         shell.capture([toolchain.sccache, "--show-stats"])
-
-    # Create the build script invocation.
-    invocation = build_script_invocation.BuildScriptInvocation(toolchain, args)
 
     # Sanitize the runtime environment.
     initialize_runtime_environment()
@@ -732,10 +745,6 @@ def main_normal():
         sys.stdout.write("Cleaning install destdir!\n")
         shell.rmtree(args.install_destdir)
 
-    # Build ninja if required, which will update the toolchain.
-    if args.build_ninja:
-        invocation.build_ninja()
-
     # Execute the underlying build script implementation.
     invocation.execute()
 
@@ -756,17 +765,6 @@ def main_normal():
         with shell.pushd(args.install_symroot):
             tar(source=prefix.lstrip('/'),
                 destination=args.symbols_package)
-
-    if args.cmake_generator == "Xcode":
-        print_warning(
-            "The Xcode projects generated with '--xcode' can be used for "
-            "navigation or editing purposes, but are not a recommended means "
-            "to building, running or debugging. For a full-fledged Xcode "
-            "workflow using these generated projects, see "
-            "https://github.com/apple/swift/blob/main/docs/HowToGuides/"
-            "GettingStarted.md#using-ninja-with-xcode"
-        )
-        print()
 
     return 0
 
@@ -798,11 +796,12 @@ def main():
 if __name__ == "__main__":
     try:
         exit_code = main()
-    except SystemExit as e:
-        error_code = process_system_exit(e)
-        os._exit(error_code)
+        log_analyzer()
+    except SystemExit:
+        raise
     except KeyboardInterrupt:
         sys.exit(1)
-    finally:
+    except Exception:
         log_analyzer()
+        raise
     sys.exit(exit_code)

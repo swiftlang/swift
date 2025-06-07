@@ -1,5 +1,9 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -object-outliner | %FileCheck %s
-//
+// RUN: %sil-opt -sil-print-types -enable-sil-verify-all %s -object-outliner | %FileCheck %s
+
+// Note: Intentionally not using %target-sil-opt, because we need at least a
+//       swift 5.1 deployment target.
+
+// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 
@@ -12,20 +16,61 @@ class Obj : Base {
   @_hasStorage var value: Int64
 }
 
-// CHECK-LABEL: sil_global private @outline_global_simpleTv_ : $Obj = {
+sil_global [let] @g1 : $Int32 = {
+  %0 = integer_literal $Builtin.Int32, 1
+  %initval = struct $Int32 (%0 : $Builtin.Int32)
+}
+
+sil_global [let] @gobj : $Obj
+sil_global @gobj_var : $Obj
+
+// CHECK-LABEL: sil_global private [let] @outline_global_simpleTv_ : $Obj = {
 // CHECK-NEXT:    %0 = integer_literal $Builtin.Int64, 1
 // CHECK-NEXT:    %1 = struct $Int64 (%0 : $Builtin.Int64)
 // CHECK-NEXT:    %initval = object $Obj (%1 : $Int64)
 // CHECK-NEXT:  }
 
-// CHECK-LABEL: sil_global private @outline_global_tailelemsTv_ : $Obj = {
-// CHECK-NEXT:    %0 = integer_literal $Builtin.Int64, 3
+// CHECK-LABEL: sil_global private [let] @outline_global_tailelemsTv_ : $Obj = {
+// CHECK-NEXT:    %0 = integer_literal $Builtin.Int64, 1
 // CHECK-NEXT:    %1 = struct $Int64 (%0 : $Builtin.Int64)
 // CHECK-NEXT:    %2 = integer_literal $Builtin.Int64, 2
 // CHECK-NEXT:    %3 = struct $Int64 (%2 : $Builtin.Int64)
-// CHECK-NEXT:    %4 = integer_literal $Builtin.Int64, 1
+// CHECK-NEXT:    %4 = integer_literal $Builtin.Int64, 3
 // CHECK-NEXT:    %5 = struct $Int64 (%4 : $Builtin.Int64)
-// CHECK-NEXT:    %initval = object $Obj (%5 : $Int64, [tail_elems] %3 : $Int64, %1 : $Int64)
+// CHECK-NEXT:    %initval = object $Obj (%1 : $Int64, [tail_elems] %3 : $Int64, %5 : $Int64)
+// CHECK-NEXT:  }
+
+// CHECK-LABEL: sil_global private [let] @tuple_tailelemsTv_ : $Obj = {
+// CHECK-NEXT:    %0 = integer_literal $Builtin.Int64, 27
+// CHECK-NEXT:    %1 = struct $Int64 (%0 : $Builtin.Int64)
+// CHECK-NEXT:    %2 = integer_literal $Builtin.Int64, 1
+// CHECK-NEXT:    %3 = struct $Int64 (%2 : $Builtin.Int64)
+// CHECK-NEXT:    %4 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:    %5 = struct $Bool (%4 : $Builtin.Int1)
+// CHECK-NEXT:    %6 = tuple (%3 : $Int64, %5 : $Bool)
+// CHECK-NEXT:    %7 = integer_literal $Builtin.Int64, 2
+// CHECK-NEXT:    %8 = struct $Int64 (%7 : $Builtin.Int64)
+// CHECK-NEXT:    %9 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:    %10 = struct $Bool (%9 : $Builtin.Int1)
+// CHECK-NEXT:    %11 = tuple (%8 : $Int64, %10 : $Bool)
+// CHECK-NEXT:    %12 = struct $Int64 (%7 : $Builtin.Int64)
+// CHECK-NEXT:    %13 = tuple (%12 : $Int64, %5 : $Bool)
+// CHECK-NEXT:    %initval = object $Obj (%1 : $Int64, [tail_elems] %6 : $(Int64, Bool), %11 : $(Int64, Bool), %13 : $(Int64, Bool))
+// CHECK-NEXT:  }
+
+// CHECK-LABEL: sil_global private [let] @outline_global_addressTv_ : $Obj = {
+// CHECK-NEXT:    %0 = integer_literal $Builtin.Int64, 1
+// CHECK-NEXT:    %1 = struct $Int64 (%0 : $Builtin.Int64)
+// CHECK-NEXT:    %2 = global_addr @g1 : $*Int32
+// CHECK-NEXT:    %3 = address_to_pointer %2 : $*Int32 to $Builtin.RawPointer
+// CHECK-NEXT:    %4 = struct $UnsafePointer<Int32> (%3 : $Builtin.RawPointer)
+// CHECK-NEXT:    %initval = object $Obj (%1 : $Int64, [tail_elems] %4 : $UnsafePointer<Int32>)
+// CHECK-NEXT:  }
+
+// CHECK-LABEL: sil_global private @init_gobjTv_ : $Obj = {
+// CHECK-NEXT:    %0 = integer_literal $Builtin.Int64, 27
+// CHECK-NEXT:    %1 = struct $Int64 (%0 : $Builtin.Int64)
+// CHECK-NEXT:    %initval = object $Obj (%1 : $Int64)
 // CHECK-NEXT:  }
 
 // CHECK-LABEL: sil @outline_global_simple
@@ -44,6 +89,30 @@ bb0:
   store %4 to %9 : $*Int64
   %10 = end_cow_mutation %7 : $Obj
   strong_release %10 : $Obj
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @remove_dealloc_instructions :
+// CHECK:         [[G:%.*]] = global_value
+// CHECK-NEXT:    strong_retain [[G]] : $Obj
+// CHECK-NEXT:    ref_element_addr
+// CHECK-NEXT:    [[C:%.*]] = unchecked_ref_cast [[G]]
+// CHECK-NEXT:    strong_release [[C]]
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'remove_dealloc_instructions'
+sil @remove_dealloc_instructions : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Int64, 1
+  %4 = struct $Int64 (%1 : $Builtin.Int64)
+  %7 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $Obj
+  %9 = ref_element_addr %7 : $Obj, #Obj.value
+  store %4 to %9 : $*Int64
+  %10 = end_cow_mutation %7 : $Obj
+  %11 = unchecked_ref_cast %10 : $Obj to $Base
+  %12 = begin_dealloc_ref %11 : $Base of %7 : $Obj
+  dealloc_ref %12 : $Base
   %r = tuple ()
   return %r : $()
 }
@@ -70,6 +139,45 @@ bb0:
   return %r : $()
 }
 
+// CHECK-LABEL: sil @outline_global_with_uncheckedrefcast : 
+// CHECK: global_value
+// CHECK: } // end sil function 'outline_global_with_uncheckedrefcast'
+sil @outline_global_with_uncheckedrefcast : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Int64, 1
+  %4 = struct $Int64 (%1 : $Builtin.Int64)
+  %7 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $Obj
+  %9 = ref_element_addr %7 : $Obj, #Obj.value
+  store %4 to %9 : $*Int64
+  %10 = unchecked_ref_cast %7 : $Obj to $Base
+  %11 = end_cow_mutation %10 : $Base
+  %12 = begin_dealloc_ref %11 : $Base of %7 : $Obj
+  dealloc_ref %12 : $Base
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @outline_global_with_move_value : 
+// CHECK: global_value
+// CHECK: } // end sil function 'outline_global_with_move_value'
+sil [ossa] @outline_global_with_move_value : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Int64, 1
+  %4 = struct $Int64 (%1 : $Builtin.Int64)
+  %7 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $Obj
+  %8 = move_value %7 : $Obj
+  %9 = begin_borrow %8 : $Obj
+  %10 = ref_element_addr %9 : $Obj, #Obj.value
+  store %4 to [trivial] %10 : $*Int64
+  end_borrow %9 : $Obj
+  %11 = end_cow_mutation %8 : $Obj
+  %12 = begin_dealloc_ref %11 : $Obj of %7 : $Obj
+  dealloc_ref %12 : $Obj
+  %r = tuple ()
+  return %r : $()
+}
 
 // CHECK-LABEL: sil @outline_global_tailelems
 // CHECK: [[G:%[0-9]+]] = global_value @outline_global_tailelemsTv_ : $Obj
@@ -116,24 +224,41 @@ bb0:
   %6 = ref_element_addr %5 : $Obj, #Obj.value
   store %4 to %6 : $*Int64
   %10 = end_cow_mutation %5 : $Obj
-  set_deallocating %10 : $Obj
-  dealloc_ref %10 : $Obj
+  %11 = begin_dealloc_ref %10 : $Obj of %5 : $Obj
+  dealloc_ref %11 : $Obj
   %r = tuple ()
   return %r : $()
 }
 
-// CHECK-LABEL: sil @dont_outline_without_tail_elems
+// CHECK-LABEL: sil @dont_outline_without_end_cow_mutation
 // CHECK: alloc_ref
 // CHECK: store
 // CHECK: return
-sil @dont_outline_without_tail_elems : $@convention(thin) () -> () {
+sil @dont_outline_without_end_cow_mutation : $@convention(thin) () -> () {
 bb0:
   %1 = integer_literal $Builtin.Int64, 1
   %4 = struct $Int64 (%1 : $Builtin.Int64)
   %7 = alloc_ref $Obj
   %9 = ref_element_addr %7 : $Obj, #Obj.value
   store %4 to %9 : $*Int64
-  %10 = end_cow_mutation %7 : $Obj
+  strong_release %7 : $Obj
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @dont_outline_keep_unique
+// CHECK:         alloc_ref
+// CHECK:         store
+// CHECK:       } // end sil function 'dont_outline_keep_unique'
+sil @dont_outline_keep_unique : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Int64, 1
+  %4 = struct $Int64 (%1 : $Builtin.Int64)
+  %7 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $Obj
+  %9 = ref_element_addr %7 : $Obj, #Obj.value
+  store %4 to %9 : $*Int64
+  %10 = end_cow_mutation [keep_unique] %7 : $Obj
   strong_release %10 : $Obj
   %r = tuple ()
   return %r : $()
@@ -278,3 +403,139 @@ bb0:
   %r = tuple ()
   return %r : $()
 }
+
+sil @unknown_use : $@convention(thin) (@guaranteed Base) -> ()
+
+// CHECK-LABEL: sil @dont_outline_with_invalid_use_of_begin_dealloc :
+// CHECK:         alloc_ref
+// CHECK:       } // end sil function 'dont_outline_with_invalid_use_of_begin_dealloc'
+sil @dont_outline_with_invalid_use_of_begin_dealloc : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Int64, 1
+  %4 = struct $Int64 (%1 : $Builtin.Int64)
+  %7 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $Obj
+  %9 = ref_element_addr %7 : $Obj, #Obj.value
+  store %4 to %9 : $*Int64
+  %10 = end_cow_mutation %7 : $Obj
+  %11 = unchecked_ref_cast %10 : $Obj to $Base
+  %12 = begin_dealloc_ref %11 : $Base of %7 : $Obj
+  %13 = function_ref @unknown_use : $@convention(thin) (@guaranteed Base) -> ()
+  %14 = apply %13(%12) : $@convention(thin) (@guaranteed Base) -> ()
+  dealloc_ref %12 : $Base
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @tuple_tailelems :
+// CHECK:         [[G:%[0-9]+]] = global_value @tuple_tailelemsTv_ : $Obj
+// CHECK:         strong_retain [[G]] : $Obj
+// CHECK-NOT:     store
+// CHECK:         return [[G]] : $Obj
+// CHECK:       } // end sil function 'tuple_tailelems'
+sil @tuple_tailelems : $@convention(thin) () -> @owned Obj {
+bb0:
+  %0 = integer_literal $Builtin.Word, 3
+  %1 = integer_literal $Builtin.Int64, 27
+  %2 = struct $Int64 (%1 : $Builtin.Int64)
+  %3 = alloc_ref [tail_elems $(Int64, Bool) * %0 : $Builtin.Word] $Obj
+  %4 = ref_element_addr %3 : $Obj, #Obj.value
+  store %2 to %4 : $*Int64
+  %6 = ref_tail_addr %3 : $Obj, $(Int64, Bool)
+  %7 = tuple_element_addr %6 : $*(Int64, Bool), 0
+  %8 = tuple_element_addr %6 : $*(Int64, Bool), 1
+  %9 = integer_literal $Builtin.Int64, 1
+  %10 = struct $Int64 (%9 : $Builtin.Int64)
+  store %10 to %7 : $*Int64
+  %12 = integer_literal $Builtin.Int1, 0
+  %13 = struct $Bool (%12 : $Builtin.Int1)
+  store %13 to %8 : $*Bool
+  %15 = integer_literal $Builtin.Word, 1
+  %16 = index_addr %6 : $*(Int64, Bool), %15 : $Builtin.Word
+  %17 = tuple_element_addr %16 : $*(Int64, Bool), 0
+  %18 = tuple_element_addr %16 : $*(Int64, Bool), 1
+  %19 = integer_literal $Builtin.Int64, 2
+  %20 = struct $Int64 (%19 : $Builtin.Int64)
+  store %20 to %17 : $*Int64
+  %22 = integer_literal $Builtin.Int1, -1
+  %23 = struct $Bool (%22 : $Builtin.Int1)
+  store %23 to %18 : $*Bool
+  %25 = integer_literal $Builtin.Word, 2
+  %26 = index_addr %6 : $*(Int64, Bool), %25 : $Builtin.Word
+  %27 = tuple_element_addr %26 : $*(Int64, Bool), 0
+  %28 = tuple_element_addr %26 : $*(Int64, Bool), 1
+  %29 = integer_literal $Builtin.Int64, 3
+  %30 = struct $Int64 (%19 : $Builtin.Int64)
+  store %30 to %27 : $*Int64
+  store %13 to %28 : $*Bool
+  %33 = end_cow_mutation %3 : $Obj
+  return %33 : $Obj
+}
+
+// CHECK-LABEL: sil @outline_global_address :
+// CHECK:         [[G:%[0-9]+]] = global_value @outline_global_addressTv_ : $Obj
+// CHECK:         strong_retain [[G]] : $Obj
+// CHECK-NOT:     store
+// CHECK:       } // end sil function 'outline_global_address'
+sil @outline_global_address : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 1
+  %1 = integer_literal $Builtin.Int64, 1
+  %4 = struct $Int64 (%1 : $Builtin.Int64)
+  %7 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $Obj
+  %9 = ref_element_addr %7 : $Obj, #Obj.value
+  store %4 to %9 : $*Int64
+  %11 = ref_tail_addr %7 : $Obj, $UnsafePointer<Int32>
+  %12 = global_addr @g1 : $*Int32
+  %13 = begin_access [read] [dynamic] %12 : $*Int32
+  %14 = address_to_pointer %13 : $*Int32 to $Builtin.RawPointer
+  end_access %13 : $*Int32
+  %16 = struct $UnsafePointer<Int32> (%14 : $Builtin.RawPointer)
+  store %16 to %11 : $*UnsafePointer<Int32>
+  %18 = end_cow_mutation %7 : $Obj
+  strong_release %18 : $Obj
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [global_init_once_fn] @init_gobj :
+// CHECK:         [[A:%.*]] = global_addr @gobj : $*Obj
+// CHECK:         [[G:%[0-9]+]] = global_value @init_gobjTv_ : $Obj
+// CHECK:         strong_retain [[G]] : $Obj
+// CHECK:         store [[G]] to [[A]]
+// CHECK:       } // end sil function 'init_gobj'
+sil [global_init_once_fn] @init_gobj : $@convention(c) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  alloc_global @gobj
+  %2 = global_addr @gobj : $*Obj
+  %3 = integer_literal $Builtin.Int64, 27
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
+  %5 = alloc_ref $Obj
+  %8 = end_init_let_ref %5 : $Obj
+  %9 = ref_element_addr %8 : $Obj, #Obj.value
+  store %4 to %9 : $*Int64
+  store %8 to %2 : $*Obj
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// CHECK-LABEL: sil [global_init_once_fn] @init_gobj_var :
+// CHECK:         alloc_ref
+// CHECK-NOT:     global_value
+// CHECK:       } // end sil function 'init_gobj_var'
+sil [global_init_once_fn] @init_gobj_var : $@convention(c) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  alloc_global @gobj_var
+  %2 = global_addr @gobj_var : $*Obj
+  %3 = integer_literal $Builtin.Int64, 27
+  %4 = struct $Int64 (%3 : $Builtin.Int64)
+  %5 = alloc_ref $Obj
+  %8 = end_init_let_ref %5 : $Obj
+  %9 = ref_element_addr %8 : $Obj, #Obj.value
+  store %4 to %9 : $*Int64
+  store %8 to %2 : $*Obj
+  %12 = tuple ()
+  return %12 : $()
+}
+
+

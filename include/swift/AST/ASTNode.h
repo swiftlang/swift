@@ -50,6 +50,15 @@ namespace swift {
     // Inherit the constructors from PointerUnion.
     using PointerUnion::PointerUnion;
 
+    // These are needed for lldb.
+    ASTNode(Expr *E) : PointerUnion(E) {}
+    ASTNode(Stmt *S) : PointerUnion(S) {}
+    ASTNode(Decl *D) : PointerUnion(D) {}
+    ASTNode(Pattern *P) : PointerUnion(P) {}
+    ASTNode(TypeRepr *T) : PointerUnion(T) {}
+    ASTNode(StmtConditionElement *S) : PointerUnion(S) {}
+    ASTNode(CaseLabelItem *C) : PointerUnion(C) {}
+
     SourceRange getSourceRange() const;
 
     /// Return the location of the start of the statement.
@@ -106,6 +115,19 @@ namespace llvm {
     static bool isEqual(const ASTNode LHS, const ASTNode RHS) {
       return LHS.getOpaqueValue() == RHS.getOpaqueValue();
     }
+  };
+
+  // A ASTNode is "pointer like".
+  template <>
+  struct PointerLikeTypeTraits<ASTNode> {
+  public:
+    static inline void *getAsVoidPointer(ASTNode N) {
+      return (void *)N.getOpaqueValue();
+    }
+    static inline ASTNode getFromVoidPointer(void *P) {
+      return ASTNode::getFromOpaqueValue(P);
+    }
+    enum { NumLowBitsAvailable = swift::TypeAlignInBits };
   };
 }
 

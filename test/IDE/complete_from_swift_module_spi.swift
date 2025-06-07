@@ -16,16 +16,12 @@
 // RUN: %target-swift-ide-test -code-completion -completion-cache-path %t/cc-cache -source-filename %t/split/with-different-spi-import.swift -I %t/build -code-completion-token=COMPLETE | %FileCheck %s --check-prefix=WITHOUT_SPI
 // RUN: %target-swift-ide-test -code-completion -completion-cache-path %t/cc-cache -source-filename %t/split/with-spi-import.swift -I %t/build -code-completion-token=COMPLETE | %FileCheck %s --check-prefix=WITH_SPI
 
-// WITH_SPI: Begin completions
 // WITH_SPI-DAG: Decl[FreeFunction]/OtherModule[pck]: apiFunc()[#Void#]; name=apiFunc()
 // WITH_SPI-DAG: Decl[FreeFunction]/OtherModule[pck]: spiFunc()[#Void#]; name=spiFunc()
-// WITH_SPI: End completions
 
-// WITHOUT_SPI: Begin completions
 // WITHOUT_SPI-NOT: spiFunc
 // WITHOUT_SPI-DAG: Decl[FreeFunction]/OtherModule[pck]: apiFunc()[#Void#]; name=apiFunc()
 // WITHOUT_SPI-NOT: spiFunc
-// WITHOUT_SPI: End completions
 
 
 // BEGIN pck.swift

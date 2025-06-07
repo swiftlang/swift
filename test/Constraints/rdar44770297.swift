@@ -8,4 +8,5 @@ func foo<T: P>(_: () throws -> T) -> T.A? { // expected-note {{where 'T' = 'Neve
   fatalError()
 }
 
-let _ = foo() {fatalError()} & nil // expected-error {{global function 'foo' requires that 'Never' conform to 'P'}}
+let _ = foo() {fatalError()} & nil
+// expected-error@-1 {{global function 'foo' requires that 'Never' conform to 'P'}}

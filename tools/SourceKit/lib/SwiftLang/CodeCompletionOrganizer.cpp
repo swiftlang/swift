@@ -23,7 +23,6 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/ilist.h"
 #include "llvm/ADT/ilist_node.h"
-#include <deque>
 
 using namespace SourceKit;
 using namespace CodeCompletion;
@@ -135,15 +134,14 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
     auto *contextFreeResult =
         ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
             sink.swiftSink, CodeCompletionResultKind::Pattern, completionString,
-            CodeCompletionOperatorKind::None, /*IsAsync=*/false,
+            CodeCompletionOperatorKind::None,
             /*BriefDocComment=*/"", CodeCompletionResultType::unknown(),
             ContextFreeNotRecommendedReason::None,
             CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
     auto *swiftResult = new (sink.allocator) CodeCompletion::SwiftResult(
         *contextFreeResult, SemanticContextKind::Local,
         CodeCompletionFlairBit::ExpressionSpecific,
-        /*NumBytesToErase=*/0, /*TypeContext=*/nullptr, /*DC=*/nullptr,
-        /*USRTypeContext=*/nullptr, /*CanCurrDeclContextHandleAsync=*/false,
+        /*NumBytesToErase=*/0, CodeCompletionResultTypeRelation::Unrelated,
         ContextualNotRecommendedReason::None);
 
     CompletionBuilder builder(sink, *swiftResult);
@@ -176,7 +174,10 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
         addCompletion(custom);
       }
       break;
+    case CompletionKind::TypePossibleFunctionParamBeginning:
     case CompletionKind::TypeDeclResultBeginning:
+    case CompletionKind::TypeBeginning:
+    case CompletionKind::TypeSimpleOrComposition:
     case CompletionKind::TypeSimpleBeginning:
       if (custom.Contexts.contains(CustomCompletionInfo::Type)) {
         changed = true;
@@ -451,7 +452,10 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
   if (filterText.empty()) {
     bool hideLowPriority =
         options.hideLowPriority &&
+        completionKind != CompletionKind::TypePossibleFunctionParamBeginning &&
         completionKind != CompletionKind::TypeDeclResultBeginning &&
+        completionKind != CompletionKind::TypeBeginning &&
+        completionKind != CompletionKind::TypeSimpleOrComposition &&
         completionKind != CompletionKind::TypeSimpleBeginning &&
         completionKind != CompletionKind::PostfixExpr;
     for (Completion *completion : completions) {
@@ -534,7 +538,7 @@ void CodeCompletionOrganizer::Impl::addCompletionsWithFilter(
     if (options.fuzzyMatching && filterText.size() >= options.minFuzzyLength) {
       match = pattern.matchesCandidate(completion->getFilterName());
     } else {
-      match = completion->getFilterName().startswith_insensitive(filterText);
+      match = completion->getFilterName().starts_with_insensitive(filterText);
     }
 
     bool isExactMatch =
@@ -698,6 +702,13 @@ static ResultBucket getResultBucket(Item &item, bool hasRequiredTypes,
   }
 }
 
+template <class T, size_t N>
+static size_t getIndex(const T (&array)[N], T element) {
+  auto I = std::find(array, &array[N], element);
+  assert(I != &array[N]);
+  return std::distance(array, I);
+}
+
 static int compareHighPriorityKeywords(Item &a_, Item &b_) {
   static CodeCompletionKeywordKind order[] = {
     CodeCompletionKeywordKind::kw_let,
@@ -708,16 +719,9 @@ static int compareHighPriorityKeywords(Item &a_, Item &b_) {
     CodeCompletionKeywordKind::kw_return,
     CodeCompletionKeywordKind::kw_func,
   };
-  auto size = sizeof(order) / sizeof(order[0]);
 
-  auto getIndex = [=](Item &item) {
-     auto I = std::find(order, &order[size], cast<Result>(item).value->getKeywordKind());
-    assert(I != &order[size]);
-    return std::distance(order, I);
-  };
-
-  auto a = getIndex(a_);
-  auto b = getIndex(b_);
+  auto a = getIndex(order, cast<Result>(a_).value->getKeywordKind());
+  auto b = getIndex(order, cast<Result>(b_).value->getKeywordKind());
   return a < b ? -1 : (b < a ? 1 : 0);
 }
 
@@ -733,16 +737,9 @@ static int compareLiterals(Item &a_, Item &b_) {
     CodeCompletionLiteralKind::Tuple,
     CodeCompletionLiteralKind::NilLiteral,
   };
-  auto size = sizeof(order) / sizeof(order[0]);
 
-  auto getIndex = [=](Item &item) {
-    auto I = std::find(order, &order[size], cast<Result>(item).value->getLiteralKind());
-    assert(I != &order[size]);
-    return std::distance(order, I);
-  };
-
-  auto a = getIndex(a_);
-  auto b = getIndex(b_);
+  auto a = getIndex(order, cast<Result>(a_).value->getLiteralKind());
+  auto b = getIndex(order, cast<Result>(b_).value->getLiteralKind());
 
   if (a != b)
     return a < b ? -1 : 1;
@@ -813,17 +810,9 @@ static int compareOperators(Item &a_, Item &b_) {
       CCOK::NotEqEq, // !==
       CCOK::TildeEq, // ~=
   };
-  auto size = sizeof(order) / sizeof(order[0]);
 
-  auto getIndex = [=](Item &item) {
-    auto I = std::find(order, &order[size],
-                       cast<Result>(item).value->getOperatorKind());
-    assert(I != &order[size]);
-    return std::distance(order, I);
-  };
-
-  auto a = getIndex(a_);
-  auto b = getIndex(b_);
+  auto a = getIndex(order, cast<Result>(a_).value->getOperatorKind());
+  auto b = getIndex(order, cast<Result>(b_).value->getOperatorKind());
   return a < b ? -1 : (b < a ? 1 : 0);
 }
 
@@ -1167,9 +1156,9 @@ Completion *CompletionBuilder::finish() {
         new (sink.allocator) ContextFreeCodeCompletionResult(
             contextFreeBase.getKind(),
             contextFreeBase.getOpaqueAssociatedKind(), opKind,
-            contextFreeBase.isSystem(), contextFreeBase.isAsync(),
-            contextFreeBase.hasAsyncAlternative(), newCompletionString,
-            contextFreeBase.getModuleName(),
+            contextFreeBase.getMacroRoles(), contextFreeBase.isSystem(),
+            contextFreeBase.hasAsyncAlternative(),
+            newCompletionString, contextFreeBase.getModuleName(),
             contextFreeBase.getBriefDocComment(),
             contextFreeBase.getAssociatedUSRs(),
             contextFreeBase.getResultType(),

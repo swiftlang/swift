@@ -33,7 +33,7 @@ protected:
   void addImpl(unsigned Val);
   void addImpl(llvm::StringRef Val);
   void addImpl(SourceKit::UIdent Val);
-  void addImpl(Optional<llvm::StringRef> Val);
+  void addImpl(std::optional<llvm::StringRef> Val);
 
 private:
   unsigned getOffsetForString(llvm::StringRef Str);
@@ -162,11 +162,11 @@ struct CompactVariantFuncs {
 
   static bool
   dictionary_apply(sourcekitd_variant_t dict,
-                   llvm::function_ref<bool(sourcekitd_uid_t,
-                                           sourcekitd_variant_t)> applier) {
+                   sourcekitd_variant_dictionary_applier_f_t applier,
+                   void *context) {
     void *Buf = (void *)dict.data[1];
     size_t Index = dict.data[2];
-    return T::dictionary_apply(Buf, Index, applier);
+    return T::dictionary_apply(Buf, Index, applier, context);
   }
 
   static VariantFunctions Funcs;
@@ -174,27 +174,30 @@ struct CompactVariantFuncs {
 
 template <typename T>
 VariantFunctions CompactVariantFuncs<T>::Funcs = {
-  get_type,
-  nullptr/*Annot_array_apply*/,
-  nullptr/*Annot_array_get_bool*/,
-  nullptr/*Annot_array_get_count*/,
-  nullptr/*Annot_array_get_int64*/,
-  nullptr/*Annot_array_get_string*/,
-  nullptr/*Annot_array_get_uid*/,
-  nullptr/*Annot_array_get_value*/,
-  nullptr/*Annot_bool_get_value*/,
-  dictionary_apply,
-  nullptr/*Annot_dictionary_get_bool*/,
-  nullptr/*Annot_dictionary_get_int64*/,
-  nullptr/*Annot_dictionary_get_string*/,
-  nullptr/*Annot_dictionary_get_value*/,
-  nullptr/*Annot_dictionary_get_uid*/,
-  nullptr/*Annot_string_get_length*/,
-  nullptr/*Annot_string_get_ptr*/,
-  nullptr/*Annot_int64_get_value*/,
-  nullptr/*Annot_uid_get_value*/,
-  nullptr/*Annot_data_get_size*/,
-  nullptr/*Annot_data_get_ptr*/,
+    get_type,
+    nullptr /*Annot_array_apply*/,
+    nullptr /*Annot_array_get_bool*/,
+    nullptr /*Annot_array_get_double*/,
+    nullptr /*Annot_array_get_count*/,
+    nullptr /*Annot_array_get_int64*/,
+    nullptr /*Annot_array_get_string*/,
+    nullptr /*Annot_array_get_uid*/,
+    nullptr /*Annot_array_get_value*/,
+    nullptr /*Annot_bool_get_value*/,
+    nullptr /*Annot_double_get_value*/,
+    dictionary_apply,
+    nullptr /*Annot_dictionary_get_bool*/,
+    nullptr /*Annot_dictionary_get_double*/,
+    nullptr /*Annot_dictionary_get_int64*/,
+    nullptr /*Annot_dictionary_get_string*/,
+    nullptr /*Annot_dictionary_get_value*/,
+    nullptr /*Annot_dictionary_get_uid*/,
+    nullptr /*Annot_string_get_length*/,
+    nullptr /*Annot_string_get_ptr*/,
+    nullptr /*Annot_int64_get_value*/,
+    nullptr /*Annot_uid_get_value*/,
+    nullptr /*Annot_data_get_size*/,
+    nullptr /*Annot_data_get_ptr*/,
 };
 
 template <typename T>
@@ -221,29 +224,31 @@ struct CompactArrayFuncs {
 
 template <typename T>
 VariantFunctions CompactArrayFuncs<T>::Funcs = {
-  get_type,
-  nullptr/*AnnotArray_array_apply*/,
-  nullptr/*AnnotArray_array_get_bool*/,
-  array_get_count,
-  nullptr/*AnnotArray_array_get_int64*/,
-  nullptr/*AnnotArray_array_get_string*/,
-  nullptr/*AnnotArray_array_get_uid*/,
-  array_get_value,
-  nullptr/*AnnotArray_bool_get_value*/,
-  nullptr/*AnnotArray_dictionary_apply*/,
-  nullptr/*AnnotArray_dictionary_get_bool*/,
-  nullptr/*AnnotArray_dictionary_get_int64*/,
-  nullptr/*AnnotArray_dictionary_get_string*/,
-  nullptr/*AnnotArray_dictionary_get_value*/,
-  nullptr/*AnnotArray_dictionary_get_uid*/,
-  nullptr/*AnnotArray_string_get_length*/,
-  nullptr/*AnnotArray_string_get_ptr*/,
-  nullptr/*AnnotArray_int64_get_value*/,
-  nullptr/*AnnotArray_uid_get_value*/,
-  nullptr/*Annot_data_get_size*/,
-  nullptr/*Annot_data_get_ptr*/,
+    get_type,
+    nullptr /*AnnotArray_array_apply*/,
+    nullptr /*AnnotArray_array_get_bool*/,
+    nullptr /*AnnotArray_array_get_double*/,
+    array_get_count,
+    nullptr /*AnnotArray_array_get_int64*/,
+    nullptr /*AnnotArray_array_get_string*/,
+    nullptr /*AnnotArray_array_get_uid*/,
+    array_get_value,
+    nullptr /*AnnotArray_bool_get_value*/,
+    nullptr /*AnnotArray_double_get_value*/,
+    nullptr /*AnnotArray_dictionary_apply*/,
+    nullptr /*AnnotArray_dictionary_get_bool*/,
+    nullptr /*AnnotArray_dictionary_get_double*/,
+    nullptr /*AnnotArray_dictionary_get_int64*/,
+    nullptr /*AnnotArray_dictionary_get_string*/,
+    nullptr /*AnnotArray_dictionary_get_value*/,
+    nullptr /*AnnotArray_dictionary_get_uid*/,
+    nullptr /*AnnotArray_string_get_length*/,
+    nullptr /*AnnotArray_string_get_ptr*/,
+    nullptr /*AnnotArray_int64_get_value*/,
+    nullptr /*AnnotArray_uid_get_value*/,
+    nullptr /*Annot_data_get_size*/,
+    nullptr /*Annot_data_get_ptr*/,
 };
-
 }
 
 #endif

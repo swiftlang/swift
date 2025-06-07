@@ -58,3 +58,55 @@ struct AccidentalReorder { // expected-note{{'init(content:optionalInt:)' declar
 func testAccidentalReorder() {
   _ = AccidentalReorder(optionalInt: 17) { 42 } // expected-warning{{backward matching of the unlabeled trailing closure is deprecated; label the argument with 'content' to suppress this warning}}
 }
+
+func sheet(
+  isPresented: Bool,
+  onDismiss: (() -> Void)? = nil,
+  content: () -> String
+) -> String {
+  content()
+}
+
+func testSwiftUISheetExample() {
+  _ = sheet(isPresented: true) {
+    "Hello world"
+  }
+
+  _ = sheet(isPresented: true)  {
+    print("Was dismissed")
+  } content: {
+    "Hello world"
+  }
+}
+
+// https://github.com/apple/swift/issues/65921
+func issue_65921(onStart: ((String) -> Void)? = nil, onEnd: (String) -> Void) { }
+
+func testIssue65921() {
+  issue_65921 { end in
+    _ = end
+  }
+
+  issue_65921 { start in
+    _ = start
+  } onEnd: { end in
+    _ = end
+  }
+}
+
+struct BlockObserver { // expected-note {{'init(startHandler:produceHandler:finishHandler:)' declared here}}
+  var startHandler: ((Any) -> Void)? = nil
+  var produceHandler: ((Any, Any) -> Void)? = nil
+  var finishHandler: ((Any, Any, Any) -> Void)? = nil
+}
+
+func testBlockObserverExample() {
+  _ = BlockObserver { _, _, _ in } // expected-warning {{backward matching of the unlabeled trailing closure is deprecated; label the argument with 'finishHandler' to suppress this warning}}
+  
+  _ = BlockObserver { _ in } produceHandler: { _, _ in }
+  _ = BlockObserver { _ in } finishHandler: { _, _, _ in }
+  
+  _ = BlockObserver { _ in }
+    produceHandler: { _, _ in }
+    finishHandler: { _, _, _ in }
+}

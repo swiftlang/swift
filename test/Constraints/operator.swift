@@ -219,7 +219,9 @@ func rdar46459603() {
   var arr = ["key": e]
 
   _ = arr.values == [e]
-  // expected-error@-1 {{binary operator '==' cannot be applied to operands of type 'Dictionary<String, E>.Values' and '[E]'}}
+  // expected-error@-1 {{referencing operator function '==' on 'Equatable' requires that 'Dictionary<String, E>.Values' conform to 'Equatable'}}
+  // expected-error@-2 {{cannot convert value of type '[E]' to expected argument type 'Dictionary<String, E>.Values'}}
+
   _ = [arr.values] == [[e]]
   // expected-error@-1 {{referencing operator function '==' on 'Array' requires that 'E' conform to 'Equatable'}} expected-note@-1 {{binary operator '==' cannot be synthesized for enums with associated values}}
   // expected-error@-2 {{cannot convert value of type 'Dictionary<String, E>.Values' to expected element type '[E]'}}
@@ -275,14 +277,15 @@ func rdar_60185506() {
 func rdar60727310() {
   func myAssertion<T>(_ a: T, _ op: ((T,T)->Bool), _ b: T) {}
   var e: Error? = nil
-  myAssertion(e, ==, nil) // expected-error {{binary operator '==' cannot be applied to two '(any Error)?' operands}}
+  myAssertion(e, ==, nil) // expected-error {{cannot convert value of type '(any Error)?' to expected argument type '(any (~Copyable & ~Escapable).Type)?'}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('any Error' and 'any (~Copyable & ~Escapable).Type') are expected to be equal}}
 }
 
 // https://github.com/apple/swift/issues/54877
 // FIXME: Bad diagnostic.
 func f_54877(_ e: Error) {
   func foo<T>(_ a: T, _ op: ((T, T) -> Bool)) {}
-  foo(e, ==) // expected-error {{type of expression is ambiguous without more context}}
+  foo(e, ==) // expected-error {{type of expression is ambiguous without a type annotation}}
 }
 
 // rdar://problem/62054241 - Swift compiler crashes when passing < as the sort function in sorted(by:) and the type of the array is not comparable

@@ -1,7 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-emit-module-interface(%t/Library.swiftinterface) %s -disable-availability-checking -module-name Library
-// RUN: %target-swift-typecheck-module-from-interface(%t/Library.swiftinterface) -disable-availability-checking -module-name Library
-// RUN: %FileCheck --check-prefix CHECK-EXTENSION %s <%t/Library.swiftinterface
+// RUN: %target-swift-emit-module-interface(%t/Library.swiftinterface) %s -module-name Library
+// RUN: %target-swift-typecheck-module-from-interface(%t/Library.swiftinterface) -module-name Library
 // RUN: %FileCheck --check-prefix CHECK %s <%t/Library.swiftinterface
 // REQUIRES: concurrency
 
@@ -10,7 +9,7 @@
 /// and not via some extension. The requirement is due to the unique
 /// optimizations applied to the implementation of actors.
 
-// CHECK-EXTENSION-NOT: extension {{.+}} : _Concurrency.Actor
+// CHECK-NOT: extension {{.+}} : _Concurrency.Actor
 
 // CHECK: public actor PlainActorClass {
 @available(SwiftStdlib 5.1, *)

@@ -343,7 +343,10 @@ OVERRIDE_TASK_STATUS(task_escalate, JobPriority,
                      swift::, (AsyncTask *task, JobPriority newPriority),
                      (task, newPriority))
 
-OVERRIDE_TASK_STATUS(task_getNearestDeadline, NearestTaskDeadline,
+/// We need to keep this entry due to ABI requirements but this overridable
+/// function is not used at all so we will change the function definition to
+/// return void instead.
+OVERRIDE_TASK_STATUS(task_getNearestDeadline, void,
                      SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),
                      swift::, (AsyncTask *task), (task))
 

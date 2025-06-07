@@ -1,3 +1,5 @@
+[** ‼️ The official C++ interoperability documentation is live at Swift.org and provides an up-to-date guide for mixing Swift and C++ ‼️ **](https://www.swift.org/documentation/cxx-interop/)
+
 # Guide: Calling Swift APIs from C++
 
 A Swift library author might want to expose their interface to C++, to allow a C++ codebase to interoperate with the Swift library.  This document describes how this can be accomplished, by first describing how Swift can expose its interface to C++, and then going into the details on how to use Swift APIs from C++.
@@ -10,7 +12,7 @@ design for the Swift to C++ interoperability layer.
 **NOTE:** This document does not go over the following Swift language features yet:
 
 * Closures
-* overriden methods/properties in classes
+* overridden methods/properties in classes
 * Existential types (any P)
 * Nested types
 * Operators
@@ -70,7 +72,7 @@ Swift functions that are callable from C++ are available in their corresponding 
 
 Fundamental primitive types have a C++ fundamental type that represents them in C++:
 
-|Swift Type    |C++ Type    |C Type (if different)    |    |target specifc    |
+|Swift Type    |C++ Type    |C Type (if different)    |    |target specific    |
 |---    |---    |---    |---    |---    |
 |Void (or no return)    |void    |    |    |    |
 |Int    |swift::Int    |ptrdiff_t    |long or long long (windows)    |YES    |
@@ -293,12 +295,12 @@ As an example, this structure renames its second `init` overload in C++ to expos
 
 ```swift
 // Swift module 'Weather'
-struct Celcius {
-  var temperatureInCelcius: Double
+struct Celsius {
+  var temperatureInCelsius: Double
 
   // FEEDBACK: could provide a constructor here?
   // NOTE: concern about encouraging people not to use labels
-  init(_ t: Double) { self.temperatureInCelcius = t }
+  init(_ t: Double) { self.temperatureInCelsius = t }
 
   // FEEDBACK: could the compiler construct the 'initFromFahrenheit' c++ name?
   @expose(c++, initFromFahrenheit)
@@ -313,8 +315,8 @@ Both initializers can then be used from C++:
 using namespace Weather;
 
 void makeSunnyDay() {
-  auto morningTemperature = Celcius::init(25);
-  auto noonTemperature    = Celcius::initFromFahrenheit(90);
+  auto morningTemperature = Celsius::init(25);
+  auto noonTemperature    = Celsius::initFromFahrenheit(90);
 }
 ```
 
@@ -556,7 +558,7 @@ public:
 
   using UpcType = swift::Tuple<swift::Int, swift::Int, swift::Int, swift::Int>;
 
-  // Extracts the associated valus from Barcode.upc enum case
+  // Extracts the associated values from Barcode.upc enum case
   UpcType getUpc() const;
 
   bool isQrCode() const;
@@ -591,7 +593,7 @@ enum value will abort the program.
 ### Resilient Enums
 
 A resilient Swift enumeration value could represent a case that's unknown to the client.
-Swift forces the client to check if the value is `@uknown default` when switching over
+Swift forces the client to check if the value is `@unknown default` when switching over
 the enumeration to account for that. C++ follows a similar principle,
 by exposing an `unknownDefault` case that can then be matched in a switch.
 
@@ -696,7 +698,7 @@ public final class Bicycle: Vehicle {
 }
 ```
 
-Get a corresponding C++ class hierachy in C++:
+Get a corresponding C++ class hierarchy in C++:
 
 ```c++
 class Vehicle { ... };

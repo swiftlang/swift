@@ -1,4 +1,4 @@
-// RUN: %target-swiftxx-frontend -I %S/Inputs -emit-silgen %s | %FileCheck %s
+// RUN: %target-swiftxx-frontend -I %S/Inputs -Xllvm -sil-print-types -emit-silgen %s | %FileCheck %s
 
 import Constructors
 
@@ -23,7 +23,7 @@ public func testConstructorWithParam() {
 // CHECK: apply [[FN]]([[AS]]) : $@convention(c) () -> @out EmptyStruct
 // CHECK-LABEL: end sil function '$s4main18emptyTypeNoArgInityyF'
 
-// CHECL-LABEL: sil [clang EmptyStruct.init] @{{_ZN11EmptyStructC1Ev|\?\?0EmptyStruct@@QEAA@XZ}} : $@convention(c) () -> @out EmptyStruct
+// CHECK-LABEL: sil [clang EmptyStruct.init] @{{_ZN11EmptyStructC1Ev|\?\?0EmptyStruct@@QEAA@XZ}} : $@convention(c) () -> @out EmptyStruct
 public func emptyTypeNoArgInit() {
   let e = EmptyStruct()
 }

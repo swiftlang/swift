@@ -22,6 +22,13 @@ final class X {
 class Y {
 }
 
+final class Z {
+  @_hasStorage var a: Int32
+
+  init()
+  deinit
+}
+
 struct SP {
   var value: X
 }
@@ -50,6 +57,9 @@ struct Ptr {
   var p: Int32
 }
 
+enum SomeErr : Error {
+    case err
+}
 
 sil_global public @global_var : $Int32
 
@@ -66,20 +76,25 @@ sil @unknown_func : $@convention(thin) () -> ()
 sil @unknown_func_with_in_arg : $@convention(thin) (@in X) -> ()
 sil @unknown_func_with_in_guaranteed_arg : $@convention(thin) (@in_guaranteed X) -> ()
 sil @unknown_func_with_inout_arg : $@convention(thin) (@inout SP) -> ()
-sil @unknown_func_with_trivial_args : $@convention(thin) (@in Int32, Int32) -> ()
+sil @unknown_func_with_trivial_args : $@convention(thin) (@in_guaranteed Int32, Int32) -> ()
 
 
 sil @$s4test1XCfD : $@convention(method) (@owned X) -> () {
 [global: copy, write]
 }
 
+sil @$s4test1ZCfD : $@convention(method) (@owned Z) -> () {
+[%0: write c0.v**]
+}
+
 // CHECK-LABEL: sil @load_store_to_args
 // CHECK-NEXT:  [%0: read v**]
 // CHECK-NEXT:  [%1: write v**]
-// CHECK-NEXT:  [%2: write c0.v**]
+// CHECK-NEXT:  [%2: noescape **, write c0.v**]
 // CHECK-NEXT:  [global: ]
 // CHECK-NEXT:  {{^[^[]}}
 sil @load_store_to_args : $@convention(thin) (@inout Int32, @inout Int32, @guaranteed X) -> () {
+[%2: noescape **]
 bb0(%0 : $*Int32, %1 : $*Int32, %2 : $X):
   %l1 = load %0 : $*Int32
   store %l1 to %1  : $*Int32
@@ -127,7 +142,7 @@ bb0(%0 : $X, %1 : $*Int32):
 
 // CHECK-LABEL: sil @partial_apply_load_store_to_args
 // CHECK-NEXT:  [%0: read v**]
-// CHECK-NEXT:  [%1: write v**]
+// CHECK-NEXT:  [%1: read v**, write v**]
 // CHECK-NEXT:  [%2: write c0.v**, destroy c*.v**]
 // CHECK-NEXT:  [global: read,write,copy,destroy,allocate,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
@@ -146,7 +161,7 @@ bb0(%0 : $*Int32, %1 : $*Int32, %2 : $X):
 
 // CHECK-LABEL: sil @guaranteed_partial_apply_load_store_to_args
 // CHECK-NEXT:  [%0: read v**]
-// CHECK-NEXT:  [%1: write v**]
+// CHECK-NEXT:  [%1: read v**, write v**]
 // CHECK-NEXT:  [%2: write c0.v**]
 // CHECK-NEXT:  [global: ]
 // CHECK-NEXT:  {{^[^[]}}
@@ -237,8 +252,8 @@ bb0:
 // CHECK-NEXT:  {{^[^[]}}
 sil @call_unknown_func_with_trivial_args : $@convention(thin) (@in Int32, Int32) -> () {
 bb0(%0 : $*Int32, %1 : $Int32):
-  %2 = function_ref @unknown_func_with_trivial_args : $@convention(thin) (@in Int32, Int32) -> ()
-  %3 = apply %2(%0, %1) : $@convention(thin) (@in Int32, Int32) -> ()
+  %2 = function_ref @unknown_func_with_trivial_args : $@convention(thin) (@in_guaranteed Int32, Int32) -> ()
+  %3 = apply %2(%0, %1) : $@convention(thin) (@in_guaranteed Int32, Int32) -> ()
 
   %r = tuple ()
   return %r : $()
@@ -418,7 +433,7 @@ bb5(%10 : $X):
 }
 
 // CHECK-LABEL: sil @load_from_global_var
-// CHECK-NEXT:  [global: read]
+// CHECK-NEXT:  [global: read,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil @load_from_global_var : $@convention(thin) () -> Int32 {
 bb0:
@@ -435,12 +450,12 @@ bb0(%0 : @owned $SP):
   return %0 : $SP
 }
 
-// CHECK-LABEL: sil [ossa] @store_destoys
+// CHECK-LABEL: sil [ossa] @store_destroys
 // CHECK-NEXT:  [%0: read v**, write v**, destroy v**]
 // CHECK-NEXT:  [%1: write c*.v**, copy c*.v**]
 // CHECK-NEXT:  [global: write,copy]
 // CHECK-NEXT:  {{^[^[]}}
-sil [ossa] @store_destoys : $@convention(thin) (@inout X, @owned X) -> () {
+sil [ossa] @store_destroys : $@convention(thin) (@inout X, @owned X) -> () {
 bb0(%0 : $*X, %1 : @owned $X):
   store %1 to [assign] %0 : $*X
   %2 = tuple ()
@@ -470,24 +485,24 @@ bb0(%0 : $*X, %1 : @owned $X):
   return %2 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @copy_destoys
+// CHECK-LABEL: sil [ossa] @copy_destroys
 // CHECK-NEXT:  [%0: read v**, write v**, destroy v**]
 // CHECK-NEXT:  [%1: read v**, copy v**]
 // CHECK-NEXT:  [global: write,copy]
 // CHECK-NEXT:  {{^[^[]}}
-sil [ossa] @copy_destoys : $@convention(thin) (@inout X, @in_guaranteed X) -> () {
+sil [ossa] @copy_destroys : $@convention(thin) (@inout X, @in_guaranteed X) -> () {
 bb0(%0 : $*X, %1 : $*X):
   copy_addr %1 to %0 : $*X
   %2 = tuple ()
   return %2 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @copy_doesnt_destoy
+// CHECK-LABEL: sil [ossa] @copy_doesnt_destroy
 // CHECK-NEXT:  [%0: write v**]
 // CHECK-NEXT:  [%1: read v**, copy v**]
 // CHECK-NEXT:  [global: ]
 // CHECK-NEXT:  {{^[^[]}}
-sil [ossa] @copy_doesnt_destoy : $@convention(thin) (@in_guaranteed X) -> @out X {
+sil [ossa] @copy_doesnt_destroy : $@convention(thin) (@in_guaranteed X) -> @out X {
 bb0(%0 : $*X, %1 : $*X):
   copy_addr %1 to [init] %0 : $*X
   %2 = tuple ()
@@ -495,7 +510,7 @@ bb0(%0 : $*X, %1 : $*X):
 }
 
 // CHECK-LABEL: sil [ossa] @destroy_value_effects1
-// CHECK-NEXT:  [%0: destroy v**.c*.v**]
+// CHECK-NEXT:  [%0: read v**.c*.v**, write v**.c*.v**, copy v**.c*.v**, destroy v**.c*.v**]
 // CHECK-NEXT:  [global: read,write,copy,destroy,allocate,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @destroy_value_effects1 : $@convention(thin) (@owned SP) -> () {
@@ -513,6 +528,17 @@ sil [ossa] @destroy_value_effects2 : $@convention(thin) (@owned SP) -> () {
 bb0(%0 : @owned $SP):
   (%1) = destructure_struct %0 : $SP
   destroy_value %1 : $X
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @destroy_value_effects3
+// CHECK-NEXT:  [%0: write c0.v**, destroy c*.v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @destroy_value_effects3 : $@convention(thin) (@owned Z) -> () {
+bb0(%0 : @owned $Z):
+  destroy_value %0 : $Z
   %2 = tuple ()
   return %2 : $()
 }
@@ -654,6 +680,13 @@ bb0(%0 : $*X):
   return %r : $()
 }
 
+sil [_semantics "programtermination_point"] @exitfunc_defined : $@convention(thin) () -> Never {
+bb0:
+  %u = function_ref @unknown_func : $@convention(thin) () -> ()
+  %a = apply %u() : $@convention(thin) () -> ()
+  unreachable
+}
+
 // CHECK-LABEL: sil @call_noreturn
 // CHECK-NEXT:  [global: read]
 // CHECK-NEXT:  {{^[^[]}}
@@ -663,6 +696,23 @@ bb0:
 
 bb1:
   %u = function_ref @exitfunc : $@convention(thin) () -> Never
+  %a = apply %u() : $@convention(thin) () -> Never
+  unreachable
+
+bb2:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @call_defined_noreturn
+// CHECK-NEXT:  [global: read]
+// CHECK-NEXT:  {{^[^[]}}
+sil @call_defined_noreturn : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb1, bb2
+
+bb1:
+  %u = function_ref @exitfunc_defined : $@convention(thin) () -> Never
   %a = apply %u() : $@convention(thin) () -> Never
   unreachable
 
@@ -805,6 +855,7 @@ bb0(%0 : $X):
 }
 
 // CHECK-LABEL: sil @not_called_partial_apply
+// CHECK-NEXT:  [%0: read v**]
 // CHECK-NEXT:  [global: ]
 // CHECK-NEXT:  {{^[^[]}}
 sil @not_called_partial_apply : $@convention(thin) (@in Int32) ->  @owned @callee_owned (Bool) -> Int32 {
@@ -815,6 +866,8 @@ bb0(%0 : $*Int32):
 }
 
 // CHECK-LABEL: sil @partial_apply_chain
+// CHECK-NEXT: [%0: read v**]
+// CHECK-NEXT: [%1: read v**]
 // CHECK-NEXT: [global: ]
 // CHECK-NEXT: {{^[^[]}}
 sil @partial_apply_chain : $@convention(thin) (@in Int32, @in Int32) ->  @owned @callee_owned (Bool) -> Int32 {
@@ -827,7 +880,7 @@ bb0(%0 : $*Int32, %1 : $*Int32):
 
 // CHECK-LABEL: sil @two_nonstack_partial_applies
 // CHECK-NEXT:  [%0: read v**]
-// CHECK-NEXT:  [%1: write v**]
+// CHECK-NEXT:  [%1: read v**, write v**]
 // CHECK-NEXT:  [%2: write c0.v**]
 // CHECK-NEXT:  [global: ]
 // CHECK-NEXT:  {{^[^[]}}
@@ -946,11 +999,13 @@ bb0(%0 : @guaranteed $S):
 }
 
 // CHECK-LABEL: sil [ossa] @storeToArgs
-// CHECK-NEXT:  [%0: write c0.v**]
-// CHECK-NEXT:  [%1: write c0.v**]
+// CHECK-NEXT:  [%0: noescape **, write c0.v**]
+// CHECK-NEXT:  [%1: noescape **, write c0.v**]
 // CHECK-NEXT:  [global: ]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @storeToArgs : $@convention(thin) (@guaranteed List, @guaranteed List) -> () {
+[%0: noescape **]
+[%1: noescape **]
 bb0(%1 : @guaranteed $List, %2 : @guaranteed $List):
   cond_br undef, bb1, bb2
 
@@ -1057,14 +1112,15 @@ bb0(%0 : @guaranteed $S):
 
 // CHECK-LABEL: sil [ossa] @has_partial_apply
 // CHECK-NEXT:  [%0: write c0.v**]
-// CHECK-NEXT:  [global: ]
+// TODO: Teach analysis that destroying noescape closures has no side effects.
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @has_partial_apply : $@convention(thin) (@guaranteed List) -> () {
 bb0(%0 : @guaranteed $List):
   %f = function_ref @storeToArgs : $@convention(thin) (@guaranteed List, @guaranteed List) -> ()
   %clo = partial_apply [callee_guaranteed] [on_stack] %f(%0) : $@convention(thin) (@guaranteed List, @guaranteed List) -> ()
   %res = apply %clo(%0) : $@noescape @callee_guaranteed (@guaranteed List) -> ()
-  dealloc_stack %clo : $@noescape @callee_guaranteed (@guaranteed List) -> ()
+  destroy_value %clo : $@noescape @callee_guaranteed (@guaranteed List) -> ()
   %r = tuple()
   return %r : $()
 }
@@ -1115,13 +1171,13 @@ bb0(%0 : $*X):
   return %3 : $()
 }
 
-// CHECK-LABEL: sil @is_escaping_closure_test
-// CHECK-NEXT:  [%0: destroy v**]
-// CHECK-NEXT:  [global: ]
+// CHECK-LABEL: sil @destroy_not_escaped_closure_test
+// CHECK-NEXT:  [%0: read v**.c*.v**, write v**.c*.v**, copy v**.c*.v**, destroy v**.c*.v**]
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
-sil @is_escaping_closure_test : $@convention(thin)(@guaranteed @callee_guaranteed () -> ()) -> Builtin.Int1 {
+sil @destroy_not_escaped_closure_test : $@convention(thin)(@owned @callee_guaranteed () -> ()) -> Builtin.Int1 {
 bb0(%0 : $@callee_guaranteed () -> ()):
-  %1 = is_escaping_closure %0: $@callee_guaranteed () -> ()
+  %1 = destroy_not_escaped_closure %0: $@callee_guaranteed () -> ()
   return %1 : $Builtin.Int1
 }
 
@@ -1156,3 +1212,72 @@ bb0(%0 : $*T, %1 : $*T):
   return %4 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_explicit_copy_addr
+// CHECK-NEXT:  [%0: read v**, copy v**]
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate,deinit_barrier]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @test_explicit_copy_addr : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : $*T):
+  %1 = alloc_stack $T
+  explicit_copy_addr %0 to [init] %1 : $*T
+  destroy_addr %1 : $*T
+  dealloc_stack %1 : $*T
+  %r = tuple()
+  return %r : $()
+}
+
+sil @store_owned_to_out : $@convention(thin) (@owned SP) -> @out SP {
+[%0: noescape **, write v**]
+[%1: escape v** -> %0.v**]
+[global: ]
+}  
+
+// CHECK-LABEL: sil @test_escaping_arg1
+// CHECK-NEXT:  [%0: write v**.c*.v**, copy v**.c*.v**, destroy v**.c*.v**]
+// CHECK-NEXT:  [global: write,copy,destroy]
+// CHECK-NEXT:  {{^[^[]}}
+sil @test_escaping_arg1 : $@convention(thin) (@owned SP) -> () {
+bb0(%0 : $SP):
+  %1 = alloc_stack $SP
+  %2 = function_ref @store_owned_to_out : $@convention(thin) (@owned SP) -> @out SP
+  %3 = apply %2(%1, %0) : $@convention(thin) (@owned SP) -> @out SP
+  %4 = struct_element_addr %1 : $*SP, #SP.value
+  %5 = load %4 : $*X
+  strong_release %5 : $X
+  dealloc_stack %1 : $*SP
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_escaping_arg2
+// CHECK-NEXT:  [%0: read v**.c*.v**, write v**.c*.v**, copy v**.c*.v**, destroy v**.c*.v**]
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate,deinit_barrier]
+// CHECK-NEXT:  {{^[^[]}}
+sil @test_escaping_arg2 : $@convention(thin) (@owned SP) -> () {
+bb0(%0 : $SP):
+  %1 = function_ref @forward_to_return : $@convention(thin) (@owned SP) -> @owned SP
+  %2 = apply %1(%0) : $@convention(thin) (@owned SP) -> @owned SP
+  release_value %2 : $SP
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_consuming_in_with_unreachable
+// CHECK-NEXT:  [%0: read v**]
+// CHECK-NEXT:  [global: ]
+// CHECK-NEXT:  {{^[^[]}}
+sil @test_consuming_in_with_unreachable : $@convention(thin) (@in X) -> () {
+bb0(%0 : $*X):
+  unreachable
+}
+
+// CHECK-LABEL: sil @test_willThrow_builtin
+// CHECK: [%0: read v**.c*.v**, copy v**.c*.v**]
+// CHECK: [global: read,copy,deinit_barrier]
+
+sil @test_willThrow_builtin : $@convention(thin) (@guaranteed any Error) -> () {
+bb0(%0: $any Error):
+  %1 = builtin "willThrow"(%0 : $any Error) : $()
+  %r = tuple ()
+  return %r : $()
+}

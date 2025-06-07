@@ -3,6 +3,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
+// REQUIRES: rdar114110966
 
 import Foundation
 
@@ -48,12 +49,12 @@ public class InClass {
 // CHECK:  switch_enum
 // CHECK: bb1
 // CHECK:  br bb5
-// CHECK: bb2:
+// CHECK: bb2({{.*}}):
 // CHECK:  apply
 // CHECK:  switch_enum
 // CHECK: bb3:
 // CHECK:  br bb5
-// CHECK: bb4:
+// CHECK: bb4({{.*}}):
 // CHECK:  objc_method
 // CHECK:  apply
 // CHECK:  objc_method

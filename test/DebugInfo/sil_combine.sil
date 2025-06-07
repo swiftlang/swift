@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-verify-all -sil-combine %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -sil-verify-all -sil-combine %s | %FileCheck %s
 // RUN: %target-swift-frontend -g -O -emit-ir -primary-file %s | %FileCheck --check-prefix=CHECK-IR %s
 
 sil_stage canonical
@@ -17,12 +17,57 @@ bb0(%0 : $Builtin.RawPointer):
   %addr1 = index_addr %addr : $*UInt8, %offset1 : $Builtin.Word
   // CHECK: debug_value %[[ADDR]] : $*UInt8, let, name "hello"
   // CHECK-SAME: expr op_constu:3:op_plus:op_deref
-  // CHECK-IR: call void @llvm.dbg.value(metadata i8* %0, metadata ![[DBG_VAR:[0-9]+]],
-  // CHECK-IR-SAME: !DIExpression(DW_OP_constu, 3, DW_OP_plus, DW_OP_deref)
+  // CHECK-IR: #dbg_value(ptr %0, ![[DBG_VAR:[0-9]+]],
+  // CHECK-IR-SAME: !DIExpression(DW_OP_plus_uconst, 3, DW_OP_deref)
   debug_value %addr1 : $*UInt8, let, name "hello", expr op_deref
   %addr2 = index_addr %addr1 : $*UInt8, %offset2 : $Builtin.Word
   %ptr = address_to_pointer %addr2 : $*UInt8 to $Builtin.RawPointer
   return %ptr : $Builtin.RawPointer
 }
+
+public struct S {}
+public struct C {
+  var x: MP
+}
+
+enum MP {
+  case A(S)
+  case B(S)
+}
+
+// CHECK-LABEL: sil @expand_alloc_stack_of_enum_without_take
+// CHECK:        [[A:%[0-9]+]] = alloc_stack $S
+// CHECK-NOT:      name "a"
+// CHECK-NEXT:   debug_value undef : $*MP, let, name "a", expr op_fragment:#C.x
+// CHECK-NEXT:   debug_value undef : $*MP, let, name "b"
+// CHECK:      bb1:
+// CHECK-NEXT:   store %0 to [[A]]
+// CHECK:      bb2:
+// CHECK-NEXT:   store %0 to [[A]]
+// CHECK:      bb3:
+// CHECK:        destroy_addr [[A]]
+// CHECK: } // end sil function 'expand_alloc_stack_of_enum_without_take'
+sil @expand_alloc_stack_of_enum_without_take : $@convention(method) (S) -> () {
+bb0(%0 : $S):
+  %1 = alloc_stack $MP, let, name "a", expr op_fragment:#C.x
+  debug_value %1 : $*MP, let, name "b", expr op_deref
+  cond_br undef, bb1, bb2
+bb1:
+  %2 = init_enum_data_addr %1 : $*MP, #MP.A!enumelt
+  store %0 to %2 : $*S
+  inject_enum_addr %1 : $*MP, #MP.A!enumelt
+  br bb3
+bb2:
+  %3 = init_enum_data_addr %1 : $*MP, #MP.A!enumelt
+  store %0 to %3 : $*S
+  inject_enum_addr %1 : $*MP, #MP.A!enumelt
+  br bb3
+bb3:
+  destroy_addr %1 : $*MP
+  dealloc_stack %1 : $*MP
+  %11 = tuple ()
+  return %11 : $()
+}
+
 
 // CHECK-IR: ![[DBG_VAR]] = !DILocalVariable(name: "hello"

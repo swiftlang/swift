@@ -1,0 +1,14 @@
+-static
+-lswiftCore
+-Xlinker
+-undefined=pthread_self
+-Xlinker
+-undefined=pthread_once
+-Xlinker
+-undefined=pthread_key_create
+-ldispatch
+-lBlocksRuntime
+-lpthread
+-ldl
+-lstdc++
+-lm

@@ -38,10 +38,32 @@ class SILLoopInfo;
 /// Compute the set of reachable blocks.
 class ReachableBlocks {
   BasicBlockSet visited;
+  bool isComputed;
 
 public:
-  ReachableBlocks(SILFunction *function) : visited(function) {}
+  ReachableBlocks(SILFunction *function)
+      : visited(function), isComputed(false) {}
 
+  /// Populate `visited` with the blocks reachable in the function.
+  void compute();
+
+  /// Whether `block` is reachable from the entry block.
+  bool isReachable(SILBasicBlock *block) const {
+    assert(isComputed);
+    return visited.contains(block);
+  }
+
+  bool hasUnreachableBlocks() const {
+    assert(isComputed);
+    for (auto &block : *visited.getFunction()) {
+      if (!isReachable(&block)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+private:
   /// Invoke \p visitor for each reachable block in \p f in worklist order (at
   /// least one predecessor has been visited--defs are always visited before
   /// uses except for phi-type block args). The \p visitor takes a block
@@ -50,9 +72,6 @@ public:
   ///
   /// Returns true if all reachable blocks were visited.
   bool visit(function_ref<bool(SILBasicBlock *)> visitor);
-
-  /// Return true if \p bb has been visited.
-  bool isVisited(SILBasicBlock *bb) const { return visited.contains(bb); }
 };
 
 /// Computes the set of blocks from which a path to the return-block exists.
@@ -69,27 +88,6 @@ public:
   }
 };
 
-/// Computes the set of blocks which are not used for error handling, i.e. not
-/// (exclusively) reachable from the error-block of a try_apply.
-class NonErrorHandlingBlocks {
-    BasicBlockWorklist worklist;
-
-public:
-  NonErrorHandlingBlocks(SILFunction *function);
-
-  /// Returns true if there exists a path from \p block to the return-block.
-  bool isNonErrorHandling(SILBasicBlock *block) const {
-    return worklist.isVisited(block);
-  }
-};
-
-/// Remove all instructions in the body of \p bb in safe manner by using
-/// undef.
-void clearBlockBody(SILBasicBlock *bb);
-
-/// Handle the mechanical aspects of removing an unreachable block.
-void removeDeadBlock(SILBasicBlock *bb);
-
 /// Remove all unreachable blocks in a function.
 bool removeUnreachableBlocks(SILFunction &f);
 
@@ -101,16 +99,6 @@ inline bool isUsedOutsideOfBlock(SILValue v) {
       return true;
   return false;
 }
-
-/// Rotate a loop's header as long as it is exiting and not equal to the
-/// passed basic block.
-/// If \p RotateSingleBlockLoops is true a single basic block loop will be
-/// rotated once. ShouldVerify specifies whether to perform verification after
-/// the transformation.
-/// Returns true if the loop could be rotated.
-bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo, SILLoopInfo *loopInfo,
-                bool rotateSingleBlockLoops, SILBasicBlock *upToBB,
-                bool shouldVerify);
 
 //===----------------------------------------------------------------------===//
 //                             BasicBlock Cloning
@@ -135,14 +123,20 @@ bool canCloneTerminator(TermInst *termInst);
 /// BasicBlockCloner handles this internally.
 class SinkAddressProjections {
   // Projections ordered from last to first in the chain.
-  SmallVector<SingleValueInstruction *, 4> projections;
-  SmallSetVector<SILValue, 4> inBlockDefs;
+  SmallVector<SingleValueInstruction *, 4> oldProjections;
+  // Cloned projections to avoid address phis.
+  SmallVectorImpl<SingleValueInstruction *> *newProjections;
+  llvm::SmallSetVector<SILValue, 4> inBlockDefs;
 
   // Transient per-projection data for use during cloning.
   SmallVector<Operand *, 4> usesToReplace;
   llvm::SmallDenseMap<SILBasicBlock *, Operand *, 4> firstBlockUse;
 
 public:
+  SinkAddressProjections(
+      SmallVectorImpl<SingleValueInstruction *> *newProjections = nullptr)
+      : newProjections(newProjections) {}
+
   /// Check for an address projection chain ending at \p inst. Return true if
   /// the given instruction is successfully analyzed.
   ///
@@ -163,6 +157,7 @@ public:
   ArrayRef<SILValue> getInBlockDefs() const {
     return inBlockDefs.getArrayRef();
   }
+
   /// Clone the chain of projections at their use sites.
   ///
   /// Return true if anything was done.
@@ -202,6 +197,8 @@ protected:
   // If available, the current DeadEndBlocks for incremental update.
   DeadEndBlocks *deBlocks;
 
+  SILPassManager *pm;
+
 public:
   /// An ordered list of old to new available value pairs.
   ///
@@ -210,8 +207,12 @@ public:
   SmallVector<std::pair<SILValue, SILValue>, 16> availVals;
 
   // Clone blocks starting at `origBB`, within the same function.
-  BasicBlockCloner(SILBasicBlock *origBB, DeadEndBlocks *deBlocks = nullptr)
-      : SILCloner(*origBB->getParent()), origBB(origBB), deBlocks(deBlocks) {}
+  BasicBlockCloner(SILBasicBlock *origBB, SILPassManager *pm, DeadEndBlocks *deBlocks = nullptr)
+      : SILCloner(*origBB->getParent()), origBB(origBB), deBlocks(deBlocks), pm(pm) {}
+
+  void registerBlockWithNewPhiArg(SILBasicBlock *b) {
+    blocksWithNewPhiArgs.push_back(b);
+  }
 
   bool canCloneBlock() {
     for (auto &inst : *origBB) {
@@ -341,68 +342,6 @@ public:
 
   llvm::SmallVectorImpl<value_type> &getInstructionPairs() {
     return instructionpairs;
-  }
-};
-
-/// Utility class for cloning init values into the static initializer of a
-/// SILGlobalVariable.
-class StaticInitCloner : public SILCloner<StaticInitCloner> {
-  friend class SILInstructionVisitor<StaticInitCloner>;
-  friend class SILCloner<StaticInitCloner>;
-
-  /// The number of not yet cloned operands for each instruction.
-  llvm::DenseMap<SILInstruction *, int> numOpsToClone;
-
-  /// List of instructions for which all operands are already cloned (or which
-  /// don't have any operands).
-  llvm::SmallVector<SILInstruction *, 8> readyToClone;
-
-  SILInstruction *insertionPoint = nullptr;
-
-public:
-  StaticInitCloner(SILGlobalVariable *gVar)
-      : SILCloner<StaticInitCloner>(gVar) {}
-
-  StaticInitCloner(SILInstruction *insertionPoint)
-      : SILCloner<StaticInitCloner>(*insertionPoint->getFunction()),
-        insertionPoint(insertionPoint) {
-    Builder.setInsertionPoint(insertionPoint);
-  }
-
-  /// Add \p InitVal and all its operands (transitively) for cloning.
-  ///
-  /// Note: all init values must are added, before calling clone().
-  /// Returns false if cloning is not possible, e.g. if we would end up cloning
-  /// a reference to a private function into a function which is serialized.
-  bool add(SILInstruction *initVal);
-
-  /// Clone \p InitVal and all its operands into the initializer of the
-  /// SILGlobalVariable.
-  ///
-  /// \return Returns the cloned instruction in the SILGlobalVariable.
-  SingleValueInstruction *clone(SingleValueInstruction *initVal);
-
-  /// Convenience function to clone a single \p InitVal.
-  static void appendToInitializer(SILGlobalVariable *gVar,
-                                  SingleValueInstruction *initVal) {
-    StaticInitCloner cloner(gVar);
-    bool success = cloner.add(initVal);
-    (void)success;
-    assert(success && "adding initVal cannot fail for a global variable");
-    cloner.clone(initVal);
-  }
-
-protected:
-  SILLocation remapLocation(SILLocation loc) {
-    if (insertionPoint)
-      return insertionPoint->getLoc();
-    return ArtificialUnreachableLocation();
-  }
-
-  const SILDebugScope *remapScope(const SILDebugScope *DS) {
-    if (insertionPoint)
-      return insertionPoint->getDebugScope();
-    return nullptr;
   }
 };
 

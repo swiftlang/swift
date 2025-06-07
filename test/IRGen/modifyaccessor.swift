@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir -disable-llvm-optzns -disable-swift-specific-llvm-optzns -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-irgen -primary-file %s | %FileCheck %s
 extension Dictionary {
   subscript(alternate key: Key) -> Value? {
     get {

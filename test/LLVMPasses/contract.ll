@@ -1,289 +1,284 @@
-; RUN: %swift-llvm-opt -swift-arc-contract %s | %FileCheck %s
+; RUN: %swift-llvm-opt -passes=swift-llvm-arc-contract %s | %FileCheck %s
 
 target datalayout = "e-p:64:64:64-S128-i1:8:8-i8:8:8-i16:16:16-i32:32:32-i64:64:64-f16:16:16-f32:32:32-f64:64:64-f128:128:128-v64:64:64-v128:128:128-a0:0:64-s0:64:64-f80:128:128-n8:16:32:64"
 target triple = "x86_64-apple-macosx10.9"
 
-%swift.refcounted = type { %swift.heapmetadata*, i64 }
-%swift.heapmetadata = type { i64 (%swift.refcounted*)*, i64 (%swift.refcounted*)* }
+%swift.refcounted = type { ptr, i64 }
+%swift.heapmetadata = type { ptr, ptr }
 %swift.bridge = type opaque
 
-declare %swift.refcounted* @swift_allocObject(%swift.heapmetadata* , i64, i64) nounwind
-declare %swift.bridge* @swift_bridgeObjectRetain(%swift.bridge*)
-declare void @swift_bridgeObjectRelease(%swift.bridge* )
-declare void @swift_release(%swift.refcounted* nocapture)
-declare %swift.refcounted* @swift_retain(%swift.refcounted* ) nounwind
-declare void @swift_unknownObjectRelease(%swift.refcounted* nocapture)
-declare %swift.refcounted* @swift_unknownObjectRetain(%swift.refcounted* ) nounwind
-declare void @__swift_fixLifetime(%swift.refcounted*)
-declare void @noread_user(%swift.refcounted*) readnone
-declare void @user(%swift.refcounted*)
-declare void @noread_user_bridged(%swift.bridge*) readnone
-declare void @user_bridged(%swift.bridge*)
-declare void @__swift_endBorrow(i8*, i8*)
+declare ptr @swift_allocObject(ptr , i64, i64) nounwind
+declare ptr @swift_bridgeObjectRetain(ptr)
+declare void @swift_bridgeObjectRelease(ptr )
+declare void @swift_release(ptr nocapture)
+declare ptr @swift_retain(ptr ) nounwind
+declare void @swift_unknownObjectRelease(ptr nocapture)
+declare ptr @swift_unknownObjectRetain(ptr ) nounwind
+declare void @__swift_fixLifetime(ptr)
+declare void @noread_user(ptr) readnone
+declare void @user(ptr)
+declare void @noread_user_bridged(ptr) readnone
+declare void @user_bridged(ptr)
+declare void @__swift_endBorrow(ptr, ptr)
 
-; CHECK-LABEL: define{{( protected)?}} void @fixlifetime_removal(i8* %0) {
+; CHECK-LABEL: define{{( protected)?}} void @fixlifetime_removal(ptr %0) {
 ; CHECK-NOT: call void @__swift_fixLifetime
-define void @fixlifetime_removal(i8*) {
+define void @fixlifetime_removal(ptr) {
 entry:
-  %1 = bitcast i8* %0 to %swift.refcounted*
-  call void @__swift_fixLifetime(%swift.refcounted* %1)
+  call void @__swift_fixLifetime(ptr %0)
   ret void
 }
 
-; CHECK-LABEL: define{{( protected)?}} void @endBorrow_removal(i8* %0, i8* %1) {
+; CHECK-LABEL: define{{( protected)?}} void @endBorrow_removal(ptr %0, ptr %1) {
 ; CHECK-NOT: call void @__swift_endBorrow
-define void @endBorrow_removal(i8*, i8*) {
+define void @endBorrow_removal(ptr, ptr) {
 entry:
-  call void @__swift_endBorrow(i8* %0, i8* %1)
+  call void @__swift_endBorrow(ptr %0, ptr %1)
   ret void
 }
 
-; CHECK-LABEL: define{{( protected)?}} %swift.refcounted* @swift_contractRetainN(%swift.refcounted* %A) {
+; CHECK-LABEL: define{{( protected)?}} ptr @swift_contractRetainN(ptr %A) {
 ; CHECK: entry:
 ; CHECK-NEXT: br i1 undef
 ; CHECK: bb1:
-; CHECK-NEXT: call %swift.refcounted* @swift_retain_n(%swift.refcounted* %A, i32 2)
-; CHECK-NEXT: call void @noread_user(%swift.refcounted* %A)
-; CHECK-NEXT: call void @noread_user(%swift.refcounted* %A)
+; CHECK-NEXT: call ptr @swift_retain_n(ptr %A, i32 2)
+; CHECK-NEXT: call void @noread_user(ptr %A)
+; CHECK-NEXT: call void @noread_user(ptr %A)
 ; CHECK-NEXT: br label %bb3
 ; CHECK: bb2:
-; CHECK-NEXT: call void @noread_user(%swift.refcounted* %A)
-; CHECK-NEXT: call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
-; CHECK-NEXT: call void @noread_user(%swift.refcounted* %A)
+; CHECK-NEXT: call void @noread_user(ptr %A)
+; CHECK-NEXT: call ptr @swift_retain(ptr %A)
+; CHECK-NEXT: call void @noread_user(ptr %A)
 ; CHECK-NEXT: br label %bb3
 ; CHECK: bb3:
-; CHECK-NEXT: call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
-; CHECK-NEXT: ret %swift.refcounted* %A
-define %swift.refcounted* @swift_contractRetainN(%swift.refcounted* %A) {
+; CHECK-NEXT: call ptr @swift_retain(ptr %A)
+; CHECK-NEXT: ret ptr %A
+define ptr @swift_contractRetainN(ptr %A) {
 entry:
   br i1 undef, label %bb1, label %bb2
 
 bb1:
-  call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
-  call void @noread_user(%swift.refcounted* %A)
-  call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
-  call void @noread_user(%swift.refcounted* %A)
+  call ptr @swift_retain(ptr %A)
+  call void @noread_user(ptr %A)
+  call ptr @swift_retain(ptr %A)
+  call void @noread_user(ptr %A)
   br label %bb3
 
 bb2:
-  call void @noread_user(%swift.refcounted* %A)
-  call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
-  call void @noread_user(%swift.refcounted* %A)
+  call void @noread_user(ptr %A)
+  call ptr @swift_retain(ptr %A)
+  call void @noread_user(ptr %A)
   br label %bb3
 
 bb3:
-  call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
-  ret %swift.refcounted* %A
+  call ptr @swift_retain(ptr %A)
+  ret ptr %A
 }
 
-; CHECK-LABEL: define{{( protected)?}} %swift.refcounted* @swift_contractRetainNWithRCIdentity(%swift.refcounted* %A) {
+; CHECK-LABEL: define{{( protected)?}} ptr @swift_contractRetainNWithRCIdentity(ptr %A) {
 ; CHECK: entry:
 ; CHECK-NEXT: br i1 undef
 ; CHECK: bb1:
-; CHECK-NEXT: call %swift.refcounted* @swift_retain_n(%swift.refcounted* %A, i32 2)
-; CHECK-NEXT: %1 = bitcast %swift.refcounted* %A to %swift.refcounted*
+; CHECK-NEXT: call ptr @swift_retain_n(ptr %A, i32 2)
 ; CHECK-NEXT: br label %bb3
 ; CHECK: bb2:
-; CHECK-NEXT: call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
+; CHECK-NEXT: call ptr @swift_retain(ptr %A)
 ; CHECK-NEXT: br label %bb3
 ; CHECK: bb3:
-; CHECK-NEXT: call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
-; CHECK-NEXT: ret %swift.refcounted* %A
-define %swift.refcounted* @swift_contractRetainNWithRCIdentity(%swift.refcounted* %A) {
+; CHECK-NEXT: call ptr @swift_retain(ptr %A)
+; CHECK-NEXT: ret ptr %A
+define ptr @swift_contractRetainNWithRCIdentity(ptr %A) {
 entry:
   br i1 undef, label %bb1, label %bb2
 
 bb1:
-  call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
-  %1 = bitcast %swift.refcounted* %A to %swift.refcounted*
-  call %swift.refcounted* @swift_retain(%swift.refcounted* %1)
+  call ptr @swift_retain(ptr %A)
+  call ptr @swift_retain(ptr %A)
   br label %bb3
 
 bb2:
-  call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
+  call ptr @swift_retain(ptr %A)
   br label %bb3
 
 bb3:
-  call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
-  ret %swift.refcounted* %A
+  call ptr @swift_retain(ptr %A)
+  ret ptr %A
 }
 
-; CHECK-LABEL: define{{( protected)?}} %swift.refcounted* @swift_contractReleaseN(%swift.refcounted* %A) {
+; CHECK-LABEL: define{{( protected)?}} ptr @swift_contractReleaseN(ptr %A) {
 ; CHECK: entry:
 ; CHECK-NEXT: br i1 undef
 ; CHECK: bb1:
-; CHECK-NEXT: call void @noread_user(%swift.refcounted* %A)
-; CHECK-NEXT: call void @swift_release_n(%swift.refcounted* %A, i32 2)
-; CHECK-NEXT: call void @noread_user(%swift.refcounted* %A)
+; CHECK-NEXT: call void @noread_user(ptr %A)
+; CHECK-NEXT: call void @swift_release_n(ptr %A, i32 2)
+; CHECK-NEXT: call void @noread_user(ptr %A)
 ; CHECK-NEXT: br label %bb3
 ; CHECK: bb2:
-; CHECK-NEXT: call void @noread_user(%swift.refcounted* %A)
-; CHECK-NEXT: call void @swift_release(%swift.refcounted* %A)
-; CHECK-NEXT: call void @noread_user(%swift.refcounted* %A)
+; CHECK-NEXT: call void @noread_user(ptr %A)
+; CHECK-NEXT: call void @swift_release(ptr %A)
+; CHECK-NEXT: call void @noread_user(ptr %A)
 ; CHECK-NEXT: br label %bb3
 ; CHECK: bb3:
-; CHECK-NEXT: call void @swift_release(%swift.refcounted* %A)
-; CHECK-NEXT: ret %swift.refcounted* %A
-define %swift.refcounted* @swift_contractReleaseN(%swift.refcounted* %A) {
+; CHECK-NEXT: call void @swift_release(ptr %A)
+; CHECK-NEXT: ret ptr %A
+define ptr @swift_contractReleaseN(ptr %A) {
 entry:
   br i1 undef, label %bb1, label %bb2
 
 bb1:
-  call void @swift_release(%swift.refcounted* %A)
-  call void @noread_user(%swift.refcounted* %A)
-  call void @swift_release(%swift.refcounted* %A)
-  call void @noread_user(%swift.refcounted* %A)
+  call void @swift_release(ptr %A)
+  call void @noread_user(ptr %A)
+  call void @swift_release(ptr %A)
+  call void @noread_user(ptr %A)
   br label %bb3
 
 bb2:
-  call void @noread_user(%swift.refcounted* %A)
-  call void @swift_release(%swift.refcounted* %A)
-  call void @noread_user(%swift.refcounted* %A)
+  call void @noread_user(ptr %A)
+  call void @swift_release(ptr %A)
+  call void @noread_user(ptr %A)
   br label %bb3
 
 bb3:
-  call void @swift_release(%swift.refcounted* %A)
-  ret %swift.refcounted* %A
+  call void @swift_release(ptr %A)
+  ret ptr %A
 }
 
-; CHECK-LABEL: define{{( protected)?}} %swift.refcounted* @swift_contractReleaseNWithRCIdentity(%swift.refcounted* %A) {
+; CHECK-LABEL: define{{( protected)?}} ptr @swift_contractReleaseNWithRCIdentity(ptr %A) {
 ; CHECK: entry:
 ; CHECK-NEXT: br i1 undef
 ; CHECK: bb1:
-; CHECK-NEXT: %0 = bitcast %swift.refcounted* %A to %swift.refcounted*
-; CHECK-NEXT: call void @swift_release_n(%swift.refcounted* %A, i32 2)
+; CHECK-NEXT: call void @swift_release_n(ptr %A, i32 2)
 ; CHECK-NEXT: br label %bb3
 ; CHECK: bb2:
-; CHECK-NEXT: call void @swift_release(%swift.refcounted* %A)
+; CHECK-NEXT: call void @swift_release(ptr %A)
 ; CHECK-NEXT: br label %bb3
 ; CHECK: bb3:
-; CHECK-NEXT: call void @swift_release(%swift.refcounted* %A)
-; CHECK-NEXT: ret %swift.refcounted* %A
-define %swift.refcounted* @swift_contractReleaseNWithRCIdentity(%swift.refcounted* %A) {
+; CHECK-NEXT: call void @swift_release(ptr %A)
+; CHECK-NEXT: ret ptr %A
+define ptr @swift_contractReleaseNWithRCIdentity(ptr %A) {
 entry:
   br i1 undef, label %bb1, label %bb2
 
 bb1:
-  call void @swift_release(%swift.refcounted* %A)
-  %0 = bitcast %swift.refcounted* %A to %swift.refcounted*
-  call void @swift_release(%swift.refcounted* %0)
+  call void @swift_release(ptr %A)
+  call void @swift_release(ptr %A)
   br label %bb3
 
 bb2:
-  call void @swift_release(%swift.refcounted* %A)
+  call void @swift_release(ptr %A)
   br label %bb3
 
 bb3:
-  call void @swift_release(%swift.refcounted* %A)
-  ret %swift.refcounted* %A
+  call void @swift_release(ptr %A)
+  ret ptr %A
 }
 
 
 ; Make sure that we do not form retainN,releaseN over uses that may
 ; read the reference count of the object.
 
-; CHECK-LABEL: define{{( protected)?}} %swift.refcounted* @swift_contractRetainNWithUnknown(%swift.refcounted* %A) {
-; CHECK-NOT: call %swift.refcounted* @swift_retain_n
-define %swift.refcounted* @swift_contractRetainNWithUnknown(%swift.refcounted* %A) {
+; CHECK-LABEL: define{{( protected)?}} ptr @swift_contractRetainNWithUnknown(ptr %A) {
+; CHECK-NOT: call ptr @swift_retain_n
+define ptr @swift_contractRetainNWithUnknown(ptr %A) {
 entry:
   br i1 undef, label %bb1, label %bb2
 
 bb1:
-  call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
-  call void @user(%swift.refcounted* %A)
-  call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
-  call void @user(%swift.refcounted* %A)
+  call ptr @swift_retain(ptr %A)
+  call void @user(ptr %A)
+  call ptr @swift_retain(ptr %A)
+  call void @user(ptr %A)
   br label %bb3
 
 bb2:
-  call void @user(%swift.refcounted* %A)
-  call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
-  call void @user(%swift.refcounted* %A)
+  call void @user(ptr %A)
+  call ptr @swift_retain(ptr %A)
+  call void @user(ptr %A)
   br label %bb3
 
 bb3:
-  call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
-  ret %swift.refcounted* %A
+  call ptr @swift_retain(ptr %A)
+  ret ptr %A
 }
 
-; CHECK-LABEL: define{{( protected)?}} %swift.refcounted* @swift_contractReleaseNWithUnknown(%swift.refcounted* %A) {
+; CHECK-LABEL: define{{( protected)?}} ptr @swift_contractReleaseNWithUnknown(ptr %A) {
 ; CHECK-NOT: call void @swift_release_n
-define %swift.refcounted* @swift_contractReleaseNWithUnknown(%swift.refcounted* %A) {
+define ptr @swift_contractReleaseNWithUnknown(ptr %A) {
 entry:
   br i1 undef, label %bb1, label %bb2
 
 bb1:
-  call void @swift_release(%swift.refcounted* %A)
-  call void @user(%swift.refcounted* %A)
-  call void @swift_release(%swift.refcounted* %A)
-  call void @user(%swift.refcounted* %A)
+  call void @swift_release(ptr %A)
+  call void @user(ptr %A)
+  call void @swift_release(ptr %A)
+  call void @user(ptr %A)
   br label %bb3
 
 bb2:
-  call void @user(%swift.refcounted* %A)
-  call void @swift_release(%swift.refcounted* %A)
-  call void @user(%swift.refcounted* %A)
+  call void @user(ptr %A)
+  call void @swift_release(ptr %A)
+  call void @user(ptr %A)
   br label %bb3
 
 bb3:
-  call void @swift_release(%swift.refcounted* %A)
-  ret %swift.refcounted* %A
+  call void @swift_release(ptr %A)
+  ret ptr %A
 }
 
 ; But do make sure that we can form retainN, releaseN in between such uses
-; CHECK-LABEL: define{{( protected)?}} %swift.refcounted* @swift_contractRetainNInterleavedWithUnknown(%swift.refcounted* %A) {
+; CHECK-LABEL: define{{( protected)?}} ptr @swift_contractRetainNInterleavedWithUnknown(ptr %A) {
 ; CHECK: bb1:
-; CHECK: call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
-; CHECK-NEXT: call void @user(%swift.refcounted* %A)
-; CHECK-NEXT: call %swift.refcounted* @swift_retain_n(%swift.refcounted* %A, i32 3)
-; CHECK-NEXT: call void @noread_user(%swift.refcounted* %A)
-; CHECK-NEXT: call void @noread_user(%swift.refcounted* %A)
-; CHECK-NEXT: call void @user(%swift.refcounted* %A)
-; CHECK-NEXT: call %swift.refcounted* @swift_retain_n(%swift.refcounted* %A, i32 2)
-; CHECK-NEXT: call void @user(%swift.refcounted* %A)
-; CHECK-NEXT: call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
+; CHECK: call ptr @swift_retain(ptr %A)
+; CHECK-NEXT: call void @user(ptr %A)
+; CHECK-NEXT: call ptr @swift_retain_n(ptr %A, i32 3)
+; CHECK-NEXT: call void @noread_user(ptr %A)
+; CHECK-NEXT: call void @noread_user(ptr %A)
+; CHECK-NEXT: call void @user(ptr %A)
+; CHECK-NEXT: call ptr @swift_retain_n(ptr %A, i32 2)
+; CHECK-NEXT: call void @user(ptr %A)
+; CHECK-NEXT: call ptr @swift_retain(ptr %A)
 ; CHECK-NEXT: br label %bb3
 
 ; CHECK: bb2:
-; CHECK-NEXT: call void @user(%swift.refcounted* %A)
-; CHECK-NEXT: call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
-; CHECK-NEXT: call void @user(%swift.refcounted* %A)
+; CHECK-NEXT: call void @user(ptr %A)
+; CHECK-NEXT: call ptr @swift_retain(ptr %A)
+; CHECK-NEXT: call void @user(ptr %A)
 ; CHECK-NEXT: br label %bb3
 
 ; CHECK: bb3:
-; CHECK-NEXT: call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
-; CHECK-NEXT: ret %swift.refcounted* %A
-define %swift.refcounted* @swift_contractRetainNInterleavedWithUnknown(%swift.refcounted* %A) {
+; CHECK-NEXT: call ptr @swift_retain(ptr %A)
+; CHECK-NEXT: ret ptr %A
+define ptr @swift_contractRetainNInterleavedWithUnknown(ptr %A) {
 entry:
   br i1 undef, label %bb1, label %bb2
 
 bb1:
-  call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
-  call void @user(%swift.refcounted* %A)
-  call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
-  call void @noread_user(%swift.refcounted* %A)
-  call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
-  call void @noread_user(%swift.refcounted* %A)
-  call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
-  call void @user(%swift.refcounted* %A)
-  call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
-  call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
-  call void @user(%swift.refcounted* %A)
-  call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
+  call ptr @swift_retain(ptr %A)
+  call void @user(ptr %A)
+  call ptr @swift_retain(ptr %A)
+  call void @noread_user(ptr %A)
+  call ptr @swift_retain(ptr %A)
+  call void @noread_user(ptr %A)
+  call ptr @swift_retain(ptr %A)
+  call void @user(ptr %A)
+  call ptr @swift_retain(ptr %A)
+  call ptr @swift_retain(ptr %A)
+  call void @user(ptr %A)
+  call ptr @swift_retain(ptr %A)
   br label %bb3
 
 bb2:
-  call void @user(%swift.refcounted* %A)
-  call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
-  call void @user(%swift.refcounted* %A)
+  call void @user(ptr %A)
+  call ptr @swift_retain(ptr %A)
+  call void @user(ptr %A)
   br label %bb3
 
 bb3:
-  call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
-  ret %swift.refcounted* %A
+  call ptr @swift_retain(ptr %A)
+  ret ptr %A
 }
 
-; CHECK-LABEL: define{{( protected)?}} %swift.refcounted* @swift_contractReleaseNInterleavedWithUnknown(%swift.refcounted* %A) {
+; CHECK-LABEL: define{{( protected)?}} ptr @swift_contractReleaseNInterleavedWithUnknown(ptr %A) {
 ; CHECK: bb1:
 ; CHECK-NEXT: @swift_release(
 ; CHECK-NEXT: @user
@@ -291,139 +286,139 @@ bb3:
 ; CHECK-NEXT: @swift_release_n
 ; CHECK-NEXT: @user
 ; CHECK-NEXT: br label %bb3
-define %swift.refcounted* @swift_contractReleaseNInterleavedWithUnknown(%swift.refcounted* %A) {
+define ptr @swift_contractReleaseNInterleavedWithUnknown(ptr %A) {
 entry:
   br i1 undef, label %bb1, label %bb2
 
 bb1:
-  call void @swift_release(%swift.refcounted* %A)
-  call void @user(%swift.refcounted* %A)
-  call void @swift_release(%swift.refcounted* %A)
-  call void @noread_user(%swift.refcounted* %A)
-  call void @swift_release(%swift.refcounted* %A)
-  call void @user(%swift.refcounted* %A)
+  call void @swift_release(ptr %A)
+  call void @user(ptr %A)
+  call void @swift_release(ptr %A)
+  call void @noread_user(ptr %A)
+  call void @swift_release(ptr %A)
+  call void @user(ptr %A)
   br label %bb3
 
 bb2:
-  call void @user(%swift.refcounted* %A)
-  call void @swift_release(%swift.refcounted* %A)
-  call void @user(%swift.refcounted* %A)
+  call void @user(ptr %A)
+  call void @swift_release(ptr %A)
+  call void @user(ptr %A)
   br label %bb3
 
 bb3:
-  call void @swift_release(%swift.refcounted* %A)
-  ret %swift.refcounted* %A
+  call void @swift_release(ptr %A)
+  ret ptr %A
 }
 
-; CHECK-LABEL: define{{( protected)?}} %swift.refcounted* @swift_contractRetainReleaseNInterleavedWithUnknown(%swift.refcounted* %A) {
+; CHECK-LABEL: define{{( protected)?}} ptr @swift_contractRetainReleaseNInterleavedWithUnknown(ptr %A) {
 ; CHECK: bb1:
-; CHECK-NEXT: call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
-; CHECK-NEXT: call void @user(%swift.refcounted* %A)
-; CHECK-NEXT: call void @noread_user(%swift.refcounted* %A)
-; CHECK-NEXT: call void @swift_release_n(%swift.refcounted* %A, i32 2)
-; CHECK-NEXT: call void @user(%swift.refcounted* %A)
-; CHECK-NEXT: call %swift.refcounted* @swift_retain_n(%swift.refcounted* %A, i32 2)
-; CHECK-NEXT: call void @swift_release(%swift.refcounted* %A)
-; CHECK-NEXT: call void @user(%swift.refcounted* %A)
-; CHECK-NEXT: call void @noread_user(%swift.refcounted* %A)
-; CHECK-NEXT: call void @swift_release_n(%swift.refcounted* %A, i32 2)
-; CHECK-NEXT: call void @user(%swift.refcounted* %A)
+; CHECK-NEXT: call ptr @swift_retain(ptr %A)
+; CHECK-NEXT: call void @user(ptr %A)
+; CHECK-NEXT: call void @noread_user(ptr %A)
+; CHECK-NEXT: call void @swift_release_n(ptr %A, i32 2)
+; CHECK-NEXT: call void @user(ptr %A)
+; CHECK-NEXT: call ptr @swift_retain_n(ptr %A, i32 2)
+; CHECK-NEXT: call void @swift_release(ptr %A)
+; CHECK-NEXT: call void @user(ptr %A)
+; CHECK-NEXT: call void @noread_user(ptr %A)
+; CHECK-NEXT: call void @swift_release_n(ptr %A, i32 2)
+; CHECK-NEXT: call void @user(ptr %A)
 ; CHECK-NEXT: br label %bb3
 ; CHECK: bb2:
-; CHECK-NEXT: call void @user(%swift.refcounted* %A)
-; CHECK-NEXT: call void @swift_release(%swift.refcounted* %A)
-; CHECK-NEXT: call void @user(%swift.refcounted* %A)
+; CHECK-NEXT: call void @user(ptr %A)
+; CHECK-NEXT: call void @swift_release(ptr %A)
+; CHECK-NEXT: call void @user(ptr %A)
 ; CHECK-NEXT: br label %bb3
 
 ; CHECK: bb3:
-; CHECK-NEXT: call void @swift_release(%swift.refcounted* %A)
-; CHECK-NEXT: ret %swift.refcounted* %A
-define %swift.refcounted* @swift_contractRetainReleaseNInterleavedWithUnknown(%swift.refcounted* %A) {
+; CHECK-NEXT: call void @swift_release(ptr %A)
+; CHECK-NEXT: ret ptr %A
+define ptr @swift_contractRetainReleaseNInterleavedWithUnknown(ptr %A) {
 entry:
   br i1 undef, label %bb1, label %bb2
 
 bb1:
-  call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
-  call void @user(%swift.refcounted* %A)
-  call void @swift_release(%swift.refcounted* %A)
-  call void @noread_user(%swift.refcounted* %A)
-  call void @swift_release(%swift.refcounted* %A)
-  call void @user(%swift.refcounted* %A)
-  call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
-  call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
-  call void @swift_release(%swift.refcounted* %A)
-  call void @user(%swift.refcounted* %A)
-  call void @swift_release(%swift.refcounted* %A)
-  call void @noread_user(%swift.refcounted* %A)
-  call void @swift_release(%swift.refcounted* %A)
-  call void @user(%swift.refcounted* %A)
+  call ptr @swift_retain(ptr %A)
+  call void @user(ptr %A)
+  call void @swift_release(ptr %A)
+  call void @noread_user(ptr %A)
+  call void @swift_release(ptr %A)
+  call void @user(ptr %A)
+  call ptr @swift_retain(ptr %A)
+  call ptr @swift_retain(ptr %A)
+  call void @swift_release(ptr %A)
+  call void @user(ptr %A)
+  call void @swift_release(ptr %A)
+  call void @noread_user(ptr %A)
+  call void @swift_release(ptr %A)
+  call void @user(ptr %A)
 
   br label %bb3
 
 bb2:
-  call void @user(%swift.refcounted* %A)
-  call void @swift_release(%swift.refcounted* %A)
-  call void @user(%swift.refcounted* %A)
+  call void @user(ptr %A)
+  call void @swift_release(ptr %A)
+  call void @user(ptr %A)
   br label %bb3
 
 bb3:
-  call void @swift_release(%swift.refcounted* %A)
-  ret %swift.refcounted* %A
+  call void @swift_release(ptr %A)
+  ret ptr %A
 }
 
-; CHECK-LABEL: define{{( protected)?}} %swift.refcounted* @swift_contractUnknownObjectRetainNInterleavedWithUnknown(%swift.refcounted* %A) {
+; CHECK-LABEL: define{{( protected)?}} ptr @swift_contractUnknownObjectRetainNInterleavedWithUnknown(ptr %A) {
 ; CHECK: bb1:
-; CHECK: call %swift.refcounted* @swift_unknownObjectRetain(%swift.refcounted* %A)
-; CHECK-NEXT: call void @user(%swift.refcounted* %A)
-; CHECK-NEXT: call %swift.refcounted* @swift_unknownObjectRetain_n(%swift.refcounted* %A, i32 3)
-; CHECK-NEXT: call void @noread_user(%swift.refcounted* %A)
-; CHECK-NEXT: call void @noread_user(%swift.refcounted* %A)
-; CHECK-NEXT: call void @user(%swift.refcounted* %A)
-; CHECK-NEXT: call %swift.refcounted* @swift_unknownObjectRetain_n(%swift.refcounted* %A, i32 2)
-; CHECK-NEXT: call void @user(%swift.refcounted* %A)
-; CHECK-NEXT: call %swift.refcounted* @swift_unknownObjectRetain(%swift.refcounted* %A)
+; CHECK: call ptr @swift_unknownObjectRetain(ptr %A)
+; CHECK-NEXT: call void @user(ptr %A)
+; CHECK-NEXT: call ptr @swift_unknownObjectRetain_n(ptr %A, i32 3)
+; CHECK-NEXT: call void @noread_user(ptr %A)
+; CHECK-NEXT: call void @noread_user(ptr %A)
+; CHECK-NEXT: call void @user(ptr %A)
+; CHECK-NEXT: call ptr @swift_unknownObjectRetain_n(ptr %A, i32 2)
+; CHECK-NEXT: call void @user(ptr %A)
+; CHECK-NEXT: call ptr @swift_unknownObjectRetain(ptr %A)
 ; CHECK-NEXT: br label %bb3
 
 ; CHECK: bb2:
-; CHECK-NEXT: call void @user(%swift.refcounted* %A)
-; CHECK-NEXT: call %swift.refcounted* @swift_unknownObjectRetain(%swift.refcounted* %A)
-; CHECK-NEXT: call void @user(%swift.refcounted* %A)
+; CHECK-NEXT: call void @user(ptr %A)
+; CHECK-NEXT: call ptr @swift_unknownObjectRetain(ptr %A)
+; CHECK-NEXT: call void @user(ptr %A)
 ; CHECK-NEXT: br label %bb3
 
 ; CHECK: bb3:
-; CHECK-NEXT: call %swift.refcounted* @swift_unknownObjectRetain(%swift.refcounted* %A)
-; CHECK-NEXT: ret %swift.refcounted* %A
-define %swift.refcounted* @swift_contractUnknownObjectRetainNInterleavedWithUnknown(%swift.refcounted* %A) {
+; CHECK-NEXT: call ptr @swift_unknownObjectRetain(ptr %A)
+; CHECK-NEXT: ret ptr %A
+define ptr @swift_contractUnknownObjectRetainNInterleavedWithUnknown(ptr %A) {
 entry:
   br i1 undef, label %bb1, label %bb2
 
 bb1:
-  call %swift.refcounted* @swift_unknownObjectRetain(%swift.refcounted* %A)
-  call void @user(%swift.refcounted* %A)
-  call %swift.refcounted* @swift_unknownObjectRetain(%swift.refcounted* %A)
-  call void @noread_user(%swift.refcounted* %A)
-  call %swift.refcounted* @swift_unknownObjectRetain(%swift.refcounted* %A)
-  call void @noread_user(%swift.refcounted* %A)
-  call %swift.refcounted* @swift_unknownObjectRetain(%swift.refcounted* %A)
-  call void @user(%swift.refcounted* %A)
-  call %swift.refcounted* @swift_unknownObjectRetain(%swift.refcounted* %A)
-  call %swift.refcounted* @swift_unknownObjectRetain(%swift.refcounted* %A)
-  call void @user(%swift.refcounted* %A)
-  call %swift.refcounted* @swift_unknownObjectRetain(%swift.refcounted* %A)
+  call ptr @swift_unknownObjectRetain(ptr %A)
+  call void @user(ptr %A)
+  call ptr @swift_unknownObjectRetain(ptr %A)
+  call void @noread_user(ptr %A)
+  call ptr @swift_unknownObjectRetain(ptr %A)
+  call void @noread_user(ptr %A)
+  call ptr @swift_unknownObjectRetain(ptr %A)
+  call void @user(ptr %A)
+  call ptr @swift_unknownObjectRetain(ptr %A)
+  call ptr @swift_unknownObjectRetain(ptr %A)
+  call void @user(ptr %A)
+  call ptr @swift_unknownObjectRetain(ptr %A)
   br label %bb3
 
 bb2:
-  call void @user(%swift.refcounted* %A)
-  call %swift.refcounted* @swift_unknownObjectRetain(%swift.refcounted* %A)
-  call void @user(%swift.refcounted* %A)
+  call void @user(ptr %A)
+  call ptr @swift_unknownObjectRetain(ptr %A)
+  call void @user(ptr %A)
   br label %bb3
 
 bb3:
-  call %swift.refcounted* @swift_unknownObjectRetain(%swift.refcounted* %A)
-  ret %swift.refcounted* %A
+  call ptr @swift_unknownObjectRetain(ptr %A)
+  ret ptr %A
 }
 
-; CHECK-LABEL: define{{( protected)?}} %swift.refcounted* @swift_contractUnknownObjectReleaseNInterleavedWithUnknown(%swift.refcounted* %A) {
+; CHECK-LABEL: define{{( protected)?}} ptr @swift_contractUnknownObjectReleaseNInterleavedWithUnknown(ptr %A) {
 ; CHECK: bb1:
 ; CHECK-NEXT: @swift_unknownObjectRelease(
 ; CHECK-NEXT: @user
@@ -431,154 +426,154 @@ bb3:
 ; CHECK-NEXT: @swift_unknownObjectRelease_n
 ; CHECK-NEXT: @user
 ; CHECK-NEXT: br label %bb3
-define %swift.refcounted* @swift_contractUnknownObjectReleaseNInterleavedWithUnknown(%swift.refcounted* %A) {
+define ptr @swift_contractUnknownObjectReleaseNInterleavedWithUnknown(ptr %A) {
 entry:
   br i1 undef, label %bb1, label %bb2
 
 bb1:
-  call void @swift_unknownObjectRelease(%swift.refcounted* %A)
-  call void @user(%swift.refcounted* %A)
-  call void @swift_unknownObjectRelease(%swift.refcounted* %A)
-  call void @noread_user(%swift.refcounted* %A)
-  call void @swift_unknownObjectRelease(%swift.refcounted* %A)
-  call void @user(%swift.refcounted* %A)
+  call void @swift_unknownObjectRelease(ptr %A)
+  call void @user(ptr %A)
+  call void @swift_unknownObjectRelease(ptr %A)
+  call void @noread_user(ptr %A)
+  call void @swift_unknownObjectRelease(ptr %A)
+  call void @user(ptr %A)
   br label %bb3
 
 bb2:
-  call void @user(%swift.refcounted* %A)
-  call void @swift_unknownObjectRelease(%swift.refcounted* %A)
-  call void @user(%swift.refcounted* %A)
+  call void @user(ptr %A)
+  call void @swift_unknownObjectRelease(ptr %A)
+  call void @user(ptr %A)
   br label %bb3
 
 bb3:
-  call void @swift_unknownObjectRelease(%swift.refcounted* %A)
-  ret %swift.refcounted* %A
+  call void @swift_unknownObjectRelease(ptr %A)
+  ret ptr %A
 }
 
-; CHECK-LABEL: define{{( protected)?}} %swift.refcounted* @swift_contractUnknownObjectRetainReleaseNInterleavedWithUnknown(%swift.refcounted* %A) {
+; CHECK-LABEL: define{{( protected)?}} ptr @swift_contractUnknownObjectRetainReleaseNInterleavedWithUnknown(ptr %A) {
 ; CHECK: bb1:
-; CHECK-NEXT: call %swift.refcounted* @swift_unknownObjectRetain(%swift.refcounted* %A)
-; CHECK-NEXT: call void @user(%swift.refcounted* %A)
-; CHECK-NEXT: call void @noread_user(%swift.refcounted* %A)
-; CHECK-NEXT: call void @swift_unknownObjectRelease_n(%swift.refcounted* %A, i32 2)
-; CHECK-NEXT: call void @user(%swift.refcounted* %A)
-; CHECK-NEXT: call %swift.refcounted* @swift_unknownObjectRetain_n(%swift.refcounted* %A, i32 2)
-; CHECK-NEXT: call void @swift_unknownObjectRelease(%swift.refcounted* %A)
-; CHECK-NEXT: call void @user(%swift.refcounted* %A)
-; CHECK-NEXT: call void @noread_user(%swift.refcounted* %A)
-; CHECK-NEXT: call void @swift_unknownObjectRelease_n(%swift.refcounted* %A, i32 2)
-; CHECK-NEXT: call void @user(%swift.refcounted* %A)
+; CHECK-NEXT: call ptr @swift_unknownObjectRetain(ptr %A)
+; CHECK-NEXT: call void @user(ptr %A)
+; CHECK-NEXT: call void @noread_user(ptr %A)
+; CHECK-NEXT: call void @swift_unknownObjectRelease_n(ptr %A, i32 2)
+; CHECK-NEXT: call void @user(ptr %A)
+; CHECK-NEXT: call ptr @swift_unknownObjectRetain_n(ptr %A, i32 2)
+; CHECK-NEXT: call void @swift_unknownObjectRelease(ptr %A)
+; CHECK-NEXT: call void @user(ptr %A)
+; CHECK-NEXT: call void @noread_user(ptr %A)
+; CHECK-NEXT: call void @swift_unknownObjectRelease_n(ptr %A, i32 2)
+; CHECK-NEXT: call void @user(ptr %A)
 ; CHECK-NEXT: br label %bb3
 ; CHECK: bb2:
-; CHECK-NEXT: call void @user(%swift.refcounted* %A)
-; CHECK-NEXT: call void @swift_unknownObjectRelease(%swift.refcounted* %A)
-; CHECK-NEXT: call void @user(%swift.refcounted* %A)
+; CHECK-NEXT: call void @user(ptr %A)
+; CHECK-NEXT: call void @swift_unknownObjectRelease(ptr %A)
+; CHECK-NEXT: call void @user(ptr %A)
 ; CHECK-NEXT: br label %bb3
 
 ; CHECK: bb3:
-; CHECK-NEXT: call void @swift_unknownObjectRelease(%swift.refcounted* %A)
-; CHECK-NEXT: ret %swift.refcounted* %A
-define %swift.refcounted* @swift_contractUnknownObjectRetainReleaseNInterleavedWithUnknown(%swift.refcounted* %A) {
+; CHECK-NEXT: call void @swift_unknownObjectRelease(ptr %A)
+; CHECK-NEXT: ret ptr %A
+define ptr @swift_contractUnknownObjectRetainReleaseNInterleavedWithUnknown(ptr %A) {
 entry:
   br i1 undef, label %bb1, label %bb2
 
 bb1:
-  call %swift.refcounted* @swift_unknownObjectRetain(%swift.refcounted* %A)
-  call void @user(%swift.refcounted* %A)
-  call void @swift_unknownObjectRelease(%swift.refcounted* %A)
-  call void @noread_user(%swift.refcounted* %A)
-  call void @swift_unknownObjectRelease(%swift.refcounted* %A)
-  call void @user(%swift.refcounted* %A)
-  call %swift.refcounted* @swift_unknownObjectRetain(%swift.refcounted* %A)
-  call %swift.refcounted* @swift_unknownObjectRetain(%swift.refcounted* %A)
-  call void @swift_unknownObjectRelease(%swift.refcounted* %A)
-  call void @user(%swift.refcounted* %A)
-  call void @swift_unknownObjectRelease(%swift.refcounted* %A)
-  call void @noread_user(%swift.refcounted* %A)
-  call void @swift_unknownObjectRelease(%swift.refcounted* %A)
-  call void @user(%swift.refcounted* %A)
+  call ptr @swift_unknownObjectRetain(ptr %A)
+  call void @user(ptr %A)
+  call void @swift_unknownObjectRelease(ptr %A)
+  call void @noread_user(ptr %A)
+  call void @swift_unknownObjectRelease(ptr %A)
+  call void @user(ptr %A)
+  call ptr @swift_unknownObjectRetain(ptr %A)
+  call ptr @swift_unknownObjectRetain(ptr %A)
+  call void @swift_unknownObjectRelease(ptr %A)
+  call void @user(ptr %A)
+  call void @swift_unknownObjectRelease(ptr %A)
+  call void @noread_user(ptr %A)
+  call void @swift_unknownObjectRelease(ptr %A)
+  call void @user(ptr %A)
   br label %bb3
 
 bb2:
-  call void @user(%swift.refcounted* %A)
-  call void @swift_unknownObjectRelease(%swift.refcounted* %A)
-  call void @user(%swift.refcounted* %A)
+  call void @user(ptr %A)
+  call void @swift_unknownObjectRelease(ptr %A)
+  call void @user(ptr %A)
   br label %bb3
 
 bb3:
-  call void @swift_unknownObjectRelease(%swift.refcounted* %A)
-  ret %swift.refcounted* %A
+  call void @swift_unknownObjectRelease(ptr %A)
+  ret ptr %A
 }
 
 
-; CHECK-LABEL: define{{( protected)?}} %swift.bridge* @swift_contractBridgeRetainWithBridge(%swift.bridge* %A) {
+; CHECK-LABEL: define{{( protected)?}} ptr @swift_contractBridgeRetainWithBridge(ptr %A) {
 ; CHECK: bb1:
-; CHECK-NEXT: [[RET0:%.+]] = call %swift.bridge* @swift_bridgeObjectRetain_n(%swift.bridge* %A, i32 2)
-; CHECK-NEXT: call void @swift_bridgeObjectRelease(%swift.bridge* [[RET0:%.+]])
-; CHECK-NEXT: call void @swift_bridgeObjectRelease(%swift.bridge* %A)
-; CHECK-NEXT: ret %swift.bridge* %A
-define %swift.bridge* @swift_contractBridgeRetainWithBridge(%swift.bridge* %A) {
+; CHECK-NEXT: [[RET0:%.+]] = call ptr @swift_bridgeObjectRetain_n(ptr %A, i32 2)
+; CHECK-NEXT: call void @swift_bridgeObjectRelease(ptr [[RET0:%.+]])
+; CHECK-NEXT: call void @swift_bridgeObjectRelease(ptr %A)
+; CHECK-NEXT: ret ptr %A
+define ptr @swift_contractBridgeRetainWithBridge(ptr %A) {
 bb1:
-  %0 = call %swift.bridge* @swift_bridgeObjectRetain(%swift.bridge* %A)
-  %1 = call %swift.bridge* @swift_bridgeObjectRetain(%swift.bridge* %A)
-  call void @swift_bridgeObjectRelease(%swift.bridge* %1)
-  call void @swift_bridgeObjectRelease(%swift.bridge* %A)
-  ret %swift.bridge* %A
+  %0 = call ptr @swift_bridgeObjectRetain(ptr %A)
+  %1 = call ptr @swift_bridgeObjectRetain(ptr %A)
+  call void @swift_bridgeObjectRelease(ptr %1)
+  call void @swift_bridgeObjectRelease(ptr %A)
+  ret ptr %A
 }
 
-; CHECK-LABEL: define{{( protected)?}} %swift.bridge* @swift_contractBridgeRetainReleaseNInterleavedWithBridge(%swift.bridge* %A) {
+; CHECK-LABEL: define{{( protected)?}} ptr @swift_contractBridgeRetainReleaseNInterleavedWithBridge(ptr %A) {
 ; CHECK: bb1:
-; CHECK-NEXT: [[RET0:%.+]] = call %swift.bridge* @swift_bridgeObjectRetain(%swift.bridge* %A)
-; CHECK-NEXT: call void @user_bridged(%swift.bridge* %A)
-; CHECK-NEXT: call void @noread_user_bridged(%swift.bridge* %A)
-; CHECK-NEXT: call void @swift_bridgeObjectRelease_n(%swift.bridge* %A, i32 2)
-; CHECK-NEXT: call void @user_bridged(%swift.bridge* %A)
-; CHECK-NEXT: [[RET1:%.+]] = call %swift.bridge* @swift_bridgeObjectRetain_n(%swift.bridge* %A, i32 2)
-; CHECK-NEXT: call void @swift_bridgeObjectRelease(%swift.bridge* %A)
-; CHECK-NEXT: call void @user_bridged(%swift.bridge* %A)
-; CHECK-NEXT: call void @noread_user_bridged(%swift.bridge* %A)
-; CHECK-NEXT: call void @swift_bridgeObjectRelease_n(%swift.bridge* %A, i32 2)
-; CHECK-NEXT: call void @user_bridged(%swift.bridge* %A)
+; CHECK-NEXT: [[RET0:%.+]] = call ptr @swift_bridgeObjectRetain(ptr %A)
+; CHECK-NEXT: call void @user_bridged(ptr %A)
+; CHECK-NEXT: call void @noread_user_bridged(ptr %A)
+; CHECK-NEXT: call void @swift_bridgeObjectRelease_n(ptr %A, i32 2)
+; CHECK-NEXT: call void @user_bridged(ptr %A)
+; CHECK-NEXT: [[RET1:%.+]] = call ptr @swift_bridgeObjectRetain_n(ptr %A, i32 2)
+; CHECK-NEXT: call void @swift_bridgeObjectRelease(ptr %A)
+; CHECK-NEXT: call void @user_bridged(ptr %A)
+; CHECK-NEXT: call void @noread_user_bridged(ptr %A)
+; CHECK-NEXT: call void @swift_bridgeObjectRelease_n(ptr %A, i32 2)
+; CHECK-NEXT: call void @user_bridged(ptr %A)
 ; CHECK-NEXT: br label %bb3
 ; CHECK: bb2:
-; CHECK-NEXT: call void @user_bridged(%swift.bridge* %A)
-; CHECK-NEXT: call void @swift_bridgeObjectRelease(%swift.bridge* %A)
-; CHECK-NEXT: call void @user_bridged(%swift.bridge* %A)
+; CHECK-NEXT: call void @user_bridged(ptr %A)
+; CHECK-NEXT: call void @swift_bridgeObjectRelease(ptr %A)
+; CHECK-NEXT: call void @user_bridged(ptr %A)
 ; CHECK-NEXT: br label %bb3
 
 ; CHECK: bb3:
-; CHECK-NEXT: call void @swift_bridgeObjectRelease(%swift.bridge* %A)
-; CHECK-NEXT: ret %swift.bridge* %A
-define %swift.bridge* @swift_contractBridgeRetainReleaseNInterleavedWithBridge(%swift.bridge* %A) {
+; CHECK-NEXT: call void @swift_bridgeObjectRelease(ptr %A)
+; CHECK-NEXT: ret ptr %A
+define ptr @swift_contractBridgeRetainReleaseNInterleavedWithBridge(ptr %A) {
 entry:
   br i1 undef, label %bb1, label %bb2
 
 bb1:
-  call %swift.bridge* @swift_bridgeObjectRetain(%swift.bridge* %A)
-  call void @user_bridged(%swift.bridge* %A)
-  call void @swift_bridgeObjectRelease(%swift.bridge* %A)
-  call void @noread_user_bridged(%swift.bridge* %A)
-  call void @swift_bridgeObjectRelease(%swift.bridge* %A)
-  call void @user_bridged(%swift.bridge* %A)
-  call %swift.bridge* @swift_bridgeObjectRetain(%swift.bridge* %A)
-  call %swift.bridge* @swift_bridgeObjectRetain(%swift.bridge* %A)
-  call void @swift_bridgeObjectRelease(%swift.bridge* %A)
-  call void @user_bridged(%swift.bridge* %A)
-  call void @swift_bridgeObjectRelease(%swift.bridge* %A)
-  call void @noread_user_bridged(%swift.bridge* %A)
-  call void @swift_bridgeObjectRelease(%swift.bridge* %A)
-  call void @user_bridged(%swift.bridge* %A)
+  call ptr @swift_bridgeObjectRetain(ptr %A)
+  call void @user_bridged(ptr %A)
+  call void @swift_bridgeObjectRelease(ptr %A)
+  call void @noread_user_bridged(ptr %A)
+  call void @swift_bridgeObjectRelease(ptr %A)
+  call void @user_bridged(ptr %A)
+  call ptr @swift_bridgeObjectRetain(ptr %A)
+  call ptr @swift_bridgeObjectRetain(ptr %A)
+  call void @swift_bridgeObjectRelease(ptr %A)
+  call void @user_bridged(ptr %A)
+  call void @swift_bridgeObjectRelease(ptr %A)
+  call void @noread_user_bridged(ptr %A)
+  call void @swift_bridgeObjectRelease(ptr %A)
+  call void @user_bridged(ptr %A)
   br label %bb3
 
 bb2:
-  call void @user_bridged(%swift.bridge* %A)
-  call void @swift_bridgeObjectRelease(%swift.bridge* %A)
-  call void @user_bridged(%swift.bridge* %A)
+  call void @user_bridged(ptr %A)
+  call void @swift_bridgeObjectRelease(ptr %A)
+  call void @user_bridged(ptr %A)
   br label %bb3
 
 bb3:
-  call void @swift_bridgeObjectRelease(%swift.bridge* %A)
-  ret %swift.bridge* %A
+  call void @swift_bridgeObjectRelease(ptr %A)
+  ret ptr %A
 }
 
 !llvm.dbg.cu = !{!1}

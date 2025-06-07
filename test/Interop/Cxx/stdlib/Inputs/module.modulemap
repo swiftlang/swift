@@ -1,19 +1,83 @@
+module StdNumeric {
+  header "std-numeric.h"
+  requires cplusplus
+  export *
+}
+
 module StdVector {
   header "std-vector.h"
   requires cplusplus
+  export *
 }
 
-module StdString {
-  header "std-string.h"
+module StdSpan {
+  header "std-span.h"
   requires cplusplus
+  export *
 }
 
 module StdMap {
   header "std-map.h"
   requires cplusplus
+  export *
+}
+
+module StdOptional {
+  header "std-optional.h"
+  requires cplusplus
+  export *
 }
 
 module StdSet {
   header "std-set.h"
   requires cplusplus
+  export *
+}
+
+module StdString {
+  header "std-string.h"
+  requires cplusplus
+  export *
+}
+
+module StdStringAndVector {
+  header "std-string-and-vector.h"
+  requires cplusplus
+  export *
+}
+
+module StdStringView {
+  header "std-string-view.h"
+  requires cplusplus
+  export *
+}
+
+module StdPair {
+  header "std-pair.h"
+  requires cplusplus
+  export *
+}
+
+module MsvcUseVecIt {
+  header "msvc-std-vector-it.h"
+  requires cplusplus
+  export *
+}
+
+module StdUniquePtr {
+  header "std-unique-ptr.h"
+  requires cplusplus
+  export *
+}
+
+module StdFunction {
+  header "std-function.h"
+  requires cplusplus
+  export *
+}
+
+module NoCXXStdlib {
+  header "no-cxx-stdlib.h"
+  requires cplusplus
+  export *
 }

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -22,6 +22,7 @@
 ///     let b = a + CollectionOfOne(toAdd)
 ///     // b == [1, 2, 3, 4, 100]
 @frozen // trivial-implementation
+@_addressableForDependencies
 public struct CollectionOfOne<Element> {
   @usableFromInline // trivial-implementation
   internal var _element: Element
@@ -158,6 +159,34 @@ extension CollectionOfOne: RandomAccessCollection, MutableCollection {
   }
 }
 
+extension CollectionOfOne {
+
+  @available(SwiftStdlib 6.2, *)
+  public var span: Span<Element> {
+    @lifetime(borrow self)
+    @_alwaysEmitIntoClient
+    get {
+      let pointer = unsafe UnsafePointer<Element>(Builtin.addressOfBorrow(self))
+      let span = unsafe Span(_unsafeStart: pointer, count: 1)
+      return unsafe _overrideLifetime(span, borrowing: self)
+    }
+  }
+
+  @available(SwiftStdlib 6.2, *)
+  public var mutableSpan: MutableSpan<Element> {
+    @lifetime(&self)
+    @_alwaysEmitIntoClient
+    mutating get {
+      let pointer = unsafe UnsafeMutablePointer<Element>(
+        Builtin.addressOfBorrow(self)
+      )
+      let span = unsafe MutableSpan(_unsafeStart: pointer, count: 1)
+      return unsafe _overrideLifetime(span, mutating: &self)
+    }
+  }
+}
+
+@_unavailableInEmbedded
 extension CollectionOfOne: CustomDebugStringConvertible {
   /// A textual representation of the collection, suitable for debugging.
   public var debugDescription: String {

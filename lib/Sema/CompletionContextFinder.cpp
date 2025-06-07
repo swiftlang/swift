@@ -11,13 +11,27 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Sema/CompletionContextFinder.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/Parse/Lexer.h"
+#include "swift/Sema/SyntacticElementTarget.h"
 
 using namespace swift;
+using namespace constraints;
 using Fallback = CompletionContextFinder::Fallback;
+
+CompletionContextFinder::CompletionContextFinder(
+    SyntacticElementTarget target, DeclContext *DC)
+    : InitialExpr(target.getAsExpr()), InitialDC(DC) {
+  assert(DC);
+  target.walk(*this);
+}
 
 ASTWalker::PreWalkResult<Expr *>
 CompletionContextFinder::walkToExprPre(Expr *E) {
   if (auto *closure = dyn_cast<ClosureExpr>(E)) {
+    // NOTE: We're querying hasSingleExpressionBody before the single-expression
+    // body transform has happened, so this won't take e.g SingleValueStmtExprs
+    // into account.
     Contexts.push_back({closure->hasSingleExpressionBody()
                             ? ContextKind::SingleStmtClosure
                             : ContextKind::MultiStmtClosure,
@@ -28,7 +42,8 @@ CompletionContextFinder::walkToExprPre(Expr *E) {
     Contexts.push_back({ContextKind::StringInterpolation, E});
   }
 
-  if (isa<ApplyExpr>(E) || isa<SequenceExpr>(E)) {
+  if (isa<ApplyExpr>(E) || isa<SequenceExpr>(E) ||
+      isa<SingleValueStmtExpr>(E)) {
     Contexts.push_back({ContextKind::FallbackExpression, E});
   }
 
@@ -54,7 +69,7 @@ CompletionContextFinder::walkToExprPre(Expr *E) {
     }
     // Code completion in key paths is modelled by a code completion component
     // Don't walk the key path's parsed expressions.
-    return Action::SkipChildren(E);
+    return Action::SkipNode(E);
   }
 
   return Action::Continue(E);
@@ -63,11 +78,23 @@ CompletionContextFinder::walkToExprPre(Expr *E) {
 ASTWalker::PostWalkResult<Expr *>
 CompletionContextFinder::walkToExprPost(Expr *E) {
   if (isa<ClosureExpr>(E) || isa<InterpolatedStringLiteralExpr>(E) ||
-      isa<ApplyExpr>(E) || isa<SequenceExpr>(E) || isa<ErrorExpr>(E)) {
+      isa<ApplyExpr>(E) || isa<SequenceExpr>(E) || isa<ErrorExpr>(E) ||
+      isa<SingleValueStmtExpr>(E)) {
     assert(Contexts.back().E == E);
     Contexts.pop_back();
   }
   return Action::Continue(E);
+}
+
+ASTWalker::PreWalkAction CompletionContextFinder::walkToDeclPre(Decl *D) {
+  // Look through any decl if we're looking for any viable fallback expression.
+  if (ForFallback)
+    return Action::Continue();
+
+  // Otherwise, follow the same rule as the ConstraintSystem, where only
+  // nested PatternBindingDecls are solved as part of the system. Local decls
+  // are handled by TypeCheckASTNodeAtLocRequest.
+  return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
 }
 
 size_t CompletionContextFinder::getKeyPathCompletionComponentIndex() const {
@@ -85,14 +112,15 @@ size_t CompletionContextFinder::getKeyPathCompletionComponentIndex() const {
   return ComponentIndex;
 }
 
-Optional<Fallback> CompletionContextFinder::getFallbackCompletionExpr() const {
+std::optional<Fallback>
+CompletionContextFinder::getFallbackCompletionExpr() const {
   if (!hasCompletionExpr()) {
     // Creating a fallback expression only makes sense if we are completing in
     // an expression, not when we're completing in a key path.
-    return None;
+    return std::nullopt;
   }
 
-  Optional<Fallback> fallback;
+  std::optional<Fallback> fallback;
   bool separatePrecheck = false;
   DeclContext *fallbackDC = InitialDC;
 
@@ -117,7 +145,7 @@ Optional<Fallback> CompletionContextFinder::getFallbackCompletionExpr() const {
       fallbackDC = cast<AbstractClosureExpr>(context.E);
       LLVM_FALLTHROUGH;
     case ContextKind::ErrorExpression:;
-      fallback = None;
+      fallback = std::nullopt;
       separatePrecheck = true;
       continue;
     }
@@ -128,5 +156,13 @@ Optional<Fallback> CompletionContextFinder::getFallbackCompletionExpr() const {
 
   if (getCompletionExpr() != InitialExpr)
     return Fallback{getCompletionExpr(), fallbackDC, separatePrecheck};
-  return None;
+  return std::nullopt;
+}
+
+bool swift::containsIDEInspectionTarget(SourceRange range,
+                                        const SourceManager &SourceMgr) {
+  if (range.isInvalid())
+    return false;
+  auto charRange = Lexer::getCharSourceRangeFromSourceRange(SourceMgr, range);
+  return SourceMgr.rangeContainsIDEInspectionTarget(charRange);
 }

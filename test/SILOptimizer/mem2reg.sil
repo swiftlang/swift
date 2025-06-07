@@ -1,7 +1,8 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -mem2reg | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -mem2reg | %FileCheck %s
 
 import Builtin
 import Swift
+import _Concurrency
 
 //////////////////
 // Declarations //
@@ -20,6 +21,12 @@ struct LargeCodesizeStruct {
   var s3: SmallCodesizeStruct
   var s4: SmallCodesizeStruct
   var s5: SmallCodesizeStruct
+}
+
+struct EmptyStruct {}
+struct Pair<T, U> {
+  var t: T
+  var u: U
 }
 
 ///////////
@@ -491,4 +498,83 @@ bb2:
 bb3:
   %11 = tuple ()
   return %11 : $()
+}
+
+// CHECK-LABEL: sil @load_from_uninitialized_empty : {{.*}} {
+// CHECK:         [[V_3_0:%[^,]+]] = struct $EmptyStruct
+// CHECK:         [[V_3_1:%[^,]+]] = struct $EmptyStruct
+// CHECK:         [[V_2_0:%[^,]+]] = struct $Pair{{.*}} ([[V_3_0]]{{.*}}, [[V_3_1]]
+// CHECK:         [[V_2_1:%[^,]+]] = struct $EmptyStruct ()
+// CHECK:         [[V_1_0:%[^,]+]] = struct $Pair{{.*}} ([[V_2_0]]{{.*}}, [[V_2_1]]
+// CHECK:         [[V_2_2:%[^,]+]] = struct $EmptyStruct
+// CHECK:         [[V_2_3:%[^,]+]] = struct $EmptyStruct
+// CHECK:         [[V_1_1:%[^,]+]] = tuple ([[V_2_2]]{{.*}}, [[V_2_3]]
+// CHECK:         [[V_1_2:%[^,]+]] = struct $EmptyStruct
+// CHECK:         [[V_0:%[^,]+]] = tuple ([[V_1_0]]{{.*}}, [[V_1_1]]{{.*}}, [[V_1_2]]{{.*}})
+// CHECK:         return [[V_0]]
+// CHECK-LABEL: } // end sil function 'load_from_uninitialized_empty'
+sil @load_from_uninitialized_empty : $@convention(thin) () -> (Pair<Pair<EmptyStruct, EmptyStruct>, EmptyStruct>, (EmptyStruct, EmptyStruct), EmptyStruct) {
+  %addr = alloc_stack $(Pair<Pair<EmptyStruct, EmptyStruct>, EmptyStruct>, (EmptyStruct, EmptyStruct), EmptyStruct)
+  %value = load %addr : $*(Pair<Pair<EmptyStruct, EmptyStruct>, EmptyStruct>, (EmptyStruct, EmptyStruct), EmptyStruct)
+  dealloc_stack %addr : $*(Pair<Pair<EmptyStruct, EmptyStruct>, EmptyStruct>, (EmptyStruct, EmptyStruct), EmptyStruct)
+  return %value : $(Pair<Pair<EmptyStruct, EmptyStruct>, EmptyStruct>, (EmptyStruct, EmptyStruct), EmptyStruct)
+}
+
+
+// CHECK-LABEL: sil @dont_canonicalize_undef : {{.*}} {
+// CHECK:         [[RETVAL:%[^,]+]] = tuple
+// CHECK:         return [[RETVAL]]
+// CHECK-LABEL: } // end sil function 'dont_canonicalize_undef'
+sil @dont_canonicalize_undef : $@convention(thin) () -> () {
+  %addr = alloc_stack $()
+  store undef to %addr : $*()
+  dealloc_stack %addr : $*()
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil @undef_for_load_of_empty_type_from_nontrivial_aggregate : {{.*}} {
+// CHECK:         [[EMPTY:%[^,]+]] = tuple ()
+// CHECK:         [[AGGREGATE:%[^,]+]] = tuple (undef : $Builtin.BridgeObject, [[EMPTY]] : $())
+// CHECK:         tuple_extract [[AGGREGATE]] : $(Builtin.BridgeObject, ()), 1
+// CHECK-LABEL: } // end sil function 'undef_for_load_of_empty_type_from_nontrivial_aggregate'
+sil @undef_for_load_of_empty_type_from_nontrivial_aggregate : $@convention(thin) () -> () {
+bb0:
+  %11 = alloc_stack $(Builtin.BridgeObject, ())
+  %12 = tuple_element_addr %11 : $*(Builtin.BridgeObject, ()), 1
+  %13 = load %12 : $*()
+  %empty = tuple ()
+  %14 = tuple (%empty : $(), %13 : $())
+  dealloc_stack %11 : $*(Builtin.BridgeObject, ())
+  return undef : $()
+}
+
+typealias ResilientTy = CheckedContinuation<(), Error>
+
+// CHECK-LABEL: sil @dont_promote_addronly_aggregate : {{.*}} {
+// CHECK:         alloc_stack
+// CHECK-LABEL: } // end sil function 'dont_promote_addronly_aggregate'
+sil @dont_promote_addronly_aggregate : $@convention(thin) () -> () {
+bb0:
+  %11 = alloc_stack $Pair<ResilientTy, ()>
+  %12 = struct_element_addr %11 : $*Pair<ResilientTy, ()>, #Pair.u
+  %13 = load %12 : $*()
+  %empty = tuple ()
+  %14 = tuple (%empty : $(), %13 : $())
+  dealloc_stack %11 : $*Pair<ResilientTy, ()>
+  return undef : $()
+}
+
+// CHECK-LABEL: sil @dont_promote_addronly_aggregate_2 : {{.*}} {
+// CHECK:         alloc_stack
+// CHECK-LABEL: } // end sil function 'dont_promote_addronly_aggregate_2'
+sil @dont_promote_addronly_aggregate_2 : $@convention(thin) <T> () -> () {
+bb0:
+  %11 = alloc_stack $Pair<T, ()>
+  %12 = struct_element_addr %11 : $*Pair<T, ()>, #Pair.u
+  %13 = load %12 : $*()
+  %empty = tuple ()
+  %14 = tuple (%empty : $(), %13 : $())
+  dealloc_stack %11 : $*Pair<T, ()>
+  return undef : $()
 }

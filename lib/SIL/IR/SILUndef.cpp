@@ -15,16 +15,12 @@
 
 using namespace swift;
 
-SILUndef::SILUndef(SILType type)
-    : ValueBase(ValueKind::SILUndef, type) {}
+SILUndef::SILUndef(SILFunction *parent, SILType type)
+    : ValueBase(ValueKind::SILUndef, type), parent(parent) {}
 
-SILUndef *SILUndef::get(SILType ty, SILModule &m) {
-  SILUndef *&entry = m.UndefValues[ty];
+SILUndef *SILUndef::get(SILFunction *fn, SILType ty) {
+  SILUndef *&entry = fn->undefValues[ty];
   if (entry == nullptr)
-    entry = new (m) SILUndef(ty);
+    entry = new (fn->getModule()) SILUndef(fn, ty);
   return entry;
-}
-
-SILUndef *SILUndef::get(SILType ty, const SILFunction &f) {
-  return SILUndef::get(ty, f.getModule());
 }

@@ -76,6 +76,8 @@
     "Sort.swift",
     "Range.swift",
     "ClosedRange.swift",
+    "RangeSet.swift",
+    "RangeSetRanges.swift",
     "CollectionOfOne.swift",
     "BridgingBuffer.swift",
     "Sequence.swift",
@@ -94,6 +96,7 @@
       ],
       "Lazy Views": [
         "Algorithm.swift",
+        "EnumeratedSequence.swift",
         "Flatten.swift",
         "FlatMap.swift",
         "Map.swift",
@@ -102,6 +105,7 @@
         "Filter.swift",
         "Reverse.swift",
         "Slice.swift",
+        "DiscontiguousSlice.swift",
         "DropWhile.swift",
         "PrefixWhile.swift",
         "LazyCollection.swift",
@@ -119,7 +123,6 @@
         "ContiguousArray.swift",
         "ContiguousArrayBuffer.swift",
         "ContiguouslyStored.swift",
-        "FixedArray.swift",
         "SliceBuffer.swift",
         "SwiftNativeNSArray.swift"],
       "HashedCollections": [
@@ -148,7 +151,7 @@
     "Builtin.swift",
     "VarArgs.swift",
     "CTypes.swift",
-    "MemoryLayout.swift",
+    "MemoryLayout.swift"
   ],
   "KeyPaths": [
     "KeyPath.swift"
@@ -158,38 +161,61 @@
     "Mirror.swift",
     "Mirrors.swift",
     "ReflectionMirror.swift",
-    "ObjectIdentifier.swift"
+    "ObjectIdentifier.swift",
+    "ObjectIdentifier+DebugDescription.swift"
   ],
   "Math": [
     "SetAlgebra.swift",
     "BuiltinMath.swift",
     {
     "Integers": [
+      "Int128.swift",
       "Integers.swift",
       "IntegerTypes.swift",
       "IntegerParsing.swift",
-      "StaticBigInt.swift"],
+      "LegacyInt128.swift",
+      "StaticBigInt.swift",
+      "UInt128.swift"],
     "Floating": [
       "FloatingPoint.swift",
       "FloatingPointParsing.swift",
       "FloatingPointTypes.swift",
       "FloatingPointRandom.swift"],
     "Vector": [
-      "SIMDConcreteOperations.swift",
+      "SIMDIntegerConcreteOperations.swift",
+      "SIMDFloatConcreteOperations.swift",
+      "SIMDMaskConcreteOperations.swift",
       "SIMDVector.swift",
-      "SIMDVectorTypes.swift"]}
+      "SIMDVectorTypes.swift"
+    ]}
   ],
   "Optional": [
     "Optional.swift"
   ],
   "Pointer": [
     "Pointer.swift",
+    "SwiftifyImport.swift",
     "TemporaryAllocation.swift",
     "UnsafePointer.swift",
     "UnsafeRawPointer.swift",
     "UnsafeBufferPointer.swift",
     "UnsafeBufferPointerSlice.swift",
     "UnsafeRawBufferPointer.swift"
+  ],
+  "Span": [
+    "MutableRawSpan.swift",
+    "MutableSpan.swift",
+    "RawSpan.swift",
+    "Span.swift"
+  ],
+  "UTF8Span": [ 
+    "UTF8EncodingError.swift",
+    "UTF8Span.swift",
+    "UTF8SpanBits.swift",
+    "UTF8SpanComparisons.swift",
+    "UTF8SpanFundamentals.swift",
+    "UTF8SpanInternalHelpers.swift",
+    "UTF8SpanIterators.swift"
   ],
   "Protocols": [
     "CompilerProtocols.swift",
@@ -240,10 +266,13 @@
     "LegacyABI.swift",
     "MigrationSupport.swift",
     "PtrAuth.swift",
-    "Int128.swift",
     "Duration.swift",
     "DurationProtocol.swift",
-    "Instant.swift"
+    "Instant.swift",
+    "EmbeddedRuntime.swift",
+    "EmbeddedStubs.swift",
+    "EmbeddedPrint.swift",
+    "InlineArray.swift"
   ],
   "Result": [
     "Result.swift"

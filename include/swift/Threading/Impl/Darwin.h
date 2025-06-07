@@ -21,9 +21,15 @@
 #include <os/lock.h>
 #include <pthread.h>
 
+#if __has_include(<sys/errno.h>)
+#include <sys/errno.h>
+#else
+#include <errno.h>
+#endif
+
 #include "chrono_utils.h"
 
-#include "llvm/ADT/Optional.h"
+#include <optional>
 
 #include "swift/Threading/Errors.h"
 
@@ -62,7 +68,7 @@ inline bool threads_same(thread_id a, thread_id b) {
   return ::pthread_equal(a, b);
 }
 
-inline llvm::Optional<stack_bounds> thread_get_current_stack_bounds() {
+inline std::optional<stack_bounds> thread_get_current_stack_bounds() {
   stack_bounds result;
   pthread_t thread = pthread_self();
 
@@ -102,9 +108,8 @@ inline void mutex_unsafe_unlock(mutex_handle &handle) {
 using lazy_mutex_handle = ::os_unfair_lock;
 
 // We don't need to be lazy here because Darwin has OS_UNFAIR_LOCK_INIT.
-inline constexpr lazy_mutex_handle lazy_mutex_initializer() {
-  return OS_UNFAIR_LOCK_INIT;
-}
+#define SWIFT_LAZY_MUTEX_INITIALIZER OS_UNFAIR_LOCK_INIT
+
 inline void lazy_mutex_destroy(lazy_mutex_handle &handle) {}
 
 inline void lazy_mutex_lock(lazy_mutex_handle &handle) {
@@ -122,6 +127,46 @@ inline void lazy_mutex_unsafe_lock(lazy_mutex_handle &handle) {
 }
 inline void lazy_mutex_unsafe_unlock(lazy_mutex_handle &handle) {
   ::os_unfair_lock_unlock(&handle);
+}
+
+// .. Recursive mutex support .................................................
+
+#if OS_LOCK_API_VERSION < 20250601
+
+// The os_unfair_recursive_lock interface is stable, but not in this SDK. Bring
+// our own definitions for what we need.
+
+#define OS_UNFAIR_RECURSIVE_LOCK_INIT                                          \
+  (os_unfair_recursive_lock{OS_UNFAIR_LOCK_INIT, 0})
+
+typedef struct os_unfair_recursive_lock_s {
+  os_unfair_lock ourl_lock;
+  uint32_t ourl_count;
+} os_unfair_recursive_lock, *os_unfair_recursive_lock_t;
+
+using recursive_mutex_handle = os_unfair_recursive_lock;
+
+extern "C" void
+os_unfair_recursive_lock_lock_with_options(os_unfair_recursive_lock_t lock,
+                                           uint32_t options);
+
+extern "C" void
+os_unfair_recursive_lock_unlock(os_unfair_recursive_lock_t lock);
+
+#endif // OS_UNFAIR_RECURSIVE_LOCK_INIT
+
+inline void recursive_mutex_init(recursive_mutex_handle &handle,
+                                 bool checked = false) {
+  handle = OS_UNFAIR_RECURSIVE_LOCK_INIT;
+}
+inline void recursive_mutex_destroy(recursive_mutex_handle &handle) {}
+
+inline void recursive_mutex_lock(recursive_mutex_handle &handle) {
+  os_unfair_recursive_lock_lock_with_options(&handle, 0);
+}
+
+inline void recursive_mutex_unlock(recursive_mutex_handle &handle) {
+  os_unfair_recursive_lock_unlock(&handle);
 }
 
 // .. ConditionVariable support ..............................................
@@ -186,7 +231,7 @@ inline void once_impl(once_t &predicate, void (*fn)(void *), void *context) {
 // On Darwin, we want to use the reserved keys
 #define SWIFT_THREADING_USE_RESERVED_TLS_KEYS 1
 
-#if !(SWIFT_THREADING_IS_COMPATIBILITY_LIBRARY && __ARM_ARCH_7K__) && __has_include(<pthread/tsd_private.h>)
+#if !(SWIFT_THREADING_IS_COMPATIBILITY_LIBRARY && (__ARM_ARCH_7K__ || __ARM64_ARCH_8_32__)) && __has_include(<pthread/tsd_private.h>)
 } // namespace threading_impl
 } // namespace swift
 
@@ -238,6 +283,8 @@ inline tls_key_t tls_get_key(tls_key k) {
     return __PTK_FRAMEWORK_SWIFT_KEY4;
   case tls_key::concurrency_fallback:
     return __PTK_FRAMEWORK_SWIFT_KEY5;
+  case tls_key::observation_transaction:
+    return __PTK_FRAMEWORK_SWIFT_KEY6;
   }
 }
 

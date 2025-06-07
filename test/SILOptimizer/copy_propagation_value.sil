@@ -1,0 +1,68 @@
+// RUN: %target-sil-opt -sil-print-types -copy-propagation -enable-sil-verify-all -module-name Swift %s | %FileCheck %s --check-prefixes=CHECK,CHECK-OPT
+// RUN: %target-sil-opt -sil-print-types -mandatory-copy-propagation -enable-sil-verify-all -module-name Swift %s | %FileCheck %s --check-prefixes=CHECK,CHECK-ONONE
+
+// Runs CopyPropagation without borrow scope canonicalization.
+
+sil_stage canonical
+
+import Builtin
+
+typealias AnyObject = Builtin.AnyObject
+
+protocol Error {}
+
+class B { }
+
+class C {
+  var a: Builtin.Int64
+}
+
+struct NonTrivialStruct {
+  @_hasStorage var val: C { get set }
+}
+
+class CompileError : Error {}
+
+// This test case used to have an invalid boundary extension.
+// CHECK-LABEL: sil [ossa] @canonicalize_borrow_of_copy_with_interesting_boundary : $@convention(thin) (@owned C) -> (@owned NonTrivialStruct, @error any Error) {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:         cond_br undef, [[SUCCESS:bb[0-9]+]], [[FAILURE:bb[0-9]+]]
+// CHECK:       [[SUCCESS]]:
+// CHECK:         [[BORROW:%[^,]+]] = begin_borrow [[INSTANCE]]
+// CHECK:         [[STRUCT:%[^,]+]] = struct $NonTrivialStruct ([[BORROW]] : $C)
+// CHECK:         [[STRUCT_OUT:%[^,]+]] = copy_value [[STRUCT]]
+// CHECK:         end_borrow [[BORROW]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         return [[STRUCT_OUT]]
+// CHECK:       [[FAILURE]]:
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         [[BOX:%[^,]+]] = alloc_existential_box
+// CHECK:         throw [[BOX]]
+// CHECK-LABEL: } // end sil function 'canonicalize_borrow_of_copy_with_interesting_boundary'
+sil [ossa] @canonicalize_borrow_of_copy_with_interesting_boundary : $@convention(thin) (@owned C) -> (@owned NonTrivialStruct, @error any Error) {
+bb0(%0 : @owned $C):
+  %1 = copy_value %0 : $C
+  %2 = copy_value %1 : $C
+  cond_br undef, bb1, bb2
+bb1:
+  destroy_value %0 : $C
+  destroy_value %1 : $C
+  %6 = begin_borrow %2 : $C
+  %7 = struct $NonTrivialStruct (%6 : $C)
+  %8 = copy_value %7 : $NonTrivialStruct
+  end_borrow %6 : $C
+  destroy_value %2 : $C
+  return %8 : $NonTrivialStruct
+bb2:
+  destroy_value %2 : $C
+  %13 = begin_borrow %1 : $C
+  %14 = struct $NonTrivialStruct (%13 : $C)
+  %15 = copy_value %14 : $NonTrivialStruct
+  end_borrow %13 : $C
+  destroy_value %1 : $C
+  destroy_value %15 : $NonTrivialStruct
+  %19 = alloc_existential_box $any Error, $CompileError
+  destroy_value %0 : $C
+  %22 = builtin "willThrow"(%19 : $any Error) : $()
+  throw %19 : $any Error
+}

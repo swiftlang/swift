@@ -15,6 +15,7 @@ add_swift_host_library(swiftSILGen STATIC
   SILGenBridging.cpp
   SILGenBuilder.cpp
   SILGenBuiltin.cpp
+  SILGenConcurrency.cpp
   SILGenConstructor.cpp
   SILGenConvert.cpp
   SILGenDecl.cpp
@@ -27,13 +28,16 @@ add_swift_host_library(swiftSILGen STATIC
   SILGenFunction.cpp
   SILGenGlobalVariable.cpp
   SILGenLazyConformance.cpp
+  SILGenLocalArchetype.cpp
   SILGenLValue.cpp
+  SILGenPack.cpp
   SILGenPattern.cpp
   SILGenPoly.cpp
   SILGenProlog.cpp
   SILGenRequests.cpp
   SILGenStmt.cpp
   SILGenThunk.cpp
+  SILGenTopLevel.cpp
   SILGenType.cpp)
 target_link_libraries(swiftSILGen PRIVATE
   swiftSerialization

@@ -34,6 +34,8 @@ public struct JoinedSequence<Base: Sequence> where Base.Element: Sequence {
   }
 }
 
+extension JoinedSequence: Sendable where Base: Sendable, Element: Sendable {}
+
 extension JoinedSequence {
   /// An iterator that presents the elements of the sequences traversed
   /// by a base iterator, concatenated using a given separator.
@@ -71,6 +73,11 @@ extension JoinedSequence {
     }
   }
 }
+
+extension JoinedSequence.Iterator: Sendable
+  where Base.Iterator: Sendable,
+        Base.Element.Iterator: Sendable,
+        Element: Sendable {}
 
 extension JoinedSequence.Iterator: IteratorProtocol {
   public typealias Element = Base.Element.Element
@@ -118,6 +125,7 @@ extension JoinedSequence.Iterator: IteratorProtocol {
         return nil
       }
     }
+    fatalError()
   }
 }
 

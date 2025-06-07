@@ -5,6 +5,6 @@
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 
-// CHECK: DoubleMainActor.h:{{[0-9]+}}:{{[0-9]+}}: warning: this attribute for global actor '@MainActor' is invalid; the declaration already has attribute for global actor '@UIActor'
+// CHECK: DoubleMainActor.h:{{[0-9]+}}:{{[0-9]+}}: warning: this attribute for global actor '@MainActor' is invalid; the declaration already has attribute for global actor '@UIActor' [#ClangDeclarationImport]
 
 protocol P : DoubleMainActor {}

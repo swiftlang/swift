@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -simplify-cfg -enable-ossa-simplify-cfg | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
 
 // Tests tryJumpThreading with OSSA for trivial branch and terminator
 // arguments. This does not require -jumpthread-simplify-cfg, which

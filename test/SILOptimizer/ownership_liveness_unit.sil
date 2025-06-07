@@ -1,0 +1,2141 @@
+// RUN: %target-sil-opt -sil-print-types -update-borrowed-from -test-runner \
+// RUN: -enable-experimental-feature LifetimeDependence \
+// RUN: %s -o /dev/null 2>&1 | %FileCheck %s
+//
+// TODO: when complete lifetime verification become the default for SIL verification,
+// then consider moving all tests with 'unreachable' into a separate file with the flag
+// -disable-ownership-verification
+
+// REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_LifetimeDependence
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+struct NCInt : ~Copyable {
+  var i: Builtin.Int64
+  deinit {}
+}
+
+enum FakeOptional<T> {
+case none
+case some(T)
+}
+
+class C {}
+class D {
+  var object: C
+}
+
+struct PairC {
+  var first: C
+  var second: C
+}
+
+sil @getC : $@convention(thin) () -> @owned C
+
+struct NE: ~Escapable {
+  var object: C
+
+  @lifetime(borrow object)
+  init(object: borrowing C) { self.object = copy object }
+}
+
+sil [ossa] @useCAddress : $@convention(thin) (@inout_aliasable C) -> ()
+
+
+// =============================================================================
+// LinearLiveness
+// =============================================================================
+
+// CHECK-LABEL: testLinearRefElementEscape: linear_liveness with: %borrow
+// CHECK-LABEL: Linear liveness:
+// CHECK: lifetime-ending user:
+// CHECK-SAME: end_borrow
+// CHECK-NEXT: last user:   end_borrow
+// CHECK-NEXT: testLinearRefElementEscape
+
+// CHECK-LABEL: testLinearRefElementEscape: linear_liveness_swift with: %borrow
+// CHECK: Linear liveness:
+// CHECK-NEXT: Live blocks:
+// CHECK-NEXT: begin: %{{.*}} = begin_borrow
+// CHECK-NEXT: ends: end_borrow
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:
+// CHECK-NEXT: last user: end_borrow
+// CHECK-NEXT: testLinearRefElementEscape
+sil [ossa] @testLinearRefElementEscape : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %borrow = begin_borrow %0 : $C
+  specify_test "linear_liveness %borrow"
+  specify_test "linear_liveness_swift %borrow"
+  cond_br undef, bb1, bb2
+
+bb1:
+  %d1 = unchecked_ref_cast %0 : $C to $D
+  %f1 = ref_element_addr %d1 : $D, #D.object
+  %p1 = address_to_pointer %f1 : $*C to $Builtin.RawPointer
+  br bb3(%d1 : $D)
+  
+bb2:
+  %d2 = unchecked_ref_cast %0 : $C to $D
+  %f2 = ref_element_addr %d2 : $D, #D.object  
+  %p2 = address_to_pointer %f2 : $*C to $Builtin.RawPointer
+  br bb3(%d2 : $D)
+
+bb3(%phi : @guaranteed $D):
+  end_borrow %borrow : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: testLinearBitwiseEscape: linear_liveness with: %borrow
+// CHECK: Linear liveness:
+// CHECK: lifetime-ending user:
+// CHECK-SAME: end_borrow
+// CHECK-NEXT: last user:   end_borrow
+// CHECK-NEXT: testLinearBitwiseEscape
+
+// CHECK-LABEL: testLinearBitwiseEscape: linear_liveness_swift with: %borrow
+// CHECK: Linear liveness:   %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: Live blocks:
+// CHECK-NEXT: begin:      %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: ends:       end_borrow
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:
+// CHECK-NEXT: last user:   end_borrow
+// CHECK-NEXT: testLinearBitwiseEscape
+sil [ossa] @testLinearBitwiseEscape : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %borrow = begin_borrow %0 : $C
+  specify_test "linear_liveness %borrow"
+  specify_test "linear_liveness_swift %borrow"
+  cond_br undef, bb1, bb2
+
+bb1:
+  %d1 = unchecked_bitwise_cast %0 : $C to $D
+  br bb3(%d1 : $D)
+  
+bb2:
+  %d2 = unchecked_bitwise_cast %0 : $C to $D
+  br bb3(%d2 : $D)
+
+bb3(%phi : @unowned $D):
+  end_borrow %borrow : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: testLinearInnerReborrow: linear_liveness with: @argument[0]
+// CHECK: Linear liveness:
+// CHECK: lifetime-ending user:
+// CHECK-SAME: destroy_value %0
+// CHECK-NEXT: last user:   destroy_value %0
+// CHECK-NEXT: testLinearInnerReborrow
+
+// CHECK-LABEL: testLinearInnerReborrow: linear_liveness_swift with: @argument[0]
+// CHECK: Linear liveness:
+// CHECK-NEXT: Live blocks:
+// CHECK-NEXT: begin:      cond_br undef, bb1, bb2
+// CHECK-NEXT: ends:       destroy_value %0 : $C
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:
+// CHECK-NEXT: last user:   destroy_value %0 : $C
+// CHECK-NEXT: testLinearInnerReborrow
+sil [ossa] @testLinearInnerReborrow : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  specify_test "linear_liveness @argument[0]"
+  specify_test "linear_liveness_swift @argument[0]"
+  cond_br undef, bb1, bb2
+
+bb1:
+  %borrow1 = begin_borrow %0 : $C
+  br bb3(%borrow1 : $C)
+  
+bb2:
+  %borrow2 = begin_borrow %0 : $C
+  br bb3(%borrow2 : $C)
+
+bb3(%phi : @guaranteed $C):
+  end_borrow %phi : $C
+  destroy_value %0 : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: testLinearAdjacentReborrow: linear_liveness with: %borrow
+// CHECK: lifetime-ending user:
+// CHECK-SAME: br bb3
+// CHECK-NEXT: lifetime-ending user: br bb3
+// CHECK-NEXT: last user: br bb3
+// CHECK-NEXT: last user: br bb3
+// CHECK-NEXT: testLinearAdjacentReborrow
+
+// CHECK-LABEL: testLinearAdjacentReborrow: linear_liveness_swift with: %borrow
+// CHECK: Live blocks:
+// CHECK-NEXT: begin:      %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: ends:       br bb3
+// CHECK-NEXT:             br bb3
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:
+// CHECK-NEXT: last user:   br bb3
+// CHECK-NEXT: last user:   br bb3
+// CHECK-NEXT: testLinearAdjacentReborrow
+sil [ossa] @testLinearAdjacentReborrow : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  specify_test "linear_liveness %borrow"
+  specify_test "linear_liveness_swift %borrow"
+  %borrow = begin_borrow %0 : $C
+  cond_br undef, bb1, bb2
+
+bb1:
+  %borrow1 = begin_borrow %borrow : $C
+  br bb3(%borrow : $C, %borrow1 : $C)
+  
+bb2:
+  %borrow2 = begin_borrow %borrow : $C
+  br bb3(%borrow : $C, %borrow2 : $C)
+
+bb3(%outer : @guaranteed $C, %inner : @guaranteed $C):
+  end_borrow %inner : $C
+  end_borrow %outer : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on testLoopConditional_incomplete_linear: linear_liveness
+// CHECK-LABEL: sil [ossa] @testLoopConditional_incomplete_linear : {{.*}} {
+// CHECK:       [[ENTRY:bb[0-9]+]]([[C:%[^,]+]] :
+// CHECK:         cond_br undef, [[HEADER:bb[0-9]+]], [[EXIT:bb[0-9]+]]
+// CHECK:       [[HEADER]]:
+// CHECK:         br [[LOOP:bb[0-9]+]]
+// CHECK:       [[LOOP]]:
+// CHECK:         [[B:%[^,]+]] = begin_borrow [[C]]
+// CHECK:         end_borrow [[B]]
+// CHECK:         br [[LOOP]]
+// CHECK:       [[EXIT]]:
+// CHECK:         destroy_value [[C]]
+// CHECK-LABEL: } // end sil function 'testLoopConditional_incomplete_linear'
+// CHECK:       Linear liveness: [[C]]
+// CHECK:       [[ENTRY]]: LiveOut
+// CHECK:       [[EXIT]]: LiveWithin
+// CHECK:       lifetime-ending user:   destroy_value [[C]]
+// CHECK:       last user:   destroy_value [[C]]
+// CHECK:       boundary edge: [[HEADER]]
+// CHECK-LABEL: end running test {{.*}} on testLoopConditional_incomplete_linear: linear_liveness
+// CHECK-LABEL: begin running test {{.*}} on testLoopConditional_incomplete_linear: linear_liveness_swift
+// CHECK:       Linear liveness: [[C]]
+// CHECK:       Live blocks:
+// CHECK:       begin:      cond_br undef, [[HEADER]], [[EXIT]]
+// CHECK:       ends:       destroy_value [[C]]
+// CHECK:       exits:  br [[LOOP]]
+// CHECK:       interiors:
+// CHECK:       last user:   destroy_value [[C]]
+// CHECK:       boundary edge:
+// CHECK-NEXT:  [[HEADER]]
+// CHECK-LABEL: end running test {{.*}} on testLoopConditional_incomplete_linear: linear_liveness_swift
+sil [ossa] @testLoopConditional_incomplete_linear : $@convention(thin) (@owned C) -> () {
+entry(%c : @owned $C):
+  specify_test "linear_liveness %c"
+  specify_test "linear_liveness_swift %c"
+  cond_br undef, header, exit
+
+header:
+  br loop
+
+loop:
+  %b = begin_borrow %c : $C
+  end_borrow %b : $C
+  br loop
+
+exit:
+  destroy_value %c : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on testLoopConditional_complete_linear: linear_liveness
+// CHECK-LABEL: sil [ossa] @testLoopConditional_complete_linear : {{.*}} {
+// CHECK:       [[ENTRY:bb[0-9]+]]([[C:%[^,]+]] :
+// CHECK:         cond_br undef, [[HEADER:bb[0-9]+]], [[EXIT:bb[0-9]+]]
+// CHECK:       [[HEADER]]:
+// CHECK:         br [[LOOP:bb[0-9]+]]
+// CHECK:       [[LOOP]]:
+// CHECK:         [[B:%[^,]+]] = begin_borrow [[C]]
+// CHECK:         end_borrow [[B]]
+// CHECK:         extend_lifetime [[C]]
+// CHECK:         br [[LOOP]]
+// CHECK:       [[EXIT]]:
+// CHECK:         destroy_value [[C]]
+// CHECK-LABEL: } // end sil function 'testLoopConditional_complete_linear'
+// CHECK:       Linear liveness: [[C]]
+// CHECK:       [[ENTRY]]: LiveOut
+// CHECK:       [[EXIT]]: LiveWithin
+// CHECK:       [[LOOP]]: LiveOut
+// CHECK:       [[HEADER]]: LiveOut
+// CHECK:       lifetime-ending user:   destroy_value [[C]]
+// CHECK:       regular user:   extend_lifetime [[C]]
+// CHECK:       last user:   destroy_value [[C]]
+// CHECK-LABEL: end running test {{.*}} on testLoopConditional_complete_linear: linear_liveness
+// CHECK-LABEL: begin running test {{.*}} on testLoopConditional_complete_linear: linear_liveness_swift
+// CHECK:       Linear liveness: [[C]]
+// CHECK:       Live blocks:
+// CHECK:       begin:      cond_br undef, [[HEADER]], [[EXIT]]
+// CHECK:       ends:       destroy_value [[C]]
+// CHECK:       interiors:   extend_lifetime [[C]]
+// CHECK:       last user:   destroy_value [[C]]
+// CHECK-LABEL: end running test {{.*}} on testLoopConditional_complete_linear: linear_liveness_swift
+sil [ossa] @testLoopConditional_complete_linear : $@convention(thin) (@owned C) -> () {
+entry(%c : @owned $C):
+  specify_test "linear_liveness %c"
+  specify_test "linear_liveness_swift %c"
+  cond_br undef, header, exit
+
+header:
+  br loop
+
+loop:
+  %b = begin_borrow %c : $C
+  end_borrow %b : $C
+  extend_lifetime %c : $C
+  br loop
+
+exit:
+  destroy_value %c : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// =============================================================================
+// visitInnerAdjacentPhis
+// =============================================================================
+
+// CHECK-LABEL: pay_the_phi: visit_inner_adjacent_phis with: %owned
+// CHECK: sil [ossa] @pay_the_phi : {{.*}} {
+// CHECK:   [[C:%[^,]+]] = apply
+// CHECK:   [[BORROW1:%[^,]+]] = begin_borrow %1
+// CHECK:   [[BORROW2:%[^,]+]] = begin_borrow %1
+// CHECK:   br [[EXIT:bb[0-9]+]]([[C]] : $C, [[BORROW1]] : $C, [[BORROW2]] :
+// CHECK: [[EXIT]]({{%[^,]+}} : @owned $C, [[GUARANTEED1:%[^,]+]] : @reborrow $C, [[GUARANTEED2:%[^,]+]] :
+// CHECK: } // end sil function 'pay_the_phi'
+//
+// CHECK:[[GUARANTEED1]] = argument of [[EXIT]]
+// CHECK:[[GUARANTEED2]] = argument of [[EXIT]]
+// CHECK-LABEL: pay_the_phi: visit_inner_adjacent_phis with: %owned
+sil [ossa] @pay_the_phi : $@convention(thin) () -> () {
+entry:
+  %getC = function_ref @getC : $@convention(thin) () -> @owned C
+  %c = apply %getC() : $@convention(thin) () -> @owned C
+  %borrow1 = begin_borrow %c : $C
+  %borrow2 = begin_borrow %c : $C
+  %borrow3 = begin_borrow %borrow2 : $C
+  br exit(%c : $C, %borrow1 : $C, %borrow2 : $C, %borrow3 : $C)
+
+exit(%owned : @owned $C, %guaranteed_1 : @guaranteed $C, %guaranteed_2 : @guaranteed $C, %guaranteed_3 : @guaranteed $C):
+  specify_test "visit_inner_adjacent_phis %owned"
+  end_borrow %guaranteed_3 : $C
+  end_borrow %guaranteed_2 : $C
+  end_borrow %guaranteed_1 : $C
+  destroy_value %owned : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: pay_the_phi_forward: visit_inner_adjacent_phis with: %reborrow
+// CHECK: bb1(%{{.*}} : @reborrow $C, [[INNER:%.*]] : @guaranteed $D):    // Preds: bb0
+// CHECK: } // end sil function 'pay_the_phi_forward'
+// CHECK: [[INNER]] = argument of bb1 : $D
+// CHECK: pay_the_phi_forward: visit_inner_adjacent_phis with: %reborrow
+sil [ossa] @pay_the_phi_forward : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %borrow0 = begin_borrow %0 : $C
+  %d0 = unchecked_ref_cast %borrow0 : $C to $D
+  br exit(%borrow0 : $C, %d0 : $D)
+
+exit(%reborrow : @guaranteed $C, %phi : @guaranteed $D):
+  specify_test "visit_inner_adjacent_phis %reborrow"
+  %f = ref_element_addr %phi : $D, #D.object
+  %o = load [copy] %f : $*C
+  destroy_value %o : $C
+  end_borrow %reborrow : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// =============================================================================
+// InteriorLiveness
+// =============================================================================
+
+// CHECK-LABEL: testInteriorRefElementEscape: interior_liveness with: %0
+// CHECK: Incomplete liveness: Escaping address
+// CHECK: last user:   %{{.*}} = address_to_pointer
+// CHECK-NEXT: testInteriorRefElementEscape:
+
+// CHECK-LABEL: testInteriorRefElementEscape: interior_liveness_swift with: %0
+// CHECK: Interior liveness: %0 = argument of bb0 : $C
+// CHECK-NEXT: Pointer escape:   %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: begin:      %{{.*}} = unchecked_ref_cast %0 : $C to $D
+// CHECK-NEXT: ends:       %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  %{{.*}} = ref_element_addr %{{.*}} : $D, #D.object
+// CHECK-NEXT:             %{{.*}} = unchecked_ref_cast %0 : $C to $D
+// CHECK-NEXT: last user:   %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: testInteriorRefElementEscape:
+sil [ossa] @testInteriorRefElementEscape : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  specify_test "interior_liveness %0"
+  specify_test "interior_liveness_swift %0"
+  %d = unchecked_ref_cast %0 : $C to $D
+  %f1 = ref_element_addr %d : $D, #D.object  
+  %p1 = address_to_pointer %f1 : $*C to $Builtin.RawPointer
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: testInteriorUnconditionalAddrCast: interior_liveness with: %1
+// CHECK: Interior liveness: %1 = argument of bb0 : $D
+// CHECK-NEXT: bb0: LiveWithin
+// CHECK-NEXT: regular user:   [[FIELD:%.*]] = ref_element_addr %1 : $D, #D.object
+// CHECK-NEXT: regular user:   unconditional_checked_cast_addr C in [[FIELD]] : $*C to D in %0 : $*D
+// CHECK-NEXT: regular user:   copy_addr [take] %4 to [init] [[FIELD]] : $*C
+// CHECK-NEXT: regular user:   unchecked_ref_cast_addr  C in [[FIELD]] : $*C to D in %0 : $*D
+// CHECK-NEXT: Complete liveness
+// CHECK-NEXT: last user:   unchecked_ref_cast_addr  C in [[FIELD]] : $*C to D in %0 : $*D
+// CHECK-NEXT: testInteriorUnconditionalAddrCast: interior_liveness with: %1
+
+// CHECK-LABEL: testInteriorUnconditionalAddrCast: interior_liveness_swift with: %1
+// CHECK: Interior liveness: %1 = argument of bb0 : $D
+// CHECK-NEXT: begin:      [[FIELD]] = ref_element_addr %1 : $D, #D.object
+// CHECK-NEXT: ends:       unchecked_ref_cast_addr  C in [[FIELD]] : $*C to D in %0 : $*D
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  copy_addr [take] %4 to [init] [[FIELD]] : $*C
+// CHECK-NEXT:             unconditional_checked_cast_addr C in [[FIELD]] : $*C to D in %0 : $*D
+// CHECK-NEXT:             [[FIELD]] = ref_element_addr %1 : $D, #D.object
+// CHECK-NEXT: last user:   unchecked_ref_cast_addr  C in [[FIELD]] : $*C to D in %0 : $*D
+// CHECK-NEXT: testInteriorUnconditionalAddrCast: interior_liveness_swift with: %1
+sil [ossa] @testInteriorUnconditionalAddrCast : $@convention(thin) (@guaranteed D) -> @out D {
+bb0(%0 : $*D, %1 : @guaranteed $D):
+  specify_test "interior_liveness %1"
+  specify_test "interior_liveness_swift %1"
+  %c1 = ref_element_addr %1 : $D, #D.object
+  unconditional_checked_cast_addr C in %c1 : $*C to D in %0 : $*D
+  %c2 = unchecked_addr_cast %0 : $*D to $*C
+  copy_addr [take] %c2 to [init] %c1 : $*C
+  unchecked_ref_cast_addr C in %c1 : $*C to D in %0 : $*D
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: begin running test 1 of 2 on testInteriorDropDeinit: interior_liveness with: %0
+// CHECK: Interior liveness: %0 = argument of bb0 : $NCInt
+// CHECK-NEXT: bb0: LiveWithin
+// CHECK-NEXT: lifetime-ending user:   [[DD:%.*]] = drop_deinit %0 : $NCInt
+// CHECK-NEXT: Complete liveness
+// CHECK-NEXT: last user:   [[DD]] = drop_deinit %0 : $NCInt
+// CHECK-LABEL: end running test 1 of 2 on testInteriorDropDeinit: interior_liveness with: %0
+
+// CHECK-LABEL: begin running test 2 of 2 on testInteriorDropDeinit: interior_liveness_swift with: %0
+// CHECK: Interior liveness: %0 = argument of bb0 : $NCInt
+// CHECK-NEXT: begin:      bb0
+// CHECK-NEXT: ends:       [[DD]] = drop_deinit %0 : $NCInt
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:
+// CHECK-NEXT: last user:   [[DD]] = drop_deinit %0 : $NCInt
+// CHECK-LABEL: end running test 2 of 2 on testInteriorDropDeinit: interior_liveness_swift with: %0
+sil [ossa] @testInteriorDropDeinit : $@convention(thin) (@owned NCInt) -> () {
+bb0(%0 : @owned $NCInt):
+  specify_test "interior_liveness %0"
+  specify_test "interior_liveness_swift %0"
+  %nd = drop_deinit %0 : $NCInt
+  destroy_value %nd : $NCInt
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on testLoopConditional_incomplete_interior: interior_liveness
+// CHECK-LABEL: sil [ossa] @testLoopConditional_incomplete_interior : {{.*}} {
+// CHECK:       [[ENTRY:bb[0-9]+]]([[C:%[^,]+]] :
+// CHECK:         cond_br undef, [[HEADER:bb[0-9]+]], [[EXIT:bb[0-9]+]]
+// CHECK:       [[HEADER]]:
+// CHECK:         br [[LOOP:bb[0-9]+]]
+// CHECK:       [[LOOP]]:
+// CHECK:         [[B:%[^,]+]] = begin_borrow [[C]]
+// CHECK:         end_borrow [[B]]
+// CHECK:         br [[LOOP]]
+// CHECK:       [[EXIT]]:
+// CHECK:         destroy_value [[C]]
+// CHECK-LABEL: } // end sil function 'testLoopConditional_incomplete_interior'
+// CHECK:       Interior liveness: [[C]]
+// CHECK:       Inner scope:   [[B]] = begin_borrow [[C]]
+// CHECK:       [[ENTRY]]: LiveOut
+// CHECK:       [[EXIT]]: LiveWithin
+// CHECK:       [[LOOP]]: LiveOut
+// CHECK:       [[HEADER]]: LiveOut
+// CHECK:       lifetime-ending user:   destroy_value [[C]]
+// CHECK:       regular user:   end_borrow [[B]]
+// CHECK:       Complete liveness
+// CHECK:       last user:   destroy_value [[C]]
+// CHECK-LABEL: end running test {{.*}} on testLoopConditional_incomplete_interior: interior_liveness
+// CHECK-LABEL: begin running test {{.*}} on testLoopConditional_incomplete_interior: interior_liveness_swift
+// CHECK:       Interior liveness: [[C]]
+// CHECK:       begin:      cond_br undef, [[HEADER]], [[EXIT]]
+// CHECK:       ends:       destroy_value [[C]]
+// CHECK:       exits:
+// CHECK:       interiors:  end_borrow [[B]]
+// CHECK:       last user:   destroy_value [[C]]
+// CHECK-LABEL: end running test {{.*}} on testLoopConditional_incomplete_interior: interior_liveness_swift
+sil [ossa] @testLoopConditional_incomplete_interior : $@convention(thin) (@owned C) -> () {
+entry(%c : @owned $C):
+  specify_test "interior_liveness %c"
+  specify_test "interior_liveness_swift %c"
+  cond_br undef, header, exit
+
+header:
+  br loop
+
+loop:
+  %b = begin_borrow %c : $C
+  end_borrow %b : $C
+  br loop
+
+exit:
+  destroy_value %c : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on testLoopConditional_complete_interior: interior_liveness
+// CHECK-LABEL: sil [ossa] @testLoopConditional_complete_interior : {{.*}} {
+// CHECK:     [[ENTRY:bb[0-9]+]]([[C:%[^,]+]] :
+// CHECK:       cond_br undef, [[HEADER:bb[0-9]+]], [[EXIT:bb[0-9]+]]
+// CHECK:     [[HEADER]]:
+// CHECK:       br [[LOOP:bb[0-9]+]]
+// CHECK:     [[LOOP]]:
+// CHECK:       [[B:%[^,]+]] = begin_borrow [[C]] : $C
+// CHECK:       end_borrow [[B]] : $C
+// CHECK:       extend_lifetime [[C]] : $C
+// CHECK:         br [[LOOP]]
+// CHECK:       [[EXIT]]:
+// CHECK:         destroy_value [[C]] : $C
+// CHECK-LABEL: } // end sil function 'testLoopConditional_complete_interior'
+// CHECK:       Interior liveness: [[C]]
+// CHECK:       Inner scope:   [[B]] = begin_borrow [[C]]
+// CHECK:       [[ENTRY]]: LiveOut
+// CHECK:       [[EXIT]]: LiveWithin
+// CHECK:       [[LOOP]]: LiveOut
+// CHECK:       [[HEADER]]: LiveOut
+// CHECK:       lifetime-ending user:   destroy_value [[C]]
+// CHECK:       regular user:   extend_lifetime [[C]]
+// CHECK:       regular user:   end_borrow [[B]]
+// CHECK:       Complete liveness
+// CHECK:       last user:   destroy_value [[C]]
+// CHECK-LABEL: end running test {{.*}} on testLoopConditional_complete_interior: interior_liveness
+
+// CHECK-LABEL: begin running test {{.*}} on testLoopConditional_complete_interior: interior_liveness_swift
+// CHECK:       Interior liveness: [[C]]
+// CHECK:       begin:      cond_br undef, [[HEADER]], [[EXIT]]
+// CHECK:       ends:       destroy_value [[C]]
+// CHECK:       exits:
+// CHECK:       interiors:  extend_lifetime [[C]]
+// CHECK:                   end_borrow [[B]]
+// CHECK:       last user:   destroy_value [[C]]
+// CHECK-LABEL: end running test {{.*}} on testLoopConditional_complete_interior: interior_liveness_swift
+sil [ossa] @testLoopConditional_complete_interior : $@convention(thin) (@owned C) -> () {
+entry(%c : @owned $C):
+  specify_test "interior_liveness %c"
+  specify_test "interior_liveness_swift %c"
+  cond_br undef, header, exit
+
+header:
+  br loop
+
+loop:
+  %b = begin_borrow %c : $C
+  end_borrow %b : $C
+  extend_lifetime %c : $C
+  br loop
+
+exit:
+  destroy_value %c : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// =============================================================================
+// InteriorLiveness and visitAdjacentPhis
+// =============================================================================
+
+// CHECK-LABEL: testInteriorReborrow: interior_liveness with: %borrow
+// CHECK: Complete liveness
+// CHECK-NEXT: last user:   br bb1
+// CHECK-NEXT: testInteriorReborrow: interior_liveness with: %borrow
+
+// CHECK-LABEL: testInteriorReborrow: interior_liveness_swift with: %borrow
+// CHECK: Interior liveness:   %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: begin:      %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: ends:       br bb1(%{{.*}} : $C)
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:
+// CHECK-NEXT: last user:   br bb1(%{{.*}} : $C)
+// CHECK-NEXT: testInteriorReborrow: interior_liveness_swift with: %borrow
+sil [ossa] @testInteriorReborrow : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %borrow = begin_borrow %0 : $C
+  specify_test "interior_liveness %borrow"
+  specify_test "interior_liveness_swift %borrow"
+  br bb1(%borrow : $C)
+
+bb1(%reborrow : @guaranteed $C):
+  end_borrow %reborrow : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: testInteriorNondominatedReborrow: interior_liveness with: %borrow1
+// CHECK: Interior liveness:   %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: Inner scope:   %{{.*}} = begin_borrow %{{.*}} : $D
+// CHECK-NEXT: bb0: LiveWithin
+// CHECK-NEXT: lifetime-ending user:   br bb1(%{{.*}} : $C, %{{.*}} : $D)
+// CHECK-NEXT: regular user:   %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: Complete liveness
+// CHECK-NEXT: last user:   br bb1(%{{.*}} : $C, %{{.*}} : $D)
+// CHECK-NEXT: testInteriorNondominatedReborrow: interior_liveness with: %borrow1
+
+// CHECK-LABEL: testInteriorNondominatedReborrow: interior_liveness_swift with: %borrow1
+// CHECK: Interior liveness:   %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: Inner scope:   %{{.*}} = begin_borrow %{{.*}} : $D
+// CHECK-NEXT: begin:      %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: ends:       br bb1(%{{.*}} : $C, %{{.*}} : $D)
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  %{{.*}} = begin_borrow %{{.*}} : $D
+// CHECK-NEXT:             %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: last user:   br bb1(%{{.*}} : $C, %{{.*}} : $D)
+// CHECK-NEXT: testInteriorNondominatedReborrow: interior_liveness_swift with: %borrow1
+sil [ossa] @testInteriorNondominatedReborrow : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %borrow1 = begin_borrow %0 : $C
+  specify_test "interior_liveness %borrow1"
+  specify_test "interior_liveness_swift %borrow1"
+  %d1 = unchecked_ref_cast %borrow1 : $C to $D
+  %borrow2 = begin_borrow %d1 : $D
+  br bb3(%borrow1 : $C, %borrow2 : $D)
+ 
+bb3(%reborrow1 : @guaranteed $C, %reborrow2 : @guaranteed $D):
+  end_borrow %reborrow2 : $D
+  end_borrow %reborrow1 : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: testInteriorDominatedReborrow: interior_liveness with: %borrow1
+// CHECK: Interior liveness:   %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: Inner scope: %{{.*}} = argument of bb1 : $D
+// CHECK-NEXT: Inner scope:   %{{.*}} = begin_borrow %{{.*}} : $D
+// CHECK-NEXT: bb0: LiveOut
+// CHECK-NEXT: bb1: LiveWithin
+// CHECK-NEXT: regular user:   end_borrow %{{.*}} : $D
+// CHECK-NEXT: lifetime-ending user:   end_borrow %{{.*}} : $C
+// CHECK-NEXT: regular user:   %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: regular user:   br bb1(%{{.*}} : $D)
+// CHECK-NEXT: Complete liveness
+// CHECK-NEXT: last user:   end_borrow %1 : $C
+// CHECK-NEXT: testInteriorDominatedReborrow: interior_liveness with: %borrow1
+
+// CHECK-LABEL: testInteriorDominatedReborrow: interior_liveness_swift with: %borrow1
+// CHECK: Interior liveness:   %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: Inner scope: %{{.*}} = argument of bb1 : $D
+// CHECK-NEXT: Inner scope:   %{{.*}} = begin_borrow %{{.*}} : $D
+// CHECK-NEXT: begin:      %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: ends:       end_borrow %{{.*}} : $C
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  end_borrow %{{.*}} : $D
+// CHECK-NEXT:             %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT:             %{{.*}} = begin_borrow %{{.*}} : $D
+// CHECK-NEXT:             %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: last user:   end_borrow %{{.*}} : $C
+// CHECK-NEXT: testInteriorDominatedReborrow: interior_liveness_swift with: %borrow1
+sil [ossa] @testInteriorDominatedReborrow : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %borrow1 = begin_borrow %0 : $C
+  specify_test "interior_liveness %borrow1"
+  specify_test "interior_liveness_swift %borrow1"
+  %d1 = unchecked_ref_cast %borrow1 : $C to $D
+  %borrow2 = begin_borrow %d1 : $D
+  br bb3(%borrow2 : $D)
+ 
+bb3(%reborrow2 : @guaranteed $D):
+  end_borrow %reborrow2 : $D
+  end_borrow %borrow1 : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: testInteriorDominatedGuaranteedForwardingPhi: interior_liveness with: @argument[0]
+// CHECK: Interior liveness: %0 = argument of bb0 : $C
+// CHECK-NEXT: bb0: LiveOut
+// CHECK-NEXT: bb3: LiveWithin
+// CHECK-NEXT: bb2: LiveOut
+// CHECK-NEXT: bb1: LiveOut
+// CHECK-NEXT: regular user:   %{{.*}} = borrowed %{{.*}} : $D from (%0 : $C)
+// CHECK-NEXT: regular user:   %{{.*}} = ref_element_addr %{{.*}} : $D, #D.object
+// CHECK-NEXT: regular user:   %{{.*}} = load [copy] %{{.*}} : $*C
+// CHECK-NEXT: regular user:   %{{.*}} = unchecked_ref_cast %0 : $C to $D
+// CHECK-NEXT: regular user:   br bb3(%{{.*}} : $D)
+// CHECK-NEXT: regular user:   %{{.*}} = unchecked_ref_cast %0 : $C to $D
+// CHECK-NEXT: regular user:   br bb3(%{{.*}} : $D)
+// CHECK-NEXT: Complete liveness
+// CHECK-NEXT: last user:   %{{.*}} = load [copy] %{{.*}} : $*C
+// CHECK-NEXT: testInteriorDominatedGuaranteedForwardingPhi:
+
+// CHECK-LABEL: testInteriorDominatedGuaranteedForwardingPhi: interior_liveness_swift with: @argument[0]
+// CHECK: Interior liveness: %0 = argument of bb0 : $C
+// CHECK-NEXT: begin:      cond_br undef, bb1, bb2
+// CHECK-NEXT: ends:       %{{.*}} = load [copy] %{{.*}} : $*C
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  %{{.*}} = ref_element_addr %{{.*}} : $D, #D.object
+// CHECK-NEXT:             %{{.*}} = borrowed %{{.*}} : $D from (%0 : $C)
+// CHECK-NEXT:             br bb3(%{{.*}} : $D)
+// CHECK-NEXT:             %{{.*}} = unchecked_ref_cast %0 : $C to $D
+// CHECK-NEXT:             br bb3(%{{.*}} : $D)
+// CHECK-NEXT:             %{{.*}} = unchecked_ref_cast %0 : $C to $D
+// CHECK-NEXT: last user:   %{{.*}} = load [copy] %{{.*}} : $*C
+// CHECK-NEXT: testInteriorDominatedGuaranteedForwardingPhi:
+sil [ossa] @testInteriorDominatedGuaranteedForwardingPhi : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  specify_test "interior_liveness @argument[0]"
+  specify_test "interior_liveness_swift @argument[0]"
+  cond_br undef, bb1, bb2
+
+bb1:
+  %d1 = unchecked_ref_cast %0 : $C to $D
+  br bb3(%d1 : $D)
+
+bb2:
+  %d2 = unchecked_ref_cast %0 : $C to $D
+  br bb3(%d2 : $D)
+
+bb3(%phi : @guaranteed $D):
+  %bf = borrowed %phi from (%0)
+  %f = ref_element_addr %bf : $D, #D.object
+  %o = load [copy] %f : $*C
+  destroy_value %o : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: testInteriorNondominatedGuaranteedForwardingPhi: interior_liveness with: %borrow1
+// CHECK: Complete liveness
+// CHECK-NEXT: last user:   br bb3(
+// CHECK-NEXT: testInteriorNondominatedGuaranteedForwardingPhi: interior_liveness with: %borrow1
+
+// CHECK-LABEL: testInteriorNondominatedGuaranteedForwardingPhi: interior_liveness_swift with: %borrow1
+// CHECK: Interior liveness:   %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: begin:      %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: ends:       br bb3(%{{.*}} : $C, %{{.*}} : $D)
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: last user:   br bb3(%{{.*}} : $C, %{{.*}} : $D)
+// CHECK-NEXT: testInteriorNondominatedGuaranteedForwardingPhi: interior_liveness_swift with: %borrow1
+sil [ossa] @testInteriorNondominatedGuaranteedForwardingPhi : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %borrow1 = begin_borrow %0 : $C
+  specify_test "interior_liveness %borrow1"
+  specify_test "interior_liveness_swift %borrow1"
+  %d1 = unchecked_ref_cast %borrow1 : $C to $D
+  br bb3(%borrow1 : $C, %d1 : $D)
+ 
+bb2:
+  %borrow2 = begin_borrow %0 : $C
+  %d2 = unchecked_ref_cast %borrow2 : $C to $D
+  br bb3(%borrow2 : $C, %d2 : $D)
+
+bb3(%reborrow : @guaranteed $C, %phi : @guaranteed $D):
+  %f = ref_element_addr %phi : $D, #D.object  
+  %o = load [copy] %f : $*C
+  destroy_value %o : $C
+  end_borrow %reborrow : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: testInnerDominatedReborrow: interior_liveness with: @argument[0]
+// CHECK: Interior liveness: %0 = argument of bb0 : $C
+// CHECK-NEXT: Inner scope: %{{.*}} = argument of bb1 : $C
+// CHECK-NEXT: Inner scope:   %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: bb0: LiveOut
+// CHECK-NEXT: bb1: LiveWithin
+// CHECK-NEXT: regular user:   end_borrow %{{.*}} : $C
+// CHECK-NEXT: regular user:   br bb1(%{{.*}} : $C)
+// CHECK-NEXT: Complete liveness
+// CHECK-NEXT: last user:   end_borrow %{{.*}} : $C
+// CHECK-NEXT: testInnerDominatedReborrow: interior_liveness with: @argument[0]
+
+// CHECK-LABEL: testInnerDominatedReborrow: interior_liveness_swift with: @argument[0]
+// CHECK: Interior liveness: %0 = argument of bb0 : $C
+// CHECK-NEXT: Inner scope: %{{.*}} = argument of bb1 : $C
+// CHECK-NEXT: Inner scope:   %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: begin:      %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: ends:       end_borrow %{{.*}} : $C
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  %{{.*}} = borrowed %{{.*}} : $C from (%0 : $C)
+// CHECK-NEXT:             %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: last user:   end_borrow %{{.*}} : $C
+// CHECK-NEXT: testInnerDominatedReborrow: interior_liveness_swift with: @argument[0]
+sil [ossa] @testInnerDominatedReborrow : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  specify_test "interior_liveness @argument[0]"
+  specify_test "interior_liveness_swift @argument[0]"
+  %borrow = begin_borrow %0 : $C
+  br bb1(%borrow : $C)
+
+bb1(%reborrow : @guaranteed $C):
+  end_borrow %reborrow : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: testInnerDominatedReborrow2: interior_liveness with: %copy0a
+// CHECK: Inner scope: %{{.*}} = argument of bb3 : $C
+// CHECK-NEXT: Inner scope:   %{{.*}} = begin_borrow %{{.*}} : $C
+// CHECK-NEXT: bb0: LiveOut
+// CHECK-NEXT: bb3: LiveWithin
+// CHECK-NEXT: bb2: LiveOut
+// CHECK-NEXT: bb1: LiveOut
+// CHECK-NEXT: regular user:   end_borrow %{{.*}} : $C
+// CHECK-NEXT: lifetime-ending user:   destroy_value %{{.*}} : $C
+// CHECK-NEXT: regular user:   br bb3(%{{.*}} : $C)
+// CHECK-NEXT: Complete liveness
+// CHECK-NEXT: last user:   destroy_value
+// CHECK-NEXT: testInnerDominatedReborrow2: interior_liveness with: %copy0a
+
+// CHECK-LABEL: testInnerDominatedReborrow2: interior_liveness_swift with: %copy0a
+// CHECK: Interior liveness:   %{{.*}} = copy_value %0 : $C
+// CHECK-NEXT: Inner scope: %{{.*}} = argument of bb3 : $C
+// CHECK-NEXT: Inner scope:   %{{.*}} = begin_borrow %{{.*}} : $C
+// CHECK-NEXT: begin:      %{{.*}} = copy_value %0 : $C
+// CHECK-NEXT: ends:       destroy_value %{{.*}} : $C
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  end_borrow %{{.*}} : $C
+// CHECK-NEXT:             %{{.*}} = borrowed %{{.*}} : $C from (%{{.*}} : $C, %{{.*}} : $C)
+// CHECK-NEXT:             %{{.*}} = begin_borrow %{{.*}} : $C
+// CHECK-NEXT: last user:   destroy_value %{{.*}} : $C
+// CHECK-NEXT: testInnerDominatedReborrow2: interior_liveness_swift with: %copy0a
+sil [ossa] @testInnerDominatedReborrow2 : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %copy0a = copy_value %0 : $C
+  %copy0b = copy_value %0 : $C
+  specify_test "interior_liveness %copy0a"
+  specify_test "interior_liveness_swift %copy0a"
+  cond_br undef, bb1, bb2
+
+bb1:
+  %borrow1 = begin_borrow %copy0a : $C
+  br bb3(%borrow1 : $C)
+
+bb2:
+  %borrow2 = begin_borrow %copy0b : $C
+  br bb3(%borrow2 : $C)
+
+bb3(%reborrow : @guaranteed $C):
+  end_borrow %reborrow : $C
+  destroy_value %copy0a : $C
+  destroy_value %copy0b : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: testInnerNonDominatedReborrow: interior_liveness with: %borrow1
+// CHECK: Inner scope:   [[BORROW:%.*]] = begin_borrow [[DEF:%.*]] : $D
+// CHECK: Complete liveness
+// CHECK-NEXT: last user:   br bb3([[DEF]] : $D, [[BORROW]] : $D)
+// CHECK-NEXT: testInnerNonDominatedReborrow: interior_liveness with: %borrow1
+
+// CHECK-LABEL: testInnerNonDominatedReborrow: interior_liveness_swift with: %borrow1
+// CHECK: Interior liveness:   %{{.*}} = begin_borrow %0 : $D
+// CHECK-NEXT: Inner scope:   %{{.*}} = begin_borrow %{{.*}} : $D
+// CHECK-NEXT: begin:      %{{.*}} = begin_borrow %0 : $D
+// CHECK-NEXT: ends:       br bb3(%{{.*}} : $D, %{{.*}} : $D)
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:
+// CHECK-NEXT: last user:   br bb3(%{{.*}} : $D, %{{.*}} : $D)
+// CHECK-NEXT: testInnerNonDominatedReborrow: interior_liveness_swift with: %borrow1
+sil [ossa] @testInnerNonDominatedReborrow : $@convention(thin) (@guaranteed D) -> () {
+bb0(%0 : @guaranteed $D):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %borrow1 = begin_borrow %0 : $D
+  specify_test "interior_liveness %borrow1"
+  specify_test "interior_liveness_swift %borrow1"
+  %inner1 = begin_borrow %borrow1 : $D
+  br bb3(%borrow1 : $D, %inner1 : $D)
+
+bb2:
+  %borrow2 = begin_borrow %0 : $D
+  %inner2 = begin_borrow %borrow2 : $D
+  br bb3(%borrow2 : $D, %inner2 : $D)
+
+bb3(%outer : @guaranteed $D, %inner : @guaranteed $D):
+  %f = ref_element_addr %inner : $D, #D.object  
+  %o = load [copy] %f : $*C
+  destroy_value %o : $C
+  end_borrow %inner : $D
+  end_borrow %outer : $D
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: testInnerAdjacentReborrow1: interior_liveness with: %outer3
+// CHECK: Interior liveness: %{{.*}} = argument of bb3 : $D
+// CHECK-NEXT: Inner scope: %{{.*}} = argument of bb4 : $D
+// CHECK-NEXT: Inner scope: %{{.*}} = argument of bb3 : $D
+// CHECK-NEXT: bb3: LiveOut
+// CHECK-NEXT: bb4: LiveWithin
+// CHECK-NEXT: regular user:   end_borrow %{{.*}} : $D
+// CHECK-NEXT: regular user:   br bb4(%{{.*}} : $D)
+// CHECK-NEXT: Complete liveness
+// CHECK-NEXT: last user:   end_borrow %{{.*}} : $D
+// CHECK-NEXT: testInnerAdjacentReborrow1: interior_liveness with: %outer3
+
+// CHECK-LABEL: testInnerAdjacentReborrow1: interior_liveness_swift with: %outer3
+// CHECK: Interior liveness: %{{.*}} = argument of bb3 : $D
+// CHECK-NEXT: Inner scope: %{{.*}} = argument of bb4 : $D
+// CHECK-NEXT: Inner scope: %{{.*}} = argument of bb3 : $D
+// CHECK-NEXT: begin:      %{{.*}} = borrowed %{{.*}} : $D from
+// CHECK-NEXT: ends:       end_borrow
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $D, %0 : $D)
+// CHECK-NEXT:             %{{.*}} = borrowed %{{.*}} : $D from (%0 : $D, %{{.*}} : $D)
+// CHECK-NEXT: last user:   end_borrow
+// CHECK-NEXT: testInnerAdjacentReborrow1: interior_liveness_swift with: %outer3
+sil [ossa] @testInnerAdjacentReborrow1 : $@convention(thin) (@guaranteed D) -> () {
+bb0(%0 : @guaranteed $D):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %copy1 = copy_value %0 : $D
+  %borrow1 = begin_borrow %copy1 : $D
+  br bb3(%copy1 : $D, %borrow1 : $D)
+
+bb2:
+  %copy2 = copy_value %0 : $D
+  %borrow2 = begin_borrow %0 : $D
+  br bb3(%copy2 : $D, %borrow2 : $D)
+
+bb3(%outer3 : @owned $D, %inner3 : @guaranteed $D):
+  specify_test "interior_liveness %outer3"
+  specify_test "interior_liveness_swift %outer3"
+  br bb4(%inner3 : $D)
+
+bb4(%inner4 : @guaranteed $D):
+  %f = ref_element_addr %inner4 : $D, #D.object  
+  %o = load [copy] %f : $*C
+  destroy_value %o : $C
+  end_borrow %inner4 : $D
+  unreachable
+}
+
+// CHECK-LABEL: testInnerAdjacentReborrow2: interior_liveness with: %outer3
+// CHECK: Inner scope: %{{.*}} = argument of bb4 : $D
+// CHECK-NEXT: Inner scope: %{{.*}} = argument of bb3 : $D
+// CHECK-NEXT: bb3: LiveOut
+// CHECK-NEXT: bb4: LiveWithin
+// CHECK-NEXT: regular user:   end_borrow %{{.*}} : $D
+// CHECK-NEXT: regular user:   br bb4(%{{.*}} : $D)
+// CHECK-NEXT: Complete liveness
+// CHECK-NEXT: last user:   end_borrow %{{.*}} : $D
+// CHECK-NEXT: testInnerAdjacentReborrow2: interior_liveness with: %outer3
+
+// CHECK-LABEL: testInnerAdjacentReborrow2: interior_liveness_swift with: %outer3
+// CHECK: Interior liveness: %{{.*}} = argument of bb3 : $D
+// CHECK-NEXT: Inner scope: %{{.*}} = argument of bb4 : $D
+// CHECK-NEXT: Inner scope: %{{.*}} = argument of bb3 : $D
+// CHECK-NEXT: begin:      {{.*}} borrowed {{.*}} from
+// CHECK-NEXT: ends:       end_borrow %{{.*}} : $D
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $D, %0 : $D)
+// CHECK-NEXT:             %{{.*}} = borrowed %{{.*}} : $D from (%0 : $D, %{{.*}} : $D)
+// CHECK-NEXT: last user:   end_borrow %{{.*}} : $D
+// CHECK-NEXT: testInnerAdjacentReborrow2: interior_liveness_swift with: %outer3
+sil [ossa] @testInnerAdjacentReborrow2 : $@convention(thin) (@guaranteed D) -> () {
+bb0(%0 : @guaranteed $D):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %copy1 = copy_value %0 : $D
+  %borrow1 = begin_borrow %copy1 : $D
+  br bb3(%copy1 : $D, %borrow1 : $D)
+
+bb2:
+  %copy2 = copy_value %0 : $D
+  %borrow2 = begin_borrow %0 : $D
+  br bb3(%copy2 : $D, %borrow2 : $D)
+
+bb3(%outer3 : @owned $D, %inner3 : @guaranteed $D):
+  specify_test "interior_liveness %outer3"
+  specify_test "interior_liveness_swift %outer3"
+  br bb4(%inner3 : $D)
+
+bb4(%inner4 : @guaranteed $D):
+  %f = ref_element_addr %inner4 : $D, #D.object
+  %o = load [copy] %f : $*C
+  destroy_value %o : $C
+  end_borrow %inner4 : $D
+  unreachable
+}
+
+// CHECK-LABEL: testInnerNonAdjacentReborrow: interior_liveness with: %outer3
+// CHECK: Interior liveness: [[DEF:%.*]] = argument of bb3 : $D
+// CHECK-NOT:  Inner scope
+// CHECK-NOT:  lifetime-ending user
+// CHECK:      Complete liveness
+// CHECK-NEXT: dead def: [[DEF]] = argument of bb3 : $D
+// CHECK-NEXT: testInnerNonAdjacentReborrow: interior_liveness with: %outer3
+
+// CHECK-LABEL: testInnerNonAdjacentReborrow: interior_liveness_swift with: %outer3
+// CHECK: Interior liveness: %{{.*}} = argument of bb3 : $D
+// CHECK-NEXT: begin:      bb3
+// CHECK-NEXT: ends:
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:
+// CHECK-NEXT: dead def:    %{{.*}} = argument of bb3 : $D
+// CHECK-NEXT: testInnerNonAdjacentReborrow: interior_liveness_swift with: %outer3
+sil [ossa] @testInnerNonAdjacentReborrow : $@convention(thin) (@guaranteed D) -> () {
+bb0(%0 : @guaranteed $D):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %copy1 = copy_value %0 : $D
+  %borrow1 = begin_borrow %0 : $D
+  br bb3(%copy1 : $D, %borrow1 : $D)
+
+bb2:
+  %copy2 = copy_value %0 : $D
+  %borrow2 = begin_borrow %0 : $D
+  br bb3(%copy2 : $D, %borrow2 : $D)
+
+bb3(%outer3 : @owned $D, %inner3 : @guaranteed $D):
+  specify_test "interior_liveness %outer3"
+  specify_test "interior_liveness_swift %outer3"
+  br bb4(%inner3 : $D)
+
+bb4(%inner4 : @guaranteed $D):
+  %f = ref_element_addr %inner4 : $D, #D.object  
+  %o = load [copy] %f : $*C
+  destroy_value %o : $C
+  end_borrow %inner4 : $D
+  unreachable
+}
+
+// CHECK-LABEL: testInnerAdjacentPhi1: interior_liveness with: %inner3
+// CHECK: Interior liveness: %{{.*}} = argument of bb3 : $C
+// CHECK-NEXT: bb3: LiveOut
+// CHECK-NEXT: bb4: LiveWithin
+// CHECK-NEXT: regular user:   %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C, %0 : $C)
+// CHECK-NEXT: regular user:   %{{.*}} = ref_element_addr %{{.*}} : $D, #D.object
+// CHECK-NEXT: regular user:   %{{.*}} = load [copy] %{{.*}} : $*C
+// CHECK-NEXT: regular user:   %{{.*}} = borrowed %{{.*}} : $D from (%0 : $C, %{{.*}} : $C)
+// CHECK-NEXT: regular user:   br bb4(%{{.*}} : $D)
+// CHECK-NEXT: regular user:   %{{.*}} = borrowed %{{.*}} : $C from (%{{.*}} : $C)
+// CHECK-NEXT: Complete liveness
+// CHECK-NEXT: last user:   %{{.*}} = load [copy] %{{.*}} : $*C
+// CHECK-NEXT: testInnerAdjacentPhi1: interior_liveness with: %inner3
+
+// CHECK-LABEL: testInnerAdjacentPhi1: interior_liveness_swift with: %inner3
+// CHECK: Interior liveness: %{{.*}} = argument of bb3 : $C
+// CHECK-NEXT: begin:      {{.*}} borrowed {{.*}} from
+// CHECK-NEXT: ends:       %{{.*}} = load [copy] %{{.*}} : $*C
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  %{{.*}} = ref_element_addr %{{.*}} : $D, #D.object
+// CHECK-NEXT:             {{.*}} borrowed {{.*}} from
+// CHECK-NEXT:             br bb4(%{{.*}} : $D)
+// CHECK-NEXT:             {{.*}} borrowed {{.*}} from
+// CHECK-NEXT:             {{.*}} borrowed {{.*}} from
+// CHECK-NEXT: last user:   %{{.*}} = load [copy] %{{.*}} : $*C
+// CHECK-NEXT: testInnerAdjacentPhi1: interior_liveness_swift with: %inner3
+sil [ossa] @testInnerAdjacentPhi1 : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %copy1 = copy_value %0 : $C
+  %borrow1 = begin_borrow %copy1 : $C
+  %d1 = unchecked_ref_cast %borrow1 : $C to $D
+  br bb3(%copy1 : $C, %borrow1 : $C, %d1 :$D)
+
+bb2:
+  %copy2 = copy_value %0 : $C
+  %borrow2 = begin_borrow %copy2 : $C
+  %d2 = unchecked_ref_cast %0 : $C to $D
+  br bb3(%copy2 : $C, %borrow2 : $C, %d2 :$D)
+
+bb3(%outer3 : @owned $C, %inner3 : @reborrow $C, %phi3 : @guaranteed $D):
+  specify_test "interior_liveness %inner3"
+  specify_test "interior_liveness_swift %inner3"
+  br bb4(%phi3 : $D)
+
+bb4(%phi4 : @guaranteed $D):
+  %f = ref_element_addr %phi4 : $D, #D.object
+  %o = load [copy] %f : $*C
+  destroy_value %o : $C
+  unreachable
+}
+
+// CHECK-LABEL: testInnerAdjacentPhi2: interior_liveness with: %inner3
+// CHECK: Interior liveness: %{{.*}} = argument of bb3 : $C
+// CHECK-NEXT: bb3: LiveOut
+// CHECK-NEXT: bb4: LiveWithin
+// CHECK-NEXT: regular user:   %{{.*}} = borrowed %{{.*}} : $D from (%0 : $C, %{{.*}} : $C)
+// CHECK-NEXT: regular user:   %{{.*}} = ref_element_addr %{{.*}} : $D, #D.object
+// CHECK-NEXT: regular user:   %{{.*}} = load [copy] %{{.*}} : $*C
+// CHECK-NEXT: regular user:   %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C, %0 : $C)
+// CHECK-NEXT: regular user:   br bb4(%{{.*}} : $D)
+// CHECK-NEXT: regular user:   %{{.*}} = borrowed %{{.*}} : $C from (%{{.*}} : $C)
+// CHECK-NEXT: Complete liveness
+// CHECK-NEXT: last user:   %{{.*}} = load [copy] %{{.*}} : $*C
+// CHECK-NEXT: testInnerAdjacentPhi2: interior_liveness with: %inner3
+
+// CHECK-LABEL: testInnerAdjacentPhi2: interior_liveness_swift with: %inner3
+// CHECK: Interior liveness: %{{.*}} = argument of bb3 : $C
+// CHECK-NEXT: begin:      {{.*}} borrowed {{.*}} from
+// CHECK-NEXT: ends:       %{{.*}} = load [copy] %{{.*}} : $*C
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  %{{.*}} = ref_element_addr %{{.*}} : $D, #D.object
+// CHECK-NEXT:             {{.*}} borrowed {{.*}} from
+// CHECK-NEXT:             br bb4(%{{.*}} : $D)
+// CHECK-NEXT:             {{.*}} borrowed {{.*}} from
+// CHECK-NEXT:             {{.*}} borrowed {{.*}} from
+// CHECK-NEXT: last user:   %{{.*}} = load [copy] %{{.*}} : $*C
+// CHECK-NEXT: testInnerAdjacentPhi2: interior_liveness_swift with: %inner3
+sil [ossa] @testInnerAdjacentPhi2 : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %copy1 = copy_value %0 : $C
+  %borrow1 = begin_borrow %copy1 : $C
+  %d1 = unchecked_ref_cast %0 : $C to $D
+  br bb3(%copy1 : $C, %borrow1 : $C, %d1 :$D)
+
+bb2:
+  %copy2 = copy_value %0 : $C
+  %borrow2 = begin_borrow %copy2 : $C
+  %d2 = unchecked_ref_cast %borrow2 : $C to $D
+  br bb3(%copy2 : $C, %borrow2 : $C, %d2 :$D)
+
+bb3(%outer3 : @owned $C, %inner3 : @reborrow $C, %phi3 : @guaranteed $D):
+  specify_test "interior_liveness %inner3"
+  specify_test "interior_liveness_swift %inner3"
+  br bb4(%phi3 : $D)
+
+bb4(%phi4 : @guaranteed $D):
+  %f = ref_element_addr %phi4 : $D, #D.object
+  %o = load [copy] %f : $*C
+  destroy_value %o : $C
+  unreachable
+}
+
+// CHECK-LABEL: testInnerNonAdjacentPhi: interior_liveness with: %inner3
+// CHECK: Interior liveness: [[DEF:%.*]] = argument of bb3 : $C
+// CHECK: Complete liveness
+// CHECK-NEXT: last user:   {{.*}} borrowed {{.*}} from
+// CHECK-NEXT: testInnerNonAdjacentPhi: interior_liveness with: %inner3
+
+// CHECK-LABEL: testInnerNonAdjacentPhi: interior_liveness_swift with: %inner3
+// CHECK: Interior liveness: %{{.*}} = argument of bb3 : $C
+// CHECK-NEXT: begin:      {{.*}} borrowed {{.*}} from
+// CHECK-NEXT: ends:     
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:
+// CHECK-NEXT: last user:   {{.*}} borrowed {{.*}} from
+// CHECK-NEXT: testInnerNonAdjacentPhi: interior_liveness_swift with: %inner3
+sil [ossa] @testInnerNonAdjacentPhi : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %copy1 = copy_value %0 : $C
+  %borrow1 = begin_borrow %copy1 : $C
+  %d1 = unchecked_ref_cast %0 : $C to $D
+  br bb3(%copy1 : $C, %borrow1 : $C, %d1 :$D)
+
+bb2:
+  %copy2 = copy_value %0 : $C
+  %borrow2 = begin_borrow %copy2 : $C
+  %d2 = unchecked_ref_cast %0 : $C to $D
+  br bb3(%copy2 : $C, %borrow2 : $C, %d2 :$D)
+
+bb3(%outer3 : @owned $C, %inner3 : @guaranteed $C, %phi3 : @guaranteed $D):
+  specify_test "interior_liveness %inner3"
+  specify_test "interior_liveness_swift %inner3"
+  br bb4(%phi3 : $D)
+
+bb4(%phi4 : @guaranteed $D):
+  %f = ref_element_addr %phi4 : $D, #D.object
+  %o = load [copy] %f : $*C
+  destroy_value %o : $C
+  unreachable
+}
+
+// CHECK-LABEL: testScopedAddress: interior_liveness with: @argument[0]
+// CHECK: Complete liveness
+// CHECK-NEXT: last user:   end_access
+// CHECK-NEXT: testScopedAddress: interior_liveness with: @argument[0]
+
+// CHECK-LABEL: testScopedAddress: interior_liveness_swift with: @argument[0]
+// CHECK: Interior liveness: %0 = argument of bb0 : $D
+// CHECK-NEXT: Inner scope:   %{{.*}} = begin_access [read] [static] %{{.*}} : $*C
+// CHECK-NEXT: begin:      %{{.*}} = ref_element_addr %0 : $D, #D.object
+// CHECK-NEXT: ends:       end_access %{{.*}} : $*C
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  %{{.*}} = begin_access [read] [static] %{{.*}} : $*C
+// CHECK-NEXT:             %{{.*}} = ref_element_addr %0 : $D, #D.object
+// CHECK-NEXT: last user:   end_access %{{.*}} : $*C
+// CHECK-NEXT: testScopedAddress: interior_liveness_swift with: @argument[0]
+sil [ossa] @testScopedAddress : $@convention(thin) (@guaranteed D) -> () {
+bb0(%0 : @guaranteed $D):
+  specify_test "interior_liveness @argument[0]"
+  specify_test "interior_liveness_swift @argument[0]"
+  %f = ref_element_addr %0 : $D, #D.object
+  %access = begin_access [read] [static] %f : $*C
+  %o = load [copy] %access : $*C
+  end_access %access : $*C
+  destroy_value %o : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// =============================================================================
+// InteriorLiveness and borrowed-from
+// =============================================================================
+
+// CHECK-LABEL: testInteriorDominatedReborrowedFrom: interior_liveness with: %borrow1
+// CHECK: Interior liveness:   %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: Inner scope: %{{.*}} = argument of bb1 : $D
+// CHECK-NEXT: Inner scope:   %{{.*}} = begin_borrow %{{.*}} : $D
+// CHECK-NEXT: bb0: LiveOut
+// CHECK-NEXT: bb1: LiveWithin
+// CHECK-NEXT: regular user:   end_borrow %{{.*}} : $D
+// CHECK-NEXT: lifetime-ending user:   end_borrow %{{.*}} : $C
+// CHECK-NEXT: regular user:   %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: regular user:   br bb1(%{{.*}} : $D)
+// CHECK-NEXT: Complete liveness
+// CHECK-NEXT: last user:   end_borrow %{{.*}} : $C
+// CHECK-NEXT: testInteriorDominatedReborrowedFrom: interior_liveness with: %borrow1
+
+// CHECK-LABEL: testInteriorDominatedReborrowedFrom: interior_liveness_swift with: %borrow1
+// CHECK: Interior liveness:   %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: Inner scope: %{{.*}} = argument of bb1 : $D
+// CHECK-NEXT: Inner scope:   %{{.*}} = begin_borrow %{{.*}} : $D
+// CHECK-NEXT: begin:      %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: ends:       end_borrow %{{.*}} : $C
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  end_borrow %{{.*}} : $D
+// CHECK-NEXT:             %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT:             %{{.*}} = begin_borrow %{{.*}} : $D
+// CHECK-NEXT:             %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: last user:   end_borrow %{{.*}} : $C
+// CHECK-NEXT: testInteriorDominatedReborrowedFrom: interior_liveness_swift with: %borrow1
+
+// CHECK-LABEL: testInteriorDominatedReborrowedFrom: interior_liveness with: %reborrow2
+// CHECK: Interior liveness: %{{.*}} = argument of bb1 : $D
+// CHECK-NEXT: bb1: LiveWithin
+// CHECK-NEXT: regular user:   %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT: regular user:   %{{.*}} = ref_element_addr %{{.*}} : $D, #D.object
+// CHECK-NEXT: regular user:   %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: lifetime-ending user:   end_borrow %{{.*}} : $D
+// CHECK-NEXT: Incomplete liveness: Escaping address
+// CHECK-NEXT: last user:   end_borrow %{{.*}} : $D
+// CHECK-NEXT: testInteriorDominatedReborrowedFrom: interior_liveness with: %reborrow2
+
+// CHECK-LABEL: testInteriorDominatedReborrowedFrom: interior_liveness_swift with: %reborrow2
+// CHECK: Interior liveness: %5 = argument of bb1 : $D                         // user: %6
+// CHECK-NEXT: Pointer escape:   %8 = address_to_pointer %7 : $*C to $Builtin.RawPointer
+// CHECK-NEXT: begin:      %6 = borrowed %5 : $D from (%1 : $C)            // users: %7, %9
+// CHECK-NEXT: ends:       end_borrow %6 : $D                              // id: %9
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  %8 = address_to_pointer %7 : $*C to $Builtin.RawPointer
+// CHECK-NEXT:             %7 = ref_element_addr %6 : $D, #D.object        // user: %8
+// CHECK-NEXT:             %6 = borrowed %5 : $D from (%1 : $C)            // users: %7, %9
+// CHECK-NEXT: last user:   end_borrow %6 : $D                              // id: %9
+// CHECK-NEXT: testInteriorDominatedReborrowedFrom: interior_liveness_swift with: %reborrow2
+sil [ossa] @testInteriorDominatedReborrowedFrom : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %borrow1 = begin_borrow %0 : $C
+  specify_test "interior_liveness %borrow1"
+  specify_test "interior_liveness_swift %borrow1"
+  %d1 = unchecked_ref_cast %borrow1 : $C to $D
+  %borrow2 = begin_borrow %d1 : $D
+  br bb1(%borrow2 : $D)
+ 
+bb1(%reborrow2 : @reborrow $D):
+  specify_test "interior_liveness %reborrow2"
+  specify_test "interior_liveness_swift %reborrow2"
+  %borrowedfrom2 = borrowed %reborrow2 from (%borrow1)
+  %f2 = ref_element_addr %borrowedfrom2 : $D, #D.object
+  %p2 = address_to_pointer %f2 : $*C to $Builtin.RawPointer
+  end_borrow %borrowedfrom2 : $D // <=== interior use
+  end_borrow %borrow1 : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: testInteriorDominatedPhiBorrowedFrom: interior_liveness with: %borrow1
+// CHECK: Interior liveness:   %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: bb0: LiveOut
+// CHECK-NEXT: bb1: LiveWithin
+// CHECK-NEXT: regular user:   %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT: regular user:   %{{.*}} = ref_element_addr %{{.*}} : $D, #D.object
+// CHECK-NEXT: regular user:   %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: lifetime-ending user:   end_borrow %{{.*}} : $C
+// CHECK-NEXT: regular user:   %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: regular user:   br bb1(%{{.*}} : $D)
+// CHECK-NEXT: Incomplete liveness: Escaping address
+// CHECK-NEXT: last user:   end_borrow %{{.*}} : $C
+// CHECK-NEXT: testInteriorDominatedPhiBorrowedFrom: interior_liveness with: %borrow1
+
+// CHECK-LABEL: testInteriorDominatedPhiBorrowedFrom: interior_liveness_swift with: %borrow1
+// CHECK: Interior liveness:   %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: Pointer escape:   %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: begin:      %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: ends:       end_borrow %{{.*}} : $C
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT:             %{{.*}} = ref_element_addr %{{.*}} : $D, #D.object
+// CHECK-NEXT:             %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT:             br bb1(%{{.*}} : $D)
+// CHECK-NEXT:             %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: last user:   end_borrow %{{.*}} : $C
+// CHECK-NEXT: testInteriorDominatedPhiBorrowedFrom: interior_liveness_swift with: %borrow1
+
+// CHECK-LABEL: testInteriorDominatedPhiBorrowedFrom: interior_liveness with: %phi
+// CHECK: Interior liveness: %{{.*}} = argument of bb1 : $D
+// CHECK-NEXT: bb1: LiveWithin
+// CHECK-NEXT: regular user:   %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT: regular user:   %{{.*}} = ref_element_addr %{{.*}} : $D, #D.object
+// CHECK-NEXT: regular user:   %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: Incomplete liveness: Escaping address
+// CHECK-NEXT: last user:   %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: testInteriorDominatedPhiBorrowedFrom: interior_liveness with: %phi
+
+// CHECK-LABEL: testInteriorDominatedPhiBorrowedFrom: interior_liveness_swift with: %phi
+// CHECK-NEXT: Interior liveness: %{{.*}} = argument of bb1 : $D
+// CHECK-NEXT: Pointer escape:   %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: begin:      %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT: ends:       %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  %{{.*}} = ref_element_addr %{{.*}} : $D, #D.object
+// CHECK-NEXT:             %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT: last user:   %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: testInteriorDominatedPhiBorrowedFrom: interior_liveness_swift with: %phi
+sil [ossa] @testInteriorDominatedPhiBorrowedFrom : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %borrow1 = begin_borrow %0 : $C
+  specify_test "interior_liveness %borrow1"
+  specify_test "interior_liveness_swift %borrow1"
+  %d1 = unchecked_ref_cast %borrow1 : $C to $D
+  br bb1(%d1 : $D)
+ 
+bb1(%phi : @guaranteed $D):
+  specify_test "interior_liveness %phi"
+  specify_test "interior_liveness_swift %phi"
+  %borrowedfrom = borrowed %phi from (%borrow1)
+  %f2 = ref_element_addr %borrowedfrom : $D, #D.object
+  %p2 = address_to_pointer %f2 : $*C to $Builtin.RawPointer
+  end_borrow %borrow1 : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+
+// CHECK-LABEL: testInteriorNondominatedReborrowedFrom: interior_liveness with: %reborrow1
+// CHECK: Interior liveness: %{{.*}} = argument of bb1 : $C
+// CHECK-NEXT: Inner scope: %{{.*}} = argument of bb1 : $D
+// CHECK-NEXT: bb1: LiveWithin
+// CHECK-NEXT: regular user:   %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT: regular user:   %{{.*}} = borrowed %{{.*}} : $C from (%0 : $C)
+// CHECK-NEXT: Incomplete liveness: Escaping address
+// CHECK-NEXT: last user:   %{{.*}} = borrowed %{{.*}} : $C from (%0 : $C)
+// CHECK-NEXT: testInteriorNondominatedReborrowedFrom: interior_liveness with: %reborrow1
+
+// CHECK-LABEL: testInteriorNondominatedReborrowedFrom: interior_liveness_swift with: %reborrow1
+// CHECK: Interior liveness: %{{.*}} = argument of bb1 : $C
+// CHECK-NEXT: Inner scope: %{{.*}} = argument of bb1 : $D
+// CHECK-NEXT: begin:      %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT: ends:       %{{.*}} = borrowed %{{.*}} : $C from (%0 : $C)
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:
+// CHECK-NEXT: last user:   %{{.*}} = borrowed %{{.*}} : $C from (%0 : $C)
+// CHECK-NEXT: testInteriorNondominatedReborrowedFrom: interior_liveness_swift with: %reborrow1
+sil [ossa] @testInteriorNondominatedReborrowedFrom : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %borrow1 = begin_borrow %0 : $C
+  %d1 = unchecked_ref_cast %borrow1 : $C to $D
+  %borrow2 = begin_borrow %d1 : $D
+  br bb1(%borrow1 : $C, %borrow2 : $D)
+ 
+bb1(%reborrow1 : @reborrow $C, %reborrow2 : @reborrow $D):
+  specify_test "interior_liveness %reborrow1"
+  specify_test "interior_liveness_swift %reborrow1"
+  %borrowfrom1 = borrowed %reborrow1 from (%0)
+  %borrowfrom2 = borrowed %reborrow2 from (%reborrow1)
+  %f2 = ref_element_addr %borrowfrom2 : $D, #D.object
+  %p2 = address_to_pointer %f2 : $*C to $Builtin.RawPointer
+  unreachable
+}
+
+// CHECK-LABEL: testInteriorNondominatedPhiBorrowedFrom: interior_liveness with: %borrow1
+// CHECK: Interior liveness:   %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: bb0: LiveWithin
+// CHECK-NEXT: lifetime-ending user:   br bb1(%{{.*}} : $C, %{{.*}} : $D)
+// CHECK-NEXT: regular user:   %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: Complete liveness
+// CHECK-NEXT: last user:   br bb1(%{{.*}} : $C, %{{.*}} : $D)
+// CHECK-NEXT: testInteriorNondominatedPhiBorrowedFrom: interior_liveness with: %borrow1
+
+// CHECK-LABEL: testInteriorNondominatedPhiBorrowedFrom: interior_liveness_swift with: %borrow1
+// CHECK: Interior liveness:   %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: begin:      %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: ends:       br bb1(%{{.*}} : $C, %{{.*}} : $D)
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: last user:   br bb1(%{{.*}} : $C, %{{.*}} : $D)
+// CHECK-NEXT: testInteriorNondominatedPhiBorrowedFrom: interior_liveness_swift with: %borrow1
+
+// CHECK-LABEL: testInteriorNondominatedPhiBorrowedFrom: interior_liveness with: %reborrow1
+// CHECK: Interior liveness: %{{.*}} = argument of bb1 : $C
+// CHECK-NEXT: bb1: LiveWithin
+// CHECK-NEXT: regular user:   %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT: regular user:   %{{.*}} = ref_element_addr %{{.*}} : $D, #D.object
+// CHECK-NEXT: regular user:   %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: regular user:   %{{.*}} = borrowed %{{.*}} : $C from (%0 : $C)
+// CHECK-NEXT: Incomplete liveness: Escaping address
+// CHECK-NEXT: last user:   %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: testInteriorNondominatedPhiBorrowedFrom: interior_liveness with: %reborrow1
+
+// CHECK-LABEL: testInteriorNondominatedPhiBorrowedFrom: interior_liveness_swift with: %reborrow1
+// CHECK: Interior liveness: %4 = argument of bb1 : $C                         // users: %6, %7
+// CHECK-NEXT: Pointer escape:   %9 = address_to_pointer %8 : $*C to $Builtin.RawPointer
+// CHECK-NEXT: begin:      %6 = borrowed %5 : $D from (%4 : $C)            // user: %8
+// CHECK-NEXT: ends:       %9 = address_to_pointer %8 : $*C to $Builtin.RawPointer
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  %8 = ref_element_addr %6 : $D, #D.object        // user: %9
+// CHECK-NEXT:             %7 = borrowed %4 : $C from (%0 : $C)
+// CHECK-NEXT:             %6 = borrowed %5 : $D from (%4 : $C)            // user: %8
+// CHECK-NEXT: last user:   %9 = address_to_pointer %8 : $*C to $Builtin.RawPointer
+// CHECK-NEXT: testInteriorNondominatedPhiBorrowedFrom: interior_liveness_swift with: %reborrow1
+sil [ossa] @testInteriorNondominatedPhiBorrowedFrom : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %borrow1 = begin_borrow %0 : $C
+  specify_test "interior_liveness %borrow1"
+  specify_test "interior_liveness_swift %borrow1"
+  %d1 = unchecked_ref_cast %borrow1 : $C to $D
+  br bb1(%borrow1 : $C, %d1 : $D) // <=== %borrow1 end
+ 
+bb1(%reborrow1 : @reborrow $C, %phi : @guaranteed $D):
+  specify_test "interior_liveness %reborrow1"
+  specify_test "interior_liveness_swift %reborrow1"
+  %borrowfrom1 = borrowed %reborrow1 from (%0)
+  %borrowfrom2 = borrowed %phi from (%reborrow1)
+  %f2 = ref_element_addr %borrowfrom2 : $D, #D.object
+  %p2 = address_to_pointer %f2 : $*C to $Builtin.RawPointer  // %reborrow1 escape
+  unreachable
+}
+
+// CHECK-LABEL: testInteriorDominatedReborrowedFromDeadEnd: interior_liveness with: %borrow1
+//
+// Recognize borrowed-from as an inner scope. The C++ implementation also detects the reborrow as an inner scope
+// because it still looks for adjacent phis.
+//
+// CHECK: Interior liveness:   %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: Inner scope: %{{.*}} = argument of bb1 : $D
+// CHECK-NEXT: Inner scope:   %{{.*}} = begin_borrow %{{.*}} : $D
+// CHECK-NEXT: bb0: LiveOut
+// CHECK-NEXT: bb1: LiveWithin
+// CHECK-NEXT: regular user:   %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT: regular user:   %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: regular user:   br bb1(%{{.*}} : $D)
+// CHECK-NEXT: Incomplete liveness: Escaping address
+// CHECK-NEXT: last user:   %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT: testInteriorDominatedReborrowedFromDeadEnd: interior_liveness with: %borrow1
+
+// CHECK-LABEL: testInteriorDominatedReborrowedFromDeadEnd: interior_liveness_swift with: %borrow1
+//
+// The Swift implementation reports the borrowed-from use as an inner scope starting at the reborrow.  Since the
+// reborrow has no scope-ending uses, it is effecively dead, the live range does not even include the borrowed-from
+// instruction.
+//
+// CHECK-NEXT: Interior liveness:   %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: Inner scope: %{{.*}} = argument of bb1 : $D
+// CHECK-NEXT: Inner scope:   %{{.*}} = begin_borrow %{{.*}} : $D
+// CHECK-NEXT: begin:      %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: ends:       %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT: exits:    
+// CHECK-NEXT: interiors:  %{{.*}} = begin_borrow %{{.*}} : $D
+// CHECK-NEXT:             %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: last user:   %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT: testInteriorDominatedReborrowedFromDeadEnd: interior_liveness_swift with: %borrow1
+
+// CHECK-LABEL: testInteriorDominatedReborrowedFromDeadEnd: interior_liveness with: %reborrow2
+// CHECK: Interior liveness: %{{.*}} = argument of bb1 : $D
+// CHECK-NEXT: bb1: LiveWithin
+// CHECK-NEXT: regular user:   %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT: regular user:   %{{.*}} = ref_element_addr %{{.*}} : $D, #D.object
+// CHECK-NEXT: regular user:   %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: Incomplete liveness: Escaping address
+// CHECK-NEXT: last user:   %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: testInteriorDominatedReborrowedFromDeadEnd: interior_liveness with: %reborrow2
+
+// CHECK-LABEL: testInteriorDominatedReborrowedFromDeadEnd: interior_liveness_swift with: %reborrow2
+// CHECK: Interior liveness: %{{.*}} = argument of bb1 : $D
+// CHECK-NEXT: Pointer escape:   %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: begin:      %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT: ends:       %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  %{{.*}} = ref_element_addr %{{.*}} : $D, #D.object
+// CHECK-NEXT:             %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT: last user:   %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: testInteriorDominatedReborrowedFromDeadEnd: interior_liveness_swift with: %reborrow2
+sil [ossa] @testInteriorDominatedReborrowedFromDeadEnd : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %borrow1 = begin_borrow %0 : $C
+  specify_test "interior_liveness %borrow1"
+  specify_test "interior_liveness_swift %borrow1"
+  %d1 = unchecked_ref_cast %borrow1 : $C to $D
+  %borrow2 = begin_borrow %d1 : $D
+  br bb1(%borrow2 : $D)
+ 
+bb1(%reborrow2 : @reborrow $D):
+  specify_test "interior_liveness %reborrow2"
+  specify_test "interior_liveness_swift %reborrow2"
+  %borrowfrom2 = borrowed %reborrow2 from (%borrow1) // %borrow1 inner scope, no escape
+  %f2 = ref_element_addr %borrowfrom2 : $D, #D.object
+  %p2 = address_to_pointer %f2 : $*C to $Builtin.RawPointer
+  unreachable
+}
+
+// CHECK-LABEL: begin running test 1 of 4 on testInteriorDominatedReborrowedFromDeadEndNested: interior_liveness with: %borrow0
+// CHECK: Interior liveness:   %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: Inner scope: %{{.*}} = argument of bb3 : $D
+// CHECK-NEXT: Inner scope:   %{{.*}} = begin_borrow %{{.*}} : $D
+// CHECK-NEXT: Inner scope:   %{{.*}} = begin_borrow %{{.*}} : $D
+// CHECK-NEXT: bb0: LiveOut
+// CHECK-NEXT: bb3: LiveWithin
+// CHECK-NEXT: bb2: LiveOut
+// CHECK-NEXT: bb1: LiveOut
+// CHECK-NEXT: regular user:   %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT: regular user:   %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: regular user:   br bb3(%{{.*}} : $D, %{{.*}} : $C)
+// CHECK-NEXT: regular user:   %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: regular user:   br bb3(%{{.*}} : $D, %{{.*}} : $C)
+// CHECK-NEXT: Incomplete liveness: Escaping address
+// CHECK-NEXT: last user:   %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT: testInteriorDominatedReborrowedFromDeadEndNested: interior_liveness with: %borrow0
+
+// CHECK-LABEL: testInteriorDominatedReborrowedFromDeadEndNested: interior_liveness_swift with: %borrow0
+// CHECK: Interior liveness:   %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: Inner scope: %{{.*}} = argument of bb3 : $D
+// CHECK-NEXT: Inner scope:   %{{.*}} = begin_borrow %{{.*}} : $D
+// CHECK-NEXT: Inner scope:   %{{.*}} = begin_borrow %{{.*}} : $D
+// CHECK-NEXT: begin:      %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: ends:       %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT: exits:    
+// CHECK-NEXT: interiors:  %{{.*}} = begin_borrow %{{.*}} : $D
+// CHECK-NEXT:             %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT:             %{{.*}} = begin_borrow %{{.*}} : $D
+// CHECK-NEXT:             %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: last user:   %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT: testInteriorDominatedReborrowedFromDeadEndNested: interior_liveness_swift with: %borrow0
+
+// CHECK-LABEL: testInteriorDominatedReborrowedFromDeadEndNested: interior_liveness with: %reborrow
+// CHECK: Interior liveness: %{{.*}} = argument of bb3 : $D
+// CHECK-NEXT: bb3: LiveWithin
+// CHECK-NEXT: regular user:   %{{.*}} = borrowed %{{.*}} : $C from (%11 : $D)
+// CHECK-NEXT: regular user:   %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT: regular user:   %{{.*}} = ref_element_addr %{{.*}} : $D, #D.object
+// CHECK-NEXT: regular user:   %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: Incomplete liveness: Escaping address
+// CHECK-NEXT: last user:   %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: testInteriorDominatedReborrowedFromDeadEndNested: interior_liveness with: %reborrow
+
+// CHECK-LABEL: testInteriorDominatedReborrowedFromDeadEndNested: interior_liveness_swift with: %reborrow
+// CHECK: Interior liveness: %{{.*}} = argument of bb3 : $D
+// CHECK-NEXT: Pointer escape:   %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: begin:      %{{.*}} = borrowed %{{.*}} : $C from (%{{.*}} : $D)
+// CHECK-NEXT: ends:       %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  %{{.*}} = ref_element_addr %{{.*}} : $D, #D.object
+// CHECK-NEXT:             %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT:             %{{.*}} = borrowed %{{.*}} : $C from (%{{.*}} : $D)
+// CHECK-NEXT: last user:   %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: testInteriorDominatedReborrowedFromDeadEndNested: interior_liveness_swift with: %reborrow
+sil [ossa] @testInteriorDominatedReborrowedFromDeadEndNested : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %borrow0 = begin_borrow %0 : $C
+  specify_test "interior_liveness %borrow0"
+  specify_test "interior_liveness_swift %borrow0"
+  cond_br undef, bb1, bb2
+
+bb1:
+  %d1 = unchecked_ref_cast %borrow0 : $C to $D
+  %borrow1 = begin_borrow %d1 : $D
+  %c1 = unchecked_ref_cast %borrow1 : $D to $C
+  br bb3(%borrow1, %c1)
+
+bb2:
+  %d2 = unchecked_ref_cast %borrow0 : $C to $D
+  %borrow2 = begin_borrow %d2 : $D
+  %c2 = unchecked_ref_cast %borrow2 : $D to $C
+  br bb3(%borrow2, %c2)
+ 
+bb3(%reborrow : @reborrow $D, %arg : @guaranteed $C):
+  specify_test "interior_liveness %reborrow"
+  specify_test "interior_liveness_swift %reborrow"
+  %borrowfromarg = borrowed %arg from (%reborrow)
+  %reborrowfrom = borrowed %reborrow from (%borrow0)
+  %f2 = ref_element_addr %reborrowfrom : $D, #D.object
+  %p2 = address_to_pointer %f2 : $*C to $Builtin.RawPointer
+  unreachable
+}
+
+// CHECK-LABEL: testInteriorNondominatedPhiBorrowedFromDeadEnd: interior_liveness with: %borrow0
+// CHECK: Interior liveness:   %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: Inner scope: %{{.*}} = argument of bb3 : $D
+// CHECK-NEXT: Inner scope:   %{{.*}} = begin_borrow %{{.*}} : $D
+// CHECK-NEXT: Inner scope:   %{{.*}} = begin_borrow %{{.*}} : $D
+// CHECK-NEXT: bb0: LiveOut
+// CHECK-NEXT: bb3: LiveWithin
+// CHECK-NEXT: bb2: LiveOut
+// CHECK-NEXT: bb1: LiveOut
+// CHECK-NEXT: regular user:   %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT: regular user:   %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: regular user:   br bb3(%{{.*}} : $D, %{{.*}} : $C)
+// CHECK-NEXT: regular user:   %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: regular user:   br bb3(%{{.*}} : $D, %{{.*}} : $C)
+// CHECK-NEXT: Incomplete liveness: Escaping address
+// CHECK-NEXT: last user:   %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT: testInteriorNondominatedPhiBorrowedFromDeadEnd: interior_liveness with: %borrow0
+
+// CHECK-LABEL: testInteriorNondominatedPhiBorrowedFromDeadEnd: interior_liveness_swift with: %borrow0
+// CHECK: Interior liveness:   %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: Inner scope: %{{.*}} = argument of bb3 : $D
+// CHECK-NEXT: Inner scope:   %{{.*}} = begin_borrow %{{.*}} : $D
+// CHECK-NEXT: Inner scope:   %{{.*}} = begin_borrow %{{.*}} : $D
+// CHECK-NEXT: begin:      %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: ends:       %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT: exits:    
+// CHECK-NEXT: interiors:  %{{.*}} = begin_borrow %{{.*}} : $D
+// CHECK-NEXT:             %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT:             %{{.*}} = begin_borrow %{{.*}} : $D
+// CHECK-NEXT:             %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: last user:   %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT: testInteriorNondominatedPhiBorrowedFromDeadEnd: interior_liveness_swift with: %borrow0
+
+// CHECK-LABEL: testInteriorNondominatedPhiBorrowedFromDeadEnd: interior_liveness with: %reborrow
+// CHECK: Interior liveness: %{{.*}} = argument of bb3 : $D
+// CHECK-NEXT: bb3: LiveWithin
+// CHECK-NEXT: regular user:   %{{.*}} = borrowed %{{.*}} : $C from (%{{.*}} : $D)
+// CHECK-NEXT: regular user:   %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: regular user:   %{{.*}} = ref_element_addr %{{.*}} : $D, #D.object
+// CHECK-NEXT: regular user:   %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: regular user:   %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT: Incomplete liveness: Escaping address
+// CHECK-NEXT: last user:   %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: testInteriorNondominatedPhiBorrowedFromDeadEnd: interior_liveness with: %reborrow
+
+// CHECK-LABEL: testInteriorNondominatedPhiBorrowedFromDeadEnd: interior_liveness_swift with: %reborrow
+// CHECK: Interior liveness: %{{.*}} = argument of bb3 : $D
+// CHECK-NEXT: Pointer escape:   %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: begin:      %{{.*}} = borrowed %{{.*}} : $C from (%{{.*}} : $D)
+// CHECK-NEXT: ends:       %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  %{{.*}} = ref_element_addr %{{.*}} : $D, #D.object
+// CHECK-NEXT:             %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT:             %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT:             %{{.*}} = borrowed %{{.*}} : $C from (%{{.*}} : $D)
+// CHECK-NEXT: last user:   %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: testInteriorNondominatedPhiBorrowedFromDeadEnd: interior_liveness_swift with: %reborrow
+sil [ossa] @testInteriorNondominatedPhiBorrowedFromDeadEnd : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %borrow0 = begin_borrow %0 : $C
+  specify_test "interior_liveness %borrow0"
+  specify_test "interior_liveness_swift %borrow0"
+  cond_br undef, bb1, bb2
+
+bb1:
+  %d1 = unchecked_ref_cast %borrow0 : $C to $D
+  %borrow1 = begin_borrow %d1 : $D
+  %c1 = unchecked_ref_cast %borrow1 : $D to $C
+  br bb3(%borrow1, %c1)
+
+bb2:
+  %d2 = unchecked_ref_cast %borrow0 : $C to $D
+  %borrow2 = begin_borrow %d2 : $D
+  %c2 = unchecked_ref_cast %borrow2 : $D to $C
+  br bb3(%borrow2, %c2)
+ 
+bb3(%reborrow : @reborrow $D, %arg : @guaranteed $C):
+  specify_test "interior_liveness %reborrow"
+  specify_test "interior_liveness_swift %reborrow"
+  %borrowfromarg = borrowed %arg from (%reborrow)
+  %reborrowfrom = borrowed %reborrow from (%borrow0)
+  %carg = unchecked_ref_cast %borrowfromarg : $C to $D
+  %f2 = ref_element_addr %carg : $D, #D.object
+  %p2 = address_to_pointer %f2 : $*C to $Builtin.RawPointer
+  unreachable
+}
+
+// =============================================================================
+// InteriorLiveness and mark_dependence
+// =============================================================================
+
+// CHECK-LABEL: begin running test 1 of 2 on testInteriorMarkDepOwnedEscapable: interior_liveness with: %0
+// CHECK: Interior liveness: %0 = argument of bb0 : $D
+// CHECK-NEXT: Inner scope:   %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $D on %0 : $D
+// CHECK-NEXT: bb0: LiveWithin
+// CHECK-NEXT: regular user:   %{{.*}} = ref_element_addr %0 : $D, #D.object
+// CHECK-NEXT: regular user:   destroy_value %{{.*}} : $D
+// CHECK-NEXT: Complete liveness
+// CHECK-NEXT: last user:   destroy_value %{{.*}} : $D
+// CHECK-NEXT: testInteriorMarkDepOwnedEscapable: interior_liveness with: %0
+
+// CHECK-LABEL: testInteriorMarkDepOwnedEscapable: interior_liveness_swift with: %0
+// CHECK: Interior liveness: %0 = argument of bb0 : $D
+// CHECK-NEXT: Inner scope:   %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $D on %0 : $D
+// CHECK-NEXT: begin:      %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $D on %0 : $D
+// CHECK-NEXT: ends:       destroy_value %{{.*}} : $D
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  %{{.*}} = ref_element_addr %0 : $D, #D.object
+// CHECK-NEXT:             %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $D on %0 : $D
+// CHECK-NEXT: last user:   destroy_value %{{.*}} : $D
+// CHECK-NEXT: testInteriorMarkDepOwnedEscapable: interior_liveness_swift with: %0
+sil [ossa] @testInteriorMarkDepOwnedEscapable : $@convention(thin) (@guaranteed D, @owned D) -> () {
+bb0(%0 : @guaranteed $D, %1 : @owned $D):
+  specify_test "interior_liveness %0"
+  specify_test "interior_liveness_swift %0"
+  %dependence = mark_dependence [nonescaping] %1: $D on %0: $D
+  %f0 = ref_element_addr %0 : $D, #D.object
+  %borrow = begin_borrow %dependence : $D
+  %f1 = ref_element_addr %borrow : $D, #D.object
+  end_borrow %borrow : $D
+  destroy_value %dependence : $D
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: testInteriorMarkDepOwnedNonEscapable: interior_liveness with: %0
+// CHECK: Interior liveness: %0 = argument of bb0 : $D
+// CHECK-NEXT: bb0: LiveWithin
+// CHECK-NEXT: regular user:   %{{.*}} = ref_element_addr %0 : $D, #D.object
+// CHECK-NEXT: regular user:   %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $NE on %0 : $D
+// CHECK-NEXT: Incomplete liveness: Escaping address
+// CHECK-NEXT: last user:   %{{.*}} = ref_element_addr %0 : $D, #D.object
+// CHECK-NEXT: testInteriorMarkDepOwnedNonEscapable: interior_liveness with: %0
+
+// CHECK-LABEL: testInteriorMarkDepOwnedNonEscapable: interior_liveness_swift with: %0
+// CHECK: Interior liveness: %0 = argument of bb0 : $D
+// CHECK-NEXT: Pointer escape:   %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $NE on %0 : $D
+// CHECK-NEXT: begin:      %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $NE on %0 : $D
+// CHECK-NEXT: ends:       %{{.*}} = ref_element_addr %0 : $D, #D.object
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $NE on %0 : $D
+// CHECK-NEXT: last user:   %{{.*}} = ref_element_addr %0 : $D, #D.object
+// CHECK-NEXT: testInteriorMarkDepOwnedNonEscapable: interior_liveness_swift with: %0
+sil [ossa] @testInteriorMarkDepOwnedNonEscapable : $@convention(thin) (@guaranteed D, @owned NE) -> () {
+bb0(%0 : @guaranteed $D, %1 : @owned $NE):
+  specify_test "interior_liveness %0"
+  specify_test "interior_liveness_swift %0"
+  %dependence = mark_dependence [nonescaping] %1: $NE on %0: $D
+  %f0 = ref_element_addr %0 : $D, #D.object
+  %borrow = begin_borrow %dependence : $NE
+  %f1 = struct_extract %borrow : $NE, #NE.object
+  end_borrow %borrow : $NE
+  destroy_value %dependence : $NE
+  %99 = tuple()
+  return %99 : $()
+}
+
+// Test mark_dependence of an address value. Walk down.
+
+// CHECK-LABEL: testInteriorMarkDepAddressValue: interior_liveness with: %0
+// CHECK: Interior liveness: %0 = argument of bb0 : $D
+// CHECK-NEXT: bb0: LiveWithin
+// CHECK-NEXT: regular user:   %{{.*}} = ref_element_addr %0 : $D, #D.object
+// CHECK-NEXT: regular user:   end_borrow %{{.*}} : $C
+// CHECK-NEXT: Complete liveness
+// CHECK-NEXT: last user:   end_borrow %{{.*}} : $C
+// CHECK-NEXT: testInteriorMarkDepAddressValue: interior_liveness with: %0
+
+// CHECK-LABEL: testInteriorMarkDepAddressValue: interior_liveness_swift with: %0
+// CHECK: Interior liveness: %0 = argument of bb0 : $D
+// CHECK-NEXT: Inner scope:   %{{.*}} = load_borrow %{{.*}} : $*C
+// CHECK-NEXT: begin:      %{{.*}} = ref_element_addr %0 : $D, #D.object
+// CHECK-NEXT: ends:       end_borrow %{{.*}} : $C
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  %{{.*}} = load_borrow %{{.*}} : $*C
+// CHECK-NEXT:             %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $*C on %{{.*}} : $C
+// CHECK-NEXT:             %{{.*}} = ref_element_addr %0 : $D, #D.object
+// CHECK-NEXT: last user:   end_borrow %{{.*}} : $C
+// CHECK-LABEL: testInteriorMarkDepAddressValue: interior_liveness_swift with: %0
+sil [ossa] @testInteriorMarkDepAddressValue : $@convention(thin) (@guaranteed D, @guaranteed C) -> () {
+bb0(%0 : @guaranteed $D, %1 : @guaranteed $C):
+  specify_test "interior_liveness %0"
+  specify_test "interior_liveness_swift %0"
+  %f = ref_element_addr %0 : $D, #D.object
+  %dependence = mark_dependence [nonescaping] %f: $*C on %1: $C
+  %load = load_borrow %dependence : $*C
+  end_borrow %load : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// Test mark_dependence on a base address value. Walk down.
+
+// CHECK-LABEL: testInteriorMarkDepAddressBase: interior_liveness with: %0
+// CHECK: Interior liveness: %0 = argument of bb0 : $D
+// CHECK-NEXT: bb0: LiveWithin
+// CHECK-NEXT: regular user:   %{{.*}} = ref_element_addr %0 : $D, #D.object
+// CHECK-NEXT: regular user:   %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $*C on %{{.*}} : $*C
+// CHECK-NEXT: Incomplete liveness: Escaping address
+// CHECK-NEXT: last user:   %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $*C on %{{.*}} : $*C
+// CHECK-NEXT: testInteriorMarkDepAddressBase: interior_liveness with: %0
+
+// CHECK-LABEL: testInteriorMarkDepAddressBase: interior_liveness_swift with: %0
+// CHECK: Interior liveness: %0 = argument of bb0 : $D
+// CHECK-NEXT: Inner scope:   %{{.*}} = load_borrow %{{.*}} : $*C
+// CHECK-NEXT: begin:      %{{.*}} = ref_element_addr %0 : $D, #D.object
+// CHECK-NEXT: ends:       end_borrow %{{.*}} : $C
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  %{{.*}} = load_borrow %{{.*}} : $*C
+// CHECK-NEXT:             %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $*C on %{{.*}} : $*C
+// CHECK-NEXT:             %{{.*}} = ref_element_addr %0 : $D, #D.object
+// CHECK-NEXT: last user:   end_borrow %{{.*}} : $C
+// CHECK-NEXT: testInteriorMarkDepAddressBase: interior_liveness_swift with: %0
+sil [ossa] @testInteriorMarkDepAddressBase : $@convention(thin) (@guaranteed D, @guaranteed D) -> () {
+bb0(%0 : @guaranteed $D, %1 : @guaranteed $D):
+  specify_test "interior_liveness %0"
+  specify_test "interior_liveness_swift %0"
+  %f0 = ref_element_addr %0 : $D, #D.object
+  %f1 = ref_element_addr %1 : $D, #D.object
+  %dependence = mark_dependence [nonescaping] %f1: $*C on %f0: $*C
+  %load = load_borrow %dependence : $*C
+  end_borrow %load : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: testInteriorMarkDepAddressDependent: interior_liveness with: %0
+// CHECK: Interior liveness: %0 = argument of bb0 : $D
+// CHECK-NEXT: bb0: LiveWithin
+// CHECK-NEXT: regular user:   %{{.*}} = ref_element_addr %0 : $D, #D.object
+// CHECK-NEXT: regular user:   %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $C on %{{.*}} : $*C
+// CHECK-NEXT: regular user:   end_access %{{.*}} : $*C
+// CHECK-NEXT: Incomplete liveness: Escaping address
+// CHECK-NEXT: last user:   end_access %{{.*}} : $*C
+// CHECK-NEXT: testInteriorMarkDepAddressDependent: interior_liveness with: %0
+
+// CHECK-LABEL: testInteriorMarkDepAddressDependent: interior_liveness_swift with: %0
+// CHECK: Interior liveness: %0 = argument of bb0 : $D
+// CHECK-NEXT: Inner scope:   %{{.*}} = begin_access [read] [static] %{{.*}} : $*C
+// CHECK-NEXT: begin:      %{{.*}} = ref_element_addr %0 : $D, #D.object
+// CHECK-NEXT: ends:       end_access %{{.*}} : $*C
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  %{{.*}} = begin_access [read] [static] %{{.*}} : $*C
+// CHECK-NEXT:             %{{.*}} = ref_element_addr %0 : $D, #D.object
+// CHECK-NEXT: last user:   end_access %{{.*}} : $*C
+// CHECK-NEXT: testInteriorMarkDepAddressDependent: interior_liveness_swift with: %0
+sil [ossa] @testInteriorMarkDepAddressDependent : $@convention(thin) (@guaranteed D, @owned C) -> () {
+bb0(%0 : @guaranteed $D, %1 : @owned $C):
+  specify_test "interior_liveness %0"
+  specify_test "interior_liveness_swift %0"
+  %f = ref_element_addr %0 : $D, #D.object
+  %access = begin_access [read] [static] %f : $*C
+  %dependence = mark_dependence [nonescaping] %1: $C on %access: $*C
+  %stack = alloc_stack $C
+  %sb = store_borrow %dependence to %stack : $*C
+  end_borrow %sb : $*C
+  destroy_value %dependence : $C
+  end_access %access : $*C
+  dealloc_stack %stack : $*C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: testInteriorDominatedReborrowedFromMarkDep: interior_liveness with: %borrow1
+// The mark_dependence is an escape because we don't follow guaranteed values.
+//
+// CHECK: Interior liveness:   %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: Inner scope: %{{.*}} = argument of bb1 : $D
+// CHECK-NEXT: Inner scope:   %{{.*}} = begin_borrow %{{.*}} : $D
+// CHECK-NEXT: bb0: LiveOut
+// CHECK-NEXT: bb1: LiveWithin
+// CHECK-NEXT: regular user:   end_borrow %{{.*}} : $D
+// CHECK-NEXT: lifetime-ending user:   end_borrow %{{.*}} : $C
+// CHECK-NEXT: regular user:   %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $D on %{{.*}} : $C
+// CHECK-NEXT: regular user:   %{{.*}} = ref_element_addr %{{.*}} : $D, #D.object
+// CHECK-NEXT: regular user:   %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: regular user:   %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: regular user:   br bb1(%{{.*}} : $D)
+// CHECK-NEXT: Incomplete liveness: Escaping address
+// CHECK-NEXT: last user:   end_borrow %{{.*}} : $C
+// CHECK-NEXT: testInteriorDominatedReborrowedFromMarkDep: interior_liveness with: %borrow1
+
+// CHECK-LABEL: testInteriorDominatedReborrowedFromMarkDep: interior_liveness_swift with: %borrow1
+// The mark_dependence is an escape because we don't follow guaranteed values.
+//
+// CHECK: Interior liveness:   %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: Inner scope: %{{.*}} = argument of bb1 : $D
+// CHECK-NEXT: Inner scope:   %{{.*}} = begin_borrow %{{.*}} : $D
+// CHECK-NEXT: Pointer escape:   %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: begin:      %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: ends:       end_borrow %{{.*}} : $C
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  end_borrow %{{.*}} : $D
+// CHECK-NEXT:             %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT:             %{{.*}} = ref_element_addr %{{.*}} : $D, #D.object
+// CHECK-NEXT:             %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $D on %{{.*}} : $C
+// CHECK-NEXT:             %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT:             %{{.*}} = begin_borrow %{{.*}} : $D
+// CHECK-NEXT:             %{{.*}} = unchecked_ref_cast %{{.*}} : $C to $D
+// CHECK-NEXT: last user:   end_borrow %{{.*}} : $C
+// CHECK-NEXT: testInteriorDominatedReborrowedFromMarkDep: interior_liveness_swift with: %borrow1
+
+// CHECK-LABEL: testInteriorDominatedReborrowedFromMarkDep: interior_liveness with: %reborrow2
+// CHECK: Interior liveness: %{{.*}} = argument of bb1 : $D
+// CHECK-NEXT: bb1: LiveWithin
+// CHECK-NEXT: regular user:   %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT: regular user:   %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $D on %{{.*}} : $C
+// CHECK-NEXT: regular user:   %{{.*}} = ref_element_addr %{{.*}} : $D, #D.object
+// CHECK-NEXT: regular user:   %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: lifetime-ending user:   end_borrow %{{.*}} : $D
+// CHECK-NEXT: Incomplete liveness: Escaping address
+// CHECK-NEXT: last user:   end_borrow %{{.*}} : $D
+// CHECK-NEXT: end running test 3 of 4 on testInteriorDominatedReborrowedFromMarkDep: interior_liveness with: %reborrow2
+
+// CHECK-LABEL: testInteriorDominatedReborrowedFromMarkDep: interior_liveness_swift with: %reborrow2
+// CHECK-NEXT: Interior liveness: %{{.*}} = argument of bb1 : $D
+// CHECK-NEXT: Pointer escape:   %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT: begin:      %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT: ends:       end_borrow %{{.*}} : $D
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  %{{.*}} = address_to_pointer %{{.*}} : $*C to $Builtin.RawPointer
+// CHECK-NEXT:             %{{.*}} = ref_element_addr %{{.*}} : $D, #D.object
+// CHECK-NEXT:             %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $D on %{{.*}} : $C
+// CHECK-NEXT:             %{{.*}} = borrowed %{{.*}} : $D from (%{{.*}} : $C)
+// CHECK-NEXT: last user:   end_borrow %{{.*}} : $D
+// CHECK-NEXT: testInteriorDominatedReborrowedFromMarkDep: interior_liveness_swift with: %reborrow2
+sil [ossa] @testInteriorDominatedReborrowedFromMarkDep : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %borrow1 = begin_borrow %0 : $C
+  specify_test "interior_liveness %borrow1"
+  specify_test "interior_liveness_swift %borrow1"
+  %d1 = unchecked_ref_cast %borrow1 : $C to $D
+  %borrow2 = begin_borrow %d1 : $D
+  br bb1(%borrow2 : $D)
+ 
+bb1(%reborrow2 : @reborrow $D):
+  specify_test "interior_liveness %reborrow2"
+  specify_test "interior_liveness_swift %reborrow2"
+  %borrowedfrom2 = borrowed %reborrow2 from (%borrow1)
+  %markdep2 = mark_dependence [nonescaping] %borrowedfrom2 on %borrow1 // Forces interior liveness
+  %f2 = ref_element_addr %markdep2 : $D, #D.object
+  %p2 = address_to_pointer %f2 : $*C to $Builtin.RawPointer
+  end_borrow %borrowedfrom2 : $D
+  end_borrow %borrow1 : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: partial_apply_noescape_onheap: interior_liveness_swift with: %box, true
+// CHECK: Interior liveness with inner uses:   %{{.*}} = alloc_box ${ var C }
+// CHECK-NEXT: Inner scope:   %{{.*}} = begin_borrow [lexical] %{{.*}} : ${ var C }
+// CHECK-NEXT: Pointer escape:   %{{.*}} = partial_apply [callee_guaranteed] %{{.*}}(%{{.*}}) : $@convention(thin) (@inout_aliasable C) -> ()
+// CHECK-NEXT: begin:      %{{.*}} = alloc_box ${ var C }
+// CHECK-NEXT: ends:       destroy_value %{{.*}} : ${ var C }
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  end_borrow %{{.*}} : ${ var C }
+// CHECK-NEXT:             %{{.*}} = partial_apply [callee_guaranteed] %{{.*}}(%{{.*}}) : $@convention(thin) (@inout_aliasable C) -> ()
+// CHECK-NEXT:             %{{.*}} = project_box %{{.*}} : ${ var C }, 0
+// CHECK-NEXT:             %{{.*}} = begin_borrow [lexical] %3 : ${ var C }
+// CHECK-NEXT: last user:   destroy_value %3 : ${ var C }
+// CHECK-NEXT: partial_apply_noescape_onheap: interior_liveness_swift with: %box, true
+sil [ossa] @partial_apply_noescape_onheap : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb2, bb1
+
+bb1:
+  %1 = enum $Optional<@callee_guaranteed () -> ()>, #Optional.none!enumelt
+  br bb4(%1)
+
+bb2:
+  %box = alloc_box ${ var C }
+  %borrow = begin_borrow [lexical] %box
+  specify_test "interior_liveness_swift %box true"
+  %adr = project_box %borrow : ${ var C }, 0
+  br bb3
+
+bb3:
+  %f = function_ref @useCAddress : $@convention(thin) (@inout_aliasable C) -> ()
+  %pa1 = partial_apply [callee_guaranteed] %f(%adr) : $@convention(thin) (@inout_aliasable C) -> ()
+  %pa2 = copy_value %pa1
+  %pane = convert_escape_to_noescape %pa2 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  %enum = enum $Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt, %pa2
+  end_borrow %borrow
+  destroy_value %box
+  destroy_value %pa1
+  destroy_value %pane
+  br bb4(%enum)
+
+bb4(%phi : @owned $Optional<@callee_guaranteed () -> ()>):
+  // ClosureLifetimeFixup destroys closures after destroying its addressable captures:
+  // this is bad OSSA but still accepted as valid until ClosureLifetimeFixup is rewritten.
+  destroy_value %phi
+  %r = tuple ()
+  return %r
+}
+
+// =============================================================================
+// ExtendedLiveness
+// =============================================================================
+
+// CHECK-LABEL: testExtendedPhi: extended-liveness with: %copy1
+// CHECK: Extended liveness:   %{{.*}} = copy_value %0 : $C
+// CHECK: lifetime-ending user:   br bb3(
+// CHECK: lifetime-ending user:   destroy_value
+// CHECK: last user:   br bb3(
+// CHECK: last user:   destroy_value
+// CHECK: testExtendedPhi: extended-liveness with: %copy1
+sil [ossa] @testExtendedPhi : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %copy1 = copy_value %0 : $C
+  specify_test "extended-liveness %copy1"
+  br bb3(%copy1 : $C)
+
+bb2:
+  %copy2 = copy_value %0 : $C
+  br bb3(%copy2 : $C)
+
+bb3(%phi : @owned $C):
+  destroy_value %phi : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: testExtendedReborrow: extended-liveness with: %borrow1
+// CHECK: Extended liveness:   %{{.*}} = begin_borrow
+// CHECK: lifetime-ending user:   br bb3(
+// CHECK: lifetime-ending user:   end_borrow
+// CHECK: last user:   br bb3(
+// CHECK: last user:   end_borrow
+// CHECK: testExtendedReborrow: extended-liveness with: %borrow1
+sil [ossa] @testExtendedReborrow : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %copy1 = copy_value %0 : $C
+  %borrow1 = begin_borrow %copy1 : $C
+  specify_test "extended-liveness %borrow1"
+  br bb3(%copy1 : $C, %borrow1 : $C)
+
+bb2:
+  %copy2 = copy_value %0 : $C
+  %borrow2 = begin_borrow %copy2 : $C
+  br bb3(%copy2 : $C, %borrow2 : $C)
+
+bb3(%phi : @owned $C, %reborrow : @guaranteed $C):
+  end_borrow %reborrow : $C
+  destroy_value %phi : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on testLoopConditional_incomplete_extended: extended-liveness
+// CHECK-LABEL: sil [ossa] @testLoopConditional_incomplete_extended : {{.*}} {
+// CHECK:       [[ENTRY:bb[0-9]+]]([[C:%[^,]+]] :
+// CHECK:         cond_br undef, [[HEADER:bb[0-9]+]], [[EXIT:bb[0-9]+]]
+// CHECK:       [[HEADER]]:
+// CHECK:         br [[LOOP:bb[0-9]+]]
+// CHECK:       [[LOOP]]:
+// CHECK:         [[B:%[^,]+]] = begin_borrow [[C]]
+// CHECK:         end_borrow [[B]]
+// CHECK:         br [[LOOP]]
+// CHECK:       [[EXIT]]:
+// CHECK:         destroy_value [[C]]
+// CHECK-LABEL: } // end sil function 'testLoopConditional_incomplete_extended'
+// CHECK:       Extended liveness: [[C]]
+// CHECK:       [[ENTRY]]: LiveOut
+// CHECK:       [[EXIT]]: LiveWithin
+// CHECK:       lifetime-ending user:   destroy_value [[C]]
+// CHECK:       last user:   destroy_value [[C]]
+// CHECK:       boundary edge: [[HEADER]]
+// CHECK-LABEL: end running test {{.*}} on testLoopConditional_incomplete_extended: extended-liveness
+sil [ossa] @testLoopConditional_incomplete_extended : $@convention(thin) (@owned C) -> () {
+entry(%c : @owned $C):
+  specify_test "extended-liveness %c"
+  cond_br undef, header, exit
+
+header:
+  br loop
+
+loop:
+  %b = begin_borrow %c : $C
+  end_borrow %b : $C
+  br loop
+
+exit:
+  destroy_value %c : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on testLoopConditional_complete_extended: extended-liveness
+// CHECK-LABEL: sil [ossa] @testLoopConditional_complete_extended : {{.*}} {
+// CHECK:       [[ENTRY:bb[0-9]+]]([[C:%[^,]+]] :
+// CHECK:         cond_br undef, [[HEADER:bb[0-9]+]], [[EXIT:bb[0-9]+]]
+// CHECK:       [[HEADER]]:
+// CHECK:         br [[LOOP:bb[0-9]+]]
+// CHECK:       [[LOOP]]:
+// CHECK:         [[B:%[^,]+]] = begin_borrow [[C]]
+// CHECK:         end_borrow [[B]]
+// CHECK:         extend_lifetime [[C]]
+// CHECK:         br [[LOOP]]
+// CHECK:       [[EXIT]]:
+// CHECK:         destroy_value [[C]]
+// CHECK-LABEL: } // end sil function 'testLoopConditional_complete_extended'
+// CHECK:       Extended liveness: [[C]]
+// CHECK:       [[ENTRY]]: LiveOut
+// CHECK:       [[EXIT]]: LiveWithin
+// CHECK:       [[LOOP]]: LiveOut
+// CHECK:       [[HEADER]]: LiveOut
+// CHECK:       lifetime-ending user:   destroy_value [[C]]
+// CHECK:       regular user:   extend_lifetime [[C]]
+// CHECK:       last user:   destroy_value [[C]]
+// CHECK-LABEL: end running test {{.*}} on testLoopConditional_complete_extended: extended-liveness
+sil [ossa] @testLoopConditional_complete_extended : $@convention(thin) (@owned C) -> () {
+entry(%c : @owned $C):
+  specify_test "extended-liveness %c"
+  cond_br undef, header, exit
+
+header:
+  br loop
+
+loop:
+  %b = begin_borrow %c : $C
+  end_borrow %b : $C
+  extend_lifetime %c : $C
+  br loop
+
+exit:
+  destroy_value %c : $C
+  %retval = tuple ()
+  return %retval : $()
+}

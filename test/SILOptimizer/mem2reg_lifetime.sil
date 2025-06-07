@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -enable-lexical-lifetimes %s -mem2reg | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -enable-lexical-lifetimes %s -mem2reg | %FileCheck %s
 
 // =============================================================================
 // Copied from mem2reg_ossa.sil                                               {{
@@ -311,8 +311,9 @@ bb2:
 // CHECK: bb3([[ARG:%.*]] : @owned $@callee_owned () -> Int):
 bb3:
   %13 = load [copy] %1 : $*@callee_owned () -> Int
-// CHECK: [[COPY:%.*]] = copy_value [[ARG]]
-// CHECK: [[RESULT:%.*]] = apply [[COPY]]
+//      : [[COPY:%.*]] = copy_value [[ARG]]
+// The above copy is eliminated by owned value canonicalization.
+// CHECK: [[RESULT:%.*]] = apply [[ARG]]
   %15 = apply %13() : $@callee_owned () -> Int
   br bb4
 
@@ -321,7 +322,8 @@ bb3:
   //       block.
 // CHECK: bb4
 bb4:
-// CHECK: destroy_value [[ARG]]
+//      : destroy_value [[ARG]]
+// The above destroy is eliminated by owned value canonicalization.
   destroy_addr %1 : $*@callee_owned () -> Int
   dealloc_stack %1 : $*@callee_owned () -> Int
   return %15 : $Int
@@ -345,7 +347,8 @@ bb0:
 // CHECK-LABEL: } // end sil function 'no_real_uses'
 
 // CHECK-LABEL: sil [ossa] @keep_release :
-// CHECK: destroy_value %0
+// CHECK: [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] %0
+// CHECK: destroy_value [[LIFETIME_OWNED]]
 // CHECK-LABEL: } // end sil function 'keep_release'
 sil [ossa] @keep_release : $@convention(thin) (@owned AnyObject) -> () {
 bb0(%0 : @owned $AnyObject):
@@ -390,7 +393,8 @@ bb0(%0 : $*Int64):
 // trade-offs.
 // CHECK-LABEL: sil [ossa] @large_struct_test :
 // CHECK: bb0([[ARG0:%.*]] : @owned $LargeCodesizeStruct):
-// CHECK:   destroy_value [[ARG0]]
+// CHECK:   [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[ARG0]]
+// CHECK:   destroy_value [[LIFETIME_OWNED]]
 // CHECK: } // end sil function 'large_struct_test'
 sil [ossa] @large_struct_test : $@convention(thin) (@owned LargeCodesizeStruct) -> () {
 bb0(%0 : @owned $LargeCodesizeStruct):
@@ -404,13 +408,10 @@ bb0(%0 : @owned $LargeCodesizeStruct):
 
 // CHECK-LABEL: sil [ossa] @small_struct_test :
 // CHECK: bb0([[ARG0:%.*]] : @owned $SmallCodesizeStruct):
-// CHECK:   [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[ARG0]]
-// CHECK:   [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
+// CHECK:   [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[ARG0]]
 // CHECK:   ([[ELEM1:%[0-9]+]], [[ELEM2:%[0-9]+]]) = destructure_struct [[LIFETIME_OWNED]]
 // CHECK:   destroy_value [[ELEM1]]
 // CHECK:   destroy_value [[ELEM2]]
-// CHECK:   end_borrow [[LIFETIME]]
-// CHECK:   destroy_value [[ARG0]]
 // CHECK: } // end sil function 'small_struct_test'
 sil [ossa] @small_struct_test : $@convention(thin) (@owned SmallCodesizeStruct) -> () {
 bb0(%0 : @owned $SmallCodesizeStruct):
@@ -425,15 +426,12 @@ bb0(%0 : @owned $SmallCodesizeStruct):
 // CHECK-LABEL: sil [ossa] @small_struct_multi_test :
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $SmallCodesizeStruct):
 // CHECK-NOT:     alloc_stack
-// CHECK:       [[LIFETIME:%[^,]+]] = begin_borrow [lexical] %0
-// CHECK:       [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
+// CHECK:       [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] %0
 // CHECK:       bb1:
 // CHECK:         [[COPY:%.*]] = copy_value [[LIFETIME_OWNED]]
 // CHECK-NEXT:    destructure_struct [[LIFETIME_OWNED]]
 // CHECK-NEXT:    destroy_value
 // CHECK-NEXT:    destroy_value
-// CHECK-NEXT:    end_borrow [[LIFETIME]]
-// CHECK-NEXT:    destroy_value [[INSTANCE]]
 // CHECK-NEXT:    begin_borrow [[COPY]]
 // CHECK-NEXT:    debug_value
 // CHECK-NEXT:    end_borrow
@@ -442,8 +440,6 @@ bb0(%0 : @owned $SmallCodesizeStruct):
 // CHECK-NEXT:    destructure_struct [[LIFETIME_OWNED]]
 // CHECK-NEXT:    destroy_value
 // CHECK-NEXT:    destroy_value
-// CHECK-NEXT:    end_borrow [[LIFETIME]]
-// CHECK-NEXT:    destroy_value [[INSTANCE]]
 // CHECK-LABEL: } // end sil function 'small_struct_multi_test'
 sil [ossa] @small_struct_multi_test : $@convention(thin) (@owned SmallCodesizeStruct) -> () {
 bb0(%0 : @owned $SmallCodesizeStruct):
@@ -537,10 +533,7 @@ sil [ossa] @callee_void_to_void : $@convention(thin) () -> ()
 //
 // CHECK-LABEL: sil [ossa] @basic_1 : $@convention(thin) (@owned C) -> () {
 // CHECK:       bb0([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         [[CALLEE:%[^,]+]] = function_ref @callee_guaranteed
 // CHECK:         [[RETVAL:%[^,]+]] = apply [[CALLEE]]([[LIFETIME_OWNED]])
 // CHECK:         destroy_value [[LIFETIME_OWNED]]
@@ -564,10 +557,7 @@ entry(%instance : @owned $C):
 // CHECK-LABEL: sil [ossa] @basic_3 : $@convention(thin) (@guaranteed C) -> () {
 // CHECK:       bb0([[INSTANCE_GUARANTEED:%[^,]+]] : @guaranteed $C):
 // CHECK:         [[INSTANCE:%[^,]+]] = copy_value [[INSTANCE_GUARANTEED]]
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         [[CALLEE:%[^,]+]] = function_ref @callee_guaranteed
 // CHECK:         [[RETVAL:%[^,]+]] = apply [[CALLEE]]([[LIFETIME_OWNED]])
 // CHECK:         destroy_value [[LIFETIME_OWNED]]
@@ -591,10 +581,7 @@ entry(%instance_guaranteed : @guaranteed $C):
 //
 // CHECK-LABEL: sil [ossa] @basic_4 : $@convention(thin) (@owned C) -> () {
 // CHECK:       bb0([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         [[CALLEE:%[^,]+]] = function_ref @callee_owned
 // CHECK:         [[RETVAL:%[^,]+]] = apply [[CALLEE]]([[LIFETIME_OWNED]])
 // CHECK:         return [[RETVAL]]
@@ -612,16 +599,10 @@ entry(%instance : @owned $C):
 
 // CHECK-LABEL: sil [ossa] @basic_5 : $@convention(thin) (@owned C, @owned C) -> () {
 // CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME_1:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_1]]
-// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = copy_value [[LIFETIME_1]]
+// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[INSTANCE_1]]
 // CHECK:         destroy_value [[LIFETIME_OWNED_1]]
-// CHECK:         end_borrow [[LIFETIME_1]]
-// CHECK:         destroy_value [[INSTANCE_1]]
-// CHECK:         [[LIFETIME_2:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_2]]
-// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = copy_value [[LIFETIME_2]]
+// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = move_value [lexical] [[INSTANCE_2]]
 // CHECK:         destroy_value [[LIFETIME_OWNED_2]]
-// CHECK:         end_borrow [[LIFETIME_2]]
-// CHECK:         destroy_value [[INSTANCE_2]]
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]]
 // CHECK-LABEL: } // end sil function 'basic_5'
@@ -640,16 +621,10 @@ entry(%instance_1 : @owned $C, %instance_2 : @owned $C):
 // CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
 // CHECK:         br [[WORK:bb[0-9]+]]
 // CHECK:       [[WORK]]:
-// CHECK:         [[LIFETIME_1:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_1]]
-// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = copy_value [[LIFETIME_1]]
+// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[INSTANCE_1]]
 // CHECK:         destroy_value [[LIFETIME_OWNED_1]]
-// CHECK:         end_borrow [[LIFETIME_1]]
-// CHECK:         destroy_value [[INSTANCE_1]]
-// CHECK:         [[LIFETIME_2:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_2]]
-// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = copy_value [[LIFETIME_2]]
+// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = move_value [lexical] [[INSTANCE_2]]
 // CHECK:         destroy_value [[LIFETIME_OWNED_2]]
-// CHECK:         end_borrow [[LIFETIME_2]]
-// CHECK:         destroy_value [[INSTANCE_2]]
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[EXIT]]:
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
@@ -672,18 +647,12 @@ exit:
 
 // CHECK-LABEL: sil [ossa] @basic_7 : $@convention(thin) (@owned C, @owned C) -> () {
 // CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME_1:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_1]]
-// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = copy_value [[LIFETIME_1]]
+// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[INSTANCE_1]]
 // CHECK:         br [[WORK:bb[0-9]+]]
 // CHECK:       [[WORK]]:
 // CHECK:         destroy_value [[LIFETIME_OWNED_1]]
-// CHECK:         end_borrow [[LIFETIME_1]]
-// CHECK:         destroy_value [[INSTANCE_1]]
-// CHECK:         [[LIFETIME_2:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_2]]
-// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = copy_value [[LIFETIME_2]]
+// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = move_value [lexical] [[INSTANCE_2]]
 // CHECK:         destroy_value [[LIFETIME_OWNED_2]]
-// CHECK:         end_borrow [[LIFETIME_2]]
-// CHECK:         destroy_value [[INSTANCE_2]]
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[EXIT]]:
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
@@ -710,10 +679,7 @@ exit:
 
 // CHECK-LABEL: sil [ossa] @after_1 : $@convention(thin) (@owned C) -> @owned C {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         [[CALLEE_VOID_TO_VOID:%[^,]+]] = function_ref @callee_void_to_void
 // CHECK:         apply [[CALLEE_VOID_TO_VOID]]
 // CHECK:         return [[LIFETIME_OWNED]]
@@ -731,14 +697,8 @@ bb0(%instance : @owned $C):
 
 // CHECK-LABEL: sil [ossa] @after_2 : $@convention(thin) (@owned C, @owned C) -> @owned C {
 // CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME_1:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_1]] 
-// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = copy_value [[LIFETIME_1]] 
-// CHECK:         end_borrow [[LIFETIME_1]] 
-// CHECK:         destroy_value [[INSTANCE_1]] 
-// CHECK:         [[LIFETIME_2:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_2]] 
-// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = copy_value [[LIFETIME_2]] 
-// CHECK:         end_borrow [[LIFETIME_2]] 
-// CHECK:         destroy_value [[INSTANCE_2]] 
+// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[INSTANCE_1]] 
+// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = move_value [lexical] [[INSTANCE_2]] 
 // CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
 // CHECK:         apply [[CALLEE_GUARANTEED]]([[LIFETIME_OWNED_2]]) 
 // CHECK:         destroy_value [[LIFETIME_OWNED_2]] 
@@ -760,10 +720,7 @@ bb0(%instance_1 : @owned $C, %instance_2 : @owned $C):
 
 // CHECK-LABEL: sil [ossa] @after_3 : $@convention(thin) (@owned C) -> @owned C {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]] 
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]] 
-// CHECK:         end_borrow [[LIFETIME]] 
-// CHECK:         destroy_value [[INSTANCE]] 
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]] 
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[EXIT]]:
 // CHECK:         [[CALLEE_VOID_TO_VOID:%[^,]+]] = function_ref @callee_void_to_void 
@@ -785,10 +742,7 @@ exit:
 
 // CHECK-LABEL: sil [ossa] @after_4 : $@convention(thin) (@owned C) -> @owned C {
 // CHECK:       bb0([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]] 
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]] 
-// CHECK:         end_borrow [[LIFETIME]] 
-// CHECK:         destroy_value [[INSTANCE]] 
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]] 
 // CHECK:         br bb1
 // CHECK:       bb1:
 // CHECK:         [[CALLEE_VOID_TO_VOID:%[^,]+]] = function_ref @callee_void_to_void 
@@ -810,10 +764,7 @@ exit:
 
 // CHECK-LABEL: sil [ossa] @after_5 : $@convention(thin) (@owned C) -> () {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[EXIT]]:
 // CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
@@ -838,20 +789,11 @@ exit:
 // CHECK-LABEL: sil [ossa] @after_6 : $@convention(thin) (@owned C, @owned C, @owned C) -> @owned C {
 // CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C, [[INSTANCE_3:%[^,]+]] : @owned $C):
 // CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
-// CHECK:         [[LIFETIME_1:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_1]]
-// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = copy_value [[LIFETIME_1]]
-// CHECK:         end_borrow [[LIFETIME_1]]
-// CHECK:         destroy_value [[INSTANCE_1]]
-// CHECK:         [[LIFETIME_2:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_2]]
-// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = copy_value [[LIFETIME_2]]
-// CHECK:         end_borrow [[LIFETIME_2]]
-// CHECK:         destroy_value [[INSTANCE_2]]
+// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[INSTANCE_1]]
+// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = move_value [lexical] [[INSTANCE_2]]
 // CHECK:         apply [[CALLEE_GUARANTEED]]([[LIFETIME_OWNED_2]])
 // CHECK:         apply [[CALLEE_GUARANTEED]]([[LIFETIME_OWNED_1]])
-// CHECK:         [[LIFETIME_3:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_3]]
-// CHECK:         [[LIFETIME_OWNED_3:%[^,]+]] = copy_value [[LIFETIME_3]]
-// CHECK:         end_borrow [[LIFETIME_3]]
-// CHECK:         destroy_value [[INSTANCE_3]]
+// CHECK:         [[LIFETIME_OWNED_3:%[^,]+]] = move_value [lexical] [[INSTANCE_3]]
 // CHECK:         destroy_value [[LIFETIME_OWNED_2]]
 // CHECK:         destroy_value [[LIFETIME_OWNED_3]]
 // CHECK:         return [[LIFETIME_OWNED_1]]
@@ -876,10 +818,7 @@ bb0(%instance_1 : @owned $C, %instance_2 : @owned $C, %instance_3 : @owned $C):
 
 // CHECK-LABEL: sil [ossa] @after_7 : $@convention(thin) (@owned C) -> @owned C {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]] 
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]] 
-// CHECK:         end_borrow [[LIFETIME]] 
-// CHECK:         destroy_value [[INSTANCE]] 
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]] 
 // CHECK:         [[CALLEE_VOID_TO_VOID:%[^,]+]] = function_ref @callee_void_to_void 
 // CHECK:         apply [[CALLEE_VOID_TO_VOID]]() 
 // CHECK:         return [[LIFETIME_OWNED]] 
@@ -897,12 +836,9 @@ bb0(%instance : @owned $C):
 
 // CHECK-LABEL: sil [ossa] @after_8 : $@convention(thin) (@owned C) -> @owned C {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]] 
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]] 
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]] 
 // CHECK:         [[COPY:%[^,]+]] = copy_value [[LIFETIME_OWNED]] 
 // CHECK:         destroy_value [[LIFETIME_OWNED]] 
-// CHECK:         end_borrow [[LIFETIME]] 
-// CHECK:         destroy_value [[INSTANCE]] 
 // CHECK:         [[CALLEE_VOID_TO_VOID:%[^,]+]] = function_ref @callee_void_to_void 
 // CHECK:         apply [[CALLEE_VOID_TO_VOID]]() 
 // CHECK:         return [[COPY]] 
@@ -921,16 +857,10 @@ bb0(%instance : @owned $C):
 
 // CHECK-LABEL: sil [ossa] @after_9 : $@convention(thin) (@owned C, @owned C) -> @owned C {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME_1:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_1]] 
-// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = copy_value [[LIFETIME_1]] 
-// CHECK:         end_borrow [[LIFETIME_1]] 
-// CHECK:         destroy_value [[INSTANCE_1]] 
+// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[INSTANCE_1]] 
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[EXIT]]:
-// CHECK:         [[LIFETIME_2:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_2]] 
-// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = copy_value [[LIFETIME_2]] 
-// CHECK:         end_borrow [[LIFETIME_2]] 
-// CHECK:         destroy_value [[INSTANCE_2]] 
+// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = move_value [lexical] [[INSTANCE_2]] 
 // CHECK:         destroy_value [[LIFETIME_OWNED_2]] 
 // CHECK:         return [[LIFETIME_OWNED_1]] 
 // CHECK-LABEL: } // end sil function 'after_9'
@@ -952,16 +882,10 @@ exit:
 // CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
 // CHECK:         br [[WORK:bb[0-9]+]]
 // CHECK:       [[WORK]]:
-// CHECK:         [[LIFETIME_1:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_1]] 
-// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = copy_value [[LIFETIME_1]] 
+// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[INSTANCE_1]] 
 // CHECK:         [[COPY:%[^,]+]] = copy_value [[LIFETIME_OWNED_1]] 
 // CHECK:         destroy_value [[LIFETIME_OWNED_1]] 
-// CHECK:         end_borrow [[LIFETIME_1]] 
-// CHECK:         destroy_value [[INSTANCE_1]] 
-// CHECK:         [[LIFETIME_2:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_2]] 
-// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = copy_value [[LIFETIME_2]] 
-// CHECK:         end_borrow [[LIFETIME_2]] 
-// CHECK:         destroy_value [[INSTANCE_2]] 
+// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = move_value [lexical] [[INSTANCE_2]] 
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[EXIT]]:
 // CHECK:         destroy_value [[LIFETIME_OWNED_2]] 
@@ -985,18 +909,12 @@ exit:
 
 // CHECK-LABEL: sil [ossa] @after_11 : $@convention(thin) (@owned C, @owned C) -> @owned C {
 // CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME_1:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_1]]
-// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = copy_value [[LIFETIME_1]]
+// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[INSTANCE_1]]
 // CHECK:         br [[WORK:bb[0-9]+]]
 // CHECK:       [[WORK]]:
 // CHECK:         [[COPY:%[^,]+]] = copy_value [[LIFETIME_OWNED_1]]
 // CHECK:         destroy_value [[LIFETIME_OWNED_1]]
-// CHECK:         end_borrow [[LIFETIME_1]]
-// CHECK:         destroy_value [[INSTANCE_1]]
-// CHECK:         [[LIFETIME_2:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_2]]
-// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = copy_value [[LIFETIME_2]]
-// CHECK:         end_borrow [[LIFETIME_2]]
-// CHECK:         destroy_value [[INSTANCE_2]]
+// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = move_value [lexical] [[INSTANCE_2]]
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[EXIT]]:
 // CHECK:         destroy_value [[LIFETIME_OWNED_2]]
@@ -1025,17 +943,11 @@ exit:
 // Check that an initial store [assign] becomes a scope end.
 // CHECK-LABEL: sil [ossa] @deferred_1 : $@convention(thin) (@owned C, @owned C) -> @owned C {
 // CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME_2:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_2]] : $C
-// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = copy_value [[LIFETIME_2]] : $C
+// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = move_value [lexical] [[INSTANCE_2]] : $C
 // CHECK:         br [[WORK:bb[0-9]+]]
 // CHECK:       [[WORK]]:
 // CHECK:         destroy_value [[LIFETIME_OWNED_2]] : $C
-// CHECK:         end_borrow [[LIFETIME_2]] : $C
-// CHECK:         destroy_value [[INSTANCE_2]] : $C
-// CHECK:         [[LIFETIME_1:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_1]] : $C
-// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = copy_value [[LIFETIME_1]] : $C
-// CHECK:         end_borrow [[LIFETIME_1]] : $C
-// CHECK:         destroy_value [[INSTANCE_1]] : $C
+// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[INSTANCE_1]] : $C
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[EXIT]]:
 // CHECK:         return [[LIFETIME_OWNED_1]] : $C
@@ -1058,19 +970,13 @@ exit:
 // scope end.
 // CHECK-LABEL: sil [ossa] @deferred_2 : $@convention(thin) (@owned C, @owned C) -> @owned C {
 // CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME_2:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_2]]
-// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = copy_value [[LIFETIME_2]]
+// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = move_value [lexical] [[INSTANCE_2]]
 // CHECK:         br [[WORK:bb[0-9]+]]
 // CHECK:       [[WORK]]:
 // CHECK:         [[COPY_2:%[^,]+]] = copy_value [[LIFETIME_OWNED_2]]
 // CHECK:         destroy_value [[COPY_2]]
 // CHECK:         destroy_value [[LIFETIME_OWNED_2]]
-// CHECK:         end_borrow [[LIFETIME_2]]
-// CHECK:         destroy_value [[INSTANCE_2]]
-// CHECK:         [[LIFETIME_1:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_1]]
-// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = copy_value [[LIFETIME_1]]
-// CHECK:         end_borrow [[LIFETIME_1]]
-// CHECK:         destroy_value [[INSTANCE_1]]
+// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[INSTANCE_1]]
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[EXIT]]:
 // CHECK:         return [[LIFETIME_OWNED_1]]
@@ -1094,17 +1000,11 @@ exit:
 // Ensure that an initial deferred destroy_addr becomes a scope end.
 // CHECK-LABEL: sil [ossa] @deferred_3 : $@convention(thin) (@owned C, @owned C) -> @owned C {
 // CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME_2:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_2]]
-// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = copy_value [[LIFETIME_2]]
+// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = move_value [lexical] [[INSTANCE_2]]
 // CHECK:         br [[WORK:bb[0-9]+]]
 // CHECK:       [[WORK]]:
 // CHECK:         destroy_value [[LIFETIME_OWNED_2]]
-// CHECK:         end_borrow [[LIFETIME_2]]
-// CHECK:         destroy_value [[INSTANCE_2]]
-// CHECK:         [[LIFETIME_1:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_1]]
-// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = copy_value [[LIFETIME_1]]
-// CHECK:         end_borrow [[LIFETIME_1]]
-// CHECK:         destroy_value [[INSTANCE_1]]
+// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[INSTANCE_1]]
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[EXIT]]:
 // CHECK:         return [[LIFETIME_OWNED_1]]
@@ -1128,19 +1028,13 @@ exit:
 // scope end.
 // CHECK-LABEL: sil [ossa] @deferred_4 : $@convention(thin) (@owned C, @owned C) -> @owned C {
 // CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME_2:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_2]]
-// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = copy_value [[LIFETIME_2]]
+// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = move_value [lexical] [[INSTANCE_2]]
 // CHECK:         br [[WORK:bb[0-9]+]]
 // CHECK:       [[WORK]]:
 // CHECK:         [[COPY_2:%[^,]+]] = copy_value [[LIFETIME_OWNED_2]]
 // CHECK:         destroy_value [[COPY_2]]
 // CHECK:         destroy_value [[LIFETIME_OWNED_2]]
-// CHECK:         end_borrow [[LIFETIME_2]]
-// CHECK:         destroy_value [[INSTANCE_2]]
-// CHECK:         [[LIFETIME_1:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_1]]
-// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = copy_value [[LIFETIME_1]]
-// CHECK:         end_borrow [[LIFETIME_1]]
-// CHECK:         destroy_value [[INSTANCE_1]]
+// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[INSTANCE_1]]
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[EXIT]]:
 // CHECK:         return [[LIFETIME_OWNED_1]]
@@ -1165,16 +1059,10 @@ exit:
 // Ensure that an initial load [take] gets a deferred scope end.
 // CHECK-LABEL: sil [ossa] @deferred_5 : $@convention(thin) (@owned C, @owned C) -> @owned C {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME_1:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_1]]
-// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = copy_value [[LIFETIME_1]]
+// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[INSTANCE_1]]
 // CHECK:         br [[WORK:bb[0-9]+]]
 // CHECK:       [[WORK]]:
-// CHECK:         end_borrow [[LIFETIME_1]]
-// CHECK:         destroy_value [[INSTANCE_1]]
-// CHECK:         [[LIFETIME_2:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_2]]
-// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = copy_value [[LIFETIME_2]]
-// CHECK:         end_borrow [[LIFETIME_2]]
-// CHECK:         destroy_value [[INSTANCE_2]]
+// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = move_value [lexical] [[INSTANCE_2]]
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[EXIT]]:
 // CHECK:         destroy_value [[LIFETIME_OWNED_2]]
@@ -1200,13 +1088,10 @@ exit:
 // scope end.
 // CHECK-LABEL: sil [ossa] @deferred_6 : $@convention(thin) (@owned C) -> @owned C {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         br [[WORK:bb[0-9]+]]
 // CHECK:       [[WORK]]:
 // CHECK:         [[COPY:%[^,]+]] = copy_value [[LIFETIME_OWNED]]
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[INSTANCE]]
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[EXIT]]:
 // CHECK:         destroy_value [[COPY]]
@@ -1229,24 +1114,15 @@ exit:
 
 // CHECK-LABEL: sil [ossa] @deferred_7 : $@convention(thin) (@owned C, @owned C) -> () {
 // CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME_1:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_2]]
-// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = copy_value [[LIFETIME_1]]
+// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[INSTANCE_2]]
 // CHECK:         br [[WORK:bb[0-9]+]]
 // CHECK:       [[WORK]]:
 // CHECK:         [[COPY_1:%[^,]+]] = copy_value [[LIFETIME_OWNED_1]]
 // CHECK:         destroy_value [[COPY_1]]
 // CHECK:         destroy_value [[LIFETIME_OWNED_1]]
-// CHECK:         end_borrow [[LIFETIME_1]]
-// CHECK:         destroy_value [[INSTANCE_2]]
-// CHECK:         [[LIFETIME_2:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_1]]
-// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = copy_value [[LIFETIME_2]]
-// CHECK:         end_borrow [[LIFETIME_2]]
-// CHECK:         destroy_value [[INSTANCE_1]]
-// CHECK:         [[LIFETIME_3:%[^,]+]] = begin_borrow [lexical] [[LIFETIME_OWNED_2]]
-// CHECK:         [[LIFETIME_OWNED_3:%[^,]+]] = copy_value [[LIFETIME_3]]
+// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = move_value [lexical] [[INSTANCE_1]]
+// CHECK:         [[LIFETIME_OWNED_3:%[^,]+]] = move_value [lexical] [[LIFETIME_OWNED_2]]
 // CHECK:         destroy_value [[LIFETIME_OWNED_3]]
-// CHECK:         end_borrow [[LIFETIME_3]]
-// CHECK:         destroy_value [[LIFETIME_OWNED_2]]
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[EXIT]]:
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
@@ -1277,10 +1153,7 @@ exit:
 
 // CHECK-LABEL: sil [ossa] @term_1 : $@convention(thin) (@owned C) -> @owned C {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
-// CHECK:         [[RETVAL:%[^,]+]] = copy_value [[LIFETIME]]
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         [[RETVAL:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         return [[RETVAL]]
 // CHECK-LABEL: } // end sil function 'term_1'
 sil [ossa] @term_1 : $@convention(thin) (@owned C) -> @owned C {
@@ -1294,10 +1167,7 @@ entry(%instance : @owned $C):
 
 // CHECK-LABEL: sil [ossa] @term_2 : $@convention(thin) (@owned C) -> @owned C {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
-// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = copy_value [[LIFETIME]]
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         br [[EXIT:bb[^,]+]]([[LIFETIME_OWNED_1]] : $C)
 // CHECK:       [[EXIT]]([[OUTSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         return [[OUTSTANCE]]
@@ -1315,10 +1185,7 @@ exit(%outstance : @owned $C):
 
 // CHECK-LABEL: sil [ossa] @term_3 : $@convention(thin) (@owned E) -> @owned C {
 // CHECK:       {{bb[^,]+}}([[EITHER:%[^,]+]] : @owned $E):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[EITHER]] : $E
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]] : $E
-// CHECK:         end_borrow [[LIFETIME]] : $E
-// CHECK:         destroy_value [[EITHER]] : $E
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[EITHER]] : $E
 // CHECK:         switch_enum [[LIFETIME_OWNED]] : $E, case #E.one!enumelt: [[EXIT:bb[0-9]+]]
 // CHECK:       [[EXIT]]([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         return [[INSTANCE]] : $C
@@ -1336,11 +1203,8 @@ one(%instance : @owned $C):
 
 // CHECK-LABEL: sil [ossa] @term_4 : $@convention(thin) (@owned C, @owned D) -> @owned D {
 // CHECK:       {{bb[^,]+}}([[SUPER_IN:%[^,]+]] : @owned $C, [[SUB_IN:%[^,]+]] : @owned $D):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[SUPER_IN]]
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[SUPER_IN]]
-// CHECK:         checked_cast_br [[LIFETIME_OWNED]] : $C to D, [[SUPER_IS_SUB:bb[^,]+]], [[SUPER_IS_SUPER:bb[0-9]+]]
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[SUPER_IN]]
+// CHECK:         checked_cast_br C in [[LIFETIME_OWNED]] : $C to D, [[SUPER_IS_SUB:bb[^,]+]], [[SUPER_IS_SUPER:bb[0-9]+]]
 // CHECK:       [[SUPER_IS_SUB]]([[SUPER_AS_SUB:%[^,]+]] : @owned $D):
 // CHECK:         destroy_value [[SUB_IN]]
 // CHECK:         br [[EXIT:bb[^,]+]]([[SUPER_AS_SUB]] : $D)
@@ -1355,7 +1219,7 @@ bb0(%super_in : @owned $C, %sub_in : @owned $D):
     %addr = alloc_stack [lexical] $C
     store %super_in to [init] %addr : $*C
     %super_load = load [take] %addr : $*C
-    checked_cast_br %super_load : $C to D, super_is_sub, super_is_super
+    checked_cast_br C in %super_load : $C to D, super_is_sub, super_is_super
 super_is_sub(%super_as_sub : @owned $D):
     destroy_value %sub_in : $D
     br exit(%super_as_sub : $D)
@@ -1369,10 +1233,7 @@ exit(%sub_out : @owned $D):
 
 // CHECK-LABEL: sil hidden [ossa] @term_5 : $@convention(thin) (@owned C) -> @error any Error {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         [[CALLEE_ERROR_OWNED:%[^,]+]] = function_ref @callee_error_owned
 // CHECK:         try_apply [[CALLEE_ERROR_OWNED]]([[LIFETIME_OWNED]]) : $@convention(thin) (@owned C) -> @error any Error, normal [[REGULAR_BLOCK:bb[^,]+]], error [[THROW_BLOCK:bb[0-9]+]]
 // CHECK:       [[REGULAR_BLOCK]]({{%[^,]+}} : $()):
@@ -1404,10 +1265,7 @@ exit:
 
 // CHECK-LABEL: sil [ossa] @term_6 : $@yield_once @convention(method) (@owned C) -> @yields C {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]] 
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]] 
-// CHECK:         end_borrow [[LIFETIME]] 
-// CHECK:         destroy_value [[INSTANCE]] 
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]] 
 // CHECK:         yield [[LIFETIME_OWNED]] : $C, resume [[RESUME_BLOCK:bb[^,]+]], unwind [[UNWIND_BLOCK:bb[0-9]+]]
 // CHECK:       [[RESUME_BLOCK]]:
 // CHECK:         destroy_value [[LIFETIME_OWNED]] 
@@ -1436,10 +1294,7 @@ unwind_block:
 
 // CHECK-LABEL: sil [ossa] @term_7 : $@convention(thin) (@owned C) -> @error C {
 // CHECK:       bb0([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]] 
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]] 
-// CHECK:         end_borrow [[LIFETIME]] 
-// CHECK:         destroy_value [[INSTANCE]] 
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]] 
 // CHECK:         cond_br undef, [[THROW_BLOCK:bb[^,]+]], [[REGULAR_BLOCK:bb[0-9]+]]
 // CHECK:       [[THROW_BLOCK]]:
 // CHECK:         throw [[LIFETIME_OWNED]] 
@@ -1470,17 +1325,11 @@ bb2:
 
 // CHECK-LABEL: sil [ossa] @unreachable_1 : $@convention(thin) (@owned C, @owned C) -> () {
 // CHECK:       {{bb[^,]+}}([[INSTANCE_1:%[^,]+]] : @owned $C, [[INSTANCE_2:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME_1:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_1]]
-// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = copy_value [[LIFETIME_1]]
+// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[INSTANCE_1]]
 // CHECK:         br [[DIE:bb[0-9]+]]
 // CHECK:       [[DIE]]:
-// CHECK:         end_borrow [[LIFETIME_1]]
-// CHECK:         destroy_value [[INSTANCE_1]]
 // CHECK:         destroy_value [[LIFETIME_OWNED_1]]
-// CHECK:         [[LIFETIME_2:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_2]]
-// CHECK:         [[COPY:%[^,]+]] = copy_value [[LIFETIME_2]]
-// CHECK:         end_borrow [[LIFETIME_2]]
-// CHECK:         destroy_value [[INSTANCE_2]]
+// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = move_value [lexical] [[INSTANCE_2]]
 // CHECK:         unreachable
 // CHECK-LABEL: } // end sil function 'unreachable_1'
 sil [ossa] @unreachable_1 : $@convention(thin) (@owned C, @owned C) -> () {
@@ -1497,10 +1346,7 @@ work:
 
 // CHECK-LABEL: sil [ossa] @unreachable_2 : $@convention(thin) (@owned C) -> () {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         unreachable
 // CHECK-LABEL: } // end sil function 'unreachable_2'
 sil [ossa] @unreachable_2 : $@convention(thin) (@owned C) -> () {
@@ -1512,10 +1358,7 @@ entry(%instance : @owned $C):
 
 // CHECK-LABEL: sil [ossa] @unreachable_3 : $@convention(thin) (@owned C) -> () {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         unreachable
 // CHECK-LABEL: } // end sil function 'unreachable_3'
 sil [ossa] @unreachable_3 : $@convention(thin) (@owned C) -> () {
@@ -1528,14 +1371,8 @@ entry(%instance : @owned $C):
 
 // CHECK-LABEL: sil [ossa] @unreachable_4 : $@convention(thin) (@owned C) -> () {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME_1:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]] : $C
-// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = copy_value [[LIFETIME_1]] : $C
-// CHECK:         end_borrow [[LIFETIME_1]] : $C
-// CHECK:         destroy_value [[INSTANCE]] : $C
-// CHECK:         [[LIFETIME_2:%[^,]+]] = begin_borrow [lexical] [[LIFETIME_OWNED_1]] : $C
-// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = copy_value [[LIFETIME_2]] : $C
-// CHECK:         end_borrow [[LIFETIME_2]] : $C
-// CHECK:         destroy_value [[LIFETIME_OWNED_1]] : $C
+// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[INSTANCE]] : $C
+// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = move_value [lexical] [[LIFETIME_OWNED_1]] : $C
 // CHECK:         unreachable
 // CHECK-LABEL: } // end sil function 'unreachable_4'
 sil [ossa] @unreachable_4 : $@convention(thin) (@owned C) -> () {
@@ -1551,12 +1388,9 @@ entry(%instance : @owned $C):
 // End lifetime before unreachable inst.
 // CHECK-LABEL: sil [ossa] @unreachable_5 : $@convention(thin) (@owned C) -> () {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[EXIT]]:
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[INSTANCE]]
 // CHECK:         unreachable
 // CHECK-LABEL: } // end sil function 'unreachable_5'
 sil [ossa] @unreachable_5 : $@convention(thin) (@owned C) -> () {
@@ -1640,8 +1474,7 @@ exit:
 // CHECK:       {{bb[0-9]+}}:
 // CHECK:         [[GET_C:%[^,]+]] = function_ref @getC : $@convention(thin) () -> @owned C
 // CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_C]]() : $@convention(thin) () -> @owned C
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         br [[LOOP_HEADER:bb[0-9]+]]
 // CHECK:       [[LOOP_HEADER]]:
 // CHECK:         br [[LOOP_BODY:bb[0-9]+]]
@@ -1652,8 +1485,6 @@ exit:
 // CHECK:       [[LOOP_BACKEDGE]]:
 // CHECK:         br [[LOOP_HEADER]]
 // CHECK:       [[DIE]]:
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[INSTANCE]]
 // CHECK:         unreachable
 // CHECK-LABEL: } // end sil function 'unreachable_loop_1'
 sil [ossa] @unreachable_loop_1 : $@convention(thin) () -> () {
@@ -1738,17 +1569,12 @@ die:
 // CHECK:         cond_br undef, [[LEFT:bb[^,]+]], [[RIGHT:bb[0-9]+]]
 // CHECK:       [[LEFT]]:
 // CHECK:         destroy_value [[INSTANCE_2]]
-// CHECK:         [[LIFETIME_1:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_1]]
-// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = copy_value [[LIFETIME_1]]
-// CHECK:         br [[EXIT:bb[^,]+]]([[INSTANCE_1]] : $C, [[LIFETIME_1]] : $C, [[LIFETIME_OWNED_1]] : $C)
+// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[INSTANCE_1]]
+// CHECK:         br [[EXIT:bb[^,]+]]([[LIFETIME_OWNED_1]] : $C)
 // CHECK:       [[RIGHT]]:
-// CHECK:         destroy_value [[INSTANCE_1]]
-// CHECK:         [[LIFETIME_2:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_2]]
-// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = copy_value [[LIFETIME_2]]
-// CHECK:         br [[EXIT]]([[INSTANCE_2]] : $C, [[LIFETIME_2]] : $C, [[LIFETIME_OWNED_2]] : $C)
-// CHECK:       [[EXIT]]([[INSTANCE:%[^,]+]] : @owned $C, [[LIFETIME:%[^,]+]] : @guaranteed $C, [[LIFETIME_OWNED:%[^,]+]] : @owned $C):
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = move_value [lexical] [[INSTANCE_2]]
+// CHECK:         br [[EXIT]]([[LIFETIME_OWNED_2]] : $C)
+// CHECK:       [[EXIT]]([[LIFETIME_OWNED:%[^,]+]] : @owned $C):
 // CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
 // CHECK:         {{%[^,]+}} = apply [[CALLEE_GUARANTEED]]([[LIFETIME_OWNED]])
 // CHECK:         destroy_value [[LIFETIME_OWNED]]
@@ -1788,10 +1614,7 @@ exit:
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[RIGHT]]:
 // CHECK:         destroy_value [[INSTANCE_0]]
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE_1]]
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[INSTANCE_1]]
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE_1]]
 // CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
 // CHECK:         {{%[^,]+}} = apply [[CALLEE_GUARANTEED]]([[LIFETIME_OWNED]])
 // CHECK:         destroy_value [[LIFETIME_OWNED]]
@@ -1831,18 +1654,14 @@ exit:
 // CHECK:         cond_br undef, [[LEFT:bb[^,]+]], [[RIGHT:bb[0-9]+]]
 // CHECK:       [[LEFT]]:
 // CHECK:         destroy_value [[TWO]]
-// CHECK:         [[LIFETIME_1:%[^,]+]] = begin_borrow [lexical] [[ONE]]
-// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = copy_value [[LIFETIME_1]]
-// CHECK:         br [[EXIT:bb[^,]+]]([[ONE]] : $C, [[LIFETIME_1]] : $C, [[LIFETIME_OWNED_1]] : $C)
+// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[ONE]]
+// CHECK:         br [[EXIT:bb[^,]+]]([[LIFETIME_OWNED_1]] : $C)
 // CHECK:       [[RIGHT]]:
 // CHECK:         destroy_value [[ONE]]
-// CHECK:         [[LIFETIME_2:%[^,]+]] = begin_borrow [lexical] [[TWO]]
-// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = copy_value [[LIFETIME_2]]
-// CHECK:         br [[EXIT]]([[TWO]] : $C, [[LIFETIME_2]] : $C, [[LIFETIME_OWNED_2]] : $C)
-// CHECK:       [[EXIT]]([[INSTANCE:%[^,]+]] : @owned $C, [[LIFETIME:%[^,]+]] : @guaranteed $C, [[LIFETIME_OWNED:%[^,]+]] : @owned $C):
+// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = move_value [lexical] [[TWO]]
+// CHECK:         br [[EXIT]]([[LIFETIME_OWNED_2]] : $C)
+// CHECK:       [[EXIT]]([[LIFETIME_OWNED:%[^,]+]] : @owned $C):
 // CHECK:         destroy_value [[LIFETIME_OWNED]]
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[INSTANCE]]
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]] : $()
 // CHECK-LABEL: } // end sil function 'diamond_3'
@@ -1873,20 +1692,14 @@ exit:
 // CHECK:         cond_br undef, [[LEFT:bb[^,]+]], [[RIGHT:bb[0-9]+]]
 // CHECK:       [[LEFT]]:
 // CHECK:         destroy_value [[TWO]]
-// CHECK:         [[LIFETIME_1:%[^,]+]] = begin_borrow [lexical] [[ONE]]
-// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = copy_value [[LIFETIME_1]]
+// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[ONE]]
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[RIGHT]]:
 // CHECK:         destroy_value [[ONE]]
-// CHECK:         [[LIFETIME_2:%[^,]+]] = begin_borrow [lexical] [[TWO]]
-// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = copy_value [[LIFETIME_2]]
-// CHECK:         end_borrow [[LIFETIME_2]]
-// CHECK:         destroy_value [[TWO]]
+// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = move_value [lexical] [[TWO]]
 // CHECK:         unreachable
 // CHECK:       [[EXIT]]:
 // CHECK:         destroy_value [[LIFETIME_OWNED_1]]
-// CHECK:         end_borrow [[LIFETIME_1]]
-// CHECK:         destroy_value [[ONE]]
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]] : $()
 // CHECK-LABEL: } // end sil function 'diamond_4' 
@@ -1914,20 +1727,14 @@ exit:
 // CHECK:         cond_br undef, [[LEFT:bb[^,]+]], [[RIGHT:bb[0-9]+]]
 // CHECK:       [[LEFT]]:
 // CHECK:         destroy_value [[TWO]]
-// CHECK:         [[LIFETIME_1:%[^,]+]] = begin_borrow [lexical] [[ONE]]
-// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = copy_value [[LIFETIME_1]]
+// CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[ONE]]
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[RIGHT]]:
 // CHECK:         destroy_value [[ONE]]
-// CHECK:         [[LIFETIME_2:%[^,]+]] = begin_borrow [lexical] [[TWO]]
-// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = copy_value [[LIFETIME_2]]
-// CHECK:         end_borrow [[LIFETIME_2]]
-// CHECK:         destroy_value [[TWO]]
+// CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = move_value [lexical] [[TWO]]
 // CHECK:         unreachable
 // CHECK:       [[EXIT]]:
 // CHECK:         destroy_value [[LIFETIME_OWNED_1]]
-// CHECK:         end_borrow [[LIFETIME_1]]
-// CHECK:         destroy_value [[ONE]]
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]] : $()
 // CHECK-LABEL: } // end sil function 'diamond_5' 
@@ -1954,19 +1761,14 @@ exit:
 // the borrow scope before the unreachable.
 // CHECK-LABEL: sil [ossa] @diamond_6 : $@convention(thin) (@owned C) -> () {
 // CHECK:       {{bb[^,]+}}([[ORIGINAL:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[ORIGINAL]]
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[ORIGINAL]]
 // CHECK:         cond_br undef, [[THROW_BLOCK:bb[^,]+]], [[REGULAR_BLOCK:bb[0-9]+]]
 // CHECK:       [[THROW_BLOCK]]:
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[REGULAR_BLOCK]]:
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[ORIGINAL]]
 // CHECK:         unreachable
 // CHECK:       [[EXIT:bb[^,]+]]:
 // CHECK:         destroy_value [[LIFETIME_OWNED]]
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[ORIGINAL]]
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]] : $()
 // CHECK-LABEL: } // end sil function 'diamond_6' 
@@ -1988,15 +1790,12 @@ exit:
 
 // CHECK-LABEL: sil [ossa] @diamond_7 : $@convention(thin) (@owned C) -> () {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         [[COPY:%[^,]+]] = copy_value [[LIFETIME_OWNED]]
 // CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
 // CHECK:         apply [[CALLEE_GUARANTEED]]([[COPY]])
 // CHECK:         destroy_value [[COPY]]
 // CHECK:         destroy_value [[LIFETIME_OWNED]]
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[INSTANCE]]
 // CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
 // CHECK:       [[LEFT]]:
 // CHECK:         unreachable
@@ -2024,21 +1823,16 @@ right:
 
 // CHECK-LABEL: sil [ossa] @diamond_8 : $@convention(thin) (@owned C) -> () {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         [[COPY:%[^,]+]] = copy_value [[LIFETIME_OWNED]]
 // CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
 // CHECK:         apply [[CALLEE_GUARANTEED]]([[COPY]])
 // CHECK:         destroy_value [[COPY]]
 // CHECK:         cond_br undef, [[DIE:bb[0-9]+]], [[EXIT:bb[0-9]+]]
 // CHECK:       [[DIE]]:
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[INSTANCE]]
 // CHECK:         unreachable
 // CHECK:       [[EXIT]]:
 // CHECK:         destroy_value [[LIFETIME_OWNED]]
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[INSTANCE]]
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]]
 // CHECK-LABEL: } // end sil function 'diamond_8'
@@ -2064,17 +1858,12 @@ right:
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         cond_br undef, [[BB1:bb[0-9]+]], [[BB4:bb[0-9]+]]
 // CHECK:       [[BB1]]:
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         cond_br undef, [[BB2:bb[0-9]+]], [[BB3:bb[0-9]+]]
 // CHECK:       [[BB2]]:
 // CHECK:         destroy_value [[LIFETIME_OWNED]]
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[INSTANCE]]
 // CHECK:         br [[BB5:bb[0-9]+]]
 // CHECK:       [[BB3]]:
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value [[INSTANCE]]
 // CHECK:         br [[BB5]]
 // CHECK:       [[BB4]]:
 // CHECK:         br [[BB5]]

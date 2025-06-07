@@ -1,6 +1,13 @@
-// RUN: %target-sil-opt -compute-side-effects -unit-test-runner %s 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -compute-side-effects -test-runner %s 2>&1 | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
+
+import Builtin
+
+typealias Int32 = Builtin.Int32
+
+sil_global public @my_errno : $Int32
+sil_global shared @global_var : $Int32
 
 sil [ossa] @unknown : $@convention(thin) () -> ()
 
@@ -31,57 +38,119 @@ sil [ossa] @empty_fn_caller_caller : $@convention(thin) () -> () {
 }
 
 
-// CHECK-LABEL: begin running test 1 of {{[0-9]+}} on call_functions: dump-function
+// CHECK-LABEL: begin running test 1 of {{[0-9]+}} on call_functions: dump_function
 // CHECK:       [[EMPTY_FN:%[^,]+]] = function_ref @empty_fn
 // CHECK:       [[EMPTY_FN_CALLER:%[^,]+]] = function_ref @empty_fn_caller
 // CHECK:       [[EMPTY_FN_CALLER_CALLER:%[^,]+]] = function_ref @empty_fn_caller_caller
 // CHECK:       [[UNKNOWN:%[^,]+]] = function_ref @unknown
 // CHECK:       [[UNKNOWN_CALLER:%[^,]+]] = function_ref @unknown_caller
-// CHECK-LABEL: end running test 1 of {{[0-9]+}} on call_functions: dump-function
-// CHECK-LABEL: begin running test 2 of {{[0-9]+}} on call_functions: is-deinit-barrier
+// CHECK-LABEL: end running test 1 of {{[0-9]+}} on call_functions: dump_function
+// CHECK-LABEL: begin running test 2 of {{[0-9]+}} on call_functions: is_deinit_barrier
 // CHECK:   apply [[EMPTY_FN]]
 // CHECK:   false
-// CHECK-LABEL: end running test 2 of {{[0-9]+}} on call_functions: is-deinit-barrier
-// CHECK-LABEL: begin running test 3 of {{[0-9]+}} on call_functions: is-deinit-barrier
+// CHECK-LABEL: end running test 2 of {{[0-9]+}} on call_functions: is_deinit_barrier
+// CHECK-LABEL: begin running test 3 of {{[0-9]+}} on call_functions: is_deinit_barrier
 // CHECK:   apply [[EMPTY_FN_CALLER]]
 // CHECK:   false
-// CHECK-LABEL: end running test 3 of {{[0-9]+}} on call_functions: is-deinit-barrier
-// CHECK-LABEL: begin running test 4 of {{[0-9]+}} on call_functions: is-deinit-barrier
+// CHECK-LABEL: end running test 3 of {{[0-9]+}} on call_functions: is_deinit_barrier
+// CHECK-LABEL: begin running test 4 of {{[0-9]+}} on call_functions: is_deinit_barrier
 // CHECK:   apply [[EMPTY_FN_CALLER_CALLER]]
 // CHECK:   false
-// CHECK-LABEL: end running test 4 of {{[0-9]+}} on call_functions: is-deinit-barrier
-// CHECK-LABEL: begin running test 5 of {{[0-9]+}} on call_functions: is-deinit-barrier
+// CHECK-LABEL: end running test 4 of {{[0-9]+}} on call_functions: is_deinit_barrier
+// CHECK-LABEL: begin running test 5 of {{[0-9]+}} on call_functions: is_deinit_barrier
 // CHECK:   apply [[UNKNOWN]]
 // CHECK:   true
-// CHECK-LABEL: end running test 5 of {{[0-9]+}} on call_functions: is-deinit-barrier
-// CHECK-LABEL: begin running test 6 of {{[0-9]+}} on call_functions: is-deinit-barrier
+// CHECK-LABEL: end running test 5 of {{[0-9]+}} on call_functions: is_deinit_barrier
+// CHECK-LABEL: begin running test 6 of {{[0-9]+}} on call_functions: is_deinit_barrier
 // CHECK:   apply [[UNKNOWN_CALLER]]
 // CHECK:   true
-// CHECK-LABEL: end running test 6 of {{[0-9]+}} on call_functions: is-deinit-barrier
+// CHECK-LABEL: end running test 6 of {{[0-9]+}} on call_functions: is_deinit_barrier
 sil [ossa] @call_functions : $@convention(thin) () -> () {
 entry:
-  test_specification "dump-function"
-  test_specification "is-deinit-barrier @instruction[1]"
+  specify_test "dump_function"
+  specify_test "is_deinit_barrier @instruction[1]"
   %empty_fn = function_ref @empty_fn : $@convention(thin) () -> ()
   apply %empty_fn() : $@convention(thin) () -> ()
 
-  test_specification "is-deinit-barrier @instruction[3]"
+  specify_test "is_deinit_barrier @instruction[3]"
   %empty_fn_caller = function_ref @empty_fn_caller : $@convention(thin) () -> ()
   apply %empty_fn_caller() : $@convention(thin) () -> ()
 
-  test_specification "is-deinit-barrier @instruction[5]"
+  specify_test "is_deinit_barrier @instruction[5]"
   %empty_fn_caller_caller = function_ref @empty_fn_caller_caller : $@convention(thin) () -> ()
   apply %empty_fn_caller_caller() : $@convention(thin) () -> ()
 
-  test_specification "is-deinit-barrier @instruction[7]"
+  specify_test "is_deinit_barrier @instruction[7]"
   %unknown = function_ref @unknown : $@convention(thin) () -> ()
   apply %unknown() : $@convention(thin) () -> ()
 
-  test_specification "is-deinit-barrier @instruction[9]"
+  specify_test "is_deinit_barrier @instruction[9]"
   %unknown_caller = function_ref @unknown_caller : $@convention(thin) () -> ()
   apply %unknown_caller() : $@convention(thin) () -> ()
 
   %retval = tuple ()
   return %retval : $()
+}
+
+actor A {}
+
+sil @getA : $() -> (@owned A)
+sil @borrowA : $@yield_once @convention(thin) () -> @yields @guaranteed A
+
+// CHECK-LABEL: begin running test 1 of {{[0-9]+}} on test_hop_to_executor: is_deinit_barrier
+// CHECK:  hop_to_executor
+// CHECK:  true
+// CHECK-LABEL: end running test 1 of {{[0-9]+}} on test_hop_to_executor: is_deinit_barrier
+sil [ossa] @test_hop_to_executor : $@convention(thin) () -> () {
+  %borrowA = function_ref @borrowA : $@yield_once @convention(thin) () -> @yields @guaranteed A
+  (%a, %token) = begin_apply %borrowA() : $@yield_once @convention(thin) () -> @yields @guaranteed A
+  specify_test "is_deinit_barrier @instruction"
+  hop_to_executor %a : $A
+  end_apply %token as $()
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: begin running test 1 of {{[0-9]+}} on test_instructions_1: is_deinit_barrier
+// CHECK:  debug_step
+// CHECK:  false
+// CHECK-LABEL: end running test 1 of {{[0-9]+}} on test_instructions_1: is_deinit_barrier
+// CHECK-LABEL: begin running test 2 of {{[0-9]+}} on test_instructions_1: is_deinit_barrier
+// CHECK:  load [trivial] {{%[^,]+}} : $*Builtin.Int32
+// CHECK:  true
+// CHECK-LABEL: end running test 2 of {{[0-9]+}} on test_instructions_1: is_deinit_barrier
+// CHECK-LABEL: begin running test 3 of {{[0-9]+}} on test_instructions_1: is_deinit_barrier
+// CHECK:  load [trivial] {{%[^,]+}} : $*Builtin.Int32
+// CHECK:  true
+// CHECK-LABEL: end running test 3 of {{[0-9]+}} on test_instructions_1: is_deinit_barrier
+sil [ossa] @test_instructions_1 : $@convention(thin) () -> () {
+entry:
+  specify_test "is_deinit_barrier @instruction"
+  debug_step
+
+  %my_errno = global_addr @my_errno : $*Builtin.Int32
+  specify_test "is_deinit_barrier @instruction"
+  %my_errno_value = load [trivial] %my_errno : $*Int32
+
+  %global_var = global_addr @global_var : $*Builtin.Int32
+  specify_test "is_deinit_barrier @instruction"
+  %global_var_value = load [trivial] %global_var : $*Int32
+
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on rdar120656227: is_deinit_barrier
+// CHECK:       builtin "int_memmove_RawPointer_RawPointer_Int64"
+// CHECK:       true
+// CHECK-LABEL: end running test {{.*}} on rdar120656227: is_deinit_barrier
+sil [ossa] @rdar120656227 : $@convention(thin) (Builtin.RawPointer, Builtin.RawPointer) -> () {
+bb0(%42 : $Builtin.RawPointer, %9 : $Builtin.RawPointer):
+  %14 = integer_literal $Builtin.Int64, 27
+  %28 = integer_literal $Builtin.Int1, 1
+  specify_test "is_deinit_barrier @instruction"
+  %43 = builtin "int_memmove_RawPointer_RawPointer_Int64"(%42 : $Builtin.RawPointer, %9 : $Builtin.RawPointer, %14 : $Builtin.Int64, %28 : $Builtin.Int1) : $()
+  %68 = tuple ()
+  return %68 : $()
 }
 

@@ -6,9 +6,9 @@ import Builtin
 
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc void @undefined() {{.*}} {
 // CHECK: entry:
-// CHECK:   store i64 undef, i64* poison, align 8
-// CHECK:   store i8 undef, i8* poison, align 8
-// CHECK:   store i8* undef, i8** poison, align 8
+// CHECK:   store i64 undef, ptr undef, align 8
+// CHECK:   store i8 undef, ptr undef, align 8
+// CHECK:   store ptr undef, ptr undef, align 8
 // CHECK:   ret void
 // CHECK: }
 sil @undefined : $() -> () {

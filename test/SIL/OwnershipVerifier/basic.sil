@@ -1,0 +1,23 @@
+// RUN: %target-sil-opt %s
+// REQUIRES: asserts
+// XFAIL: *
+
+// Make sure that the ownership verifier is turned on by default
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+class X {}
+
+sil [ossa] @testit : $@convention(thin) (@owned X) -> () {
+bb0(%0 : @owned $X):
+  destroy_value %0 : $X
+  destroy_value %0 : $X
+  %r = tuple ()
+  return %r : $()
+}
+
+

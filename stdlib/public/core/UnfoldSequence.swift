@@ -126,3 +126,6 @@ public struct UnfoldSequence<Element, State>: Sequence, IteratorProtocol {
     self._next = _next
   }
 }
+
+extension UnfoldSequence: @unchecked Sendable
+  where Element: Sendable, State: Sendable {}

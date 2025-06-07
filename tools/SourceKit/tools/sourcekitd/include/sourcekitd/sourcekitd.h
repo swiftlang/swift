@@ -25,7 +25,7 @@
 /// The policy about the sourcekitd API is to keep it source and ABI compatible,
 /// thus SOURCEKITD_VERSION_MAJOR is expected to remain stable.
 #define SOURCEKITD_VERSION_MAJOR 0
-#define SOURCEKITD_VERSION_MINOR 4
+#define SOURCEKITD_VERSION_MINOR 5
 
 #define SOURCEKITD_VERSION_ENCODE(major, minor) ( \
       ((major) * 10000)                           \
@@ -52,12 +52,14 @@
 # define SOURCEKITD_END_DECLS
 #endif
 
-#ifndef SOURCEKITD_PUBLIC
-# if defined (_MSC_VER)
-#  define SOURCEKITD_PUBLIC __declspec(dllimport)
+#if defined(_WIN32)
+# if defined(sourcekitd_EXPORTS)
+#   define SOURCEKITD_PUBLIC __declspec(dllexport)
 # else
-#  define SOURCEKITD_PUBLIC
+#   define SOURCEKITD_PUBLIC __declspec(dllimport)
 # endif
+#else
+# define SOURCEKITD_PUBLIC
 #endif
 
 #ifndef __has_feature
@@ -86,6 +88,22 @@
 #endif
 
 SOURCEKITD_BEGIN_DECLS
+
+/// Register plugin paths.
+///
+/// This must be called before 'sourcekitd_initialize()' or
+/// 'sourcekitd_load_client_plugins()'.
+SOURCEKITD_PUBLIC void
+sourcekitd_register_plugin_path(const char *clientPlugin,
+                                const char *servicePlugin);
+
+/// Load and initialzie registered client plugins.
+///
+/// NOTE: This function is called implicitly by 'sourcekitd_initialize()'. Only
+/// clients that cannot call 'sourcekitd_initialize()' should need to call this
+/// directly. Also, all clients must register the same plugins in the same
+/// order.
+SOURCEKITD_PUBLIC void sourcekitd_load_client_plugins(void);
 
 /// Initializes structures needed across the rest of the sourcekitd API.
 ///
@@ -310,8 +328,7 @@ typedef enum {
   SOURCEKITD_VARIANT_TYPE_STRING = 4,
   SOURCEKITD_VARIANT_TYPE_UID = 5,
   SOURCEKITD_VARIANT_TYPE_BOOL = 6,
-  // Reserved for future addition
-  // SOURCEKITD_VARIANT_TYPE_DOUBLE = 7,
+  SOURCEKITD_VARIANT_TYPE_DOUBLE = 7,
   SOURCEKITD_VARIANT_TYPE_DATA = 8,
 } sourcekitd_variant_type_t;
 
@@ -387,6 +404,13 @@ bool
 sourcekitd_variant_dictionary_get_bool(sourcekitd_variant_t dict,
                                        sourcekitd_uid_t key);
 
+/// The underlying \c double value for the specified key. 0.0 if the
+/// value for the specified key is not a double value or if there is no
+/// value for the specified key.
+SOURCEKITD_PUBLIC SOURCEKITD_NONNULL_ALL SOURCEKITD_WARN_RESULT double
+sourcekitd_variant_dictionary_get_double(sourcekitd_variant_t dict,
+                                         sourcekitd_uid_t key);
+
 /// The underlying \c sourcekitd_uid_t value for the specified key. NULL if the
 /// value for the specified key is not a uid value or if there is no
 /// value for the specified key.
@@ -458,6 +482,9 @@ SOURCEKITD_PUBLIC SOURCEKITD_WARN_RESULT
 bool
 sourcekitd_variant_array_get_bool(sourcekitd_variant_t array, size_t index);
 
+SOURCEKITD_PUBLIC SOURCEKITD_WARN_RESULT double
+sourcekitd_variant_array_get_double(sourcekitd_variant_t array, size_t index);
+
 SOURCEKITD_PUBLIC SOURCEKITD_WARN_RESULT
 sourcekitd_uid_t
 sourcekitd_variant_array_get_uid(sourcekitd_variant_t array, size_t index);
@@ -511,6 +538,9 @@ sourcekitd_variant_int64_get_value(sourcekitd_variant_t obj);
 SOURCEKITD_PUBLIC SOURCEKITD_WARN_RESULT
 bool
 sourcekitd_variant_bool_get_value(sourcekitd_variant_t obj);
+
+SOURCEKITD_PUBLIC SOURCEKITD_WARN_RESULT double
+sourcekitd_variant_double_get_value(sourcekitd_variant_t obj);
 
 SOURCEKITD_PUBLIC SOURCEKITD_WARN_RESULT
 size_t

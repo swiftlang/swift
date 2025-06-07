@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature ClosureIsolation
+
+// REQUIRES: swift_feature_ClosureIsolation
 
 func foo<T, U>(a: () -> T, b: () -> U) {}
 
@@ -119,4 +121,14 @@ struct TrickyTest {
     var x : Int = f () { // expected-error {{extra trailing closure passed in call}}
         3
     }
+}
+
+struct IsolationTest {
+  func acceptClosureWithParameter(_: (Int) -> Int) {}
+
+  func test() {
+    acceptClosureWithParameter {
+      nonisolated parameter in return parameter // expected-error {{the parameter list of a 'nonisolated' closure requires parentheses}} {{19-19=(}} {{29-29=)}}
+    }
+  }
 }

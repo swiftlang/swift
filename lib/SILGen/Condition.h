@@ -18,6 +18,7 @@
 #define SWIFT_SIL_LOWERING_CONDITION_H
 
 #include "llvm/ADT/ArrayRef.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILValue.h"
 #include "SILGenFunction.h"
@@ -105,8 +106,8 @@ class ConditionalValue {
   SILValue result;
   
   /// The Scope for the current branch.
-  Optional<Scope> scope;
-  
+  std::optional<Scope> scope;
+
   /// A place to hold conditional Initializations of our result.
   std::unique_ptr<Initialization> currentInitialization;
   

@@ -137,6 +137,7 @@
 
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FrozenMultiMap.h"
@@ -300,8 +301,8 @@ struct UseState {
   SILValue address;
   SmallVector<MarkUnresolvedMoveAddrInst *, 1> markMoves;
   SmallPtrSet<SILInstruction *, 1> seenMarkMoves;
-  SmallSetVector<SILInstruction *, 2> inits;
-  SmallSetVector<SILInstruction *, 4> livenessUses;
+  llvm::SmallSetVector<SILInstruction *, 2> inits;
+  llvm::SmallSetVector<SILInstruction *, 4> livenessUses;
   SmallBlotSetVector<DestroyAddrInst *, 4> destroys;
   llvm::SmallDenseMap<SILInstruction *, unsigned, 4> destroyToIndexMap;
   SmallBlotSetVector<SILInstruction *, 4> reinits;
@@ -544,6 +545,7 @@ namespace {
 /// and the compiler emits assigns when it reinitializes vars this early in the
 /// pipeline.
 struct ClosureArgDataflowState {
+  ASTContext &C;
   SmallVector<SILInstruction *, 32> livenessWorklist;
   SmallVector<SILInstruction *, 32> consumingWorklist;
   MultiDefPrunedLiveness livenessForConsumes;
@@ -551,13 +553,15 @@ struct ClosureArgDataflowState {
 
 public:
   ClosureArgDataflowState(SILFunction *function, UseState &useState)
-      : livenessForConsumes(function), useState(useState) {}
+      : C(function->getASTContext()),
+        livenessForConsumes(function), useState(useState) {}
 
   bool process(
       SILArgument *arg, ClosureOperandState &state,
       SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers);
 
 private:
+
   /// Perform our liveness dataflow. Returns true if we found any liveness uses
   /// at all. These we will need to error upon.
   bool performLivenessDataflow(const BasicBlockSet &initBlocks,
@@ -719,7 +723,7 @@ void ClosureArgDataflowState::classifyUses(BasicBlockSet &initBlocks,
 
   for (auto *user : useState.inits) {
     if (upwardScanForInit(user, useState)) {
-      LLVM_DEBUG(llvm::dbgs() << "    Found init block at: " << *user);
+      LLVM_DEBUG(llvm::dbgs() << "    Found init block during classifyUses at: " << *user);
       livenessForConsumes.initializeDef(user);
       initBlocks.insert(user->getParent());
     }
@@ -727,7 +731,7 @@ void ClosureArgDataflowState::classifyUses(BasicBlockSet &initBlocks,
 
   for (auto *user : useState.livenessUses) {
     if (upwardScanForUseOut(user, useState)) {
-      LLVM_DEBUG(llvm::dbgs() << "    Found use block at: " << *user);
+      LLVM_DEBUG(llvm::dbgs() << "    Found use block during classifyUses at: " << *user);
       livenessBlocks.insert(user->getParent());
       livenessWorklist.push_back(user);
     }
@@ -742,7 +746,7 @@ void ClosureArgDataflowState::classifyUses(BasicBlockSet &initBlocks,
     assert(iter != useState.destroyToIndexMap.end());
 
     if (upwardScanForDestroys(destroy, useState)) {
-      LLVM_DEBUG(llvm::dbgs() << "    Found destroy block at: " << *destroy);
+      LLVM_DEBUG(llvm::dbgs() << "    Found destroy block during classifyUses at: " << *destroy);
       consumingBlocks.insert(destroy->getParent());
       consumingWorklist.push_back(destroy);
     }
@@ -755,8 +759,17 @@ void ClosureArgDataflowState::classifyUses(BasicBlockSet &initBlocks,
     auto iter = useState.reinitToIndexMap.find(reinit);
     assert(iter != useState.reinitToIndexMap.end());
 
+    // TODO: Reinitialization analysis is currently incomplete and leads
+    // to miscompiles. Treat reinitializations as regular uses for now.
+    if (!C.LangOpts.hasFeature(Feature::ReinitializeConsumeInMultiBlockDefer)) {
+      LLVM_DEBUG(llvm::dbgs() << "    Treating reinit as use block during classifyUses at: " << *reinit);
+      livenessBlocks.insert(reinit->getParent());
+      livenessWorklist.push_back(reinit);
+      continue;
+    }
+
     if (upwardScanForDestroys(reinit, useState)) {
-      LLVM_DEBUG(llvm::dbgs() << "    Found reinit block at: " << *reinit);
+      LLVM_DEBUG(llvm::dbgs() << "    Found reinit block during classifyUses at: " << *reinit);
       consumingBlocks.insert(reinit->getParent());
       consumingWorklist.push_back(reinit);
     }
@@ -823,31 +836,38 @@ bool ClosureArgDataflowState::process(
   // parameter. We are going to change it to be an out parameter and eliminate
   // these when we clone the closure.
   if (performConsumingDataflow(initBlocks, consumingBlocks)) {
+    LLVM_DEBUG(llvm::dbgs() << "found single consuming use!\n");
+    
     // Before we do anything, make sure our argument has at least one single
     // debug_value user. If we have many we can't handle it since something in
     // SILGen is emitting weird code. Our tests will ensure that SILGen does not
     // diverge by mistake. So we are really just being careful.
     if (hasMoreThanOneDebugUse(address)) {
       // Failing b/c more than one debug use!
+      LLVM_DEBUG(llvm::dbgs() << "...but argument has more than one debug use!\n");
       return false;
     }
 
     //!!! FIXME: Why?
-    // auto *frontBlock = &*fn->begin();
-    // livenessForConsumes.initializeDefBlock(frontBlock);
+    //auto *frontBlock = &*fn->begin();
+    //livenessForConsumes.initializeDef(address);
 
-    for (unsigned i : indices(livenessWorklist)) {
-      if (auto *ptr = livenessWorklist[i]) {
+    for (unsigned i : indices(consumingWorklist)) {
+      if (auto *ptr = consumingWorklist[i]) {
+        LLVM_DEBUG(llvm::dbgs() << "liveness for consume: " << *ptr);
         state.pairedConsumingInsts.push_back(ptr);
-        livenessForConsumes.updateForUse(ptr, true /*is lifetime ending*/);
+        //livenessForConsumes.updateForUse(ptr, true /*is lifetime ending*/);
       }
     }
 
     // If our consumes do not have a linear lifetime, bail. We will error on the
     // move being unknown.
     for (auto *ptr : state.pairedConsumingInsts) {
-      if (livenessForConsumes.isWithinBoundary(ptr))
+      /*if (livenessForConsumes.isWithinBoundary(ptr)) {
+        LLVM_DEBUG(llvm::dbgs() << "consuming inst within boundary; bailing: "
+                                << *ptr);
         return false;
+      }*/
       postDominatingConsumingUsers.insert(ptr);
     }
     state.result = DownwardScanResult::ClosureConsume;
@@ -973,7 +993,7 @@ struct ClosureArgumentInOutToOutCloner
 public:
   ClosureArgumentInOutToOutCloner(
       SILOptFunctionBuilder &funcBuilder, SILFunction *orig,
-      IsSerialized_t isSerialized,
+      SerializedKind_t serializedKind,
       SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers,
       const SmallBitVector &argsToConvertIndices, StringRef name);
 
@@ -1057,17 +1077,17 @@ public:
 private:
   static SILFunction *initCloned(
       SILOptFunctionBuilder &funcBuilder, SILFunction *orig,
-      IsSerialized_t isSerialized,
+      SerializedKind_t serializedKind,
       SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers,
       const SmallBitVector &argsToConvertIndices, StringRef cloneName);
 };
 
 } // namespace
 
-static std::string getClonedName(SILFunction *func, IsSerialized_t serialized,
+static std::string getClonedName(SILFunction *func, SerializedKind_t serialized,
                                  const SmallBitVector &argsToConvertIndices) {
   auto kind = Demangle::SpecializationPass::MoveDiagnosticInOutToOut;
-  Mangle::FunctionSignatureSpecializationMangler Mangler(kind, serialized,
+  Mangle::FunctionSignatureSpecializationMangler Mangler(func->getASTContext(), kind, serialized,
                                                          func);
   for (int i = argsToConvertIndices.find_first(); i != -1;
        i = argsToConvertIndices.find_next(i)) {
@@ -1078,11 +1098,11 @@ static std::string getClonedName(SILFunction *func, IsSerialized_t serialized,
 
 ClosureArgumentInOutToOutCloner::ClosureArgumentInOutToOutCloner(
     SILOptFunctionBuilder &funcBuilder, SILFunction *orig,
-    IsSerialized_t isSerialized,
+    SerializedKind_t serializedKind,
     SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers,
     const SmallBitVector &argsToConvertIndices, StringRef name)
     : SILClonerWithScopes<ClosureArgumentInOutToOutCloner>(*initCloned(
-          funcBuilder, orig, isSerialized, postDominatingConsumingUsers,
+          funcBuilder, orig, serializedKind, postDominatingConsumingUsers,
           argsToConvertIndices, name)),
       postDominatingConsumingUsers(postDominatingConsumingUsers), orig(orig),
       argsToConvertIndices(argsToConvertIndices) {
@@ -1095,7 +1115,7 @@ ClosureArgumentInOutToOutCloner::ClosureArgumentInOutToOutCloner(
 /// parameters (which are specified by PromotedArgIndices).
 SILFunction *ClosureArgumentInOutToOutCloner::initCloned(
     SILOptFunctionBuilder &funcBuilder, SILFunction *orig,
-    IsSerialized_t serialized,
+    SerializedKind_t serialized,
     SmallBlotSetVector<SILInstruction *, 8> &postDominatingConsumingUsers,
     const SmallBitVector &argsToConvertIndices, StringRef clonedName) {
   SILModule &mod = orig->getModule();
@@ -1320,11 +1340,11 @@ bool GatherLexicalLifetimeUseVisitor::visitUse(Operand *op,
     return true;
   }
 
-  // Then see if we have a inout_aliasable full apply site use. In that case, we
-  // are going to try and extend move checking into the partial apply using
-  // cloning to eliminate destroys or reinits.
   if (auto fas = FullApplySite::isa(op->getUser())) {
-    if (stripAccessMarkers(op->get()) != useState.address) {
+    auto convention = fas.getCaptureConvention(*op);
+    // Bail on non-inout apply uses of fields.
+    if (convention != SILArgumentConvention::Indirect_Inout &&
+        stripAccessMarkers(op->get()) != useState.address) {
       LLVM_DEBUG(
           llvm::dbgs()
           << "!!! Error! Found consuming closure use not on base address: "
@@ -1332,8 +1352,10 @@ bool GatherLexicalLifetimeUseVisitor::visitUse(Operand *op,
       return false;
     }
 
-    if (fas.getArgumentOperandConvention(*op) ==
-        SILArgumentConvention::Indirect_InoutAliasable) {
+    // Then see if we have an inout_aliasable full apply site use. In that case,
+    // we are going to try and extend move checking into the partial apply
+    // using cloning to eliminate destroys or reinits.
+    if (convention == SILArgumentConvention::Indirect_InoutAliasable) {
       // If we don't find the function, we can't handle this, so bail.
       auto *func = fas.getCalleeFunction();
       if (!func || !func->isDefer())
@@ -1508,10 +1530,8 @@ bool DataflowState::cleanupAllDestroyAddr(
           dbgValueInsertBuilder.setCurrentDebugScope(
               addressDebugInst->getDebugScope());
           dbgValueInsertBuilder.createDebugValue(
-              addressDebugInst.inst->getLoc(),
-              SILUndef::get(address->getType(), dvi->getModule()), *varInfo,
-              false,
-              /*was moved*/ true);
+              (*addressDebugInst)->getLoc(), SILUndef::get(address), *varInfo,
+              DontPoisonRefs, UsesMoveableValueDebugInfo);
         }
       }
       useState.destroys.insert(dvi);
@@ -1550,9 +1570,9 @@ bool DataflowState::cleanupAllDestroyAddr(
         // be defined before the value.
         SILBuilderWithScope reinitBuilder((*reinit)->getNextInstruction());
         reinitBuilder.setCurrentDebugScope(addressDebugInst->getDebugScope());
-        reinitBuilder.createDebugValue(addressDebugInst.inst->getLoc(), address,
-                                       *varInfo, false,
-                                       /*was moved*/ true);
+        reinitBuilder.createDebugValue((*addressDebugInst)->getLoc(), address,
+                                       *varInfo, DontPoisonRefs,
+                                       UsesMoveableValueDebugInfo);
       }
     }
     madeChange = true;
@@ -1655,19 +1675,23 @@ bool DataflowState::process(
         auto &astContext = fn->getASTContext();
         {
           auto diag =
-              diag::sil_movekillscopyablevalue_value_consumed_more_than_once;
+              diag::sil_movechecking_value_used_after_consume;
           StringRef name = getDebugVarName(address);
           diagnose(astContext, getSourceLocFromValue(address), diag, name);
         }
 
         {
-          auto diag = diag::sil_movekillscopyablevalue_move_here;
-          diagnose(astContext, mvi->getLoc().getSourceLoc(), diag);
+          auto diag = diag::sil_movechecking_consuming_use_here;
+          if (auto sourceLoc = mvi->getLoc().getSourceLoc()) {
+            diagnose(astContext, sourceLoc, diag);
+          }
         }
 
         {
-          auto diag = diag::sil_movekillscopyablevalue_use_here;
-          diagnose(astContext, iter->second->getLoc().getSourceLoc(), diag);
+          auto diag = diag::sil_movechecking_nonconsuming_use_here;
+          if (auto sourceLoc = iter->second->getLoc().getSourceLoc()) {
+            diagnose(astContext, sourceLoc, diag);
+          }
         }
 
         emittedSingleDiagnostic = true;
@@ -1685,20 +1709,24 @@ bool DataflowState::process(
           auto &astContext = fn->getASTContext();
           {
             auto diag =
-                diag::sil_movekillscopyablevalue_value_consumed_more_than_once;
+                diag::sil_movechecking_value_used_after_consume;
             StringRef name = getDebugVarName(address);
             diagnose(astContext, getSourceLocFromValue(address), diag, name);
           }
 
           {
-            auto diag = diag::sil_movekillscopyablevalue_move_here;
-            diagnose(astContext, mvi->getLoc().getSourceLoc(), diag);
+            auto diag = diag::sil_movechecking_consuming_use_here;
+            if (auto sourceLoc = mvi->getLoc().getSourceLoc()) {
+              diagnose(astContext, sourceLoc, diag);
+            }
           }
 
           {
-            auto diag = diag::sil_movekillscopyablevalue_use_here;
+            auto diag = diag::sil_movechecking_nonconsuming_use_here;
             for (auto *user : iter->second->pairedUseInsts) {
-              diagnose(astContext, user->getLoc().getSourceLoc(), diag);
+              if (auto sourceLoc = user->getLoc().getSourceLoc()) {
+                diagnose(astContext, sourceLoc, diag);
+              }
             }
           }
 
@@ -1794,9 +1822,8 @@ bool DataflowState::process(
           SILBuilderWithScope undefBuilder(builder);
           undefBuilder.setCurrentDebugScope(addressDebugInst->getDebugScope());
           undefBuilder.createDebugValue(
-              addressDebugInst->getLoc(),
-              SILUndef::get(address->getType(), builder.getModule()), *varInfo,
-              false /*poison*/, true /*was moved*/);
+              addressDebugInst->getLoc(), SILUndef::get(address), *varInfo,
+              DontPoisonRefs, UsesMoveableValueDebugInfo);
         }
       }
 
@@ -1830,7 +1857,7 @@ void DataflowState::init() {
   // mark this as an "init block".
   for (auto *init : useState.inits) {
     if (upwardScanForInit(init, useState)) {
-      LLVM_DEBUG(llvm::dbgs() << "    Found use block at: " << *init);
+      LLVM_DEBUG(llvm::dbgs() << "    Found use block during DataflowState::init at: " << *init);
       initBlocks.insert(init->getParent());
     }
   }
@@ -1838,7 +1865,7 @@ void DataflowState::init() {
   // Then go through all normal uses and do upwardScanForUseOut.
   for (auto *user : useState.livenessUses) {
     if (upwardScanForUseOut(user, useState)) {
-      LLVM_DEBUG(llvm::dbgs() << "    Found liveness block at: " << *user);
+      LLVM_DEBUG(llvm::dbgs() << "    Found liveness block during DataflowState::init at: " << *user);
       useBlocks[user->getParent()] = user;
     }
   }
@@ -1855,7 +1882,7 @@ void DataflowState::init() {
     assert(iter != useState.destroyToIndexMap.end());
 
     if (upwardScanForDestroys(destroy, useState)) {
-      LLVM_DEBUG(llvm::dbgs() << "    Found destroy block at: " << *destroy);
+      LLVM_DEBUG(llvm::dbgs() << "    Found destroy block during DataflowState::init at: " << *destroy);
       destroyBlocks[destroy->getParent()] = destroy;
     }
   }
@@ -1871,7 +1898,7 @@ void DataflowState::init() {
     assert(iter != useState.reinitToIndexMap.end());
 
     if (upwardScanForDestroys(reinit, useState)) {
-      LLVM_DEBUG(llvm::dbgs() << "    Found reinit block at: " << *reinit);
+      LLVM_DEBUG(llvm::dbgs() << "    Found reinit block during DataflowState::init at: " << *reinit);
       reinitBlocks[reinit->getParent()] = reinit;
     }
   }
@@ -1891,14 +1918,14 @@ void DataflowState::init() {
     case DownwardScanResult::ClosureUse:
       if (upwardScanForUseOut(user, useState)) {
         LLVM_DEBUG(llvm::dbgs()
-                   << "    Found closure liveness block at: " << *user);
+                   << "    Found closure liveness block during DataflowState::init at: " << *user);
         closureUseBlocks[user->getParent()] = &state;
       }
       break;
     case DownwardScanResult::ClosureConsume:
       if (upwardScanForDestroys(user, useState)) {
         LLVM_DEBUG(llvm::dbgs()
-                   << "    Found closure consuming block at: " << *user);
+                   << "    Found closure consuming block during DataflowState::init at: " << *user);
         closureConsumeBlocks[user->getParent()] = use;
       }
       break;
@@ -1956,14 +1983,15 @@ void ConsumeOperatorCopyableAddressesChecker::cloneDeferCalleeAndRewriteUses(
   auto *origCallee = oldApplySite.getReferencedFunctionOrNull();
   assert(origCallee);
 
-  auto name = getClonedName(origCallee, origCallee->isSerialized(), bitVector);
+  auto name =
+      getClonedName(origCallee, origCallee->getSerializedKind(), bitVector);
 
   SILFunction *newCallee = nullptr;
   if (auto *fn = origCallee->getModule().lookUpFunction(name)) {
     newCallee = fn;
   } else {
     ClosureArgumentInOutToOutCloner cloner(
-        funcBuilder, origCallee, origCallee->isSerialized(),
+        funcBuilder, origCallee, origCallee->getSerializedKind(),
         postDominatingConsumingUsers, bitVector, name);
     cloner.populateCloned();
     newCallee = cloner.getCloned();
@@ -2013,20 +2041,20 @@ void ConsumeOperatorCopyableAddressesChecker::cloneDeferCalleeAndRewriteUses(
 bool ConsumeOperatorCopyableAddressesChecker::performClosureDataflow(
     Operand *callerOperand, ClosureOperandState &calleeOperandState) {
   auto fas = FullApplySite::isa(callerOperand->getUser());
-  auto *func = fas.getCalleeFunction();
+  auto *callee = fas.getCalleeFunction();
   auto *address =
-      func->begin()->getArgument(fas.getCalleeArgIndex(*callerOperand));
+      callee->begin()->getArgument(fas.getCalleeArgIndex(*callerOperand));
 
   LLVM_DEBUG(llvm::dbgs() << "Performing closure dataflow on caller use: "
                           << *callerOperand->getUser());
-  LLVM_DEBUG(llvm::dbgs() << "    Callee: " << func->getName() << '\n');
+  LLVM_DEBUG(llvm::dbgs() << "    Callee: " << callee->getName() << '\n');
   LLVM_DEBUG(llvm::dbgs() << "    Callee Argument: " << *address);
   // We emit an end closure dataflow to make it easier when reading debug output
   // to make it easy to see when we have returned to analyzing the caller.
   SWIFT_DEFER {
     LLVM_DEBUG(llvm::dbgs()
                    << "Finished performing closure dataflow on Callee: "
-                   << func->getName() << '\n';);
+                   << callee->getName() << '\n';);
   };
   auto accessPathWithBase = AccessPathWithBase::compute(address);
   auto accessPath = accessPathWithBase.accessPath;
@@ -2047,12 +2075,81 @@ bool ConsumeOperatorCopyableAddressesChecker::performClosureDataflow(
   GatherClosureUseVisitor visitor(closureUseState);
   SWIFT_DEFER { visitor.clear(); };
   visitor.reset(address);
-  if (!visitAccessPathUses(visitor, accessPath, fn))
+  if (!visitAccessPathUses(visitor, accessPath, callee))
     return false;
 
-  ClosureArgDataflowState closureUseDataflowState(fn, closureUseState);
+  ClosureArgDataflowState closureUseDataflowState(callee, closureUseState);
   return closureUseDataflowState.process(address, calleeOperandState,
                                          closureConsumes);
+}
+
+struct MoveConstraint {
+  enum Value : uint8_t {
+    None,
+    RequiresReinit,
+    Illegal,
+  } value;
+
+  operator Value() { return value; }
+  MoveConstraint(Value value) : value(value) {}
+
+  static MoveConstraint forGuaranteed(bool guaranteed) {
+    return guaranteed ? Illegal : None;
+  }
+
+  bool isIllegal() { return value == Illegal; }
+};
+
+static MoveConstraint getMoveConstraint(SILValue addr) {
+  assert(addr->getType().isAddress());
+  auto access = AccessPathWithBase::computeInScope(addr);
+  auto base = access.getAccessBase();
+  switch (access.accessPath.getStorage().getKind()) {
+  case AccessRepresentation::Kind::Box:
+    // Even if the box is guaranteed, it may be permitted to consume its
+    // storage.
+    return MoveConstraint::None;
+  case AccessRepresentation::Kind::Stack: {
+    // An alloc_stack is guaranteed if it's a "store_borrow destination".
+    auto *asi = cast<AllocStackInst>(base.getBaseAddress());
+    return MoveConstraint::forGuaranteed(
+        !asi->getUsersOfType<StoreBorrowInst>().empty());
+  }
+  case AccessRepresentation::Kind::Global:
+    // A global can be consumed if it's reinitialized.
+    return MoveConstraint::RequiresReinit;
+  case AccessRepresentation::Kind::Class:
+    // A class field can be consumed if it's reinitialized.
+    return MoveConstraint::RequiresReinit;
+  case AccessRepresentation::Kind::Tail:
+    // A class field can be consumed if it's reinitialized.
+    return MoveConstraint::RequiresReinit;
+  case AccessRepresentation::Kind::Argument: {
+    // An indirect argument is guaranteed if it's @in_guaranteed.
+    auto *arg = base.getArgument();
+    return MoveConstraint::forGuaranteed(
+        arg->getArgumentConvention().isGuaranteedConventionInCaller());
+  }
+  case AccessRepresentation::Kind::Yield: {
+    auto baseAddr = base.getBaseAddress();
+    auto *bai = cast<BeginApplyInst>(
+        cast<MultipleValueInstructionResult>(baseAddr)->getParent());
+    auto index = *bai->getIndexOfResult(baseAddr);
+    auto info = bai->getSubstCalleeConv().getYieldInfoForOperandIndex(index);
+    return MoveConstraint::forGuaranteed(!info.isConsumedInCaller());
+  }
+  case AccessRepresentation::Kind::Nested: {
+    auto *bai = cast<BeginAccessInst>(base.getBaseAddress());
+    if (bai->getAccessKind() == SILAccessKind::Init ||
+        bai->getAccessKind() == SILAccessKind::Read)
+      return MoveConstraint::Illegal;
+    // Allow moves from both modify and deinit.
+    return MoveConstraint::None;
+  }
+  case AccessRepresentation::Kind::Unidentified:
+    // Conservatively reject for now.
+    return MoveConstraint::Illegal;
+  }
 }
 
 // Returns true if we emitted a diagnostic and handled the single block
@@ -2061,6 +2158,23 @@ bool ConsumeOperatorCopyableAddressesChecker::performClosureDataflow(
 bool ConsumeOperatorCopyableAddressesChecker::performSingleBasicBlockAnalysis(
     SILValue address, DebugVarCarryingInst addressDebugInst,
     MarkUnresolvedMoveAddrInst *mvi) {
+  if (getMoveConstraint(mvi->getSrc()).isIllegal()) {
+    auto &astCtx = mvi->getFunction()->getASTContext();
+    StringRef name = getDebugVarName(address);
+    diagnose(astCtx, getSourceLocFromValue(address),
+             diag::sil_movechecking_guaranteed_value_consumed, name);
+    diagnose(astCtx, mvi->getLoc().getSourceLoc(),
+             diag::sil_movechecking_consuming_use_here);
+
+    // Replace the marker instruction with a copy_addr to avoid subsequent
+    // diagnostics.
+    SILBuilderWithScope builder(mvi);
+    builder.createCopyAddr(mvi->getLoc(), mvi->getSrc(), mvi->getDest(),
+                           IsNotTake, IsInitialization);
+    mvi->eraseFromParent();
+
+    return true;
+  }
   // First scan downwards to make sure we are move out of this block.
   auto &useState = dataflowState.useState;
   auto &applySiteToPromotedArgIndices =
@@ -2091,10 +2205,8 @@ bool ConsumeOperatorCopyableAddressesChecker::performSingleBasicBlockAnalysis(
         SILBuilderWithScope undefBuilder(builder);
         undefBuilder.setCurrentDebugScope(addressDebugInst->getDebugScope());
         undefBuilder.createDebugValue(
-            addressDebugInst->getLoc(),
-            SILUndef::get(address->getType(), builder.getModule()), *varInfo,
-            false,
-            /*was moved*/ true);
+            addressDebugInst->getLoc(), SILUndef::get(address), *varInfo,
+            DontPoisonRefs, UsesMoveableValueDebugInfo);
       }
       addressDebugInst.markAsMoved();
     }
@@ -2114,18 +2226,22 @@ bool ConsumeOperatorCopyableAddressesChecker::performSingleBasicBlockAnalysis(
     auto &astCtx = mvi->getFunction()->getASTContext();
     {
       auto diag =
-          diag::sil_movekillscopyablevalue_value_consumed_more_than_once;
+          diag::sil_movechecking_value_used_after_consume;
       StringRef name = getDebugVarName(address);
       diagnose(astCtx, getSourceLocFromValue(address), diag, name);
     }
 
-    auto diag = diag::sil_movekillscopyablevalue_move_here;
-    diagnose(astCtx, mvi->getLoc().getSourceLoc(), diag);
+    auto diag = diag::sil_movechecking_consuming_use_here;
+    if (auto sourceLoc = mvi->getLoc().getSourceLoc()) {
+      diagnose(astCtx, sourceLoc, diag);
+    }
 
     {
-      auto diag = diag::sil_movekillscopyablevalue_use_here;
+      auto diag = diag::sil_movechecking_nonconsuming_use_here;
       for (auto *user : interestingClosureUsers) {
-        diagnose(astCtx, user->getLoc().getSourceLoc(), diag);
+        if (auto sourceLoc = user->getLoc().getSourceLoc()) {
+          diagnose(astCtx, sourceLoc, diag);
+        }
       }
     }
 
@@ -2155,19 +2271,23 @@ bool ConsumeOperatorCopyableAddressesChecker::performSingleBasicBlockAnalysis(
     auto &astCtx = mvi->getFunction()->getASTContext();
     {
       auto diag =
-          diag::sil_movekillscopyablevalue_value_consumed_more_than_once;
+          diag::sil_movechecking_value_used_after_consume;
       StringRef name = getDebugVarName(address);
       diagnose(astCtx, getSourceLocFromValue(address), diag, name);
     }
 
     {
-      auto diag = diag::sil_movekillscopyablevalue_move_here;
-      diagnose(astCtx, mvi->getLoc().getSourceLoc(), diag);
+      auto diag = diag::sil_movechecking_consuming_use_here;
+      if (auto sourceLoc = mvi->getLoc().getSourceLoc()) {
+        diagnose(astCtx, sourceLoc, diag);
+      }
     }
 
     {
-      auto diag = diag::sil_movekillscopyablevalue_use_here;
-      diagnose(astCtx, interestingUser->getLoc().getSourceLoc(), diag);
+      auto diag = diag::sil_movechecking_nonconsuming_use_here;
+      if (auto sourceLoc = interestingUser->getLoc().getSourceLoc()) {
+        diagnose(astCtx, sourceLoc, diag);
+      }
     }
 
     // We purposely continue to see if at least in simple cases, we can flag
@@ -2202,10 +2322,8 @@ bool ConsumeOperatorCopyableAddressesChecker::performSingleBasicBlockAnalysis(
           SILBuilderWithScope undefBuilder(builder);
           undefBuilder.setCurrentDebugScope(addressDebugInst->getDebugScope());
           undefBuilder.createDebugValue(
-              addressDebugInst->getLoc(),
-              SILUndef::get(address->getType(), builder.getModule()), *varInfo,
-              false,
-              /*was moved*/ true);
+              addressDebugInst->getLoc(), SILUndef::get(address), *varInfo,
+              DontPoisonRefs, UsesMoveableValueDebugInfo);
         }
         {
           // Make sure at the reinit point to create a new debug value after the
@@ -2214,8 +2332,8 @@ bool ConsumeOperatorCopyableAddressesChecker::performSingleBasicBlockAnalysis(
           SILBuilderWithScope reinitBuilder(next);
           reinitBuilder.setCurrentDebugScope(addressDebugInst->getDebugScope());
           reinitBuilder.createDebugValue(addressDebugInst->getLoc(), address,
-                                         *varInfo, false,
-                                         /*was moved*/ true);
+                                         *varInfo, DontPoisonRefs,
+                                         UsesMoveableValueDebugInfo);
         }
       }
       addressDebugInst.markAsMoved();
@@ -2254,10 +2372,8 @@ bool ConsumeOperatorCopyableAddressesChecker::performSingleBasicBlockAnalysis(
         SILBuilderWithScope undefBuilder(builder);
         undefBuilder.setCurrentDebugScope(addressDebugInst->getDebugScope());
         undefBuilder.createDebugValue(
-            addressDebugInst->getLoc(),
-            SILUndef::get(address->getType(), builder.getModule()), *varInfo,
-            false,
-            /*was moved*/ true);
+            addressDebugInst->getLoc(), SILUndef::get(address), *varInfo,
+            DontPoisonRefs, UsesMoveableValueDebugInfo);
       }
       addressDebugInst.markAsMoved();
     }
@@ -2388,6 +2504,70 @@ bool ConsumeOperatorCopyableAddressesChecker::check(SILValue address) {
 }
 
 //===----------------------------------------------------------------------===//
+//                     MARK: Unsupported Use Case Errors
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+struct UnsupportedUseCaseDiagnosticEmitter {
+  MarkUnresolvedMoveAddrInst *mai;
+
+  ~UnsupportedUseCaseDiagnosticEmitter() {
+    assert(!mai && "Didn't call cleanup!\n");
+  }
+
+  bool cleanup() && {
+    // Now that we have emitted the error, replace the move_addr with a
+    // copy_addr so that future passes never see it. We mark it as a
+    // copy_addr [init].
+    SILBuilderWithScope builder(mai);
+    builder.createCopyAddr(mai->getLoc(), mai->getSrc(), mai->getDest(),
+                           IsNotTake, IsInitialization);
+    mai->eraseFromParent();
+    mai = nullptr;
+    return true;
+  }
+
+  ASTContext &getASTContext() const { return mai->getModule().getASTContext(); }
+
+  void emitUnsupportedUseCaseError() const {
+    auto diag =
+        diag::sil_movekillscopyablevalue_move_applied_to_unsupported_move;
+    diagnose(getASTContext(), mai->getLoc().getSourceLoc(), diag);
+  }
+
+  /// Try to pattern match if we were trying to move a global. In such a case,
+  /// emit a better error.
+  bool tryEmitCannotConsumeNonLocalMemoryError() const {
+    auto src = stripAccessMarkers(mai->getSrc());
+
+    if (isa<GlobalAddrInst>(src)) {
+      auto diag = diag::sil_movekillscopyable_move_applied_to_nonlocal_memory;
+      diagnose(getASTContext(), mai->getLoc().getSourceLoc(), diag, 0);
+      return true;
+    }
+
+    // If we have a project_box, then we must have an escaping capture. It is
+    // the only case that allocbox to stack doesn't handle today.
+    if (isa<ProjectBoxInst>(src)) {
+      auto diag = diag::sil_movekillscopyable_move_applied_to_nonlocal_memory;
+      diagnose(getASTContext(), mai->getLoc().getSourceLoc(), diag, 1);
+      return true;
+    }
+
+    return false;
+  }
+
+  void emit() const {
+    if (tryEmitCannotConsumeNonLocalMemoryError())
+      return;
+    emitUnsupportedUseCaseError();
+  }
+};
+
+} // namespace
+
+//===----------------------------------------------------------------------===//
 //                            Top Level Entrypoint
 //===----------------------------------------------------------------------===//
 
@@ -2397,11 +2577,6 @@ class ConsumeOperatorCopyableAddressesCheckerPass
     : public SILFunctionTransform {
   void run() override {
     auto *fn = getFunction();
-    auto &astContext = fn->getASTContext();
-
-    // Only run this pass if the move only language feature is enabled.
-    if (!astContext.LangOpts.Features.contains(Feature::MoveOnly))
-      return;
 
     // Don't rerun diagnostics on deserialized functions.
     if (getFunction()->wasDeserializedCanonical())
@@ -2410,12 +2585,14 @@ class ConsumeOperatorCopyableAddressesCheckerPass
     assert(fn->getModule().getStage() == SILStage::Raw &&
            "Should only run on Raw SIL");
 
-    SmallSetVector<SILValue, 32> addressesToCheck;
+    llvm::SmallSetVector<SILValue, 32> addressesToCheck;
 
     for (auto *arg : fn->front().getSILFunctionArguments()) {
       if (arg->getType().isAddress() &&
           (arg->hasConvention(SILArgumentConvention::Indirect_In) ||
-           arg->hasConvention(SILArgumentConvention::Indirect_Inout)))
+           arg->hasConvention(SILArgumentConvention::Indirect_In_Guaranteed) ||
+           arg->hasConvention(SILArgumentConvention::Indirect_Inout) ||
+           arg->hasConvention(SILArgumentConvention::Indirect_InoutAliasable)))
         addressesToCheck.insert(arg);
     }
 
@@ -2425,8 +2602,8 @@ class ConsumeOperatorCopyableAddressesCheckerPass
         ++ii;
 
         if (auto *asi = dyn_cast<AllocStackInst>(inst)) {
-          // Only check lexical alloc_stack that were not emitted as vars.
-          if (asi->isLexical()) {
+          // Only check var_decl alloc_stack insts.
+          if (asi->isFromVarDecl()) {
             LLVM_DEBUG(llvm::dbgs() << "Found lexical alloc_stack: " << *asi);
             addressesToCheck.insert(asi);
             continue;
@@ -2437,7 +2614,7 @@ class ConsumeOperatorCopyableAddressesCheckerPass
 
     LLVM_DEBUG(llvm::dbgs() << "Visiting Function: " << fn->getName() << "\n");
     auto addressToProcess =
-        llvm::makeArrayRef(addressesToCheck.begin(), addressesToCheck.end());
+        llvm::ArrayRef(addressesToCheck.begin(), addressesToCheck.end());
 
     SILOptFunctionBuilder funcBuilder(*this);
 
@@ -2490,17 +2667,9 @@ class ConsumeOperatorCopyableAddressesCheckerPass
         ++ii;
 
         if (auto *mai = dyn_cast<MarkUnresolvedMoveAddrInst>(inst)) {
-          auto diag =
-              diag::sil_movekillscopyablevalue_move_applied_to_unsupported_move;
-          diagnose(astContext, mai->getLoc().getSourceLoc(), diag);
-
-          // Now that we have emitted the error, replace the move_addr with a
-          // copy_addr so that future passes never see it. We mark it as a
-          // copy_addr [init].
-          SILBuilderWithScope builder(mai);
-          builder.createCopyAddr(mai->getLoc(), mai->getSrc(), mai->getDest(),
-                                 IsNotTake, IsInitialization);
-          mai->eraseFromParent();
+          UnsupportedUseCaseDiagnosticEmitter emitter{mai};
+          emitter.emit();
+          std::move(emitter).cleanup();
           lateMadeChange = true;
         }
       }

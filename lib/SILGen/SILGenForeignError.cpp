@@ -19,6 +19,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 
@@ -97,12 +98,10 @@ static void emitStoreToForeignErrorSlot(SILGenFunction &SGF,
   }
 
   // Otherwise, do a normal assignment.
-  LValue lvalue =
-    SGF.emitPropertyLValue(loc, ManagedValue::forUnmanaged(foreignErrorSlot),
-                           bridgedErrorPtrType, pointeeProperty,
-                           LValueOptions(),
-                           SGFAccessKind::Write,
-                           AccessSemantics::Ordinary);
+  LValue lvalue = SGF.emitPropertyLValue(
+      loc, ManagedValue::forRValueWithoutOwnership(foreignErrorSlot),
+      bridgedErrorPtrType, pointeeProperty, LValueOptions(),
+      SGFAccessKind::Write, AccessSemantics::Ordinary);
   RValue rvalue(SGF, loc, bridgedErrorProto,
                 SGF.emitManagedRValueWithCleanup(bridgedError));
   SGF.emitAssignToLValue(loc, std::move(rvalue), std::move(lvalue));
@@ -187,7 +186,7 @@ emitBridgeErrorForForeignError(SILLocation loc,
   case ForeignErrorConvention::NilResult:
     return B.createOptionalNone(loc, bridgedResultType);
   case ForeignErrorConvention::NonNilError:
-    return SILUndef::get(bridgedResultType, F);
+    return SILUndef::get(F, bridgedResultType);
   }
   llvm_unreachable("bad foreign error convention kind");
 }
@@ -248,8 +247,8 @@ emitBridgeReturnValueForForeignError(SILLocation loc,
   llvm_unreachable("bad foreign error convention kind");
 }
 
-static FunctionSection
-functionSectionForConvention(Optional<ForeignAsyncConvention> foreignAsync) {
+static FunctionSection functionSectionForConvention(
+    std::optional<ForeignAsyncConvention> foreignAsync) {
   // If there is a foreign async convention too, the error block branches to
   // the block awaiting the continuation.
   return foreignAsync ? FunctionSection::Ordinary : FunctionSection::Postmatter;
@@ -258,8 +257,9 @@ functionSectionForConvention(Optional<ForeignAsyncConvention> foreignAsync) {
 /// Step out of the current control flow to emit a foreign error block,
 /// which loads from the error slot and jumps to the error slot.
 SILValue SILGenFunction::emitForeignErrorBlock(
-    SILLocation loc, SILBasicBlock *errorBB, Optional<ManagedValue> errorSlot,
-    Optional<ForeignAsyncConvention> foreignAsync) {
+    SILLocation loc, SILBasicBlock *errorBB,
+    std::optional<ManagedValue> errorSlot,
+    std::optional<ForeignAsyncConvention> foreignAsync) {
   SILGenSavedInsertionPoint savedIP(*this, errorBB,
                                     functionSectionForConvention(foreignAsync));
   Scope scope(Cleanups, CleanupLocation(loc));
@@ -308,7 +308,7 @@ static SILValue
 emitResultIsZeroErrorCheck(SILGenFunction &SGF, SILLocation loc,
                            ManagedValue result, ManagedValue errorSlot,
                            bool suppressErrorCheck, bool zeroIsError,
-                           Optional<ForeignAsyncConvention> foreignAsync) {
+                           std::optional<ForeignAsyncConvention> foreignAsync) {
   // Just ignore the call result if we're suppressing the error check.
   if (suppressErrorCheck) {
     return SILValue();
@@ -353,7 +353,7 @@ static std::pair<ManagedValue, SILValue>
 emitResultIsNilErrorCheck(SILGenFunction &SGF, SILLocation loc,
                           ManagedValue origResult, ManagedValue errorSlot,
                           bool suppressErrorCheck,
-                          Optional<ForeignAsyncConvention> foreignAsync) {
+                          std::optional<ForeignAsyncConvention> foreignAsync) {
   assert(!foreignAsync);
   // Take local ownership of the optional result value.
   SILValue optionalResult = origResult.forward(SGF);
@@ -389,10 +389,10 @@ emitResultIsNilErrorCheck(SILGenFunction &SGF, SILLocation loc,
 }
 
 /// Perform a foreign error check by testing whether the error was nil.
-static SILValue
-emitErrorIsNonNilErrorCheck(SILGenFunction &SGF, SILLocation loc,
-                            ManagedValue errorSlot, bool suppressErrorCheck,
-                            Optional<ForeignAsyncConvention> foreignAsync) {
+static SILValue emitErrorIsNonNilErrorCheck(
+    SILGenFunction &SGF, SILLocation loc, ManagedValue errorSlot,
+    bool suppressErrorCheck,
+    std::optional<ForeignAsyncConvention> foreignAsync) {
   // If we're suppressing the check, just don't check.
   if (suppressErrorCheck)
     return SILValue();
@@ -416,7 +416,8 @@ emitErrorIsNonNilErrorCheck(SILGenFunction &SGF, SILLocation loc,
   // in the errorSlot as our BB argument so we can pass ownership correctly. In
   // emitForeignErrorBlock, we will create the appropriate cleanup for the
   // argument.
-  SILValue error = SGF.emitForeignErrorBlock(loc, errorBB, None, foreignAsync);
+  SILValue error =
+      SGF.emitForeignErrorBlock(loc, errorBB, std::nullopt, foreignAsync);
 
   // Return the result.
   SGF.B.emitBlock(contBB);
@@ -432,7 +433,7 @@ SILValue SILGenFunction::emitForeignErrorCheck(
     SILLocation loc, SmallVectorImpl<ManagedValue> &results,
     ManagedValue errorSlot, bool suppressErrorCheck,
     const ForeignErrorConvention &foreignError,
-    Optional<ForeignAsyncConvention> foreignAsync) {
+    std::optional<ForeignAsyncConvention> foreignAsync) {
   // All of this is autogenerated.
   loc.markAutoGenerated();
 

@@ -54,11 +54,14 @@ SIMPLE_LOCATOR_PATH_ELT(AutoclosureResult)
 /// The result of a closure.
 SIMPLE_LOCATOR_PATH_ELT(ClosureResult)
 
+/// The thrown error of a closure.
+SIMPLE_LOCATOR_PATH_ELT(ClosureThrownError)
+
 /// FIXME: Misleading name: this locator is used only for single-expression
 /// closure returns.
 ///
 /// The type of a closure body.
-CUSTOM_LOCATOR_PATH_ELT(ClosureBody)
+SIMPLE_LOCATOR_PATH_ELT(ClosureBody)
 
 /// The lookup for a constructor member.
 SIMPLE_LOCATOR_PATH_ELT(ConstructorMember)
@@ -73,7 +76,7 @@ CUSTOM_LOCATOR_PATH_ELT(ContextualType)
 SIMPLE_LOCATOR_PATH_ELT(DynamicLookupResult)
 
 /// The superclass of a protocol composition type.
-SIMPLE_LOCATOR_PATH_ELT(ProtocolCompositionSuperclassType)
+CUSTOM_LOCATOR_PATH_ELT(ProtocolCompositionMemberType)
 
 /// The constraint of an existential type.
 SIMPLE_LOCATOR_PATH_ELT(ExistentialConstraintType)
@@ -123,10 +126,13 @@ CUSTOM_LOCATOR_PATH_ELT(KeyPathDynamicMember)
 SIMPLE_LOCATOR_PATH_ELT(KeyPathRoot)
 
 /// The type of the key path expression.
-CUSTOM_LOCATOR_PATH_ELT(KeyPathType)
+SIMPLE_LOCATOR_PATH_ELT(KeyPathType)
 
 /// The value of a key path.
 SIMPLE_LOCATOR_PATH_ELT(KeyPathValue)
+
+/// The index parameter of a special `subscript(keyPath: KeyPath<...>)`.
+SIMPLE_LOCATOR_PATH_ELT(KeyPathSubscriptIndex)
 
 /// An implicit @lvalue-to-inout conversion; only valid for operator
 /// arguments.
@@ -147,15 +153,15 @@ CUSTOM_LOCATOR_PATH_ELT(OpenedGeneric)
 /// type at the base of the locator.
 CUSTOM_LOCATOR_PATH_ELT(OpenedOpaqueArchetype)
 
-/// An optional payload.
-SIMPLE_LOCATOR_PATH_ELT(OptionalPayload)
+/// The optional payload in an optional injection, ie a T -> T? conversion.
+SIMPLE_LOCATOR_PATH_ELT(OptionalInjection)
 
 /// The parent of a nested type.
 SIMPLE_LOCATOR_PATH_ELT(ParentType)
 
 /// The requirement that we're matching during protocol conformance
 /// checking.
-CUSTOM_LOCATOR_PATH_ELT(ProtocolRequirement)
+SIMPLE_LOCATOR_PATH_ELT(ProtocolRequirement)
 
 /// Type parameter requirements.
 ABSTRACT_LOCATOR_PATH_ELT(AnyRequirement)
@@ -181,6 +187,10 @@ CUSTOM_LOCATOR_PATH_ELT(SynthesizedArgument)
 /// path components.
 CUSTOM_LOCATOR_PATH_ELT(TupleType)
 
+/// A generic type, which provides context for subsequent generic
+/// argument path components.
+CUSTOM_LOCATOR_PATH_ELT(GenericType)
+
 /// Tuple elements.
 ABSTRACT_LOCATOR_PATH_ELT(AnyTupleElement)
   /// A tuple element referenced by position.
@@ -197,6 +207,9 @@ CUSTOM_LOCATOR_PATH_ELT(PackElement)
 
 /// The shape of a parameter pack.
 SIMPLE_LOCATOR_PATH_ELT(PackShape)
+
+/// The type of an "opened" pack expansion
+CUSTOM_LOCATOR_PATH_ELT(PackExpansionType)
 
 /// The pattern  of a pack expansion.
 SIMPLE_LOCATOR_PATH_ELT(PackExpansionPattern)
@@ -217,6 +230,10 @@ CUSTOM_LOCATOR_PATH_ELT(TernaryBranch)
 
 /// Performing a pattern patch.
 CUSTOM_LOCATOR_PATH_ELT(PatternMatch)
+
+/// The constraint that models the allowed implicit casts for
+/// an EnumElementPattern.
+SIMPLE_LOCATOR_PATH_ELT(EnumPatternImplicitCastMatch)
 
 /// Points to a particular attribute associated with one of
 /// the arguments e.g. `inout` or its type e.g. `@escaping`.
@@ -248,6 +265,9 @@ CUSTOM_LOCATOR_PATH_ELT(SyntacticElement)
 /// The element of the pattern binding declaration.
 CUSTOM_LOCATOR_PATH_ELT(PatternBindingElement)
 
+/// A particular result of a ThenStmt at a given index in a SingleValueStmtExpr.
+CUSTOM_LOCATOR_PATH_ELT(SingleValueStmtResult)
+
 /// A declaration introduced by a pattern: name (i.e. `x`) or `_`
 ABSTRACT_LOCATOR_PATH_ELT(PatternDecl)
   /// The variable declared by a named pattern.
@@ -257,6 +277,20 @@ ABSTRACT_LOCATOR_PATH_ELT(PatternDecl)
 
 /// A function type global actor.
 SIMPLE_LOCATOR_PATH_ELT(GlobalActorType)
+
+/// The thrown error of a function type.
+SIMPLE_LOCATOR_PATH_ELT(ThrownErrorType)
+
+/// A type coercion operand.
+SIMPLE_LOCATOR_PATH_ELT(CoercionOperand)
+
+/// A fallback type for some AST location (i.e. key path literal).
+SIMPLE_LOCATOR_PATH_ELT(FallbackType)
+
+/// An implicit conversion (upcast) associated with an existential member access
+/// performed to abstract the member reference type away from context-specific
+/// types like `Self` that are not well-formed in the access context.
+SIMPLE_LOCATOR_PATH_ELT(ExistentialMemberAccessConversion)
 
 #undef LOCATOR_PATH_ELT
 #undef CUSTOM_LOCATOR_PATH_ELT

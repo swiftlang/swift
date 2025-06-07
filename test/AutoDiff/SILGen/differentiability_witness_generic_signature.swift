@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen -verify -module-name main %s -warn-redundant-requirements | %FileCheck %s
-// RUN: %target-swift-emit-sil -verify -module-name main %s -warn-redundant-requirements
+// RUN: %target-swift-emit-silgen -verify -module-name main %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -verify -module-name main %s
 
 // NOTE: SILParser crashes for SILGen round-trip
 // (https://github.com/apple/swift/issues/54370).
@@ -85,7 +85,7 @@ extension AllConcrete where T == Float {
   // Derivative generic signature: `<T where T == Float>` (explicit `where` clause)
   //    Witness generic signature: none
   @_silgen_name("allconcrete_where_gensig")
-  @differentiable(reverse where T == Float) // expected-warning {{redundant same-type constraint 'T' == 'Float'}}
+  @differentiable(reverse where T == Float)
   func whereClauseGenericSignature() -> AllConcrete {
     return self
   }
@@ -159,7 +159,7 @@ extension NotAllConcrete where T == Float {
   // Derivative generic signature: `<T, U where T == Float>` (explicit `where` clause)
   //    Witness generic signature: `<T, U where T == Float>` (not all concrete)
   @_silgen_name("notallconcrete_where_gensig")
-  @differentiable(reverse where T == Float) // expected-warning {{redundant same-type constraint 'T' == 'Float'}}
+  @differentiable(reverse where T == Float)
   func whereClauseGenericSignature() -> NotAllConcrete {
     return self
   }

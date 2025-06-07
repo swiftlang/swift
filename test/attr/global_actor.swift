@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s  -disable-availability-checking
+// RUN: %target-swift-frontend -typecheck -verify %s  -disable-availability-checking -package-name myPkg
 // REQUIRES: concurrency
 
 actor SomeActor { }
@@ -20,11 +20,11 @@ struct GenericGlobalActor<T> {
 
 // Ill-formed global actors.
 @globalActor
-final class GA2 { // expected-error{{type 'GA2' does not conform to protocol 'GlobalActor'}}
+final class GA2 { // expected-error{{type 'GA2' does not conform to protocol 'GlobalActor'}} expected-note {{add stubs for conformance}}
 }
 
 @globalActor
-struct GA3 { // expected-error{{type 'GA3' does not conform to protocol 'GlobalActor'}}
+struct GA3 { // expected-error{{type 'GA3' does not conform to protocol 'GlobalActor'}} expected-note {{add stubs for conformance}}
   let shared = SomeActor()
 }
 
@@ -41,7 +41,7 @@ open class GA5 { // expected-error{{non-final class 'GA5' cannot be a global act
 }
 
 @globalActor
-struct GA6<T> { // expected-error{{type 'GA6<T>' does not conform to protocol 'GlobalActor'}}
+struct GA6<T> { // expected-error{{type 'GA6<T>' does not conform to protocol 'GlobalActor'}} expected-note {{add stubs for conformance}}
 }
 
 extension GA6 where T: Equatable {
@@ -67,7 +67,7 @@ struct OtherGlobalActor {
 }
 
 @GA1 struct X {
-  @GA1 var member: Int // expected-warning {{stored property 'member' within struct cannot have a global actor; this is an error in Swift 6}}
+  @GA1 var member: Int
 }
 
 struct Y {
@@ -80,7 +80,7 @@ struct Y {
 
 class SomeClass {
   @GA1 init() { }
-  @GA1 deinit { } // expected-error{{deinitializer cannot have a global actor}}
+  @GA1 deinit { }
 }
 
 @GA1 typealias Integer = Int // expected-error{{type alias cannot have a global actor}}
@@ -98,7 +98,7 @@ struct Container {
 // Redundant attributes
 // -----------------------------------------------------------------------
 extension SomeActor {
-  @GA1 nonisolated func conflict1() { } // expected-error 3{{instance method 'conflict1()' has multiple actor-isolation attributes ('nonisolated' and 'GA1')}}
+  @GA1 nonisolated func conflict1() { } // expected-warning {{instance method 'conflict1()' has multiple actor-isolation attributes (@GA1 and 'nonisolated')}}
 }
 
 
@@ -107,15 +107,21 @@ extension SomeActor {
 // -----------------------------------------------------------------------
 
 @globalActor
-private struct PrivateGA { // expected-note 2 {{type declared here}}
+private struct PrivateGA { // expected-note 3 {{type declared here}}
   actor Actor {}
   static let shared = Actor()
 }
 
 @globalActor
-internal struct InternalGA { // expected-note 1 {{type declared here}}
+internal struct InternalGA { // expected-note 2 {{type declared here}}
   actor Actor {}
   static let shared = Actor()
+}
+
+@globalActor
+package struct PackageGA { // expected-note 1 {{type declared here}}
+  package actor Actor {}
+  package static let shared = Actor()
 }
 
 @globalActor
@@ -126,12 +132,77 @@ public struct PublicGA {
 
 @PrivateGA private struct PrivateStructPrivateGA {}
 @InternalGA private struct PrivateStructInternalGA {}
+@PackageGA private struct PrivateStructPackageGA {}
 @PublicGA private struct PrivateStructPublicGA {}
 
 @PrivateGA internal struct InternalStructPrivateGA {} // expected-error {{internal struct 'InternalStructPrivateGA' cannot have private global actor 'PrivateGA'}}
 @InternalGA internal struct InternalStructInternalGA {}
+@PackageGA internal struct InternalStructPackageGA {}
 @PublicGA internal struct InternalStructPublicGA {}
+
+@PrivateGA package class PackageClassPrivateGA {} // expected-error {{package class 'PackageClassPrivateGA' cannot have private global actor 'PrivateGA'}}
+@InternalGA package class PackageClassInternalGA {} // expected-error {{package class 'PackageClassInternalGA' cannot have internal global actor 'InternalGA'}}
+@PackageGA package struct PackageClassPackageGA {}
+@PublicGA package class PackageClassPublicGA {}
 
 @PrivateGA open class OpenClassPrivateGA {} // expected-error {{open class 'OpenClassPrivateGA' cannot have private global actor 'PrivateGA'}}
 @InternalGA open class OpenClassInternalGA {} // expected-error {{open class 'OpenClassInternalGA' cannot have internal global actor 'InternalGA'}}
+@PackageGA open class OpenClassPackageGA {} // expected-error {{open class 'OpenClassPackageGA' cannot have package global actor 'PackageGA'}}
 @PublicGA open class OpenClassPublicGA {}
+
+// rdar://99281333 - no accessors/addressors/observers expect to 'get' are allowed to have a global actor attribute
+do {
+  class TestInvalidAccessors {
+    var test1: Int {
+      get { 42 }
+      @GA1
+      set { } // expected-warning {{setter cannot have a global actor}} {{-1:7-11=}}
+      // expected-note@-1 {{move global actor attribute to property 'test1'}} {{-3:5-5=@GA1}}
+
+      @GA1 _modify { fatalError() } // expected-warning {{_modify accessor cannot have a global actor}} {{7-12=}}
+      // expected-note@-1 {{move global actor attribute to property 'test1'}} {{-6:5-5=@GA1}}
+    }
+
+    func local() {
+      var test: Bool {
+        get { false }
+
+        @GA1
+        set { } // expected-warning {{setter cannot have a global actor}}
+      }
+    }
+
+    @GA1 var testAlreadyWithGlobal: String {
+      get { "" }
+      @GA1 set { } // expected-warning {{setter cannot have a global actor}} {{7-12=}}
+    }
+  }
+
+  struct TestStruct {
+    var test1: Int {
+      get { 42 }
+      @GA1
+      set { } // expected-warning {{setter cannot have a global actor}} {{-1:7-11=}}
+      // expected-note@-1 {{move global actor attribute to property 'test1'}} {{-3:5-5=@GA1}}
+      @GA1 _modify { fatalError() } // expected-warning {{_modify accessor cannot have a global actor}} {{7-12=}}
+      // expected-note@-1 {{move global actor attribute to property 'test1'}} {{-5:5-5=@GA1}}
+    }
+
+    var test2: Int {
+      @GA1 willSet { // expected-warning {{willSet observer cannot have a global actor}} {{7-12=}}
+        // expected-note@-1 {{move global actor attribute to property 'test2'}} {{-1:5-5=@GA1}}
+      }
+    }
+
+    subscript(x: Int) -> Bool {
+      get { true }
+      @GA1 set { } // expected-warning {{setter cannot have a global actor}} {{7-12=}}
+      // expected-note@-1 {{move global actor attribute to subscript 'subscript(_:)'}} {{-2:5-5=@GA1}}
+    }
+
+    @GA1 subscript(y: Bool) -> String {
+      get { "" }
+      @GA1 set { } // expected-warning {{setter cannot have a global actor}} {{7-12=}}
+    }
+  }
+}

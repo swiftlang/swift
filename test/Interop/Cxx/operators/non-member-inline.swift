@@ -187,4 +187,17 @@ OperatorsTestSuite.test("pipe pipe (||)") {
   expectEqual(true, result.value)
 }
 
+OperatorsTestSuite.test("UnnamedParameterInOperator.equal") {
+  let lhs = ClassWithOperatorEqualsParamUnnamed()
+  let rhs = ClassWithOperatorEqualsParamUnnamed()
+  expectFalse(lhs == rhs)
+}
+
+OperatorsTestSuite.test("LValueAndRValueArithmetic.+") {
+  let lhs = LValueAndRValueArithmetic(value: 123)
+  let rhs = LValueAndRValueArithmetic(value: 146)
+
+  expectEqual(269, (lhs + rhs).value)
+}
+
 runAllTests()

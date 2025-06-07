@@ -15,6 +15,7 @@
 #include "CodeCompletionResultBuilder.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/IDE/CodeCompletionString.h"
 #include "swift/IDE/CodeCompletionStringPrinter.h"
 
@@ -30,35 +31,7 @@ bool CompletionOverrideLookup::addAccessControl(
   if (AccessOfContext < AccessLevel::Public)
     return false;
 
-  auto Access = VD->getFormalAccess();
-  // Use the greater access between the protocol requirement and the witness.
-  // In case of:
-  //
-  //   public protocol P { func foo() }
-  //   public class B { func foo() {} }
-  //   public class C: B, P {
-  //     <complete>
-  //   }
-  //
-  // 'VD' is 'B.foo()' which is implicitly 'internal'. But as the overriding
-  // declaration, the user needs to write both 'public' and 'override':
-  //
-  //   public class C: B {
-  //     public override func foo() {}
-  //   }
-  if (Access < AccessLevel::Public &&
-      !isa<ProtocolDecl>(VD->getDeclContext())) {
-    for (auto Conformance : CurrentNominal->getAllConformances()) {
-      Conformance->getRootConformance()->forEachValueWitness(
-          [&](ValueDecl *req, Witness witness) {
-            if (witness.getDecl() == VD)
-              Access = std::max(Access,
-                                Conformance->getProtocol()->getFormalAccess());
-          });
-    }
-  }
-
-  Access = std::min(Access, AccessOfContext);
+  AccessLevel Access = std::min(VD->getFormalAccess(), AccessOfContext);
   // Only emit 'public', not needed otherwise.
   if (Access < AccessLevel::Public)
     return false;
@@ -103,8 +76,7 @@ Type CompletionOverrideLookup::getOpaqueResultType(
 
   // Try substitution to see if the associated type is resolved to concrete
   // type.
-  auto substMap =
-      currTy->getMemberSubstitutionMap(CurrDeclContext->getParentModule(), VD);
+  auto substMap = currTy->getMemberSubstitutionMap(VD);
   if (!ResultT.subst(substMap)->is<DependentMemberType>())
     // If resolved print it.
     return nullptr;
@@ -115,24 +87,15 @@ Type CompletionOverrideLookup::getOpaqueResultType(
     // If it has same type requrement, we will emit the concrete type.
     return nullptr;
 
-  // Collect requirements on the associatedtype.
-  SmallVector<Type, 2> opaqueTypes;
-  bool hasExplicitAnyObject = false;
-  if (auto superTy = genericSig->getSuperclassBound(ResultT))
-    opaqueTypes.push_back(superTy);
-  for (const auto proto : genericSig->getRequiredProtocols(ResultT))
-    opaqueTypes.push_back(proto->getDeclaredInterfaceType());
-  if (auto layout = genericSig->getLayoutConstraint(ResultT))
-    hasExplicitAnyObject = layout->isClass();
+  auto upperBound = genericSig->getUpperBound(
+      ResultT,
+      /*forExistentialSelf=*/false,
+      /*withParameterizedProtocols=*/false);
 
-  if (!hasExplicitAnyObject) {
-    if (opaqueTypes.empty())
-      return nullptr;
-    if (opaqueTypes.size() == 1)
-      return opaqueTypes.front();
-  }
-  return ProtocolCompositionType::get(VD->getASTContext(), opaqueTypes,
-                                      hasExplicitAnyObject);
+  if (upperBound->isAny())
+    return nullptr;
+
+  return upperBound;
 }
 
 void CompletionOverrideLookup::addValueOverride(
@@ -193,12 +156,12 @@ void CompletionOverrideLookup::addValueOverride(
 
   PO.SkipUnderscoredKeywords = true;
   PO.PrintImplicitAttrs = false;
-  PO.ExclusiveAttrList.push_back(TAK_escaping);
-  PO.ExclusiveAttrList.push_back(TAK_autoclosure);
+  PO.ExclusiveAttrList.push_back(TypeAttrKind::Escaping);
+  PO.ExclusiveAttrList.push_back(TypeAttrKind::Autoclosure);
   // Print certain modifiers only when the introducer is not written.
   // Otherwise, the user can add it after the completion.
   if (!hasDeclIntroducer) {
-    PO.ExclusiveAttrList.push_back(DAK_Nonisolated);
+    PO.ExclusiveAttrList.push_back(DeclAttrKind::Nonisolated);
   }
 
   PO.PrintAccess = false;
@@ -493,8 +456,8 @@ void CompletionOverrideLookup::addResultBuilderBuildCompletion(
   std::string declStringWithoutFunc;
   {
     llvm::raw_string_ostream out(declStringWithoutFunc);
-    printResultBuilderBuildFunction(builder, componentType, function, None,
-                                    out);
+    printResultBuilderBuildFunction(builder, componentType, function,
+                                    std::nullopt, out);
   }
   Builder.addTextChunk(declStringWithoutFunc);
   Builder.addBraceStmtWithCursor();
@@ -541,7 +504,7 @@ void CompletionOverrideLookup::getOverrideCompletions(SourceLoc Loc) {
   if (CurrTy && !CurrTy->is<ErrorType>()) {
     // Look for overridable static members too.
     Type Meta = MetatypeType::get(CurrTy);
-    lookupVisibleMemberDecls(*this, Meta, CurrDeclContext,
+    lookupVisibleMemberDecls(*this, Meta, introducerLoc, CurrDeclContext,
                              /*includeInstanceMembers=*/true,
                              /*includeDerivedRequirements*/ true,
                              /*includeProtocolExtensionMembers*/ false);

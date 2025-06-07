@@ -1,0 +1,19 @@
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s > %t/main.swift
+// RUN: %target-swift-frontend -O -parse-as-library -sil-verify-none -emit-sil %t/main.swift -o /dev/null
+
+// REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
+// REQUIRES: long_test
+
+// Check that the compiler does not crash in DCE due to a stack overflow.
+// rdar://106198943
+
+public func test(_ a: Int) -> Int {
+  switch (a) {
+% for i in range(32000):
+    case ${i}: return ${i % 7}
+% end
+    default: return -1
+  }
+}
+

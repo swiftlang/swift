@@ -37,7 +37,7 @@ namespace {
         return true;
       }
       
-      if (const auto *explicitCastExpr = dyn_cast<ExplicitCastExpr>(E)) {
+      if (isa<ExplicitCastExpr>(E)) {
         // If the user has already provided an explicit cast for the
         // 'try?', then we don't need to add one. So let's track whether
         // one is active

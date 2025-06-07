@@ -185,7 +185,8 @@ func NonVoidReturn1() -> Int {
 }
 
 func NonVoidReturn2() -> Int {
-  return + // expected-error {{unary operator cannot be separated from its operand}} {{11-1=}} expected-error {{expected expression in 'return' statement}}
+  // FIXME: Bad diagnostic
+  return + // expected-error {{unary operator cannot be separated from its operand}} {{11-+1:1=}} expected-error {{expected expression in 'return' statement}}
 }
 
 func VoidReturn1() {
@@ -238,9 +239,9 @@ func DoStmt() {
 
 
 func DoWhileStmt1() {
+  // expected-note@+2 {{did you mean 'repeat-while' statement?}} {{3-5=repeat}}
+  // expected-note@+1 {{did you mean separate 'do' and 'while' statements?}} {{+1:5-5=\n}}
   do { // expected-error {{'do-while' statement is not allowed}}
-  // expected-note@-1 {{did you mean 'repeat-while' statement?}} {{3-5=repeat}}
-  // expected-note@-2 {{did you mean separate 'do' and 'while' statements?}} {{5-5=\n}}
   } while true
 }
 
@@ -270,12 +271,13 @@ func RepeatWhileStmt1() {
 }
 
 func RepeatWhileStmt2() {
-  repeat // expected-error {{expected '{' after 'repeat'}} expected-error {{expected 'while' after body of 'repeat' statement}}
+  repeat // expected-error@+1 {{expected expression}}
 }
 
 func RepeatWhileStmt4() {
+  // FIXME: Bad diagnostic
   repeat {
-  } while + // expected-error {{unary operator cannot be separated from its operand}} {{12-1=}} expected-error {{expected expression in 'repeat-while' condition}}
+  } while + // expected-error {{unary operator cannot be separated from its operand}} {{12-+1:1=}} expected-error {{expected expression in 'repeat-while' condition}}
 }
 
 func brokenSwitch(_ x: Int) -> Int {
@@ -300,7 +302,7 @@ func breakContinue(_ x : Int) -> Int {
 Outer:
   for _ in 0...1000 {
 
-  Switch: // expected-error {{switch must be exhaustive}} expected-note{{do you want to add a default clause?}}
+  Switch: // expected-error {{switch must be exhaustive}} expected-note{{add a default clause}}
   switch x {
     case 42: break Outer
     case 97: continue Outer
@@ -474,7 +476,7 @@ func r25178926(_ a : Type) {
   switch a { // expected-error {{switch must be exhaustive}}
   // expected-note@-1 {{missing case: '.Bar'}}
   case .Foo, .Bar where 1 != 100:
-    // expected-warning @-1 {{'where' only applies to the second pattern match in this case}}
+    // expected-warning @-1 {{'where' only applies to the second pattern match in this 'case'}}
     // expected-note @-2 {{disambiguate by adding a line break between them if this is desired}} {{14-14=\n       }}
     // expected-note @-3 {{duplicate the 'where' on both patterns to check both patterns}} {{12-12= where 1 != 100}}
     break
@@ -496,8 +498,37 @@ func r25178926(_ a : Type) {
   switch a { // expected-error {{switch must be exhaustive}}
   // expected-note@-1 {{missing case: '.Foo'}}
   // expected-note@-2 {{missing case: '.Bar'}}
+  // expected-note@-3 {{add missing cases}}
   case .Foo where 1 != 100, .Bar where 1 != 100:
     break
+  }
+}
+
+func testAmbiguousWhereInCatch() {
+  protocol P1 {}
+  protocol P2 {}
+  func throwingFn() throws {}
+  do {
+    try throwingFn()
+  } catch is P1, is P2 where .random() {
+    // expected-warning @-1 {{'where' only applies to the second pattern match in this 'catch'}}
+    // expected-note @-2 {{disambiguate by adding a line break between them if this is desired}} {{18-18=\n          }}
+    // expected-note @-3 {{duplicate the 'where' on both patterns to check both patterns}} {{16-16= where .random()}}
+  } catch {
+
+  }
+  do {
+    try throwingFn()
+  } catch is P1,
+          is P2 where .random() {
+  } catch {
+
+  }
+  do {
+    try throwingFn()
+  } catch is P1 where .random(), is P2 where .random() {
+  } catch {
+
   }
 }
 
@@ -525,7 +556,7 @@ func fn(x: Int) {
 }
 
 func bad_if() {
-  if 1 {} // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+  if 1 {} // expected-error {{integer literal value '1' cannot be used as a boolean; did you mean 'true'?}} {{6-7=true}}
   if (x: false) {} // expected-error {{cannot convert value of type '(x: Bool)' to expected condition type 'Bool'}}
   if (x: 1) {} // expected-error {{cannot convert value of type '(x: Int)' to expected condition type 'Bool'}}
   if nil {} // expected-error {{'nil' is not compatible with expected condition type 'Bool'}}
@@ -564,33 +595,33 @@ outerLoop: repeat { // expected-note {{'outerLoop' declared here}}
   continue outerloop // expected-error {{cannot find label 'outerloop' in scope; did you mean 'outerLoop'?}} {{12-21=outerLoop}}
 } while true
 
-outerLoop1: for _ in [1] { // expected-note {{did you mean 'outerLoop1'?}} {{11-20=outerLoop1}}
-  outerLoop2: for _ in [1] { // expected-note {{did you mean 'outerLoop2'?}} {{11-20=outerLoop2}}
+outerLoop1: for _ in [1] { // expected-note {{did you mean 'outerLoop1'?}} {{+2:11-20=outerLoop1}}
+  outerLoop2: for _ in [1] { // expected-note {{did you mean 'outerLoop2'?}} {{+1:11-20=outerLoop2}}
     break outerloop // expected-error {{cannot find label 'outerloop' in scope}}
   }
 }
-outerLoop1: for _ in [1] { // expected-note {{did you mean 'outerLoop1'?}} {{14-23=outerLoop1}}
-  outerLoop2: for _ in [1] { // expected-note {{did you mean 'outerLoop2'?}} {{14-23=outerLoop2}}
+outerLoop1: for _ in [1] { // expected-note {{did you mean 'outerLoop1'?}} {{+2:14-23=outerLoop1}}
+  outerLoop2: for _ in [1] { // expected-note {{did you mean 'outerLoop2'?}} {{+1:14-23=outerLoop2}}
     continue outerloop // expected-error {{cannot find label 'outerloop' in scope}}
   }
 }
-outerLoop1: while true { // expected-note {{did you mean 'outerLoop1'?}} {{11-20=outerLoop1}}
-  outerLoop2: while true { // expected-note {{did you mean 'outerLoop2'?}} {{11-20=outerLoop2}}
+outerLoop1: while true { // expected-note {{did you mean 'outerLoop1'?}} {{+2:11-20=outerLoop1}}
+  outerLoop2: while true { // expected-note {{did you mean 'outerLoop2'?}} {{+1:11-20=outerLoop2}}
     break outerloop // expected-error {{cannot find label 'outerloop' in scope}}
   }
 }
-outerLoop1: while true { // expected-note {{did you mean 'outerLoop1'?}} {{14-23=outerLoop1}}
-  outerLoop2: while true { // expected-note {{did you mean 'outerLoop2'?}} {{14-23=outerLoop2}}
+outerLoop1: while true { // expected-note {{did you mean 'outerLoop1'?}} {{+2:14-23=outerLoop1}}
+  outerLoop2: while true { // expected-note {{did you mean 'outerLoop2'?}} {{+1:14-23=outerLoop2}}
     continue outerloop // expected-error {{cannot find label 'outerloop' in scope}}
   }
 }
-outerLoop1: repeat { // expected-note {{did you mean 'outerLoop1'?}} {{11-20=outerLoop1}}
-  outerLoop2: repeat { // expected-note {{did you mean 'outerLoop2'?}} {{11-20=outerLoop2}}
+outerLoop1: repeat { // expected-note {{did you mean 'outerLoop1'?}} {{+2:11-20=outerLoop1}}
+  outerLoop2: repeat { // expected-note {{did you mean 'outerLoop2'?}} {{+1:11-20=outerLoop2}}
     break outerloop // expected-error {{cannot find label 'outerloop' in scope}}
   } while true
 } while true
-outerLoop1: repeat { // expected-note {{did you mean 'outerLoop1'?}} {{14-23=outerLoop1}}
-  outerLoop2: repeat { // expected-note {{did you mean 'outerLoop2'?}} {{14-23=outerLoop2}}
+outerLoop1: repeat { // expected-note {{did you mean 'outerLoop1'?}} {{+2:14-23=outerLoop1}}
+  outerLoop2: repeat { // expected-note {{did you mean 'outerLoop2'?}} {{+1:14-23=outerLoop2}}
     continue outerloop // expected-error {{cannot find label 'outerloop' in scope}}
   } while true
 } while true

@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/IDE/SelectedOverloadInfo.h"
 
 using namespace swift::ide;
@@ -36,8 +37,13 @@ swift::ide::getSelectedOverloadInfo(const Solution &S,
     if (Result.BaseTy) {
       Result.BaseTy = S.simplifyType(Result.BaseTy)->getRValueType();
     }
+    if (Result.BaseTy && Result.BaseTy->is<ModuleType>()) {
+      Result.BaseTy = nullptr;
+    }
 
-    Result.Value = SelectedOverload->choice.getDeclOrNull();
+    if (auto ReferencedDecl = SelectedOverload->choice.getDeclOrNull()) {
+      Result.ValueRef = S.resolveConcreteDeclRef(ReferencedDecl, CalleeLocator);
+    }
     Result.ValueTy =
         S.simplifyTypeForCodeCompletion(SelectedOverload->adjustedOpenedType);
 
@@ -83,6 +89,8 @@ swift::ide::getSelectedOverloadInfo(const Solution &S,
   }
   case OverloadChoiceKind::DynamicMemberLookup:
   case OverloadChoiceKind::TupleIndex:
+  case OverloadChoiceKind::MaterializePack:
+  case OverloadChoiceKind::ExtractFunctionIsolation:
     // If it's DynamicMemberLookup, we don't know which function is being
     // called, so we can't extract any information from it.
     // TupleIndex isn't a function call and is not relevant for argument

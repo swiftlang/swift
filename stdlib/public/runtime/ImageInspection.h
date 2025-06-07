@@ -76,6 +76,7 @@ void addImageDynamicReplacementBlockCallback(const void *baseAddress,
                                              const void *start, uintptr_t size,
                                              const void *start2,
                                              uintptr_t size2);
+
 void addImageAccessibleFunctionsBlockCallback(const void *baseAddress,
                                               const void *start,
                                               uintptr_t size);

@@ -80,16 +80,8 @@
 // RUN: %swift_driver -g -### %s 2>&1 | %FileCheck -check-prefix=OPTIONS_BEFORE_FILE %s
 // OPTIONS_BEFORE_FILE: -g
 
-// RUN: not %swift_driver -target abc -### %s 2>&1 | %FileCheck -check-prefix=BAD_TARGET %s
-// BAD_TARGET: error: unknown target 'abc'
-
-// RUN: %swiftc_driver -incremental %s -### 2>&1 | %FileCheck -check-prefix=INCREMENTAL_WITHOUT_OFM %s
-// INCREMENTAL_WITHOUT_OFM: warning: ignoring -incremental (currently requires an output file map)
-// INCREMENTAL_WITHOUT_OFM: swift{{(-frontend|c)?(\.exe)?"?}} -frontend
-
-// RUN: %swiftc_driver -incremental -output-file-map %S/Inputs/empty-ofm.json %s -### 2>&1 | %FileCheck -check-prefix=INCREMENTAL_WITHOUT_OFM_ENTRY %s
-// INCREMENTAL_WITHOUT_OFM_ENTRY: ignoring -incremental; output file map has no master dependencies entry ("swift-dependencies" under "")
-// INCREMENTAL_WITHOUT_OFM_ENTRY: swift{{(-frontend|c)?(\.exe)?"?}} -frontend
+// RUN: not %swiftc_driver_plain -target x86_64-unknown-hurd -### %s 2>&1 | %FileCheck -check-prefix=BAD_TARGET %s
+// BAD_TARGET: error: unknown target 'x86_64-unknown-hurd'
 
 // RUN: %swiftc_driver -driver-print-jobs -enforce-exclusivity=checked %s | %FileCheck -check-prefix=EXCLUSIVITY_CHECKED %s
 // EXCLUSIVITY_CHECKED: swift
@@ -115,6 +107,45 @@
 // RUN: not %swiftc_driver -debug-info-format=dwarf %s 2>&1 | %FileCheck -check-prefix MISSING_OPTION_G_ERROR %s
 // RUN: not %swiftc_driver -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix MISSING_OPTION_G_ERROR %s
 // MISSING_OPTION_G_ERROR: error: option '-debug-info-format={{.*}}' is missing a required argument (-g)
+
+// RUN: %swift_driver -### -g -dwarf-version=3 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_3 %s
+// DWARF_VERSION_5: -dwarf-version=5
+// DWARF_VERSION_4: -dwarf-version=4
+// DWARF_VERSION_3: -dwarf-version=3
+// DWARF_VERSION_2: -dwarf-version=2
+// RUN: not %swift_driver -dwarf-version=1 %s 2>&1 | %FileCheck -check-prefix INVALID_DWARF_VERSION %s
+// RUN: not %swift_driver -dwarf-version=6 %s 2>&1 | %FileCheck -check-prefix INVALID_DWARF_VERSION %s
+// RUN: not %swiftc_driver -dwarf-version=1 %s 2>&1 | %FileCheck -check-prefix INVALID_DWARF_VERSION %s
+// RUN: not %swiftc_driver -dwarf-version=6 %s 2>&1 | %FileCheck -check-prefix INVALID_DWARF_VERSION %s
+// INVALID_DWARF_VERSION: invalid value '{{1|6}}' in '-dwarf-version={{1|6}}'
+
+// RUN: %swift_driver -### -g -target x86_64-apple-macosx10.10 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_2 %s
+// RUN: %swiftc_driver -### -g -target x86_64-apple-macosx10.10 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_2 %s
+// RUN: %swift_driver -### -g -target x86_64-apple-macosx10.11 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
+// RUN: %swiftc_driver -### -g -target x86_64-apple-macosx10.11 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
+// RUN: %swift_driver -### -g -target x86_64-apple-macos14.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
+// RUN: %swiftc_driver -### -g -target x86_64-apple-macos14.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
+// RUN: %swift_driver -### -g -target arm64-apple-ios8.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_2 %s
+// RUN: %swiftc_driver -### -g -target arm64-apple-ios8.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_2 %s
+// RUN: %swift_driver -### -g -target arm64-apple-ios9.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
+// RUN: %swiftc_driver -### -g -target arm64-apple-ios9.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
+// RUN: %swift_driver -### -g -target x86_64-apple-ios17.0-macabi %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
+// RUN: %swiftc_driver -### -g -target x86_64-apple-ios17.0-macabi %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
+// RUN: %swift_driver -### -g -target arm64-apple-tvos17.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
+// RUN: %swiftc_driver -### -g -target arm64-apple-tvos17.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
+// RUN: %swift_driver -### -g -target arm64_32-apple-watchos10.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
+// RUN: %swiftc_driver -### -g -target arm64_32-apple-watchos10.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_4 %s
+
+// RUN: %swift_driver -### -g -target x86_64-apple-macosx15 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_5 %s
+// RUN: %swiftc_driver -### -g -target x86_64-apple-macosx15 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_5 %s
+// RUN: %swift_driver -### -g -target arm64-apple-ios18.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_5 %s
+// RUN: %swiftc_driver -### -g -target arm64-apple-ios18.0 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_5 %s
+// RUN: %swift_driver -### -g -target arm64-apple-ios18.0-macabi %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_5 %s
+// RUN: %swiftc_driver -### -g -target arm64-apple-ios18.0-macabi %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_5 %s
+// RUN: %swift_driver -### -g -target arm64-apple-tvos18 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_5 %s
+// RUN: %swiftc_driver -### -g -target arm64-apple-tvos18 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_5 %s
+// RUN: %swift_driver -### -g -target arm64_32-apple-watchos11 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_5 %s
+// RUN: %swiftc_driver -### -g -target arm64_32-apple-watchos11 %s 2>&1 | %FileCheck -check-prefix DWARF_VERSION_5 %s
 
 // RUN: not %swift_driver -gline-tables-only -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s
 // RUN: not %swift_driver -gdwarf-types -debug-info-format=codeview %s 2>&1 | %FileCheck -check-prefix BAD_DEBUG_LEVEL_ERROR %s

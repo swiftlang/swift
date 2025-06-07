@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift -enable-bare-slash-regex -disable-availability-checking -typo-correction-limit 0
-// REQUIRES: swift_in_compiler
+// REQUIRES: swift_swift_parser
 // REQUIRES: concurrency
 
 prefix operator /
@@ -52,7 +52,6 @@ do {
   _=/0/
   // expected-error@-1 {{'_' can only appear in a pattern or on the left side of an assignment}}
   // expected-error@-2 {{cannot find operator '=/' in scope}}
-  // expected-error@-3 {{'/' is not a postfix unary operator}}
 }
 
 // No closing '/' so a prefix operator.
@@ -121,6 +120,7 @@ do {
 } // expected-error {{expected expression after operator}}
 
 _ = /x/??/x/ // expected-error {{'/' is not a postfix unary operator}}
+// expected-error@-1 2 {{cannot use optional chaining on non-optional value of type 'Regex<Substring>'}}
 
 _ = /x/ ... /y/ // expected-error {{referencing operator function '...' on 'Comparable' requires that 'Regex<Substring>' conform to 'Comparable'}}
 
@@ -130,7 +130,6 @@ _ = /x/.../y/
 
 _ = /x/...
 // expected-error@-1 {{unary operator '...' cannot be applied to an operand of type 'Regex<Substring>'}}
-// expected-note@-2 {{overloads for '...' exist with these partially matching parameter lists}}
 
 do {
   _ = /x /...
@@ -263,8 +262,7 @@ default:
 
 do {} catch /x/ {}
 // expected-error@-1 {{expression pattern of type 'Regex<Substring>' cannot match values of type 'any Error'}}
-// expected-error@-2 {{binary operator '~=' cannot be applied to two 'any Error' operands}}
-// expected-warning@-3 {{'catch' block is unreachable because no errors are thrown in 'do' block}}
+// expected-warning@-2 {{'catch' block is unreachable because no errors are thrown in 'do' block}}
 
 switch /x/ {
 default:
@@ -409,7 +407,8 @@ _ = /\()/
 // expected-error@-1 {{'/' is not a prefix unary operator}}
 // expected-error@-2 {{'/' is not a postfix unary operator}}
 // expected-error@-3 {{invalid component of Swift key path}}
-
+// expected-error@-4 {{type of expression is ambiguous without a type annotation}}
+  
 do {
   let _: Regex = (/whatever\)/
   // expected-note@-1 {{to match this opening '('}}
@@ -447,7 +446,6 @@ _ = ^/"/"
 _ = ^/"[/"
 // expected-error@-1 {{'^' is not a prefix unary operator}}
 // expected-error@-2 {{unterminated string literal}}
-// expected-error@-3 {{expected custom character class members}}
 
 _ = (^/)("/")
 

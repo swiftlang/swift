@@ -19,6 +19,10 @@
 import Darwin
 #elseif canImport(Glibc)
 import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif canImport(Android)
+import Android
 #elseif os(WASI)
 import WASILibc
 #elseif os(Windows)
@@ -69,7 +73,7 @@ public typealias ThreadHandle = HANDLE
 #else
 public typealias ThreadHandle = pthread_t
 
-#if os(Linux) || os(Android)
+#if (os(Linux) && !canImport(Musl)) || os(Android)
 internal func _make_pthread_t() -> pthread_t {
   return pthread_t()
 }

@@ -1,11 +1,11 @@
-// RUN: %target-swift-ide-test -code-completion -code-completion-token=A -source-filename=%s | %FileCheck %s
-// RUN: %target-swift-ide-test -code-completion -code-completion-token=B -source-filename=%s | %FileCheck %s
+// RUN: %batch-code-completion
 
 func test1() {
   1 + [0]#^A^#
+// A: Decl[InstanceVar]/CurrNominal/IsSystem/TypeRelation[Convertible]:      .startIndex[#Int#]; name=startIndex
 }
 func test2() {
   "" + [""]#^B^#
+// B: Decl[InstanceVar]/CurrNominal/IsSystem:      .startIndex[#Int#]; name=startIndex
 }
-// Sanity check results.
-// CHECK: Decl[InstanceVar]/CurrNominal/IsSystem:      .startIndex[#Int#]; name=startIndex
+

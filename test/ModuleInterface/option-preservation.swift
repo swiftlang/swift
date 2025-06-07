@@ -5,11 +5,10 @@
 //
 // CHECK-SWIFTINTERFACE: swift-module-flags:
 // CHECK-SWIFTINTERFACE-SAME: -enable-library-evolution
+// CHECK-SWIFTINTERFACE-SAME: -target-min-inlining-version 42
 // CHECK-SWIFTINTERFACE-SAME: -Onone
 // CHECK-SWIFTINTERFACE-SAME: -enforce-exclusivity=unchecked
 // CHECK-SWIFTINTERFACE-SAME: -autolink-force-load
-// CHECK-SWIFTINTERFACE: swift-module-flags-ignorable:
-// CHECK-SWIFTINTERFACE-SAME: -target-min-inlining-version 42
 // CHECK-SWIFTINTERFACE-SAME: -enable-bare-slash-regex
 
 // Make sure flags show up when filelists are enabled

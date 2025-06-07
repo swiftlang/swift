@@ -16,7 +16,6 @@ func testInvalidStructCursor() {
 func testInvalidStructMemberCompletion() {
   let foo: InvalidStruct
   foo.#^INVALID-MEMBER^#
-  // INVALID-MEMBER: Begin completions
   // INVALID-MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      memberA[#Int#];
   // INVALID-MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      memberB[#<<error type>>#];
   // INVALID-MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      memberC[#<<error type>>#];
@@ -25,26 +24,22 @@ func testInvalidStructMemberCompletion() {
   // INVALID-MEMBER-DAG: Decl[InstanceMethod]/Super:         add({#<<error type>>#})[#Void#];
   // INVALID-MEMBER-DAG: Decl[InstanceMethod]/Super:         get()[#InvalidStruct.Item#];
   // INVALID-MEMBER-DAG: Decl[InstanceMethod]/Super:         set({#item: InvalidStruct.Item#})[#Void#];
-  // INVALID-MEMBER: End completions
 }
 
 func testInvalidTypeCompletion() {
   let foo: #^INVALID-TYPE^#;
-  // INVALID-TYPE: Begin completions
   // INVALID-TYPE-DAG: Decl[Enum]/OtherModule[errors]:     InvalidEnum[#InvalidEnum#];
   // INVALID-TYPE-DAG: Decl[Class]/OtherModule[errors]:    InvalidClass[#InvalidClass#];
-  // INVALID-TYPE-DAG: Decl[Struct]/OtherModule[errors]:   InvalidGenericStruct[#InvalidGenericStruct#];
+  // INVALID-TYPE-DAG: Decl[Struct]/OtherModule[errors]:   InvalidGenericStruct[#InvalidGenericStruct<T, U>#];
   // INVALID-TYPE-DAG: Decl[Struct]/OtherModule[errors]:   InvalidStruct[#InvalidStruct#];
   // INVALID-TYPE-DAG: Decl[TypeAlias]/OtherModule[errors]: InvalidAlias[#InvalidAlias#];
   // INVALID-TYPE-DAG: Decl[Class]/OtherModule[errors]:    InvalidClassSub1[#InvalidClassSub1#];
   // INVALID-TYPE-DAG: Decl[Class]/OtherModule[errors]:    InvalidClassSub2[#InvalidClassSub2#];
   // INVALID-TYPE-DAG: Decl[Protocol]/OtherModule[errors]: InvalidProtocol[#InvalidProtocol#];
-  // INVALID-TYPE: End completions
 }
 
 func testInvalidTopLevelCompletion() {
   #^INVALID-TOP^#
-  // INVALID-TOP: Begin completions
   // INVALID-TOP-DAG: Decl[Enum]/OtherModule[errors]:     InvalidEnum[#InvalidEnum#];
   // INVALID-TOP-DAG: Decl[Class]/OtherModule[errors]:    InvalidClass[#InvalidClass#];
   // INVALID-TOP-DAG: Decl[FreeFunction]/OtherModule[errors]: invalidGenericFuncBody({#param: T#})[#T#];
@@ -53,9 +48,9 @@ func testInvalidTopLevelCompletion() {
   // INVALID-TOP-DAG: Decl[GlobalVar]/OtherModule[errors]: invalidGlobalClosureBody[#<<error type>>#];
   // INVALID-TOP-DAG: Decl[FreeFunction]/OtherModule[errors]: invalidFuncSignature()[#Void#];
   // INVALID-TOP-DAG: Decl[GlobalVar]/OtherModule[errors]: invalidGlobalMissingInit[#String#];
-  // INVALID-TOP-DAG: Decl[Struct]/OtherModule[errors]:   InvalidGenericStruct[#InvalidGenericStruct#];
+  // INVALID-TOP-DAG: Decl[Struct]/OtherModule[errors]:   InvalidGenericStruct[#InvalidGenericStruct<T, U>#];
   // INVALID-TOP-DAG: Decl[Struct]/OtherModule[errors]:   InvalidStruct[#InvalidStruct#];
-  // INVALID-TOP-DAG: Decl[FreeFunction]/OtherModule[errors]: typeUsesFunc({#pe: InvalidEnum#}, {#pa: <<error type>>#}, {#pp: InvalidProtocol#}, {#ps: InvalidStruct#}, {#pg: <<error type>>#}, {#pc: InvalidClass#})[#Int#];
+  // INVALID-TOP-DAG: Decl[FreeFunction]/OtherModule[errors]: typeUsesFunc({#pe: InvalidEnum#}, {#pa: <<error type>>#}, {#pp: any InvalidProtocol#}, {#ps: InvalidStruct#}, {#pg: <<error type>>#}, {#pc: InvalidClass#})[#Int#];
   // INVALID-TOP-DAG: Decl[GlobalVar]/OtherModule[errors]: invalidGlobalKeypath[#InvalidStruct.Type#];
   // INVALID-TOP-DAG: Decl[TypeAlias]/OtherModule[errors]: InvalidAlias[#InvalidAlias#];
   // INVALID-TOP-DAG: Decl[FreeFunction]/OtherModule[errors]: invalidGenericFuncType({#param: T#})[#<<error type>>#];
@@ -65,7 +60,6 @@ func testInvalidTopLevelCompletion() {
   // INVALID-TOP-DAG: Decl[Class]/OtherModule[errors]:    InvalidClassSub2[#InvalidClassSub2#];
   // INVALID-TOP-DAG: Decl[Protocol]/OtherModule[errors]/Flair[RareType]: InvalidProtocol[#InvalidProtocol#];
   // INVALID-TOP-DAG: Decl[FreeFunction]/OtherModule[errors]: invalidFuncThrows()[' throws'][#<<error type>>#];
-  // INVALID-TOP: End completions
 }
 
 // RUN: %empty-directory(%t)

@@ -13,6 +13,7 @@
 #ifndef SWIFT_FRONTEND_MODULEINTERFACESUPPORT_H
 #define SWIFT_FRONTEND_MODULEINTERFACESUPPORT_H
 
+#include "swift/AST/PrintOptions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Version.h"
 #include "llvm/Support/Regex.h"
@@ -21,6 +22,8 @@
 #define SWIFT_COMPILER_VERSION_KEY "swift-compiler-version"
 #define SWIFT_MODULE_FLAGS_KEY "swift-module-flags"
 #define SWIFT_MODULE_FLAGS_IGNORABLE_KEY "swift-module-flags-ignorable"
+#define SWIFT_MODULE_FLAGS_IGNORABLE_PRIVATE_KEY                               \
+  "swift-module-flags-ignorable-private"
 
 namespace swift {
 
@@ -41,21 +44,26 @@ struct ModuleInterfaceOptions {
   /// [TODO: Clang-type-plumbing] This check should go away.
   bool PrintFullConvention = false;
 
-  /// Copy of all the command-line flags passed at .swiftinterface
-  /// generation time, re-applied to CompilerInvocation when reading
-  /// back .swiftinterface and reconstructing .swiftmodule.
-  std::string Flags;
+  struct InterfaceFlags {
+    /// Copy of all the command-line flags passed at .swiftinterface
+    /// generation time, re-applied to CompilerInvocation when reading
+    /// back .swiftinterface and reconstructing .swiftmodule.
+    std::string Flags = "";
 
-  /// Flags that should be emitted to the .swiftinterface file but are OK to be
-  /// ignored by the earlier version of the compiler.
-  std::string IgnorableFlags;
+    /// Flags that should be emitted to the .swiftinterface file but are OK to
+    /// be ignored by the earlier version of the compiler.
+    std::string IgnorableFlags = "";
+  };
 
-  /// Print for a private swiftinterface file, SPI decls and attributes.
-  bool PrintPrivateInterfaceContent = false;
+  /// Flags which appear in all .swiftinterface files.
+  InterfaceFlags PublicFlags = {};
 
-  /// Print imports with both @_implementationOnly and @_spi, only applies
-  /// when PrintSPIs is true.
-  bool ExperimentalSPIImports = false;
+  /// Flags which appear in both the private and package .swiftinterface files,
+  /// but not the public interface.
+  InterfaceFlags PrivateFlags = {};
+
+  /// Flags which appear only in the .package.swiftinterface.
+  InterfaceFlags PackageFlags = {};
 
   /// Print imports that are missing from the source and used in API.
   bool PrintMissingImports = true;
@@ -63,15 +71,42 @@ struct ModuleInterfaceOptions {
   /// Intentionally print invalid syntax into the file.
   bool DebugPrintInvalidSyntax = false;
 
-  /// A list of modules we shouldn't import in the public interfaces.
-  std::vector<std::string> ModulesToSkipInPublicInterface;
+  /// A mode which decides whether the printed interface contains package, SPIs, or public/inlinable declarations.
+  PrintOptions::InterfaceMode InterfaceContentMode = PrintOptions::InterfaceMode::Public;
+  bool printPublicInterface() const {
+    return InterfaceContentMode == PrintOptions::InterfaceMode::Public;
+  }
+  bool printPackageInterface() const {
+    return InterfaceContentMode == PrintOptions::InterfaceMode::Package;
+  }
+  void setInterfaceMode(PrintOptions::InterfaceMode mode) {
+    InterfaceContentMode = mode;
+  }
 };
 
 extern version::Version InterfaceFormatVersion;
 std::string getSwiftInterfaceCompilerVersionForCurrentCompiler(ASTContext &ctx);
 
+/// A regex that matches lines like this:
+///
+///     // swift-interface-format-version: 1.0
+///
+/// and extracts "1.0".
 llvm::Regex getSwiftInterfaceFormatVersionRegex();
+
+/// A regex that matches lines like this:
+///
+///     // swift-compiler-version: Apple Swift version 5.8 (swiftlang-5.8.0.117.59)
+///
+/// and extracts "Apple Swift version 5.8 (swiftlang-5.8.0.117.59)".
 llvm::Regex getSwiftInterfaceCompilerVersionRegex();
+
+/// A regex that matches strings like this:
+///
+///     Apple Swift version 5.8
+///
+/// and extracts "5.8".
+llvm::Regex getSwiftInterfaceCompilerToolsVersionRegex();
 
 /// Emit a stable module interface for \p M, which can be used by a client
 /// source file to import this module, subject to options given by \p Opts.

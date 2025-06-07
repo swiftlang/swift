@@ -7,6 +7,40 @@
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
 swift_compiler_sources(Optimizer
+  SimplifyAllocRefDynamic.swift
+  SimplifyAllocStack.swift
+  SimplifyApply.swift
+  SimplifyBeginAndLoadBorrow.swift
   SimplifyBeginCOWMutation.swift
+  SimplifyBranch.swift
+  SimplifyBuiltin.swift
+  SimplifyCheckedCast.swift
+  SimplifyClassifyBridgeObject.swift
+  SimplifyCondBranch.swift
+  SimplifyCondFail.swift
+  SimplifyConvertEscapeToNoEscape.swift
+  SimplifyCopyBlock.swift
+  SimplifyCopyValue.swift
+  SimplifyDebugStep.swift
+  SimplifyDestroyValue.swift
+  SimplifyDestructure.swift
+  SimplifyFixLifetime.swift
   SimplifyGlobalValue.swift
-  SimplifyStrongRetainRelease.swift)
+  SimplifyInitEnumDataAddr.swift
+  SimplifyKeyPath.swift
+  SimplifyLoad.swift
+  SimplifyMarkDependence.swift
+  SimplifyMisc.swift
+  SimplifyPartialApply.swift
+  SimplifyPointerToAddress.swift
+  SimplifyRefCasts.swift
+  SimplifyRetainReleaseValue.swift
+  SimplifyStrongRetainRelease.swift
+  SimplifyStructExtract.swift
+  SimplifySwitchEnum.swift
+  SimplifyTuple.swift
+  SimplifyTupleExtract.swift
+  SimplifyUncheckedAddrCast.swift
+  SimplifyUncheckedEnumData.swift
+  SimplifyValueToBridgeObject.swift
+  SimplifyWitnessMethod.swift)

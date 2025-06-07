@@ -1,5 +1,9 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-sil-opt %s -test-instruction-iteration -o %t/out.sil | %FileCheck --check-prefix=LOG %s
+// RUN: %target-sil-opt -sil-print-types %s -test-instruction-iteration -o %t/out.sil | %FileCheck --check-prefix=LOG %s
+// RUN: %FileCheck %s < %t/out.sil
+
+// Use this testfile to check if the `swift-frontend -sil-opt` option works.
+// RUN: %swift_frontend_plain -sil-opt -sil-print-types %s -test-instruction-iteration -o %t/out.sil | %FileCheck --check-prefix=LOG %s
 // RUN: %FileCheck %s < %t/out.sil
 
 // REQUIRES: swift_in_compiler
@@ -229,5 +233,63 @@ bb0:
   %1 = string_literal utf8 "split_block"
   %2 = integer_literal $Builtin.Int64, 3 
   return %0 : $()
+}
+
+sil @use1 : $@convention(thin) (Builtin.RawPointer) -> ()
+sil @use2 : $@convention(thin) (Builtin.RawPointer, Builtin.RawPointer) -> ()
+
+// LOG-LABEL: Test instruction iteration in print_uses:
+// LOG-NEXT:  bb0:
+// LOG-NEXT:    %0 = string_literal utf8 "print_uses"
+// LOG-NEXT:  use: operand #2 of   %4 = apply %3(%0, %0)
+// LOG-NEXT:  use: operand #1 of   %4 = apply %3(%0, %0)
+// LOG-NEXT:  use: operand #1 of   %2 = apply %1(%0)
+// LOG-NEXT:    // function_ref use1
+// LOG:       End function print_uses:
+sil @print_uses : $@convention(thin) () -> () {
+bb0:
+  %0 = string_literal utf8 "print_uses"
+  %1 = function_ref @use1 : $@convention(thin) (Builtin.RawPointer) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (Builtin.RawPointer) -> ()
+  %3 = function_ref @use2 : $@convention(thin) (Builtin.RawPointer, Builtin.RawPointer) -> ()
+  %4 = apply %3(%0, %0) : $@convention(thin) (Builtin.RawPointer, Builtin.RawPointer) -> ()
+  %5 = tuple ()
+  return %5
+}
+
+// LOG-LABEL: Test instruction iteration in delete_first_user:
+// LOG-NEXT:  bb0:
+// LOG-NEXT:    %0 = string_literal utf8 "delete_first_user"
+// LOG-NEXT:  use: operand #1 of   %2 = apply %1(%0)
+// LOG-NEXT:    // function_ref use1
+// LOG:       End function delete_first_user:
+sil @delete_first_user : $@convention(thin) () -> () {
+bb0:
+  %0 = string_literal utf8 "delete_first_user"
+  %1 = function_ref @use1 : $@convention(thin) (Builtin.RawPointer) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (Builtin.RawPointer) -> ()
+  %3 = function_ref @use2 : $@convention(thin) (Builtin.RawPointer, Builtin.RawPointer) -> ()
+  %4 = apply %3(%0, %0) : $@convention(thin) (Builtin.RawPointer, Builtin.RawPointer) -> ()
+  %5 = tuple ()
+  return %5
+}
+
+// LOG-LABEL: Test instruction iteration in delete_second_user:
+// LOG-NEXT:  bb0:
+// LOG-NEXT:    %0 = string_literal utf8 "delete_second_user"
+// LOG-NEXT:  use: operand #1 of   %5 = apply %1(%0)
+// LOG-NEXT:  use: operand #1 of   %2 = apply %1(%0)
+// LOG-NEXT:    // function_ref use1
+// LOG:       End function delete_second_user:
+sil @delete_second_user : $@convention(thin) () -> () {
+bb0:
+  %0 = string_literal utf8 "delete_second_user"
+  %1 = function_ref @use1 : $@convention(thin) (Builtin.RawPointer) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (Builtin.RawPointer) -> ()
+  %3 = function_ref @use2 : $@convention(thin) (Builtin.RawPointer, Builtin.RawPointer) -> ()
+  %4 = apply %3(%0, %0) : $@convention(thin) (Builtin.RawPointer, Builtin.RawPointer) -> ()
+  %5 = apply %1(%0) : $@convention(thin) (Builtin.RawPointer) -> ()
+  %6 = tuple ()
+  return %6
 }
 

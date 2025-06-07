@@ -1,0 +1,5 @@
+// It is important that this test uses a second module.modulemap file.
+module ImportsMissingHeaderIndirect {
+  header "ImportsMissingHeaderIndirect.h"
+  export *
+}

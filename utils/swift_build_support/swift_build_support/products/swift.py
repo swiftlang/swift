@@ -10,11 +10,14 @@
 #
 # ----------------------------------------------------------------------------
 
+from build_swift.build_swift.constants import SWIFT_REPO_NAME
+
 from . import cmark
 from . import earlyswiftdriver
 from . import libcxx
 from . import llvm
 from . import product
+from . import staticswiftlinux
 from ..cmake import CMakeOptions
 
 
@@ -52,11 +55,27 @@ class Swift(product.Product):
         # Add experimental concurrency flag.
         self.cmake_options.extend(self._enable_experimental_concurrency)
 
+        # Add experimental cxx interop flags.
+        self.cmake_options.extend(self._enable_experimental_cxx_interop)
+        self.cmake_options.extend(self._enable_cxx_interop_swift_bridging_header)
+
         # Add experimental distributed flag.
         self.cmake_options.extend(self._enable_experimental_distributed)
 
-        # Add experimental reflection flag.
-        self.cmake_options.extend(self._enable_experimental_reflection)
+        # Add backtracing flag.
+        self.cmake_options.extend(self._enable_backtracing)
+
+        # Add experimental observation flag.
+        self.cmake_options.extend(self._enable_experimental_observation)
+
+        # Add synchronization flag.
+        self.cmake_options.extend(self._enable_synchronization)
+
+        # Add volatile flag.
+        self.cmake_options.extend(self._enable_volatile)
+
+        # Add runtime module flag.
+        self.cmake_options.extend(self._enable_runtime_module)
 
         # Add static vprintf flag
         self.cmake_options.extend(self._enable_stdlib_static_vprintf)
@@ -68,8 +87,32 @@ class Swift(product.Product):
 
         self.cmake_options.extend(self._enable_stdlib_unicode_data)
 
+        self.cmake_options.extend(self._enable_embedded_stdlib)
+
+        self.cmake_options.extend(self._enable_embedded_stdlib_cross_compiling)
+
+        self.cmake_options.extend(self._enable_stdlib_symbol_graphs)
+
         self.cmake_options.extend(
             self._swift_tools_ld64_lto_codegen_only_for_supporting_targets)
+
+        self.cmake_options.extend(
+            self._enable_experimental_parser_validation)
+
+        self._handle_swift_debuginfo_non_lto_args()
+
+        self.cmake_options.extend(
+            self._enable_new_runtime_build)
+
+        self.cmake_options.extend_raw(self.args.extra_swift_cmake_options)
+
+    @classmethod
+    def product_source_name(cls):
+        """product_source_name() -> str
+
+        The name of the source code directory of this product.
+        """
+        return SWIFT_REPO_NAME
 
     @classmethod
     def is_build_script_impl_product(cls):
@@ -166,14 +209,44 @@ updated without updating swift.py?")
                  self.args.enable_experimental_concurrency)]
 
     @property
+    def _enable_experimental_cxx_interop(self):
+        return [('SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP:BOOL',
+                 self.args.enable_experimental_cxx_interop)]
+
+    @property
+    def _enable_cxx_interop_swift_bridging_header(self):
+        return [('SWIFT_ENABLE_CXX_INTEROP_SWIFT_BRIDGING_HEADER:BOOL',
+                 self.args.enable_cxx_interop_swift_bridging_header)]
+
+    @property
     def _enable_experimental_distributed(self):
         return [('SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED:BOOL',
                  self.args.enable_experimental_distributed)]
 
     @property
-    def _enable_experimental_reflection(self):
-        return [('SWIFT_ENABLE_EXPERIMENTAL_REFLECTION:BOOL',
-                 self.args.enable_experimental_reflection)]
+    def _enable_backtracing(self):
+        return [('SWIFT_ENABLE_BACKTRACING:BOOL',
+                 self.args.swift_enable_backtracing)]
+
+    @property
+    def _enable_experimental_observation(self):
+        return [('SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION:BOOL',
+                 self.args.enable_experimental_observation)]
+
+    @property
+    def _enable_synchronization(self):
+        return [('SWIFT_ENABLE_SYNCHRONIZATION:BOOL',
+                 self.args.enable_synchronization)]
+
+    @property
+    def _enable_volatile(self):
+        return [('SWIFT_ENABLE_VOLATILE:BOOL',
+                 self.args.enable_volatile)]
+
+    @property
+    def _enable_runtime_module(self):
+        return [('SWIFT_ENABLE_RUNTIME_MODULE:BOOL',
+                 self.args.enable_runtime_module)]
 
     @property
     def _enable_stdlib_static_vprintf(self):
@@ -200,9 +273,47 @@ updated without updating swift.py?")
         return [('SWIFT_TOOLS_LD64_LTO_CODEGEN_ONLY_FOR_SUPPORTING_TARGETS:BOOL',
                  self.args.swift_tools_ld64_lto_codegen_only_for_supporting_targets)]
 
+    @property
+    def _enable_experimental_parser_validation(self):
+        return [('SWIFT_ENABLE_EXPERIMENTAL_PARSER_VALIDATION:BOOL',
+                 self.args.enable_experimental_parser_validation)]
+
+    @property
+    def _enable_embedded_stdlib(self):
+        return [('SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB',
+                 self.args.build_embedded_stdlib)]
+
+    @property
+    def _enable_embedded_stdlib_cross_compiling(self):
+        return [('SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING',
+                 self.args.build_embedded_stdlib_cross_compiling)]
+
+    @property
+    def _enable_stdlib_symbol_graphs(self):
+        return [('SWIFT_STDLIB_BUILD_SYMBOL_GRAPHS:BOOL',
+                 self.args.build_stdlib_docs)]
+
+    @property
+    def _enable_new_runtime_build(self):
+        return [('SWIFT_ENABLE_NEW_RUNTIME_BUILD:BOOL',
+                 self.args.enable_new_runtime_build)]
+
+    def _handle_swift_debuginfo_non_lto_args(self):
+        if ('swift_debuginfo_non_lto_args' not in self.args
+                or self.args.swift_debuginfo_non_lto_args is None):
+            # Ensure the final value of the variable is determined
+            # by the build-script invocation, and not by any value present
+            # in CMakeCache.txt (e.g. as a result of previous incremental builds)
+            self.cmake_options.undefine('SWIFT_DEBUGINFO_NON_LTO_ARGS')
+        else:
+            self.cmake_options.extend(
+                [('SWIFT_DEBUGINFO_NON_LTO_ARGS:STRING',
+                 ";".join(self.args.swift_debuginfo_non_lto_args))])
+
     @classmethod
     def get_dependencies(cls):
         return [cmark.CMark,
                 earlyswiftdriver.EarlySwiftDriver,
                 llvm.LLVM,
+                staticswiftlinux.StaticSwiftLinuxConfig,
                 libcxx.LibCXX]

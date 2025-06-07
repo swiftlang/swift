@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import Basic
+import AST
 import SILBridging
 
 /// A basic block argument.
@@ -20,15 +21,28 @@ public class Argument : Value, Hashable {
   public var definingInstruction: Instruction? { nil }
 
   public var parentBlock: BasicBlock {
-    return SILArgument_getParent(bridged).block
+    return bridged.getParent().block
   }
 
-  var bridged: BridgedArgument { BridgedArgument(obj: SwiftObject(self)) }
-  
+  public var bridged: BridgedArgument { BridgedArgument(obj: SwiftObject(self)) }
+
   public var index: Int {
     return parentBlock.arguments.firstIndex(of: self)!
   }
-  
+
+  public var isReborrow: Bool { bridged.isReborrow() }
+
+  public var isLexical: Bool { false }
+
+  public func findVarDecl() -> VarDecl? {
+    if let varDecl = bridged.getVarDecl().getAs(VarDecl.self) {
+      return varDecl
+    }
+    return findVarDeclFromDebugUsers()
+  }
+
+  public var sourceLoc: SourceLoc? { findVarDecl()?.nameLoc }
+
   public static func ==(lhs: Argument, rhs: Argument) -> Bool {
     lhs === rhs
   }
@@ -40,45 +54,352 @@ public class Argument : Value, Hashable {
 
 final public class FunctionArgument : Argument {
   public var convention: ArgumentConvention {
-    SILArgument_getConvention(bridged).convention
+    parentFunction.argumentConventions[index]
+  }
+
+  public override var isLexical: Bool {
+    bridged.FunctionArgument_isLexical()
+  }
+
+  public var isClosureCapture: Bool {
+    bridged.FunctionArgument_isClosureCapture()
+  }
+
+  public var isSelf: Bool {
+    parentFunction.argumentConventions.selfIndex == index
+  }
+
+  // FIXME: This is incorrect in two cases: it does not include the
+  // indirect error result, and, prior to address lowering, does not
+  // include pack results.
+  public var isIndirectResult: Bool {
+    return index < parentFunction.numIndirectResultArguments
+  }
+
+  /// If the function's result depends on this argument, return the
+  /// kind of dependence.
+  public var resultDependence: LifetimeDependenceConvention? {
+    parentFunction.argumentConventions[resultDependsOn: index]
+  }
+
+  /// Copies the following flags from `arg`:
+  /// 1. noImplicitCopy
+  /// 2. lifetimeAnnotation
+  /// 3. closureCapture
+  /// 4. parameterPack
+  public func copyFlags(from arg: FunctionArgument) {
+    bridged.copyFlags(arg.bridged)
   }
 }
 
-final public class BlockArgument : Argument {
-  public var isPhiArgument: Bool {
-    parentBlock.predecessors.allSatisfy {
-      let term = $0.terminator
-      return term is BranchInst || term is CondBranchInst
+public struct Phi {
+  public let value: Argument
+
+  // TODO: Remove the CondBr case. All passes avoid critical edges. It
+  // is only included here for compatibility with .sil tests that have
+  // not been migrated.
+  public init?(_ value: Value) {
+    guard let argument = value as? Argument else {
+      return nil
+    }
+    var preds = argument.parentBlock.predecessors
+    if let pred = preds.next() {
+      let term = pred.terminator
+      guard term is BranchInst || term is CondBranchInst else {
+        return nil
+      }
+    } else {
+      // No predecessors indicates an unreachable block (except for function arguments).
+      // Treat this like a degenerate phi so we don't consider it a terminator result.
+      if argument is FunctionArgument {
+        return nil
+      }
+    }
+    self.value = argument
+  }
+
+  public init?(using operand: Operand) {
+    switch operand.instruction {
+    case let br as BranchInst:
+      self.init(br.getArgument(for: operand))
+    case let condBr as CondBranchInst:
+      guard let arg = condBr.getArgument(for: operand) else { return nil }
+      self.init(arg)
+    default:
+      return nil
     }
   }
 
-  public var incomingPhiOperands: LazyMapSequence<PredecessorList, Operand> {
-    assert(isPhiArgument)
-    let idx = index
-    return parentBlock.predecessors.lazy.map {
-      switch $0.terminator {
-        case let br as BranchInst:
-          return br.operands[idx]
-        case let condBr as CondBranchInst:
-          if condBr.trueBlock == self.parentBlock {
-            assert(condBr.falseBlock != self.parentBlock)
-            return condBr.trueOperands[idx]
-          } else {
-            assert(condBr.falseBlock == self.parentBlock)
-            return condBr.falseOperands[idx]
-          }
-        default:
-          fatalError("wrong terminator for phi-argument")
+  public var predecessors: PredecessorList {
+    return value.parentBlock.predecessors
+  }
+
+  public var successor: BasicBlock {
+    return value.parentBlock
+  }
+
+  public func incomingOperand(inPredecessor predecessor: BasicBlock)
+  -> Operand {
+    let blockArgIdx = value.index
+    switch predecessor.terminator {
+    case let br as BranchInst:
+      return br.operands[blockArgIdx]
+    case let condBr as CondBranchInst:
+      if condBr.trueBlock == successor {
+        assert(condBr.falseBlock != successor)
+        return condBr.trueOperands[blockArgIdx]
+      } else {
+        assert(condBr.falseBlock == successor)
+        return condBr.falseOperands[blockArgIdx]
+      }
+    default:
+      fatalError("wrong terminator for phi-argument")
+    }
+  }
+
+  public var incomingOperands: LazyMapSequence<PredecessorList, Operand> {
+    predecessors.lazy.map { incomingOperand(inPredecessor: $0) }
+  }
+
+  public var incomingValues: LazyMapSequence<LazyMapSequence<PredecessorList, Operand>, Value> {
+    incomingOperands.lazy.map { $0.value }
+  }
+
+  public var isReborrow: Bool { value.isReborrow }
+
+  public var endsLifetime: Bool {
+    value.ownership == .owned || value.isReborrow
+  }
+
+  public var borrowedFrom: BorrowedFromInst? {
+    for use in value.uses {
+      if let bfi = use.forwardingBorrowedFromUser {
+        return bfi
+      }
+    }
+    return nil
+  }
+
+  // Returns true if the phi has an end_borrow or a re-borrowing branch as user.
+  // This should be consistent with the `isReborrow` flag.
+  public var hasBorrowEndingUse: Bool {
+    let phiValue: Value = borrowedFrom ?? value
+    return phiValue.uses.contains {
+      switch $0.ownership {
+        case .endBorrow, .reborrow: return true
+        default:                    return false
       }
     }
   }
 
-  public var incomingPhiValues: LazyMapSequence<LazyMapSequence<PredecessorList, Operand>, Value> {
-    incomingPhiOperands.lazy.map { $0.value }
+  public static func ==(lhs: Phi, rhs: Phi) -> Bool {
+    lhs.value === rhs.value
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    value.hash(into: &hasher)
   }
 }
 
-public enum ArgumentConvention {
+extension Phi {
+  /// Return true of this phi is directly returned with no side effects between the phi and the return.
+  public var isReturnValue: Bool {
+    if let singleUse = value.uses.singleUse, let ret = singleUse.instruction as? ReturnInst,
+       ret.parentBlock == successor {
+      for inst in successor.instructions {
+        if inst.mayHaveSideEffects {
+          return false
+        }
+      }
+      return true
+    }
+    return false
+  }
+}
+
+extension Operand {
+  public var forwardingBorrowedFromUser: BorrowedFromInst? {
+    if let bfi = instruction as? BorrowedFromInst, index == 0 {
+      return bfi
+    }
+    return nil
+  }
+}
+
+public struct TerminatorResult {
+  public let value: Argument
+
+  public init?(_ value: Value) {
+    guard let argument = value as? Argument else { return nil }
+    var preds = argument.parentBlock.predecessors
+    guard let pred = preds.next() else { return nil }
+    let term = pred.terminator
+    if term is BranchInst || term is CondBranchInst { return nil }
+    self.value = argument
+  }
+
+  public var terminator: TermInst {
+    var preds = value.parentBlock.predecessors
+    return preds.next()!.terminator
+  }
+  
+  public var predecessor: BasicBlock {
+    return terminator.parentBlock
+  }
+
+  public var successor: BasicBlock {
+    return value.parentBlock
+  }
+
+  public static func ==(lhs: TerminatorResult, rhs: TerminatorResult) -> Bool {
+    lhs.value == rhs.value
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    value.hash(into: &hasher)
+  }
+}
+
+/// ArgumentConventions indexed on a SIL function's argument index.
+/// When derived from an ApplySite, this corresponds to the callee
+/// function's argument index.
+///
+/// When derived from an ApplySite, `convention` is the substituted
+/// convention. Substitution only affects the type inside ResultInfo
+/// and ParameterInfo. It does not change the resulting
+/// ArgumentConvention, ResultConvention, or LifetimeDependenceInfo.
+public struct ArgumentConventions : Collection, CustomStringConvertible {
+  public let convention: FunctionConvention
+
+  public var startIndex: Int { 0 }
+
+  public var endIndex: Int {
+    firstParameterIndex + convention.parameters.count
+  }
+
+  public func index(after index: Int) -> Int {
+    return index + 1
+  }
+
+  public subscript(_ argumentIndex: Int) -> ArgumentConvention {
+    if let paramIdx = parameterIndex(for: argumentIndex) {
+      return convention.parameters[paramIdx].convention
+    }
+    let resultInfo = convention.indirectSILResult(at: argumentIndex)
+    return ArgumentConvention(result: resultInfo.convention)
+  }
+
+  public subscript(result argumentIndex: Int) -> ResultInfo? {
+    if parameterIndex(for: argumentIndex) != nil {
+      return nil
+    }
+    return convention.indirectSILResult(at: argumentIndex)
+  }
+
+  public subscript(parameter argumentIndex: Int) -> ParameterInfo? {
+    guard let paramIdx = parameterIndex(for: argumentIndex) else {
+      return nil
+    }
+    return convention.parameters[paramIdx]
+  }
+
+  public subscript(parameterDependencies targetArgumentIndex: Int) -> FunctionConvention.LifetimeDependencies? {
+    guard let targetParamIdx = parameterIndex(for: targetArgumentIndex) else {
+      return nil
+    }
+    return convention.parameterDependencies(for: targetParamIdx)
+  }
+
+  /// Return a dependence of the function results on the indexed parameter.
+  public subscript(resultDependsOn argumentIndex: Int) -> LifetimeDependenceConvention? {
+    findDependence(source: argumentIndex, in: convention.resultDependencies)
+  }
+
+  /// Return a dependence of the target argument on the source argument.
+  public func getDependence(target targetArgumentIndex: Int, source sourceArgumentIndex: Int)
+    -> LifetimeDependenceConvention? {
+    findDependence(source: sourceArgumentIndex, in: self[parameterDependencies: targetArgumentIndex])
+  }
+
+  /// Number of SIL arguments for the function type's results
+  /// including the error result. Use this to avoid lazy iteration
+  /// over indirectSILResults to find the count.
+  var indirectSILResultCount: Int {
+    convention.indirectSILResultCount
+  }
+
+  /// The SIL argument index of the function type's first parameter.
+  public var firstParameterIndex: Int { indirectSILResultCount }
+
+  /// The SIL argument index of the 'self' parameter.
+  var selfIndex: Int? {
+    guard convention.hasSelfParameter else { return nil }
+    // self is the last parameter
+    return endIndex - 1
+  }
+
+  public var description: String {
+    var str = convention.functionType.description
+    for idx in startIndex..<indirectSILResultCount {
+      str += "\n[\(idx)]  indirect result: " + self[idx].description
+    }
+    for idx in indirectSILResultCount..<endIndex {
+      str += "\n[\(idx)]        parameter: " + self[idx].description
+      if let deps = self[parameterDependencies: idx] {
+        str += "\n          lifetime: \(deps)"
+      }
+      if let dep = self[resultDependsOn: idx] {
+        str += "\n   result dependence: " + dep.description
+      }
+    }
+    return str
+  }
+}
+
+extension ArgumentConventions {
+  private func parameterIndex(for argIdx: Int) -> Int? {
+    let firstParamIdx = firstParameterIndex  // bridging call
+    return argIdx < firstParamIdx ? nil : argIdx - firstParamIdx
+  }
+
+  private func findDependence(source argumentIndex: Int, in dependencies: FunctionConvention.LifetimeDependencies?)
+    -> LifetimeDependenceConvention? {
+    guard let paramIdx = parameterIndex(for: argumentIndex) else {
+      return nil
+    }
+    return dependencies?[paramIdx]
+  }
+}
+
+public struct YieldConventions : Collection, CustomStringConvertible {
+  public let convention: FunctionConvention
+
+  public var yields: FunctionConvention.Yields {
+    return convention.yields
+  }
+
+  public var startIndex: Int { 0 }
+
+  public var endIndex: Int { yields.count }
+
+  public func index(after index: Int) -> Int {
+    return index + 1
+  }
+
+  public subscript(_ index: Int) -> ArgumentConvention {
+    return yields[index].convention
+  }
+
+  public var description: String {
+    var str = convention.functionType.description
+    yields.forEach {
+      str += "\n      yield: " + $0.description
+    }
+    return str
+  }
+}
+
+public enum ArgumentConvention : CustomStringConvertible {
   /// This argument is passed indirectly, i.e. by directly passing the address
   /// of an object in memory.  The callee is responsible for destroying the
   /// object.  The callee may assume that the address does not alias any valid
@@ -104,6 +425,12 @@ public enum ArgumentConvention {
   /// convention used by mutable captures in @noescape closures.
   case indirectInoutAliasable
 
+  /// This argument is passed indirectly, i.e. by directly passing the address
+  /// of an object in memory. The callee may modify, but does not destroy the
+  /// object. This corresponds to the parameter-passing convention of the
+  /// Itanium C++ ABI, which is used ubiquitously on non-Windows targets.
+  case indirectInCXX
+
   /// This argument represents an indirect return value address. The callee stores
   /// the returned value to this argument. At the time when the function is called,
   /// the memory location referenced by the argument is uninitialized.
@@ -122,10 +449,46 @@ public enum ArgumentConvention {
   /// guarantees its validity for the entirety of the call.
   case directGuaranteed
 
+  /// This argument is a value pack of mutable references to storage,
+  /// which the function is being given exclusive access to.  The elements
+  /// must be passed indirectly.
+  case packInout
+
+  /// This argument is a value pack, and ownership of the elements is being
+  /// transferred into this function.  Whether the elements are passed
+  /// indirectly is recorded in the pack type.
+  case packOwned
+
+  /// This argument is a value pack, and ownership of the elements is not
+  /// being transferred into this function.  Whether the elements are passed
+  /// indirectly is recorded in the pack type.
+  case packGuaranteed
+
+  /// This argument is a pack of indirect return value addresses.  The
+  /// addresses are stored in the pack by the caller and read out by the
+  /// callee; within the callee, they are individually treated like
+  /// indirectOut arguments.
+  case packOut
+
+  public init(result: ResultConvention) {
+    switch result {
+    case .indirect:
+      self = .indirectOut
+    case .owned:
+      self = .directOwned
+    case .unowned, .unownedInnerPointer, .autoreleased:
+      self = .directUnowned
+    case .pack:
+      self = .packOut
+    }
+  }
+
   public var isIndirect: Bool {
     switch self {
     case .indirectIn, .indirectInGuaranteed,
-         .indirectInout, .indirectInoutAliasable, .indirectOut:
+         .indirectInout, .indirectInoutAliasable, .indirectInCXX,
+         .indirectOut, .packOut, .packInout, .packOwned,
+         .packGuaranteed:
       return true
     case .directOwned, .directUnowned, .directGuaranteed:
       return false
@@ -134,20 +497,47 @@ public enum ArgumentConvention {
 
   public var isIndirectIn: Bool {
     switch self {
-    case .indirectIn, .indirectInGuaranteed:
+    case .indirectIn, .indirectInGuaranteed, .indirectInCXX,
+         .packOwned, .packGuaranteed:
       return true
     case .directOwned, .directUnowned, .directGuaranteed,
-         .indirectInout, .indirectInoutAliasable, .indirectOut:
+         .indirectInout, .indirectInoutAliasable,
+         .indirectOut,
+         .packOut, .packInout:
+      return false
+    }
+  }
+
+  public var isIndirectOut: Bool {
+    switch self {
+    case .indirectOut, .packOut:
+      return true
+    case .indirectInGuaranteed, .directGuaranteed, .packGuaranteed,
+         .indirectIn, .directOwned, .directUnowned,
+         .indirectInout, .indirectInoutAliasable, .indirectInCXX,
+         .packInout, .packOwned:
       return false
     }
   }
 
   public var isGuaranteed: Bool {
     switch self {
-    case .indirectInGuaranteed, .directGuaranteed:
+    case .indirectInGuaranteed, .directGuaranteed, .packGuaranteed:
       return true
     case .indirectIn, .directOwned, .directUnowned,
-         .indirectInout, .indirectInoutAliasable, .indirectOut:
+         .indirectInout, .indirectInoutAliasable, .indirectInCXX,
+         .indirectOut, .packOut, .packInout, .packOwned:
+      return false
+    }
+  }
+
+  public var isConsumed: Bool {
+    switch self {
+    case .indirectIn, .indirectInCXX, .directOwned, .packOwned:
+      return true
+    case .indirectInGuaranteed, .directGuaranteed, .packGuaranteed,
+          .indirectInout, .indirectInoutAliasable, .indirectOut,
+          .packOut, .packInout, .directUnowned:
       return false
     }
   }
@@ -157,7 +547,12 @@ public enum ArgumentConvention {
     case .indirectIn,
          .indirectOut,
          .indirectInGuaranteed,
-         .indirectInout:
+         .indirectInout,
+         .indirectInCXX,
+         .packOut,
+         .packInout,
+         .packOwned,
+         .packGuaranteed:
       return true
 
     case .indirectInoutAliasable,
@@ -171,16 +566,52 @@ public enum ArgumentConvention {
   public var isInout: Bool {
     switch self {
     case .indirectInout,
-         .indirectInoutAliasable:
+         .indirectInoutAliasable,
+         .packInout:
       return true
 
     case .indirectIn,
          .indirectOut,
          .indirectInGuaranteed,
+         .indirectInCXX,
          .directUnowned,
          .directGuaranteed,
-         .directOwned:
+         .directOwned,
+         .packOut,
+         .packOwned,
+         .packGuaranteed:
       return false
+    }
+  }
+
+  public var description: String {
+    switch self {
+    case .indirectIn:
+      return "indirectIn"
+    case .indirectInGuaranteed:
+      return "indirectInGuaranteed"
+    case .indirectInout:
+      return "indirectInout"
+    case .indirectInoutAliasable:
+      return "indirectInoutAliasable"
+    case .indirectInCXX:
+      return "indirectInCXX"
+    case .indirectOut:
+      return "indirectOut"
+    case .directOwned:
+      return "directOwned"
+    case .directUnowned:
+      return "directUnowned"
+    case .directGuaranteed:
+      return "directGuaranteed"
+    case .packInout:
+      return "packInout"
+    case .packOwned:
+      return "packOwned"
+    case .packGuaranteed:
+      return "packGuaranteed"
+    case .packOut:
+      return "packOut"
     }
   }
 }
@@ -189,23 +620,53 @@ public enum ArgumentConvention {
 
 extension BridgedArgument {
   public var argument: Argument { obj.getAs(Argument.self) }
-  public var blockArgument: BlockArgument { obj.getAs(BlockArgument.self) }
   public var functionArgument: FunctionArgument { obj.getAs(FunctionArgument.self) }
+}
+
+extension Optional where Wrapped == Argument {
+  public var bridged: OptionalBridgedArgument {
+    OptionalBridgedArgument(obj: self?.bridged.obj)
+  }
 }
 
 extension BridgedArgumentConvention {
   var convention: ArgumentConvention {
     switch self {
-      case ArgumentConvention_Indirect_In:             return .indirectIn
-      case ArgumentConvention_Indirect_In_Guaranteed:  return .indirectInGuaranteed
-      case ArgumentConvention_Indirect_Inout:          return .indirectInout
-      case ArgumentConvention_Indirect_InoutAliasable: return .indirectInoutAliasable
-      case ArgumentConvention_Indirect_Out:            return .indirectOut
-      case ArgumentConvention_Direct_Owned:            return .directOwned
-      case ArgumentConvention_Direct_Unowned:          return .directUnowned
-      case ArgumentConvention_Direct_Guaranteed:       return .directGuaranteed
+      case .Indirect_In:             return .indirectIn
+      case .Indirect_In_Guaranteed:  return .indirectInGuaranteed
+      case .Indirect_Inout:          return .indirectInout
+      case .Indirect_InoutAliasable: return .indirectInoutAliasable
+      case .Indirect_In_CXX:         return .indirectInCXX
+      case .Indirect_Out:            return .indirectOut
+      case .Direct_Owned:            return .directOwned
+      case .Direct_Unowned:          return .directUnowned
+      case .Direct_Guaranteed:       return .directGuaranteed
+      case .Pack_Out:                return .packOut
+      case .Pack_Inout:              return .packInout
+      case .Pack_Owned:              return .packOwned
+      case .Pack_Guaranteed:         return .packGuaranteed
       default:
         fatalError("unsupported argument convention")
+    }
+  }
+}
+
+extension ArgumentConvention {
+  var bridged: BridgedArgumentConvention {
+    switch self {
+      case .indirectIn:             return .Indirect_In
+      case .indirectInGuaranteed:   return .Indirect_In_Guaranteed
+      case .indirectInout:          return .Indirect_Inout
+      case .indirectInoutAliasable: return .Indirect_InoutAliasable
+      case .indirectInCXX:          return .Indirect_In_CXX
+      case .indirectOut:            return .Indirect_Out
+      case .directOwned:            return .Direct_Owned
+      case .directUnowned:          return .Direct_Unowned
+      case .directGuaranteed:       return .Direct_Guaranteed
+      case .packOut:                return .Pack_Out
+      case .packInout:              return .Pack_Inout
+      case .packOwned:              return .Pack_Owned
+      case .packGuaranteed:         return .Pack_Guaranteed
     }
   }
 }

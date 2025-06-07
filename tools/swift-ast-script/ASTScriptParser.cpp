@@ -33,7 +33,7 @@ class ASTScriptParser {
   ASTContext &Context;
   DiagnosticEngine &Diags;
   std::unique_ptr<llvm::MemoryBuffer> Buffer;
-  Optional<Lexer> TheLexer;
+  std::optional<Lexer> TheLexer;
   Token Tok;
 
 public:
@@ -94,9 +94,10 @@ private:
     return true;
   }
 
-  Optional<StringRef> consumeIfIdentifier() {
+  std::optional<StringRef> consumeIfIdentifier() {
     StringRef ident;
-    return consumeIfIdentifier(ident) ? Optional<StringRef>(ident) : None;
+    return consumeIfIdentifier(ident) ? std::optional<StringRef>(ident)
+                                      : std::nullopt;
   }
 
   /***************************************************************************/

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -enable-experimental-move-only -sil-consume-operator-copyable-values-checker | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %s -sil-consume-operator-copyable-values-checker | %FileCheck %s
 
 // REQUIRES: optimized_stdlib
 
@@ -7,13 +7,13 @@ sil_stage raw
 import Builtin
 
 // Make sure that when we process a move_addr on an alloc_stack/debug_value that
-// we properly put the [moved] marker on them.
+// we properly put the [moveable_value_debuginfo] marker on them.
 
 // CHECK-LABEL: sil [ossa] @singleBlock : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 // CHECK: bb0([[ARG:%.*]] :
-// CHECK: debug_value [moved] [[ARG]] : $Builtin.NativeObject, let, name "myName"
+// CHECK: debug_value [moveable_value_debuginfo] [[ARG]] : $Builtin.NativeObject, let, name "myName"
 // CHECK: [[MOVED_VAL:%.*]] = move_value [[ARG]]
-// CHECK: debug_value [moved] undef : $Builtin.NativeObject, let, name "myName"
+// CHECK: debug_value [moveable_value_debuginfo] undef : $Builtin.NativeObject, let, name "myName"
 // CHECK: } // end sil function 'singleBlock'
 sil [ossa] @singleBlock : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
@@ -30,7 +30,7 @@ bb0(%0 : @owned $Builtin.NativeObject):
 // Make sure we break right after the debug_value here. This ensures that when
 // we llvm.dbg.addr the shadow copy, we avoid bad LLVM behavior in SelectionDAG
 // that sinks llvm.dbg.addr to end of block.
-// CHECK:   debug_value [moved] [[ARG]]
+// CHECK:   debug_value [moveable_value_debuginfo] [[ARG]]
 // CHECK:   cond_br undef, bb1, bb2
 //
 // CHECK: bb1:
@@ -38,7 +38,7 @@ bb0(%0 : @owned $Builtin.NativeObject):
 //
 // We don't break the block after the undefs since they become llvm.dbg.value
 // which do not have the problem that llvm.dbg.addr shadow values have.
-// CHECK:   debug_value [moved] undef : $Builtin.NativeObject, let, name "myName"
+// CHECK:   debug_value [moveable_value_debuginfo] undef : $Builtin.NativeObject, let, name "myName"
 // CHECK-NEXT: destroy_value
 // CHECK: } // end sil function 'multipleBlock'
 sil [ossa] @multipleBlock : $@convention(thin) (@owned Builtin.NativeObject) -> () {

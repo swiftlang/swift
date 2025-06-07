@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -compute-side-effects -copy-propagation -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -update-borrowed-from -compute-side-effects -copy-propagation -enable-sil-verify-all %s | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
@@ -186,8 +186,9 @@ exit:
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $C):
 // CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
 // CHECK:         br [[WORK:bb[0-9]+]]([[LIFETIME]] : $C)
-// CHECK:       [[WORK]]([[LIFETIME_2:%[^,]+]] : @guaranteed $C):
-// CHECK:         end_borrow [[LIFETIME_2]]
+// CHECK:       [[WORK]]([[LIFETIME_2:%[^,]+]] : @reborrow $C):
+// CHECK:         [[R:%.*]] = borrowed [[LIFETIME_2]] : $C from (%0 : $C)
+// CHECK:         end_borrow [[R]]
 // CHECK:         tuple ()
 // CHECK:         destroy_value [[INSTANCE]]
 // CHECK:         br
@@ -332,10 +333,8 @@ exit:
 //
 // CHECK-LABEL: sil [ossa] @dont_hoist_over_apply_at_copy : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[REGISTER_0:%[^,]+]] :
-// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
 // CHECK:         apply
 // CHECK:         destroy_value [[INSTANCE]]
-// CHECK:         destroy_value [[COPY]]
 // CHECK-LABEL: } // end sil function 'dont_hoist_over_apply_at_copy'
 sil [ossa] @dont_hoist_over_apply_at_copy : $@convention(thin) (@owned C) -> () {
 entry(%instance : @owned $C):
@@ -460,7 +459,7 @@ entry(%instance : @owned $C, %input : $S):
     %modify_s = function_ref @modify_s : $@yield_once @convention(thin) () -> @yields @inout S
     (%addr, %continuation) = begin_apply %modify_s() : $@yield_once @convention(thin) () -> @yields @inout S
     store %input to [trivial] %addr : $*S
-    end_apply %continuation
+    end_apply %continuation as $()
     destroy_value %instance : $C
     %retval = tuple ()
     return %retval : $()

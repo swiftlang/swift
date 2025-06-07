@@ -226,7 +226,7 @@ struct RetOverloadedSubscript {
 
 struct MissingGetterSubscript1 {
   subscript (i : Int) -> Int {
-  } // expected-error {{missing return in subscript expected to return 'Int'}}
+  } // missing return expectations moved to `SILOptimizer/missing_returns`
 }
 struct MissingGetterSubscript2 {
   subscript (i : Int, j : Int) -> Int {
@@ -320,7 +320,7 @@ struct MutableComputedGetter {
 struct MutableSubscriptInGetter {
   var value: Int
   subscript(index: Int) -> Int {
-    get { // expected-note {{mark accessor 'mutating' to make 'self' mutable}}
+    get { // expected-note {{mark getter 'mutating' to make 'self' mutable}}
       value = 5 // expected-error{{cannot assign to property: 'self' is immutable}}
       return 5
     }
@@ -464,15 +464,15 @@ do {
 
 struct InOutSubscripts {
   subscript(x1: inout Int) -> Int { return 0 }
-  // expected-error@-1 {{'inout' must not be used on subscript parameters}}
+  // expected-error@-1 {{'inout' may only be used on function or initializer parameters}}
 
   subscript(x2: inout Int, y2: inout Int) -> Int { return 0 }
-  // expected-error@-1 2{{'inout' must not be used on subscript parameters}}
+  // expected-error@-1 2{{'inout' may only be used on function or initializer parameters}}
 
   subscript(x3: (inout Int) -> ()) -> Int { return 0 } // ok
   subscript(x4: (inout Int, inout Int) -> ()) -> Int { return 0 } // ok
 
   subscript(inout x5: Int) -> Int { return 0 }
   // expected-error@-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}}
-  // expected-error@-2 {{'inout' must not be used on subscript parameters}}
+  // expected-error@-2 {{'inout' may only be used on function or initializer parameters}}
 }

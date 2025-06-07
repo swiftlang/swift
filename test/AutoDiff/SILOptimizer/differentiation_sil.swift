@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %FileCheck %s --check-prefix=CHECK-SILGEN
-// RUN: %target-swift-frontend -enable-experimental-forward-mode-differentiation -emit-sil %s | %FileCheck %s --check-prefix=CHECK-SIL
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s | %FileCheck %s --check-prefix=CHECK-SILGEN
+// RUN: %target-swift-frontend -enable-experimental-forward-mode-differentiation -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s --check-prefix=CHECK-SIL
 
 // Simple differentiation transform test: check SIL before and after the transform.
 
@@ -23,7 +23,7 @@ func basic(_ x: Float) -> Float { x }
 
 @_silgen_name("test_differentiable_function")
 func testDifferentiableFunction() {
-  let _: @differentiable(reverse) (Float) -> Float = basic
+  let a: @differentiable(reverse) (Float) -> Float = basic
 }
 
 // CHECK-SILGEN-LABEL: sil hidden [ossa] @test_differentiable_function : $@convention(thin) () -> () {

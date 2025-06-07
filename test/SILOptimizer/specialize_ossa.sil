@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -parse-serialized-sil -enable-sil-verify-all -sil-partial-specialization -generic-specializer %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -parse-serialized-sil -enable-sil-verify-all -sil-partial-specialization -generic-specializer %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -6,6 +6,7 @@ import Builtin
 import Swift
 
 class Klass {}
+class GenericKlass<T> {}
 
 sil [ossa] [transparent] @ossaTransparentCallee : $@convention(thin) <T> (@in T) -> () {
 bb0(%0 : $*T):
@@ -43,7 +44,7 @@ bb0(%0 : $Builtin.NativeObject):
 // CHECK-LABEL: sil [ossa] @exp1 : $@convention(thin) () -> () {
 // CHECK-NOT: apply
 // Call of specialized initializer: <Int32>
-// CHECK: [[CTOR:%[0-9]+]] = function_ref @$s8XXX_inits5Int32V_Tg5
+// CHECK: [[CTOR:%[0-9]+]] = function_ref @$s8XXX_inits5Int32V_Tt1g5
 // CHECK: apply [[CTOR]]
 // CHECK: [[ACCEPTS_INT:%[0-9]+]] = function_ref @acceptsInt
 // Call of specialized XXX_foo: <Int32>
@@ -634,7 +635,7 @@ bb0:
 
 // test_bind<A> (Builtin.RawPointer, A.Type) -> ()
 // Check that this is specialized as T=Int.
-// CHECK-LABEL: sil shared [ossa] @$s9test_bindSi_Tg5 : $@convention(thin) (Builtin.RawPointer, @thick Int.Type) -> ()
+// CHECK-LABEL: sil shared [ossa] @$s9test_bindSi_Tt0g5 : $@convention(thin) (Builtin.RawPointer) -> () {
 // CHECK: bind_memory %0 : $Builtin.RawPointer, {{%.*}} : $Builtin.Word to $*Int
 // CHECK: return
 sil hidden [ossa] @test_bind : $@convention(thin) <T> (Builtin.RawPointer, @thick T.Type) -> () {
@@ -893,7 +894,7 @@ bb0(%0 : $*T, %1 :$*T):
 }
 
 // This should not assert.
-// CHECK-LABEL: sil shared [ossa] @$s26specialize_no_return_applys5NeverO_Tg5
+// CHECK-LABEL: sil shared [ossa] @$s26specialize_no_return_applys5NeverO_Ttg5 : $@convention(thin) () -> () {
 // CHECK:      apply
 // CHECK-NEXT: unreachable
 
@@ -1225,7 +1226,7 @@ bb0(%0 : $Builtin.Int32, %1 : @guaranteed $Builtin.NativeObject):
   %0a = alloc_stack $Builtin.Int32
   store %0 to [trivial] %0a : $*Builtin.Int32
   (%0r, %0token) = begin_apply %f<Builtin.Int32>(%0a) : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @in_guaranteed T
-  end_apply %0token
+  end_apply %0token as $()
   dealloc_stack %0a : $*Builtin.Int32
 
   %1b = alloc_stack $Builtin.NativeObject
@@ -1233,7 +1234,7 @@ bb0(%0 : $Builtin.Int32, %1 : @guaranteed $Builtin.NativeObject):
   store %1c to [init] %1b : $*Builtin.NativeObject
   (%1result, %1token) = begin_apply %f<Builtin.NativeObject>(%1b) : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @in_guaranteed T
 
-  end_apply %1token
+  end_apply %1token as $()
   destroy_addr %1b : $*Builtin.NativeObject
   dealloc_stack %1b : $*Builtin.NativeObject
 
@@ -1252,7 +1253,7 @@ bb0(%0 : $Builtin.Int32, %1 : @guaranteed $Builtin.NativeObject):
   %0a = alloc_stack $Builtin.Int32
   store %0 to [trivial] %0a : $*Builtin.Int32
   (%0r, %0token) = begin_apply %f<Builtin.Int32>(%0a) : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @in T
-  end_apply %0token
+  end_apply %0token as $()
   dealloc_stack %0a : $*Builtin.Int32
 
   %1b = alloc_stack $Builtin.NativeObject
@@ -1261,7 +1262,7 @@ bb0(%0 : $Builtin.Int32, %1 : @guaranteed $Builtin.NativeObject):
   (%1result, %1token) = begin_apply %f<Builtin.NativeObject>(%1b) : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @in T
   destroy_addr %1result : $*Builtin.NativeObject
 
-  end_apply %1token
+  end_apply %1token as $()
   destroy_addr %1b : $*Builtin.NativeObject
   dealloc_stack %1b : $*Builtin.NativeObject
 
@@ -1280,7 +1281,7 @@ bb0(%0 : $Builtin.Int32, %1 : @guaranteed $Builtin.NativeObject):
   %0a = alloc_stack $Builtin.Int32
   store %0 to [trivial] %0a : $*Builtin.Int32
   (%0r, %0token) = begin_apply %f<Builtin.Int32>(%0a) : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @inout T
-  end_apply %0token
+  end_apply %0token as $()
   dealloc_stack %0a : $*Builtin.Int32
 
   %1b = alloc_stack $Builtin.NativeObject
@@ -1288,7 +1289,7 @@ bb0(%0 : $Builtin.Int32, %1 : @guaranteed $Builtin.NativeObject):
   store %1c to [init] %1b : $*Builtin.NativeObject
   (%1result, %1token) = begin_apply %f<Builtin.NativeObject>(%1b) : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @inout T
 
-  end_apply %1token
+  end_apply %1token as $()
   destroy_addr %1b : $*Builtin.NativeObject
   dealloc_stack %1b : $*Builtin.NativeObject
 
@@ -1305,7 +1306,7 @@ sil @genericReturn : $@convention(thin) <τ_0_0> (@guaranteed AnyObject) -> @out
 // The generic cloner needs to be able to compute liveness to fixup a
 // store borrow scope when the only use is in unreachable code.
 // specialized testNoReturnSpecialization
-// CHECK-LABEL: sil shared [ossa] @$s26testNoReturnSpecializations5NeverO_Tg5 : $@convention(thin) (@guaranteed AnyObject, @thick Never.Type) -> () {
+// CHECK-LABEL: sil shared [ossa] @$s26testNoReturnSpecializations5NeverO_Tt0g5 : $@convention(thin) (@guaranteed AnyObject) -> () {
 // CHECK:   [[SB:%.*]] = store_borrow %0 to %{{.*}} : $*AnyObject
 // CHECK:   [[LB:%.*]] = load_borrow [[SB]] : $*AnyObject
 // CHECK:   apply %{{.*}}<Never>(%{{.*}}, [[LB]]) : $@convention(thin) <τ_0_0> (@guaranteed AnyObject) -> @out τ_0_0
@@ -1314,7 +1315,7 @@ sil @genericReturn : $@convention(thin) <τ_0_0> (@guaranteed AnyObject) -> @out
 // CHECK: bb1:
 // CHECK:   end_borrow [[LB]] : $AnyObject
 // CHECK:   end_borrow [[SB]] : $*AnyObject
-// CHECK-LABEL: } // end sil function '$s26testNoReturnSpecializations5NeverO_Tg5'
+// CHECK-LABEL: } // end sil function '$s26testNoReturnSpecializations5NeverO_Tt0g5'
 sil [ossa] @testNoReturnSpecialization : $@convention(thin) <T> (@in_guaranteed AnyObject, @thick T.Type) -> () {
 bb0(%0 : $*AnyObject, %1 : $@thick T.Type):
   %2 = load_borrow %0 : $*AnyObject
@@ -1335,4 +1336,332 @@ bb0(%0 : $*AnyObject):
   %r = apply %f<Never>(%0, %m) : $@convention(thin) <T> (@in_guaranteed AnyObject, @thick T.Type) -> ()
   %t = tuple ()
   return %t : $()
+}
+
+sil [ossa] @metatypeUsed : $@convention(thin) <T> (@thick GenericKlass<T>.Type) -> () {
+bb0(%0 : $@thick GenericKlass<T>.Type):
+  %1 = alloc_ref_dynamic %0 : $@thick GenericKlass<T>.Type, $GenericKlass<T>
+  destroy_value %1 : $GenericKlass<T>
+   %3 = tuple ()
+  return %3 : $()
+}
+
+sil [ossa] @metatypeUnused : $@convention(thin) <T> (@thick GenericKlass<T>.Type) -> () {
+bb0(%0 : $@thick GenericKlass<T>.Type):
+  debug_value %0 : $@thick GenericKlass<T>.Type, let, name "mt", argno 0
+   %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @callUsedMetatypeWithConcreteMetatype :
+// CHECK:         = function_ref @$s12metatypeUsedSi_Ttg5 : $@convention(thin) () -> ()
+// CHECK-LABEL: } // end sil function 'callUsedMetatypeWithConcreteMetatype'
+sil [ossa] @callUsedMetatypeWithConcreteMetatype : $@convention(thin) () -> () {
+bb0:
+  %0 = metatype $@thick GenericKlass<Int>.Type
+  %1 = function_ref @metatypeUsed : $@convention(thin) <T> (@thick GenericKlass<T>.Type) -> ()
+  %2 = apply %1<Int>(%0) : $@convention(thin) <T> (@thick GenericKlass<T>.Type) -> ()
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @callUsedMetatypeWithUnknownMetatype :
+// CHECK:         = function_ref @$s12metatypeUsedSi_Tg5 : $@convention(thin) (@thick GenericKlass<Int>.Type) -> ()
+// CHECK-LABEL: } // end sil function 'callUsedMetatypeWithUnknownMetatype'
+sil [ossa] @callUsedMetatypeWithUnknownMetatype : $@convention(thin) (@thick GenericKlass<Int>.Type) -> () {
+bb0(%0 : $@thick GenericKlass<Int>.Type):
+  %1 = function_ref @metatypeUsed : $@convention(thin) <T> (@thick GenericKlass<T>.Type) -> ()
+  %2 = apply %1<Int>(%0) : $@convention(thin) <T> (@thick GenericKlass<T>.Type) -> ()
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @callUnusedMetatypeWithUnknownMetatype :
+// CHECK:         = function_ref @$s14metatypeUnusedSi_Ttg5 : $@convention(thin) () -> ()
+// CHECK-LABEL: } // end sil function 'callUnusedMetatypeWithUnknownMetatype'
+sil [ossa] @callUnusedMetatypeWithUnknownMetatype : $@convention(thin) (@thick GenericKlass<Int>.Type) -> () {
+bb0(%0 : $@thick GenericKlass<Int>.Type):
+  %1 = function_ref @metatypeUnused : $@convention(thin) <T> (@thick GenericKlass<T>.Type) -> ()
+  %2 = apply %1<Int>(%0) : $@convention(thin) <T> (@thick GenericKlass<T>.Type) -> ()
+  %3 = tuple ()
+  return %3 : $()
+}
+
+sil [ossa] @closure_with_metatype : $@convention(thin) <T> (@in_guaranteed T, @thick GenericKlass<T>.Type) -> () {
+bb0(%0 : $*T, %1 : $@thick GenericKlass<T>.Type):
+   %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @returnClosureWithAppliedMetatype :
+// CHECK:         = function_ref @$s21closure_with_metatypeSi_Tt0G5 : $@convention(thin) (@in_guaranteed Int) -> ()
+// CHECK-LABEL: } // end sil function 'returnClosureWithAppliedMetatype'
+sil [ossa] @returnClosureWithAppliedMetatype : $@convention(thin) () -> @owned @callee_owned (@in_guaranteed Int) -> () {
+bb0:
+  %0 = metatype $@thick GenericKlass<Int>.Type
+  %1 = function_ref @closure_with_metatype : $@convention(thin) <T> (@in_guaranteed T, @thick GenericKlass<T>.Type) -> ()
+  %2 = partial_apply %1<Int>(%0) : $@convention(thin) <T> (@in_guaranteed T, @thick GenericKlass<T>.Type) -> ()
+  return %2 : $@callee_owned (@in_guaranteed Int) -> ()
+}
+
+// CHECK-LABEL: sil [ossa] @returnClosureWithNotAppliedMetatype :
+// CHECK:         = function_ref @$s21closure_with_metatypeSi_TG5 : $@convention(thin) (@in_guaranteed Int, @thick GenericKlass<Int>.Type) -> ()
+// CHECK-LABEL: } // end sil function 'returnClosureWithNotAppliedMetatype'
+sil [ossa] @returnClosureWithNotAppliedMetatype : $@convention(thin) () -> @owned @callee_owned (@in_guaranteed Int, @thick GenericKlass<Int>.Type) -> () {
+bb0:
+  %1 = function_ref @closure_with_metatype : $@convention(thin) <T> (@in_guaranteed T, @thick GenericKlass<T>.Type) -> ()
+  %2 = partial_apply %1<Int>() : $@convention(thin) <T> (@in_guaranteed T, @thick GenericKlass<T>.Type) -> ()
+  return %2 : $@callee_owned (@in_guaranteed Int, @thick GenericKlass<Int>.Type) -> ()
+}
+
+sil [ossa] @method_with_dynamic_self : $@convention(method) <T> (@thick GenericKlass<T>.Type) -> () {
+bb0(%0 : $@thick GenericKlass<T>.Type):
+  %1 = metatype $@thick @dynamic_self GenericKlass<T>.Type
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @callMethodWithDynamicSelf :
+// CHECK:         = function_ref @$s24method_with_dynamic_selfSi_Tg5 : $@convention(method) (@thick GenericKlass<Int>.Type) -> ()
+// CHECK-LABEL: } // end sil function 'callMethodWithDynamicSelf'
+sil [ossa] @callMethodWithDynamicSelf : $@convention(thin) () -> () {
+bb0:
+  %0 = metatype $@thick GenericKlass<Int>.Type
+  %1 = function_ref @method_with_dynamic_self : $@convention(method) <T> (@thick GenericKlass<T>.Type) -> ()
+  %2 = apply %1<Int>(%0) : $@convention(method) <T> (@thick GenericKlass<T>.Type) -> ()
+  return %2 : $()
+}
+
+sil @complex_closure : $@convention(thin) <T> (@thick T.Type, @in_guaranteed T, Bool) -> @out T {
+bb0(%0 : $*T, %2 : $@thick T.Type, %3 : $*T, %4 : $Bool):
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @returnComplexClosure :
+// CHECK:         = function_ref @$s15complex_closureSi_Tt0G5 : $@convention(thin) (@in_guaranteed Int, Bool) -> @out Int
+// CHECK-LABEL: } // end sil function 'returnComplexClosure'
+sil [ossa] @returnComplexClosure : $@convention(thin) (@in Int, Bool) -> @owned @callee_owned () -> @out Int {
+bb0(%0: $*Int, %1 : $Bool):
+  %2 = metatype $@thick Int.Type
+  %3 = function_ref @complex_closure : $@convention(thin) <T> (@thick T.Type, @in_guaranteed T, Bool) -> @out T
+  %4 = partial_apply %3<Int>(%2, %0, %1) : $@convention(thin) <T> (@thick T.Type, @in_guaranteed T, Bool) -> @out T
+  return %4 : $@callee_owned () -> @out Int
+}
+
+sil [ossa] @closure_with_thin_metatype : $@convention(thin) <T> (@in_guaranteed T, @thin GenericKlass<T>.Type) -> @out T {
+bb0(%0 : $*T, %1 : $*T, %2 : $@thin GenericKlass<T>.Type):
+  copy_addr %1 to [init] %0: $*T
+   %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @returnClosureWithNotAppliedThinMetatype :
+// CHECK:         = function_ref @$s26closure_with_thin_metatypeSi_TG5 : $@convention(thin) (@in_guaranteed Int, @thin GenericKlass<Int>.Type) -> @out Int
+// CHECK-LABEL: } // end sil function 'returnClosureWithNotAppliedThinMetatype'
+sil [ossa] @returnClosureWithNotAppliedThinMetatype : $@convention(thin) () -> @owned @callee_owned (@in_guaranteed Int, @thin GenericKlass<Int>.Type) -> @out Int {
+bb0:
+  %1 = function_ref @closure_with_thin_metatype : $@convention(thin) <T> (@in_guaranteed T, @thin GenericKlass<T>.Type) -> @out T
+  %2 = partial_apply %1<Int>() : $@convention(thin) <T> (@in_guaranteed T, @thin GenericKlass<T>.Type) -> @out T
+  return %2 : $@callee_owned (@in_guaranteed Int, @thin GenericKlass<Int>.Type) -> @out Int
+}
+
+sil [ossa] @method_with_dynamic_self_arg : $@convention(method) <T> (@thick @dynamic_self GenericKlass<T>.Type) -> () {
+bb0(%0 : $@thick @dynamic_self GenericKlass<T>.Type):
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @callMethodWithDynamicSelfArg :
+// CHECK:         = function_ref @$s28method_with_dynamic_self_argSi_Tg5 : $@convention(method) (@thick @dynamic_self GenericKlass<Int>.Type) -> ()
+// CHECK-LABEL: } // end sil function 'callMethodWithDynamicSelfArg'
+sil [ossa] @callMethodWithDynamicSelfArg : $@convention(method) (@guaranteed GenericKlass<Int>) -> () {
+bb0(%0 : @guaranteed $GenericKlass<Int>):
+  %1 = metatype $@thick @dynamic_self GenericKlass<Int>.Type
+  %2 = function_ref @method_with_dynamic_self_arg : $@convention(method) <T> (@thick @dynamic_self GenericKlass<T>.Type) -> ()
+  %3 = apply %2<Int>(%1) : $@convention(method) <T> (@thick @dynamic_self GenericKlass<T>.Type) -> ()
+  return %3 : $()
+}
+
+// Specialize tuple_addr_constructor
+
+// In this case we specialized using all non-tuple types
+// CHECK-LABEL: sil shared [ossa] @$s29tuple_addr_constructor_calleeBo_4main4BaseCBoADTg5 : $@convention(thin) (@owned Builtin.NativeObject, @owned Base, @owned Builtin.NativeObject, @owned Base) -> () {
+// CHECK: tuple_addr_constructor [init] {{%.*}} : $*(Builtin.NativeObject, Base, Builtin.NativeObject, Base) with ({{%.*}} : $*Builtin.NativeObject, {{%.*}} : $*Base, {{%.*}} : $Builtin.NativeObject, {{%.*}} : $Base)
+// CHECK: } // end sil function '$s29tuple_addr_constructor_calleeBo_4main4BaseCBoADTg5'
+
+// In this case, we specialized where a single parameter was an empty
+// tuple... make sure that we eliminated it as a parameter to tuple_addr_constructor
+// CHECK-LABEL: sil shared [ossa] @$s29tuple_addr_constructor_calleeBo_4main4BaseCytADTg5 : $@convention(thin) (@owned Builtin.NativeObject, @owned Base, @owned (), @owned Base) -> () {
+// CHECK: tuple_addr_constructor [init] {{%.*}} : $*(Builtin.NativeObject, Base, (), Base) with ({{%.*}} : $*Builtin.NativeObject, {{%.*}} : $*Base, {{%.*}} : $Base)
+// CHECK: } // end sil function '$s29tuple_addr_constructor_calleeBo_4main4BaseCytADTg5'
+
+// Make sure we handle this with multiple level tuples
+// CHECK-LABEL: sil shared [ossa] @$s29tuple_addr_constructor_calleeBo_4main4BaseCyt_yt_ytttADTg5 : $@convention(thin) (@owned Builtin.NativeObject, @owned Base, @owned ((), ((), ())), @owned Base) -> () {
+// CHECK: tuple_addr_constructor [init] {{%.*}} : $*(Builtin.NativeObject, Base, ((), ((), ())), Base) with ({{%.*}} : $*Builtin.NativeObject, {{%.*}} : $*Base, {{%.*}} : $Base)
+// CHECK: } // end sil function '$s29tuple_addr_constructor_calleeBo_4main4BaseCyt_yt_ytttADTg5'
+
+// Make sure we keep in the parameter if we have one leaf node.
+// CHECK-LABEL: sil shared [ossa] @$s29tuple_addr_constructor_calleeBo_4main4BaseCyt_Bo_ytttADTg5 : $@convention(thin) (@owned Builtin.NativeObject, @owned Base, @owned ((), (Builtin.NativeObject, ())), @owned Base) -> () {
+// CHECK: tuple_addr_constructor [init] {{%.*}} : $*(Builtin.NativeObject, Base, ((), (Builtin.NativeObject, ())), Base) with ({{%.*}} : $*Builtin.NativeObject, {{%.*}} : $*Base, {{%.*}} : $((), (Builtin.NativeObject, ())), {{%.*}} : $Base)
+// CHECK: } // end sil function '$s29tuple_addr_constructor_calleeBo_4main4BaseCyt_Bo_ytttADTg5'
+
+// CHECK-LABEL: sil shared [ossa] @$s29tuple_addr_constructor_calleeyt_ytyt_yt_ytttytTg5 : $@convention(thin) ((), (), @owned ((), ((), ())), @owned ()) -> () {
+// CHECK-NOT: tuple_addr_constructor
+// CHECK: } // end sil function '$s29tuple_addr_constructor_calleeyt_ytyt_yt_ytttytTg5'
+
+sil [ossa] @tuple_addr_constructor_callee : $@convention(thin) <T1, T2, T3, T4> (@in T1, @in T2, @owned T3, @owned T4) -> () {
+bb0(%arg0 : $*T1, %arg1 : $*T2, %arg2 : @owned $T3, %arg3 : @owned $T4):
+  %tup = alloc_stack $(T1, T2, T3, T4)
+  tuple_addr_constructor [init] %tup : $*(T1, T2, T3, T4) with (%arg0 : $*T1, %arg1 : $*T2, %arg2 : $T3, %arg3 : $T4)
+  destroy_addr %tup : $*(T1, T2, T3, T4)
+  dealloc_stack %tup : $*(T1, T2, T3, T4)
+  %2 = tuple ()
+  return %2 : $()
+}
+
+sil [ossa] @specializeTupleAddrConstructorSimple : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Base) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject, %1 : @guaranteed $Base):
+  %2 = function_ref @tuple_addr_constructor_callee : $@convention(thin) <T1, T2, T3, T4> (@in T1, @in T2, @owned T3, @owned T4) -> ()
+  %3 = alloc_stack $*Builtin.NativeObject
+  %4 = alloc_stack $*Base
+  %0a = copy_value %0 : $Builtin.NativeObject
+  %0b = copy_value %0 : $Builtin.NativeObject
+  store %0b to [init] %3 : $*Builtin.NativeObject
+  %1a = copy_value %1 : $Base
+  %1b = copy_value %1 : $Base
+  store %1b to [init] %4 : $*Base
+  apply %2<Builtin.NativeObject, Base, Builtin.NativeObject, Base>(%3, %4, %0a, %1a) : $@convention(thin) <T1, T2, T3, T4> (@in T1, @in T2, @owned T3, @owned T4) -> ()
+  dealloc_stack %4 : $*Base
+  dealloc_stack %3 : $*Builtin.NativeObject
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @specializeTupleAddrConstructorEliminateTuple : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Base) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject, %1 : @guaranteed $Base):
+  %2 = function_ref @tuple_addr_constructor_callee : $@convention(thin) <T1, T2, T3, T4> (@in T1, @in T2, @owned T3, @owned T4) -> ()
+  %3 = alloc_stack $*Builtin.NativeObject
+  %4 = alloc_stack $*Base
+  %0a = tuple ()
+  %0b = copy_value %0 : $Builtin.NativeObject
+  store %0b to [init] %3 : $*Builtin.NativeObject
+  %1a = copy_value %1 : $Base
+  %1b = copy_value %1 : $Base
+  store %1b to [init] %4 : $*Base
+  apply %2<Builtin.NativeObject, Base, (), Base>(%3, %4, %0a, %1a) : $@convention(thin) <T1, T2, T3, T4> (@in T1, @in T2, @owned T3, @owned T4) -> ()
+  dealloc_stack %4 : $*Base
+  dealloc_stack %3 : $*Builtin.NativeObject
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @specializeTupleAddrConstructorEliminateMultiLevelTuple : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Base) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject, %1 : @guaranteed $Base):
+  %2 = function_ref @tuple_addr_constructor_callee : $@convention(thin) <T1, T2, T3, T4> (@in T1, @in T2, @owned T3, @owned T4) -> ()
+  %3 = alloc_stack $*Builtin.NativeObject
+  %4 = alloc_stack $*Base
+  %0b = copy_value %0 : $Builtin.NativeObject
+  store %0b to [init] %3 : $*Builtin.NativeObject
+  %1a = copy_value %1 : $Base
+  %1b = copy_value %1 : $Base
+  store %1b to [init] %4 : $*Base
+  %tup = tuple ()
+  %tup2 = tuple (%tup : $(), %tup : $())
+  %tup3 = tuple (%tup : $(), %tup2 : $((), ()))
+  apply %2<Builtin.NativeObject, Base, ((), ((), ())), Base>(%3, %4, %tup3, %1a) : $@convention(thin) <T1, T2, T3, T4> (@in T1, @in T2, @owned T3, @owned T4) -> ()
+  dealloc_stack %4 : $*Base
+  dealloc_stack %3 : $*Builtin.NativeObject
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @specializeTupleAddrConstructorEliminateNoEliminateIfOneElt : $@convention(thin) (@guaranteed Builtin.NativeObject, @guaranteed Base) -> () {
+bb0(%0 : @guaranteed $Builtin.NativeObject, %1 : @guaranteed $Base):
+  %2 = function_ref @tuple_addr_constructor_callee : $@convention(thin) <T1, T2, T3, T4> (@in T1, @in T2, @owned T3, @owned T4) -> ()
+  %3 = alloc_stack $*Builtin.NativeObject
+  %4 = alloc_stack $*Base
+  %0a = copy_value %0 : $Builtin.NativeObject
+  %0b = copy_value %0 : $Builtin.NativeObject
+  store %0b to [init] %3 : $*Builtin.NativeObject
+  %1a = copy_value %1 : $Base
+  %1b = copy_value %1 : $Base
+  store %1b to [init] %4 : $*Base
+  %tup = tuple ()
+  %tup2 = tuple (%0a : $Builtin.NativeObject, %tup : $())
+  %tup3 = tuple (%tup : $(), %tup2 : $(Builtin.NativeObject, ()))
+  apply %2<Builtin.NativeObject, Base, ((), (Builtin.NativeObject, ())), Base>(%3, %4, %tup3, %1a) : $@convention(thin) <T1, T2, T3, T4> (@in T1, @in T2, @owned T3, @owned T4) -> ()
+  dealloc_stack %4 : $*Base
+  dealloc_stack %3 : $*Builtin.NativeObject
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @specializeTupleAddrConstructorNoEmitIfAllTuple : $@convention(thin) () -> () {
+bb0:
+  %2 = function_ref @tuple_addr_constructor_callee : $@convention(thin) <T1, T2, T3, T4> (@in T1, @in T2, @owned T3, @owned T4) -> ()
+  %3 = alloc_stack $*()
+  %4 = alloc_stack $*()
+  %tup = tuple ()
+  %tup2 = tuple (%tup : $(), %tup : $())
+  %tup3 = tuple (%tup : $(), %tup2 : $((), ()))
+  apply %2<(), (), ((), ((), ())), ()>(%3, %4, %tup3, %tup) : $@convention(thin) <T1, T2, T3, T4> (@in T1, @in T2, @owned T3, @owned T4) -> ()
+  dealloc_stack %4 : $*()
+  dealloc_stack %3 : $*()
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @unused_argument : $@convention(thin) <T> (@in_guaranteed T) -> () {
+[global: ]
+bb0(%0 : $*T):
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @call_generic_func_with_no_arg_read :
+// CHECK-NOT:     load
+// CHECK:           = apply {{%[0-9]+}}() :
+// CHECK-NOT:     end_borrow
+// CHECK:       } // end sil function 'call_generic_func_with_no_arg_read'
+sil [ossa] @call_generic_func_with_no_arg_read : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack $Klass
+  %2 = function_ref @unused_argument : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %3 = apply %2<Klass>(%1) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  dealloc_stack %1 : $*Klass
+  %5 = tuple ()
+  return %5 : $()
+}
+
+sil [ossa] @callee : $@convention(thin) <Result> (@inout Result, @in_guaranteed Int, Int) -> () {
+bb0(%0 : $*Result, %1 : $*Int, %2 : $Int):
+  unreachable
+}
+
+sil [reabstraction_thunk] [ossa] @thunk : $@convention(thin) <τ_0_0> (@inout τ_0_0, Int, @guaranteed @noescape @callee_guaranteed (@inout τ_0_0, @in_guaranteed Int) -> ()) -> ()
+
+// CHECK-LABEL: sil [ossa] @insert_copy_when_removing_thunk :
+// CHECK:         [[P:%.*]] = partial_apply [callee_guaranteed] [on_stack] %2(%0)
+// CHECK:         [[C:%.*]] = copy_value [[P]]
+// CHECK:         [[V:%.*]] = convert_function [[C]]
+// CHECK:         apply [[V]]
+// CHECK:         destroy_value [[V]]
+// CHECK:         destroy_value [[P]]
+// CHECK:       } // end sil function 'insert_copy_when_removing_thunk'
+sil [ossa] @insert_copy_when_removing_thunk : $@convention(method) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = alloc_stack $Int
+  %2 = function_ref @callee : $@convention(thin) <τ_0_0> (@inout τ_0_0, @in_guaranteed Int, Int) -> ()
+  %3 = partial_apply [callee_guaranteed] [on_stack] %2<Int>(%0) : $@convention(thin) <τ_0_0> (@inout τ_0_0, @in_guaranteed Int, Int) -> ()
+  %4 = function_ref @thunk : $@convention(thin) <τ_0_0> (@inout τ_0_0, Int, @guaranteed @noescape @callee_guaranteed (@inout τ_0_0, @in_guaranteed Int) -> ()) -> ()
+  %5 = partial_apply [callee_guaranteed] [on_stack] %4<Int>(%3) : $@convention(thin) <τ_0_0> (@inout τ_0_0, Int, @guaranteed @noescape @callee_guaranteed (@inout τ_0_0, @in_guaranteed Int) -> ()) -> ()
+  %6 = convert_function %5 to $@noescape @callee_guaranteed @substituted <τ_0_0> (@inout τ_0_0, Int) -> () for <Int>
+  store %0 to [trivial] %1
+  %8 = apply %6(%1, %0) : $@noescape @callee_guaranteed @substituted <τ_0_0> (@inout τ_0_0, Int) -> () for <Int>
+  destroy_value %6
+  destroy_value %3
+  %11 = load [trivial] %1
+  dealloc_stack %1
+  return %11
 }

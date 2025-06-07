@@ -2,8 +2,15 @@
 // swift-module-flags: -module-name SilencePreconcurrency
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -compile-module-from-interface -o %/t/SilencePreconcurrency.swiftmodule %s -verify
+// RUN: %target-swift-frontend -emit-module -o %t/Preconcurrency.swiftmodule -module-name Preconcurrency %S/Inputs/preconcurrency.swift
+// RUN: %target-swift-frontend -compile-module-from-interface -o %t/SilencePreconcurrency.swiftmodule %s -I %t -verify
 
 // REQUIRES: OS=macosx
 
 @preconcurrency import Swift
+import Preconcurrency
+
+@available(macOS 10.15, *)
+public enum SendableEnum: Sendable {
+  case caseWithNonSendablePayload(_ ns: NotSendable)
+}

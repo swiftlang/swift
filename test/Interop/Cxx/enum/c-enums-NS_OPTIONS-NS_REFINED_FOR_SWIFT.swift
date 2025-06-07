@@ -3,8 +3,9 @@
 
 import CenumsNSOptions
 
-// CHECK:      typealias NSAttributedStringFormattingOptions = UInt
-// CHECK-NEXT: struct __NSAttributedStringFormattingOptions : OptionSet, @unchecked Sendable {
+// CHECK-NOT: typealias NSAttributedStringFormattingOptions = UInt
+
+// CHECK: struct __NSAttributedStringFormattingOptions : OptionSet, @unchecked Sendable {
 // CHECK-NEXT:   init(rawValue: UInt)
 // CHECK-NEXT:   let rawValue: UInt
 // CHECK-NEXT:   typealias RawValue = UInt

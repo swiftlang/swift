@@ -17,6 +17,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -25,8 +26,33 @@ using namespace swift;
 static_assert(sizeof(SILLocation) <= 2 * sizeof(void *),
               "SILLocation must stay small");
 
-SILLocation::FilenameAndLocation *SILLocation::FilenameAndLocation::
-alloc(unsigned line, unsigned column, StringRef filename, SILModule &module) {
+SILLocation::SILLocation(Stmt *S) : SILLocation(ASTNodeTy(S), RegularKind) {
+  if (S->isImplicit())
+    kindAndFlags.fields.implicit = true;
+}
+
+SILLocation::SILLocation(Expr *E) : SILLocation(ASTNodeTy(E), RegularKind) {
+  if (E->isImplicit())
+    kindAndFlags.fields.implicit = true;
+}
+SILLocation::SILLocation(Decl *D) : SILLocation(ASTNodeTy(D), RegularKind) {
+  if (D && D->isImplicit())
+    kindAndFlags.fields.implicit = true;
+}
+
+SILLocation::SILLocation(Pattern *P) : SILLocation(ASTNodeTy(P), RegularKind) {
+  if (P->isImplicit())
+    kindAndFlags.fields.implicit = true;
+}
+
+SILLocation::SILLocation(SourceLoc L, LocationKind K, bool Implicit)
+    : storage(L), kindAndFlags(K, SourceLocKind) {
+  kindAndFlags.fields.implicit = Implicit;
+}
+
+SILLocation::FilenameAndLocation *
+SILLocation::FilenameAndLocation::alloc(unsigned line, unsigned column,
+                                        StringRef filename, SILModule &module) {
   return new (module) FilenameAndLocation(line, column, filename);
 }
 
@@ -34,6 +60,28 @@ void SILLocation::FilenameAndLocation::dump() const { print(llvm::dbgs()); }
 
 void SILLocation::FilenameAndLocation::print(raw_ostream &OS) const {
   OS << filename << ':' << line << ':' << column;
+}
+
+void SILLocation::pointToEnd() {
+  switch (getStorageKind()) {
+  case ASTNodeKind:
+    return storage.ASTNodeLoc.setInt(1);
+  case ExtendedASTNodeKind:
+    return storage.extendedASTNodeLoc->primary.setInt(1);
+  default:
+    assert(false && "only AST nodes can be pointed to end");
+  }
+}
+
+bool SILLocation::pointsToEnd() const {
+  switch (getStorageKind()) {
+  case ASTNodeKind:
+    return storage.ASTNodeLoc.getInt();
+  case ExtendedASTNodeKind:
+    return storage.extendedASTNodeLoc->primary.getInt();
+  default:
+    return false;
+  }
 }
 
 SourceLoc SILLocation::getSourceLoc() const {
@@ -49,25 +97,24 @@ SourceLoc SILLocation::getSourceLoc() const {
 }
 
 SourceLoc SILLocation::getSourceLoc(ASTNodeTy N) const {
-  if (N.isNull())
+  auto P = N.getPointer();
+  if (P.isNull())
     return SourceLoc();
 
-  if (alwaysPointsToEnd() ||
-      is<CleanupLocation>() ||
-      is<ImplicitReturnLocation>())
+  if (pointsToEnd() || is<CleanupLocation>() || is<ImplicitReturnLocation>())
     return getEndSourceLoc(N);
 
   // Use the start location for the ReturnKind.
   if (is<ReturnLocation>())
     return getStartSourceLoc(N);
 
-  if (auto *decl = N.dyn_cast<Decl*>())
+  if (auto *decl = P.dyn_cast<Decl*>())
     return decl->getLoc();
-  if (auto *expr = N.dyn_cast<Expr*>())
+  if (auto *expr = P.dyn_cast<Expr*>())
     return expr->getLoc();
-  if (auto *stmt = N.dyn_cast<Stmt*>())
+  if (auto *stmt = P.dyn_cast<Stmt*>())
     return stmt->getStartLoc();
-  if (auto *patt = N.dyn_cast<Pattern*>())
+  if (auto *patt = P.dyn_cast<Pattern*>())
     return patt->getStartLoc();
   llvm_unreachable("impossible SILLocation");
 }
@@ -90,17 +137,20 @@ SourceLoc SILLocation::getStartSourceLoc() const {
     return SourceLoc();
   if (isSILFile())
     return storage.sourceLoc;
+  if (getStorageKind() == FilenameAndLocationKind)
+    return SourceLoc();
   return getStartSourceLoc(getPrimaryASTNode());
 }
 
 SourceLoc SILLocation::getStartSourceLoc(ASTNodeTy N) {
-  if (auto *decl = N.dyn_cast<Decl*>())
+  auto P = N.getPointer();
+  if (auto *decl = P.dyn_cast<Decl*>())
     return decl->getStartLoc();
-  if (auto *expr = N.dyn_cast<Expr*>())
+  if (auto *expr = P.dyn_cast<Expr*>())
     return expr->getStartLoc();
-  if (auto *stmt = N.dyn_cast<Stmt*>())
+  if (auto *stmt = P.dyn_cast<Stmt*>())
     return stmt->getStartLoc();
-  if (auto *patt = N.dyn_cast<Pattern*>())
+  if (auto *patt = P.dyn_cast<Pattern*>())
     return patt->getStartLoc();
   llvm_unreachable("impossible SILLocation");
 }
@@ -110,17 +160,20 @@ SourceLoc SILLocation::getEndSourceLoc() const {
     return SourceLoc();
   if (isSILFile())
     return storage.sourceLoc;
+  if (getStorageKind() == FilenameAndLocationKind)
+    return SourceLoc();
   return getEndSourceLoc(getPrimaryASTNode());
 }
 
 SourceLoc SILLocation::getEndSourceLoc(ASTNodeTy N) {
-  if (auto decl = N.dyn_cast<Decl*>())
+  auto P = N.getPointer();
+  if (auto decl = P.dyn_cast<Decl*>())
     return decl->getEndLoc();
-  if (auto expr = N.dyn_cast<Expr*>())
+  if (auto expr = P.dyn_cast<Expr*>())
     return expr->getEndLoc();
-  if (auto stmt = N.dyn_cast<Stmt*>())
+  if (auto stmt = P.dyn_cast<Stmt*>())
     return stmt->getEndLoc();
-  if (auto patt = N.dyn_cast<Pattern*>())
+  if (auto patt = P.dyn_cast<Pattern*>())
     return patt->getEndLoc();
   llvm_unreachable("impossible SILLocation");
 }
@@ -168,7 +221,7 @@ static void printSourceLoc(SourceLoc loc, raw_ostream &OS) {
 
 void SILLocation::dump() const {
   if (isNull()) {
-    llvm::dbgs() << "<no loc>";
+    llvm::dbgs() << "<no loc>" << "\n";
     return;
   }
   if (auto D = getAsASTNode<Decl>())
@@ -186,15 +239,17 @@ void SILLocation::dump() const {
     printSourceLoc(getSourceLoc(), llvm::dbgs());
   }
 
-  if (isAutoGenerated())     llvm::dbgs() << ":auto";
-  if (alwaysPointsToEnd())   llvm::dbgs() << ":end";
-  if (isInPrologue())        llvm::dbgs() << ":prologue";
-  if (isSILFile())           llvm::dbgs() << ":sil";
+  if (isAutoGenerated()) llvm::dbgs() << ":auto";
+  if (isImplicit())      llvm::dbgs() << ":implicit";
+  if (pointsToEnd())     llvm::dbgs() << ":end";
+  if (isInPrologue())    llvm::dbgs() << ":prologue";
+  if (isSILFile())       llvm::dbgs() << ":sil";
   if (hasASTNodeForDebugging()) {
     llvm::dbgs() << ":debug[";
     printSourceLoc(getSourceLocForDebugging(), llvm::dbgs());
-    llvm::dbgs() << "]\n";
+    llvm::dbgs() << "]";
   }
+  llvm::dbgs() << "\n";
 }
 
 void SILLocation::print(raw_ostream &OS, const SourceManager &SM) const {
@@ -219,33 +274,46 @@ void SILLocation::print(raw_ostream &OS) const {
   }
 }
 
-RegularLocation::RegularLocation(Stmt *S, Pattern *P, SILModule &Module) :
-  SILLocation(new (Module) ExtendedASTNodeLoc(S, P), RegularKind) {}
+RegularLocation::RegularLocation(Decl *D, SILLocation LocForDebugging,
+                                 SILModule &Module)
+    : SILLocation(new(Module) ExtendedASTNodeLoc(
+                      {D, 0}, LocForDebugging.getPrimaryASTNode()),
+                  RegularKind) {}
+RegularLocation::RegularLocation(Stmt *S, Pattern *P, SILModule &Module)
+  : SILLocation(new(Module) ExtendedASTNodeLoc({S, 0}, {P, 0}), RegularKind) {}
 
 SILLocation::ExtendedASTNodeLoc *
 RegularLocation::getDebugOnlyExtendedASTNodeLoc(SILLocation L,
                                                 SILModule &Module) {
+  ASTNodeTy Empty({(Decl *)nullptr, 0});
   if (auto D = L.getAsASTNode<Decl>())
-    return new (Module) ExtendedASTNodeLoc((Decl *)nullptr, D);
+    return new (Module) ExtendedASTNodeLoc(Empty, {D, 0});
   if (auto E = L.getAsASTNode<Expr>())
-    return new (Module) ExtendedASTNodeLoc((Decl *)nullptr, E);
-  if (auto S = L.getAsASTNode<Stmt>())
-    return new (Module) ExtendedASTNodeLoc((Decl *)nullptr, S);
+    return new (Module) ExtendedASTNodeLoc(Empty, {E, 0});
+  if (auto S = L.getAsASTNode<Stmt>()) {
+    // If the source location of the SILLocation passed in matches the EndLoc of
+    // the Stmt, set the primary ASTNodeTy integer to 1, so that
+    // SILLocation::getSourceLoc returns the EndLoc when queried.
+    if (L.getSourceLocForDebugging() == S->getEndLoc())
+      Empty.setInt(1);
+    return new (Module) ExtendedASTNodeLoc(Empty, {S, 0});
+  }
   auto P = L.getAsASTNode<Pattern>();
-  return new (Module) ExtendedASTNodeLoc((Decl *)nullptr, P);
+  return new (Module) ExtendedASTNodeLoc(Empty, {P, 0});
 }
 
 SILLocation::ExtendedASTNodeLoc *
 RegularLocation::getDiagnosticOnlyExtendedASTNodeLoc(SILLocation L,
                                                      SILModule &Module) {
+  ASTNodeTy Empty({(Decl *)nullptr, 0});
   if (auto D = L.getAsASTNode<Decl>())
-    return new (Module) ExtendedASTNodeLoc(D, (Decl *)nullptr);
+    return new (Module) ExtendedASTNodeLoc({D, 0}, Empty);
   if (auto E = L.getAsASTNode<Expr>())
-    return new (Module) ExtendedASTNodeLoc(E, (Decl *)nullptr);
+    return new (Module) ExtendedASTNodeLoc({E, 0}, Empty);
   if (auto S = L.getAsASTNode<Stmt>())
-    return new (Module) ExtendedASTNodeLoc(S, (Decl *)nullptr);
+    return new (Module) ExtendedASTNodeLoc({S, 0}, Empty);
   auto P = L.getAsASTNode<Pattern>();
-  return new (Module) ExtendedASTNodeLoc(P, (Decl *)nullptr);
+  return new (Module) ExtendedASTNodeLoc({P, 0}, Empty);
 }
 
 RegularLocation::RegularLocation(SILLocation ForDebuggingOrDiagnosticsOnly,

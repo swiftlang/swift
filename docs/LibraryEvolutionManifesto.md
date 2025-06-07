@@ -122,7 +122,7 @@ Both of these annotations are things the compiler already knows when a type is d
 
 The compiler actually has basic support for frozen classes, which allow stored properties to be accessed directly by offset from the class reference. There's no real reason why this can't be supported more generally, but confusion around *what's* being frozen and the rarity of wanting to make this promise anyway kept it out of [SE-0260][].
 
-[SE-0260]: https://github.com/apple/swift-evolution/blob/main/proposals/0260-library-evolution.md
+[SE-0260]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0260-library-evolution.md
 
 
 # Generalized Availability Model

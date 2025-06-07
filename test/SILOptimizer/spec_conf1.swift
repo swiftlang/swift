@@ -19,8 +19,8 @@ func inner_function<T : P>(In In : T) { }
 @inline(never)
 func outer_function<T : P>(In In : T) { inner_function(In: In) }
 
-//CHECK: sil shared [noinline] {{.*}}@$s10spec_conf114outer_function2Inyx_tAA1PRzlFAA3FooC_Tg5
-//CHECK: $s10spec_conf114inner_function2Inyx_tAA1PRzlFAA3FooC_Tg5
+//CHECK: sil shared [noinline] {{.*}}@$s10spec_conf114outer_function2Inyx_tAA1PRzlFAA3FooC_Ttg5
+//CHECK: $s10spec_conf114inner_function2Inyx_tAA1PRzlFAA3FooC_Ttg5
 //CHECK-NEXT: apply
 //CHECK: return
 

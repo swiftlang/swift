@@ -19,6 +19,7 @@
 #ifndef SWIFT_LAYOUT_CONSTRAINTKIND_H
 #define SWIFT_LAYOUT_CONSTRAINTKIND_H
 
+namespace swift {
 /// Describes a layout constraint information.
 enum class LayoutConstraintKind : uint8_t {
   // It is not a known layout constraint.
@@ -39,7 +40,12 @@ enum class LayoutConstraintKind : uint8_t {
   RefCountedObject,
   // It is a layout constraint representing a native reference counted object.
   NativeRefCountedObject,
-  LastLayout = NativeRefCountedObject,
+  // It is a layout constraint representing a bridge object
+  BridgeObject,
+  // It is a layout constraint representing a trivial type of a known stride.
+  TrivialStride,
+  LastLayout = TrivialStride,
 };
+} // namespace swift
 
-#endif
+#endif // SWIFT_LAYOUT_CONSTRAINTKIND_H

@@ -33,6 +33,7 @@ void ExpandResponseFilesWithRetry(llvm::StringSaver &Saver,
 /// Generates the list of arguments that would be passed to the compiler
 /// frontend from the given driver arguments.
 ///
+/// \param DriverPath The path to 'swiftc'.
 /// \param ArgList The driver arguments (i.e. normal arguments for \c swiftc).
 /// \param Diags The DiagnosticEngine used to report any errors parsing the
 /// arguments.
@@ -48,7 +49,8 @@ void ExpandResponseFilesWithRetry(llvm::StringSaver &Saver,
 /// \note This function is not intended to create invocations which are
 /// suitable for use in REPL or immediate modes.
 bool getSingleFrontendInvocationFromDriverArguments(
-    ArrayRef<const char *> ArgList, DiagnosticEngine &Diags,
+    StringRef DriverPath, ArrayRef<const char *> ArgList,
+    DiagnosticEngine &Diags,
     llvm::function_ref<bool(ArrayRef<const char *> FrontendArgs)> Action,
     bool ForceNoOutputs = false);
 

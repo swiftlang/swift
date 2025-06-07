@@ -16,27 +16,35 @@
 
 #include "GenStruct.h"
 
+#include "IRGen.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILFunctionBuilder.h"
 #include "swift/SIL/SILModule.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
+#include "clang/AST/CharUnits.h"
 #include "clang/AST/Decl.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/GlobalDecl.h"
 #include "clang/AST/Mangle.h"
 #include "clang/AST/RecordLayout.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "clang/CodeGen/SwiftCallingConv.h"
 #include "clang/Sema/Sema.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
+#include "llvm/Support/Error.h"
+#include <iterator>
 
 #include "GenDecl.h"
 #include "GenMeta.h"
@@ -83,7 +91,6 @@ static clang::CXXDestructorDecl *getCXXDestructor(SILType type) {
     return nullptr;
   return cxxRecordDecl->getDestructor();
 }
-
 namespace {
   class StructFieldInfo : public RecordField<StructFieldInfo> {
   public:
@@ -150,6 +157,7 @@ namespace {
     using super::asImpl;
 
   public:
+
     const FieldInfoType &getFieldInfo(VarDecl *field) const {
       // FIXME: cache the physical field index in the VarDecl.
       for (auto &fieldInfo : asImpl().getFields()) {
@@ -187,8 +195,14 @@ namespace {
     Address projectFieldAddress(IRGenFunction &IGF, Address addr, SILType T,
                                 VarDecl *field) const {
       auto &fieldInfo = getFieldInfo(field);
-      if (fieldInfo.isEmpty())
-        return fieldInfo.getTypeInfo().getUndefAddress();
+      if (fieldInfo.isEmpty()) {
+        // For fields with empty types, we could return undef.
+        // But if this is a struct_element_addr which is a result of an optimized
+        // `MemoryLayout<S>.offset(of: \.field)` we cannot return undef. We have
+        // to be consistent with `offset(of:)`, which returns 0. Therefore we
+        // return the base address of the struct.
+        return addr;
+      }
 
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       return fieldInfo.projectAddress(IGF, addr, offsets);
@@ -235,20 +249,48 @@ namespace {
       return fieldInfo.getStructIndex();
     }
 
-    Optional<unsigned> getFieldIndexIfNotEmpty(IRGenModule &IGM,
-                                               VarDecl *field) const {
+    std::optional<unsigned> getFieldIndexIfNotEmpty(IRGenModule &IGM,
+                                                    VarDecl *field) const {
       auto &fieldInfo = getFieldInfo(field);
       if (fieldInfo.isEmpty())
-        return None;
+        return std::nullopt;
       return fieldInfo.getStructIndex();
     }
 
     bool isSingleRetainablePointer(ResilienceExpansion expansion,
                                    ReferenceCounting *rc) const override {
+      // If the type isn't copyable, it doesn't share representation with
+      // a single-refcounted pointer.
+      //
+      // This is sufficient to rule out types with user-defined deinits today,
+      // since copyable structs are not allowed to define a deinit. If we
+      // ever added user-defined copy constructors to the language, then we'd
+      // have to also check that.
+      if (!this->isCopyable(expansion)) {
+        return false;
+      }
+                                   
       auto fields = asImpl().getFields();
       if (fields.size() != 1)
         return false;
       return fields[0].getTypeInfo().isSingleRetainablePointer(expansion, rc);
+    }
+
+    void destroy(IRGenFunction &IGF, Address address, SILType T,
+                 bool isOutlined) const override {
+
+      // If the struct has a deinit declared, then call it to destroy the
+      // value.
+      if (!tryEmitDestroyUsingDeinit(IGF, address, T)) {
+        if (!asImpl().areFieldsABIAccessible()) {
+          emitDestroyCall(IGF, T, address);
+          return;
+        }
+
+        // Otherwise, perform elementwise destruction of the value.
+        super::destroy(IGF, address, T, isOutlined);
+      }
+      super::fillWithZerosIfSensitive(IGF, address, T);
     }
 
     void verify(IRGenTypeVerifierFunction &IGF,
@@ -328,28 +370,6 @@ namespace {
                                   ClangFieldInfo> {
     const clang::RecordDecl *ClangDecl;
 
-    template <class Fn>
-    void forEachNonEmptyBase(Fn fn) const {
-      auto &layout = ClangDecl->getASTContext().getASTRecordLayout(ClangDecl);
-
-      if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(ClangDecl)) {
-        for (auto base : cxxRecord->bases()) {
-          auto baseType = base.getType().getCanonicalType();
-
-          auto baseRecord = cast<clang::RecordType>(baseType)->getDecl();
-          auto baseCxxRecord = cast<clang::CXXRecordDecl>(baseRecord);
-
-          if (baseCxxRecord->isEmpty())
-            continue;
-
-          auto offset = layout.getBaseClassOffset(baseCxxRecord);
-          auto size =
-              ClangDecl->getASTContext().getTypeSizeInChars(baseType);
-          fn(baseType, offset, size);
-        }
-      }
-    }
-
   public:
     LoadableClangRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
                                 unsigned explosionSize, llvm::Type *storageType,
@@ -357,33 +377,45 @@ namespace {
                                 Alignment align,
                                 const clang::RecordDecl *clangDecl)
         : StructTypeInfoBase(StructTypeInfoKind::LoadableClangRecordTypeInfo,
-                             fields, explosionSize, storageType, size,
-                             std::move(spareBits), align, IsPOD, IsFixedSize),
+                             fields, explosionSize, FieldsAreABIAccessible,
+                             storageType, size, std::move(spareBits), align,
+                             IsTriviallyDestroyable,
+                             IsCopyable,
+                             IsFixedSize, IsABIAccessible),
           ClangDecl(clangDecl) {}
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
-      if (!IGM.getOptions().ForceStructTypeLayouts) {
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
+      if (!useStructLayouts) {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
       if (!areFieldsABIAccessible()) {
         return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
       }
+      if (getFields().empty()) {
+        return IGM.typeLayoutCache.getEmptyEntry();
+      }
 
       std::vector<TypeLayoutEntry *> fields;
       for (auto &field : getFields()) {
         auto fieldTy = field.getType(IGM, T);
+        if (!fieldTy) {
+          return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+        }
         fields.push_back(
-            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy));
+            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy, useStructLayouts));
       }
       assert(!fields.empty() &&
              "Empty structs should not be LoadableClangRecordTypeInfo");
 
-      if (fields.size() == 1) {
-        return fields[0];
-      }
+      // if (fields.size() == 1 && getBestKnownAlignment() == *fields[0]->fixedAlignment(IGM)) {
+      //   return fields[0];
+      // }
 
-      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1);
+      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(
+          fields, T, getBestKnownAlignment().getValue(), *this);
     }
 
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
@@ -394,19 +426,110 @@ namespace {
 
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
                           Size offset) const override {
-      forEachNonEmptyBase([&](clang::QualType type, clang::CharUnits offset,
-                              clang::CharUnits) {
-        lowering.addTypedData(type, offset);
-      });
+      if (auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(ClangDecl)) {
+        for (auto base : getBasesAndOffsets(cxxRecordDecl)) {
+          lowering.addTypedData(base.decl, base.offset.asCharUnits());
+        }
+      }
 
       lowering.addTypedData(ClangDecl, offset.asCharUnits());
     }
 
-    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
-      return None;
+    std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF) const {
+      return std::nullopt;
     }
-    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
-      return None;
+    std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
+      return std::nullopt;
+    }
+    MemberAccessStrategy
+    getNonFixedFieldAccessStrategy(IRGenModule &IGM, SILType T,
+                                   const ClangFieldInfo &field) const {
+      llvm_unreachable("non-fixed field in Clang type?");
+    }
+  };
+
+  class AddressOnlyPointerAuthRecordTypeInfo final
+      : public StructTypeInfoBase<AddressOnlyPointerAuthRecordTypeInfo,
+                                  FixedTypeInfo, ClangFieldInfo> {
+    const clang::RecordDecl *clangDecl;
+
+    void emitCopyWithCopyFunction(IRGenFunction &IGF, SILType T, Address src,
+                                  Address dst) const {
+      auto *copyFunction =
+          clang::CodeGen::getNonTrivialCStructCopyAssignmentOperator(
+              IGF.IGM.getClangCGM(), dst.getAlignment(), src.getAlignment(),
+              /*isVolatile*/ false,
+              clang::QualType(clangDecl->getTypeForDecl(), 0));
+      auto *dstValue = dst.getAddress();
+      auto *srcValue = src.getAddress();
+      IGF.Builder.CreateCall(copyFunction->getFunctionType(), copyFunction,
+                             {dstValue, srcValue});
+    }
+
+  public:
+    AddressOnlyPointerAuthRecordTypeInfo(ArrayRef<ClangFieldInfo> fields,
+                                         llvm::Type *storageType, Size size,
+                                         Alignment align,
+                                         const clang::RecordDecl *clangDecl)
+        : StructTypeInfoBase(StructTypeInfoKind::AddressOnlyClangRecordTypeInfo,
+                             fields, FieldsAreABIAccessible, storageType, size,
+                             // We can't assume any spare bits in a C++ type
+                             // with user-defined special member functions.
+                             SpareBitVector(std::optional<APInt>{
+                                 llvm::APInt(size.getValueInBits(), 0)}),
+                             align, IsNotTriviallyDestroyable,
+                             IsNotBitwiseTakable, IsCopyable, IsFixedSize,
+                             IsABIAccessible),
+          clangDecl(clangDecl) {
+      (void)clangDecl;
+    }
+
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
+      if (!useStructLayouts) {
+        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+      }
+      assert(false && "Implement proper type layout info in the future");
+      return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+    }
+
+    void initializeFromParams(IRGenFunction &IGF, Explosion &params,
+                              Address addr, SILType T,
+                              bool isOutlined) const override {
+      llvm_unreachable("Address-only C++ types must be created by C++ special "
+                       "member functions.");
+    }
+
+    void initializeWithCopy(IRGenFunction &IGF, Address dst, Address src,
+                            SILType T, bool isOutlined) const override {
+      emitCopyWithCopyFunction(IGF, T, src, dst);
+    }
+
+    void assignWithCopy(IRGenFunction &IGF, Address dst, Address src, SILType T,
+                        bool isOutlined) const override {
+      emitCopyWithCopyFunction(IGF, T, src, dst);
+    }
+
+    void initializeWithTake(IRGenFunction &IGF, Address dst, Address src,
+                            SILType T, bool isOutlined,
+                            bool zeroizeIfSensitive) const override {
+      emitCopyWithCopyFunction(IGF, T, src, dst);
+      destroy(IGF, src, T, isOutlined);
+    }
+
+    void assignWithTake(IRGenFunction &IGF, Address dst, Address src, SILType T,
+                        bool isOutlined) const override {
+      emitCopyWithCopyFunction(IGF, T, src, dst);
+      destroy(IGF, src, T, isOutlined);
+    }
+
+    std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF) const {
+      return std::nullopt;
+    }
+    std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
+      return std::nullopt;
     }
     MemberAccessStrategy
     getNonFixedFieldAccessStrategy(IRGenModule &IGM, SILType T,
@@ -421,15 +544,29 @@ namespace {
     const clang::RecordDecl *ClangDecl;
 
     const clang::CXXConstructorDecl *findCopyConstructor() const {
-      const clang::CXXRecordDecl *cxxRecordDecl =
-          dyn_cast<clang::CXXRecordDecl>(ClangDecl);
+      const auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(ClangDecl);
       if (!cxxRecordDecl)
         return nullptr;
-      for (auto method : cxxRecordDecl->methods()) {
-        if (auto ctor = dyn_cast<clang::CXXConstructorDecl>(method)) {
-          if (ctor->isCopyConstructor())
-            return ctor;
-        }
+      for (auto ctor : cxxRecordDecl->ctors()) {
+        if (ctor->isCopyConstructor() &&
+            // FIXME: Support default arguments (rdar://142414553)
+            ctor->getNumParams() == 1 &&
+            ctor->getAccess() == clang::AS_public && !ctor->isDeleted())
+          return ctor;
+      }
+      return nullptr;
+    }
+
+    const clang::CXXConstructorDecl *findMoveConstructor() const {
+      const auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(ClangDecl);
+      if (!cxxRecordDecl)
+        return nullptr;
+      for (auto ctor : cxxRecordDecl->ctors()) {
+        if (ctor->isMoveConstructor() &&
+            // FIXME: Support default arguments (rdar://142414553)
+            ctor->getNumParams() == 1 &&
+            ctor->getAccess() == clang::AS_public && !ctor->isDeleted())
+          return ctor;
       }
       return nullptr;
     }
@@ -444,23 +581,32 @@ namespace {
       //   void (%struct.T* %this, %struct.T* %0)
       auto ptrTypeDecl =
           IGF.getSILModule().getASTContext().getUnsafePointerDecl();
-      auto subst = SubstitutionMap::get(ptrTypeDecl->getGenericSignature(),
-                                        {T.getASTType()},
-                                        ArrayRef<ProtocolConformanceRef>{});
+      auto sig = ptrTypeDecl->getGenericSignature();
+
+      // Map the generic parameter to T
+      auto subst = SubstitutionMap::get(sig, {T.getASTType()},
+                              LookUpConformanceInModule());
       auto ptrType = ptrTypeDecl->getDeclaredInterfaceType().subst(subst);
       SILParameterInfo ptrParam(ptrType->getCanonicalType(),
                                 ParameterConvention::Direct_Unowned);
       SILResultInfo result(T.getASTType(), ResultConvention::Indirect);
 
+      auto clangFnType = T.getASTContext().getCanonicalClangFunctionType(
+          {ptrParam}, result, SILFunctionTypeRepresentation::CFunctionPointer);
+      auto extInfo = SILExtInfoBuilder()
+                         .withClangFunctionType(clangFnType)
+                         .withRepresentation(
+                             SILFunctionTypeRepresentation::CFunctionPointer)
+                         .build();
+
       return SILFunctionType::get(
           GenericSignature(),
-          SILFunctionType::ExtInfo().withRepresentation(
-              SILFunctionTypeRepresentation::CFunctionPointer),
+          extInfo,
           SILCoroutineKind::None,
           /*callee=*/ParameterConvention::Direct_Unowned,
           /*params*/ {ptrParam},
           /*yields*/ {}, /*results*/ {result},
-          /*error*/ None,
+          /*error*/ std::nullopt,
           /*pattern subs*/ SubstitutionMap(),
           /*invocation subs*/ SubstitutionMap(), IGF.IGM.Context);
     }
@@ -475,18 +621,25 @@ namespace {
       auto clangFnAddr =
           IGF.IGM.getAddrOfClangGlobalDecl(globalDecl, NotForDefinition);
       auto callee = cast<llvm::Function>(clangFnAddr->stripPointerCasts());
-      Signature signature = IGF.IGM.getSignature(fnType);
+      Signature signature = IGF.IGM.getSignature(fnType, copyConstructor);
       std::string name = "__swift_cxx_copy_ctor" + callee->getName().str();
+      auto *origClangFnAddr = clangFnAddr;
       clangFnAddr = emitCXXConstructorThunkIfNeeded(
           IGF.IGM, signature, copyConstructor, name, clangFnAddr);
       callee = cast<llvm::Function>(clangFnAddr);
-      if (IGF.IGM.getLLVMContext().supportsTypedPointers()) {
-        dest = IGF.coerceValue(dest, callee->getFunctionType()->getParamType(0),
-                               IGF.IGM.DataLayout);
-        src = IGF.coerceValue(src, callee->getFunctionType()->getParamType(1),
-                              IGF.IGM.DataLayout);
+      llvm::Value *args[] = {dest, src};
+      if (clangFnAddr == origClangFnAddr) {
+        // Ensure we can use 'invoke' to trap on uncaught exceptions when
+        // calling original copy constructor without going through the thunk.
+        emitCXXConstructorCall(IGF, copyConstructor, callee->getFunctionType(),
+                               callee, args);
+        return;
       }
-      IGF.Builder.CreateCall(callee->getFunctionType(), callee, {dest, src});
+      // Check if we're calling a thunk that traps on exception thrown from copy
+      // constructor.
+      if (IGF.IGM.emittedForeignFunctionThunksWithExceptionTraps.count(callee))
+        IGF.setCallsThunksWithForeignExceptionTraps();
+      IGF.Builder.CreateCall(callee->getFunctionType(), callee, args);
     }
 
   public:
@@ -495,12 +648,16 @@ namespace {
                                       Alignment align,
                                       const clang::RecordDecl *clangDecl)
         : StructTypeInfoBase(StructTypeInfoKind::AddressOnlyClangRecordTypeInfo,
-                             fields, storageType, size,
+                             fields, FieldsAreABIAccessible, storageType, size,
                              // We can't assume any spare bits in a C++ type
                              // with user-defined special member functions.
-                             SpareBitVector(llvm::Optional<APInt>{
+                             SpareBitVector(std::optional<APInt>{
                                  llvm::APInt(size.getValueInBits(), 0)}),
-                             align, IsNotPOD, IsNotBitwiseTakable, IsFixedSize),
+                             align, IsNotTriviallyDestroyable,
+                             IsNotBitwiseTakable,
+                             // TODO: Set this appropriately for the type's
+                             // C++ import behavior.
+                             IsCopyable, IsFixedSize, IsABIAccessible),
           ClangDecl(clangDecl) {
       (void)ClangDecl;
     }
@@ -519,14 +676,7 @@ namespace {
         return;
       }
 
-      if (!destructor->isUserProvided() &&
-          !destructor->doesThisDeclarationHaveABody()) {
-        assert(!destructor->isDeleted() &&
-               "Swift cannot handle a type with no known destructor.");
-        // Make sure we define the destructor so we have something to call.
-        auto &sema = IGF.IGM.Context.getClangModuleLoader()->getClangSema();
-        sema.DefineImplicitDestructor(clang::SourceLocation(), destructor);
-      }
+      IGF.IGM.ensureImplicitCXXDestructorBodyIsDefined(destructor);
 
       clang::GlobalDecl destructorGlobalDecl(destructor, clang::Dtor_Complete);
       auto *destructorFnAddr =
@@ -535,10 +685,6 @@ namespace {
 
       SmallVector<llvm::Value *, 2> args;
       auto *thisArg = address.getAddress();
-      if (IGF.IGM.getLLVMContext().supportsTypedPointers())
-        thisArg = IGF.coerceValue(address.getAddress(),
-                                  destructorFnAddr->getArg(0)->getType(),
-                                  IGF.IGM.DataLayout);
       args.push_back(thisArg);
       llvm::Value *implicitParam =
           clang::CodeGen::getCXXDestructorImplicitParam(
@@ -551,14 +697,30 @@ namespace {
                                         IGF.IGM.DataLayout);
         args.push_back(implicitParam);
       }
+      bool canThrow = false;
+      if (IGF.IGM.isForeignExceptionHandlingEnabled()) {
+        if (!IGF.IGM.isCxxNoThrow(destructor, /*defaultNoThrow=*/true))
+          canThrow = true;
+      }
+      if (canThrow) {
+        IGF.createExceptionTrapScope([&](llvm::BasicBlock *invokeNormalDest,
+                                         llvm::BasicBlock *invokeUnwindDest) {
+          IGF.Builder.createInvoke(destructorFnAddr->getFunctionType(),
+                                   destructorFnAddr, args, invokeNormalDest,
+                                   invokeUnwindDest);
+        });
+        return;
+      }
 
       IGF.Builder.CreateCall(destructorFnAddr->getFunctionType(),
                              destructorFnAddr, args);
     }
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
-      if (!IGM.getOptions().ForceStructTypeLayouts || getCXXDestructor(T) ||
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
+      if (!useStructLayouts || getCXXDestructor(T) ||
           !areFieldsABIAccessible()) {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
@@ -566,17 +728,21 @@ namespace {
       std::vector<TypeLayoutEntry *> fields;
       for (auto &field : getFields()) {
         auto fieldTy = field.getType(IGM, T);
+        if (!fieldTy) {
+          return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+        }
         fields.push_back(
-            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy));
+            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy, useStructLayouts));
       }
       assert(!fields.empty() &&
              "Empty structs should not be AddressOnlyRecordTypeInfo");
 
-      if (fields.size() == 1) {
+      if (fields.size() == 1 && getBestKnownAlignment() == *fields[0]->fixedAlignment(IGM)) {
         return fields[0];
       }
 
-      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1);
+      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(
+          fields, T, getBestKnownAlignment().getValue(), *this);
     }
 
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
@@ -604,6 +770,7 @@ namespace {
     void assignWithCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,
                         SILType T, bool isOutlined) const override {
       if (auto copyConstructor = findCopyConstructor()) {
+        destroy(IGF, destAddr, T, isOutlined);
         emitCopyWithCopyConstructor(IGF, T, copyConstructor,
                                     srcAddr.getAddress(),
                                     destAddr.getAddress());
@@ -615,7 +782,16 @@ namespace {
     }
 
     void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
-                            SILType T, bool isOutlined) const override {
+                            SILType T, bool isOutlined,
+                            bool zeroizeIfSensitive) const override {
+      if (auto moveConstructor = findMoveConstructor()) {
+        emitCopyWithCopyConstructor(IGF, T, moveConstructor,
+                                    src.getAddress(),
+                                    dest.getAddress());
+        destroy(IGF, src, T, isOutlined);
+        return;
+      }
+
       if (auto copyConstructor = findCopyConstructor()) {
         emitCopyWithCopyConstructor(IGF, T, copyConstructor,
                                     src.getAddress(),
@@ -626,12 +802,22 @@ namespace {
 
       StructTypeInfoBase<AddressOnlyCXXClangRecordTypeInfo, FixedTypeInfo,
                          ClangFieldInfo>::initializeWithTake(IGF, dest, src, T,
-                                                             isOutlined);
+                                                             isOutlined, zeroizeIfSensitive);
     }
 
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src, SILType T,
                         bool isOutlined) const override {
+      if (auto moveConstructor = findMoveConstructor()) {
+        destroy(IGF, dest, T, isOutlined);
+        emitCopyWithCopyConstructor(IGF, T, moveConstructor,
+                                    src.getAddress(),
+                                    dest.getAddress());
+        destroy(IGF, src, T, isOutlined);
+        return;
+      }
+
       if (auto copyConstructor = findCopyConstructor()) {
+        destroy(IGF, dest, T, isOutlined);
         emitCopyWithCopyConstructor(IGF, T, copyConstructor,
                                     src.getAddress(),
                                     dest.getAddress());
@@ -644,9 +830,11 @@ namespace {
                                                          isOutlined);
     }
 
-    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const { return None; }
-    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
-      return None;
+    std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF) const {
+      return std::nullopt;
+    }
+    std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
+      return std::nullopt;
     }
     MemberAccessStrategy
     getNonFixedFieldAccessStrategy(IRGenModule &IGM, SILType T,
@@ -658,17 +846,25 @@ namespace {
   /// A type implementation for loadable struct types.
   class LoadableStructTypeInfo final
       : public StructTypeInfoBase<LoadableStructTypeInfo, LoadableTypeInfo> {
+    using super = StructTypeInfoBase<LoadableStructTypeInfo, LoadableTypeInfo>;
+
   public:
     LoadableStructTypeInfo(ArrayRef<StructFieldInfo> fields,
+                           FieldsAreABIAccessible_t areFieldsABIAccessible,
                            unsigned explosionSize,
                            llvm::Type *storageType, Size size,
                            SpareBitVector &&spareBits,
-                           Alignment align, IsPOD_t isPOD,
-                           IsFixedSize_t alwaysFixedSize)
+                           Alignment align,
+                           IsTriviallyDestroyable_t isTriviallyDestroyable,
+                           IsCopyable_t isCopyable,
+                           IsFixedSize_t alwaysFixedSize,
+                           IsABIAccessible_t isABIAccessible)
       : StructTypeInfoBase(StructTypeInfoKind::LoadableStructTypeInfo,
-                           fields, explosionSize,
+                           fields, explosionSize, areFieldsABIAccessible,
                            storageType, size, std::move(spareBits),
-                           align, isPOD, alwaysFixedSize)
+                           align, isTriviallyDestroyable,
+                           isCopyable,
+                           alwaysFixedSize, isABIAccessible)
     {}
 
     void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
@@ -680,9 +876,11 @@ namespace {
       }
     }
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
-      if (!IGM.getOptions().ForceStructTypeLayouts) {
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
+      if (!useStructLayouts) {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
 
@@ -698,14 +896,16 @@ namespace {
       for (auto &field : getFields()) {
         auto fieldTy = field.getType(IGM, T);
         fields.push_back(
-            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy));
+            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy, useStructLayouts));
       }
 
-      if (fields.size() == 1) {
-        return fields[0];
-      }
+      // if (fields.size() == 1 && isFixedSize() &&
+      //     getBestKnownAlignment() == *fields[0]->fixedAlignment(IGM)) {
+      //   return fields[0];
+      // }
 
-      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1);
+      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(
+          fields, T, getBestKnownAlignment().getValue(), *this);
     }
 
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
@@ -713,16 +913,35 @@ namespace {
                               bool isOutlined) const override {
       LoadableStructTypeInfo::initialize(IGF, params, addr, isOutlined);
     }
-    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
-      return None;
+    std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF) const {
+      return std::nullopt;
     }
-    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
-      return None;
+    std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
+      return std::nullopt;
     }
     MemberAccessStrategy
     getNonFixedFieldAccessStrategy(IRGenModule &IGM, SILType T,
                                    const StructFieldInfo &field) const {
       llvm_unreachable("non-fixed field in loadable type?");
+    }
+    
+    void consume(IRGenFunction &IGF, Explosion &explosion,
+                 Atomicity atomicity, SILType T) const override {
+      // If the struct has a deinit declared, then call it to consume the
+      // value.
+      if (tryEmitConsumeUsingDeinit(IGF, explosion, T)) {
+        return;
+      }
+
+      if (!areFieldsABIAccessible()) {
+        auto temporary = allocateStack(IGF, T, "deinit.arg").getAddress();
+        initialize(IGF, explosion, temporary, /*outlined*/false);
+        emitDestroyCall(IGF, T, temporary);
+        return;
+      }
+
+      // Otherwise, do elementwise destruction of the value.
+      return super::consume(IGF, explosion, atomicity, T);
     }
   };
 
@@ -733,18 +952,28 @@ namespace {
                                                    FixedTypeInfo>> {
   public:
     // FIXME: Spare bits between struct members.
-    FixedStructTypeInfo(ArrayRef<StructFieldInfo> fields, llvm::Type *T,
+    FixedStructTypeInfo(ArrayRef<StructFieldInfo> fields,
+                        FieldsAreABIAccessible_t areFieldsABIAccessible,
+                        llvm::Type *T,
                         Size size, SpareBitVector &&spareBits,
-                        Alignment align, IsPOD_t isPOD, IsBitwiseTakable_t isBT,
-                        IsFixedSize_t alwaysFixedSize)
+                        Alignment align,
+                        IsTriviallyDestroyable_t isTriviallyDestroyable,
+                        IsBitwiseTakable_t isBT,
+                        IsCopyable_t isCopyable,
+                        IsFixedSize_t alwaysFixedSize,
+                        IsABIAccessible_t isABIAccessible)
       : StructTypeInfoBase(StructTypeInfoKind::FixedStructTypeInfo,
-                           fields, T, size, std::move(spareBits), align,
-                           isPOD, isBT, alwaysFixedSize)
+                           fields, areFieldsABIAccessible,
+                           T, size, std::move(spareBits), align,
+                           isTriviallyDestroyable, isBT, isCopyable,
+                           alwaysFixedSize, isABIAccessible)
     {}
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
-      if (!IGM.getOptions().ForceStructTypeLayouts) {
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
+      if (!useStructLayouts) {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       }
 
@@ -752,27 +981,55 @@ namespace {
         return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
       }
 
+      // If we have a raw layout struct who is fixed size, it means the
+      // layout of the struct is fully concrete.
+      if (auto rawLayout = T.getRawLayout()) {
+        // Defer to this fixed type info for type layout if the raw layout
+        // specifies size and alignment.
+        if (rawLayout->getSizeAndAlignment()) {
+          return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+        }
+
+        auto likeType = T.getRawLayoutSubstitutedLikeType();
+        auto loweredLikeType = IGM.getLoweredType(likeType);
+        auto likeTypeLayout = IGM.getTypeInfo(loweredLikeType)
+            .buildTypeLayoutEntry(IGM, loweredLikeType, useStructLayouts);
+
+        // If we're an array, use the ArrayLayoutEntry.
+        if (rawLayout->getArrayLikeTypeAndCount()) {
+          auto countType = T.getRawLayoutSubstitutedCountType()->getCanonicalType();
+          return IGM.typeLayoutCache.getOrCreateArrayEntry(likeTypeLayout,
+                                                           loweredLikeType,
+                                                           countType);
+        }
+
+        // Otherwise, this is just going to use the same layout entry as the
+        // like type.
+        return likeTypeLayout;
+      }
+
       std::vector<TypeLayoutEntry *> fields;
       for (auto &field : getFields()) {
         auto fieldTy = field.getType(IGM, T);
         fields.push_back(
-            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy));
+            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy, useStructLayouts));
       }
       assert(!fields.empty() &&
              "Empty structs should not be FixedStructTypeInfo");
 
-      if (fields.size() == 1) {
-        return fields[0];
-      }
+      // if (fields.size() == 1  && getBestKnownAlignment() == *fields[0]->fixedAlignment(IGM)) {
+      //   return fields[0];
+      // }
 
-      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1);
+      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(
+          fields, T, getBestKnownAlignment().getValue(), *this);
     }
 
-    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF) const {
-      return None;
+    std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF) const {
+      return std::nullopt;
     }
-    llvm::NoneType getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
-      return None;
+    std::nullopt_t getNonFixedOffsets(IRGenFunction &IGF, SILType T) const {
+      return std::nullopt;
     }
     MemberAccessStrategy
     getNonFixedFieldAccessStrategy(IRGenModule &IGM, SILType T,
@@ -825,33 +1082,65 @@ namespace {
                            FieldsAreABIAccessible_t fieldsAccessible,
                            llvm::Type *T,
                            Alignment align,
-                           IsPOD_t isPOD, IsBitwiseTakable_t isBT,
+                           IsTriviallyDestroyable_t isTriviallyDestroyable,
+                           IsBitwiseTakable_t isBT,
+                           IsCopyable_t isCopyable,
                            IsABIAccessible_t structAccessible)
       : StructTypeInfoBase(StructTypeInfoKind::NonFixedStructTypeInfo,
                            fields, fieldsAccessible,
-                           T, align, isPOD, isBT, structAccessible) {
+                           T, align, isTriviallyDestroyable, isBT, isCopyable,
+                           structAccessible) {
     }
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
       if (!areFieldsABIAccessible()) {
         return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
+      }
+
+      // If we have a raw layout struct who is non-fixed size, it means the
+      // layout of the struct is dependent on the archetype of the thing it's
+      // like.
+      if (auto rawLayout = T.getRawLayout()) {
+        // Note: We don't have to handle the size and alignment case here for
+        // raw layout because those are always fixed, so only dependent layouts
+        // will be non-fixed.
+
+        auto likeType = T.getRawLayoutSubstitutedLikeType();
+        auto loweredLikeType = IGM.getLoweredType(likeType->getCanonicalType());
+        auto likeTypeLayout = IGM.getTypeInfo(loweredLikeType)
+            .buildTypeLayoutEntry(IGM, loweredLikeType, useStructLayouts);
+
+        // If we're an array, use the ArrayLayoutEntry.
+        if (rawLayout->getArrayLikeTypeAndCount()) {
+          auto countType = T.getRawLayoutSubstitutedCountType()->getCanonicalType();
+          return IGM.typeLayoutCache.getOrCreateArrayEntry(likeTypeLayout,
+                                                           loweredLikeType,
+                                                           countType);
+        }
+
+        // Otherwise, this is just going to use the same layout entry as the
+        // like type.
+        return likeTypeLayout;
       }
 
       std::vector<TypeLayoutEntry *> fields;
       for (auto &field : getFields()) {
         auto fieldTy = field.getType(IGM, T);
         fields.push_back(
-            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy));
+            field.getTypeInfo().buildTypeLayoutEntry(IGM, fieldTy, useStructLayouts));
       }
       assert(!fields.empty() &&
              "Empty structs should not be NonFixedStructTypeInfo");
 
-      if (fields.size() == 1) {
-        return fields[0];
-      }
+      // if (fields.size() == 1 && getBestKnownAlignment() > Alignment(1)) {
+      //   return fields[0];
+      // }
 
-      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(fields, 1);
+      return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(
+          fields, T, getBestKnownAlignment().getValue(), *this);
     }
 
     // We have an indirect schema.
@@ -946,39 +1235,50 @@ namespace {
     }
 
     LoadableStructTypeInfo *createLoadable(ArrayRef<StructFieldInfo> fields,
+                                           FieldsAreABIAccessible_t areFieldsABIAccessible,
                                            StructLayout &&layout,
                                            unsigned explosionSize) {
+      auto isABIAccessible = isTypeABIAccessibleIfFixedSize(IGM, TheStruct);
       return LoadableStructTypeInfo::create(fields,
+                                            areFieldsABIAccessible,
                                             explosionSize,
                                             layout.getType(),
                                             layout.getSize(),
                                             std::move(layout.getSpareBits()),
                                             layout.getAlignment(),
-                                            layout.isPOD(),
-                                            layout.isAlwaysFixedSize());
+                                            layout.isTriviallyDestroyable(),
+                                            layout.isCopyable(),
+                                            layout.isAlwaysFixedSize(),
+                                            isABIAccessible);
     }
 
     FixedStructTypeInfo *createFixed(ArrayRef<StructFieldInfo> fields,
+                                     FieldsAreABIAccessible_t areFieldsABIAccessible,
                                      StructLayout &&layout) {
-      return FixedStructTypeInfo::create(fields, layout.getType(),
+      auto isABIAccessible = isTypeABIAccessibleIfFixedSize(IGM, TheStruct);
+      return FixedStructTypeInfo::create(fields, areFieldsABIAccessible,
+                                         layout.getType(),
                                          layout.getSize(),
                                          std::move(layout.getSpareBits()),
                                          layout.getAlignment(),
-                                         layout.isPOD(),
+                                         layout.isTriviallyDestroyable(),
                                          layout.isBitwiseTakable(),
-                                         layout.isAlwaysFixedSize());
+                                         layout.isCopyable(),
+                                         layout.isAlwaysFixedSize(),
+                                         isABIAccessible);
     }
 
     NonFixedStructTypeInfo *createNonFixed(ArrayRef<StructFieldInfo> fields,
-                                     FieldsAreABIAccessible_t fieldsAccessible,
+                                           FieldsAreABIAccessible_t fieldsAccessible,
                                            StructLayout &&layout) {
       auto structAccessible = IsABIAccessible_t(
         IGM.getSILModule().isTypeMetadataAccessible(TheStruct));
       return NonFixedStructTypeInfo::create(fields, fieldsAccessible,
                                             layout.getType(),
                                             layout.getAlignment(),
-                                            layout.isPOD(),
+                                            layout.isTriviallyDestroyable(),
                                             layout.isBitwiseTakable(),
+                                            layout.isCopyable(),
                                             structAccessible);
     }
 
@@ -996,8 +1296,7 @@ namespace {
     }
 
     StructLayout performLayout(ArrayRef<const TypeInfo *> fieldTypes) {
-      return StructLayout(IGM, TheStruct->getAnyNominal(),
-                          LayoutKind::NonHeapObject,
+      return StructLayout(IGM, TheStruct, LayoutKind::NonHeapObject,
                           LayoutStrategy::Optimal, fieldTypes, StructTy);
     }
   };
@@ -1017,6 +1316,7 @@ class ClangRecordLowering {
   SmallVector<llvm::Type *, 8> LLVMFields;
   SmallVector<ClangFieldInfo, 8> FieldInfos;
   Size NextOffset = Size(0);
+  Size SubobjectAdjustment = Size(0);
   unsigned NextExplosionIndex = 0;
 public:
   ClangRecordLowering(IRGenModule &IGM, StructDecl *swiftDecl,
@@ -1034,8 +1334,8 @@ public:
     if (ClangDecl->isUnion()) {
       collectUnionFields();
     } else {
-      collectBases();
-      collectStructFields();
+      collectBases(ClangDecl);
+      collectStructFields(ClangDecl);
     }
   }
 
@@ -1045,8 +1345,10 @@ public:
       return AddressOnlyCXXClangRecordTypeInfo::create(
           FieldInfos, llvmType, TotalStride, TotalAlignment, ClangDecl);
     }
-    // TODO: New AddressOnlyPtrAuthTypeInfo to handle address diversified field
-    // function ptrs in C structs.
+    if (SwiftType.getStructOrBoundGenericStruct()->isNonTrivialPtrAuth()) {
+      return AddressOnlyPointerAuthRecordTypeInfo::create(
+          FieldInfos, llvmType, TotalStride, TotalAlignment, ClangDecl);
+    }
     return LoadableClangRecordTypeInfo::create(
         FieldInfos, NextExplosionIndex, llvmType, TotalStride,
         std::move(SpareBits), TotalAlignment, ClangDecl);
@@ -1064,33 +1366,28 @@ private:
     return (swiftField->getClangNode().castAsDecl() == clangField);
   }
 
-  void collectBases() {
-    auto &layout = ClangDecl->getASTContext().getASTRecordLayout(ClangDecl);
-
-    if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(ClangDecl)) {
-      for (auto base : cxxRecord->bases()) {
-        if (base.isVirtual())
-          continue;
-
-        auto baseType = base.getType().getCanonicalType();
-
-        auto baseRecord = cast<clang::RecordType>(baseType)->getDecl();
-        auto baseCxxRecord = cast<clang::CXXRecordDecl>(baseRecord);
-
-        if (baseCxxRecord->isEmpty())
-          continue;
-
-        auto offset = layout.getBaseClassOffset(baseCxxRecord);
-        auto size = ClangDecl->getASTContext().getTypeSizeInChars(baseType);
-        addOpaqueField(Size(offset.getQuantity()), Size(size.getQuantity()));
+  void collectBases(const clang::RecordDecl *decl) {
+    if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(decl)) {
+      auto bases = getBasesAndOffsets(cxxRecord);
+      for (auto base : bases) {
+        SubobjectAdjustment += base.offset;
+        collectBases(base.decl);
+        collectStructFields(base.decl);
+        SubobjectAdjustment -= base.offset;
       }
     }
   }
 
-  void collectStructFields() {
-    auto cfi = ClangDecl->field_begin(), cfe = ClangDecl->field_end();
+  void collectStructFields(const clang::RecordDecl *decl) {
+    auto cfi = decl->field_begin(), cfe = decl->field_end();
+    const auto &layout = ClangContext.getASTRecordLayout(decl);
     auto swiftProperties = SwiftDecl->getStoredProperties();
     auto sfi = swiftProperties.begin(), sfe = swiftProperties.end();
+    // When collecting fields from the base subobjects, we do not have corresponding swift
+    // stored properties.
+    bool isBaseSubobject = decl != ClangDecl;
+    if (isBaseSubobject)
+      sfi = swiftProperties.end();
 
     while (cfi != cfe) {
       const clang::FieldDecl *clangField = *cfi++;
@@ -1100,13 +1397,13 @@ private:
       if (clangField->isBitField()) {
         // Collect all of the following bitfields.
         unsigned bitStart =
-          ClangLayout.getFieldOffset(clangField->getFieldIndex());
+          layout.getFieldOffset(clangField->getFieldIndex());
         unsigned bitEnd = bitStart + clangField->getBitWidthValue(ClangContext);
 
         while (cfi != cfe && (*cfi)->isBitField()) {
           clangField = *cfi++;
           unsigned nextStart =
-            ClangLayout.getFieldOffset(clangField->getFieldIndex());
+            layout.getFieldOffset(clangField->getFieldIndex());
           assert(nextStart >= bitEnd && "laying out bit-fields out of order?");
 
           // In a heuristic effort to reduce the number of weird-sized
@@ -1124,7 +1421,7 @@ private:
         continue;
       }
 
-      VarDecl *swiftField;
+      VarDecl *swiftField = nullptr;
       if (sfi != sfe) {
         swiftField = *sfi;
         if (isImportOfClangField(swiftField, clangField)) {
@@ -1132,45 +1429,60 @@ private:
         } else {
           swiftField = nullptr;
         }
-      } else {
-        swiftField = nullptr;
-      }
+      } 
 
       // Try to position this field.  If this fails, it's because we
       // didn't lay out padding correctly.
-      addStructField(clangField, swiftField);
+      addStructField(clangField, swiftField, layout);
     }
 
     assert(sfi == sfe && "more Swift fields than there were Clang fields?");
 
-    // We never take advantage of tail padding, because that would prevent
-    // us from passing the address of the object off to C, which is a pretty
-    // likely scenario for imported C types.
-    assert(NextOffset <= TotalStride);
-    assert(SpareBits.size() <= TotalStride.getValueInBits());
-    if (NextOffset < TotalStride) {
-      addPaddingField(TotalStride);
+    auto objectSize = isBaseSubobject ? layout.getDataSize() : layout.getSize();
+    Size objectTotalStride = Size(objectSize.getQuantity());
+    // Unless this is a base subobject of a C++ type, we do not take advantage
+    // of tail padding, because that would prevent us from passing the address
+    // of the object off to C, which is a pretty likely scenario for imported C
+    // types.
+    // In C++, fields of a derived class might get placed into tail padding of a
+    // base class, in which case we should not add extra padding here.
+    assert(NextOffset <= SubobjectAdjustment + objectTotalStride);
+    assert(SpareBits.size() <= SubobjectAdjustment.getValueInBits() +
+                                   objectTotalStride.getValueInBits());
+    if (NextOffset < objectTotalStride) {
+      addPaddingField(objectTotalStride);
     }
   }
 
   /// Place the next struct field at its appropriate offset.
   void addStructField(const clang::FieldDecl *clangField,
-                      VarDecl *swiftField) {
-    unsigned fieldOffset = ClangLayout.getFieldOffset(clangField->getFieldIndex());
+                      VarDecl *swiftField, const clang::ASTRecordLayout &layout) {
+    bool isZeroSized = clangField->isZeroSize(ClangContext);
+    unsigned fieldOffset = layout.getFieldOffset(clangField->getFieldIndex());
     assert(!clangField->isBitField());
-    Size offset(fieldOffset / 8);
+    Size offset( SubobjectAdjustment.getValue() + fieldOffset / 8);
+    std::optional<clang::CharUnits> dataSize;
+    if (clangField->hasAttr<clang::NoUniqueAddressAttr>()) {
+      if (const auto *rd = clangField->getType()->getAsRecordDecl()) {
+        // Clang can store the next field in the padding of this one.
+        const auto &fieldLayout = ClangContext.getASTRecordLayout(rd);
+        dataSize = fieldLayout.getDataSize();
+      }
+    }
 
     // If we have a Swift import of this type, use our lowered information.
     if (swiftField) {
       auto &fieldTI = cast<FixedTypeInfo>(IGM.getTypeInfo(
           SwiftType.getFieldType(swiftField, IGM.getSILModule(),
                                  IGM.getMaximalTypeExpansionContext())));
-      addField(swiftField, offset, fieldTI);
+      addField(swiftField, offset, fieldTI, isZeroSized);
       return;
     }
 
     // Otherwise, add it as an opaque blob.
-    auto fieldSize = ClangContext.getTypeSizeInChars(clangField->getType());
+    auto fieldTypeSize = ClangContext.getTypeSizeInChars(clangField->getType());
+    auto fieldSize = isZeroSized ? clang::CharUnits::Zero()
+                                 : dataSize.value_or(fieldTypeSize);
     return addOpaqueField(offset, Size(fieldSize.getQuantity()));
   }
 
@@ -1196,23 +1508,23 @@ private:
     if (fieldSize.isZero()) return;
 
     auto &opaqueTI = IGM.getOpaqueStorageTypeInfo(fieldSize, Alignment(1));
-    addField(nullptr, offset, opaqueTI);
+    addField(nullptr, offset, opaqueTI, false);
   }
 
   /// Add storage for an (optional) Swift field at the given offset.
   void addField(VarDecl *swiftField, Size offset,
-                const FixedTypeInfo &fieldType) {
-    assert(offset >= NextOffset && "adding fields out of order");
+                const FixedTypeInfo &fieldType, bool isZeroSized) {
+    assert(isZeroSized || offset >= NextOffset && "adding fields out of order");
 
     // Add a padding field if required.
-    if (offset != NextOffset)
+    if (!isZeroSized && offset != NextOffset)
       addPaddingField(offset);
 
-    addFieldInfo(swiftField, fieldType);
+    addFieldInfo(swiftField, fieldType, isZeroSized);
   }
 
   /// Add information to track a value field at the current offset.
-  void addFieldInfo(VarDecl *swiftField, const FixedTypeInfo &fieldType) {
+  void addFieldInfo(VarDecl *swiftField, const FixedTypeInfo &fieldType, bool isZeroSized) {
     bool isLoadableField = isa<LoadableTypeInfo>(fieldType);
     unsigned explosionSize = 0;
     if (isLoadableField)
@@ -1222,12 +1534,16 @@ private:
     unsigned explosionEnd = NextExplosionIndex;
 
     ElementLayout layout = ElementLayout::getIncomplete(fieldType);
-    auto isEmpty = fieldType.isKnownEmpty(ResilienceExpansion::Maximal);
-    if (isEmpty)
-      layout.completeEmptyTailAllocatedCType(
-          fieldType.isPOD(ResilienceExpansion::Maximal), NextOffset);
-    else
-      layout.completeFixed(fieldType.isPOD(ResilienceExpansion::Maximal),
+    auto isEmpty = isZeroSized || fieldType.isKnownEmpty(ResilienceExpansion::Maximal);
+    if (isEmpty) {
+      if (isZeroSized)
+        layout.completeEmpty(
+            fieldType.isTriviallyDestroyable(ResilienceExpansion::Maximal), NextOffset);
+      else
+        layout.completeEmptyTailAllocatedCType(
+            fieldType.isTriviallyDestroyable(ResilienceExpansion::Maximal), NextOffset);
+    } else
+      layout.completeFixed(fieldType.isTriviallyDestroyable(ResilienceExpansion::Maximal),
                            NextOffset, LLVMFields.size());
 
     if (isLoadableField)
@@ -1306,9 +1622,9 @@ irgen::getPhysicalStructMemberAccessStrategy(IRGenModule &IGM,
   FOR_STRUCT_IMPL(IGM, baseType, getFieldAccessStrategy, baseType, field);
 }
 
-Optional<unsigned> irgen::getPhysicalStructFieldIndex(IRGenModule &IGM,
-                                                      SILType baseType,
-                                                      VarDecl *field) {
+std::optional<unsigned> irgen::getPhysicalStructFieldIndex(IRGenModule &IGM,
+                                                           SILType baseType,
+                                                           VarDecl *field) {
   FOR_STRUCT_IMPL(IGM, baseType, getFieldIndexIfNotEmpty, field);
 }
 
@@ -1319,7 +1635,8 @@ const TypeInfo *irgen::getPhysicalStructFieldTypeInfo(IRGenModule &IGM,
 }
 
 void IRGenModule::emitStructDecl(StructDecl *st) {
-  if (!IRGen.hasLazyMetadata(st)) {
+  if (!IRGen.hasLazyMetadata(st) &&
+      !st->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
     emitStructMetadata(*this, st);
     emitFieldDescriptor(st);
   }
@@ -1328,6 +1645,12 @@ void IRGenModule::emitStructDecl(StructDecl *st) {
 }
 
 void IRGenModule::maybeEmitOpaqueTypeDecl(OpaqueTypeDecl *opaque) {
+  if (opaque->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return;
+
+  if (!opaque->isAvailableDuringLowering())
+    return;
+
   if (IRGen.Opts.EnableAnonymousContextMangledNames) {
     // If we're emitting anonymous context mangled names for debuggability,
     // then emit all opaque type descriptors and make them runtime-discoverable
@@ -1353,22 +1676,27 @@ namespace {
       : public ResilientTypeInfo<ResilientStructTypeInfo>
   {
   public:
-    ResilientStructTypeInfo(llvm::Type *T, IsABIAccessible_t abiAccessible)
-      : ResilientTypeInfo(T, abiAccessible) {
+    ResilientStructTypeInfo(llvm::Type *T,
+                            IsCopyable_t copyable,
+                            IsABIAccessible_t abiAccessible)
+      : ResilientTypeInfo(T, copyable, abiAccessible) {
       setSubclassKind((unsigned) StructTypeInfoKind::ResilientStructTypeInfo);
     }
 
-    TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                          SILType T) const override {
+    TypeLayoutEntry
+    *buildTypeLayoutEntry(IRGenModule &IGM,
+                          SILType T,
+                          bool useStructLayouts) const override {
       return IGM.typeLayoutCache.getOrCreateResilientEntry(T);
     }
   };
 } // end anonymous namespace
 
 const TypeInfo *
-TypeConverter::convertResilientStruct(IsABIAccessible_t abiAccessible) {
+TypeConverter::convertResilientStruct(IsCopyable_t copyable,
+                                      IsABIAccessible_t abiAccessible) {
   llvm::Type *storageType = IGM.OpaqueTy;
-  return new ResilientStructTypeInfo(storageType, abiAccessible);
+  return new ResilientStructTypeInfo(storageType, copyable, abiAccessible);
 }
 
 const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
@@ -1383,9 +1711,18 @@ const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
       || IGM.getSILTypes().getTypeLowering(SILType::getPrimitiveAddressType(type),
                                             TypeExpansionContext::minimal())
             .getRecursiveProperties().isInfinite()) {
+    auto copyable = !D->canBeCopyable()
+      ? IsNotCopyable : IsCopyable;
     auto structAccessible =
       IsABIAccessible_t(IGM.getSILModule().isTypeMetadataAccessible(type));
-    return &getResilientStructTypeInfo(structAccessible);
+    auto *bitwiseCopyableProtocol =
+        IGM.getSwiftModule()->getASTContext().getProtocol(
+            KnownProtocolKind::BitwiseCopyable);
+    if (bitwiseCopyableProtocol &&
+        checkConformance(type, bitwiseCopyableProtocol)) {
+      return BitwiseCopyableTypeInfo::create(IGM.OpaqueTy, structAccessible);
+    }
+    return &getResilientStructTypeInfo(copyable, structAccessible);
   }
 
   // Create the struct type.

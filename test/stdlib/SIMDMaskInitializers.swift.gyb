@@ -1,0 +1,36 @@
+//===--- SIMDMaskInitializers.swift.gyb -------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2025 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s -o %t/SIMDMaskInitializers.swift
+// RUN: %target-swift-frontend -primary-file %t/SIMDMaskInitializers.swift -S | %FileCheck %t/SIMDMaskInitializers.swift --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECKOnone-%target-cpu
+// RUN: %target-swift-frontend -primary-file %t/SIMDMaskInitializers.swift -S -O | %FileCheck %t/SIMDMaskInitializers.swift --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECKO-%target-cpu
+
+import Swift
+
+%for bits in [8,16,32,64]:
+% for totalBits in [64,128]:
+%  n = totalBits // bits
+%  if n != 1:
+%   neonSuffix = str(n) + {8:'b',16:'h',32:'s',64:'d'}[bits]
+func repeating${n}_mask${bits}(_ scalar: Bool) -> SIMDMask<SIMD${n}<Int${bits}>> {
+  SIMDMask(repeating: scalar)
+}
+// CHECK: repeating${n}_mask${bits}{{[[:alnum:]_]+}}:
+// CHECKO-arm64-NEXT: sbfx [[REG:[wx][0-9]]], {{[wx]}}0, #0, #1
+// CHECKO-arm64-NEXT: dup.${neonSuffix} v0, [[REG]]
+// CHECKO-arm64-NEXT: ret
+// CHECKOnone-arm64: dup.${neonSuffix}
+// CHECKOnone-arm64: ret
+
+%  end
+% end
+%end

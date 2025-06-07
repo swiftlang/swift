@@ -7,10 +7,10 @@ protocol Sequence<Element> { // expected-note {{'Sequence' declared here}}
 // 'any' is required here
 
 func takesSequenceOfInt1(_: Sequence<Int>) {}
-// expected-error@-1 {{use of protocol 'Sequence' as a type must be written 'any Sequence'}}
+// expected-warning@-1 {{use of protocol 'Sequence' as a type must be written 'any Sequence'}}
 
 func returnsSequenceOfInt1() -> Sequence<Int> {}
-// expected-error@-1 {{use of protocol 'Sequence' as a type must be written 'any Sequence'}}
+// expected-warning@-1 {{use of protocol 'Sequence' as a type must be written 'any Sequence'}}
 
 struct ConcreteSequence<Element> : Sequence {}
 
@@ -46,7 +46,6 @@ struct Collapse<T: DoubleWide>: DoubleWide {
 
 func test() -> any DoubleWide<some DoubleWide<Int, Int>, some DoubleWide<Int, Int>> { return Collapse<Int>(x: 42) }
 // expected-error@-1 {{'some' types cannot be used in constraints on existential types}}
-// expected-error@-2 {{'some' types cannot be used in constraints on existential types}}
 
 func diagonalizeAny(_ x: any Sequence<Int>) -> any Sequence<(Int, Int)> {
   return x.map { ($0, $0) }
@@ -75,7 +74,7 @@ func saturation(_ dry: any Sponge, _ wet: any Sponge<Int, Int>) {
 
 func typeExpr() {
   _ = Sequence<Int>.self
-  // expected-error@-1 {{use of protocol 'Sequence' as a type must be written 'any Sequence'}}
+  // expected-warning@-1 {{use of protocol 'Sequence' as a type must be written 'any Sequence'}}
 
   _ = any Sequence<Int>.self
   // expected-error@-1 {{'self' is not a member type of protocol 'parameterized_existential.Sequence<Swift.Int>'}}
@@ -83,12 +82,14 @@ func typeExpr() {
   _ = (any Sequence<Int>).self
 }
 
-/// Not supported as a protocol composition term for now
+func increment(_ n : any Collection<Float>) {
+  for value in n {
+      _ = value + 1
+  }
+}
 
-protocol SomeProto {}
-
-func protocolCompositionNotSupported1(_: SomeProto & Sequence<Int>) {}
-// expected-error@-1 {{non-protocol, non-class type 'Sequence<Int>' cannot be used within a protocol-constrained type}}
-
-func protocolCompositionNotSupported2(_: any SomeProto & Sequence<Int>) {}
-// expected-error@-1 {{non-protocol, non-class type 'Sequence<Int>' cannot be used within a protocol-constrained type}}
+func genericIncrement<T: Numeric>(_ n : any Collection<T>) {
+  for value in n {
+    _ = value + 1
+  }
+}

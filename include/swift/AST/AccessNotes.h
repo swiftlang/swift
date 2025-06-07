@@ -24,6 +24,7 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
+#include <optional>
 #include <set>
 #include <string>
 #include <vector>
@@ -47,7 +48,7 @@ public:
   DeclName name;
 
   /// For accessors, the kind of accessor; for non-accessors, \c None.
-  Optional<AccessorKind> accessorKind;
+  std::optional<AccessorKind> accessorKind;
 
   AccessNoteDeclName(ASTContext &ctx, StringRef str);
   AccessNoteDeclName();
@@ -70,15 +71,15 @@ public:
 
   /// If \c true, add an @objc attribute; if \c false, delete an @objc
   /// attribute; if \c None, do nothing.
-  Optional<bool> ObjC;
+  std::optional<bool> ObjC;
 
   /// If \c true, add a dynamic modifier; if \c false, delete a dynamic
   /// modifier; if \c None, do nothing.
-  Optional<bool> Dynamic;
+  std::optional<bool> Dynamic;
 
   /// If set, modify an @objc attribute to give it the specified \c ObjCName.
   /// If \c ObjC would otherwise be \c None, it will be set to \c true.
-  Optional<ObjCSelector> ObjCName;
+  std::optional<ObjCSelector> ObjCName;
 
   void dump(llvm::raw_ostream &os, int indent = 0) const;
   SWIFT_DEBUG_DUMP;
@@ -96,8 +97,8 @@ public:
 
   /// Load the access notes from \p buffer, or \c None if they cannot be loaded.
   /// Diagnoses any parsing issues with the access notes file.
-  static llvm::Optional<AccessNotesFile>
-      load(ASTContext &ctx, const llvm::MemoryBuffer *buffer);
+  static std::optional<AccessNotesFile> load(ASTContext &ctx,
+                                             const llvm::MemoryBuffer *buffer);
 
   /// Look up the access note in this file, if any, which applies to \p VD.
   NullablePtr<const AccessNote> lookup(ValueDecl *VD) const;

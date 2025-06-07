@@ -122,6 +122,9 @@ enum PMOUseKind {
   /// An indirect 'in' parameter of an Apply instruction.
   IndirectIn,
 
+  /// The base of a dependence.
+  DependenceBase,
+
   /// This instruction is a general escape of the value, e.g. a call to a
   /// closure that captures it.
   Escape,
@@ -145,13 +148,21 @@ struct PMOMemoryUse {
   bool isValid() const { return Inst != nullptr; }
 };
 
-/// collectPMOElementUsesFrom - Analyze all uses of the specified allocation
-/// instruction (alloc_box, alloc_stack or mark_uninitialized), classifying them
-/// and storing the information found into the Uses and Releases lists.
-LLVM_NODISCARD bool
+/// Analyze all uses of the specified allocation instruction (alloc_box,
+/// alloc_stack or mark_uninitialized), classifying them and storing the
+/// information found into the Uses lists.
+[[nodiscard]] bool
 collectPMOElementUsesFrom(const PMOMemoryObjectInfo &MemoryInfo,
-                          SmallVectorImpl<PMOMemoryUse> &Uses,
-                          SmallVectorImpl<SILInstruction *> &Releases);
+                          SmallVectorImpl<PMOMemoryUse> &Uses);
+
+/// Analyze all uses of the specified allocation instruction (alloc_box,
+/// alloc_stack or mark_uninitialized), classifying them and storing the
+/// information found into the Uses and Releases lists.
+[[nodiscard]] bool
+collectPMOElementUsesAndDestroysFrom(
+  const PMOMemoryObjectInfo &MemoryInfo,
+  SmallVectorImpl<PMOMemoryUse> &Uses,
+  SmallVectorImpl<SILInstruction *> &Releases);
 
 } // end namespace swift
 

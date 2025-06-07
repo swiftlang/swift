@@ -104,7 +104,6 @@ extension Int {
 let _ = 1["1"]  // expected-error {{ambiguous use of 'subscript(_:)'}}
 
 let squares = [ 1, 2, 3 ].reduce([:]) { (dict, n) in
-  // expected-warning@-1 {{empty collection literal requires an explicit type}}
   var dict = dict
   dict[n] = n * n
   return dict
@@ -114,6 +113,7 @@ let squares = [ 1, 2, 3 ].reduce([:]) { (dict, n) in
 func r23670252(_ dictionary: [String : AnyObject], someObject: AnyObject) {
   let color : String?
   color = dictionary["color"]  // expected-error {{cannot assign value of type 'AnyObject?' to type 'String?'}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('AnyObject' and 'String') are expected to be equal}}
   _ = color
 }
 
@@ -230,11 +230,11 @@ func test_subscript_accepts_type_name_argument() {
   }
 
   func test(a: A, optA: A?) {
-    let _ = a[A] // expected-warning {{expected member name or constructor call after type name}}
+    let _ = a[A] // expected-warning {{expected member name or initializer call after type name; this will be an error in Swift 6}}
     // expected-note@-1 {{add arguments after the type to construct a value of the type}} {{16-16=()}}
     // expected-note@-2 {{use '.self' to reference the type object}} {{16-16=.self}}
 
-    let _ = optA?[A] // expected-warning {{expected member name or constructor call after type name}}
+    let _ = optA?[A] // expected-warning {{expected member name or initializer call after type name; this will be an error in Swift 6}}
     // expected-note@-1 {{add arguments after the type to construct a value of the type}} {{20-20=()}}
     // expected-note@-2 {{use '.self' to reference the type object}} {{20-20=.self}}
   }

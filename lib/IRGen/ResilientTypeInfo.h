@@ -20,6 +20,7 @@
 #define SWIFT_IRGEN_RESILIENTTYPEINFO_H
 
 #include "NonFixedTypeInfo.h"
+#include "Outlining.h"
 
 namespace swift {
 namespace irgen {
@@ -42,9 +43,12 @@ namespace irgen {
 template <class Impl>
 class ResilientTypeInfo : public WitnessSizedTypeInfo<Impl> {
 protected:
-  ResilientTypeInfo(llvm::Type *type, IsABIAccessible_t abiAccessible)
+  ResilientTypeInfo(llvm::Type *type,
+                    IsCopyable_t copyable,
+                    IsABIAccessible_t abiAccessible)
     : WitnessSizedTypeInfo<Impl>(type, Alignment(1),
-                                 IsNotPOD, IsNotBitwiseTakable,
+                                 IsNotTriviallyDestroyable, IsNotBitwiseTakable,
+                                 copyable,
                                  abiAccessible) {}
 
 public:
@@ -100,7 +104,8 @@ public:
   }
 
   void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
-                          SILType T, bool isOutlined) const override {
+                          SILType T, bool isOutlined,
+                          bool zeroizeIfSensitive) const override {
     emitInitializeWithTakeCall(IGF, T, dest, src);
   }
 
@@ -154,7 +159,7 @@ public:
 
   void collectMetadataForOutlining(OutliningMetadataCollector &collector,
                                    SILType T) const override {
-    collector.collectTypeMetadataForLayout(T);
+    collector.collectTypeMetadata(T);
   }
 };
 

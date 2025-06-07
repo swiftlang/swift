@@ -3,31 +3,30 @@
     {
       key.kind: source.lang.swift.decl.function.method.instance,
       key.name: "fooInstanceFunc0()",
-      key.sourcetext: "fooInstanceFunc0()",
       key.description: "fooInstanceFunc0()",
       key.typename: "Double",
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.unknown,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:15complete_member11FooProtocolP16fooInstanceFunc0SdyF",
-      key.modulename: "complete_member"
+      key.modulename: "complete_member",
+      key.sourcetext: "fooInstanceFunc0()"
     },
     {
       key.kind: source.lang.swift.decl.function.method.instance,
       key.name: "fooInstanceFunc1(:)",
-      key.sourcetext: "fooInstanceFunc1(<#T##a: Int##Int#>)",
       key.description: "fooInstanceFunc1(a: Int)",
       key.typename: "Double",
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.unknown,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:15complete_member11FooProtocolP16fooInstanceFunc1ySdSiF",
-      key.modulename: "complete_member"
+      key.modulename: "complete_member",
+      key.sourcetext: "fooInstanceFunc1(<#T##a: Int##Int#>)"
     },
     {
       key.kind: source.lang.swift.decl.var.instance,
       key.name: "fooInstanceVar",
-      key.sourcetext: "fooInstanceVar",
       key.description: "fooInstanceVar",
       key.typename: "Int",
       key.doc.brief: "fooInstanceVar Aaa. Bbb.",
@@ -35,17 +34,18 @@
       key.typerelation: source.codecompletion.typerelation.unknown,
       key.num_bytes_to_erase: 0,
       key.associated_usrs: "s:15complete_member11FooProtocolP14fooInstanceVarSivp",
-      key.modulename: "complete_member"
+      key.modulename: "complete_member",
+      key.sourcetext: "fooInstanceVar"
     },
     {
       key.kind: source.lang.swift.keyword,
       key.name: "self",
-      key.sourcetext: "self",
       key.description: "self",
-      key.typename: "FooProtocol",
+      key.typename: "any FooProtocol",
       key.context: source.codecompletion.context.thisclass,
       key.typerelation: source.codecompletion.typerelation.unknown,
-      key.num_bytes_to_erase: 0
+      key.num_bytes_to_erase: 0,
+      key.sourcetext: "self"
     }
   ]
 }

@@ -1,8 +1,8 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
+// RUN: %batch-code-completion
 
 // WITH_GETSET: Keyword/None:                       get; name=get
 // WITH_GETSET: Keyword/None:                       set; name=set
+// WITH_GETSET: Keyword/None:                       init; name=init
 // NO_GETSET-NOT: get
 // NO_GETSET-NOT: set
 
@@ -116,7 +116,7 @@ extension UNKNOWN_TYPE {
     get {}
     #^UNKNOWN_EXT_PROPERTY_SECOND?check=NO_GLOBAL;check=NO_SELF;check=WITH_GETSET;check=WITH_OBSERVER^#
   }
-  subscript<T>(_1 index: T) -> T where T: ANOTHER_UNKNWON_TYPE {
+  subscript<T>(_1 index: T) -> T where T: ANOTHER_UNKNOWN_TYPE {
     #^UNKNOWN_EXT_SUBSCRIPT_FIRST?check=WITH_GLOBAL;check=WITH_SELF;check=WITH_GETSET;check=NO_OBSERVER^#
   }
   subscript(_2 index: Int) -> String {

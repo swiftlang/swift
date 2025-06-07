@@ -1,26 +1,26 @@
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -profile-generate -target x86_64-apple-macosx10.9 %s | %FileCheck -check-prefix=CHECK -check-prefix=OSX %s
+// RUN: %swiftc_driver -sdk '""' -driver-print-jobs -profile-generate -target x86_64-apple-macosx10.9 %s | %FileCheck -check-prefix=CHECK -check-prefix=OSX %s
 
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -profile-generate -target x86_64-apple-ios7.1-simulator -resource-dir %S/Inputs/fake-resource-dir-old/lib/swift/ %s | %FileCheck -check-prefix=CHECK -check-prefix=IOS %s
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -profile-generate -target arm64-apple-ios7.1 -resource-dir %S/Inputs/fake-resource-dir-old/lib/swift/ %s | %FileCheck -check-prefix=CHECK -check-prefix=IOS %s
+// RUN: %swiftc_driver -sdk '""' -driver-print-jobs -profile-generate -target x86_64-apple-ios7.1-simulator -resource-dir %S/Inputs/fake-resource-dir-old/lib/swift/ %s | %FileCheck -check-prefix=CHECK -check-prefix=IOS %s
+// RUN: %swiftc_driver -sdk '""' -driver-print-jobs -profile-generate -target arm64-apple-ios7.1 -resource-dir %S/Inputs/fake-resource-dir-old/lib/swift/ %s | %FileCheck -check-prefix=CHECK -check-prefix=IOS %s
 
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -profile-generate -target x86_64-apple-ios7.1-simulator -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ %s | %FileCheck -check-prefix=CHECK -check-prefix=IOSSIM %s
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -profile-generate -target arm64-apple-ios7.1 -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ %s | %FileCheck -check-prefix=CHECK -check-prefix=IOS %s
+// RUN: %swiftc_driver -sdk '""' -driver-print-jobs -profile-generate -target x86_64-apple-ios7.1-simulator -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ %s | %FileCheck -check-prefix=CHECK -check-prefix=IOSSIM %s
+// RUN: %swiftc_driver -sdk '""' -driver-print-jobs -profile-generate -target arm64-apple-ios7.1 -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ %s | %FileCheck -check-prefix=CHECK -check-prefix=IOS %s
 
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -profile-generate -target x86_64-apple-tvos9.0-simulator -resource-dir %S/Inputs/fake-resource-dir-old/lib/swift/ %s | %FileCheck -check-prefix=CHECK -check-prefix=tvOS %s
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -profile-generate -target arm64-apple-tvos9.0 -resource-dir %S/Inputs/fake-resource-dir-old/lib/swift/ %s | %FileCheck -check-prefix=CHECK -check-prefix=tvOS %s
+// RUN: %swiftc_driver -sdk '""' -driver-print-jobs -profile-generate -target x86_64-apple-tvos9.0-simulator -resource-dir %S/Inputs/fake-resource-dir-old/lib/swift/ %s | %FileCheck -check-prefix=CHECK -check-prefix=tvOS %s
+// RUN: %swiftc_driver -sdk '""' -driver-print-jobs -profile-generate -target arm64-apple-tvos9.0 -resource-dir %S/Inputs/fake-resource-dir-old/lib/swift/ %s | %FileCheck -check-prefix=CHECK -check-prefix=tvOS %s
 
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -profile-generate -target x86_64-apple-tvos9.0-simulator -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ %s | %FileCheck -check-prefix=CHECK -check-prefix=tvOS_SIM %s
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -profile-generate -target arm64-apple-tvos9.0 -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ %s | %FileCheck -check-prefix=CHECK -check-prefix=tvOS %s
+// RUN: %swiftc_driver -sdk '""' -driver-print-jobs -profile-generate -target x86_64-apple-tvos9.0-simulator -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ %s | %FileCheck -check-prefix=CHECK -check-prefix=tvOS_SIM %s
+// RUN: %swiftc_driver -sdk '""' -driver-print-jobs -profile-generate -target arm64-apple-tvos9.0 -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ %s | %FileCheck -check-prefix=CHECK -check-prefix=tvOS %s
 
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -profile-generate -target i386-apple-watchos2.0-simulator -resource-dir %S/Inputs/fake-resource-dir-old/lib/swift/ %s | %FileCheck -check-prefix=CHECK -check-prefix=watchOS %s
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -profile-generate -target armv7k-apple-watchos2.0 -resource-dir %S/Inputs/fake-resource-dir-old/lib/swift/ %s | %FileCheck -check-prefix=CHECK -check-prefix=watchOS %s
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -profile-generate -target i386-apple-watchos2.0-simulator -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ %s | %FileCheck -check-prefix=CHECK -check-prefix=watchOS_SIM %s
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -profile-generate -target armv7k-apple-watchos2.0 -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ %s | %FileCheck -check-prefix=CHECK -check-prefix=watchOS %s
+// RUN: %swiftc_driver -sdk '""' -driver-print-jobs -profile-generate -target i386-apple-watchos2.0-simulator -resource-dir %S/Inputs/fake-resource-dir-old/lib/swift/ %s | %FileCheck -check-prefix=CHECK -check-prefix=watchOS %s
+// RUN: %swiftc_driver -sdk '""' -driver-print-jobs -profile-generate -target armv7k-apple-watchos2.0 -resource-dir %S/Inputs/fake-resource-dir-old/lib/swift/ %s | %FileCheck -check-prefix=CHECK -check-prefix=watchOS %s
+// RUN: %swiftc_driver -sdk '""' -driver-print-jobs -profile-generate -target i386-apple-watchos2.0-simulator -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ %s | %FileCheck -check-prefix=CHECK -check-prefix=watchOS_SIM %s
+// RUN: %swiftc_driver -sdk '""' -driver-print-jobs -profile-generate -target armv7k-apple-watchos2.0 -resource-dir %S/Inputs/fake-resource-dir/lib/swift/ %s | %FileCheck -check-prefix=CHECK -check-prefix=watchOS %s
 
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -profile-generate -target x86_64-unknown-linux-gnu %s | %FileCheck -check-prefix=CHECK -check-prefix=LINUX %s
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -profile-generate -target x86_64-unknown-windows-msvc %s | %FileCheck -check-prefix=CHECK -check-prefix=WINDOWS %s
+// RUN: %swiftc_driver -sdk '""' -driver-print-jobs -profile-generate -target x86_64-unknown-linux-gnu %s | %FileCheck -check-prefix=CHECK -check-prefix=LINUX %s
+// RUN: %swiftc_driver -sdk '""' -driver-print-jobs -profile-generate -target x86_64-unknown-windows-msvc %s | %FileCheck -check-prefix=CHECK -check-prefix=WINDOWS %s
 
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -profile-generate -target wasm32-unknown-wasi %s | %FileCheck -check-prefix CHECK -check-prefix WASI %s
+// RUN: %swiftc_driver -sdk '""' -driver-print-jobs -profile-generate -target wasm32-unknown-wasi -resource-dir %S/Inputs/fake-resource-dir/lib/swift_static %s | %FileCheck -check-prefix CHECK -check-prefix WASI %s
 
 // CHECK: swift
 // CHECK: -profile-generate
@@ -55,15 +55,15 @@
 // WINDOWS: -lclang_rt.profile
 
 // WASI: clang{{(\.exe)?"? }}
-// WASI: lib{{(\\\\|/)}}swift{{(\\\\|/)}}clang{{(\\\\|/)}}lib{{(\\\\|/)}}wasi{{(\\\\|/)}}libclang_rt.profile-wasm32.a
+// WASI: lib{{(\\\\|/)}}{{swift|swift_static}}{{(\\\\|/)}}clang{{(\\\\|/)}}lib{{(\\\\|/)}}wasi{{(\\\\|/)}}libclang_rt.profile-wasm32.a
 // WASI: -u__llvm_profile_runtime
 
-// RUN: not %swiftc_driver -sdk "" -driver-print-jobs -profile-generate -profile-use=/dev/null %s 2>&1 | %FileCheck -check-prefix=MIX_GEN_USE %s
+// RUN: not %swiftc_driver -sdk '""' -driver-print-jobs -profile-generate -profile-use=/dev/null %s 2>&1 | %FileCheck -check-prefix=MIX_GEN_USE %s
 // MIX_GEN_USE: conflicting options '-profile-generate' and '-profile-use'
 
-// RUN: not %swiftc_driver -sdk "" -driver-print-jobs -profile-use=%t.does_not_exist %s 2>&1 | %FileCheck -check-prefix=USE_MISSING_FILE %s
+// RUN: not %swiftc_driver -sdk '""' -driver-print-jobs -profile-use=%t.does_not_exist %s 2>&1 | %FileCheck -check-prefix=USE_MISSING_FILE %s
 // USE_MISSING_FILE: no profdata file exists at '{{[^']+}}.does_not_exist'
 
-// RUN: %swiftc_driver -sdk "" -driver-print-jobs -profile-use=/dev/null %s | %FileCheck -check-prefix=USE_DEVNULL %s
+// RUN: %swiftc_driver -sdk '""' -driver-print-jobs -profile-use=/dev/null %s | %FileCheck -check-prefix=USE_DEVNULL %s
 // USE_DEVNULL: swift
 // USE_DEVNULL: -profile-use={{/dev/null|(.*profiling-[^ ]*.o)}}

@@ -19,8 +19,8 @@ void takesRef(Ref r);
 import Test
 
 public func test(x: Ref) {
-    // CHECK: note: function uses foreign reference type 'Ref' as a value in the return types which breaks 'import_reference' contract (outlined in C++ Interop User Manual).
+    // CHECK: note: function uses foreign reference type 'Ref' as a value in the return types which breaks 'swift_shared_reference' contract
     returnsRef()
-    // CHECK: note: function uses foreign reference type 'Ref' as a value in a parameter types which breaks 'import_reference' contract (outlined in C++ Interop User Manual).
+    // CHECK: note: function uses foreign reference type 'Ref' as a value in a parameter types which breaks 'swift_shared_reference' contract
     takesRef(x)
 }

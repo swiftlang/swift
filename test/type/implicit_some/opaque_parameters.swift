@@ -1,6 +1,6 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -warn-redundant-requirements  -enable-experimental-feature ImplicitSome
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature ImplicitSome
 
-// REQUIRES: asserts
+// REQUIRES: swift_feature_ImplicitSome
 
 protocol P { }
 
@@ -62,10 +62,9 @@ func consumingA(fn: (P) -> Void) { } // expected-error{{'some' cannot appear in 
 func consumingB(fn: FnType<P>) { } // expected-error{{'some' cannot appear in parameter position in parameter type '(P) -> Void'}}
 
 
-// TO-DO Handle plain generic opaque parameters
 func takePrimaryCollections(
-  _ strings:some  Collection<String>,
-  _ ints : some Collection<Int>
+  _ strings: Collection<String>,
+  _ ints : Collection<Int>
 ) {
   for s in strings {
     let _: String = s
@@ -75,9 +74,8 @@ func takePrimaryCollections(
     let _: Int = i
   }
 }
-// TO-DO Handle plain generic opaque parameters
 func takeMatchedPrimaryCollections<T: Equatable>(
-  _ first: some Collection<T>, _ second: some Collection<T>
+  _ first: Collection<T>, _ second: Collection<T>
 ) -> Bool {
   first.elementsEqual(second)
 }
@@ -88,5 +86,5 @@ func testPrimaries(
   takePrimaryCollections(setOfStrings, setOfInts)
   takePrimaryCollections(setOfStrings, arrayOfInts)
   _ = takeMatchedPrimaryCollections(arrayOfInts, setOfInts)
-  _ = takeMatchedPrimaryCollections(arrayOfInts, setOfStrings) // expected-error{{type of expression is ambiguous without more context}}
+  _ = takeMatchedPrimaryCollections(arrayOfInts, setOfStrings) // expected-error{{type of expression is ambiguous without a type annotation}}
 }

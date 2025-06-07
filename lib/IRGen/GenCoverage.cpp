@@ -19,6 +19,7 @@
 #include "SwiftTargetInfo.h"
 
 #include "swift/AST/IRGenOptions.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Module.h"
@@ -27,15 +28,23 @@
 #include "llvm/ProfileData/InstrProf.h"
 #include "llvm/Support/FileSystem.h"
 
-// This selects the coverage mapping format defined when `InstrProfData.inc`
-// is textually included.
-#define COVMAP_V3
-
 using namespace swift;
 using namespace irgen;
 
 using llvm::coverage::CounterMappingRegion;
 using llvm::coverage::CovMapVersion;
+
+// This affects the coverage mapping format defined when `InstrProfData.inc`
+// is textually included. Note that it means 'version >= 3', not 'version == 3'.
+#define COVMAP_V3
+
+/// This assert is here to make sure we make all the necessary code generation
+/// changes that are needed to support the new coverage mapping format. Note we
+/// cannot pin our version, as it must remain in sync with the version Clang is
+/// using.
+/// Do not bump without at least filing a bug and pinging a coverage maintainer.
+static_assert(CovMapVersion::CurrentVersion == CovMapVersion::Version7,
+              "Coverage mapping emission needs updating");
 
 static std::string getInstrProfSection(IRGenModule &IGM,
                                        llvm::InstrProfSectKind SK) {
@@ -76,19 +85,31 @@ void IRGenModule::emitCoverageMaps(ArrayRef<const SILCoverageMap *> Mappings) {
                              llvm::getCoverageUnusedNamesVarName());
   }
 
-  std::vector<StringRef> Files;
-  for (const auto &M : Mappings)
-    if (std::find(Files.begin(), Files.end(), M->getFilename()) == Files.end())
-      Files.push_back(M->getFilename());
-
-  auto remapper = getOptions().CoveragePrefixMap;
+  llvm::DenseMap<StringRef, unsigned> RawFileIndices;
+  llvm::SmallVector<StringRef, 8> RawFiles;
+  for (const auto &M : Mappings) {
+    auto Filename = M->getFilename();
+    auto Inserted = RawFileIndices.insert({Filename, RawFiles.size()}).second;
+    if (!Inserted)
+      continue;
+    RawFiles.push_back(Filename);
+  }
+  const auto &Remapper = getOptions().CoveragePrefixMap;
 
   llvm::SmallVector<std::string, 8> FilenameStrs;
-  for (StringRef Name : Files) {
-    llvm::SmallString<256> Path(Name);
-    llvm::sys::fs::make_absolute(Path);
-    FilenameStrs.push_back(remapper.remapPath(Path));
-  }
+  FilenameStrs.reserve(RawFiles.size() + 1);
+
+  // First element needs to be the current working directory. Note if this
+  // scheme ever changes, the FileID computation below will need updating.
+  SmallString<256> WorkingDirectory;
+  llvm::sys::fs::current_path(WorkingDirectory);
+  FilenameStrs.emplace_back(Remapper.remapPath(WorkingDirectory));
+
+  // Following elements are the filenames present. We use their relative path,
+  // which llvm-cov will turn back into absolute paths using the working
+  // directory element.
+  for (auto Name : RawFiles)
+    FilenameStrs.emplace_back(Remapper.remapPath(Name));
 
   // Encode the filenames.
   std::string Filenames;
@@ -112,13 +133,21 @@ void IRGenModule::emitCoverageMaps(ArrayRef<const SILCoverageMap *> Mappings) {
     const uint64_t NameHash = llvm::IndexedInstrProf::ComputeHash(NameValue);
     std::string FuncRecordName = "__covrec_" + llvm::utohexstr(NameHash);
 
-    unsigned FileID =
-        std::find(Files.begin(), Files.end(), M->getFilename()) - Files.begin();
+    // The file ID needs to be bumped by 1 to account for the working directory
+    // as the first element.
+    unsigned FileID = [&]() {
+      auto Result = RawFileIndices.find(M->getFilename());
+      assert(Result != RawFileIndices.end());
+      return Result->second + 1;
+    }();
+    assert(FileID < FilenameStrs.size());
+
     std::vector<CounterMappingRegion> Regions;
-    for (const auto &MR : M->getMappedRegions())
-      Regions.emplace_back(CounterMappingRegion::makeRegion(
-          MR.Counter, /*FileID=*/0, MR.StartLine, MR.StartCol, MR.EndLine,
-          MR.EndCol));
+    for (const auto &MR : M->getMappedRegions()) {
+      // The FileID here is 0, because it's an index into VirtualFileMapping,
+      // and we only ever have a single file associated for a function.
+      Regions.push_back(MR.getLLVMRegion(/*FileID*/ 0));
+    }
     // Append each function's regions into the encoded buffer.
     ArrayRef<unsigned> VirtualFileMapping(FileID);
     llvm::coverage::CoverageMappingWriter W(VirtualFileMapping,
@@ -134,7 +163,7 @@ void IRGenModule::emitCoverageMaps(ArrayRef<const SILCoverageMap *> Mappings) {
 #include "llvm/ProfileData/InstrProfData.inc"
     };
     auto *FunctionRecordTy =
-        llvm::StructType::get(Ctx, makeArrayRef(FunctionRecordTypes),
+        llvm::StructType::get(Ctx, llvm::ArrayRef(FunctionRecordTypes),
                               /*isPacked=*/true);
 
     // Create the function record constant.
@@ -143,7 +172,7 @@ void IRGenModule::emitCoverageMaps(ArrayRef<const SILCoverageMap *> Mappings) {
 #include "llvm/ProfileData/InstrProfData.inc"
     };
     auto *FuncRecordConstant = llvm::ConstantStruct::get(
-        FunctionRecordTy, makeArrayRef(FunctionRecordVals));
+        FunctionRecordTy, llvm::ArrayRef(FunctionRecordVals));
 
     // Create the function record global.
     auto *FuncRecord = new llvm::GlobalVariable(
@@ -168,20 +197,20 @@ void IRGenModule::emitCoverageMaps(ArrayRef<const SILCoverageMap *> Mappings) {
 #include "llvm/ProfileData/InstrProfData.inc"
   };
   auto CovDataHeaderTy =
-      llvm::StructType::get(Ctx, makeArrayRef(CovDataHeaderTypes));
+      llvm::StructType::get(Ctx, llvm::ArrayRef(CovDataHeaderTypes));
   llvm::Constant *CovDataHeaderVals[] = {
 #define COVMAP_HEADER(Type, LLVMType, Name, Init) Init,
 #include "llvm/ProfileData/InstrProfData.inc"
   };
   auto CovDataHeaderVal = llvm::ConstantStruct::get(
-      CovDataHeaderTy, makeArrayRef(CovDataHeaderVals));
+      CovDataHeaderTy, llvm::ArrayRef(CovDataHeaderVals));
 
   // Create the coverage data record
   llvm::Type *CovDataTypes[] = {CovDataHeaderTy, FilenamesVal->getType()};
-  auto CovDataTy = llvm::StructType::get(Ctx, makeArrayRef(CovDataTypes));
+  auto CovDataTy = llvm::StructType::get(Ctx, llvm::ArrayRef(CovDataTypes));
   llvm::Constant *TUDataVals[] = {CovDataHeaderVal, FilenamesVal};
   auto CovDataVal =
-      llvm::ConstantStruct::get(CovDataTy, makeArrayRef(TUDataVals));
+      llvm::ConstantStruct::get(CovDataTy, llvm::ArrayRef(TUDataVals));
   auto CovData = new llvm::GlobalVariable(
       *getModule(), CovDataTy, true, llvm::GlobalValue::PrivateLinkage,
       CovDataVal, llvm::getCoverageMappingVarName());

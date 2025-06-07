@@ -35,8 +35,8 @@
   case A
   case B = 0
   // DUPLICATE_CASES: :[[@LINE-1]]:12: error: raw value for enum case is not unique
-  // DUPLICATE_CASES: :[[@LINE-3]]:8: note: raw value previously used here
-  // DUPLICATE_CASES: :[[@LINE-4]]:8: note: raw value implicitly auto-incremented from zero
+  // DUPLICATE_CASES: note: raw value previously used here
+  // DUPLICATE_CASES: note: raw value implicitly auto-incremented from zero
 }
 
 #elseif NON_INT_RAW_VALUE

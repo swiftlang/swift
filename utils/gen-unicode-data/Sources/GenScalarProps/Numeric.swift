@@ -108,6 +108,12 @@ func emitNumericData(
   values: [(ClosedRange<UInt32>, String)],
   into result: inout String
 ) {
+  result += """
+  #define NUMERIC_TYPE_COUNT \(types.count)
+
+
+  """
+
   emitCollection(
     types,
     name: "_swift_stdlib_numeric_type",
@@ -144,7 +150,12 @@ func emitNumericData(
   
   let valueMph = mph(for: allScalars)
   
-  emitMph(valueMph, name: "_swift_stdlib_numeric_values", into: &result)
+  emitMph(
+    valueMph,
+    name: "_swift_stdlib_numeric_values",
+    defineLabel: "NUMERIC_VALUES",
+    into: &result
+  )
   
   var valueIndices: [UInt8] = .init(repeating: 0, count: allScalars.count)
   
@@ -165,8 +176,8 @@ func emitNumericData(
 }
 
 func generateNumericProps(into result: inout String) {
-  let derivedNumericType = readFile("Data/DerivedNumericType.txt")
-  let derivedNumericValues = readFile("Data/DerivedNumericValues.txt")
+  let derivedNumericType = readFile("Data/16/DerivedNumericType.txt")
+  let derivedNumericValues = readFile("Data/16/DerivedNumericValues.txt")
   
   var numericTypes: [(ClosedRange<UInt32>, NumericType)] = []
   var numericValues: [(ClosedRange<UInt32>, String)] = []

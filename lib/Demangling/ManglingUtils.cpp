@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Demangling/ManglingUtils.h"
+#include <optional>
 
 using namespace swift;
 using namespace Mangle;
@@ -25,9 +26,16 @@ bool Mangle::isNonAscii(StringRef str) {
 }
 
 bool Mangle::needsPunycodeEncoding(StringRef str) {
-  for (unsigned char c : str) {
-    if (!isValidSymbolChar(c))
+  if (str.empty()) {
+    return false;
+  }
+  if (!isValidSymbolStart(str.front())) {
+    return true;
+  }
+  for (unsigned char c : str.substr(1)) {
+    if (!isValidSymbolChar(c)) {
       return true;
+    }
   }
   return false;
 }
@@ -66,8 +74,9 @@ std::string Mangle::translateOperator(StringRef Op) {
   return Encoded;
 }
 
-llvm::Optional<StringRef> Mangle::getStandardTypeSubst(
-    StringRef TypeName, bool allowConcurrencyManglings) {
+std::optional<StringRef>
+Mangle::getStandardTypeSubst(StringRef TypeName,
+                             bool allowConcurrencyManglings) {
 #define STANDARD_TYPE(KIND, MANGLING, TYPENAME)      \
   if (TypeName == #TYPENAME) {                       \
     return StringRef(#MANGLING);                     \
@@ -80,6 +89,5 @@ llvm::Optional<StringRef> Mangle::getStandardTypeSubst(
 
 #include "swift/Demangling/StandardTypesMangling.def"
 
-  return llvm::None;
+  return std::nullopt;
 }
-

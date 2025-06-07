@@ -93,6 +93,6 @@ Some branches are *automerged* into other branches, to keep them in sync. This i
 To update the Branch/Tag requirements, please follow these steps:
 
   1. Create pull requests to update the branch/tag in the following repositories:
-     - in `apple/swift` modify [`update-checkout-config.json`](https://github.com/apple/swift/blob/main/utils/update_checkout/update-checkout-config.json)
-     - in `apple/swift-source-compat-suite` repository modify [`common.py`](https://github.com/apple/swift-source-compat-suite/blob/main/common.py)
+     - in `swiftlang/swift` modify [`update-checkout-config.json`](https://github.com/swiftlang/swift/blob/main/utils/update_checkout/update-checkout-config.json)
+     - in `swiftlang/swift-source-compat-suite` repository modify [`common.py`](https://github.com/swiftlang/swift-source-compat-suite/blob/main/common.py)
   1. Notify @shahmishal after creating the pull requests

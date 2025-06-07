@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-debuginfo -enable-sil-verify-all %s -allocbox-to-stack -enable-copy-propagation=requested-passes-only -enable-lexical-borrow-scopes=false | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -sil-print-debuginfo -enable-sil-verify-all %s -allocbox-to-stack -enable-copy-propagation=requested-passes-only | %FileCheck %s
 
 sil_stage raw
 
@@ -266,7 +266,7 @@ bb0(%0 : $Bool):
   return %6 : $Bool
 
   // CHECK: alloc_stack $Bool
-  // CHECK-NEXT: store
+  // CHECK-NEXT: store {{%[0-9]+}}
   // CHECK-NEXT: tuple ()
   // CHECK-NEXT: load
   // CHECK-NEXT: dealloc_stack
@@ -398,7 +398,7 @@ bb0(%0 : $Int):
 }
 
 // CHECK-LABEL: sil private @$s6struct8useStack1tySi_tFSiycfU_Tf0s_n
-// CHECK-LABEL: sil private @$s6struct8useStack1tySi_tFSiycfU_
+// CHECK-LABEL: sil private [_semantics "sil.optimizer.delete_if_unused"] @$s6struct8useStack1tySi_tFSiycfU_
 // struct.(useStack (t : Swift.Int) -> ()).(closure #1)
 sil private @$s6struct8useStack1tySi_tFSiycfU_ : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int {
 bb0(%0 : $<τ_0_0> { var τ_0_0 } <Int>):
@@ -651,7 +651,7 @@ bb0(%0 : $Int, %1 : $*S<T>):
   return %9 : $Bool
 }
 
-// CHECK-LABEL: sil shared @closure1
+// CHECK-LABEL: sil shared [_semantics "sil.optimizer.delete_if_unused"] @closure1
 sil shared @closure1 : $@convention(thin) <T where T : Count> (Int, @owned <τ_0_0 : Count> { var S<τ_0_0> } <T>) -> Bool {
 // CHECK: bb0
 bb0(%0 : $Int, %1 : $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>):
@@ -673,7 +673,7 @@ bb0(%0 : $Int, %1 : $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>):
 // CHECK: return
 // CHECK-NOT: bb1
 
-// CHECK-LABEL: sil shared @closure2
+// CHECK-LABEL: sil shared [_semantics "sil.optimizer.delete_if_unused"] @closure2
 sil shared @closure2 : $@convention(thin) <T where T : Count> (Int, @owned <τ_0_0 : Count> { var S<τ_0_0> } <T>) -> Bool {
 // CHECK: bb0
 bb0(%0 : $Int, %1 : $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>):
@@ -803,7 +803,7 @@ bb5(%25 : $Error):                                // Preds: bb4 bb3
 // CHECK-NEXT:   dealloc_stack [[BOX]]
 // CHECK-NEXT:   dealloc_stack [[STACK1]]
 // CHECK:      bb2:
-// CHECK:        store
+// CHECK:        store {{%[0-9]+}}
 // CHECK:        [[STACK2:%[0-9]+]] = alloc_stack $Bool
 // CHECK-NEXT:   dealloc_stack [[STACK2]] : $*Bool, loc "testloc":27:27
 // CHECK-NEXT:   dealloc_stack [[BOX]] : $*Int, loc "testloc":27:27
@@ -841,7 +841,7 @@ bb3:
 // CHECK:      bb0(%0 : $Int):
 // CHECK-NEXT:   [[REF:%[0-9]+]] = alloc_ref [stack] $SomeClass
 // CHECK-NEXT:   [[BOX:%[0-9]+]] = alloc_stack $Int
-// CHECK:        store
+// CHECK:        store {{%[0-9]+}}
 // CHECK:        dealloc_stack [[BOX]]
 // CHECK-NEXT:   dealloc_stack_ref [[REF]]
 // CHECK-NEXT:   tuple
@@ -868,7 +868,7 @@ bb0(%0 : $Int):
 // CHECK-NEXT:   dealloc_stack [[STACK2]]
 // CHECK-NEXT:   unreachable
 // CHECK:      bb2:
-// CHECK:        store
+// CHECK:        store {{%[0-9]+}}
 // CHECK:        dealloc_stack [[BOX]]
 // CHECK-NEXT:   dealloc_stack [[STACK1]]
 // CHECK-NEXT:   tuple
@@ -904,7 +904,7 @@ bb2:
 // CHECK-NEXT:   dealloc_stack [[BOX]]
 // CHECK-NEXT:   unreachable
 // CHECK:      bb2:
-// CHECK:        store
+// CHECK:        store {{%[0-9]+}}
 // CHECK:        dealloc_stack [[BOX]]
 // CHECK-NEXT:   dealloc_stack [[STACK1]]
 // CHECK-NEXT:   tuple
@@ -938,7 +938,7 @@ bb2:
 // CHECK:      bb1:
 // CHECK-NEXT:   unreachable
 // CHECK:      bb2:
-// CHECK:        store
+// CHECK:        store {{%[0-9]+}}
 // CHECK:        dealloc_stack [[STACK]]
 // CHECK-NEXT:   dealloc_stack [[BOX]]
 // CHECK-NEXT:   tuple
@@ -969,7 +969,7 @@ bb2:
 // CHECK:      bb1:
 // CHECK-NEXT:   unreachable
 // CHECK:      bb2:
-// CHECK:        store
+// CHECK:        store {{%[0-9]+}}
 // CHECK:        dealloc_stack [[BOX]]
 // CHECK-NEXT:   tuple
 // CHECK-NEXT:   return
@@ -998,7 +998,7 @@ bb2:
 // CHECK-NEXT:   {{.*}} = alloc_stack $Bool
 // CHECK-NEXT:   unreachable
 // CHECK:      bb2:
-// CHECK:        store
+// CHECK:        store {{%[0-9]+}}
 // CHECK:        dealloc_stack [[BOX]]
 // CHECK-NEXT:   tuple
 // CHECK-NEXT:   return
@@ -1065,7 +1065,7 @@ bb3:
 // CHECK-NEXT:   dealloc_stack [[AI]]
 // CHECK-NEXT:   br bb3
 // CHECK:      bb3:
-// CHECK-NEXT:   store
+// CHECK-NEXT:   store {{%[0-9]+}}
 // CHECK-NEXT:   load
 // CHECK-NEXT:   unreachable
 sil @nesting_and_unreachable7 : $@convention(thin) (Bool) -> Bool {
@@ -1100,7 +1100,7 @@ bb3:
 // CHECK-NEXT:   dealloc_stack [[STACK2]]
 // CHECK-NEXT:   br bb4
 // CHECK:      bb3:
-// CHECK:        store
+// CHECK:        store {{%[0-9]+}}
 // CHECK:        dealloc_stack [[STACK2]]
 // CHECK-NEXT:   dealloc_stack [[STACK1]]
 // CHECK-NEXT:   dealloc_stack [[BOX]]
@@ -1193,4 +1193,36 @@ bb3(%error : $Error):
 bb4:
   %v = tuple ()
   return %v : $()
+}
+
+
+sil [ossa] @move_closure_callee : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> () {
+bb0(%box : @closureCapture @guaranteed ${ var Builtin.Int32 }):
+  %13 = integer_literal $Builtin.Int32, 13
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  store %13 to [trivial] %addr : $*Builtin.Int32
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @move_closure : {{.*}} {
+// CHECK:         [[SPECIALIZED_CLOSURE:%[^,]+]] = function_ref @$s19move_closure_calleeTf0s_n : $@convention(thin) (@inout_aliasable Builtin.Int32) -> ()
+// CHECK:         partial_apply [callee_guaranteed] [[SPECIALIZED_CLOSURE]]
+// CHECK-LABEL: } // end sil function 'move_closure'
+sil [ossa] @move_closure : $@convention(thin) () -> Builtin.Int32 {
+bb0:
+  %box = alloc_box ${ var Builtin.Int32 }
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  %42 = integer_literal $Builtin.Int32, 42
+  store %42 to [trivial] %addr : $*Builtin.Int32
+  %callee = function_ref @move_closure_callee : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> ()
+  %box_copy = copy_value %box : ${ var Builtin.Int32 }
+  mark_function_escape %addr : $*Builtin.Int32
+  %closure = partial_apply [callee_guaranteed] %callee(%box_copy) : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> ()
+  %closure_move = move_value %closure : $@callee_guaranteed () -> ()
+  apply %closure_move() : $@callee_guaranteed () -> ()
+  destroy_value %closure_move : $@callee_guaranteed () -> ()
+  %value = load [trivial] %addr : $*Builtin.Int32
+  destroy_value %box : ${ var Builtin.Int32 }
+  return %value : $Builtin.Int32
 }

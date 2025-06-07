@@ -1,0 +1,61 @@
+//===--- Simplifications.def ------------------------------------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file contains macro-metaprogramming for instruction simplifications
+// running in SILCombine.
+//
+//===----------------------------------------------------------------------===//
+
+/// INSTRUCTION_SIMPLIFICATION(Inst)
+///   Defines an instruction simplification which is implemented in swift and is
+///   run by the SILCombiner.
+///   The \p Inst argument specifies the instruction class.
+///
+///   No further code is need on the C++ side. On the swift side an instruction
+///   simplification must be registered for the instruction class with
+///   `registerForSILCombine`.
+///
+
+/// INSTRUCTION_SIMPLIFICATION_WITH_LEGACY(Inst)
+///   Like INSTRUCTION_SIMPLIFICATION, but also runs the legacy `visitInst`
+///   implementation in SILCombine.
+
+INSTRUCTION_SIMPLIFICATION(BeginBorrowInst)
+INSTRUCTION_SIMPLIFICATION(BeginCOWMutationInst)
+INSTRUCTION_SIMPLIFICATION(ClassifyBridgeObjectInst)
+INSTRUCTION_SIMPLIFICATION(FixLifetimeInst)
+INSTRUCTION_SIMPLIFICATION(GlobalValueInst)
+INSTRUCTION_SIMPLIFICATION(StrongRetainInst)
+INSTRUCTION_SIMPLIFICATION(StrongReleaseInst)
+INSTRUCTION_SIMPLIFICATION(RetainValueInst)
+INSTRUCTION_SIMPLIFICATION(ReleaseValueInst)
+INSTRUCTION_SIMPLIFICATION(LoadInst)
+INSTRUCTION_SIMPLIFICATION(LoadBorrowInst)
+INSTRUCTION_SIMPLIFICATION(CopyValueInst)
+INSTRUCTION_SIMPLIFICATION(CopyBlockInst)
+INSTRUCTION_SIMPLIFICATION(DestroyValueInst)
+INSTRUCTION_SIMPLIFICATION(DestructureStructInst)
+INSTRUCTION_SIMPLIFICATION(DestructureTupleInst)
+INSTRUCTION_SIMPLIFICATION(MarkDependenceInst)
+INSTRUCTION_SIMPLIFICATION(MarkDependenceAddrInst)
+INSTRUCTION_SIMPLIFICATION(PointerToAddressInst)
+INSTRUCTION_SIMPLIFICATION(TypeValueInst)
+INSTRUCTION_SIMPLIFICATION(UncheckedAddrCastInst)
+INSTRUCTION_SIMPLIFICATION(UncheckedEnumDataInst)
+INSTRUCTION_SIMPLIFICATION(WitnessMethodInst)
+INSTRUCTION_SIMPLIFICATION_WITH_LEGACY(AllocStackInst)
+INSTRUCTION_SIMPLIFICATION_WITH_LEGACY(UnconditionalCheckedCastInst)
+INSTRUCTION_SIMPLIFICATION_WITH_LEGACY(ApplyInst)
+INSTRUCTION_SIMPLIFICATION_WITH_LEGACY(TryApplyInst)
+
+#undef INSTRUCTION_SIMPLIFICATION
+#undef INSTRUCTION_SIMPLIFICATION_WITH_LEGACY

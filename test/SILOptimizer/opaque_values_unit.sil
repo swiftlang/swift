@@ -1,4 +1,6 @@
-// RUN: %target-sil-opt -enable-sil-opaque-values -unit-test-runner %s 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-opaque-values -test-runner %s 2>&1 | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
 
 import Builtin
 
@@ -7,15 +9,15 @@ class C {}
 // Verify that SILFunction_getSelfArgumentIndex respects SILFunctionConventions
 // and returns right value even in the presence of indirect results.
 //
-// CHECK-LABEL: begin running test 1 of {{[^,]+}} on f: function-get-self-argument-index
-// The correct value is 0 here when opaque values are enabled because the result
+// CHECK-LABEL: begin running test 1 of {{[^,]+}} on f: argument_conventions
+// The parameter index is 0 here when opaque values are enabled because the result
 // is just returned.  It could mistakenly be calculated as 1 though because
 // after AddressLowering there will be a new argument at index 0 for the
 // indirect result.
-// CHECK:       self argument index = 0
-// CHECK-LABEL: end running test 1 of {{[^,]+}} on f: function-get-self-argument-index
+// CHECK:       [0] parameter: directGuaranteed
+// CHECK-LABEL: end running test 1 of {{[^,]+}} on f: argument_conventions
 sil [ossa] @f : $@convention(method) <T> (@guaranteed C) -> @out T {
 entry(%instance : @guaranteed $C):
-    test_specification "function-get-self-argument-index"
+    specify_test "argument_conventions"
     unreachable
 }

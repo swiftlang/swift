@@ -1,10 +1,11 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine -sil-combine-canonicalize=false | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -sil-combine -sil-combine-canonicalize=false | %FileCheck %s
 //
 // Run sil-combine without canonicalization to test specific patterns
 // in isolation.
 
 sil_stage canonical
 
+import Swift
 import Builtin
 
 class Klass {}
@@ -26,10 +27,9 @@ class KlassWithTailAllocatedElems {
 // CHECK: [[PROJ:%.*]] = project_box [[BORROW]]
 // CHECK-NOT: pointer_to_address
 // CHECK-NOT: address_to_pointer
-// CHECK: [[CAST_RESULT:%.*]] = unchecked_addr_cast [[PROJ]]
 // CHECK-NOT: pointer_to_address
 // CHECK-NOT: address_to_pointer
-// CHECK: load [trivial] [[CAST_RESULT]]
+// CHECK: load [trivial] [[PROJ]]
 // CHECK: end_borrow [[BORROW]]
 // CHECK: destroy_value [[BOX]]
 // CHECK-LABEL: } // end sil function 'unchecked_addr_cast_borrowed_box'
@@ -81,3 +81,25 @@ bb0:
   destroy_value %obj : $KlassWithTailAllocatedElems
   return %val : $Builtin.Word
 }
+
+sil @get_native_object : $@convention(thin) () -> @owned Builtin.NativeObject
+
+// CHECK-LABEL: sil [ossa] @bitwise_combines_guaranteed :
+// CHECK: unchecked_ref_cast
+// CHECK-LABEL: } // end sil function 'bitwise_combines_guaranteed'
+sil [ossa] @bitwise_combines_guaranteed : $@convention(thin) () -> @owned Optional<Builtin.NativeObject> {
+bb0:
+  %f = function_ref @get_native_object : $@convention(thin) () -> @owned Builtin.NativeObject
+  %0 = apply %f() : $@convention(thin) () -> @owned Builtin.NativeObject
+  %b = begin_borrow [lexical] %0 : $Builtin.NativeObject
+  br bb1
+
+bb1:
+  %2 = unchecked_trivial_bit_cast %b : $Builtin.NativeObject to $Builtin.Word
+  %3 = unchecked_bitwise_cast %2 : $Builtin.Word to $Optional<Builtin.NativeObject>
+  %c = copy_value %3 : $Optional<Builtin.NativeObject>
+  end_borrow %b : $Builtin.NativeObject
+  destroy_value %0 : $Builtin.NativeObject
+  return %c : $Optional<Builtin.NativeObject>
+}
+

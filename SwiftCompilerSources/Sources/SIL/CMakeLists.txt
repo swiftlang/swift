@@ -9,22 +9,30 @@
 add_swift_compiler_module(SIL
   DEPENDS
     Basic
+    AST
   SOURCES
     ApplySite.swift
     Argument.swift
+    ASTExtensions.swift
     BasicBlock.swift
     Builder.swift
+    ConstExpressionEvaluator.swift
+    DeclRef.swift
     Effects.swift
+    ForwardingInstruction.swift
     Function.swift
+    FunctionConvention.swift
     GlobalVariable.swift
     Instruction.swift
+    Linkage.swift
     Location.swift
     Operand.swift
     Registration.swift
-    SmallProjectionPath.swift
-    SubstitutionMap.swift
+    SILStage.swift
     Type.swift
-    Utils.swift
     Value.swift
     VTable.swift
     WitnessTable.swift)
+
+add_subdirectory(Utilities)
+

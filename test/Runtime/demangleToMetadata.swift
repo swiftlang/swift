@@ -1,9 +1,11 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend -disable-availability-checking -parse-stdlib %s -module-name main -o %t/a.out
+// RUN: %target-build-swift -target %target-swift-5.1-abi-triple -parse-stdlib %s -module-name main -o %t/a.out \
+// RUN:     -enable-experimental-feature LifetimeDependence
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// REQUIRES: swift_feature_LifetimeDependence
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
@@ -79,28 +81,28 @@ DemangleToMetadataTests.test("function types") {
   expectEqual(type(of: f0_throws), _typeByName("yyKc")!)
 
   // More parameters.
-  expectEqual(type(of: f1), _typeByName("yyyt_tc")!)
-  expectEqual(type(of: f2), _typeByName("yyyt_yttc")!)
+  expectEqual(type(of: f1), _typeByName("yyt_tc")!)
+  expectEqual(type(of: f2), _typeByName("yyt_yttc")!)
 
   // Variadic parameters.
-  expectEqual(type(of: f1_variadic), _typeByName("yyytd_tc")!)
+  expectEqual(type(of: f1_variadic), _typeByName("yytd_tc")!)
 
   // Inout parameters.
-  expectEqual(type(of: f1_inout), _typeByName("yyytzc")!)
+  expectEqual(type(of: f1_inout), _typeByName("yytzc")!)
 
   // Ownership parameters.
-  expectEqual(type(of: f1_shared), _typeByName("yyyXlhc")!)
-  expectEqual(type(of: f1_owned), _typeByName("yyyXlnc")!)
+  expectEqual(type(of: f1_shared), _typeByName("yyXlhc")!)
+  expectEqual(type(of: f1_owned), _typeByName("yyXlnc")!)
 
   // Concurrent function types.
-  expectEqual(type(of: f1_takes_concurrent), _typeByName("yyyyYbXEc")!)
+  expectEqual(type(of: f1_takes_concurrent), _typeByName("yyyYbXEc")!)
 
   // Mix-and-match.
-  expectEqual(type(of: f2_variadic_inout), _typeByName("yyytd_ytztc")!)
+  expectEqual(type(of: f2_variadic_inout), _typeByName("yytd_ytztc")!)
 
   // A function type that hasn't been built before.
   expectEqual("(Int, Float, Double, String, Character, UInt, Bool) -> ()",
-    String(describing: _typeByName("yySi_SfSdSSs9CharacterVSuSbtc")!))
+    String(describing: _typeByName("ySi_SfSdSSs9CharacterVSuSbtc")!))
 
   // Escaping
   expectEqual(type(of: f1_escaping), _typeByName("ySfSicc")!)
@@ -145,16 +147,16 @@ func f1_composition_superclass(_: C & P1 & P2) { }
 
 DemangleToMetadataTests.test("existential types") {
   // Any, AnyObject
-  expectEqual(type(of: f2_any_anyobject), _typeByName("yyyp_yXltc")!)
+  expectEqual(type(of: f2_any_anyobject), _typeByName("yyp_yXltc")!)
 
   // References to protocols.
-  expectEqual(type(of: f1_composition), _typeByName("yy4main2P1_4main2P2pc")!)
+  expectEqual(type(of: f1_composition), _typeByName("y4main2P1_4main2P2pc")!)
 
   // Reference to protocol with AnyObject.
-  expectEqual(type(of: f1_composition_anyobject), _typeByName("yy4main2P1_Xlc")!)
+  expectEqual(type(of: f1_composition_anyobject), _typeByName("y4main2P1_Xlc")!)
 
   // References to superclass.
-  expectEqual(type(of: f1_composition_superclass), _typeByName("yy4main2P1_4main2P2AA1CCXcc")!)
+  expectEqual(type(of: f1_composition_superclass), _typeByName("y4main2P1_4main2P2AA1CCXcc")!)
 
   // Demangle an existential type that hasn't been seen before.
   expectEqual("P1 & P2 & P3", String(describing: _typeByName("4main2P1_4main2P24main2P3p")!))
@@ -242,6 +244,12 @@ class CG2<T, U> {
   }
 }
 
+struct ReallyLongGeneric<T, U, V, W> {}
+
+extension ReallyLongGeneric where T == U, U == V.Element, V == W, W: Collection {
+  struct Nested {}
+}
+
 DemangleToMetadataTests.test("nested generic specializations") {
   expectEqual(EG<Int, String>.NestedSG<Double>.self,
     _typeByName("4main2EGO8NestedSGVySiSS_SdG")!)
@@ -252,6 +260,10 @@ DemangleToMetadataTests.test("nested generic specializations") {
   expectEqual(
     CG2<Int, String>.Inner<Double>.Innermost<Int8, Int16, Int32, Int64>.self,
     _typeByName("4main3CG2C5InnerC9InnermostVySiSS_Sd_s4Int8Vs5Int16Vs5Int32Vs5Int64VG")!)
+  expectEqual(
+    ReallyLongGeneric<Int, Int, [Int], [Int]>.Nested.self,
+    _typeByName("4main17ReallyLongGenericVAAE6NestedVyS2iSaySiGAF_G")!
+  )
 }
 
 DemangleToMetadataTests.test("demangle built-in types") {
@@ -275,6 +287,7 @@ DemangleToMetadataTests.test("demangle built-in types") {
   expectEqual(Builtin.RawUnsafeContinuation.self, _typeByName("Bc")!)
   expectEqual(Builtin.Executor.self, _typeByName("Be")!)
   expectNotNil(_typeByName("BD"))
+  expectNotNil(_typeByName("Bd")) // NonDefaultDistributedActor storage
   expectEqual(Builtin.Job.self, _typeByName("Bj")!)
 }
 
@@ -482,6 +495,9 @@ DemangleToMetadataTests.test("Nested types in same-type-constrained extensions")
   // V !: P3 in InnerTEqualsConformsToP1
 }
 
+struct NonCopyable: ~Copyable {}
+struct NonEscapable: ~Escapable {}
+
 if #available(SwiftStdlib 5.3, *) {
   DemangleToMetadataTests.test("Round-trip with _mangledTypeName and _typeByName") {
     func roundTrip<T>(_ type: T.Type) {
@@ -501,7 +517,7 @@ if #available(SwiftStdlib 5.3, *) {
   }
 
   DemangleToMetadataTests.test("Check _mangledTypeName, _typeName use appropriate cache keys") {
-    // sanity check that name functions use the right keys to store cached names:
+    // soundness check that name functions use the right keys to store cached names:
     for _ in 1...2 {
       expectEqual("Si", _mangledTypeName(Int.self)!)
       expectEqual("Swift.Int", _typeName(Int.self, qualified: true))
@@ -513,11 +529,58 @@ if #available(SwiftStdlib 5.3, *) {
     let type: Any.Type = Int.self
     expectEqual("Si", _mangledTypeName(type))
   }
+
+  DemangleToMetadataTests.test("Check _MangledTypeName with any ~Copyable.Type") {
+    let type: any ~Copyable.Type = NonCopyable.self
+    expectEqual("4main11NonCopyableV", _mangledTypeName(type))
+  }
+
+  DemangleToMetadataTests.test("Check _MangledTypeName with any ~Escapable.Type") {
+    let type: any ~Escapable.Type = NonEscapable.self
+    expectEqual("4main12NonEscapableV", _mangledTypeName(type))
+  }
 }
 
 if #available(SwiftStdlib 5.1, *) {
   DemangleToMetadataTests.test("Concurrency standard substitutions") {
     expectEqual(TaskGroup<Int>.self, _typeByName("ScGySiG")!)
+  }
+}
+
+enum MyBigError: Error {
+  case epicFail
+}
+
+@available(SwiftStdlib 6.0, *)
+func getFnTypeWithThrownError<E: Error>(_: E.Type) -> Any.Type {
+  typealias Fn = (Int) throws(E) -> Void
+  return Fn.self
+}
+
+if #available(SwiftStdlib 6.0, *) {
+  DemangleToMetadataTests.test("typed throws") {
+    typealias Fn = (Int) throws(MyBigError) -> Void
+    expectEqual("ySi4main10MyBigErrorOYKc", _mangledTypeName(Fn.self)!)
+    expectEqual(Fn.self, _typeByName("ySi4main10MyBigErrorOYKc")!)
+
+
+    expectEqual(getFnTypeWithThrownError(MyBigError.self), _typeByName("ySi4main10MyBigErrorOYKc")!)
+
+    // throws(any Error) -> throws
+    expectEqual(getFnTypeWithThrownError((any Error).self), _typeByName("ySiKc")!)
+
+    // throws(Never) -> non-throwing
+    expectEqual(getFnTypeWithThrownError(Never.self), _typeByName("ySic")!)
+  }
+}
+
+if #available(SwiftStdlib 6.1, *) {
+  DemangleToMetadataTests.test("NUL-terminated name, excessive length value") {
+    let t = _typeByName("4main1SV\0random stuff here")
+    expectNotNil(t)
+    if let t {
+      expectEqual(type(of: S()), t)
+    }
   }
 }
 

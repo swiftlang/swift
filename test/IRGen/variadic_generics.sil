@@ -1,14 +1,11 @@
-// RUN: %target-swift-frontend -emit-ir -primary-file %s -enable-experimental-feature VariadicGenerics | %IRGenFileCheck %s
-
-// Because of -enable-experimental-feature VariadicGenerics
-// REQUIRES: asserts
+// RUN: %target-swift-frontend -emit-ir -primary-file %s | %IRGenFileCheck %s
 
 import Builtin
 import Swift
 
 // CHECK-LABEL: define{{.*}} @test_dynamic_1(
 // CHECK:         ret [[INT]] 4
-sil @test_dynamic_1 : $<T...> () -> Builtin.PackIndex {
+sil @test_dynamic_1 : $<each T> () -> Builtin.PackIndex {
 bb0:
   %intIndex = integer_literal $Builtin.Word, 4
   %index = dynamic_pack_index %intIndex of $Pack{repeat each T}
@@ -17,7 +14,7 @@ bb0:
 
 // CHECK-LABEL: define{{.*}} @test_scalar_1(
 // CHECK:         ret [[INT]] 0
-sil @test_scalar_1 : $<T...> () -> Builtin.PackIndex {
+sil @test_scalar_1 : $<each T> () -> Builtin.PackIndex {
 bb0:
   %index = scalar_pack_index 0 of $Pack{Int, repeat each T}
   return %index : $Builtin.PackIndex
@@ -26,7 +23,7 @@ bb0:
 // CHECK-LABEL: define{{.*}} @test_scalar_2(
 // CHECK:         [[INDEX:%.*]] = add [[INT]] %0, 1
 // CHECK:         ret [[INT]] [[INDEX]]
-sil @test_scalar_2 : $<T...> () -> Builtin.PackIndex {
+sil @test_scalar_2 : $<each T> () -> Builtin.PackIndex {
 bb0:
   %index = scalar_pack_index 2 of $Pack{Int, repeat each T, Int}
   return %index : $Builtin.PackIndex
@@ -36,7 +33,7 @@ bb0:
 // CHECK:         [[T0:%.*]] = add [[INT]] %0, %0
 // CHECK:         [[INDEX:%.*]] = add [[INT]] [[T0]], 2
 // CHECK:         ret [[INT]] [[INDEX]]
-sil @test_scalar_3 : $<T...> () -> Builtin.PackIndex {
+sil @test_scalar_3 : $<each T> () -> Builtin.PackIndex {
 bb0:
   %index = scalar_pack_index 4 of $Pack{Int, repeat each T, Int, repeat each T, Int}
   return %index : $Builtin.PackIndex
@@ -44,7 +41,7 @@ bb0:
 
 // CHECK-LABEL: define{{.*}} @test_pack_1(
 // CHECK:         ret [[INT]] 7
-sil @test_pack_1 : $<T...> () -> Builtin.PackIndex {
+sil @test_pack_1 : $<each T> () -> Builtin.PackIndex {
 bb0:
   %intIndex = integer_literal $Builtin.Word, 7
   %innerIndex = dynamic_pack_index %intIndex of $Pack{repeat each T}
@@ -54,7 +51,7 @@ bb0:
 
 // CHECK-LABEL: define{{.*}} @test_pack_2(
 // CHECK:         ret [[INT]] 8
-sil @test_pack_2 : $<T...> () -> Builtin.PackIndex {
+sil @test_pack_2 : $<each T> () -> Builtin.PackIndex {
 bb0:
   %intIndex = integer_literal $Builtin.Word, 7
   %innerIndex = dynamic_pack_index %intIndex of $Pack{repeat each T}
@@ -66,10 +63,133 @@ bb0:
 // CHECK:         [[T0:%.*]] = add [[INT]] %0, 1
 // CHECK:         [[INDEX:%.*]] = add [[INT]] [[T0]], 7
 // CHECK:         ret [[INT]] [[INDEX]]
-sil @test_pack_3 : $<T...> () -> Builtin.PackIndex {
+sil @test_pack_3 : $<each T> () -> Builtin.PackIndex {
 bb0:
   %intIndex = integer_literal $Builtin.Word, 7
   %innerIndex = dynamic_pack_index %intIndex of $Pack{repeat each T}
   %index = pack_pack_index 2, %innerIndex of $Pack{repeat each T, Int, repeat each T}
   return %index : $Builtin.PackIndex
+}
+
+// CHECK-LABEL: define{{.*}} @test_pack_element_get_1(
+// CHECK: [[INDEX:%.*]] = add [[INT]] %1, 1
+// CHECK: [[ELT_STORAGE:%.*]] = getelementptr inbounds ptr, ptr %0, [[INT]] [[INDEX]]
+// CHECK: [[ELT_ADDR:%.*]] = load ptr, ptr [[ELT_STORAGE]], align
+// CHECK: [[VALUE_ADDR:%.*]] = getelementptr inbounds{{.*}} %TSi, ptr [[ELT_ADDR]], i32 0, i32 0
+// CHECK: [[RET:%.*]] = load [[INT]], ptr [[VALUE_ADDR]], align
+// CHECK: ret [[INT]] [[RET]]
+sil @test_pack_element_get_1 : $<each T> (@pack_owned Pack{Int, repeat each T, Int}) -> Int {
+bb0(%pack : $*Pack{Int, repeat each T, Int}):
+  %index = scalar_pack_index 2 of $Pack{Int, repeat each T, Int}
+  %elementAddr = pack_element_get %index of %pack : $*Pack{Int, repeat each T, Int} as $*Int
+  %value = load %elementAddr : $*Int
+  return %value : $Int
+ }
+ 
+// CHECK-LABEL: define{{.*}} @test_pack_element_set_1(
+// CHECK: [[INDEX:%.*]] = add [[INT]] %2, 1
+// CHECK: [[ELT_STORAGE:%.*]] = getelementptr inbounds ptr, ptr %0, [[INT]] [[INDEX]]
+// CHECK: [[ELT_ADDR:%.*]] = load ptr, ptr [[ELT_STORAGE]], align
+// CHECK: [[VALUE_ADDR:%.*]] = getelementptr inbounds{{.*}} %TSi, ptr [[ELT_ADDR]], i32 0, i32 0
+// CHECK: store [[INT]] %1, ptr [[VALUE_ADDR]], align
+// CHECK: ret void
+sil @test_pack_element_set_1 : $<each T> (@pack_owned Pack{Int, repeat each T, Int}, Int) -> () {
+bb0(%pack : $*Pack{Int, repeat each T, Int}, %value : $Int):
+  %index = scalar_pack_index 2 of $Pack{Int, repeat each T, Int}
+  %elementAddr = pack_element_get %index of %pack : $*Pack{Int, repeat each T, Int} as $*Int
+  store %value to %elementAddr : $*Int
+   %ret = tuple ()
+   return %ret : $()
+ }
+
+// CHECK-LABEL: define {{.*}}@test_pack_alloc_1_dynamic(
+// CHECK-SAME:       [[INT]] [[PACK_SIZE:%[^,]+]]
+// CHECK:        [[SIZE:%[^,]+]] = add [[INT]] [[PACK_SIZE]], [[PACK_SIZE]]
+// CHECK:        [[SP_SAVE:%[^,]+]] = call ptr @llvm.stacksave.p0()
+// CHECK:        alloca ptr, [[INT]] [[SIZE]]
+// CHECK:        call void @llvm.stackrestore.p0(ptr [[SP_SAVE]])
+sil @test_pack_alloc_1_dynamic : $<each T> () -> () {
+// Control flow so that stack saving/restoring is emitted
+entry:
+  cond_br undef, left, right
+left:
+  br exit
+right:
+  br exit
+exit:
+  %addr = alloc_pack $Pack{repeat each T, repeat each T}
+  dealloc_pack %addr : $*Pack{repeat each T, repeat each T}
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: define {{.*}}@test_pack_alloc_2_static
+// CHECK:         [[STACK:%[^,]+]] = alloca [2 x ptr]
+// CHECK:         call void @llvm.lifetime.start.p0
+// CHECK:         call void @llvm.lifetime.end.p0
+sil @test_pack_alloc_2_static : $<each T> () -> () {
+  %addr = alloc_pack $Pack{Int, Int}
+  dealloc_pack %addr : $*Pack{Int, Int}
+  %ret = tuple ()
+  return %ret : $()
+}
+
+sil @borrow : $<T> (@in_guaranteed T) -> () {
+entry(%addr : $*T):
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: define {{.*}}@test_tuple_pack_element_addr_1(
+// CHECK-SAME:        ptr [[TUPLE_ADDR:%[^,]+]], i{{(64|32)}} [[INDEX:%[^,]+]]
+// CHECK:         [[ELT_TYPE:%.*]] = phi ptr [
+// CHECK:         [[RESPONSE:%[^,]+]] = call swiftcc %swift.metadata_response @swift_getTupleTypeMetadata
+// CHECK:         [[UNCAST_METADATA:%[^,]+]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
+// CHECK:         [[OFFSET_PTR:%[^,]+]] = getelementptr inbounds %swift.tuple_type, ptr [[UNCAST_METADATA]], i{{(64|32)}} 0, i32 3, i{{(64|32)}} [[INDEX]]
+// CHECK:         [[OFFSET:%[^,]+]] = load i32, ptr [[OFFSET_PTR]], align
+// CHECK:         [[UNCAST_ELEMENT_ADDR:%[^,]+]] = getelementptr inbounds i8, ptr [[TUPLE_ADDR]], i32 [[OFFSET]]
+// CHECK:         call swiftcc void @borrow(ptr noalias [[UNCAST_ELEMENT_ADDR]], ptr [[ELT_TYPE]])
+sil @test_tuple_pack_element_addr_1 :  $<T, U> (@inout (String, T, U, Int), Builtin.Word) -> () {
+bb0(%tuple : $*(String, T, U, Int), %i : $Builtin.Word):
+  %index = dynamic_pack_index %i of $Pack{Float, T, U, Float}
+  %0 = open_pack_element %index of <each U_1> at <Pack{String, T, U, Int}>, shape $U_1, uuid "01234567-89AB-CDEF-0123-000000000004"
+  %elt = tuple_pack_element_addr %index of %tuple : $*(String, T, U, Int) as $*@pack_element("01234567-89AB-CDEF-0123-000000000004") U_1
+  %blackhole = function_ref @borrow : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  apply %blackhole<(@pack_element("01234567-89AB-CDEF-0123-000000000004") U_1)>(%elt) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: define{{.*}} @test_pack_length_1
+// CHECK:         ret [[INT]] %0
+sil @test_pack_length_1 : $<each T> () -> Builtin.Word {
+bb0:
+  %len = pack_length $Pack{repeat each T}
+  return %len : $Builtin.Word
+}
+
+// CHECK-LABEL: define{{.*}} @test_pack_length_2
+// CHECK:         [[T0:%.*]] = add [[INT]] %0, %0
+// CHECK:         [[T1:%.*]] = add [[INT]] [[T0]], 3
+// CHECK:         ret [[INT]] [[T1]]
+sil @test_pack_length_2 : $<each T> () -> Builtin.Word {
+bb0:
+  %len = pack_length $Pack{repeat each T, repeat each T, Int, Float, String}
+  return %len : $Builtin.Word
+}
+
+// Translate the pattern type of a pack expansion type when
+// emitting tuple type metadata for layout.  rdar://110971671
+
+// CHECK-LABEL: define{{.*}} @test_pack_expansion_for_layout
+// CHECK:         [[PACK_LEN:%.*]] = add [[INT]] %0, 1
+// CHECK-NEXT:    [[VANISHES:%.*]] = icmp eq [[INT]] [[PACK_LEN]], 1
+// CHECK-NEXT:    br i1 [[VANISHES]],
+// CHECK:         call swiftcc %swift.metadata_response @swift_getTupleTypeMetadata(
+sil @test_pack_expansion_for_layout : $<each T> () -> () {
+bb0:
+  %tuple = alloc_stack $(Int, repeat () async throws -> each T)
+  dealloc_stack %tuple : $*(Int, repeat () async throws -> each T)
+  %result = tuple ()
+  return %result : $()
 }

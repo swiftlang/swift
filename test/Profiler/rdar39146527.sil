@@ -76,11 +76,9 @@ bb9(%31 : $(Character, allowingJoined: Bool)):
   %35 = struct_extract %34 : $_StringGuts, #_StringGuts._object
   %36 = struct_extract %35 : $_StringObject, #_StringObject._object
   strong_retain %36 : $Builtin.BridgeObject
-  %38 = move_value [lexical] %32 : $Character
-
   // CHECK: increment_profiler_counter 2, "$s4Test4NameO11valueStringSSvg", num_counters 4, hash 0
   increment_profiler_counter 2, "$s4Test4NameO11valueStringSSvg", num_counters 4, hash 0
-  %40 = struct_extract %38 : $Character, #Character._str
+  %40 = struct_extract %32 : $Character, #Character._str
   release_value %25 : $Name
   br bb11(%40 : $String)
 

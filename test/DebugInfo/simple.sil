@@ -20,4 +20,3 @@ bb0(%0 : $Int32):
   // CHECK: ![[LOC]] = !DILocation(line: [[@LINE+1]],
   return %10 : $Int32                               // id: %11
 }
-

@@ -1,0 +1,52 @@
+// RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+
+class C {}
+sil [ossa] @callee_owned : $@convention(thin) (@owned C) -> ()
+
+// Fold apply when guaranteed lexical value used in one but not two branches
+// and the lexical scope ends before the use on the non-lexical branch.
+//
+// CHECK-LABEL: sil [ossa] @nofold_two_parallel_owned_uses_one_lexical___scope_ends_before_use : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
+// CHECK:         [[MOVE:%[^,]+]] = move_value [lexical] [[INSTANCE]]
+// CHECK:         [[CALLEE_OWNED:%[^,]+]] = function_ref @callee_owned
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK:         apply [[CALLEE_OWNED]]([[MOVE]])
+// CHECK:         destroy_value [[COPY]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[RIGHT]]:
+// CHECK:         destroy_value [[MOVE]]
+// CHECK:         apply [[CALLEE_OWNED]]([[COPY]])
+// CHECK:         br [[EXIT]]
+// CHECK:       [[EXIT]]:
+// CHECK-LABEL: } // end sil function 'nofold_two_parallel_owned_uses_one_lexical___scope_ends_before_use'
+sil [ossa] @nofold_two_parallel_owned_uses_one_lexical___scope_ends_before_use : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  specify_test "lexical_destroy_folding @trace[0]"
+  %copy_2 = copy_value %instance : $C
+  %lifetime = begin_borrow [lexical] %instance : $C
+  debug_value [trace] %lifetime : $C
+  %callee_owned = function_ref @callee_owned : $@convention(thin) (@owned C) -> ()
+  cond_br undef, left, right
+
+left:
+  %copy_1 = copy_value %lifetime : $C
+  apply %callee_owned(%copy_1) : $@convention(thin) (@owned C) -> ()
+  end_borrow %lifetime : $C
+  destroy_value %instance : $C
+  destroy_value %copy_2 : $C
+  br exit
+
+right:
+  end_borrow %lifetime : $C
+  destroy_value %instance : $C
+  apply %callee_owned(%copy_2) : $@convention(thin) (@owned C) -> ()
+  br exit
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+

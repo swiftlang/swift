@@ -13,6 +13,8 @@
 #include "SILGenFunction.h"
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
+#include "swift/Basic/Platform.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILDeclRef.h"
 
 using namespace swift;
@@ -49,6 +51,26 @@ static Type getResultInterfaceType(AbstractFunctionDecl *AFD) {
   llvm_unreachable("Unhandled AbstractFunctionDecl type");
 }
 
+static SILValue emitZipperedBackDeployIfAvailableBooleanTestValue(
+    SILGenFunction &SGF, AbstractFunctionDecl *AFD, SILLocation loc,
+    SILBasicBlock *availableBB, SILBasicBlock *unavailableBB) {
+  auto &ctx = SGF.getASTContext();
+  assert(ctx.LangOpts.TargetVariant);
+
+  VersionRange OSVersion = VersionRange::all();
+  if (auto version = AFD->getBackDeployedBeforeOSVersion(ctx)) {
+    OSVersion = VersionRange::allGTE(*version);
+  }
+
+  VersionRange VariantOSVersion = VersionRange::all();
+  if (auto version =
+          AFD->getBackDeployedBeforeOSVersion(ctx, /*forTargetVariant=*/true)) {
+    VariantOSVersion = VersionRange::allGTE(*version);
+  }
+
+  return SGF.emitZipperedOSVersionRangeCheck(loc, OSVersion, VariantOSVersion);
+}
+
 /// Emit the following branch SIL instruction:
 /// \verbatim
 /// if #available(OSVersion) {
@@ -62,7 +84,15 @@ static void emitBackDeployIfAvailableCondition(SILGenFunction &SGF,
                                                SILLocation loc,
                                                SILBasicBlock *availableBB,
                                                SILBasicBlock *unavailableBB) {
-  auto version = AFD->getBackDeployBeforeOSVersion(SGF.SGM.getASTContext());
+  if (SGF.getASTContext().LangOpts.TargetVariant) {
+    SILValue booleanTestValue =
+        emitZipperedBackDeployIfAvailableBooleanTestValue(
+            SGF, AFD, loc, availableBB, unavailableBB);
+    SGF.B.createCondBranch(loc, booleanTestValue, availableBB, unavailableBB);
+    return;
+  }
+
+  auto version = AFD->getBackDeployedBeforeOSVersion(SGF.SGM.getASTContext());
   VersionRange OSVersion = VersionRange::empty();
   if (version.has_value()) {
     OSVersion = VersionRange::allGTE(*version);
@@ -75,7 +105,10 @@ static void emitBackDeployIfAvailableCondition(SILGenFunction &SGF,
     SILType i1 = SILType::getBuiltinIntegerType(1, SGF.getASTContext());
     booleanTestValue = SGF.B.createIntegerLiteral(loc, i1, 1);
   } else {
-    booleanTestValue = SGF.emitOSVersionRangeCheck(loc, OSVersion);
+    bool isMacCatalyst =
+        tripleIsMacCatalystEnvironment(SGF.getASTContext().LangOpts.Target);
+    booleanTestValue =
+        SGF.emitOSVersionRangeCheck(loc, OSVersion, isMacCatalyst);
   }
 
   SGF.B.createCondBranch(loc, booleanTestValue, availableBB, unavailableBB);
@@ -121,12 +154,14 @@ static void emitBackDeployForwardApplyAndReturnOrThrow(
 
     // Emit resume block.
     SGF.B.emitBlock(resumeBB);
-    SGF.B.createEndApply(loc, token);
+    SGF.B.createEndApply(loc, token,
+                         SILType::getEmptyTupleType(SGF.getASTContext()));
     SGF.B.createBranch(loc, SGF.ReturnDest.getBlock());
 
     // Emit unwind block.
     SGF.B.emitBlock(unwindBB);
-    SGF.B.createEndApply(loc, token);
+    SGF.B.createEndApply(loc, token,
+                         SILType::getEmptyTupleType(SGF.getASTContext()));
     SGF.B.createBranch(loc, SGF.CoroutineUnwindDest.getBlock());
     return;
   }
@@ -143,9 +178,9 @@ static void emitBackDeployForwardApplyAndReturnOrThrow(
 
     // Emit error block.
     SGF.B.emitBlock(errorBB);
-    SILValue error = errorBB->createPhiArgument(
-        SGF.F.mapTypeIntoContext(fnConv.getSILErrorType(TEC)),
-        OwnershipKind::Owned);
+    ManagedValue error =
+        SGF.B.createPhi(SGF.F.mapTypeIntoContext(fnConv.getSILErrorType(TEC)),
+                        OwnershipKind::Owned);
     SGF.B.createBranch(loc, SGF.ThrowDest.getBlock(), {error});
 
     // Emit normal block.
@@ -166,6 +201,35 @@ static void emitBackDeployForwardApplyAndReturnOrThrow(
   extractAllElements(apply, loc, SGF.B, directResults);
 
   SGF.B.createBranch(loc, SGF.ReturnDest.getBlock(), directResults);
+}
+
+bool SILGenModule::requiresBackDeploymentThunk(ValueDecl *decl,
+                                               ResilienceExpansion expansion) {
+  auto &ctx = getASTContext();
+  auto backDeployBeforeVersion = decl->getBackDeployedBeforeOSVersion(ctx);
+  if (!backDeployBeforeVersion)
+    return false;
+
+  switch (expansion) {
+  case ResilienceExpansion::Minimal:
+    // In a minimal resilience expansion we must always call the back deployment
+    // thunk since we can't predict the deployment targets of the modules that
+    // might inline the call.
+    return true;
+  case ResilienceExpansion::Maximal:
+    // FIXME: We can skip thunking if we're in the same module.
+    break;
+  }
+
+  // Use of a back deployment thunk is unnecessary if the deployment target is
+  // high enough that the ABI implementation of the back deployed declaration is
+  // guaranteed to be available.
+  auto deploymentAvailability = AvailabilityRange::forDeploymentTarget(ctx);
+  auto declAvailability = AvailabilityRange(*backDeployBeforeVersion);
+  if (deploymentAvailability.isContainedIn(declAvailability))
+    return false;
+
+  return true;
 }
 
 void SILGenFunction::emitBackDeploymentThunk(SILDeclRef thunk) {
@@ -190,14 +254,18 @@ void SILGenFunction::emitBackDeploymentThunk(SILDeclRef thunk) {
 
   // Generate the thunk prolog by collecting parameters.
   SmallVector<ManagedValue, 4> params;
-  SmallVector<SILArgument *, 4> indirectParams;
-  collectThunkParams(loc, params, &indirectParams);
+  SmallVector<ManagedValue, 4> indirectParams;
+  SmallVector<ManagedValue, 4> indirectErrorResults;
+  collectThunkParams(loc, params, &indirectParams, &indirectErrorResults);
 
-  // Build up the list of arguments that we're going to invoke the the real
+  // Build up the list of arguments that we're going to invoke the real
   // function with.
   SmallVector<SILValue, 8> paramsForForwarding;
   for (auto indirectParam : indirectParams) {
-    paramsForForwarding.emplace_back(indirectParam);
+    paramsForForwarding.emplace_back(indirectParam.getLValueAddress());
+  }
+  for (auto indirectErrorResult : indirectErrorResults) {
+    paramsForForwarding.emplace_back(indirectErrorResult.getLValueAddress());
   }
 
   for (auto param : params) {
@@ -207,7 +275,9 @@ void SILGenFunction::emitBackDeploymentThunk(SILDeclRef thunk) {
     paramsForForwarding.emplace_back(param.forward(*this));
   }
 
-  prepareEpilog(getResultInterfaceType(AFD), AFD->hasThrows(),
+  prepareEpilog(AFD,
+                getResultInterfaceType(AFD),
+                AFD->getEffectiveThrownErrorType(),
                 CleanupLocation(AFD));
 
   SILBasicBlock *availableBB = createBasicBlock("availableBB");

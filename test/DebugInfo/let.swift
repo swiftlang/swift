@@ -5,7 +5,7 @@ class DeepThought {
 }
 
 func foo() -> Int64 {
-  // CHECK: call void @llvm.dbg.declare(metadata %T3let11DeepThoughtC** {{.*}}, metadata ![[A:.*]], metadata !DIExpression())
+  // CHECK: #dbg_declare(ptr {{.*}}, ![[A:.*]], !DIExpression()
   // CHECK-DAG: !DILocalVariable(name: "machine",{{.*}}line: [[@LINE+1]], type: !{{[0-9]+}})
   let machine = DeepThought()
   // CHECK-DAG: !DILocalVariable(name: "a", {{.*}}line: [[@LINE+1]],

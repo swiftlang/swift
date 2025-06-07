@@ -1,6 +1,7 @@
-// RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -target %target-swift-5.1-abi-triple | %FileCheck %s
 
-// REQUIRES: CPU=x86_64
+// REQUIRES: swift_in_compiler
+// REQUIRES: PTRSIZE=64
 
 var g0 : Int = 1
 var g1 : (Void, Int, Void)
@@ -50,6 +51,19 @@ extension A {
 // CHECK-NOT: g8
 // CHECK-NOT: g9
 
-// CHECK: define{{( dllexport)?}}{{( protected)?}} i32 @main(i32 %0, i8** %1) {{.*}} {
-// CHECK:      store  i64 {{.*}}, i64* getelementptr inbounds ([[INT]], [[INT]]* @"$s7globals2g0Sivp", i32 0, i32 0), align 8
+// CHECK: define{{( dllexport)?}}{{( protected)?}} i32 @main(i32 %0, ptr %1) {{.*}} {
+// CHECK:      store  i64 {{.*}}, ptr @"$s7globals2g0Sivp", align 8
 
+// CHECK:  [[BUF_PROJ:%.*]] = call {{.*}} @__swift_project_value_buffer({{.*}}s7globals1gQrvp
+// CHECK:  call void @llvm.memcpy{{.*}}({{.*}}[[BUF_PROJ]]
+
+
+public protocol Some {}
+
+public struct Implementer : Some {
+  var w = (0, 1, 2, 3, 4)
+
+  public init() { }
+}
+
+let g : some Some = Implementer()

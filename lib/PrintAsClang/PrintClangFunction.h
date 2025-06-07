@@ -18,11 +18,12 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/GenericRequirement.h"
+#include "swift/IRGen/IRABIDetailsProvider.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
+#include <optional>
 
 namespace swift {
 
@@ -41,7 +42,7 @@ class SwiftToClangInteropContext;
 class DeclAndTypePrinter;
 
 struct ClangRepresentation {
-  enum Kind { representable, unsupported };
+  enum Kind { representable, objcxxonly, unsupported };
 
   ClangRepresentation(Kind kind) : kind(kind) {}
 
@@ -49,8 +50,14 @@ struct ClangRepresentation {
   /// language mode.
   bool isUnsupported() const { return kind == unsupported; }
 
+  /// Returns true if the given Swift node is only supported in
+  /// Objective C++ mode.
+  bool isObjCxxOnly() const { return kind == objcxxonly; }
+
   const ClangRepresentation &merge(ClangRepresentation other) {
-    if (kind != unsupported)
+    if (other.kind == unsupported)
+      kind = unsupported;
+    else if (kind == representable)
       kind = other.kind;
     return *this;
   }
@@ -107,45 +114,49 @@ public:
 
   /// Print the body of the inline C++ function thunk that calls the underlying
   /// Swift function.
-  void printCxxThunkBody(const AbstractFunctionDecl *FD,
-                         const LoweredFunctionSignature &signature,
-                         StringRef swiftSymbolName,
-                         const NominalTypeDecl *typeDeclContext,
-                         const ModuleDecl *moduleContext, Type resultTy,
-                         const ParameterList *params, bool hasThrows = false,
-                         const AnyFunctionType *funcType = nullptr);
+  void printCxxThunkBody(
+      const AbstractFunctionDecl *FD, const LoweredFunctionSignature &signature,
+      StringRef swiftSymbolName, const NominalTypeDecl *typeDeclContext,
+      const ModuleDecl *moduleContext, Type resultTy,
+      const ParameterList *params, bool hasThrows = false,
+      const AnyFunctionType *funcType = nullptr, bool isStaticMethod = false,
+      std::optional<IRABIDetailsProvider::MethodDispatchInfo> dispatchInfo =
+          std::nullopt);
 
   /// Print the Swift method as C++ method declaration/definition, including
   /// constructors.
-  void printCxxMethod(const NominalTypeDecl *typeDeclContext,
-                      const AbstractFunctionDecl *FD,
-                      const LoweredFunctionSignature &signature,
-                      StringRef swiftSymbolName, Type resultTy,
-                      bool isDefinition);
+  void printCxxMethod(
+      DeclAndTypePrinter &declAndTypePrinter,
+      const NominalTypeDecl *typeDeclContext, const AbstractFunctionDecl *FD,
+      const LoweredFunctionSignature &signature, StringRef swiftSymbolName,
+      Type resultTy, bool isStatic, bool isDefinition,
+      std::optional<IRABIDetailsProvider::MethodDispatchInfo> dispatchInfo);
 
   /// Print the C++ getter/setter method signature.
-  void printCxxPropertyAccessorMethod(const NominalTypeDecl *typeDeclContext,
-                                      const AccessorDecl *accessor,
-                                      const LoweredFunctionSignature &signature,
-                                      StringRef swiftSymbolName, Type resultTy,
-                                      bool isStatic, bool isDefinition);
+  void printCxxPropertyAccessorMethod(
+      DeclAndTypePrinter &declAndTypePrinter,
+      const NominalTypeDecl *typeDeclContext, const AccessorDecl *accessor,
+      const LoweredFunctionSignature &signature, StringRef swiftSymbolName,
+      Type resultTy, bool isStatic, bool isDefinition,
+      std::optional<IRABIDetailsProvider::MethodDispatchInfo> dispatchInfo);
 
   /// Print the C++ subscript method.
   void printCxxSubscriptAccessorMethod(
+      DeclAndTypePrinter &declAndTypePrinter,
       const NominalTypeDecl *typeDeclContext, const AccessorDecl *accessor,
       const LoweredFunctionSignature &signature, StringRef swiftSymbolName,
-      Type resultTy, bool isDefinition);
+      Type resultTy, bool isDefinition,
+      std::optional<IRABIDetailsProvider::MethodDispatchInfo> dispatchInfo);
 
   /// Print Swift type as C/C++ type, as the return type of a C/C++ function.
-  ClangRepresentation
-  printClangFunctionReturnType(Type ty, OptionalTypeKind optKind,
-                               ModuleDecl *moduleContext,
-                               OutputLanguageMode outputLang);
+  ClangRepresentation printClangFunctionReturnType(
+      raw_ostream &stream, Type ty, OptionalTypeKind optKind,
+      ModuleDecl *moduleContext, OutputLanguageMode outputLang);
 
   static void printGenericReturnSequence(
       raw_ostream &os, const GenericTypeParamType *gtpt,
       llvm::function_ref<void(StringRef)> invocationPrinter,
-      Optional<StringRef> initializeWithTakeFromValue = llvm::None);
+      std::optional<StringRef> initializeWithTakeFromValue = std::nullopt);
 
   using PrinterTy =
       llvm::function_ref<void(llvm::MapVector<Type, std::string> &)>;
@@ -158,6 +169,15 @@ public:
                               PrinterTy bodyPrinter, ValueDecl *valueDecl,
                               ModuleDecl *emittedModule,
                               raw_ostream &outOfLineOS);
+
+  static ClangRepresentation
+  getTypeRepresentation(PrimitiveTypeMapping &typeMapping,
+                        SwiftToClangInteropContext &interopContext,
+                        DeclAndTypePrinter &declPrinter,
+                        const ModuleDecl *emittedModule, Type ty);
+
+  /// Prints the name of the type including generic arguments.
+  void printTypeName(Type ty, const ModuleDecl *moduleContext);
 
 private:
   void printCxxToCFunctionParameterUse(Type type, StringRef name,

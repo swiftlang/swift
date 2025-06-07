@@ -29,7 +29,7 @@ private:
   const llvm::opt::ArgList &Args;
   FrontendOptions &Opts;
 
-  Optional<std::vector<std::string>>
+  std::optional<std::vector<std::string>>
       cachedOutputFilenamesFromCommandLineOrFilelist;
 
   void handleDebugCrashGroupArguments();
@@ -48,6 +48,7 @@ private:
   void computePlaygroundOptions();
   void computePrintStatsOptions();
   void computeTBDOptions();
+  bool computeAvailabilityDomains();
 
   bool setUpImmediateArgs();
 

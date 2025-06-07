@@ -8,12 +8,14 @@
 
 import basic
 
-// CHECK: !DIModule(scope: null, name: "basic", includePath: "
+// CHECK: !DIModule(scope: null, name: "basic",
+// CHECK-SAME:      includePath: "
 // CHECK-SAME:      basic.swiftinterface"
 
 // Even if the module interface is in the SDK, we still return the path
 // to the swiftinterface.
-// SDK:   !DIModule(scope: null, name: "basic", includePath: "
+// SDK:   !DIModule(scope: null, name: "basic",
+// SDK-SAME:        includePath: "
 // SDK-SAME:        basic{{.*}}.swiftinterface"
 
 func markUsed<T>(_ t: T) {}

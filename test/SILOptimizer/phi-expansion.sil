@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -phi-expansion | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %s -phi-expansion | %FileCheck %s
 
 sil_stage canonical
 

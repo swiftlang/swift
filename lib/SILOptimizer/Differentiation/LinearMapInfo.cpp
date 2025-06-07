@@ -10,18 +10,20 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Linear map struct and branching trace enum information for differentiation.
+// Linear map tuple and branching trace enum information for differentiation.
 //
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "differentiation"
 
+#include "swift/SIL/ApplySite.h"
 #include "swift/SILOptimizer/Differentiation/LinearMapInfo.h"
 #include "swift/SILOptimizer/Differentiation/ADContext.h"
 
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/LoopInfo.h"
 
 namespace swift {
@@ -40,7 +42,7 @@ static GenericParamList *cloneGenericParameters(ASTContext &ctx,
   for (auto paramType : sig.getGenericParams()) {
     auto *clonedParam = GenericTypeParamDecl::createImplicit(
         dc, paramType->getName(), paramType->getDepth(), paramType->getIndex(),
-        paramType->isParameterPack());
+        paramType->getParamKind());
     clonedParam->setDeclContext(dc);
     clonedParams.push_back(clonedParam);
   }
@@ -69,59 +71,14 @@ SILType LinearMapInfo::remapTypeInDerivative(SILType ty) {
   return derivative->mapTypeIntoContext(ty);
 }
 
-VarDecl *LinearMapInfo::addVarDecl(NominalTypeDecl *nominal, StringRef name,
-                                   Type type) {
-  auto &astCtx = nominal->getASTContext();
-  auto id = astCtx.getIdentifier(name);
-  auto *varDecl = new (astCtx) VarDecl(
-      /*IsStatic*/ false, VarDecl::Introducer::Var,
-      SourceLoc(), id, nominal);
-  varDecl->setAccess(AccessLevel::Private);
-  if (type->hasArchetype())
-    varDecl->setInterfaceType(type->mapTypeOutOfContext());
-  else
-    varDecl->setInterfaceType(type);
-  nominal->addMember(varDecl);
-  return varDecl;
-}
-
-void LinearMapInfo::computeAccessLevel(NominalTypeDecl *nominal,
-                                       SILLinkage originalLinkage) {
-  auto &astCtx = nominal->getASTContext();
-  switch (originalLinkage) {
-  case swift::SILLinkage::Public:
-  case swift::SILLinkage::PublicNonABI:
-    nominal->setAccess(AccessLevel::Internal);
-    nominal->getAttrs().add(new (astCtx)
-                                UsableFromInlineAttr(/*Implicit*/ true));
-    break;
-  case swift::SILLinkage::Hidden:
-  case swift::SILLinkage::Shared:
-    nominal->setAccess(AccessLevel::Internal);
-    break;
-  case swift::SILLinkage::Private:
-    nominal->setAccess(AccessLevel::FilePrivate);
-    break;
-  default:
-    // When the original function has external linkage, we create an internal
-    // struct for use by our own module. This is necessary for cross-cell
-    // differentiation in Jupyter.
-    // TODO: Add a test in the compiler that exercises a similar situation as
-    // cross-cell differentiation in Jupyter.
-    nominal->setAccess(AccessLevel::Internal);
-  }
-}
-
 EnumDecl *
 LinearMapInfo::createBranchingTraceDecl(SILBasicBlock *originalBB,
-                                        CanGenericSignature genericSig,
-                                        SILLoopInfo *loopInfo) {
+                                        CanGenericSignature genericSig) {
   assert(originalBB->getParent() == original);
   auto &astCtx = original->getASTContext();
-  auto *moduleDecl = original->getModule().getSwiftModule();
   auto &file = getSynthesizedFile();
   // Create a branching trace enum.
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(astCtx);
   auto config = this->config.withGenericSignature(genericSig);
   auto enumName = mangler.mangleAutoDiffGeneratedDeclaration(
       AutoDiffGeneratedDeclarationKind::BranchingTraceEnum,
@@ -137,34 +94,64 @@ LinearMapInfo::createBranchingTraceDecl(SILBasicBlock *originalBB,
   // Note: must mark enum as implicit to satisfy assertion in
   // `Parser::parseDeclListDelayed`.
   branchingTraceDecl->setImplicit();
-  // Branching trace enums shall not be resilient.
-  branchingTraceDecl->getAttrs().add(new (astCtx) FrozenAttr(/*implicit*/ true));
   if (genericSig)
     branchingTraceDecl->setGenericSignature(genericSig);
-  computeAccessLevel(branchingTraceDecl, original->getEffectiveSymbolLinkage());
+  switch (original->getEffectiveSymbolLinkage()) {
+  case swift::SILLinkage::Public:
+  case swift::SILLinkage::PublicNonABI:
+    // Branching trace enums shall not be resilient.
+    branchingTraceDecl->getAttrs().add(new (astCtx) FrozenAttr(/*implicit*/ true));
+    branchingTraceDecl->getAttrs().add(new (astCtx) UsableFromInlineAttr(/*Implicit*/ true));
+    LLVM_FALLTHROUGH;
+  case swift::SILLinkage::Hidden:
+  case swift::SILLinkage::Shared:
+    branchingTraceDecl->setAccess(AccessLevel::Internal);
+    break;
+  case swift::SILLinkage::Private:
+    branchingTraceDecl->setAccess(AccessLevel::FilePrivate);
+    break;
+  default:
+    // When the original function has external linkage, we create an internal
+    // struct for use by our own module. This is necessary for cross-cell
+    // differentiation in Jupyter.
+    // TODO: Add a test in the compiler that exercises a similar situation as
+    // cross-cell differentiation in Jupyter.
+    branchingTraceDecl->setAccess(AccessLevel::Internal);
+  }
   file.addTopLevelDecl(branchingTraceDecl);
+  file.getParentModule()->clearLookupCache();
+
+  return branchingTraceDecl;
+}
+
+void LinearMapInfo::populateBranchingTraceDecl(SILBasicBlock *originalBB,
+                                               SILLoopInfo *loopInfo) {
+  auto &astCtx = original->getASTContext();
+  auto *moduleDecl = original->getModule().getSwiftModule();
+  auto loc = original->getLocation().getSourceLoc();
+  auto *branchingTraceDecl = getBranchingTraceDecl(originalBB);
+
   // Add basic block enum cases.
   for (auto *predBB : originalBB->getPredecessorBlocks()) {
     // Create dummy declaration representing enum case parameter.
     auto *decl = new (astCtx)
         ParamDecl(loc, loc, Identifier(), loc, Identifier(), moduleDecl);
     decl->setSpecifier(ParamDecl::Specifier::Default);
-    // If predecessor block is in a loop, its linear map struct will be
+    // If predecessor block is in a loop, its linear map tuple will be
     // indirectly referenced in memory owned by the context object. The payload
     // is just a raw pointer.
     if (loopInfo->getLoopFor(predBB)) {
-      blocksInLoop.insert(predBB);
+      heapAllocatedContext = true;
       decl->setInterfaceType(astCtx.TheRawPointerType);
-    }
-    // Otherwise the payload is the linear map struct.
-    else {
-      auto *linearMapStruct = getLinearMapStruct(predBB);
-      assert(linearMapStruct);
-      auto linearMapStructTy =
-          linearMapStruct->getDeclaredInterfaceType()->getCanonicalType();
+    } else { // Otherwise the payload is the linear map tuple.
+      auto *linearMapStructTy = getLinearMapTupleType(predBB);
+      // Do not create entries for unreachable predecessors
+      if (!linearMapStructTy)
+        continue;
+      auto canLinearMapStructTy = linearMapStructTy->getCanonicalType();
       decl->setInterfaceType(
-          linearMapStructTy->hasArchetype()
-              ? linearMapStructTy->mapTypeOutOfContext() : linearMapStructTy);
+          canLinearMapStructTy->hasArchetype()
+              ? canLinearMapStructTy->mapTypeOutOfContext() : canLinearMapStructTy);
     }
     // Create enum element and enum case declarations.
     auto *paramList = ParameterList::create(astCtx, {decl});
@@ -181,51 +168,132 @@ LinearMapInfo::createBranchingTraceDecl(SILBasicBlock *originalBB,
     // Record enum element declaration.
     branchingTraceEnumCases.insert({{predBB, originalBB}, enumEltDecl});
   }
-  return branchingTraceDecl;
 }
 
-StructDecl *
-LinearMapInfo::createLinearMapStruct(SILBasicBlock *originalBB,
-                                     CanGenericSignature genericSig) {
-  assert(originalBB->getParent() == original);
-  auto *original = originalBB->getParent();
-  auto &astCtx = original->getASTContext();
-  auto &file = getSynthesizedFile();
-  // Create a linear map struct.
-  Mangle::ASTMangler mangler;
-  auto config = this->config.withGenericSignature(genericSig);
-  auto structName = mangler.mangleAutoDiffGeneratedDeclaration(
-      AutoDiffGeneratedDeclarationKind::LinearMapStruct,
-      original->getName().str(), originalBB->getDebugID(), kind, config);
-  auto structId = astCtx.getIdentifier(structName);
-  GenericParamList *genericParams = nullptr;
-  if (genericSig)
-    genericParams = cloneGenericParameters(astCtx, &file, genericSig);
-  auto *linearMapStruct = new (astCtx) StructDecl(
-      /*StructLoc*/ SourceLoc(), /*Name*/ structId, /*NameLoc*/ SourceLoc(),
-      /*Inherited*/ {}, /*GenericParams*/ genericParams, /*DC*/ &file);
-  // Note: must mark struct as implicit to satisfy assertion in
-  // `Parser::parseDeclListDelayed`.
-  linearMapStruct->setImplicit();
-  // Linear map structs shall not be resilient.
-  linearMapStruct->getAttrs().add(new (astCtx) FrozenAttr(/*implicit*/ true));
-  if (genericSig)
-    linearMapStruct->setGenericSignature(genericSig);
-  computeAccessLevel(linearMapStruct, original->getEffectiveSymbolLinkage());
-  file.addTopLevelDecl(linearMapStruct);
-  return linearMapStruct;
-}
 
-VarDecl *LinearMapInfo::addLinearMapDecl(ApplyInst *ai, SILType linearMapType) {
+Type LinearMapInfo::getLinearMapType(ADContext &context, FullApplySite fai) {
+  SmallVector<SILValue, 4> allResults;
+  SmallVector<unsigned, 8> activeParamIndices;
+  SmallVector<unsigned, 8> activeResultIndices;
+  collectMinimalIndicesForFunctionCall(fai, config, activityInfo, allResults,
+                                       activeParamIndices, activeResultIndices);
+
+  // Check if there are any active results or arguments. If not, skip
+  // this instruction.
+  auto hasActiveResults = llvm::any_of(allResults, [&](SILValue res) {
+    return activityInfo.isActive(res, config);
+  });
+  bool hasActiveSemanticResultArgument = false;
+  bool hasActiveArguments = false;
+  auto numIndirectResults = fai.getNumIndirectSILResults();
+  for (auto argIdx : range(fai.getSubstCalleeConv().getNumParameters())) {
+    auto arg = fai.getArgumentsWithoutIndirectResults()[argIdx];
+    if (activityInfo.isActive(arg, config)) {
+      hasActiveArguments = true;
+      auto paramInfo = fai.getSubstCalleeConv().getParamInfoForSILArg(
+          numIndirectResults + argIdx);
+      if (paramInfo.isAutoDiffSemanticResult())
+        hasActiveSemanticResultArgument = true;
+    }
+  }
+  if (!hasActiveArguments)
+    return {};
+  if (!hasActiveResults && !hasActiveSemanticResultArgument)
+    return {};
+
+  // Compute differentiability parameters.
+  // - If the callee has `@differentiable` function type, use differentiation
+  //   parameters from the function type.
+  // - Otherwise, use the active parameters.
+  IndexSubset *parameters;
+  auto origFnSubstTy = fai.getSubstCalleeType();
+  auto remappedOrigFnSubstTy =
+      remapTypeInDerivative(SILType::getPrimitiveObjectType(origFnSubstTy))
+          .castTo<SILFunctionType>()
+          ->getUnsubstitutedType(original->getModule());
+  if (remappedOrigFnSubstTy->isDifferentiable()) {
+    parameters = remappedOrigFnSubstTy->getDifferentiabilityParameterIndices();
+  } else {
+    parameters = IndexSubset::get(
+        original->getASTContext(),
+        fai.getArgumentsWithoutIndirectResults().size(), activeParamIndices);
+  }
+  // Compute differentiability results.
+  auto *results = IndexSubset::get(original->getASTContext(),
+                                   remappedOrigFnSubstTy->getNumAutoDiffSemanticResults(),
+                                   activeResultIndices);
+  // Create autodiff indices for the `apply` instruction.
+  AutoDiffConfig applyConfig(parameters, results);
+
+  // Check for non-differentiable original function type.
+  auto checkNondifferentiableOriginalFunctionType =
+    [&](CanSILFunctionType origFnTy) {
+    // Check non-differentiable arguments.
+    for (auto paramIndex : applyConfig.parameterIndices->getIndices()) {
+      auto remappedParamType =
+          origFnTy->getParameters()[paramIndex].getSILStorageInterfaceType();
+      if (!remappedParamType.isDifferentiable(derivative->getModule()))
+        return true;
+    }
+    // Check non-differentiable results.
+    unsigned firstSemanticParamResultIdx = origFnTy->getNumResults();
+    unsigned firstYieldResultIndex = origFnTy->getNumResults() +
+      origFnTy->getNumAutoDiffSemanticResultsParameters();
+    for (auto resultIndex : applyConfig.resultIndices->getIndices()) {
+      SILType remappedResultType;
+      if (resultIndex >= firstYieldResultIndex) {
+        auto yieldResultIdx = resultIndex - firstYieldResultIndex;
+        const auto& yield = origFnTy->getYields()[yieldResultIdx];
+        // We do not have a good way to differentiate direct yields
+        if (!yield.isAutoDiffSemanticResult())
+          return true;
+        remappedResultType = yield.getSILStorageInterfaceType();
+      } else if (resultIndex >= firstSemanticParamResultIdx) {
+        auto semanticResultArgIdx = resultIndex - firstSemanticParamResultIdx;
+        auto semanticResultArg =
+            *std::next(fai.getAutoDiffSemanticResultArguments().begin(),
+                       semanticResultArgIdx);
+        remappedResultType = semanticResultArg->getType();
+      } else {
+        remappedResultType =
+            origFnTy->getResults()[resultIndex].getSILStorageInterfaceType();
+      }
+      if (!remappedResultType.isDifferentiable(derivative->getModule()))
+        return true;
+    }
+    return false;
+  };
+  if (checkNondifferentiableOriginalFunctionType(remappedOrigFnSubstTy))
+    return nullptr;
+
+  AutoDiffDerivativeFunctionKind derivativeFnKind(kind);
+  auto derivativeFnType =
+      remappedOrigFnSubstTy
+          ->getAutoDiffDerivativeFunctionType(
+              parameters, results, derivativeFnKind, context.getTypeConverter(),
+              LookUpConformanceInModule())
+          ->getUnsubstitutedType(original->getModule());
+
+  auto linearMapSILType = derivativeFnType->getAllResultsInterfaceType();
+  if (auto tupleType = linearMapSILType.getAs<TupleType>()) {
+    linearMapSILType = SILType::getPrimitiveObjectType(
+        tupleType.getElementType(tupleType->getElements().size() - 1));
+  }
+  if (auto fnTy = linearMapSILType.getAs<SILFunctionType>()) {
+    linearMapSILType = SILType::getPrimitiveObjectType(
+        fnTy->getUnsubstitutedType(original->getModule()));
+  }
+
   // IRGen requires decls to have AST types (not `SILFunctionType`), so we
   // convert the `SILFunctionType` of the linear map to a `FunctionType` with
   // the same parameters and results.
-  auto silFnTy = linearMapType.castTo<SILFunctionType>();
+  auto silFnTy = linearMapSILType.castTo<SILFunctionType>();
   SmallVector<AnyFunctionType::Param, 8> params;
   for (auto &param : silFnTy->getParameters()) {
     ParameterTypeFlags flags;
-    if (param.isIndirectMutating())
+    if (param.isAutoDiffSemanticResult())
       flags = flags.withInOut(true);
+
     params.push_back(
         AnyFunctionType::Param(param.getInterfaceType(), Identifier(), flags));
   }
@@ -243,127 +311,10 @@ VarDecl *LinearMapInfo::addLinearMapDecl(ApplyInst *ai, SILType linearMapType) {
         params, silFnTy->getAllResultsInterfaceType().getASTType(), info);
   }
 
-  auto *origBB = ai->getParent();
-  auto *linMapStruct = getLinearMapStruct(origBB);
-  std::string linearMapName;
-  switch (kind) {
-  case AutoDiffLinearMapKind::Differential:
-    linearMapName = "differential_" + llvm::itostr(linearMapFieldMap.size());
-    break;
-  case AutoDiffLinearMapKind::Pullback:
-    linearMapName = "pullback_" + llvm::itostr(linearMapFieldMap.size());
-    break;
-  }
-  auto *linearMapDecl = addVarDecl(linMapStruct, linearMapName, astFnTy);
-  linearMapFieldMap.insert({ai, linearMapDecl});
-  return linearMapDecl;
-}
+  if (astFnTy->hasArchetype())
+    return astFnTy->mapTypeOutOfContext();
 
-void LinearMapInfo::addLinearMapToStruct(ADContext &context, ApplyInst *ai) {
-  SmallVector<SILValue, 4> allResults;
-  SmallVector<unsigned, 8> activeParamIndices;
-  SmallVector<unsigned, 8> activeResultIndices;
-  collectMinimalIndicesForFunctionCall(ai, config, activityInfo, allResults,
-                                       activeParamIndices, activeResultIndices);
-
-  // Check if there are any active results or arguments. If not, skip
-  // this instruction.
-  auto hasActiveResults = llvm::any_of(allResults, [&](SILValue res) {
-    return activityInfo.isActive(res, config);
-  });
-  bool hasActiveInoutArgument = false;
-  bool hasActiveArguments = false;
-  auto numIndirectResults = ai->getNumIndirectResults();
-  for (auto argIdx : range(ai->getSubstCalleeConv().getNumParameters())) {
-    auto arg = ai->getArgumentsWithoutIndirectResults()[argIdx];
-    if (activityInfo.isActive(arg, config)) {
-      hasActiveArguments = true;
-      auto paramInfo = ai->getSubstCalleeConv().getParamInfoForSILArg(
-          numIndirectResults + argIdx);
-      if (paramInfo.isIndirectMutating())
-        hasActiveInoutArgument = true;
-    }
-  }
-  if (!hasActiveArguments)
-    return;
-  if (!hasActiveResults && !hasActiveInoutArgument)
-    return;
-
-  // Compute differentiability parameters.
-  // - If the callee has `@differentiable` function type, use differentiation
-  //   parameters from the function type.
-  // - Otherwise, use the active parameters.
-  IndexSubset *parameters;
-  auto origFnSubstTy = ai->getSubstCalleeType();
-  auto remappedOrigFnSubstTy =
-      remapTypeInDerivative(SILType::getPrimitiveObjectType(origFnSubstTy))
-          .castTo<SILFunctionType>()
-          ->getUnsubstitutedType(original->getModule());
-  if (remappedOrigFnSubstTy->isDifferentiable()) {
-    parameters = remappedOrigFnSubstTy->getDifferentiabilityParameterIndices();
-  } else {
-    parameters = IndexSubset::get(
-        original->getASTContext(),
-        ai->getArgumentsWithoutIndirectResults().size(), activeParamIndices);
-  }
-  // Compute differentiability results.
-  auto numResults = remappedOrigFnSubstTy->getNumResults() +
-                    remappedOrigFnSubstTy->getNumIndirectMutatingParameters();
-  auto *results = IndexSubset::get(original->getASTContext(), numResults,
-                                   activeResultIndices);
-  // Create autodiff indices for the `apply` instruction.
-  AutoDiffConfig applyConfig(parameters, results);
-
-  // Check for non-differentiable original function type.
-  auto checkNondifferentiableOriginalFunctionType = [&](CanSILFunctionType
-                                                            origFnTy) {
-    // Check non-differentiable arguments.
-    for (auto paramIndex : applyConfig.parameterIndices->getIndices()) {
-      auto remappedParamType =
-          origFnTy->getParameters()[paramIndex].getSILStorageInterfaceType();
-      if (!remappedParamType.isDifferentiable(derivative->getModule()))
-        return true;
-    }
-    // Check non-differentiable results.
-    for (auto resultIndex : applyConfig.resultIndices->getIndices()) {
-      SILType remappedResultType;
-      if (resultIndex >= origFnTy->getNumResults()) {
-        auto inoutArgIdx = resultIndex - origFnTy->getNumResults();
-        auto inoutArg =
-            *std::next(ai->getInoutArguments().begin(), inoutArgIdx);
-        remappedResultType = inoutArg->getType();
-      } else {
-        remappedResultType =
-            origFnTy->getResults()[resultIndex].getSILStorageInterfaceType();
-      }
-      if (!remappedResultType.isDifferentiable(derivative->getModule()))
-        return true;
-    }
-    return false;
-  };
-  if (checkNondifferentiableOriginalFunctionType(remappedOrigFnSubstTy))
-    return;
-
-  AutoDiffDerivativeFunctionKind derivativeFnKind(kind);
-  auto derivativeFnType =
-      remappedOrigFnSubstTy
-          ->getAutoDiffDerivativeFunctionType(
-              parameters, results, derivativeFnKind, context.getTypeConverter(),
-              LookUpConformanceInModule(
-                  derivative->getModule().getSwiftModule()))
-          ->getUnsubstitutedType(original->getModule());
-
-  auto derivativeFnResultTypes = derivativeFnType->getAllResultsInterfaceType();
-  auto linearMapSILType = derivativeFnResultTypes;
-  if (auto tupleType = linearMapSILType.getAs<TupleType>()) {
-    linearMapSILType = SILType::getPrimitiveObjectType(
-        tupleType.getElementType(tupleType->getElements().size() - 1));
-  }
-  if (auto fnTy = linearMapSILType.getAs<SILFunctionType>()) {
-    linearMapSILType = SILType::getPrimitiveObjectType(
-        fnTy->getUnsubstitutedType(original->getModule()));
-  }
-  addLinearMapDecl(ai, linearMapSILType);
+  return astFnTy;
 }
 
 void LinearMapInfo::generateDifferentiationDataStructures(
@@ -374,12 +325,6 @@ void LinearMapInfo::generateDifferentiationDataStructures(
   if (auto *derivativeFnGenEnv = derivativeFn->getGenericEnvironment())
     derivativeFnGenSig =
         derivativeFnGenEnv->getGenericSignature().getCanonicalSignature();
-
-  // Create linear map struct for each original block.
-  for (auto &origBB : *original) {
-    auto *linearMapStruct = createLinearMapStruct(&origBB, derivativeFnGenSig);
-    linearMapStructs.insert({&origBB, linearMapStruct});
-  }
 
   // Create branching trace enum for each original block and add it as a field
   // in the corresponding struct.
@@ -392,42 +337,71 @@ void LinearMapInfo::generateDifferentiationDataStructures(
     traceEnumFieldName = "predecessor";
     break;
   }
+
   for (auto &origBB : *original) {
     auto *traceEnum =
-        createBranchingTraceDecl(&origBB, derivativeFnGenSig, loopInfo);
+        createBranchingTraceDecl(&origBB, derivativeFnGenSig);
     branchingTraceDecls.insert({&origBB, traceEnum});
-    if (origBB.isEntry())
-      continue;
-    // Add branching trace enum field to corresponding linear map struct.
-    auto *linearMapStruct = getLinearMapStruct(&origBB);
-    auto *traceEnumField = addVarDecl(
-        linearMapStruct, astCtx.getIdentifier(traceEnumFieldName).str(),
-        traceEnum->getDeclaredInterfaceType());
-    linearMapStructEnumFields.insert({linearMapStruct, traceEnumField});
   }
 
-  // Do not add linear map fields for semantic member accessors, which have
-  // special-case pullback generation. Linear map structs should be empty.
-  if (isSemanticMemberAccessor(original))
-    return;
+  // Add linear map fields to the linear map tuples.
+  //
+  // Now we need to be very careful as we're having a very subtle
+  // chicken-and-egg problem. We need lowered branch trace enum type for the
+  // linear map typle type. However branch trace enum type lowering depends on
+  // the lowering of its elements (at very least, the type classification of
+  // being trivial / non-trivial). As the lowering is cached we need to ensure
+  // we compute lowered type for the branch trace enum when the corresponding
+  // EnumDecl is fully complete: we cannot add more entries without causing some
+  // very subtle issues later on. However, the elements of the enum are linear
+  // map tuples of predecessors, that correspondingly may contain branch trace
+  // enums of corresponding predecessor BBs.
+  //
+  // Traverse all BBs in reverse post-order traversal order to ensure we process
+  // each BB before its predecessors.
+  llvm::ReversePostOrderTraversal<SILFunction *> RPOT(original);
+  for (auto Iter = RPOT.begin(), E = RPOT.end(); Iter != E; ++Iter) {
+    auto *origBB = *Iter;
+    SmallVector<TupleTypeElt, 4> linearTupleTypes;
+    if (!origBB->isEntry()) {
+      populateBranchingTraceDecl(origBB, loopInfo);
 
-  // Add linear map fields to the linear map structs.
-  for (auto &origBB : *original) {
-    for (auto &inst : origBB) {
-      if (auto *ai = dyn_cast<ApplyInst>(&inst)) {
-        // Add linear map field to struct for active `apply` instructions.
-        // Skip array literal intrinsic applications since array literal
-        // initialization is linear and handled separately.
-        if (!shouldDifferentiateApplySite(ai) ||
-            ArraySemanticsCall(ai, semantics::ARRAY_UNINITIALIZED_INTRINSIC))
+      CanType traceEnumType = getBranchingTraceEnumLoweredType(origBB).getASTType();
+      linearTupleTypes.emplace_back(traceEnumType,
+                                    astCtx.getIdentifier(traceEnumFieldName));
+    }
+
+    if (isSemanticMemberAccessor(original)) {
+      // Do not add linear map fields for semantic member accessors, which have
+      // special-case pullback generation. Linear map tuples should be empty.
+    } else {
+      for (auto &inst : *origBB) {
+        if (auto *ai = dyn_cast<ApplyInst>(&inst))
+          // Skip array literal intrinsic applications since array literal
+          // initialization is linear and handled separately.
+          if (ArraySemanticsCall(ai, semantics::ARRAY_UNINITIALIZED_INTRINSIC) ||
+              ArraySemanticsCall(ai, semantics::ARRAY_FINALIZE_INTRINSIC))
+            continue;
+
+        if (!isa<FullApplySite>(&inst))
           continue;
-        if (ArraySemanticsCall(ai, semantics::ARRAY_FINALIZE_INTRINSIC))
+
+        FullApplySite fai(&inst);
+        // Add linear map field to struct for active apply sites instructions.
+        if (!shouldDifferentiateApplySite(fai))
           continue;
+
         LLVM_DEBUG(getADDebugStream()
-                   << "Adding linear map struct field for " << *ai);
-        addLinearMapToStruct(context, ai);
+                   << "Adding linear map tuple field for " << inst);
+        if (Type linearMapType = getLinearMapType(context, fai)) {
+          LLVM_DEBUG(getADDebugStream() << "Computed type: " << linearMapType << '\n');
+          linearMapIndexMap.insert({fai, linearTupleTypes.size()});
+          linearTupleTypes.emplace_back(linearMapType);
+        }
       }
     }
+
+    linearMapTuples.insert({origBB, TupleType::get(linearTupleTypes, astCtx)});
   }
 
   // Print generated linear map structs and branching trace enums.
@@ -440,13 +414,14 @@ void LinearMapInfo::generateDifferentiationDataStructures(
     printOptions.TypeDefinitions = true;
     printOptions.ExplodePatternBindingDecls = true;
     printOptions.SkipImplicit = false;
-    s << "Generated linear map structs and branching trace enums for @"
+    s << "Generated linear map tuples and branching trace enums for @"
       << original->getName() << ":\n";
     for (auto &origBB : *original) {
-      auto *linearMapStruct = getLinearMapStruct(&origBB);
-      linearMapStruct->print(s, printOptions);
+      auto *linearMapTuple = getLinearMapTupleType(&origBB);
+      linearMapTuple->print(s, printOptions);
       s << '\n';
     }
+
     for (auto &origBB : *original) {
       auto *traceEnum = getBranchingTraceDecl(&origBB);
       traceEnum->print(s, printOptions);
@@ -496,6 +471,19 @@ bool LinearMapInfo::shouldDifferentiateApplySite(FullApplySite applySite) {
   return hasActiveResults && hasActiveArguments;
 }
 
+static bool shouldDifferentiateInjectEnumAddr(
+    const InjectEnumAddrInst &inject,
+    const DifferentiableActivityInfo &activityInfo,
+    const AutoDiffConfig &config) {
+  SILValue en = inject.getOperand();
+  for (auto use : en->getUses()) {
+    auto *init = dyn_cast<InitEnumDataAddrInst>(use->getUser());
+    if (init && activityInfo.isActive(init, config))
+      return true;
+  }
+  return false;
+}
+
 /// Returns a flag indicating whether the instruction should be differentiated,
 /// given the differentiation indices of the instruction's parent function.
 /// Whether the instruction should be differentiated is determined sequentially
@@ -541,14 +529,27 @@ bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
   // Should differentiate any allocation instruction that has an active result.
   if ((isa<AllocationInst>(inst) && hasActiveResults))
     return true;
+  // Should differentiate end_apply if the corresponding begin_apply is
+  // differentiable
+  if (auto *eai = dyn_cast<EndApplyInst>(inst))
+    return shouldDifferentiateApplySite(eai->getBeginApply());
   if (hasActiveOperands) {
     // Should differentiate any instruction that performs reference counting,
     // lifetime ending, access ending, or destroying on an active operand.
     if (isa<RefCountingInst>(inst) || isa<EndAccessInst>(inst) ||
         isa<EndBorrowInst>(inst) || isa<DeallocationInst>(inst) ||
-        isa<DestroyValueInst>(inst) || isa<DestroyAddrInst>(inst))
+        isa<DestroyValueInst>(inst) || isa<DestroyAddrInst>(inst) ||
+        isa<AbortApplyInst>(inst) ||
+        isa<YieldInst>(inst))
       return true;
   }
+
+  // Should differentiate `inject_enum_addr` if the corresponding
+  // `init_enum_addr` has an active operand.
+  if (auto inject = dyn_cast<InjectEnumAddrInst>(inst))
+    if (shouldDifferentiateInjectEnumAddr(*inject, activityInfo, config))
+      return true;
+
   return false;
 }
 

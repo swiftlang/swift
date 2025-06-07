@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -object-outliner | %FileCheck %s
 
+// REQUIRES: swift_in_compiler
+
 
 import Builtin
 import Swift
@@ -20,8 +22,8 @@ sil @patatino : $@convention(thin) () -> () {
   %0 = integer_literal $Builtin.Word, 0
   %1 = alloc_ref [tail_elems $Int64 * %0 : $Builtin.Word] $B
   %2 = end_cow_mutation %1 : $B
-  set_deallocating %2 : $B
-  dealloc_ref %2 : $B
+  %3 = begin_dealloc_ref %2 : $B of %1 : $B
+  dealloc_ref %3 : $B
   %45 = tuple ()
   return %45 : $()
 }

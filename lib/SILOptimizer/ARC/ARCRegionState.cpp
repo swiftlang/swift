@@ -14,6 +14,7 @@
 #include "ARCRegionState.h"
 #include "ARCSequenceOptUtils.h"
 #include "RCStateTransitionVisitors.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
 #include "swift/SILOptimizer/Analysis/LoopRegionAnalysis.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
@@ -166,7 +167,7 @@ bool ARCRegionState::processBlockBottomUp(
     EpilogueARCFunctionInfo *EAFI, LoopRegionFunctionInfo *LRFI,
     bool FreezeOwnedArgEpilogueReleases,
     BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap,
-    ImmutablePointerSetFactory<SILInstruction> &SetFactory) {
+    ImmutablePointerSetFactory<SILInstruction *> &SetFactory) {
   LLVM_DEBUG(llvm::dbgs() << ">>>> Bottom Up!\n");
 
   SILBasicBlock &BB = *R->getBlock();
@@ -311,7 +312,7 @@ bool ARCRegionState::processBottomUp(
     llvm::DenseSet<SILInstruction *> &UnmatchedRefCountInsts,
     BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap,
     llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo,
-    ImmutablePointerSetFactory<SILInstruction> &SetFactory) {
+    ImmutablePointerSetFactory<SILInstruction *> &SetFactory) {
   const LoopRegion *R = getRegion();
 
   // We only process basic blocks for now. This ensures that we always propagate
@@ -331,7 +332,7 @@ bool ARCRegionState::processBottomUp(
 bool ARCRegionState::processBlockTopDown(
     SILBasicBlock &BB, AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
     BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
-    ImmutablePointerSetFactory<SILInstruction> &SetFactory) {
+    ImmutablePointerSetFactory<SILInstruction *> &SetFactory) {
   LLVM_DEBUG(llvm::dbgs() << ">>>> Top Down!\n");
 
   bool NestingDetected = false;
@@ -460,7 +461,7 @@ bool ARCRegionState::processTopDown(
     llvm::DenseSet<SILInstruction *> &UnmatchedRefCountInsts,
     BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
     llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo,
-    ImmutablePointerSetFactory<SILInstruction> &SetFactory) {
+    ImmutablePointerSetFactory<SILInstruction *> &SetFactory) {
   const LoopRegion *R = getRegion();
 
   // We only process basic blocks for now. This ensures that we always propagate

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -access-enforcement-opts -I %S/Inputs/abi %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -access-enforcement-opts -I %S/Inputs/abi %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -240,6 +240,7 @@ bb0:
   %9 = convert_escape_to_noescape %8 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
   %10 = begin_access [read] [dynamic] %0 : $*X
   %12 = apply %9() : $@noescape @callee_guaranteed () -> ()
+  destroy_value %9 : $@noescape @callee_guaranteed () -> ()
   end_borrow %8 : $@callee_guaranteed () -> ()
   destroy_value %7 : $@callee_guaranteed () -> ()
   end_access %10 : $*X
@@ -344,7 +345,9 @@ bb0:
   %15 = convert_escape_to_noescape %13 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
 
   %16 = apply %11() : $@noescape @callee_guaranteed () -> ()
+  destroy_value %11 : $@noescape @callee_guaranteed () -> ()
   %17 = apply %15() : $@noescape @callee_guaranteed () -> ()
+  destroy_value %15 : $@noescape @callee_guaranteed () -> ()
   destroy_value %7 : $@callee_guaranteed () -> ()
   destroy_value %13 : $@callee_guaranteed () -> ()
   destroy_value %0 : ${ var Int64 }
@@ -411,6 +414,7 @@ bb0:
   %11 = convert_escape_to_noescape %7 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
   %12 = begin_access [read] [dynamic] %1 : $*Int64
   %15 = apply %11() : $@noescape @callee_guaranteed () -> ()
+  destroy_value %11 : $@noescape @callee_guaranteed () -> ()
   destroy_value %9 : $@callee_guaranteed () -> ()
   end_access %12 : $*Int64
   destroy_value %8 : $@callee_guaranteed () -> ()
@@ -477,6 +481,7 @@ bb0:
 
   %12 = begin_access [read] [dynamic] %1 : $*Int64
   %15 = apply %11() : $@noescape @callee_guaranteed () -> ()
+  destroy_value %11 : $@noescape @callee_guaranteed () -> ()
   destroy_value %9 : $@callee_guaranteed () -> ()
   end_access %12 : $*Int64
   destroy_value %8 : $@callee_guaranteed () -> ()
@@ -550,6 +555,7 @@ bb0:
   %13 = tuple ()
   %14 = tuple ()
   %15 = apply %11() : $@noescape @callee_guaranteed () -> ()
+  destroy_value %11 : $@noescape @callee_guaranteed () -> ()
   %16 = tuple ()
   destroy_value %9 : $@callee_guaranteed () -> ()
   end_access %12 : $*Int64
@@ -628,6 +634,7 @@ bb0:
   %13 = tuple ()
   %14 = tuple ()
   %15 = apply %11() : $@noescape @callee_guaranteed () -> ()
+  destroy_value %11 : $@noescape @callee_guaranteed () -> ()
   %16 = tuple ()
   destroy_value %9 : $@callee_guaranteed () -> ()
   end_access %12 : $*Int64
@@ -689,6 +696,7 @@ bb0:
   %12 = copy_value %11 : $@callee_guaranteed () -> ()
   %13 = convert_escape_to_noescape %12 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
   %14 = apply %13() : $@noescape @callee_guaranteed () -> ()
+  destroy_value %13 : $@noescape @callee_guaranteed () -> ()
   %15 = tuple ()
   destroy_value %12 : $@callee_guaranteed () -> ()
   destroy_value %11 : $@callee_guaranteed () -> ()
@@ -766,6 +774,7 @@ bb0:
   %12 = copy_value %11 : $@callee_guaranteed () -> ()
   %13 = convert_escape_to_noescape %12 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
   %14 = apply %13() : $@noescape @callee_guaranteed () -> ()
+  destroy_value %13 : $@noescape @callee_guaranteed () -> ()
   %15 = tuple ()
   destroy_value %12 : $@callee_guaranteed () -> ()
   destroy_value %11 : $@callee_guaranteed () -> ()
@@ -838,6 +847,7 @@ bb0:
   %12 = copy_value %11 : $@callee_guaranteed () -> ()
   %13 = convert_escape_to_noescape %12 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
   %14 = apply %13() : $@noescape @callee_guaranteed () -> ()
+  destroy_value %13 : $@noescape @callee_guaranteed () -> ()
   %15 = tuple ()
   destroy_value %12 : $@callee_guaranteed () -> ()
   destroy_value %11 : $@callee_guaranteed () -> ()
@@ -912,6 +922,7 @@ bb0:
   %12 = copy_value %11 : $@callee_guaranteed () -> ()
   %13 = convert_escape_to_noescape %12 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
   %14 = apply %13() : $@noescape @callee_guaranteed () -> ()
+  destroy_value %13 : $@noescape @callee_guaranteed () -> ()
   %15 = tuple ()
   destroy_value %12 : $@callee_guaranteed () -> ()
   destroy_value %11 : $@callee_guaranteed () -> ()
@@ -995,9 +1006,9 @@ bb0:
 // CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [trivial] [[BEGIN]] : $*X
 // CHECK-NEXT: load [trivial] [[BEGIN]] : $*X
-// CHECK-NEXT: end_access [[BEGIN]] : $*X
 // CHECK-NEXT: destroy_value
-// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [trivial] [[BEGIN]] : $*X
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
 // CHECK-LABEL: } // end sil function 'testOldToNewMapReadMayRelease'
 sil [ossa] @testOldToNewMapReadMayRelease : $@convention(thin) () -> () {
 bb0:
@@ -1894,3 +1905,28 @@ bb0(%0 : $UnsafeRawPointer):
   return %9 : $()
 }
 
+
+// CHECK-LABEL: sil [ossa] @merge_3_pairs_and_escaping_pointer :
+// CHECK:         ref_element_addr
+// CHECK-NEXT:    begin_access
+// CHECK-NEXT:    end_access
+// CHECK-NEXT:    ref_element_addr
+// CHECK-NEXT:    begin_access
+// CHECK-NEXT:    address_to_pointer
+// CHECK-NEXT:    end_access
+// CHECK-NEXT:    tuple
+// CHECK-LABEL: } // end sil function 'merge_3_pairs_and_escaping_pointer'
+sil [ossa] @merge_3_pairs_and_escaping_pointer : $@convention(thin) (@guaranteed RefElemClass) -> () {
+bb0(%1 : @guaranteed $RefElemClass):
+  %2 = ref_element_addr %1, #RefElemClass.x
+  %3 = begin_access [modify] [dynamic] %2
+  end_access %3
+  %5 = begin_access [modify] [dynamic] %2
+  end_access %5
+  %7 = ref_element_addr %1, #RefElemClass.x
+  %8 = begin_access [modify] [dynamic] %7
+  %9 = address_to_pointer %8 to $Builtin.RawPointer
+  end_access %8
+  %11 = tuple ()
+  return %11
+}

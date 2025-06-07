@@ -1,0 +1,53 @@
+// RUN: %target-swift-frontend -emit-ir %s | %IRGenFileCheck %s
+
+// REQUIRES: concurrency
+
+import Swift
+import _Concurrency
+
+sil_stage canonical
+
+sil @closure : $<T> (@guaranteed Optional<any Actor>, Int) -> ()
+
+sil @form_closure : $<T> (@guaranteed Optional<any Actor>, Int) -> @callee_guaranteed @isolated(any) () -> () {
+entry(%actor: $Optional<any Actor>, %int: $Int):
+  %f = function_ref @closure : $@convention(thin) <T> (@guaranteed Optional<any Actor>, Int) -> ()
+  %closure = partial_apply [isolated_any] [callee_guaranteed] %f<T>(%actor, %int) : $@convention(thin) <T> (@guaranteed Optional<any Actor>, Int) -> ()
+  return %closure : $@callee_guaranteed @isolated(any) () -> ()
+}
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { ptr, ptr } @form_closure
+// CHECK: ([[INT]] %0, [[INT]] %1, [[INT]] %2, ptr %T)
+//   ptr: heap metadata
+//   ptr: heap refcount
+//   ptr: isolation ref
+//   ptr: isolation wtable
+//   ptr: T metadata
+//   ptr: int capture
+// CHECK-64: [[BOX:%.*]] = call noalias ptr @swift_allocObject(ptr {{.*}}, [[INT]] 48, [[INT]] 7)
+// CHECK-32: [[BOX:%.*]] = call noalias ptr @swift_allocObject(ptr {{.*}}, [[INT]] 24, [[INT]] 3)
+// CHECK-NEXT: [[ISO_ADDR:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, %TScA_pSg, [{{4|8}} x i8], %TSi }>, ptr [[BOX]], i32 0, i32 1
+// CHECK-NEXT: [[ISO_REF_ADDR:%.*]] = getelementptr inbounds{{.*}} { [[INT]], [[INT]] }, ptr [[ISO_ADDR]], i32 0, i32 0
+// CHECK-NEXT: store [[INT]] %0, ptr [[ISO_REF_ADDR]], align
+// CHECK-NEXT: [[ISO_WT_ADDR:%.*]] = getelementptr inbounds{{.*}} { [[INT]], [[INT]] }, ptr [[ISO_ADDR]], i32 0, i32 1
+// CHECK-NEXT: store [[INT]] %1, ptr [[ISO_WT_ADDR]], align
+// CHECK-NEXT: [[T_ADDR:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, %TScA_pSg, [{{4|8}} x i8], %TSi }>, ptr [[BOX]], i32 0, i32 2
+// CHECK-NEXT: store ptr %T, ptr [[T_ADDR]], align
+// CHECK:      [[RESULT:%.*]] = insertvalue { ptr, ptr } { ptr @"$s7closureTA{{(\.ptrauth.*)?}}", ptr undef }, ptr [[BOX]], 1
+// CHECK-NEXT: ret { ptr, ptr } [[RESULT]]
+
+sil @extract_closure_isolation : $(@guaranteed @callee_guaranteed @isolated(any) () -> ()) -> Optional<any Actor> {
+entry(%fn : $@callee_guaranteed @isolated(any) () -> ()):
+  %actor = function_extract_isolation %fn : $@callee_guaranteed @isolated(any) () -> ()
+  return %actor : $Optional<any Actor>
+}
+// CHECK-64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i64, i64 } @extract_closure_isolation
+// CHECK-32-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { i32, i32 } @extract_closure_isolation
+// CHECK-64:   [[ISO_ADDR:%.*]] = getelementptr inbounds i8, ptr %1, i32 16
+// CHECK-32:   [[ISO_ADDR:%.*]] = getelementptr inbounds i8, ptr %1, i32 8
+// CHECK-NEXT: [[ISO_REF_ADDR:%.*]] = getelementptr inbounds{{.*}} { [[INT]], [[INT]] }, ptr [[ISO_ADDR]], i32 0, i32 0
+// CHECK-NEXT: [[ISO_REF:%.*]] = load [[INT]], ptr [[ISO_REF_ADDR]], align
+// CHECK-NEXT: [[ISO_WT_ADDR:%.*]] = getelementptr inbounds{{.*}} { [[INT]], [[INT]] }, ptr [[ISO_ADDR]], i32 0, i32 1
+// CHECK-NEXT: [[ISO_WT:%.*]] = load [[INT]], ptr [[ISO_WT_ADDR]], align
+// CHECK-NEXT: [[T0:%.*]] = insertvalue { [[INT]], [[INT]] } undef, [[INT]] [[ISO_REF]], 0
+// CHECK-NEXT: [[T1:%.*]] = insertvalue { [[INT]], [[INT]] } [[T0]], [[INT]] [[ISO_WT]], 1
+// CHECK-NEXT: ret { [[INT]], [[INT]] } [[T1]]

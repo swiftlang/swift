@@ -20,8 +20,9 @@
 
 #include "swift/Remote/RemoteAddress.h"
 #include "swift/SwiftRemoteMirror/MemoryReaderInterface.h"
-#include "llvm/ADT/Optional.h"
+#include <optional>
 
+#include <cstdlib>
 #include <cstring>
 #include <functional>
 #include <memory>
@@ -149,9 +150,9 @@ public:
     return RemoteAbsolutePointer("", readValue);
   }
 
-  virtual llvm::Optional<RemoteAbsolutePointer>
+  virtual std::optional<RemoteAbsolutePointer>
   resolvePointerAsSymbol(RemoteAddress address) {
-    return llvm::None;
+    return std::nullopt;
   }
 
   /// Lookup a symbol for the given remote address.
@@ -169,8 +170,8 @@ public:
   }
 
   /// Attempt to read and resolve a pointer value at the given remote address.
-  llvm::Optional<RemoteAbsolutePointer> readPointer(RemoteAddress address,
-                                                    unsigned pointerSize) {
+  std::optional<RemoteAbsolutePointer> readPointer(RemoteAddress address,
+                                                   unsigned pointerSize) {
     // First, try to lookup the pointer as a dynamic symbol (binding), as
     // reading memory may potentially be expensive.
     if (auto dynamicSymbol = getDynamicSymbol(address))
@@ -178,8 +179,8 @@ public:
 
     auto result = readBytes(address, pointerSize);
     if (!result)
-      return llvm::None;
-    
+      return std::nullopt;
+
     uint64_t pointerData;
     if (pointerSize == 4) {
       uint32_t theData;
@@ -188,13 +189,13 @@ public:
     } else if (pointerSize == 8) {
       memcpy(&pointerData, result.get(), 8);
     } else {
-      return llvm::None;
+      return std::nullopt;
     }
     
     return resolvePointer(address, pointerData);
   }
 
- // Parse extra inhabitants stored in a pointer.
+  // Parse extra inhabitants stored in a pointer.
   // Sets *extraInhabitant to -1 if the pointer at this address
   // is actually a valid pointer.
   // Otherwise, it sets *extraInhabitant to the inhabitant

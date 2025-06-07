@@ -14,6 +14,7 @@
 #include "CodeCompletionDiagnostics.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/IDE/CodeCompletionStringPrinter.h"
 #include "swift/IDE/Utils.h"
@@ -34,6 +35,11 @@ static bool shouldCopyAssociatedUSRForDecl(const ValueDecl *VD) {
   if (isa<ModuleDecl>(VD))
     return false;
   if (VD->hasClangNode() && !VD->getClangDecl())
+    return false;
+
+  // Avoid generating USRs for decls in local contexts, we cannot guarantee
+  // any parent closures will be type-checked, which is needed for mangling.
+  if (VD->getDeclContext()->getLocalContext())
     return false;
 
   return true;
@@ -69,7 +75,7 @@ copyAssociatedUSRs(llvm::BumpPtrAllocator &Allocator, const Decl *D) {
       });
 
   if (!USRs.empty())
-    return makeArrayRef(USRs).copy(Allocator);
+    return llvm::ArrayRef(USRs).copy(Allocator);
 
   return {};
 }
@@ -128,7 +134,7 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
     }
 
     ContextFreeResult = ContextFreeCodeCompletionResult::createDeclResult(
-        Sink, CCS, AssociatedDecl, IsAsync, HasAsyncAlternative, ModuleName,
+        Sink, CCS, AssociatedDecl, HasAsyncAlternative, ModuleName,
         NullTerminatedStringRef(BriefDocComment, Allocator),
         copyAssociatedUSRs(Allocator, AssociatedDecl), ResultType,
         ContextFreeNotRecReason, ContextFreeDiagnosticSeverity,
@@ -145,7 +151,7 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
   case CodeCompletionResultKind::Pattern:
     ContextFreeResult =
         ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
-            Sink, Kind, CCS, CodeCompletionOperatorKind::None, IsAsync,
+            Sink, Kind, CCS, CodeCompletionOperatorKind::None,
             NullTerminatedStringRef(BriefDocComment, Allocator), ResultType,
             ContextFreeNotRecReason, ContextFreeDiagnosticSeverity,
             ContextFreeDiagnosticMessage);
@@ -162,22 +168,27 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
     // we don't need to compute any contextual properties.
     return new (Allocator) CodeCompletionResult(
         *ContextFreeResult, SemanticContextKind::None, CodeCompletionFlair(),
-        /*NumBytesToErase=*/0, /*TypeContext=*/nullptr,
-        /*DC=*/nullptr, /*USRTypeContext=*/nullptr,
-        /*CanCurrDeclContextHandleAsync=*/false,
+        /*NumBytesToErase=*/0, CodeCompletionResultTypeRelation::Unrelated,
         ContextualNotRecommendedReason::None);
   } else {
     assert(
         ContextFreeResult != nullptr &&
         "ContextFreeResult should have been constructed by the switch above");
+
     // We know that the ContextFreeResult has an AST-based type because it was
     // just computed and not read from the cache and
     // Sink.shouldProduceContextFreeResults() is false. So we can pass nullptr
     // for USRTypeContext.
+    CodeCompletionResultTypeRelation typeRelation =
+        ContextFreeResult->calculateContextualTypeRelation(
+            DC, TypeContext, /*usrTypeContext=*/nullptr);
+    ContextualNotRecommendedReason notRecommendedReason =
+        ContextFreeResult->calculateContextualNotRecommendedReason(
+            ContextualNotRecReason, CanCurrDeclContextHandleAsync);
+
     return new (Allocator) CodeCompletionResult(
         *ContextFreeResult, SemanticContext, Flair, NumBytesToErase,
-        TypeContext, DC, /*USRTypeContext=*/nullptr,
-        CanCurrDeclContextHandleAsync, ContextualNotRecReason);
+        typeRelation, notRecommendedReason);
   }
 }
 
@@ -207,9 +218,9 @@ void CodeCompletionResultBuilder::setAssociatedDecl(const Decl *D) {
     CurrentModule = MD;
   }
 
-  if (D->getAttrs().getDeprecated(D->getASTContext()))
+  if (D->isDeprecated())
     setContextFreeNotRecommended(ContextFreeNotRecommendedReason::Deprecated);
-  else if (D->getAttrs().getSoftDeprecated(D->getASTContext()))
+  else if (D->getSoftDeprecatedAttr())
     setContextFreeNotRecommended(
         ContextFreeNotRecommendedReason::SoftDeprecated);
 
@@ -222,67 +233,65 @@ void CodeCompletionResultBuilder::setAssociatedDecl(const Decl *D) {
       }
     }
   } else {
-    setBriefDocComment(AssociatedDecl->getBriefComment());
+    setBriefDocComment(AssociatedDecl->getSemanticBriefComment());
   }
 }
 
 void CodeCompletionResultBuilder::addCallArgument(
     Identifier Name, Identifier LocalName, Type Ty, Type ContextTy,
     bool IsVarArg, bool IsInOut, bool IsIUO, bool IsAutoClosure,
-    bool UseUnderscoreLabel, bool IsLabeledTrailingClosure, bool HasDefault) {
+    bool IsLabeledTrailingClosure, bool IsForOperator, bool HasDefault) {
   ++CurrentNestingLevel;
   using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
 
   addSimpleChunk(ChunkKind::CallArgumentBegin);
 
   if (shouldAnnotateResults()) {
-    if (!Name.empty() || !LocalName.empty()) {
-      llvm::SmallString<16> EscapedKeyword;
-
-      if (!Name.empty()) {
-        addChunkWithText(
-            CodeCompletionString::Chunk::ChunkKind::CallArgumentName,
-            escapeKeyword(Name.str(), false, EscapedKeyword));
-
-        if (!LocalName.empty() && Name != LocalName) {
-          addChunkWithTextNoCopy(ChunkKind::Text, " ");
-          getLastChunk().setIsAnnotation();
-          addChunkWithText(
-              ChunkKind::CallArgumentInternalName,
-              escapeKeyword(LocalName.str(), false, EscapedKeyword));
-          getLastChunk().setIsAnnotation();
-        }
-      } else {
-        assert(!LocalName.empty());
-        addChunkWithTextNoCopy(ChunkKind::CallArgumentName, "_");
-        getLastChunk().setIsAnnotation();
+    llvm::SmallString<16> EscapedKeyword;
+    if (!Name.empty()) {
+      addChunkWithText(ChunkKind::CallArgumentName,
+                       escapeKeyword(Name.str(), false, EscapedKeyword));
+      if (!LocalName.empty() && Name != LocalName) {
         addChunkWithTextNoCopy(ChunkKind::Text, " ");
         getLastChunk().setIsAnnotation();
         addChunkWithText(ChunkKind::CallArgumentInternalName,
                          escapeKeyword(LocalName.str(), false, EscapedKeyword));
+        getLastChunk().setIsAnnotation();
       }
       addChunkWithTextNoCopy(ChunkKind::CallArgumentColon, ": ");
+    } else if (!LocalName.empty()) {
+      addChunkWithTextNoCopy(ChunkKind::CallArgumentName, "_");
+      getLastChunk().setIsAnnotation();
+      addChunkWithTextNoCopy(ChunkKind::Text, " ");
+      getLastChunk().setIsAnnotation();
+      addChunkWithText(ChunkKind::CallArgumentInternalName,
+                       escapeKeyword(LocalName.str(), false, EscapedKeyword));
+      addChunkWithTextNoCopy(ChunkKind::CallArgumentColon, ": ");
+    } else if (!IsForOperator) {
+      addChunkWithTextNoCopy(ChunkKind::CallArgumentName, "_");
+      if (!IsLabeledTrailingClosure)
+        getLastChunk().setIsAnnotation();
+      addChunkWithTextNoCopy(ChunkKind::CallArgumentColon, ": ");
+      if (!IsLabeledTrailingClosure)
+        getLastChunk().setIsAnnotation();
     }
   } else {
+    llvm::SmallString<16> stash;
+    ChunkKind nameKind;
+    StringRef nameStr;
     if (!Name.empty()) {
-      llvm::SmallString<16> EscapedKeyword;
-      addChunkWithText(CodeCompletionString::Chunk::ChunkKind::CallArgumentName,
-                       escapeKeyword(Name.str(), false, EscapedKeyword));
-      addChunkWithTextNoCopy(
-          CodeCompletionString::Chunk::ChunkKind::CallArgumentColon, ": ");
-    } else if (UseUnderscoreLabel) {
-      addChunkWithTextNoCopy(
-          CodeCompletionString::Chunk::ChunkKind::CallArgumentName, "_");
-      addChunkWithTextNoCopy(
-          CodeCompletionString::Chunk::ChunkKind::CallArgumentColon, ": ");
+      nameKind = ChunkKind::CallArgumentName;
+      nameStr = escapeKeyword(Name.str(), false, stash);
+    } else if (IsLabeledTrailingClosure) {
+      nameKind = ChunkKind::CallArgumentName;
+      nameStr = "_";
     } else if (!LocalName.empty()) {
-      // Use local (non-API) parameter name if we have nothing else.
-      llvm::SmallString<16> EscapedKeyword;
-      addChunkWithText(
-          CodeCompletionString::Chunk::ChunkKind::CallArgumentInternalName,
-          escapeKeyword(LocalName.str(), false, EscapedKeyword));
-      addChunkWithTextNoCopy(
-          CodeCompletionString::Chunk::ChunkKind::CallArgumentColon, ": ");
+      nameKind = ChunkKind::CallArgumentInternalName;
+      nameStr = escapeKeyword(LocalName.str(), false, stash);
+    }
+    if (!nameStr.empty()) {
+      addChunkWithText(nameKind, nameStr);
+      addChunkWithTextNoCopy(ChunkKind::CallArgumentColon, ": ");
     }
   }
 
@@ -399,7 +408,8 @@ void CodeCompletionResultBuilder::withNestedGroup(
   --CurrentNestingLevel;
 }
 
-void CodeCompletionResultBuilder::addTypeAnnotation(Type T, PrintOptions PO,
+void CodeCompletionResultBuilder::addTypeAnnotation(Type T,
+                                                    const PrintOptions &PO,
                                                     StringRef suffix) {
   T = T->getReferenceStorageReferent();
 

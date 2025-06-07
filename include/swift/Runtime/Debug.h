@@ -124,6 +124,14 @@ swift_dynamicCastFailure(const void *sourceType, const char *sourceName,
 SWIFT_RUNTIME_EXPORT
 void swift_reportError(uint32_t flags, const char *message);
 
+SWIFT_RUNTIME_EXPORT
+void swift_reportWarning(uint32_t flags, const char *message);
+
+#if !defined(SWIFT_HAVE_CRASHREPORTERCLIENT)
+SWIFT_RUNTIME_EXPORT
+std::atomic<const char *> *swift_getFatalErrorMessageBuffer();
+#endif
+
 // Halt due to an overflow in swift_retain().
 SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_RUNTIME_ATTRIBUTE_NOINLINE
 void swift_abortRetainOverflow();
@@ -151,6 +159,10 @@ void swift_abortDynamicReplacementDisabling();
 // Halt due to trying to use unicode data on platforms that don't have it.
 SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_RUNTIME_ATTRIBUTE_NOINLINE
 void swift_abortDisabledUnicodeSupport();
+
+// Halt due to a failure to allocate memory.
+SWIFT_RUNTIME_ATTRIBUTE_NORETURN
+void swift_abortAllocationFailure(size_t size, size_t alignMask);
 
 /// This function dumps one line of a stack trace. It is assumed that \p framePC
 /// is the address of the stack frame at index \p index. If \p shortOutput is

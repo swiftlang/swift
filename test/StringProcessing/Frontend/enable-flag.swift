@@ -2,7 +2,7 @@
 // RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-string-processing -enable-bare-slash-regex
 // RUN: %target-typecheck-verify-swift -disable-availability-checking -disable-experimental-string-processing -enable-experimental-string-processing -enable-bare-slash-regex
 
-// REQUIRES: swift_in_compiler
+// REQUIRES: swift_swift_parser
 
 prefix operator /
 

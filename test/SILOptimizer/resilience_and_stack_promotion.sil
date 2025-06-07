@@ -1,0 +1,39 @@
+// RUN: %empty-directory(%t)
+
+// RUN: %target-swift-frontend -parse-as-library -emit-module -o %t/Module.swiftmodule -module-name=Module %S/Inputs/public_class.swift -O
+// RUN: %target-swift-frontend -parse-as-library -emit-module -o %t/Resilient.swiftmodule -module-name=Resilient %S/Inputs/public_class.swift -O -enable-library-evolution
+
+// RUN: %target-sil-opt -stack-promotion -I %t %s | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+import Module
+import Resilient
+
+// CHECK-LABEL: sil @promote_non_resilient :
+// CHECK:         alloc_ref [stack] $Base
+// CHECK:       } // end sil function 'promote_non_resilient'
+sil @promote_non_resilient : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $Module.Base
+  strong_release %0 : $Module.Base
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @dont_promote_resilient :
+// CHECK:         alloc_ref $Base
+// CHECK:       } // end sil function 'dont_promote_resilient'
+sil @dont_promote_resilient : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $Resilient.Base
+  strong_release %0 : $Resilient.Base
+  %2 = tuple ()
+  return %2 : $()
+}

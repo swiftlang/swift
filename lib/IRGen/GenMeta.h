@@ -17,6 +17,7 @@
 #ifndef SWIFT_IRGEN_GENMETA_H
 #define SWIFT_IRGEN_GENMETA_H
 
+#include "swift/ABI/MetadataValues.h"
 #include <utility>
 
 namespace llvm {
@@ -58,6 +59,11 @@ namespace irgen {
                          const ClassLayout &fragileLayout,
                          const ClassLayout &resilientLayout);
 
+  /// Emit "embedded Swift" class metadata (a simple vtable) for the given class
+  /// declaration.
+  void emitEmbeddedClassMetadata(IRGenModule &IGM, ClassDecl *theClass,
+                                 const ClassLayout &fragileLayout);
+
   /// Emit the constant initializer of the type metadata candidate for
   /// the given foreign class declaration.
   llvm::Constant *emitForeignTypeMetadataInitializer(IRGenModule &IGM,
@@ -76,6 +82,10 @@ namespace irgen {
 
   /// Emit the type metadata accessor for a type for which it might be used.
   void emitLazyMetadataAccessor(IRGenModule &IGM, NominalTypeDecl *type);
+
+  void emitLazyClassMetadata(IRGenModule &IGM, CanType classType);
+
+  void emitLazySpecializedClassMetadata(IRGenModule &IGM, CanType classType);
 
   void emitLazyCanonicalSpecializedMetadataAccessor(IRGenModule &IGM,
                                                     CanType theType);
@@ -121,6 +131,15 @@ namespace irgen {
                                        llvm::Value *metadata);
 
   /// Given a reference to nominal type metadata of the given type,
+  /// derive a reference to the type metadata pack stored in the nth
+  /// requirement slot.  The type must have generic arguments.
+  llvm::Value *emitArgumentMetadataPackRef(IRGenFunction &IGF,
+                                           NominalTypeDecl *theDecl,
+                                           const GenericTypeRequirements &reqts,
+                                           unsigned reqtIndex,
+                                           llvm::Value *metadata);
+
+  /// Given a reference to nominal type metadata of the given type,
   /// derive a reference to a protocol witness table stored in the nth
   /// requirement slot.  The type must have generic arguments.
   llvm::Value *emitArgumentWitnessTableRef(IRGenFunction &IGF,
@@ -128,6 +147,33 @@ namespace irgen {
                                            const GenericTypeRequirements &reqts,
                                            unsigned reqtIndex,
                                            llvm::Value *metadata);
+
+  /// Given a reference to nominal type metadata of the given type,
+  /// derive a reference to a protocol witness table pack stored in the nth
+  /// requirement slot.  The type must have generic arguments.
+  llvm::Value *emitArgumentWitnessTablePackRef(IRGenFunction &IGF,
+                                               NominalTypeDecl *theDecl,
+                                           const GenericTypeRequirements &reqts,
+                                               unsigned reqtIndex,
+                                               llvm::Value *metadata);
+
+  /// Given a reference to nominal type metadata of the given type,
+  /// derive a reference to a the pack shape stored in the nth
+  /// requirement slot.  The type must have generic arguments.
+  llvm::Value *emitArgumentPackShapeRef(IRGenFunction &IGF,
+                                        NominalTypeDecl *theDecl,
+                                        const GenericTypeRequirements &reqts,
+                                        unsigned reqtIndex,
+                                        llvm::Value *metadata);
+
+  /// Given a reference to nominal type metadata of the given type,
+  /// derive a reference to the value for the nth argument metadata.
+  /// The type must have generic arguments.
+  llvm::Value *emitValueGenericRef(IRGenFunction &IGF,
+                                   NominalTypeDecl *theDecl,
+                                   const GenericTypeRequirements &reqts,
+                                   unsigned reqtIndex,
+                                   llvm::Value *metadata);
 
   /// Given a metatype value, read its instance type.
   llvm::Value *emitMetatypeInstanceType(IRGenFunction &IGF,
@@ -147,11 +193,15 @@ namespace irgen {
     enum : unsigned {
       // Class metadata has two words of head-allocated data: the destructor
       // and the value witness table.
-      Class = 2,
+      Class = 3,
       
       // Struct and enum metadata have one word of head-allocated data:
       // the value witness table.
-      ValueType = 1,
+      ValueType = 2,
+
+      // Some builtin and well-known types don't have a layout string
+      // for binary compatibility reasons.
+      NoTypeLayoutString = 1,
       
       // Other metadata objects have no head allocation.
       None = 0,
@@ -165,12 +215,53 @@ namespace irgen {
   void getArgAsLocalSelfTypeMetadata(IRGenFunction &IGF, llvm::Value *arg,
                                      CanType abstractType);
 
+  struct GenericPackArgument {
+    GenericPackKind Kind;
+    unsigned Index;
+    CanType ReducedShape;
+
+    GenericPackArgument(GenericPackKind kind,
+                        unsigned index,
+                        CanType reducedShape)
+      : Kind(kind), Index(index), ReducedShape(reducedShape) {}
+  };
+
+  struct GenericValueArgument {
+    CanType Type;
+
+    GenericValueArgument(CanType valueType) : Type(valueType) {}
+  };
+
   /// Description of the metadata emitted by adding generic requirements.
-  struct GenericRequirementsMetadata {
+  struct GenericArgumentMetadata {
+    unsigned NumParams = 0;
+    unsigned NumParamsEmitted = 0;
     unsigned NumRequirements = 0;
     unsigned NumGenericKeyArguments = 0;
-    unsigned NumGenericExtraArguments = 0;
+    SmallVector<CanType, 1> ShapeClasses;
+    SmallVector<GenericPackArgument, 1> GenericPackArguments;
+    SmallVector<GenericValueArgument, 1> GenericValueArguments;
   };
+
+  /// Add generic parameters to the given constant struct builder.
+  ///
+  /// \param sig The generic signature whose parameters we wish to emit.
+  GenericArgumentMetadata addGenericParameters(
+                                          IRGenModule &IGM,
+                                          ConstantStructBuilder &B,
+                                          GenericSignature sig,
+                                          bool implicit);
+
+  /// Add generic requirements to the given constant struct builder.
+  ///
+  /// This is a convenience implementation that passes along the generic
+  /// signature's requirements.
+  ///
+  /// \param sig The generic signature whose requirements should be added.
+  GenericArgumentMetadata addGenericRequirements(
+                                          IRGenModule &IGM,
+                                          ConstantStructBuilder &B,
+                                          GenericSignature sig);
 
   /// Add generic requirements to the given constant struct builder.
   ///
@@ -178,16 +269,39 @@ namespace irgen {
   /// described.
   ///
   /// \param requirements The requirements to add.
-  GenericRequirementsMetadata addGenericRequirements(
+  /// \param inverses The inverse requirements.
+  GenericArgumentMetadata addGenericRequirements(
                                           IRGenModule &IGM,
                                           ConstantStructBuilder &B,
                                           GenericSignature sig,
-                                          ArrayRef<Requirement> requirements);
+                                          ArrayRef<Requirement> requirements,
+                                         ArrayRef<InverseRequirement> inverses);
+
+  /// Add generic pack shape descriptors to the given constant struct builder.
+  ///
+  /// These appear in generic type metadata, and conformance descriptors with
+  /// conditional pack requirements.
+  void addGenericPackShapeDescriptors(IRGenModule &IGM,
+                                      ConstantStructBuilder &B,
+                                      ArrayRef<CanType> shapes,
+                                      ArrayRef<GenericPackArgument> packArgs);
+
+  /// Add the generic value descriptors to the given constant struct builder.
+  ///
+  /// These appear in generic type metadata.
+  void addGenericValueDescriptors(IRGenModule &IGM,
+                                  ConstantStructBuilder &B,
+                                  ArrayRef<GenericValueArgument> values);
 
   llvm::GlobalValue *emitAsyncFunctionPointer(IRGenModule &IGM,
                                               llvm::Function *function,
                                               LinkEntity entity,
                                               Size size);
+
+  llvm::GlobalValue *emitCoroFunctionPointer(IRGenModule &IGM,
+                                             llvm::Function *function,
+                                             LinkEntity entity,
+                                             Size size = Size(0));
 
   /// Determine whether the given opaque type requires a witness table for the
   /// given requirement.

@@ -4,9 +4,11 @@ add_swift_unittest(swiftSemaTests
   BindingInferenceTests.cpp
   ConstraintGenerationTests.cpp
   ConstraintSimplificationTests.cpp
+  ConstraintSystemDumpTests.cpp
   UnresolvedMemberLookupTests.cpp
   PlaceholderTypeInferenceTests.cpp
-  SolutionFilteringTests.cpp)
+  SolutionFilteringTests.cpp
+  KeypathFunctionConversionTests.cpp)
 
 target_link_libraries(swiftSemaTests
   PRIVATE

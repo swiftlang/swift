@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t.mcp)
-// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -Xcc -w -typecheck %s -module-cache-path %t.mcp -disable-named-lazy-member-loading 2>&1 | %FileCheck %s
+// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/custom-modules -Xcc -w -typecheck %s -diagnostic-style llvm -module-cache-path %t.mcp 2>&1 | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -20,25 +20,19 @@ func test(_ i: Int) {
   // We only see these five warnings because Clang can catch the other invalid
   // cases, and marks the attribute as invalid ahead of time.
   
-  // CHECK: warning: too few parameters in swift_name attribute (expected 2; got 1)
+  // CHECK: warning: too few parameters in swift_name attribute (expected 2; got 1) [#ClangDeclarationImport]
   // CHECK: + (instancetype)g:(id)x outParam:(int *)foo SWIFT_NAME(init(g:));
   // CHECK-NOT: warning:
   // CHECK: note: please report this issue to the owners of 'ObjCIRExtras'
   // CHECK-NOT: warning:
 
-  // CHECK: warning: too few parameters in swift_name attribute (expected 2; got 1)
-  // CHECK: + (instancetype)testW:(id)x out:(id *)outObject SWIFT_NAME(ww(_:));
-  // CHECK-NOT: warning:
-  // CHECK: note: please report this issue to the owners of 'ObjCIRExtras'
-  // CHECK-NOT: warning:
-
-  // CHECK: warning: cycle detected while resolving 'CircularName' in swift_name attribute for 'CircularName'
+  // CHECK: warning: cycle detected while resolving 'CircularName' in swift_name attribute for 'CircularName' [#ClangDeclarationImport]
   // CHECK: SWIFT_NAME(CircularName.Inner) @interface CircularName : NSObject @end
   // CHECK-NOT: {{warning|note}}:
   // CHECK: note: please report this issue to the owners of 'ObjCIRExtras'
   // CHECK-NOT: warning:
 
-  // CHECK: warning: cycle detected while resolving 'MutuallyCircularNameB' in swift_name attribute for 'MutuallyCircularNameA'
+  // CHECK: warning: cycle detected while resolving 'MutuallyCircularNameB' in swift_name attribute for 'MutuallyCircularNameA' [#ClangDeclarationImport]
   // CHECK: SWIFT_NAME(MutuallyCircularNameB.Inner) @interface MutuallyCircularNameA : NSObject @end
   // CHECK-NOT: {{warning|note}}:
   // CHECK: note: while resolving 'MutuallyCircularNameA' in swift_name attribute for 'MutuallyCircularNameB'

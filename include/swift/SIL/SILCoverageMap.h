@@ -41,17 +41,52 @@ namespace swift {
 class SILCoverageMap : public llvm::ilist_node<SILCoverageMap>,
                        public SILAllocated<SILCoverageMap> {
 public:
-  struct MappedRegion {
+  class MappedRegion {
+  public:
+    enum class Kind {
+      /// A code region, which represents a regular region of source code.
+      Code,
+
+      /// A skipped region, which represents a region that cannot have any
+      /// coverage associated with it. This is used for e.g the inactive body of
+      /// a \c #if.
+      Skipped
+    };
+
+    Kind RegionKind;
     unsigned StartLine;
     unsigned StartCol;
     unsigned EndLine;
     unsigned EndCol;
     llvm::coverage::Counter Counter;
 
-    MappedRegion(unsigned StartLine, unsigned StartCol, unsigned EndLine,
-                 unsigned EndCol, llvm::coverage::Counter Counter)
-        : StartLine(StartLine), StartCol(StartCol), EndLine(EndLine),
-          EndCol(EndCol), Counter(Counter) {}
+  private:
+    MappedRegion(Kind RegionKind, unsigned StartLine, unsigned StartCol,
+                 unsigned EndLine, unsigned EndCol,
+                 llvm::coverage::Counter Counter)
+        : RegionKind(RegionKind), StartLine(StartLine), StartCol(StartCol),
+          EndLine(EndLine), EndCol(EndCol), Counter(Counter) {}
+
+  public:
+    /// A code region, which represents a regular region of source code.
+    static MappedRegion code(unsigned StartLine, unsigned StartCol,
+                             unsigned EndLine, unsigned EndCol,
+                             llvm::coverage::Counter Counter) {
+      return MappedRegion(Kind::Code, StartLine, StartCol, EndLine, EndCol,
+                          Counter);
+    }
+
+    /// A skipped region, which represents a region that cannot have any
+    /// coverage associated with it. This is used for e.g the inactive body of
+    /// a \c #if.
+    static MappedRegion skipped(unsigned StartLine, unsigned StartCol,
+                                unsigned EndLine, unsigned EndCol) {
+      return MappedRegion(Kind::Skipped, StartLine, StartCol, EndLine, EndCol,
+                          llvm::coverage::Counter());
+    }
+
+    /// Retrieve the equivalent LLVM mapped region.
+    llvm::coverage::CounterMappingRegion getLLVMRegion(unsigned FileID) const;
   };
 
 private:
@@ -127,7 +162,16 @@ public:
     return Expressions;
   }
 
-  void printCounter(llvm::raw_ostream &OS, llvm::coverage::Counter C) const;
+  /// Print a given profiling counter expression, given the reference to the
+  /// counter, and the list of counters it may reference.
+  static void
+  printCounter(llvm::raw_ostream &OS, llvm::coverage::Counter C,
+               ArrayRef<llvm::coverage::CounterExpression> Expressions);
+
+  /// Print a given profiling counter expression.
+  void printCounter(llvm::raw_ostream &OS, llvm::coverage::Counter C) const {
+    printCounter(OS, C, getExpressions());
+  }
 
   /// Print the coverage map.
   void print(llvm::raw_ostream &OS, bool Verbose = false,

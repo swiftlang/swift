@@ -28,6 +28,7 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Demangling/Demangler.h"
@@ -91,7 +92,7 @@ public:
 /// The template subclasses do target-specific logic.
 class RemoteASTContextImpl {
   std::unique_ptr<IRGenContext> IRGen;
-  Optional<Failure> CurFailure;
+  std::optional<Failure> CurFailure;
 
 public:
   RemoteASTContextImpl() = default;
@@ -116,11 +117,11 @@ public:
                                  unsigned ordinal) = 0;
   Result<uint64_t>
   getOffsetOfMember(Type type, RemoteAddress optMetadata, StringRef memberName){
-    // Sanity check: obviously invalid arguments.
+    // Soundness check: obviously invalid arguments.
     if (!type || memberName.empty())
       return Result<uint64_t>::emplaceFailure(Failure::BadArgument);
 
-    // Sanity check: if the caller gave us a dependent type, there's no way
+    // Soundness check: if the caller gave us a dependent type, there's no way
     // we can handle that.
     if (type->hasTypeParameter() || type->hasArchetype())
       return Result<uint64_t>::emplaceFailure(Failure::DependentArgument);
@@ -391,7 +392,7 @@ private:
   }
 
   /// Attempt to discover the size and alignment of the given type.
-  Optional<std::pair<Size, Alignment>>
+  std::optional<std::pair<Size, Alignment>>
   getTypeSizeAndAlignment(irgen::IRGenModule &IGM, SILType eltTy) {
     auto &eltTI = IGM.getTypeInfo(eltTy);
     if (auto fixedTI = dyn_cast<irgen::FixedTypeInfo>(&eltTI)) {
@@ -400,7 +401,7 @@ private:
     }
 
     // TODO: handle resilient types
-    return None;
+    return std::nullopt;
   }
 };
 
@@ -432,7 +433,7 @@ class RemoteASTContextConcreteImpl final : public RemoteASTContextImpl {
 public:
   RemoteASTContextConcreteImpl(std::shared_ptr<MemoryReader> &&reader,
                                ASTContext &ctx)
-    : Reader(std::move(reader), ctx) {}
+    : Reader(std::move(reader), ctx, GenericSignature()) {}
 
   Result<Type> getTypeForRemoteTypeMetadata(RemoteAddress metadata,
                                             bool skipArtificial) override {

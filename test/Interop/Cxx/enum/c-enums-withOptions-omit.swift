@@ -57,3 +57,19 @@ import CenumsWithOptionsOmit
 // CHECK-NEXT: class func willTransitionToState(_ state: UITableViewCellStateMask)
 // CHECK-NEXT: @available(swift, obsoleted: 3, renamed: "willTransition(to:)")
 // CHECK-NEXT: func willTransitionToState(_ state: UITableViewCellStateMask)
+
+// Tests for forControlEvents -> 'for controlEvents'
+// CHECK-NEXT: class func addTarget(_ target: Any?, action: OpaquePointer!, for controlEvents: UIControlEvents)
+// CHECK-NEXT: func addTarget(_ target: Any?, action: OpaquePointer!, for controlEvents: UIControlEvents)
+// CHECK-NEXT: @available(swift, obsoleted: 3, renamed: "addTarget(_:action:for:)")
+// CHECK-NEXT: class func addTarget(_ target: Any?, action: OpaquePointer!, forControlEvents controlEvents: UIControlEvents)
+// CHECK-NEXT: @available(swift, obsoleted: 3, renamed: "addTarget(_:action:for:)")
+// CHECK-NEXT: func addTarget(_ target: Any?, action: OpaquePointer!, forControlEvents controlEvents: UIControlEvents)
+
+// Tests for atScrollPosition -> 'at atScrollPosition'
+// CHECK-NEXT: class func scrollToRow(at indexPath: NSIndexPath!, at scrollPosition: UITableViewScrollPosition)
+// CHECK-NEXT: func scrollToRow(at indexPath: NSIndexPath!, at scrollPosition: UITableViewScrollPosition)
+// CHECK-NEXT: @available(swift, obsoleted: 3, renamed: "scrollToRow(at:at:)")
+// CHECK-NEXT: class func scrollToRowAtIndexPath(_ indexPath: NSIndexPath!, atScrollPosition scrollPosition: UITableViewScrollPosition)
+// CHECK-NEXT: @available(swift, obsoleted: 3, renamed: "scrollToRow(at:at:)")
+// CHECK-NEXT: func scrollToRowAtIndexPath(_ indexPath: NSIndexPath!, atScrollPosition scrollPosition: UITableViewScrollPosition)

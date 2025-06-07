@@ -1,11 +1,9 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library) | %FileCheck %s --dump-input=always
+// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -parse-as-library) | %FileCheck %s --dump-input=always
+
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
-// UNSUPPORTED: OS=linux-gnu
-
-// REQUIRES: rdar86028226
 
 struct Boom: Error {}
 
@@ -17,7 +15,7 @@ func boom() async throws -> Int {
 func test_taskGroup_next() async {
   let sum = await withThrowingTaskGroup(of: Int.self, returning: Int.self) { group in
     for n in 1...10 {
-      group.spawn {
+      group.addTask {
         return n.isMultiple(of: 3) ? try await boom() : n
       }
     }
@@ -50,7 +48,7 @@ func test_taskGroup_next() async {
 func test_taskGroup_for_in() async {
   let sum = await withThrowingTaskGroup(of: Int.self, returning: Int.self) { group in
     for n in 1...10 {
-      group.spawn {
+      group.addTask {
         return n.isMultiple(of: 3) ? try await boom() : n
       }
     }
@@ -81,7 +79,7 @@ func test_taskGroup_for_in() async {
 func test_taskGroup_asyncIterator() async {
   let sum = await withThrowingTaskGroup(of: Int.self, returning: Int.self) { group in
     for n in 1...10 {
-      group.spawn {
+      group.addTask {
         return n.isMultiple(of: 3) ? try await boom() : n
       }
     }
@@ -119,7 +117,7 @@ func test_taskGroup_asyncIterator() async {
 func test_taskGroup_contains() async {
   let sum = await withTaskGroup(of: Int.self, returning: Int.self) { group in
     for n in 1...4 {
-      group.spawn {
+      group.addTask {
         return n
       }
     }
@@ -128,7 +126,7 @@ func test_taskGroup_contains() async {
     print("three = \(three)") // CHECK: three = true
 
     for n in 5...7 {
-      group.spawn {
+      group.addTask {
         return n
       }
     }

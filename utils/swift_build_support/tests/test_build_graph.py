@@ -54,4 +54,4 @@ class BuildGraphTestCase(unittest.TestCase):
         selectedProducts = [products['swiftpm']]
         schedule = build_graph.produce_scheduled_build(selectedProducts)
         names = [x.name for x in schedule[0]]
-        self.assertEquals(['cmark', 'llvm', 'swift', 'swiftpm'], names)
+        self.assertEqual(['cmark', 'llvm', 'swift', 'swiftpm'], names)

@@ -23,7 +23,7 @@ namespace swift {
 class AsyncLet;
 class AsyncTask;
 class ContinuationAsyncContext;
-class ExecutorRef;
+class SerialExecutorRef;
 struct HeapObject;
 class Job;
 class TaskGroup;
@@ -47,8 +47,7 @@ void actor_dequeue(HeapObject *actor, Job *job);
 // State values are:
 // Idle = 0, Scheduled = 1, Running = 2, Zombie_ReadyForDeallocation = 3,
 // invalid/unknown = 255
-void actor_state_changed(HeapObject *actor, Job *firstJob,
-                         bool needsPreprocessing, uint8_t state,
+void actor_state_changed(HeapObject *actor, Job *firstJob, uint8_t state,
                          bool isDistributedRemote, bool isPriorityEscalated,
                          uint8_t maxPriority);
 
@@ -64,7 +63,7 @@ void task_create(AsyncTask *task, AsyncTask *parent, TaskGroup *group,
 void task_destroy(AsyncTask *task);
 
 void task_status_changed(AsyncTask *task, uint8_t maxPriority, bool isCancelled,
-                         bool isEscalated, bool isRunning, bool isEnqueued);
+                         bool isEscalated, bool isStarting, bool isRunning, bool isEnqueued);
 
 void task_flags_changed(AsyncTask *task, uint8_t jobPriority, bool isChildTask,
                         bool isFuture, bool isGroupChildTask,

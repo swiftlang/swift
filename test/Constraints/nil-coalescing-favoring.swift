@@ -6,9 +6,9 @@ struct B {
 
 struct A {
   init(_ other: B) {}
-  // CHECK: constructor_decl{{.*}}interface type='(A.Type) -> (B?) -> A'
+  // CHECK: constructor_decl{{.*}}interface_type="(A.Type) -> (B?) -> A"
   init(_ other: B?) {
-    // CHECK: dot_syntax_call_expr type='(B) -> A'
+    // CHECK: dot_syntax_call_expr type="(B) -> A"
     self.init(other ?? ._none)
   }
 }

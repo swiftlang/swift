@@ -54,14 +54,6 @@
 // Clean up the test executable because hard links are expensive.
 // RUN: rm -rf %t/DISTINCTIVE-PATH/usr/bin/swiftc
 
-// RUN: %swiftc_driver -driver-print-jobs -whole-module-optimization -incremental %s 2>&1 > %t.wmo-inc.txt
-// RUN: %FileCheck %s < %t.wmo-inc.txt
-// RUN: %FileCheck -check-prefix NO-REFERENCE-DEPENDENCIES %s < %t.wmo-inc.txt
-
-// RUN: %swiftc_driver -driver-print-jobs -embed-bitcode -incremental %s 2>&1 > %t.embed-inc.txt
-// RUN: %FileCheck %s < %t.embed-inc.txt
-// RUN: %FileCheck -check-prefix NO-REFERENCE-DEPENDENCIES %s < %t.embed-inc.txt
-
 // REQUIRES: CODEGENERATOR=X86
 
 // swift-frontend cannot be copied to another location with bootstrapping because
@@ -75,14 +67,13 @@
 // COMPLEX: bin{{/|\\\\}}swift
 // COMPLEX: -c
 // COMPLEX: Driver{{/|\\\\}}driver-compile.swift
-// COMPLEX-DAG: -sdk {{.*}}/Inputs/clang-importer-sdk
+// COMPLEX-DAG: -sdk
 // COMPLEX-DAG: -foo -bar
 // COMPLEX-DAG: -Xllvm -baz
 // COMPLEX-DAG: -Xcc -garply
 // COMPLEX-DAG: -F /path/to/frameworks -Fsystem /path/to/systemframeworks -F /path/to/more/frameworks
 // COMPLEX-DAG: -I /path/to/headers -I path/to/more/headers
 // COMPLEX-DAG: -module-cache-path /tmp/modules
-// COMPLEX-DAG: -emit-reference-dependencies-path {{(.*(/|\\))?driver-compile[^ /]*}}.swiftdeps
 // COMPLEX: -o {{.+}}.o
 
 
@@ -135,6 +126,3 @@
 // UPDATE-CODE: {{DISTINCTIVE-PATH|distinctive-path}}{{/|\\\\}}usr{{/|\\\\}}bin{{/|\\\\}}swift{{c?(\.exe)?}}
 // UPDATE-CODE: -frontend -c
 // UPDATE-CODE: -emit-remap-file-path {{.+}}.remap
-
-// NO-REFERENCE-DEPENDENCIES: bin{{/|\\\\}}swift
-// NO-REFERENCE-DEPENDENCIES-NOT: -emit-reference-dependencies

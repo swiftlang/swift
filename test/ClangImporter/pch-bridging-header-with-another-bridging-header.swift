@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -emit-module -import-objc-header %S/Inputs/pch-bridging-header-with-another-bridging-header/app.h -I %S/Inputs/pch-bridging-header-with-another-bridging-header -module-name App -emit-module-path %t/App.swiftmodule %S/../Inputs/empty.swift
+// RUN: %target-build-swift -emit-module -disable-bridging-pch -import-objc-header %S/Inputs/pch-bridging-header-with-another-bridging-header/app.h -I %S/Inputs/pch-bridging-header-with-another-bridging-header -module-name App -emit-module-path %t/App.swiftmodule %S/../Inputs/empty.swift
 // RUN: llvm-bcanalyzer -dump %t/App.swiftmodule | %FileCheck %s
 
 // CHECK: IMPORTED_HEADER{{.*}}Inputs/pch-bridging-header-with-another-bridging-header/app.h

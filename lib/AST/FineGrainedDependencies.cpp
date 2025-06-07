@@ -18,6 +18,7 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/FineGrainedDependencyFormat.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Demangling/Demangle.h"
@@ -42,34 +43,34 @@ using namespace fine_grained_dependencies;
 // MARK: Emitting and reading SourceFileDepGraph
 //==============================================================================
 
-Optional<SourceFileDepGraph>
+std::optional<SourceFileDepGraph>
 SourceFileDepGraph::loadFromPath(StringRef path, const bool allowSwiftModule) {
   const bool treatAsModule =
       allowSwiftModule &&
-      path.endswith(file_types::getExtension(file_types::TY_SwiftModuleFile));
+      path.ends_with(file_types::getExtension(file_types::TY_SwiftModuleFile));
   auto bufferOrError = llvm::MemoryBuffer::getFile(path);
   if (!bufferOrError)
-    return None;
+    return std::nullopt;
   return treatAsModule ? loadFromSwiftModuleBuffer(*bufferOrError.get())
                        : loadFromBuffer(*bufferOrError.get());
 }
 
-Optional<SourceFileDepGraph>
+std::optional<SourceFileDepGraph>
 SourceFileDepGraph::loadFromBuffer(llvm::MemoryBuffer &buffer) {
   SourceFileDepGraph fg;
   if (swift::fine_grained_dependencies::readFineGrainedDependencyGraph(
       buffer, fg))
-    return None;
-  return Optional<SourceFileDepGraph>(std::move(fg));
+    return std::nullopt;
+  return std::optional<SourceFileDepGraph>(std::move(fg));
 }
 
-Optional<SourceFileDepGraph>
+std::optional<SourceFileDepGraph>
 SourceFileDepGraph::loadFromSwiftModuleBuffer(llvm::MemoryBuffer &buffer) {
   SourceFileDepGraph fg;
   if (swift::fine_grained_dependencies::
           readFineGrainedDependencyGraphFromSwiftModule(buffer, fg))
-    return None;
-  return Optional<SourceFileDepGraph>(std::move(fg));
+    return std::nullopt;
+  return std::optional<SourceFileDepGraph>(std::move(fg));
 }
 
 //==============================================================================
@@ -114,7 +115,7 @@ void SourceFileDepGraph::forEachArc(
 
 InterfaceAndImplementationPair<SourceFileDepGraphNode>
 SourceFileDepGraph::findExistingNodePairOrCreateAndAddIfNew(
-    const DependencyKey &interfaceKey, Optional<Fingerprint> fingerprint) {
+    const DependencyKey &interfaceKey, std::optional<Fingerprint> fingerprint) {
 
   // Optimization for whole-file users:
   if (interfaceKey.getKind() == NodeKind::sourceFileProvide &&
@@ -143,14 +144,14 @@ SourceFileDepGraph::findExistingNodePairOrCreateAndAddIfNew(
   // But, if an arc is added for this, then *any* change that causes
   // a same-named interface to be dirty will dirty this implementation,
   // even if that interface is in another file.
-  // Therefor no such arc is added here, and any dirtying of either
+  // Therefore no such arc is added here, and any dirtying of either
   // the interface or implementation of this declaration will cause
   // the driver to recompile this source file.
   return nodePair;
 }
 
 SourceFileDepGraphNode *SourceFileDepGraph::findExistingNodeOrCreateIfNew(
-    const DependencyKey &key, const Optional<Fingerprint> fingerprint,
+    const DependencyKey &key, const std::optional<Fingerprint> fingerprint,
     const bool isProvides) {
   SourceFileDepGraphNode *result = memoizedNodes.findExistingOrCreateIfNew(
       key, [&](DependencyKey key) -> SourceFileDepGraphNode * {
@@ -174,7 +175,7 @@ SourceFileDepGraphNode *SourceFileDepGraph::findExistingNodeOrCreateIfNew(
   // since we won't be able to tell which Decl is depended-upon (is this right?)
   // just use the one node, but erase its print:
   if (fingerprint != result->getFingerprint())
-    result->setFingerprint(None);
+    result->setFingerprint(std::nullopt);
   return result;
 }
 
@@ -373,11 +374,13 @@ void SourceFileDepGraph::verifySame(const SourceFileDepGraph &other) const {
 #endif
 }
 
-void SourceFileDepGraph::emitDotFile(StringRef outputPath,
+void SourceFileDepGraph::emitDotFile(llvm::vfs::OutputBackend &outputBackend,
+                                     StringRef outputPath,
                                      DiagnosticEngine &diags) {
   std::string dotFileName = outputPath.str() + ".dot";
-  withOutputFile(diags, dotFileName, [&](llvm::raw_pwrite_stream &out) {
-    DotFileEmitter<SourceFileDepGraph>(out, *this, false, false).emit();
-    return false;
-  });
+  withOutputPath(
+      diags, outputBackend, dotFileName, [&](llvm::raw_pwrite_stream &out) {
+        DotFileEmitter<SourceFileDepGraph>(out, *this, false, false).emit();
+        return false;
+      });
 }

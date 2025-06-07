@@ -6,6 +6,7 @@ import SwiftUI
 
 enum ColorScheme: CaseIterable, Hashable, Equatable, Identifiable {
 // expected-error@-1 {{type 'ColorScheme' does not conform to protocol 'Identifiable'}}
+// expected-note@-2 {{add stubs for conformance}}
   case `default`
   case pink
 
@@ -35,7 +36,7 @@ struct CountdownEditor : View {
       Spacer()
       Image(systemName: symbol)
         .foregroundColor(selectedColor.color)
-        // expected-error@-1 {{cannot convert value of type 'Binding<Subject>' to expected argument type 'Color?'}}
+        // expected-error@-1 {{cannot convert value of type 'Binding<Subject>' to expected argument type 'Color'}}
         // expected-error@-2 {{referencing subscript 'subscript(dynamicMember:)' requires wrapper 'Binding<ColorScheme>'}}
         // expected-error@-3 {{value of type 'ColorScheme' has no dynamic member 'color' using key path from root type 'ColorScheme'}}
     }

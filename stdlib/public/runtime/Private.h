@@ -30,7 +30,7 @@
 #endif
 
 // Opaque ISAs need to use object_getClass which is in runtime.h
-#if SWIFT_HAS_OPAQUE_ISAS
+#if SWIFT_OBJC_INTEROP && SWIFT_HAS_OPAQUE_ISAS
 #include <objc/runtime.h>
 #endif
 
@@ -172,7 +172,7 @@ public:
   /// Note, in this case, the object may or may not have a non-pointer ISA.
   /// Masking, or otherwise, may be required to get a class pointer.
   static inline const ClassMetadata *_swift_getClassOfAllocated(const void *object) {
-#if SWIFT_HAS_OPAQUE_ISAS
+#if SWIFT_OBJC_INTEROP && SWIFT_HAS_OPAQUE_ISAS
     // The ISA is opaque so masking it will not return a pointer.  We instead
     // need to call the objc runtime to get the class.
     id idObject = reinterpret_cast<id>(const_cast<void *>(object));
@@ -280,15 +280,92 @@ public:
   Demangle::NodePointer _swift_buildDemanglingForMetadata(const Metadata *type,
                                                           Demangle::Demangler &Dem);
 
+  /// Build the demangling for the generic type that's created by specializing
+  /// the given type context descriptor with the given arguments.
+  Demangle::NodePointer
+  _buildDemanglingForGenericType(const TypeContextDescriptor *description,
+                                 const void *const *arguments,
+                                 Demangle::Demangler &Dem);
+
   /// Callback used to provide the substitution of a generic parameter
   /// (described by depth/index) to its metadata.
+  ///
+  /// The return type here is a lie; it's actually a MetadataPackOrValue.
   using SubstGenericParameterFn =
-    std::function<const Metadata *(unsigned depth, unsigned index)>;
+    std::function<const void *(unsigned depth, unsigned index)>;
+
+  /// Callback used to provide the substitution of a generic parameter
+  /// (described by the ordinal, or "flat index") to its metadata. The index may
+  /// be "full" or it may be only relative to key arguments. The call is
+  /// provided both indexes and may use the one it requires.
+  ///
+  /// The return type here is a lie; it's actually a MetadataPackOrValue.
+  using SubstGenericParameterOrdinalFn =
+    std::function<const void *(unsigned fullOrdinal, unsigned keyOrdinal)>;
 
   /// Callback used to provide the substitution of a witness table based on
   /// its index into the enclosing generic environment.
   using SubstDependentWitnessTableFn =
     std::function<const WitnessTable *(const Metadata *type, unsigned index)>;
+
+  /// A pointer to type metadata or a heap-allocated metadata pack.
+  struct SWIFT_RUNTIME_LIBRARY_VISIBILITY MetadataPackOrValue {
+    const void *Ptr;
+
+    MetadataPackOrValue() : Ptr(nullptr) {}
+
+    explicit MetadataPackOrValue(const void *ptr) : Ptr(ptr) {}
+
+    explicit MetadataPackOrValue(intptr_t value)
+        : Ptr(reinterpret_cast<const void *>(value)) {}
+
+    explicit MetadataPackOrValue(MetadataResponse response) : Ptr(response.Value) {}
+
+    explicit MetadataPackOrValue(MetadataPackPointer ptr) : Ptr(ptr.getPointer()) {
+      if (ptr.getLifetime() != PackLifetime::OnHeap)
+        fatalError(0, "Cannot have an on-stack pack here\n");
+    }
+
+    explicit operator bool() const { return Ptr != nullptr; }
+
+    bool isNull() const {
+      return !Ptr;
+    }
+
+    bool isMetadataOrNull() const {
+      return (reinterpret_cast<uintptr_t>(Ptr) & 1) == 0;
+    }
+
+    bool isMetadata() const {
+      return Ptr && isMetadataOrNull();
+    }
+
+    bool isMetadataPack() const {
+      return Ptr && (reinterpret_cast<uintptr_t>(Ptr) & 1) == 1;
+    }
+
+    const Metadata *getMetadata() const {
+      if (isMetadata())
+        return reinterpret_cast<const Metadata *>(Ptr);
+      fatalError(0, "Expected metadata but got a metadata pack\n");
+    }
+
+    const Metadata *getMetadataOrNull() const {
+      if (isMetadataOrNull())
+        return reinterpret_cast<const Metadata *>(Ptr);
+      fatalError(0, "Expected metadata but got a metadata pack\n");
+    }
+
+    MetadataPackPointer getMetadataPack() const {
+      if (isMetadataPack())
+        return MetadataPackPointer(Ptr);
+      fatalError(0, "Expected a metadata pack but got metadata\n");
+    }
+
+    intptr_t getValue() const {
+      return reinterpret_cast<intptr_t>(Ptr);
+    }
+  };
 
   /// Function object that produces substitutions for the generic parameters
   /// that occur within a mangled name, using the generic arguments from
@@ -339,6 +416,9 @@ public:
     /// The number of key generic parameters.
     mutable unsigned numKeyGenericParameters = 0;
 
+    /// The number of pack shape classes.
+    mutable unsigned numShapeClasses = 0;
+
     /// Builds the descriptor path.
     ///
     /// \returns a pair containing the number of key generic parameters in
@@ -386,7 +466,8 @@ public:
 
     const void * const *getGenericArgs() const { return genericArgs; }
 
-    const Metadata *getMetadata(unsigned depth, unsigned index) const;
+    MetadataPackOrValue getMetadata(unsigned depth, unsigned index) const;
+    MetadataPackOrValue getMetadataKeyArgOrdinal(unsigned ordinal) const;
     const WitnessTable *getWitnessTable(const Metadata *type,
                                         unsigned index) const;
   };
@@ -421,41 +502,34 @@ public:
                                const void * const *arguments,
                                SubstGenericParameterFn substGenericParam,
                                SubstDependentWitnessTableFn substWitnessTable);
-#pragma clang diagnostic pop
 
-  /// Function object that produces substitutions for the generic parameters
-  /// that occur within a mangled name, using the complete set of generic
-  /// arguments "as written".
+  /// Retrieve the type metadata pack described by the given type name.
   ///
-  /// Use with \c _getTypeByMangledName to decode potentially-generic types.
-  class SWIFT_RUNTIME_LIBRARY_VISIBILITY SubstGenericParametersFromWrittenArgs {
-    /// The complete set of generic arguments.
-    const llvm::SmallVectorImpl<const Metadata *> &allGenericArgs;
+  /// \p substGenericParam Function that provides generic argument metadata
+  /// given a particular generic parameter specified by depth/index.
+  /// \p substWitnessTable Function that provides witness tables given a
+  /// particular dependent conformance index.
+  SWIFT_RUNTIME_LIBRARY_VISIBILITY
+  TypeLookupErrorOr<MetadataPackPointer> getTypePackByMangledName(
+                               StringRef typeName,
+                               const void * const *arguments,
+                               SubstGenericParameterFn substGenericParam,
+                               SubstDependentWitnessTableFn substWitnessTable);
 
-    /// The counts of generic parameters at each level.
-    const llvm::SmallVectorImpl<unsigned> &genericParamCounts;
+  /// Retrieve the type value described by the given type name.
+  ///
+  /// \p substGenericParam Function that provides generic argument metadata
+  /// given a particular generic parameter specified by depth/index.
+  /// \p substWitnessTable Function that provides witness tables given a
+  /// particular dependent conformance index.
+  SWIFT_RUNTIME_LIBRARY_VISIBILITY
+  TypeLookupErrorOr<intptr_t> getTypeValueByMangledName(
+                               StringRef typeName,
+                               const void * const *arguments,
+                               SubstGenericParameterFn substGenericParam,
+                               SubstDependentWitnessTableFn substWitnessTable);
 
-  public:
-    /// Initialize a new function object to handle substitutions. Both
-    /// parameters are references to vectors that must live longer than
-    /// this function object.
-    ///
-    /// \param allGenericArgs The complete set of generic arguments, as written.
-    /// This could come directly from "source" (where all generic arguments are
-    /// encoded) or from metadata via gatherWrittenGenericArgs().
-    ///
-    /// \param genericParamCounts The count of generic parameters at each
-    /// generic level, typically gathered by _gatherGenericParameterCounts.
-    explicit SubstGenericParametersFromWrittenArgs(
-        const llvm::SmallVectorImpl<const Metadata *> &allGenericArgs,
-        const llvm::SmallVectorImpl<unsigned> &genericParamCounts)
-        : allGenericArgs(allGenericArgs),
-          genericParamCounts(genericParamCounts) {}
-
-    const Metadata *getMetadata(unsigned depth, unsigned index) const;
-    const WitnessTable *getWitnessTable(const Metadata *type,
-                                        unsigned index) const;
-  };
+#pragma clang diagnostic pop
 
   /// Gather generic parameter counts from a context descriptor.
   ///
@@ -465,13 +539,27 @@ public:
                                      Demangler &BorrowFrom);
 
   /// Map depth/index to a flat index.
-  llvm::Optional<unsigned> _depthIndexToFlatIndex(
-                                          unsigned depth, unsigned index,
-                                          llvm::ArrayRef<unsigned> paramCounts);
+  std::optional<unsigned>
+  _depthIndexToFlatIndex(unsigned depth, unsigned index,
+                         llvm::ArrayRef<unsigned> paramCounts);
+
+  /// Gathers all of the written generic parameters needed for
+  /// '_gatherGenericParameters'. This takes a list of key arguments and fills
+  /// in the generic arguments with all generic arguments.
+  ///
+  /// \returns true if the operation succeeded.
+  bool _gatherWrittenGenericParameters(
+      const TypeContextDescriptor *descriptor,
+      llvm::ArrayRef<const void *> keyArgs,
+      llvm::SmallVectorImpl<MetadataPackOrValue> &genericArgs,
+      Demangle::Demangler &Dem);
 
   /// Check the given generic requirements using the given set of generic
   /// arguments, collecting the key arguments (e.g., witness tables) for
   /// the caller.
+  ///
+  /// \param genericParams The generic parameters corresponding to the
+  /// arguments.
   ///
   /// \param requirements The set of requirements to evaluate.
   ///
@@ -479,12 +567,18 @@ public:
   /// generic requirements (e.g., those that need to be
   /// passed to an instantiation function) will be added to this vector.
   ///
+  /// \param context When non-NULL, receives any information about the
+  /// execution context that is required to use this conformance.
+  ///
   /// \returns the error if an error occurred, None otherwise.
-  llvm::Optional<TypeLookupError> _checkGenericRequirements(
+  std::optional<TypeLookupError> _checkGenericRequirements(
+      llvm::ArrayRef<GenericParamDescriptor> genericParams,
       llvm::ArrayRef<GenericRequirementDescriptor> requirements,
       llvm::SmallVectorImpl<const void *> &extraArguments,
       SubstGenericParameterFn substGenericParam,
-      SubstDependentWitnessTableFn substWitnessTable);
+      SubstGenericParameterOrdinalFn substGenericParamOrdinal,
+      SubstDependentWitnessTableFn substWitnessTable,
+      ConformanceExecutionContext *context);
 
   /// A helper function which avoids performing a store if the destination
   /// address already contains the source value.  This is useful when
@@ -534,22 +628,11 @@ public:
   SWIFT_RETURNS_NONNULL SWIFT_NODISCARD
   void *allocateMetadata(size_t size, size_t align);
 
-  /// Gather the set of generic arguments that would be written in the
-  /// source, as a f
-  ///
-  /// This function computes generic arguments even when they are not
-  /// directly represented in the metadata, e.g., generic parameters that
-  /// are canonicalized away by same-type constraints and are therefore not
-  /// "key" parameters.
-  ///
-  /// \code
-  ///   extension Array where Element == String { }
-  ///   extension Dictionary where Key == Value { }
-  /// \endcode
-  void gatherWrittenGenericArgs(const Metadata *metadata,
-                                const TypeContextDescriptor *description,
-                                llvm::SmallVectorImpl<const Metadata *> &allGenericArgs,
-                                Demangler &BorrowFrom);
+  // Compare two pieces of metadata that should be identical. Returns true if
+  // they are, false if they are not equal. Dumps the metadata contents to
+  // stderr if they are not equal.
+  bool compareGenericMetadata(const Metadata *original,
+                              const Metadata *newMetadata);
 
   Demangle::NodePointer
   _buildDemanglingForContext(const ContextDescriptor *context,
@@ -600,6 +683,19 @@ public:
   bool _isCImportedTagType(const TypeContextDescriptor *type,
                            const ParsedTypeIdentity &identity);
 
+  /// The execution context for a conformance, containing any additional
+  /// checking that has to be done in context to determine whether a given
+  /// conformance is available.
+  struct ConformanceExecutionContext {
+    /// The global actor to which this conformance is isolated, or NULL for
+    /// a nonisolated conformances.
+    const Metadata *globalActorIsolationType = nullptr;
+
+    /// When the conformance is global-actor-isolated, this is the conformance
+    /// of globalActorIsolationType to GlobalActor.
+    const WitnessTable *globalActorIsolationWitnessTable = nullptr;
+  };
+
   /// Check whether a type conforms to a protocol.
   ///
   /// \param value - can be null, in which case the question should
@@ -607,10 +703,26 @@ public:
   /// \param conformance - if non-null, and the protocol requires a
   ///   witness table, and the type implements the protocol, the witness
   ///   table will be placed here
-  bool _conformsToProtocol(const OpaqueValue *value,
-                           const Metadata *type,
-                           ProtocolDescriptorRef protocol,
-                           const WitnessTable **conformance);
+  /// \param context - when non-NULL, receives any information about the
+  /// required execution context for this conformance.
+  bool _conformsToProtocol(
+      const OpaqueValue *value,
+      const Metadata *type,
+      ProtocolDescriptorRef protocol,
+      const WitnessTable **conformance,
+      ConformanceExecutionContext *context);
+
+  /// Check whether a type conforms to a value within the currently-executing
+  /// context.
+  ///
+  /// This is equivalent to a _conformsToProtocol check followed by runtime
+  /// checking for global actor isolation, if needed.
+  bool _conformsToProtocolInContext(
+      const OpaqueValue *value,
+      const Metadata *type,
+      ProtocolDescriptorRef protocol,
+      const WitnessTable **conformance,
+      bool prohibitIsolatedConformances);
 
   /// Construct type metadata for the given protocol.
   const Metadata *
@@ -663,11 +775,21 @@ public:
                                   const ProtocolRequirement *reqBase,
                                   const ProtocolRequirement *assocConformance);
 
+  RelativeWitnessTable *
+  lookThroughOptionalConditionalWitnessTable(const RelativeWitnessTable *wtable);
+
 #if SWIFT_OBJC_INTEROP
   /// Returns a retained Quick Look representation object an Obj-C object.
   SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_INTERNAL
   id _quickLookObjectForPointer(void *value);
 #endif
+
+  /// Hook function that calls into the concurrency library to check whether
+  /// we are currently executing the given global actor.
+  SWIFT_RUNTIME_LIBRARY_VISIBILITY
+  extern bool (* __ptrauth_swift_is_global_actor_function SWIFT_CC(swift)
+                     _swift_task_isCurrentGlobalActorHook)(
+      const Metadata *, const WitnessTable *);
 
 } // end namespace swift
 

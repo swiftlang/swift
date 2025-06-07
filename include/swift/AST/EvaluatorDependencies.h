@@ -24,6 +24,7 @@
 #include "swift/Basic/NullablePtr.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/SetVector.h"
 #include <vector>
 
 namespace swift {
@@ -57,9 +58,12 @@ class DependencyRecorder {
   /// References recorded while evaluating a dependency source request for each
   /// source file. This map is updated upon completion of a dependency source
   /// request, and includes all references from each downstream request as well.
-  llvm::DenseMap<SourceFile *,
-                 llvm::DenseSet<DependencyCollector::Reference,
-                                DependencyCollector::Reference::Info>>
+  llvm::DenseMap<
+      SourceFile *,
+      llvm::SetVector<DependencyCollector::Reference,
+                      llvm::SmallVector<DependencyCollector::Reference>,
+                      llvm::DenseSet<DependencyCollector::Reference,
+                                     DependencyCollector::Reference::Info>>>
       fileReferences;
 
   /// References recorded while evaluating each request. This map is populated
@@ -73,8 +77,11 @@ class DependencyRecorder {
   /// dependency sink request, we update the innermost set of references.
   /// Upon completion of a request, we union the completed request's references
   /// with the next innermost active request.
-  std::vector<llvm::SmallDenseSet<DependencyCollector::Reference, 2,
-                                  DependencyCollector::Reference::Info>>
+  std::vector<llvm::SetVector<
+      DependencyCollector::Reference,
+      std::vector<DependencyCollector::Reference>,
+      llvm::SmallDenseSet<DependencyCollector::Reference, 2,
+                          DependencyCollector::Reference::Info>>>
       activeRequestReferences;
 
 #ifndef NDEBUG
@@ -163,8 +170,7 @@ void evaluator::DependencyRecorder::endRequest(const Request &req) {
     return;
 
   // Convert the set of dependencies into a vector.
-  std::vector<DependencyCollector::Reference>
-      vec(recorded.begin(), recorded.end());
+  std::vector<DependencyCollector::Reference> vec = recorded.takeVector();
 
   // The recorded dependencies bubble up to the parent request.
   if (!activeRequestReferences.empty()) {

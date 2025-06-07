@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library) | %FileCheck --dump-input=always %s
+// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple %import-libdispatch -parse-as-library) | %FileCheck --dump-input=always %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -10,17 +10,10 @@
 
 import Dispatch
 
-// Work around the inability of older Swift runtimes to print a task priority.
-extension TaskPriority: CustomStringConvertible {
-  public var description: String {
-    "TaskPriority(rawValue: \(rawValue))"
-  }
-}
-
 @available(SwiftStdlib 5.1, *)
 @main struct Main {
   static func main() async {
-    print("main priority: \(Task.currentPriority)") // CHECK: main priority: TaskPriority(rawValue: [[#MAIN_PRIORITY:]])
+    print("main priority: \(Task.currentPriority)") // CHECK: main priority: TaskPriority.medium
     await test_detach()
     await test_multiple_lo_indirectly_escalated()
   }
@@ -29,18 +22,18 @@ extension TaskPriority: CustomStringConvertible {
 @available(SwiftStdlib 5.1, *)
 func test_detach() async {
   let a1 = Task.currentPriority
-  print("a1: \(a1)") // CHECK: a1: TaskPriority(rawValue: [[#MAIN_PRIORITY]])
+  print("a1: \(a1)") // CHECK: a1: TaskPriority.medium
 
   // Note: remember to detach using a higher priority, otherwise a lower one
   // might be escalated by the get() and we could see `default` in the detached
   // task.
   await detach(priority: .userInitiated) {
     let a2 = Task.currentPriority
-    print("a2: \(a2)") // CHECK: a2: TaskPriority(rawValue: 25)
+    print("a2: \(a2)") // CHECK: a2: TaskPriority.high
   }.get()
 
   let a3 = Task.currentPriority
-  print("a3: \(a3)") // CHECK: a3: TaskPriority(rawValue: [[#MAIN_PRIORITY]])
+  print("a3: \(a3)") // CHECK: a3: TaskPriority.medium
 }
 
 @available(SwiftStdlib 5.1, *)

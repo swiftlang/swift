@@ -16,6 +16,8 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/FineGrainedDependencies.h"
+#include "llvm/Support/VirtualOutputBackend.h"
+#include <optional>
 
 namespace swift {
 class DiagnosticEngine;
@@ -39,6 +41,9 @@ protected:
 
   DiagnosticEngine &diags;
 
+  /// OutputBackend.
+  llvm::vfs::OutputBackend &backend;
+
   /// Graph under construction
   SourceFileDepGraph g;
 
@@ -49,7 +54,8 @@ public:
                                     StringRef swiftDeps,
                                     Fingerprint fileFingerprint,
                                     bool emitDotFileAfterConstruction,
-                                    DiagnosticEngine &diags);
+                                    DiagnosticEngine &diags,
+                                    llvm::vfs::OutputBackend &outputBackend);
 
   virtual ~AbstractSourceFileDepGraphFactory() = default;
 
@@ -85,26 +91,26 @@ protected:
   /// represent some \c Decl defined in this source file. \param key the
   /// interface key of the pair
   void addADefinedDecl(const DependencyKey &key,
-                       Optional<Fingerprint> fingerprint);
+                       std::optional<Fingerprint> fingerprint);
 
   void addAUsedDecl(const DependencyKey &def, const DependencyKey &use);
 
   /// Add an external dependency node to the graph. If the provided fingerprint
   /// is not \c None, it is added to the def key.
-  void addAnExternalDependency(const DependencyKey &def,
-                               const DependencyKey &use,
-                               Optional<Fingerprint> dependencyFingerprint);
+  void
+  addAnExternalDependency(const DependencyKey &def, const DependencyKey &use,
+                          std::optional<Fingerprint> dependencyFingerprint);
 
-  static Optional<Fingerprint>
+  static std::optional<Fingerprint>
   getFingerprintIfAny(std::pair<const NominalTypeDecl *, const ValueDecl *>) {
-    return None;
+    return std::nullopt;
   }
 
-  static Optional<Fingerprint> getFingerprintIfAny(const Decl *d) {
+  static std::optional<Fingerprint> getFingerprintIfAny(const Decl *d) {
     if (const auto *idc = dyn_cast<IterableDeclContext>(d)) {
       return idc->getBodyFingerprint();
     }
-    return None;
+    return std::nullopt;
   }
 };
 

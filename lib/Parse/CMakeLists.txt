@@ -1,6 +1,6 @@
 
 
-if(CMAKE_HOST_SYSTEM_NAME STREQUAL Windows)
+if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows")
   set(SWIFT_GYB_FLAGS --line-directive "^\"#line %(line)d \\\"%(file)s\\\"^\"")
 else()
   set(SWIFT_GYB_FLAGS --line-directive "\'#line" "%(line)d" "\"%(file)s\"\'")
@@ -10,6 +10,7 @@ add_swift_host_library(swiftParse STATIC
   Confusables.cpp
   Lexer.cpp
   ParseDecl.cpp
+  ParseDeclName.cpp
   ParseExpr.cpp
   ParseGeneric.cpp
   ParseIfConfig.cpp
@@ -25,45 +26,21 @@ target_link_libraries(swiftParse PRIVATE
   swiftAST
 )
 
-if (SWIFT_SWIFT_PARSER)
-  # Link against the SwiftSyntax parser and libraries it depends on. The actual
-  # formulation of this is a hack to work around a CMake bug in Ninja file
-  # generation that results in multiple Ninja targets producing the same file in
-  # a downstream SourceKit target. This should be expressed as:
-  #
-  #   target_link_libraries(swiftParse
-  #     PRIVATE
-  #     SwiftSyntax::SwiftParser
-  #     ...
-  #   )
+if (SWIFT_BUILD_SWIFT_SYNTAX)
   target_link_libraries(swiftParse
     PRIVATE
-    SwiftSyntax::SwiftBasicFormat
-    SwiftSyntax::SwiftParser
-    SwiftSyntax::SwiftParserDiagnostics
-    SwiftSyntax::SwiftDiagnostics
-    SwiftSyntax::SwiftSyntax
-    SwiftSyntax::SwiftOperators
-    SwiftSyntax::SwiftSyntaxBuilder
-    SwiftSyntax::SwiftSyntaxMacros
-    $<TARGET_OBJECTS:swiftASTGen>
-  )
-
-  add_dependencies(swiftParse
-    SwiftSyntax::SwiftBasicFormat
-    SwiftSyntax::SwiftParser
-    SwiftSyntax::SwiftParserDiagnostics
-    SwiftSyntax::SwiftDiagnostics
-    SwiftSyntax::SwiftSyntax
-    SwiftSyntax::SwiftOperators
-    SwiftSyntax::SwiftSyntaxBuilder
-    SwiftSyntax::SwiftSyntaxMacros
     swiftASTGen
   )
 
+  add_dependencies(swiftParse
+    swiftASTGen
+  )
+endif()
+
+if(SWIFT_BUILD_REGEX_PARSER_IN_COMPILER)
   target_compile_definitions(swiftParse
-    PRIVATE
-    SWIFT_SWIFT_PARSER
+    PUBLIC
+    SWIFT_BUILD_REGEX_PARSER_IN_COMPILER
   )
 endif()
 

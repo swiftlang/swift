@@ -2,9 +2,9 @@
 // RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -disable-availability-checking %S/Inputs/specialize_opaque_type_archetypes_2.swift -module-name External -emit-module -emit-module-path %t/External.swiftmodule
 // RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -disable-availability-checking %S/Inputs/specialize_opaque_type_archetypes_3.swift -enable-library-evolution -module-name External2 -emit-module -emit-module-path %t/External2.swiftmodule
 // RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -disable-availability-checking %S/Inputs/specialize_opaque_type_archetypes_4.swift -I %t -enable-library-evolution -module-name External3 -emit-module -emit-module-path %t/External3.swiftmodule
-// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -disable-availability-checking %S/Inputs/specialize_opaque_type_archetypes_3.swift -I %t -enable-library-evolution -module-name External2 -Osize -emit-module -o - | %target-sil-opt -module-name External2 | %FileCheck --check-prefix=RESILIENT %s
-// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -disable-availability-checking -I %t -module-name A -enforce-exclusivity=checked -Osize -emit-sil -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
-// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -disable-availability-checking -I %t -module-name A -enforce-exclusivity=checked -enable-library-evolution -Osize -emit-sil -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -disable-availability-checking %S/Inputs/specialize_opaque_type_archetypes_3.swift -I %t -enable-library-evolution -module-name External2 -Osize -Xllvm -sil-disable-pass=redundant-load-elimination -emit-module -o - | %target-sil-opt -sil-print-types -module-name External2 | %FileCheck --check-prefix=RESILIENT %s
+// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -disable-availability-checking -I %t -module-name A -enforce-exclusivity=checked -Osize -Xllvm -sil-disable-pass=redundant-load-elimination -Xllvm -sil-print-types -emit-sil -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-lexical-lifetimes=false -disable-availability-checking -I %t -module-name A -enforce-exclusivity=checked -enable-library-evolution -Osize -Xllvm -sil-disable-pass=redundant-load-elimination -Xllvm -sil-print-types -emit-sil -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: swift_in_compiler
 
@@ -121,7 +121,7 @@ public func useExternal() {
 // Call to a resilient function should not be specialized.
 
 // CHECK-LABEL: sil @$s1A20useExternalResilientyyF
-// CHECK:  [[RES:%.*]] = alloc_stack $@_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0)
+// CHECK:  [[RES:%.*]] = alloc_stack [var_decl] $@_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0)
 // CHECK:  [[FUN:%.*]] = function_ref @$s9External217externalResilientQryF : $@convention(thin) @substituted {{.*}} for <@_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0) __>
 // CHECK:  apply [[FUN]]([[RES]])
 // CHECK:  witness_method
@@ -229,7 +229,7 @@ func nonResilient() -> some ExternalP2 {
 }
 
 // CHECK-LABEL: sil @$s1A019usePairResilientNonC0yyF : $@convention(thin) () -> ()
-// CHECK: alloc_stack $Pair<MyInt64, @_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0)
+// CHECK: alloc_stack [var_decl] $Pair<MyInt64, @_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0)
 // CHECK: [[USEP:%.*]] = function_ref @$s1A4usePyyxAA1PRzlFs5Int64V_Tg5
 // CHECK: [[FIRST_MYVALUE3:%.*]] = struct $Int64
 // CHECK: apply [[USEP]]([[FIRST_MYVALUE3]])
@@ -281,7 +281,7 @@ public func useExternalResilient2() {
 
 // In this case we should only 'peel' one layer of opaque archetypes.
 // CHECK-LABEL: sil @$s1A21useExternalResilient3yyF
-// CHECK:  [[RES:%.*]] = alloc_stack $@_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0)
+// CHECK:  [[RES:%.*]] = alloc_stack [var_decl] $@_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0)
 // CHECK:  [[FUN:%.*]] = function_ref @$s9External3031inlinableExternalResilientCallsD0QryF : $@convention(thin) @substituted {{.*}} for <@_opaqueReturnTypeOf("$s9External217externalResilientQryF", 0) __>
 // CHECK:  apply [[FUN]]([[RES]])
 public func useExternalResilient3() {
@@ -313,7 +313,7 @@ public func testStoredProperty() {
 }
 
 // CHECK-LABEL: sil @$s1A21testResilientPropertyyyF
-// CHECK:   [[CONTAINER:%.*]] = alloc_stack $ResilientContainer
+// CHECK:   [[CONTAINER:%.*]] = alloc_stack [var_decl] $ResilientContainer
 // CHECK:   [[RES:%.*]] = alloc_stack $@_opaqueReturnTypeOf("$s9External218ResilientContainerV16computedPropertyQrvp", 0)
 // CHECK:   [[FUN:%.*]] = function_ref @$s9External218ResilientContainerV16computedPropertyQrvg
 // CHECK:   apply [[FUN]]([[RES]], [[CONTAINER]])
@@ -323,7 +323,7 @@ public func testResilientProperty() {
 }
 
 // CHECK-LABEL: sil @$s1A30testResilientInlinablePropertyyyF
-// CHECK:  [[CONTAINER:%.*]] = alloc_stack $ResilientContainer
+// CHECK:  [[CONTAINER:%.*]] = alloc_stack [var_decl] $ResilientContainer
 // CHECK:  [[RES:%.*]] = alloc_stack $Int64
 // CHECK:  [[FUN:%.*]] = function_ref @$s9External218ResilientContainerV18inlineablePropertyQrvg
 // CHECK:  apply [[FUN]]([[RES]], [[CONTAINER]])
@@ -333,7 +333,7 @@ public func testResilientInlinableProperty() {
 }
 
 // CHECK-LABEL: sil @$s1A31testResilientInlinableProperty3yyF
-// CHECK:  [[CONTAINER:%.*]] = alloc_stack $ResilientContainer
+// CHECK:  [[CONTAINER:%.*]] = alloc_stack [var_decl] $ResilientContainer
 // CHECK:  [[RES:%.*]] = alloc_stack $Int64
 // CHECK:  [[FUN:%.*]] = function_ref @$s9External218ResilientContainerV19inlineableProperty2Qrvg
 // CHECK:  apply [[FUN]]([[RES]], [[CONTAINER]])
@@ -343,7 +343,7 @@ public func testResilientInlinableProperty3() {
 }
 
 // CHECK-LABEL: sil @$s1A22testResilientProperty2yyF
-// CHECK:  [[CONTAINER:%.*]] = alloc_stack $ResilientContainer2
+// CHECK:  [[CONTAINER:%.*]] = alloc_stack [var_decl] $ResilientContainer2
 // CHECK:  [[RES:%.*]] = alloc_stack $@_opaqueReturnTypeOf("$s9External319ResilientContainer2V16computedPropertyQrvp", 0)
 // CHECK:  [[FUN:%.*]] = function_ref @$s9External319ResilientContainer2V16computedPropertyQrvg
 // CHECK:  apply [[FUN]]([[RES]], [[CONTAINER]])
@@ -354,7 +354,7 @@ public func testResilientProperty2() {
 
 // The inlinable property recursively calls an resilient property 'peel' one layer of opaque archetypes.
 // CHECK-LABEL: sil @$s1A31testResilientInlinableProperty2yyF
-// CHECK:  [[CONTAINER:%.*]] = alloc_stack $ResilientContainer2
+// CHECK:  [[CONTAINER:%.*]] = alloc_stack [var_decl] $ResilientContainer2
 // CHECK:  [[RES:%.*]] = alloc_stack $@_opaqueReturnTypeOf("$s9External218ResilientContainerV16computedPropertyQrvp", 0)
 // CHECK:  [[FUN:%.*]] = function_ref @$s9External319ResilientContainer2V18inlineablePropertyQrvg
 // CHECK:  apply [[FUN]]([[RES]], [[CONTAINER]])
@@ -364,10 +364,10 @@ public func testResilientInlinableProperty2() {
 }
 
 // CHECK-LABEL: sil @$s1A035testResilientInlinablePropertyCallsbC0yyF : $@convention(thin) () -> () {
-// CHECK:   [[CONTAINTER:%.*]] = alloc_stack $ResilientContainer2
+// CHECK:   [[CONTAINER:%.*]] = alloc_stack [var_decl] $ResilientContainer2
 // CHECK:   [[RES:%.*]] = alloc_stack $Int64
 // CHECK:   [[FUN:%.*]] = function_ref @$s9External319ResilientContainer2V023inlineablePropertyCallsB10InlineableQrvg
-// CHECK:  apply [[FUN]]([[RES]], [[CONTAINTER]])
+// CHECK:  apply [[FUN]]([[RES]], [[CONTAINER]])
 public func testResilientInlinablePropertyCallsResilientInlinable() {
   let r = ResilientContainer2()
   useP(r.inlineablePropertyCallsResilientInlineable.myValue3())
@@ -377,16 +377,16 @@ public func testResilientInlinablePropertyCallsResilientInlinable() {
 // RESILIENT:       {{bb[0-9]+}}({{%[^,]+}} : $Int, {{%[^,]+}} : @_eagerMove $
 // RESILIENT-LABEL: } // end sil function '$s9External218ResilientContainerV33genericEagerMoveInlineableContextyyxlFSi_Tgq5'
 
-// RESILIENT-LABEL: sil [serialized] [canonical] @$s9External218ResilientContainerV33genericEagerMoveInlineableContextyyxlF : {{.*}} {
+// RESILIENT-LABEL: sil [serialized] [canonical] [ossa] @$s9External218ResilientContainerV33genericEagerMoveInlineableContextyyxlF : {{.*}} {
 // RESILIENT:       {{bb[0-9]+}}({{%[^,]+}} : $*T, {{%[^,]+}} : @_eagerMove $
 // RESILIENT-LABEL: } // end sil function '$s9External218ResilientContainerV33genericEagerMoveInlineableContextyyxlF'
 
-// RESILIENT-LABEL: sil [serialized] [canonical] @$s9External218ResilientContainerV26eagerMoveInlineableContextyyF : $@convention(method) (@in_guaranteed ResilientContainer) -> () {
+// RESILIENT-LABEL: sil [serialized] [canonical] [ossa] @$s9External218ResilientContainerV26eagerMoveInlineableContextyyF : $@convention(method) (@in_guaranteed ResilientContainer) -> () {
 // RESILIENT:       {{bb[0-9]+}}({{%[^,]+}} : @_eagerMove $
 // RESILIENT-LABEL: } // end sil function '$s9External218ResilientContainerV26eagerMoveInlineableContextyyF'
 
-// RESILIENT-LABEL: sil [serialized] [canonical] @$s9External218ResilientContainerV17inlineableContextyyF
-// RESILIENT:  [[RES:%.*]] = alloc_stack $@_opaqueReturnTypeOf("$s9External218ResilientContainerV16computedPropertyQrvp", 0)
+// RESILIENT-LABEL: sil [serialized] [canonical] [ossa] @$s9External218ResilientContainerV17inlineableContextyyF
+// RESILIENT:  [[RES:%.*]] = alloc_stack [var_decl] $@_opaqueReturnTypeOf("$s9External218ResilientContainerV16computedPropertyQrvp", 0)
 // RESILIENT:  [[FUN:%.*]] = function_ref @$s9External218ResilientContainerV16computedPropertyQrvg
 // RESILIENT:  apply [[FUN]]([[RES]], %0)
 
@@ -421,12 +421,12 @@ struct PAEM : P4EM {
 // CHECK:   apply [[F]]([[V]])
 
 // CHECK-64-LABEL: sil hidden @$s1A2PAV4testyyF : $@convention(method) (PA) -> ()
-// CHECK-64:   [[V:%.*]] = integer_literal $Builtin.Int64, 5
-// CHECK-64:   [[I:%.*]] = struct $Int64 ([[V]] : $Builtin.Int64)
-// CHECK-64:   [[F:%.*]] = function_ref @$s1A4usePyyxAA1PRzlFs5Int64V_Tg5
-// CHECK-64:   apply [[F]]([[I]]) : $@convention(thin) (Int64) -> ()
-// CHECK-64:   apply [[F]]([[I]]) : $@convention(thin) (Int64) -> ()
-
+// CHECK-64:         [[V:%.*]] = integer_literal $Builtin.Int64, 5
+// CHECK-64-DAG:     [[I:%.*]] = struct $Int64 ([[V]] : $Builtin.Int64)
+// CHECK-64-DAG:     [[F:%.*]] = function_ref @$s1A4usePyyxAA1PRzlFs5Int64V_Tg5
+// CHECK-64:         apply [[F]]([[I]]) : $@convention(thin) (Int64) -> ()
+// CHECK-64:         apply [[F]]([[I]]) : $@convention(thin) (Int64) -> ()
+// CHECK-64:       } // end sil function '$s1A2PAV4testyyF'
 @inline(never)
 func testIt<T>(cl: (Int64) throws -> T) {
  do {

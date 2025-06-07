@@ -34,7 +34,7 @@ internal func _parseIntegerDigits<Result: FixedWidthInteger>(
   }
   let multiplicand = Result(truncatingIfNeeded: radix)
   var result = 0 as Result
-  for digit in codeUnits {
+  for unsafe digit in unsafe codeUnits {
     let digitValue: Result
     if _fastPath(digit >= _0 && digit < numericalUpperBound) {
       digitValue = Result(truncatingIfNeeded: digit &- _0)
@@ -57,6 +57,7 @@ internal func _parseIntegerDigits<Result: FixedWidthInteger>(
 }
 
 @_alwaysEmitIntoClient
+@inline(__always)
 internal func _parseInteger<Result: FixedWidthInteger>(
   ascii codeUnits: UnsafeBufferPointer<UInt8>, radix: Int
 ) -> Result? {
@@ -65,18 +66,18 @@ internal func _parseInteger<Result: FixedWidthInteger>(
   // ASCII constants, named for clarity:
   let _plus = 43 as UInt8, _minus = 45 as UInt8
   
-  let first = codeUnits[0]
+  let first = unsafe codeUnits[0]
   if first == _minus {
-    return _parseIntegerDigits(
+    return unsafe _parseIntegerDigits(
       ascii: UnsafeBufferPointer(rebasing: codeUnits[1...]),
       radix: radix, isNegative: true)
   }
   if first == _plus {
-    return _parseIntegerDigits(
+    return unsafe _parseIntegerDigits(
       ascii: UnsafeBufferPointer(rebasing: codeUnits[1...]),
       radix: radix, isNegative: false)
   }
-  return _parseIntegerDigits(ascii: codeUnits, radix: radix, isNegative: false)
+  return unsafe _parseIntegerDigits(ascii: codeUnits, radix: radix, isNegative: false)
 }
 
 @_alwaysEmitIntoClient
@@ -85,7 +86,7 @@ internal func _parseInteger<S: StringProtocol, Result: FixedWidthInteger>(
   ascii text: S, radix: Int
 ) -> Result? {
   var str = String(text)
-  return str.withUTF8 { _parseInteger(ascii: $0, radix: radix) }
+  return str.withUTF8 { unsafe _parseInteger(ascii: $0, radix: radix) }
 }
 
 extension FixedWidthInteger {
@@ -128,7 +129,7 @@ extension FixedWidthInteger {
     guard _fastPath(!text.isEmpty) else { return nil }
     let result: Self? =
       text.utf8.withContiguousStorageIfAvailable {
-        _parseInteger(ascii: $0, radix: radix)
+        unsafe _parseInteger(ascii: $0, radix: radix)
       } ?? _parseInteger(ascii: text, radix: radix)
     guard let result_ = result else { return nil }
     self = result_

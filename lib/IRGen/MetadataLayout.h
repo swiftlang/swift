@@ -273,6 +273,14 @@ public:
 
   MethodInfo getMethodInfo(IRGenFunction &IGF, SILDeclRef method) const;
 
+  const StoredMethodInfo *
+  getStoredMethodInfoIfPresent(SILDeclRef method) const {
+    auto it = MethodInfos.find(method);
+    if (it != MethodInfos.end())
+      return &it->second;
+    return nullptr;
+  }
+
   Offset getFieldOffset(IRGenFunction &IGF, VarDecl *field) const;
 
   /// Assuming that the given field offset is at a static offset in

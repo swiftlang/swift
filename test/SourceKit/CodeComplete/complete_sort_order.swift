@@ -13,7 +13,6 @@ func test() {
 // RUN: %FileCheck -check-prefix=NAME_UNSORTED %s < %t.orig.off
 // RUN: not %diff -u %t.orig %t.orig.off
 
-// NAME_SORTED: key.name: "#column"
 // NAME_SORTED: key.name: "foo(a:)"
 // NAME_SORTED-NOT: key.name:
 // NAME_SORTED: key.name: "foo(a:)"
@@ -46,7 +45,6 @@ func test() {
 // CONTEXT: key.name: "foo(b:)"
 // CONTEXT-NOT: key.name:
 // CONTEXT: key.name: "test()"
-// CONTEXT: key.name: "#column"
 // CONTEXT: key.name: "complete_sort_order"
 
 // RUN: %complete-test -tok=STMT_0 %s | %FileCheck %s -check-prefix=STMT
@@ -193,11 +191,11 @@ func test6() {
 // VOID_1: ]
 
 // VOID_1_RAW: key.name: "foo1()",
-// VOID_1_RAW-NEXT: key.sourcetext: "foo1()",
 // VOID_1_RAW-NEXT: key.description: "foo1()",
 // VOID_1_RAW-NEXT: key.typename: "Void",
 // VOID_1_RAW-NEXT: key.context: source.codecompletion.context.local,
 // VOID_1_RAW-NEXT: key.num_bytes_to_erase: 0,
+// VOID_1_RAW: key.sourcetext: "foo1()"
 
 
 
@@ -238,7 +236,7 @@ func test8() {
     }
 // CALLARG: (arg: String)
 // CALLARG: (label: Int)
+// CALLARG: intVal
 // CALLARG: stringVal
 // CALLARG: String
-// CALLARG: intVal
 }

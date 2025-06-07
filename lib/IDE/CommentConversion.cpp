@@ -24,6 +24,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/Comment.h"
 #include "clang/AST/Decl.h"
 #include "clang/Index/CommentToXML.h"
 
@@ -297,7 +298,7 @@ void CommentToXMLConverter::visitCommentParts(const swift::markup::CommentParts 
     printThrowsDiscussion(Parts.ThrowsField.value());
 
   if (!Parts.Tags.empty()) {
-    printTagFields(llvm::makeArrayRef(Parts.Tags.begin(), Parts.Tags.end()));
+    printTagFields(llvm::ArrayRef(Parts.Tags.begin(), Parts.Tags.end()));
   }
 
   if (!Parts.BodyNodes.empty()) {
@@ -380,7 +381,7 @@ visitDocComment(const DocComment *DC, TypeOrExtensionDecl SynthesizedTarget) {
     PO.VarInitializers = false;
     PO.ShouldQualifyNestedDeclarations =
         PrintOptions::QualifyNestedDeclarations::TypesOnly;
-    PO.SkipUnderscoredStdlibProtocols = false;
+    PO.SkipUnderscoredSystemProtocols = false;
     if (SynthesizedTarget)
       PO.initForSynthesizedExtension(SynthesizedTarget);
 
@@ -468,6 +469,32 @@ std::string ide::extractPlainTextFromComment(const StringRef Text) {
   return getLineListFromComment(SourceMgr, MC, Text).str();
 }
 
+static DocComment *getCascadingDocComment(swift::markup::MarkupContext &MC,
+                                          const Decl *D) {
+  auto *docD = D->getDocCommentProvidingDecl();
+  if (!docD)
+    return nullptr;
+
+  auto *doc = getSingleDocComment(MC, docD);
+  assert(doc && "getDocCommentProvidingDecl() returned decl with no comment");
+
+  // If the doc-comment is inherited from other decl, add a note about it.
+  if (docD != D) {
+    doc->setDecl(D);
+    if (auto baseD = docD->getDeclContext()->getSelfNominalTypeDecl()) {
+      doc->addInheritanceNote(MC, baseD);
+
+      // If the doc is inherited from protocol requirement, associate the
+      // requirement with the doc-comment.
+      // FIXME: This is to keep the old behavior.
+      if (isa<ProtocolDecl>(baseD))
+        doc->setDecl(docD);
+    }
+  }
+
+  return doc;
+}
+
 bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS,
                                        TypeOrExtensionDecl SynthesizedTarget) {
   auto MaybeClangNode = D->getClangNode();
@@ -492,6 +519,38 @@ bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS,
   CommentToXMLConverter Converter(OS);
   Converter.visitDocComment(DC, SynthesizedTarget);
 
+  OS.flush();
+  return true;
+}
+
+bool ide::getRawDocumentationComment(const Decl *D, raw_ostream &OS) {
+  ClangNode MaybeClangNode = D->getClangNode();
+  if (MaybeClangNode) {
+    const clang::Decl *CD = MaybeClangNode.getAsDecl();
+    if (!CD) {
+      return false;
+    }
+    const clang::ASTContext &ClangContext = CD->getASTContext();
+    const clang::comments::FullComment *FC =
+      ClangContext.getCommentForDecl(CD, /*PP=*/nullptr);
+    if (!FC) {
+      return false;
+    }
+    const clang::RawComment *rawComment = ClangContext.getRawCommentForAnyRedecl(FC->getDecl());
+    if (!rawComment) {
+      return false;
+    }
+    OS << rawComment->getFormattedText(ClangContext.getSourceManager(),
+                                       ClangContext.getDiagnostics());
+    return true;
+  }
+
+  const Decl *docD = D->getDocCommentProvidingDecl();
+  if (!docD) {
+    return false;
+  }
+  RawComment rawComment = docD->getRawComment();
+  OS << swift::markup::MarkupContext().getLineList(rawComment).str();
   OS.flush();
   return true;
 }

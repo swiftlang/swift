@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -210,6 +210,74 @@ extension BidirectionalCollection where Element: Equatable {
 }
 
 //===----------------------------------------------------------------------===//
+// indices(where:) / indices(of:)
+//===----------------------------------------------------------------------===//
+
+#if !$Embedded
+extension Collection {
+  /// Returns the indices of all the elements that match the given predicate.
+  ///
+  /// For example, you can use this method to find all the places that a
+  /// vowel occurs in a string.
+  ///
+  ///     let str = "Fresh cheese in a breeze"
+  ///     let vowels: Set<Character> = ["a", "e", "i", "o", "u"]
+  ///     let allTheVowels = str.indices(where: { vowels.contains($0) })
+  ///     // str[allTheVowels].count == 9
+  ///
+  /// - Parameter predicate: A closure that takes an element as its argument
+  ///   and returns a Boolean value that indicates whether the passed element
+  ///   represents a match.
+  /// - Returns: A set of the indices of the elements for which `predicate`
+  ///   returns `true`.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  @available(SwiftStdlib 6.0, *)
+  @inlinable
+  public func indices(
+    where predicate: (Element) throws -> Bool
+  ) rethrows -> RangeSet<Index> {
+    var result: [Range<Index>] = []
+    var end = startIndex
+    while let begin = try self[end...].firstIndex(where: predicate) {
+      end = try self[begin...].prefix(while: predicate).endIndex
+      result.append(begin ..< end)
+
+      guard end < self.endIndex else {
+        break
+      }
+      self.formIndex(after: &end)
+    }
+
+    return RangeSet(_orderedRanges: result)
+  }
+}
+
+extension Collection where Element: Equatable {
+  /// Returns the indices of all the elements that are equal to the given
+  /// element.
+  ///
+  /// For example, you can use this method to find all the places that a
+  /// particular letter occurs in a string.
+  ///
+  ///     let str = "Fresh cheese in a breeze"
+  ///     let allTheEs = str.indices(of: "e")
+  ///     // str[allTheEs].count == 7
+  ///
+  /// - Parameter element: An element to look for in the collection.
+  /// - Returns: A set of the indices of the elements that are equal to
+  ///   `element`.
+  ///
+  /// - Complexity: O(*n*), where *n* is the length of the collection.
+  @available(SwiftStdlib 6.0, *)
+  @inlinable
+  public func indices(of element: Element) -> RangeSet<Index> {
+    indices(where: { $0 == element })
+  }
+}
+#endif
+
+//===----------------------------------------------------------------------===//
 // partition(by:)
 //===----------------------------------------------------------------------===//
 
@@ -330,9 +398,9 @@ extension MutableCollection where Self: BidirectionalCollection {
   public mutating func partition(
     by belongsInSecondPartition: (Element) throws -> Bool
   ) rethrows -> Index {
-    let maybeOffset = try withContiguousMutableStorageIfAvailable {
+    let maybeOffset = try unsafe withContiguousMutableStorageIfAvailable {
       (bufferPointer) -> Int in
-      let unsafeBufferPivot = try bufferPointer._partitionImpl(
+      let unsafeBufferPivot = try unsafe bufferPointer._partitionImpl(
         by: belongsInSecondPartition)
       return unsafeBufferPivot - bufferPointer.startIndex
     }
@@ -373,6 +441,7 @@ extension MutableCollection where Self: BidirectionalCollection {
       swapAt(lo, hi)
       formIndex(after: &lo)
     }
+    fatalError()
   }
 }
 

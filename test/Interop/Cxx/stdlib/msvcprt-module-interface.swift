@@ -12,13 +12,13 @@
 // CHECK-STRING:   typealias size_t = size_t
 // CHECK-STRING:   static func to_string(_ _Val: Int32) -> std.string
 // CHECK-STRING:   static func to_wstring(_ _Val: Int32) -> std.wstring
-// CHECK-STRING:   struct __CxxTemplateInstSs : CxxRandomAccessCollection {
+// CHECK-STRING:   struct basic_string<CChar, std.char_traits<CChar>, std.allocator<CChar>> : CxxRandomAccessCollection {
 // CHECK-STRING:     typealias value_type = CChar
 // CHECK-STRING:   }
-// CHECK-STRING:   struct __CxxTemplateInstSbIwSt11char_traitsIwESaIwEE : CxxRandomAccessCollection {
+// CHECK-STRING:   struct basic_string<CWideChar, std.char_traits<CWideChar>, std.allocator<CWideChar>> : CxxRandomAccessCollection {
 // CHECK-STRING:     typealias value_type = CWideChar
 // CHECK-STRING:   }
-// CHECK-STRING:   typealias string = std.__CxxTemplateInstSs
-// CHECK-STRING:   typealias wstring = std.__CxxTemplateInstSbIwSt11char_traitsIwESaIwEE
+// CHECK-STRING:   typealias string = std.basic_string<CChar, std.char_traits<CChar>, std.allocator<CChar>>
+// CHECK-STRING:   typealias wstring = std.basic_string<CWideChar, std.char_traits<CWideChar>, std.allocator<CWideChar>>
 // CHECK-STRING: }
 

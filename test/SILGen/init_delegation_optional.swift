@@ -2,8 +2,8 @@
 // optionals, or else we do not discern the difference between a failure and a
 // constructed value. Run in compatibility modes that disable and enable
 // the flattening to verify this.
-// RUN: %target-swift-emit-silgen %s -swift-version 5 | %FileCheck %s
-// RUN: %target-swift-emit-silgen %s -swift-version 4.2 | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -swift-version 5 | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -swift-version 4.2 | %FileCheck %s
 
 extension Optional {
   init(nonFailable1: ()) {
@@ -15,7 +15,7 @@ extension Optional {
     // CHECK: bb0([[OUT:%[0-9]+]] : $*Optional<Wrapped>, [[SELF_META:%[0-9]+]] : $@thin Optional<Wrapped>.Type):
     // CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_box $<τ_0_0> { var Optional<τ_0_0> } <Wrapped>, var
     // CHECK-NEXT: [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-    // CHECK-NEXT: [[SELF_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+    // CHECK-NEXT: [[SELF_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [var_decl] [[MARKED_SELF_BOX]]
     // CHECK-NEXT: [[PB:%[0-9]+]] = project_box [[SELF_LIFETIME]]
     // CHECK: [[RESULT_ADDR:%[0-9]+]] = alloc_stack $Optional<Wrapped>
     // CHECK: [[DELEG_INIT:%[0-9]+]] = function_ref @$sSq24init_delegation_optionalE12nonFailable1xSgyt_tcfC
@@ -36,7 +36,7 @@ extension Optional {
     // CHECK: bb0([[OUT:%[0-9]+]] : $*Optional<Optional<Wrapped>>, [[SELF_META:%[0-9]+]] : $@thin Optional<Wrapped>.Type):
     // CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_box $<τ_0_0> { var Optional<τ_0_0> } <Wrapped>, var
     // CHECK-NEXT: [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-    // CHECK-NEXT: [[SELF_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+    // CHECK-NEXT: [[SELF_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [var_decl] [[MARKED_SELF_BOX]]
     // CHECK-NEXT: [[PB:%[0-9]+]] = project_box [[SELF_LIFETIME]]
     // CHECK: [[RESULT_ADDR:%[0-9]+]] = alloc_stack $Optional<Wrapped>
     // CHECK: [[DELEG_INIT:%[0-9]+]] = function_ref @$sSq24init_delegation_optionalE12nonFailable1xSgyt_tcfC
@@ -65,7 +65,7 @@ extension Optional {
     // CHECK: bb0([[OUT:%[0-9]+]] : $*Optional<Optional<Wrapped>>, [[SELF_META:%[0-9]+]] : $@thin Optional<Wrapped>.Type):
     // CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_box $<τ_0_0> { var Optional<τ_0_0> } <Wrapped>, var
     // CHECK-NEXT: [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-    // CHECK-NEXT: [[SELF_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+    // CHECK-NEXT: [[SELF_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [var_decl] [[MARKED_SELF_BOX]]
     // CHECK-NEXT: [[PB:%[0-9]+]] = project_box [[SELF_LIFETIME]]
     // CHECK: [[OPT_RESULT_ADDR:%[0-9]+]] = alloc_stack $Optional<Optional<Wrapped>>
     // CHECK: [[DELEG_INIT:%[0-9]+]] = function_ref @$sSq24init_delegation_optionalE9failable1xSgSgyt_tcfC
@@ -111,7 +111,7 @@ extension Optional {
     // CHECK: bb0([[OUT:%[0-9]+]] : $*Optional<Optional<Wrapped>>, [[SELF_META:%[0-9]+]] : $@thin Optional<Wrapped>.Type):
     // CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_box $<τ_0_0> { var Optional<τ_0_0> } <Wrapped>, var
     // CHECK-NEXT: [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-    // CHECK-NEXT: [[SELF_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+    // CHECK-NEXT: [[SELF_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [var_decl] [[MARKED_SELF_BOX]]
     // CHECK-NEXT: [[PB:%[0-9]+]] = project_box [[SELF_LIFETIME]]
     // CHECK: [[OPT_RESULT_ADDR:%[0-9]+]] = alloc_stack $Optional<Optional<Wrapped>>
     // CHECK-NEXT: [[OPT_RESULT_DATA_ADDR:%[0-9]+]] = init_enum_data_addr [[OPT_RESULT_ADDR]] : {{.*}}, #Optional.some!enumelt
@@ -172,7 +172,7 @@ extension Optional {
     // CHECK: bb0([[OUT:%[0-9]+]] : $*Optional<Optional<Wrapped>>, [[SELF_META:%[0-9]+]] : $@thin Optional<Wrapped>.Type):
     // CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_box $<τ_0_0> { var Optional<τ_0_0> } <Wrapped>, var
     // CHECK-NEXT: [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-    // CHECK-NEXT: [[SELF_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+    // CHECK-NEXT: [[SELF_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [var_decl] [[MARKED_SELF_BOX]]
     // CHECK-NEXT: [[PB:%[0-9]+]] = project_box [[SELF_LIFETIME]]
     // CHECK: [[OPT_OPT_RESULT_ADDR:%[0-9]+]] = alloc_stack $Optional<Optional<Optional<Wrapped>>>
     // CHECK-NEXT: [[OPT_OPT_RESULT_DATA_ADDR:%[0-9]+]] = init_enum_data_addr [[OPT_OPT_RESULT_ADDR]] : {{.*}}, #Optional.some!enumelt
@@ -245,7 +245,7 @@ extension Optional {
     // CHECK: bb0([[OUT:%[0-9]+]] : $*Optional<Optional<Wrapped>>, [[SELF_META:%[0-9]+]] : $@thin Optional<Wrapped>.Type):
     // CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_box $<τ_0_0> { var Optional<τ_0_0> } <Wrapped>, var
     // CHECK-NEXT: [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-    // CHECK-NEXT: [[SELF_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+    // CHECK-NEXT: [[SELF_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [var_decl] [[MARKED_SELF_BOX]]
     // CHECK-NEXT: [[PB:%[0-9]+]] = project_box [[SELF_LIFETIME]]
     // CHECK: [[OPT_RESULT_ADDR:%[0-9]+]] = alloc_stack $Optional<Optional<Wrapped>>
     // CHECK-NEXT: [[OPT_RESULT_DATA_ADDR:%[0-9]+]] = init_enum_data_addr [[OPT_RESULT_ADDR]] : {{.*}}, #Optional.some!enumelt
@@ -313,7 +313,7 @@ extension Optional {
     // CHECK: bb0([[OUT:%[0-9]+]] : $*Optional<Optional<Wrapped>>, [[SELF_META:%[0-9]+]] : $@thin Optional<Wrapped>.Type):
     // CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_box $<τ_0_0> { var Optional<τ_0_0> } <Wrapped>, var
     // CHECK-NEXT: [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-    // CHECK-NEXT: [[SELF_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[MARKED_SELF_BOX]]
+    // CHECK-NEXT: [[SELF_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [var_decl] [[MARKED_SELF_BOX]]
     // CHECK-NEXT: [[PB:%[0-9]+]] = project_box [[SELF_LIFETIME]]
     // CHECK: [[OPT_RESULT_ADDR:%[0-9]+]] = alloc_stack $Optional<Optional<Wrapped>>
     // CHECK: [[DELEG_INIT:%[0-9]+]] = function_ref @$sSq24init_delegation_optionalE17failableAndThrowsxSgSgyt_tKcfC
@@ -365,7 +365,8 @@ extension Optional where Wrapped == Optional<Bool> {
     // CHECK: bb0([[SELF_META:%[0-9]+]] : $@thin Optional<Optional<Bool>>.Type):
     // CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_box ${ var Optional<Optional<Bool>> }, var
     // CHECK-NEXT: [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-    // CHECK-NEXT: [[PB:%[0-9]+]] = project_box [[MARKED_SELF_BOX]]
+    // CHECK-NEXT: [[MARKED_SELF_LIFETIME:%[0-9]+]] = begin_borrow [var_decl] [[MARKED_SELF_BOX]]
+    // CHECK-NEXT: [[PB:%[0-9]+]] = project_box [[MARKED_SELF_LIFETIME]]
     // CHECK: [[RESULT_ADDR:%[0-9]+]] = alloc_stack $Optional<Optional<Bool>>
     // CHECK: [[DELEG_INIT:%[0-9]+]] = function_ref @$sSq24init_delegation_optionalE12nonFailable1xSgyt_tcfC
     // CHECK-NEXT: apply [[DELEG_INIT]]<Bool?>([[RESULT_ADDR]], [[SELF_META]])
@@ -374,6 +375,7 @@ extension Optional where Wrapped == Optional<Bool> {
     // CHECK-NEXT: dealloc_stack [[RESULT_ADDR]]
     // CHECK-NEXT: [[RESULT:%[0-9]+]] = load [trivial] [[PB]]
     // CHECK-NEXT: [[INJECT_INTO_OPT:%[0-9]+]] = enum $Optional<Optional<Optional<Bool>>>, #Optional.some!enumelt, [[RESULT]]
+    // CHECK-NEXT: end_borrow [[MARKED_SELF_LIFETIME]]
     // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
     // CHECK-NEXT: br bb2([[INJECT_INTO_OPT]] : $Optional<Optional<Optional<Bool>>>)
     //
@@ -391,7 +393,8 @@ extension Optional where Wrapped == Optional<Bool> {
     // CHECK: bb0([[SELF_META:%[0-9]+]] : $@thin Optional<Optional<Bool>>.Type):
     // CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_box ${ var Optional<Optional<Bool>> }, var
     // CHECK-NEXT: [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-    // CHECK-NEXT: [[PB:%[0-9]+]] = project_box [[MARKED_SELF_BOX]]
+    // CHECK-NEXT: [[MARKED_SELF_LIFETIME:%[0-9]+]] = begin_borrow [var_decl] [[MARKED_SELF_BOX]]
+    // CHECK-NEXT: [[PB:%[0-9]+]] = project_box [[MARKED_SELF_LIFETIME]]
     // CHECK: [[DELEG_INIT:%[0-9]+]] = function_ref @$sSq24init_delegation_optionalSbSgRszlE13SpecFailable1ABSgSgyt_tcfC
     // CHECK-NEXT: [[OPT_RESULT:%[0-9]+]] = apply [[DELEG_INIT]]([[SELF_META]])
     // CHECK: [[SELECT:%[0-9]+]] = select_enum [[OPT_RESULT]]
@@ -405,10 +408,12 @@ extension Optional where Wrapped == Optional<Bool> {
     // CHECK-NEXT: assign [[RESULT]] to [[PB]]
     // CHECK-NEXT: [[RESULT:%[0-9]+]] = load [trivial] [[PB]]
     // CHECK-NEXT: [[INJECT_INTO_OPT:%[0-9]+]] = enum $Optional<Optional<Optional<Bool>>>, #Optional.some!enumelt, [[RESULT]]
+    // CHECK-NEXT: end_borrow [[MARKED_SELF_LIFETIME]]
     // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
     // CHECK-NEXT: br bb4([[INJECT_INTO_OPT]] : $Optional<Optional<Optional<Bool>>>)
     //
     // CHECK: bb3:
+    // CHECK-NEXT: end_borrow [[MARKED_SELF_LIFETIME]]
     // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
     // CHECK-NEXT: [[NIL:%[0-9]+]] = enum $Optional<Optional<Optional<Bool>>>, #Optional.none!enumelt
     // CHECK-NEXT: br bb4([[NIL]] : $Optional<Optional<Optional<Bool>>>)
@@ -428,7 +433,8 @@ extension Optional where Wrapped == Optional<Bool> {
     // CHECK: bb0([[SELF_META:%[0-9]+]] : $@thin Optional<Optional<Bool>>.Type):
     // CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_box ${ var Optional<Optional<Bool>> }, var
     // CHECK-NEXT: [[MARKED_SELF_BOX:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-    // CHECK-NEXT: [[PB:%[0-9]+]] = project_box [[MARKED_SELF_BOX]]
+    // CHECK-NEXT: [[MARKED_SELF_LIFETIME:%[0-9]+]] = begin_borrow [var_decl] [[MARKED_SELF_BOX]]
+    // CHECK-NEXT: [[PB:%[0-9]+]] = project_box [[MARKED_SELF_LIFETIME]]
     // CHECK: [[DELEG_INIT:%[0-9]+]] = function_ref @$sSq24init_delegation_optionalSbSgRszlE21SpecFailableAndThrowsABSgSgyt_tKcfC
     // CHECK-NEXT: try_apply [[DELEG_INIT]]([[SELF_META]]) : {{.*}}, normal [[SUCC_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
     //
@@ -458,10 +464,12 @@ extension Optional where Wrapped == Optional<Bool> {
     // CHECK-NEXT: assign [[RESULT]] to [[PB]]
     // CHECK-NEXT: [[RESULT:%[0-9]+]] = load [trivial] [[PB]]
     // CHECK-NEXT: [[INJECT_INTO_OPT:%[0-9]+]] = enum $Optional<Optional<Optional<Bool>>>, #Optional.some!enumelt, [[RESULT]]
+    // CHECK-NEXT: end_borrow [[MARKED_SELF_LIFETIME]]
     // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
     // CHECK-NEXT: br bb9([[INJECT_INTO_OPT]] : $Optional<Optional<Optional<Bool>>>)
     //
     // CHECK: bb8:
+    // CHECK-NEXT: end_borrow [[MARKED_SELF_LIFETIME]]
     // CHECK-NEXT: destroy_value [[MARKED_SELF_BOX]]
     // CHECK-NEXT: [[NIL:%[0-9]+]] = enum $Optional<Optional<Optional<Bool>>>, #Optional.none!enumelt
     // CHECK-NEXT: br bb9([[NIL]] : $Optional<Optional<Optional<Bool>>>)

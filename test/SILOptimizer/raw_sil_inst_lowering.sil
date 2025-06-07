@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -raw-sil-inst-lowering | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -raw-sil-inst-lowering | %FileCheck %s
 
 sil_stage raw
 
@@ -108,7 +108,7 @@ bb0(%0 : @owned $SomeClass):
   %9 = partial_apply [callee_guaranteed] %8() : $@convention(thin) (@owned SomeClass) -> @owned Wrapper<SomeClass>
   %10 = function_ref @set_closure : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
   %11 = partial_apply [callee_guaranteed] %10(%1) : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
-  assign_by_wrapper origin property_wrapper, %0 : $SomeClass to [init] %7 : $*Wrapper<SomeClass>, init %9 : $@callee_guaranteed (@owned SomeClass) -> @owned Wrapper<SomeClass>, set %11 : $@callee_guaranteed (@owned SomeClass) -> ()
+  assign_by_wrapper %0 : $SomeClass to [init] %7 : $*Wrapper<SomeClass>, init %9 : $@callee_guaranteed (@owned SomeClass) -> @owned Wrapper<SomeClass>, set %11 : $@callee_guaranteed (@owned SomeClass) -> ()
   destroy_value %11 : $@callee_guaranteed (@owned SomeClass) -> ()
   destroy_value %9 : $@callee_guaranteed (@owned SomeClass) -> @owned Wrapper<SomeClass>
   %16 = load [take] %1 : $*RefStruct
@@ -132,7 +132,7 @@ bb0(%0 : @owned $SomeClass):
   %9 = partial_apply [callee_guaranteed] %8() : $@convention(thin) (@owned SomeClass) -> @out Wrapper<SomeClass>
   %10 = function_ref @set_closure : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
   %11 = partial_apply [callee_guaranteed] %10(%1) : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
-  assign_by_wrapper origin property_wrapper, %0 : $SomeClass to [init] %7 : $*Wrapper<SomeClass>, init %9 : $@callee_guaranteed (@owned SomeClass) -> @out Wrapper<SomeClass>, set %11 : $@callee_guaranteed (@owned SomeClass) -> ()
+  assign_by_wrapper %0 : $SomeClass to [init] %7 : $*Wrapper<SomeClass>, init %9 : $@callee_guaranteed (@owned SomeClass) -> @out Wrapper<SomeClass>, set %11 : $@callee_guaranteed (@owned SomeClass) -> ()
   destroy_value %11 : $@callee_guaranteed (@owned SomeClass) -> ()
   destroy_value %9 : $@callee_guaranteed (@owned SomeClass) -> @out Wrapper<SomeClass>
   %16 = load [take] %1 : $*RefStruct
@@ -157,7 +157,7 @@ bb0(%0 : @owned $SomeClass, %1 : @owned $Wrapper<SomeClass>):
   %9 = partial_apply [callee_guaranteed] %8() : $@convention(thin) (@owned SomeClass) -> @owned Wrapper<SomeClass>
   %10 = function_ref @set_closure : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
   %11 = partial_apply [callee_guaranteed] %10(%2) : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
-  assign_by_wrapper origin property_wrapper, %0 : $SomeClass to [assign] %7 : $*Wrapper<SomeClass>, init %9 : $@callee_guaranteed (@owned SomeClass) -> @owned Wrapper<SomeClass>, set %11 : $@callee_guaranteed (@owned SomeClass) -> ()
+  assign_by_wrapper %0 : $SomeClass to [assign] %7 : $*Wrapper<SomeClass>, init %9 : $@callee_guaranteed (@owned SomeClass) -> @owned Wrapper<SomeClass>, set %11 : $@callee_guaranteed (@owned SomeClass) -> ()
   destroy_value %11 : $@callee_guaranteed (@owned SomeClass) -> ()
   destroy_value %9 : $@callee_guaranteed (@owned SomeClass) -> @owned Wrapper<SomeClass>
   %16 = load [take] %2 : $*RefStruct
@@ -182,7 +182,7 @@ bb0(%0 : @owned $SomeClass, %1 : @owned $Wrapper<SomeClass>):
   %9 = partial_apply [callee_guaranteed] %8() : $@convention(thin) (@owned SomeClass) -> @out Wrapper<SomeClass>
   %10 = function_ref @set_closure : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
   %11 = partial_apply [callee_guaranteed] %10(%2) : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
-  assign_by_wrapper origin property_wrapper, %0 : $SomeClass to [assign] %7 : $*Wrapper<SomeClass>, init %9 : $@callee_guaranteed (@owned SomeClass) -> @out Wrapper<SomeClass>, set %11 : $@callee_guaranteed (@owned SomeClass) -> ()
+  assign_by_wrapper %0 : $SomeClass to [assign] %7 : $*Wrapper<SomeClass>, init %9 : $@callee_guaranteed (@owned SomeClass) -> @out Wrapper<SomeClass>, set %11 : $@callee_guaranteed (@owned SomeClass) -> ()
   destroy_value %11 : $@callee_guaranteed (@owned SomeClass) -> ()
   destroy_value %9 : $@callee_guaranteed (@owned SomeClass) -> @out Wrapper<SomeClass>
   %16 = load [take] %2 : $*RefStruct
@@ -207,7 +207,7 @@ bb0(%0 : @owned $SomeClass, %1 : @owned $RefStruct):
   %9 = partial_apply [callee_guaranteed] %8() : $@convention(thin) (@owned SomeClass) -> @owned Wrapper<SomeClass>
   %10 = function_ref @set_closure : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
   %11 = partial_apply [callee_guaranteed] %10(%2) : $@convention(method) (@owned SomeClass, @inout RefStruct) -> ()
-  assign_by_wrapper origin property_wrapper, %0 : $SomeClass to [assign_wrapped_value] %7 : $*Wrapper<SomeClass>, init %9 : $@callee_guaranteed (@owned SomeClass) -> @owned Wrapper<SomeClass>, set %11 : $@callee_guaranteed (@owned SomeClass) -> ()
+  assign_by_wrapper %0 : $SomeClass to [assign_wrapped_value] %7 : $*Wrapper<SomeClass>, init %9 : $@callee_guaranteed (@owned SomeClass) -> @owned Wrapper<SomeClass>, set %11 : $@callee_guaranteed (@owned SomeClass) -> ()
   destroy_value %11 : $@callee_guaranteed (@owned SomeClass) -> ()
   destroy_value %9 : $@callee_guaranteed (@owned SomeClass) -> @owned Wrapper<SomeClass>
   %16 = load [take] %2 : $*RefStruct

@@ -29,7 +29,25 @@
 
 namespace swift {
 
+#if 0
+using ThreadID = decltype(pthread_self());
+
+inline ThreadID _swift_get_thread_id() {
+#if defined(_WIN32)
+  return GetCurrentThreadId();
+#else
+  return pthread_self();
+#endif
+}
+
+#define SWIFT_TASK_DEBUG_LOG(fmt, ...)                                         \
+  fprintf(stderr, "[%lu] [%s:%d](%s) " fmt "\n",                               \
+          (unsigned long)_swift_get_thread_id(),                               \
+          __FILE__, __LINE__, __FUNCTION__,                                    \
+          __VA_ARGS__)
+#else
 #define SWIFT_TASK_DEBUG_LOG(fmt ...) (void)0
+#endif
 
 /// Allocate task-local memory on behalf of a specific task,
 /// not necessarily the current one.  Generally this should only be
@@ -91,18 +109,23 @@ public:
 
 /// Adopt the voucher stored in `task`. This removes the voucher from the task
 /// and adopts it on the current thread.
+__attribute__((visibility("hidden")))
 void adoptTaskVoucher(AsyncTask *task);
 
 /// Restore the voucher for `task`. This un-adopts the current thread's voucher
 /// and stores it back into the task again.
+__attribute__((visibility("hidden")))
 void restoreTaskVoucher(AsyncTask *task);
 
 /// release() establishes a happens-before relation with a preceding acquire()
 /// on the same address.
+__attribute__((visibility("hidden")))
 void _swift_tsan_acquire(void *addr);
+__attribute__((visibility("hidden")))
 void _swift_tsan_release(void *addr);
 
 /// Clear the active task reference for the current thread.
+__attribute__((visibility("hidden")))
 AsyncTask *_swift_task_clearCurrent();
 
 /// The current state of a task's status records.

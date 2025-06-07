@@ -6,7 +6,8 @@
 
 namespace swift {
 
-int doGenerateModuleAPIDescription(StringRef MainExecutablePath,
+int doGenerateModuleAPIDescription(StringRef DriverPath,
+                                   StringRef MainExecutablePath,
                                    ArrayRef<std::string> Args);
 
 } // end namespace swift

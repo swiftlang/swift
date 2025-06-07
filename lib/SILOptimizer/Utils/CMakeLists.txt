@@ -19,16 +19,19 @@ target_sources(swiftSILOptimizer PRIVATE
   InstOptUtils.cpp
   KeyPathProjector.cpp
   LexicalDestroyFolding.cpp
-  LexicalDestroyHoisting.cpp
-  LoadStoreOptUtils.cpp
   LoopUtils.cpp
   OptimizerStatsUtils.cpp
+  RegionIsolation.cpp
   PartialApplyCombiner.cpp
+  PartitionUtils.cpp
   PerformanceInlinerUtils.cpp
   ShrinkBorrowScope.cpp
   SILInliner.cpp
+  SILIsolationInfo.cpp
   SILSSAUpdater.cpp
   SpecializationMangler.cpp
   StackNesting.cpp
   ValueLifetime.cpp
-  OwnershipOptUtils.cpp)
+  VariableNameUtils.cpp
+  OwnershipOptUtils.cpp
+  OptimizerBridging.cpp)

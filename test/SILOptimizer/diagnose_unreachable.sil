@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -diagnose-unreachable -sil-print-debuginfo | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -update-borrowed-from -diagnose-unreachable -sil-print-debuginfo | %FileCheck %s
 
 import Builtin
 import Swift
@@ -148,7 +148,7 @@ sil @removeTriviallyDeadInstructions : $@convention(thin) (@owned B) -> () {
 bb0(%0 : $B):
   %1 = alloc_box $<τ_0_0> { var τ_0_0 } <B>
   %1a = project_box %1 : $<τ_0_0> { var τ_0_0 } <B>, 0
-  store %0 to %1a : $*B                 // CHECK: store
+  store %0 to %1a : $*B                 // CHECK: store {{%[0-9]+}}
   %3 = load %1a : $*B
   strong_retain %3 : $B                         // CHECK: strong_retain
   %5 = unchecked_ref_cast %3 : $B to $Builtin.NativeObject     // CHECK-NOT: unchecked_ref_cast
@@ -568,7 +568,7 @@ bb3:
 // CHECK-NEXT: alloc_stack
 // CHECK-NEXT: tuple
 // CHECK-NEXT: init_enum_data_addr
-// CHECK-NEXT: store
+// CHECK-NEXT: store {{%[0-9]+}}
 // CHECK-NEXT: inject_enum_addr
 // CHECK-NEXT: br bb1
 // CHECK: } // end sil function 'constant_fold_switch_enum_addr_with_payload'
@@ -596,7 +596,7 @@ bb2:
 // CHECK: bb0(
 // CHECK-NEXT: alloc_stack
 // CHECK-NEXT: init_enum_data_addr
-// CHECK-NEXT: store
+// CHECK-NEXT: store {{%[0-9]+}}
 // CHECK-NEXT: inject_enum_addr
 // CHECK-NEXT: br bb1
 // CHECK: } // end sil function 'constant_fold_switch_enum_addr_with_nontrivial_payload'
@@ -627,7 +627,7 @@ bb3:
 // CHECK: bb0(
 // CHECK-NEXT: alloc_stack
 // CHECK-NEXT: init_enum_data_addr
-// CHECK-NEXT: store
+// CHECK-NEXT: store {{%[0-9]+}}
 // CHECK-NEXT: inject_enum_addr
 // CHECK-NEXT: br bb1
 // CHECK: } // end sil function 'constant_fold_switch_enum_addr_with_nontrivial_payload_2'

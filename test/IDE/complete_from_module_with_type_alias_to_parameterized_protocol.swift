@@ -23,8 +23,6 @@ import pck
 
 #^COMPLETE^#
 
-// CHECK: Begin completions
 // CHECK-DAG: Decl[Protocol]/OtherModule[pck]/Flair[RareType]: Foo[#Foo#];
 // CHECK-DAG: Decl[TypeAlias]/OtherModule[pck]:   Problem[#Foo<String>#];
 // CHECK-DAG: Decl[TypeAlias]/OtherModule[pck]:   ConstrainedBar[#Foo<T>#];
-// CHECK: End completions

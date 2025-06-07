@@ -25,6 +25,7 @@
 
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Utils/InstModCallbacks.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 
 namespace llvm {
@@ -36,7 +37,6 @@ namespace swift {
 class DominanceInfo;
 class SILLoop;
 class SILLoopInfo;
-struct InstModCallbacks;
 
 /// Adds a new argument to an edge between a branch and a destination
 /// block. Allows for user injected callbacks via \p callbacks.
@@ -65,14 +65,16 @@ TermInst *changeEdgeValue(TermInst *branch, SILBasicBlock *dest, size_t idx,
 /// specified index. Asserts internally that the argument along the edge does
 /// not have uses.
 TermInst *deleteEdgeValue(TermInst *branch, SILBasicBlock *destBlock,
-                          size_t argIndex, bool cleanupDeadPhiOp = true);
+                          size_t argIndex, bool cleanupDeadPhiOp = true,
+                          InstModCallbacks callbacks = InstModCallbacks());
 
 /// Erase the \p argIndex phi argument from \p block. Asserts that the argument
 /// is a /real/ phi argument. Removes all incoming values for the argument from
 /// predecessor terminators. Asserts internally that it only ever is given
 /// "true" phi argument.
 void erasePhiArgument(SILBasicBlock *block, unsigned argIndex,
-                      bool cleanupDeadPhiOp = true);
+                      bool cleanupDeadPhiOp = true,
+                      InstModCallbacks callbacks = InstModCallbacks());
 
 /// Check if the edge from the terminator is critical.
 bool isCriticalEdge(TermInst *t, unsigned edgeIdx);
@@ -187,6 +189,8 @@ bool mergeBasicBlockWithSuccessor(SILBasicBlock *bb, DominanceInfo *domInfo,
 /// the number of instructions, so interleaved merging and splitting is
 /// quadratic.
 bool mergeBasicBlocks(SILFunction *f);
+
+bool isTrapNoReturnFunction(SILFunction *f);
 
 /// Return true if we conservatively find all bb's that are non-failure exit
 /// basic blocks and place them in \p bbs. If we find something we don't

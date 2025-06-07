@@ -23,21 +23,23 @@
 
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILInstructionWorklist.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
-#include "swift/SIL/InstructionUtils.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
+#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ProtocolConformanceAnalysis.h"
 #include "swift/SILOptimizer/OptimizerBridging.h"
+#include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
 #include "swift/SILOptimizer/Utils/Existential.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
-#include "swift/SILOptimizer/PassManager/PassManager.h"
 
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
@@ -45,6 +47,10 @@
 namespace swift {
 
 class AliasAnalysis;
+class SILCombineCanonicalize;
+namespace test {
+struct SILCombinerProcessInstruction;
+}
 
 /// This is a class which maintains the state of the combiner and simplifies
 /// many operations such as removing/adding instructions and syncing them with
@@ -54,6 +60,8 @@ class SILCombiner :
   SILFunctionTransform *parentTransform;
 
   AliasAnalysis *AA;
+
+  BasicCalleeAnalysis *CA;
 
   DominanceAnalysis *DA;
 
@@ -69,16 +77,18 @@ class SILCombiner :
   /// lifetimes in OSSA.
   NonLocalAccessBlockAnalysis *NLABA;
 
+public:
   /// Worklist containing all of the instructions primed for simplification.
   SmallSILInstructionWorklist<256> Worklist;
 
+private:
   /// Utility for dead code removal.
   InstructionDeleter deleter;
 
   /// A cache of "dead end blocks" through which all paths it is known that the
   /// program will terminate. This means that we are allowed to leak
   /// objects.
-  DeadEndBlocks deadEndBlocks;
+  DeadEndBlocksAnalysis *DEBA;
 
   /// Variable to track if the SILCombiner made any changes.
   bool MadeChange;
@@ -99,10 +109,12 @@ class SILCombiner :
   // The tracking list is used by `Builder` for newly added
   // instructions, which we will periodically move to our worklist.
   llvm::SmallVector<SILInstruction *, 64> TrackingList;
-  
+
+public:
   /// Builder used to insert instructions.
   SILBuilder Builder;
 
+private:
   SILOptFunctionBuilder FuncBuilder;
 
   /// Cast optimizer
@@ -123,6 +135,8 @@ public:
               bool removeCondFails, bool enableCopyPropagation);
 
   bool runOnFunction(SILFunction &F);
+
+  bool shouldRemoveCondFail(CondFailInst &);
 
   void clear() {
     Iteration = 0;
@@ -206,8 +220,10 @@ public:
   // by this method.
   SILInstruction *eraseInstFromFunction(SILInstruction &I,
                                         SILBasicBlock::iterator &InstIter,
-                                        bool AddOperandsToWorklist = true) {
-    Worklist.eraseInstFromFunction(I, InstIter, AddOperandsToWorklist);
+                                        bool AddOperandsToWorklist = true,
+                                        bool salvageDebugInfo = true) {
+    Worklist.eraseInstFromFunction(I, InstIter, AddOperandsToWorklist,
+                                   salvageDebugInfo);
     MadeChange = true;
     // Dummy return, so the caller doesn't need to explicitly return nullptr.
     return nullptr;
@@ -218,9 +234,10 @@ public:
   void eraseInstIncludingUsers(SILInstruction *inst);
 
   SILInstruction *eraseInstFromFunction(SILInstruction &I,
-                                        bool AddOperandsToWorklist = true) {
+                                        bool AddOperandsToWorklist = true,
+                                        bool salvageDebugInfo = true) {
     SILBasicBlock::iterator nullIter;
-    return eraseInstFromFunction(I, nullIter, AddOperandsToWorklist);
+    return eraseInstFromFunction(I, nullIter, AddOperandsToWorklist, salvageDebugInfo);
   }
 
   void addInitialGroup(ArrayRef<SILInstruction *> List) {
@@ -231,39 +248,25 @@ public:
   SILInstruction *visitSILInstruction(SILInstruction *I) { return nullptr; }
 
   /// Instruction visitors.
-  SILInstruction *visitReleaseValueInst(ReleaseValueInst *DI);
-  SILInstruction *visitRetainValueInst(RetainValueInst *CI);
   SILInstruction *visitPartialApplyInst(PartialApplyInst *AI);
-  SILInstruction *visitApplyInst(ApplyInst *AI);
   SILInstruction *visitBeginApplyInst(BeginApplyInst *BAI);
-  SILInstruction *visitTryApplyInst(TryApplyInst *AI);
   SILInstruction *optimizeStringObject(BuiltinInst *BI);
   SILInstruction *visitBuiltinInst(BuiltinInst *BI);
   SILInstruction *visitCondFailInst(CondFailInst *CFI);
-  SILInstruction *visitCopyValueInst(CopyValueInst *cvi);
-  SILInstruction *visitDestroyValueInst(DestroyValueInst *dvi);
   SILInstruction *visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
   SILInstruction *visitUpcastInst(UpcastInst *UCI);
 
   // NOTE: The load optimized in this method is a load [trivial].
   SILInstruction *optimizeLoadFromStringLiteral(LoadInst *li);
 
-  SILInstruction *visitLoadInst(LoadInst *LI);
-  SILInstruction *visitLoadBorrowInst(LoadBorrowInst *LI);
   SILInstruction *visitIndexAddrInst(IndexAddrInst *IA);
   bool optimizeStackAllocatedEnum(AllocStackInst *AS);
-  SILInstruction *visitAllocStackInst(AllocStackInst *AS);
-  SILInstruction *visitAllocRefInst(AllocRefInst *AR);
   SILInstruction *visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI);
   SILInstruction *visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI);
-  SILInstruction *visitPointerToAddressInst(PointerToAddressInst *PTAI);
-  SILInstruction *visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI);
   SILInstruction *visitUncheckedRefCastInst(UncheckedRefCastInst *URCI);
   SILInstruction *visitEndCOWMutationInst(EndCOWMutationInst *URCI);
   SILInstruction *visitUncheckedRefCastAddrInst(UncheckedRefCastAddrInst *URCI);
   SILInstruction *visitBridgeObjectToRefInst(BridgeObjectToRefInst *BORI);
-  SILInstruction *visitUnconditionalCheckedCastInst(
-                    UnconditionalCheckedCastInst *UCCI);
   SILInstruction *
   visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *UCCAI);
   SILInstruction *visitRawPointerToRefInst(RawPointerToRefInst *RPTR);
@@ -280,7 +283,6 @@ public:
   SILInstruction *visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *TTOCMI);
   SILInstruction *visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *OCTTMI);
   SILInstruction *visitTupleExtractInst(TupleExtractInst *TEI);
-  SILInstruction *visitFixLifetimeInst(FixLifetimeInst *FLI);
   SILInstruction *visitSwitchValueInst(SwitchValueInst *SVI);
   SILInstruction *
   visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI);
@@ -289,21 +291,25 @@ public:
   SILInstruction *visitUnreachableInst(UnreachableInst *UI);
   SILInstruction *visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI);
       
-  SILInstruction *visitMarkDependenceInst(MarkDependenceInst *MDI);
-  SILInstruction *visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *CBOI);
   SILInstruction *visitConvertFunctionInst(ConvertFunctionInst *CFI);
   SILInstruction *
   visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *Cvt);
   SILInstruction *
   visitDifferentiableFunctionExtractInst(DifferentiableFunctionExtractInst *DFEI);
   
+  SILInstruction *visitPackLengthInst(PackLengthInst *PLI);
+  SILInstruction *visitPackElementGetInst(PackElementGetInst *PEGI);
+  SILInstruction *visitTuplePackElementAddrInst(TuplePackElementAddrInst *TPEAI);
+  SILInstruction *visitCopyAddrInst(CopyAddrInst *CAI);
+
   SILInstruction *legacyVisitGlobalValueInst(GlobalValueInst *globalValue);
 
-#define PASS(ID, TAG, DESCRIPTION)
-#define SWIFT_FUNCTION_PASS(ID, TAG, DESCRIPTION)
-#define SWIFT_SILCOMBINE_PASS(INST) \
+#define INSTRUCTION_SIMPLIFICATION(INST) \
   SILInstruction *visit##INST(INST *);
-#include "swift/SILOptimizer/PassManager/Passes.def"
+#define INSTRUCTION_SIMPLIFICATION_WITH_LEGACY(INST) \
+  SILInstruction *visit##INST(INST *);          \
+  SILInstruction *legacyVisit##INST(INST *);
+#include "Simplifications.def"
 
   /// Instruction visitor helpers.
 
@@ -328,13 +334,7 @@ public:
   SILInstruction *optimizeApplyOfConvertFunctionInst(FullApplySite AI,
                                                      ConvertFunctionInst *CFI);
 
-  bool tryOptimizeKeypath(ApplyInst *AI);
   bool tryOptimizeInoutKeypath(BeginApplyInst *AI);
-  bool tryOptimizeKeypathApplication(ApplyInst *AI, SILFunction *callee);
-  bool tryOptimizeKeypathOffsetOf(ApplyInst *AI, FuncDecl *calleeFn,
-                                  KeyPathInst *kp);
-  bool tryOptimizeKeypathKVCString(ApplyInst *AI, FuncDecl *calleeFn,
-                                  KeyPathInst *kp);
 
   /// Sinks owned forwarding instructions to their uses if they do not have
   /// non-debug non-consuming uses. Deletes any debug_values and destroy_values
@@ -367,17 +367,15 @@ public:
       SingleValueInstruction *user, SingleValueInstruction *value,
       function_ref<SILValue()> newValueGenerator);
 
-  SILInstruction *optimizeAlignment(PointerToAddressInst *ptrAdrInst);
-
   InstModCallbacks &getInstModCallbacks() { return deleter.getCallbacks(); }
 
 private:
   // Build concrete existential information using findInitExistential.
-  Optional<ConcreteOpenedExistentialInfo>
+  std::optional<ConcreteOpenedExistentialInfo>
   buildConcreteOpenedExistentialInfo(Operand &ArgOperand);
 
   // Build concrete existential information using SoleConformingType.
-  Optional<ConcreteOpenedExistentialInfo>
+  std::optional<ConcreteOpenedExistentialInfo>
   buildConcreteOpenedExistentialInfoFromSoleConformingType(Operand &ArgOperand);
 
   // Common utility function to build concrete existential information for all
@@ -416,6 +414,11 @@ private:
 
   /// Perform one SILCombine iteration.
   bool doOneIteration(SILFunction &F, unsigned Iteration);
+
+  void processInstruction(SILInstruction *instruction,
+                          SILCombineCanonicalize &scCanonicalize,
+                          bool &MadeChange);
+  friend test::SILCombinerProcessInstruction;
 
   /// Add reachable code to the worklist. Meant to be used when starting to
   /// process a new function.

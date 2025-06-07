@@ -17,7 +17,7 @@ import SwiftShims
 internal func _isClassType(_ type: Any.Type) -> Bool {
   // a thick metatype is represented with a pointer metadata structure,
   // so this unsafeBitCast is a safe operation here.
-  return swift_isClassType(unsafeBitCast(type, to: UnsafeRawPointer.self))
+  return unsafe swift_isClassType(unsafeBitCast(type, to: UnsafeRawPointer.self))
 }
 
 @_silgen_name("swift_getMetadataKind")
@@ -64,10 +64,10 @@ internal func getChild<T>(of value: T, type: Any.Type, index: Int) -> (label: St
   var nameC: UnsafePointer<CChar>? = nil
   var freeFunc: NameFreeFunc? = nil
   
-  let value = _getChild(of: value, type: type, index: index, outName: &nameC, outFreeFunc: &freeFunc)
+  let value = unsafe _getChild(of: value, type: type, index: index, outName: &nameC, outFreeFunc: &freeFunc)
   
-  let name = nameC.flatMap({ String(validatingUTF8: $0) })
-  freeFunc?(nameC)
+  let name = unsafe nameC.flatMap({ unsafe String(validatingCString: $0) })
+  unsafe freeFunc?(nameC)
   return (name, value)
 }
 
@@ -79,8 +79,8 @@ internal func _getQuickLookObject<T>(_: T) -> AnyObject?
 internal func _isImpl(_ object: AnyObject, kindOf: UnsafePointer<CChar>) -> Bool
 
 internal func _is(_ object: AnyObject, kindOf `class`: String) -> Bool {
-  return `class`.withCString {
-    return _isImpl(object, kindOf: $0)
+  return unsafe `class`.withCString {
+    return unsafe _isImpl(object, kindOf: $0)
   }
 }
 
@@ -88,8 +88,8 @@ internal func _getClassPlaygroundQuickLook(
   _ object: AnyObject
 ) -> _PlaygroundQuickLook? {
   if _is(object, kindOf: "NSNumber") {
-    let number: _NSNumber = unsafeBitCast(object, to: _NSNumber.self)
-    switch UInt8(number.objCType[0]) {
+    let number: _NSNumber = unsafe unsafeBitCast(object, to: _NSNumber.self)
+    switch unsafe UInt8(number.objCType[0]) {
     case UInt8(ascii: "d"):
       return .double(number.doubleValue)
     case UInt8(ascii: "f"):
@@ -213,6 +213,9 @@ public struct _EachFieldOptions: OptionSet {
   public static var ignoreUnknown = _EachFieldOptions(rawValue: 1 << 1)
 }
 
+@available(SwiftStdlib 5.2, *)
+extension _EachFieldOptions: Sendable {}
+
 /// The metadata "kind" for a type.
 @available(SwiftStdlib 5.2, *)
 @_spi(Reflection)
@@ -249,6 +252,9 @@ public enum _MetadataKind: UInt {
   }
 }
 
+@available(SwiftStdlib 5.2, *)
+extension _MetadataKind: Sendable {}
+
 /// Calls the given closure on every field of the specified type.
 ///
 /// If `body` returns `false` for any field, no additional fields are visited.
@@ -279,13 +285,19 @@ public func _forEachField(
   for i in 0..<childCount {
     let offset = _getChildOffset(type, index: i)
 
-    var field = _FieldReflectionMetadata()
-    let childType = _getChildMetadata(type, index: i, fieldMetadata: &field)
-    defer { field.freeFunc?(field.name) }
+    var field = unsafe _FieldReflectionMetadata()
+    let childType = unsafe _getChildMetadata(type, index: i, fieldMetadata: &field)
+    defer { unsafe field.freeFunc?(field.name) }
     let kind = _MetadataKind(childType)
 
-    if !body(field.name!, offset, childType, kind) {
-      return false
+    if let name = unsafe field.name {
+      if unsafe !body(name, offset, childType, kind) {
+        return false
+      }
+    } else {
+      if unsafe !body("", offset, childType, kind) {
+        return false
+      }
     }
   }
 
@@ -323,9 +335,9 @@ public func _forEachFieldWithKeyPath<Root>(
   for i in 0..<childCount {
     let offset = _getChildOffset(type, index: i)
 
-    var field = _FieldReflectionMetadata()
-    let childType = _getChildMetadata(type, index: i, fieldMetadata: &field)
-    defer { field.freeFunc?(field.name) }
+    var field = unsafe _FieldReflectionMetadata()
+    let childType = unsafe _getChildMetadata(type, index: i, fieldMetadata: &field)
+    defer { unsafe field.freeFunc?(field.name) }
     let kind = _MetadataKind(childType)
     let supportedType: Bool
     switch kind {
@@ -335,35 +347,42 @@ public func _forEachFieldWithKeyPath<Root>(
       default:
         supportedType = false
     }
-    if !supportedType || !field.isStrong {
+    if unsafe !supportedType || !field.isStrong {
       if !ignoreUnknown { return false }
       continue;
     }
     func keyPathType<Leaf>(for: Leaf.Type) -> PartialKeyPath<Root>.Type {
-      if field.isVar { return WritableKeyPath<Root, Leaf>.self }
+      if unsafe field.isVar { return WritableKeyPath<Root, Leaf>.self }
       return KeyPath<Root, Leaf>.self
     }
     let resultSize = MemoryLayout<Int32>.size + MemoryLayout<Int>.size
-    let partialKeyPath = _openExistential(childType, do: keyPathType)
+    let partialKeyPath = unsafe _openExistential(childType, do: keyPathType)
        ._create(capacityInBytes: resultSize) {
-      var destBuilder = KeyPathBuffer.Builder($0)
-      destBuilder.pushHeader(KeyPathBuffer.Header(
+      var destBuilder = unsafe KeyPathBuffer.Builder($0)
+      unsafe destBuilder.pushHeader(KeyPathBuffer.Header(
         size: resultSize - MemoryLayout<Int>.size,
         trivial: true,
-        hasReferencePrefix: false
+        hasReferencePrefix: false,
+        isSingleComponent: true
       ))
-      let component = RawKeyPathComponent(
+      let component = unsafe RawKeyPathComponent(
            header: RawKeyPathComponent.Header(stored: .struct,
                                               mutable: field.isVar,
                                               inlineOffset: UInt32(offset)),
            body: UnsafeRawBufferPointer(start: nil, count: 0))
-      component.clone(
+      unsafe component.clone(
         into: &destBuilder.buffer,
         endOfReferencePrefix: false)
     }
 
-    if !body(field.name!, partialKeyPath) {
-      return false
+    if let name = unsafe field.name {
+      if unsafe !body(name, partialKeyPath) {
+        return false
+      }
+    } else {
+      if unsafe !body("", partialKeyPath) {
+        return false
+      }
     }
   }
 

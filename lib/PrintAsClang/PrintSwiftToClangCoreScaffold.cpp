@@ -17,50 +17,44 @@
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Type.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/IRGen/IRABIDetailsProvider.h"
 #include "swift/IRGen/Linking.h"
+#include "clang/Basic/AddressSpaces.h"
+#include "clang/Basic/TargetInfo.h"
 #include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
 
-static void printKnownCType(Type t, PrimitiveTypeMapping &typeMapping,
-                            raw_ostream &os) {
-  auto info =
-      typeMapping.getKnownCTypeInfo(t->getNominalOrBoundGenericNominal());
-  assert(info.has_value() && "not a known type");
-  os << info->name;
-  if (info->canBeNullable)
-    os << " _Null_unspecified";
-}
-
-static void printKnownStruct(
+static void printKnownStruct(const ASTContext &astContext,
     PrimitiveTypeMapping &typeMapping, raw_ostream &os, StringRef name,
     const IRABIDetailsProvider::TypeRecordABIRepresentation &typeRecord) {
   assert(typeRecord.getMembers().size() > 1);
   os << "struct " << name << " {\n";
   for (const auto &ty : llvm::enumerate(typeRecord.getMembers())) {
     os << "  ";
-    printKnownCType(ty.value(), typeMapping, os);
+    ClangSyntaxPrinter(astContext, os).printKnownCType(ty.value(), typeMapping);
     os << " _" << ty.index() << ";\n";
   }
   os << "};\n";
 }
 
-static void printKnownTypedef(
+static void printKnownTypedef(const ASTContext &astContext,
     PrimitiveTypeMapping &typeMapping, raw_ostream &os, StringRef name,
     const IRABIDetailsProvider::TypeRecordABIRepresentation &typeRecord) {
   assert(typeRecord.getMembers().size() == 1);
   os << "typedef ";
-  printKnownCType(typeRecord.getMembers()[0], typeMapping, os);
+  ClangSyntaxPrinter(astContext, os).printKnownCType(typeRecord.getMembers()[0],
+                                         typeMapping);
   os << " " << name << ";\n";
 }
 
-static void printKnownType(
+static void printKnownType(const ASTContext &astContext,
     PrimitiveTypeMapping &typeMapping, raw_ostream &os, StringRef name,
     const IRABIDetailsProvider::TypeRecordABIRepresentation &typeRecord) {
   if (typeRecord.getMembers().size() == 1)
-    return printKnownTypedef(typeMapping, os, name, typeRecord);
-  printKnownStruct(typeMapping, os, name, typeRecord);
+    return printKnownTypedef(astContext, typeMapping, os, name, typeRecord);
+  printKnownStruct(astContext, typeMapping, os, name, typeRecord);
 }
 
 static void
@@ -149,10 +143,10 @@ static void printTypeMetadataResponseType(SwiftToClangInteropContext &ctx,
   os << "// Swift type metadata response type.\n";
   // Print out the type metadata structure.
   auto funcSig = ctx.getIrABIDetails().getTypeMetadataAccessFunctionSignature();
-  printKnownType(typeMapping, os, "MetadataResponseTy", funcSig.returnType);
+  printKnownType(ctx.getASTContext(), typeMapping, os, "MetadataResponseTy", funcSig.returnType);
   assert(funcSig.parameterTypes.size() == 1);
   os << "// Swift type metadata request type.\n";
-  printKnownType(typeMapping, os, "MetadataRequestTy",
+  printKnownType(ctx.getASTContext(), typeMapping, os, "MetadataRequestTy",
                  funcSig.parameterTypes[0]);
 }
 
@@ -173,15 +167,49 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
 
       // Pointer types.
       // FIXME: support raw pointers?
-      astContext.getOpaquePointerType()};
+      astContext.getOpaquePointerType(),
 
-  for (Type type : llvm::makeArrayRef(supportedPrimitiveTypes)) {
+      astContext.getIntType(), astContext.getUIntType()};
+
+  auto primTypesArray = llvm::ArrayRef(supportedPrimitiveTypes);
+
+  // Ensure that `long` and `unsigned long` are treated as valid
+  // generic Swift types (`Int` and `UInt`) on platforms
+  // that do define `Int`/`ptrdiff_t` as `long` and don't define `int64_t` to be
+  // `long`.
+  auto &clangTI =
+      astContext.getClangModuleLoader()->getClangASTContext().getTargetInfo();
+  bool isSwiftIntLong =
+      clangTI.getPtrDiffType(clang::LangAS::Default) == clang::TransferrableTargetInfo::SignedLong;
+  bool isInt64Long =
+      clangTI.getInt64Type() == clang::TransferrableTargetInfo::SignedLong;
+  if (!(isSwiftIntLong && !isInt64Long))
+    primTypesArray = primTypesArray.drop_back(2);
+
+  // We do not have metadata for primitive types in Embedded Swift.
+  // As a result, the following features are not supported with primitive types in this mode:
+  // - Dynamic casts
+  // - Static self
+  // - Generic requirement parameters
+  // - Metadata source parameter
+  bool embedded = astContext.LangOpts.hasFeature(Feature::Embedded);
+
+  for (Type type : primTypesArray) {
     auto typeInfo = *typeMapping.getKnownCxxTypeInfo(
         type->getNominalOrBoundGenericNominal());
 
+    if (!isCForwardDefinition) {
+      os << "template<>\n";
+      os << "inline const constexpr bool isUsableInGenericContext<"
+         << typeInfo.name << "> = true;\n\n";
+    }
+
+    if (embedded)
+      continue;
+
     auto typeMetadataFunc = irgen::LinkEntity::forTypeMetadata(
         type->getCanonicalType(), irgen::TypeMetadataAddress::AddressPoint);
-    std::string typeMetadataVarName = typeMetadataFunc.mangleAsString();
+    std::string typeMetadataVarName = typeMetadataFunc.mangleAsString(type->getASTContext());
 
     if (isCForwardDefinition) {
       os << "// type metadata address for " << type.getString() << ".\n";
@@ -190,12 +218,10 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
       continue;
     }
 
-    os << "template<>\n";
-    os << "static inline const constexpr bool isUsableInGenericContext<"
-       << typeInfo.name << "> = true;\n\n";
-
     os << "template<>\nstruct TypeMetadataTrait<" << typeInfo.name << "> {\n"
-       << "  static inline void * _Nonnull getTypeMetadata() {\n"
+       << "  static ";
+    ClangSyntaxPrinter(astContext, os).printInlineForThunk();
+    os << "void * _Nonnull getTypeMetadata() {\n"
        << "    return &" << cxx_synthesis::getCxxImplNamespaceName()
        << "::" << typeMetadataVarName << ";\n"
        << "  }\n};\n\n";
@@ -206,25 +232,28 @@ void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
                                           ASTContext &astContext,
                                           PrimitiveTypeMapping &typeMapping,
                                           raw_ostream &os) {
-  ClangSyntaxPrinter printer(os);
-  printer.printNamespace("swift", [&](raw_ostream &) {
-    printer.printNamespace(
-        cxx_synthesis::getCxxImplNamespaceName(), [&](raw_ostream &) {
-          printer.printExternC([&](raw_ostream &os) {
-            printTypeMetadataResponseType(ctx, typeMapping, os);
-            os << "\n";
-            printValueWitnessTable(os);
-            os << "\n";
-            printPrimitiveGenericTypeTraits(os, astContext, typeMapping,
-                                            /*isCForwardDefinition=*/true);
-          });
-          os << "\n";
+  ClangSyntaxPrinter printer(astContext, os);
+  printer.printNamespace(
+      cxx_synthesis::getCxxSwiftNamespaceName(),
+      [&](raw_ostream &) {
+        printer.printNamespace(
+            cxx_synthesis::getCxxImplNamespaceName(), [&](raw_ostream &) {
+              printer.printExternC([&](raw_ostream &os) {
+                printTypeMetadataResponseType(ctx, typeMapping, os);
+                os << "\n";
+                printValueWitnessTable(os);
+                os << "\n";
+                printPrimitiveGenericTypeTraits(os, astContext, typeMapping,
+                                                /*isCForwardDefinition=*/true);
+              });
+              os << "\n";
+            });
+        os << "\n";
+        // C++ only supports inline variables from C++17.
+        ClangSyntaxPrinter(astContext, os).printIgnoredCxx17ExtensionDiagnosticBlock([&]() {
+          printPrimitiveGenericTypeTraits(os, astContext, typeMapping,
+                                          /*isCForwardDefinition=*/false);
         });
-    os << "\n";
-    // C++ only supports inline variables from C++17.
-    ClangSyntaxPrinter(os).printIgnoredCxx17ExtensionDiagnosticBlock([&]() {
-      printPrimitiveGenericTypeTraits(os, astContext, typeMapping,
-                                      /*isCForwardDefinition=*/false);
-    });
-  });
+      },
+      ClangSyntaxPrinter::NamespaceTrivia::AttributeSwiftPrivate);
 }

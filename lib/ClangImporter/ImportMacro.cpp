@@ -22,6 +22,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/Unicode.h"
 #include "swift/ClangImporter/ClangModule.h"
@@ -52,14 +53,14 @@ static bool isInSystemModule(DeclContext *D) {
   return cast<ClangModuleUnit>(D->getModuleScopeContext())->isSystemModule();
 }
 
-static Optional<StringRef> getTokenSpelling(ClangImporter::Implementation &impl,
-                                            const clang::Token &tok) {
+static std::optional<StringRef>
+getTokenSpelling(ClangImporter::Implementation &impl, const clang::Token &tok) {
   bool tokenInvalid = false;
   llvm::SmallString<32> spellingBuffer;
   StringRef tokenSpelling = impl.getClangPreprocessor().getSpelling(
       tok, spellingBuffer, &tokenInvalid);
   if (tokenInvalid)
-    return None;
+    return std::nullopt;
   return tokenSpelling;
 }
 
@@ -74,8 +75,9 @@ createMacroConstant(ClangImporter::Implementation &Impl,
                     bool isStatic,
                     ClangNode ClangN) {
   Impl.ImportedMacroConstants[macro] = {value, type};
-  return SwiftDeclSynthesizer(Impl).createConstant(
-      name, dc, type, value, convertKind, isStatic, ClangN);
+  return SwiftDeclSynthesizer(Impl).createConstant(name, dc, type, value,
+                                                   convertKind, isStatic,
+                                                   ClangN, AccessLevel::Public);
 }
 
 static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
@@ -93,7 +95,7 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
     // FIXME: remove this when the following radar is implemented:
     // <rdar://problem/16445608> Swift should set up a DiagnosticConsumer for
     // Clang
-    Optional<StringRef> TokSpelling = getTokenSpelling(Impl, tok);
+    std::optional<StringRef> TokSpelling = getTokenSpelling(Impl, tok);
     if (!TokSpelling)
       return nullptr;
     if (TokSpelling->contains('_'))
@@ -202,9 +204,9 @@ static ValueDecl *importStringLiteral(ClangImporter::Implementation &Impl,
   if (!unicode::isWellFormedUTF8(text))
     return nullptr;
 
-  return SwiftDeclSynthesizer(Impl).createConstant(name, DC, importTy, text,
-                                                   ConstantConvertKind::None,
-                                                   /*static*/ false, ClangN);
+  return SwiftDeclSynthesizer(Impl).createConstant(
+      name, DC, importTy, text, ConstantConvertKind::None,
+      /*static*/ false, ClangN, AccessLevel::Public);
 }
 
 static ValueDecl *importLiteral(ClangImporter::Implementation &Impl,
@@ -261,9 +263,9 @@ static ValueDecl *importNil(ClangImporter::Implementation &Impl,
   // We use a dummy type since we don't have a convenient type for 'nil'.  Any
   // use of this will be an error anyway.
   auto type = TupleType::getEmpty(Impl.SwiftContext);
-  return Impl.createUnavailableDecl(name, DC, type,
-                                    "use 'nil' instead of this imported macro",
-                                    /*isStatic=*/false, clangN);
+  return Impl.createUnavailableDecl(
+      name, DC, type, "use 'nil' instead of this imported macro",
+      /*isStatic=*/false, clangN, AccessLevel::Public);
 }
 
 static bool isSignToken(const clang::Token &tok) {
@@ -271,8 +273,8 @@ static bool isSignToken(const clang::Token &tok) {
          tok.is(clang::tok::tilde);
 }
 
-static Optional<clang::QualType> builtinTypeForToken(const clang::Token &tok,
-    const clang::ASTContext &context) {
+static std::optional<clang::QualType>
+builtinTypeForToken(const clang::Token &tok, const clang::ASTContext &context) {
   switch (tok.getKind()) {
   case clang::tok::kw_short:
     return clang::QualType(context.ShortTy);
@@ -300,20 +302,21 @@ static Optional<clang::QualType> builtinTypeForToken(const clang::Token &tok,
     return clang::QualType(context.WCharTy);
   case clang::tok::kw_bool:
     return clang::QualType(context.BoolTy);
+  case clang::tok::kw_char8_t:
+    return clang::QualType(context.Char8Ty);
   case clang::tok::kw_char16_t:
     return clang::QualType(context.Char16Ty);
   case clang::tok::kw_char32_t:
     return clang::QualType(context.Char32Ty);
   default:
-    return llvm::None;
+    return std::nullopt;
   }
 }
 
-static Optional<std::pair<llvm::APSInt, Type>>
-  getIntegerConstantForMacroToken(ClangImporter::Implementation &impl,
-                                  const clang::MacroInfo *macro,
-                                  DeclContext *DC,
-                                  const clang::Token &token) {
+static std::optional<std::pair<llvm::APSInt, Type>>
+getIntegerConstantForMacroToken(ClangImporter::Implementation &impl,
+                                const clang::MacroInfo *macro, DeclContext *DC,
+                                const clang::Token &token) {
 
   // Integer literal.
   if (token.is(clang::tok::numeric_constant)) {
@@ -328,13 +331,15 @@ static Optional<std::pair<llvm::APSInt, Type>>
     }
 
   // Macro identifier.
+  // TODO: for some reason when in C++ mode, "hasMacroDefinition" is often
+  // false: rdar://110071334
   } else if (token.is(clang::tok::identifier) &&
              token.getIdentifierInfo()->hasMacroDefinition()) {
 
     auto rawID = token.getIdentifierInfo();
     auto definition = impl.getClangPreprocessor().getMacroDefinition(rawID);
     if (!definition)
-      return None;
+      return std::nullopt;
 
     ClangNode macroNode;
     const clang::MacroInfo *macroInfo;
@@ -354,16 +359,16 @@ static Optional<std::pair<llvm::APSInt, Type>>
 
     auto searcher = impl.ImportedMacroConstants.find(macroInfo);
     if (searcher == impl.ImportedMacroConstants.end()) {
-      return None;
+      return std::nullopt;
     }
     auto importedConstant = searcher->second;
     if (!importedConstant.first.isInt()) {
-      return None;
+      return std::nullopt;
     }
     return {{ importedConstant.first.getInt(), importedConstant.second }};
   }
 
-  return None;
+  return std::nullopt;
 }
 
 static ValueDecl *importMacro(ClangImporter::Implementation &impl,
@@ -398,10 +403,9 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
 
   // Handle tokens starting with a type cast
   bool castTypeIsId = false;
-  if (numTokens > 3 &&
-      tokenI[0].is(clang::tok::l_paren) &&
+  if (numTokens > 3 && tokenI[0].is(clang::tok::l_paren) &&
       (tokenI[1].is(clang::tok::identifier) ||
-        impl.getClangSema().isSimpleTypeSpecifier(tokenI[1].getKind())) &&
+       tokenI[1].isSimpleTypeSpecifier(impl.getClangSema().getLangOpts())) &&
       tokenI[2].is(clang::tok::r_paren)) {
     if (!castType.isNull()) {
       // this is a nested cast
@@ -422,7 +426,7 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
       auto diagState = impl.getClangSema().DelayedDiagnostics.push(diagPool);
       auto parsedType = impl.getClangSema().getTypeName(identifier,
                                                         clang::SourceLocation(),
-                                                        /*scope*/nullptr);
+                                                        impl.getClangSema().TUScope);
       impl.getClangSema().DelayedDiagnostics.popWithoutEmitting(diagState);
 
       if (parsedType && diagPool.empty()) {
@@ -471,6 +475,15 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
 
     if (tok.is(clang::tok::identifier)) {
       auto clangID = tok.getIdentifierInfo();
+
+      if (clangID->isOutOfDate())
+        // Update the identifier with macro definitions subsequently loaded from
+        // a module/AST file. We're supposed to use
+        // Preprocessor::HandleIdentifier() to do that, but that method does too
+        // much to call it here. Instead, we call getLeafModuleMacros() for its
+        // side effect of calling updateOutOfDateIdentifier().
+        // FIXME: clang should give us a better way to do this.
+        (void)impl.getClangPreprocessor().getLeafModuleMacros(clangID);
 
       // If it's an identifier that is itself a macro, look into that macro.
       if (clangID->hasMacroDefinition()) {
@@ -694,7 +707,7 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
 
     // Unhandled operators.
     } else {
-      if (Optional<StringRef> operatorSpelling =
+      if (std::optional<StringRef> operatorSpelling =
               getTokenSpelling(impl, tokenI[1])) {
         impl.addImportDiagnostic(
             &tokenI[1],
@@ -766,10 +779,11 @@ ValueDecl *ClangImporter::Implementation::importMacro(Identifier name,
   PrettyStackTraceStringAction stackRAII{"importing macro", name.str()};
 
   // Look for macros imported with the same name.
-  auto known = ImportedMacros.find(name);
-  if (known == ImportedMacros.end()) {
+  auto [known, inserted] = ImportedMacros.try_emplace(
+      name, SmallVector<std::pair<const clang::MacroInfo *, ValueDecl *>, 2>{});
+  if (inserted) {
     // Push in a placeholder to break circularity.
-    ImportedMacros[name].push_back({macro, nullptr});
+    known->getSecond().push_back({macro, nullptr});
   } else {
     // Check whether this macro has already been imported.
     for (const auto &entry : known->second) {

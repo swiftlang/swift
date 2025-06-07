@@ -1,5 +1,9 @@
-// RUN: %target-typecheck-verify-swift  -disable-availability-checking -debugger-support
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -debugger-support %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -debugger-support %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -debugger-support %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
+
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 // This test simulates LLDB's expression evaluator making an otherwise illegal
 // synchronous call into an extension of an actor, as it would to run `p n` in

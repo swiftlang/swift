@@ -62,7 +62,8 @@ struct BatchNorm<Scalar>: Layer { // Crash requires conformance to `Layer`
   @differentiable(reverse)
   func callAsFunction(_ input: Tensor<Scalar>) -> Tensor<Scalar> {
     var offset = self.offset
-    if true { // Crash requires `if true`
+    // TODO: cannot use literal `true` because it crashes
+    if 1 == 1 { // Crash requires `if true`
       offset += offset // Using `offset = offset + offset` stops the crash
     }
     return offset

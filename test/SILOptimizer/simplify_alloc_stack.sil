@@ -1,0 +1,383 @@
+// RUN: %target-sil-opt %s -simplification -simplify-instruction=alloc_stack | %FileCheck %s
+
+import Swift
+import Builtin
+
+public class C {}
+
+public struct S {}
+
+protocol P {
+}
+
+public class C2: P {}
+
+public struct T: P {
+  let c: C
+  let s: S
+}
+
+public struct T1: P {
+  let x: Int
+}
+
+public struct T2: P {
+  let x: Int
+}
+
+enum MP {
+  case A(S)
+  case B(S)
+}
+
+public enum X {
+  case none
+  case some(T)
+}
+
+sil [ossa] @take_s : $@convention(thin) (@in S) -> ()
+sil [ossa] @take_t : $@convention(thin) (@in T) -> ()
+sil [ossa] @use_mp : $@convention(thin) (@in_guaranteed MP) -> ()
+sil [ossa] @use_c2 : $@convention(thin) (@in_guaranteed C2) -> ()
+
+// CHECK-LABEL: sil [ossa] @expand_alloc_stack_of_enum1 :
+// CHECK:        [[A:%[0-9]+]] = alloc_stack [lexical] $S
+// CHECK:      bb1:
+// CHECK-NEXT:   store %0 to [trivial] [[A]]
+// CHECK:      bb2:
+// CHECK-NEXT:   store %0 to [trivial] [[A]]
+// CHECK:      bb3:
+// CHECK:        apply {{%[0-9]+}}([[A]])
+// CHECK:      } // end sil function 'expand_alloc_stack_of_enum1'
+sil [ossa] @expand_alloc_stack_of_enum1 : $@convention(method) (S) -> () {
+bb0(%0 : $S):
+  %1 = alloc_stack [lexical] $MP
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = init_enum_data_addr %1 : $*MP, #MP.A!enumelt
+  store %0 to [trivial] %2 : $*S
+  inject_enum_addr %1 : $*MP, #MP.A!enumelt
+  br bb3
+
+bb2:
+  %3 = init_enum_data_addr %1 : $*MP, #MP.A!enumelt
+  store %0 to [trivial] %3 : $*S
+  inject_enum_addr %1 : $*MP, #MP.A!enumelt
+  br bb3
+
+bb3:
+  %7 = unchecked_take_enum_data_addr %1 : $*MP, #MP.A!enumelt
+  %8 = function_ref @take_s : $@convention(thin) (@in S) -> ()
+  %9 = apply %8(%7) : $@convention(thin) (@in S) -> ()
+  dealloc_stack %1 : $*MP
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @expand_alloc_stack_of_enum_without_take :
+// CHECK:         [[A:%[0-9]+]] = alloc_stack $S
+// CHECK:       bb1:
+// CHECK-NEXT:    store %0 to [trivial] [[A]]
+// CHECK:       bb2:
+// CHECK-NEXT:    store %0 to [trivial] [[A]]
+// CHECK:       bb3:
+// CHECK:         destroy_addr [[A]]
+// CHECK:       } // end sil function 'expand_alloc_stack_of_enum_without_take'
+sil [ossa] @expand_alloc_stack_of_enum_without_take : $@convention(method) (S) -> () {
+bb0(%0 : $S):
+  %1 = alloc_stack $MP
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = init_enum_data_addr %1 : $*MP, #MP.A!enumelt
+  store %0 to [trivial] %2 : $*S
+  inject_enum_addr %1 : $*MP, #MP.A!enumelt
+  br bb3
+
+bb2:
+  %3 = init_enum_data_addr %1 : $*MP, #MP.A!enumelt
+  store %0 to [trivial] %3 : $*S
+  inject_enum_addr %1 : $*MP, #MP.A!enumelt
+  br bb3
+
+bb3:
+  destroy_addr %1 : $*MP
+  dealloc_stack %1 : $*MP
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @expand_alloc_stack_of_enum_multiple_cases :
+// CHECK:         [[A:%[0-9]+]] = alloc_stack $T
+// CHECK:       bb1:
+// CHECK-NEXT:    [[COPY_ARG:%.*]] = copy_value %0
+// CHECK-NEXT:    store [[COPY_ARG]] to [init] [[A]]
+// CHECK:         apply {{%[0-9]+}}([[A]])
+// CHECK:       bb2:
+// CHECK-NEXT:    br bb3
+// CHECK:       bb3:
+// CHECK:       } // end sil function 'expand_alloc_stack_of_enum_multiple_cases'
+sil [ossa] @expand_alloc_stack_of_enum_multiple_cases : $@convention(method) (@guaranteed T) -> () {
+bb0(%0 : @guaranteed $T):
+  %1 = alloc_stack $X
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = init_enum_data_addr %1 : $*X, #X.some!enumelt
+  %0a = copy_value %0 : $T
+  store %0a to [init] %2 : $*T
+  inject_enum_addr %1 : $*X, #X.some!enumelt
+  %7 = unchecked_take_enum_data_addr %1 : $*X, #X.some!enumelt
+  %8 = function_ref @take_t : $@convention(thin) (@in T) -> ()
+  %9 = apply %8(%7) : $@convention(thin) (@in T) -> ()
+  br bb3
+
+bb2:
+  inject_enum_addr %1 : $*X, #X.none!enumelt
+  destroy_addr %1 : $*X
+  br bb3
+
+bb3:
+  dealloc_stack %1 : $*X
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_expand_alloc_stack_of_enum_multiple_cases :
+// CHECK:         alloc_stack $MP
+// CHECK:       } // end sil function 'dont_expand_alloc_stack_of_enum_multiple_cases'
+sil [ossa] @dont_expand_alloc_stack_of_enum_multiple_cases : $@convention(method) (S) -> () {
+bb0(%0 : $S):
+  %1 = alloc_stack $MP
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = init_enum_data_addr %1 : $*MP, #MP.A!enumelt
+  store %0 to [trivial] %2 : $*S
+  inject_enum_addr %1 : $*MP, #MP.A!enumelt
+  br bb3
+
+bb2:
+  %3 = init_enum_data_addr %1 : $*MP, #MP.B!enumelt
+  store %0 to [trivial] %3 : $*S
+  inject_enum_addr %1 : $*MP, #MP.B!enumelt
+  br bb3
+
+bb3:
+  destroy_addr %1 : $*MP
+  dealloc_stack %1 : $*MP
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_expand_alloc_stack_of_enum_multiple_cases2 :
+// CHECK:         alloc_stack $X
+// CHECK:       } // end sil function 'dont_expand_alloc_stack_of_enum_multiple_cases2'
+sil [ossa] @dont_expand_alloc_stack_of_enum_multiple_cases2 : $@convention(method) (@guaranteed T) -> () {
+bb0(%0 : @guaranteed $T):
+  %1 = alloc_stack $X
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = init_enum_data_addr %1 : $*X, #X.some!enumelt
+  %0a = copy_value %0 : $T
+  store %0a to [init] %2 : $*T
+  inject_enum_addr %1 : $*X, #X.some!enumelt
+  br bb3
+
+bb2:
+  inject_enum_addr %1 : $*X, #X.none!enumelt
+  br bb3
+
+bb3:
+  destroy_addr %1 : $*X
+  dealloc_stack %1 : $*X
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_expand_alloc_stack_of_enum_unknown_use :
+// CHECK:         alloc_stack $MP
+// CHECK:       } // end sil function 'dont_expand_alloc_stack_of_enum_unknown_use'
+sil [ossa] @dont_expand_alloc_stack_of_enum_unknown_use : $@convention(method) (S) -> () {
+bb0(%0 : $S):
+  %1 = alloc_stack $MP
+  %2 = init_enum_data_addr %1 : $*MP, #MP.A!enumelt
+  store %0 to [trivial] %2 : $*S
+  inject_enum_addr %1 : $*MP, #MP.A!enumelt
+  %8 = function_ref @use_mp : $@convention(thin) (@in_guaranteed MP) -> ()
+  %9 = apply %8(%1) : $@convention(thin) (@in_guaranteed MP) -> ()
+  destroy_addr %1 : $*MP
+  dealloc_stack %1 : $*MP
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @replace_archetype :
+// CHECK:         [[S:%.*]] = alloc_stack [lexical] $T
+// CHECK:         debug_value [[S]]
+// CHECK:         unchecked_addr_cast [[S]]
+// CHECK:         destroy_addr [[S]]
+// CHECK:       } // end sil function 'replace_archetype'
+sil [ossa] @replace_archetype : $@convention(thin) (@owned T) -> () {
+bb0(%0 : @owned $T):
+  %1 = metatype $@thick T.Type
+  %2 = init_existential_metatype %1, $@thick P.Type
+  %3 = open_existential_metatype %2 to $@thick (@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913", P) Self).Type
+  %4 = alloc_stack [lexical] $@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913", P) Self
+  debug_value %4, var, name "x"
+  %5 = unchecked_addr_cast %4 to $*T
+  store %0 to [init] %5
+  destroy_addr %4
+  dealloc_stack %4
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @replace_existential_with_concrete_type1 :
+// CHECK:         [[S:%.*]] = alloc_stack $T
+// CHECK-NOT:     init_existential_addr
+// CHECK-NOT:     open_existential_addr
+// CHECK:         destroy_addr [[S]]
+// CHECK:       } // end sil function 'replace_existential_with_concrete_type1'
+sil [ossa] @replace_existential_with_concrete_type1 : $@convention(thin) (@owned T) -> () {
+bb0(%0 : @owned $T):
+  %5 = alloc_stack $any P
+  %6 = init_existential_addr %5, $T
+  store %0 to [init] %6
+  %8 = open_existential_addr mutable_access %5 to $*@opened("83DE9694-7315-11E8-955C-ACDE48001122", P) Self
+  destroy_addr %8
+  dealloc_stack %5
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @replace_existential_with_concrete_type2 :
+// CHECK:         [[S:%.*]] = alloc_stack $T
+// CHECK-NOT:     init_existential_addr
+// CHECK-NOT:     open_existential_addr
+// CHECK:         store
+// CHECK:         unconditional_checked_cast_addr T in [[S]] to T in %0
+// CHECK:         destroy_addr [[S]]
+// CHECK:       } // end sil function 'replace_existential_with_concrete_type2'
+sil [ossa] @replace_existential_with_concrete_type2 : $@convention(thin) (@owned T) -> @out T {
+bb0(%0 : $*T, %1 : @owned $T):
+  %2 = metatype $@thick T.Type
+  %3 = init_existential_metatype %2, $@thick P.Type
+  %4 = open_existential_metatype %3 to $@thick (@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913", P) Self).Type
+  %5 = alloc_stack $any P
+  %6 = init_existential_addr %5, $(@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913", P) Self)
+  %7 = unchecked_addr_cast %6 to $*T
+  store %1 to [init] %7
+  unconditional_checked_cast_addr any P in %5 to T in %0
+  %8 = open_existential_addr mutable_access %5 to $*@opened("83DE9694-7315-11E8-955C-ACDE48001122", P) Self
+  destroy_addr %8
+  dealloc_stack %5
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @replace_existential_with_archetype :
+// CHECK:         [[S:%.*]] = alloc_stack $@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913", any P) Self
+// CHECK-NOT:     init_existential_addr
+// CHECK-NOT:     open_existential_addr
+// CHECK:         checked_cast_addr_br take_always @opened("82105EE0-DCB0-11E5-865D-C8E0EB309913", any P) Self in [[S]] to T in %0, bb1, bb2
+// CHECK:       } // end sil function 'replace_existential_with_archetype'
+sil [ossa] @replace_existential_with_archetype : $@convention(thin) (@owned T, @thick P.Type) -> @out T {
+bb0(%0 : $*T, %1 : @owned $T, %2 : $@thick P.Type):
+  %3 = open_existential_metatype %2 to $@thick (@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913", P) Self).Type
+  %4 = alloc_stack $any P
+  %5 = init_existential_addr %4, $(@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913", P) Self)
+  %6 = unchecked_addr_cast %5 to $*T
+  store %1 to [init] %6
+  checked_cast_addr_br take_always any P in %4 to T in %0, bb1, bb2
+bb1:
+  dealloc_stack %4
+  %r = tuple ()
+  return %r
+bb2:
+  dealloc_stack %4
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @dont_replace_archetype_not_dominating :
+// CHECK:         alloc_stack $any P
+// CHECK:         init_existential_addr
+// CHECK:         open_existential_addr
+// CHECK:       } // end sil function 'dont_replace_archetype_not_dominating'
+sil [ossa] @dont_replace_archetype_not_dominating : $@convention(thin) (@owned T, @thick P.Type) -> () {
+bb0(%0 : @owned $T, %1 : $@thick P.Type):
+  %4 = alloc_stack $any P
+  %3 = open_existential_metatype %1 to $@thick (@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913", P) Self).Type
+  %5 = init_existential_addr %4, $(@opened("82105EE0-DCB0-11E5-865D-C8E0EB309913", P) Self)
+  %6 = unchecked_addr_cast %5 to $*T
+  store %0 to [init] %6
+  %8 = open_existential_addr mutable_access %4 to $*@opened("83DE9694-7315-11E8-955C-ACDE48001122", P) Self
+  destroy_addr %8
+  dealloc_stack %4
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @dont_replace_multiple_inits :
+// CHECK:         [[S:%.*]] = alloc_stack $any P
+// CHECK:         init_existential_addr [[S]], $T1
+// CHECK:         init_existential_addr [[S]], $T2
+// CHECK:         open_existential_addr
+// CHECK:       } // end sil function 'dont_replace_multiple_inits'
+sil [ossa] @dont_replace_multiple_inits : $@convention(thin) (T1, T2) -> () {
+bb0(%0 : $T1, %1 : $T2):
+  %5 = alloc_stack $any P
+  cond_br undef, bb1, bb2
+
+bb1:
+  %6 = init_existential_addr %5, $T1
+  store %0 to [trivial] %6
+  br bb3
+
+bb2:
+  %9 = init_existential_addr %5, $T2
+  store %1 to [trivial] %9
+  br bb3
+
+bb3:
+  %8 = open_existential_addr mutable_access %5 to $*@opened("83DE9694-7315-11E8-955C-ACDE48001122", P) Self
+  destroy_addr %8
+  dealloc_stack %5
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @init_existential_with_dynamic_self :
+// CHECK:         [[S:%.*]] = alloc_stack $C2
+// CHECK:         store %0 to [init] [[S]]
+// CHECK:         apply %{{[0-9]+}}([[S]])
+// CHECK:       } // end sil function 'init_existential_with_dynamic_self'
+sil [ossa] @init_existential_with_dynamic_self : $@convention(method) (@owned C2) -> () {
+bb0(%0 : @owned $C2):
+  %1 = alloc_stack $P
+  %2 = init_existential_addr %1, $@dynamic_self C2
+  store %0 to [init] %2
+  %4 = function_ref @use_c2 : $@convention(thin) (@in_guaranteed C2) -> ()
+  %5 = apply %4(%2) : $@convention(thin) (@in_guaranteed C2) -> ()
+  destroy_addr %1
+  dealloc_stack %1
+  return %5
+}
+
+// CHECK-LABEL: sil [ossa] @dont_replace_existential_with_escaping_addr :
+// CHECK:         alloc_stack $any P
+// CHECK:       } // end sil function 'dont_replace_existential_with_escaping_addr'
+sil [ossa] @dont_replace_existential_with_escaping_addr : $@convention(thin) <V> (@thick V.Type, @owned C2) -> @out V {
+bb0(%0 : $*V, %1 : $@thick V.Type, %2 : @owned $C2):
+  %114 = alloc_stack $any P
+  %117 = init_existential_addr %114, $C2
+  store %2 to [init] %117
+  %129 = unchecked_addr_cast %114 to $*V
+  copy_addr %129 to [init] %0
+  destroy_addr %114
+  dealloc_stack %114
+  %137 = tuple ()
+  return %137
+}

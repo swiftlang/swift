@@ -18,58 +18,80 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Subsystems.h"
+#include "ImporterImpl.h"
 
 using namespace swift;
 
-Optional<ObjCInterfaceAndImplementation>
+std::optional<ObjCInterfaceAndImplementation>
 ObjCInterfaceAndImplementationRequest::getCachedResult() const {
   auto passedDecl = std::get<0>(getStorage());
-  if (!passedDecl)
+  if (!passedDecl) {
     return {};
+  }
 
-  auto cachedDecl = passedDecl->getCachedObjCImplementationDecl();
-
-  // !cachedDecl means that no decl has been cached and we need to evaluate the
-  // request.
-  if (!cachedDecl)
-    return None;
-
-  // nullptr cachedDecl means that the lack of a decl was cached.
-  else if (!*cachedDecl)
+  if (passedDecl->getCachedLacksObjCInterfaceOrImplementation()) {
+    // We've computed this request and found that this is a normal declaration.
     return {};
+  }
 
-  // A decl was cached! Arbitrarily guess that we looked up the implementation
-  // from the interface.
-  ObjCInterfaceAndImplementation result{passedDecl, *cachedDecl};
+  // Either we've computed this request and cached a result in the ImporterImpl,
+  // or we haven't computed this request. Check the caches.
+  auto &ctx = passedDecl->getASTContext();
+  auto importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+  auto &impl = importer->Impl;
 
-  // An imported decl can only be an interface; a native decl can only be an
-  // implementation. If `implementationDecl` has a Clang node, we must have
-  // looked up the interface from the implementation.
-  if (result.implementationDecl->hasClangNode())
-    std::swap(result.interfaceDecl, result.implementationDecl);
+  // We need the full list of interfaces for a given implementation, but that's
+  // only available through `InterfacesByImplementation`. So we must first
+  // figure out the key into that cache, which might require a reverse lookup in
+  // `ImplementationsByInterface`.
 
-  return result;
+  Decl *implDecl = nullptr;
+  if (passedDecl->hasClangNode()) {
+    // `passedDecl` *could* be an interface.
+    auto iter = impl.ImplementationsByInterface.find(passedDecl);
+    if (iter != impl.ImplementationsByInterface.end())
+      implDecl = iter->second;
+  } else {
+    // `passedDecl` *could* be an implementation.
+    implDecl = passedDecl;
+  }
+
+  if (implDecl) {
+    auto iter = impl.InterfacesByImplementation.find(implDecl);
+    if (iter != impl.InterfacesByImplementation.end()) {
+      return ObjCInterfaceAndImplementation(iter->second, implDecl);
+    }
+  }
+
+  // Nothing in the caches, so we must need to compute this.
+  return std::nullopt;
 }
 
 void ObjCInterfaceAndImplementationRequest::
 cacheResult(ObjCInterfaceAndImplementation value) const {
-  Decl *decl = std::get<0>(getStorage());
+  Decl *passedDecl = std::get<0>(getStorage());
 
-  if (!value) {
-    // `decl` is neither an interface nor an implementation.
-    decl->setCachedObjCImplementationDecl(nullptr);
+  if (value.empty()) {
+    // `decl` is neither an interface nor an implementation; remember this.
+    passedDecl->setCachedLacksObjCInterfaceOrImplementation(true);
     return;
   }
 
   // Cache computed pointers from implementations to interfaces.
-  value.interfaceDecl->
-      setCachedObjCImplementationDecl(value.implementationDecl);
-  value.implementationDecl->
-      setCachedObjCImplementationDecl(value.interfaceDecl);
+  auto &ctx = passedDecl->getASTContext();
+  auto importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+  auto &impl = importer->Impl;
+
+  impl.InterfacesByImplementation.insert({ value.implementationDecl,
+                                           value.interfaceDecls });
+  for (auto interfaceDecl : value.interfaceDecls)
+    impl.ImplementationsByInterface.insert({ interfaceDecl,
+                                             value.implementationDecl });
 
   // If this was a duplicate implementation, cache a null so we don't recompute.
-  if (decl != value.interfaceDecl && decl != value.implementationDecl)
-    decl->setCachedObjCImplementationDecl(nullptr);
+  if (!passedDecl->hasClangNode() && passedDecl != value.implementationDecl) {
+    passedDecl->setCachedLacksObjCInterfaceOrImplementation(true);
+  }
 }
 
 // Define request evaluation functions for each of the name lookup requests.

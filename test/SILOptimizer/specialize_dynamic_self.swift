@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name specialize_dynamic_self -Xllvm -sil-disable-pass=FunctionSignatureOpts -emit-sil -O -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name specialize_dynamic_self -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xllvm -sil-print-types -emit-sil -O -primary-file %s | %FileCheck %s
 
 protocol P {}
 
@@ -11,7 +11,7 @@ extension P {
 
 class C<T> : P {
   // CHECK-LABEL: sil shared [noinline] @$s23specialize_dynamic_self1CC11returnsSelfACyxGXDyFSi_Tg5 : $@convention(method) (@guaranteed C<Int>) -> @owned C<Int>
-  // CHECK: [[RESULT:%.*]] = alloc_stack [lexical] $C<Int>
+  // CHECK: [[RESULT:%.*]] = alloc_stack {{.*}}$C<Int>
   // CHECK: [[FN:%.*]] = function_ref @$s23specialize_dynamic_self1PPAAE7method1yyF : $@convention(method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
   // CHECK: apply [[FN]]<@dynamic_self C<Int>>([[RESULT]]) : $@convention(method) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
   // CHECK: return %0 : $C<Int>

@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -emit-module-path %t/has_symbol_helper.swiftmodule -parse-as-library %S/Inputs/has_symbol/has_symbol_helper.swift -enable-library-evolution -disable-availability-checking -DCONCURRENCY
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/has_symbol_helper.swiftmodule -parse-as-library %S/Inputs/has_symbol/has_symbol_helper.swift -enable-library-evolution -target %target-swift-5.1-abi-triple -DCONCURRENCY
 // RUN: %target-swift-frontend -emit-irgen %s -I %t -module-name test | %FileCheck %s
 
 // REQUIRES: concurrency
@@ -17,11 +17,15 @@ public func testGlobalFunctions() {
 
 // --- asyncFunc() ---
 // CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper9asyncFuncyyYaFTwS"()
-// CHECK:   ret i1 and (i1 icmp ne (void (%swift.context*)* @"$s17has_symbol_helper9asyncFuncyyYaF", void (%swift.context*)* null), i1 icmp ne (%swift.async_func_pointer* @"$s17has_symbol_helper9asyncFuncyyYaFTu", %swift.async_func_pointer* null))
+// CHECK:   [[V0:%.*]] = icmp ne ptr @"$s17has_symbol_helper9asyncFuncyyYaF", null
+// CHECK:   [[V1:%.*]] = icmp ne ptr @"$s17has_symbol_helper9asyncFuncyyYaFTu", null
+// CHECK:   [[RES:%.*]] = and i1 [[V0]], [[V1]]
+// CHECK:   ret i1 [[RES]]
 
 // --- isolatedFunc() ---
 // CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper12isolatedFuncyyFTwS"()
-// CHECK:   ret i1 icmp ne (void ()* @"$s17has_symbol_helper12isolatedFuncyyF", void ()* null)
+// CHECK:   [[RES:%.*]] = icmp ne ptr @"$s17has_symbol_helper12isolatedFuncyyF", null
+// CHECK:   ret i1 [[RES]]
 
 public func testActor(_ a: A) {
   // CHECK: %{{[0-9]+}} = call i1 @"$s17has_symbol_helper1ACACycfcTwS"()
@@ -30,13 +34,21 @@ public func testActor(_ a: A) {
   // CHECK: %{{[0-9]+}} = call i1 @"$s17has_symbol_helper1AC11asyncMethodyyYaFTwS"()
   if #_hasSymbol(a.asyncMethod) {}
 
-  // FIXME: Add support for actor isolated methods
+  // FIXME: Add support for actor-isolated methods
 }
 
 // --- A.init() ---
 // CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper1ACACycfcTwS"()
-// CHECK:   ret i1 and (i1 icmp ne (%T17has_symbol_helper1AC* (%T17has_symbol_helper1AC*)* @"$s17has_symbol_helper1ACACycfc", %T17has_symbol_helper1AC* (%T17has_symbol_helper1AC*)* null), i1 icmp ne (%T17has_symbol_helper1AC* (%swift.type*)* @"$s17has_symbol_helper1ACACycfC", %T17has_symbol_helper1AC* (%swift.type*)* null))
+// CHECK:   [[V0:%.*]] = icmp ne ptr @"$s17has_symbol_helper1ACACycfc", null
+// CHECK:   [[V1:%.*]] = icmp ne ptr @"$s17has_symbol_helper1ACACycfC", null
+// CHECK:   [[RES:%.*]] = and i1 [[V0]], [[V1]]
+// CHECK:   ret i1 [[RES]]
 
 // --- A.asyncMethod() ---
 // CHECK: define linkonce_odr hidden i1 @"$s17has_symbol_helper1AC11asyncMethodyyYaFTwS"()
-// CHECK:   ret i1 and (i1 and (i1 icmp ne (void (%swift.context*, %T17has_symbol_helper1AC*)* @"$s17has_symbol_helper1AC11asyncMethodyyYaFTj", void (%swift.context*, %T17has_symbol_helper1AC*)* null), i1 icmp ne (%swift.async_func_pointer* @"$s17has_symbol_helper1AC11asyncMethodyyYaFTjTu", %swift.async_func_pointer* null)), i1 icmp ne (%swift.method_descriptor* @"$s17has_symbol_helper1AC11asyncMethodyyYaFTq", %swift.method_descriptor* null))
+// CHECK:   [[V0:%.*]] = icmp ne ptr @"$s17has_symbol_helper1AC11asyncMethodyyYaFTj", null
+// CHECK:   [[V1:%.*]] = icmp ne ptr @"$s17has_symbol_helper1AC11asyncMethodyyYaFTjTu", null
+// CHECK:   [[V2:%.*]] = and i1 [[V0]], [[V1]]
+// CHECK:   [[V3:%.*]] = icmp ne ptr @"$s17has_symbol_helper1AC11asyncMethodyyYaFTq", null
+// CHECK:   [[RES:%.*]] = and i1 [[V2]], [[V3]]
+// CHECK:   ret i1 [[RES]]

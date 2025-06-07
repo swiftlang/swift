@@ -24,7 +24,9 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SynthesizedFileUnit.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILModule.h"
@@ -51,14 +53,14 @@ static bool isGlobalOrStaticVar(VarDecl *VD) {
 
 using DynamicKind = SILSymbolVisitor::DynamicKind;
 
-static Optional<DynamicKind> getDynamicKind(ValueDecl *VD) {
+static std::optional<DynamicKind> getDynamicKind(ValueDecl *VD) {
   if (VD->shouldUseNativeMethodReplacement())
     return DynamicKind::Replaceable;
 
   if (VD->getDynamicallyReplacedDecl())
     return DynamicKind::Replacement;
 
-  return None;
+  return std::nullopt;
 }
 
 class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
@@ -102,20 +104,41 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
     if (!ignoreLinkage) {
       auto linkage = effectiveLinkageForClassMember(
           declRef.getLinkage(ForDefinition), declRef.getSubclassScope());
-      if (Ctx.getOpts().PublicSymbolsOnly && linkage != SILLinkage::Public)
+      if (shouldSkipVisit(linkage))
         return;
     }
 
     Visitor.addFunction(declRef);
   }
 
+  bool shouldSkipVisit(SILLinkage linkage) {
+    return Ctx.getOpts().PublicOrPackageSymbolsOnly &&
+    !(linkage == SILLinkage::Public || linkage == SILLinkage::Package);
+  }
+  bool shouldSkipVisit(SILDeclRef declRef) {
+    return Ctx.getOpts().PublicOrPackageSymbolsOnly && !declRef.isSerialized();
+  }
+  bool shouldSkipVisit(FormalLinkage formalLinkage) {
+    return Ctx.getOpts().PublicOrPackageSymbolsOnly &&
+    !(formalLinkage == FormalLinkage::PublicUnique || formalLinkage == FormalLinkage::PackageUnique);
+  }
+
   void addAsyncFunctionPointer(SILDeclRef declRef) {
     auto silLinkage = effectiveLinkageForClassMember(
         declRef.getLinkage(ForDefinition), declRef.getSubclassScope());
-    if (Ctx.getOpts().PublicSymbolsOnly && silLinkage != SILLinkage::Public)
+    if (shouldSkipVisit(silLinkage))
       return;
 
     Visitor.addAsyncFunctionPointer(declRef);
+  }
+
+  void addCoroFunctionPointer(SILDeclRef declRef) {
+    auto silLinkage = effectiveLinkageForClassMember(
+        declRef.getLinkage(ForDefinition), declRef.getSubclassScope());
+    if (shouldSkipVisit(silLinkage))
+      return;
+
+    Visitor.addCoroFunctionPointer(declRef);
   }
 
   void addAutoDiffLinearMapFunction(AbstractFunctionDecl *original,
@@ -127,7 +150,7 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
 
     // Linear maps are public only when the original function is serialized. So
     // if we're only including public symbols and it's not serialized, bail.
-    if (Ctx.getOpts().PublicSymbolsOnly && !declRef.isSerialized())
+    if (shouldSkipVisit(declRef))
       return;
 
     // Differential functions are emitted only when forward-mode is enabled.
@@ -138,7 +161,7 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
     auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
         config.parameterIndices,
         original->getInterfaceType()->castTo<AnyFunctionType>());
-    Mangle::ASTMangler mangler;
+    Mangle::ASTMangler mangler(original->getASTContext());
     AutoDiffConfig silConfig{
         loweredParamIndices, config.resultIndices,
         autodiff::getDifferentiabilityWitnessGenericSignature(
@@ -180,8 +203,7 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
     auto originalLinkage = declRef.getLinkage(ForDefinition);
     if (foreign)
       originalLinkage = stripExternalFromLinkage(originalLinkage);
-    if (Ctx.getOpts().PublicSymbolsOnly &&
-        originalLinkage != SILLinkage::Public)
+    if (shouldSkipVisit(originalLinkage))
       return;
 
     auto *silParamIndices = autodiff::getLoweredParameterIndices(
@@ -194,7 +216,7 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
         autodiff::getDifferentiabilityWitnessGenericSignature(
             original->getGenericSignature(), derivativeGenericSignature)};
 
-    Mangle::ASTMangler mangler;
+    Mangle::ASTMangler mangler(original->getASTContext());
     auto mangledName = mangler.mangleSILDifferentiabilityWitness(
         originalMangledName, kind, config);
 
@@ -239,8 +261,7 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
     for (auto conformance :
          IDC->getLocalConformances(ConformanceLookupKind::NonInherited)) {
       auto protocol = conformance->getProtocol();
-      if (Ctx.getOpts().PublicSymbolsOnly &&
-          getDeclLinkage(protocol) != FormalLinkage::PublicUnique)
+      if (canSkipNominal(protocol))
         continue;
 
       auto needsWTable =
@@ -258,7 +279,8 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
       // We cannot emit the witness table symbol if the protocol is imported
       // from another module and it's resilient, because initialization of that
       // protocol is necessary in this case
-      if (!rootConformance->getProtocol()->isResilient(
+      if (Ctx.getOpts().FragileResilientProtocols ||
+          !rootConformance->getProtocol()->isResilient(
               IDC->getAsGenericContext()->getParentModule(),
               ResilienceExpansion::Maximal))
         Visitor.addProtocolWitnessTable(rootConformance);
@@ -267,17 +289,19 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
       // FIXME: the logic around visibility in extensions is confusing, and
       // sometimes witness thunks need to be manually made public.
 
-      auto conformanceIsFixed =
-          SILWitnessTable::conformanceIsSerialized(rootConformance);
+      auto conformanceSeializedKind =
+          SILWitnessTable::conformanceSerializedKind(rootConformance);
       auto addSymbolIfNecessary = [&](ValueDecl *requirementDecl,
                                       ValueDecl *witnessDecl) {
         auto witnessRef = SILDeclRef(witnessDecl);
-        if (Ctx.getOpts().PublicSymbolsOnly) {
-          if (!conformanceIsFixed)
+        if (Ctx.getOpts().PublicOrPackageSymbolsOnly) {
+          if (conformanceSeializedKind == IsNotSerialized)
             return;
 
           if (!isa<SelfProtocolConformance>(rootConformance) &&
-              !fixmeWitnessHasLinkageThatNeedsToBePublic(witnessRef)) {
+              !fixmeWitnessHasLinkageThatNeedsToBePublic(
+                  witnessRef,
+                  witnessRef.getASTContext().SILOpts.EnableSerializePackage)) {
             return;
           }
         }
@@ -288,6 +312,9 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
       rootConformance->forEachValueWitness([&](ValueDecl *valueReq,
                                                Witness witness) {
         auto witnessDecl = witness.getDecl();
+        if (!witnessDecl)
+          return;
+
         if (isa<AbstractFunctionDecl>(valueReq)) {
           addSymbolIfNecessary(valueReq, witnessDecl);
         } else if (auto *storage = dyn_cast<AbstractStorageDecl>(valueReq)) {
@@ -303,13 +330,12 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
             addSymbolIfNecessary(getter, witnessDecl);
           }
         }
-      });
+      }, /*useResolver=*/true);
     }
   }
 
   bool addClassMetadata(ClassDecl *CD) {
-    if (Ctx.getOpts().PublicSymbolsOnly &&
-        getDeclLinkage(CD) != FormalLinkage::PublicUnique)
+    if (canSkipNominal(CD))
       return false;
 
     auto &ctxt = CD->getASTContext();
@@ -320,8 +346,12 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
     // Metaclasses and ObjC classes (duh) are an ObjC thing, and so are not
     // needed in build artifacts/for classes which can't touch ObjC.
     if (objCCompatible) {
-      if (isObjC || CD->getMetaclassKind() == ClassDecl::MetaclassKind::ObjC)
+      if (isObjC)
         Visitor.addObjCInterface(CD);
+      else if (CD->getMetaclassKind() == ClassDecl::MetaclassKind::ObjC)
+        // If an ObjCInterface was not added, an external ObjC Metaclass can
+        // still be needed for subclassing.
+        Visitor.addObjCMetaclass(CD);
       else
         Visitor.addSwiftMetaclassStub(CD);
     }
@@ -365,11 +395,19 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
     Visitor.addMethodDescriptor(method);
   }
 
-  void addRuntimeDiscoverableAttrGenerators(ValueDecl *D) {
-    for (auto *attr : D->getRuntimeDiscoverableAttrs()) {
-      addFunction(SILDeclRef::getRuntimeAttributeGenerator(attr, D),
-                  /*ignoreLinkage=*/true);
-    }
+  /// Returns `true` if the neither the nominal nor its members have any symbols
+  /// that need to be visited because it has non-public linkage.
+  bool canSkipNominal(const NominalTypeDecl *NTD) {
+    if (!Ctx.getOpts().PublicOrPackageSymbolsOnly)
+      return false;
+
+    // Don't skip nominals from clang modules; they have PublicNonUnique
+    // linkage.
+    if (isa<ClangModuleUnit>(NTD->getDeclContext()->getModuleScopeContext()))
+      return false;
+
+    return !(getDeclLinkage(NTD) == FormalLinkage::PublicUnique ||
+             getDeclLinkage(NTD) == FormalLinkage::PackageUnique);
   }
 
 public:
@@ -390,7 +428,7 @@ public:
   void visit(FileUnit *file) {
     auto visitFile = [this](FileUnit *file) {
       SmallVector<Decl *, 16> decls;
-      file->getTopLevelDecls(decls);
+      file->getTopLevelDeclsWithAuxiliaryDecls(decls);
 
       addMainIfNecessary(file);
 
@@ -411,9 +449,14 @@ public:
 
   void visitDefaultArguments(ValueDecl *VD, ParameterList *PL) {
     auto moduleDecl = VD->getModuleContext();
-    auto publicDefaultArgGenerators = moduleDecl->isTestingEnabled() ||
-                                      moduleDecl->arePrivateImportsEnabled();
-    if (Ctx.getOpts().PublicSymbolsOnly && !publicDefaultArgGenerators)
+    // Check if symbols should be more visible than their declared access level.
+    // In case of `package` access level, the symbol should be visible by an
+    // external module in the same package, thus the default argument should be
+    // generated and its linkage emitted.
+    auto shouldGenerateDefaultArgs = moduleDecl->isTestingEnabled() ||
+                                     moduleDecl->arePrivateImportsEnabled() ||
+                                     VD->getFormalAccess() >= AccessLevel::Package;
+    if (Ctx.getOpts().PublicOrPackageSymbolsOnly && !shouldGenerateDefaultArgs)
       return;
 
     // In Swift 3 (or under -enable-testing), default arguments (of public
@@ -429,12 +472,14 @@ public:
 
   void visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     // Add exported prespecialized symbols.
-    for (auto *attr : AFD->getAttrs().getAttributes<SpecializeAttr>()) {
+    for (auto *attr : AFD->getAttrs().getAttributes<AbstractSpecializeAttr>()) {
       if (!attr->isExported())
         continue;
 
-      auto erasedSignature = attr->getSpecializedSignature().typeErased(
-          attr->getTypeErasedParams());
+      auto specializedSignature = attr->getSpecializedSignature(AFD);
+      auto erasedSignature =
+          SILSpecializeAttr::buildTypeErasedSignature(specializedSignature,
+                                                      attr->getTypeErasedParams());
 
       if (auto *targetFun = attr->getTargetFunctionDecl(AFD)) {
         addFunction(SILDeclRef(targetFun, erasedSignature),
@@ -445,6 +490,9 @@ public:
     }
 
     addFunction(SILDeclRef(AFD));
+
+    ASSERT(ABIRoleInfo(AFD).providesAPI()
+              && "SILSymbolVisitorImpl visiting ABI-only decl?");
 
     if (auto dynKind = getDynamicKind(AFD)) {
       // Add the global function pointer for a dynamically replaceable function.
@@ -465,27 +513,40 @@ public:
 
     // Add derivative function symbols.
     for (const auto *differentiableAttr :
-         AFD->getAttrs().getAttributes<DifferentiableAttr>())
+           AFD->getAttrs().getAttributes<DifferentiableAttr>()) {
+      auto *resultIndices = autodiff::getFunctionSemanticResultIndices(
+        AFD,
+        differentiableAttr->getParameterIndices());
       addDerivativeConfiguration(
           differentiableAttr->getDifferentiabilityKind(), AFD,
           AutoDiffConfig(differentiableAttr->getParameterIndices(),
-                         IndexSubset::get(AFD->getASTContext(), 1, {0}),
+                         resultIndices,
                          differentiableAttr->getDerivativeGenericSignature()));
+    }
+
     for (const auto *derivativeAttr :
-         AFD->getAttrs().getAttributes<DerivativeAttr>())
+         AFD->getAttrs().getAttributes<DerivativeAttr>()) {
+      auto *resultIndices = autodiff::getFunctionSemanticResultIndices(
+        derivativeAttr->getOriginalFunction(AFD->getASTContext()),
+        derivativeAttr->getParameterIndices());
       addDerivativeConfiguration(
           DifferentiabilityKind::Reverse,
           derivativeAttr->getOriginalFunction(AFD->getASTContext()),
           AutoDiffConfig(derivativeAttr->getParameterIndices(),
-                         IndexSubset::get(AFD->getASTContext(), 1, {0}),
+                         resultIndices,
                          AFD->getGenericSignature()));
-
-    addRuntimeDiscoverableAttrGenerators(AFD);
+    }
 
     visitDefaultArguments(AFD, AFD->getParameters());
 
     if (AFD->hasAsync()) {
       addAsyncFunctionPointer(SILDeclRef(AFD));
+    }
+
+    auto *accessor = dyn_cast<AccessorDecl>(AFD);
+    if (accessor &&
+        requiresFeatureCoroutineAccessors(accessor->getAccessorKind())) {
+      addCoroFunctionPointer(SILDeclRef(accessor));
     }
 
     // Skip non objc compatible methods or non-public methods.
@@ -508,7 +569,7 @@ public:
 
   void visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
     // Add the property descriptor if the decl needs it.
-    if (ASD->exportsPropertyDescriptor()) {
+    if (ASD->getPropertyDescriptorGenericSignature()) {
       Visitor.addPropertyDescriptor(ASD);
     }
 
@@ -522,18 +583,22 @@ public:
 
     // Add derivative function symbols.
     for (const auto *differentiableAttr :
-         ASD->getAttrs().getAttributes<DifferentiableAttr>())
+         ASD->getAttrs().getAttributes<DifferentiableAttr>()) {
+      // FIXME: handle other accessors
+      auto accessorDecl = ASD->getOpaqueAccessor(AccessorKind::Get);
       addDerivativeConfiguration(
           differentiableAttr->getDifferentiabilityKind(),
-          ASD->getOpaqueAccessor(AccessorKind::Get),
+          accessorDecl,
           AutoDiffConfig(differentiableAttr->getParameterIndices(),
-                         IndexSubset::get(ASD->getASTContext(), 1, {0}),
+                         autodiff::getFunctionSemanticResultIndices(accessorDecl,
+                                                                    differentiableAttr->getParameterIndices()),
                          differentiableAttr->getDerivativeGenericSignature()));
+    }
   }
 
   void visitVarDecl(VarDecl *VD) {
     // Variables inside non-resilient modules have some additional symbols.
-    if (!VD->isResilient()) {
+    if (!VD->isStrictlyResilient()) {
       // Non-global variables might have an explicit initializer symbol in
       // non-resilient modules.
       if (VD->getAttrs().hasAttribute<HasInitialValueAttr>() &&
@@ -543,18 +608,14 @@ public:
         // Stored property initializers for public properties are public.
         addFunction(declRef);
       }
-
       // Statically/globally stored variables have some special handling.
       if (VD->hasStorage() && isGlobalOrStaticVar(VD)) {
-        if (!Ctx.getOpts().PublicSymbolsOnly ||
-            getDeclLinkage(VD) == FormalLinkage::PublicUnique) {
+        if (!shouldSkipVisit(getDeclLinkage(VD))) {
           Visitor.addGlobalVar(VD);
         }
-
         if (VD->isLazilyInitializedGlobal())
           addFunction(SILDeclRef(VD, SILDeclRef::Kind::GlobalAccessor));
       }
-
       // Wrapped non-static member properties may have a backing initializer.
       auto initInfo = VD->getPropertyWrapperInitializerInfo();
       if (initInfo.hasInitFromWrappedValue() && !VD->isStatic()) {
@@ -562,10 +623,7 @@ public:
             VD, SILDeclRef::Kind::PropertyWrapperBackingInitializer));
       }
     }
-
     visitAbstractStorageDecl(VD);
-
-    addRuntimeDiscoverableAttrGenerators(VD);
   }
 
   void visitSubscriptDecl(SubscriptDecl *SD) {
@@ -573,7 +631,22 @@ public:
     visitAbstractStorageDecl(SD);
   }
 
+  template<typename NominalOrExtension>
+  void visitMembers(NominalOrExtension *D) {
+    if (!Ctx.getOpts().VisitMembers)
+      return;
+
+    for (auto member : D->getABIMembers())
+      visit(member);
+  }
+
   void visitNominalTypeDecl(NominalTypeDecl *NTD) {
+    if (canSkipNominal(NTD))
+      return;
+
+    if (NTD->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+      return;
+
     auto declaredType = NTD->getDeclaredType()->getCanonicalType();
 
     if (!NTD->getObjCImplementationDecl()) {
@@ -589,11 +662,7 @@ public:
     // There are symbols associated with any protocols this type conforms to.
     addConformances(NTD);
 
-    addRuntimeDiscoverableAttrGenerators(NTD);
-
-    if (Ctx.getOpts().VisitMembers)
-      for (auto member : NTD->getMembers())
-        visit(member);
+    visitMembers(NTD);
   }
 
   void visitClassDecl(ClassDecl *CD) {
@@ -616,19 +685,24 @@ public:
       void addMethod(SILDeclRef method) {
         assert(method.getDecl()->getDeclContext() == CD);
 
-        if (VirtualFunctionElimination || CD->hasResilientMetadata()) {
-          if (FirstTime) {
-            FirstTime = false;
+        // If the class is itself resilient and has at least one vtable
+        // entry, it has a method lookup function.
+        bool hasLookupFunc =
+            VirtualFunctionElimination || CD->hasResilientMetadata();
+        if (FirstTime) {
+          FirstTime = false;
 
-            // If the class is itself resilient and has at least one vtable
-            // entry, it has a method lookup function.
+          if (hasLookupFunc)
             Visitor.addMethodLookupFunction(CD);
-          }
-
-          Visitor.addDispatchThunk(method);
         }
 
+        if (!Visitor.willVisitDecl(method.getDecl()))
+          return;
+        if (hasLookupFunc)
+          Visitor.addDispatchThunk(method);
+
         Visitor.addMethodDescriptor(method);
+        Visitor.didVisitDecl(method.getDecl());
       }
 
       void addMethodOverride(SILDeclRef baseRef, SILDeclRef derivedRef) {}
@@ -659,9 +733,9 @@ public:
   }
 
   void visitDestructorDecl(DestructorDecl *DD) {
-    // Destructors come in two forms (deallocating and non-deallocating), like
-    // constructors above. Classes use both but move only non-class nominal
-    // types only use the deallocating one. This is the deallocating one:
+    // Destructors come in three forms (non-deallocating, deallocating, isolated
+    // deallocating) Classes use all three but move only non-class nominal types
+    // only use the deallocating one. This is the deallocating one:
     visitAbstractFunctionDecl(DD);
 
     if (auto parentClass = DD->getParent()->getSelfClassDecl()) {
@@ -670,21 +744,31 @@ public:
         addFunction(SILDeclRef(DD, SILDeclRef::Kind::Destroyer));
       }
     }
+
+    // And isolated also does not always exist
+    if (Lowering::needsIsolatingDestructor(DD)) {
+      addFunction(SILDeclRef(DD, SILDeclRef::Kind::IsolatedDeallocator));
+    }
   }
 
   void visitExtensionDecl(ExtensionDecl *ED) {
+    auto nominal = ED->getExtendedNominal();
+    if (!nominal)
+      return;
+
+    if (canSkipNominal(nominal))
+      return;
+
     if (auto CD = dyn_cast_or_null<ClassDecl>(ED->getImplementedObjCDecl())) {
       // @_objcImplementation extensions generate the class metadata symbols.
       (void)addClassMetadata(CD);
     }
 
-    if (!isa<ProtocolDecl>(ED->getExtendedNominal())) {
+    if (!isa<ProtocolDecl>(nominal)) {
       addConformances(ED);
     }
 
-    if (Ctx.getOpts().VisitMembers)
-      for (auto member : ED->getMembers())
-        visit(member);
+    visitMembers(ED);
   }
 
 #ifndef NDEBUG
@@ -699,8 +783,6 @@ public:
     case DeclKind::Accessor:
     case DeclKind::Constructor:
     case DeclKind::Destructor:
-    case DeclKind::IfConfig:
-    case DeclKind::PoundDiagnostic:
       return true;
     case DeclKind::OpaqueType:
     case DeclKind::Enum:
@@ -722,6 +804,7 @@ public:
     case DeclKind::PostfixOperator:
     case DeclKind::Macro:
     case DeclKind::MacroExpansion:
+    case DeclKind::Using:
       return false;
     case DeclKind::Missing:
       llvm_unreachable("missing decl should not show up here");
@@ -733,6 +816,9 @@ public:
 #endif
 
   void visitProtocolDecl(ProtocolDecl *PD) {
+    if (canSkipNominal(PD))
+      return;
+
     if (!PD->isObjC() && !PD->isMarkerProtocol()) {
       Visitor.addProtocolDescriptor(PD);
 
@@ -754,10 +840,20 @@ public:
             Visitor.addDispatchThunk(declRef);
             Visitor.addMethodDescriptor(declRef);
           }
+          auto *decl =
+              llvm::dyn_cast_or_null<AbstractFunctionDecl>(declRef.getDecl());
+          if (decl && decl->hasBody()) {
+            Visitor.addFunction(declRef);
+            auto *accessor = dyn_cast<AccessorDecl>(decl);
+            if (accessor && requiresFeatureCoroutineAccessors(
+                                accessor->getAccessorKind())) {
+              Visitor.addCoroFunctionPointer(SILDeclRef(accessor));
+            }
+          }
         }
 
-        void addAssociatedType(AssociatedType associatedType) {
-          Visitor.addAssociatedTypeDescriptor(associatedType.getAssociation());
+        void addAssociatedType(AssociatedTypeDecl *assocType) {
+          Visitor.addAssociatedTypeDescriptor(assocType);
         }
 
         void addProtocolConformanceDescriptor() {
@@ -788,8 +884,7 @@ public:
 #ifndef NDEBUG
     // There are currently no symbols associated with the members of a protocol;
     // each conforming type has to handle them individually.
-    // (NB. anything within an active IfConfigDecls also appears outside). Let's
-    // assert this fact:
+    // Let's assert this fact:
     for (auto *member : PD->getMembers()) {
       assert(isExpectedProtocolMember(member) &&
              "unexpected member of protocol during TBD generation");
@@ -813,17 +908,16 @@ public:
   void visit##CLASS##Decl(CLASS##Decl *) {}
 
   UNINTERESTING_DECL(EnumCase)
-  UNINTERESTING_DECL(IfConfig)
   UNINTERESTING_DECL(Import)
   UNINTERESTING_DECL(MacroExpansion)
   UNINTERESTING_DECL(Missing)
   UNINTERESTING_DECL(MissingMember)
   UNINTERESTING_DECL(Operator)
   UNINTERESTING_DECL(PatternBinding)
-  UNINTERESTING_DECL(PoundDiagnostic)
   UNINTERESTING_DECL(PrecedenceGroup)
   UNINTERESTING_DECL(TopLevelCode)
   UNINTERESTING_DECL(Value)
+  UNINTERESTING_DECL(Using)
 
 #undef UNINTERESTING_DECL
 };

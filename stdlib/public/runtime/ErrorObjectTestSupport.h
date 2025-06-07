@@ -23,6 +23,11 @@ namespace swift {
 
 #if defined(__cplusplus)
 SWIFT_RUNTIME_EXPORT std::atomic<void (*)(SwiftError *error)> _swift_willThrow;
+SWIFT_RUNTIME_EXPORT std::atomic<void (*)(
+  OpaqueValue *value,
+  const Metadata *type,
+  const WitnessTable *errorConformance
+)> _swift_willThrowTypedImpl;
 #endif
 
 /// Set the value of @c _swift_willThrow atomically.

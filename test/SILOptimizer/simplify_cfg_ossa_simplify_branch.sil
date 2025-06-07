@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -unit-test-runner %s 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -update-borrowed-from -test-runner %s 2>&1 | %FileCheck %s
 
 enum FakeOptional<T> {
   case some(T)
@@ -17,7 +17,7 @@ sil [ossa] @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
 sil [ossa] @test_cfg1 : $@convention(thin) (@guaranteed SuperKlass) -> @out FakeOptional<Klass> {
 bb0(%0 : $*FakeOptional<Klass>, %1 : @guaranteed $SuperKlass):
   %2 = init_enum_data_addr %0 : $*FakeOptional<Klass>, #FakeOptional.some!enumelt
-  checked_cast_br %1 : $SuperKlass to Klass, bb1, bb2
+  checked_cast_br SuperKlass in %1 : $SuperKlass to Klass, bb1, bb2
 
 bb1(%6 : @guaranteed $Klass):
   %7 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %6 : $Klass
@@ -58,7 +58,7 @@ enum E1<T> {
 // CHECK-LABEL: } // end sil function 'test_simplify_term_with_identical_dest_blocks1'
 sil [ossa] @test_simplify_term_with_identical_dest_blocks1 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
-  test_specification "simplify-cfg-simplify-term-with-identical-dest-blocks @block[0]"
+  specify_test "simplify_cfg_simplify_term_with_identical_dest_blocks @block[0]"
   %1 = begin_borrow %0 : $Klass
   br bb1(%1 : $Klass)
 
@@ -79,7 +79,7 @@ bb2(%5 : @guaranteed $Klass):
 // CHECK-LABEL: } // end sil function 'test_simplify_term_with_identical_dest_blocks2'
 sil [ossa] @test_simplify_term_with_identical_dest_blocks2 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
-  test_specification "simplify-cfg-simplify-term-with-identical-dest-blocks @block[0]"
+  specify_test "simplify_cfg_simplify_term_with_identical_dest_blocks @block[0]"
   br bb1(%0 : $Klass)
 
 bb1(%3 : @owned $Klass):

@@ -18,6 +18,7 @@
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILSuccessor.h"
@@ -415,12 +416,12 @@ ARCSequenceDataflowEvaluator::~ARCSequenceDataflowEvaluator() = default;
 
 void ARCSequenceDataflowEvaluator::clear() { BBStateInfo->clear(); }
 
-llvm::Optional<ARCBBStateInfoHandle>
+std::optional<ARCBBStateInfoHandle>
 ARCSequenceDataflowEvaluator::getBottomUpBBState(SILBasicBlock *BB) {
   return BBStateInfo->getBottomUpBBHandle(BB);
 }
 
-llvm::Optional<ARCBBStateInfoHandle>
+std::optional<ARCBBStateInfoHandle>
 ARCSequenceDataflowEvaluator::getTopDownBBState(SILBasicBlock *BB) {
   return BBStateInfo->getTopDownBBHandle(BB);
 }

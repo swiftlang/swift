@@ -158,16 +158,14 @@ struct Q {
   let s: String?
 }
 let q = Q(s: nil)
-let a: Int? = q.s.utf8 // expected-error{{value of optional type 'String?' must be unwrapped to refer to member 'utf8' of wrapped base type 'String'}}
-// expected-error@-1 {{cannot convert value of type 'String.UTF8View?' to specified type 'Int?'}}
-// expected-note@-2{{chain the optional using '?'}}{{18-18=?}}
-let b: Int = q.s.utf8 // expected-error{{value of optional type 'String?' must be unwrapped to refer to member 'utf8' of wrapped base type 'String'}}
+let a: Int? = q.s.utf8 // expected-error{{value of optional type 'String?' must be unwrapped to refer to member 'utf8' of wrapped base type 'String'}} expected-note {{chain the optional using '?'}}{{18-18=?}}
+// expected-error@-1 {{cannot assign value of type 'String.UTF8View?' to type 'Int?'}}
+// expected-note@-2 {{arguments to generic parameter 'Wrapped' ('String.UTF8View' and 'Int') are expected to be equal}}
+let b: Int = q.s.utf8 // expected-error{{value of optional type 'String?' must be unwrapped to refer to member 'utf8' of wrapped base type 'String'}} expected-note {{chain the optional using '?'}}{{17-17=?}} expected-note {{force-unwrap using '!'}}{{17-17=!}}
 // expected-error@-1 {{cannot convert value of type 'String.UTF8View' to specified type 'Int'}}
-// expected-note@-2{{chain the optional using '?'}}{{17-17=?}}
-// expected-note@-3{{force-unwrap using '!'}}{{17-17=!}}
-let d: Int! = q.s.utf8 // expected-error{{value of optional type 'String?' must be unwrapped to refer to member 'utf8' of wrapped base type 'String'}}
-// expected-error@-1 {{cannot convert value of type 'String.UTF8View?' to specified type 'Int?'}}
-// expected-note@-2{{chain the optional using '?'}}{{18-18=?}}
+let d: Int! = q.s.utf8 // expected-error{{value of optional type 'String?' must be unwrapped to refer to member 'utf8' of wrapped base type 'String'}} expected-note {{chain the optional using '?'}}{{18-18=?}}
+// expected-error@-1 {{cannot assign value of type 'String.UTF8View?' to type 'Int?'}}
+// expected-note@-2 {{arguments to generic parameter 'Wrapped' ('String.UTF8View' and 'Int') are expected to be equal}}
 let c = q.s.utf8 // expected-error{{value of optional type 'String?' must be unwrapped to refer to member 'utf8' of wrapped base type 'String'}}
 // expected-note@-1{{chain the optional using '?' to access member 'utf8' only for non-'nil' base values}}{{12-12=?}}
 // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}{{12-12=!}}
@@ -362,6 +360,5 @@ func testKeyPathSubscriptArgFixes(_ fn: @escaping () -> Int) {
 
 // https://github.com/apple/swift/issues/54865
 func f_54865(a: Any, _ str: String?) {
-  a == str // expected-error {{binary operator '==' cannot be applied to operands of type 'Any' and 'String?'}}
-  // expected-note@-1 {{overloads for '==' exist with these partially matching parameter lists: (String, String)}}
+  a == str // expected-error {{cannot convert value of type 'Any' to expected argument type 'String'}}
 }

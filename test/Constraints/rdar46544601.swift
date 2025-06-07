@@ -22,9 +22,9 @@ extension P {
 func crash(_ p: P, payload: [UInt8]) throws {
   p.foo(data: payload).then { _ in
     return Future<(D, [D])>()
-  }.then { (id, arr) in // expected-error {{generic parameter 'U' could not be inferred}}
+  }.then { (id, arr) in
     p.foo(arr: arr, data: []).and(result: (id, arr))
-  }.then { args0 in
+  }.then { args0 in // expected-error {{generic parameter 'U' could not be inferred}}
     let (parentID, args1) = args0
     p.bar(root: parentID, from: p).and(result: args1)
   }.whenFailure { _ in }

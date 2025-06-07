@@ -643,12 +643,6 @@ struct PatternBindingWithTwoVars3 { var x = y, y = x }
 // expected-note@-4 {{through reference here}}
 // expected-note@-5 {{through reference here}}
 // expected-note@-6 {{through reference here}}
-// expected-error@-7 {{circular reference}}
-// expected-note@-8 {{through reference here}}
-// expected-note@-9 {{through reference here}}
-// expected-note@-10 {{through reference here}}
-// expected-note@-11 {{through reference here}}
-// expected-note@-12 {{through reference here}}
 
 // https://github.com/apple/swift/issues/51518
 do {

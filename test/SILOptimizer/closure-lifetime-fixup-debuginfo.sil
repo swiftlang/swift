@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -closure-lifetime-fixup -emit-verbose-sil %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all -closure-lifetime-fixup -emit-verbose-sil -sil-disable-copy-elimination-of-copyable-closure-capture=true %s | %FileCheck %s
 
 import Builtin
 import Swift
@@ -32,6 +32,7 @@ bb0(%self : $*Self):
   %noescape = convert_escape_to_noescape [not_guaranteed] %converted : $@callee_guaranteed @substituted <Tee> () -> (@out Tee, @error any Error) for <Self.Index> to $@noescape @callee_guaranteed @substituted <Tee> () -> (@out Tee, @error any Error) for <Self.Index>, scope 2
   try_apply undef<Self.Index>(%noescape) : $@convention(thin) <Tee> (@noescape @callee_guaranteed @substituted <Tee> () -> (@out Tee, @error any Error) for <Tee>) -> (@error any Error), normal bb1, error bb2, scope 2
 bb1(%result : $()):
+  destroy_value %noescape : $@noescape @callee_guaranteed @substituted <Tee> () -> (@out Tee, @error any Error) for <Self.Index>, scope 2
   destroy_value %converted : $@callee_guaranteed @substituted <Tee> () -> (@out Tee, @error any Error) for <Self.Index>, scope 2
   destroy_addr %self : $*Self, scope 2
   %retval = tuple (), scope 2

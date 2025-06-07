@@ -21,6 +21,7 @@
 #include "swift/shims/RuntimeShims.h"
 #include <algorithm>
 #include <stdlib.h>
+#include <string.h>
 #if defined(__APPLE__) && SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC
 #include "swift/Basic/Lazy.h"
 #include <malloc/malloc.h>
@@ -32,10 +33,11 @@ using namespace swift;
 /// On Apple platforms, \c malloc() is always 16-byte aligned.
 static constexpr size_t MALLOC_ALIGN_MASK = 15;
 
-#elif defined(__linux__) || defined(_WIN32)
+#elif defined(__linux__) || defined(_WIN32) || defined(__wasi__)
 /// On Linux and Windows, \c malloc() returns 16-byte aligned pointers on 64-bit
 /// and 8-byte aligned pointers on 32-bit.
-#if defined(__LP64) || defined(_WIN64)
+/// On wasi-libc, pointers are 16-byte aligned even though 32-bit for SIMD access.
+#if defined(__LP64) || defined(_WIN64) || defined(__wasi__)
 static constexpr size_t MALLOC_ALIGN_MASK = 15;
 #else
 static constexpr size_t MALLOC_ALIGN_MASK = 7;
@@ -60,20 +62,17 @@ static constexpr size_t MALLOC_ALIGN_MASK = alignof(std::max_align_t) - 1;
 static_assert(_swift_MinAllocationAlignment > MALLOC_ALIGN_MASK,
               "Swift's default alignment must exceed platform malloc mask.");
 
-#if defined(__APPLE__) && SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC
-static inline malloc_zone_t *DEFAULT_ZONE() {
-  static malloc_zone_t *z = SWIFT_LAZY_CONSTANT(malloc_default_zone());
-  return z;
-}
-#endif
-
 // When alignMask == ~(size_t(0)), allocation uses the "default"
 // _swift_MinAllocationAlignment. This is different than calling swift_slowAlloc
 // with `alignMask == _swift_MinAllocationAlignment - 1` because it forces
 // the use of AlignedAlloc. This allows manually allocated to memory to always
 // be deallocated with AlignedFree without knowledge of its original allocation
 // alignment.
-//
+static size_t computeAlignment(size_t alignMask) {
+  return (alignMask == ~(size_t(0))) ? _swift_MinAllocationAlignment
+                                     : alignMask + 1;
+}
+
 // For alignMask > (_minAllocationAlignment-1)
 // i.e. alignment == 0 || alignment > _minAllocationAlignment:
 //   The runtime must use AlignedAlloc, and the standard library must
@@ -87,19 +86,50 @@ void *swift::swift_slowAlloc(size_t size, size_t alignMask) {
   void *p;
   // This check also forces "default" alignment to use AlignedAlloc.
   if (alignMask <= MALLOC_ALIGN_MASK) {
-#if defined(__APPLE__) && SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC
-    p = malloc_zone_malloc(DEFAULT_ZONE(), size);
-#else
     p = malloc(size);
-#endif
   } else {
-    size_t alignment = (alignMask == ~(size_t(0)))
-                           ? _swift_MinAllocationAlignment
-                           : alignMask + 1;
+    size_t alignment = computeAlignment(alignMask);
     p = AlignedAlloc(size, alignment);
   }
-  if (!p) swift::crash("Could not allocate memory.");
+  if (!p) swift::swift_abortAllocationFailure(size, alignMask);
   return p;
+}
+
+void *swift::swift_slowAllocTyped(size_t size, size_t alignMask,
+                                  MallocTypeId typeId) {
+#if SWIFT_STDLIB_HAS_MALLOC_TYPE
+  if (__builtin_available(macOS 15, iOS 17, tvOS 17, watchOS 10, *)) {
+    void *p;
+    // This check also forces "default" alignment to use malloc_memalign().
+    if (alignMask <= MALLOC_ALIGN_MASK) {
+      p = malloc_type_malloc(size, typeId);
+    } else {
+      size_t alignment = computeAlignment(alignMask);
+
+      // Do not use malloc_type_aligned_alloc() here, because we want this
+      // to work if `size` is not an integer multiple of `alignment`, which
+      // was a requirement of the latter in C11 (but not C17 and later).
+      int err = malloc_type_posix_memalign(&p, alignment, size, typeId);
+      if (err != 0)
+        p = nullptr;
+    }
+    if (!p) swift::swift_abortAllocationFailure(size, alignMask);
+    return p;
+  }
+#endif
+  return swift_slowAlloc(size, alignMask);
+}
+
+void *swift::swift_coroFrameAlloc(size_t size,
+                                  MallocTypeId typeId) {
+#if SWIFT_STDLIB_HAS_MALLOC_TYPE
+  if (__builtin_available(macOS 15, iOS 17, tvOS 17, watchOS 10, *)) {
+    void *p = malloc_type_malloc(size, typeId);
+    if (!p) swift::swift_abortAllocationFailure(size, 0);
+    return p;
+  }
+#endif
+  return malloc(size);
 }
 
 // Unknown alignment is specified by passing alignMask == ~(size_t(0)), forcing
@@ -120,11 +150,7 @@ void *swift::swift_slowAlloc(size_t size, size_t alignMask) {
 //   consistent with allocation with the same alignment.
 static void swift_slowDeallocImpl(void *ptr, size_t alignMask) {
   if (alignMask <= MALLOC_ALIGN_MASK) {
-#if defined(__APPLE__) && SWIFT_STDLIB_HAS_DARWIN_LIBMALLOC
-    malloc_zone_free(DEFAULT_ZONE(), ptr);
-#else
     free(ptr);
-#endif
   } else {
     AlignedFree(ptr);
   }
@@ -132,4 +158,11 @@ static void swift_slowDeallocImpl(void *ptr, size_t alignMask) {
 
 void swift::swift_slowDealloc(void *ptr, size_t bytes, size_t alignMask) {
   swift_slowDeallocImpl(ptr, alignMask);
+}
+
+void swift::swift_clearSensitive(void *ptr, size_t bytes) {
+  // TODO: use memset_s if available
+  // Though, it shouldn't make too much difference because the optimizer cannot remove
+  // the following memset without inlining this library function.
+  memset(ptr, 0, bytes);
 }

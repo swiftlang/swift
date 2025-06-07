@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name protocol_optional -parse-as-library -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name protocol_optional -parse-as-library -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck %s
 
 @objc protocol P1 {
   @objc optional func method(_ x: Int)
@@ -17,12 +17,12 @@ func optionalMethodGeneric<T : P1>(t t : T) {
   var t = t
   // CHECK: bb0([[T:%[0-9]+]] : @guaranteed $T):
   // CHECK:   [[TBOX:%[0-9]+]] = alloc_box $<τ_0_0 where τ_0_0 : P1> { var τ_0_0 } <T>
-  // CHECK:   [[TLIFETIME:%[^,]+]] = begin_borrow [lexical] [[TBOX]]
+  // CHECK:   [[TLIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[TBOX]]
   // CHECK:   [[PT:%[0-9]+]] = project_box [[TLIFETIME]]
   // CHECK:   [[T_COPY:%.*]] = copy_value [[T]]
   // CHECK:   store [[T_COPY]] to [init] [[PT]] : $*T
   // CHECK:   [[OPT_BOX:%[0-9]+]] = alloc_box ${ var Optional<@callee_guaranteed (Int) -> ()> }
-  // CHECK:   [[OPT_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[OPT_BOX]]
+  // CHECK:   [[OPT_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[OPT_BOX]]
   // CHECK:   project_box [[OPT_LIFETIME]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PT]] : $*T
   // CHECK:   [[T:%[0-9]+]] = load [copy] [[READ]] : $*T
@@ -36,7 +36,7 @@ func optionalMethodGeneric<T : P1>(t t : T) {
 func optionalStaticMethodRefGeneric<T: P1>(t: T) {
   // CHECK: bb0(%0 : @guaranteed $T):
   // CHECK:   [[BOX:%[0-9]+]] = alloc_box ${ var Optional<@callee_guaranteed (Int) -> ()> }, var
-  // CHECK:   [[BOX_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[BOX]]
+  // CHECK:   [[BOX_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [var_decl] [[BOX]]
   // CHECK:   [[UNBOX:%[0-9]+]] = project_box [[BOX_LIFETIME]]
   // CHECK:   [[META:%[0-9]+]] = metatype $@thick T.Type
   // CHECK:   [[OBJC_META:%[0-9]+]] = thick_to_objc_metatype [[META]]
@@ -49,7 +49,7 @@ func optionalStaticMethodRefGeneric<T: P1>(t: T) {
 // CHECK-LABEL: sil hidden [ossa] @$s17protocol_optional0B23MethodUnboundRefGeneric1tyx_tAA2P1RzlF : $@convention(thin) <T where T : P1> (@guaranteed T) -> () {
 // CHECK: bb0([[T:%[0-9]+]] : @guaranteed $T):
 // CHECK:   [[BOX:%[0-9]+]] = alloc_box $<τ_0_0 where τ_0_0 : P1> { var @callee_guaranteed @substituted <τ_0_0 where τ_0_0 : AnyObject> (@guaranteed τ_0_0) -> @owned Optional<@callee_guaranteed (Int) -> ()> for <τ_0_0> } <T>
-// CHECK:   [[BOX_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[BOX]]
+// CHECK:   [[BOX_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK:   [[PBOX:%[0-9]+]] = project_box [[BOX_LIFETIME]]
 // CHECK:   [[THUNK:%[0-9]+]] = function_ref @$[[THUNK_NAME:[_0-9a-zA-Z]+]]
 // CHECK:   [[SPEC_THUNK:%[0-9]+]] = partial_apply [callee_guaranteed] [[THUNK]]<T>()
@@ -70,7 +70,7 @@ func optionalMethodUnboundRefGeneric<T : P1>(t: T) {
 // CHECK-LABEL: sil hidden [ossa] @$s17protocol_optional0B27MethodUnboundRefExistentialyyF : $@convention(thin) () -> () {
 // CHECK: bb0:
 // CHECK:   [[BOX:%[0-9]+]] = alloc_box ${ var @callee_guaranteed (@guaranteed any P1) -> @owned Optional<@callee_guaranteed () -> @owned any P1> }
-// CHECK:   [[BOX_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [[BOX]]
+// CHECK:   [[BOX_LIFETIME:%[0-9]+]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK:   [[PBOX:%[0-9]+]] = project_box [[BOX_LIFETIME]]
 // CHECK:   [[THUNK:%[0-9]+]] = function_ref @$[[THUNK_NAME:[_0-9a-zA-Z]+]]
 // CHECK:   [[THUNK_THICK:%[0-9]+]] = thin_to_thick_function [[THUNK]]
@@ -98,12 +98,13 @@ func optionalPropertyGeneric<T : P1>(t t : T) {
   var t = t
   // CHECK: bb0([[T:%[0-9]+]] : @guaranteed $T):
   // CHECK:   [[TBOX:%[0-9]+]] = alloc_box $<τ_0_0 where τ_0_0 : P1> { var τ_0_0 } <T>
-  // CHECK:   [[TLIFETIME:%[^,]+]] = begin_borrow [lexical] [[TBOX]]
+  // CHECK:   [[TLIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[TBOX]]
   // CHECK:   [[PT:%[0-9]+]] = project_box [[TLIFETIME]]
   // CHECK:   [[T_COPY:%.*]] = copy_value [[T]]
   // CHECK:   store [[T_COPY]] to [init] [[PT]] : $*T
   // CHECK:   [[OPT_BOX:%[0-9]+]] = alloc_box ${ var Optional<Int> }
-  // CHECK:   project_box [[OPT_BOX]]
+  // CHECK:   [[OPT_LIFETIME:%.*]] = begin_borrow [var_decl] [[OPT_BOX]]
+  // CHECK:   project_box [[OPT_LIFETIME]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PT]] : $*T
   // CHECK:   [[T:%[0-9]+]] = load [copy] [[READ]] : $*T
   // CHECK:   alloc_stack $Optional<Int>
@@ -117,12 +118,13 @@ func optionalSubscriptGeneric<T : P1>(t t : T) {
   var t = t
   // CHECK: bb0([[T:%[0-9]+]] : @guaranteed $T):
   // CHECK:   [[TBOX:%[0-9]+]] = alloc_box $<τ_0_0 where τ_0_0 : P1> { var τ_0_0 } <T>
-  // CHECK:   [[TLIFETIME:%[^,]+]] = begin_borrow [lexical] [[TBOX]]
+  // CHECK:   [[TLIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[TBOX]]
   // CHECK:   [[PT:%[0-9]+]] = project_box [[TLIFETIME]]
   // CHECK:   [[T_COPY:%.*]] = copy_value [[T]]
   // CHECK:   store [[T_COPY]] to [init] [[PT]] : $*T
   // CHECK:   [[OPT_BOX:%[0-9]+]] = alloc_box ${ var Optional<Int> }
-  // CHECK:   project_box [[OPT_BOX]]
+  // CHECK:   [[OPT_LIFETIME:%.*]] = begin_borrow [var_decl] [[OPT_BOX]]
+  // CHECK:   project_box [[OPT_LIFETIME]]
   // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[PT]] : $*T
   // CHECK:   [[T:%[0-9]+]] = load [copy] [[READ]] : $*T
   // CHECK:   [[FIVELIT:%[0-9]+]] = integer_literal $Builtin.IntLiteral, 5

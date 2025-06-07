@@ -1,3 +1,8 @@
+module Constructor {
+  header "constructor.h"
+  requires cplusplus
+}
+
 module POD {
   header "pod.h"
   requires cplusplus
@@ -18,6 +23,11 @@ module Nullable {
   requires cplusplus
 }
 
+module Inheritance {
+  header "inheritance.h"
+  requires cplusplus
+}
+
 module WitnessTable {
   header "witness-table.h"
   requires cplusplus
@@ -28,7 +38,28 @@ module ReferenceCounted {
   requires cplusplus
 }
 
+module ReferenceCountedObjCProperty {
+  header "reference-counted-objc-property.h"
+  requires cplusplus
+  export *
+}
+
 module MemberLayout {
   header "member-layout.h"
+  requires cplusplus
+}
+
+module MemberInheritance {
+  header "member-inheritance.h"
+  requires cplusplus
+}
+
+module DerivedFieldGetterReturnsOwnedFRT {
+  header "derived-field-getter-returns-owned-frt.h"
+  requires cplusplus
+}
+
+module FunctionsAndMethodsReturningFRT {
+  header "cxx-functions-and-methods-returning-frt.h"
   requires cplusplus
 }

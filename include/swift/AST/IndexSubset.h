@@ -108,8 +108,10 @@ public:
   static IndexSubset *get(ASTContext &ctx, unsigned capacity,
                           ArrayRef<unsigned> indices) {
     SmallBitVector indicesBitVec(capacity, false);
-    for (auto index : indices)
+    for (auto index : indices) {
+      assert(index < capacity);
       indicesBitVec.set(index);
+    }
     return IndexSubset::get(ctx, indicesBitVec);
   }
 
@@ -195,6 +197,7 @@ public:
 
   bool isSubsetOf(IndexSubset *other) const;
   bool isSupersetOf(IndexSubset *other) const;
+  bool isDisjointWith(IndexSubset *other) const;
 
   IndexSubset *adding(unsigned index, ASTContext &ctx) const;
   IndexSubset *extendingCapacity(ASTContext &ctx,

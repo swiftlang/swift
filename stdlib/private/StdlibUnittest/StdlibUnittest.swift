@@ -17,22 +17,35 @@ import SwiftPrivateLibcExtras
 
 #if canImport(Darwin)
 #if _runtime(_ObjC)
-import Foundation
+internal import Foundation
 #endif
-import Darwin
+internal import Darwin
+internal import var Darwin.errno
 #elseif canImport(Glibc)
-import Glibc
+internal import Glibc
+#elseif canImport(Musl)
+internal import Musl
+#elseif canImport(Android)
+internal import Android
+#elseif os(WASI)
+internal import WASILibc
 #elseif os(Windows)
-import CRT
-import WinSDK
+internal import CRT
+internal import WinSDK
 #endif
 
 #if _runtime(_ObjC)
-import ObjectiveC
+internal import ObjectiveC
 #endif
 
 #if SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
 import _Concurrency
+#endif
+
+#if os(WASI)
+let platformSupportsChildProcesses = false
+#else
+let platformSupportsChildProcesses = true
 #endif
 
 extension String {
@@ -739,11 +752,14 @@ public func expectNil<T>(_ value: T?,
 }
 
 @discardableResult
-public func expectNotNil<T>(_ value: T?,
+@lifetime(copy value)
+public func expectNotNil<T: ~Copyable & ~Escapable>(
+  _ value: consuming T?,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) -> T? {
+  file: String = #file, line: UInt = #line
+) -> T? {
   if value == nil {
     expectationFailure("expected optional to be non-nil", trace: message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
@@ -840,7 +856,7 @@ func _printDebuggingAdvice(_ fullTestName: String) {
 #else
   let interpreter = getenv("SWIFT_INTERPRETER")
   if interpreter != nil {
-    if let interpreterCmd = String(validatingUTF8: interpreter!) {
+    if let interpreterCmd = String(validatingCString: interpreter!) {
         invocation.insert(interpreterCmd, at: 0)
     }
   }
@@ -1094,7 +1110,7 @@ class _ParentProcess {
       var ret: CInt
       repeat {
         ret = _stdlib_select(&readfds, &writefds, &errorfds, nil)
-      } while ret == -1  &&  errno == EINTR
+      } while ret == -1 && errno == EINTR
       if ret <= 0 {
         fatalError("select() returned an error")
       }
@@ -1724,7 +1740,7 @@ public func runAllTests() {
   if _isChildProcess {
     _childProcess()
   } else {
-    var runTestsInProcess: Bool = false
+    var runTestsInProcess: Bool = !platformSupportsChildProcesses
     var filter: String?
     var args = [String]()
     var i = 0
@@ -1794,7 +1810,7 @@ public func runAllTestsAsync() async {
   if _isChildProcess {
     await _childProcessAsync()
   } else {
-    var runTestsInProcess: Bool = false
+    var runTestsInProcess: Bool = !platformSupportsChildProcesses
     var filter: String?
     var args = [String]()
     var i = 0
@@ -2099,6 +2115,11 @@ public final class TestSuite {
       return self
     }
 
+    public func require(_ stdlibVersion: StdLibVersion) -> _TestBuilder {
+      _data._skip.append(.minimumStdlib(stdlibVersion))
+      return self
+    }
+
     public func stdin(_ stdinText: String, eof: Bool = false) -> _TestBuilder {
       _data._stdinText = stdinText
       _data._stdinEndsWithEOF = eof
@@ -2190,14 +2211,45 @@ func _getSystemVersionPlistProperty(_ propertyName: String) -> String? {
 #endif
 #endif
 
+public enum StdLibVersion: String {
+  case stdlib_5_7  = "5.7"
+  case stdlib_5_8  = "5.8"
+  case stdlib_5_9  = "5.9"
+  case stdlib_5_10 = "5.10"
+  case stdlib_6_0  = "6.0"
+  case stdlib_6_1  = "6.1"
+  case stdlib_6_2  = "6.2"
+  
+  var isAvailable: Bool {
+    switch self {
+    case .stdlib_5_7:
+      return if #available(SwiftStdlib 5.7, *)  { true } else { false }
+    case .stdlib_5_8:
+      return if #available(SwiftStdlib 5.8, *)  { true } else { false }
+    case .stdlib_5_9:
+      return if #available(SwiftStdlib 5.9, *)  { true } else { false }
+    case .stdlib_5_10:
+      return if #available(SwiftStdlib 5.10, *) { true } else { false }
+    case .stdlib_6_0:
+      return if #available(SwiftStdlib 6.0, *)  { true } else { false }
+    case .stdlib_6_1:
+      return if #available(SwiftStdlib 6.1, *)  { true } else { false }
+    case .stdlib_6_2:
+      return if #available(SwiftStdlib 6.2, *)  { true } else { false }
+    }
+  }
+}
+
 public enum OSVersion : CustomStringConvertible {
   case osx(major: Int, minor: Int, bugFix: Int)
   case iOS(major: Int, minor: Int, bugFix: Int)
   case tvOS(major: Int, minor: Int, bugFix: Int)
   case watchOS(major: Int, minor: Int, bugFix: Int)
+  case visionOS(major: Int, minor: Int, bugFix: Int)
   case iOSSimulator
   case tvOSSimulator
   case watchOSSimulator
+  case visionOSSimulator
   case linux
   case freeBSD
   case openBSD
@@ -2218,12 +2270,16 @@ public enum OSVersion : CustomStringConvertible {
       return "TVOS \(major).\(minor).\(bugFix)"
     case .watchOS(let major, let minor, let bugFix):
       return "watchOS \(major).\(minor).\(bugFix)"
+    case .visionOS(let major, let minor, let bugFix):
+      return "visionOS \(major).\(minor).\(bugFix)"
     case .iOSSimulator:
       return "iOSSimulator"
     case .tvOSSimulator:
       return "TVOSSimulator"
     case .watchOSSimulator:
       return "watchOSSimulator"
+    case .visionOSSimulator:
+      return "visionOSSimulator"
     case .linux:
       return "Linux"
     case .freeBSD:
@@ -2272,6 +2328,8 @@ func _getOSVersion() -> OSVersion {
   return .tvOSSimulator
 #elseif os(watchOS) && targetEnvironment(simulator)
   return .watchOSSimulator
+#elseif os(visionOS) && targetEnvironment(simulator)
+  return .visionOSSimulator
 #elseif os(Linux)
   return .linux
 #elseif os(FreeBSD)
@@ -2301,6 +2359,8 @@ func _getOSVersion() -> OSVersion {
   return .tvOS(major: major, minor: minor, bugFix: bugFix)
   #elseif os(watchOS)
   return .watchOS(major: major, minor: minor, bugFix: bugFix)
+  #elseif os(visionOS)
+  return .visionOS(major: major, minor: minor, bugFix: bugFix)
   #else
   fatalError("could not determine OS version")
   #endif
@@ -2363,6 +2423,16 @@ public enum TestRunPredicate : CustomStringConvertible {
 
   case watchOSSimulatorAny(/*reason:*/ String)
 
+  case visionOSAny(/*reason:*/ String)
+  case visionOSMajor(Int, reason: String)
+  case visionOSMajorRange(ClosedRange<Int>, reason: String)
+  case visionOSMinor(Int, Int, reason: String)
+  case visionOSMinorRange(Int, ClosedRange<Int>, reason: String)
+  case visionOSBugFix(Int, Int, Int, reason: String)
+  case visionOSBugFixRange(Int, Int, ClosedRange<Int>, reason: String)
+
+  case visionOSSimulatorAny(/*reason:*/ String)
+
   case linuxAny(reason: String)
 
   case freeBSDAny(reason: String)
@@ -2377,9 +2447,13 @@ public enum TestRunPredicate : CustomStringConvertible {
 
   case haikuAny(reason: String)
 
+  case wasiAny(reason: String)
+
   case objCRuntime(/*reason:*/ String)
   case nativeRuntime(/*reason:*/ String)
 
+  case minimumStdlib(StdLibVersion)
+  
   public var description: String {
     switch self {
     case .custom(_, let reason):
@@ -2457,6 +2531,24 @@ public enum TestRunPredicate : CustomStringConvertible {
     case .watchOSSimulatorAny(let reason):
       return "watchOSSimulatorAny(*, reason: \(reason))"
 
+    case .visionOSAny(let reason):
+      return "visionOS(*, reason: \(reason))"
+    case .visionOSMajor(let major, let reason):
+      return "visionOS(\(major).*, reason: \(reason))"
+    case .visionOSMajorRange(let range, let reason):
+      return "visionOS([\(range)], reason: \(reason))"
+    case .visionOSMinor(let major, let minor, let reason):
+      return "visionOS(\(major).\(minor), reason: \(reason))"
+    case .visionOSMinorRange(let major, let minorRange, let reason):
+      return "visionOS(\(major).[\(minorRange)], reason: \(reason))"
+    case .visionOSBugFix(let major, let minor, let bugFix, let reason):
+      return "visionOS(\(major).\(minor).\(bugFix), reason: \(reason))"
+    case .visionOSBugFixRange(let major, let minor, let bugFixRange, let reason):
+      return "visionOS(\(major).\(minor).[\(bugFixRange)], reason: \(reason))"
+
+    case .visionOSSimulatorAny(let reason):
+      return "visionOSSimulatorAny(*, reason: \(reason))"
+
     case .linuxAny(reason: let reason):
       return "linuxAny(*, reason: \(reason))"
 
@@ -2478,10 +2570,16 @@ public enum TestRunPredicate : CustomStringConvertible {
     case .haikuAny(reason: let reason):
       return "haikuAny(*, reason: \(reason))"
 
+    case .wasiAny(reason: let reason):
+      return "wasiAny(*, reason: \(reason))"
+
     case .objCRuntime(let reason):
       return "Objective-C runtime, reason: \(reason))"
     case .nativeRuntime(let reason):
       return "Native runtime (no ObjC), reason: \(reason))"
+      
+    case .minimumStdlib(let version):
+      return "Requires Swift \(version.rawValue)'s standard library"
     }
   }
 
@@ -2735,6 +2833,70 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
+    case .visionOSAny:
+      switch _getRunningOSVersion() {
+      case .visionOS:
+        return true
+      default:
+        return false
+      }
+
+    case .visionOSMajor(let major, _):
+      switch _getRunningOSVersion() {
+      case .visionOS(major, _, _):
+        return true
+      default:
+        return false
+      }
+
+    case .visionOSMajorRange(let range, _):
+      switch _getRunningOSVersion() {
+      case .visionOS(let major, _, _):
+        return range.contains(major)
+      default:
+        return false
+      }
+
+    case .visionOSMinor(let major, let minor, _):
+      switch _getRunningOSVersion() {
+      case .visionOS(major, minor, _):
+        return true
+      default:
+        return false
+      }
+
+    case .visionOSMinorRange(let major, let minorRange, _):
+      switch _getRunningOSVersion() {
+      case .visionOS(major, let runningMinor, _):
+        return minorRange.contains(runningMinor)
+      default:
+        return false
+      }
+
+    case .visionOSBugFix(let major, let minor, let bugFix, _):
+      switch _getRunningOSVersion() {
+      case .visionOS(major, minor, bugFix):
+        return true
+      default:
+        return false
+      }
+
+    case .visionOSBugFixRange(let major, let minor, let bugFixRange, _):
+      switch _getRunningOSVersion() {
+      case .visionOS(major, minor, let runningBugFix):
+        return bugFixRange.contains(runningBugFix)
+      default:
+        return false
+      }
+
+    case .visionOSSimulatorAny:
+      switch _getRunningOSVersion() {
+      case .visionOSSimulator:
+        return true
+      default:
+        return false
+      }
+
     case .linuxAny:
       switch _getRunningOSVersion() {
       case .linux:
@@ -2793,6 +2955,14 @@ public enum TestRunPredicate : CustomStringConvertible {
         return false
       }
 
+    case .wasiAny:
+      switch _getRunningOSVersion() {
+      case .wasi:
+        return true
+      default:
+        return false
+      }
+
     case .objCRuntime:
 #if _runtime(_ObjC)
       return true
@@ -2806,6 +2976,9 @@ public enum TestRunPredicate : CustomStringConvertible {
 #else
       return true
 #endif
+      
+    case .minimumStdlib(let version):
+      return !version.isAvailable
     }
   }
 }
@@ -3479,11 +3652,11 @@ struct Pair<T : Comparable> : Comparable {
   var first: T
   var second: T
 
-  static func == <T>(lhs: Pair<T>, rhs: Pair<T>) -> Bool {
+  static func ==(lhs: Pair<T>, rhs: Pair<T>) -> Bool {
     return lhs.first == rhs.first && lhs.second == rhs.second
   }
 
-  static func < <T>(lhs: Pair<T>, rhs: Pair<T>) -> Bool {
+  static func <(lhs: Pair<T>, rhs: Pair<T>) -> Bool {
     return [lhs.first, lhs.second].lexicographicallyPrecedes(
       [rhs.first, rhs.second])
   }

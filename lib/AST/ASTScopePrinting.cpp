@@ -28,6 +28,8 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/Support/Compiler.h"
 #include <algorithm>
@@ -39,22 +41,20 @@ using namespace ast_scope;
 
 void ASTScopeImpl::dump() const { print(llvm::errs(), 0, false); }
 
+void ASTScopeImpl::dumpParents() const { printParents(llvm::errs()); }
+
 void ASTScopeImpl::dumpOneScopeMapLocation(
     std::pair<unsigned, unsigned> lineColumn) {
   auto bufferID = getSourceFile()->getBufferID();
-  if (!bufferID) {
-    llvm::errs() << "***No buffer, dumping all scopes***";
-    print(llvm::errs());
-    return;
-  }
   SourceLoc loc = getSourceManager().getLocForLineCol(
-      *bufferID, lineColumn.first, lineColumn.second);
+      bufferID, lineColumn.first, lineColumn.second);
   if (loc.isInvalid())
     return;
 
   llvm::errs() << "***Scope at " << lineColumn.first << ":" << lineColumn.second
                << "***\n";
-  auto *locScope = findInnermostEnclosingScope(loc, &llvm::errs());
+  auto *parentModule = getSourceFile()->getParentModule();
+  auto *locScope = findInnermostEnclosingScope(parentModule, loc, &llvm::errs());
   locScope->print(llvm::errs(), 0, false, false);
 
   namelookup::ASTScopeDeclGatherer gatherer;
@@ -70,9 +70,13 @@ void ASTScopeImpl::dumpOneScopeMapLocation(
   }
 }
 
-llvm::raw_ostream &ASTScopeImpl::verificationError() const {
-  return llvm::errs() << "ASTScopeImpl verification error in source file '"
-                      << getSourceFile()->getFilename() << "': ";
+void ASTScopeImpl::abortWithVerificationError(
+    llvm::function_ref<void(llvm::raw_ostream &)> messageFn) const {
+  ABORT([&](auto &out) {
+    out << "ASTScopeImpl verification error in source file '"
+        << getSourceFile()->getFilename() << "':\n";
+    messageFn(out);
+  });
 }
 
 #pragma mark printing
@@ -127,6 +131,21 @@ void ASTScopeImpl::printRange(llvm::raw_ostream &out) const {
   printSourceRange(out, range, getSourceManager());
 }
 
+void ASTScopeImpl::printParents(llvm::raw_ostream &out) const {
+  SmallVector<const ASTScopeImpl *, 8> nodes;
+  const ASTScopeImpl *cursor = this;
+  do {
+    nodes.push_back(cursor);
+    cursor = cursor->getParent().getPtrOrNull();
+  } while (cursor);
+
+  std::reverse(nodes.begin(), nodes.end());
+
+  for (auto i : indices(nodes)) {
+    nodes[i]->print(out, i, /*lastChild=*/true, /*printChildren=*/false);
+  }
+}
+
 #pragma mark printSpecifics
 
 
@@ -148,11 +167,10 @@ NullablePtr<const void> ASTScopeImpl::addressForPrinting() const {
 void GenericTypeOrExtensionScope::printSpecifics(llvm::raw_ostream &out) const {
   if (shouldHaveABody() && !doesDeclHaveABody())
     out << "<no body>";
-  // Sadly, the following can trip assertions
-  //  else if (auto *n = getCorrespondingNominalTypeDecl().getPtrOrNull())
-  //    out << "'" << n->getFullName() << "'";
-  //  else
-  //    out << "<no extended nominal?!>";
+  else if (auto *n = getCorrespondingNominalTypeDecl().getPtrOrNull())
+    out << "'" << n->getName() << "'";
+  else
+    out << "<no extended nominal?!>";
 }
 
 void GenericParamScope::printSpecifics(llvm::raw_ostream &out) const {
@@ -180,6 +198,10 @@ void SubscriptDeclScope::printSpecifics(llvm::raw_ostream &out) const {
 
 void MacroDeclScope::printSpecifics(llvm::raw_ostream &out) const {
   decl->dumpRef(out);
+}
+
+void MacroExpansionDeclScope::printSpecifics(llvm::raw_ostream &out) const {
+  out << decl->getMacroName();
 }
 
 void ConditionalClausePatternUseScope::printSpecifics(

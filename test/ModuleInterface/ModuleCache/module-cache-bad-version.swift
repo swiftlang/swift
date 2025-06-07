@@ -20,7 +20,7 @@
 // RUN: not %target-swift-frontend -I %t -module-cache-path %t/modulecache -emit-module  -o %t/TestModule.swiftmodule -module-name TestModule %s >%t/err.txt 2>&1
 // RUN: test ! -f %t/TestModule.swiftmodule
 // This avoids a problem in Windows with test ! -f 'foo*' for a file that doesn't exist
-// RUN: %{python} -c "import sys; import glob; sys.exit(len(glob.glob('%t/modulecache/LeafModule-*.swiftmodule')) != 0)"
+// RUN: %{python} -c "import sys; import glob; sys.exit(len(glob.glob(r'%t/modulecache/LeafModule-*.swiftmodule')) != 0)"
 // RUN: %FileCheck %s -check-prefix=CHECK-ERR <%t/err.txt
 // CHECK-ERR: {{error: unsupported version of module interface '.*[/\\]LeafModule.swiftinterface': '9999.999'}}
 // CHECK-ERR: error: no such module 'LeafModule

@@ -15,9 +15,9 @@ let constante : String = "Hello World"
 
 let constante2 = "Hello World"
 
-let caractere : Character = Array(constante)[0]
+let character : Character = Array(constante)[0]
 
-let caractere2 : Character = "A"
+let character2 : Character = "A"
 
 var variable : String
 

@@ -27,6 +27,7 @@
 // REQUIRES: reflection
 
 // rdar://96439408
+// UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: use_os_stdlib
 
 import StdlibUnittest
@@ -921,6 +922,72 @@ mirrors.test("class/Cluster") {
 //===--- Miscellaneous ----------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
+protocol Box<Value> {
+  associatedtype Value
+  var value: Value {get}
+}
+
+mirrors.test("Extended Existential (struct)") {
+  struct Container<Value>: Box {
+    var value: Value
+  }
+  func genericErase<T>(_ value: T) -> Any {
+    value
+  }
+  let container: any Box<Int> = Container(value: 42)
+  if #available(iOS 16, macOS 13, tvOS 16, watchOS 9, *) {
+    let subject = genericErase(container)
+    let mirror = Mirror(reflecting: subject)
+    let children = mirror.children
+    expectEqual(1, children.count)
+    let first = children.first!
+    expectEqual("value", first.label)
+    expectEqual(42, first.value as! Int)
+  }
+}
+
+protocol OBox<Value>: AnyObject {
+  associatedtype Value
+  var value: Value {get}
+}
+
+mirrors.test("Extended Existential (class)") {
+  class Container<Value>: OBox {
+    var value: Value
+    init(value: Value) { self.value = value }
+  }
+  func genericErase<T>(_ value: T) -> Any {
+    value
+  }
+  let container: any OBox<Int> = Container(value: 42)
+  if #available(iOS 16, macOS 13, tvOS 16, watchOS 9, *) {
+    let subject = genericErase(container)
+    let mirror = Mirror(reflecting: subject)
+    let children = mirror.children
+    expectEqual(1, children.count)
+    let first = children.first!
+    expectEqual("value", first.label)
+    expectEqual(42, first.value as! Int)
+  }
+}
+
+mirrors.test("Extended Existential (metatype)") {
+  class Container<Value>: Box {
+    var value: Value
+    init(value: Value) { self.value = value }
+  }
+  func genericErase<T>(_ value: T) -> Any {
+    value
+  }
+  let t: any Box<Int>.Type = Container<Int>.self
+  if #available(iOS 16, macOS 13, tvOS 16, watchOS 9, *) {
+    let subject = genericErase(t)
+    let mirror = Mirror(reflecting: subject)
+    let children = mirror.children
+    expectEqual(0, children.count)
+  }
+}
+
 mirrors.test("Addressing") {
   let m0 = Mirror(reflecting: [1, 2, 3])
   expectEqual(1, m0.descendant(0) as? Int)
@@ -1601,6 +1668,48 @@ mirrors.test("MetatypeMirror") {
       "- Mirror.SomeNativeProto & Mirror.SomeOtherNativeProto #0\n",
       output)
   }
+}
+
+class MetatypeExampleClass {}
+class MetatypeExampleSubclass: MetatypeExampleClass {}
+final class MetatypeExampleFinalClass {}
+enum MetatypeExampleEnum {}
+struct MetatypeContainer {
+  var before = 42
+  var before2 = 43
+  var structType = String.self
+  var enumType = MetatypeExampleEnum.self
+  var tupleType = (Int, String, AnyObject).self
+  var functionType = (() -> Void).self
+  var classType = MetatypeExampleClass.self
+  var subclassType: MetatypeExampleClass.Type = MetatypeExampleSubclass.self
+  var finalClassType = MetatypeExampleFinalClass.self
+  var existentialType: (any Any).Type = Any.self
+  var existentialType2: Any.Type = Any.self
+  var after = 45
+}
+
+mirrors.test("MetatypeFields") {
+  var output = ""
+  let container = MetatypeContainer()
+  dump(container, to: &output)
+  expectEqual("""
+    ▿ Mirror.MetatypeContainer
+      - before: 42
+      - before2: 43
+      - structType: Swift.String #0
+      - enumType: Mirror.MetatypeExampleEnum #1
+      - tupleType: (Swift.Int, Swift.String, Swift.AnyObject) #2
+      - functionType: () -> () #3
+      - classType: Mirror.MetatypeExampleClass #4
+      - subclassType: Mirror.MetatypeExampleSubclass #5
+      - finalClassType: Mirror.MetatypeExampleFinalClass #6
+      - existentialType: Any #7
+      - existentialType2: Any #7
+      - after: 45
+
+    """,
+    output)
 }
 
 //===--- Tuples -----------------------------------------------------------===//

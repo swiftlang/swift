@@ -1,0 +1,564 @@
+\documentclass[../generics]{subfiles}
+
+\begin{document}
+
+\chapter{Introduction}\label{roadmap}
+
+\lettrine{S}{wift's generics implementation} is best understood by first considering various design constraints faced by the compiler:
+\begin{enumerate}
+\item Generic functions should be independently type checked, without knowledge of all possible generic arguments that they are invoked with.
+\item Shared libraries that export generic types and functions should be able to evolve resiliently without requiring recompilation of clients.
+\item Layouts of generic types should be determined by their concrete substitutions, with fields of generic parameter type stored inline.
+\item Abstraction over concrete types with generic parameters should only impose a cost across module boundaries, or in other situations where type information is not available at compile time.
+\end{enumerate}
+
+\noindent The high-level design can be summarized as follows:
+\begin{enumerate}
+\item The interface between a generic function and its caller is mediated by \textbf{generic requirements}. The generic requirements describe the behavior of the generic parameter types inside the function body, and the generic arguments at the call site are checked against the function's generic requirements at compile time.
+\item Generic functions receive \textbf{runtime type metadata} for each generic argument from the caller. Type metadata defines operations to abstractly manipulate values of their type without knowledge of their concrete layout.
+\item Runtime type metadata is constructed for each type in the language. The \textbf{runtime type layout} of a generic type is computed recursively from the type metadata of the generic arguments. Generic types always store their contents directly, without indirection through a heap-allocated \index{boxing}box.
+\item The optimizer can generate a \textbf{specialization} of a generic function in the case where the definition is visible at the call site. This eliminates the overhead of runtime type metadata and abstract value manipulation.
+\end{enumerate}
+
+We're going to think of the compiler as \textsl{a library for modeling the concepts of the target language}. The Swift generics implementation defines four fundamental kinds of semantic objects: \emph{generic signatures}, \emph{substitution maps}, \emph{requirement signatures}, and \emph{conformances}. As we will see, they are understood as much by their inherent structure, as their relationships with each other. Subsequent chapters will dive into all the details, but first, we're going to present a series of worked examples.
+
+\section{Functions}
+
+Consider these two rather contrived function declarations:
+\begin{Verbatim}
+func identity(_ x: Int) -> Int { return x }
+func identity(_ x: String) -> String { return x }
+\end{Verbatim}
+Both have the same exact definition apart from the parameter and return type, and indeed you can write the same function for any concrete type. Our aesthetic sense might lead us to replace both with a single generic function:
+\begin{Verbatim}
+func identity<T>(_ x: T) -> T { return x }
+\end{Verbatim}
+While this function declaration is trivial, it illustrates some important concepts and allows us to introduce terminology. We'll see a full description of the compilation pipeline in the next chapter, but for now, let's consider a simplified view where we begin with parsing, then type checking, and finally code generation.
+
+\begin{figure}\captionabove{The abstract syntax tree for \texttt{identity(\char`_:)}}\label{identity ast}
+\begin{center}
+\begin{tikzpicture}[%
+  grow via three points={one child at (0.5,-0.7) and
+  two children at (0.5,-0.7) and (0.5,-1.4)},
+  edge from parent path={[->] (\tikzparentnode.south) |- (\tikzchildnode.west)}]
+  \node  [class] {\vphantom{p}function declaration: \texttt{identity}}
+    child { node [class] {\vphantom{p}generic parameter list: \texttt{<T>}}
+      child { node  [class] {\vphantom{p}generic parameter declaration: \tT}}}
+    child [missing] {}
+    child { node [class] {\vphantom{p}parameter declaration: \texttt{\char`_\ x:\ T}}
+      child { node  [class] {\vphantom{p}type representation: \tT}}}
+    child [missing] {}
+    child { node [class] {\vphantom{p}type representation: \tT}}
+    child { node [class] {\vphantom{p}body}
+      child { node  [class] {\vphantom{p}statement: \texttt{return x}}
+        child { node  [class] {\vphantom{p}expression: \texttt{x}}}}
+      child [missing] {}}
+    child [missing] {}
+    child [missing] {};
+\end{tikzpicture}
+\end{center}
+\end{figure}
+
+\index{function declaration}
+\index{generic parameter list}
+\index{generic parameter declaration}
+\index{type representation}
+\index{identifier}
+\index{name lookup}
+\index{expression}
+\index{parser}
+\paragraph{Parsing.} \FigRef{identity ast} shows the abstract syntax tree produced by the parser before type checking. The key elements:
+\begin{enumerate}
+\item The \emph{generic parameter list} \texttt{<T>} introduces a single \emph{generic parameter declaration} named \tT. As its name suggests, this declares the generic parameter type \tT, scoped to the entire source range of this function.
+\item The \emph{type representation} \tT\ appears twice, first in the declaration of the parameter ``\verb|_ x: T|'' and then again, as the return type. A type representation is the purely syntactic form of a type. The parser does not perform name lookup, so the type representation stores the identifier \tT\ and does not refer to the generic parameter declaration of \tT\ in any way.
+\item The function body contains an expression referencing \texttt{x}. Again, the parser does not perform name lookup, so this is just the identifier \texttt{x} and is not associated with the parameter declaration ``\verb|_ x: T|''.
+\end{enumerate}
+
+\index{generic parameter type}
+\index{generic signature}
+\index{type resolution}
+\index{type}
+\index{interface type}
+\index{generic function type}
+\paragraph{Type checking.} The type checker constructs the \emph{interface type} of the function declaration from the following:
+\begin{enumerate}
+\item A \emph{generic signature}, to introduce the generic parameter type \tT. In our case, the generic signature has the printed representation \texttt{<T>}. This is the simplest generic signature, apart from the empty generic signature of a non-generic declaration. We'll see more interesting generic signatures soon.
+
+\item The \emph{interface type} of the parameter ``\verb|_ x: T|'', which is declared to be the type representation \tT\ in source. The compiler component responsible for resolving this to a semantic type is called \emph{type resolution}. In this case, we perform name lookup inside the lexical scope defined by the function, which finds the generic parameter type~\tT.
+
+\item The function's return type, which also resolves to the generic parameter type~\tT.
+\end{enumerate}
+All of this is packaged up into a \emph{generic function type} which completely describes the type checking behavior of a reference to this function:
+\begin{quote}
+\begin{verbatim}
+<T> (T) -> T
+\end{verbatim}
+\end{quote}
+The name ``\tT'' is of no semantic consequence beyond name lookup. We will learn that the \emph{canonical type} for the above erases the generic parameter type \tT\ to the notation \ttgp{0}{0}. More generally, each generic parameter type is uniquely identified within its lexical scope by its \emph{depth} and \emph{index}.
+
+Having computed the interface type of the function, the type checker moves on to the function's body. The type of the return statement's expression must match the return type of the function declaration. When we type check the return expression \texttt{x}, we use name lookup to find the parameter declaration ``\verb|_ x: T|''. The interface type of this parameter declaration is the generic parameter type \tT, which is understood relative to the function's generic signature. The type assigned to the expression, however, is the \index{archetype type}\emph{archetype} corresponding to \tT, denoted $\archetype{T}$. We will learn later that an archetype is a self-describing form of a type parameter which behaves like a concrete type.
+
+\paragraph{Code generation.}
+We've now successfully type checked our function declaration. How might we generate code for it? Recall the two concrete implementations that we folded into our single generic function:
+\begin{Verbatim}
+func identity(_ x: Int) -> Int { return x }
+func identity(_ x: String) -> String { return x }
+\end{Verbatim}
+The \index{calling convention}calling conventions of these functions differ significantly:
+\begin{enumerate}
+\item The first function receives and returns the \texttt{Int} value in a machine register. The \texttt{Int} type is \emph{trivial},\footnote{Or POD, for you C++ folks.} meaning it can be copied and moved at will.
+\item The second function is trickier. A \texttt{String} is stored as a 16-byte value in memory, and contains a pointer to a reference-counted buffer. When manipulating values of a non-trivial type like \texttt{String}, memory ownership comes into play.
+\end{enumerate}
+
+The standard ownership semantics for a Swift function call are defined such that the caller retains ownership over the parameter values passed into the callee, while the callee transfers ownership of the return value to the caller. Thus the implementation of \verb|identity(_:)| must create a logical copy of \texttt{x} and then move this copy back to the caller, and do this in a manner that abstracts over all possible concrete types.
+
+The calling convention for a generic function passes \index{runtime type metadata}\emph{runtime type metadata} for each generic parameter in the function's generic signature. Runtime type metadata describes the size and alignment of a concrete type, and provides implementations of the \emph{move}, \emph{copy} and \emph{destroy} operations.
+
+We move and copy values of trivial type by copying bytes; destroy does nothing in this case. With a reference type, the value is a reference-counted pointer; copy and destroy operations update the reference count, while a move leaves the reference count unchanged. The value operations for structs and enums are defined recursively from their members. Finally, weak references and existential types also have non-trivial value operations.
+
+For copyable types, a move is semantically equivalent to a copy followed by a destroy, only more efficient. Traditionally, all types in the language were copyable. \IndexSwift{5.9}Swift 5.9 introduced \index{noncopyable type}\emph{noncopyable types} \cite{se0390}, and \IndexSwift{6.0}Swift 6 extended generics to work with noncopyable types \cite{se0427}. We will not discuss noncopyable types in this book.
+
+\begin{MoreDetails}
+\item Types: \ChapRef{types}
+\item Generic parameter lists: \SecRef{generic params}
+\item Function declarations: \SecRef{function decls}
+\item Archetypes: \ChapRef{genericenv}
+\item Type resolution: \ChapRef{typeresolution}
+\end{MoreDetails}
+
+\index{call expression}
+\index{expression}
+\paragraph{Substitution maps.} Let us now turn our attention to the callers of generic functions. A \emph{call expression} brings together a \emph{callee} and a list of argument expressions. A callee is just an expression of function type. This function type's parameters must match the argument expressions, and its return type is then the type of the call expression. Some possible callees include an expression that names an existing function declaration, type expressions (which is sugar for invoking a constructor member of the type), function parameters and local variables of function type, and even other calls whose result has function type. In our example, we might call the \verb|identity(_:)| function as follows:
+\begin{Verbatim}
+identity(3)
+identity("Hello, Swift")
+\end{Verbatim}
+In Swift, calls to generic functions do not specify their generic arguments explicitly; the type checker infers them from the types of call argument expressions. Generic arguments are encoded in a \index{substitution map}\emph{substitution map}, which assigns a \emph{replacement type} to each generic parameter type of the callee's generic signature.
+
+The generic signature of \verb|identity(_:)| has a single generic parameter type. Thus each of its substitution maps holds a single concrete type. We now introduce some notation. Here are two possible substitution maps, corresponding to the two calls shown above:
+\[
+\Sigma_1 := \SubstMap{\SubstType{T}{Int}}
+\qquad
+\Sigma_2 := \SubstMap{\SubstType{T}{String}}
+\]
+We can form the return type of a call by taking the function declaration's return type, and applying the corresponding substitution map. We denote this application using the ``$\otimes$'' operator. For now, this simply extracts the concrete type stored therein:
+\[\tT \otimes \Sigma_1 = \texttt{Int}
+\qquad
+\tT \otimes \Sigma_2 = \texttt{String}
+\]
+
+Substitution maps play a role in code generation. When calling a generic function, the compiler must realize the runtime type metadata for each replacement type in the substitution map of the call. In our example, the types \texttt{Int} and \texttt{String} are \emph{nominal types} defined in the standard library. They are non-generic and have a fixed layout, so their runtime type metadata is accessed by calling a function, exported by the standard library, that returns the address of a constant symbol.
+
+\begin{MoreDetails}
+\item Substitution maps: \ChapRef{substmaps}
+\end{MoreDetails}
+
+\index{inlinable function}
+\paragraph{Specialization.} Reification of runtime type metadata and the subsequent indirect manipulation of values incurs a performance penalty. As an alternative, if the definition of a generic function is visible at the call site, the optimizer can generate a \emph{specialization} of the generic function by cloning the definition and applying the substitution map to all types appearing in the function's body. Definitions of generic functions are always visible to the specializer within their defining module. Shared library developers can also opt-in to exporting the body of a function across module boundaries with the \texttt{@inlinable} attribute.
+
+\begin{MoreDetails}
+\item \texttt{@inlinable} attribute: \SecRef{module system}
+\end{MoreDetails}
+
+\section{Nominal Types}
+
+\index{struct declaration}
+\index{stored property declaration}
+For our next example we consider a simple generic struct declaration:
+\begin{Verbatim}
+struct Pair<T> {
+  let first: T
+  let second: T
+
+  init(first: T, second: T) {
+    self.first = first
+    self.second = second
+  }
+}
+\end{Verbatim}
+A struct declaration is an example of a \emph{nominal type declaration}. A \emph{generic nominal type}, like \texttt{Pair<Int>} or \texttt{Pair<String>} is a reference to a generic nominal type declaration together with a list of \index{generic argument}generic argument types.
+
+The in-memory layout of a struct value is determined by the interface types of its stored properties. Our \texttt{Pair} struct declares two stored properties, \texttt{first} and \texttt{second}, both with interface type \tT. Thus the layout of a \texttt{Pair} depends on the layout of the generic parameter type~\tT.
+
+The generic nominal type \texttt{Pair<T>}, formed by taking the generic parameter type as the argument, is called the \emph{declared interface type} of \texttt{Pair}. The type \texttt{Pair<Int>} is a \emph{specialized type} of the declared interface type, \texttt{Pair<T>}. We can obtain \texttt{Pair<Int>} from \texttt{Pair<T>} by applying a substitution map:
+\[\texttt{Pair<T>} \otimes \SubstMap{\SubstType{T}{Int}} = \texttt{Pair<Int>}\]
+
+This ``factorization'' is our first example of what is in fact an algebraic identity. The \index{context substitution map}\emph{context substitution map} of a generic nominal type is the substitution map formed from its generic arguments. This has the property that applying the context substitution map to the declared interface type recovers the original generic nominal type. Suppose we declare a local variable of type \texttt{Pair<Int>}:
+\begin{Verbatim}
+let twoIntegers: Pair<Int> = ...
+\end{Verbatim}
+The compiler must allocate storage on the stack for this value. We take the context substitution map, and apply it to the interface type of each stored property:
+\[\tT \otimes \SubstMap{\SubstType{T}{Int}} = \texttt{Int}\]
+We see that a value of type \texttt{Pair<Int>} stores two consecutive values of type \texttt{Int}, which gives \texttt{Pair<Int>} a size of 16 bytes and alignment of 8 bytes. Since \texttt{Pair<Int>} is trivial, the stack allocation does not require any special cleanup once we exit its scope.
+
+Now, we complete our local variable declaration by writing down an \index{expression}\index{initial value expression}initial value expression which calls the constructor:
+\begin{Verbatim}
+let twoIntegers: Pair<Int> = Pair(first: 1, second: 2)
+\end{Verbatim}
+While the value has the type \texttt{Pair<Int>} at the call site, inside the constructor the value being initialized is of type \texttt{Pair<T>}. We construct the runtime type metadata for \texttt{Pair<Int>} by calling the \index{metadata access function}\emph{metadata access function} for \texttt{Pair} with the runtime type metadata for \texttt{Int} as an argument. The metadata for \texttt{Pair<Int>} has two parts:
+
+\begin{enumerate}
+\item A common prefix present in all runtime type metadata, which includes the total size and alignment of a value, and implementations of the move, copy and destroy operations.
+\item A private area specific to the declaration of \texttt{Pair} itself, which stores the runtime type metadata for \tT, followed by the \emph{field offset vector}, storing the offset of each stored property of this specialization of \texttt{Pair<T>}.
+\end{enumerate}
+
+The metadata access function for a generic type takes the metadata for each generic argument, and calculates the offset of each stored property, also obtaining the size and alignment of the entire value. The move, copy and destroy operations of the aggregate type delegate to the corresponding operations in the generic argument metadata. The constructor of \texttt{Pair} then uses the runtime type metadata for both \texttt{Pair<T>} and \tT\ to correctly initialize the aggregate value from its two constituent parts.
+
+\index{structural type}
+Structural types, such as function types, tuple types and metatypes, are similar to generic nominal types in that we call a metadata access function to obtain runtime type metadata for them, but this time, the metadata access function is part of the Swift runtime. For example, to construct metadata for the tuple type \texttt{(Int, Pair<String>)}, we first call the metadata access function for \texttt{Pair} to get \texttt{Pair<String>}, then call an entry point in the runtime to obtain \texttt{(Int, Pair<String>)}.
+
+\begin{MoreDetails}
+\item Declarations: \ChapRef{decls}
+\item Context substitution map: \SecRef{contextsubstmap}
+\item Structural types: \SecRef{more types}
+\end{MoreDetails}
+
+\section{Protocols}\label{intro protocols}
+
+Our \verb|identity(_:)| and \texttt{Pair} declarations both abstract over arbitrary concrete types, but in turn, this limits their generic parameter \tT\ to the common capabilities shared by all types---the move, copy and destroy operations. By stating \emph{generic requirements}, a generic declaration can impose various restrictions on the concrete types used as generic arguments, which in turn endows its generic parameter types with new capabilities provided by those concrete types.
+
+A \emph{protocol} abstracts over the capabilities of a concrete type. By stating a \index{conformance requirement}\emph{conformance requirement} between a generic parameter type and protocol, a generic declaration can require that its generic argument is a concrete type that \emph{conforms} to this protocol:
+\begin{Verbatim}
+protocol Shape {
+  func draw()
+}
+
+func drawShapes<S: Shape>(_ shapes: Array<S>) {
+  for shape in shapes {
+    shape.draw()
+  }
+}
+\end{Verbatim}
+
+The \verb|drawShapes(_:)| function takes an array of values, all of the same type, which must conform to \texttt{Shape}. So far we only encountered the \index{generic signature}generic signature \texttt{<T>}. More generally, a generic signature lists one or more generic parameter types, together with their requirements. The generic signature of \verb|drawShapes(_:)| has the single requirement $\ConfReq{S}{Shape}$. We will use the following notation for generic signatures with requirements:
+\begin{quote}
+\begin{verbatim}
+<S where S: Shape>
+\end{verbatim}
+\end{quote}
+The interface type of \verb|drawShapes(_:)| incorporates this generic signature into a generic function type:
+\begin{quote}
+\begin{verbatim}
+<S where S: Shape> (Array<S>) -> ()
+\end{verbatim}
+\end{quote}
+We can also write the \verb|drawShapes(_:)| function to state the conformance requirement with a trailing \texttt{where} clause, or we can avoid naming the generic parameter \texttt{S} by using an \emph{opaque parameter type} instead:
+\begin{Verbatim}
+func drawShapes<S>(_ shapes: Array<S>) where S: Shape
+func drawShapes(_ shapes: Array<some Shape>)
+\end{Verbatim}
+All three forms of \verb|drawShapes(_:)| are ultimately equivalent, because they define the same generic signature, up to the choice of generic parameter name. In general, when there is more than one way to spell the same underlying language construct due to syntax sugar, the semantic objects ``desugar'' these differences into the same uniform representation.
+\begin{MoreDetails}
+\item Protocols: \SecRef{protocols}
+\item Requirements: \SecRef{requirements}
+\item Generic signatures: \ChapRef{genericsig}
+\end{MoreDetails}
+
+\paragraph{Qualified  lookup.}
+Once we have a generic signature, we can type check the body of \verb|drawShapes(_:)|. The \texttt{for}~loop introduces a local variable ``\texttt{shape}'' of type $\archetype{S}$ (we re-iterate that the generic parameter type \texttt{S} is represented as the archetype $\archetype{S}$ inside a function body, but the distinction doesn't matter right now). This variable is referenced inside the \texttt{for} loop by the \index{member expression}\emph{member expression} ``\texttt{shape.draw}'':
+\begin{Verbatim}[firstnumber=6]
+  for shape in shapes {
+    shape.draw()
+  }
+\end{Verbatim}
+
+Our generic signature has the conformance requirement $\ConfReq{S}{Shape}$, so the caller must provide a replacement type for \texttt{S} conforming to \texttt{Shape}. We'll return to the caller's side of the equation shortly, but inside the callee, the requirement also tells us that the archetype $\archetype{S}$ conforms to \texttt{Shape}. To resolve the member expression, the type checker performs a \index{qualified lookup}\emph{qualified lookup} of the identifier \texttt{draw} with a base type of $\archetype{S}$. A qualified lookup into an archetype checks each protocol the archetype conforms to, so we find and return the \texttt{draw()} method of the \texttt{Shape} protocol.
+
+How does the compiler generate code for the call \verb|shape.draw()|? Together with the runtime type metadata for \texttt{S}, the \index{calling convention}calling convention for \verb|drawShapes(_:)| passes an additional argument, corresponding to the conformance requirement $\ConfReq{S}{Shape}$. This argument is the \index{witness table}\emph{witness table} for the conformance. The layout of a witness table is determined by the protocol's members; a witness table for a conformance to \texttt{Shape} has a single entry, the implementation of the \texttt{draw()} method. To call \texttt{shape.draw()}, we load the function pointer from the witness table, and invoke it with the value of \texttt{shape}.
+
+\begin{MoreDetails}
+\item Name lookup: \SecRef{name lookup}
+\end{MoreDetails}
+\paragraph{Conformances.} This \texttt{Circle} type states a \index{conformance}\emph{conformance} to the \texttt{Shape} protocol:
+\begin{Verbatim}
+struct Circle: Shape {
+  let radius: Double
+  func draw() {...}
+}
+\end{Verbatim}
+The \index{conformance checker}\emph{conformance checker} ensures that the conforming type \texttt{Circle} declares a \emph{witness} for the \texttt{draw()} method of \texttt{Shape}, and records this fact in a \index{normal conformance}\emph{normal conformance}. We denote this normal conformance by $\ConfReq{Circle}{Shape}$. When generating code for the declaration of \texttt{Circle}, we also emit the witness table for the normal conformance $\ConfReq{Circle}{Shape}$. This witness table contains a pointer to the implementation of \texttt{Circle.draw()}.
+
+Now, let's call \verb|drawShapes(_:)| with an array of circles and look at the substitution map for the call:
+\begin{Verbatim}
+drawShapes([Circle(radius: 1), Circle(radius: 2)])
+\end{Verbatim}
+When the callee's generic signature has conformance requirements, the substitution map must store a conformance for each conformance requirement. This is the ``proof'' that the \index{conforming type}concrete replacement type actually conforms to the protocol, as required. We denote a substitution map with conformances as follows:
+\[\SubstMapC{\SubstType{S}{Circle}}{\SubstConf{S}{Circle}{Shape}}\]
+To find the normal conformance, the type checker performs a \index{global conformance lookup}\emph{global conformance lookup} with the concrete type and protocol:
+\[\Proto{Shape}\otimes\texttt{Circle}=\ConfReq{Circle}{Shape}\]
+
+When generating code for the call to \verb|drawShapes(_:)|, we visit each entry in the substitution map, emitting a reference to runtime type metadata for each replacement type, and a reference to the witness table for each conformance. In our case, we pass the runtime type metadata for \texttt{Circle} and witness table for $\ConfReq{Circle}{Shape}$.
+
+\begin{MoreDetails}
+\item Conformances: \ChapRef{conformances}
+\item Conformance lookup: \SecRef{conformance lookup}
+\end{MoreDetails}
+
+\paragraph{Existential types.}
+Note that \verb|drawShapes(_:)| operates on a \emph{homogeneous} array of shapes. While the array contains an arbitrary number of elements, \verb|drawShapes(_:)| only receives a single runtime type metadata for \texttt{S}, and one witness table for the conformance requirement $\ConfReq{S}{Shape}$, which together describe the behavior of each element in the array. If we instead want a function taking a \emph{heterogeneous} array of shapes, we can use an \index{existential type}\emph{existential type} as the element type of our array:
+\begin{Verbatim}
+func drawShapes(_ shapes: Array<any Shape>) {
+  for shape in shapes {
+    shape.draw()
+  }
+}
+\end{Verbatim}
+
+This function uses the \texttt{Shape} protocol in a new way. The existential type \texttt{any Shape} is a container for a value of some concrete type, together with runtime type metadata, and a witness table describing the conformance. This container stores small values inline, otherwise it points to a heap-allocated \index{boxing}box. Observe the difference between the type \texttt{Array<S>} from the previous variant of \verb|drawShapes(_:)|, and \texttt{Array<any Shape>} here. Every element of the latter has its own runtime type metadata and witness table, so we can mix multiple types of shapes in one array. In the implementation, existential types are built on top of the core primitives of the generics system.
+
+\begin{MoreDetails}
+\item Existential types: \ChapRef{existentialtypes}
+\end{MoreDetails}
+
+\section{Associated Types}
+
+The standard library's \texttt{IteratorProtocol} declares an \index{associated type declaration}associated type. This allows us to abstract over iterators whose element type depends on the conformance:
+\begin{Verbatim}
+protocol IteratorProtocol {
+  associatedtype Element
+  mutating func next() -> Element?
+}
+\end{Verbatim}
+A conforming type must declare a member type named \texttt{Element}, and a \texttt{next()} method returning an optional value of this type. This member type, which can be a type alias or nominal type, is the \emph{type witness} for the associated type \texttt{Element}.
+
+We declare a \texttt{Nat} type conforming to \texttt{IteratorProtocol} with an \texttt{Element} type of \texttt{Int}, for generating an infinite stream of consecutive natural numbers:
+\begin{Verbatim}
+struct Nat: IteratorProtocol {
+  typealias Element = Int
+  var x = 0
+  
+  mutating func next() -> Int? {
+    defer { x += 1 }
+    return x
+  }
+}
+\end{Verbatim}
+We say that \texttt{Int} is the \emph{type witness} for \texttt{[IteratorProtocol]Element} in the conformance $\ConfReq{Nat}{IteratorProtocol}$. We can express this in our type substitution algebra, using the type witness \emph{projection} operation on normal conformances:
+\[\AssocType{IteratorProtocol}{Element}\otimes \ConfReq{Nat}{IteratorProtocol} = \texttt{Int}\]
+(More accurately, the type witness is the \texttt{Element} \index{type alias type}\emph{type alias type}, which is \emph{canonically equal} to \texttt{Int}.) Finally, we can actually omit the declaration of the \texttt{Element} type alias above, because in this case, \index{associated type inference}\emph{associated type inference} will deduce it for us.
+
+\begin{MoreDetails}
+\item Type witnesses: \SecRef{type witnesses}
+\item Associated type inference: \SecRef{associated conformances}
+\end{MoreDetails}
+
+\paragraph{Dependent member types.} This function reads a pair of elements from an iterator:
+\begin{Verbatim}
+func readTwo<I: IteratorProtocol>(_ iter: inout I) -> Pair<I.Element> {
+  return Pair(first: iter.next()!, second: iter.next()!)
+}
+\end{Verbatim}
+The return type is the generic nominal type \texttt{Pair<I.Element>}, obtained by applying the declaration of \texttt{Pair} to the generic argument \texttt{I.Element}. The generic argument is a \index{dependent member type}\emph{dependent member type}, built from the base type \texttt{I} together with the associated type declaration \texttt{[IteratorProtocol]Element}. This dependent member type represents the type witness in the conformance $\ConfReq{I}{IteratorProtocol}$.
+
+Suppose we call \verb|readTwo(_:)| with a value of type \texttt{Nat}:
+\begin{Verbatim}
+var iter = Nat()
+print(readTwo(&iter))
+\end{Verbatim}
+The substitution map for the call stores the replacement type \texttt{Nat} and the conformance of \texttt{Nat} to \texttt{IteratorProtocol}. We'll call this substitution map~$\Sigma$:
+\begin{align*}
+\Sigma := \SubstMapC{&\SubstType{I}{Nat}}{\\
+&\SubstConf{I}{Nat}{IteratorProtocol}}
+\end{align*}
+The type of the call expression is then $\texttt{Pair<I.Element>}\otimes\Sigma$. Applying a substitution map to a generic nominal type recursively substitutes the generic arguments. Since the dependent member type \texttt{I.Element} abstracts over the type witness in the conformance, we could guess $\texttt{I.Element}\otimes\Sigma=\texttt{Int}$. We will eventually understand the next equation, to relate dependent member type substitution with type witness projection:
+\begin{gather*}
+\texttt{I.Element}\otimes\Sigma\\
+\qquad {} = \AssocType{IteratorProtocol}{Element}\otimes \ConfReq{I}{IteratorProtocol}\otimes\Sigma\\
+\qquad {} = \AssocType{IteratorProtocol}{Element}\otimes \ConfReq{Nat}{IteratorProtocol}\\
+\qquad {} = \texttt{Int}
+\end{gather*}
+We can finally say that $\texttt{Pair<I.Element>}\otimes\Sigma=\texttt{Pair<Int>}$ is the return type of our call to \verb|readTwo(_:)|.
+
+\begin{MoreDetails}
+\item Dependent member type substitution: \SecRef{abstract conformances}, \ChapRef{conformance paths}
+\end{MoreDetails}
+
+\paragraph{Bound and unbound.}
+We now briefly introduce a concept that will later become important in our study of type substitution. If we need to make the associated type declaration explicit, we use the notation \verb|I.[IteratorProtocol]Element|, despite this not being valid language syntax. This is the \index{bound dependent member type}\emph{bound} form of a dependent member type. To transform the syntactic type representation \texttt{I.Element} into a bound dependent member type, type resolution queries qualified lookup on the base type \texttt{I}, which is known to conform to \texttt{IteratorProtocol}; thus, the lookup finds the associated type declaration \texttt{Element}. For our current purposes, it is more convenient to use the \index{unbound dependent member type}\emph{unbound} notation for a dependent member type, written in the source language style \texttt{I.Element}.
+
+\begin{MoreDetails}
+\item Member type representations: \SecRef{identtyperepr}
+\end{MoreDetails}
+
+\paragraph{Type parameters.} Generic parameter types and dependent member types are the two kinds of \index{type parameter}\emph{type parameters}. The generic signature of \verb|readTwo(_:)| defines two type parameters, \texttt{I} and \texttt{I.Element}.
+
+As with generic parameter types, dependent member types map to \index{archetype type}archetypes in the body of a generic function. We can reveal a little more about the structure of archetypes now, and say that an archetype packages a type parameter together with a generic signature. While a type parameter is just a \emph{name} which can only be understood in relation to some generic signature, an archetype inherently ``knows'' what requirements it is subject to.
+
+\begin{MoreDetails}
+\item Type parameters: \SecRef{fundamental types}
+\item Primary archetypes: \SecRef{archetypesubst}
+\end{MoreDetails}
+
+\paragraph{Code generation.}
+Inside the body of \verb|readTwo(_:)|, the \index{expression}\index{call expression}call expression \verb|iter.next()!| has the type \texttt{$\archetype{I.Element}$?}, which is force-unwrapped to yield the type $\archetype{I.Element}$. To manipulate a value of this type abstractly, we need its runtime type metadata.
+
+We recover the runtime type metadata for an associated type from the witness table at run time, in the same way that dependent member type substitution projects a type witness from a conformance at compile time.
+
+A witness table for a conformance to \texttt{IteratorProtocol} consists of a metadata access function to witness the \texttt{Element} associated type, and a function pointer to witness the \texttt{next()} method. The witness table for $\ConfReq{Nat}{IteratorProtocol}$ references the runtime type metadata for \texttt{Int}, defined by the standard library.
+
+\paragraph{Same-type requirements.} To introduce another fundamental requirement kind, we compose \texttt{Pair} and \texttt{IteratorProtocol} in a new way, writing a function that takes two iterators and reads an element from each one:
+\begin{Verbatim}
+func readTwoParallel<I, J>(_ i: I, _ j: J) -> Pair<I.Element>
+    where I: IteratorProtocol, J: IteratorProtocol,
+          I.Element == J.Element {
+  return Pair(first: i.next()!, second: j.next()!)
+}
+\end{Verbatim}
+The generic signature of our \verb|readTwoParallel(_:)| states the \emph{same-type requirement} $\SameReq{I.Element}{J.Element}$:
+\begin{quote}
+\begin{verbatim}
+<I, J where I: IteratorProtocol, J: IteratorProtocol,
+            I.Element == J.Element>
+\end{verbatim}
+\end{quote}
+This generic signature defines four type parameters, \texttt{I}, \texttt{J}, \texttt{I.Element}, and \texttt{J.Element}, where the final two abstract over the same concrete type, forming an \index{equivalence class!of type parameters}\emph{equivalence class}. It is often convenient to refer to an entire equivalence class by a representative type parameter. To make this choice in a deterministic fashion, we \emph{order} type parameters and say the smallest type parameter inside an equivalence class is a \index{reduced type}\emph{reduced type}. In our example, \texttt{I.Element} is the reduced type of \texttt{J.Element}.
+
+In the presence of same-type requirements, an archetype represents a reduced type parameter (and thus an entire equivalence class of type parameters). In the body of \verb|readTwoParallel(_:)|, the expressions \verb|i.next()!| and \verb|j.next()!| both return the type $\archetype{I.Element}$, and the call to the \texttt{Pair} constructor is made with this substitution map:
+\[\SubstMap{\SubstType{T}{$\archetype{I.Element}$}}\]
+
+\begin{MoreDetails}
+\item Reduced types: \SecRef{reduced types}
+\item The type parameter graph: \SecRef{type parameter graph}
+\end{MoreDetails}
+
+\paragraph{Checking generic arguments.}
+When type checking a call to \verb|readTwoParallel(_:)|, we must ensure the same-type requirement is satisfied. Suppose we define two new iterator types, \texttt{BabyNames} and \texttt{CatNames}, both witnessing the \texttt{Element} associated type with \texttt{String}, and we call \verb|readTwoParallel(_:)| with these types:
+\begin{Verbatim}
+var i = BabyNames()
+var j = CatNames()
+print(readTwoParallel(&i, &j))
+\end{Verbatim}
+We're making the call with this substitution map:
+\begin{align*}
+\Sigma := \SubstMapC{&\SubstType{I}{BabyNames},\\
+&\SubstType{J}{CatNames}}{\\
+&\SubstConf{I}{BabyNames}{IteratorProtocol}\\
+&\SubstConf{J}{CatNames}{IteratorProtocol}}
+\end{align*}
+The type checker applies $\Sigma$ to both sides of the same-type requirement, which gives us $\texttt{I.Element}\otimes\Sigma=\texttt{String}$ and $\texttt{J.Element}\otimes\Sigma=\texttt{String}$. The result is \texttt{String} in both cases, so we get the following \index{substituted requirement}\emph{substituted requirement}:
+\[\SameReq{I.Element}{J.Element}\otimes\Sigma=\SameReq{String}{String}\]
+The substituted requirement is satisfied so the code is well-typed, and we see that the call returns \texttt{Pair<String>}. Suppose instead we had substituted \texttt{I} with \texttt{Nat}:
+\begin{Verbatim}
+var i = Nat()
+var j = CatNames()
+print(readTwoParallel(&i, &j))  // error
+\end{Verbatim}
+In this case, we get the substituted requirement $\SameReq{Int}{String}$ which is unsatisfied, so the call is malformed and the type checker must \index{diagnostic!unsatisfied requirement}diagnose an error.
+
+\begin{MoreDetails}
+\item Checking generic arguments: \SecRef{checking generic arguments}
+\end{MoreDetails}
+
+\section{Associated Requirements}
+
+Protocols can impose \index{associated requirement}\emph{associated requirements} on their associated types. A conforming type must then satisfy these requirements. This capability is what gives Swift generics much of their distinctive flavor. Perhaps the simplest example is the \texttt{Sequence} protocol in the standard library, which abstracts over types that can produce a fresh iterator on demand:
+\begin{Verbatim}
+protocol Sequence {
+  associatedtype Element
+  associatedtype Iterator: IteratorProtocol
+    where Element == Iterator.Element
+
+  func makeIterator() -> Iterator
+}
+\end{Verbatim}
+This protocol states two associated requirements:
+\begin{itemize}
+\item The \index{associated conformance requirement}conformance requirement $\ConfReq{Self.Iterator}{IteratorProtocol}$, stated using the sugared form, as a constraint type in the inheritance clause of the \texttt{Iterator} associated type.
+\item The \index{associated same-type requirement}same-type requirement $\SameReq{Self.Element}{Self.Iterator.Element}$, which we state in a trailing \texttt{where} clause attached to the associated type.
+\end{itemize}
+Associated requirements are like the requirements in a generic signature, except they are rooted in the \IndexSelf protocol \tSelf\ type. Once again, there are multiple equivalent syntactic forms for stating them. For example, we could write out the conformance requirement explicitly, and the above \texttt{where} clause could be attached to the protocol itself for the same semantic effect.
+
+The associated requirements of a protocol are recorded in the protocol's \index{requirement signature}\emph{requirement signature}. The \texttt{Sequence} protocol has the following requirement signature:
+\begin{quote}
+\begin{verbatim}
+<Self where Self.Element == Self.Iterator.Element,
+            Self.Iterator: IteratorProtocol>
+\end{verbatim}
+\end{quote}
+Now consider this generic signature, and call it $G$:
+\begin{quote}
+\begin{verbatim}
+<T, U where T: Sequence, U: Sequence,
+            T.Element == U.Element>
+\end{verbatim}
+\end{quote}
+We can informally describe $G$ by looking at its equivalence classes:
+\begin{itemize}
+\item \tT, which conforms to \texttt{Sequence}.
+\item \texttt{U}, which conforms to \texttt{Sequence}.
+\item \texttt{T.Element}, \texttt{U.Element}, \texttt{T.Iterator.Element} and \texttt{U.Iterator.Element} are all in one equivalence class.
+\item \texttt{T.Iterator}, which conforms to \texttt{IteratorProtocol}.
+\item \texttt{U.Iterator}, which conforms to \texttt{IteratorProtocol}.
+\end{itemize}
+To make this kind of analysis precise, we will develop a theory of \index{derived requirement}\emph{derived requirements} to reason about requirements that are not explicitly stated, but are logical consequences of other requirements. The following are some interesting derived requirements of $G$:
+\begin{gather*}
+\ConfReq{T.Iterator}{IteratorProtocol}\\
+\ConfReq{U.Iterator}{IteratorProtocol}\\
+\SameReq{T.Element}{T.Iterator.Element}\\
+\SameReq{U.Element}{U.Iterator.Element}\\
+\SameReq{T.Iterator.Element}{U.Iterator.Element}
+\end{gather*}
+
+At this point, it's worth clarifying that type parameters have a recursive structure; the base type of \texttt{U.Iterator.Element} is another dependent member type, \texttt{U.Iterator}. The theory of derived requirements will also describe the \emph{valid type parameters} of a generic signature.
+
+\paragraph{Conformances.}
+A normal conformance stores the \index{associated conformance}\emph{associated conformance} for each associated conformance requirement of its protocol. In the runtime representation, there is a corresponding entry in the witness table for each associated conformance requirement. A witness table for \texttt{Sequence} has four entries:
+\begin{enumerate}
+\item A metadata access function to witness the \texttt{Element} associated type.
+\item A metadata access function to witness the \texttt{Iterator} associated type.
+\item A \index{witness table}\emph{witness table access function} to witness the associated conformance requirement \ConfReq{Self.Iterator}{IteratorProtocol}.
+\item A function pointer to witness the \texttt{makeIterator()} protocol method.
+\end{enumerate}
+Protocol inheritance is the special case of an associated conformance requirement with a subject type of \tSelf. The standard library \texttt{Collection} protocol inherits from \texttt{Sequence}, so the associated conformance requirement $\ConfReq{Self}{Sequence}$ appears in the requirement signature of \texttt{Collection}. Starting from a conformance $\ConfReq{Array<Int>}{Collection}$, we can get at the conformance to \texttt{Sequence} via \emph{associated conformance projection}:
+\[\AssocConf{Self}{Sequence}\otimes\ConfReq{Array<Int>}{Collection}=\ConfReq{Array<Int>}{Sequence}\]
+Similarly, at runtime, starting from a witness table for a conformance to \texttt{Collection}, we can recover a witness table for a conformance to \texttt{Sequence}, and thus all of the metadata described above. We will take a closer look at the other associated requirements of the \texttt{Collection} protocol in due time. This will lead us into the topic of \emph{recursive} associated conformance requirements, which as we show, enable the type substitution algebra to encode any computable function.
+
+\begin{MoreDetails}
+\item Requirement signatures: \SecRef{requirement sig}
+\item Derived requirements: \SecRef{derived req}
+\item Associated conformances: \SecRef{associated conformances}
+\item Recursive conformances: \SecRef{recursive conformances}
+\end{MoreDetails}
+
+\section{Related Work}
+
+A \index{calling convention}calling convention centered on a runtime representation of types was explored in a 1996 paper \cite{intensional}. Swift protocols are similar in spirit to \index{Haskell}Haskell type classes, described in \cite{typeclass}, and subsequently \cite{typeclasshaskell} and \cite{peytonjones1997type}. Swift witness tables follow the ``dictionary passing'' implementation strategy for type classes. Two papers subsequently introduced type classes with associated types, but without associated requirements. Using our Swift lingo, the first paper defined a formal model for associated types witnessed by \index{nested type declaration}nested nominal types \cite{assoctype}. In this model, every \index{type witness}type witness is a distinct concrete type. To translate their example into Swift:
+\begin{Verbatim}
+protocol ArrayElem {
+  associatedtype Array
+  func index(_: Array, _: Int) -> Self
+}
+\end{Verbatim}
+The second paper described \emph{associated type synonyms} \cite{synonyms}. This is the special case of an associated type witnessed by a type alias in Swift. Again, we translate their example:
+\begin{Verbatim}
+protocol Collects {
+  associatedtype Elem
+  static var empty: Self { get }
+  func insert(_: Elem) -> Self
+  func toList() -> [Elem]
+}
+\end{Verbatim}
+Other relevant papers  from the Haskell world include \cite{schrijvers2008type} and \cite{kiselyov2009fun}.
+
+\paragraph{C++.} While \index{C++}C++ templates are synonymous with ``generic programming'' to many programmers, C++ is somewhat unusual compared to most languages with parametric polymorphism, because templates are fundamentally syntactic in nature. Compiling a template declaration only does some minimal amount of semantic analysis, with most type checking deferred to until \emph{after} template expansion. There is no formal notion of requirements on template parameters, so whether template expansion succeeds or fails at a given expansion point depends on how the template's body uses the substituted template parameters.
+
+The inherent flexibility of C++ templates enables some advanced metaprogramming techniques \cite{gregor}. On the other hand, a template declaration's body must be visible from each expansion point, so this model is fundamentally at odds with separate compilation. Undesirable consequences include libraries where large parts must be implemented in header files, and cryptic error messages on template expansion failure.
+
+Swift's generics model was in many ways inspired by ``C++0x concepts,'' a proposal to extend the C++ template metaprogramming model with \emph{concepts}, a form of type classes with associated types (\cite{concepts}, \cite{essential}). Concepts could declare their own associated requirements, but the full ramifications were perhaps not yet apparent to the authors when they wrote this remark:
+\begin{quote}
+\textsl{``Concepts often include requirements on associated types. For example, a container's associated iterator \texttt{A} would be required to model the \texttt{Iterator} concept. This form of concept composition is slightly different from refinement but close enough that we do not wish to clutter our presentation [\ldots]''}
+\end{quote}
+
+\paragraph{Rust.}
+\index{Rust}Rust generics are separately type checked, but Rust does not define a calling convention for unspecialized generic code, so there is no separate compilation. Instead, the implementation of a generic function is \emph{specialized}, or \emph{monomorphized}, for every unique set of generic arguments.
+
+Rust's \emph{traits} are similar to Swift's protocols; traits can declare associated types and associated conformance requirements. Rust generics also allow some kinds of abstraction not supported by Swift, such as lifetime variables, generic associated types \cite{rust_gat}, and const generics \cite{rust_const}. On the flip side, Rust does not allow same-type requirements to be stated in full generality~\cite{rust_same}. Instead, trait bounds can constrain associated types with a syntactic form resembling Swift's \index{parameterized protocol type}parameterized protocol types (\SecRef{protocols}), but we will show in \ExRef{proto assoc rule} that Swift's same-type requirements are more general.
+
+Rust's ``\texttt{where} clause elaboration'' is more limited than Swift's derived requirements formalism, and associated requirements sometimes need to be re-stated in the \texttt{where} clause of a generic declaration \cite{rust_bug}. An early attempt at formalizing Rust traits appears in a PhD dissertation from 2015 \cite{Milewski_2015}. A more recent effort is ``Chalk,'' an implementation of a \index{Prolog}Prolog-like solver based on Horn clauses~\cite{rust_chalk}.
+
+\paragraph{Java.}
+\index{Java}Java generics are separately type checked and compiled. In Java, only reference types can be used as generic arguments; primitive value types must be boxed first. Generic argument types are not reified at runtime, and values of generic parameter type are always represented as object pointers. This avoids the complexity of dependent layout, but comes at the cost of more runtime type checks and heap allocation. Java generics are based on existential types and also support \emph{variance}, a subtyping relation between different instantiations of the same generic type, defined in terms of the subtype relation on corresponding generic arguments \cite{java_faq}.
+
+\paragraph{Hylo.}
+\index{Hylo} Hylo is a research language with a focus on mutable value semantics \cite{hylo}. Hylo's generic programming capabilities are similar to Swift and Rust. The Hylo compiler implementation incorporates some ideas from this book, using the theory of string rewriting to reason about generic requirements \cite{hylorqm}.
+\end{document}

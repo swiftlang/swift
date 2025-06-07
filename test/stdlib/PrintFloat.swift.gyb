@@ -8,6 +8,9 @@
 // rdar://77087867
 // UNSUPPORTED: CPU=arm64_32 && OS=watchos
 
+// rdar://104232602
+// UNSUPPORTED: CPU=x86_64 && (DARWIN_SIMULATOR=ios || DARWIN_SIMULATOR=watchos || DARWIN_SIMULATOR=tvos)
+
 import StdlibUnittest
 import SwiftPrivateLibcExtras
 #if canImport(Darwin)
@@ -16,6 +19,8 @@ import SwiftPrivateLibcExtras
   import Glibc
 #elseif os(WASI)
   import WASILibc
+#elseif canImport(Android)
+  import Android
 #elseif os(Windows)
   import CRT
 #else
@@ -345,11 +350,9 @@ fileprivate let generatedCases_Float80: [(Float80, String)] = [
 
 let PrintTests = TestSuite("FloatingPointPrinting")
 
-% for FloatType in ['Float16', 'Float', 'Double', 'Float80']:
-% if FloatType == 'Float16':
-#if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
-@available(SwiftStdlib 5.3, *)
-% elif FloatType == 'Float80':
+// Float16 handled separately in PrintFloat16.swift
+% for FloatType in ['Float', 'Double', 'Float80']:
+% if FloatType == 'Float80':
 #if !os(Windows) && (arch(i386) || arch(x86_64))
 % end
 
@@ -384,9 +387,6 @@ fileprivate func expectDescription(_ expected: String, _ object: ${FloatType},
 // * Close. If there is more than one accurate and short value, we want the one
 //   that is closest (as an infinitely-precise real number) to the original
 //   binary float (interpreted as an infinitely-precise real number).
-% if FloatType == 'Float16':
-@available(SwiftStdlib 5.3, *)
-% end
 fileprivate func expectAccurateDescription(_ object: ${FloatType},
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
@@ -423,7 +423,7 @@ fileprivate func expectAccurateDescription(_ object: ${FloatType},
   // that the result is not closer.  Note this requires higher-precision
   // arithmetic.
 }
-% if FloatType in ['Float16','Float80']:
+% if FloatType == 'Float80':
 #endif
 % end
 % end
@@ -572,7 +572,7 @@ PrintTests.test("CustomDebugStringConvertible") {
 
 PrintTests.test("Printable_CFloat") {
   // Basic check for CFloat: Since it's a synonym for Float, we don't
-  // need more detailed verification, just basic sanity.
+  // need more detailed verification, just basic soundness.
   expectDescription("1.0", CFloat(1.0))
   expectDescription("1.1", CFloat(1.1))
   expectDescription("-1.0", CFloat(-1.0))
@@ -585,156 +585,10 @@ PrintTests.test("Printable_CDouble") {
   expectDescription("-1.0", CDouble(-1.0))
 }
 
-#if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
-if #available(SwiftStdlib 5.3, *) {
-PrintTests.test("Printable_Float16") {
-  func asFloat16(_ f: Float16) -> Float16 { return f }
-
-  // Basic sanity checks:
-  let f = 100.125 as Float16
-  expectEqual("f = 100.1", "f = \(f)")
-
-  expectDescription("0.0", asFloat16(0.0))
-  expectDescription("-0.0", -asFloat16(0.0))
-  expectDescription("0.1", asFloat16(0.1))
-  expectDescription("-0.1", asFloat16(-0.1))
-  expectDescription("1.0", asFloat16(1.0))
-  expectDescription("-1.0", asFloat16(-1.0))
-  expectDescription("1.1", asFloat16(1.1))
-  expectDescription("100.1", asFloat16(100.125))
-  expectDescription("-100.1", asFloat16(-100.125))
-
-  // Standard special numbers:
-  expectDescription("inf", Float16.infinity)
-  expectDescription("-inf", -Float16.infinity)
-  expectDescription("3.14", Float16.pi)
-  expectDescription("65504.0", Float16.greatestFiniteMagnitude)
-#if !arch(arm)
-  expectDescription("6e-08", Float16.leastNonzeroMagnitude)
-#endif
-  expectDescription("6.104e-05", Float16.leastNormalMagnitude)
-
-  // Special cases for the underlying algorithms:
-  // Smallest Float16 that requires 5 digits to print accurately
-  expectDescription("0.00010014", Float16(bitPattern: 0x0690))
-
-  // NaNs require special care in testing:
-  // NaN is printed with additional detail to debugDescription, but not description
-  expectNaN("nan", Float16.nan)
-  expectNaN("nan(0xff)", Float16(nan: 255, signaling: false))
-  expectNaN("nan(0xff)", Float16(bitPattern: 0x7eff))
-  expectNaN("-nan", -Float16.nan)
-  expectNaN("-nan(0xff)", -Float16(nan: 255, signaling: false))
-/*
-  // These fail on macOS x86_64, pass on iphonesimulator-i386, and
-  // probably behave in varying fashion on ARM32 and ARM64.
-  // So I'll just comment them out for now...
-  // Once we get real Float16 argument passing everywhere,
-  // these can be enabled again.
-  expectFailure {
-  expectNaN("snan", Float16.signalingNaN)
-  expectNaN("-snan", -Float16.signalingNaN)
-  expectNaN("snan(0xff)", Float16(nan: 255, signaling: true))
-  expectNaN("-snan(0xff)", -Float16(nan: 255, signaling: true))
-  expectNaN("snan(0xff)", Float16(bitPattern: 0x7dff))
-  }
-*/
-  expectEqual("nan", Float16.signalingNaN.description)
-  expectEqual("nan", (-Float16.signalingNaN).description)
-  expectEqual("nan", Float16(nan: 255, signaling: true).description)
-  expectEqual("nan", (-Float16(nan: 255, signaling: true)).description)
-  expectEqual("nan", Float16(bitPattern: 0x7dff).description)
-
-  // Every power of 10 should print with only a single digit '1'
-  let leastPowerOfTen = -7
-  let greatestPowerOfTen = 4
-  for power in leastPowerOfTen ... greatestPowerOfTen {
-    let s: String
-    if power < -4 { // Exponential form
-      s = exponentialPowerOfTen(power)
-    } else if power < 0 { // Fractional decimal form
-      s = "0." + String(repeating: "0", count: -power - 1) + "1"
-    } else { // Decimal form
-      s = "1" + String(repeating: "0", count: power) + ".0"
-    }
-    let f = Float16(s)!
-    expectDescription(s, f)
-  }
-
-  // Powers of 2
-  expectDescription("6e-08", 0x1p-24 as Float16)
-  expectDescription("1e-07", 0x1p-23 as Float16)
-  expectDescription("2.4e-07", 0x1p-22 as Float16)
-  expectDescription("5e-07", 0x1p-21 as Float16)
-  expectDescription("9.5e-07", 0x1p-20 as Float16)
-  expectDescription("1.9e-06", 0x1p-19 as Float16)
-  expectDescription("3.8e-06", 0x1p-18 as Float16)
-  expectDescription("7.6e-06", 0x1p-17 as Float16)
-  expectDescription("1.526e-05", 0x1p-16  as Float16)
-  expectDescription("3.05e-05", 0x1p-15 as Float16)
-  expectDescription("6.104e-05", 0x1p-14 as Float16)
-  expectDescription("0.0001221", 0x1p-13 as Float16)
-  expectDescription("0.0002441", 0x1p-12 as Float16)
-  expectDescription("0.0004883", 0x1p-11 as Float16)
-  expectDescription("0.000977", 0x1p-10 as Float16)
-  expectDescription("0.001953", 0x1p-9 as Float16)
-  expectDescription("0.003906", 0x1p-8 as Float16)
-  expectDescription("0.007812", 0x1p-7 as Float16)
-  expectDescription("0.01563", 0x1p-6 as Float16)
-  expectDescription("0.03125", 0x1p-5 as Float16)
-  expectDescription("0.0625", 0x1p-4 as Float16)
-  expectDescription("0.125", 0x1p-3 as Float16)
-  expectDescription("0.25", 0x1p-2 as Float16)
-  expectDescription("0.5", 0x1p-1 as Float16)
-  expectDescription("1.0", 0x1p0 as Float16)
-  expectDescription("2.0", 0x1p1 as Float16)
-  expectDescription("4.0", 0x1p2 as Float16)
-  expectDescription("8.0", 0x1p3 as Float16)
-  expectDescription("16.0", 0x1p4 as Float16)
-  expectDescription("32.0", 0x1p5 as Float16)
-  expectDescription("64.0", 0x1p6 as Float16)
-  expectDescription("128.0", 0x1p7 as Float16)
-  expectDescription("256.0", 0x1p8 as Float16)
-  expectDescription("512.0", 0x1p9 as Float16)
-  expectDescription("1024.0", 0x1p10 as Float16)
-  // Float16 can represent all integers -2048...2048
-  // For Float,Double, we use decimal form to this point,
-  // then exponential, but Float16 is so short that we
-  // just use decimal for all integer values:
-  expectDescription("2048.0", Float16(1 << 11))
-  expectDescription("-2048.0", -Float16(1 << 11))
-  expectDescription("2050.0", Float16(1 << 11).nextUp)
-  expectDescription("-2050.0", -(Float16(1 << 11).nextUp))
-  expectDescription("4096.0", 0x1p12 as Float16)
-  expectDescription("8192.0", 0x1p13 as Float16)
-  expectDescription("16384.0", 0x1p14 as Float16)
-  expectDescription("32768.0", 0x1p15 as Float16)
-  // Maximum Float16: 2**16 - 2**5
-  expectDescription("65504.0", Float16(bitPattern:0x7bff))
-  expectDescription("-65504.0", Float16(bitPattern:0xfbff))
-
-  expectDescription("1.0", asFloat16(1.00001))
-  expectDescription("12496.0",  asFloat16(12500.0))
-  expectDescription("1250.0",   asFloat16(1250.0))
-  expectDescription("125.0",    asFloat16(125.0))
-  expectDescription("12.5",     asFloat16(12.5))
-  expectDescription("1.25",     asFloat16(1.25))
-  expectDescription("0.125",    asFloat16(0.125))
-  expectDescription("0.0125",   asFloat16(0.0125))
-  expectDescription("0.00125",  asFloat16(0.00125))
-  expectDescription("0.000125", asFloat16(0.000125))
-  expectDescription("1.25e-05", asFloat16(0.0000125))
-  expectDescription("1.25e-06", asFloat16(0.00000125))
-  expectDescription("1e-07", asFloat16(0.000000125))
-  expectDescription("0.0", asFloat16(0.0000000125))
-}
-}
-#endif
-
 PrintTests.test("Printable_Float") {
   func asFloat32(_ f: Float32) -> Float32 { return f }
 
-  // Basic sanity checks:
+  // Basic soundness checks:
   let f = 100.125 as Float
   expectEqual("f = 100.125", "f = \(f)")
 
@@ -861,7 +715,7 @@ PrintTests.test("Printable_Float") {
 PrintTests.test("Printable_Double") {
   func asFloat64(_ f: Float64) -> Float64 { return f }
 
-  // Sanity check
+  // Soundness check
   let f = 100.125 as Double
   expectEqual("f = 100.125", "f = \(f)")
 
@@ -985,7 +839,7 @@ PrintTests.test("Printable_Float80") {
 #if !os(Windows) && (arch(i386) || arch(x86_64))
   func asFloat80(_ f: Swift.Float80) -> Swift.Float80 { return f }
 
-  // Sanity
+  // Soundness
   let f = 100.125 as Float80
   expectEqual("f = 100.125", "f = \(f)")
 

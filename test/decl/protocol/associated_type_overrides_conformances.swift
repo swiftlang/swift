@@ -5,12 +5,12 @@ func assertTypeWitnessForP2_A<T: P2, U>(in: T.Type, is: U.Type) where T.A == U {
 
 protocol P1 {
   associatedtype A
-  // expected-note@-1 2 {{protocol requires nested type 'A'; do you want to add it?}}
+  // expected-note@-1 2 {{protocol requires nested type 'A'}}
   // expected-note@-2 2 {{multiple matching types named 'A'}}
 }
 protocol P2: P1 {
   associatedtype A
-  // expected-note@-1 2 {{protocol requires nested type 'A'; do you want to add it?}}
+  // expected-note@-1 2 {{protocol requires nested type 'A'}}
   // expected-note@-2 2 {{multiple matching types named 'A'}}
 }
 
@@ -31,7 +31,7 @@ struct S2<T> {}
 extension S2: P1 where T == Never {
   typealias A = Int
 }
-extension S2: P2 {} // expected-error {{type 'S2<T>' does not conform to protocol 'P2'}}
+extension S2: P2 {} // expected-error {{type 'S2<T>' does not conform to protocol 'P2'}} expected-note {{add stubs for conformance}}
 
 struct S3<T> {}
 extension S3: P1 where T == Never {}
@@ -59,7 +59,7 @@ extension S5: P1 {
 extension S5: P2 where T == Never {}
 
 struct S6<T> {}
-extension S6: P1 {} // expected-error {{type 'S6<T>' does not conform to protocol 'P1'}}
+extension S6: P1 {} // expected-error {{type 'S6<T>' does not conform to protocol 'P1'}} expected-note {{add stubs for conformance}}
 extension S6: P2 where T == Never {
   typealias A = Bool
 }
@@ -83,7 +83,7 @@ struct S9<T> {}
 extension S9: P2 where T == Never {
   typealias A = Bool
 }
-extension S9: P1 {} // expected-error {{type 'S9<T>' does not conform to protocol 'P1'}}
+extension S9: P1 {} // expected-error {{type 'S9<T>' does not conform to protocol 'P1'}} expected-note {{add stubs for conformance}}
 
 // Conformance to P2 checked first and less restrictive.
 struct S10<T> {}
@@ -99,7 +99,7 @@ extension S10: P1 where T == Never { // expected-error {{type 'S10<T>' does not 
 }
 
 struct S11<T> {}
-extension S11: P2 {} // expected-error {{type 'S11<T>' does not conform to protocol 'P2'}}
+extension S11: P2 {} // expected-error {{type 'S11<T>' does not conform to protocol 'P2'}} expected-note {{add stubs for conformance}}
 extension S11: P1 where T == Never {
   typealias A = Int
 }

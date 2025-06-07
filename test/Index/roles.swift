@@ -499,3 +499,68 @@ protocol WithPrimary<Assoc> {
 // CHECK: [[@LINE-1]]:18 | type-alias/associated-type/Swift | Assoc | {{.*}} | Def,RelChild | rel: 1
 // CHECK-NEXT: RelChild | protocol/Swift | WithPrimary | {{.*}}
 }
+
+struct Root {} // CHECK: [[@LINE]]:8 | struct/Swift | Root | [[Root_USR:.*]] | Def | rel: 0
+
+typealias Alias = Root // CHECK: [[@LINE]]:11 | type-alias/Swift | Alias | [[Alias_USR:.*]] | Def | rel: 0
+
+extension Alias {
+  // CHECK: [[@LINE-1]]:11 | type-alias/Swift | Alias | [[Alias_USR]] | Ref | rel: 0
+  // CHECK: [[@LINE-2]]:11 | struct/Swift | Root | [[Root_USR]] | Ref,Impl,RelExt | rel: 1
+  func empty() {}
+}
+
+func returnsInt() -> Int { 0 }
+
+func containerFunc() {
+  // Make sure all the references here are contained by the function.
+  let i = returnsInt()
+  // CHECK:      [[@LINE-1]]:11 | function/Swift | returnsInt() | {{.*}} | Ref,Call,RelCall,RelCont | rel: 1
+  // CHECK-NEXT: RelCall,RelCont | function/Swift | containerFunc()
+
+  let (_, k): (Int, Int) = (
+    { let a = x; return a }(),
+    { let b = y; return b }()
+  )
+  // CHECK:      [[@LINE-4]]:16 | struct/Swift | Int | s:Si | Ref,RelCont | rel: 1
+  // CHECK-NEXT: RelCont | function/Swift | containerFunc()
+  // CHECK:      [[@LINE-6]]:21 | struct/Swift | Int | s:Si | Ref,RelCont | rel: 1
+  // CHECK-NEXT: RelCont | function/Swift | containerFunc()
+
+  // CHECK:      [[@LINE-8]]:15 | variable/Swift | x | {{.*}} | Ref,Read,RelCont | rel: 1
+  // CHECK-NEXT: RelCont | function/Swift | containerFunc()
+
+  // CHECK:      [[@LINE-11]]:15 | function/acc-get/Swift | getter:x | {{.*}} | Ref,Call,Impl,RelCall,RelCont | rel: 1
+  // CHECK-NEXT: RelCall,RelCont | function/Swift | containerFunc()
+
+  // CHECK:      [[@LINE-13]]:15 | variable/Swift | y | {{.*}} | Ref,Read,RelCont | rel: 1
+  // CHECK-NEXT: RelCont | function/Swift | containerFunc()
+
+  // CHECK:      [[@LINE-16]]:15 | function/acc-get/Swift | getter:y | {{.*}} | Ref,Call,Impl,RelCall,RelCont | rel: 1
+  // CHECK-NEXT: RelCall,RelCont | function/Swift | containerFunc()
+}
+
+// rdar://131749546 - Make sure we record the override relation for the
+// pseudo accessor for 'x'.
+class BaseClass {
+  var x = 0
+  // CHECK:      [[@LINE-1]]:7 | instance-property/Swift | x | s:14swift_ide_test9BaseClassC1xSivp | Def,RelChild | rel: 1
+  // CHECK:      [[@LINE-2]]:7 | instance-method/acc-get/Swift | getter:x | s:14swift_ide_test9BaseClassC1xSivg | Def,Dyn,Impl,RelChild,RelAcc | rel: 1
+  // CHECK-NEXT:   RelChild,RelAcc | instance-property/Swift | x | s:14swift_ide_test9BaseClassC1xSivp
+  // CHECK:      [[@LINE-4]]:7 | instance-method/acc-set/Swift | setter:x | s:14swift_ide_test9BaseClassC1xSivs | Def,Dyn,Impl,RelChild,RelAcc | rel: 1
+  // CHECK-NEXT:   RelChild,RelAcc | instance-property/Swift | x | s:14swift_ide_test9BaseClassC1xSivp
+}
+class Subclass: BaseClass {
+  override var x: Int {
+    // CHECK:      [[@LINE-1]]:16 | instance-property/Swift | x | s:14swift_ide_test8SubclassC1xSivp | Def,RelChild,RelOver | rel: 2
+    // CHECK-NEXT:   RelOver | instance-property/Swift | x | s:14swift_ide_test9BaseClassC1xSivp
+    get { 0 }
+    // CHECK:      [[@LINE-1]]:5 | instance-method/acc-get/Swift | getter:x | s:14swift_ide_test8SubclassC1xSivg | Def,Dyn,RelChild,RelOver,RelAcc | rel: 2
+    // CHECK-NEXT:   RelOver | instance-method/acc-get/Swift | getter:x | s:14swift_ide_test9BaseClassC1xSivg
+    // CHECK-NEXT:   RelChild,RelAcc | instance-property/Swift | x | s:14swift_ide_test8SubclassC1xSivp
+    set {}
+    // CHECK:      [[@LINE-1]]:5 | instance-method/acc-set/Swift | setter:x | s:14swift_ide_test8SubclassC1xSivs | Def,Dyn,RelChild,RelOver,RelAcc | rel: 2
+    // CHECK-NEXT:   RelOver | instance-method/acc-set/Swift | setter:x | s:14swift_ide_test9BaseClassC1xSivs
+    // CHECK-NEXT:   RelChild,RelAcc | instance-property/Swift | x | s:14swift_ide_test8SubclassC1xSivp
+  }
+}

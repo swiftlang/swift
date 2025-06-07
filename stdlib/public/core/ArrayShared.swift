@@ -41,15 +41,19 @@ func _allocateUninitializedArray<Element>(_  builtinCount: Builtin.Word)
   if count > 0 {
     // Doing the actual buffer allocation outside of the array.uninitialized
     // semantics function enables stack propagation of the buffer.
+    #if !$Embedded
     let bufferObject = Builtin.allocWithTailElems_1(
-       getContiguousArrayStorageType(for: Element.self),
-       builtinCount, Element.self)
+       getContiguousArrayStorageType(for: Element.self), builtinCount, Element.self)
+    #else
+    let bufferObject = Builtin.allocWithTailElems_1(
+       _ContiguousArrayStorage<Element>.self, builtinCount, Element.self)
+    #endif
 
-    let (array, ptr) = Array<Element>._adoptStorage(bufferObject, count: count)
+    let (array, ptr) = unsafe Array<Element>._adoptStorage(bufferObject, count: count)
     return (array, ptr._rawValue)
   }
   // For an empty array no buffer allocation is needed.
-  let (array, ptr) = Array<Element>._allocateUninitialized(count)
+  let (array, ptr) = unsafe Array<Element>._allocateUninitialized(count)
   return (array, ptr._rawValue)
 }
 
@@ -94,6 +98,7 @@ func _finalizeUninitializedArray<Element>(
 }
 #endif
 
+@_unavailableInEmbedded
 extension Collection {  
   // Utility method for collections that wish to implement
   // CustomStringConvertible and CustomDebugStringConvertible using a bracketed
@@ -116,7 +121,11 @@ extension Collection {
       } else {
         result += ", "
       }
+      #if !$Embedded
       debugPrint(item, terminator: "", to: &result)
+      #else
+      "(cannot print value in embedded Swift)".write(to: &result)
+      #endif
     }
     result += type != nil ? "])" : "]"
     return result
@@ -140,15 +149,15 @@ extension _ArrayBufferProtocol {
     var newBuffer = _forceCreateUniqueMutableBuffer(
       newCount: newCount, requiredCapacity: newCount)
 
-    _arrayOutOfPlaceUpdate(
+    unsafe _arrayOutOfPlaceUpdate(
       &newBuffer, bounds.lowerBound - startIndex, insertCount,
       { rawMemory, count in
-        var p = rawMemory
+        var p = unsafe rawMemory
         var q = newValues.startIndex
         for _ in 0..<count {
-          p.initialize(to: newValues[q])
+          unsafe p.initialize(to: newValues[q])
           newValues.formIndex(after: &q)
-          p += 1
+          unsafe p += 1
         }
         _expectEnd(of: newValues, is: q)
       }
@@ -277,51 +286,51 @@ extension _ArrayBufferProtocol {
     _internalInvariant(headCount + tailCount <= sourceCount)
 
     let oldCount = sourceCount - headCount - tailCount
-    let destStart = dest.firstElementAddress
-    let newStart = destStart + headCount
-    let newEnd = newStart + newCount
+    let destStart = unsafe dest.firstElementAddress
+    let newStart = unsafe destStart + headCount
+    let newEnd = unsafe newStart + newCount
 
     // Check to see if we have storage we can move from
     if let backing = requestUniqueMutableBackingBuffer(
       minimumCapacity: sourceCount) {
 
-      let sourceStart = firstElementAddress
-      let oldStart = sourceStart + headCount
+      let sourceStart = unsafe firstElementAddress
+      let oldStart = unsafe sourceStart + headCount
 
       // Destroy any items that may be lurking in a _SliceBuffer before
       // its real first element
-      let backingStart = backing.firstElementAddress
-      let sourceOffset = sourceStart - backingStart
-      backingStart.deinitialize(count: sourceOffset)
+      let backingStart = unsafe backing.firstElementAddress
+      let sourceOffset = unsafe sourceStart - backingStart
+      unsafe backingStart.deinitialize(count: sourceOffset)
 
       // Move the head items
-      destStart.moveInitialize(from: sourceStart, count: headCount)
+      unsafe destStart.moveInitialize(from: sourceStart, count: headCount)
 
       // Destroy unused source items
-      oldStart.deinitialize(count: oldCount)
+      unsafe oldStart.deinitialize(count: oldCount)
 
-      initializeNewElements(newStart, newCount)
+      unsafe initializeNewElements(newStart, newCount)
 
       // Move the tail items
-      newEnd.moveInitialize(from: oldStart + oldCount, count: tailCount)
+      unsafe newEnd.moveInitialize(from: oldStart + oldCount, count: tailCount)
 
       // Destroy any items that may be lurking in a _SliceBuffer after
       // its real last element
-      let backingEnd = backingStart + backing.count
-      let sourceEnd = sourceStart + sourceCount
-      sourceEnd.deinitialize(count: backingEnd - sourceEnd)
+      let backingEnd = unsafe backingStart + backing.count
+      let sourceEnd = unsafe sourceStart + sourceCount
+      unsafe sourceEnd.deinitialize(count: backingEnd - sourceEnd)
       backing.count = 0
     }
     else {
       let headStart = startIndex
       let headEnd = headStart + headCount
-      let newStart = _copyContents(
+      let newStart = unsafe _copyContents(
         subRange: headStart..<headEnd,
         initializing: destStart)
-      initializeNewElements(newStart, newCount)
+      unsafe initializeNewElements(newStart, newCount)
       let tailStart = headEnd + oldCount
       let tailEnd = endIndex
-      _copyContents(subRange: tailStart..<tailEnd, initializing: newEnd)
+      unsafe _copyContents(subRange: tailStart..<tailEnd, initializing: newEnd)
     }
     self = Self(_buffer: dest, shiftedToStartIndex: startIndex)
   }
@@ -339,7 +348,7 @@ extension _ArrayBufferProtocol {
 
     var newBuffer = _forceCreateUniqueMutableBuffer(
       newCount: bufferCount, requiredCapacity: bufferCount)
-    _arrayOutOfPlaceUpdate(&newBuffer, bufferCount, 0)
+    unsafe _arrayOutOfPlaceUpdate(&newBuffer, bufferCount, 0)
   }
 
   /// Append items from `newItems` to a buffer.
@@ -367,14 +376,14 @@ extension _ArrayBufferProtocol {
         // need to request 1 more than current count/capacity
         minNewCapacity: newCount + 1)
 
-      _arrayOutOfPlaceUpdate(&newBuffer, newCount, 0)
+      unsafe _arrayOutOfPlaceUpdate(&newBuffer, newCount, 0)
 
       let currentCapacity = self.capacity
-      let base = self.firstElementAddress
+      let base = unsafe self.firstElementAddress
 
       // fill while there is another item and spare capacity
       while let next = nextItem, newCount < currentCapacity {
-        (base + newCount).initialize(to: next)
+        unsafe (base + newCount).initialize(to: next)
         newCount += 1
         nextItem = stream.next()
       }

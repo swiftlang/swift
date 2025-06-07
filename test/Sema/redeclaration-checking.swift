@@ -63,36 +63,30 @@ func stmtTest() {
   if case (let x, let x)? = n {}
   // expected-note@-1 {{'x' previously declared here}}
   // expected-error@-2 {{invalid redeclaration of 'x'}}
-  // expected-warning@-3 2{{never used}}
 
   for case (let x, let x) in [(Int, Int)]() {}
   // expected-note@-1 {{'x' previously declared here}}
   // expected-error@-2 {{invalid redeclaration of 'x'}}
-  // expected-warning@-3 2{{never used}}
 
   switch n {
   case (let x, let x)?: _ = ()
   // expected-note@-1 {{'x' previously declared here}}
   // expected-error@-2 {{invalid redeclaration of 'x'}}
-  // expected-warning@-3 2{{never used}}
   case nil: _ = ()
   }
 
   while case (let x, let x)? = n {}
   // expected-note@-1 {{'x' previously declared here}}
   // expected-error@-2 {{invalid redeclaration of 'x'}}
-  // expected-warning@-3 2{{never used}}
 
   guard case (let x, let x)? = n else {}
   // expected-note@-1 {{'x' previously declared here}}
   // expected-error@-2 {{invalid redeclaration of 'x'}}
-  // expected-warning@-3 2{{never used}}
 
   do {} catch MyError.error(let x, let x) {}
   // expected-note@-1 {{'x' previously declared here}}
   // expected-error@-2 {{invalid redeclaration of 'x'}}
-  // expected-warning@-3 2{{never used}}
-  // expected-warning@-4 {{unreachable}}
+  // expected-warning@-3 {{unreachable}}
 }
 
 func fullNameTest() {
@@ -111,4 +105,50 @@ protocol SillyProtocol {
 
   subscript(x: Int, x: Int) -> Int { get }
   subscript(a x: Int, b x: Int) -> Int { get }
+}
+
+// https://github.com/apple/swift/issues/63750
+let issue63750 = {
+  for (x,x) in [(0,0)] {}
+  // expected-error@-1 {{invalid redeclaration of 'x'}}
+  // expected-note@-2 {{'x' previously declared here}}
+
+  if case let (x,x) = (0,0) {}
+  // expected-error@-1 {{invalid redeclaration of 'x'}}
+  // expected-note@-2 {{'x' previously declared here}}
+
+  switch (0,0) {
+  case let (x,x):
+    // expected-error@-1 {{invalid redeclaration of 'x'}}
+    // expected-note@-2 {{'x' previously declared here}}
+    ()
+  }
+  
+  func bar(_ x: Int) -> Int { x }
+  if case (bar(let x), let x) = (0,0) {}
+  // expected-error@-1 {{'let' binding pattern cannot appear in an expression}}
+  // expected-error@-2 {{invalid redeclaration of 'x'}}
+  // expected-note@-3 {{'x' previously declared here}}
+}
+func issue63750fn() {
+  // Make sure the behavior is consistent with the multi-statement closure case.
+  for (x,x) in [(0,0)] {}
+  // expected-error@-1 {{invalid redeclaration of 'x'}}
+  // expected-note@-2 {{'x' previously declared here}}
+
+  if case let (x,x) = (0,0) {} // expected-warning {{'if' condition is always true}}
+  // expected-error@-1 {{invalid redeclaration of 'x'}}
+  // expected-note@-2 {{'x' previously declared here}}
+
+  switch (0,0) {
+  case let (x,x):
+    // expected-error@-1 {{invalid redeclaration of 'x'}}
+    // expected-note@-2 {{'x' previously declared here}}
+    ()
+  }
+  func bar(_ x: Int) -> Int { x }
+  if case (bar(let x), let x) = (0,0) {}
+  // expected-error@-1 {{'let' binding pattern cannot appear in an expression}}
+  // expected-error@-2 {{invalid redeclaration of 'x'}}
+  // expected-note@-3 {{'x' previously declared here}}
 }

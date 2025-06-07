@@ -15,10 +15,12 @@
 //
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
@@ -32,35 +34,137 @@ using namespace constraints;
 #define DEBUG_TYPE "Constraint solver overall"
 STATISTIC(NumDiscardedSolutions, "Number of solutions discarded");
 
-void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
-  if (isForCodeCompletion()) {
-    switch (kind) {
-    case SK_NonDefaultLiteral:
-      // Don't increase score for non-default literals in expressions involving
-      // a code completion. In the below example, members of EnumA and EnumB
-      // should be ranked equally:
-      //   func overloaded(_ x: Float, _ y: EnumA) {}
-      //   func overloaded(_ x: Int, _ y: EnumB) {}
-      //   func overloaded(_ x: Float) -> EnumA {}
-      //   func overloaded(_ x: Int) -> EnumB {}
-      //
-      //   overloaded(1, .<complete>) {}
-      //   overloaded(1).<complete>
-      return;
-    default:
-      break;
+/// Returns \c true if \p expr takes a code completion expression as an
+/// argument.
+static bool exprHasCodeCompletionAsArgument(Expr *expr, ConstraintSystem &cs) {
+  if (auto args = expr->getArgs()) {
+    for (auto arg : *args) {
+      if (isa<CodeCompletionExpr>(arg.getExpr())) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+static bool shouldIgnoreScoreIncreaseForCodeCompletion(
+    ScoreKind kind, ConstraintLocatorBuilder Locator, ConstraintSystem &cs) {
+  if (kind < SK_SyncInAsync) {
+    // We don't want to ignore score kinds that make the code invalid.
+    return false;
+  }
+  auto expr = Locator.trySimplifyToExpr();
+  if (!expr) {
+    return false;
+  }
+
+  // These are a few hand-picked examples in which we don't want to increase the
+  // score in code completion mode. Technically, to get all valid results, we
+  // would like to not increase the score if the expression contains the code
+  // completion token anywhere but that's not possible for performance reasons.
+  // Thus, just special case the most common cases.
+
+  // The code completion token itself.
+  if (isa<CodeCompletionExpr>(expr)) {
+    return true;
+  }
+
+  // An assignment where the LHS or RHS contains the code completion token (e.g.
+  // an optional conversion).
+  // E.g.
+  // x[#^COMPLETE^#] = foo
+  // let a = foo(#^COMPLETE^#)
+  if (auto assign = dyn_cast<AssignExpr>(expr)) {
+    if (exprHasCodeCompletionAsArgument(assign->getSrc(), cs)) {
+      return true;
+    } else if (exprHasCodeCompletionAsArgument(assign->getDest(), cs)) {
+      return true;
     }
   }
 
+  // If the function call takes the code completion token as an argument, the
+  // call also shouldn't increase the score.
+  // E.g. `foo` in
+  // foo(#^COMPLETE^#)
+  if (exprHasCodeCompletionAsArgument(expr, cs)) {
+    return true;
+  }
+
+  if (auto parent = cs.getParentExpr(expr)) {
+    // The sibling argument is the code completion expression, this allows e.g.
+    // non-default literal values in sibling arguments.
+    // E.g. we allow a 1 to be a double in
+    // foo(1, #^COMPLETE^#)
+    if (exprHasCodeCompletionAsArgument(parent, cs)) {
+      return true;
+    }
+    // If we are completing a member of a literal, consider completion results
+    // for all possible literal types. E.g. show completion results for `let a:
+    // Double = 1.#^COMPLETE^#
+    if (isa_and_nonnull<CodeCompletionExpr>(parent) &&
+        kind == SK_NonDefaultLiteral) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
+  unsigned index = static_cast<unsigned>(kind);
+  CurrentScore.Data[index] += value;
+
+  if (solverState && value > 0)
+    recordChange(SolverTrail::Change::IncreasedScore(kind, value));
+}
+
+void ConstraintSystem::increaseScore(ScoreKind kind,
+                                     ConstraintLocatorBuilder Locator,
+                                     unsigned value) {
+  if (isForCodeCompletion() &&
+      shouldIgnoreScoreIncreaseForCodeCompletion(kind, Locator, *this)) {
+    if (isDebugMode() && value > 0) {
+      if (solverState)
+        llvm::errs().indent(solverState->getCurrentIndent());
+      llvm::errs() << "(not increasing '" << Score::getNameFor(kind)
+      << "' score by " << value
+      << " because of proximity to code completion token";
+      Locator.dump(&getASTContext().SourceMgr, llvm::errs());
+      llvm::errs() << ")\n";
+    }
+    return;
+  }
   if (isDebugMode() && value > 0) {
     if (solverState)
       llvm::errs().indent(solverState->getCurrentIndent());
     llvm::errs() << "(increasing '" << Score::getNameFor(kind) << "' score by "
-                 << value << ")\n";
+    << value << " @ ";
+    Locator.dump(&getASTContext().SourceMgr, llvm::errs());
+    llvm::errs() << ")\n";
   }
 
-  unsigned index = static_cast<unsigned>(kind);
-  CurrentScore.Data[index] += value;
+  increaseScore(kind, value);
+}
+
+void ConstraintSystem::replayScore(const Score &score) {
+  if (solverState) {
+    for (unsigned i = 0; i < NumScoreKinds; ++i) {
+      if (unsigned value = score.Data[i])
+        recordChange(
+          SolverTrail::Change::IncreasedScore(ScoreKind(i), value));
+    }
+  }
+  CurrentScore += score;
+}
+
+void ConstraintSystem::clearScore() {
+  for (unsigned i = 0; i < NumScoreKinds; ++i) {
+    if (unsigned value = CurrentScore.Data[i]) {
+      recordChange(
+        SolverTrail::Change::DecreasedScore(ScoreKind(i), value));
+    }
+  }
+  CurrentScore = Score();
 }
 
 bool ConstraintSystem::worseThanBestSolution() const {
@@ -129,6 +233,10 @@ static bool sameOverloadChoice(const OverloadChoice &x,
 
   case OverloadChoiceKind::TupleIndex:
     return x.getTupleIndex() == y.getTupleIndex();
+
+  case OverloadChoiceKind::MaterializePack:
+  case OverloadChoiceKind::ExtractFunctionIsolation:
+    return true;
   }
 
   llvm_unreachable("Unhandled OverloadChoiceKind in switch.");
@@ -218,7 +326,7 @@ computeSelfTypeRelationship(DeclContext *dc, ValueDecl *decl1,
 
   // If the model type does not conform to the protocol, the bases are
   // unrelated.
-  auto conformance = dc->getParentModule()->lookupConformance(modelTy, proto);
+  auto conformance = lookupConformance(modelTy, proto);
   if (conformance.isInvalid())
     return {SelfTypeRelationship::Unrelated, conformance};
 
@@ -267,9 +375,16 @@ static bool isDeclMoreConstrainedThan(ValueDecl *decl1, ValueDecl *decl2) {
       for (size_t i = 0; i < params1.size(); i++) {
         auto p1 = params1[i];
         auto p2 = params2[i];
-          
-        int np1 = static_cast<int>(sig1->getRequiredProtocols(p1).size());
-        int np2 = static_cast<int>(sig2->getRequiredProtocols(p2).size());
+
+        int np1 =
+            llvm::count_if(sig1->getRequiredProtocols(p1), [](const auto *P) {
+              return !P->getInvertibleProtocolKind();
+            });
+        int np2 =
+            llvm::count_if(sig2->getRequiredProtocols(p2), [](const auto *P) {
+              return !P->getInvertibleProtocolKind();
+            });
+
         int aDelta = np1 - np2;
           
         if (aDelta)
@@ -309,16 +424,19 @@ static bool isProtocolExtensionAsSpecializedAs(DeclContext *dc1,
 
   // Form a constraint system where we've opened up all of the requirements of
   // the second protocol extension.
-  ConstraintSystem cs(dc1, None);
-  OpenedTypeMap replacements;
+  ConstraintSystem cs(dc1, std::nullopt);
+  SmallVector<OpenedType, 4> replacements;
   cs.openGeneric(dc2, sig2, ConstraintLocatorBuilder(nullptr), replacements);
 
   // Bind the 'Self' type from the first extension to the type parameter from
   // opening 'Self' of the second extension.
   Type selfType1 = sig1.getGenericParams()[0];
   Type selfType2 = sig2.getGenericParams()[0];
+  ASSERT(selfType1->isEqual(selfType2));
+  ASSERT(replacements[0].first->isEqual(selfType2));
+
   cs.addConstraint(ConstraintKind::Bind,
-                   replacements[cast<GenericTypeParamType>(selfType2->getCanonicalType())],
+                   replacements[0].second,
                    dc1->mapTypeIntoContext(selfType1),
                    nullptr);
 
@@ -348,16 +466,18 @@ static bool paramIsIUO(const ValueDecl *decl, int paramNum) {
 /// "Specialized" is essentially a form of subtyping, defined below.
 static bool isDeclAsSpecializedAs(DeclContext *dc, ValueDecl *decl1,
                                   ValueDecl *decl2,
-                                  bool isDynamicOverloadComparison = false) {
+                                  bool isDynamicOverloadComparison = false,
+                                  bool allowMissingConformances = true) {
   return evaluateOrDefault(decl1->getASTContext().evaluator,
                            CompareDeclSpecializationRequest{
-                               dc, decl1, decl2, isDynamicOverloadComparison},
+                               dc, decl1, decl2, isDynamicOverloadComparison,
+                               allowMissingConformances},
                            false);
 }
 
 bool CompareDeclSpecializationRequest::evaluate(
     Evaluator &eval, DeclContext *dc, ValueDecl *decl1, ValueDecl *decl2,
-    bool isDynamicOverloadComparison) const {
+    bool isDynamicOverloadComparison, bool allowMissingConformances) const {
   auto &C = decl1->getASTContext();
   // Construct a constraint system to compare the two declarations.
   ConstraintSystem cs(dc, ConstraintSystemOptions());
@@ -461,7 +581,7 @@ bool CompareDeclSpecializationRequest::evaluate(
 
   auto openType = [&](ConstraintSystem &cs, DeclContext *innerDC,
                       DeclContext *outerDC, Type type,
-                      OpenedTypeMap &replacements,
+                      SmallVectorImpl<OpenedType> &replacements,
                       ConstraintLocator *locator) -> Type {
     if (auto *funcType = type->getAs<AnyFunctionType>()) {
       return cs.openFunctionType(funcType, locator, replacements, outerDC);
@@ -470,7 +590,7 @@ bool CompareDeclSpecializationRequest::evaluate(
     cs.openGeneric(outerDC, innerDC->getGenericSignatureOfContext(), locator,
                    replacements);
 
-    return cs.openType(type, replacements);
+    return cs.openType(type, replacements, locator);
   };
 
   bool knownNonSubtype = false;
@@ -479,12 +599,11 @@ bool CompareDeclSpecializationRequest::evaluate(
   // FIXME: Locator when anchored on a declaration.
   // Get the type of a reference to the second declaration.
 
-  OpenedTypeMap unused, replacements;
-  auto openedType2 = openType(cs, innerDC1, outerDC2, type2, unused, locator);
-  auto openedType1 =
-      openType(cs, innerDC2, outerDC1, type1, replacements, locator);
+  SmallVector<OpenedType, 4> unused, replacements;
+  auto openedType2 = openType(cs, innerDC2, outerDC2, type2, unused, locator);
+  auto openedType1 = openType(cs, innerDC1, outerDC1, type1, replacements, locator);
 
-  for (const auto &replacement : replacements) {
+  for (auto replacement : replacements) {
     if (auto mapped = innerDC1->mapTypeIntoContext(replacement.first)) {
       cs.addConstraint(ConstraintKind::Bind, replacement.second, mapped,
                        locator);
@@ -564,84 +683,147 @@ bool CompareDeclSpecializationRequest::evaluate(
     auto params1 = funcTy1->getParams();
     auto params2 = funcTy2->getParams();
 
-    unsigned numParams1 = params1.size();
-    unsigned numParams2 = params2.size();
-    if (numParams1 > numParams2)
-      return completeResult(false);
+    // TODO: We should consider merging these two branches together in
+    //       the future instead of re-implementing `matchCallArguments`.
+    if (containsPackExpansionType(params1) ||
+        containsPackExpansionType(params2)) {
+      ParameterListInfo paramListInfo(params2, decl2, decl2->hasCurriedSelf());
 
-    // If they both have trailing closures, compare those separately.
-    bool compareTrailingClosureParamsSeparately = false;
-    if (numParams1 > 0 && numParams2 > 0 &&
-        params1.back().getParameterType()->is<AnyFunctionType>() &&
-        params2.back().getParameterType()->is<AnyFunctionType>()) {
-      compareTrailingClosureParamsSeparately = true;
-    }
+      MatchCallArgumentListener listener;
+      SmallVector<AnyFunctionType::Param> args(params1);
+      auto matching = matchCallArguments(
+          args, params2, paramListInfo, std::nullopt,
+          /*allowFixes=*/false, listener, TrailingClosureMatching::Forward);
 
-    auto maybeAddSubtypeConstraint =
-        [&](const AnyFunctionType::Param &param1,
-            const AnyFunctionType::Param &param2) -> bool {
-      // If one parameter is variadic and the other is not...
-      if (param1.isVariadic() != param2.isVariadic()) {
-        // If the first parameter is the variadic one, it's not
-        // more specialized.
-        if (param1.isVariadic())
-          return false;
+      if (!matching)
+        return completeResult(false);
 
-        fewerEffectiveParameters = true;
+      for (unsigned paramIdx = 0,
+                    numParams = matching->parameterBindings.size();
+           paramIdx != numParams; ++paramIdx) {
+        const auto &param = params2[paramIdx];
+        auto paramTy = param.getOldType();
+        auto argIndices = matching->parameterBindings[paramIdx];
+        if (argIndices.empty())
+          continue;
+
+        if (paramListInfo.isVariadicGenericParameter(paramIdx) &&
+            isPackExpansionType(paramTy) &&
+            (argIndices.size() > 1 ||
+             !isPackExpansionType(args[argIndices.front()].getOldType()))) {
+          SmallVector<Type, 2> argTypes;
+          for (auto argIdx : argIndices) {
+            // Don't prefer `T...` over `repeat each T`.
+            if (args[argIdx].isVariadic())
+              return completeResult(false);
+            argTypes.push_back(args[argIdx].getPlainType());
+          }
+
+          auto *argPack = PackType::get(cs.getASTContext(), argTypes);
+          cs.addConstraint(ConstraintKind::Subtype,
+                           PackExpansionType::get(argPack, argPack), paramTy,
+                           locator);
+          continue;
+        }
+
+        for (auto argIdx : argIndices) {
+          const auto &arg = args[argIdx];
+          // Always prefer non-variadic version when possible.
+          if (arg.isVariadic())
+            return completeResult(false);
+
+          cs.addConstraint(ConstraintKind::Subtype, arg.getOldType(),
+                           paramTy, locator);
+        }
+      }
+    } else {
+      unsigned numParams1 = params1.size();
+      unsigned numParams2 = params2.size();
+
+      if (numParams1 > numParams2)
+        return completeResult(false);
+
+      // If they both have trailing closures, compare those separately.
+      bool compareTrailingClosureParamsSeparately = false;
+      if (numParams1 > 0 && numParams2 > 0 &&
+          params1.back().getParameterType()->is<AnyFunctionType>() &&
+          params2.back().getParameterType()->is<AnyFunctionType>()) {
+        compareTrailingClosureParamsSeparately = true;
       }
 
-      Type paramType1 = getAdjustedParamType(param1);
-      Type paramType2 = getAdjustedParamType(param2);
+      auto maybeAddSubtypeConstraint =
+          [&](const AnyFunctionType::Param &param1,
+              const AnyFunctionType::Param &param2) -> bool {
+        // If one parameter is variadic and the other is not...
+        if (param1.isVariadic() != param2.isVariadic()) {
+          // If the first parameter is the variadic one, it's not
+          // more specialized.
+          if (param1.isVariadic())
+            return false;
 
-      // Check whether the first parameter is a subtype of the second.
-      cs.addConstraint(ConstraintKind::Subtype, paramType1, paramType2,
-                       locator);
-      return true;
-    };
+          fewerEffectiveParameters = true;
+        }
 
-    auto pairMatcher = [&](unsigned idx1, unsigned idx2) -> bool {
-      // Emulate behavior from when IUO was a type, where IUOs
-      // were considered subtypes of plain optionals, but not
-      // vice-versa.  This wouldn't normally happen, but there are
-      // cases where we can rename imported APIs so that we have a
-      // name collision, and where the parameter type(s) are the
-      // same except for details of the kind of optional declared.
-      auto param1IsIUO = paramIsIUO(decl1, idx1);
-      auto param2IsIUO = paramIsIUO(decl2, idx2);
-      if (param2IsIUO && !param1IsIUO)
-        return false;
+        Type paramType1 = getAdjustedParamType(param1);
+        Type paramType2 = getAdjustedParamType(param2);
 
-      if (!maybeAddSubtypeConstraint(params1[idx1], params2[idx2]))
-        return false;
+        // Check whether the first parameter is a subtype of the second.
+        cs.addConstraint(ConstraintKind::Subtype, paramType1, paramType2,
+                         locator);
+        return true;
+      };
 
-      return true;
-    };
+      auto pairMatcher = [&](unsigned idx1, unsigned idx2) -> bool {
+        // Emulate behavior from when IUO was a type, where IUOs
+        // were considered subtypes of plain optionals, but not
+        // vice-versa.  This wouldn't normally happen, but there are
+        // cases where we can rename imported APIs so that we have a
+        // name collision, and where the parameter type(s) are the
+        // same except for details of the kind of optional declared.
+        auto param1IsIUO = paramIsIUO(decl1, idx1);
+        auto param2IsIUO = paramIsIUO(decl2, idx2);
+        if (param2IsIUO && !param1IsIUO)
+          return false;
 
-    ParameterListInfo paramInfo(params2, decl2, decl2->hasCurriedSelf());
-    auto params2ForMatching = params2;
-    if (compareTrailingClosureParamsSeparately) {
-      --numParams1;
-      params2ForMatching = params2.drop_back();
+        if (!maybeAddSubtypeConstraint(params1[idx1], params2[idx2]))
+          return false;
+
+        return true;
+      };
+
+      ParameterListInfo paramInfo(params2, decl2, decl2->hasCurriedSelf());
+      auto params2ForMatching = params2;
+      if (compareTrailingClosureParamsSeparately) {
+        --numParams1;
+        params2ForMatching = params2.drop_back();
+      }
+
+      InputMatcher IM(params2ForMatching, paramInfo);
+      if (IM.match(numParams1, pairMatcher) != InputMatcher::IM_Succeeded)
+        return completeResult(false);
+
+      fewerEffectiveParameters |= (IM.getNumSkippedParameters() != 0);
+
+      if (compareTrailingClosureParamsSeparately)
+        if (!maybeAddSubtypeConstraint(params1.back(), params2.back()))
+          knownNonSubtype = true;
     }
-
-    InputMatcher IM(params2ForMatching, paramInfo);
-    if (IM.match(numParams1, pairMatcher) != InputMatcher::IM_Succeeded)
-      return completeResult(false);
-
-    fewerEffectiveParameters |= (IM.getNumSkippedParameters() != 0);
-
-    if (compareTrailingClosureParamsSeparately)
-      if (!maybeAddSubtypeConstraint(params1.back(), params2.back()))
-        knownNonSubtype = true;
   }
 
   if (!knownNonSubtype) {
     // Solve the system.
     auto solution = cs.solveSingle(FreeTypeVariableBinding::Allow);
 
-    // Ban value-to-optional conversions.
-    if (solution && solution->getFixedScore().Data[SK_ValueToOptional] == 0)
-      return completeResult(true);
+    if (solution) {
+      auto score = solution->getFixedScore();
+
+      // Ban value-to-optional conversions and
+      // missing conformances if they are disallowed.
+      if (score.Data[SK_ValueToOptional] == 0 &&
+          (allowMissingConformances ||
+           score.Data[SK_MissingSynthesizableConformance] == 0))
+        return completeResult(true);
+    }
   }
 
   // If the first function has fewer effective parameters than the
@@ -665,10 +847,10 @@ Comparison TypeChecker::compareDeclarations(DeclContext *dc,
 }
 
 static Type getUnlabeledType(Type type, ASTContext &ctx) {
-  return type.transform([&](Type type) -> Type {
-    if (auto *tupleType = dyn_cast<TupleType>(type.getPointer())) {
+  return type.transformRec([&](TypeBase *type) -> std::optional<Type> {
+    if (auto *tupleType = dyn_cast<TupleType>(type)) {
       if (tupleType->getNumElements() == 1)
-        return ParenType::get(ctx, tupleType->getElementType(0));
+        return tupleType->getElementType(0);
 
       SmallVector<TupleTypeElt, 8> elts;
       for (auto elt : tupleType->getElements()) {
@@ -678,7 +860,7 @@ static Type getUnlabeledType(Type type, ASTContext &ctx) {
       return TupleType::get(elts, ctx);
     }
 
-    return type;
+    return std::nullopt;
   });
 }
 
@@ -736,7 +918,7 @@ struct TypeBindingsToCompare {
 /// Given the bound types of two constructor overloads, returns their parameter
 /// list types as tuples to compare for solution ranking, or \c None if they
 /// shouldn't be compared.
-static Optional<TypeBindingsToCompare>
+static std::optional<TypeBindingsToCompare>
 getConstructorParamsAsTuples(ASTContext &ctx, Type boundTy1, Type boundTy2) {
   auto choiceTy1 =
       boundTy1->lookThroughAllOptionalTypes()->getAs<FunctionType>();
@@ -746,19 +928,19 @@ getConstructorParamsAsTuples(ASTContext &ctx, Type boundTy1, Type boundTy2) {
   // If the type variables haven't been bound to functions yet, let's not try
   // and rank them.
   if (!choiceTy1 || !choiceTy2)
-    return None;
+    return std::nullopt;
 
   auto initParams1 = choiceTy1->getParams();
   auto initParams2 = choiceTy2->getParams();
   if (initParams1.size() != initParams2.size())
-    return None;
+    return std::nullopt;
 
   // Don't compare if there are variadic differences. This preserves the
   // behavior of when we'd compare through matchTupleTypes with the parameter
   // flags intact.
   for (auto idx : indices(initParams1)) {
     if (initParams1[idx].isVariadic() != initParams2[idx].isVariadic())
-      return None;
+      return std::nullopt;
   }
 
   // Awful hack needed to preserve source compatibility: If we have single
@@ -816,7 +998,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
              ? SolutionCompareResult::Better
              : SolutionCompareResult::Worse;
   }
-  
+
   // Compute relative score.
   unsigned score1 = 0;
   unsigned score2 = 0;
@@ -887,6 +1069,16 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // FIXME: Along with the FIXME below, this is a hack to work around
     // problems with restating requirements in protocols.
     identical = false;
+
+    if (cs.isForCodeCompletion()) {
+      // Don't rank based on overload choices of function calls that contain the
+      // code completion token.
+      if (auto anchor = simplifyLocatorToAnchor(overload.locator)) {
+        if (cs.containsIDEInspectionTarget(cs.includingParentApply(anchor)))
+          continue;
+      }
+    }
+
     bool decl1InSubprotocol = false;
     bool decl2InSubprotocol = false;
     if (dc1->getContextKind() == DeclContextKind::GenericTypeDecl &&
@@ -957,6 +1149,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // The kinds of overload choice match, but the contents don't.
     switch (choice1.getKind()) {
     case OverloadChoiceKind::TupleIndex:
+    case OverloadChoiceKind::MaterializePack:
+    case OverloadChoiceKind::ExtractFunctionIsolation:
       continue;
 
     case OverloadChoiceKind::KeyPathApplication:
@@ -981,12 +1175,14 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     bool firstAsSpecializedAs = false;
     bool secondAsSpecializedAs = false;
     if (isDeclAsSpecializedAs(cs.DC, decl1, decl2,
-                              isDynamicOverloadComparison)) {
+                              isDynamicOverloadComparison,
+                              /*allowMissingConformances=*/false)) {
       score1 += weight;
       firstAsSpecializedAs = true;
     }
     if (isDeclAsSpecializedAs(cs.DC, decl2, decl1,
-                              isDynamicOverloadComparison)) {
+                              isDynamicOverloadComparison,
+                              /*allowMissingConformances=*/false)) {
       score2 += weight;
       secondAsSpecializedAs = true;
     }
@@ -1159,6 +1355,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   const auto &bindings2 = solutions[idx2].typeBindings;
 
   for (const auto &binding1 : bindings1) {
+    if (!binding1.second)
+      continue;
+
     auto *typeVar = binding1.first;
     auto *loc = typeVar->getImpl().getLocator();
 
@@ -1182,6 +1381,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // let's consider it.
     auto binding2 = bindings2.find(typeVar);
     if (binding2 == bindings2.end())
+      continue;
+
+    if (!binding2->second)
       continue;
 
     TypeBindingsToCompare typesToCompare(binding1.second, binding2->second);
@@ -1214,7 +1416,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // If either of the types still contains type variables, we can't
     // compare them.
     // FIXME: This is really unfortunate. More type variable sharing
-    // (when it's sane) would help us do much better here.
+    // (when it's sound) would help us do much better here.
     if (type1->hasTypeVariable() || type2->hasTypeVariable()) {
       identical = false;
       continue;
@@ -1347,15 +1549,15 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
                   : SolutionCompareResult::Incomparable;
 }
 
-Optional<unsigned>
+std::optional<unsigned>
 ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
                                    bool minimize) {
   // Don't spend time filtering solutions if we already hit a threshold.
   if (isTooComplex(viable))
-    return None;
+    return std::nullopt;
 
   if (viable.empty())
-    return None;
+    return std::nullopt;
   if (viable.size() == 1)
     return 0;
 
@@ -1403,7 +1605,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
 
     // Give up if we're out of time.
     if (isTooComplex(/*solutions=*/{}))
-      return None;
+      return std::nullopt;
   }
 
   // Make sure that our current best is better than all of the solved systems.
@@ -1429,7 +1631,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
     case SolutionCompareResult::Incomparable:
       // If we're not supposed to minimize the result set, just return eagerly.
       if (!minimize)
-        return None;
+        return std::nullopt;
 
       ambiguous = true;
       break;
@@ -1437,7 +1639,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
 
     // Give up if we're out of time.
     if (isTooComplex(/*solutions=*/{}))
-      return None;
+      return std::nullopt;
   }
 
   // If the result was not ambiguous, we're done.
@@ -1447,7 +1649,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
   }
 
   if (!minimize)
-    return None;
+    return std::nullopt;
 
   // Remove any solution that is worse than some other solution.
   unsigned outIndex = 0;
@@ -1467,7 +1669,7 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
   viable.erase(viable.begin() + outIndex, viable.end());
   NumDiscardedSolutions += viable.size() - outIndex;
 
-  return None;
+  return std::nullopt;
 }
 
 SolutionDiff::SolutionDiff(ArrayRef<Solution> solutions) {

@@ -18,8 +18,8 @@ enum NonBarBaz {
 
 let _: Foo<Bar> = Foo<Bar> { (a: Bar) -> Void in
   switch a {
-  // CHECK: (pattern_is type='Bar' value_cast Baz
-  // CHECK-NEXT: (pattern_enum_element type='Baz' Baz.someCase
+  // CHECK: (pattern_is type="any Bar" cast_kind=value_cast cast_to="Baz"
+  // CHECK-NEXT: (pattern_enum_element type="Baz" {{.*}} element="Baz.someCase"
   case let .someCase(value) as Baz:
     print(value)
   // expected-warning@-1 {{cast from 'any Bar' to unrelated type 'NonBarBaz' always fails}}

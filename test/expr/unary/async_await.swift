@@ -203,10 +203,39 @@ func testAsyncLet() async throws {
   _ = await x5
 }
 
+func search(query: String) async throws -> [String] {
+  let entities: [String] = []
+
+  async let r = entities.filter { $0.contains(query) }.map { String($0) }
+  return await r
+}
+
 // expected-note@+1 3{{add 'async' to function 'testAsyncLetOutOfAsync()' to make it asynchronous}} {{30-30= async}}
 func testAsyncLetOutOfAsync() {
   async let x = 1 // expected-error{{'async let' in a function that does not support concurrency}}
 
   _ = await x  // expected-error{{'async let' in a function that does not support concurrency}}
   _ = x // expected-error{{'async let' in a function that does not support concurrency}}
+}
+
+class A {}
+class B: A {}
+func f(_ x: String) async -> String? { x }
+func testAsyncExprWithoutAwait() async {
+  async let result: B? = nil
+  if let result: A = result {} // expected-error {{expression is 'async' but is not marked with 'await'}} {{22-22=await }}
+  // expected-warning@-1 {{immutable value 'result' was never used; consider replacing with '_' or removing it}}
+  // expected-note@-2 {{reference to async let 'result' is 'async'}}
+  if let result: A {} // expected-error {{expression is 'async' but is not marked with 'await'}} {{18-18=await }}
+  // expected-warning@-1 {{immutable value 'result' was never used; consider replacing with '_' or removing it}}
+  // expected-note@-2 {{reference to async let 'result' is 'async'}}
+  if let result = result {} // expected-error {{expression is 'async' but is not marked with 'await'}} {{19-19=await }}
+  // expected-warning@-1 {{value 'result' was defined but never used; consider replacing with boolean test}}
+  // expected-note@-2 {{reference to async let 'result' is 'async'}}
+  if let result {} // expected-error {{expression is 'async' but is not marked with 'await'}} {{16-16= = await result}}
+  // expected-warning@-1 {{value 'result' was defined but never used; consider replacing with boolean test}}
+  // expected-note@-2 {{reference to async let 'result' is 'async'}}
+  let a = f("a") // expected-error {{expression is 'async' but is not marked with 'await'}} {{11-11=await }}
+  // expected-warning@-1 {{initialization of immutable value 'a' was never used; consider replacing with assignment to '_' or removing it}}
+  // expected-note@-2 {{call is 'async'}}
 }

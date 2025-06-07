@@ -1,0 +1,30 @@
+//===--- BlockListAction.def - Define all blocklist actions -----*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+//  This definition file describes all block list actions for meta-programming
+//  purposes.
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef BLOCKLIST_ACTION
+#define BLOCKLIST_ACTION(NAME)
+#endif
+
+BLOCKLIST_ACTION(ShouldUseBinaryModule)
+BLOCKLIST_ACTION(ShouldUseTextualModule)
+BLOCKLIST_ACTION(DowngradeInterfaceVerificationFailure)
+BLOCKLIST_ACTION(ShouldUseLayoutStringValueWitnesses)
+BLOCKLIST_ACTION(ShouldDisableOwnershipVerification)
+BLOCKLIST_ACTION(SkipEmittingFineModuleTrace)
+BLOCKLIST_ACTION(SkipIndexingModule)
+
+#undef BLOCKLIST_ACTION

@@ -1,0 +1,184 @@
+// RUN: %target-sil-opt -sil-print-types -loadable-address -enable-sil-verify-all %s | %FileCheck %s
+
+// REQUIRES: PTRSIZE=64
+// REQUIRES: OS=macosx
+
+sil_stage canonical
+import Builtin
+import Swift
+
+public struct BigStruct {
+  var i0 : Int32 = 0
+  var i1 : Int32 = 1
+  var i2 : Int32 = 2
+  var i3 : Int32 = 3
+  var i4 : Int32 = 4
+  var i5 : Int32 = 5
+  var i6 : Int32 = 6
+  var i7 : Int32 = 7
+  var i8 : Int32 = 8
+}
+
+public struct ContainsClosure {
+  let c: () -> BigStruct
+}
+
+sil @make_big_struct : $@convention(thin) () -> BigStruct
+sil @use_big_struct : $@convention(thin) (BigStruct) -> ()
+
+sil @takeClosure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+
+typealias Invocation = @convention(thin) (BigStruct) -> ()
+
+struct InvocationWrapper {
+  let invocation: Invocation
+}
+
+sil_global hidden [let] @invocation : $InvocationWrapper
+
+sil @invocationClosure : $@convention(thin) (BigStruct) -> ()
+
+// CHECK-LABEL: sil_global @globalWithClosureInStruct : $ContainsClosure = {
+// CHECK:         %0 = function_ref @make_big_struct : $@convention(thin) () -> @out BigStruct
+// CHECK-NEXT:    %1 = thin_to_thick_function %0 : $@convention(thin) () -> @out BigStruct to $@callee_guaranteed () -> @out BigStruct
+// CHECK-NEXT:    %initval = struct $ContainsClosure (%1 : $@callee_guaranteed () -> @out BigStruct)
+// CHECK-NEXT:  } 
+sil_global @globalWithClosureInStruct : $ContainsClosure = {
+  %0 = function_ref @make_big_struct : $@convention(thin) () -> BigStruct
+  %1 = thin_to_thick_function %0 : $@convention(thin) () -> BigStruct to $@callee_guaranteed () -> BigStruct
+  %initval = struct $ContainsClosure (%1 : $@callee_guaranteed () -> BigStruct)
+}
+
+// CHECK-LABEL: sil @test_yield_big : $@yield_once @convention(thin) () -> @yields @in_guaranteed BigStruct {
+// CHECK:       bb0:
+// CHECK-NEXT:    [[TEMP:%.*]] = alloc_stack $BigStruct
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[MAKE:%.*]] = function_ref @make_big_struct : $@convention(thin) () -> @out BigStruct
+// CHECK-NEXT:    apply [[MAKE]]([[TEMP]])
+// CHECK-NEXT:    yield [[TEMP]] : $*BigStruct, resume bb1, unwind bb2
+// CHECK:       bb1:
+// CHECK-NEXT:    [[RET:%.*]] = tuple ()
+// CHECK-NEXT:    dealloc_stack [[TEMP]] : $*BigStruct
+// CHECK-NEXT:    return [[RET]] : $()
+// CHECK:       bb2:
+// CHECK-NEXT:    dealloc_stack [[TEMP]] : $*BigStruct
+// CHECK-NEXT:    unwind
+sil @test_yield_big : $@convention(thin) @yield_once() -> (@yields BigStruct) {
+entry:
+  %make = function_ref @make_big_struct : $@convention(thin) () -> BigStruct
+  %big = apply %make() : $@convention(thin) () -> BigStruct
+  yield %big : $BigStruct, resume resume, unwind unwind
+
+resume:
+  %ret = tuple ()
+  return %ret : $()
+
+unwind:
+  unwind
+}
+
+// CHECK-LABEL: sil @use_yield_big : $@convention(thin) () -> () {
+// CHECK:       bb0:
+// CHECK-NEXT:    [[TEMP:%.*]] = alloc_stack $BigStruct
+// CHECK-NEXT:    [[TEMP2:%.*]] = alloc_stack $BigStruct
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[CORO:%.*]] = function_ref @test_yield_big : $@yield_once @convention(thin) () -> @yields @in_guaranteed BigStruct
+// CHECK-NEXT:    ([[ADDR:%.*]], [[TOKEN:%.*]]) = begin_apply [[CORO]]()
+// CHECK-NEXT:   copy_addr [take] [[ADDR]] to [init] [[TEMP]] : $*BigStruct
+// CHECK-NEXT:   copy_addr [take] [[TEMP]] to [init] [[TEMP2]] : $*BigStruct
+// CHECK-NEXT:    // function_ref
+// CHECK-NEXT:    [[USE:%.*]] = function_ref @use_big_struct : $@convention(thin) (@in_guaranteed BigStruct) -> ()
+// CHECK-NEXT:    apply [[USE]]([[TEMP2]])
+// CHECK-NEXT:    [[RET:%.*]] = end_apply [[TOKEN]] as $()
+// CHECK-NEXT:    dealloc_stack [[TEMP2]] : $*BigStruct
+// CHECK-NEXT:    dealloc_stack [[TEMP]] : $*BigStruct
+// CHECK-NEXT:    return [[RET]] : $()
+sil @use_yield_big : $@convention(thin) () -> () {
+entry:
+  %yield_big = function_ref @test_yield_big : $@convention(thin) @yield_once() -> (@yields BigStruct)
+  (%big, %token) = begin_apply %yield_big() : $@convention(thin) @yield_once() -> (@yields BigStruct)
+  %use_big = function_ref @use_big_struct : $@convention(thin) (BigStruct) -> ()
+  apply %use_big(%big) : $@convention(thin) (BigStruct) -> ()
+  %ret = end_apply %token as $()
+  return %ret : $()
+}
+
+sil @yield_fun_ptr2 : $@yield_once @convention(thin) () -> @yields @inout Optional<@callee_guaranteed (@guaranteed BigStruct) -> ()>
+
+// CHECK-LABEL: sil @yield_funptr : $
+// CHECK: (%1, %2) = begin_apply %0() : $@yield_once @convention(thin) () -> @yields @inout Optional<@callee_guaranteed (@in_guaranteed BigStruct) -> ()>
+// CHECK: yield %1
+sil @yield_funptr : $@yield_once @convention(thin) () -> @yields @inout Optional<@callee_guaranteed (@guaranteed BigStruct) -> ()> {
+bb0:
+  %2 = function_ref @yield_fun_ptr2 : $@yield_once @convention(thin) () -> @yields @inout Optional<@callee_guaranteed (@guaranteed BigStruct) -> ()>
+  (%3, %4) = begin_apply %2() : $@yield_once @convention(thin) () -> @yields @inout Optional<@callee_guaranteed (@guaranteed BigStruct) -> ()>
+  yield %3 : $*Optional<@callee_guaranteed (@guaranteed BigStruct) -> ()>, resume bb1, unwind bb2
+
+bb1:
+  end_apply %4 as $()
+  %7 = tuple ()
+  return %7 : $()
+
+bb2:
+  abort_apply %4
+  unwind
+}
+
+// CHECK-LABEL: sil @test_yield_and_retain
+// CHECK:   [[S:%[0-9]+]] = alloc_stack $BigStruct
+// CHECK:   copy_addr [take] %0 to [init] [[S]]
+// CHECK:   retain_value_addr [[S]]
+// CHECK:   yield [[S]] : $*BigStruct
+// CHECK: // end sil function 'test_yield_and_retain'
+sil @test_yield_and_retain : $@convention(thin) @yield_once (@in_guaranteed BigStruct) -> @yields BigStruct {
+entry(%0 : $*BigStruct):
+  %big = load %0 : $*BigStruct
+  retain_value %big : $BigStruct
+  yield %big : $BigStruct, resume resume, unwind unwind
+
+resume:
+  %ret = tuple ()
+  return %ret : $()
+
+unwind:
+  unwind
+}
+
+// Test that partial apply captured arguments are converted to
+// @in_guaranteed, unless they are actually owned, which is not
+// allowed for on-stack closures.
+//
+// CHECK-LABEL: sil hidden @testLoadableCapture : $@convention(thin) (@in_guaranteed BigStruct) -> () {
+// CHECK: partial_apply [callee_guaranteed] [on_stack] %{{.*}}(%0) : $@convention(thin) (@in_guaranteed BigStruct) -> ()
+// CHECK-LABEL: // end sil function 'testLoadableCapture'
+sil hidden @testLoadableCapture : $@convention(thin) (BigStruct) -> () {
+bb0(%0 : $BigStruct):
+  %2 = function_ref @testLoadableCaptureClosure : $@convention(thin) (BigStruct) -> () // user: %3
+  %3 = partial_apply [callee_guaranteed] [on_stack] %2(%0) : $@convention(thin) (BigStruct) -> () // users: %6, %5
+  %4 = function_ref @takeClosure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> () // user: %5
+  %5 = apply %4(%3) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  dealloc_stack %3 : $@noescape @callee_guaranteed () -> () // id: %6
+  %7 = tuple ()                                   // user: %8
+  return %7 : $()                                 // id: %8
+}
+
+sil private @testLoadableCaptureClosure : $@convention(thin) (BigStruct) -> () {
+bb0(%0 : @closureCapture $BigStruct):
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// Test a rewritten function_ref stored in a struct property.
+// CHECK-LABEL: sil [global_init_once_fn] @test_invocation : $@convention(c) (Builtin.RawPointer) -> () {
+// CHECK: [[F:%[0-9]+]] = function_ref @invocationClosure : $@convention(thin) (@in_guaranteed BigStruct) -> ()
+// CHECK: = struct $InvocationWrapper ([[F]] : $@convention(thin) (@in_guaranteed BigStruct) -> ())
+sil [global_init_once_fn] @test_invocation : $@convention(c) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  alloc_global @invocation
+  %g = global_addr @invocation : $*InvocationWrapper
+  %f = function_ref @invocationClosure : $@convention(thin) (BigStruct) -> ()
+  %s = struct $InvocationWrapper (%f : $@convention(thin) (BigStruct) -> ())
+  store %s to %g : $*InvocationWrapper
+  %r = tuple ()
+  return %r : $()
+}

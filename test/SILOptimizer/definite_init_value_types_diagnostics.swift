@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify
-// RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify
 
 struct EmptyStruct {}
 
@@ -78,4 +77,17 @@ struct AddressStruct {
 
     self = AddressStruct()
   } // expected-error {{return from initializer without initializing all stored properties}}
+}
+
+// Old versions of swift-syntax have this logical use-before-definition; make
+// sure we keep it working.
+struct InitLogicalUseBeforeDef {
+  let offset: UInt16
+
+  init?(value: Int) {
+    if value > type(of: self.offset).max {
+      return nil
+    }
+    offset = UInt16(value)
+  }
 }

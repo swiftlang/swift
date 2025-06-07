@@ -80,6 +80,7 @@ class HostSpecificConfiguration(object):
         # vs. build vs. run) and the SDKs to configure with.
         self.sdks_to_configure = set()
         self.swift_stdlib_build_targets = []
+        self.swift_libexec_build_targets = []
         self.swift_test_run_targets = []
         self.swift_benchmark_build_targets = []
         self.swift_benchmark_run_targets = []
@@ -114,6 +115,7 @@ class HostSpecificConfiguration(object):
             build_benchmarks = build and dt_supports_benchmark
             build_external_benchmarks = all([build, dt_supports_benchmark,
                                              args.build_external_benchmarks])
+            build_libexec = build and args.build_swift_libexec
 
             # FIXME: Note, `build-script-impl` computed a property here
             # w.r.t. testing, but it was actually unused.
@@ -147,6 +149,9 @@ class HostSpecificConfiguration(object):
                 else:
                     self.swift_stdlib_build_targets.append(
                         "swift-test-stdlib-" + name)
+            if build_libexec:
+                self.swift_libexec_build_targets.append(
+                    'swift-libexec-' + name)
             if build_benchmarks:
                 self.swift_benchmark_build_targets.append(
                     "swift-benchmark-" + name)
@@ -182,14 +187,6 @@ class HostSpecificConfiguration(object):
                     subset_suffix = "-only_stress"
                 else:
                     subset_suffix = ""
-
-                # If the compiler is being tested after being built to use the
-                # standalone swift-driver, we build a test-target to
-                # run a reduced set of lit-tests that verify the early swift-driver.
-                if args.test_early_swift_driver and\
-                   not test_host_only:
-                    self.swift_test_run_targets.append(
-                        "check-swift-only_early_swiftdriver-{}".format(name))
 
                 # Support for running the macCatalyst tests with
                 # the iOS-like target triple.
@@ -233,6 +230,8 @@ class HostSpecificConfiguration(object):
         platforms_to_skip_build = set()
         if not stage_dependent_args.build_linux:
             platforms_to_skip_build.add(StdlibDeploymentTarget.Linux)
+        if not stage_dependent_args.build_linux_static:
+            platforms_to_skip_build.add(StdlibDeploymentTarget.LinuxStatic)
         if not stage_dependent_args.build_freebsd:
             platforms_to_skip_build.add(StdlibDeploymentTarget.FreeBSD)
         if not stage_dependent_args.build_cygwin:
@@ -253,14 +252,25 @@ class HostSpecificConfiguration(object):
         if not stage_dependent_args.build_watchos_simulator:
             platforms_to_skip_build.add(
                 StdlibDeploymentTarget.AppleWatchSimulator)
+        if StdlibDeploymentTarget.XROS and \
+           not stage_dependent_args.build_xros_device:
+            platforms_to_skip_build.add(StdlibDeploymentTarget.XROS)
+        if StdlibDeploymentTarget.XROSSimulator and \
+           not stage_dependent_args.build_xros_simulator:
+            platforms_to_skip_build.add(
+                StdlibDeploymentTarget.XROSSimulator)
         if not stage_dependent_args.build_android:
             platforms_to_skip_build.add(StdlibDeploymentTarget.Android)
+        if not args.build_wasm:
+            platforms_to_skip_build.add(StdlibDeploymentTarget.WASI)
         return platforms_to_skip_build
 
     def __platforms_to_skip_test(self, args, stage_dependent_args):
         platforms_to_skip_test = set()
         if not stage_dependent_args.test_linux:
             platforms_to_skip_test.add(StdlibDeploymentTarget.Linux)
+        if not stage_dependent_args.test_linux_static:
+            platforms_to_skip_test.add(StdlibDeploymentTarget.LinuxStatic)
         if not stage_dependent_args.test_freebsd:
             platforms_to_skip_test.add(StdlibDeploymentTarget.FreeBSD)
         if not stage_dependent_args.test_cygwin:
@@ -294,6 +304,18 @@ class HostSpecificConfiguration(object):
         if not stage_dependent_args.test_watchos_simulator:
             platforms_to_skip_test.add(
                 StdlibDeploymentTarget.AppleWatchSimulator)
+        if StdlibDeploymentTarget.XROS and \
+           not stage_dependent_args.test_xros_host and \
+           not args.only_non_executable_test:
+            platforms_to_skip_test.add(StdlibDeploymentTarget.XROS)
+        elif StdlibDeploymentTarget.XROS and not args.only_non_executable_test:
+            raise ArgumentError(None,
+                                "error: xrOS device tests are not " +
+                                "supported in open-source Swift.")
+        if StdlibDeploymentTarget.XROSSimulator and \
+           not stage_dependent_args.test_xros_simulator:
+            platforms_to_skip_test.add(
+                StdlibDeploymentTarget.XROSSimulator)
         if not stage_dependent_args.test_android:
             platforms_to_skip_test.add(StdlibDeploymentTarget.Android)
 
@@ -301,9 +323,6 @@ class HostSpecificConfiguration(object):
 
     def __platforms_archs_to_skip_test(self, args, stage_dependent_args, host_target):
         platforms_archs_to_skip_test = set()
-        if not stage_dependent_args.test_watchos_32bit_simulator:
-            platforms_archs_to_skip_test.add(
-                StdlibDeploymentTarget.AppleWatchSimulator.i386)
         if host_target == StdlibDeploymentTarget.OSX.x86_64.name:
             platforms_archs_to_skip_test.add(
                 StdlibDeploymentTarget.iOSSimulator.arm64)
@@ -311,13 +330,14 @@ class HostSpecificConfiguration(object):
                 StdlibDeploymentTarget.AppleTVSimulator.arm64)
             platforms_archs_to_skip_test.add(
                 StdlibDeploymentTarget.AppleWatchSimulator.arm64)
+            if StdlibDeploymentTarget.XROSSimulator is not None:
+                platforms_archs_to_skip_test.add(
+                    StdlibDeploymentTarget.XROSSimulator.arm64)
         if host_target == StdlibDeploymentTarget.OSX.arm64.name:
             platforms_archs_to_skip_test.add(
                 StdlibDeploymentTarget.iOSSimulator.x86_64)
             platforms_archs_to_skip_test.add(
                 StdlibDeploymentTarget.AppleTVSimulator.x86_64)
-            platforms_archs_to_skip_test.add(
-                StdlibDeploymentTarget.AppleWatchSimulator.i386)
             platforms_archs_to_skip_test.add(
                 StdlibDeploymentTarget.AppleWatchSimulator.x86_64)
 
@@ -336,4 +356,8 @@ class HostSpecificConfiguration(object):
         if not stage_dependent_args.test_watchos_host and \
            not args.only_non_executable_test:
             platforms_to_skip_test_host.add(StdlibDeploymentTarget.AppleWatch)
+        if StdlibDeploymentTarget.XROS and \
+           not stage_dependent_args.test_xros_host and \
+           not args.only_non_executable_test:
+            platforms_to_skip_test_host.add(StdlibDeploymentTarget.XROS)
         return platforms_to_skip_test_host

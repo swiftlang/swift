@@ -1,0 +1,154 @@
+// REQUIRES: OS=macosx || OS=iOS
+// RUN: %target-swift-frontend -emit-irgen %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-ptrsize-%target-ptrauth
+
+import Builtin
+
+sil @marker : $(Builtin.Int32) -> ()
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @test_simple
+// CHECK-32-SAME:  ptr noalias dereferenceable([[BUFFER_SIZE:16]]) %0)
+// CHECK-64-SAME:  (ptr noalias dereferenceable([[BUFFER_SIZE:32]]) %0)
+// CHECK-SAME:  [[CORO_ATTRIBUTES:#[0-9]+]]
+sil @test_simple : $@yield_once () -> () {
+entry:
+  // CHECK-32: [[ID:%.*]] = call token (i32, i32, ptr, ptr, ptr, ptr, ...) @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:4]], ptr %0, ptr @"$sIetA_TC", ptr @__swift_coroFrameAllocStub, ptr @free, i64 38223)
+  // CHECK-64: [[ID:%.*]] = call token (i32, i32, ptr, ptr, ptr, ptr, ...) @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:8]], ptr %0, ptr @"$sIetA_TC", ptr @__swift_coroFrameAllocStub, ptr @free, i64 38223)
+  // CHECK-NEXT:    [[BEGIN:%.*]] = call ptr @llvm.coro.begin(token [[ID]], ptr null)
+
+  // CHECK-NEXT:    call swiftcc void @marker(i32 1000)
+  %marker = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
+  %1000 = integer_literal $Builtin.Int32, 1000
+  apply %marker(%1000) : $@convention(thin) (Builtin.Int32) -> ()
+  
+  // CHECK-NEXT:    [[IS_UNWIND:%.*]] = call i1 (...) @llvm.coro.suspend.retcon.i1()
+  // CHECK-NEXT:    br i1 [[IS_UNWIND]]
+  yield (), resume resume, unwind unwind
+
+resume:
+  // CHECK:         call swiftcc void @marker(i32 2000)
+  %2000 = integer_literal $Builtin.Int32, 2000
+  apply %marker(%2000) : $@convention(thin) (Builtin.Int32) -> ()
+  // CHECK:         br label %coro.end
+  %ret = tuple ()
+  return %ret : $()
+
+unwind:
+  // CHECK:         call swiftcc void @marker(i32 3000)
+  %3000 = integer_literal $Builtin.Int32, 3000
+  apply %marker(%3000) : $@convention(thin) (Builtin.Int32) -> ()
+  // CHECK:         br label %coro.end
+  unwind
+
+  // CHECK:       coro.end:
+  // CHECK:         call i1 @llvm.coro.end(ptr [[BEGIN]], i1 false, token none)
+  // CHECK-NEXT:    unreachable
+}
+
+// CHECK-32:       define linkonce_odr hidden ptr @__swift_coroFrameAllocStub(i32 %0, i64 %1) #1{{( comdat)?}} {
+// CHECK-64:       define linkonce_odr hidden ptr @__swift_coroFrameAllocStub(i64 %0, i64 %1) #1{{( comdat)?}} {
+// CHECK:       [[T0:%.*]] = icmp ne ptr @swift_coroFrameAlloc, null
+// CHECK:       br i1 [[T0]], label %return-coroFrameAlloc, label %return-malloc
+
+// CHECK-LABEL: return-coroFrameAlloc:
+// CHECK-32:         [[T1:%.*]] = call ptr @swift_coroFrameAlloc(i32 %0, i64 %1)
+// CHECK-64:         [[T1:%.*]] = call ptr @swift_coroFrameAlloc(i64 %0, i64 %1)
+// CHECK:         ret ptr [[T1]]
+
+// CHECK-LABEL: return-malloc:
+// CHECK-32:         [[T2:%.*]] = call ptr @malloc(i32 %0)
+// CHECK-64:         [[T2:%.*]] = call ptr @malloc(i64 %0)
+// CHECK:         ret ptr [[T2]]
+
+// CHECK-32:       declare extern_weak ptr @swift_coroFrameAlloc(i32, i64)
+// CHECK-64:       declare extern_weak ptr @swift_coroFrameAlloc(i64, i64)
+
+// CHECK-LABEL:     declare{{( dllimport)?}}{{( protected)?}} swiftcc void @"$sIetA_TC"
+// CHECK-SAME:      (ptr noalias dereferenceable([[BUFFER_SIZE]]), i1)
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_simple_call(i1 %0)
+sil @test_simple_call : $(Builtin.Int1) -> () {
+entry(%flag : $Builtin.Int1):
+  //   Allocate the buffer.
+  // CHECK:         [[T0:%.*]] = alloca {{\[}}[[BUFFER_SIZE]] x i8], align [[BUFFER_ALIGN]]
+  // CHECK-NEXT:    [[BUFFER:%.*]] = getelementptr inbounds{{.*}} {{\[}}[[BUFFER_SIZE]] x i8], ptr [[T0]], i32 0, i32 0
+  // CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 [[BUFFER_SIZE]], ptr [[BUFFER]])
+
+  //   Prepare the continuation function pointer to block analysis.
+  // CHECK-NEXT:    [[T0:%.*]] = call ptr @llvm.coro.prepare.retcon(ptr @test_simple)
+  //   Call the function pointer.
+  // CHECK-NEXT:    [[CONTINUATION:%.*]] = call swiftcc ptr [[T0]](ptr noalias dereferenceable([[BUFFER_SIZE]]) [[BUFFER]])
+  %0 = function_ref @test_simple : $@convention(thin) @yield_once () -> ()
+  %token = begin_apply %0() : $@convention(thin) @yield_once () -> ()
+
+  //   Branch.
+  // CHECK-NEXT:    br i1 %0,
+  cond_br %flag, yes, no
+
+yes:
+  // CHECK-64-ptrauth: ptrtoint
+  // CHECK-64-ptrauth-NEXT: ptrauth.blend
+  // CHECK:    call swiftcc void [[CONTINUATION]](ptr noalias dereferenceable([[BUFFER_SIZE]]) [[BUFFER]], i1 false)
+  // CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 [[BUFFER_SIZE]], ptr [[BUFFER]])
+  end_apply %token as $()
+
+  // CHECK-NEXT:    br label
+  br cont
+
+no:
+  // CHECK-64-ptrauth: ptrtoint
+  // CHECK-64-ptrauth-NEXT: ptrauth.blend
+  // CHECK:    call swiftcc void [[CONTINUATION]](ptr noalias dereferenceable([[BUFFER_SIZE]]) [[BUFFER]], i1 true)
+  // CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 [[BUFFER_SIZE]], ptr [[BUFFER]])
+  abort_apply %token
+
+  // CHECK-NEXT:    br label
+  br cont
+
+cont:
+  // CHECK:         ret void
+  %ret = tuple ()
+  return %ret : $()
+}
+
+sil @yields_pair : $@yield_once @convention(thin) () -> (@yields Builtin.Int32, @yields Builtin.Int32)
+
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @test_yields_pair()
+sil @test_yields_pair : $() -> () {
+entry:
+  %marker = function_ref @marker : $@convention(thin) (Builtin.Int32) -> ()
+
+  //   Allocate the buffer.
+  // CHECK:         [[T0:%.*]] = alloca {{\[}}[[BUFFER_SIZE]] x i8], align [[BUFFER_ALIGN]]
+  // CHECK-NEXT:    [[BUFFER:%.*]] = getelementptr inbounds{{.*}} {{\[}}[[BUFFER_SIZE]] x i8], ptr [[T0]], i32 0, i32 0
+  // CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 [[BUFFER_SIZE]], ptr [[BUFFER]])
+
+  //   Prepare the continuation function pointer to block analysis.
+  // CHECK-NEXT:    [[T0:%.*]] = call ptr @llvm.coro.prepare.retcon(ptr @yields_pair)
+  //   Call the function pointer.
+  // CHECK-NEXT:    [[PACKED:%.*]] = call swiftcc { ptr, i32, i32 } [[T0]](ptr noalias dereferenceable([[BUFFER_SIZE]]) [[BUFFER]])
+  // CHECK-NEXT:    [[CONTINUATION:%.*]] = extractvalue { ptr, i32, i32 } [[PACKED]], 0
+  // CHECK-NEXT:    [[FIRST:%.*]] = extractvalue { ptr, i32, i32 } [[PACKED]], 1
+  // CHECK-NEXT:    [[SECOND:%.*]] = extractvalue { ptr, i32, i32 } [[PACKED]], 2
+  %coro = function_ref @yields_pair : $@yield_once @convention(thin) () -> (@yields Builtin.Int32, @yields Builtin.Int32)
+  (%first, %second, %token) = begin_apply %coro() : $@yield_once @convention(thin) () -> (@yields Builtin.Int32, @yields Builtin.Int32)
+
+  // CHECK-NEXT:    call swiftcc void @marker(i32 [[FIRST]])
+  apply %marker(%first) : $@convention(thin) (Builtin.Int32) -> ()
+
+  // CHECK-64-ptrauth-NEXT: ptrtoint
+  // CHECK-64-ptrauth-NEXT: ptrauth.blend
+  // CHECK-NEXT:    call swiftcc void [[CONTINUATION]](ptr noalias dereferenceable([[BUFFER_SIZE]]) [[BUFFER]], i1 false)
+  // CHECK-NEXT:    call void @llvm.lifetime.end.p0(i64 [[BUFFER_SIZE]], ptr [[BUFFER]])
+  end_apply %token as $()
+
+  // CHECK-NEXT:    call swiftcc void @marker(i32 [[SECOND]])
+  apply %marker(%second) : $@convention(thin) (Builtin.Int32) -> ()
+
+  // CHECK-NEXT:    ret void
+  %ret = tuple ()
+  return %ret : $()
+}
+
+
+// CHECK:       attributes [[CORO_ATTRIBUTES]] =
+// CHECK-SAME:    noinline

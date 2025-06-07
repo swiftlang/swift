@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name statements -Xllvm -sil-full-demangle -parse-as-library -verify %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name statements -Xllvm -sil-full-demangle -parse-as-library -verify %s | %FileCheck %s
 
 class MyClass { 
   func foo() { }
@@ -361,6 +361,7 @@ func test_do() {
   do {
     // CHECK: [[CTOR:%.*]] = function_ref @$s10statements7MyClassC{{[_0-9a-zA-Z]*}}fC
     // CHECK: [[OBJ:%.*]] = apply [[CTOR]](
+    // CHECK: [[OBJMOVE:%.*]] = move_value [lexical] [var_decl] [[OBJ]]
     let obj = MyClass()
     _ = obj
     
@@ -370,7 +371,7 @@ func test_do() {
     bar(1)
 
     // CHECK-NOT: br bb
-    // CHECK: destroy_value [[OBJ]]
+    // CHECK: destroy_value [[OBJMOVE]]
     // CHECK-NOT: br bb
   }
 
@@ -391,6 +392,7 @@ func test_do_labeled() {
   lbl: do {
     // CHECK: [[CTOR:%.*]] = function_ref @$s10statements7MyClassC{{[_0-9a-zA-Z]*}}fC
     // CHECK: [[OBJ:%.*]] = apply [[CTOR]](
+    // CHECK: [[OBJMOVE:%.*]] = move_value [lexical] [var_decl] [[OBJ]]
     let obj = MyClass()
     _ = obj
 
@@ -403,7 +405,7 @@ func test_do_labeled() {
     // CHECK: cond_br {{%.*}}, bb2, bb3
     if (global_cond) {
       // CHECK: bb2:
-      // CHECK: destroy_value [[OBJ]]
+      // CHECK: destroy_value [[OBJMOVE]]
       // CHECK: br bb1
       continue lbl
     }
@@ -418,7 +420,7 @@ func test_do_labeled() {
     // CHECK: cond_br {{%.*}}, bb4, bb5
     if (global_cond) {
       // CHECK: bb4:
-      // CHECK: destroy_value [[OBJ]]
+      // CHECK: destroy_value [[OBJMOVE]]
       // CHECK: br bb6
       break lbl
     }
@@ -429,7 +431,7 @@ func test_do_labeled() {
     // CHECK: apply [[BAR]](
     bar(3)
 
-    // CHECK: destroy_value [[OBJ]]
+    // CHECK: destroy_value [[OBJMOVE]]
     // CHECK: br bb6
   }
 
@@ -526,7 +528,8 @@ func defer_mutable(_ x: Int) {
   var x = x
   // expected-warning@-1 {{variable 'x' was never mutated; consider changing to 'let' constant}}
   // CHECK: [[BOX:%.*]] = alloc_box ${ var Int }
-  // CHECK-NEXT: project_box [[BOX]]
+  // CHECK-NEXT: [[BOX_LIFETIME:%.*]] = begin_borrow [var_decl] [[BOX]]
+  // CHECK-NEXT: project_box [[BOX_LIFETIME]]
   // CHECK-NOT: [[BOX]]
   // CHECK: function_ref @$s10statements13defer_mutableyySiF6$deferL_yyF : $@convention(thin) (@inout_aliasable Int) -> ()
   // CHECK-NOT: [[BOX]]
@@ -582,14 +585,17 @@ func testRequireExprPattern(_ a : Int) {
 func testRequireOptional1(_ a : Int?) -> Int {
 
   // CHECK: [[SOME]]([[PAYLOAD:%.*]] : $Int):
-  // CHECK-NEXT:   debug_value [[PAYLOAD]] : $Int, let, name "t"
-  // CHECK-NEXT:   return [[PAYLOAD]] : $Int
+  // CHECK-NEXT:   [[MV_PAYLOAD:%.*]] = move_value [var_decl] [[PAYLOAD]] : $Int
+  // CHECK-NEXT:   debug_value [[MV_PAYLOAD]] : $Int, let, name "t"
+  // CHECK-NEXT:   extend_lifetime [[MV_PAYLOAD]] : $Int
+  // CHECK-NEXT:   return [[MV_PAYLOAD]] : $Int
   guard let t = a else { abort() }
 
   // CHECK: [[NONE]]:
   // CHECK-NEXT:    // function_ref statements.abort() -> Swift.Never
   // CHECK-NEXT:    [[FUNC_REF:%.*]] = function_ref @$s10statements5aborts5NeverOyF
   // CHECK-NEXT:    apply [[FUNC_REF]]() : $@convention(thin) () -> Never
+  // CHECK-NEXT:    ignored_use
   // CHECK-NEXT:    unreachable
   return t
 }
@@ -603,17 +609,19 @@ func testRequireOptional2(_ a : String?) -> String {
   guard let t = a else { abort() }
 
   // CHECK:  [[SOME_BB]]([[STR:%.*]] : @owned $String):
-  // CHECK-NEXT:   [[BORROWED_STR:%.*]] = begin_borrow [lexical] [[STR]]
-  // CHECK-NEXT:   debug_value [[BORROWED_STR]] : $String, let, name "t"
+  // CHECK: [[STRMOVE:%.*]] = move_value [var_decl] [[STR]]
+  // CHECK-NEXT:   debug_value [[STRMOVE]] : $String, let, name "t"
+  // CHECK-NEXT:   [[BORROWED_STR:%.*]] = begin_borrow [[STRMOVE]]
   // CHECK-NEXT:   [[RETURN:%.*]] = copy_value [[BORROWED_STR]]
   // CHECK-NEXT:   end_borrow [[BORROWED_STR]]
-  // CHECK-NEXT:   destroy_value [[STR]] : $String
+  // CHECK-NEXT:   destroy_value [[STRMOVE]] : $String
   // CHECK-NEXT:   return [[RETURN]] : $String
 
   // CHECK: [[NONE_BB]]:
   // CHECK-NEXT:   // function_ref statements.abort() -> Swift.Never
   // CHECK-NEXT:   [[ABORT_FUNC:%.*]] = function_ref @$s10statements5aborts5NeverOyF
   // CHECK-NEXT:   [[NEVER:%.*]] = apply [[ABORT_FUNC]]()
+  // CHECK-NEXT:   ignored_use
   // CHECK-NEXT:   unreachable
   return t
 }
@@ -631,7 +639,7 @@ func testCleanupEmission<T>(_ x: T) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s10statements15test_is_patternyyAA9BaseClassCF
 func test_is_pattern(_ y : BaseClass) {
-  // checked_cast_br %0 : $BaseClass to DerivedClass
+  // checked_cast_br BaseClass in %0 : $BaseClass to DerivedClass
   guard case is DerivedClass = y else { marker_1(); return }
 
   marker_2()
@@ -641,17 +649,18 @@ func test_is_pattern(_ y : BaseClass) {
 func test_as_pattern(_ y : BaseClass) -> DerivedClass {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $BaseClass):
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
-  // CHECK:   checked_cast_br [[ARG_COPY]] : $BaseClass to DerivedClass
+  // CHECK:   checked_cast_br BaseClass in [[ARG_COPY]] : $BaseClass to DerivedClass
   guard case let result as DerivedClass = y else {  }
   // CHECK: bb{{.*}}({{.*}} : @owned $DerivedClass):
 
 
   // CHECK: bb{{.*}}([[PTR:%[0-9]+]] : @owned $DerivedClass):
-  // CHECK-NEXT: [[BORROWED_PTR:%.*]] = begin_borrow [lexical] [[PTR]]
-  // CHECK-NEXT: debug_value [[BORROWED_PTR]] : $DerivedClass, let, name "result"
+  // CHECK-NEXT: [[MOVED_PTR:%.*]] = move_value [lexical] [var_decl] [[PTR]]
+  // CHECK-NEXT: debug_value [[MOVED_PTR]] : $DerivedClass, let, name "result"
+  // CHECK-NEXT: [[BORROWED_PTR:%.*]] = begin_borrow [[MOVED_PTR]]
   // CHECK-NEXT: [[RESULT:%.*]] = copy_value [[BORROWED_PTR]]
   // CHECK-NEXT: end_borrow [[BORROWED_PTR]]
-  // CHECK-NEXT: destroy_value [[PTR]] : $DerivedClass
+  // CHECK-NEXT: destroy_value [[MOVED_PTR]] : $DerivedClass
   // CHECK-NEXT: return [[RESULT]] : $DerivedClass
   return result
 }
@@ -765,8 +774,13 @@ func let_else_tuple_binding(_ a : (Int, Int)?) -> Int {
 
   // CHECK: [[SOME_BB]]([[PAYLOAD:%.*]] : $(Int, Int)):
   // CHECK-NEXT:   ([[PAYLOAD_1:%.*]], [[PAYLOAD_2:%.*]]) = destructure_tuple [[PAYLOAD]]
-  // CHECK-NEXT:   debug_value [[PAYLOAD_1]] : $Int, let, name "x"
-  // CHECK-NEXT:   debug_value [[PAYLOAD_2]] : $Int, let, name "y"
-  // CHECK-NEXT:   return [[PAYLOAD_1]] : $Int
+  // CHECK-NEXT:   [[MV_1:%.*]] = move_value [var_decl] [[PAYLOAD_1]] : $Int
+  // CHECK-NEXT:   debug_value [[MV_1]] : $Int, let, name "x"
+  // CHECK-NEXT:   [[MV_2:%.*]] = move_value [var_decl] [[PAYLOAD_2]] : $Int
+  // CHECK-NEXT:   debug_value [[MV_2]] : $Int, let, name "y"
+  // CHECK-NEXT:   ignored_use
+  // CHECK-NEXT:   extend_lifetime [[MV_2]] : $Int
+  // CHECK-NEXT:   extend_lifetime [[MV_1]] : $Int
+  // CHECK-NEXT:   return [[MV_1]] : $Int
 }
 

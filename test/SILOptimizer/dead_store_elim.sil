@@ -1,4 +1,5 @@
-// RUN: %target-sil-opt %s -dead-store-elim -max-partial-store-count=2 -enable-sil-verify-all | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %s -dead-store-elimination -enable-sil-verify-all | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %s -compute-side-effects -dead-store-elimination -enable-sil-verify-all | %FileCheck %s --check-prefix=CHECK-SEA-DSE
 
 // REQUIRES: swift_in_compiler
 
@@ -104,6 +105,11 @@ class foo {
   var a: Int
    deinit
   init()
+}
+
+struct IntAndFoo {
+  var i: Int
+  var f: foo
 }
 
 class AB {
@@ -252,6 +258,8 @@ bb0(%0 : $B):
 // CHECK: bb0
 // CHECK-NEXT: load
 // CHECK-NEXT: integer_literal
+// CHECK-NEXT: builtin
+// CHECK-NEXT: tuple_extract
 // CHECK-NEXT: builtin
 // CHECK-NEXT: tuple_extract
 // CHECK-NEXT: {{ store}}
@@ -1537,8 +1545,168 @@ bb0:
   %3 = struct $Int (%2 : $Builtin.Int64)
   %4 = ref_element_addr %1 : $foo, #foo.a
   store %3 to %4 : $*Int
-  set_deallocating %1 : $foo
-  dealloc_ref %1 : $foo
+  %6 = begin_dealloc_ref %1 : $foo of %1 : $foo
+  dealloc_ref %6 : $foo
   dealloc_stack_ref %1 : $foo
   return %3 : $Int
 }
+
+sil @read_from_argument : $@convention(thin) (@in_guaranteed Int) -> ()
+
+// CHECK-LABEL: sil @test_ref_tail_addr  :
+// CHECK-NOT:     store
+// CHECK:       end sil function 'test_ref_tail_addr'
+sil @test_ref_tail_addr : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = integer_literal $Builtin.Word, 1
+  %2 = alloc_ref [stack] [tail_elems $Int * %1 : $Builtin.Word] $foo
+  %3 = ref_element_addr %2 : $foo, #foo.a
+  store %0 to %3 : $*Int
+  %5 = ref_tail_addr %2 : $foo, $Int
+  %6 = function_ref @read_from_argument : $@convention(thin) (@in_guaranteed Int) -> ()
+  %7 = apply %6(%5) : $@convention(thin) (@in_guaranteed Int) -> ()
+  dealloc_stack_ref %2 : $foo
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_split_tuple  :
+// CHECK:         [[T1:%.*]] = tuple_element_addr %1 : $*(Int, Int), 0 
+// CHECK-NEXT:    store {{.*}} to [[T1]]
+// CHECK-NOT:     store
+// CHECK:         fix_lifetime
+// CHECK-NEXT:    [[T2:%.*]] = tuple_element_addr %1 : $*(Int, Int), 1
+// CHECK-NEXT:    store %0 to [[T2]]
+// CHECK-NOT:     store
+// CHECK:       end sil function 'test_split_tuple'
+sil @test_split_tuple : $@convention(thin) (Int, @inout (Int, Int)) -> () {
+bb0(%0 : $Int, %1 : $*(Int, Int)):
+  %2 = tuple (%0 : $Int, %0 : $Int)
+  store %2 to %1 : $*(Int, Int)
+  fix_lifetime %0 : $Int
+  %4 = tuple_element_addr %1 : $*(Int, Int), 1
+  store %0 to %4 : $*Int
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_ossa_not_trivial  :
+// CHECK:         store %0
+// CHECK:         store %1
+// CHECK:       end sil function 'test_ossa_not_trivial'
+sil [ossa] @test_ossa_not_trivial : $@convention(thin) (@owned foo, @owned foo, @inout foo) -> () {
+bb0(%0 : @owned $foo, %1 : @owned $foo, %2 : $*foo):
+  store %0 to [assign] %2 : $*foo
+  store %1 to [assign] %2 : $*foo
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_ossa_partial_trivial  :
+// CHECK-NOT:     store %0
+// CHECK:         store %1
+// CHECK:       end sil function 'test_ossa_partial_trivial'
+sil [ossa] @test_ossa_partial_trivial : $@convention(thin) (Int, @owned IntAndFoo, @inout IntAndFoo) -> () {
+bb0(%0 : $Int, %1 : @owned $IntAndFoo, %2 : $*IntAndFoo):
+  %3 = struct_element_addr %2 : $*IntAndFoo, #IntAndFoo.i
+  store %0 to [trivial] %3 : $*Int
+  store %1 to [assign] %2 : $*IntAndFoo
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_bind_memory  :
+// CHECK:         store %0
+// CHECK:       end sil function 'test_bind_memory'
+sil @test_bind_memory : $@convention(thin) (UInt64, Builtin.Word) -> Builtin.Int8 {
+bb0(%0 : $UInt64, %1 : $Builtin.Word):
+  %35 = alloc_stack $(UInt64, UInt64)
+  %36 = tuple_element_addr %35 : $*(UInt64, UInt64), 0
+  store %0 to %36 : $*UInt64
+  %50 = address_to_pointer %35 : $*(UInt64, UInt64) to $Builtin.RawPointer
+  %52 = bind_memory %50 : $Builtin.RawPointer, %1 : $Builtin.Word to $*UInt8
+  %72 = pointer_to_address %50 : $Builtin.RawPointer to [strict] $*UInt8
+  %75 = struct_element_addr %72 : $*UInt8, #UInt8._value
+  %76 = load %75 : $*Builtin.Int8
+  dealloc_stack %35 : $*(UInt64, UInt64)
+  return %76 : $Builtin.Int8
+}
+
+class Klass {}
+
+sil @klassClosure : $@convention(thin) (@in_guaranteed Klass) -> ()
+
+sil @test_pa_without_apply : $@convention(thin) (@in Klass) -> @callee_guaranteed () -> () {
+bb0(%0 : $*Klass):
+  %3 = function_ref @klassClosure : $@convention(thin) (@in_guaranteed Klass) -> ()
+  %4 = partial_apply [callee_guaranteed] %3(%0) : $@convention(thin) (@in_guaranteed Klass) -> ()
+  return %4 : $@callee_guaranteed ()  -> ()
+}
+
+// CHECK-SEA-DSE: sil @dont_dead_store_capture :
+// CHECK-SEA-DSE: store
+// CHECK-SEA-DSE: } // end sil function 'dont_dead_store_capture'
+sil @dont_dead_store_capture : $@convention(thin) (@in_guaranteed (Klass, Klass)) -> () {
+bb0(%0 : $*(Klass, Klass)):
+  %ele = tuple_element_addr %0 : $*(Klass, Klass), 1
+  %1 = load %ele : $*Klass
+  %3 = alloc_stack $Klass
+  store %1 to %3 : $*Klass
+  strong_retain %1 : $Klass
+  %4 = function_ref @test_pa_without_apply : $@convention(thin) (@in Klass) -> @callee_guaranteed () -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@in Klass) -> @callee_guaranteed () -> ()
+  %6 = apply %5() : $@callee_guaranteed () -> ()
+  dealloc_stack %3 : $*Klass
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil @indexing_is_not_overlapping :
+// CHECK:         store %0
+// CHECK:         store %0
+// CHECK:       end sil function 'indexing_is_not_overlapping'
+sil @indexing_is_not_overlapping : $@convention(thin) (Int, Builtin.RawPointer) -> () {
+bb0(%0 : $Int, %1 : $Builtin.RawPointer):
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*Int
+  %3 = integer_literal $Builtin.Word, 3
+  %4 = index_addr [stack_protection] %2 : $*Int, %3 : $Builtin.Word
+  store %0 to %4 : $*Int
+  store %0 to %2 : $*Int
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @indexing_is_not_overlapping2 :
+// CHECK:         store %1
+// CHECK:         store %0
+// CHECK:       end sil function 'indexing_is_not_overlapping2'
+sil @indexing_is_not_overlapping2 : $@convention(thin) (Int, Builtin.Int64, Builtin.RawPointer) -> () {
+bb0(%0 : $Int, %1 : $Builtin.Int64, %2 : $Builtin.RawPointer):
+  %3 = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*Int
+  %4 = integer_literal $Builtin.Word, 3
+  %5 = index_addr [stack_protection] %3 : $*Int, %4 : $Builtin.Word
+  %6 = struct_element_addr %5 : $*Int, #Int.value
+  store %1 to %6 : $*Builtin.Int64
+  store %0 to %3 : $*Int
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @closure_with_inout : $@convention(thin) (@inout_aliasable Int) -> ()
+
+// CHECK-LABEL: sil @closure_with_inout_reads_argument :
+// CHECK:         store %0
+// CHECK:       end sil function 'closure_with_inout_reads_argument'
+sil @closure_with_inout_reads_argument : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_stack $Int
+  store %0 to %1
+  %3 = function_ref @closure_with_inout : $@convention(thin) (@inout_aliasable Int) -> ()
+  %4 = partial_apply [callee_guaranteed] [on_stack] %3(%1) : $@convention(thin) (@inout_aliasable Int) -> ()
+  %50 = apply %4() : $@noescape @callee_guaranteed () -> ()
+  dealloc_stack %4 : $@noescape @callee_guaranteed () -> ()
+  dealloc_stack %1 : $*Int
+  %r = tuple ()
+  return %r
+}
+

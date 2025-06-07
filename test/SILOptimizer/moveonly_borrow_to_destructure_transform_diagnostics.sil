@@ -1,52 +1,50 @@
-// RUN: %target-sil-opt -move-only-diagnostics-silently-emit-diagnostics -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all -sil-move-only-borrow-to-destructure %s | %FileCheck %s
-// RUN: %target-sil-opt -verify -enable-experimental-move-only -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all -sil-move-only-borrow-to-destructure %s
+// RUN: %target-sil-opt -move-only-diagnostics-silently-emit-diagnostics -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all -sil-move-only-borrow-to-destructure %s | %FileCheck %s
+// RUN: %target-sil-opt -verify -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all -sil-move-only-borrow-to-destructure %s
+
+// REQUIRES: swift_feature_MoveOnlyClasses
 
 sil_stage raw
 
 import Builtin
+import Swift
 
 //////////////////
 // Declarations //
 //////////////////
 
 class Klass {}
-@_moveOnly
-class MoveOnlyKlass {
+class MoveOnlyKlass: ~Copyable {
   var value: Builtin.Int32
 }
 
-@_moveOnly
-struct KlassPair {
+struct KlassPair: ~Copyable {
   var lhs: Klass
   var rhs: MoveOnlyKlass
 }
 
-@_moveOnly
-struct AggStruct {
+struct AggStruct: ~Copyable {
   var pair: KlassPair
 }
 
-@_moveOnly
-struct KlassPair2 {
+struct KlassPair2: ~Copyable {
   var lhs: MoveOnlyKlass
   var rhs: MoveOnlyKlass
 }
 
-@_moveOnly
-struct AggStruct2 {
+struct AggStruct2: ~Copyable {
   var lhs: MoveOnlyKlass
   var pair: KlassPair2
   var rhs: MoveOnlyKlass
 }
 
-@_moveOnly
-struct SingleIntContainingStruct {
+struct SingleIntContainingStruct: ~Copyable {
     var value: Builtin.Int32
 }
 
 sil @misc_use : $@convention(thin) () -> ()
 sil @aggstruct_consume : $@convention(thin) (@owned AggStruct) -> ()
 sil @moveonlyklass_consume : $@convention(thin) (@owned MoveOnlyKlass) -> ()
+sil @moveonlyklass_consume_use : $@convention(thin) (@owned MoveOnlyKlass, @guaranteed MoveOnlyKlass) -> ()
 sil @moveonlyklass_use : $@convention(thin) (@guaranteed MoveOnlyKlass) -> ()
 sil @klass_use : $@convention(thin) (@guaranteed Klass) -> ()
 
@@ -57,13 +55,13 @@ sil @klass_use : $@convention(thin) (@guaranteed Klass) -> ()
 // CHECK-LABEL: sil [ossa] @test_access_single_child_field_consume : $@convention(method) (@guaranteed AggStruct2) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $AggStruct2):
 // CHECK:   explicit_copy_value [[ARG]]
-// CHECK-NOT: mark_must_check
+// CHECK-NOT: mark_unresolved_non_copyable_value
 // CHECK: } // end sil function 'test_access_single_child_field_consume'
 sil [ossa] @test_access_single_child_field_consume : $@convention(method) (@guaranteed AggStruct2) -> () {
 bb0(%0 : @guaranteed $AggStruct2):
   %1 = copy_value %0 : $AggStruct2
-  %2 = mark_must_check [no_copy] %1 : $AggStruct2 // expected-error {{'self' has a move only field that was consumed before later uses}}
-  debug_value %2 : $AggStruct2, let, name "self", argno 1, implicit
+  %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $AggStruct2 // expected-error {{cannot use 'self' after partial consume}}
+  debug_value %2 : $AggStruct2, let, name "self", argno 1
   %4 = begin_borrow %2 : $AggStruct2
   %5 = struct_extract %4 : $AggStruct2, #AggStruct2.pair
   %6 = struct_extract %5 : $KlassPair2, #KlassPair2.lhs
@@ -76,8 +74,89 @@ bb0(%0 : @guaranteed $AggStruct2):
   end_borrow %4a : $AggStruct2
   destroy_value %2 : $AggStruct2
   %9 = function_ref @moveonlyklass_consume : $@convention(thin) (@owned MoveOnlyKlass) -> ()
-  apply %9(%7) : $@convention(thin) (@owned MoveOnlyKlass) -> () // expected-note {{consuming use}}
-  apply %9(%7a) : $@convention(thin) (@owned MoveOnlyKlass) -> () // expected-note {{boundary use here}}
+  apply %9(%7) : $@convention(thin) (@owned MoveOnlyKlass) -> () // expected-note {{partially consumed here}}
+  apply %9(%7a) : $@convention(thin) (@owned MoveOnlyKlass) -> () // expected-note {{used here}}
   %9999 = tuple()
   return %9999 : $()
+}
+
+sil [ossa] @test_access_single_child_field_consume2 : $@convention(method) (@guaranteed AggStruct2) -> @owned KlassPair2 {
+bb0(%0 : @guaranteed $AggStruct2):
+  %1 = copy_value %0 : $AggStruct2
+  %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $AggStruct2 // expected-error {{'self' consumed more than once}}
+  debug_value %2 : $AggStruct2, let, name "self", argno 1
+  %4 = begin_borrow %2 : $AggStruct2
+  %5 = struct_extract %4 : $AggStruct2, #AggStruct2.pair
+  %6 = struct_extract %5 : $KlassPair2, #KlassPair2.lhs
+  %7 = copy_value %6 : $MoveOnlyKlass
+  end_borrow %4 : $AggStruct2
+  %4a = begin_borrow %2 : $AggStruct2
+  %5a = struct_extract %4a : $AggStruct2, #AggStruct2.pair
+  %6a = struct_extract %5a : $KlassPair2, #KlassPair2.lhs
+  %7a = copy_value %6a : $MoveOnlyKlass
+  end_borrow %4a : $AggStruct2
+  destroy_value %2 : $AggStruct2
+  %8 = struct $KlassPair2(%7 : $MoveOnlyKlass, %7a : $MoveOnlyKlass) // expected-note {{multiple consumes here}}
+  return %8 : $KlassPair2
+}
+
+sil [ossa] @test_access_single_child_field_consume3 : $@convention(method) (@guaranteed AggStruct2) -> () {
+bb0(%0 : @guaranteed $AggStruct2):
+  %1 = copy_value %0 : $AggStruct2
+  %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $AggStruct2 // expected-error {{'self' consumed and used at the same time}}
+  debug_value %2 : $AggStruct2, let, name "self", argno 1
+  %4 = begin_borrow %2 : $AggStruct2
+  %5 = struct_extract %4 : $AggStruct2, #AggStruct2.pair
+  %6 = struct_extract %5 : $KlassPair2, #KlassPair2.lhs
+  %7 = copy_value %6 : $MoveOnlyKlass
+  end_borrow %4 : $AggStruct2
+  %4a = begin_borrow %2 : $AggStruct2
+  %5a = struct_extract %4a : $AggStruct2, #AggStruct2.pair
+  %6a = struct_extract %5a : $KlassPair2, #KlassPair2.lhs
+  %7a = copy_value %6a : $MoveOnlyKlass
+  end_borrow %4a : $AggStruct2
+  destroy_value %2 : $AggStruct2
+  %8 = function_ref @moveonlyklass_consume_use : $@convention(thin) (@owned MoveOnlyKlass, @guaranteed MoveOnlyKlass) -> ()
+  apply %8(%7, %7a) : $@convention(thin) (@owned MoveOnlyKlass, @guaranteed MoveOnlyKlass) -> () // expected-note {{consumed and used here}}
+  destroy_value %7a : $MoveOnlyKlass
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+sil [ossa] @test_loop_error : $@convention(thin) (@owned AggStruct2) -> () {
+bb0(%0 : @owned $AggStruct2):
+  %1 = move_value [lexical] %0 : $AggStruct2
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $AggStruct2
+  debug_value %2 : $AggStruct2, let, name "x", argno 1
+  %4 = copy_value %2 : $AggStruct2
+  %5 = move_value [lexical] %4 : $AggStruct2
+  %6 = mark_unresolved_non_copyable_value [consumable_and_assignable] %5 : $AggStruct2
+  // expected-error @-1 {{cannot use 'x2' after partial consume}}
+  // expected-error @-2 {{cannot use 'x2' after partial consume}}
+  debug_value %6 : $AggStruct2, let, name "x2"
+  %8 = begin_borrow %6 : $AggStruct2
+  %9 = struct_extract %8 : $AggStruct2, #AggStruct2.lhs
+  %10 = copy_value %9 : $MoveOnlyKlass
+  %11 = function_ref @moveonlyklass_consume : $@convention(thin) (@owned MoveOnlyKlass) -> ()
+  %12 = apply %11(%10) : $@convention(thin) (@owned MoveOnlyKlass) -> () // expected-note {{partially consumed here}}
+  end_borrow %8 : $AggStruct2
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb3
+
+bb2:
+  %51 = begin_borrow %6 : $AggStruct2
+  %52 = struct_extract %51 : $AggStruct2, #AggStruct2.lhs
+  %53 = copy_value %52 : $MoveOnlyKlass
+  %54 = function_ref @moveonlyklass_consume : $@convention(thin) (@owned MoveOnlyKlass) -> ()
+  %55 = apply %54(%53) : $@convention(thin) (@owned MoveOnlyKlass) -> () // expected-note {{partially consumed here}}
+  end_borrow %51 : $AggStruct2
+  br bb1
+
+bb3:
+  destroy_value %6 : $AggStruct2
+  destroy_value %2 : $AggStruct2
+  %61 = tuple ()
+  return %61 : $()
 }

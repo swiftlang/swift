@@ -62,8 +62,7 @@
 /// have a consistent type interface.
 @frozen
 public struct Bool: Sendable {
-  @usableFromInline
-  internal var _value: Builtin.Int1
+  public var _value: Builtin.Int1
 
   /// Creates an instance initialized to `false`.
   ///
@@ -75,8 +74,8 @@ public struct Bool: Sendable {
     self._value = Builtin.trunc_Int8_Int1(zero._value)
   }
 
-  @usableFromInline @_transparent
-  internal init(_ v: Builtin.Int1) { self._value = v }
+  @_transparent
+  public init(_ _v: Builtin.Int1) { self._value = _v }
   
   /// Creates an instance equal to the given Boolean value.
   ///
@@ -142,6 +141,7 @@ public struct Bool: Sendable {
 
 extension Bool: _ExpressibleByBuiltinBooleanLiteral, ExpressibleByBooleanLiteral {
   @_transparent
+  @_semantics("bool.literal_init")
   public init(_builtinBooleanLiteral value: Builtin.Int1) {
     self._value = value
   }

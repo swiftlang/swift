@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-move-only %s -parse-stdlib -emit-sil -o /dev/null
+// RUN: %target-swift-frontend %s -parse-stdlib -emit-sil -o /dev/null
 
 import Swift
 
@@ -14,7 +14,7 @@ public class Klass {
 public func copyableVarArgTestCCFlowReinitOutOfBlockTest(_ k: inout Klass) {
     k.doSomething()
     if booleanValue {
-        let m = _move k
+        let m = consume k
         m.doSomething()
     }
     k = Klass()

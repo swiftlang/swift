@@ -3,18 +3,24 @@
 // RUN: %empty-directory(%t)
 // RUN: %{python} %utils/split_file.py -o %t %s
 
-// RUN: %target-swift-frontend -emit-module %t/empty.swift -module-name empty -o %t/empty.swiftmodule
-// RUN: %target-swift-frontend -emit-module %t/libA.swift -module-name libA -o %t/libA.swiftmodule
-// RUN: %target-swift-frontend -emit-module %t/libB.swift -module-name libB -o %t/libB.swiftmodule -I %t
+// RUN: %target-swift-frontend -emit-module %t/empty.swift -module-name empty -o %t/empty.swiftmodule \
+// RUN:   -enable-library-evolution
+// RUN: %target-swift-frontend -emit-module %t/libA.swift -module-name libA -o %t/libA.swiftmodule \
+// RUN:   -enable-library-evolution
+// RUN: %target-swift-frontend -emit-module %t/libB.swift -module-name libB -o %t/libB.swiftmodule -I %t \
+// RUN:   -enable-library-evolution
 
 /// In pre-Swift 6, this is a warning where there's no implementation-only import present.
-// RUN: %target-swift-frontend -emit-module %t/clientFileA-Swift5.swift %t/clientFileB.swift -module-name client -o %t/client.swiftmodule -I %t -verify
+// RUN: %target-swift-frontend -emit-module %t/clientFileA-Swift5.swift %t/clientFileB.swift -module-name client -o %t/client.swiftmodule -I %t -verify \
+// RUN:   -enable-library-evolution
 
 /// In pre-Swift 6, this remains an error when there's an implementation-only import present.
-// RUN: %target-swift-frontend -emit-module %t/clientFileA-OldCheck.swift %t/clientFileB.swift -module-name client -o %t/client.swiftmodule -I %t -verify
+// RUN: %target-swift-frontend -emit-module %t/clientFileA-OldCheck.swift %t/clientFileB.swift -module-name client -o %t/client.swiftmodule -I %t -verify \
+// RUN:   -enable-library-evolution
 
 /// In Swift 6, it's an error.
-// RUN: %target-swift-frontend -emit-module %t/clientFileA-Swift6.swift %t/clientFileB.swift -module-name client -o %t/client.swiftmodule -I %t -verify -swift-version 6
+// RUN: %target-swift-frontend -emit-module %t/clientFileA-Swift6.swift %t/clientFileB.swift -module-name client -o %t/client.swiftmodule -I %t -verify -swift-version 6 \
+// RUN:   -enable-library-evolution
 
 /// The swiftinterface is broken by the missing import without the workaround.
 // RUN: %target-swift-emit-module-interface(%t/ClientBroken.swiftinterface)  %t/clientFileA-Swift5.swift %t/clientFileB.swift -I %t -disable-print-missing-imports-in-module-interface
@@ -29,8 +35,6 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t/ClientFixed.swiftinterface) -I %t
 // RUN: cat %t/ClientFixed.swiftinterface | %FileCheck -check-prefix ALIASED %s
 // ALIASED: import Module___libB
-
-// REQUIRES: asserts
 
 // BEGIN empty.swift
 
@@ -54,23 +58,24 @@ extension ImportedType : SomeProtocol {}
 
 /// Client module
 // BEGIN clientFileA-Swift5.swift
-import libA
+public import libA
 
 @inlinable public func bar() {
   let a = ImportedType()
-  a.implicitlyImportedMethod() // expected-warning {{instance method 'implicitlyImportedMethod()' cannot be used in an '@inlinable' function because 'libB' was not imported by this file; this is an error in Swift 6}}
+  a.implicitlyImportedMethod() // expected-warning {{instance method 'implicitlyImportedMethod()' cannot be used in an '@inlinable' function because 'libB' was not imported by this file; this is an error in the Swift 6 language mode}}
   // expected-note@-1 {{The missing import of module 'libB' will be added implicitly}}
 
   // Expected implicit imports are still fine
   a.localModuleMethod()
 
-  conformanceUse(a) // expected-warning {{cannot use conformance of 'ImportedType' to 'SomeProtocol' here; 'libB' was not imported by this file; this is an error in Swift 6}}
+  conformanceUse(a) // expected-warning {{cannot use conformance of 'ImportedType' to 'SomeProtocol' here; 'libB' was not imported by this file; this is an error in the Swift 6 language mode}}
   // expected-note@-1 {{The missing import of module 'libB' will be added implicitly}}
 }
 
 // BEGIN clientFileA-OldCheck.swift
-import libA
+public import libA
 @_implementationOnly import empty
+// expected-warning @-1 {{'@_implementationOnly' is deprecated, use 'internal import' instead}}
 
 @inlinable public func bar() {
   let a = ImportedType()
@@ -79,12 +84,12 @@ import libA
   // Expected implicit imports are still fine
   a.localModuleMethod()
 
-  conformanceUse(a) // expected-warning {{cannot use conformance of 'ImportedType' to 'SomeProtocol' here; 'libB' was not imported by this file; this is an error in Swift 6}}
+  conformanceUse(a) // expected-warning {{cannot use conformance of 'ImportedType' to 'SomeProtocol' here; 'libB' was not imported by this file; this is an error in the Swift 6 language mode}}
   // expected-note@-1 {{The missing import of module 'libB' will be added implicitly}}
 }
 
 // BEGIN clientFileA-Swift6.swift
-import libA
+public import libA
 
 @inlinable public func bar() {
   let a = ImportedType()
@@ -98,7 +103,8 @@ import libA
 
 // BEGIN clientFileB.swift
 @_implementationOnly import libB
-import libA
+// expected-warning @-1 {{'@_implementationOnly' is deprecated, use 'internal import' instead}}
+public import libA
 extension ImportedType {
     public func localModuleMethod() {}
 }

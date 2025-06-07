@@ -108,6 +108,154 @@ public:
   }
 };
 
+enum class WellKnownFunction {
+  // Array.init()
+  ArrayInitEmpty,
+  // Array._allocateUninitializedArray
+  AllocateUninitializedArray,
+  // Array._endMutation
+  EndArrayMutation,
+  // _finalizeUninitializedArray
+  FinalizeUninitializedArray,
+  // Array.append(_:)
+  ArrayAppendElement,
+  // String.init()
+  StringInitEmpty,
+  // String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  StringMakeUTF8,
+  // static String.append (_: String, _: inout String)
+  StringAppend,
+  // static String.== infix(_: String)
+  StringEquals,
+  // String.percentEscapedString.getter
+  StringEscapePercent,
+  // BinaryInteger.description.getter
+  BinaryIntegerDescription,
+  // _assertionFailure(_: StaticString, _: StaticString, file: StaticString,...)
+  AssertionFailure,
+  // A function taking one argument that prints the symbolic value of the
+  // argument during constant evaluation. This must only be used for debugging.
+  DebugPrint
+};
+
+//===----------------------------------------------------------------------===//
+// ConstExprFunctionState implementation.
+//===----------------------------------------------------------------------===//
+
+/// This type represents the state of computed values within a function
+/// as evaluation happens.  A separate instance of this is made for each
+/// callee in a call chain to represent the constant values given the set of
+/// formal parameters that callee was invoked with.
+class ConstExprFunctionState {
+  /// This is the evaluator that is computing this function state.  We use it to
+  /// allocate space for values and to query the call stack.
+  ConstExprEvaluator &evaluator;
+
+  /// If we are analyzing the body of a constexpr function, this is the
+  /// function.  This is null for the top-level expression.
+  SILFunction *fn;
+
+  /// If we have a function being analyzed, this is the substitutionMap for
+  /// the call to it.
+  /// substitutionMap specifies a mapping from all of the protocol and type
+  /// requirements in the generic signature down to concrete conformances and
+  /// concrete types.
+  SubstitutionMap substitutionMap;
+
+  /// This keeps track of the number of instructions we've evaluated.  If this
+  /// goes beyond the execution cap, then we start returning unknown values.
+  unsigned &numInstEvaluated;
+
+  /// This is a state of previously analyzed values, maintained and filled in
+  /// by getConstantValue.  This does not hold the memory referred to by SIL
+  /// addresses.
+  llvm::DenseMap<SILValue, SymbolicValue> calculatedValues;
+
+  /// If a SILValue is not bound to a SymbolicValue in the calculatedValues,
+  /// try to compute it recursively by visiting its defining instruction.
+  bool recursivelyComputeValueIfNotInState = false;
+
+public:
+  ConstExprFunctionState(ConstExprEvaluator &evaluator, SILFunction *fn,
+                         SubstitutionMap substitutionMap,
+                         unsigned &numInstEvaluated,
+                         bool enableTopLevelEvaluation);
+
+  /// Pretty print the state to stderr.
+  void dump() const;
+
+  void setValue(SILValue value, SymbolicValue symVal);
+
+  /// Return the symbolic value for a SILValue if it is bound in the interpreter
+  /// state. If not, return None.
+  std::optional<SymbolicValue> lookupValue(SILValue value);
+
+  /// Invariant: Before the call, `calculatedValues` must not contain `addr`
+  /// as a key.
+  SymbolicValue createMemoryObject(SILValue addr, SymbolicValue initialValue);
+
+  /// Return the SymbolicValue for the specified SIL value. If the SIL value is
+  /// not in \c calculatedValues, try computing the SymbolicValue recursively
+  /// if \c recursivelyComputeValueIfNotInState flag is set.
+  SymbolicValue getConstantValue(SILValue value);
+
+  /// Evaluate the specified instruction in a flow sensitive way, for use by
+  /// the constexpr function evaluator.  This does not handle control flow
+  /// statements.
+  std::optional<SymbolicValue> evaluateFlowSensitive(SILInstruction *inst);
+
+  /// Evaluate a branch or non-branch instruction and if the evaluation was
+  /// successful, return the next instruction from where the evaluation must
+  /// continue.
+  /// \param instI basic-block iterator pointing to the instruction to evaluate.
+  /// \param visitedBlocks basic blocks already visited during evaluation.
+  ///   This is used to detect loops.
+  /// \returns a pair where the first and second elements are defined as
+  /// follows:
+  ///   If the evaluation of the instruction is successful, the first element
+  ///   is the iterator to the next instruction from the where the evaluation
+  ///   must continue. Otherwise, it is None.
+  ///
+  ///   Second element is None, if the evaluation is successful.
+  ///   Otherwise, is an unknown symbolic value that contains the error.
+  std::pair<std::optional<SILBasicBlock::iterator>,
+            std::optional<SymbolicValue>>
+  evaluateInstructionAndGetNext(
+      SILBasicBlock::iterator instI,
+      SmallPtrSetImpl<SILBasicBlock *> &visitedBlocks);
+
+  Type substituteGenericParamsAndSimplify(Type ty);
+  CanType substituteGenericParamsAndSimplify(CanType ty) {
+    return substituteGenericParamsAndSimplify(Type(ty))->getCanonicalType();
+  }
+  SymbolicValue computeConstantValue(SILValue value);
+  SymbolicValue computeConstantValueBuiltin(BuiltinInst *inst);
+
+  std::optional<SymbolicValue> computeCallResult(ApplyInst *apply);
+
+  std::optional<SymbolicValue> computeOpaqueCallResult(ApplyInst *apply,
+                                                       SILFunction *callee);
+
+  std::optional<SymbolicValue>
+  computeWellKnownCallResult(ApplyInst *apply, WellKnownFunction callee);
+
+  /// Evaluate a closure creation instruction which is either a partial_apply
+  /// instruction or a thin_to_think_function instruction. On success, this
+  /// function will bind the \c closureInst parameter to its symbolic value.
+  /// On failure, it returns the unknown symbolic value that captures the error.
+  std::optional<SymbolicValue>
+  evaluateClosureCreation(SingleValueInstruction *closureInst);
+
+  SymbolicValue getSingleWriterAddressValue(SILValue addr);
+  SymbolicValue getConstAddrAndLoadResult(SILValue addr);
+  SymbolicValue loadAddrValue(SILValue addr, SymbolicValue addrVal);
+  std::optional<SymbolicValue> computeFSStore(SymbolicValue storedCst,
+                                              SILValue dest);
+
+private:
+  std::optional<SymbolicValue> initializeAddressFromSingleWriter(SILValue addr);
+};
+
 /// A constant-expression evaluator that can be used to step through a control
 /// flow graph (SILFunction body) by evaluating one instruction at a time.
 /// This evaluator can also "skip" instructions without evaluating them and
@@ -127,6 +275,10 @@ private:
   ConstExprStepEvaluator(const ConstExprStepEvaluator &) = delete;
   void operator=(const ConstExprStepEvaluator &) = delete;
 
+  /// Set all addresses that could be mutated by the instruction to an
+  /// unknown symbolic value if it is not already so.
+  void setMutableAddressesToUnknown(SILInstruction *inst);
+
 public:
   /// Constructs a step evaluator given an allocator and a non-null pointer to a
   /// SILFunction.
@@ -145,7 +297,8 @@ public:
   ///
   ///   Second element is None, if the evaluation is successful.
   ///   Otherwise, is an unknown symbolic value that contains the error.
-  std::pair<Optional<SILBasicBlock::iterator>, Optional<SymbolicValue>>
+  std::pair<std::optional<SILBasicBlock::iterator>,
+            std::optional<SymbolicValue>>
   evaluate(SILBasicBlock::iterator instI);
 
   /// Skip the instruction without evaluating it and conservatively account for
@@ -164,7 +317,8 @@ public:
   ///
   ///   Second element is None if skipping the instruction is successful.
   ///   Otherwise, it is an unknown symbolic value containing the error.
-  std::pair<Optional<SILBasicBlock::iterator>, Optional<SymbolicValue>>
+  std::pair<std::optional<SILBasicBlock::iterator>,
+            std::optional<SymbolicValue>>
   skipByMakingEffectsNonConstant(SILBasicBlock::iterator instI);
 
   /// Try evaluating an instruction and if the evaluation fails, skip the
@@ -183,10 +337,11 @@ public:
   ///
   ///   Second element is None if the evaluation is successful.
   ///   Otherwise, it is an unknown symbolic value containing the error.
-  std::pair<Optional<SILBasicBlock::iterator>, Optional<SymbolicValue>>
+  std::pair<std::optional<SILBasicBlock::iterator>,
+            std::optional<SymbolicValue>>
   tryEvaluateOrElseMakeEffectsNonConstant(SILBasicBlock::iterator instI);
 
-  Optional<SymbolicValue> lookupConstValue(SILValue value);
+  std::optional<SymbolicValue> lookupConstValue(SILValue value);
 
   /// Return the number of instructions evaluated for the last `evaluate`
   /// operation. This could be used by the clients to limit the number of

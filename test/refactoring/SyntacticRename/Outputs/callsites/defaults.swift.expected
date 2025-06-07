@@ -1,16 +1,16 @@
-func /*defaults:def*/betterName(x xx: Int = 4, y: Int = 2, z: Int = 1) {}
+func /*defaults:def*/<base>withDefaults</base>(<arglabel index=0>_</arglabel><param index=0> xx</param>: Int = 4, <arglabel index=1>y</arglabel><param index=1></param>: Int = 2, <arglabel index=2>x</arglabel><param index=2></param>: Int = 1) {}
 
 // valid
-/*defaults:call*/betterName()
-/*defaults:call*/betterName(x: 2)
-/*defaults:call*/betterName(y: 2)
-/*defaults:call*/betterName(x: 2, z: 3)
-/*defaults:call*/betterName(y: 2, z: 3)
-/*defaults:call*/betterName(x: 2, y: 1, z: 4)
+/*defaults:call*/<base>withDefaults</base>()
+/*defaults:call*/<base>withDefaults</base>(<callcombo index=0></callcombo>2)
+/*defaults:call*/<base>withDefaults</base>(<callarg index=1>y</callarg><callcolon index=1>: </callcolon>2)
+/*defaults:call*/<base>withDefaults</base>(<callcombo index=0></callcombo>2, <callarg index=2>x</callarg><callcolon index=2>: </callcolon>3)
+/*defaults:call*/<base>withDefaults</base>(<callarg index=1>y</callarg><callcolon index=1>: </callcolon>2, <callarg index=2>x</callarg><callcolon index=2>: </callcolon>3)
+/*defaults:call*/<base>withDefaults</base>(<callcombo index=0></callcombo>2, <callarg index=1>y</callarg><callcolon index=1>: </callcolon>1, <callarg index=2>x</callarg><callcolon index=2>: </callcolon>4)
 
 // false positives
-/*defaults:call*/betterName(y: 2, 3)
-/*defaults:call*/betterName(y: 2, 4, z: 3)
+/*defaults:call*/<base>withDefaults</base>(<callarg index=1>y</callarg><callcolon index=1>: </callcolon>2, 3)
+/*defaults:call*/<base>withDefaults</base>(<callarg index=1>y</callarg><callcolon index=1>: </callcolon>2, 4, <callarg index=2>x</callarg><callcolon index=2>: </callcolon>3)
 
 // invalid
 /*defaults:call*/withDefaults(x: 2, y: 3)

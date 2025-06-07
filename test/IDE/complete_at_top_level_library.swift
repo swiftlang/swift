@@ -11,7 +11,6 @@ protocol MyProtocol {}
 
 #^TOPLEVEL^#
 
-// LIBRARY: Begin completions
 // LIBRARY-DAG: Keyword[associatedtype]/None:       associatedtype; name=associatedtype
 // LIBRARY-DAG: Keyword[class]/None/Flair[CommonKeyword]: class; name=class
 // LIBRARY-DAG: Keyword[deinit]/None:               deinit; name=deinit
@@ -20,7 +19,6 @@ protocol MyProtocol {}
 // LIBRARY-DAG: Keyword[func]/None:                 func; name=func
 // LIBRARY-DAG: Keyword[import]/None:               import; name=import
 // LIBRARY-DAG: Keyword[init]/None:                 init; name=init
-// LIBRARY-DAG: Keyword[inout]/None:                inout; name=inout
 // LIBRARY-DAG: Keyword[operator]/None:             operator; name=operator
 // LIBRARY-DAG: Keyword[precedencegroup]/None:      precedencegroup; name=precedencegroup
 // LIBRARY-DAG: Keyword[protocol]/None/Flair[CommonKeyword]: protocol; name=protocol
@@ -72,22 +70,13 @@ protocol MyProtocol {}
 // LIBRARY-DAG: Literal[Boolean]/None/Flair[ExprAtFileScope]: false[#Bool#]; name=false
 // LIBRARY-DAG: Literal[Nil]/None/Flair[ExprAtFileScope]: nil; name=nil
 // LIBRARY-DAG: Literal[String]/None/Flair[ExprAtFileScope]: "{#(abc)#}"[#String#]; name=""
-// LIBRARY-DAG: Literal[Array]/None/Flair[ExprAtFileScope]: [{#(values)#}][#Array#]; name=[]
-// LIBRARY-DAG: Literal[Dictionary]/None/Flair[ExprAtFileScope]: [{#(key)#}: {#(value)#}][#Dictionary#]; name=[: ]
+// LIBRARY-DAG: Literal[Array]/None/Flair[ExprAtFileScope]: [{#(values)#}][#Array<Element>#]; name=[]
+// LIBRARY-DAG: Literal[Dictionary]/None/Flair[ExprAtFileScope]: [{#(key)#}: {#(value)#}][#Dictionary<Key, Value>#]; name=[: ]
 // LIBRARY-DAG: Literal[Tuple]/None/Flair[ExprAtFileScope]: ({#(values)#}); name=()
-// LIBRARY-DAG: Keyword[#fileID]/None/Flair[ExprAtFileScope]: #fileID[#String#]; name=#fileID
-// LIBRARY-DAG: Keyword[#file]/None/Flair[ExprAtFileScope]: #file[#String#]; name=#file
-// LIBRARY-DAG: Keyword[#filePath]/None/Flair[ExprAtFileScope]: #filePath[#String#]; name=#filePath
-// LIBRARY-DAG: Keyword[#function]/None/Flair[ExprAtFileScope]: #function[#String#]; name=#function
-// LIBRARY-DAG: Keyword[#line]/None/Flair[ExprAtFileScope]: #line[#Int#]; name=#line
-// LIBRARY-DAG: Keyword[#column]/None/Flair[ExprAtFileScope]: #column[#Int#]; name=#column
-// LIBRARY-DAG: Keyword[#dsohandle]/None/Flair[ExprAtFileScope]: #dsohandle[#UnsafeRawPointer#]; name=#dsohandle
 // LIBRARY-DAG: Decl[Struct]/CurrModule/Flair[ExprAtFileScope]: MyStruct[#MyStruct#]; name=MyStruct
 // LIBRARY-DAG: Decl[Protocol]/CurrModule/Flair[RareType,ExprAtFileScope]: MyProtocol[#MyProtocol#]; name=MyProtocol
 // LIBRARY-DAG: Decl[Struct]/OtherModule[Swift]/Flair[ExprAtFileScope]/IsSystem: Int[#Int#]; name=Int
-// LIBRARY: End completions
 
-// SCRIPT: Begin completions
 // SCRIPT-DAG: Keyword[associatedtype]/None:       associatedtype; name=associatedtype
 // SCRIPT-DAG: Keyword[class]/None:                class; name=class
 // SCRIPT-DAG: Keyword[deinit]/None:               deinit; name=deinit
@@ -96,7 +85,6 @@ protocol MyProtocol {}
 // SCRIPT-DAG: Keyword[func]/None:                 func; name=func
 // SCRIPT-DAG: Keyword[import]/None:               import; name=import
 // SCRIPT-DAG: Keyword[init]/None:                 init; name=init
-// SCRIPT-DAG: Keyword[inout]/None:                inout; name=inout
 // SCRIPT-DAG: Keyword[operator]/None:             operator; name=operator
 // SCRIPT-DAG: Keyword[precedencegroup]/None:      precedencegroup; name=precedencegroup
 // SCRIPT-DAG: Keyword[protocol]/None:             protocol; name=protocol
@@ -148,17 +136,9 @@ protocol MyProtocol {}
 // SCRIPT-DAG: Literal[Boolean]/None: false[#Bool#]; name=false
 // SCRIPT-DAG: Literal[Nil]/None: nil; name=nil
 // SCRIPT-DAG: Literal[String]/None: "{#(abc)#}"[#String#]; name=""
-// SCRIPT-DAG: Literal[Array]/None: [{#(values)#}][#Array#]; name=[]
-// SCRIPT-DAG: Literal[Dictionary]/None: [{#(key)#}: {#(value)#}][#Dictionary#]; name=[: ]
+// SCRIPT-DAG: Literal[Array]/None: [{#(values)#}][#Array<Element>#]; name=[]
+// SCRIPT-DAG: Literal[Dictionary]/None: [{#(key)#}: {#(value)#}][#Dictionary<Key, Value>#]; name=[: ]
 // SCRIPT-DAG: Literal[Tuple]/None: ({#(values)#}); name=()
-// SCRIPT-DAG: Keyword[#fileID]/None: #fileID[#String#]; name=#fileID
-// SCRIPT-DAG: Keyword[#file]/None: #file[#String#]; name=#file
-// SCRIPT-DAG: Keyword[#filePath]/None: #filePath[#String#]; name=#filePath
-// SCRIPT-DAG: Keyword[#function]/None: #function[#String#]; name=#function
-// SCRIPT-DAG: Keyword[#line]/None: #line[#Int#]; name=#line
-// SCRIPT-DAG: Keyword[#column]/None: #column[#Int#]; name=#column
-// SCRIPT-DAG: Keyword[#dsohandle]/None: #dsohandle[#UnsafeRawPointer#]; name=#dsohandle
 // SCRIPT-DAG: Decl[Struct]/CurrModule: MyStruct[#MyStruct#]; name=MyStruct
 // SCRIPT-DAG: Decl[Protocol]/CurrModule/Flair[RareType]: MyProtocol[#MyProtocol#]; name=MyProtocol
 // SCRIPT-DAG: Decl[Struct]/OtherModule[Swift]/IsSystem: Int[#Int#]; name=Int
-// SCRIPT: End completions

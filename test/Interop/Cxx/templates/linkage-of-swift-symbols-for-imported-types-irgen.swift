@@ -16,13 +16,13 @@ public func getMagicNumberForLinkageComparison() -> Any {
 // CHECK: $sSo11MagicNumberVMf" = linkonce_odr hidden constant
 // CHECK: $sSo11MagicNumberVML" = linkonce_odr hidden global
 
-// CHECK: $sSo034__CxxTemplateInst12MagicWrapperI11D7NumberEVWV" = linkonce_odr hidden constant
-// CHECK: $sSo034__CxxTemplateInst12MagicWrapperI11D7NumberEVMn" = linkonce_odr hidden constant
-// CHECK: $sSo034__CxxTemplateInst12MagicWrapperI11D7NumberEVMf" = linkonce_odr hidden constant
-// CHECK: $sSo034__CxxTemplateInst12MagicWrapperI11D7NumberEVML" = linkonce_odr hidden global
+// CHECK: $sSo0031MagicWrapperMagicNumber_IJFJhAbVWV" = linkonce_odr hidden constant
+// CHECK: $sSo0031MagicWrapperMagicNumber_IJFJhAbVMn" = linkonce_odr hidden constant
+// CHECK: $sSo0031MagicWrapperMagicNumber_IJFJhAbVMf" = linkonce_odr hidden constant
+// CHECK: $sSo0031MagicWrapperMagicNumber_IJFJhAbVML" = linkonce_odr hidden global
 
 // CHECK: $sSo11MagicNumberVMB" = linkonce_odr hidden constant
 // CHECK: $sSo11MagicNumberVMF" = linkonce_odr hidden constant
 
-// CHECK: $sSo034__CxxTemplateInst12MagicWrapperI11D7NumberEVMB" = linkonce_odr hidden constant
-// CHECK: $sSo034__CxxTemplateInst12MagicWrapperI11D7NumberEVMF" = linkonce_odr hidden constant
+// CHECK: $sSo0031MagicWrapperMagicNumber_IJFJhAbVMB" = linkonce_odr hidden constant
+// CHECK: $sSo0031MagicWrapperMagicNumber_IJFJhAbVMF" = linkonce_odr hidden constant

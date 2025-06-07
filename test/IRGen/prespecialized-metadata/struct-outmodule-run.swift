@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
-// RUN: %clang -c -v %target-cc-options %target-threading-opt -g -O0 -isysroot %sdk %S/Inputs/isPrespecialized.cpp -o %t/isPrespecialized.o -I %clang-include-dir -I %swift_src_root/include/ -I %swift_src_root/stdlib/public/SwiftShims/ -I %llvm_src_root/include -I %llvm_obj_root/include -L %clang-include-dir/../lib/swift/macosx
+// RUN: %clang -c -std=c++17 -v %target-cc-options %target-threading-opt -g -O0 -isysroot %sdk %S/Inputs/isPrespecialized.cpp -o %t/isPrespecialized.o -I %swift-include-dir -I %swift_src_root/include/ -I %swift_src_root/stdlib/public/SwiftShims/ -I %llvm_src_root/include -I %llvm_obj_root/include -L %swift-include-dir/../lib/swift/macosx
 
 // RUN: %target-build-swift %S/Inputs/struct-public-nonfrozen-1argument.swift -emit-module -emit-library -module-name Module -Xfrontend -prespecialize-generic-metadata -target %module-target-future -emit-module-path %t/Module.swiftmodule -o %t/%target-library-name(Module)
 
-// RUN: %target-build-swift -v %mcp_opt %s %S/Inputs/main.swift %S/Inputs/consume-logging-metadata-value.swift %t/isPrespecialized.o -import-objc-header %S/Inputs/isPrespecialized.h -Xfrontend -prespecialize-generic-metadata -target %module-target-future -lc++ -I %t -L %t -lModule -L %clang-include-dir/../lib/swift/macosx -sdk %sdk -o %t/main
+// RUN: %target-build-swift -v %mcp_opt %s %S/Inputs/main.swift %S/Inputs/consume-logging-metadata-value.swift %t/isPrespecialized.o -import-objc-header %S/Inputs/isPrespecialized.h -Xfrontend -prespecialize-generic-metadata -target %module-target-future -lc++ -I %t -L %t -lModule -L %swift-include-dir/../lib/swift/macosx -sdk %sdk -o %t/main
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 

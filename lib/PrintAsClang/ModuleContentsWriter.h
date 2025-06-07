@@ -17,6 +17,7 @@
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/StringSet.h"
 
 namespace clang {
   class Module;
@@ -36,6 +37,11 @@ void printModuleContentsAsObjC(raw_ostream &os,
                                ModuleDecl &M,
                                SwiftToClangInteropContext &interopContext);
 
+void printModuleContentsAsC(raw_ostream &os,
+                            llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
+                            ModuleDecl &M,
+                            SwiftToClangInteropContext &interopContext);
+
 struct EmittedClangHeaderDependencyInfo {
     /// The set of imported modules used by this module.
     SmallPtrSet<ImportModuleTy, 8> imports;
@@ -46,10 +52,9 @@ struct EmittedClangHeaderDependencyInfo {
 /// Prints the declarations of \p M to \p os in C++ language mode.
 ///
 /// \returns Dependencies required by this module.
-EmittedClangHeaderDependencyInfo printModuleContentsAsCxx(raw_ostream &os,
-                              ModuleDecl &M,
-                              SwiftToClangInteropContext &interopContext,
-                              bool requiresExposedAttribute);
+EmittedClangHeaderDependencyInfo printModuleContentsAsCxx(
+    raw_ostream &os, ModuleDecl &M, SwiftToClangInteropContext &interopContext,
+    bool requiresExposedAttribute, llvm::StringSet<> &exposedModules);
 
 } // end namespace swift
 

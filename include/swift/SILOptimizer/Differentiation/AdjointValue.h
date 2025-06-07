@@ -19,9 +19,13 @@
 #define SWIFT_SILOPTIMIZER_UTILS_DIFFERENTIATION_ADJOINTVALUE_H
 
 #include "swift/AST/Decl.h"
+#include "swift/SIL/SILDebugVariable.h"
+#include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILValue.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/Support/Debug.h"
+
+#include <variant>
 
 namespace swift {
 namespace autodiff {
@@ -38,9 +42,17 @@ enum AdjointValueKind {
 
   /// A concrete SIL value.
   Concrete,
+
+  /// A special adjoint, made up of 2 adjoints -- an aggregate base adjoint and
+  /// an element adjoint to add to one of its fields. This case exists to avoid
+  /// eager materialization of a base adjoint upon addition with one of its
+  /// fields.
+  AddElement,
 };
 
 class AdjointValue;
+
+struct AddElementValue;
 
 class AdjointValueBase {
   friend class AdjointValue;
@@ -54,15 +66,19 @@ class AdjointValueBase {
   using DebugInfo = std::pair<SILDebugLocation, SILDebugVariable>;
 
   /// The debug location and variable info associated with the original value.
-  Optional<DebugInfo> debugInfo;
+  std::optional<DebugInfo> debugInfo;
 
   /// The underlying value.
   union Value {
     unsigned numAggregateElements;
     SILValue concrete;
+    AddElementValue *addElementValue;
+
     Value(unsigned numAggregateElements)
         : numAggregateElements(numAggregateElements) {}
     Value(SILValue v) : concrete(v) {}
+    Value(AddElementValue *addElementValue)
+        : addElementValue(addElementValue) {}
     Value() {}
   } value;
 
@@ -71,7 +87,7 @@ class AdjointValueBase {
 
   explicit AdjointValueBase(SILType type,
                             llvm::ArrayRef<AdjointValue> aggregate,
-                            Optional<DebugInfo> debugInfo)
+                            std::optional<DebugInfo> debugInfo)
       : kind(AdjointValueKind::Aggregate), type(type), debugInfo(debugInfo),
         value(aggregate.size()) {
     MutableArrayRef<AdjointValue> tailElements(
@@ -80,12 +96,17 @@ class AdjointValueBase {
         aggregate.begin(), aggregate.end(), tailElements.begin());
   }
 
-  explicit AdjointValueBase(SILValue v, Optional<DebugInfo> debugInfo)
+  explicit AdjointValueBase(SILValue v, std::optional<DebugInfo> debugInfo)
       : kind(AdjointValueKind::Concrete), type(v->getType()),
         debugInfo(debugInfo), value(v) {}
 
-  explicit AdjointValueBase(SILType type, Optional<DebugInfo> debugInfo)
+  explicit AdjointValueBase(SILType type, std::optional<DebugInfo> debugInfo)
       : kind(AdjointValueKind::Zero), type(type), debugInfo(debugInfo) {}
+
+  explicit AdjointValueBase(SILType type, AddElementValue *addElementValue,
+                            std::optional<DebugInfo> debugInfo)
+      : kind(AdjointValueKind::AddElement), type(type), debugInfo(debugInfo),
+        value(addElementValue) {}
 };
 
 /// A symbolic adjoint value that wraps a `SILValue`, a zero, or an aggregate
@@ -103,34 +124,42 @@ public:
 
   using DebugInfo = AdjointValueBase::DebugInfo;
 
-  static AdjointValue createConcrete(
-      llvm::BumpPtrAllocator &allocator, SILValue value,
-      Optional<DebugInfo> debugInfo = None) {
+  static AdjointValue
+  createConcrete(llvm::BumpPtrAllocator &allocator, SILValue value,
+                 std::optional<DebugInfo> debugInfo = std::nullopt) {
     auto *buf = allocator.Allocate<AdjointValueBase>();
     return new (buf) AdjointValueBase(value, debugInfo);
   }
 
-  static AdjointValue createZero(
-      llvm::BumpPtrAllocator &allocator, SILType type,
-      Optional<DebugInfo> debugInfo = None) {
+  static AdjointValue
+  createZero(llvm::BumpPtrAllocator &allocator, SILType type,
+             std::optional<DebugInfo> debugInfo = std::nullopt) {
     auto *buf = allocator.Allocate<AdjointValueBase>();
     return new (buf) AdjointValueBase(type, debugInfo);
   }
 
-  static AdjointValue createAggregate(
-      llvm::BumpPtrAllocator &allocator, SILType type,
-      ArrayRef<AdjointValue> elements,
-      Optional<DebugInfo> debugInfo = None) {
+  static AdjointValue
+  createAggregate(llvm::BumpPtrAllocator &allocator, SILType type,
+                  ArrayRef<AdjointValue> elements,
+                  std::optional<DebugInfo> debugInfo = std::nullopt) {
     AdjointValue *buf = reinterpret_cast<AdjointValue *>(allocator.Allocate(
         sizeof(AdjointValueBase) + elements.size() * sizeof(AdjointValue),
         alignof(AdjointValueBase)));
     return new (buf) AdjointValueBase(type, elements, debugInfo);
   }
 
+  static AdjointValue
+  createAddElement(llvm::BumpPtrAllocator &allocator, SILType type,
+                   AddElementValue *addElementValue,
+                   std::optional<DebugInfo> debugInfo = std::nullopt) {
+    auto *buf = allocator.Allocate<AdjointValueBase>();
+    return new (buf) AdjointValueBase(type, addElementValue, debugInfo);
+  }
+
   AdjointValueKind getKind() const { return base->kind; }
   SILType getType() const { return base->type; }
   CanType getSwiftType() const { return getType().getASTType(); }
-  Optional<DebugInfo> getDebugInfo() const { return base->debugInfo; }
+  std::optional<DebugInfo> getDebugInfo() const { return base->debugInfo; }
   void setDebugInfo(DebugInfo debugInfo) const { base->debugInfo = debugInfo; }
 
   NominalTypeDecl *getAnyNominal() const {
@@ -140,6 +169,9 @@ public:
   bool isZero() const { return getKind() == AdjointValueKind::Zero; }
   bool isAggregate() const { return getKind() == AdjointValueKind::Aggregate; }
   bool isConcrete() const { return getKind() == AdjointValueKind::Concrete; }
+  bool isAddElement() const {
+    return getKind() == AdjointValueKind::AddElement;
+  }
 
   unsigned getNumAggregateElements() const {
     assert(isAggregate());
@@ -162,39 +194,75 @@ public:
     return base->value.concrete;
   }
 
-  void print(llvm::raw_ostream &s) const {
-    switch (getKind()) {
-    case AdjointValueKind::Zero:
-      s << "Zero[" << getType() << ']';
-      break;
-    case AdjointValueKind::Aggregate:
-      s << "Aggregate[" << getType() << "](";
-      if (auto *decl =
-              getType().getASTType()->getStructOrBoundGenericStruct()) {
-        interleave(
-            llvm::zip(decl->getStoredProperties(), getAggregateElements()),
-            [&s](std::tuple<VarDecl *, const AdjointValue &> elt) {
-              s << std::get<0>(elt)->getName() << ": ";
-              std::get<1>(elt).print(s);
-            },
-            [&s] { s << ", "; });
-      } else if (getType().is<TupleType>()) {
-        interleave(
-            getAggregateElements(),
-            [&s](const AdjointValue &elt) { elt.print(s); },
-            [&s] { s << ", "; });
-      } else {
-        llvm_unreachable("Invalid aggregate");
-      }
-      s << ')';
-      break;
-    case AdjointValueKind::Concrete:
-      s << "Concrete[" << getType() << "](" << base->value.concrete << ')';
-      break;
-    }
+  AddElementValue *getAddElementValue() const {
+    assert(isAddElement());
+    return base->value.addElementValue;
   }
 
+  void print(llvm::raw_ostream &s) const;
+
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); };
+};
+
+/// An abstraction that represents the field locator in
+/// an `AddElement` adjoint kind. Depending on the aggregate
+/// kind - tuple or struct, of the `baseAdjoint` in an
+/// `AddElement` adjoint, the field locator may be an `unsigned int`
+/// or a `VarDecl *`.
+struct FieldLocator final {
+  FieldLocator(VarDecl *field) : inner(field) {}
+  FieldLocator(unsigned int index) : inner(index) {}
+
+  friend AddElementValue;
+
+private:
+  bool isTupleFieldLocator() const {
+    return std::holds_alternative<unsigned int>(inner);
+  }
+
+  const static constexpr std::true_type TUPLE_FIELD_LOCATOR_TAG =
+      std::true_type{};
+  const static constexpr std::false_type STRUCT_FIELD_LOCATOR_TAG =
+      std::false_type{};
+
+  unsigned int getInner(std::true_type) const {
+    return std::get<unsigned int>(inner);
+  }
+
+  VarDecl *getInner(std::false_type) const {
+    return std::get<VarDecl *>(inner);
+  }
+
+  std::variant<unsigned int, VarDecl *> inner;
+};
+
+/// The underlying value for an `AddElement` adjoint.
+struct AddElementValue final {
+  AdjointValue baseAdjoint;
+  AdjointValue eltToAdd;
+  FieldLocator fieldLocator;
+
+  AddElementValue(AdjointValue baseAdjoint, AdjointValue eltToAdd,
+                  FieldLocator fieldLocator)
+      : baseAdjoint(baseAdjoint), eltToAdd(eltToAdd),
+        fieldLocator(fieldLocator) {
+    assert(baseAdjoint.getType().is<TupleType>() ||
+           baseAdjoint.getType().getStructOrBoundGenericStruct() != nullptr);
+  }
+
+  bool isTupleAdjoint() const { return fieldLocator.isTupleFieldLocator(); }
+
+  bool isStructAdjoint() const { return !isTupleAdjoint(); }
+
+  VarDecl *getFieldDecl() const {
+    assert(isStructAdjoint());
+    return this->fieldLocator.getInner(FieldLocator::STRUCT_FIELD_LOCATOR_TAG);
+  }
+
+  unsigned int getFieldIndex() const {
+    assert(isTupleAdjoint());
+    return this->fieldLocator.getInner(FieldLocator::TUPLE_FIELD_LOCATOR_TAG);
+  }
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &os,

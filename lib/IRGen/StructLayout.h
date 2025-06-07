@@ -60,7 +60,7 @@ enum class LayoutKind {
 class NonFixedOffsetsImpl;
 
 /// The type to pass around for non-fixed offsets.
-using NonFixedOffsets = Optional<NonFixedOffsetsImpl *>;
+using NonFixedOffsets = std::optional<NonFixedOffsetsImpl *>;
 
 /// An abstract class for determining non-fixed offsets.
 class NonFixedOffsetsImpl {
@@ -126,9 +126,9 @@ private:
   /// or in the non-fixed elements array (if non-fixed).
   unsigned Index : 28;
 
-  /// Whether this element is known to be POD in the local resilience
-  /// domain.
-  unsigned IsPOD : 1;
+  /// Whether this element is known to be trivially destructible in the local
+  /// resilience domain.
+  unsigned IsTriviallyDestroyable : 1;
 
   /// The kind of layout performed for this element.
   unsigned TheKind : 3;
@@ -148,31 +148,31 @@ public:
   void completeFrom(const ElementLayout &other) {
     assert(!isCompleted());
     TheKind = other.TheKind;
-    IsPOD = other.IsPOD;
+    IsTriviallyDestroyable = other.IsTriviallyDestroyable;
     ByteOffset = other.ByteOffset;
     ByteOffsetForLayout = other.ByteOffsetForLayout;
     Index = other.Index;
   }
 
-  void completeEmpty(IsPOD_t isPOD, Size byteOffset) {
+  void completeEmpty(IsTriviallyDestroyable_t isTriviallyDestroyable, Size byteOffset) {
     TheKind = unsigned(Kind::Empty);
-    IsPOD = unsigned(isPOD);
+    IsTriviallyDestroyable = unsigned(isTriviallyDestroyable);
     ByteOffset = 0;
     ByteOffsetForLayout = byteOffset.getValue();
     Index = 0; // make a complete write of the bitfield
   }
 
-  void completeInitialNonFixedSize(IsPOD_t isPOD) {
+  void completeInitialNonFixedSize(IsTriviallyDestroyable_t isTriviallyDestroyable) {
     TheKind = unsigned(Kind::InitialNonFixedSize);
-    IsPOD = unsigned(isPOD);
+    IsTriviallyDestroyable = unsigned(isTriviallyDestroyable);
     ByteOffset = 0;
     ByteOffsetForLayout = ByteOffset;
     Index = 0; // make a complete write of the bitfield
   }
 
-  void completeFixed(IsPOD_t isPOD, Size byteOffset, unsigned structIndex) {
+  void completeFixed(IsTriviallyDestroyable_t isTriviallyDestroyable, Size byteOffset, unsigned structIndex) {
     TheKind = unsigned(Kind::Fixed);
-    IsPOD = unsigned(isPOD);
+    IsTriviallyDestroyable = unsigned(isTriviallyDestroyable);
     ByteOffset = byteOffset.getValue();
     ByteOffsetForLayout = ByteOffset;
     Index = structIndex;
@@ -180,9 +180,9 @@ public:
     assert(getByteOffset() == byteOffset);
   }
 
-  void completeEmptyTailAllocatedCType(IsPOD_t isPOD, Size byteOffset) {
+  void completeEmptyTailAllocatedCType(IsTriviallyDestroyable_t isTriviallyDestroyable, Size byteOffset) {
     TheKind = unsigned(Kind::EmptyTailAllocatedCType);
-    IsPOD = unsigned(isPOD);
+    IsTriviallyDestroyable = unsigned(isTriviallyDestroyable);
     ByteOffset = byteOffset.getValue();
     ByteOffsetForLayout = ByteOffset;
     Index = 0;
@@ -193,9 +193,9 @@ public:
   /// Complete this element layout with a non-fixed offset.
   ///
   /// \param nonFixedElementIndex - the index into the elements array
-  void completeNonFixed(IsPOD_t isPOD, unsigned nonFixedElementIndex) {
+  void completeNonFixed(IsTriviallyDestroyable_t isTriviallyDestroyable, unsigned nonFixedElementIndex) {
     TheKind = unsigned(Kind::NonFixed);
-    IsPOD = unsigned(isPOD);
+    IsTriviallyDestroyable = unsigned(isTriviallyDestroyable);
     Index = nonFixedElementIndex;
   }
 
@@ -213,9 +213,9 @@ public:
   }
 
   /// Is this element known to be POD?
-  IsPOD_t isPOD() const {
+  IsTriviallyDestroyable_t isTriviallyDestroyable() const {
     assert(isCompleted());
-    return IsPOD_t(IsPOD);
+    return IsTriviallyDestroyable_t(IsTriviallyDestroyable);
   }
 
   /// Can we access this element at a static offset?
@@ -283,8 +283,10 @@ private:
   SmallVector<SpareBitVector, 8> CurSpareBits;
   unsigned NextNonFixedOffsetIndex = 0;
   bool IsFixedLayout = true;
-  IsPOD_t IsKnownPOD = IsPOD;
-  IsBitwiseTakable_t IsKnownBitwiseTakable = IsBitwiseTakable;
+  bool IsLoadable = true;
+  IsTriviallyDestroyable_t IsKnownTriviallyDestroyable = IsTriviallyDestroyable;
+  IsBitwiseTakable_t IsKnownBitwiseTakable = IsBitwiseTakableAndBorrowable;
+  IsCopyable_t IsKnownCopyable = IsCopyable;
   IsFixedSize_t IsKnownAlwaysFixedSize = IsFixedSize;
 public:
   StructLayoutBuilder(IRGenModule &IGM) : IGM(IGM) {}
@@ -298,7 +300,10 @@ public:
   /// Add the default-actor header to the layout.  This must be the second
   /// thing added to the layout, following the Swift heap header.
   void addDefaultActorHeader(ElementLayout &elt);
-  
+  /// Add the non-default distributed actor header to the layout.
+  /// This must be the second thing added to the layout, following the Swift heap header.
+  void addNonDefaultDistributedActorHeader(ElementLayout &elt);
+
   /// Add a number of fields to the layout.  The field layouts need
   /// only have the TypeInfo set; the rest will be filled out.
   ///
@@ -323,14 +328,23 @@ public:
   /// Return whether the structure has a fixed-size layout.
   bool isFixedLayout() const { return IsFixedLayout; }
 
+  /// Return whether the structure has a loadable layout.
+  bool isLoadable() const { return IsLoadable; }
+
   /// Return whether the structure is known to be POD in the local
   /// resilience scope.
-  IsPOD_t isPOD() const { return IsKnownPOD; }
+  IsTriviallyDestroyable_t isTriviallyDestroyable() const { return IsKnownTriviallyDestroyable; }
 
   /// Return whether the structure is known to be bitwise-takable in the local
   /// resilience scope.
   IsBitwiseTakable_t isBitwiseTakable() const {
     return IsKnownBitwiseTakable;
+  }
+  
+  /// Return whether the structure is known to be copyable in the local
+  /// resilience scope.
+  IsCopyable_t isCopyable() const {
+    return IsKnownCopyable;
   }
 
   /// Return whether the structure is known to be fixed-size in all
@@ -392,8 +406,12 @@ class StructLayout {
   /// alignment are exact.
   bool IsFixedLayout;
 
-  IsPOD_t IsKnownPOD;
+  /// Whether this layout 
+  bool IsLoadable;
+
+  IsTriviallyDestroyable_t IsKnownTriviallyDestroyable;
   IsBitwiseTakable_t IsKnownBitwiseTakable;
+  IsCopyable_t IsKnownCopyable;
   IsFixedSize_t IsKnownAlwaysFixedSize = IsFixedSize;
   
   llvm::Type *Ty;
@@ -408,9 +426,8 @@ public:
   ///   layout must include the reference-counting header
   /// \param typeToFill - if present, must be an opaque type whose body
   ///   will be filled with this layout
-  StructLayout(IRGenModule &IGM, NominalTypeDecl *decl,
-               LayoutKind kind, LayoutStrategy strategy,
-               ArrayRef<const TypeInfo *> fields,
+  StructLayout(IRGenModule &IGM, std::optional<CanType> type, LayoutKind kind,
+               LayoutStrategy strategy, ArrayRef<const TypeInfo *> fields,
                llvm::StructType *typeToFill = 0);
 
   /// Create a structure layout from a builder.
@@ -423,8 +440,10 @@ public:
       headerSize(builder.getHeaderSize()),
       SpareBits(builder.getSpareBits()),
       IsFixedLayout(builder.isFixedLayout()),
-      IsKnownPOD(builder.isPOD()),
+      IsLoadable(builder.isLoadable()),
+      IsKnownTriviallyDestroyable(builder.isTriviallyDestroyable()),
       IsKnownBitwiseTakable(builder.isBitwiseTakable()),
+      IsKnownCopyable(builder.isCopyable()),
       IsKnownAlwaysFixedSize(builder.isAlwaysFixedSize()),
       Ty(type),
       Elements(elements.begin(), elements.end()) {}
@@ -441,15 +460,21 @@ public:
   const SpareBitVector &getSpareBits() const { return SpareBits; }
   SpareBitVector &getSpareBits() { return SpareBits; }
   bool isKnownEmpty() const { return isFixedLayout() && MinimumSize.isZero(); }
-  IsPOD_t isPOD() const { return IsKnownPOD; }
+  IsTriviallyDestroyable_t isTriviallyDestroyable() const {
+    return IsKnownTriviallyDestroyable;
+  }
   IsBitwiseTakable_t isBitwiseTakable() const {
     return IsKnownBitwiseTakable;
+  }
+  IsCopyable_t isCopyable() const {
+    return IsKnownCopyable;
   }
   IsFixedSize_t isAlwaysFixedSize() const {
     return IsKnownAlwaysFixedSize;
   }
 
   bool isFixedLayout() const { return IsFixedLayout; }
+  bool isLoadable() const { return IsLoadable; }
   llvm::Constant *emitSize(IRGenModule &IGM) const;
   llvm::Constant *emitAlignMask(IRGenModule &IGM) const;
 
@@ -459,6 +484,7 @@ public:
 };
 
 Size getDefaultActorStorageFieldOffset(IRGenModule &IGM);
+Size getNonDefaultDistributedActorStorageFieldOffset(IRGenModule &IGM);
 
 } // end namespace irgen
 } // end namespace swift

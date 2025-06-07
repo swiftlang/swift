@@ -24,6 +24,6 @@ SANITIZER(0, Address,   address,    asan)
 SANITIZER(1, Thread,    thread,     tsan)
 SANITIZER(2, Undefined, undefined,  ubsan)
 SANITIZER(3, Fuzzer,    fuzzer,     fuzzer)
-SANITIZER(4, Scudo,     scudo,      scudo)
+SANITIZER(4, Scudo,     scudo,      scudo_standalone)
 
 #undef SANITIZER

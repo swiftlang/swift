@@ -61,6 +61,7 @@
 
 #define DEBUG_TYPE "sil-move-async-var-debuginfo-propagator"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/SIL/ApplySite.h"
@@ -93,11 +94,10 @@ static DebugVarCarryingInst
 cloneDebugValueMakeUndef(DebugVarCarryingInst original, SILBasicBlock *block) {
   SILBuilderWithScope builder(&block->front());
   builder.setCurrentDebugScope(original->getDebugScope());
-  auto *undef = SILUndef::get(
-      original.getOperandForDebugValueClone()->getType(), block->getModule());
+  auto *undef = SILUndef::get(original.getOperandForDebugValueClone());
   return builder.createDebugValue(original->getLoc(), undef,
-                                  *original.getVarInfo(), false,
-                                  true /*was moved*/);
+                                  *original.getVarInfo(), DontPoisonRefs,
+                                  UsesMoveableValueDebugInfo);
 }
 
 static DebugVarCarryingInst
@@ -105,36 +105,34 @@ cloneDebugValueMakeUndef(DebugVarCarryingInst original,
                          SILInstruction *insertPt) {
   SILBuilderWithScope builder(std::next(insertPt->getIterator()));
   builder.setCurrentDebugScope(original->getDebugScope());
-  auto *undef =
-      SILUndef::get(original.getOperandForDebugValueClone()->getType(),
-                    insertPt->getModule());
+  auto *undef = SILUndef::get(original.getOperandForDebugValueClone());
   return builder.createDebugValue(original->getLoc(), undef,
-                                  *original.getVarInfo(), false,
-                                  true /*was moved*/);
+                                  *original.getVarInfo(), DontPoisonRefs,
+                                  UsesMoveableValueDebugInfo);
 }
 
 static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
                                        SILInstruction *insertPt) {
-  if (original.spareBits)
-    return cloneDebugValueMakeUndef(original, insertPt).inst;
+  if (original.getSpareBits())
+    return *cloneDebugValueMakeUndef(original, insertPt);
 
   SILBuilderWithScope builder(std::next(insertPt->getIterator()));
   builder.setCurrentDebugScope(original->getDebugScope());
   return builder.createDebugValue(
       original->getLoc(), original.getOperandForDebugValueClone(),
-      *original.getVarInfo(), false, true /*was moved*/);
+      *original.getVarInfo(), DontPoisonRefs, UsesMoveableValueDebugInfo);
 }
 
 static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
                                        SILBasicBlock *block) {
-  if (original.spareBits)
-    return cloneDebugValueMakeUndef(original, block).inst;
+  if (original.getSpareBits())
+    return *cloneDebugValueMakeUndef(original, block);
 
   SILBuilderWithScope builder(&block->front());
   builder.setCurrentDebugScope(original->getDebugScope());
   return builder.createDebugValue(
       original->getLoc(), original.getOperandForDebugValueClone(),
-      *original.getVarInfo(), false, true /*was moved*/);
+      *original.getVarInfo(), DontPoisonRefs, UsesMoveableValueDebugInfo);
 }
 
 namespace {
@@ -201,7 +199,7 @@ struct DebugInstMutableArrayRef {
     LLVM_DEBUG(llvm::dbgs() << "Cloning debug info for undef at block: bb"
                             << insertBlock->getDebugID() << '\n');
     for (auto value : state) {
-      if (!value || !value.spareBits)
+      if (!value || !value.getSpareBits())
         continue;
       LLVM_DEBUG(llvm::dbgs() << "    Inst to clone: " << **value);
       cloneDebugValueMakeUndef(value, insertBlock);
@@ -350,8 +348,11 @@ struct DebugInfoPropagator {
     // var with a count already and return that value. If we did not, we insert
     // with the new count before expanding the set (initializing the map with
     // the correct value).
+    auto debugVariable = debugVar;
+    debugVariable.DIExpr = debugVariable.DIExpr.getFragmentPart();
+    debugVariable.Type = {};
     auto iter = dbgVarToDbgVarIndexMap.insert(
-        {debugVar, dbgVarToDbgVarIndexMap.size()});
+        {debugVariable, dbgVarToDbgVarIndexMap.size()});
     LLVM_DEBUG(if (iter.second) llvm::dbgs()
                    << "Mapping: [" << iter.first->second
                    << "] = " << iter.first->first.Name << '\n';);
@@ -441,7 +442,7 @@ void DebugInfoPropagator::performInitialLocalDataflow() {
       // Check if our debug inst is an undef. If so, we store an undef sentinel
       // value. This just means the spare bit is set to 1.
       if (isa<SILUndef>(debugInst.getOperandForDebugValueClone())) {
-        debugInst.spareBits = 1;
+        debugInst.setSpareBits(1);
       }
 
       // Destructively update blockLastGenInst with this. This ensures we always
@@ -580,7 +581,7 @@ void DebugInfoPropagator::performGlobalDataflow() {
                          << "Invalidating along one path... inserting undef "
                             "at merge point?!\n");
               currentValue = dbgVar;
-              currentValue.spareBits = 1;
+              currentValue.setSpareBits(1);
             }
 
             // In either case, we then continue.
@@ -594,7 +595,7 @@ void DebugInfoPropagator::performGlobalDataflow() {
           // If our intersection fails, need to insert later SILUndef
           // debug_value at merge point. Set the spareBit to 1 so we know this
           // is undef.
-          currentValue.spareBits = 1;
+          currentValue.setSpareBits(1);
           LLVM_DEBUG(llvm::dbgs() << "Invalidating along one path... "
                                      "inserting undef at merge point 2?!\n");
         }

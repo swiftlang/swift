@@ -1,0 +1,186 @@
+# build.ps1 overrides the status of each test in this file when LLVM tests are run with lit.
+#
+# Prefer `xfail` for tests that fail reliably. Use `skip` for flaky tests.
+# Test summaries call them "excluded". Please find the right "Tests that ..."
+# category for new entries.
+
+### Tests that fail reliably ###
+
+xfail lldb-api :: lang/cpp/unique-types4/TestUniqueTypes4.py
+xfail lldb-shell :: Recognizer/verbose_trap.test
+xfail lldb-shell :: Settings/TestEchoCommands.test
+xfail lldb-shell :: Swift/MissingVFSOverlay.test
+xfail lldb-shell :: Swift/No.swiftmodule.test
+xfail lldb-shell :: Swift/ToolchainMismatch.test
+xfail lldb-shell :: Swift/global.test
+xfail lldb-shell :: Swift/runtime-initialization.test
+xfail lldb-shell :: SwiftREPL/BreakpointSimple.test
+xfail lldb-shell :: SwiftREPL/ClosureScope.test
+xfail lldb-shell :: SwiftREPL/ExistentialTypes.test
+xfail lldb-shell :: SwiftREPL/LookupAfterImport.test
+xfail lldb-shell :: SwiftREPL/LookupWithAttributedImport.test
+xfail lldb-shell :: SwiftREPL/OpenClass.test
+xfail lldb-shell :: SwiftREPL/OptionalUnowned.test
+xfail lldb-shell :: SwiftREPL/RedirectInputUnreadable.test
+xfail lldb-shell :: SwiftREPL/SwiftInterface.test
+xfail lldb-shell :: SymbolFile/DWARF/x86/dead-code-filtering.yaml
+
+### Tests that pass locally, but fail in CI reliably ###
+
+# https://github.com/swiftlang/llvm-project/issues/9539
+xfail lldb-shell :: SwiftREPL/Basic.test
+xfail lldb-shell :: SwiftREPL/Class.test
+xfail lldb-shell :: SwiftREPL/ComputedProperties.test
+xfail lldb-shell :: SwiftREPL/Deadlock.test
+xfail lldb-shell :: SwiftREPL/DiagnosticOptions.test
+xfail lldb-shell :: SwiftREPL/Dict.test
+xfail lldb-shell :: SwiftREPL/ErrorReturn.test
+xfail lldb-shell :: SwiftREPL/ExclusivityREPL.test
+xfail lldb-shell :: SwiftREPL/GenericTypealias.test
+xfail lldb-shell :: SwiftREPL/Generics.test
+xfail lldb-shell :: SwiftREPL/ImportError.test
+xfail lldb-shell :: SwiftREPL/MetatypeRepl.test
+xfail lldb-shell :: SwiftREPL/Optional.test
+xfail lldb-shell :: SwiftREPL/PropertyWrapperTopLevel.test
+xfail lldb-shell :: SwiftREPL/RecursiveClass.test
+xfail lldb-shell :: SwiftREPL/Redefinition.test
+xfail lldb-shell :: SwiftREPL/RedirectInput.test
+xfail lldb-shell :: SwiftREPL/RedirectInputNoSuchFile.test
+xfail lldb-shell :: SwiftREPL/Regex.test
+xfail lldb-shell :: SwiftREPL/SimpleExpressions.test
+xfail lldb-shell :: SwiftREPL/Struct.test
+xfail lldb-shell :: SwiftREPL/Subclassing.test
+xfail lldb-shell :: SwiftREPL/SwiftInterfaceForceModuleLoadMode.test
+xfail lldb-shell :: SwiftREPL/SwiftTypeLookup.test
+xfail lldb-shell :: SwiftREPL/SyntaxError.test
+xfail lldb-shell :: SwiftREPL/UninitVariables.test
+xfail lldb-shell :: SwiftREPL/ZeroSizeStruct.test
+xfail lldb-shell :: SwiftREPL/enum-singlecase.test
+xfail lldb-shell :: SwiftREPL/one-char-string.test
+
+xfail lldb-api :: commands/apropos/with-process/TestAproposWithProcess.py
+xfail lldb-api :: commands/command/nested_alias/TestNestedAlias.py
+xfail lldb-api :: commands/expression/entry-bp/TestExprEntryBP.py
+xfail lldb-api :: commands/memory/write/TestMemoryWrite.py
+xfail lldb-api :: functionalities/breakpoint/address_breakpoints/TestAddressBreakpoints.py
+xfail lldb-api :: functionalities/breakpoint/auto_continue/TestBreakpointAutoContinue.py
+xfail lldb-api :: functionalities/breakpoint/breakpoint_conditions/TestBreakpointConditions.py
+xfail lldb-api :: functionalities/breakpoint/breakpoint_options/TestBreakpointOptions.py
+xfail lldb-api :: functionalities/breakpoint/step_over_breakpoint/TestStepOverBreakpoint.py
+xfail lldb-api :: functionalities/conditional_break/TestConditionalBreak.py
+xfail lldb-api :: functionalities/memory/find/TestMemoryFind.py
+xfail lldb-api :: lang/c/anonymous/TestAnonymous.py
+xfail lldb-api :: lang/c/array_types/TestArrayTypes.py
+xfail lldb-api :: lang/c/enum_types/TestEnumTypes.py
+xfail lldb-api :: lang/c/forward/TestForwardDeclaration.py
+xfail lldb-api :: lang/c/function_types/TestFunctionTypes.py
+xfail lldb-api :: lang/c/register_variables/TestRegisterVariables.py
+xfail lldb-api :: lang/c/set_values/TestSetValues.py
+xfail lldb-api :: lang/c/shared_lib/TestSharedLib.py
+xfail lldb-api :: lang/cpp/class_types/TestClassTypes.py
+xfail lldb-api :: lang/cpp/inlines/TestInlines.py
+xfail lldb-api :: python_api/compile_unit/TestCompileUnitAPI.py
+xfail lldb-api :: python_api/thread/TestThreadAPI.py
+xfail lldb-api :: source-manager/TestSourceManager.py
+xfail lldb-shell :: Driver/TestConvenienceVariables.test
+
+# https://github.com/swiftlang/llvm-project/issues/9620
+xfail lldb-shell :: Swift/expression-diagnostics.test
+
+# https://github.com/swiftlang/llvm-project/issues/9540
+xfail lldb-shell :: SymbolFile/NativePDB/local-variables.cpp
+xfail lldb-shell :: SymbolFile/NativePDB/stack_unwinding01.cpp
+xfail lldb-api :: lang/c/local_variables/TestLocalVariables.py
+
+# https://github.com/swiftlang/llvm-project/issues/9637
+xfail lldb-api :: python_api/address_range/TestAddressRange.py
+
+# https://github.com/swiftlang/llvm-project/issues/9643
+xfail lldb-shell :: Commands/command-process-launch-user-entry.test
+
+# Skip SymbolTests because we cannot xfail unittests by name. We would need to
+# specify their indexes, but these are subject to change. Right now, failures
+# are:
+#  FAIL: lldb-unit :: Symbol/./SymbolTests.exe/24/27 (1 of 27)
+#  FAIL: lldb-unit :: Symbol/./SymbolTests.exe/21/27 (3 of 27)
+#  FAIL: lldb-unit :: Symbol/./SymbolTests.exe/22/27 (9 of 27)
+#  FAIL: lldb-unit :: Symbol/./SymbolTests.exe/25/27 (11 of 27)
+#
+# Respective tests are:
+#  lldb-unit :: Symbol/./SymbolTests.exe/ClangArgs/UniquingCollisionWithAddedFlags
+#  lldb-unit :: Symbol/./SymbolTests.exe/ClangArgs/UniquingCollisionWithExistingFlags
+#  lldb-unit :: Symbol/./SymbolTests.exe/TestSwiftASTContext/ApplyWorkingDir
+#  lldb-unit :: Symbol/./SymbolTests.exe/TestSwiftASTContext/PluginPath
+#
+skip lldb-unit :: Symbol/./SymbolTests.exe
+
+### Tests that fail occasionally ###
+
+# https://github.com/swiftlang/llvm-project/issues/9705
+skip lldb-api :: python_api/section/TestSectionAPI.py
+
+# Passes upstream in bot lldb-aarch64-windows; it fails in swiftlang
+# since https://github.com/swiftlang/llvm-project/pull/9493 relanded
+skip lldb-api :: functionalities/breakpoint/same_cu_name/TestFileBreakpoinsSameCUName.py
+
+# Disable 37 tests: 17 unsupported, 6 usually failed, 14 usually passed (but flaky)
+# https://github.com/swiftlang/llvm-project/issues/9099
+# https://github.com/swiftlang/llvm-project/issues/9100
+# https://github.com/swiftlang/llvm-project/issues/9101
+skip lldb-api :: tools/lldb-server
+
+### Tests that time out occasionally ###
+
+skip lldb-api :: commands/dwim-print/TestDWIMPrint.py
+skip lldb-api :: commands/thread/backtrace/TestThreadBacktraceRepeat.py
+skip lldb-api :: functionalities/inferior-crashing/TestInferiorCrashing.py
+skip lldb-api :: functionalities/inline-stepping/TestInlineStepping.py
+skip lldb-api :: functionalities/step_scripted/TestStepScripted.py
+skip lldb-api :: functionalities/thread/thread_specific_break/TestThreadSpecificBreakpoint.py
+
+### Tests that pass occasionally ###
+
+# Fixed upstream: https://github.com/llvm/llvm-project/commit/ec009994a06338995dfb6431c943b299f9327fd2
+# But patches don't apply on stable branch due to downstream changes.
+skip lldb-api :: functionalities/archives/TestBSDArchives.py
+skip lldb-api :: macosx/duplicate-archive-members/TestDuplicateMembers.py
+
+### Tests that pass accidentally ###
+
+https://github.com/llvm/llvm-project/issues/116972
+skip lldb-api :: api/command-return-object/TestSBCommandReturnObject.py
+skip lldb-api :: api/multiple-targets/TestMultipleTargets.py
+
+### Tests that fail during setup and thus show up as UNRESOLVED ***
+
+# https://github.com/swiftlang/llvm-project/issues/9887
+skip lldb-api :: lang/swift/async/tasks/TestSwiftTaskBacktrace.py
+skip lldb-api :: lang/swift/async/tasks/TestSwiftTaskSelect.py
+
+skip lldb-api :: functionalities/breakpoint/breakpoint_command/TestBreakpointCommandsFromPython.py
+skip lldb-api :: tools/lldb-dap/instruction-breakpoint/TestDAP_instruction_breakpoint.py
+skip lldb-api :: tools/lldb-dap/output/TestDAP_output.py
+
+### Untriaged ###
+
+skip lldb-api :: commands/statistics/basic/TestStats.py
+skip lldb-api :: lang/BoundsSafety/array_of_ptrs/TestArrayOfBoundsSafetyPointers.py
+skip lldb-api :: lang/BoundsSafety/out_of_bounds_pointer/TestOutOfBoundsPointer.py
+skip lldb-shell :: Commands/command-expr-diagnostics.test
+skip lldb-unit :: Host/./HostTests.exe
+
+# https://github.com/llvm/llvm-project/issues/62983
+skip lldb-api :: functionalities/var_path/TestVarPath.py
+
+# https://github.com/swiftlang/llvm-project/issues/9073
+skip lldb-api :: lang/c/trampoline_stepping/TestTrampolineStepping.py
+
+# https://github.com/swiftlang/llvm-project/issues/9072
+skip lldb-api :: lang/cpp/bitfields/TestCppBitfields.py
+
+skip lldb-shell :: Swift/astcontext_error.test
+skip lldb-shell :: Swift/cond-breakpoint.test
+
+skip lldb-api :: functionalities/data-formatter/data-formatter-cpp/TestDataFormatterCpp.py
+skip lldb-api :: lang/cpp/frame-var-depth-and-elem-count/TestFrameVarDepthAndElemCount.py
+skip lldb-api :: functionalities/inferior-crashing/recursive-inferior/TestRecursiveInferiorStep.py

@@ -1,0 +1,368 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2020 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+import Swift
+
+// ==== addTask / addTaskUnlessCancelled ---------------------------------------
+% # Generate:
+% # - both method kinds (2)
+% # - for every task group kind (4)
+% # - every overload that we need to keep for ABI compatibility
+% # - #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY guarded versions making the methods unavailable
+
+% for (IFDEF, TYPES, ALL_AVAILABILITY, ADD_TASK_METHOD_VARIANT, PARAMS) in [
+%      # -----------------------------------------------------------------------
+%      # === Added task name ---------------------------------------------------
+%      (
+%        '', # no #if condition
+%        [
+%          'TaskGroup',
+%          'ThrowingTaskGroup',
+%          'DiscardingTaskGroup',
+%          'ThrowingDiscardingTaskGroup'
+%        ],
+%        [
+%          '@available(SwiftStdlib 6.0, *)', # because task executor
+%          '@_unavailableInEmbedded', # since TaskExecutor is not available on embedded
+%        ],
+%        ['addTask', 'addTaskUnlessCancelled'],
+%        [
+%          'name: String?',
+%          'executorPreference taskExecutor: (any TaskExecutor)? = nil',
+%          'priority: TaskPriority? = nil',
+%          # throws and ChildTaskResult will be adjusted per task group type
+%          'operation: sending @escaping @isolated(any) () async throws -> ChildTaskResult'
+%        ],
+%      ),
+%      (
+%        '', # no #if condition
+%        [
+%          'TaskGroup',
+%          'ThrowingTaskGroup',
+%        ],
+%        [
+%          '@available(SwiftStdlib 5.1, *)',
+%        ],
+%        ['addTask', 'addTaskUnlessCancelled'],
+%        [
+%          'name: String?',
+%          # without task executor
+%          'priority: TaskPriority? = nil',
+%          # throws and ChildTaskResult will be adjusted per task group type
+%          'operation: sending @escaping @isolated(any) () async throws -> ChildTaskResult'
+%        ],
+%      ),
+%      (
+%        '', # no #if condition
+%        [
+%          'DiscardingTaskGroup',
+%          'ThrowingDiscardingTaskGroup'
+%        ],
+%        [
+%          '@available(SwiftStdlib 5.9, *)', # because Discarding task groups
+%        ],
+%        ['addTask', 'addTaskUnlessCancelled'],
+%        [
+%          'name: String?',
+%          # without task executor
+%          'priority: TaskPriority? = nil',
+%          # throws and ChildTaskResult will be adjusted per task group type
+%          'operation: sending @escaping @isolated(any) () async throws -> ChildTaskResult'
+%        ],
+%      ),
+%      # -----------------------------------------------------------------------
+%      # === Added TaskExecutor
+%      (
+%        '', # no #if condition
+%        [
+%          'TaskGroup',
+%          'ThrowingTaskGroup',
+%          'DiscardingTaskGroup',
+%          'ThrowingDiscardingTaskGroup'
+%        ],
+%        [
+%          '@available(SwiftStdlib 6.0, *)',
+%          '@_unavailableInEmbedded', # since TaskExecutor is not available on embedded
+%        ],
+%        ['addTask', 'addTaskUnlessCancelled'],
+%        [
+%          'executorPreference taskExecutor: (any TaskExecutor)? = nil',
+%          'priority: TaskPriority? = nil',
+%          # throws and ChildTaskResult will be adjusted per task group type
+%          'operation: sending @escaping @isolated(any) () async throws -> ChildTaskResult'
+%        ],
+%      ),
+%      (
+%        'SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY',
+%        [
+%          'TaskGroup',
+%          'ThrowingTaskGroup',
+%        ],
+%        [
+%          '// version for task to thread model, without priority parameter',
+%        ],
+%        ['addTask', 'addTaskUnlessCancelled'],
+%        [
+%          # throws and ChildTaskResult will be adjusted per task group type
+%          'operation: sending @escaping @isolated(any) () async throws -> ChildTaskResult'
+%        ],
+%      ),
+%      # -----------------------------------------------------------------------
+%      # === Baseline
+%      (
+%        '!SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY',
+%        [
+%          'TaskGroup',
+%          'ThrowingTaskGroup',
+%        ],
+%        [
+%          '@available(SwiftStdlib 5.1, *)',
+%        ],
+%        ['addTask', 'addTaskUnlessCancelled'],
+%        [
+%          'priority: TaskPriority? = nil',
+%          # throws and ChildTaskResult will be adjusted per task group type
+%          'operation: sending @escaping @isolated(any) () async throws -> ChildTaskResult'
+%        ],
+%      ),
+%      (
+%        'SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY',
+%        [
+%          'TaskGroup',
+%          'ThrowingTaskGroup',
+%        ],
+%        [
+%          '@available(SwiftStdlib 5.1, *)',
+%          '@available(*, unavailable, message: "Unavailable in task-to-thread concurrency model", renamed: "addTask(operation:)")',
+%        ],
+%        ['addTask', 'addTaskUnlessCancelled'],
+%        [
+%          'priority: TaskPriority? = nil',
+%          # throws and ChildTaskResult will be adjusted per task group type
+%          'operation: sending @escaping @isolated(any) () async throws -> ChildTaskResult'
+%        ],
+%      ),
+%      (
+%        '',
+%        [
+%          'DiscardingTaskGroup',
+%          'ThrowingDiscardingTaskGroup',
+%        ],
+%        [
+%          '@available(SwiftStdlib 5.9, *)',
+%        ],
+%        ['addTask', 'addTaskUnlessCancelled'],
+%        [
+%          'priority: TaskPriority? = nil',
+%          # throws and ChildTaskResult will be adjusted per task group type
+%          'operation: sending @escaping @isolated(any) () async throws -> ChildTaskResult'
+%        ],
+%      ),
+% ]:
+%
+% for TYPE in TYPES:
+% IS_DISCARDING = 'Discarding' in TYPE
+% IS_THROWING = 'Throwing' in TYPE
+%
+% def adjust_params_for_group_kind(params):
+%   res = []
+%   for p in params:
+%     np = p
+%     if IS_DISCARDING:
+%       np = np.replace("-> ChildTaskResult", "-> Void")
+%     if not IS_THROWING:
+%       np = np.replace("throws", "")
+%     res.append(np)
+%   return res
+%
+% for METHOD_NAME in ADD_TASK_METHOD_VARIANT:
+%
+% IS_ADD_UNLESS_CANCELLED = METHOD_NAME == "addTaskUnlessCancelled"
+% IS_IMPL_UNAVAILABLE = any('Unavailable in task-to-thread' in av for av in ALL_AVAILABILITY)
+% IS_TASK_TO_THREAD_MODEL = 'SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY' == IFDEF
+%
+% HAS_TASK_PRIORITY = any('priority:' in param for param in PARAMS)
+% HAS_TASK_NAME = any('name:' in param for param in PARAMS)
+% HAS_TASK_EXECUTOR = any('taskExecutor:' in param for param in PARAMS)
+%
+% ARROW_RETURN_TYPE = "-> Bool " if IS_ADD_UNLESS_CANCELLED else ""
+%
+% if IS_DISCARDING:
+%   TASK_CREATE_FN = 'Builtin.createDiscardingTask'
+% else:
+%   TASK_CREATE_FN = 'Builtin.createTask'
+% end
+
+% if IFDEF:
+#if ${IFDEF}
+% end
+
+% if HAS_TASK_EXECUTOR:
+@available(SwiftStdlib 6.0, *)
+% elif IS_DISCARDING:
+@available(SwiftStdlib 5.9, *)
+% else:
+@available(SwiftStdlib 5.1, *)
+% end
+extension ${TYPE} {
+
+  % if IS_ADD_UNLESS_CANCELLED:
+  /// Adds a child task to the group, unless the group has been canceled.
+  /// Returns a boolean value indicating if the task was successfully added to the group or not.
+  % else:
+  /// Adds a child task to the group.
+  % end
+  ///
+  % if IS_THROWING:
+  /// This method doesn't throw an error, even if the child task does.
+  /// Instead, the corresponding call to `ThrowingTaskGroup.next()` rethrows that error.
+  % end
+  ///
+  /// - Parameters:
+  % if HAS_TASK_NAME:
+  ///   - name: Human readable name of this task.
+  % end
+  % if HAS_TASK_EXECUTOR:
+  ///   - taskExecutor:
+  ///   - taskExecutor: The task executor that the child task should be started on and keep using.
+  ///      Explicitly passing `nil` as the executor preference is equivalent to
+  ///      calling the `${METHOD_NAME}` method without a preference, and effectively
+  ///      means to inherit the outer context's executor preference.
+  ///      You can also pass the ``globalConcurrentExecutor`` global executor explicitly.
+  % end
+  % if HAS_TASK_PRIORITY:
+  ///   - priority: The priority of the operation task.
+  ///     Omit this parameter or pass `nil` to inherit the task group's base priority.
+  % end
+  ///     Omit this parameter or pass `.unspecified`
+  ///     to set the child task's priority to the priority of the group.
+  ///   - operation: The operation to execute as part of the task group.
+  % if IS_ADD_UNLESS_CANCELLED:
+  /// - Returns: `true` if the child task was added to the group;
+  ///   otherwise `false`.
+  % end
+  @_alwaysEmitIntoClient
+  ${"\n  ".join(ALL_AVAILABILITY)}
+  public mutating func ${METHOD_NAME}( // ${TYPE}/${METHOD_NAME}
+    ${",\n    ".join(adjust_params_for_group_kind(PARAMS))}
+  ) ${ARROW_RETURN_TYPE}{
+    % if IS_IMPL_UNAVAILABLE:
+    fatalError("Unavailable in task-to-thread concurrency model")
+    % else: # !IS_IMPL_UNAVAILABLE
+    % if IS_ADD_UNLESS_CANCELLED:
+    let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
+
+    guard canAdd else {
+      // the group is cancelled and is not accepting any new work
+      return false
+    }
+    % end # IS_ADD_UNLESS_CANCELLED
+
+    let flags = taskCreateFlags(
+      priority: ${'priority' if HAS_TASK_PRIORITY else 'nil'},
+      isChildTask: true,
+      copyTaskLocals: false,
+      inheritContext: false,
+      % if IS_TASK_TO_THREAD_MODEL:
+      // task-to-thread model; don't enqueue as we'll run inline
+      enqueueJob: false,
+      % else:
+      enqueueJob: true,
+      % end
+      % if IS_ADD_UNLESS_CANCELLED:
+      % # In this case, we already added the pending task count before we create the task
+      % # so we must not add to the pending counter again.
+      addPendingGroupTaskUnconditionally: false,
+      % else:
+      addPendingGroupTaskUnconditionally: true,
+      % end
+      isDiscardingTask: ${str(IS_DISCARDING).lower()},
+      isSynchronousStart: false
+    )
+
+    let builtinSerialExecutor =
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+
+    var task: Builtin.NativeObject?
+
+    % # These #if conditionals are in specific order because if we have the "latest one",
+    % # we definitely have the prior ones, as we always keep adding parameters.
+    % if HAS_TASK_NAME:
+    #if $BuiltinCreateAsyncTaskName
+    if let name {
+      task =
+        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
+          ${TASK_CREATE_FN}(
+            flags: flags,
+            initialSerialExecutor: builtinSerialExecutor,
+            taskGroup: _group,
+            % if HAS_TASK_EXECUTOR:
+            initialTaskExecutorConsuming: taskExecutor,
+            % end
+            taskName: nameBytes.baseAddress!._rawValue,
+            operation: operation).0
+        }
+    }
+    #endif // $BuiltinCreateAsyncTaskName
+    % end # HAS_TASK_NAME
+
+    % if HAS_TASK_EXECUTOR:
+    // Task name was not set, or task name createTask is unavailable
+    if task == nil, let taskExecutor {
+      #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
+      task = ${TASK_CREATE_FN}(
+        flags: flags,
+        initialSerialExecutor: builtinSerialExecutor,
+        taskGroup: _group,
+        initialTaskExecutorConsuming: taskExecutor,
+        operation: operation).0
+      #else
+      // legacy branch for the non-consuming task executor
+      let executorBuiltin: Builtin.Executor =
+        taskExecutor.asUnownedTaskExecutor().executor
+
+      task = ${TASK_CREATE_FN}(
+        flags: flags,
+        initialSerialExecutor: builtinSerialExecutor,
+        taskGroup: _group,
+        initialTaskExecutor: executorBuiltin,
+        operation: operation).0
+      #endif
+    }
+    % end
+
+    % # The baseline fallback, if no other create calls could be used
+    if task == nil {
+      task = ${TASK_CREATE_FN}(
+        flags: flags,
+        initialSerialExecutor: builtinSerialExecutor,
+        taskGroup: _group,
+        operation: operation).0
+    }
+
+    // Assert that we did create the task, but there's no need to store it,
+    // as it was added to the group itself.
+    assert(task != nil, "Expected task to be created!")
+    % if IS_ADD_UNLESS_CANCELLED:
+    return true // task successfully enqueued
+    % end
+    % end # !IS_IMPL_UNAVAILABLE
+  }
+
+}
+% if IFDEF:
+#endif
+% end
+
+% end
+% end
+% end

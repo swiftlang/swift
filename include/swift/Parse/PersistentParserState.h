@@ -34,19 +34,17 @@ enum class IDEInspectionDelayedDeclKind {
 class IDEInspectionDelayedDeclState {
 public:
   IDEInspectionDelayedDeclKind Kind;
-  unsigned Flags;
   DeclContext *ParentContext;
   unsigned StartOffset;
   unsigned EndOffset;
   unsigned PrevOffset;
 
   IDEInspectionDelayedDeclState(IDEInspectionDelayedDeclKind Kind,
-                                unsigned Flags, DeclContext *ParentContext,
+                                DeclContext *ParentContext,
                                 unsigned StartOffset, unsigned EndOffset,
                                 unsigned PrevOffset)
-      : Kind(Kind), Flags(Flags), ParentContext(ParentContext),
-        StartOffset(StartOffset), EndOffset(EndOffset), PrevOffset(PrevOffset) {
-  }
+      : Kind(Kind), ParentContext(ParentContext), StartOffset(StartOffset),
+        EndOffset(EndOffset), PrevOffset(PrevOffset) {}
 };
 
 /// Parser state persistent across multiple parses.
@@ -60,7 +58,6 @@ public:
 
   void setIDEInspectionDelayedDeclState(SourceManager &SM, unsigned BufferID,
                                         IDEInspectionDelayedDeclKind Kind,
-                                        unsigned Flags,
                                         DeclContext *ParentContext,
                                         SourceRange BodyRange,
                                         SourceLoc PreviousLoc);

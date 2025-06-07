@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -generic-specializer %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -generic-specializer %s | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
@@ -118,7 +118,7 @@ bb2:
 // CHECK-NEXT:    [[CORO:%.*]] = function_ref @$s9coroutineSb_Tg5 : $@yield_once @convention(thin) (Bool) -> @yields @inout Bool
 // CHECK-NEXT:    [[LOAD:%.*]] = load [[TEMP]] : $*Bool
 // CHECK-NEXT:    ([[ADDR:%.*]], [[TOKEN:%.*]]) = begin_apply [[CORO]]([[LOAD]])
-// CHECK-NEXT:    end_apply [[TOKEN]]
+// CHECK-NEXT:    end_apply [[TOKEN]] as $()
 // CHECK-NEXT:    dealloc_stack [[TEMP]] : $*Bool
 // CHECK-NEXT:    [[RV:%.*]] = tuple ()
 // CHECK-NEXT:    return [[RV]] : $()
@@ -129,17 +129,17 @@ bb0(%0 : $Bool):
   %temp = alloc_stack $Bool
   store %0 to %temp : $*Bool
   (%addr, %token) = begin_apply %coro<Bool>(%temp) : $@yield_once @convention(thin) <T> (@in T) -> @yields @inout T
-  end_apply %token
+  end_apply %token as $()
   dealloc_stack %temp : $*Bool
   %rv = tuple ()
   return %rv : $()
 }
 
 // CHECK-LABEL: sil shared @$s21arg_escapes_to_return4main1XC_Tg5
-// CHECK-NEXT:  [%0: escape => %r]
+// CHECK-NEXT:  [%0: escape -> %r]
 // CHECK-NEXT:  {{^[^[]}}
 sil @arg_escapes_to_return : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
-[%1: escape => %0] 
+[%1: escape -> %0] 
 bb0(%0 : $*T, %1 : $*T):
   copy_addr %1 to [init] %0 : $*T
   %4 = tuple ()
@@ -147,10 +147,10 @@ bb0(%0 : $*T, %1 : $*T):
 }
 
 // CHECK-LABEL: sil shared @$s015arg_escapes_to_A04main1XC_Tg5
-// CHECK-NEXT:  [%1: escape => %0]
+// CHECK-NEXT:  [%1: escape -> %0]
 // CHECK-NEXT:  {{^[^[]}}
 sil @arg_escapes_to_arg : $@convention(thin) <T> (@inout T, @in_guaranteed T) -> () {
-[%1: escape => %0] 
+[%1: escape -> %0] 
 bb0(%0 : $*T, %1 : $*T):
   copy_addr %1 to %0 : $*T
   %4 = tuple ()

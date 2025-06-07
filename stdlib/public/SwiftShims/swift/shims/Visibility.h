@@ -134,7 +134,7 @@
 // right for Windows, we have everything set up to get it right on
 // other targets as well, and doing so lets the compiler use more
 // efficient symbol access patterns.
-#if defined(__MACH__) || defined(__wasi__)
+#if defined(__MACH__) || defined(__wasm__)
 
 // On Mach-O and WebAssembly, we use non-hidden visibility.  We just use
 // default visibility on both imports and exports, both because these
@@ -168,9 +168,13 @@
 // FIXME: this #else should be some sort of #elif Windows
 #else // !__MACH__ && !__ELF__
 
-// On PE/COFF, we use dllimport and dllexport.
-# define SWIFT_ATTRIBUTE_FOR_EXPORTS __declspec(dllexport)
-# define SWIFT_ATTRIBUTE_FOR_IMPORTS __declspec(dllimport)
+# if defined(SWIFT_STATIC_STDLIB)
+#   define SWIFT_ATTRIBUTE_FOR_EXPORTS /**/
+#   define SWIFT_ATTRIBUTE_FOR_IMPORTS /**/
+# else
+#   define SWIFT_ATTRIBUTE_FOR_EXPORTS __declspec(dllexport)
+#   define SWIFT_ATTRIBUTE_FOR_IMPORTS __declspec(dllimport)
+# endif
 
 #endif
 
@@ -217,10 +221,13 @@
 // TODO: use this in shims headers in overlays.
 #if defined(__cplusplus)
 #define SWIFT_EXPORT_FROM(LIBRARY) extern "C" SWIFT_EXPORT_FROM_ATTRIBUTE(LIBRARY)
+#define SWIFT_EXTERN_C extern "C" 
 #else
 #define SWIFT_EXPORT_FROM(LIBRARY) SWIFT_EXPORT_FROM_ATTRIBUTE(LIBRARY)
+#define SWIFT_EXTERN_C
 #endif
 #define SWIFT_RUNTIME_EXPORT SWIFT_EXPORT_FROM(swiftCore)
+#define SWIFT_RUNTIME_EXPORT_ATTRIBUTE SWIFT_EXPORT_FROM_ATTRIBUTE(swiftCore)
 
 #if __cplusplus > 201402l && __has_cpp_attribute(fallthrough)
 #define SWIFT_FALLTHROUGH [[fallthrough]]

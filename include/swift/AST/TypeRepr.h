@@ -19,16 +19,18 @@
 
 #include "swift/AST/Attr.h"
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Identifier.h"
+#include "swift/AST/LifetimeDependence.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
+#include "swift/Basic/Debug.h"
+#include "swift/Basic/InlineBitfield.h"
+#include "swift/Basic/Located.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/STLExtras.h"
-#include "swift/Basic/Debug.h"
-#include "swift/Basic/Located.h"
-#include "swift/Basic/InlineBitfield.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
 
@@ -39,6 +41,8 @@ namespace swift {
   class DeclRefTypeRepr;
   class TupleTypeRepr;
   class TypeDecl;
+
+enum class ParamSpecifier : uint8_t;
 
 enum class TypeReprKind : uint8_t {
 #define TYPEREPR(ID, PARENT) ID,
@@ -58,6 +62,7 @@ class alignas(1 << TypeReprAlignInBits) TypeRepr
   void operator=(const TypeRepr&) = delete;
 
 protected:
+  // clang-format off
   union { uint64_t OpaqueBits;
 
   SWIFT_INLINE_BITFIELD_BASE(TypeRepr, bitmax(NumTypeReprKindBits,8)+1+1,
@@ -79,16 +84,13 @@ protected:
     NumElements : 32
   );
 
-  SWIFT_INLINE_BITFIELD_EMPTY(DeclRefTypeRepr, TypeRepr);
-  SWIFT_INLINE_BITFIELD_EMPTY(IdentTypeRepr, DeclRefTypeRepr);
-
-  SWIFT_INLINE_BITFIELD_FULL(GenericIdentTypeRepr, IdentTypeRepr, 32,
+  SWIFT_INLINE_BITFIELD_FULL(DeclRefTypeRepr, TypeRepr, 1+32,
+    /// Whether this instance has a valid angle bracket source range.
+    HasAngleBrackets: 1,
     : NumPadBits,
+
     NumGenericArgs : 32
   );
-
-  SWIFT_INLINE_BITFIELD_FULL(MemberTypeRepr, DeclRefTypeRepr, 32,
-                             : NumPadBits, NumMemberComponents : 32);
 
   SWIFT_INLINE_BITFIELD_FULL(CompositionTypeRepr, TypeRepr, 32,
     : NumPadBits,
@@ -100,12 +102,17 @@ protected:
     NumFields : 32
   );
 
+  SWIFT_INLINE_BITFIELD_FULL(AttributedTypeRepr, TypeRepr, 32,
+    : NumPadBits,
+    NumAttributes : 32
+  );
+
   SWIFT_INLINE_BITFIELD_FULL(PackTypeRepr, TypeRepr, 32,
     /// The number of elements contained.
     NumElements : 32
   );
-
   } Bits;
+  // clang-format on
 
   TypeRepr(TypeReprKind K) {
     Bits.OpaqueBits = 0;
@@ -123,7 +130,7 @@ public:
   }
 
   /// Is this type representation a protocol?
-  bool isProtocol(DeclContext *dc);
+  bool isProtocolOrProtocolComposition(DeclContext *dc);
 
   /// Is this type representation known to be invalid?
   bool isInvalid() const { return Bits.TypeRepr.Invalid; }
@@ -143,9 +150,13 @@ public:
   SourceLoc getEndLoc() const;
   SourceRange getSourceRange() const;
 
-  /// Find an @unchecked attribute and return its source location, or return
-  /// an invalid source location if there is no such attribute.
-  SourceLoc findUncheckedAttrLoc() const;
+  /// Find an attribute with the provided kind and return its source location,
+  /// or return an invalid source location if there is no such attribute.
+  SourceLoc findAttrLoc(TypeAttrKind kind) const;
+
+  /// Find a custom attribute within this type, or return NULL if there is
+  /// no such attribute.
+  CustomAttr *findCustomAttr() const;
 
   /// Is this type grammatically a type-simple?
   inline bool isSimple() const; // bottom of this file
@@ -172,6 +183,10 @@ public:
   /// opaque return type reprs.
   bool hasOpaque();
 
+  /// Returns a Boolean value indicating whether this written type is
+  /// parenthesized, that is, matches the following grammar: `'(' type ')'`.
+  bool isParenType() const;
+
   /// Retrieve the type repr without any parentheses around it.
   ///
   /// The use of this function must be restricted to contexts where
@@ -180,27 +195,54 @@ public:
   /// \c Type::getCanonicalType() or \c Type::getWithoutParens().
   TypeRepr *getWithoutParens() const;
 
+  /// Whether this is a `UnqualifiedIdentTypeRepr` with no generic arguments,
+  /// matching the given identifier.
+  bool isSimpleUnqualifiedIdentifier(Identifier identifier) const;
+
+  /// Whether this is a `UnqualifiedIdentTypeRepr` with no generic arguments,
+  /// matching the given string.
+  bool isSimpleUnqualifiedIdentifier(StringRef str) const;
+
   //*** Allocation Routines ************************************************/
 
   void print(raw_ostream &OS, const PrintOptions &Opts = PrintOptions()) const;
   void print(ASTPrinter &Printer, const PrintOptions &Opts) const;
   SWIFT_DEBUG_DUMP;
+  void dump(raw_ostream &OS, unsigned indent = 0) const;
 };
 
 /// A TypeRepr for a type with a syntax error.  Can be used both as a
 /// top-level TypeRepr and as a part of other TypeRepr.
 ///
-/// The client should make sure to emit a diagnostic at the construction time
-/// (in the parser).  All uses of this type should be ignored and not
-/// re-diagnosed.
+/// The client can either emit a detailed diagnostic at the construction time
+/// (in the parser) or store a zero-arg diagnostic in this TypeRepr to be
+/// emitted after parsing, during type resolution.
+///
+/// All uses of this type should be ignored and not re-diagnosed.
 class ErrorTypeRepr : public TypeRepr {
   SourceRange Range;
+  std::optional<ZeroArgDiagnostic> DelayedDiag;
+
+  ErrorTypeRepr(SourceRange Range, std::optional<ZeroArgDiagnostic> Diag)
+      : TypeRepr(TypeReprKind::Error), Range(Range), DelayedDiag(Diag) {}
 
 public:
-  ErrorTypeRepr() : TypeRepr(TypeReprKind::Error) {}
-  ErrorTypeRepr(SourceLoc Loc) : TypeRepr(TypeReprKind::Error), Range(Loc) {}
-  ErrorTypeRepr(SourceRange Range)
-      : TypeRepr(TypeReprKind::Error), Range(Range) {}
+  static ErrorTypeRepr *
+  create(ASTContext &Context, SourceRange Range,
+         std::optional<ZeroArgDiagnostic> DelayedDiag = std::nullopt) {
+    assert((!DelayedDiag || Range) && "diagnostic needs a location");
+    return new (Context) ErrorTypeRepr(Range, DelayedDiag);
+  }
+
+  static ErrorTypeRepr *
+  create(ASTContext &Context, SourceLoc Loc = SourceLoc(),
+         std::optional<ZeroArgDiagnostic> DelayedDiag = std::nullopt) {
+    return create(Context, SourceRange(Loc), DelayedDiag);
+  }
+
+  /// If there is a delayed diagnostic stored in this TypeRepr, consumes and
+  /// emits that diagnostic.
+  void dischargeDiagnostic(ASTContext &Context);
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Error;
@@ -218,19 +260,47 @@ private:
 /// \code
 ///   @convention(thin) Foo
 /// \endcode
-class AttributedTypeRepr : public TypeRepr {
-  // FIXME: TypeAttributes isn't a great use of space.
-  TypeAttributes Attrs;
+class AttributedTypeRepr final
+    : public TypeRepr,
+      private llvm::TrailingObjects<AttributedTypeRepr, TypeOrCustomAttr> {
   TypeRepr *Ty;
 
-public:
-  AttributedTypeRepr(const TypeAttributes &Attrs, TypeRepr *Ty)
-    : TypeRepr(TypeReprKind::Attributed), Attrs(Attrs), Ty(Ty) {
+  AttributedTypeRepr(ArrayRef<TypeOrCustomAttr> attrs, TypeRepr *Ty)
+      : TypeRepr(TypeReprKind::Attributed), Ty(Ty) {
+    assert(!attrs.empty());
+    Bits.AttributedTypeRepr.NumAttributes = attrs.size();
+    std::uninitialized_copy(attrs.begin(), attrs.end(),
+                            getTrailingObjects<TypeOrCustomAttr>());
+
   }
 
-  const TypeAttributes &getAttrs() const { return Attrs; }
-  void setAttrs(const TypeAttributes &attrs) { Attrs = attrs; }
+  friend TrailingObjects;
+
+public:
+  static AttributedTypeRepr *create(const ASTContext &C,
+                                    ArrayRef<TypeOrCustomAttr> attrs,
+                                    TypeRepr *ty);
+
+  ArrayRef<TypeOrCustomAttr> getAttrs() const {
+    return llvm::ArrayRef(getTrailingObjects<TypeOrCustomAttr>(),
+                          Bits.AttributedTypeRepr.NumAttributes);
+  }
+
+  TypeAttribute *get(TypeAttrKind kind) const;
+  bool has(TypeAttrKind kind) const {
+    return get(kind) != nullptr;
+  }
+  SourceLoc getAttrLoc(TypeAttrKind kind) const {
+    auto attr = get(kind);
+    return attr ? attr->getAttrLoc() : SourceLoc();
+  }
+
   TypeRepr *getTypeRepr() const { return Ty; }
+
+  /// Return the value of the first SIL ownership attribute (such as
+  /// `sil_weak`) in these attributes, or ReferenceOwnership::Strong if
+  /// there is no such attribute.
+  ReferenceOwnership getSILOwnership() const;
 
   void printAttrs(llvm::raw_ostream &OS) const;
   void printAttrs(ASTPrinter &Printer, const PrintOptions &Options) const;
@@ -241,14 +311,21 @@ public:
   static bool classof(const AttributedTypeRepr *T) { return true; }
 
 private:
-  SourceLoc getStartLocImpl() const { return Attrs.AtLoc; }
+  SourceLoc getStartLocImpl() const {
+    auto attr = getAttrs().front();
+    if (auto customAttr = attr.dyn_cast<CustomAttr*>()) {
+      return customAttr->getStartLoc();
+    } else {
+      return attr.get<TypeAttribute*>()->getStartLoc();
+    }
+  }
   SourceLoc getEndLocImpl() const { return Ty->getEndLoc(); }
   SourceLoc getLocImpl() const { return Ty->getLoc(); }
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
 
-class IdentTypeRepr;
+class UnqualifiedIdentTypeRepr;
 
 /// This is the abstract base class for types that directly reference a
 /// type declaration. In written syntax, this type representation consists of
@@ -257,165 +334,136 @@ class IdentTypeRepr;
 ///   Foo.Bar<Gen>
 /// \endcode
 class DeclRefTypeRepr : public TypeRepr {
-protected:
-  explicit DeclRefTypeRepr(TypeReprKind K) : TypeRepr(K) {}
-
-public:
-  /// Returns \c this if it is a \c IdentTypeRepr. Otherwise, \c this
-  /// is a \c MemberTypeRepr, and the method returns its base component.
-  TypeRepr *getBaseComponent();
-
-  /// Returns \c this if it is a \c IdentTypeRepr. Otherwise, \c this
-  /// is a \c MemberTypeRepr, and the method returns its last member component.
-  IdentTypeRepr *getLastComponent();
-
-  /// The type declaration the last component is bound to.
-  TypeDecl *getBoundDecl() const;
-
-  /// The identifier that describes the last component.
-  DeclNameRef getNameRef() const;
-
-  static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::SimpleIdent ||
-           T->getKind() == TypeReprKind::GenericIdent ||
-           T->getKind() == TypeReprKind::Member;
-  }
-  static bool classof(const DeclRefTypeRepr *T) { return true; }
-};
-
-/// An identifier type with an optional set of generic arguments.
-/// \code
-///   Foo
-///   Bar<Gen>
-/// \endcode
-class IdentTypeRepr : public DeclRefTypeRepr {
-  DeclNameLoc Loc;
+  DeclNameLoc NameLoc;
 
   /// Either the identifier or declaration that describes this
   /// component.
   ///
   /// The initial parsed representation is always an identifier, and
   /// name lookup will resolve this to a specific declaration.
-  llvm::PointerUnion<DeclNameRef, TypeDecl *> IdOrDecl;
+  llvm::PointerUnion<DeclNameRef, TypeDecl *> NameOrDecl;
 
   /// The declaration context from which the bound declaration was
   /// found. only valid if IdOrDecl is a TypeDecl.
   DeclContext *DC;
 
 protected:
-  IdentTypeRepr(TypeReprKind K, DeclNameLoc Loc, DeclNameRef Id)
-      : DeclRefTypeRepr(K), Loc(Loc), IdOrDecl(Id), DC(nullptr) {}
+  explicit DeclRefTypeRepr(TypeReprKind K, DeclNameRef Name,
+                           DeclNameLoc NameLoc, unsigned NumGenericArgs,
+                           bool HasAngleBrackets);
 
 public:
-  DeclNameLoc getNameLoc() const { return Loc; }
+  static DeclRefTypeRepr *create(const ASTContext &C, TypeRepr *Base,
+                                 DeclNameLoc NameLoc, DeclNameRef Name);
+
+  static DeclRefTypeRepr *create(const ASTContext &C, TypeRepr *Base,
+                                 DeclNameLoc NameLoc, DeclNameRef Name,
+                                 ArrayRef<TypeRepr *> GenericArgs,
+                                 SourceRange AngleBrackets);
+
+  /// Returns the qualifier or base type representation. For example, `A.B`
+  /// for `A.B.C`. The base of a `UnqualifiedIdentTypeRepr` is null.
+  TypeRepr *getBase() const;
+
+  /// Returns the root qualifier. For example, `A` for `A.B.C`. The root
+  /// qualifier of a `UnqualifiedIdentTypeRepr` is itself.
+  TypeRepr *getRoot();
+
+  /// Returns the root qualifier. For example, `A` for `A.B.C`. The root
+  /// qualifier of a `UnqualifiedIdentTypeRepr` is itself.
+  const TypeRepr *getRoot() const;
+
+  DeclNameLoc getNameLoc() const;
   DeclNameRef getNameRef() const;
 
   /// Replace the identifier with a new identifier, e.g., due to typo
   /// correction.
-  void overwriteNameRef(DeclNameRef newId) { IdOrDecl = newId; }
+  void overwriteNameRef(DeclNameRef newId);
 
-  /// Return true if this name has been resolved to a type decl. This happens
-  /// during type resolution.
-  bool isBound() const { return IdOrDecl.is<TypeDecl *>(); }
+  /// Returns whether this instance has been bound to a type declaration. This
+  /// happens during type resolution.
+  bool isBound() const;
 
-  TypeDecl *getBoundDecl() const { return IdOrDecl.dyn_cast<TypeDecl*>(); }
+  /// Returns the type declaration this instance has been bound to.
+  TypeDecl *getBoundDecl() const;
 
-  DeclContext *getDeclContext() const {
-    assert(isBound());
-    return DC;
-  }
+  DeclContext *getDeclContext() const;
 
-  void setValue(TypeDecl *TD, DeclContext *DC) {
-    IdOrDecl = TD;
-    this->DC = DC;
-  }
+  void setValue(TypeDecl *TD, DeclContext *DC);
 
-  static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::SimpleIdent ||
-           T->getKind() == TypeReprKind::GenericIdent;
-  }
-  static bool classof(const IdentTypeRepr *T) { return true; }
+  /// Returns whether this instance has a generic argument list. That is, either
+  /// a valid angle bracket source range, or a positive number of generic
+  /// arguments.
+  bool hasGenericArgList() const;
+
+  unsigned getNumGenericArgs() const;
+
+  ArrayRef<TypeRepr *> getGenericArgs() const;
 
 protected:
+  /// Returns whether this instance has a valid angle bracket source range.
+  bool hasAngleBrackets() const;
+
+public:
+  SourceRange getAngleBrackets() const;
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::UnqualifiedIdent ||
+           T->getKind() == TypeReprKind::QualifiedIdent;
+  }
+  static bool classof(const DeclRefTypeRepr *T) { return true; }
+
+protected:
+  SourceLoc getLocImpl() const;
+  SourceLoc getEndLocImpl() const;
+
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
 
-  SourceLoc getLocImpl() const { return Loc.getBaseNameLoc(); }
   friend class TypeRepr;
 };
 
-/// A simple identifier type like "Int".
-class SimpleIdentTypeRepr : public IdentTypeRepr {
-public:
-  SimpleIdentTypeRepr(DeclNameLoc Loc, DeclNameRef Id)
-      : IdentTypeRepr(TypeReprKind::SimpleIdent, Loc, Id) {}
-
-  // SmallVector::emplace_back will never need to call this because
-  // we reserve the right size, but it does try statically.
-  SimpleIdentTypeRepr(const SimpleIdentTypeRepr &repr)
-      : SimpleIdentTypeRepr(repr.getNameLoc(), repr.getNameRef()) {
-    llvm_unreachable("should not be called dynamically");
-  }
-
-  static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::SimpleIdent;
-  }
-  static bool classof(const SimpleIdentTypeRepr *T) { return true; }
-
-private:
-  SourceLoc getStartLocImpl() const { return getNameLoc().getStartLoc(); }
-  SourceLoc getEndLocImpl() const { return getNameLoc().getEndLoc(); }
-  friend class TypeRepr;
-};
-
-/// An identifier type with generic arguments.
+/// An unqualified identifier type an optional set of generic arguments.
 /// \code
+///   Foo
 ///   Bar<Gen>
 /// \endcode
-class GenericIdentTypeRepr final
-    : public IdentTypeRepr,
-      private llvm::TrailingObjects<GenericIdentTypeRepr, TypeRepr *> {
+class UnqualifiedIdentTypeRepr final
+    : public DeclRefTypeRepr,
+      private llvm::TrailingObjects<UnqualifiedIdentTypeRepr, TypeRepr *,
+                                    SourceRange> {
   friend TrailingObjects;
-  SourceRange AngleBrackets;
 
-  GenericIdentTypeRepr(DeclNameLoc Loc, DeclNameRef Id,
-                       ArrayRef<TypeRepr *> GenericArgs,
-                       SourceRange AngleBrackets)
-      : IdentTypeRepr(TypeReprKind::GenericIdent, Loc, Id),
-        AngleBrackets(AngleBrackets) {
-    Bits.GenericIdentTypeRepr.NumGenericArgs = GenericArgs.size();
-#ifndef NDEBUG
-    for (auto arg : GenericArgs)
-      assert(arg != nullptr);
-#endif
-    std::uninitialized_copy(GenericArgs.begin(), GenericArgs.end(),
-                            getTrailingObjects<TypeRepr*>());
+  size_t numTrailingObjects(OverloadToken<TypeRepr *>) const {
+    return getNumGenericArgs();
   }
+
+  UnqualifiedIdentTypeRepr(DeclNameRef Name, DeclNameLoc NameLoc);
+
+  UnqualifiedIdentTypeRepr(DeclNameRef Name, DeclNameLoc NameLoc,
+                           ArrayRef<TypeRepr *> GenericArgs,
+                           SourceRange AngleBrackets);
 
 public:
-  static GenericIdentTypeRepr *create(const ASTContext &C,
-                                      DeclNameLoc Loc,
-                                      DeclNameRef Id,
-                                      ArrayRef<TypeRepr*> GenericArgs,
-                                      SourceRange AngleBrackets);
+  static UnqualifiedIdentTypeRepr *
+  create(const ASTContext &C, DeclNameLoc NameLoc, DeclNameRef Name);
 
-  unsigned getNumGenericArgs() const {
-    return Bits.GenericIdentTypeRepr.NumGenericArgs;
-  }
+  static UnqualifiedIdentTypeRepr *create(const ASTContext &C,
+                                          DeclNameLoc NameLoc, DeclNameRef Name,
+                                          ArrayRef<TypeRepr *> GenericArgs,
+                                          SourceRange AngleBrackets);
 
-  ArrayRef<TypeRepr*> getGenericArgs() const {
-    return {getTrailingObjects<TypeRepr*>(),
-            Bits.GenericIdentTypeRepr.NumGenericArgs};
-  }
-  SourceRange getAngleBrackets() const { return AngleBrackets; }
+  ArrayRef<TypeRepr *> getGenericArgs() const;
+
+  SourceRange getAngleBrackets() const;
 
   static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::GenericIdent;
+    return T->getKind() == TypeReprKind::UnqualifiedIdent;
   }
-  static bool classof(const GenericIdentTypeRepr *T) { return true; }
+  static bool classof(const UnqualifiedIdentTypeRepr *T) { return true; }
 
-private:
+protected:
   SourceLoc getStartLocImpl() const { return getNameLoc().getStartLoc(); }
-  SourceLoc getEndLocImpl() const { return AngleBrackets.End; }
+
   friend class TypeRepr;
 };
 
@@ -425,53 +473,53 @@ private:
 ///   Foo.Bar<Gen>.Baz
 ///   [Int].Bar
 /// \endcode
-class MemberTypeRepr final : public DeclRefTypeRepr,
-      private llvm::TrailingObjects<MemberTypeRepr, IdentTypeRepr *> {
+class QualifiedIdentTypeRepr final
+    : public DeclRefTypeRepr,
+      private llvm::TrailingObjects<QualifiedIdentTypeRepr, TypeRepr *,
+                                    SourceRange> {
   friend TrailingObjects;
 
-  /// The base component, which is not necessarily an identifier type.
+  /// The qualifier or base type representation. For example, `A.B` for `A.B.C`.
   TypeRepr *Base;
 
-  MemberTypeRepr(TypeRepr *Base, ArrayRef<IdentTypeRepr *> MemberComponents)
-      : DeclRefTypeRepr(TypeReprKind::Member), Base(Base) {
-    Bits.MemberTypeRepr.NumMemberComponents = MemberComponents.size();
-    assert(MemberComponents.size() > 0 &&
-           "MemberTypeRepr requires at least 1 member component");
-    std::uninitialized_copy(MemberComponents.begin(), MemberComponents.end(),
-                            getTrailingObjects<IdentTypeRepr *>());
+  size_t numTrailingObjects(OverloadToken<TypeRepr *>) const {
+    return getNumGenericArgs();
   }
+
+  QualifiedIdentTypeRepr(TypeRepr *Base, DeclNameRef Name, DeclNameLoc NameLoc);
+
+  QualifiedIdentTypeRepr(TypeRepr *Base, DeclNameRef Name, DeclNameLoc NameLoc,
+                         ArrayRef<TypeRepr *> GenericArgs,
+                         SourceRange AngleBrackets);
 
 public:
-  static TypeRepr *create(const ASTContext &Ctx, TypeRepr *Base,
-                          ArrayRef<IdentTypeRepr *> MemberComponents);
+  static QualifiedIdentTypeRepr *create(const ASTContext &C, TypeRepr *Base,
+                                        DeclNameLoc NameLoc, DeclNameRef Name);
 
-  static DeclRefTypeRepr *create(const ASTContext &Ctx,
-                                 ArrayRef<IdentTypeRepr *> Components);
+  static QualifiedIdentTypeRepr *create(const ASTContext &C, TypeRepr *Base,
+                                        DeclNameLoc NameLoc, DeclNameRef Name,
+                                        ArrayRef<TypeRepr *> GenericArgs,
+                                        SourceRange AngleBrackets);
 
-  TypeRepr *getBaseComponent() const { return Base; }
+  /// Returns the qualifier or base type representation. For example, `A.B`
+  /// for `A.B.C`.
+  TypeRepr *getBase() const;
 
-  ArrayRef<IdentTypeRepr *> getMemberComponents() const {
-    return {getTrailingObjects<IdentTypeRepr *>(),
-            Bits.MemberTypeRepr.NumMemberComponents};
-  }
+  /// Returns the root qualifier. For example, `A` for `A.B.C`.
+  TypeRepr *getRoot() const;
 
-  IdentTypeRepr *getLastComponent() const {
-    return getMemberComponents().back();
-  }
+  ArrayRef<TypeRepr *> getGenericArgs() const;
+
+  SourceRange getAngleBrackets() const;
 
   static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::Member;
+    return T->getKind() == TypeReprKind::QualifiedIdent;
   }
-  static bool classof(const MemberTypeRepr *T) { return true; }
+  static bool classof(const QualifiedIdentTypeRepr *T) { return true; }
 
 private:
-  SourceLoc getStartLocImpl() const {
-    return getBaseComponent()->getStartLoc();
-  }
-  SourceLoc getEndLocImpl() const { return getLastComponent()->getEndLoc(); }
-  SourceLoc getLocImpl() const { return getLastComponent()->getLoc(); }
+  SourceLoc getStartLocImpl() const;
 
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
 
@@ -494,13 +542,16 @@ class FunctionTypeRepr : public TypeRepr {
 
   TupleTypeRepr *ArgsTy;
   TypeRepr *RetTy;
+  TypeRepr *ThrownTy;
   SourceLoc AsyncLoc;
   SourceLoc ThrowsLoc;
   SourceLoc ArrowLoc;
 
 public:
   FunctionTypeRepr(GenericParamList *genericParams, TupleTypeRepr *argsTy,
-                   SourceLoc asyncLoc, SourceLoc throwsLoc, SourceLoc arrowLoc,
+                   SourceLoc asyncLoc, SourceLoc throwsLoc, 
+                   TypeRepr *thrownTy,
+                   SourceLoc arrowLoc,
                    TypeRepr *retTy,
                    GenericParamList *patternGenericParams = nullptr,
                    ArrayRef<TypeRepr *> patternSubs = {},
@@ -510,7 +561,7 @@ public:
       InvocationSubs(invocationSubs),
       PatternGenericParams(patternGenericParams),
       PatternSubs(patternSubs),
-      ArgsTy(argsTy), RetTy(retTy),
+      ArgsTy(argsTy), RetTy(retTy), ThrownTy(thrownTy),
       AsyncLoc(asyncLoc), ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc) {
   }
 
@@ -540,6 +591,7 @@ public:
   }
 
   TupleTypeRepr *getArgsTypeRepr() const { return ArgsTy; }
+  TypeRepr *getThrownTypeRepr() const { return ThrownTy; }
   TypeRepr *getResultTypeRepr() const { return RetTy; }
   bool isAsync() const { return AsyncLoc.isValid(); }
   bool isThrowing() const { return ThrowsLoc.isValid(); }
@@ -581,6 +633,35 @@ public:
     return T->getKind() == TypeReprKind::Array;
   }
   static bool classof(const ArrayTypeRepr *T) { return true; }
+
+private:
+  SourceLoc getStartLocImpl() const { return Brackets.Start; }
+  SourceLoc getEndLocImpl() const { return Brackets.End; }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
+
+/// An InlineArray type e.g `[2 of Foo]`, sugar for `InlineArray<2, Foo>`.
+class InlineArrayTypeRepr : public TypeRepr {
+  TypeRepr *Count;
+  TypeRepr *Element;
+  SourceRange Brackets;
+
+  InlineArrayTypeRepr(TypeRepr *count, TypeRepr *element, SourceRange brackets)
+      : TypeRepr(TypeReprKind::InlineArray), Count(count), Element(element),
+        Brackets(brackets) {}
+
+public:
+  static InlineArrayTypeRepr *create(ASTContext &ctx, TypeRepr *count,
+                                     TypeRepr *element, SourceRange brackets);
+
+  TypeRepr *getCount() const { return Count; }
+  TypeRepr *getElement() const { return Element; }
+  SourceRange getBrackets() const { return Brackets; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::InlineArray;
+  }
 
 private:
   SourceLoc getStartLocImpl() const { return Brackets.Start; }
@@ -724,20 +805,12 @@ private:
   friend class TypeRepr;
 };
 
-/// A pack expansion 'T...' with a pattern 'T'.
+/// A pack expansion 'repeat T' with a pattern 'T'.
 ///
 /// Can appear in the following positions:
 /// - The type of a parameter declaration in a function declaration
 /// - The type of a parameter in a function type
 /// - The element of a tuple
-///
-/// In the first two cases, it also spells an old-style variadic parameter
-/// desugaring to an array type. The two meanings are distinguished by the
-/// presence of at least one pack type parameter in the pack expansion
-/// pattern.
-///
-/// In the third case, tuples cannot contain an old-style variadic element,
-/// so the pack expansion must be a real variadic pack expansion.
 class PackExpansionTypeRepr final : public TypeRepr {
   SourceLoc RepeatLoc;
   TypeRepr *Pattern;
@@ -790,12 +863,12 @@ public:
   SourceRange getBracesRange() const { return BraceLocs; }
 
   MutableArrayRef<TypeRepr*> getMutableElements() {
-    return llvm::makeMutableArrayRef(getTrailingObjects<TypeRepr*>(),
-                                     Bits.PackTypeRepr.NumElements);
+    return llvm::MutableArrayRef(getTrailingObjects<TypeRepr *>(),
+                                 Bits.PackTypeRepr.NumElements);
   }
   ArrayRef<TypeRepr*> getElements() const {
-    return llvm::makeArrayRef(getTrailingObjects<TypeRepr*>(),
-                              Bits.PackTypeRepr.NumElements);
+    return llvm::ArrayRef(getTrailingObjects<TypeRepr *>(),
+                          Bits.PackTypeRepr.NumElements);
   }
 
   static bool classof(const TypeRepr *T) {
@@ -821,22 +894,22 @@ private:
 ///   func f(value: (each T)...) where each T: P {}
 /// }
 /// \endcode
-class PackReferenceTypeRepr: public TypeRepr {
+class PackElementTypeRepr: public TypeRepr {
   TypeRepr *PackType;
   SourceLoc EachLoc;
 
 public:
-  PackReferenceTypeRepr(SourceLoc eachLoc, TypeRepr *packType)
-    : TypeRepr(TypeReprKind::PackReference), PackType(packType),
+  PackElementTypeRepr(SourceLoc eachLoc, TypeRepr *packType)
+    : TypeRepr(TypeReprKind::PackElement), PackType(packType),
       EachLoc(eachLoc) {}
 
   TypeRepr *getPackType() const { return PackType; }
   SourceLoc getEachLoc() const { return EachLoc; }
 
   static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::PackReference;
+    return T->getKind() == TypeReprKind::PackElement;
   }
-  static bool classof(const PackReferenceTypeRepr *T) { return true; }
+  static bool classof(const PackElementTypeRepr *T) { return true; }
 
 private:
   SourceLoc getStartLocImpl() const { return EachLoc; }
@@ -877,7 +950,7 @@ public:
 
   ArrayRef<TupleTypeReprElement> getElements() const {
     return { getTrailingObjects<TupleTypeReprElement>(),
-             Bits.TupleTypeRepr.NumElements };
+             static_cast<size_t>(Bits.TupleTypeRepr.NumElements) };
   }
 
   void getElementTypes(SmallVectorImpl<TypeRepr *> &Types) const {
@@ -963,7 +1036,7 @@ class CompositionTypeRepr final : public TypeRepr,
 
 public:
   ArrayRef<TypeRepr *> getTypes() const {
-    return {getTrailingObjects<TypeRepr*>(), Bits.CompositionTypeRepr.NumTypes};
+    return {getTrailingObjects<TypeRepr*>(), static_cast<size_t>(Bits.CompositionTypeRepr.NumTypes)};
   }
   SourceLoc getSourceLoc() const { return FirstTypeLoc; }
   SourceRange getCompositionRange() const { return CompositionRange; }
@@ -1062,16 +1135,20 @@ class SpecifierTypeRepr : public TypeRepr {
 public:
   SpecifierTypeRepr(TypeReprKind Kind, TypeRepr *Base, SourceLoc Loc)
     : TypeRepr(Kind), Base(Base), SpecifierLoc(Loc) {
+    // ensure the kind passed-in matches up with our TypeRepr classof.
+    assert(SpecifierTypeRepr::classof(cast<TypeRepr>(this)));
   }
   
   TypeRepr *getBase() const { return Base; }
   SourceLoc getSpecifierLoc() const { return SpecifierLoc; }
   
   static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::InOut ||
-           T->getKind() == TypeReprKind::Shared ||
-           T->getKind() == TypeReprKind::Owned ||
-           T->getKind() == TypeReprKind::Isolated;
+    return T->getKind() == TypeReprKind::Ownership ||
+           T->getKind() == TypeReprKind::Isolated ||
+           T->getKind() == TypeReprKind::CompileTimeLiteral ||
+           T->getKind() == TypeReprKind::ConstValue ||
+           T->getKind() == TypeReprKind::LifetimeDependent ||
+           T->getKind() == TypeReprKind::Sending;
   }
   static bool classof(const SpecifierTypeRepr *T) { return true; }
   
@@ -1081,52 +1158,37 @@ private:
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
-  
-/// An 'inout' type.
+
+/// A parameter type with an ownership specifier, such as `inout`, `borrowing`,
+/// or `consuming`.
 /// \code
 ///   x : inout Int
+///   y : consuming Int
+///   z : borrowing Int
 /// \endcode
-class InOutTypeRepr : public SpecifierTypeRepr {
+
+class OwnershipTypeRepr : public SpecifierTypeRepr {
+  ParamSpecifier Specifier;
 public:
-  InOutTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
-    : SpecifierTypeRepr(TypeReprKind::InOut, Base, InOutLoc) {}
+  OwnershipTypeRepr(TypeRepr *Base, ParamSpecifier Specifier,
+                    SourceLoc ModifierLoc)
+    : SpecifierTypeRepr(TypeReprKind::Ownership, Base, ModifierLoc),
+      Specifier(Specifier) {}
   
+  ParamSpecifier getSpecifier() const { return Specifier; }
+  
+  /// Return the \c ValueOwnership kind that corresponds to the specifier.
+  ValueOwnership getValueOwnership() const;
+  
+  /// Return the spelling of the ownership specifier as a string.
+  StringRef getSpecifierSpelling() const;
+
   static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::InOut;
+    return T->getKind() == TypeReprKind::Ownership;
   }
-  static bool classof(const InOutTypeRepr *T) { return true; }
+  static bool classof(const OwnershipTypeRepr *T) { return true; }
 };
   
-/// A 'shared' type.
-/// \code
-///   x : shared Int
-/// \endcode
-class SharedTypeRepr : public SpecifierTypeRepr {
-public:
-  SharedTypeRepr(TypeRepr *Base, SourceLoc SharedLoc)
-    : SpecifierTypeRepr(TypeReprKind::Shared, Base, SharedLoc) {}
-
-  static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::Shared;
-  }
-  static bool classof(const SharedTypeRepr *T) { return true; }
-};
-
-/// A 'owned' type.
-/// \code
-///   x : owned Int
-/// \endcode
-class OwnedTypeRepr : public SpecifierTypeRepr {
-public:
-  OwnedTypeRepr(TypeRepr *Base, SourceLoc OwnedLoc)
-      : SpecifierTypeRepr(TypeReprKind::Owned, Base, OwnedLoc) {}
-
-  static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::Owned;
-  }
-  static bool classof(const OwnedTypeRepr *T) { return true; }
-};
-
 /// An 'isolated' type.
 /// \code
 ///   x : isolated Actor
@@ -1146,15 +1208,74 @@ public:
 /// \code
 ///   x : _const Int
 /// \endcode
-class CompileTimeConstTypeRepr : public SpecifierTypeRepr {
+class CompileTimeLiteralTypeRepr : public SpecifierTypeRepr {
 public:
-  CompileTimeConstTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
-    : SpecifierTypeRepr(TypeReprKind::CompileTimeConst, Base, InOutLoc) {}
+  CompileTimeLiteralTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
+    : SpecifierTypeRepr(TypeReprKind::CompileTimeLiteral, Base, InOutLoc) {}
 
   static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::CompileTimeConst;
+    return T->getKind() == TypeReprKind::CompileTimeLiteral;
   }
-  static bool classof(const CompileTimeConstTypeRepr *T) { return true; }
+  static bool classof(const CompileTimeLiteralTypeRepr *T) { return true; }
+};
+
+/// An '@const' type.
+/// \code
+///   x : @const Int
+/// \endcode
+class ConstValueTypeRepr : public SpecifierTypeRepr {
+public:
+  ConstValueTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
+    : SpecifierTypeRepr(TypeReprKind::ConstValue, Base, InOutLoc) {}
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::ConstValue;
+  }
+  static bool classof(const ConstValueTypeRepr *T) { return true; }
+};
+
+/// A sending type.
+/// \code
+///   x : sending Int
+/// \endcode
+class SendingTypeRepr : public SpecifierTypeRepr {
+public:
+  SendingTypeRepr(TypeRepr *Base, SourceLoc Loc)
+      : SpecifierTypeRepr(TypeReprKind::Sending, Base, Loc) {}
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::Sending;
+  }
+  static bool classof(const SendingTypeRepr *T) { return true; }
+};
+
+/// A 'nonisolated(nonsending)' function type.
+/// \code
+///   x : nonisolated(nonsending) () async -> Int
+/// \endcode
+class CallerIsolatedTypeRepr : public TypeRepr {
+  TypeRepr *Base;
+  SourceLoc Loc;
+
+public:
+  CallerIsolatedTypeRepr(TypeRepr *Base, SourceLoc Loc)
+      : TypeRepr(TypeReprKind::CallerIsolated), Base(Base), Loc(Loc) {
+    assert(Base);
+  }
+
+  TypeRepr *getBase() const { return Base; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::CallerIsolated;
+  }
+  static bool classof(const CallerIsolatedTypeRepr *T) { return true; }
+
+private:
+  SourceLoc getStartLocImpl() const { return Loc; }
+  SourceLoc getEndLocImpl() const { return Base->getEndLoc(); }
+  SourceLoc getLocImpl() const { return Base->getLoc(); }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
 };
 
 /// A TypeRepr for a known, fixed type.
@@ -1186,6 +1307,33 @@ public:
     return T->getKind() == TypeReprKind::Fixed;
   }
   static bool classof(const FixedTypeRepr *T) { return true; }
+
+private:
+  SourceLoc getStartLocImpl() const { return Loc; }
+  SourceLoc getEndLocImpl() const { return Loc; }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
+
+/// A TypeRepr for uses of 'Self' in the type of a declaration.
+class SelfTypeRepr : public TypeRepr {
+  Type Ty;
+  SourceLoc Loc;
+
+public:
+  SelfTypeRepr(Type Ty, SourceLoc Loc)
+    : TypeRepr(TypeReprKind::Self), Ty(Ty), Loc(Loc) {}
+
+  /// Retrieve the location.
+  SourceLoc getLoc() const { return Loc; }
+
+  /// Retrieve the fixed type.
+  Type getType() const { return Ty; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::Self;
+  }
+  static bool classof(const SelfTypeRepr *T) { return true; }
 
 private:
   SourceLoc getStartLocImpl() const { return Loc; }
@@ -1311,6 +1459,34 @@ private:
   friend class TypeRepr;
 };
 
+/// A type repr representing the inverse of some constraint. For example,
+///    ~Copyable
+/// where `Copyable` is the constraint type.
+class InverseTypeRepr : public TypeRepr {
+  TypeRepr *Constraint;
+  SourceLoc TildeLoc;
+
+public:
+  InverseTypeRepr(SourceLoc tildeLoc, TypeRepr *constraint)
+      : TypeRepr(TypeReprKind::Inverse), Constraint(constraint),
+        TildeLoc(tildeLoc) {}
+
+  TypeRepr *getConstraint() const { return Constraint; }
+  SourceLoc getTildeLoc() const { return TildeLoc; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::Inverse;
+  }
+  static bool classof(const InverseTypeRepr *T) { return true; }
+
+private:
+  SourceLoc getStartLocImpl() const { return TildeLoc; }
+  SourceLoc getEndLocImpl() const { return Constraint->getEndLoc(); }
+  SourceLoc getLocImpl() const { return TildeLoc; }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
+
 /// TypeRepr for a user-specified placeholder (essentially, a user-facing
 /// representation of an anonymous type variable.
 ///
@@ -1396,7 +1572,7 @@ public:
   
   ArrayRef<Field> getFields() const {
     return {getTrailingObjects<Field>(),
-            Bits.SILBoxTypeRepr.NumFields};
+            static_cast<size_t>(Bits.SILBoxTypeRepr.NumFields)};
   }
   ArrayRef<TypeRepr *> getGenericArguments() const {
     return {getTrailingObjects<TypeRepr*>(),
@@ -1428,39 +1604,112 @@ private:
   friend TypeRepr;
 };
 
+class LifetimeDependentTypeRepr final : public SpecifierTypeRepr {
+  LifetimeEntry *entry;
+
+public:
+  LifetimeDependentTypeRepr(TypeRepr *base, LifetimeEntry *entry)
+      : SpecifierTypeRepr(TypeReprKind::LifetimeDependent, base,
+                          entry->getLoc()),
+        entry(entry) {}
+
+  static LifetimeDependentTypeRepr *create(ASTContext &C, TypeRepr *base,
+                                           LifetimeEntry *entry);
+
+  LifetimeEntry *getLifetimeEntry() const { return entry; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::LifetimeDependent;
+  }
+  static bool classof(const LifetimeDependentTypeRepr *T) { return true; }
+
+private:
+  SourceLoc getStartLocImpl() const;
+  SourceLoc getEndLocImpl() const;
+  SourceLoc getLocImpl() const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
+
+/// A TypeRepr for an integer appearing in a type position.
+class IntegerTypeRepr final : public TypeRepr {
+  StringRef Value;
+  SourceLoc Loc;
+  SourceLoc MinusLoc;
+
+public:
+  IntegerTypeRepr(StringRef value, SourceLoc loc, SourceLoc minusLoc)
+    : TypeRepr(TypeReprKind::Integer), Value(value), Loc(loc),
+      MinusLoc(minusLoc) {}
+
+  StringRef getValue() const {
+    return Value;
+  }
+
+  SourceLoc getLoc() const {
+    return Loc;
+  }
+
+  SourceLoc getMinusLoc() const {
+    return MinusLoc;
+  }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::Integer;
+  }
+
+private:
+  SourceLoc getStartLocImpl() const {
+    if (MinusLoc)
+      return MinusLoc;
+
+    return Loc;
+  }
+
+  SourceLoc getEndLocImpl() const { return Loc; }
+  SourceLoc getLocImpl() const { return Loc; }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
+
 inline bool TypeRepr::isSimple() const {
   // NOTE: Please keep this logic in sync with TypeBase::hasSimpleTypeRepr().
   switch (getKind()) {
   case TypeReprKind::Attributed:
   case TypeReprKind::Error:
   case TypeReprKind::Function:
-  case TypeReprKind::InOut:
+  case TypeReprKind::Ownership:
   case TypeReprKind::Composition:
   case TypeReprKind::OpaqueReturn:
   case TypeReprKind::NamedOpaqueReturn:
   case TypeReprKind::Existential:
-  case TypeReprKind::PackReference:
+  case TypeReprKind::PackElement:
     return false;
-  case TypeReprKind::SimpleIdent:
-  case TypeReprKind::GenericIdent:
-  case TypeReprKind::Member:
+  case TypeReprKind::UnqualifiedIdent:
+  case TypeReprKind::QualifiedIdent:
   case TypeReprKind::Metatype:
   case TypeReprKind::Protocol:
   case TypeReprKind::Dictionary:
   case TypeReprKind::Optional:
   case TypeReprKind::ImplicitlyUnwrappedOptional:
+  case TypeReprKind::Inverse:
   case TypeReprKind::Vararg:
   case TypeReprKind::PackExpansion:
   case TypeReprKind::Pack:
   case TypeReprKind::Tuple:
   case TypeReprKind::Fixed:
+  case TypeReprKind::Self:
   case TypeReprKind::Array:
+  case TypeReprKind::InlineArray:
   case TypeReprKind::SILBox:
-  case TypeReprKind::Shared:
-  case TypeReprKind::Owned:
   case TypeReprKind::Isolated:
+  case TypeReprKind::Sending:
   case TypeReprKind::Placeholder:
-  case TypeReprKind::CompileTimeConst:
+  case TypeReprKind::CompileTimeLiteral:
+  case TypeReprKind::ConstValue:
+  case TypeReprKind::LifetimeDependent:
+  case TypeReprKind::Integer:
+  case TypeReprKind::CallerIsolated:
     return true;
   }
   llvm_unreachable("bad TypeRepr kind");

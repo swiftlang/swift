@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: not %target-swift-frontend -I %S/Inputs/failing-overlay/ -typecheck %s 2>&1 | %FileCheck %s
+// RUN: not %target-swift-frontend -I %S/Inputs/failing-overlay/ -typecheck %s -diagnostic-style llvm 2>&1 | %FileCheck %s
 
 import ImportsOverlay
 

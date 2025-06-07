@@ -8,6 +8,7 @@ add_swift_host_library(swiftIRGen STATIC
   ExtraInhabitants.cpp
   Fulfillment.cpp
   GenArchetype.cpp
+  GenArray.cpp
   GenBuiltin.cpp
   GenCall.cpp
   GenCast.cpp
@@ -16,6 +17,7 @@ add_swift_host_library(swiftIRGen STATIC
   GenClass.cpp
   GenConstant.cpp
   GenControl.cpp
+  GenCoro.cpp
   GenCoverage.cpp
   GenConcurrency.cpp
   GenDistributed.cpp
@@ -59,6 +61,7 @@ add_swift_host_library(swiftIRGen STATIC
   MetadataLayout.cpp
   MetadataRequest.cpp
   Outlining.cpp
+  PackMetadataMarkerInserter.cpp
   StructLayout.cpp
   SwiftTargetInfo.cpp
   TBDGen.cpp
@@ -69,7 +72,9 @@ add_swift_host_library(swiftIRGen STATIC
 
   LLVM_LINK_COMPONENTS
     target
+    targetparser
     transformutils
+    irprinter
 )
 target_link_libraries(swiftIRGen INTERFACE
   clangCodeGen

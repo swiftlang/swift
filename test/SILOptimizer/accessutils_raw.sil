@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-experimental-move-only %s -dump-access -o /dev/null | %FileCheck %s
+// RUN: %target-sil-opt %s -dump-access -o /dev/null | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
@@ -8,19 +8,19 @@
 sil_stage raw
 
 import Builtin
+import Swift
 
 class List {
   var x: Builtin.Int64
   let next: List
 }
 
-@_moveOnly
-struct MoveOnlyPair {
+struct MoveOnlyPair: ~Copyable {
   var lhs: List
   var rhs: List
 }
 
-// CHECK-LABEL: Accesses for testMarkMustCheckInst
+// CHECK-LABEL: Accesses for testMarkUnresolvedNonCopyableValueInst
 // CHECK-NEXT: Value:   %5 = struct_element_addr %4 : $*MoveOnlyPair, #MoveOnlyPair.lhs
 // CHECK-NEXT:   Scope:   %4 = begin_access [modify] [static] %3 : $*MoveOnlyPair
 // CHECK-NEXT:   Base: box -   %2 = project_box %1 : ${ var MoveOnlyPair }, 0
@@ -33,12 +33,12 @@ struct MoveOnlyPair {
 // CHECK-NEXT:   Path: "s1"
 // CHECK-NEXT:     Storage:   %1 = alloc_box ${ var MoveOnlyPair }
 // CHECK-NEXT:     Path: "c0.s1"
-// CHECK-NEXT: End accesses for testMarkMustCheckInst
-sil [ossa] @testMarkMustCheckInst : $@convention(thin) (@guaranteed List) -> () {
+// CHECK-NEXT: End accesses for testMarkUnresolvedNonCopyableValueInst
+sil [ossa] @testMarkUnresolvedNonCopyableValueInst : $@convention(thin) (@guaranteed List) -> () {
 bb0(%0 : @guaranteed $List):
   %1 = alloc_box ${ var MoveOnlyPair }
   %2 = project_box %1 : ${ var MoveOnlyPair }, 0
-  %3 = mark_must_check [no_implicit_copy] %2 : $*MoveOnlyPair
+  %3 = mark_unresolved_non_copyable_value [consumable_and_assignable] %2 : $*MoveOnlyPair
   %3c = begin_access [modify] [static] %3 : $*MoveOnlyPair
   %3a = struct_element_addr %3c : $*MoveOnlyPair, #MoveOnlyPair.lhs
   %3b = struct_element_addr %3c : $*MoveOnlyPair, #MoveOnlyPair.rhs

@@ -1,0 +1,3 @@
+struct ClangType {
+  int i;
+};

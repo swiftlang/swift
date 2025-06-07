@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -compute-escape-effects -stack-promotion -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -compute-escape-effects -stack-promotion -enable-sil-verify-all %s | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
@@ -74,10 +74,14 @@ bb0:
   return %n1 : $XX
 }
 
-// CHECK-LABEL: sil @dont_promote_in_unreachable
-// CHECK: bb1:
-// CHECK-NEXT: alloc_ref $XX
-sil @dont_promote_in_unreachable : $@convention(thin) () -> () {
+// CHECK-LABEL: sil @promote_in_unreachable :
+// CHECK:       bb1:
+// CHECK-NEXT:    alloc_ref [stack] $XX
+// CHECK:         apply
+// CHECK:         apply
+// CHECK-NEXT:    unreachable
+// CHECK:       } // end sil function 'promote_in_unreachable'
+sil @promote_in_unreachable : $@convention(thin) () -> () {
 bb0:
   cond_br undef, bb1, bb2
 
@@ -95,6 +99,34 @@ bb1:
 bb2:
   %r = tuple ()
   return %r : $()
+}
+
+// CHECK-LABEL: sil @promote_in_unreachable_loop :
+// CHECK:       bb1:
+// CHECK-NEXT:    alloc_ref [stack] $XX
+// CHECK:         apply
+// CHECK:         apply
+// CHECK-NEXT:    strong_release
+// CHECK-NEXT:    dealloc_stack_ref
+// CHECK-NEXT:    cond_br
+// CHECK:       } // end sil function 'promote_in_unreachable_loop'
+sil @promote_in_unreachable_loop : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  %o1 = alloc_ref $XX
+  %f1 = function_ref @xx_init : $@convention(thin) (@guaranteed XX) -> XX
+  %n1 = apply %f1(%o1) : $@convention(thin) (@guaranteed XX) -> XX
+  %l1 = ref_element_addr %n1 : $XX, #XX.x
+  %l2 = load %l1 : $*Int32
+  %f2 = function_ref @consume_int : $@convention(thin) (Int32) -> ()
+  %a = apply %f2(%l2) : $@convention(thin) (Int32) -> ()
+  strong_release %o1 : $XX
+  cond_br undef, bb1, bb2
+
+bb2:
+  unreachable
 }
 
 // CHECK-LABEL: sil @promote_nested
@@ -1156,3 +1188,48 @@ bb0(%0 : $UnownedLink):
   %r = tuple ()
   return %r : $()
 }
+
+// CHECK-LABEL: sil @dont_crash_with_wrong_stacknesting_with_infinite_loop
+// CHECK:         alloc_ref [stack] $XX
+// CHECK-LABEL: } // end sil function 'dont_crash_with_wrong_stacknesting_with_infinite_loop'
+sil @dont_crash_with_wrong_stacknesting_with_infinite_loop : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Int
+  %1 = alloc_ref $XX
+  dealloc_stack %0 : $*Int
+  cond_br undef, bb1, bb2
+bb1:
+  strong_release %1 : $XX
+  %4 = tuple ()
+  return %4 : $()
+
+bb2:
+  br bb3
+bb3:
+  br bb3
+}
+
+// CHECK-LABEL: sil @inner_liverange_jumps_to_outer_in_header_block
+// CHECK:         alloc_ref $XX
+// CHECK-LABEL: } // end sil function 'inner_liverange_jumps_to_outer_in_header_block'
+sil @inner_liverange_jumps_to_outer_in_header_block : $@convention(thin) (@owned XX) -> () {
+bb0(%0 : $XX):
+  %1 = alloc_stack $XX
+  br bb1(%0 : $XX)
+
+bb1(%2 : $XX):
+  strong_release %2 : $XX
+  %4 = alloc_ref $XX
+  store %4 to %1 : $*XX
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1(%4 : $XX)
+
+bb3:
+  strong_release %4 : $XX
+  dealloc_stack %1 : $*XX
+  %r = tuple ()
+  return %r : $()
+}
+

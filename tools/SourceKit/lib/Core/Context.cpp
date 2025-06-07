@@ -16,9 +16,9 @@
 
 using namespace SourceKit;
 
-GlobalConfig::Settings
-GlobalConfig::update(Optional<unsigned> CompletionMaxASTContextReuseCount,
-                     Optional<unsigned> CompletionCheckDependencyInterval) {
+GlobalConfig::Settings GlobalConfig::update(
+    std::optional<unsigned> CompletionMaxASTContextReuseCount,
+    std::optional<unsigned> CompletionCheckDependencyInterval) {
   llvm::sys::ScopedLock L(Mtx);
   if (CompletionMaxASTContextReuseCount.has_value())
     State.IDEInspectionOpts.MaxASTContextReuseCount =
@@ -37,18 +37,19 @@ GlobalConfig::getIDEInspectionOpts() const {
 
 SourceKit::Context::Context(
     StringRef SwiftExecutablePath, StringRef RuntimeLibPath,
-    StringRef DiagnosticDocumentationPath,
     llvm::function_ref<std::unique_ptr<LangSupport>(Context &)>
         LangSupportFactoryFn,
+    llvm::function_ref<std::shared_ptr<PluginSupport>(Context &)>
+        PluginSupportFactoryFn,
     bool shouldDispatchNotificationsOnMain)
     : SwiftExecutablePath(SwiftExecutablePath), RuntimeLibPath(RuntimeLibPath),
-      DiagnosticDocumentationPath(DiagnosticDocumentationPath),
       NotificationCtr(
           new NotificationCenter(shouldDispatchNotificationsOnMain)),
       Config(new GlobalConfig()), ReqTracker(new RequestTracker()),
       SlowRequestSim(new SlowRequestSimulator(ReqTracker)) {
   // Should be called last after everything is initialized.
   SwiftLang = LangSupportFactoryFn(*this);
+  Plugins = PluginSupportFactoryFn(*this);
 }
 
 SourceKit::Context::~Context() {

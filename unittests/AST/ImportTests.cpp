@@ -25,7 +25,7 @@ class ImportPathContext {
 public:
   ImportPathContext() = default;
 
-  /// Hepler routine for building ImportPath
+  /// Helper routine for building ImportPath
   /// Build()
   /// @see ImportPathBuilder
   inline ImportPath Build(StringRef Name) noexcept {
@@ -38,7 +38,7 @@ public:
 TEST(ImportPath, Comparison) {
   ImportPathContext ctx;
 
-  /// Simple sanity check:
+  /// Simple soundness check:
   EXPECT_FALSE(ctx.Build("A.B.C") < ctx.Build("A.B.C"));
 
   /// Check order chain:

@@ -13,13 +13,19 @@
 #ifndef SWIFT_NAME_TRANSLATION_H
 #define SWIFT_NAME_TRANSLATION_H
 
-#include "swift/AST/Identifier.h"
 #include "swift/AST/AttrKind.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/Identifier.h"
+#include <optional>
 
 namespace swift {
-  class ValueDecl;
-  class EnumDecl;
-  class EnumElementDecl;
+
+class EnumDecl;
+class EnumElementDecl;
+struct InverseRequirement;
+class GenericSignature;
+class ValueDecl;
 
 namespace objc_translation {
   enum CustomNamesOnly_t : bool {
@@ -63,17 +69,31 @@ StringRef
 getNameForCxx(const ValueDecl *VD,
               CustomNamesOnly_t customNamesOnly = objc_translation::Normal);
 
-enum RepresentationKind { Representable, Unsupported };
+enum RepresentationKind { Representable, ObjCxxOnly, Unsupported };
 
 enum RepresentationError {
+  UnrepresentableObjC,
   UnrepresentableAsync,
   UnrepresentableIsolatedInActor,
   UnrepresentableRequiresClientEmission,
+  UnrepresentableGeneric,
+  UnrepresentableGenericRequirements,
+  UnrepresentableThrows,
+  UnrepresentableIndirectEnum,
+  UnrepresentableEnumCaseType,
+  UnrepresentableEnumCaseTuple,
+  UnrepresentableProtocol,
+  UnrepresentableMoveOnly,
+  UnrepresentableMacro,
+  UnrepresentableZeroSizedValueType,
 };
+
+/// Constructs a diagnostic that describes the given C++ representation error.
+Diagnostic diagnoseRepresenationError(RepresentationError error, ValueDecl *vd);
 
 struct DeclRepresentation {
   RepresentationKind kind;
-  llvm::Optional<RepresentationError> error;
+  std::optional<RepresentationError> error;
 
   /// Returns true if the given Swift node is unsupported in Clang in any
   /// language mode.
@@ -81,17 +101,24 @@ struct DeclRepresentation {
 };
 
 /// Returns the C++ representation info for the given declaration.
-DeclRepresentation getDeclRepresentation(const ValueDecl *VD);
+DeclRepresentation getDeclRepresentation(
+    const ValueDecl *VD,
+    std::optional<std::function<bool(const NominalTypeDecl *)>> isZeroSized);
 
 /// Returns true if the given value decl is exposable to C++.
-inline bool isExposableToCxx(const ValueDecl *VD) {
-  return !getDeclRepresentation(VD).isUnsupported();
+inline bool isExposableToCxx(
+    const ValueDecl *VD,
+    std::optional<std::function<bool(const NominalTypeDecl *)>> isZeroSized) {
+  return !getDeclRepresentation(VD, isZeroSized).isUnsupported();
 }
 
 /// Returns true if the given value decl D is visible to C++ of its
 /// own accord (i.e. without considering its context)
 bool isVisibleToCxx(const ValueDecl *VD, AccessLevel minRequiredAccess,
                     bool checkParent = true);
+
+/// Determine whether the given generic signature can be exposed to C++.
+bool isExposableToCxx(GenericSignature genericSig);
 
 } // end namespace cxx_translation
 

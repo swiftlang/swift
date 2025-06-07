@@ -13,8 +13,9 @@
 #ifndef SWIFT_REWRITELOOP_H
 #define SWIFT_REWRITELOOP_H
 
+#include "swift/Basic/Assertions.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/DenseMap.h"
 
 #include "Symbol.h"
 #include "Term.h"
@@ -250,11 +251,11 @@ struct RewriteStep {
     Kind = kind;
 
     StartOffset = startOffset;
-    assert(StartOffset == startOffset && "Overflow");
+    ASSERT(StartOffset == startOffset && "Overflow");
     EndOffset = endOffset;
-    assert(EndOffset == endOffset && "Overflow");
+    ASSERT(EndOffset == endOffset && "Overflow");
     Arg = arg;
-    assert(Arg == arg && "Overflow");
+    ASSERT(Arg == arg && "Overflow");
     Inverse = inverse;
   }
 
@@ -335,18 +336,18 @@ struct RewriteStep {
   }
 
   unsigned getRuleID() const {
-    assert(Kind == RewriteStep::Rule);
+    ASSERT(Kind == RewriteStep::Rule);
     return Arg;
   }
 
   unsigned getTypeDifferenceID() const {
-    assert(Kind == RewriteStep::LeftConcreteProjection ||
+    ASSERT(Kind == RewriteStep::LeftConcreteProjection ||
            Kind == RewriteStep::RightConcreteProjection);
     return (Arg >> 16) & 0xffff;
   }
 
   unsigned getSubstitutionIndex() const {
-    assert(Kind == RewriteStep::LeftConcreteProjection ||
+    ASSERT(Kind == RewriteStep::LeftConcreteProjection ||
            Kind == RewriteStep::RightConcreteProjection);
     return Arg & 0xffff;
   }
@@ -363,8 +364,8 @@ struct RewriteStep {
 private:
   static unsigned getConcreteProjectionArg(unsigned differenceID,
                                            unsigned substitutionIndex) {
-    assert(differenceID <= 0xffff);
-    assert(substitutionIndex <= 0xffff);
+    ASSERT(differenceID <= 0xffff);
+    ASSERT(substitutionIndex <= 0xffff);
 
     return (differenceID << 16) | substitutionIndex;
   }
@@ -372,7 +373,7 @@ private:
 
 /// Records a sequence of zero or more rewrite rules applied to a term.
 class RewritePath {
-  SmallVector<RewriteStep, 3> Steps;
+  llvm::SmallVector<RewriteStep, 3> Steps;
 
 public:
   bool empty() const {
@@ -393,7 +394,7 @@ public:
   }
 
   void resize(unsigned newSize) {
-    assert(newSize <= size());
+    ASSERT(newSize <= size());
     Steps.erase(Steps.begin() + newSize, Steps.end());
   }
 
@@ -411,7 +412,7 @@ public:
 
   bool replaceRuleWithPath(unsigned ruleID, const RewritePath &path);
 
-  SmallVector<unsigned, 1>
+  llvm::SmallVector<unsigned, 1>
   findRulesAppearingOnceInEmptyContext(const MutableTerm &term,
                                        const RewriteSystem &system) const;
 
@@ -443,7 +444,7 @@ public:
 
 private:
   /// Cached value for findRulesAppearingOnceInEmptyContext().
-  SmallVector<unsigned, 1> RulesInEmptyContext;
+  llvm::SmallVector<unsigned, 1> RulesInEmptyContext;
 
   /// Cached value for getProjectionCount().
   unsigned ProjectionCount : 15;
@@ -489,7 +490,7 @@ public:
   }
 
   void markDeleted() {
-    assert(!Deleted);
+    ASSERT(!Deleted);
     Deleted = 1;
   }
 
@@ -500,7 +501,7 @@ public:
 
   bool isUseful(const RewriteSystem &system) const;
 
-  ArrayRef<unsigned>
+  llvm::ArrayRef<unsigned>
   findRulesAppearingOnceInEmptyContext(const RewriteSystem &system) const;
 
   unsigned getProjectionCount(const RewriteSystem &system) const;
@@ -539,11 +540,11 @@ struct AppliedRewriteStep {
 ///
 struct RewritePathEvaluator {
   /// The primary stack. Most rewrite steps operate on the top of this stack.
-  SmallVector<MutableTerm, 2> Primary;
+  llvm::SmallVector<MutableTerm, 2> Primary;
 
   /// The secondary stack. The 'Shift' rewrite step moves terms between the
   /// primary and secondary stacks.
-  SmallVector<MutableTerm, 2> Secondary;
+  llvm::SmallVector<MutableTerm, 2> Secondary;
 
   explicit RewritePathEvaluator(const MutableTerm &term) {
     Primary.push_back(term);
@@ -557,7 +558,7 @@ struct RewritePathEvaluator {
   /// We're "in context" if we're in the middle of rewriting concrete
   /// substitutions.
   bool isInContext() const {
-    assert(Primary.size() > 0);
+    ASSERT(Primary.size() > 0);
     return (Primary.size() > 1 || Secondary.size() > 0);
   }
 

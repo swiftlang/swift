@@ -1,10 +1,11 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -lswiftSwiftReflectionTest %s -o %t/reflect_nested
 // RUN: %target-codesign %t/reflect_nested
-// RUN: %target-run %target-swift-reflection-test %t/reflect_nested 2>&1 | %FileCheck %s --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-run %target-swift-reflection-test %t/reflect_nested 2>&1 | %FileCheck %s --check-prefix=CHECK
 // REQUIRES: reflection_test_support
 // REQUIRES: executable_test
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: asan
 
 import SwiftReflectionTest
 
@@ -26,24 +27,14 @@ var obj = OuterGeneric.Inner.Innermost(x: 17, y: "hello")
 
 reflect(object: obj)
 
-// CHECK-64: Reflecting an object.
-// CHECK-64: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
-// CHECK-64: Type reference:
-// CHECK-64: (bound_generic_class reflect_nested.OuterGeneric.Inner.Innermost
-// CHECK-64-NEXT:   (struct Swift.String)
-// CHECK-64-NEXT:   (bound_generic_class reflect_nested.OuterGeneric.Inner
-// CHECK-64-NEXT:     (bound_generic_class reflect_nested.OuterGeneric
-// CHECK-64-NEXT:       (struct Swift.Int))))
+// CHECK: Reflecting an object.
+// CHECK: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
+// CHECK: Type reference:
+// CHECK: (bound_generic_class reflect_nested.OuterGeneric.Inner.Innermost
+// CHECK-NEXT:   (struct Swift.String)
+// CHECK-NEXT:   (bound_generic_class reflect_nested.OuterGeneric
+// CHECK-NEXT:     (struct Swift.Int)))
 
-// CHECK-32: Reflecting an object.
-// CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
-// CHECK-32: Type reference:
-// CHECK-32: (bound_generic_class reflect_nested.OuterGeneric.Inner.Innermost
-// CHECK-32-NEXT:   (struct Swift.String)
-// CHECK-32-NEXT:   (bound_generic_class reflect_nested.OuterGeneric.Inner
-// CHECK-32-NEXT:     (bound_generic_class reflect_nested.OuterGeneric
-// CHECK-32-NEXT:       (struct Swift.Int))))
-  
 class OuterNonGeneric {
   class InnerGeneric<T, U> {
     var x: T
@@ -59,24 +50,13 @@ class OuterNonGeneric {
 var obj2 = OuterNonGeneric.InnerGeneric(x: 17, y: "hello")
 reflect(object: obj2)
 
-// CHECK-64: Reflecting an object.
-// CHECK-64: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
-// CHECK-64: Type reference:
-// CHECK-64: (bound_generic_class reflect_nested.OuterNonGeneric.InnerGeneric
-// CHECK-64-NEXT:   (struct Swift.Int)
-// CHECK-64-NEXT:   (struct Swift.String)
-// CHECK-64-NEXT:     (bound_generic_class reflect_nested.OuterNonGeneric))
-
-// CHECK-32: Reflecting an object.
-// CHECK-32: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
-// CHECK-32: Type reference:
-// CHECK-32: (bound_generic_class reflect_nested.OuterNonGeneric.InnerGeneric
-// CHECK-32-NEXT:   (struct Swift.Int)
-// CHECK-32-NEXT:   (struct Swift.String)
-// CHECK-32-NEXT:     (bound_generic_class reflect_nested.OuterNonGeneric))
+// CHECK: Reflecting an object.
+// CHECK: Instance pointer in child address space: 0x{{[0-9a-fA-F]+}}
+// CHECK: Type reference:
+// CHECK: (bound_generic_class reflect_nested.OuterNonGeneric.InnerGeneric
+// CHECK-NEXT:   (struct Swift.Int)
+// CHECK-NEXT:   (struct Swift.String))
 
 doneReflecting()
 
-// CHECK-64: Done.
-
-// CHECK-32: Done.
+// CHECK: Done.

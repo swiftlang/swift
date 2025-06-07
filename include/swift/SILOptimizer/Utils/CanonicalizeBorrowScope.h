@@ -60,10 +60,13 @@ private:
   // The borrow that begins this scope.
   BorrowedValue borrowedValue;
 
+  /// The function containing this scope.
+  SILFunction *function;
+
   /// Pruned liveness for the extended live range including copies. For this
   /// purpose, only consuming instructions are considered "lifetime
   /// ending". end_borrows do not end a liverange that may include owned copies.
-  SSAPrunedLiveness liveness;
+  BitfieldRef<SSAPrunedLiveness> liveness;
 
   InstructionDeleter &deleter;
 
@@ -85,11 +88,12 @@ private:
   llvm::SmallDenseMap<SILBasicBlock *, CopyValueInst *, 4> persistentCopies;
 
 public:
-  CanonicalizeBorrowScope(InstructionDeleter &deleter) : deleter(deleter) {}
+  CanonicalizeBorrowScope(SILFunction *function, InstructionDeleter &deleter)
+      : function(function), deleter(deleter) {}
 
   BorrowedValue getBorrowedValue() const { return borrowedValue; }
 
-  const SSAPrunedLiveness &getLiveness() const { return liveness; }
+  const SSAPrunedLiveness &getLiveness() const { return *liveness; }
 
   InstructionDeleter &getDeleter() { return deleter; }
 
@@ -135,11 +139,18 @@ public:
 
 protected:
   void initBorrow(BorrowedValue borrow) {
-    assert(borrow && liveness.empty() && persistentCopies.empty());
+    assert(borrow && persistentCopies.empty() &&
+           (!liveness || liveness->empty()));
 
+    borrowedValue = BorrowedValue();
+    defUseWorklist.clear();
+    blockWorklist.clear();
+    persistentCopies.clear();
     updatedCopies.clear();
+
     borrowedValue = borrow;
-    liveness.initializeDef(borrowedValue.value);
+    if (liveness)
+      liveness->initializeDef(borrowedValue.value);
   }
 
   bool computeBorrowLiveness();
@@ -157,12 +168,6 @@ bool shrinkBorrowScope(
 MoveValueInst *foldDestroysOfCopiedLexicalBorrow(BeginBorrowInst *bbi,
                                                  DominanceInfo &dominanceTree,
                                                  InstructionDeleter &deleter);
-
-bool hoistDestroysOfOwnedLexicalValue(SILValue const value,
-                                      SILFunction &function,
-                                      InstructionDeleter &deleter,
-                                      BasicCalleeAnalysis *calleeAnalysis);
-
 } // namespace swift
 
 #endif // SWIFT_SILOPTIMIZER_UTILS_CANONICALIZEBORROWSCOPES_H

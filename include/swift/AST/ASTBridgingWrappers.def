@@ -1,0 +1,128 @@
+//===--- ASTBridgingWrappers.def - Swift AST Metaprogramming ----*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2023 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines macros used for bridging macro-metaprogramming with AST
+// nodes.
+//
+//===----------------------------------------------------------------------===//
+
+/// AST_BRIDGING_WRAPPER(Name)
+///   The default macro to define a bridging wrapper type.
+
+/// AST_BRIDGING_WRAPPER_NULLABLE(Name)
+///   Specifies that both a nullable and non-null variant of the wrapper should
+///   be created.
+#ifndef AST_BRIDGING_WRAPPER_NULLABLE
+#define AST_BRIDGING_WRAPPER_NULLABLE(Name) AST_BRIDGING_WRAPPER(Name)
+#endif
+
+/// AST_BRIDGING_WRAPPER_NONNULL(Name)
+///   Specifies that only a non-null variant of the wrapper should be created.
+#ifndef AST_BRIDGING_WRAPPER_NONNULL
+#define AST_BRIDGING_WRAPPER_NONNULL(Name) AST_BRIDGING_WRAPPER(Name)
+#endif
+
+/// AST_BRIDGING_WRAPPER_CONST(Name)
+///   The default macro to define a const bridging wrapper type.
+#ifndef AST_BRIDGING_WRAPPER_CONST
+#define AST_BRIDGING_WRAPPER_CONST(Name) AST_BRIDGING_WRAPPER(Name)
+#endif
+
+/// AST_BRIDGING_WRAPPER_CONST_NULLABLE(Name)
+///   Specifies that both a nullable and non-null variant of the wrapper should
+///   be created.
+#ifndef AST_BRIDGING_WRAPPER_CONST_NULLABLE
+#define AST_BRIDGING_WRAPPER_CONST_NULLABLE(Name) AST_BRIDGING_WRAPPER_CONST(Name)
+#endif
+
+/// AST_BRIDGING_WRAPPER_CONST_NONNULL(Name)
+///   Specifies that only a non-null variant of the wrapper should be created.
+#ifndef AST_BRIDGING_WRAPPER_CONST_NONNULL
+#define AST_BRIDGING_WRAPPER_CONST_NONNULL(Name) AST_BRIDGING_WRAPPER_CONST(Name)
+#endif
+
+#ifndef DECL
+#define DECL(Id, Parent) AST_BRIDGING_WRAPPER_NULLABLE(Id##Decl)
+#endif
+#define ABSTRACT_DECL(Id, Parent) DECL(Id, Parent)
+#include "swift/AST/DeclNodes.def"
+
+#ifndef EXPR
+#define EXPR(Id, Parent) AST_BRIDGING_WRAPPER_NONNULL(Id##Expr)
+#endif
+#define ABSTRACT_EXPR(Id, Parent) EXPR(Id, Parent)
+#include "swift/AST/ExprNodes.def"
+
+#ifndef STMT
+#define STMT(Id, Parent) AST_BRIDGING_WRAPPER_NONNULL(Id##Stmt)
+#endif
+#define ABSTRACT_STMT(Id, Parent) STMT(Id, Parent)
+#include "swift/AST/StmtNodes.def"
+
+#ifndef TYPEREPR
+#define TYPEREPR(Id, Parent) AST_BRIDGING_WRAPPER_NONNULL(Id##TypeRepr)
+#endif
+#define ABSTRACT_TYPEREPR(Id, Parent) TYPEREPR(Id, Parent)
+#include "swift/AST/TypeReprNodes.def"
+
+#ifndef PATTERN
+#define PATTERN(Id, Parent) AST_BRIDGING_WRAPPER_NONNULL(Id##Pattern)
+#endif
+#include "swift/AST/PatternNodes.def"
+
+#ifndef DECL_ATTR
+#define SIMPLE_DECL_ATTR(...)
+#define DECL_ATTR(_, Id, ...) AST_BRIDGING_WRAPPER_NONNULL(Id##Attr)
+#endif
+#include "swift/AST/DeclAttr.def"
+
+#ifndef TYPE_ATTR
+#define SIMPLE_TYPE_ATTR(...)
+#define TYPE_ATTR(SPELLING, CLASS) AST_BRIDGING_WRAPPER_NONNULL(CLASS##TypeAttr)
+#endif
+#include "swift/AST/TypeAttr.def"
+
+// Some of the base classes need to be nullable to allow them to be used as
+// optional parameters.
+AST_BRIDGING_WRAPPER_NULLABLE(Decl)
+AST_BRIDGING_WRAPPER_NONNULL(DeclContext)
+AST_BRIDGING_WRAPPER_NONNULL(SourceFile)
+AST_BRIDGING_WRAPPER_NULLABLE(Stmt)
+AST_BRIDGING_WRAPPER_NULLABLE(Expr)
+AST_BRIDGING_WRAPPER_NULLABLE(Pattern)
+AST_BRIDGING_WRAPPER_NULLABLE(TypeRepr)
+AST_BRIDGING_WRAPPER_NULLABLE(DeclAttribute)
+AST_BRIDGING_WRAPPER_NULLABLE(TypeAttribute)
+
+// Misc AST types to generate wrappers for.
+AST_BRIDGING_WRAPPER_NULLABLE(GenericParamList)
+AST_BRIDGING_WRAPPER_NULLABLE(TrailingWhereClause)
+AST_BRIDGING_WRAPPER_NULLABLE(ParameterList)
+AST_BRIDGING_WRAPPER_NULLABLE(PatternBindingInitializer)
+AST_BRIDGING_WRAPPER_NULLABLE(DefaultArgumentInitializer)
+AST_BRIDGING_WRAPPER_NULLABLE(CustomAttributeInitializer)
+AST_BRIDGING_WRAPPER_NONNULL(CustomAttribute)
+AST_BRIDGING_WRAPPER_NULLABLE(ArgumentList)
+AST_BRIDGING_WRAPPER_NULLABLE(AvailabilitySpec)
+AST_BRIDGING_WRAPPER_CONST_NONNULL(AvailabilityMacroMap)
+AST_BRIDGING_WRAPPER_NONNULL(PoundAvailableInfo)
+AST_BRIDGING_WRAPPER_NONNULL(LifetimeEntry)
+
+// Non-AST types to generate wrappers for.
+AST_BRIDGING_WRAPPER_NULLABLE(DiagnosticEngine)
+
+#undef AST_BRIDGING_WRAPPER_NONNULL
+#undef AST_BRIDGING_WRAPPER_NULLABLE
+#undef AST_BRIDGING_WRAPPER_CONST_NONNULL
+#undef AST_BRIDGING_WRAPPER_CONST_NULLABLE
+#undef AST_BRIDGING_WRAPPER_CONST
+#undef AST_BRIDGING_WRAPPER

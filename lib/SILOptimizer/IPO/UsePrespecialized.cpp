@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "use-prespecialized"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -84,14 +85,18 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
 
     SubstitutionMap Subs = AI.getSubstitutionMap();
 
-    // Bail if any generic type parameters are unbound.
+    // Bail if the replacement types depend on the callee's generic
+    // environment.
+    //
     // TODO: Remove this limitation once public partial specializations
     // are supported and can be provided by other modules.
-    if (Subs.hasArchetypes())
+    if (Subs.getRecursiveProperties().hasArchetype())
       continue;
 
     ReabstractionInfo ReInfo(M.getSwiftModule(), M.isWholeModule(), AI,
-                             ReferencedF, Subs, IsNotSerialized);
+                             ReferencedF, Subs, IsNotSerialized,
+                             /*ConvertIndirectToDirect=*/ true,
+                             /*dropUnusedArguments=*/ false);
 
     if (!ReInfo.canBeSpecialized())
       continue;
@@ -104,7 +109,7 @@ bool UsePrespecialized::replaceByPrespecialized(SILFunction &F) {
 
     // Create a name of the specialization. All external pre-specializations
     // are serialized without bodies. Thus use IsNotSerialized here.
-    Mangle::GenericSpecializationMangler NewGenericMangler(ReferencedF,
+    Mangle::GenericSpecializationMangler NewGenericMangler(M.getASTContext(), ReferencedF,
                                                            IsNotSerialized);
     std::string ClonedName = NewGenericMangler.mangleReabstracted(Subs,
        ReInfo.needAlternativeMangling());

@@ -10,17 +10,17 @@ enum Singleton {
 
 // CHECK: @"$s1A1GC14zeroSizedFieldAA9SingletonOvpWvd" = hidden constant i{{(64|32)}} 0
 // Check that the instance start is after the header (at 8 or 16).
-// CHECK-macosx: _DATA__TtC1A1G = internal constant {{.*}} { i32 {{(128|129)}}, i32 {{(16|8|40)}}
-// CHECK-ios: _DATA__TtC1A1G = internal constant {{.*}} { i32 {{(128|129)}}, i32 {{(16|8|40)}}
-// CHECK-watchos: _DATA__TtC1A1G = internal constant {{.*}} { i32 {{(128|129)}}, i32 {{(16|8|40)}}
-// CHECK-tvos: _DATA__TtC1A1G = internal constant {{.*}} { i32 128, i32 {{(16|8)}}
+// CHECK-macosx: @_DATA__TtC1A1G = internal constant {{.*}} { i32 {{(128|192)}}, i32 {{(16|8)}}
+// CHECK-ios: @_DATA__TtC1A1G = internal constant {{.*}} { i32 {{(128|192)}}, i32 {{(16|8)}}
+// CHECK-watchos: @_DATA__TtC1A1G = internal constant {{.*}} { i32 {{(128|192)}}, i32 {{(16|8)}}
+// CHECK-tvos: @_DATA__TtC1A1G = internal constant {{.*}} { i32 {{(128|192)}}, i32 {{(16|8)}}
 
 class G {
   var zeroSizedField = Singleton.only
   var r = ResilientInt(i:1)
 }
 
-// CHECK-LABEL: define {{.*}}swiftcc %swift.metadata_response @"$s1A12MyControllerCMr"(%swift.type* %0, i8* %1, i8** %2)
+// CHECK-LABEL: define {{.*}}swiftcc %swift.metadata_response @"$s1A12MyControllerCMr"(ptr %0, ptr %1, ptr %2)
 // CHECK-NOT: ret
 // CHECK:  call swiftcc %swift.metadata_response @"$s1A17InternalContainerVMa"(
 // CHECK:  ret

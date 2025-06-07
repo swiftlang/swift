@@ -17,6 +17,7 @@
 #ifndef SWIFT_IRGEN_STRUCTMETADATALAYOUT_H
 #define SWIFT_IRGEN_STRUCTMETADATALAYOUT_H
 
+#include "Field.h"
 #include "NominalMetadataVisitor.h"
 #include "swift/AST/IRGenOptions.h"
 
@@ -43,8 +44,10 @@ protected:
 
 public:
   void layout() {
-    static_assert(MetadataAdjustmentIndex::ValueType == 1,
+    static_assert(MetadataAdjustmentIndex::ValueType == 2,
                   "Adjustment index must be synchronized with this layout");
+
+    asImpl().addLayoutStringPointer();
 
     // Metadata header.
     super::layout();
@@ -61,8 +64,10 @@ public:
 
     // Struct field offsets.
     asImpl().noteStartOfFieldOffsets();
-    for (VarDecl *prop : Target->getStoredProperties())
-      asImpl().addFieldOffset(prop);
+    for (VarDecl *prop : Target->getStoredProperties()) {
+      if (isExportableField(prop))
+        asImpl().addFieldOffset(prop);
+    }
 
     asImpl().noteEndOfFieldOffsets();
 
@@ -96,6 +101,7 @@ protected:
 
 public:
   void addMetadataFlags() { addPointer(); }
+  void addLayoutStringPointer() { addPointer(); }
   void addValueWitnessTable() { addPointer(); }
   void addNominalTypeDescriptor() { addPointer(); }
   void addFieldOffset(VarDecl *) { addInt32(); }

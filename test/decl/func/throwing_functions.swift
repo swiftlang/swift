@@ -70,13 +70,14 @@ func fooT(_ callback: () -> Bool) {}
 
 // Throwing and non-throwing types are not equivalent.
 struct X<T> { }
+// expected-note@-1{{arguments to generic parameter 'T' ('(String) -> Int' and '(String) throws -> Int') are expected to be equal}}
 
 func specializedOnFuncType1(_ x: X<(String) throws -> Int>) { }
 func specializedOnFuncType2(_ x: X<(String) -> Int>) { }
 func testSpecializedOnFuncType(_ xThrows: X<(String) throws -> Int>,
                                xNonThrows: X<(String) -> Int>) {
   specializedOnFuncType1(xThrows) // ok
-  specializedOnFuncType1(xNonThrows) // expected-error{{invalid conversion from throwing function of type '(String) -> Int' to non-throwing function type '(String) throws -> Int'}}
+  specializedOnFuncType1(xNonThrows) // expected-error{{cannot convert value of type 'X<(String) -> Int>' to expected argument type 'X<(String) throws -> Int>'}}
   specializedOnFuncType2(xThrows)  // expected-error{{invalid conversion from throwing function of type '(String) throws -> Int' to non-throwing function type '(String) -> Int'}}
   specializedOnFuncType2(xNonThrows) // ok
 }

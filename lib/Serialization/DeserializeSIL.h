@@ -71,6 +71,10 @@ namespace swift {
     MutableArrayRef<ModuleFile::PartiallySerialized<SILDefaultWitnessTable *>>
     DefaultWitnessTables;
 
+    std::unique_ptr<SerializedFuncTable> DefaultOverrideTableList;
+    MutableArrayRef<ModuleFile::PartiallySerialized<SILDefaultOverrideTable *>>
+        DefaultOverrideTables;
+
     MutableArrayRef<ModuleFile::PartiallySerialized<SILProperty *>>
     Properties;
 
@@ -113,7 +117,7 @@ namespace swift {
     llvm::Expected<SILFunction *>
     readSILFunctionChecked(serialization::DeclID, SILFunction *InFunc,
                            StringRef Name, bool declarationOnly,
-                           bool errorIfEmptyBody = true);
+                           bool errorIfEmptyBody = true, bool forDebugScope = false);
 
     /// Read a SIL basic block within a given SIL function.
     SILBasicBlock *readSILBasicBlock(SILFunction *Fn,
@@ -132,8 +136,12 @@ namespace swift {
     /// When an instruction or block argument is defined, this method is used to
     /// register it and update our symbol table.
     void setLocalValue(ValueBase *Value, serialization::ValueID Id);
+
     /// Get a reference to a local value with the specified ID and type.
-    SILValue getLocalValue(serialization::ValueID Id,
+    ///
+    /// NOTE: \p inContext is expected to be nullptr if we are inserting into a
+    /// global variable initializer.
+    SILValue getLocalValue(SILFunction *inContext, serialization::ValueID Id,
                            SILType Type);
 
     SILType getSILType(Type ty, SILValueCategory category,
@@ -142,8 +150,17 @@ namespace swift {
     SILDifferentiabilityWitness *
     getSILDifferentiabilityWitnessForReference(StringRef mangledKey);
 
-    SILFunction *getFuncForReference(StringRef Name, SILType Ty);
-    SILFunction *getFuncForReference(StringRef Name);
+    llvm::Expected<const SILDebugScope *>
+    readDebugScopes(SILFunction *F, SmallVectorImpl<uint64_t> &scratch,
+                    SILBuilder &Builder, unsigned kind);
+    llvm::Expected<unsigned> readNextRecord(SmallVectorImpl<uint64_t> &scratch);
+    std::optional<SILLocation> readLoc(unsigned kind, SmallVectorImpl<uint64_t> &scratch);
+
+    llvm::DenseMap<unsigned, const SILDebugScope *> ParsedScopes;
+    llvm::SmallVector<SILLocation::FilenameAndLocation *> ParsedLocs;
+
+    SILFunction *getFuncForReference(StringRef Name, SILType Ty, TypeExpansionContext context);
+    SILFunction *getFuncForReference(StringRef Name, bool forDebugScope = false);
     SILVTable *readVTable(serialization::DeclID);
     SILMoveOnlyDeinit *readMoveOnlyDeinit(serialization::DeclID);
     SILGlobalVariable *getGlobalForReference(StringRef Name);
@@ -162,19 +179,24 @@ namespace swift {
     void readWitnessTableEntries(
            llvm::BitstreamEntry &entry,
            std::vector<SILWitnessTable::Entry> &witnessEntries,
-           std::vector<SILWitnessTable::ConditionalConformance>
-             &conditionalConformances);
+           std::vector<ProtocolConformanceRef> &conditionalConformances);
     SILProperty *readProperty(serialization::DeclID);
     SILDefaultWitnessTable *
     readDefaultWitnessTable(serialization::DeclID,
                             SILDefaultWitnessTable *existingWt);
+    void readDefaultOverrideTableEntries(
+        llvm::BitstreamEntry &entry,
+        std::vector<SILDefaultOverrideTable::Entry> &entries);
+    SILDefaultOverrideTable *
+    readDefaultOverrideTable(serialization::DeclID,
+                             SILDefaultOverrideTable *existingOt);
     SILDifferentiabilityWitness *
         readDifferentiabilityWitness(serialization::DeclID);
 
-    Optional<KeyPathPatternComponent>
+    std::optional<KeyPathPatternComponent>
     readKeyPathComponent(ArrayRef<uint64_t> ListOfValues, unsigned &nextValue);
-    
-public:
+
+  public:
     Identifier getModuleIdentifier() const {
       return MF->getAssociatedModule()->getName();
     }
@@ -184,12 +206,16 @@ public:
     SILFunction *lookupSILFunction(SILFunction *InFunc, bool onlyUpdateLinkage);
     SILFunction *lookupSILFunction(StringRef Name,
                                    bool declarationOnly = false);
-    bool hasSILFunction(StringRef Name, Optional<SILLinkage> Linkage = None);
+    SILGlobalVariable *lookupSILGlobalVariable(StringRef Name);
+    bool hasSILFunction(StringRef Name,
+                        std::optional<SILLinkage> Linkage = std::nullopt);
     SILVTable *lookupVTable(StringRef MangledClassName);
     SILMoveOnlyDeinit *lookupMoveOnlyDeinit(StringRef mangledNominalTypeName);
     SILWitnessTable *lookupWitnessTable(SILWitnessTable *wt);
     SILDefaultWitnessTable *
     lookupDefaultWitnessTable(SILDefaultWitnessTable *wt);
+    SILDefaultOverrideTable *
+    lookupDefaultOverrideTable(SILDefaultOverrideTable *ot);
     SILDifferentiabilityWitness *
     lookupDifferentiabilityWitness(StringRef mangledDiffWitnessKey);
 
@@ -262,6 +288,7 @@ public:
       getAllVTables();
       getAllWitnessTables();
       getAllDefaultWitnessTables();
+      getAllDefaultOverrideTables();
       getAllProperties();
       getAllDifferentiabilityWitnesses();
       getAllMoveOnlyDeinits();
@@ -287,6 +314,10 @@ public:
     /// Deserialize all DefaultWitnessTables inside the module and add them
     /// to SILMod.
     void getAllDefaultWitnessTables();
+
+    /// Deserialize all DefaultOverrideTables inside the module and add them to
+    /// SILMod.
+    void getAllDefaultOverrideTables();
 
     /// Deserialize all Property descriptors inside the module and add them
     /// to SILMod.

@@ -139,7 +139,7 @@ struct SyntaxStructureElement {
 struct SyntaxStructureNode {
   const Decl *Dcl = nullptr;
   SyntaxStructureKind Kind;
-  DeclAttributes Attrs;
+  ParsedDeclAttributes Attrs;
   CharSourceRange Range;
   CharSourceRange BodyRange;
   CharSourceRange NameRange;

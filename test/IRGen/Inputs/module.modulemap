@@ -33,5 +33,13 @@ module SynthesizedProtocol {
 }
 
 module PointerAuth {
-   header "ptrauth_field_fptr_import.h"
- }
+  header "ptrauth_field_fptr_import.h"
+}
+
+module CFBridgedType {
+  header "CFBridgedType.h"
+}
+
+module RawLayoutCXX {
+  header "raw_layout_cxx.h"
+}

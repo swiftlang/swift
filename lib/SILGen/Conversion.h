@@ -17,6 +17,7 @@
 #ifndef SWIFT_LOWERING_CONVERSION_H
 #define SWIFT_LOWERING_CONVERSION_H
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/ExternalUnion.h"
 #include "Initialization.h"
 #include "SGFContext.h"
@@ -24,8 +25,14 @@
 namespace swift {
 namespace Lowering {
 
+class OptionalInjectionConversion;
+
 /// An abstraction representing certain kinds of conversion that SILGen can
-/// do automatically in various situations.
+/// do automatically in various situations.  These are used primarily with
+/// ConvertingInitialization in order to guide the emission of an expression.
+/// Some of these conversions are semantically required, such as propagating
+/// @isolated(any) down to the emission of the function reference, or some of
+/// the bridging conversions.
 class Conversion {
 public:
   enum KindTy {
@@ -37,6 +44,9 @@ public:
     /// implicit force cast.
     ForceAndBridgeToObjC,
 
+    /// Force an optional value.
+    ForceOptional,
+
     /// A bridging conversion from a foreign type.
     BridgeFromObjC,
 
@@ -44,57 +54,105 @@ public:
     BridgeResultFromObjC,
 
     /// An erasure to Any (possibly wrapped in optional conversions).
-    /// This is sortof a bridging conversion.
+    /// This is sortof a bridging conversion?  Really it's more of a
+    /// subtype conversion, but we're calling it out separately here,
+    /// and that's easier.
     AnyErasure,
 
-    LastBridgingKind = AnyErasure,
+    /// A subtype conversion, except it's allowed to do optional injections
+    /// and existential erasures.  This comes up with bridging peepholes
+    /// and is annoying to not have a way to represent.  The conversion
+    /// should always involve class references and so will be harmless
+    /// in terms of representations.
+    BridgingSubtype,
 
-    /// An orig-to-subst conversion.
-    OrigToSubst,
+    /// A subtype conversion.
+    Subtype,
 
-    /// A subst-to-orig conversion.  These can always be annihilated.
-    SubstToOrig,
+    /// A reabstraction conversion.  There can also be a subtype difference
+    /// between the substituted types.
+    Reabstract,
   };
 
   static bool isBridgingKind(KindTy kind) {
-    return kind <= LastBridgingKind;
+    switch (kind) {
+    case BridgeToObjC:
+    case ForceAndBridgeToObjC:
+    case ForceOptional:
+    case BridgeFromObjC:
+    case BridgeResultFromObjC:
+    case AnyErasure:
+    case BridgingSubtype:
+    case Subtype:
+      return true;
+
+    case Reabstract:
+      return false;
+    }
+    llvm_unreachable("bad kind");
   }
   
   static bool isReabstractionKind(KindTy kind) {
-    // Update if we end up with more kinds!
-    return !isBridgingKind(kind);
+    switch (kind) {
+    case Reabstract:
+      return true;
+
+    case BridgeToObjC:
+    case ForceAndBridgeToObjC:
+    case ForceOptional:
+    case BridgeFromObjC:
+    case BridgeResultFromObjC:
+    case AnyErasure:
+    case BridgingSubtype:
+    case Subtype:
+      return false;
+    }
+    llvm_unreachable("bad kind");
   }
 
 private:
   KindTy Kind;
 
-  struct BridgingTypes {
-    CanType OrigType;
-    CanType ResultType;
-    SILType LoweredResultType;
+  struct BridgingStorage {
     bool IsExplicit;
   };
 
-  struct ReabstractionTypes {
-    AbstractionPattern OrigType;
-    CanType SubstType;
-    SILType LoweredResultType;
+  /// The types we store for reabstracting contexts.  In general, when
+  /// we're just emitting an expression, it's expected that the input
+  /// abstraction type and lowered type will match the input formal type,
+  /// which will be the type of the expression we're emitting.  They can
+  /// therefore simply be replaced if we're e.g. prepending a subtype
+  /// conversion to the reabstraction.  But it's very useful to be able to
+  /// represent both sides of the conversion uniformly so that e.g. we can
+  /// elegantly perform a single (perhaps identity) reabstraction when
+  /// receiving a function result or loading a value from abstracted
+  /// storage.
+  struct ReabstractionStorage {
+    AbstractionPattern InputOrigType;
+    AbstractionPattern OutputOrigType;
+    SILType InputLoweredTy;
   };
 
-  using Members = ExternalUnionMembers<BridgingTypes, ReabstractionTypes>;
+  CanType SourceType;
+  CanType ResultType;
+  SILType LoweredResultType;
+
+  using Members = ExternalUnionMembers<BridgingStorage, ReabstractionStorage>;
 
   static Members::Index getStorageIndexForKind(KindTy kind) {
     switch (kind) {
     case BridgeToObjC:
     case ForceAndBridgeToObjC:
+    case ForceOptional:
     case BridgeFromObjC:
     case BridgeResultFromObjC:
     case AnyErasure:
-      return Members::indexOf<BridgingTypes>();
+    case BridgingSubtype:
+    case Subtype:
+      return Members::indexOf<BridgingStorage>();
 
-    case OrigToSubst:
-    case SubstToOrig:
-      return Members::indexOf<ReabstractionTypes>();
+    case Reabstract:
+      return Members::indexOf<ReabstractionStorage>();
     }
     llvm_unreachable("bad kind");
   }
@@ -103,38 +161,93 @@ private:
   static_assert(decltype(Types)::union_is_trivially_copyable,
                 "define the special members if this changes");
 
-  Conversion(KindTy kind, CanType origType, CanType resultType,
+  Conversion(KindTy kind, CanType sourceType, CanType resultType,
              SILType loweredResultTy, bool isExplicit)
-      : Kind(kind) {
-    Types.emplaceAggregate<BridgingTypes>(kind, origType, resultType,
-                                          loweredResultTy, isExplicit);
+      : Kind(kind), SourceType(sourceType), ResultType(resultType),
+        LoweredResultType(loweredResultTy) {
+    Types.emplaceAggregate<BridgingStorage>(kind, isExplicit);
   }
 
-  Conversion(KindTy kind, AbstractionPattern origType, CanType substType,
-             SILType loweredResultTy)
-      : Kind(kind) {
-    Types.emplaceAggregate<ReabstractionTypes>(kind, origType, substType,
-                                               loweredResultTy);
+  Conversion(AbstractionPattern inputOrigType, CanType inputSubstType,
+             SILType inputLoweredTy,
+             AbstractionPattern outputOrigType, CanType outputSubstType,
+             SILType outputLoweredTy)
+      : Kind(Reabstract), SourceType(inputSubstType),
+        ResultType(outputSubstType),
+        LoweredResultType(outputLoweredTy) {
+    Types.emplaceAggregate<ReabstractionStorage>(Kind, inputOrigType,
+                                                 outputOrigType,
+                                                 inputLoweredTy);
+  }
+
+  static bool isAllowedConversion(CanType inputType, CanType outputType) {
+    // Allow all identity conversions.  (This should only happen with
+    // reabstraction.)
+    if (inputType == outputType) return true;
+
+    // Allow optional-to-optional conversions, but not injections
+    // into optional.  Emitters can be expected to just strip optionality
+    // from the result type when peepholing through an optional injection,
+    // and doing so avoids the need to handle injections specially in
+    // emitters, like those for function references and closures.
+    while (auto outputObjectType = outputType.getOptionalObjectType()) {
+      auto inputObjectType = inputType.getOptionalObjectType();
+      if (!inputObjectType) return false;
+      outputType = outputObjectType;
+      inputType = inputObjectType;
+    }
+
+    // Disallow existential erasures from being directly represented here
+    // because it may involve a representation change for the value.  Emitters
+    // shouldn't have to specially recognize those.
+    if (outputType.isExistentialType())
+      return inputType.isExistentialType();
+
+    assert(!inputType.getOptionalObjectType());
+    return true;
   }
 
 public:
   static Conversion getOrigToSubst(AbstractionPattern origType,
                                    CanType substType,
-                                   SILType loweredResultTy) {
-    return Conversion(OrigToSubst, origType, substType, loweredResultTy);
+                                   SILType inputLoweredTy,
+                                   SILType outputLoweredTy) {
+    return getReabstract(origType, substType, inputLoweredTy,
+                         AbstractionPattern(substType), substType, outputLoweredTy);
   }
 
   static Conversion getSubstToOrig(AbstractionPattern origType,
                                    CanType substType,
-                                   SILType loweredResultTy) {
-    return Conversion(SubstToOrig, origType, substType, loweredResultTy);
+                                   SILType inputLoweredTy,
+                                   SILType outputLoweredTy) {
+    return getReabstract(AbstractionPattern(substType), substType, inputLoweredTy,
+                         origType, substType, outputLoweredTy);
+  }
+
+  static Conversion getReabstract(AbstractionPattern inputOrigType,
+                                  CanType inputSubstType,
+                                  SILType inputLoweredTy,
+                                  AbstractionPattern outputOrigType,
+                                  CanType outputSubstType,
+                                  SILType outputLoweredTy) {
+    assert(isAllowedConversion(inputSubstType, outputSubstType) &&
+           "don't build subtype conversions that do existential erasures");
+    return Conversion(inputOrigType, inputSubstType, inputLoweredTy,
+                      outputOrigType, outputSubstType, outputLoweredTy);
   }
 
   static Conversion getBridging(KindTy kind, CanType origType,
                                 CanType resultType, SILType loweredResultTy,
                                 bool isExplicit = false) {
     assert(isBridgingKind(kind));
+    assert((kind != Subtype || isAllowedConversion(origType, resultType)) &&
+           "disallowed conversion for subtype relationship");
     return Conversion(kind, origType, resultType, loweredResultTy, isExplicit);
+  }
+
+  static Conversion getSubtype(CanType origType, CanType substType,
+                               SILType loweredResultTy) {
+    return getBridging(Subtype, origType, substType, loweredResultTy);
   }
 
   KindTy getKind() const {
@@ -149,45 +262,74 @@ public:
     return isReabstractionKind(getKind());
   }
 
-  AbstractionPattern getReabstractionOrigType() const {
-    return Types.get<ReabstractionTypes>(Kind).OrigType;
+  AbstractionPattern getReabstractionInputOrigType() const {
+    return Types.get<ReabstractionStorage>(Kind).InputOrigType;
   }
 
-  CanType getReabstractionSubstType() const {
-    return Types.get<ReabstractionTypes>(Kind).SubstType;
+  CanType getReabstractionInputSubstType() const {
+    return getSourceType();
   }
 
-  SILType getReabstractionLoweredResultType() const {
-    return Types.get<ReabstractionTypes>(Kind).LoweredResultType;
+  SILType getReabstractionInputLoweredType() const {
+    return Types.get<ReabstractionStorage>(Kind).InputLoweredTy;
+  }
+
+  AbstractionPattern getReabstractionOutputOrigType() const {
+    return Types.get<ReabstractionStorage>(Kind).OutputOrigType;
+  }
+
+  CanType getReabstractionOutputSubstType() const {
+    return getResultType();
+  }
+
+  SILType getReabstractionOutputLoweredType() const {
+    return getLoweredResultType();
   }
 
   bool isBridgingExplicit() const {
-    return Types.get<BridgingTypes>(Kind).IsExplicit;
+    return Types.get<BridgingStorage>(Kind).IsExplicit;
   }
 
-  CanType getBridgingSourceType() const {
-    return Types.get<BridgingTypes>(Kind).OrigType;
+  CanType getSourceType() const {
+    return SourceType;
   }
 
-  CanType getBridgingResultType() const {
-    return Types.get<BridgingTypes>(Kind).ResultType;
+  CanType getResultType() const {
+    return ResultType;
   }
 
-  SILType getBridgingLoweredResultType() const {
-    return Types.get<BridgingTypes>(Kind).LoweredResultType;
+  SILType getLoweredResultType() const {
+    return LoweredResultType;
   }
+
+  /// Given that this conversion is not one of the specialized bridging
+  /// conversion (i.e. it is either a reabstraction or a subtype conversion),
+  /// rebuild it with the given source type.
+  Conversion withSourceType(AbstractionPattern origSourceType,
+                            CanType sourceType,
+                            SILType loweredSourceTy) const;
+  Conversion withSourceType(SILGenFunction &SGF, CanType sourceType) const;
+
+  /// Given that this conversion is not one of the specialized bridging
+  /// conversion (i.e. it is either a reabstraction or a subtype conversion),
+  /// rebuild it with the given result type.
+  Conversion withResultType(AbstractionPattern origResultType,
+                            CanType sourceType,
+                            SILType loweredSourceTy) const;
 
   ManagedValue emit(SILGenFunction &SGF, SILLocation loc,
                     ManagedValue source, SGFContext ctxt) const;
 
   /// Try to form a conversion that does an optional injection
   /// or optional-to-optional conversion followed by this conversion.
-  Optional<Conversion>
+  std::optional<Conversion>
   adjustForInitialOptionalConversions(CanType newSourceType) const;
 
   /// Try to form a conversion that does a force-value followed by
   /// this conversion.
-  Optional<Conversion> adjustForInitialForceValue() const;
+  std::optional<Conversion> adjustForInitialForceValue() const;
+
+  OptionalInjectionConversion adjustForInitialOptionalInjection() const;
 
   void dump() const LLVM_ATTRIBUTE_USED;
   void print(llvm::raw_ostream &out) const;
@@ -206,7 +348,14 @@ public:
     BridgeToAnyObject,
 
     /// The value just needs to undergo a subtype conversion.
-    Subtype
+    Subtype,
+
+    /// The inner conversion is a subtype conversion and can be done implicitly
+    /// as part of the outer conversion.
+    SubtypeIntoReabstract,
+
+    /// Both conversions are reabstractions and can be combined.
+    Reabstract,
   };
 
 private:
@@ -226,17 +375,73 @@ public:
   bool isForced() const { return Forced; }
 };
 
-Optional<ConversionPeepholeHint>
-canPeepholeConversions(SILGenFunction &SGF,
-                       const Conversion &outerConversion,
-                       const Conversion &innerConversion);
+struct CombinedConversions {
+  std::optional<Conversion> first;
+  std::optional<Conversion> second;
+
+  explicit CombinedConversions() {}
+  explicit CombinedConversions(const Conversion &first)
+    : first(first) {}
+  explicit CombinedConversions(const Conversion &first,
+                               const Conversion &second)
+    : first(first), second(second) {}
+};
+
+bool canPeepholeConversions(SILGenFunction &SGF,
+                            const Conversion &outer,
+                            const Conversion &inner);
+
+/// The result of trying to combine an optional injection with an existing
+/// conversion.
+class OptionalInjectionConversion {
+  enum Kind {
+    None,
+    Injection,
+    Value
+  };
+
+  std::optional<Conversion> conversion;
+  Kind kind;
+
+  OptionalInjectionConversion(Kind kind, const Conversion &conv)
+    : conversion(conv), kind(kind) {}
+
+public:
+  OptionalInjectionConversion() : kind(None) {}
+  static OptionalInjectionConversion forInjection(const Conversion &conv) {
+    return { Injection, conv };
+  }
+  static OptionalInjectionConversion forValue(const Conversion &conv) {
+    return { Value, conv };
+  }
+
+  /// Is the result of this combination a conversion that produces a
+  /// value of the original optional type?
+  bool isInjection() const {
+    return kind == Injection;
+  }
+  const Conversion &getInjectionConversion() const {
+    assert(isInjection());
+    return *conversion;
+  }
+
+  /// Is the result of this combination a conversion that produces a
+  /// value of the element of the original optional type?
+  bool isValue() const {
+    return kind == Value;
+  }
+  const Conversion &getValueConversion() const {
+    assert(isValue());
+    return *conversion;
+  }
+};
 
 /// An initialization where we ultimately want to apply a conversion to
 /// the value before completing the initialization.
 ///
 /// Value generators may call getAsConversion() to check whether an
-/// Initialization is one of these.  If so, they may call either
-/// tryPeephole or setConvertedValue.
+/// Initialization is one of these.  This adds initWithConvertedValue
+/// to the normal set of ways to receive an initializing value.
 class ConvertingInitialization final : public Initialization {
 private:
   enum StateTy {
@@ -250,7 +455,15 @@ private:
     Finished,
 
     /// The converted value has been extracted.
-    Extracted
+    Extracted,
+
+    /// We're doing pack initialization instead of the normal state
+    /// transition, and we haven't been finished yet.
+    PackExpanding,
+
+    /// We're doing pack initialization instead of the normal state
+    /// transition, and finishInitialization has been called.
+    FinishedPackExpanding,
   };
 
   StateTy State;
@@ -280,6 +493,7 @@ public:
       FinalContext(SGFContext(subInitialization.get())) {
     OwnedSubInitialization = std::move(subInitialization);
   }
+
   
   /// Return the conversion to apply to the unconverted value.
   const Conversion &getConversion() const {
@@ -293,27 +507,49 @@ public:
 
   // The three ways to perform this initialization:
 
-  /// Set the unconverted value for this initialization.
+  /// Set the converted value for this initialization.
+  ///
+  /// If the converted value has been emitted into the final context, you
+  /// can pass ManagedValue::forInContext() to this function.  In this
+  /// case, you must call finishInitialization on the final initialization
+  /// yourself prior to calling this.  finishEmission will return
+  /// ManagedValue::forInContext().
+  ///
+  /// Otherwise, if the final context exists, this will forward the value
+  /// into it and finish it.  finishEmission will return
+  /// ManagedValue::forInContext().
+  ///
+  /// Otherwise, this will store the value internally, and finishEmission
+  /// will return it.
+  ///
+  /// You must call finishInitialization after calling this.
+  void initWithConvertedValue(SILGenFunction &SGF, SILLocation loc,
+                              ManagedValue value);
+
+  /// Set the unconverted value for this initialization.  The value will
+  /// first be converted.  If the final context has an initialization,
+  /// the converted value will be forwarded into it, and finishEmission
+  /// will return ManagedValue::forInContext().  Otherwise, finishEmission
+  /// will return the converted value.
+  ///
+  /// You must call finishInitialization after calling this.
   void copyOrInitValueInto(SILGenFunction &SGF, SILLocation loc,
                            ManagedValue value, bool isInit) override;
 
   /// Given that the result of the given expression needs to sequentially
   /// undergo the given conversion and then this conversion, attempt to
-  /// peephole the result.  If successful, the value will be set in this
-  /// initialization.  The initialization will not yet be finished.
+  /// peephole the result.
+  ///
+  /// If this returns true, this initialization will have been initialized
+  /// as if initWithConvertedValue has been called.  You must call
+  /// finishInitialization in this path.
+  ///
+  /// Otherwise, there is no state change for the conversion.
   bool tryPeephole(SILGenFunction &SGF, Expr *E, Conversion innerConversion);
   bool tryPeephole(SILGenFunction &SGF, SILLocation loc,
                    Conversion innerConversion, ValueProducerRef producer);
   bool tryPeephole(SILGenFunction &SGF, SILLocation loc, ManagedValue value,
                    Conversion innerConversion);
-
-  /// Set the converted value for this initialization.
-  void setConvertedValue(ManagedValue value) {
-    assert(getState() == Uninitialized);
-    assert(!value.isInContext() || FinalContext.getEmitInto());
-    Value = value;
-    State = Initialized;
-  }
 
   /// Given that an emitter was able to adjust the conversion when
   /// emitting into this initialization, continue emission into the
@@ -340,14 +576,28 @@ public:
     return this;
   }
   
-  // Get the abstraction pattern, if any, the value is converted to.
-  Optional<AbstractionPattern> getAbstractionPattern() const override;
-
   // Bookkeeping.
   void finishInitialization(SILGenFunction &SGF) override {
-    assert(getState() == Initialized);
-    State = Finished;
+    if (getState() == PackExpanding) {
+      FinalContext.getEmitInto()->finishInitialization(SGF);
+      State = FinishedPackExpanding;
+    } else {
+      assert(getState() == Initialized);
+      State = Finished;
+    }
   }
+
+  // Support pack-expansion initialization.
+  bool canPerformPackExpansionInitialization() const override {
+    if (auto finalInit = FinalContext.getEmitInto())
+      return finalInit->canPerformPackExpansionInitialization();
+    return false;
+  }
+
+  void performPackExpansionInitialization(SILGenFunction &SGF,
+                                          SILLocation loc,
+                                          SILValue indexWithinComponent,
+                llvm::function_ref<void(Initialization *into)> fn) override;
 };
 
 } // end namespace Lowering

@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend-emit-module -emit-module-path %t/InferViaDefaults.swiftmodule -module-name InferViaDefaults %S/Inputs/type_inference_via_defaults_other_module.swift
 // RUN: %target-build-swift -module-name main -Xfrontend -parse-as-library -I %t %s %S/Inputs/type_inference_via_defaults_other_module.swift -o %t/a.out
-// RUN: %target-run %t/a.out | %FileCheck %s --color
+// RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: OS=macosx && CPU=x86_64
 

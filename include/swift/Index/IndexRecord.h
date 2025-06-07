@@ -57,7 +57,7 @@ bool indexAndRecord(SourceFile *primarySourceFile, StringRef indexUnitToken,
                     StringRef indexStorePath, bool indexClangModules,
                     bool indexSystemModules, bool skipStdlib,
                     bool includeLocals, bool isDebugCompilation,
-                    StringRef targetTriple,
+                    bool isExplicitModuleBuild, StringRef targetTriple,
                     const DependencyTracker &dependencyTracker,
                     const PathRemapper &pathRemapper);
 
@@ -99,7 +99,8 @@ bool indexAndRecord(ModuleDecl *module, ArrayRef<std::string> indexUnitTokens,
                     StringRef moduleUnitToken, StringRef indexStorePath,
                     bool indexClangModules, bool indexSystemModules,
                     bool skipStdlib, bool includeLocals,
-                    bool isDebugCompilation, StringRef targetTriple,
+                    bool isDebugCompilation, bool isExplicitModuleBuild,
+                    StringRef targetTriple,
                     const DependencyTracker &dependencyTracker,
                     const PathRemapper &pathRemapper);
 // FIXME: indexUnitTokens could be StringRef, but that creates an impedance

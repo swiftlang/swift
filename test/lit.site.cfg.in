@@ -13,12 +13,15 @@
 import os
 import platform
 import sys
+import lit.util
 
 config.cmake = "@CMAKE_COMMAND@"
+config.cmake_binary_dir = "@CMAKE_BINARY_DIR@"
 config.llvm_src_root = "@LLVM_MAIN_SRC_DIR@"
 config.llvm_obj_root = "@LLVM_BINARY_DIR@"
 config.llvm_tools_dir = "@LLVM_TOOLS_DIR@"
 config.llvm_libs_dir = "@LLVM_LIBS_DIR@"
+config.llvm_plugin_ext = "@LLVM_PLUGIN_EXT@"
 config.llvm_code_generators = "@LLVM_TARGETS_TO_BUILD@".split(";")
 config.lit_tools_dir = "@LLVM_LIT_TOOLS_DIR@"
 config.swift_src_root = lit_config.params.get("swift_src_root", "@SWIFT_SOURCE_DIR@")
@@ -27,9 +30,14 @@ config.target_triple = "@LLVM_TARGET_TRIPLE@"
 config.variant_triple = "@VARIANT_TRIPLE@"
 config.variant_sdk = "@VARIANT_SDK@"
 config.variant_suffix = "@VARIANT_SUFFIX@"
+config.external_embedded_platform = "@VARIANT_EXTERNAL_EMBEDDED_PLATFORM@" == "TRUE"
+config.external_embedded_device = "@VARIANT_EXTERNAL_EMBEDDED_DEVICE@"
 config.swiftlib_dir = "@LIT_SWIFTLIB_DIR@"
 config.swift_test_results_dir = \
     lit_config.params.get("swift_test_results_dir", "@SWIFT_TEST_RESULTS_DIR@")
+
+config.host_triple = "@SWIFT_HOST_TRIPLE@"
+config.host_sdkroot = "@SWIFT_HOST_SDKROOT@"
 
 config.coverage_mode = "@SWIFT_ANALYZE_CODE_COVERAGE@"
 config.lldb_build_root = "@LLDB_BUILD_DIR@"
@@ -37,6 +45,12 @@ config.libdispatch_build_path = "@SWIFT_PATH_TO_LIBDISPATCH_BUILD@"
 config.libdispatch_static_build_path = "@SWIFT_PATH_TO_LIBDISPATCH_STATIC_BUILD@"
 config.swift_driver_test_options = "@SWIFT_DRIVER_TEST_OPTIONS@"
 config.swift_frontend_test_options = "@SWIFT_FRONTEND_TEST_OPTIONS@"
+config.swift_ide_test_test_options = "@SWIFT_IDE_TEST_TEST_OPTIONS@"
+
+config.cmake_c_compiler = r'''@CMAKE_C_COMPILER@'''
+config.cmake_cxx_compiler = r'''@CMAKE_CXX_COMPILER@'''
+config.c_flags = r'''@CMAKE_C_FLAGS@'''
+config.exe_linker_flags = r'''@CMAKE_EXE_LINKER_FLAGS@'''
 
 # --- Darwin ---
 config.darwin_xcrun_toolchain = "@SWIFT_DARWIN_XCRUN_TOOLCHAIN@"
@@ -85,6 +99,8 @@ if '@SWIFT_STDLIB_ENABLE_LTO@'.lower() in ['full', 'thin']:
 
 if "@LLVM_ENABLE_ASSERTIONS@" == "TRUE":
     config.available_features.add('asserts')
+    # Tests that require -swift-version 7 can only run with asserts compilers
+    config.available_features.add('swift7')
 else:
     config.available_features.add('no_asserts')
 
@@ -105,13 +121,6 @@ if "@SWIFT_ENABLE_REFLECTION@" == "TRUE":
 if "@SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS@" == "TRUE":
     config.available_features.add('runtime_function_counters')
 
-if "@CMAKE_GENERATOR@" == "Xcode":
-    xcode_bin_dir = os.path.join(config.llvm_obj_root, "@LLVM_BUILD_TYPE@",
-                                 'bin')
-    lit_config.note('Adding to path: ' + xcode_bin_dir)
-    config.environment['PATH'] = \
-      os.path.pathsep.join((xcode_bin_dir, config.environment['PATH']))
-
 config.available_features.add("CMAKE_GENERATOR=@CMAKE_GENERATOR@")
 
 if "@SWIFT_ENABLE_MACCATALYST@" == "TRUE":
@@ -130,8 +139,6 @@ if "@SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING@" == "TRUE":
     config.available_features.add('differentiable_programming')
 if "@SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY@" == "TRUE":
     config.available_features.add('concurrency')
-if "@SWIFT_BACK_DEPLOY_CONCURRENCY@" == "TRUE":
-    config.available_features.add('back_deploy_concurrency')
 if "@SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED@" == "TRUE":
     config.available_features.add('distributed')
 if "@SWIFT_STDLIB_STATIC_PRINT@" == "TRUE":
@@ -140,33 +147,35 @@ if "@SWIFT_STDLIB_ENABLE_UNICODE_DATA" == "TRUE":
     config.available_features.add('stdlib_unicode_data')
 if "@SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING@" == "TRUE":
     config.available_features.add('string_processing')
-if "@SWIFT_ENABLE_EXPERIMENTAL_REFLECTION@" == "TRUE":
-    config.available_features.add('reflection')
+if "@SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION@" == "TRUE":
+    config.available_features.add('observation')
 if "@SWIFT_STDLIB_ENABLE_DEBUG_PRECONDITIONS_IN_RELEASE@" == "TRUE":
     config.available_features.add('swift_stdlib_debug_preconditions_in_release')
+if "@SWIFT_ENABLE_VOLATILE@" == "TRUE":
+    config.available_features.add('volatile')
+if "@SWIFT_ENABLE_SYNCHRONIZATION@" == "TRUE":
+    config.available_features.add('synchronization')
+if "@SWIFT_ENABLE_VOLATILE@" == "TRUE":
+    config.available_features.add('volatile')
+if "@SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB@" == "TRUE":
+    config.available_features.add('embedded_stdlib')
+if "@SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING@" == "TRUE":
+    config.available_features.add('embedded_stdlib_cross_compiling')
 
 config.swift_freestanding_is_darwin = "@SWIFT_FREESTANDING_IS_DARWIN@" == "TRUE"
 config.swift_stdlib_use_relative_protocol_witness_tables = "@SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES@" == "TRUE"
+config.swift_stdlib_use_use_fragile_resilient_protocol_witness_tables = "@SWIFT_STDLIB_USE_FRAGILE_RESILIENT_PROTOCOL_WITNESS_TABLES@" == "TRUE"
 config.swift_enable_dispatch = "@SWIFT_ENABLE_DISPATCH@" == "TRUE"
 config.swift_stdlib_enable_objc_interop = "@SWIFT_STDLIB_ENABLE_OBJC_INTEROP@" == "TRUE"
 # Configured in DarwinSDKs.cmake
 config.freestanding_sdk_name = "@SWIFT_SDK_FREESTANDING_LIB_SUBDIR@"
 
-if "@BOOTSTRAPPING_MODE@" != "OFF":
-  config.available_features.add('swift_in_compiler')
-
-if "@SWIFT_PATH_TO_EARLYSWIFTSYNTAX_BUILD_DIR@" != "":
+if '@SWIFT_BUILD_SWIFT_SYNTAX@' == 'TRUE':
   config.available_features.add('swift_swift_parser')
-
-if "@BOOTSTRAPPING_MODE@" == 'HOSTTOOLS':
-  config.available_features.add('hosttools_mode')
-elif "@BOOTSTRAPPING_MODE@" == 'BOOTSTRAPPING':
-  config.available_features.add('bootstrapping_mode')
-elif "@BOOTSTRAPPING_MODE@" == 'BOOTSTRAPPING-WITH-HOSTLIBS':
-  config.available_features.add('bootstrapping_with_hostlibs_mode')
 
 # Let the main config do the real work.
 if config.test_exec_root is None:
-    config.test_exec_root = os.path.dirname(os.path.realpath(__file__))
+    config.test_exec_root = os.path.dirname(lit.util.abs_path_preserve_drive(__file__))
+lit_config.load_config(config, os.path.join(config.test_exec_root, "lit.swift-features.cfg"))
 lit_config.load_config(
     config, os.path.join(config.swift_src_root, "test", "lit.cfg"))

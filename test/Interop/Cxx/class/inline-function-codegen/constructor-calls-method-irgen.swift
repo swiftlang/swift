@@ -6,4 +6,4 @@ public func getIncrementorValue() -> CInt {
   return callConstructor(41)
 }
 
-// CHECK: define {{.*}}i32 @{{_ZN11Incrementor9incrementEi|"\?increment@Incrementor@@QEAAHH@Z"}}(%struct.Incrementor* {{.*}}, i32 {{.*}})
+// CHECK: define {{.*}}i32 @{{_ZN11Incrementor9incrementEi|"\?increment@Incrementor@@QEAAHH@Z"}}(ptr {{.*}}, i32 {{.*}})

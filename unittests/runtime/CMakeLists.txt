@@ -12,9 +12,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
       set(CMAKE_C_COMPILER "${SWIFT_NATIVE_CLANG_TOOLS_PATH}/clang")
     endif()
   elseif(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
-    if(NOT "${CMAKE_C_COMPILER_ID}" MATCHES "Clang")
-      message(FATAL_ERROR "Building the swift runtime is not supported with ${CMAKE_C_COMPILER_ID}. Use the just-built clang instead.")
-    endif()
+    message(FATAL_ERROR "Building the swift runtime is not supported with ${CMAKE_C_COMPILER_ID}. Use the just-built clang instead.")
   else()
     message(WARNING "Building the swift runtime using the host compiler, and not the just-built clang.")
 
@@ -63,7 +61,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     list(APPEND PLATFORM_TARGET_LINK_LIBRARIES
       ${EXECINFO_LIBRARY}
       )
-  elseif(SWIFT_HOST_VARIANT STREQUAL windows)
+  elseif(SWIFT_HOST_VARIANT STREQUAL "windows")
     list(APPEND PLATFORM_TARGET_LINK_LIBRARIES DbgHelp;Synchronization)
   endif()
 
@@ -100,7 +98,7 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     Actor.cpp
     TaskStatus.cpp)
 
-  add_swift_unittest(SwiftRuntimeTests
+  add_swift_unittest(SwiftRuntimeTests IS_TARGET_TEST
     Array.cpp
     CompatibilityOverrideRuntime.cpp
     CompatibilityOverrideConcurrency.cpp
@@ -108,15 +106,18 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     Metadata.cpp
     Enum.cpp
     ExtendedExistential.cpp
+    Heap.cpp
+    PrebuiltStringMap.cpp
     Refcounting.cpp
     Stdlib.cpp
     StackAllocator.cpp
+    TypeLayoutChecks.cpp
     ${PLATFORM_SOURCES}
 
     # The runtime tests link to internal runtime symbols, which aren't exported
     # from the swiftCore dylib, so we need to link to both the runtime archive
     # and the stdlib.
-    $<TARGET_OBJECTS:swiftRuntime${SWIFT_PRIMARY_VARIANT_SUFFIX}>
+    $<TARGET_OBJECTS:swiftRuntimeCore${SWIFT_PRIMARY_VARIANT_SUFFIX}>
     $<TARGET_OBJECTS:swiftLLVMSupport${SWIFT_PRIMARY_VARIANT_SUFFIX}>
     $<TARGET_OBJECTS:swiftDemangling${SWIFT_PRIMARY_VARIANT_SUFFIX}>
     )

@@ -48,24 +48,19 @@ func testReturnVoid1() {
 // A similar construct is also allowed in C, and might be used to cause a
 // compiler error if the type of that expression changes to non-void.
 
-// RETURN_VOID_1: Begin completions
 // RETURN_VOID_1-DAG: Decl[Struct]/CurrModule: FooStruct[#FooStruct#]{{; name=.+$}}
-// RETURN_VOID_1: End completions
 }
 
 func testReturnInt1() {
   return #^RETURN_INT_1^#
-// RETURN_INT_1: Begin completions
 // RETURN_INT_1-DAG: Decl[Struct]/CurrModule: FooStruct[#FooStruct#]{{; name=.+$}}
-// RETURN_INT_1: End completions
 }
 
 func testReturnInt2(_ fooObject: FooStruct) {
   return fooObject.#^RETURN_INT_2^#
-// RETURN_INT_2: Begin completions
-// RETURN_INT_2-NEXT: Keyword[self]/CurrNominal: self[#FooStruct#]; name=self
-// RETURN_INT_2-NEXT: Decl[InstanceVar]/CurrNominal: instanceVar[#Int#]{{; name=.+$}}
-// RETURN_INT_2-NEXT: End completions
+// RETURN_INT_2: Begin completions, 2 items
+// RETURN_INT_2-DAG: Keyword[self]/CurrNominal: self[#FooStruct#]; name=self
+// RETURN_INT_2-DAG: Decl[InstanceVar]/CurrNominal: instanceVar[#Int#]{{; name=.+$}}
 }
 
 func testMisplacedTry() throws -> Int {
@@ -82,7 +77,6 @@ func testTR1() -> Int? {
 	var fs : FooStruct
 	return #^RETURN_TR1^#
 
-// RETURN_TR1: Begin completions
 // RETURN_TR1-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: oi[#Int?#]{{; name=.+$}}
 // RETURN_TR1-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Convertible]: testTR1()[#Int?#]{{; name=.+$}}
 // RETURN_TR1-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]: i[#Int#]{{; name=.+$}}
@@ -94,7 +88,6 @@ func testTR2(_ g : Gen) -> Int? {
   return g.#^RETURN_TR2^#
 }
 
-// RETURN_TR2: Begin completions
 // RETURN_TR2-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: IntGen()[#Int#]{{; name=.+$}}
 // RETURN_TR2-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: IntOpGen()[#Int?#]{{; name=.+$}}
 // RETURN_TR2-DAG: Decl[InstanceMethod]/CurrNominal:   StringGen()[#String#]{{; name=.+$}}
@@ -106,7 +99,6 @@ func testTR3(_ g : Gen) -> Int? {
   return g.IG.#^RETURN_TR3^#
 }
 
-// RETURN_TR3: Begin completions
 // RETURN_TR3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: InternalIntGen()[#Int#]{{; name=.+$}}
 // RETURN_TR3-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: InternalIntOpGen()[#Int?#]{{; name=.+$}}
 // RETURN_TR3-DAG: Decl[InstanceMethod]/CurrNominal:   InternalStringGen()[#String#]{{; name=.+$}}

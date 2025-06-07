@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend  %s -O -emit-sil | %FileCheck %s -check-prefix=CHECK-O
-// RUN: %target-swift-frontend  %s -Osize -emit-sil | %FileCheck %s -check-prefix=CHECK-OSIZE
+// RUN: %target-swift-frontend  %s -O -Xllvm -sil-print-types -emit-sil | %FileCheck %s -check-prefix=CHECK-O
+// RUN: %target-swift-frontend  %s -Osize -Xllvm -sil-print-types -emit-sil | %FileCheck %s -check-prefix=CHECK-OSIZE
 
 @_semantics("optimize.sil.specialize.generic.size.never")
 func foo<T>(_ t: T) -> T {

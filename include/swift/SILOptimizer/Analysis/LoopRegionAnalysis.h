@@ -206,28 +206,29 @@ public:
     unsigned asInt() const { return *reinterpret_cast<const unsigned *>(this); }
 
     struct ToLiveSucc {
-      Optional<SuccessorID> operator()(Optional<SuccessorID> ID) const {
+      std::optional<SuccessorID>
+      operator()(std::optional<SuccessorID> ID) const {
         return ID;
       }
     };
 
     struct ToLiveLocalSucc {
-      Optional<unsigned> operator()(Optional<SuccessorID> ID) const {
+      std::optional<unsigned> operator()(std::optional<SuccessorID> ID) const {
         if (!ID)
-          return None;
+          return std::nullopt;
         if ((*ID).IsNonLocal)
-          return None;
-        return (*ID).ID;
+          return std::nullopt;
+        return static_cast<unsigned>((*ID).ID);
       }
     };
 
     struct ToLiveNonLocalSucc {
-      Optional<unsigned> operator()(Optional<SuccessorID> ID) const {
+      std::optional<unsigned> operator()(std::optional<SuccessorID> ID) const {
         if (!ID)
-          return None;
+          return std::nullopt;
         if (!(*ID).IsNonLocal)
-          return None;
-        return (*ID).ID;
+          return std::nullopt;
+        return static_cast<unsigned>((*ID).ID);
       }
     };
   };
@@ -325,7 +326,7 @@ public:
   class backedge_iterator {
     friend struct SubregionData;
     using InnerIterTy = llvm::SmallVectorImpl<unsigned>::const_iterator;
-    llvm::Optional<InnerIterTy> InnerIter;
+    std::optional<InnerIterTy> InnerIter;
 
     backedge_iterator(llvm::SmallVectorImpl<unsigned>::const_iterator iter)
         : InnerIter(iter) {}
@@ -388,7 +389,7 @@ private:
   unsigned ID;
 
   /// The parent region of this ID if it exists.
-  llvm::Optional<unsigned> ParentID;
+  std::optional<unsigned> ParentID;
 
   /// The IDs of the predecessor regions of this region.
   llvm::SmallVector<unsigned, 4> Preds;
@@ -624,13 +625,13 @@ public:
     return getSubregionData().getBackedgeRegions();
   }
 
-  Optional<unsigned> getBackedgeRegion() const {
+  std::optional<unsigned> getBackedgeRegion() const {
     if (isBlock())
-      return None;
+      return std::nullopt;
     auto bedge_begin = getSubregionData().backedge_begin();
     auto bedge_end = getSubregionData().backedge_end();
     if (bedge_begin == bedge_end)
-      return None;
+      return std::nullopt;
     return *bedge_begin;
   }
 
@@ -716,7 +717,7 @@ public:
 
   /// Return the ID of the parent region of this BB. Asserts if this is a
   /// function region.
-  Optional<unsigned> getParentID() const { return ParentID; }
+  std::optional<unsigned> getParentID() const { return ParentID; }
 
   unsigned getRPONumber() const {
     if (isBlock())
@@ -862,7 +863,7 @@ class LoopRegionFunctionInfo {
   llvm::BumpPtrAllocator Allocator;
 
   /// The ID in the IDToRegionMap of the Region associated with \p F.
-  llvm::Optional<unsigned> FunctionRegionID;
+  std::optional<unsigned> FunctionRegionID;
 
   /// A map from a BB to the ID in the IDToRegionMap of the Region associated
   /// with the BB.
@@ -931,11 +932,11 @@ public:
   RegionTy *getRegionForNonLocalSuccessor(const RegionTy *Child,
                                           unsigned SuccID) const;
 
-  Optional<unsigned> getGrandparentID(const RegionTy *GrandChild) {
+  std::optional<unsigned> getGrandparentID(const RegionTy *GrandChild) {
     if (auto ParentID = GrandChild->getParentID()) {
       return getRegion(*ParentID)->getParentID();
     }
-    return None;
+    return std::nullopt;
   }
 
   /// Look up the region associated with this block and return it. Asserts if

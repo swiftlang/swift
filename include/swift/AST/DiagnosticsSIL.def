@@ -21,6 +21,12 @@
 #include "DefineDiagnosticMacros.h"
 
 // SILGen issues.
+WARNING(return_borrowing_switch_binding,none,
+        "returning the non-'Copyable' value of a pattern binding from a "
+        "switch that borrows by default; the switch will be performed as a "
+        "consume for compatibility for now, but this will require an explicit "
+        "'switch consume' in the future", ())
+
 ERROR(bridging_module_missing,none,
       "unable to find module '%0' for implicit conversion function '%0.%1'",
       (StringRef, StringRef))
@@ -46,6 +52,9 @@ ERROR(bridging_objcbridgeable_broken,none,
 ERROR(sil_function_redefinition,none,
       "multiple definitions of symbol '%0'",
       (StringRef))
+NOTE(sil_function_redefinition_note,none,
+      "other definition here",
+      ())
 
 ERROR(invalid_sil_builtin,none,
       "INTERNAL ERROR: invalid use of builtin: %0",
@@ -88,8 +97,22 @@ ERROR(exclusivity_access_required_unknown_decl,none,
         "%select{initialization|read|modification|deinitialization}0 requires "
         "exclusive access; consider copying to a local variable", (unsigned))
 
+ERROR(exclusivity_access_required_moveonly,none,
+      "overlapping accesses to %0, but "
+      "%select{initialization|read|modification|deinitialization}1 requires "
+      "exclusive access",
+      (StringRef, unsigned))
+
+ERROR(exclusivity_access_required_unknown_decl_moveonly,none,
+        "overlapping accesses, but "
+        "%select{initialization|read|modification|deinitialization}0 requires "
+        "exclusive access", (unsigned))
+
 NOTE(exclusivity_conflicting_access,none,
      "conflicting access is here", ())
+
+ERROR(unsupported_sil_builtin,none,
+      "builtin '%0' is not supported by SIL generation", (StringRef))
 
 ERROR(unsupported_c_function_pointer_conversion,none,
       "C function pointer signature %0 is not compatible with expected type %1",
@@ -103,6 +126,25 @@ ERROR(c_function_pointer_from_function_with_context,none,
 
 ERROR(objc_selector_malformed,none,"the type ObjectiveC.Selector is malformed",
       ())
+
+ERROR(unsupported_variadic_function_abstraction,none,
+      "cannot fully abstract a value of variadic function type %0 because "
+      "different contexts will not be able to reliably agree on a calling "
+      "convention; try wrapping it in a struct",
+      (Type))
+
+ERROR(function_type_mismatch,none,
+      "function type mismatch, declared as %0 but used as %1", (Type, Type))
+NOTE(function_declared_here,none,
+     "function declared here", ())
+
+ERROR(deserialize_function_type_mismatch,Fatal,
+      "type mismatch of function '%0', declared as %1 but used in a swift module as %2",
+      (StringRef, Type, Type))
+
+ERROR(without_actually_escaping_on_isolated_any,none,
+      "withoutActuallyEscaping is currently unimplemented for '@isolated(any)' "
+      "function values", ())
 
 // Capture before declaration diagnostics.
 ERROR(capture_before_declaration,none,
@@ -178,6 +220,14 @@ ERROR(ivar_not_initialized_at_superinit,none,
 ERROR(ivar_not_initialized_at_implicit_superinit,none,
       "property '%0' not initialized at implicitly generated super.init call",
       (StringRef, bool))
+ERROR(ivar_not_initialized_by_init_accessor,none,
+      "property %0 not initialized by init accessor",
+      (DeclName))
+
+ERROR(noncopyable_dynamic_lifetime_unsupported,none,
+      "conditional initialization or destruction of noncopyable types is not "
+      "supported; this variable must be consistently in an initialized or "
+      "uninitialized state through every code path", ())
 
 ERROR(self_use_before_fully_init,none,
       "'self' used in %select{method call|property access}1 %0 before "
@@ -190,6 +240,9 @@ ERROR(use_of_self_before_fully_init,none,
 
 NOTE(stored_property_not_initialized,none,
      "'%0' not initialized", (StringRef))
+NOTE(isolated_property_initializer,none,
+     "%1 default value of '%0' cannot be used in a %2 initalizer",
+     (StringRef, ActorIsolation, ActorIsolation))
 
 ERROR(selfinit_multiple_times,none,
       "'%select{super|self}0.init' called multiple times in initializer",
@@ -262,12 +315,12 @@ ERROR(missing_never_call_closure,none,
       (Type))
 
 ERROR(missing_return_decl,none,
-      "missing return in %1 expected to return %0",
-      (Type, DescriptiveDeclKind))
+      "missing return in %kindonly1 expected to return %0",
+      (Type, const AbstractFunctionDecl *))
 ERROR(missing_never_call_decl,none,
-      "%1 with uninhabited return type %0 is missing "
+      "%kindonly1 with uninhabited return type %0 is missing "
       "call to another never-returning function on all paths",
-      (Type, DescriptiveDeclKind))
+      (Type, const AbstractFunctionDecl *))
 
 NOTE(missing_return_last_expr_note,none,
     "did you mean to return the last expression?", ())
@@ -299,8 +352,6 @@ WARNING(warn_dead_weak_store,none,
         "deallocated here", ())
 
 // performance diagnostics
-ERROR(performance_annotations_not_enabled,none,
-      "use -experimental-performance-annotations to enable performance annotations", ())
 ERROR(performance_dynamic_casting,none,
       "dynamic casting can lock or allocate", ())
 ERROR(performance_metadata,none,
@@ -323,6 +374,58 @@ ERROR(performance_unknown_callees,none,
       "called function is not known at compile time and can have unpredictable performance", ())
 ERROR(performance_callee_unavailable,none,
       "called function is not available in this module and can have unpredictable performance", ())
+ERROR(bad_attr_on_non_const_global,none,
+      "global variable must be a compile-time constant to use %0 attribute", (StringRef))
+ERROR(global_must_be_compile_time_const,none,
+      "global variable must be a compile-time constant", ())
+ERROR(embedded_cannot_specialize_class_method,none,
+      "classes cannot have a non-final, generic method %0 in embedded Swift", (DeclName))
+ERROR(embedded_cannot_specialize_witness_method,none,
+      "a protocol type cannot contain a generic method %0 in embedded Swift", (DeclName))
+ERROR(cannot_specialize_class,none,
+      "cannot specialize %0 because class definition is not available (make sure to build with -wmo)", (Type))
+ERROR(embedded_swift_existential_type,none,
+      "cannot use a value of protocol type %0 in embedded Swift", (Type))
+ERROR(embedded_swift_existential_protocol,none,
+      "cannot use a value of protocol type 'any %0' in embedded Swift", (StringRef))
+ERROR(embedded_swift_existential,none,
+      "cannot use a value of protocol type in embedded Swift", ())
+ERROR(perf_diag_existential_type,none,
+      "cannot use a value of protocol type %0 in '@_noExistential' function", (Type))
+ERROR(perf_diag_existential,none,
+      "cannot use a value of protocol type in '@_noExistential' function", ())
+ERROR(embedded_swift_value_deinit,none,
+      "cannot de-virtualize deinit of type %0", (Type))
+ERROR(embedded_swift_metatype_type,none,
+      "cannot use metatype of type %0 in embedded Swift", (Type))
+ERROR(embedded_swift_metatype,none,
+      "cannot use metatype in embedded Swift", ())
+ERROR(embedded_swift_keypath,none,
+      "cannot use key path in embedded Swift", ())
+ERROR(embedded_swift_dynamic_cast,none,
+      "cannot do dynamic casting in embedded Swift", ())
+ERROR(embedded_swift_allocating_type,none,
+      "cannot use allocating type %0 in -no-allocations mode", (Type))
+ERROR(embedded_swift_allocating_coroutine,none,
+      "cannot use co-routines (like accessors) in -no-allocations mode", ())
+ERROR(embedded_swift_allocating_closure,none,
+      "cannot use escaping closures in -no-allocations mode", ())
+ERROR(embedded_swift_allocating,none,
+      "cannot use allocating operation in -no-allocations mode", ())
+ERROR(embedded_capture_of_generic_value_with_deinit,none,
+      "capturing generic non-copyable type with deinit in escaping closure not supported in embedded Swift", ())
+ERROR(embedded_call_generic_function,none,
+      "cannot specialize generic function or default protocol method in this context", ())
+ERROR(embedded_call_generic_function_with_dynamic_self,none,
+      "cannot call an initializer or static method, which is defined as default protocol method, from a class method or initializer", ())
+NOTE(embedded_specialization_called_from,none,
+      "generic specialization called here", ())
+NOTE(embedded_existential_created,none,
+      "protocol type value created here", ())
+NOTE(embedded_constructor_called,none,
+      "instance of type created here", ())
+ERROR(wrong_linkage_for_serialized_function,none,
+      "function has wrong linkage to be called from %0", (StringRef))
 NOTE(performance_called_from,none,
       "called from here", ())
 
@@ -538,10 +641,8 @@ NOTE(autodiff_member_subset_indices_not_differentiable,none,
 NOTE(autodiff_cannot_param_subset_thunk_partially_applied_orig_fn,none,
      "cannot convert a direct method reference to a '@differentiable' "
      "function; use an explicit closure instead", ())
-NOTE(autodiff_cannot_differentiate_through_multiple_results,none,
-     "cannot differentiate through multiple results", ())
-NOTE(autodiff_cannot_differentiate_through_inout_arguments,none,
-     "cannot differentiate through 'inout' arguments", ())
+NOTE(autodiff_cannot_differentiate_through_direct_yield,none,
+     "cannot differentiate through a '_read' accessor", ())
 NOTE(autodiff_enums_unsupported,none,
      "differentiating enum values is not yet supported", ())
 NOTE(autodiff_stored_property_parent_not_differentiable,none,
@@ -616,14 +717,16 @@ WARNING(warning_int_to_fp_inexact, none,
 
 // Flow-isolation diagnostics
 ERROR(isolated_after_nonisolated, none,
-      "cannot access %1 %2 here in %select{non-isolated initializer|deinitializer}0",
-      (bool, DescriptiveDeclKind, DeclName))
+      "cannot access %kind1 here in "
+      "%select{nonisolated initializer|deinitializer}0",
+      (bool, const ValueDecl *))
 NOTE(nonisolated_blame, none, "after %1%2 %3, "
-     "only non-isolated properties of 'self' can be accessed from "
+     "only nonisolated properties of 'self' can be accessed from "
      "%select{this init|a deinit}0", (bool, StringRef, StringRef, DeclName))
-ERROR(non_sendable_from_deinit,none,
-        "cannot access %1 %2 with a non-sendable type %0 from non-isolated deinit",
-        (Type, DescriptiveDeclKind, DeclName))
+ERROR(isolated_property_mutation_in_nonisolated_context,none,
+      "actor-isolated %kind0 can not be %select{referenced|mutated}1 "
+      "from a nonisolated context",
+      (const ValueDecl *, bool))
 
 // Yield usage errors
 ERROR(return_before_yield, none, "accessor must yield before returning",())
@@ -694,12 +797,22 @@ ERROR(polymorphic_builtin_passed_type_without_static_overload, none, "Static"
       "overload implied by passing argument of type %2",
       (Identifier, StringRef, Type))
 
+ERROR(builtin_get_function_isolation_bad_argument, none,
+      "argument to 'extractFunctionIsolation' must have '@isolated(any)' "
+      "function type",
+      ())
+
 ERROR(box_to_stack_cannot_promote_box_to_stack_due_to_escape_alloc, none,
       "Can not promote value from heap to stack due to value escaping", ())
 NOTE(box_to_stack_cannot_promote_box_to_stack_due_to_escape_location, none,
      "value escapes here", ())
 
 WARNING(semantic_function_improper_nesting, none, "'@_semantics' function calls non-'@_semantics' function with nested '@_semantics' calls", ())
+
+// SDK mismatch diagnostics
+ERROR(missing_deinit_on_executor_function, none,
+      "Missing 'swift_task_deinitOnExecutor' function! "
+      "This is likely due to an outdated/incompatible SDK.", ())
 
 // Capture promotion diagnostics
 WARNING(capturepromotion_concurrentcapture_mutation, none,
@@ -711,70 +824,376 @@ NOTE(capturepromotion_concurrentcapture_capturinguse_here, none,
 NOTE(capturepromotion_variable_defined_here,none,
      "variable defined here", ())
 
-// move operator used on generic or evalue
-ERROR(move_operator_used_on_generic_or_existential_value, none,
-      "move() used on a generic or existential value", ())
-
-// copy operator used on generic or evalue
-ERROR(copy_operator_used_on_generic_or_existential_value, none,
-      "copy() used on a generic or existential value", ())
-
 // noimplicitcopy on generic or existential binding
 ERROR(noimplicitcopy_used_on_generic_or_existential, none,
-      "@_noImplicitCopy can not be used on a generic or existential typed "
+      "'@_noImplicitCopy' can not be used on a generic or existential typed "
       "binding or a nominal type containing such typed things", ())
 
-// move only checker diagnostics
-ERROR(sil_moveonlychecker_owned_value_consumed_more_than_once, none,
+// discard statement
+ERROR(discard_nontrivial_storage,none,
+      "can only 'discard' type %0 if it contains trivially-destroyed "
+      "stored properties at this time",
+      (Type))
+NOTE(discard_nontrivial_storage_note,none,
+      "type %0 cannot be trivially destroyed",
+      (Type))
+NOTE(discard_nontrivial_implicit_storage_note,none,
+     "type %0 implicitly contains %1 which cannot be trivially destroyed",
+     (Type, Type))
+
+
+/// Move Checking / Noncopyable types diagnostics
+
+ERROR(sil_movechecking_owned_value_consumed_more_than_once, none,
       "'%0' consumed more than once", (StringRef))
-ERROR(sil_moveonlychecker_value_used_after_consume, none,
-      "'%0' used after consume. Lifetime extension of variable requires a copy", (StringRef))
-ERROR(sil_moveonlychecker_guaranteed_value_consumed, none,
-      "'%0' has guaranteed ownership but was consumed", (StringRef))
-ERROR(sil_moveonlychecker_guaranteed_value_captured_by_closure, none,
-      "'%0' has guaranteed ownership but was consumed due to being captured by a closure", (StringRef))
-ERROR(sil_moveonlychecker_let_value_consumed_in_closure, none,
-      "'%0' consumed in closure. This is illegal since if the closure is invoked more than once the binding will be uninitialized on later invocations", (StringRef))
-ERROR(sil_moveonlychecker_inout_not_reinitialized_before_end_of_function, none,
-      "'%0' consumed but not reinitialized before end of function", (StringRef))
-ERROR(sil_moveonlychecker_inout_not_reinitialized_before_end_of_closure, none,
-      "'%0' consumed in closure but not reinitialized before end of closure", (StringRef))
-ERROR(sil_moveonlychecker_value_consumed_in_a_loop, none,
-      "'%0' consumed by a use in a loop", (StringRef))
-ERROR(sil_moveonlychecker_exclusivity_violation, none,
-      "'%0' has consuming use that cannot be eliminated due to a tight exclusivity scope", (StringRef))
-ERROR(sil_moveonlychecker_moveonly_field_consumed, none,
-      "'%0' has a move only field that was consumed before later uses", (StringRef))
+ERROR(sil_movechecking_owned_value_consumed_and_used_at_same_time, none,
+      "'%0' consumed and used at the same time", (StringRef))
+ERROR(sil_movechecking_value_used_after_consume, none,
+      "'%0' used after consume", (StringRef))
+ERROR(sil_movechecking_guaranteed_value_consumed, none,
+      "'%0' is borrowed and cannot be consumed", (StringRef))
+ERROR(sil_movechecking_borrowed_parameter_captured_by_closure, none,
+      "'%0' cannot be captured by an escaping closure since it is a borrowed "
+      "parameter",
+      (StringRef))
+ERROR(sil_movechecking_capture_consumed, none,
+      "noncopyable '%0' cannot be consumed when captured by an escaping closure", (StringRef))
+ERROR(sil_movechecking_not_reinitialized_before_end_of_function, none,
+      "missing reinitialization of %select{inout parameter|closure capture}1 '%0' "
+      "after consume", (StringRef, bool))
+ERROR(sil_movechecking_not_reinitialized_before_end_of_coroutine, none,
+      "field '%0' was consumed but not reinitialized; "
+      "the field must be reinitialized during the access", (StringRef))
+ERROR(sil_movechecking_not_reinitialized_before_end_of_access, none,
+      "missing reinitialization of %select{inout parameter|closure capture}1 '%0' "
+      "after consume while accessing memory", (StringRef, bool))
+ERROR(sil_movechecking_value_consumed_in_a_loop, none,
+      "'%0' consumed in a loop", (StringRef))
+ERROR(sil_movechecking_use_after_partial_consume, none,
+      "cannot use '%0' after partial consume", (StringRef))
+ERROR(sil_movechecking_notconsumable_but_assignable_was_consumed, none,
+      "cannot consume noncopyable stored property '%0' %select{of a class|that is global}1",
+      (StringRef, bool))
+ERROR(sil_movechecking_cannot_destructure_has_deinit, none,
+      "cannot partially consume '%0' when it has a deinitializer",
+      (StringRef))
+ERROR(sil_movechecking_cannot_destructure_imported_nonfrozen, none,
+      "cannot partially consume '%0' of non-frozen type %1 imported from %2",
+      (StringRef, Type, const ModuleDecl*))
+ERROR(sil_movechecking_cannot_destructure_exported_usableFromInline_alwaysEmitIntoClient, none,
+      "cannot partially consume '%0' of non-frozen usableFromInline type %1 "
+      "within a function annotated '@_alwaysEmitIntoClient'",
+      (StringRef, Type))
+ERROR(sil_movechecking_cannot_destructure, none,
+      "cannot partially consume '%0'",
+      (StringRef))
+ERROR(sil_movechecking_cannot_partially_reinit_has_deinit, none,
+      "cannot partially reinitialize '%0' when it has a deinitializer; only full reinitialization is allowed",
+      (StringRef))
+ERROR(sil_movechecking_cannot_partially_reinit_nonfrozen, none,
+      "cannot partially reinitialize '%0' of non-frozen type %1 imported from %2; only full reinitialization is allowed",
+      (StringRef, Type, const ModuleDecl*))
+ERROR(sil_movechecking_cannot_partially_reinit_exported_usableFromInline_alwaysEmitIntoClient, none,
+      "cannot partially reinitialize '%0' of non-frozen usableFromInline type "
+      "%1 within a function annotated '@_alwaysEmitIntoClient'",
+      (StringRef, Type))
+ERROR(sil_movechecking_cannot_partially_reinit, none,
+      "cannot partially reinitialize '%0' after it has been consumed; only full reinitialization is allowed",
+      (StringRef))
+ERROR(sil_movechecking_discard_missing_consume_self, none,
+      "must consume 'self' before exiting method that discards self", ())
+ERROR(sil_movechecking_reinit_after_discard, none,
+      "cannot reinitialize 'self' after 'discard self'", ())
+ERROR(sil_movechecking_consume_during_deinit, none,
+      "'self' cannot be consumed during 'deinit'", ())
 
-NOTE(sil_moveonlychecker_moveonly_field_consumed_here, none,
-     "move only field consumed here", ())
-NOTE(sil_moveonlychecker_boundary_use, none,
-     "boundary use here", ())
-NOTE(sil_moveonlychecker_consuming_use_here, none,
-     "consuming use", ())
-NOTE(sil_moveonlychecker_consuming_closure_use_here, none,
-     "closure capture", ())
-NOTE(sil_moveonlychecker_nonconsuming_use_here, none,
-     "non-consuming use", ())
-ERROR(sil_moveonlychecker_not_understand_no_implicit_copy, none,
-      "Usage of @noImplicitCopy that the move checker does not know how to "
-      "check!", ())
-ERROR(sil_moveonlychecker_not_understand_moveonly, none,
-      "Usage of a move only type that the move checker does not know how to "
-      "check!", ())
+NOTE(sil_movechecking_discard_self_here, none,
+     "discarded self here", ())
+NOTE(sil_movechecking_partial_consume_here, none,
+     "partially consumed here", ())
+NOTE(sil_movechecking_consuming_use_here, none,
+     "consumed here", ())
+NOTE(sil_movechecking_consumed_again_here, none,
+     "consumed again here", ())
+NOTE(sil_movechecking_two_consuming_uses_here, none,
+     "multiple consumes here", ())
+NOTE(sil_movechecking_consuming_and_non_consuming_uses_here, none,
+     "consumed and used here", ())
+NOTE(sil_movechecking_consuming_closure_use_here, none,
+     "closure capturing '%0' here", (StringRef))
+NOTE(sil_movechecking_nonconsuming_use_here, none,
+     "used here", ())
+NOTE(sil_movechecking_consumed_in_loop_here, none,
+     "consumed in loop here", ())
+NOTE(sil_movechecking_deinit_here, none,
+     "deinitializer declared here", ())
 
-// move kills copyable values checker diagnostics
-ERROR(sil_movekillscopyablevalue_value_consumed_more_than_once, none,
-      "'%0' used after being moved", (StringRef))
-NOTE(sil_movekillscopyablevalue_move_here, none,
-     "move here", ())
-NOTE(sil_movekillscopyablevalue_use_here, none,
-     "use here", ())
-NOTE(sil_movekillscopyablevalue_value_consumed_in_loop, none,
-     "cyclic move here. move will occur multiple times in the loop", ())
+// errors involving noncopyables that are considered to be bugs in the compiler
+ERROR(sil_movechecking_not_understand_consumable_and_assignable, none,
+      "usage of no-implicit-copy value that the compiler can't verify. This is a compiler bug. Please file a bug with a small example of the bug", ())
+ERROR(sil_movechecking_not_understand_moveonly, none,
+      "usage of a noncopyable type that compiler can't verify. This is a compiler bug. Please file a bug with a small example of the bug", ())
+ERROR(sil_movechecking_bug_missed_copy, none,
+      "copy of noncopyable typed value. This is a compiler bug. Please file a bug with a small example of the bug", ())
+ERROR(sil_movechecking_bug_exclusivity_violation, none,
+      "'%0' has an unexpected exclusivity violation. This is a compiler bug. Please file a bug with a small example of the bug", (StringRef))
 ERROR(sil_movekillscopyablevalue_move_applied_to_unsupported_move, none,
-      "_move applied to value that the compiler does not support checking",
+      "'consume' applied to value that the compiler does not support. This is a compiler bug. Please file a bug with a small example of the bug",
       ())
+ERROR(sil_movekillscopyable_move_applied_to_nonlocal_memory, none,
+      "'consume' cannot be applied to %select{globals|escaping captures}0",
+      (unsigned))
+
+
+// Implicit inout-to-UnsafeRawPointer conversions
+WARNING(nontrivial_to_rawpointer_conversion,none,
+        "forming %1 to a variable of type %0; this is likely incorrect because %2 may contain "
+        "an object reference.", (Type, Type, Type))
+
+WARNING(nontrivial_string_to_rawpointer_conversion,none,
+        "forming %0 to an inout variable of type String exposes the internal representation "
+        "rather than the string contents.", (Type))
+
+// MARK: Reference Binding Warnings
+ERROR(sil_referencebinding_unknown_pattern, none,
+      "reference binding that the compiler does not understand how to check. Please file a bug",
+      ())
+ERROR(sil_referencebinding_src_used_within_inout_scope, none,
+      "var bound to inout binding cannot be used within the inout binding's scope",
+      ())
+NOTE(sil_referencebinding_inout_binding_here, none,
+      "inout binding here",
+      ())
+
+//===----------------------------------------------------------------------===//
+//                  MARK: Region-Based Isolation Diagnostics
+//===----------------------------------------------------------------------===//
+
+// READ THIS: Please when adding diagnostics for region-based isolation, keep
+// them ordered in sections depending on which emitter uses it. It makes it
+// easier for people unfamiliar with the code to quickly see which diagnostics
+// are used by which of the SendNonSendable emitters use.
+
+//===
+// Misc
+
+ERROR(regionbasedisolation_unknown_pattern, none,
+      "pattern that the region-based isolation checker does not understand how to check. Please file a bug",
+      ())
+NOTE(regionbasedisolation_maybe_race, none,
+     "access can happen concurrently", ())
+NOTE(regionbasedisolation_type_is_non_sendable, none,
+      "%0 is a non-Sendable type",
+      (Type))
+
+//===
+// Use After Send Emitter
+
+GROUPED_ERROR(regionbasedisolation_named_send_yields_race,
+      SendingRisksDataRace, none,
+      "sending %0 risks causing data races",
+      (Identifier))
+GROUPED_ERROR(regionbasedisolation_type_send_yields_race, SendingRisksDataRace, none,
+      "sending value of non-Sendable type %0 risks causing data races",
+      (Type))
+NOTE(regionbasedisolation_type_use_after_send, none,
+      "sending value of non-Sendable type %0 to %1 callee risks causing data races between %1 and local %2 uses",
+      (Type, ActorIsolation, ActorIsolation))
+NOTE(regionbasedisolation_type_use_after_send_callee, none,
+     "sending value of non-Sendable type %0 to %1 %kind2 risks causing data "
+     "races between %1 and local %3 uses",
+     (Type, ActorIsolation, const ValueDecl *, ActorIsolation))
+
+NOTE(regionbasedisolation_named_info_send_yields_race, none,
+     "sending %1%0 to %2 callee risks causing data races between %2 and local %3 uses",
+     (Identifier, StringRef, ActorIsolation, ActorIsolation))
+NOTE(regionbasedisolation_named_info_send_yields_race_callee, none,
+     "sending %1%0 to %2 %kind3 risks causing data races between %2 and local %4 uses",
+     (Identifier, StringRef, ActorIsolation, const ValueDecl *, ActorIsolation))
+
+// Use after send closure.
+NOTE(regionbasedisolation_type_isolated_capture_yields_race, none,
+      "sending value of non-Sendable type %0 to %1 closure due to closure capture risks causing races in between %1 and %2 uses",
+      (Type, ActorIsolation, ActorIsolation))
+
+// Value captured in async let and reused.
+NOTE(regionbasedisolation_named_nonisolated_asynclet_name, none,
+      "sending %0 into async let risks causing data races between async let uses and local uses",
+      (Identifier))
+
+NOTE(regionbasedisolation_named_value_used_after_explicit_sending, none,
+      "%0 used after being passed as a 'sending' parameter; Later uses could race",
+      (Identifier))
+NOTE(regionbasedisolation_named_isolated_closure_yields_race, none,
+      "%0%1 is captured by a %2 closure. %2 uses in closure may race against later %3 uses",
+      (StringRef, Identifier, ActorIsolation, ActorIsolation))
+
+NOTE(regionbasedisolation_typed_use_after_sending, none,
+      "Passing value of non-Sendable type %0 as a 'sending' argument risks causing races in between local and caller code",
+      (Type))
+NOTE(regionbasedisolation_typed_use_after_sending_callee, none,
+      "Passing value of non-Sendable type %0 as a 'sending' argument to %kind1 risks causing races in between local and caller code",
+      (Type, const ValueDecl *))
+
+//===
+// Sending Never Sendable Emitter
+
+NOTE(regionbasedisolation_named_send_never_sendable, none,
+      "sending %1%0 to %2 callee risks causing data races between %2 and %3 uses",
+      (Identifier, StringRef, ActorIsolation, StringRef))
+NOTE(regionbasedisolation_named_send_never_sendable_callee, none,
+      "sending %1%0 to %2 %kind3 risks causing data races between %2 and %4 uses",
+      (Identifier, StringRef, ActorIsolation, const ValueDecl *, StringRef))
+
+NOTE(regionbasedisolation_named_send_into_sending_param, none,
+     "%0%1 is passed as a 'sending' parameter; Uses in callee may race with "
+     "later %0uses",
+     (StringRef, Identifier))
+NOTE(regionbasedisolation_named_nosend_send_into_result, none,
+     "%0%1 cannot be a 'sending' result. %2 uses may race with caller uses",
+     (StringRef, Identifier, StringRef))
+NOTE(regionbasedisolation_typed_tns_passed_to_sending, none,
+     "Passing %0 value of non-Sendable type %1 as a 'sending' parameter risks "
+     "causing races inbetween %0 uses and uses reachable from the callee",
+     (StringRef, Type))
+
+ERROR(regionbasedisolation_typed_tns_passed_sending_closure, none,
+     "passing closure as a 'sending' parameter risks causing data races between %0 and concurrent execution of the closure",
+     (StringRef))
+NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_value, none,
+     "closure captures %0 %1",
+     (StringRef, DeclName))
+NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_value_task_isolated, none,
+     "closure captures %0 which is accessible to code in the current task",
+     (DeclName))
+NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_boxed_value_task_isolated, none,
+     "closure captures reference to mutable %kind0 which is accessible to code in the current task",
+     (const ValueDecl *))
+NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_value_region, none,
+     "closure captures %1 which is accessible to %0 code",
+     (StringRef, DeclName))
+
+NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_multiple_value, none,
+     "closure captures non-Sendable %0",
+     (DeclName))
+NOTE(regionbasedisolation_closure_captures, none,
+     "closure captures %0",
+     (DeclName))
+NOTE(regionbasedisolation_closure_captures_actor, none,
+     "closure captures %0 allowing access to %1 state within the closure",
+     (DeclName, StringRef))
+
+NOTE(regionbasedisolation_typed_tns_passed_to_sending_callee, none,
+     "Passing %0 value of non-Sendable type %1 as a 'sending' parameter to %kind2 risks causing races inbetween %0 uses and uses reachable from %2",
+     (StringRef, Type, const ValueDecl *))
+
+NOTE(regionbasedisolation_named_send_nt_asynclet_capture, none,
+      "sending %1 %0 into async let risks causing data races between nonisolated and %1 uses",
+      (Identifier, StringRef))
+NOTE(regionbasedisolation_typed_sendneversendable_via_arg, none,
+      "sending %0 value of non-Sendable type %1 to %2 callee risks causing races in between %0 and %2 uses",
+      (StringRef, Type, ActorIsolation))
+NOTE(regionbasedisolation_typed_sendneversendable_via_arg_callee, none,
+      "sending %0 value of non-Sendable type %1 to %2 %kind3 risks causing races in between %0 and %2 uses",
+      (StringRef, Type, ActorIsolation, const ValueDecl *))
+
+// Error that is only used when the send non sendable emitter cannot discover any
+// information to give a better diagnostic.
+ERROR(regionbasedisolation_task_or_actor_isolated_sent, none,
+      "task or actor-isolated value cannot be sent", ())
+
+//===
+// InOut Sending Emitter
+
+NOTE(regionbasedisolation_inout_sending_must_be_reinitialized, none,
+     "'inout sending' parameter must be reinitialized before function exit with a non-actor-isolated value",
+     ())
+ERROR(regionbasedisolation_inout_sending_cannot_be_actor_isolated, none,
+      "'inout sending' parameter %0 cannot be %1at end of function",
+      (Identifier, StringRef))
+NOTE(regionbasedisolation_inout_sending_cannot_be_actor_isolated_note, none,
+      "%1%0 risks causing races in between %1uses and caller uses since caller assumes value is not actor isolated",
+      (Identifier, StringRef))
+
+//===
+// Out Sending
+
+ERROR(regionbasedisolation_out_sending_cannot_be_actor_isolated_type, none,
+      "returning a %1 %0 value as a 'sending' result risks causing data races",
+      (Type, StringRef))
+NOTE(regionbasedisolation_out_sending_cannot_be_actor_isolated_note_type, none,
+      "returning a %1 %0 value risks causing races since the caller assumes the value can be safely sent to other isolation domains",
+      (Type, StringRef))
+ERROR(regionbasedisolation_out_sending_cannot_be_actor_isolated_named, none,
+      "returning %1 %0 as a 'sending' result risks causing data races",
+      (Identifier, StringRef))
+NOTE(regionbasedisolation_out_sending_cannot_be_actor_isolated_note_named, none,
+      "returning %1 %0 risks causing data races since the caller assumes that %0 can be safely sent to other isolation domains",
+      (Identifier, StringRef))
+
+//===
+// non-Sendable Results
+
+// Example: returning main-actor isolated result to a custom-actor isolated context risks causing data races
+ERROR(rbi_isolation_crossing_result, none,
+      "non-Sendable %0-typed result can not be returned from %1 %kind2 to %3 context",
+      (Type, ActorIsolation, const ValueDecl *, ActorIsolation))
+ERROR(rbi_isolation_crossing_result_no_decl, none,
+      "non-Sendable %0-typed result can not be returned from %1 function to %2 context",
+      (Type, ActorIsolation, ActorIsolation))
+NOTE(rbi_non_sendable_nominal,none,
+     "%kind0 does not conform to the 'Sendable' protocol",
+      (const ValueDecl *))
+NOTE(rbi_nonsendable_function_type,none,
+     "a function type must be marked '@Sendable' to conform to 'Sendable'", ())
+NOTE(rbi_add_nominal_sendable_conformance,none,
+     "consider making %kind0 conform to the 'Sendable' protocol",
+     (const ValueDecl *))
+NOTE(rbi_add_generic_parameter_sendable_conformance,none,
+     "consider making generic parameter %0 conform to the 'Sendable' protocol",
+     (Type))
+
+// Concurrency related diagnostics
+ERROR(cannot_find_executor_factory_type, none,
+      "the DefaultExecutorFactory type could not be found", ())
+ERROR(executor_factory_must_conform, none,
+      "the DefaultExecutorFactory does not conform to 'ExecutorFactory'", ())
+
+//===----------------------------------------------------------------------===//
+//                           MARK: Misc Diagnostics
+//===----------------------------------------------------------------------===//
+
+// TODO: print the name of the nominal type
+ERROR(deinit_not_visible, none,
+      "deinit of non-copyable type not visible in the current module", ())
+
+ERROR(lifetime_variable_outside_scope, none,
+      "lifetime-dependent variable '%0' escapes its scope", (Identifier))
+ERROR(lifetime_value_outside_scope, none,
+      "lifetime-dependent value escapes its scope", ())
+ERROR(lifetime_value_outside_accessor, none,
+      "lifetime-dependent value returned by generated accessor '%0'", (StringRef))
+ERROR(lifetime_value_outside_thunk, none,
+      "lifetime-dependent value returned by generated %select{function|thunk}0 '%1'", (bool, StringRef))
+NOTE(lifetime_outside_scope_argument, none,
+     "it depends on the lifetime of argument '%0'", (Identifier))
+NOTE(lifetime_outside_scope_synthesized_argument, none,
+     "it depends on the lifetime of an argument of '%0'", (Identifier))
+NOTE(lifetime_outside_scope_access, none,
+     "it depends on this scoped access to variable '%0'", (Identifier))
+NOTE(lifetime_outside_scope_variable, none,
+     "it depends on the lifetime of variable '%0'", (Identifier))
+NOTE(lifetime_outside_scope_value, none,
+     "it depends on the lifetime of this parent value", ())
+NOTE(lifetime_outside_scope_capture, none,
+     "it depends on a closure capture; this is not yet supported", ())
+NOTE(lifetime_outside_scope_use, none,
+     "this use of the lifetime-dependent value is out of scope", ())
+NOTE(lifetime_outside_scope_escape, none,
+     "this use causes the lifetime-dependent value to escape", ())
+
+ERROR(noncopyable_shared_case_block_unimplemented, none,
+      "matching a non-'Copyable' value using a case label that has multiple patterns is not implemented", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

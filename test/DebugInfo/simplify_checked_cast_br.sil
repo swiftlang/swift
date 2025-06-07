@@ -1,0 +1,39 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -simplification -simplify-instruction=checked_cast_br -sil-print-debuginfo | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+import Swift
+import Builtin
+
+protocol P : AnyObject {}
+class B : P {}
+class X : B {}
+
+// CHECK-LABEL: sil [ossa] @test_ossa :
+// CHECK:         %0 = alloc_ref
+// CHECK-NEXT:  checked_cast_br X in %0 : $X
+// CHECK:     bb2([[A:%.*]] : @owned $X):
+// CHECK-NEXT:  [[U:%.*]] = upcast [[A]] : $X to $B, loc "takethis":1:1
+// CHECK-NEXT:  [[E:%.*]] = init_existential_ref [[U]] {{.+}}, loc "takethis":1:1
+// CHECK-NEXT:  debug_value [[E]] : $AnyObject, let, name "me", loc "ignore-this-meta-inst":1:1
+// CHECK-NEXT:  destroy_value [[E]] : $AnyObject, loc "takethis":1:1
+// CHECK:       } // end sil function 'test_ossa'
+sil [ossa] @test_ossa : $@convention(thin) () -> @owned X {
+bb0:
+  %0 = alloc_ref $X
+  %1 = upcast %0 : $X to $B
+  %2 = init_existential_ref %1 : $B : $B, $AnyObject
+  debug_value %2 : $AnyObject, name "x"
+  checked_cast_br AnyObject in %2 : $AnyObject to X, bb1, bb2
+
+bb1(%5 : @owned $X):
+  return %5 : $X
+
+bb2(%7 : @owned $AnyObject):
+  debug_value %7 : $AnyObject, let, name "me", loc "ignore-this-meta-inst":1:1
+  destroy_value %7: $AnyObject, loc "takethis":1:1
+  unreachable
+}
+
+sil_vtable X {
+}

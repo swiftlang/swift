@@ -16,6 +16,7 @@
 
 extension Set where Element == AnyHashable {
   @inlinable
+  @discardableResult
   public mutating func insert<ConcreteElement: Hashable>(
     _ newMember: __owned ConcreteElement
   ) -> (inserted: Bool, memberAfterInsert: ConcreteElement) {

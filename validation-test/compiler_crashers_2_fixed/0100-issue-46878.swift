@@ -1,7 +1,5 @@
 // RUN: not %target-swift-frontend -emit-ir -primary-file %s
 
-// REQUIRES: asserts
-
 // https://github.com/apple/swift/issues/46878
 
 internal protocol _UTFEncoding {

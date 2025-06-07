@@ -1,0 +1,43 @@
+// RUN: %target-swift-frontend -module-name access_markers -swift-version 4 -enforce-exclusivity=checked %s -emit-ir | %FileCheck %s --check-prefix=CHECK
+// WebAssembly does not support llvm.returnaddress.
+// UNSUPPORTED: CPU=wasm32
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class A {
+  @_hasStorage var property: Int64 { get set }
+  @_hasStorage var exProperty: Any { get set }
+  deinit
+  init()
+}
+
+// CHECK-DAG: [[C:%T14access_markers1AC]] = type
+
+sil_vtable A {}
+
+// CHECK-LABEL: define {{.*}}void @testUnpairedExternal(
+sil @testUnpairedExternal : $(@guaranteed A, @inout Builtin.UnsafeValueBuffer) -> () {
+bb0(%0 : $A, %1 : $*Builtin.UnsafeValueBuffer):
+  // CHECK:      [[PROPERTY:%.*]] = getelementptr inbounds{{.*}} [[C]], ptr %0, i32 0, i32 1
+  %2 = ref_element_addr %0 : $A, #A.property
+
+  // CHECK-NEXT: [[PC:%.*]] = call ptr @llvm.returnaddress(i32 0)
+  // CHECK-NEXT: call void @swift_beginAccess(ptr [[PROPERTY]], ptr [[SCRATCH:%1]], [[SIZE:i(32|64)]] 33, ptr [[PC]])
+  begin_unpaired_access [modify] [dynamic] %2 : $*Int64, %1 : $*Builtin.UnsafeValueBuffer
+
+  // CHECK-NEXT: call void @swift_endAccess(ptr [[SCRATCH]])
+  end_unpaired_access [dynamic] %1 : $*Builtin.UnsafeValueBuffer
+
+  // CHECK-NEXT: [[PC:%.*]] = call ptr @llvm.returnaddress(i32 0)
+  // CHECK-NEXT: call void @swift_beginAccess(ptr [[PROPERTY]], ptr [[SCRATCH]], [[SIZE]] 32, ptr [[PC]])
+  begin_unpaired_access [read] [dynamic] %2 : $*Int64, %1 : $*Builtin.UnsafeValueBuffer
+
+  // CHECK-NEXT: call void @swift_endAccess(ptr [[SCRATCH]])
+  end_unpaired_access [dynamic] %1 : $*Builtin.UnsafeValueBuffer
+
+  %20 = tuple ()
+  return %20 : $()
+}

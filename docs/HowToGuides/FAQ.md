@@ -18,9 +18,9 @@ The general idea is to build as little as you can.
   aren't doing so already.
 - Use `build-script`'s various `--skip-*` flags to skip configuring for
   platforms that you do not care about.
-- If you're on macOS, use `--swift-darwin-supported-archs="x86_64"`.
-- Use a release build without assertions (`--release --no-assertions`).
-  While debuginfo and assertions are valuable to enable when working on the
+- If you're on macOS, use `--swift-darwin-supported-archs "$(uname -m)"`.
+- Build the release variant without assertions (`--release --no-assertions`).
+  While debug info and assertions are valuable to enable when working on the
   toolchain itself, they are not so useful if you are working only on changes
   to the build system.
 
@@ -99,7 +99,7 @@ This compiles the `.rst` files in the `docs` directory into HTML in the
 
 For the Markdown documentation, you can view the rendered HTML directly on
 GitHub. For example, this file is rendered on GitHub at
-https://github.com/apple/swift/tree/main/docs/HowToGuides/FAQ.md .
+https://github.com/swiftlang/swift/tree/main/docs/HowToGuides/FAQ.md .
 
 HTML documentation for the standard library on Darwin platforms is hosted on the
 [Apple Developer website](https://developer.apple.com/documentation/swift/swift_standard_library).
@@ -133,5 +133,49 @@ git rebase --continue
 
 ### How do I clean up my git history?
 
-TODO: Link to a beginner-friendly external resource, or (less preferably)
-describe basic usage of rebase here.
+Git's history can sometimes become cluttered with many small commits. 
+Fortunately, Git has a feature called `rebase` that allows you to clean up your commit history. 
+If you want to learn more, 
+[GitHub - About Git rebase](https://docs.github.com/en/get-started/using-git/about-git-rebase) 
+provides a comprehensive overview of `rebase`.
+
+> **Warning**
+We suggest considering to `rebase` only those commits that haven't been pushed to a public branch. 
+Rebasing existing commits would block merging because we don't allow force pushes to the repository.
+If you need to tidy up commits that have already been pushed, 
+it's generally better to use `git revert` for the sake of avoid causing confusion for other developers.
+
+
+Here's a small gist that goes through the basics on how to use it:
+
+1. Begin an interactive rebase: Use `git rebase -i HEAD~N`, where `N` is the number of commits 
+   from the latest one you want to edit. This will open a text editor, 
+   listing the last `N` commits with the word "pick" next to each one.
+
+   ```sh
+   git rebase -i HEAD~N
+   ```
+   
+2. Edit the commits: Replace "pick" with the operation you want to perform on the commit:
+
+   - `reword`: Change the commit message.
+   - `edit`: Amend the commit.
+   - `squash`: Combine the commit with the previous one.
+   - `fixup`: Similar to `squash`, but discard this commit's log message.
+   - `drop`: Remove the commit.
+
+3. Save and exit: After saving and closing the file, git will execute each operation. 
+   If you selected `reword`, `edit`, or `squash`, git will pause and give you a chance
+   to alter the commit message or the commit itself.
+
+   ```sh
+   git commit --amend
+   ```
+
+4. Continue the rebase: Once you're done with each commit, you can continue the rebase 
+   using `git rebase --continue`. If you want to abort the rebase at any point, 
+   you can use `git rebase --abort`.
+
+   ```sh
+   git rebase --continue
+   ```

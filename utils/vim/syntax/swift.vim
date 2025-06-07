@@ -16,6 +16,7 @@ if exists("b:current_syntax")
 endif
 
 syn keyword swiftKeyword
+      \ await
       \ break
       \ case
       \ catch
@@ -47,6 +48,7 @@ syn keyword swiftImport skipwhite skipempty nextgroup=swiftImportModule
       \ import
 
 syn keyword swiftDefinitionModifier
+      \ async
       \ convenience
       \ dynamic
       \ fileprivate
@@ -59,6 +61,7 @@ syn keyword swiftDefinitionModifier
       \ prefix
       \ private
       \ public
+      \ reasync
       \ required
       \ rethrows
       \ static
@@ -177,9 +180,9 @@ syn region swiftString contains=swiftInterpolationRegion
       \ start=/"/ skip=/\\\\\|\\"/ end=/"/
 syn region swiftInterpolationRegion contained contains=TOP
       \ matchgroup=swiftInterpolation start=/\\(/ end=/)/
-syn region swiftComment contains=swiftComment,swiftLineComment,swiftTodo
+syn region swiftComment contains=swiftComment,swiftTodo
       \ start="/\*" end="\*/"
-syn region swiftLineComment contains=swiftComment,swiftTodo
+syn region swiftLineComment contains=swiftTodo
       \ start="//" end="$"
 
 syn match swiftDecimal
@@ -204,6 +207,9 @@ syn match swiftTupleIndexNumber contains=swiftDecimal
 syn match swiftDecimal contained
       \ /[0-9]\+/
 
+" This is a superset of the Preproc macros below, so it must come FIRST
+syn match swiftFreestandingMacro
+      \ /#\<[A-Za-z_][A-Za-z_0-9]*\>/
 syn match swiftPreproc
       \ /#\(\<column\>\|\<dsohandle\>\|\<file\>\|\<line\>\|\<function\>\)/
 syn match swiftPreproc
@@ -268,6 +274,7 @@ hi def link swiftLabel Operator
 hi def link swiftMutating Statement
 hi def link swiftPreproc PreCondit
 hi def link swiftPreprocFalse Comment
+hi def link swiftFreestandingMacro Macro
 hi def link swiftAttribute Type
 hi def link swiftTodo Todo
 hi def link swiftNil Constant

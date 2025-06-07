@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-build-swift -module-name main  -Xfrontend -disable-availability-checking -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-5.7-abi-triple %S/../Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-build-swift -module-name main  -target %target-swift-5.7-abi-triple -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
 // RUN: %target-codesign %t/a.out
-// RUN: %target-run %t/a.out | %FileCheck %s --color
+// RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -21,6 +21,7 @@ import FakeDistributedActorSystems
 typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
 
 protocol Greeting: DistributedActor {
+// protocol Greeting: DistributedActor where ActorSystem: DistributedActorSystem<any Codable> {
   distributed func greeting() -> String
   distributed func greetingAsyncThrows() async throws -> String
 }
@@ -35,7 +36,7 @@ extension Greeting {
   }
 }
 
-extension Greeting where SerializationRequirement == Codable {
+extension Greeting where ActorSystem: DistributedActorSystem<any Codable> {
   // okay, uses Codable to transfer arguments.
   distributed func greetDistributed(name: String) async throws {
     // okay, we're on the actor
@@ -53,10 +54,11 @@ extension Greeting where SerializationRequirement == Codable {
   }
 }
 
-extension Greeting where SerializationRequirement == Codable {
+extension Greeting where ActorSystem: DistributedActorSystem<any Codable> {
   nonisolated func greetAliceALot() async throws {
     try await greetDistributed(name: "Alice") // okay, via Codable
     let rawGreeting = try await greeting() // okay, via Self's serialization requirement
+    print("rawGreeting = \(rawGreeting)")
     // greetLocal(name: "Alice") // would be error: only 'distributed' instance methods can be called on a potentially remote distributed actor}}
   }
 }

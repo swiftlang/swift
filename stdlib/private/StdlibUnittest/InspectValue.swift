@@ -16,7 +16,7 @@ public enum SwiftRuntime {
   private static func _metadataKind<T>(of value: T) -> UnsafePointer<CChar>
 
   public static func metadataKind<T>(of value: T) -> String {
-    return String(validatingUTF8: _metadataKind(of: value))!
+    return String(validatingCString: _metadataKind(of: value))!
   }
 }
 

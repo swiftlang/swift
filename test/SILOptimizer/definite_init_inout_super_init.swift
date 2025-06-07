@@ -1,4 +1,4 @@
-// RUN: %target-swiftc_driver -Xfrontend -disable-sil-ownership-verifier -emit-sil %s -o /dev/null -Xfrontend -verify
+// RUN: %target-swiftc_driver -emit-sil %s -o /dev/null -Xfrontend -verify
 
 // TODO: Change this back to using target-swift-frontend once we move errors to
 // type checker and SILGen.
@@ -15,7 +15,7 @@ class A : B {
 
   init() {
     self.x = 12
-    super.init(x: &x) // expected-error {{immutable value 'self.x' must not be passed inout}}
+    super.init(x: &x) // expected-error {{cannot pass immutable value as inout argument: 'x' is a 'let' constant}}
   }
 }
 
@@ -24,7 +24,7 @@ class C : B {
 
   init() {
     self.x = Klass()
-    super.init(x: &x) // expected-error {{immutable value 'self.x' must not be passed inout}}
+    super.init(x: &x) // expected-error {{cannot pass immutable value as inout argument: 'x' is a 'let' constant}}
   }
 }
 

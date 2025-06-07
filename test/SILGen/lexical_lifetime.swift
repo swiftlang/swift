@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-lexical-lifetimes -module-name borrow -parse-stdlib %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -enable-lexical-lifetimes -module-name borrow -parse-stdlib %s | %FileCheck %s
 
 import Swift
 
@@ -26,6 +26,10 @@ enum E {
 @_silgen_name("use_generic")
 func use_generic<T>(_ t: T) {}
 
+struct NonlexicalBox<X> {
+  @_eagerMove var x: X
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Declarations                                                               }}
 ////////////////////////////////////////////////////////////////////////////////
@@ -40,8 +44,8 @@ func use_generic<T>(_ t: T) {}
 // CHECK-LABEL: sil hidden [ossa] @lexical_borrow_let_class
 // CHECK:   [[INIT_C:%[^,]+]] = function_ref @$s6borrow1CCACycfC
 // CHECK:   [[INSTANCE:%[^,]+]] = apply [[INIT_C]]({{%[0-9]+}})
-// CHECK:   [[BORROW:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]] : $C
-// CHECK:   end_borrow [[BORROW:%[^,]+]]
+// CHECK:   [[MOVE:%[^,]+]] = move_value [lexical] [var_decl] [[INSTANCE]] : $C
+// CHECK:   destroy_value [[MOVE:%[^,]+]]
 // CHECK-LABEL: } // end sil function 'lexical_borrow_let_class'
 @_silgen_name("lexical_borrow_let_class")
 func lexical_borrow_let_class() {
@@ -53,8 +57,8 @@ func lexical_borrow_let_class() {
 // CHECK:   [[INSTANCE:%[^,]+]] = apply [[INIT_C]]({{%[^,]+}})
 // CHECK:   switch_enum [[INSTANCE]] : $Optional<C>, case #Optional.some!enumelt: [[BASIC_BLOCK2:bb[^,]+]], case #Optional.none!enumelt: {{bb[^,]+}}
 // CHECK: [[BASIC_BLOCK2]]([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:   [[BORROW:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]] : $C
-// CHECK:   end_borrow [[BORROW]] : $C
+// CHECK:   [[MOVE:%[^,]+]] = move_value [lexical] [var_decl] [[INSTANCE]] : $C
+// CHECK:   destroy_value [[MOVE:%[^,]+]]
 // CHECK-LABEL: // end sil function 'lexical_borrow_if_let_class'
 @_silgen_name("lexical_borrow_if_let_class")
 func lexical_borrow_if_let_class() {
@@ -66,8 +70,8 @@ func lexical_borrow_if_let_class() {
 // CHECK-LABEL: sil hidden [ossa] @lexical_borrow_let_class_in_struct
 // CHECK:   [[INIT_S:%[^,]+]] = function_ref @$s6borrow1SV1cAcA1CC_tcfC
 // CHECK:   [[INSTANCE:%[^,]+]] = apply [[INIT_S]]({{%[0-9]+}}, {{%[0-9]+}})
-// CHECK:   [[BORROW:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]] : $S
-// CHECK:   end_borrow [[BORROW:%[^,]+]]
+// CHECK:   [[MOVE:%[^,]+]] = move_value [lexical] [var_decl] [[INSTANCE]]
+// CHECK:   destroy_value [[MOVE:%[^,]+]]
 // CHECK-LABEL: } // end sil function 'lexical_borrow_let_class_in_struct'
 @_silgen_name("lexical_borrow_let_class_in_struct")
 func lexical_borrow_let_class_in_struct() {
@@ -76,8 +80,8 @@ func lexical_borrow_let_class_in_struct() {
 
 // CHECK-LABEL: sil hidden [ossa] @lexical_borrow_let_class_in_enum
 // CHECK:   [[INSTANCE:%[^,]+]] = enum $E, #E.e!enumelt, {{%[0-9]+}} : $C
-// CHECK:   [[BORROW:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]] : $E
-// CHECK:   end_borrow [[BORROW:%[^,]+]]
+// CHECK:   [[MOVE:%[^,]+]] = move_value [lexical] [var_decl] [[INSTANCE]]
+// CHECK:   destroy_value [[MOVE:%[^,]+]]
 // CHECK-LABEL: } // end sil function 'lexical_borrow_let_class_in_enum'
 @_silgen_name("lexical_borrow_let_class_in_enum")
 func lexical_borrow_let_class_in_enum() {
@@ -146,6 +150,8 @@ extension C {
   __consuming
   func eagermove_method_attr() {}
 }
+
+func f<T>() -> (NonlexicalBox<T>) {}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Test                                                                       }}

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -117,7 +117,7 @@ public protocol RawRepresentable<RawValue> {
   ///     }
   ///
   ///     print(PaperSize(rawValue: "Legal"))
-  ///     // Prints "Optional("PaperSize.Legal")"
+  ///     // Prints "Optional(PaperSize.Legal)"
   ///
   ///     print(PaperSize(rawValue: "Tabloid"))
   ///     // Prints "nil"
@@ -149,6 +149,7 @@ public protocol RawRepresentable<RawValue> {
 ///   - lhs: A raw-representable instance.
 ///   - rhs: A second raw-representable instance.
 @inlinable // trivial-implementation
+@_semantics("rawrepresentable.is_equal")
 public func == <T: RawRepresentable>(lhs: T, rhs: T) -> Bool
   where T.RawValue: Equatable {
   return lhs.rawValue == rhs.rawValue
@@ -266,8 +267,9 @@ public protocol CaseIterable {
 /// `Optional` type conforms to `ExpressibleByNilLiteral`.
 /// `ExpressibleByNilLiteral` conformance for types that use `nil` for other
 /// purposes is discouraged.
-public protocol ExpressibleByNilLiteral {
+public protocol ExpressibleByNilLiteral: ~Copyable, ~Escapable {
   /// Creates an instance initialized with `nil`.
+  @lifetime(immortal)
   init(nilLiteral: ())
 }
 
@@ -658,7 +660,7 @@ public protocol ExpressibleByArrayLiteral {
 ///
 ///     let countryCodes = ["BR": "Brazil", "GH": "Ghana",
 ///                         "JP": "Japan", "US": "United States"]
-///     // 'countryCodes' has type [String: String]
+///     // 'countryCodes' has type '[String: String]'
 ///
 ///     print(countryCodes["BR"]!)
 ///     // Prints "Brazil"
@@ -765,6 +767,7 @@ public protocol ExpressibleByDictionaryLiteral {
 public protocol ExpressibleByStringInterpolation
   : ExpressibleByStringLiteral {
   
+#if !$Embedded
   /// The type each segment of a string literal containing interpolations
   /// should be appended to.
   ///
@@ -773,6 +776,10 @@ public protocol ExpressibleByStringInterpolation
   associatedtype StringInterpolation: StringInterpolationProtocol
     = DefaultStringInterpolation
     where StringInterpolation.StringLiteralType == StringLiteralType
+#else
+  associatedtype StringInterpolation: StringInterpolationProtocol
+    where StringInterpolation.StringLiteralType == StringLiteralType
+#endif
 
   /// Creates an instance from a string interpolation.
   /// 
@@ -940,6 +947,7 @@ public protocol _ExpressibleByColorLiteral {
 
 /// A type that can be initialized using an image literal (e.g.
 /// `#imageLiteral(resourceName: "hi.png")`).
+@_unavailableInEmbedded
 public protocol _ExpressibleByImageLiteral {
   /// Creates an instance initialized with the given resource name.
   ///
@@ -950,6 +958,7 @@ public protocol _ExpressibleByImageLiteral {
 
 /// A type that can be initialized using a file reference literal (e.g.
 /// `#fileLiteral(resourceName: "resource.txt")`).
+@_unavailableInEmbedded
 public protocol _ExpressibleByFileReferenceLiteral {
   /// Creates an instance initialized with the given resource name.
   ///

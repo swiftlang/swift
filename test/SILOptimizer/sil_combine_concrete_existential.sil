@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all %s -sil-combine -sil-print-generic-specialization-info | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enable-sil-verify-all %s -sil-combine -sil-print-generic-specialization-info | %FileCheck %s
 // RUN: %target-swift-frontend -O %s -emit-ir
 
 // REQUIRES: swift_in_compiler
@@ -660,21 +660,20 @@ extension MyObject : SubscriptionViewControllerDelegate { }
 
 sil @callee2 : $@convention(thin) <τ_0_0 where τ_0_0 : SubscriptionViewControllerDelegate> (@in τ_0_0, @thick SubscriptionViewControllerBuilder.Type) -> @owned SubscriptionViewControllerBuilder
 
-// CHECK: sil @test_opend_archetype_concrete_conformance_substitution : $@convention(method) (@guaranteed any ResourceKitProtocol, @guaranteed ViewController) -> () {
+// CHECK: sil @test_opened_archetype_concrete_conformance_substitution : $@convention(method) (@guaranteed any ResourceKitProtocol, @guaranteed ViewController) -> () {
 // CHECK: bb0([[ARG:%.*]] : $any ResourceKitProtocol, [[ARG2:%.*]] : $ViewController):
 // CHECK:   [[T1:%.*]] = metatype $@thick SubscriptionViewControllerBuilder.Type
 // CHECK:   [[T2:%.*]] = open_existential_ref [[ARG]] : $any ResourceKitProtocol to $@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122", any ResourceKitProtocol) Self
-// CHECK:   [[T3:%.*]] = alloc_stack $any SubscriptionViewControllerDelegate
-// CHECK:   [[T4:%.*]] = init_existential_addr [[T3]] : $*any SubscriptionViewControllerDelegate, $@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122", any ResourceKitProtocol) Self
+// CHECK:   [[T4:%.*]] = alloc_stack $@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122"
 // CHECK:   store [[T2]] to [[T4]] : $*@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122", any ResourceKitProtocol) Self
 // CHECK:   [[T5:%.*]] = function_ref @callee2 : $@convention(thin) <τ_0_0 where τ_0_0 : SubscriptionViewControllerDelegate> (@in τ_0_0, @thick SubscriptionViewControllerBuilder.Type) -> @owned SubscriptionViewControllerBuilder
 // CHECK:   [[T6:%.*]] = alloc_stack $@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122", any ResourceKitProtocol) Self
 // CHECK:   copy_addr [[T4]] to [init] [[T6]] : $*@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122", any ResourceKitProtocol) Self
-// CHECK: Generic specialization information for call-site callee2 <ResourceKitProtocol> conformances <(inherited_conformance type=ResourceKitProtocol protocol=SubscriptionViewControllerDelegate
-// CHECK:  (normal_conformance type=MyObject protocol=SubscriptionViewControllerDelegate))>:
+// CHECK: Generic specialization information for call-site callee2 <any ResourceKitProtocol> conformances <(inherited_conformance type="any ResourceKitProtocol" protocol="SubscriptionViewControllerDelegate"
+// CHECK:  (normal_conformance type="MyObject" protocol="SubscriptionViewControllerDelegate"
 // CHECK:   apply [[T5]]<@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122", any ResourceKitProtocol) Self>([[T6]], [[T1]])
 
-sil @test_opend_archetype_concrete_conformance_substitution : $@convention(method) (@guaranteed ResourceKitProtocol, @guaranteed ViewController) -> () {
+sil @test_opened_archetype_concrete_conformance_substitution : $@convention(method) (@guaranteed ResourceKitProtocol, @guaranteed ViewController) -> () {
 bb0(%0 : $ResourceKitProtocol, %1 : $ViewController):
   %4 = metatype $@thick SubscriptionViewControllerBuilder.Type
   %5 = open_existential_ref %0 : $ResourceKitProtocol to $@opened("E4D92D2A-8893-11EA-9C89-ACDE48001122", ResourceKitProtocol) Self

@@ -71,6 +71,14 @@ SWIFT_RUNTIME_STDLIB_API void
 swift_willThrow(SWIFT_CONTEXT void *unused,
                 SWIFT_ERROR_RESULT SwiftError **object);
 
+/// Called when throwing a typed error.  Serves as a breakpoint hook
+/// for debuggers.
+SWIFT_CC(swift)
+SWIFT_RUNTIME_STDLIB_API void
+swift_willThrowTypedImpl(OpaqueValue *value,
+                         const Metadata *type,
+                         const WitnessTable *errorConformance);
+
 /// Called when an error is thrown out of the top level of a script.
 SWIFT_CC(swift)
 SWIFT_RUNTIME_STDLIB_API SWIFT_NORETURN void

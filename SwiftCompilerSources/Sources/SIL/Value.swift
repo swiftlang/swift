@@ -13,6 +13,7 @@
 import Basic
 import SILBridging
 
+@_semantics("arc.immortal")
 public protocol Value : AnyObject, CustomStringConvertible {
   var uses: UseList { get }
   var type: Type { get }
@@ -24,15 +25,20 @@ public protocol Value : AnyObject, CustomStringConvertible {
   var definingInstruction: Instruction? { get }
   
   /// The block where the value is defined.
-  ///
-  /// It's not legal to get the definingBlock of an `Undef` value.
   var parentBlock: BasicBlock { get }
+
+  /// The function where the value lives in.
+  ///
+  /// It's not legal to get the parentFunction of an instruction in a global initializer.
+  var parentFunction: Function { get }
 
   /// True if the value has a trivial type.
   var hasTrivialType: Bool { get }
 
   /// True if the value has a trivial type which is and does not contain a Builtin.RawPointer.
   var hasTrivialNonPointerType: Bool { get }
+
+  var isLexical: Bool { get }
 }
 
 public enum Ownership {
@@ -74,30 +80,48 @@ public enum Ownership {
   /// points in the SSA graph, where more information about the value is
   /// statically available on some control flow paths.
   case none
-  
-  public var _bridged: BridgedOwnership {
+
+  public var hasLifetime: Bool {
     switch self {
-      case .unowned:    return Ownership_Unowned
-      case .owned:      return Ownership_Owned
-      case .guaranteed: return Ownership_Guaranteed
-      case .none:       return Ownership_None
+    case .owned, .guaranteed:
+      return true
+    case .unowned, .none:
+      return false
+    }
+  }
+
+  public init(bridged: BridgedValue.Ownership) {
+    switch bridged {
+    case .Unowned:    self = .unowned
+    case .Owned:      self = .owned
+    case .Guaranteed: self = .guaranteed
+    case .None:       self = .none
+    default:
+      fatalError("unsupported ownership")
+    }
+  }
+
+  public var _bridged: BridgedValue.Ownership {
+    switch self {
+      case .unowned:    return BridgedValue.Ownership.Unowned
+      case .owned:      return BridgedValue.Ownership.Owned
+      case .guaranteed: return BridgedValue.Ownership.Guaranteed
+      case .none:       return BridgedValue.Ownership.None
     }
   }
 }
 
 extension Value {
   public var description: String {
-    let stdString = SILNode_debugDescription(bridgedNode)
-    return String(_cxxString: stdString)
+    return String(taking: bridged.getDebugDescription())
   }
 
-  public var uses: UseList {
-    UseList(SILValue_firstUse(bridged))
-  }
+  public var uses: UseList { UseList(bridged.getFirstUse()) }
   
+  // Default implementation for all values which have a parent block, like instructions and arguments.
   public var parentFunction: Function { parentBlock.parentFunction }
 
-  public var type: Type { SILValue_getType(bridged).type }
+  public var type: Type { bridged.getType().type }
 
   /// True if the value has a trivial type.
   public var hasTrivialType: Bool { type.isTrivial(in: parentFunction) }
@@ -105,15 +129,63 @@ extension Value {
   /// True if the value has a trivial type which is and does not contain a Builtin.RawPointer.
   public var hasTrivialNonPointerType: Bool { type.isTrivialNonPointer(in: parentFunction) }
 
-  public var ownership: Ownership { SILValue_getOwnership(bridged).ownership }
+  public var ownership: Ownership {
+    switch bridged.getOwnership() {
+    case .Unowned:    return .unowned
+    case .Owned:      return .owned
+    case .Guaranteed: return .guaranteed
+    case .None:       return .none
+    default:
+      fatalError("unsupported ownership")
+    }
+  }
+
+  /// Return true if the object type conforms to Escapable.
+  ///
+  /// Note: noescape function types conform to Escapable, use mayEscape instead to exclude them.
+  public var isEscapable: Bool {
+    type.objectType.isEscapable(in: parentFunction)
+  }
+
+  /// Return true only if this value's lifetime is unconstrained by an outer lifetime. Requires all of the following:
+  /// - the object type conforms to Escapable
+  /// - the type is not a noescape function
+  /// - the value is not the direct result of a partial_apply with a noescape (inout_aliasable) capture.
+  public var mayEscape: Bool {
+    if !type.objectType.mayEscape(in: parentFunction) {
+      return false
+    }
+    // A noescape partial_apply has an escaping function type if it has not been promoted to on_stack, but it's value
+    // still cannot "escape" its captures.
+    //
+    // TODO: This would be much more robust if pai.hasNoescapeCapture simply implied !pai.type.isEscapable
+    if let pai = self as? PartialApplyInst {
+      return pai.mayEscape
+    }
+    return true
+  }
+
+  public var definingInstructionOrTerminator: Instruction? {
+    if let def = definingInstruction {
+      return def
+    } else if let result = TerminatorResult(self) {
+      return result.terminator
+    }
+    return nil
+  }
+
+  public var nextInstruction: Instruction {
+    if self is Argument {
+      return parentBlock.instructions.first!
+    }
+    // Block terminators do not directly produce values.
+    return definingInstruction!.next!
+  }
 
   public var hashable: HashableValue { ObjectIdentifier(self) }
 
   public var bridged: BridgedValue {
     BridgedValue(obj: SwiftObject(self as AnyObject))
-  }
-  var bridgedNode: BridgedNode {
-    BridgedNode(obj: SwiftObject(self as AnyObject))
   }
 }
 
@@ -128,6 +200,12 @@ public func ==(_ lhs: Value, _ rhs: Value) -> Bool {
 
 public func !=(_ lhs: Value, _ rhs: Value) -> Bool {
   return !(lhs === rhs)
+}
+
+extension CollectionLikeSequence where Element == Value {
+  public func contains(_ element: Element) -> Bool {
+    return self.contains { $0 == element }
+  }
 }
 
 /// A projected value, which is defined by the original value and a projection path.
@@ -147,28 +225,54 @@ extension Value {
     ProjectedValue(value: self, path: path)
   }
 
-  /// Returns a projected value, defined by this value and path containig a single field of `kind` and `index`.
+  /// Returns a projected value, defined by this value and path containing a single field of `kind` and `index`.
   public func at(_ kind: SmallProjectionPath.FieldKind, index: Int = 0) -> ProjectedValue {
     ProjectedValue(value: self, path: SmallProjectionPath(kind, index: index))
+  }
+
+  /// Projects all "contained" addresses of this value.
+  ///
+  /// If this value is an address, projects all sub-fields of the address, e.g. struct fields.
+  ///
+  /// If this value is not an address, projects all "interior" pointers of the value:
+  /// If this value is a class, "interior" pointer means: an address of any stored property of the class instance.
+  /// If this value is a struct or another value type, "interior" pointers refer to any stored propery addresses of
+  /// any class references in the struct or value type. For example:
+  ///
+  /// class C { var x: Int; var y: Int }
+  /// struct S { var c1: C; var c2: C }
+  /// let s: S
+  ///
+  /// `s.allContainedAddresss` refers to `s.c1.x`, `s.c1.y`, `s.c2.x` and `s.c2.y`
+  ///
+  public var allContainedAddresss: ProjectedValue {
+    if type.isAddress {
+      // This is the regular case: the path selects any sub-fields of an address.
+      return at(SmallProjectionPath(.anyValueFields))
+    }
+    if type.isClass {
+      // If the value is a (non-address) reference it means: all addresses within the class instance.
+      return at(SmallProjectionPath(.anyValueFields).push(.anyClassField))
+    }
+    // Any other non-address value means: all addresses of any referenced class instances within the value.
+    return at(SmallProjectionPath(.anyValueFields).push(.anyClassField).push(.anyValueFields))
   }
 }
 
 
 extension BridgedValue {
-  public func getAs<T: AnyObject>(_ valueType: T.Type) -> T { obj.getAs(T.self) }
-
   public var value: Value {
-    // This is much faster than a conformance lookup with `as! Value`.
-    let v = getAs(AnyObject.self)
-    switch v {
-      case let inst as SingleValueInstruction:
-        return inst
-      case let arg as Argument:
-        return arg
-      case let mvr as MultipleValueInstructionResult:
-        return mvr
-      case let undef as Undef:
-        return undef
+    // Doing the type check in C++ is much faster than a conformance lookup with `as! Value`.
+    // And it makes a difference because this is a time critical function.
+    switch getKind() {
+      case .SingleValueInstruction:
+        return obj.getAs(SingleValueInstruction.self)
+      case .Argument:
+        return obj.getAs(Argument.self)
+      case .MultipleValueInstructionResult:
+        return obj.getAs(MultipleValueInstructionResult.self)
+      case .Undef:
+        return obj.getAs(Undef.self)
       default:
         fatalError("unknown Value type")
     }
@@ -178,8 +282,11 @@ extension BridgedValue {
 public final class Undef : Value {
   public var definingInstruction: Instruction? { nil }
 
+  public var parentFunction: Function { bridged.SILUndef_getParentFunction().function }
+
   public var parentBlock: BasicBlock {
-    fatalError("undef has no defining block")
+    // By convention, undefs are considered to be defined at the entry of the function.
+    parentFunction.entryBlock
   }
 
   /// Undef has not parent function, therefore the default `hasTrivialType` does not work.
@@ -189,28 +296,43 @@ public final class Undef : Value {
   /// Undef has not parent function, therefore the default `hasTrivialNonPointerType` does not work.
   /// Return the conservative default in this case.
   public var hasTrivialNonPointerType: Bool { false }
+
+  public var isLexical: Bool { false }
 }
 
 final class PlaceholderValue : Value {
   public var definingInstruction: Instruction? { nil }
+
   public var parentBlock: BasicBlock {
     fatalError("PlaceholderValue has no defining block")
   }
+
+  public var isLexical: Bool { false }
+
+  public var parentFunction: Function { bridged.PlaceholderValue_getParentFunction().function }
 }
 
 extension OptionalBridgedValue {
-  var value: Value? { obj.getAs(AnyObject.self) as? Value }
+  public var value: Value? { obj.getAs(AnyObject.self) as? Value }
 }
 
-extension BridgedOwnership {
-  var ownership: Ownership {
-    switch self {
-      case Ownership_Unowned:    return .unowned
-      case Ownership_Owned:      return .owned
-      case Ownership_Guaranteed: return .guaranteed
-      case Ownership_None:       return .none
-      default:
-        fatalError("unsupported ownership")
+extension Optional where Wrapped == Value {
+  public var bridged: OptionalBridgedValue {
+    OptionalBridgedValue(obj: self?.bridged.obj)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+//                            Bridging Utilities
+//===----------------------------------------------------------------------===//
+
+extension Array where Element == Value {
+  public func withBridgedValues<T>(_ c: (BridgedValueArray) -> T) -> T {
+    return self.withUnsafeBufferPointer { bufPtr in
+      assert(bufPtr.count == self.count)
+      return bufPtr.withMemoryRebound(to: BridgeValueExistential.self) { valPtr in
+        return c(BridgedValueArray(base: valPtr.baseAddress, count: self.count))
+      }
     }
   }
 }

@@ -50,7 +50,7 @@ linesClose = r'[\ \t]* end [\ \t]* (?: \# .* )? $'
 
 # Note: Where "# Absorb" appears below, the regexp attempts to eat up
 # through the end of ${...} and %{...}% constructs.  In reality we
-# handle this with the Python tokenizer, which avoids mis-detections
+# handle this with the Python tokenizer, which avoids misdetections
 # due to nesting, comments and strings.  This extra absorption in the
 # regexp facilitates testing the regexp on its own, by preventing the
 # interior of some of these constructs from being treated as literal
@@ -1242,16 +1242,20 @@ def main():
             ast = parse_template(args.file, f.read())
     if args.dump:
         print(ast)
+
     # Allow the template to open files and import .py files relative to its own
     # directory
+    saved_cwd = os.getcwd()
     os.chdir(os.path.dirname(os.path.abspath(args.file)))
     sys.path = ['.'] + sys.path
+    result_text = execute_template(ast, args.line_directive, **bindings)
 
     if args.target == '-':
-        sys.stdout.write(execute_template(ast, args.line_directive, **bindings))
+        sys.stdout.write(result_text)
     else:
+        os.chdir(saved_cwd)
         with io.open(args.target, 'w', encoding='utf-8', newline='\n') as f:
-            f.write(execute_template(ast, args.line_directive, **bindings))
+            f.write(result_text)
 
 
 if __name__ == '__main__':

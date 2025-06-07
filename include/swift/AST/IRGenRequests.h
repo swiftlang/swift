@@ -132,7 +132,7 @@ public:
 struct IRGenDescriptor {
   llvm::PointerUnion<FileUnit *, ModuleDecl *> Ctx;
 
-  using SymsToEmit = Optional<llvm::SmallVector<std::string, 1>>;
+  using SymsToEmit = std::optional<llvm::SmallVector<std::string, 1>>;
   SymsToEmit SymbolsToEmit;
 
   const IRGenOptions &Opts;
@@ -150,6 +150,7 @@ struct IRGenDescriptor {
   StringRef PrivateDiscriminator;
   ArrayRef<std::string> parallelOutputFilenames;
   llvm::GlobalVariable **outModuleHash;
+  llvm::raw_pwrite_stream *out = nullptr;
 
   friend llvm::hash_code hash_value(const IRGenDescriptor &owner) {
     return llvm::hash_combine(owner.Ctx, owner.SymbolsToEmit, owner.SILMod);
@@ -172,7 +173,7 @@ public:
           const TBDGenOptions &TBDOpts, const SILOptions &SILOpts,
           Lowering::TypeConverter &Conv, std::unique_ptr<SILModule> &&SILMod,
           StringRef ModuleName, const PrimarySpecificPaths &PSPs,
-          StringRef PrivateDiscriminator, SymsToEmit symsToEmit = None,
+          StringRef PrivateDiscriminator, SymsToEmit symsToEmit = std::nullopt,
           llvm::GlobalVariable **outModuleHash = nullptr) {
     return IRGenDescriptor{file,
                            symsToEmit,
@@ -188,14 +189,13 @@ public:
                            outModuleHash};
   }
 
-  static IRGenDescriptor
-  forWholeModule(ModuleDecl *M, const IRGenOptions &Opts,
-                 const TBDGenOptions &TBDOpts, const SILOptions &SILOpts,
-                 Lowering::TypeConverter &Conv,
-                 std::unique_ptr<SILModule> &&SILMod, StringRef ModuleName,
-                 const PrimarySpecificPaths &PSPs, SymsToEmit symsToEmit = None,
-                 ArrayRef<std::string> parallelOutputFilenames = {},
-                 llvm::GlobalVariable **outModuleHash = nullptr) {
+  static IRGenDescriptor forWholeModule(
+      ModuleDecl *M, const IRGenOptions &Opts, const TBDGenOptions &TBDOpts,
+      const SILOptions &SILOpts, Lowering::TypeConverter &Conv,
+      std::unique_ptr<SILModule> &&SILMod, StringRef ModuleName,
+      const PrimarySpecificPaths &PSPs, SymsToEmit symsToEmit = std::nullopt,
+      ArrayRef<std::string> parallelOutputFilenames = {},
+      llvm::GlobalVariable **outModuleHash = nullptr) {
     return IRGenDescriptor{M,
                            symsToEmit,
                            Opts,

@@ -84,12 +84,12 @@ private:
 
   /// Returns the EpilogueARCBlockState for \p BB. If \p BB is unreachable,
   /// returns None
-  Optional<EpilogueARCBlockState *> getState(SILBasicBlock *BB) {
+  std::optional<EpilogueARCBlockState *> getState(SILBasicBlock *BB) {
     // poNumber will be None for unreachable blocks
     auto poNumber = PO->getPONumber(BB);
     if (poNumber.has_value())
       return &IndexToStateMap[*poNumber];
-    return None;
+    return std::nullopt;
   }
 
   /// Return true if this is a function exiting block this epilogue ARC
@@ -99,7 +99,8 @@ private:
       return BB->getTerminator()->isFunctionExiting();
 
     return BB->getTerminator()->isFunctionExiting() &&
-           BB->getTerminator()->getTermKind() != TermKind::ThrowInst;
+           BB->getTerminator()->getTermKind() != TermKind::ThrowInst &&
+           BB->getTerminator()->getTermKind() != TermKind::ThrowAddrInst;
   }
 
   /// Return true if this is a function exit block.

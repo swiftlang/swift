@@ -2,147 +2,317 @@
 # Each line is a case-sensitive file pattern followed by one or more owners.
 # Order is important. The last matching pattern has the most precedence.
 # More information: https://docs.github.com/en/articles/about-code-owners
+#
+# Please mirror the repository's file hierarchy in case-sensitive lexicographic
+# order.
+
+# TODO: /.clang-format
+
+/.clang-tidy      @egorzhdan
+
+/.dir-locals.el   @al45tair
+/.editorconfig    @hamishknight
+# TODO: /.flake8
+/.gitattributes   @shahmishal
 
 # .github
-/.github/                         @shahmishal
-/.github/CODEOWNERS               @AnthonyLatsis @shahmishal
-/.github/ISSUE_TEMPLATE/          @AnthonyLatsis @hborla @LucianoPAlmeida @shahmishal @xedin
-/.github/PULL_REQUEST_TEMPLATE.md @AnthonyLatsis @hborla @LucianoPAlmeida @shahmishal @xedin
+/.github/                                 @shahmishal
+/.github/CODEOWNERS                       @AnthonyLatsis @shahmishal
+/.github/ISSUE_TEMPLATE/                  @AnthonyLatsis @hborla @shahmishal @xedin
+/.github/PULL_REQUEST_TEMPLATE.md         @AnthonyLatsis @hborla @shahmishal @xedin
+
+/.gitignore           @shahmishal
+# TODO: /.mailmap
+# TODO: /Brewfile
+/CHANGELOG.md         @hborla
+# TODO: /CMakeLists.txt
+/CODE_OF_CONDUCT.md   @swiftlang/core-team
+/CODE_OWNERS.TXT      @swiftlang/core-team
+/CONTRIBUTING.md      @AnthonyLatsis @xedin
+/LICENSE.txt          @swiftlang/core-team
+# TODO: /README.md
+
+# Runtimes
+/Runtimes/**/*.cmake                                    @etcwilde @compnerd @edymtt @justice-adams-apple
+/Runtimes/**/CMakeLists.txt                             @etcwilde @compnerd @edymtt @justice-adams-apple
+/Runtimes/Core/cmake/caches/Vendors/Apple/              @etcwilde @shahmishal @edymtt @justice-adams-apple
+/Runtimes/Core/cmake/modules/ExperimentalFeatures.cmake @tshortli @etcwilde @compnerd @edymtt @justice-adams-apple
+
+# SwiftCompilerSources
+/SwiftCompilerSources                     @eeckstein
+
+# apinotes
+# TODO: /apinotes
+
+# benchmark
+/benchmark                                @eeckstein
+
+# bindings
+# TODO: /bindings
+
+# cmake
+/cmake/**/*Windows*                       @compnerd
 
 # docs
-/docs/HowToGuides/ @AnthonyLatsis @LucianoPAlmeida @xedin
-/docs/Generics/    @slavapestov
-/docs/Generics.rst @slavapestov
+/docs/ABI/                                @rjmccall
+/docs/ABI/*Mangling*                      @eeckstein
+/docs/ABI/GenericSignature.md             @slavapestov
+/docs/ABI/KeyPaths.md                     @jckarter
+/docs/ABI/RegisterUsage.md                @al45tair
+/docs/CrossCompilationModel.md            @MaxDesiatov
+/docs/Generics                            @slavapestov
+/docs/HowToGuides/                        @AnthonyLatsis @xedin
+/docs/Optimizer*                          @eeckstein
+/docs/SIL*                                @jckarter
+/docs/Windows*                            @compnerd
 
-# Standard Library
-# TODO: /stdlib/
-/stdlib/public/Cxx/        @zoecarver @hyp @egorzhdan
-/stdlib/public/Distributed/ @ktoso
-/stdlib/public/Windows/    @compnerd
-# TODO: /*test/stdlib/
-# TODO: /unittests/stdlib/
+# include
+/include/swift-c/DependencyScan/                   @artemcm @cachemeifyoucan
+/include/swift/*Demangl*/                          @rjmccall
+/include/swift/AST/                                @hborla @slavapestov @xedin
+/include/swift/AST/*Availability*                  @tshortli
+/include/swift/AST/*Conformance*                   @slavapestov
+/include/swift/AST/*Demangl*                       @rjmccall
+/include/swift/AST/*Distributed*                   @ktoso
+/include/swift/AST/*Generic*                       @hborla @slavapestov
+/include/swift/AST/*Protocol*                      @hborla @slavapestov
+/include/swift/AST/*Requirement*                   @hborla @slavapestov
+/include/swift/AST/*Substitution*                  @slavapestov
+/include/swift/AST/DiagnosticGroup*                @DougGregor
+/include/swift/AST/DiagnosticsClangImporter.def    @zoecarver @egorzhdan @beccadax @ian-twilightcoder @Xazax-hun @j-hui @fahadnayyar @susmonteiro
+/include/swift/AST/DiagnosticsDriver.def           @artemcm
+/include/swift/AST/DiagnosticsFrontend.def         @artemcm @tshortli
+/include/swift/AST/DiagnosticsIDE.def              @bnbarham @hamishknight @rintaro
+/include/swift/AST/DiagnosticsIRGen.def            @rjmccall
+/include/swift/AST/DiagnosticsModuleDiffer.def     @nkcsgexi
+/include/swift/AST/DiagnosticsParse.def            @bnbarham @CodaFi @DougGregor @hamishknight @rintaro
+/include/swift/AST/DiagnosticsRefactoring.def      @bnbarham @hamishknight @rintaro
+/include/swift/AST/DiagnosticsSIL.def              @jckarter
+/include/swift/AST/Evaluator*                      @CodaFi @slavapestov
+/include/swift/Basic/                              @DougGregor
+/include/swift/Basic/Features.def                  @DougGregor @hborla
+/include/swift/ClangImporter                       @zoecarver @egorzhdan @beccadax @ian-twilightcoder @Xazax-hun @j-hui @fahadnayyar @susmonteiro
+/include/swift/DependencyScan                      @artemcm @cachemeifyoucan
+/include/swift/Driver*/                            @artemcm
+/include/swift/Frontend*/                          @artemcm @tshortli
+/include/swift/IDE/                                @bnbarham @hamishknight @rintaro
+/include/swift/IRGen/                              @rjmccall
+/include/swift/Index/                              @bnbarham @hamishknight @rintaro
+/include/swift/Markup/                             @nkcsgexi
+/include/swift/Migrator/                           @nkcsgexi
+/include/swift/Option/*Options*                    @tshortli
+/include/swift/Parse/                              @bnbarham @CodaFi @DougGregor @hamishknight @rintaro
+/include/swift/PrintAsClang                        @zoecarver @egorzhdan @Xazax-hun @j-hui @fahadnayyar @susmonteiro
+/include/swift/Refactoring                         @bnbarham @hamishknight @rintaro
+/include/swift/Runtime/                            @rjmccall @compnerd
+/include/swift/SIL/                                @jckarter
+/include/swift/SIL/*Coverage*                      @bnbarham @hamishknight @rintaro
+/include/swift/SIL/*DebugInfo*                     @adrian-prantl
+/include/swift/SIL/SILDebug*                       @adrian-prantl
+/include/swift/SIL/SILProfiler.h                   @bnbarham @hamishknight @rintaro
+/include/swift/SILOptimizer/                       @eeckstein
+/include/swift/SILOptimizer/Utils/Distributed*     @ktoso
+/include/swift/Sema/                               @hborla @slavapestov @xedin
+/include/swift/Sema/CS*                            @hborla @xedin
+/include/swift/Sema/Constraint*                    @hborla @xedin
+/include/swift/Serialization/                      @xymus
+/include/swift/Serialization/SerializedModuleLoader* @artemcm
+/include/swift/SwiftRemoteMirror/                  @slavapestov
+/include/swift/SymbolGraphGen/                     @QuietMisdreavus
+/include/swift/Threading                           @al45tair
 
-# ASTGen
-/lib/ASTGen/  @zoecarver @CodaFi
-/test/ASTGen/ @zoecarver @CodaFi
+# lib
+/lib/*Demangl*/                                     @rjmccall
+/lib/AST/                                           @hborla @slavapestov @xedin
+/lib/AST/*Availability*                             @tshortli
+/lib/AST/*Conformance*                              @slavapestov
+/lib/AST/*Demangl*                                  @rjmccall
+/lib/AST/*Generic*                                  @hborla @slavapestov
+/lib/AST/*Requirement*                              @hborla @slavapestov
+/lib/AST/*Substitution                              @slavapestov
+/lib/AST/ASTPrinter.cpp                             @hborla @slavapestov @xedin @tshortli
+/lib/AST/Evaluator*                                 @CodaFi @slavapestov
+/lib/AST/ModuleLoader.cpp                           @artemcm
+/lib/AST/RequirementMachine/                        @slavapestov
+/lib/ASTGen/                                        @bnbarham @CodaFi @hamishknight @rintaro
+/lib/Basic/                                         @DougGregor
+/lib/Basic/Windows                                  @compnerd
+/lib/ClangImporter                                  @zoecarver @egorzhdan @beccadax @ian-twilightcoder @Xazax-hun @j-hui @fahadnayyar @susmonteiro
+/lib/ClangImporter/DWARFImporter*                   @adrian-prantl
+/lib/DependencyScan                                 @artemcm @cachemeifyoucan
+/lib/Driver*/                                       @artemcm
+/lib/DriverTool/autolink_extract_main.cpp           @MaxDesiatov @etcwilde
+/lib/DriverTool/sil*                                @jckarter
+/lib/DriverTool/sil_opt*                            @eeckstein
+/lib/DriverTool/swift_symbolgraph_extract_main.cpp  @QuietMisdreavus
+/lib/Frontend*/                                     @artemcm @tshortli
+/lib/IDE/                                           @bnbarham @hamishknight @rintaro
+/lib/IDETool/                                       @bnbarham @hamishknight @rintaro
+/lib/IRGen/                                         @rjmccall
+/lib/IRGen/*Coverage*                               @bnbarham @hamishknight @rintaro
+/lib/IRGen/*Debug*                                  @adrian-prantl
+/lib/IRGen/*Distributed*                            @ktoso
+/lib/Index/                                         @bnbarham @hamishknight @rintaro
+/lib/Macros/Sources/SwiftMacros/Swiftify*           @hnrklssn @Xazax-hun
+/lib/Markup/                                        @nkcsgexi
+/lib/Migrator/                                      @nkcsgexi
+/lib/Parse/                                         @bnbarham @CodaFi @DougGregor @hamishknight @rintaro
+/lib/PrintAsClang                                   @zoecarver @egorzhdan @Xazax-hun @j-hui @fahadnayyar @susmonteiro
+/lib/Refactoring/                                   @bnbarham @hamishknight @rintaro
+/lib/SIL/                                           @jckarter
+/lib/SIL/**/*DebugInfo*                             @adrian-prantl
+/lib/SIL/IR/*Coverage*                              @bnbarham @hamishknight @rintaro
+/lib/SIL/IR/SILDebug*                               @adrian-prantl
+/lib/SIL/IR/SILLocation*                            @adrian-prantl
+/lib/SIL/IR/SILProfiler.cpp                         @bnbarham @hamishknight @rintaro
+/lib/SILGen/                                        @jckarter
+/lib/SILGen/*Distributed*                           @ktoso
+/lib/SILOptimizer/                                  @eeckstein
+/lib/SILOptimizer/**/*DebugInfo*                    @adrian-prantl
+/lib/SILOptimizer/Mandatory/ConsumeOperator*        @kavon
+/lib/SILOptimizer/Mandatory/FlowIsolation.cpp       @kavon
+/lib/SILOptimizer/Mandatory/MoveOnly*               @kavon
+/lib/SILOptimizer/Utils/Distributed*                @ktoso
+/lib/Sema/                                          @hborla @slavapestov @xedin
+/lib/Sema/*Availability*                            @tshortli
+/lib/Sema/CS*                                       @hborla @xedin
+/lib/Sema/CodeSynthesisDistributed*                 @hborla @ktoso
+/lib/Sema/Constraint*                               @hborla @xedin
+/lib/Sema/DerivedConformance*                       @slavapestov
+/lib/Sema/DerivedConformanceDistributed*            @ktoso @slavapestov
+/lib/Sema/OpenedExistentials*                       @AnthonyLatsis @slavapestov
+/lib/Sema/TypeCheckDistributed*                     @hborla @ktoso @xedin
+/lib/Sema/TypeCheckProtocol*                        @AnthonyLatsis @hborla @slavapestov
+/lib/Sema/TypeCheckType*                            @AnthonyLatsis @hborla @slavapestov @xedin
+/lib/Serialization/                                 @xymus
+/lib/Serialization/SerializedModuleLoader*          @artemcm
+/lib/SwiftRemoteMirror/                             @slavapestov
+/lib/SymbolGraphGen                                 @QuietMisdreavus
+/lib/Threading                                      @al45tair
 
-# Dependency scanning
-include/swift/DependencyScan                 @artemcm
-lib/DependencyScan                           @artemcm
-lib/Frontend/ModuleInterfaceLoader.cpp       @artemcm
-lib/Serialization/SerializedModuleLoader.cpp @artemcm
-test/ScanDependencies                        @artemcm
+# localization
+# TODO: /localization
 
-# Driver
-include/swift/Driver @artemcm
-lib/Driver           @artemcm
-test/Driver          @artemcm
+# stdlib
+/stdlib/                                  @swiftlang/standard-librarians
+/stdlib/private/*Runtime*/                @rjmccall
+/stdlib/private/SwiftReflectionTest/      @slavapestov
+/stdlib/public/core/Swiftify*             @hnrklssn @Xazax-hun
+/stdlib/public/*Demangl*/                 @rjmccall
+/stdlib/public/Concurrency/               @ktoso
+/stdlib/public/Cxx/                       @zoecarver @egorzhdan @Xazax-hun @j-hui @fahadnayyar @susmonteiro
+/stdlib/public/Distributed/               @ktoso
+/stdlib/public/Observation/               @phausler
+/stdlib/public/RuntimeModule/             @al45tair @mikeash
+/stdlib/public/SwiftRemoteMirror/         @slavapestov
+/stdlib/public/Threading/                 @al45tair
+/stdlib/public/Windows/                   @compnerd
+/stdlib/public/libexec/swift-backtrace/   @al45tair
+/stdlib/public/runtime/                   @mikeash @al45tair
+/stdlib/tools/swift-reflection-test/      @slavapestov
 
-# Owners of the parser
-/include/swift/Parse/ @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
-/lib/Parse/           @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
-/*test/Parse/         @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
-/unittests/Parse/     @ahoppen @bnbarham @CodaFi @DougGregor @rintaro
-
-SwiftCompilerSources @eeckstein
-
-# C++ Interop
-include/swift/ClangImporter @zoecarver @hyp @egorzhdan
-include/swift/PrintAsClang  @zoecarver @hyp @egorzhdan
-lib/ClangImporter           @zoecarver @hyp @egorzhdan
-lib/PrintAsClang            @zoecarver @hyp @egorzhdan
-test/Interop                @zoecarver @hyp @egorzhdan
-
-# Threading implementation
-include/swift/Threading @al45tair
-lib/Threading           @al45tair
-
-# Windows support
-cmake/**/*Windows*    @compnerd
-lib/Basic/Windows     @compnerd
-utils/*windows*       @compnerd
-
-# Repository checkout utils
-
-/utils/update_checkout/ @shahmishal
-/utils/update-checkout* @shahmishal
-
-
-# AST
-/include/swift/AST/               @hborla @slavapestov @xedin
-/include/swift/AST/*Conformance*  @slavapestov
-/include/swift/AST/*Distributed*  @ktoso
-/include/swift/AST/Evaluator*     @CodaFi @slavapestov
-/include/swift/AST/*Generic*      @hborla @slavapestov
-/include/swift/AST/*Protocol*     @hborla @slavapestov
-/include/swift/AST/*Requirement*  @hborla @slavapestov
-/include/swift/AST/*Substitution* @slavapestov
-/lib/AST/                         @hborla @slavapestov @xedin
-/lib/AST/*Conformance*            @slavapestov
-/lib/AST/Evaluator*               @CodaFi @slavapestov
-/lib/AST/*Generic*                @hborla @slavapestov
-/lib/AST/ModuleLoader.cpp         @artemcm
-/lib/AST/*Requirement*            @hborla @slavapestov
-/lib/AST/RequirementMachine/      @slavapestov
-/lib/AST/*Substitution            @slavapestov
-/unittests/AST/                   @hborla @slavapestov @xedin
-/unittests/AST/*Evaluator*        @CodaFi @slavapestov
-
-# Sema
-/include/swift/Sema/                     @hborla @slavapestov @xedin
-/include/swift/Sema/Constraint*          @hborla @xedin
-/include/swift/Sema/CS*                  @hborla @xedin
-/lib/Sema/                               @hborla @slavapestov @xedin
-/lib/Sema/Constraint*                    @hborla @xedin
-/lib/Sema/CS*                            @hborla @xedin
-/lib/Sema/CodeSynthesisDistributed*      @hborla @ktoso
-/lib/Sema/DerivedConformance*            @slavapestov
-/lib/Sema/DerivedConformanceDistributed* @ktoso @slavapestov
-/lib/Sema/TypeCheckDistributed*          @hborla @ktoso @xedin
-/lib/Sema/TypeCheckType*                 @AnthonyLatsis @hborla @slavapestov @xedin
-/lib/Sema/TypeCheckProtocol*             @AnthonyLatsis @hborla @slavapestov
-/test/Constraints/                       @hborla @xedin
-/test/decl/                              @hborla @slavapestov
-/test/decl/protocol/                     @AnthonyLatsis @hborla @slavapestov
+# test
+/test/*Demangl*/                                    @rjmccall
+/test/ASTGen/                                       @bnbarham @CodaFi @hamishknight @rintaro
+/test/Concurrency/                                  @ktoso
+/test/Constraints/                                  @hborla @xedin
+/test/DebugInfo/                                    @adrian-prantl
+/test/Distributed/                                  @ktoso
+/test/Driver/                                       @artemcm
+/test/Driver/static*                                @MaxDesiatov @etcwilde
+/test/Frontend/                                     @artemcm @tshortli
+/test/Generics/                                     @hborla @slavapestov
+/test/Generics/inverse*                             @kavon
+/test/IDE/                                          @bnbarham @hamishknight @rintaro
+/test/IRGen/                                        @AnthonyLatsis @rjmccall
+/test/Index/                                        @bnbarham @hamishknight @rintaro
+/test/Interop/                                      @zoecarver @egorzhdan @Xazax-hun @j-hui @fahadnayyar @susmonteiro @hnrklssn
+/test/Macros/SwiftifyImport                         @hnrklssn @Xazax-hun
+/test/Migrator/                                     @nkcsgexi
+/test/Parse/                                        @bnbarham @CodaFi @DougGregor @hamishknight @rintaro
+/test/Profiler                                      @bnbarham @hamishknight @rintaro
+/test/Reflection/                                   @slavapestov
+/test/Runtime/                                      @rjmccall
+/test/SIL/                                          @jckarter
+/test/SILGen/                                       @jckarter
+/test/SILOptimizer/                                 @eeckstein
+/test/SILOptimizer/moveonly*                        @kavon
+/test/SILOptimizer/noimplicitcopy*                  @kavon
+/test/ScanDependencies/                             @artemcm
+/test/Sema/                                         @hborla @slavapestov @xedin
+/test/Sema/moveonly*                                @kavon
+/test/Serialization/                                @xymus
+/test/SourceKit/                                    @bnbarham @hamishknight @rintaro
+/test/SymbolGraph/                                  @QuietMisdreavus
+/test/abi/                                          @swiftlang/standard-librarians
+/test/decl/                                         @hborla @slavapestov
+/test/decl/protocol/                                @AnthonyLatsis @hborla @slavapestov
 # FIXME: This file could have a dedicated directory.
 /test/decl/protocol/special/DistributedActor.swift  @ktoso
-# FIXME: Should there be a 'Sema' folder under 'Distributed'? Or perhaps it
-# should be the other way around, i.e 'Sema/Distributed', 'SILGen/Distributed',
-# etc.?
-/test/Distributed/*                      @ktoso
-# FIXME: Is there a better way to structure this high-level 'Inputs' dir.? We
-# want only the Sema bits here.
-/test/Distributed/Inputs/                @ktoso
-/test/expr/                              @hborla @slavapestov @xedin
-/test/Generics/                          @hborla @slavapestov
-/test/Sema/                              @hborla @slavapestov @xedin
-/test/stmt/                              @hborla @xedin
-/test/type/                              @hborla @slavapestov @xedin
-/validation-test/Sema/                   @hborla @slavapestov @xedin
-/unittests/Sema/                         @hborla @xedin
+/test/expr/                                         @hborla @slavapestov @xedin
+/test/refactoring/                                  @bnbarham @hamishknight @rintaro
+/test/sil*                                          @jckarter
+/test/sil-opt*                                      @eeckstein
+/test/stdlib/                                       @swiftlang/standard-librarians
+/test/stmt/                                         @hborla @xedin
+/test/type/                                         @hborla @slavapestov @xedin
 
-# SIL/SILGen
-# TODO: /include/swift/SIL/
-# TODO: /lib/SIL/
-# TODO: /lib/SILGen/
-/lib/SILGen/*Distributed* @ktoso
-/test/Distributed/SIL/    @ktoso
-# TODO: /*test/SIL/
-# TODO: /*test/SILGen/
-# TODO: /unittests/SIL/
+# tools
+# TODO: /tools
+/tools/*reflection/                                 @slavapestov
+/tools/SourceKit                                    @bnbarham @hamishknight @rintaro
+/tools/driver/                                      @artemcm
+/tools/lldb-moduleimport-test/                      @adrian-prantl
+/tools/swift-demangle*                              @rjmccall
+/tools/swift-ide-test                               @bnbarham @hamishknight @rintaro
+/tools/swift-inspect                                @mikeash @al45tair @compnerd
+/tools/swift-refactor                               @bnbarham @hamishknight @rintaro
 
-# SILOptimizer
-# TODO: /include/swift/SILOptimizer/
-/include/swift/SILOptimizer/Utils/Distributed* @ktoso
-# TODO: /lib/SILOptimizer/
-/lib/SILOptimizer/Utils/Distributed*           @ktoso
-# TODO: /*test/SILOptimizer/
+# unittests
+/unittests/*Demangl*/                     @rjmccall
+/unittests/AST/                           @hborla @slavapestov @xedin
+/unittests/AST/*Evaluator*                @CodaFi @slavapestov
+/unittests/DependencyScan/                @artemcm @cachemeifyoucan
+/unittests/Frontend*/                     @artemcm @tshortli
+/unittests/Parse/                         @bnbarham @CodaFi @DougGregor @hamishknight @rintaro
+/unittests/Reflection/                    @slavapestov
+/unittests/SIL/                           @jckarter
+/unittests/Sema/                          @hborla @xedin
+/unittests/SourceKit/                     @bnbarham @rintaro @hamishknight
+/unittests/runtime/                       @rjmccall
 
-# IRGen
-# TODO: /include/swift/IRGen/
-# TODO: /lib/IRGen/
-/lib/IRGen/*Distributed* @ktoso
-# TODO: /*test/IRGen/
+# userdocs
+# TODO: /userdocs
 
-# TODO: Find a better place for this entry.
-/test/Distributed/Runtime @ktoso
+# utils
+/utils/*windows*                                              @compnerd
+/utils/build.ps1                                              @compnerd
+/utils/build_swift/                                           @etcwilde @justice-adams-apple @shahmishal
+/utils/generate-xcode                                         @hamishknight
+/utils/gyb_sourcekit_support/                                 @bnbarham @hamishknight @rintaro
+/utils/sourcekit_fuzzer/                                      @bnbarham @hamishknight @rintaro
+/utils/swift-xcodegen/                                        @hamishknight
+/utils/swift_build_support/                                   @etcwilde @justice-adams-apple @shahmishal
+/utils/swift_build_support/products/earlyswiftsyntax.py       @bnbarham @hamishknight @rintaro
+/utils/swift_build_support/products/skstresstester.py         @bnbarham @hamishknight @rintaro
+/utils/swift_build_support/products/sourcekitlsp.py           @bnbarham @hamishknight @rintaro
+/utils/swift_build_support/products/swiftformat.py            @allevato @bnbarham @hamishknight @rintaro
+/utils/swift_build_support/products/swiftsyntax.py            @bnbarham @hamishknight @rintaro
+/utils/update-checkout*                                       @etcwilde @justice-adams-apple @shahmishal
+/utils/update_checkout/                                       @etcwilde @justice-adams-apple @shahmishal
+/utils/update_checkout/update-checkout-config.json            @shahmishal
+/utils/vim/                                                   @compnerd
+
+# validation-test
+/validation-test/Driver/                  @artemcm
+/validation-test/IDE/                     @bnbarham @rintaro @hamishknight
+/validation-test/IRGen/                   @rjmccall
+/validation-test/Parse/                   @bnbarham @CodaFi @DougGregor @hamishknight @rintaro
+/validation-test/Reflection/              @slavapestov
+/validation-test/Runtime/                 @rjmccall
+/validation-test/SIL/                     @jckarter
+/validation-test/SILGen/                  @jckarter
+/validation-test/SILOptimizer/            @eeckstein
+/validation-test/Sema/                    @hborla @slavapestov @xedin
+/validation-test/Serialization/           @xymus
+/validation-test/stdlib/                  @swiftlang/standard-librarians

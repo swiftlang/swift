@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-arc-analysis"
 
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/Projection.h"
@@ -104,7 +105,7 @@ static bool canApplyOfBuiltinUseNonTrivialValues(BuiltinInst *BInst) {
   auto &II = BInst->getIntrinsicInfo();
   if (II.ID != llvm::Intrinsic::not_intrinsic) {
     auto attrs = II.getOrCreateAttributes(F->getASTContext());
-    if (attrs.hasFnAttr(llvm::Attribute::ReadNone)) {
+    if (attrs.getMemoryEffects().doesNotAccessMemory()) {
       for (auto &Op : BInst->getAllOperands()) {
         if (!Op.get()->getType().isTrivial(*F)) {
           return true;
@@ -174,8 +175,9 @@ bool swift::canUseObject(SILInstruction *Inst) {
   case SILInstructionKind::UncheckedAddrCastInst:
   case SILInstructionKind::RefToRawPointerInst:
   case SILInstructionKind::RawPointerToRefInst:
-  case SILInstructionKind::UnconditionalCheckedCastInst:
   case SILInstructionKind::UncheckedBitwiseCastInst:
+  case SILInstructionKind::EndInitLetRefInst:
+  case SILInstructionKind::BeginDeallocRefInst:
     return false;
 
   // If we have a trivial bit cast between trivial types, it is not something
@@ -240,7 +242,7 @@ static bool doOperandsAlias(ArrayRef<Operand> Ops, SILValue Ptr,
   // If any are not no alias, we have a use.
   return std::any_of(Ops.begin(), Ops.end(),
                      [&AA, &Ptr](const Operand &Op) -> bool {
-                       return !AA->isNoAlias(Ptr, Op.get());
+                       return AA->mayAlias(Ptr, Op.get());
                      });
 }
 
@@ -321,7 +323,7 @@ bool swift::mustUseValue(SILInstruction *User, SILValue Ptr,
 
   // If any of AI's arguments must alias Ptr, return true.
   for (SILValue Arg : AI->getArguments())
-    if (AA->isMustAlias(Arg, Ptr))
+    if (Arg == Ptr)
       return true;
   return false;
 }
@@ -345,7 +347,7 @@ bool swift::mustGuaranteedUseValue(SILInstruction *User, SILValue Ptr,
     return false;
 
   // Return true if Ptr alias's self.
-  return AA->isMustAlias(AI->getSelfArgument(), Ptr);
+  return AI->getSelfArgument() == Ptr;
 }
 
 //===----------------------------------------------------------------------===//
@@ -356,18 +358,15 @@ bool swift::mustGuaranteedUseValue(SILInstruction *User, SILValue Ptr,
 /// If \p Op has arc uses in the instruction range [Start, End), return the
 /// first such instruction. Otherwise return None. We assume that
 /// Start and End are both in the same basic block.
-Optional<SILBasicBlock::iterator>
-swift::
-valueHasARCUsesInInstructionRange(SILValue Op,
-                                  SILBasicBlock::iterator Start,
-                                  SILBasicBlock::iterator End,
-                                  AliasAnalysis *AA) {
+std::optional<SILBasicBlock::iterator> swift::valueHasARCUsesInInstructionRange(
+    SILValue Op, SILBasicBlock::iterator Start, SILBasicBlock::iterator End,
+    AliasAnalysis *AA) {
   assert(Start->getParent() == End->getParent() &&
          "Start and End should be in the same basic block");
 
   // If Start == End, then we have an empty range, return false.
   if (Start == End)
-    return None;
+    return std::nullopt;
 
   // Otherwise, until Start != End.
   while (Start != End) {
@@ -380,13 +379,13 @@ valueHasARCUsesInInstructionRange(SILValue Op,
   }
 
   // If all such instructions cannot use Op, return false.
-  return None;
+  return std::nullopt;
 }
 
 /// If \p Op has arc uses in the instruction range (Start, End], return the
 /// first such instruction. Otherwise return None. We assume that Start and End
 /// are both in the same basic block.
-Optional<SILBasicBlock::iterator>
+std::optional<SILBasicBlock::iterator>
 swift::valueHasARCUsesInReverseInstructionRange(SILValue Op,
                                                 SILBasicBlock::iterator Start,
                                                 SILBasicBlock::iterator End,
@@ -398,7 +397,7 @@ swift::valueHasARCUsesInReverseInstructionRange(SILValue Op,
 
   // If Start == End, then we have an empty range, return false.
   if (Start == End)
-    return None;
+    return std::nullopt;
 
   // Otherwise, until End == Start.
   while (Start != End) {
@@ -411,25 +410,23 @@ swift::valueHasARCUsesInReverseInstructionRange(SILValue Op,
   }
 
   // If all such instructions cannot use Op, return false.
-  return None;
+  return std::nullopt;
 }
 
 /// If \p Op has instructions in the instruction range (Start, End] which may
 /// decrement it, return the first such instruction. Returns None
 /// if no such instruction exists. We assume that Start and End are both in the
 /// same basic block.
-Optional<SILBasicBlock::iterator>
-swift::
-valueHasARCDecrementOrCheckInInstructionRange(SILValue Op,
-                                              SILBasicBlock::iterator Start,
-                                              SILBasicBlock::iterator End,
-                                              AliasAnalysis *AA) {
+std::optional<SILBasicBlock::iterator>
+swift::valueHasARCDecrementOrCheckInInstructionRange(
+    SILValue Op, SILBasicBlock::iterator Start, SILBasicBlock::iterator End,
+    AliasAnalysis *AA) {
   assert(Start->getParent() == End->getParent() &&
          "Start and End should be in the same basic block");
 
   // If Start == End, then we have an empty range, return nothing.
   if (Start == End)
-    return None;
+    return std::nullopt;
 
   // Otherwise, until Start != End.
   while (Start != End) {
@@ -443,7 +440,7 @@ valueHasARCDecrementOrCheckInInstructionRange(SILValue Op,
   }
 
   // If all such instructions cannot decrement Op, return nothing.
-  return None;
+  return std::nullopt;
 }
 
 bool
@@ -459,7 +456,7 @@ mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
       // mutate the reference itself). In fact it's operand's RC root would be
       // the parent object. This means we can ignore it as a direct RC user.
       return false;
-    case SILInstructionKind::IsEscapingClosureInst:
+    case SILInstructionKind::DestroyNotEscapedClosureInst:
       // FIXME: this is overly conservative. It should return true only of the
       // RC identity of the single operand matches Ptr.
       return true;
@@ -483,7 +480,7 @@ mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
   // such a case, if we can not prove no alias, we need to be conservative and
   // return true.
   CanSILFunctionType FType = FAS.getSubstCalleeType();
-  if (FType->isCalleeGuaranteed() && !AA->isNoAlias(FAS.getCallee(), Ptr)) {
+  if (FType->isCalleeGuaranteed() && AA->mayAlias(FAS.getCallee(), Ptr)) {
     return true;
   }
 
@@ -499,10 +496,10 @@ mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
   // Ptr. If we fail, return true.
   auto Params = FType->getParameters();
   for (unsigned i : indices(Params)) {    
-    if (!Params[i].isGuaranteed())
+    if (!Params[i].isGuaranteedInCaller())
       continue;
-    SILValue Op = FAS.getArgument(i);
-    if (!AA->isNoAlias(Op, Ptr))
+    SILValue Op = FAS.getArgumentsWithoutIndirectResults()[i];
+    if (AA->mayAlias(Op, Ptr))
       return true;
   }
 

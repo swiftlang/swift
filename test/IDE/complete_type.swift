@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
+// RUN: %batch-code-completion
 
 //===--- Helper types that are used in this test
 
@@ -34,23 +34,19 @@ protocol BarProtocol {
 
 typealias FooTypealias = Int
 
-// WITH_GLOBAL_TYPES: Begin completions
 // Global completions
 // WITH_GLOBAL_TYPES-DAG: Decl[Struct]/CurrModule:    FooStruct[#FooStruct#]{{; name=.+$}}
 // WITH_GLOBAL_TYPES-DAG: Decl[Enum]/CurrModule:      FooEnum[#FooEnum#]{{; name=.+$}}
 // WITH_GLOBAL_TYPES-DAG: Decl[Class]/CurrModule:     FooClass[#FooClass#]{{; name=.+$}}
 // WITH_GLOBAL_TYPES-DAG: Decl[Protocol]/CurrModule:  FooProtocol[#FooProtocol#]{{; name=.+$}}
 // WITH_GLOBAL_TYPES-DAG: Decl[TypeAlias]/CurrModule: FooTypealias[#Int#]{{; name=.+$}}
-// WITH_GLOBAL_TYPES: End completions
 
-// WITH_GLOBAL_TYPES_EXPR: Begin completions
 // Global completions at expression position
 // WITH_GLOBAL_TYPES_EXPR-DAG: Decl[Struct]/CurrModule:    FooStruct[#FooStruct#]{{; name=.+$}}
 // WITH_GLOBAL_TYPES_EXPR-DAG: Decl[Enum]/CurrModule:      FooEnum[#FooEnum#]{{; name=.+$}}
 // WITH_GLOBAL_TYPES_EXPR-DAG: Decl[Class]/CurrModule:     FooClass[#FooClass#]{{; name=.+$}}
 // WITH_GLOBAL_TYPES_EXPR-DAG: Decl[Protocol]/CurrModule/Flair[RareType]: FooProtocol[#FooProtocol#]{{; name=.+$}}
 // WITH_GLOBAL_TYPES_EXPR-DAG: Decl[TypeAlias]/CurrModule: FooTypealias[#Int#]{{; name=.+$}}
-// WITH_GLOBAL_TYPES_EXPR: End completions
 
 // GLOBAL_NEGATIVE-NOT: Decl.*: fooObject
 // GLOBAL_NEGATIVE-NOT: Decl.*: fooFunc
@@ -62,15 +58,12 @@ typealias FooTypealias = Int
 // WITHOUT_GLOBAL_TYPES-NOT: Decl.*: FooTypealias
 
 // ERROR_COMMON: found code completion token
-// ERROR_COMMON-NOT: Begin completions
 
 //===---
 //===--- Test that we include 'Self' type while completing inside a protocol.
 //===---
 
-// TYPE_IN_PROTOCOL: Begin completions
 // TYPE_IN_PROTOCOL-DAG: Decl[GenericTypeParam]/Local: Self[#Self#]{{; name=.+$}}
-// TYPE_IN_PROTOCOL: End completions
 
 protocol TestSelf1 {
   func instanceFunc() -> #^TYPE_IN_PROTOCOL_1?check=TYPE_IN_PROTOCOL;check=WITH_GLOBAL_TYPES;check=GLOBAL_NEGATIVE^#
@@ -86,12 +79,10 @@ func testTypeInParamGeneric1<
     GenericBar : FooProtocol & BarProtocol,
     GenericBaz>(a: #^TYPE_IN_FUNC_PARAM_GENERIC_1?check=TYPE_IN_FUNC_PARAM_GENERIC_1;check=WITH_GLOBAL_TYPES;check=GLOBAL_NEGATIVE^#
 
-// TYPE_IN_FUNC_PARAM_GENERIC_1: Begin completions
 // Generic parameters of the function.
 // TYPE_IN_FUNC_PARAM_GENERIC_1-DAG: Decl[GenericTypeParam]/Local: GenericFoo[#GenericFoo#]{{; name=.+$}}
 // TYPE_IN_FUNC_PARAM_GENERIC_1-DAG: Decl[GenericTypeParam]/Local: GenericBar[#GenericBar#]{{; name=.+$}}
 // TYPE_IN_FUNC_PARAM_GENERIC_1-DAG: Decl[GenericTypeParam]/Local: GenericBaz[#GenericBaz#]{{; name=.+$}}
-// TYPE_IN_FUNC_PARAM_GENERIC_1: End completions
 
 struct TestTypeInParamGeneric2<
     StructGenericFoo : FooProtocol,
@@ -100,11 +91,9 @@ struct TestTypeInParamGeneric2<
   func testTypeInParamGeneric2(a: #^TYPE_IN_FUNC_PARAM_GENERIC_2?check=TYPE_IN_FUNC_PARAM_GENERIC_2;check=WITH_GLOBAL_TYPES;check=GLOBAL_NEGATIVE^#
 }
 
-// TYPE_IN_FUNC_PARAM_GENERIC_2: Begin completions
 // TYPE_IN_FUNC_PARAM_GENERIC_2-DAG: Decl[GenericTypeParam]/Local: StructGenericFoo[#StructGenericFoo#]{{; name=.+$}}
 // TYPE_IN_FUNC_PARAM_GENERIC_2-DAG: Decl[GenericTypeParam]/Local: StructGenericBar[#StructGenericBar#]{{; name=.+$}}
 // TYPE_IN_FUNC_PARAM_GENERIC_2-DAG: Decl[GenericTypeParam]/Local: StructGenericBaz[#StructGenericBaz#]{{; name=.+$}}
-// TYPE_IN_FUNC_PARAM_GENERIC_2: End completions
 
 struct TestTypeInParamGeneric3 {
   func testTypeInParamGeneric3<
@@ -113,11 +102,9 @@ struct TestTypeInParamGeneric3 {
       GenericBaz>(a: #^TYPE_IN_FUNC_PARAM_GENERIC_3?check=TYPE_IN_FUNC_PARAM_GENERIC_3;check=WITH_GLOBAL_TYPES;check=GLOBAL_NEGATIVE^#
 }
 
-// TYPE_IN_FUNC_PARAM_GENERIC_3: Begin completions
 // TYPE_IN_FUNC_PARAM_GENERIC_3-DAG: Decl[GenericTypeParam]/Local: GenericFoo[#GenericFoo#]{{; name=.+$}}
 // TYPE_IN_FUNC_PARAM_GENERIC_3-DAG: Decl[GenericTypeParam]/Local: GenericBar[#GenericBar#]{{; name=.+$}}
 // TYPE_IN_FUNC_PARAM_GENERIC_3-DAG: Decl[GenericTypeParam]/Local: GenericBaz[#GenericBaz#]{{; name=.+$}}
-// TYPE_IN_FUNC_PARAM_GENERIC_3: End completions
 
 struct TestTypeInParamGeneric4<
     StructGenericFoo : FooProtocol,
@@ -129,7 +116,6 @@ struct TestTypeInParamGeneric4<
       GenericBaz>(a: #^TYPE_IN_FUNC_PARAM_GENERIC_4?check=TYPE_IN_FUNC_PARAM_GENERIC_4;check=WITH_GLOBAL_TYPES;check=GLOBAL_NEGATIVE^#
 }
 
-// TYPE_IN_FUNC_PARAM_GENERIC_4: Begin completions
 // Generic parameters of the struct.
 // TYPE_IN_FUNC_PARAM_GENERIC_4-DAG: Decl[GenericTypeParam]/Local: StructGenericFoo[#StructGenericFoo#]{{; name=.+$}}
 // TYPE_IN_FUNC_PARAM_GENERIC_4-DAG: Decl[GenericTypeParam]/Local: StructGenericBar[#StructGenericBar#]{{; name=.+$}}
@@ -138,7 +124,6 @@ struct TestTypeInParamGeneric4<
 // TYPE_IN_FUNC_PARAM_GENERIC_4-DAG: Decl[GenericTypeParam]/Local: GenericFoo[#GenericFoo#]{{; name=.+$}}
 // TYPE_IN_FUNC_PARAM_GENERIC_4-DAG: Decl[GenericTypeParam]/Local: GenericBar[#GenericBar#]{{; name=.+$}}
 // TYPE_IN_FUNC_PARAM_GENERIC_4-DAG: Decl[GenericTypeParam]/Local: GenericBaz[#GenericBaz#]{{; name=.+$}}
-// TYPE_IN_FUNC_PARAM_GENERIC_4: End completions
 
 struct TestTypeInParamGeneric5<StructGenericFoo> {
   struct TestTypeInParamGeneric5a<StructGenericBar> {
@@ -148,14 +133,12 @@ struct TestTypeInParamGeneric5<StructGenericFoo> {
   }
 }
 
-// TYPE_IN_FUNC_PARAM_GENERIC_5: Begin completions
 // Generic parameters of the containing structs.
 // TYPE_IN_FUNC_PARAM_GENERIC_5-DAG: Decl[GenericTypeParam]/Local: StructGenericFoo[#StructGenericFoo#]{{; name=.+$}}
 // TYPE_IN_FUNC_PARAM_GENERIC_5-DAG: Decl[GenericTypeParam]/Local: StructGenericBar[#StructGenericBar#]{{; name=.+$}}
 // TYPE_IN_FUNC_PARAM_GENERIC_5-DAG: Decl[GenericTypeParam]/Local: StructGenericBaz[#StructGenericBaz#]{{; name=.+$}}
 // Generic parameters of the function.
 // TYPE_IN_FUNC_PARAM_GENERIC_5-DAG: Decl[GenericTypeParam]/Local: GenericFoo[#GenericFoo#]{{; name=.+$}}
-// TYPE_IN_FUNC_PARAM_GENERIC_5: End completions
 
 struct TestTypeInConstructorParamGeneric1<
     StructGenericFoo : FooProtocol,
@@ -164,11 +147,9 @@ struct TestTypeInConstructorParamGeneric1<
   init(a: #^TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_1?check=TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_1;check=WITH_GLOBAL_TYPES;check=GLOBAL_NEGATIVE^#
 }
 
-// TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_1: Begin completions
 // TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_1-DAG: Decl[GenericTypeParam]/Local: StructGenericFoo[#StructGenericFoo#]{{; name=.+$}}
 // TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_1-DAG: Decl[GenericTypeParam]/Local: StructGenericBar[#StructGenericBar#]{{; name=.+$}}
 // TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_1-DAG: Decl[GenericTypeParam]/Local: StructGenericBaz[#StructGenericBaz#]{{; name=.+$}}
-// TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_1: End completions
 
 struct TestTypeInConstructorParamGeneric2 {
   init<GenericFoo : FooProtocol,
@@ -176,11 +157,9 @@ struct TestTypeInConstructorParamGeneric2 {
        GenericBaz>(a: #^TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_2?check=TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_2;check=WITH_GLOBAL_TYPES;check=GLOBAL_NEGATIVE^#
 }
 
-// TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_2: Begin completions
 // TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_2-DAG: Decl[GenericTypeParam]/Local: GenericFoo[#GenericFoo#]{{; name=.+$}}
 // TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_2-DAG: Decl[GenericTypeParam]/Local: GenericBar[#GenericBar#]{{; name=.+$}}
 // TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_2-DAG: Decl[GenericTypeParam]/Local: GenericBaz[#GenericBaz#]{{; name=.+$}}
-// TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_2: End completions
 
 struct TestTypeInConstructorParamGeneric3<
     StructGenericFoo : FooProtocol,
@@ -191,7 +170,6 @@ struct TestTypeInConstructorParamGeneric3<
        GenericBaz>(a: #^TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_3?check=TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_3;check=WITH_GLOBAL_TYPES;check=GLOBAL_NEGATIVE^#
 }
 
-// TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_3: Begin completions
 // Generic parameters of the struct.
 // TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_3-DAG: Decl[GenericTypeParam]/Local: StructGenericFoo[#StructGenericFoo#]{{; name=.+$}}
 // TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_3-DAG: Decl[GenericTypeParam]/Local: StructGenericBar[#StructGenericBar#]{{; name=.+$}}
@@ -200,7 +178,6 @@ struct TestTypeInConstructorParamGeneric3<
 // TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_3-DAG: Decl[GenericTypeParam]/Local: GenericFoo[#GenericFoo#]{{; name=.+$}}
 // TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_3-DAG: Decl[GenericTypeParam]/Local: GenericBar[#GenericBar#]{{; name=.+$}}
 // TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_3-DAG: Decl[GenericTypeParam]/Local: GenericBaz[#GenericBaz#]{{; name=.+$}}
-// TYPE_IN_CONSTRUCTOR_PARAM_GENERIC_3: End completions
 
 // No tests for destructors: destructors don't have parameters.
 
@@ -217,20 +194,14 @@ class A<T> {
 	subscript(_ arg: Int) -> #^TYPE_IN_SUBSCR_GEN_PARAM_NO_DUP^#
 }
 
-// TYPE_IN_RETURN_GEN_PARAM_NO_DUP: Begin completions
 // TYPE_IN_RETURN_GEN_PARAM_NO_DUP-DAG: Decl[GenericTypeParam]/Local: T[#T#]; name=T
 // TYPE_IN_RETURN_GEN_PARAM_NO_DUP-NOT: Decl[GenericTypeParam]/Local: T[#T#]; name=T
-// TYPE_IN_RETURN_GEN_PARAM_NO_DUP: End completions
 
-// TYPE_IVAR_GEN_PARAM_NO_DUP: Begin completions
 // TYPE_IVAR_GEN_PARAM_NO_DUP-DAG: Decl[GenericTypeParam]/Local: T[#T#]; name=T
 // TYPE_IVAR_GEN_PARAM_NO_DUP-NOT: Decl[GenericTypeParam]/Local: T[#T#]; name=T
-// TYPE_IVAR_GEN_PARAM_NO_DUP: End completions
 
-// TYPE_IN_SUBSCR_GEN_PARAM_NO_DUP: Begin completions
 // TYPE_IN_SUBSCR_GEN_PARAM_NO_DUP-DAG: Decl[GenericTypeParam]/Local: T[#T#]; name=T
 // TYPE_IN_SUBSCR_GEN_PARAM_NO_DUP-NOT: Decl[GenericTypeParam]/Local: T[#T#]; name=T
-// TYPE_IN_SUBSCR_GEN_PARAM_NO_DUP: End completions
 
 //===---
 //===--- Test that we can complete types in variable declarations.
@@ -251,12 +222,10 @@ func testTypeInLocalVarInFreeFunc2() {
 
   var localVar: #^TYPE_IN_LOCAL_VAR_IN_FREE_FUNC_2?check=TYPE_IN_LOCAL_VAR_IN_FREE_FUNC_2;check=WITH_GLOBAL_TYPES;check=GLOBAL_NEGATIVE^#
 }
-// TYPE_IN_LOCAL_VAR_IN_FREE_FUNC_2: Begin completions
 // TYPE_IN_LOCAL_VAR_IN_FREE_FUNC_2-DAG: Decl[Struct]/Local:    NestedStruct[#NestedStruct#]{{; name=.+$}}
 // TYPE_IN_LOCAL_VAR_IN_FREE_FUNC_2-DAG: Decl[Class]/Local:     NestedClass[#NestedClass#]{{; name=.+$}}
 // TYPE_IN_LOCAL_VAR_IN_FREE_FUNC_2-DAG: Decl[Enum]/Local:      NestedEnum[#NestedEnum#]{{; name=.+$}}
 // TYPE_IN_LOCAL_VAR_IN_FREE_FUNC_2-DAG: Decl[TypeAlias]/Local: NestedTypealias[#Int#]{{; name=.+$}}
-// TYPE_IN_LOCAL_VAR_IN_FREE_FUNC_2: End completions
 
 class TestTypeInLocalVarInMemberFunc1 {
   struct NestedStruct {}
@@ -279,12 +248,10 @@ class TestTypeInLocalVarInMemberFunc1 {
     var localVar: #^TYPE_IN_LOCAL_VAR_IN_INSTANCE_FUNC_1?check=TYPE_IN_LOCAL_VAR_IN_MEMBER_FUNC_1;check=WITH_GLOBAL_TYPES;check=GLOBAL_NEGATIVE^#
   }
 }
-// TYPE_IN_LOCAL_VAR_IN_MEMBER_FUNC_1: Begin completions
 // TYPE_IN_LOCAL_VAR_IN_MEMBER_FUNC_1-DAG: Decl[Struct]/CurrNominal:    NestedStruct[#NestedStruct#]{{; name=.+$}}
 // TYPE_IN_LOCAL_VAR_IN_MEMBER_FUNC_1-DAG: Decl[Class]/CurrNominal:     NestedClass[#NestedClass#]{{; name=.+$}}
 // TYPE_IN_LOCAL_VAR_IN_MEMBER_FUNC_1-DAG: Decl[Enum]/CurrNominal:      NestedEnum[#NestedEnum#]{{; name=.+$}}
 // TYPE_IN_LOCAL_VAR_IN_MEMBER_FUNC_1-DAG: Decl[TypeAlias]/CurrNominal: NestedTypealias[#Int#]{{; name=.+$}}
-// TYPE_IN_LOCAL_VAR_IN_MEMBER_FUNC_1: End completions
 
 var TypeInGlobalVar1: #^TYPE_IN_GLOBAL_VAR_1?check=WITH_GLOBAL_TYPES;check=GLOBAL_NEGATIVE^#
 
@@ -346,7 +313,7 @@ struct TypeInStructInheritance2 : , #^TYPE_IN_STRUCT_INHERITANCE_2?check=WITH_GL
 
 struct TypeInStructInheritance3 : FooProtocol, #^TYPE_IN_STRUCT_INHERITANCE_3?check=WITH_GLOBAL_TYPES;check=GLOBAL_NEGATIVE^#
 
-// FIXME: 'check' shold be 'WITH_GLOBAL_TYPES'
+// FIXME: 'check' should be 'WITH_GLOBAL_TYPES'
 struct TypeInStructInheritance4 : FooProtocol., #^TYPE_IN_STRUCT_INHERITANCE_4?check=WITH_GLOBAL_TYPES_EXPR^#
 
 struct TypeInStructInheritance5 : #^TYPE_IN_STRUCT_INHERITANCE_5?check=WITH_GLOBAL_TYPES;check=GLOBAL_NEGATIVE^# {
@@ -358,7 +325,7 @@ struct TypeInStructInheritance6 : , #^TYPE_IN_STRUCT_INHERITANCE_6?check=WITH_GL
 struct TypeInStructInheritance7 : FooProtocol, #^TYPE_IN_STRUCT_INHERITANCE_7?check=WITH_GLOBAL_TYPES;check=GLOBAL_NEGATIVE^# {
 }
 
-// FIXME: 'check' shold be 'WITH_GLOBAL_TYPES'
+// FIXME: 'check' should be 'WITH_GLOBAL_TYPES'
 struct TypeInStructInheritance8 : FooProtocol., #^TYPE_IN_STRUCT_INHERITANCE_8?check=WITH_GLOBAL_TYPES_EXPR^# {
 }
 
@@ -509,7 +476,6 @@ extension VarBase1 {
   typealias BaseExtNestedTypealias = Int
 }
 
-// VAR_BASE_1_TYPES: Begin completions
 // From VarBase1
 // VAR_BASE_1_TYPES-DAG: Decl[Struct]/CurrNominal:    BaseNestedStruct[#VarBase1.BaseNestedStruct#]{{; name=.+$}}
 // VAR_BASE_1_TYPES-DAG: Decl[Class]/CurrNominal:     BaseNestedClass[#VarBase1.BaseNestedClass#]{{; name=.+$}}
@@ -520,9 +486,7 @@ extension VarBase1 {
 // VAR_BASE_1_TYPES-DAG: Decl[Class]/CurrNominal:     BaseExtNestedClass[#VarBase1.BaseExtNestedClass#]{{; name=.+$}}
 // VAR_BASE_1_TYPES-DAG: Decl[Enum]/CurrNominal:      BaseExtNestedEnum[#VarBase1.BaseExtNestedEnum#]{{; name=.+$}}
 // VAR_BASE_1_TYPES-DAG: Decl[TypeAlias]/CurrNominal: BaseExtNestedTypealias[#Int#]{{; name=.+$}}
-// VAR_BASE_1_TYPES: End completions
 
-// VAR_BASE_1_TYPES_INCONTEXT: Begin completions
 // From VarBase1
 // VAR_BASE_1_TYPES_INCONTEXT-DAG: Decl[Struct]/CurrNominal:    BaseNestedStruct[#BaseNestedStruct#]{{; name=.+$}}
 // VAR_BASE_1_TYPES_INCONTEXT-DAG: Decl[Class]/CurrNominal:     BaseNestedClass[#BaseNestedClass#]{{; name=.+$}}
@@ -533,9 +497,7 @@ extension VarBase1 {
 // VAR_BASE_1_TYPES_INCONTEXT-DAG: Decl[Class]/CurrNominal:     BaseExtNestedClass[#BaseExtNestedClass#]{{; name=.+$}}
 // VAR_BASE_1_TYPES_INCONTEXT-DAG: Decl[Enum]/CurrNominal:      BaseExtNestedEnum[#BaseExtNestedEnum#]{{; name=.+$}}
 // VAR_BASE_1_TYPES_INCONTEXT-DAG: Decl[TypeAlias]/CurrNominal: BaseExtNestedTypealias[#Int#]{{; name=.+$}}
-// VAR_BASE_1_TYPES_INCONTEXT: End completions
 
-// VAR_BASE_1_NO_DOT_TYPES: Begin completions
 // From VarBase1
 // VAR_BASE_1_NO_DOT_TYPES-DAG: Decl[Struct]/CurrNominal:    .BaseNestedStruct[#VarBase1.BaseNestedStruct#]{{; name=.+$}}
 // VAR_BASE_1_NO_DOT_TYPES-DAG: Decl[Class]/CurrNominal:     .BaseNestedClass[#VarBase1.BaseNestedClass#]{{; name=.+$}}
@@ -546,7 +508,6 @@ extension VarBase1 {
 // VAR_BASE_1_NO_DOT_TYPES-DAG: Decl[Class]/CurrNominal:     .BaseExtNestedClass[#VarBase1.BaseExtNestedClass#]{{; name=.+$}}
 // VAR_BASE_1_NO_DOT_TYPES-DAG: Decl[Enum]/CurrNominal:      .BaseExtNestedEnum[#VarBase1.BaseExtNestedEnum#]{{; name=.+$}}
 // VAR_BASE_1_NO_DOT_TYPES-DAG: Decl[TypeAlias]/CurrNominal: .BaseExtNestedTypealias[#Int#]{{; name=.+$}}
-// VAR_BASE_1_NO_DOT_TYPES: End completions
 
 class VarDerived1 : VarBase1 {
   var instanceVarDerived1 : #^TYPE_IN_INSTANCE_VAR_3?check=VAR_DERIVED_1_TYPES_INCONTEXT;check=WITH_GLOBAL_TYPES;check=GLOBAL_NEGATIVE^#
@@ -588,7 +549,6 @@ extension VarDerived1 {
   typealias DerivedExtNestedTypealias = Int
 }
 
-// VAR_DERIVED_1_TYPES: Begin completions
 // From VarBase1
 // VAR_DERIVED_1_TYPES-DAG: Decl[Struct]/Super:          BaseNestedStruct[#VarBase1.BaseNestedStruct#]{{; name=.+$}}
 // VAR_DERIVED_1_TYPES-DAG: Decl[Class]/Super:           BaseNestedClass[#VarBase1.BaseNestedClass#]{{; name=.+$}}
@@ -609,9 +569,7 @@ extension VarDerived1 {
 // VAR_DERIVED_1_TYPES-DAG: Decl[Class]/CurrNominal:     DerivedExtNestedClass[#VarDerived1.DerivedExtNestedClass#]{{; name=.+$}}
 // VAR_DERIVED_1_TYPES-DAG: Decl[Enum]/CurrNominal:      DerivedExtNestedEnum[#VarDerived1.DerivedExtNestedEnum#]{{; name=.+$}}
 // VAR_DERIVED_1_TYPES-DAG: Decl[TypeAlias]/CurrNominal: DerivedExtNestedTypealias[#Int#]{{; name=.+$}}
-// VAR_DERIVED_1_TYPES: End completions
 
-// VAR_DERIVED_1_TYPES_INCONTEXT: Begin completions
 // From VarBase1
 // VAR_DERIVED_1_TYPES_INCONTEXT-DAG: Decl[Struct]/Super:          BaseNestedStruct[#VarBase1.BaseNestedStruct#]{{; name=.+$}}
 // VAR_DERIVED_1_TYPES_INCONTEXT-DAG: Decl[Class]/Super:           BaseNestedClass[#VarBase1.BaseNestedClass#]{{; name=.+$}}
@@ -632,7 +590,6 @@ extension VarDerived1 {
 // VAR_DERIVED_1_TYPES_INCONTEXT-DAG: Decl[Class]/CurrNominal:     DerivedExtNestedClass[#DerivedExtNestedClass#]{{; name=.+$}}
 // VAR_DERIVED_1_TYPES_INCONTEXT-DAG: Decl[Enum]/CurrNominal:      DerivedExtNestedEnum[#DerivedExtNestedEnum#]{{; name=.+$}}
 // VAR_DERIVED_1_TYPES_INCONTEXT-DAG: Decl[TypeAlias]/CurrNominal: DerivedExtNestedTypealias[#Int#]{{; name=.+$}}
-// VAR_DERIVED_1_TYPES_INCONTEXT: End completions
 
 //===---
 //===--- Test that we can complete based on user-provided type-identifier.
@@ -663,37 +620,31 @@ func testTypeIdentifierGeneric1<
     GenericFoo : FooProtocol
     >(a: GenericFoo.#^TYPE_IDENTIFIER_GENERIC_1?check=TYPE_IDENTIFIER_GENERIC_1;check=WITHOUT_GLOBAL_TYPES;check=GLOBAL_NEGATIVE^#
 
-// TYPE_IDENTIFIER_GENERIC_1: Begin completions
-// TYPE_IDENTIFIER_GENERIC_1-NEXT: Decl[AssociatedType]/CurrNominal: FooTypeAlias1{{; name=.+$}}
-// TYPE_IDENTIFIER_GENERIC_1-NEXT: Keyword/None:          Type[#GenericFoo.Type#]
-// TYPE_IDENTIFIER_GENERIC_1-NEXT: End completions
+// TYPE_IDENTIFIER_GENERIC_1: Begin completions, 2 items
+// TYPE_IDENTIFIER_GENERIC_1-DAG: Decl[AssociatedType]/CurrNominal: FooTypeAlias1{{; name=.+$}}
+// TYPE_IDENTIFIER_GENERIC_1-DAG: Keyword/None:          Type[#GenericFoo.Type#]
 
 func testTypeIdentifierGeneric2<
     GenericFoo : FooProtocol & BarProtocol
     >(a: GenericFoo.#^TYPE_IDENTIFIER_GENERIC_2?check=TYPE_IDENTIFIER_GENERIC_2;check=WITHOUT_GLOBAL_TYPES;check=GLOBAL_NEGATIVE^#
 
-// TYPE_IDENTIFIER_GENERIC_2: Begin completions
-// TYPE_IDENTIFIER_GENERIC_2-NEXT: Decl[AssociatedType]/CurrNominal: BarTypeAlias1{{; name=.+$}}
-// TYPE_IDENTIFIER_GENERIC_2-NEXT: Decl[AssociatedType]/CurrNominal: FooTypeAlias1{{; name=.+$}}
-// TYPE_IDENTIFIER_GENERIC_2-NEXT: Keyword/None:          Type[#GenericFoo.Type#]
-// TYPE_IDENTIFIER_GENERIC_2-NEXT: End completions
+// TYPE_IDENTIFIER_GENERIC_2: Begin completions, 3 items
+// TYPE_IDENTIFIER_GENERIC_2-DAG: Decl[AssociatedType]/CurrNominal: BarTypeAlias1{{; name=.+$}}
+// TYPE_IDENTIFIER_GENERIC_2-DAG: Decl[AssociatedType]/CurrNominal: FooTypeAlias1{{; name=.+$}}
+// TYPE_IDENTIFIER_GENERIC_2-DAG: Keyword/None:          Type[#GenericFoo.Type#]
 
 func testTypeIdentifierGeneric3<
     GenericFoo>(a: GenericFoo.#^TYPE_IDENTIFIER_GENERIC_3^#
 
-// TYPE_IDENTIFIER_GENERIC_3: Begin completions
-// TYPE_IDENTIFIER_GENERIC_3-NEXT: Keyword/None:          Type[#GenericFoo.Type#]
+// TYPE_IDENTIFIER_GENERIC_3-DAG: Keyword/None:          Type[#GenericFoo.Type#]
 // TYPE_IDENTIFIER_GENERIC_3-NOT: Keyword/CurrNominal:    self[#GenericFoo#]
-// TYPE_IDENTIFIER_GENERIC_3-NEXT: End completions
 
 func testTypeIdentifierIrrelevant1() {
   var a: Int
   #^TYPE_IDENTIFIER_IRRELEVANT_1^#
 }
-// TYPE_IDENTIFIER_IRRELEVANT_1: Begin completions
 // TYPE_IDENTIFIER_IRRELEVANT_1-DAG: Decl[LocalVar]/Local: a[#Int#]{{; name=.+$}}
 // TYPE_IDENTIFIER_IRRELEVANT_1-DAG: Decl[GlobalVar]/CurrModule: fooObject[#FooStruct#]{{; name=.+$}}
-// TYPE_IDENTIFIER_IRRELEVANT_1: End completions
 
 //===---
 //===--- Test that we can complete types in 'as' cast.
@@ -738,9 +689,8 @@ func testProtocol() {
   let _: FooProtocol.#^PROTOCOL_DOT_1^#
 // PROTOCOL_DOT_1: Begin completions, 3 items
 // PROTOCOL_DOT_1-DAG: Decl[AssociatedType]/CurrNominal:   FooTypeAlias1; name=FooTypeAlias1
-// PROTOCOL_DOT_1-DAG: Keyword/None:                       Protocol[#FooProtocol.Protocol#]; name=Protocol
-// PROTOCOL_DOT_1-DAG: Keyword/None:                       Type[#FooProtocol.Type#]; name=Type
-// PROTOCOL_DOT_1: End completions
+// PROTOCOL_DOT_1-DAG: Keyword/None:                       Protocol[#(any FooProtocol).Type#]; name=Protocol
+// PROTOCOL_DOT_1-DAG: Keyword/None:                       Type[#any FooProtocol.Type#]; name=Type
 }
 
 //===---
@@ -761,10 +711,8 @@ extension Task.Inner {
 }
 extension Task.Inner.#^UNBOUND_DOT_1?check=UNBOUND_DOT^# {}
 func testUnbound(x: Task.Inner.#^UNBOUND_DOT_2?check=UNBOUND_DOT^#) {}
-// UNBOUND_DOT: Begin completions
 // UNBOUND_DOT-DAG: Decl[TypeAlias]/CurrNominal:        Failure[#Int#]; name=Failure
 // UNBOUND_DOT-DAG: Keyword/None:                       Type[#Task.Inner.Type#]; name=Type
-// UNBOUND_DOT: End completions
 
 
 protocol MyProtocol {}
@@ -773,9 +721,7 @@ struct OuterStruct<U>  {
 }
 
 func testUnbound2(x: OuterStruct<Int>.Inner.#^UNBOUND_DOT_3^#) {}
-// UNBOUND_DOT_3: Begin completions
 // UNBOUND_DOT_3-DAG: Keyword/None:                       Type[#OuterStruct<Int>.Inner.Type#]; name=Type
-// UNBOUND_DOT_3: End completions
 
 // rdar://problem/67102794
 struct HasProtoAlias {
@@ -789,7 +735,6 @@ struct ContainExtension {
 // EXTENSION_INHERITANCE: Begin completions, 2 items
 // EXTENSION_INHERITANCE-DAG: Decl[TypeAlias]/CurrNominal:        ProtoAlias[#FooProtocol#];
 // EXTENSION_INHERITANCE-DAG: Keyword/None:                       Type[#HasProtoAlias.Type#];
-// EXTENSION_INHERITANCE: End completions
 
 var _: (() -> #^IN_POSTFIX_BASE_1?check=WITH_GLOBAL_TYPES^#)?
 var _: (() -> #^IN_POSTFIX_BASE_2?check=WITH_GLOBAL_TYPES^#)!
@@ -810,4 +755,14 @@ var _: HaveNested.#^IN_POSTFIX_BASE_MEMBER_5?check=POSTFIX_BASE_MEMBER^#.Type
 // POSTFIX_BASE_MEMBER: Begin completions, 2 items
 // POSTFIX_BASE_MEMBER-DAG: Decl[Struct]/CurrNominal:           Nested[#HaveNested.Nested#];
 // POSTFIX_BASE_MEMBER-DAG: Keyword/None:                       Type[#HaveNested.Type#];
-// POSTFIX_BASE_MEMBER: End completions
+
+func testGenericResultCompletion1<T>() -> #^GENERIC_RESULT1?check=GENERIC_RESULT^# {}
+func testGenericResultCompletion2<T>() -> [#^GENERIC_RESULT2?check=GENERIC_RESULT^#] {}
+func testGenericResultCompletion3<T>() -> (#^GENERIC_RESULT3?check=GENERIC_RESULT^#) {}
+func testGenericResultCompletion4<T>() -> (Int, #^GENERIC_RESULT4?check=GENERIC_RESULT^#) {}
+func testGenericResultCompletion5<T>() -> FooProtocol & #^GENERIC_RESULT5?check=GENERIC_RESULT^# {}
+func testGenericResultCompletion6<T>() -> [[#^GENERIC_RESULT6?check=GENERIC_RESULT^#]] {}
+func testGenericResultCompletion7<T>() -> Array< #^GENERIC_RESULT7?check=GENERIC_RESULT^#> {}
+func testGenericResultCompletion8<T>() -> Array<(Int, #^GENERIC_RESULT8?check=GENERIC_RESULT^#)> {}
+
+// GENERIC_RESULT-DAG: Decl[GenericTypeParam]/Local: T[#T#]; name=T

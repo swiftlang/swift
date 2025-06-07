@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen -primary-file %s -disable-availability-checking | %FileCheck %s
-// RUN: %target-swift-emit-sil -primary-file %s -O -disable-availability-checking
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -primary-file %s -disable-availability-checking | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -primary-file %s -O -disable-availability-checking
 
 // CHECK-LABEL: sil [ossa] @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
 

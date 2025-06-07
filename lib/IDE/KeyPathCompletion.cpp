@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/IDE/KeyPathCompletion.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/IDE/CompletionLookup.h"
@@ -37,8 +38,8 @@ void KeyPathTypeCheckCompletionCallback::sawSolutionImpl(
   if (ComponentIndex == 0) {
     // We are completing on the root and need to extract the key path's root
     // type.
-    if (KeyPath->getRootType()) {
-      BaseType = S.getResolvedType(KeyPath->getRootType());
+    if (auto *rootTy = KeyPath->getExplicitRootType()) {
+      BaseType = S.getResolvedType(rootTy);
     } else {
       // The key path doesn't have a root TypeRepr set, so we can't look the key
       // path's root up through it. Build a constraint locator and look the
@@ -52,7 +53,7 @@ void KeyPathTypeCheckCompletionCallback::sawSolutionImpl(
             return Entry.first->getImpl().getLocator() == RootLocator;
           });
       if (BaseVariableTypeBinding != S.typeBindings.end()) {
-        BaseType = S.simplifyType(BaseVariableTypeBinding->getSecond());
+        BaseType = S.simplifyType(BaseVariableTypeBinding->second);
       }
     }
   } else {
@@ -73,10 +74,9 @@ void KeyPathTypeCheckCompletionCallback::sawSolutionImpl(
   Results.push_back({BaseType, /*OnRoot=*/(ComponentIndex == 0)});
 }
 
-void KeyPathTypeCheckCompletionCallback::deliverResults(
+void KeyPathTypeCheckCompletionCallback::collectResults(
     DeclContext *DC, SourceLoc DotLoc,
-    ide::CodeCompletionContext &CompletionCtx,
-    CodeCompletionConsumer &Consumer) {
+    ide::CodeCompletionContext &CompletionCtx) {
   ASTContext &Ctx = DC->getASTContext();
   CompletionLookup Lookup(CompletionCtx.getResultSink(), Ctx, DC,
                           &CompletionCtx);
@@ -91,5 +91,6 @@ void KeyPathTypeCheckCompletionCallback::deliverResults(
     Lookup.getValueExprCompletions(Result.BaseType);
   }
 
-  deliverCompletionResults(CompletionCtx, Lookup, DC, Consumer);
+  collectCompletionResults(CompletionCtx, Lookup, DC, ExpectedTypeContext(),
+                           /*CanCurrDeclContextHandleAsync=*/false);
 }

@@ -11,12 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "ScanFixture.h"
-#include "swift/Basic/Platform.h"
 #include "swift/Basic/Defer.h"
-#include "llvm/ADT/Triple.h"
-#include "llvm/Support/Host.h"
+#include "swift/Basic/Platform.h"
+#include "swift/DependencyScan/DependencyScanImpl.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/TargetParser/Host.h"
+#include "llvm/TargetParser/Triple.h"
 #include "gtest/gtest.h"
 #include <string>
 
@@ -174,11 +175,157 @@ export *\n\
   for (auto &command : CommandStrArr) {
     Command.push_back(command.c_str());
   }
-  auto DependenciesOrErr = ScannerTool.getDependencies(Command, {});
+  auto DependenciesOrErr = ScannerTool.getDependencies(Command, {}, {});
   ASSERT_FALSE(DependenciesOrErr.getError());
   auto Dependencies = DependenciesOrErr.get();
   // TODO: Output/verify dependency graph correctness
   // llvm::dbgs() << "Deps: " << Dependencies << "\n";
 
+  swiftscan_dependency_graph_dispose(Dependencies);
+}
+
+TEST_F(ScanTest, TestModuleDepsHash) {
+  SmallString<256> tempDir;
+  ASSERT_FALSE(llvm::sys::fs::createUniqueDirectory("ScanTest.TestModuleDepsHash", tempDir));
+  SWIFT_DEFER { llvm::sys::fs::remove_directories(tempDir); };
+
+  // Create test input file
+  std::string TestPathStr = createFilename(tempDir, "foo.swift");
+  ASSERT_FALSE(emitFileWithContents(tempDir, "foo.swift", "import A\n"));
+
+  // Create includes
+  std::string IncludeDirPath = createFilename(tempDir, "include");
+  ASSERT_FALSE(llvm::sys::fs::create_directory(IncludeDirPath));
+  std::string SwiftDirPath = createFilename(IncludeDirPath, "Swift");
+  ASSERT_FALSE(llvm::sys::fs::create_directory(SwiftDirPath));
+
+  // Create imported module Swift interface files
+  ASSERT_FALSE(emitFileWithContents(SwiftDirPath, "A.swiftinterface",
+                                    "// swift-interface-format-version: 1.0\n\
+// swift-module-flags: -module-name A\n\
+import Swift\n\
+public func overlayFuncA() { }\n"));
+
+  // Paths to shims and stdlib
+  llvm::SmallString<128> ShimsLibDir = StdLibDir;
+  llvm::sys::path::append(ShimsLibDir, "shims");
+  auto Target = llvm::Triple(llvm::sys::getDefaultTargetTriple());
+  llvm::sys::path::append(StdLibDir, getPlatformNameForTriple(Target));
+
+  std::vector<std::string> BaseCommandStrArr = {
+    TestPathStr,
+    std::string("-I ") + SwiftDirPath,
+    std::string("-I ") + StdLibDir.str().str(),
+    std::string("-I ") + ShimsLibDir.str().str(),
+  };
+
+  std::vector<std::string> CommandStrArrA = BaseCommandStrArr;
+  CommandStrArrA.push_back("-module-name");
+  CommandStrArrA.push_back("A");
+  std::vector<std::string> CommandStrArrB = BaseCommandStrArr;
+  CommandStrArrB.push_back("-module-name");
+  CommandStrArrB.push_back("B");
+
+  // On Windows we need to add an extra escape for path separator characters because otherwise
+  // the command line tokenizer will treat them as escape characters.
+  for (size_t i = 0; i < CommandStrArrA.size(); ++i) {
+    std::replace(CommandStrArrA[i].begin(), CommandStrArrA[i].end(), '\\', '/');
+  }
+  std::vector<const char*> CommandA;
+  for (auto &command : CommandStrArrA) {
+    CommandA.push_back(command.c_str());
+  }
+
+  for (size_t i = 0; i < CommandStrArrB.size(); ++i) {
+    std::replace(CommandStrArrB[i].begin(), CommandStrArrB[i].end(), '\\', '/');
+  }
+  std::vector<const char*> CommandB;
+  for (auto &command : CommandStrArrB) {
+    CommandB.push_back(command.c_str());
+  }
+
+  auto ScanDiagnosticConsumer = std::make_shared<DependencyScanDiagnosticCollector>();
+  auto instanceA = ScannerTool.initCompilerInstanceForScan(CommandA, {}, ScanDiagnosticConsumer);
+  auto instanceB = ScannerTool.initCompilerInstanceForScan(CommandB, {}, ScanDiagnosticConsumer);
+  // Ensure that scans that only differ in module name have distinct scanning context hashes
+  ASSERT_NE(instanceA->ScanInstance.get()->getInvocation().getModuleScanningHash(),
+            instanceB->ScanInstance.get()->getInvocation().getModuleScanningHash());
+}
+
+TEST_F(ScanTest, TestModuleCycle) {
+  SmallString<256> tempDir;
+  ASSERT_FALSE(llvm::sys::fs::createUniqueDirectory("ScanTest.TestModuleCycle", tempDir));
+  SWIFT_DEFER { llvm::sys::fs::remove_directories(tempDir); };
+
+  // Create test input file
+  std::string TestPathStr = createFilename(tempDir, "foo.swift");
+  ASSERT_FALSE(emitFileWithContents(tempDir, "foo.swift", "import A\n"));
+
+  // Create includes
+  std::string IncludeDirPath = createFilename(tempDir, "include");
+  ASSERT_FALSE(llvm::sys::fs::create_directory(IncludeDirPath));
+  std::string SwiftDirPath = createFilename(IncludeDirPath, "Swift");
+  ASSERT_FALSE(llvm::sys::fs::create_directory(SwiftDirPath));
+
+  // Create imported module Swift interface files
+  ASSERT_FALSE(emitFileWithContents(SwiftDirPath, "A.swiftinterface",
+                                    "// swift-interface-format-version: 1.0\n\
+// swift-module-flags: -module-name A\n\
+import Swift\n\
+import B\n\
+public func funcA() { }\n"));
+  ASSERT_FALSE(emitFileWithContents(SwiftDirPath, "B.swiftinterface",
+                                    "// swift-interface-format-version: 1.0\n\
+// swift-module-flags: -module-name B\n\
+import Swift\n\
+import A\n\
+public func funcB() { }\n"));
+
+  // Paths to shims and stdlib
+  llvm::SmallString<128> ShimsLibDir = StdLibDir;
+  llvm::sys::path::append(ShimsLibDir, "shims");
+  auto Target = llvm::Triple(llvm::sys::getDefaultTargetTriple());
+  llvm::sys::path::append(StdLibDir, getPlatformNameForTriple(Target));
+
+  std::vector<std::string> BaseCommandStrArr = {
+    TestPathStr,
+    std::string("-I ") + SwiftDirPath,
+    std::string("-I ") + StdLibDir.str().str(),
+    std::string("-I ") + ShimsLibDir.str().str(),
+  };
+
+  std::vector<std::string> CommandStr = BaseCommandStrArr;
+  CommandStr.push_back("-module-name");
+  CommandStr.push_back("test");
+
+  // On Windows we need to add an extra escape for path separator characters because otherwise
+  // the command line tokenizer will treat them as escape characters.
+  for (size_t i = 0; i < CommandStr.size(); ++i) {
+    std::replace(CommandStr[i].begin(), CommandStr[i].end(), '\\', '/');
+  }
+  std::vector<const char*> Command;
+  for (auto &command : CommandStr)
+    Command.push_back(command.c_str());
+
+  auto ScanDiagnosticConsumer = std::make_shared<DependencyScanDiagnosticCollector>();
+
+  auto DependenciesOrErr = ScannerTool.getDependencies(Command, {}, {});
+
+  // Ensure a hollow output with diagnostic info is produced
+  ASSERT_FALSE(DependenciesOrErr.getError());
+  auto Dependencies = DependenciesOrErr.get();
+  auto Diagnostics = Dependencies->diagnostics;
+  ASSERT_TRUE(Diagnostics->count == 1);
+  auto Diagnostic = Diagnostics->diagnostics[0];
+  ASSERT_TRUE(Diagnostic->severity == SWIFTSCAN_DIAGNOSTIC_SEVERITY_ERROR);
+  auto Message = std::string((const char*)Diagnostic->message.data,
+                             Diagnostic->message.length);
+  ASSERT_TRUE(Message == "module dependency cycle: 'A.swiftinterface -> B.swiftinterface -> A.swiftinterface'\n");
+
+  // Ensure hollow output is hollow
+  ASSERT_TRUE(Dependencies->dependencies->count == 1);
+  ASSERT_TRUE(Dependencies->dependencies->modules[0]->source_files->count == 0);
+  ASSERT_TRUE(Dependencies->dependencies->modules[0]->direct_dependencies->count == 0);
+  ASSERT_TRUE(Dependencies->dependencies->modules[0]->link_libraries->count == 0);
   swiftscan_dependency_graph_dispose(Dependencies);
 }

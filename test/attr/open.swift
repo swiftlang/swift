@@ -1,15 +1,15 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -emit-module -c %S/Inputs/OpenHelpers.swift -o %t/OpenHelpers.swiftmodule
+// RUN: %target-build-swift -emit-module %S/Inputs/OpenHelpers.swift -o %t/OpenHelpers.swiftmodule
 // RUN: %target-typecheck-verify-swift -I %t
 
 import OpenHelpers
 
 /**** General structural limitations on open. ****/
 
-open private class OpenIsNotCompatibleWithPrivate {} // expected-error {{duplicate modifier}} expected-note{{modifier already specified here}}
-open fileprivate class OpenIsNotCompatibleWithFilePrivate {} // expected-error {{duplicate modifier}} expected-note{{modifier already specified here}}
-open internal class OpenIsNotCompatibleWithInternal {} // expected-error {{duplicate modifier}} expected-note{{modifier already specified here}}
-open public class OpenIsNotCompatibleWithPublic {} // expected-error {{duplicate modifier}} expected-note{{modifier already specified here}}
+open private class OpenIsNotCompatibleWithPrivate {} // expected-error {{multiple incompatible access-level modifiers specified}} expected-note{{previous modifier specified here}}
+open fileprivate class OpenIsNotCompatibleWithFilePrivate {} // expected-error {{multiple incompatible access-level modifiers specified}} expected-note{{previous modifier specified here}}
+open internal class OpenIsNotCompatibleWithInternal {} // expected-error {{multiple incompatible access-level modifiers specified}} expected-note{{previous modifier specified here}}
+open public class OpenIsNotCompatibleWithPublic {} // expected-error {{multiple incompatible access-level modifiers specified}} expected-note{{previous modifier specified here}}
 open open class OpenIsNotCompatibleWithOpen {} // expected-error {{duplicate modifier}} expected-note{{modifier already specified here}}
 
 open typealias OpenIsNotAllowedOnTypeAliases = Int // expected-error {{only classes and overridable class members can be declared 'open'; use 'public'}}
@@ -137,7 +137,7 @@ open class OpenSubClass : OpenSuperClass {
 
 class InvalidOpenExtensionClass { }
 
-open extension InvalidOpenExtensionClass {  // expected-error {{extensions cannot be declared 'open'; declare individual members as 'open' instead}} {{1-6=}} {{3-3=public }} {{3-3=public }}
+open extension InvalidOpenExtensionClass {  // expected-error {{extensions cannot be declared 'open'; declare individual members as 'open' instead}} {{1-6=}} {{+1:3-3=public }} {{+3:3-3=public }}
   func C() { } // Insert public
   private func A() { } // OK
   var F: Int { 3 } // Insert public

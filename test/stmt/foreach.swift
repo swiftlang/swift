@@ -26,7 +26,7 @@ func bad_containers_3(bc: BadContainer3) {
 
 struct BadIterator1 {}
 
-struct BadContainer4 : Sequence { // expected-error{{type 'BadContainer4' does not conform to protocol 'Sequence'}}
+struct BadContainer4 : Sequence { // expected-error{{type 'BadContainer4' does not conform to protocol 'Sequence'}} expected-note {{add stubs for conformance}}
   typealias Iterator = BadIterator1 // expected-note{{possibly intended match 'BadContainer4.Iterator' (aka 'BadIterator1') does not conform to 'IteratorProtocol'}}
   func makeIterator() -> BadIterator1 { }
 }
@@ -266,5 +266,101 @@ do {
 // rdar://100343275 - Sema is accepting incorrect code which leads to a crash in SILGen
 do {
   for (x, y, z) in [] { // expected-error {{tuple pattern cannot match values of non-tuple type 'Any'}}
+  }
+}
+
+do {
+  // https://github.com/apple/swift/issues/65650 - Make sure we say 'String', not 'Any'.
+  for (x, y) in [""] {} // expected-error {{tuple pattern cannot match values of non-tuple type 'String'}}
+}
+
+do {
+  class Base : Hashable {
+    static func ==(_: Base, _: Base) -> Bool { false }
+
+    func hash(into hasher: inout Hasher) {}
+  }
+
+  class Child : Base {
+    var value: Int = 0
+  }
+
+  struct Range {
+    func contains(_: Base) -> Bool { return false }
+  }
+
+  func test(data: Set<Child>, _ range: Range) {
+    for v in data where range.contains(v) {
+      _ = v.value // Ok (`v` is inferred from `data` and not from `range`)
+    }
+  }
+}
+
+// rdar://117220710 - The compiler incorrectly infers `v` pattern to be optional.
+do {
+  struct S {
+    var test: Int
+  }
+
+  func check(_: S?, _: S?) -> Bool { false }
+
+  func test(data: [S]?, exclusion: S?) {
+    for v in data ?? [] where check(v, exclusion) {
+      _ = v.test // Ok
+    }
+  }
+
+  let _ = { (data: [S]?, exclusion: S?) in
+    for v in data ?? [] where check(v, exclusion) {
+      _ = v.test // Ok
+    }
+  }
+}
+
+// SE-0408
+do {
+  func variadic<each T: Collection>(ts: repeat each T) {
+    for t in repeat each ts where !ts.isEmpty {}
+    // expected-error@-1 {{'where' clause in pack iteration is not supported}}
+
+    func test(_: () -> Void) {}
+
+    test {
+      for t in repeat each ts where !ts.isEmpty {}
+      // expected-error@-1 {{'where' clause in pack iteration is not supported}}
+    }
+  }
+  
+  func nested<each T, each U>(value: repeat each T, value1: repeat each U) {
+    for e1 in repeat each value {
+      for _ in [] {}
+      for e2 in repeat each value1 {
+        let y = e1 // Ok
+      }
+      let x = e1 // Ok
+    }
+  }
+}
+
+// https://github.com/apple/swift/issues/73207
+do {
+  func test(_ levels: [Range<Int>]) {
+    for (i, leaves): (Int, Range<Int>) in levels[8 ..< 15].enumerated() { // Ok
+      _ = i
+      _ = leaves
+    }
+  }
+}
+
+// Make sure the bodies still type-check okay if the preamble is invalid.
+func testInvalidPreamble() {
+  func takesAutoclosure(_ x: @autoclosure () -> Int) -> Int { 0 }
+
+  for _ in undefined { // expected-error {{cannot find 'undefined' in scope}}
+    let a = takesAutoclosure(0) // Fine
+  }
+  for x in undefined { // expected-error {{cannot find 'undefined' in scope}}
+    let b: Int = x  // No type error, `x` is invalid.
+    _ = "" as Int // expected-error {{cannot convert value of type 'String' to type 'Int' in coercion}}
   }
 }

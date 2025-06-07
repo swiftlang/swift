@@ -1,10 +1,14 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %s -import-objc-header %S/Inputs/imported-block-typedefs.h -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/imported-block-typedefs.swiftmodule -typecheck -emit-objc-header-path %t/imported-block-typedefs-output.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
-// RUN: %FileCheck %s < %t/imported-block-typedefs-output.h
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/imported-block-typedefs.swiftmodule -typecheck -emit-objc-header-path %t/imported-block-typedefs-output.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module 2>%t/stderr.txt
+// RUN: %FileCheck %s --input-file %t/imported-block-typedefs-output.h
+// RUN: %FileCheck --check-prefix ERROR %s --input-file %t/stderr.txt
 // RUN: %check-in-clang %t/imported-block-typedefs-output.h -include %S/Inputs/imported-block-typedefs.h
 
 // REQUIRES: objc_interop
+
+// ERROR-DAG: <unknown>:0: warning: implicit import of bridging header 'imported-block-typedefs.h' via module 'main' is deprecated and will be removed in a later version of Swift
+// ERROR-NOT: warning: arbitrarily printing
 
 import ObjectiveC
 

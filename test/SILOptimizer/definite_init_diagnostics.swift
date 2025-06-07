@@ -103,6 +103,7 @@ func test2() {
   
   
   // Weak
+  // expected-warning @+1 {{variable 'w1' was never mutated; consider changing to 'let' constant}} {{8-11=let}}
   weak var w1 : SomeClass?
   _ = w1                // ok: default-initialized
 
@@ -110,7 +111,7 @@ func test2() {
   // expected-warning@+3 {{instance will be immediately deallocated because variable 'w2' is 'weak'}}
   // expected-note@+2 {{a strong reference is required to prevent the instance from being deallocated}}
   // expected-note@+1 {{'w2' declared here}}
-  weak var w2 = SomeClass()
+  weak let w2 = SomeClass()
   _ = w2                // ok
   
   
@@ -125,6 +126,18 @@ func test2() {
   // expected-note@+1 {{'u2' declared here}}
   unowned let u2 = SomeClass()
   _ = u2                // ok
+
+  // Array
+  var arr1: [String] // expected-note {{variable defined here}}
+  arr1.append("item") // expected-error {{variable 'arr1' used before being initialized}}
+  var arr2: [String] = []
+  arr2.append("item") // ok
+
+  // Dictionary
+  var d1: [String: Int] // expected-note {{variable defined here}}
+  d1["key"] = 1 // expected-error {{variable 'd1' used before being initialized}}
+  var d2: [String: Int] = [:]
+  d2["key"] = 1 // ok
 }
 
 
@@ -772,9 +785,9 @@ func throwingSwap<T>(_ a: inout T, _ b: inout T) throws {}
 
 // <rdar://problem/19035287> let properties should only be initializable, not reassignable
 struct LetProperties {
-  // expected-note @+1 5 {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
+  // expected-note @+1 2 {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
   let arr : [Int]
-  // expected-note @+1 7 {{change 'let' to 'var' to make it mutable}} {{3-6=var}} {{3-6=var}}
+  // expected-note @+1 2 {{change 'let' to 'var' to make it mutable}} {{3-6=var}} {{3-6=var}}
   let (u, v) : (Int, Int)
   // expected-note @+1 2 {{change 'let' to 'var' to make it mutable}} {{3-6=var}} {{3-6=var}}
   let w : (Int, Int)
@@ -828,21 +841,10 @@ struct LetProperties {
   init() throws {
     u = 1; v = 13; w = (1,2); y = 1 ; z = u
 
-    var variable = 42
-    swap(&u, &variable)  // expected-error {{immutable value 'self.u' must not be passed inout}}
-    try throwingSwap(&u, &variable)  // expected-error {{immutable value 'self.u' must not be passed inout}}
-
     u.inspect()  // ok, non mutating.
-    u.mutate()  // expected-error {{mutating method 'mutate' may not be used on immutable value 'self.u'}}
     
     arr = []
-    arr += []      // expected-error {{mutating operator '+=' may not be used on immutable value 'self.arr'}}
-    arr.append(4)  // expected-error {{mutating method 'append' may not be used on immutable value 'self.arr'}}
     arr[12] = 17   // expected-error {{cannot mutate subscript of immutable value 'self.arr'}}
-    let _ = arr[replacing: 12, with: 17] // expected-error {{mutating accessor for subscript may not be used on immutable value 'self.arr'}}
-
-    methodTakesInOut(&u)  // expected-error {{immutable value 'self.u' must not be passed inout}}
-    try throwingMethodTakesInOut(&u)  // expected-error {{immutable value 'self.u' must not be passed inout}}
   }
 }
 
@@ -855,12 +857,11 @@ protocol TestMutabilityProtocol {
  
 class C<T : TestMutabilityProtocol> {
   let x : T
-  let y : T // expected-note {{change 'let' to 'var' to make it mutable}}
+  let y : T
   
   init(a : T) {
     x = a; y = a
     x.toIntMax()
-    y.changeToIntMax()  // expected-error {{mutating method 'changeToIntMax' may not be used on immutable value 'self.y'}}
   }
 }
 
@@ -897,15 +898,14 @@ func testLocalProperties(_ b : Int) -> Int {
 // Should be rejected as multiple assignment.
 func testAddressOnlyProperty<T>(_ b : T) -> T {
   // expected-note @+1 {{change 'let' to 'var' to make it mutable}} {{3-6=var}}
-  let x : T  // expected-note {{change 'let' to 'var' to make it mutable}}
+  let x : T
   let y : T
   let z : T   // never assigned is ok.  expected-warning {{immutable value 'z' was never used}} {{7-8=_}}
   x = b
   y = b
   x = b   // expected-error {{immutable value 'x' may only be initialized once}}
 
-  var tmp = b
-  swap(&x, &tmp)   // expected-error {{immutable value 'x' must not be passed inout}}
+  _ = x
   return y
 }
 
@@ -949,14 +949,11 @@ struct StructMutatingMethodTest {
 
  // <rdar://problem/19268443> DI should reject this call to transparent function
  class TransparentFunction {
-  let x : Int  // expected-note {{change 'let' to 'var' to make it mutable}}
-  let y : Int  // expected-note {{change 'let' to 'var' to make it mutable}}
+  let x : Int
+  let y : Int
   init() {
     x = 42
-    x += 1     // expected-error {{mutating operator '+=' may not be used on immutable value 'self.x'}}
-
     y = 12
-    myTransparentFunction(&y)  // expected-error {{immutable value 'self.y' must not be passed inout}}
   }
 }
 
@@ -1093,9 +1090,9 @@ extension ProtocolInitTest {
 // <rdar://problem/22436880> Function accepting UnsafeMutablePointer is able to change value of immutable value
 func bug22436880(_ x: UnsafeMutablePointer<Int>) {}
 func test22436880() {
-  let x: Int // expected-note {{change 'let' to 'var' to make it mutable}}
+  let x: Int
   x = 1
-  bug22436880(&x) // expected-error {{immutable value 'x' must not be passed inout}}
+  _ = x
 }
 
 // https://github.com/apple/swift/issues/42806
@@ -1499,8 +1496,7 @@ func testOptionalChainingWithGenerics<T: DIOptionalTestProtocol>(p: T) -> T? {
             // expected-note@-2 {{constant defined here}}
 
   // note that here assignment to 'f' is a call to the setter.
-  x?.f = 0  // expected-error {{constant 'x' used before being initialized}}
-            // expected-error@-1 {{constant 'x' passed by reference before being initialized}}
+  x?.f = 0  // expected-error 2 {{constant 'x' used before being initialized}}
   return x  // expected-error {{constant 'x' used before being initialized}}
 }
 
@@ -1508,9 +1504,7 @@ func testOptionalChainingWithGenerics<T: DIOptionalTestProtocol>(p: T) -> T? {
 
 func testOptionalTupleUse(x: Bool) -> Int? {
   let optTuple: (Int, Int)? // expected-note {{constant defined here}}
-                            // expected-note@-1 {{constant defined here}}
   return optTuple?.1 // expected-error {{constant 'optTuple' used before being initialized}}
-                     // expected-error@-1 {{constant 'optTuple' used before being initialized}}
 }
 
 func testOptionalTupleOverwrite(x: Bool) -> (Int, Int)? {
@@ -1536,15 +1530,14 @@ func testOptionalTupleNoError2(x: Bool) -> (Int, Int)? {
 // Test forced unwrapping of optionals
 
 func testOptionalUseByUnwrap() {
-  let x: Int? // expected-note {{constant defined here}}
-              // expected-warning@-1 {{immutable value 'x' was never used; consider removing it}}
-  x! = 0      // expected-error {{constant 'x' used before being initialized}}
+  let x: Int? // expected-warning {{immutable value 'x' was never used; consider removing it}}
+  x = 0
 }
 
 func testOptionalWriteByUnwrap() -> Int? {
   let x: Int? // expected-note {{change 'let' to 'var' to make it mutable}}
   x = 0
-  x! = 0      // expected-error {{immutable value 'x' may only be initialized once}}
+  x = 0      // expected-error {{immutable value 'x' may only be initialized once}}
   return x
 }
 
@@ -1632,4 +1625,45 @@ class DerivedWrappedProperty : SomeClass {
     foo(self)  // expected-error {{'self' used in method call 'foo' before 'super.init' call}}
   }  // expected-error {{'super.init' isn't called on all paths before returning from initializer}}
 
+}
+
+// rdar://129031705 ([error: ... used before being initialized)
+// Related to treating 'let's as immutable RValues.
+struct S {
+  let rotation: (Int, Int)
+
+  init() {
+    rotation.0 = 0
+    rotation.1 = rotation.0
+  }
+}
+
+// rdar://135028163 - trying local 'lets' of tuple type as immutable rvalues, i.e.,
+// the same issue as the above rdar://129031705.
+func tupleAsLocal() {
+  let rotation: (Int, Int)
+  rotation.0 = 0
+  rotation.1 = rotation.0
+}
+
+// rdar://128890586: Init accessors
+final class HasInitAccessors {
+  private var _ints: [Int] = []
+
+  private var ints: [Int] {
+    @storageRestrictions(initializes: _ints)
+    init(initialValue) {
+        _ints = initialValue
+    }
+    get {
+        return _ints
+    }
+    set {
+      _ints = newValue
+    }
+  }
+
+  init() {
+    ints.append(0)
+  }
 }

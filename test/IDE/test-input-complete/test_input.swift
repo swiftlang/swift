@@ -34,6 +34,8 @@
 // RUN: %swift-ide-test -test-input-complete -source-filename %S/Inputs/multi_line_string1.swift | %FileCheck %s -check-prefix=INCOMPLETE
 // RUN: %swift-ide-test -test-input-complete -source-filename %S/Inputs/multi_line_string2.swift | %FileCheck %s -check-prefix=INCOMPLETE
 // RUN: %swift-ide-test -test-input-complete -source-filename %S/Inputs/multi_line_string3.swift | %FileCheck %s -check-prefix=INCOMPLETE
+// RUN: %swift-ide-test -test-input-complete -source-filename %S/Inputs/multi_line_string4.swift | %FileCheck %s -check-prefix=INCOMPLETE
+// RUN: %swift-ide-test -test-input-complete -source-filename %S/Inputs/multi_line_string5.swift | %FileCheck %s -check-prefix=INCOMPLETE
 
 // INCOMPLETE: IS_INCOMPLETE
 // COMPLETE: IS_COMPLETE

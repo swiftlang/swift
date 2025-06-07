@@ -1,0 +1,36 @@
+// RUN: %target-swiftc_driver -Xfrontend -disable-debugger-shadow-copies -g -emit-ir %s | %FileCheck %s
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// CHECK-LABEL: define {{.*}} @couple_of_voids
+sil hidden @couple_of_voids : $@convention(thin) () -> () {
+bb0:
+  %3 = tuple ()
+  // CHECK-NOT: #dbg_value
+  debug_value %3 : $(), let, (name "success", loc "void.swift":3:1), type $*((), ()), expr op_tuple_fragment:$((), ()):0
+  return %3 : $()
+} // end sil function 'couple_of_voids'
+
+// CHECK-LABEL: define {{.*}} @one_existing
+sil hidden @one_existing : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %1 = integer_literal $Builtin.Int64, 0
+  // CHECK: #dbg_value
+  // CHECK-SAME: ![[RESULT_VAR:[0-9]+]]
+  debug_value %1 : $Builtin.Int64, let, (name "result", loc "void.swift":3:1), type $*(Builtin.Int64, ()), expr op_tuple_fragment:$(Builtin.Int64, ()):0
+  return %1 : $Builtin.Int64
+} // end sil function 'one_existing'
+
+// CHECK-LABEL: define {{.*}} @one_empty
+sil hidden @one_empty : $@convention(thin) () -> () {
+bb0:
+  %3 = tuple ()
+  // CHECK-NOT: #dbg_value
+  debug_value %3 : $(), let, (name "failure", loc "void.swift":3:1), type $*(Builtin.Int64, ()), expr op_tuple_fragment:$(Builtin.Int64, ()):1
+  return %3 : $()
+} // end sil function 'one_empty'
+
+// CHECK: ![[RESULT_VAR]] = !DILocalVariable
+// CHECK-SAME: name: "result"

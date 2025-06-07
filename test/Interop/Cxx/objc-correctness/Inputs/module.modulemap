@@ -1,5 +1,51 @@
-module ProtocolNamingConflict [extern_c] {
+module ProtocolNamingConflict {
   header "protocol-naming-conflict.h"
   requires objc
 }
 
+module CxxClassWithNSStringInit {
+  header "cxx-class-with-arc-fields-ctor.h"
+  requires objc
+  requires cplusplus
+}
+
+module NSOptionsMangling {
+  header "NSOptionsMangling.h"
+}
+
+module NSNotificationBridging {
+  header "nsnotification-bridging.h"
+  requires objc
+  requires cplusplus
+}
+
+module NSStreamDelegate {
+  header "NSStreamDelegate.h"
+  requires objc
+}
+
+module OSObject {
+  header "os-object.h"
+  requires objc
+  requires cplusplus
+}
+
+module NSTextCheckingResult {
+  header "NSTextCheckingResult.h"
+  requires objc
+}
+
+module MockPOSIX {
+  header "POSIX.h"
+}
+
+module ID {
+  header "id.h"
+  requires objc
+  requires cplusplus
+}
+
+module CxxForeignRef {
+  header "cxx-frt.h"
+  requires cplusplus
+}

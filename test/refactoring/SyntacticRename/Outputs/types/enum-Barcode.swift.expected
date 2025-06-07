@@ -24,15 +24,15 @@ extension /*class-Animal:def*/Animal {
 	func boo(a: /*generic-T*/T, b: /*generic-U*/U) {}
 }
 
-enum /*enum-Barcode:def*/BetterBarcode {
+enum /*enum-Barcode:def*/<base>Barcode</base> {
 	case upc(Int, Int, Int, Int)
 	case /*case-qrCode:def*/qrCode(code: String)
 	case /*case-other:def*/other(Int)
 	case /*case-another:def*/another
 }
-var barCode: /*enum-Barcode*/BetterBarcode = /*enum-Barcode*/BetterBarcode.upc(1, 1, 1, 1)
+var barCode: /*enum-Barcode*/<base>Barcode</base> = /*enum-Barcode*/<base>Barcode</base>.upc(1, 1, 1, 1)
 barCode = . /*case-qrCode:call*/qrCode(code: "ABCDEFG")
-barCode = /*enum-Barcode*/BetterBarcode . /*case-qrCode:call*/qrCode(code: "J")
+barCode = /*enum-Barcode*/<base>Barcode</base> . /*case-qrCode:call*/qrCode(code: "J")
 barCode = . /*case-other:call*/other(2)
 barCode = . /*case-another*/another
 

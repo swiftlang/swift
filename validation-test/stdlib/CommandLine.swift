@@ -8,7 +8,7 @@
 // RUN: %target-run %t/CommandLineStressTest foo bar baz qux quux corge grault garply waldo fred plugh xyzzy and thud
 // REQUIRES: executable_test
 // REQUIRES: stress_test
-// UNSUPPORTED: single_threaded_runtime
+// UNSUPPORTED: threading_none
 
 // REQUIRES: rdar70423908
 

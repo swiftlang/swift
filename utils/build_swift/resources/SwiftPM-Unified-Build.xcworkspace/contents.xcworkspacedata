@@ -11,9 +11,10 @@
    <FileRef location = "group:../../../../swift-driver"></FileRef>
    <FileRef location = "group:../../../../swift-format"></FileRef>
    <FileRef location = "group:../../../../swift-stress-tester/SourceKitStressTester"></FileRef>
-   <FileRef location = "group:../../../../swift-stress-tester/SwiftEvolve"></FileRef>
    <FileRef location = "group:../../../../swift-syntax"></FileRef>
+   <FileRef location = "group:../../../../swift-syntax/CodeGeneration"></FileRef>
    <FileRef location = "group:../../../../swift-syntax/Examples"></FileRef>
+   <FileRef location = "group:../../../../swift-syntax/SwiftParserCLI"></FileRef>
    <FileRef location = "group:../../../../swift-system"></FileRef>
    <FileRef location = "group:../../../../swift-tools-support-core"></FileRef>
    <FileRef location = "group:../../../../swiftpm"></FileRef>

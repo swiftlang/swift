@@ -15,11 +15,13 @@
 #include "SourceInfoFormat.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/Comment.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Serialization/Serialization.h"
@@ -183,7 +185,7 @@ public:
     for (auto It = Map.begin(); It != Map.end(); ++ It) {
       ViewBuffer.push_back(It->first);
     }
-    return llvm::makeArrayRef(ViewBuffer);
+    return llvm::ArrayRef(ViewBuffer);
   }
 
   bool isEnable() {
@@ -231,7 +233,7 @@ public:
 
     // Source order.
     dataLength += numLen;
-    endian::Writer writer(out, little);
+    endian::Writer writer(out, llvm::endianness::little);
     writer.write<uint32_t>(keyLength);
     writer.write<uint32_t>(dataLength);
     return { keyLength, dataLength };
@@ -243,7 +245,7 @@ public:
 
   void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                 unsigned len) {
-    endian::Writer writer(out, little);
+    endian::Writer writer(out, llvm::endianness::little);
     writer.write<uint32_t>(data.Brief.size());
     out << data.Brief;
     writer.write<uint32_t>(data.Raw.Comments.size());
@@ -299,7 +301,7 @@ static void writeGroupNames(const comment_block::GroupNamesLayout &GroupNames,
                             ArrayRef<StringRef> Names) {
   llvm::SmallString<32> Blob;
   llvm::raw_svector_ostream BlobStream(Blob);
-  endian::Writer Writer(BlobStream, little);
+  endian::Writer Writer(BlobStream, llvm::endianness::little);
   Writer.write<uint32_t>(Names.size());
   for (auto N : Names) {
     Writer.write<uint32_t>(N.size());
@@ -309,53 +311,15 @@ static void writeGroupNames(const comment_block::GroupNamesLayout &GroupNames,
   GroupNames.emit(Scratch, BlobStream.str());
 }
 
-static bool hasDoubleUnderscore(Decl *D) {
-  // Exclude decls with double-underscored names, either in arguments or
-  // base names.
-  static StringRef Prefix = "__";
-
-  // If it's a function or subscript with a parameter with leading
-  // double underscore, it's a private function or subscript.
-  if (isa<AbstractFunctionDecl>(D) || isa<SubscriptDecl>(D)) {
-    if (getParameterList(cast<ValueDecl>(D))->hasInternalParameter(Prefix))
-      return true;
-  }
-
-  if (auto *VD = dyn_cast<ValueDecl>(D)) {
-    auto Name = VD->getBaseName();
-    if (!Name.isSpecial() &&
-        Name.getIdentifier().str().startswith(Prefix)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-static bool shouldIncludeDecl(Decl *D, bool ExcludeDoubleUnderscore) {
-  if (auto *VD = dyn_cast<ValueDecl>(D)) {
-    // Skip the decl if it's not visible to clients. The use of
-    // getEffectiveAccess is unusual here; we want to take the testability
-    // state into account and emit documentation if and only if they are
-    // visible to clients (which means public ordinarily, but
-    // public+internal when testing enabled).
-    if (VD->getEffectiveAccess() < swift::AccessLevel::Public)
-      return false;
-  }
-
-  // Skip SPI decls, unless we're generating a symbol graph with SPI information.
-  if (D->isSPI() && !D->getASTContext().SymbolGraphOpts.IncludeSPISymbols)
+static bool shouldIncludeDecl(Decl *D, bool ForSourceInfo) {
+  switch (getDocCommentSerializationTargetFor(D)) {
+  case DocCommentSerializationTarget::None:
     return false;
-
-  if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    auto *extended = ED->getExtendedNominal();
-    if (!extended)
-      return false;
-    return shouldIncludeDecl(extended, ExcludeDoubleUnderscore);
+  case DocCommentSerializationTarget::SourceInfoOnly:
+    return ForSourceInfo;
+  case DocCommentSerializationTarget::SwiftDocAndSourceInfo:
+    return true;
   }
-  if (ExcludeDoubleUnderscore && hasDoubleUnderscore(D)) {
-    return false;
-  }
-  return true;
 }
 
 static void writeDeclCommentTable(
@@ -394,7 +358,9 @@ static void writeDeclCommentTable(
       if (!D->canHaveComment())
         return false;
 
-      // Skip the decl if it does not have a comment.
+      // Skip the decl if it does not have a comment. Note this means
+      // we'll only serialize "direct" brief comments, but that's okay
+      // because clients can compute the semantic brief comment themselves.
       if (D->getRawComment().Comments.empty())
         return false;
       return true;
@@ -409,14 +375,20 @@ static void writeDeclCommentTable(
           return;
       }
       generator.insert(copyString(USRBuffer.str()),
-                       { ED->getBriefComment(), ED->getRawComment(),
-                         GroupContext.getGroupSequence(ED),
-                         SourceOrder++ });
+                       {ED->getSemanticBriefComment(), ED->getRawComment(),
+                        GroupContext.getGroupSequence(ED), SourceOrder++});
+    }
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
     }
 
     PreWalkAction walkToDeclPre(Decl *D) override {
-      if (!shouldIncludeDecl(D, /*ExcludeDoubleUnderscore*/true))
-        return Action::SkipChildren();
+      if (!shouldIncludeDecl(D, /*ForSourceInfo*/false)) {
+        // Pattern binding decls don't have comments to serialize, but we should
+        // still visit their vars.
+        return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
+      }
       if (!shouldSerializeDoc(D))
         return Action::Continue();
       if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
@@ -437,23 +409,22 @@ static void writeDeclCommentTable(
       }
 
       generator.insert(copyString(USRBuffer.str()),
-                       { VD->getBriefComment(), D->getRawComment(),
-                         GroupContext.getGroupSequence(VD),
-                         SourceOrder++ });
+                       {VD->getSemanticBriefComment(), D->getRawComment(),
+                        GroupContext.getGroupSequence(VD), SourceOrder++});
       return Action::Continue();
     }
 
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-      return Action::SkipChildren(S);
+      return Action::SkipNode(S);
     }
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      return Action::SkipChildren(E);
+      return Action::SkipNode(E);
     }
     PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
     PreWalkAction walkToParameterListPre(ParameterList *PL) override {
-      return Action::SkipChildren();
+      return Action::SkipNode();
     }
   };
 
@@ -463,7 +434,7 @@ static void writeDeclCommentTable(
   SmallVector<const FileUnit *, 1> Scratch;
   if (SF) {
     Scratch.push_back(SF);
-    files = llvm::makeArrayRef(Scratch);
+    files = llvm::ArrayRef(Scratch);
   } else {
     files = M->getFiles();
   }
@@ -477,7 +448,7 @@ static void writeDeclCommentTable(
   {
     llvm::raw_svector_ostream blobStream(hashTableBlob);
     // Make sure that no bucket is at offset 0
-    endian::write<uint32_t>(blobStream, 0, little);
+    endian::write<uint32_t>(blobStream, 0, llvm::endianness::little);
     tableOffset = Writer.generator.Emit(blobStream);
   }
 
@@ -549,7 +520,7 @@ public:
     const unsigned numLen = 4;
     uint32_t keyLength = key.size();
     uint32_t dataLength = numLen;
-    endian::Writer writer(out, little);
+    endian::Writer writer(out, llvm::endianness::little);
     writer.write<uint32_t>(keyLength);
     return { keyLength, dataLength };
   }
@@ -560,7 +531,7 @@ public:
 
   void EmitData(raw_ostream &out, key_type_ref key, data_type_ref data,
                 unsigned len) {
-    endian::Writer writer(out, little);
+    endian::Writer writer(out, llvm::endianness::little);
     writer.write<uint32_t>(data);
   }
 };
@@ -570,12 +541,12 @@ class DeclUSRsTableWriter {
   llvm::OnDiskChainedHashTableGenerator<USRTableInfo> generator;
 public:
   uint32_t peekNextId() const { return USRs.size(); }
-  Optional<uint32_t> getNewUSRId(StringRef USR) {
+  std::optional<uint32_t> getNewUSRId(StringRef USR) {
     // Attempt to insert the USR into the StringSet.
     auto It = USRs.insert(USR);
     // If the USR exists in the StringSet, return None.
     if (!It.second)
-      return None;
+      return std::nullopt;
     auto Id = USRs.size() - 1;
     // We have to insert the USR from the StringSet because it's where the
     // memory is owned.
@@ -590,7 +561,7 @@ public:
     {
       llvm::raw_svector_ostream blobStream(hashTableBlob);
       // Make sure that no bucket is at offset 0
-      endian::write<uint32_t>(blobStream, 0, little);
+      endian::write<uint32_t>(blobStream, 0, llvm::endianness::little);
       tableOffset = generator.Emit(blobStream);
     }
     USRsList.emit(scratch, tableOffset, hashTableBlob);
@@ -667,7 +638,7 @@ public:
     }
 
     llvm::raw_svector_ostream OS(Buffer);
-    endian::Writer Writer(OS, little);
+    endian::Writer Writer(OS, llvm::endianness::little);
     Writer.write<uint32_t>(DocRanges.size());
     for (const auto &DocRange : DocRanges) {
       writeRawLoc(DocRange.first, Writer, Strings);
@@ -696,23 +667,27 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
                            DocWriter(DocWriter) {}
 
   PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-    return Action::SkipChildren(S);
+    return Action::SkipNode(S);
   }
   PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-    return Action::SkipChildren(E);
+    return Action::SkipNode(E);
   }
   PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
-    return Action::SkipChildren();
+    return Action::SkipNode();
   }
   PreWalkAction walkToParameterListPre(ParameterList *PL) override {
-    return Action::SkipChildren();
+    return Action::SkipNode();
   }
 
-  Optional<uint32_t> calculateNewUSRId(Decl *D) {
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Expansion;
+  }
+
+  std::optional<uint32_t> calculateNewUSRId(Decl *D) {
     llvm::SmallString<512> Buffer;
     llvm::raw_svector_ostream OS(Buffer);
     if (ide::printDeclUSR(D, OS))
-      return None;
+      return std::nullopt;
     return USRWriter.getNewUSRId(OS.str());
   }
 
@@ -723,11 +698,11 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
   }
 
   PreWalkAction walkToDeclPre(Decl *D) override {
-    // .swiftdoc doesn't include comments for double underscored symbols, but
-    // for .swiftsourceinfo, having the source location for these symbols isn't
-    // a concern because these symbols are in .swiftinterface anyway.
-    if (!shouldIncludeDecl(D, /*ExcludeDoubleUnderscore*/false))
-      return Action::SkipChildren();
+    if (!shouldIncludeDecl(D, /*ForSourceInfo*/true)) {
+      // Pattern binding decls don't have comments to serialize, but we should
+      // still visit their vars.
+      return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
+    }
     if (!shouldSerializeSourceLoc(D))
       return Action::Continue();
 
@@ -745,10 +720,10 @@ struct BasicDeclLocsTableWriter : public ASTWalker {
     llvm::sys::fs::make_absolute(AbsolutePath);
 
     llvm::raw_svector_ostream Out(Buffer);
-    endian::Writer Writer(Out, little);
+    endian::Writer Writer(Out, llvm::endianness::little);
     Writer.write<uint32_t>(FWriter.getTextOffset(AbsolutePath.str()));
-    Writer.write<uint32_t>(DocWriter.getDocRangesOffset(
-        D, llvm::makeArrayRef(RawLocs->DocRanges)));
+    Writer.write<uint32_t>(
+        DocWriter.getDocRangesOffset(D, llvm::ArrayRef(RawLocs->DocRanges)));
     writeRawLoc(RawLocs->Loc, Writer, FWriter);
     writeRawLoc(RawLocs->StartLoc, Writer, FWriter);
     writeRawLoc(RawLocs->EndLoc, Writer, FWriter);
@@ -808,7 +783,7 @@ static void emitFileListRecord(llvm::BitstreamWriter &Out,
                            .count();
 
       llvm::raw_svector_ostream out(Buffer);
-      endian::Writer writer(out, little);
+      endian::Writer writer(out, llvm::endianness::little);
       // FilePath.
       writer.write<uint32_t>(fileID);
 

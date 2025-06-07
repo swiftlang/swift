@@ -22,6 +22,7 @@
 #define DEBUG_TYPE "sil-simplify"
 
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/PatternMatch.h"
@@ -46,14 +47,11 @@ namespace {
     SILValue visitStructExtractInst(StructExtractInst *SEI);
     SILValue visitEnumInst(EnumInst *EI);
     SILValue visitSelectEnumInst(SelectEnumInst *SEI);
-    SILValue visitUncheckedEnumDataInst(UncheckedEnumDataInst *UEDI);
     SILValue visitAddressToPointerInst(AddressToPointerInst *ATPI);
-    SILValue visitPointerToAddressInst(PointerToAddressInst *PTAI);
     SILValue visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
     SILValue
     visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI);
     SILValue visitUncheckedRefCastInst(UncheckedRefCastInst *OPRI);
-    SILValue visitUncheckedAddrCastInst(UncheckedAddrCastInst *UACI);
     SILValue visitStructInst(StructInst *SI);
     SILValue visitTupleInst(TupleInst *SI);
     SILValue visitBuiltinInst(BuiltinInst *AI);
@@ -166,22 +164,6 @@ SILValue InstSimplifier::visitStructExtractInst(StructExtractInst *sei) {
   // struct_extract(struct(x, y), x) -> x
   if (auto *si = dyn_cast<StructInst>(op))
     return si->getFieldValue(sei->getField());
-
-  return SILValue();
-}
-
-SILValue
-InstSimplifier::visitUncheckedEnumDataInst(UncheckedEnumDataInst *uedi) {
-  // (unchecked_enum_data (enum payload)) -> payload
-  auto opt = lookThroughOwnershipInsts(uedi->getOperand());
-  if (auto *ei = dyn_cast<EnumInst>(opt)) {
-    if (ei->getElement() != uedi->getElement())
-      return SILValue();
-
-    assert(ei->hasOperand() &&
-           "Should only get data from an enum with payload.");
-    return lookThroughOwnershipInsts(ei->getOperand());
-  }
 
   return SILValue();
 }
@@ -302,16 +284,6 @@ SILValue InstSimplifier::visitAddressToPointerInst(AddressToPointerInst *ATPI) {
   return SILValue();
 }
 
-SILValue InstSimplifier::visitPointerToAddressInst(PointerToAddressInst *PTAI) {
-  // If this address is not strict, then it cannot be replaced by an address
-  // that may be strict.
-  if (auto *ATPI = dyn_cast<AddressToPointerInst>(PTAI->getOperand()))
-    if (ATPI->getOperand()->getType() == PTAI->getType() && PTAI->isStrict())
-      return ATPI->getOperand();
-
-  return SILValue();
-}
-
 SILValue InstSimplifier::visitRefToRawPointerInst(RefToRawPointerInst *RefToRaw) {
   // Perform the following simplification:
   //
@@ -382,21 +354,6 @@ visitUncheckedRefCastInst(UncheckedRefCastInst *OPRI) {
 
   // (destroy_value (unchecked_ref_cast x)) -> destroy_value x
   return simplifyDeadCast(OPRI);
-}
-
-SILValue
-InstSimplifier::
-visitUncheckedAddrCastInst(UncheckedAddrCastInst *UACI) {
-  // (unchecked-addr-cast Y->X (unchecked-addr-cast x X->Y)) -> x
-  if (auto *OtherUACI = dyn_cast<UncheckedAddrCastInst>(&*UACI->getOperand()))
-    if (OtherUACI->getOperand()->getType() == UACI->getType())
-      return OtherUACI->getOperand();
-
-  // (unchecked-addr-cast X->X x) -> x
-  if (UACI->getOperand()->getType() == UACI->getType())
-    return UACI->getOperand();
-
-  return SILValue();
 }
 
 SILValue InstSimplifier::visitUpcastInst(UpcastInst *UI) {
@@ -477,10 +434,10 @@ SILValue InstSimplifier::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
   // SILCombine.
   //
   // (convert_function Y->X (convert_function x X->Y)) -> x
-  SILValue convertedValue = lookThroughOwnershipInsts(cfi->getConverted());
+  SILValue convertedValue = lookThroughOwnershipInsts(cfi->getOperand());
   if (auto *subCFI = dyn_cast<ConvertFunctionInst>(convertedValue))
-    if (subCFI->getConverted()->getType() == cfi->getType())
-      return lookThroughOwnershipInsts(subCFI->getConverted());
+    if (subCFI->getOperand()->getType() == cfi->getType())
+      return lookThroughOwnershipInsts(subCFI->getOperand());
 
   return SILValue();
 }

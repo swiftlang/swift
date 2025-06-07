@@ -7,7 +7,7 @@ import Builtin
 import Swift
 
 sil @cl : $@convention(thin) (@in_guaranteed Builtin.Int64) -> ()
-sil @f : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+sil @f : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
 
 // This test case used to loop infinitely because it processed the dead block as
 // part of a dominance based algorithm.
@@ -39,8 +39,9 @@ bb6:
         %40 = function_ref @cl : $@convention(thin) (@in_guaranteed Builtin.Int64) -> ()
   %43 = partial_apply [callee_guaranteed] %40(%41) : $@convention(thin) (@in_guaranteed Builtin.Int64) -> ()
   %44 = convert_escape_to_noescape [not_guaranteed] %43 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
-  %55 = function_ref @f : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
-  %56 = apply %55(%44) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> ()
+  %55 = function_ref @f : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %56 = apply %55(%44) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %44 : $@noescape @callee_guaranteed () -> ()
   destroy_value %43 : $@callee_guaranteed () -> ()
   dealloc_stack %41 : $*Builtin.Int64
   br bb8

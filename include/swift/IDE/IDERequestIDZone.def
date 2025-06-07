@@ -18,7 +18,8 @@
 SWIFT_REQUEST(IDE, CollectOverriddenDeclsRequest,
               ArrayRef<ValueDecl *>(OverridenDeclsOwner), Cached,
               NoLocationInfo)
-SWIFT_REQUEST(IDE, CursorInfoRequest, ide::ResolvedCursorInfo(CursorInfoOwner),
+SWIFT_REQUEST(IDE, CursorInfoRequest,
+              ide::ResolvedCursorInfoPtr(CursorInfoOwner),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(IDE, ProvideDefaultImplForRequest,
               ArrayRef<ValueDecl *>(ValueDecl *), Cached,

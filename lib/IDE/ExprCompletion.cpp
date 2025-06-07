@@ -39,8 +39,7 @@ static bool solutionSpecificVarTypesEqual(
 
 bool ExprTypeCheckCompletionCallback::Result::operator==(
     const Result &Other) const {
-  return IsImplicitSingleExpressionReturn ==
-             Other.IsImplicitSingleExpressionReturn &&
+  return IsImpliedResult == Other.IsImpliedResult &&
          IsInAsyncContext == Other.IsInAsyncContext &&
          nullableTypesEqual(UnresolvedMemberBaseType,
                             Other.UnresolvedMemberBaseType) &&
@@ -59,13 +58,12 @@ void ExprTypeCheckCompletionCallback::addExpectedType(Type ExpectedType) {
 }
 
 void ExprTypeCheckCompletionCallback::addResult(
-    bool IsImplicitSingleExpressionReturn, bool IsInAsyncContext,
-    Type UnresolvedMemberBaseType,
+    bool IsImpliedResult, bool IsInAsyncContext, Type UnresolvedMemberBaseType,
     llvm::SmallDenseMap<const VarDecl *, Type> SolutionSpecificVarTypes) {
   if (!AddUnresolvedMemberCompletions) {
     UnresolvedMemberBaseType = Type();
   }
-  Result NewResult = {IsImplicitSingleExpressionReturn, IsInAsyncContext,
+  Result NewResult = {IsImpliedResult, IsInAsyncContext,
                       UnresolvedMemberBaseType, SolutionSpecificVarTypes};
   if (llvm::is_contained(Results, NewResult)) {
     return;
@@ -75,38 +73,39 @@ void ExprTypeCheckCompletionCallback::addResult(
 
 void ExprTypeCheckCompletionCallback::sawSolutionImpl(
     const constraints::Solution &S) {
-  auto &CS = S.getConstraintSystem();
-
   Type ExpectedTy = getTypeForCompletion(S, CompletionExpr);
-
-  bool ImplicitReturn = isImplicitSingleExpressionReturn(CS, CompletionExpr);
-
+  bool IsImpliedResult = isImpliedResult(S, CompletionExpr);
   bool IsAsync = isContextAsync(S, DC);
 
   llvm::SmallDenseMap<const VarDecl *, Type> SolutionSpecificVarTypes;
   getSolutionSpecificVarTypes(S, SolutionSpecificVarTypes);
 
-  addResult(ImplicitReturn, IsAsync, ExpectedTy, SolutionSpecificVarTypes);
+  addResult(IsImpliedResult, IsAsync, ExpectedTy, SolutionSpecificVarTypes);
   addExpectedType(ExpectedTy);
 
   if (auto PatternMatchType = getPatternMatchType(S, CompletionExpr)) {
-    addResult(ImplicitReturn, IsAsync, PatternMatchType,
+    addResult(IsImpliedResult, IsAsync, PatternMatchType,
               SolutionSpecificVarTypes);
     addExpectedType(PatternMatchType);
   }
 }
 
-void ExprTypeCheckCompletionCallback::deliverResults(
-    SourceLoc CCLoc, ide::CodeCompletionContext &CompletionCtx,
-    CodeCompletionConsumer &Consumer) {
+void ExprTypeCheckCompletionCallback::collectResults(
+    SourceLoc CCLoc, ide::CodeCompletionContext &CompletionCtx) {
   ASTContext &Ctx = DC->getASTContext();
   CompletionLookup Lookup(CompletionCtx.getResultSink(), Ctx, DC,
                           &CompletionCtx);
   Lookup.shouldCheckForDuplicates(Results.size() > 1);
 
+  // The type context that is being used for global results.
+  ExpectedTypeContext UnifiedTypeContext;
+  UnifiedTypeContext.setPreferNonVoid(true);
+  bool UnifiedCanHandleAsync = false;
+
   for (auto &Result : Results) {
-    Lookup.setExpectedTypes(ExpectedTypes,
-                            Result.IsImplicitSingleExpressionReturn);
+    WithSolutionSpecificVarTypesRAII VarTypes(Result.SolutionSpecificVarTypes);
+
+    Lookup.setExpectedTypes(ExpectedTypes, Result.IsImpliedResult);
     Lookup.setCanCurrDeclContextHandleAsync(Result.IsInAsyncContext);
     Lookup.setSolutionSpecificVarTypes(Result.SolutionSpecificVarTypes);
 
@@ -115,7 +114,11 @@ void ExprTypeCheckCompletionCallback::deliverResults(
     if (Result.UnresolvedMemberBaseType) {
       Lookup.getUnresolvedMemberCompletions(Result.UnresolvedMemberBaseType);
     }
+
+    UnifiedTypeContext.merge(*Lookup.getExpectedTypeContext());
+    UnifiedCanHandleAsync |= Result.IsInAsyncContext;
   }
 
-  deliverCompletionResults(CompletionCtx, Lookup, DC, Consumer);
+  collectCompletionResults(CompletionCtx, Lookup, DC, UnifiedTypeContext,
+                           UnifiedCanHandleAsync);
 }

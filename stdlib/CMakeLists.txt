@@ -24,6 +24,20 @@ else()
   set(SWIFT_BUILD_TEST_SUPPORT_MODULES_default FALSE)
 endif()
 
+# TODO(compnerd) use a target to avoid re-creating this file all the time
+function(generate_windows_vfs_overlay)
+  file(TO_CMAKE_PATH ${VCToolsInstallDir} VCToolsInstallDir)
+  file(TO_CMAKE_PATH ${UniversalCRTSdkDir} UniversalCRTSdkDir)
+  configure_file("${PROJECT_SOURCE_DIR}/cmake/WindowsVFS.yaml.in"
+                 "${CMAKE_CURRENT_BINARY_DIR}/windows-vfs-overlay.yaml"
+                 @ONLY)
+endfunction()
+if(WINDOWS IN_LIST SWIFT_SDKS)
+  generate_windows_vfs_overlay()
+  file(TO_CMAKE_PATH "${CMAKE_CURRENT_BINARY_DIR}/windows-vfs-overlay.yaml"
+       SWIFT_WINDOWS_VFS_OVERLAY)
+endif()
+
 #
 # User-configurable options for the standard library.
 #
@@ -209,6 +223,10 @@ if(SWIFT_STDLIB_ENABLE_SIB_TARGETS)
   swift_create_stdlib_targets("swift-stdlib" "sibgen" TRUE)
 endif()
 swift_create_stdlib_targets("swift-test-stdlib" "" FALSE)
+
+# Create the libexec targets
+swift_create_stdlib_targets("swift-libexec" "" TRUE)
+swift_create_stdlib_targets("swift-test-libexec" "" FALSE)
 
 # FIXME: Include the toolchain directory before the public directory. Otherwise
 # the clang resource directory symlink stops installing correctly.

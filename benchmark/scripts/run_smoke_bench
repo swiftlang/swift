@@ -275,7 +275,8 @@ def test_performance(
 
 def report_code_size(opt_level, old_dir, new_dir, architecture, platform, output_file):
     if opt_level == "swiftlibs":
-        files = glob.glob(os.path.join(old_dir, "lib", "swift", platform, "*.dylib"))
+        p = os.path.join(old_dir, "lib", "swift", platform, architecture, "*.dylib")
+        files = glob.glob(p)
     else:
         files = glob.glob(
             os.path.join(old_dir, opt_level + "-" + architecture + "*" +

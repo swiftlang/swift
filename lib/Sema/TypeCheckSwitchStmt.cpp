@@ -18,6 +18,7 @@
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Pattern.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/STLExtras.h"
 
@@ -444,11 +445,11 @@ namespace {
       // \p minusCount is an optional pointer counting the number of
       // remaining calls to minus before the computation times out.
       // Returns None if the computation "timed out".
-      Optional<Space> minus(const Space &other, const DeclContext *DC,
-                            unsigned *minusCount) const {
+      std::optional<Space> minus(const Space &other, const DeclContext *DC,
+                                 unsigned *minusCount) const {
         if (minusCount && (*minusCount)-- == 0)
-          return None;
-        
+          return std::nullopt;
+
         if (this->isEmpty()) {
           return Space();
         }
@@ -521,7 +522,7 @@ namespace {
             if (auto diff = tot.minus(s, DC, minusCount))
               tot = *diff;
             else
-              return None;
+              return std::nullopt;
           }
           return tot;
         }
@@ -535,7 +536,7 @@ namespace {
           for (auto s : this->getSpaces()) {
             auto diff = s.minus(other, DC, minusCount);
             if (!diff)
-              return None;
+              return std::nullopt;
             if (diff->getKind() == SpaceKind::Disjunct) {
               smallSpaces.append(diff->getSpaces().begin(),
                                  diff->getSpaces().end());
@@ -570,7 +571,7 @@ namespace {
           for (auto subSpace : this->getSpaces()) {
             auto nextSpace = subSpace.minus(other, DC, minusCount);
             if (!nextSpace)
-              return None;
+              return std::nullopt;
             if (nextSpace.value().isEmpty())
               return Space();
             newSubSpaces.push_back(nextSpace.value());
@@ -616,7 +617,7 @@ namespace {
 
             auto reducedSpaceOrNone = s1.minus(s2, DC, minusCount);
             if (!reducedSpaceOrNone)
-              return None;
+              return std::nullopt;
             auto reducedSpace = *reducedSpaceOrNone;
             
             // If one of the constructor parameters is empty it means
@@ -784,28 +785,11 @@ namespace {
         }
       }
 
-      /// Use this if you're doing getAs<TupleType> on a Type (and it succeeds)
-      /// to compute the spaces for it. Handy for disambiguating fields
-      /// that are tuples from associated values.
-      ///
-      ///    .e((a: X, b: X)) -> ((a: X, b: X))
-      /// vs .f(a: X, b: X)   -> (a: X, b: X)
-      static void getTupleTypeSpaces(Type &outerType,
-                                     TupleType *tty,
+      /// Splat a tuple type into a set of element type spaces.
+      static void getTupleTypeSpaces(TupleType *tty,
                                      SmallVectorImpl<Space> &spaces) {
-        ArrayRef<TupleTypeElt> ttyElts = tty->getElements();
-        if (isa<ParenType>(outerType.getPointer())) {
-          // We had an actual tuple!
-          SmallVector<Space, 4> innerSpaces;
-          for (auto &elt: ttyElts)
-            innerSpaces.push_back(Space::forType(elt.getType(), elt.getName()));
-          spaces.push_back(
-            Space::forConstructor(tty, Identifier(), innerSpaces));
-        } else {
-          // We're looking at the fields of a constructor here.
-          for (auto &elt: ttyElts)
-            spaces.push_back(Space::forType(elt.getType(), elt.getName()));
-        }
+        for (auto &elt : tty->getElements())
+          spaces.push_back(Space::forType(elt.getType(), elt.getName()));
       };
 
       // Decompose a type into its component spaces, ignoring any enum
@@ -828,9 +812,9 @@ namespace {
           auto children = E->getAllElements();
           llvm::transform(
               children, std::back_inserter(arr), [&](EnumElementDecl *eed) {
-                // Don't force people to match unavailable cases; they can't
-                // even write them.
-                if (AvailableAttr::isUnavailable(eed)) {
+                // Don't force people to match unavailable cases since they
+                // should not be instantiated at run time.
+                if (eed->isUnavailable()) {
                   return Space();
                 }
 
@@ -842,25 +826,35 @@ namespace {
                   return Space();
                 }
 
-                // .e(a: X, b: X)   -> (a: X, b: X)
-                // .f((a: X, b: X)) -> ((a: X, b: X)
                 SmallVector<Space, 4> constElemSpaces;
-                if (auto payloadTy = eed->getArgumentInterfaceType()) {
-                  auto eedTy = tp->getCanonicalType()->getTypeOfMember(
-                      E->getModuleContext(), eed, payloadTy);
-                  if (auto *TTy = eedTy->getAs<TupleType>()) {
-                    Space::getTupleTypeSpaces(eedTy, TTy, constElemSpaces);
-                  } else if (auto *TTy =
-                                 dyn_cast<ParenType>(eedTy.getPointer())) {
-                    constElemSpaces.push_back(
-                        Space::forType(TTy->getUnderlyingType(), Identifier()));
+                auto params = eed->getCaseConstructorParams();
+                auto isParenLike = params.size() == 1 && !params[0].hasLabel();
+
+                // .e(a: X, b: X)   -> (a: X, b: X)
+                // .f((a: X, b: X)) -> ((a: X, b: X))
+                for (auto &param : params) {
+                  auto payloadTy = tp->getCanonicalType()->getTypeOfMember(
+                      eed, param.getParameterType());
+                  // A single tuple payload gets splatted into a constructor
+                  // space of its constituent elements. This allows the
+                  // deprecated ability to match using a .x(a, b, c) pattern
+                  // instead of a .x((a, b, c)) pattern.
+                  auto *tupleTy = payloadTy->getAs<TupleType>();
+                  if (tupleTy && isParenLike) {
+                    SmallVector<Space, 4> innerSpaces;
+                    Space::getTupleTypeSpaces(tupleTy, innerSpaces);
+                    constElemSpaces.push_back(Space::forConstructor(
+                        tupleTy, Identifier(), innerSpaces));
+                    continue;
                   }
+                  constElemSpaces.push_back(
+                      Space::forType(payloadTy, param.getLabel()));
                 }
                 return Space::forConstructor(tp, eed->getName(),
                                              constElemSpaces);
               });
 
-          if (!E->isFormallyExhaustive(DC)) {
+          if (!E->treatAsExhaustiveForDiags(DC)) {
             arr.push_back(Space::forUnknown(/*allowedButNotRequired*/false));
           } else if (!E->getAttrs().hasAttribute<FrozenAttr>()) {
             arr.push_back(Space::forUnknown(/*allowedButNotRequired*/true));
@@ -869,11 +863,8 @@ namespace {
         } else if (auto *TTy = tp->castTo<TupleType>()) {
           // Decompose each of the elements into its component type space.
           SmallVector<Space, 4> constElemSpaces;
-          llvm::transform(TTy->getElements(),
-                          std::back_inserter(constElemSpaces),
-                          [&](TupleTypeElt elt) {
-            return Space::forType(elt.getType(), elt.getName());
-          });
+          Space::getTupleTypeSpaces(TTy, constElemSpaces);
+
           // Create an empty constructor head for the tuple space.
           arr.push_back(Space::forConstructor(tp, Identifier(),
                                               constElemSpaces));
@@ -1058,16 +1049,18 @@ namespace {
                              unknownCase);
         return;
       }
-      
+
       auto uncovered = diff.value();
-      if (unknownCase && uncovered.isEmpty()) {
-        DE.diagnose(unknownCase->getLoc(), diag::redundant_particular_case)
-          .highlight(unknownCase->getSourceRange());
-      }
 
       // Account for unknown cases. If the developer wrote `unknown`, they're
       // all handled; otherwise, we ignore the ones that were added for enums
       // that are implicitly frozen.
+      //
+      // Note that we do not diagnose an unknown case as redundant, even if the
+      // uncovered space is empty because we trust that if the developer went to
+      // the trouble of writing @unknown that it was for a good reason, like
+      // addressing diagnostics in another build configuration where there are
+      // potentially unknown cases.
       uncovered = *uncovered.minus(Space::forUnknown(unknownCase == nullptr),
                                    DC, /*&minusCount*/ nullptr);
 
@@ -1121,18 +1114,16 @@ namespace {
       llvm::SmallString<128> buffer;
       llvm::raw_svector_ostream OS(buffer);
 
-      bool InEditor = Context.LangOpts.DiagnosticsEditorMode;
-
       // Decide whether we want an error or a warning.
-      Optional<decltype(diag::non_exhaustive_switch)> mainDiagType =
+      std::optional<decltype(diag::non_exhaustive_switch)> mainDiagType =
           diag::non_exhaustive_switch;
+      bool downgrade = false;
       if (unknownCase) {
         switch (defaultReason) {
         case RequiresDefault::EmptySwitchBody:
           llvm_unreachable("there's an @unknown case; the body can't be empty");
         case RequiresDefault::No:
-          if (!uncovered.isEmpty())
-            mainDiagType = diag::non_exhaustive_switch_warn;
+          downgrade = !uncovered.isEmpty();
           break;
         case RequiresDefault::UncoveredSwitch:
         case RequiresDefault::SpaceTooLarge: {
@@ -1155,7 +1146,7 @@ namespace {
       case DowngradeToWarning::ForUnknownCase: {
         if (Context.LangOpts.DebuggerSupport ||
             Context.LangOpts.Playground ||
-            !Context.LangOpts.EnableNonFrozenEnumExhaustivityDiagnostics) {
+            !Context.LangOpts.hasFeature(Feature::NonfrozenEnumExhaustivity)) {
           // Don't require covering unknown cases in the debugger or in
           // playgrounds.
           return;
@@ -1163,13 +1154,29 @@ namespace {
         assert(defaultReason == RequiresDefault::No);
         Type subjectType = Switch->getSubjectExpr()->getType();
         bool shouldIncludeFutureVersionComment = false;
-        if (auto *theEnum = subjectType->getEnumOrBoundGenericEnum()) {
+        auto *theEnum = subjectType->getEnumOrBoundGenericEnum();
+
+        if (theEnum) {
+          auto *enumModule = theEnum->getParentModule();
           shouldIncludeFutureVersionComment =
-              theEnum->getParentModule()->isSystemModule();
+              enumModule->isSystemModule() ||
+              theEnum->getAttrs().hasAttribute<ExtensibleAttr>();
         }
-        DE.diagnose(startLoc, diag::non_exhaustive_switch_unknown_only,
-                    subjectType, shouldIncludeFutureVersionComment);
-        mainDiagType = None;
+
+        auto diag =
+            DE.diagnose(startLoc, diag::non_exhaustive_switch_unknown_only,
+                        subjectType, shouldIncludeFutureVersionComment);
+
+        // Presence of `@preEnumExtensibility` pushed the warning farther
+        // into the future.
+        if (theEnum &&
+            theEnum->getAttrs().hasAttribute<PreEnumExtensibilityAttr>()) {
+          diag.warnUntilFutureSwiftVersion();
+        } else {
+          diag.warnUntilSwiftVersion(6);
+        }
+
+        mainDiagType = std::nullopt;
       }
         break;
       }
@@ -1185,7 +1192,8 @@ namespace {
         return;
       case RequiresDefault::UncoveredSwitch: {
         OS << tok::kw_default << ":\n" << placeholder << "\n";
-        DE.diagnose(startLoc, mainDiagType.value());
+        DE.diagnose(startLoc, mainDiagType.value())
+          .limitBehaviorIf(downgrade, DiagnosticBehavior::Warning);
         DE.diagnose(startLoc, diag::missing_several_cases, /*default*/true)
           .fixItInsert(insertLoc, buffer.str());
       }
@@ -1203,8 +1211,10 @@ namespace {
       if (uncovered.isEmpty()) return;
 
       // Check if we still have to emit the main diagnostic.
-      if (mainDiagType.has_value())
-        DE.diagnose(startLoc, mainDiagType.value());
+      if (mainDiagType.has_value()) {
+        DE.diagnose(startLoc, mainDiagType.value())
+          .limitBehaviorIf(downgrade, DiagnosticBehavior::Warning);
+      }
 
       // Add notes to explain what's missing.
       auto processUncoveredSpaces =
@@ -1253,7 +1263,7 @@ namespace {
               // will later decompose the space into cases.
               continue;
             }
-            if (!Context.LangOpts.EnableNonFrozenEnumExhaustivityDiagnostics)
+            if (!Context.LangOpts.hasFeature(Feature::NonfrozenEnumExhaustivity))
               continue;
 
             // This can occur if the switch is empty and the subject type is an
@@ -1267,7 +1277,8 @@ namespace {
         }
       };
 
-      // If editing is enabled, emit a formatted error of the form:
+      // Emit a formatted note of the form, which has a Fix-It associated with
+      // it, primarily to be used in IDEs:
       //
       // switch must be exhaustive, do you want to add missing cases?
       //     case (.none, .some(_)):
@@ -1275,53 +1286,40 @@ namespace {
       //     case (.some(_), .none):
       //       <#code#>
       //
-      // else:
-      //
-      // switch must be exhaustive, consider adding missing cases:
+      // To also provide actionable output for command line errors, emit notes
+      // like the following:
       //
       // missing case '(.none, .some(_))'
       // missing case '(.some(_), .none)'
-      if (InEditor) {
-        buffer.clear();
+      SmallString<128> missingSeveralCasesFixIt;
+      int diagnosedCases = 0;
 
-        bool alreadyEmittedSomething = false;
-        processUncoveredSpaces([&](const Space &space,
-                                   bool onlyOneUncoveredSpace) {
-          if (space.getKind() == SpaceKind::UnknownCase) {
-            OS << "@unknown " << tok::kw_default;
-            if (onlyOneUncoveredSpace) {
-              OS << ":\n<#fatalError()#>\n";
-              DE.diagnose(startLoc, diag::missing_unknown_case)
-                .fixItInsert(insertLoc, buffer.str());
-              alreadyEmittedSomething = true;
-              return;
-            }
-          } else {
-            OS << tok::kw_case << " ";
-            space.show(OS);
-          }
-          OS << ":\n" << placeholder << "\n";
-        });
+      processUncoveredSpaces([&](const Space &space,
+                                 bool onlyOneUncoveredSpace) {
+        llvm::SmallString<64> fixItBuffer;
+        llvm::raw_svector_ostream fixItOS(fixItBuffer);
+        if (space.getKind() == SpaceKind::UnknownCase) {
+          fixItOS << "@unknown " << tok::kw_default << ":\n<#fatalError()#>\n";
+          DE.diagnose(startLoc, diag::missing_unknown_case)
+              .fixItInsert(insertLoc, fixItBuffer.str());
+        } else {
+          llvm::SmallString<64> spaceBuffer;
+          llvm::raw_svector_ostream spaceOS(spaceBuffer);
+          space.show(spaceOS);
 
-        if (!alreadyEmittedSomething) {
-          DE.diagnose(startLoc, diag::missing_several_cases, false)
-            .fixItInsert(insertLoc, buffer.str());
+          fixItOS << tok::kw_case << " " << spaceBuffer << ":\n"
+                  << placeholder << "\n";
+          DE.diagnose(startLoc, diag::missing_particular_case,
+                      spaceBuffer.str())
+              .fixItInsert(insertLoc, fixItBuffer);
         }
+        diagnosedCases += 1;
+        missingSeveralCasesFixIt += fixItBuffer;
+      });
 
-      } else {
-        processUncoveredSpaces([&](const Space &space,
-                                   bool onlyOneUncoveredSpace) {
-          if (space.getKind() == SpaceKind::UnknownCase) {
-            auto note = DE.diagnose(startLoc, diag::missing_unknown_case);
-            if (onlyOneUncoveredSpace)
-              note.fixItInsert(insertLoc, "@unknown default:\n<#fatalError#>()\n");
-            return;
-          }
-
-          buffer.clear();
-          space.show(OS);
-          DE.diagnose(startLoc, diag::missing_particular_case, buffer.str());
-        });
+      if (diagnosedCases > 1) {
+        DE.diagnose(startLoc, diag::missing_several_cases, false)
+            .fixItInsert(insertLoc, missingSeveralCasesFixIt.str());
       }
     }
 
@@ -1480,8 +1478,7 @@ namespace {
       }
       case PatternKind::OptionalSome: {
         auto *OSP = cast<OptionalSomePattern>(item);
-        auto &Ctx = OSP->getElementDecl()->getASTContext();
-        const Identifier name = Ctx.getOptionalSomeDecl()->getBaseIdentifier();
+        const Identifier name = OSP->getElementDecl()->getBaseIdentifier();
 
         auto subSpace = projectPattern(OSP->getSubPattern());
         // To match patterns like (_, _, ...)?, we must rewrite the underlying
@@ -1500,8 +1497,8 @@ namespace {
           // If there's no sub-pattern then there's no further recursive
           // structure here.  Yield the constructor space.
           // FIXME: Compound names.
-          return Space::forConstructor(item->getType(),
-                                       VP->getName().getBaseIdentifier(), None);
+          return Space::forConstructor(
+              item->getType(), VP->getName().getBaseIdentifier(), std::nullopt);
         }
 
         SmallVector<Space, 4> conArgSpace;
@@ -1527,12 +1524,12 @@ namespace {
           // matched by a single var pattern.  Project it like the tuple it
           // really is.
           //
-          // FIXME: SE-0155 makes this case unreachable.
+          // FIXME: SE-0155 will eventually this case unreachable. For now it's
+          // permitted as a deprecated behavior.
           if (SP->getKind() == PatternKind::Named
               || SP->getKind() == PatternKind::Any) {
-            Type outerType = SP->getType();
-            if (auto *TTy = outerType->getAs<TupleType>())
-              Space::getTupleTypeSpaces(outerType, TTy, conArgSpace);
+            if (auto *TTy = SP->getType()->getAs<TupleType>())
+              Space::getTupleTypeSpaces(TTy, conArgSpace);
             else
               conArgSpace.push_back(projectPattern(SP));
           } else if (SP->getKind() == PatternKind::Tuple) {

@@ -1,11 +1,9 @@
 cake: Func FrozenKind.__derived_enum_equals(_:_:) has been removed
-cake: Accessor GlobalLetChangedToVar.Get() is a new API without @available attribute
-cake: Accessor GlobalVarChangedToLet.Get() is a new API without @available attribute
-cake: Accessor GlobalVarChangedToLet.Modify() is a new API without @available attribute
-cake: Accessor GlobalVarChangedToLet.Set() is a new API without @available attribute
-cake: Enum FrozenKind is now with @frozen
-cake: Enum IceKind is now with @frozen
-cake: Func FrozenKind.==(_:_:) is a new API without @available attribute
+cake: Accessor GlobalLetChangedToVar.Get() is a new API without '@available'
+cake: Accessor GlobalVarChangedToLet.Get() is a new API without '@available'
+cake: Accessor GlobalVarChangedToLet.Modify() is a new API without '@available'
+cake: Accessor GlobalVarChangedToLet.Set() is a new API without '@available'
+cake: Func FrozenKind.==(_:_:) is a new API without '@available'
 cake: Var C1.CIIns1 is no longer a stored property
 cake: Var C1.CIIns2 is no longer a stored property
 cake: Var RemoveSetters.Value is no longer a stored property

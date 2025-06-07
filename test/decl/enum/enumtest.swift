@@ -324,8 +324,8 @@ func useSynthesizedMember() {
 
 // Non-materializable argument type
 enum Lens<T> {
-  case foo(inout T) // expected-error {{'inout' may only be used on parameters}}
-  case bar(inout T, Int) // expected-error {{'inout' may only be used on parameters}}
+  case foo(inout T) // expected-error {{'inout' may only be used on function or initializer parameters}}
+  case bar(inout T, Int) // expected-error {{'inout' may only be used on function or initializer parameters}}
 
   case baz((inout T) -> ()) // ok
   case quux((inout T, inout T) -> ()) // ok

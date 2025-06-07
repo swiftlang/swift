@@ -23,11 +23,22 @@
 ERROR(invalid_diagnostic,none,
       "INTERNAL ERROR: this diagnostic should not be produced", ())
 
+NOTE(kind_declname_declared_here,none,
+     "%0 %1 declared here", (DescriptiveDeclKind, DeclName))
+NOTE(decl_declared_here_with_kind,none,
+     "%kind0 declared here", (const Decl *))
+
 ERROR(not_implemented,none,
       "INTERNAL ERROR: feature not implemented: %0", (StringRef))
 
 ERROR(error_opening_output,none,
       "error opening '%0' for output: %1", (StringRef, StringRef))
+
+ERROR(error_closing_output,none,
+      "error closing '%0' for output: %1", (StringRef, StringRef))
+
+ERROR(error_mccas,none,
+      "error trying to materialize MCCAS object file: %0", (StringRef))
 
 ERROR(cannot_find_group_info_file,none,
       "cannot find group info file at path: '%0'", (StringRef))
@@ -41,9 +52,17 @@ ERROR(error_no_group_info,none,
 NOTE(brace_stmt_suggest_do,none,
      "did you mean to use a 'do' statement?", ())
 
-WARNING(error_in_future_swift_version,none,
-        "%0; this is an error in Swift %1",
+// This does not have a group because warnings of this kind inherit the group
+// from the wrapped error.
+GROUPED_WARNING(error_in_swift_lang_mode,ErrorInFutureSwiftVersion,none,
+        "%0; this is an error in the Swift %1 language mode",
         (DiagnosticInfo *, unsigned))
+
+// This does not have a group because warnings of this kind inherit the group
+// from the wrapped error.
+WARNING(error_in_a_future_swift_lang_mode,none,
+        "%0; this will be an error in a future Swift language mode",
+        (DiagnosticInfo *))
 
 // Generic disambiguation
 NOTE(while_parsing_as_left_angle_bracket,none,
@@ -52,11 +71,6 @@ NOTE(while_parsing_as_left_angle_bracket,none,
 // Generic determinism-forcing override.
 REMARK(remark_max_determinism_overriding,none,
          "SWIFTC_MAXIMUM_DETERMINISM overriding %0", (StringRef))
-
-// FIXME: This is used both as a parse error (a literal "super" outside a
-// method) and a type-checker error ("super" in a method of a non-class type).
-ERROR(super_not_in_class_method,none,
-      "'super' cannot be used outside of class members", ())
 
 ERROR(class_func_not_in_class,none,
       "class methods are only allowed within classes; "
@@ -68,18 +82,27 @@ ERROR(class_subscript_not_in_class,none,
       "class subscripts are only allowed within classes; "
       "use 'static' to declare a %select{static|requirement fulfilled by either a static or class}0 subscript", (bool))
 
-ERROR(require_static_for_const,none,
+ERROR(require_static_for_literal,none,
       "'static' is required for _const variable declaration", ())
 
-ERROR(require_let_for_const,none,
+ERROR(require_let_for_literal,none,
       "let is required for a _const variable declaration", ())
 
+ERROR(require_literal_initializer_for_literal,none,
+      "_const let should be initialized with a literal value", ())
+      
 ERROR(require_const_initializer_for_const,none,
-      "_const let should be initialized with a compile-time literal", ())
+      "'@const' value should be initialized with a compile-time value", ())
+
+ERROR(require_const_arg_for_parameter,none,
+      "expected a compile-time value argument for a '@const' parameter", ())
 
 // FIXME: Used by both the parser and the type-checker.
 ERROR(func_decl_without_brace,PointsToFirstBadToken,
       "expected '{' in body of function declaration", ())
+
+ERROR(func_decl_no_body_expected,PointsToFirstBadToken,
+      "unexpected body of function declaration", ())
 
 NOTE(convert_let_to_var,none,
      "change 'let' to 'var' to make it mutable", ())
@@ -108,10 +131,6 @@ ERROR(generic_signature_not_valid,none,
 ERROR(generic_signature_not_equal,none,
       "generic signature %0 is not equal to new signature %1",
       (StringRef, StringRef))
-
-// Used in diagnostics that are split across requests implemented in several places.
-ERROR(concurrency_default_actor_not_found,none,
-      "broken standard library: cannot find default actor type '%0'", (StringRef))
 
 // FIXME: Used by swift-api-digester. Don't want to set up a separate diagnostics
 // file just for a few errors.
@@ -162,9 +181,6 @@ ERROR(circular_enum_inheritance,none,
 ERROR(circular_protocol_def,none,
       "protocol %0 refines itself", (Identifier))
 
-NOTE(kind_declname_declared_here,none,
-     "%0 %1 declared here", (DescriptiveDeclKind, DeclName))
-
 WARNING(warn_property_wrapper_module_scope,none,
         "ignoring associated type %0 in favor of module-scoped property "
         "wrapper %0; please qualify the reference with %1",
@@ -193,36 +209,70 @@ WARNING(cross_imported_by_both_modules, none,
 //------------------------------------------------------------------------------
 
 ERROR(scanner_find_cycle, none,
-      "dependency scanner detected dependency cycle: '%0'", (StringRef))
+      "module dependency cycle: '%0'", (StringRef))
+
+NOTE(scanner_find_cycle_swift_overlay_path, none,
+     "Swift Overlay dependency of '%0' on '%1' via Clang module dependency: '%2'", (StringRef, StringRef, StringRef))
 
 ERROR(scanner_arguments_invalid, none,
       "dependencies scanner cannot be configured with arguments: '%0'", (StringRef))
 
-WARNING(warn_scanner_deserialize_failed, none,
-        "Failed to load module scanning dependency cache from: '%0', re-building scanner cache from scratch.", (StringRef))
+ERROR(error_scanner_extra, none,
+      "failed inside dependency scanner: '%0'", (StringRef))
+
+REMARK(warn_scanner_deserialize_failed, none,
+       "Incremental module scan: Failed to load module scanning dependency cache from: '%0', re-building scanner cache from scratch.", (StringRef))
 
 REMARK(remark_reuse_cache, none,
-       "Re-using serialized module scanning dependency cache from: '%0'.", (StringRef))
+       "Incremental module scan: Re-using serialized module scanning dependency cache from: '%0'.", (StringRef))
+
+REMARK(remark_scanner_uncached_lookups, none,
+       "Module Dependency Scanner queries executed: '%0'.", (unsigned))
 
 REMARK(remark_save_cache, none,
-       "Serializing module scanning dependency cache to: '%0'.", (StringRef))
+       "Incremental module scan: Serializing module scanning dependency cache to: '%0'.", (StringRef))
+
+REMARK(remark_scanner_stale_result_invalidate, none,
+       "Incremental module scan: Dependency info for module '%0' invalidated due to a modified input"
+       " since last scan: '%1'.", (StringRef, StringRef))
+
+REMARK(remark_scanner_invalidate_upstream, none,
+       "Incremental module scan: Dependency info for module '%0' invalidated due to an out-of-date"
+       " dependency.", (StringRef))
+
+REMARK(remark_scanner_invalidate_configuration, none,
+       "Incremental module scan: Dependency info for module '%0' invalidated due to wrong configuration.", (StringRef))
+
+REMARK(remark_scanner_invalidate_cas_error, none,
+       "Incremental module scan: Dependency info for module '%0' invalidated due to cas error: %1", (StringRef, StringRef))
+
+REMARK(remark_scanner_invalidate_missing_cas, none,
+       "Incremental module scan: Dependency info for module '%0' invalidated due to missing CAS input '%1'.", (StringRef, StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: custom attribute diagnostics
 //------------------------------------------------------------------------------
 
-ERROR(unknown_attribute,none,
+ERROR(unknown_attr_name,none,
       "unknown attribute '%0'", (StringRef))
+ERROR(unknown_type_attr,none,
+      "unknown %kind0", (const TypeAttribute *))
 
 //------------------------------------------------------------------------------
 // MARK: macro diagnostics
 //------------------------------------------------------------------------------
 NOTE(in_macro_expansion,none,
-     "in expansion of macro %0 here", (DeclName))
+     "in expansion of macro %0%select{| on %kind1}1 here", (DeclName, const Decl *))
 ERROR(macro_experimental,none,
-      "macros are an experimental feature that is not enabled", ())
-ERROR(ambiguous_macro_reference,none,
-      "ambiguous reference to macro %0", (DeclName))
+      "%0 macros are an experimental feature that is not enabled %select{|(%1)}1",
+      (StringRef, StringRef))
+      
+//------------------------------------------------------------------------------
+// MARK: lexical lookup diagnostics
+//------------------------------------------------------------------------------
+      
+ERROR(lookup_outputs_dont_match,none,
+"Unqualified lookup output from ASTScope and SwiftLexicalLookup don't match", ())
 
 //------------------------------------------------------------------------------
 // MARK: bridged diagnostics
@@ -233,6 +283,13 @@ WARNING(bridged_warning, none,"%0", (StringRef))
 ERROR(bridged_error, none, "%0", (StringRef))
 ERROR(bridged_fatal_error, Fatal, "%0", (StringRef))
 REMARK(bridged_remark, none, "%0", (StringRef))
+
+//------------------------------------------------------------------------------
+// MARK: #warning and #error
+//------------------------------------------------------------------------------
+
+WARNING(pound_warning, none, "%0", (StringRef))
+ERROR(pound_error, none, "%0", (StringRef))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

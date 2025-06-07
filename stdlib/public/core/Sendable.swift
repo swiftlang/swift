@@ -10,7 +10,61 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A type whose values can safely be passed across concurrency domains by copying.
+/// A type whose metatype can be shared across arbitrary concurrent contexts
+/// without introducing a risk of data races. When a generic type `T` conforms
+/// to `SendableMetatype`, its metatype `T.Type` conforms to `Sendable`.  All
+/// concrete types implicitly conform to the `SendableMetatype` protocol, so its
+/// primary purpose is in generic code to prohibit the use of isolated
+/// conformances along with the generic type.
+///
+/// A generic type `T` will need a `SendableMetatype` conformance when its
+/// metatype is shared across concurrency boundaries. For example,
+///
+///     protocol P {
+///       static func f()
+///     }
+///
+///     func useFromAnotherTask<T: P>(_: T.Type) {
+///       Task { @concurrent in
+///         T.f()   // error: capturing non-Sendable type `T.Type` in a concurrently-executing task
+///       }
+///     }
+///
+/// The potential data race above would occur when `useFromAnotherTask` is
+/// provided with an isolated conformance to `P`. For example:
+///
+///     @MainActor
+///     class MyModel: @MainActor P {
+///       /*implicitly @MainActor/*
+///       static func f() {
+///         /* on the main actor */
+///       }
+///     }
+///
+///     useFromAnotherTask(MyModel.self)
+///
+/// Here, the error within the body of `useFromAnotherTask` is preventing the
+/// isolated conformance from leaving the current task and actor. The signature
+/// of `useFromAnotherTask` can be adjusted to introduce a requirement on
+/// `SendableMetatype`:
+///
+///     func useFromAnotherTask<T: P & SendableMetatype>(_: T.Type) {
+///       Task { @concurrent in
+///         T.f()   // error: okay, T.Type is Sendable
+///       }
+///     }
+///
+///     useFromAnotherTask(MyModel.self) // error: cannot use main-actor-isolated conformance `MyModel: P` for a `SendableMetatype`-conforming type parameter `T`
+///
+/// The `Sendable` protocol inherits from `SendableMetatype`, so any generic
+/// type `T` with a requirement `T: Sendable` will have the implied requirement
+/// `T: SendableMetatype`.
+@_marker public protocol SendableMetatype: ~Copyable, ~Escapable { }
+
+/// A thread-safe type whose values can be shared across arbitrary concurrent
+/// contexts without introducing a risk of data races. Values of the type may
+/// have no shared mutable state, or they may protect that state with a lock or
+/// by forcing it to only be accessed from a specific actor.
 ///
 /// You can safely pass values of a sendable type
 /// from one concurrency domain to another ---
@@ -129,7 +183,11 @@
 /// ### Sendable Metatypes
 ///
 /// Metatypes such as `Int.Type` implicitly conform to the `Sendable` protocol.
-@_marker public protocol Sendable { }
+/// For a generic type `T`, its metatype `T.Type` does not necessarily conform
+/// to `Sendable`. Please see the `SendableMetatype` protocol for more
+/// information.
+@_marker public protocol Sendable: SendableMetatype, ~Copyable, ~Escapable { }
+
 ///
 /// A type whose values can safely be passed across concurrency domains by copying,
 /// but which disables some safety checking at the conformance site.
@@ -138,11 +196,14 @@
 ///
 ///     struct MyStructure: @unchecked Sendable { ... }
 @available(*, deprecated, message: "Use @unchecked Sendable instead")
+@available(swift, obsoleted: 6.0, message: "Use @unchecked Sendable instead")
 @_marker public protocol UnsafeSendable: Sendable { }
 
 // Historical names
 @available(*, deprecated, renamed: "Sendable")
+@available(swift, obsoleted: 6.0, renamed: "Sendable")
 public typealias ConcurrentValue = Sendable
 
 @available(*, deprecated, renamed: "Sendable")
+@available(swift, obsoleted: 6.0, renamed: "Sendable")
 public typealias UnsafeConcurrentValue = UnsafeSendable

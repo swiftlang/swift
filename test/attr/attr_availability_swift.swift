@@ -4,19 +4,31 @@
 func foo() {
 }
 
-@available(swift 3.0, iOS 10, *) // expected-error {{version-availability must be specified alone}}
+@available(swift 3.0, *) // expected-error {{Swift version availability must be specified alone}}
+func foo2() {
+}
+
+@available(swift 3.0, iOS 10, *) // expected-error {{Swift version availability must be specified alone}}
 func bar() {
 }
 
+@available(iOS 10, swift 3.0, *) // expected-error {{Swift version availability must be specified alone}}
+func bar2() {
+}
+
+@available(iOS 10, *, swift 3.0) // expected-error {{Swift version availability must be specified alone}}
+func bar3() {
+}
+
 func baz() {
-  if #available(swift 4) { // expected-error {{Swift language version checks not allowed in #available}}
+  if #available(swift 4) { // expected-error {{Swift version checks not allowed in #available}}
                            // expected-error @-1 {{condition required for target platform}}
     print("yes")
   } else {
     print("no")
   }
 
-  if #unavailable(swift 4) { // expected-error {{Swift language version checks not allowed in #unavailable}}
+  if #unavailable(swift 4) { // expected-error {{Swift version checks not allowed in #unavailable}}
     print("no")
   } else {
     print("yes")

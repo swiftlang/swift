@@ -330,3 +330,57 @@ bb0:
   dealloc_stack %0 : $*Outer
   return %32 : $Builtin.Int64
 } // CHECK: Returns int: 103
+
+// Test whether the constant evaluator can handle reading and writing into
+// structs containing unknown symbolic values created by skipping functions.
+
+struct UnknownStruct {
+  let value: Int64
+}
+
+struct StructWithSkippedElements {
+  let knownValue: Int64
+  let unknownValue: UnknownStruct
+}
+
+sil @skipUnknownStructCreate : $@convention(thin) () -> UnknownStruct
+
+// CHECK-LABEL: @interpretStructsWithSkippedElements
+sil @interpretStructsWithSkippedElements : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 301
+  %1 = struct $Int64 (%0 : $Builtin.Int64)
+  %2 = function_ref @skipUnknownStructCreate : $@convention(thin) () -> UnknownStruct
+  %3 = apply %2() : $@convention(thin) () -> UnknownStruct
+  %4 = struct $StructWithSkippedElements (%1 : $Int64, %3 : $UnknownStruct)
+  %5 = alloc_stack $StructWithSkippedElements, var, name "s"
+  store %4 to %5 : $*StructWithSkippedElements
+
+  %6 = struct_element_addr %5 : $*StructWithSkippedElements, #StructWithSkippedElements.unknownValue
+  %7 = struct_element_addr %6 : $*UnknownStruct, #UnknownStruct.value
+  %8 = load %7 : $*Int64
+  %9 = struct_extract %8 : $Int64, #Int64._value
+  dealloc_stack %5 : $*StructWithSkippedElements
+  return %9 : $Builtin.Int64
+} // CHECK: Returns unknown
+
+// CHECK-LABEL: @interpretStructsWithSkippedElementsRW
+sil @interpretStructsWithSkippedElementsRW : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 301
+  %1 = struct $Int64 (%0 : $Builtin.Int64)
+  %2 = function_ref @skipUnknownStructCreate : $@convention(thin) () -> UnknownStruct
+  %3 = apply %2() : $@convention(thin) () -> UnknownStruct
+  %4 = struct $StructWithSkippedElements (%1 : $Int64, %3 : $UnknownStruct)
+  %5 = alloc_stack $StructWithSkippedElements, var, name "s"
+  store %4 to %5 : $*StructWithSkippedElements
+
+  %6 = struct_element_addr %5 : $*StructWithSkippedElements, #StructWithSkippedElements.unknownValue
+  %7 = struct_element_addr %6 : $*UnknownStruct, #UnknownStruct.value
+  store %1 to %7 : $*Int64
+  %8 = struct_element_addr %5 : $*StructWithSkippedElements, #StructWithSkippedElements.knownValue
+  %9 = load %8 : $*Int64
+  %10 = struct_extract %9 : $Int64, #Int64._value
+  dealloc_stack %5 : $*StructWithSkippedElements
+  return %10 : $Builtin.Int64
+} // CHECK: Returns int: 301

@@ -75,7 +75,7 @@ static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
   builder.setCurrentDebugScope(original->getDebugScope());
   return builder.createDebugValue(
       original->getLoc(), original.getOperandForDebugValueClone(),
-      *original.getVarInfo(), false, true /*was moved*/);
+      *original.getVarInfo(), DontPoisonRefs, UsesMoveableValueDebugInfo);
 }
 
 static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
@@ -84,7 +84,7 @@ static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
   builder.setCurrentDebugScope(original->getDebugScope());
   return builder.createDebugValue(
       original->getLoc(), original.getOperandForDebugValueClone(),
-      *original.getVarInfo(), false, true /*was moved*/);
+      *original.getVarInfo(), DontPoisonRefs, UsesMoveableValueDebugInfo);
 }
 
 //===----------------------------------------------------------------------===//
@@ -221,6 +221,9 @@ bool DebugInfoCanonicalizer::process() {
           LLVM_DEBUG(llvm::dbgs() << "        Has no var info?! Skipping!\n");
           continue;
         }
+        // Strip things we don't need in the map.
+        debugInfo->DIExpr = debugInfo->DIExpr.getFragmentPart();
+        debugInfo->Type = {};
 
         // Otherwise, we may have a new debug_value to track. Try to begin
         // tracking it...

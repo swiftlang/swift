@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enforce-exclusivity=checked -enable-sil-verify-all %s -licm | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enforce-exclusivity=checked -enable-sil-verify-all %s -licm | %FileCheck %s
 
 sil_stage canonical
 
@@ -153,10 +153,12 @@ bb2:
 // CHECK-LABEL: sil @hoist_access_static : $@convention(thin) () -> () {
 // CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
 // CHECK: [[BEGIN:%.*]] = begin_access [read] [static] [[GLOBAL]] : $*X
-// CHECK-NEXT: load
-// CHECK-NEXT: br bb1
+
+// Currently disabled because of a workaround in AliasAnalysis: rdar://151841926
+// xCHECK-NEXT: load
+// xCHECK-NEXT: br bb1
 // CHECK: apply
-// CHECK-NEXT: cond_br
+// xCHECK-NEXT: cond_br
 // CHECK: bb2
 // CHECK: end_access [[BEGIN]]
 // CHECK-LABEL: } // end sil function 'hoist_access_static'

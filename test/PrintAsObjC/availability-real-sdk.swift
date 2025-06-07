@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t %s
-// RUN: %target-swift-frontend -parse-as-library %t/availability-real-sdk.swiftmodule -typecheck -emit-objc-header-path %t/availability-real-sdk.h -import-objc-header %S/../Inputs/empty.h
+// RUN: %target-swift-frontend -parse-as-library %t/availability-real-sdk.swiftmodule -typecheck -verify -emit-objc-header-path %t/availability-real-sdk.h -import-objc-header %S/../Inputs/empty.h
 // RUN: %FileCheck %s < %t/availability-real-sdk.h
 // RUN: %check-in-clang %t/availability-real-sdk.h
 
@@ -48,7 +48,6 @@
 // CHECK-NEXT: - (nonnull instancetype)initWithObjects:(id _Nonnull const * _Nullable)objects count:(NSUInteger)cnt OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: - (nullable instancetype)initWithCoder:(NSCoder * _Nonnull){{[a-zA-Z]+}} OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: @end
-
 
 import Foundation
 

@@ -2,9 +2,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module-path %t/default_arguments_other.swiftmodule -emit-module -swift-version 4 -primary-file %S/Inputs/default_arguments_other.swift
 
-// RUN: %target-swift-emit-silgen -module-name default_arguments_serialized -Xllvm -sil-full-demangle -swift-version 4 -I %t %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name default_arguments_serialized -Xllvm -sil-full-demangle -swift-version 4 -I %t %s | %FileCheck %s
 
-// RUN: %target-swift-emit-sil -module-name default_arguments_serialized -Xllvm -sil-full-demangle -O -swift-version 4 -I %t %s | %FileCheck %s --check-prefix=OPT
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -module-name default_arguments_serialized -Xllvm -sil-full-demangle -O -swift-version 4 -I %t %s | %FileCheck %s --check-prefix=OPT
 
 // Check that default arguments are serialized in Swift 4 mode.
 

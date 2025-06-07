@@ -18,6 +18,7 @@ internal protocol _HashTableDelegate {
 
 @usableFromInline
 @frozen
+@unsafe
 internal struct _HashTable {
   @usableFromInline
   internal typealias Word = _UnsafeBitset.Word
@@ -33,23 +34,23 @@ internal struct _HashTable {
   internal init(words: UnsafeMutablePointer<Word>, bucketCount: Int) {
     _internalInvariant(bucketCount > 0 && bucketCount & (bucketCount - 1) == 0,
       "bucketCount must be a power of two")
-    self.words = words
+    unsafe self.words = unsafe words
     // The bucket count is a power of two, so subtracting 1 will never overflow
     // and get us a nice mask.
-    self.bucketMask = bucketCount &- 1
+    unsafe self.bucketMask = bucketCount &- 1
   }
 
   @inlinable
   internal var bucketCount: Int {
     @inline(__always) get {
-      return _assumeNonNegative(bucketMask &+ 1)
+      return unsafe _assumeNonNegative(bucketMask &+ 1)
     }
   }
 
   @inlinable
   internal var wordCount: Int {
     @inline(__always) get {
-      return _UnsafeBitset.wordCount(forCapacity: bucketCount)
+      return unsafe _UnsafeBitset.wordCount(forCapacity: bucketCount)
     }
   }
 
@@ -61,9 +62,12 @@ internal struct _HashTable {
   /// to occupied buckets in the table.
   @_alwaysEmitIntoClient
   internal var bitset: _UnsafeBitset {
-    _UnsafeBitset(words: words, wordCount: wordCount)
+    unsafe _UnsafeBitset(words: words, wordCount: wordCount)
   }
 }
+
+@available(*, unavailable)
+extension _HashTable: Sendable {}
 
 extension _HashTable {
   /// The inverse of the maximum hash table load factor.
@@ -73,7 +77,7 @@ extension _HashTable {
 
   internal static func capacity(forScale scale: Int8) -> Int {
     let bucketCount = (1 as Int) &<< scale
-    return Int(Double(bucketCount) * maxLoadFactor)
+    return unsafe Int(Double(bucketCount) * maxLoadFactor)
   }
 
   internal static func scale(forCapacity capacity: Int) -> Int8 {
@@ -81,7 +85,7 @@ extension _HashTable {
     // Calculate the minimum number of entries we need to allocate to satisfy
     // the maximum load factor. `capacity + 1` below ensures that we always
     // leave at least one hole.
-    let minimumEntries = Swift.max(
+    let minimumEntries = unsafe Swift.max(
       Int((Double(capacity) / maxLoadFactor).rounded(.up)),
       capacity + 1)
     // The actual number of entries we need to allocate is the lowest power of
@@ -91,7 +95,7 @@ extension _HashTable {
     _internalInvariant(exponent >= 0 && exponent < Int.bitWidth)
     // The scale is the exponent corresponding to the bucket count.
     let scale = Int8(truncatingIfNeeded: exponent)
-    _internalInvariant(self.capacity(forScale: scale) >= capacity)
+    unsafe _internalInvariant(self.capacity(forScale: scale) >= capacity)
     return scale
   }
 
@@ -102,7 +106,7 @@ extension _HashTable {
   }
 
   internal static func hashSeed(
-    for object: AnyObject,
+    for object: Builtin.NativeObject,
     scale: Int8
   ) -> Int {
     // We generate a new hash seed whenever a new hash table is allocated and
@@ -124,7 +128,7 @@ extension _HashTable {
     // 128-bit execution seed takes care of randomization. We only need to
     // guarantee that no two tables with the same seed can coexist at the same
     // time (apart from copy-on-write derivatives of the same table).
-    return unsafeBitCast(object, to: Int.self)
+    return unsafe unsafeBitCast(object, to: Int.self)
   }
 }
 
@@ -144,20 +148,20 @@ extension _HashTable {
     @inlinable
     @inline(__always)
     internal init(word: Int, bit: Int) {
-      self.offset = _UnsafeBitset.join(word: word, bit: bit)
+      unsafe self.offset = unsafe _UnsafeBitset.join(word: word, bit: bit)
     }
 
     @inlinable
     internal var word: Int {
       @inline(__always) get {
-        return _UnsafeBitset.word(for: offset)
+        return unsafe _UnsafeBitset.word(for: offset)
       }
     }
 
     @inlinable
     internal var bit: Int {
       @inline(__always) get {
-        return _UnsafeBitset.bit(for: offset)
+        return unsafe _UnsafeBitset.bit(for: offset)
       }
     }
   }
@@ -182,6 +186,7 @@ extension _HashTable.Bucket: Comparable {
 }
 
 extension _HashTable {
+  @unsafe
   @usableFromInline
   @frozen
   internal struct Index {
@@ -194,8 +199,8 @@ extension _HashTable {
     @inlinable
     @inline(__always)
     internal init(bucket: Bucket, age: Int32) {
-      self.bucket = bucket
-      self.age = age
+      unsafe self.bucket = bucket
+      unsafe self.age = age
     }
   }
 }
@@ -207,9 +212,9 @@ extension _HashTable.Index: Equatable {
     lhs: _HashTable.Index,
     rhs: _HashTable.Index
   ) -> Bool {
-    _precondition(lhs.age == rhs.age,
+    unsafe _precondition(lhs.age == rhs.age,
       "Can't compare indices belonging to different collections")
-    return lhs.bucket == rhs.bucket
+    return unsafe lhs.bucket == rhs.bucket
   }
 }
 
@@ -220,16 +225,17 @@ extension _HashTable.Index: Comparable {
     lhs: _HashTable.Index,
     rhs: _HashTable.Index
   ) -> Bool {
-    _precondition(lhs.age == rhs.age,
+    unsafe _precondition(lhs.age == rhs.age,
       "Can't compare indices belonging to different collections")
-    return lhs.bucket < rhs.bucket
+    return unsafe lhs.bucket < rhs.bucket
   }
 }
 
-extension _HashTable: Sequence {
+extension _HashTable: @unsafe Sequence {
+  @unsafe
   @usableFromInline
   @frozen
-  internal struct Iterator: IteratorProtocol {
+  internal struct Iterator: @unsafe IteratorProtocol {
     @usableFromInline
     let hashTable: _HashTable
     @usableFromInline
@@ -240,25 +246,25 @@ extension _HashTable: Sequence {
     @inlinable
     @inline(__always)
     init(_ hashTable: _HashTable) {
-      self.hashTable = hashTable
-      self.wordIndex = 0
-      self.word = hashTable.words[0]
-      if hashTable.bucketCount < Word.capacity {
-        self.word = self.word.intersecting(elementsBelow: hashTable.bucketCount)
+      unsafe self.hashTable = unsafe hashTable
+      unsafe self.wordIndex = 0
+      unsafe self.word = unsafe hashTable.words[0]
+      if unsafe hashTable.bucketCount < Word.capacity {
+        unsafe self.word = unsafe self.word.intersecting(elementsBelow: hashTable.bucketCount)
       }
     }
 
     @inlinable
     @inline(__always)
     internal mutating func next() -> Bucket? {
-      if let bit = word.next() {
-        return Bucket(word: wordIndex, bit: bit)
+      if let bit = unsafe word.next() {
+        return unsafe Bucket(word: wordIndex, bit: bit)
       }
-      while wordIndex + 1 < hashTable.wordCount {
-        wordIndex += 1
-        word = hashTable.words[wordIndex]
-        if let bit = word.next() {
-          return Bucket(word: wordIndex, bit: bit)
+      while unsafe wordIndex + 1 < hashTable.wordCount {
+        unsafe wordIndex += 1
+        unsafe word = unsafe hashTable.words[wordIndex]
+        if let bit = unsafe word.next() {
+          return unsafe Bucket(word: wordIndex, bit: bit)
         }
       }
       return nil
@@ -268,71 +274,75 @@ extension _HashTable: Sequence {
   @inlinable
   @inline(__always)
   internal func makeIterator() -> Iterator {
-    return Iterator(self)
+    return unsafe Iterator(self)
   }
 }
 
+@available(*, unavailable)
+extension _HashTable.Iterator: Sendable {}
+
 extension _HashTable {
+  @safe
   @inlinable
   @inline(__always)
   internal func isValid(_ bucket: Bucket) -> Bool {
-    return bucket.offset >= 0 && bucket.offset < bucketCount
+    return unsafe bucket.offset >= 0 && bucket.offset < bucketCount
   }
 
   @inlinable
   @inline(__always)
   internal func _isOccupied(_ bucket: Bucket) -> Bool {
     _internalInvariant(isValid(bucket))
-    return words[bucket.word].uncheckedContains(bucket.bit)
+    return unsafe words[bucket.word].uncheckedContains(bucket.bit)
   }
 
   @inlinable
   @inline(__always)
   internal func isOccupied(_ bucket: Bucket) -> Bool {
-    return isValid(bucket) && _isOccupied(bucket)
+    return unsafe isValid(bucket) && _isOccupied(bucket)
   }
 
   @inlinable
   @inline(__always)
   internal func checkOccupied(_ bucket: Bucket) {
-    _precondition(isOccupied(bucket),
+    unsafe _precondition(isOccupied(bucket),
       "Attempting to access Collection elements using an invalid Index")
   }
 
   @inlinable
   @inline(__always)
   internal func _firstOccupiedBucket(fromWord word: Int) -> Bucket {
-    _internalInvariant(word >= 0 && word <= wordCount)
+    unsafe _internalInvariant(word >= 0 && word <= wordCount)
     var word = word
-    while word < wordCount {
-      if let bit = words[word].minimum {
+    while unsafe word < wordCount {
+      if let bit = unsafe words[word].minimum {
         return Bucket(word: word, bit: bit)
       }
       word += 1
     }
-    return endBucket
+    return unsafe endBucket
   }
 
   @inlinable
   internal func occupiedBucket(after bucket: Bucket) -> Bucket {
     _internalInvariant(isValid(bucket))
     let word = bucket.word
-    if let bit = words[word].intersecting(elementsAbove: bucket.bit).minimum {
+    if let bit = unsafe words[word].intersecting(elementsAbove: bucket.bit).minimum {
       return Bucket(word: word, bit: bit)
     }
-    return _firstOccupiedBucket(fromWord: word + 1)
+    return unsafe _firstOccupiedBucket(fromWord: word + 1)
   }
 
   @inlinable
   internal var startBucket: Bucket {
-    return _firstOccupiedBucket(fromWord: 0)
+    return unsafe _firstOccupiedBucket(fromWord: 0)
   }
 
   @inlinable
   internal var endBucket: Bucket {
     @inline(__always)
     get {
-      return Bucket(offset: bucketCount)
+      return unsafe Bucket(offset: bucketCount)
     }
   }
 }
@@ -341,7 +351,7 @@ extension _HashTable {
   @inlinable
   @inline(__always)
   internal func idealBucket(forHashValue hashValue: Int) -> Bucket {
-    return Bucket(offset: hashValue & bucketMask)
+    return unsafe Bucket(offset: hashValue & bucketMask)
   }
 
   /// The next bucket after `bucket`, with wraparound at the end of the table.
@@ -350,7 +360,7 @@ extension _HashTable {
   internal func bucket(wrappedAfter bucket: Bucket) -> Bucket {
     // The bucket is less than bucketCount, which is power of two less than
     // Int.max. Therefore adding 1 does not overflow.
-    return Bucket(offset: (bucket.offset &+ 1) & bucketMask)
+    return unsafe Bucket(offset: (bucket.offset &+ 1) & bucketMask)
   }
 }
 
@@ -362,7 +372,7 @@ extension _HashTable {
     // are guaranteed to be all set, so the formula below gives correct results.
     var word = bucket.word
     if let bit =
-      words[word]
+      unsafe words[word]
         .complement
         .intersecting(elementsBelow: bucket.bit)
         .maximum {
@@ -374,12 +384,13 @@ extension _HashTable {
       if word < 0 {
         _precondition(!wrap, "Hash table has no holes")
         wrap = true
-        word = wordCount - 1
+        word = unsafe wordCount - 1
       }
-      if let bit = words[word].complement.maximum {
+      if let bit = unsafe words[word].complement.maximum {
         return Bucket(word: word, bit: bit)
       }
     }
+    fatalError()
   }
 
   @inlinable
@@ -389,7 +400,7 @@ extension _HashTable {
     // are guaranteed to be all set, so the formula below gives correct results.
     var word = bucket.word
     if let bit =
-      words[word]
+      unsafe words[word]
         .complement
         .subtracting(elementsBelow: bucket.bit)
         .minimum {
@@ -398,15 +409,16 @@ extension _HashTable {
     var wrap = false
     while true {
       word &+= 1
-      if word == wordCount {
+      if unsafe word == wordCount {
         _precondition(!wrap, "Hash table has no holes")
         wrap = true
         word = 0
       }
-      if let bit = words[word].complement.minimum {
+      if let bit = unsafe words[word].complement.minimum {
         return Bucket(word: word, bit: bit)
       }
     }
+    fatalError()
   }
 }
 
@@ -415,8 +427,8 @@ extension _HashTable {
   @inline(__always)
   @_effects(releasenone)
   internal func copyContents(of other: _HashTable) {
-    _internalInvariant(bucketCount == other.bucketCount)
-    self.words.update(from: other.words, count: wordCount)
+    unsafe _internalInvariant(bucketCount == other.bucketCount)
+    unsafe self.words.update(from: other.words, count: wordCount)
   }
 
   /// Insert a new entry with the specified hash value into the table.
@@ -424,8 +436,8 @@ extension _HashTable {
   @inlinable
   @inline(__always)
   internal func insertNew(hashValue: Int) -> Bucket {
-    let hole = nextHole(atOrAfter: idealBucket(forHashValue: hashValue))
-    insert(hole)
+    let hole = unsafe nextHole(atOrAfter: idealBucket(forHashValue: hashValue))
+    unsafe insert(hole)
     return hole
   }
 
@@ -433,20 +445,20 @@ extension _HashTable {
   @inlinable
   @inline(__always)
   internal func insert(_ bucket: Bucket) {
-    _internalInvariant(!isOccupied(bucket))
-    words[bucket.word].uncheckedInsert(bucket.bit)
+    unsafe _internalInvariant(!isOccupied(bucket))
+    unsafe words[bucket.word].uncheckedInsert(bucket.bit)
   }
 
   @inlinable
   @inline(__always)
   internal func clear() {
-    if bucketCount < Word.capacity {
+    if unsafe bucketCount < Word.capacity {
       // We have only a single partial word. Set all out of bounds bits, so that
       // `occupiedBucket(after:)` and `nextHole(atOrAfter:)` works correctly
       // without a special case.
-      words[0] = Word.allBits.subtracting(elementsBelow: bucketCount)
+      unsafe words[0] = Word.allBits.subtracting(elementsBelow: bucketCount)
     } else {
-      words.update(repeating: .empty, count: wordCount)
+      unsafe words.update(repeating: .empty, count: wordCount)
     }
   }
 
@@ -456,29 +468,29 @@ extension _HashTable {
     at bucket: Bucket,
     with delegate: D
   ) {
-    _internalInvariant(isOccupied(bucket))
+    unsafe _internalInvariant(isOccupied(bucket))
 
     // If we've put a hole in a chain of contiguous elements, some element after
     // the hole may belong where the new hole is.
 
     var hole = bucket
-    var candidate = self.bucket(wrappedAfter: hole)
+    var candidate = unsafe self.bucket(wrappedAfter: hole)
 
-    guard _isOccupied(candidate) else {
+    guard unsafe _isOccupied(candidate) else {
       // Fast path: Don't get the first bucket when there's nothing to do.
-      words[hole.word].uncheckedRemove(hole.bit)
+      unsafe words[hole.word].uncheckedRemove(hole.bit)
       return
     }
 
     // Find the first bucket in the contiguous chain that contains the entry
     // we've just deleted.
-    let start = self.bucket(wrappedAfter: previousHole(before: bucket))
+    let start = unsafe self.bucket(wrappedAfter: previousHole(before: bucket))
 
     // Relocate out-of-place elements in the chain, repeating until we get to
     // the end of the chain.
-    while _isOccupied(candidate) {
+    while unsafe _isOccupied(candidate) {
       let candidateHash = delegate.hashValue(at: candidate)
-      let ideal = idealBucket(forHashValue: candidateHash)
+      let ideal = unsafe idealBucket(forHashValue: candidateHash)
 
       // Does this element belong between start and hole?  We need two
       // separate tests depending on whether [start, hole] wraps around the
@@ -489,9 +501,9 @@ extension _HashTable {
         delegate.moveEntry(from: candidate, to: hole)
         hole = candidate
       }
-      candidate = self.bucket(wrappedAfter: candidate)
+      unsafe candidate = unsafe self.bucket(wrappedAfter: candidate)
     }
 
-    words[hole.word].uncheckedRemove(hole.bit)
+    unsafe words[hole.word].uncheckedRemove(hole.bit)
   }
 }

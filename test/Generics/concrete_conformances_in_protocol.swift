@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift
 // RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 protocol P {
@@ -13,7 +13,6 @@ struct S : P {
 
 protocol R0 {
   associatedtype A where A : P, A == S
-  // expected-warning@-1 {{redundant conformance constraint 'S' : 'P'}}
 }
 
 ////
@@ -26,7 +25,6 @@ struct G<T> : P {}
 protocol R1 {
   associatedtype A
   associatedtype B where B : P, B == G<A>
-  // expected-warning@-1 {{redundant conformance constraint 'G<Self.A>' : 'P'}}
 }
 
 // CHECK-LABEL: concrete_conformances_in_protocol.(file).R2@
@@ -34,7 +32,6 @@ protocol R1 {
 
 protocol R2 {
   associatedtype A where A : P, A == G<B>
-  // expected-warning@-1 {{redundant conformance constraint 'G<Self.B>' : 'P'}}
   associatedtype B
 }
 
@@ -52,7 +49,6 @@ struct GG<T : P> : PP {}
 protocol RR3 {
   associatedtype A : P
   associatedtype B where B : PP, B == GG<A>
-  // expected-warning@-1 {{redundant conformance constraint 'GG<Self.A>' : 'PP'}}
 }
 
 // CHECK-LABEL: concrete_conformances_in_protocol.(file).RR4@
@@ -60,7 +56,6 @@ protocol RR3 {
 
 protocol RR4 {
   associatedtype A where A : PP, A == GG<B>
-  // expected-warning@-1 {{redundant conformance constraint 'GG<Self.B>' : 'PP'}}
   associatedtype B : P
 }
 
@@ -70,7 +65,6 @@ protocol RR4 {
 protocol RR5 {
   associatedtype A : PP
   associatedtype B where B : PP, B == GG<A.T>
-  // expected-warning@-1 {{redundant conformance constraint 'GG<Self.A.T>' : 'PP'}}
 }
 
 // CHECK-LABEL: concrete_conformances_in_protocol.(file).RR6@
@@ -78,7 +72,6 @@ protocol RR5 {
 
 protocol RR6 {
   associatedtype A where A : PP, A == GG<B.T>
-  // expected-warning@-1 {{redundant conformance constraint 'GG<Self.B.T>' : 'PP'}}
   associatedtype B : PP
 }
 
@@ -95,7 +88,6 @@ struct GGG<U : P1> : P1 {
 
 protocol P2 {
   associatedtype T : P1 where T == GGG<U>
-  // expected-warning@-1 {{redundant conformance constraint 'GGG<Self.U>' : 'P1'}}
   associatedtype U : P1
 }
 

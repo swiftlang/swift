@@ -33,8 +33,8 @@ print(a + /*pattern-b*/b)
 
 struct S {
 	lazy var lazyVal: Int = {
-		let /*lazy:def*/myNewVal = 0
-		return /*lazy:ref*/myNewVal
+		let /*lazy:def*/<base>myVal</base> = 0
+		return /*lazy:ref*/<base>myVal</base>
 	}()
 }
 

@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -emit-verbose-sil -sdk %S/Inputs -I %S/Inputs -enable-source-import | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -emit-verbose-sil -sdk %S/Inputs -I %S/Inputs -enable-source-import | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -289,11 +289,11 @@ class SomeWrapperTests {
 
 // CHECK-LABEL: sil hidden [ossa] @$s15objc_properties16SomeWrapperTestsCyACSScfc : $@convention(method) (@owned String, @owned SomeWrapperTests) -> @owned SomeWrapperTests {
 // CHECK:  [[M:%.*]] = function_ref @$s15objc_properties16SomeWrapperTestsC04someD0SivsTD
-// CHECK:  [[C:%.*]] = partial_apply [callee_guaranteed] [[M]]({{.*}})
-// CHECK: assign_by_wrapper origin property_wrapper, {{%.*}}: $Int to {{%.*}} : $*SomeWrapper, init {{.*}} : $@callee_guaranteed (Int) -> SomeWrapper, set [[C]] : $@callee_guaranteed (Int) -> ()
+// CHECK:  [[C:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[M]]({{.*}})
+// CHECK: assign_by_wrapper {{%.*}}: $Int to {{%.*}} : $*SomeWrapper, init {{.*}} : $@callee_guaranteed (Int) -> SomeWrapper, set [[C]] : $@noescape @callee_guaranteed (Int) -> ()
 // CHECK: [[M:%.*]] = function_ref @$s15objc_properties16SomeWrapperTestsC1sSSSgvsTD
-// CHECK: [[C:%.*]] = partial_apply [callee_guaranteed] [[M]](
-// CHECK:  assign_by_wrapper origin property_wrapper, {{.*}} : $Optional<String> to {{.*}} : $*W<Optional<String>>, init {{.*}} : $@callee_guaranteed (@owned Optional<String>) -> @owned W<Optional<String>>, set [[C]] : $@callee_guaranteed (@owned Optional<String>) -> ()
+// CHECK: [[C:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[M]](
+// CHECK:  assign_by_wrapper {{.*}} : $Optional<String> to {{.*}} : $*W<Optional<String>>, init {{.*}} : $@callee_guaranteed (@owned Optional<String>) -> @owned W<Optional<String>>, set [[C]] : $@noescape @callee_guaranteed (@owned Optional<String>) -> ()
   init(_ s: String) {
     someWrapper = 1000
     self.s = s

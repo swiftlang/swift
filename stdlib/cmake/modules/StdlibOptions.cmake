@@ -95,6 +95,17 @@ option(SWIFT_ENABLE_MODULE_INTERFACES
        "Generate .swiftinterface files alongside .swiftmodule files"
        "${SWIFT_STDLIB_STABLE_ABI}")
 
+option(SWIFT_STDLIB_EMIT_API_DESCRIPTORS
+        "Emit api descriptors for the standard library"
+        FALSE)
+
+option(SWIFT_STDLIB_BUILD_ONLY_CORE_MODULES
+       "Build only the core subset of the standard library,
+       ignoring additional libraries such as Distributed, Observation and Synchronization.
+       This is an option meant for internal configurations inside Apple
+       that need to build the standard libraries in chunks when constructing an SDK"
+       FALSE)
+
 if("${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
   set(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default TRUE)
 elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "LINUX")
@@ -106,7 +117,7 @@ endif()
 option(SWIFT_STDLIB_ENABLE_PRESPECIALIZATION
        "Should stdlib be built with generic metadata prespecialization enabled. Defaults to On on Darwin and on Linux."
        "${SWIFT_STDLIB_ENABLE_PRESPECIALIZATION_default}")
- 
+
 option(SWIFT_STDLIB_ENABLE_UNICODE_DATA
        "Should stdlib be built with full unicode support"
        TRUE)
@@ -135,7 +146,15 @@ option(SWIFT_STDLIB_BUILD_PRIVATE
        TRUE)
 
 option(SWIFT_STDLIB_HAS_DLADDR
-       "Build stdlib assuming the runtime environment runtime environment provides dladdr API."
+       "Build stdlib assuming the runtime environment provides the dladdr API."
+       TRUE)
+
+option(SWIFT_STDLIB_HAS_DLSYM
+       "Build stdlib assuming the runtime environment provides the dlsym API."
+       TRUE)
+
+option(SWIFT_STDLIB_HAS_FILESYSTEM
+       "Build stdlib assuming the runtime environment has a filesystem."
        TRUE)
 
 option(SWIFT_RUNTIME_STATIC_IMAGE_INSPECTION
@@ -175,15 +194,9 @@ option(SWIFT_ENABLE_REFLECTION
 set(SWIFT_STDLIB_REFLECTION_METADATA "enabled" CACHE STRING
     "Build stdlib with runtime metadata (valid options are 'enabled', 'disabled' and 'debugger-only').")
 
-if(SWIFT_FREESTANDING_FLAVOR STREQUAL "apple" AND NOT SWIFT_FREESTANDING_IS_DARWIN)
-  set(SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY_default TRUE)
-else()
-  set(SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY_default FALSE)
-endif()
-
 option(SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
        "Should concurrency use the task-to-thread model."
-       "${SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY_default}")
+       FALSE)
 
 option(SWIFT_STDLIB_HAS_STDIN
        "Build stdlib assuming the platform supports stdin and getline API."
@@ -197,13 +210,32 @@ option(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
        "Build the standard libraries assuming that they will be used in an environment with only a single thread."
        FALSE)
 
-if(SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
-  set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "none")
-elseif(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY)
-  set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "singlethreaded")
-else()
-  set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "dispatch")
-endif()
+option(SWIFT_USE_OS_TRACE_LAZY_INIT
+       "Use the os_trace call to check if lazy init has been completed before making os_signpost calls."
+       FALSE)
+
+# Use dispatch as the system scheduler by default.
+# For convenience, we set this to false when concurrency is disabled.
+set(SWIFT_CONCURRENCY_USES_DISPATCH FALSE)
+if (SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
+
+   if (SWIFT_ENABLE_DISPATCH)
+     set(SWIFT_CONCURRENCY_USES_DISPATCH TRUE)
+     if (NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND NOT EXISTS "${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}")
+       message(SEND_ERROR "Concurrency requires libdispatch on non-Darwin hosts.  Please specify SWIFT_PATH_TO_LIBDISPATCH_SOURCE")
+     endif()
+   endif()
+
+  if(SWIFT_CONCURRENCY_USES_DISPATCH)
+    set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "dispatch")
+  elseif(SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
+    set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "none")
+  elseif(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY)
+    set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "singlethreaded")
+  else()
+    set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default "hooked")
+  endif()
+endif() # SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
 
 set(SWIFT_CONCURRENCY_GLOBAL_EXECUTOR
     "${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR_default}" CACHE STRING
@@ -221,10 +253,17 @@ set(SWIFT_STDLIB_ENABLE_LTO OFF CACHE STRING "Build Swift stdlib with LTO. One
     option only affects the standard library and runtime, not tools.")
 
 if("${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
+  set(SWIFT_STDLIB_TRACING_default TRUE)
   set(SWIFT_STDLIB_CONCURRENCY_TRACING_default TRUE)
 else()
+  set(SWIFT_STDLIB_TRACING_default FALSE)
   set(SWIFT_STDLIB_CONCURRENCY_TRACING_default FALSE)
 endif()
+
+option(SWIFT_STDLIB_TRACING
+  "Enable tracing in the runtime; assumes the presence of os_log(3)
+   and the os_signpost(3) API."
+  "${SWIFT_STDLIB_TRACING_default}")
 
 option(SWIFT_STDLIB_CONCURRENCY_TRACING
   "Enable concurrency tracing in the runtime; assumes the presence of os_log(3)
@@ -234,3 +273,26 @@ option(SWIFT_STDLIB_CONCURRENCY_TRACING
 option(SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
        "Use relative protocol witness tables"
        FALSE)
+
+option(SWIFT_STDLIB_USE_FRAGILE_RESILIENT_PROTOCOL_WITNESS_TABLES
+       "Use fragile protocol witness tables for resilient protocols"
+       FALSE)
+
+if("${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
+  set(SWIFT_STDLIB_INSTALL_PARENT_MODULE_FOR_SHIMS_default TRUE)
+else()
+  set(SWIFT_STDLIB_INSTALL_PARENT_MODULE_FOR_SHIMS_default FALSE)
+endif()
+
+option(SWIFT_STDLIB_INSTALL_PARENT_MODULE_FOR_SHIMS
+       "Install a parent module map for Swift shims."
+       ${SWIFT_STDLIB_INSTALL_PARENT_MODULE_FOR_SHIMS_default})
+
+option(SWIFT_STDLIB_OVERRIDABLE_RETAIN_RELEASE
+       "Allow retain/release functions to be overridden by indirecting through function pointers."
+       TRUE)
+
+set(SWIFT_RUNTIME_FIXED_BACKTRACER_PATH "" CACHE STRING
+  "If set, provides a fixed path to the swift-backtrace binary.  This
+   will disable dynamic determination of the path and will also disable
+   the setting in SWIFT_BACKTRACE.")

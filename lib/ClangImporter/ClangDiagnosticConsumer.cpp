@@ -16,6 +16,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
+#include "swift/Basic/Assertions.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/Frontend/DiagnosticRenderer.h"
 #include "clang/Frontend/FrontendDiagnostic.h"
@@ -118,6 +119,7 @@ void ClangDiagnosticConsumer::HandleDiagnostic(
   // we're looking for.
   if (clangDiag.getID() == clang::diag::err_module_not_found &&
       CurrentImport && clangDiag.getArgStdStr(0) == CurrentImport->getName()) {
+    CurrentImportNotFound = true;
     return;
   }
 

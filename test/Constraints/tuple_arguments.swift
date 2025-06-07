@@ -1490,7 +1490,7 @@ do {
   let tuple = (1, (2, 3))
   [tuple].map { (x, (y, z)) -> Int in x + y + z } // expected-note 2 {{'x' declared here}}
   // expected-error@-1 {{closure tuple parameter does not support destructuring}} {{21-27=arg1}} {{39-39=let (y, z) = arg1; }}
-  // expected-warning@-2 {{unnamed parameters must be written with the empty name '_'}}  {{21-21=_: }}
+  // expected-warning@-2 {{unnamed parameters must be written with the empty name '_'; this is an error in the Swift 6 language mode}}  {{21-21=_: }}
   // expected-error@-3 {{cannot find 'y' in scope; did you mean 'x'?}}
   // expected-error@-4 {{cannot find 'z' in scope; did you mean 'x'?}}
 }
@@ -1500,9 +1500,9 @@ let r31892961_1 = [1: 1, 2: 2]
 r31892961_1.forEach { (k, v) in print(k + v) }
 
 let r31892961_2 = [1, 2, 3]
+// expected-error@+2 {{closure tuple parameter does not support destructuring}} {{48-60=arg0}} {{+1:3-3=\n  let (index, val) = arg0\n  }}
+// expected-warning@+1 {{unnamed parameters must be written with the empty name '_'; this is an error in the Swift 6 language mode}} {{48-48=_: }}
 let _: [Int] = r31892961_2.enumerated().map { ((index, val)) in
-  // expected-error@-1 {{closure tuple parameter does not support destructuring}} {{48-60=arg0}} {{3-3=\n  let (index, val) = arg0\n  }}
-  // expected-warning@-2 {{unnamed parameters must be written with the empty name '_'}} {{48-48=_: }}
   val + 1
   // expected-error@-1 {{cannot find 'val' in scope}}
 }
@@ -1518,13 +1518,13 @@ _ = [r31892961_4].map { x, y in x + y }
 let r31892961_5 = (x: 1, (y: 2, (w: 3, z: 4)))
 [r31892961_5].map { (x: Int, (y: Int, (w: Int, z: Int))) in x + y } // expected-note {{'x' declared here}}
 // expected-error@-1 {{closure tuple parameter does not support destructuring}} {{30-56=arg1}} {{61-61=let (y, (w, z)) = arg1; }}
-// expected-warning@-2 {{unnamed parameters must be written with the empty name '_'}} {{30-30=_: }}
+// expected-warning@-2 {{unnamed parameters must be written with the empty name '_'; this is an error in the Swift 6 language mode}} {{30-30=_: }}
 // expected-error@-3{{cannot find 'y' in scope; did you mean 'x'?}}
 
 let r31892961_6 = (x: 1, (y: 2, z: 4))
 [r31892961_6].map { (x: Int, (y: Int, z: Int)) in x + y } // expected-note {{'x' declared here}}
 // expected-error@-1 {{closure tuple parameter does not support destructuring}} {{30-46=arg1}} {{51-51=let (y, z) = arg1; }}
-// expected-warning@-2 {{unnamed parameters must be written with the empty name '_'}} {{30-30=_: }}
+// expected-warning@-2 {{unnamed parameters must be written with the empty name '_'; this is an error in the Swift 6 language mode}} {{30-30=_: }}
 // expected-error@-3{{cannot find 'y' in scope; did you mean 'x'?}}
 
 // rdar://problem/32214649 -- these regressed in Swift 4 mode
@@ -1660,6 +1660,7 @@ do {
   func foo(_: (() -> Void)?) {}
   func bar() -> ((()) -> Void)? { return nil }
   foo(bar()) // expected-error {{cannot convert value of type '((()) -> Void)?' to expected argument type '(() -> Void)?'}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('(()) -> Void' and '() -> Void') are expected to be equal}}
 }
 
 // https://github.com/apple/swift/issues/49059
@@ -1699,6 +1700,7 @@ do {
   func log<T>() -> ((T) -> Void)? { return nil }
 
   f(a: log() as ((()) -> Void)?) // expected-error {{cannot convert value of type '((()) -> Void)?' to expected argument type '(() -> Void)?'}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('(()) -> Void' and '() -> Void') are expected to be equal}}
 
   func logNoOptional<T>() -> (T) -> Void { }
   f(a: logNoOptional() as ((()) -> Void)) // expected-error {{cannot convert value of type '(()) -> Void' to expected argument type '() -> Void'}}
@@ -1726,7 +1728,7 @@ do {
 do {
   func f(_: Int...) {}
   let _ = [(1, 2, 3)].map(f) // expected-error {{no exact matches in call to instance method 'map'}}
-  // expected-note@-1 {{found candidate with type '(((Int, Int, Int)) throws -> _) throws -> Array<_>'}}
+  // expected-note@-1 {{found candidate with type '(((Int, Int, Int)) -> _) -> Array<_>'}}
 }
 
 // rdar://problem/48443263 - cannot convert value of type '() -> Void' to expected argument type '(_) -> Void'
@@ -1798,4 +1800,10 @@ func variadicSplat() {
   takesFnWithVarg { x, y in
     _ = y.count
   }
+}
+
+func tuple_splat_with_a_label() {
+  func test(vals: Int, _: String, _: Float) {} // expected-note 2 {{'test(vals:_:_:)' declared here}}
+  test(vals: (23, "hello", 3.14)) // expected-error {{local function 'test' expects 3 separate arguments; remove extra parentheses to change tuple into separate arguments}}
+  test((vals: 23, "hello", 3.14)) // expected-error {{local function 'test' expects 3 separate arguments; remove extra parentheses to change tuple into separate arguments}}
 }

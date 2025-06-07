@@ -22,6 +22,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ImporterImpl.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/SwiftAbstractBasicWriter.h"
 
 using namespace swift;
@@ -66,8 +67,8 @@ private:
 
   StableSerializationPath findImportedPath(const clang::NamedDecl *decl) {
     // We've almost certainly imported this declaration, look for it.
-    Optional<Decl *> swiftDeclOpt =
-      Impl.importDeclCached(decl, Impl.CurrentVersion);
+    std::optional<Decl *> swiftDeclOpt =
+        Impl.importDeclCached(decl, Impl.CurrentVersion);
     if (swiftDeclOpt.has_value() && swiftDeclOpt.value()) {
       auto swiftDecl = swiftDeclOpt.value();
       // The serialization code doesn't allow us to cross-reference
@@ -314,6 +315,20 @@ namespace {
       // replace with a meaningless location.
       if (loc.isValid())
         IsSerializable = false;
+    }
+
+    void writeAttr(const clang::Attr *attr) {}
+
+    // CountAttributedType is a clang type representing a pointer with
+    // a "counted_by" type attribute and DynamicRangePointerType
+    // is representing a "__ended_by" type attribute.
+    // TypeCoupledDeclRefInfo is used to hold information of a declaration
+    // referenced from an expression argument of "__counted_by(expr)" or
+    // "__ended_by(expr)".
+    // Leave it non-serializable for now as we currently don't import
+    // these types into Swift.
+    void writeTypeCoupledDeclRefInfo(clang::TypeCoupledDeclRefInfo info) {
+      llvm_unreachable("TypeCoupledDeclRefInfo shouldn't be reached from swift");
     }
   };
 }

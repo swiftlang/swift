@@ -555,7 +555,7 @@ func passesBaseIntAndPArray() {
 //
 
 struct DerivedBox<T : Derived> {}
-// expected-note@-1 {{requirement specified as 'T' : 'Derived' [with T = Derived & P3]}}
+// expected-note@-1 {{requirement specified as 'T' : 'Derived' [with T = any Derived & P3]}}
 
 func takesBoxWithP3(_: DerivedBox<Derived & P3>) {}
 // expected-error@-1 {{'DerivedBox' requires that 'any Derived & P3' inherit from 'Derived'}}
@@ -577,3 +577,10 @@ struct Generic<T> {
     }
   }
 }
+
+// https://github.com/swiftlang/swift/issues/76164
+protocol P5 where Self: Other {}
+protocol P6 {}
+
+func invalidOverload(_: P5 & P6 & Other) {} // expected-note {{'invalidOverload' previously declared here}}
+func invalidOverload(_: P5 & P6) {} // expected-error {{invalid redeclaration of 'invalidOverload'}}

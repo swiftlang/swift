@@ -12,13 +12,13 @@
 // CHECK:   mutating func make42Ref<T>(_ val: inout T)
 // CHECK: }
 
-// CHECK: struct __CxxTemplateInst32TemplateClassWithMemberTemplatesIiE {
+// CHECK: struct TemplateClassWithMemberTemplates<CInt> {
 // CHECK:   init(_ val: Int32)
 // CHECK:   var value: Int32
 // CHECK:   mutating func setValue<U>(_ val: U)
 // CHECK: }
 
-// CHECK: typealias IntWrapper = __CxxTemplateInst32TemplateClassWithMemberTemplatesIiE
+// CHECK: typealias IntWrapper = TemplateClassWithMemberTemplates<CInt>
 
 // CHECK: struct HasStaticMemberTemplates {
 // CHECK:   init()
@@ -27,21 +27,36 @@
 // CHECK:   static func removeReference<T>(_ a: inout T) -> T
 // CHECK: }
 
-// CHECK: struct __CxxTemplateInst17MyTemplatedStructIiE {
+// CHECK: struct MyTemplatedStruct<CInt> {
 // CHECK:   init()
 // CHECK: }
 
 // CHECK: struct HasTemplatedField {
-// CHECK:   init(x: __CxxTemplateInst17MyTemplatedStructIiE)
-// CHECK:   var x: __CxxTemplateInst17MyTemplatedStructIiE
+// CHECK:   init(x: MyTemplatedStruct<CInt>)
+// CHECK:   var x: MyTemplatedStruct<CInt>
 // CHECK: }
 
-// CHECK: struct __CxxTemplateInst33HasUninstantiatableTemplateMemberIN39HasTemplateInstantiationWithForwardDecl12NoDefinitionE32TemplateClassWithMemberTemplatesIS1_EE {
+// CHECK: struct HasNestedInstantiation {
+// CHECK:   struct MyNestedTemplatedStruct<T> {
+// CHECK:   }
+// CHECK:   typealias NestedInst = MyTemplatedStruct<HasNestedInstantiation.MyNestedTemplatedStruct<CInt>>
+// CHECK: }
+
+// CHECK: enum NS {
+// CHECK:   struct HasNestedInstantiation {
+// CHECK:     struct MyNestedTemplatedStruct<T> {
+// CHECK:     }
+// CHECK:     typealias NestedInst = MyTemplatedStruct<NS.HasNestedInstantiation.MyNestedTemplatedStruct<CInt>>
+// CHECK:   }
+// CHECK: }
+
+
+// CHECK: struct HasUninstantiatableTemplateMember<HasTemplateInstantiationWithForwardDecl.NoDefinition, TemplateClassWithMemberTemplates<HasTemplateInstantiationWithForwardDecl.NoDefinition>> {
 // CHECK:   init(pointer: OpaquePointer!)
 // CHECK:   var pointer: OpaquePointer!
 // CHECK: }
 
 // CHECK: struct HasTemplateInstantiationWithForwardDecl {
-// CHECK:   init(noDefMember: __CxxTemplateInst33HasUninstantiatableTemplateMemberIN39HasTemplateInstantiationWithForwardDecl12NoDefinitionE32TemplateClassWithMemberTemplatesIS1_EE)
-// CHECK:   var noDefMember: __CxxTemplateInst33HasUninstantiatableTemplateMemberIN39HasTemplateInstantiationWithForwardDecl12NoDefinitionE32TemplateClassWithMemberTemplatesIS1_EE
+// CHECK:   init(noDefMember: HasUninstantiatableTemplateMember<HasTemplateInstantiationWithForwardDecl.NoDefinition, TemplateClassWithMemberTemplates<HasTemplateInstantiationWithForwardDecl.NoDefinition>>)
+// CHECK:   var noDefMember: HasUninstantiatableTemplateMember<HasTemplateInstantiationWithForwardDecl.NoDefinition, TemplateClassWithMemberTemplates<HasTemplateInstantiationWithForwardDecl.NoDefinition>>
 // CHECK: }

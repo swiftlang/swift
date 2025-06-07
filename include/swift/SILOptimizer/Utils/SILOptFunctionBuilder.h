@@ -56,6 +56,9 @@ public:
   }
 
   SILModule &getModule() const { return *getPassManager().getModule(); }
+  irgen::IRGenModule *getIRGenModule() const {
+    return transform.getIRGenModule();
+  }
 
 private:
   SILPassManager &getPassManager() const {

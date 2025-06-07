@@ -142,3 +142,20 @@ class Kitten : Snout {}
 extension Kitten {
   @nonobjc func sniff() {}
 }
+
+// Test preventing protocol witnesses for unavailable requirements
+@objc
+protocol ProtocolWithRenamedRequirement {
+  @available(*, unavailable, renamed: "new(bar:)")
+  @objc optional func old(foo: Int) // expected-note{{'old(foo:)' has been explicitly marked unavailable here}}
+  func new(bar: Int)
+}
+
+class ClassWithGoodWitness : ProtocolWithRenamedRequirement {
+  @objc func new(bar: Int) {}
+}
+
+class ClassWithBadWitness : ProtocolWithRenamedRequirement {
+  @objc func old(foo: Int) {} // expected-error{{'old(foo:)' has been renamed to 'new(bar:)'}}
+  @objc func new(bar: Int) {}
+}

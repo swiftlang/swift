@@ -37,6 +37,7 @@ namespace swift {
   enum class DeclRefKind;
   class Expr;
   class ExtensionDecl;
+  class FreestandingMacroExpansion;
   class FunctionType;
   class LabeledConditionalStmt;
   class LookupResult;
@@ -53,17 +54,25 @@ namespace swift {
   namespace constraints {
   class ConstraintSystem;
   class Solution;
-  class SolutionApplicationTarget;
+  class SyntacticElementTarget;
   }
 
   /// Typecheck binding initializer at \p bindingIndex.
-  void typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned bindingIndex,
-                               bool leaveClosureBodiesUnchecked);
+  void typeCheckPatternBinding(PatternBindingDecl *PBD, unsigned bindingIndex);
+
+  /// Attempt to merge two types for the purposes of completion lookup. In
+  /// general this means preferring a subtype over a supertype, but can also e.g
+  /// prefer an optional over a non-optional. If the two types are incompatible,
+  /// null is returned.
+  Type tryMergeBaseTypeForCompletionLookup(Type ty1, Type ty2, DeclContext *dc);
 
   /// Check if T1 is convertible to T2.
   ///
   /// \returns true on convertible, false on not.
   bool isConvertibleTo(Type T1, Type T2, bool openArchetypes, DeclContext &DC);
+
+  /// Check whether \p T1 is a subtype of \p T2.
+  bool isSubtypeOf(Type T1, Type T2, DeclContext *DC);
 
   void collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
                         llvm::SmallDenseMap<ValueDecl*, ValueDecl*> &DefaultMap);
@@ -123,26 +132,9 @@ namespace swift {
 
   /// Return the type of an expression parsed during code completion, or
   /// None on error.
-  Optional<Type> getTypeOfCompletionContextExpr(
-                   ASTContext &Ctx,
-                   DeclContext *DC,
-                   CompletionTypeCheckKind kind,
-                   Expr *&parsedExpr,
-                   ConcreteDeclRef &referencedDecl);
-
-  /// Resolve type of operator function with \c opName appending it to \c LHS.
-  ///
-  /// For \p refKind, use \c DeclRefKind::PostfixOperator for postfix operator,
-  /// or \c DeclRefKind::BinaryOperator for infix operator.
-  /// On success, returns resolved function type of the operator. The LHS should
-  /// already be type-checked. This function guarantees LHS not to be modified.
-  FunctionType *getTypeOfCompletionOperator(DeclContext *DC, Expr *LHS,
-                                            Identifier opName,
-                                            DeclRefKind refKind,
-                                            ConcreteDeclRef &referencedDecl);
-
-  /// Typecheck the given expression.
-  bool typeCheckExpression(DeclContext *DC, Expr *&parsedExpr);
+  std::optional<Type> getTypeOfCompletionContextExpr(
+      ASTContext &Ctx, DeclContext *DC, CompletionTypeCheckKind kind,
+      Expr *&parsedExpr, ConcreteDeclRef &referencedDecl);
 
   /// Type check a function body element which is at \p TagetLoc.
   bool typeCheckASTNodeAtLoc(TypeCheckASTNodeAtLocContext TypeCheckCtx,
@@ -161,13 +153,12 @@ namespace swift {
   /// \returns `true` if target was applicable and it was possible to infer
   /// types for code completion, `false` otherwise.
   bool typeCheckForCodeCompletion(
-      constraints::SolutionApplicationTarget &target, bool needsPrecheck,
+      constraints::SyntacticElementTarget &target, bool needsPrecheck,
       llvm::function_ref<void(const constraints::Solution &)> callback);
 
   /// Thunk around \c TypeChecker::resolveDeclRefExpr to make it available to
   /// \c swift::ide
-  Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
-                         bool replaceInvalidRefsWithErrors);
+  Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context);
 
   LookupResult
   lookupSemanticMember(DeclContext *DC, Type ty, DeclName name);
@@ -178,6 +169,15 @@ namespace swift {
   /// work happened to have synthesized them.
   void
   getTopLevelDeclsForDisplay(ModuleDecl *M, SmallVectorImpl<Decl*> &Results, bool Recursive = false);
+
+  /// Get all of the top-level declarations that should be printed as part of
+  /// this module. This may force synthesis of top-level declarations that
+  /// \p getDisplayDeclsForModule would only return if previous
+  /// work happened to have synthesized them.
+  void getTopLevelDeclsForDisplay(
+      ModuleDecl *M, SmallVectorImpl<Decl *> &Results,
+      llvm::function_ref<void(ModuleDecl *, SmallVectorImpl<Decl *> &)>
+          getDisplayDeclsForModule);
 
   struct ExtensionInfo {
     // The extension with the declarations to apply.
@@ -197,7 +197,7 @@ namespace swift {
     Implementation &Impl;
   public:
     SynthesizedExtensionAnalyzer(NominalTypeDecl *Target,
-                                 PrintOptions Options,
+                                 PrintOptions &&Options,
                                  bool IncludeUnconditional = true);
     ~SynthesizedExtensionAnalyzer();
 
@@ -319,10 +319,11 @@ namespace swift {
 
   /// Print the declaration for a result builder "build" function, for use
   /// in Fix-Its, code completion, and so on.
-  void printResultBuilderBuildFunction(
-      NominalTypeDecl *builder, Type componentType,
-      ResultBuilderBuildFunction function,
-      Optional<std::string> stubIndent, llvm::raw_ostream &out);
+  void printResultBuilderBuildFunction(NominalTypeDecl *builder,
+                                       Type componentType,
+                                       ResultBuilderBuildFunction function,
+                                       std::optional<std::string> stubIndent,
+                                       llvm::raw_ostream &out);
 
   /// Compute the insertion location, indentation string, and component type
   /// for a Fix-It that adds a new build* function to a result builder.
@@ -333,9 +334,9 @@ namespace swift {
   bool completionContextUsesConcurrencyFeatures(const DeclContext *dc);
 
   /// Determine the isolation of a particular closure.
-  ClosureActorIsolation determineClosureActorIsolation(
+  ActorIsolation determineClosureActorIsolation(
       AbstractClosureExpr *closure, llvm::function_ref<Type(Expr *)> getType,
-      llvm::function_ref<ClosureActorIsolation(AbstractClosureExpr *)>
+      llvm::function_ref<ActorIsolation(AbstractClosureExpr *)>
           getClosureActorIsolation);
 
   /// If the capture list shadows any declarations using shorthand syntax, i.e.
@@ -355,6 +356,13 @@ namespace swift {
   SmallVector<std::pair<ValueDecl *, ValueDecl *>, 1>
   getShorthandShadows(LabeledConditionalStmt *CondStmt,
                       DeclContext *DC = nullptr);
+
+  SourceFile *evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
+                                        StringRef discriminator);
+
+  SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
+                                    CustomAttr *attr, bool passParentContext,
+                                    MacroRole role, StringRef discriminator);
 }
 
 #endif

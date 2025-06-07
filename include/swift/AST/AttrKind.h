@@ -102,21 +102,85 @@ enum class EffectsKind : uint8_t {
 enum : unsigned { NumEffectsKindBits =
   countBitsUsed(static_cast<unsigned>(EffectsKind::Last_EffectsKind)) };
 
-  
-enum DeclAttrKind : unsigned {
-#define DECL_ATTR(_, NAME, ...) DAK_##NAME,
-#include "swift/AST/Attr.def"
-  DAK_Count
+/// This enum represents the possible values of the @_expose attribute.
+enum class ExposureKind: uint8_t {
+  Cxx,
+  Wasm,
+  Last_ExposureKind = Wasm
 };
 
-enum : unsigned { NumDeclAttrKindBits =
-  countBitsUsed(static_cast<unsigned>(DeclAttrKind::DAK_Count - 1)) };
+enum : unsigned { NumExposureKindBits =
+  countBitsUsed(static_cast<unsigned>(ExposureKind::Last_ExposureKind)) };
+  
+/// This enum represents the possible values of the @_extern attribute.
+enum class ExternKind: uint8_t {
+  /// Reference an externally defined C function.
+  /// The imported function has C function pointer representation,
+  /// and is called using the C calling convention.
+  C,
+  /// Reference an externally defined function through WebAssembly's
+  /// import mechanism.
+  /// This does not specify the calling convention and can be used
+  /// with other extern kinds together.
+  /// Effectively, this is no-op on non-WebAssembly targets.
+  Wasm,
+  Last_ExternKind = Wasm
+};
 
-// Define enumerators for each type attribute, e.g. TAK_weak.
-enum TypeAttrKind {
-#define TYPE_ATTR(X) TAK_##X,
-#include "swift/AST/Attr.def"
-  TAK_Count
+enum : unsigned { NumExternKindBits =
+  countBitsUsed(static_cast<unsigned>(ExternKind::Last_ExternKind)) };
+
+enum class NonIsolatedModifier : uint8_t {
+  None = 0,
+  Unsafe,
+  NonSending,
+  Last_NonIsolatedModifier = NonSending
+};
+
+enum : unsigned {
+  NumNonIsolatedModifierBits = countBitsUsed(
+      static_cast<unsigned>(NonIsolatedModifier::Last_NonIsolatedModifier))
+};
+
+enum class InheritActorContextModifier : uint8_t {
+  /// Inherit the actor execution context if the isolated parameter was
+  /// captured by the closure, context is nonisolated or isolated to a
+  /// global actor.
+  None = 0,
+  /// Always inherit the actor context, even when the isolated parameter
+  /// for the context is not closed over explicitly.
+  Always,
+  Last_InheritActorContextKind = Always
+};
+
+enum : unsigned {
+  NumInheritActorContextKindBits = countBitsUsed(static_cast<unsigned>(
+      InheritActorContextModifier::Last_InheritActorContextKind))
+};
+
+enum class DeclAttrKind : unsigned {
+#define DECL_ATTR(_, CLASS, ...) CLASS,
+#define LAST_DECL_ATTR(CLASS) Last_DeclAttr = CLASS,
+#include "swift/AST/DeclAttr.def"
+};
+
+StringRef getDeclAttrKindID(DeclAttrKind kind);
+
+enum : unsigned {
+  NumDeclAttrKinds = static_cast<unsigned>(DeclAttrKind::Last_DeclAttr) + 1,
+  NumDeclAttrKindBits = countBitsUsed(NumDeclAttrKinds - 1),
+};
+
+// Define enumerators for each type attribute, e.g. TypeAttrKind::Weak.
+enum class TypeAttrKind {
+#define TYPE_ATTR(_, CLASS) CLASS,
+#define LAST_TYPE_ATTR(CLASS) Last_TypeAttr = CLASS,
+#include "swift/AST/TypeAttr.def"
+};
+
+enum : unsigned {
+  NumTypeAttrKinds = static_cast<unsigned>(TypeAttrKind::Last_TypeAttr) + 1,
+  NumTypeAttrKindBits = countBitsUsed(NumTypeAttrKinds - 1),
 };
 
 } // end namespace swift

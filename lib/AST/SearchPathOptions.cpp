@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/SearchPathOptions.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/Support/Errc.h"
 
@@ -47,9 +48,9 @@ void ModuleSearchPathLookup::rebuildLookupTable(const SearchPathOptions *Opts,
   clearLookupTable();
 
   for (auto Entry : llvm::enumerate(Opts->getImportSearchPaths())) {
-    addFilesInPathToLookupTable(FS, Entry.value(),
+    addFilesInPathToLookupTable(FS, Entry.value().Path,
                                 ModuleSearchPathKind::Import,
-                                /*isSystem=*/false, Entry.index());
+                                Entry.value().IsSystem, Entry.index());
   }
 
   for (auto Entry : llvm::enumerate(Opts->getFrameworkSearchPaths())) {
@@ -57,14 +58,10 @@ void ModuleSearchPathLookup::rebuildLookupTable(const SearchPathOptions *Opts,
                                 Entry.value().IsSystem, Entry.index());
   }
 
-  // Apple platforms have extra implicit framework search paths:
-  // $SDKROOT/System/Library/Frameworks/ and $SDKROOT/Library/Frameworks/.
-  if (IsOSDarwin) {
-    for (auto Entry : llvm::enumerate(Opts->getDarwinImplicitFrameworkSearchPaths())) {
-      addFilesInPathToLookupTable(FS, Entry.value(),
-                                  ModuleSearchPathKind::DarwinImplicitFramework,
-                                  /*isSystem=*/true, Entry.index());
-    }
+  for (auto Entry : llvm::enumerate(Opts->getImplicitFrameworkSearchPaths())) {
+    addFilesInPathToLookupTable(FS, Entry.value(),
+                                ModuleSearchPathKind::ImplicitFramework,
+                                /*isSystem=*/true, Entry.index());
   }
 
   for (auto Entry : llvm::enumerate(Opts->getRuntimeLibraryImportPaths())) {
@@ -73,16 +70,66 @@ void ModuleSearchPathLookup::rebuildLookupTable(const SearchPathOptions *Opts,
                                 /*isSystem=*/true, Entry.index());
   }
 
-  for (auto Entry : llvm::enumerate(Opts->getCompilerPluginLibraryPaths())) {
-    addFilesInPathToLookupTable(FS, Entry.value(),
-                                ModuleSearchPathKind::CompilerPlugin,
-                                /*isSystem=*/false, Entry.index());
-  }
-
   State.FileSystem = FS;
   State.IsOSDarwin = IsOSDarwin;
   State.Opts = Opts;
   State.IsPopulated = true;
+}
+
+static std::string computeSDKPlatformPath(StringRef SDKPath,
+                                          llvm::vfs::FileSystem *FS) {
+  if (SDKPath.empty())
+    return "";
+
+  SmallString<128> platformPath;
+  if (auto err = FS->getRealPath(SDKPath, platformPath))
+    llvm::sys::path::append(platformPath, SDKPath);
+
+  llvm::sys::path::remove_filename(platformPath); // specific SDK
+  llvm::sys::path::remove_filename(platformPath); // SDKs
+  llvm::sys::path::remove_filename(platformPath); // Developer
+
+  if (!llvm::sys::path::filename(platformPath).ends_with(".platform"))
+    return "";
+
+  return platformPath.str().str();
+}
+
+std::optional<StringRef>
+SearchPathOptions::getSDKPlatformPath(llvm::vfs::FileSystem *FS) const {
+  if (!SDKPlatformPath)
+    SDKPlatformPath = computeSDKPlatformPath(getSDKPath(), FS);
+  if (SDKPlatformPath->empty())
+    return std::nullopt;
+  return *SDKPlatformPath;
+}
+
+void SearchPathOptions::dump(bool isDarwin) const {
+  llvm::errs() << "Module import search paths:\n";
+  for (auto Entry : llvm::enumerate(getImportSearchPaths())) {
+    llvm::errs() << "  [" << Entry.index() << "] "
+                 << (Entry.value().IsSystem ? "(system) " : "(non-system) ")
+                 << Entry.value().Path << "\n";
+  }
+
+  llvm::errs() << "Framework search paths:\n";
+  for (auto Entry : llvm::enumerate(getFrameworkSearchPaths())) {
+    llvm::errs() << "  [" << Entry.index() << "] "
+                 << (Entry.value().IsSystem ? "(system) " : "(non-system) ")
+                 << Entry.value().Path << "\n";
+  }
+
+  llvm::errs() << "Implicit framework search paths:\n";
+  for (auto Entry : llvm::enumerate(getImplicitFrameworkSearchPaths())) {
+    llvm::errs() << "  [" << Entry.index() << "] " << Entry.value() << "\n";
+  }
+
+  llvm::errs() << "Runtime library import search paths:\n";
+  for (auto Entry : llvm::enumerate(getRuntimeLibraryImportPaths())) {
+    llvm::errs() << "  [" << Entry.index() << "] " << Entry.value() << "\n";
+  }
+
+  llvm::errs() << "(End of search path lists.)\n";
 }
 
 SmallVector<const ModuleSearchPath *, 4>
@@ -107,10 +154,12 @@ ModuleSearchPathLookup::searchPathsContainingFile(
   llvm::SmallSet<std::pair<ModuleSearchPathKind, unsigned>, 4> ResultIds;
 
   for (auto &Filename : Filenames) {
-    for (auto &Entry : LookupTable[Filename]) {
-      if (ResultIds.insert(std::make_pair(Entry->getKind(), Entry->getIndex()))
-              .second) {
-        Result.push_back(Entry.get());
+    if (LookupTable.contains(Filename)) {
+      for (auto &Entry : LookupTable.at(Filename)) {
+        if (ResultIds.insert(std::make_pair(Entry->getKind(), Entry->getIndex()))
+                .second) {
+          Result.push_back(Entry.get());
+        }
       }
     }
   }

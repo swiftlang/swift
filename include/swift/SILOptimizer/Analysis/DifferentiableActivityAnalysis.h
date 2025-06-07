@@ -139,8 +139,7 @@ private:
           type->mapTypeOutOfContext());
     }
     // Look up conformance in the current module.
-    auto lookupConformance =
-        LookUpConformanceInModule(getFunction().getModule().getSwiftModule());
+    auto lookupConformance = LookUpConformanceInModule();
     return type->getAutoDiffTangentSpace(lookupConformance).has_value();
   }
 

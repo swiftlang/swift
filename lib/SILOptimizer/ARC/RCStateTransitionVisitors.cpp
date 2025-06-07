@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "arc-sequence-opts"
 #include "RCStateTransitionVisitors.h"
 #include "ARCBBState.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
 #include "llvm/Support/Debug.h"
@@ -57,7 +58,7 @@ BottomUpDataflowRCStateVisitor<ARCState>::BottomUpDataflowRCStateVisitor(
     RCIdentityFunctionInfo *RCFI, EpilogueARCFunctionInfo *EAFI,
     ARCState &State, bool FreezeOwnedArgEpilogueReleases,
     IncToDecStateMapTy &IncToDecStateMap,
-    ImmutablePointerSetFactory<SILInstruction> &SetFactory)
+    ImmutablePointerSetFactory<SILInstruction *> &SetFactory)
     : RCFI(RCFI), EAFI(EAFI), DataflowState(State),
       FreezeOwnedArgEpilogueReleases(FreezeOwnedArgEpilogueReleases),
       IncToDecStateMap(IncToDecStateMap), SetFactory(SetFactory) {}
@@ -184,7 +185,7 @@ template <class ARCState>
 TopDownDataflowRCStateVisitor<ARCState>::TopDownDataflowRCStateVisitor(
     RCIdentityFunctionInfo *RCFI, ARCState &DataflowState,
     DecToIncStateMapTy &DecToIncStateMap,
-    ImmutablePointerSetFactory<SILInstruction> &SetFactory)
+    ImmutablePointerSetFactory<SILInstruction *> &SetFactory)
     : RCFI(RCFI), DataflowState(DataflowState),
       DecToIncStateMap(DecToIncStateMap), SetFactory(SetFactory) {}
 

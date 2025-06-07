@@ -22,18 +22,11 @@ using namespace SourceKit;
 using namespace sourcekitd;
 
 struct CodeCompletionResultsArrayBuilder::Implementation {
-  CompactArrayBuilder<UIdent,
-                      StringRef,
-                      StringRef,
-                      StringRef,
-                      StringRef,
-                      Optional<StringRef>,
-                      Optional<StringRef>,
-                      Optional<StringRef>,
-                      UIdent,
-                      UIdent,
-                      uint8_t,
-                      uint8_t> Builder;
+  CompactArrayBuilder<UIdent, StringRef, StringRef, StringRef, StringRef,
+                      std::optional<StringRef>, std::optional<StringRef>,
+                      std::optional<StringRef>, UIdent, UIdent, uint8_t,
+                      uint8_t>
+      Builder;
 };
 
 CodeCompletionResultsArrayBuilder::CodeCompletionResultsArrayBuilder()
@@ -46,19 +39,11 @@ CodeCompletionResultsArrayBuilder::~CodeCompletionResultsArrayBuilder() {
 }
 
 void CodeCompletionResultsArrayBuilder::add(
-    UIdent Kind,
-    StringRef Name,
-    StringRef Description,
-    StringRef SourceText,
-    StringRef TypeName,
-    Optional<StringRef> ModuleName,
-    Optional<StringRef> DocBrief,
-    Optional<StringRef> AssocUSRs,
-    UIdent SemanticContext,
-    UIdent TypeRelation,
-    bool NotRecommended,
-    bool IsSystem,
-    unsigned NumBytesToErase) {
+    UIdent Kind, StringRef Name, StringRef Description, StringRef SourceText,
+    StringRef TypeName, std::optional<StringRef> ModuleName,
+    std::optional<StringRef> DocBrief, std::optional<StringRef> AssocUSRs,
+    UIdent SemanticContext, UIdent TypeRelation, bool NotRecommended,
+    bool IsSystem, unsigned NumBytesToErase) {
 
   uint8_t Flags = 0;
   Flags |= NotRecommended << 1;
@@ -105,8 +90,8 @@ public:
 
   static bool
   dictionary_apply(void *Buf, size_t Index,
-                   llvm::function_ref<bool(sourcekitd_uid_t,
-                                           sourcekitd_variant_t)> applier) {
+                   sourcekitd_variant_dictionary_applier_f_t applier,
+                   void *context) {
     CompactArrayReaderTy Reader(Buf);
 
     sourcekitd_uid_t Kind;
@@ -139,11 +124,12 @@ public:
     bool NotRecommended = Flags & 0x2;
     bool IsSystem = Flags & 0x1;
 
-#define APPLY(K, Ty, Field)                              \
-  do {                                                   \
-    sourcekitd_uid_t key = SKDUIDFromUIdent(K);          \
-    sourcekitd_variant_t var = make##Ty##Variant(Field); \
-    if (!applier(key, var)) return false;                \
+#define APPLY(K, Ty, Field)                                                    \
+  do {                                                                         \
+    sourcekitd_uid_t key = SKDUIDFromUIdent(K);                                \
+    sourcekitd_variant_t var = make##Ty##Variant(Field);                       \
+    if (!applier(key, var, context))                                           \
+      return false;                                                            \
   } while (0)
 
     APPLY(KeyKind, UID, Kind);

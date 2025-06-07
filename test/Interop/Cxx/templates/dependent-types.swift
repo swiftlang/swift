@@ -1,3 +1,6 @@
+// Waiting for support for dependent types to be added back: rdar://103530256&90587703&89090706&89090631&89034704&89034440&83406001&83367285
+// XFAIL: *
+
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none -Xfrontend -disable-availability-checking)
 //
 // REQUIRES: executable_test
@@ -58,9 +61,6 @@ DependentTypesTestSuite.test("Takes const ref and returns dependent type.") {
   expectEqual(m.getValue(), 42)
 }
 
-// We still have some problems calling methods on Windows
-// (https://github.com/apple/swift/issues/55575 and rdar://88391102).
-#if !os(Windows)
 DependentTypesTestSuite.test("Function template methods") {
   let m = M<Int>(value: 42)
   let m2 = m.memberDependentReturnType(CInt(32)) as! M<CInt>
@@ -97,8 +97,6 @@ DependentTypesTestSuite.test("Complex different dependent argument and return ty
   let m2 = complexDependantReturnTypeSameAsArg(42, T: Int.self) as! Int
   expectEqual(m2, 42)
 }
-
-#endif // Windows
 
 //TODO: Import issue: rdar://89028943
 // DependentTypesTestSuite.test("Dependent to Reference") {

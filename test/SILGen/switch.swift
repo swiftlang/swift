@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -module-name switch %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name switch %s | %FileCheck %s
 
 //////////////////
 // Declarations //
@@ -456,7 +456,7 @@ class E : C {}
 // CHECK-LABEL: sil hidden [ossa] @$s6switch16test_isa_class_11xyAA1BC_tF : $@convention(thin) (@guaranteed B) -> () {
 func test_isa_class_1(x: B) {
   // CHECK: bb0([[X:%.*]] : @guaranteed $B):
-  // CHECK:   checked_cast_br [[X]] : $B to D1, [[IS_D1:bb[0-9]+]], [[IS_NOT_D1:bb[0-9]+]]
+  // CHECK:   checked_cast_br B in [[X]] : $B to D1, [[IS_D1:bb[0-9]+]], [[IS_NOT_D1:bb[0-9]+]]
   switch x {
 
   // CHECK: [[IS_D1]]([[CAST_D1:%.*]] : @guaranteed $D1):
@@ -479,7 +479,7 @@ func test_isa_class_1(x: B) {
   // CHECK-NEXT:   br [[NEXT_CASE]]
 
   // CHECK: [[NEXT_CASE]]:
-  // CHECK:   checked_cast_br [[X]] : $B to D2, [[IS_D2:bb[0-9]+]], [[IS_NOT_D2:bb[0-9]+]]
+  // CHECK:   checked_cast_br B in [[X]] : $B to D2, [[IS_D2:bb[0-9]+]], [[IS_NOT_D2:bb[0-9]+]]
   case is D2:
   // CHECK: [[IS_D2]]([[CAST_D2:%.*]] : @guaranteed $D2):
   // CHECK:   [[CAST_D2_COPY:%.*]] = copy_value [[CAST_D2]]
@@ -489,7 +489,7 @@ func test_isa_class_1(x: B) {
     b()
 
   // CHECK: [[IS_NOT_D2]]([[CASTFAIL_D2:%.*]] : @guaranteed $B):
-  // CHECK:   checked_cast_br [[X]] : $B to E, [[IS_E:bb[0-9]+]], [[IS_NOT_E:bb[0-9]+]]
+  // CHECK:   checked_cast_br B in [[X]] : $B to E, [[IS_E:bb[0-9]+]], [[IS_NOT_E:bb[0-9]+]]
   case is E where funged():
   // CHECK: [[IS_E]]([[CAST_E:%.*]] : @guaranteed $E):
   // CHECK:   [[CAST_E_COPY:%.*]] = copy_value [[CAST_E]]
@@ -510,7 +510,7 @@ func test_isa_class_1(x: B) {
   // CHECK:   br [[NEXT_CASE]]
 
   // CHECK: [[NEXT_CASE]]:
-  // CHECK:   checked_cast_br [[X]] : $B to C, [[IS_C:bb[0-9]+]], [[IS_NOT_C:bb[0-9]+]]
+  // CHECK:   checked_cast_br B in [[X]] : $B to C, [[IS_C:bb[0-9]+]], [[IS_NOT_C:bb[0-9]+]]
 
   case is C:
   // CHECK: [[IS_C]]([[CAST_C:%.*]] : @guaranteed $C):
@@ -539,83 +539,87 @@ func test_isa_class_2(x: B) -> AnyObject {
   // CHECK: bb0([[X:%.*]] : @guaranteed $B):
   switch x {
 
-  // CHECK:   checked_cast_br [[X]] : $B to D1, [[IS_D1:bb[0-9]+]], [[IS_NOT_D1:bb[0-9]+]]
+  // CHECK:   checked_cast_br B in [[X]] : $B to D1, [[IS_D1:bb[0-9]+]], [[IS_NOT_D1:bb[0-9]+]]
   case let y as D1 where runced():
   // CHECK: [[IS_D1]]([[CAST_D1:%.*]] : @guaranteed $D1):
   // CHECK:   [[CAST_D1_COPY:%.*]] = copy_value [[CAST_D1]]
-  // CHECK:   [[BORROWED_CAST_D1_COPY:%.*]] = begin_borrow [lexical] [[CAST_D1_COPY]]
+  // CHECK:   [[MOVED_D1_COPY:%.*]] = move_value [lexical] [var_decl] [[CAST_D1_COPY]]
   // CHECK:   function_ref @$s6switch6runcedSbyF
   // CHECK:   cond_br {{%.*}}, [[CASE1:bb[0-9]+]], [[NO_CASE1:bb[0-9]+]]
 
   // CHECK: [[CASE1]]:
   // CHECK:   function_ref @$s6switch1ayyF
+  // CHECK:   [[BORROWED_CAST_D1_COPY:%.*]] = begin_borrow [[MOVED_D1_COPY]]
   // CHECK:   [[CAST_D1_COPY_COPY:%.*]] = copy_value [[BORROWED_CAST_D1_COPY]]
   // CHECK:   [[RET:%.*]] = init_existential_ref [[CAST_D1_COPY_COPY]]
   // CHECK:   end_borrow [[BORROWED_CAST_D1_COPY]]
-  // CHECK:   destroy_value [[CAST_D1_COPY]]
+  // CHECK:   destroy_value [[MOVED_D1_COPY]]
   // CHECK:   br [[CONT:bb[0-9]+]]([[RET]] : $AnyObject)
     a()
     return y
 
   // CHECK: [[NO_CASE1]]:
-  // CHECK:   destroy_value [[CAST_D1_COPY]]
+  // CHECK:   destroy_value [[MOVED_D1_COPY]]
   // CHECK:   br [[NEXT_CASE:bb5]]
 
   // CHECK: [[IS_NOT_D1]]([[NOCAST_D1:%.*]] : @guaranteed $B):
   // CHECK:   br [[NEXT_CASE]]
 
   // CHECK: [[NEXT_CASE]]:
-  // CHECK:   checked_cast_br [[X]] : $B to D2, [[CASE2:bb[0-9]+]], [[IS_NOT_D2:bb[0-9]+]]
+  // CHECK:   checked_cast_br B in [[X]] : $B to D2, [[CASE2:bb[0-9]+]], [[IS_NOT_D2:bb[0-9]+]]
   case let y as D2:
   // CHECK: [[CASE2]]([[CAST_D2:%.*]] : @guaranteed $D2):
   // CHECK:   [[CAST_D2_COPY:%.*]] = copy_value [[CAST_D2]]
-  // CHECK:   [[BORROWED_CAST_D2_COPY:%.*]] = begin_borrow [lexical] [[CAST_D2_COPY]]
+  // CHECK:   [[MOVED_CAST_D2_COPY:%.*]] = move_value [lexical] [var_decl] [[CAST_D2_COPY]]
   // CHECK:   function_ref @$s6switch1byyF
+  // CHECK:   [[BORROWED_CAST_D2_COPY:%.*]] = begin_borrow [[MOVED_CAST_D2_COPY]]
   // CHECK:   [[CAST_D2_COPY_COPY:%.*]] = copy_value [[BORROWED_CAST_D2_COPY]]
   // CHECK:   [[RET:%.*]] = init_existential_ref [[CAST_D2_COPY_COPY]]
   // CHECK:   end_borrow [[BORROWED_CAST_D2_COPY]]
-  // CHECK:   destroy_value [[CAST_D2_COPY]]
+  // CHECK:   destroy_value [[MOVED_CAST_D2_COPY]]
   // CHECK:   br [[CONT]]([[RET]] : $AnyObject)
     b()
     return y
 
   // CHECK: [[IS_NOT_D2]]([[NOCAST_D2:%.*]] : @guaranteed $B):
-  // CHECK:   checked_cast_br [[X]] : $B to E, [[IS_E:bb[0-9]+]], [[IS_NOT_E:bb[0-9]+]]
+  // CHECK:   checked_cast_br B in [[X]] : $B to E, [[IS_E:bb[0-9]+]], [[IS_NOT_E:bb[0-9]+]]
   case let y as E where funged():
   // CHECK: [[IS_E]]([[CAST_E:%.*]] : @guaranteed $E):
   // CHECK:   [[CAST_E_COPY:%.*]] = copy_value [[CAST_E]]
-  // CHECK:   [[BORROWED_CAST_E_COPY:%.*]] = begin_borrow [lexical] [[CAST_E_COPY]]
+  // CHECK:   [[MOVED_CAST_E_COPY:%.*]] = move_value [lexical] [var_decl] [[CAST_E_COPY]]
   // CHECK:   function_ref @$s6switch6fungedSbyF
   // CHECK:   cond_br {{%.*}}, [[CASE3:bb[0-9]+]], [[NO_CASE3:bb[0-9]+]]
 
   // CHECK: [[CASE3]]:
   // CHECK:   function_ref @$s6switch1cyyF
+  // CHECK:   [[BORROWED_CAST_E_COPY:%.*]] = begin_borrow [[MOVED_CAST_E_COPY]]
   // CHECK:   [[CAST_E_COPY_COPY:%.*]] = copy_value [[BORROWED_CAST_E_COPY]]
   // CHECK:   [[RET:%.*]] = init_existential_ref [[CAST_E_COPY_COPY]]
   // CHECK:   end_borrow [[BORROWED_CAST_E_COPY]]
-  // CHECK:   destroy_value [[CAST_E_COPY]]
+  // CHECK:   destroy_value [[MOVED_CAST_E_COPY]]
   // CHECK:   br [[CONT]]([[RET]] : $AnyObject)
     c()
     return y
 
   // CHECK: [[NO_CASE3]]:
-  // CHECK:    destroy_value [[CAST_E_COPY]]
+  // CHECK:    destroy_value [[MOVED_CAST_E_COPY]]
   // CHECK:   br [[NEXT_CASE:bb[0-9]+]]
 
   // CHECK: [[IS_NOT_E]]([[NOCAST_E:%.*]] : @guaranteed $B):
   // CHECK:   br [[NEXT_CASE]]
 
   // CHECK: [[NEXT_CASE]]
-  // CHECK:   checked_cast_br [[X]] : $B to C, [[CASE4:bb[0-9]+]], [[IS_NOT_C:bb[0-9]+]]
+  // CHECK:   checked_cast_br B in [[X]] : $B to C, [[CASE4:bb[0-9]+]], [[IS_NOT_C:bb[0-9]+]]
   case let y as C:
   // CHECK: [[CASE4]]([[CAST_C:%.*]] : @guaranteed $C):
   // CHECK:   [[CAST_C_COPY:%.*]] = copy_value [[CAST_C]]
-  // CHECK:   [[BORROWED_CAST_C_COPY:%.*]] = begin_borrow [lexical] [[CAST_C_COPY]]
+  // CHECK:   [[MOVED_CAST_C_COPY:%.*]] = move_value [lexical] [var_decl] [[CAST_C_COPY]]
   // CHECK:   function_ref @$s6switch1dyyF
+  // CHECK:   [[BORROWED_CAST_C_COPY:%.*]] = begin_borrow [[MOVED_CAST_C_COPY]]
   // CHECK:   [[CAST_C_COPY_COPY:%.*]] = copy_value [[BORROWED_CAST_C_COPY]]
   // CHECK:   [[RET:%.*]] = init_existential_ref [[CAST_C_COPY_COPY]]
   // CHECK:   end_borrow [[BORROWED_CAST_C_COPY]]
-  // CHECK:   destroy_value [[CAST_C_COPY]]
+  // CHECK:   destroy_value [[MOVED_CAST_C_COPY]]
   // CHECK:   br [[CONT]]([[RET]] : $AnyObject)
     d()
     return y
@@ -1113,8 +1117,9 @@ func testLabeledScalarPayload(_ lsp: LabeledScalarPayload) -> Any {
   switch lsp {
   // CHECK: bb1([[TUPLE:%.*]] : $(name: Int)):
   // CHECK:   [[X:%.*]] = destructure_tuple [[TUPLE]]
+  // CHECK:   [[MV:%.*]] = move_value [var_decl] [[X]] : $Int
   // CHECK:   [[ANY_X_ADDR:%.*]] = init_existential_addr {{%.*}}, $Int
-  // CHECK:   store [[X]] to [trivial] [[ANY_X_ADDR]]
+  // CHECK:   store [[MV]] to [trivial] [[ANY_X_ADDR]]
   case let .Payload(x):
     return x
   }
@@ -1144,7 +1149,8 @@ func testOptionalEnumMix(_ a : Int?) -> Int {
     return 0
 
   // CHECK: [[SOMEBB]]([[X:%.*]] : $Int):
-  // CHECK-NEXT: debug_value [[X]] : $Int, let, name "x"
+  // CHECK-NEXT: [[MV:%.*]] = move_value [var_decl] [[X]] : $Int
+  // CHECK-NEXT: debug_value [[MV]] : $Int, let, name "x"
   // CHECK: integer_literal $Builtin.IntLiteral, 0
 
   case .none:
@@ -1166,7 +1172,8 @@ func testOptionalEnumMixWithNil(_ a : Int?) -> Int {
     return 0
 
   // CHECK: [[SOMEBB]]([[X:%.*]] : $Int):
-  // CHECK-NEXT: debug_value [[X]] : $Int, let, name "x"
+  // CHECK-NEXT: [[MV:%.*]] = move_value [var_decl] [[X]] : $Int
+  // CHECK-NEXT: debug_value [[MV]] : $Int, let, name "x"
   // CHECK: integer_literal $Builtin.IntLiteral, 0
 
   case nil:
@@ -1184,16 +1191,24 @@ func testMultiPatternsWithOuterScopeSameNamedVar(base: Int?, filter: Int?) {
   switch(base, filter) {
 
   case (.some(let base), .some(let filter)):
-    // CHECK: bb2(%10 : $Int):
-    // CHECK-NEXT: debug_value %8 : $Int, let, name "base"
-    // CHECK-NEXT: debug_value %10 : $Int, let, name "filter"
+    // CHECK: bb1([[BASE:%[0-9]+]] : $Int):
+    // CHECK:   switch_enum
+    // CHECK: bb2([[FILTER:%[0-9]+]] : $Int):
+    // CHECK-NEXT: [[MV_BASE:%.*]] = move_value [var_decl] [[BASE]]
+    // CHECK-NEXT: [[MV_FILTER:%.*]] = move_value [var_decl] [[FILTER]]
+    // CHECK-NEXT: debug_value [[MV_BASE]] : $Int, let, name "base"
+    // CHECK-NEXT: debug_value [[MV_FILTER]] : $Int, let, name "filter"
     print("both: \(base), \(filter)")
   case (.some(let base), .none), (.none, .some(let base)):
     // CHECK: bb3:
-    // CHECK-NEXT: br bb6(%8 : $Int)
+    // CHECK-NEXT: [[MV_BASE_PATTERN:%.*]] = move_value [var_decl] [[BASE]] : $Int
+    // CHECK-NEXT: extend_lifetime [[MV_BASE_PATTERN]] : $Int
+    // CHECK-NEXT: br bb6([[MV_BASE_PATTERN]] : $Int)
 
     // CHECK: bb5([[OTHER_BASE:%.*]] : $Int)
-    // CHECK-NEXT: br bb6([[OTHER_BASE]] : $Int)
+    // CHECK-NEXT: [[MV_OTHER_BASE:%.*]] = move_value [var_decl] [[OTHER_BASE]] : $Int
+    // CHECK-NEXT: extend_lifetime [[MV_OTHER_BASE]] : $Int
+    // CHECK-NEXT: br bb6([[MV_OTHER_BASE]] : $Int)
 
     // CHECK: bb6([[ARG:%.*]] : $Int):
     // CHECK-NEXT: debug_value [[ARG]] : $Int, let, name "base"
@@ -1239,6 +1254,7 @@ func testUninhabitedSwitchScrutinee() {
   func test5() {
     // CHECK: %0 = function_ref @$s6switch12myFatalErrorAA7MyNeverOyF : $@convention(thin) () -> MyNever
     // CHECK-NEXT: %1 = apply %0() : $@convention(thin) () -> MyNever
+    // CHECK-NEXT: ignored_use %1
     // CHECK-NEXT: unreachable
     switch myFatalError() {}
   }
@@ -1346,7 +1362,7 @@ func partial_address_only_tuple_dispatch(_ name: Klass, _ value: Any?) {
 // CHECK:   [[TUP_0:%.*]] = tuple_element_addr [[TUP]] : $*(Klass, Optional<Any>), 0
 // CHECK:   [[TUP_0_VAL:%.*]] = load_borrow [[TUP_0]]
 // CHECK:   [[TUP_1:%.*]] = tuple_element_addr [[TUP]] : $*(Klass, Optional<Any>), 1
-// CHECK:   checked_cast_br [[TUP_0_VAL]] : $Klass to AnyObject, [[IS_ANYOBJECT_BB:bb[0-9]+]], [[ISNOT_ANYOBJECT_BB:bb[0-9]+]]
+// CHECK:   checked_cast_br Klass in [[TUP_0_VAL]] : $Klass to AnyObject, [[IS_ANYOBJECT_BB:bb[0-9]+]], [[ISNOT_ANYOBJECT_BB:bb[0-9]+]]
 //
 // CHECK: [[IS_ANYOBJECT_BB]]([[ANYOBJECT:%.*]] : @guaranteed $AnyObject):
 // CHECK:   [[ANYOBJECT_COPY:%.*]] = copy_value [[ANYOBJECT]]
@@ -1371,10 +1387,9 @@ func partial_address_only_tuple_dispatch(_ name: Klass, _ value: Any?) {
 //
 // CHECK: [[IS_ANY_BB]]:
 // CHECK-NEXT:   [[ANYOBJECT:%.*]] = load [take] [[ANYOBJECT_ADDR]]
-// CHECK-NEXT:   begin_borrow
+// CHECK-NEXT:   [[MOVED:%.*]] = move_value
 // CHECK-NEXT:   debug_value
-// CHECK-NEXT:   end_borrow
-// CHECK-NEXT:   destroy_value [[ANYOBJECT]]
+// CHECK-NEXT:   destroy_value [[MOVED]]
 // CHECK-NEXT:   dealloc_stack [[ANYOBJECT_ADDR]]
 // CHECK-NEXT:   destroy_addr [[SOME_ANY_ADDR]]
 // CHECK-NEXT:   dealloc_stack [[OPT_ANY_ADDR]]
@@ -1458,16 +1473,16 @@ func testVoidType() {
 
 // CHECK-LABEL: sil hidden [ossa] @$s6switch28addressOnlyFallthroughCalleeyyAA015MultipleAddressC8CaseEnumOyxGSzRzlF : $@convention(thin) <T where T : BinaryInteger> (@in_guaranteed MultipleAddressOnlyCaseEnum<T>) -> () {
 // CHECK: bb0([[ARG:%.*]] :
-// CHECK:   [[AB_PHI:%.*]] = alloc_stack $T, let, name "x"
-// CHECK:   [[ABB_PHI:%.*]] = alloc_stack $T, let, name "x"
-// CHECK:   [[ABBC_PHI:%.*]] = alloc_stack $T, let, name "x"
+// CHECK:   [[AB_PHI:%.*]] = alloc_stack $T
+// CHECK:   [[ABB_PHI:%.*]] = alloc_stack $T
+// CHECK:   [[ABBC_PHI:%.*]] = alloc_stack $T
 // CHECK:   [[SWITCH_ENUM_ARG:%.*]] = alloc_stack $MultipleAddressOnlyCaseEnum<T>
 // CHECK:   copy_addr [[ARG]] to [init] [[SWITCH_ENUM_ARG]]
 // CHECK:   switch_enum_addr [[SWITCH_ENUM_ARG]] : $*MultipleAddressOnlyCaseEnum<T>, case #MultipleAddressOnlyCaseEnum.a!enumelt: [[BB_A:bb[0-9]+]], case #MultipleAddressOnlyCaseEnum.b!enumelt: [[BB_B:bb[0-9]+]], case #MultipleAddressOnlyCaseEnum.c!enumelt: [[BB_C:bb[0-9]+]]
 //
 // CHECK: [[BB_A]]:
 // CHECK:   [[SWITCH_ENUM_ARG_PROJ:%.*]] = unchecked_take_enum_data_addr [[SWITCH_ENUM_ARG]]
-// CHECK:   [[CASE_BODY_VAR_A:%.*]] = alloc_stack [lexical] $T, let, name "x"
+// CHECK:   [[CASE_BODY_VAR_A:%.*]] = alloc_stack [lexical] [var_decl] $T, let, name "x"
 // CHECK:   copy_addr [take] [[SWITCH_ENUM_ARG_PROJ]] to [init] [[CASE_BODY_VAR_A]]
 // CHECK:   copy_addr [[CASE_BODY_VAR_A]] to [init] [[AB_PHI]]
 // CHECK:   destroy_addr [[CASE_BODY_VAR_A]]
@@ -1475,7 +1490,7 @@ func testVoidType() {
 //
 // CHECK: [[BB_B]]:
 // CHECK:   [[SWITCH_ENUM_ARG_PROJ:%.*]] = unchecked_take_enum_data_addr [[SWITCH_ENUM_ARG]]
-// CHECK:   [[CASE_BODY_VAR_B:%.*]] = alloc_stack [lexical] $T, let, name "x"
+// CHECK:   [[CASE_BODY_VAR_B:%.*]] = alloc_stack [lexical] [var_decl] $T, let, name "x"
 // CHECK:   copy_addr [[SWITCH_ENUM_ARG_PROJ]] to [init] [[CASE_BODY_VAR_B]]
 // CHECK:   [[FUNC_CMP:%.*]] = function_ref @$sSzsE2eeoiySbx_qd__tSzRd__lFZ :
 // CHECK:   [[GUARD_RESULT:%.*]] = apply [[FUNC_CMP]]<T, Int>([[CASE_BODY_VAR_B]], {{%.*}}, {{%.*}})
@@ -1500,14 +1515,14 @@ func testVoidType() {
 //
 // CHECK: [[BB_B_GUARD_FAIL]]:
 // CHECK:   destroy_addr [[CASE_BODY_VAR_B]]
-// CHECK:   [[CASE_BODY_VAR_B_2:%.*]] = alloc_stack [lexical] $T, let, name "x"
+// CHECK:   [[CASE_BODY_VAR_B_2:%.*]] = alloc_stack [lexical] [var_decl] $T, let, name "x"
 // CHECK:   copy_addr [take] [[SWITCH_ENUM_ARG_PROJ]] to [init] [[CASE_BODY_VAR_B_2]]
 // CHECK:   copy_addr [[CASE_BODY_VAR_B_2]] to [init] [[ABB_PHI]]
 // CHECK:   br [[BB_AB_CONT]]
 //
 // CHECK: [[BB_C]]:
 // CHECK:   [[SWITCH_ENUM_ARG_PROJ:%.*]] = unchecked_take_enum_data_addr [[SWITCH_ENUM_ARG]]
-// CHECK:   [[CASE_BODY_VAR_C:%.*]] = alloc_stack [lexical] $T, let, name "x"
+// CHECK:   [[CASE_BODY_VAR_C:%.*]] = alloc_stack [lexical] [var_decl] $T, let, name "x"
 // CHECK:   copy_addr [take] [[SWITCH_ENUM_ARG_PROJ]] to [init] [[CASE_BODY_VAR_C]]
 // CHECK:   copy_addr [[CASE_BODY_VAR_C]] to [init] [[ABBC_PHI]]
 // CHECK:   destroy_addr [[CASE_BODY_VAR_C]]
@@ -1538,15 +1553,16 @@ func addressOnlyFallthroughCaller() {
 //
 // CHECK: [[BB_A]]([[BB_A_ARG:%.*]] : @guaranteed
 // CHECK:   [[BB_A_ARG_COPY:%.*]] = copy_value [[BB_A_ARG]]
-// CHECK:   [[BB_A_ARG_COPY_BORROW:%.*]] = begin_borrow [lexical] [[BB_A_ARG_COPY]]
+// CHECK:   [[BB_A_ARG_COPY_MOVE:%.*]] = move_value [lexical] [var_decl] [[BB_A_ARG_COPY]]
+// CHECK:   [[BB_A_ARG_COPY_BORROW:%.*]] = begin_borrow [[BB_A_ARG_COPY_MOVE]]
 // CHECK:   apply {{%.*}}([[BB_A_ARG_COPY_BORROW]])
-// CHECK:   [[RESULT:%.*]] = copy_value [[BB_A_ARG_COPY_BORROW]]
+// CHECK:   [[RESULT:%.*]] = copy_value [[BB_A_ARG_COPY_MOVE]]
 // CHECK:   br [[BB_AB:bb[0-9]+]]([[RESULT]] :
 //
 // CHECK: [[BB_B]]([[BB_B_ARG:%.*]] : @guaranteed
 // CHECK:   [[BB_B_ARG_COPY:%.*]] = copy_value [[BB_B_ARG]]
-// CHECK:   [[BB_B_ARG_COPY_BORROW:%.*]] = begin_borrow [lexical] [[BB_B_ARG_COPY]]
-// CHECK:   [[RESULT:%.*]] = copy_value [[BB_B_ARG_COPY_BORROW]]
+// CHECK:   [[BB_B_ARG_COPY_MOVE:%.*]] = move_value [lexical] [var_decl] [[BB_B_ARG_COPY]]
+// CHECK:   [[RESULT:%.*]] = copy_value [[BB_B_ARG_COPY_MOVE]]
 // CHECK:   br [[BB_AB:bb[0-9]+]]([[RESULT]] :
 //
 // CHECK: [[BB_AB:bb[0-9]+]]([[BB_AB_PHI:%.*]] : @owned
@@ -1557,8 +1573,8 @@ func addressOnlyFallthroughCaller() {
 //
 // CHECK: [[BB_C]]([[BB_C_ARG:%.*]] : @guaranteed
 // CHECK:   [[BB_C_COPY:%.*]] = copy_value [[BB_C_ARG]]
-// CHECK:   [[BB_C_BORROWED_COPY:%.*]] = begin_borrow [lexical] [[BB_C_COPY]]
-// CHECK:   [[RESULT:%.*]] = copy_value [[BB_C_BORROWED_COPY]]
+// CHECK:   [[BB_C_BORROWED_MOVE:%.*]] = move_value [lexical] [var_decl] [[BB_C_COPY]]
+// CHECK:   [[RESULT:%.*]] = copy_value [[BB_C_BORROWED_MOVE]]
 // CHECK:   br [[BB_ABC]]([[RESULT]] :
 //
 // CHECK: [[BB_ABC]]([[BB_ABC_ARG:%.*]] : @owned

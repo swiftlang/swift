@@ -1,4 +1,4 @@
 public enum Horse {
-  @available(macOS 100, *)
+  @available(macOS 50, *)
   case kevin(Int)
 }

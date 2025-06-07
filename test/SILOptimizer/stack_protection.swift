@@ -36,12 +36,40 @@ public func overflowWithUnsafeBytes() {
   }
 }
 
+// CHECK-LABEL: sil [stack_protection] @$s4test31overflowWithUnsafeBorrowedBytes5valueySi_tF
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function '$s4test31overflowWithUnsafeBorrowedBytes5valueySi_tF'
+public func overflowWithUnsafeBorrowedBytes(value: Int) {
+  withUnsafeBytes(of: value) {
+    potentiallyBadCFunction($0.bindMemory(to: Int.self).baseAddress!)
+  }
+}
+
+// CHECK-LABEL: sil @$s4test9onlyLoads5valueS2i_tF
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function '$s4test9onlyLoads5valueS2i_tF'
+public func onlyLoads(value: Int) -> Int {
+  withUnsafeBytes(of: value) {
+    $0.load(as: Int.self)
+  }
+}
+
 // CHECK-LABEL: sil @$s4test22unprotectedUnsafeBytesyyF
 // CHECK-NOT:     copy_addr
 // CHECK:       } // end sil function '$s4test22unprotectedUnsafeBytesyyF'
 public func unprotectedUnsafeBytes() {
   var x = 0
   _withUnprotectedUnsafeBytes(of: &x) {
+    potentiallyBadCFunction($0.bindMemory(to: Int.self).baseAddress!)
+  }
+}
+
+// CHECK-LABEL: sil @$s4test29unprotectedUnsafeMutableBytesyyF
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function '$s4test29unprotectedUnsafeMutableBytesyyF'
+public func unprotectedUnsafeMutableBytes() {
+  var x = 0
+  _withUnprotectedUnsafeMutableBytes(of: &x) {
     potentiallyBadCFunction($0.bindMemory(to: Int.self).baseAddress!)
   }
 }
@@ -91,5 +119,19 @@ public func testWithUnsafeTemporaryAllocation() {
   withUnsafeTemporaryAllocation(of: Int.self, capacity: 10) {
     potentiallyBadCFunction($0.baseAddress!)
   }
+}
+
+// CHECK-LABEL: sil @$s4test13loadUnalignedySiSVF
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function '$s4test13loadUnalignedySiSVF'
+public func loadUnaligned(_ urp: UnsafeRawPointer) -> Int {
+  return urp.loadUnaligned(as: Int.self)
+}
+
+// CHECK-LABEL: sil @$s4test19storeBytesToPointeryySv_SitF :
+// CHECK-NOT:     copy_addr
+// CHECK:       } // end sil function '$s4test19storeBytesToPointeryySv_SitF'
+public func storeBytesToPointer(_ p: UnsafeMutableRawPointer, _ i: Int) {
+  p.storeBytes(of: i, as: Int.self)
 }
 

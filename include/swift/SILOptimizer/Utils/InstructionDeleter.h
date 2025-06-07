@@ -97,6 +97,7 @@
 
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Utils/InstModCallbacks.h"
+#include "llvm/ADT/SetVector.h"
 
 namespace swift {
 
@@ -113,7 +114,7 @@ class InstructionDeleter {
   /// instructions in this set is important as when a dead instruction is
   /// removed, new instructions will be generated to fix the lifetime of the
   /// instruction's operands. This has to be deterministic.
-  SmallSetVector<SILInstruction *, 8> deadInstructions;
+  llvm::SmallSetVector<SILInstruction *, 8> deadInstructions;
 
   /// Callbacks used when adding/deleting instructions.
   InstModCallbacks callbacks;
@@ -159,6 +160,7 @@ public:
   ///
   /// Calls callbacks.notifyWillBeDeleted().
   bool deleteIfDead(SILInstruction *inst);
+  bool deleteIfDead(SILInstruction *inst, bool fixLifetime);
 
   /// Delete the instruction \p inst, ignoring its side effects. If any operand
   /// definitions will become dead after deleting this instruction, track them

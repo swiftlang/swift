@@ -5,7 +5,7 @@
 
 // RUN: %target-build-swift -Xfrontend -conditional-runtime-records %s -emit-ir -o %t/main.ll
 
-// RUN: %target-clang %t/main.ll -isysroot %sdk -L%swift_obj_root/lib/swift/%target-sdk-name -flto -o %t/main
+// RUN: %target-clang %t/main.ll -isysroot %sdk -L%swift-lib-dir/swift/%target-sdk-name -flto -o %t/main
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 
@@ -25,6 +25,7 @@
 @inline(never) func func1_used() { print("func1_used") }
 
 // (2) unused
+@_semantics("no.preserve.debugger")
 @inline(never) func func2_dead() { print("func2_dead") }
 
 // (3) completely unused
@@ -35,6 +36,7 @@ protocol TheProtocol { }
 
 // (5) unused class
 class MyClass: TheProtocol {
+  	@_semantics("no.preserve.debugger")
 	func unused_method() {}
 }
 

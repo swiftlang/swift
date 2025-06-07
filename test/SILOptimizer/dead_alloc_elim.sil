@@ -1,4 +1,6 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -deadobject-elim %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -deadobject-elim %s | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
 
 import Swift
 import Builtin
@@ -82,11 +84,11 @@ sil @trivial_destructor_trivial : $@convention(thin) () -> () {
 // CHECK-NEXT: return
 sil @devirtualized_destructor : $@convention(thin) () -> () {
   %0 = alloc_ref $NontrivialDestructor
-  set_deallocating %0 : $NontrivialDestructor
-  fix_lifetime %0 : $NontrivialDestructor
-  dealloc_ref %0 : $NontrivialDestructor
-  %1 = tuple()
-  return %1 : $()
+  %1 = begin_dealloc_ref %0 : $NontrivialDestructor of %0 : $NontrivialDestructor
+  fix_lifetime %1 : $NontrivialDestructor
+  dealloc_ref %1 : $NontrivialDestructor
+  %4 = tuple()
+  return %4 : $()
 }
 
 // In non-OSSA we cannot remove alloc_refs with stores to non-trivial properties.
@@ -99,7 +101,7 @@ bb0(%0 : $Kl):
   %20 = alloc_ref [stack] $NontrivialDestructor
   %21 = ref_element_addr %20 : $NontrivialDestructor, #NontrivialDestructor.p
   store %0 to %21 : $*Kl
-  set_deallocating %20 : $NontrivialDestructor
+  %4 = begin_dealloc_ref %20 : $NontrivialDestructor of %20 : $NontrivialDestructor
   destroy_addr %21 : $*Kl
   dealloc_stack_ref %20 : $NontrivialDestructor
   %r = tuple ()
@@ -127,9 +129,11 @@ sil @store_to_trivial_property : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %20 = alloc_ref [stack] $NontrivialDestructor
   %21 = ref_element_addr %20 : $NontrivialDestructor, #NontrivialDestructor.i
-  store %0 to %21 : $*Int
-  set_deallocating %20 : $NontrivialDestructor
-  dealloc_ref %20 : $NontrivialDestructor
+  %22 = begin_access [modify] [dynamic] %21 : $*Int
+  store %0 to %22 : $*Int
+  end_access %22 : $*Int
+  %6 = begin_dealloc_ref %20 : $NontrivialDestructor of %20 : $NontrivialDestructor
+  dealloc_ref %6 : $NontrivialDestructor
   dealloc_stack_ref %20 : $NontrivialDestructor
   %r = tuple ()
   return %r : $()
@@ -468,11 +472,11 @@ bb0(%0 : $Kl):
   %28 = index_addr %11 : $*Kl, %27 : $Builtin.Word
   retain_value %0 : $Kl
   store %0 to %28 : $*Kl
-  set_deallocating %4 : $ArrayStorage
+  %6 = begin_dealloc_ref %4 : $ArrayStorage of %4 : $ArrayStorage
   %65 = address_to_pointer %11 : $*Kl to $Builtin.RawPointer
   %66 = metatype $@thick Kl.Type
   %67 = builtin "destroyArray"<Kl>(%66 : $@thick Kl.Type, %65 : $Builtin.RawPointer, %3 : $Builtin.Word) : $()
-  dealloc_ref %4 : $ArrayStorage
+  dealloc_ref %6 : $ArrayStorage
   %10 = tuple ()
   return %10 : $()
 }
@@ -507,13 +511,13 @@ bb0(%0 : $String, %1 : $Int, %2 : $UInt):
   retain_value %0 : $String
   store %1 to %29 : $*Int
   store %0 to %30 : $*String
-  set_deallocating %4 : $_ContiguousArrayStorage<(Int, String)>
-  %64 = ref_tail_addr %4 : $_ContiguousArrayStorage<(Int, String)>, $(Int, String)
+  %31 = begin_dealloc_ref %4 : $_ContiguousArrayStorage<(Int, String)> of %4 : $_ContiguousArrayStorage<(Int, String)>
+  %64 = ref_tail_addr %31 : $_ContiguousArrayStorage<(Int, String)>, $(Int, String)
   %65 = address_to_pointer %64 : $*(Int, String) to $Builtin.RawPointer
   %66 = metatype $@thick (Int, String).Type
   %67 = builtin "destroyArray"<(Int, String)>(%66 : $@thick (Int, String).Type, %65 : $Builtin.RawPointer, %3 : $Builtin.Word) : $()
-  fix_lifetime %4 : $_ContiguousArrayStorage<(Int, String)>
-  dealloc_ref %4 : $_ContiguousArrayStorage<(Int, String)>
+  fix_lifetime %31 : $_ContiguousArrayStorage<(Int, String)>
+  dealloc_ref %31 : $_ContiguousArrayStorage<(Int, String)>
   dealloc_stack_ref %4 : $_ContiguousArrayStorage<(Int, String)>
   %10 = tuple ()
   return %10 : $()
@@ -536,11 +540,11 @@ bb0(%0 : $Kl):
   %30 = index_addr %11 : $*Kl, %27 : $Builtin.Word
   retain_value %0 : $Kl
   store %0 to %30 : $*Kl // Overwrites the first store
-  set_deallocating %4 : $ArrayStorage
+  %6 = begin_dealloc_ref %4 : $ArrayStorage of %4 : $ArrayStorage
   %65 = address_to_pointer %11 : $*Kl to $Builtin.RawPointer
   %66 = metatype $@thick Kl.Type
   %67 = builtin "destroyArray"<Kl>(%66 : $@thick Kl.Type, %65 : $Builtin.RawPointer, %3 : $Builtin.Word) : $()
-  dealloc_ref %4 : $ArrayStorage
+  dealloc_ref %6 : $ArrayStorage
   %10 = tuple ()
   return %10 : $()
 }
@@ -560,11 +564,11 @@ bb0(%0 : $Kl):
   %28 = index_addr %11 : $*Kl, %27 : $Builtin.Word
   retain_value %0 : $Kl
   store %0 to %28 : $*Kl
-  set_deallocating %4 : $ArrayStorage
+  %6 = begin_dealloc_ref %4 : $ArrayStorage of %4 : $ArrayStorage
   %65 = address_to_pointer %11 : $*Kl to $Builtin.RawPointer
   %66 = metatype $@thick Kl.Type
   %67 = builtin "destroyArray"<Kl>(%66 : $@thick Kl.Type, %65 : $Builtin.RawPointer, %3 : $Builtin.Word) : $()
-  dealloc_ref %4 : $ArrayStorage
+  dealloc_ref %6 : $ArrayStorage
   %10 = tuple ()
   return %10 : $()
 }
@@ -583,11 +587,11 @@ bb0(%0 : $Kl):
   %28 = index_addr %11 : $*Kl, %2 : $Builtin.Word // out-of-bounds store
   retain_value %0 : $Kl
   store %0 to %28 : $*Kl
-  set_deallocating %4 : $ArrayStorage
+  %6 = begin_dealloc_ref %4 : $ArrayStorage of %4 : $ArrayStorage
   %65 = address_to_pointer %11 : $*Kl to $Builtin.RawPointer
   %66 = metatype $@thick Kl.Type
   %67 = builtin "destroyArray"<Kl>(%66 : $@thick Kl.Type, %65 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
-  dealloc_ref %4 : $ArrayStorage
+  dealloc_ref %6 : $ArrayStorage
   %10 = tuple ()
   return %10 : $()
 }
@@ -606,11 +610,11 @@ bb0(%0 : $Kl, %1 : $Builtin.Word):
   %28 = index_addr %11 : $*Kl, %27 : $Builtin.Word
   retain_value %0 : $Kl
   store %0 to %28 : $*Kl
-  set_deallocating %4 : $ArrayStorage
+  %6 = begin_dealloc_ref %4 : $ArrayStorage of %4 : $ArrayStorage
   %65 = address_to_pointer %11 : $*Kl to $Builtin.RawPointer
   %66 = metatype $@thick Kl.Type
   %67 = builtin "destroyArray"<Kl>(%66 : $@thick Kl.Type, %65 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
-  dealloc_ref %4 : $ArrayStorage
+  dealloc_ref %6 : $ArrayStorage
   %10 = tuple ()
   return %10 : $()
 }
@@ -634,11 +638,11 @@ bb2:
   store %0 to %28 : $*Kl
   br bb3
 bb3:
-  set_deallocating %4 : $ArrayStorage
+  %6 = begin_dealloc_ref %4 : $ArrayStorage of %4 : $ArrayStorage
   %65 = address_to_pointer %11 : $*Kl to $Builtin.RawPointer
   %66 = metatype $@thick Kl.Type
   %67 = builtin "destroyArray"<Kl>(%66 : $@thick Kl.Type, %65 : $Builtin.RawPointer, %3 : $Builtin.Word) : $()
-  dealloc_ref %4 : $ArrayStorage
+  dealloc_ref %6 : $ArrayStorage
   %10 = tuple ()
   return %10 : $()
 }
@@ -652,9 +656,9 @@ struct I {
 struct S2 { }
 
 sil @getter : $@convention(method) (@guaranteed KeyPath<I, II>, S2) -> @out II
-sil @kpgetter : $@convention(thin) (@in_guaranteed S2, UnsafeRawPointer) -> @out II
-sil @equ : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool
-sil @hsh : $@convention(thin) (UnsafeRawPointer) -> Int
+sil @kpgetter : $@convention(keypath_accessor_getter) (@in_guaranteed S2, @in_guaranteed KeyPath<I, II>) -> @out II
+sil @equ : $@convention(keypath_accessor_equals) (@in_guaranteed KeyPath<I, II>, @in_guaranteed KeyPath<I, II>) -> Bool
+sil @hsh : $@convention(keypath_accessor_hash) (@in_guaranteed KeyPath<I, II>) -> Int
 
 
 // CHECK-LABEL: sil @remove_dead_keypath
@@ -663,7 +667,7 @@ sil @hsh : $@convention(thin) (UnsafeRawPointer) -> Int
 sil @remove_dead_keypath: $@convention(thin) () -> () {
 bb0:
   %0 = keypath $KeyPath<I, II>, (root $I; stored_property #I.x : $II)
-  %1 = keypath $KeyPath<S2, II>, (root $S2; gettable_property $II, id @getter : $@convention(method) (@guaranteed KeyPath<I, II>, S2) -> @out II, getter @kpgetter: $@convention(thin) (@in_guaranteed S2, UnsafeRawPointer) -> @out II, indices [%$0 : $KeyPath<I, II> : $KeyPath<I, II>], indices_equals @equ : $@convention(thin) (UnsafeRawPointer, UnsafeRawPointer) -> Bool, indices_hash @hsh : $@convention(thin) (UnsafeRawPointer) -> Int) (%0)
+  %1 = keypath $KeyPath<S2, II>, (root $S2; gettable_property $II, id @getter : $@convention(method) (@guaranteed KeyPath<I, II>, S2) -> @out II, getter @kpgetter: $@convention(keypath_accessor_getter) (@in_guaranteed S2, @in_guaranteed KeyPath<I, II>) -> @out II, indices [%$0 : $KeyPath<I, II> : $KeyPath<I, II>], indices_equals @equ : $@convention(keypath_accessor_equals) (@in_guaranteed KeyPath<I, II>, @in_guaranteed KeyPath<I, II>) -> Bool, indices_hash @hsh : $@convention(keypath_accessor_hash) (@in_guaranteed KeyPath<I, II>) -> Int) (%0)
 
   %r = tuple ()
   return %r : $()
@@ -706,3 +710,14 @@ bb0(%0 : $_ContiguousArrayStorage<Element>):
   return %15 : $()
 }
 
+// CHECK-LABEL: @dead_zero_init
+// CHECK-NOT: alloc_stack
+// // CHECK: } // end sil function 'dead_zero_init'
+sil @dead_zero_init : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Kl
+  %empty = builtin "zeroInitializer"(%0 : $*Kl) : $()
+  dealloc_stack %0 : $*Kl
+  %1 = tuple ()
+  return %1 : $()
+}

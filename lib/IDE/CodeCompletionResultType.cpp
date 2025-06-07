@@ -16,18 +16,22 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Sema/IDETypeChecking.h"
 
 using namespace swift;
 using namespace ide;
 using TypeRelation = CodeCompletionResultTypeRelation;
 
+#define DEBUG_TYPE "CodeCompletionResultType"
+#include "llvm/Support/Debug.h"
+
 // MARK: - Utilities
 
 /// Returns the kind of attributes \c Ty can be used as.
 static OptionSet<CustomAttributeKind> getCustomAttributeKinds(Type Ty) {
   OptionSet<CustomAttributeKind> Result;
-  if (auto NominalTy = Ty->getAs<NominalType>()) {
+  if (auto NominalTy = Ty->getAs<NominalOrBoundGenericNominalType>()) {
     auto NominalDecl = NominalTy->getDecl();
     if (NominalDecl->getAttrs().hasAttribute<PropertyWrapperAttr>()) {
       Result |= CustomAttributeKind::PropertyWrapper;
@@ -84,27 +88,37 @@ USRBasedTypeContext::USRBasedTypeContext(const ExpectedTypeContext *TypeContext,
 
 TypeRelation
 USRBasedTypeContext::typeRelation(const USRBasedType *ResultType) const {
-  if (ExpectedCustomAttributeKinds) {
-    return ResultType->getCustomAttributeKinds() & ExpectedCustomAttributeKinds
-               ? TypeRelation::Convertible
-               : TypeRelation::Unrelated;
-  }
-  const USRBasedType *VoidType = Arena.getVoidType();
-  if (ResultType == VoidType) {
-    // Void is not convertible to anything and we don't report Void <-> Void
-    // identical matches (see USRBasedType::typeRelation). So we don't have to
-    // check anything if the result returns Void.
-    return TypeRelation::Unknown;
-  }
-
-  TypeRelation Res = TypeRelation::Unknown;
-  for (auto &ContextualType : ContextualTypes) {
-    Res = std::max(Res, ContextualType.typeRelation(ResultType, VoidType));
-    if (Res == TypeRelation::MAX_VALUE) {
-      return Res; // We can't improve further
+  auto compute = [&]() -> TypeRelation {
+    if (ExpectedCustomAttributeKinds) {
+      return ResultType->getCustomAttributeKinds() &
+                     ExpectedCustomAttributeKinds
+                 ? TypeRelation::Convertible
+                 : TypeRelation::Unrelated;
     }
-  }
-  return Res;
+    const USRBasedType *VoidType = Arena.getVoidType();
+    if (ResultType == VoidType) {
+      // Void is not convertible to anything and we don't report Void <-> Void
+      // identical matches (see USRBasedType::typeRelation). So we don't have to
+      // check anything if the result returns Void.
+      return TypeRelation::Unknown;
+    }
+
+    TypeRelation Res = TypeRelation::Unknown;
+    for (auto &ContextualType : ContextualTypes) {
+      Res = std::max(Res, ContextualType.typeRelation(ResultType, VoidType));
+      if (Res == TypeRelation::MAX_VALUE) {
+        return Res; // We can't improve further
+      }
+    }
+    return Res;
+  };
+  auto iter = CachedTypeRelations.find(ResultType);
+  if (iter != CachedTypeRelations.end())
+    return iter->second;
+
+  auto relation = compute();
+  CachedTypeRelations.insert({ResultType, relation});
+  return relation;
 }
 
 // MARK: - USRBasedTypeArena
@@ -117,38 +131,6 @@ USRBasedTypeArena::USRBasedTypeArena() {
 const USRBasedType *USRBasedTypeArena::getVoidType() const { return VoidType; }
 
 // MARK: - USRBasedType
-
-TypeRelation USRBasedType::typeRelationImpl(
-    const USRBasedType *ResultType, const USRBasedType *VoidType,
-    SmallPtrSetImpl<const USRBasedType *> &VisitedTypes) const {
-
-  // `this` is the contextual type.
-  if (this == VoidType) {
-    // We don't report Void <-> Void matches because that would boost
-    // methods returning Void in e.g.
-    // func foo() { #^COMPLETE^# }
-    // because #^COMPLETE^# is implicitly returned. But that's not very
-    // helpful.
-    return TypeRelation::Unknown;
-  }
-  if (ResultType == this) {
-    return TypeRelation::Convertible;
-  }
-  for (const USRBasedType *Supertype : ResultType->getSupertypes()) {
-    if (!VisitedTypes.insert(Supertype).second) {
-      // Already visited this type.
-      continue;
-    }
-    if (this->typeRelation(Supertype, VoidType) >= TypeRelation::Convertible) {
-      return TypeRelation::Convertible;
-    }
-  }
-  // TypeRelation computation based on USRs is an under-approximation because we
-  // don't take into account generic conversions or retroactive conformance of
-  // library types. Hence, we can't know for sure that ResultType is not
-  // convertible to `this` type and thus can't return Unrelated or Invalid here.
-  return TypeRelation::Unknown;
-}
 
 const USRBasedType *USRBasedType::null(USRBasedTypeArena &Arena) {
   return USRBasedType::fromUSR(/*USR=*/"", /*Supertypes=*/{}, {}, Arena);
@@ -217,23 +199,33 @@ const USRBasedType *USRBasedType::fromType(Type Ty, USRBasedTypeArena &Arena) {
     return ExistingTypeIt->second;
   }
 
+  LLVM_DEBUG(llvm::dbgs() << "enter USRBasedType(" << Ty << ", USR = "
+                          << USR << ")\n";
+             Ty->dump(llvm::dbgs()););
+
   SmallVector<const USRBasedType *, 2> Supertypes;
   ;
   if (auto Nominal = Ty->getAnyNominal()) {
     if (auto *Proto = dyn_cast<ProtocolDecl>(Nominal)) {
-      Proto->walkInheritedProtocols([&](ProtocolDecl *inherited) {
-        if (Proto != inherited &&
-            !inherited->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+      for (auto *inherited : Proto->getAllInheritedProtocols()) {
+        if (!inherited->isSpecificProtocol(KnownProtocolKind::Sendable) &&
+            !inherited->getInvertibleProtocolKind()) {
+          LLVM_DEBUG(llvm::dbgs() << "Adding inherited protocol "
+                                  << inherited->getName()
+                                  << "\n";);
           Supertypes.push_back(USRBasedType::fromType(
             inherited->getDeclaredInterfaceType(), Arena));
         }
-
-        return TypeWalker::Action::Continue;
-      });
+      }
     } else {
       auto Conformances = Nominal->getAllConformances();
       Supertypes.reserve(Conformances.size());
       for (auto Conformance : Conformances) {
+        if (isa<InheritedProtocolConformance>(Conformance)) {
+          // Skip inherited conformances; we'll collect them when we visit the
+          // superclass.
+          continue;
+        }
         if (Conformance->getDeclContext()->getParentModule() !=
             Nominal->getModuleContext()) {
           // Only include conformances that are declared within the module of the
@@ -241,14 +233,21 @@ const USRBasedType *USRBasedType::fromType(Type Ty, USRBasedTypeArena &Arena) {
           // exist when using the code completion cache from a different module.
           continue;
         }
-        if (Conformance->getProtocol()->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+        if (Conformance->getProtocol()->isSpecificProtocol(KnownProtocolKind::Sendable) ||
+            Conformance->getProtocol()->getInvertibleProtocolKind()) {
           // FIXME: Sendable conformances are lazily synthesized as they are
           // needed by the compiler. Depending on whether we checked whether a
           // type conforms to Sendable before constructing the USRBasedType, we
           // get different results for its conformance. For now, always drop the
           // Sendable conformance.
+          //
+          // FIXME: Copyable and Escapable conformances are skipped because the
+          // USR mangling produces the type 'Any' for the protocol type.
           continue;
         }
+        LLVM_DEBUG(llvm::dbgs() << "Adding conformed protocol "
+                                << Conformance->getProtocol()->getName()
+                                << "\n";);
         Supertypes.push_back(USRBasedType::fromType(
             Conformance->getProtocol()->getDeclaredInterfaceType(), Arena));
       }
@@ -284,11 +283,17 @@ const USRBasedType *USRBasedType::fromType(Type Ty, USRBasedTypeArena &Arena) {
 
   Type Superclass = getSuperclass(Ty);
   while (Superclass) {
+    LLVM_DEBUG(llvm::dbgs() << "Adding superclass "
+                            << Superclass
+                            << "\n";);
     Supertypes.push_back(USRBasedType::fromType(Superclass, Arena));
     Superclass = getSuperclass(Superclass);
   }
 
   assert(llvm::all_of(Supertypes, [&USR](const USRBasedType *Ty) {
+    if (Ty->getUSR() == USR) {
+      LLVM_DEBUG(llvm::dbgs() << "Duplicate USR: " << USR << "\n";);
+    }
     return Ty->getUSR() != USR;
   }) && "Circular supertypes?");
 
@@ -301,14 +306,46 @@ const USRBasedType *USRBasedType::fromType(Type Ty, USRBasedTypeArena &Arena) {
     return ImpliedSupertypes.contains(Ty);
   });
 
+  LLVM_DEBUG(llvm::dbgs() << "leave USRBasedType(" << Ty << ")\n";
+             Ty->dump(llvm::dbgs()););
+
   return USRBasedType::fromUSR(USR, Supertypes, ::getCustomAttributeKinds(Ty),
                                Arena);
 }
 
 TypeRelation USRBasedType::typeRelation(const USRBasedType *ResultType,
                                         const USRBasedType *VoidType) const {
-  SmallPtrSet<const USRBasedType *, 4> VisitedTypes;
-  return this->typeRelationImpl(ResultType, VoidType, VisitedTypes);
+  // `this` is the contextual type.
+  if (this == VoidType) {
+    // We don't report Void <-> Void matches because that would boost
+    // methods returning Void in e.g.
+    // func foo() { #^COMPLETE^# }
+    // because #^COMPLETE^# is implicitly returned. But that's not very
+    // helpful.
+    return TypeRelation::Unknown;
+  }
+
+  SmallPtrSet<const USRBasedType *, 16> VisitedTypes;
+  SmallVector<const USRBasedType *, 16> Worklist;
+  Worklist.push_back(ResultType);
+  while (!Worklist.empty()) {
+    auto *CurrentType = Worklist.pop_back_val();
+    if (CurrentType == this)
+      return TypeRelation::Convertible;
+
+    for (const USRBasedType *Supertype : CurrentType->getSupertypes()) {
+      if (!VisitedTypes.insert(Supertype).second) {
+        // Already visited this type.
+        continue;
+      }
+      Worklist.push_back(Supertype);
+    }
+  }
+  // TypeRelation computation based on USRs is an under-approximation because we
+  // don't take into account generic conversions or retroactive conformance of
+  // library types. Hence, we can't know for sure that ResultType is not
+  // convertible to `this` type and thus can't return Unrelated or Invalid here.
+  return TypeRelation::Unknown;
 }
 
 // MARK: - USRBasedTypeContext
@@ -356,15 +393,20 @@ static TypeRelation calculateTypeRelation(Type Ty, Type ExpectedTy,
     return TypeRelation::Unknown;
   }
 
-  // Equality/Conversion of GenericTypeParameterType won't account for
-  // requirements – ignore them
-  if (!Ty->hasTypeParameter() && !ExpectedTy->hasTypeParameter()) {
-    if (Ty->isEqual(ExpectedTy))
-      return TypeRelation::Convertible;
+  ASSERT(!Ty->hasUnboundGenericType() && !ExpectedTy->hasUnboundGenericType());
+  ASSERT(!ExpectedTy->hasTypeParameter());
+
+  if (Ty->isEqual(ExpectedTy))
+    return TypeRelation::Convertible;
+
+  // FIXME: We ought to be opening generic parameters present in completion
+  // results for generic decls, and mapping into context types for non-generic
+  // decls. For now, avoid attempting to compare.
+  if (!Ty->hasTypeParameter()) {
     bool isAny = false;
     isAny |= ExpectedTy->isAny();
     isAny |= ExpectedTy->is<ArchetypeType>() &&
-             !ExpectedTy->castTo<ArchetypeType>()->hasRequirements();
+             ExpectedTy->castTo<ArchetypeType>()->getExistentialType()->isAny();
 
     if (!isAny && isConvertibleTo(Ty, ExpectedTy, /*openArchetypes=*/true,
                                   const_cast<DeclContext &>(DC)))
@@ -396,8 +438,9 @@ calculateMaxTypeRelation(Type Ty, const ExpectedTypeContext &typeContext,
 
   auto Result = TypeRelation::Unrelated;
   for (auto expectedTy : typeContext.getPossibleTypes()) {
-    // Do not use Void type context for a single-expression body, since the
-    // implicit return does not constrain the expression.
+    // Do not use Void type context for an implied result such as a
+    // single-expression closure body, since the implicit return does not
+    // constrain the expression.
     //
     //     { ... -> ()  in x } // x can be anything
     //
@@ -405,16 +448,15 @@ calculateMaxTypeRelation(Type Ty, const ExpectedTypeContext &typeContext,
     //
     //     { ... -> Int in x }        // x must be Int
     //     { ... -> ()  in return x } // x must be Void
-    if (typeContext.isImplicitSingleExpressionReturn() && expectedTy->isVoid())
+    if (typeContext.isImpliedResult() && expectedTy->isVoid())
       continue;
 
     Result = std::max(Result, calculateTypeRelation(Ty, expectedTy, DC));
   }
 
-  // Map invalid -> unrelated when in a single-expression body, since the
-  // input may be incomplete.
-  if (typeContext.isImplicitSingleExpressionReturn() &&
-      Result == TypeRelation::Invalid)
+  // Map invalid -> unrelated for an implied result, since the input may be
+  // incomplete.
+  if (typeContext.isImpliedResult() && Result == TypeRelation::Invalid)
     Result = TypeRelation::Unrelated;
 
   return Result;

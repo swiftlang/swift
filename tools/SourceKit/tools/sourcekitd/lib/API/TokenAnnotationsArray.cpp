@@ -81,18 +81,17 @@ public:
     IsSystem = LengthAndIsSystem & 0x1;
   }
 
-  static bool apply(sourcekitd_uid_t Kind,
-                    unsigned Offset,
-                    unsigned Length,
+  static bool apply(sourcekitd_uid_t Kind, unsigned Offset, unsigned Length,
                     bool IsSystem,
-                    llvm::function_ref<bool(sourcekitd_uid_t,
-                                            sourcekitd_variant_t)> applier) {
+                    sourcekitd_variant_dictionary_applier_f_t applier,
+                    void *context) {
 
-#define APPLY(K, Ty, Field)                              \
-  do {                                                   \
-    sourcekitd_uid_t key = SKDUIDFromUIdent(K);          \
-    sourcekitd_variant_t var = make##Ty##Variant(Field); \
-    if (!applier(key, var)) return false;                \
+#define APPLY(K, Ty, Field)                                                    \
+  do {                                                                         \
+    sourcekitd_uid_t key = SKDUIDFromUIdent(K);                                \
+    sourcekitd_variant_t var = make##Ty##Variant(Field);                       \
+    if (!applier(key, var, context))                                           \
+      return false;                                                            \
   } while (0)
 
     APPLY(KeyKind, UID, Kind);
@@ -162,11 +161,11 @@ struct CompactVariantFuncs<TokenAnnotationsArray> {
 
     return Fn(key, Kind, Offset, Length, IsSystem);
   }
-  
+
   static bool
   dictionary_apply(sourcekitd_variant_t dict,
-                   llvm::function_ref<bool(sourcekitd_uid_t,
-                                           sourcekitd_variant_t)> applier) {
+                   sourcekitd_variant_dictionary_applier_f_t applier,
+                   void *context) {
     void *Buf = (void*)dict.data[1];
     size_t Index = dict.data[2];
 
@@ -176,7 +175,8 @@ struct CompactVariantFuncs<TokenAnnotationsArray> {
     bool IsSystem;
     TokenAnnotationsArray::readElements(Buf, Index,
                                         Kind, Offset, Length, IsSystem);
-    return TokenAnnotationsArray::apply(Kind, Offset, Length, IsSystem, applier);
+    return TokenAnnotationsArray::apply(Kind, Offset, Length, IsSystem, applier,
+                                        context);
   }
 
   static bool dictionary_get_bool(sourcekitd_variant_t dict,
@@ -200,27 +200,30 @@ struct CompactVariantFuncs<TokenAnnotationsArray> {
 };
 
 VariantFunctions CompactVariantFuncs<TokenAnnotationsArray>::Funcs = {
-  get_type,
-  nullptr/*Annot_array_apply*/,
-  nullptr/*Annot_array_get_bool*/,
-  nullptr/*Annot_array_get_count*/,
-  nullptr/*Annot_array_get_int64*/,
-  nullptr/*Annot_array_get_string*/,
-  nullptr/*Annot_array_get_uid*/,
-  nullptr/*Annot_array_get_value*/,
-  nullptr/*Annot_bool_get_value*/,
-  dictionary_apply,
-  dictionary_get_bool,
-  dictionary_get_int64,
-  nullptr/*Annot_dictionary_get_string*/,
-  nullptr/*Annot_dictionary_get_value*/,
-  dictionary_get_uid,
-  nullptr/*Annot_string_get_length*/,
-  nullptr/*Annot_string_get_ptr*/,
-  nullptr/*Annot_int64_get_value*/,
-  nullptr/*Annot_uid_get_value*/,
-  nullptr/*Annot_data_get_size*/,
-  nullptr/*Annot_data_get_ptr*/,
+    get_type,
+    nullptr /*Annot_array_apply*/,
+    nullptr /*Annot_array_get_bool*/,
+    nullptr /*Annot_array_get_double*/,
+    nullptr /*Annot_array_get_count*/,
+    nullptr /*Annot_array_get_int64*/,
+    nullptr /*Annot_array_get_string*/,
+    nullptr /*Annot_array_get_uid*/,
+    nullptr /*Annot_array_get_value*/,
+    nullptr /*Annot_bool_get_value*/,
+    nullptr /*Annot_double_get_value*/,
+    dictionary_apply,
+    dictionary_get_bool,
+    nullptr /*Annot_dictionary_get_double*/,
+    dictionary_get_int64,
+    nullptr /*Annot_dictionary_get_string*/,
+    nullptr /*Annot_dictionary_get_value*/,
+    dictionary_get_uid,
+    nullptr /*Annot_string_get_length*/,
+    nullptr /*Annot_string_get_ptr*/,
+    nullptr /*Annot_int64_get_value*/,
+    nullptr /*Annot_uid_get_value*/,
+    nullptr /*Annot_data_get_size*/,
+    nullptr /*Annot_data_get_ptr*/,
 };
 
 } // namespace sourcekitd

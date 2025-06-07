@@ -56,8 +56,8 @@ struct G<T : P1 & P2> {}
 // CHECK: - τ_0_0.[P1:B].[P1:B].[P1:B] => τ_0_0.[P1:B]
 // CHECK: }
 // CHECK-LABEL: Property map: {
-// CHECK: τ_0_0.[P1:A] => { conforms_to: [P1] concrete_type: [concrete: S1] }
-// CHECK: τ_0_0.[P1:B] => { conforms_to: [P1] concrete_type: [concrete: S2] }
-// CHECK: τ_0_0.[P1:A].[P1:B] => { conforms_to: [P1] concrete_type: [concrete: S2] }
-// CHECK: τ_0_0.[P1:B].[P1:B] => { conforms_to: [P1] concrete_type: [concrete: S1] }
+// CHECK: τ_0_0.[P1:A] => { conforms_to: [P1 Copyable Escapable] concrete_type: [concrete: S1] }
+// CHECK: τ_0_0.[P1:B] => { conforms_to: [P1 Copyable Escapable] concrete_type: [concrete: S2] }
+// CHECK: τ_0_0.[P1:A].[P1:B] => { conforms_to: [P1 Copyable Escapable] concrete_type: [concrete: S2] }
+// CHECK: τ_0_0.[P1:B].[P1:B] => { conforms_to: [P1 Copyable Escapable] concrete_type: [concrete: S1] }
 // CHECK: }

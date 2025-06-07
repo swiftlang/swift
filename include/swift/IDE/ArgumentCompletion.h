@@ -25,29 +25,63 @@ class ArgumentTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
   struct Result {
     /// The type associated with the code completion expression itself.
     Type ExpectedType;
+
+    /// The expected return type of the function call.
+    Type ExpectedCallType;
+
     /// True if this is a subscript rather than a function call.
     bool IsSubscript;
+
     /// The FuncDecl or SubscriptDecl associated with the call.
     ValueDecl *FuncD;
+
     /// The type of the function being called.
-    Type FuncTy;
+    AnyFunctionType *FuncTy;
+
     /// The index of the argument containing the completion location
     unsigned ArgIdx;
+
     /// The index of the parameter corresponding to the completion argument.
-    Optional<unsigned> ParamIdx;
+    std::optional<unsigned> ParamIdx;
+
     /// The indices of all params that were bound to non-synthesized
     /// arguments. Used so we don't suggest them even when the args are out of
     /// order.
     std::set<unsigned> ClaimedParamIndices;
+
     /// True if the completion is a noninitial term in a variadic argument.
     bool IsNoninitialVariadic;
+
+    /// Whether to suggest the entire functions signature instead of a single
+    /// argument for this result.
+    ///
+    /// This is the case if there are no arguments or labels in the call yet and
+    /// causes us to add a completion result that completes `Point(|)` to
+    /// `Point(x: <Int>, y: <Int>)`.
+    bool IncludeSignature;
+
     /// The base type of the call/subscript (null for free functions).
     Type BaseType;
+
     /// True if an argument label precedes the completion location.
     bool HasLabel;
+
+    /// The argument index of the first trailing closure.
+    ///
+    /// \c None if the call doesn't have a trailing closure.
+    std::optional<unsigned> FirstTrailingClosureIndex;
+
     /// Whether the surrounding context is async and thus calling async
     /// functions is supported.
     bool IsInAsyncContext;
+
+    /// A bitfield to mark whether the parameter at a given index is optional.
+    /// Parameters can be optional if they have a default argument or belong to
+    /// a parameter pack.
+    /// Indices are based on the parameters in \c FuncTy. Note that the number
+    /// of parameters in \c FuncTy and \c FuncD is different when a parameter
+    /// pack has been exploded.
+    llvm::BitVector DeclParamIsOptional;
 
     /// Types of variables that were determined in the solution that produced
     /// this result. This in particular includes parameters of closures that
@@ -70,18 +104,22 @@ class ArgumentTypeCheckCompletionCallback : public TypeCheckCompletionCallback {
 
   void sawSolutionImpl(const constraints::Solution &solution) override;
 
+  /// Populates \p ShadowedDecls with all \c FuncD in \p Results that are
+  /// defined in protocol extensions but redeclared on a nominal type and thus
+  /// cannot be accessed
+  void computeShadowedDecls(SmallPtrSetImpl<ValueDecl *> &ShadowedDecls);
+
 public:
   ArgumentTypeCheckCompletionCallback(CodeCompletionExpr *CompletionExpr,
                                       DeclContext *DC)
       : CompletionExpr(CompletionExpr), DC(DC) {}
 
-  /// \param IncludeSignature Whether to include a suggestion for the entire
-  /// function signature instead of suggesting individual labels. Used when
-  /// completing after the opening '(' of a function call \param Loc The
-  /// location of the code completion token
-  void deliverResults(bool IncludeSignature, SourceLoc Loc, DeclContext *DC,
-                      CodeCompletionContext &CompletionCtx,
-                      CodeCompletionConsumer &Consumer);
+  /// \param IsLabeledTrailingClosure Whether we are completing the label of a
+  /// labeled trailing closure, ie. if the code completion location is outside
+  /// the call after the first trailing closure of the call.
+  void collectResults(bool IsLabeledTrailingClosure,
+                      SourceLoc Loc, DeclContext *DC,
+                      CodeCompletionContext &CompletionCtx);
 };
 
 } // end namespace ide

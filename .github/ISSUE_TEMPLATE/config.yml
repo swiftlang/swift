@@ -1,0 +1,48 @@
+# This source file is part of the Swift.org open source project
+#
+# Copyright (c) 2023 Apple Inc. and the Swift project authors
+# Licensed under Apache License v2.0 with Runtime Library Exception
+#
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+
+blank_issues_enabled: true
+contact_links:
+  - name: 🌐 Discuss an idea
+    url: https://forums.swift.org/c/evolution/discuss
+    about: >
+      Share an idea with the Swift community.
+  - name: 📄 Formally propose a change
+    url: https://www.swift.org/swift-evolution
+    about: >
+      Formally propose an addition, removal, or change to the features of the
+      Swift language or the public interface of the Swift standard library.
+  - name: 🙋 Ask a question about Swift
+    url: https://forums.swift.org/c/swift-users
+    about: >
+      Ask a question about or get help with the Swift language and its standard
+      library. Beginner questions welcome!
+  - name: 🙋 Ask a question about the Swift compiler
+    url: https://forums.swift.org/c/development/compiler
+    about: >
+      Ask a question about or get help with contributing to the Swift compiler.
+  - name: 🙋 Ask a question on the Apple Developer Forums
+    url: https://developer.apple.com/forums
+    about: >
+      Ask a question about or get help with app development for Apple platforms
+      in general. Topics include Xcode and other closed source Apple developer
+      software such as SwiftUI and UIKit.
+  - name: 🪲 Report an issue using Feedback Assistant
+    url: https://developer.apple.com/bug-reporting
+    about: >
+      Report an issue with Xcode or other closed source Apple developer
+      software such as SwiftUI and UIKit.
+  - name: 🪲 Report an issue with The Swift Programming Language (the book)
+    url: https://github.com/apple/swift-book/issues/new/choose
+    about: >
+      Like the Swift compiler and standard library, TSPL is open source and
+      welcomes contributions.
+  - name: 📖 Learn Swift
+    url: https://docs.swift.org/swift-book/documentation/the-swift-programming-language
+    about: >
+      Read The Swift Programming Language, the official book on Swift.

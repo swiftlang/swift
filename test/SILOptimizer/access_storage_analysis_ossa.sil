@@ -372,7 +372,7 @@ bb0(%0 : @guaranteed $C, %1 : $Int):
 // CHECK-LABEL: @readWriteIdentifiedClass
 // CHECK: [modify] Class   %1 = alloc_ref $C
 // CHECK: Field: var property: Int
-sil [ossa] @readWriteIdentifiedClass : $@convention(thin) (Int) -> (Int) {
+sil [ossa] @readWriteIdentifiedClass : $@convention(thin) (Int) -> @owned C {
 bb0(%0 : $Int):
   %1 = alloc_ref $C
   %2 = function_ref @writeIdentifiedClass : $@convention(thin) (@guaranteed C, Int) -> ()
@@ -383,8 +383,7 @@ bb0(%0 : $Int):
   %6 = load [trivial] %5 : $*Int
   end_access %5 : $*Int
   end_borrow %borrow : $C
-  destroy_value %1 : $C
-  return %6 : $Int
+  return %1 : $C
 }
 
 // CHECK-LABEL: @readIdentifiedNestedClass
@@ -423,7 +422,7 @@ bb0(%0 : @guaranteed $C, %1 : $Int):
 // CHECK-LABEL: @readWriteIdentifiedNestedClass
 // CHECK: [modify] Class   %1 = alloc_ref $C
 // CHECK: Field: var property: Int
-sil [ossa] @readWriteIdentifiedNestedClass : $@convention(thin) (Int) -> (Int) {
+sil [ossa] @readWriteIdentifiedNestedClass : $@convention(thin) (Int) -> @owned C {
 bb0(%0 : $Int):
   %1 = alloc_ref $C
   %2 = function_ref @writeIdentifiedNestedClass : $@convention(thin) (@guaranteed C, Int) -> ()
@@ -436,8 +435,7 @@ bb0(%0 : $Int):
   end_access %5 : $*Int
   end_access %6 : $*Int
   end_borrow %borrow : $C
-  destroy_value %1 : $C
-  return %7 : $Int
+  return %1 : $C
 }
 
 enum TreeB<T> {
@@ -447,7 +445,7 @@ enum TreeB<T> {
 }
 
 // CHECK-LABEL: @readIndirectEnum
-// CHECK: [read] Argument %1 = argument of bb0 : $*TreeB<T>
+// CHECK: unidentified accesses: modify
 sil [ossa] @readIndirectEnum : $@convention(thin) <T> (@in TreeB<T>) -> (@out TreeB<T>) {
 bb0(%0 : $*TreeB<T>, %1 : $*TreeB<T>):
   %enumAddr = unchecked_take_enum_data_addr %1 : $*TreeB<T>, #TreeB.Branch!enumelt
@@ -465,8 +463,7 @@ bb0(%0 : $*TreeB<T>, %1 : $*TreeB<T>):
 struct SomeError: Error {}
 
 // CHECK-LABEL: @writeIdentifiedArgReadUnidentifiedVarious
-// CHECK: [modify] Argument %0 = argument of bb0 : $*Int
-// CHECK: unidentified accesses: read
+// CHECK: unidentified accesses: modify
 sil [ossa] @writeIdentifiedArgReadUnidentifiedVarious : $@convention(thin) (Int, @owned Error) -> (@out Int) {
 bb0(%out : $*Int, %i : $Int, %e : @owned $Error):
   %argAccess = begin_access [modify] [dynamic] %out : $*Int
@@ -541,6 +538,7 @@ bb0(%0 : $Int):
   %access = begin_access [modify] [dynamic] %s1 : $*Int
   %call = apply %npa(%access) : $@noescape @callee_guaranteed (@inout Int) -> ()
   end_access %access : $*Int
+  destroy_value %npa : $@noescape @callee_guaranteed (@inout Int) -> ()
   end_borrow %borrow : $@callee_guaranteed (@inout Int) -> ()
   destroy_value %pa : $@callee_guaranteed (@inout Int) -> ()
   dealloc_stack %s2 : $*Int

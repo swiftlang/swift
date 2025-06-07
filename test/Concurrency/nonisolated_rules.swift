@@ -1,0 +1,186 @@
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -swift-version 6 -parse-as-library %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
+
+// REQUIRES: concurrency
+
+@MainActor
+protocol GloballyIsolated {}
+
+// expected-note@+1 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
+class NonSendable {}
+
+@propertyWrapper struct P {
+  var wrappedValue = 0
+}
+
+// MARK: - Structs
+
+struct ImplicitlySendable {
+  var a: Int
+
+  // always okay
+  nonisolated let b = 0
+  nonisolated var c: Int { 0 }
+  nonisolated var d = 0
+
+  // never okay
+  nonisolated lazy var e = 0  // expected-error {{'nonisolated' is not supported on lazy properties}}
+  @P nonisolated var f = 0  // expected-error {{'nonisolated' is not supported on properties with property wrappers}}
+}
+
+struct ImplicitlyNonSendable {
+  let a: NonSendable
+
+  // always okay
+  nonisolated let b = 0
+  nonisolated var c: Int { 0 }
+  nonisolated var d = 0
+
+  // never okay
+  nonisolated lazy var e = 0  // expected-error {{'nonisolated' is not supported on lazy properties}}
+  @P nonisolated var f = 0  // expected-error {{'nonisolated' is not supported on properties with property wrappers}}
+}
+
+public struct PublicSendable: Sendable {
+  // always okay
+  nonisolated let b = 0
+  nonisolated var c: Int { 0 }
+  nonisolated var d = 0
+
+  // never okay
+  nonisolated lazy var e = 0  // expected-error {{'nonisolated' is not supported on lazy properties}}
+  @P nonisolated var f = 0  // expected-error {{'nonisolated' is not supported on properties with property wrappers}}
+}
+
+public struct PublicNonSendable {
+  // always okay
+  nonisolated let b = 0
+  nonisolated var c: Int { 0 }
+  nonisolated var d = 0
+
+  // never okay
+  nonisolated lazy var e = 0  // expected-error {{'nonisolated' is not supported on lazy properties}}
+  @P nonisolated var f = 0  // expected-error {{'nonisolated' is not supported on properties with property wrappers}}
+}
+
+
+nonisolated struct NonisolatedStruct: GloballyIsolated {
+  var x: NonSendable
+  var y: Int = 1
+
+  init(x: NonSendable) {
+    self.x = x // okay
+  }
+
+  struct Nested: GloballyIsolated {
+    var z: NonSendable
+    nonisolated init(z: NonSendable) {
+      self.z = z
+    }
+  }
+}
+
+@MainActor struct S {
+  var value: NonSendable // globally-isolated
+  struct Nested {} // 'Nested' is not @MainActor-isolated
+}
+
+// expected-note@+1 {{calls to global function 'requireMain()' from outside of its actor context are implicitly asynchronous}}
+@MainActor func requireMain() {}
+
+nonisolated struct S1: GloballyIsolated {
+  var x: NonSendable
+  func f() {
+    // expected-error@+1 {{call to main actor-isolated global function 'requireMain()' in a synchronous nonisolated context}}
+    requireMain()
+  }
+}
+
+// MARK: - Protocols
+
+nonisolated protocol Refined: GloballyIsolated {}
+
+struct A: Refined {
+  var x: NonSendable
+  init(x: NonSendable) {
+    self.x = x // okay
+  }
+}
+
+// MARK: - Extensions
+
+nonisolated extension GloballyIsolated {
+  var x: NonSendable { .init () }
+  func implicitlyNonisolated() {}
+}
+
+struct C: GloballyIsolated {
+  nonisolated func explicitlyNonisolated() {
+    let _ = x // okay
+    implicitlyNonisolated() // okay
+  }
+}
+
+// MARK: - Enums
+
+nonisolated enum E: GloballyIsolated {
+  func implicitlyNonisolated() {}
+  init() {}
+}
+
+struct TestEnum {
+  nonisolated func call() {
+    E().implicitlyNonisolated() // okay
+  }
+}
+
+// MARK: - Classes
+
+nonisolated class K: GloballyIsolated {
+  var x: NonSendable
+  init(x: NonSendable) {
+    self.x = x // okay
+  }
+}
+
+// MARK: - Storage of non-Sendable
+
+class KlassA {
+  nonisolated var test: NonSendable = NonSendable()
+}
+
+// MARK: - Restrictions
+
+@MainActor
+nonisolated struct Conflict {}
+// expected-error@-1 {{struct 'Conflict' has multiple actor-isolation attributes (@MainActor and 'nonisolated')}}
+
+struct B: Sendable {
+  // expected-error@+1 {{'nonisolated' can not be applied to variable with non-'Sendable' type 'NonSendable}}
+  nonisolated let test: NonSendable
+}
+
+final class KlassB: Sendable {
+  // expected-note@+2 {{convert 'test' to a 'let' constant or consider declaring it 'nonisolated(unsafe)' if manually managing concurrency safety}}
+  // expected-error@+1 {{'nonisolated' cannot be applied to mutable stored properties}}
+  nonisolated var test: Int = 1
+}
+
+class NotSendable {}
+
+@MainActor
+struct UnsafeInitialization {
+  nonisolated(unsafe) let ns: NotSendable
+
+  nonisolated init(ns: NotSendable) {
+    self.ns = ns // okay
+  }
+}
+
+// rdar://147965036 - Make sure we don't crash.
+func rdar147965036() {
+  func test(_: () -> Void) {}
+  test { @nonisolated in
+    // expected-error@-1 {{'nonisolated' is a declaration modifier, not an attribute}}
+    // expected-error@-2 {{'nonisolated' is not supported on a closure}}
+  }
+}

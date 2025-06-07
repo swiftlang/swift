@@ -13,6 +13,7 @@
 #include "swift/AST/FileSystem.h"
 #include "swift/AST/FineGrainedDependencies.h"
 #include "swift/AST/FineGrainedDependencyFormat.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/Version.h"
 #include "llvm/ADT/SmallVector.h"
@@ -21,6 +22,7 @@
 #include "llvm/Bitstream/BitstreamWriter.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/VirtualOutputBackend.h"
 
 using namespace swift;
 using namespace fine_grained_dependencies;
@@ -40,7 +42,7 @@ class Deserializer {
   bool enterTopLevelBlock();
   bool readMetadata();
 
-  llvm::Optional<std::string> getIdentifier(unsigned n);
+  std::optional<std::string> getIdentifier(unsigned n);
 
 public:
   Deserializer(llvm::MemoryBufferRef Data) : Cursor(Data) {}
@@ -139,16 +141,16 @@ bool Deserializer::readMetadata() {
   return false;
 }
 
-static llvm::Optional<NodeKind> getNodeKind(unsigned nodeKind) {
+static std::optional<NodeKind> getNodeKind(unsigned nodeKind) {
   if (nodeKind < unsigned(NodeKind::kindCount))
     return NodeKind(nodeKind);
-  return None;
+  return std::nullopt;
 }
 
-static llvm::Optional<DeclAspect> getDeclAspect(unsigned declAspect) {
+static std::optional<DeclAspect> getDeclAspect(unsigned declAspect) {
   if (declAspect < unsigned(DeclAspect::aspectCount))
     return DeclAspect(declAspect);
-  return None;
+  return std::nullopt;
 }
 
 bool Deserializer::readFineGrainedDependencyGraph(SourceFileDepGraph &g,
@@ -284,13 +286,13 @@ bool swift::fine_grained_dependencies::readFineGrainedDependencyGraph(
   return readFineGrainedDependencyGraph(*buffer.get(), g);
 }
 
-llvm::Optional<std::string> Deserializer::getIdentifier(unsigned n) {
+std::optional<std::string> Deserializer::getIdentifier(unsigned n) {
   if (n == 0)
     return std::string();
 
   --n;
   if (n >= Identifiers.size())
-    return None;
+    return std::nullopt;
 
   return Identifiers[n];
 }
@@ -498,10 +500,10 @@ void swift::fine_grained_dependencies::writeFineGrainedDependencyGraph(
 }
 
 bool swift::fine_grained_dependencies::writeFineGrainedDependencyGraphToPath(
-    DiagnosticEngine &diags, StringRef path,
+    DiagnosticEngine &diags, llvm::vfs::OutputBackend &backend, StringRef path,
     const SourceFileDepGraph &g) {
   PrettyStackTraceStringAction stackTrace("saving fine-grained dependency graph", path);
-  return withOutputFile(diags, path, [&](llvm::raw_ostream &out) {
+  return withOutputPath(diags, backend, path, [&](llvm::raw_ostream &out) {
     SmallVector<char, 0> Buffer;
     llvm::BitstreamWriter Writer{Buffer};
     writeFineGrainedDependencyGraph(Writer, g, Purpose::ForSwiftDeps);

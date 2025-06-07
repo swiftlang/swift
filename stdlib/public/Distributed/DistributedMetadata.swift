@@ -19,8 +19,8 @@ import Swift
 public // SPI Distributed
 func _getParameterCount(mangledMethodName name: String) -> Int32 {
   let nameUTF8 = Array(name.utf8)
-  return nameUTF8.withUnsafeBufferPointer { nameUTF8 in
-    return __getParameterCount(
+  return unsafe nameUTF8.withUnsafeBufferPointer { nameUTF8 in
+    return unsafe __getParameterCount(
         nameUTF8.baseAddress!, UInt(nameUTF8.endIndex))
   }
 }
@@ -47,8 +47,8 @@ func _getParameterTypeInfo(
   into typesBuffer: Builtin.RawPointer, length typesLength: Int
 ) -> Int32 {
   let nameUTF8 = Array(name.utf8)
-  return nameUTF8.withUnsafeBufferPointer { nameUTF8 in
-    return __getParameterTypeInfo(
+  return unsafe nameUTF8.withUnsafeBufferPointer { nameUTF8 in
+    return unsafe __getParameterTypeInfo(
         nameUTF8.baseAddress!, UInt(nameUTF8.endIndex),
         genericEnv, genericArguments, typesBuffer, typesLength)
   }
@@ -67,6 +67,7 @@ func __getParameterTypeInfo(
 ) -> Int32
 
 @available(SwiftStdlib 5.7, *)
+@available(*, deprecated, message: "Use `__getReturnTypeInfo(_:_:_:_:)` directly")
 public // SPI Distributed
 func _getReturnTypeInfo(
   mangledMethodName name: String,
@@ -74,8 +75,8 @@ func _getReturnTypeInfo(
   genericArguments: UnsafeRawPointer?
 ) -> Any.Type? {
   let nameUTF8 = Array(name.utf8)
-  return nameUTF8.withUnsafeBufferPointer { nameUTF8 in
-    return __getReturnTypeInfo(nameUTF8.baseAddress!, UInt(nameUTF8.endIndex),
+  return unsafe nameUTF8.withUnsafeBufferPointer { nameUTF8 in
+    return unsafe __getReturnTypeInfo(nameUTF8.baseAddress!, UInt(nameUTF8.endIndex),
                                genericEnv, genericArguments)
   }
 }
@@ -90,9 +91,11 @@ func __getReturnTypeInfo(
     _ genericArguments: UnsafeRawPointer?
 ) -> Any.Type?
 
+/// Typealias for Swift `TypeNamePair` and similar ones which Swift runtime
+/// uses to return String data/length pairs.
+typealias _SwiftNamePair = (UnsafePointer<UInt8>, Int)
 
-/// Retrieve a generic environment descriptor associated with
-/// the given distributed target
+/// Deprecated SPI: Instead use the entry point with the actor parameter passed.
 @available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_distributed_getGenericEnvironment")
 public // SPI Distributed

@@ -1,0 +1,37 @@
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+// CHECK-LABEL: define{{.*}} swiftcc void @func1
+
+// CHECK: [[METADATA_PAIR:%.*]] = phi %swift.metadata_response
+// CHECK: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[METADATA_PAIR]], 0
+// CHECK: [[VWT_PTR:%.*]] = getelementptr inbounds ptr, ptr [[METADATA]], {{i32|i64}} -1
+// CHECK: [[VWT:%.*]] = load ptr, ptr [[VWT_PTR]]
+// CHECK: [[DESTROY_PTR:%.*]] = getelementptr inbounds ptr, ptr {{%.*}}, i32 1
+// CHECK: [[DESTROY:%.*]] = load ptr, ptr [[DESTROY_PTR]]
+// CHECK: call void [[DESTROY]]({{.*}})
+// CHECK: ret void
+
+sil @func1 : $@convention(thin) <each V> (@in (repeat each V)) -> () {
+bb0(%0 : $*(repeat each V)):
+  destroy_addr %0 : $*(repeat each V)
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: define{{.*}} swiftcc void @func2
+// CHECK-NOT: call void %
+// CHECK: ret void
+
+sil @func2 : $@convention(thin) <each V where repeat each V : BitwiseCopyable> (@in (repeat each V)) -> () {
+bb0(%0 : $*(repeat each V)):
+  destroy_addr %0 : $*(repeat each V)
+  %ret = tuple ()
+  return %ret : $()
+}
+

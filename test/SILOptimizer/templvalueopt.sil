@@ -1,7 +1,9 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -temp-lvalue-opt | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -temp-lvalue-elimination | %FileCheck %s
 
 import Swift
 import Builtin
+
+// REQUIRES: swift_in_compiler
 
 // CHECK-LABEL: sil @test_enum_with_initialize :
 // CHECK:      bb0(%0 : $*Optional<Any>, %1 : $*Any):
@@ -132,15 +134,15 @@ bb0(%0 : $*Optional<Any>, %1 : $*Any):
   return %6 : $()
 }
 
-// CHECK-LABEL: sil @write_to_dest_ok_if_before_liferange :
+// CHECK-LABEL: sil @write_to_dest_ok_if_before_liverange :
 // CHECK:      bb0(%0 : $*Optional<Any>, %1 : $*Any):
 // CHECK-NEXT:   destroy_addr
 // CHECK-NEXT:   init_enum_data_addr
 // CHECK-NEXT:   copy_addr
 // CHECK-NEXT:   inject_enum_addr
 // CHECK-NOT:    copy_addr
-// CHECK: } // end sil function 'write_to_dest_ok_if_before_liferange'
-sil @write_to_dest_ok_if_before_liferange : $@convention(thin) (@inout Optional<Any>, @in Any) -> () {
+// CHECK: } // end sil function 'write_to_dest_ok_if_before_liverange'
+sil @write_to_dest_ok_if_before_liverange : $@convention(thin) (@inout Optional<Any>, @in Any) -> () {
 bb0(%0 : $*Optional<Any>, %1 : $*Any):
   %2 = alloc_stack $Optional<Any>
   destroy_addr %0 : $*Optional<Any>
@@ -249,3 +251,63 @@ bb0(%0 : $*T, %1 : $*T):
   return %78 : $()
 }
 
+
+// CHECK-LABEL: sil @optimize_builtin_zeroInitialize : {{.*}} {
+// CHECK:       bb0([[RET_ADDR:%[^,]+]] :
+// CHECK:         builtin "zeroInitializer"([[RET_ADDR]] : $*T) : $()
+// CHECK:         apply undef<T>([[RET_ADDR]])
+// CHECK-LABEL: } // end sil function 'optimize_builtin_zeroInitialize'
+sil @optimize_builtin_zeroInitialize : $@convention(thin) <T> () -> @out T {
+bb0(%ret_addr : $*T):
+  %temporary = alloc_stack [lexical] $T
+  builtin "zeroInitializer"(%temporary : $*T) : $()
+  apply undef<T>(%temporary) : $@convention(thin) <T> () -> @out T
+  copy_addr [take] %temporary to [init] %ret_addr : $*T
+  dealloc_stack %temporary : $*T
+
+  // Ensure that the following builtin instructions don't interfere with
+  // temp l value from getting rid of the temporary.
+  %empty = builtin "fence_release"() : $()
+  %ptr = address_to_pointer %ret_addr : $*T to $Builtin.RawPointer
+  %load = builtin "atomicload_monotonic_Int64"(%ptr : $Builtin.RawPointer) : $Builtin.Int64
+  %onetwoeight = integer_literal $Builtin.Int64, 128
+  %empty2 = builtin "atomicstore_monotonic_Int64"(%ptr : $Builtin.RawPointer, %onetwoeight : $Builtin.Int64) : $()
+  %add = builtin "atomicrmw_add_monotonic_Int64"(%ptr : $Builtin.RawPointer, %onetwoeight : $Builtin.Int64) : $Builtin.Int64
+  %cmpxchg = builtin "cmpxchg_monotonic_monotonic_Int64"(%ptr : $Builtin.RawPointer, %onetwoeight : $Builtin.Int64, %onetwoeight : $Builtin.Int64) : $(Builtin.Int64, Builtin.Int1)
+  %15 = tuple ()
+  return %15 : $()
+}
+
+class Klass {
+  init()
+}
+
+enum FakeOptional {
+  case none
+  case some(Klass)
+}
+
+sil @initfn : $@convention(thin) () -> @out Klass
+
+// CHECK-LABEL: sil @test_enum
+// CHECK:         [[I:%.*]] = init_enum_data_addr %0
+// CHECK:         [[S:%.*]] = alloc_stack $Klass
+// CHECK:         copy_addr [take] [[S]] to [init] [[I]]
+// CHECK-LABEL: } // end sil function 'test_enum'
+sil @test_enum : $@convention(thin) () -> @out FakeOptional {
+bb0(%0 : $*FakeOptional):
+  %1 = alloc_stack [lexical] [var_decl] $Klass
+  %2 = function_ref @initfn : $@convention(thin) () -> @out Klass
+  %3 = apply %2(%1) : $@convention(thin) () -> @out Klass
+  %4 = alloc_stack $Klass
+  %5 = apply %2(%4) : $@convention(thin) () -> @out Klass
+  destroy_addr %1
+  copy_addr [take] %4 to [init] %1
+  dealloc_stack %4
+  %9 = init_enum_data_addr %0, #FakeOptional.some!enumelt
+  copy_addr [take] %1 to [init] %9
+  inject_enum_addr %0, #FakeOptional.some!enumelt
+  dealloc_stack %1
+  %13 = tuple ()
+  return %13
+}

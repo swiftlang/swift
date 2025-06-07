@@ -48,7 +48,7 @@ class Term;
 struct SuperclassRequirement {
   /// The most specific superclass constraint (in type difference order) for
   /// this level in the class hierarchy.
-  Optional<Symbol> SuperclassType;
+  std::optional<Symbol> SuperclassType;
 
   /// Superclass rules that apply to this key.
   llvm::SmallVector<std::pair<Symbol, unsigned>, 1> SuperclassRules;
@@ -72,7 +72,7 @@ class PropertyBag {
   LayoutConstraint Layout;
 
   /// The corresponding layout rule for the above.
-  Optional<unsigned> LayoutRule;
+  std::optional<unsigned> LayoutRule;
 
   /// The most specific superclass declaration for which this type has a
   /// superclass constraint.
@@ -84,7 +84,7 @@ class PropertyBag {
   llvm::SmallDenseMap<const ClassDecl *, SuperclassRequirement, 2> Superclasses;
 
   /// The most specific concrete type constraint this type satisfies.
-  Optional<Symbol> ConcreteType;
+  std::optional<Symbol> ConcreteType;
 
   /// Concrete type rules that apply to this key.
   llvm::SmallVector<std::pair<Symbol, unsigned>, 1> ConcreteTypeRules;
@@ -103,8 +103,9 @@ class PropertyBag {
   PropertyBag &operator=(PropertyBag &&) = delete;
 
   const SuperclassRequirement &getSuperclassRequirement() const {
-    assert(SuperclassDecl != nullptr);
+    ASSERT(SuperclassDecl != nullptr);
     auto found = Superclasses.find(SuperclassDecl);
+    ASSERT(found != Superclasses.end());
     return found->second;
   }
 
@@ -123,7 +124,7 @@ public:
   }
 
   Type getSuperclassBound(
-      TypeArrayView<GenericTypeParamType> genericParams,
+      ArrayRef<GenericTypeParamType *> genericParams,
       const MutableTerm &lookupTerm,
       const PropertyMap &map) const;
 
@@ -136,7 +137,7 @@ public:
   }
 
   Type getConcreteType(
-      TypeArrayView<GenericTypeParamType> genericParams,
+      ArrayRef<GenericTypeParamType *> genericParams,
       const MutableTerm &lookupTerm,
       const PropertyMap &map) const;
 
@@ -227,15 +228,15 @@ public:
   //////////////////////////////////////////////////////////////////////////////
 
   Type getTypeForTerm(Term term,
-                      TypeArrayView<GenericTypeParamType> genericParams) const;
+                      ArrayRef<GenericTypeParamType *> genericParams) const;
 
   Type getTypeForTerm(const MutableTerm &term,
-                      TypeArrayView<GenericTypeParamType> genericParams) const;
+                      ArrayRef<GenericTypeParamType *> genericParams) const;
 
   Type getTypeFromSubstitutionSchema(
                       Type schema,
                       ArrayRef<Term> substitutions,
-                      TypeArrayView<GenericTypeParamType> genericParams,
+                      ArrayRef<GenericTypeParamType *> genericParams,
                       const MutableTerm &prefix) const;
 
 private:
@@ -253,11 +254,10 @@ private:
                           Symbol lhsProperty, unsigned lhsRuleID,
                           Symbol rhsProperty, unsigned rhsRuleID);
 
-  void unifyConcreteTypes(Term key,
-                          Optional<Symbol> &bestProperty,
-                          llvm::SmallVectorImpl<std::pair<Symbol, unsigned>> &
-                              existingRules,
-                          Symbol property, unsigned ruleID);
+  void unifyConcreteTypes(
+      Term key, std::optional<Symbol> &bestProperty,
+      llvm::SmallVectorImpl<std::pair<Symbol, unsigned>> &existingRules,
+      Symbol property, unsigned ruleID);
 
   void recordSuperclassRelation(Term key,
                                 Symbol superclassType,

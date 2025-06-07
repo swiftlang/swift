@@ -1,9 +1,9 @@
 class /*/*class-Foo:unknown*/Foo in comment*/ /*class-Foo:def*/Foo {}
 protocol /*protocol-Proto:def*/Proto {
-	associatedtype /*associated-Item:def*/Element
+	associatedtype /*associated-Item:def*/<base>Item</base>
 }
 class /*class-Bar:def*/Bar : /*class-Foo*/Foo, /*protocol-Proto*/Proto {
-	typealias /*associated-Item:def*/Element = Int
+	typealias /*associated-Item:def*/<base>Item</base> = Int
 }
 
 let x: /*class-Bar*/Bar = /*class-Bar*/Bar()
@@ -17,7 +17,7 @@ var example: /*alias-FuncType*/FuncType = {a, b in x}
 
 func bar<X:/*protocol-Proto*/Proto, Y>(a: X, b: Y) {}
 
-class /*class-Animal:def*/Animal</*generic-T:def*/T, /*generic-U:def*/U> where /*generic-U*/U:/*protocol-Proto*/Proto, /*generic-U*/U . /*associated-Item*/Element == Int {}
+class /*class-Animal:def*/Animal</*generic-T:def*/T, /*generic-U:def*/U> where /*generic-U*/U:/*protocol-Proto*/Proto, /*generic-U*/U . /*associated-Item*/<base>Item</base> == Int {}
 
 var anAnimal: /*class-Animal*/Animal<Int, /*class-Bar*/Bar> = /*class-Animal*/Animal()
 extension /*class-Animal:def*/Animal {

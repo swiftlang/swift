@@ -85,8 +85,8 @@ class OuterGenericClass<T> {
       init(t: T) { super.init(); self.t = t }
     }
 
-    class InnerGenericClass<U> : OuterGenericClass<U> // expected-error {{type 'InnerGenericClass' cannot be nested in generic function 'genericFunction'}}
-      where U : Racoon, U.Stripes == T {
+    class InnerGenericClass<V> : OuterGenericClass<V> // expected-error {{type 'InnerGenericClass' cannot be nested in generic function 'genericFunction'}}
+      where V : Racoon, V.Stripes == T {
       let t: T
 
       init(t: T) { super.init(); self.t = t }
@@ -120,7 +120,7 @@ struct OuterGenericStruct<A> {
   func middleFunction() {
     struct ConformingType : Racoon {
     // expected-error@-1 {{type 'ConformingType' cannot be nested in generic function 'middleFunction()'}}
-      typealias Stripes = A
+      typealias Stripes = String
     }
   }
 }
@@ -130,7 +130,7 @@ func genericFunction<T>(t: T) {
   class First : Second<T>.UnknownType { }
   // expected-error@-1 {{type 'First' cannot be nested in generic function 'genericFunction(t:)'}}
   // expected-error@-2 {{'UnknownType' is not a member type of generic class 'type_in_function.Second<T>'}}
-  class Second<T> : Second { } // expected-note{{'Second' declared here}}
+  class Second<U> : Second { } // expected-note{{'Second' declared here}}
   // expected-error@-1 {{type 'Second' cannot be nested in generic function 'genericFunction(t:)'}}
   // expected-error@-2 {{'Second' inherits from itself}}
 }

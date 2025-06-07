@@ -1,7 +1,9 @@
-// RUN: %target-swift-emit-silgen -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
-// RUN: %target-swift-emit-sil -Onone -parse-stdlib %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck -check-prefix=CANONICAL %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types  -enable-builtin-module %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types  -enable-builtin-module -Onone %s -disable-access-control -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck -check-prefix=CANONICAL %s
 
-import Swift
+// REQUIRES: swift_in_compiler
+
+import Builtin
 
 protocol ClassProto : class { }
 
@@ -152,10 +154,7 @@ func assign_tuple(_ x: (Builtin.Int64, Builtin.NativeObject),
   var x = x
   var y = y
   // CHECK: [[ADDR:%.*]] = pointer_to_address {{%.*}} to [strict] $*(Builtin.Int64, Builtin.NativeObject)
-  // CHECK: [[T0:%.*]] = tuple_element_addr [[ADDR]]
-  // CHECK: assign {{%.*}} to [[T0]]
-  // CHECK: [[T0:%.*]] = tuple_element_addr [[ADDR]]
-  // CHECK: assign {{%.*}} to [[T0]]
+  // CHECK: tuple_addr_constructor [assign] [[ADDR]] : $*(Builtin.Int64, Builtin.NativeObject) with
   // CHECK: destroy_value
   Builtin.assign(x, y)
 }
@@ -783,8 +782,10 @@ func bindMemory<T>(ptr: Builtin.RawPointer, idx: Builtin.Word, _: T.Type) {
 // CHECK-LABEL: sil hidden [ossa] @$s8builtins12rebindMemory{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0([[P:%.*]] : $Builtin.RawPointer, [[I:%.*]] : $Builtin.Word, [[T:%.*]] : $@thick T.Type):
 // CHECK: [[BIND:%.*]] = bind_memory [[P]] : $Builtin.RawPointer, [[I]] : $Builtin.Word to $*T
-// CHECK: [[REBIND:%.*]] = rebind_memory [[P]] : $Builtin.RawPointer to [[BIND]] : $Builtin.Word
-// CHECK: %{{.*}} = rebind_memory [[P]] : $Builtin.RawPointer to [[REBIND]] : $Builtin.Word
+// CHECK: [[MV1:%.*]] = move_value [var_decl] [[BIND]] : $Builtin.Word
+// CHECK: [[REBIND:%.*]] = rebind_memory [[P]] : $Builtin.RawPointer to [[MV1]] : $Builtin.Word
+// CHECK: [[MV2:%.*]] = move_value [var_decl] [[REBIND]] : $Builtin.Word
+// CHECK: %{{.*}} = rebind_memory [[P]] : $Builtin.RawPointer to [[MV2]] : $Builtin.Word
 // CHECK:   return {{%.*}} : $()
 // CHECK: }
 func rebindMemory<T>(ptr: Builtin.RawPointer, idx: Builtin.Word, _: T.Type) {
@@ -828,7 +829,6 @@ func retain(ptr: Builtin.NativeObject) {
 // CANONICAL: bb0([[P:%.*]] : $Builtin.NativeObject):
 // CANONICAL-NEXT:   debug_value
 // CANONICAL-NEXT:   strong_release [[P]]
-// CANONICAL-NEXT:   tuple
 // CANONICAL-NEXT:   tuple
 // CANONICAL-NEXT:   return
 // CANONICAL: } // end sil function '$s8builtins7release{{[_0-9a-zA-Z]*}}F'
@@ -874,4 +874,32 @@ func assumeTrue(_ x: Builtin.Int1) {
 // CHECK: return
 func assumeAlignment(_ p: Builtin.RawPointer, _ x: Builtin.Word) {
   Builtin.assumeAlignment(p, x)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins9packCountyBwxxQpRvzlF : $@convention(thin) <each T> (@pack_guaranteed Pack{repeat each T}) -> Builtin.Word {
+// CHECK: bb0(%0 : $*Pack{repeat each T}):
+// CHECK:   [[META:%.*]] = metatype $@thin (repeat each T).Type
+// CHECK:   [[PACK_LENGTH:%.*]] = pack_length $Pack{repeat each T}
+// CHECK:   return [[PACK_LENGTH]] : $Builtin.Word
+func packCount<each T>(_ x: repeat each T) -> Builtin.Word {
+  Builtin.packLength((repeat each T).self)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins10getEnumTagyBi32_xlF : $@convention(thin) <T> (@in_guaranteed T) -> Builtin.Int32 {
+// CHECK: bb0([[INPUT:%.*]] : $*T):
+// CHECK-NOT: copy_addr
+// CHECK:   [[TAG:%.*]] = builtin "getEnumTag"<T>([[INPUT]] : $*T)
+// CHECK:   return [[TAG]] : $Builtin.Int32
+func getEnumTag<T>(_ x: T) -> Builtin.Int32 {
+  Builtin.getEnumTag(x)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins13injectEnumTag_3tagyxz_Bi32_tlF : $@convention(thin) <T> (@inout T, Builtin.Int32) -> () {
+// CHECK: bb0([[INPUT:%.*]] : $*T, [[TAG:%.*]] : $Builtin.Int32):
+// CHECK-NOT: copy_addr
+// CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unknown] [[INPUT]] : $*T
+// CHECK:   builtin "injectEnumTag"<T>([[ACCESS]] : $*T, [[TAG]] : $Builtin.Int32)
+// CHECK:   end_access [[ACCESS]]
+func injectEnumTag<T>(_ x: inout T, tag: Builtin.Int32) {
+  Builtin.injectEnumTag(&x, tag)
 }

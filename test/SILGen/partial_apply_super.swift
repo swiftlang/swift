@@ -9,7 +9,7 @@
 
 // RUN: %target-swift-frontend -emit-module -I %t -o %t %S/../Inputs/fixed_layout_class.swift
 
-// RUN: %target-swift-emit-silgen -module-name partial_apply_super -enable-library-evolution -parse-as-library -I %t %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name partial_apply_super -enable-library-evolution -parse-as-library -I %t %s | %FileCheck %s
 
 import resilient_class
 import fixed_layout_class

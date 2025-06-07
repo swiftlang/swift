@@ -18,7 +18,7 @@
 #include "swift/Driver/Action.h"
 #include "swift/Driver/Job.h"
 #include "swift/Option/Options.h"
-#include "llvm/ADT/Triple.h"
+#include "llvm/TargetParser/Triple.h"
 #include "llvm/Option/Option.h"
 
 #include <memory>
@@ -143,6 +143,11 @@ protected:
                                      const llvm::opt::ArgList &inputArgs,
                                      llvm::opt::ArgStringList &arguments) const;
 
+  virtual void addPlatformSpecificPluginFrontendArgs(
+      const OutputInfo &OI,
+      const CommandOutput &output,
+      const llvm::opt::ArgList &inputArgs,
+      llvm::opt::ArgStringList &arguments) const;
   virtual InvocationInfo constructInvocation(const CompileJobAction &job,
                                              const JobContext &context) const;
   virtual InvocationInfo constructInvocation(const InterpretJobAction &job,
@@ -243,10 +248,13 @@ protected:
   /// Gets the response file path and command line argument for an invocation
   /// if the tool supports response files and if the command line length would
   /// exceed system limits.
-  Optional<Job::ResponseFileInfo>
+  std::optional<Job::ResponseFileInfo>
   getResponseFileInfo(const Compilation &C, const char *executablePath,
                       const InvocationInfo &invocationInfo,
                       const JobContext &context) const;
+
+  void addPluginArguments(const llvm::opt::ArgList &Args,
+                          llvm::opt::ArgStringList &Arguments) const;
 
 public:
   virtual ~ToolChain() = default;
@@ -335,7 +343,7 @@ public:
   void addLinkRuntimeLib(const llvm::opt::ArgList &Args,
                          llvm::opt::ArgStringList &Arguments,
                          StringRef LibName) const;
-    
+
   /// Validates arguments passed to the toolchain.
   ///
   /// An override point for platform-specific subclasses to customize the

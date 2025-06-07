@@ -1,0 +1,160 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -onone-simplification -simplify-instruction=destructure_struct | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-ONONE
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -simplification -simplify-instruction=destructure_struct | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-O
+
+// REQUIRES: swift_in_compiler
+
+import Swift
+import Builtin
+
+struct S {
+  @_hasStorage let a: String
+  @_hasStorage let b: Int
+}
+
+struct TrivialS {
+  @_hasStorage let a: Int
+  @_hasStorage let b: Int
+}
+
+// CHECK-LABEL: sil [ossa] @forward_owned :
+// CHECK-NOT:     destructure_struct
+// CHECK:         fix_lifetime %1
+// CHECK:         return %0
+// CHECK:       } // end sil function 'forward_owned'
+sil [ossa] @forward_owned : $@convention(thin) (@owned String, Int) -> @owned String {
+bb0(%0 : @owned $String, %1 : $Int):
+  %2 = struct $S (%0 : $String, %1 : $Int)
+  (%3, %4) = destructure_struct %2 : $S
+  fix_lifetime %4 : $Int
+  return %3 : $String
+}
+
+// CHECK-LABEL: sil [ossa] @forward_borrowed :
+// CHECK-NOT:     destructure_struct
+// CHECK:         fix_lifetime %0
+// CHECK:         fix_lifetime %1
+// CHECK:       } // end sil function 'forward_borrowed'
+sil [ossa] @forward_borrowed : $@convention(thin) (@guaranteed String, Int) -> () {
+bb0(%0 : @guaranteed $String, %1 : $Int):
+  %2 = struct $S (%0 : $String, %1 : $Int)
+  (%3, %4) = destructure_struct %2 : $S
+  fix_lifetime %3 : $String
+  fix_lifetime %4 : $Int
+   %7 = tuple ()
+  return %7 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_forward_owned_with_uses :
+// CHECK:         (%5, %6) = destructure_struct %2 : $S
+// CHECK:         fix_lifetime %6
+// CHECK:         return %5
+// CHECK:       } // end sil function 'dont_forward_owned_with_uses'
+sil [ossa] @dont_forward_owned_with_uses : $@convention(thin) (@owned String, Int) -> @owned String {
+bb0(%0 : @owned $String, %1 : $Int):
+  %2 = struct $S (%0 : $String, %1 : $Int)
+  %3 = begin_borrow %2 : $S
+  end_borrow %3 : $S
+  (%5, %6) = destructure_struct %2 : $S
+  fix_lifetime %6 : $Int
+  return %5 : $String
+}
+
+// CHECK-LABEL: sil [ossa] @forward_owned_with_debug_use :
+// CHECK-ONONE:   (%4, %5) = destructure_struct %2 : $S
+// CHECK-ONONE:   fix_lifetime %5
+// CHECK-ONONE:   return %4
+// CHECK-O:       fix_lifetime %1
+// CHECK-O:       return %0
+// CHECK:       } // end sil function 'forward_owned_with_debug_use'
+sil [ossa] @forward_owned_with_debug_use : $@convention(thin) (@owned String, Int) -> @owned String {
+bb0(%0 : @owned $String, %1 : $Int):
+  %2 = struct $S (%0 : $String, %1 : $Int)
+  debug_value %2 : $S, let, name "s"
+  (%4, %5) = destructure_struct %2 : $S
+  fix_lifetime %5 : $Int
+  return %4 : $String
+}
+
+// CHECK-LABEL: sil [ossa] @forward_with_copy :
+// CHECK:         %2 = copy_value %0
+// CHECK:         %3 = struct $S (%0 : $String, %1 : $Int)
+// CHECK:         fix_lifetime %1
+// CHECK:         destroy_value %3
+// CHECK:         return %2
+// CHECK:       } // end sil function 'forward_with_copy'
+sil [ossa] @forward_with_copy : $@convention(thin) (@owned String, Int) -> @owned String {
+bb0(%0 : @owned $String, %1 : $Int):
+  %2 = struct $S (%0 : $String, %1 : $Int)
+  %3 = copy_value %2 : $S
+  (%4, %5) = destructure_struct %3 : $S
+  fix_lifetime %5 : $Int
+  destroy_value %2 : $S
+  return %4 : $String
+}
+
+// CHECK-LABEL: sil [ossa] @forward_with_two_copies :
+// CHECK:         %2 = copy_value %0
+// CHECK:         %3 = struct $S (%0 : $String, %1 : $Int)
+// CHECK:         %4 = copy_value %3
+// CHECK:         fix_lifetime %1
+// CHECK:         destroy_value %3
+// CHECK:         destroy_value %4
+// CHECK:         return %2
+// CHECK:       } // end sil function 'forward_with_two_copies'
+sil [ossa] @forward_with_two_copies : $@convention(thin) (@owned String, Int) -> @owned String {
+bb0(%0 : @owned $String, %1 : $Int):
+  %2 = struct $S (%0 : $String, %1 : $Int)
+  %3 = copy_value %2 : $S
+  %4 = copy_value %3 : $S
+  (%5, %6) = destructure_struct %4 : $S
+  fix_lifetime %6 : $Int
+  destroy_value %2 : $S
+  destroy_value %3 : $S
+  return %5 : $String
+}
+
+// CHECK-LABEL: sil [ossa] @copy_has_other_uses :
+// CHECK:         destructure_struct
+// CHECK:       } // end sil function 'copy_has_other_uses'
+sil [ossa] @copy_has_other_uses : $@convention(thin) (@owned String, Int) -> @owned String {
+bb0(%0 : @owned $String, %1 : $Int):
+  %2 = struct $S (%0 : $String, %1 : $Int)
+  %3 = copy_value %2 : $S
+  fix_lifetime %3 : $S
+  (%5, %6) = destructure_struct %3 : $S
+  fix_lifetime %6 : $Int
+  destroy_value %2 : $S
+  return %5 : $String
+}
+
+// CHECK-LABEL: sil [ossa] @different_basic_block :
+// CHECK:       bb2:
+// CHECK:         destructure_struct
+// CHECK:       } // end sil function 'different_basic_block'
+sil [ossa] @different_basic_block : $@convention(thin) (@owned String, Int) -> @owned String {
+bb0(%0 : @owned $String, %1 : $Int):
+  %2 = struct $S (%0 : $String, %1 : $Int)
+  %3 = copy_value %2 : $S
+  cond_br undef, bb1, bb2
+bb1:
+  destroy_value %3 : $S
+  unreachable
+bb2:
+  (%4, %5) = destructure_struct %3 : $S
+  fix_lifetime %5 : $Int
+  destroy_value %2 : $S
+  return %4 : $String
+}
+
+// CHECK-LABEL: sil [ossa] @to_struct_extract :
+// CHECK:         %1 = struct_extract %0 : $TrivialS, #TrivialS.a
+// CHECK:         %2 = struct_extract %0 : $TrivialS, #TrivialS.b
+// CHECK:         %3 = tuple (%1 : $Int, %2 : $Int)
+// CHECK:       } // end sil function 'to_struct_extract'
+sil [ossa] @to_struct_extract : $@convention(thin) (TrivialS) -> (Int, Int) {
+bb0(%0 : $TrivialS):
+  (%1, %2) = destructure_struct %0
+  %3 = tuple (%1, %2)
+  return %3
+}
+

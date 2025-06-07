@@ -12,10 +12,12 @@ let _ : @convention(c) (Int) -> Int = f1!
 // expected-error@-1{{cannot convert value of type '@convention(c, cType: "size_t (*)(size_t)") (Int) -> Int' to specified type '@convention(c) (Int) -> Int'}}
 
 let _ : (@convention(c) (Int) -> Int)? = f1
-// expected-error@-1{{cannot convert value of type '(@convention(c, cType: "size_t (*)(size_t)") (Int) -> Int)?' to specified type '(@convention(c) (Int) -> Int)?'}}
+// expected-error@-1{{cannot assign value of type '(@convention(c, cType: "size_t (*)(size_t)") (Int) -> Int)?' to type '(@convention(c) (Int) -> Int)?'}}
+// expected-note@-2 {{arguments to generic parameter 'Wrapped' ('@convention(c, cType: "size_t (*)(size_t)") (Int) -> Int' and '@convention(c) (Int) -> Int') are expected to be equal}}
 
 let _ : (@convention(c, cType: "void *(*)(void *)") (Int) -> Int)? = f1
-// expected-error@-1{{cannot convert value of type '(@convention(c, cType: "size_t (*)(size_t)") (Int) -> Int)?' to specified type '(@convention(c, cType: "void *(*)(void *)") (Int) -> Int)?'}}
+// expected-error@-1{{cannot assign value of type '(@convention(c, cType: "size_t (*)(size_t)") (Int) -> Int)?' to type '(@convention(c, cType: "void *(*)(void *)") (Int) -> Int)?'}}
+// expected-note@-2 {{arguments to generic parameter 'Wrapped' ('@convention(c, cType: "size_t (*)(size_t)") (Int) -> Int' and '@convention(c, cType: "void *(*)(void *)") (Int) -> Int') are expected to be equal}}
 
 
 // Converting from @convention(c) -> @convention(swift) works
@@ -40,10 +42,10 @@ let _ : @convention(c, cType: "size_t (*)(size_t)") (Int) -> Int = fs
 let f2 : (@convention(c) ((@convention(c, cType: "size_t (*)(size_t)") (Swift.Int) -> Swift.Int)?) -> (@convention(c, cType: "size_t (*)(size_t)") (Swift.Int) -> Swift.Int)?)? = getHigherOrderFunctionPointer()!
 
 let _ : (@convention(c) ((@convention(c) (Swift.Int) -> Swift.Int)?) -> (@convention(c, cType: "size_t (*)(size_t)") (Swift.Int) -> Swift.Int)?)? = f2!
-// expected-error@-1{{cannot convert value of type '@convention(c) ((@convention(c, cType: "size_t (*)(size_t)") (Int) -> Int)?) -> (@convention(c, cType: "size_t (*)(size_t)") (Int) -> Int)?' to specified type '(@convention(c) ((@convention(c) (Int) -> Int)?) -> (@convention(c, cType: "size_t (*)(size_t)") (Int) -> Int)?)?'}}
+// expected-error@-1{{cannot convert value of type '@convention(c) ((@convention(c, cType: "size_t (*)(size_t)") (Int) -> Int)?) -> (@convention(c, cType: "size_t (*)(size_t)") (Int) -> Int)?' to specified type '@convention(c) ((@convention(c) (Int) -> Int)?) -> (@convention(c, cType: "size_t (*)(size_t)") (Int) -> Int)?'}}
 
 let _ : (@convention(c) ((@convention(c) (Swift.Int) -> Swift.Int)?) -> (@convention(c) (Swift.Int) -> Swift.Int)?)? = f2!
-// expected-error@-1{{cannot convert value of type '@convention(c) ((@convention(c, cType: "size_t (*)(size_t)") (Int) -> Int)?) -> (@convention(c, cType: "size_t (*)(size_t)") (Int) -> Int)?' to specified type '(@convention(c) ((@convention(c) (Int) -> Int)?) -> (@convention(c) (Int) -> Int)?)?'}}
+// expected-error@-1{{cannot convert value of type '@convention(c) ((@convention(c, cType: "size_t (*)(size_t)") (Int) -> Int)?) -> (@convention(c, cType: "size_t (*)(size_t)") (Int) -> Int)?' to specified type '@convention(c) ((@convention(c) (Int) -> Int)?) -> (@convention(c) (Int) -> Int)?'}}
 
 let f3 = getFunctionPointer3
 

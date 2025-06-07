@@ -24,25 +24,25 @@ internal func _loadPartialUnalignedUInt64LE(
   var result: UInt64 = 0
   switch byteCount {
   case 7:
-    result |= UInt64(p.load(fromByteOffset: 6, as: UInt8.self)) &<< 48
+    unsafe result |= UInt64(p.load(fromByteOffset: 6, as: UInt8.self)) &<< 48
     fallthrough
   case 6:
-    result |= UInt64(p.load(fromByteOffset: 5, as: UInt8.self)) &<< 40
+    unsafe result |= UInt64(p.load(fromByteOffset: 5, as: UInt8.self)) &<< 40
     fallthrough
   case 5:
-    result |= UInt64(p.load(fromByteOffset: 4, as: UInt8.self)) &<< 32
+    unsafe result |= UInt64(p.load(fromByteOffset: 4, as: UInt8.self)) &<< 32
     fallthrough
   case 4:
-    result |= UInt64(p.load(fromByteOffset: 3, as: UInt8.self)) &<< 24
+    unsafe result |= UInt64(p.load(fromByteOffset: 3, as: UInt8.self)) &<< 24
     fallthrough
   case 3:
-    result |= UInt64(p.load(fromByteOffset: 2, as: UInt8.self)) &<< 16
+    unsafe result |= UInt64(p.load(fromByteOffset: 2, as: UInt8.self)) &<< 16
     fallthrough
   case 2:
-    result |= UInt64(p.load(fromByteOffset: 1, as: UInt8.self)) &<< 8
+    unsafe result |= UInt64(p.load(fromByteOffset: 1, as: UInt8.self)) &<< 8
     fallthrough
   case 1:
-    result |= UInt64(p.load(fromByteOffset: 0, as: UInt8.self))
+    unsafe result |= UInt64(p.load(fromByteOffset: 0, as: UInt8.self))
     fallthrough
   case 0:
     return result
@@ -160,10 +160,14 @@ extension Hasher {
 
     @inline(__always)
     internal mutating func combine(_ value: UInt) {
-#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
-      combine(UInt32(truncatingIfNeeded: value))
-#else
+#if _pointerBitWidth(_64)
       combine(UInt64(truncatingIfNeeded: value))
+#elseif _pointerBitWidth(_32)
+      combine(UInt32(truncatingIfNeeded: value))
+#elseif _pointerBitWidth(_16)
+      combine(UInt16(truncatingIfNeeded: value))
+#else
+#error("Unknown platform")
 #endif
     }
 
@@ -217,9 +221,9 @@ extension Hasher {
         let end = _roundUp(start, toAlignment: MemoryLayout<UInt64>.alignment)
         let c = min(remaining, Int(end - start))
         if c > 0 {
-          let chunk = _loadPartialUnalignedUInt64LE(data, byteCount: c)
+          let chunk = unsafe _loadPartialUnalignedUInt64LE(data, byteCount: c)
           combine(bytes: chunk, count: c)
-          data += c
+          unsafe data += c
           remaining -= c
         }
       }
@@ -229,15 +233,15 @@ extension Hasher {
 
       // Load as many aligned words as there are in the input buffer
       while remaining >= MemoryLayout<UInt64>.size {
-        combine(UInt64(littleEndian: data.load(as: UInt64.self)))
-        data += MemoryLayout<UInt64>.size
+        unsafe combine(UInt64(littleEndian: data.load(as: UInt64.self)))
+        unsafe data += MemoryLayout<UInt64>.size
         remaining -= MemoryLayout<UInt64>.size
       }
 
       // Load last partial word of data
       _internalInvariant(remaining >= 0 && remaining < 8)
       if remaining > 0 {
-        let chunk = _loadPartialUnalignedUInt64LE(data, byteCount: remaining)
+        let chunk = unsafe _loadPartialUnalignedUInt64LE(data, byteCount: remaining)
         combine(bytes: chunk, count: remaining)
       }
     }
@@ -248,6 +252,16 @@ extension Hasher {
     }
   }
 }
+
+#if $Embedded
+@usableFromInline
+var _swift_stdlib_Hashing_parameters: _SwiftHashingParameters = {
+  var seed0: UInt64 = 0, seed1: UInt64 = 0
+  unsafe swift_stdlib_random(&seed0, MemoryLayout<UInt64>.size)
+  unsafe swift_stdlib_random(&seed1, MemoryLayout<UInt64>.size)
+  return .init(seed0: seed0, seed1: seed1, deterministic: false)
+}()
+#endif
 
 /// The universal hash function used by `Set` and `Dictionary`.
 ///
@@ -382,7 +396,7 @@ public struct Hasher {
   /// - Parameter bytes: A raw memory buffer.
   @_effects(releasenone)
   public mutating func combine(bytes: UnsafeRawBufferPointer) {
-    _core.combine(bytes: bytes)
+    unsafe _core.combine(bytes: bytes)
   }
 
   /// Finalize the hasher state and return the hash value.
@@ -423,15 +437,17 @@ public struct Hasher {
   @usableFromInline
   internal static func _hash(seed: Int, _ value: UInt) -> Int {
     var state = _State(seed: seed)
-#if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
+#if _pointerBitWidth(_64)
+    _internalInvariant(UInt.bitWidth == UInt64.bitWidth)
+    state.compress(UInt64(truncatingIfNeeded: value))
+    let tbc = _TailBuffer(tail: 0, byteCount: 8)
+#elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     _internalInvariant(UInt.bitWidth < UInt64.bitWidth)
     let tbc = _TailBuffer(
       tail: UInt64(truncatingIfNeeded: value),
       byteCount: UInt.bitWidth &>> 3)
 #else
-    _internalInvariant(UInt.bitWidth == UInt64.bitWidth)
-    state.compress(UInt64(truncatingIfNeeded: value))
-    let tbc = _TailBuffer(tail: 0, byteCount: 8)
+#error("Unknown platform")
 #endif
     return Int(truncatingIfNeeded: state.finalize(tailAndByteCount: tbc.value))
   }
@@ -454,7 +470,7 @@ public struct Hasher {
     seed: Int,
     bytes: UnsafeRawBufferPointer) -> Int {
     var core = _Core(seed: seed)
-    core.combine(bytes: bytes)
+    unsafe core.combine(bytes: bytes)
     return Int(truncatingIfNeeded: core.finalize())
   }
 }

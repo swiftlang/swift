@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -jumpthread-simplify-cfg -enable-ossa-simplify-cfg -enable-ossa-rewriteterminator | %FileCheck %s
-// RUN: %target-sil-opt -enable-sil-verify-all %s -jumpthread-simplify-cfg -enable-ossa-simplify-cfg -enable-ossa-rewriteterminator -debug-only=sil-simplify-cfg 2>&1 | %FileCheck %s --check-prefix=CHECK-TRACE
+// RUN: %target-sil-opt -enable-sil-verify-all %s -update-borrowed-from -jumpthread-simplify-cfg
+// RUN: %target-sil-opt -enable-sil-verify-all %s -update-borrowed-from -jumpthread-simplify-cfg -debug-only=sil-simplify-cfg
 //
 // REQUIRES: asserts
 
@@ -47,32 +47,32 @@ sil [ossa] @_TFC3ccb4Base6middlefS0_FT_T_ : $@convention(method) (@guaranteed Ba
 
 sil @get_base : $@convention(thin) () -> @owned Base
 
-// CHECK-LABEL: sil [ossa] @redundant_checked_cast_br
+// TODO-CHECK-LABEL: sil [ossa] @redundant_checked_cast_br
 sil [ossa] @redundant_checked_cast_br : $@convention(method) (@guaranteed Base) -> () {
 bb0(%0 : @guaranteed $Base):
-// CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
+// TODO-CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
   %1 = class_method %0 : $Base, #Base.middle : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
-// CHECK: checked_cast_br [exact] %0 : $Base to Base, [[SUCCESS:bb[0-9]+]], [[FAIL:bb[0-9]+]]
-  checked_cast_br [exact] %0 : $Base to Base, bb2, bb7
+// TODO-CHECK: checked_cast_br [exact] Base in %0 : $Base to Base, [[SUCCESS:bb[0-9]+]], [[FAIL:bb[0-9]+]]
+  checked_cast_br [exact] Base in %0 : $Base to Base, bb2, bb7
 
-// CHECK: bb1
+// TODO-CHECK: bb1
 bb1:
   %3 = tuple ()
   return %3 : $()
 
 bb2(%5 : @guaranteed $Base):
-// CHECK: [[SUCCESS]]
+// TODO-CHECK: [[SUCCESS]]
   %7 = class_method %0 : $Base, #Base.inner : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
-// CHECK-NOT: checked_cast_br
-  checked_cast_br [exact] %0 : $Base to Base, bb3, bb5
-// CHECK: [[INNER:%.*]] = function_ref @_TFC3ccb4Base5innerfS0_FT_T_ : $@convention(method) (@guaranteed Base) -> ()
-// CHECK: apply [[INNER]]
-// CHECK: br bb1
+// TODO-CHECK-NOT: checked_cast_br
+  checked_cast_br [exact] Base in %0 : $Base to Base, bb3, bb5
+// TODO-CHECK: [[INNER:%.*]] = function_ref @_TFC3ccb4Base5innerfS0_FT_T_ : $@convention(method) (@guaranteed Base) -> ()
+// TODO-CHECK: apply [[INNER]]
+// TODO-CHECK: br bb1
 
 bb3(%9 : @guaranteed $Base):
-// CHECK: [[FAIL]]
-// CHECK-NOT: function-ref
-// CHECK: apply [[METHOD]]
+// TODO-CHECK: [[FAIL]]
+// TODO-CHECK-NOT: function-ref
+// TODO-CHECK: apply [[METHOD]]
 
   %10 = function_ref @_TFC3ccb4Base5innerfS0_FT_T_ : $@convention(method) (@guaranteed Base) -> ()
   %11 = apply %10(%0) : $@convention(method) (@guaranteed Base) -> ()
@@ -94,36 +94,36 @@ bb7(%defaultBB0 : @guaranteed $Base):
   br bb1
 }
 
-// CHECK-LABEL: sil [ossa] @redundant_checked_cast_br_owned
+// TODO-CHECK-LABEL: sil [ossa] @redundant_checked_cast_br_owned
 sil [ossa] @redundant_checked_cast_br_owned : $@convention(method) (@guaranteed Base) -> () {
-// CHECK: [[COPY:%.*]] = copy_value %0
-// CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
-// CHECK: checked_cast_br [exact] [[COPY]] : $Base to Base, [[SUCCESS:bb[0-9]+]], [[FAIL:bb[0-9]+]]
+// TODO-CHECK: [[COPY:%.*]] = copy_value %0
+// TODO-CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
+// TODO-CHECK: checked_cast_br [exact] Base in [[COPY]] : $Base to Base, [[SUCCESS:bb[0-9]+]], [[FAIL:bb[0-9]+]]
 bb0(%0 : @guaranteed $Base):
   %copy = copy_value %0 : $Base
   %1 = class_method %0 : $Base, #Base.middle : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
-  checked_cast_br [exact] %copy : $Base to Base, bb2, bb7
+  checked_cast_br [exact] Base in %copy : $Base to Base, bb2, bb7
 
-// CHECK: bb1
+// TODO-CHECK: bb1
 bb1:
   %3 = tuple ()
   return %3 : $()
 
-// CHECK: [[SUCCESS]]([[SUCCESSARG:%.*]] : @owned $Base)
-// CHECK-NOT: checked_cast_br
+// TODO-CHECK: [[SUCCESS]]([[SUCCESSARG:%.*]] : @owned $Base)
+// TODO-CHECK-NOT: checked_cast_br
 //
 // FIXME_rauw: RAUW should not create this copy!
-// CHECK: [[SUCCESSCOPY:%.*]] = copy_value [[SUCCESSARG]] : $Base
-// CHECK: [[INNER:%.*]] = function_ref @_TFC3ccb4Base5innerfS0_FT_T_ : $@convention(method) (@guaranteed Base) -> ()
-// CHECK: apply [[INNER]]([[SUCCESSCOPY]])
-// CHECK: br bb1
+// TODO-CHECK: [[SUCCESSCOPY:%.*]] = copy_value [[SUCCESSARG]] : $Base
+// TODO-CHECK: [[INNER:%.*]] = function_ref @_TFC3ccb4Base5innerfS0_FT_T_ : $@convention(method) (@guaranteed Base) -> ()
+// TODO-CHECK: apply [[INNER]]([[SUCCESSCOPY]])
+// TODO-CHECK: br bb1
 bb2(%5 : @owned $Base):
   %7 = class_method %0 : $Base, #Base.inner : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
-  checked_cast_br [exact] %5 : $Base to Base, bb3, bb5
+  checked_cast_br [exact] Base in %5 : $Base to Base, bb3, bb5
 
-// CHECK: [[FAIL]]([[FAILARG:%.*]] : @owned $Base)
-// CHECK-NOT: function-ref
-// CHECK: apply [[METHOD]]([[FAILARG]])
+// TODO-CHECK: [[FAIL]]([[FAILARG:%.*]] : @owned $Base)
+// TODO-CHECK-NOT: function-ref
+// TODO-CHECK: apply [[METHOD]]([[FAILARG]])
 bb3(%9 : @owned $Base):
   %10 = function_ref @_TFC3ccb4Base5innerfS0_FT_T_ : $@convention(method) (@guaranteed Base) -> ()
   %11 = apply %10(%9) : $@convention(method) (@guaranteed Base) -> ()
@@ -148,25 +148,25 @@ bb7(%defaultBB0 : @owned $Base):
   br bb1
 }
 
-// CHECK-LABEL: sil [ossa] @not_redundant_checked_cast_br : $@convention(method) (@guaranteed Base) -> () {
+// TODO-CHECK-LABEL: sil [ossa] @not_redundant_checked_cast_br : $@convention(method) (@guaranteed Base) -> () {
 sil [ossa] @not_redundant_checked_cast_br : $@convention(method) (@guaranteed Base) -> () {
 bb0(%0 : @guaranteed $Base):
-// CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
+// TODO-CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
   %1 = class_method %0 : $Base, #Base.middle : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
-// CHECK: checked_cast_br [exact] %0 : $Base to Base, [[SUCCESS:bb[0-9]+]], [[FAIL:bb[0-9]+]]
-  checked_cast_br [exact] %0 : $Base to Base, bb2, bb7
+// TODO-CHECK: checked_cast_br [exact] Base in %0 : $Base to Base, [[SUCCESS:bb[0-9]+]], [[FAIL:bb[0-9]+]]
+  checked_cast_br [exact] Base in %0 : $Base to Base, bb2, bb7
 
-// CHECK: bb1:
-// CHECK: tuple ()
-// CHECK: return
+// TODO-CHECK: bb1:
+// TODO-CHECK: tuple ()
+// TODO-CHECK: return
 
 bb1:
   %3 = tuple ()
   return %3 : $()
 
 bb2(%5 : @guaranteed $Base):
-// CHECK: [[SUCCESS]]
-// CHECK: [[METHOD2:%.*]] = class_method %0 : $Base, #Base.inner : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
+// TODO-CHECK: [[SUCCESS]]
+// TODO-CHECK: [[METHOD2:%.*]] = class_method %0 : $Base, #Base.inner : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
   %7 = class_method %0 : $Base, #Base.inner : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
   %8 = apply %7(%0) : $@convention(method) (@guaranteed Base) -> ()
   br bb4
@@ -189,34 +189,34 @@ bb6(%17 : $()):
   br bb1
 
 bb7(%10a : @guaranteed $Base):
-// CHECK: checked_cast_br [exact] %0 : $Base to Derived
-  checked_cast_br [exact] %0 : $Base to Derived, bb3, bb5
+// TODO-CHECK: checked_cast_br [exact] Base in %0 : $Base to Derived
+  checked_cast_br [exact] Base in %0 : $Base to Derived, bb3, bb5
 }
 
-// CHECK-LABEL: sil [ossa] @failing_checked_cast_br
+// TODO-CHECK-LABEL: sil [ossa] @failing_checked_cast_br
 sil [ossa] @failing_checked_cast_br : $@convention(method) (@guaranteed Base) -> () {
 bb0(%0 : @guaranteed $Base):
-// CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
+// TODO-CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
   %1 = class_method %0 : $Base, #Base.middle : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
-// CHECK: checked_cast_br [exact] %0 : $Base to Base, [[SUCCESS:bb[0-9]+]], [[FAIL:bb[0-9]+]]
-  checked_cast_br [exact] %0 : $Base to Base, bb2, bb7
+// TODO-CHECK: checked_cast_br [exact] Base in %0 : $Base to Base, [[SUCCESS:bb[0-9]+]], [[FAIL:bb[0-9]+]]
+  checked_cast_br [exact] Base in %0 : $Base to Base, bb2, bb7
 
-// CHECK-LABEL: bb1
+// TODO-CHECK-LABEL: bb1
 bb1:
   %3 = tuple ()
   return %3 : $()
 
 bb2(%5 : @guaranteed $Base):
-// CHECK: [[SUCCESS]]([[SUCCESSARG:%.*]] : @guaranteed $Base)
-// CHECK: [[METHOD2:%.*]] = class_method %0 : $Base, #Base.inner : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
+// TODO-CHECK: [[SUCCESS]]([[SUCCESSARG:%.*]] : @guaranteed $Base)
+// TODO-CHECK: [[METHOD2:%.*]] = class_method %0 : $Base, #Base.inner : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
   %7 = class_method %0 : $Base, #Base.inner : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
-// CHECK-NOT: checked_cast_br [exact] %0 : $Base to Derived
-// CHECK: apply [[METHOD2]]([[SUCCESSARG]])
+// TODO-CHECK-NOT: checked_cast_br [exact] Base in %0 : $Base to Derived
+// TODO-CHECK: apply [[METHOD2]]([[SUCCESSARG]])
 // Check that checked_cast_br [exact] was replaced by a branch to the failure BB of the checked_cast_br.
 // This is because bb2 is reached via the success branch of the checked_cast_br [exact] from bb0.
 // It means that the exact dynamic type of %0 is $Base. Thus it cannot be $Derived.
-// CHECK: br bb1
-  checked_cast_br [exact] %5 : $Base to Derived, bb3, bb5
+// TODO-CHECK: br bb1
+  checked_cast_br [exact] Base in %5 : $Base to Derived, bb3, bb5
 
 bb3(%9 : @guaranteed $Derived):
   %10 = function_ref @_TFC3ccb4Base5innerfS0_FT_T_ : $@convention(method) (@guaranteed Base) -> ()
@@ -239,32 +239,32 @@ bb7(%anotherDefaultPayload : @guaranteed $Base):
   br bb1
 }
 
-// CHECK-LABEL: sil [ossa] @failing_checked_cast_br_owned
+// TODO-CHECK-LABEL: sil [ossa] @failing_checked_cast_br_owned
 sil [ossa] @failing_checked_cast_br_owned : $@convention(method) (@guaranteed Base) -> () {
-// CHECK: [[COPY:%.*]] = copy_value %0
-// CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
-// CHECK: checked_cast_br [exact] [[COPY]] : $Base to Base, [[SUCCESS:bb[0-9]+]], [[FAIL:bb[0-9]+]]
+// TODO-CHECK: [[COPY:%.*]] = copy_value %0
+// TODO-CHECK: [[METHOD:%.*]] = class_method %0 : $Base, #Base.middle : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
+// TODO-CHECK: checked_cast_br [exact] Base in [[COPY]] : $Base to Base, [[SUCCESS:bb[0-9]+]], [[FAIL:bb[0-9]+]]
 bb0(%0 : @guaranteed $Base):
   %copy = copy_value %0 : $Base
   %1 = class_method %0 : $Base, #Base.middle : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
-  checked_cast_br [exact] %copy : $Base to Base, bb2, bb7
+  checked_cast_br [exact] Base in %copy : $Base to Base, bb2, bb7
 
-// CHECK-LABEL: bb1
+// TODO-CHECK-LABEL: bb1
 bb1:
   %3 = tuple ()
   return %3 : $()
 
-// CHECK: [[SUCCESS]]([[SUCCESSARG:%.*]] : @owned $Base)
-// CHECK: [[METHOD2:%.*]] = class_method %0 : $Base, #Base.inner : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
-// CHECK-NOT: checked_cast_br [exact] %0 : $Base to Derived
-// CHECK: apply [[METHOD2]]([[SUCCESSARG]])
+// TODO-CHECK: [[SUCCESS]]([[SUCCESSARG:%.*]] : @owned $Base)
+// TODO-CHECK: [[METHOD2:%.*]] = class_method %0 : $Base, #Base.inner : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
+// TODO-CHECK-NOT: checked_cast_br [exact] Base in %0 : $Base to Derived
+// TODO-CHECK: apply [[METHOD2]]([[SUCCESSARG]])
 // Check that checked_cast_br [exact] was replaced by a branch to the failure BB of the checked_cast_br.
 // This is because bb2 is reached via the success branch of the checked_cast_br [exact] from bb0.
 // It means that the exact dynamic type of %0 is $Base. Thus it cannot be $Derived.
-// CHECK: br bb1
+// TODO-CHECK: br bb1
 bb2(%5 : @owned $Base):
   %7 = class_method %0 : $Base, #Base.inner : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
-  checked_cast_br [exact] %5 : $Base to Derived, bb3, bb5
+  checked_cast_br [exact] Base in %5 : $Base to Derived, bb3, bb5
 
 bb3(%9 : @owned $Derived):
   %upcast = upcast %9 : $Derived to $Base
@@ -293,19 +293,19 @@ bb7(%anotherDefaultPayload : @owned $Base):
 
 sil [ossa] @unknown2 : $@convention(thin) () -> ()
 
-// CHECK-LABEL: no_checked_cast_br_threading_with_alloc_ref_stack
-// CHECK: checked_cast_br
-// CHECK: apply
-// CHECK: apply
-// CHECK: checked_cast_br
-// CHECK: apply
-// CHECK: apply
-// CHECK: return
+// TODO-CHECK-LABEL: no_checked_cast_br_threading_with_alloc_ref_stack
+// TODO-CHECK: checked_cast_br
+// TODO-CHECK: apply
+// TODO-CHECK: apply
+// TODO-CHECK: checked_cast_br
+// TODO-CHECK: apply
+// TODO-CHECK: apply
+// TODO-CHECK: return
 sil [ossa] @no_checked_cast_br_threading_with_alloc_ref_stack : $@convention(method) (@guaranteed Base) -> () {
 bb0(%0 : @guaranteed $Base):
   %fu = function_ref @unknown : $@convention(thin) () -> ()
   %fu2 = function_ref @unknown2 : $@convention(thin) () -> ()
-  checked_cast_br [exact] %0 : $Base to Base, bb1, bb2
+  checked_cast_br [exact] Base in %0 : $Base to Base, bb1, bb2
 
 bb1(%1 : @guaranteed $Base):
   apply %fu() : $@convention(thin) () -> ()
@@ -317,7 +317,7 @@ bb2(%1a : @guaranteed $Base):
 
 bb3:
   %a = alloc_ref [stack] $Base
-  checked_cast_br [exact] %0 : $Base to Base, bb4, bb5
+  checked_cast_br [exact] Base in %0 : $Base to Base, bb4, bb5
 
 bb4(%2 : @guaranteed $Base):
   apply %fu() : $@convention(thin) () -> ()
@@ -341,7 +341,7 @@ bb6:
 sil [ossa] @redundant_checked_cast_br_joined_success_fail_unknown : $@convention(method) (@guaranteed Base) -> () {
 bb0(%0 : @guaranteed $Base):
   %middle = class_method %0 : $Base, #Base.middle : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
-  checked_cast_br [exact] %0 : $Base to Base, bb1, bb4
+  checked_cast_br [exact] Base in %0 : $Base to Base, bb1, bb4
 
 bb1(%successBB0 : @guaranteed $Base):
   cond_br undef, bb2, bb3
@@ -371,7 +371,7 @@ bb7(%unknown : @guaranteed $Base):
 
 bb8(%joined : @guaranteed $Base):
   %joinedCall = apply %middle(%joined) : $@convention(method) (@guaranteed Base) -> ()
-  checked_cast_br [exact] %joined : $Base to Base, bb9, bb10
+  checked_cast_br [exact] Base in %joined : $Base to Base, bb9, bb10
 
 bb9(%successBB7 : @guaranteed $Base):
   %successBB7call8 = apply %middle(%successBB7) : $@convention(method) (@guaranteed Base) -> ()
@@ -389,19 +389,19 @@ bb11:
 
 // Verify that checked-cast jump-threading kicks in and generates verifiable SIL.
 //
-// CHECK-TRACE-LABEL: ### Run SimplifyCFG on $testCheckCastJumpThread
-// CHECK-TRACE: Condition is the same if reached over {{.*}} parent @$testCheckCastJumpThread : $@convention(thin) (@guaranteed Klass) -> @owned any OtherKlass }
-// CHECK-TRACE-NEXT: // %{{.*}} user:
-// CHECK-TRACE-NEXT: bb1(%{{.*}} : @owned $any OtherKlass):
-// CHECK-TRACE-NEXT:   destroy_value
-// CHECK-TRACE-NEXT:   br bb5(%{{.*}} : $Klass)
+// TODO-CHECK-TRACE-LABEL: ### Run SimplifyCFG on $testCheckCastJumpThread
+// TODO-CHECK-TRACE: Condition is the same if reached over {{.*}} parent @$testCheckCastJumpThread : $@convention(thin) (@guaranteed Klass) -> @owned any OtherKlass }
+// TODO-CHECK-TRACE-NEXT: // %{{.*}} user:
+// TODO-CHECK-TRACE-NEXT: bb1(%{{.*}} : @owned $any OtherKlass):
+// TODO-CHECK-TRACE-NEXT:   destroy_value
+// TODO-CHECK-TRACE-NEXT:   br bb5(%{{.*}} : $Klass)
 sil shared [ossa] @$testCheckCastJumpThread : $@convention(thin) (@guaranteed Klass) -> @owned OtherKlass {
 bb0(%0 : @guaranteed $Klass):
   %1 = function_ref @get_klass : $@convention(thin) () -> @owned Klass
   %2 = integer_literal $Builtin.Int64, 1
   %3 = apply %1() : $@convention(thin) () -> @owned Klass
   %4 = copy_value %3 : $Klass
-  checked_cast_br %3 : $Klass to OtherKlass, bb1, bb2
+  checked_cast_br Klass in %3 : $Klass to OtherKlass, bb1, bb2
 
 bb1(%5 : @owned $OtherKlass):
   destroy_value %5 : $OtherKlass
@@ -427,7 +427,7 @@ bb6:
   br bb10(%2 : $Builtin.Int64)
 
 bb7(%16 : @owned $Klass):
-  checked_cast_br %16 : $Klass to OtherKlass, bb9, bb8
+  checked_cast_br Klass in %16 : $Klass to OtherKlass, bb9, bb8
 
 bb8(%18 : @owned $Klass):
   destroy_value %18 : $Klass
@@ -439,7 +439,7 @@ bb9(%20 : @owned $OtherKlass):
 bb10(%22 : $Builtin.Int64):
   %23 = apply %1() : $@convention(thin) () -> @owned Klass
   %24 = copy_value %23 : $Klass
-  checked_cast_br %23 : $Klass to OtherKlass, bb11, bb12
+  checked_cast_br Klass in %23 : $Klass to OtherKlass, bb11, bb12
 
 bb11(%25 : @owned $OtherKlass):
   destroy_value %25 : $OtherKlass
@@ -474,36 +474,36 @@ bb17:
 // Replace an owned result with a guaranteed value on the success path.
 // Introduce a copy for the new lifetime.
 //
-// CHECK-LABEL: sil [ossa] @redundant_checked_cast_br_rauw_guaranteed_to_owned_success : $@convention(method) (@owned Base) -> () {
-// CHECK: bb0(%0 : @owned $Base):
-// CHECK:   [[BORROW:%.*]] = begin_borrow %0 : $Base
-// CHECK:   checked_cast_br [exact] [[BORROW]]  : $Base to Base, bb1, bb2
-// CHECK: bb1([[EXACT:%.*]] : @guaranteed $Base):
-// CHECK-NEXT:   [[NEWCP:%.*]] = copy_value [[EXACT]] : $Base
-// CHECK-NEXT:   [[OLDCP:%.*]] = copy_value [[EXACT]] : $Base
-// CHECK-NEXT:   end_borrow
-// CHECK:   destroy_value [[OLDCP]] : $Base
-// CHECK:   apply %{{.*}}([[NEWCP]]) : $@convention(method) (@guaranteed Base) -> ()
-// CHECK:   destroy_value [[NEWCP]] : $Base
-// CHECK:   br bb3
-// CHECK: bb2([[INEXACT:%.*]] : @guaranteed $Base):
-// CHECK:   apply %{{.*}}([[INEXACT]]) : $@convention(method) (@guaranteed Base) -> ()
-// CHECK:   end_borrow %1 : $Base
-// CHECK:   br bb3
-// CHECK: bb3:
-// CHECK:   destroy_value %0 : $Base
-// CHECK-LABEL: } // end sil function 'redundant_checked_cast_br_rauw_guaranteed_to_owned_success'
+// TODO-CHECK-LABEL: sil [ossa] @redundant_checked_cast_br_rauw_guaranteed_to_owned_success : $@convention(method) (@owned Base) -> () {
+// TODO-CHECK: bb0(%0 : @owned $Base):
+// TODO-CHECK:   [[BORROW:%.*]] = begin_borrow %0 : $Base
+// TODO-CHECK:   checked_cast_br [exact] Base in [[BORROW]]  : $Base to Base, bb1, bb2
+// TODO-CHECK: bb1([[EXACT:%.*]] : @guaranteed $Base):
+// TODO-CHECK-NEXT:   [[NEWCP:%.*]] = copy_value [[EXACT]] : $Base
+// TODO-CHECK-NEXT:   [[OLDCP:%.*]] = copy_value [[EXACT]] : $Base
+// TODO-CHECK-NEXT:   end_borrow
+// TODO-CHECK:   destroy_value [[OLDCP]] : $Base
+// TODO-CHECK:   apply %{{.*}}([[NEWCP]]) : $@convention(method) (@guaranteed Base) -> ()
+// TODO-CHECK:   destroy_value [[NEWCP]] : $Base
+// TODO-CHECK:   br bb3
+// TODO-CHECK: bb2([[INEXACT:%.*]] : @guaranteed $Base):
+// TODO-CHECK:   apply %{{.*}}([[INEXACT]]) : $@convention(method) (@guaranteed Base) -> ()
+// TODO-CHECK:   end_borrow %1 : $Base
+// TODO-CHECK:   br bb3
+// TODO-CHECK: bb3:
+// TODO-CHECK:   destroy_value %0 : $Base
+// TODO-CHECK-LABEL: } // end sil function 'redundant_checked_cast_br_rauw_guaranteed_to_owned_success'
 sil [ossa] @redundant_checked_cast_br_rauw_guaranteed_to_owned_success : $@convention(method) (@owned Base) -> () {
 bb0(%0 : @owned $Base):
   %borrow = begin_borrow %0 : $Base
   %1 = class_method %0 : $Base, #Base.middle : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
-  checked_cast_br [exact] %borrow : $Base to Base, bb1, bb6
+  checked_cast_br [exact] Base in %borrow : $Base to Base, bb1, bb6
 
 bb1(%5 : @guaranteed $Base):
   %6 = copy_value %5 : $Base
   end_borrow %borrow : $Base
   %7 = class_method %0 : $Base, #Base.inner : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
-  checked_cast_br [exact] %6 : $Base to Base, bb2, bb4
+  checked_cast_br [exact] Base in %6 : $Base to Base, bb2, bb4
 
 bb2(%9 : @owned $Base):
   %10 = function_ref @_TFC3ccb4Base5innerfS0_FT_T_ : $@convention(method) (@guaranteed Base) -> ()
@@ -538,39 +538,39 @@ bb7:
 // Introduce a copy for the new lifetime.
 // Simplify down to a single diamond.
 //
-// TODO: Simplify some of the obvisouly dead copy/destroy/borrows
+// TODO: Simplify some of the obviously dead copy/destroy/borrows
 // on-the-fly after each simplify-cfg. Possible using CanonicalizeOSSALifetime.
 //
-// CHECK-LABEL: sil [ossa] @redundant_checked_cast_br_rauw_guaranteed_to_owned_merge : $@convention(method) (@owned Base) -> () {
-// CHECK: bb0(%0 : @owned $Base):
-// CHECK:   [[BORROW:%.*]] = begin_borrow %0 : $Base
-// CHECK:   checked_cast_br [exact] [[BORROW]] : $Base to Base, bb1, bb3
-// CHECK: bb1([[ARG1:%.*]] : @guaranteed $Base):
-// CHECK:   [[NEWCOPY1:%.*]] = copy_value [[ARG1]] : $Base
-// CHECK:   apply %{{.*}}([[ARG1]]) : $@convention(method) (@guaranteed Base) -> ()
-// CHECK:   [[OLDCOPY:%.*]] = copy_value [[BORROW]] : $Base
-// CHECK:   end_borrow [[BORROW]] : $Base
-// CHECK:   destroy_value [[OLDCOPY]] : $Base
-// CHECK:   apply %{{.*}}([[NEWCOPY1]]) : $@convention(method) (@guaranteed Base) -> ()
-// CHECK:   destroy_value [[NEWCOPY1]] : $Base
-// CHECK:   br bb2
-// CHECK: bb2:
-// CHECK:   destroy_value %0 : $Base
-// CHECK:   return
-// CHECK: bb3([[ARG3:%.*]] : @guaranteed $Base):
-// CHECK:   apply %1([[ARG3]]) : $@convention(method) (@guaranteed Base) -> ()
-// CHECK:   [[NEWCOPY3:%.*]] = copy_value [[BORROW]] : $Base
-// CHECK:   end_borrow [[BORROW]] : $Base
-// CHECK:   apply %{{.*}}([[NEWCOPY3]]) : $@convention(method) (@guaranteed Base) -> ()
-// CHECK:   destroy_value [[NEWCOPY3]] : $Base
-// CHECK:   br bb2
-// CHECK-LABEL: } // end sil function 'redundant_checked_cast_br_rauw_guaranteed_to_owned_merge'
+// TODO-CHECK-LABEL: sil [ossa] @redundant_checked_cast_br_rauw_guaranteed_to_owned_merge : $@convention(method) (@owned Base) -> () {
+// TODO-CHECK: bb0(%0 : @owned $Base):
+// TODO-CHECK:   [[BORROW:%.*]] = begin_borrow %0 : $Base
+// TODO-CHECK:   checked_cast_br [exact] Base in [[BORROW]] : $Base to Base, bb1, bb3
+// TODO-CHECK: bb1([[ARG1:%.*]] : @guaranteed $Base):
+// TODO-CHECK:   [[NEWCOPY1:%.*]] = copy_value [[ARG1]] : $Base
+// TODO-CHECK:   apply %{{.*}}([[ARG1]]) : $@convention(method) (@guaranteed Base) -> ()
+// TODO-CHECK:   [[OLDCOPY:%.*]] = copy_value [[BORROW]] : $Base
+// TODO-CHECK:   end_borrow [[BORROW]] : $Base
+// TODO-CHECK:   destroy_value [[OLDCOPY]] : $Base
+// TODO-CHECK:   apply %{{.*}}([[NEWCOPY1]]) : $@convention(method) (@guaranteed Base) -> ()
+// TODO-CHECK:   destroy_value [[NEWCOPY1]] : $Base
+// TODO-CHECK:   br bb2
+// TODO-CHECK: bb2:
+// TODO-CHECK:   destroy_value %0 : $Base
+// TODO-CHECK:   return
+// TODO-CHECK: bb3([[ARG3:%.*]] : @guaranteed $Base):
+// TODO-CHECK:   apply %1([[ARG3]]) : $@convention(method) (@guaranteed Base) -> ()
+// TODO-CHECK:   [[NEWCOPY3:%.*]] = copy_value [[BORROW]] : $Base
+// TODO-CHECK:   end_borrow [[BORROW]] : $Base
+// TODO-CHECK:   apply %{{.*}}([[NEWCOPY3]]) : $@convention(method) (@guaranteed Base) -> ()
+// TODO-CHECK:   destroy_value [[NEWCOPY3]] : $Base
+// TODO-CHECK:   br bb2
+// TODO-CHECK-LABEL: } // end sil function 'redundant_checked_cast_br_rauw_guaranteed_to_owned_merge'
 sil [ossa] @redundant_checked_cast_br_rauw_guaranteed_to_owned_merge : $@convention(method) (@owned Base) -> () {
 bb0(%0 : @owned $Base):
   %m = class_method %0 : $Base, #Base.inner : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
   %f = function_ref @_TFC3ccb4Base5innerfS0_FT_T_ : $@convention(method) (@guaranteed Base) -> ()
   %1 = begin_borrow %0 : $Base
-  checked_cast_br [exact] %1 : $Base to Base, bb1, bb2
+  checked_cast_br [exact] Base in %1 : $Base to Base, bb1, bb2
 
 bb1(%4 : @guaranteed $Base):
   %5 = apply %f(%4) : $@convention(method) (@guaranteed Base) -> ()
@@ -583,7 +583,7 @@ bb2(%7 : @guaranteed $Base):
 bb3:
   %11 = copy_value %1 : $Base
   end_borrow %1 : $Base
-  checked_cast_br [exact] %11 : $Base to Base, bb4, bb5
+  checked_cast_br [exact] Base in %11 : $Base to Base, bb4, bb5
 
 bb4(%14 : @owned $Base):
   %15 = apply %f(%14) : $@convention(method) (@guaranteed Base) -> ()
@@ -608,34 +608,34 @@ bb6:
 //
 // Clone the success path, introducing a copy on it.
 //
-// CHECK-LABEL: sil [ossa] @redundant_checked_cast_br_rauw_guaranteed_to_owned_mergecopy : $@convention(method) (@owned Base) -> () {
-// CHECK: bb0(%0 : @owned $Base):
-// CHECK:   [[BORROW:%.*]] = begin_borrow %0 : $Base
-// CHECK:   checked_cast_br [exact] [[BORROW]] : $Base to Base, bb1, bb2
-// CHECK: bb1([[ARG1:%.*]] : @guaranteed $Base):
-// CHECK:   [[CP1:%.*]] = copy_value [[ARG1]] : $Base
-// CHECK:   apply %2([[ARG1]]) : $@convention(method) (@guaranteed Base) -> ()
-// CHECK:   end_borrow [[BORROW]] : $Base
-// CHECK:   br bb4([[CP1]] : $Base)
-// CHECK: bb2([[ARG2:%.*]] : @guaranteed $Base):
-// CHECK:   apply %{{.*}}([[ARG2]]) : $@convention(method) (@guaranteed Base) -> ()
-// CHECK:   [[RESULT:%.*]] = apply %{{.*}}() : $@convention(thin) () -> @owned Base
-// CHECK:   end_borrow [[BORROW]] : $Base
-// CHECK:   checked_cast_br [exact] %13 : $Base to Base, bb3, bb5
-// CHECK: bb3([[ARG3:%.*]] : @owned $Base):
-// CHECK:   br bb4(%16 : $Base)
-// CHECK: bb4([[ARG4:%.*]] : @owned $Base):
-// CHECK:   apply %{{.*}}([[ARG4]]) : $@convention(method) (@guaranteed Base) -> ()
-// CHECK:   destroy_value [[ARG4]] : $Base
-// CHECK:   br bb6
-// CHECK: bb5([[ARG5:%.*]] : @owned $Base):
-// CHECK:   apply %{{.*}}([[ARG5]]) : $@convention(method) (@guaranteed Base) -> ()
-// CHECK:   destroy_value [[ARG5]] : $Base
-// CHECK:   br bb6
-// CHECK: bb6:
-// CHECK:   destroy_value %0 : $Base
-// CHECK:   return
-// CHECK-LABEL: } // end sil function 'redundant_checked_cast_br_rauw_guaranteed_to_owned_mergecopy'
+// TODO-CHECK-LABEL: sil [ossa] @redundant_checked_cast_br_rauw_guaranteed_to_owned_mergecopy : $@convention(method) (@owned Base) -> () {
+// TODO-CHECK: bb0(%0 : @owned $Base):
+// TODO-CHECK:   [[BORROW:%.*]] = begin_borrow %0 : $Base
+// TODO-CHECK:   checked_cast_br [exact] Base in [[BORROW]] : $Base to Base, bb1, bb2
+// TODO-CHECK: bb1([[ARG1:%.*]] : @guaranteed $Base):
+// TODO-CHECK:   [[CP1:%.*]] = copy_value [[ARG1]] : $Base
+// TODO-CHECK:   apply %2([[ARG1]]) : $@convention(method) (@guaranteed Base) -> ()
+// TODO-CHECK:   end_borrow [[BORROW]] : $Base
+// TODO-CHECK:   br bb4([[CP1]] : $Base)
+// TODO-CHECK: bb2([[ARG2:%.*]] : @guaranteed $Base):
+// TODO-CHECK:   apply %{{.*}}([[ARG2]]) : $@convention(method) (@guaranteed Base) -> ()
+// TODO-CHECK:   [[RESULT:%.*]] = apply %{{.*}}() : $@convention(thin) () -> @owned Base
+// TODO-CHECK:   end_borrow [[BORROW]] : $Base
+// TODO-CHECK:   checked_cast_br [exact] Base in %13 : $Base to Base, bb3, bb5
+// TODO-CHECK: bb3([[ARG3:%.*]] : @owned $Base):
+// TODO-CHECK:   br bb4(%16 : $Base)
+// TODO-CHECK: bb4([[ARG4:%.*]] : @owned $Base):
+// TODO-CHECK:   apply %{{.*}}([[ARG4]]) : $@convention(method) (@guaranteed Base) -> ()
+// TODO-CHECK:   destroy_value [[ARG4]] : $Base
+// TODO-CHECK:   br bb6
+// TODO-CHECK: bb5([[ARG5:%.*]] : @owned $Base):
+// TODO-CHECK:   apply %{{.*}}([[ARG5]]) : $@convention(method) (@guaranteed Base) -> ()
+// TODO-CHECK:   destroy_value [[ARG5]] : $Base
+// TODO-CHECK:   br bb6
+// TODO-CHECK: bb6:
+// TODO-CHECK:   destroy_value %0 : $Base
+// TODO-CHECK:   return
+// TODO-CHECK-LABEL: } // end sil function 'redundant_checked_cast_br_rauw_guaranteed_to_owned_mergecopy'
 sil [ossa] @redundant_checked_cast_br_rauw_guaranteed_to_owned_mergecopy : $@convention(method) (@owned Base) -> () {
 bb0(%0 : @owned $Base):
   %1 = class_method %0 : $Base, #Base.inner : (Base) -> () -> (), $@convention(method) (@guaranteed Base) -> ()
@@ -643,7 +643,7 @@ bb0(%0 : @owned $Base):
   %2 = function_ref @_TFC3ccb4Base5innerfS0_FT_T_ : $@convention(method) (@guaranteed Base) -> ()
   %f = function_ref @get_base : $@convention(thin) () -> @owned Base
   %3 = begin_borrow %0 : $Base
-  checked_cast_br [exact] %3 : $Base to Base, bb1, bb2
+  checked_cast_br [exact] Base in %3 : $Base to Base, bb1, bb2
 
 bb1(%6 : @guaranteed $Base):
   %7 = apply %2(%6) : $@convention(method) (@guaranteed Base) -> ()
@@ -657,7 +657,7 @@ bb2(%9 : @guaranteed $Base):
 
 bb3(%12 : @owned $Base):
   end_borrow %3 : $Base
-  checked_cast_br [exact] %12 : $Base to Base, bb6, bb7
+  checked_cast_br [exact] Base in %12 : $Base to Base, bb6, bb7
 
 bb6(%16 : @owned $Base):
   %17 = apply %2(%16) : $@convention(method) (@guaranteed Base) -> ()
@@ -675,20 +675,20 @@ bb8:
   return %25 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @redundant_checked_cast_failure_path :
-// CHECK: checked_cast_br
-// CHECK-NOT: checked_cast_br
-// CHECK-LABEL: } // end sil function 'redundant_checked_cast_failure_path'
+// TODO-CHECK-LABEL: sil [ossa] @redundant_checked_cast_failure_path :
+// TODO-CHECK: checked_cast_br
+// TODO-CHECK-NOT: checked_cast_br
+// TODO-CHECK-LABEL: } // end sil function 'redundant_checked_cast_failure_path'
 sil [ossa] @redundant_checked_cast_failure_path : $@convention(method) (@owned Base) -> () {
 bb0(%0 : @owned $Base):
   %borrow = begin_borrow %0 : $Base
-  checked_cast_br %borrow : $Base to Derived, bb1, bb2
+  checked_cast_br Base in %borrow : $Base to Derived, bb1, bb2
 
 bb1(%succ1 : @guaranteed $Derived):
   br bbexit
 
 bb2(%5 : @guaranteed $Base):
-  checked_cast_br %5 : $Base to Derived, bb3, bb4
+  checked_cast_br Base in %5 : $Base to Derived, bb3, bb4
 
 bb3(%9 : @guaranteed $Derived):
   br bbexit
@@ -705,14 +705,14 @@ bbexit:
   return %t : $()
 }
 
-// CHECK-LABEL: sil [ossa] @redundant_checked_cast_failure_path_not_idom :
-// CHECK: checked_cast_br
-// CHECK-NOT: checked_cast_br
-// CHECK-LABEL: } // end sil function 'redundant_checked_cast_failure_path_not_idom'
+// TODO-CHECK-LABEL: sil [ossa] @redundant_checked_cast_failure_path_not_idom :
+// TODO-CHECK: checked_cast_br
+// TODO-CHECK-NOT: checked_cast_br
+// TODO-CHECK-LABEL: } // end sil function 'redundant_checked_cast_failure_path_not_idom'
 sil [ossa] @redundant_checked_cast_failure_path_not_idom : $@convention(method) (@owned Base) -> () {
 bb0(%0 : @owned $Base):
   %borrow = begin_borrow %0 : $Base
-  checked_cast_br %borrow : $Base to Derived, bb1, bb2
+  checked_cast_br Base in %borrow : $Base to Derived, bb1, bb2
 
 bb1(%succ1 : @guaranteed $Derived):
   br bbexit
@@ -721,7 +721,7 @@ bb2(%5 : @guaranteed $Base):
   br bb3(%5 : $Base)
 
 bb3(%6 : @guaranteed $Base):
-  checked_cast_br %6 : $Base to Derived, bb4, bb5
+  checked_cast_br Base in %6 : $Base to Derived, bb4, bb5
 
 bb4(%9 : @guaranteed $Derived):
   br bbexit

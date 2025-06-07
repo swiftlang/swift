@@ -15,10 +15,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define DEBUG_TYPE "sil-diagnose-invalid-escaping-captures"
+
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
@@ -152,9 +156,17 @@ static bool checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
 }
 
 const ParamDecl *getParamDeclFromOperand(SILValue value) {
-  // Look through mark must check.
-  if (auto *mmci = dyn_cast<MarkMustCheckInst>(value))
-    value = mmci->getOperand();
+  while (true) {
+    // Look through mark must check.
+    if (auto *mmci = dyn_cast<MarkUnresolvedNonCopyableValueInst>(value)) {
+      value = mmci->getOperand();
+    // Look through copies.
+    } else if (auto *ci = dyn_cast<CopyValueInst>(value)) {
+      value = ci->getOperand();
+    } else {
+      break;
+    }
+  }
 
   if (auto *arg = dyn_cast<SILArgument>(value))
     if (auto *decl = dyn_cast_or_null<ParamDecl>(arg->getDecl()))
@@ -172,6 +184,7 @@ bool isUseOfSelfInInitializer(Operand *oper) {
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(value)) {
       switch (MUI->getMarkUninitializedKind()) {
       case MarkUninitializedInst::Kind::Var:
+      case MarkUninitializedInst::Kind::Out:
         return false;
       case MarkUninitializedInst::Kind::RootSelf:
       case MarkUninitializedInst::Kind::CrossModuleRootSelf:
@@ -190,6 +203,8 @@ bool isUseOfSelfInInitializer(Operand *oper) {
 }
 
 static bool checkForEscapingPartialApplyUses(PartialApplyInst *PAI) {
+  LLVM_DEBUG(llvm::dbgs() << "Checking for escaping partial apply uses.\n");
+
   // Avoid exponential path exploration.
   SmallVector<Operand *, 8> uses;
   llvm::SmallDenseSet<Operand *, 8> visited;
@@ -206,10 +221,16 @@ static bool checkForEscapingPartialApplyUses(PartialApplyInst *PAI) {
   bool foundEscapingUse = false;
   while (!uses.empty()) {
     Operand *oper = uses.pop_back_val();
-    foundEscapingUse |= checkNoEscapePartialApplyUse(oper, [&](SILValue V) {
+    LLVM_DEBUG(llvm::dbgs() << "Visiting user: " << *oper->getUser());
+    bool localFoundEscapingUse = checkNoEscapePartialApplyUse(oper, [&](SILValue V) {
       for (Operand *use : V->getUses())
         uselistInsert(use);
     });
+    LLVM_DEBUG(
+        if (localFoundEscapingUse)
+          llvm::dbgs() << "    Escapes!\n";
+    );
+    foundEscapingUse |= localFoundEscapingUse;
   }
 
   // If there aren't any, we're fine.
@@ -268,11 +289,19 @@ static void diagnoseCaptureLoc(ASTContext &Context, DeclContext *DC,
     Operand *oper = uses.pop_back_val();
     SILInstruction *user = oper->getUser();
 
+    // Look through copy_value.
+    if (auto *ci = dyn_cast<CopyValueInst>(user)) {
+      for (auto *use : ci->getUses()) {
+        uselistInsert(use);
+      }
+      continue;
+    }
+
     if (isIncidentalUse(user) || onlyAffectsRefCount(user))
       continue;
 
     // Look through mark must check inst.
-    if (auto *mmci = dyn_cast<MarkMustCheckInst>(user)) {
+    if (auto *mmci = dyn_cast<MarkUnresolvedNonCopyableValueInst>(user)) {
       for (auto *use : mmci->getUses())
         uselistInsert(use);
       continue;
@@ -308,22 +337,6 @@ static void diagnoseCaptureLoc(ASTContext &Context, DeclContext *DC,
   }
 }
 
-static bool isNonEscapingFunctionValue(SILValue value) {
-  auto type = value->getType().getASTType();
-
-  // Look through box types to handle mutable 'var' bindings.
-  if (auto boxType = dyn_cast<SILBoxType>(type)) {
-    for (auto field : boxType->getLayout()->getFields()) {
-      if (field.getLoweredType()->isNoEscape())
-        return true;
-    }
-
-    return false;
-  }
-
-  return type->isNoEscape();
-}
-
 // Diagnose this partial_apply if it captures a non-escaping value and has
 // an escaping use.
 static void checkPartialApply(ASTContext &Context, DeclContext *DC,
@@ -332,6 +345,8 @@ static void checkPartialApply(ASTContext &Context, DeclContext *DC,
   // original closure instead.
   if (isPartialApplyOfReabstractionThunk(PAI))
     return;
+
+  LLVM_DEBUG(llvm::dbgs() << "Checking Partial Apply: " << *PAI);
 
   ApplySite apply(PAI);
 
@@ -349,7 +364,7 @@ static void checkPartialApply(ASTContext &Context, DeclContext *DC,
 
     // Captures of noescape function types or tuples containing noescape
     // function types cannot escape.
-    if (isNonEscapingFunctionValue(value))
+    if (value->getType().containsNoEscapeFunction())
       noEscapeCaptures.push_back(&oper);
   }
 
@@ -380,18 +395,24 @@ static void checkPartialApply(ASTContext &Context, DeclContext *DC,
       }
     }
   }
+
+  bool emittedError = false;
+
   // First, diagnose the inout captures, if any.
   for (auto inoutCapture : inoutCaptures) {
-    Optional<Identifier> paramName = None;
+    std::optional<Identifier> paramName = std::nullopt;
     if (isUseOfSelfInInitializer(inoutCapture)) {
+      emittedError = true;
       diagnose(Context, PAI->getLoc(), diag::escaping_mutable_self_capture,
                functionKind);
     } else {
       auto *param = getParamDeclFromOperand(inoutCapture->get());
-      if (param->isSelfParameter())
+      if (param->isSelfParameter()) {
+        emittedError = true;
         diagnose(Context, PAI->getLoc(), diag::escaping_mutable_self_capture,
                  functionKind);
-      else {
+      } else {
+        emittedError = true;
         paramName = param->getName();
         diagnose(Context, PAI->getLoc(), diag::escaping_inout_capture,
                  functionKind, param->getName());
@@ -400,30 +421,45 @@ static void checkPartialApply(ASTContext &Context, DeclContext *DC,
       }
     }
     if (functionKind != EscapingAutoClosure) {
+      emittedError = true;
       diagnoseCaptureLoc(Context, DC, PAI, inoutCapture);
       continue;
     }
     // For an autoclosure capture, present a way to fix the problem.
-    if (paramName)
+    if (paramName) {
+      emittedError = true;
       diagnose(Context, PAI->getLoc(), diag::copy_inout_captured_by_autoclosure,
                paramName.value());
-    else
+    } else {
+      emittedError = true;
       diagnose(Context, PAI->getLoc(), diag::copy_self_captured_by_autoclosure);
+    }
   }
 
   // Finally, diagnose captures of values with noescape type.
   for (auto noEscapeCapture : noEscapeCaptures) {
     if (auto *param = getParamDeclFromOperand(noEscapeCapture->get())) {
+      emittedError = true;
       diagnose(Context, PAI->getLoc(), diag::escaping_noescape_param_capture,
                functionKind, param->getName());
       diagnose(Context, param->getLoc(), diag::noescape_param_defined_here,
                param->getName());
     } else {
+      emittedError = true;
       diagnose(Context, PAI->getLoc(), diag::escaping_noescape_var_capture,
                functionKind);
     }
 
     diagnoseCaptureLoc(Context, DC, PAI, noEscapeCapture);
+  }
+
+  // If we emitted an error, mark the closure function as not being suitable for
+  // noncopyable diagnostics. The user can fix the issue and then recompile.
+  if (emittedError) {
+    if (auto *f = apply.getCalleeFunction()) {
+      auto s = semantics::NO_MOVEONLY_DIAGNOSTICS;
+      f->addSemanticsAttr(s);
+    }
   }
 }
 
@@ -450,7 +486,7 @@ static void checkPartialApply(ASTContext &Context, DeclContext *DC,
 static void checkApply(ASTContext &Context, FullApplySite site) {
   auto isNoEscapeParam = [&](SILValue value) -> const ParamDecl * {
     // If the value is an escaping, do not enforce any restrictions.
-    if (!isNonEscapingFunctionValue(value))
+    if (!value->getType().containsNoEscapeFunction())
       return nullptr;
 
     // If the value is not a function parameter, do not enforce any restrictions.
@@ -479,9 +515,13 @@ static void checkApply(ASTContext &Context, FullApplySite site) {
     auto arg = pair.first;
     bool capture = pair.second;
 
-    if (auto *CI = dyn_cast<ConversionInst>(arg)) {
-      arglistInsert(CI->getConverted(), /*capture=*/false);
+    if (auto CI = ConversionOperation(arg)) {
+      arglistInsert(CI.getConverted(), /*capture=*/false);
       continue;
+    }
+
+    if (auto *Copy = dyn_cast<CopyValueInst>(arg)) {
+      arglistInsert(Copy->getOperand(), capture);
     }
 
     // If one of our call arguments is a noescape parameter, diagnose the
@@ -519,7 +559,7 @@ static void checkEscapingCaptures(SILFunction *F) {
   if (F->empty())
     return;
 
-  auto &Context =F->getASTContext();
+  auto &Context = F->getASTContext();
   auto *DC = F->getDeclContext();
 
   for (auto &BB : *F) {
@@ -542,6 +582,8 @@ private:
     if (F->wasDeserializedCanonical())
       return;
 
+    LLVM_DEBUG(llvm::dbgs() << "*** Diagnosing escaping captures in function: "
+                            << F->getName() << '\n');
     checkEscapingCaptures(F);
   }
 };

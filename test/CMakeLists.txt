@@ -28,6 +28,39 @@ function(swift_configure_lit_site_cfg source_path destination_path installed_nam
   endif()
 endfunction()
 
+function(swift_generate_lit_swift_features_cfg output_path)
+  if(SWIFT_COMPILER_IS_MSVC_LIKE)
+    set(test_lit_swift_features_cmd
+      "${CMAKE_C_COMPILER}" "/P" "/EP" "/I" "${SWIFT_MAIN_INCLUDE_DIR}" "/TC"
+      "/Fi<<<OUTPUT_FILE>>>")
+  else()
+    set(test_lit_swift_features_cmd
+      "${CMAKE_C_COMPILER}" "-E" "-P" "-I${SWIFT_MAIN_INCLUDE_DIR}" "-x" "c" "-o"
+      "<<<OUTPUT_FILE>>>")
+  endif()
+
+  list(
+    TRANSFORM test_lit_swift_features_cmd
+    REPLACE "<<<OUTPUT_FILE>>>" "${output_path}")
+  add_custom_command(
+    OUTPUT "${output_path}"
+    COMMAND
+      ${test_lit_swift_features_cmd}
+      "${CMAKE_CURRENT_SOURCE_DIR}/lit.swift-features.cfg.inc"
+    DEPENDS
+      "lit.swift-features.cfg.inc"
+      "${SWIFT_MAIN_INCLUDE_DIR}/swift/Basic/Features.def"
+  )
+
+  # Execute during generation once, so one can run Lit without rebuilding the
+  # test suite dependencies first.
+  execute_process(
+    COMMAND
+      ${test_lit_swift_features_cmd}
+      "${CMAKE_CURRENT_SOURCE_DIR}/lit.swift-features.cfg.inc"
+  )
+endfunction()
+
 function(normalize_boolean_spelling var_name)
   if(${var_name})
     set("${var_name}" TRUE PARENT_SCOPE)
@@ -49,35 +82,42 @@ function(get_test_dependencies SDK result_var_name)
 
   set(deps_binaries)
 
+  if (SWIFT_BUILD_LIBEXEC AND SWIFT_ENABLE_BACKTRACING)
+    # Only add if `swift-backtrace` builds for this SDK
+    if (TARGET "swift-backtrace-${SDK}")
+      list(APPEND deps_binaries
+        "swift-backtrace-${SDK}")
+    endif()
+  endif()
+
   if (SWIFT_INCLUDE_TOOLS)
     list(APPEND deps_binaries
+      libMockPlugin
       lldb-moduleimport-test
-      sil-func-extractor
-      sil-llvm-gen
-      sil-nm
-      sil-opt
-      sil-passpipeline-dumper
       swift-frontend
       swift-demangle
       swift-demangle-yamldump
-      swift-dependency-tool
       swift-ide-test
-      swift-llvm-opt
       swift-refactor
       swift-reflection-dump
-      swift-remoteast-test)
+      swift-remoteast-test
+      swift-scan-test)
 
     if(SWIFT_BUILD_SOURCEKIT)
       list(APPEND deps_binaries sourcekitd-test complete-test)
+    endif()
+
+    if(SWIFT_BUILD_SWIFT_SYNTAX)
+      list(APPEND deps_binaries swift-plugin-server)
     endif()
   endif()
 
   if(NOT SWIFT_BUILT_STANDALONE)
     list(APPEND deps_binaries
-      arcmt-test
-      c-arcmt-test
       c-index-test
+      CASPluginTest
       clang
+      clang-cas-test
       count
       dsymutil
       FileCheck
@@ -85,6 +125,7 @@ function(get_test_dependencies SDK result_var_name)
       llvm-ar
       llvm-as
       llvm-bcanalyzer
+      llvm-cas
       llvm-cov
       llvm-dis
       llvm-dwarfdump
@@ -96,6 +137,7 @@ function(get_test_dependencies SDK result_var_name)
       llvm-readobj
       llvm-size
       llvm-strings
+      llvm-readtapi
       not
       split-file)
   endif()
@@ -103,18 +145,22 @@ function(get_test_dependencies SDK result_var_name)
   if(("${SDK}" STREQUAL "IOS") OR
      ("${SDK}" STREQUAL "TVOS") OR
      ("${SDK}" STREQUAL "WATCHOS") OR
+     ("${SDK}" STREQUAL "XROS") OR
      ("${SDK}" STREQUAL "OSX") OR
      ("${SDK}" STREQUAL "IOS_SIMULATOR") OR
      ("${SDK}" STREQUAL "TVOS_SIMULATOR") OR
      ("${SDK}" STREQUAL "WATCHOS_SIMULATOR") OR
+     ("${SDK}" STREQUAL "XROS_SIMULATOR") OR
      ("${SDK}" STREQUAL "FREESTANDING") OR
      ("${SDK}" STREQUAL "LINUX") OR
+     ("${SDK}" STREQUAL "LINUX_STATIC") OR
      ("${SDK}" STREQUAL "CYGWIN") OR
      ("${SDK}" STREQUAL "FREEBSD") OR
      ("${SDK}" STREQUAL "OPENBSD") OR
      ("${SDK}" STREQUAL "ANDROID") OR
      ("${SDK}" STREQUAL "WINDOWS") OR
-     ("${SDK}" STREQUAL "HAIKU"))
+     ("${SDK}" STREQUAL "HAIKU") OR
+     ("${SDK}" STREQUAL "WASI"))
     # No extra dependencies.
   else()
     message(FATAL_ERROR "Unknown SDK: ${SDK}")
@@ -154,8 +200,14 @@ if(NOT SWIFT_INCLUDE_TOOLS)
       )
   endif()
   if(SWIFT_BUILD_STDLIB)
-    list(APPEND SWIFT_LIT_ARGS
-         "--param" "test_resource_dir=${SWIFTLIB_DIR}")
+    # If building only static stdlib, use `swift_static` resources directory.
+    if(NOT SWIFT_BUILD_DYNAMIC_STDLIB AND SWIFT_BUILD_STATIC_STDLIB)
+      list(APPEND SWIFT_LIT_ARGS
+           "--param" "test_resource_dir=${SWIFTSTATICLIB_DIR}")
+    else()
+      list(APPEND SWIFT_LIT_ARGS
+           "--param" "test_resource_dir=${SWIFTLIB_DIR}")
+    endif()
   endif()
 endif()
 
@@ -186,10 +238,10 @@ normalize_boolean_spelling(SWIFT_ASAN_BUILD)
 normalize_boolean_spelling(SWIFT_ENABLE_SOURCEKIT_TESTS)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
-normalize_boolean_spelling(SWIFT_BACK_DEPLOY_CONCURRENCY)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
 normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
-normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_REFLECTION)
+normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION)
+normalize_boolean_spelling(SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS)
 normalize_boolean_spelling(SWIFT_ENABLE_MACCATALYST)
 normalize_boolean_spelling(SWIFT_RUN_TESTS_WITH_HOST_COMPILER)
 normalize_boolean_spelling(SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
@@ -204,7 +256,18 @@ normalize_boolean_spelling(SWIFT_STDLIB_STATIC_PRINT)
 normalize_boolean_spelling(SWIFT_STDLIB_ENABLE_UNICODE_DATA)
 normalize_boolean_spelling(SWIFT_ENABLE_DISPATCH)
 normalize_boolean_spelling(SWIFT_STDLIB_ENABLE_OBJC_INTEROP)
+normalize_boolean_spelling(SWIFT_ENABLE_BACKTRACING)
+normalize_boolean_spelling(SWIFT_ENABLE_RUNTIME_MODULE)
+normalize_boolean_spelling(SWIFT_BUILD_SWIFT_SYNTAX)
+normalize_boolean_spelling(SWIFT_ENABLE_SYNCHRONIZATION)
+normalize_boolean_spelling(SWIFT_ENABLE_VOLATILE)
+normalize_boolean_spelling(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
+normalize_boolean_spelling(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
+normalize_boolean_spelling(SWIFT_BUILD_REMOTE_MIRROR)
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" SWIFT_OPTIMIZED)
+
+# Get 'SWIFT_HOST_SDKROOT' for lit.site.cfg.in
+set(SWIFT_HOST_SDKROOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
 
 set(profdata_merge_worker
     "${CMAKE_CURRENT_SOURCE_DIR}/../utils/profdata_merge/main.py")
@@ -223,7 +286,6 @@ set(TEST_SUBSETS
     only_validation
     only_long
     only_stress
-    only_early_swiftdriver
 )
 
 if(NOT "${COVERAGE_DB}" STREQUAL "")
@@ -265,6 +327,9 @@ foreach(SDK ${SWIFT_SDKS})
         set(SWIFT_HAVE_LIBXML2 FALSE)
       endif()
 
+      set(VARIANT_EXTERNAL_EMBEDDED_PLATFORM FALSE)
+      set(VARIANT_EXTERNAL_EMBEDDED_DEVICE)
+
       swift_configure_lit_site_cfg(
           "${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.in"
           "${test_bin_dir}/lit.site.cfg"
@@ -279,6 +344,13 @@ foreach(SDK ${SWIFT_SDKS})
           "${CMAKE_CURRENT_SOURCE_DIR}/../validation-test/lit.site.cfg.in"
           "${validation_test_bin_dir}/lit.site.cfg"
           "validation-test${VARIANT_SUFFIX}.lit.site.cfg")
+
+      swift_generate_lit_swift_features_cfg("${test_bin_dir}/lit.swift-features.cfg")
+      swift_generate_lit_swift_features_cfg("${validation_test_bin_dir}/lit.swift-features.cfg")
+      add_custom_target(lit_swift_features_cfg_${VARIANT_SUFFIX}
+        DEPENDS
+          "${test_bin_dir}/lit.swift-features.cfg"
+          "${validation_test_bin_dir}/lit.swift-features.cfg")
 
       set(test_dependencies)
       get_test_dependencies("${SDK}" test_dependencies)
@@ -303,6 +375,10 @@ foreach(SDK ${SWIFT_SDKS})
         endif()
       endif()
 
+      if(TARGET "embedded-libraries")
+        list(APPEND test_dependencies "embedded-libraries")
+      endif()
+
       if(NOT "${COVERAGE_DB}" STREQUAL "")
         list(APPEND test_dependencies "touch-covering-tests")
       endif()
@@ -313,9 +389,12 @@ foreach(SDK ${SWIFT_SDKS})
 
       set(validation_test_dependencies)
 
+      list(APPEND test_dependencies lit_swift_features_cfg_${VARIANT_SUFFIX})
+      list(APPEND validation_test_dependencies lit_swift_features_cfg_${VARIANT_SUFFIX})
+
       set(command_upload_stdlib)
       set(command_upload_swift_reflection_test)
-      if("${SDK}" STREQUAL "IOS" OR "${SDK}" STREQUAL "TVOS" OR "${SDK}" STREQUAL "WATCHOS")
+      if("${SDK}" STREQUAL "IOS" OR "${SDK}" STREQUAL "TVOS" OR "${SDK}" STREQUAL "WATCHOS" OR "${SDK}" STREQUAL "XROS")
         # These are supported testing SDKs, but their implementation of
         # `command_upload_stdlib` is hidden.
       elseif("${SDK}" STREQUAL "ANDROID" AND NOT "${SWIFT_HOST_VARIANT}" STREQUAL "android")
@@ -377,10 +456,6 @@ foreach(SDK ${SWIFT_SDKS})
           list(APPEND LIT_ARGS "--param" "concurrency")
         endif()
 
-        if(SWIFT_BACK_DEPLOY_CONCURRENCY)
-          list(APPEND LIT_ARGS "--param" "back_deploy_concurrency")
-        endif()
-
         if(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
           list(APPEND LIT_ARGS "--param" "distributed")
         endif()
@@ -389,11 +464,38 @@ foreach(SDK ${SWIFT_SDKS})
           list(APPEND LIT_ARGS "--param" "string_processing")
         endif()
 
-        if(SWIFT_ENABLE_EXPERIMENTAL_REFLECTION)
-          list(APPEND LIT_ARGS "--param" "reflection")
+        if(SWIFT_ENABLE_BACKTRACING)
+          list(APPEND LIT_ARGS "--param" "backtracing")
+        endif()
+
+        if(SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION)
+          list(APPEND LIT_ARGS "--param" "observation")
+        endif()
+
+        if(SWIFT_ENABLE_SYNCHRONIZATION)
+          list(APPEND LIT_ARGS "--param" "synchronization")
+        endif()
+
+        if(SWIFT_ENABLE_VOLATILE)
+          list(APPEND LIT_ARGS "--param" "volatile")
+        endif()
+
+        if(SWIFT_ENABLE_RUNTIME_MODULE)
+          list(APPEND LIT_ARGS "--param" "runtime_module")
+        endif()
+
+        if(SWIFT_BUILD_REMOTE_MIRROR)
+          list(APPEND LIT_ARGS "--param" "remote_mirror")
         endif()
 
         list(APPEND LIT_ARGS "--param" "threading=${SWIFT_SDK_${SDK}_THREADING_PACKAGE}")
+
+        # Enable on-crash backtracing if supported
+        if(("${SDK}" STREQUAL "OSX" OR "${SDK}" STREQUAL "LINUX")
+            AND NOT SWIFT_ASAN_BUILD)
+          list(APPEND LIT_ARGS "--param" "backtrace_on_crash")
+        endif()
+
         foreach(test_subset ${TEST_SUBSETS})
           set(directories)
           set(dependencies ${test_dependencies})
@@ -402,7 +504,6 @@ foreach(SDK ${SWIFT_SDKS})
              (test_subset STREQUAL "validation") OR
              (test_subset STREQUAL "only_long") OR
              (test_subset STREQUAL "only_stress") OR
-             (test_subset STREQUAL "only_early_swiftdriver") OR
              (test_subset STREQUAL "all"))
             list(APPEND directories "${test_bin_dir}")
           endif()
@@ -480,6 +581,41 @@ foreach(SDK ${SWIFT_SDKS})
     endforeach()
   endforeach()
 endforeach()
+
+if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
+  set(VARIANT_SUFFIX "-embedded-armv7")
+  set(VARIANT_TRIPLE "armv7em-none-none-eabi")
+  set(VARIANT_EXTERNAL_EMBEDDED_PLATFORM TRUE)
+  set(VARIANT_EXTERNAL_EMBEDDED_DEVICE "arm-qemu-stm32f4")
+  set(SWIFT_TEST_RESULTS_DIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/swift-test-results/${VARIANT_TRIPLE}")
+  swift_configure_lit_site_cfg(
+      "${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.in"
+      "${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}/lit.site.cfg"
+      "test${VARIANT_SUFFIX}.lit.site.cfg")
+  swift_generate_lit_swift_features_cfg("${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}/lit.swift-features.cfg")
+
+  set(VARIANT_SUFFIX "-embedded-avr")
+  set(VARIANT_TRIPLE "avr-none-none-elf")
+  set(VARIANT_EXTERNAL_EMBEDDED_PLATFORM TRUE)
+  set(VARIANT_EXTERNAL_EMBEDDED_DEVICE "avr-qemu-atmega2560")
+  set(SWIFT_TEST_RESULTS_DIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/swift-test-results/${VARIANT_TRIPLE}")
+  swift_configure_lit_site_cfg(
+      "${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.in"
+      "${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}/lit.site.cfg"
+      "test${VARIANT_SUFFIX}.lit.site.cfg")
+  swift_generate_lit_swift_features_cfg("${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}/lit.swift-features.cfg")
+
+  set(VARIANT_SUFFIX "-embedded-riscv32")
+  set(VARIANT_TRIPLE "riscv32-none-none-eabi")
+  set(VARIANT_EXTERNAL_EMBEDDED_PLATFORM TRUE)
+  set(VARIANT_EXTERNAL_EMBEDDED_DEVICE "riscv32-qemu-virt")
+  set(SWIFT_TEST_RESULTS_DIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/swift-test-results/${VARIANT_TRIPLE}")
+  swift_configure_lit_site_cfg(
+      "${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.in"
+      "${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}/lit.site.cfg"
+      "test${VARIANT_SUFFIX}.lit.site.cfg")
+  swift_generate_lit_swift_features_cfg("${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}/lit.swift-features.cfg")
+endif()
 
 # Add shortcuts for the default variant.
 foreach(test_mode ${TEST_MODES})

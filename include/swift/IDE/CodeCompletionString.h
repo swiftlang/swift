@@ -20,6 +20,7 @@
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/TrailingObjects.h"
+#include <optional>
 
 namespace swift {
 namespace ide {
@@ -32,7 +33,7 @@ class CodeCompletionStringChunk {
 
 public:
   enum class ChunkKind {
-    /// "open", "public", "internal", "fileprivate", or "private".
+    /// "open", "public", "package", "internal", "fileprivate", or "private".
     AccessControlKeyword,
 
     /// such as @"available".
@@ -352,7 +353,7 @@ public:
   }
 
   StringRef getFirstTextChunk(bool includeLeadingPunctuation = false) const;
-  Optional<unsigned>
+  std::optional<unsigned>
   getFirstTextChunkIndex(bool includeLeadingPunctuation = false) const;
 
   /// Print a debug representation of the code completion string to \p OS.

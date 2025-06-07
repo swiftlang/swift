@@ -14,6 +14,9 @@
 
 import ArgumentParser
 import SwiftRemoteMirror
+#if canImport(string_h)
+import string_h
+#endif
 
 struct DumpConcurrency: ParsableCommand {
   static let configuration = CommandConfiguration(
@@ -313,20 +316,20 @@ fileprivate class ConcurrencyDumper {
     let taskToThread: [swift_addr_t: UInt64] =
         Dictionary(threadCurrentTasks.map{ ($1, $0) }, uniquingKeysWith: { $1 })
 
-    var lastChilds: [Bool] = []
+    var lastChildFlags: [Bool] = []
 
     let hierarchy = taskHierarchy()
     for (i, (level, lastChild, task)) in hierarchy.enumerated() {
-      lastChilds.removeSubrange(level...)
-      lastChilds.append(lastChild)
+      lastChildFlags.removeSubrange(level...)
+      lastChildFlags.append(lastChild)
 
       let prevEntry = i > 0 ? hierarchy[i - 1] : nil
 
       let levelDidIncrease = level > (prevEntry?.level ?? -1)
 
       var prefix = ""
-      for lastChild in lastChilds {
-        prefix += lastChild ? "     " : "   | "
+      for lastChildFlag in lastChildFlags {
+        prefix += lastChildFlag ? "     " : "   | "
       }
       prefix += "   "
       let firstPrefix = String(prefix.dropLast(5) + (
@@ -350,7 +353,7 @@ fileprivate class ConcurrencyDumper {
 
       let flags = decodeTaskFlags(task)
 
-      output("Task \(hex: task.id) - flags=\(flags) enqueuePriority=\(hex: task.enqueuePriority) maxPriority=\(hex: task.maxPriority) address=\(hex: task.address)")
+      output("Task \(task.id) - flags=\(flags) enqueuePriority=\(hex: task.enqueuePriority) maxPriority=\(hex: task.maxPriority) address=\(hex: task.address)")
       if let thread = taskToThread[swift_addr_t(task.address)] {
         output("current task on thread \(hex: thread)")
       }
@@ -411,7 +414,7 @@ fileprivate class ConcurrencyDumper {
 
       func jobStr(_ job: swift_reflection_ptr_t) -> String {
         if let task = tasks[job] {
-          return "Task \(hex: task.id) \(symbolicateBacktracePointer(ptr: task.runJob))"
+          return "Task \(task.id) \(symbolicateBacktracePointer(ptr: task.runJob))"
         }
         return "<internal job \(hex: job)>"
       }
@@ -421,10 +424,17 @@ fileprivate class ConcurrencyDumper {
         print("    no jobs queued")
       } else {
         print("    job queue: \(jobStr(job))")
-        while job != 0 {
+        let limit = 1000
+        for i in 1 ... limit {
           job = swift_reflection_nextJob(context, job);
           if job != 0 {
             print("               \(jobStr(job))")
+          } else {
+            break
+          }
+
+          if i == limit {
+            print("               ...truncated...")
           }
         }
       }
@@ -442,7 +452,7 @@ fileprivate class ConcurrencyDumper {
     for (thread, task) in threadCurrentTasks {
       let taskStr: String
       if let info = tasks[swift_reflection_ptr_t(task)] {
-        taskStr = "\(hex: info.id)"
+        taskStr = "\(info.id)"
       } else {
         taskStr = "<unknown task \(hex: task)>"
       }

@@ -31,6 +31,7 @@ namespace llvm {
 }
 
 namespace clang {
+  class CXXConstructorDecl;
   namespace CodeGen {
     class CGFunctionInfo;    
   }
@@ -53,6 +54,8 @@ class TypeInfo;
 class ForeignFunctionInfo {
 public:
   const clang::CodeGen::CGFunctionInfo *ClangInfo = nullptr;
+  /// True if the foreign function can throw an Objective-C / C++ exception.
+  bool canThrow = false;
 };
 
 /// An encapsulation of the extra lowering information we might want to
@@ -122,8 +125,8 @@ public:
   }
 
 private:
-  llvm::Optional<GenericRequirement> requirement;
-  llvm::Optional<MetadataSource> metadataSource;
+  std::optional<GenericRequirement> requirement;
+  std::optional<MetadataSource> metadataSource;
 };
 
 /// Recorded information about the specific ABI details.
@@ -135,7 +138,7 @@ public:
     inline DirectResult(const irgen::TypeInfo &typeInfo) : typeInfo(typeInfo) {}
   };
   /// The direct result, or \c None if direct result is void.
-  llvm::Optional<DirectResult> directResult;
+  std::optional<DirectResult> directResult;
   /// Recorded information about the indirect result parameters convention.
   struct IndirectResult {
     /// Does this indirect result parameter have the `sret` attribute?
@@ -178,7 +181,7 @@ class Signature {
   llvm::CallingConv::ID CallingConv;
   ExtraData::Kind ExtraDataKind; // packed with above
   ExtraData ExtraDataStorage;
-  llvm::Optional<SignatureExpansionABIDetails> ABIDetails;
+  std::optional<SignatureExpansionABIDetails> ABIDetails;
   static_assert(ExtraData::union_is_trivially_copyable,
                 "not trivially copyable");
 
@@ -200,8 +203,10 @@ public:
   /// This is a private detail of the implementation of
   /// IRGenModule::getSignature(CanSILFunctionType), which is what
   /// clients should generally be using.
-  static Signature getUncached(IRGenModule &IGM, CanSILFunctionType formalType,
-                               FunctionPointerKind kind);
+  static Signature
+  getUncached(IRGenModule &IGM, CanSILFunctionType formalType,
+              FunctionPointerKind kind, bool forStaticCall = false,
+              const clang::CXXConstructorDecl *cxxCtorDecl = nullptr);
 
   static SignatureExpansionABIDetails
   getUncachedABIDetails(IRGenModule &IGM, CanSILFunctionType formalType,

@@ -230,6 +230,19 @@ enum E7: String {
 
 func checkAnyIsAKeyword(x: Any) {}
 
+var binExpr = 1 + 2 + 3
+
+struct A: ExpressibleByIntegerLiteral {
+    init(integerLiteral value: Int) {
+        self.value = value
+    }
+    let value: Int
+}
+var a: A = 42
+
+let stringStr = "str"
+let strInterpolation = "This is a \(stringStr + "ing") interpolation"
+
 // REQUIRES: objc_interop
 // RUN: %empty-directory(%t.tmp)
 // RUN: %swiftc_driver -emit-module -o %t.tmp/FooSwiftModule.swiftmodule %S/Inputs/FooSwiftModule.swift
@@ -275,6 +288,9 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK4-NEXT: Foo{{$}}
 // CHECK4-NEXT: <Declaration>var fooIntVar: <Type usr="s:s5Int32V">Int32</Type></Declaration>
 // CHECK4-NEXT: <decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>fooIntVar</decl.name>: <decl.var.type><ref.struct usr="s:s5Int32V">Int32</ref.struct></decl.var.type></decl.var.global>
+// CHECK4-NEXT: DOC COMMENT 
+// CHECK4-NEXT: Aaa. fooIntVar. Bbb. 
+// CHECK4-NEXT: DOC COMMENT XML
 // CHECK4-NEXT: <Variable file="{{[^"]+}}Foo.h" line="{{[0-9]+}}" column="{{[0-9]+}}"><Name>fooIntVar</Name><USR>c:@fooIntVar</USR><Declaration>var fooIntVar: Int32</Declaration><Abstract><Para> Aaa. fooIntVar. Bbb.</Para></Abstract></Variable>
 
 // RUN: %sourcekitd-test -req=cursor -pos=8:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK5 %s
@@ -294,6 +310,9 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK6-NEXT: FooSwiftModule
 // CHECK6-NEXT: <Declaration>func fooSwiftFunc() -&gt; <Type usr="s:Si">Int</Type></Declaration>
 // CHECK6-NEXT: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>fooSwiftFunc</decl.name>() -&gt; <decl.function.returntype><ref.struct usr="s:Si">Int</ref.struct></decl.function.returntype></decl.function.free>
+// CHECK6-NEXT: DOC COMMENT 
+// CHECK6-NEXT: This is 'fooSwiftFunc' from 'FooSwiftModule'. 
+// CHECK6-NEXT: DOC COMMENT XML
 // CHECK6-NEXT: {{^}}<Function file="{{.*}}/FooSwiftModule.swift" line="2" column="13"><Name>fooSwiftFunc()</Name><USR>s:14FooSwiftModule03fooB4FuncSiyF</USR><Declaration>func fooSwiftFunc() -&gt; Int</Declaration><CommentParts><Abstract><Para>This is ‘fooSwiftFunc’ from ‘FooSwiftModule’.</Para></Abstract></CommentParts></Function>{{$}}
 
 // RUN: %sourcekitd-test -req=cursor -pos=14:10 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK7 %s
@@ -306,6 +325,9 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK7-NEXT: cursor_info{{$}}
 // CHECK7-NEXT: <Declaration>struct S1</Declaration>
 // CHECK7-NEXT: <decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>S1</decl.name></decl.struct>
+// CHECK7-NEXT: DOC COMMENT 
+// CHECK7-NEXT: Aaa. S1. Bbb. 
+// CHECK7-NEXT: DOC COMMENT XML
 // CHECK7-NEXT: <Class file="{{[^"]+}}cursor_info.swift" line="13" column="8"><Name>S1</Name><USR>s:11cursor_info2S1V</USR><Declaration>struct S1</Declaration><CommentParts><Abstract><Para>Aaa.  S1.  Bbb.</Para></Abstract></CommentParts></Class>
 
 // RUN: %sourcekitd-test -req=cursor -pos=19:12 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK8 %s
@@ -346,7 +368,7 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK13: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>testDefaultParam</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>arg1</decl.var.parameter.argument_label>: <decl.var.parameter.type><ref.struct usr="s:Si">Int</ref.struct></decl.var.parameter.type> = 0</decl.var.parameter>)</decl.function.free>
 
 // RUN: %sourcekitd-test -req=cursor -pos=34:4 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK14 %s
-// CHECK14: source.lang.swift.ref.function.free ({{.*}}Foo.framework/Frameworks/FooSub.framework/Headers/FooSub.h:4:5-4:16)
+// CHECK14: source.lang.swift.ref.function.free ({{.*}}Foo.framework/Frameworks/FooSub.framework/Headers/FooSub.h:4:5-4:22)
 // CHECK14: fooSubFunc1
 // CHECK14: c:@F@fooSubFunc1
 // CHECK14: source.lang.objc
@@ -767,6 +789,11 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK87-NEXT: cursor_info{{$}}
 // CHECK87-NEXT: <Declaration>struct HasLocalizationKey</Declaration>
 // CHECK87-NEXT: <decl.struct><syntaxtype.keyword>struct</syntaxtype.keyword> <decl.name>HasLocalizationKey</decl.name></decl.struct>
+// CHECK87-NEXT: DOC COMMENT
+// CHECK87-NEXT: Brief. 
+// CHECK87-EMPTY:  
+// CHECK87-NEXT: - LocalizationKey: ABC 
+// CHECK87-NEXT: DOC COMMENT XML
 // CHECK87-NEXT: <Class file="{{[^"]+}}cursor_info.swift" line="213" column="8"><Name>HasLocalizationKey</Name><USR>s:11cursor_info18HasLocalizationKeyV</USR><Declaration>struct HasLocalizationKey</Declaration><CommentParts><Abstract><Para>Brief.</Para></Abstract></CommentParts></Class>
 // CHECK87-NEXT: <LocalizationKey>ABC</LocalizationKey>
 
@@ -780,6 +807,9 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK88-NEXT: cursor_info{{$}}
 // CHECK88-NEXT: <Declaration>func hasLocalizationKey2()</Declaration>
 // CHECK88-NEXT: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>hasLocalizationKey2</decl.name>()</decl.function.free>
+// CHECK88-NEXT: DOC COMMENT 
+// CHECK88-NEXT: - LocalizationKey: ABC 
+// CHECK88-NEXT: DOC COMMENT XML 
 // CHECK88-NEXT: <Function file="{{[^"]+}}cursor_info.swift" line="216" column="6"><Name>hasLocalizationKey2()</Name><USR>s:11cursor_info19hasLocalizationKey2yyF</USR><Declaration>func hasLocalizationKey2()</Declaration><CommentParts></CommentParts></Function>
 // CHECK88-NEXT: <LocalizationKey>ABC</LocalizationKey>
 
@@ -804,8 +834,71 @@ func checkAnyIsAKeyword(x: Any) {}
 // CHECK93-NEXT: <decl.enumelement><syntaxtype.keyword>case</syntaxtype.keyword> <decl.name>b</decl.name> = <syntaxtype.string>&quot;f&quot;</syntaxtype.string></decl.enumelement>
 
 // RUN: %sourcekitd-test -req=cursor -pos=227:14 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK94 %s
-// CHECK94: <empty cursor info; internal diagnostic: "Resolved to incomplete expression or statement.">
+// CHECK94: source.lang.swift.ref.struct
+// CHECK94-NEXT: String
+// CHECK94-NEXT: s:SS
+// CHECK94-NEXT: source.lang.swift
+// CHECK94-NEXT: String.Type
+// CHECK94-NEXT: $sSSmD
+// CHECK94-NEXT: Swift
+// CHECK94-NEXT: <Group>String</Group>
+// CHECK94-NEXT: SYSTEM
+// CHECK94-NEXT: <Declaration>@frozen @_eagerMove struct String</Declaration>
 
 // RUN:  %sourcekitd-test -req=cursor -pos=231:6 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK95 %s
 // CHECK95: <Declaration>func checkAnyIsAKeyword(x: Any)</Declaration>
 // CHECK95-NEXT: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>checkAnyIsAKeyword</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>x</decl.var.parameter.argument_label>: <decl.var.parameter.type><syntaxtype.keyword>Any</syntaxtype.keyword></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>
+
+// RUN: %sourcekitd-test -req=cursor -pos=23:23 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK96 %s
+// CHECK96: source.lang.swift.ref.struct
+// CHECK96-NEXT: String
+// CHECK96-NEXT: s:SS
+// CHECK96-NEXT: source.lang.swift
+// CHECK96-NEXT: String.Type
+// CHECK96-NEXT: $sSSmD
+// CHECK96-NEXT: Swift
+// CHECK96-NEXT: <Group>String</Group>
+// CHECK96-NEXT: SYSTEM
+// CHECK96-NEXT: <Declaration>@frozen @_eagerMove struct String</Declaration>
+
+// RUN: %sourcekitd-test -req=cursor -pos=233:19 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK97 %s
+// CHECK97: source.lang.swift.ref.struct
+// CHECK97-NEXT: Int
+// CHECK97-NEXT: s:Si
+// CHECK97-NEXT: source.lang.swift
+// CHECK97-NEXT: Int.Type
+// CHECK97-NEXT: $sSimD
+// CHECK97-NEXT: Swift
+// CHECK97-NEXT: <Group>Math/Integers</Group>
+// CHECK97-NEXT: SYSTEM
+
+// RUN: %sourcekitd-test -req=cursor -pos=241:12 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK98 %s
+// CHECK98: source.lang.swift.ref.function.constructor (236:5-236:36)
+// CHECK98-NEXT: init(integerLiteral:)
+// CHECK98-NEXT: s:11cursor_info1AV14integerLiteralACSi_tcfc
+// CHECK98-NEXT: source.lang.swift
+// CHECK98-NEXT: (A.Type) -> (Int) -> A
+// CHECK98-NEXT: $s14integerLiteral11cursor_info1AVSi_tcD
+// CHECK98-NEXT: cursor_info
+
+// RUN: %sourcekitd-test -req=cursor -pos=244:51 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK99 %s
+// CHECK99: source.lang.swift.ref.struct ()
+// CHECK99-NEXT: String
+// CHECK99-NEXT: s:SS
+// CHECK99-NEXT: source.lang.swift
+// CHECK99-NEXT: String.Type
+// CHECK99-NEXT: $sSSmD
+// CHECK99-NEXT: Swift
+// CHECK99-NEXT: <Group>String</Group>
+// CHECK99-NEXT: SYSTEM
+
+// RUN: %sourcekitd-test -req=cursor -pos=244:61 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK100 %s
+// CHECK100: source.lang.swift.ref.function.constructor ()
+// CHECK100-NEXT: init(stringInterpolation:)
+// CHECK100-NEXT: s:SS19stringInterpolationSSs013DefaultStringB0V_tcfc
+// CHECK100-NEXT: source.lang.swift
+// CHECK100-NEXT: (String.Type) -> (DefaultStringInterpolation) -> String
+// CHECK100-NEXT: $s19stringInterpolationSSs013DefaultStringB0V_tcD
+// CHECK100-NEXT: Swift
+// CHECK100-NEXT: <Group>String</Group>
+// CHECK100-NEXT: SYSTEM

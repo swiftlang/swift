@@ -1,0 +1,88 @@
+// RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+
+import Builtin
+
+class Box<T> {
+  var value: T
+}
+
+class C {}
+
+
+// CHECK-LABEL: begin running test {{.*}} on test_phi_nested_access: get_access_base with
+// CHECK:       sil @test_phi_nested_access : {{.*}} {
+// CHECK:       bb0([[BOX:%[^,]+]] :
+// CHECK:         [[VALUE_ADDR:%[^,]+]] = ref_element_addr [[BOX]]
+// CHECK:         [[VALUE_ACCESS:%[^,]+]] = begin_access [read] [unsafe] [[VALUE_ADDR]]
+// CHECK:         [[VALUE_PTR:%[^,]+]] = address_to_pointer [stack_protection] [[VALUE_ACCESS]]
+// CHECK:         end_access [[VALUE_ACCESS]]
+// CHECK:         br bb1([[VALUE_PTR]]
+// CHECK:       bb1([[VALUE_PHI:%[^,]+]] :
+// CHECK:       } // end sil function 'test_phi_nested_access'
+// CHECK:       Address: [[VALUE_PHI]] = argument of bb1
+// CHECK:       Base:   [[VALUE_ADDR]] = ref_element_addr
+// CHECK-LABEL: end running test {{.*}} on test_phi_nested_access: get_access_base with
+// CHECK-LABEL: begin running test {{.*}} on test_phi_nested_access: compute_access_storage with
+// CHECK:       Address: [[VALUE_PHI]] = argument of bb1
+// CHECK:       Class [[BOX]] = argument of bb0
+// CHECK:         Field: var value: T Index: 0
+// CHECK-LABEL: end running test {{.*}} on test_phi_nested_access: compute_access_storage with
+// CHECK-LABEL: begin running test 3 of 3 on test_phi_nested_access: accesspath
+// CHECK:       Access path for: %6 = argument of bb1
+// CHECK:       Exact Use:   end_access %2
+// CHECK-LABEL: end running test 3 of 3 on test_phi_nested_access: accesspath
+sil @test_phi_nested_access : $@convention(method) (@guaranteed Box<C>) -> () {
+bb1(%box : $Box<C>):         
+  %value_addr = ref_element_addr %box : $Box<C>, #Box.value 
+  %value_access = begin_access [read] [unsafe] %value_addr : $*C 
+  %value_ptr = address_to_pointer [stack_protection] %value_access : $*C to $Builtin.RawPointer 
+  end_access %value_access : $*C          
+  br exit(%value_ptr : $Builtin.RawPointer)               
+
+exit(%phi : $Builtin.RawPointer):                   
+  specify_test "get_access_base @argument"
+  specify_test "compute_access_storage @argument"
+  specify_test "accesspath @argument"
+  %retval = tuple ()
+  return %retval : $()
+} 
+
+sil_global @global_c : $C
+
+// CHECK-LABEL: begin running test {{.*}} on test_access_global
+// CHECK:       sil @test_access_global : {{.*}} {
+// CHECK:         [[GLOBAL:%[^,]+]] = global_addr @global_c
+// CHECK:         [[ACCESS:%[^,]+]] = begin_access [read] [dynamic] [[GLOBAL]]
+// CHECK:       } // end sil function 'test_access_global'
+// CHECK:       Address:   [[ACCESS]] = begin_access [read] [dynamic] [[GLOBAL]]
+// CHECK:       Access:   [[ACCESS]] = begin_access [read] [dynamic] [[GLOBAL]]
+// CHECK-LABEL: end running test {{.*}} on test_access_global
+sil @test_access_global : $@convention(thin) () -> () {
+  %15 = global_addr @global_c : $*C
+  specify_test "get_typed_access_address @instruction"
+  %16 = begin_access [read] [dynamic] %15 : $*C
+  end_access %16 : $*C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on test_mark_uninitialized_inst: get_access_base
+// CHECK: Address:  %{{.*}} = mark_uninitialized [var] [[ALLOC:%.*]] : $*C
+// CHECK: Base:     [[ALLOC]] = alloc_stack [var_decl] $C
+// CHECK-LABEL: end running test {{.*}} on test_mark_uninitialized_inst: get_access_base
+// CHECK-LABEL: begin running test {{.*}} on test_mark_uninitialized_inst: swift_get_access_base
+// CHECK: Address:  %{{.*}} = mark_uninitialized [var] [[ALLOC:%.*]] : $*C
+// CHECK: Base: stack - [[ALLOC]] = alloc_stack [var_decl] $C
+// CHECK-LABEL: end running test {{.*}} on test_mark_uninitialized_inst: swift_get_access_base
+sil [ossa] @test_mark_uninitialized_inst : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = alloc_stack [var_decl] $C, let
+  %2 = mark_uninitialized [var] %1 : $*C
+  specify_test "get_access_base %2"
+  specify_test "swift_get_access_base %2"
+  assign %0 to %2 : $*C
+  destroy_addr %2 : $*C
+  dealloc_stack %1 : $*C
+  %9999 = tuple()
+  return %9999 : $()
+}

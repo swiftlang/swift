@@ -21,6 +21,7 @@
 #include "Initialization.h"
 #include "SILGenFunction.h"
 #include "swift/AST/CanTypeVisitor.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/AbstractionPattern.h"
@@ -34,14 +35,12 @@ using namespace Lowering;
 //                              Helper Routines
 //===----------------------------------------------------------------------===//
 
-static unsigned getTupleSize(CanType t) {
-  if (auto tt = dyn_cast<TupleType>(t))
-    return tt->getNumElements();
-  return 1;
-}
-
 unsigned RValue::getRValueSize(AbstractionPattern pattern, CanType formalType) {
   if (pattern.isTuple()) {
+    if (pattern.doesTupleContainPackExpansionType())
+      return 1;
+
+    // We can use the naive parallel walk here because of the check above.
     unsigned count = 0;
     auto formalTupleType = cast<TupleType>(formalType);
     for (auto i : indices(formalTupleType.getElementTypes())) {
@@ -57,6 +56,10 @@ unsigned RValue::getRValueSize(AbstractionPattern pattern, CanType formalType) {
 /// Return the number of rvalue elements in the given canonical type.
 unsigned RValue::getRValueSize(CanType type) {
   if (auto tupleType = dyn_cast<TupleType>(type)) {
+    // Don't recursively expand tuples containing pack expansions.
+    if (tupleType.containsPackExpansionType())
+      return 1;
+
     unsigned count = 0;
     for (auto eltType : tupleType.getElementTypes())
       count += getRValueSize(eltType);
@@ -86,12 +89,8 @@ public:
 
   void visitType(CanType formalType, ManagedValue v) {
     // If we have a loadable type that has not been loaded, actually load it.
-    if (!v.getType().isObject() && v.getType().isLoadable(SGF.F)) {
-      if (v.isPlusOne(SGF)) {
-        v = SGF.B.createLoadTake(loc, v);
-      } else {
-        v = SGF.B.createLoadBorrow(loc, v);
-      }
+    if (!v.getType().isObject()) {
+      v = SGF.B.createLoadIfLoadable(loc, v);
     }
 
     values.push_back(v);
@@ -156,6 +155,10 @@ public:
   }
 
   void visitTupleType(CanTupleType tupleFormalType, ManagedValue tuple) {
+    // Don't recursively expand tuples containing pack expansions.
+    if (tupleFormalType.containsPackExpansionType())
+      return visitType(tupleFormalType, tuple);
+
     if (tuple.getType().isObject()) {
       return visitObjectTupleType(tupleFormalType, tuple);
     }
@@ -202,6 +205,10 @@ public:
   }
 
   ManagedValue visitTupleType(CanTupleType t, SILLocation l) {
+    // Tuples with pack expansions aren't exploded.
+    if (t.containsPackExpansionType())
+      return visitType(t, l);
+
     SmallVector<ManagedValue, 4> elts;
     for (auto fieldTy : t.getElementTypes())
       elts.push_back(this->visit(fieldTy, l));
@@ -251,6 +258,10 @@ public:
   }
 
   void visitTupleType(CanTupleType t, Initialization *address, SILLocation l) {
+    // Tuples containing pack expansions shouldn't be exploded.
+    if (t.containsPackExpansionType())
+      return visitType(t, address, l);
+
     assert(address->canSplitIntoTupleElements());
     llvm::SmallVector<InitializationPtr, 4> buf;
     auto bufResult = address->splitIntoTupleElements(SGF, l, t, buf);
@@ -272,10 +283,11 @@ public:
 
 template <ImplodeKind KIND>
 static ManagedValue implodeTupleValues(ArrayRef<ManagedValue> values,
-                                       SILGenFunction &SGF, CanType tupleType,
+                                       SILGenFunction &SGF, CanType type,
                                        SILLocation l) {
   // Non-tuples don't need to be imploded.
-  if (!isa<TupleType>(tupleType)) {
+  auto tupleType = dyn_cast<TupleType>(type);
+  if (!tupleType || tupleType.containsPackExpansionType()) {
     assert(values.size() == 1 && "exploded non-tuple value?!");
     return ImplodeLoadableTupleValue<KIND>::getValue(SGF, values[0], l);
   }
@@ -289,13 +301,13 @@ static ManagedValue implodeTupleValues(ArrayRef<ManagedValue> values,
            "address-only values are always managed!");
     auto buffer = SGF.emitTemporary(l, TL);
     ImplodeAddressOnlyTuple<KIND>(values, SGF)
-        .visit(tupleType, buffer.get(), l);
+        .visitTupleType(tupleType, buffer.get(), l);
     return buffer->getManagedAddress();
   }
 
   // To implode loadable tuples, we just need to combine the elements with
   // TupleInsts.
-  return ImplodeLoadableTupleValue<KIND>(values, SGF).visit(tupleType, l);
+  return ImplodeLoadableTupleValue<KIND>(values, SGF).visitTupleType(tupleType, l);
 }
 
 /// Perform a copy or init operation from an array of ManagedValue (from an
@@ -321,7 +333,7 @@ static void copyOrInitValuesInto(Initialization *init,
 
   // If the element has non-tuple type, just serve it up to the initialization.
   auto tupleType = dyn_cast<TupleType>(type);
-  if (!tupleType) {
+  if (!tupleType || tupleType.containsPackExpansionType()) {
     // We take the first value.
     ManagedValue result = values[0];
     values = values.slice(1);
@@ -373,7 +385,7 @@ LLVM_ATTRIBUTE_UNUSED
 static unsigned
 expectedExplosionSize(CanType type) {
   auto tuple = dyn_cast<TupleType>(type);
-  if (!tuple)
+  if (!tuple || tuple.containsPackExpansionType())
     return 1;
   unsigned total = 0;
   for (unsigned i = 0; i < tuple->getNumElements(); ++i) {
@@ -389,12 +401,8 @@ static void verifyHelper(ArrayRef<ManagedValue> values,
 // This is a no-op in non-assert builds.
 #ifndef NDEBUG
   ValueOwnershipKind result = OwnershipKind::None;
-  Optional<bool> sameHaveCleanups;
+  std::optional<bool> sameHaveCleanups;
   for (ManagedValue v : values) {
-    assert((!SGF || !v.getType().isLoadable(SGF.get()->F) ||
-            v.getType().isObject()) &&
-           "All loadable values in an RValue must be an object");
-
     ValueOwnershipKind kind = v.getOwnershipKind();
     if (kind == OwnershipKind::None)
       continue;
@@ -469,7 +477,7 @@ RValue::RValue(SILGenFunction &SGF, Expr *expr, ManagedValue v)
 }
 
 RValue::RValue(CanType type)
-  : type(type), elementsToBeAdded(getTupleSize(type)) {
+  : type(type), elementsToBeAdded(getRValueSize(type)) {
 }
 
 RValue::RValue(AbstractionPattern pattern, CanType type)
@@ -479,12 +487,14 @@ RValue::RValue(AbstractionPattern pattern, CanType type)
 void RValue::addElement(RValue &&element) & {
   assert(!element.isUsed() && "adding consumed value to r-value");
   assert(!element.isInSpecialState() && "adding special value to r-value");
-  assert(!isComplete() && "rvalue already complete");
-  assert(!isInSpecialState() && "cannot add elements to a special r-value");
-  --elementsToBeAdded;
-  values.insert(values.end(),
-                element.values.begin(), element.values.end());
-  element.makeUsed();
+  assert(elementsToBeAdded >= element.values.size() && "rvalue too full");
+  if (!element.values.empty()) {
+    assert(!isInSpecialState() && "cannot add elements to a special r-value");
+    elementsToBeAdded -= element.values.size();
+    values.insert(values.end(),
+                  element.values.begin(), element.values.end());
+    element.makeUsed();
+  }
 
   assert(!isComplete() || values.size() == getRValueSize(type));
   // Call into the verifier helper directly without an SGF since we know that
@@ -526,10 +536,10 @@ SILValue RValue::forwardAsSingleStorageValue(SILGenFunction &SGF,
   return SGF.emitConversionFromSemanticValue(l, result, storageType);
 }
 
-void RValue::forwardInto(SILGenFunction &SGF, SILLocation loc, 
+void RValue::forwardInto(SILGenFunction &SGF, SILLocation loc,
                          Initialization *I) && {
   assert(isComplete() && "rvalue is not complete");
-  assert(isPlusOne(SGF) && "Can not forward borrowed RValues");
+  assert(isPlusOneOrTrivial(SGF) && "Can not forward borrowed RValues");
   ArrayRef<ManagedValue> elts = values;
   copyOrInitValuesInto<ImplodeKind::Forward>(I, elts, type, loc, SGF);
 }
@@ -541,35 +551,44 @@ void RValue::copyInto(SILGenFunction &SGF, SILLocation loc,
   copyOrInitValuesInto<ImplodeKind::Copy>(I, elts, type, loc, SGF);
 }
 
-static void assignRecursive(SILGenFunction &SGF, SILLocation loc,
-                            CanType type, ArrayRef<ManagedValue> &srcValues,
-                            SILValue destAddr) {
-  // Recurse into tuples.
-  if (auto srcTupleType = dyn_cast<TupleType>(type)) {
-    assert(destAddr->getType().castTo<TupleType>()->getNumElements()
-             == srcTupleType->getNumElements());
-    for (auto eltIndex : indices(srcTupleType.getElementTypes())) {
-      auto eltDestAddr = SGF.B.createTupleElementAddr(loc, destAddr, eltIndex);
-      assignRecursive(SGF, loc, srcTupleType.getElementType(eltIndex),
-                      srcValues, eltDestAddr);
-    }
-    return;
-  }
-
-  // Otherwise, pull the front value off the list.
-  auto srcValue = srcValues.front();
-  srcValues = srcValues.slice(1);
-
-  srcValue.assignInto(SGF, loc, destAddr);
-}
-
 void RValue::assignInto(SILGenFunction &SGF, SILLocation loc,
                         SILValue destAddr) && {
   assert(isComplete() && "rvalue is not complete");
-  assert(isPlusOne(SGF) && "Can not assign borrowed RValues");
-  ArrayRef<ManagedValue> srcValues = values;
-  assignRecursive(SGF, loc, type, srcValues, destAddr);
-  assert(srcValues.empty() && "didn't claim all elements!");
+  assert(isPlusOneOrTrivial(SGF) && "Can not assign borrowed RValues");
+  ArrayRef<ManagedValue> srcMvValues = values;
+
+  SWIFT_DEFER { assert(srcMvValues.empty() && "didn't claim all elements!"); };
+
+  // If we do not have a tuple, just bail early.
+  auto srcTupleType = dyn_cast<TupleType>(type);
+  if (!srcTupleType || srcTupleType.containsPackExpansionType()) {
+    // Otherwise, pull the front value off the list.
+    auto srcValue = srcMvValues.front();
+    srcMvValues = srcMvValues.slice(1);
+    srcValue.assignInto(SGF, loc, destAddr);
+    return;
+  }
+
+  assert(destAddr->getType().castTo<TupleType>()->getNumElements() ==
+         srcTupleType->getNumElements());
+
+  // If there are sourced managed values, initialize the address with a tuple.
+  if (srcMvValues.size()) {
+    if (SGF.useLoweredAddresses()) {
+      // Without opaque values, a tuple_addr_constructor is used to initialize
+      // the memory all at once.
+      SGF.B.createTupleAddrConstructor(loc, destAddr, srcMvValues,
+                                       IsNotInitialization);
+    } else {
+      // With opaque values, a tuple can always be formed and assigned to the
+      // memory.
+      auto tupleTy = destAddr->getType().getObjectType();
+      auto tuple = SGF.B.createTuple(loc, tupleTy, srcMvValues);
+      SGF.B.createAssign(loc, tuple.forward(SGF), destAddr,
+                         AssignOwnershipQualifier::Unknown);
+    }
+  }
+  srcMvValues = ArrayRef<ManagedValue>();
 }
 
 ManagedValue RValue::getAsSingleValue(SILGenFunction &SGF, SILLocation loc) && {
@@ -646,16 +665,23 @@ RValue RValue::extractElement(unsigned n) && {
     assert(n == 0);
     unsigned to = getRValueSize(type);
     assert(to == values.size());
-    RValue element(nullptr, llvm::makeArrayRef(values).slice(0, to), type);
+    RValue element(nullptr, llvm::ArrayRef(values).slice(0, to), type);
     makeUsed();
     return element;
   }
 
+  // This is implementable, but we can do it lazily if we add that kind
+  // of projection.
+  assert(!tupleTy.containsPackExpansionType() &&
+         "can't extract elements from tuples containing pack expansions "
+         "right now");
+
   auto range = getElementRange(tupleTy, n);
   unsigned from = range.first, to = range.second;
 
-  CanType eltType = cast<TupleType>(type).getElementType(n);
-  RValue element(nullptr, llvm::makeArrayRef(values).slice(from, to - from), eltType);
+  CanType eltType = tupleTy.getElementType(n);
+  RValue element(nullptr, llvm::ArrayRef(values).slice(from, to - from),
+                 eltType);
   makeUsed();
   return element;
 }
@@ -669,18 +695,24 @@ void RValue::extractElements(SmallVectorImpl<RValue> &elements) && {
     assert(to == values.size());
     // We use push_back instead of emplace_back since emplace_back can not
     // invoke the private constructor we are attempting to invoke.
-    elements.push_back({nullptr, llvm::makeArrayRef(values).slice(0, to), type});
+    elements.push_back({nullptr, llvm::ArrayRef(values).slice(0, to), type});
     makeUsed();
     return;
   }
+
+  // This is implementable, but we can do it lazily if we add that kind
+  // of decomposition.
+  assert(!tupleTy.containsPackExpansionType() &&
+         "can't extract elements from tuples containing pack expansions "
+         "right now");
 
   unsigned from = 0;
   for (auto eltType : tupleTy.getElementTypes()) {
     unsigned to = from + getRValueSize(eltType);
     // We use push_back instead of emplace_back since emplace_back can not
     // invoke the private constructor we are attempting to invoke.
-    elements.push_back({nullptr, llvm::makeArrayRef(values).slice(from, to - from),
-                        eltType});
+    elements.push_back(
+        {nullptr, llvm::ArrayRef(values).slice(from, to - from), eltType});
     from = to;
   }
   assert(from == values.size());
@@ -700,7 +732,7 @@ RValue RValue::copy(SILGenFunction &SGF, SILLocation loc) const & {
 }
 
 RValue RValue::ensurePlusOne(SILGenFunction &SGF, SILLocation loc) && {
-  if (!isPlusOne(SGF))
+  if (!isPlusOneOrTrivial(SGF))
     return copy(SGF, loc);
   return std::move(*this);
 }
@@ -717,7 +749,8 @@ RValue RValue::borrow(SILGenFunction &SGF, SILLocation loc) const & {
 }
 
 ManagedValue RValue::materialize(SILGenFunction &SGF, SILLocation loc) && {
-  assert(isPlusOne(SGF) && "Can not materialize a non-plus one RValue");
+  assert(isPlusOneOrTrivial(SGF) &&
+         "Can not materialize a non-plus one RValue");
   auto &paramTL = SGF.getTypeLowering(getType());
 
   // If we're already materialized, we're done.
@@ -787,6 +820,13 @@ void RValue::verify(SILGenFunction &SGF) const & {
 bool RValue::isPlusOne(SILGenFunction &SGF) const & {
   return llvm::all_of(
       values, [&SGF](ManagedValue mv) -> bool { return mv.isPlusOne(SGF); });
+}
+
+bool RValue::isPlusOneOrTrivial(SILGenFunction &SGF) const & {
+  return llvm::all_of(
+      values, [&SGF](ManagedValue mv) -> bool {
+        return mv.isPlusOneOrTrivial(SGF);
+      });
 }
 
 bool RValue::isPlusZero(SILGenFunction &SGF) const & {

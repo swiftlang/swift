@@ -121,6 +121,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/CFG.h"
@@ -159,7 +160,7 @@ class ArrayInfo {
   llvm::DenseMap<uint64_t, StoreInst *> elementStoreMap;
 
   /// List of Sequence.forEach calls invoked on the array.
-  SmallSetVector<TryApplyInst *, 4> forEachCalls;
+  llvm::SmallSetVector<TryApplyInst *, 4> forEachCalls;
 
   /// Indicates whether the array could be modified after initialization. Note
   /// that this not include modifications to the elements of the array. When
@@ -302,18 +303,26 @@ void ArrayInfo::classifyUsesOfArray(SILValue arrayValue) {
     // above as the array would be passed indirectly.
     if (isFixLifetimeUseOfArray(user, arrayValue))
       continue;
+    if (auto mdi = MarkDependenceInstruction(user)) {
+      if (mdi.getBase() == arrayValue)
+        continue;
+    }
     // Check if this is a forEach call on the array.
     if (TryApplyInst *forEachCall = isForEachUseOfArray(user, arrayValue)) {
       forEachCalls.insert(forEachCall);
       continue;
     }
-    // Recursively classify begin_borrow and copy_value uses.
+    // Recursively classify begin_borrow, copy_value, and move_value uses.
     if (BeginBorrowInst *beginBorrow = dyn_cast<BeginBorrowInst>(user)) {
       classifyUsesOfArray(beginBorrow);
       continue;
     }
     if (CopyValueInst *copyValue = dyn_cast<CopyValueInst>(user)) {
       classifyUsesOfArray(copyValue);
+      continue;
+    }
+    if (MoveValueInst *moveValue = dyn_cast<MoveValueInst>(user)) {
+      classifyUsesOfArray(moveValue);
       continue;
     }
     if (DestroyValueInst *destroyValue = dyn_cast<DestroyValueInst>(user)) {
@@ -483,10 +492,11 @@ static void unrollForEach(ArrayInfo &arrayInfo, TryApplyInst *forEachCall,
   // targets must be taking a phi argument.
   SILBasicBlock *normalBB = forEachCall->getNormalBB();
   SILBasicBlock *errorBB = forEachCall->getErrorBB();
-  assert(errorBB->getSILPhiArguments().size() == 1 &&
-         normalBB->getSILPhiArguments().size() == 1);
+  assert(normalBB->getSILPhiArguments().size() == 1);
   SILPhiArgument *normalArgument = normalBB->getSILPhiArguments()[0];
-  SILPhiArgument *errorArgument = errorBB->getSILPhiArguments()[0];
+  SILPhiArgument *errorArgument = nullptr;
+  if (errorBB->getSILPhiArguments().size() == 1)
+    errorArgument = errorBB->getSILPhiArguments()[0];
 
   // A generator for creating a basic block for use as the target of the
   // "normal" branch of a try_apply.
@@ -503,8 +513,12 @@ static void unrollForEach(ArrayInfo &arrayInfo, TryApplyInst *forEachCall,
   auto errorTargetGenerator = [&](SILBasicBlock *insertionBlock,
                                   SILValue borrowedElem, SILValue storeBorrow) {
     SILBasicBlock *newErrorBB = fun->createBasicBlockBefore(insertionBlock);
-    SILValue argument = newErrorBB->createPhiArgument(
+    SILValue argument;
+    if (errorArgument) {
+      argument = newErrorBB->createPhiArgument(
         errorArgument->getType(), errorArgument->getOwnershipKind());
+    }
+
     // Make the errorBB jump to the error target of the original forEach.
     SILBuilderWithScope builder(newErrorBB, forEachCall);
     if (storeBorrow) {
@@ -513,7 +527,11 @@ static void unrollForEach(ArrayInfo &arrayInfo, TryApplyInst *forEachCall,
     if (borrowedElem) {
       builder.createEndBorrow(forEachLoc, borrowedElem);
     }
-    builder.createBranch(forEachLoc, errorBB, argument);
+
+    if (argument)
+      builder.createBranch(forEachLoc, errorBB, argument);
+    else
+      builder.createBranch(forEachLoc, errorBB);
     return newErrorBB;
   };
 

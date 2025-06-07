@@ -26,3 +26,9 @@ typedef enum {
 typedef enum EnumByBoth {
   EnumByBothX
 } EnumByBoth;
+
+
+typedef enum {
+  kEventInit,
+  kEventReset
+} SystemEvent;

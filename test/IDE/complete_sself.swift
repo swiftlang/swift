@@ -1,18 +1,12 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
+// RUN: %batch-code-completion
 
-// NOSELF: Begin completions
 // NOSELF-NOT: name=Self
-// NOSELF: End completions
 
-// GENERICPARAM: Begin completions
 // GENERICPARAM: Decl[GenericTypeParam]/Local: Self[#Self#];
 
-// STATICSELF: Begin completions
-// STATICSELF: Keyword[Self]/CurrNominal: Self[#S#];
+// STATICSELF: Keyword[Self]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: Self[#S#];
 
-// DYNAMICSELF: Begin completions
-// DYNAMICSELF: Keyword[Self]/CurrNominal: Self[#Self#];
+// DYNAMICSELF: Keyword[Self]/CurrNominal{{(/TypeRelation\[Convertible\])?}}: Self[#Self#];
 
 func freeFunc() {
   #^GLOBAL_BODY_EXPR?check=NOSELF^#

@@ -10,12 +10,62 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <cstdio>
+
 #include "swift/Runtime/HeapObject.h"
 
 namespace swift {
 
-template <typename RefCountBits>
-HeapObject *RefCounts<RefCountBits>::incrementSlow(RefCountBits oldbits,
+// Return an object's side table, allocating it if necessary.
+// Returns null if the object is deiniting.
+// SideTableRefCountBits specialization intentionally does not exist.
+template <>
+HeapObjectSideTableEntry* RefCounts<InlineRefCountBits>::allocateSideTable(bool failIfDeiniting)
+{
+  auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
+
+  // Preflight failures before allocating a new side table.
+  if (oldbits.hasSideTable()) {
+    // Already have a side table. Return it.
+    return oldbits.getSideTable();
+  }
+  else if (failIfDeiniting && oldbits.getIsDeiniting()) {
+    // Already past the start of deinit. Do nothing.
+    return nullptr;
+  }
+
+  // Preflight passed. Allocate a side table.
+
+  // FIXME: custom side table allocator
+  auto side = swift_cxx_newObject<HeapObjectSideTableEntry>(getHeapObject());
+
+  auto newbits = InlineRefCountBits(side);
+
+  do {
+    if (oldbits.hasSideTable()) {
+      // Already have a side table. Return it and delete ours.
+      // Read before delete to streamline barriers.
+      auto result = oldbits.getSideTable();
+      swift_cxx_deleteObject(side);
+      return result;
+    }
+    else if (failIfDeiniting && oldbits.getIsDeiniting()) {
+      // Already past the start of deinit. Do nothing.
+      return nullptr;
+    }
+
+    side->initRefCounts(oldbits);
+
+  } while (! refCounts.compare_exchange_weak(oldbits, newbits,
+                                             std::memory_order_release,
+                                             std::memory_order_relaxed));
+
+  return side;
+}
+
+
+template <>
+HeapObject *RefCounts<InlineRefCountBits>::incrementSlow(InlineRefCountBits oldbits,
                                                    uint32_t n) {
   if (oldbits.isImmortal(false)) {
     return getHeapObject();
@@ -26,20 +76,27 @@ HeapObject *RefCounts<RefCountBits>::incrementSlow(RefCountBits oldbits,
     side->incrementStrong(n);
   }
   else {
+    // Overflow into a new side table.
+    auto side = allocateSideTable(false);
+    side->incrementStrong(n);
+  }
+  return getHeapObject();
+}
+template <>
+HeapObject *RefCounts<SideTableRefCountBits>::incrementSlow(SideTableRefCountBits oldbits,
+                                                uint32_t n) {
+  if (oldbits.isImmortal(false)) {
+    return getHeapObject();
+  }
+  else {
     // Retain count overflow.
     swift::swift_abortRetainOverflow();
   }
   return getHeapObject();
 }
-template HeapObject *
-RefCounts<InlineRefCountBits>::incrementSlow(InlineRefCountBits oldbits,
-                                             uint32_t n);
-template HeapObject *
-RefCounts<SideTableRefCountBits>::incrementSlow(SideTableRefCountBits oldbits,
-                                                uint32_t n);
 
-template <typename RefCountBits>
-void RefCounts<RefCountBits>::incrementNonAtomicSlow(RefCountBits oldbits,
+template <>
+void RefCounts<InlineRefCountBits>::incrementNonAtomicSlow(InlineRefCountBits oldbits,
                                                      uint32_t n) {
   if (oldbits.isImmortal(false)) {
     return;
@@ -49,11 +106,19 @@ void RefCounts<RefCountBits>::incrementNonAtomicSlow(RefCountBits oldbits,
     auto side = oldbits.getSideTable();
     side->incrementStrong(n);  // FIXME: can there be a nonatomic impl?
   } else {
+    // Overflow into a new side table.
+    auto side = allocateSideTable(false);
+    side->incrementStrong(n);  // FIXME: can there be a nonatomic impl?
+  }
+}
+template <>
+void RefCounts<SideTableRefCountBits>::incrementNonAtomicSlow(SideTableRefCountBits oldbits, uint32_t n) {
+  if (oldbits.isImmortal(false)) {
+    return;
+  } else {
     swift::swift_abortRetainOverflow();
   }
 }
-template void RefCounts<InlineRefCountBits>::incrementNonAtomicSlow(InlineRefCountBits oldbits, uint32_t n);
-template void RefCounts<SideTableRefCountBits>::incrementNonAtomicSlow(SideTableRefCountBits oldbits, uint32_t n);
 
 template <typename RefCountBits>
 bool RefCounts<RefCountBits>::tryIncrementSlow(RefCountBits oldbits) {
@@ -80,53 +145,6 @@ bool RefCounts<RefCountBits>::tryIncrementNonAtomicSlow(RefCountBits oldbits) {
 }
 template bool RefCounts<InlineRefCountBits>::tryIncrementNonAtomicSlow(InlineRefCountBits oldbits);
 template bool RefCounts<SideTableRefCountBits>::tryIncrementNonAtomicSlow(SideTableRefCountBits oldbits);
-
-// Return an object's side table, allocating it if necessary.
-// Returns null if the object is deiniting.
-// SideTableRefCountBits specialization intentionally does not exist.
-template <>
-HeapObjectSideTableEntry* RefCounts<InlineRefCountBits>::allocateSideTable(bool failIfDeiniting)
-{
-  auto oldbits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
-  
-  // Preflight failures before allocating a new side table.
-  if (oldbits.hasSideTable()) {
-    // Already have a side table. Return it.
-    return oldbits.getSideTable();
-  } 
-  else if (failIfDeiniting && oldbits.getIsDeiniting()) {
-    // Already past the start of deinit. Do nothing.
-    return nullptr;
-  }
-
-  // Preflight passed. Allocate a side table.
-  
-  // FIXME: custom side table allocator
-  auto side = swift_cxx_newObject<HeapObjectSideTableEntry>(getHeapObject());
-  
-  auto newbits = InlineRefCountBits(side);
-  
-  do {
-    if (oldbits.hasSideTable()) {
-      // Already have a side table. Return it and delete ours.
-      // Read before delete to streamline barriers.
-      auto result = oldbits.getSideTable();
-      swift_cxx_deleteObject(side);
-      return result;
-    }
-    else if (failIfDeiniting && oldbits.getIsDeiniting()) {
-      // Already past the start of deinit. Do nothing.
-      return nullptr;
-    }
-    
-    side->initRefCounts(oldbits);
-    
-  } while (! refCounts.compare_exchange_weak(oldbits, newbits,
-                                             std::memory_order_release,
-                                             std::memory_order_relaxed));
-  return side;
-}
-
 
 // SideTableRefCountBits specialization intentionally does not exist.
 template <>
@@ -182,6 +200,17 @@ bool RefCounts<InlineRefCountBits>::setIsImmutableCOWBuffer(bool immutable) {
 }
 
 #endif
+
+template <typename RefCountBits>
+void RefCounts<RefCountBits>::dump() const {
+  printf("Location: %p\n", this);
+  printf("Strong Ref Count: %d.\n", getCount());
+  printf("Unowned Ref Count: %d.\n", getUnownedCount());
+  printf("Weak Ref Count: %d.\n", getWeakCount());
+  printf("RefCount Side Table: %p.\n", getSideTable());
+  printf("Is Deiniting: %s.\n", isDeiniting() ? "true" : "false");
+  printf("Is Immortal: %s.\n", refCounts.load().isImmortal(false) ? "true" : "false");
+}
 
 // namespace swift
 } // namespace swift

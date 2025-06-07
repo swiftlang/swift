@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_public_non_abi.sil
-// RUN: %target-swift-frontend -emit-sil -I %t %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_public_non_abi.sil -Xllvm -sil-disable-pass=simplification
+// RUN: %target-swift-frontend -emit-sil -I %t %s -Xllvm -sil-disable-pass=simplification | %FileCheck %s
 
 sil_stage raw
 

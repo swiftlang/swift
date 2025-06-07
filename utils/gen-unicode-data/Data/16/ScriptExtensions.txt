@@ -1,0 +1,233 @@
+# ScriptExtensions-16.0.0.txt
+# Date: 2024-07-30, 19:38:00 GMT
+# © 2024 Unicode®, Inc.
+# Unicode and the Unicode Logo are registered trademarks of Unicode, Inc. in the U.S. and other countries.
+# For terms of use and license, see https://www.unicode.org/terms_of_use.html
+#
+# Unicode Character Database
+#   For documentation, see https://www.unicode.org/reports/tr44/
+#
+# The Script_Extensions property indicates which characters are commonly used
+# with more than one script, but with a limited number of scripts.
+# For each code point, there is one or more property values.  Each such value is a Script property value.
+# For more information, see:
+#   UAX #24, Unicode Script Property: https://www.unicode.org/reports/tr24/
+#     Especially the sections:
+#       https://www.unicode.org/reports/tr24/#Assignment_Script_Values
+#       https://www.unicode.org/reports/tr24/#Assignment_ScriptX_Values
+#
+# Each Script_Extensions value in this file consists of a set
+# of one or more abbreviated Script property values. The ordering of the
+# values in that set is not material, but for stability in presentation
+# it is given here as alphabetical.
+#
+# All code points not explicitly listed for Script_Extensions
+# have as their value the corresponding Script property value.
+#
+# @missing: 0000..10FFFF; <script>
+00B7          ; Avst Cari Copt Dupl Elba Geor Glag Gong Goth Grek Hani Latn Lydi Mahj Perm Shaw #Po MIDDLE DOT
+02BC          ; Beng Cyrl Deva Latn Lisu Thai Toto #Lm   MODIFIER LETTER APOSTROPHE
+02C7          ; Bopo Latn                      # Lm      CARON
+02C9..02CB    ; Bopo Latn                      # Lm  [3] MODIFIER LETTER MACRON..MODIFIER LETTER GRAVE ACCENT
+02CD          ; Latn Lisu                      # Lm      MODIFIER LETTER LOW MACRON
+02D7          ; Latn Thai                      # Sk      MODIFIER LETTER MINUS SIGN
+02D9          ; Bopo Latn                      # Sk      DOT ABOVE
+0300          ; Cher Copt Cyrl Grek Latn Perm Sunu Tale #Mn COMBINING GRAVE ACCENT
+0301          ; Cher Cyrl Grek Latn Osge Sunu Tale Todr #Mn COMBINING ACUTE ACCENT
+0302          ; Cher Cyrl Latn Tfng            # Mn      COMBINING CIRCUMFLEX ACCENT
+0303          ; Glag Latn Sunu Syrc Thai       # Mn      COMBINING TILDE
+0304          ; Aghb Cher Copt Cyrl Goth Grek Latn Osge Syrc Tfng Todr #Mn COMBINING MACRON
+0305          ; Copt Elba Glag Goth Kana Latn  # Mn      COMBINING OVERLINE
+0306          ; Cyrl Grek Latn Perm            # Mn      COMBINING BREVE
+0307          ; Copt Dupl Hebr Latn Perm Syrc Tale Tfng Todr #Mn COMBINING DOT ABOVE
+0308          ; Armn Cyrl Dupl Goth Grek Hebr Latn Perm Syrc Tale #Mn COMBINING DIAERESIS
+0309          ; Latn Tfng                      # Mn      COMBINING HOOK ABOVE
+030A          ; Dupl Latn Syrc                 # Mn      COMBINING RING ABOVE
+030B          ; Cher Cyrl Latn Osge            # Mn      COMBINING DOUBLE ACUTE ACCENT
+030C          ; Cher Latn Tale                 # Mn      COMBINING CARON
+030D          ; Latn Sunu                      # Mn      COMBINING VERTICAL LINE ABOVE
+030E          ; Ethi Latn                      # Mn      COMBINING DOUBLE VERTICAL LINE ABOVE
+0310          ; Latn Sunu                      # Mn      COMBINING CANDRABINDU
+0311          ; Cyrl Latn Todr                 # Mn      COMBINING INVERTED BREVE
+0313          ; Grek Latn Perm Todr            # Mn      COMBINING COMMA ABOVE
+0320          ; Latn Syrc                      # Mn      COMBINING MINUS SIGN BELOW
+0323          ; Cher Dupl Kana Latn Syrc       # Mn      COMBINING DOT BELOW
+0324          ; Cher Dupl Latn Syrc            # Mn      COMBINING DIAERESIS BELOW
+0325          ; Latn Syrc                      # Mn      COMBINING RING BELOW
+032D          ; Latn Sunu Syrc                 # Mn      COMBINING CIRCUMFLEX ACCENT BELOW
+032E          ; Latn Syrc                      # Mn      COMBINING BREVE BELOW
+0330          ; Cher Latn Syrc                 # Mn      COMBINING TILDE BELOW
+0331          ; Aghb Cher Goth Latn Sunu Thai  # Mn      COMBINING MACRON BELOW
+0342          ; Grek                           # Mn      COMBINING GREEK PERISPOMENI
+0345          ; Grek                           # Mn      COMBINING GREEK YPOGEGRAMMENI
+0358          ; Latn Osge                      # Mn      COMBINING DOT ABOVE RIGHT
+035E          ; Aghb Latn Todr                 # Mn      COMBINING DOUBLE MACRON
+0363..036F    ; Latn                           # Mn [13] COMBINING LATIN SMALL LETTER A..COMBINING LATIN SMALL LETTER X
+0374          ; Copt Grek                      # Lm      GREEK NUMERAL SIGN
+0375          ; Copt Grek                      # Sk      GREEK LOWER NUMERAL SIGN
+0483          ; Cyrl Perm                      # Mn      COMBINING CYRILLIC TITLO
+0484          ; Cyrl Glag                      # Mn      COMBINING CYRILLIC PALATALIZATION
+0485..0486    ; Cyrl Latn                      # Mn  [2] COMBINING CYRILLIC DASIA PNEUMATA..COMBINING CYRILLIC PSILI PNEUMATA
+0487          ; Cyrl Glag                      # Mn      COMBINING CYRILLIC POKRYTIE
+0589          ; Armn Geor Glag                 # Po      ARMENIAN FULL STOP
+060C          ; Arab Gara Nkoo Rohg Syrc Thaa Yezi #Po   ARABIC COMMA
+061B          ; Arab Gara Nkoo Rohg Syrc Thaa Yezi #Po   ARABIC SEMICOLON
+061C          ; Arab Syrc Thaa                 # Cf      ARABIC LETTER MARK
+061F          ; Adlm Arab Gara Nkoo Rohg Syrc Thaa Yezi #Po ARABIC QUESTION MARK
+0640          ; Adlm Arab Mand Mani Ougr Phlp Rohg Sogd Syrc #Lm ARABIC TATWEEL
+064B..0655    ; Arab Syrc                      # Mn [11] ARABIC FATHATAN..ARABIC HAMZA BELOW
+0660..0669    ; Arab Thaa Yezi                 # Nd [10] ARABIC-INDIC DIGIT ZERO..ARABIC-INDIC DIGIT NINE
+0670          ; Arab Syrc                      # Mn      ARABIC LETTER SUPERSCRIPT ALEF
+06D4          ; Arab Rohg                      # Po      ARABIC FULL STOP
+0951          ; Beng Deva Gran Gujr Guru Knda Latn Mlym Orya Shrd Taml Telu Tirh #Mn DEVANAGARI STRESS SIGN UDATTA
+0952          ; Beng Deva Gran Gujr Guru Knda Latn Mlym Orya Taml Telu Tirh #Mn DEVANAGARI STRESS SIGN ANUDATTA
+0964          ; Beng Deva Dogr Gong Gonm Gran Gujr Guru Knda Mahj Mlym Nand Onao Orya Sind Sinh Sylo Takr Taml Telu Tirh #Po DEVANAGARI DANDA
+0965          ; Beng Deva Dogr Gong Gonm Gran Gujr Gukh Guru Knda Limb Mahj Mlym Nand Onao Orya Sind Sinh Sylo Takr Taml Telu Tirh #Po DEVANAGARI DOUBLE DANDA
+0966..096F    ; Deva Dogr Kthi Mahj            # Nd [10] DEVANAGARI DIGIT ZERO..DEVANAGARI DIGIT NINE
+09E6..09EF    ; Beng Cakm Sylo                 # Nd [10] BENGALI DIGIT ZERO..BENGALI DIGIT NINE
+0A66..0A6F    ; Guru Mult                      # Nd [10] GURMUKHI DIGIT ZERO..GURMUKHI DIGIT NINE
+0AE6..0AEF    ; Gujr Khoj                      # Nd [10] GUJARATI DIGIT ZERO..GUJARATI DIGIT NINE
+0BE6..0BEF    ; Gran Taml                      # Nd [10] TAMIL DIGIT ZERO..TAMIL DIGIT NINE
+0BF0..0BF2    ; Gran Taml                      # No  [3] TAMIL NUMBER TEN..TAMIL NUMBER ONE THOUSAND
+0BF3          ; Gran Taml                      # So      TAMIL DAY SIGN
+0CE6..0CEF    ; Knda Nand Tutg                 # Nd [10] KANNADA DIGIT ZERO..KANNADA DIGIT NINE
+1040..1049    ; Cakm Mymr Tale                 # Nd [10] MYANMAR DIGIT ZERO..MYANMAR DIGIT NINE
+10FB          ; Geor Glag Latn                 # Po      GEORGIAN PARAGRAPH SEPARATOR
+16EB..16ED    ; Runr                           # Po  [3] RUNIC SINGLE PUNCTUATION..RUNIC CROSS PUNCTUATION
+1735..1736    ; Buhd Hano Tagb Tglg            # Po  [2] PHILIPPINE SINGLE PUNCTUATION..PHILIPPINE DOUBLE PUNCTUATION
+1802..1803    ; Mong Phag                      # Po  [2] MONGOLIAN COMMA..MONGOLIAN FULL STOP
+1805          ; Mong Phag                      # Po      MONGOLIAN FOUR DOTS
+1CD0          ; Beng Deva Gran Knda            # Mn      VEDIC TONE KARSHANA
+1CD1          ; Deva                           # Mn      VEDIC TONE SHARA
+1CD2          ; Beng Deva Gran Knda            # Mn      VEDIC TONE PRENKHA
+1CD3          ; Deva Gran Knda                 # Po      VEDIC SIGN NIHSHVASA
+1CD4          ; Deva                           # Mn      VEDIC SIGN YAJURVEDIC MIDLINE SVARITA
+1CD5..1CD6    ; Beng Deva                      # Mn  [2] VEDIC TONE YAJURVEDIC AGGRAVATED INDEPENDENT SVARITA..VEDIC TONE YAJURVEDIC INDEPENDENT SVARITA
+1CD7          ; Deva Shrd                      # Mn      VEDIC TONE YAJURVEDIC KATHAKA INDEPENDENT SVARITA
+1CD8          ; Beng Deva                      # Mn      VEDIC TONE CANDRA BELOW
+1CD9          ; Deva Shrd                      # Mn      VEDIC TONE YAJURVEDIC KATHAKA INDEPENDENT SVARITA SCHROEDER
+1CDA          ; Deva Knda Mlym Orya Taml Telu  # Mn      VEDIC TONE DOUBLE SVARITA
+1CDB          ; Deva                           # Mn      VEDIC TONE TRIPLE SVARITA
+1CDC..1CDD    ; Deva Shrd                      # Mn  [2] VEDIC TONE KATHAKA ANUDATTA..VEDIC TONE DOT BELOW
+1CDE..1CDF    ; Deva                           # Mn  [2] VEDIC TONE TWO DOTS BELOW..VEDIC TONE THREE DOTS BELOW
+1CE0          ; Deva Shrd                      # Mn      VEDIC TONE RIGVEDIC KASHMIRI INDEPENDENT SVARITA
+1CE1          ; Beng Deva                      # Mc      VEDIC TONE ATHARVAVEDIC INDEPENDENT SVARITA
+1CE2..1CE8    ; Deva                           # Mn  [7] VEDIC SIGN VISARGA SVARITA..VEDIC SIGN VISARGA ANUDATTA WITH TAIL
+1CE9          ; Deva Nand                      # Lo      VEDIC SIGN ANUSVARA ANTARGOMUKHA
+1CEA          ; Beng Deva                      # Lo      VEDIC SIGN ANUSVARA BAHIRGOMUKHA
+1CEB..1CEC    ; Deva                           # Lo  [2] VEDIC SIGN ANUSVARA VAMAGOMUKHA..VEDIC SIGN ANUSVARA VAMAGOMUKHA WITH TAIL
+1CED          ; Beng Deva                      # Mn      VEDIC SIGN TIRYAK
+1CEE..1CF1    ; Deva                           # Lo  [4] VEDIC SIGN HEXIFORM LONG ANUSVARA..VEDIC SIGN ANUSVARA UBHAYATO MUKHA
+1CF2          ; Beng Deva Gran Knda Mlym Nand Orya Sinh Telu Tirh Tutg #Lo VEDIC SIGN ARDHAVISARGA
+1CF3          ; Deva Gran                      # Lo      VEDIC SIGN ROTATED ARDHAVISARGA
+1CF4          ; Deva Gran Knda Tutg            # Mn      VEDIC TONE CANDRA ABOVE
+1CF5..1CF6    ; Beng Deva                      # Lo  [2] VEDIC SIGN JIHVAMULIYA..VEDIC SIGN UPADHMANIYA
+1CF7          ; Beng                           # Mc      VEDIC SIGN ATIKRAMA
+1CF8..1CF9    ; Deva Gran                      # Mn  [2] VEDIC TONE RING ABOVE..VEDIC TONE DOUBLE RING ABOVE
+1CFA          ; Nand                           # Lo      VEDIC SIGN DOUBLE ANUSVARA ANTARGOMUKHA
+1DC0..1DC1    ; Grek                           # Mn  [2] COMBINING DOTTED GRAVE ACCENT..COMBINING DOTTED ACUTE ACCENT
+1DF8          ; Cyrl Latn Syrc                 # Mn      COMBINING DOT ABOVE LEFT
+1DFA          ; Syrc                           # Mn      COMBINING DOT BELOW LEFT
+202F          ; Latn Mong Phag                 # Zs      NARROW NO-BREAK SPACE
+204F          ; Adlm Arab                      # Po      REVERSED SEMICOLON
+205A          ; Cari Geor Glag Hung Lyci Orkh  # Po      TWO DOT PUNCTUATION
+205D          ; Cari Grek Hung Mero            # Po      TRICOLON
+20F0          ; Deva Gran Latn                 # Mn      COMBINING ASTERISK ABOVE
+2E17          ; Copt Latn                      # Pd      DOUBLE OBLIQUE HYPHEN
+2E30          ; Avst Orkh                      # Po      RING POINT
+2E31          ; Avst Cari Geor Hung Kthi Lydi Samr #Po   WORD SEPARATOR MIDDLE DOT
+2E3C          ; Dupl                           # Po      STENOGRAPHIC FULL STOP
+2E41          ; Adlm Arab Hung                 # Po      REVERSED COMMA
+2E43          ; Cyrl Glag                      # Po      DASH WITH LEFT UPTURN
+2FF0..2FFF    ; Hani Tang                      # So [16] IDEOGRAPHIC DESCRIPTION CHARACTER LEFT TO RIGHT..IDEOGRAPHIC DESCRIPTION CHARACTER ROTATION
+3001          ; Bopo Hang Hani Hira Kana Mong Yiii #Po   IDEOGRAPHIC COMMA
+3002          ; Bopo Hang Hani Hira Kana Mong Phag Yiii #Po IDEOGRAPHIC FULL STOP
+3003          ; Bopo Hang Hani Hira Kana       # Po      DITTO MARK
+3006          ; Hani                           # Lo      IDEOGRAPHIC CLOSING MARK
+3008          ; Bopo Hang Hani Hira Kana Mong Tibt Yiii #Ps LEFT ANGLE BRACKET
+3009          ; Bopo Hang Hani Hira Kana Mong Tibt Yiii #Pe RIGHT ANGLE BRACKET
+300A          ; Bopo Hang Hani Hira Kana Lisu Mong Tibt Yiii #Ps LEFT DOUBLE ANGLE BRACKET
+300B          ; Bopo Hang Hani Hira Kana Lisu Mong Tibt Yiii #Pe RIGHT DOUBLE ANGLE BRACKET
+300C          ; Bopo Hang Hani Hira Kana Yiii  # Ps      LEFT CORNER BRACKET
+300D          ; Bopo Hang Hani Hira Kana Yiii  # Pe      RIGHT CORNER BRACKET
+300E          ; Bopo Hang Hani Hira Kana Yiii  # Ps      LEFT WHITE CORNER BRACKET
+300F          ; Bopo Hang Hani Hira Kana Yiii  # Pe      RIGHT WHITE CORNER BRACKET
+3010          ; Bopo Hang Hani Hira Kana Yiii  # Ps      LEFT BLACK LENTICULAR BRACKET
+3011          ; Bopo Hang Hani Hira Kana Yiii  # Pe      RIGHT BLACK LENTICULAR BRACKET
+3013          ; Bopo Hang Hani Hira Kana       # So      GETA MARK
+3014          ; Bopo Hang Hani Hira Kana Yiii  # Ps      LEFT TORTOISE SHELL BRACKET
+3015          ; Bopo Hang Hani Hira Kana Yiii  # Pe      RIGHT TORTOISE SHELL BRACKET
+3016          ; Bopo Hang Hani Hira Kana Yiii  # Ps      LEFT WHITE LENTICULAR BRACKET
+3017          ; Bopo Hang Hani Hira Kana Yiii  # Pe      RIGHT WHITE LENTICULAR BRACKET
+3018          ; Bopo Hang Hani Hira Kana Yiii  # Ps      LEFT WHITE TORTOISE SHELL BRACKET
+3019          ; Bopo Hang Hani Hira Kana Yiii  # Pe      RIGHT WHITE TORTOISE SHELL BRACKET
+301A          ; Bopo Hang Hani Hira Kana Yiii  # Ps      LEFT WHITE SQUARE BRACKET
+301B          ; Bopo Hang Hani Hira Kana Yiii  # Pe      RIGHT WHITE SQUARE BRACKET
+301C          ; Bopo Hang Hani Hira Kana       # Pd      WAVE DASH
+301D          ; Bopo Hang Hani Hira Kana       # Ps      REVERSED DOUBLE PRIME QUOTATION MARK
+301E..301F    ; Bopo Hang Hani Hira Kana       # Pe  [2] DOUBLE PRIME QUOTATION MARK..LOW DOUBLE PRIME QUOTATION MARK
+302A..302D    ; Bopo Hani                      # Mn  [4] IDEOGRAPHIC LEVEL TONE MARK..IDEOGRAPHIC ENTERING TONE MARK
+3030          ; Bopo Hang Hani Hira Kana       # Pd      WAVY DASH
+3031..3035    ; Hira Kana                      # Lm  [5] VERTICAL KANA REPEAT MARK..VERTICAL KANA REPEAT MARK LOWER HALF
+3037          ; Bopo Hang Hani Hira Kana       # So      IDEOGRAPHIC TELEGRAPH LINE FEED SEPARATOR SYMBOL
+303C          ; Hani Hira Kana                 # Lo      MASU MARK
+303D          ; Hani Hira Kana                 # Po      PART ALTERNATION MARK
+303E..303F    ; Hani                           # So  [2] IDEOGRAPHIC VARIATION INDICATOR..IDEOGRAPHIC HALF FILL SPACE
+3099..309A    ; Hira Kana                      # Mn  [2] COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK..COMBINING KATAKANA-HIRAGANA SEMI-VOICED SOUND MARK
+309B..309C    ; Hira Kana                      # Sk  [2] KATAKANA-HIRAGANA VOICED SOUND MARK..KATAKANA-HIRAGANA SEMI-VOICED SOUND MARK
+30A0          ; Hira Kana                      # Pd      KATAKANA-HIRAGANA DOUBLE HYPHEN
+30FB          ; Bopo Hang Hani Hira Kana Yiii  # Po      KATAKANA MIDDLE DOT
+30FC          ; Hira Kana                      # Lm      KATAKANA-HIRAGANA PROLONGED SOUND MARK
+3190..3191    ; Hani                           # So  [2] IDEOGRAPHIC ANNOTATION LINKING MARK..IDEOGRAPHIC ANNOTATION REVERSE MARK
+3192..3195    ; Hani                           # No  [4] IDEOGRAPHIC ANNOTATION ONE MARK..IDEOGRAPHIC ANNOTATION FOUR MARK
+3196..319F    ; Hani                           # So [10] IDEOGRAPHIC ANNOTATION TOP MARK..IDEOGRAPHIC ANNOTATION MAN MARK
+31C0..31E5    ; Hani                           # So [38] CJK STROKE T..CJK STROKE SZP
+31EF          ; Hani Tang                      # So      IDEOGRAPHIC DESCRIPTION CHARACTER SUBTRACTION
+3220..3229    ; Hani                           # No [10] PARENTHESIZED IDEOGRAPH ONE..PARENTHESIZED IDEOGRAPH TEN
+322A..3247    ; Hani                           # So [30] PARENTHESIZED IDEOGRAPH MOON..CIRCLED IDEOGRAPH KOTO
+3280..3289    ; Hani                           # No [10] CIRCLED IDEOGRAPH ONE..CIRCLED IDEOGRAPH TEN
+328A..32B0    ; Hani                           # So [39] CIRCLED IDEOGRAPH MOON..CIRCLED IDEOGRAPH NIGHT
+32C0..32CB    ; Hani                           # So [12] IDEOGRAPHIC TELEGRAPH SYMBOL FOR JANUARY..IDEOGRAPHIC TELEGRAPH SYMBOL FOR DECEMBER
+32FF          ; Hani                           # So      SQUARE ERA NAME REIWA
+3358..3370    ; Hani                           # So [25] IDEOGRAPHIC TELEGRAPH SYMBOL FOR HOUR ZERO..IDEOGRAPHIC TELEGRAPH SYMBOL FOR HOUR TWENTY-FOUR
+337B..337F    ; Hani                           # So  [5] SQUARE ERA NAME HEISEI..SQUARE CORPORATION
+33E0..33FE    ; Hani                           # So [31] IDEOGRAPHIC TELEGRAPH SYMBOL FOR DAY ONE..IDEOGRAPHIC TELEGRAPH SYMBOL FOR DAY THIRTY-ONE
+A66F          ; Cyrl Glag                      # Mn      COMBINING CYRILLIC VZMET
+A700..A707    ; Hani Latn                      # Sk  [8] MODIFIER LETTER CHINESE TONE YIN PING..MODIFIER LETTER CHINESE TONE YANG RU
+A830..A832    ; Deva Dogr Gujr Guru Khoj Knda Kthi Mahj Mlym Modi Nand Shrd Sind Takr Tirh Tutg #No [3] NORTH INDIC FRACTION ONE QUARTER..NORTH INDIC FRACTION THREE QUARTERS
+A833..A835    ; Deva Dogr Gujr Guru Khoj Knda Kthi Mahj Modi Nand Shrd Sind Takr Tirh Tutg #No [3] NORTH INDIC FRACTION ONE SIXTEENTH..NORTH INDIC FRACTION THREE SIXTEENTHS
+A836..A837    ; Deva Dogr Gujr Guru Khoj Kthi Mahj Modi Sind Takr Tirh #So [2] NORTH INDIC QUARTER MARK..NORTH INDIC PLACEHOLDER MARK
+A838          ; Deva Dogr Gujr Guru Khoj Kthi Mahj Modi Shrd Sind Takr Tirh #Sc NORTH INDIC RUPEE MARK
+A839          ; Deva Dogr Gujr Guru Khoj Kthi Mahj Modi Sind Takr Tirh #So NORTH INDIC QUANTITY MARK
+A8F1          ; Beng Deva Tutg                 # Mn      COMBINING DEVANAGARI SIGN AVAGRAHA
+A8F3          ; Deva Taml                      # Lo      DEVANAGARI SIGN CANDRABINDU VIRAMA
+A92E          ; Kali Latn Mymr                 # Po      KAYAH LI SIGN CWI
+A9CF          ; Bugi Java                      # Lm      JAVANESE PANGRANGKEP
+FD3E          ; Arab Nkoo                      # Pe      ORNATE LEFT PARENTHESIS
+FD3F          ; Arab Nkoo                      # Ps      ORNATE RIGHT PARENTHESIS
+FDF2          ; Arab Thaa                      # Lo      ARABIC LIGATURE ALLAH ISOLATED FORM
+FDFD          ; Arab Thaa                      # So      ARABIC LIGATURE BISMILLAH AR-RAHMAN AR-RAHEEM
+FE45..FE46    ; Bopo Hang Hani Hira Kana       # Po  [2] SESAME DOT..WHITE SESAME DOT
+FF61          ; Bopo Hang Hani Hira Kana Yiii  # Po      HALFWIDTH IDEOGRAPHIC FULL STOP
+FF62          ; Bopo Hang Hani Hira Kana Yiii  # Ps      HALFWIDTH LEFT CORNER BRACKET
+FF63          ; Bopo Hang Hani Hira Kana Yiii  # Pe      HALFWIDTH RIGHT CORNER BRACKET
+FF64..FF65    ; Bopo Hang Hani Hira Kana Yiii  # Po  [2] HALFWIDTH IDEOGRAPHIC COMMA..HALFWIDTH KATAKANA MIDDLE DOT
+FF70          ; Hira Kana                      # Lm      HALFWIDTH KATAKANA-HIRAGANA PROLONGED SOUND MARK
+FF9E..FF9F    ; Hira Kana                      # Lm  [2] HALFWIDTH KATAKANA VOICED SOUND MARK..HALFWIDTH KATAKANA SEMI-VOICED SOUND MARK
+10100..10101  ; Cpmn Cprt Linb                 # Po  [2] AEGEAN WORD SEPARATOR LINE..AEGEAN WORD SEPARATOR DOT
+10102         ; Cprt Linb                      # Po      AEGEAN CHECK MARK
+10107..10133  ; Cprt Lina Linb                 # No [45] AEGEAN NUMBER ONE..AEGEAN NUMBER NINETY THOUSAND
+10137..1013F  ; Cprt Linb                      # So  [9] AEGEAN WEIGHT BASE UNIT..AEGEAN MEASURE THIRD SUBUNIT
+102E0         ; Arab Copt                      # Mn      COPTIC EPACT THOUSANDS MARK
+102E1..102FB  ; Arab Copt                      # No [27] COPTIC EPACT DIGIT ONE..COPTIC EPACT NUMBER NINE HUNDRED
+10AF2         ; Mani Ougr                      # Po      MANICHAEAN PUNCTUATION DOUBLE DOT WITHIN DOT
+11301         ; Gran Taml                      # Mn      GRANTHA SIGN CANDRABINDU
+11303         ; Gran Taml                      # Mc      GRANTHA SIGN VISARGA
+1133B..1133C  ; Gran Taml                      # Mn  [2] COMBINING BINDU BELOW..GRANTHA SIGN NUKTA
+11FD0..11FD1  ; Gran Taml                      # No  [2] TAMIL FRACTION ONE QUARTER..TAMIL FRACTION ONE HALF-1
+11FD3         ; Gran Taml                      # No      TAMIL FRACTION THREE QUARTERS
+1BCA0..1BCA3  ; Dupl                           # Cf  [4] SHORTHAND FORMAT LETTER OVERLAP..SHORTHAND FORMAT UP STEP
+1D360..1D371  ; Hani                           # No [18] COUNTING ROD UNIT DIGIT ONE..COUNTING ROD TENS DIGIT NINE
+1F250..1F251  ; Hani                           # So  [2] CIRCLED IDEOGRAPH ADVANTAGE..CIRCLED IDEOGRAPH ACCEPT
+
+# EOF

@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift
+// RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 extension extension_for_invalid_type_1 { // expected-error {{cannot find type 'extension_for_invalid_type_1' in scope}}
   func f() { }
@@ -10,7 +11,7 @@ extension extension_for_invalid_type_3 { // expected-error {{cannot find type 'e
   init() {}
 }
 extension extension_for_invalid_type_4 { // expected-error {{cannot find type 'extension_for_invalid_type_4' in scope}}
-  deinit {} // expected-error {{deinitializers may only be declared within a class or actor}}
+  deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or noncopyable type}}
 }
 extension extension_for_invalid_type_5 { // expected-error {{cannot find type 'extension_for_invalid_type_5' in scope}}
   typealias X = Int
@@ -87,11 +88,6 @@ protocol P1 {}
 
 protocol P2 {}
 
-extension () {} // expected-error {{non-nominal type '()' cannot be extended}} {{educational-notes=nominal-types}}
-
-typealias TupleAlias = (x: Int, y: Int)
-extension TupleAlias {} // expected-error{{non-nominal type 'TupleAlias' (aka '(x: Int, y: Int)') cannot be extended}} {{educational-notes=nominal-types}}
-
 // Test property accessors in extended types
 class C {}
 extension C {
@@ -143,6 +139,8 @@ class JustAClass: DoesNotImposeClassReq_1 {
   var property: String = ""
 }
 
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=DoesNotImposeClassReq_1
+// CHECK-NEXT: Generic signature: <Self where Self : JustAClass>
 extension DoesNotImposeClassReq_1 where Self: JustAClass {
   var wrappingProperty1: String {
     get { return property }
@@ -196,17 +194,19 @@ protocol DoesNotImposeClassReq_2 {
   var property: String { get set }
 }
 
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=DoesNotImposeClassReq_2
+// CHECK-NEXT: Generic signature: <Self where Self : AnyObject, Self : DoesNotImposeClassReq_2>
 extension DoesNotImposeClassReq_2 where Self : AnyObject {
   var wrappingProperty1: String {
     get { property }
     set { property = newValue } // expected-error {{cannot assign to property: 'self' is immutable}}
-    // expected-note@-1 {{mark accessor 'mutating' to make 'self' mutable}}{{5-5=mutating }}
+    // expected-note@-1 {{mark setter 'mutating' to make 'self' mutable}}{{5-5=mutating }}
   }
   
   var wrappingProperty2: String {
     get { property }
     nonmutating set { property = newValue } // expected-error {{cannot assign to property: 'self' is immutable}}
-    // expected-note@-1 {{mark accessor 'mutating' to make 'self' mutable}}{{5-16=mutating}}
+    // expected-note@-1 {{mark setter 'mutating' to make 'self' mutable}}{{5-16=mutating}}
   }
   
   var wrappingProperty3: String {
@@ -244,6 +244,8 @@ class JustAClass1: DoesNotImposeClassReq_3 {
   var someProperty = 0
 }
 
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=DoesNotImposeClassReq_3
+// CHECK-NEXT: Generic signature: <Self where Self : JustAClass1>
 extension DoesNotImposeClassReq_3 where Self: JustAClass1 {
   var anotherProperty1: Int {
     get { return someProperty }
@@ -268,7 +270,9 @@ class JustAClass2: ImposeClassReq1 {
   var someProperty = 0
 }
 
-extension ImposeClassReq1 where Self: AnyObject { // expected-warning {{redundant constraint 'Self' : 'AnyObject'}}
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=ImposeClassReq1
+// CHECK-NEXT: Generic signature: <Self where Self : ImposeClassReq1>
+extension ImposeClassReq1 where Self: AnyObject {
   var wrappingProperty1: Int {
     get { return someProperty }
     set { someProperty = newValue }
@@ -389,3 +393,12 @@ extension B4 {
 // expected-error@-1 {{extension of existential type 'B4' (aka 'any P4') is not supported}}
 // expected-note@-2 {{did you mean to extend 'P4' instead?}} {{11-13=P4}}
 }
+
+
+extension Sendable {} // expected-error {{cannot extend protocol 'Sendable'}}
+extension Copyable {} // expected-error {{cannot extend protocol 'Copyable'}}
+extension Escapable {} // expected-error {{cannot extend protocol 'Escapable'}}
+extension BitwiseCopyable {} // expected-error {{cannot extend protocol 'BitwiseCopyable'}}
+
+@_marker protocol MyMarkerProto {}
+extension MyMarkerProto {} // OK

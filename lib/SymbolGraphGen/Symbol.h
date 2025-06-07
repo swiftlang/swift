@@ -35,10 +35,10 @@ class Symbol {
   /// Either a ValueDecl* or ExtensionDecl*.
   const Decl *D;
   Type BaseType;
-  const NominalTypeDecl *SynthesizedBaseTypeDecl;
+  const ValueDecl *SynthesizedBaseTypeDecl;
 
   Symbol(SymbolGraph *Graph, const ValueDecl *VD, const ExtensionDecl *ED,
-         const NominalTypeDecl *SynthesizedBaseTypeDecl,
+         const ValueDecl *SynthesizedBaseTypeDecl,
          Type BaseTypeForSubstitution = Type());
 
   swift::DeclName getName(const Decl *D) const;
@@ -87,11 +87,11 @@ class Symbol {
 
 public:
   Symbol(SymbolGraph *Graph, const ExtensionDecl *ED,
-         const NominalTypeDecl *SynthesizedBaseTypeDecl,
+         const ValueDecl *SynthesizedBaseTypeDecl,
          Type BaseTypeForSubstitution = Type());
 
   Symbol(SymbolGraph *Graph, const ValueDecl *VD,
-         const NominalTypeDecl *SynthesizedBaseTypeDecl,
+         const ValueDecl *SynthesizedBaseTypeDecl,
          Type BaseTypeForSubstitution = Type());
 
   void serialize(llvm::json::OStream &OS) const;
@@ -108,7 +108,7 @@ public:
     return BaseType;
   }
 
-  const NominalTypeDecl *getSynthesizedBaseTypeDecl() const {
+  const ValueDecl *getSynthesizedBaseTypeDecl() const {
     return SynthesizedBaseTypeDecl;
   }
 
@@ -129,6 +129,19 @@ public:
   /// implementation, returns that decl. Returns null if there are no docs or if
   /// the symbol has its own doc comments to render.
   const ValueDecl *getDeclInheritingDocs() const;
+
+  /// If this symbol is an implementation of a protocol requirement for a
+  /// protocol declared outside its module, returns the upstream decl for that
+  /// requirement.
+  const ValueDecl *getForeignProtocolRequirement() const;
+
+  /// If this symbol is an implementation of a protocol requirement, returns the
+  /// upstream decl for that requirement.
+  const ValueDecl *getProtocolRequirement() const;
+
+  /// If this symbol is a synthesized symbol or an implementation of a protocol
+  /// requirement, returns the upstream decl.
+  const ValueDecl *getInheritedDecl() const;
 
   static bool supportsKind(DeclKind Kind);
 
@@ -162,19 +175,19 @@ using SymbolGraph = swift::symbolgraphgen::SymbolGraph;
 
 template <> struct DenseMapInfo<Symbol> {
   static inline Symbol getEmptyKey() {
-    return Symbol {
-      DenseMapInfo<SymbolGraph *>::getEmptyKey(),
-      DenseMapInfo<const swift::ValueDecl *>::getEmptyKey(),
-      DenseMapInfo<const swift::NominalTypeDecl *>::getTombstoneKey(),
-      DenseMapInfo<swift::Type>::getEmptyKey(),
+    return Symbol{
+        DenseMapInfo<SymbolGraph *>::getEmptyKey(),
+        DenseMapInfo<const swift::ValueDecl *>::getEmptyKey(),
+        DenseMapInfo<const swift::ValueDecl *>::getTombstoneKey(),
+        DenseMapInfo<swift::Type>::getEmptyKey(),
     };
   }
   static inline Symbol getTombstoneKey() {
-    return Symbol {
-      DenseMapInfo<SymbolGraph *>::getTombstoneKey(),
-      DenseMapInfo<const swift::ValueDecl *>::getTombstoneKey(),
-      DenseMapInfo<const swift::NominalTypeDecl *>::getTombstoneKey(),
-      DenseMapInfo<swift::Type>::getTombstoneKey(),
+    return Symbol{
+        DenseMapInfo<SymbolGraph *>::getTombstoneKey(),
+        DenseMapInfo<const swift::ValueDecl *>::getTombstoneKey(),
+        DenseMapInfo<const swift::ValueDecl *>::getTombstoneKey(),
+        DenseMapInfo<swift::Type>::getTombstoneKey(),
     };
   }
   static unsigned getHashValue(const Symbol S) {
@@ -182,7 +195,8 @@ template <> struct DenseMapInfo<Symbol> {
     H ^= DenseMapInfo<SymbolGraph *>::getHashValue(S.getGraph());
     H ^=
         DenseMapInfo<const swift::Decl *>::getHashValue(S.getLocalSymbolDecl());
-    H ^= DenseMapInfo<const swift::NominalTypeDecl *>::getHashValue(S.getSynthesizedBaseTypeDecl());
+    H ^= DenseMapInfo<const swift::ValueDecl *>::getHashValue(
+        S.getSynthesizedBaseTypeDecl());
     H ^= DenseMapInfo<swift::Type>::getHashValue(S.getBaseType());
     return H;
   }

@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/../Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-build-swift -module-name main -Xfrontend -disable-availability-checking -j2 -parse-as-library -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-5.7-abi-triple %S/../Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-build-swift -module-name main -target %target-swift-5.7-abi-triple -j2 -parse-as-library -plugin-path %swift-plugin-dir -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
 // RUN: %target-codesign %t/a.out
-// RUN: %target-run %t/a.out | %FileCheck %s --color
+// RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -20,6 +20,7 @@ import FakeDistributedActorSystems
 
 typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
 
+@available(SwiftStdlib 6.0, *)
 protocol PlainWorker {
   associatedtype WorkItem: Sendable & Codable
   associatedtype WorkResult: Sendable & Codable
@@ -28,7 +29,9 @@ protocol PlainWorker {
   func asyncThrows(work: WorkItem) async throws -> WorkResult
 }
 
-protocol DistributedWorker: DistributedActor where ActorSystem == DefaultDistributedActorSystem {
+@Resolvable
+@available(SwiftStdlib 6.0, *)
+protocol DistributedWorker<WorkItem, WorkResult>: DistributedActor where ActorSystem == DefaultDistributedActorSystem {
   associatedtype WorkItem: Sendable & Codable
   associatedtype WorkResult: Sendable & Codable
 
@@ -49,6 +52,7 @@ protocol DistributedWorker: DistributedActor where ActorSystem == DefaultDistrib
   func asyncThrowsReq_witnessDistributed_asyncThrows(work: WorkItem) async throws -> WorkResult
 }
 
+@available(SwiftStdlib 6.0, *)
 distributed actor ThePlainWorker: PlainWorker {
   typealias ActorSystem = DefaultDistributedActorSystem
   typealias WorkItem = String
@@ -59,6 +63,7 @@ distributed actor ThePlainWorker: PlainWorker {
   }
 }
 
+@available(SwiftStdlib 6.0, *)
 distributed actor TheWorker: DistributedWorker {
   typealias ActorSystem = DefaultDistributedActorSystem
   typealias WorkItem = String
@@ -105,6 +110,7 @@ distributed actor TheWorker: DistributedWorker {
 
 }
 
+@available(SwiftStdlib 6.0, *)
 func test_generic(system: DefaultDistributedActorSystem) async throws {
   let localW = TheWorker(actorSystem: system)
   let remoteW = try! TheWorker.resolve(id: localW.id, using: system)
@@ -218,6 +224,7 @@ func test_generic(system: DefaultDistributedActorSystem) async throws {
   // distributedness of those witnesses never actually is used remotely, but at
   // least check we invoke the right methods.
 
+  @available(SwiftStdlib 6.0, *)
   func call_requirement_witnessedByDistributed_sync<W: DistributedWorker>(w: W) async throws -> String where W.WorkItem == String, W.WorkResult == String {
     try await w.whenLocal { __secretlyKnownToBeLocal in
       try await __secretlyKnownToBeLocal.asyncThrowsReq_witnessDistributed_sync(work: "Hello")
@@ -231,6 +238,7 @@ func test_generic(system: DefaultDistributedActorSystem) async throws {
   }
   print("==== ----------------------------------------------------------------")
 
+  @available(SwiftStdlib 6.0, *)
   func call_requirement_witnessedByDistributed_async<W: DistributedWorker>(w: W) async throws -> String where W.WorkItem == String, W.WorkResult == String {
     try await w.whenLocal { __secretlyKnownToBeLocal in
       try await __secretlyKnownToBeLocal.asyncThrowsReq_witnessDistributed_async(work: "Hello")
@@ -244,6 +252,7 @@ func test_generic(system: DefaultDistributedActorSystem) async throws {
   }
   print("==== ----------------------------------------------------------------")
 
+  @available(SwiftStdlib 6.0, *)
   func call_requirement_witnessedByDistributed_syncThrows<W: DistributedWorker>(w: W) async throws -> String where W.WorkItem == String, W.WorkResult == String {
     try await w.whenLocal { __secretlyKnownToBeLocal in
       try await __secretlyKnownToBeLocal.asyncThrowsReq_witnessDistributed_syncThrows(work: "Hello")
@@ -257,6 +266,7 @@ func test_generic(system: DefaultDistributedActorSystem) async throws {
   }
   print("==== ----------------------------------------------------------------")
 
+  @available(SwiftStdlib 6.0, *)
   func call_requirement_witnessedByDistributed_asyncThrows<W: DistributedWorker>(w: W) async throws -> String where W.WorkItem == String, W.WorkResult == String {
     try await w.whenLocal { __secretlyKnownToBeLocal in
       try await __secretlyKnownToBeLocal.asyncThrowsReq_witnessDistributed_asyncThrows(work: "Hello")
@@ -271,6 +281,7 @@ func test_generic(system: DefaultDistributedActorSystem) async throws {
   print("==== ----------------------------------------------------------------")
 }
 
+@available(SwiftStdlib 6.0, *)
 func test_whenLocal(system: DefaultDistributedActorSystem) async throws {
   let localW = TheWorker(actorSystem: system)
   let remoteW = try! TheWorker.resolve(id: localW.id, using: system)
@@ -341,6 +352,7 @@ func test_whenLocal(system: DefaultDistributedActorSystem) async throws {
   }
 }
 
+@available(SwiftStdlib 6.0, *)
 func test_generic_plain(system: DefaultDistributedActorSystem) async throws {
   let localW = ThePlainWorker(actorSystem: system)
   let remoteW = try! ThePlainWorker.resolve(id: localW.id, using: system)
@@ -355,6 +367,7 @@ func test_generic_plain(system: DefaultDistributedActorSystem) async throws {
   }
   print("==== ----------------------------------------------------------------")
 
+  @available(SwiftStdlib 6.0, *)
   func call_plainWorker<W: PlainWorker>(w: W) async throws -> String where W.WorkItem == String, W.WorkResult == String {
     try await w.asyncThrows(work: "Hello")
   }
@@ -372,6 +385,7 @@ func test_generic_plain(system: DefaultDistributedActorSystem) async throws {
   }
 }
 
+@available(SwiftStdlib 6.0, *)
 @main struct Main {
   static func main() async {
     let system = DefaultDistributedActorSystem()

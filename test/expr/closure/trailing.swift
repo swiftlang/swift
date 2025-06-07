@@ -332,7 +332,7 @@ func testOverloadAmbiguity() {
   overloadOnLabelSomeDefaultArgs(1) {} // expected-error {{ambiguous use of 'overloadOnLabelSomeDefaultArgs'}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabelSomeDefaultArgs(_:x:a:)'}} {{35-37=, a: }} {{39-39=)}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabelSomeDefaultArgs(_:x:b:)'}} {{35-37=, b: }} {{39-39=)}}
   overloadOnLabelSomeDefaultArgs(1, x: 2) {} // expected-error {{ambiguous use of 'overloadOnLabelSomeDefaultArgs'}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabelSomeDefaultArgs(_:x:a:)'}} {{41-43=, a: }} {{45-45=)}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabelSomeDefaultArgs(_:x:b:)'}} {{41-43=, b: }} {{45-45=)}}
 
-  overloadOnLabelSomeDefaultArgs( // expected-error {{ambiguous use of 'overloadOnLabelSomeDefaultArgs'}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabelSomeDefaultArgs(_:x:a:)'}} {{12-5=, a: }} {{4-4=)}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabelSomeDefaultArgs(_:x:b:)'}} {{12-5=, b: }} {{4-4=)}}
+  overloadOnLabelSomeDefaultArgs( // expected-error {{ambiguous use of 'overloadOnLabelSomeDefaultArgs'}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabelSomeDefaultArgs(_:x:a:)'}} {{+1:12-+2:5=, a: }} {{+4:4-4=)}} expected-note {{use an explicit argument label instead of a trailing closure to call 'overloadOnLabelSomeDefaultArgs(_:x:b:)'}} {{+1:12-+2:5=, b: }} {{+4:4-4=)}}
     1, x: 2
   ) {
     // some
@@ -487,4 +487,40 @@ func rdar92521618() {
 
   if let _ = { foo {} }() {}
   guard let _ = { foo {} }() else { return }
+}
+
+// Argument matching never binds trailing closure arguments to
+// defaulted/variadic parameters of non-function type.
+do {
+  // Trailing closure not considered fulfilled by 'arg'.
+  // Note: Used to crash.
+  do {
+    func variadic(arg: Int...) {} // expected-note@:10 {{'variadic(arg:)' declared here}}{{none}}
+    func defaulted(arg: Int = 0) {}
+
+    let _ = variadic { return () }
+    // expected-error@-1:22 {{trailing closure passed to parameter of type 'Int' that does not accept a closure}}{{none}}
+    let _ = defaulted { return () }
+    // expected-error@-1:23 {{extra trailing closure passed in call}}{{none}}
+  }
+  // Trailing closure considered fulfilled by 'x' instead of 'arg'.
+  do {
+    func variadic(arg: Int..., x: String) {} // expected-note@:10 {{'variadic(arg:x:)' declared here}}{{none}}
+    func defaulted(arg: Int = 0, x: String) {} // expected-note@:10 {{'defaulted(arg:x:)' declared here}}{{none}}
+
+    let _ = variadic { return () }
+    // expected-error@-1:22 {{trailing closure passed to parameter of type 'String' that does not accept a closure}}{{none}}
+    let _ = defaulted { return () }
+    // expected-error@-1:23 {{trailing closure passed to parameter of type 'String' that does not accept a closure}}{{none}}
+  }
+  // Trailing closure considered fulfilled by 'arg'; has function type.
+  do {
+    func variadic(arg: ((Int) -> Void)...) {}
+    func defaulted(arg: ((Int) -> Void) = { _ in }) {}
+
+    let _ = variadic { return () }
+    // expected-error@-1:22 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}}{{23-23= _ in}}
+    let _ = defaulted { return () }
+    // expected-error@-1:23 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}}{{24-24= _ in}}
+  }
 }

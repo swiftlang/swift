@@ -38,6 +38,7 @@ class SILType;
 
 namespace irgen {
 class Explosion;
+class OptionalExplosion;
 class IRGenFunction;
 
 /// Emit the buildMainActorExecutorRef builtin.
@@ -47,8 +48,20 @@ void emitBuildMainActorExecutorRef(IRGenFunction &IGF, Explosion &out);
 void emitBuildDefaultActorExecutorRef(IRGenFunction &IGF, llvm::Value *actor,
                                       Explosion &out);
 
+/// Emit the buildOrdinaryTaskExecutorRef builtin.
+void emitBuildOrdinaryTaskExecutorRef(
+    IRGenFunction &IGF, llvm::Value *executor, CanType executorType,
+    ProtocolConformanceRef executorConformance, Explosion &out);
+
 /// Emit the buildOrdinarySerialExecutorRef builtin.
 void emitBuildOrdinarySerialExecutorRef(IRGenFunction &IGF,
+                                        llvm::Value *executor,
+                                        CanType executorType,
+                                        ProtocolConformanceRef executorConformance,
+                                        Explosion &out);
+
+/// Emit the buildComplexEqualitySerialExecutorRef builtin.
+void emitBuildComplexEqualitySerialExecutorRef(IRGenFunction &IGF,
                                         llvm::Value *executor,
                                         CanType executorType,
                                         ProtocolConformanceRef executorConformance,
@@ -78,6 +91,24 @@ void emitDestroyTaskGroup(IRGenFunction &IGF, llvm::Value *group);
 void emitTaskRunInline(IRGenFunction &IGF, SubstitutionMap subs,
                        llvm::Value *result, llvm::Value *closure,
                        llvm::Value *closureContext);
+
+void emitTaskCancel(IRGenFunction &IGF, llvm::Value *task);
+
+llvm::Value *maybeAddEmbeddedSwiftResultTypeInfo(IRGenFunction &IGF,
+                                                 llvm::Value *taskOptions,
+                                                 CanType formalResultType);
+
+/// Emit a call to swift_task_create[_f] with the given flags, options, and
+/// task function.
+std::pair<llvm::Value *, llvm::Value *>
+emitTaskCreate(IRGenFunction &IGF, llvm::Value *flags,
+               OptionalExplosion &initialExecutor,
+               OptionalExplosion &taskGroup,
+               OptionalExplosion &taskExecutorUnowned,
+               OptionalExplosion &taskExecutorExistential,
+               OptionalExplosion &taskName,
+               Explosion &taskFunction,
+               SubstitutionMap subs);
 
 } // end namespace irgen
 } // end namespace swift

@@ -49,7 +49,8 @@ bb0:
  %5 = function_ref @adoptStorage : $@convention(thin) (@owned AnyObject, MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
  %6 = apply %5(%2, %3, %4) : $@convention(thin) (@owned AnyObject, MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
  %7 = tuple_extract %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>), 0
- %8 = tuple_extract %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>), 1
+ %8a = tuple_extract %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>), 1
+ %8 = mark_dependence %8a : $UnsafeMutablePointer<MyInt> on %7 : $MyArray<MyInt>
  debug_value %7 : $MyArray<MyInt>
  %f = function_ref @finalize : $@convention(thin) (@owned MyArray<MyInt>) -> @owned MyArray<MyInt>
  %a = apply %f(%7) : $@convention(thin) (@owned MyArray<MyInt>) -> @owned MyArray<MyInt>
@@ -76,7 +77,8 @@ bb0:
  %5 = function_ref @allocateUninitialized : $@convention(thin) (MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
  %6 = apply %5(%3, %4) : $@convention(thin) (MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
  %7 = tuple_extract %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>), 0
- %8 = tuple_extract %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>), 1
+ %8a = tuple_extract %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>), 1
+ %8 = mark_dependence %8a : $UnsafeMutablePointer<MyInt> on %7 : $MyArray<MyInt>
  debug_value %7 : $MyArray<MyInt>
  %9 = function_ref @getCount : $@convention(method) (@guaranteed MyArray<MyInt>) -> MyInt
  %10 = apply %9(%7) : $@convention(method) (@guaranteed MyArray<MyInt>) -> MyInt
@@ -141,7 +143,8 @@ bb0:
  %5 = function_ref @adoptStorage : $@convention(thin) (@owned AnyObject, MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
  %6 = apply %5(%2, %3, %4) : $@convention(thin) (@owned AnyObject, MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
  %7 = tuple_extract %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>), 0
- %8 = tuple_extract %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>), 1
+ %8a = tuple_extract %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>), 1
+ %8 = mark_dependence %8a : $UnsafeMutablePointer<MyInt> on %7 : $MyArray<MyInt>
  store %7 to %15 : $*MyArray<MyInt>
  debug_value %7 : $MyArray<MyInt>
  %9 = function_ref @getCount : $@convention(method) (@guaranteed MyArray<MyInt>) -> MyInt
@@ -171,7 +174,8 @@ bb0:
  %5 = function_ref @adoptStorage : $@convention(thin) (@owned AnyObject, MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
  %6 = apply %5(%2, %3, %4) : $@convention(thin) (@owned AnyObject, MyInt, @thin MyArray<MyInt>.Type) -> @owned (MyArray<MyInt>, UnsafeMutablePointer<MyInt>)
  %7 = tuple_extract %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>), 0
- %8 = tuple_extract %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>), 1
+ %8a = tuple_extract %6 : $(MyArray<MyInt>, UnsafeMutablePointer<MyInt>), 1
+ %8 = mark_dependence %8a : $UnsafeMutablePointer<MyInt> on %7 : $MyArray<MyInt>
  debug_value %7 : $MyArray<MyInt>
  %15 = function_ref @mayWrite : $@convention(thin) (@guaranteed MyArray<MyInt>) -> ()
  %16 = apply %15(%7) : $@convention(thin) (@guaranteed MyArray<MyInt>) -> ()

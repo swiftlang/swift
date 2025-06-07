@@ -1,0 +1,50 @@
+// RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+
+// REQUIRES: asserts
+
+// CHECK-LABEL: begin running test {{.*}} on with_trap: dead_end_blocks
+// CHECK-LABEL: sil @with_trap : {{.*}} {
+// CHECK:         cond_br undef, [[DIE:bb[0-9]+]], [[EXIT:bb[0-9]+]]
+// CHECK:       [[DIE]]:
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'with_trap'
+// CHECK:       [[DIE]]
+// CHECK-LABEL: end running test {{.*}} on with_trap: dead_end_blocks
+sil @with_trap : $@convention(thin) () -> () {
+entry:
+  specify_test "dead_end_blocks"
+  cond_br undef, die, exit
+
+die:
+  unreachable
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on with_infinite_loop: dead_end_blocks
+// CHECK-LABEL: sil @with_infinite_loop : $@convention(thin) () -> () {
+// CHECK:         cond_br undef, [[EXIT:bb[0-9]+]], [[HEADER:bb[0-9]+]]
+// CHECK:       [[HEADER]]:
+// CHECK:         br [[LOOP:bb[0-9]+]]
+// CHECK:       [[LOOP]]:
+// CHECK:         br [[LOOP]]
+// CHECK-LABEL: } // end sil function 'with_infinite_loop'
+// CHECK:       [[HEADER]]
+// CHECK:       [[LOOP]]
+// CHECK-LABEL: end running test {{.*}} on with_infinite_loop: dead_end_blocks
+sil @with_infinite_loop : $@convention(thin) () -> () {
+entry:
+  specify_test "dead_end_blocks"
+  cond_br undef, exit, header
+header:
+  br loop
+loop:
+  br loop
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+

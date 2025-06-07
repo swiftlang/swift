@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
 
 @propertyWrapper
 struct TestWrapper<ValueType> {
@@ -36,7 +36,7 @@ _ = state1.someValues
 
 // CHECK-LABEL: sil hidden [ossa] @$s26property_wrapper_coroutine5StateV6valuesSaySSGvM : $@yield_once @convention(method) (@inout State) -> @yields @inout Array<String> {
 // CHECK: bb0([[STATE:%.*]] : $*State):
-// CHECK:  debug_value [[STATE]] : $*State, var, name "self", argno {{.*}}, {{.*}} expr op_deref
+// CHECK:  debug_value [[STATE]] : $*State, var, name "self", argno {{.*}}, expr op_deref
 // CHECK:  [[BEGIN_ACCESS:%.*]] = begin_access [modify] [unknown] [[STATE]] : $*State
 // CHECK:  [[BACKING_ADDR:%.*]] = struct_element_addr [[BEGIN_ACCESS]] : $*State, #State._values
 // CHECK:  [[VALUE_ADDR:%.*]] = struct_element_addr [[BACKING_ADDR]] : $*TestWrapper<Array<String>>, #TestWrapper.wrappedValue

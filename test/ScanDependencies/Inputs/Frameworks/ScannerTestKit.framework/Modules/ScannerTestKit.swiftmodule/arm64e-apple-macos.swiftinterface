@@ -1,0 +1,4 @@
+// swift-interface-format-version: 1.0
+// swift-compiler-version: Apple Swift version 5.9
+// swift-module-flags: -target arm64e-apple-macos10.13 -enable-library-evolution -swift-version 5 -module-name ScannerTestKit
+import Swift

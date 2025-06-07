@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -primary-file %s | %FileCheck %s
 
 // Tests for the ForEachLoopUnroll mandatory optimization pass that unrolls
 // Sequence.forEach calls over array literals.
@@ -64,8 +64,10 @@ func unrollLetArrayLiteralWithClosures(i: Int32, j: Int32) {
   a.forEach { print($0()) }
   // CHECK: [[ALLOCATE:%[0-9]+]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
   // CHECK: [[ARRAYTUP:%[0-9]+]] = apply [[ALLOCATE]]<() -> Int32>
+  // CHECK: [[ARRAYVAL:%[0-9]+]] =  tuple_extract [[ARRAYTUP]] : $(Array<() -> Int32>, Builtin.RawPointer), 0
   // CHECK: [[STORAGEPTR:%[0-9]+]] =  tuple_extract [[ARRAYTUP]] : $(Array<() -> Int32>, Builtin.RawPointer), 1
-  // CHECK: [[STORAGEADDR:%[0-9]+]] = pointer_to_address [[STORAGEPTR]]
+  // CHECK: [[MDI:%[0-9]+]] = mark_dependence [[STORAGEPTR]] : $Builtin.RawPointer on [[ARRAYVAL]] : $Array<() -> Int32>
+  // CHECK: [[STORAGEADDR:%[0-9]+]] = pointer_to_address [[MDI]]
   // CHECK: store [[CLOSURE1:%[0-9]+]] to [[STORAGEADDR]]
   // CHECK: [[INDEX1:%[0-9]+]] = index_addr [[STORAGEADDR]]
   // CHECK: store [[CLOSURE2:%[0-9]+]] to [[INDEX1]]

@@ -26,7 +26,7 @@ markUsed(has_accessibility.z) // expected-error {{module 'has_accessibility' has
 
 markUsed(accessibility.a)
 markUsed(accessibility.b)
-markUsed(accessibility.c) // expected-error {{module 'accessibility' has no member named 'c'}}
+markUsed(accessibility.c) // expected-error {{'c' is inaccessible due to 'private' protection level}}
 
 markUsed(x)
 markUsed(y) // expected-error {{cannot find 'y' in scope}}
@@ -104,10 +104,10 @@ protocol MethodProto {
 
 extension OriginallyEmpty : MethodProto {}
 #if !ACCESS_DISABLED
-extension HiddenMethod : MethodProto {} // expected-error {{type 'HiddenMethod' does not conform to protocol 'MethodProto'}}
+extension HiddenMethod : MethodProto {} // expected-error {{type 'HiddenMethod' does not conform to protocol 'MethodProto'}} expected-note {{add stubs for conformance}}
 // TESTABLE-NOT: :[[@LINE-1]]:{{[^:]+}}:
 
-extension Foo : MethodProto {} // expected-error {{type 'Foo' does not conform to protocol 'MethodProto'}}
+extension Foo : MethodProto {} // expected-error {{type 'Foo' does not conform to protocol 'MethodProto'}} expected-note {{add stubs for conformance}}
 #endif
 
 
@@ -117,10 +117,10 @@ protocol TypeProto {
 
 extension OriginallyEmpty {}
 #if !ACCESS_DISABLED
-extension HiddenType : TypeProto {} // expected-error {{type 'HiddenType' does not conform to protocol 'TypeProto'}}
+extension HiddenType : TypeProto {} // expected-error {{type 'HiddenType' does not conform to protocol 'TypeProto'}} expected-note {{add stubs for conformance}}
 // TESTABLE-NOT: :[[@LINE-1]]:{{[^:]+}}:
 
-extension Foo : TypeProto {} // expected-error {{type 'Foo' does not conform to protocol 'TypeProto'}}
+extension Foo : TypeProto {} // expected-error {{type 'Foo' does not conform to protocol 'TypeProto'}} expected-note {{add stubs for conformance}}
 #endif
 
 
@@ -157,8 +157,8 @@ public protocol Fooable {
 }
 
 #if !ACCESS_DISABLED
-internal struct FooImpl: Fooable, HasDefaultImplementation {} // expected-error {{type 'FooImpl' does not conform to protocol 'Fooable'}}
-public struct PublicFooImpl: Fooable, HasDefaultImplementation {} // expected-error {{type 'PublicFooImpl' does not conform to protocol 'Fooable'}}
+internal struct FooImpl: Fooable, HasDefaultImplementation {} // expected-error {{type 'FooImpl' does not conform to protocol 'Fooable'}} expected-note {{add stubs for conformance}}
+public struct PublicFooImpl: Fooable, HasDefaultImplementation {} // expected-error {{type 'PublicFooImpl' does not conform to protocol 'Fooable'}} expected-note {{add stubs for conformance}}
 // TESTABLE-NOT: method 'foo()'
 
 internal class TestableSub: InternalBase {} // expected-error {{cannot find type 'InternalBase' in scope}}

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all=0 -module-name Swift -o /dev/null %s 2>&1
+// RUN: %target-sil-opt -update-borrowed-from -enable-objc-interop -enable-sil-verify-all=0 -module-name Swift -o /dev/null %s 2>&1
 // REQUIRES: asserts
 
 // This file is meant to contain tests that previously the verifier treated
@@ -59,7 +59,7 @@ class X {
   @objc class func g() {}
 }
 
-protocol SwiftKlassP : class {
+protocol SwiftKlassP : AnyObject {
   func foo()
 }
 
@@ -253,12 +253,11 @@ bb0(%0 : $Builtin.Word, %1 : $Builtin.Word, %2 : $@thick SuperKlass.Type):
 }
 
 // All of these uses should not be consuming except for the destroy.
-sil [ossa] @select_enum_test : $@convention(thin) (@owned ThreeDifferingPayloadEnum, @owned Builtin.NativeObject, Optional<Builtin.Int32>, @owned Builtin.NativeObject) -> () {
-bb0(%0 : @owned $ThreeDifferingPayloadEnum, %1 : @owned $Builtin.NativeObject, %2 : $Optional<Builtin.Int32>, %3 : @owned $Builtin.NativeObject):
+sil [ossa] @select_enum_test : $@convention(thin) (@owned ThreeDifferingPayloadEnum, Builtin.Int1, Optional<Builtin.Int32>, Builtin.Int1) -> () {
+bb0(%0 : @owned $ThreeDifferingPayloadEnum, %1 : $Builtin.Int1, %2 : $Optional<Builtin.Int32>, %3 : $Builtin.Int1):
   %4 = integer_literal $Builtin.Int32, 2
   select_enum %0 : $ThreeDifferingPayloadEnum, case #ThreeDifferingPayloadEnum.nopayload!enumelt: %4, case #ThreeDifferingPayloadEnum.trivial_payload!enumelt: %4, case #ThreeDifferingPayloadEnum.nontrivial_payload!enumelt: %4 : $Builtin.Int32
-  %5 = select_enum %2 : $Optional<Builtin.Int32>, case #Optional.none!enumelt: %1, case #Optional.some!enumelt: %3 : $Builtin.NativeObject
-  destroy_value %5 : $Builtin.NativeObject
+  %5 = select_enum %2 : $Optional<Builtin.Int32>, case #Optional.none!enumelt: %1, case #Optional.some!enumelt: %3 : $Builtin.Int1
   destroy_value %0 : $ThreeDifferingPayloadEnum
   %9999 = tuple()
   return %9999 : $()
@@ -742,7 +741,7 @@ bb51:
 // We check first for objects, then for metatypes, then for guaranteed values
 sil [ossa] @checked_cast_br_test : $@convention(thin) (@owned Builtin.NativeObject, @guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject, %6 : @guaranteed $Builtin.NativeObject):
-  checked_cast_br %0 : $Builtin.NativeObject to SuperKlass, bb1, bb2
+  checked_cast_br Builtin.NativeObject in %0 : $Builtin.NativeObject to SuperKlass, bb1, bb2
 
 bb1(%1 : @owned $SuperKlass):
   destroy_value %1 : $SuperKlass
@@ -754,7 +753,7 @@ bb2(%2 : @owned $Builtin.NativeObject):
 
 bb3:
   %3 = metatype $@thick SuperKlass.Type
-  checked_cast_br %3 : $@thick SuperKlass.Type to @thick SubKlass.Type, bb4, bb5
+  checked_cast_br SuperKlass.Type in %3 : $@thick SuperKlass.Type to @thick SubKlass.Type, bb4, bb5
 
 bb4(%4 : $@thick SubKlass.Type):
   br bb6
@@ -763,7 +762,7 @@ bb5(%5 : $@thick SuperKlass.Type):
   br bb6
 
 bb6:
-  checked_cast_br %6 : $Builtin.NativeObject to SuperKlass, bb7, bb8
+  checked_cast_br Builtin.NativeObject in %6 : $Builtin.NativeObject to SuperKlass, bb7, bb8
 
 bb7(%7 : @guaranteed $SuperKlass):
   br bb9
@@ -1048,7 +1047,7 @@ bb0:
 sil [ossa] @transforming_terminator_undef_test : $@convention(thin) () -> () {
 bb0:
   %0 = unchecked_ref_cast undef : $Builtin.NativeObject to $Builtin.NativeObject
-  checked_cast_br %0 : $Builtin.NativeObject to SuperKlass, bb1, bb2, forwarding: @owned
+  checked_cast_br Builtin.NativeObject in %0 : $Builtin.NativeObject to SuperKlass, bb1, bb2, forwarding: @owned
 
 bb1(%1 : @owned $SuperKlass):
   destroy_value %1 : $SuperKlass
@@ -1117,22 +1116,14 @@ bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
   return %9999 : $()
 }
 
-sil [ossa] @owned_partial_apply_is_escaping_closure : $@convention(thin) () -> () {
+sil [ossa] @owned_partial_apply_destroy_not_escaped_closure : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @no_arg_or_output_function : $@convention(thin) () -> ()
   %1 = partial_apply %0() : $@convention(thin) () -> ()
-  %2 = is_escaping_closure %1 : $@callee_owned () -> ()
-  %3 = begin_borrow %1 : $@callee_owned () -> ()
-  %4 = is_escaping_closure %3 : $@callee_owned () -> ()
-  end_borrow %3 : $@callee_owned () -> ()
-  destroy_value %1 : $@callee_owned () -> ()
+  destroy_not_escaped_closure %1 : $@callee_owned () -> ()
 
   %5 = partial_apply [callee_guaranteed] %0() : $@convention(thin) () -> ()
-  %6 = is_escaping_closure %5 : $@callee_guaranteed () -> ()
-  %7 = begin_borrow %5 : $@callee_guaranteed () -> ()
-  %8 = is_escaping_closure %7 : $@callee_guaranteed () -> ()
-  end_borrow %7 : $@callee_guaranteed () -> ()
-  destroy_value %5 : $@callee_guaranteed () -> ()
+  destroy_not_escaped_closure %5 : $@callee_guaranteed () -> ()
 
   %9999 = tuple()
   return %9999 : $()
@@ -1433,23 +1424,3 @@ bb0(%0 : @unowned $ThreeDifferingPayloadEnum):
   return %1 : $Builtin.Int32
 }
 
-sil [ossa] @test_select_value : $@convention(thin) (Builtin.Word) -> Builtin.Word {
-bb0(%0 : $Builtin.Word):
-
-  %1 = integer_literal $Builtin.Word, 1
-  %2 = integer_literal $Builtin.Word, 2
-  %3 = integer_literal $Builtin.Word, 3
-  %4 = integer_literal $Builtin.Word, 4
-  %5 = integer_literal $Builtin.Word, 5
-  %6 = integer_literal $Builtin.Word, 6
-  %11 = integer_literal $Builtin.Word, 11
-  %22 = integer_literal $Builtin.Word, 22
-  %33 = integer_literal $Builtin.Word, 33
-  %44 = integer_literal $Builtin.Word, 44
-  %55 = integer_literal $Builtin.Word, 55
-  %66 = integer_literal $Builtin.Word, 66
-
-  %10 = select_value %1: $Builtin.Word, case %1: %11, case %2: %22, case %4: %44, case %5: %55, case %6: %66, default %33 : $Builtin.Word
-
-  return %10 : $Builtin.Word
-}

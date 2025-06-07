@@ -127,77 +127,16 @@ public:
   }
 };
 
-class IncrementalJobAction : public JobAction {
-public:
-  struct InputInfo {
-    /// The status of an input known to the driver. These are used to affect
-    /// the scheduling decisions made during an incremental build.
-    ///
-    /// \Note The order of cases matters. They are ordered from least to
-    /// greatest impact on the incremental build schedule.
-    enum class Status {
-      /// The input to this job is up to date.
-      UpToDate,
-      /// The input to this job has changed in a way that requires this job to
-      /// be rerun, but not in such a way that it requires a cascading rebuild.
-      NeedsNonCascadingBuild,
-      /// The input to this job has changed in a way that requires this job to
-      /// be rerun, and in such a way that all jobs dependent upon this one
-      /// must be scheduled as well.
-      NeedsCascadingBuild,
-      /// The input to this job was not known to the driver when it was last
-      /// run.
-      NewlyAdded
-    };
 
-  public:
-    Status status = Status::UpToDate;
-    llvm::sys::TimePoint<> previousModTime;
-
-    InputInfo() = default;
-    InputInfo(Status stat, llvm::sys::TimePoint<> time)
-        : status(stat), previousModTime(time) {}
-
-    static InputInfo makeNewlyAdded() {
-      return {Status::NewlyAdded, llvm::sys::TimePoint<>::max()};
-    }
-
-    static InputInfo makeNeedsCascadingRebuild() {
-      return {Status::NeedsCascadingBuild, llvm::sys::TimePoint<>::min()};
-    }
-  };
-
-private:
-  virtual void anchor() override;
-  InputInfo inputInfo;
-
-public:
-  IncrementalJobAction(Kind Kind, ArrayRef<const Action *> Inputs,
-                       file_types::ID Type, InputInfo info)
-      : JobAction(Kind, Inputs, Type), inputInfo(info) {}
-
-public:
-  InputInfo getInputInfo() const {
-    return inputInfo;
-  }
-
-public:
-  static bool classof(const Action *A) {
-    return A->getKind() == Action::Kind::CompileJob ||
-           A->getKind() == Action::Kind::MergeModuleJob;
-  }
-};
-
-class CompileJobAction : public IncrementalJobAction {
+class CompileJobAction : public JobAction {
 private:
   virtual void anchor() override;
 
 public:
   CompileJobAction(file_types::ID OutputType)
-      : IncrementalJobAction(Action::Kind::CompileJob, None, OutputType, {}) {}
-  CompileJobAction(Action *Input, file_types::ID OutputType, InputInfo info)
-      : IncrementalJobAction(Action::Kind::CompileJob, Input, OutputType,
-                             info) {}
+      : JobAction(Action::Kind::CompileJob, std::nullopt, OutputType) {}
+  CompileJobAction(Action *Input, file_types::ID OutputType)
+      : JobAction(Action::Kind::CompileJob, Input, OutputType) {}
 
   static bool classof(const Action *A) {
     return A->getKind() == Action::Kind::CompileJob;
@@ -230,7 +169,7 @@ private:
 
 public:
   explicit InterpretJobAction()
-      : JobAction(Action::Kind::InterpretJob, llvm::None,
+      : JobAction(Action::Kind::InterpretJob, std::nullopt,
                   file_types::TY_Nothing) {}
 
   static bool classof(const Action *A) {
@@ -270,8 +209,7 @@ private:
   Mode RequestedMode;
 public:
   REPLJobAction(Mode mode)
-      : JobAction(Action::Kind::REPLJob, llvm::None,
-                  file_types::TY_Nothing),
+      : JobAction(Action::Kind::REPLJob, std::nullopt, file_types::TY_Nothing),
         RequestedMode(mode) {}
 
   Mode getRequestedMode() const { return RequestedMode; }
@@ -281,12 +219,12 @@ public:
   }
 };
 
-class MergeModuleJobAction : public IncrementalJobAction {
+class MergeModuleJobAction : public JobAction {
   virtual void anchor() override;
 public:
-  MergeModuleJobAction(ArrayRef<const Action *> Inputs, InputInfo input)
-      : IncrementalJobAction(Action::Kind::MergeModuleJob, Inputs,
-                             file_types::TY_SwiftModuleFile, input) {}
+  MergeModuleJobAction(ArrayRef<const Action *> Inputs)
+      : JobAction(Action::Kind::MergeModuleJob, Inputs,
+                  file_types::TY_SwiftModuleFile) {}
 
   static bool classof(const Action *A) {
     return A->getKind() == Action::Kind::MergeModuleJob;
@@ -406,7 +344,8 @@ public:
     : JobAction(Action::Kind::VerifyModuleInterfaceJob, { ModuleEmitter },
                 file_types::TY_Nothing), inputType(inputType) {
     assert(inputType == file_types::TY_SwiftModuleInterfaceFile ||
-           inputType == file_types::TY_PrivateSwiftModuleInterfaceFile);
+           inputType == file_types::TY_PrivateSwiftModuleInterfaceFile ||
+           inputType == file_types::TY_PackageSwiftModuleInterfaceFile);
   }
 
   file_types::ID getInputType() const { return inputType; }

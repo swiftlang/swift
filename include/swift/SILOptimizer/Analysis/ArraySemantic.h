@@ -125,7 +125,7 @@ public:
   SILValue getIndex() const;
 
   /// Get the index as a constant if possible.
-  Optional<int64_t> getConstantIndex() const;
+  std::optional<int64_t> getConstantIndex() const;
 
   /// Get the array.props.isNativeTypeChecked argument.
   SILValue getArrayPropertyIsNativeTypeChecked() const;
@@ -151,22 +151,6 @@ public:
   /// Remove the semantics call replacing it by a release of any @owned
   /// parameter.
   void removeCall();
-
-  /// Replace a call to get_element by a value.
-  ///
-  /// Preconditions:
-  /// The value \p V must dominate this get_element call.
-  /// This must be a get_element call.
-  ///
-  /// Returns true on success, false otherwise.
-  bool replaceByValue(SILValue V);
-
-  /// Replace a call to append(contentsOf: ) with a series of
-  /// append(element: ) calls.
-  bool replaceByAppendingValues(SILFunction *AppendFn,
-                                SILFunction *ReserveFn,
-                                const llvm::SmallVectorImpl<SILValue> &Vals,
-                                SubstitutionMap Subs);
 
   /// Hoist the call to the insert point.
   void hoist(SILInstruction *InsertBefore, DominanceInfo *DT) {

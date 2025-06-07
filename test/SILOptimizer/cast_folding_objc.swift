@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xllvm -sil-disable-pass=PerfInliner -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -Xllvm -sil-disable-pass=FunctionSignatureOpts -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s
 
 // We want to check two things here:
 // - Correctness
@@ -77,12 +77,9 @@ public func castObjCToSwift<T>(_ t: T) -> Int {
   return t as! Int
 }
 
-// Check that compiler understands that this cast always fails
 // CHECK-LABEL: sil [noinline] {{.*}}@$s17cast_folding_objc37testFailingBridgedCastFromObjCtoSwiftySiSo8NSStringCF
-// CHECK: [[ONE:%[0-9]+]] = integer_literal $Builtin.Int1, -1
-// CHECK: cond_fail [[ONE]] : $Builtin.Int1, "failed cast"
-// CHECK-NEXT: unreachable
-// CHECK-NEXT: }
+// CHECK:         unconditional_checked_cast %0 : $NSString to NSNumber
+// CHECK:       } // end sil function '$s17cast_folding_objc37testFailingBridgedCastFromObjCtoSwiftySiSo8NSStringCF'
 @inline(never)
 public func testFailingBridgedCastFromObjCtoSwift(_ ns: NSString) -> Int {
   return castObjCToSwift(ns)
@@ -322,7 +319,7 @@ public class MyString: NSString {}
 // CHECK:   [[BRIDGED_VALUE:%.*]] = apply [[FUNC]]([[ARG]])
 // CHECK-NOT: apply
 // CHECK-NOT: unconditional_checked_cast
-// CHECK: checked_cast_br [[BRIDGED_VALUE]] : $NSString to MyString, [[SUCC_BB:bb[0-9]+]], [[FAIL_BB:bb[0-9]+]]
+// CHECK: checked_cast_br String in [[BRIDGED_VALUE]] : $NSString to MyString, [[SUCC_BB:bb[0-9]+]], [[FAIL_BB:bb[0-9]+]]
 //
 // CHECK: [[SUCC_BB]]([[CAST_BRIDGED_VALUE:%.*]] : $MyString)
 // CHECK:   [[SOME:%.*]] = enum $Optional<MyString>, #Optional.some!enumelt, [[CAST_BRIDGED_VALUE]] : $MyString

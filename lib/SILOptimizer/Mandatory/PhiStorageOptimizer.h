@@ -24,6 +24,8 @@
 
 namespace swift {
 
+class DominanceInfo;
+
 class CoalescedPhi {
   friend class PhiStorageOptimizer;
 
@@ -37,7 +39,8 @@ public:
   CoalescedPhi(CoalescedPhi &&) = default;
   CoalescedPhi &operator=(CoalescedPhi &&) = default;
 
-  void coalesce(PhiValue phi, const ValueStorageMap &valueStorageMap);
+  void coalesce(PhiValue phi, const ValueStorageMap &valueStorageMap,
+                DominanceInfo *domInfo);
 
   bool empty() const { return coalescedOperands.empty(); }
 

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -wmo -access-enforcement-wmo %s -enable-sil-verify-all | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -wmo -access-enforcement-wmo %s -enable-sil-verify-all | %FileCheck %s
 //
 // Test the AccessEnforcementWMO pass in isolation. This ensures that
 // no upstream passes have removed SIL-level access markers that are
@@ -176,7 +176,7 @@ bb0(%0 : $C):
 // CHECK: begin_unpaired_access [modify] [dynamic] [[E3]] : $*Int64, %{{.*}} : $*Builtin.UnsafeValueBuffer
 // CHECK: [[E4:%.*]] = ref_element_addr %0 : $C, #C.internalProp
 // CHECK: begin_unpaired_access [modify] [dynamic] [[E4]] : $*Int64, %{{.*}} : $*Builtin.UnsafeValueBuffer
-// CHECK: keypath $ReferenceWritableKeyPath<C, Int64>, (root $C; settable_property $Int64,  id #C.keyPathProp!getter : (C) -> () -> Int64, getter @$s10access_wmo1CC11keyPathPropSivpACTK : $@convention(thin) (@in_guaranteed C) -> @out Int64, setter @$s10access_wmo1CC11keyPathPropSivpACTk : $@convention(thin) (@in_guaranteed Int64, @in_guaranteed C) -> ())
+// CHECK: keypath $ReferenceWritableKeyPath<C, Int64>, (root $C; settable_property $Int64,  id #C.keyPathProp!getter : (C) -> () -> Int64, getter @$s10access_wmo1CC11keyPathPropSivpACTK : $@convention(keypath_accessor_getter) (@in_guaranteed C) -> @out Int64, setter @$s10access_wmo1CC11keyPathPropSivpACTk : $@convention(keypath_accessor_setter) (@in_guaranteed Int64, @in_guaranteed C) -> ())
 // CHECK: keypath $ReferenceWritableKeyPath<C, Int64>, (root $C; stored_property #C.finalKeyPathProp : $Int64)
 // CHECK: [[E5:%.*]] = ref_element_addr %0 : $C, #C.publicProp
 // CHECK: begin_unpaired_access [modify] [dynamic] [[E5]] : $*Int64, %{{.*}} : $*Builtin.UnsafeValueBuffer
@@ -207,7 +207,7 @@ bb0(%0 : $C, %1 : $Int64):
   %22 = apply %8(%21, %1) : $@convention(thin) (@inout Int64, Int64) -> ()
   end_unpaired_access [dynamic] %18 : $*Builtin.UnsafeValueBuffer
   dealloc_stack %18 : $*Builtin.UnsafeValueBuffer
-  %25 = keypath $ReferenceWritableKeyPath<C, Int64>, (root $C; settable_property $Int64,  id #C.keyPathProp!getter : (C) -> () -> Int64, getter @$s10access_wmo1CC11keyPathPropSivpACTK : $@convention(thin) (@in_guaranteed C) -> @out Int64, setter @$s10access_wmo1CC11keyPathPropSivpACTk : $@convention(thin) (@in_guaranteed Int64, @in_guaranteed C) -> ())
+  %25 = keypath $ReferenceWritableKeyPath<C, Int64>, (root $C; settable_property $Int64,  id #C.keyPathProp!getter : (C) -> () -> Int64, getter @$s10access_wmo1CC11keyPathPropSivpACTK : $@convention(keypath_accessor_getter) (@in_guaranteed C) -> @out Int64, setter @$s10access_wmo1CC11keyPathPropSivpACTk : $@convention(keypath_accessor_setter) (@in_guaranteed Int64, @in_guaranteed C) -> ())
   // function_ref setKeyPath(_:_:_:)
   %26 = function_ref @$s10access_wmo10setKeyPathyyAA1CC_s017ReferenceWritabledE0CyADSiGSitF : $@convention(thin) (@guaranteed C, @guaranteed ReferenceWritableKeyPath<C, Int64>, Int64) -> ()
   %27 = apply %26(%0, %25, %1) : $@convention(thin) (@guaranteed C, @guaranteed ReferenceWritableKeyPath<C, Int64>, Int64) -> ()
@@ -228,10 +228,10 @@ bb0(%0 : $C, %1 : $Int64):
 
 // key path getter for C.keyPathProp : C
 //
-// CHECK-LABEL: sil shared [thunk] @$s10access_wmo1CC11keyPathPropSivpACTK : $@convention(thin) (@in_guaranteed C) -> @out Int64 {
+// CHECK-LABEL: sil shared [thunk] @$s10access_wmo1CC11keyPathPropSivpACTK : $@convention(keypath_accessor_getter) (@in_guaranteed C) -> @out Int64 {
 // CHECK: begin_access [read] [static] [no_nested_conflict] %{{.*}} : $*Int64
 // CHECK-LABEL: } // end sil function '$s10access_wmo1CC11keyPathPropSivpACTK'
-sil shared [thunk] @$s10access_wmo1CC11keyPathPropSivpACTK : $@convention(thin) (@in_guaranteed C) -> @out Int64 {
+sil shared [thunk] @$s10access_wmo1CC11keyPathPropSivpACTK : $@convention(keypath_accessor_getter) (@in_guaranteed C) -> @out Int64 {
 bb0(%0 : $*Int64, %1 : $*C):
   %2 = load %1 : $*C                              // user: %3
   %3 = ref_element_addr %2 : $C, #C.keyPathProp   // user: %4
@@ -245,10 +245,10 @@ bb0(%0 : $*Int64, %1 : $*C):
 
 // key path setter for C.keyPathProp : C
 //
-// CHECK-LABEL: sil shared [thunk] @$s10access_wmo1CC11keyPathPropSivpACTk : $@convention(thin) (@in_guaranteed Int64, @in_guaranteed C) -> () {
+// CHECK-LABEL: sil shared [thunk] @$s10access_wmo1CC11keyPathPropSivpACTk : $@convention(keypath_accessor_setter) (@in_guaranteed Int64, @in_guaranteed C) -> () {
 // CHECK: begin_access [modify] [static] [no_nested_conflict] %{{.*}} : $*Int64
 // CHECK-LABEL: } // end sil function '$s10access_wmo1CC11keyPathPropSivpACTk'
-sil shared [thunk] @$s10access_wmo1CC11keyPathPropSivpACTk : $@convention(thin) (@in_guaranteed Int64, @in_guaranteed C) -> () {
+sil shared [thunk] @$s10access_wmo1CC11keyPathPropSivpACTk : $@convention(keypath_accessor_setter) (@in_guaranteed Int64, @in_guaranteed C) -> () {
 bb0(%0 : $*Int64, %1 : $*C):
   %2 = load %0 : $*Int64                          // user: %6
   %3 = load %1 : $*C                              // user: %4

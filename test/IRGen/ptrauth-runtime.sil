@@ -12,8 +12,8 @@ bb0(%0 : $Builtin.NativeObject):
   strong_retain %0 : $Builtin.NativeObject
   return %0 : $Builtin.NativeObject
 }
-// CHECK-LABEL: define swiftcc %swift.refcounted* @test_retain(%swift.refcounted* %0)
-// CHECK:      call %swift.refcounted* @swift_retain(
-// CHECK-NEXT: ret %swift.refcounted* %0
+// CHECK-LABEL: define swiftcc ptr @test_retain(ptr %0)
+// CHECK:      call ptr @swift_retain(
+// CHECK-NEXT: ret ptr %0
 
-// CHECK: declare %swift.refcounted* @swift_retain(%swift.refcounted* returned
+// CHECK: declare ptr @swift_retain(ptr returned

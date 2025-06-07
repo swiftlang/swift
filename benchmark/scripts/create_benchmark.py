@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import datetime
 import os
 import re
 
@@ -46,18 +47,22 @@ def create_benchmark_file(name):
     and places it in the `single-source` directory.
     """
 
+    file_text = ""
     template_path = create_relative_path("Template.swift")
-    benchmark_template = ""
     with open(template_path, "r") as f:
-        benchmark_template = "".join(f.readlines())
+        file_text = "".join(f.readlines())
 
-    # fill in template with benchmark name.
-    formatted_template = benchmark_template.format(name=name)
+    # fill in missing template details
+    file_text = file_text.format(
+        name=name,
+        padding="-" * (56 - len(name)),
+        year=datetime.date.today().year
+    )
 
-    relative_path = create_relative_path("../single-source/")
-    source_file_path = os.path.join(relative_path, name + ".swift")
-    with open(source_file_path, "w") as f:
-        f.write(formatted_template)
+    file_path_prefix = create_relative_path("../single-source/")
+    file_path = os.path.join(file_path_prefix, name + ".swift")
+    with open(file_path, "w") as f:
+        f.write(file_text)
 
 
 def add_import_benchmark(name):
@@ -119,9 +124,9 @@ def add_register_benchmark(name):
 
     file_new_contents = insert_line_alphabetically(
         name,
-        "registerBenchmark(" + name + ")\n",
+        "register(" + name + ".benchmarks)\n",
         file_contents,
-        r"registerBenchmark\(([a-zA-Z]+)\)",
+        r"register\(([a-zA-Z]+)\.benchmarks\)",
     )
     with open(relative_path, "w") as f:
         for line in file_new_contents:

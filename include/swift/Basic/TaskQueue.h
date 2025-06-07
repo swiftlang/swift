@@ -84,19 +84,20 @@ private:
   // the process identifier of the operating system
   ProcessId OSPid;
   // usage information about the process, if available
-  Optional<ResourceUsage> ProcessUsage;
+  std::optional<ResourceUsage> ProcessUsage;
 
 public:
   TaskProcessInformation(ProcessId Pid, uint64_t utime, uint64_t stime,
                          uint64_t maxrss)
       : OSPid(Pid), ProcessUsage(ResourceUsage(utime, stime, maxrss)) {}
 
-  TaskProcessInformation(ProcessId Pid) : OSPid(Pid), ProcessUsage(None) {}
+  TaskProcessInformation(ProcessId Pid)
+      : OSPid(Pid), ProcessUsage(std::nullopt) {}
 
 #if defined(HAVE_GETRUSAGE) && !defined(__HAIKU__)
   TaskProcessInformation(ProcessId Pid, struct rusage Usage);
 #endif // defined(HAVE_GETRUSAGE) && !defined(__HAIKU__)
-  Optional<ResourceUsage> getResourceUsage() { return ProcessUsage; }
+  std::optional<ResourceUsage> getResourceUsage() { return ProcessUsage; }
   virtual ~TaskProcessInformation() = default;
   virtual void provideMapping(json::Output &out);
 };
@@ -175,7 +176,8 @@ public:
   /// should proceed
   using TaskSignalledCallback = std::function<TaskFinishedResponse(
       ProcessId Pid, StringRef ErrorMsg, StringRef Output, StringRef Errors,
-      void *Context, Optional<int> Signal, TaskProcessInformation ProcInfo)>;
+      void *Context, std::optional<int> Signal,
+      TaskProcessInformation ProcInfo)>;
 #pragma clang diagnostic pop
 
   /// Indicates whether TaskQueue supports buffering output on the
@@ -203,7 +205,7 @@ public:
   /// \param Context an optional context which will be associated with the task
   /// \param SeparateErrors Controls whether error output is reported separately
   virtual void addTask(const char *ExecPath, ArrayRef<const char *> Args,
-                       ArrayRef<const char *> Env = llvm::None,
+                       ArrayRef<const char *> Env = std::nullopt,
                        void *Context = nullptr, bool SeparateErrors = false);
 
   /// Synchronously executes the tasks in the TaskQueue.
@@ -238,8 +240,8 @@ class DummyTaskQueue : public TaskQueue {
     bool SeparateErrors;
 
     DummyTask(const char *ExecPath, ArrayRef<const char *> Args,
-              ArrayRef<const char *> Env = llvm::None, void *Context = nullptr,
-              bool SeparateErrors = false)
+              ArrayRef<const char *> Env = std::nullopt,
+              void *Context = nullptr, bool SeparateErrors = false)
         : ExecPath(ExecPath), Args(Args), Env(Env), Context(Context),
           SeparateErrors(SeparateErrors) {}
   };
@@ -252,7 +254,7 @@ public:
   virtual ~DummyTaskQueue();
 
   void addTask(const char *ExecPath, ArrayRef<const char *> Args,
-               ArrayRef<const char *> Env = llvm::None,
+               ArrayRef<const char *> Env = std::nullopt,
                void *Context = nullptr, bool SeparateErrors = false) override;
 
   bool

@@ -1065,7 +1065,7 @@ public func f530_assignToVar() {
 // HECK:  try_apply [[WT]]<@opened("{{.*}}", any Decoder) Self>([[OPENED]]) : $@convention(witness_method: Decoder) <τ_0_0 where τ_0_0 : Decoder> (@in_guaranteed τ_0_0) -> (@out UnkeyedDecodingContainer, @error any Error), normal bb2, error bb1
 //
 // CHECK:bb{{.*}}([[RET1:%.*]] : @owned $any UnkeyedDecodingContainer):
-// HECK:  [[BORROW2:%.*]] = begin_borrow [lexical] [[RET1]] : $any UnkeyedDecodingContainer
+// HECK:  [[BORROW2:%.*]] = begin_borrow [lexical] [var_decl] [[RET1]] : $any UnkeyedDecodingContainer
 // HECK:  [[OPENED2:%.*]] = open_existential_value [[BORROW2]] : $any UnkeyedDecodingContainer to $@opened("{{.*}}", any UnkeyedDecodingContainer) Self
 // HECK:  [[WT2:%.*]] = witness_method $@opened("{{.*}}", any UnkeyedDecodingContainer) Self, #UnkeyedDecodingContainer.isAtEnd!getter : <Self where Self : UnkeyedDecodingContainer> (Self) -> () -> Builtin.Int1, [[OPENED2]] : $@opened("{{.*}}", UnkeyedDecodingContainer) Self : $@convention(witness_method: UnkeyedDecodingContainer) <τ_0_0 where τ_0_0 : UnkeyedDecodingContainer> (@in_guaranteed τ_0_0) -> Builtin.Int1
 // HECK:  [[RET2:%.*]] = apply [[WT2]]<@opened("{{.*}}", any UnkeyedDecodingContainer) Self>([[OPENED2]]) : $@convention(witness_method: UnkeyedDecodingContainer) <τ_0_0 where τ_0_0 : UnkeyedDecodingContainer> (@in_guaranteed τ_0_0) -> Builtin.Int1

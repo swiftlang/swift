@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-ir -import-objc-header %S/Inputs/objc_runtime_name_clang_attr.h %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-objective-c-protocol-symbolic-references -emit-ir -import-objc-header %S/Inputs/objc_runtime_name_clang_attr.h %s | %FileCheck %s
 // REQUIRES: objc_interop
 
 // Use the runtime name for runtime instantiation

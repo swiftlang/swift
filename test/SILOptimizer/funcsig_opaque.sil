@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-opaque-values -function-signature-opts %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-opaque-values -function-signature-opts %s | %FileCheck %s
 
 import Builtin
 
@@ -24,20 +24,16 @@ sil @testAggregateArgHelper : $@convention(thin) (@owned R<S>) -> ()
 //
 // CHECK-LABEL: sil shared @$s16testAggregateArgTf4g_n : $@convention(thin) (@in_guaranteed R<S>) -> @out () {
 // CHECK: bb0(%0 : $R<S>):
-// CHECK:   [[COPY:%.*]] = copy_value %0 : $R<S>
 // CHECK:   retain_value %0 : $R<S>
 // CHECK:   [[F:%.*]] = function_ref @testAggregateArgHelper : $@convention(thin) (@owned R<S>) -> ()
-// CHECK:   [[CALL:%.*]] = apply [[F]]([[COPY]]) : $@convention(thin) (@owned R<S>) -> ()
-// CHECK:   destroy_value %0 : $R<S>
+// CHECK:   [[CALL:%.*]] = apply [[F]](%0) : $@convention(thin) (@owned R<S>) -> ()
 // CHECK:   return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function '$s16testAggregateArgTf4g_n'
 sil @testAggregateArg : $@convention(thin) (@in R<S>) -> @out () {
 bb0(%0 : $R<S>):
-  %9 = copy_value %0 : $R<S>
   retain_value %0 : $R<S>
   %10 = function_ref @testAggregateArgHelper : $@convention(thin) (@owned R<S>) -> ()
-  %12 = apply %10(%9) : $@convention(thin) (@owned R<S>) -> ()
-  destroy_value %0 : $R<S>
+  %12 = apply %10(%0) : $@convention(thin) (@owned R<S>) -> ()
   release_value %0 : $R<S>
   %1284 = tuple ()
   return %1284 : $()

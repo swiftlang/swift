@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name address_only_types -parse-as-library -parse-stdlib %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name address_only_types -parse-as-library -parse-stdlib %s | %FileCheck %s
 
 precedencegroup AssignmentPrecedence { assignment: true }
 
@@ -166,7 +166,7 @@ func address_only_assignment_from_lv(_ dest: inout Unloadable, v: Unloadable) {
   var v = v
   // CHECK: bb0([[DEST:%[0-9]+]] : $*any Unloadable, [[VARG:%[0-9]+]] : $*any Unloadable):
   // CHECK: [[VBOX:%.*]] = alloc_box ${ var any Unloadable }
-  // CHECK: [[V_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[VBOX]]
+  // CHECK: [[V_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[VBOX]]
   // CHECK: [[PBOX:%[0-9]+]] = project_box [[V_LIFETIME]]
   // CHECK: copy_addr [[VARG]] to [init] [[PBOX]] : $*any Unloadable
   dest = v
@@ -212,7 +212,7 @@ func address_only_var() -> Unloadable {
   // CHECK: bb0([[RET:%[0-9]+]] : $*any Unloadable):
   var x = some_address_only_function_1()
   // CHECK: [[XBOX:%[0-9]+]] = alloc_box ${ var any Unloadable }
-  // CHECK: [[XBOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[XBOX]]
+  // CHECK: [[XBOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[XBOX]]
   // CHECK: [[XPB:%.*]] = project_box [[XBOX_LIFETIME]]
   // CHECK: apply {{%.*}}([[XPB]])
   return x

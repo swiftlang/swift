@@ -27,9 +27,12 @@
 /// The Mach-O section name for the section containing protocol conformances.
 /// This lives within SEG_TEXT.
 #define MachOProtocolConformancesSection "__swift5_proto"
-/// The Mach-O section name for the section containing type references.
+/// The Mach-O section name for the section containing copyable type references.
 /// This lives within SEG_TEXT.
 #define MachOTypeMetadataRecordSection "__swift5_types"
+/// The Mach-O section name for the section containing additional type references.
+/// This lives within SEG_TEXT.
+#define MachOExtraTypeMetadataRecordSection "__swift5_types2"
 /// The Mach-O section name for the section containing dynamic replacements.
 /// This lives within SEG_TEXT.
 #define MachODynamicReplacementSection "__swift5_replace"
@@ -48,7 +51,7 @@
 
 namespace swift {
 struct MetadataSections;
-static constexpr const uintptr_t CurrentSectionMetadataVersion = 3;
+static constexpr const uintptr_t CurrentSectionMetadataVersion = 4;
 }
 
 struct SectionInfo {

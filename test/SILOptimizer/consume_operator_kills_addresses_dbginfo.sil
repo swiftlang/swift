@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -enable-experimental-move-only -sil-consume-operator-copyable-addresses-checker | %FileCheck %s
+// RUN: %target-sil-opt %s -sil-consume-operator-copyable-addresses-checker | %FileCheck %s
 
 // REQUIRES: optimized_stdlib
 
@@ -19,27 +19,22 @@ public protocol P {
 sil @forceSplit : $@convention(thin) @async () -> ()
 sil @genericUse : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
 
-enum Optional<T> {
-case some(T)
-case none
-}
-
 ///////////
 // Tests //
 ///////////
 
 // Make sure that when we process a move_addr on an alloc_stack/debug_value that
-// we properly put the [moved] marker on them.
+// we properly put the [moveable_value_debuginfo] marker on them.
 
 // CHECK-LABEL: sil [ossa] @singleBlock : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-// CHECK:   [[SRC_ADDR:%.*]] = alloc_stack [lexical] [moved] $Builtin.NativeObject, let, name "[[VAR_NAME:.*]]"
+// CHECK:   [[SRC_ADDR:%.*]] = alloc_stack [lexical] [var_decl] [moveable_value_debuginfo] $Builtin.NativeObject, let, name "[[VAR_NAME:.*]]"
 // CHECK:   [[DEST_ADDR:%.*]] = alloc_stack $Builtin.NativeObject
 // CHECK:   copy_addr [take] [[SRC_ADDR]] to [init] [[DEST_ADDR]]
-// CHECK-NEXT: debug_value [moved] undef
+// CHECK-NEXT: debug_value [moveable_value_debuginfo] undef
 // CHECK: } // end sil function 'singleBlock'
 sil [ossa] @singleBlock : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
-  %1 = alloc_stack [lexical] $Builtin.NativeObject, let, name "myName"
+  %1 = alloc_stack [lexical] [var_decl] $Builtin.NativeObject, let, name "myName"
   %2 = copy_value %0 : $Builtin.NativeObject
   store %2 to [init] %1 : $*Builtin.NativeObject
 
@@ -59,19 +54,19 @@ bb0(%0 : @owned $Builtin.NativeObject):
 
 // CHECK-LABEL: sil [ossa] @multipleBlock : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 // CHECK: bb0(
-// CHECK:   [[SRC_ADDR:%.*]] = alloc_stack [lexical] [moved] $Builtin.NativeObject, let, name "[[VAR_NAME:.*]]"
+// CHECK:   [[SRC_ADDR:%.*]] = alloc_stack [lexical] [var_decl] [moveable_value_debuginfo] $Builtin.NativeObject, let, name "[[VAR_NAME:.*]]"
 // CHECK:   [[DEST_ADDR:%.*]] = alloc_stack $Builtin.NativeObject
 // CHECK:   cond_br undef, [[LHS:bb[0-9]+]], [[RHS:bb[0-9]+]]
 //
 // CHECK: [[LHS]]:
 // CHECK:   copy_addr [take] [[SRC_ADDR]] to [init] [[DEST_ADDR]]
-// CHECK:   debug_value [moved] undef : $*Builtin.NativeObject, let, name "[[VAR_NAME]]"
+// CHECK:   debug_value [moveable_value_debuginfo] undef : $*Builtin.NativeObject, let, name "[[VAR_NAME]]"
 // CHECK:   br bb
 //
 // CHECK: } // end sil function 'multipleBlock'
 sil [ossa] @multipleBlock : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
-  %1 = alloc_stack [lexical] $Builtin.NativeObject, let, name "myName"
+  %1 = alloc_stack [lexical] [var_decl] $Builtin.NativeObject, let, name "myName"
   %2 = copy_value %0 : $Builtin.NativeObject
   store %2 to [init] %1 : $*Builtin.NativeObject
   %dest = alloc_stack $Builtin.NativeObject
@@ -101,7 +96,7 @@ bb3:
 // CHECK-NEXT: // function_ref forceSplit
 // CHECK-NEXT: function_ref @forceSplit
 // CHECK-NEXT: apply
-// CHECK-NEXT: debug_value [moved] undef
+// CHECK-NEXT: debug_value [moveable_value_debuginfo] undef
 // CHECK-NEXT: destroy_addr
 // CHECK-NEXT: hop_to_executor
 // CHECK-NEXT: br bb3

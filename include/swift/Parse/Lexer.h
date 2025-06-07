@@ -82,7 +82,7 @@ class Lexer {
 
   /// A queue of diagnostics to emit when a token is consumed. We want to queue
   /// them, as the parser may backtrack and re-lex a token.
-  Optional<DiagnosticQueue> DiagQueue;
+  std::optional<DiagnosticQueue> DiagQueue;
 
   using State = LexerState;
 
@@ -249,11 +249,11 @@ public:
 
   /// If a lexer cut off point has been set returns the offset in the buffer at
   /// which lexing is being cut off.
-  Optional<size_t> lexingCutOffOffset() const {
+  std::optional<size_t> lexingCutOffOffset() const {
     if (LexerCutOffPoint) {
       return LexerCutOffPoint - BufferStart;
     } else {
-      return None;
+      return std::nullopt;
     }
   }
 
@@ -394,6 +394,15 @@ public:
   /// Determines if the given string is a valid non-operator
   /// identifier, without escaping characters.
   static bool isIdentifier(StringRef identifier);
+
+  // Returns true if the given string is a raw identifier that must always
+  // be escaped by backticks when printing it back in source form or writing
+  // its name into runtime metadata.
+  static bool identifierMustAlwaysBeEscaped(StringRef str);
+
+  /// Determines if the given string is a valid non-operator
+  /// identifier if it were surrounded by backticks.
+  static bool isValidAsEscapedIdentifier(StringRef identifier);
 
   /// Determine the token kind of the string, given that it is a valid
   /// non-operator identifier. Return tok::identifier if the string is not a
@@ -598,12 +607,7 @@ private:
   void lexHexNumber();
   void lexNumber();
 
-  /// Skip over trivia and return characters that were skipped over in a \c
-  /// StringRef. \p AllTriviaStart determines the start of the trivia. In nearly
-  /// all cases, this should be \c CurPtr. If other trivia has already been
-  /// skipped over (like a BOM), this can be used to point to the start of the
-  /// BOM. The returned \c StringRef will always start at \p AllTriviaStart.
-  StringRef lexTrivia(bool IsForTrailingTrivia, const char *AllTriviaStart);
+  void lexTrivia();
   static unsigned lexUnicodeEscape(const char *&CurPtr, Lexer *Diags);
 
   unsigned lexCharacter(const char *&CurPtr, char StopQuote,

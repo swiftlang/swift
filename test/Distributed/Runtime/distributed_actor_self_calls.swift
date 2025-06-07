@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen -disable-availability-checking -parse-as-library %s | %FileCheck %s
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library)
+// RUN: %target-swift-emit-silgen -target %target-swift-5.7-abi-triple -parse-as-library %s | %FileCheck %s
+// RUN: %target-run-simple-swift( -target %target-swift-5.7-abi-triple -parse-as-library)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -16,7 +16,7 @@ distributed actor Philosopher {
   distributed func think() {
   }
 
-  // CHECK: sil hidden [ossa] @$s28distributed_actor_self_calls11PhilosopherC10stopEatingyyF : $@convention(method) (@guaranteed Philosopher) -> () {
+  // CHECK: sil hidden [ossa] @$s28distributed_actor_self_calls11PhilosopherC10stopEatingyyF : $@convention(method) (@sil_isolated @guaranteed Philosopher) -> () {
   func stopEating() { // NOTE: marking this async solves the issue; we find the async context then
     self.think()
 
@@ -25,7 +25,7 @@ distributed actor Philosopher {
     // trying to get the async context to call the async thunk would fail here.
     //
     // CHECK:        // function_ref Philosopher.think()
-    // CHECK-NEXT:   [[E:%[0-9]+]] = function_ref @$s28distributed_actor_self_calls11PhilosopherC5thinkyyF : $@convention(method) (@guaranteed Philosopher) -> ()
+    // CHECK-NEXT:   [[E:%[0-9]+]] = function_ref @$s28distributed_actor_self_calls11PhilosopherC5thinkyyF : $@convention(method) (@sil_isolated @guaranteed Philosopher) -> ()
   }
 }
 

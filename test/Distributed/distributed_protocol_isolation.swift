@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -typecheck -verify -strict-concurrency=targeted -disable-availability-checking -I %t 2>&1 %s
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-5.7-abi-triple %S/Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-swift-frontend -typecheck -verify -strict-concurrency=targeted -target %target-swift-5.7-abi-triple -I %t 2>&1 %s
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
@@ -14,7 +14,7 @@ typealias DefaultDistributedActorSystem = FakeActorSystem
 // MARK: Distributed actor protocols
 
 protocol WrongDistFuncs {
-    distributed func notDistActor() // expected-error{{'distributed' method can only be declared within 'distributed actor'}}{{5-17=}} {{25-25=: DistributedActor}}
+    distributed func notDistActor() // expected-error{{'distributed' method can only be declared within 'distributed actor'}}{{5-17=}} {{-1:25-25=: DistributedActor}}
 }
 
 protocol DistProtocol: DistributedActor {
@@ -96,33 +96,34 @@ func outside_good_ext<DP: DistProtocol>(dp: DP) async throws {
 /// A distributed actor could only conform to this by making everything 'nonisolated':
 protocol StrictlyLocal {
   func local()
-  // expected-note@-1 2{{mark the protocol requirement 'local()' 'async throws' to allow actor-isolated conformances}}{{15-15= async throws}}
 
   func localThrows() throws
-  // expected-note@-1 2{{mark the protocol requirement 'localThrows()' 'async' to allow actor-isolated conformances}}{{22-22=async }}
 
   func localAsync() async
-  // expected-note@-1 2{{mark the protocol requirement 'localAsync()' 'throws' to allow actor-isolated conformances}}
 }
 
+// expected-error@+1{{conformance of 'Nope1_StrictlyLocal' to protocol 'StrictlyLocal' crosses into actor-isolated code and can cause data races}}
 distributed actor Nope1_StrictlyLocal: StrictlyLocal {
+  // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}{{40-40=@preconcurrency }}
+  // expected-note@-2{{mark all declarations used in the conformance 'nonisolated'}}
+
   func local() {}
-  // expected-error@-1{{distributed actor-isolated instance method 'local()' cannot be used to satisfy nonisolated protocol requirement}}
-  // expected-note@-2{{add 'nonisolated' to 'local()' to make this instance method not isolated to the actor}}
+  // expected-note@-1{{actor-isolated instance method 'local()' cannot satisfy nonisolated requirement}}
   func localThrows() throws {}
-  // expected-error@-1{{distributed actor-isolated instance method 'localThrows()' cannot be used to satisfy nonisolated protocol requirement}}
-  // expected-note@-2{{add 'nonisolated' to 'localThrows()' to make this instance method not isolated to the actor}}
+  // expected-note@-1{{actor-isolated instance method 'localThrows()' cannot satisfy nonisolated requirement}}
   func localAsync() async {}
-  // expected-error@-1{{distributed actor-isolated instance method 'localAsync()' cannot be used to satisfy nonisolated protocol requirement}}
-  // expected-note@-2{{add 'nonisolated' to 'localAsync()' to make this instance method not isolated to the actor}}
+  // expected-note@-1{{actor-isolated instance method 'localAsync()' cannot satisfy nonisolated requirement}}
 }
+
+// expected-error@+1{{conformance of 'Nope2_StrictlyLocal' to protocol 'StrictlyLocal' involves isolation mismatches and can cause data races}}
 distributed actor Nope2_StrictlyLocal: StrictlyLocal {
+  // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}
   distributed func local() {}
-  // expected-error@-1{{actor-isolated distributed instance method 'local()' cannot be used to satisfy nonisolated protocol requirement}}
+  // expected-note@-1{{actor-isolated distributed instance method 'local()' cannot satisfy nonisolated requirement}}
   distributed func localThrows() throws {}
-  // expected-error@-1{{actor-isolated distributed instance method 'localThrows()' cannot be used to satisfy nonisolated protocol requirement}}
+  // expected-note@-1{{actor-isolated distributed instance method 'localThrows()' cannot satisfy nonisolated requirement}}
   distributed func localAsync() async {}
-  // expected-error@-1{{actor-isolated distributed instance method 'localAsync()' cannot be used to satisfy nonisolated protocol requirement}}
+  // expected-note@-1{{actor-isolated distributed instance method 'localAsync()' cannot satisfy nonisolated requirement}}
 }
 distributed actor OK_StrictlyLocal: StrictlyLocal {
   nonisolated func local() {}
@@ -139,7 +140,6 @@ actor MyServer : Server {
 
 protocol AsyncThrowsAll {
   func maybe(param: String, int: Int) async throws -> Int
-  // expected-note@-1{{'maybe(param:int:)' declared here}}
 }
 
 actor LocalOK_AsyncThrowsAll: AsyncThrowsAll {
@@ -156,11 +156,12 @@ actor LocalOK_ImplicitlyThrowsAsync_AsyncThrowsAll: AsyncThrowsAll {
   func maybe(param: String, int: Int) -> Int { 1111 }
 }
 
+// expected-error@+1{{conformance of 'Nope1_AsyncThrowsAll' to distributed protocol 'AsyncThrowsAll' uses non-distributed operations}}
 distributed actor Nope1_AsyncThrowsAll: AsyncThrowsAll {
+  // expected-note@-1{{mark all declarations used in the conformance 'distributed'}}
+
   func maybe(param: String, int: Int) async throws -> Int { 111 }
-  // expected-error@-1{{distributed actor-isolated instance method 'maybe(param:int:)' cannot be used to satisfy nonisolated protocol requirement}}
-  // expected-note@-2{{add 'nonisolated' to 'maybe(param:int:)' to make this instance method not isolated to the actor}}
-  // expected-note@-3{{add 'distributed' to 'maybe(param:int:)' to make this instance method satisfy the protocol requirement}}
+  // expected-note@-1{{non-distributed instance method 'maybe(param:int:)'}}
 }
 
 distributed actor OK_AsyncThrowsAll: AsyncThrowsAll {
@@ -187,7 +188,6 @@ func testAsyncThrowsAll(p: AsyncThrowsAll,
 
 protocol TerminationWatchingA {
   func terminated(a: String) async
-  // expected-note@-1{{mark the protocol requirement 'terminated(a:)' 'throws' to allow actor-isolated conformances}}
 }
 
 protocol TerminationWatchingDA: DistributedActor {
@@ -201,10 +201,13 @@ func test_watching_A(a: A_TerminationWatchingA) async throws {
   await a.terminated(a: "normal")
 }
 
+// expected-error@+1{{conformance of 'DA_TerminationWatchingA' to protocol 'TerminationWatchingA' crosses into actor-isolated code and can cause data races}}
 distributed actor DA_TerminationWatchingA: TerminationWatchingA {
+  // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}
+  // expected-note@-2{{mark all declarations used in the conformance 'nonisolated'}}
+
   func terminated(a: String) { }
-  // expected-error@-1{{distributed actor-isolated instance method 'terminated(a:)' cannot be used to satisfy nonisolated protocol requirement}}
-  // expected-note@-2{{add 'nonisolated' to 'terminated(a:)' to make this instance method not isolated to the actor}}
+  // expected-note@-1{{actor-isolated instance method 'terminated(a:)' cannot satisfy nonisolated requirement}}
 }
 
 distributed actor DA_TerminationWatchingDA: TerminationWatchingDA {

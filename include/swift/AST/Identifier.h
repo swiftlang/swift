@@ -93,28 +93,40 @@ public:
   }
   
   bool empty() const { return Pointer == nullptr; }
+  bool nonempty() const { return !empty(); }
 
   LLVM_ATTRIBUTE_USED bool is(StringRef string) const {
-    return str().equals(string);
+    return str() == string;
   }
   
   /// isOperator - Return true if this identifier is an operator, false if it is
   /// a normal identifier.
-  /// FIXME: We should maybe cache this.
   bool isOperator() const {
     if (empty())
       return false;
     if (isEditorPlaceholder())
       return false;
-    if ((unsigned char)Pointer[0] < 0x80)
-      return isOperatorStartCodePoint((unsigned char)Pointer[0]);
 
     // Handle the high unicode case out of line.
     return isOperatorSlow();
   }
 
+  /// Returns true if this identifier contains non-identifier characters and
+  /// must always be escaped with backticks, even in contexts were other
+  /// escaped identifiers could omit backticks (like keywords as argument
+  /// labels).
+  bool mustAlwaysBeEscaped() const;
+
   bool isArithmeticOperator() const {
     return is("+") || is("-") || is("*") || is("/") || is("%");
+  }
+
+  bool isBitwiseOperator() const {
+    return is("~") || is("&") || is("|") || is("^");
+  }
+
+  bool isShiftOperator() const {
+    return is("<<") || is(">>");
   }
 
   // Returns whether this is a standard comparison operator,
@@ -126,10 +138,6 @@ public:
 
   bool isNilCoalescingOperator() const {
     return is("??");
-  }
-
-  bool isExpansionOperator() const {
-    return is("...");
   }
 
   /// isOperatorStartCodePoint - Return true if the specified code point is a
@@ -177,14 +185,18 @@ public:
   }
 
   bool hasDollarPrefix() const {
-    return str().startswith("$") && !(getLength() == 1);
+    return str().starts_with("$") && !(getLength() == 1);
+  }
+  
+  bool hasUnderscoredNaming() const {
+    return str().starts_with("_");
   }
   
   const void *getAsOpaquePointer() const {
       return static_cast<const void *>(Pointer);
   }
   
-  static Identifier getFromOpaquePointer(void *P) {
+  static Identifier getFromOpaquePointer(const void *P) {
     return Identifier((const char*)P);
   }
 
@@ -263,11 +275,15 @@ namespace llvm {
   
 } // end namespace llvm
 
+class BridgedDeclBaseName;
+
 namespace swift {
 
 /// Wrapper that may either be an Identifier or a special name
 /// (e.g. for subscripts)
 class DeclBaseName {
+  friend class ::BridgedDeclBaseName;
+
 public:
   enum class Kind: uint8_t {
     Normal,
@@ -322,6 +338,8 @@ public:
 
   bool isSubscript() const { return getKind() == Kind::Subscript; }
 
+  bool isConstructor() const { return getKind() == Kind::Constructor; }
+
   /// Return the identifier backing the name. Assumes that the name is not
   /// special.
   Identifier getIdentifier() const {
@@ -333,6 +351,10 @@ public:
 
   bool isOperator() const {
     return !isSpecial() && getIdentifier().isOperator();
+  }
+
+  bool mustAlwaysBeEscaped() const {
+    return !isSpecial() && getIdentifier().mustAlwaysBeEscaped();
   }
 
   bool isEditorPlaceholder() const {
@@ -363,7 +385,11 @@ public:
   }
 
   int compare(DeclBaseName other) const {
-    return userFacingName().compare(other.userFacingName());
+    if (int result = userFacingName().compare(other.userFacingName()))
+      return result;
+    if (getKind() == other.getKind())
+      return 0;
+    return getKind() < other.getKind() ? -1 : 1;
   }
 
   bool operator==(StringRef Str) const {
@@ -556,7 +582,12 @@ public:
   bool isOperator() const {
     return getBaseName().isOperator();
   }
-  
+
+  /// True if this name is an escaped identifier.
+  bool mustAlwaysBeEscaped() const {
+    return getBaseName().mustAlwaysBeEscaped();
+  }
+
   /// True if this name should be found by a decl ref or member ref under the
   /// name specified by 'refName'.
   ///
@@ -662,63 +693,73 @@ public:
   void *getOpaqueValue() const { return FullName.getOpaqueValue(); }
   static DeclNameRef getFromOpaqueValue(void *p);
 
+  explicit DeclNameRef(ASTContext &C, Identifier moduleSelector,
+                       DeclName fullName)
+    : FullName(fullName) { }
+
+  explicit DeclNameRef(ASTContext &C, Identifier moduleSelector,
+                       DeclBaseName baseName, ArrayRef<Identifier> argLabels)
+    : FullName(C, baseName, argLabels) { }
+
   explicit DeclNameRef(DeclName FullName)
     : FullName(FullName) { }
 
-  explicit DeclNameRef(DeclBaseName BaseName)
-    : FullName(BaseName) { }
+  bool hasModuleSelector() const {
+    return false;
+  }
 
-  explicit DeclNameRef(Identifier BaseName)
-    : FullName(BaseName) { }
+  Identifier getModuleSelector() const {
+    return Identifier();
+  }
 
   /// The name of the declaration being referenced.
   DeclName getFullName() const {
     return FullName;
   }
 
-  DeclName &getFullName() {
-    return FullName;
-  }
-
   /// The base name of the declaration being referenced.
   DeclBaseName getBaseName() const {
-    return FullName.getBaseName();
+    return getFullName().getBaseName();
   }
 
   Identifier getBaseIdentifier() const {
-    return FullName.getBaseIdentifier();
+    return getFullName().getBaseIdentifier();
   }
 
   ArrayRef<Identifier> getArgumentNames() const {
-    return FullName.getArgumentNames();
+    return getFullName().getArgumentNames();
   }
 
   bool isSimpleName() const {
-    return FullName.isSimpleName();
+    return getFullName().isSimpleName();
   }
 
   bool isSimpleName(DeclBaseName name) const {
-    return FullName.isSimpleName(name);
+    return getFullName().isSimpleName(name);
   }
 
   bool isSimpleName(StringRef name) const {
-    return FullName.isSimpleName(name);
+    return getFullName().isSimpleName(name);
   }
 
   bool isSpecial() const {
-    return FullName.isSpecial();
+    return getFullName().isSpecial();
   }
 
   bool isOperator() const {
-    return FullName.isOperator();
+    return getFullName().isOperator();
+  }
+
+  bool mustAlwaysBeEscaped() const {
+    return getFullName().mustAlwaysBeEscaped();
   }
 
   bool isCompoundName() const {
-    return FullName.isCompoundName();
+    return getFullName().isCompoundName();
   }
 
   explicit operator bool() const {
-    return (bool)FullName;
+    return (bool)getFullName();
   }
 
   /// Compare two declaration names, producing -1 if \c *this comes before
@@ -758,7 +799,7 @@ public:
     return lhs.compare(rhs) >= 0;
   }
 
-  DeclNameRef withoutArgumentLabels() const;
+  DeclNameRef withoutArgumentLabels(ASTContext &C) const;
   DeclNameRef withArgumentLabels(ASTContext &C,
                                  ArrayRef<Identifier> argumentNames) const;
 
@@ -791,15 +832,14 @@ inline DeclNameRef DeclNameRef::getFromOpaqueValue(void *p) {
   return DeclNameRef(DeclName::getFromOpaqueValue(p));
 }
 
-inline DeclNameRef DeclNameRef::withoutArgumentLabels() const {
-  return DeclNameRef(getBaseName());
+inline DeclNameRef DeclNameRef::withoutArgumentLabels(ASTContext &C) const {
+  return DeclNameRef(C, getModuleSelector(), getBaseName());
 }
 
 inline DeclNameRef DeclNameRef::withArgumentLabels(
     ASTContext &C, ArrayRef<Identifier> argumentNames) const {
-  return DeclNameRef(DeclName(C, getBaseName(), argumentNames));
+  return DeclNameRef(C, getModuleSelector(), getBaseName(), argumentNames);
 }
-
 
 inline DeclNameRef DeclNameRef::createSubscript() {
   return DeclNameRef(DeclBaseName::createSubscript());
@@ -843,7 +883,7 @@ public:
   /// This should not be used to parse selectors written directly in Swift
   /// source code (e.g. the argument of an @objc attribute). Use the
   /// parser for that.
-  static llvm::Optional<ObjCSelector> parse(ASTContext &ctx, StringRef string);
+  static std::optional<ObjCSelector> parse(ASTContext &ctx, StringRef string);
 
   /// Convert to true if the decl name is valid.
   explicit operator bool() const { return (bool)Storage; }

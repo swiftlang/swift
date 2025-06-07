@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "predictable-memopt"
 
 #include "PMOMemoryUseCollector.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/BlotMapVector.h"
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/Basic/FrozenMultiMap.h"
@@ -20,6 +21,7 @@
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/LinearLifetimeChecker.h"
+#include "swift/SIL/OSSALifetimeCompletion.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -36,14 +38,47 @@
 
 using namespace swift;
 
-STATISTIC(NumLoadPromoted, "Number of loads promoted");
+static llvm::cl::opt<bool> EnableAggressiveExpansionBlocking(
+  "enable-aggressive-expansion-blocking", llvm::cl::init(false));
+
 STATISTIC(NumLoadTakePromoted, "Number of load takes promoted");
 STATISTIC(NumDestroyAddrPromoted, "Number of destroy_addrs promoted");
 STATISTIC(NumAllocRemoved, "Number of allocations completely removed");
 
+namespace {
+
+/// The following utilities handle two fundamentally different optimizations:
+/// - load-copy removal preserves allocation
+/// - dead allocation removal replaces the allocation
+///
+/// Ownership handling is completely different in these cases. The utilities are
+/// not well-factored to reflect this, so we have a mode flag.
+enum class OptimizationMode {
+  PreserveAlloc,
+  ReplaceAlloc
+};
+
+} // end namespace
+
 //===----------------------------------------------------------------------===//
 //                            Subelement Analysis
 //===----------------------------------------------------------------------===//
+
+namespace {
+
+// The type of a particular memory access and its corresponding subelement index
+// range relative to the allocation being optimized.
+struct LoadInfo {
+  SILType loadType;
+  unsigned firstElt;
+  unsigned numElts;
+
+  IntRange<unsigned> range() const {
+    return IntRange<unsigned>(firstElt, firstElt + numElts);
+  }
+};
+
+} // namespace
 
 // We can only analyze components of structs whose storage is fully accessible
 // from Swift.
@@ -55,14 +90,14 @@ getFullyReferenceableStruct(SILType Ty) {
   return SD;
 }
 
-static unsigned getNumSubElements(SILType T, SILModule &M,
+static unsigned getNumSubElements(SILType T, SILFunction &F,
                                   TypeExpansionContext context) {
 
   if (auto TT = T.getAs<TupleType>()) {
     unsigned NumElements = 0;
     for (auto index : indices(TT.getElementTypes()))
       NumElements +=
-          getNumSubElements(T.getTupleElementType(index), M, context);
+          getNumSubElements(T.getTupleElementType(index), F, context);
     return NumElements;
   }
   
@@ -70,8 +105,13 @@ static unsigned getNumSubElements(SILType T, SILModule &M,
     unsigned NumElements = 0;
     for (auto *D : SD->getStoredProperties())
       NumElements +=
-          getNumSubElements(T.getFieldType(D, M, context), M, context);
-    return NumElements;
+        getNumSubElements(T.getFieldType(D, F.getModule(), context), F,
+                          context);
+
+    // Returning NumElements == 0 implies that "empty" values can be
+    // materialized without ownership. This is only valid for trivial types.
+    if (NumElements > 0 || T.isTrivial(F))
+      return NumElements;
   }
   
   // If this isn't a tuple or struct, it is a single element.
@@ -116,7 +156,7 @@ static SILValue getAccessPathRoot(SILValue pointer) {
 static unsigned computeSubelement(SILValue Pointer,
                                   SingleValueInstruction *RootInst) {
   unsigned SubElementNumber = 0;
-  SILModule &M = RootInst->getModule();
+  auto &F = *RootInst->getFunction();
   
   while (1) {
     // If we got to the root, we're done.
@@ -139,7 +179,7 @@ static unsigned computeSubelement(SILValue Pointer,
       // Keep track of what subelement is being referenced.
       for (unsigned i = 0, e = TEAI->getFieldIndex(); i != e; ++i) {
         SubElementNumber +=
-            getNumSubElements(TT.getTupleElementType(i), M,
+            getNumSubElements(TT.getTupleElementType(i), F,
                               TypeExpansionContext(*RootInst->getFunction()));
       }
       Pointer = TEAI->getOperand();
@@ -155,10 +195,16 @@ static unsigned computeSubelement(SILValue Pointer,
         if (D == SEAI->getField()) break;
         auto context = TypeExpansionContext(*RootInst->getFunction());
         SubElementNumber +=
-            getNumSubElements(ST.getFieldType(D, M, context), M, context);
+          getNumSubElements(ST.getFieldType(D, F.getModule(), context), F,
+                            context);
       }
       
       Pointer = SEAI->getOperand();
+      continue;
+    }
+
+    if (auto *MD = dyn_cast<MarkDependenceInst>(Pointer)) {
+      Pointer = MD->getValue();
       continue;
     }
 
@@ -187,7 +233,7 @@ struct AvailableValue {
 
   /// If this gets too expensive in terms of copying, we can use an arena and a
   /// FrozenPtrSet like we do in ARC.
-  SmallSetVector<StoreInst *, 1> InsertionPoints;
+  llvm::SmallSetVector<SILInstruction *, 1> InsertionPoints;
 
   /// Just for updating.
   SmallVectorImpl<PMOMemoryUse> *Uses;
@@ -200,7 +246,7 @@ public:
   /// *NOTE* We assume that all available values start with a singular insertion
   /// point and insertion points are added by merging.
   AvailableValue(SILValue Value, unsigned SubElementNumber,
-                 StoreInst *InsertPoint)
+                 SILInstruction *InsertPoint)
       : Value(Value), SubElementNumber(SubElementNumber), InsertionPoints() {
     InsertionPoints.insert(InsertPoint);
   }
@@ -240,7 +286,7 @@ public:
   SILValue getValue() const { return Value; }
   SILType getType() const { return Value->getType(); }
   unsigned getSubElementNumber() const { return SubElementNumber; }
-  ArrayRef<StoreInst *> getInsertionPoints() const {
+  ArrayRef<SILInstruction *> getInsertionPoints() const {
     return InsertionPoints.getArrayRef();
   }
 
@@ -249,7 +295,7 @@ public:
     InsertionPoints.set_union(Other.InsertionPoints);
   }
 
-  void addInsertionPoint(StoreInst *si) & { InsertionPoints.insert(si); }
+  void addInsertionPoint(SILInstruction *i) & { InsertionPoints.insert(i); }
 
   AvailableValue emitStructExtract(SILBuilder &B, SILLocation Loc, VarDecl *D,
                                    unsigned SubElementNumber) const {
@@ -267,8 +313,7 @@ public:
   AvailableValue emitBeginBorrow(SILBuilder &b, SILLocation loc) const {
     // If we do not have ownership or already are guaranteed, just return a copy
     // of our state.
-    if (!b.hasOwnership() ||
-        Value->getOwnershipKind().isCompatibleWith(OwnershipKind::Guaranteed)) {
+    if (Value->getOwnershipKind().isCompatibleWith(OwnershipKind::Guaranteed)) {
       return {Value, SubElementNumber, InsertionPoints};
     }
 
@@ -318,6 +363,28 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os, const AvailableValue &V) {
 //                           Subelement Extraction
 //===----------------------------------------------------------------------===//
 
+static bool isFullyAvailable(SILType loadTy, unsigned firstElt,
+                             ArrayRef<AvailableValue> AvailableValues) {
+  if (firstElt >= AvailableValues.size()) { // #Elements may be zero.
+    return false;
+  }
+
+  auto &firstVal = AvailableValues[firstElt];
+
+  // Make sure that the first element is available and is the correct type.
+  if (!firstVal || firstVal.getType() != loadTy)
+    return false;
+
+  auto &function = *firstVal.getValue()->getFunction();
+  return llvm::all_of(
+    range(getNumSubElements(loadTy, function, TypeExpansionContext(function))),
+    [&](unsigned index) -> bool {
+      auto &val = AvailableValues[firstElt + index];
+      return val.getValue() == firstVal.getValue() &&
+        val.getSubElementNumber() == index;
+    });
+}
+
 /// Given an aggregate value and an access path, non-destructively extract the
 /// value indicated by the path.
 static SILValue nonDestructivelyExtractSubElement(const AvailableValue &Val,
@@ -332,7 +399,7 @@ static SILValue nonDestructivelyExtractSubElement(const AvailableValue &Val,
       // Keep track of what subelement is being referenced.
       SILType EltTy = ValTy.getTupleElementType(EltNo);
       unsigned NumSubElt = getNumSubElements(
-          EltTy, B.getModule(), TypeExpansionContext(B.getFunction()));
+          EltTy, B.getFunction(), TypeExpansionContext(B.getFunction()));
       if (SubElementNumber < NumSubElt) {
         auto BorrowedVal = Val.emitBeginBorrow(B, Loc);
         auto NewVal =
@@ -357,7 +424,7 @@ static SILValue nonDestructivelyExtractSubElement(const AvailableValue &Val,
       auto fieldType = ValTy.getFieldType(
           D, B.getModule(), TypeExpansionContext(B.getFunction()));
       unsigned NumSubElt = getNumSubElements(
-          fieldType, B.getModule(), TypeExpansionContext(B.getFunction()));
+          fieldType, B.getFunction(), TypeExpansionContext(B.getFunction()));
 
       if (SubElementNumber < NumSubElt) {
         auto BorrowedVal = Val.emitBeginBorrow(B, Loc);
@@ -383,9 +450,217 @@ static SILValue nonDestructivelyExtractSubElement(const AvailableValue &Val,
   // load [copy] or a load [trivial], while in non-[ossa] SIL we will
   // be replacing unqualified loads.
   assert(SubElementNumber == 0 && "Miscalculation indexing subelements");
-  if (!B.hasOwnership())
-    return Val.getValue();
   return B.emitCopyValueOperation(Loc, Val.getValue());
+}
+
+//===----------------------------------------------------------------------===//
+//                              Ownership Fixup
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// For OptimizedMode == PreserveAlloc. Track inserted copies and casts for
+/// ownership fixup.
+struct AvailableValueFixup {
+  /// Keep track of all instructions that we have added. Once we are done
+  /// promoting a value, we need to make sure that if we need to balance any
+  /// copies (to avoid leaks), we do so. This is not used if we are performing a
+  /// take.
+  SmallVector<SILInstruction *, 16> insertedInsts;
+
+  AvailableValueFixup() = default;
+  AvailableValueFixup(const AvailableValueFixup &) = delete;
+  AvailableValueFixup &operator=(const AvailableValueFixup &) = delete;
+
+  ~AvailableValueFixup() {
+    assert(insertedInsts.empty() && "need to fix ownership");
+  }
+};
+
+} // end namespace
+
+namespace {
+
+/// For available value data flow with OptimizedMode::PreserveAlloc: track only
+/// inserted copies and casts for ownership fixup after dataflow completes. Phis
+/// are not allowed.
+struct AvailableValueDataflowFixup: AvailableValueFixup {
+  /// Given a single available value, get an owned copy if it is possible to
+  /// create one without introducing a phi. Return the copy. Otherwise, return
+  /// an invalid SILValue.
+  SILValue getSingleOwnedValue(const AvailableValue &availableVal);
+
+  // Verify ownership of promoted instructions in asserts builds or when
+  // -sil-verify-all is set.
+  //
+  // Clears insertedInsts.
+  void verifyOwnership(DeadEndBlocks &deBlocks);
+
+  // Deletes all insertedInsts without fixing ownership.
+  // Clears insertedInsts.
+  void deleteInsertedInsts(InstructionDeleter &deleter);
+};
+
+} // end namespace
+
+// In OptimizationMode::PreserveAlloc, get a copy of this single available
+// value. This requires a copy at the allocation's insertion point (store).
+//
+// Assumption: this copy will be consumed at a cast-like instruction
+// (mark_dependence), which caused dataflow to invalidate the currently
+// available value. Therefore, since phis are not allowed, the consumption
+// cannot be in an inner loop relative to the copy. Unlike getMergedOwnedValue,
+// there is no need for a second copy.
+//
+// Note: the caller must add the consuming cast to this->insertedInsts.
+SILValue AvailableValueDataflowFixup::getSingleOwnedValue(
+  const AvailableValue &availableVal) {
+
+  SILValue value = availableVal.getValue();
+  // If there is no need for copies, then we don't care about multiple insertion
+  // points.
+  if (value->getType().isTrivial(*value->getFunction())) {
+    return value;
+  }
+  ArrayRef<SILInstruction *> insertPts = availableVal.getInsertionPoints();
+  if (insertPts.size() > 1)
+    return SILValue();
+  
+  return SILBuilderWithScope(insertPts[0], &insertedInsts)
+    .emitCopyValueOperation(insertPts[0]->getLoc(), value);
+}
+
+void AvailableValueDataflowFixup::verifyOwnership(DeadEndBlocks &deBlocks) {
+  for (auto *inst : insertedInsts) {
+    if (inst->isDeleted())
+      continue;
+
+    for (auto result : inst->getResults()) {
+      result.verifyOwnership(&deBlocks);
+    }
+  }
+  insertedInsts.clear();
+}
+
+void AvailableValueDataflowFixup::
+deleteInsertedInsts(InstructionDeleter  &deleter) {
+  for (auto *inst : insertedInsts) {
+    if (inst->isDeleted())
+      continue;
+    
+    deleter.forceDeleteWithUsers(inst);
+  }
+  insertedInsts.clear();
+}
+
+// In OptimizationMode::PreserveAlloc: insert copies and phis for aggregate
+// values.
+struct AvailableValueAggregationFixup: AvailableValueFixup {
+  DeadEndBlocks &deadEndBlocks;
+  
+  /// The list of phi nodes inserted by the SSA updater.
+  SmallVector<SILPhiArgument *, 16> insertedPhiNodes;
+
+  AvailableValueAggregationFixup(DeadEndBlocks &deadEndBlocks)
+    : deadEndBlocks(deadEndBlocks) {}
+
+  /// For a single 'availableVal', insert copies at each insertion point. Merge
+  /// all copies, creating phis if needed. Return the final copy. Otherwise,
+  /// return an invalid SILValue.
+  SILValue mergeCopies(const AvailableValue &availableVal,
+                       SILType loadTy,
+                       SILInstruction *availableAtInst,
+                       bool isFullyAvailable);
+
+private:
+  /// As a result of us using the SSA updater, insert hand off copy/destroys at
+  /// each phi and make sure that intermediate phis do not leak by inserting
+  /// destroys along paths that go through the intermediate phi that do not also
+  /// go through the.
+  void addHandOffCopyDestroysForPhis(SILInstruction *load, SILValue newVal);
+};
+
+// For OptimizationMode::PreserveAlloc, insert copies at the available value's
+// insertion points to provide an owned value. Merge the copies into phis.
+// Create another copy before 'availableAtInst' in case it consumes the owned
+// value within an inner loop. Add the copies to insertedInsts and phis to
+// insertedPhiNodes.
+SILValue AvailableValueAggregationFixup::mergeCopies(
+  const AvailableValue &availableVal, SILType loadTy,
+  SILInstruction *availableAtInst,
+  bool isFullyAvailable) {
+
+  auto emitValue = [&](SILInstruction *insertPt) {
+    if (isFullyAvailable) {
+      SILValue fullVal = availableVal.getValue();
+      if (fullVal->use_empty()
+          && fullVal->getOwnershipKind() == OwnershipKind::Owned) {
+        // This value was inserted during data flow to propagate ownership. It
+        // does not need to be copied.
+        return fullVal;
+      }
+      return SILBuilderWithScope(insertPt, &insertedInsts)
+        .emitCopyValueOperation(insertPt->getLoc(), fullVal);
+    }
+    SILBuilderWithScope builder(insertPt, &insertedInsts);
+    SILValue eltVal = nonDestructivelyExtractSubElement(availableVal, builder,
+                                                        insertPt->getLoc());
+    assert(eltVal->getType() == loadTy && "Subelement types mismatch");
+    assert(eltVal->getOwnershipKind().isCompatibleWith(OwnershipKind::Owned));
+    return eltVal;
+  };
+
+  ArrayRef<SILInstruction *> insertPts = availableVal.getInsertionPoints();
+  if (insertPts.size() == 1) {
+    SILValue eltVal = emitValue(insertPts[0]);
+    if (isFullyAvailable)
+      return eltVal;
+    
+    return SILBuilderWithScope(availableAtInst, &insertedInsts)
+      .emitCopyValueOperation(availableAtInst->getLoc(), eltVal);
+  }
+  // If we have multiple insertion points, put copies at each point and use the
+  // SSA updater to get a value. The reason why this is safe is that we can only
+  // have multiple insertion points if we are storing exactly the same value
+  // implying that we can just copy firstVal at each insertion point.
+  SILSSAUpdater updater(&insertedPhiNodes);
+  SILFunction *function = availableAtInst->getFunction();
+  assert(function->hasOwnership() && "requires OSSA");
+  updater.initialize(function, loadTy, OwnershipKind::Owned);
+
+  std::optional<SILValue> singularValue;
+  for (auto *insertPt : insertPts) {
+    SILValue eltVal = emitValue(insertPt);
+
+    if (!singularValue.has_value()) {
+      singularValue = eltVal;
+    } else if (*singularValue != eltVal) {
+      singularValue = SILValue();
+    }
+    // And then put the value into the SSA updater.
+    updater.addAvailableValue(insertPt->getParent(), eltVal);
+  }
+
+  // If we only are tracking a singular value, we do not need to construct
+  // SSA. Just return that value.
+  if (auto val = singularValue.value_or(SILValue())) {
+    // Non-trivial values will always be copied above at each insertion
+    // point, and will, therefore, have multiple incoming values.
+    assert(val->getType().isTrivial(*function) &&
+           "Should never reach this code path if we are in ossa and have a "
+           "non-trivial value");
+    return val;
+  }
+
+  // Finally, grab the value from the SSA updater.
+  SILValue result =
+    updater.getValueInMiddleOfBlock(availableAtInst->getParent());
+  assert(result->getOwnershipKind().isCompatibleWith(OwnershipKind::Owned));
+  assert(result->getType() == loadTy && "Subelement types mismatch");
+  // Insert another copy at the point of availability in case it is inside a
+  // loop.
+  return SILBuilderWithScope(availableAtInst, &insertedInsts)
+    .emitCopyValueOperation(availableAtInst->getLoc(), result);
 }
 
 //===----------------------------------------------------------------------===//
@@ -417,34 +692,22 @@ class AvailableValueAggregator {
   SILModule &M;
   SILBuilderWithScope B;
   SILLocation Loc;
-  MutableArrayRef<AvailableValue> AvailableValueList;
+  ArrayRef<AvailableValue> AvailableValueList;
   SmallVectorImpl<PMOMemoryUse> &Uses;
-  DeadEndBlocks &deadEndBlocks;
   AvailableValueExpectedOwnership expectedOwnership;
 
-  /// Keep track of all instructions that we have added. Once we are done
-  /// promoting a value, we need to make sure that if we need to balance any
-  /// copies (to avoid leaks), we do so. This is not used if we are performing a
-  /// take.
-  SmallVector<SILInstruction *, 16> insertedInsts;
-
-  /// The list of phi nodes inserted by the SSA updater.
-  SmallVector<SILPhiArgument *, 16> insertedPhiNodes;
-
-  /// A set of copy_values whose lifetime we balanced while inserting phi
-  /// nodes. This means that these copy_value must be skipped in
-  /// addMissingDestroysForCopiedValues.
-  SmallPtrSet<CopyValueInst *, 16> copyValueProcessedWithPhiNodes;
+  AvailableValueAggregationFixup ownershipFixup;
 
 public:
   AvailableValueAggregator(SILInstruction *Inst,
-                           MutableArrayRef<AvailableValue> AvailableValueList,
+                           ArrayRef<AvailableValue> AvailableValueList,
                            SmallVectorImpl<PMOMemoryUse> &Uses,
                            DeadEndBlocks &deadEndBlocks,
                            AvailableValueExpectedOwnership expectedOwnership)
       : M(Inst->getModule()), B(Inst), Loc(Inst->getLoc()),
         AvailableValueList(AvailableValueList), Uses(Uses),
-        deadEndBlocks(deadEndBlocks), expectedOwnership(expectedOwnership) {}
+        expectedOwnership(expectedOwnership), ownershipFixup(deadEndBlocks)
+  {}
 
   // This is intended to be passed by reference only once constructed.
   AvailableValueAggregator(const AvailableValueAggregator &) = delete;
@@ -472,38 +735,12 @@ public:
     return expectedOwnership == AvailableValueExpectedOwnership::Copy;
   }
 
-  /// Given a load_borrow that we have aggregated a new value for, fixup the
-  /// reference counts of the intermediate copies and phis to ensure that all
-  /// forwarding operations in the CFG are strongly control equivalent (i.e. run
-  /// the same number of times).
-  void fixupOwnership(SILInstruction *load, SILValue newVal) {
-    assert(isa<LoadBorrowInst>(load) || isa<LoadInst>(load));
-
-    addHandOffCopyDestroysForPhis(load, newVal);
-    addMissingDestroysForCopiedValues(load, newVal);
-  }
-
 private:
   SILValue aggregateFullyAvailableValue(SILType loadTy, unsigned firstElt);
   SILValue aggregateTupleSubElts(TupleType *tt, SILType loadTy,
                                  SILValue address, unsigned firstElt);
   SILValue aggregateStructSubElts(StructDecl *sd, SILType loadTy,
                                   SILValue address, unsigned firstElt);
-  SILValue handlePrimitiveValue(SILType loadTy, SILValue address,
-                                unsigned firstElt);
-  bool isFullyAvailable(SILType loadTy, unsigned firstElt) const;
-
-
-  /// If as a result of us copying values, we may have unconsumed destroys, find
-  /// the appropriate location and place the values there. Only used when
-  /// ownership is enabled.
-  void addMissingDestroysForCopiedValues(SILInstruction *load, SILValue newVal);
-
-  /// As a result of us using the SSA updater, insert hand off copy/destroys at
-  /// each phi and make sure that intermediate phis do not leak by inserting
-  /// destroys along paths that go through the intermediate phi that do not also
-  /// go through the
-  void addHandOffCopyDestroysForPhis(SILInstruction *load, SILValue newVal);
 };
 
 } // end anonymous namespace
@@ -518,39 +755,12 @@ void AvailableValueAggregator::print(llvm::raw_ostream &os) const {
   }
 }
 
-bool AvailableValueAggregator::isFullyAvailable(SILType loadTy,
-                                                unsigned firstElt) const {
-  if (firstElt >= AvailableValueList.size()) { // #Elements may be zero.
-    return false;
-  }
-
-  auto &firstVal = AvailableValueList[firstElt];
-
-  // Make sure that the first element is available and is the correct type.
-  if (!firstVal || firstVal.getType() != loadTy)
-    return false;
-
-  return llvm::all_of(range(getNumSubElements(
-                          loadTy, M, TypeExpansionContext(B.getFunction()))),
-                      [&](unsigned index) -> bool {
-                        auto &val = AvailableValueList[firstElt + index];
-                        return val.getValue() == firstVal.getValue() &&
-                               val.getSubElementNumber() == index;
-                      });
-}
-
 // We can only take if we never have to split a larger value to promote this
 // address.
 bool AvailableValueAggregator::canTake(SILType loadTy,
                                        unsigned firstElt) const {
-  // If we do not have ownership, we can always take since we do not need to
-  // keep any ownership invariants up to date. In the future, we should be able
-  // to chop up larger values before they are being stored.
-  if (!B.hasOwnership())
-    return true;
-
   // If we are trivially fully available, just return true.
-  if (isFullyAvailable(loadTy, firstElt))
+  if (isFullyAvailable(loadTy, firstElt, AvailableValueList))
     return true;
 
   // Otherwise see if we are an aggregate with fully available leaf types.
@@ -558,7 +768,8 @@ bool AvailableValueAggregator::canTake(SILType loadTy,
     return llvm::all_of(indices(tt->getElements()), [&](unsigned eltNo) {
       SILType eltTy = loadTy.getTupleElementType(eltNo);
       unsigned numSubElt =
-          getNumSubElements(eltTy, M, TypeExpansionContext(B.getFunction()));
+        getNumSubElements(eltTy, B.getFunction(),
+                          TypeExpansionContext(B.getFunction()));
       bool success = canTake(eltTy, firstElt);
       firstElt += numSubElt;
       return success;
@@ -569,7 +780,7 @@ bool AvailableValueAggregator::canTake(SILType loadTy,
     return llvm::all_of(sd->getStoredProperties(), [&](VarDecl *decl) -> bool {
       auto context = TypeExpansionContext(B.getFunction());
       SILType eltTy = loadTy.getFieldType(decl, M, context);
-      unsigned numSubElt = getNumSubElements(eltTy, M, context);
+      unsigned numSubElt = getNumSubElements(eltTy, B.getFunction(), context);
       bool success = canTake(eltTy, firstElt);
       firstElt += numSubElt;
       return success;
@@ -607,7 +818,8 @@ SILValue AvailableValueAggregator::aggregateValues(SILType LoadTy,
         aggregateTupleSubElts(tupleType, LoadTy, Address, FirstElt);
     if (isTopLevel && result->getOwnershipKind() == OwnershipKind::Guaranteed) {
       SILValue borrowedResult = result;
-      SILBuilderWithScope builder(&*B.getInsertionPoint(), &insertedInsts);
+      SILBuilderWithScope builder(&*B.getInsertionPoint(),
+                                  &ownershipFixup.insertedInsts);
       result = builder.emitCopyValueOperation(Loc, borrowedResult);
       SmallVector<BorrowedValue, 4> introducers;
       bool foundIntroducers =
@@ -628,7 +840,8 @@ SILValue AvailableValueAggregator::aggregateValues(SILType LoadTy,
         aggregateStructSubElts(structDecl, LoadTy, Address, FirstElt);
     if (isTopLevel && result->getOwnershipKind() == OwnershipKind::Guaranteed) {
       SILValue borrowedResult = result;
-      SILBuilderWithScope builder(&*B.getInsertionPoint(), &insertedInsts);
+      SILBuilderWithScope builder(&*B.getInsertionPoint(),
+                                  &ownershipFixup.insertedInsts);
       result = builder.emitCopyValueOperation(Loc, borrowedResult);
       SmallVector<BorrowedValue, 4> introducers;
       bool foundIntroducers =
@@ -647,7 +860,20 @@ SILValue AvailableValueAggregator::aggregateValues(SILType LoadTy,
   // NOTE: We should never call this when taking since when taking we know that
   // our underlying value is always fully available.
   assert(!isTake());
-  return handlePrimitiveValue(LoadTy, Address, FirstElt);
+  // If the value is not available, load the value and update our use list.
+  auto &val = AvailableValueList[FirstElt];
+  if (!val) {
+    LoadInst *load = ([&]() {
+      SILBuilderWithScope builder(&*B.getInsertionPoint(),
+                                  &ownershipFixup.insertedInsts);
+      return builder.createTrivialLoadOr(Loc, Address,
+                                         LoadOwnershipQualifier::Copy);
+    }());
+    Uses.emplace_back(load, PMOUseKind::Load);
+    return load;
+  }
+  return ownershipFixup.mergeCopies(val, LoadTy, &*B.getInsertionPoint(),
+                                    /*isFullyAvailable*/false);
 }
 
 // See if we have this value is fully available. In such a case, return it as an
@@ -657,88 +883,23 @@ SILValue
 AvailableValueAggregator::aggregateFullyAvailableValue(SILType loadTy,
                                                        unsigned firstElt) {
   // Check if our underlying type is fully available. If it isn't, bail.
-  if (!isFullyAvailable(loadTy, firstElt))
+  if (!isFullyAvailable(loadTy, firstElt, AvailableValueList))
     return SILValue();
 
   // Ok, grab out first value. (note: any actually will do).
   auto &firstVal = AvailableValueList[firstElt];
 
   // Ok, we know that all of our available values are all parts of the same
-  // value. Without ownership, we can just return the underlying first value.
-  if (!B.hasOwnership())
+  // value.
+  assert(B.hasOwnership() && "requires OSSA");
+  if (isTake())
     return firstVal.getValue();
 
   // Otherwise, we need to put in a copy. This is b/c we only propagate along +1
   // values and we are eliminating a load [copy].
-  ArrayRef<StoreInst *> insertPts = firstVal.getInsertionPoints();
-  if (insertPts.size() == 1) {
-    // Use the scope and location of the store at the insertion point.
-    SILBuilderWithScope builder(insertPts[0], &insertedInsts);
-    SILLocation loc = insertPts[0]->getLoc();
-    // If we have a take, just return the value.
-    if (isTake())
-      return firstVal.getValue();
-    // Otherwise, return a copy of the value.
-    return builder.emitCopyValueOperation(loc, firstVal.getValue());
-  }
-
-  // If we have multiple insertion points, put copies at each point and use the
-  // SSA updater to get a value. The reason why this is safe is that we can only
-  // have multiple insertion points if we are storing exactly the same value
-  // implying that we can just copy firstVal at each insertion point.
-  SILSSAUpdater updater(&insertedPhiNodes);
-  updater.initialize(loadTy, B.hasOwnership() ? OwnershipKind::Owned
-                                              : OwnershipKind::None);
-
-  Optional<SILValue> singularValue;
-  for (auto *insertPt : insertPts) {
-    // Use the scope and location of the store at the insertion point.
-    SILBuilderWithScope builder(insertPt, &insertedInsts);
-    SILLocation loc = insertPt->getLoc();
-    SILValue eltVal = firstVal.getValue();
-
-    // If we are not taking, copy the element value.
-    if (!isTake()) {
-      eltVal = builder.emitCopyValueOperation(loc, eltVal);
-    }
-
-    if (!singularValue.has_value()) {
-      singularValue = eltVal;
-    } else if (*singularValue != eltVal) {
-      singularValue = SILValue();
-    }
-
-    // And then put the value into the SSA updater.
-    updater.addAvailableValue(insertPt->getParent(), eltVal);
-  }
-
-  // If we only are tracking a singular value, we do not need to construct
-  // SSA. Just return that value.
-  if (auto val = singularValue.value_or(SILValue())) {
-    // This assert documents that we are expecting that if we are in ossa, have
-    // a non-trivial value, and are not taking, we should never go down this
-    // code path. If we did, we would need to insert a copy here. The reason why
-    // we know we will never go down this code path is since we have been
-    // inserting copy_values implying that our potential singular value would be
-    // of the copy_values which are guaranteed to all be different.
-    assert((!B.hasOwnership() || isTake() ||
-            val->getType().isTrivial(*B.getInsertionBB()->getParent())) &&
-           "Should never reach this code path if we are in ossa and have a "
-           "non-trivial value");
-    return val;
-  }
-
-  // Finally, grab the value from the SSA updater.
-  SILValue result = updater.getValueInMiddleOfBlock(B.getInsertionBB());
-  assert(result->getOwnershipKind().isCompatibleWith(OwnershipKind::Owned));
-  if (isTake() || !B.hasOwnership()) {
-    return result;
-  }
-
-  // Be careful with this value and insert a copy in our load block to prevent
-  // any weird control equivalence issues.
-  SILBuilderWithScope builder(&*B.getInsertionPoint(), &insertedInsts);
-  return builder.emitCopyValueOperation(Loc, result);
+  return
+    ownershipFixup.mergeCopies(firstVal, loadTy, &*B.getInsertionPoint(),
+                               /*isFullyAvailable*/true);
 }
 
 SILValue AvailableValueAggregator::aggregateTupleSubElts(TupleType *TT,
@@ -750,7 +911,8 @@ SILValue AvailableValueAggregator::aggregateTupleSubElts(TupleType *TT,
   for (unsigned EltNo : indices(TT->getElements())) {
     SILType EltTy = LoadTy.getTupleElementType(EltNo);
     unsigned NumSubElt =
-        getNumSubElements(EltTy, M, TypeExpansionContext(B.getFunction()));
+      getNumSubElements(EltTy, B.getFunction(),
+                        TypeExpansionContext(B.getFunction()));
 
     // If we are missing any of the available values in this struct element,
     // compute an address to load from.
@@ -787,7 +949,7 @@ SILValue AvailableValueAggregator::aggregateStructSubElts(StructDecl *sd,
   for (auto *decl : sd->getStoredProperties()) {
     auto context = TypeExpansionContext(B.getFunction());
     SILType eltTy = loadTy.getFieldType(decl, M, context);
-    unsigned numSubElt = getNumSubElements(eltTy, M, context);
+    unsigned numSubElt = getNumSubElements(eltTy, B.getFunction(), context);
 
     // If we are missing any of the available values in this struct element,
     // compute an address to load from.
@@ -810,499 +972,6 @@ SILValue AvailableValueAggregator::aggregateStructSubElts(StructDecl *sd,
   }
 
   return B.createStruct(Loc, loadTy, resultElts);
-}
-
-// We have looked through all of the aggregate values and finally found a value
-// that is not available without transforming, i.e. a "primitive value". If the
-// value is available, use it (extracting if we need to), otherwise emit a load
-// of the value with the appropriate qualifier.
-SILValue AvailableValueAggregator::handlePrimitiveValue(SILType loadTy,
-                                                        SILValue address,
-                                                        unsigned firstElt) {
-  assert(!isTake() && "Should only take fully available values?!");
-
-  // If the value is not available, load the value and update our use list.
-  auto &val = AvailableValueList[firstElt];
-  if (!val) {
-    LoadInst *load = ([&]() {
-      if (B.hasOwnership()) {
-        SILBuilderWithScope builder(&*B.getInsertionPoint(), &insertedInsts);
-        return builder.createTrivialLoadOr(Loc, address,
-                                           LoadOwnershipQualifier::Copy);
-      }
-      return B.createLoad(Loc, address, LoadOwnershipQualifier::Unqualified);
-    }());
-    Uses.emplace_back(load, PMOUseKind::Load);
-    return load;
-  }
-
-  // If we have 1 insertion point, just extract the value and return.
-  //
-  // This saves us from having to spend compile time in the SSA updater in this
-  // case.
-  ArrayRef<StoreInst *> insertPts = val.getInsertionPoints();
-  if (insertPts.size() == 1) {
-    // Use the scope and location of the store at the insertion point.
-    SILBuilderWithScope builder(insertPts[0], &insertedInsts);
-    SILLocation loc = insertPts[0]->getLoc();
-    SILValue eltVal = nonDestructivelyExtractSubElement(val, builder, loc);
-    assert(!builder.hasOwnership() ||
-           eltVal->getOwnershipKind().isCompatibleWith(OwnershipKind::Owned));
-    assert(eltVal->getType() == loadTy && "Subelement types mismatch");
-
-    if (!builder.hasOwnership()) {
-      return eltVal;
-    }
-
-    SILBuilderWithScope builder2(&*B.getInsertionPoint(), &insertedInsts);
-    return builder2.emitCopyValueOperation(Loc, eltVal);
-  }
-
-  // If we have an available value, then we want to extract the subelement from
-  // the borrowed aggregate before each insertion point. Note that since we have
-  // inserted copies at each of these insertion points, we know that we will
-  // never have the same value along all paths unless we have a trivial value
-  // meaning the SSA updater given a non-trivial value must /always/ be used.
-  SILSSAUpdater updater(&insertedPhiNodes);
-  updater.initialize(loadTy, B.hasOwnership() ? OwnershipKind::Owned
-                                              : OwnershipKind::None);
-
-  Optional<SILValue> singularValue;
-  for (auto *i : insertPts) {
-    // Use the scope and location of the store at the insertion point.
-    SILBuilderWithScope builder(i, &insertedInsts);
-    SILLocation loc = i->getLoc();
-    SILValue eltVal = nonDestructivelyExtractSubElement(val, builder, loc);
-    assert(!builder.hasOwnership() ||
-           eltVal->getOwnershipKind().isCompatibleWith(OwnershipKind::Owned));
-
-    if (!singularValue.has_value()) {
-      singularValue = eltVal;
-    } else if (*singularValue != eltVal) {
-      singularValue = SILValue();
-    }
-
-    updater.addAvailableValue(i->getParent(), eltVal);
-  }
-
-  SILBasicBlock *insertBlock = B.getInsertionBB();
-
-  // If we are not in ossa and have a singular value or if we are in ossa and
-  // have a trivial singular value, just return that value.
-  //
-  // This can never happen for non-trivial values in ossa since we never should
-  // visit this code path if we have a take implying that non-trivial values
-  // /will/ have a copy and thus are guaranteed (since each copy yields a
-  // different value) to not be singular values.
-  if (auto val = singularValue.value_or(SILValue())) {
-    assert((!B.hasOwnership() ||
-            val->getType().isTrivial(*insertBlock->getParent())) &&
-           "Should have inserted copies for each insertion point, so shouldn't "
-           "have a singular value if non-trivial?!");
-    return val;
-  }
-
-  // Finally, grab the value from the SSA updater.
-  SILValue eltVal = updater.getValueInMiddleOfBlock(insertBlock);
-  assert(!B.hasOwnership() ||
-         eltVal->getOwnershipKind().isCompatibleWith(OwnershipKind::Owned));
-  assert(eltVal->getType() == loadTy && "Subelement types mismatch");
-  if (!B.hasOwnership())
-    return eltVal;
-  SILBuilderWithScope builder(&*B.getInsertionPoint(), &insertedInsts);
-  return builder.emitCopyValueOperation(Loc, eltVal);
-}
-
-static SILInstruction *
-getNonPhiBlockIncomingValueDef(SILValue incomingValue,
-                               SingleValueInstruction *phiCopy) {
-  assert(isa<CopyValueInst>(phiCopy));
-  auto *phiBlock = phiCopy->getParent();
-  if (phiBlock == incomingValue->getParentBlock()) {
-    return nullptr;
-  }
-
-  if (auto *cvi = dyn_cast<CopyValueInst>(incomingValue)) {
-    return cvi;
-  }
-
-  assert(isa<SILPhiArgument>(incomingValue));
-
-  // Otherwise, our copy_value may not be post-dominated by our phi. To
-  // work around that, we need to insert destroys along the other
-  // paths. So set base to the first instruction in our argument's block,
-  // so we can insert destroys for our base.
-  return &*incomingValue->getParentBlock()->begin();
-}
-
-static bool
-terminatorHasAnyKnownPhis(TermInst *ti,
-                          ArrayRef<SILPhiArgument *> insertedPhiNodesSorted) {
-  for (auto succArgList : ti->getSuccessorBlockArgumentLists()) {
-    if (llvm::any_of(succArgList, [&](SILArgument *arg) {
-          return binary_search(insertedPhiNodesSorted,
-                               cast<SILPhiArgument>(arg));
-        })) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
-namespace {
-
-class PhiNodeCopyCleanupInserter {
-  llvm::SmallMapVector<SILValue, unsigned, 8> incomingValues;
-
-  /// Map from index -> (incomingValueIndex, copy).
-  ///
-  /// We are going to stable_sort this array using the indices of
-  /// incomingValueIndex. This will ensure that we always visit in
-  /// insertion order our incoming values (since the indices we are
-  /// sorting by are the count of incoming values we have seen so far
-  /// when we see the incoming value) and maintain the internal
-  /// insertion sort within our range as well. This ensures that we
-  /// visit our incoming values in visitation order and that within
-  /// their own values, also visit them in visitation order with
-  /// respect to each other.
-  SmallFrozenMultiMap<unsigned, SingleValueInstruction *, 16> copiesToCleanup;
-
-  /// The lifetime frontier that we use to compute lifetime endpoints
-  /// when emitting cleanups.
-  ValueLifetimeAnalysis::Frontier lifetimeFrontier;
-
-public:
-  PhiNodeCopyCleanupInserter() = default;
-
-  void trackNewCleanup(SILValue incomingValue, CopyValueInst *copy) {
-    auto entry = std::make_pair(incomingValue, incomingValues.size());
-    auto iter = incomingValues.insert(entry);
-    // If we did not succeed, then iter.first.second is the index of
-    // incoming value. Otherwise, it will be nextIndex.
-    copiesToCleanup.insert(iter.first->second, copy);
-  }
-
-  void emit(DeadEndBlocks &deadEndBlocks) &&;
-};
-
-} // end anonymous namespace
-
-void PhiNodeCopyCleanupInserter::emit(DeadEndBlocks &deadEndBlocks) && {
-  // READ THIS: We are being very careful here to avoid allowing for
-  // non-determinism to enter here.
-  //
-  // 1. First we create a list of indices of our phi node data. Then we use a
-  //    stable sort those indices into the order in which our phi node cleanups
-  //    would be in if we compared just using incomingValues. We use a stable
-  //    sort here to ensure that within the same "cohort" of values, our order
-  //    is insertion order.
-  //
-  // 2. We go through the list of phiNodeCleanupStates in insertion order. We
-  //    also maintain a set of already visited base values. When we visit the
-  //    first phiNodeCleanupState for a specific phi, we process the phi
-  //    then. This ensures that we always process the phis in insertion order as
-  //    well.
-  copiesToCleanup.setFrozen();
-
-  for (auto keyValue : copiesToCleanup.getRange()) {
-    unsigned incomingValueIndex = keyValue.first;
-    auto copies = keyValue.second;
-
-    SILValue incomingValue =
-        std::next(incomingValues.begin(), incomingValueIndex)->first;
-    SingleValueInstruction *phiCopy = copies.front();
-    auto *insertPt = getNonPhiBlockIncomingValueDef(incomingValue, phiCopy);
-    auto loc = RegularLocation::getAutoGeneratedLocation();
-
-    // Before we do anything, see if we have a single cleanup state. In such a
-    // case, we could have that we have a phi node as an incoming value and a
-    // copy_value in that same block. In such a case, we want to just insert the
-    // copy and continue. This means that
-    // cleanupState.getNonPhiBlockIncomingValueDef() should always return a
-    // non-null value in the code below.
-    if (copies.size() == 1 && isa<SILArgument>(incomingValue) && !insertPt) {
-      SILBasicBlock *phiBlock = phiCopy->getParent();
-      SILBuilderWithScope builder(phiBlock->getTerminator());
-      builder.createDestroyValue(loc, incomingValue);
-      continue;
-    }
-
-    // Otherwise, we know that we have for this incomingValue, multiple
-    // potential insert pts that we need to handle at the same time with our
-    // lifetime query. Lifetime extend our base over these copy_value uses.
-    assert(lifetimeFrontier.empty());
-    auto *def = getNonPhiBlockIncomingValueDef(incomingValue, phiCopy);
-    assert(def && "Should never have a nullptr here since we handled all of "
-                  "the single block cases earlier");
-    ValueLifetimeAnalysis analysis(def, copies);
-    bool foundCriticalEdges = !analysis.computeFrontier(
-        lifetimeFrontier, ValueLifetimeAnalysis::DontModifyCFG, &deadEndBlocks);
-    (void)foundCriticalEdges;
-    assert(!foundCriticalEdges);
-
-    while (!lifetimeFrontier.empty()) {
-      auto *insertPoint = lifetimeFrontier.pop_back_val();
-      SILBuilderWithScope builder(insertPoint);
-      builder.createDestroyValue(loc, incomingValue);
-    }
-  }
-}
-
-void AvailableValueAggregator::addHandOffCopyDestroysForPhis(
-    SILInstruction *load, SILValue newVal) {
-  assert(isa<LoadBorrowInst>(load) || isa<LoadInst>(load));
-
-  SmallVector<SILBasicBlock *, 8> leakingBlocks;
-  SmallVector<std::pair<SILBasicBlock *, SILValue>, 8> incomingValues;
-  auto loc = RegularLocation::getAutoGeneratedLocation();
-
-#ifndef NDEBUG
-  LLVM_DEBUG(llvm::dbgs() << "Inserted Phis!\n");
-  for (auto *phi : insertedPhiNodes) {
-    LLVM_DEBUG(llvm::dbgs() << "Phi: " << *phi);
-  }
-#endif
-
-  // Before we begin, identify the offset for all phis that are intermediate
-  // phis inserted by the SSA updater. We are taking advantage of the fact that
-  // the SSA updater just constructs the web without knowledge of ownership. So
-  // if a phi node is only used by another phi node that we inserted, then we
-  // have an intermediate phi node.
-  //
-  // TODO: There should be a better way of doing this than doing a copy + sort.
-  SmallVector<SILPhiArgument *, 32> insertedPhiNodesSorted;
-  llvm::copy(insertedPhiNodes, std::back_inserter(insertedPhiNodesSorted));
-  llvm::sort(insertedPhiNodesSorted);
-
-  SmallBitVector intermediatePhiOffsets(insertedPhiNodes.size());
-  for (unsigned i : indices(insertedPhiNodes)) {
-    if (TermInst *termInst =
-            insertedPhiNodes[i]->getSingleUserOfType<TermInst>()) {
-      // Only set the value if we find termInst has a successor with a phi node
-      // in our insertedPhiNodes.
-      if (terminatorHasAnyKnownPhis(termInst, insertedPhiNodesSorted)) {
-        intermediatePhiOffsets.set(i);
-      }
-    }
-  }
-
-  // First go through all of our phi nodes doing the following:
-  //
-  // 1. If any of the phi node have a copy_value as an operand, we know that the
-  //    copy_value does not dominate our final definition since otherwise the
-  //    SSA updater would not have inserted a phi node here. In such a case
-  //    since we may not have that the copy_value is post-dominated by the phi,
-  //    we need to insert a copy_value at the phi to allow for post-domination
-  //    and then use the ValueLifetimeChecker to determine the rest of the
-  //    frontier for the base value.
-  //
-  // 2. If our phi node is used by another phi node, we run into a similar
-  //    problem where we could have that our original phi node does not dominate
-  //    our final definition (since the SSA updater would not have inserted the
-  //    phi) and may not be strongly control dependent on our phi. To work
-  //    around this problem, we insert at the phi a copy_value to allow for the
-  //    phi to post_dominate its copy and then extend the lifetime of the phied
-  //    value over that copy.
-  //
-  // As an extra complication to this, when we insert compensating releases for
-  // any copy_values from (1), we need to insert the destroy_value on "base
-  // values" (either a copy_value or the first instruction of a phi argument's
-  // block) /after/ we have found all of the base_values to ensure that if the
-  // same base value is used by multiple phis, we do not insert too many destroy
-  // value.
-  //
-  // NOTE: At first glance one may think that such a problem could not occur
-  // with phi nodes as well. Sadly if we allow for double backedge loops, it is
-  // possible (there may be more cases).
-  PhiNodeCopyCleanupInserter cleanupInserter;
-
-  for (unsigned i : indices(insertedPhiNodes)) {
-    auto *phi = insertedPhiNodes[i];
-
-    // If our phi is not owned, continue. No fixes are needed.
-    if (phi->getOwnershipKind() != OwnershipKind::Owned)
-      continue;
-
-    LLVM_DEBUG(llvm::dbgs() << "Visiting inserted phi: " << *phi);
-    // Otherwise, we have a copy_value that may not be strongly control
-    // equivalent with our phi node. In such a case, we need to use
-    // ValueLifetimeAnalysis to lifetime extend the copy such that we can
-    // produce a new copy_value at the phi. We insert destroys along the
-    // frontier.
-    leakingBlocks.clear();
-    incomingValues.clear();
-
-    phi->getIncomingPhiValues(incomingValues);
-    unsigned phiIndex = phi->getIndex();
-    for (auto pair : incomingValues) {
-      SILValue value = pair.second;
-
-      // If we had a non-trivial type with non-owned ownership, we will not see
-      // a copy_value, so skip them here.
-      if (value->getOwnershipKind() != OwnershipKind::Owned)
-        continue;
-
-      // Otherwise, value should be from a copy_value or a phi node.
-      assert(isa<CopyValueInst>(value) || isa<SILPhiArgument>(value));
-
-      // If we have a copy_value, remove it from the inserted insts set so we
-      // skip it when we start processing insertedInstrs.
-      if (auto *cvi = dyn_cast<CopyValueInst>(value)) {
-        copyValueProcessedWithPhiNodes.insert(cvi);
-
-        // Then check if our termInst is in the same block as our copy_value. In
-        // such a case, we can just use the copy_value as our phi's value
-        // without needing to worry about any issues around control equivalence.
-        if (pair.first == cvi->getParent())
-          continue;
-      } else {
-        assert(isa<SILPhiArgument>(value));
-      }
-
-      // Otherwise, insert a copy_value instruction right before the phi. We use
-      // that for our actual phi.
-      auto *termInst = pair.first->getTerminator();
-      SILBuilderWithScope builder(termInst);
-      CopyValueInst *phiCopy = builder.createCopyValue(loc, value);
-      termInst->setOperand(phiIndex, phiCopy);
-
-      // Now that we know our base, phi, phiCopy for this specific incoming
-      // value, append it to the phiNodeCleanupState so we can insert
-      // destroy_values late after we visit all insertedPhiNodes.
-      cleanupInserter.trackNewCleanup(value, phiCopy);
-    }
-
-    // Then see if our phi is an intermediate phi. If it is an intermediate phi,
-    // we know that this is not the phi node that is post-dominated by the
-    // load_borrow and that we will lifetime extend it via the child
-    // phi. Instead, we need to just ensure that our phi arg does not leak onto
-    // its set of post-dominating paths, subtracting from that set the path
-    // through our terminator use.
-    if (intermediatePhiOffsets[i]) {
-      continue;
-    }
-
-    // If we reach this point, then we know that we are a phi node that actually
-    // dominates our user so we need to lifetime extend it over the
-    // load_borrow. Thus insert copy_value along the incoming edges and then
-    // lifetime extend the phi node over the load_borrow.
-    //
-    // The linear lifetime checker doesn't care if the passed in load is
-    // actually a user of our copy_value. What we care about is that the load is
-    // guaranteed to be in the block where we have reformed the tuple in a
-    // consuming manner. This means if we add it as the consuming use of the
-    // copy, we can find the leaking places if any exist.
-    //
-    // Then perform the linear lifetime check. If we succeed, continue. We have
-    // no further work to do.
-    auto *loadOperand = &load->getAllOperands()[0];
-    LinearLifetimeChecker checker(deadEndBlocks);
-    bool consumedInLoop = checker.completeConsumingUseSet(
-        phi, loadOperand, [&](SILBasicBlock::iterator iter) {
-          SILBuilderWithScope builder(iter);
-          builder.emitDestroyValueOperation(loc, phi);
-        });
-
-    // Ok, we found some leaking blocks and potentially that our load is
-    // "consumed" inside a different loop in the loop nest from cvi. If we are
-    // consumed in the loop, then our visit should have inserted all of the
-    // necessary destroys for us by inserting the destroys on the loop
-    // boundaries. So, continue.
-    //
-    // NOTE: This includes cases where due to an infinite loop, we did not
-    // insert /any/ destroys since the loop has no boundary in a certain sense.
-    if (consumedInLoop) {
-      continue;
-    }
-
-    // Otherwise, we need to insert one last destroy after the load for our phi.
-    auto next = std::next(load->getIterator());
-    SILBuilderWithScope builder(next);
-    builder.emitDestroyValueOperation(next->getLoc(), phi);
-  }
-
-  // Alright! In summary, we just lifetime extended all of our phis,
-  // lifetime extended them to the load block, and inserted phi copies
-  // at all of our intermediate phi nodes. Now we need to cleanup and
-  // insert all of the compensating destroy_value that we need.
-  std::move(cleanupInserter).emit(deadEndBlocks);
-
-  // Clear the phi node array now that we are done.
-  insertedPhiNodes.clear();
-}
-
-void AvailableValueAggregator::addMissingDestroysForCopiedValues(
-    SILInstruction *load, SILValue newVal) {
-  assert(B.hasOwnership() &&
-         "We assume this is only called if we have ownership");
-
-  SmallVector<SILBasicBlock *, 8> leakingBlocks;
-  auto loc = RegularLocation::getAutoGeneratedLocation();
-
-  for (auto *inst : insertedInsts) {
-    // Otherwise, see if this is a load [copy]. It if it a load [copy], then we
-    // know that the load [copy] must be in the load block meaning we can just
-    // put a destroy_value /after/ the load_borrow to ensure that the value
-    // lives long enough for us to copy_value it or a derived value for the
-    // begin_borrow.
-    if (auto *li = dyn_cast<LoadInst>(inst)) {
-      if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Copy) {
-        assert(li->getParent() == load->getParent());
-        auto next = std::next(load->getIterator());
-        SILBuilderWithScope builder(next);
-        builder.emitDestroyValueOperation(next->getLoc(), li);
-        continue;
-      }
-    }
-
-    // Our copy_value may have been unset above if it was used by a phi
-    // (implying it does not dominate our final user).
-    auto *cvi = dyn_cast<CopyValueInst>(inst);
-    if (!cvi)
-      continue;
-
-    // If we already handled this copy_value above when handling phi nodes, just
-    // continue.
-    if (copyValueProcessedWithPhiNodes.count(cvi))
-      continue;
-
-    // Clear our state.
-    leakingBlocks.clear();
-
-    // The linear lifetime checker doesn't care if the passed in load is
-    // actually a user of our copy_value. What we care about is that the load is
-    // guaranteed to be in the block where we have reformed the tuple in a
-    // consuming manner. This means if we add it as the consuming use of the
-    // copy, we can find the leaking places if any exist.
-    //
-    // Then perform the linear lifetime check. If we succeed, continue. We have
-    // no further work to do.
-    auto *loadOperand = &load->getAllOperands()[0];
-    LinearLifetimeChecker checker(deadEndBlocks);
-    bool consumedInLoop = checker.completeConsumingUseSet(
-        cvi, loadOperand, [&](SILBasicBlock::iterator iter) {
-          SILBuilderWithScope builder(iter);
-          builder.emitDestroyValueOperation(loc, cvi);
-        });
-
-    // Ok, we found some leaking blocks and potentially that our load is
-    // "consumed" inside a different loop in the loop nest from cvi. If we are
-    // consumed in the loop, then our visit should have inserted all of the
-    // necessary destroys for us by inserting the destroys on the loop
-    // boundaries. So, continue.
-    //
-    // NOTE: This includes cases where due to an infinite loop, we did not
-    // insert /any/ destroys since the loop has no boundary in a certain sense.
-    if (consumedInLoop) {
-      continue;
-    }
-
-    // Otherwise, we need to insert one last destroy after the load for our phi.
-    auto next = std::next(load->getIterator());
-    SILBuilderWithScope builder(next);
-    builder.emitDestroyValueOperation(next->getLoc(), cvi);
-  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -1332,8 +1001,8 @@ class AvailableValueDataflowContext {
   unsigned NumMemorySubElements;
 
   /// The set of uses that we are tracking. This is only here so we can update
-  /// when exploding copy_addr. It would be great if we did not have to store
-  /// this.
+  /// when exploding copy_addr and mark_dependence. It would be great if we did
+  /// not have to store this.
   SmallVectorImpl<PMOMemoryUse> &Uses;
 
   InstructionDeleter &deleter;
@@ -1360,25 +1029,35 @@ class AvailableValueDataflowContext {
   /// InOutUses, and Escapes), to their entry in Uses.
   llvm::SmallDenseMap<SILInstruction *, unsigned, 16> NonLoadUses;
 
+  AvailableValueDataflowFixup ownershipFixup;
+
   /// Does this value escape anywhere in the function. We use this very
   /// conservatively.
   bool HasAnyEscape = false;
 
+  /// When promoting load [copy], the original allocation must be
+  /// preserved. This introduced extra copies.
+  OptimizationMode optimizationMode;
+
 public:
   AvailableValueDataflowContext(AllocationInst *TheMemory,
                                 unsigned NumMemorySubElements,
+                                OptimizationMode mode,
                                 SmallVectorImpl<PMOMemoryUse> &Uses,
-                                InstructionDeleter &deleter);
+                                InstructionDeleter &deleter,
+                                DeadEndBlocks &deBlocks);
 
-  /// Try to compute available values for "TheMemory" at the instruction \p
-  /// StartingFrom. We only compute the values for set bits in \p
-  /// RequiredElts. We return the vailable values in \p Result. If any available
-  /// values were found, return true. Otherwise, return false.
-  bool computeAvailableValues(SILInstruction *StartingFrom,
-                              unsigned FirstEltOffset,
-                              unsigned NumLoadSubElements,
-                              SmallBitVector &RequiredElts,
-                              SmallVectorImpl<AvailableValue> &Result);
+  // Find an available for for subelements of 'SrcAddr'.
+  // Return the SILType of the object in 'SrcAddr' and index of the first sub
+  // element in that object.
+  // If not all subelements are availab, return nullopt.
+  //
+  // Available value analysis can create dead owned casts. OSSA is invalid until
+  // the ownership chain is complete by replacing the uses of the loaded value
+  // and calling fixupOwnership().
+  std::optional<LoadInfo>
+  computeAvailableValues(SILValue SrcAddr, SILInstruction *Inst,
+                         SmallVectorImpl<AvailableValue> &AvailableValues);
 
   /// Return true if the box has escaped at the specified instruction.  We are
   /// not
@@ -1388,13 +1067,38 @@ public:
   /// Explode a copy_addr, updating the Uses at the same time.
   void explodeCopyAddr(CopyAddrInst *CAI);
 
+  void verifyOwnership(DeadEndBlocks &deBlocks) {
+    ownershipFixup.verifyOwnership(deBlocks);
+  }
+  
+  void deleteInsertedInsts(InstructionDeleter &deleter) {
+    ownershipFixup.deleteInsertedInsts(deleter);
+  }
+
 private:
   SILModule &getModule() const { return TheMemory->getModule(); }
 
-  void updateAvailableValues(SILInstruction *Inst,
-                             SmallBitVector &RequiredElts,
-                             SmallVectorImpl<AvailableValue> &Result,
-                             SmallBitVector &ConflictingValues);
+  SILFunction &getFunction() const { return *TheMemory->getFunction(); }
+
+  void updateAvailableValues(
+    SILInstruction *Inst,
+    SmallBitVector &RequiredElts,
+    SmallVectorImpl<AvailableValue> &Result,
+    llvm::SmallDenseMap<SILBasicBlock *, SmallBitVector, 32> &VisitedBlocks,
+    SmallBitVector &ConflictingValues);
+
+  /// Try to compute available values for "TheMemory" at the instruction \p
+  /// StartingFrom. We only compute the values for set bits in \p
+  /// RequiredElts. We return the vailable values in \p Result. If any available
+  /// values were found, return true. Otherwise, return false.
+  ///
+  /// In OptimizationMode::PreserveAlloc, this may insert casts and copies to
+  /// propagate owned values.
+  bool computeAvailableElementValues(SILInstruction *StartingFrom,
+                                     LoadInfo loadInfo,
+                                     SmallBitVector &RequiredElts,
+                                     SmallVectorImpl<AvailableValue> &Result);
+
   void computeAvailableValuesFrom(
       SILBasicBlock::iterator StartingFrom, SILBasicBlock *BB,
       SmallBitVector &RequiredElts,
@@ -1402,17 +1106,29 @@ private:
       llvm::SmallDenseMap<SILBasicBlock *, SmallBitVector, 32>
           &VisitedBlocks,
       SmallBitVector &ConflictingValues);
+
+  /// Promote a mark_dependence, updating the available values.
+  void updateMarkDependenceValues(
+    MarkDependenceInst *md,
+    SmallBitVector &RequiredElts,
+    SmallVectorImpl<AvailableValue> &Result,
+    llvm::SmallDenseMap<SILBasicBlock *, SmallBitVector, 32> &VisitedBlocks,
+    SmallBitVector &ConflictingValues);
+
+  SILValue createAvailableMarkDependence(MarkDependenceInst *md,
+                                         AvailableValue &availableVal);
 };
 
 } // end anonymous namespace
 
 AvailableValueDataflowContext::AvailableValueDataflowContext(
     AllocationInst *InputTheMemory, unsigned NumMemorySubElements,
-    SmallVectorImpl<PMOMemoryUse> &InputUses, InstructionDeleter &deleter)
+    OptimizationMode mode, SmallVectorImpl<PMOMemoryUse> &InputUses,
+    InstructionDeleter &deleter, DeadEndBlocks &deBlocks)
     : TheMemory(InputTheMemory), NumMemorySubElements(NumMemorySubElements),
       Uses(InputUses), deleter(deleter),
       HasLocalDefinition(InputTheMemory->getFunction()),
-      HasLocalKill(InputTheMemory->getFunction()) {
+      HasLocalKill(InputTheMemory->getFunction()), optimizationMode(mode) {
   // The first step of processing an element is to collect information about the
   // element into data structures we use later.
   for (unsigned ui : indices(Uses)) {
@@ -1422,7 +1138,8 @@ AvailableValueDataflowContext::AvailableValueDataflowContext(
     // If we have a load...
     if (Use.Kind == PMOUseKind::Load) {
       // Skip load borrow use and open_existential_addr.
-      if (isa<LoadBorrowInst>(Use.Inst) || isa<OpenExistentialAddrInst>(Use.Inst))
+      if (isa<LoadBorrowInst>(Use.Inst) ||
+          isa<OpenExistentialAddrInst>(Use.Inst))
         continue;
 
       // That is not a load take, continue. Otherwise, stash the load [take].
@@ -1445,9 +1162,17 @@ AvailableValueDataflowContext::AvailableValueDataflowContext(
         continue;
       }
 
+      // mark_dependence of the dependent value is equivalent to take-init.
+      if (isa<MarkDependenceInst>(Use.Inst)) {
+        HasLocalKill.set(Use.Inst->getParent());
+        continue;
+      }
       llvm_unreachable("Unhandled SILInstructionKind for PMOUseKind::Load?!");
     }
-
+    if (Use.Kind == PMOUseKind::DependenceBase) {
+      // An address used as a dependence base does not affect load promotion.
+      continue;
+    }
     // Keep track of all the uses that aren't loads.
     NonLoadUses[Use.Inst] = ui;
     HasLocalDefinition.set(Use.Inst->getParent());
@@ -1465,6 +1190,52 @@ AvailableValueDataflowContext::AvailableValueDataflowContext(
   HasLocalDefinition.set(TheMemory->getParent());
 }
 
+
+std::optional<LoadInfo>
+AvailableValueDataflowContext::computeAvailableValues(
+    SILValue SrcAddr, SILInstruction *Inst,
+    SmallVectorImpl<AvailableValue> &AvailableValues) {
+  // If the box has escaped at this instruction, we can't safely promote the
+  // load.
+  if (hasEscapedAt(Inst))
+    return std::nullopt;
+
+  SILType LoadTy = SrcAddr->getType().getObjectType();
+
+  // If this is a load/copy_addr from a struct field that we want to promote,
+  // compute the access path down to the field so we can determine precise
+  // def/use behavior.
+  unsigned FirstElt = computeSubelement(SrcAddr, TheMemory);
+
+  // If this is a load from within an enum projection, we can't promote it since
+  // we don't track subelements in a type that could be changing.
+  if (FirstElt == ~0U)
+    return std::nullopt;
+
+  unsigned NumLoadSubElements = getNumSubElements(
+    LoadTy, getFunction(), TypeExpansionContext(getFunction()));
+
+  LoadInfo loadInfo = {LoadTy, FirstElt, NumLoadSubElements};
+
+  AvailableValues.resize(NumMemorySubElements);
+
+  // If no bits are demanded, we trivially succeed. This can happen when there
+  // is a load of an empty struct.
+  if (NumLoadSubElements == 0)
+    return loadInfo;
+
+  // Set up the bitvector of elements being demanded by the load.
+  SmallBitVector RequiredElts(NumMemorySubElements);
+  RequiredElts.set(*loadInfo.range().begin(), *loadInfo.range().end());
+
+  // Find out if we have any available values.
+  if (!computeAvailableElementValues(Inst, loadInfo, RequiredElts,
+                                     AvailableValues)) {
+    return std::nullopt;
+  }
+  return loadInfo;
+}
+
 // This function takes in the current (potentially uninitialized) available
 // values for theMemory and for the subset of AvailableValues corresponding to
 // \p address either:
@@ -1479,16 +1250,16 @@ static inline void updateAvailableValuesHelper(
     SingleValueInstruction *theMemory, SILInstruction *inst, SILValue address,
     SmallBitVector &requiredElts, SmallVectorImpl<AvailableValue> &result,
     SmallBitVector &conflictingValues,
-    function_ref<Optional<AvailableValue>(unsigned)> defaultFunc,
+    function_ref<std::optional<AvailableValue>(unsigned)> defaultFunc,
     function_ref<bool(AvailableValue &, unsigned)> isSafeFunc) {
-  auto &mod = theMemory->getModule();
   unsigned startSubElt = computeSubelement(address, theMemory);
 
   // TODO: Is this needed now?
   assert(startSubElt != ~0U && "Store within enum projection not handled");
+  auto &f = *theMemory->getFunction();
   for (unsigned i : range(getNumSubElements(
-           address->getType().getObjectType(), mod,
-           TypeExpansionContext(*theMemory->getFunction())))) {
+                            address->getType().getObjectType(), f,
+                            TypeExpansionContext(f)))) {
     // If this element is not required, don't fill it in.
     if (!requiredElts[startSubElt + i])
       continue;
@@ -1525,13 +1296,14 @@ static inline void updateAvailableValuesHelper(
 
     // Otherwise, we found another insertion point for our available
     // value. Today this will always be a Store.
-    entry.addInsertionPoint(cast<StoreInst>(inst));
+    entry.addInsertionPoint(inst);
   }
 }
 
 void AvailableValueDataflowContext::updateAvailableValues(
     SILInstruction *Inst, SmallBitVector &RequiredElts,
     SmallVectorImpl<AvailableValue> &Result,
+    llvm::SmallDenseMap<SILBasicBlock *, SmallBitVector, 32> &VisitedBlocks,
     SmallBitVector &ConflictingValues) {
 
   // If we are visiting a load [take], it invalidates the underlying available
@@ -1543,19 +1315,20 @@ void AvailableValueDataflowContext::updateAvailableValues(
   if (auto *LI = dyn_cast<LoadInst>(Inst)) {
     // First see if this is a load inst that we are tracking.
     if (LoadTakeUses.count(LI)) {
-      updateAvailableValuesHelper(TheMemory, LI, LI->getOperand(), RequiredElts,
-                                  Result, ConflictingValues,
-                                  /*default*/
-                                  [](unsigned) -> Optional<AvailableValue> {
-                                    // We never initialize values. We only
-                                    // want to invalidate.
-                                    return None;
-                                  },
-                                  /*isSafe*/
-                                  [](AvailableValue &, unsigned) -> bool {
-                                    // Always assume values conflict.
-                                    return false;
-                                  });
+      updateAvailableValuesHelper(
+          TheMemory, LI, LI->getOperand(), RequiredElts, Result,
+          ConflictingValues,
+          /*default*/
+          [](unsigned) -> std::optional<AvailableValue> {
+            // We never initialize values. We only
+            // want to invalidate.
+            return std::nullopt;
+          },
+          /*isSafe*/
+          [](AvailableValue &, unsigned) -> bool {
+            // Always assume values conflict.
+            return false;
+          });
       return;
     }
   }
@@ -1565,8 +1338,8 @@ void AvailableValueDataflowContext::updateAvailableValues(
     updateAvailableValuesHelper(
         TheMemory, SI, SI->getDest(), RequiredElts, Result, ConflictingValues,
         /*default*/
-        [&](unsigned ResultOffset) -> Optional<AvailableValue> {
-          Optional<AvailableValue> Result;
+        [&](unsigned ResultOffset) -> std::optional<AvailableValue> {
+          std::optional<AvailableValue> Result;
           Result.emplace(SI->getSrc(), ResultOffset, SI);
           return Result;
         },
@@ -1593,19 +1366,20 @@ void AvailableValueDataflowContext::updateAvailableValues(
   if (auto *CAI = dyn_cast<CopyAddrInst>(Inst)) {
     // If we have a load take use, we must be tracking a store of CAI.
     if (LoadTakeUses.count(CAI)) {
-      updateAvailableValuesHelper(TheMemory, CAI, CAI->getSrc(), RequiredElts,
-                                  Result, ConflictingValues,
-                                  /*default*/
-                                  [](unsigned) -> Optional<AvailableValue> {
-                                    // We never give values default initialized
-                                    // values. We only want to invalidate.
-                                    return None;
-                                  },
-                                  /*isSafe*/
-                                  [](AvailableValue &, unsigned) -> bool {
-                                    // Always assume values conflict.
-                                    return false;
-                                  });
+      updateAvailableValuesHelper(
+          TheMemory, CAI, CAI->getSrc(), RequiredElts, Result,
+          ConflictingValues,
+          /*default*/
+          [](unsigned) -> std::optional<AvailableValue> {
+            // We never give values default initialized
+            // values. We only want to invalidate.
+            return std::nullopt;
+          },
+          /*isSafe*/
+          [](AvailableValue &, unsigned) -> bool {
+            // Always assume values conflict.
+            return false;
+          });
       return;
     }
 
@@ -1615,7 +1389,8 @@ void AvailableValueDataflowContext::updateAvailableValues(
 
     bool AnyRequired = false;
     for (unsigned i : range(getNumSubElements(
-             ValTy, getModule(), TypeExpansionContext(*CAI->getFunction())))) {
+                              ValTy, getFunction(),
+                              TypeExpansionContext(getFunction())))) {
       // If this element is not required, don't fill it in.
       AnyRequired = RequiredElts[StartSubElt+i];
       if (AnyRequired) break;
@@ -1640,6 +1415,34 @@ void AvailableValueDataflowContext::updateAvailableValues(
     }
   }
 
+  if (auto *MD = dyn_cast<MarkDependenceInst>(Inst)) {
+    unsigned StartSubElt = computeSubelement(MD->getValue(), TheMemory);
+    assert(StartSubElt != ~0U && "Store within enum projection not handled");
+    SILType ValTy = MD->getValue()->getType();
+
+    // Check if this mark_dependence provides any required values before
+    // potentially bailing out (because it is address-only).
+    bool AnyRequired = false;
+    for (unsigned i : range(getNumSubElements(
+             ValTy, getFunction(), TypeExpansionContext(getFunction())))) {
+      // If this element is not required, don't fill it in.
+      AnyRequired = RequiredElts[StartSubElt+i];
+      if (AnyRequired) break;
+    }
+
+    // If this is a dependence that doesn't intersect the loaded subelements,
+    // just continue with an unmodified load mask.
+    if (!AnyRequired)
+      return;
+    
+    // If the mark_dependence is loadable, promote it.
+    if (MD->getValue()->getType().isLoadable(*MD->getFunction())) {
+      updateMarkDependenceValues(MD, RequiredElts, Result, VisitedBlocks,
+                                 ConflictingValues);
+      return;
+    }
+  }
+
   // TODO: inout apply's should only clobber pieces passed in.
 
   // Otherwise, this is some unknown instruction, conservatively assume that all
@@ -1649,10 +1452,9 @@ void AvailableValueDataflowContext::updateAvailableValues(
   return;
 }
 
-bool AvailableValueDataflowContext::computeAvailableValues(
-    SILInstruction *StartingFrom, unsigned FirstEltOffset,
-    unsigned NumLoadSubElements, SmallBitVector &RequiredElts,
-    SmallVectorImpl<AvailableValue> &Result) {
+bool AvailableValueDataflowContext::computeAvailableElementValues(
+    SILInstruction *StartingFrom, LoadInfo loadInfo,
+    SmallBitVector &RequiredElts, SmallVectorImpl<AvailableValue> &Result) {
   llvm::SmallDenseMap<SILBasicBlock*, SmallBitVector, 32> VisitedBlocks;
   SmallBitVector ConflictingValues(Result.size());
 
@@ -1663,8 +1465,7 @@ bool AvailableValueDataflowContext::computeAvailableValues(
   // promote this load and there is nothing to do.
   SmallBitVector AvailableValueIsPresent(NumMemorySubElements);
 
-  for (unsigned i :
-       range(FirstEltOffset, FirstEltOffset + NumLoadSubElements)) {
+  for (unsigned i : loadInfo.range()) {
     AvailableValueIsPresent[i] = Result[i].getValue();
   }
 
@@ -1721,7 +1522,8 @@ void AvailableValueDataflowContext::computeAvailableValuesFrom(
       // Given an interesting instruction, incorporate it into the set of
       // results, and filter down the list of demanded subelements that we still
       // need.
-      updateAvailableValues(TheInst, RequiredElts, Result, ConflictingValues);
+      updateAvailableValues(TheInst, RequiredElts, Result, VisitedBlocks,
+                            ConflictingValues);
       
       // If this satisfied all of the demanded values, we're done.
       if (RequiredElts.none())
@@ -1885,6 +1687,94 @@ void AvailableValueDataflowContext::explodeCopyAddr(CopyAddrInst *CAI) {
   deleter.forceDelete(CAI);
 }
 
+/// Promote a mark_dependence instruction of a loadable type into a
+/// mark_dependence
+void AvailableValueDataflowContext::updateMarkDependenceValues(
+  MarkDependenceInst *md,
+  SmallBitVector &RequiredElts,
+  SmallVectorImpl<AvailableValue> &Result,
+  llvm::SmallDenseMap<SILBasicBlock *, SmallBitVector, 32> &VisitedBlocks,
+  SmallBitVector &ConflictingValues) {
+
+  // Recursively compute all currently required available values up to the
+  // mark_dependence, regardless of whether they are required for the
+  // mark_dependence.
+  computeAvailableValuesFrom(md->getIterator(), md->getParent(), RequiredElts,
+                             Result, VisitedBlocks, ConflictingValues);
+
+  unsigned firstMDElt = computeSubelement(md->getValue(), TheMemory);
+  // If address is an enum projection, we can't promote it since we don't track
+  // subelements in a type that could be changing.
+  if (firstMDElt == ~0U) {
+    RequiredElts.clear();
+    ConflictingValues = SmallBitVector(Result.size(), true);
+    return;
+  }
+  SILType valueTy = md->getValue()->getType().getObjectType();
+  unsigned numMDSubElements = getNumSubElements(
+    valueTy, getFunction(), TypeExpansionContext(getFunction()));
+
+  // Update each required subelement of the mark_dependence value.
+  for (unsigned subIdx = firstMDElt; subIdx < firstMDElt + numMDSubElements;
+       ++subIdx) {
+    // If the available value has a conflict, then AvailableValue still holds
+    // a value that was available on a different path. It cannot be used.
+    if (ConflictingValues[subIdx]) {
+      Result[subIdx] = {};
+      continue;
+    }
+    // If no value is available for this subelement, or it was never required,
+    // then no promotion happens.
+    if (auto &availableVal = Result[subIdx]) {
+      auto newMD = createAvailableMarkDependence(md, availableVal);
+      // Update the available value. This may invalidate the Result.
+      Result[subIdx] = AvailableValue(newMD, subIdx, md);
+    }
+  }
+}
+
+// Find or create a mark_dependence that is a promotion of 'md' for 'value'.
+// Return nullptr if the mark_dependence cannot be promoted.
+// This does not currently allow phi creation.
+SILValue AvailableValueDataflowContext::
+createAvailableMarkDependence(MarkDependenceInst *md,
+                              AvailableValue &availableVal) {
+  SILValue value = availableVal.getValue();
+  // If the allocation is replaced, no copies are created for promoted values
+  // and any promoted mark_dependence must be reused.
+  if (optimizationMode == OptimizationMode::ReplaceAlloc) {
+    auto mdIter = md->getIterator();
+    auto instBegin = md->getParentBlock()->begin();
+    while (mdIter != instBegin) {
+      --mdIter;
+      auto *newMD = dyn_cast<MarkDependenceInst>(&*mdIter);
+      if (!newMD)
+        break;
+
+      if (newMD->getValue() == value
+          && newMD->getBase() == md->getBase()
+          && newMD->dependenceKind() == md->dependenceKind()) {
+        return newMD;
+      }
+    }
+  } else {
+    // With OptimizationMode::PreserveAlloc, always create a new copy for each
+    // promoted value. This creates separate ownership, which is needed for each
+    // promoted load, and prevents reusing the mark_dependence later (via the
+    // code above) if the allocation is eliminated.
+    value = ownershipFixup.getSingleOwnedValue(availableVal);
+    if (!value)
+      return SILValue();
+  }
+  LLVM_DEBUG(llvm::dbgs() << "  -- Promoting mark_dependence: " << *md
+             << " source: " << value << "\n");
+  auto *newMD = SILBuilderWithScope(md)
+    .createMarkDependence(md->getLoc(), value, md->getBase(),
+                          md->dependenceKind());
+  ownershipFixup.insertedInsts.push_back(newMD);
+  return newMD;
+}
+
 bool AvailableValueDataflowContext::hasEscapedAt(SILInstruction *I) {
   // Return true if the box has escaped at the specified instruction.  We are
   // not allowed to do load promotion in an escape region.
@@ -1897,10 +1787,6 @@ bool AvailableValueDataflowContext::hasEscapedAt(SILInstruction *I) {
   // dominated by "... && X != 0".
   return HasAnyEscape;
 }
-
-//===----------------------------------------------------------------------===//
-//                          Allocation Optimization
-//===----------------------------------------------------------------------===//
 
 static SILType getMemoryType(AllocationInst *memory) {
   // Compute the type of the memory object.
@@ -1915,11 +1801,101 @@ static SILType getMemoryType(AllocationInst *memory) {
   return cast<AllocStackInst>(memory)->getElementType();
 }
 
+//===----------------------------------------------------------------------===//
+//                         Optimize dead allocation:
+//                         Fully promote each access
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+class PromotableInstructions {
+  // All promotable instructions share a vector of available values.
+  SmallVectorImpl<AvailableValue> &allAvailableValues;
+
+  SmallVector<SILInstruction *> promotableInsts;
+  SmallVector<std::pair<unsigned, unsigned>, 8> availableValueOffsets;
+
+public:
+  PromotableInstructions(SmallVectorImpl<AvailableValue> &allAvailableValues)
+      : allAvailableValues(allAvailableValues) {}
+
+  unsigned size() const { return promotableInsts.size(); }
+
+  void push(SILInstruction *instruction) {
+    promotableInsts.push_back(instruction);
+  }
+
+  // Available values must be initialized in the same order that the
+  // instructions are pushed. Return the instruction's index.
+  unsigned
+  initializeAvailableValues(SILInstruction *instruction,
+                            SmallVectorImpl<AvailableValue> &&availableValues) {
+
+    unsigned nextInstIdx = availableValueOffsets.size();
+    assert(instruction == promotableInsts[nextInstIdx]);
+
+    unsigned startOffset = allAvailableValues.size();
+    unsigned endOffset = startOffset + availableValues.size();
+    availableValueOffsets.push_back({startOffset, endOffset});
+    std::move(availableValues.begin(), availableValues.end(),
+              std::back_inserter(allAvailableValues));
+    return nextInstIdx;
+  }
+
+  ArrayRef<SILInstruction *> instructions() const { return promotableInsts; }
+
+  ArrayRef<AvailableValue> availableValues(unsigned index) {
+    return mutableAvailableValues(index);
+  }
+
+  MutableArrayRef<AvailableValue> mutableAvailableValues(unsigned index) {
+    unsigned startOffset, endOffset;
+    std::tie(startOffset, endOffset) = availableValueOffsets[index];
+    return {allAvailableValues.begin() + startOffset,
+            allAvailableValues.begin() + endOffset};
+  }
+
+#ifndef NDEBUG
+  void verify() {
+    for (unsigned i : range(promotableInsts.size())) {
+      promotableInsts[i]->verifyOperandOwnership();
+      assert(!availableValues(i).empty()
+             && "Value without any available values?!");
+    }
+  }
+#endif
+};
+
+} // end anonymous namespace
+
+namespace {
+
+struct Promotions {
+  SmallVector<AvailableValue, 32> allAvailableValues;
+  PromotableInstructions loadTakes;
+  PromotableInstructions destroys;
+  PromotableInstructions markDepBases;
+
+  Promotions()
+      : loadTakes(allAvailableValues), destroys(allAvailableValues),
+        markDepBases(allAvailableValues) {}
+
+#ifndef NDEBUG
+  void verify() {
+    loadTakes.verify();
+    destroys.verify();
+    markDepBases.verify();
+  }
+#endif
+};
+
+} // end anonymous namespace
+
 namespace {
 
 /// This performs load promotion and deletes synthesized allocations if all
 /// loads can be removed.
-class AllocOptimize {
+class OptimizeDeadAlloc {
 
   SILModule &Module;
 
@@ -1940,35 +1916,58 @@ class AllocOptimize {
 
   InstructionDeleter &deleter;
 
+  DominanceInfo *domInfo;
+
   /// A structure that we use to compute our available values.
   AvailableValueDataflowContext DataflowContext;
 
+  Promotions promotions;
+
+  SmallBlotSetVector<SILValue, 32> valuesNeedingLifetimeCompletion;
+
 public:
-  AllocOptimize(AllocationInst *memory, SmallVectorImpl<PMOMemoryUse> &uses,
-                SmallVectorImpl<SILInstruction *> &releases,
-                DeadEndBlocks &deadEndBlocks, InstructionDeleter &deleter)
+  SILFunction *getFunction() const { return TheMemory->getFunction(); }
+
+  bool isTrivial() const { return MemoryType.isTrivial(getFunction()); }
+
+  OptimizeDeadAlloc(AllocationInst *memory,
+                    SmallVectorImpl<PMOMemoryUse> &uses,
+                    SmallVectorImpl<SILInstruction *> &releases,
+                    DeadEndBlocks &deadEndBlocks, InstructionDeleter &deleter,
+                    DominanceInfo *domInfo)
       : Module(memory->getModule()), TheMemory(memory),
         MemoryType(getMemoryType(memory)),
         NumMemorySubElements(getNumSubElements(
-            MemoryType, Module, TypeExpansionContext(*memory->getFunction()))),
+            MemoryType, *memory->getFunction(),
+            TypeExpansionContext(*memory->getFunction()))),
         Uses(uses), Releases(releases), deadEndBlocks(deadEndBlocks),
-        deleter(deleter),
-        DataflowContext(TheMemory, NumMemorySubElements, uses, deleter) {}
-
-  bool optimizeMemoryAccesses();
+        deleter(deleter), domInfo(domInfo),
+        DataflowContext(TheMemory, NumMemorySubElements,
+                        OptimizationMode::ReplaceAlloc, uses, deleter,
+                        deadEndBlocks) {}
 
   /// If the allocation is an autogenerated allocation that is only stored to
   /// (after load promotion) then remove it completely.
   bool tryToRemoveDeadAllocation();
 
 private:
-  Optional<std::pair<SILType, unsigned>>
-  computeAvailableValues(SILValue SrcAddr, SILInstruction *Inst,
-                         SmallVectorImpl<AvailableValue> &AvailableValues);
-  bool promoteLoadCopy(LoadInst *li);
-  bool promoteLoadBorrow(LoadBorrowInst *lbi);
-  bool promoteCopyAddr(CopyAddrInst *cai);
+  SILInstruction *collectUsesForPromotion();
 
+  /// Return true if a mark_dependence can be promoted. If so, this initializes
+  /// the available values in promotions.
+  bool canPromoteMarkDepBase(MarkDependenceInst *md);
+
+  /// Return true if a load [take] or destroy_addr can be promoted. If so, this
+  /// initializes the available values in promotions.
+  bool canPromoteTake(SILInstruction *i,
+                      PromotableInstructions &promotableInsts);
+
+  SILValue promoteMarkDepBase(MarkDependenceInst *md,
+                              ArrayRef<AvailableValue> availableValues);
+
+  void promoteMarkDepAddrBase(MarkDependenceAddrInst *md,
+                              ArrayRef<AvailableValue> availableValues);
+  
   /// Promote a load take cleaning up everything except for RAUWing the
   /// instruction with the aggregated result. The routine returns the new
   /// aggregated result to the caller and expects the caller to eventually RAUW
@@ -1978,348 +1977,391 @@ private:
   ///
   /// \returns the value that the caller will RAUW with \p inst.
   SILValue promoteLoadTake(LoadInst *inst,
-                           MutableArrayRef<AvailableValue> values);
+                           ArrayRef<AvailableValue> availableValues);
   void promoteDestroyAddr(DestroyAddrInst *dai,
-                          MutableArrayRef<AvailableValue> values);
-  bool canPromoteTake(SILInstruction *i,
-                      SmallVectorImpl<AvailableValue> &availableValues);
+                          ArrayRef<AvailableValue> availableValues);
+
+  bool canRemoveDeadAllocation();
+
+  void removeDeadAllocation();
 };
 
 } // end anonymous namespace
 
-Optional<std::pair<SILType, unsigned>> AllocOptimize::computeAvailableValues(
-    SILValue SrcAddr, SILInstruction *Inst,
-    SmallVectorImpl<AvailableValue> &AvailableValues) {
-  // If the box has escaped at this instruction, we can't safely promote the
-  // load.
-  if (DataflowContext.hasEscapedAt(Inst))
-    return None;
-
-  SILType LoadTy = SrcAddr->getType().getObjectType();
-
-  // If this is a load/copy_addr from a struct field that we want to promote,
-  // compute the access path down to the field so we can determine precise
-  // def/use behavior.
-  unsigned FirstElt = computeSubelement(SrcAddr, TheMemory);
-
-  // If this is a load from within an enum projection, we can't promote it since
-  // we don't track subelements in a type that could be changing.
-  if (FirstElt == ~0U)
-    return None;
-
-  unsigned NumLoadSubElements = getNumSubElements(
-      LoadTy, Module, TypeExpansionContext(*TheMemory->getFunction()));
-
-  // Set up the bitvector of elements being demanded by the load.
-  SmallBitVector RequiredElts(NumMemorySubElements);
-  RequiredElts.set(FirstElt, FirstElt + NumLoadSubElements);
-
-  AvailableValues.resize(NumMemorySubElements);
-
-  // Find out if we have any available values.  If no bits are demanded, we
-  // trivially succeed. This can happen when there is a load of an empty struct.
-  if (NumLoadSubElements != 0 &&
-      !DataflowContext.computeAvailableValues(
-          Inst, FirstElt, NumLoadSubElements, RequiredElts, AvailableValues))
-    return None;
-
-  return std::make_pair(LoadTy, FirstElt);
+// We don't want to remove allocations that are required for useful debug
+// information at -O0.  As such, we only remove allocations if:
+//
+// 1. They are in a transparent function.
+// 2. They are in a normal function, but didn't come from a VarDecl, or came
+//    from one that was autogenerated or inlined from a transparent function.
+static bool isRemovableAutogeneratedAllocation(AllocationInst *TheMemory) {
+  SILLocation loc = TheMemory->getLoc();
+  return TheMemory->getFunction()->isTransparent() ||
+         !loc.getAsASTNode<VarDecl>() || loc.isAutoGenerated() ||
+         loc.is<MandatoryInlinedLocation>();
 }
 
-/// If we are able to optimize \p Inst, return the source address that
-/// instruction is loading from. If we can not optimize \p Inst, then just
-/// return an empty SILValue.
-static SILValue tryFindSrcAddrForLoad(SILInstruction *i) {
-  // We can always promote a load_borrow.
-  if (auto *lbi = dyn_cast<LoadBorrowInst>(i))
-    return lbi->getOperand();
-
-  // We only handle load [copy], load [trivial], load and copy_addr right
-  // now. Notably we do not support load [take] when promoting loads.
-  if (auto *li = dyn_cast<LoadInst>(i))
-    if (li->getOwnershipQualifier() != LoadOwnershipQualifier::Take)
-      return li->getOperand();
-
-  // If this is a CopyAddr, verify that the element type is loadable.  If not,
-  // we can't explode to a load.
-  auto *cai = dyn_cast<CopyAddrInst>(i);
-  if (!cai || !cai->getSrc()->getType().isLoadable(*cai->getFunction()))
-    return SILValue();
-  return cai->getSrc();
+bool OptimizeDeadAlloc::tryToRemoveDeadAllocation() {
+  if (!canRemoveDeadAllocation()) {
+    DataflowContext.deleteInsertedInsts(deleter);
+    return false;
+  }
+  removeDeadAllocation();
+  // Once the entire allocation is promoted, non of the instructions promoted
+  // during dataflow should need ownership fixup.
+  return true;
 }
 
-/// At this point, we know that this element satisfies the definitive init
-/// requirements, so we can try to promote loads to enable SSA-based dataflow
-/// analysis.  We know that accesses to this element only access this element,
-/// cross element accesses have been scalarized.
-///
-/// This returns true if the load has been removed from the program.
-bool AllocOptimize::promoteLoadCopy(LoadInst *li) {
-  // Note that we intentionally don't support forwarding of weak pointers,
-  // because the underlying value may drop be deallocated at any time.  We would
-  // have to prove that something in this function is holding the weak value
-  // live across the promoted region and that isn't desired for a stable
-  // diagnostics pass this like one.
+bool OptimizeDeadAlloc::canRemoveDeadAllocation() {
+  assert(TheMemory->getFunction()->hasOwnership() &&
+         "Can only eliminate dead allocations with ownership enabled");
+  assert((isa<AllocBoxInst>(TheMemory) || isa<AllocStackInst>(TheMemory)) &&
+         "Unhandled allocation case");
 
-  // First attempt to find a source addr for our "load" instruction. If we fail
-  // to find a valid value, just return.
-  SILValue srcAddr = tryFindSrcAddrForLoad(li);
-  if (!srcAddr)
+  if (!isRemovableAutogeneratedAllocation(TheMemory))
     return false;
 
-  SmallVector<AvailableValue, 8> availableValues;
-  auto result = computeAvailableValues(srcAddr, li, availableValues);
-  if (!result.has_value())
+  // Check the uses list to see if there are any non-store uses left over after
+  // load promotion and other things PMO does.
+  if (auto *badUser = collectUsesForPromotion()) {
+    LLVM_DEBUG(llvm::dbgs() << "*** Failed to remove autogenerated alloc: "
+                               "kept alive by: "
+                            << *badUser);
     return false;
+  }
 
-  SILType loadTy = result->first;
-  unsigned firstElt = result->second;
-
-  // Aggregate together all of the subelements into something that has the same
-  // type as the load did, and emit smaller loads for any subelements that were
-  // not available. We are "propagating" a +1 available value from the store
-  // points.
-  AvailableValueAggregator agg(li, availableValues, Uses, deadEndBlocks,
-                               AvailableValueExpectedOwnership::Copy);
-  SILValue newVal = agg.aggregateValues(loadTy, li->getOperand(), firstElt);
-
-  LLVM_DEBUG(llvm::dbgs() << "  *** Promoting load: " << *li);
-  LLVM_DEBUG(llvm::dbgs() << "      To value: " << *newVal);
-  ++NumLoadPromoted;
-
-  // If we did not have ownership, we did not insert extra copies at our stores,
-  // so we can just RAUW and return.
-  if (!li->getFunction()->hasOwnership()) {
-    li->replaceAllUsesWith(newVal);
-    SILValue addr = li->getOperand();
-    deleter.forceDelete(li);
-    if (auto *addrI = addr->getDefiningInstruction())
-      deleter.deleteIfDead(addrI);
+  for (auto *md : promotions.markDepBases.instructions()) {
+    if (!canPromoteMarkDepBase(cast<MarkDependenceInst>(md)))
+      return false;
+  }
+  if (isTrivial()) {
     return true;
   }
-
-  // If we inserted any copies, we created the copies at our stores. We know
-  // that in our load block, we will reform the aggregate as appropriate at the
-  // load implying that the value /must/ be fully consumed. If we promoted a +0
-  // value, we created dominating destroys along those paths. Thus any leaking
-  // blocks that we may have can be found by performing a linear lifetime check
-  // over all copies that we found using the load as the "consuming uses" (just
-  // for the purposes of identifying the consuming block).
-  agg.fixupOwnership(li, newVal);
-
-  // Now that we have fixed up all of our missing destroys, insert the copy
-  // value for our actual load and RAUW.
-  newVal = SILBuilderWithScope(li).emitCopyValueOperation(li->getLoc(), newVal);
-
-  li->replaceAllUsesWith(newVal);
-  SILValue addr = li->getOperand();
-  deleter.forceDelete(li);
-  if (auto *addrI = addr->getDefiningInstruction())
-    deleter.deleteIfDead(addrI);
-  return true;
-}
-
-bool AllocOptimize::promoteCopyAddr(CopyAddrInst *cai) {
-  // Note that we intentionally don't support forwarding of weak pointers,
-  // because the underlying value may drop be deallocated at any time.  We would
-  // have to prove that something in this function is holding the weak value
-  // live across the promoted region and that isn't desired for a stable
-  // diagnostics pass this like one.
-
-  // First attempt to find a source addr for our "load" instruction. If we fail
-  // to find a valid value, just return.
-  SILValue srcAddr = tryFindSrcAddrForLoad(cai);
-  if (!srcAddr)
-    return false;
-
-  SmallVector<AvailableValue, 8> availableValues;
-  auto result = computeAvailableValues(srcAddr, cai, availableValues);
-  if (!result.has_value())
-    return false;
-
-  // Ok, we have some available values.  If we have a copy_addr, explode it now,
-  // exposing the load operation within it.  Subsequent optimization passes will
-  // see the load and propagate the available values into it.
-  DataflowContext.explodeCopyAddr(cai);
-
-  // This is removing the copy_addr, but explodeCopyAddr takes care of
-  // removing the instruction from Uses for us, so we return false.
-  return false;
-}
-
-/// At this point, we know that this element satisfies the definitive init
-/// requirements, so we can try to promote loads to enable SSA-based dataflow
-/// analysis.  We know that accesses to this element only access this element,
-/// cross element accesses have been scalarized.
-///
-/// This returns true if the load has been removed from the program.
-bool AllocOptimize::promoteLoadBorrow(LoadBorrowInst *lbi) {
-  // Note that we intentionally don't support forwarding of weak pointers,
-  // because the underlying value may drop be deallocated at any time.  We would
-  // have to prove that something in this function is holding the weak value
-  // live across the promoted region and that isn't desired for a stable
-  // diagnostics pass this like one.
-
-  // First attempt to find a source addr for our "load" instruction. If we fail
-  // to find a valid value, just return.
-  SILValue srcAddr = tryFindSrcAddrForLoad(lbi);
-  if (!srcAddr)
-    return false;
-
-  SmallVector<AvailableValue, 8> availableValues;
-  auto result = computeAvailableValues(srcAddr, lbi, availableValues);
-  if (!result.has_value())
-    return false;
-
-  ++NumLoadPromoted;
-
-  SILType loadTy = result->first;
-  unsigned firstElt = result->second;
-
-  // Aggregate together all of the subelements into something that has the same
-  // type as the load did, and emit smaller loads for any subelements that were
-  // not available. We are "propagating" a +1 available value from the store
-  // points.
-  AvailableValueAggregator agg(lbi, availableValues, Uses, deadEndBlocks,
-                               AvailableValueExpectedOwnership::Borrow);
-  SILValue newVal = agg.aggregateValues(loadTy, lbi->getOperand(), firstElt);
-
-  LLVM_DEBUG(llvm::dbgs() << "  *** Promoting load: " << *lbi);
-  LLVM_DEBUG(llvm::dbgs() << "      To value: " << *newVal);
-
-  // If we inserted any copies, we created the copies at our
-  // stores. We know that in our load block, we will reform the
-  // aggregate as appropriate, will borrow the value there and give us
-  // a whole pristine new value. Now in this routine, we go through
-  // all of the copies and phis that we inserted and ensure that:
-  //
-  // 1. Phis are always strongly control equivalent to the copies that
-  //    produced their incoming values.
-  //
-  // 2. All intermediate copies are properly lifetime extended to the
-  //    load block and all leaking blocks are filled in as appropriate
-  //    with destroy_values.
-  agg.fixupOwnership(lbi, newVal);
-
-  // Now that we have fixed up the lifetimes of all of our incoming copies so
-  // that they are alive over the load point, copy, borrow newVal and insert
-  // destroy_value after the end_borrow and then RAUW.
-  SILBuilderWithScope builder(lbi);
-  SILValue copiedVal = builder.emitCopyValueOperation(lbi->getLoc(), newVal);
-  newVal = builder.createBeginBorrow(lbi->getLoc(), copiedVal);
-
-  for (auto *ebi : lbi->getUsersOfType<EndBorrowInst>()) {
-    auto next = std::next(ebi->getIterator());
-    SILBuilderWithScope(next).emitDestroyValueOperation(ebi->getLoc(),
-                                                        copiedVal);
+  for (auto *load : promotions.loadTakes.instructions()) {
+    if (!canPromoteTake(load, promotions.loadTakes))
+      return false;
   }
+  for (auto *destroy : promotions.destroys.instructions()) {
+    if (!canPromoteTake(destroy, promotions.destroys))
+      return false;
+  }
+  // Gather up all found available values before promoting anything so we can
+  // fix up lifetimes later if we need to.
+  for (auto pmoMemUse : Uses) {
+    if (pmoMemUse.Inst && pmoMemUse.Kind == PMOUseKind::Initialization) {
+      if (isa<MarkDependenceInst>(pmoMemUse.Inst)) {
+        // mark_dependence of the dependent value is considered both a load and
+        // an init use. They can simply be deleted when the allocation is dead.
+        continue;
+      }
+      // Today if we promote, this is always a store, since we would have
+      // blown up the copy_addr otherwise. Given that, always make sure we
+      // clean up the src as appropriate after we optimize.
+      auto *si = dyn_cast<StoreInst>(pmoMemUse.Inst);
+      if (!si)
+        return false;
+      auto src = si->getSrc();
 
-  lbi->replaceAllUsesWith(newVal);
-  SILValue addr = lbi->getOperand();
-  deleter.forceDelete(lbi);
-  if (auto *addrI = addr->getDefiningInstruction())
-    deleter.deleteIfDead(addrI);
+      // Bail if src has any uses that are forwarding unowned uses. This
+      // allows us to know that we never have to deal with forwarding unowned
+      // instructions like br. These are corner cases that complicate the
+      // logic below.
+      for (auto *use : src->getUses()) {
+        if (use->getOperandOwnership() == OperandOwnership::ForwardingUnowned)
+          return false;
+      }
+      // FIXME: Lifetime completion on Boundary::Liveness requires that 'src'
+      // has no escaping uses. Check escaping uses here and either bailout or
+      // request completion on Boundary::Availability.
+      valuesNeedingLifetimeCompletion.insert(src);
+    }
+  }
   return true;
+}
+
+// Collect all uses that require promotion before this allocation can be
+// eliminated. Returns nullptr on success. Upon failure, return the first
+// instruction corresponding to a use that cannot be promoted.
+//
+// Populates 'loadTakeList'.
+SILInstruction *OptimizeDeadAlloc::collectUsesForPromotion() {
+  for (auto &u : Uses) {
+    // Ignore removed instructions.
+    if (u.Inst == nullptr)
+      continue;
+
+    switch (u.Kind) {
+    case PMOUseKind::Assign:
+      // Until we can promote the value being destroyed by the assign, we can
+      // not remove deallocations with such assigns.
+      return u.Inst;
+    case PMOUseKind::InitOrAssign:
+      continue; // These don't prevent removal.
+    case PMOUseKind::Load:
+      // For now only handle takes from alloc_stack.
+      //
+      // TODO: It should be implementable, but it has not been needed yet.
+      if (auto *li = dyn_cast<LoadInst>(u.Inst)) {
+        if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
+          promotions.loadTakes.push(li);
+          continue;
+        }
+      }
+      if (isa<MarkDependenceInst>(u.Inst)) {
+        // A mark_dependence source use does not prevent removal. The use
+        // collector already looks through them to find other uses.
+        continue;
+      }
+      return u.Inst;
+    case PMOUseKind::DependenceBase:
+      promotions.markDepBases.push(u.Inst);
+      continue;
+    case PMOUseKind::Initialization:
+      if (!isa<ApplyInst>(u.Inst) &&
+          // A copy_addr that is not a take affects the retain count
+          // of the source.
+          (!isa<CopyAddrInst>(u.Inst)
+           || cast<CopyAddrInst>(u.Inst)->isTakeOfSrc())) {
+        continue;
+      }
+      LLVM_FALLTHROUGH;
+    case PMOUseKind::IndirectIn:
+    case PMOUseKind::InOutUse:
+    case PMOUseKind::Escape:
+      return u.Inst; // These do prevent removal.
+    }
+  }
+  // Ignore destroys of trivial values. They are destroy_value instructions
+  // that only destroy the dead box itself.
+  if (!isTrivial()) {
+    // Non-trivial allocations require ownership cleanup. We only promote
+    // alloc_stack in that case--all releases must be destroy_addr.
+    for (auto *release : Releases) {
+      // We stash all of the destroy_addr that we see.
+      if (auto *dai = dyn_cast_or_null<DestroyAddrInst>(release)) {
+        promotions.destroys.push(dai);
+        continue;
+      }
+      return release;
+    }
+  }
+  return nullptr;
+}
+
+bool OptimizeDeadAlloc::canPromoteMarkDepBase(MarkDependenceInst *md) {
+  SILValue srcAddr = md->getBase();
+  SmallVector<AvailableValue, 8> availableValues;
+  auto loadInfo =
+      DataflowContext.computeAvailableValues(srcAddr, md, availableValues);
+  if (!loadInfo.has_value())
+    return false;
+
+  unsigned index = promotions.markDepBases.initializeAvailableValues(
+      md, std::move(availableValues));
+
+  SILType baseTy = loadInfo->loadType;
+  if (auto *abi = dyn_cast<AllocBoxInst>(TheMemory)) {
+    if (baseTy == abi->getType()) {
+      baseTy = MemoryType.getObjectType();
+    }
+  }
+  return isFullyAvailable(baseTy, loadInfo->firstElt,
+                          promotions.markDepBases.availableValues(index));
 }
 
 /// Return true if we can promote the given destroy.
-bool AllocOptimize::canPromoteTake(
-    SILInstruction *inst, SmallVectorImpl<AvailableValue> &availableValues) {
+bool OptimizeDeadAlloc::canPromoteTake(
+    SILInstruction *inst, PromotableInstructions &promotableInsts) {
+
   SILValue address = inst->getOperand(0);
 
   // We cannot promote destroys of address-only types, because we can't expose
   // the load.
-  SILType loadTy = address->getType().getObjectType();
-  if (loadTy.isAddressOnly(*inst->getFunction()))
+  if (address->getType().isAddressOnly(*inst->getFunction()))
     return false;
-  
-  // If the box has escaped at this instruction, we can't safely promote the
-  // load.
-  if (DataflowContext.hasEscapedAt(inst))
-    return false;
-  
-  // Compute the access path down to the field so we can determine precise
-  // def/use behavior.
-  unsigned firstElt = computeSubelement(address, TheMemory);
-  assert(firstElt != ~0U && "destroy within enum projection is not valid");
-  auto expansionContext = TypeExpansionContext(*inst->getFunction());
-  unsigned numLoadSubElements =
-      getNumSubElements(loadTy, Module, expansionContext);
 
-  // Find out if we have any available values.  If no bits are demanded, we
-  // trivially succeed. This can happen when there is a load of an empty struct.
-  if (numLoadSubElements == 0)
-    return true;
-
-  // Set up the bitvector of elements being demanded by the load.
-  SmallBitVector requiredElts(NumMemorySubElements);
-  requiredElts.set(firstElt, firstElt + numLoadSubElements);
-
-  // Compute our available values. If we do not have any available values,
-  // return false. We have nothing further to do.
-  SmallVector<AvailableValue, 8> tmpList;
-  tmpList.resize(NumMemorySubElements);
-  if (!DataflowContext.computeAvailableValues(
-          inst, firstElt, numLoadSubElements, requiredElts, tmpList))
+  SmallVector<AvailableValue, 8> availableValues;
+  auto loadInfo = DataflowContext.computeAvailableValues(address, inst,
+                                                         availableValues);
+  if (!loadInfo.has_value())
     return false;
 
   // Now check that we can perform a take upon our available values. This
   // implies today that our value is fully available. If the value is not fully
   // available, we would need to split stores to promote this destroy_addr. We
   // do not support that yet.
-  AvailableValueAggregator agg(inst, tmpList, Uses, deadEndBlocks,
+  AvailableValueAggregator agg(inst, availableValues, Uses, deadEndBlocks,
                                AvailableValueExpectedOwnership::Take);
-  if (!agg.canTake(loadTy, firstElt))
+  if (!agg.canTake(loadInfo->loadType, loadInfo->firstElt))
     return false;
 
   // As a final check, make sure that we have an available value for each value,
   // if not bail.
-  for (const auto &av : tmpList)
+  for (const auto &av : availableValues)
     if (!av.Value)
       return false;
 
   // Ok, we can promote this destroy_addr... move the temporary lists contents
   // into the final AvailableValues list.
-  std::move(tmpList.begin(), tmpList.end(),
-            std::back_inserter(availableValues));
+  promotableInsts.initializeAvailableValues(inst, std::move(availableValues));
 
   return true;
 }
 
-// DestroyAddr is a composed operation merging load [take] + destroy_value.  If
-// the implicit load's value is available, explode it.
-//
-// NOTE: We only do this if we have a fully available value.
-//
-// Note that we handle the general case of a destroy_addr of a piece of the
-// memory object, not just destroy_addrs of the entire thing.
-void AllocOptimize::promoteDestroyAddr(
-    DestroyAddrInst *dai, MutableArrayRef<AvailableValue> availableValues) {
-  SILValue address = dai->getOperand();
-  SILType loadTy = address->getType().getObjectType();
+void OptimizeDeadAlloc::removeDeadAllocation() {
+  for (auto idxVal : llvm::enumerate(promotions.markDepBases.instructions())) {
+    auto vals = promotions.markDepBases.availableValues(idxVal.index());
+    if (auto *mdi = dyn_cast<MarkDependenceInst>(idxVal.value())) {
+      promoteMarkDepBase(mdi, vals);
+      continue;
+    }
+    auto *mda = cast<MarkDependenceAddrInst>(idxVal.value());
+    promoteMarkDepAddrBase(mda, vals);
+  }
 
-  // Compute the access path down to the field so we can determine precise
-  // def/use behavior.
-  unsigned firstElt = computeSubelement(address, TheMemory);
+  // If our memory is trivially typed, we can just remove it without needing to
+  // consider if the stored value needs to be destroyed. So at this point,
+  // delete the memory!
+  if (isTrivial()) {
+    LLVM_DEBUG(llvm::dbgs() << "*** Removing autogenerated trivial allocation: "
+                            << *TheMemory);
 
-  // Aggregate together all of the subelements into something that has the same
-  // type as the load did, and emit smaller) loads for any subelements that were
-  // not available.
-  AvailableValueAggregator agg(dai, availableValues, Uses, deadEndBlocks,
-                               AvailableValueExpectedOwnership::Take);
-  SILValue newVal = agg.aggregateValues(loadTy, address, firstElt);
+    // If it is safe to remove, do it.  Recursively remove all instructions
+    // hanging off the allocation instruction, then return success.  Let the
+    // caller remove the allocation itself to avoid iterator invalidation.
+    deleter.forceDeleteWithUsers(TheMemory);
+    return;
+  }
 
-  ++NumDestroyAddrPromoted;
+  // Since our load [take] may be available values for our
+  // destroy_addr/load [take], we promote the destroy_addr first and then handle
+  // load [take] with extra rigour later to handle that possibility.
+  for (auto idxVal : llvm::enumerate(promotions.destroys.instructions())) {
+    auto *dai = cast<DestroyAddrInst>(idxVal.value());
+    auto vals = promotions.destroys.availableValues(idxVal.index());
+    promoteDestroyAddr(dai, vals);
+    // We do not need to unset releases, since we are going to exit here.
+  }
 
-  LLVM_DEBUG(llvm::dbgs() << "  *** Promoting destroy_addr: " << *dai);
-  LLVM_DEBUG(llvm::dbgs() << "      To value: " << *newVal);
+  llvm::SmallMapVector<LoadInst *, SILValue, 32> loadsToDelete;
+  for (auto idxVal : llvm::enumerate(promotions.loadTakes.instructions())) {
+    for (auto &availableVal :
+         promotions.loadTakes.mutableAvailableValues(idxVal.index())) {
+      auto *availableLoad = dyn_cast<LoadInst>(availableVal.Value);
+      if (!availableLoad)
+        continue;
 
-  SILBuilderWithScope(dai).emitDestroyValueOperation(dai->getLoc(), newVal);
-  deleter.forceDelete(dai);
+      auto iter = loadsToDelete.find(availableLoad);
+      if (iter == loadsToDelete.end())
+        continue;
+
+      SILValue newValue = iter->second;
+      assert(newValue && "We should neer store a nil SILValue into this map");
+      availableVal.Value = newValue;
+    }
+
+    auto *loadTake = cast<LoadInst>(idxVal.value());
+    auto vals = promotions.loadTakes.availableValues(idxVal.index());
+    SILValue result = promoteLoadTake(loadTake, vals);
+    assert(result);
+
+    // We need to erase liCast here before we erase it since a load [take] that
+    // we are promoting could be an available value for another load
+    // [take]. Consider the following SIL:
+    //
+    // %mem = alloc_stack
+    // store %arg to [init] %mem
+    // %0 = load [take] %mem
+    // store %0 to [init] %mem
+    // %1 = load [take] %mem
+    // destroy_value %1
+    // dealloc_stack %mem
+    //
+    // In such a case, we are going to delete %0 here, but %0 is an available
+    // value for %1, so we will
+    auto insertIter = loadsToDelete.insert({loadTake, result});
+    valuesNeedingLifetimeCompletion.erase(loadTake);
+    (void)insertIter;
+    assert(insertIter.second && "loadTakeState doesn't have unique loads?!");
+  }
+
+  // Now that we have promoted all of our load [take], perform the actual
+  // RAUW/removal.
+  for (auto p : loadsToDelete) {
+    LoadInst *li = p.first;
+    SILValue newValue = p.second;
+    li->replaceAllUsesWith(newValue);
+    deleter.forceDelete(li);
+  }
+
+  LLVM_DEBUG(llvm::dbgs() << "*** Removing autogenerated non-trivial alloc: "
+                          << *TheMemory);
+
+  // If it is safe to remove, do it.  Recursively remove all instructions
+  // hanging off the allocation instruction, then return success.
+  deleter.forceDeleteWithUsers(TheMemory);
+  DataflowContext.verifyOwnership(deadEndBlocks);
+
+  // Now look at all of our available values and complete any of their
+  // post-dominating consuming use sets. This can happen if we have an enum that
+  // is known dynamically none along a path. This is dynamically correct, but
+  // can not be represented in OSSA so we insert these destroys along said path.
+  OSSALifetimeCompletion completion(TheMemory->getFunction(), domInfo,
+                                    deadEndBlocks);
+
+  while (!valuesNeedingLifetimeCompletion.empty()) {
+    auto optV = valuesNeedingLifetimeCompletion.pop_back_val();
+    if (!optV)
+      continue;
+    SILValue v = *optV;
+    // Lexical enums can have incomplete lifetimes in non payload paths that
+    // don't end in unreachable. Force their lifetime to end immediately after
+    // the last use instead.
+    auto boundary = v->getType().isOrHasEnum()
+                        ? OSSALifetimeCompletion::Boundary::Liveness
+                        : OSSALifetimeCompletion::Boundary::Availability;
+    LLVM_DEBUG(llvm::dbgs() << "Completing lifetime of: ");
+    LLVM_DEBUG(v->dump());
+    completion.completeOSSALifetime(v, boundary);
+  }
 }
 
-SILValue AllocOptimize::promoteLoadTake(
-    LoadInst *li, MutableArrayRef<AvailableValue> availableValues) {
+SILValue OptimizeDeadAlloc::promoteMarkDepBase(
+    MarkDependenceInst *md, ArrayRef<AvailableValue> availableValues) {
+
+  LLVM_DEBUG(llvm::dbgs() << "  *** Promoting mark_dependence base: " << *md);
+  SILBuilderWithScope B(md);
+  SILValue dependentValue = md->getValue();
+  for (auto &availableValue : availableValues) {
+    dependentValue =
+        B.createMarkDependence(md->getLoc(), dependentValue,
+                               availableValue.getValue(), md->dependenceKind());
+  }
+  LLVM_DEBUG(llvm::dbgs() << "      To value: " << dependentValue);
+  md->replaceAllUsesWith(dependentValue);
+  deleter.deleteIfDead(md);
+  return dependentValue;
+}
+
+void OptimizeDeadAlloc::promoteMarkDepAddrBase(
+  MarkDependenceAddrInst *md, ArrayRef<AvailableValue> availableValues) {
+
+  SILValue dependentAddress = md->getAddress();
+  LLVM_DEBUG(llvm::dbgs() << "  *** Promoting mark_dependence_addr base: "
+             << *md
+             << "      To address: " << dependentAddress);
+  SILBuilderWithScope B(md);
+  for (auto &availableValue : availableValues) {
+    B.createMarkDependenceAddr(md->getLoc(), dependentAddress,
+                               availableValue.getValue(),
+                               md->dependenceKind());
+  }
+  deleter.deleteIfDead(md);
+}
+
+SILValue
+OptimizeDeadAlloc::promoteLoadTake(LoadInst *li,
+                                   ArrayRef<AvailableValue> availableValues) {
   assert(li->getOwnershipQualifier() == LoadOwnershipQualifier::Take &&
          "load [copy], load [trivial], load should be handled by "
          "promoteLoadCopy");
@@ -2347,482 +2389,36 @@ SILValue AllocOptimize::promoteLoadTake(
   return newVal;
 }
 
-namespace {
-
-struct TakePromotionState {
-  ArrayRef<SILInstruction *> takeInsts;
-  SmallVector<unsigned, 8> takeInstIndices;
-  SmallVector<AvailableValue, 32> availableValueList;
-  SmallVector<unsigned, 8> availableValueStartOffsets;
-
-  TakePromotionState(ArrayRef<SILInstruction *> takeInsts)
-      : takeInsts(takeInsts) {}
-
-  unsigned size() const { return takeInstIndices.size(); }
-
-  void verify() {
-#ifndef NDEBUG
-    for (unsigned i : range(size())) {
-      SILInstruction *inst;
-      MutableArrayRef<AvailableValue> data;
-      std::tie(inst, data) = getData(i);
-      assert(inst);
-      inst->verifyOperandOwnership();
-      assert(!data.empty() && "Value without any available values?!");
-    }
-#endif
-  }
-
-  void verify(unsigned startOffset) {
-#ifndef NDEBUG
-    assert(startOffset < size());
-    for (unsigned i : range(startOffset, size())) {
-      SILInstruction *inst;
-      MutableArrayRef<AvailableValue> data;
-      std::tie(inst, data) = getData(i);
-      assert(inst);
-      inst->verifyOperandOwnership();
-      assert(!data.empty() && "Value without any available values?!");
-    }
-#endif
-  }
-
-  void initializeForTakeInst(unsigned takeInstIndex) {
-    availableValueStartOffsets.push_back(availableValueList.size());
-    takeInstIndices.push_back(takeInstIndex);
-  }
-
-  std::pair<SILInstruction *, MutableArrayRef<AvailableValue>>
-  getData(unsigned index) {
-    unsigned takeInstIndex = takeInstIndices[index];
-    unsigned startOffset = availableValueStartOffsets[index];
-    unsigned count;
-
-    if ((availableValueStartOffsets.size() - 1) != index) {
-      count = availableValueStartOffsets[index + 1] - startOffset;
-    } else {
-      count = availableValueList.size() - startOffset;
-    }
-
-    auto values = MutableArrayRef<AvailableValue>(availableValueList);
-    return {takeInsts[takeInstIndex], values.slice(startOffset, count)};
-  }
-};
-
-} // end anonymous namespace
-
-// Check if our use list has any non store, non take uses that keep the value
-// alive. Returns nullptr on success and the user that prevents removal on
-// failure.
+// DestroyAddr is a composed operation merging load [take] + destroy_value.  If
+// the implicit load's value is available, explode it.
 //
-// NOTE: This also gathers up any takes that we need to process.
-static SILInstruction *
-checkForNonStoreNonTakeUses(ArrayRef<PMOMemoryUse> uses,
-                            SmallVectorImpl<SILInstruction *> &loadTakeList) {
-  for (auto &u : uses) {
-    // Ignore removed instructions.
-    if (u.Inst == nullptr)
-      continue;
-
-    switch (u.Kind) {
-    case PMOUseKind::Assign:
-      // Until we can promote the value being destroyed by the assign, we can
-      // not remove deallocations with such assigns.
-      return u.Inst;
-    case PMOUseKind::InitOrAssign:
-      continue; // These don't prevent removal.
-    case PMOUseKind::Load:
-      // For now only handle takes from alloc_stack.
-      //
-      // TODO: It should be implementable, but it has not been needed yet.
-      if (auto *li = dyn_cast<LoadInst>(u.Inst)) {
-        if (li->getOwnershipQualifier() == LoadOwnershipQualifier::Take) {
-          loadTakeList.push_back(li);
-          continue;
-        }
-      }
-      return u.Inst;
-    case PMOUseKind::Initialization:
-      if (!isa<ApplyInst>(u.Inst) &&
-          // A copy_addr that is not a take affects the retain count
-          // of the source.
-          (!isa<CopyAddrInst>(u.Inst) ||
-           cast<CopyAddrInst>(u.Inst)->isTakeOfSrc()))
-        continue;
-      // FALL THROUGH.
-      LLVM_FALLTHROUGH;
-    case PMOUseKind::IndirectIn:
-    case PMOUseKind::InOutUse:
-    case PMOUseKind::Escape:
-      return u.Inst; // These do prevent removal.
-    }
-  }
-
-  return nullptr;
-}
-
-// We don't want to remove allocations that are required for useful debug
-// information at -O0.  As such, we only remove allocations if:
+// NOTE: We only do this if we have a fully available value.
 //
-// 1. They are in a transparent function.
-// 2. They are in a normal function, but didn't come from a VarDecl, or came
-//    from one that was autogenerated or inlined from a transparent function.
-static bool isRemovableAutogeneratedAllocation(AllocationInst *TheMemory) {
-  SILLocation loc = TheMemory->getLoc();
-  return TheMemory->getFunction()->isTransparent() ||
-         !loc.getAsASTNode<VarDecl>() || loc.isAutoGenerated() ||
-         loc.is<MandatoryInlinedLocation>();
-}
+// Note that we handle the general case of a destroy_addr of a piece of the
+// memory object, not just destroy_addrs of the entire thing.
+void OptimizeDeadAlloc::promoteDestroyAddr(
+    DestroyAddrInst *dai, ArrayRef<AvailableValue> availableValues) {
+  SILValue address = dai->getOperand();
+  SILType loadTy = address->getType().getObjectType();
 
-bool AllocOptimize::tryToRemoveDeadAllocation() {
-  assert(TheMemory->getFunction()->hasOwnership() &&
-         "Can only eliminate dead allocations with ownership enabled");
-  assert((isa<AllocBoxInst>(TheMemory) || isa<AllocStackInst>(TheMemory)) &&
-         "Unhandled allocation case");
+  // Compute the access path down to the field so we can determine precise
+  // def/use behavior.
+  unsigned firstElt = computeSubelement(address, TheMemory);
 
-  if (!isRemovableAutogeneratedAllocation(TheMemory))
-    return false;
+  // Aggregate together all of the subelements into something that has the same
+  // type as the load did, and emit smaller) loads for any subelements that were
+  // not available.
+  AvailableValueAggregator agg(dai, availableValues, Uses, deadEndBlocks,
+                               AvailableValueExpectedOwnership::Take);
+  SILValue newVal = agg.aggregateValues(loadTy, address, firstElt);
 
-  SmallVector<SILInstruction *, 8> loadTakeList;
-  // Check the uses list to see if there are any non-store uses left over after
-  // load promotion and other things PMO does.
-  if (auto *badUser = checkForNonStoreNonTakeUses(Uses, loadTakeList)) {
-    LLVM_DEBUG(llvm::dbgs() << "*** Failed to remove autogenerated alloc: "
-                               "kept alive by: "
-                            << *badUser);
-    return false;
-  }
+  ++NumDestroyAddrPromoted;
 
-  // If our memory is trivially typed, we can just remove it without needing to
-  // consider if the stored value needs to be destroyed. So at this point,
-  // delete the memory!
-  if (MemoryType.isTrivial(*TheMemory->getFunction())) {
-    LLVM_DEBUG(llvm::dbgs() << "*** Removing autogenerated trivial allocation: "
-                            << *TheMemory);
+  LLVM_DEBUG(llvm::dbgs() << "  *** Promoting destroy_addr: " << *dai);
+  LLVM_DEBUG(llvm::dbgs() << "      To value: " << *newVal);
 
-    // If it is safe to remove, do it.  Recursively remove all instructions
-    // hanging off the allocation instruction, then return success.  Let the
-    // caller remove the allocation itself to avoid iterator invalidation.
-    deleter.forceDeleteWithUsers(TheMemory);
-    return true;
-  }
-
-  // Now make sure we can promote all load [take] and prepare state for each of
-  // them.
-  TakePromotionState loadTakeState(loadTakeList);
-  for (auto p : llvm::enumerate(loadTakeList)) {
-    loadTakeState.initializeForTakeInst(p.index());
-    if (!canPromoteTake(p.value(), loadTakeState.availableValueList))
-      return false;
-  }
-
-  // Otherwise removing the deallocation will drop any releases.  Check that
-  // there is nothing preventing removal.
-  TakePromotionState destroyAddrState(Releases);
-  for (auto p : llvm::enumerate(Releases)) {
-    auto *r = p.value();
-    if (r == nullptr)
-      continue;
-
-    // We stash all of the destroy_addr that we see.
-    if (auto *dai = dyn_cast<DestroyAddrInst>(r)) {
-      destroyAddrState.initializeForTakeInst(p.index() /*destroyAddrIndex*/);
-      // Make sure we can actually promote this destroy addr. If we can not,
-      // then we must bail. In order to not gather available values twice, we
-      // gather the available values here that we will use to promote the
-      // values.
-      if (!canPromoteTake(dai, destroyAddrState.availableValueList))
-        return false;
-      continue;
-    }
-
-    LLVM_DEBUG(llvm::dbgs()
-               << "*** Failed to remove autogenerated non-trivial alloc: "
-                  "kept alive by release: "
-               << *r);
-    return false;
-  }
-
-  // If we reached this point, we can promote all of our destroy_addr and load
-  // take. Before we begin, gather up all found available values before we do
-  // anything so we can fix up lifetimes later if we need to.
-  SmallBlotSetVector<SILValue, 32> valuesNeedingLifetimeCompletion;
-  for (auto pmoMemUse : Uses) {
-    if (pmoMemUse.Inst && pmoMemUse.Kind == PMOUseKind::Initialization) {
-      // Today if we promote, this is always a store, since we would have
-      // blown up the copy_addr otherwise. Given that, always make sure we
-      // clean up the src as appropriate after we optimize.
-      auto *si = cast<StoreInst>(pmoMemUse.Inst);
-      auto src = si->getSrc();
-
-      // Bail if src has any uses that are forwarding unowned uses. This
-      // allows us to know that we never have to deal with forwarding unowned
-      // instructions like br. These are corner cases that complicate the
-      // logic below.
-      for (auto *use : src->getUses()) {
-        if (use->getOperandOwnership() == OperandOwnership::ForwardingUnowned)
-          return false;
-      }
-      valuesNeedingLifetimeCompletion.insert(src);
-    }
-  }
-
-  // Since our load [take] may be available values for our
-  // destroy_addr/load [take], we promote the destroy_addr first and then handle
-  // load [take] with extra rigour later to handle that possibility.
-  for (unsigned i : range(destroyAddrState.size())) {
-    SILInstruction *dai;
-    MutableArrayRef<AvailableValue> values;
-    std::tie(dai, values) = destroyAddrState.getData(i);
-    promoteDestroyAddr(cast<DestroyAddrInst>(dai), values);
-    // We do not need to unset releases, since we are going to exit here.
-  }
-
-  llvm::SmallMapVector<LoadInst *, SILValue, 32> loadsToDelete;
-  for (unsigned i : range(loadTakeState.size())) {
-    SILInstruction *li;
-    MutableArrayRef<AvailableValue> values;
-    std::tie(li, values) = loadTakeState.getData(i);
-
-    for (unsigned i : indices(values)) {
-      auto v = values[i].Value;
-      auto *li = dyn_cast<LoadInst>(v);
-      if (!li)
-        continue;
-
-      auto iter = loadsToDelete.find(li);
-      if (iter == loadsToDelete.end())
-        continue;
-
-      SILValue newValue = iter->second;
-      assert(newValue && "We should neer store a nil SILValue into this map");
-      values[i].Value = newValue;
-    }
-
-    auto *liCast = cast<LoadInst>(li);
-    SILValue result = promoteLoadTake(liCast, values);
-    assert(result);
-
-    // We need to erase liCast here before we erase it since a load [take] that
-    // we are promoting could be an available value for another load
-    // [take]. Consider the following SIL:
-    //
-    // %mem = alloc_stack
-    // store %arg to [init] %mem
-    // %0 = load [take] %mem
-    // store %0 to [init] %mem
-    // %1 = load [take] %mem
-    // destroy_value %1
-    // dealloc_stack %mem
-    //
-    // In such a case, we are going to delete %0 here, but %0 is an available
-    // value for %1, so we will
-    auto insertIter = loadsToDelete.insert({liCast, result});
-    valuesNeedingLifetimeCompletion.erase(liCast);
-    (void)insertIter;
-    assert(insertIter.second && "loadTakeState doesn't have unique loads?!");
-  }
-
-  // Now that we have promoted all of our load [take], perform the actual
-  // RAUW/removal.
-  for (auto p : loadsToDelete) {
-    LoadInst *li = p.first;
-    SILValue newValue = p.second;
-    li->replaceAllUsesWith(newValue);
-    deleter.forceDelete(li);
-  }
-
-  LLVM_DEBUG(llvm::dbgs() << "*** Removing autogenerated non-trivial alloc: "
-                          << *TheMemory);
-
-  // If it is safe to remove, do it.  Recursively remove all instructions
-  // hanging off the allocation instruction, then return success.
-  deleter.forceDeleteWithUsers(TheMemory);
-
-  // Now look at all of our available values and complete any of their
-  // post-dominating consuming use sets. This can happen if we have an enum that
-  // is known dynamically none along a path. This is dynamically correct, but
-  // can not be represented in OSSA so we insert these destroys along said path.
-  SmallVector<SILBasicBlock *, 32> consumingUseBlocks;
-  while (!valuesNeedingLifetimeCompletion.empty()) {
-    auto optV = valuesNeedingLifetimeCompletion.pop_back_val();
-    if (!optV)
-      continue;
-    SILValue v = *optV;
-    if (v->getOwnershipKind() != OwnershipKind::Owned)
-      continue;
-
-    // FIXME: This doesn't handle situations where non-consuming uses are in
-    // blocks in which the consuming use is already deleted. Replace the
-    // following code with an general OSSA utility for owned lifetime
-    // fixup. ValueLifetimeAnalysis does this easily, but we also need to handle
-    // reborrows by adding copies. An OwnershipOptUtils utility will handle
-    // that soon.
-
-    // First see if our value doesn't have any uses. In such a case, just
-    // insert a destroy_value at the next instruction and return.
-    if (v->use_empty()) {
-      auto *next = v->getNextInstruction();
-      auto loc = RegularLocation::getAutoGeneratedLocation();
-      SILBuilderWithScope localBuilder(next);
-      localBuilder.createDestroyValue(loc, v);
-      continue;
-    }
-
-    // Otherwise, we first see if we have any consuming uses at all. If we do,
-    // then we know that any such consuming uses since we have an owned value
-    // /must/ be strongly control equivalent to our value and unreachable from
-    // each other, so we can just use findJointPostDominatingSet to complete
-    // the set.
-    consumingUseBlocks.clear();
-    for (auto *use : v->getConsumingUses())
-      consumingUseBlocks.push_back(use->getParentBlock());
-
-    if (!consumingUseBlocks.empty()) {
-      findJointPostDominatingSet(
-          v->getParentBlock(), consumingUseBlocks, [](SILBasicBlock *) {},
-          [&](SILBasicBlock *result) {
-            auto loc = RegularLocation::getAutoGeneratedLocation();
-            SILBuilderWithScope builder(result);
-            builder.createDestroyValue(loc, v);
-          });
-      continue;
-    }
-
-    // If we do not have at least one consuming use, we need to do something
-    // different. This situation can occur given a non-trivial enum typed
-    // stack allocation that:
-    //
-    // 1. Had a destroy_addr eliminated along a path where we dynamically know
-    //    that the stack allocation is storing a trivial case.
-    //
-    // 2. Had some other paths where due to dead end blocks, no destroy_addr
-    //    is needed.
-    //
-    // To fix this, we just treat all uses as consuming blocks and insert
-    // destroys using the joint post dominance set computer and insert
-    // destroys at the end of all input blocks in the post dom set and at the
-    // beginning of any leaking blocks.
-    {
-      // TODO: Can we just pass this in to findJointPostDominatingSet instead
-      // of recomputing it there? Maybe an overload that lets us do this?
-      BasicBlockSet foundUseBlocks(v->getFunction());
-      for (auto *use : v->getUses()) {
-        auto *block = use->getParentBlock();
-        if (!foundUseBlocks.insert(block))
-          continue;
-        consumingUseBlocks.push_back(block);
-      }
-    }
-    findJointPostDominatingSet(
-        v->getParentBlock(), consumingUseBlocks,
-        [&](SILBasicBlock *foundInputBlock) {
-          // This is a block that is reachable from another use. We are not
-          // interested in these.
-        },
-        [&](SILBasicBlock *leakingBlock) {
-          auto loc = RegularLocation::getAutoGeneratedLocation();
-          SILBuilderWithScope builder(leakingBlock);
-          builder.createDestroyValue(loc, v);
-        },
-        [&](SILBasicBlock *inputBlockInPostDomSet) {
-          auto *termInst = inputBlockInPostDomSet->getTerminator();
-          switch (termInst->getTermKind()) {
-          case TermKind::UnreachableInst:
-            // We do not care about input blocks that end in unreachables. We
-            // are going to leak down them so do not insert a destroy_value
-            // there.
-            return;
-
-          // NOTE: Given that our input value is owned, our branch can only
-          // accept the use as a non-consuming use if the branch is forwarding
-          // unowned ownership. Luckily for use, we checked early if we had
-          // any such uses and bailed, so we know the branch can not use our
-          // value. This is just avoiding a corner case that we don't need to
-          // handle.
-          case TermKind::BranchInst:
-            LLVM_FALLTHROUGH;
-          // NOTE: We put cond_br here since in OSSA, cond_br can never have
-          // a non-trivial value operand, meaning we can insert before.
-          case TermKind::CondBranchInst:
-            LLVM_FALLTHROUGH;
-          case TermKind::ReturnInst:
-          case TermKind::ThrowInst:
-          case TermKind::UnwindInst:
-          case TermKind::YieldInst: {
-            // These terminators can never be non-consuming uses of an owned
-            // value since we would be leaking the owned value no matter what
-            // we do. Given that, we can assume that what ever the
-            // non-consuming use actually was, must be before this
-            // instruction. So insert the destroy_value at the end of the
-            // block, before the terminator.
-            auto loc = RegularLocation::getAutoGeneratedLocation();
-            SILBuilderWithScope localBuilder(termInst);
-            localBuilder.createDestroyValue(loc, v);
-            return;
-          }
-          case TermKind::TryApplyInst:
-          case TermKind::SwitchValueInst:
-          case TermKind::SwitchEnumInst:
-          case TermKind::SwitchEnumAddrInst:
-          case TermKind::DynamicMethodBranchInst:
-          case TermKind::AwaitAsyncContinuationInst:
-          case TermKind::CheckedCastBranchInst:
-          case TermKind::CheckedCastAddrBranchInst: {
-            // Otherwise, we insert the destroy_addr /after/ the
-            // terminator. All of these are guaranteed to have each successor
-            // to have the block as its only predecessor block.
-            SILBuilderWithScope::insertAfter(termInst, [&](auto &b) {
-              auto loc = RegularLocation::getAutoGeneratedLocation();
-              b.createDestroyValue(loc, v);
-            });
-            return;
-          }
-          }
-          llvm_unreachable("Case that did not return in its body?!");
-        });
-  }
-
-  return true;
-}
-
-bool AllocOptimize::optimizeMemoryAccesses() {
-  bool changed = false;
-
-  // If we've successfully checked all of the definitive initialization
-  // requirements, try to promote loads.  This can explode copy_addrs, so the
-  // use list may change size.
-  for (unsigned i = 0; i != Uses.size(); ++i) {
-    auto &use = Uses[i];
-    // Ignore entries for instructions that got expanded along the way.
-    if (use.Inst && use.Kind == PMOUseKind::Load) {
-      if (auto *cai = dyn_cast<CopyAddrInst>(use.Inst)) {
-        if (promoteCopyAddr(cai)) {
-          Uses[i].Inst = nullptr; // remove entry if load got deleted.
-          changed = true;
-        }
-        continue;
-      }
-
-      if (auto *lbi = dyn_cast<LoadBorrowInst>(use.Inst)) {
-        if (promoteLoadBorrow(lbi)) {
-          Uses[i].Inst = nullptr; // remove entry if load got deleted.
-          changed = true;
-        }
-        continue;
-      }
-
-      if (auto *li = dyn_cast<LoadInst>(use.Inst)) {
-        if (promoteLoadCopy(li)) {
-          Uses[i].Inst = nullptr; // remove entry if load got deleted.
-          changed = true;
-        }
-        continue;
-      }
-    }
-  }
-
-  return changed;
+  SILBuilderWithScope(dai).emitDestroyValueOperation(dai->getLoc(), newVal);
+  deleter.forceDelete(dai);
 }
 
 //===----------------------------------------------------------------------===//
@@ -2846,59 +2442,25 @@ static AllocationInst *getOptimizableAllocation(SILInstruction *i) {
   if (getMemoryType(alloc).isMoveOnly())
     return nullptr;
 
+  // Don't promote large types.
+  auto &mod = alloc->getFunction()->getModule();
+  if (EnableAggressiveExpansionBlocking &&
+      mod.getOptions().UseAggressiveReg2MemForCodeSize &&
+      !shouldExpand(mod, alloc->getType().getObjectType()))
+    return nullptr;
+
   // Otherwise we are good to go. Lets try to optimize this memory!
   return alloc;
 }
 
-bool swift::optimizeMemoryAccesses(SILFunction &fn) {
-  bool changed = false;
-  DeadEndBlocks deadEndBlocks(&fn);
-
-  InstructionDeleter deleter;
-  for (auto &bb : fn) {
-    for (SILInstruction &inst : bb.deletableInstructions()) {
-      // First see if i is an allocation that we can optimize. If not, skip it.
-      AllocationInst *alloc = getOptimizableAllocation(&inst);
-      if (!alloc) {
-        continue;
-      }
-
-      LLVM_DEBUG(llvm::dbgs()
-                 << "*** PMO Optimize Memory Accesses looking at: " << *alloc);
-      PMOMemoryObjectInfo memInfo(alloc);
-
-      // Set up the datastructure used to collect the uses of the allocation.
-      SmallVector<PMOMemoryUse, 16> uses;
-      SmallVector<SILInstruction *, 4> destroys;
-
-      // Walk the use list of the pointer, collecting them. If we are not able
-      // to optimize, skip this value. *NOTE* We may still scalarize values
-      // inside the value.
-      if (!collectPMOElementUsesFrom(memInfo, uses, destroys)) {
-        // Avoid advancing this iterator until after collectPMOElementUsesFrom()
-        // runs. It creates and deletes instructions other than alloc.
-        continue;
-      }
-      AllocOptimize allocOptimize(alloc, uses, destroys, deadEndBlocks,
-                                  deleter);
-      changed |= allocOptimize.optimizeMemoryAccesses();
-
-      // Move onto the next instruction. We know this is safe since we do not
-      // eliminate allocations here.
-    }
-  }
-
-  return changed;
-}
-
-bool swift::eliminateDeadAllocations(SILFunction &fn) {
-  if (!fn.hasOwnership())
+bool swift::eliminateDeadAllocations(SILFunction *fn, DominanceInfo *domInfo) {
+  if (!fn->hasOwnership()) {
     return false;
-
+  }
   bool changed = false;
-  DeadEndBlocks deadEndBlocks(&fn);
+  DeadEndBlocks deadEndBlocks(fn);
 
-  for (auto &bb : fn) {
+  for (auto &bb : *fn) {
     InstructionDeleter deleter;
     for (SILInstruction &inst : bb.deletableInstructions()) {
       // First see if i is an allocation that we can optimize. If not, skip it.
@@ -2919,12 +2481,12 @@ bool swift::eliminateDeadAllocations(SILFunction &fn) {
       // Walk the use list of the pointer, collecting them. If we are not able
       // to optimize, skip this value. *NOTE* We may still scalarize values
       // inside the value.
-      if (!collectPMOElementUsesFrom(memInfo, uses, destroys)) {
+      if (!collectPMOElementUsesAndDestroysFrom(memInfo, uses, destroys)) {
         continue;
       }
-      AllocOptimize allocOptimize(alloc, uses, destroys, deadEndBlocks,
-                                  deleter);
-      if (allocOptimize.tryToRemoveDeadAllocation()) {
+      OptimizeDeadAlloc optimizeDeadAlloc(alloc, uses, destroys, deadEndBlocks,
+                                          deleter, domInfo);
+      if (optimizeDeadAlloc.tryToRemoveDeadAllocation()) {
         deleter.cleanupDeadInstructions();
         ++NumAllocRemoved;
         changed = true;
@@ -2936,37 +2498,23 @@ bool swift::eliminateDeadAllocations(SILFunction &fn) {
 
 namespace {
 
-class PredictableMemoryAccessOptimizations : public SILFunctionTransform {
-  /// The entry point to the transformation.
-  ///
-  /// FIXME: This pass should not need to rerun on deserialized
-  /// functions. Nothing should have changed in the upstream pipeline after
-  /// deserialization. However, rerunning does improve some benchmarks. This
-  /// either indicates that this pass missing some opportunities the first time,
-  /// or has a pass order dependency on other early passes.
-  void run() override {
-    // TODO: Can we invalidate here just instructions?
-    if (optimizeMemoryAccesses(*getFunction()))
-      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
-  }
-};
-
 class PredictableDeadAllocationElimination : public SILFunctionTransform {
   void run() override {
-    // If we are already canonical or do not have ownership, just bail.
-    if (getFunction()->wasDeserializedCanonical() ||
-        !getFunction()->hasOwnership())
+    auto *func = getFunction();
+    if (!func->hasOwnership())
       return;
-    if (eliminateDeadAllocations(*getFunction()))
+
+    LLVM_DEBUG(llvm::dbgs() << "Looking at: " << func->getName() << "\n");
+    auto *da = getAnalysis<DominanceAnalysis>();
+    // If we are already canonical or do not have ownership, just bail.
+    if (func->wasDeserializedCanonical() || !func->hasOwnership())
+      return;
+    if (eliminateDeadAllocations(func, da->get(func)))
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
   }
 };
 
 } // end anonymous namespace
-
-SILTransform *swift::createPredictableMemoryAccessOptimizations() {
-  return new PredictableMemoryAccessOptimizations();
-}
 
 SILTransform *swift::createPredictableDeadAllocationElimination() {
   return new PredictableDeadAllocationElimination();

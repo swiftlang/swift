@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -diagnostic-constant-propagation | %FileCheck %s
-// RUN: %target-sil-opt -enable-sil-verify-all %s -performance-constant-propagation | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -diagnostic-constant-propagation | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -performance-constant-propagation | %FileCheck %s
 
 import Swift
 import Builtin
@@ -94,6 +94,25 @@ bb0:
  return %23 : $Builtin.Int64
 
 // CHECK-LABEL: sil @fold_arithmetic_with_overflow
+// CHECK-NOT: integer_literal $Builtin.Int64, 2
+// CHECK-NOT: integer_literal $Builtin.Int64, 3
+// CHECK-NOT: integer_literal $Builtin.Int64, 0
+// CHECK-NOT: builtin
+// CHECK: [[RES:%.*]] = integer_literal $Builtin.Int64, 7
+// CHECK-NEXT: return [[RES]] : $Builtin.Int64
+}
+
+// Compute an expression using a chain of arithmetic with non-overflowing instructions: 2 * (2 + 3) - 3
+sil @fold_arithmetic_without_overflow : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+ %0 = integer_literal $Builtin.Int64, 2
+ %110 = integer_literal $Builtin.Int64, 3
+ %19 = builtin "add_Int64"(%0 : $Builtin.Int64, %110 : $Builtin.Int64) : $Builtin.Int64
+ %21 = builtin "mul_Int64"(%0 : $Builtin.Int64, %19 : $Builtin.Int64) : $Builtin.Int64
+ %23 = builtin "sub_Int64"(%21 : $Builtin.Int64, %110 : $Builtin.Int64) : $Builtin.Int64
+ return %23 : $Builtin.Int64
+
+// CHECK-LABEL: sil @fold_arithmetic_without_overflow
 // CHECK-NOT: integer_literal $Builtin.Int64, 2
 // CHECK-NOT: integer_literal $Builtin.Int64, 3
 // CHECK-NOT: integer_literal $Builtin.Int64, 0
@@ -506,9 +525,545 @@ bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
 // CHECK: } // end sil function 'dont_fold_unsigned_op_with_overflow_lt_zero'
 }
 
+// fold float comparison operations involving literals only
+sil @fold_literal_float_comparison : $@convention(thin) () -> () {
+  %0 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1
+  %1 = float_literal $Builtin.FPIEEE32, 0x40000000 // 2
+  
+  // Ordered
+  %3 = builtin "fcmp_oeq_FPIEEE32"(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %4 = builtin "fcmp_ogt_FPIEEE32"(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %5 = builtin "fcmp_oge_FPIEEE32"(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %6 = builtin "fcmp_olt_FPIEEE32"(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %7 = builtin "fcmp_ole_FPIEEE32"(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %8 = builtin "fcmp_one_FPIEEE32"(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %9 = builtin "fcmp_ord_FPIEEE32"(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  
+  // Unordered
+  %11 = builtin "fcmp_ueq_FPIEEE32"(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %12 = builtin "fcmp_ugt_FPIEEE32"(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %13 = builtin "fcmp_uge_FPIEEE32"(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %14 = builtin "fcmp_ult_FPIEEE32"(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %15 = builtin "fcmp_ule_FPIEEE32"(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %16 = builtin "fcmp_une_FPIEEE32"(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %17 = builtin "fcmp_uno_FPIEEE32"(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
 
-// fold_float_operations
-sil @fold_float_operations : $@convention(thin) () -> Builtin.FPIEEE64 {
+  %404 = tuple ()     
+  return %404 : $()  
+
+// CHECK-LABEL:sil @fold_literal_float_comparison
+// CHECK-NEXT: bb0:
+// CHECK-NEXT:   %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %1 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %2 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %3 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %4 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %5 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %6 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %7 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %8 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %9 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %10 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %11 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %12 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %13 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %14 = tuple ()                                  
+// CHECK-NEXT:   return %14 : $()                                
+// CHECK-NEXT: } // end sil function 'fold_literal_float_comparison'
+}
+
+// fold float comparison operations with NaN
+sil @fold_float_comparison_with_nan : $@convention(thin) () -> () {
+    %1 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1
+  %900 = integer_literal $Builtin.Int32, 2143289344 // user: %3
+  %909 = builtin "bitcast_Int32_FPIEEE32"(%900 : $Builtin.Int32) : $Builtin.FPIEEE32 
+
+  // Ordered
+  %3 = builtin "fcmp_oeq_FPIEEE32"(%909 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %4 = builtin "fcmp_ogt_FPIEEE32"(%909 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %5 = builtin "fcmp_oge_FPIEEE32"(%909 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %6 = builtin "fcmp_olt_FPIEEE32"(%909 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %7 = builtin "fcmp_ole_FPIEEE32"(%909 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %8 = builtin "fcmp_one_FPIEEE32"(%909 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+
+  %31 = builtin "fcmp_oeq_FPIEEE32"(%1 : $Builtin.FPIEEE32, %909 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %41 = builtin "fcmp_ogt_FPIEEE32"(%1 : $Builtin.FPIEEE32, %909 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %51 = builtin "fcmp_oge_FPIEEE32"(%1 : $Builtin.FPIEEE32, %909 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %61 = builtin "fcmp_olt_FPIEEE32"(%1 : $Builtin.FPIEEE32, %909 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %71 = builtin "fcmp_ole_FPIEEE32"(%1 : $Builtin.FPIEEE32, %909 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %81 = builtin "fcmp_one_FPIEEE32"(%1 : $Builtin.FPIEEE32, %909 : $Builtin.FPIEEE32) : $Builtin.Int1
+  
+  // Unordered
+  %11 = builtin "fcmp_ueq_FPIEEE32"(%909 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %12 = builtin "fcmp_ugt_FPIEEE32"(%909 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %13 = builtin "fcmp_uge_FPIEEE32"(%909 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %14 = builtin "fcmp_ult_FPIEEE32"(%909 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %15 = builtin "fcmp_ule_FPIEEE32"(%909 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %16 = builtin "fcmp_une_FPIEEE32"(%909 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+
+  %111 = builtin "fcmp_ueq_FPIEEE32"(%1 : $Builtin.FPIEEE32, %909 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %121 = builtin "fcmp_ugt_FPIEEE32"(%1 : $Builtin.FPIEEE32, %909 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %131 = builtin "fcmp_uge_FPIEEE32"(%1 : $Builtin.FPIEEE32, %909 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %141 = builtin "fcmp_ult_FPIEEE32"(%1 : $Builtin.FPIEEE32, %909 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %151 = builtin "fcmp_ule_FPIEEE32"(%1 : $Builtin.FPIEEE32, %909 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %161 = builtin "fcmp_une_FPIEEE32"(%1 : $Builtin.FPIEEE32, %909 : $Builtin.FPIEEE32) : $Builtin.Int1
+
+  %404 = tuple ()     
+  return %404 : $() 
+
+// CHECK-LABEL:sil @fold_float_comparison_with_nan
+// CHECK-NEXT: bb0:
+// CHECK-NEXT:   %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %1 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %2 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %3 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %4 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %5 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %6 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %7 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %8 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %9 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %10 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %11 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %12 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %13 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %14 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %15 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %16 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %17 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %18 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %19 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %20 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %21 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %22 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %23 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %24 = tuple ()                                  
+// CHECK-NEXT:   return %24 : $()                                
+// CHECK-NEXT: } // end sil function 'fold_float_comparison_with_nan'
+}
+
+// fold float comparison operations with Infinity
+sil @fold_float_comparison_with_inf : $@convention(thin) () -> () {
+  %1 = float_literal $Builtin.FPIEEE32, 0x3F800000 // 1
+
+  %900 = integer_literal $Builtin.Int32, 2139095040 // user: %4
+  %909 = builtin "bitcast_Int32_FPIEEE32"(%900 : $Builtin.Int32) : $Builtin.FPIEEE32 
+
+  // Ordered
+  %4 = builtin "fcmp_ogt_FPIEEE32"(%909 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %5 = builtin "fcmp_oge_FPIEEE32"(%909 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %6 = builtin "fcmp_olt_FPIEEE32"(%909 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %7 = builtin "fcmp_ole_FPIEEE32"(%909 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+
+  %41 = builtin "fcmp_ogt_FPIEEE32"(%1 : $Builtin.FPIEEE32, %909 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %51 = builtin "fcmp_oge_FPIEEE32"(%1 : $Builtin.FPIEEE32, %909 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %61 = builtin "fcmp_olt_FPIEEE32"(%1 : $Builtin.FPIEEE32, %909 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %71 = builtin "fcmp_ole_FPIEEE32"(%1 : $Builtin.FPIEEE32, %909 : $Builtin.FPIEEE32) : $Builtin.Int1
+  
+  // Unordered
+  %12 = builtin "fcmp_ugt_FPIEEE32"(%909 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %13 = builtin "fcmp_uge_FPIEEE32"(%909 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %14 = builtin "fcmp_ult_FPIEEE32"(%909 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %15 = builtin "fcmp_ule_FPIEEE32"(%909 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+
+  %121 = builtin "fcmp_ugt_FPIEEE32"(%1 : $Builtin.FPIEEE32, %909 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %131 = builtin "fcmp_uge_FPIEEE32"(%1 : $Builtin.FPIEEE32, %909 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %141 = builtin "fcmp_ult_FPIEEE32"(%1 : $Builtin.FPIEEE32, %909 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %151 = builtin "fcmp_ule_FPIEEE32"(%1 : $Builtin.FPIEEE32, %909 : $Builtin.FPIEEE32) : $Builtin.Int1
+
+  %404 = tuple ()     
+  return %404 : $()  
+
+// CHECK-LABEL: sil @fold_float_comparison_with_inf
+// CHECK-NEXT: bb0:
+// CHECK-NEXT:   %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %1 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %2 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %3 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %4 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %5 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %6 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %7 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %8 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %9 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %10 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %11 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %12 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %13 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %14 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %15 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %16 = tuple ()
+// CHECK-NEXT:   return %16 : $()
+// CHECK-NEXT: } // end sil function 'fold_float_comparison_with_inf'
+}
+
+// fold double comparison operations involving literals only
+sil @fold_literal_double_comparison : $@convention(thin) () -> () {
+  %0 = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000 // 1
+  %1 = float_literal $Builtin.FPIEEE64, 0x4000000000000000 // 2
+  
+  // Ordered
+  %3 = builtin "fcmp_oeq_FPIEEE64"(%0 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %4 = builtin "fcmp_ogt_FPIEEE64"(%0 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %5 = builtin "fcmp_oge_FPIEEE64"(%0 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %6 = builtin "fcmp_olt_FPIEEE64"(%0 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %7 = builtin "fcmp_ole_FPIEEE64"(%0 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %8 = builtin "fcmp_one_FPIEEE64"(%0 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %9 = builtin "fcmp_ord_FPIEEE64"(%0 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+  
+  // Unordered
+  %11 = builtin "fcmp_ueq_FPIEEE64"(%0 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %12 = builtin "fcmp_ugt_FPIEEE64"(%0 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %13 = builtin "fcmp_uge_FPIEEE64"(%0 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %14 = builtin "fcmp_ult_FPIEEE64"(%0 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %15 = builtin "fcmp_ule_FPIEEE64"(%0 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %16 = builtin "fcmp_une_FPIEEE64"(%0 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %17 = builtin "fcmp_uno_FPIEEE64"(%0 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+
+  %404 = tuple ()     
+  return %404 : $()  
+
+// CHECK-LABEL:sil @fold_literal_double_comparison
+// CHECK-NEXT: bb0:
+// CHECK-NEXT:   %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %1 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %2 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %3 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %4 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %5 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %6 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %7 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %8 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %9 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %10 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %11 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %12 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %13 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %14 = tuple ()                                  
+// CHECK-NEXT:   return %14 : $()                                
+// CHECK-NEXT: } // end sil function 'fold_literal_double_comparison'
+}
+
+// fold double comparison operations with NaN
+sil @fold_double_comparison_with_nan : $@convention(thin) () -> () {
+bb0:
+  %1 = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000 // 1
+  %900 = integer_literal $Builtin.Int64, 9221120237041090560 
+  %909 = builtin "bitcast_Int64_FPIEEE64"(%900 : $Builtin.Int64) : $Builtin.FPIEEE64 
+
+  // Ordered
+  %3 = builtin "fcmp_oeq_FPIEEE64"(%909 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %4 = builtin "fcmp_ogt_FPIEEE64"(%909 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %5 = builtin "fcmp_oge_FPIEEE64"(%909 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %6 = builtin "fcmp_olt_FPIEEE64"(%909 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %7 = builtin "fcmp_ole_FPIEEE64"(%909 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %8 = builtin "fcmp_one_FPIEEE64"(%909 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+
+  %31 = builtin "fcmp_oeq_FPIEEE64"(%1 : $Builtin.FPIEEE64, %909 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %41 = builtin "fcmp_ogt_FPIEEE64"(%1 : $Builtin.FPIEEE64, %909 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %51 = builtin "fcmp_oge_FPIEEE64"(%1 : $Builtin.FPIEEE64, %909 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %61 = builtin "fcmp_olt_FPIEEE64"(%1 : $Builtin.FPIEEE64, %909 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %71 = builtin "fcmp_ole_FPIEEE64"(%1 : $Builtin.FPIEEE64, %909 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %81 = builtin "fcmp_one_FPIEEE64"(%1 : $Builtin.FPIEEE64, %909 : $Builtin.FPIEEE64) : $Builtin.Int1
+  
+  // Unordered
+  %11 = builtin "fcmp_ueq_FPIEEE64"(%909 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %12 = builtin "fcmp_ugt_FPIEEE64"(%909 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %13 = builtin "fcmp_uge_FPIEEE64"(%909 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %14 = builtin "fcmp_ult_FPIEEE64"(%909 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %15 = builtin "fcmp_ule_FPIEEE64"(%909 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %16 = builtin "fcmp_une_FPIEEE64"(%909 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+
+  %111 = builtin "fcmp_ueq_FPIEEE64"(%1 : $Builtin.FPIEEE64, %909 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %121 = builtin "fcmp_ugt_FPIEEE64"(%1 : $Builtin.FPIEEE64, %909 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %131 = builtin "fcmp_uge_FPIEEE64"(%1 : $Builtin.FPIEEE64, %909 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %141 = builtin "fcmp_ult_FPIEEE64"(%1 : $Builtin.FPIEEE64, %909 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %151 = builtin "fcmp_ule_FPIEEE64"(%1 : $Builtin.FPIEEE64, %909 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %161 = builtin "fcmp_une_FPIEEE64"(%1 : $Builtin.FPIEEE64, %909 : $Builtin.FPIEEE64) : $Builtin.Int1
+
+  %404 = tuple ()     
+  return %404 : $() 
+
+// CHECK-LABEL:sil @fold_double_comparison_with_nan
+// CHECK-NEXT: bb0:
+// CHECK-NEXT:   %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %1 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %2 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %3 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %4 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %5 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %6 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %7 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %8 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %9 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %10 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %11 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %12 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %13 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %14 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %15 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %16 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %17 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %18 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %19 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %20 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %21 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %22 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %23 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %24 = tuple ()                                  
+// CHECK-NEXT:   return %24 : $()                                
+// CHECK-NEXT: } // end sil function 'fold_double_comparison_with_nan'
+}
+
+// fold double comparison operations with Infinity
+sil @fold_double_comparison_with_inf : $@convention(thin) () -> () {
+bb0:
+  %1 = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000 // 1
+  %900 = integer_literal $Builtin.Int64, 9218868437227405312 
+  %909 = builtin "bitcast_Int64_FPIEEE64"(%900 : $Builtin.Int64) : $Builtin.FPIEEE64 
+
+  // Ordered
+  %4 = builtin "fcmp_ogt_FPIEEE64"(%909 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %5 = builtin "fcmp_oge_FPIEEE64"(%909 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %6 = builtin "fcmp_olt_FPIEEE64"(%909 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %7 = builtin "fcmp_ole_FPIEEE64"(%909 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+
+  %41 = builtin "fcmp_ogt_FPIEEE64"(%1 : $Builtin.FPIEEE64, %909 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %51 = builtin "fcmp_oge_FPIEEE64"(%1 : $Builtin.FPIEEE64, %909 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %61 = builtin "fcmp_olt_FPIEEE64"(%1 : $Builtin.FPIEEE64, %909 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %71 = builtin "fcmp_ole_FPIEEE64"(%1 : $Builtin.FPIEEE64, %909 : $Builtin.FPIEEE64) : $Builtin.Int1
+  
+  // Unordered
+  %12 = builtin "fcmp_ugt_FPIEEE64"(%909 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %13 = builtin "fcmp_uge_FPIEEE64"(%909 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %14 = builtin "fcmp_ult_FPIEEE64"(%909 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %15 = builtin "fcmp_ule_FPIEEE64"(%909 : $Builtin.FPIEEE64, %1 : $Builtin.FPIEEE64) : $Builtin.Int1
+
+  %121 = builtin "fcmp_ugt_FPIEEE64"(%1 : $Builtin.FPIEEE64, %909 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %131 = builtin "fcmp_uge_FPIEEE64"(%1 : $Builtin.FPIEEE64, %909 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %141 = builtin "fcmp_ult_FPIEEE64"(%1 : $Builtin.FPIEEE64, %909 : $Builtin.FPIEEE64) : $Builtin.Int1
+  %151 = builtin "fcmp_ule_FPIEEE64"(%1 : $Builtin.FPIEEE64, %909 : $Builtin.FPIEEE64) : $Builtin.Int1
+
+  %404 = tuple ()     
+  return %404 : $()  
+
+// CHECK-LABEL: sil @fold_double_comparison_with_inf
+// CHECK-NEXT: bb0:
+// CHECK-NEXT:   %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %1 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %2 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %3 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %4 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %5 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %6 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %7 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %8 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %9 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %10 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %11 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %12 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %13 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:   %14 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %15 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:   %16 = tuple ()
+// CHECK-NEXT:   return %16 : $()
+// CHECK-NEXT: } // end sil function 'fold_double_comparison_with_inf'
+}
+
+sil @dont_fold_comparison_with_inf : $@convention(thin) (Builtin.FPIEEE32) -> Builtin.Int1 {
+bb0(%0 : $Builtin.FPIEEE32):
+  %2 = float_literal $Builtin.FPIEEE32, 0x0
+  %4 = builtin "fadd_FPIEEE32"(%0 : $Builtin.FPIEEE32, %2 : $Builtin.FPIEEE32) : $Builtin.FPIEEE32
+  %5 = integer_literal $Builtin.Int32, 2139095040
+  %6 = builtin "bitcast_Int32_FPIEEE32"(%5 : $Builtin.Int32) : $Builtin.FPIEEE32
+  %9 = builtin "fcmp_olt_FPIEEE32"(%4 : $Builtin.FPIEEE32, %6 : $Builtin.FPIEEE32) : $Builtin.Int1
+  return %9 : $Builtin.Int1
+
+// CHECK-LABEL: sil @dont_fold_comparison_with_inf :
+// CHECK:         [[R:%.*]] = builtin "fcmp_olt_FPIEEE32"
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'dont_fold_comparison_with_inf'
+}
+
+sil @fold_comparison_with_inf : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %2 = float_literal $Builtin.FPIEEE32, 0x7F800000 // +Inf // user: %3
+  %5 = integer_literal $Builtin.Int32, 2139095040
+  %6 = builtin "bitcast_Int32_FPIEEE32"(%5 : $Builtin.Int32) : $Builtin.FPIEEE32
+  %9 = builtin "fcmp_olt_FPIEEE32"(%2 : $Builtin.FPIEEE32, %6 : $Builtin.FPIEEE32) : $Builtin.Int1
+  return %9 : $Builtin.Int1
+
+// CHECK-LABEL: sil @fold_comparison_with_inf :
+// CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'fold_comparison_with_inf'
+}
+
+// fold float comparison operations with Infinity/NaN when the other argument is not constant
+sil @fold_float_comparison_with_non_constant_arg : $@convention(thin) (Float) -> () {
+bb0(%0: $Float):
+  %1 = struct_extract %0 : $Float, #Float._value
+  
+  %2 = integer_literal $Builtin.Int32, 2143289344
+  %3 = builtin "bitcast_Int32_FPIEEE32"(%2 : $Builtin.Int32) : $Builtin.FPIEEE32 // NaN
+  
+  %4 = integer_literal $Builtin.Int32, 2139095040
+  %5 = builtin "bitcast_Int32_FPIEEE32"(%4 : $Builtin.Int32) : $Builtin.FPIEEE32 // Inf
+
+  %6 = builtin "fcmp_oge_FPIEEE32"(%3 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %7 = builtin "fcmp_oge_FPIEEE32"(%5 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  
+  %8 = tuple ()     
+  return %8 : $()  
+
+// CHECK-LABEL: sil @fold_float_comparison_with_non_constant_arg
+// CHECK:       bb0(%0 : $Float):
+// CHECK-NEXT:    %1 = struct_extract %0 : $Float, #Float._value
+// CHECK-NEXT:    %2 = float_literal $Builtin.FPIEEE32, 0x7F800000 // +Inf
+
+// Comparison with NaN is always folded
+// CHECK-NEXT:    %3 = integer_literal $Builtin.Int1, 0 
+
+// Comparison with Inf is not folded unless the other argument can be proven to be constant
+// CHECK-NEXT:    %4 = builtin "fcmp_oge_FPIEEE32"(%2 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+
+// CHECK-NEXT:    %5 = tuple ()
+// CHECK-NEXT:    return %5
+// CHECK-NEXT:  } // end sil function 'fold_float_comparison_with_non_constant_arg'
+}
+
+sil @fold_inf_comparisons_with_itself : $@convention(thin) () -> () {
+  %0 = integer_literal $Builtin.Int32, 2139095040 // user: %4
+  %1 = builtin "bitcast_Int32_FPIEEE32"(%0 : $Builtin.Int32) : $Builtin.FPIEEE32 
+
+  // Infinity is equal to, greater than equal to and less than equal to itself
+  %3 = builtin "fcmp_oeq_FPIEEE32"(%1 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %4 = builtin "fcmp_oge_FPIEEE32"(%1 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %5 = builtin "fcmp_ole_FPIEEE32"(%1 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %6 = builtin "fcmp_ueq_FPIEEE32"(%1 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %7 = builtin "fcmp_uge_FPIEEE32"(%1 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %8 = builtin "fcmp_ule_FPIEEE32"(%1 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+
+  // Infinity cannot be unequal to, greater than or less than itself
+  %9 = builtin "fcmp_one_FPIEEE32"(%1 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %10 = builtin "fcmp_ogt_FPIEEE32"(%1 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %11 = builtin "fcmp_olt_FPIEEE32"(%1 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %12 = builtin "fcmp_une_FPIEEE32"(%1 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %13 = builtin "fcmp_ugt_FPIEEE32"(%1 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %14 = builtin "fcmp_ult_FPIEEE32"(%1 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+
+  %15 = tuple ()     
+  return %15 : $()  
+
+// CHECK-LABEL: sil @fold_inf_comparisons_with_itself
+// CHECK: bb0:
+// CHECK:   %0 = integer_literal $Builtin.Int1, -1
+// CHECK:   %1 = integer_literal $Builtin.Int1, -1
+// CHECK:   %2 = integer_literal $Builtin.Int1, -1
+// CHECK:   %3 = integer_literal $Builtin.Int1, -1
+// CHECK:   %4 = integer_literal $Builtin.Int1, -1
+// CHECK:   %5 = integer_literal $Builtin.Int1, -1
+// CHECK:   %6 = integer_literal $Builtin.Int1, -1
+// CHECK:   %7 = integer_literal $Builtin.Int1, -1
+// CHECK:   %8 = integer_literal $Builtin.Int1, -1
+// CHECK:   %9 = integer_literal $Builtin.Int1, -1
+// CHECK:   %10 = integer_literal $Builtin.Int1, -1
+// CHECK:   %11 = integer_literal $Builtin.Int1, -1
+// CHECK:   %12 = integer_literal $Builtin.Int1, 0
+// CHECK:   %13 = integer_literal $Builtin.Int1, 0
+// CHECK:   %14 = integer_literal $Builtin.Int1, 0
+// CHECK:   %15 = integer_literal $Builtin.Int1, 0
+// CHECK:   %16 = integer_literal $Builtin.Int1, 0
+// CHECK:   %17 = integer_literal $Builtin.Int1, 0
+// CHECK:   %18 = integer_literal $Builtin.Int1, 0
+// CHECK:   %19 = integer_literal $Builtin.Int1, 0
+// CHECK:   %20 = integer_literal $Builtin.Int1, 0
+// CHECK:   %21 = integer_literal $Builtin.Int1, 0
+// CHECK:   %22 = integer_literal $Builtin.Int1, 0
+// CHECK:   %23 = integer_literal $Builtin.Int1, 0
+// CHECK:   %24 = tuple ()                                  
+// CHECK:   return %24 : $()                                
+// CHECK: } // end sil function 'fold_inf_comparisons_with_itself'
+}
+
+
+// CHECK-LABEL: sil @fold_cast_to_fp :
+// CHECK:       bb0:
+// CHECK-NEXT:    %0 = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000 // 1
+// CHECK-NEXT:    return %0 : $Builtin.FPIEEE64
+// CHECK:       } // end sil function 'fold_cast_to_fp'
+sil @fold_cast_to_fp : $@convention(thin) () -> Builtin.FPIEEE64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 1
+  %1 = builtin "sitofp_Int64_FPIEEE64"(%0) : $Builtin.FPIEEE64
+  return %1
+}
+
+// CHECK-LABEL: sil @fold_bitcast_to_fp :
+// CHECK:       bb0:
+// CHECK-NEXT:    %0 = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000
+// CHECK-NEXT:    return %0
+// CHECK:       } // end sil function 'fold_bitcast_to_fp'
+sil @fold_bitcast_to_fp : $@convention(thin) () -> Builtin.FPIEEE64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 4607182418800017408
+  %1 = builtin "bitcast_Int64_FPIEEE64"(%0) : $Builtin.FPIEEE64
+  return %1
+}
+
+// CHECK-LABEL: sil @fold_bitcast_to_int :
+// CHECK:       bb0:
+// CHECK-NEXT:    %0 = integer_literal $Builtin.Int64, 4607182418800017408
+// CHECK-NEXT:    return %0
+// CHECK:       } // end sil function 'fold_bitcast_to_int'
+sil @fold_bitcast_to_int : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000
+  %1 = builtin "bitcast_FPIEEE64_Int64"(%0) : $Builtin.Int64
+  return %1
+}
+
+// CHECK-LABEL: sil @fold_rint :
+// CHECK:       bb0:
+// CHECK-NEXT:    %0 = float_literal $Builtin.FPIEEE64, 0x40F0000000000000 // 65536
+// CHECK-NEXT:    return %0 : $Builtin.FPIEEE64
+// CHECK:       } // end sil function 'fold_rint'
+sil @fold_rint : $@convention(thin) () -> Builtin.FPIEEE64 {
+bb0:
+  %0 = float_literal $Builtin.FPIEEE64, 0x40F0000000000000 // 65536
+  %1 = builtin "int_rint_FPIEEE64"(%0) : $Builtin.FPIEEE64
+  return %1
+}
+
+// fold float comparison operations with opaque values, that may be constant
+// but are hidden behind a struct or a tuple.
+sil @fold_float_comparison_between_opaque_val : $@convention(thin) () -> () {
+  %0 = integer_literal $Builtin.Int32, 2143289344 
+  
+  %1 = builtin "bitcast_Int32_FPIEEE32"(%0 : $Builtin.Int32) : $Builtin.FPIEEE32 
+  %2 = struct $Float (%1 : $Builtin.FPIEEE32)     
+  %3 = struct_extract %2 : $Float, #Float._value  
+  %4 = integer_literal $Builtin.Int32, 2139095040 
+  
+  %5 = builtin "bitcast_Int32_FPIEEE32"(%4 : $Builtin.Int32) : $Builtin.FPIEEE32 
+  %6 = struct $Float (%5 : $Builtin.FPIEEE32)     
+  %7 = struct_extract %6 : $Float, #Float._value  
+  
+  %8 = builtin "fcmp_olt_FPIEEE32"(%3 : $Builtin.FPIEEE32, %7 : $Builtin.FPIEEE32) : $Builtin.Int1 
+    
+  %9 = tuple ()     
+  return %9 : $()  
+
+// CHECK-LABEL: sil @fold_float_comparison_between_opaque_val
+// CHECK: bb0:
+// CHECK:   %0 = integer_literal $Builtin.Int1, 0           
+// CHECK:   %1 = tuple ()                                  
+// CHECK:   return %1 : $()           
+// CHECK: } // end sil function 'fold_float_comparison_between_opaque_val'
+}
+
+// fold_float_arith_operations
+sil @fold_float_arith_operations : $@convention(thin) () -> Builtin.FPIEEE64 {
 bb0:
   %4 = float_literal $Builtin.FPIEEE64, 0x402E4CCCCCCCCCCD // 15.15
   %11 = float_literal $Builtin.FPIEEE64, 0x400A666666666666 // 3.2999999999999998 // user: %12
@@ -518,7 +1073,7 @@ bb0:
   %13 = builtin "fmul_FPIEEE64"(%4 : $Builtin.FPIEEE64, %11 : $Builtin.FPIEEE64) : $Builtin.FPIEEE64
   return %13 : $Builtin.FPIEEE64
 
-// CHECK-LABEL: sil @fold_float_operations
+// CHECK-LABEL: sil @fold_float_arith_operations
 // CHECK: bb0:
 // CHECK-NEXT: %0 = float_literal $Builtin.FPIEEE64, 0x4032733333333333
 // CHECK-NEXT: %1 = float_literal $Builtin.FPIEEE64, 0x40125D1745D1745D
@@ -918,6 +1473,33 @@ bb0(%0 : $*Error, %1 : $*E1):
   return %2 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @generic_to_existential_cast
+// CHECK:         init_existential_addr
+// CHECK:       } // end sil function 'generic_to_existential_cast'
+sil [ossa] @generic_to_existential_cast : $@convention(thin) <T where T : P> (@in_guaranteed T) -> @out any P {
+bb0(%0: $*any P, %1 : $*T):
+  %29 = alloc_stack $T
+  copy_addr %1 to [init] %29
+  unconditional_checked_cast_addr T in %29 to any P in %0
+  dealloc_stack %29
+  %10 = tuple ()
+  return %10
+}
+
+// CHECK-LABEL: sil [ossa] @existential_generic_to_existential_cast
+// CHECK:         unconditional_checked_cast_addr
+// CHECK:       } // end sil function 'existential_generic_to_existential_cast'
+sil [ossa] @existential_generic_to_existential_cast : $@convention(thin) <T where T : Error> (@in_guaranteed T) -> @owned any Error {
+bb0(%0 : $*T):
+  %29 = alloc_stack $T
+  copy_addr %0 to [init] %29
+  %31 = alloc_stack $any Error
+  unconditional_checked_cast_addr T in %29 to any Error in %31
+  %33 = load [take] %31
+  dealloc_stack %31
+  dealloc_stack %29
+  return %33
+}
 // Test constant folding of Builtin.globalStringTablePointer.
 
 // CHECK-LABEL: sil @replace_global_string_table_pointer
@@ -1046,7 +1628,7 @@ class BClass : AClass {}
 sil @test_checked_cast_br_thick_class_type : $@convention(thin) (@thin P.Protocol) -> Builtin.Int1 {
 bb0(%0 : $@thin P.Protocol):
   %2 = metatype $@thick BClass.Type
-  checked_cast_br %2 : $@thick BClass.Type to AClass.Type, bb1, bb2
+  checked_cast_br BClass.Type in %2 : $@thick BClass.Type to AClass.Type, bb1, bb2
 
 bb1(%5 : $@thick AClass.Type):
   debug_value %5 : $@thick AClass.Type, let, name "type"

@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "arc-sequence-opts"
 #include "RefCountState.h"
 #include "RCStateTransition.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
 
@@ -82,8 +83,7 @@ MergeTopDownLatticeStates(TopDownRefCountState::LatticeState L1,
 /// Initializes/reinitialized the state for I. If we reinitialize we return
 /// true.
 bool BottomUpRefCountState::initWithMutatorInst(
-    ImmutablePointerSet<SILInstruction> *I,
-    RCIdentityFunctionInfo *RCFI) {
+    ImmutablePointerSet<SILInstruction *> *I, RCIdentityFunctionInfo *RCFI) {
   assert(I->size() == 1);
   SILInstruction *Inst = *I->begin();
   assert((isa<StrongReleaseInst>(Inst) || isa<ReleaseValueInst>(Inst)) &&
@@ -486,7 +486,7 @@ void BottomUpRefCountState::checkAndResetKnownSafety(
     return;
   // If the VisitingRC and VisitedRC do not alias, they cannot be incorrectly
   // paired.
-  if (AA->isNoAlias(VisitingRC, VisitedRC))
+  if (!AA->mayAlias(VisitingRC, VisitedRC))
     return;
   LLVM_DEBUG(llvm::dbgs() << "Clearing KnownSafe for: ");
   LLVM_DEBUG(VisitedRC->dump());
@@ -529,8 +529,7 @@ void BottomUpRefCountState::updateForDifferentLoopInst(SILInstruction *I,
 /// Initializes/reinitialized the state for I. If we reinitialize we return
 /// true.
 bool TopDownRefCountState::initWithMutatorInst(
-    ImmutablePointerSet<SILInstruction> *I,
-    RCIdentityFunctionInfo *RCFI) {
+    ImmutablePointerSet<SILInstruction *> *I, RCIdentityFunctionInfo *RCFI) {
   assert(I->size() == 1);
   SILInstruction *Inst = *I->begin();
   (void)Inst;
@@ -563,7 +562,7 @@ void TopDownRefCountState::initWithArg(SILFunctionArgument *Arg) {
 /// Initialize this RefCountState with an instruction which introduces a new
 /// ref count at +1.
 void TopDownRefCountState::initWithEntranceInst(
-    ImmutablePointerSet<SILInstruction> *I, SILValue RCIdentity) {
+    ImmutablePointerSet<SILInstruction *> *I, SILValue RCIdentity) {
   LatState = LatticeState::Incremented;
   Transition = RCStateTransition(I);
   assert(Transition.getKind() == RCStateTransitionKind::StrongEntrance &&
@@ -914,7 +913,7 @@ void TopDownRefCountState::checkAndResetKnownSafety(
     return;
   // If the VisitingRC and VisitedRC do not alias, they cannot be incorrectly
   // paired.
-  if (AA->isNoAlias(VisitingRC, VisitedRC))
+  if (!AA->mayAlias(VisitingRC, VisitedRC))
     return;
   LLVM_DEBUG(llvm::dbgs() << "Clearing KnownSafe for: ");
   LLVM_DEBUG(VisitedRC->dump());

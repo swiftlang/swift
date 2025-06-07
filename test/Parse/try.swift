@@ -106,7 +106,7 @@ func test() throws -> Int {
     try break // expected-error {{'try' cannot be used with 'break'}}
   }
   
-  try throw // expected-error {{'try' must be placed on the thrown expression}} {{3-7=}} {{3-3=try }} expected-error {{expected expression in 'throw' statement}}
+  try throw // expected-error {{'try' must be placed on the thrown expression}} {{+1:3-3=try }} {{3-7=}} expected-error {{expected expression in 'throw' statement}}
   ; // Reset parser.
   
   try return // expected-error {{'try' cannot be used with 'return'}} expected-error {{non-void function should return a value}}
@@ -237,12 +237,14 @@ struct ThingProducer {
 }
 
 let optProducer: ThingProducer? = ThingProducer()
-let _: Int? = try? optProducer?.produceInt() // expected-error {{value of optional type 'Int??' not unwrapped; did you mean to use 'try!' or chain with '?'?}}
+let _: Int? = try? optProducer?.produceInt() // expected-error {{cannot assign value of type 'Int??' to type 'Int?'}}
+// expected-note@-1 {{arguments to generic parameter 'Wrapped' ('Int?' and 'Int') are expected to be equal}}
 let _: Int = try? optProducer?.produceInt() // expected-error {{cannot convert value of type 'Int??' to specified type 'Int'}}
 let _: String = try? optProducer?.produceInt() // expected-error {{cannot convert value of type 'Int??' to specified type 'String'}}
 let _: Int?? = try? optProducer?.produceInt() // good
 
-let _: Int? = try? optProducer?.produceIntNoThrowing() // expected-error {{value of optional type 'Int??' not unwrapped; did you mean to use 'try!' or chain with '?'?}}
+let _: Int? = try? optProducer?.produceIntNoThrowing() // expected-error {{cannot assign value of type 'Int??' to type 'Int?'}}
+// expected-note@-1 {{arguments to generic parameter 'Wrapped' ('Int?' and 'Int') are expected to be equal}}
 let _: Int?? = try? optProducer?.produceIntNoThrowing() // expected-warning {{no calls to throwing functions occur within 'try' expression}}
 
 let _: Int? = (try? optProducer?.produceAny()) as? Int // good

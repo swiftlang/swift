@@ -21,6 +21,7 @@ namespace swift {
 
 class ClassDecl;
 class ModuleDecl;
+class DeclAndTypePrinter;
 
 /// Responsible for printing a Swift class decl or in C or C++ mode, to
 /// be included in a Swift module's generated clang header.
@@ -30,7 +31,8 @@ public:
 
   /// Print the C++ class definition that corresponds to the given Swift class.
   void printClassTypeDecl(const ClassDecl *typeDecl,
-                          llvm::function_ref<void(void)> bodyPrinter);
+                          llvm::function_ref<void(void)> bodyPrinter,
+                          DeclAndTypePrinter &declAndTypePrinter);
 
   static void
   printClassTypeReturnScaffold(raw_ostream &os, const ClassDecl *type,

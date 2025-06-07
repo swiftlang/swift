@@ -73,8 +73,8 @@ class RCStateTransition {
   /// An RCStateTransition can represent either an RC end point (i.e. an initial
   /// or terminal RC transition) or a ptr set of Mutators.
   SILNode *EndPoint;
-  ImmutablePointerSet<SILInstruction> *Mutators =
-      ImmutablePointerSetFactory<SILInstruction>::getEmptySet();
+  ImmutablePointerSet<SILInstruction *> *Mutators =
+      ImmutablePointerSetFactory<SILInstruction *>::getEmptySet();
   RCStateTransitionKind Kind;
 
   // Should only be constructed be default RefCountState.
@@ -84,9 +84,9 @@ public:
   ~RCStateTransition() = default;
   RCStateTransition(const RCStateTransition &R) = default;
 
-  RCStateTransition(ImmutablePointerSet<SILInstruction> *I) {
+  RCStateTransition(ImmutablePointerSet<SILInstruction *> *I) {
     assert(I->size() == 1);
-    SILInstruction *Inst = *I->begin();
+    auto *Inst = *I->begin();
     Kind = getRCStateTransitionKind(Inst->asSILNode());
     if (isRCStateTransitionEndPoint(Kind)) {
       EndPoint = Inst->asSILNode();

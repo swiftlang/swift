@@ -1,0 +1,14 @@
+// RUN: %scale-test --begin 2 --end 10 --step 1 --select NumConstraintScopes %s
+// REQUIRES: asserts,no_asan
+
+struct Test {
+  var id: String
+}
+
+func test(data: [Test]) -> Set<String> {
+  Set(data.map(\.id) +
+%for i in range(0, N):
+      data.map(\.id) +
+%end
+    data.map(\.id))
+}

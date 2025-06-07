@@ -10,11 +10,13 @@
 // RUN:   -emit-module-interface-path %t/Lib.swiftinterface
 
 /// Build against the swiftmodule.
-// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t
+// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
+// RUN:   -enable-deserialization-safety
 
 /// Build against the swiftinterface.
 // RUN: rm %t/Lib.swiftmodule
-// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t
+// RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t \
+// RUN:   -enable-deserialization-safety
 
 //--- Lib.swift
 

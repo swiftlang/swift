@@ -17,15 +17,19 @@
 #ifndef SWIFT_BASIC_OPTIONSET_H
 #define SWIFT_BASIC_OPTIONSET_H
 
-#include "llvm/ADT/None.h"
-
-#include <type_traits>
 #include <cstdint>
 #include <initializer_list>
+#include <optional>
+#include <type_traits>
 
 namespace swift {
-
-using llvm::None;
+/// The Swift standard library also has an `OptionSet` type that is imported
+/// when using C++ to Swift interop within the compiler.
+/// Since the Swift stdlib is also imported in the `swift` namespace, the two
+/// types would conflict. Move the compiler's OptionSet into a sub-namespace
+/// to avoid collisions. Below we do `using namespace optionset`, which makes
+/// the C++ `OptionSet` type available everywhere the `swift` namespace is used.
+namespace optionset {
 
 /// The class template \c OptionSet captures a set of options stored as the
 /// bits in an unsigned integral value.
@@ -54,7 +58,7 @@ public:
   constexpr OptionSet() : Storage() {}
 
   /// Create an empty option set.
-  constexpr OptionSet(llvm::NoneType) : Storage() {}
+  constexpr OptionSet(std::nullopt_t) : Storage() {}
 
   /// Create an option set with only the given option set.
   constexpr OptionSet(Flags flag) : Storage(static_cast<StorageType>(flag)) {}
@@ -153,7 +157,8 @@ private:
                               Flags>::value,
                 "operator| should produce an OptionSet");
 };
-
+} // end namespace optionset
+using namespace optionset;
 } // end namespace swift
 
 #endif // SWIFT_BASIC_OPTIONSET_H

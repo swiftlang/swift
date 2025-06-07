@@ -1,11 +1,11 @@
-# WordBreakTest-14.0.0.txt
-# Date: 2021-03-08, 06:22:40 GMT
-# © 2021 Unicode®, Inc.
+# WordBreakTest-16.0.0.txt
+# Date: 2024-04-30, 21:48:43 GMT
+# © 2024 Unicode®, Inc.
 # Unicode and the Unicode Logo are registered trademarks of Unicode, Inc. in the U.S. and other countries.
-# For terms of use, see http://www.unicode.org/terms_of_use.html
+# For terms of use and license, see https://www.unicode.org/terms_of_use.html
 #
 # Unicode Character Database
-#   For documentation, see http://www.unicode.org/reports/tr44/
+#   For documentation, see https://www.unicode.org/reports/tr44/
 #
 # Default Word_Break Test
 #
@@ -1708,6 +1708,9 @@
 ÷ 0061 × 0308 ÷ #  ÷ [0.2] LATIN SMALL LETTER A (ALetter) × [4.0] COMBINING DIAERESIS (Extend_FE) ÷ [0.3]
 ÷ 0020 × 200D ÷ 0646 ÷  #  ÷ [0.2] SPACE (WSegSpace) × [4.0] ZERO WIDTH JOINER (ZWJ_FE) ÷ [999.0] ARABIC LETTER NOON (ALetter) ÷ [0.3]
 ÷ 0646 × 200D ÷ 0020 ÷  #  ÷ [0.2] ARABIC LETTER NOON (ALetter) × [4.0] ZERO WIDTH JOINER (ZWJ_FE) ÷ [999.0] SPACE (WSegSpace) ÷ [0.3]
+÷ 0671 × 0644 × 0631 × 064E × 0651 × 062D × 0650 × 064A × 0645 × 0650 ÷ 0020 ÷ 06DD × 0661 ÷  #  ÷ [0.2] ARABIC LETTER ALEF WASLA (ALetter) × [5.0] ARABIC LETTER LAM (ALetter) × [5.0] ARABIC LETTER REH (ALetter) × [4.0] ARABIC FATHA (Extend_FE) × [4.0] ARABIC SHADDA (Extend_FE) × [5.0] ARABIC LETTER HAH (ALetter) × [4.0] ARABIC KASRA (Extend_FE) × [5.0] ARABIC LETTER YEH (ALetter) × [5.0] ARABIC LETTER MEEM (ALetter) × [4.0] ARABIC KASRA (Extend_FE) ÷ [999.0] SPACE (WSegSpace) ÷ [999.0] ARABIC END OF AYAH (Numeric) × [8.0] ARABIC-INDIC DIGIT ONE (Numeric) ÷ [0.3]
+÷ 0721 × 0719 × 0721 × 0718 × 072A × 0710 ÷ 0020 ÷ 070F × 071D × 0717 ÷ #  ÷ [0.2] SYRIAC LETTER MIM (ALetter) × [5.0] SYRIAC LETTER ZAIN (ALetter) × [5.0] SYRIAC LETTER MIM (ALetter) × [5.0] SYRIAC LETTER WAW (ALetter) × [5.0] SYRIAC LETTER RISH (ALetter) × [5.0] SYRIAC LETTER ALAPH (ALetter) ÷ [999.0] SPACE (WSegSpace) ÷ [999.0] SYRIAC ABBREVIATION MARK (ALetter) × [5.0] SYRIAC LETTER YUDH (ALetter) × [5.0] SYRIAC LETTER HE (ALetter) ÷ [0.3]
+÷ 072C × 070F × 072B × 0712 × 0718 ÷  #  ÷ [0.2] SYRIAC LETTER TAW (ALetter) × [5.0] SYRIAC ABBREVIATION MARK (ALetter) × [5.0] SYRIAC LETTER SHIN (ALetter) × [5.0] SYRIAC LETTER BETH (ALetter) × [5.0] SYRIAC LETTER WAW (ALetter) ÷ [0.3]
 ÷ 0041 × 0041 × 0041 ÷  #  ÷ [0.2] LATIN CAPITAL LETTER A (ALetter) × [5.0] LATIN CAPITAL LETTER A (ALetter) × [5.0] LATIN CAPITAL LETTER A (ALetter) ÷ [0.3]
 ÷ 0041 × 003A × 0041 ÷  #  ÷ [0.2] LATIN CAPITAL LETTER A (ALetter) × [6.0] COLON (MidLetter) × [7.0] LATIN CAPITAL LETTER A (ALetter) ÷ [0.3]
 ÷ 0041 ÷ 003A ÷ 003A ÷ 0041 ÷ #  ÷ [0.2] LATIN CAPITAL LETTER A (ALetter) ÷ [999.0] COLON (MidLetter) ÷ [999.0] COLON (MidLetter) ÷ [999.0] LATIN CAPITAL LETTER A (ALetter) ÷ [0.3]
@@ -1846,6 +1849,6 @@
 ÷ 0061 × 005F × 0031 ÷ 002C ÷ 002C ÷ 0061 ÷ #  ÷ [0.2] LATIN SMALL LETTER A (ALetter) × [13.1] LOW LINE (ExtendNumLet) × [13.2] DIGIT ONE (Numeric) ÷ [999.0] COMMA (MidNum) ÷ [999.0] COMMA (MidNum) ÷ [999.0] LATIN SMALL LETTER A (ALetter) ÷ [0.3]
 ÷ 0061 × 005F × 0061 ÷ 002C ÷ 002C ÷ 0061 ÷ #  ÷ [0.2] LATIN SMALL LETTER A (ALetter) × [13.1] LOW LINE (ExtendNumLet) × [13.2] LATIN SMALL LETTER A (ALetter) ÷ [999.0] COMMA (MidNum) ÷ [999.0] COMMA (MidNum) ÷ [999.0] LATIN SMALL LETTER A (ALetter) ÷ [0.3]
 #
-# Lines: 1823
+# Lines: 1826
 #
 # EOF

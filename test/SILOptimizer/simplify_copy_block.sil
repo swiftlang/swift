@@ -1,0 +1,172 @@
+// RUN: %target-sil-opt %s -simplification -simplify-instruction=copy_block | %FileCheck %s
+
+// REQUIRES: objc_interop
+
+sil_stage canonical
+
+import Swift
+import SwiftShims
+import Builtin
+
+// CHECK-LABEL: sil [ossa] @remove_copy_block :
+// CHECK-NOT:     copy_block
+// CHECK:         apply %0
+// CHECK-NOT:     destroy_value
+// CHECK:       } // end sil function 'remove_copy_block'
+sil [ossa] @remove_copy_block : $@convention(thin) (@convention(block) @noescape () -> ()) -> () {
+bb0(%0 : @unowned $@convention(block) @noescape () -> ()):
+  %2 = copy_block %0
+  %3 = begin_borrow [lexical] %2
+  %4 = apply %3() : $@convention(block) @noescape () -> ()
+  end_borrow %3
+  destroy_value %2
+  %7 = tuple ()
+  return %7
+}
+
+// CHECK-LABEL: sil [ossa] @remove_copy_block_with_partial_apply :
+// CHECK-NOT:     copy_block
+// CHECK:         [[B:%.*]] = unchecked_ownership_conversion %0, @unowned to @guaranteed
+// CHECK:         [[PA:%.*]] = partial_apply [callee_guaranteed] [on_stack] {{%[0-9]+}}([[B]])
+// CHECK:         destroy_value [[PA]]
+// CHECK-NOT:     destroy_value
+// CHECK:       } // end sil function 'remove_copy_block_with_partial_apply'
+sil [ossa] @remove_copy_block_with_partial_apply : $@convention(thin) (@convention(block) @noescape () -> ()) -> () {
+bb0(%0 : @unowned $@convention(block) @noescape () -> ()):
+  %2 = copy_block %0
+  %3 = function_ref @thunk : $@convention(thin) (@guaranteed @convention(block) @noescape () -> ()) -> ()
+  %4 = partial_apply [callee_guaranteed] [on_stack] %3(%2) : $@convention(thin) (@guaranteed @convention(block) @noescape () -> ()) -> ()
+  destroy_value %4
+  destroy_value %2
+  %7 = tuple ()
+  return %7
+}
+
+// CHECK-LABEL: sil [ossa] @remove_copy_block_with_partial_apply_guaranteed :
+// CHECK-NOT:     copy_block
+// CHECK:         [[PA:%.*]] = partial_apply [callee_guaranteed] [on_stack] {{%[0-9]+}}(%0)
+// CHECK:         destroy_value [[PA]]
+// CHECK-NOT:     destroy_value
+// CHECK:       } // end sil function 'remove_copy_block_with_partial_apply_guaranteed'
+sil [ossa] @remove_copy_block_with_partial_apply_guaranteed : $@convention(thin) (@guaranteed @convention(block) @noescape () -> ()) -> () {
+bb0(%0 : @guaranteed $@convention(block) @noescape () -> ()):
+  %2 = copy_block %0
+  %3 = function_ref @thunk : $@convention(thin) (@guaranteed @convention(block) @noescape () -> ()) -> ()
+  %4 = partial_apply [callee_guaranteed] [on_stack] %3(%2) : $@convention(thin) (@guaranteed @convention(block) @noescape () -> ()) -> ()
+  destroy_value %4
+  destroy_value %2
+  %7 = tuple ()
+  return %7
+}
+
+// CHECK-LABEL: sil [ossa] @remove_copy_block_with_partial_apply_owned :
+// CHECK-NOT:     copy_block
+// CHECK:         [[PA:%.*]] = partial_apply [callee_guaranteed] [on_stack] {{%[0-9]+}}(%0)
+// CHECK:       } // end sil function 'remove_copy_block_with_partial_apply_owned'
+sil [ossa] @remove_copy_block_with_partial_apply_owned : $@convention(thin) (@owned @convention(block) @noescape () -> ()) -> () {
+bb0(%0 : @owned $@convention(block) @noescape () -> ()):
+  %2 = copy_block %0
+  %3 = function_ref @thunk : $@convention(thin) (@guaranteed @convention(block) @noescape () -> ()) -> ()
+  %4 = partial_apply [callee_guaranteed] [on_stack] %3(%2) : $@convention(thin) (@guaranteed @convention(block) @noescape () -> ()) -> ()
+  destroy_value %4
+  destroy_value %2
+  destroy_value %0
+  %7 = tuple ()
+  return %7
+}
+
+sil [ossa] @thunk : $@convention(thin) (@guaranteed @convention(block) @noescape () -> ()) -> () {
+bb0(%0 : @guaranteed $@convention(block) @noescape () -> ()):
+  %1 = apply %0() : $@convention(block) @noescape () -> ()
+  %2 = tuple ()
+  return %2
+}
+
+sil @use_closure : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+
+// CHECK-LABEL: sil [ossa] @dont_remove_copy_block_with_escaping_partial_apply :
+// CHECK:         copy_block
+// CHECK:       } // end sil function 'dont_remove_copy_block_with_escaping_partial_apply'
+sil [ossa] @dont_remove_copy_block_with_escaping_partial_apply : $@convention(thin) (@convention(block) @noescape () -> ()) -> () {
+bb0(%0 : @unowned $@convention(block) @noescape () -> ()):
+  %2 = copy_block %0
+  %3 = function_ref @thunk : $@convention(thin) (@guaranteed @convention(block) @noescape () -> ()) -> ()
+  %4 = partial_apply [callee_guaranteed] %3(%2) : $@convention(thin) (@guaranteed @convention(block) @noescape () -> ()) -> ()
+  %5 = function_ref @use_closure : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  apply %5(%4) : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
+  destroy_value %4
+  %7 = tuple ()
+  return %7
+}
+
+sil [ossa] @unknown_thunk : $@convention(thin) (@guaranteed @convention(block) @noescape () -> ()) -> ()
+
+// CHECK-LABEL: sil [ossa] @dont_remove_copy_block_with_unknown_partial_apply :
+// CHECK:         copy_block
+// CHECK:       } // end sil function 'dont_remove_copy_block_with_unknown_partial_apply'
+sil [ossa] @dont_remove_copy_block_with_unknown_partial_apply : $@convention(thin) (@convention(block) @noescape () -> ()) -> () {
+bb0(%0 : @unowned $@convention(block) @noescape () -> ()):
+  %2 = copy_block %0
+  %3 = function_ref @unknown_thunk : $@convention(thin) (@guaranteed @convention(block) @noescape () -> ()) -> ()
+  %4 = partial_apply [callee_guaranteed] [on_stack] %3(%2) : $@convention(thin) (@guaranteed @convention(block) @noescape () -> ()) -> ()
+  destroy_value %4
+  destroy_value %2
+  %7 = tuple ()
+  return %7
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_copy_block_with_partial_apply_escaping :
+// CHECK:         copy_block
+// CHECK:       } // end sil function 'dont_remove_copy_block_with_partial_apply_escaping'
+sil [ossa] @dont_remove_copy_block_with_partial_apply_escaping : $@convention(thin) (@convention(block) @noescape () -> ()) -> () {
+bb0(%0 : @unowned $@convention(block) @noescape () -> ()):
+  %2 = copy_block %0
+  %3 = function_ref @thunk_escaping : $@convention(thin) (@guaranteed @convention(block) @noescape () -> ()) -> ()
+  %4 = partial_apply [callee_guaranteed] [on_stack] %3(%2) : $@convention(thin) (@guaranteed @convention(block) @noescape () -> ()) -> ()
+  destroy_value %4
+  destroy_value %2
+  %7 = tuple ()
+  return %7
+}
+
+sil [ossa] @thunk_escaping : $@convention(thin) (@guaranteed @convention(block) @noescape () -> ()) -> () {
+bb0(%0 : @guaranteed $@convention(block) @noescape () -> ()):
+  %1 = function_ref @use_block : $@convention(thin) (@convention(block) @noescape () -> ()) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (@convention(block) @noescape () -> ()) -> ()
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_copied_block :
+// CHECK:         copy_block
+// CHECK:       } // end sil function 'dont_remove_copied_block'
+sil [ossa] @dont_remove_copied_block : $@convention(thin) (@convention(block) @noescape () -> ()) -> () {
+bb0(%0 : @unowned $@convention(block) @noescape () -> ()):
+  %2 = copy_block %0
+  %3 = begin_borrow [lexical] %2
+  %4 = apply %3() : $@convention(block) @noescape () -> ()
+  %5 = copy_value %3
+  fix_lifetime %5
+  destroy_value %5
+  end_borrow %3
+  destroy_value %2
+  %7 = tuple ()
+  return %7
+}
+
+sil [ossa] @use_block : $@convention(thin) (@convention(block) @noescape () -> ()) -> ()
+
+// CHECK-LABEL: sil [ossa] @dont_remove_escaping_block :
+// CHECK:         copy_block
+// CHECK:       } // end sil function 'dont_remove_escaping_block'
+sil [ossa] @dont_remove_escaping_block : $@convention(thin) (@convention(block) @noescape () -> ()) -> () {
+bb0(%0 : @unowned $@convention(block) @noescape () -> ()):
+  %2 = copy_block %0
+  %3 = begin_borrow [lexical] %2
+  %4 = function_ref @use_block : $@convention(thin) (@convention(block) @noescape () -> ()) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@convention(block) @noescape () -> ()) -> ()
+  end_borrow %3
+  destroy_value %2
+  %7 = tuple ()
+  return %7
+}

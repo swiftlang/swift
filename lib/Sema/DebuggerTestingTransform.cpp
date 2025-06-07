@@ -26,6 +26,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Subsystems.h"
 
 #include "TypeChecker.h"
@@ -58,7 +59,7 @@ unsigned DiscriminatorFinder::getNextDiscriminator() {
 
 namespace {
 
-/// Instrument decls with sanity-checks which the debugger can evaluate.
+/// Instrument decls with soundness-checks which the debugger can evaluate.
 class DebuggerTestingTransform : public ASTWalker {
   ASTContext &Ctx;
   DiscriminatorFinder &DF;
@@ -73,24 +74,28 @@ public:
         DebuggerTestingCheckExpectName(
             Ctx.getIdentifier("_debuggerTestingCheckExpect")) {}
 
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Expansion;
+  }
+
   PreWalkAction walkToDeclPre(Decl *D) override {
     pushLocalDeclContext(D);
 
     // Skip implicit decls, because the debugger isn't used to step through
     // these.
     if (D->isImplicit())
-      return Action::SkipChildren();
+      return Action::SkipNode();
 
     // Whitelist the kinds of decls to transform.
     // TODO: Expand the set of decls visited here.
     if (auto *FD = dyn_cast<AbstractFunctionDecl>(D))
-      return Action::VisitChildrenIf(FD->getBody());
+      return Action::VisitNodeIf(FD->getTypecheckedBody());
     if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D))
-      return Action::VisitChildrenIf(TLCD->getBody());
+      return Action::VisitNodeIf(TLCD->getBody());
     if (isa<NominalTypeDecl>(D))
       return Action::Continue();
 
-    return Action::SkipChildren();
+    return Action::SkipNode();
   }
 
   PostWalkAction walkToDeclPost(Decl *D) override {
@@ -180,7 +185,7 @@ private:
 
     // Don't capture variables which aren't default-initialized.
     if (auto *VD = dyn_cast<VarDecl>(DstDecl))
-      if (!VD->isParentInitialized() &&
+      if (!VD->isParentExecutabledInitialized() &&
           !(isa<ParamDecl>(VD) &&
             cast<ParamDecl>(VD)->isInOut()))
         return Action::Continue(OriginalExpr);
@@ -249,7 +254,7 @@ private:
 
     auto *POArgList = ArgumentList::forImplicitUnlabeled(Ctx, {DstRef});
     auto *POCall = CallExpr::createImplicit(Ctx, PODeclRef, POArgList);
-    POCall->setThrows(false);
+    POCall->setThrows(nullptr);
 
     // Create the call to checkExpect.
     UnresolvedDeclRefExpr *CheckExpectDRE = new (Ctx)
@@ -259,13 +264,13 @@ private:
         ArgumentList::forImplicitUnlabeled(Ctx, {Varname, POCall});
     auto *CheckExpectExpr =
         CallExpr::createImplicit(Ctx, CheckExpectDRE, CheckArgList);
-    CheckExpectExpr->setThrows(false);
+    CheckExpectExpr->setThrows(nullptr);
 
     // Create the closure.
     auto *Params = ParameterList::createEmpty(Ctx);
     auto *Closure = new (Ctx)
         ClosureExpr(DeclAttributes(), SourceRange(), nullptr, Params,
-                    SourceLoc(), SourceLoc(),
+                    SourceLoc(), SourceLoc(), /*thrownType=*/nullptr,
                     SourceLoc(), SourceLoc(), nullptr,
                     getCurrentDeclContext());
     Closure->setImplicit(true);
@@ -275,11 +280,11 @@ private:
     ASTNode ClosureElements[] = {OriginalExpr, CheckExpectExpr};
     auto *ClosureBody = BraceStmt::create(Ctx, SourceLoc(), ClosureElements,
                                           SourceLoc(), /*Implicit=*/true);
-    Closure->setBody(ClosureBody, /*isSingleExpression=*/false);
+    Closure->setBody(ClosureBody);
 
     // Call the closure.
     auto *ClosureCall = CallExpr::createImplicitEmpty(Ctx, Closure);
-    ClosureCall->setThrows(false);
+    ClosureCall->setThrows(nullptr);
 
     // TODO: typeCheckExpression() seems to assign types to everything here,
     // but may not be sufficient in some cases.
@@ -292,7 +297,7 @@ private:
     // ensures that the type checker can infer <noescape> for captured values.
     TypeChecker::computeCaptures(Closure);
 
-    return Action::SkipChildren(FinalExpr);
+    return Action::SkipNode(FinalExpr);
   }
 };
 
@@ -305,7 +310,7 @@ void swift::performDebuggerTestingTransform(SourceFile &SF) {
   for (Decl *D : SF.getTopLevelDecls())
     D->walk(DF);
 
-  // Instrument the decls with checkExpect() sanity-checks.
+  // Instrument the decls with checkExpect() soundness-checks.
   for (Decl *D : SF.getTopLevelDecls()) {
     DebuggerTestingTransform Transform{D->getASTContext(), DF};
     D->walk(Transform);

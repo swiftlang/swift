@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -parse-stdlib %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -parse-stdlib %s | %FileCheck %s
 
 import Swift
 
@@ -92,10 +92,13 @@ func existential_metatype_from_thin() -> Any.Type {
 // CHECK:      [[T1:%.*]] = metatype $@thin SomeStruct.Type
 // CHECK:      [[T0:%.*]] = function_ref @$s9metatypes10SomeStructV{{[_0-9a-zA-Z]*}}fC
 // CHECK-NEXT: [[T2:%.*]] = apply [[T0]]([[T1]])
-// CHECK-NEXT: debug_value [[T2]] : $SomeStruct, let, name "s"
+// CHECK-NEXT: [[MV:%.*]] = move_value [var_decl] [[T2]] : $SomeStruct
+// CHECK-NEXT: debug_value [[MV]] : $SomeStruct, let, name "s"
+// CHECK-NEXT: ignored_use
 // CHECK-NEXT: [[T0:%.*]] = metatype $@thin SomeStruct.Type
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thick SomeStruct.Type
 // CHECK-NEXT: [[T2:%.*]] = init_existential_metatype [[T1]] : $@thick SomeStruct.Type, $@thick any Any.Type
+// CHECK-NEXT: extend_lifetime [[MV]] : $SomeStruct
 // CHECK-NEXT: return [[T2]] : $@thick any Any.Type
 func existential_metatype_from_thin_value() -> Any.Type {
   let s = SomeStruct()

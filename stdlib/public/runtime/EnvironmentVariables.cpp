@@ -15,13 +15,25 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Runtime/Debug.h"
+#include "swift/Runtime/Paths.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 
 #include <string.h>
+#include <inttypes.h>
+
+#if defined(__ANDROID__)
+#include <sys/system_properties.h>
+#endif
 
 using namespace swift;
 
 namespace {
+
+// This is required to make the macro machinery work correctly; we can't
+// declare a VARIABLE(..., const char *, ...) because then the token-pasted
+// names won't work properly.  It *does* mean that if you want to use std::string
+// somewhere in this file, you'll have to fully qualify the name.
+typedef const char *string;
 
 // Require all environment variable names to start with SWIFT_
 static constexpr bool hasSwiftPrefix(const char *str) {
@@ -115,12 +127,20 @@ static uint32_t parse_uint32_t(const char *name,
   }
   if (n > UINT32_MAX) {
     swift::warning(RuntimeErrorFlagNone,
-                   "Warning: %s=%s out of bounds, clamping to %d.\n",
+                   "Warning: %s=%s out of bounds, clamping to %" PRIu32 ".\n",
                    name, value, UINT32_MAX);
     return UINT32_MAX;
   }
 
   return n;
+}
+
+static string parse_string(const char *name,
+                           const char *value,
+                           string defaultValue) {
+  if (!value || value[0] == 0)
+    return strdup(defaultValue);
+  return strdup(value);
 }
 
 // Print a list of all the environment variables. Lazy initialization makes
@@ -145,14 +165,17 @@ void printHelp(const char *extra) {
 } // end anonymous namespace
 
 // Define backing variables.
-#define VARIABLE(name, type, defaultValue, help) \
-  type swift::runtime::environment::name ## _variable = defaultValue;
+#define VARIABLE(name, type, defaultValue, help)                               \
+  type swift::runtime::environment::name##_variable = defaultValue;            \
+  bool swift::runtime::environment::name##_isSet_variable = false;
 #include "EnvironmentVariables.def"
 
 // Initialization code.
 swift::once_t swift::runtime::environment::initializeToken;
 
-#if SWIFT_STDLIB_HAS_ENVIRON && (defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__linux__))
+#if SWIFT_STDLIB_HAS_ENVIRON
+
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__linux__)
 extern "C" char **environ;
 #define ENVIRON environ
 #elif defined(_WIN32)
@@ -170,7 +193,33 @@ extern "C" char **_environ;
 #endif
 #endif
 
-#ifdef ENVIRON
+#if defined(__ANDROID__)
+// On Android, also try loading runtime debug env variables from system props.
+static void platformInitialize(void *context) {
+  (void)context;
+  char buffer[PROP_VALUE_MAX] = "";
+// Only system properties prefixed with "debug." can be set without root access.
+#define SYSPROP_PREFIX "debug.org.swift.runtime."
+#define VARIABLE(name, type, defaultValue, help)                \
+  if (__system_property_get(SYSPROP_PREFIX #name, buffer)) {    \
+    swift::runtime::environment::name##_isSet_variable = true;  \
+    swift::runtime::environment::name##_variable =              \
+        parse_##type(#name, buffer, defaultValue);              \
+  }
+#include "EnvironmentVariables.def"
+#undef VARIABLE
+}
+#else
+static void platformInitialize(void *context) {
+  (void)context;
+}
+#endif
+
+#endif
+
+#if SWIFT_STDLIB_HAS_ENVIRON
+
+#if defined(ENVIRON)
 void swift::runtime::environment::initialize(void *context) {
   // On platforms where we have an environment variable array available, scan it
   // directly. This optimizes for the common case where no variables are set,
@@ -178,6 +227,11 @@ void swift::runtime::environment::initialize(void *context) {
   // us to detect some spelling mistakes by warning on unknown SWIFT_ variables.
 
   bool SWIFT_DEBUG_HELP_variable = false;
+
+  // Placeholder variable, we never use the result but the macros want to write
+  // to it.
+  bool SWIFT_DEBUG_HELP_isSet_variable = false;
+  (void)SWIFT_DEBUG_HELP_isSet_variable; // Silence warnings about unused vars.
   for (char **var = ENVIRON; *var; var++) {
     // Immediately skip anything without a SWIFT_ prefix.
     if (strncmp(*var, "SWIFT_", 6) != 0)
@@ -188,12 +242,13 @@ void swift::runtime::environment::initialize(void *context) {
     // parsed by functions named parse_<type> above. An unknown type will
     // produce an error that parse_<unknown-type> doesn't exist. Add new parsers
     // above.
-#define VARIABLE(name, type, defaultValue, help)                       \
-    if (strncmp(*var, #name "=", strlen(#name "=")) == 0) {            \
-      name ## _variable =                                              \
-        parse_ ## type(#name, *var + strlen(#name "="), defaultValue); \
-      foundVariable = true;                                            \
-    }
+#define VARIABLE(name, type, defaultValue, help)                               \
+  if (strncmp(*var, #name "=", strlen(#name "=")) == 0) {                      \
+    name##_variable =                                                          \
+        parse_##type(#name, *var + strlen(#name "="), defaultValue);           \
+    name##_isSet_variable = true;                                              \
+    foundVariable = true;                                                      \
+  }
     // SWIFT_DEBUG_HELP is not in the variables list. Parse it like the other
     // variables.
     VARIABLE(SWIFT_DEBUG_HELP, bool, false, )
@@ -215,25 +270,35 @@ void swift::runtime::environment::initialize(void *context) {
     }
   }
 
+  platformInitialize(context);
+
   if (SWIFT_DEBUG_HELP_variable)
     printHelp(nullptr);
 }
-#elif SWIFT_STDLIB_HAS_ENVIRON
+#else
 void swift::runtime::environment::initialize(void *context) {
   // Emit a getenv call for each variable. This is less efficient but works
   // everywhere.
-#define VARIABLE(name, type, defaultValue, help) \
-  name ## _variable = parse_ ## type(#name, getenv(#name), defaultValue);
+#define VARIABLE(name, type, defaultValue, help)                               \
+  do {                                                                         \
+    const char *name##_string = getenv(#name);                                 \
+    if (name##_string)                                                         \
+      name##_isSet_variable = true;                                            \
+    name##_variable = parse_##type(#name, name##_string, defaultValue);        \
+  } while (0);
 #include "EnvironmentVariables.def"
+
+  platformInitialize(context);
 
   // Print help if requested.
   if (parse_bool("SWIFT_DEBUG_HELP", getenv("SWIFT_DEBUG_HELP"), false))
     printHelp("Using getenv to read variables. Unknown SWIFT_DEBUG_ variables "
               "will not be flagged.");
 }
+#endif
+
 #else
 void swift::runtime::environment::initialize(void *context) {
-  (void)context;
 }
 #endif
 
@@ -247,12 +312,10 @@ SWIFT_RUNTIME_STDLIB_SPI bool concurrencyEnableCooperativeQueues() {
       SWIFT_DEBUG_CONCURRENCY_ENABLE_COOPERATIVE_QUEUES();
 }
 
-
-SWIFT_RUNTIME_STDLIB_SPI bool concurrencyEnableJobDispatchIntegration() {
-  return runtime::environment::
-      SWIFT_ENABLE_ASYNC_JOB_DISPATCH_INTEGRATION();
-}
-
 SWIFT_RUNTIME_STDLIB_SPI bool concurrencyValidateUncheckedContinuations() {
   return runtime::environment::SWIFT_DEBUG_VALIDATE_UNCHECKED_CONTINUATIONS();
+}
+
+SWIFT_RUNTIME_STDLIB_SPI const char *concurrencyIsCurrentExecutorLegacyModeOverride() {
+  return runtime::environment::SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE();
 }

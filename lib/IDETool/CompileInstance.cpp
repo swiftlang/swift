@@ -16,8 +16,10 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/PluginLoader.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/PrettyStackTrace.h"
@@ -124,19 +126,21 @@ getModifiedFunctionDeclList(const SourceFile &SF, SourceManager &tmpSM,
   SearchPathOptions searchPathOpts = ctx.SearchPathOpts;
   ClangImporterOptions clangOpts = ctx.ClangImporterOpts;
   SILOptions silOpts = ctx.SILOpts;
+  CASOptions casOpts = ctx.CASOpts;
   symbolgraphgen::SymbolGraphOptions symbolOpts = ctx.SymbolGraphOpts;
+  SerializationOptions serializationOpts = ctx.SerializationOpts;
 
   DiagnosticEngine tmpDiags(tmpSM);
-  auto &tmpCtx = *ASTContext::get(langOpts, typeckOpts, silOpts, searchPathOpts,
-                                  clangOpts, symbolOpts, tmpSM, tmpDiags);
+  auto &tmpCtx =
+      *ASTContext::get(langOpts, typeckOpts, silOpts, searchPathOpts, clangOpts,
+                       symbolOpts, casOpts, serializationOpts, tmpSM, tmpDiags);
   registerParseRequestFunctions(tmpCtx.evaluator);
   registerTypeCheckerRequestFunctions(tmpCtx.evaluator);
 
-  ModuleDecl *tmpM = ModuleDecl::create(Identifier(), tmpCtx);
+  ModuleDecl *tmpM = ModuleDecl::createEmpty(Identifier(), tmpCtx);
   auto tmpBufferID = tmpSM.addNewSourceBuffer(std::move(*tmpBuffer));
   SourceFile *tmpSF = new (tmpCtx)
       SourceFile(*tmpM, SF.Kind, tmpBufferID, SF.getParsingOptions());
-  tmpM->addAuxiliaryFile(*tmpSF);
 
   // If the top-level code has been changed, we can't do anything.
   if (SF.getInterfaceHash() != tmpSF->getInterfaceHash())
@@ -193,8 +197,9 @@ void retypeCheckFunctionBody(AbstractFunctionDecl *func,
       sliceBufferID,
       GeneratedSourceInfo{
         GeneratedSourceInfo::ReplacedFunctionBody,
-        func->getOriginalBodySourceRange(),
-        newRange,
+        Lexer::getCharSourceRangeFromSourceRange(
+          origSM, func->getOriginalBodySourceRange()),
+        Lexer::getCharSourceRangeFromSourceRange(origSM, newRange),
         func,
         nullptr
       }
@@ -216,9 +221,9 @@ bool CompileInstance::performCachedSemaIfPossible(DiagnosticConsumer *DiagC) {
   auto FS = SM.getFileSystem();
 
   if (shouldCheckDependencies()) {
-    if (areAnyDependentFilesInvalidated(*CI, *FS, /*excludeBufferID=*/None,
-                                        DependencyCheckedTimestamp,
-                                        InMemoryDependencyHash)) {
+    if (areAnyDependentFilesInvalidated(
+            *CI, *FS, /*excludeBufferID=*/std::nullopt,
+            DependencyCheckedTimestamp, InMemoryDependencyHash)) {
       return true;
     }
     DependencyCheckedTimestamp = std::chrono::system_clock::now();
@@ -253,17 +258,19 @@ bool CompileInstance::setupCI(
   auto &Diags = CI->getDiags();
 
   SmallVector<const char *, 16> args;
-  // Put '-resource-dir' and '-diagnostic-documentation-path' at the top to
-  // allow overriding them with the passed in arguments.
+  // Put '-resource-dir' at the top to allow overriding them with the passed in
+  // arguments.
   args.append({"-resource-dir", RuntimeResourcePath.c_str()});
-  args.append({"-Xfrontend", "-diagnostic-documentation-path", "-Xfrontend",
-               DiagnosticDocumentationPath.c_str()});
   args.append(origArgs.begin(), origArgs.end());
+
+  SmallString<256> driverPath(SwiftExecutablePath);
+  llvm::sys::path::remove_filename(driverPath);
+  llvm::sys::path::append(driverPath, "swiftc");
 
   CompilerInvocation invocation;
   bool invocationCreationFailed =
       driver::getSingleFrontendInvocationFromDriverArguments(
-          args, Diags,
+          driverPath, args, Diags,
           [&](ArrayRef<const char *> FrontendArgs) {
             return invocation.parseArgs(FrontendArgs, Diags);
           },
@@ -298,6 +305,7 @@ bool CompileInstance::setupCI(
     assert(Diags.hadAnyError());
     return false;
   }
+  CI->getASTContext().getPluginLoader().setRegistry(Plugins.get());
 
   return true;
 }
@@ -338,7 +346,7 @@ bool CompileInstance::performSema(
   CachedArgHash = ArgsHash;
   CachedReuseCount = 0;
   InMemoryDependencyHash.clear();
-  cacheDependencyHashIfNeeded(*CI, /*excludeBufferID=*/None,
+  cacheDependencyHashIfNeeded(*CI, /*excludeBufferID=*/std::nullopt,
                               InMemoryDependencyHash);
 
   // Perform!

@@ -114,7 +114,7 @@ var x15: Int {
   // For the purpose of this test we need to use an attribute that cannot be
   // applied to the getter.
   weak
-  var foo: SomeClass? = SomeClass()  // expected-warning {{variable 'foo' was written to, but never read}}
+  var foo: SomeClass? = SomeClass()  // expected-warning {{variable 'foo' was never used; consider replacing with '_' or removing it}}
   // expected-warning@-1 {{instance will be immediately deallocated because variable 'foo' is 'weak'}}
   // expected-note@-2 {{a strong reference is required to prevent the instance from being deallocated}}
   // expected-note@-3 {{'foo' declared here}}
@@ -378,12 +378,12 @@ var x12: X {
   }
 }
 
-var x13: X {} // expected-error {{missing return in accessor expected to return 'X'}}
+var x13: X {} // missing return expectations moved to `SILOptimizer/missing_returns`
 
 struct X14 {}
 extension X14 {
   var x14: X {
-  } // expected-error {{missing return in accessor expected to return 'X'}}
+  } // missing return expectations moved to `SILOptimizer/missing_returns`
 }
 
 // Type checking problems
@@ -1215,7 +1215,8 @@ _ = r19874152S5()  // ok
 
 
 struct r19874152S6 {
-  let (a,b) = (1,2)   // Cannot handle implicit synth of this yet.
+  // Cannot handle implicit synth of this yet.
+  let (a,b) = (1,2)   // expected-error {{unsupported}}
 }
 _ = r19874152S5()  // ok
 
@@ -1341,14 +1342,4 @@ class C3_51744 {
 class LazyPropInClass {
   lazy var foo: Int = { return 0 } // expected-error {{function produces expected type 'Int'; did you mean to call it with '()'?}}
   // expected-note@-1 {{Remove '=' to make 'foo' a computed property}}{{21-23=}}{{3-8=}}
-}
-
-// https://github.com/apple/swift/issues/57936
-
-enum E1_57936 {
-  var foo: Int {} // expected-error{{missing return in accessor expected to return 'Int'}}
-}
-
-enum E2_57936<T> {
-  var foo: T {} // expected-error{{missing return in accessor expected to return 'T'}}
 }

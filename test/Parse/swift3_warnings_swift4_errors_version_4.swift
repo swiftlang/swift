@@ -11,7 +11,7 @@ protocol P2 {}
 
 let x: protocol<> // expected-error {{'protocol<>' syntax has been removed; use 'Any' instead}}
 let y: protocol<P1> // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}}}
-let z: protocol<P1, P2> // expected-error {{'protocol<...>' composition syntax has been removed; join the protocols using '&'}}
+let z: protocol<P1, P2> // expected-error {{'protocol<...>' composition syntax has been removed; join the type constraints using '&'}}
 
 func bar(f: @noescape () -> ()) {} // expected-error {{unknown attribute 'noescape'}}
 

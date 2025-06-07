@@ -519,6 +519,50 @@ TEST_F(LexerTest, RestoreStopAtCodeCompletion) {
   ASSERT_EQ(tok::eof, Tok.getKind());
 }
 
+TEST_F(LexerTest, CharactersContainTheEdgeContinuationByte) {
+  // A continuation byte must be in the range greater than or
+  // equal to 0x80 and less than or equal to 0xBF
+
+  // À(0xC3 0x80), 㗀(0xE3 0x97 0x80), 🀀(0xF0 0x9F 0x80 0x80),
+  // ÿ(0xC3 0xBF), 俿(0xE4 0xBF 0xBF), 𐐿(0xF0 0x90 0x90 0xBF)
+  const char *Source = "À 㗀 🀀 ÿ 俿 𐐿";
+
+  LangOptions LangOpts;
+  SourceManager SourceMgr;
+  unsigned BufferID = SourceMgr.addMemBufferCopy(Source);
+
+  Lexer L(LangOpts, SourceMgr, BufferID, /*Diags=*/nullptr, LexerMode::Swift);
+
+  Token Tok;
+
+  L.lex(Tok);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("À", Tok.getText());
+
+  L.lex(Tok);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("㗀", Tok.getText());
+
+  L.lex(Tok);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("🀀", Tok.getText());
+
+  L.lex(Tok);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("ÿ", Tok.getText());
+
+  L.lex(Tok);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("俿", Tok.getText());
+
+  L.lex(Tok);
+  ASSERT_EQ(tok::identifier, Tok.getKind());
+  ASSERT_EQ("𐐿", Tok.getText());
+
+  L.lex(Tok);
+  ASSERT_EQ(tok::eof, Tok.getKind());
+}
+
 TEST_F(LexerTest, getLocForStartOfToken) {
   const char *Source = "aaa \n \tbbb \"hello\" \"-\\(val)-\"";
 
@@ -655,7 +699,7 @@ public:
 bool containsPrefix(const std::vector<std::string> &strs,
                     const std::string &prefix) {
   for (auto &str : strs) {
-    if (StringRef(str).startswith(StringRef(prefix))) {
+    if (StringRef(str).starts_with(StringRef(prefix))) {
       return true;
     }
   }
@@ -708,6 +752,29 @@ TEST_F(LexerTest, DiagnoseEmbeddedNulOffset) {
       DiagConsumer.messages, "1, 2: nul character embedded in middle of file"));
   ASSERT_FALSE(containsPrefix(
       DiagConsumer.messages, "1, 4: nul character embedded in middle of file"));
+}
+
+TEST_F(LexerTest, InvalidUTF8Bytes) {
+  const char *Source = "\x80";
+
+  LangOptions LangOpts;
+  SourceManager SourceMgr;
+  unsigned BufferID = SourceMgr.addMemBufferCopy(Source);
+
+  StringCaptureDiagnosticConsumer DiagConsumer;
+  DiagnosticEngine Diags(SourceMgr);
+  Diags.addConsumer(DiagConsumer);
+
+  Lexer L(LangOpts, SourceMgr, BufferID, &Diags, LexerMode::Swift);
+
+  Token Tok;
+
+  L.lex(Tok);
+
+  ASSERT_EQ(DiagConsumer.messages.size(), 1);
+  auto message = DiagConsumer.messages.front();
+  ASSERT_TRUE(message.find("invalid UTF-8 found in source file") !=
+              std::string::npos);
 }
 
 #if HAS_MMAP

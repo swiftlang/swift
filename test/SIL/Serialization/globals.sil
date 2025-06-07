@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -emit-module -o %t/tmp.swiftmodule
-// RUN: %target-sil-opt %t/tmp.swiftmodule | %FileCheck %s
+// RUN: %target-swift-frontend %s -Xllvm -sil-disable-pass=simplification -emit-module -o %t/tmp.swiftmodule
+// RUN: %target-sil-opt -sil-print-types %t/tmp.swiftmodule | %FileCheck %s
 
 sil_stage canonical
 

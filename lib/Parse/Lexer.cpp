@@ -17,13 +17,15 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Identifier.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Bridging/ASTGen.h"
 #include "swift/Parse/Confusables.h"
-#include "swift/Parse/RegexParserBridging.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/ADT/bit.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MathExtras.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -31,12 +33,6 @@
 #include "clang/Basic/CharInfo.h"
 
 #include <limits>
-
-// Regex lexing delivered via libSwift.
-static RegexLiteralLexingFn regexLiteralLexingFn = nullptr;
-void Parser_registerRegexLiteralLexingFn(RegexLiteralLexingFn fn) {
-  regexLiteralLexingFn = fn;
-}
 
 using namespace swift;
 
@@ -59,7 +55,7 @@ using clang::isWhitespace;
 static bool EncodeToUTF8(unsigned CharValue,
                          SmallVectorImpl<char> &Result) {
   // Number of bits in the value, ignoring leading zeros.
-  unsigned NumBits = 32-llvm::countLeadingZeros(CharValue);
+  unsigned NumBits = 32-llvm::countl_zero(CharValue);
 
   // Handle the leading byte, based on the number of bits in the value.
   unsigned NumTrailingBytes;
@@ -96,18 +92,12 @@ static bool EncodeToUTF8(unsigned CharValue,
   return false;
 }
 
-
-/// CLO8 - Return the number of leading ones in the specified 8-bit value.
-static unsigned CLO8(unsigned char C) {
-  return llvm::countLeadingOnes(uint32_t(C) << 24);
-}
-
 /// isStartOfUTF8Character - Return true if this isn't a UTF8 continuation
 /// character, which will be of the form 0b10XXXXXX
 static bool isStartOfUTF8Character(unsigned char C) {
   // RFC 2279: The octet values FE and FF never appear.
   // RFC 3629: The octet values C0, C1, F5 to FF never appear.
-  return C <= 0x80 || (C >= 0xC2 && C < 0xF5);
+  return C < 0x80 || (C >= 0xC2 && C < 0xF5);
 }
 
 /// validateUTF8CharacterAndAdvance - Given a pointer to the starting byte of a
@@ -122,13 +112,9 @@ uint32_t swift::validateUTF8CharacterAndAdvance(const char *&Ptr,
   if (CurByte < 0x80)
     return CurByte;
   
-  // Read the number of high bits set, which indicates the number of bytes in
-  // the character.
-  unsigned EncodedBytes = CLO8(CurByte);
-  
-  // If this is 0b10XXXXXX, then it is a continuation character.
-  if (EncodedBytes == 1 ||
-      !isStartOfUTF8Character(CurByte)) {
+  // If this is not the start of a UTF8 character,
+  // then it is either a continuation byte or an invalid UTF8 code point.
+  if (!isStartOfUTF8Character(CurByte)) {
     // Skip until we get the start of another character.  This is guaranteed to
     // at least stop at the nul at the end of the buffer.
     while (Ptr < End && !isStartOfUTF8Character(*Ptr))
@@ -136,11 +122,16 @@ uint32_t swift::validateUTF8CharacterAndAdvance(const char *&Ptr,
     return ~0U;
   }
   
+  // Read the number of high bits set, which indicates the number of bytes in
+  // the character.
+  unsigned char EncodedBytes = llvm::countl_one(CurByte);
+  assert((EncodedBytes >= 2 && EncodedBytes <= 4));
+  
   // Drop the high bits indicating the # bytes of the result.
   unsigned CharValue = (unsigned char)(CurByte << EncodedBytes) >> EncodedBytes;
   
   // Read and validate the continuation bytes.
-  for (unsigned i = 1; i != EncodedBytes; ++i) {
+  for (unsigned char i = 1; i != EncodedBytes; ++i) {
     if (Ptr >= End)
       return ~0U;
     CurByte = *Ptr;
@@ -161,7 +152,7 @@ uint32_t swift::validateUTF8CharacterAndAdvance(const char *&Ptr,
   // If we got here, we read the appropriate number of accumulated bytes.
   // Verify that the encoding was actually minimal.
   // Number of bits in the value, ignoring leading zeros.
-  unsigned NumBits = 32-llvm::countLeadingZeros(CharValue);
+  unsigned NumBits = 32-llvm::countl_zero(CharValue);
   
   if (NumBits <= 5+6)
     return EncodedBytes == 2 ? CharValue : ~0U;
@@ -200,7 +191,7 @@ void Lexer::initialize(unsigned Offset, unsigned EndOffset) {
   assert(BufferStart + EndOffset <= BufferEnd);
 
   // Check for Unicode BOM at start of file (Only UTF-8 BOM supported now).
-  size_t BOMLength = contents.startswith("\xEF\xBB\xBF") ? 3 : 0;
+  size_t BOMLength = contents.starts_with("\xEF\xBB\xBF") ? 3 : 0;
 
   // Keep information about existence of UTF-8 BOM for transparency source code
   // editing with libSyntax.
@@ -213,7 +204,7 @@ void Lexer::initialize(unsigned Offset, unsigned EndOffset) {
     // inserted to mark the code completion token. If the IDE inspection offset
     // points to a normal character, no code completion token should be
     // inserted.
-    if (Ptr >= BufferStart && Ptr <= BufferEnd && *Ptr == '\0') {
+    if (Ptr >= BufferStart && Ptr < BufferEnd && *Ptr == '\0') {
       CodeCompletionPtr = Ptr;
     }
   }
@@ -590,6 +581,45 @@ static bool isValidIdentifierStartCodePoint(uint32_t c) {
   return true;
 }
 
+static bool isForbiddenRawIdentifierWhitespace(uint32_t c) {
+  if ((c >= 0x0009 && c <= 0x000D) ||
+      c == 0x0085 ||
+      c == 0x00A0 ||
+      c == 0x1680 ||
+      (c >= 0x2000 && c <= 0x200A) ||
+      (c >= 0x2028 && c <= 0x2029) ||
+      c == 0x202F ||
+      c == 0x205F ||
+      c == 0x3000)
+    return true;
+
+  return false;
+}
+
+static bool isPermittedRawIdentifierWhitespace(uint32_t c) {
+  return c == 0x0020 || c == 0x200E || c == 0x200F;
+}
+
+static bool isValidIdentifierEscapedCodePoint(uint32_t c) {
+  // An escaped identifier is terminated by a backtick, and the backslash is
+  // reserved for possible future escaping.
+  if (c == '`' || c == '\\')
+    return false;
+
+  if ((c >= 0x0000 && c <= 0x001F) || c == 0x007F)
+    return false;
+
+  // This is the set of code points satisfying the `White_Space` property,
+  // excluding the set satisfying the `Pattern_White_Space` property, and
+  // excluding any other ASCII non-printables and Unicode separators. In
+  // other words, the only whitespace code points allowed in a raw
+  // identifier are U+0020, and U+200E/200F (LTR/RTL marks).
+  if (isForbiddenRawIdentifierWhitespace(c))
+    return false;
+
+  return true;
+}
+
 static bool advanceIf(char const *&ptr, char const *end,
                       bool (*predicate)(uint32_t)) {
   char const *next = ptr;
@@ -614,6 +644,10 @@ static bool advanceIfValidContinuationOfIdentifier(char const *&ptr,
   return advanceIf(ptr, end, isValidIdentifierContinuationCodePoint);
 }
 
+static bool advanceIfValidEscapedIdentifier(char const *&ptr, char const *end) {
+  return advanceIf(ptr, end, isValidIdentifierEscapedCodePoint);
+}
+
 static bool advanceIfValidStartOfOperator(char const *&ptr,
                                           char const *end) {
   return advanceIf(ptr, end, Identifier::isOperatorStartCodePoint);
@@ -624,6 +658,17 @@ static bool advanceIfValidContinuationOfOperator(char const *&ptr,
   return advanceIf(ptr, end, Identifier::isOperatorContinuationCodePoint);
 }
 
+/// Returns true if the given string is entirely whitespace (considering only
+/// those whitespace code points permitted in raw identifiers).
+static bool isEscapedIdentifierEntirelyWhitespace(StringRef string) {
+  if (string.empty()) return true;
+  char const *p = string.data(), *end = string.end();
+  if (!advanceIf(p, end, isPermittedRawIdentifierWhitespace))
+    return false;
+  while (p < end && advanceIf(p, end, isPermittedRawIdentifierWhitespace));
+  return p == end;
+}
+
 bool Lexer::isIdentifier(StringRef string) {
   if (string.empty()) return false;
   char const *p = string.data(), *end = string.end();
@@ -631,6 +676,34 @@ bool Lexer::isIdentifier(StringRef string) {
     return false;
   while (p < end && advanceIfValidContinuationOfIdentifier(p, end));
   return p == end;
+}
+
+bool Lexer::identifierMustAlwaysBeEscaped(StringRef str) {
+  if (str.empty())
+    return false;
+
+  bool mustEscape =
+      !isOperator(str) && !isIdentifier(str) &&
+      str.front() != '$'; // a property wrapper does not need to be escaped
+
+  // dollar sign must be escaped
+  if (str == "$") {
+    mustEscape = true;
+  }
+  return mustEscape;
+}
+
+bool Lexer::isValidAsEscapedIdentifier(StringRef string) {
+  if (string.empty())
+    return false;
+  char const *p = string.data(), *end = string.end();
+  if (!advanceIfValidEscapedIdentifier(p, end))
+    return false;
+  while (p < end && advanceIfValidEscapedIdentifier(p, end))
+    ;
+  if (p != end)
+    return false;
+  return !isEscapedIdentifierEntirelyWhitespace(string);
 }
 
 /// Determines if the given string is a valid operator identifier,
@@ -692,6 +765,11 @@ void Lexer::lexHash() {
   .Case(#id, tok::pound_##id)
 #include "swift/AST/TokenKinds.def"
   .Default(tok::pound);
+
+  // If we found '#assert' but that experimental feature is not enabled,
+  // treat it as '#'.
+  if (Kind == tok::pound_assert && !LangOpts.hasFeature(Feature::StaticAssert))
+    Kind = tok::pound;
 
   // If we didn't find a match, then just return tok::pound.  This is highly
   // dubious in terms of error recovery, but is useful for code completion and
@@ -1837,6 +1915,12 @@ void Lexer::diagnoseSingleQuoteStringLiteral(const char *TokStart,
       OutputPtr = Ptr;
       // Escape double quotes.
       replacement.append("\\\"");
+    } else if (Ptr[-1] == 0) {
+      // The string literal might contain a null byte if the code completion
+      // position is inside the string literal. Don't include the null byte in
+      // the replacement string.
+      replacement.append(OutputPtr, Ptr - 1);
+      OutputPtr = Ptr;
     }
   }
   assert(Ptr == TokEnd && Ptr[-1] == '\'');
@@ -2001,7 +2085,7 @@ bool Lexer::isPotentialUnskippableBareSlashRegexLiteral(const Token &Tok) const 
   // We either don't have a regex literal, or we failed a heuristic. We now need
   // to make sure we don't have an unbalanced `{` or `}`, as that would have the
   // potential to change the range of a skipped body if we try to more
-  // agressively lex a regex literal during normal parsing. If we have balanced
+  // aggressively lex a regex literal during normal parsing. If we have balanced
   // `{` + `}`, we can proceed with skipping. Worst case scenario is we emit a
   // worse diagnostic.
   // FIXME: We ought to silence lexer diagnostics when skipping, this would
@@ -2034,9 +2118,10 @@ bool Lexer::isPotentialUnskippableBareSlashRegexLiteral(const Token &Tok) const 
 const char *Lexer::tryScanRegexLiteral(const char *TokStart, bool MustBeRegex,
                                        DiagnosticEngine *Diags,
                                        bool &CompletelyErroneous) const {
+#if SWIFT_BUILD_REGEX_PARSER_IN_COMPILER
   // We need to have experimental string processing enabled, and have the
   // parsing logic for regex literals available.
-  if (!LangOpts.EnableExperimentalStringProcessing || !regexLiteralLexingFn)
+  if (!LangOpts.EnableExperimentalStringProcessing)
     return nullptr;
 
   bool IsForwardSlash = (*TokStart == '/');
@@ -2082,9 +2167,9 @@ const char *Lexer::tryScanRegexLiteral(const char *TokStart, bool MustBeRegex,
   // - Ptr will not be advanced if this is not for a regex literal.
   // - CompletelyErroneous will be set if there was an error that cannot be
   //   recovered from.
-  auto *Ptr = TokStart;
-  CompletelyErroneous = regexLiteralLexingFn(
-      &Ptr, BufferEnd, MustBeRegex, Diags);
+  const char *Ptr = TokStart;
+  CompletelyErroneous =
+      swift_ASTGen_lexRegexLiteral(&Ptr, BufferEnd, MustBeRegex, Diags);
 
   // If we didn't make any lexing progress, this isn't a regex literal and we
   // should fallback to lexing as something else.
@@ -2172,6 +2257,9 @@ const char *Lexer::tryScanRegexLiteral(const char *TokStart, bool MustBeRegex,
   }
   assert(Ptr > TokStart && Ptr <= BufferEnd);
   return Ptr;
+#else
+  return nullptr;
+#endif
 }
 
 bool Lexer::tryLexRegexLiteral(const char *TokStart) {
@@ -2210,7 +2298,7 @@ bool Lexer::tryLexRegexLiteral(const char *TokStart) {
 }
 
 /// lexEscapedIdentifier:
-///   identifier ::= '`' identifier '`'
+///   identifier ::= '`' escaped-identifier '`'
 ///
 /// If it doesn't match this production, the leading ` is a punctuator.
 void Lexer::lexEscapedIdentifier() {
@@ -2221,21 +2309,15 @@ void Lexer::lexEscapedIdentifier() {
   // Check whether we have an identifier followed by another backtick, in which
   // case this is an escaped identifier.
   const char *IdentifierStart = CurPtr;
-  if (advanceIfValidStartOfIdentifier(CurPtr, BufferEnd)) {
-    // Keep continuing the identifier.
-    while (advanceIfValidContinuationOfIdentifier(CurPtr, BufferEnd));
+  while (advanceIfValidEscapedIdentifier(CurPtr, BufferEnd))
+    ;
 
-    // If we have the terminating "`", it's an escaped identifier.
-    if (*CurPtr == '`') {
-      ++CurPtr;
-      formEscapedIdentifierToken(Quote);
-      return;
-    }
-  }
-
-  // Special case; allow '`$`'.
-  if (Quote[1] == '$' && Quote[2] == '`') {
-    CurPtr = Quote + 3;
+  // If we have the terminating "`", it's an escaped/raw identifier, unless it
+  // contained only operator characters or was entirely whitespace.
+  StringRef IdStr(IdentifierStart, CurPtr - IdentifierStart);
+  if (*CurPtr == '`' && !isOperator(IdStr) &&
+      !isEscapedIdentifierEntirelyWhitespace(IdStr)) {
+    ++CurPtr;
     formEscapedIdentifierToken(Quote);
     return;
   }
@@ -2278,7 +2360,7 @@ bool Lexer::tryLexConflictMarker(bool EatNewline) {
   
   // Check to see if we have <<<<<<< or >>>>.
   StringRef restOfBuffer(Ptr, BufferEnd - Ptr);
-  if (!restOfBuffer.startswith("<<<<<<< ") && !restOfBuffer.startswith(">>>> "))
+  if (!restOfBuffer.starts_with("<<<<<<< ") && !restOfBuffer.starts_with(">>>> "))
     return false;
   
   ConflictMarkerKind Kind = *Ptr == '<' ? ConflictMarkerKind::Normal
@@ -2597,7 +2679,6 @@ void Lexer::lexImpl() {
   if (DiagQueue)
     DiagQueue->clear();
 
-  const char *LeadingTriviaStart = CurPtr;
   if (CurPtr == BufferStart) {
     if (BufferStart < ContentStart) {
       size_t BOMLen = ContentStart - BufferStart;
@@ -2609,7 +2690,7 @@ void Lexer::lexImpl() {
     NextToken.setAtStartOfLine(false);
   }
 
-  lexTrivia(/*IsForTrailingTrivia=*/false, LeadingTriviaStart);
+  lexTrivia();
 
   // Remember the start of the token so we can form the text range.
   const char *TokStart = CurPtr;
@@ -2813,8 +2894,7 @@ Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc,
   return L.peekNextToken();
 }
 
-StringRef Lexer::lexTrivia(bool IsForTrailingTrivia,
-                           const char *AllTriviaStart) {
+void Lexer::lexTrivia() {
   CommentStart = nullptr;
 
 Restart:
@@ -2822,13 +2902,9 @@ Restart:
 
   switch (*CurPtr++) {
   case '\n':
-    if (IsForTrailingTrivia)
-      break;
     NextToken.setAtStartOfLine(true);
     goto Restart;
   case '\r':
-    if (IsForTrailingTrivia)
-      break;
     NextToken.setAtStartOfLine(true);
     if (CurPtr[0] == '\n') {
       ++CurPtr;
@@ -2840,8 +2916,7 @@ Restart:
   case '\f':
     goto Restart;
   case '/':
-    if (IsForTrailingTrivia || isKeepingComments()) {
-      // Don't lex comments as trailing trivia (for now).
+    if (isKeepingComments()) {
       // Don't try to lex comments here if we are lexing comments as Tokens.
       break;
     } else if (*CurPtr == '/') {
@@ -2922,15 +2997,12 @@ Restart:
     bool ShouldTokenize = lexUnknown(/*EmitDiagnosticsIfToken=*/false);
     if (ShouldTokenize) {
       CurPtr = Tmp;
-      size_t Length = CurPtr - AllTriviaStart;
-      return StringRef(AllTriviaStart, Length);
+      return;
     }
     goto Restart;
   }
   // Reset the cursor.
   --CurPtr;
-  size_t Length = CurPtr - AllTriviaStart;
-  return StringRef(AllTriviaStart, Length);
 }
 
 SourceLoc Lexer::getLocForEndOfToken(const SourceManager &SM, SourceLoc Loc) {
@@ -3119,7 +3191,7 @@ bool tryAdvanceToEndOfConflictMarker(const char *&CurPtr,
 
   // Check to see if we have <<<<<<< or >>>>.
   StringRef restOfBuffer(Ptr, BufferEnd - Ptr);
-  if (!restOfBuffer.startswith("<<<<<<< ") && !restOfBuffer.startswith(">>>> "))
+  if (!restOfBuffer.starts_with("<<<<<<< ") && !restOfBuffer.starts_with(">>>> "))
     return false;
 
   ConflictMarkerKind Kind =

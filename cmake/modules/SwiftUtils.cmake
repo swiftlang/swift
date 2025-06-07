@@ -107,6 +107,16 @@ function(get_bootstrapping_swift_lib_dir bs_lib_dir bootstrapping)
     elseif("${bootstrapping}" STREQUAL "")
       get_bootstrapping_path(bs_lib_dir ${lib_dir} "1")
     endif()
+  elseif(BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
+    if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
+      # Compiler's INSTALL_RPATH is set to libs in the build directory
+      # For building stdlib, use stdlib in the builder's resource directory
+      # because the runtime may not be built yet.
+      # FIXME: This assumes the ABI hasn't changed since the builder.
+      get_filename_component(swift_bin_dir ${CMAKE_Swift_COMPILER} DIRECTORY)
+      get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
+      set(bs_lib_dir "${swift_dir}/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+    endif()
   endif()
   set(bs_lib_dir ${bs_lib_dir} PARENT_SCOPE)
 endfunction()
@@ -161,14 +171,10 @@ function(swift_create_post_build_symlink target)
     ""
     ${ARGN})
 
-  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
-    if(CS_IS_DIRECTORY)
-      set(cmake_symlink_option "copy_directory")
-    else()
-      set(cmake_symlink_option "copy_if_different")
-    endif()
+  if(CS_IS_DIRECTORY)
+    set(cmake_symlink_option "${SWIFT_COPY_OR_SYMLINK_DIR}")
   else()
-      set(cmake_symlink_option "create_symlink")
+    set(cmake_symlink_option "${SWIFT_COPY_OR_SYMLINK}")
   endif()
 
   add_custom_command(TARGET "${target}" POST_BUILD
@@ -184,27 +190,27 @@ endfunction()
 # we create a `swift-driver` symlink adjacent to the `swift` and `swiftc` executables
 # to ensure that `swiftc` forwards to the standalone driver when invoked.
 function(swift_create_early_driver_copies target)
-  # Early swift-driver is built adjacent to the compiler (swift build dir)
-  set(driver_bin_dir "${CMAKE_BINARY_DIR}/../earlyswiftdriver-${SWIFT_HOST_VARIANT}-${SWIFT_HOST_VARIANT_ARCH}/release/bin")
-  set(swift_bin_dir "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
-  # If early swift-driver wasn't built, nothing to do here.
-  if(NOT EXISTS "${driver_bin_dir}/swift-driver" OR NOT EXISTS "${driver_bin_dir}/swift-help")
-      message(STATUS "Skipping creating early SwiftDriver symlinks - no early SwiftDriver build found.")
-      return()
+  set(SWIFT_EARLY_SWIFT_DRIVER_BUILD "" CACHE PATH "Path to early swift-driver build")
+
+  if(NOT SWIFT_EARLY_SWIFT_DRIVER_BUILD)
+    return()
   endif()
 
-  message(STATUS "Copying over early SwiftDriver executable.")
-  message(STATUS "From: ${driver_bin_dir}/swift-driver")
-  message(STATUS "To: ${swift_bin_dir}/swift-driver")
-  # Use configure_file instead of file(COPY...) to establish a dependency.
-  # Further Changes to `swift-driver` will cause it to be copied over.
-  configure_file(${driver_bin_dir}/swift-driver ${swift_bin_dir}/swift-driver COPYONLY)
+  if(EXISTS ${SWIFT_EARLY_SWIFT_DRIVER_BUILD}/swift-driver${CMAKE_EXECUTABLE_SUFFIX})
+    message(STATUS "Creating early SwiftDriver symlinks")
 
-  message(STATUS "From: ${driver_bin_dir}/swift-help")
-  message(STATUS "To: ${swift_bin_dir}/swift-help")
-  # Use configure_file instead of file(COPY...) to establish a dependency.
-  # Further Changes to `swift-driver` will cause it to be copied over.  
-  configure_file(${driver_bin_dir}/swift-help ${swift_bin_dir}/swift-help COPYONLY)
+    # Use `configure_file` instead of `file(COPY ...)` to establish a
+    # dependency.  Further changes to `swift-driver` will cause it to be copied
+    # over.
+    configure_file(${SWIFT_EARLY_SWIFT_DRIVER_BUILD}/swift-driver${CMAKE_EXECUTABLE_SUFFIX}
+                   ${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-driver${CMAKE_EXECUTABLE_SUFFIX}
+                   COPYONLY)
+    configure_file(${SWIFT_EARLY_SWIFT_DRIVER_BUILD}/swift-help${CMAKE_EXECUTABLE_SUFFIX}
+                   ${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-help${CMAKE_EXECUTABLE_SUFFIX}
+                   COPYONLY)
+  else()
+    message(STATUS "Not creating early SwiftDriver symlinks (swift-driver not found)")
+  endif()
 endfunction()
 
 function(dump_swift_vars)

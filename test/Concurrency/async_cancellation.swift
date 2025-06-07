@@ -1,5 +1,8 @@
-// RUN: %target-typecheck-verify-swift  -disable-availability-checking
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
+
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 enum PictureData {
   case value(String)
@@ -26,7 +29,7 @@ struct SomeFile: Sendable {
 }
 
 @available(SwiftStdlib 5.1, *)
-func test_cancellation_withTaskCancellationHandler(_ anything: Any) async -> PictureData {
+func test_cancellation_withTaskCancellationHandler(_ anything: Any) async -> PictureData? {
   let handle: Task<PictureData, Error> = .init {
     let file = SomeFile()
 
@@ -38,6 +41,7 @@ func test_cancellation_withTaskCancellationHandler(_ anything: Any) async -> Pic
   }
 
   handle.cancel()
+  return nil
 }
 
 @available(SwiftStdlib 5.1, *)

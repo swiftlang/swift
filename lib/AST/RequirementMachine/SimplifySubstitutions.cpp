@@ -63,6 +63,7 @@
 
 #include "PropertyMap.h"
 #include "RewriteSystem.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 using namespace rewriting;
@@ -174,7 +175,7 @@ void RewriteSystem::buildRewritePathForJoiningTerms(MutableTerm lhsTerm,
 
   path->append(lhsPath);
 
-  assert(lhsTerm == rhsTerm);
+  CONDITIONAL_ASSERT(lhsTerm == rhsTerm);
 }
 
 /// Given two concrete type rules (T.[LHS] => T) and (T.[RHS] => T) and
@@ -261,10 +262,11 @@ void RewriteSystem::processTypeDifference(const TypeDifference &difference,
   if (lhsRule.getRHS() == difference.BaseTerm &&
       !lhsRule.isSubstitutionSimplified()) {
     if (lhsRule.isFrozen()) {
-      llvm::errs() << "Frozen rule should already be subst-simplified: "
-                   << lhsRule << "\n\n";
-      dump(llvm::errs());
-      abort();
+      ABORT([&](auto &out) {
+        out << "Frozen rule should already be subst-simplified: " << lhsRule
+            << "\n\n";
+        dump(out);
+      });
     }
     lhsRule.markSubstitutionSimplified();
   }
@@ -281,16 +283,14 @@ void RewriteSystem::processTypeDifference(const TypeDifference &difference,
 ///
 /// Otherwise returns an index which can be passed to
 /// RewriteSystem::getTypeDifference().
-Optional<unsigned>
-RewriteSystem::simplifySubstitutions(Term baseTerm, Symbol symbol,
-                                     const PropertyMap *map,
-                                     RewritePath *path) {
-  assert(symbol.hasSubstitutions());
+std::optional<unsigned> RewriteSystem::simplifySubstitutions(
+    Term baseTerm, Symbol symbol, const PropertyMap *map, RewritePath *path) {
+  ASSERT(symbol.hasSubstitutions());
 
   // Fast path if the type is fully concrete.
   auto substitutions = symbol.getSubstitutions();
   if (substitutions.empty())
-    return None;
+    return std::nullopt;
 
   // Save the original rewrite path length so that we can reset if if we don't
   // find anything to simplify.
@@ -349,22 +349,22 @@ RewriteSystem::simplifySubstitutions(Term baseTerm, Symbol symbol,
     if (path) {
       // The rewrite path should consist of a Decompose, followed by a number
       // of Shifts, followed by a Compose.
-  #ifndef NDEBUG
-      for (auto iter = path->begin() + oldSize; iter < path->end(); ++iter) {
-        assert(iter->Kind == RewriteStep::Shift ||
-               iter->Kind == RewriteStep::Decompose);
+      if (CONDITIONAL_ASSERT_enabled()) {
+        for (auto iter = path->begin() + oldSize; iter < path->end(); ++iter) {
+          ASSERT(iter->Kind == RewriteStep::Shift ||
+                 iter->Kind == RewriteStep::Decompose);
+        }
       }
-  #endif
 
       path->resize(oldSize);
     }
-    return None;
+    return std::nullopt;
   }
 
   auto difference = buildTypeDifference(baseTerm, symbol,
                                         sameTypes, concreteTypes,
                                         Context);
-  assert(difference.LHS != difference.RHS);
+  ASSERT(difference.LHS != difference.RHS);
 
   unsigned differenceID = recordTypeDifference(difference);
 
@@ -401,8 +401,8 @@ void RewriteSystem::simplifyLeftHandSideSubstitutions(const PropertyMap *map) {
       continue;
 
     auto difference = getTypeDifference(*differenceID);
-    assert(difference.LHS == symbol);
-    assert(difference.RHS != symbol);
+    ASSERT(difference.LHS == symbol);
+    ASSERT(difference.RHS != symbol);
 
     MutableTerm rhs(rule.getRHS());
     MutableTerm lhs(rhs);

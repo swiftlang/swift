@@ -67,9 +67,6 @@ do {
 
   // Invalid examples.
 
-  let _: Int!.Wrapped // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}
-  let _: (Int!).Wrapped // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}
-
   let _: Any.Undef // expected-error {{'Undef' is not a member type of type 'Any'}}
   let _: Int.Type.Undef // expected-error {{'Undef' is not a member type of type 'Swift.Int.Type'}}
   let _: P1.Protocol.Undef // expected-error {{'Undef' is not a member type of type '(any test.P1).Type'}}
@@ -83,4 +80,34 @@ do {
   let _: ().Undef // expected-error {{'Undef' is not a member type of type '()'}}
   let _: (Int, Int).Undef // expected-error {{'Undef' is not a member type of type '(Swift.Int, Swift.Int)'}}
   let _: ((Int) -> Void).Undef // expected-error {{'Undef' is not a member type of type '(Swift.Int) -> Swift.Void'}}
+}
+
+// Accept member type expressions rooted on 'Self' or non-identifier qualifiers
+// until Swift 6.
+do {
+  struct Test {
+    enum E {}
+
+    func blackHole<T>(_: T.Type) {}
+
+    func test() {
+      blackHole(Self.E)
+      // expected-warning@-1 {{expected member name or initializer call after type name; this will be an error in Swift 6}}
+      // expected-note@-2 {{use '.self' to reference the type object}}
+      blackHole((Test).E)
+      // expected-warning@-1 {{expected member name or initializer call after type name; this will be an error in Swift 6}}
+      // expected-note@-2 {{use '.self' to reference the type object}}
+      blackHole([Test].Element)
+      // expected-warning@-1 {{expected member name or initializer call after type name; this will be an error in Swift 6}}
+      // expected-note@-2 {{use '.self' to reference the type object}}
+      // expected-note@-3 {{add arguments after the type to construct a value of the type}}
+      blackHole([Int : Test].Element)
+      // expected-warning@-1 {{expected member name or initializer call after type name; this will be an error in Swift 6}}
+      // expected-note@-2 {{use '.self' to reference the type object}}
+      blackHole(Test?.Wrapped)
+      // expected-warning@-1 {{expected member name or initializer call after type name; this will be an error in Swift 6}}
+      // expected-note@-2 {{use '.self' to reference the type object}}
+      // expected-note@-3 {{add arguments after the type to construct a value of the type}}
+    }
+  }
 }

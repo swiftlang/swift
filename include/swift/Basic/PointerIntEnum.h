@@ -14,12 +14,12 @@
 #define SWIFT_BASIC_POINTERINTENUM_H
 
 #include "swift/Basic/LLVM.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/Support/PointerLikeTypeTraits.h"
 #include <cassert>
 #include <climits>
 #include <cstdlib>
 #include <cstring>
+#include <optional>
 #include <type_traits>
 #include <utility>
 
@@ -185,9 +185,9 @@ public:
 
   /// \returns the kind of the enum if the enum is valid. Returns None if the
   /// enum is invalid.
-  Optional<EnumTy> getKind() const {
+  std::optional<EnumTy> getKind() const {
     if (!isValid())
-      return None;
+      return std::nullopt;
 
     // Check if the bottom pointer bits are all not set. If that is true then we
     // know that we have a pointer kind.

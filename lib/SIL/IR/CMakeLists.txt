@@ -14,6 +14,7 @@ target_sources(swiftSIL PRIVATE
   SILDebugInfoExpression.cpp
   SILDebugScope.cpp
   SILDeclRef.cpp
+  SILDefaultOverrideTable.cpp
   SILDefaultWitnessTable.cpp
   SILDifferentiabilityWitness.cpp
   SILFunction.cpp
@@ -30,6 +31,7 @@ target_sources(swiftSIL PRIVATE
   SILSuccessor.cpp
   SILSymbolVisitor.cpp
   SILType.cpp
+  SILTypeSubstitution.cpp
   SILUndef.cpp
   SILVTable.cpp
   SILValue.cpp

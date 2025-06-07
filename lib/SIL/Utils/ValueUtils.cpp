@@ -11,16 +11,24 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/ValueUtils.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/SILFunction.h"
 
 using namespace swift;
 
-ValueOwnershipKind swift::mergeSILValueOwnership(ArrayRef<SILValue> values) {
-  auto range = makeTransformRange(values,
-                                  [](SILValue v) {
-                                    assert(v->getType().isObject());
-                                    return v->getOwnershipKind();
-                                  });
-  return ValueOwnershipKind::merge(range);
+ValueOwnershipKind swift::getSILValueOwnership(ArrayRef<SILValue> values,
+                                               SILType ty) {
+  auto range = makeTransformRange(values, [](SILValue v) {
+    assert(v->getType().isObject());
+    return v->getOwnershipKind();
+  });
+
+  auto mergedOwnership = ValueOwnershipKind::merge(range);
+
+  // If we have a move only type, return owned ownership.
+  if (ty && ty.isMoveOnly() && mergedOwnership == OwnershipKind::None) {
+    return OwnershipKind::Owned;
+  }
+  return mergedOwnership;
 }

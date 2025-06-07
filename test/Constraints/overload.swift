@@ -285,3 +285,67 @@ func rdar97396399() {
     }
   }
 }
+
+// https://github.com/apple/swift/issues/63834
+func f63834(int: Int, string: String) {} // expected-note 3{{found candidate with type '(Int, String) -> ()'}}
+func f63834(int: Int, string: Bool) {} // expected-note 3{{found candidate with type '(Int, Bool) -> ()'}}
+
+func f63834_1(int: Int, string: Bool) {} // expected-note{{candidate '(Int, Bool) -> ()' has 2 parameters, but context '(Int) -> Void' has 1}}
+func f63834_1(int: Int, string: String) {} // expected-note{{candidate '(Int, String) -> ()' has 2 parameters, but context '(Int) -> Void' has 1}}
+
+// FIXME: We can mention candidate type.
+func f63834_2(int: Int, string: Bool) {} // expected-note {{found this candidate}}
+func f63834_2(int: Int, string: String) {} // expected-note {{found this candidate}}
+
+// One function argument mismatch
+let _ = f63834(int:string:) as (Int, Int) -> Void // expected-error{{no exact matches in reference to global function 'f63834'}}
+// Contextual mismatch
+let _ = f63834(int:string:) as Int // expected-error{{no exact matches in reference to global function 'f63834'}}
+let _ = (f63834(int:string:)) as Int // expected-error{{no exact matches in reference to global function 'f63834'}}
+
+// Missing function argument
+let _ = f63834_1(int:string:) as (Int) -> Void // expected-error{{no exact matches in reference to global function 'f63834_1'}}
+// None of the function argument types matches
+let _ = f63834_2(int:string:) as (Double, Double) -> Void // expected-error{{no exact matches in reference to global function 'f63834_2'}}
+let _ = { i, j in } as (Int) -> Void // expected-error{{contextual closure type '(Int) -> Void' expects 1 argument, but 2 were used in closure body}}
+
+struct A63834 {
+  static func fn(int: Int, string: String) {} // expected-note{{candidate '(Int, String) -> ()' has 2 parameters, but context '(Int) -> Void' has 1}}
+  static func fn(int: Int, string: Bool) {}  // expected-note{{candidate '(Int, Bool) -> ()' has 2 parameters, but context '(Int) -> Void' has 1}}
+
+  static func fn1(int: Int, string: String) {} // expected-note{{found candidate with type '(Int, String) -> ()'}}
+  static func fn1(int: Int, string: Bool) {}  // expected-note{{found candidate with type '(Int, Bool) -> ()'}}
+}
+let _ = A63834.fn1(int:string:) as Int // expected-error {{no exact matches in reference to static method 'fn1'}}
+let _ = A63834.fn(int:string:) as (Int) -> Void // expected-error{{no exact matches in reference to static method 'fn'}}
+
+typealias Magic<T> = T
+func f63834_D(_ x: Int = 0) {}
+func f63834_D(_ x: String) {}
+
+(f63834_D as Magic)() // expected-error{{missing argument for parameter #1 in call}}
+
+func fn63834_3() -> String {} // expected-note {{found candidate with type 'String'}}
+func fn63834_3() -> Double {} // expected-note {{found candidate with type 'Double'}}
+
+fn63834_3() as Int // expected-error {{no exact matches in call to global function 'fn63834_3'}}
+
+// Make sure that Copyable and/or Escapable don't change overloading behavior
+do {
+  struct S {
+    var v: Int
+  }
+
+  func test(data: [S]) {
+    let transformed = data.flatMap { e in
+      if true {
+        return Array<S>()
+      }
+      return Array(arrayLiteral: e)
+    }
+
+    _ = transformed.map {
+      _ = $0.v // Ok
+    }
+  }
+}

@@ -20,7 +20,10 @@
 #include "swift/Demangling/Demangler.h"
 #include "swift/Runtime/AccessibleFunction.h"
 #include "swift/Runtime/Concurrent.h"
+#include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/Metadata.h"
+#include "swift/Threading/Once.h"
+#include "Tracing.h"
 
 #include <cstdint>
 #include <new>
@@ -97,6 +100,29 @@ static Lazy<AccessibleFunctionsState> Functions;
 
 } // end anonymous namespace
 
+LLVM_ATTRIBUTE_UNUSED
+static void _dumpAccessibleFunctionRecords(void *context) {
+  auto &S = Functions.get();
+
+  fprintf(stderr, "==== Accessible Function Records ====\n");
+  int count = 0;
+  for (const auto &section : S.SectionsToScan.snapshot()) {
+    for (auto &record : section) {
+      auto recordName =
+          swift::Demangle::makeSymbolicMangledNameStringRef(record.Name.get());
+      auto demangledRecordName =
+          swift::Demangle::demangleSymbolAsString(recordName);
+      fprintf(stderr, "Record name: %s\n", recordName.data());
+      fprintf(stderr, "    Demangled: %s\n", demangledRecordName.c_str());
+      fprintf(stderr, "    Function Ptr: %p\n", record.Function.get());
+      fprintf(stderr, "    Flags.IsDistributed: %d\n", record.Flags.isDistributed());
+      ++count;
+    }
+  }
+  fprintf(stderr, "Record count: %d\n", count);
+  fprintf(stderr, "==== End of Accessible Function Records ====\n");
+}
+
 static void _registerAccessibleFunctions(AccessibleFunctionsState &C,
                                          AccessibleFunctionsSection section) {
   C.SectionsToScan.push_back(section);
@@ -120,12 +146,15 @@ void swift::addImageAccessibleFunctionsBlockCallback(
 
 static const AccessibleFunctionRecord *
 _searchForFunctionRecord(AccessibleFunctionsState &S, llvm::StringRef name) {
+  auto traceState = runtime::trace::accessible_function_scan_begin(name);
+
   for (const auto &section : S.SectionsToScan.snapshot()) {
     for (auto &record : section) {
       auto recordName =
           swift::Demangle::makeSymbolicMangledNameStringRef(record.Name.get());
-      if (recordName == name)
-        return &record;
+      if (recordName == name) {
+        return traceState.end(&record);
+      }
     }
   }
   return nullptr;
@@ -136,14 +165,19 @@ const AccessibleFunctionRecord *
 swift::runtime::swift_findAccessibleFunction(const char *targetNameStart,
                                              size_t targetNameLength) {
   auto &S = Functions.get();
-
   llvm::StringRef name{targetNameStart, targetNameLength};
+
+  if (swift::runtime::environment::SWIFT_DUMP_ACCESSIBLE_FUNCTIONS()) {
+    static swift::once_t dumpAccessibleFunctionsToken;
+    swift::once(dumpAccessibleFunctionsToken, _dumpAccessibleFunctionRecords, nullptr);
+  }
 
   // Look for an existing entry.
   {
     auto snapshot = S.Cache.snapshot();
-    if (auto E = snapshot.find(name))
+    if (auto E = snapshot.find(name)) {
       return E->getRecord();
+    }
   }
 
   // If entry doesn't exist (either record doesn't exist, hasn't been loaded, or

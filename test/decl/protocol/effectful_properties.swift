@@ -1,25 +1,25 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple
 
 /////
 // This test is focused on checking protocol conformance and constraint checking
 
 protocol None {
   associatedtype V
-  // expected-note@+2 {{protocol requires property 'someProp' with type 'CA_N.V' (aka 'Int'); do you want to add a stub?}}
-  // expected-note@+1 2 {{protocol requires property 'someProp' with type 'Self.V'; do you want to add a stub?}}
+  // expected-note@+2 {{protocol requires property 'someProp' with type 'CA_N.V' (aka 'Int')}}
+  // expected-note@+1 2 {{protocol requires property 'someProp' with type 'Self.V'}}
   var someProp : V { get }
 }
 
 protocol T {
   associatedtype V
-  // expected-note@+2 {{protocol requires property 'someProp' with type 'CAT_T.V' (aka 'Int'); do you want to add a stub?}}
-  // expected-note@+1 {{protocol requires property 'someProp' with type 'Self.V'; do you want to add a stub?}}
+  // expected-note@+2 {{protocol requires property 'someProp' with type 'CAT_T.V' (aka 'Int')}}
+  // expected-note@+1 {{protocol requires property 'someProp' with type 'Self.V'}}
   var someProp : V { get throws }
 }
 
 protocol A {
   associatedtype V
-  // expected-note@+1 2 {{protocol requires property 'someProp' with type 'Self.V'; do you want to add a stub?}}
+  // expected-note@+1 2 {{protocol requires property 'someProp' with type 'Self.V'}}
   var someProp : V { get async }
 }
 
@@ -51,21 +51,25 @@ class CN_AT : AT   { typealias V = Int; var someProp : Int { _read {yield 0} } }
 
 // Remaining conformances test the limit check for kinds of effects allowed
 
+// expected-note@+3 {{add stubs for conformance}}
 // expected-note@+2 3 {{candidate throws, but protocol does not allow it}}
 // expected-error@+1 {{type 'CT_N' does not conform to protocol 'None'}}
 class CT_N : None { typealias V = Int; var someProp : Int { get throws {0} } }
 class CT_T : T    { typealias V = Int; var someProp : Int { get throws {0} } }
 
+// expected-note@+3 {{add stubs for conformance}}
 // expected-note@+2 {{candidate throws, but protocol does not allow it}}
 // expected-error@+1{{type 'CT_A' does not conform to protocol 'A'}}
 class CT_A : A    { typealias V = Int; var someProp : Int { get throws {0} } }
 class CT_AT : AT   { typealias V = Int; var someProp : Int { get throws {0} } }
 // ------ ------ ------ ------ ------ ------ ------ ------ ------ ------
 
+// expected-note@+3 {{add stubs for conformance}} 
 // expected-note@+2 3 {{candidate is 'async', but protocol requirement is not}}
 // expected-error@+1 {{type 'CA_N' does not conform to protocol 'None'}}
 struct CA_N : None { typealias V = Int; var someProp : Int { get async {0} } }
 
+// expected-note@+3 {{add stubs for conformance}}
 // expected-note@+2 {{candidate is 'async', but protocol requirement is not}}
 // expected-error@+1 {{type 'CA_T' does not conform to protocol 'T'}}
 class CA_T : T    { typealias V = Int; var someProp : Int { get async {0} } }
@@ -76,18 +80,21 @@ enum CA_AT : AT   { typealias V = Int; var someProp : Int { get async {0} } }
 
 // I put these on separate lines to ensure diagnostics point to the right thing.
 
+// expected-note@+2 {{add stubs for conformance}}
 // expected-error@+1 {{type 'CAT_N' does not conform to protocol 'None'}}
 class CAT_N : None { typealias V = Int;
   // expected-note@+2 {{candidate throws, but protocol does not allow it}}
   // expected-note@+1 2 {{candidate is 'async', but protocol requirement is not}}
   var someProp : Int { get async throws {0} }
 }
+// expected-note@+2 {{add stubs for conformance}}
 // expected-error@+1 {{type 'CAT_T' does not conform to protocol 'T'}}
 enum CAT_T : T    { typealias V = Int;
   // expected-note@+2 {{candidate throws, but protocol does not allow it}}
   // expected-note@+1 2 {{candidate is 'async', but protocol requirement is not}}
   var someProp : Int { get async throws {0} }
 }
+// expected-note@+2 {{add stubs for conformance}}
 // expected-error@+1 {{type 'CAT_A' does not conform to protocol 'A'}}
 class CAT_A : A    { typealias V = Int;
   // expected-note@+1 {{candidate throws, but protocol does not allow it}}
@@ -162,29 +169,29 @@ protocol AsyncThrowsSub {
 
 struct SN_N : NoneSub
   { subscript(_ i : Int) -> Bool { get { true } }}
-class SA_N : NoneSub // expected-error{{type 'SA_N' does not conform to protocol 'NoneSub'}}
+class SA_N : NoneSub // expected-error{{type 'SA_N' does not conform to protocol 'NoneSub'}} expected-note {{add stubs for conformance}}
   { subscript(_ i : Int) -> Bool { get async { true } }} // expected-note{{candidate is 'async', but protocol requirement is not}}
-class ST_N : NoneSub // expected-error{{type 'ST_N' does not conform to protocol 'NoneSub'}}
+class ST_N : NoneSub // expected-error{{type 'ST_N' does not conform to protocol 'NoneSub'}} expected-note {{add stubs for conformance}}
   { subscript(_ i : Int) -> Bool { get throws { true } }} // expected-note{{candidate throws, but protocol does not allow it}}
-class SAT_N : NoneSub // expected-error{{type 'SAT_N' does not conform to protocol 'NoneSub'}}
+class SAT_N : NoneSub // expected-error{{type 'SAT_N' does not conform to protocol 'NoneSub'}} expected-note {{add stubs for conformance}}
   { subscript(_ i : Int) -> Bool { get async throws { true } }} // expected-note{{candidate is 'async', but protocol requirement is not}}
 
 class SN_A : AsyncSub
   { subscript(_ i : Int) -> Bool { get { true } }}
 struct SA_A : AsyncSub
   { subscript(_ i : Int) -> Bool { get async { true } }}
-enum ST_A : AsyncSub // expected-error{{type 'ST_A' does not conform to protocol 'AsyncSub'}}
+enum ST_A : AsyncSub // expected-error{{type 'ST_A' does not conform to protocol 'AsyncSub'}} expected-note {{add stubs for conformance}}
   { subscript(_ i : Int) -> Bool { get throws { true } }} // expected-note{{candidate throws, but protocol does not allow it}}
-class SAT_A : AsyncSub // expected-error{{type 'SAT_A' does not conform to protocol 'AsyncSub'}}
+class SAT_A : AsyncSub // expected-error{{type 'SAT_A' does not conform to protocol 'AsyncSub'}} expected-note {{add stubs for conformance}}
   { subscript(_ i : Int) -> Bool { get async throws { true } }} // expected-note{{candidate throws, but protocol does not allow it}}
 
 class SN_T : ThrowsSub
   { subscript(_ i : Int) -> Bool { get { true } }}
-class SA_T : ThrowsSub // expected-error{{type 'SA_T' does not conform to protocol 'ThrowsSub'}}
+class SA_T : ThrowsSub // expected-error{{type 'SA_T' does not conform to protocol 'ThrowsSub'}} expected-note {{add stubs for conformance}}
   { subscript(_ i : Int) -> Bool { get async { true } }} // expected-note{{candidate is 'async', but protocol requirement is not}}
 struct ST_T : ThrowsSub
   { subscript(_ i : Int) -> Bool { get throws { true } }}
-struct SAT_T : ThrowsSub // expected-error{{type 'SAT_T' does not conform to protocol 'ThrowsSub'}}
+struct SAT_T : ThrowsSub // expected-error{{type 'SAT_T' does not conform to protocol 'ThrowsSub'}} expected-note {{add stubs for conformance}}
   { subscript(_ i : Int) -> Bool { get async throws { true } }} // expected-note{{candidate is 'async', but protocol requirement is not}}
 
 class SN_AT : AsyncThrowsSub
@@ -239,17 +246,17 @@ func composed4<U : T & None >(u : U) {
 // redefining the protocols to make sure the fix-its are matched
 
 protocol NoEffects {
-// expected-note@+1 2 {{protocol requires property 'someProp' with type 'Int'; do you want to add a stub?}}
+// expected-note@+1 2 {{protocol requires property 'someProp' with type 'Int'}}
   var someProp : Int { get }
 }
 
 protocol Throws {
-  // expected-note@+1 2 {{protocol requires property 'someProp' with type 'Int'; do you want to add a stub?}}
+  // expected-note@+1 2 {{protocol requires property 'someProp' with type 'Int'}}
   var someProp : Int { get throws }
 }
 
 protocol Async {
-  // expected-note@+1 3 {{protocol requires property 'someProp' with type 'Int'; do you want to add a stub?}}
+  // expected-note@+1 3 {{protocol requires property 'someProp' with type 'Int'}}
   var someProp : Int { get async }
 }
 
@@ -266,9 +273,11 @@ extension CN_AT : AsyncByInheritance, ThrowsByInheritance, AsyncThrowsByInherita
 
 extension CT_N : Throws {}
 
+// expected-note@+2 {{add stubs for conformance}}
 // expected-error@+1 {{type 'CT_N' does not conform to protocol 'NoEffects'}}
 extension CT_N : ThrowsByInheritance {}
 
+// expected-note@+2 {{add stubs for conformance}}
 // expected-error@+1 {{type 'CT_N' does not conform to protocol 'Async'}}
 extension CT_N : AsyncByInheritance {}
 
@@ -276,20 +285,25 @@ extension CT_N : AsyncByInheritance {}
 
 extension CA_N : Async {}
 
+// expected-note@+2 {{add stubs for conformance}}
 // expected-error@+1 {{type 'CA_N' does not conform to protocol 'NoEffects'}}
 extension CA_N : AsyncByInheritance {}
 
+// expected-note@+2 {{add stubs for conformance}}
 // expected-error@+1 {{type 'CA_N' does not conform to protocol 'Throws'}}
 extension CA_N : ThrowsByInheritance {}
 
 // ----- -----
 
+// expected-note@+2 {{add stubs for conformance}}
 // expected-error@+1 {{type 'CAT_N' does not conform to protocol 'Async'}}
 extension CAT_N : Async {}
 
+// expected-note@+2 {{add stubs for conformance}}
 // expected-error@+1 {{type 'CAT_N' does not conform to protocol 'Throws'}}
 extension CAT_N : Throws {}
 
+// expected-note@+3 {{add stubs for conformance}}
 // expected-error@+2 {{type 'CAT_T' does not conform to protocol 'Async'}}
 // expected-error@+1 {{type 'CAT_T' does not conform to protocol 'Throws'}}
 extension CAT_T : AsyncThrowsByInheritance {}

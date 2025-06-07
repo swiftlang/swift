@@ -40,10 +40,10 @@ extension TheReplaceables {
 }
 
 extension K {
-  @_dynamicReplacement(for: init(i:)) // expected-error{{replaced constructor 'init(i:)' is not marked as convenience}}
+  @_dynamicReplacement(for: init(i:)) // expected-error{{replaced initializer 'init(i:)' is not marked as convenience}}
   convenience init(ri: Int) { }
 
-  @_dynamicReplacement(for: init(c:)) // expected-error{{replaced constructor 'init(c:)' is marked as convenience}})
+  @_dynamicReplacement(for: init(c:)) // expected-error{{replaced initializer 'init(c:)' is marked as convenience}})
   init(rc: Int) { }
 
   @_dynamicReplacement(for:finalFunction())
@@ -73,5 +73,25 @@ extension P {
 
   @_dynamicReplacement(for: f())
   func replacement_f() {
+  }
+}
+
+struct ImplicitModifier {
+  var i: Int {
+    get { 1 }
+    set {}
+  }
+}
+
+extension ImplicitModifier {
+  @_dynamicReplacement(for: i) // expected-error{{replaced 'modify' accessor for 'i' is not explicitly defined}}
+  var _i: Int {
+    get {
+      0
+    }
+    _modify {
+      var i: Int = 0
+      yield &i
+    }
   }
 }

@@ -25,10 +25,12 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -51,49 +53,6 @@ namespace {
     using ResultsVector = SmallVector<LookupResultEntry, 4>;
     
   private:
-    /// Finds lookup results based on the types that self conforms to.
-    /// For instance, self always conforms to a struct, enum or class.
-    /// But in addition, self could conform to any number of protocols.
-    /// For example, when there's a protocol extension, e.g. extension P where
-    /// self: P2, self also conforms to P2 so P2 must be searched.
-    class ResultFinderForTypeContext {
-      UnqualifiedLookupFactory *const factory;
-      /// Nontypes are formally members of the base type, i.e. the dynamic type
-      /// of the activation record.
-      const DeclContext *const dynamicContext;
-      /// Types are formally members of the metatype, i.e. the static type of the
-      /// activation record.
-      const DeclContext *const staticContext;
-      using SelfBounds = SmallVector<NominalTypeDecl *, 2>;
-      SelfBounds selfBounds;
-      
-    public:
-      /// \p staticContext is also the context from which to derive the self types
-      ResultFinderForTypeContext(UnqualifiedLookupFactory *factory,
-                                 const DeclContext *dynamicContext,
-                                 const DeclContext *staticContext);
-
-      SWIFT_DEBUG_DUMP;
-      
-    private:
-      SelfBounds findSelfBounds(const DeclContext *dc);
-      ValueDecl *lookupBaseDecl(const DeclContext *baseDC) const;
-      ValueDecl *getBaseDeclForResult(const DeclContext *baseDC) const;
-
-      // Classify this declaration.
-      // Types are formally members of the metatype.
-      const DeclContext *
-      whereValueIsMember(const ValueDecl *const member) const {
-        return isa<TypeDecl>(member) ? staticContext : dynamicContext;
-      }
-
-    public:
-      /// Do the lookups and add matches to results.
-      void findResults(const DeclNameRef &Name, NLOptions baseNLOptions,
-                       const DeclContext *contextForLookup,
-                       SmallVectorImpl<LookupResultEntry> &results) const;
-    };
-    
     // Inputs
     const DeclNameRef Name;
     DeclContext *const DC;
@@ -106,6 +65,7 @@ namespace {
     
     const Options options;
     const bool isOriginallyTypeLookup;
+    const bool isOriginallyMacroLookup;
     const NLOptions baseNLOptions;
 
     // Outputs
@@ -151,6 +111,10 @@ namespace {
 
 #pragma mark context-based lookup declarations
 
+    ValueDecl *lookupBaseDecl(const DeclContext *baseDC) const;
+
+    ValueDecl *getBaseDeclForResult(const DeclContext *baseDC) const;
+
     /// For diagnostic purposes, move aside the unavailables, and put
     /// them back as a last-ditch effort.
     /// Could be cleaner someday with a richer interface to UnqualifiedLookup.
@@ -167,11 +131,13 @@ namespace {
 #pragma mark common helper declarations
     static NLOptions
     computeBaseNLOptions(const UnqualifiedLookupOptions options,
-                         const bool isOriginallyTypeLookup);
+                         const bool isOriginallyTypeLookup,
+                         const bool isOriginallyMacroLookup);
 
     void findResultsAndSaveUnavailables(
-        const DeclContext *lookupContextForThisContext,
-        ResultFinderForTypeContext &&resultFinderForTypeContext,
+        const DeclContext *dynamicContext,
+        const DeclContext *staticContext,
+        SmallVector<NominalTypeDecl *, 2> selfBounds,
         NLOptions baseNLOptions);
 
   public:
@@ -260,7 +226,10 @@ UnqualifiedLookupFactory::UnqualifiedLookupFactory(
   DebugClient(M.getDebugClient()),
   options(options),
   isOriginallyTypeLookup(options.contains(Flags::TypeLookup)),
-  baseNLOptions(computeBaseNLOptions(options, isOriginallyTypeLookup)),
+  isOriginallyMacroLookup(options.contains(Flags::MacroLookup)),
+  baseNLOptions(
+      computeBaseNLOptions(
+        options, isOriginallyTypeLookup, isOriginallyMacroLookup)),
   Results(Results),
   IndexOfFirstOuterResult(IndexOfFirstOuterResult)
 {}
@@ -272,9 +241,12 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
   auto localCounter = lookupCounter;
   (void)localCounter; // for debugging
 #endif
-  FrontendStatsTracer StatsTracer(Ctx.Stats,
-                                  "performUnqualifiedLookup",
-                                  DC->getParentSourceFile());
+
+  if (options.contains(UnqualifiedLookupFlags::ModuleLookup)) {
+    lookForAModuleWithTheGivenName(DC->getModuleScopeContext());
+    recordCompletionOfAScope();
+    return;
+  }
 
   if (Loc.isValid() && DC->getParentSourceFile()) {
     // Operator lookup is always global, for the time being.
@@ -294,7 +266,8 @@ void UnqualifiedLookupFactory::performUnqualifiedLookup() {
   if (!isFirstResultEnough()) {
     // If no result has been found yet, the dependency must be on a top-level
     // name, since up to now, the search has been for non-top-level names.
-    auto *moduleScopeContext = DC->getModuleScopeContext();
+    auto *moduleScopeContext = getModuleScopeLookupContext(DC);
+
     lookUpTopLevelNamesInModuleScopeContext(moduleScopeContext);
   }
 }
@@ -324,29 +297,8 @@ void UnqualifiedLookupFactory::lookUpTopLevelNamesInModuleScopeContext(
 
 #pragma mark context-based lookup definitions
 
-void UnqualifiedLookupFactory::ResultFinderForTypeContext::findResults(
-    const DeclNameRef &Name, NLOptions baseNLOptions,
-    const DeclContext *contextForLookup,
-    SmallVectorImpl<LookupResultEntry> &results) const {
-  // An optimization:
-  if (selfBounds.empty())
-    return;
-
-  SmallVector<ValueDecl *, 4> Lookup;
-  contextForLookup->lookupQualified(selfBounds, Name, baseNLOptions, Lookup);
-  for (auto Result : Lookup) {
-    auto baseDC = const_cast<DeclContext *>(whereValueIsMember(Result));
-    auto baseDecl = getBaseDeclForResult(baseDC);
-    results.emplace_back(baseDC, baseDecl, Result);
-#ifndef NDEBUG
-    factory->addedResult(results.back());
-#endif
-  }
-}
-
 ValueDecl *
-UnqualifiedLookupFactory::ResultFinderForTypeContext::getBaseDeclForResult(
-    const DeclContext *baseDC) const {
+UnqualifiedLookupFactory::getBaseDeclForResult(const DeclContext *baseDC) const {
   if (baseDC == nullptr) {
     return nullptr;
   }
@@ -381,8 +333,7 @@ UnqualifiedLookupFactory::ResultFinderForTypeContext::getBaseDeclForResult(
 /// unwrapping condition (e.g. `guard let self else { return }`).
 /// If this is true, then we know any implicit self reference in the
 /// following scope is guaranteed to be non-optional.
-bool implicitSelfReferenceIsUnwrapped(const ValueDecl *selfDecl,
-                                      const AbstractClosureExpr *inClosure) {
+static bool implicitSelfReferenceIsUnwrapped(const ValueDecl *selfDecl) {
   ASTContext &Ctx = selfDecl->getASTContext();
 
   // Check if the implicit self decl refers to a var in a conditional stmt
@@ -397,35 +348,23 @@ bool implicitSelfReferenceIsUnwrapped(const ValueDecl *selfDecl,
     return false;
   }
 
-  // Find the condition that defined the self decl,
-  // and check that both its LHS and RHS are 'self'
-  for (auto cond : conditionalStmt->getCond()) {
-    if (auto pattern = cond.getPattern()) {
-      if (pattern->getBoundName() != Ctx.Id_self) {
-        continue;
-      }
-    }
-
-    if (auto selfDRE = dyn_cast<DeclRefExpr>(cond.getInitializer())) {
-      return (selfDRE->getDecl()->getName().isSimpleName(Ctx.Id_self));
-    }
-  }
-
-  return false;
+  return conditionalStmt->rebindsSelf(Ctx);
 }
 
-ValueDecl *UnqualifiedLookupFactory::ResultFinderForTypeContext::lookupBaseDecl(
-    const DeclContext *baseDC) const {
+ValueDecl *UnqualifiedLookupFactory::lookupBaseDecl(const DeclContext *baseDC) const {
+  // If the member was not in local context, we're not going to need the
+  // 'self' declaration, so skip all this work to avoid request cycles.
+  if (!baseDC->isLocalContext())
+    return nullptr;
+
+  // If we're only interested in type declarations, we can also skip everything.
+  if (isOriginallyTypeLookup)
+    return nullptr;
+
   // Perform an unqualified lookup for the base decl of this result. This
   // handles cases where self was rebound (e.g. `guard let self = self`)
-  // earlier in the scope.
-  //
-  // Only do this in closures that capture self weakly, since implicit self
-  // isn't allowed to be rebound in other contexts. In other contexts, implicit
-  // self _always_ refers to the context's self `ParamDecl`, even if there
-  // is another local decl with the name `self` that would be found by
-  // `lookupSingleLocalDecl`.
-  auto closureExpr = dyn_cast<ClosureExpr>(factory->DC);
+  // earlier in this closure or some outer closure.
+  auto closureExpr = DC->getInnermostClosureForCaptures();
   if (!closureExpr) {
     return nullptr;
   }
@@ -437,20 +376,20 @@ ValueDecl *UnqualifiedLookupFactory::ResultFinderForTypeContext::lookupBaseDecl(
     }
   }
 
-  if (!capturesSelfWeakly) {
+  // Previously we didn't perform the lookup of 'self' for anything outside
+  // of a '[weak self]' closure, maintain that behavior until Swift 6 mode.
+  if (!Ctx.LangOpts.isSwiftVersionAtLeast(6) && !capturesSelfWeakly)
     return nullptr;
-  }
 
-  auto selfDecl = ASTScope::lookupSingleLocalDecl(
-      factory->DC->getParentSourceFile(), DeclName(factory->Ctx.Id_self),
-      factory->Loc);
-
+  auto selfDecl = ASTScope::lookupSingleLocalDecl(DC->getParentSourceFile(),
+                                                  DeclName(Ctx.Id_self), Loc);
   if (!selfDecl) {
     return nullptr;
   }
 
   // In Swift 5 mode, implicit self is allowed within non-escaping
-  // closures even before self is unwrapped. For example, this is allowed:
+  // `weak self` closures even before self is unwrapped.
+  // For example, this is allowed:
   //
   //   doVoidStuffNonEscaping { [weak self] in
   //     method() // implicitly `self.method()`
@@ -458,7 +397,7 @@ ValueDecl *UnqualifiedLookupFactory::ResultFinderForTypeContext::lookupBaseDecl(
   //
   // To support this, we have to preserve the lookup behavior from
   // Swift 5.7 and earlier where implicit self defaults to the closure's
-  // `ParamDecl`. This causes the closure to capture self strongly, however,
+  // `ParamDecl`. This causes the closure to capture self strongly,
   // which is not acceptable for escaping closures.
   //
   // Escaping closures, however, only need to permit implicit self once
@@ -472,8 +411,29 @@ ValueDecl *UnqualifiedLookupFactory::ResultFinderForTypeContext::lookupBaseDecl(
   // In these cases, using the Swift 6 lookup behavior doesn't affect
   // how the body is type-checked, so it can be used in Swift 5 mode
   // without breaking source compatibility for non-escaping closures.
-  if (!factory->Ctx.LangOpts.isSwiftVersionAtLeast(6) &&
-      !implicitSelfReferenceIsUnwrapped(selfDecl, closureExpr)) {
+  if (!Ctx.LangOpts.isSwiftVersionAtLeast(6) &&
+      !implicitSelfReferenceIsUnwrapped(selfDecl)) {
+    return nullptr;
+  }
+
+  // Closures are only allowed to rebind self in specific circumstances:
+  //  1. In a capture list with an explicit capture.
+  //  2. In a `guard let self = self` / `if let self = self` condition
+  //     in a closure that captures self weakly.
+  //
+  // These rebindings can be done by any parent closure, and apply
+  // to all nested closures. We only need to check these structural
+  // requirements loosely here -- more extensive validation happens
+  // later in MiscDiagnostics::diagnoseImplicitSelfUseInClosure.
+  //
+  // Other types of rebindings, like an arbitrary "let `self` = foo",
+  // are never allowed to rebind self.
+  auto selfVD = dyn_cast<VarDecl>(selfDecl);
+  if (!selfVD) {
+    return nullptr;
+  }
+
+  if (!(selfVD->isCaptureList() || selfVD->getParentPatternStmt())) {
     return nullptr;
   }
 
@@ -493,9 +453,7 @@ void UnqualifiedLookupFactory::setAsideUnavailableResults(
   // Predicate that determines whether a lookup result should
   // be unavailable except as a last-ditch effort.
   auto unavailableLookupResult = [&](const LookupResultEntry &result) {
-    auto &effectiveVersion = Ctx.LangOpts.EffectiveLanguageVersion;
-    return result.getValueDecl()->getAttrs().isUnavailableInSwiftVersion(
-        effectiveVersion);
+    return result.getValueDecl()->isUnavailableInCurrentSwiftVersion();
   };
 
   // If all of the results we found are unavailable, keep looking.
@@ -516,12 +474,30 @@ void UnqualifiedLookupFactory::addImportedResults(const DeclContext *const dc) {
   using namespace namelookup;
   SmallVector<ValueDecl *, 8> CurModuleResults;
   auto resolutionKind = isOriginallyTypeLookup ? ResolutionKind::TypesOnly
-                                               : ResolutionKind::Overloadable;
+                      : isOriginallyMacroLookup ? ResolutionKind::MacrosOnly
+                      : ResolutionKind::Overloadable;
   auto nlOptions = NL_UnqualifiedDefault;
   if (options.contains(Flags::IncludeUsableFromInline))
     nlOptions |= NL_IncludeUsableFromInline;
+  if (options.contains(Flags::ExcludeMacroExpansions))
+    nlOptions |= NL_ExcludeMacroExpansions;
+  if (options.contains(Flags::ABIProviding))
+    nlOptions |= NL_ABIProviding;
   lookupInModule(dc, Name.getFullName(), CurModuleResults,
-                 NLKind::UnqualifiedLookup, resolutionKind, dc, nlOptions);
+                 NLKind::UnqualifiedLookup, resolutionKind, dc,
+                 Loc, nlOptions);
+
+  if (dc->isInSwiftinterface() &&
+      !dc->getASTContext().LangOpts.FormalCxxInteropMode) {
+    // It's possible that the textual interface was originally compiled without
+    // C++ interop enabled, but is now being imported in another compilation
+    // instance with C++ interop enabled. In that case, we filter out any decls
+    // that only exist due to C++ interop, e.g., namespace.
+    CurModuleResults.erase(std::remove_if(CurModuleResults.begin(),
+                                          CurModuleResults.end(),
+                                          importer::declIsCxxOnly),
+                           CurModuleResults.end());
+  }
 
   // Always perform name shadowing for type lookup.
   if (options.contains(Flags::TypeLookup)) {
@@ -596,25 +572,45 @@ void UnqualifiedLookupFactory::lookForAModuleWithTheGivenName(
 #pragma mark common helper definitions
 
 void UnqualifiedLookupFactory::findResultsAndSaveUnavailables(
-    const DeclContext *lookupContextForThisContext,
-    ResultFinderForTypeContext &&resultFinderForTypeContext,
+    const DeclContext *dynamicContext,
+    const DeclContext *staticContext,
+    SmallVector<NominalTypeDecl *, 2> selfBounds,
     NLOptions baseNLOptions) {
+  if (selfBounds.empty())
+    return;
+
   auto firstPossiblyUnavailableResult = Results.size();
-  resultFinderForTypeContext.findResults(Name, baseNLOptions,
-                                         lookupContextForThisContext, Results);
+  SmallVector<ValueDecl *, 4> Lookup;
+  staticContext->lookupQualified(selfBounds, Name, Loc, baseNLOptions, Lookup);
+  for (auto Result : Lookup) {
+    auto baseDC = isa<TypeDecl>(Result) ? staticContext : dynamicContext;
+    auto baseDecl = getBaseDeclForResult(baseDC);
+    Results.emplace_back(const_cast<DeclContext *>(baseDC), baseDecl, Result);
+#ifndef NDEBUG
+    addedResult(Results.back());
+#endif
+  }
+
   setAsideUnavailableResults(firstPossiblyUnavailableResult);
 }
 
 NLOptions UnqualifiedLookupFactory::computeBaseNLOptions(
     const UnqualifiedLookupOptions options,
-    const bool isOriginallyTypeLookup) {
+    const bool isOriginallyTypeLookup,
+    const bool isOriginallyMacroLookup) {
   NLOptions baseNLOptions = NL_UnqualifiedDefault;
   if (options.contains(Flags::AllowProtocolMembers))
     baseNLOptions |= NL_ProtocolMembers;
   if (isOriginallyTypeLookup)
     baseNLOptions |= NL_OnlyTypes;
+  if (isOriginallyMacroLookup)
+    baseNLOptions |= NL_OnlyMacros;
   if (options.contains(Flags::IgnoreAccessControl))
     baseNLOptions |= NL_IgnoreAccessControl;
+  if (options.contains(Flags::IgnoreMissingImports))
+    baseNLOptions |= NL_IgnoreMissingImports;
+  if (options.contains(Flags::ABIProviding))
+    baseNLOptions |= NL_ABIProviding;
   return baseNLOptions;
 }
 
@@ -630,34 +626,6 @@ void UnqualifiedLookupFactory::recordCompletionOfAScope() {
   // OK to call (NOOP) if there are more inner results and Results is empty
   if (IndexOfFirstOuterResult == 0)
     IndexOfFirstOuterResult = Results.size();
-}
-
-UnqualifiedLookupFactory::ResultFinderForTypeContext::
-    ResultFinderForTypeContext(UnqualifiedLookupFactory *factory,
-                               const DeclContext *dynamicContext,
-                               const DeclContext *staticContext)
-    : factory(factory), dynamicContext(dynamicContext),
-      staticContext(staticContext), selfBounds(findSelfBounds(staticContext)) {}
-
-UnqualifiedLookupFactory::ResultFinderForTypeContext::SelfBounds
-UnqualifiedLookupFactory::ResultFinderForTypeContext::findSelfBounds(
-    const DeclContext *dc) {
-  auto nominal = dc->getSelfNominalTypeDecl();
-  if (!nominal)
-    return {};
-
-  SelfBounds selfBounds;
-  selfBounds.push_back(nominal);
-
-  // For a protocol extension, check whether there are additional "Self"
-  // constraints that can affect name lookup.
-  if (dc->getExtendedProtocolDecl()) {
-    auto ext = cast<ExtensionDecl>(dc);
-    auto bounds = getSelfBoundsFromWhereClause(ext);
-    for (auto bound : bounds.decls)
-      selfBounds.push_back(bound);
-  }
-  return selfBounds;
 }
 
 #pragma mark ASTScopeImpl support
@@ -749,9 +717,12 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::consume(
         continue;
     }
 
+    if (!ABIRoleInfo(value).matchesOptions(factory.options))
+      continue;
+
     factory.Results.push_back(LookupResultEntry(value));
 #ifndef NDEBUG
-    factory.stopForDebuggingIfAddingTargetLookupResult(factory.Results.back());
+    factory.addedResult(factory.Results.back());
 #endif
   }
   factory.recordCompletionOfAScope();
@@ -764,10 +735,14 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::consumePossiblyNotInScope(
     return false;
 
   for (auto *var : vars) {
-    if (!factory.Name.getFullName().isSimpleName(var->getName()))
+    if (!factory.Name.getFullName().isSimpleName(var->getName())
+        || !ABIRoleInfo(var).matchesOptions(factory.options))
       continue;
 
     factory.Results.push_back(LookupResultEntry(var));
+#ifndef NDEBUG
+    factory.addedResult(factory.Results.back());
+#endif
   }
 
   return false;
@@ -783,16 +758,32 @@ bool ASTScopeDeclGatherer::consume(ArrayRef<ValueDecl *> valuesArg,
 // TODO: in future, migrate this functionality into ASTScopes
 bool ASTScopeDeclConsumerForUnqualifiedLookup::lookInMembers(
     const DeclContext *scopeDC) const {
+  auto nominal = scopeDC->getSelfNominalTypeDecl();
+  if (!nominal)
+    return false;
+
+  SmallVector<NominalTypeDecl *, 2> selfBounds;
+  selfBounds.push_back(nominal);
+
+  // For a protocol extension, check whether there are additional "Self"
+  // constraints that can affect name lookup.
+  if (!factory.options.contains(UnqualifiedLookupFlags::DisregardSelfBounds)) {
+    if (scopeDC->getExtendedProtocolDecl()) {
+      auto ext = cast<ExtensionDecl>(scopeDC);
+      auto bounds = getSelfBoundsFromWhereClause(ext);
+      for (auto bound : bounds.decls)
+        selfBounds.push_back(bound);
+    }
+  }
+
   // We're looking for members of a type.
   //
   // If we started the looking from inside a scope where a 'self' parameter
   // is visible, instance members are returned with the 'self' parameter's
   // DeclContext as the base, which is how the expression checker knows to
   // convert the unqualified reference into a self member access.
-  auto resultFinder = UnqualifiedLookupFactory::ResultFinderForTypeContext(
-      &factory, candidateSelfDC ? candidateSelfDC : scopeDC, scopeDC);
-  factory.findResultsAndSaveUnavailables(scopeDC, std::move(resultFinder),
-                                         factory.baseNLOptions);
+  factory.findResultsAndSaveUnavailables(candidateSelfDC ? candidateSelfDC : scopeDC,
+                                         scopeDC, selfBounds, factory.baseNLOptions);
   factory.recordCompletionOfAScope();
 
   // We're done looking inside a nominal type declaration. It is possible
@@ -817,18 +808,6 @@ UnqualifiedLookupRequest::evaluate(Evaluator &evaluator,
 }
 
 #pragma mark debugging
-
-void UnqualifiedLookupFactory::ResultFinderForTypeContext::dump() const {
-  (void)factory;
-  llvm::errs() << "dynamicContext: ";
-  dynamicContext->dumpContext();
-  llvm::errs() << "staticContext: ";
-  staticContext->dumpContext();
-  llvm::errs() << "selfBounds: ";
-  for (const auto *D : selfBounds)
-    D->dump(llvm::errs(), 1);
-  llvm::errs() << "\n";
-}
 
 void UnqualifiedLookupFactory::dump() const { print(llvm::errs()); }
 void UnqualifiedLookupFactory::dumpScopes() const { printScopes(llvm::errs()); }
@@ -916,14 +895,19 @@ class ASTScopeDeclConsumerForLocalLookup
     : public AbstractASTScopeDeclConsumer {
   DeclName name;
   bool stopAfterInnermostBraceStmt;
+  ABIRole roleFilter;
   SmallVectorImpl<ValueDecl *> &results;
 
 public:
   ASTScopeDeclConsumerForLocalLookup(
       DeclName name, bool stopAfterInnermostBraceStmt,
-      SmallVectorImpl<ValueDecl *> &results)
+      ABIRole roleFilter, SmallVectorImpl<ValueDecl *> &results)
     : name(name), stopAfterInnermostBraceStmt(stopAfterInnermostBraceStmt),
-      results(results) {}
+      roleFilter(roleFilter), results(results) {}
+
+  bool hasCorrectABIRole(ValueDecl *vd) const {
+    return ABIRoleInfo(vd).matches(roleFilter);
+  }
 
   bool consume(ArrayRef<ValueDecl *> values,
                NullablePtr<DeclContext> baseDC) override {
@@ -932,14 +916,16 @@ public:
       if (auto *varDecl = dyn_cast<VarDecl>(value)) {
         // Check if the name matches any auxiliary decls not in the AST
         varDecl->visitAuxiliaryDecls([&](VarDecl *auxiliaryVar) {
-          if (name.isSimpleName(auxiliaryVar->getName())) {
+          if (name.isSimpleName(auxiliaryVar->getName())
+                && hasCorrectABIRole(auxiliaryVar)) {
             results.push_back(auxiliaryVar);
             foundMatch = true;
           }
         });
       }
 
-      if (!foundMatch && value->getName().matchesRef(name))
+      if (!foundMatch && value->getName().matchesRef(name)
+              && hasCorrectABIRole(value))
         results.push_back(value);
     }
 
@@ -967,9 +953,10 @@ public:
 /// interface type computation.
 void ASTScope::lookupLocalDecls(SourceFile *sf, DeclName name, SourceLoc loc,
                                 bool stopAfterInnermostBraceStmt,
+                                ABIRole roleFilter,
                                 SmallVectorImpl<ValueDecl *> &results) {
   ASTScopeDeclConsumerForLocalLookup consumer(name, stopAfterInnermostBraceStmt,
-                                              results);
+                                              roleFilter, results);
   ASTScope::unqualifiedLookup(sf, loc, consumer);
 }
 
@@ -982,4 +969,20 @@ ValueDecl *ASTScope::lookupSingleLocalDecl(SourceFile *sf, DeclName name,
   if (result.size() != 1)
     return nullptr;
   return result[0];
+}
+
+DeclContext *swift::getModuleScopeLookupContext(DeclContext *dc) {
+  auto moduleScopeContext = dc->getModuleScopeContext();
+
+  // When the module scope context is in a Clang module but we actually
+  // have a parent source file, it's because we are within a macro
+  // expansion triggered for the imported declaration. In such cases,
+  // we want to use the parent source file as the lookup context, becauae
+  // it has the appropriate resolved imports.
+  if (isa<ClangModuleUnit>(moduleScopeContext)) {
+    if (auto parentSF = dc->getParentSourceFile())
+      return parentSF;
+  }
+
+  return moduleScopeContext;
 }

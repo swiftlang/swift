@@ -16,8 +16,8 @@ func /*whitespace-labels:def*/aFunc(     a  b: Int ,_   a: Int, c c   : Int) {}
 
 func /*referenced:def*/bar(a: Int) {}
 
-func /*varargs:def*/aFunc(_ c: Int...) {}
-/*varargs:call*/aFunc(1, 2, 3, 4)
+func /*varargs:def*/<base>aFunc</base>(<arglabel index=0>c</arglabel><param index=0></param>: Int...) {}
+/*varargs:call*/<base>aFunc</base>(<callarg index=0>c</callarg><callcolon index=0>: </callcolon>1, 2, 3, 4)
 
 class AStruct {
     func /*method:def*/foo(a: Int, b: Int, _ c: Int) -> Int {

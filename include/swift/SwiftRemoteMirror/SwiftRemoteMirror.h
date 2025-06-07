@@ -138,6 +138,15 @@ SWIFT_REMOTE_MIRROR_LINKAGE
 int
 swift_reflection_ownsAddress(SwiftReflectionContextRef ContextRef, uintptr_t Address);
 
+/// Returns whether the given address is strictly in the DATA, AUTH or TEXT
+/// segments of the image added to this library. Images must be added using
+/// swift_reflection_addImage, not swift_reflection_addReflectionInfo, for this
+/// function to work properly. If addReflectionInfo is used, the return value
+/// will always be false.
+SWIFT_REMOTE_MIRROR_LINKAGE
+int
+swift_reflection_ownsAddressStrict(SwiftReflectionContextRef ContextRef, uintptr_t Address);
+
 /// Returns the metadata pointer for a given object.
 SWIFT_REMOTE_MIRROR_LINKAGE
 uintptr_t
@@ -179,6 +188,9 @@ swift_reflection_typeRefForMangledTypeName(SwiftReflectionContextRef ContextRef,
 ///
 /// The returned string is heap allocated and the caller must free() it when
 /// done.
+SWIFT_REMOTE_MIRROR_DEPRECATED(
+    "Please use swift_reflection_copyNameForTypeRef()",
+    "swift_reflection_copyNameForTypeRef")
 SWIFT_REMOTE_MIRROR_LINKAGE
 char *
 swift_reflection_copyDemangledNameForTypeRef(
@@ -188,6 +200,18 @@ SWIFT_REMOTE_MIRROR_LINKAGE
 char *
 swift_reflection_copyDemangledNameForProtocolDescriptor(
   SwiftReflectionContextRef ContextRef, swift_reflection_ptr_t Proto);
+
+/// Returns the mangled or demangled name for a typeref, or NULL if the name
+/// couldn't be created.
+///
+/// The returned string is heap allocated and the caller must free() it when
+/// done.
+
+SWIFT_REMOTE_MIRROR_LINKAGE
+char*
+swift_reflection_copyNameForTypeRef(SwiftReflectionContextRef ContextRef,
+                                    swift_typeref_t OpaqueTypeRef,
+                                    bool mangled);
 
 /// Returns a structure describing the layout of a value of a typeref.
 /// For classes, this returns the reference value itself.

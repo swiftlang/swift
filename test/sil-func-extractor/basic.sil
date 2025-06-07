@@ -2,6 +2,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-sil-func-extractor %s -func=use_before_init -emit-sib -o %t/out.sib -module-name main && %target-sil-opt %t/out.sib -module-name main | %FileCheck %s
 
+// Use this testfile to check if the `swift-frontend -sil-func-extractr` option works.
+// RUN: %swift_frontend_plain -sil-func-extractor %s -func=use_before_init | %FileCheck %s
+
 import Builtin
 import Swift
 

@@ -41,6 +41,24 @@
     PROTOCOL_WITH_NAME(Id, Name)
 #endif
 
+/// \def INVERTIBLE_PROTOCOL_WITH_NAME(id, name)
+/// \param Name a string literal with the external name of this protocol
+/// \param Id the internal "enum name" of this protocol.
+#ifndef INVERTIBLE_PROTOCOL_WITH_NAME
+#define INVERTIBLE_PROTOCOL_WITH_NAME(Id, Name) \
+    PROTOCOL_WITH_NAME(Id, Name)
+#endif
+
+/// \def REPRESSIBLE_PROTOCOL_WITH_NAME(id, name)
+/// \param id the internal "enum name" of this protocol
+/// \param name a string literal with the external name of this protocol
+#ifndef REPRESSIBLE_PROTOCOL_WITH_NAME
+#define REPRESSIBLE_PROTOCOL_WITH_NAME(Id, Name) \
+    PROTOCOL_WITH_NAME(Id, Name)
+#endif
+
+#define REPRESSIBLE_PROTOCOL(name) REPRESSIBLE_PROTOCOL_WITH_NAME(name, #name)
+#define REPRESSIBLE_PROTOCOL_(name) REPRESSIBLE_PROTOCOL_WITH_NAME(name, "_" #name)
 
 #define PROTOCOL(name) PROTOCOL_WITH_NAME(name, #name)
 #define PROTOCOL_(name) PROTOCOL_WITH_NAME(name, "_" #name)
@@ -59,7 +77,6 @@
     BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(name, "_" #name)
 
 PROTOCOL(Actor)
-PROTOCOL(AnyActor)
 PROTOCOL(Sequence)
 PROTOCOL(Identifiable)
 PROTOCOL(IteratorProtocol)
@@ -74,9 +91,13 @@ PROTOCOL(CaseIterable)
 PROTOCOL(SIMD)
 PROTOCOL(SIMDScalar)
 PROTOCOL(BinaryInteger)
+PROTOCOL(FixedWidthInteger)
 PROTOCOL(RangeReplaceableCollection)
+PROTOCOL(Executor)
 PROTOCOL(SerialExecutor)
+PROTOCOL(TaskExecutor)
 PROTOCOL(GlobalActor)
+PROTOCOL(ExecutorFactory)
 
 PROTOCOL_(BridgedNSError)
 PROTOCOL_(BridgedStoredNSError)
@@ -87,6 +108,7 @@ PROTOCOL(Encodable)
 PROTOCOL(Decodable)
 
 PROTOCOL(Sendable)
+PROTOCOL(SendableMetatype)
 PROTOCOL(UnsafeSendable)
 
 PROTOCOL_(ObjectiveCBridgeable)
@@ -99,22 +121,43 @@ PROTOCOL(Differentiable)
 
 // Distributed Actors
 PROTOCOL(DistributedActor)
+PROTOCOL_(DistributedActorStub)
 PROTOCOL(DistributedActorSystem)
 PROTOCOL(DistributedTargetInvocationEncoder)
 PROTOCOL(DistributedTargetInvocationDecoder)
 PROTOCOL(DistributedTargetInvocationResultHandler)
 
 // C++ Standard Library Overlay:
+PROTOCOL(CxxConvertibleToBool)
 PROTOCOL(CxxConvertibleToCollection)
+PROTOCOL(CxxDictionary)
+PROTOCOL(CxxOptional)
+PROTOCOL(CxxPair)
+PROTOCOL(CxxSet)
 PROTOCOL(CxxRandomAccessCollection)
+PROTOCOL(CxxMutableRandomAccessCollection)
 PROTOCOL(CxxSequence)
+PROTOCOL(CxxUniqueSet)
+PROTOCOL(CxxVector)
+PROTOCOL(CxxSpan)
+PROTOCOL(CxxMutableSpan)
 PROTOCOL(UnsafeCxxInputIterator)
+PROTOCOL(UnsafeCxxMutableInputIterator)
 PROTOCOL(UnsafeCxxRandomAccessIterator)
+PROTOCOL(UnsafeCxxMutableRandomAccessIterator)
+PROTOCOL(UnsafeCxxContiguousIterator)
+PROTOCOL(UnsafeCxxMutableContiguousIterator)
 
 PROTOCOL(AsyncSequence)
 PROTOCOL(AsyncIteratorProtocol)
 
 PROTOCOL(FloatingPoint)
+
+#define INVERTIBLE_PROTOCOL(Name, Bit) \
+    INVERTIBLE_PROTOCOL_WITH_NAME(Name, #Name)
+#include "swift/ABI/InvertibleProtocols.def"
+
+REPRESSIBLE_PROTOCOL(BitwiseCopyable)
 
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByArrayLiteral, "Array", false)
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByBooleanLiteral, "BooleanLiteralType", true)
@@ -143,6 +186,10 @@ BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByBuiltinUnicodeScalarLitera
 #undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
 #undef BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_
 #undef BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
+#undef REPRESSIBLE_PROTOCOL_WITH_NAME
+#undef REPRESSIBLE_PROTOCOL
+#undef REPRESSIBLE_PROTOCOL_
+#undef INVERTIBLE_PROTOCOL_WITH_NAME
 #undef PROTOCOL
 #undef PROTOCOL_
 #undef PROTOCOL_WITH_NAME

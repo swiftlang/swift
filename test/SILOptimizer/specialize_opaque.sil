@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-opaque-values -enable-sil-verify-all -generic-specializer %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-opaque-values -enable-sil-verify-all -generic-specializer %s | %FileCheck %s
 
 sil_stage raw
 
@@ -6,7 +6,7 @@ import Builtin
 
 // Test that foo is specialized on Builtin.Int64 and the copy_values and destroy_values are dropped.
 //
-// CHECK-LABEL: sil shared @$s3fooBi64__Tg5 : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> () {
+// CHECK-LABEL: sil shared [ossa] @$s3fooBi64__Tg5 : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> () {
 // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
 // CHECK:   [[F:%.*]] = function_ref @$s3fooBi64__Tg5 : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> ()
 // CHECK:   %{{.*}} = apply [[F]](%0, %1) : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> ()
@@ -14,8 +14,8 @@ import Builtin
 // CHECK-NOT: destroy_value
 // CHECK:   return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function '$s3fooBi64__Tg5'
-sil hidden @foo : $@convention(thin) <T> (@in T, @in T) -> () {
-bb0(%0 : $T, %1 : $T):
+sil hidden [ossa] @foo : $@convention(thin) <T> (@in T, @in T) -> () {
+bb0(%0 : @owned $T, %1 : @owned $T):
   %f = function_ref @foo : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> ()
   %cp0 = copy_value %0 : $T
   %cp1 = copy_value %1 : $T

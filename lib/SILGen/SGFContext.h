@@ -167,14 +167,6 @@ public:
 
     return SGFContext();
   }
-  
-  /// Return the abstraction pattern of the context we're emitting into.
-  Optional<AbstractionPattern> getAbstractionPattern() const {
-    if (auto *init = getEmitInto()) {
-      return init->getAbstractionPattern();
-    }
-    return None;
-  }
 };
 
 using ValueProducerRef =

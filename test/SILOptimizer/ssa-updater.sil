@@ -1,0 +1,182 @@
+// RUN: %target-sil-opt -test-runner %s -sil-disable-input-verify | %FileCheck %s
+
+// Arguments to specify_test:
+// * the first arguments are values, which are added as "available values" to the SSA-updater
+// * the next arguments are operands, which are set to the computed values at that place
+
+sil_stage canonical
+
+import Builtin
+
+class C {}
+
+sil @c2 : $@convention(thin) (@guaranteed C) -> @owned C
+
+// CHECK-LABEL: sil [ossa] @reuse_phi_arg1 :
+// CHECK:       bb17([[P:%.*]] : @owned $C):
+// CHECK:         apply {{%[0-9]+}}([[P]])
+// CHECK-NEXT:    destroy_value [[P]]
+// CHECK:       } // end sil function 'reuse_phi_arg1'
+sil [ossa] @reuse_phi_arg1 : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  br bb3
+
+bb1(%2 : @owned $C):
+  cond_br undef, bb2, bb22
+
+bb2:
+  br bb18
+
+bb3:
+  cond_br undef, bb4, bb5
+
+bb4:
+  br bb17
+
+bb5:
+  cond_br undef, bb9, bb6
+
+bb6:
+  cond_br undef, bb8, bb7
+
+bb7:
+  br bb12
+
+bb8:
+  br bb11
+
+bb9:
+  br bb10
+
+bb10:
+  br bb18
+
+bb11:
+  br bb17
+
+bb12:
+  cond_br undef, bb16, bb13
+
+bb13:
+  cond_br undef, bb15, bb14
+
+bb14:
+  br bb12
+
+bb15:
+  br bb11
+
+bb16:
+  br bb10
+
+bb17:
+  %19 = function_ref @c2 : $@convention(thin) (@guaranteed C) -> @owned C
+  specify_test "update_ssa %0 %2 @instruction[+3].operand @instruction[+1].operand @instruction[+0].operand[1]"
+  %20 = apply %19(%2) : $@convention(thin) (@guaranteed C) -> @owned C
+  destroy_value %2
+  cond_br undef, bb19, bb20
+
+bb18:
+  destroy_value %2
+  br bb21
+
+bb19:
+  destroy_value %20
+  br bb21
+
+bb20:
+  br bb1(%20)
+
+bb21:
+  %28 = tuple ()
+  return %28
+
+bb22:
+  br bb3
+}
+
+// CHECK-LABEL: sil [ossa] @reuse_phi_arg2 :
+// CHECK:       bb17([[P:%.*]] : @owned $C):
+// CHECK:         apply {{%[0-9]+}}([[P]])
+// CHECK-NEXT:    destroy_value [[P]]
+// CHECK:       } // end sil function 'reuse_phi_arg2'
+sil [ossa] @reuse_phi_arg2 : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  br bb3
+
+bb1(%2 : @owned $C):
+  cond_br undef, bb2, bb23
+
+bb2:
+  br bb19
+
+bb3:
+  cond_br undef, bb4, bb5
+
+bb4:
+  br bb17
+
+bb5:
+  cond_br undef, bb9, bb6
+
+bb6:
+  cond_br undef, bb8, bb7
+
+bb7:
+  br bb12
+
+bb8:
+  br bb11
+
+bb9:
+  br bb10
+
+bb10:
+  br bb19
+
+bb11:
+  br bb17
+
+bb12:
+  cond_br undef, bb16, bb13
+
+bb13:
+  cond_br undef, bb15, bb14
+
+bb14:
+  br bb12
+
+bb15:
+  br bb11
+
+bb16:
+  br bb10
+
+bb17:
+  br bb18
+
+bb18:
+  %19 = function_ref @c2 : $@convention(thin) (@guaranteed C) -> @owned C
+  specify_test "update_ssa %0 %2 @instruction[+3].operand @instruction[+1].operand @instruction[+0].operand[1]"
+  %20 = apply %19(%2) : $@convention(thin) (@guaranteed C) -> @owned C
+  destroy_value %2
+  cond_br undef, bb20, bb21
+bb19:
+  destroy_value %2
+  br bb22
+
+bb20:
+  destroy_value %20
+  br bb22
+
+bb21:
+  br bb1(%20)
+
+bb22:
+  %28 = tuple ()
+  return %28
+
+bb23:
+  br bb3
+
+}

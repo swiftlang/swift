@@ -1,13 +1,15 @@
-// RUN: %target-sil-opt -opt-mode=none  -enable-sil-verify-all %s -compute-side-effects -ssa-destroy-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKDEB --check-prefix=CHECK-DEB
-// RUN: %target-sil-opt -opt-mode=speed -enable-sil-verify-all %s -compute-side-effects -ssa-destroy-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKOPT --check-prefix=CHECK-OPT
+// RUN: %target-sil-opt -sil-print-types -enable-experimental-feature LifetimeDependence -opt-mode=none  -enable-sil-verify-all %s -compute-side-effects -destroy-addr-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKDEB --check-prefix=CHECK-DEB
+// RUN: %target-sil-opt -sil-print-types -enable-experimental-feature LifetimeDependence -opt-mode=speed -enable-sil-verify-all %s -compute-side-effects -destroy-addr-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKOPT --check-prefix=CHECK-OPT
 //
 // TODO: migrate the remaining tests from destroy_hoisting.sil.
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_LifetimeDependence
 
 sil_stage canonical
 
 import Builtin
+import Swift
 
 typealias AnyObject = Builtin.AnyObject
 
@@ -78,6 +80,9 @@ struct STXXITXXII {
   var txxi_2: TXXI
   var i: I
 }
+
+struct MoS: ~Copyable {}
+struct MoE: ~Copyable {}
 
 sil @unknown : $@convention(thin) () -> ()
 sil @use_S : $@convention(thin) (@in_guaranteed S) -> ()
@@ -587,7 +592,7 @@ entry(%in_addr : $*X):
   return %retval : $X
 }
 
-// If a begin_apply uses the address, the end_appy and abort_apply should be
+// If a begin_apply uses the address, the end_apply and abort_apply should be
 // regarded as uses too.  Don't hoist over them.
 //
 // CHECK-LABEL: sil [ossa] @nohoist_over_end_apply_use : {{.*}} {
@@ -599,7 +604,7 @@ sil [ossa] @nohoist_over_end_apply_use : $@convention(thin) (@inout X, @owned X)
 entry(%addr : $*X, %instance : @owned $X):
   %coro = function_ref @coro : $@yield_once @convention(thin) (@inout X) -> @yields ()
   (%empty, %continuation) = begin_apply %coro(%addr) : $@yield_once @convention(thin) (@inout X) -> @yields ()
-  end_apply %continuation
+  end_apply %continuation as $()
   %retval = tuple ()
   store %instance to [assign] %addr : $*X
   return %retval : $()
@@ -626,13 +631,37 @@ entry(%instance : $*X):
   return %value : $X
 }
 
-// Hoist even if the pointerified address gets used.
+// If lexical, hoist even if the pointerified address gets used.
 //
 // CHECK-LABEL: sil [ossa] @hoist_despite_use_of_pointer : {{.*}} {
-// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:         [[INSTANCE:%[^,]+]] = alloc_stack [lexical]
+// CHECK-NEXT:    copy_addr {{.*}} to [init] [[INSTANCE]]
 // CHECK-NEXT:    destroy_addr [[INSTANCE]]
 // CHECK-LABEL: } // end sil function 'hoist_despite_use_of_pointer'
-sil [ossa] @hoist_despite_use_of_pointer : $@convention(thin) (@inout X) -> () {
+sil [ossa] @hoist_despite_use_of_pointer : $@convention(thin) (@in_guaranteed X) -> () {
+entry(%original : $*X):
+   %instance = alloc_stack [lexical] $X
+   copy_addr %original to [init] %instance : $*X
+   %addr_for_pointer = alloc_stack $Builtin.RawPointer
+   %pointer = address_to_pointer %instance : $*X to $Builtin.RawPointer
+   store %pointer to [trivial] %addr_for_pointer : $*Builtin.RawPointer
+   %retval = tuple ()
+   dealloc_stack %addr_for_pointer : $*Builtin.RawPointer
+   destroy_addr %instance : $*X
+   dealloc_stack %instance : $*X
+   return %retval : $()
+}
+
+// If non-lexical, _don't_ hoist if the pointerified address gets used--deinit
+// barriers are ignored.
+//
+// CHECK-LABEL: sil [ossa] @no_hoist_nonlexical_because_of_use_of_pointer : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:         destroy_addr [[INSTANCE]]
+// CHECK-NEXT:    dealloc_stack
+// CHECK-NEXT:    return
+// CHECK-LABEL: } // end sil function 'no_hoist_nonlexical_because_of_use_of_pointer'
+sil [ossa] @no_hoist_nonlexical_because_of_use_of_pointer : $@convention(thin) (@inout X) -> () {
 entry(%instance : $*X):
    %addr_for_pointer = alloc_stack $Builtin.RawPointer
    %pointer = address_to_pointer %instance : $*X to $Builtin.RawPointer
@@ -1144,4 +1173,146 @@ entry(%addr : $*X):
   destroy_addr %addr : $*X
   %retval = tuple ()
   return %retval : $()
+}
+
+// Even though the apply of %empty is not a deinit barrier (cf.
+// hoist_over_apply_of_non_barrier_fn), verify that the destroy_addr is not
+// hoisted, because MoS is move-only.
+// CHECK-LABEL: sil [ossa] @dont_move_destroy_addr_of_moveonly_struct : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[ADDR:%[^,]+]] :
+// CHECK:         apply
+// CHECK:         destroy_addr [[ADDR]]
+// CHECK-LABEL: } // end sil function 'dont_move_destroy_addr_of_moveonly_struct'
+sil [ossa] @dont_move_destroy_addr_of_moveonly_struct : $@convention(thin) (@in MoS) -> () {
+entry(%addr : $*MoS):
+  %empty = function_ref @empty : $@convention(thin) () -> ()
+  apply %empty() : $@convention(thin) () -> ()
+  destroy_addr %addr : $*MoS
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_move_destroy_addr_of_moveonly_enum : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[ADDR:%[^,]+]] :
+// CHECK:         apply
+// CHECK:         destroy_addr [[ADDR]]
+// CHECK-LABEL: } // end sil function 'dont_move_destroy_addr_of_moveonly_enum'
+sil [ossa] @dont_move_destroy_addr_of_moveonly_enum : $@convention(thin) (@in MoE) -> () {
+entry(%addr : $*MoE):
+  %empty = function_ref @empty : $@convention(thin) () -> ()
+  apply %empty() : $@convention(thin) () -> ()
+  destroy_addr %addr : $*MoE
+  %retval = tuple ()
+  return %retval : $()
+}
+
+sil @getPointer : $@convention(thin) () -> Builtin.RawPointer
+
+struct Nontrivial {
+  var guts: Builtin.AnyObject
+}
+
+sil [ossa] @rdar121327964 : $@convention(method) (@owned Nontrivial) -> () {
+bb0(%0 : @owned $Nontrivial):
+  %6 = function_ref @getPointer : $@convention(thin) () -> Builtin.RawPointer
+  %7 = apply %6() : $@convention(thin) () -> Builtin.RawPointer
+  %8 = pointer_to_address %7 : $Builtin.RawPointer to [strict] $*Nontrivial
+  %9 = copy_value %0 : $Nontrivial
+  %10 = begin_access [modify] [dynamic] %8 : $*Nontrivial
+  store %9 to [assign] %10 : $*Nontrivial
+  end_access %10 : $*Nontrivial
+  destroy_value %0 : $Nontrivial
+  %14 = tuple ()
+  return %14 : $()
+}
+
+struct Regular {
+  var storage: Builtin.NativeObject
+}
+struct NEGutless: ~Escapable {
+  let ptr: UnsafeRawPointer?
+}
+struct NEMarker : ~Escapable {}
+struct NEAggregate: ~Escapable {
+  var ne: NEGutless
+  let regular: Regular
+
+  @lifetime(copy ne) init(ne: NEMarker)
+}
+
+// CHECK-LABEL: sil [ossa] @no_destructure_nonescapable : {{.*}} {
+// CHECK:       bb0([[AGGREGATE:%[^,]+]] :
+// CHECK:       destroy_addr [[AGGREGATE]]
+// CHECK-LABEL: } // end sil function 'no_destructure_nonescapable'
+sil [ossa] @no_destructure_nonescapable : $@convention(method) (@in NEAggregate) -> () {
+bb0(%aggregate : $*NEAggregate):
+  %regular = struct_element_addr %aggregate, #NEAggregate.regular
+  %regular_copy = alloc_stack $Regular
+  copy_addr %regular to [init] %regular_copy
+  destroy_addr %regular_copy
+  dealloc_stack %regular_copy
+  destroy_addr %aggregate
+  %retval = tuple ()
+  return %retval
+}
+
+struct NCGutless: ~Copyable {
+  let ptr: UnsafeRawPointer?
+}
+struct NCAggregate: ~Copyable {
+  var ne: NCGutless
+  let regular: Regular
+  deinit {}
+}
+
+// CHECK-LABEL: sil [ossa] @no_destructure_noncopyable : {{.*}} {
+// CHECK:       bb0([[AGGREGATE:%[^,]+]] :
+// CHECK:       destroy_addr [[AGGREGATE]]
+// CHECK-LABEL: } // end sil function 'no_destructure_noncopyable'
+sil [ossa] @no_destructure_noncopyable : $@convention(method) (@in NCAggregate) -> () {
+bb0(%aggregate : $*NCAggregate):
+  %regular = struct_element_addr %aggregate, #NCAggregate.regular
+  %regular_copy = alloc_stack $Regular
+  copy_addr %regular to [init] %regular_copy
+  destroy_addr %regular_copy
+  dealloc_stack %regular_copy
+  destroy_addr %aggregate
+  %retval = tuple ()
+  return %retval
+}
+
+// CHECK-LABEL: sil [ossa] @nohoist_ieda : {{.*}} {
+// CHECK:         [[IEDA:%[^,]+]] = init_enum_data_addr
+// CHECK:         tuple
+// CHECK-NEXT:    destroy_addr [[IEDA]]
+// CHECK-LABEL: } // end sil function 'nohoist_ieda'
+sil [ossa] @nohoist_ieda : $@convention(thin) () -> @out TwoCases {
+bb0(%out : $*TwoCases):
+  %ieda = init_enum_data_addr %out, #TwoCases.A!enumelt
+  apply undef(%ieda) : $@convention(thin) () -> @out X
+  %retval = tuple ()
+  destroy_addr %ieda
+  apply undef(%ieda) : $@convention(thin) () -> @out X
+  inject_enum_addr %out, #TwoCases.A!enumelt
+  return %retval
+}
+
+// CHECK-LABEL: sil [ossa] @nohoist_ieda_2 : {{.*}} {
+// CHECK:         [[IEDA:%[^,]+]] = init_enum_data_addr
+// CHECK:         tuple
+// CHECK:         [[CTM:%[^,]+]] = copyable_to_moveonlywrapper_addr [[IEDA]]
+// CHECK:         [[MTC:%[^,]+]] = moveonlywrapper_to_copyable_addr [[CTM]]
+// CHECK-NEXT:    destroy_addr [[MTC]]
+// CHECK-LABEL: } // end sil function 'nohoist_ieda_2'
+sil [ossa] @nohoist_ieda_2 : $@convention(thin) () -> @out TwoCases {
+bb0(%out : $*TwoCases):
+  %ieda = init_enum_data_addr %out, #TwoCases.A!enumelt
+  apply undef(%ieda) : $@convention(thin) () -> @out X
+  %retval = tuple ()
+  %ctm = copyable_to_moveonlywrapper_addr %ieda
+  %mtc = moveonlywrapper_to_copyable_addr %ctm
+  destroy_addr %mtc
+  apply undef(%ieda) : $@convention(thin) () -> @out X
+  inject_enum_addr %out, #TwoCases.A!enumelt
+  return %retval
 }

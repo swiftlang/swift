@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -17,6 +17,7 @@ import SwiftShims
 // functionality and guidance for efficiently working with Strings.
 //
 @frozen
+@_addressableForDependencies
 public // SPI(corelibs-foundation)
 struct _StringGuts: @unchecked Sendable {
   @usableFromInline
@@ -52,7 +53,7 @@ extension _StringGuts {
 
   @inlinable @inline(__always)
   internal init(_ bufPtr: UnsafeBufferPointer<UInt8>, isASCII: Bool) {
-    self.init(_StringObject(immortal: bufPtr, isASCII: isASCII))
+    unsafe self.init(_StringObject(immortal: bufPtr, isASCII: isASCII))
   }
 
   @inline(__always)
@@ -63,7 +64,23 @@ extension _StringGuts {
   internal init(_ storage: __SharedStringStorage) {
     self.init(_StringObject(storage))
   }
+  
+#if !$Embedded
+internal init(
+  constantCocoa cocoa: AnyObject,
+  providesFastUTF8: Bool,
+  isASCII: Bool,
+  length: Int
+) {
+  self.init(_StringObject(
+    constantCocoa: cocoa,
+    providesFastUTF8: providesFastUTF8,
+    isASCII: isASCII,
+    length: length))
+}
+#endif
 
+  #if !$Embedded
   internal init(
     cocoa: AnyObject, providesFastUTF8: Bool, isASCII: Bool, length: Int
   ) {
@@ -73,6 +90,7 @@ extension _StringGuts {
       isASCII: isASCII,
       length: length))
   }
+  #endif
 }
 
 // Queries
@@ -123,7 +141,7 @@ extension _StringGuts {
   // Whether this string has breadcrumbs
   internal var hasBreadcrumbs: Bool {
     return hasSharedStorage
-      || (hasNativeStorage && _object.nativeStorage.hasBreadcrumbs)
+      || (hasNativeStorage && _object.withNativeStorage { $0.hasBreadcrumbs })
   }
 }
 
@@ -149,7 +167,7 @@ extension _StringGuts {
     if self.isSmall { return try _SmallString(_object).withUTF8(f) }
 
     defer { _fixLifetime(self) }
-    return try f(_object.fastUTF8)
+    return try unsafe f(_object.fastUTF8)
   }
 
   @inlinable @inline(__always)
@@ -157,8 +175,8 @@ extension _StringGuts {
     range: Range<Int>,
     _ f: (UnsafeBufferPointer<UInt8>) throws -> R
   ) rethrows -> R {
-    return try self.withFastUTF8 { wholeUTF8 in
-      return try f(UnsafeBufferPointer(rebasing: wholeUTF8[range]))
+    return try unsafe self.withFastUTF8 { wholeUTF8 in
+      return try unsafe f(unsafe UnsafeBufferPointer(rebasing: wholeUTF8[range]))
     }
   }
 
@@ -166,8 +184,8 @@ extension _StringGuts {
   internal func withFastCChar<R>(
     _ f: (UnsafeBufferPointer<CChar>) throws -> R
   ) rethrows -> R {
-    return try self.withFastUTF8 { utf8 in
-      return try utf8.withMemoryRebound(to: CChar.self, f)
+    return try unsafe self.withFastUTF8 { utf8 in
+      return try unsafe utf8.withMemoryRebound(to: CChar.self, f)
     }
   }
 }
@@ -179,16 +197,18 @@ extension _StringGuts {
   #else
   @usableFromInline @inline(never) @_effects(releasenone)
   internal func _invariantCheck() {
-    #if arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32)
+    #if _pointerBitWidth(_64)
+    _internalInvariant(MemoryLayout<String>.size == 16, """
+    the runtime is depending on this, update Reflection.mm and \
+    this if you change it
+    """)
+    #elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     _internalInvariant(MemoryLayout<String>.size == 12, """
     the runtime is depending on this, update Reflection.mm and \
     this if you change it
     """)
     #else
-    _internalInvariant(MemoryLayout<String>.size == 16, """
-    the runtime is depending on this, update Reflection.mm and \
-    this if you change it
-    """)
+    #error("Unknown platform")
     #endif
   }
   #endif // INTERNAL_CHECKS_ENABLED
@@ -203,11 +223,11 @@ extension _StringGuts {
     _ body: (UnsafePointer<Int8>) throws -> Result
   ) rethrows -> Result {
     if _slowPath(!_object.isFastZeroTerminated) {
-      return try _slowWithCString(body)
+      return try unsafe _slowWithCString(body)
     }
 
-    return try self.withFastCChar {
-      return try body($0.baseAddress._unsafelyUnwrappedUnchecked)
+    return try unsafe self.withFastCChar {
+      return try unsafe body($0.baseAddress._unsafelyUnwrappedUnchecked)
     }
   }
 
@@ -217,9 +237,9 @@ extension _StringGuts {
     _ body: (UnsafePointer<Int8>) throws -> Result
   ) rethrows -> Result {
     _internalInvariant(!_object.isFastZeroTerminated)
-    return try String(self).utf8CString.withUnsafeBufferPointer {
-      let ptr = $0.baseAddress._unsafelyUnwrappedUnchecked
-      return try body(ptr)
+    return try unsafe String(self).utf8CString.withUnsafeBufferPointer {
+      let ptr = unsafe $0.baseAddress._unsafelyUnwrappedUnchecked
+      return try unsafe body(ptr)
     }
   }
 }
@@ -229,18 +249,18 @@ extension _StringGuts {
   // Contents of the buffer are unspecified if nil is returned.
   @inlinable
   internal func copyUTF8(into mbp: UnsafeMutableBufferPointer<UInt8>) -> Int? {
-    let ptr = mbp.baseAddress._unsafelyUnwrappedUnchecked
+    let ptr = unsafe mbp.baseAddress._unsafelyUnwrappedUnchecked
     if _fastPath(self.isFastUTF8) {
-      return self.withFastUTF8 { utf8 in
+      return unsafe self.withFastUTF8 { utf8 in
         guard utf8.count <= mbp.count else { return nil }
 
-        let utf8Start = utf8.baseAddress._unsafelyUnwrappedUnchecked
-        ptr.initialize(from: utf8Start, count: utf8.count)
+        let utf8Start = unsafe utf8.baseAddress._unsafelyUnwrappedUnchecked
+        unsafe ptr.initialize(from: utf8Start, count: utf8.count)
         return utf8.count
       }
     }
 
-    return _foreignCopyUTF8(into: mbp)
+    return unsafe _foreignCopyUTF8(into: mbp)
   }
   @_effects(releasenone)
   @usableFromInline @inline(never) // slow-path
@@ -249,21 +269,20 @@ extension _StringGuts {
   ) -> Int? {
     #if _runtime(_ObjC)
     // Currently, foreign  means NSString
-    if let res = _cocoaStringCopyUTF8(_object.cocoaObject,
-      into: UnsafeMutableRawBufferPointer(start: mbp.baseAddress,
-                                          count: mbp.count)) {
-      return res
+    let res = _object.withCocoaObject {
+      unsafe _cocoaStringCopyUTF8($0, into: UnsafeMutableRawBufferPointer(mbp))
     }
-    
+    if let res { return res }
+
     // If the NSString contains invalid UTF8 (e.g. unpaired surrogates), we
     // can get nil from cocoaStringCopyUTF8 in situations where a character by
     // character loop would get something more useful like repaired contents
-    var ptr = mbp.baseAddress._unsafelyUnwrappedUnchecked
+    var ptr = unsafe mbp.baseAddress._unsafelyUnwrappedUnchecked
     var numWritten = 0
     for cu in String(self).utf8 {
       guard numWritten < mbp.count else { return nil }
-      ptr.initialize(to: cu)
-      ptr += 1
+      unsafe ptr.initialize(to: cu)
+      unsafe ptr += 1
       numWritten += 1
     }
     
@@ -399,9 +418,95 @@ extension _StringGuts {
   }
 }
 
+#if _runtime(_ObjC)
+extension _StringGuts {
+
+  private static var _associationKey: UnsafeRawPointer {
+    struct AssociationKey {}
+    // We never dereference this, we only use this address as a unique key
+    return unsafe unsafeBitCast(
+      ObjectIdentifier(AssociationKey.self),
+      to: UnsafeRawPointer.self
+    )
+  }
+
+  private func _getAssociatedStorage() -> __StringStorage? {
+    _internalInvariant(_object.hasObjCBridgeableObject)
+    let getter = unsafe unsafeBitCast(
+      getGetAssociatedObjectPtr(),
+      to: (@convention(c)(
+        AnyObject,
+        UnsafeRawPointer
+      ) -> UnsafeRawPointer?).self
+    )
+
+    if let assocPtr = unsafe getter(
+      _object.objCBridgeableObject,
+      Self._associationKey
+    ) {
+      let storage: __StringStorage
+      storage = unsafe Unmanaged.fromOpaque(assocPtr).takeUnretainedValue()
+      return storage
+    }
+    return nil
+  }
+
+  private func _setAssociatedStorage(_ storage: __StringStorage) {
+    _internalInvariant(_object.hasObjCBridgeableObject)
+    let setter = unsafe unsafeBitCast(
+      getSetAssociatedObjectPtr(),
+      to: (@convention(c)(
+        AnyObject,
+        UnsafeRawPointer,
+        AnyObject?,
+        UInt
+      ) -> Void).self
+    )
+
+    unsafe setter(
+      _object.objCBridgeableObject,
+      Self._associationKey,
+      storage,
+      1 //OBJC_ASSOCIATION_RETAIN_NONATOMIC
+    )
+  }
+
+  internal func _getOrAllocateAssociatedStorage() -> __StringStorage {
+    _internalInvariant(_object.hasObjCBridgeableObject)
+    let unwrapped: __StringStorage
+    // libobjc already provides the necessary memory barriers for
+    // double checked locking to be safe, per comments on
+    // https://github.com/swiftlang/swift/pull/75148
+    if let storage = _getAssociatedStorage() {
+      unwrapped = storage
+    } else {
+      let lock = _object.objCBridgeableObject
+      objc_sync_enter(lock)
+      if let storage  = _getAssociatedStorage() {
+        unwrapped = storage
+      } else {
+        var contents = String.UnicodeScalarView()
+        // always reserve a capacity larger than a small string
+        contents.reserveCapacity(
+          Swift.max(_SmallString.capacity + 1, count + count >> 1)
+        )
+        for c in String.UnicodeScalarView(self) {
+          contents.append(c)
+        }
+        _precondition(contents._guts._object.hasNativeStorage)
+        unwrapped = (consume contents)._guts._object.nativeStorage
+        _setAssociatedStorage(unwrapped)
+      }
+      defer { _fixLifetime(unwrapped) }
+      objc_sync_exit(lock)
+    }
+    return unwrapped
+  }
+}
+#endif
+
 // Old SPI(corelibs-foundation)
 extension _StringGuts {
-  @available(*, deprecated)
   public // SPI(corelibs-foundation)
   var _isContiguousASCII: Bool {
     return !isSmall && isFastUTF8 && isASCII
@@ -416,7 +521,7 @@ extension _StringGuts {
   // FIXME: Mark as obsoleted. Still used by swift-corelibs-foundation.
   @available(*, deprecated)
   public var startASCII: UnsafeMutablePointer<UInt8> {
-    return UnsafeMutablePointer(mutating: _object.fastUTF8.baseAddress!)
+    return unsafe UnsafeMutablePointer(mutating: _object.fastUTF8.baseAddress!)
   }
 
   // FIXME: Previously used by swift-corelibs-foundation. Aging for removal.
@@ -429,10 +534,10 @@ extension _StringGuts {
 // FIXME: Previously used by swift-corelibs-foundation. Aging for removal.
 @available(*, unavailable)
 public func _persistCString(_ p: UnsafePointer<CChar>?) -> [CChar]? {
-  guard let s = p else { return nil }
-  let bytesToCopy = UTF8._nullCodeUnitOffset(in: s) + 1 // +1 for the terminating NUL
-  let result = [CChar](unsafeUninitializedCapacity: bytesToCopy) { buf, initedCount in
-    buf.baseAddress!.update(from: s, count: bytesToCopy)
+  guard let s = unsafe p else { return nil }
+  let bytesToCopy = unsafe UTF8._nullCodeUnitOffset(in: s) + 1 // +1 for the terminating NUL
+  let result = unsafe [CChar](unsafeUninitializedCapacity: bytesToCopy) { buf, initedCount in
+    unsafe buf.baseAddress!.update(from: s, count: bytesToCopy)
     initedCount = bytesToCopy
   }
   return result

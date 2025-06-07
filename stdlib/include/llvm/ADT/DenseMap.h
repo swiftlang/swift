@@ -89,7 +89,7 @@ public:
     return makeConstIterator(getBucketsEnd(), getBucketsEnd(), true);
   }
 
-  LLVM_NODISCARD bool empty() const {
+  [[nodiscard]] bool empty() const {
     return getNumEntries() == 0;
   }
   unsigned size() const { return getNumEntries(); }

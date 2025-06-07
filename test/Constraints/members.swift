@@ -553,8 +553,8 @@ func rdar_48114578() {
   struct S<T> {
     var value: T
 
-    static func valueOf<T>(_ v: T) -> S<T> {
-      return S<T>(value: v)
+    static func valueOf<U>(_ v: U) -> S<U> {
+      return S<U>(value: v)
     }
   }
 
@@ -617,7 +617,7 @@ func rdar50679161() {
 
     _ = { () -> Void in
       var foo = S
-      // expected-error@-1 {{expected member name or constructor call after type name}}
+      // expected-error@-1 {{expected member name or initializer call after type name}}
       // expected-note@-2 {{add arguments after the type to construct a value of the type}}
       // expected-note@-3 {{use '.self' to reference the type object}}
       print(foo)
@@ -634,6 +634,7 @@ func rdar_50467583_and_50909555() {
     // expected-note@-2 {{found candidate with type '(Int) -> Int'}}
     // expected-note@-3 {{found candidate with type '(Range<Int>) -> ArraySlice<Int>'}}
     // expected-note@-4 {{found candidate with type '((UnboundedRange_) -> ()) -> ArraySlice<Int>'}}
+    // expected-note@-5 * {{found candidate with type '(RangeSet<Array<Int>.Index>) -> DiscontiguousSlice<[Int]>' (aka '(RangeSet<Int>) -> DiscontiguousSlice<Array<Int>>')}}
   }
   
   // rdar://problem/50909555
@@ -801,4 +802,48 @@ func test_leading_dot_syntax_unknown_base_ambiguity() {
   func fn<T: Hashable>(_: String, value: T?) {}
 
   fn("", value: .member) // expected-error {{cannot infer contextual base in reference to member 'member'}}
+}
+
+// rdar://105348781 - failed to produce a diagnostic when passing optional to unrelated type.
+func test_mismatch_between_param_and_optional_chain() {
+  func fn(_: String) {}
+
+  struct Test {
+    var data: [Int]?
+
+    func test() {
+      fn(data?.first) // expected-error {{cannot convert value of type 'Int?' to expected argument type 'String'}}
+    }
+  }
+}
+
+// rdar://124549952 - incorrect "type of expression is ambiguous without a type annotation"
+do {
+  func fn() -> (any BinaryInteger)? {}
+
+  func test() {
+    let _ = fn()?.op().value
+    // expected-error@-1 {{value of type 'any BinaryInteger' has no member 'op'}}
+  }
+}
+
+do {
+  func test<T>(_: T) -> T? { nil }
+  func test<U>(_: U) -> Int { 0 }
+
+  func compute(x: Any) {
+    test(x)!.unknown()
+    // expected-error@-1 {{value of type 'Any' has no member 'unknown'}}
+    // expected-note@-2 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}
+  }
+}
+
+func testCompoundLeadingDot() {
+  struct S {
+    static func foo(x: Int) -> Self { .init() }
+  }
+
+  // Make sure we correctly strip the argument label.
+  let _: S = .foo(x:)(0)
+  let _: S = .foo(x:)(x: 0) // expected-error {{extraneous argument label 'x:' in call}}
 }

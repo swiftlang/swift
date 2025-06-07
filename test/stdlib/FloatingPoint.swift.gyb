@@ -1,6 +1,9 @@
 // RUN: %target-run-simple-swiftgyb(-parse-stdlib)
 // REQUIRES: executable_test
 
+// rdar://104232602
+// UNSUPPORTED: CPU=x86_64 && (DARWIN_SIMULATOR=ios || DARWIN_SIMULATOR=watchos || DARWIN_SIMULATOR=tvos)
+
 import Swift
 import StdlibUnittest
 
@@ -538,7 +541,7 @@ FloatingPoint.test("${Self}.round") {
 }
 
 FloatingPoint.test("${Self}.remainder") {
-  //  Basic sanity tests only; these are only sufficient to provide reassurance
+  //  Basic soundness tests only; these are only sufficient to provide reassurance
   //  that a known-good remainder function (e.g. from the C stdlib) has been
   //  shimmed correctly.  They are not sufficient for development of such a
   //  function, and should not be employed for that purpose.
@@ -554,7 +557,7 @@ FloatingPoint.test("${Self}.remainder") {
 }
 
 FloatingPoint.test("${Self}.squareRoot") {
-  //  Basic sanity tests only; these are only sufficient to provide reassurance
+  //  Basic soundness tests only; these are only sufficient to provide reassurance
   //  that a known-good square root function (e.g. from the C stdlib) has been
   //  shimmed correctly.  They are not sufficient for development of such a
   //  function, and should not be employed for that purpose.
@@ -815,7 +818,7 @@ FloatingPoint.test("${FloatSelf}/{Comparable,Hashable,Equatable}") {
         expectFalse(lhs >= rhs)
         expectFalse(lhs > rhs)
       } else {
-        // The sane case.
+        // The sound case.
         checkFloatingPointComparison_${FloatSelf}(
           lhsIdx < rhsIdx ?
             ExpectedComparisonResult.lt :

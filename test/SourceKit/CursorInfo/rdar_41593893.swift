@@ -1,11 +1,11 @@
 // RUN: %empty-directory(%t)
-// RUN: %{python} %utils/split_file.py -o %t %s
+// RUN: split-file %s %t
+
 // RUN: %sourcekitd-test -req=cursor -pos=8:37 %t/first.swift -- %t/first.swift %t/second.swift | %FileCheck %s
 
 // CHECK: source.lang.swift.ref.var.instance (6:9-6:12)
 
-
-// BEGIN first.swift
+//--- first.swift
 protocol ChatDataSourceDelegateProtocol {
     func chatDataSourceDidUpdate()
 }
@@ -17,7 +17,7 @@ class BaseChatViewController {
     }
 }
 
-// BEGIN second.swift
+//--- second.swift
 extension BaseChatViewController: ChatDataSourceDelegateProtocol {
     func chatDataSourceDidUpdate() { fatalError() }
 }

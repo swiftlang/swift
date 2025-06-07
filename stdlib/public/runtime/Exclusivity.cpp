@@ -37,14 +37,14 @@
 #include <memory>
 
 // Pick a return-address strategy
-#if __GNUC__
+#if defined(__wasm__)
+// Wasm can't access call frame for security purposes
+#define get_return_address() ((void*) 0)
+#elif __GNUC__
 #define get_return_address() __builtin_return_address(0)
 #elif _MSC_VER
 #include <intrin.h>
 #define get_return_address() _ReturnAddress()
-#elif defined(__wasm__)
-// Wasm can't access call frame for security purposes
-#define get_return_address() ((void*) 0)
 #else
 #error missing implementation for get_return_address
 #define get_return_address() ((void*) 0)
@@ -138,6 +138,7 @@ static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
 
   RuntimeErrorDetails::Thread secondaryThread = {
     .description = oldAccess,
+    .threadID = 0,
     .numFrames = 1,
     .frames = &oldPC
   };
@@ -148,7 +149,11 @@ static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
     .framesToSkip = framesToSkip,
     .memoryAddress = pointer,
     .numExtraThreads = 1,
-    .threads = &secondaryThread
+    .threads = &secondaryThread,
+    .numFixIts = 0,
+    .fixIts = nullptr,
+    .numNotes = 0,
+    .notes = nullptr,
   };
   _swift_reportToDebugger(RuntimeErrorFlagFatal, message, &details);
 }

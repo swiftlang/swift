@@ -18,7 +18,6 @@ class Derived<T: Hashable>: Base<T> {
 // OVERRIDE: Begin completions, 2 items
 // OVERRIDE-DAG: Decl[InstanceMethod]/Super/Erase[5]: override func onBase() -> T {|};
 // OVERRIDE-DAG: Decl[InstanceMethod]/Super/Erase[5]: override func onRoot() {|};
-// OVERRIDE-DAG: End completions
 
 }
 
@@ -29,5 +28,4 @@ func testMember(val: Derived<Int>) {
 // MEMBER-DAG: Decl[InstanceMethod]/CurrNominal:   onDerived()[#Void#]; name=onDerived()
 // MEMBER-DAG: Decl[InstanceMethod]/Super:         onBase()[#Int#]; name=onBase()
 // MEMBER-DAG: Decl[InstanceMethod]/Super:         onRoot()[#Void#]; name=onRoot()
-// MEMBER: End completions
 }

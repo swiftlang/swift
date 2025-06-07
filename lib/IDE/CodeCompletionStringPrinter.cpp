@@ -13,13 +13,14 @@
 #include "swift/IDE/CodeCompletionStringPrinter.h"
 #include "CodeCompletionResultBuilder.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 using namespace swift::ide;
 
 using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
 
-Optional<ChunkKind>
+std::optional<ChunkKind>
 CodeCompletionStringPrinter::getChunkKindForPrintNameContext(
     PrintNameContext context) const {
   switch (context) {
@@ -34,25 +35,26 @@ CodeCompletionStringPrinter::getChunkKindForPrintNameContext(
     return ChunkKind::Attribute;
   case PrintNameContext::FunctionParameterExternal:
     if (isInType()) {
-      return None;
+      return std::nullopt;
     }
     return ChunkKind::ParameterDeclExternalName;
   case PrintNameContext::FunctionParameterLocal:
     if (isInType()) {
-      return None;
+      return std::nullopt;
     }
     return ChunkKind::ParameterDeclLocalName;
   default:
-    return None;
+    return std::nullopt;
   }
 }
 
-Optional<ChunkKind> CodeCompletionStringPrinter::getChunkKindForStructureKind(
+std::optional<ChunkKind>
+CodeCompletionStringPrinter::getChunkKindForStructureKind(
     PrintStructureKind Kind) const {
   switch (Kind) {
   case PrintStructureKind::FunctionParameter:
     if (isInType()) {
-      return None;
+      return std::nullopt;
     }
     return ChunkKind::ParameterDeclBegin;
   case PrintStructureKind::DefaultArgumentClause:
@@ -68,7 +70,7 @@ Optional<ChunkKind> CodeCompletionStringPrinter::getChunkKindForStructureKind(
   case PrintStructureKind::FunctionParameterType:
     return ChunkKind::ParameterDeclTypeBegin;
   default:
-    return None;
+    return std::nullopt;
   }
 }
 
@@ -131,7 +133,7 @@ void CodeCompletionStringPrinter::printTypeRef(Type T, const TypeDecl *TD,
                                                Identifier Name,
                                                PrintNameContext NameContext) {
 
-  NextChunkKind = TD->getModuleContext()->isSystemModule()
+  NextChunkKind = TD->getModuleContext()->isNonUserModule()
                       ? ChunkKind::TypeIdSystem
                       : ChunkKind::TypeIdUser;
 

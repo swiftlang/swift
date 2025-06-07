@@ -1,6 +1,6 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=NotPreDefinedClassTemplate -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
 
-// CHECK:      struct __CxxTemplateInst12MagicWrapperI10IntWrapperE {
+// CHECK:      struct MagicWrapper<IntWrapper> {
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   init(t: IntWrapper)
 // CHECK-NEXT:   var t: IntWrapper
@@ -14,4 +14,4 @@
 // CHECK-NEXT:   var value: Int32
 // CHECK-NEXT: }
 
-// CHECK-NEXT: typealias MagicallyWrappedIntWithoutDefinition = __CxxTemplateInst12MagicWrapperI10IntWrapperE
+// CHECK-NEXT: typealias MagicallyWrappedIntWithoutDefinition = MagicWrapper<IntWrapper>

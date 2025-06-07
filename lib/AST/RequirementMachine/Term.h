@@ -10,9 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "Symbol.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
-#include "Symbol.h"
+#include <optional>
 
 #ifndef SWIFT_RQM_TERM_H
 #define SWIFT_RQM_TERM_H
@@ -75,11 +76,11 @@ public:
     return begin()->getRootProtocol();
   }
 
-  bool containsUnresolvedSymbols() const;
+  bool containsNameSymbols() const;
 
   void dump(llvm::raw_ostream &out) const;
 
-  Optional<int> compare(Term other, RewriteContext &ctx) const;
+  std::optional<int> compare(Term other, RewriteContext &ctx) const;
 
   friend bool operator==(Term lhs, Term rhs) {
     return lhs.Ptr == rhs.Ptr;
@@ -122,14 +123,18 @@ public:
   explicit MutableTerm(llvm::SmallVector<Symbol, 3> &&symbols)
     : Symbols(std::move(symbols)) {}
 
-  explicit MutableTerm(ArrayRef<Symbol> symbols)
-    : Symbols(symbols.begin(), symbols.end()) {}
+  explicit MutableTerm(llvm::ArrayRef<Symbol> symbols)
+      : Symbols(symbols.begin(), symbols.end()) {}
 
   explicit MutableTerm(Term term)
     : Symbols(term.begin(), term.end()) {}
 
   void add(Symbol symbol) {
     Symbols.push_back(symbol);
+  }
+
+  void prepend(Symbol symbol) {
+    Symbols.insert(Symbols.begin(), symbol);
   }
 
   void append(Term other) {
@@ -144,7 +149,8 @@ public:
     Symbols.append(from, to);
   }
 
-  Optional<int> compare(const MutableTerm &other, RewriteContext &ctx) const;
+  std::optional<int> compare(const MutableTerm &other,
+                             RewriteContext &ctx) const;
 
   bool empty() const { return Symbols.empty(); }
 
@@ -165,6 +171,10 @@ public:
 
   std::reverse_iterator<Symbol *> rbegin() { return Symbols.rbegin(); }
   std::reverse_iterator<Symbol *> rend() { return Symbols.rend(); }
+  
+  Symbol front() const {
+    return Symbols.front();
+  }
 
   Symbol back() const {
     return Symbols.back();

@@ -28,6 +28,7 @@
 #include "llvm/Support/Chrono.h"
 #include "llvm/Support/Program.h"
 #include "llvm/Support/raw_ostream.h"
+#include <optional>
 
 #include <memory>
 
@@ -311,27 +312,11 @@ private:
 
   /// The path and argument string to use for the response file if the job's
   /// arguments should be passed using one.
-  Optional<ResponseFileInfo> ResponseFile;
+  std::optional<ResponseFileInfo> ResponseFile;
 
   /// The modification time of the main input file, if any.
   llvm::sys::TimePoint<> InputModTime = llvm::sys::TimePoint<>::max();
 
-#ifndef NDEBUG
-  /// The "wave" of incremental jobs that this \c Job was scheduled into.
-  ///
-  /// The first "wave" of jobs is computed by the driver from the set of inputs
-  /// and external files that have been mutated by the user. From there, as
-  /// jobs from the first wave finish executing, we reload their \c swiftdeps
-  /// files and re-integrate them into the dependency graph to discover
-  /// the jobs for the second "wave".
-  ///
-  /// In +asserts builds, we ensure that no more than two "waves" occur for
-  /// any given incremental compilation session. This is a consequence of
-  /// 1) transitivity in dependency arcs
-  /// 2) dependency tracing from uses that affect a def's interfaces to that
-  ///    def's uses.
-  mutable unsigned Wave = 1;
-#endif
 
 public:
   Job(const JobAction &Source, SmallVectorImpl<const Job *> &&Inputs,
@@ -339,7 +324,7 @@ public:
       llvm::opt::ArgStringList Arguments,
       EnvironmentVector ExtraEnvironment = {},
       std::vector<FilelistInfo> Infos = {},
-      Optional<ResponseFileInfo> ResponseFile = None)
+      std::optional<ResponseFileInfo> ResponseFile = std::nullopt)
       : SourceAndCondition(&Source, Condition::Always),
         Inputs(std::move(Inputs)), Output(std::move(Output)),
         Executable(Executable), Arguments(std::move(Arguments)),
@@ -424,11 +409,6 @@ public:
   /// Assumes that, if a compile job, has one primary swift input
   /// May return empty if none.
   StringRef getFirstSwiftPrimaryInput() const;
-
-#ifndef NDEBUG
-  unsigned getWave() const { return Wave; }
-  void setWave(unsigned WaveNum) const { Wave = WaveNum; }
-#endif
 };
 
 /// A BatchJob comprises a _set_ of jobs, each of which is sufficiently similar
@@ -456,7 +436,7 @@ public:
            llvm::opt::ArgStringList Arguments,
            EnvironmentVector ExtraEnvironment, std::vector<FilelistInfo> Infos,
            ArrayRef<const Job *> Combined, Job::PID &NextQuasiPID,
-           Optional<ResponseFileInfo> ResponseFile = None);
+           std::optional<ResponseFileInfo> ResponseFile = std::nullopt);
 
   ArrayRef<const Job*> getCombinedJobs() const {
     return CombinedJobs;

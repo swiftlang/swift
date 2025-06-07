@@ -61,3 +61,55 @@ bb0:
   return %1 : $Builtin.BridgeObject
 }
 
+@_semantics("arc.immortal") protocol P : AnyObject {
+}
+
+@_semantics("arc.immortal") class C {
+  init()
+}
+
+@_inheritsConvenienceInitializers class D : C {
+  override init()
+}
+
+class E : P {
+  init()
+}
+
+// CHECK-LABEL: sil @testSemanticsOnClass
+// CHECK-NOT:   retain
+// CHECK: } // end sil function 'testSemanticsOnClass'
+sil @testSemanticsOnClass : $@convention(thin) (@guaranteed C) -> @owned C {
+bb0(%0 : $C):
+  strong_retain %0 : $C
+  return %0 : $C                                  // id: %3
+}
+
+// CHECK-LABEL: sil @testSemanticsOnDerivedClass
+// CHECK-NOT:   retain
+// CHECK: } // end sil function 'testSemanticsOnDerivedClass'
+sil @testSemanticsOnDerivedClass : $@convention(thin) (@guaranteed D) -> @owned D {
+bb0(%0 : $D):
+  strong_retain %0 : $D
+  return %0 : $D
+}
+
+// CHECK-LABEL: sil @testSemanticsOnConformingClass
+// CHECK-NOT:   retain
+// CHECK: } // end sil function 'testSemanticsOnConformingClass'
+sil @testSemanticsOnConformingClass : $@convention(thin) (@guaranteed E) -> @owned E {
+bb0(%0 : $E):
+  strong_retain %0 : $E
+  return %0 : $E
+}
+
+// CHECK-LABEL: sil @testSemanticsOnProtocol
+// CHECK-NOT:   retain
+// CHECK: } // end sil function 'testSemanticsOnProtocol'
+sil @testSemanticsOnProtocol : $@convention(thin) (@guaranteed any P) -> @owned any P {
+bb0(%0 : $any P):
+  strong_retain %0 : $any P
+  return %0 : $any P
+}
+
+

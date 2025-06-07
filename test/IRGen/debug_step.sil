@@ -1,0 +1,16 @@
+// RUN: %target-swift-frontend -g -emit-ir %s | %FileCheck %s
+
+// CHECK-LABEL: define {{.*}} @test_debug_step
+sil @test_debug_step : $@convention(thin) () -> () {
+bb0:
+  // CHECK: "nop"{{.*}}, !dbg [[L1:![0-9]+]]
+  debug_step, loc "a.swift":1:2
+  // CHECK: "nop"{{.*}}, !dbg [[L2:![0-9]+]]
+  debug_step, loc "b.swift":3:4
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-DAG: [[L1]] = !DILocation(line: 1, column: 2, {{.*}})
+// CHECK-DAG: [[L2]] = !DILocation(line: 3, column: 4, {{.*}})
+

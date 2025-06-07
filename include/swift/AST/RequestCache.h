@@ -18,6 +18,7 @@
 #include "swift/AST/DependencyCollector.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/raw_ostream.h"
 
 #ifndef SWIFT_AST_REQUEST_CACHE_H
 #define SWIFT_AST_REQUEST_CACHE_H
@@ -162,14 +163,22 @@ public:
 class PerRequestCache {
   void *Storage;
   std::function<void(void *)> Deleter;
+  std::function<void(llvm::raw_ostream &out, void *)> Dumper;
 
-  PerRequestCache(void *storage, std::function<void(void *)> deleter)
-      : Storage(storage), Deleter(deleter) {}
+  PerRequestCache(void *storage,
+                  std::function<void(void *)> deleter,
+                  std::function<void(llvm::raw_ostream &out, void *)> dumper)
+      : Storage(storage), Deleter(deleter), Dumper(dumper) {}
 
 public:
-  PerRequestCache() : Storage(nullptr), Deleter([](void *) {}) {}
+  PerRequestCache()
+    : Storage(nullptr),
+      Deleter([](void *) {}),
+      Dumper([](llvm::raw_ostream &, void *) {}) {}
   PerRequestCache(PerRequestCache &&other)
-      : Storage(other.Storage), Deleter(std::move(other.Deleter)) {
+      : Storage(other.Storage),
+        Deleter(std::move(other.Deleter)),
+        Dumper(std::move(other.Dumper)) {
     other.Storage = nullptr;
   }
 
@@ -190,7 +199,17 @@ public:
         llvm::DenseMap<RequestKey<Request>,
                        typename Request::OutputType>;
     return PerRequestCache(new Map(),
-                           [](void *ptr) { delete static_cast<Map *>(ptr); });
+                           [](void *ptr) { delete static_cast<Map *>(ptr); },
+                           [](llvm::raw_ostream &out, void *storage) {
+                             out << TypeID<Request>::getName() << "\t";
+                             if (auto *map = static_cast<Map *>(storage)) {
+                               out << map->size() << "\t"
+                                   << llvm::capacity_in_bytes(*map);
+                             } else {
+                               out << "0\t0";
+                             }
+                             out << "\n";
+                           });
   }
 
   template <typename Request>
@@ -204,10 +223,27 @@ public:
     return static_cast<Map *>(Storage);
   }
 
+  template <typename Request>
+  std::pair<size_t, size_t>
+  size() const {
+    using Map =
+        llvm::DenseMap<RequestKey<Request>,
+                       typename Request::OutputType>;
+    if (!Storage)
+      return std::make_pair(0, 0);
+
+    auto map = static_cast<Map *>(Storage);
+    return std::make_pair(map.size(), llvm::capacity_in_bytes(map));
+  }
+
   bool isNull() const { return !Storage; }
   ~PerRequestCache() {
     if (Storage)
       Deleter(Storage);
+  }
+
+  void dump(llvm::raw_ostream &out) {
+    Dumper(out, Storage);
   }
 };
 
@@ -259,12 +295,11 @@ public:
   }
 
   template <typename Request>
-  void insert(Request req, typename Request::OutputType val) {
+  bool insert(Request req, typename Request::OutputType val) {
     auto *cache = getCache<Request>();
     auto result = cache->insert({RequestKey<Request>(std::move(req)),
-                                 std::move(val)});
-    assert(result.second && "Request result was already cached");
-    (void) result;
+                                std::move(val)});
+    return result.second;
   }
 
   template <typename Request>
@@ -275,6 +310,15 @@ public:
 
   void clear() {
 #define SWIFT_TYPEID_ZONE(Name, Id) Name##ZoneCache.clear();
+#include "swift/Basic/TypeIDZones.def"
+#undef SWIFT_TYPEID_ZONE
+  }
+
+  void dump(llvm::raw_ostream &out) {
+#define SWIFT_TYPEID_ZONE(Name, Id)                                            \
+    for (auto &entry : Name##ZoneCache) {                                      \
+      entry.dump(out);                                                         \
+    }
 #include "swift/Basic/TypeIDZones.def"
 #undef SWIFT_TYPEID_ZONE
   }

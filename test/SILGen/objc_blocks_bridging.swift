@@ -1,8 +1,8 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
-// RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc_blocks_bridging -verify -I %S/Inputs -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -module-name objc_blocks_bridging -verify -I %S/Inputs -disable-objc-attr-requires-foundation-module  %s | %FileCheck %s --check-prefix=GUARANTEED
+// RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -sil-print-types -module-name objc_blocks_bridging -verify -I %S/Inputs -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -sil-print-types -module-name objc_blocks_bridging -verify -I %S/Inputs -disable-objc-attr-requires-foundation-module  %s | %FileCheck %s --check-prefix=GUARANTEED
 
 // REQUIRES: objc_interop
 
@@ -16,9 +16,10 @@ import Foundation
   // CHECK:         [[THUNK:%.*]] = function_ref @$sS2iIyByd_S2iIegyd_TR
   // CHECK:         [[BRIDGED:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[ARG1_COPY]])
   // CHECK:         [[CONVERT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[BRIDGED]]
+  // CHECK:         [[CONVERTB:%.*]] = begin_borrow [[CONVERT]]
   // CHECK:         [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
-  // CHECK:         [[NATIVE:%.*]] = function_ref @$s20objc_blocks_bridging3FooC3foo{{[_0-9a-zA-Z]*}}F : $@convention(method) (@noescape @callee_guaranteed (Int) -> Int, Int, @guaranteed Foo) -> Int
-  // CHECK:         apply [[NATIVE]]([[CONVERT]], {{.*}}, [[BORROWED_SELF_COPY]])
+  // CHECK:         [[NATIVE:%.*]] = function_ref @$s20objc_blocks_bridging3FooC3foo{{[_0-9a-zA-Z]*}}F : $@convention(method) (@guaranteed @noescape @callee_guaranteed (Int) -> Int, Int, @guaranteed Foo) -> Int
+  // CHECK:         apply [[NATIVE]]([[CONVERTB]], {{.*}}, [[BORROWED_SELF_COPY]])
   // CHECK:         end_borrow [[BORROWED_SELF_COPY]]
   // CHECK: } // end sil function '$s20objc_blocks_bridging3FooC3foo_1xS3iXE_SitFTo'
   @objc dynamic func foo(_ f: (Int) -> Int, x: Int) -> Int {
@@ -33,9 +34,10 @@ import Foundation
   // CHECK:         [[THUNK:%.*]] = function_ref @$sSo8NSStringCABIyBya_S2SIeggo_TR
   // CHECK:         [[BRIDGED:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[BLOCK_COPY]])
   // CHECK:         [[CONVERT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[BRIDGED]]
+  // CHECK:         [[CONVERTB:%.*]] = begin_borrow [[CONVERT]]
   // CHECK:         [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
-  // CHECK:         [[NATIVE:%.*]] = function_ref @$s20objc_blocks_bridging3FooC3bar{{[_0-9a-zA-Z]*}}F : $@convention(method) (@noescape @callee_guaranteed (@guaranteed String) -> @owned String, @guaranteed String, @guaranteed Foo) -> @owned String
-  // CHECK:         apply [[NATIVE]]([[CONVERT]], {{%.*}}, [[BORROWED_SELF_COPY]])
+  // CHECK:         [[NATIVE:%.*]] = function_ref @$s20objc_blocks_bridging3FooC3bar{{[_0-9a-zA-Z]*}}F : $@convention(method) (@guaranteed @noescape @callee_guaranteed (@guaranteed String) -> @owned String, @guaranteed String, @guaranteed Foo) -> @owned String
+  // CHECK:         apply [[NATIVE]]([[CONVERTB]], {{%.*}}, [[BORROWED_SELF_COPY]])
   // CHECK:         end_borrow [[BORROWED_SELF_COPY]]
   // CHECK: } // end sil function '$s20objc_blocks_bridging3FooC3bar_1xS3SXE_SStFTo'
   @objc dynamic func bar(_ f: (String) -> String, x: String) -> String {
@@ -57,9 +59,10 @@ import Foundation
   // CHECK:         [[THUNK:%.*]] = function_ref @$sSo8NSStringCSgACIyBya_SSSgADIeggo_TR
   // CHECK:         [[BRIDGED:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[BLOCK_COPY]])
   // CHECK:         [[CONVERT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[BRIDGED]]
+  // CHECK:         [[CONVERTB:%.*]] = begin_borrow [[CONVERT]]
   // CHECK:         [[BORROWED_SELF_COPY:%.*]] = begin_borrow [[SELF_COPY]]
-  // CHECK:         [[NATIVE:%.*]] = function_ref @$s20objc_blocks_bridging3FooC3bas{{[_0-9a-zA-Z]*}}F : $@convention(method) (@noescape @callee_guaranteed (@guaranteed Optional<String>) -> @owned Optional<String>, @guaranteed Optional<String>, @guaranteed Foo) -> @owned Optional<String>
-  // CHECK:         apply [[NATIVE]]([[CONVERT]], {{%.*}}, [[BORROWED_SELF_COPY]])
+  // CHECK:         [[NATIVE:%.*]] = function_ref @$s20objc_blocks_bridging3FooC3bas{{[_0-9a-zA-Z]*}}F : $@convention(method) (@guaranteed @noescape @callee_guaranteed (@guaranteed Optional<String>) -> @owned Optional<String>, @guaranteed Optional<String>, @guaranteed Foo) -> @owned Optional<String>
+  // CHECK:         apply [[NATIVE]]([[CONVERTB]], {{%.*}}, [[BORROWED_SELF_COPY]])
   // CHECK:         end_borrow [[BORROWED_SELF_COPY]]
   @objc dynamic func bas(_ f: (String?) -> String?, x: String?) -> String? {
     return f(x)
@@ -146,7 +149,7 @@ class Test: NSObject {
   @objc func blockTakesBlock() -> ((Int) -> Int) -> Int {}
 }
 
-// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sS2iIgyd_SiIegyd_S2iIyByd_SiIeyByd_TR
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sS2iIgyd_SiIeggd_S2iIyByd_SiIeyByd_TR
 // CHECK:         [[BLOCK_COPY:%.*]] = copy_block [[ORIG_BLOCK:%.*]] :
 // CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] {{%.*}}([[BLOCK_COPY]])
 // CHECK: [[CONVERT:%.*]] = convert_escape_to_noescape [not_guaranteed] [[CLOSURE]]
@@ -197,9 +200,11 @@ func bridgeNoescapeBlock(fn: () -> (), optFn: (() -> ())?) {
   noescapeBlock { }
   // CHECK: destroy_value [[SOME_BLOCK]]
 
+  // CHECK: [[ORIG_A:%.*]] = copy_value %0
+  // CHECK: [[ORIG_B:%.*]] = copy_value [[ORIG_A]]
   // CHECK: [[WAE_THUNK:%.*]] = function_ref @$sIg_Ieg_TR
-  // CHECK: [[WAE_PA:%.*]] = partial_apply [callee_guaranteed] [[WAE_THUNK]](%0)
-  // CHECK: [[WAE_MD:%.*]] = mark_dependence [[WAE_PA]] : $@callee_guaranteed () -> () on %0
+  // CHECK: [[WAE_PA:%.*]] = partial_apply [callee_guaranteed] [[WAE_THUNK]]([[ORIG_B]])
+  // CHECK: [[WAE_MD:%.*]] = mark_dependence [[WAE_PA]] : $@callee_guaranteed () -> () on [[ORIG_A]]
   // CHECK: [[WAE:%.*]] = copy_value [[WAE_MD]]
   // CHECK: [[BLOCK_ALLOC:%.*]] = alloc_stack $@block_storage @callee_guaranteed () -> ()
   // CHECK: [[BLOCK_ADDR:%.*]] = project_block_storage [[BLOCK_ALLOC]]
@@ -242,9 +247,11 @@ func bridgeNoescapeBlock(fn: () -> (), optFn: (() -> ())?) {
   noescapeNonnullBlock { }
   // CHECK: destroy_value [[BLOCK]]
 
+  // CHECK: [[ORIG_A:%.*]] = copy_value %0
+  // CHECK: [[ORIG_B:%.*]] = copy_value [[ORIG_A]]
   // CHECK: [[WAE_THUNK:%.*]] = function_ref @$sIg_Ieg_TR
-  // CHECK: [[WAE_PA:%.*]] = partial_apply [callee_guaranteed] [[WAE_THUNK]](%0)
-  // CHECK: [[WAE_MD:%.*]] = mark_dependence [[WAE_PA]] : $@callee_guaranteed () -> () on %0
+  // CHECK: [[WAE_PA:%.*]] = partial_apply [callee_guaranteed] [[WAE_THUNK]]([[ORIG_B]])
+  // CHECK: [[WAE_MD:%.*]] = mark_dependence [[WAE_PA]] : $@callee_guaranteed () -> () on [[ORIG_A]]
   // CHECK: [[WAE:%.*]] = copy_value [[WAE_MD]]
   // CHECK: [[BLOCK_ALLOC:%.*]] = alloc_stack $@block_storage @callee_guaranteed () -> ()
   // CHECK: [[BLOCK_ADDR:%.*]] = project_block_storage [[BLOCK_ALLOC]]
@@ -294,7 +301,7 @@ struct GenericStruct<T> {
     o.someDynamicMethod(closure: closure)
   }
 }
-// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sIg_Iegy_IyB_IyBy_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@noescape @callee_guaranteed () -> ()) -> (), @convention(block) @noescape () -> ()) -> () {
+// CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sIg_Iegg_IyB_IyBy_TR : $@convention(c) (@inout_aliasable @block_storage @callee_guaranteed (@guaranteed @noescape @callee_guaranteed () -> ()) -> (), @convention(block) @noescape () -> ()) -> () {
 // CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sIyB_Ieg_TR : $@convention(thin) (@guaranteed @convention(block) @noescape () -> ()) -> ()
 
 // rdar://35402696

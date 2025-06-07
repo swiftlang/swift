@@ -17,6 +17,7 @@
 #include "GenIntegerLiteral.h"
 
 #include "swift/ABI/MetadataValues.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/GlobalVariable.h"
@@ -43,7 +44,7 @@ public:
   IntegerLiteralTypeInfo(llvm::StructType *storageType,
                          Size size, Alignment align, SpareBitVector &&spareBits)
       : TrivialScalarPairTypeInfo(storageType, size, std::move(spareBits), align,
-                                  IsPOD, IsFixedSize) {}
+                            IsTriviallyDestroyable, IsCopyable, IsFixedSize, IsABIAccessible) {}
 
   static Size getFirstElementSize(IRGenModule &IGM) {
     return IGM.getPointerSize();
@@ -52,13 +53,15 @@ public:
     return ".data";
   }
 
-  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                        SILType T) const override {
-    if (!IGM.getOptions().ForceStructTypeLayouts) {
+  TypeLayoutEntry
+  *buildTypeLayoutEntry(IRGenModule &IGM,
+                        SILType T,
+                        bool useStructLayouts) const override {
+    if (!useStructLayouts) {
       return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
     }
     return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T,
-                                                      ScalarKind::POD);
+                                            ScalarKind::TriviallyDestroyable);
   }
 
   static Size getSecondElementOffset(IRGenModule &IGM) {
@@ -152,7 +155,7 @@ ConstantIntegerLiteralMap::get(IRGenModule &IGM, APInt &&value) {
   auto &entry = map[value];
   if (entry.Data) return entry;
 
-  assert(value.getMinSignedBits() == value.getBitWidth() &&
+  assert(value.getSignificantBits() == value.getBitWidth() &&
          "expected IntegerLiteral value to be maximally compact");
 
   // We're going to break the value down into pointer-sized chunks.

@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
 
 class A {}
 class B : A {}
@@ -7,7 +7,7 @@ class B : A {}
 // CHECK-LABEL: sil hidden [ossa] @$s4main3fooyyAA1ACSgF : $@convention(thin) (@guaranteed Optional<A>) -> () {
 // CHECK:    bb0([[ARG:%.*]] : @guaranteed $Optional<A>):
 // CHECK:      [[X:%.*]] = alloc_box ${ var Optional<B> }, var, name "x"
-// CHECK:      [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[X]]
+// CHECK:      [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[X]]
 // CHECK-NEXT: [[PB:%.*]] = project_box [[X_LIFETIME]]
 //   Check whether the temporary holds a value.
 // CHECK:      [[ARG_COPY:%.*]] = copy_value [[ARG]]
@@ -16,7 +16,7 @@ class B : A {}
 //   If so, pull the value out and check whether it's a B.
 // CHECK:    [[IS_PRESENT]]([[VAL:%.*]] :
 // CHECK-NEXT: [[X_VALUE:%.*]] = init_enum_data_addr [[PB]] : $*Optional<B>, #Optional.some
-// CHECK-NEXT: checked_cast_br [[VAL]] : $A to B, [[IS_B:bb.*]], [[NOT_B:bb[0-9]+]]
+// CHECK-NEXT: checked_cast_br A in [[VAL]] : $A to B, [[IS_B:bb.*]], [[NOT_B:bb[0-9]+]]
 //
 //   If so, materialize that and inject it into x.
 // CHECK:    [[IS_B]]([[T0:%.*]] : @owned $B):
@@ -53,7 +53,7 @@ func foo(_ y : A?) {
 // CHECK-LABEL: sil hidden [ossa] @$s4main3baryyAA1ACSgSgSgSgF : $@convention(thin) (@guaranteed Optional<Optional<Optional<Optional<A>>>>) -> () {
 // CHECK:    bb0([[ARG:%.*]] : @guaranteed $Optional<Optional<Optional<Optional<A>>>>):
 // CHECK:      [[X:%.*]] = alloc_box ${ var Optional<Optional<Optional<B>>> }, var, name "x"
-// CHECK:      [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[X]]
+// CHECK:      [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[X]]
 // CHECK-NEXT: [[PB:%.*]] = project_box [[X_LIFETIME]]
 // -- Check for some(...)
 // CHECK-NEXT: [[ARG_COPY:%.*]] = copy_value [[ARG]]
@@ -79,7 +79,7 @@ func foo(_ y : A?) {
 //
 //   If so, pull out the A and check whether it's a B.
 // CHECK:    [[PPPP]]([[VAL:%.*]] :
-// CHECK-NEXT: checked_cast_br [[VAL]] : $A to B, [[IS_B:bb.*]], [[NOT_B:bb[0-9]+]]
+// CHECK-NEXT: checked_cast_br A in [[VAL]] : $A to B, [[IS_B:bb.*]], [[NOT_B:bb[0-9]+]]
 //
 //   If so, inject it back into an optional.
 //   TODO: We're going to switch back out of this; we really should peephole it.
@@ -140,13 +140,13 @@ func bar(_ y : A????) {
 // CHECK-LABEL: sil hidden [ossa] @$s4main3bazyyyXlSgF : $@convention(thin) (@guaranteed Optional<AnyObject>) -> () {
 // CHECK:       bb0([[ARG:%.*]] : @guaranteed $Optional<AnyObject>):
 // CHECK:         [[X:%.*]] = alloc_box ${ var Optional<B> }, var, name "x"
-// CHECK:         [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[X]]
+// CHECK:         [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[X]]
 // CHECK-NEXT:    [[PB:%.*]] = project_box [[X_LIFETIME]]
 // CHECK-NEXT:    [[ARG_COPY:%.*]] = copy_value [[ARG]]
 // CHECK:         switch_enum [[ARG_COPY]]
 // CHECK:       bb1([[VAL:%.*]] : @owned $AnyObject):
 // CHECK-NEXT:    [[X_VALUE:%.*]] = init_enum_data_addr [[PB]] : $*Optional<B>, #Optional.some
-// CHECK-NEXT:    checked_cast_br [[VAL]] : $AnyObject to B, [[IS_B:bb.*]], [[NOT_B:bb[0-9]+]]
+// CHECK-NEXT:    checked_cast_br AnyObject in [[VAL]] : $AnyObject to B, [[IS_B:bb.*]], [[NOT_B:bb[0-9]+]]
 // CHECK:       [[IS_B]]([[CASTED_VALUE:%.*]] : @owned $B):
 // CHECK:         store [[CASTED_VALUE]] to [init] [[X_VALUE]]
 // CHECK:       [[NOT_B]]([[ORIGINAL_VALUE:%.*]] : @owned $AnyObject):
@@ -201,8 +201,10 @@ public struct TestAddressOnlyStruct<T> {
 // CHECK: bb0(%0 : $Optional<Int>):
 // CHECK-NEXT: debug_value %0 : $Optional<Int>, let, name "a"
 // CHECK-NEXT: [[X:%.*]] = alloc_box ${ var Optional<Int> }, var, name "x"
-// CHECK-NEXT: [[PB:%.*]] = project_box [[X]]
+// CHECK-NEXT: [[L:%.*]] = begin_borrow [var_decl] [[X]]
+// CHECK-NEXT: [[PB:%.*]] = project_box [[L]]
 // CHECK-NEXT: store %0 to [trivial] [[PB]] : $*Optional<Int>
+// CHECK-NEXT: end_borrow [[L]]
 // CHECK-NEXT: destroy_value [[X]] : ${ var Optional<Int> }
 func testContextualInitOfNonAddrOnlyType(_ a : Int?) {
   var x: Int! = a

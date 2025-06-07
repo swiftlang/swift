@@ -31,10 +31,16 @@ class SILOptFunctionBuilder;
 /// The \p ID must be the ID of a binary bit-operation builtin.
 APInt constantFoldBitOperation(APInt lhs, APInt rhs, BuiltinValueKind ID);
 
+/// Evaluates the constant result of a floating point comparison.
+///
+/// The \p ID must be the ID of a floating point builtin operation.
+APInt constantFoldComparisonFloat(APFloat lhs, APFloat rhs,
+                                  BuiltinValueKind ID);
+
 /// Evaluates the constant result of an integer comparison.
 ///
 /// The \p ID must be the ID of an integer builtin operation.
-APInt constantFoldComparison(APInt lhs, APInt rhs, BuiltinValueKind ID);
+APInt constantFoldComparisonInt(APInt lhs, APInt rhs, BuiltinValueKind ID);
 
 /// Evaluates the constant result of a binary operation with overflow.
 ///
@@ -52,6 +58,10 @@ APInt constantFoldDiv(APInt lhs, APInt rhs, bool &Overflow, BuiltinValueKind ID)
   /// The \p ID must be the ID of a trunc/sext/zext builtin.
 APInt constantFoldCast(APInt val, const BuiltinInfo &BI);
 
+/// If `ResultsInError` is not none than errors are diagnosed and
+/// `ResultsInError` is set to true in case of an error.
+SILValue constantFoldBuiltin(BuiltinInst *BI,
+                             std::optional<bool> &ResultsInError);
 
 /// A utility class to do constant folding.
 class ConstantFolder {

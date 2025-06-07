@@ -15,3 +15,4 @@ class A {
 // RUN: diff -u %S/Outputs/extract_subscript/FromGetter.swift.expected %t.result/FromGetter.swift
 // RUN: %refactor -extract-function -source-filename %s -pos=8:1 -end-pos=8:19 >> %t.result/FromSetter.swift
 // RUN: diff -u %S/Outputs/extract_subscript/FromSetter.swift.expected %t.result/FromSetter.swift
+// REQUIRES: swift_swift_parser

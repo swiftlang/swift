@@ -87,6 +87,36 @@ inline LoadableBoolWrapper operator||(LoadableBoolWrapper lhs, LoadableBoolWrapp
   return LoadableBoolWrapper{.value = lhs.value || rhs.value};
 }
 
+struct ClassWithOperatorEqualsParamUnnamed {};
+
+inline bool operator==(const ClassWithOperatorEqualsParamUnnamed &,
+                       const ClassWithOperatorEqualsParamUnnamed &) {
+  return false;
+}
+
+struct RValueArithmetic {
+  int value;
+};
+
+RValueArithmetic operator+(const RValueArithmetic &lhs,
+                           RValueArithmetic &&rhs) {
+  return {lhs.value + rhs.value};
+}
+
+struct LValueAndRValueArithmetic {
+  int value;
+};
+
+LValueAndRValueArithmetic operator+(const LValueAndRValueArithmetic &lhs,
+                                    const LValueAndRValueArithmetic &rhs) {
+  return {lhs.value + rhs.value};
+}
+
+LValueAndRValueArithmetic operator+(const LValueAndRValueArithmetic &lhs,
+                                    LValueAndRValueArithmetic &&rhs) {
+  return {lhs.value + rhs.value};
+}
+
 // Make sure that we don't crash on templated operators
 template<typename T> struct S {};
 template<typename T> S<T> operator+(S<T> lhs, S<T> rhs);

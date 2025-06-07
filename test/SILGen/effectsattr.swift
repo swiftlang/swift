@@ -20,7 +20,7 @@
 @_effects(notEscaping t.**) @_silgen_name("func5") func func5<T>(_ t: T) { }
 
 //CHECK-LABEL: sil hidden [ossa] @func6
-//CHECK-NEXT:  [%1: escape! v**.c* => %0.v**]
+//CHECK-NEXT:  [%1: escape! v**.c* -> %0.v**]
 //CHECK-NEXT:  {{^[^[]}}
 @_effects(escaping t.value**.class* => return.value**) @_silgen_name("func6") func func6<T>(_ t: T) -> T { }
 

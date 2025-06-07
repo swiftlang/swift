@@ -3,5 +3,7 @@
 
 import Swift
 
-public struct DeclaringLibraryTy {}
+public struct DeclaringLibraryTy {
+  public init()
+}
 public struct ShadowTy {}

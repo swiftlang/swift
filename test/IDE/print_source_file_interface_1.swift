@@ -3,15 +3,13 @@
 
 // More blah blah.
 
-#if FOO
 import Swift
 
+#if FOO
 class FooEnabled {}
 
 typealias MyN = Int
 #else
-import Swift
-
 class FooDisabled {}
 
 typealias MyN = Int

@@ -1,9 +1,9 @@
 // First parse this and then emit a *.sib. Then read in the *.sib, then recreate
 // RUN: %empty-directory(%t)
 // FIXME: <rdar://problem/29281364> sil-opt -verify is broken
-// RUN: %target-sil-opt %s -enable-sil-opaque-values -emit-sib -o %t/tmp.sib -module-name opaqueval
-// RUN: %target-sil-opt %t/tmp.sib -enable-sil-opaque-values -verify -o %t/tmp.2.sib -module-name opaqueval
-// RUN: %target-sil-opt %t/tmp.2.sib -enable-sil-opaque-values -emit-sorted-sil -verify -module-name opaqueval | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %s -enable-sil-opaque-values -emit-sib -o %t/tmp.sib -module-name opaqueval
+// RUN: %target-sil-opt -sil-print-types %t/tmp.sib -enable-sil-opaque-values -verify -o %t/tmp.2.sib -module-name opaqueval
+// RUN: %target-sil-opt -sil-print-types %t/tmp.2.sib -enable-sil-opaque-values -emit-sorted-sil -verify -module-name opaqueval | %FileCheck %s
 
 sil_stage raw
 
@@ -82,3 +82,52 @@ bb0(%0 : $S):
   return %t : $()
 }
 // CHECK-LABEL: } // end sil function 'serialize_mutating'
+
+struct WeakBox<T : AnyObject> {
+  weak var t: T?
+}
+
+// CHECK-LABEL: sil [ossa] @test_strong_copy_weak_value : {{.*}} {
+// CHECK:       bb0([[INSTANCE:%[^,]+]] :
+// CHECK:         [[WEAK_OPTIONAL:%[^,]+]] = struct_extract [[INSTANCE]]
+// CHECK:         strong_copy_weak_value [[WEAK_OPTIONAL]]
+// CHECK-LABEL: } // end sil function 'test_strong_copy_weak_value'
+sil [ossa] @test_strong_copy_weak_value : $@convention(thin) <T where T : AnyObject> (@in_guaranteed WeakBox<T>) -> @owned Optional<T> {
+bb0(%instance : @guaranteed $WeakBox<T>):
+  %weak_optional = struct_extract %instance : $WeakBox<T>, #WeakBox.t
+  %strong_optional = strong_copy_weak_value %weak_optional : $@sil_weak Optional<T>
+  return %strong_optional : $Optional<T>
+}
+
+// Test tuple_pack_extract parsing.
+
+// CHECK-LABEL: sil [ossa] @test_tuple_pack_extract : {{.*}} {
+// CHECK:       bb0([[TUPLE_ADDR:%[^,]+]] :
+// CHECK:         [[TUPLE:%[^,]+]] = load_borrow [[TUPLE_ADDR]]
+// CHECK:         [[ZERO:%[^,]+]] = integer_literal
+// CHECK:         [[INDEX:%[^,]+]] = dynamic_pack_index [[ZERO]]
+// CHECK:         [[ELT:%[^,]+]] = tuple_pack_extract [[INDEX]] of [[TUPLE]]
+// CHECK-LABEL: } // end sil function 'test_tuple_pack_extract'
+sil [ossa] @test_tuple_pack_extract : $@convention(thin) <each T> (@in_guaranteed (repeat each T)) -> () {
+entry(%tuple_addr : $*(repeat each T)):
+  %tuple = load_borrow %tuple_addr : $*(repeat each T)
+  %zero = integer_literal $Builtin.Word, 0
+  %index = dynamic_pack_index %zero of $Pack{repeat each T}
+  %opened = open_pack_element %index of <each U_1> at <Pack{repeat each T}>, shape $U_1, uuid "00000000-0000-0000-0000-000000000000"
+  %elt = tuple_pack_extract %index of %tuple : $(repeat each T) as $@pack_element("00000000-0000-0000-0000-000000000000") U_1
+  end_borrow %tuple : $(repeat each T)
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_weak_copy_value_1 : {{.*}} {
+// CHECK:       bb0([[VALUE:%[^,]+]] :
+// CHECK:         weak_copy_value [[VALUE]]
+// CHECK-LABEL: } // end sil function 'test_weak_copy_value_1'
+sil [ossa] @test_weak_copy_value_1 : $@convention(thin) <T where T : AnyObject> (@owned Optional<T>) -> @out WeakBox<T> {
+bb0(%value : @owned $Optional<T>):
+  %weak_value = weak_copy_value %value : $Optional<T>
+  destroy_value %value : $Optional<T>
+  %retval = struct $WeakBox<T> (%weak_value : $@sil_weak Optional<T>)
+  return %retval : $WeakBox<T>
+}

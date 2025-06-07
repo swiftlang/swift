@@ -11,18 +11,26 @@
 
 // Run the scan
 // RUN: %target-swift-frontend -scan-dependencies %s -o %t/deps.json -F %t/Frameworks/ -sdk %t
-// RUN: %FileCheck %s < %t/deps.json
+// RUN: %validate-json %t/deps.json | %FileCheck %s
 
 import Foo
 
+// Appears as a dependency of the main module
 // CHECK: "swiftPrebuiltExternal": "Foo"
+
+// Appears as, specifically, a source-imported dependency of the main module
 // CHECK:      "swiftPrebuiltExternal": "Foo"
+
+// Actual node in the dependency graph for module 'Foo'
+// CHECK:      "swiftPrebuiltExternal": "Foo"
+
 // CHECK-NEXT:    },
 // CHECK-NEXT:    {
 // CHECK-NEXT:      "modulePath": 
 // CHECK-NEXT:      "directDependencies": [
 // CHECK:      "details": {
 // CHECK-NEXT:        "swiftPrebuiltExternal": {
-// CHECK-NEXT:          "compiledModulePath": 
+// CHECK-NEXT:          "compiledModulePath":
+// CHECK-NEXT:          "userModuleVersion":
 // CHECK-NEXT:          "isFramework": true
 // CHECK-NEXT:        }

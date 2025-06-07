@@ -11,7 +11,6 @@
 
 import #^CLANG_IMPORT1^#
 
-// CLANG_IMPORT1:	Begin completions
 // CLANG_IMPORT1-DAG:	Decl[Module]/None:       Foo[#Module#]; name=Foo
 // CLANG_IMPORT1-DAG:	Decl[Module]/None: FooHelper[#Module#]; name=FooHelper
 // CLANG_IMPORT1-DAG:	Decl[Module]/None:       Bar[#Module#]; name=Bar
@@ -21,7 +20,6 @@ import Foo
 
 import #^CLANG_IMPORT2^#
 
-// CLANG_IMPORT2: Begin completions
 // CLANG_IMPORT2-DAG: Decl[Module]/None/NotRecommended:       Foo[#Module#]; name=Foo
 // CLANG_IMPORT2-DAG: Decl[Module]/None/NotRecommended: FooHelper[#Module#]; name=FooHelper
 // CLANG_IMPORT2-DAG: Decl[Module]/None:                      Bar[#Module#]; name=Bar
@@ -29,16 +27,14 @@ import #^CLANG_IMPORT2^#
 
 import Foo.#^CLANG_IMPORT3^#
 
-// CLANG_IMPORT3: Begin completions
-// CLANG_IMPORT3-NEXT: Decl[Module]/None:   FooSub[#Module#]; name=FooSub
+// CLANG_IMPORT3: Decl[Module]/None:   FooSub[#Module#]; name=FooSub
 
 import Foo.FooSub
 
 import Foo.#^CLANG_IMPORT8^#
 
 // FIXME: This should be marked as not recommended, holding for Swift's submodules support.
-// CLANG_IMPORT8: Begin completions
-// CLANG_IMPORT8-NEXT: Decl[Module]/None:   FooSub[#Module#]; name=FooSub
+// CLANG_IMPORT8: Decl[Module]/None:   FooSub[#Module#]; name=FooSub
 
 import Foo#^CLANG_IMPORT4^#
 // CLANG_IMPORT4-NOT: Begin completions

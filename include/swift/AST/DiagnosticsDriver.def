@@ -80,15 +80,6 @@ ERROR(error_unsupported_option,none,
       "option '%0' is not supported by '%1'; did you mean to use '%2'?",
       (StringRef, StringRef, StringRef))
 
-WARNING(incremental_requires_output_file_map,none,
-        "ignoring -incremental (currently requires an output file map)", ())
-WARNING(incremental_requires_build_record_entry,none,
-        "ignoring -incremental; output file map has no master dependencies "
-        "entry (\"%0\" under \"\")", (StringRef))
-
-WARNING(unable_to_open_incremental_comparison_log,none,
-"unable to open incremental comparison log file '%0'", (StringRef))
-
 ERROR(error_os_minimum_deployment,none,
       "Swift requires a minimum deployment target of %0", (StringRef))
 ERROR(error_sdk_too_old,none,
@@ -99,22 +90,6 @@ ERROR(error_ios_maximum_deployment_32,none,
 ERROR(error_unsupported_target_variant,none,
       "unsupported '%select{-target|-target-variant}1' value '%0'; use 'ios-macabi' instead",
       (StringRef, bool))
-
-WARNING(warn_arclite_not_found_when_link_objc_runtime,none,
-        "unable to find Objective-C runtime support library 'arclite'; "
-        "pass '-no-link-objc-runtime' to silence this warning", ())
-
-WARNING(warn_cannot_stat_input,none,
-        "unable to determine when '%0' was last modified: %1",
-        (StringRef, StringRef))
-
-WARNING(warn_unable_to_load_dependencies, none,
-        "unable to load dependencies file \"%0\", disabling incremental mode",
-        (StringRef))
-
-ERROR(error_input_changed_during_build,none,
-      "input file '%0' was modified during the build",
-      (StringRef))
 
 ERROR(error_conflicting_options, none,
       "conflicting options '%0' and '%1'",
@@ -130,9 +105,6 @@ WARNING(warn_ignore_embed_bitcode_marker, none,
 
 WARNING(verify_debug_info_requires_debug_option,none,
         "ignoring '-verify-debug-info'; no debug info is being generated", ())
-
-ERROR(verify_incremental_dependencies_needs_incremental,none,
-      "'-verify-incremental-dependencies' requires '-incremental'", ())
 
 ERROR(error_profile_missing,none,
       "no profdata file exists at '%0'", (StringRef))
@@ -152,19 +124,14 @@ WARNING(warn_use_filelists_deprecated, none,
         "the option '-driver-use-filelists' is deprecated; use "
         "'-driver-filelist-threshold=0' instead", ())
 
-WARNING(warn_unable_to_load_primary, none,
-"unable to load primary swift file \"%0\", %1",
-(StringRef, StringRef))
-
 ERROR(cannot_find_migration_script, none,
       "missing migration script from path '%0'", (StringRef))
 
 ERROR(error_darwin_static_stdlib_not_supported, none,
       "-static-stdlib is no longer supported on Apple platforms", ())
 
-ERROR(error_darwin_only_supports_libcxx, none,
-      "The only C++ standard library supported on Apple platforms is libc++",
-      ())
+WARNING(warn_darwin_link_objc_deprecated, none,
+      "-link-objc-runtime is no longer supported on Apple platforms", ())
 
 ERROR(error_wasm_doesnt_support_global_base, none,
       "The --global-base argument is not supported when targeting WebAssembly",
@@ -184,6 +151,9 @@ WARNING(warn_drv_darwin_sdk_invalid_settings, none,
 
 WARNING(warning_unsupported_driver_option,none,
         "option '%0' is only supported in swift-driver", (StringRef))
+
+WARNING(new_driver_not_found,none,
+        "using (deprecated) legacy driver, Swift installation does not contain swift-driver at: '%0'", (StringRef))
 
 WARNING(old_driver_deprecated,none,
         "legacy driver is now deprecated; consider avoiding specifying '%0'", (StringRef))

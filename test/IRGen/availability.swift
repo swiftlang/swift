@@ -1,7 +1,8 @@
 // RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s
 // RUN: %target-swift-frontend -primary-file %s -O -emit-ir | %FileCheck %s --check-prefix=OPT
 
-// REQUIRES: objc_interop
+// On iOS stdlib_isOSVersionAtLeast() is @_transparent, which affects optimization.
+// REQUIRES: OS=macosx || OS=tvos || OS=watchos || OS=xros
 
 import Foundation
 
@@ -19,7 +20,7 @@ import Foundation
 // OPT: s10Foundation11MeasurementVySo17NSUnitTemperature
 
 public func dontHoist() {
-  if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
+  if #available(macOS 51.0, iOS 54.0, watchOS 57.0, tvOS 54.0, visionOS 51.1, *) {
       let measurement = Measurement<UnitTemperature>(value: Double(42), unit: .celsius)
       print("\(measurement)")
   } else {
@@ -49,13 +50,13 @@ public func dontHoist() {
 // OPT-NOT: call {{.*}} @"$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF"
 // OPT: ret void
 public func multipleAvailabilityChecks() {
-  if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
+  if #available(macOS 51.0, iOS 54.0, watchOS 57.0, tvOS 54.0, visionOS 51.1, *) {
     print("test one")
   }
-  if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
+  if #available(macOS 51.0, iOS 54.0, watchOS 57.0, tvOS 54.0, visionOS 51.1, *) {
     print("test two")
   }
-  if #available(OSX 10.12, iOS 10.0, watchOS 3.0, tvOS 10.0, *) {
+  if #available(macOS 51.0, iOS 54.0, watchOS 57.0, tvOS 54.0, visionOS 51.1, *) {
     print("test three")
   }
 }

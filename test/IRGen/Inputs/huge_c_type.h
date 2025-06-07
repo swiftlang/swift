@@ -1,7 +1,5 @@
 #include <stdint.h>
 
-typedef uint8_t bool;
-
 #define CREATE_ARRAY(T, N)                                                     \
   struct {                                                                     \
     T data[N];                                                                 \
@@ -15,7 +13,7 @@ typedef struct {
 
 typedef struct {
   uint64_t a;
-  bool b;
+  uint8_t b;
   CREATE_ARRAY(Thing, 16) c;
   uint32_t d;
   uint64_t e;

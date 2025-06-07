@@ -1,381 +1,184 @@
-import CASTBridging
+//===--- Diagnostics.swift ------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2023 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
 import SwiftDiagnostics
 import SwiftSyntax
 
-fileprivate func emitDiagnosticParts(
-  diagEnginePtr: UnsafeMutablePointer<UInt8>,
-  sourceFileBuffer: UnsafeMutableBufferPointer<UInt8>,
-  message: String,
-  severity: DiagnosticSeverity,
-  position: AbsolutePosition,
-  highlights: [Syntax] = [],
-  fixItChanges: [FixIt.Change] = []
-) {
-  // Map severity
-  let bridgedSeverity: BridgedDiagnosticSeverity
-  switch severity {
-    case .error: bridgedSeverity = .error
-    case .note: bridgedSeverity = .note
-    case .warning: bridgedSeverity = .warning
+extension ASTGenVisitor {
+  /// Emits the given ASTGen diagnostic via the C++ diagnostic engine.
+  func diagnose(_ message: ASTGenDiagnostic, highlights: [Syntax]? = nil, notes: [Note] = [], fixIts: [FixIt] = []) {
+    self.diagnose(Diagnostic(
+      node: message.node,
+      message: message,
+      highlights: highlights,
+      notes: notes,
+      fixIts: fixIts
+    ))
   }
 
-  // Form a source location for the given absolute position
-  func sourceLoc(
-    at position: AbsolutePosition
-  ) -> UnsafeMutablePointer<UInt8>? {
-    if let sourceFileBase = sourceFileBuffer.baseAddress,
-      position.utf8Offset >= 0 &&
-        position.utf8Offset < sourceFileBuffer.count {
-      return sourceFileBase + position.utf8Offset
-    }
-
-    return nil
-  }
-
-  // Emit the diagnostic
-  var mutableMessage = message
-  let diag = mutableMessage.withUTF8 { messageBuffer in
-    SwiftDiagnostic_create(
-      diagEnginePtr, bridgedSeverity, sourceLoc(at: position),
-      messageBuffer.baseAddress, messageBuffer.count
+  /// Emits the given diagnostic via the C++ diagnostic engine.
+  func diagnose(_ diagnostic: Diagnostic) {
+    emitDiagnostic(
+      diagnosticEngine: self.diagnosticEngine,
+      sourceFileBuffer: self.base,
+      diagnostic: diagnostic,
+      diagnosticSeverity: diagnostic.diagMessage.severity
     )
   }
 
-  // Emit highlights
-  for highlight in highlights {
-    SwiftDiagnostic_highlight(
-      diag, sourceLoc(at: highlight.position),
-      sourceLoc(at: highlight.endPosition)
-    )
-  }
-
-  // Emit changes for a Fix-It.
-  for change in fixItChanges {
-    let replaceStartLoc: UnsafeMutablePointer<UInt8>?
-    let replaceEndLoc: UnsafeMutablePointer<UInt8>?
-    var newText: String
-
-    switch change {
-    case .replace(let oldNode, let newNode):
-      replaceStartLoc = sourceLoc(at: oldNode.position)
-      replaceEndLoc = sourceLoc(at: oldNode.endPosition)
-      newText = newNode.description
-
-    case .replaceLeadingTrivia(let oldToken, let newTrivia):
-      replaceStartLoc = sourceLoc(at: oldToken.position)
-      replaceEndLoc = sourceLoc(
-        at: oldToken.positionAfterSkippingLeadingTrivia)
-      newText = newTrivia.description
-
-    case .replaceTrailingTrivia(let oldToken, let newTrivia):
-      replaceStartLoc = sourceLoc(at: oldToken.endPositionBeforeTrailingTrivia)
-      replaceEndLoc = sourceLoc(at: oldToken.endPosition)
-      newText = newTrivia.description
-    }
-
-    newText.withUTF8 { textBuffer in
-      SwiftDiagnostic_fixItReplace(
-        diag, replaceStartLoc, replaceEndLoc,
-        textBuffer.baseAddress, textBuffer.count
-      )
-    }
-  }
-
-  SwiftDiagnostic_finish(diag);
-}
-
-/// Emit the given diagnostic via the diagnostic engine.
-func emitDiagnostic(
-  diagEnginePtr: UnsafeMutablePointer<UInt8>,
-  sourceFileBuffer: UnsafeMutableBufferPointer<UInt8>,
-  diagnostic: Diagnostic,
-  messageSuffix: String? = nil
-) {
-  // Emit the main diagnostic
-  emitDiagnosticParts(
-    diagEnginePtr: diagEnginePtr,
-    sourceFileBuffer: sourceFileBuffer,
-    message: diagnostic.diagMessage.message + (messageSuffix ?? ""),
-    severity: diagnostic.diagMessage.severity,
-    position: diagnostic.position,
-    highlights: diagnostic.highlights
-  )
-
-  // Emit Fix-Its.
-  for fixIt in diagnostic.fixIts {
-    emitDiagnosticParts(
-        diagEnginePtr: diagEnginePtr,
-        sourceFileBuffer: sourceFileBuffer,
-        message: fixIt.message.message,
-        severity: .note, position: diagnostic.position,
-        fixItChanges: fixIt.changes.changes
-    )
-  }
-
-  // Emit any notes as follow-ons.
-  for note in diagnostic.notes {
-    emitDiagnosticParts(
-      diagEnginePtr: diagEnginePtr,
-      sourceFileBuffer: sourceFileBuffer,
-      message: note.message,
-      severity: .note, position: note.position
-    )
+  /// Emits the given diagnostics via the C++ diagnostic engine.
+  func diagnoseAll(_ diagnostics: [Diagnostic]) {
+    diagnostics.forEach(diagnose)
   }
 }
 
-extension SourceManager {
-  private func diagnoseSingle<Node: SyntaxProtocol>(
-    message: String,
-    severity: DiagnosticSeverity,
-    node: Node,
-    position: AbsolutePosition,
-    highlights: [Syntax] = [],
-    fixItChanges: [FixIt.Change] = []
-  ) {
-    // Map severity
-    let bridgedSeverity: BridgedDiagnosticSeverity
-    switch severity {
-      case .error: bridgedSeverity = .error
-      case .note: bridgedSeverity = .note
-      case .warning: bridgedSeverity = .warning
-    }
-
-    // Emit the diagnostic
-    var mutableMessage = message
-    let diag = mutableMessage.withUTF8 { messageBuffer in
-      SwiftDiagnostic_create(
-        cxxDiagnosticEngine, bridgedSeverity,
-        cxxSourceLocation(for: node, at: position),
-        messageBuffer.baseAddress, messageBuffer.count
-      )
-    }
-
-    // Emit highlights
-    for highlight in highlights {
-      SwiftDiagnostic_highlight(
-        diag,
-        cxxSourceLocation(for: highlight),
-        cxxSourceLocation(for: highlight, at: highlight.endPosition)
-      )
-    }
-
-    // Emit changes for a Fix-It.
-    for change in fixItChanges {
-      let replaceStartLoc: CxxSourceLoc?
-      let replaceEndLoc: CxxSourceLoc?
-      var newText: String
-
-      switch change {
-      case .replace(let oldNode, let newNode):
-        replaceStartLoc = cxxSourceLocation(for: oldNode)
-        replaceEndLoc = cxxSourceLocation(
-          for: oldNode,
-          at: oldNode.endPosition
-        )
-        newText = newNode.description
-
-      case .replaceLeadingTrivia(let oldToken, let newTrivia):
-        replaceStartLoc = cxxSourceLocation(for: oldToken)
-        replaceEndLoc = cxxSourceLocation(
-          for: oldToken,
-          at: oldToken.positionAfterSkippingLeadingTrivia
-        )
-        newText = newTrivia.description
-
-      case .replaceTrailingTrivia(let oldToken, let newTrivia):
-        replaceStartLoc = cxxSourceLocation(
-          for: oldToken,
-          at: oldToken.endPositionBeforeTrailingTrivia)
-        replaceEndLoc = cxxSourceLocation(
-          for: oldToken,
-          at: oldToken.endPosition
-        )
-        newText = newTrivia.description
-      }
-
-      newText.withUTF8 { textBuffer in
-        SwiftDiagnostic_fixItReplace(
-          diag, replaceStartLoc, replaceEndLoc,
-          textBuffer.baseAddress, textBuffer.count
-        )
-      }
-    }
-
-    SwiftDiagnostic_finish(diag);
-  }
-
-  /// Emit a diagnostic via the C++ diagnostic engine.
-  func diagnose(
-    diagnostic: Diagnostic,
-    messageSuffix: String? = nil
-  ) {
-    // Emit the main diagnostic.
-    diagnoseSingle(
-      message: diagnostic.diagMessage.message + (messageSuffix ?? ""),
-      severity: diagnostic.diagMessage.severity,
-      node: diagnostic.node,
-      position: diagnostic.position,
-      highlights: diagnostic.highlights
-    )
-
-    // Emit Fix-Its.
-    for fixIt in diagnostic.fixIts {
-      diagnoseSingle(
-          message: fixIt.message.message,
-          severity: .note,
-          node: diagnostic.node,
-          position: diagnostic.position,
-          fixItChanges: fixIt.changes.changes
-      )
-    }
-
-    // Emit any notes as follow-ons.
-    for note in diagnostic.notes {
-      diagnoseSingle(
-        message: note.message,
-        severity: .note,
-        node: note.node,
-        position: note.position
-      )
-    }
-  }
-}
-
-/// A set of queued diagnostics created by the C++ compiler and rendered
-/// via the swift-syntax renderer.
-struct QueuedDiagnostics {
-  /// The source file in which all of the diagnostics occur.
-  let sourceFile: SourceFileSyntax
-
-  /// The underlying buffer within the C++ SourceManager, which is used
-  /// for computations of source locations.
-  let buffer: UnsafeBufferPointer<UInt8>
-
-  /// The set of diagnostics.
-  fileprivate var diagnostics: [Diagnostic] = []
-
-  mutating func diagnose(_ diagnostic: Diagnostic) {
-    assert(diagnostic.node.root == sourceFile.root)
-    diagnostics.append(diagnostic)
-  }
-
-  func render() -> String {
-    return DiagnosticsFormatter.annotatedSource(
-      tree: sourceFile,
-      diags: diagnostics
-    )
-  }
-}
-
-/// Create a queued diagnostics structure in which we can
-@_cdecl("swift_ASTGen_createQueuedDiagnostics")
-public func createQueuedDiagnostics(
-  sourceFilePtr: UnsafeMutablePointer<UInt8>
-) -> UnsafeRawPointer {
-  return sourceFilePtr.withMemoryRebound(
-    to: ExportedSourceFile.self, capacity: 1
-  ) { sourceFile in
-    let ptr = UnsafeMutablePointer<QueuedDiagnostics>.allocate(capacity: 1)
-    ptr.initialize(to: .init(
-      sourceFile: sourceFile.pointee.syntax,
-      buffer: sourceFile.pointee.buffer)
-    )
-    return UnsafeRawPointer(ptr)
-  }
-}
-
-/// Destroy the queued diagnostics.
-@_cdecl("swift_ASTGen_destroyQueuedDiagnostics")
-public func destroyQueuedDiagnostics(
-  queuedDiagnosticsPtr: UnsafeMutablePointer<UInt8>
-) {
-  queuedDiagnosticsPtr.withMemoryRebound(to: QueuedDiagnostics.self, capacity: 1) { queuedDiagnostics in
-    queuedDiagnostics.deinitialize(count: 1)
-    queuedDiagnostics.deallocate()
-  }
-}
-
-/// Diagnostic message used for thrown errors.
-fileprivate struct SimpleDiagnostic: DiagnosticMessage {
-  let message: String
-
-  let severity: DiagnosticSeverity
+struct ASTGenDiagnostic: DiagnosticMessage {
+  var node: Syntax
+  var message: String
+  var severity: DiagnosticSeverity
+  var messageID: String
 
   var diagnosticID: MessageID {
-    .init(domain: "SwiftCompiler", id: "SimpleDiagnostic")
+    MessageID(domain: "ASTGen", id: messageID)
+  }
+
+  init(node: some SyntaxProtocol, message: String, severity: DiagnosticSeverity = .error, messageID: String) {
+    self.node = Syntax(node)
+    self.message = message
+    self.severity = severity
+    self.messageID = messageID
+  }
+
+  fileprivate init(node: some SyntaxProtocol, message: String, severity: DiagnosticSeverity = .error, function: String = #function) {
+    // Extract messageID from the function name.
+    let messageID = String(function.prefix(while: { $0 != "(" }))
+    self.init(node: node, message: message, severity: severity, messageID: messageID)
   }
 }
 
-extension BridgedDiagnosticSeverity {
-  var asSeverity: DiagnosticSeverity {
-    switch self {
-    case .fatalError: return .error
-    case .error: return .error
-    case .warning: return .warning
-    case .remark: return .warning // FIXME
-    case .note: return .note
-    @unknown default: return .error
+extension ASTGenDiagnostic {
+  /// An error emitted when a token is of an unexpected kind.
+  static func unexpectedTokenKind(token: TokenSyntax) -> Self {
+    guard let parent = token.parent else {
+      preconditionFailure("Expected a child (not a root) token")
     }
+
+    return Self(
+      node: token,
+      message: """
+      unexpected token kind for token:
+        \(token.debugDescription)
+      in parent:
+        \(parent.debugDescription(indentString: "  "))
+      """
+    )
+  }
+
+  /// An error emitted when an optional child token is unexpectedly nil.
+  static func missingChildToken(parent: some SyntaxProtocol, kindOfTokenMissing: TokenKind) -> Self {
+    Self(
+      node: parent,
+      message: """
+      missing child token of kind '\(kindOfTokenMissing)' in:
+        \(parent.debugDescription(indentString: "  "))
+      """
+    )
+  }
+
+  /// An error emitted when a syntax collection entry is encountered that is
+  /// considered a duplicate of a previous entry per the language grammar.
+  static func duplicateSyntax(duplicate: some SyntaxProtocol, original: some SyntaxProtocol) -> Self {
+    precondition(duplicate.kind == original.kind, "Expected duplicate and original to be of same kind")
+
+    guard let duplicateParent = duplicate.parent, let originalParent = original.parent,
+      duplicateParent == originalParent, duplicateParent.kind.isSyntaxCollection
+    else {
+      preconditionFailure("Expected a shared syntax collection parent")
+    }
+
+    return Self(
+      node: duplicate,
+      message: """
+      unexpected duplicate syntax in list:
+        \(duplicate.debugDescription(indentString: "  "))
+      previous syntax:
+        \(original.debugDescription(indentString: "  "))
+      """
+    )
+  }
+
+  static func nonTrivialPatternForAccessor(_ pattern: some SyntaxProtocol) -> Self {
+    Self(
+      node: pattern,
+      message: "getter/setter can only be defined for a single variable"
+    )
+  }
+
+  static func unknownAccessorSpecifier(_ specifier: TokenSyntax) -> Self {
+    Self(
+      node: specifier,
+      message: "unknown accessor specifier '\(specifier.text)'"
+    )
   }
 }
 
-/// Add a new diagnostic to the queue.
-@_cdecl("swift_ASTGen_addQueuedDiagnostic")
-public func addQueuedDiagnostic(
-  queuedDiagnosticsPtr: UnsafeMutableRawPointer,
-  text: UnsafePointer<UInt8>,
-  textLength: Int,
-  severity: BridgedDiagnosticSeverity,
-  position: UnsafePointer<UInt8>
-) {
-  let queuedDiagnostics = queuedDiagnosticsPtr.bindMemory(
-    to: QueuedDiagnostics.self, capacity: 1
-  )
-
-  // Find the offset.
-  let buffer = queuedDiagnostics.pointee.buffer
-  let offset = position - buffer.baseAddress!
-  if offset < 0 || offset >= buffer.count {
-    return
-  }
-
-  // Find the token at that offset.
-  let sf = queuedDiagnostics.pointee.sourceFile
-  guard let token = sf.token(at: AbsolutePosition(utf8Offset: offset)) else {
-    return
-  }
-
-  let textBuffer = UnsafeBufferPointer(start: text, count: textLength)
-  let diagnostic = Diagnostic(
-    node: Syntax(token),
-    message: SimpleDiagnostic(
-      message: String(decoding: textBuffer, as: UTF8.self),
-      severity: severity.asSeverity
+/// Decl diagnostics
+extension ASTGenDiagnostic {
+  static func illegalTopLevelStmt(_ stmt: some SyntaxProtocol) -> Self {
+    Self(
+      node: stmt,
+      message: "statements are not allowed at the top level"
     )
-  )
+  }
 
-  queuedDiagnostics.pointee.diagnose(diagnostic)
+  static func illegalTopLevelExpr(_ expr: some SyntaxProtocol) -> Self {
+    Self(
+      node: expr,
+      message: "expressions are not allowed at the top level"
+    )
+  }
+
+  static func invalidDefaultIsolationSpecifier(_ specifier: some SyntaxProtocol) -> Self {
+    Self(
+      node: specifier,
+      message: "default isolation can only be set to '@MainActor' or 'nonisolated'"
+    )
+  }
 }
 
-
-/// Render the queued diagnostics into a UTF-8 string.
-@_cdecl("swift_ASTGen_renderQueuedDiagnostics")
-public func renterQueuedDiagnostics(
-  queuedDiagnosticsPtr: UnsafeMutablePointer<UInt8>,
-  contextSize: Int,
-  colorize: Int,
-  renderedPointer: UnsafeMutablePointer<UnsafePointer<UInt8>?>,
-  renderedLength: UnsafeMutablePointer<Int>
-) {
-  queuedDiagnosticsPtr.withMemoryRebound(to: QueuedDiagnostics.self, capacity: 1) { queuedDiagnostics in
-    let renderedStr = DiagnosticsFormatter.annotatedSource(
-      tree: queuedDiagnostics.pointee.sourceFile,
-      diags: queuedDiagnostics.pointee.diagnostics,
-      contextSize: contextSize,
-      colorize: colorize != 0
+/// DeclAttributes diagnostics
+extension ASTGenDiagnostic {
+  static func expectedArgumentsInAttribute(_ attribute: AttributeSyntax) -> Self {
+    // FIXME: The diagnostic position should be at the and of the attribute name.
+    Self(
+      node: attribute,
+      message: "expected arguments for '\(attribute.attributeName.trimmedDescription)' attribute"
     )
+  }
 
-    (renderedPointer.pointee, renderedLength.pointee) =
-        allocateUTF8String(renderedStr)
+  static func extraneousArgumentsInAttribute(_ attribute: AttributeSyntax, _ extra: some SyntaxProtocol) -> Self {
+    Self(
+      node: extra,
+      message: "unexpected arguments in '\(attribute.attributeName.trimmedDescription)' attribute"
+    )
+  }
+}
+
+extension ASTGenDiagnostic {
+  static func poundDiagnostic(_ node: StringLiteralExprSyntax, message: String, isError: Bool) -> Self {
+    Self(
+      node: node,
+      message: node.representedLiteralValue!,
+      severity: isError ? .error : .warning
+    )
   }
 }

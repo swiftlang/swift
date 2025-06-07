@@ -61,18 +61,18 @@ struct X2g : P2 {
 }
 
 // Static/non-static mismatch.
-struct X2w : P2 { // expected-error{{type 'X2w' does not conform to protocol 'P2'}}
+struct X2w : P2 { // expected-error{{type 'X2w' does not conform to protocol 'P2'}} expected-note {{add stubs for conformance}}
   typealias Assoc = X1a
   static func f1(_ x: X1a) { } // expected-note{{candidate operates on a type, not an instance as required}}
 }
 
 // Deduction of type that doesn't meet requirements
-struct X2x : P2 { // expected-error{{type 'X2x' does not conform to protocol 'P2'}}
+struct X2x : P2 { // expected-error{{type 'X2x' does not conform to protocol 'P2'}} expected-note {{add stubs for conformance}}
   func f1(x: Int) { }
 }
 
 // Mismatch in parameter types
-struct X2y : P2 { // expected-error{{type 'X2y' does not conform to protocol 'P2'}}
+struct X2y : P2 { // expected-error{{type 'X2y' does not conform to protocol 'P2'}} expected-note {{add stubs for conformance}}
   typealias Assoc = X1a
   func f1(x: X1b) { }
 }
@@ -101,7 +101,7 @@ prefix func ~~(_: X3a) -> X1a {}
 // FIXME: Add example with overloaded prefix/postfix
 
 // Prefix/postfix mismatch.
-struct X3z : P3 { // expected-error{{type 'X3z' does not conform to protocol 'P3'}}
+struct X3z : P3 { // expected-error{{type 'X3z' does not conform to protocol 'P3'}} expected-note {{add stubs for conformance}}
   typealias Assoc = X1a
 }
 
@@ -122,7 +122,7 @@ struct X4a : P4 {
 postfix func ~~(_: X4a) -> X1a {}
 
 // Prefix/postfix mismatch.
-struct X4z : P4 { // expected-error{{type 'X4z' does not conform to protocol 'P4'}}
+struct X4z : P4 { // expected-error{{type 'X4z' does not conform to protocol 'P4'}} expected-note {{add stubs for conformance}}
   typealias Assoc = X1a
 }
 
@@ -190,7 +190,7 @@ protocol P6 {
   func foo(_ x: Int)
   func bar(x: Int) // expected-note{{protocol requires function 'bar(x:)' with type '(Int) -> ()'}}
 }
-struct X6 : P6 { // expected-error{{type 'X6' does not conform to protocol 'P6'}}
+struct X6 : P6 { // expected-error{{type 'X6' does not conform to protocol 'P6'}} expected-note {{add stubs for conformance}}
   func foo(_ x: Missing) { } // expected-error{{cannot find type 'Missing' in scope}}
   func bar() { }
 }
@@ -206,7 +206,7 @@ protocol P6Ownership {
   __consuming func mismatch__consuming_mutating(x: Int) // expected-note {{protocol requires function 'mismatch__consuming_mutating(x:)' with type '(Int) -> ()'}}
   mutating func mismatch__mutating_consuming(x: Int)
 }
-struct X6Ownership : P6Ownership { // expected-error{{type 'X6Ownership' does not conform to protocol 'P6Ownership'}}
+struct X6Ownership : P6Ownership { // expected-error{{type 'X6Ownership' does not conform to protocol 'P6Ownership'}} expected-note {{add stubs for conformance}}
   func thunk__shared(_ x: Int) { } // OK
   func mismatch__shared(_ x: __shared Int) { } // OK
   func mismatch__owned(x: __owned Int) { } // OK

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -sroa %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -sroa %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -46,8 +46,6 @@ sil [ossa] @use_int32 : $@convention(thin) (Builtin.Int32) -> ()
 sil [ossa] @struct_with_scalar_fields : $@convention(thin) (S1) -> () {
 bb0(%0 : $S1):
   %1 = alloc_stack $S1
-  debug_value %1 : $*S1 // should not prevent the optimization
-  debug_value %1 : $*S1                // should not prevent the optimization
   store %0 to [trivial] %1 : $*S1
   %2 = function_ref @use_int32 : $@convention(thin) (Builtin.Int32) -> ()
   %3 = struct_element_addr %1 : $*S1, #S1.y
@@ -483,7 +481,6 @@ sil [ossa] @use_obj : $@convention(thin) (@owned Obj) -> ()
 sil [ossa] @struct_with_obj_fields : $@convention(thin) (@owned NotTrivial) -> () {
 bb0(%0 : @owned $NotTrivial):
   %1 = alloc_stack $NotTrivial
-  debug_value %1 : $*NotTrivial // should not prevent the optimization
   store %0 to [init] %1 : $*NotTrivial
   %2 = function_ref @use_obj : $@convention(thin) (@owned Obj) -> ()
   %3 = struct_element_addr %1 : $*NotTrivial, #NotTrivial.y

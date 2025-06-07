@@ -1,6 +1,6 @@
-// RUN: %target-run-simple-swift
+// RUN: %target-run-simple-swift -strict-concurrency=complete
 // REQUIRES: executable_test
-// REQUIRES: VENDOR=apple || OS=linux-androideabi || OS=linux-android || OS=linux-gnu || OS=openbsd
+// REQUIRES: VENDOR=apple || OS=linux-androideabi || OS=linux-android || OS=linux-gnu || OS=openbsd || OS=freebsd
 // UNSUPPORTED: freestanding
 
 import Swift
@@ -10,11 +10,17 @@ import StdlibUnittest
   import Darwin
 #elseif canImport(Glibc)
   import Glibc
+#elseif canImport(Android)
+  import Android
 #else
 #error("Unsupported platform")
 #endif
 
 var POSIXErrorCodeTestSuite = TestSuite("POSIXErrorCode")
+
+// Ensure that POSIXErrorCode is actually Sendable
+func send(_ value: some Sendable) {}
+send(POSIXErrorCode.EPERM)
 
 #if canImport(Darwin)
 
@@ -156,6 +162,7 @@ POSIXErrorCodeTestSuite.test("Linux POSIX error codes constants") {
   expectEqual(EOWNERDEAD, POSIXErrorCode.EOWNERDEAD.rawValue)
   expectEqual(ENOTRECOVERABLE, POSIXErrorCode.ENOTRECOVERABLE.rawValue)
 }
+
 #elseif os(OpenBSD)
 
 POSIXErrorCodeTestSuite.test("OpenBSD POSIX error codes constants") {
@@ -256,6 +263,108 @@ POSIXErrorCodeTestSuite.test("OpenBSD POSIX error codes constants") {
   expectEqual(EPROTO, POSIXErrorCode.EPROTO.rawValue)
 
   expectEqual(EWOULDBLOCK, POSIXErrorCode.EAGAIN.rawValue)
+}
+
+#elseif os(FreeBSD)
+
+POSIXErrorCodeTestSuite.test("FreeBSD POSIX error codes constants") {
+  expectEqual(EPERM, POSIXErrorCode.EPERM.rawValue)
+  expectEqual(ENOENT, POSIXErrorCode.ENOENT.rawValue)
+  expectEqual(ESRCH, POSIXErrorCode.ESRCH.rawValue)
+  expectEqual(EINTR, POSIXErrorCode.EINTR.rawValue)
+  expectEqual(EIO, POSIXErrorCode.EIO.rawValue)
+  expectEqual(ENXIO, POSIXErrorCode.ENXIO.rawValue)
+  expectEqual(E2BIG, POSIXErrorCode.E2BIG.rawValue)
+  expectEqual(ENOEXEC, POSIXErrorCode.ENOEXEC.rawValue)
+  expectEqual(EBADF, POSIXErrorCode.EBADF.rawValue)
+  expectEqual(ECHILD, POSIXErrorCode.ECHILD.rawValue)
+  expectEqual(EDEADLK, POSIXErrorCode.EDEADLK.rawValue)
+  expectEqual(ENOMEM, POSIXErrorCode.ENOMEM.rawValue)
+  expectEqual(EACCES, POSIXErrorCode.EACCES.rawValue)
+  expectEqual(EFAULT, POSIXErrorCode.EFAULT.rawValue)
+  expectEqual(ENOTBLK, POSIXErrorCode.ENOTBLK.rawValue)
+  expectEqual(EBUSY, POSIXErrorCode.EBUSY.rawValue)
+  expectEqual(EEXIST, POSIXErrorCode.EEXIST.rawValue)
+  expectEqual(EXDEV, POSIXErrorCode.EXDEV.rawValue)
+  expectEqual(ENODEV, POSIXErrorCode.ENODEV.rawValue)
+  expectEqual(ENOTDIR, POSIXErrorCode.ENOTDIR.rawValue)
+  expectEqual(EISDIR, POSIXErrorCode.EISDIR.rawValue)
+  expectEqual(EINVAL, POSIXErrorCode.EINVAL.rawValue)
+  expectEqual(ENFILE, POSIXErrorCode.ENFILE.rawValue)
+  expectEqual(EMFILE, POSIXErrorCode.EMFILE.rawValue)
+  expectEqual(ENOTTY, POSIXErrorCode.ENOTTY.rawValue)
+  expectEqual(ETXTBSY, POSIXErrorCode.ETXTBSY.rawValue)
+  expectEqual(EFBIG, POSIXErrorCode.EFBIG.rawValue)
+  expectEqual(ENOSPC, POSIXErrorCode.ENOSPC.rawValue)
+  expectEqual(ESPIPE, POSIXErrorCode.ESPIPE.rawValue)
+  expectEqual(EROFS, POSIXErrorCode.EROFS.rawValue)
+  expectEqual(EMLINK, POSIXErrorCode.EMLINK.rawValue)
+  expectEqual(EPIPE, POSIXErrorCode.EPIPE.rawValue)
+  expectEqual(EDOM, POSIXErrorCode.EDOM.rawValue)
+  expectEqual(ERANGE, POSIXErrorCode.ERANGE.rawValue)
+  expectEqual(EAGAIN, POSIXErrorCode.EAGAIN.rawValue)
+  expectEqual(EINPROGRESS, POSIXErrorCode.EINPROGRESS.rawValue)
+  expectEqual(EALREADY, POSIXErrorCode.EALREADY.rawValue)
+  expectEqual(ENOTSOCK, POSIXErrorCode.ENOTSOCK.rawValue)
+  expectEqual(EDESTADDRREQ, POSIXErrorCode.EDESTADDRREQ.rawValue)
+  expectEqual(EMSGSIZE, POSIXErrorCode.EMSGSIZE.rawValue)
+  expectEqual(EPROTOTYPE, POSIXErrorCode.EPROTOTYPE.rawValue)
+  expectEqual(ENOPROTOOPT, POSIXErrorCode.ENOPROTOOPT.rawValue)
+  expectEqual(EPROTONOSUPPORT, POSIXErrorCode.EPROTONOSUPPORT.rawValue)
+  expectEqual(ESOCKTNOSUPPORT, POSIXErrorCode.ESOCKTNOSUPPORT.rawValue)
+  expectEqual(EOPNOTSUPP, POSIXErrorCode.EOPNOTSUPP.rawValue)
+  expectEqual(EPFNOSUPPORT, POSIXErrorCode.EPFNOSUPPORT.rawValue)
+  expectEqual(EAFNOSUPPORT, POSIXErrorCode.EAFNOSUPPORT.rawValue)
+  expectEqual(EADDRINUSE, POSIXErrorCode.EADDRINUSE.rawValue)
+  expectEqual(EADDRNOTAVAIL, POSIXErrorCode.EADDRNOTAVAIL.rawValue)
+  expectEqual(ENETDOWN, POSIXErrorCode.ENETDOWN.rawValue)
+  expectEqual(ENETUNREACH, POSIXErrorCode.ENETUNREACH.rawValue)
+  expectEqual(ENETRESET, POSIXErrorCode.ENETRESET.rawValue)
+  expectEqual(ECONNABORTED, POSIXErrorCode.ECONNABORTED.rawValue)
+  expectEqual(ECONNRESET, POSIXErrorCode.ECONNRESET.rawValue)
+  expectEqual(ENOBUFS, POSIXErrorCode.ENOBUFS.rawValue)
+  expectEqual(EISCONN, POSIXErrorCode.EISCONN.rawValue)
+  expectEqual(ENOTCONN, POSIXErrorCode.ENOTCONN.rawValue)
+  expectEqual(ESHUTDOWN, POSIXErrorCode.ESHUTDOWN.rawValue)
+  expectEqual(ETOOMANYREFS, POSIXErrorCode.ETOOMANYREFS.rawValue)
+  expectEqual(ETIMEDOUT, POSIXErrorCode.ETIMEDOUT.rawValue)
+  expectEqual(ECONNREFUSED, POSIXErrorCode.ECONNREFUSED.rawValue)
+  expectEqual(ELOOP, POSIXErrorCode.ELOOP.rawValue)
+  expectEqual(ENAMETOOLONG, POSIXErrorCode.ENAMETOOLONG.rawValue)
+  expectEqual(EHOSTDOWN, POSIXErrorCode.EHOSTDOWN.rawValue)
+  expectEqual(EHOSTUNREACH, POSIXErrorCode.EHOSTUNREACH.rawValue)
+  expectEqual(ENOTEMPTY, POSIXErrorCode.ENOTEMPTY.rawValue)
+  expectEqual(EPROCLIM, POSIXErrorCode.EPROCLIM.rawValue)
+  expectEqual(EUSERS, POSIXErrorCode.EUSERS.rawValue)
+  expectEqual(EDQUOT, POSIXErrorCode.EDQUOT.rawValue)
+  expectEqual(ESTALE, POSIXErrorCode.ESTALE.rawValue)
+  expectEqual(EREMOTE, POSIXErrorCode.EREMOTE.rawValue)
+  expectEqual(EBADRPC, POSIXErrorCode.EBADRPC.rawValue)
+  expectEqual(ERPCMISMATCH, POSIXErrorCode.ERPCMISMATCH.rawValue)
+  expectEqual(EPROGUNAVAIL, POSIXErrorCode.EPROGUNAVAIL.rawValue)
+  expectEqual(EPROGMISMATCH, POSIXErrorCode.EPROGMISMATCH.rawValue)
+  expectEqual(EPROCUNAVAIL, POSIXErrorCode.EPROCUNAVAIL.rawValue)
+  expectEqual(ENOLCK, POSIXErrorCode.ENOLCK.rawValue)
+  expectEqual(ENOSYS, POSIXErrorCode.ENOSYS.rawValue)
+  expectEqual(EFTYPE, POSIXErrorCode.EFTYPE.rawValue)
+  expectEqual(EAUTH, POSIXErrorCode.EAUTH.rawValue)
+  expectEqual(ENEEDAUTH, POSIXErrorCode.ENEEDAUTH.rawValue)
+  expectEqual(EIDRM, POSIXErrorCode.EIDRM.rawValue)
+  expectEqual(ENOMSG, POSIXErrorCode.ENOMSG.rawValue)
+  expectEqual(EOVERFLOW, POSIXErrorCode.EOVERFLOW.rawValue)
+  expectEqual(ECANCELED, POSIXErrorCode.ECANCELED.rawValue)
+  expectEqual(EILSEQ, POSIXErrorCode.EILSEQ.rawValue)
+  expectEqual(ENOATTR, POSIXErrorCode.ENOATTR.rawValue)
+  expectEqual(EDOOFUS, POSIXErrorCode.EDOOFUS.rawValue)
+  expectEqual(EBADMSG, POSIXErrorCode.EBADMSG.rawValue)
+  expectEqual(EMULTIHOP, POSIXErrorCode.EMULTIHOP.rawValue)
+  expectEqual(ENOLINK, POSIXErrorCode.ENOLINK.rawValue)
+  expectEqual(EPROTO, POSIXErrorCode.EPROTO.rawValue)
+  expectEqual(ENOTCAPABLE, POSIXErrorCode.ENOTCAPABLE.rawValue)
+  expectEqual(ECAPMODE, POSIXErrorCode.ECAPMODE.rawValue)
+  expectEqual(ENOTRECOVERABLE, POSIXErrorCode.ENOTRECOVERABLE.rawValue)
+  expectEqual(EOWNERDEAD, POSIXErrorCode.EOWNERDEAD.rawValue)
+  expectEqual(EINTEGRITY, POSIXErrorCode.EINTEGRITY.rawValue)
 }
 
 #endif

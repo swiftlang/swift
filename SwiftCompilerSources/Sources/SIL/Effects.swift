@@ -71,7 +71,7 @@ extension Function {
       var effects = definedGlobalEffects
 
       // Even a `[readnone]` function can read from indirect arguments.
-      if (0..<numArguments).contains(where: {getArgumentConvention(for: $0).isIndirectIn}) {
+      if (0..<numArguments).contains(where: {argumentConventions[$0].isIndirectIn}) {
         effects.memory.read = true
       }
       // Even `[readnone]` and `[readonly]` functions write to indirect results.
@@ -88,9 +88,41 @@ extension Function {
   public func getSideEffects(forArgument argument: ProjectedValue,
                              atIndex argumentIndex: Int,
                              withConvention convention: ArgumentConvention) -> SideEffects.GlobalEffects {
+    var result = SideEffects.GlobalEffects()
+
+    // Effects are only defined for operations which don't involve a load.
+    // In case the argument's path involves a load we need to return the global effects.
+    if argument.value.type.isAddress {
+      // Indirect arguments:
+      if argument.path.mayHaveClassProjection {
+        // For example:
+        //   bb0(%0: $*C):
+        //     %1 = load %0               // the involved load
+        //     %2 = ref_element_addr %1   // class projection
+        return getSideEffects()
+      }
+    } else {
+      // Direct arguments:
+      if argument.path.mayHaveTwoClassProjections {
+        // For example:
+        //   bb0(%0: $C):
+        //     %1 = ref_element_addr %1   // first class projection
+        //     %2 = load %1               // the involved load
+        //     %3 = ref_element_addr %2   // second class projection
+        return getSideEffects()
+
+      } else if argument.path.mayHaveClassProjection {
+        // For example:
+        //   bb0(%0: $C):
+        //     %1 = ref_element_addr %1   // class projection
+        //     %2 = load [take] %1        // the involved load
+        //     destroy_value %2
+        result.ownership = getSideEffects().ownership
+      }
+    }
+
     if let sideEffects = effects.sideEffects {
       /// There are computed side effects.
-      var result = SideEffects.GlobalEffects()
       let argEffect = sideEffects.getArgumentEffects(for: argumentIndex)
       if let effectPath = argEffect.read, effectPath.mayOverlap(with: argument.path) {
         result.memory.read = true
@@ -111,7 +143,7 @@ extension Function {
       if convention.isIndirectIn {
         // Even a `[readnone]` function can read from an indirect argument.
         result.memory.read = true
-      } else if convention == .indirectOut {
+      } else if convention.isIndirectOut {
         // Even `[readnone]` and `[readonly]` functions write to indirect results.
         result.memory.write = true
       }
@@ -129,12 +161,7 @@ extension Function {
       break
     }
     if isProgramTerminationPoint {
-      // We can ignore any memory writes in a program termination point, because it's not relevant
-      // for the caller. But we need to consider memory reads, otherwise preceeding memory writes
-      // would be eliminated by dead-store-elimination in the caller. E.g. String initialization
-      // for error strings which are printed by the program termination point.
-      // Regarding ownership: a program termination point must not touch any reference counted objects.
-      return SideEffects.GlobalEffects(memory: SideEffects.Memory(read: true))
+      return SideEffects.GlobalEffects.worstEffects.forProgramTerminationPoints
     }
     var result = SideEffects.GlobalEffects.worstEffects
     switch effectAttribute {
@@ -208,9 +235,9 @@ public struct EscapeEffects : CustomStringConvertible, NoReflectionChildren {
       ///    [%0: escape s1 => %r]   // field 2 of argument 0 exclusively escapes via return.
       ///    [%0: escape s1 -> %r]   // field 2 of argument 0 - and other values - escape via return
       ///
-      /// The "exclusive" flag (= second payload) is true if only the argument escapes,
-      /// but nothing else escapes to the return value.
-      /// For example, "exclusive" is true for the following function:
+      /// The `isExclusive` flag is true if only the argument escapes, but nothing else escapes to
+      /// the return value.
+      /// For example, `isExclusive` is true for the following function:
       ///
       ///   @_effect(escaping c => return)
       ///   func exclusiveEscape(_ c: Class) -> Class { return c }
@@ -222,17 +249,40 @@ public struct EscapeEffects : CustomStringConvertible, NoReflectionChildren {
       ///   @_effect(escaping c -> return)
       ///   func notExclusiveEscape(_ c: Class) -> Class { return cond ? c : global }
       ///
-      case escapingToReturn(SmallProjectionPath, Bool)         // toPath, exclusive
+      /// Also, if `isExclusive` is true, there must not be a store in the chain from the argument to
+      /// the return, e.g.
+      ///
+      ///   @_effect(escaping x -> return)
+      ///   func notExclusiveEscape(_ s: String) -> Class {
+      ///     c = new Class()
+      ///     c.s = s             // Store, which prevents the effect to be `isExclusive`
+      ///     return s
+      ///   }
+      case escapingToReturn(toPath: SmallProjectionPath, isExclusive: Bool)
 
       /// Like `escapingToReturn`, but the argument escapes to another argument.
       ///
       /// Example: The argument effects of
+      ///
       ///   func argToArgEscape(_ r: inout Class, _ c: Class) { r = c }
       ///
       /// would be
       ///    [%1: escape => %0]   // Argument 1 escapes to argument 0
       ///
-      case escapingToArgument(Int, SmallProjectionPath, Bool)  // toArgumentIndex, toPath, exclusive
+      /// It's not allowed that the argument (or a derived value) is _stored_ to an object which is loaded from somewhere.
+      /// In the following example `c` is loaded from the indirect inout argument and `s` is stored to a field of `c`:
+      ///
+      ///   func noEscapeEffect(_ c: inout Class, s: String) {
+      ///     c.s = s
+      ///   }
+      ///
+      /// In this case there is no escaping effect from `s` to `c`.
+      /// Note that theoretically this rule also applies to the `escapingToReturn` effect, but it's impossible
+      /// to construct such a situation for an argument which is only escaping to the function return.
+      ///
+      /// The `escapingToArgument` doesn't have an `isExclusive` flag, because an argument-to-argument escape
+      /// always involves a store, which makes an exclusive escape impossible.
+      case escapingToArgument(toArgumentIndex: Int, toPath: SmallProjectionPath)
     }
 
     /// To which argument does this effect apply to?
@@ -277,28 +327,25 @@ public struct EscapeEffects : CustomStringConvertible, NoReflectionChildren {
           if resultArgDelta != 1 {
             return nil
           }
-          self.kind = .escapingToArgument(0, toPath, exclusive)
+          self.kind = .escapingToArgument(toArgumentIndex: 0, toPath: toPath)
         } else {
-          self.kind = .escapingToReturn(toPath, exclusive)
+          self.kind = .escapingToReturn(toPath: toPath, isExclusive: exclusive)
         }
-      case .escapingToArgument(let toArgIdx, let toPath, let exclusive):
+      case .escapingToArgument(let toArgIdx, let toPath):
         let resultingToArgIdx = toArgIdx + resultArgDelta
         if resultingToArgIdx < 0 {
           if resultingToArgIdx != -1 {
             return nil
           }
-          self.kind = .escapingToReturn(toPath, exclusive)
+          self.kind = .escapingToReturn(toPath: toPath, isExclusive: false)
         } else {
-          self.kind = .escapingToArgument(resultingToArgIdx, toPath, exclusive)
+          self.kind = .escapingToArgument(toArgumentIndex: resultingToArgIdx, toPath: toPath)
         }
       }
     }
 
     public func matches(_ rhsArgIdx: Int, _ rhsPath: SmallProjectionPath) -> Bool {
-      if argumentIndex != rhsArgIdx {
-        return false
-      }
-      return rhsPath.matches(pattern: pathPattern)
+      return argumentIndex == rhsArgIdx && rhsPath.matches(pattern: pathPattern)
     }
 
     public var bodyDescription: String {
@@ -309,9 +356,9 @@ public struct EscapeEffects : CustomStringConvertible, NoReflectionChildren {
         case .escapingToReturn(let toPath, let exclusive):
           let toPathStr = (toPath.isEmpty ? "" : ".\(toPath)")
           return "escape\(patternStr) \(exclusive ? "=>" : "->") %r\(toPathStr)"
-        case .escapingToArgument(let toArgIdx, let toPath, let exclusive):
+        case .escapingToArgument(let toArgIdx, let toPath):
           let toPathStr = (toPath.isEmpty ? "" : ".\(toPath)")
-          return "escape\(patternStr) \(exclusive ? "=>" : "->") %\(toArgIdx)\(toPathStr)"
+          return "escape\(patternStr) -> %\(toArgIdx)\(toPathStr)"
       }
     }
 
@@ -342,7 +389,7 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
 
   /// Returns the effects of an argument.
   ///
-  /// In constrast to using `arguments` directly, it's valid to have an `argumentIndex`
+  /// In contrast to using `arguments` directly, it's valid to have an `argumentIndex`
   /// which is larger than the number of elements in `arguments`.
   public func getArgumentEffects(for argumentIndex: Int) -> ArgumentEffects {
     if argumentIndex < arguments.count {
@@ -378,7 +425,7 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
   
   /// Side-effects of a specific function argument.
   ///
-  /// The paths describe what (projeted) values of an argument are affected.
+  /// The paths describe what (projected) values of an argument are affected.
   /// If a path is nil, than there is no such effect on the argument.
   ///
   /// A path can contain any projection or wildcards, as long as there is no load involved.
@@ -486,12 +533,13 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
         result.ownership = SideEffects.Ownership()
       }
       switch convention {
-      case .indirectIn:
-        result.memory.write = false
-      case .indirectInGuaranteed:
+      case .indirectIn, .packOwned:
+        // indirect-in arguments are consumed by the caller and that not only counts as read but also as a write.
+        break
+      case .indirectInGuaranteed, .packGuaranteed:
         result.memory.write = false
         result.ownership.destroy = false
-      case .indirectOut:
+      case .indirectOut, .packOut, .packInout:
         result.memory.read = false
         result.ownership.copy = false
         result.ownership.destroy = false
@@ -499,7 +547,7 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
       case .directGuaranteed:
         // Note that `directGuaranteed` still has a "destroy" effect, because an object stored in
         // a class property could be destroyed.
-        if argument.path.hasNoClassProjection {
+        if !argument.path.mayHaveClassProjection {
           result.ownership.destroy = false
         }
         fallthrough
@@ -509,10 +557,22 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
           result.memory = SideEffects.Memory()
         }
 
-      case .indirectInout, .indirectInoutAliasable:
+      case .indirectInout, .indirectInoutAliasable, .indirectInCXX:
         break
       }
       return result
+    }
+
+    /// Effects with all effects removed which are not relevant for program termination points (like `fatalError`).
+    public var forProgramTerminationPoints: GlobalEffects {
+      // We can ignore any memory writes in a program termination point, because it's not relevant
+      // for the caller. But we need to consider memory reads, otherwise preceding memory writes
+      // would be eliminated by dead-store-elimination in the caller. E.g. String initialization
+      // for error strings which are printed by the program termination point.
+      // Regarding ownership: a program termination point must not touch any reference counted objects.
+      // Also, the deinit-barrier effect is not relevant because functions like `fatalError` and `exit` are
+      // not accessing objects (except strings).
+      return GlobalEffects(memory: Memory(read: memory.read))
     }
 
     public static var worstEffects: GlobalEffects {
@@ -549,6 +609,10 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
     public mutating func merge(with other: Memory) {
       read = read || other.read
       write = write || other.write
+    }
+
+    public static var noEffects: Memory {
+      Memory(read: false, write: false)
     }
 
     public static var worstEffects: Memory {
@@ -610,16 +674,21 @@ extension StringParser {
             try throwError("multi-value returns not supported yet")
           }
           let toPath = try parsePathPatternFromSource(for: function, type: function.argumentTypes[0])
-          return EscapeEffects.ArgumentEffect(.escapingToArgument(0, toPath, exclusive),
+
+          // Exclusive escapes are ignored for indirect return values.
+          return EscapeEffects.ArgumentEffect(.escapingToArgument(toArgumentIndex: 0, toPath: toPath),
                                       argumentIndex: fromArgIdx, pathPattern: fromPath, isDerived: false)
         }
         let toPath = try parsePathPatternFromSource(for: function, type: function.resultType)
-        return EscapeEffects.ArgumentEffect(.escapingToReturn(toPath, exclusive),
+        return EscapeEffects.ArgumentEffect(.escapingToReturn(toPath: toPath, isExclusive: exclusive),
                                     argumentIndex: fromArgIdx, pathPattern: fromPath, isDerived: false)
+      }
+      if exclusive {
+        try throwError("exclusive escapes to arguments are not supported")
       }
       let toArgIdx = try parseArgumentIndexFromSource(for: function, params: params)
       let toPath = try parsePathPatternFromSource(for: function, type: function.argumentTypes[toArgIdx])
-      return EscapeEffects.ArgumentEffect(.escapingToArgument(toArgIdx, toPath, exclusive),
+      return EscapeEffects.ArgumentEffect(.escapingToArgument(toArgumentIndex: toArgIdx, toPath: toPath),
                                   argumentIndex: fromArgIdx, pathPattern: fromPath, isDerived: false)
     }
     try throwError("unknown effect")
@@ -628,10 +697,10 @@ extension StringParser {
   private mutating func parseArgumentIndexFromSource(for function: Function,
                                              params: Dictionary<String, Int>) throws -> Int {
     if consume("self") {
-      if !function.hasSelfArgument {
+      guard let selfArgIdx = function.selfArgumentIndex else {
         try throwError("function does not have a self argument")
       }
-      return function.selfArgumentIndex
+      return selfArgIdx
     }
     if let name = consumeIdentifier() {
       guard let idx = params[name] else {
@@ -683,12 +752,15 @@ extension StringParser {
         let effect: EscapeEffects.ArgumentEffect
         if consume("%r") {
           let toPath = consume(".") ? try parseProjectionPathFromSIL() : SmallProjectionPath()
-          effect = EscapeEffects.ArgumentEffect(.escapingToReturn(toPath, exclusive),
+          effect = EscapeEffects.ArgumentEffect(.escapingToReturn(toPath: toPath, isExclusive: exclusive),
                                                 argumentIndex: argumentIndex, pathPattern: fromPath, isDerived: isDerived)
         } else {
+          if exclusive {
+            try throwError("exclusive escapes to arguments are not supported")
+          }
           let toArgIdx = try parseArgumentIndexFromSIL()
           let toPath = consume(".") ? try parseProjectionPathFromSIL() : SmallProjectionPath()
-          effect = EscapeEffects.ArgumentEffect(.escapingToArgument(toArgIdx, toPath, exclusive),
+          effect = EscapeEffects.ArgumentEffect(.escapingToArgument(toArgumentIndex: toArgIdx, toPath: toPath),
                                                 argumentIndex: argumentIndex, pathPattern: fromPath, isDerived: isDerived)
         }
         effects.escapeEffects.arguments.append(effect)

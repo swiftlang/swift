@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all -function-signature-opts -sil-fso-disable-dead-argument -sil-fso-disable-owned-to-guaranteed -enable-expand-all -sil-fso-optimize-if-not-called %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enable-sil-verify-all -function-signature-opts -sil-fso-disable-dead-argument -sil-fso-disable-owned-to-guaranteed -enable-expand-all -sil-fso-optimize-if-not-called %s | %FileCheck %s
 
 // *NOTE* We turn off all other fso optimizations including dead arg so we can
 // make sure that we are not exploding those.

@@ -16,6 +16,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -24,6 +25,7 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/VirtualOutputBackend.h"
 
 using namespace swift;
 
@@ -43,16 +45,15 @@ static void findAllClangImports(const clang::Module *module,
 }
 
 bool swift::emitImportedModules(ModuleDecl *mainModule,
-                                const FrontendOptions &opts) {
+                                const FrontendOptions &opts,
+                                llvm::vfs::OutputBackend &backend) {
   auto &Context = mainModule->getASTContext();
   std::string path = opts.InputsAndOutputs.getSingleOutputFilename();
-  std::error_code EC;
-  llvm::raw_fd_ostream out(path, EC, llvm::sys::fs::OF_None);
-
-  if (out.has_error() || EC) {
-    Context.Diags.diagnose(SourceLoc(), diag::error_opening_output, path,
-                           EC.message());
-    out.clear_error();
+  auto &diags = Context.Diags;
+  auto out = backend.createFile(path);
+  if (!out) {
+    diags.diagnose(SourceLoc(), diag::error_opening_output,
+                   path, toString(out.takeError()));
     return true;
   }
 
@@ -83,10 +84,7 @@ bool swift::emitImportedModules(ModuleDecl *mainModule,
     if (!clangImporter->importBridgingHeader(implicitHeaderPath, mainModule)) {
       SmallVector<ImportedModule, 16> imported;
       clangImporter->getImportedHeaderModule()->getImportedModules(
-          imported, {ModuleDecl::ImportFilterKind::Exported,
-                     ModuleDecl::ImportFilterKind::Default,
-                     ModuleDecl::ImportFilterKind::ImplementationOnly,
-                     ModuleDecl::ImportFilterKind::SPIAccessControl});
+          imported, ModuleDecl::getImportFilterLocal());
 
       for (auto IM : imported) {
         if (auto clangModule = IM.importedModule->findUnderlyingClangModule())
@@ -113,7 +111,13 @@ bool swift::emitImportedModules(ModuleDecl *mainModule,
   }
 
   for (auto name : Modules) {
-    out << name << "\n";
+    *out << name << "\n";
+  }
+
+  if (auto error = out->keep()) {
+    diags.diagnose(SourceLoc(), diag::error_closing_output,
+                   path, toString(std::move(error)));
+    return true;
   }
 
   return false;

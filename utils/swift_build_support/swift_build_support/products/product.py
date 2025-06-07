@@ -81,7 +81,7 @@ class Product(object):
         """is_ignore_install_all_product -> bool
 
         Whether this product is to ignore the install-all directive
-        and insted always respect its own should_install.
+        and instead always respect its own should_install.
         This is useful when we run -install-all but have products
         which should never be installed into the toolchain
         (e.g. earlyswiftdriver)
@@ -288,12 +288,16 @@ class Product(object):
             target = '{}-apple-watchos{}'.format(
                 arch,
                 self.args.darwin_deployment_version_watchos if include_version else "")
+        elif platform in ['xrsimulator', 'xros']:
+            target = '{}-apple-xros{}'.format(
+                arch, self.args.darwin_deployment_version_xros)
         return target
 
-    def generate_darwin_toolchain_file(self, platform, arch):
+    def generate_darwin_toolchain_file(self, platform, arch,
+                                       macos_deployment_version=None):
         """
         Generates a new CMake tolchain file that specifies Darwin as a target
-        plaftorm.
+        platform.
 
             Returns: path on the filesystem to the newly generated toolchain file.
         """
@@ -303,9 +307,14 @@ class Product(object):
 
         cmake_osx_sysroot = xcrun.sdk_path(platform)
 
-        target = self.target_for_platform(platform, arch)
-        if not target:
-            raise RuntimeError('Unhandled platform {}?!'.format(platform))
+        if platform == 'macosx':
+            if macos_deployment_version is None:
+                macos_deployment_version = self.args.darwin_deployment_version_osx
+            target = '{}-apple-macosx{}'.format(arch, macos_deployment_version)
+        else:
+            target = self.target_for_platform(platform, arch)
+            if not target:
+                raise RuntimeError('Unhandled platform {}?!'.format(platform))
 
         toolchain_args = {}
 
@@ -339,7 +348,7 @@ class Product(object):
 
         return toolchain_file
 
-    def get_linux_abi(self, arch):
+    def get_linux_target_components(self, arch):
         # Map tuples of (platform, arch) to ABI
         #
         # E.x.: Hard ABI or Soft ABI for Linux map to gnueabihf
@@ -348,27 +357,42 @@ class Product(object):
             'armv7': ('arm', 'gnueabihf')
         }
 
-        # Default is just arch, gnu
-        sysroot_arch, abi = arch_platform_to_abi.get(arch, (arch, 'gnu'))
-        return sysroot_arch, abi
+        abi = 'gnu'
+        vendor = 'unknown'
+
+        try:
+            output = shell.capture([self.toolchain.cc, "--print-target-triple"])
+
+            # clang can't handle default `*-unknown-linux-*` components on Alpine,
+            # it needs special handling to propagate `vendor` and `abi` intact
+            if 'alpine-linux-musl' in output:
+                vendor = 'alpine'
+                abi = 'musl'
+
+            sysroot_arch, abi = arch_platform_to_abi.get(arch, (arch, abi))
+
+        except BaseException:
+            # Default is just arch, gnu
+            sysroot_arch, abi = arch_platform_to_abi.get(arch, (arch, abi))
+        return sysroot_arch, vendor, abi
 
     def get_linux_sysroot(self, platform, arch):
         if not self.is_cross_compile_target('{}-{}'.format(platform, arch)):
             return None
-        sysroot_arch, abi = self.get_linux_abi(arch)
+        sysroot_arch, _, abi = self.get_linux_target_components(arch)
         # $ARCH-$PLATFORM-$ABI
         # E.x.: aarch64-linux-gnu
         sysroot_dirname = '{}-{}-{}'.format(sysroot_arch, platform, abi)
         return os.path.join(os.sep, 'usr', sysroot_dirname)
 
     def get_linux_target(self, platform, arch):
-        sysroot_arch, abi = self.get_linux_abi(arch)
-        return '{}-unknown-linux-{}'.format(sysroot_arch, abi)
+        sysroot_arch, vendor, abi = self.get_linux_target_components(arch)
+        return '{}-{}-linux-{}'.format(sysroot_arch, vendor, abi)
 
-    def generate_linux_toolchain_file(self, platform, arch):
+    def generate_linux_toolchain_file(self, platform, arch, crosscompiling=True):
         """
         Generates a new CMake tolchain file that specifies Linux as a target
-        plaftorm.
+        platform.
 
             Returns: path on the filesystem to the newly generated toolchain file.
         """
@@ -378,8 +402,9 @@ class Product(object):
 
         toolchain_args = {}
 
-        toolchain_args['CMAKE_SYSTEM_NAME'] = 'Linux'
-        toolchain_args['CMAKE_SYSTEM_PROCESSOR'] = arch
+        if crosscompiling:
+            toolchain_args['CMAKE_SYSTEM_NAME'] = 'Linux'
+            toolchain_args['CMAKE_SYSTEM_PROCESSOR'] = arch
 
         # We only set the actual sysroot if we are actually cross
         # compiling. This is important since otherwise cmake seems to change the
@@ -411,10 +436,11 @@ class Product(object):
 
         return toolchain_file
 
-    def generate_toolchain_file_for_darwin_or_linux(self, host_target):
+    def generate_toolchain_file_for_darwin_or_linux(
+            self, host_target, override_macos_deployment_version=None):
         """
         Checks `host_target` platform and generates a new CMake tolchain file
-        appropriate for that target plaftorm (either Darwin or Linux). Defines
+        appropriate for that target platform (either Darwin or Linux). Defines
         `CMAKE_C_FLAGS` and `CMAKE_CXX_FLAGS` as CMake options. Also defines
         `CMAKE_TOOLCHAIN_FILE` with the path of the generated toolchain file
         as a CMake option.
@@ -430,7 +456,9 @@ class Product(object):
 
         toolchain_file = None
         if self.is_darwin_host(host_target):
-            toolchain_file = self.generate_darwin_toolchain_file(platform, arch)
+            toolchain_file = self.generate_darwin_toolchain_file(
+                platform, arch,
+                macos_deployment_version=override_macos_deployment_version)
             self.cmake_options.define('CMAKE_TOOLCHAIN_FILE:PATH', toolchain_file)
         elif platform == "linux":
             toolchain_file = self.generate_linux_toolchain_file(platform, arch)

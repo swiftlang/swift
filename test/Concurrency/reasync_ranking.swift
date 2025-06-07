@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -target %target-swift-5.1-abi-triple
+
 // REQUIRES: concurrency
 
 // We don't want 'reasync' overloads to have a higher score in the

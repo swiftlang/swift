@@ -152,7 +152,7 @@ func hasCallToAsyncAlternative(c: ConvertAsync) {
 // RUN: %sourcekitd-test -req=cursor -pos=95:10  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
 // RUN: %sourcekitd-test -req=cursor -pos=96:10  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
 // RUN: %sourcekitd-test -req=cursor -pos=96:25  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
-// RUN: %sourcekitd-test -req=cursor -pos=97:11  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
+// RUN: %sourcekitd-test -req=cursor -pos=97:11  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-NORENAME
 // RUN: %sourcekitd-test -req=cursor -pos=97:27  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
 // RUN: %sourcekitd-test -req=cursor -pos=98:11  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-NORENAME
 
@@ -170,7 +170,7 @@ func hasCallToAsyncAlternative(c: ConvertAsync) {
 // RUN: %sourcekitd-test -req=cursor -pos=117:16  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
 // RUN: %sourcekitd-test -req=cursor -pos=117:17  -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-GLOBAL
 
-// RUN: %sourcekitd-test -req=cursor -pos=35:10 -end-pos=35:16 -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-RENAME-EXTRACT
+// RUN: %sourcekitd-test -req=cursor -pos=35:10 -end-pos=35:16 -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-RENAME
 
 // RUN: %sourcekitd-test -req=cursor -pos=54:10 -end-pos=54:22 -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-LOCAL
 // RUN: %sourcekitd-test -req=cursor -pos=54:12 -end-pos=54:22 -cursor-action %s -- %s | %FileCheck %s -check-prefix=CHECK-SELF-RENAME1
@@ -231,6 +231,8 @@ func hasCallToAsyncAlternative(c: ConvertAsync) {
 // CHECK-LOCAL-NOT: Global Rename
 // CHECK-LOCAL: ACTIONS END
 
+// CHECK-RENAME: Global Rename
+
 // CHECK-RENAME-EXTRACT: Global Rename
 // CHECK-RENAME-EXTRACT: Extract Method
 
@@ -273,3 +275,4 @@ func hasCallToAsyncAlternative(c: ConvertAsync) {
 // CHECK-CALLASYNC: ACTIONS END
 
 // REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: swift_swift_parser

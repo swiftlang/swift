@@ -11,11 +11,11 @@
 // REQUIRES: OS=linux-gnu
 
 // CHECK-STD: enum std {
-// CHECK-STRING:   struct {{__CxxTemplateInstNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE|__CxxTemplateInstSs}} : CxxRandomAccessCollection {
-// CHECK-STRING:     typealias value_type = std.__CxxTemplateInstSt11char_traitsIcE.char_type
+// CHECK-STRING:   struct basic_string<CChar, std{{(.__cxx11)?}}.char_traits<CChar>, std{{(.__cxx11)?}}.allocator<CChar>> : CxxMutableRandomAccessCollection {
+// CHECK-STRING:     typealias value_type = std.char_traits<CChar>.char_type
 // CHECK-STRING:   }
-// CHECK-STRING:   struct {{__CxxTemplateInstNSt7__cxx1112basic_stringIwSt11char_traitsIwESaIwEEE|__CxxTemplateInstSbIwSt11char_traitsIwESaIwEE}} : CxxRandomAccessCollection {
-// CHECK-STRING:     typealias value_type = std.__CxxTemplateInstSt11char_traitsIwE.char_type
+// CHECK-STRING:   struct basic_string<CWideChar, std{{(.__cxx11)?}}.char_traits<CWideChar>, std{{(.__cxx11)?}}.allocator<CWideChar>> : CxxMutableRandomAccessCollection {
+// CHECK-STRING:     typealias value_type = std.char_traits<CWideChar>.char_type
 // CHECK-STRING:   }
 
 // CHECK-TO-STRING:   static func to_string(_ __val: Int32) -> std{{(.__cxx11)?}}.string
@@ -23,6 +23,6 @@
 
 // CHECK-SIZE-T:   typealias size_t = Int
 
-// CHECK-STRING:   typealias string = std.{{__cxx11.__CxxTemplateInstNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEE|__CxxTemplateInstSs}}
-// CHECK-STRING:   typealias wstring = std.{{__cxx11.__CxxTemplateInstNSt7__cxx1112basic_stringIwSt11char_traitsIwESaIwEEE|__CxxTemplateInstSbIwSt11char_traitsIwESaIwEE}}
+// CHECK-STRING:   typealias string =  std{{(.__cxx11)?}}.basic_string<CChar, std{{(.__cxx11)?}}.char_traits<CChar>, std{{(.__cxx11)?}}.allocator<CChar>>
+// CHECK-STRING:   typealias wstring =  std{{(.__cxx11)?}}.basic_string<CWideChar, std{{(.__cxx11)?}}.char_traits<CWideChar>, std{{(.__cxx11)?}}.allocator<CWideChar>>
 // CHECK-STD: }

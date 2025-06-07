@@ -1,0 +1,14 @@
+module Oceans {
+  header "Oceans.h"
+  export *
+}
+
+module Rivers {
+  header "Rivers.h"
+  export *
+}
+
+module Seas {
+  header "Seas.h"
+  export *
+}

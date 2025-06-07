@@ -18,6 +18,12 @@
 #include "swift/Runtime/Concurrency.h"
 #include "gtest/gtest.h"
 
+#if __has_include("pthread.h")
+
+#define RUN_ASYNC_MAIN_DRAIN_QUEUE_TEST 1
+#include <pthread.h>
+#endif // HAVE_PTHREAD_H
+
 #include <stdio.h>
 
 using namespace swift;
@@ -31,8 +37,8 @@ T getEmptyValue() {
   return T();
 }
 template <>
-ExecutorRef getEmptyValue() {
-  return ExecutorRef::generic();
+SerialExecutorRef getEmptyValue() {
+  return SerialExecutorRef::generic();
 }
 } // namespace
 
@@ -44,6 +50,15 @@ ExecutorRef getEmptyValue() {
     Ran = true;                                                                \
     return getEmptyValue<ret>();                                               \
   }
+#define OVERRIDE_TASK_NORETURN(name, attrs, ccAttrs, namespace, typedArgs,     \
+                               namedArgs)                                      \
+  static ccAttrs void name##Override(COMPATIBILITY_UNPAREN_WITH_COMMA(         \
+      typedArgs) Original_##name originalImpl) {                               \
+    if (!EnableOverride)                                                       \
+      originalImpl COMPATIBILITY_PAREN(namedArgs);                             \
+    Ran = true;                                                                \
+  }
+
 #include "../../stdlib/public/CompatibilityOverride/CompatibilityOverrideConcurrency.def"
 
 struct OverrideSection {
@@ -55,7 +70,7 @@ struct OverrideSection {
 };
 
 OverrideSection ConcurrencyOverrides
-    __attribute__((section("__DATA,__s58async_hook"))) = {
+    __attribute__((section("__DATA," COMPATIBILITY_OVERRIDE_SECTION_NAME_swift_Concurrency))) = {
         0,
 #define OVERRIDE(name, ret, attrs, ccAttrs, namespace, typedArgs, namedArgs)   \
   name##Override,
@@ -70,6 +85,21 @@ swift_task_enqueueGlobal_override(Job *job,
 }
 
 SWIFT_CC(swift)
+static void
+swift_task_checkIsolated_override(SerialExecutorRef executor,
+                                      swift_task_checkIsolated_original original) {
+  Ran = true;
+}
+
+SWIFT_CC(swift)
+static int8_t
+swift_task_isIsolatingCurrentContext_override(SerialExecutorRef executor,
+                                      swift_task_isIsolatingCurrentContext_original original) {
+  Ran = true;
+  return 0;
+}
+
+SWIFT_CC(swift)
 static void swift_task_enqueueGlobalWithDelay_override(
     unsigned long long delay, Job *job,
     swift_task_enqueueGlobalWithDelay_original original) {
@@ -81,6 +111,26 @@ static void swift_task_enqueueMainExecutor_override(
     Job *job, swift_task_enqueueMainExecutor_original original) {
   Ran = true;
 }
+
+SWIFT_CC(swift)
+static void swift_task_startOnMainActor_override(AsyncTask* task) {
+  Ran = true;
+}
+
+SWIFT_CC(swift)
+static void swift_task_immediate_override(AsyncTask* task, SerialExecutorRef targetExecutor) {
+  Ran = true;
+}
+
+#ifdef RUN_ASYNC_MAIN_DRAIN_QUEUE_TEST
+[[noreturn]] SWIFT_CC(swift)
+static void swift_task_asyncMainDrainQueue_override_fn(
+    swift_task_asyncMainDrainQueue_original original,
+    swift_task_asyncMainDrainQueue_override compatOverride) {
+  Ran = true;
+  pthread_exit(nullptr); // noreturn function
+}
+#endif
 
 class CompatibilityOverrideConcurrencyTest : public ::testing::Test {
 protected:
@@ -100,6 +150,14 @@ protected:
         swift_task_enqueueGlobalWithDelay_override;
     swift_task_enqueueMainExecutor_hook =
         swift_task_enqueueMainExecutor_override;
+    swift_task_checkIsolated_hook =
+        swift_task_checkIsolated_override;
+    swift_task_isIsolatingCurrentContext_hook =
+        swift_task_isIsolatingCurrentContext_override;
+#ifdef RUN_ASYNC_MAIN_DRAIN_QUEUE_TEST
+    swift_task_asyncMainDrainQueue_hook =
+        swift_task_asyncMainDrainQueue_override_fn;
+#endif
   }
 
   virtual void TearDown() {
@@ -113,11 +171,22 @@ static Job fakeJob{{JobKind::DefaultActorInline},
                    nullptr};
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_enqueue) {
-  swift_task_enqueue(&fakeJob, ExecutorRef::generic());
+  swift_task_enqueue(&fakeJob, SerialExecutorRef::generic());
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_job_run) {
-  swift_job_run(&fakeJob, ExecutorRef::generic());
+  swift_job_run(&fakeJob, SerialExecutorRef::generic());
+}
+
+TEST_F(CompatibilityOverrideConcurrencyTest,
+       test_swift_job_run_on_task_executor) {
+  swift_job_run_on_task_executor(&fakeJob, TaskExecutorRef::undefined());
+}
+
+TEST_F(CompatibilityOverrideConcurrencyTest,
+       test_swift_job_run_on_serial_and_task_executor) {
+  swift_job_run_on_serial_and_task_executor(
+      &fakeJob, SerialExecutorRef::generic(), TaskExecutorRef::undefined());
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_getCurrentExecutor) {
@@ -125,7 +194,7 @@ TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_getCurrentExecutor)
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_switch) {
-  swift_task_switch(nullptr, nullptr, ExecutorRef::generic());
+  swift_task_switch(nullptr, nullptr, SerialExecutorRef::generic());
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_enqueueGlobal) {
@@ -135,6 +204,16 @@ TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_enqueueGlobal) {
 TEST_F(CompatibilityOverrideConcurrencyTest,
        test_swift_task_enqueueGlobalWithDelay) {
   swift_task_enqueueGlobalWithDelay(0, &fakeJob);
+}
+
+TEST_F(CompatibilityOverrideConcurrencyTest,
+       test_swift_task_checkIsolated) {
+  swift_task_checkIsolated(SerialExecutorRef::generic());
+}
+
+TEST_F(CompatibilityOverrideConcurrencyTest,
+       test_swift_task_isIsolatingCurrentContext) {
+  swift_task_isIsolatingCurrentContext(SerialExecutorRef::generic());
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest,
@@ -243,6 +322,18 @@ TEST_F(CompatibilityOverrideConcurrencyTest, task_hasTaskGroupStatusRecord) {
   swift_task_hasTaskGroupStatusRecord();
 }
 
+TEST_F(CompatibilityOverrideConcurrencyTest, task_getPreferredTaskExecutor) {
+  swift_task_getPreferredTaskExecutor();
+}
+
+TEST_F(CompatibilityOverrideConcurrencyTest, task_pushTaskExecutorPreference) {
+  swift_task_pushTaskExecutorPreference(TaskExecutorRef::undefined());
+}
+
+TEST_F(CompatibilityOverrideConcurrencyTest, task_popTaskExecutorPreference) {
+  swift_task_popTaskExecutorPreference(nullptr);
+}
+
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_cancel) {
   swift_task_cancel(nullptr);
 }
@@ -255,8 +346,41 @@ TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_escalate) {
   swift_task_escalate(nullptr, {});
 }
 
-TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_getNearestDeadline) {
-  swift_task_getNearestDeadline(nullptr);
+TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_startOnMainActorImpl) {
+  swift_task_startOnMainActor(nullptr);
 }
+
+TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_immediately) {
+  swift_task_immediate(nullptr, SerialExecutorRef::generic());
+}
+
+TEST_F(CompatibilityOverrideConcurrencyTest,
+       test_swift_task_isCurrentExecutorWithFlags) {
+  swift_task_isCurrentExecutorWithFlags(
+      swift_task_getMainExecutor(), swift_task_is_current_executor_flag::None);
+}
+
+#if RUN_ASYNC_MAIN_DRAIN_QUEUE_TEST
+TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_asyncMainDrainQueue) {
+
+  auto runner = [](void *) -> void * {
+    swift_task_asyncMainDrainQueue();
+    return nullptr;
+  };
+
+  int ret = 0;
+  pthread_t thread;
+  pthread_attr_t attrs;
+  ret = pthread_attr_init(&attrs);
+  ASSERT_EQ(ret, 0);
+  ret = pthread_create(&thread, &attrs, runner, nullptr);
+  ASSERT_EQ(ret, 0);
+  void * result = nullptr;
+  ret = pthread_join(thread, &result);
+  ASSERT_EQ(ret, 0);
+  pthread_attr_destroy(&attrs);
+  ASSERT_EQ(ret, 0);
+}
+#endif
 
 #endif

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -36,17 +36,42 @@ ERROR(error_unsupported_target_os, none,
 ERROR(error_unsupported_target_arch, none,
       "unsupported target architecture: '%0'", (StringRef))
 
-ERROR(error_experimental_feature_not_available, none,
-      "experimental feature '%0' cannot be enabled in a production compiler",
-      (StringRef))
+WARNING(warning_upcoming_feature_on_by_default, none,
+        "upcoming feature '%0' is already enabled as of Swift version %1",
+        (StringRef, unsigned))
 
-ERROR(error_upcoming_feature_on_by_default, none,
-      "upcoming feature '%0' is already enabled as of Swift version %1",
-      (StringRef, unsigned))
+GROUPED_WARNING(unrecognized_feature, StrictLanguageFeatures, DefaultIgnore,
+                "'%0' is not a recognized "
+                "%select{experimental|upcoming}1 feature",
+                (StringRef, bool))
+
+GROUPED_WARNING(feature_not_experimental, StrictLanguageFeatures, DefaultIgnore,
+                "'%0' is not an experimental feature, "
+                "use -%select{disable|enable}1-upcoming-feature instead",
+                (StringRef, bool))
+
+GROUPED_WARNING(invalid_feature_mode, StrictLanguageFeatures, none,
+                "'%0' is not a recognized mode for feature '%1'"
+                "%select{|; did you mean '%2'?}3",
+                (StringRef, StringRef, StringRef, bool))
+
+GROUPED_WARNING(cannot_disable_feature_with_mode, StrictLanguageFeatures, none,
+                "'%0' argument '%1' cannot specify a mode",
+                (StringRef, StringRef))
+
+GROUPED_WARNING(feature_does_not_support_migration_mode, StrictLanguageFeatures,
+                none,
+                "feature '%0' does not support migration mode",
+                (StringRef))
 
 ERROR(error_unknown_library_level, none,
       "unknown library level '%0', "
       "expected one of 'api', 'spi', 'ipi', or 'other'", (StringRef))
+
+ERROR(error_old_spi_only_import_unsupported, none,
+      "'-experimental-spi-imports' is unsupported in Swift 6, "
+      "use '@_spiOnly' instead",
+      ())
 
 ERROR(error_unknown_require_explicit_availability, none,
       "unknown argument '%0', passed to -require-explicit-availability, "
@@ -62,9 +87,6 @@ WARNING(warning_inferred_simulator_target,none,
 
 ERROR(error_argument_not_allowed_with, none,
       "argument '%0' is not allowed with '%1'", (StringRef, StringRef))
-
-WARNING(warning_argument_not_supported_with_optimization, none,
-        "argument '%0' is not supported with optimization", (StringRef))
 
 ERROR(error_option_requires_sanitizer, none,
       "option '%0' requires a sanitizer to be enabled. Use -sanitize= to "
@@ -91,6 +113,8 @@ ERROR(error_missing_arg_value,none,
       (StringRef, unsigned))
 ERROR(error_unknown_arg,none,
       "unknown argument: '%0'", (StringRef))
+GROUPED_WARNING(unknown_warning_group, UnknownWarningGroup, none,
+                "unknown warning group: '%0'", (StringRef))
 ERROR(error_invalid_arg_value,none,
       "invalid value '%1' in '%0'", (StringRef, StringRef))
 ERROR(error_invalid_arg_combination,none,
@@ -105,11 +129,11 @@ WARNING(warning_cannot_find_locale_file,none,
 WARNING(warning_cannot_multithread_batch_mode,none,
       "ignoring -num-threads argument; cannot multithread batch mode", ())
 ERROR(error_cannot_explicit_interface_build_in_mode,none,
-      "'-explicit-interface-module-build' only supported when building a module from interface ('-compile-module-from-interface')'", ())
-ERROR(error_cannot_direct_cc1_pcm_build_in_mode,none,
-      "'-direct-clang-cc1-module-build' only supported when building a PCM ('-emit-pcm')'", ())
+      "'-explicit-interface-module-build' only supported when building a module from interface ('-compile-module-from-interface' or '-typecheck-module-from-interface')'", ())
 ERROR(error_unsupported_option_argument,none,
       "unsupported argument '%1' to option '%0'", (StringRef, StringRef))
+ERROR(error_swift_module_file_requires_delimeter,none,
+      "-swift-module-file= argument requires format <name>=<path>, got: '%0'", (StringRef))
 ERROR(error_immediate_mode_missing_stdlib,none,
       "could not load the swift standard library", ())
 ERROR(error_immediate_mode_missing_library,none,
@@ -119,13 +143,17 @@ ERROR(error_immediate_mode_primary_file,none,
       "immediate mode is incompatible with -primary-file", ())
 ERROR(error_missing_frontend_action,none,
       "no frontend action was selected", ())
-ERROR(error_unsupported_frontend_action, none,
-      "unsupported action: %0", (StringRef))
 ERROR(error_invalid_source_location_str,none,
       "invalid source location string '%0'", (StringRef))
 ERROR(error_no_source_location_scope_map,none,
       "-dump-scope-maps argument must be 'expanded' or a list of "
       "source locations", ())
+ERROR(error_load_plugin_executable,none,
+      "invalid value '%0' in '-load-plugin-executable'; "
+      "make sure to use format '<plugin path>#<module names>'", (StringRef))
+ERROR(error_load_resolved_plugin,none,
+      "invalid value '%0' in '-load-resolved-plugin'; "
+      "make sure to use format '<library path>#<plugin path>#<module names>' where library and plugin path can't both be empty", (StringRef))
 
 NOTE(note_valid_swift_versions, none,
      "valid arguments to '-swift-version' are %0", (StringRef))
@@ -151,7 +179,9 @@ ERROR(error_mode_cannot_emit_module_summary,none,
 ERROR(error_mode_cannot_emit_symbol_graph,none,
       "this mode does not support emitting symbol graph files", ())
 ERROR(error_mode_cannot_emit_abi_descriptor,none,
-      "this mode does not support emitting ABI descriptor", ())
+      "this mode does not support emitting ABI descriptor files", ())
+ERROR(error_mode_cannot_emit_api_descriptor,none,
+      "this mode does not support emitting API descriptor files", ())
 ERROR(error_mode_cannot_emit_const_values,none,
       "this mode does not support emitting extracted const values", ())
 ERROR(error_mode_cannot_emit_module_semantic_info,none,
@@ -159,19 +189,22 @@ ERROR(error_mode_cannot_emit_module_semantic_info,none,
 ERROR(cannot_emit_ir_skipping_function_bodies,none,
       "the -experimental-skip-*-function-bodies* flags do not support "
       "emitting IR", ())
-ERROR(cannot_emit_ir_checking_api_availability_only,none,
-      "the flag -check-api-availability-only does not support "
-      "emitting IR", ())
 
 WARNING(emit_reference_dependencies_without_primary_file,none,
         "ignoring -emit-reference-dependencies (requires -primary-file)", ())
+
+WARNING(ignoring_option_obsolete,none,
+        "ignoring '%0'; this option is obsolete", (StringRef))
+WARNING(ignoring_option_requires_option,none,
+        "ignoring %0 (requires %1)", (StringRef, StringRef))
+WARNING(warn_ignore_option_overriden_by,none,
+        "ignoring %0 (overriden by %1)", (StringRef, StringRef))
 
 WARNING(warn_implicit_concurrency_import_failed,none,
         "unable to perform implicit import of \"_Concurrency\" module: no such module found", ())
 REMARK(warn_implicit_string_processing_import_failed,none,
        "unable to perform implicit import of \"_StringProcessing\" module: no such module found", ())
 
-ERROR(error_module_name_required,none, "-module-name is required", ())
 ERROR(error_bad_module_name,none,
       "module name \"%0\" is not a valid identifier"
       "%select{|; use -module-name flag to specify an alternate name}1",
@@ -185,20 +218,17 @@ ERROR(error_bad_export_as_name,none,
       "export-as name \"%0\" is not a valid identifier",
       (StringRef))
 
-ERROR(error_bad_package_name,none,
-      "package name \"%0\" is not a valid identifier",
-      (StringRef))
-ERROR(error_stdlib_package_name,none,
-      "package name \"%0\" is reserved for the standard library",
-      (StringRef))
+ERROR(error_empty_package_name,none,
+      "package-name is empty",
+      ())
 ERROR(error_stdlib_not_found,Fatal,
       "unable to load standard library for target '%0'", (StringRef))
 ERROR(error_module_alias_invalid_format,none,
-      "invalid module alias format \"%0\"; make sure to use the format '-module-alias alias_name=underlying_name'", (StringRef))
+      "invalid module alias format \"%0\"; make sure to use the format '-module-alias alias_name=real_name'", (StringRef))
 ERROR(error_module_alias_forbidden_name,none,
       "invalid module alias \"%0\"; make sure the alias differs from the module name, module ABI name, module link name, and a standard library name", (StringRef))
 ERROR(error_module_alias_duplicate,none,
-      "duplicate module alias; the name \"%0\" is already used for a module alias or an underlying name", (StringRef))
+      "duplicate module alias; the name \"%0\" is already used for an alias or a real name", (StringRef))
 
 ERROR(error_unable_to_load_supplementary_output_file_map, none,
       "unable to load supplementary output file map '%0': %1",
@@ -217,6 +247,10 @@ ERROR(error_mode_requires_an_input_file,none,
       "this mode requires at least one input file", ())
 ERROR(error_mode_requires_one_sil_multi_sib,none,
       "this mode requires .sil for primary-file and only .sib for other inputs",
+      ())
+
+ERROR(error_clang_validate_once_requires_session_file,none,
+      "'-validate-clang-modules-once' also requires a '-clang-build-session-file' argument",
       ())
 
 ERROR(error_no_output_filename_specified,none,
@@ -246,10 +280,6 @@ ERROR(error_cannot_have_supplementary_outputs,none,
 ERROR(error_duplicate_input_file,none,
       "duplicate input file '%0'", (StringRef))
 
-ERROR(repl_must_be_initialized,none,
-      "variables currently must have an initial value when entered at the "
-      "top level of the REPL", ())
-
 ERROR(verify_encountered_fatal,none,
       "fatal error encountered while in -verify mode", ())
 
@@ -269,6 +299,17 @@ ERROR(error_index_inputs_more_than_outputs,none,
 REMARK(remark_indexing_system_module,none,
        "indexing system module at %0"
        "%select{|; skipping because of a broken swiftinterface}1",
+       (StringRef, bool))
+
+ERROR(error_create_symbolic_interfaces_dir,none,
+      "creating symbolic interfaces directory: %0", (StringRef))
+ERROR(error_symbolic_interfaces_failed_status_check,none,
+      "failed file status check: %0", (StringRef))
+ERROR(error_write_symbolic_interface,none,
+      "writing symbolic interface file: %0", (StringRef))
+REMARK(remark_emitting_symbolic_interface_module,none,
+       "emitting symbolic interface at %0"
+       "%select{|; skipping because it's up to date}1",
        (StringRef, bool))
 
 ERROR(error_wrong_number_of_arguments,none,
@@ -301,6 +342,10 @@ ERROR(tbd_not_supported_with_cmo,none,
         "Test-Based InstallAPI (TBD) is not support with cross-module-optimization",
         ())
 
+WARNING(api_descriptor_only_supported_in_whole_module,none,
+        "API descriptor generation is only supported when the whole module can be seen",
+        ())
+
 ERROR(previous_installname_map_missing,none,
       "cannot open previous install name map from %0",
       (StringRef))
@@ -325,16 +370,8 @@ ERROR(placeholder_dependency_module_map_corrupted,none,
       "Swift placeholder dependency module map from %0 is malformed",
       (StringRef))
 
-ERROR(batch_scan_input_file_missing,none,
-      "cannot open batch dependencies scan input file from %0",
-      (StringRef))
-
 ERROR(const_extract_protocol_list_input_file_missing,none,
       "cannot open constant extraction protocol list input file from %0",
-      (StringRef))
-
-ERROR(batch_scan_input_file_corrupted,none,
-      "batch dependencies scan input file from %0 is malformed",
       (StringRef))
 
 ERROR(const_extract_protocol_list_input_file_corrupted,none,
@@ -404,8 +441,6 @@ ERROR(unsupported_version_of_module_interface,none,
       (StringRef, llvm::VersionTuple))
 ERROR(error_opening_explicit_module_file,none,
       "failed to open explicit Swift module: %0", (StringRef))
-ERROR(error_extracting_flags_from_module_interface,none,
-      "error extracting flags from module interface", ())
 WARNING(warning_module_shadowing_may_break_module_interface,none,
         "public %0 %1 shadows module %2, which may cause failures when "
         "importing %3 or its clients in some configurations; please rename "
@@ -418,9 +453,25 @@ REMARK(rebuilding_module_from_interface,none,
 NOTE(sdk_version_pbm_version,none,
      "SDK build version is '%0'; prebuilt modules were "
      "built using SDK build version: '%1'", (StringRef, StringRef))
+NOTE(compiled_module_ignored_reason,none,
+     "compiled module '%0' was ignored because %select{%error"
+     "|it belongs to a framework in the SDK"
+     "|it's a library module in the SDK"
+     "|loading from module interfaces is preferred"
+     "|it's a compiler host module"
+     "|the module name is blocklisted,"
+     "|the default is to load from module interfaces}1",
+     (StringRef, unsigned))
 NOTE(out_of_date_module_here,none,
      "%select{compiled|cached|forwarding|prebuilt}0 module is out of date: '%1'",
      (unsigned, StringRef))
+NOTE(module_interface_ignored_reason,none,
+     "not defaulting to module interface because %select{%error"
+     "|it is a local module"
+     "|it was blocklisted"
+     "|the reader is a debugger}1"
+     ", preferring binary module at '%0'",
+     (StringRef, unsigned))
 NOTE(module_interface_dependency_out_of_date,none,
      "dependency is out of date: '%0'",
      (StringRef))
@@ -438,6 +489,8 @@ ERROR(unknown_forced_module_loading_mode,none,
       (StringRef))
 ERROR(error_creating_remark_serializer,none,
       "error while creating remark serializer: '%0'", (StringRef))
+ERROR(invalid_can_import_module_version,none,
+      "invalid version passed to -module-can-import-version: '%0'", (StringRef))
 
 REMARK(interface_file_lock_failure,none,
       "building module interface without lock file", ())
@@ -453,6 +506,43 @@ REMARK(interface_file_backup_used,none,
       "building module from '%0' failed; retrying building module from '%1'", (StringRef, StringRef))
 
 WARNING(warn_flag_deprecated,none, "flag '%0' is deprecated", (StringRef))
+ERROR(flag_unsuppored,none, "flag '%0' is unsupported", (StringRef))
+
+// Output deterministic check
+ERROR(error_nondeterministic_output,none,
+      "output file '%0' is not deterministic: hash value '%1' vs '%2' between two compilations",
+      (StringRef, StringRef, StringRef))
+ERROR(error_output_missing,none,
+      "output file '%0' is missing from %select{first|second}1 compilation for deterministic check",
+      (StringRef, /*SecondRun=*/bool))
+REMARK(matching_output_produced,none,
+      "produced matching output file '%0' for deterministic check: hash '%1'", (StringRef, StringRef))
+
+// Caching related diagnostics
+ERROR(error_caching_no_cas_fs, none,
+    "caching is enabled without CAS file-system options, input is not immutable", ())
+ERROR(error_prefix_mapping, none, "cannot create scanner prefix mapping: '%0'", (StringRef))
+
+REMARK(replay_output, none, "replay output file '%0': key '%1'", (StringRef, StringRef))
+REMARK(output_cache_miss, none, "cache miss for input file '%0': key '%1'", (StringRef, StringRef))
+
+// CAS related diagnostics
+ERROR(error_invalid_cas_id, none, "CAS cannot parse id '%0': %1", (StringRef, StringRef))
+ERROR(error_cas, none, "CAS error encountered during %0: %1", (StringRef, StringRef))
+ERROR(error_cas_fs_creation, none, "cannot create CAS filesystem: %0", (StringRef))
+ERROR(error_cache_key_creation, none, "cannot create cache key for compilation %0: %1", (StringRef, StringRef))
+ERROR(error_cas_file_ref, none, "cannot load file %0 from CAS filesystem", (StringRef))
+ERROR(error_cas_conflict_options, none, "cannot setup CAS due to conflicting '-cas-*' options", ())
+ERROR(error_cas_initialization, none, "CAS cannot be initialized from the specified '-cas-*' options: %0", (StringRef))
+ERROR(error_cas_malformed_input, none, "CAS input '%0' is malformed: %1", (StringRef, StringRef))
+WARNING(cache_replay_failed, none, "cache replay failed: %0", (StringRef))
+
+ERROR(error_failed_cached_diag, none, "failed to serialize cached diagnostics: %0", (StringRef))
+ERROR(error_replay_cached_diag, none, "failed to replay cached diagnostics: %0", (StringRef))
+
+ERROR(error_load_input_from_cas, none, "failed to load input '%0' from CAS", (StringRef))
+
+ERROR(error_wrong_input_num_for_input_file_key, none, "-input-file-key only support one input file", ())
 
 // Dependency Verifier Diagnostics
 ERROR(missing_member_dependency,none,
@@ -487,8 +577,67 @@ REMARK(warning_in_access_notes_file,none,
        "ignored invalid content in access notes file: %0",
        (StringRef))
 
-WARNING(compiler_plugin_not_loaded,none,
-        "compiler plugin not loaded: %0; loader error: %1", (StringRef, StringRef))
+ERROR(dont_enable_interop_and_compat,none,
+      "do not pass both '-enable-experimental-cxx-interop' and "
+      "'-cxx-interoperability-mode'; remove '-enable-experimental-cxx-interop'", ())
+
+NOTE(valid_cxx_interop_modes,none,
+      "valid arguments to '%0' are %1", (StringRef, StringRef))
+NOTE(swift_will_maintain_compat,none,
+     "Swift will maintain source compatibility for imported APIs based on the "
+     "selected compatibility mode, so updating the Swift compiler will not "
+     "change how APIs are imported", ())
+WARNING(enable_interop_flag_deprecated,none,
+        "the '-enable-experimental-cxx-interop' flag is deprecated; please pass "
+        "'-cxx-interoperability-mode=' instead", ())
+
+ERROR(layout_string_instantiation_without_layout_strings,none,
+      "-enable-layout-string-value-witnesses-instantiation can not be enabled "
+      "without -enable-layout-string-value-witnesses.", ())
+
+ERROR(evolution_with_embedded,none,
+      "Library evolution cannot be enabled with embedded Swift.", ())
+ERROR(wmo_with_embedded,none,
+      "Whole module optimization (wmo) must be enabled with embedded Swift.", ())
+ERROR(objc_with_embedded,none,
+      "Objective-C interoperability cannot be enabled with embedded Swift.", ())
+ERROR(no_allocations_without_embedded,none,
+      "-no-allocations is only applicable with embedded Swift.", ())
+ERROR(min_ptr_value_without_embedded,none,
+      "-min-valid-pointer-value is only applicable with embedded Swift.", ())
+ERROR(no_swift_sources_with_embedded,none,
+      "embedded swift cannot be enabled in a compiler built without Swift sources", ())
+
+ERROR(package_cmo_requires_library_evolution, none,
+        "Library evolution must be enabled for Package CMO", ())
+
+ERROR(experimental_not_supported_in_production,none,
+      "experimental feature '%0' cannot be enabled in production compiler",
+      (StringRef))
+
+GROUPED_WARNING(command_line_conflicts_with_strict_safety,StrictMemorySafety,none,
+      "'%0' is not memory-safe and should not be combined with "
+      "strict memory safety checking", (StringRef))
+
+ERROR(json_zlib_not_supported,none,
+      "this compiler was not built with zlib compression support enabled; "
+      "'-dump-ast-format json-zlib' cannot be used", ())
+
+ERROR(ast_format_requires_dump_ast,none,
+      "structured AST formats are only supported when using -dump-ast", ())
+
+ERROR(unknown_dump_ast_format,none,
+      "unknown format '%0' requested with '-dump-ast-format'", (StringRef))
+
+ERROR(dependency_scan_unexpected_variant, none,
+      "unexpected variant during dependency scanning on module '%0'", (StringRef))
+NOTE(dependency_scan_unexpected_variant_context_hash_note, none,
+     "first module context hash: '%0', second module context hash: '%1'", (StringRef, StringRef))
+NOTE(dependency_scan_unexpected_variant_module_map_note, none,
+     "first module module map: '%0', second module module map: '%1'", (StringRef, StringRef))
+NOTE(dependency_scan_unexpected_variant_extra_arg_note, none,
+     "%select{first|second}0 module command-line has extra argument: '%1'", (bool, StringRef))
+
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

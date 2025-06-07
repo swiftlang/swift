@@ -92,13 +92,13 @@ def addStatsFromInput(inputFile, db):
     for line in inputFile:
         # Read next line
         # Split into segments
-        segments = line.split(",")
+        segments = line.split(", ")
         if len(segments) < 6 or not (segments[0] in [
                 'module', 'function', 'function_history']):
             continue
         # Trim all values
-        segments = map(str.strip, segments)
-        if segments[0] == 'function_history':
+        segments = list(map(str.strip, segments))
+        if segments[0] == 'function_history' or segments[1] == 'lostvars':
             # Process history records
             delta = 0.0
             (kind, counter, stage, transform, passnum,
@@ -128,7 +128,7 @@ def processStatsFile(filename, dbname):
             filename,
             dbname))
     db = OptStatsDB(dbname)
-    with open(filename, "rb") as inputFile:
+    with open(filename, "r") as inputFile:
         addStatsFromInput(inputFile, db)
     db.finish()
 

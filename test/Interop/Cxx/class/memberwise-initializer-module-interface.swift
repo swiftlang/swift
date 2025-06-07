@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=MemberwiseInitializer -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=MemberwiseInitializer -access-filter-public -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
 
 // CHECK:      struct StructPrivateOnly {
 // CHECK-NEXT:   init()
@@ -38,6 +38,16 @@
 // CHECK-NEXT:   var varPublic: Int32
 // CHECK-NEXT: }
 // CHECK-NEXT: struct ClassWithUnimportedMemberFunction {
+// CHECK-NEXT:   init()
+// CHECK-NEXT:   init(varPublic: Int32)
+// CHECK-NEXT:   var varPublic: Int32
+// CHECK-NEXT: }
+// CHECK-NEXT: struct ClassWithTemplatedFunction {
+// CHECK-NEXT:   init()
+// CHECK-NEXT:   init(varPublic: Int32)
+// CHECK-NEXT:   var varPublic: Int32
+// CHECK-NEXT: }
+// CHECK-NEXT: struct ClassWithTemplatedUsingDecl {
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   init(varPublic: Int32)
 // CHECK-NEXT:   var varPublic: Int32

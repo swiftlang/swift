@@ -1,9 +1,17 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine -jumpthread-simplify-cfg | %FileCheck %s
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-module -enable-library-evolution \
+// RUN:   -emit-module-path=%t/resilient_struct.swiftmodule \
+// RUN:   -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
+
+// RUN: %target-sil-opt -sil-print-types -sdk %clang-importer-sdk-path -enable-sil-verify-all %s -sil-combine -jumpthread-simplify-cfg -I %t | %FileCheck %s
 
 sil_stage canonical
 
 import Builtin
 import Swift
+
+import resilient_struct
+import ctypes
 
 // CHECK-LABEL: sil  @convert_inject_enum_addr_select_enum_addr_into_cond_br : $@convention(thin) (@in Int, @inout _Stdout) -> ()
 // CHECK-NOT: init_existential_addr
@@ -39,7 +47,6 @@ bb2:
   copy_addr [take] %19 to [init] %2 : $*CustomStringConvertible
   br bb1
 }
-
 
 // CHECK-LABEL: sil  @convert_inject_enum_addr_switch_enum_addr_into_cond_br : $@convention(thin) (@in Int, @inout _Stdout) -> ()
 // CHECK-NOT: init_existential_addr
@@ -114,7 +121,6 @@ bb22:
   inject_enum_addr %3 : $*Optional<CustomStringConvertible>, #Optional.none!enumelt
   br bb2
 }
-
 
 class A {
 
@@ -249,4 +255,465 @@ bb2:
 bb22:
   inject_enum_addr %3 : $*Optional<CustomStringConvertible>, #Optional.none!enumelt
   br bb2
+}
+
+sil @no_init : $@convention(thin) () -> (@out ())
+
+// CHECK-LABEL: sil @test_empty_tuple_uninintialized : $@convention(thin) () -> () {
+// CHECK-NOT: inject_enum_addr
+// CHECK-LABEL: } // end sil function 'test_empty_tuple_uninintialized'
+sil @test_empty_tuple_uninintialized : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Optional<()>
+  %1 = init_enum_data_addr %0 : $*Optional<()>, #Optional.some!enumelt
+  %f = function_ref @no_init : $@convention(thin) () -> (@out ())
+  apply %f(%1) : $@convention(thin) () -> (@out ())
+  inject_enum_addr %0 : $*Optional<()>, #Optional.some!enumelt
+  %2 = load %0 : $*Optional<()>
+  switch_enum %2 : $Optional<()>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%4 : $()):
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %0 : $*Optional<()>
+  %8 = tuple ()
+  return %8 : $()
+}
+
+sil @no_init_nested_tuple : $@convention(thin) () -> (@out ((), ()))
+
+// CHECK-LABEL: sil @test_empty_nested_tuple_uninintialized : $@convention(thin) () -> () {
+// CHECK-NOT: inject_enum_addr
+// CHECK-LABEL: } // end sil function 'test_empty_nested_tuple_uninintialized'
+sil @test_empty_nested_tuple_uninintialized : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Optional<((), ())>
+  %1 = init_enum_data_addr %0 : $*Optional<((), ())>, #Optional.some!enumelt
+  %f = function_ref @no_init_nested_tuple : $@convention(thin) () -> (@out ((), ()))
+  apply %f(%1) : $@convention(thin) () -> (@out ((), ()))
+  inject_enum_addr %0 : $*Optional<((), ())>, #Optional.some!enumelt
+  %2 = load %0 : $*Optional<((), ())>
+  switch_enum %2 : $Optional<((), ())>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%4 : $((), ())):
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %0 : $*Optional<((), ())>
+  %8 = tuple ()
+  return %8 : $()
+}
+
+sil @no_init_struct : $@convention(thin) () -> (@out ResilientEmptyStruct)
+
+// CHECK-LABEL: sil @test_empty_struct_uninitialized : $@convention(thin) () -> () {
+// CHECK-NOT: switch_enum_addr
+// CHECK-LABEL: } // end sil function 'test_empty_struct_uninitialized'
+sil @test_empty_struct_uninitialized : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Optional<ResilientEmptyStruct>
+  %1 = init_enum_data_addr %0 : $*Optional<ResilientEmptyStruct>, #Optional.some!enumelt
+  %f = function_ref @no_init_struct : $@convention(thin) () -> (@out ResilientEmptyStruct)
+  apply %f(%1) : $@convention(thin) () -> (@out ResilientEmptyStruct)
+  inject_enum_addr %0 : $*Optional<ResilientEmptyStruct>, #Optional.some!enumelt
+  switch_enum_addr %0 : $*Optional<ResilientEmptyStruct>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %0 : $*Optional<ResilientEmptyStruct>
+  %8 = tuple ()
+  return %8 : $()
+}
+
+sil @no_init_c_union : $@convention(thin) () -> (@out EmptyCUnion)
+
+// CHECK-LABEL: sil @test_empty_c_union : $@convention(thin) () -> () {
+// CHECK: inject_enum_addr
+// CHECK-LABEL: } // end sil function 'test_empty_c_union'
+sil @test_empty_c_union : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Optional<EmptyCUnion>
+  %1 = init_enum_data_addr %0 : $*Optional<EmptyCUnion>, #Optional.some!enumelt
+  %f = function_ref @no_init_c_union : $@convention(thin) () -> (@out EmptyCUnion)
+  apply %f(%1) : $@convention(thin) () -> (@out EmptyCUnion)
+  inject_enum_addr %0 : $*Optional<EmptyCUnion>, #Optional.some!enumelt
+  switch_enum_addr %0 : $*Optional<EmptyCUnion>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %0 : $*Optional<EmptyCUnion>
+  %8 = tuple ()
+  return %8 : $()
+}
+
+struct NestedUnreferenceableStorage {
+  let e: EmptyCUnion
+}
+
+sil @no_init_nested_c_union : $@convention(thin) () -> (@out NestedUnreferenceableStorage)
+
+// CHECK-LABEL: sil @test_empty_nested_c_union : $@convention(thin) () -> () {
+// CHECK: inject_enum_addr
+// CHECK-LABEL: } // end sil function 'test_empty_nested_c_union'
+sil @test_empty_nested_c_union : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Optional<NestedUnreferenceableStorage>
+  %1 = init_enum_data_addr %0 : $*Optional<NestedUnreferenceableStorage>, #Optional.some!enumelt
+  %f = function_ref @no_init_nested_c_union : $@convention(thin) () -> (@out NestedUnreferenceableStorage)
+  apply %f(%1) : $@convention(thin) () -> (@out NestedUnreferenceableStorage)
+  inject_enum_addr %0 : $*Optional<NestedUnreferenceableStorage>, #Optional.some!enumelt
+  switch_enum_addr %0 : $*Optional<NestedUnreferenceableStorage>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %0 : $*Optional<NestedUnreferenceableStorage>
+  %8 = tuple ()
+  return %8 : $()
+}
+
+sil @getVoidOut : $@convention(thin) () -> @out ()
+sil @getIntOut : $@convention(thin) () -> @out Int
+
+// CHECK-LABEL: sil @empty_nondominating_apply : {{.*}} {
+// CHECK:         inject_enum_addr
+// CHECK-LABEL: } // end sil function 'empty_nondominating_apply'
+sil @empty_nondominating_apply : $@convention(thin) (Builtin.Int1) -> () {
+entry(%cond : $Builtin.Int1):
+  %addr = alloc_stack $Optional<()>
+  %some_addr = init_enum_data_addr %addr : $*Optional<()>, #Optional.some!enumelt
+  cond_br %cond, left, right
+
+left:
+  br middle
+
+right:
+  %get = function_ref @getVoidOut : $@convention(thin) () -> @out ()
+  apply %get(%some_addr) : $@convention(thin) () -> @out ()
+  br middle
+
+middle:
+  inject_enum_addr %addr : $*Optional<()>, #Optional.some!enumelt
+  %o = load %addr : $*Optional<()>
+  switch_enum %o : $Optional<()>, case #Optional.some!enumelt: some_block, case #Optional.none!enumelt: none_block
+
+some_block(%avoid : $()):
+  br exit
+
+none_block:
+  br exit
+
+exit:
+  dealloc_stack %addr : $*Optional<()>
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil @check_dominating_apply_unreachable : {{.*}} {
+// CHECK-NOT:     inject_enum_addr
+// CHECK-LABEL: } // end sil function 'check_dominating_apply_unreachable'
+sil @check_dominating_apply_unreachable : $@convention(thin) (Builtin.Int1) -> () {
+entry(%cond : $Builtin.Int1):
+  %addr = alloc_stack $Optional<()>
+  %some_addr = init_enum_data_addr %addr : $*Optional<()>, #Optional.some!enumelt
+  cond_br %cond, left, right
+
+left:
+  %get = function_ref @getVoidOut : $@convention(thin) () -> @out ()
+  apply %get(%some_addr) : $@convention(thin) () -> @out ()
+  br middle
+
+right:
+  unreachable
+
+middle:
+  inject_enum_addr %addr : $*Optional<()>, #Optional.some!enumelt
+  %o = load %addr : $*Optional<()>
+  switch_enum %o : $Optional<()>, case #Optional.some!enumelt: some_block, case #Optional.none!enumelt: none_block
+
+some_block(%avoid : $()):
+  br exit
+
+none_block:
+  br exit
+
+exit:
+  dealloc_stack %addr : $*Optional<()>
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil @check_dominating_apply_unreachable_nonempty : {{.*}} {
+// CHECK-NOT:     inject_enum_addr
+// CHECK-LABEL: } // end sil function 'check_dominating_apply_unreachable_nonempty'
+sil @check_dominating_apply_unreachable_nonempty : $@convention(thin) (Builtin.Int1) -> () {
+entry(%cond : $Builtin.Int1):
+  %addr = alloc_stack $Optional<Int>
+  %some_addr = init_enum_data_addr %addr : $*Optional<Int>, #Optional.some!enumelt
+  cond_br %cond, left, right
+
+left:
+  %get = function_ref @getIntOut : $@convention(thin) () -> @out Int
+  apply %get(%some_addr) : $@convention(thin) () -> @out Int
+  br middle
+
+right:
+  unreachable
+
+middle:
+  inject_enum_addr %addr : $*Optional<Int>, #Optional.some!enumelt
+  %o = load %addr : $*Optional<Int>
+  switch_enum %o : $Optional<Int>, case #Optional.some!enumelt: some_block, case #Optional.none!enumelt: none_block
+
+some_block(%avoid : $Int):
+  br exit
+
+none_block:
+  br exit
+
+exit:
+  dealloc_stack %addr : $*Optional<Int>
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil @empty_nondominating_store : {{.*}} {
+// CHECK:         inject_enum_addr
+// CHECK-LABEL: } // end sil function 'empty_nondominating_store'
+sil @empty_nondominating_store : $@convention(thin) (Builtin.Int1) -> () {
+entry(%cond : $Builtin.Int1):
+  %addr = alloc_stack $Optional<()>
+  %some_addr = init_enum_data_addr %addr : $*Optional<()>, #Optional.some!enumelt
+  cond_br %cond, left, right
+
+left:
+  br middle
+
+right:
+  %void = tuple ()
+  store %void to %some_addr : $*()
+  br middle
+
+middle:
+  inject_enum_addr %addr : $*Optional<()>, #Optional.some!enumelt
+  %o = load %addr : $*Optional<()>
+  switch_enum %o : $Optional<()>, case #Optional.some!enumelt: some_block, case #Optional.none!enumelt: none_block
+
+some_block(%avoid : $()):
+  br exit
+
+none_block:
+  br exit
+
+exit:
+  dealloc_stack %addr : $*Optional<()>
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil @empty_nondominating_tuple_store_neither : {{.*}} {
+// CHECK:         inject_enum_addr
+// CHECK-LABEL: } // end sil function 'empty_nondominating_tuple_store_neither'
+sil @empty_nondominating_tuple_store_neither : $@convention(thin) (Builtin.Int1) -> () {
+entry(%cond : $Builtin.Int1):
+  %addr = alloc_stack $Optional<((), ())>
+  %some_addr = init_enum_data_addr %addr : $*Optional<((), ())>, #Optional.some!enumelt
+  %left_addr = tuple_element_addr %some_addr : $*((), ()), 0
+  %right_addr = tuple_element_addr %some_addr : $*((), ()), 1
+  cond_br %cond, left, right
+
+left:
+  br middle
+
+right:
+  %void = tuple ()
+  store %void to %left_addr : $*()
+  store %void to %right_addr : $*()
+  br middle
+
+middle:
+  inject_enum_addr %addr : $*Optional<((), ())>, #Optional.some!enumelt
+  %o = load %addr : $*Optional<((), ())>
+  switch_enum %o : $Optional<((), ())>, case #Optional.some!enumelt: some_block, case #Optional.none!enumelt: none_block
+
+some_block(%avoid : $((), ())):
+  br exit
+
+none_block:
+  br exit
+
+exit:
+  dealloc_stack %addr : $*Optional<((), ())>
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil @empty_nondominating_tuple_store_left : {{.*}} {
+// CHECK:         inject_enum_addr
+// CHECK-LABEL: } // end sil function 'empty_nondominating_tuple_store_left'
+sil @empty_nondominating_tuple_store_left : $@convention(thin) (Builtin.Int1) -> () {
+entry(%cond : $Builtin.Int1):
+  %addr = alloc_stack $Optional<((), ())>
+  %some_addr = init_enum_data_addr %addr : $*Optional<((), ())>, #Optional.some!enumelt
+  %left_addr = tuple_element_addr %some_addr : $*((), ()), 0
+  %right_addr = tuple_element_addr %some_addr : $*((), ()), 1
+  %void = tuple ()
+  cond_br %cond, left, right
+
+left:
+  br middle
+
+right:
+  store %void to %left_addr : $*()
+  br middle
+
+middle:
+  store %void to %right_addr : $*()
+  inject_enum_addr %addr : $*Optional<((), ())>, #Optional.some!enumelt
+  %o = load %addr : $*Optional<((), ())>
+  switch_enum %o : $Optional<((), ())>, case #Optional.some!enumelt: some_block, case #Optional.none!enumelt: none_block
+
+some_block(%avoid : $((), ())):
+  br exit
+
+none_block:
+  br exit
+
+exit:
+  dealloc_stack %addr : $*Optional<((), ())>
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil @empty_nondominating_tuple_store_right : {{.*}} {
+// CHECK:         inject_enum_addr
+// CHECK-LABEL: } // end sil function 'empty_nondominating_tuple_store_right'
+sil @empty_nondominating_tuple_store_right : $@convention(thin) (Builtin.Int1) -> () {
+entry(%cond : $Builtin.Int1):
+  %addr = alloc_stack $Optional<((), ())>
+  %some_addr = init_enum_data_addr %addr : $*Optional<((), ())>, #Optional.some!enumelt
+  %left_addr = tuple_element_addr %some_addr : $*((), ()), 0
+  %right_addr = tuple_element_addr %some_addr : $*((), ()), 1
+  %void = tuple ()
+  cond_br %cond, left, right
+
+left:
+  br middle
+
+right:
+  store %void to %right_addr : $*()
+  br middle
+
+middle:
+  store %void to %left_addr : $*()
+  inject_enum_addr %addr : $*Optional<((), ())>, #Optional.some!enumelt
+  %o = load %addr : $*Optional<((), ())>
+  switch_enum %o : $Optional<((), ())>, case #Optional.some!enumelt: some_block, case #Optional.none!enumelt: none_block
+
+some_block(%avoid : $((), ())):
+  br exit
+
+none_block:
+  br exit
+
+exit:
+  dealloc_stack %addr : $*Optional<((), ())>
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil @check_partially_dominating_tuple_stores : {{.*}} {
+// CHECK:         inject_enum_addr
+// CHECK-LABEL: } // end sil function 'check_partially_dominating_tuple_stores'
+sil @check_partially_dominating_tuple_stores : $@convention(thin) (Builtin.Int1) -> () {
+entry(%cond : $Builtin.Int1):
+  %addr = alloc_stack $Optional<(Builtin.Int1, ())>
+  %some_addr = init_enum_data_addr %addr : $*Optional<(Builtin.Int1, ())>, #Optional.some!enumelt
+  %left_addr = tuple_element_addr %some_addr : $*(Builtin.Int1, ()), 0
+  %false = integer_literal $Builtin.Int1, 0
+  store %false to %left_addr : $*Builtin.Int1
+  %right_addr = tuple_element_addr %some_addr : $*(Builtin.Int1, ()), 1
+  cond_br %cond, left, right
+
+left:
+  br middle
+
+right:
+  %void = tuple ()
+  store %void to %right_addr : $*()
+  br middle
+
+middle:
+  inject_enum_addr %addr : $*Optional<(Builtin.Int1, ())>, #Optional.some!enumelt
+  %o = load %addr : $*Optional<(Builtin.Int1, ())>
+  switch_enum %o : $Optional<(Builtin.Int1, ())>, case #Optional.some!enumelt: some_block, case #Optional.none!enumelt: none_block
+
+some_block(%avoid : $(Builtin.Int1, ())):
+  br exit
+
+none_block:
+  br exit
+
+exit:
+  dealloc_stack %addr : $*Optional<(Builtin.Int1, ())>
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil @empty_dominating_tuple_stores : {{.*}} {
+// CHECK-NOT:     inject_enum_addr
+// CHECK-LABEL: } // end sil function 'empty_dominating_tuple_stores'
+sil @empty_dominating_tuple_stores : $@convention(thin) (Builtin.Int1) -> () {
+entry(%cond : $Builtin.Int1):
+  %addr = alloc_stack $Optional<((), ())>
+  %some_addr = init_enum_data_addr %addr : $*Optional<((), ())>, #Optional.some!enumelt
+  %left_addr = tuple_element_addr %some_addr : $*((), ()), 0
+  %right_addr = tuple_element_addr %some_addr : $*((), ()), 1
+  %void = tuple ()
+  cond_br %cond, left, right
+
+left:
+  br middle
+
+right:
+  br middle
+
+middle:
+  store %void to %right_addr : $*()
+  store %void to %left_addr : $*()
+  inject_enum_addr %addr : $*Optional<((), ())>, #Optional.some!enumelt
+  %o = load %addr : $*Optional<((), ())>
+  switch_enum %o : $Optional<((), ())>, case #Optional.some!enumelt: some_block, case #Optional.none!enumelt: none_block
+
+some_block(%avoid : $((), ())):
+  br exit
+
+none_block:
+  br exit
+
+exit:
+  dealloc_stack %addr : $*Optional<((), ())>
+  %retval = tuple ()
+  return %retval : $()
 }

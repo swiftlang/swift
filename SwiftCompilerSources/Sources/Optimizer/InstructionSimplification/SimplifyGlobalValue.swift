@@ -18,7 +18,7 @@ import SIL
 // Note that `simplifyStrongRetainPass` and `simplifyStrongReleasePass` can
 // even remove "unbalanced" retains/releases of a `global_value`, but this
 // requires a minimum deployment target.
-extension GlobalValueInst : SILCombineSimplifyable {
+extension GlobalValueInst : Simplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
     var users = Stack<Instruction>(context)
     defer { users.deinitialize() }

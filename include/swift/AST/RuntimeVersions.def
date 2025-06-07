@@ -1,0 +1,179 @@
+//===--- RuntimeVersions.def - Runtime Version Metaprogramming --*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines macros used for macro-metaprogramming with runtime
+// versions.
+//
+//===----------------------------------------------------------------------===//
+
+/// MAJOR_VERSION(V)
+///   V - The major version number.
+///
+/// This should be used to bracket RUNTIME_VERSIONs for a given major version.
+#ifndef MAJOR_VERSION
+#define MAJOR_VERSION(V)
+#endif
+
+/// END_MAJOR_VERSION(V)
+///   V - The major version number.
+///
+/// This should be used to bracket RUNTIME_VERSIONs for a given major version.
+#ifndef END_MAJOR_VERSION
+#define END_MAJOR_VERSION(V)
+#endif
+
+/// RUNTIME_VERSION(V, Ps)
+///   V  - A tuple of (major, minor) version numbers.
+///   Ps - A list of corresponding platform versions.
+///
+/// Describes a runtime version.  Ps should be a list of PLATFORM() or FUTURE
+/// labels describing the mapping between runtime versions and platform.  Do
+/// not include any separators in the list (i.e. no ','s or ';'s).
+#ifndef RUNTIME_VERSION
+#define RUNTIME_VERSION(V, Ps)
+#endif
+
+/// PLATFORM(P, V)
+///   P  - The name of the platform (e.g. macOS, iOS, or watchOS)
+///   V  - A tuple containing the platform version.
+#ifndef PLATFORM
+#define PLATFORM(P, V)
+#endif
+
+/// FUTURE
+///
+/// Label a runtime version as a future version.
+#ifndef FUTURE
+#define FUTURE
+#endif
+
+// .. Swift 5 ............................................................... //
+
+MAJOR_VERSION(5)
+
+RUNTIME_VERSION(
+  (5, 0),
+  PLATFORM(macOS,   (10, 14, 4))
+  PLATFORM(iOS,     (12, 2))
+  PLATFORM(watchOS, (5, 2))
+)
+
+RUNTIME_VERSION(
+  (5, 1),
+  PLATFORM(macOS,   (10, 15, 0))
+  PLATFORM(iOS,     (13, 0, 0))
+  PLATFORM(watchOS, (6, 0, 0))
+)
+
+RUNTIME_VERSION(
+  (5, 2),
+  PLATFORM(macOS,   (10, 15, 4))
+  PLATFORM(iOS,     (13, 4, 0))
+  PLATFORM(watchOS, (6, 2, 0))
+)
+
+RUNTIME_VERSION(
+  (5, 3),
+  PLATFORM(macOS,   (10, 16, 0))
+  PLATFORM(iOS,     (14, 0, 0))
+  PLATFORM(watchOS, (7, 0, 0))
+)
+
+RUNTIME_VERSION(
+  (5, 4),
+  PLATFORM(macOS,   (11, 3, 0))
+  PLATFORM(iOS,     (14, 5, 0))
+  PLATFORM(watchOS, (7, 4, 0))
+)
+
+RUNTIME_VERSION(
+  (5, 5),
+  PLATFORM(macOS,   (12, 0, 0))
+  PLATFORM(iOS,     (15, 0, 0))
+  PLATFORM(watchOS, (8, 0, 0))
+)
+
+RUNTIME_VERSION(
+  (5, 6),
+  PLATFORM(macOS,   (12, 3, 0))
+  PLATFORM(iOS,     (15, 4, 0))
+  PLATFORM(watchOS, (8, 5, 0))
+)
+
+RUNTIME_VERSION(
+  (5, 7),
+  PLATFORM(macOS,   (13, 0, 0))
+  PLATFORM(iOS,     (16, 0, 0))
+  PLATFORM(watchOS, (9, 0, 0))
+)
+
+RUNTIME_VERSION(
+  (5, 8),
+  PLATFORM(macOS,   (13, 3, 0))
+  PLATFORM(iOS,     (16, 4, 0))
+  PLATFORM(watchOS, (9, 4, 0))
+)
+
+RUNTIME_VERSION(
+  (5, 9),
+  PLATFORM(macOS,   (14, 0, 0))
+  PLATFORM(iOS,     (17, 0, 0))
+  PLATFORM(watchOS, (10, 0, 0))
+)
+
+RUNTIME_VERSION(
+  (5, 10),
+  PLATFORM(macOS,   (14, 4, 0))
+  PLATFORM(iOS,     (17, 4, 0))
+  PLATFORM(watchOS, (10, 4, 0))
+  PLATFORM(visionOS,(1, 0, 0))
+)
+
+END_MAJOR_VERSION(5)
+
+MAJOR_VERSION(6)
+
+RUNTIME_VERSION(
+  (6, 0),
+  PLATFORM(macOS,   (15, 0, 0))
+  PLATFORM(iOS,     (18, 0, 0))
+  PLATFORM(watchOS, (11, 0, 0))
+  PLATFORM(visionOS,(2, 0, 0))
+)
+
+RUNTIME_VERSION(
+  (6, 1),
+  PLATFORM(macOS,   (15, 4, 0))
+  PLATFORM(iOS,     (18, 4, 0))
+  PLATFORM(watchOS, (11, 4, 0))
+  PLATFORM(visionOS,(2, 4, 0))
+)
+
+RUNTIME_VERSION(
+  (6, 2),
+  FUTURE
+)
+
+RUNTIME_VERSION(
+  (6, 3),
+  FUTURE
+)
+
+END_MAJOR_VERSION(6)
+
+// .......................................................................... //
+
+#undef MAJOR_VERSION
+#undef END_MAJOR_VERSION
+#undef RUNTIME_VERSION
+#undef PLATFORM
+#undef FUTURE

@@ -19,7 +19,7 @@ import SIL
 /// dumps anything, but aborts if the result is wrong.
 ///
 /// This pass is used for testing `AccessUtils`.
-let accessDumper = FunctionPass(name: "dump-access", {
+let accessDumper = FunctionPass(name: "dump-access") {
   (function: Function, context: FunctionPassContext) in
   print("Accesses for \(function.name)")
 
@@ -29,7 +29,7 @@ let accessDumper = FunctionPass(name: "dump-access", {
       case let st as StoreInst:
         printAccessInfo(address: st.destination)
       case let load as LoadInst:
-        printAccessInfo(address: load.operand)
+        printAccessInfo(address: load.address)
       case let apply as ApplyInst:
         guard let callee = apply.referencedFunction else {
           break
@@ -46,7 +46,7 @@ let accessDumper = FunctionPass(name: "dump-access", {
   }
 
   print("End accesses for \(function.name)")
-})
+}
 
 private struct AccessStoragePathVisitor : ValueUseDefWalker {
   var walkUpCache = WalkerCache<Path>()
@@ -67,8 +67,16 @@ private func printAccessInfo(address: Value) {
     print("  Scope: base")
   }
 
-  print("  Base: \(ap.base)")
-  print("  Path: \"\(ap.projectionPath)\"")
+  let constAp = address.constantAccessPath
+  if constAp == ap {
+    print("  Base: \(ap.base)")
+    print("  Path: \"\(ap.projectionPath)\"")
+  } else {
+    print("  nonconst-base: \(ap.base)")
+    print("  nonconst-path: \"\(ap.projectionPath)\"")
+    print("  const-base: \(constAp.base)")
+    print("  const-path: \"\(constAp.projectionPath)\"")
+  }
 
   var arw = AccessStoragePathVisitor()
   if !arw.visitAccessStorageRoots(of: ap) {
@@ -79,18 +87,40 @@ private func printAccessInfo(address: Value) {
 private func checkAliasInfo(forArgumentsOf apply: ApplyInst, expectDistinct: Bool) {
   let address1 = apply.arguments[0]
   let address2 = apply.arguments[1]
-  let path1 = address1.accessPath
-  let path2 = address2.accessPath
 
+  checkIsDistinct(path1: address1.accessPath,
+                  path2: address2.accessPath,
+                  expectDistinct: expectDistinct,
+                  instruction: apply)
+
+  if !expectDistinct {
+    // Also check all combinations with the constant variant of access paths.
+    // Note: we can't do that for "isDistinct" because "isDistinct" might be more conservative in one of the variants.
+    checkIsDistinct(path1: address1.constantAccessPath,
+                    path2: address2.constantAccessPath,
+                    expectDistinct: false,
+                    instruction: apply)
+    checkIsDistinct(path1: address1.accessPath,
+                    path2: address2.constantAccessPath,
+                    expectDistinct: false,
+                    instruction: apply)
+    checkIsDistinct(path1: address1.constantAccessPath,
+                    path2: address2.accessPath,
+                    expectDistinct: false,
+                    instruction: apply)
+  }
+}
+
+private func checkIsDistinct(path1: AccessPath, path2: AccessPath, expectDistinct: Bool, instruction: Instruction) {
   if path1.isDistinct(from: path2) != expectDistinct {
-    print("wrong isDistinct result of \(apply)")
+    print("wrong isDistinct result of \(instruction)")
   } else if path2.isDistinct(from: path1) != expectDistinct {
-    print("wrong reverse isDistinct result of \(apply)")
+    print("wrong reverse isDistinct result of \(instruction)")
   } else {
     return
   }
-  
+
   print("in function")
-  print(apply.parentFunction)
+  print(instruction.parentFunction)
   fatalError()
 }

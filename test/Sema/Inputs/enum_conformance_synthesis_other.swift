@@ -1,7 +1,6 @@
 // Note that for the test to be effective, each of these enums must only have
 // its Equatable or Hashable conformance referenced /once/ in the primary file.
 enum FromOtherFile : String {
-// expected-note@-1 {{type declared here}}
   case A = "a"
 }
 enum AlsoFromOtherFile : Int {
@@ -28,8 +27,4 @@ protocol ImplierOther: Equatable {}
 extension ImpliedMain: ImplierMain {}
 enum ImpliedOther: ImplierOther {
     case a(Int)
-}
-
-enum CaseIterableAcrossFiles {
-  case A
 }

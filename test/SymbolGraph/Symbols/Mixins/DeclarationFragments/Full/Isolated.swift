@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -module-name Isolated -emit-module -emit-module-path %t/Isolated.swiftmodule -disable-availability-checking
+// RUN: %target-swift-frontend %s -module-name Isolated -emit-module -emit-module-path %t/Isolated.swiftmodule -target %target-swift-5.1-abi-triple
 // RUN: %target-swift-symbolgraph-extract -module-name Isolated -I %t -pretty-print -output-dir %t
 // RUN: %FileCheck %s --input-file %t/Isolated.symbols.json
 

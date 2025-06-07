@@ -66,7 +66,7 @@ else:
 }%
 
 % if bits == 80:
-#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+#if !(os(Windows) || os(Android) || ($Embedded && !os(Linux) && !(os(macOS) || os(iOS) || os(watchOS) || os(tvOS)))) && (arch(i386) || arch(x86_64))
 % elif bits == 16:
 #if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
 % end
@@ -105,8 +105,8 @@ extension ${Self}: CustomStringConvertible {
       return "nan"
     } else {
       var (buffer, length) = _float${bits}ToString(self, debug: false)
-      return buffer.withBytes { (bufferPtr) in
-        String._fromASCII(
+      return unsafe buffer.withBytes { (bufferPtr) in
+        unsafe String._fromASCII(
           UnsafeBufferPointer(start: bufferPtr, count: length))
       }
     }
@@ -121,8 +121,8 @@ extension ${Self}: CustomDebugStringConvertible {
   /// that NaN values are printed in an extended format.
   public var debugDescription: String {
     var (buffer, length) = _float${bits}ToString(self, debug: true)
-    return buffer.withBytes { (bufferPtr) in
-      String._fromASCII(
+    return unsafe buffer.withBytes { (bufferPtr) in
+      unsafe String._fromASCII(
         UnsafeBufferPointer(start: bufferPtr, count: length))
     }
   }
@@ -132,9 +132,9 @@ ${Availability(bits)}
 extension ${Self}: TextOutputStreamable {
   public func write<Target>(to target: inout Target) where Target: TextOutputStream {
     var (buffer, length) = _float${bits}ToString(self, debug: true)
-    buffer.withBytes { (bufferPtr) in
-      let bufPtr = UnsafeBufferPointer(start: bufferPtr, count: length)
-      target._writeASCII(bufPtr)
+    unsafe buffer.withBytes { (bufferPtr) in
+      let bufPtr = unsafe UnsafeBufferPointer(start: bufferPtr, count: length)
+      unsafe target._writeASCII(bufPtr)
     }
   }
 }
@@ -317,7 +317,7 @@ extension ${Self}: BinaryFloatingPoint {
 
   @inlinable
   internal var _representation: _Representation {
-    return unsafeBitCast(self, to: _Representation.self)
+    return unsafe unsafeBitCast(self, to: _Representation.self)
   }
 
   @inlinable
@@ -378,7 +378,7 @@ extension ${Self}: BinaryFloatingPoint {
     if exponent != 0 { significand |= Float80._explicitBitMask }
     let rep = _Representation(
       explicitSignificand: significand, signAndExponent: signBit|exponent)
-    self = unsafeBitCast(rep, to: Float80.self)
+    self = unsafe unsafeBitCast(rep, to: Float80.self)
   }
 
   @inlinable
@@ -405,7 +405,7 @@ extension ${Self}: BinaryFloatingPoint {
       explicitSignificand: ${Self}._explicitBitMask,
       signAndExponent: 0x7fff
     )
-    return unsafeBitCast(rep, to: ${Self}.self)
+    return unsafe unsafeBitCast(rep, to: ${Self}.self)
 %else:
     return ${Self}(
       sign: .plus,
@@ -426,7 +426,7 @@ extension ${Self}: BinaryFloatingPoint {
       explicitSignificand: ${Self}._explicitBitMask | ${Self}._quietNaNMask,
       signAndExponent: 0x7fff
     )
-    return unsafeBitCast(rep, to: ${Self}.self)
+    return unsafe unsafeBitCast(rep, to: ${Self}.self)
 %else:
     return ${Self}(nan: 0, signaling: false)
 %end
@@ -541,6 +541,7 @@ extension ${Self}: BinaryFloatingPoint {
   }
 
   @inlinable
+  @_semantics("optimize.sil.inline.constant.arguments")
   public var exponent: Int {
     if !isFinite { return .max }
     if isZero { return .min }
@@ -714,8 +715,10 @@ extension ${Self}: BinaryFloatingPoint {
       _value = Builtin.int_ceil_FPIEEE${bits}(_value)
     case .down:
       _value = Builtin.int_floor_FPIEEE${bits}(_value)
+    #if !$Embedded
     @unknown default:
       self._roundSlowPath(rule)
+    #endif
     }
   }
   
@@ -882,6 +885,7 @@ extension ${Self}: BinaryFloatingPoint {
   }
 
   @inlinable
+  @_semantics("optimize.sil.inline.constant.arguments")
   public var significandWidth: Int {
     let trailingZeroBits = significandBitPattern.trailingZeroBitCount
     if isNormal {
@@ -917,7 +921,7 @@ extension ${Self}: _ExpressibleByBuiltinIntegerLiteral, ExpressibleByIntegerLite
 }
 
 % if bits != 80:
-#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+#if !(os(Windows) || os(Android) || ($Embedded && !os(Linux) && !(os(macOS) || os(iOS) || os(watchOS) || os(tvOS)))) && (arch(i386) || arch(x86_64))
 % end
 
 % builtinFloatLiteralBits = 80
@@ -1003,6 +1007,7 @@ extension ${Self}: Hashable {
 }
 
 % if bits != 16:
+@_unavailableInEmbedded
 extension ${Self}: _HasCustomAnyHashableRepresentation {
   // Not @inlinable
   public func _toCustomAnyHashable() -> AnyHashable? {
@@ -1055,13 +1060,13 @@ extension ${Self} {
   @inlinable // FIXME(inline-always)
   @inline(__always)
   public init<Source: BinaryInteger>(_ value: Source) {
-    if value.bitWidth <= ${word_bits} {
+    if value.bitWidth <= 64 {
       if Source.isSigned {
-        let asInt = Int(truncatingIfNeeded: value)
-        _value = Builtin.sitofp_Int${word_bits}_FPIEEE${bits}(asInt._value)
+        let asInt = Int64(truncatingIfNeeded: value)
+        _value = Builtin.sitofp_Int64_FPIEEE${bits}(asInt._value)
       } else {
-        let asUInt = UInt(truncatingIfNeeded: value)
-        _value = Builtin.uitofp_Int${word_bits}_FPIEEE${bits}(asUInt._value)
+        let asUInt = UInt64(truncatingIfNeeded: value)
+        _value = Builtin.uitofp_Int64_FPIEEE${bits}(asUInt._value)
       }
     } else {
       // TODO: we can do much better than the generic _convert here for Float
@@ -1123,7 +1128,7 @@ extension ${Self} {
 %   That = src_type.stdlib_name
 
 %   if srcBits == 80:
-#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+#if !(os(Windows) || os(Android) || ($Embedded && !os(Linux) && !(os(macOS) || os(iOS) || os(watchOS) || os(tvOS)))) && (arch(i386) || arch(x86_64))
 %   elif srcBits == 16:
 #if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
 %   end
@@ -1279,6 +1284,7 @@ extension ${Self}: Strideable {
 //===----------------------------------------------------------------------===//
 
 % if bits != 16:
+@_unavailableInEmbedded
 internal struct _${Self}AnyHashableBox: _AnyHashableBox {
   internal typealias Base = ${Self}
 
@@ -1352,7 +1358,7 @@ internal struct _${Self}AnyHashableBox: _AnyHashableBox {
     into result: UnsafeMutablePointer<T>
   ) -> Bool {
     guard let value = _value as? T else { return false }
-    result.initialize(to: value)
+    unsafe result.initialize(to: value)
     return true
   }
 }

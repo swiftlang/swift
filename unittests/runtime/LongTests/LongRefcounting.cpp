@@ -107,7 +107,7 @@ static SWIFT_CC(swift) void deinitTestObject(SWIFT_CONTEXT HeapObject *_object) 
 }
 
 static const FullMetadata<ClassMetadata> TestClassObjectMetadata = {
-  { { &deinitTestObject }, { &VALUE_WITNESS_SYM(Bo) } },
+  { { nullptr }, { &deinitTestObject }, { &VALUE_WITNESS_SYM(Bo) } },
   { { nullptr }, ClassFlags::UsesSwiftRefcounting, 0, 0, 0, 0, 0, 0 }
 };
 
@@ -282,7 +282,7 @@ TEST(LongRefcountingTest, unowned_retain_overflow_DeathTest) {
   auto object = allocTestObject(&deinited, 1);
 
   // URC is 1. Retain to maxURC, then retain again and verify overflow error.
-  unownedRetainALot<true>(object, maxURC);
+  unownedRetainALot<true>(object, maxURC - 1);
   EXPECT_EQ(0u, deinited);
   EXPECT_ALLOCATED(object);
   ASSERT_DEATH(swift_unownedRetain(object),
@@ -329,7 +329,7 @@ TEST(LongRefcountingTest, nonatomic_unowned_retain_overflow_DeathTest) {
   auto object = allocTestObject(&deinited, 1);
 
   // URC is 1. Retain to maxURC, then retain again and verify overflow error.
-  unownedRetainALot<false>(object, maxURC);
+  unownedRetainALot<false>(object, maxURC - 1);
   EXPECT_EQ(0u, deinited);
   EXPECT_ALLOCATED(object);
   ASSERT_DEATH(swift_nonatomic_unownedRetain(object),

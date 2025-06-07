@@ -15,7 +15,6 @@ APINotesTest(APINotesTest.h): TypeAlias CatAttributeName has been removed
 APINotesTest(APINotesTest.h): Protocol SwiftTypeWithMethodLeft has been renamed to Protocol SwiftTypeWithMethodRight
 APINotesTest(APINotesTest.h): Var OldType.oldMember has been renamed to Var NewType.newMember
 APINotesTest(APINotesTest.h): Var globalAttributeName has been renamed to Var AnimalAttributeName.globalAttributeName
-APINotesTest: Import Foundation has been renamed to Import objc_generics
 
 /* Type Changes */
 APINotesTest(APINotesTest.h): Constructor Cat.init(name:) has return type change from APINotesTest.Cat to APINotesTest.Cat?

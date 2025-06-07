@@ -3,14 +3,14 @@
 // https://github.com/apple/swift/issues/52995
 
 protocol Nested {
-    associatedtype U // expected-note {{protocol requires nested type 'U'; do you want to add it?}}
+    associatedtype U // expected-note {{protocol requires nested type 'U'}}
 }
 
 class A<M> {
     func f<T : Nested>(_ t: T, _ keyPath: WritableKeyPath<M, T.U>) {}
 }
 
-class B<Y> : Nested { // expected-error {{type 'B<Y>' does not conform to protocol 'Nested'}}
+class B<Y> : Nested { // expected-error {{type 'B<Y>' does not conform to protocol 'Nested'}} expected-note {{add stubs for conformance}}
     var i: Y?
 }
 

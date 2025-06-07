@@ -49,12 +49,12 @@ func foo() {
   // NOTE: The point of this test is to trigger IRGenSIL::emitShadowCopy()
   //       and IRGenSIL::emitShadowCopyIfNeeded(). It may be worthwhile to
   //       simplify this testcase.
-  // CHECK: store float %0, float* %myArg.debug, {{.*}}, !dbg ![[PROLOGUE:[0-9]+]]
-  // CHECK: store float {{.*}}, float* %self.debug.myVal1._value, {{.*}}, !dbg ![[PROLOGUE]]
+  // CHECK: store float %0, ptr %myArg.debug, {{.*}}, !dbg ![[PROLOGUE:[0-9]+]]
+  // CHECK: store float {{.*}}, ptr %self.debug.myVal1._value, {{.*}}, !dbg ![[PROLOGUE]]
 
 // func myLoop() {
   // CHECK: define {{.*}} @"$s4main6myLoopyyF"
-  // CHECK: call void @llvm.dbg.declare(metadata i64* %index.debug, {{.*}}), !dbg ![[FORLOOP:[0-9]+]]
+  // CHECK: #dbg_declare(ptr %index.debug, {{.*}}, ![[FORLOOP:[0-9]+]]
   // CHECK: phi i64 [ %{{.[0-9]+}}, %{{.[0-9]+}} ], !dbg ![[FORLOOP]]
   // CHECK: call {{.*}} @"$s4main8markUsedyyxlF"{{.*}}, !dbg ![[FORBODY:[0-9]+]]
   // CHECK: ret void
@@ -70,19 +70,18 @@ func foo() {
 // func foo()
   // CHECK: define {{.*}} @"$s4main3fooyyF"
   // CHECK: %[[MYARRAY:.*]] = alloca
-  // CHECK: call void @llvm.dbg.declare(metadata %TSa* %[[MYARRAY]],
-  // CHECK-SAME: !dbg ![[ARRAY:[0-9]+]]
+  // CHECK: #dbg_declare(ptr %[[MYARRAY]], !{{.*}}, !DIExpression
+  // CHECK-SAME: ![[ARRAY:[0-9]+]]
   // CHECK: call swiftcc { {{.*}} } @"${{.*}}_allocateUninitializedArray{{.*}}"
-  // CHECK-SAME: !dbg ![[ARRAY]]
+  // CHECK-SAME: !dbg ![[ARRAY_ALLOC:[0-9]+]]
   // CHECK: ret void
 
 // CHECK-DAG: ![[ADD]] = !DILocation(line: 6, scope:
 // CHECK-DAG: ![[DIV]] = !DILocation(line: 7, scope:
-// FIXME: The location of ``@llvm.trap`` should be in Integers.swift.gyb
-//        instead of being artificial.
-// CHECK: ![[INLINEDADD]] = !DILocation(line: 0, scope: ![[FAILURE_FUNC:[0-9]+]], inlinedAt: ![[INLINELOC:[0-9]+]]
+
+// CHECK: ![[INLINEDADD]] = !DILocation(line: 6, scope: ![[FAILURE_FUNC:[0-9]+]], inlinedAt: ![[INLINELOC:[0-9]+]]
 // CHECK-DAG: !{{.*}} = distinct !DISubprogram(name: "Swift runtime failure: arithmetic overflow", scope: {{.*}}, flags: DIFlagArtificial, spFlags: DISPFlagDefinition, {{.*}})
-// CHECK-DAG: ![[INLINELOC]] = !DILocation(line: 0, scope: !{{[0-9]+}}, inlinedAt: ![[ADD]]
+// CHECK-DAG: ![[INLINELOC]] = distinct !DILocation(line: 6, scope: !{{[0-9]+}}, inlinedAt: ![[ADD]]
 
 // NOTE: These prologue instructions are given artificial line locations for
 //       LLDB, but for CodeView they should have the location of the function
@@ -94,3 +93,4 @@ func foo() {
 // CHECK-DAG: ![[CASE]] = !DILocation(line: 24, scope:
 // CHECK-DAG: ![[DEFAULTCLEANUP]] = !DILocation(line: 27, scope:
 // CHECK-DAG: ![[ARRAY]] = !DILocation(line: 31, scope:
+// CHECK-DAG: ![[ARRAY_ALLOC]] = !DILocation(line: 31, scope:

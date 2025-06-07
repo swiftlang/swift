@@ -1,6 +1,7 @@
 target_sources(swiftSILOptimizer PRIVATE
   AccessEnforcementSelection.cpp
   AccessMarkerElimination.cpp
+  AlwaysEmitConformanceMetadataPreservation.cpp
   AddressLowering.cpp
   CapturePromotion.cpp
   ClosureLifetimeFixup.cpp
@@ -8,11 +9,11 @@ target_sources(swiftSILOptimizer PRIVATE
   ConsumeOperatorCopyableValuesChecker.cpp
   PhiStorageOptimizer.cpp
   ConstantPropagation.cpp
+  DiagnoseUnnecessaryPreconcurrencyImports.cpp
   DebugInfoCanonicalizer.cpp
   DefiniteInitialization.cpp
   DIMemoryUseCollector.cpp
   DataflowDiagnostics.cpp
-  DiagnoseInfiniteRecursion.cpp
   DiagnoseInvalidEscapingCaptures.cpp
   DiagnoseLifetimeIssues.cpp
   DiagnoseStaticExclusivity.cpp
@@ -23,22 +24,32 @@ target_sources(swiftSILOptimizer PRIVATE
   LexicalLifetimeEliminator.cpp
   LowerHopToActor.cpp
   MandatoryInlining.cpp
-  MovedAsyncVarDebugInfoPropagator.cpp
-  MoveOnlyAddressChecker.cpp
-  MoveOnlyBorrowToDestructureTransform.cpp
-  MoveOnlyBorrowToDestructureTransformTester.cpp
-  MoveOnlyDeinitInsertion.cpp
+  MoveOnlyAddressCheckerTester.cpp
+  MoveOnlyAddressCheckerUtils.cpp
+  MoveOnlyBorrowToDestructureTester.cpp
+  MoveOnlyBorrowToDestructureUtils.cpp
+  MoveOnlyChecker.cpp
   MoveOnlyDiagnostics.cpp
-  MoveOnlyObjectChecker.cpp
+  MoveOnlyObjectCheckerTester.cpp
+  MoveOnlyObjectCheckerUtils.cpp
+  MoveOnlyTempAllocationFromLetTester.cpp
+  MoveOnlyTypeUtils.cpp
+  MoveOnlyUtils.cpp
+  MovedAsyncVarDebugInfoPropagator.cpp
   NestedSemanticFunctionCheck.cpp
   OptimizeHopToExecutor.cpp
   PerformanceDiagnostics.cpp
   PredictableMemOpt.cpp
   PMOMemoryUseCollector.cpp
   RawSILInstLowering.cpp
+  ReferenceBindingTransform.cpp
+  ThunkLowering.cpp
+  SendNonSendable.cpp
+  LowerTupleAddrConstructor.cpp
   SILGenCleanup.cpp
   YieldOnceCheck.cpp
-  MandatoryCombine.cpp
   OSLogOptimization.cpp
   MoveOnlyWrappedTypeEliminator.cpp
+  RegionAnalysisInvalidationTransform.cpp
+  DiagnosticDeadFunctionElimination.cpp
   OwnershipModelEliminator.cpp)

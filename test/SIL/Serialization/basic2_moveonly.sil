@@ -1,26 +1,28 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-sil-opt -enable-experimental-move-only %s -emit-sib -o %t/tmp.sib -module-name basic2
-// RUN: %target-sil-opt -enable-experimental-move-only %t/tmp.sib -o %t/tmp.2.sib -module-name basic2
-// RUN: %target-sil-opt -enable-experimental-move-only %t/tmp.2.sib -module-name basic2 -emit-sorted-sil | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %s -emit-sib -o %t/tmp.sib -module-name basic2
+// RUN: %target-sil-opt -sil-print-types %t/tmp.sib -o %t/tmp.2.sib -module-name basic2
+// RUN: %target-sil-opt -sil-print-types %t/tmp.2.sib -module-name basic2 -emit-sorted-sil | %FileCheck %s
 
 // Once move only is no longer behind a feature flag, merge this into basic2.
 
 sil_stage raw
 
+import Swift
+
 class Klass {}
-@_moveOnly struct MoveOnlyPair {
+struct MoveOnlyPair: ~Copyable {
   var lhs: Klass
   var rhs: Klass
 }
 
-// CHECK-LABEL: sil [ossa] @testMarkMustCheckInst : $@convention(thin) (@guaranteed Klass) -> () {
-// CHECK: mark_must_check [no_implicit_copy] %{{[0-9]+}} : $*MoveOnlyPair
-// CHECK: } // end sil function 'testMarkMustCheckInst'
-sil [ossa] @testMarkMustCheckInst : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK-LABEL: sil [ossa] @testMarkUnresolvedNonCopyableValueInst : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK: mark_unresolved_non_copyable_value [consumable_and_assignable] %{{[0-9]+}} : $*MoveOnlyPair
+// CHECK: } // end sil function 'testMarkUnresolvedNonCopyableValueInst'
+sil [ossa] @testMarkUnresolvedNonCopyableValueInst : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
   %1 = alloc_box ${ var MoveOnlyPair }
   %2 = project_box %1 : ${ var MoveOnlyPair }, 0
-  %3 = mark_must_check [no_implicit_copy] %2 : $*MoveOnlyPair
+  %3 = mark_unresolved_non_copyable_value [consumable_and_assignable] %2 : $*MoveOnlyPair
   %3c = begin_access [modify] [static] %3 : $*MoveOnlyPair
   %3a = struct_element_addr %3c : $*MoveOnlyPair, #MoveOnlyPair.lhs
   %3b = struct_element_addr %3c : $*MoveOnlyPair, #MoveOnlyPair.rhs

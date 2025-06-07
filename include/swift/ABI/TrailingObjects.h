@@ -207,6 +207,21 @@ protected:
             sizeof(NextTy) * Count1,
         MoreCounts...);
   }
+
+  // Helper function for TrailingObjects::sizeWithTrailingTypeCount. This
+  // recurses to superclasses until n reaches zero, then computes the size of
+  // the object up to that point.
+  static size_t sizeWithTrailingTypeCountImpl(const BaseTy *Obj, size_t n) {
+    if (n > 0)
+      return ParentType::sizeWithTrailingTypeCountImpl(Obj, n - 1);
+
+    auto *Ptr = getTrailingObjectsImpl(
+        Obj, TrailingObjectsBase::OverloadToken<NextTy>());
+    auto Count = TopTrailingObj::callNumTrailingObjects(
+        Obj, TrailingObjectsBase::OverloadToken<NextTy>());
+    auto *End = Ptr + Count;
+    return (const char *)End - (const char *)Obj;
+  }
 };
 
 // The base case of the TrailingObjectsImpl inheritance recursion,
@@ -225,6 +240,10 @@ protected:
   }
 
   template <bool CheckAlignment> static void verifyTrailingObjectsAlignment() {}
+
+  static size_t sizeWithTrailingTypeCountImpl(const BaseTy *Obj, size_t n) {
+    return 0;
+  }
 };
 
 } // end namespace trailing_objects_internal
@@ -234,7 +253,8 @@ protected:
 /// See the file comment for details on the usage of the
 /// TrailingObjects type.
 template <typename BaseTy, typename... TrailingTys>
-class TrailingObjects : private trailing_objects_internal::TrailingObjectsImpl<
+class swift_ptrauth_struct_derived(BaseTy) TrailingObjects
+    : private trailing_objects_internal::TrailingObjectsImpl<
                             trailing_objects_internal::AlignmentCalcHelper<
                                 TrailingTys...>::Alignment,
                             BaseTy, TrailingObjects<BaseTy, TrailingTys...>,
@@ -385,6 +405,20 @@ public:
 
     BaseTy *const p;
   };
+
+  // Get the number of trailing types in this TrailingObjects specialization.
+  static size_t trailingTypeCount() { return sizeof...(TrailingTys); }
+
+  // Get the size of the object including trailing objects through index N. This
+  // allows working out the size of a TrailingObjects subclass incrementally,
+  // by calling this repeatedly starting from 0. This is needed for remote
+  // inspection, which needs to figure out how much memory to read just from the
+  // contents of the object. It can repeatedly read a prefix until it has the
+  // whole thing.
+  size_t sizeWithTrailingTypeCount(size_t n) const {
+    return ParentType::sizeWithTrailingTypeCountImpl(
+        static_cast<const BaseTy *>(this), n);
+  }
 };
 
 } // end namespace ABI

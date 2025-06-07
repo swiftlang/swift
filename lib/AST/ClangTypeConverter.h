@@ -70,14 +70,16 @@ public:
   /// \returns The appropriate clang type on success, nullptr on failure.
   ///
   /// Precondition: The representation argument must be C-compatible.
-  const clang::Type *getFunctionType(
-    ArrayRef<AnyFunctionType::Param> params, Type resultTy,
-    AnyFunctionType::Representation repr);
+  template <bool templateArgument>
+  const clang::Type *getFunctionType(ArrayRef<AnyFunctionType::Param> params,
+                                     Type resultTy,
+                                     AnyFunctionType::Representation repr);
 
   /// Compute the C function type for a SIL function type.
-  const clang::Type *getFunctionType(
-    ArrayRef<SILParameterInfo> params, Optional<SILResultInfo> result,
-    SILFunctionType::Representation repr);
+  template <bool templateArgument>
+  const clang::Type *getFunctionType(ArrayRef<SILParameterInfo> params,
+                                     std::optional<SILResultInfo> result,
+                                     SILFunctionType::Representation repr);
 
   /// Check whether the given Clang declaration is an export of a Swift
   /// declaration introduced by this converter, and if so, return the original
@@ -97,6 +99,18 @@ public:
       SmallVectorImpl<clang::TemplateArgument> &templateArgs);
 
 private:
+  enum class PointerKind {
+    UnsafeMutablePointer,
+    UnsafePointer,
+    AutoreleasingUnsafeMutablePointer,
+    Unmanaged,
+    CFunctionPointer,
+  };
+
+  std::optional<PointerKind> classifyPointer(Type type);
+
+  std::optional<unsigned> classifySIMD(Type type);
+
   friend ASTContext; // HACK: expose `convert` method to ASTContext
 
   clang::QualType convert(Type type);
@@ -104,9 +118,25 @@ private:
   clang::QualType convertMemberType(NominalTypeDecl *DC,
                                     StringRef memberName);
 
+  /// Convert Swift types that are used as C++ function template arguments.
+  ///
+  /// C++ function templates can only be instantiated with types originally
+  /// imported from Clang, and a handful of builtin Swift types (e.g., integers
+  /// and floats).
+  clang::QualType convertTemplateArgument(Type type);
+
+  clang::QualType convertClangDecl(Type type, const clang::Decl *decl);
+
+  template <bool templateArgument>
+  clang::QualType convertSIMDType(CanType scalarType, unsigned width);
+
+  template <bool templateArgument>
+  clang::QualType convertPointerType(CanType pointeeType, PointerKind kind);
+
   void registerExportedClangDecl(Decl *swiftDecl,
                                  const clang::Decl *clangDecl);
 
+  clang::QualType reverseImportedTypeMapping(StructType *type);
   clang::QualType reverseBuiltinTypeMapping(StructType *type);
 
   friend TypeVisitor<ClangTypeConverter, clang::QualType>;
@@ -120,6 +150,7 @@ private:
   clang::QualType visitBoundGenericClassType(BoundGenericClassType *type);
   clang::QualType visitBoundGenericType(BoundGenericType *type);
   clang::QualType visitEnumType(EnumType *type);
+  template <bool templateArgument = false>
   clang::QualType visitFunctionType(FunctionType *type);
   clang::QualType visitProtocolCompositionType(ProtocolCompositionType *type);
   clang::QualType visitExistentialType(ExistentialType *type);
@@ -128,6 +159,7 @@ private:
   clang::QualType visitBuiltinFloatType(BuiltinFloatType *type);
   clang::QualType visitArchetypeType(ArchetypeType *type);
   clang::QualType visitDependentMemberType(DependentMemberType *type);
+  template <bool templateArgument = false>
   clang::QualType visitSILFunctionType(SILFunctionType *type);
   clang::QualType visitGenericTypeParamType(GenericTypeParamType *type);
   clang::QualType visitDynamicSelfType(DynamicSelfType *type);

@@ -82,6 +82,7 @@ typedef void (^NonsendableCompletionHandler)(NSString * _Nullable, NSString * _N
 -(void)doSomethingSlowNullably:(NSString *)operation completionHandler:(void (^ _Nullable)(NSInteger))handler;
 -(void)findAnswerNullably:(NSString *)operation completionHandler:(void (^ _Nullable)(NSString *))handler;
 -(void)doSomethingDangerousNullably:(NSString *)operation completionHandler:(void (^ _Nullable)(NSString *_Nullable, NSError *_Nullable))handler;
+-(void)doSomethingUnspecifiedNullablyWithCompletionHandler:(void (^ _Nullable)(NSString *_Nullable, NSError *_Nullable))handler;
 
 // rdar://72604599
 - (void)stopRecordingWithHandler:(nullable void (^)(NSObject *_Nullable_result x, NSError *_Nullable error))handler __attribute__((swift_async_name("stopRecording()"))) __attribute__((swift_async(not_swift_private, 1)));
@@ -122,6 +123,19 @@ typedef void (^NonsendableCompletionHandler)(NSString * _Nullable, NSString * _N
     __attribute__((swift_async_error(zero_argument, 3)));
 - (void)getIceCreamFlavorWithCompletionHandler:
     (void (^)(Flavor flavor, NSError *__nullable error))completionHandler;
+
+@property(class, strong, readonly) SlowServer *standardServer;
+- (void)getValueWithKey:(NSString *)valueIdentifier
+             completion:(void (^)(NSString *__nullable value,
+                                  NSError *__nullable error))completionHandler;
+- (void)getMainActorValueWithKey:(NSString *)valueIdentifier
+                      completion:
+                          (void (^)(NSString *__nullable value,
+                                    NSError *__nullable error))completionHandler
+    MAIN_ACTOR;
+
+- (void)startAt:(__nullable NSDate *)value
+     completion:(void (^_Nonnull)(void))completion;
 @end
 
 @protocol RefrigeratorDelegate<NSObject>
@@ -178,7 +192,7 @@ typedef void ( ^ObjCErrorHandler )( NSError * _Nullable inError );
   - (void) myMethod:(NSInteger)value1 foo:(NSInteger)value2;
 @end
 
-@interface GenericObject<T> : NSObject
+@interface GenericObject<T> : NSObject // expected-note {{generic class 'GenericObject' does not conform to the 'Sendable' protocol}}
 - (void)doSomethingWithCompletionHandler:(void (^)(T _Nullable_result, NSError * _Nullable))completionHandler;
 - (void)doAnotherThingWithCompletionHandler:(void (^)(GenericObject<T> *_Nullable))completionHandler;
 @end
@@ -217,7 +231,7 @@ MAIN_ACTOR MAIN_ACTOR __attribute__((__swift_attr__("@MainActor"))) @protocol Tr
 
 SENDABLE @interface SendableClass : NSObject @end
 
-NONSENDABLE @interface NonSendableClass : NSObject @end
+NONSENDABLE @interface NonSendableClass : NSObject @end // expected-note {{class 'NonSendableClass' does not conform to the 'Sendable' protocol}}
 
 ASSUME_NONSENDABLE_BEGIN
 
@@ -225,17 +239,20 @@ SENDABLE @interface AuditedSendable : NSObject @end
 @interface AuditedNonSendable : NSObject @end
 NONSENDABLE SENDABLE @interface AuditedBoth : NSObject @end
 
+SENDABLE @protocol SendableProtocol @end
+@protocol SendableProtocolRefined <SendableProtocol> @end
+
 typedef NS_ENUM(unsigned, SendableEnum) {
   SendableEnumFoo, SendableEnumBar
 };
-typedef NS_ENUM(unsigned, NonSendableEnum) {
+typedef NS_ENUM(unsigned, NonSendableEnum) { // expected-note {{enum 'NonSendableEnum' does not conform to the 'Sendable' protocol}}
   NonSendableEnumFoo, NonSendableEnumBar
 } NONSENDABLE;
 
 typedef NS_OPTIONS(unsigned, SendableOptions) {
   SendableOptionsFoo = 1 << 0, SendableOptionsBar = 1 << 1
 };
-typedef NS_OPTIONS(unsigned, NonSendableOptions) {
+typedef NS_OPTIONS(unsigned, NonSendableOptions) { // expected-note {{struct 'NonSendableOptions' does not conform to the 'Sendable' protocol}}
   NonSendableOptionsFoo = 1 << 0, NonSendableOptionsBar = 1 << 1
 } NONSENDABLE;
 
@@ -246,7 +263,7 @@ typedef NS_ERROR_ENUM(unsigned, SendableErrorCode, SendableErrorDomain) {
 typedef NS_ERROR_ENUM(unsigned, NonSendableErrorCode, NonSendableErrorDomain) {
   NonSendableErrorCodeFoo, NonSendableErrorCodeBar
 } NONSENDABLE;
-// expected-warning@-3 {{cannot make error code type 'NonSendableErrorCode' non-sendable because Swift errors are always sendable}}
+// expected-warning@-3 {{cannot make error code type 'NonSendableErrorCode' non-Sendable because Swift errors are always sendable}}
 
 UI_ACTOR
 @interface PictureFrame : NSObject
@@ -260,10 +277,10 @@ UI_ACTOR
 @end
 
 typedef NSString *SendableStringEnum NS_STRING_ENUM;
-typedef NSString *NonSendableStringEnum NS_STRING_ENUM NONSENDABLE;
+typedef NSString *NonSendableStringEnum NS_STRING_ENUM NONSENDABLE; // expected-note {{struct 'NonSendableStringEnum' does not conform to the 'Sendable' protocol}}
 
 typedef NSString *SendableStringStruct NS_EXTENSIBLE_STRING_ENUM;
-typedef NSString *NonSendableStringStruct NS_EXTENSIBLE_STRING_ENUM NONSENDABLE;
+typedef NSString *NonSendableStringStruct NS_EXTENSIBLE_STRING_ENUM NONSENDABLE; // expected-note {{struct 'NonSendableStringStruct' does not conform to the 'Sendable' protocol}}
 
 SENDABLE
 typedef struct {
@@ -325,6 +342,43 @@ UI_ACTOR
 @protocol CoffeeDelegate <NSObject>
 @optional
 - (void)icedMochaService:(NSObject *)mochaService generateMochaWithCompletion:(void (^)(NSObject *_Nullable ingredient1, NSObject *ingredient2, NSObject *ingredient3))completionHandler;
+@end
+
+MAIN_ACTOR
+@interface MyView : NSObject
+- (void)display;
+@property(readonly) BOOL isVisible;
+@end
+
+// rdar://114049646
+MAIN_ACTOR
+@protocol HotdogCompetitor
+- (nullable NSString *)pileOfHotdogsToEatWithLimit:(NSObject *)limit
+                                                   error:(NSError * __autoreleasing *)error;
+@end
+
+@protocol Loadable
+- (void)loadStuffWithIdentifier:(NSInteger)identifier reply:(void (^)())reply;
+- (void)loadStuffWithOtherIdentifier:(NSInteger)otherIdentifier reply:(void (^)())reply;
+- (void)loadStuffWithGroupID:(NSInteger)groupID reply:(void (^)())reply;
+@end
+
+@interface ImplementsLoadable : NSObject
+- (void)loadStuffWithIdentifier:(NSInteger)identifier reply:(void (^)())reply;
+- (void)loadStuffWithGroupID:(NSInteger)groupID reply:(void (^)())reply;
+@end
+
+@protocol DictionaryLoader
+- (void)loadDictionaryWithCompletionHandler:(void (^)(NSDictionary <NSString *, NSNumber *> * _Nullable))completionHandler;
+@end
+
+@protocol FloatLoader
+@optional
+- (void)loadFloatWithCompletionHandler:(void (^)(float))completionHandler;
+@end
+
+@protocol FailableFloatLoader
+- (void)loadFloatOrThrowWithCompletionHandler:(void (^)(float, NSError* __nullable)) completionHandler;
 @end
 
 #pragma clang assume_nonnull end

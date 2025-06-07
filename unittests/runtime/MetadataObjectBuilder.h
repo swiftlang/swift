@@ -34,7 +34,7 @@ inline void addModuleContextDescriptor(AnyObjectBuilder &builder,
   auto contextFlags = ContextDescriptorFlags(ContextDescriptorKind::Module,
                                              /*generic*/ false,
                                              /*unique*/ true,
-                                             /*version*/ 0,
+                                             /*hasInvertibleProtocols*/ false,
                                              /*kindSpecific*/ 0);
   builder.add32(contextFlags.getIntValue());
 
@@ -55,7 +55,7 @@ inline void addProtocolDescriptor(AnyObjectBuilder &builder,
   auto contextFlags = ContextDescriptorFlags(ContextDescriptorKind::Protocol,
                                              /*generic*/ false,
                                              /*unique*/ true,
-                                             /*version*/ 0,
+                                             /*hasInvertibleProtocols*/ false,
                                              /*kindSpecific*/ 0);
   builder.add32(contextFlags.getIntValue());
 

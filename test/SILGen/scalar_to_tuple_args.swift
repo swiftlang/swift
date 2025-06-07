@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name scalar_to_tuple_args %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name scalar_to_tuple_args %s | %FileCheck %s
 
 func inoutWithDefaults(_ x: inout Int, y: Int = 0, z: Int = 0) {}
 func inoutWithCallerSideDefaults(_ x: inout Int, y: Int = #line) {}
@@ -55,7 +55,8 @@ tupleWithDefaults(x: (x,x))
 
 // CHECK: [[ALLOC_ARRAY:%.*]] = apply {{.*}} -> (@owned Array<τ_0_0>, Builtin.RawPointer)
 // CHECK: ([[ARRAY:%.*]], [[MEMORY:%.*]]) = destructure_tuple [[ALLOC_ARRAY]]
-// CHECK: [[ADDR:%.*]] = pointer_to_address [[MEMORY]]
+// CHECK: [[MDI:%.*]] = mark_dependence [[MEMORY]]
+// CHECK: [[ADDR:%.*]] = pointer_to_address [[MDI]]
 // CHECK: [[READ:%.*]] = begin_access [read] [dynamic] [[X_ADDR]] : $*Int
 // CHECK: copy_addr [[READ]] to [init] [[ADDR]]
 // CHECK: [[FIN_FN:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF

@@ -67,10 +67,16 @@ ResultTests.test("Throwing Initialization and Unwrapping") {
   func throwing() throws -> String {
     throw Err.err
   }
-    
+
+  func throwingTyped() throws(Err) -> String {
+    throw .err
+  }
+
+  func knownNotThrowing() -> String { return string }
+
   let result1 = Result { try throwing() }
   let result2 = Result { try notThrowing() }
-  
+
   expectEqual(result1.failure as? Err, Err.err)
   expectEqual(result2.success, string)
     
@@ -98,6 +104,22 @@ ResultTests.test("Throwing Initialization and Unwrapping") {
   } catch {
     expectUnreachable()
   }
+
+  // Test strongly typed error via closure.
+  // FIXME: Type inference should eliminate the need for the throws(Err)
+  // annotations below.
+  let result4 = Result { () throws(Err) in try throwingTyped() }
+  let _: Result<String, Err> = result4 // check the type
+  expectEqual(result4.failure, .err)
+  do throws(Err) {
+    _ = try result4.get()
+  } catch let error {
+    expectEqual(error, .err)
+  }
+
+  let result5 = Result { knownNotThrowing() }
+  let _: Result<String, Never> = result5 // check the type
+  _ = result5.get() // no need for 'try'
 }
 
 ResultTests.test("Functional Transforms") {

@@ -14,11 +14,120 @@
 #include "CodeCompletionDiagnostics.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/IDE/CodeCompletionResultPrinter.h"
 #include "swift/IDE/CodeCompletionResultSink.h"
 
 using namespace swift;
 using namespace swift::ide;
+
+CodeCompletionMacroRoles swift::ide::getCompletionMacroRoles(const Decl *D) {
+  CodeCompletionMacroRoles roles;
+
+  auto *MD = dyn_cast<MacroDecl>(D);
+  if (!MD)
+    return roles;
+
+  MacroRoles macroRoles = MD->getMacroRoles();
+  if (macroRoles.contains(MacroRole::Expression)) {
+    roles |= CodeCompletionMacroRole::Expression;
+  }
+  if (macroRoles.contains(MacroRole::Declaration)) {
+    roles |= CodeCompletionMacroRole::Declaration;
+  }
+  if (macroRoles.contains(MacroRole::CodeItem)) {
+    roles |= CodeCompletionMacroRole::CodeItem;
+  }
+  if (macroRoles.contains(MacroRole::Accessor)) {
+    roles |= CodeCompletionMacroRole::AttachedVar;
+  }
+  if (macroRoles & MacroRoles({MacroRole::MemberAttribute, MacroRole::Member,
+                               MacroRole::Conformance,
+                               MacroRole::Extension,})) {
+    roles |= CodeCompletionMacroRole::AttachedContext;
+  }
+  if (macroRoles.contains(MacroRole::Peer)) {
+    roles |= CodeCompletionMacroRole::AttachedDecl;
+  }
+  if (macroRoles.contains(MacroRole::Body) ||
+      macroRoles.contains(MacroRole::Preamble)) {
+    roles |= CodeCompletionMacroRole::AttachedFunction;
+  }
+
+  return roles;
+}
+
+CodeCompletionMacroRoles
+swift::ide::getCompletionMacroRoles(OptionSet<CustomAttributeKind> kinds) {
+  CodeCompletionMacroRoles roles;
+  if (kinds.contains(CustomAttributeKind::VarMacro)) {
+    roles |= CodeCompletionMacroRole::AttachedVar;
+  }
+  if (kinds.contains(CustomAttributeKind::ContextMacro)) {
+    roles |= CodeCompletionMacroRole::AttachedContext;
+  }
+  if (kinds.contains(CustomAttributeKind::DeclMacro)) {
+    roles |= CodeCompletionMacroRole::AttachedDecl;
+  }
+  if (kinds.contains(CustomAttributeKind::FunctionMacro)) {
+    roles |= CodeCompletionMacroRole::AttachedFunction;
+  }
+  return roles;
+}
+
+CodeCompletionMacroRoles
+swift::ide::getCompletionMacroRoles(CodeCompletionFilter filter) {
+  CodeCompletionMacroRoles roles;
+  if (filter.contains(CodeCompletionFilterFlag::ExpressionMacro)) {
+    roles |= CodeCompletionMacroRole::Expression;
+  }
+  if (filter.contains(CodeCompletionFilterFlag::DeclarationMacro)) {
+    roles |= CodeCompletionMacroRole::Declaration;
+  }
+  if (filter.contains(CodeCompletionFilterFlag::CodeItemMacro)) {
+    roles |= CodeCompletionMacroRole::CodeItem;
+  }
+  if (filter.contains(CodeCompletionFilterFlag::AttachedVarMacro)) {
+    roles |= CodeCompletionMacroRole::AttachedVar;
+  }
+  if (filter.contains(CodeCompletionFilterFlag::AttachedContextMacro)) {
+    roles |= CodeCompletionMacroRole::AttachedContext;
+  }
+  if (filter.contains(CodeCompletionFilterFlag::AttachedDeclMacro)) {
+    roles |= CodeCompletionMacroRole::AttachedDecl;
+  }
+  if (filter.contains(CodeCompletionFilterFlag::AttachedFunctionMacro)) {
+    roles |= CodeCompletionMacroRole::AttachedFunction;
+  }
+  return roles;
+}
+
+CodeCompletionFilter
+swift::ide::getCompletionFilter(CodeCompletionMacroRoles roles) {
+  CodeCompletionFilter filter;
+  if (roles.contains(CodeCompletionMacroRole::Expression)) {
+    filter |= CodeCompletionFilterFlag::ExpressionMacro;
+  }
+  if (roles.contains(CodeCompletionMacroRole::Declaration)) {
+    filter |= CodeCompletionFilterFlag::DeclarationMacro;
+  }
+  if (roles.contains(CodeCompletionMacroRole::CodeItem)) {
+    filter |= CodeCompletionFilterFlag::CodeItemMacro;
+  }
+  if (roles.contains(CodeCompletionMacroRole::AttachedVar)) {
+    filter |= CodeCompletionFilterFlag::AttachedVarMacro;
+  }
+  if (roles.contains(CodeCompletionMacroRole::AttachedContext)) {
+    filter |= CodeCompletionFilterFlag::AttachedContextMacro;
+  }
+  if (roles.contains(CodeCompletionMacroRole::AttachedDecl)) {
+    filter |= CodeCompletionFilterFlag::AttachedDeclMacro;
+  }
+  if (roles.contains(CodeCompletionMacroRole::AttachedFunction)) {
+    filter |= CodeCompletionFilterFlag::AttachedFunctionMacro;
+  }
+  return filter;
+}
 
 // MARK: - ContextFreeCodeCompletionResult
 
@@ -26,8 +135,7 @@ ContextFreeCodeCompletionResult *
 ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
     CodeCompletionResultSink &Sink, CodeCompletionResultKind Kind,
     CodeCompletionString *CompletionString,
-    CodeCompletionOperatorKind KnownOperatorKind, bool IsAsync,
-    NullTerminatedStringRef BriefDocComment,
+    CodeCompletionOperatorKind KnownOperatorKind, NullTerminatedStringRef BriefDocComment,
     CodeCompletionResultType ResultType,
     ContextFreeNotRecommendedReason NotRecommended,
     CodeCompletionDiagnosticSeverity DiagnosticSeverity,
@@ -42,8 +150,9 @@ ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
     NameForDiagnostics = "operator";
   }
   return new (Sink.getAllocator()) ContextFreeCodeCompletionResult(
-      Kind, /*AssociatedKind=*/0, KnownOperatorKind,
-      /*IsSystem=*/false, IsAsync, /*HasAsyncAlternative=*/false, CompletionString,
+      Kind, /*AssociatedKind=*/0, KnownOperatorKind, /*MacroRoles=*/{},
+      /*IsSystem=*/false, /*HasAsyncAlternative=*/false,
+      CompletionString,
       /*ModuleName=*/"", BriefDocComment,
       /*AssociatedUSRs=*/{}, ResultType, NotRecommended, DiagnosticSeverity,
       DiagnosticMessage,
@@ -62,8 +171,8 @@ ContextFreeCodeCompletionResult::createKeywordResult(
   }
   return new (Sink.getAllocator()) ContextFreeCodeCompletionResult(
       CodeCompletionResultKind::Keyword, static_cast<uint8_t>(Kind),
-      CodeCompletionOperatorKind::None, /*IsSystem=*/false, /*IsAsync=*/false,
-      /*HasAsyncAlternative=*/false, CompletionString,
+      CodeCompletionOperatorKind::None, /*MacroRoles=*/{},
+      /*IsSystem=*/false, /*HasAsyncAlternative=*/false, CompletionString,
       /*ModuleName=*/"", BriefDocComment,
       /*AssociatedUSRs=*/{}, ResultType, ContextFreeNotRecommendedReason::None,
       CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"",
@@ -81,8 +190,8 @@ ContextFreeCodeCompletionResult::createLiteralResult(
   }
   return new (Sink.getAllocator()) ContextFreeCodeCompletionResult(
       CodeCompletionResultKind::Literal, static_cast<uint8_t>(LiteralKind),
-      CodeCompletionOperatorKind::None,
-      /*IsSystem=*/false, /*IsAsync=*/false, /*HasAsyncAlternative=*/false,
+      CodeCompletionOperatorKind::None, /*MacroRoles=*/{},
+      /*IsSystem=*/false, /*HasAsyncAlternative=*/false,
       CompletionString,
       /*ModuleName=*/"",
       /*BriefDocComment=*/"",
@@ -110,7 +219,7 @@ getDeclNameForDiagnostics(const Decl *D, CodeCompletionResultSink &Sink) {
 ContextFreeCodeCompletionResult *
 ContextFreeCodeCompletionResult::createDeclResult(
     CodeCompletionResultSink &Sink, CodeCompletionString *CompletionString,
-    const Decl *AssociatedDecl, bool IsAsync, bool HasAsyncAlternative,
+    const Decl *AssociatedDecl, bool HasAsyncAlternative,
     NullTerminatedStringRef ModuleName, NullTerminatedStringRef BriefDocComment,
     ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
     CodeCompletionResultType ResultType,
@@ -124,10 +233,10 @@ ContextFreeCodeCompletionResult::createDeclResult(
   return new (Sink.getAllocator()) ContextFreeCodeCompletionResult(
       CodeCompletionResultKind::Declaration,
       static_cast<uint8_t>(getCodeCompletionDeclKind(AssociatedDecl)),
-      CodeCompletionOperatorKind::None, getDeclIsSystem(AssociatedDecl),
-      IsAsync, HasAsyncAlternative, CompletionString, ModuleName,
-      BriefDocComment, AssociatedUSRs, ResultType, NotRecommended,
-      DiagnosticSeverity, DiagnosticMessage,
+      CodeCompletionOperatorKind::None, getCompletionMacroRoles(AssociatedDecl),
+      getDeclIsSystem(AssociatedDecl), HasAsyncAlternative,
+      CompletionString, ModuleName, BriefDocComment, AssociatedUSRs, ResultType,
+      NotRecommended, DiagnosticSeverity, DiagnosticMessage,
       getCodeCompletionResultFilterName(CompletionString, Sink.getAllocator()),
       /*NameForDiagnostics=*/getDeclNameForDiagnostics(AssociatedDecl, Sink));
 }
@@ -139,7 +248,7 @@ ContextFreeCodeCompletionResult::getCodeCompletionOperatorKind(
   using CCOK = CodeCompletionOperatorKind;
   using OpPair = std::pair<StringRef, CCOK>;
 
-  // This list must be kept in alphabetical order.
+  // This list must be kept in lexicographic order.
   static OpPair ops[] = {
       std::make_pair("!", CCOK::Bang),
       std::make_pair("!=", CCOK::NotEq),
@@ -183,13 +292,12 @@ ContextFreeCodeCompletionResult::getCodeCompletionOperatorKind(
       std::make_pair("||", CCOK::PipePipe),
       std::make_pair("~=", CCOK::TildeEq),
   };
-  static auto opsSize = sizeof(ops) / sizeof(ops[0]);
 
   auto I = std::lower_bound(
-      ops, &ops[opsSize], std::make_pair(name, CCOK::None),
+      std::begin(ops), std::end(ops), std::make_pair(name, CCOK::None),
       [](const OpPair &a, const OpPair &b) { return a.first < b.first; });
 
-  if (I == &ops[opsSize] || I->first != name)
+  if (I == std::end(ops) || I->first != name)
     return CCOK::Unknown;
   return I->second;
 }
@@ -202,13 +310,12 @@ ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
   case DeclKind::PatternBinding:
   case DeclKind::EnumCase:
   case DeclKind::TopLevelCode:
-  case DeclKind::IfConfig:
-  case DeclKind::PoundDiagnostic:
   case DeclKind::Missing:
   case DeclKind::MissingMember:
   case DeclKind::OpaqueType:
   case DeclKind::BuiltinTuple:
   case DeclKind::MacroExpansion:
+  case DeclKind::Using:
     llvm_unreachable("not expecting such a declaration result");
   case DeclKind::Module:
     return CodeCompletionDeclKind::Module;
@@ -293,42 +400,41 @@ ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
 }
 
 bool ContextFreeCodeCompletionResult::getDeclIsSystem(const Decl *D) {
-  return D->getModuleContext()->isSystemModule();
+  return D->getModuleContext()->isNonUserModule();
 }
 
-// MARK: - CodeCompletionResult
-
-static ContextualNotRecommendedReason
-getNotRecommenedReason(const ContextFreeCodeCompletionResult &ContextFree,
-                       bool CanCurrDeclContextHandleAsync,
-                       ContextualNotRecommendedReason ExplicitReason) {
-  if (ExplicitReason != ContextualNotRecommendedReason::None) {
-    return ExplicitReason;
+ContextualNotRecommendedReason
+ContextFreeCodeCompletionResult::calculateContextualNotRecommendedReason(
+    ContextualNotRecommendedReason explicitReason,
+    bool canCurrDeclContextHandleAsync) const {
+  if (explicitReason != ContextualNotRecommendedReason::None) {
+    return explicitReason;
   }
-  if (ContextFree.isAsync() && !CanCurrDeclContextHandleAsync) {
-    return ContextualNotRecommendedReason::InvalidAsyncContext;
-  }
-  if (ContextFree.hasAsyncAlternative() && CanCurrDeclContextHandleAsync) {
+  if (HasAsyncAlternative && canCurrDeclContextHandleAsync) {
     return ContextualNotRecommendedReason::
         NonAsyncAlternativeUsedInAsyncContext;
   }
   return ContextualNotRecommendedReason::None;
 }
 
-CodeCompletionResult::CodeCompletionResult(
-    const ContextFreeCodeCompletionResult &ContextFree,
-    SemanticContextKind SemanticContext, CodeCompletionFlair Flair,
-    uint8_t NumBytesToErase, const ExpectedTypeContext *TypeContext,
-    const DeclContext *DC, const USRBasedTypeContext *USRTypeContext,
-    bool CanCurrDeclContextHandleAsync,
-    ContextualNotRecommendedReason NotRecommended)
-    : ContextFree(ContextFree), SemanticContext(SemanticContext),
-      Flair(Flair.toRaw()),
-      NotRecommended(getNotRecommenedReason(
-          ContextFree, CanCurrDeclContextHandleAsync, NotRecommended)),
-      NumBytesToErase(NumBytesToErase),
-      TypeDistance(ContextFree.getResultType().calculateTypeRelation(
-          TypeContext, DC, USRTypeContext)) {}
+CodeCompletionResultTypeRelation
+ContextFreeCodeCompletionResult::calculateContextualTypeRelation(
+    const DeclContext *dc, const ExpectedTypeContext *typeContext,
+    const USRBasedTypeContext *usrTypeContext) const {
+  CodeCompletionResultTypeRelation typeRelation =
+      getResultType().calculateTypeRelation(typeContext, dc, usrTypeContext);
+  if (typeRelation >= CodeCompletionResultTypeRelation::Convertible ||
+      !typeContext)
+    return typeRelation;
+
+  CodeCompletionMacroRoles expectedRoles =
+      getCompletionMacroRoles(typeContext->getExpectedCustomAttributeKinds());
+  if (MacroRoles & expectedRoles)
+    return CodeCompletionResultTypeRelation::Convertible;
+  return typeRelation;
+}
+
+// MARK: - CodeCompletionResult
 
 CodeCompletionResult *
 CodeCompletionResult::withFlair(CodeCompletionFlair NewFlair,

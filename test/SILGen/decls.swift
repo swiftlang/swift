@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -Xllvm -sil-full-demangle -parse-as-library %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden [ossa] @$s5decls11void_returnyyF
 // CHECK: = tuple
@@ -33,27 +33,34 @@ func tuple_patterns() {
   var (a, b) : (Int, Float)
   // CHECK: [[ABOX:%[0-9]+]] = alloc_box ${ var Int }
   // CHECK: [[AADDR:%[0-9]+]] = mark_uninitialized [var] [[ABOX]]
-  // CHECK: [[PBA:%.*]] = project_box [[AADDR]]
+  // CHECK: [[ALIFE:%.*]] = begin_borrow [var_decl] [[AADDR]]
+  // CHECK: [[PBA:%.*]] = project_box [[ALIFE]]
   // CHECK: [[BBOX:%[0-9]+]] = alloc_box ${ var Float }
   // CHECK: [[BADDR:%[0-9]+]] = mark_uninitialized [var] [[BBOX]]
-  // CHECK: [[PBB:%.*]] = project_box [[BADDR]]
+  // CHECK: [[BLIFE:%.*]] = begin_borrow [var_decl] [[BADDR]]
+  // CHECK: [[PBB:%.*]] = project_box [[BLIFE]]
 
   var (c, d) = (a, b)
   // CHECK: [[CADDR:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[PBC:%.*]] = project_box [[CADDR]]
+  // CHECK: [[CLIFE:%.*]] = begin_borrow [var_decl] [[CADDR]]
+  // CHECK: [[PBC:%.*]] = project_box [[CLIFE]]
   // CHECK: [[DADDR:%[0-9]+]] = alloc_box ${ var Float }
-  // CHECK: [[PBD:%.*]] = project_box [[DADDR]]
+  // CHECK: [[DLIFE:%.*]] = begin_borrow [var_decl] [[DADDR]]
+  // CHECK: [[PBD:%.*]] = project_box [[DLIFE]]
   // CHECK: [[READA:%.*]] = begin_access [read] [unknown] [[PBA]] : $*Int
   // CHECK: copy_addr [[READA]] to [init] [[PBC]]
   // CHECK: [[READB:%.*]] = begin_access [read] [unknown] [[PBB]] : $*Float
   // CHECK: copy_addr [[READB]] to [init] [[PBD]]
   // CHECK: [[EADDR:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[PBE:%.*]] = project_box [[EADDR]]
+  // CHECK: [[ELIFE:%.*]] = begin_borrow [var_decl] [[EADDR]]
+  // CHECK: [[PBE:%.*]] = project_box [[ELIFE]]
   // CHECK: [[FADDR:%[0-9]+]] = alloc_box ${ var Float }
-  // CHECK: [[PBF:%.*]] = project_box [[FADDR]]
+  // CHECK: [[FLIFE:%.*]] = begin_borrow [var_decl] [[FADDR]]
+  // CHECK: [[PBF:%.*]] = project_box [[FLIFE]]
   // CHECK: [[GADDR:%[0-9]+]] = alloc_box ${ var () }
   // CHECK: [[HADDR:%[0-9]+]] = alloc_box ${ var Double }
-  // CHECK: [[PBH:%.*]] = project_box [[HADDR]]
+  // CHECK: [[HLIFE:%.*]] = begin_borrow [var_decl] [[HADDR]]
+  // CHECK: [[PBH:%.*]] = project_box [[HLIFE]]
   // CHECK: [[EFGH:%[0-9]+]] = apply
   // CHECK: ([[E:%[0-9]+]], [[F:%[0-9]+]], [[H:%[0-9]+]]) = destructure_tuple
   // CHECK: store [[E]] to [trivial] [[PBE]]
@@ -62,7 +69,8 @@ func tuple_patterns() {
   var (e,f,g,h) : (Int, Float, (), Double) = MRV()
 
   // CHECK: [[IADDR:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[PBI:%.*]] = project_box [[IADDR]]
+  // CHECK: [[ILIFE:%.*]] = begin_borrow [var_decl] [[IADDR]]
+  // CHECK: [[PBI:%.*]] = project_box [[ILIFE]]
   // CHECK-NOT: alloc_box ${ var Float }
   // CHECK: [[READA:%.*]] = begin_access [read] [unknown] [[PBA]] : $*Int
   // CHECK: copy_addr [[READA]] to [init] [[PBI]]
@@ -72,7 +80,8 @@ func tuple_patterns() {
   var (i,_) = (a, b)
 
   // CHECK: [[JADDR:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[PBJ:%.*]] = project_box [[JADDR]]
+  // CHECK: [[JLIFE:%.*]] = begin_borrow [var_decl] [[JADDR]]
+  // CHECK: [[PBJ:%.*]] = project_box [[JLIFE]]
   // CHECK-NOT: alloc_box ${ var Float }
   // CHECK: [[KADDR:%[0-9]+]] = alloc_box ${ var () }
   // CHECK-NOT: alloc_box ${ var Double }
@@ -85,10 +94,12 @@ func tuple_patterns() {
 // CHECK-LABEL: sil hidden [ossa] @$s5decls16simple_arguments{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : $Int, %1 : $Int):
 // CHECK: [[X:%[0-9]+]] = alloc_box ${ var Int }
-// CHECK-NEXT: [[PBX:%.*]] = project_box [[X]]
+// CHECK-NEXT: [[XLIFE:%.*]] = begin_borrow [var_decl] [[X]]
+// CHECK-NEXT: [[PBX:%.*]] = project_box [[XLIFE]]
 // CHECK-NEXT: store %0 to [trivial] [[PBX]]
 // CHECK-NEXT: [[Y:%[0-9]+]] = alloc_box ${ var Int }
-// CHECK-NEXT: [[PBY:%[0-9]+]] = project_box [[Y]]
+// CHECK-NEXT: [[YLIFE:%[0-9]+]] = begin_borrow [var_decl] [[Y]]
+// CHECK-NEXT: [[PBY:%[0-9]+]] = project_box [[YLIFE]]
 // CHECK-NEXT: store %1 to [trivial] [[PBY]]
 func simple_arguments(x: Int, y: Int) -> Int {
   var x = x
@@ -106,7 +117,8 @@ func tuple_argument(x: (Int, Float, ())) {
 // CHECK-LABEL: sil hidden [ossa] @$s5decls14inout_argument{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0(%0 : $*Int, %1 : $Int):
 // CHECK: [[X_LOCAL:%[0-9]+]] = alloc_box ${ var Int }
-// CHECK: [[PBX:%.*]] = project_box [[X_LOCAL]]
+// CHECK: [[XLIFE:%.*]] = begin_borrow [var_decl] [[X_LOCAL]]
+// CHECK: [[PBX:%.*]] = project_box [[XLIFE]]
 func inout_argument(x: inout Int, y: Int) {
   var y = y
   x = y
@@ -130,7 +142,8 @@ func store_to_global(x: Int) {
   var x = x
   global = x
   // CHECK: [[XADDR:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[PBX:%.*]] = project_box [[XADDR]]
+  // CHECK: [[XLIFE:%.*]] = begin_borrow [var_decl] [[XADDR]]
+  // CHECK: [[PBX:%.*]] = project_box [[XLIFE]]
   // CHECK: [[ACCESSOR:%[0-9]+]] = function_ref @$s5decls6globalSivau
   // CHECK: [[PTR:%[0-9]+]] = apply [[ACCESSOR]]()
   // CHECK: [[ADDR:%[0-9]+]] = pointer_to_address [[PTR]]

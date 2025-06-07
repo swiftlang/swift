@@ -17,14 +17,16 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 
 AutoDiffDerivativeFunctionKind::AutoDiffDerivativeFunctionKind(
     StringRef string) {
-  Optional<innerty> result = llvm::StringSwitch<Optional<innerty>>(string)
-                                 .Case("jvp", JVP)
-                                 .Case("vjp", VJP);
+  std::optional<innerty> result =
+      llvm::StringSwitch<std::optional<innerty>>(string)
+          .Case("jvp", JVP)
+          .Case("vjp", VJP);
   assert(result && "Invalid string");
   rawValue = *result;
 }
@@ -44,19 +46,20 @@ NormalDifferentiableFunctionTypeComponent::
 
 NormalDifferentiableFunctionTypeComponent::
     NormalDifferentiableFunctionTypeComponent(StringRef string) {
-  Optional<innerty> result = llvm::StringSwitch<Optional<innerty>>(string)
-                                 .Case("original", Original)
-                                 .Case("jvp", JVP)
-                                 .Case("vjp", VJP);
+  std::optional<innerty> result =
+      llvm::StringSwitch<std::optional<innerty>>(string)
+          .Case("original", Original)
+          .Case("jvp", JVP)
+          .Case("vjp", VJP);
   assert(result && "Invalid string");
   rawValue = *result;
 }
 
-Optional<AutoDiffDerivativeFunctionKind>
+std::optional<AutoDiffDerivativeFunctionKind>
 NormalDifferentiableFunctionTypeComponent::getAsDerivativeFunctionKind() const {
   switch (rawValue) {
   case Original:
-    return None;
+    return std::nullopt;
   case JVP:
     return {AutoDiffDerivativeFunctionKind::JVP};
   case VJP:
@@ -67,24 +70,26 @@ NormalDifferentiableFunctionTypeComponent::getAsDerivativeFunctionKind() const {
 
 LinearDifferentiableFunctionTypeComponent::
     LinearDifferentiableFunctionTypeComponent(StringRef string) {
-  Optional<innerty> result = llvm::StringSwitch<Optional<innerty>>(string)
-                                 .Case("original", Original)
-                                 .Case("transpose", Transpose);
+  std::optional<innerty> result =
+      llvm::StringSwitch<std::optional<innerty>>(string)
+          .Case("original", Original)
+          .Case("transpose", Transpose);
   assert(result && "Invalid string");
   rawValue = *result;
 }
 
 DifferentiabilityWitnessFunctionKind::DifferentiabilityWitnessFunctionKind(
     StringRef string) {
-  Optional<innerty> result = llvm::StringSwitch<Optional<innerty>>(string)
-                                 .Case("jvp", JVP)
-                                 .Case("vjp", VJP)
-                                 .Case("transpose", Transpose);
+  std::optional<innerty> result =
+      llvm::StringSwitch<std::optional<innerty>>(string)
+          .Case("jvp", JVP)
+          .Case("vjp", VJP)
+          .Case("transpose", Transpose);
   assert(result && "Invalid string");
   rawValue = *result;
 }
 
-Optional<AutoDiffDerivativeFunctionKind>
+std::optional<AutoDiffDerivativeFunctionKind>
 DifferentiabilityWitnessFunctionKind::getAsDerivativeFunctionKind() const {
   switch (rawValue) {
   case JVP:
@@ -92,9 +97,13 @@ DifferentiabilityWitnessFunctionKind::getAsDerivativeFunctionKind() const {
   case VJP:
     return {AutoDiffDerivativeFunctionKind::VJP};
   case Transpose:
-    return None;
+    return std::nullopt;
   }
   llvm_unreachable("invalid derivative kind");
+}
+
+void AutoDiffConfig::dump() const {
+  print(llvm::errs());
 }
 
 void AutoDiffConfig::print(llvm::raw_ostream &s) const {
@@ -176,39 +185,85 @@ void AnyFunctionType::getSubsetParameters(
   }
 }
 
-void autodiff::getFunctionSemanticResultTypes(
-    AnyFunctionType *functionType,
-    SmallVectorImpl<AutoDiffSemanticFunctionResultType> &result,
-    GenericEnvironment *genericEnv) {
+void autodiff::getFunctionSemanticResults(
+    const AnyFunctionType *functionType,
+    const IndexSubset *parameterIndices,
+    SmallVectorImpl<AutoDiffSemanticFunctionResultType> &resultTypes) {
   auto &ctx = functionType->getASTContext();
-
-  // Remap type in `genericEnv`, if specified.
-  auto remap = [&](Type type) {
-    if (!genericEnv)
-      return type;
-    return genericEnv->mapTypeIntoContext(type);
-  };
 
   // Collect formal result type as a semantic result, unless it is
   // `Void`.
   auto formalResultType = functionType->getResult();
   if (auto *resultFunctionType =
-          functionType->getResult()->getAs<AnyFunctionType>()) {
+      functionType->getResult()->getAs<AnyFunctionType>())
     formalResultType = resultFunctionType->getResult();
-  }
-  if (!formalResultType->isEqual(ctx.TheEmptyTupleType))
-    result.push_back({remap(formalResultType), /*isInout*/ false});
 
-  // Collect `inout` parameters as semantic results.
-  for (auto param : functionType->getParams())
-    if (param.isInOut())
-      result.push_back({remap(param.getPlainType()), /*isInout*/ true});
-  if (auto *resultFunctionType =
-          functionType->getResult()->getAs<AnyFunctionType>()) {
-    for (auto param : resultFunctionType->getParams())
-      if (param.isInOut())
-        result.push_back({remap(param.getPlainType()), /*isInout*/ true});
+  unsigned resultIdx = 0;
+  if (!formalResultType->isEqual(ctx.TheEmptyTupleType)) {
+    // Separate tuple elements into individual results.
+    if (formalResultType->is<TupleType>()) {
+      for (auto elt : formalResultType->castTo<TupleType>()->getElements()) {
+        resultTypes.emplace_back(elt.getType(), resultIdx++,
+                                 /*isParameter*/ false);
+      }
+    } else {
+      resultTypes.emplace_back(formalResultType, resultIdx++,
+                               /*isParameter*/ false);
+    }
   }
+
+  // Collect wrt semantic result (`inout`) parameters as
+  // semantic results
+  auto collectSemanticResults = [&](const AnyFunctionType *functionType,
+                                    unsigned curryOffset = 0) {
+    for (auto paramAndIndex : enumerate(functionType->getParams())) {
+      if (!paramAndIndex.value().isAutoDiffSemanticResult())
+        continue;
+
+      unsigned idx = paramAndIndex.index() + curryOffset;
+      assert(idx < parameterIndices->getCapacity() &&
+             "invalid parameter index");
+      if (parameterIndices->contains(idx))
+        resultTypes.emplace_back(paramAndIndex.value().getPlainType(),
+                                 resultIdx, /*isParameter*/ true);
+      resultIdx += 1;
+    }
+  };
+
+  if (auto *resultFnType =
+      functionType->getResult()->getAs<AnyFunctionType>()) {
+    // Here we assume that the input is a function type with curried `Self`
+    assert(functionType->getNumParams() == 1 && "unexpected function type");
+
+    collectSemanticResults(resultFnType);
+    collectSemanticResults(functionType, resultFnType->getNumParams());
+  } else
+    collectSemanticResults(functionType);
+}
+
+IndexSubset *
+autodiff::getFunctionSemanticResultIndices(const AnyFunctionType *functionType,
+                                           const IndexSubset *parameterIndices) {
+  auto &ctx = functionType->getASTContext();
+
+  SmallVector<AutoDiffSemanticFunctionResultType, 1> semanticResults;
+  autodiff::getFunctionSemanticResults(functionType, parameterIndices,
+                                       semanticResults);
+  SmallVector<unsigned> resultIndices;
+  unsigned cap = 0;
+  for (const auto& result : semanticResults) {
+    resultIndices.push_back(result.index);
+    cap = std::max(cap, result.index + 1U);
+  }
+
+  return IndexSubset::get(ctx, cap, resultIndices);
+}
+
+IndexSubset *
+autodiff::getFunctionSemanticResultIndices(const AbstractFunctionDecl *AFD,
+                                           const IndexSubset *parameterIndices) {
+  return getFunctionSemanticResultIndices(AFD->getInterfaceType()->castTo<AnyFunctionType>(),
+                                          parameterIndices);
 }
 
 // TODO(TF-874): Simplify this helper. See TF-874 for WIP.
@@ -247,8 +302,30 @@ autodiff::getLoweredParameterIndices(IndexSubset *parameterIndices,
                           loweredSILIndices);
 }
 
+/// Collects the semantic results of the given function type in
+/// `originalResults`. The semantic results are formal results followed by
+/// semantic result parameters, in type order.
+void
+autodiff::getSemanticResults(SILFunctionType *functionType,
+                             IndexSubset *parameterIndices,
+                             SmallVectorImpl<SILResultInfo> &originalResults) {
+  // Collect original formal results.
+  originalResults.append(functionType->getResults().begin(),
+                         functionType->getResults().end());
+
+  // Collect original semantic result parameters.
+  for (auto i : range(functionType->getNumParameters())) {
+    auto param = functionType->getParameters()[i];
+    if (!param.isAutoDiffSemanticResult())
+      continue;
+    if (!param.hasOption(SILParameterInfo::NotDifferentiable))
+      originalResults.emplace_back(param.getInterfaceType(), ResultConvention::Indirect);
+  }
+}
+
 GenericSignature autodiff::getConstrainedDerivativeGenericSignature(
-    SILFunctionType *originalFnTy, IndexSubset *diffParamIndices,
+    SILFunctionType *originalFnTy,
+    IndexSubset *diffParamIndices, IndexSubset *diffResultIndices,
     GenericSignature derivativeGenSig, LookupConformanceFn lookupConformance,
     bool isTranspose) {
   if (!derivativeGenSig)
@@ -258,24 +335,60 @@ GenericSignature autodiff::getConstrainedDerivativeGenericSignature(
   auto &ctx = originalFnTy->getASTContext();
   auto *diffableProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
   SmallVector<Requirement, 4> requirements;
-  for (unsigned paramIdx : diffParamIndices->getIndices()) {
-    // Require differentiability parameters to conform to `Differentiable`.
-    auto paramType = originalFnTy->getParameters()[paramIdx].getInterfaceType();
-    Requirement req(RequirementKind::Conformance, paramType,
+
+  auto addRequirement = [&](CanType type) {
+    Requirement req(RequirementKind::Conformance, type,
                     diffableProto->getDeclaredInterfaceType());
     requirements.push_back(req);
     if (isTranspose) {
       // Require linearity parameters to additionally satisfy
       // `Self == Self.TangentVector`.
-      auto tanSpace = paramType->getAutoDiffTangentSpace(lookupConformance);
-      auto paramTanType = tanSpace->getCanonicalType();
-      Requirement req(RequirementKind::SameType, paramType, paramTanType);
+      auto tanSpace = type->getAutoDiffTangentSpace(lookupConformance);
+      auto tanType = tanSpace->getCanonicalType();
+      Requirement req(RequirementKind::SameType, type, tanType);
       requirements.push_back(req);
     }
+  };
+
+  // Require differentiability parameters to conform to `Differentiable`.
+  for (unsigned paramIdx : diffParamIndices->getIndices()) {
+    auto paramType = originalFnTy->getParameters()[paramIdx].getInterfaceType();
+    addRequirement(paramType);
   }
+
+  // Require differentiability results to conform to `Differentiable`.
+  SmallVector<SILResultInfo, 2> originalResults;
+  getSemanticResults(originalFnTy, diffParamIndices, originalResults);
+  unsigned firstSemanticParamResultIdx = originalFnTy->getNumResults();
+  unsigned firstYieldResultIndex = originalFnTy->getNumResults() +
+      originalFnTy->getNumAutoDiffSemanticResultsParameters();
+  for (unsigned resultIdx : diffResultIndices->getIndices()) {
+    // Handle formal original result.
+    if (resultIdx < firstSemanticParamResultIdx) {
+      auto resultType = originalResults[resultIdx].getInterfaceType();
+      addRequirement(resultType);
+    } else if (resultIdx < firstYieldResultIndex) {
+      // Handle original semantic result parameters.
+      auto resultParamIndex = resultIdx - originalFnTy->getNumResults();
+      auto resultParamIt = std::next(
+        originalFnTy->getAutoDiffSemanticResultsParameters().begin(),
+        resultParamIndex);
+      auto paramIndex =
+        std::distance(originalFnTy->getParameters().begin(), &*resultParamIt);
+      addRequirement(originalFnTy->getParameters()[paramIndex].getInterfaceType());
+    } else {
+      // Handle formal original yields.
+      assert(originalFnTy->isCoroutine());
+      assert(originalFnTy->getCoroutineKind() == SILCoroutineKind::YieldOnce);
+      auto yieldResultIndex = resultIdx - firstYieldResultIndex;
+      addRequirement(originalFnTy->getYields()[yieldResultIndex].getInterfaceType());
+    }
+  }
+
   return buildGenericSignature(ctx, derivativeGenSig,
                                /*addedGenericParams*/ {},
-                               std::move(requirements));
+                               std::move(requirements),
+                               /*allowInverses=*/true);
 }
 
 // Given the rest of a `Builtin.applyDerivative_{jvp|vjp}` or
@@ -286,7 +399,7 @@ static void parseAutoDiffBuiltinCommonConfig(
     StringRef &operationName, unsigned &arity, bool &throws) {
   // Parse '_arity'.
   constexpr char arityPrefix[] = "_arity";
-  if (operationName.startswith(arityPrefix)) {
+  if (operationName.starts_with(arityPrefix)) {
     operationName = operationName.drop_front(sizeof(arityPrefix) - 1);
     auto arityStr = operationName.take_while(llvm::isDigit);
     operationName = operationName.drop_front(arityStr.size());
@@ -298,7 +411,7 @@ static void parseAutoDiffBuiltinCommonConfig(
   }
   // Parse '_throws'.
   constexpr char throwsPrefix[] = "_throws";
-  if (operationName.startswith(throwsPrefix)) {
+  if (operationName.starts_with(throwsPrefix)) {
     operationName = operationName.drop_front(sizeof(throwsPrefix) - 1);
     throws = true;
   } else {
@@ -310,15 +423,15 @@ bool autodiff::getBuiltinApplyDerivativeConfig(
     StringRef operationName, AutoDiffDerivativeFunctionKind &kind,
     unsigned &arity, bool &throws) {
   constexpr char prefix[] = "applyDerivative";
-  if (!operationName.startswith(prefix))
+  if (!operationName.starts_with(prefix))
     return false;
   operationName = operationName.drop_front(sizeof(prefix) - 1);
   // Parse 'jvp' or 'vjp'.
   constexpr char jvpPrefix[] = "_jvp";
   constexpr char vjpPrefix[] = "_vjp";
-  if (operationName.startswith(jvpPrefix))
+  if (operationName.starts_with(jvpPrefix))
     kind = AutoDiffDerivativeFunctionKind::JVP;
-  else if (operationName.startswith(vjpPrefix))
+  else if (operationName.starts_with(vjpPrefix))
     kind = AutoDiffDerivativeFunctionKind::VJP;
   operationName = operationName.drop_front(sizeof(jvpPrefix) - 1);
   parseAutoDiffBuiltinCommonConfig(operationName, arity, throws);
@@ -328,7 +441,7 @@ bool autodiff::getBuiltinApplyDerivativeConfig(
 bool autodiff::getBuiltinApplyTransposeConfig(
     StringRef operationName, unsigned &arity, bool &throws) {
   constexpr char prefix[] = "applyTranspose";
-  if (!operationName.startswith(prefix))
+  if (!operationName.starts_with(prefix))
     return false;
   operationName = operationName.drop_front(sizeof(prefix) - 1);
   parseAutoDiffBuiltinCommonConfig(operationName, arity, throws);
@@ -339,9 +452,9 @@ bool autodiff::getBuiltinDifferentiableOrLinearFunctionConfig(
     StringRef operationName, unsigned &arity, bool &throws) {
   constexpr char differentiablePrefix[] = "differentiableFunction";
   constexpr char linearPrefix[] = "linearFunction";
-  if (operationName.startswith(differentiablePrefix))
+  if (operationName.starts_with(differentiablePrefix))
     operationName = operationName.drop_front(sizeof(differentiablePrefix) - 1);
-  else if (operationName.startswith(linearPrefix))
+  else if (operationName.starts_with(linearPrefix))
     operationName = operationName.drop_front(sizeof(linearPrefix) - 1);
   else
     return false;
@@ -394,9 +507,6 @@ void DerivativeFunctionTypeError::log(raw_ostream &OS) const {
   switch (kind) {
   case Kind::NoSemanticResults:
     OS << "has no semantic results ('Void' result)";
-    break;
-  case Kind::MultipleSemanticResults:
-    OS << "has multiple semantic results";
     break;
   case Kind::NoDifferentiabilityParameters:
     OS << "has no differentiability parameters";
@@ -485,9 +595,8 @@ TangentPropertyInfo TangentStoredPropertyRequest::evaluate(
          "Expected a stored property or a property-wrapped property");
   auto *parentDC = originalField->getDeclContext();
   assert(parentDC->isTypeContext());
-  auto *moduleDecl = originalField->getModuleContext();
   auto parentTan =
-      baseType->getAutoDiffTangentSpace(LookUpConformanceInModule(moduleDecl));
+      baseType->getAutoDiffTangentSpace(LookUpConformanceInModule());
   // Error if parent nominal type does not conform to `Differentiable`.
   if (!parentTan) {
     return TangentPropertyInfo(
@@ -499,17 +608,16 @@ TangentPropertyInfo TangentStoredPropertyRequest::evaluate(
         TangentPropertyInfo::Error::Kind::NoDerivativeOriginalProperty);
   }
   // Error if original property's type does not conform to `Differentiable`.
-  auto originalFieldType = baseType->getTypeOfMember(
-      originalField->getModuleContext(), originalField);
+  auto originalFieldType = baseType->getTypeOfMember(originalField);
   auto originalFieldTan = originalFieldType->getAutoDiffTangentSpace(
-      LookUpConformanceInModule(moduleDecl));
+      LookUpConformanceInModule());
   if (!originalFieldTan) {
     return TangentPropertyInfo(
         TangentPropertyInfo::Error::Kind::OriginalPropertyNotDifferentiable);
   }
   // Get the parent `TangentVector` type.
   auto parentTanType =
-      baseType->getAutoDiffTangentSpace(LookUpConformanceInModule(moduleDecl))
+      baseType->getAutoDiffTangentSpace(LookUpConformanceInModule())
           ->getType();
   auto *parentTanStruct = parentTanType->getStructOrBoundGenericStruct();
   // Error if parent `TangentVector` is not a struct.
@@ -541,7 +649,7 @@ TangentPropertyInfo TangentStoredPropertyRequest::evaluate(
   // `TangentVector` type.
   auto originalFieldTanType = originalFieldTan->getType();
   auto tanFieldType =
-      parentTanType->getTypeOfMember(tanField->getModuleContext(), tanField);
+      parentTanType->getTypeOfMember(tanField);
   if (!originalFieldTanType->isEqual(tanFieldType)) {
     return TangentPropertyInfo(
         TangentPropertyInfo::Error::Kind::TangentPropertyWrongType,

@@ -215,8 +215,8 @@ namespace irgen {
   /// Emit a load of the 'alignmentMask' value witness.
   llvm::Value *emitLoadOfAlignmentMask(IRGenFunction &IGF, SILType T);
 
-  /// Emit a load of the 'isPOD' value witness.
-  llvm::Value *emitLoadOfIsPOD(IRGenFunction &IGF, SILType T);
+  /// Emit a load of the 'isTriviallyDestroyable' value witness.
+  llvm::Value *emitLoadOfIsTriviallyDestroyable(IRGenFunction &IGF, SILType T);
 
   /// Emit a load of the 'isBitwiseTakable' value witness.
   llvm::Value *emitLoadOfIsBitwiseTakable(IRGenFunction &IGF, SILType T);

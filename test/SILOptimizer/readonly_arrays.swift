@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -target %target-future-triple -primary-file %s -O -sil-verify-all -Xllvm -sil-disable-pass=FunctionSignatureOpts -module-name=test -emit-ir | %FileCheck %s
+// RUN: %target-swift-frontend -target %module-target-future -primary-file %s -O -sil-verify-all -disable-availability-checking -Xllvm -sil-disable-pass=FunctionSignatureOpts -module-name=test -emit-ir | %FileCheck %s
 
 // Also do an end-to-end test to check all components, including IRGen.
 // RUN: %empty-directory(%t) 
@@ -9,23 +9,26 @@
 
 // Check if the optimizer is able to convert array literals to constant statically initialized arrays.
 
-// CHECK: @"$s4test11arrayLookupyS2iFTv_r" = {{.*}} constant {{.*}} @"$ss19__EmptyArrayStorageCN", {{.*}} @_swiftImmortalRefCount
-// CHECK: @"$s4test11returnArraySaySiGyFTv_r" = {{.*}} constant {{.*}} @"$ss19__EmptyArrayStorageCN", {{.*}} @_swiftImmortalRefCount
-// CHECK: @"$s4test9passArrayyyFTv_r" = {{.*}} constant {{.*}} @"$ss19__EmptyArrayStorageCN", {{.*}} @_swiftImmortalRefCount
-// CHECK: @"$s4test9passArrayyyFTv0_r" = {{.*}} constant {{.*}} @"$ss19__EmptyArrayStorageCN", {{.*}} @_swiftImmortalRefCount
-// CHECK: @"$s4test10storeArrayyyFTv_r" = {{.*}} constant {{.*}} @"$ss19__EmptyArrayStorageCN", {{.*}} @_swiftImmortalRefCount
-// CHECK: @"$s4test3StrV14staticVariable_WZTv_r" = {{.*}} constant {{.*}} @"$ss19__EmptyArrayStorageCN", {{.*}} @_swiftImmortalRefCount
-// CHECK-NOT: swift_initStaticObject
+// CHECK-DAG: @"$s4test11arrayLookupyS2iFTv_r" = {{.*}} constant {{.*}} @"$ss20__StaticArrayStorageCN", {{.*}} @_swiftImmortalRefCount
+// CHECK-DAG: @"$s4test11returnArraySaySiGyFTv_r" = {{.*}} constant {{.*}} @"$ss20__StaticArrayStorageCN", {{.*}} @_swiftImmortalRefCount
+// CHECK-DAG: @"$s4test9passArrayyyFTv_r" = {{.*}} constant {{.*}} @"$ss20__StaticArrayStorageCN", {{.*}} @_swiftImmortalRefCount
+// CHECK-DAG: @"$s4test9passArrayyyFTv0_r" = {{.*}} constant {{.*}} @"$ss20__StaticArrayStorageCN", {{.*}} @_swiftImmortalRefCount
+// CHECK-DAG: @"$s4test10storeArrayyyFTv_r" = {{.*}} constant {{.*}} @"$ss20__StaticArrayStorageCN", {{.*}} @_swiftImmortalRefCount
+// CHECK-DAG: @"$s4test3StrV9staticLet_WZTv_r" = {{.*}} constant {{.*}} @"$ss20__StaticArrayStorageCN", {{.*}} @_swiftImmortalRefCount
+// CHECK-DAG: @"$s4test3StrV9staticVar_WZTv_r" = {{.*}} constant {{.*}} @"$ss20__StaticArrayStorageCN", {{.*}} @_swiftImmortalRefCount
+// CHECK-DAG: @"$s4test3StrV9staticVarSaySiGvpZ" = global %TSa <{ %Ts12_ArrayBufferV <{ %Ts14_BridgeStorageV <{ ptr @"$s4test3StrV9staticVar_WZTv_r" }> }> }>
+// CHECK-DAG: @"$s4test3StrV14twoDimensionalSaySaySiGGvpZ" = global %TSa <{ %Ts12_ArrayBufferV <{ %Ts14_BridgeStorageV <{ ptr @"$s4test3StrV14twoDimensional_WZTv{{[0-9]*}}_r" }> }> }>, align 8
 
 // UNSUPPORTED: use_os_stdlib
 
 // Currently, constant static arrays only work on Darwin platforms.
 // REQUIRES: VENDOR=apple
 
-// REQUIRES: rdar101126543
 
 public struct Str {
-  public static let staticVariable = [ 200, 201, 202 ]
+  public static let staticLet = [ 200, 201, 202 ]
+  public static var staticVar = [ 300, 301, 302 ]
+  public static var twoDimensional = [[1, 2], [3, 4], [5, 6]]
 }
 
 @inline(never)
@@ -65,7 +68,13 @@ public func storeArray() {
 }
 
 // CHECK-OUTPUT:      [200, 201, 202]
-print(Str.staticVariable)
+print(Str.staticLet)
+
+// CHECK-OUTPUT:      [300, 301, 302]
+print(Str.staticVar)
+
+// CHECK-OUTPUT{LITERAL}: [[1, 2], [3, 4], [5, 6]]
+print(Str.twoDimensional)
 
 // CHECK-OUTPUT-NEXT: 11
 print(arrayLookup(1))

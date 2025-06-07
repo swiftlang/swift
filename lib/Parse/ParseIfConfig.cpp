@@ -16,8 +16,11 @@
 
 #include "swift/Parse/Parser.h"
 
+#include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/DiagnosticSuppression.h"
+#include "swift/AST/DiagnosticsParse.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Version.h"
@@ -32,13 +35,13 @@ using namespace swift;
 namespace {
 
 /// Get PlatformConditionKind from platform condition name.
-static
-Optional<PlatformConditionKind> getPlatformConditionKind(StringRef Name) {
-  return llvm::StringSwitch<Optional<PlatformConditionKind>>(Name)
+static std::optional<PlatformConditionKind>
+getPlatformConditionKind(StringRef Name) {
+  return llvm::StringSwitch<std::optional<PlatformConditionKind>>(Name)
 #define PLATFORM_CONDITION(LABEL, IDENTIFIER) \
     .Case(IDENTIFIER, PlatformConditionKind::LABEL)
 #include "swift/AST/PlatformConditionKinds.def"
-    .Default(None);
+      .Default(std::nullopt);
 }
 
 /// Get platform condition name from PlatformConditionKind.
@@ -58,8 +61,8 @@ static StringRef extractExprSource(SourceManager &SM, Expr *E) {
   return SM.extractText(Range);
 }
 
-static bool isValidPrefixUnaryOperator(Optional<StringRef> UnaryOperator) {
-  return UnaryOperator != None &&
+static bool isValidPrefixUnaryOperator(std::optional<StringRef> UnaryOperator) {
+  return UnaryOperator != std::nullopt &&
          (UnaryOperator.value() == ">=" || UnaryOperator.value() == "<");
 }
 
@@ -164,13 +167,13 @@ class ValidateIfConfigCondition :
   bool HasError;
 
   /// Get the identifier string of the UnresolvedDeclRefExpr.
-  Optional<StringRef> getDeclRefStr(Expr *E, DeclRefKind Kind) {
+  std::optional<StringRef> getDeclRefStr(Expr *E, DeclRefKind Kind) {
     auto UDRE = dyn_cast<UnresolvedDeclRefExpr>(E);
     if (!UDRE ||
         !UDRE->hasName() ||
         UDRE->getRefKind() != Kind ||
         UDRE->getName().isCompoundName())
-      return None;
+      return std::nullopt;
 
     return UDRE->getName().getBaseIdentifier().str();
   }
@@ -182,7 +185,7 @@ class ValidateIfConfigCondition :
     if (!UDE)
       return getDeclRefStr(E, DeclRefKind::Ordinary).has_value();
 
-    return UDE->getFunctionRefKind() == FunctionRefKind::Unapplied &&
+    return UDE->getFunctionRefInfo().isUnappliedBaseName() &&
            isModulePath(UDE->getBase());
   }
 
@@ -197,7 +200,7 @@ class ValidateIfConfigCondition :
   Expr *foldSequence(Expr *LHS, ArrayRef<Expr*> &S, bool isRecurse = false) {
     assert(!S.empty() && ((S.size() & 1) == 0));
 
-    auto getNextOperator = [&]() -> Optional<StringRef> {
+    auto getNextOperator = [&]() -> std::optional<StringRef> {
       assert((S.size() & 1) == 0);
       while (!S.empty()) {
         auto Name = getDeclRefStr(S[0], DeclRefKind::BinaryOperator);
@@ -212,7 +215,7 @@ class ValidateIfConfigCondition :
         // Consume invalid operator and the immediate RHS.
         S = S.slice(2);
       }
-      return None;
+      return std::nullopt;
     };
 
     // Extract out the first operator name.
@@ -299,10 +302,13 @@ public:
       if (E->getArgs()->empty()) {
         D.diagnose(E->getLoc(), diag::platform_condition_expected_argument);
       } else {
-        D.diagnose(E->getLoc(), diag::platform_condition_expected_one_argument);
+        SourceLoc DiagLoc = E->getArgs()->front().getStartLoc();
+        assert(DiagLoc.isValid() && "parsed Argument should have a location");
+        D.diagnose(DiagLoc, diag::platform_condition_expected_one_argument);
       }
       return nullptr;
     }
+    SourceLoc ArgLoc = Arg->getStartLoc();
     // '_compiler_version' '(' string-literal ')'
     if (*KindName == "_compiler_version") {
       if (auto SLE = dyn_cast<StringLiteralExpr>(Arg)) {
@@ -326,11 +332,12 @@ public:
     if (*KindName == "swift" || *KindName == "compiler" ||
         *KindName == "_compiler_version") {
       auto PUE = dyn_cast<PrefixUnaryExpr>(Arg);
-      Optional<StringRef> PrefixName =
-          PUE ? getDeclRefStr(PUE->getFn(), DeclRefKind::PrefixOperator) : None;
+      std::optional<StringRef> PrefixName =
+          PUE ? getDeclRefStr(PUE->getFn(), DeclRefKind::PrefixOperator)
+              : std::nullopt;
       if (!isValidPrefixUnaryOperator(PrefixName)) {
         D.diagnose(
-            Arg->getLoc(), diag::unsupported_platform_condition_argument,
+            ArgLoc, diag::unsupported_platform_condition_argument,
             "a unary comparison '>=' or '<'; for example, '>=2.2' or '<2.2'");
         return nullptr;
       }
@@ -351,7 +358,7 @@ public:
       }
 
       if (!isModulePath(Arg)) {
-        D.diagnose(E->getLoc(), diag::unsupported_platform_condition_argument,
+        D.diagnose(ArgLoc, diag::unsupported_platform_condition_argument,
                    "module name");
         return nullptr;
       }
@@ -360,7 +367,7 @@ public:
 
     if (*KindName == "hasFeature") {
       if (!getDeclRefStr(Arg, DeclRefKind::Ordinary)) {
-        D.diagnose(E->getLoc(), diag::unsupported_platform_condition_argument,
+        D.diagnose(ArgLoc, diag::unsupported_platform_condition_argument,
                    "feature name");
         return nullptr;
       }
@@ -370,7 +377,7 @@ public:
 
     if (*KindName == "hasAttribute") {
       if (!getDeclRefStr(Arg, DeclRefKind::Ordinary)) {
-        D.diagnose(E->getLoc(), diag::unsupported_platform_condition_argument,
+        D.diagnose(ArgLoc, diag::unsupported_platform_condition_argument,
                    "attribute name");
         return nullptr;
       }
@@ -378,7 +385,7 @@ public:
       return E;
     }
 
-    // ( 'os' | 'arch' | '_endian' | '_runtime' ) '(' identifier ')''
+    // ( 'os' | 'arch' | '_endian' | '_pointerBitWidth' | '_runtime' | '_hasAtomicBitWidth' ) '(' identifier ')''
     auto Kind = getPlatformConditionKind(*KindName);
     if (!Kind.has_value()) {
       D.diagnose(E->getLoc(), diag::unsupported_platform_condition_expression);
@@ -387,7 +394,7 @@ public:
 
     auto ArgStr = getDeclRefStr(Arg, DeclRefKind::Ordinary);
     if (!ArgStr.has_value()) {
-      D.diagnose(E->getLoc(), diag::unsupported_platform_condition_argument,
+      D.diagnose(ArgLoc, diag::unsupported_platform_condition_argument,
                  "identifier");
       return nullptr;
     }
@@ -398,7 +405,7 @@ public:
                                                       suggestedKind, suggestedValues)) {
       if (Kind == PlatformConditionKind::Runtime) {
         // Error for _runtime()
-        D.diagnose(Arg->getLoc(),
+        D.diagnose(ArgLoc,
                    diag::unsupported_platform_runtime_condition_argument);
         return nullptr;
       }
@@ -412,36 +419,38 @@ public:
         DiagName = "architecture"; break;
       case PlatformConditionKind::Endianness:
         DiagName = "endianness"; break;
+      case PlatformConditionKind::PointerBitWidth:
+        DiagName = "pointer bit width"; break;
       case PlatformConditionKind::CanImport:
         DiagName = "import conditional"; break;
       case PlatformConditionKind::TargetEnvironment:
         DiagName = "target environment"; break;
       case PlatformConditionKind::PtrAuth:
         DiagName = "pointer authentication scheme"; break;
+      case PlatformConditionKind::HasAtomicBitWidth:
+        DiagName = "has atomic bit width"; break;
       case PlatformConditionKind::Runtime:
         llvm_unreachable("handled above");
       }
-      auto Loc = Arg->getLoc();
-      D.diagnose(Loc, diag::unknown_platform_condition_argument,
-                 DiagName, *KindName);
+      D.diagnose(ArgLoc, diag::unknown_platform_condition_argument, DiagName,
+                 *KindName);
       if (suggestedKind != *Kind) {
         auto suggestedKindName = getPlatformConditionName(suggestedKind);
-        D.diagnose(Loc, diag::note_typo_candidate, suggestedKindName)
-          .fixItReplace(E->getFn()->getSourceRange(), suggestedKindName);
+        D.diagnose(ArgLoc, diag::note_typo_candidate, suggestedKindName)
+            .fixItReplace(E->getFn()->getSourceRange(), suggestedKindName);
       }
       for (auto suggestion : suggestedValues)
-        D.diagnose(Loc, diag::note_typo_candidate, suggestion)
-          .fixItReplace(Arg->getSourceRange(), suggestion);
+        D.diagnose(ArgLoc, diag::note_typo_candidate, suggestion)
+            .fixItReplace(Arg->getSourceRange(), suggestion);
     }
     else if (!suggestedValues.empty()) {
       // The value the user gave has been replaced by something newer.
       assert(suggestedValues.size() == 1 && "only support one replacement");
       auto replacement = suggestedValues.front();
 
-      auto Loc = Arg->getLoc();
-      D.diagnose(Loc, diag::renamed_platform_condition_argument,
-                 *ArgStr, replacement)
-        .fixItReplace(Arg->getSourceRange(), replacement);
+      D.diagnose(ArgLoc, diag::renamed_platform_condition_argument, *ArgStr,
+                 replacement)
+          .fixItReplace(Arg->getSourceRange(), replacement);
     }
 
     return E;
@@ -550,20 +559,13 @@ public:
 
   bool visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *E) {
     auto Name = getDeclRefStr(E);
+    if (Name.empty())
+      return false;
 
-    // Check whether this is any one of the known compiler features.
-    const auto &langOpts = Ctx.LangOpts;
-    bool isKnownFeature = llvm::StringSwitch<bool>(Name)
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) \
-        .Case("$" #FeatureName, Option)
-#define UPCOMING_FEATURE(FeatureName, SENumber, Version)
-#include "swift/Basic/Features.def"
-        .Default(false);
-
-    if (isKnownFeature)
+    if (Name.starts_with("$") && Ctx.LangOpts.hasFeature(Name.drop_front()))
       return true;
-    
-    return langOpts.isCustomConditionalCompilationFlagSet(Name);
+
+    return Ctx.LangOpts.isCustomConditionalCompilationFlagSet(Name);
   }
 
   bool visitCallExpr(CallExpr *E) {
@@ -604,7 +606,8 @@ public:
       }
       ImportPath::Module::Builder builder(Ctx, Str, /*separator=*/'.',
                                           Arg->getStartLoc());
-      return Ctx.canImportModule(builder.get(), version, underlyingModule);
+      return Ctx.canImportModule(builder.get(), E->getLoc(), version,
+                                 underlyingModule);
     } else if (KindName == "hasFeature") {
       auto featureName = getDeclRefStr(Arg);
       return Ctx.LangOpts.hasFeature(featureName);
@@ -765,14 +768,35 @@ static Expr *findAnyLikelySimulatorEnvironmentTest(Expr *Condition) {
 
 } // end anonymous namespace
 
+/// Call into the Swift implementation of #if condition evaluation.
+///
+/// \returns std::nullopt if the Swift implementation is not available, or
+/// a pair (isActive, allowSyntaxErrors) describing whether the evaluated
+/// condition indicates that the region is active and whether, if inactive,
+/// the code in that region is allowed to have syntax errors.
+static std::optional<std::pair<bool, bool>> evaluateWithSwiftIfConfig(
+    Parser &parser,
+    SourceRange conditionRange,
+    bool shouldEvaluate
+) {
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  return evaluateOrDefault(
+      parser.Context.evaluator,
+      EvaluateIfConditionRequest{&parser.SF, conditionRange, shouldEvaluate},
+      std::pair(false, false));
+#else
+  return std::nullopt;
+#endif
+}
 
 /// Parse and populate a #if ... #endif directive.
 /// Delegate callback function to parse elements in the blocks.
-template<typename Result>
+template <typename Result>
 Result Parser::parseIfConfigRaw(
-    llvm::function_ref<void(SourceLoc clauseLoc, Expr *condition,
-                            bool isActive, IfConfigElementsRole role)>
-      parseElements,
+    IfConfigContext ifConfigContext,
+    llvm::function_ref<void(SourceLoc clauseLoc, Expr *condition, bool isActive,
+                            IfConfigElementsRole role)>
+        parseElements,
     llvm::function_ref<Result(SourceLoc endLoc, bool hadMissingEnd)> finish) {
   assert(Tok.is(tok::pound_if));
 
@@ -785,7 +809,8 @@ Result Parser::parseIfConfigRaw(
       SourceMgr.getIDEInspectionTargetBufferID() == L->getBufferID() &&
       SourceMgr.isBeforeInBuffer(Tok.getLoc(),
                                  SourceMgr.getIDEInspectionTargetLoc())) {
-    llvm::SaveAndRestore<Optional<StableHasher>> H(CurrentTokenHash, None);
+    llvm::SaveAndRestore<std::optional<StableHasher>> H(CurrentTokenHash,
+                                                        std::nullopt);
     BacktrackingScope backtrack(*this);
     do {
       auto startLoc = Tok.getLoc();
@@ -810,8 +835,14 @@ Result Parser::parseIfConfigRaw(
       // determined solely by which block has the completion token.
       !ideInspectionClauseLoc.isValid();
 
+  // For constructing syntactic structures, we need AST nodes even for
+  // non-active regions.
+  bool allActive = SF.getParsingOptions().contains(
+      SourceFile::ParsingFlags::PoundIfAllActive);
+
   bool foundActive = false;
   bool isVersionCondition = false;
+  CharSourceRange activeBodyRange;
   while (1) {
     bool isElse = Tok.is(tok::pound_else);
     SourceLoc ClauseLoc = consumeToken();
@@ -838,14 +869,28 @@ Result Parser::parseIfConfigRaw(
       if (result.isNull())
         return makeParserError();
       Condition = result.get();
-      if (validateIfConfigCondition(Condition, Context, Diags)) {
+      if (std::optional<std::pair<bool, bool>> evalResult =
+              evaluateWithSwiftIfConfig(*this,
+                                        Condition->getSourceRange(),
+                                        shouldEvaluate)) {
+        if (!foundActive) {
+          isActive = evalResult->first;
+          isVersionCondition = evalResult->second;
+        }
+      } else if (validateIfConfigCondition(Condition, Context, Diags)) {
         // Error in the condition;
         isActive = false;
         isVersionCondition = false;
-      } else if (!foundActive && shouldEvaluate) {
+      } else if (!foundActive) {
         // Evaluate the condition only if we haven't found any active one and
         // we're not in parse-only mode.
-        isActive = evaluateIfConfigCondition(Condition, Context);
+        if (shouldEvaluate) {
+          isActive = evaluateIfConfigCondition(Condition, Context);
+        }
+        // Determine isVersionCondition regardless of whether we're active.
+        // This is necessary in some edge cases, e.g. where we're in a nested,
+        // inactive #if block, and we encounter an inactive `#if compiler` check,
+        // as we have to explicitly skip parsing in such edge cases.
         isVersionCondition = isVersionIfConfigCondition(Condition);
       }
     }
@@ -853,6 +898,9 @@ Result Parser::parseIfConfigRaw(
     // Treat the region containing code completion token as "active".
     if (ideInspectionClauseLoc.isValid() && !foundActive)
       isActive = (ClauseLoc == ideInspectionClauseLoc);
+
+    if (allActive)
+      isActive = true;
 
     foundActive |= isActive;
 
@@ -869,12 +917,13 @@ Result Parser::parseIfConfigRaw(
     }
 
     // Parse elements
+    auto bodyStart = Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc);
     llvm::SaveAndRestore<bool> S(InInactiveClauseEnvironment,
                                  InInactiveClauseEnvironment || !isActive);
     // Disable updating the interface hash inside inactive blocks.
-    Optional<llvm::SaveAndRestore<Optional<StableHasher>>> T;
+    std::optional<llvm::SaveAndRestore<std::optional<StableHasher>>> T;
     if (!isActive)
-      T.emplace(CurrentTokenHash, None);
+      T.emplace(CurrentTokenHash, std::nullopt);
 
     if (isActive || !isVersionCondition) {
       parseElements(
@@ -887,6 +936,32 @@ Result Parser::parseIfConfigRaw(
           ClauseLoc, Condition, isActive, IfConfigElementsRole::Skipped);
     }
 
+    // We ought to be at the end of the clause, diagnose if not and skip to
+    // the closing token. `#if` + `#endif` are considered stronger delimiters
+    // than `{` + `}`, so we can skip over those too.
+    if (Tok.isNot(tok::pound_elseif, tok::pound_else, tok::pound_endif,
+                  tok::eof)) {
+      if (Tok.is(tok::r_brace)) {
+        diagnose(Tok, diag::unexpected_rbrace_in_conditional_compilation_block);
+      } else if (ifConfigContext == IfConfigContext::PostfixExpr) {
+        diagnose(Tok, diag::expr_postfix_ifconfig_unexpectedtoken);
+      } else {
+        // We ought to never hit this case in practice, but fall back to a
+        // generic 'unexpected tokens' diagnostic if we weren't able to produce
+        // a better diagnostic during the parsing of the clause.
+        diagnose(Tok, diag::ifconfig_unexpectedtoken);
+      }
+      skipUntilConditionalBlockClose();
+    }
+
+    // Record the clause range info in SourceFile.
+    if (shouldEvaluate) {
+      auto kind = isActive ? IfConfigClauseRangeInfo::ActiveClause
+                           : IfConfigClauseRangeInfo::InactiveClause;
+      SF.recordIfConfigClauseRangeInfo(
+          {ClauseLoc, bodyStart, Tok.getLoc(), kind});
+    }
+
     if (Tok.isNot(tok::pound_elseif, tok::pound_else))
       break;
 
@@ -897,48 +972,46 @@ Result Parser::parseIfConfigRaw(
   SourceLoc EndLoc;
   bool HadMissingEnd = parseEndIfDirective(EndLoc);
 
+  // Record the '#end' ranges in SourceFile.
+  if (!HadMissingEnd && shouldEvaluate) {
+    SourceLoc EndOfEndLoc = getEndOfPreviousLoc();
+    SF.recordIfConfigClauseRangeInfo({EndLoc, EndOfEndLoc, EndOfEndLoc,
+                                      IfConfigClauseRangeInfo::EndDirective});
+  }
   return finish(EndLoc, HadMissingEnd);
 }
 
-/// Parse and populate a #if ... #endif directive.
+// Parse and populate a #if ... #endif directive.
 /// Delegate callback function to parse elements in the blocks.
-ParserResult<IfConfigDecl> Parser::parseIfConfig(
-    llvm::function_ref<void(SmallVectorImpl<ASTNode> &, bool)> parseElements) {
-  SmallVector<IfConfigClause, 4> clauses;
-  return parseIfConfigRaw<ParserResult<IfConfigDecl>>(
-      [&](SourceLoc clauseLoc, Expr *condition, bool isActive,
-          IfConfigElementsRole role) {
-        SmallVector<ASTNode, 16> elements;
-        if (role != IfConfigElementsRole::Skipped)
-          parseElements(elements, isActive);
-        if (role == IfConfigElementsRole::SyntaxOnly)
-          elements.clear();
-
-        clauses.emplace_back(
-            clauseLoc, condition, Context.AllocateCopy(elements), isActive);
-      }, [&](SourceLoc endLoc, bool hadMissingEnd) {
-        auto *ICD = new (Context) IfConfigDecl(CurDeclContext,
-                                               Context.AllocateCopy(clauses),
-                                               endLoc, hadMissingEnd);
-        return makeParserResult(ICD);
-      });
-}
-
-ParserStatus Parser::parseIfConfigDeclAttributes(
-    DeclAttributes &attributes, bool ifConfigsAreDeclAttrs,
-    PatternBindingInitializer *initContext) {
+ParserStatus Parser::parseIfConfig(
+    IfConfigContext ifConfigContext,
+    llvm::function_ref<void(bool)> parseElements) {
   ParserStatus status = makeParserSuccess();
   return parseIfConfigRaw<ParserStatus>(
+      ifConfigContext,
+      [&](SourceLoc clauseLoc, Expr *condition, bool isActive,
+          IfConfigElementsRole role) {
+        if (role != IfConfigElementsRole::Skipped)
+          parseElements(isActive);
+      },
+      [&](SourceLoc endLoc, bool hadMissingEnd) {
+      return status;
+    });
+}
+
+ParserStatus Parser::parseIfConfigAttributes(
+    DeclAttributes &attributes, bool ifConfigsAreDeclAttrs) {
+  ParserStatus status = makeParserSuccess();
+  return parseIfConfigRaw<ParserStatus>(
+      IfConfigContext::DeclAttrs,
       [&](SourceLoc clauseLoc, Expr *condition, bool isActive,
           IfConfigElementsRole role) {
         if (isActive) {
-          status |= parseDeclAttributeList(
-              attributes, ifConfigsAreDeclAttrs, initContext);
+          status |= parseDeclAttributeList(attributes, ifConfigsAreDeclAttrs);
         } else if (role != IfConfigElementsRole::Skipped) {
           DeclAttributes skippedAttributes;
-          PatternBindingInitializer *skippedInitContext = nullptr;
           status |= parseDeclAttributeList(
-              skippedAttributes, ifConfigsAreDeclAttrs, skippedInitContext);
+              skippedAttributes, ifConfigsAreDeclAttrs);
         }
       },
       [&](SourceLoc endLoc, bool hadMissingEnd) {

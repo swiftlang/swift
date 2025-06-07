@@ -14,6 +14,7 @@
 
 #include "SILCombiner.h"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/PatternMatch.h"
@@ -144,7 +145,7 @@ public:
     if (!hasOneNonDebugUse(next))
       return false;
 
-    assert(rest.empty() || getSingleNonDebugUser(rest.back()) == next);
+    assert(rest.empty() || getSingleNonDebugUser(next) == rest.back());
     rest.push_back(next);
     return true;
   }
@@ -183,7 +184,7 @@ private:
       auto *next = inst->getSingleUse();
       assert(next);
       assert(rest.empty() || bool(next->getUser() == rest.back()));
-      next->set(SILUndef::get(next->get()->getType(), inst->getModule()));
+      next->set(SILUndef::get(next->get()));
       SC.eraseInstFromFunction(*inst);
     }
   }
@@ -214,283 +215,6 @@ SILInstruction *SILCombiner::visitUpcastInst(UpcastInst *uci) {
           operandAsUpcast->getOperand());
     }
   }
-
-  return nullptr;
-}
-
-// Optimize Builtin.assumeAlignment -> pointer_to_address
-//
-// Case #1. Literal zero = natural alignment
-//    %1 = integer_literal $Builtin.Int64, 0
-//    %2 = builtin "assumeAlignment"
-//         (%0 : $Builtin.RawPointer, %1 : $Builtin.Int64) : $Builtin.RawPointer
-//    %3 = pointer_to_address %2 : $Builtin.RawPointer to [align=1] $*Int
-//
-//    Erases the `pointer_to_address` `[align=]` attribute:
-//
-// Case #2. Literal nonzero = forced alignment.
-//
-//    %1 = integer_literal $Builtin.Int64, 16
-//    %2 = builtin "assumeAlignment"
-//         (%0 : $Builtin.RawPointer, %1 : $Builtin.Int64) : $Builtin.RawPointer
-//    %3 = pointer_to_address %2 : $Builtin.RawPointer to [align=1] $*Int
-//
-//    Promotes the `pointer_to_address` `[align=]` attribute to a higher value.
-//
-// Case #3. Folded dynamic alignment
-//
-//    %1 = builtin "alignof"<T>(%0 : $@thin T.Type) : $Builtin.Word
-//    %2 = builtin "assumeAlignment"
-//         (%0 : $Builtin.RawPointer, %1 : $Builtin.Int64) : $Builtin.RawPointer
-//    %3 = pointer_to_address %2 : $Builtin.RawPointer to [align=1] $*T
-//
-//    Erases the `pointer_to_address` `[align=]` attribute.
-SILInstruction *
-SILCombiner::optimizeAlignment(PointerToAddressInst *ptrAdrInst) {
-  if (!ptrAdrInst->alignment())
-    return nullptr;
-
-  llvm::Align oldAlign = ptrAdrInst->alignment().valueOrOne();
-
-  // TODO: stripCasts(ptrAdrInst->getOperand()) can be used to find the Builtin,
-  // but then the Builtin could not be trivially removed. Ideally,
-  // Builtin.assume will be the immediate operand so it can be removed in the
-  // common case.
-  BuiltinInst *assumeAlign = dyn_cast<BuiltinInst>(ptrAdrInst->getOperand());
-  if (!assumeAlign
-      || assumeAlign->getBuiltinKind() != BuiltinValueKind::AssumeAlignment) {
-    return nullptr;
-  }
-  SILValue ptrSrc = assumeAlign->getArguments()[0];
-  SILValue alignOper = assumeAlign->getArguments()[1];
-
-  if (auto *integerInst = dyn_cast<IntegerLiteralInst>(alignOper)) {
-    llvm::MaybeAlign newAlign(integerInst->getValue().getLimitedValue());
-    if (newAlign && newAlign.valueOrOne() <= oldAlign)
-      return nullptr;
-
-    // Case #1: the pointer is assumed naturally aligned
-    //
-    // Or Case #2: the pointer is assumed to have non-zero alignment greater
-    // than it current alignment.
-    //
-    // In either case, rewrite the address alignment with the assumed alignment,
-    // and bypass the Builtin.assumeAlign.
-    return Builder.createPointerToAddress(
-        ptrAdrInst->getLoc(), ptrSrc, ptrAdrInst->getType(),
-        ptrAdrInst->isStrict(), ptrAdrInst->isInvariant(), newAlign);
-  }
-  // Handle possible 32-bit sign-extension.
-  SILValue extendedAlignment;
-  if (match(alignOper,
-            m_ApplyInst(BuiltinValueKind::SExtOrBitCast,
-                        m_ApplyInst(BuiltinValueKind::TruncOrBitCast,
-                                    m_SILValue(extendedAlignment))))) {
-    alignOper = extendedAlignment;
-  }
-  if (match(alignOper,
-            m_ApplyInst(BuiltinValueKind::Alignof))) {
-    CanType formalType = cast<BuiltinInst>(alignOper)->getSubstitutions()
-      .getReplacementTypes()[0]->getReducedType(
-          ptrAdrInst->getFunction()->getGenericSignature());
-
-    SILType instanceType = ptrAdrInst->getFunction()->getLoweredType(
-      Lowering::AbstractionPattern::getOpaque(), formalType);
-
-    if (instanceType.getAddressType() != ptrAdrInst->getType())
-      return nullptr;
-
-    // Case #3: the alignOf type matches the address type. Convert to a
-    // naturally aligned pointer by erasing alignment and bypassing the
-    // Builtin.assumeAlign.
-    return Builder.createPointerToAddress(
-        ptrAdrInst->getLoc(), ptrSrc, ptrAdrInst->getType(),
-        ptrAdrInst->isStrict(), ptrAdrInst->isInvariant());
-  }
-  return nullptr;
-}
-
-SILInstruction *
-SILCombiner::
-visitPointerToAddressInst(PointerToAddressInst *PTAI) {
-  auto *F = PTAI->getFunction();
-
-  Builder.setCurrentDebugScope(PTAI->getDebugScope());
-
-  // If we reach this point, we know that the types must be different since
-  // otherwise simplifyInstruction would have handled the identity case. This is
-  // always legal to do since address-to-pointer pointer-to-address implies
-  // layout compatibility.
-  //
-  // (pointer-to-address strict (address-to-pointer %x))
-  // -> (unchecked_addr_cast %x)
-  if (PTAI->isStrict()) {
-    // We can not perform this optimization with ownership until we are able to
-    // handle issues around interior pointers and expanding borrow scopes.
-    if (auto *ATPI = dyn_cast<AddressToPointerInst>(PTAI->getOperand())) {
-      if (!hasOwnership()) {
-        return Builder.createUncheckedAddrCast(PTAI->getLoc(),
-                                               ATPI->getOperand(),
-                                               PTAI->getType());
-      }
-
-      OwnershipRAUWHelper helper(ownershipFixupContext, PTAI,
-                                 ATPI->getOperand());
-      if (helper) {
-        auto replacement = helper.prepareReplacement();
-        auto *newInst = Builder.createUncheckedAddrCast(PTAI->getLoc(),
-                                                        replacement,
-                                                        PTAI->getType());
-        helper.perform(newInst);
-        return nullptr;
-      }
-    }
-  }
-
-  // The rest of these canonicalizations optimize the code around
-  // pointer_to_address by leave in a pointer_to_address meaning that we do not
-  // need to worry about moving addresses out of interior pointer scopes.
-
-  // Turn this also into an index_addr. We generate this pattern after switching
-  // the Word type to an explicit Int32 or Int64 in the stdlib.
-  //
-  // %101 = builtin "strideof"<Int>(%84 : $@thick Int.Type) :
-  //         $Builtin.Word
-  // %102 = builtin "zextOrBitCast_Word_Int64"(%101 : $Builtin.Word) :
-  //         $Builtin.Int64
-  // %111 = builtin "smul_with_overflow_Int64"(%108 : $Builtin.Int64,
-  //                               %102 : $Builtin.Int64, %20 : $Builtin.Int1) :
-  //         $(Builtin.Int64, Builtin.Int1)
-  // %112 = tuple_extract %111 : $(Builtin.Int64, Builtin.Int1), 0
-  // %113 = builtin "truncOrBitCast_Int64_Word"(%112 : $Builtin.Int64) :
-  //         $Builtin.Word
-  // %114 = index_raw_pointer %100 : $Builtin.RawPointer, %113 : $Builtin.Word
-  // %115 = pointer_to_address %114 : $Builtin.RawPointer to [strict] $*Int
-  //
-  // This is safe for ownership since our final SIL still has a
-  // pointer_to_address meaning that we do not need to worry about interior
-  // pointers.
-  SILValue Distance;
-  SILValue TruncOrBitCast;
-  MetatypeInst *Metatype;
-  IndexRawPointerInst *IndexRawPtr;
-  BuiltinInst *StrideMul;
-  if (match(
-          PTAI->getOperand(),
-          m_IndexRawPointerInst(IndexRawPtr))) {
-    SILValue Ptr = IndexRawPtr->getOperand(0);
-    SILValue TruncOrBitCast = IndexRawPtr->getOperand(1);
-    if (match(TruncOrBitCast, m_ApplyInst(BuiltinValueKind::TruncOrBitCast,
-                                          m_TupleExtractOperation(
-                                              m_BuiltinInst(StrideMul), 0)))) {
-      if (match(StrideMul,
-                m_ApplyInst(
-                    BuiltinValueKind::SMulOver, m_SILValue(Distance),
-                    m_ApplyInst(BuiltinValueKind::ZExtOrBitCast,
-                                m_ApplyInst(BuiltinValueKind::Strideof,
-                                            m_MetatypeInst(Metatype))))) ||
-          match(StrideMul,
-                m_ApplyInst(
-                    BuiltinValueKind::SMulOver,
-                    m_ApplyInst(BuiltinValueKind::ZExtOrBitCast,
-                                m_ApplyInst(BuiltinValueKind::Strideof,
-                                            m_MetatypeInst(Metatype))),
-                    m_SILValue(Distance)))) {
-
-        SILType InstanceType =
-            F->getLoweredType(Metatype->getType()
-                .castTo<MetatypeType>().getInstanceType());
-
-        auto *Trunc = cast<BuiltinInst>(TruncOrBitCast);
-
-        // Make sure that the type of the metatype matches the type that we are
-        // casting to so we stride by the correct amount.
-        if (InstanceType.getAddressType() != PTAI->getType()) {
-          return nullptr;
-        }
-
-        auto *NewPTAI = Builder.createPointerToAddress(PTAI->getLoc(), Ptr,
-                                                       PTAI->getType(),
-                                                       PTAI->isStrict(),
-                                                       PTAI->isInvariant());
-        auto DistanceAsWord = Builder.createBuiltin(
-            PTAI->getLoc(), Trunc->getName(), Trunc->getType(), {}, Distance);
-
-        return Builder.createIndexAddr(PTAI->getLoc(), NewPTAI, DistanceAsWord,
-                                       /*needsStackProtection=*/ false);
-      }
-    }
-  }
-
-  // Turn:
-  //
-  //   %stride = Builtin.strideof(T) * %distance
-  //   %ptr' = index_raw_pointer %ptr, %stride
-  //   %result = pointer_to_address %ptr, [strict] $T'
-  //
-  // To:
-  //
-  //   %addr = pointer_to_address %ptr, [strict] $T
-  //   %result = index_addr %addr, %distance
-  //
-  // This is safe for ownership since our final SIL still has a
-  // pointer_to_address meaning that we do not need to worry about interior
-  // pointers.
-  BuiltinInst *Bytes = nullptr;
-  if (match(PTAI->getOperand(),
-            m_IndexRawPointerInst(
-                m_ValueBase(),
-                m_TupleExtractOperation(m_BuiltinInst(Bytes), 0)))) {
-    assert(Bytes != nullptr &&
-           "Bytes should have been assigned a non-null value");
-    if (match(Bytes, m_ApplyInst(BuiltinValueKind::SMulOver, m_ValueBase(),
-                                 m_ApplyInst(BuiltinValueKind::Strideof,
-                                             m_MetatypeInst(Metatype)),
-                                 m_ValueBase()))) {
-
-      SILType InstanceType =
-          F->getLoweredType(Metatype->getType()
-              .castTo<MetatypeType>().getInstanceType());
-
-      // Make sure that the type of the metatype matches the type that we are
-      // casting to so we stride by the correct amount.
-      if (InstanceType.getAddressType() != PTAI->getType())
-        return nullptr;
-
-      auto IRPI = cast<IndexRawPointerInst>(PTAI->getOperand());
-      SILValue Ptr = IRPI->getOperand(0);
-      SILValue Distance = Bytes->getArguments()[0];
-      auto *NewPTAI =
-        Builder.createPointerToAddress(PTAI->getLoc(), Ptr, PTAI->getType(),
-                                       PTAI->isStrict(), PTAI->isInvariant());
-      return Builder.createIndexAddr(PTAI->getLoc(), NewPTAI, Distance,
-                                     /*needsStackProtection=*/ false);
-    }
-  }
-
-  return optimizeAlignment(PTAI);
-}
-
-SILInstruction *
-SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
-  // These are always safe to perform due to interior pointer ownership
-  // requirements being transitive along addresses.
-
-  Builder.setCurrentDebugScope(UADCI->getDebugScope());
-
-  // (unchecked_addr_cast (unchecked_addr_cast x X->Y) Y->Z)
-  //   ->
-  // (unchecked_addr_cast x X->Z)
-  if (auto *OtherUADCI = dyn_cast<UncheckedAddrCastInst>(UADCI->getOperand()))
-    return Builder.createUncheckedAddrCast(UADCI->getLoc(),
-                                           OtherUADCI->getOperand(),
-                                           UADCI->getType());
-
-  // (unchecked_addr_cast cls->superclass) -> (upcast cls->superclass)
-  if (UADCI->getType() != UADCI->getOperand()->getType() &&
-      UADCI->getType().isExactSuperclassOf(UADCI->getOperand()->getType()))
-    return Builder.createUpcast(UADCI->getLoc(), UADCI->getOperand(),
-                                UADCI->getType());
 
   return nullptr;
 }
@@ -600,7 +324,8 @@ SILInstruction *SILCombiner::visitEndCOWMutationInst(EndCOWMutationInst *ECM) {
 
   SingleValueInstruction *refCast = cast<SingleValueInstruction>(op);
   auto *newECM = Builder.createEndCOWMutation(ECM->getLoc(),
-                                              refCast->getOperand(0));
+                                              refCast->getOperand(0),
+                                              ECM->doKeepUnique());
   ECM->replaceAllUsesWith(refCast);
   refCast->setOperand(0, newECM);
   refCast->moveAfter(newECM);
@@ -774,7 +499,7 @@ SILInstruction *SILCombiner::visitUnconditionalCheckedCastAddrInst(
 
 SILInstruction *
 SILCombiner::
-visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
+legacyVisitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
   CastOpt.optimizeUnconditionalCheckedCastInst(UCCI);
   if (UCCI->isDeleted()) {
     MadeChange = true;
@@ -807,40 +532,12 @@ SILCombiner::visitRawPointerToRefInst(RawPointerToRefInst *rawToRef) {
   //   ->
   // (unchecked_ref_cast x X->Z)
   if (auto *refToRaw = dyn_cast<RefToRawPointerInst>(rawToRef->getOperand())) {
+    // We do this optimization only in non-ossa.
+    // In ossa, the copy created by ossa rauw is unoptimizable, skipping for
+    // this reason.
     if (!hasOwnership()) {
       return Builder.createUncheckedRefCast(
           rawToRef->getLoc(), refToRaw->getOperand(), rawToRef->getType());
-    }
-
-    // raw_pointer_to_ref produces an unowned value. So we need to handle it
-    // especially with ownership.
-    {
-      SILValue originalRef = refToRaw->getOperand();
-      OwnershipRAUWHelper helper(ownershipFixupContext, rawToRef, originalRef);
-      if (helper) {
-        // We use the refToRaw's insertion point to insert our
-        // unchecked_ref_cast, since we don't know if our guaranteed value
-        SILBuilderWithScope localBuilder(std::next(refToRaw->getIterator()),
-                                         Builder);
-        // Since we are using std::next, we use getAutogeneratedLocation to
-        // avoid any issues if our next insertion point is a terminator.
-        auto loc = RegularLocation::getAutoGeneratedLocation();
-        auto replacement = helper.prepareReplacement();
-        auto *newInst = localBuilder.createUncheckedRefCast(
-            loc, replacement, rawToRef->getType());
-        // If we have an operand with ownership, we need to change our
-        // unchecked_ref_cast to produce an unowned value. This is because
-        // otherwise, our unchecked_ref_cast will consume the underlying owned
-        // value, changing a BitwiseEscape to a LifetimeEnding use?! In
-        // contrast, for guaranteed, we are replacing a BitwiseEscape use
-        // (ref_to_rawpointer) with a ForwardedBorrowingUse (unchecked_ref_cast)
-        // which is safe.
-        if (newInst->getForwardingOwnershipKind() == OwnershipKind::Owned) {
-          newInst->setForwardingOwnershipKind(OwnershipKind::Unowned);
-        }
-        helper.perform(newInst);
-        return nullptr;
-      }
     }
   }
 
@@ -951,7 +648,8 @@ SILCombiner::visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *TTOCMI) {
   //
   // (thick_to_objc_metatype (existential_metatype @thick)) ->
   // (existential_metatype @objc_metatype)
-  if (CastOpt.optimizeMetatypeConversion(TTOCMI, MetatypeRepresentation::Thick))
+  if (CastOpt.optimizeMetatypeConversion(ConversionOperation(TTOCMI),
+                                         MetatypeRepresentation::Thick))
     MadeChange = true;
 
   return nullptr;
@@ -973,7 +671,8 @@ SILCombiner::visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *OCTTMI) {
   //
   // (objc_to_thick_metatype (existential_metatype @objc_metatype)) ->
   // (existential_metatype @thick)
-  if (CastOpt.optimizeMetatypeConversion(OCTTMI, MetatypeRepresentation::ObjC))
+  if (CastOpt.optimizeMetatypeConversion(ConversionOperation(OCTTMI),
+                                         MetatypeRepresentation::ObjC))
     MadeChange = true;
 
   return nullptr;
@@ -1073,17 +772,17 @@ SILInstruction *SILCombiner::visitConvertEscapeToNoEscapeInst(
   // (convert_escape_to_noescape (thin_to_thick_function (convert_function x)))
   //
   // This unblocks the `thin_to_thick_function` peephole optimization below.
-  if (auto *CFI = dyn_cast<ConvertFunctionInst>(Cvt->getConverted())) {
-    if (CFI->getSingleUse()) {
-      if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(CFI->getConverted())) {
+  if (auto *CFI = dyn_cast<ConvertFunctionInst>(Cvt->getOperand())) {
+    if (hasOneNonDebugUse(CFI)) {
+      if (auto *TTTFI = dyn_cast<ThinToThickFunctionInst>(CFI->getOperand())) {
         if (TTTFI->getSingleUse()) {
           auto convertedThickType = CFI->getType().castTo<SILFunctionType>();
           auto convertedThinType = convertedThickType->getWithRepresentation(
             SILFunctionTypeRepresentation::Thin);
           auto *newCFI = Builder.createConvertFunction(
-            CFI->getLoc(), TTTFI->getConverted(),
-            SILType::getPrimitiveObjectType(convertedThinType),
-            CFI->withoutActuallyEscaping());
+              CFI->getLoc(), TTTFI->getOperand(),
+              SILType::getPrimitiveObjectType(convertedThinType),
+              CFI->withoutActuallyEscaping());
           auto *newTTTFI = Builder.createThinToThickFunction(
             TTTFI->getLoc(), newCFI, CFI->getType());
           replaceInstUsesWith(*CFI, newTTTFI);
@@ -1097,7 +796,8 @@ SILInstruction *SILCombiner::visitConvertEscapeToNoEscapeInst(
   //
   // (convert_escape_to_noescape (thin_to_thick_function x)) =>
   // (thin_to_thick_function [noescape] x)
-  if (auto *OrigThinToThick = dyn_cast<ThinToThickFunctionInst>(Cvt->getConverted())) {
+  if (auto *OrigThinToThick =
+          dyn_cast<ThinToThickFunctionInst>(Cvt->getOperand())) {
     auto origFunType = OrigThinToThick->getType().getAs<SILFunctionType>();
     auto NewTy = origFunType->getWithExtInfo(origFunType->getExtInfo().withNoEscape(true));
 
@@ -1118,39 +818,42 @@ SILInstruction *SILCombiner::visitConvertEscapeToNoEscapeInst(
   // %jvp' = convert_escape_to_noescape %jvp
   // %vjp' = convert_escape_to_noescape %vjp
   // %y = differentiable_function(%orig', %jvp', %vjp')
-  if (auto *DFI = dyn_cast<DifferentiableFunctionInst>(Cvt->getConverted())) {
-    auto createConvertEscapeToNoEscape = [&](NormalDifferentiableFunctionTypeComponent extractee) {
-      if (!DFI->hasExtractee(extractee))
-        return SILValue();
+  if (auto *DFI = dyn_cast<DifferentiableFunctionInst>(Cvt->getOperand())) {
+    if (hasOneNonDebugUse(DFI)) {
+      auto createConvertEscapeToNoEscape =
+        [&](NormalDifferentiableFunctionTypeComponent extractee) {
+          if (!DFI->hasExtractee(extractee))
+            return SILValue();
         
-      auto operand = DFI->getExtractee(extractee);
-      auto fnType = operand->getType().castTo<SILFunctionType>();
-      auto noEscapeFnType =
-        fnType->getWithExtInfo(fnType->getExtInfo().withNoEscape());
-      auto noEscapeType = SILType::getPrimitiveObjectType(noEscapeFnType);
-      return Builder.createConvertEscapeToNoEscape(
-        operand.getLoc(), operand, noEscapeType, Cvt->isLifetimeGuaranteed())->getResult(0);
-    };
+          auto operand = DFI->getExtractee(extractee);
+          auto fnType = operand->getType().castTo<SILFunctionType>();
+          auto noEscapeFnType =
+            fnType->getWithExtInfo(fnType->getExtInfo().withNoEscape());
+          auto noEscapeType = SILType::getPrimitiveObjectType(noEscapeFnType);
+          return Builder.createConvertEscapeToNoEscape(
+            operand.getLoc(), operand, noEscapeType, Cvt->isLifetimeGuaranteed())->getResult(0);
+        };
     
-    SILValue originalNoEscape =
-      createConvertEscapeToNoEscape(NormalDifferentiableFunctionTypeComponent::Original);
-    SILValue convertedJVP = createConvertEscapeToNoEscape(
-      NormalDifferentiableFunctionTypeComponent::JVP);
-    SILValue convertedVJP = createConvertEscapeToNoEscape(
-      NormalDifferentiableFunctionTypeComponent::VJP);
+      SILValue originalNoEscape =
+        createConvertEscapeToNoEscape(NormalDifferentiableFunctionTypeComponent::Original);
+      SILValue convertedJVP = createConvertEscapeToNoEscape(
+        NormalDifferentiableFunctionTypeComponent::JVP);
+      SILValue convertedVJP = createConvertEscapeToNoEscape(
+        NormalDifferentiableFunctionTypeComponent::VJP);
 
-    Optional<std::pair<SILValue, SILValue>> derivativeFunctions;
-    if (convertedJVP && convertedVJP)
-      derivativeFunctions = std::make_pair(convertedJVP, convertedVJP);
+      std::optional<std::pair<SILValue, SILValue>> derivativeFunctions;
+      if (convertedJVP && convertedVJP)
+        derivativeFunctions = std::make_pair(convertedJVP, convertedVJP);
 
-    auto *newDFI = Builder.createDifferentiableFunction(
-      DFI->getLoc(), DFI->getParameterIndices(), DFI->getResultIndices(),
-      originalNoEscape, derivativeFunctions);
-    assert(newDFI->getType() == Cvt->getType() &&
-           "New `@differentiable` function instruction should have same type "
-           "as the old `convert_escape_to_no_escape` instruction");
-    return newDFI;
-  }  
+      auto *newDFI = Builder.createDifferentiableFunction(
+        DFI->getLoc(), DFI->getParameterIndices(), DFI->getResultIndices(),
+        originalNoEscape, derivativeFunctions);
+      assert(newDFI->getType() == Cvt->getType() &&
+             "New `@differentiable` function instruction should have same type "
+             "as the old `convert_escape_to_no_escape` instruction");
+      return newDFI;
+    }
+  }
   
   return nullptr;
 }
@@ -1187,10 +890,10 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
         // with the original value.
         //
         // OWNERSHIP DISCUSSION: We know that cfi is forwarding, so we know that
-        // if cfi is not owned, then we know that cfi->getConverted() must be
+        // if cfi is not owned, then we know that cfi->getOperand() must be
         // valid at applySite and also that the applySite does not consume a
         // value. In such a case, just perform the change and continue.
-        SILValue newValue = cfi->getConverted();
+        SILValue newValue = cfi->getOperand();
         if (newValue->getOwnershipKind() != OwnershipKind::Owned &&
             newValue->getOwnershipKind() != OwnershipKind::Guaranteed) {
           getInstModCallbacks().setUseValue(use, newValue);
@@ -1224,8 +927,9 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
                                       pa->getArguments().end());
 
         auto newPA = Builder.createPartialApply(
-            pa->getLoc(), cfi->getConverted(), pa->getSubstitutionMap(), args,
-            pa->getFunctionType()->getCalleeConvention());
+            pa->getLoc(), cfi->getOperand(), pa->getSubstitutionMap(), args,
+            pa->getFunctionType()->getCalleeConvention(),
+            pa->getResultIsolation());
         auto newConvert = Builder.createConvertFunction(pa->getLoc(), newPA,
                                                         partialApplyTy, false);
         replaceInstUsesWith(*pa, newConvert);
@@ -1234,19 +938,20 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
       }
 
       OwnershipRAUWHelper checkRAUW(ownershipFixupContext, pa,
-                                    cfi->getConverted());
+                                    cfi->getOperand());
       if (!checkRAUW)
         continue;
 
       SmallVector<SILValue, 4> args(pa->getArguments().begin(),
                                     pa->getArguments().end());
-      auto newValue = makeCopiedValueAvailable(cfi->getConverted(),
-                                               pa->getParent());
+      auto newValue =
+          makeCopiedValueAvailable(cfi->getOperand(), pa->getParent());
 
       SILBuilderWithScope localBuilder(std::next(pa->getIterator()), Builder);
       auto *newPA = localBuilder.createPartialApply(
           pa->getLoc(), newValue, pa->getSubstitutionMap(), args,
-          pa->getFunctionType()->getCalleeConvention());
+          pa->getFunctionType()->getCalleeConvention(),
+          pa->getResultIsolation());
       if (!use->isLifetimeEnding()) {
         localBuilder.emitDestroyValueOperation(pa->getLoc(), newValue);
       }
@@ -1265,12 +970,12 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
   }
 
   // (convert_function (convert_function x)) => (convert_function x)
-  if (auto *subCFI = dyn_cast<ConvertFunctionInst>(cfi->getConverted())) {
+  if (auto *subCFI = dyn_cast<ConvertFunctionInst>(cfi->getOperand())) {
     // We handle the case of an identity conversion in inst simplify, so if we
     // see this pattern then we know that we don't have a round trip and thus
     // should just bypass the intermediate conversion.
     if (cfi->getForwardingOwnershipKind() != OwnershipKind::Owned) {
-      cfi->getOperandRef().set(subCFI->getConverted());
+      cfi->getOperandRef().set(subCFI->getOperand());
       // Return cfi to show we changed it.
       return cfi;
     }
@@ -1282,7 +987,7 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
     // canonical.
     SingleBlockOwnedForwardingInstFolder folder(*this, cfi);
     if (folder.add(subCFI))
-      return std::move(folder).optimizeWithSetValue(subCFI->getConverted());
+      return std::move(folder).optimizeWithSetValue(subCFI->getOperand());
   }
 
   // Push conversion instructions inside `differentiable_function`. This
@@ -1297,7 +1002,10 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
   // %jvp' = convert_function %jvp
   // %vjp' = convert_function %vjp
   // %y = differentiable_function(%orig', %jvp', %vjp')
-  if (auto *DFI = dyn_cast<DifferentiableFunctionInst>(cfi->getConverted())) {
+  if (auto *DFI = dyn_cast<DifferentiableFunctionInst>(cfi->getOperand())) {
+    if (!hasOneNonDebugUse(DFI))
+      return nullptr;
+
     auto createConvertFunctionOfComponent =
       [&](NormalDifferentiableFunctionTypeComponent extractee) {
         if (!DFI->hasExtractee(extractee))
@@ -1321,7 +1029,7 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
           NormalDifferentiableFunctionTypeComponent::JVP);
       SILValue convertedVJP = createConvertFunctionOfComponent(
           NormalDifferentiableFunctionTypeComponent::VJP);
-      Optional<std::pair<SILValue, SILValue>> derivativeFunctions;
+      std::optional<std::pair<SILValue, SILValue>> derivativeFunctions;
       if (convertedJVP && convertedVJP)
         derivativeFunctions = std::make_pair(convertedJVP, convertedVJP);
       auto *newDFI = Builder.createDifferentiableFunction(
@@ -1332,7 +1040,7 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
              "as the old `convert_function` instruction");
       return newDFI;
   }
-  
+
   // Replace a convert_function that only has refcounting uses with its
   // operand.
   tryEliminateOnlyOwnershipUsedForwardingInst(cfi, getInstModCallbacks());

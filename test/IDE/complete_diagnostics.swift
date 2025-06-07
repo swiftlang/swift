@@ -75,15 +75,12 @@ public struct Foo {
 
 import MyModule
 import #^IMPORT^#;
-// IMPORT: Begin completions
 // IMPORT-DAG: Decl[Module]/None/NotRecommended:   MyModule[#Module#]; name=MyModule; diagnostics=warning:module 'MyModule' is already imported{{$}}
 // IMPORT-DAG: Decl[Module]/None/NotRecommended:   OtherModule[#Module#]; name=OtherModule; diagnostics=note:module 'OtherModule' is already imported via another module import{{$}}
 // IMPORT-DAG: Decl[Module]/None/NotRecommended:   Swift[#Module#]; name=Swift; diagnostics=warning:module 'Swift' is already imported{{$}}
-// IMPORT: End completions
 
 func test(foo: Foo) {
   foo.#^MEMBER^#
-// MEMBER: Begin completions
 // MEMBER-DAG: Keyword[self]/CurrNominal:          self[#Foo#]; name=self
 // MEMBER-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: deprecatedUnconditional()[#Void#]; name=deprecatedUnconditional(); diagnostics=warning:'deprecatedUnconditional()' is deprecated{{$}}
 // MEMBER-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: deprecatedPlatformUnconditional()[#Void#]; name=deprecatedPlatformUnconditional(); diagnostics=warning:'deprecatedPlatformUnconditional()' is deprecated in macOS{{$}}
@@ -99,14 +96,11 @@ func test(foo: Foo) {
 // MEMBER-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: futureDeprecatedPlatformVersionMessage()[#Void#]; name=futureDeprecatedPlatformVersionMessage(); diagnostics=warning:'futureDeprecatedPlatformVersionMessage()' will be deprecated in a future version of macOS: this is a "message"{{$}}
 // MEMBER-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: futureDeprecatedPlatformVersionRenamed()[#Void#]; name=futureDeprecatedPlatformVersionRenamed(); diagnostics=warning:'futureDeprecatedPlatformVersionRenamed()' will be deprecated in a future version of macOS: renamed to 'renamedName'{{$}}
 // MEMBER-DAG: Decl[InstanceVar]/CurrNominal/NotRecommended: softDeprecatedVar[#Int#]; name=softDeprecatedVar; diagnostics=warning:'softDeprecatedVar' will be deprecated in a future version{{$}}
-// MEMBER: End completions
 }
 
 func testOwnGetter() {
     var valueInOwnGetter: Int {
       #^GETTER^#
     }
-// GETTER: Begin completions 
 // GETTER-DAG: Decl[LocalVar]/Local/NotRecommended/TypeRelation[Convertible]: valueInOwnGetter[#Int#]; name=valueInOwnGetter; diagnostics=warning:attempting to access 'valueInOwnGetter' within its own getter{{$}}
-// GETTER: End completions
 }

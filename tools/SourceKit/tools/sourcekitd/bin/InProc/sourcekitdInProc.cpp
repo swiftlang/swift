@@ -12,6 +12,7 @@
 
 #include "sourcekitd/Internal.h"
 #include "sourcekitd/Service.h"
+#include "sourcekitd/sourcekitdInProc-Internal.h"
 
 #include "SourceKit/Support/Concurrency.h"
 #include "SourceKit/Support/Logging.h"
@@ -33,6 +34,15 @@
 #endif
 
 using namespace SourceKit;
+
+/// The queue on which the all incoming requests will be handled. If barriers
+/// are enabled, open/edit/close requests will be dispatched as barriers on this
+/// queue.
+WorkQueue *msgHandlingQueue = nullptr;
+
+/// Whether request barriers have been enabled, i.e. whether open/edit/close
+/// requests should be dispatched as barriers.
+static bool RequestBarriersEnabled = false;
 
 static void postNotification(sourcekitd_response_t Notification);
 
@@ -74,33 +84,43 @@ static void getToolchainPrefixPath(llvm::SmallVectorImpl<char> &Path) {
     llvm::sys::path::remove_filename(Path);
 }
 
-static std::string getRuntimeLibPath() {
+std::string sourcekitdInProc::getRuntimeLibPath() {
   llvm::SmallString<128> libPath;
   getToolchainPrefixPath(libPath);
   llvm::sys::path::append(libPath, "lib");
   return libPath.str().str();
 }
 
-static std::string getSwiftExecutablePath() {
+std::string sourcekitdInProc::getSwiftExecutablePath() {
   llvm::SmallString<128> path;
   getToolchainPrefixPath(path);
   llvm::sys::path::append(path, "bin", "swift-frontend");
   return path.str().str();
 }
 
-static std::string getDiagnosticDocumentationPath() {
-  llvm::SmallString<128> docPath;
-  getToolchainPrefixPath(docPath);
-  llvm::sys::path::append(docPath, "share", "doc", "swift", "diagnostics");
-  return docPath.str().str();
+static std::vector<std::string> registeredPlugins;
+
+void sourcekitd_load_client_plugins(void) {
+  // There should be no independent client.
 }
 
 void sourcekitd_initialize(void) {
+  assert(msgHandlingQueue == nullptr && "Cannot initialize service twice");
+  msgHandlingQueue = new WorkQueue(WorkQueue::Dequeuing::Concurrent,
+                                   "sourcekitdInProc.msgHandlingQueue");
   if (sourcekitd::initializeClient()) {
     LOG_INFO_FUNC(High, "initializing");
-    sourcekitd::initializeService(getSwiftExecutablePath(), getRuntimeLibPath(),
-                                  getDiagnosticDocumentationPath(),
+    sourcekitd::initializeService(sourcekitdInProc::getSwiftExecutablePath(),
+                                  sourcekitdInProc::getRuntimeLibPath(),
                                   postNotification);
+    static std::once_flag flag;
+    std::call_once(flag, [] {
+      sourcekitd::PluginInitParams pluginParams(
+          /*isClientOnly=*/false, sourcekitd::pluginRegisterRequestHandler,
+          sourcekitd::pluginRegisterCancellationHandler,
+          sourcekitd::pluginGetOpaqueSwiftIDEInspectionInstance());
+      sourcekitd::loadPlugins(registeredPlugins, pluginParams);
+    });
   }
 }
 
@@ -109,6 +129,13 @@ void sourcekitd_shutdown(void) {
     LOG_INFO_FUNC(High, "shutting down");
     sourcekitd::shutdownService();
   }
+}
+
+void sourcekitd_register_plugin_path(const char *clientPlugin,
+                                     const char *servicePlugin) {
+  (void)clientPlugin; // sourcekitdInProc has no independent client.
+  if (servicePlugin)
+    registeredPlugins.push_back(servicePlugin);
 }
 
 void sourcekitd::set_interrupted_connection_handler(
@@ -154,7 +181,7 @@ void sourcekitd_send_request(sourcekitd_object_t req,
 
   sourcekitd_request_retain(req);
   receiver = Block_copy(receiver);
-  WorkQueue::dispatchConcurrent([=] {
+  auto handler = [=] {
     sourcekitd::handleRequest(req, /*CancellationToken=*/request_handle,
                               [=](sourcekitd_response_t resp) {
                                 // The receiver accepts ownership of the
@@ -163,7 +190,20 @@ void sourcekitd_send_request(sourcekitd_object_t req,
                                 Block_release(receiver);
                               });
     sourcekitd_request_release(req);
-  });
+  };
+
+  if (sourcekitd::requestIsEnableBarriers(req)) {
+    RequestBarriersEnabled = true;
+    sourcekitd::sendBarriersEnabledResponse([=](sourcekitd_response_t resp) {
+      // The receiver accepts ownership of the response.
+      receiver(resp);
+      Block_release(receiver);
+    });
+  } else if (RequestBarriersEnabled && sourcekitd::requestIsBarrier(req)) {
+    msgHandlingQueue->dispatchBarrier(handler);
+  } else {
+    msgHandlingQueue->dispatchConcurrent(handler);
+  }
 }
 
 void sourcekitd_cancel_request(sourcekitd_request_handle_t handle) {

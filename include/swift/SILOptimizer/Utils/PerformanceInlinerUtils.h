@@ -29,19 +29,20 @@ extern llvm::cl::opt<bool> EnableSILInliningOfGenerics;
 
 namespace swift {
 class BasicCalleeAnalysis;
+class IsSelfRecursiveAnalysis;
 
 // Controls the decision to inline functions with @_semantics, @effect and
 // global_init attributes.
 enum class InlineSelection {
   Everything,
-  NoGlobalInit, // and no availability semantics calls
-  NoSemanticsAndGlobalInit,
+  NoSemanticsAndEffects,
   OnlyInlineAlways,
 };
 
 /// Check if this ApplySite is eligible for inlining. If so, return the callee.
 SILFunction *getEligibleFunction(FullApplySite AI,
-                                 InlineSelection WhatToInline);
+                                 InlineSelection WhatToInline,
+                                 IsSelfRecursiveAnalysis *SRA);
 
 // Returns true if this is a pure call, i.e. the callee has no side-effects
 // and all arguments are constants.
@@ -71,6 +72,11 @@ inline bool isOptimizableSemanticFunction(SILFunction *function) {
 /// within another semantic function, or from a "trivial" wrapper.
 bool isNestedSemanticCall(FullApplySite apply);
 
+// Strips down simple function conversion operations until a base SILValue is
+// reached.
+//
+// Returns a nullptr if `val` is not a function conversion instruction.
+SILValue stripFunctionConversions(SILValue val);
 } // end swift namespace
 
 //===----------------------------------------------------------------------===//
@@ -425,6 +431,7 @@ public:
       return;
 
     BlockInfoStorage.resize(numBlocks);
+    CBI.analyze(F);
 
     // First step: compute the length of the blocks.
     unsigned BlockIdx = 0;
@@ -452,7 +459,8 @@ public:
 
       if (isa<ReturnInst>(BB.getTerminator()))
         BBInfo->getDistances(0).DistToExit = Length;
-      else if (isa<ThrowInst>(BB.getTerminator()))
+      else if (isa<ThrowInst>(BB.getTerminator()) ||
+               isa<ThrowAddrInst>(BB.getTerminator()))
         BBInfo->getDistances(0).DistToExit = Length + ColdBlockLength;
     }
     // Compute the distances for all loops in the function.

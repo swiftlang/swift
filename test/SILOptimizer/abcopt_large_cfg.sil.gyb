@@ -3,7 +3,7 @@
 
 // Check that the optimization does not crash due to a stack overflow.
 
-// RUN: %target-sil-opt -sil-verify-none -abcopts  %t/main.sil | %FileCheck %s
+// RUN: %target-sil-opt -sil-verify-none -bcopts  %t/main.sil | %FileCheck %s
 
 sil_stage canonical
 
@@ -32,7 +32,7 @@ bb0(%0: $Int32, %1: $Bool, %2: @owned $ArrayInt):
 
 // CHECK-LABEL: sil [ossa] @test_very_deep_domtree :
 
-// Currently there is nothing ot check here, because the optimization bails in
+// Currently there is nothing to check here, because the optimization bails in
 // this case.
 // In future we might check that even with a deep domtree it can hoist the check.
 

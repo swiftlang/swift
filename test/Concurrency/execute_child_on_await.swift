@@ -1,4 +1,5 @@
-// RUN: %target-run-simple-swift(-parse-as-library -Xfrontend -disable-availability-checking -Xfrontend -concurrency-model=task-to-thread -g -Xlinker -object_path_lto -Xlinker /tmp/abc.o)
+// RUN: %target-run-simple-swift(-parse-as-library -target %target-swift-5.1-abi-triple -Xfrontend -concurrency-model=task-to-thread -g -Xlinker -object_path_lto -Xlinker /tmp/abc.o)
+
 // REQUIRES: concurrency
 // REQUIRES: executable_test
 // REQUIRES: freestanding

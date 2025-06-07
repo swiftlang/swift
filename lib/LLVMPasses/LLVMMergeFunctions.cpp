@@ -28,34 +28,36 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/LLVMPasses/Passes.h"
 #include "clang/AST/StableHash.h"
 #include "clang/Basic/PointerAuthOptions.h"
-#include "llvm/Transforms/IPO.h"
-#include "llvm/Transforms/Utils/FunctionComparator.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/FoldingSet.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/Triple.h"
 #include "llvm/IR/Attributes.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
+#include "llvm/IR/GlobalPtrAuthInfo.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Operator.h"
+#include "llvm/IR/StructuralHash.h"
 #include "llvm/IR/ValueHandle.h"
 #include "llvm/IR/ValueMap.h"
-#include "llvm/IR/GlobalPtrAuthInfo.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/TargetParser/Triple.h"
+#include "llvm/Transforms/IPO.h"
+#include "llvm/Transforms/Utils/FunctionComparator.h"
 #include <vector>
 
 using namespace llvm;
@@ -128,7 +130,7 @@ static bool canParameterizeCallOperand(const CallInst *CI, unsigned opIdx) {
     if (Callee->isIntrinsic())
       return false;
     // objc_msgSend stubs must be called, and can't have their address taken.
-    if (Callee->getName().startswith("objc_msgSend$"))
+    if (Callee->getName().starts_with("objc_msgSend$"))
       return false;
   }
   if (isCalleeOperand(CI, opIdx) &&
@@ -256,11 +258,12 @@ private:
     FunctionEntry *First;
 
     /// A very cheap hash, used to early exit if functions do not match.
-    FunctionComparator::FunctionHash Hash;
+    llvm::IRHash Hash;
+
   public:
     // Note the hash is recalculated potentially multiple times, but it is cheap.
     EquivalenceClass(FunctionEntry *First)
-      : First(First), Hash(FunctionComparator::functionHash(*First->F)) {
+        : First(First), Hash(llvm::StructuralHash(*First->F)) {
       assert(!First->Next);
     }
   };
@@ -463,7 +466,7 @@ private:
   }
 
   /// Checks the rules of order relation introduced among functions set.
-  /// Returns true, if sanity check has been passed, and false if failed.
+  /// Returns true, if soundness check has been passed, and false if failed.
   bool doSanityCheck(std::vector<WeakTrackingVH> &Worklist);
 
   /// Updates the numUnhandledCallees of all user functions of the equivalence
@@ -638,7 +641,7 @@ static bool mayMergeCallsToFunction(Function &F) {
   StringRef Name = F.getName();
 
   // Calls to dtrace probes must generate unique patchpoints.
-  if (Name.startswith("__dtrace"))
+  if (Name.starts_with("__dtrace"))
     return false;
 
   return true;
@@ -710,21 +713,18 @@ bool SwiftMergeFunctions::runOnModule(Module &M) {
 
   // All functions in the module, ordered by hash. Functions with a unique
   // hash value are easily eliminated.
-  std::vector<std::pair<FunctionComparator::FunctionHash, Function *>>
-    HashedFuncs;
+  std::vector<std::pair<IRHash, Function *>> HashedFuncs;
 
   for (Function &Func : M) {
     if (isEligibleFunction(&Func)) {
-      HashedFuncs.push_back({FunctionComparator::functionHash(Func), &Func});
+      HashedFuncs.push_back({llvm::StructuralHash(Func), &Func});
     }
   }
 
   std::stable_sort(
       HashedFuncs.begin(), HashedFuncs.end(),
-      [](const std::pair<FunctionComparator::FunctionHash, Function *> &a,
-         const std::pair<FunctionComparator::FunctionHash, Function *> &b) {
-        return a.first < b.first;
-      });
+      [](const std::pair<IRHash, Function *> &a,
+         const std::pair<IRHash, Function *> &b) { return a.first < b.first; });
 
   std::vector<FunctionEntry> FuncEntryStorage;
   FuncEntryStorage.reserve(HashedFuncs.size());
@@ -1079,6 +1079,7 @@ void SwiftMergeFunctions::mergeWithParams(const FunctionInfos &FInfos,
   Function *NewFunction = Function::Create(funcType,
                                            FirstF->getLinkage(),
                                            FirstF->getName() + "Tm");
+  NewFunction->setIsNewDbgInfoFormat(FirstF->IsNewDbgInfoFormat);
   NewFunction->copyAttributesFrom(FirstF);
   // NOTE: this function is not externally available, do ensure that we reset
   // the DLL storage
@@ -1092,9 +1093,7 @@ void SwiftMergeFunctions::mergeWithParams(const FunctionInfos &FInfos,
   LLVM_DEBUG(dbgs() << "  Merge into " << NewFunction->getName() << '\n');
 
   // Move the body of FirstF into the NewFunction.
-  NewFunction->getBasicBlockList().splice(NewFunction->begin(),
-                                          FirstF->getBasicBlockList());
-
+  NewFunction->splice(NewFunction->begin(), FirstF);
   auto NewArgIter = NewFunction->arg_begin();
   for (Argument &OrigArg : FirstF->args()) {
     Argument &NewArg = *NewArgIter++;
@@ -1188,18 +1187,20 @@ void SwiftMergeFunctions::removeEquivalenceClassFromTree(FunctionEntry *FE) {
 // Selects proper bitcast operation,
 // but a bit simpler then CastInst::getCastOpcode.
 static Value *createCast(IRBuilder<> &Builder, Value *V, Type *DestTy) {
+  if (V->getType() == DestTy)
+    return V;
+
   Type *SrcTy = V->getType();
   if (SrcTy->isStructTy()) {
     assert(DestTy->isStructTy());
     assert(SrcTy->getStructNumElements() == DestTy->getStructNumElements());
     Value *Result = UndefValue::get(DestTy);
     for (unsigned int I = 0, E = SrcTy->getStructNumElements(); I < E; ++I) {
-      Value *Element = createCast(
-          Builder, Builder.CreateExtractValue(V, makeArrayRef(I)),
-          DestTy->getStructElementType(I));
+      Value *Element =
+          createCast(Builder, Builder.CreateExtractValue(V, llvm::ArrayRef(I)),
+                     DestTy->getStructElementType(I));
 
-      Result =
-          Builder.CreateInsertValue(Result, Element, makeArrayRef(I));
+      Result = Builder.CreateInsertValue(Result, Element, llvm::ArrayRef(I));
     }
     return Result;
   }
@@ -1260,29 +1261,6 @@ void SwiftMergeFunctions::writeThunk(Function *ToFunc, Function *Thunk,
   ++NumSwiftThunksWritten;
 }
 
-static llvm::AttributeList
-fixUpTypesInByValAndStructRetAttributes(llvm::FunctionType *fnType,
-                                        llvm::AttributeList attrList) {
-  auto &context = fnType->getContext();
-  if (!context.supportsTypedPointers())
-    return attrList;
-
-  for (unsigned i = 0; i < fnType->getNumParams(); ++i) {
-    auto paramTy = fnType->getParamType(i);
-    auto attrListIndex = llvm::AttributeList::FirstArgIndex + i;
-    if (attrList.hasParamAttr(i, llvm::Attribute::StructRet) &&
-        paramTy->getNonOpaquePointerElementType() != attrList.getParamStructRetType(i))
-      attrList = attrList.replaceAttributeTypeAtIndex(
-          context, attrListIndex, llvm::Attribute::StructRet,
-          paramTy->getNonOpaquePointerElementType());
-    if (attrList.hasParamAttr(i, llvm::Attribute::ByVal) &&
-        paramTy->getNonOpaquePointerElementType() != attrList.getParamByValType(i))
-      attrList = attrList.replaceAttributeTypeAtIndex(
-          context, attrListIndex, llvm::Attribute::ByVal,
-          paramTy->getNonOpaquePointerElementType());
-  }
-  return attrList;
-}
 /// Replace direct callers of Old with New. Also add parameters to the call to
 /// \p New, which are defined by the FuncIdx's value in \p Params.
 bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
@@ -1355,9 +1333,9 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
     auto newAttrList = AttributeList::get(Context, /*FnAttrs=*/AttributeSet(),
                                             NewPAL.getRetAttrs(),
                                             NewArgAttrs);
-    newAttrList = fixUpTypesInByValAndStructRetAttributes(FType, newAttrList);
     NewCI->setAttributes(newAttrList);
-    CI->replaceAllUsesWith(NewCI);
+    Value *retVal = createCast(Builder, NewCI, CI->getType());
+    CI->replaceAllUsesWith(retVal);
     CI->eraseFromParent();
   }
   assert(Old->use_empty() && "should have replaced all uses of old function");

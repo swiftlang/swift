@@ -287,24 +287,6 @@ bb2:
   return undef : $()
 }
 
-sil @switch_value_test : $() -> () {
-bb0:
-  // CHECK: switch_value undef : $Builtin.Int1, case undef: bb1
-  switch_value undef : $Builtin.Int1, case undef: bb1
-bb1:
-  // CHECK: switch_value undef : $() -> (), case undef: bb2
-  switch_value undef : $() -> (), case undef: bb2
-bb2:
-  return undef : $()
-}
-
-sil @select_value_test : $() -> () {
-bb0:
-  // CHECK: select_value undef : $Builtin.Int1, case undef: undef, default undef : $Builtin.Int1
-  select_value undef : $Builtin.Int1, case undef: undef, default undef : $Builtin.Int1
-  return undef : $()
-}
-
 sil @switch_enum_test : $() -> () {
 bb0:
   // CHECK: switch_enum undef : $E, case #E.Case!enumelt: bb1, default bb2
@@ -343,8 +325,8 @@ bb3:
 
 sil @checked_cast_br_test : $() -> () {
 bb0:
-  // CHECK: checked_cast_br undef : $C to C, bb1, bb2
-  checked_cast_br undef : $C to C, bb1, bb2
+  // CHECK: checked_cast_br C in undef : $C to C, bb1, bb2
+  checked_cast_br C in undef : $C to C, bb1, bb2
 bb1(%x : $C):
   br bb3
 bb2:

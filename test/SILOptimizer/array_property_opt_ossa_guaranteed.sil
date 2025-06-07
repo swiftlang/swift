@@ -26,6 +26,56 @@ bb0(%0: @guaranteed $MyArray<MyClass>):
   unreachable
 }
 
+// CHECK-LABEL: sil [ossa] @load_copy_within_loop : 
+// CHECK: [[FUNC:%.*]] = function_ref @arrayPropertyIsNative
+// CHECK: apply [[FUNC]]
+// CHECK-NOT: function_ref @arrayPropertyIsNative
+// CHECK-NOT: apply [[FUNC]]
+// CHECK-LABEL: } // end sil function 'load_copy_within_loop'
+sil [ossa] @load_copy_within_loop : $@convention(thin) (@inout MyArray<MyClass>, @inout MyBool) -> MyBool {
+bb0(%0 : $*MyArray<MyClass>, %1 : $*MyBool):
+  br bb1
+
+bb1:
+  %3 = load [copy] %0 : $*MyArray<MyClass>
+  %4 = load [trivial] %1 : $*MyBool
+  %2 = function_ref @arrayPropertyIsNative : $@convention(method) (@guaranteed MyArray<MyClass>) -> Bool
+  %5 = apply %2(%3) : $@convention(method) (@guaranteed MyArray<MyClass>) -> Bool
+  destroy_value %3 : $MyArray<MyClass>
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  return %4 : $MyBool
+}
+
+// CHECK-LABEL: sil [ossa] @load_borrow_within_loop : 
+// CHECK: [[FUNC:%.*]] = function_ref @arrayPropertyIsNative
+// CHECK: apply [[FUNC]]
+// CHECK-NOT: function_ref @arrayPropertyIsNative
+// CHECK-NOT: apply [[FUNC]]
+// CHECK-LABEL: } // end sil function 'load_borrow_within_loop'
+sil [ossa] @load_borrow_within_loop : $@convention(thin) (@inout MyArray<MyClass>, @inout MyBool) -> MyBool {
+bb0(%0 : $*MyArray<MyClass>, %1 : $*MyBool):
+  br bb1
+
+bb1:
+  %3 = load_borrow %0 : $*MyArray<MyClass>
+  %4 = load [trivial] %1 : $*MyBool
+  %2 = function_ref @arrayPropertyIsNative : $@convention(method) (@guaranteed MyArray<MyClass>) -> Bool
+  %5 = apply %2(%3) : $@convention(method) (@guaranteed MyArray<MyClass>) -> Bool
+  end_borrow %3 : $MyArray<MyClass>
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  return %4 : $MyBool
+}
+
 // CHECK-LABEL: sil [ossa] @load_and_copy_within_loop : 
 // CHECK: bb1:
 // CHECK: [[FUNC1:%.*]] = function_ref @arrayPropertyIsNative

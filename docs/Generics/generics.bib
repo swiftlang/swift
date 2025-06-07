@@ -1,255 +1,629 @@
-@misc{llvmtalk,
-    author    = "John McCall and Slava Pestov",
-    title     = "Implementing {S}wift generics",
-    url       = "https://www.youtube.com/watch?v=ctS8FzqcRug",
-    year      = {2017}
-}
-@misc{sr617,
-    title     = "{SR-617}: \texttt{Self} not always resolved dynamically with Generics",
-    url       = "https://github.com/apple/swift/issues/43234",
-    year      = {2016}
-}
-@misc{sr631,
-    title     = "{SR-631}: Extensions in different files do not recognize each other",
-    url       = "https://github.com/apple/swift/issues/43248",
-    year      = {2016}
-}
-@misc{sr4206,
-    title     = "{SR-4206}: Override checking does not properly enforce requirements",
-    url       = "https://github.com/apple/swift/issues/46789",
-    year      = {2017}
-}
-@misc{se0011,
-    author    = "Loïc Lecrenier",
-    title     = "{SE-0011}: Replace \texttt{typealias} keyword with \texttt{associatedtype} for associated type declarations",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0011-replace-typealias-associated.md",
-    year      = {2015}
-}
-@misc{se0021,
-    author    = "Doug Gregor",
-    title     = "{SE-0021}: Naming Functions with Argument Labels",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0021-generalized-naming.md",
-    year      = {2016}
-}
-@misc{se0029,
-    author    = "Chris Lattner",
-    title     = "{SE-0029}: Remove implicit tuple splat behavior from function applications",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0029-remove-implicit-tuple-splat.md",
-    year      = {2016}
-}
-@misc{se0048,
-    author    = "Chris Lattner",
-    title     = "{SE-0048}: Generic type aliases",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0048-generic-typealias.md",
-    year      = {2016}
-}
-@misc{se0066,
-    author    = "Chris Lattner",
-    title     = "{SE-0066}: Standardize function type argument syntax to require parentheses",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0066-standardize-function-type-syntax.md",
-    year      = {2016}
-}
-@misc{se0077,
-    author    = "Anton Zhilin",
-    title     = "{SE-0077}: Improved operator declarations",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0077-operator-precedence.md",
-    year      = {2016}
-}
-@misc{se0091,
-    author    = "Tony Allevato and Doug Gregor",
-    title     = "{SE-0091}: Improving operator requirements in protocols",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0091-improving-operators-in-protocols.md",
-    year      = {2016}
-}
-@misc{se0110,
-    author    = "Vladimir S. and Austin Zheng",
-    title     = "{SE-0110}: Distinguish between single-tuple and multiple-argument function types",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0110-distinguish-single-tuple-arg.md",
-    year      = {2016}
-}
-@misc{se0111,
-    author    = "Austin Zheng",
-    title     = "{SE-0111}: Remove type system significance of function argument labels",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0111-remove-arg-label-type-significance.md",
-    year      = {2016}
-}
-@misc{se0068,
-    author    = "Erica Sadun",
-    title     = "{SE-0068}: Expanding Swift \texttt{Self} to class members and value types",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0068-universal-self.md",
-    year      = {2016}
-}
-@misc{se0081,
-    author    = "David Hart and Robert Widman and Pyry Jahkola",
-    title     = "{SE-0081}: Move \texttt{where} clause to end of declaration",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0081-move-where-expression.md",
-    year      = {2016}
-}
-@misc{se0092,
-    author    = "David Hart and Doug Gregor",
-    title     = "{SE-0092}: Typealiases in protocols and protocol extensions",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0092-typealiases-in-protocols.md",
-    year      = {2016}
-}
-@misc{se0095,
-    author    = "Trent Nadeau",
-    title     = "{SE-0103}: Make non-escaping closures the default",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0103-make-noescape-default.md",
-    year      = {2016}
-}
-@misc{se0103,
-    author    = "Adrian Zubarev and Austin Zheng",
-    title     = "{SE-0095}: Replace \texttt{protocol<P1,P2>} syntax with \texttt{P1 \& P2} syntax",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0095-any-as-existential.md",
-    year      = {2016}
-}
-@misc{se0142,
-    author    = "David Hart and Jacob Bandes-Storch and Doug Gregor",
-    title     = "{SE-0142}: Permit where clauses to constrain associated types",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0142-associated-types-constraints.md",
-    year      = {2017}
-}
-@misc{se0143,
-    author    = "Doug Gregor",
-    title     = "{SE-0143}: Conditional conformances",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0143-conditional-conformances.md",
-    year      = {2016}
-}
-@misc{se0148,
-    author    = "Chris Eidhof",
-    title     = "{SE-0148}: Generic subscripts",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0148-generic-subscripts.md",
-    year      = {2017}
-}
-@misc{se0156,
-    author    = "David Hart and Austin Zheng",
-    title     = "{SE-0156}: Class and subtype existentials",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0156-subclass-existentials.md",
-    year      = {2017}
-}
-@misc{se0157,
-    author    = "Doug Gregor and Erica Sadun and Austin Zheng",
-    title     = "{SE-0157}: Support recursive constraints on associated types",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0157-recursive-protocol-constraints.md",
-    year      = {2017}
-}
-@misc{se0193,
-    author    = "Slava Pestov",
-    title     = "{SE-0193}: Cross-module inlining and specialization",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0193-cross-module-inlining-and-specialization.md",
-    year      = {2018}
-}
-@misc{se0244,
-    author    = "Doug Gregor and Joe Groff",
-    title     = "{SE-0244}: Opaque result types",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0244-opaque-result-types.md",
-    year      = {2019}
-}
-@misc{se0260,
-    author    = "Jordan Rose and Ben Cohen",
-    title     = "{SE-0260}: Library Evolution for Stable {ABIs}",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0260-library-evolution.md",
-    year      = {2019}
-}
-@misc{se0261,
-    author    = "Anthony Latsis",
-    title     = "{SE-0261}: \texttt{where} clauses on contextually generic declarations",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0267-where-on-contextually-generic.md",
-    year      = {2019}
-}
-@misc{se0281,
-    author    = "Nate Cook and Nate Chandler and Matt Ricketson",
-    title     = "{SE-0281}: \texttt{@main}: Type-Based Program Entry Points",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0281-main-attribute.md",
-    year      = {2020}
+@IEEEtranBSTCTL{IEEEexample:BSTcontrol,
+    CTLname_url_prefix = "\\*",
+    CTLdash_repeated_names = "no"
 }
 
-@misc{se0296,
-    author    = "John McCall and Doug Gregor",
-    title     = "{SE-0296}: Async/await",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0296-async-await.md",
-    year      = {2020}
+@misc{tspl,
+    title     = "The {S}wift Programming Language",
+    url       = "https://docs.swift.org/swift-book/",
+    year      = {2014}
 }
-@misc{se0309,
-    author    = "Anthony Latsis and Filip Sakel and Suyash Srijan",
-    title     = "{SE-0309}: Unlock existentials for all protocols",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0309-unlock-existential-types-for-all-protocols.md",
-    year      = {2022}
-}
-@misc{se0315,
-    author    = "Frederick Kellison-Linn",
-    title     = "{SE-0315}: Type placeholders",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0315-placeholder-types.md",
-    year      = {2021}
-}
-@misc{se0328,
-    author    = "Benjamin Driscoll and Holly Borla",
-    title     = "{SE-0328}: Structural opaque result types",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0328-structural-opaque-result-types.md",
-    year      = {2021}
-}
-@misc{se0341,
-    author    = "Doug Gregor",
-    title     = "{SE-0341}: Opaque parameter declarations",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0341-opaque-parameters.md",
-    year      = {2022}
-}
-@misc{se0346,
-    author    = "Pavel Yaskevich and Holly Borla and Slava Pestov",
-    title     = "{SE-0346}: Lightweight same-type requirements for primary associated types",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0346-light-weight-same-type-syntax.md",
-    year      = {2022}
-}
-@misc{se0352,
-    author    = "Doug Gregor",
-    title     = "{SE-0352}: Implicitly opened existentials",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0352-implicit-open-existentials.md",
-    year      = {2022}
-}
-@misc{se0353,
-    author    = "Robert Widmann",
-    title     = "{SE-0353}: Constrained existential types",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0353-constrained-existential-types.md",
-    year      = {2022}
-}
-@misc{se0355,
-    author    = "Holly Borla",
-    title     = "{SE-0335}: Introduce existential \texttt{any}",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0335-existential-any.md",
-    year      = {2021}
-}
-@misc{se0361,
-    author    = "Holly Borla",
-    title     = "{SE-0361}: Extensions on bound generic types",
-    url       = "https://github.com/apple/swift-evolution/blob/main/proposals/0361-bound-generic-extensions.md",
-    year      = {2022}
-}
-@misc(sil,
-    title     = "Swift Intermediate Language {(SIL)}",
-    url       = "https://github.com/apple/swift/blob/main/docs/SIL.rst",
-    year      = {2016}
-)
-@misc(gensig,
-    author    = "Doug Gregor",
-    title     = "Generic Signatures",
-    url       = "https://github.com/apple/swift/blob/main/docs/ABI/GenericSignature.md",
-    year      = {2018}
-)
-@misc(reqeval,
-    author    = "Doug Gregor",
-    title     = "Request evaluator",
-    url       = "https://github.com/apple/swift/blob/main/docs/RequestEvaluator.md",
-    year      = {2018}
-)
-@misc(incremental,
-    author    = "Jordan Rose",
-    title     = "Dependency analysis",
-    url       = "https://github.com/apple/swift/blob/main/docs/DependencyAnalysis.md",
-    year      = {2015}
-)
 
+@book{muchnick1997advanced,
+  title={Advanced Compiler Design and Implementation},
+  author={Muchnick, S.},
+  isbn={9781558603202},
+  lccn={97013063},
+  url={https://www.goodreads.com/en/book/show/887908},
+  year={1997},
+  publisher={Morgan Kaufmann Publishers}
+}
+
+@book{cooper2004engineering,
+  title={Engineering a Compiler},
+  author={Cooper, K.D. and Torczon, L.},
+  isbn={9781558606982},
+  lccn={2004268209},
+  url={https://dl.acm.org/doi/pdf/10.5555/2737838},
+  year={2004},
+  publisher={Elsevier Science}
+}
+
+@book{incrementalracket,
+  title={Essentials of Compilation},
+  subtitle={An incremental approach in {R}acket},
+  author={Jeremy G. Siek},
+  isbn={9780262047760},
+  url={https://mitpress.mit.edu/9780262047760/essentials-of-compilation/},
+  year={2023},
+  publisher={The MIT Press}
+}
+
+@book{craftinginterpreter,
+  title={Crafting Interpreters},
+  author={Robert Nystrom},
+  year={2021},
+  publisher={Genever Benning},
+  isbn={9780990582946},
+  url={https://craftinginterpreters.com}
+}
+
+@book{gregor,
+  title={C++ Templates: The Complete Guide},
+  author={Vandevoorde, D. and Josuttis, N.M. and Gregor, D.},
+  isbn={9780134778747},
+  url={http://www.tmplbook.com/},
+  year={2017},
+  publisher={Pearson Education}
+}
+
+@book{grimaldi,
+  title={Discrete and Combinatorial Mathematics: An Applied Introduction},
+  author={Grimaldi, R.P.},
+  year={1998},
+  isbn={9780201199123},
+  publisher={Addison-Wesley Longman},
+  url={https://www.goodreads.com/en/book/show/1575542}
+}
+
+@book{bradley2007calculus,
+  title={The Calculus of Computation: Decision Procedures with Applications to Verification},
+  author={Bradley, A.R. and Manna, Z.},
+  isbn={9783540741138},
+  lccn={2007932679},
+  year={2007},
+  publisher={Springer},
+  url={https://link.springer.com/book/10.1007/978-3-540-74113-8}
+}
+
+@book{postmodern,
+  title={Post-Modern Algebra},
+  author={Smith, J.D.H. and Romanowska, A.B.},
+  year={2011},
+  isbn={9780471127383},
+  publisher={Wiley},
+  url={https://www.wiley.com/en-us/Post+Modern+Algebra-p-9780471127383}
+}
+
+@book{catprogrammer,
+  title={Category Theory for Programmers},
+  author={Milewski, B.},
+  isbn={9780464825081},
+  url={https://github.com/hmemcpy/milewski-ctfp-pdf/},
+  year={2018},
+  publisher={Blurb, Incorporated}
+}
+
+@book{alggraph,
+  title={Algebraic Graph Theory: Morphisms, Monoids and Matrices},
+  author={Knauer, U.},
+  year={2019},
+  isbn={9783110616125},
+  publisher={De Gruyter},
+  url={https://www.degruyter.com/document/doi/10.1515/9783110617368/html?lang=en}
+}
+
+@book{godsil2001algebraic,
+  title={Algebraic Graph Theory},
+  author={Godsil, C. and Royle, G.F.},
+  isbn={9780387952208},
+  lccn={lc00053776},
+  series={Graduate Texts in Mathematics},
+  url={https://link.springer.com/book/10.1007/978-1-4613-0163-9},
+  year={2001},
+  publisher={Springer}
+}
+
+@book{combinatorialgroup,
+  title={Combinatorial Group Theory: Presentations of Groups in Terms of Generators and Relations},
+  author={Magnus, W. and Karrass, A. and Solitar, D.},
+  year={1976},
+  publisher={Dover Publications},
+  isbn={9780486438306},
+  url={https://www.goodreads.com/book/show/331129.Combinatorial_Group_Theory}
+}
+
+@book{rotman,
+  title={An Introduction to the Theory of Groups},
+  author={Joseph J. Rotman},
+  doi={https://doi.org/10.1007/978-1-4612-4176-8},
+  url={https://link.springer.com/book/10.1007/978-1-4612-4176-8},
+  publisher={Springer},
+  year={1994},
+  isbn={9780387942858}
+}
+
+@book{book2012string,
+  title={String-Rewriting Systems},
+  author={Book, R.V. and Otto, F.},
+  isbn={9781461397717},
+  lccn={92037370},
+  series={Monographs in Computer Science},
+  url={https://link.springer.com/book/10.1007/978-1-4613-9771-7},
+  year={2012},
+  publisher={Springer}
+}
+
+@book{andallthat,
+  place={Cambridge},
+  title={Term Rewriting and All That},
+  DOI={10.1017/CBO9781139172752},
+  publisher={Cambridge University Press},
+  author={Baader, Franz and Nipkow, Tobias},
+  year={1998},
+  isbn={9780521779203},
+  url={https://www21.in.tum.de/~nipkow/TRaAT/}
+}
+
+@book{epstein1992word,
+  title={Word Processing in Groups},
+  author={Epstein, D.B.A.},
+  isbn={9781439865699},
+  url={https://www.taylorfrancis.com/books/mono/10.1201/9781439865699/word-processing-groups-david-epstein},
+  year={1992},
+  publisher={CRC Press}
+}
+
+@book{art1,
+  title={The Art of Computer Programming: Volume 1: Fundamental Algorithms},
+  author={Knuth, D. E.},
+  isbn={9780321635754},
+  url={https://www-cs-faculty.stanford.edu/~knuth/taocp.html},
+  year={1997},
+  publisher={Addison-Wesley}
+}
+
+@book{art3,
+  title={The Art of Computer Programming: Volume 3: Sorting and Searching},
+  author={Knuth, D. E.},
+  isbn={9780321635785},
+  url={https://www-cs-faculty.stanford.edu/~knuth/taocp.html},
+  year={1998},
+  publisher={Addison-Wesley}
+}
+
+@book{art4b,
+  title={The Art of Computer Programming: Volume 4B: Combinatorial Algorithms},
+  author={Knuth, D. E.},
+  isbn={9780137926817},
+  url={https://www-cs-faculty.stanford.edu/~knuth/taocp.html},
+  year={2022},
+  publisher={Addison-Wesley},
+}
+
+@book{konig,
+  title={Theory of Finite and Infinite Graphs},
+  author={K{\H{o}}nig, D.},
+  year={1936},
+  isbn={9780817633899},
+  publisher={Birkh{\"a}user Boston},
+  url={https://www.goodreads.com/book/show/3359970-theory-of-finite-and-infinite-graphs}
+}
+
+@book{minskymachines,
+  title={Computation: Finite and Infinite Machines},
+  author={Marvin L. Minsky},
+  year={1967},
+  isbn = {0131655639},
+  publisher = {Prentice-Hall, Inc.},
+  address = {USA},
+  url={https://www.goodreads.com/en/book/show/326791.Computation}
+}
+
+@book{cutland,
+  title={Computability: An Introduction to Recursive Function Theory},
+  author={Nigel Cutland},
+  year={1980},
+  isbn={9780521294652},
+  publisher={Cambridge University Press},
+  url={https://www.cambridge.org/us/universitypress/subjects/computer-science/programming-languages-and-applied-logic/computability-introduction-recursive-function-theory?format=PB}
+}
+
+@book{collatzbook,
+  title={The Ultimate Challenge: The $3x+1$ Problem},
+  author={Lagarias, J.C.},
+  series={Monograph Bks},
+  year={2010},
+  publisher={American Mathematical Society},
+  url={https://bookstore.ams.org/mbk-78}
+}
+
+@book{curry,
+  title={Foundations of Mathematical Logic},
+  author={Curry, H.B.},
+  isbn={9780486634623},
+  year={1977},
+  publisher={Dover Publications},
+  url={https://store.doverpublications.com/products/9780486634623}
+}
+
+@book{combinatory,
+  title={Combinatory Logic},
+  author={Curry, H.B. and Feys, R.},
+  volume={1},
+  year={1958},
+  publisher={North-Holland Publishing Company},
+  url={https://www.goodreads.com/book/show/65701927-combinatory-logic}
+}
+
+@book{semigroup,
+  title={Fundamentals of Semigroup Theory},
+  author={Howie, J.M.},
+  series={LMS monographs},
+  year={1995},
+  publisher={Clarendon Press},
+  url={https://www.goodreads.com/book/show/3420594-fundamentals-of-semigroup-theory}
+}
+
+@book{tarski1953undecidable,
+  title={Undecidable Theories},
+  author={Tarski, A. and Mostowski, A. and Robinson, R.M.},
+  isbn={9780444533784},
+  series={Studies in logic and the foundations of mathematics},
+  year={1953},
+  publisher={North-Holland},
+  url={https://www.goodreads.com/book/show/7439448-undecidable-theories}
+}
+
+@book{forth,
+  title={Thinking Forth: A Language and Philosophy for Solving Problems},
+  url={https://www.forth.com/wp-content/uploads/2018/11/thinking-forth-color.pdf},
+  author={Leo Brodie},
+  publisher={Punchy Publishing},
+  year=2004
+}
+
+@book{garey1979computers,
+  title={Computers and Intractability: A Guide to the Theory of NP-completeness},
+  author={Garey, M.R. and Johnson, D.S.},
+  isbn={9780716710448},
+  lccn={lc78012361},
+  series={Mathematical Sciences Series},
+  url={https://www.goodreads.com/book/show/284369.Computers_and_Intractability},
+  year={1979},
+  publisher={Freeman}
+}
+
+@article{factor,
+author = {Pestov, Slava and Ehrenberg, Daniel and Groff, Joe},
+title = {Factor: a dynamic stack-based programming language},
+year = {2010},
+issue_date = {December 2010},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {45},
+number = {12},
+issn = {0362-1340},
+url = {https://factorcode.org/slava/dls.pdf},
+doi = {10.1145/1899661.1869637},
+journal = {SIGPLAN Not.},
+month = {oct},
+pages = {43–58}
+}
+
+@article{rajexistential,
+author = {Barik, Rajkishore and Sridharan, Manu and Ramanathan, Murali Krishna and Chabbi, Milind},
+title = {Optimization of {Swift} Protocols},
+year = {2019},
+issue_date = {October 2019},
+publisher = {Association for Computing Machinery},
+volume = {3},
+number = {OOPSLA},
+url = {https://manu.sridharan.net/files/OOPSLA19Swift.pdf},
+journal = {Proc. ACM Program. Lang.},
+month = {oct},
+articleno = {164}}
+
+@inproceedings{llvm,
+  author={Lattner, C. and Adve, V.},
+  booktitle={International Symposium on Code Generation and Optimization, 2004. CGO 2004.}, 
+  title={{LLVM:} a compilation framework for lifelong program analysis and transformation}, 
+  year={2004},
+  volume={},
+  number={},
+  pages={75-86},
+  url={https://llvm.org/pubs/2004-01-30-CGO-LLVM.pdf}}
+
+@incollection{formalmans1,
+author = {Perrin, Dominique},
+title = {Chapter 1 - {F}inite {A}utomata},
+year = {1990},
+publisher = {Elsevier},
+address = {Amsterdam},
+booktitle = {Handbook of Theoretical Computer Science (Vol. B): Formal Models and Semantics},
+url = {https://www.goodreads.com/book/show/2305428.Handbook_of_Theoretical_Computer_Science_Vol_B}
+}
+
+@incollection{formalmans6,
+author = {Nachum Dershowitz and Jean-Pierre Jouannaud},
+title = {Chapter 6 - {R}ewrite {S}ystems},
+year = {1990},
+publisher = {Elsevier},
+address = {Amsterdam},
+booktitle = {Handbook of Theoretical Computer Science (Vol. B): Formal Models and Semantics},
+url = {https://www.goodreads.com/book/show/2305428.Handbook_of_Theoretical_Computer_Science_Vol_B}
+}
+
+@inproceedings{intensional,
+author = {Harper, Robert and Morrisett, Greg},
+title = {Compiling Polymorphism Using Intensional Type Analysis},
+year = {1995},
+publisher = {Association for Computing Machinery},
+url = {https://www.cs.cmu.edu/~rwh/papers/intensional/popl95.pdf},
+booktitle = {Proceedings of the 22nd ACM SIGPLAN-SIGACT Symposium on Principles of Programming Languages},
+pages = {130–141},
+numpages = {12},
+location = {San Francisco, California, USA},
+series = {POPL '95}
+}
+
+@inproceedings{typeclass,
+author = {Wadler, P. and Blott, S.},
+title = {How to Make Ad-Hoc Polymorphism Less Ad Hoc},
+year = {1989},
+publisher = {Association for Computing Machinery},
+url = {https://www.researchgate.net/profile/Stephen-Blott/publication/2710954_How_to_Make_Ad-Hoc_Polymorphism_Less_Ad_Hoc/links/553e01f20cf2fbfe509b81f8/How-to-Make-Ad-Hoc-Polymorphism-Less-Ad-Hoc.pdf},
+booktitle = {Proceedings of the 16th ACM SIGPLAN-SIGACT Symposium on Principles of Programming Languages},
+pages = {60–76},
+numpages = {17},
+series = {POPL '89}
+}
+
+@article{typeclasshaskell,
+author = {Hall, Cordelia V. and Hammond, Kevin and Peyton Jones, Simon L. and Wadler, Philip L.},
+title = {Type Classes in {Haskell}},
+year = {1996},
+issue_date = {March 1996},
+publisher = {Association for Computing Machinery},
+volume = {18},
+number = {2}, url = {https://dl.acm.org/doi/pdf/10.1145/227699.227700},
+journal = {ACM Trans. Program. Lang. Syst.},
+month = {mar},
+pages = {109–138},
+numpages = {30}
+}
+
+@inproceedings{peytonjones1997type,
+author = {Peyton Jones, Simon and Jones, Mark and Meijer, Erik},
+title = {Type classes: an exploration of the design space},
+booktitle = {Haskell workshop},
+year = {1997},
+month = {January},
+url = {https://www.microsoft.com/en-us/research/publication/type-classes-an-exploration-of-the-design-space/},
+edition = {Haskell workshop},
+}
+
+@inproceedings{assoctype,
+author = {Chakravarty, Manuel M. T. and Keller, Gabriele and Jones, Simon Peyton and Marlow, Simon},
+title = {Associated Types with Class},
+year = {2005},
+publisher = {Association for Computing Machinery},
+url = {https://www.microsoft.com/en-us/research/wp-content/uploads/2005/01/assoc.pdf},
+booktitle = {Proceedings of the 32nd ACM SIGPLAN-SIGACT Symposium on Principles of Programming Languages},
+pages = {1–13},
+numpages = {13},
+series = {POPL '05}
+}
+
+@inproceedings{synonyms,
+author = {Chakravarty, Manuel M. T. and Keller, Gabriele and Jones, Simon Peyton},
+title = {Associated Type Synonyms},
+year = {2005},
+publisher = {Association for Computing Machinery},
+url = {https://www.microsoft.com/en-us/research/wp-content/uploads/2005/01/at-syns.pdf},
+booktitle = {Proceedings of the Tenth ACM SIGPLAN International Conference on Functional Programming},
+pages = {241–253},
+numpages = {13},
+series = {ICFP '05}
+}
+
+@inproceedings{concepts,
+author = {Gregor, Douglas and J\"{a}rvi, Jaakko and Siek, Jeremy and Stroustrup, Bjarne and Dos Reis, Gabriel and Lumsdaine, Andrew},
+title = {Concepts: Linguistic Support for Generic Programming in {C++}},
+year = {2006},
+publisher = {Association for Computing Machinery},
+url = {https://www.stroustrup.com/oopsla06.pdf},
+booktitle = {Proceedings of the 21st Annual ACM SIGPLAN Conference on Object-Oriented Programming Systems, Languages, and Applications},
+pages = {291–310},
+numpages = {20},
+location = {Portland, Oregon, USA},
+series = {OOPSLA '06}}
+
+@inproceedings{essential,
+author = {Siek, Jeremy G. and Lumsdaine, Andrew},
+title = {Essential Language Support for Generic Programming},
+year = {2005},
+isbn = {1595930566},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://www.researchgate.net/publication/213886648_Essential_Language_Support_for_Generic_Programming},
+doi = {10.1145/1065010.1065021},
+booktitle = {Proceedings of the 2005 ACM SIGPLAN Conference on Programming Language Design and Implementation},
+pages = {73–84},
+numpages = {12},
+location = {Chicago, IL, USA},
+series = {PLDI '05}
+}
+
+@inproceedings{mptc,
+  title={Principal Type Inference for {GHC}-Style Multi-parameter Type Classes},
+  author={Martin Sulzmann and Tom Schrijvers and Peter James Stuckey},
+  booktitle={Asian Symposium on Programming Languages and Systems},
+  year={2006},
+  url={https://lirias.kuleuven.be/retrieve/25382/}
+}
+
+@article{wells,
+title = {Typability and type checking in {System F} are equivalent and undecidable},
+journal = {Annals of Pure and Applied Logic},
+volume = {98},
+number = {1},
+pages = {111-156},
+year = {1999},
+url = {https://www.sciencedirect.com/science/article/pii/S0168007298000475},
+author = {J.B. Wells}
+}
+
+@phdthesis{Milewski_2015,
+series={Electronic Theses and Dissertations (ETDs) 2008+},
+title={Formalizing {Rust} traits}, url={https://open.library.ubc.ca/collections/ubctheses/24/items/1.0220521}, DOI={http://dx.doi.org/10.14288/1.0220521},
+school={University of British Columbia},
+author={Milewski, Jonatan},
+year={2015},
+collection={Electronic Theses and Dissertations (ETDs) 2008+}
+}
+
+@misc{joy,
+  URL = {https://hypercubed.github.io/joy/joy.html},
+  title = {Joy programming language},
+  author = {Manfred von Thun}
+}
+
+@misc{wolframtag,
+  URL = {https://writings.stephenwolfram.com/2021/03/after-100-years-can-we-finally-crack-posts-problem-of-tag-a-story-of-computational-irreducibility-and-more/},
+  title = {After 100 Years, Can We Finally Crack {P}ost’s Problem of ``{T}ag?'' {A} Story of Computational Irreducibility, and More},
+  author = {Stephen Wolfram}
+}
+
+@article{posttag,
+ URL = {http://www.jstor.org/stable/2371809},
+ author = {Emil L. Post},
+ journal = {American Journal of Mathematics},
+ number = {2},
+ pages = {197--215},
+ publisher = {Johns Hopkins University Press},
+ title = {Formal Reductions of the General Combinatorial Decision Problem},
+ volume = {65},
+ year = {1943}
+}
+
+@article{collatztag,
+title = {Tag systems and {C}ollatz-like functions},
+journal = {Theoretical Computer Science},
+volume = {390},
+number = {1},
+pages = {92-101},
+year = {2008},
+url = {https://www.sciencedirect.com/science/article/pii/S0304397507007700},
+author = {Liesbeth {De Mol}}
+}
+
+@article{turingtag,
+ URL = {http://www.jstor.org/stable/1970290},
+ author = {Marvin L. Minsky},
+ journal = {Annals of Mathematics},
+ number = {3},
+ pages = {437--455},
+ publisher = {Annals of Mathematics},
+ title = {Recursive Unsolvability of {P}ost's Problem of {``Tag''} and other Topics in Theory of {T}uring Machines},
+ urldate = {2023-04-23},
+ volume = {74},
+ year = {1961}
+}
+
+@article{conversion,
+ URL = {https://www.ams.org/journals/tran/1936-039-03/S0002-9947-1936-1501858-0/S0002-9947-1936-1501858-0.pdf},
+ author = {Alonzo Church and J. B. Rosser},
+ journal = {Transactions of the American Mathematical Society},
+ number = {3},
+ pages = {472--482},
+ publisher = {American Mathematical Society},
+ title = {Some Properties of Conversion},
+ urldate = {2023-04-23},
+ volume = {39},
+ year = {1936}
+}
+
+@article{church,
+  title={An Unsolvable Problem of Elementary Number Theory},
+  author={Alonzo Church},
+  journal={American Journal of Mathematics},
+  year={1936},
+  volume={58},
+  pages={345},
+url={https://www.semanticscholar.org/paper/An-Unsolvable-Problem-of-Elementary-Number-Theory-Church/60400c043b2624f9cfc2d8daa0f45f3c1d524de3}
+}
+
+@article{post_1947,
+title={Recursive Unsolvability of a problem of {T}hue},
+volume={12},
+DOI={10.2307/2267170},
+number={1},
+journal={The Journal of Symbolic Logic},
+publisher={Cambridge University Press},
+author={Post, Emil L.},
+year={1947}, pages={1–11},
+url={https://www.wolframscience.com/prizes/tm23/images/Post2.pdf}}
+
+@article{thue_translation,
+  author    = {James F. Power},
+  title     = {Thue's 1914 paper: a translation},
+  journal   = {CoRR},
+  volume    = {abs/1308.5858},
+  year      = {2013},
+  url       = {http://arxiv.org/abs/1308.5858}
+}
+
+@article{turing,
+    author = {Turing, A. M.},
+    title = "On Computable Numbers, with an Application to the {Entscheidungsproblem}",
+    journal = {Proceedings of the London Mathematical Society},
+    volume = {s2-42},
+    number = {1},
+    pages = {230-265},
+    year = {1937},
+    month = {01},
+    issn = {0024-6115},
+    url = {https://www.cs.virginia.edu/~robins/Turing_Paper_1936.pdf},
+}
+
+@incollection{undecidablesemigroup,
+author = {Tseitin, G. S.},
+title = {An associative calculus with an insoluble problem of equivalence},
+booktitle={Problems of the constructive direction in mathematics. Part~1},
+year={1958},
+volume={52},
+pages={172--189},
+publisher={Acad. Sci. USSR},
+address={Moscow--Leningrad},
+URL={https://www.mathnet.ru/php/archive.phtml?wshow=paper&jrnid=tm&paperid=1317&option_lang=eng}
+}
+
+@misc{nybergbrodda2024g,
+title={{G.} {S.} {T}seytin's seven-relation semigroup with undecidable word problem},
+author={Carl-Fredrik Nyberg-Brodda},
+year={2024},
+eprint={2401.11757},
+archivePrefix={arXiv},
+url={https://arxiv.org/abs/2401.11757}
+}
+
+@article{universalsemigroup,
+author = {Donald J. Collins},
+doi = {10.1007/BF02219049},
+isbn = {1573-8302},
+journal = {Algebra and Logic},
+number = {6},
+pages = {442--446},
+title = {A universal semigroup},
+url = {https://m.mathnet.ru/php/archive.phtml?wshow=paper&jrnid=al&paperid=1278&option_lang=rus},
+volume = {9},
+year = {1970}
+}
 
 @article{undecidablegroup,
+ URL = {http://www.jstor.org/stable/1970103},
+ author = {William W. Boone},
+ journal = {Annals of Mathematics},
+ number = {2},
+ pages = {207--265},
+ publisher = {[Annals of Mathematics, Trustees of Princeton University on Behalf of the Annals of Mathematics, Mathematics Department, Princeton University]},
+ title = {The Word Problem},
+ volume = {70},
+ year = {1959}
+}
+
+@article{undecidablegroup_collins,
 author = {Donald J. Collins},
 title = {{A simple presentation of a group with unsolvable word problem}},
 volume = {30},
@@ -261,22 +635,81 @@ year = {1986},
 doi = {10.1215/ijm/1256044631},
 URL = {https://doi.org/10.1215/ijm/1256044631}
 }
-@book{andallthat, place={Cambridge}, title={Term Rewriting and All That}, DOI={10.1017/CBO9781139172752}, publisher={Cambridge University Press}, author={Baader, Franz and Nipkow, Tobias}, year={1998}}
-@Inbook{Knuth1983,
-author="Knuth, D. E.
-and Bendix, P. B.",
-editor="Siekmann, J{\"o}rg H.
-and Wrightson, Graham",
+
+@article{java_undecidable,
+  author = {Grigore, Radu},
+  title = {Java Generics Are {T}uring Complete},
+  year = {2017},
+  issue_date = {January 2017},
+  publisher = {Association for Computing Machinery},
+  volume = {52}, number = {1},
+  issn = {0362-1340},
+  url = {https://arxiv.org/abs/1605.05274},
+  doi = {10.1145/3093333.3009871},
+  journal = {SIGPLAN Not.}, month = {Jan}, pages = {73–85}, numpages = {13},
+}
+
+@incollection{Knuth1983,
+author="Knuth, D. E. and Bendix, P. B.",
 title="Simple Word Problems in Universal Algebras",
 bookTitle="Automation of Reasoning: 2: Classical Papers on Computational Logic 1967--1970",
 year="1983",
-publisher="Springer Berlin Heidelberg",
-address="Berlin, Heidelberg",
+publisher="Springer",
 pages="342--376",
 isbn="978-3-642-81955-1",
 doi="10.1007/978-3-642-81955-1_23",
-url="https://doi.org/10.1007/978-3-642-81955-1_23"
+url="https://www.semanticscholar.org/paper/Simple-Word-Problems-in-Universal-Algebras-Knuth-Bendix/94877bdf8313565b90758a5e664764139857b358"
 }
+
+@article{HUET198111,
+title = {A complete proof of correctness of the {Knuth-Bendix} completion algorithm},
+journal = {Journal of Computer and System Sciences},
+volume = {23},
+number = {1},
+pages = {11-21},
+year = {1981},
+issn = {0022-0000},
+doi = {https://doi.org/10.1016/0022-0000(81)90002-7},
+url = {https://www.sciencedirect.com/science/article/pii/0022000081900027},
+author = {Gérard Huet}
+}
+
+@article{tarjan,
+author = {Tarjan, Robert},
+title = {Depth-First Search and Linear Graph Algorithms},
+journal = {SIAM Journal on Computing},
+volume = {1},
+number = {2},
+pages = {146-160},
+year = {1972},
+URL = {https://github.com/tpn/pdfs/blob/master/Depth-First\%20Search\%20and\%20Linear\%20Graph\%20Algorithms\%20-\%20Tarjan\%20(1972).pdf}
+}
+
+@article{KAPUR1985337,
+title = {A finite {T}hue system with decidable word problem and without equivalent finite canonical system},
+journal = {Theoretical Computer Science},
+volume = {35},
+pages = {337-344},
+year = {1985},
+issn = {0304-3975},
+doi = {https://doi.org/10.1016/0304-3975(85)90023-4},
+url = {https://www.sciencedirect.com/science/article/pii/0304397585900234},
+author = {Deepak Kapur and Paliath Narendran}
+}
+
+@article{fptype,
+title = {Word problems and a homological finiteness condition for monoids},
+journal = {Journal of Pure and Applied Algebra},
+volume = {49},
+number = {1},
+pages = {201-217},
+year = {1987},
+issn = {0022-4049},
+doi = {https://doi.org/10.1016/0022-4049(87)90129-0},
+url = {https://www.sciencedirect.com/science/article/pii/0022404987901290},
+author = {Craig C. Squier}
+}
+
 @article{SQUIER1994271,
 title = {A finiteness condition for rewriting systems},
 journal = {Theoretical Computer Science},
@@ -289,20 +722,852 @@ doi = {https://doi.org/10.1016/0304-3975(94)90175-9},
 url = {https://www.sciencedirect.com/science/article/pii/0304397594901759},
 author = {Craig C. Squier and Friedrich Otto and Yuji Kobayashi}
 }
-@inproceedings{guiraud:hal-00818253,
-  TITLE = {{A Homotopical Completion Procedure with Applications to Coherence of Monoids}},
+
+@article{LAFONT1995229,
+title = {A new finiteness condition for monoids presented by complete rewriting systems (after {Craig C. Squier})},
+journal = {Journal of Pure and Applied Algebra},
+volume = {98},
+number = {3},
+pages = {229-244},
+year = {1995},
+doi = {https://doi.org/10.1016/0022-4049(94)00043-I},
+url = {https://www.sciencedirect.com/science/article/pii/002240499400043I},
+author = {Yves Lafont}
+}
+
+@article{fdtfp3,
+title = {Finite Derivation Type Implies The Homological Finiteness Condition {FP3}},
+author = {Robert Cremanns and Friedrich Otto},
+journal = {Journal of Symbolic Computation},
+volume = {18},
+number = {2},
+pages = {91-112},
+year = {1994},
+issn = {0747-7171},
+doi = {https://doi.org/10.1006/jsco.1994.1039},
+url = {https://www.sciencedirect.com/science/article/pii/S074771718471039X}
+}
+
+@article{mild,
+title = {A finitely presented monoid which has solvable word problem but has no regular complete presentation},
+journal = {Theoretical Computer Science},
+volume = {146},
+number = {1},
+pages = {321-329},
+year = {1995},
+issn = {0304-3975},
+doi = {https://doi.org/10.1016/0304-3975(94)00264-J},
+url = {https://www.sciencedirect.com/science/article/pii/030439759400264J},
+author = {Yuji Kobayashi}
+}
+
+@incollection{Otto1997,
+author="Otto, F. and Kobayashi, Y.",
+title="Properties of Monoids That Are Presented by Finite Convergent String-Rewriting Systems --- A Survey",
+bookTitle="Advances in Algorithms, Languages, and Complexity",
+year="1997",
+publisher="Springer",
+pages="225--266",
+doi="10.1007/978-1-4613-3394-4_12",
+url="https://static.aminer.org/pdf/PDF/000/066/293/properties_of_monoids_that_are_presented_by_finite_convergent_string.pdf"
+}
+
+@article{homotopyreduction,
+title = {Homotopy reduction systems for monoid presentations: Asphericity and low-dimensional homology},
+journal = {Journal of Pure and Applied Algebra},
+volume = {130},
+number = {2},
+pages = {159-195},
+year = {1998},
+url = {https://www.sciencedirect.com/science/article/pii/S0022404997000959},
+author = {Yuji Kobayashi}
+}
+
+@misc{undecidablegroup2,
+author = {Will Cravitz},
+title = {An introduction to the word problem for groups},
+url = {https://math.uchicago.edu/~may/REU2021/REUPapers/Cravitz.pdf},
+year = {2021}
+}
+
+@misc{loggedrewriting,
+  url = {https://arxiv.org/abs/math/0507344},
+  author = {Heyworth, A. and Johnson, M.},
+  title = {Logged Rewriting for Monoids},
+  publisher = {arXiv},
+  year = {2005}
+}
+
+@inproceedings{homotopicalcompletion,
+  TITLE = {A Homotopical Completion Procedure with Applications to Coherence of Monoids},
   AUTHOR = {Guiraud, Yves and Malbos, Philippe and Mimram, Samuel},
-  URL = {https://hal.inria.fr/hal-00818253},
   BOOKTITLE = {{RTA - 24th International Conference on Rewriting Techniques and Applications - 2013}},
-  ADDRESS = {Eindhoven, Netherlands},
-  EDITOR = {Van Raamsdonk, Femke},
-  PUBLISHER = {{Schloss Dagstuhl--Leibniz-Zentrum fuer Informatik}},
-  SERIES = {Leibniz International Proceedings in Informatics (LIPIcs)},
   VOLUME = {21},
   PAGES = {223-238},
   YEAR = {2013},
   MONTH = Jun,
-  DOI = {10.4230/LIPIcs.RTA.2013.223},
-  HAL_ID = {hal-00818253},
-  HAL_VERSION = {v1},
+  URL = {https://hal.inria.fr/hal-00818253}
+}
+
+@article{fdot,
+title = {Finite Domination Type for Monoid Presentations},
+journal = {Mathematics and Statistics},
+volume = {10},
+number = {5},
+pages = {1105-1110},
+year = {2022},
+doi = {https://doi.org/10.13189/ms.2022.100520},
+url = {https://www.hrpub.org/journals/article_info.php?aid=12552}
+}
+
+@article{BUCHBERGER19873,
+title = {History and basic features of the critical-pair/completion procedure},
+journal = {Journal of Symbolic Computation},
+volume = {3},
+number = {1},
+pages = {3-38},
+year = {1987},
+issn = {0747-7171},
+doi = {https://doi.org/10.1016/S0747-7171(87)80020-2},
+url = {https://www.sciencedirect.com/science/article/pii/S0747717187800202},
+author = {Bruno Buchberger}
+}
+
+@article{BOOK198739,
+title = {Thue systems as rewriting systems},
+journal = {Journal of Symbolic Computation},
+volume = {3},
+number = {1},
+pages = {39-68},
+year = {1987},
+issn = {0747-7171},
+doi = {https://doi.org/10.1016/S0747-7171(87)80021-4},
+url = {https://www.sciencedirect.com/science/article/pii/S0747717187800214},
+author = {Ronald V. Book}
+}
+
+@article{narendran,
+author = {Kapur, Deepak and Narendran, Paliath},
+title = {The {Knuth-Bendix} Completion Procedure and {Thue} Systems},
+journal = {SIAM Journal on Computing},
+volume = {14},
+number = {4},
+pages = {1052-1072},
+year = {1985},
+doi = {10.1137/0214073},
+URL = {https://doi.org/10.1137/0214073}
+}
+
+@article{valuesemantics,
+title	= {Mutable Value Semantics},
+author	= {Dimi Racordon and Denys Shabalin and Daniel Zheng and Dave Abrahams and Brennan Saeta},
+year	= {2022},
+URL	= {http://www.jot.fm/issues/issue_2022_02/article2.pdf},
+journal	= {Journal of Object Technology},
+volume	= {21}
+}
+
+@article{ODUNLAING1983339,
+title = {Undecidable questions related to {C}hurch-{R}osser {T}hue systems},
+journal = {Theoretical Computer Science},
+volume = {23},
+number = {3},
+pages = {339-345},
+year = {1983},
+url = {https://www.sciencedirect.com/science/article/pii/0304397583900397},
+author = {Colm Ó'Dúnlaing}}
+
+@article{newman,
+ URL = {http://www.ens-lyon.fr/LIP/REWRITING/TERMINATION/NEWMAN/Newman.pdf},
+ author = {M. H. A. Newman},
+ journal = {Annals of Mathematics},
+ number = {2},
+ pages = {223--243},
+ publisher = {Annals of Mathematics},
+ title = {On Theories with a Combinatorial Definition of Equivalence},
+ volume = {43},
+ year = {1942}
+}
+
+@article{Lafont1991ChurchRooserPA,
+  title={{C}hurch-{R}osser property and homology of monoids},
+  author={Yves Lafont and Alain Prout{\'e}},
+  journal={Mathematical Structures in Computer Science},
+  year={1991},
+  volume={1},
+  pages={297 - 326},
+  url={https://www.irif.fr/~mellies/mpri/mpri-ens/articles/lafont-proute-church-rosser-property-and-homology-of-monoids.pdf}
+}
+
+@article{KOBAYASHI2000547,
+title = {Finite Homotopy Bases of One-Relator Monoids},
+journal = {Journal of Algebra},
+volume = {229},
+number = {2},
+pages = {547-569},
+year = {2000},
+issn = {0021-8693},
+doi = {https://doi.org/10.1006/jabr.1999.8251},
+url = {https://www.sciencedirect.com/science/article/pii/S0021869399982510},
+author = {Yuji Kobayashi},
+}
+
+
+@article{onerelation,
+  author = {Nyberg-Brodda, Carl-Fredrik},
+  doi = {10.1007/s00233-021-10216-8},
+  isbn = {1432-2137},
+  journal = {Semigroup Forum},
+  number = {2},
+  pages = {297--355},
+  title = {The word problem for one-relation monoids: a survey},
+  url = {https://link.springer.com/article/10.1007/s00233-021-10216-8},
+  volume = {103},
+  year = {2021}
+}
+
+@article{practicalhigherrank,
+author = {Peyton Jones, Simon and Vytiniotis, Dimitrios and Weirich, Stephanie and Shields, Mark},
+title = {Practical Type Inference for Arbitrary-Rank Types},
+year = {2007},
+issue_date = {January 2007},
+publisher = {Cambridge University Press},
+address = {USA},
+volume = {17},
+number = {1},
+issn = {0956-7968},
+url = {https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/putting.pdf},
+doi = {10.1017/S0956796806006034},
+journal = {J. Funct. Program.},
+month = {jan},
+pages = {1–82},
+numpages = {82}
+}
+
+@article{NEEDHAM1996195,
+title = {Infinite complete group presentations},
+journal = {Journal of Pure and Applied Algebra},
+volume = {110},
+number = {2},
+pages = {195-218},
+year = {1996},
+issn = {0022-4049},
+doi = {https://doi.org/10.1016/0022-4049(95)00108-5},
+url = {https://www.sciencedirect.com/science/article/pii/0022404995001085},
+author = {Roger E. Needham}
+}
+
+@article{OTTO1998621,
+title = {Infinite Convergent String-rewriting Systems and Cross-sections for Finitely Presented Monoids},
+journal = {Journal of Symbolic Computation},
+volume = {26},
+number = {5},
+pages = {621-648},
+year = {1998},
+issn = {0747-7171},
+doi = {https://doi.org/10.1006/jsco.1998.0230},
+url = {https://www.sciencedirect.com/science/article/pii/S0747717198902309},
+author = {F. Otto and M. Katsura and Y. Kobayashi}
+}
+
+@inproceedings{schrijvers2008type,
+author = {Schrijvers, Tom and Peyton Jones, Simon and Chakravarty, Manuel and Sulzmann, Martin},
+title = {Type Checking with Open Type Functions},
+booktitle = {ICFP 2008},
+year = {2008},
+month = {April},
+url = {https://www.microsoft.com/en-us/research/publication/type-checking-with-open-type-functions/},
+edition = {ICFP 2008}
+}
+
+@article{improvedequivalence,
+author = {Galler, Bernard A. and Fisher, Michael J.},
+title = {An improved equivalence algorithm},
+year = {1964},
+issue_date = {May 1964},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {7},
+number = {5},
+issn = {0001-0782},
+url = {https://dl.acm.org/doi/pdf/10.1145/364099.364331},
+doi = {10.1145/364099.364331},
+journal = {Commun. ACM},
+month = {may},
+pages = {301–303},
+numpages = {3}
+}
+
+@article{unionfindsurvey,
+author = {Galil, Zvi and Italiano, Giuseppe F.},
+title = {Data structures and algorithms for disjoint set union problems},
+year = {1991},
+issue_date = {Sept. 1991},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA}, volume = {23},
+number = {3},
+issn = {0360-0300},
+url = {https://dl.acm.org/doi/pdf/10.1145/116873.116878},
+oi = {10.1145/116873.116878},
+journal = {ACM Comput. Surv.},
+month = {sep},
+pages = {319–344},
+numpages = {26}
+}
+
+@article{ahocorasick,
+author = {Aho, Alfred V. and Corasick, Margaret J.},
+title = {Efficient string matching: an aid to bibliographic search},
+year = {1975},
+issue_date = {June 1975},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {18},
+number = {6},
+issn = {0001-0782},
+url = {https://doi.org/10.1145/360825.360855},
+doi = {10.1145/360825.360855},
+journal = {Commun. ACM},
+month = {jun},
+pages = {333–340},
+numpages = {8}
+}
+
+@article{formalabi,
+author = {Wagner, Andrew and Eisbach, Zachary and Ahmed, Amal},
+title = {Realistic Realizability: Specifying {ABIs} You Can Count On},
+year = {2024},
+issue_date = {October 2024},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+volume = {8},
+number = {OOPSLA2},
+url = {https://doi.org/10.1145/3689755},
+doi = {10.1145/3689755},
+journal = {Proc. ACM Program. Lang.},
+month = oct
+}
+
+@inproceedings{cook,
+author = {Cook, Stephen A.},
+title = {The complexity of theorem-proving procedures},
+year = {1971},
+isbn = {9781450374644},
+publisher = {Association for Computing Machinery},
+address = {New York, NY, USA},
+url = {https://dl.acm.org/doi/pdf/10.1145/800157.805047},
+doi = {10.1145/800157.805047},
+booktitle = {Proceedings of the Third Annual ACM Symposium on Theory of Computing},
+pages = {151–158}
+}
+
+@misc{kiselyov2009fun,
+author = {Kiselyov, Oleg and Peyton Jones, Simon and Shan, {Chung-chieh}},
+title = {Fun with type functions},
+year = {2009},
+month = {April},
+url = {https://www.microsoft.com/en-us/research/publication/fun-type-functions/},
+edition = {Presented at Tony Hoare's 75th birthday celebration, Cambridge, 17 April 2009.}
+}
+
+@misc{henry2021tietze,
+  title={Tietze Equivalences as Weak Equivalences}, 
+  author={Simon Henry and Samuel Mimram},
+  year={2021},
+  url={https://arxiv.org/abs/2101.03591}
+}
+
+@misc{pvnp,
+  URL = {https://www.scottaaronson.com/papers/pnp.pdf}, 
+  title = {{P} $\stackrel{?}{=}$ {NP}},
+  author = {Scott Aaronson},
+  year={2017}
+}
+
+@misc{csharpsat,
+  title = {Lambda Expressions vs. Anonymous Methods, Part Five},
+  author = {Eric Lippert},
+  year = {2007},
+  url = {https://learn.microsoft.com/en-us/archive/blogs/ericlippert/lambda-expressions-vs-anonymous-methods-part-five}
+}
+
+@misc{java_faq,
+  author = "Angelika Langer",
+  title = "Java Generics {FAQs}",
+  year = {2004},
+  url = {http://www.angelikalanger.com/GenericsFAQ/JavaGenericsFAQ.html}
+}
+
+@misc{rust_chalk,
+  author="{Rust Traits Working Group}",
+  title = "The {Chalk} Book",
+  url = "https://rust-lang.github.io/chalk/book/",
+  year = {2015}
+}
+
+@misc{rust_bug,
+  author = "Aaron Turon",
+  title="{``where''} clauses are only elaborated for supertraits, and not other things",
+  url = "https://github.com/rust-lang/rust/issues/20671",
+  year = {2015}
+}
+@misc{rust_same,
+  author = "Jared Roesch",
+  title="Parse and accept type equality constraints in {``where''} clauses",
+  url = "https://github.com/rust-lang/rust/issues/20041",
+  year = {2014}
+}
+
+@misc{rust_const,
+  title="{Rust} {RFC} 2000: Const Generics",
+  url = "https://rust-lang.github.io/rfcs/1598-generic_associated_types.html",
+  author="{Rust Traits Working Group}",
+  year = {2017}
+}
+
+@misc{rust_gat,
+  title="{Rust} {RFC} 1598: Generic Associated Types",
+  author="{Rust Traits Working Group}",
+  url = "https://rust-lang.github.io/rfcs/1598-generic_associated_types.html",
+  year = {2016}
+}
+
+@misc{hylo,
+  title="The {H}ylo programming language",
+  author="Dave Abrahams and Dimi Racordon",
+  url="https://www.hylo-lang.org",
+  year={2021}
+}
+
+@misc{hylorqm,
+  title="Implement a variant of {S}lava {P}estov's requirement machine",
+  author="Dimi Racordon",
+  url="https://github.com/hylo-lang/hylo/pull/1482",
+  year={2024}
+}
+
+@misc{llvmtalk,
+    author    = "John McCall and Slava Pestov",
+    title     = "Implementing {S}wift generics",
+    url       = "https://www.youtube.com/watch?v=ctS8FzqcRug",
+    year      = {2017}
+}
+
+@misc{cvwtalk,
+    author    = "Dario Rexin",
+    title     = "Compact value witnesses in {S}wift",
+    url       = "https://www.youtube.com/watch?v=ctS8FzqcRug",
+    year      = {2023}
+}
+
+@misc{siltalk,
+    author    = "Joe Groff and Chris Lattner",
+    title     = "{S}wift's High-Level {IR}: A Case Study",
+    url       = "https://www.youtube.com/watch?v=Ntj8ab-5cvE",
+    year      = {2015}
+}
+
+@misc(sil,
+    title     = "Swift Intermediate Language {(SIL)}",
+    url       = "https://github.com/swiftlang/swift/blob/main/docs/SIL.rst",
+    year      = {2016}
+)
+@misc(gensig,
+    author    = "Doug Gregor",
+    title     = "Generic Signatures",
+    url       = "https://github.com/swiftlang/swift/blob/main/docs/ABI/GenericSignature.md",
+    year      = {2018}
+)
+@misc(reqeval,
+    author    = "Doug Gregor",
+    title     = "Request evaluator",
+    url       = "https://github.com/swiftlang/swift/blob/main/docs/RequestEvaluator.md",
+    year      = {2018}
+)
+@misc(incremental,
+    author    = "Jordan Rose",
+    title     = "Dependency analysis",
+    url       = "https://github.com/swiftlang/swift/blob/main/docs/DependencyAnalysis.md",
+    year      = {2015}
+)
+@misc(mangling,
+    title     = "Mangling",
+    url       = "https://github.com/swiftlang/swift/blob/main/docs/ABI/Mangling.rst",
+    year      = {2012}
+)
+@misc{libraryevolution,
+    author    = "Jordan Rose and Slava Pestov",
+    title     = "Library Evolution",
+    url       = "https://github.com/swiftlang/swift/blob/main/docs/LibraryEvolution.rst",
+    year      = {2015}
+}
+@misc{rustturing,
+    author    = "Shea Leffler",
+    title     = "Rust's Type System is {Turing-Complete}",
+    url       = "https://sdleffler.github.io/RustTypeSystemTuringComplete/",
+    year      = {2017}
+}
+
+@misc{tscollatz,
+    author    = "Robbie Ostrow",
+    title     = "Taking Types Too Far",
+    url       = "https://ostro.ws/post-taking-types-too-far",
+    year      = {2019}
+}
+
+@misc{implrecursive,
+      title = "Implementing Recursive Protocol Constraints",
+      author = "Doug Gregor",
+      url = "https://gist.github.com/DougGregor/e7c4e7bb4465d6f5fa2b59be72dbdba6",
+      year = {2016}
+}
+
+@misc{swift57,
+  author = "Holly Borla",
+  title = "Swift 5.7 released",
+  year = {2022},
+  url = {https://www.swift.org/blog/swift-5.7-released/},
+}
+
+@misc{brainfuck,
+  author = {Keith Bauer},
+  title = {Brain{F}*** in the {S}wift type system},
+  url = {https://forums.swift.org/t/brainf-in-the-swift-type-system/68301},
+  year = {2023}
+}
+
+@misc{substfunctype,
+  author = {Joe Groff},
+  title = {Improving the representation of polymorphic interfaces in {SIL} with ``substituted function types''},
+  url = {https://forums.swift.org/t/improving-the-representation-of-polymorphic-interfaces-in-sil-with-substituted-function-types/29711},
+  year = {2019}
+}
+
+@misc{sr617,
+    title     = "{SR-617}: \texttt{Self} not always resolved dynamically with Generics",
+    url       = "https://github.com/swiftlang/swift/issues/43234",
+    year      = {2016}
+}
+@misc{sr631,
+    title     = "{SR-631}: Extensions in different files do not recognize each other",
+    url       = "https://github.com/swiftlang/swift/issues/43248",
+    year      = {2016}
+}
+@misc{sr4206,
+    title     = "{SR-4206}: Override checking does not properly enforce requirements",
+    url       = "https://github.com/swiftlang/swift/issues/46789",
+    year      = {2017}
+}
+@misc{sr6724,
+    title     = "{SR-6724}: Swift 4.1 crash when using conditional conformance",
+    url       = "https://github.com/swiftlang/swift/issues/49273",
+    year      = {2018}
+}
+@misc{sr12120,
+    title     = "{SR-12120}: Compiler forgets some constraints of {P} within extension to {P}, known bug?",
+    url       = "https://github.com/swiftlang/swift/issues/54555",
+    year      = {2020}
+}
+@misc{sr2235,
+    title     = "{SR-2235}: Redeclared associatedtype inference not working",
+    url       = "https://github.com/swiftlang/swift/issues/44842",
+    year      = {2016},
+}
+
+@misc{evolution,
+    title     = "Swift evolution process",
+    url       = "https://www.swift.org/swift-evolution/",
+    year      = {2016}
+}
+
+@misc{se0011,
+    author    = "Loïc Lecrenier",
+    title     = "{SE-0011}: Replace \texttt{typealias} keyword with \texttt{associatedtype} for associated type declarations",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0011-replace-typealias-associated.md",
+    year      = {2015}
+}
+@misc{se0021,
+    author    = "Doug Gregor",
+    title     = "{SE-0021}: Naming Functions with Argument Labels",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0021-generalized-naming.md",
+    year      = {2016}
+}
+@misc{se0029,
+    author    = "Chris Lattner",
+    title     = "{SE-0029}: Remove implicit tuple splat behavior from function applications",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0029-remove-implicit-tuple-splat.md",
+    year      = {2016}
+}
+@misc{se0035,
+    author    = "Joe Groff",
+    title     = "{SE-0035}: Limiting \texttt{inout} capture to \texttt{@noescape} contexts",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0035-limit-inout-capture.md",
+    year      = {2016}
+}
+@misc{se0048,
+    author    = "Chris Lattner",
+    title     = "{SE-0048}: Generic type aliases",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0048-generic-typealias.md",
+    year      = {2016}
+}
+@misc{se0066,
+    author    = "Chris Lattner",
+    title     = "{SE-0066}: Standardize function type argument syntax to require parentheses",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0066-standardize-function-type-syntax.md",
+    year      = {2016}
+}
+@misc{se0077,
+    author    = "Anton Zhilin",
+    title     = "{SE-0077}: Improved operator declarations",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0077-operator-precedence.md",
+    year      = {2016}
+}
+@misc{se0091,
+    author    = "Tony Allevato and Doug Gregor",
+    title     = "{SE-0091}: Improving operator requirements in protocols",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0091-improving-operators-in-protocols.md",
+    year      = {2016}
+}
+@misc{se0110,
+    author    = "Vladimir S. and Austin Zheng",
+    title     = "{SE-0110}: Distinguish between single-tuple and multiple-argument function types",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0110-distinguish-single-tuple-arg.md",
+    year      = {2016}
+}
+@misc{se0111,
+    author    = "Austin Zheng",
+    title     = "{SE-0111}: Remove type system significance of function argument labels",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0111-remove-arg-label-type-significance.md",
+    year      = {2016}
+}
+@misc{se0068,
+    author    = "Erica Sadun",
+    title     = "{SE-0068}: Expanding Swift \texttt{Self} to class members and value types",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0068-universal-self.md",
+    year      = {2016}
+}
+@misc{se0081,
+    author    = "David Hart and Robert Widmann and Pyry Jahkola",
+    title     = "{SE-0081}: Move \texttt{where} clause to end of declaration",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0081-move-where-expression.md",
+    year      = {2016}
+}
+@misc{se0092,
+    author    = "David Hart and Doug Gregor",
+    title     = "{SE-0092}: Typealiases in protocols and protocol extensions",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0092-typealiases-in-protocols.md",
+    year      = {2016}
+}
+@misc{se0095,
+    author    = "Adrian Zubarev and Austin Zheng",
+    title     = "{SE-0095}: Replace \texttt{protocol<P1,P2>} syntax with \texttt{P1 \& P2} syntax",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0095-any-as-existential.md",
+    year      = {2016}
+}
+@misc{se0103,
+    author    = "Trent Nadeau",
+    title     = "{SE-0103}: Make non-escaping closures the default",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0103-make-noescape-default.md",
+    year      = {2016}
+}
+@misc{se0142,
+    author    = "David Hart and Jacob Bandes-Storch and Doug Gregor",
+    title     = "{SE-0142}: Permit where clauses to constrain associated types",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0142-associated-types-constraints.md",
+    year      = {2017}
+}
+@misc{se0143,
+    author    = "Doug Gregor",
+    title     = "{SE-0143}: Conditional conformances",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0143-conditional-conformances.md",
+    year      = {2016}
+}
+@misc{se0148,
+    author    = "Chris Eidhof",
+    title     = "{SE-0148}: Generic subscripts",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0148-generic-subscripts.md",
+    year      = {2017}
+}
+@misc{se0156,
+    author    = "David Hart and Austin Zheng",
+    title     = "{SE-0156}: Class and subtype existentials",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0156-subclass-existentials.md",
+    year      = {2017}
+}
+@misc{se0157,
+    author    = "Doug Gregor and Erica Sadun and Austin Zheng",
+    title     = "{SE-0157}: Support recursive constraints on associated types",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0157-recursive-protocol-constraints.md",
+    year      = {2017}
+}
+@misc{se0193,
+    author    = "Slava Pestov",
+    title     = "{SE-0193}: Cross-module inlining and specialization",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0193-cross-module-inlining-and-specialization.md",
+    year      = {2018}
+}
+@misc{se0244,
+    author    = "Doug Gregor and Joe Groff",
+    title     = "{SE-0244}: Opaque result types",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0244-opaque-result-types.md",
+    year      = {2019}
+}
+@misc{se0252,
+    author    = "Doug Gregor and Pavel Yaskevich",
+    title     = "{SE-0252}: Key path member lookup",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0252-keypath-dynamic-member-lookup.md",
+    year      = {2019}
+}
+@misc{se0254,
+    author    = "Becca Royal-Gordon",
+    title     = "{SE-0254}: Static and class subscripts",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0254-static-subscripts.md",
+    year      = {2019}
+}
+@misc{se0260,
+    author    = "Jordan Rose and Ben Cohen",
+    title     = "{SE-0260}: Library Evolution for Stable {ABIs}",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0260-library-evolution.md",
+    year      = {2019}
+}
+@misc{se0261,
+    author    = "Anthony Latsis",
+    title     = "{SE-0261}: \texttt{where} clauses on contextually generic declarations",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0267-where-on-contextually-generic.md",
+    year      = {2019}
+}
+@misc{se0281,
+    author    = "Nate Cook and Nate Chandler and Matt Ricketson",
+    title     = "{SE-0281}: \texttt{@main}: Type-Based Program Entry Points",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0281-main-attribute.md",
+    year      = {2020}
+}
+
+@misc{se0296,
+    author    = "John McCall and Doug Gregor",
+    title     = "{SE-0296}: Async/await",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0296-async-await.md",
+    year      = {2020}
+}
+
+@misc{se0306,
+    author    = "John McCall and Doug Gregor and Konrad Malawski and Chris Lattner",
+    title     = "{SE-0306}: Actors",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0306-actors.md",
+    year      = {2020}
+}
+
+@misc{se0309,
+    author    = "Anthony Latsis and Filip Sakel and Suyash Srijan",
+    title     = "{SE-0309}: Unlock existentials for all protocols",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0309-unlock-existential-types-for-all-protocols.md",
+    year      = {2022}
+}
+@misc{se0315,
+    author    = "Frederick Kellison-Linn",
+    title     = "{SE-0315}: Type placeholders",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0315-placeholder-types.md",
+    year      = {2021}
+}
+@misc{se0328,
+    author    = "Benjamin Driscoll and Holly Borla",
+    title     = "{SE-0328}: Structural opaque result types",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0328-structural-opaque-result-types.md",
+    year      = {2021}
+}
+@misc{se0341,
+    author    = "Doug Gregor",
+    title     = "{SE-0341}: Opaque parameter declarations",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0341-opaque-parameters.md",
+    year      = {2022}
+}
+@misc{se0346,
+    author    = "Pavel Yaskevich and Holly Borla and Slava Pestov",
+    title     = "{SE-0346}: Lightweight same-type requirements for primary associated types",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0346-light-weight-same-type-syntax.md",
+    year      = {2022}
+}
+@misc{se0352,
+    author    = "Doug Gregor",
+    title     = "{SE-0352}: Implicitly opened existentials",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0352-implicit-open-existentials.md",
+    year      = {2022}
+}
+@misc{se0353,
+    author    = "Robert Widmann",
+    title     = "{SE-0353}: Constrained existential types",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0353-constrained-existential-types.md",
+    year      = {2022}
+}
+@misc{se0355,
+    author    = "Holly Borla",
+    title     = "{SE-0335}: Introduce existential \texttt{any}",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0335-existential-any.md",
+    year      = {2021}
+}
+@misc{se0361,
+    author    = "Holly Borla",
+    title     = "{SE-0361}: Extensions on bound generic types",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0361-bound-generic-extensions.md",
+    year      = {2022}
+}
+@misc{se0364,
+    author    = "Harlan Haskins",
+    title     = "{SE-0364}: Warning for Retroactive Conformances of External Types",
+    url       = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0364-retroactive-conformance-warning.md",
+    year      = {2023}
+}
+@misc{se0377,
+    author    = "Michael Gottesman and Joe Groff",
+    title     = "{SE-0377}: \texttt{borrowing} and \texttt{consuming} parameter ownership modifiers",
+    url = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0377-parameter-ownership-modifiers.md",
+    year      = {2023}
+}
+@misc{se0383,
+      author  = "Robert Widmann",
+      title   = "{SE-0383}: Deprecate {@UIApplicationMain} and {@NSApplicationMain}",
+      url = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0383-deprecate-uiapplicationmain-and-nsapplicationmain.md",
+      year    = {2023}
+}
+@misc{se0390,
+    author    = "Joe Groff and Michael Gottesman and Andrew Trick and Kavon Farvardin",
+    title     = "{SE-0390}: Noncopyable structs and enums",
+    url = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0390-noncopyable-structs-and-enums.md",
+    year      = {2023}
+}
+@misc{se0393,
+    author    = "Holly Borla and John McCall and Slava Pestov",
+    title     = "{SE-0393}: Value and Type Parameter Packs",
+    url = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0393-parameter-packs.md",
+    year      = {2023}
+}
+@misc{se0398,
+    author    = "Slava Pestov and Holly Borla",
+    title     = "{SE-0398}: Allow Generic Types to Abstract Over Packs",
+    url = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0398-variadic-types.md",
+    year      = {2023}
+}
+@misc{se0399,
+    author    = "Sophia Poirier and Holly Borla",
+    title     = "{SE-0399}: Tuple of value pack expansion",
+    url = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0399-tuple-of-value-pack-expansion.md",
+    year      = {2023}
+}
+@misc{se0404,
+    author    = "Karl Wagner",
+    title     = "{SE-0404}: Nested protocols",
+    url = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0404-nested-protocols.md",
+    year      = {2023}
+}
+@misc{se0413,
+    author    = "Jorge Revuelta and Torsten Lehmann and Doug Gregor",
+    title     = "{SE-0413}: Typed throws",
+    url = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0413-typed-throws.md",
+    year      = {2023}
+}
+@misc{se0427,
+    author    = "Kavon Farvardin and Tim Kientzle and Slava Pestov",
+    title     = "{SE-0427}: Noncopyable generics",
+    url = "https://github.com/swiftlang/swift-evolution/blob/main/proposals/0427-noncopyable-generics.md",
+    year      = {2024}
 }

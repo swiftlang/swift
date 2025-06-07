@@ -42,20 +42,24 @@ generate_revision_inc(llvm_revision_inc LLVM "${LLVM_MAIN_SRC_DIR}")
 generate_revision_inc(swift_revision_inc Swift "${SWIFT_SOURCE_DIR}")
 
 add_swift_host_library(swiftBasic STATIC
+  Assertions.cpp
   BasicBridging.cpp
   BasicSourceInfo.cpp
   Cache.cpp
+  CASOptions.cpp
   ClusteredBitVector.cpp
   DiverseStack.cpp
   Edit.cpp
   EditorPlaceholder.cpp
   ExponentialGrowthAppendingBinaryByteStream.cpp
+  Feature.cpp
   FileSystem.cpp
   FileTypes.cpp
   Fingerprint.cpp
   ParseableOutput.cpp
   JSONSerialization.cpp
   LangOptions.cpp
+  LoadDynamicLibrary.cpp
   Located.cpp
   Mangler.cpp
   OutputFileMap.cpp
@@ -65,16 +69,20 @@ add_swift_host_library(swiftBasic STATIC
   PrimitiveParsing.cpp
   Program.cpp
   QuotedString.cpp
+  Sandbox.cpp
+  SmallBitVector.cpp
   SourceLoc.cpp
   StableHasher.cpp
   Statistic.cpp
   StringExtras.cpp
+  SupportedFeatures.cpp
   TargetInfo.cpp
   TaskQueue.cpp
   ThreadSafeRefCounted.cpp
   Unicode.cpp
   UUID.cpp
   Version.cpp
+  BlockList.cpp
 
   ${llvm_revision_inc}
   ${clang_revision_inc}
@@ -86,11 +94,12 @@ add_swift_host_library(swiftBasic STATIC
   # Platform-agnostic fallback TaskQueue implementation
   Default/TaskQueue.inc
 
-  LLVM_LINK_COMPONENTS support)
+  LLVM_LINK_COMPONENTS support targetparser)
 _swift_gyb_target_sources(swiftBasic PRIVATE
     UnicodeExtendedGraphemeClusters.cpp.gyb)
 
 target_include_directories(swiftBasic PRIVATE
+  clangBasic
   ${UUID_INCLUDE})
 
 target_link_libraries(swiftBasic PUBLIC
@@ -98,6 +107,7 @@ target_link_libraries(swiftBasic PUBLIC
 target_link_libraries(swiftBasic PRIVATE
   ${UUID_LIBRARIES})
 
+include(${CMAKE_CURRENT_LIST_DIR}/../../cmake/SwiftVersion.cmake)
 message(STATUS "Swift version: ${SWIFT_VERSION}")
 message(STATUS "Swift vendor: ${SWIFT_VENDOR}")
 
@@ -124,10 +134,8 @@ if(NOT "${SWIFT_VENDOR}" STREQUAL "")
       " -DSWIFT_VENDOR=\"\\\"${SWIFT_VENDOR}\\\"\"")
 endif()
 
-set(SWIFT_COMPILER_VERSION "" CACHE STRING
-    "The string that identifies the SCM commit(s) for this build")
-
 message(STATUS "Swift compiler version: ${SWIFT_COMPILER_VERSION}")
+message(STATUS "Swift toolchain version: ${SWIFT_TOOLCHAIN_VERSION}")
 message(STATUS "Embedded clang compiler version: ${CLANG_COMPILER_VERSION}")
 
 if(SWIFT_COMPILER_VERSION)
@@ -140,3 +148,7 @@ if(CLANG_COMPILER_VERSION)
     " -DCLANG_COMPILER_VERSION=\"\\\"${CLANG_COMPILER_VERSION}\\\"\"")
 endif()
 
+if(SWIFT_TOOLCHAIN_VERSION)
+  set_property(SOURCE Version.cpp APPEND_STRING PROPERTY COMPILE_FLAGS
+    " -DSWIFT_TOOLCHAIN_VERSION=\"\\\"${SWIFT_TOOLCHAIN_VERSION}\\\"\"")
+endif()

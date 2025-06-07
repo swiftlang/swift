@@ -18,7 +18,7 @@ class MyObject : NSObject {
   // LOC-CHECK: ret
   @objc var MyArr = NSArray()
   // IMPORT-CHECK: filename: "{{.*}}test-foundation.swift"
-  // IMPORT-CHECK-DAG: [[FOUNDATION:[0-9]+]] = !DIModule({{.*}} name: "Foundation",{{.*}} includePath: {{.*}}Foundation.framework
+  // IMPORT-CHECK-DAG: [[FOUNDATION:[0-9]+]] = !DIModule({{.*}} name: "Foundation",{{.*}} includePath: {{.*}}Foundation.framework"
   // IMPORT-CHECK-DAG: [[OVERLAY:[0-9]+]] = !DIModule({{.*}} name: "Foundation",{{.*}} includePath: {{.*}}Foundation.swiftmodule
   // IMPORT-CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "NSArray", scope: ![[NSARRAY:[0-9]+]]
   //  IMPORT-CHECK-DAG: ![[NSARRAY]] = !DIModule(scope: ![[FOUNDATION:[0-9]+]], name: "NSArray"
@@ -26,10 +26,9 @@ class MyObject : NSObject {
   // directly.
   // IMPORT-CHECK-DAG: !DIImportedEntity(tag: DW_TAG_imported_module, {{.*}}entity: ![[OVERLAY]]
 
-  // ALLOCCTOR-CHECK: ![[F:.*]] = !DIFile(filename: "<compiler-generated>",
-  // ALLOCCTOR-CHECK: distinct !DISubprogram(name: "init",
-  // ALLOCCTOR-CHECK-SAME:                   linkageName: "$sSo7NSArrayCABycfC",
-  // ALLOCCTOR-CHECK-SAME:                   file: ![[F]],
+  // ALLOCCTOR-CHECK: distinct !DISubprogram(name: "init", linkageName: "$sSo7NSArrayCABycfC"
+  // ALLOCCTOR-CHECK-SAME: file: ![[F:[0-9]+]],
+  // ALLOCCTOR-CHECK: ![[F]] = !DIFile(filename: "{{.*}}/NSArray.h",
   @objc func foo(_ obj: MyObject) {
     return obj.foo(obj)
   }

@@ -1,8 +1,3 @@
-module AccessSpecifiers {
-  header "access-specifiers.h"
-  requires cplusplus
-}
-
 module TypeClassification {
   header "type-classification.h"
   requires cplusplus
@@ -78,6 +73,11 @@ module ProtocolConformance {
   requires cplusplus
 }
 
+module Sendable {
+  header "sendable.h"
+  requires cplusplus
+}
+
 module StructuredBindingsGetMethod {
   header "structured-bindings-get-method.h"
   requires cplusplus
@@ -135,4 +135,26 @@ module ForwardDeclaredInNamespace {
 module ConformsTo {
   header "conforms-to.h"
   requires cplusplus
+}
+
+module CopyMoveAssignment {
+  header "copy-move-assignment.h"
+  requires cplusplus
+}
+
+module Closure {
+  header "closure.h"
+  requires cplusplus
+}
+
+module PIMPL {
+  header "pimpl.h"
+  requires cplusplus
+  export *
+}
+
+module SimpleStructs {
+  header "simple-structs.h"
+  requires cplusplus
+  export *
 }

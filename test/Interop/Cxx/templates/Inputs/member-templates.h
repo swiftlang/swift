@@ -50,6 +50,22 @@ struct HasTemplatedField {
   MyTemplatedStruct<int> x;
 };
 
+struct HasNestedInstantiation {
+  template <typename T>
+  struct MyNestedTemplatedStruct {};
+
+  using NestedInst = MyTemplatedStruct<MyNestedTemplatedStruct<int>>;
+};
+
+namespace NS {
+struct HasNestedInstantiation {
+  template <typename T>
+  struct MyNestedTemplatedStruct {};
+
+  using NestedInst = MyTemplatedStruct<MyNestedTemplatedStruct<int>>;
+};
+}
+
 template <typename A, typename R = TemplateClassWithMemberTemplates<A>>
 struct HasUninstantiatableTemplateMember {
   R *pointer; // R cannot be instantiated here, because R is an incomplete type,

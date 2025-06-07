@@ -1,0 +1,70 @@
+// RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -sil-combine-disable-alloc-stack-opts | %FileCheck %s
+// REQUIRES: swift_in_compiler
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class Klass {}
+
+struct Wrapper {
+  var val1: Klass
+  var val2: Klass
+}
+
+// CHECK-LABEL: sil [ossa] @test_destructure_struct1 : $@convention(thin) () -> () {
+// CHECK-NOT: destructure_struct
+// CHECK-LABEL: } // end sil function 'test_destructure_struct1'
+sil [ossa] @test_destructure_struct1 : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 100
+  %1 = struct $Int32(%0 : $Builtin.Int32)
+  (%2) = destructure_struct %1 : $Int32
+  apply undef(%2) : $@convention(thin) (Builtin.Int32) -> ()
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_destructure_struct2 : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+// CHECK-NOT: destructure_struct
+// CHECK-LABEL: } // end sil function 'test_destructure_struct2'
+sil [ossa] @test_destructure_struct2 : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %3 = struct $Wrapper(%0 : $Klass, %1 : $Klass)
+  debug_value %3 : $Wrapper
+  (%4, %5) = destructure_struct %3 : $Wrapper
+  apply undef(%4) : $@convention(thin) (@owned Klass) -> ()
+  destroy_value %5 : $Klass
+  %t = tuple ()
+  return %t : $()
+}
+ 
+// CHECK-LABEL: sil [ossa] @test_destructure_tuple1 : $@convention(thin) () -> () {
+// CHECK-NOT: destructure_tuple
+// CHECK-LABEL: } // end sil function 'test_destructure_tuple1'
+sil [ossa] @test_destructure_tuple1 : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int32, 100
+  %1 = integer_literal $Builtin.Int32, 200
+  %2 = tuple (%0 : $Builtin.Int32, %1 : $Builtin.Int32)
+  (%3, %4) = destructure_tuple %2 : $(Builtin.Int32, Builtin.Int32)
+  apply undef(%4) : $@convention(thin) (Builtin.Int32) -> ()
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_destructure_tuple2 : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+// CHECK-NOT: destructure_tuple
+// CHECK-LABEL: } // end sil function 'test_destructure_tuple2'
+sil [ossa] @test_destructure_tuple2 : $@convention(thin) (@owned Klass, @owned Klass) -> () {
+bb0(%0 : @owned $Klass, %1 : @owned $Klass):
+  %3 = tuple(%0 : $Klass, %1 : $Klass)
+  debug_value %3 : $(Klass, Klass)
+  (%4, %5) = destructure_tuple %3 : $(Klass, Klass)
+  apply undef(%4) : $@convention(thin) (@owned Klass) -> ()
+  destroy_value %5 : $Klass
+  %t = tuple ()
+  return %t : $()
+}
+

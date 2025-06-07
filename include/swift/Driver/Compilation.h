@@ -24,7 +24,6 @@
 #include "swift/Basic/OutputFileMap.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Driver/Driver.h"
-#include "swift/Driver/FineGrainedDependencyDriverGraph.h"
 #include "swift/Driver/Job.h"
 #include "swift/Driver/Util.h"
 #include "llvm/ADT/StringRef.h"
@@ -84,10 +83,9 @@ public:
     bool hadAbnormalExit;
     /// The exit code of this driver process.
     int exitCode;
-    /// The dependency graph built up during the compilation of this module.
-    ///
-    /// This data is used for cross-module module dependencies.
-    fine_grained_dependencies::ModuleDepGraph depGraph;
+
+    Result(bool hadAbnormalExit, int exitCode)
+        : hadAbnormalExit(hadAbnormalExit), exitCode(exitCode) {}
 
     Result(const Result &) = delete;
     Result &operator=(const Result &) = delete;
@@ -97,8 +95,7 @@ public:
 
     /// Construct a \c Compilation::Result from just an exit code.
     static Result code(int code) {
-      return Compilation::Result{false, code,
-                                 fine_grained_dependencies::ModuleDepGraph()};
+      return Compilation::Result{false, code};
     }
   };
 
@@ -166,32 +163,9 @@ private:
   /// These apply whether the compilation succeeds or fails. If the
   llvm::StringMap<PreserveOnSignal> TempFilePaths;
 
-  /// Write information about this compilation to this file.
-  ///
-  /// This is used for incremental builds.
-  std::string CompilationRecordPath;
-
-  /// A hash representing all the arguments that could trigger a full rebuild.
-  std::string ArgsHash;
-
-  /// When the build was started.
-  ///
-  /// This should be as close as possible to when the driver was invoked, since
-  /// it's used as a lower bound.
-  llvm::sys::TimePoint<> BuildStartTime;
-
-  /// The time of the last build.
-  ///
-  /// If unknown, this will be some time in the past.
-  llvm::sys::TimePoint<> LastBuildTime = llvm::sys::TimePoint<>::min();
-
   /// Indicates whether this Compilation should continue execution of subtasks
   /// even if they returned an error status.
   bool ContinueBuildingAfterErrors = false;
-
-  /// Indicates whether tasks should only be executed if their output is out
-  /// of date.
-  bool EnableIncrementalBuild;
 
   /// Indicates whether groups of parallel frontend jobs should be merged
   /// together and run in composite "batch jobs" when possible, to reduce
@@ -203,11 +177,11 @@ private:
 
   /// Overrides parallelism level and \c BatchSizeLimit, sets exact
   /// count of batches, if in batch-mode.
-  const Optional<unsigned> BatchCount;
+  const std::optional<unsigned> BatchCount;
 
   /// Overrides maximum batch size, if in batch-mode and not overridden
   /// by \c BatchCount.
-  const Optional<unsigned> BatchSizeLimit;
+  const std::optional<unsigned> BatchSizeLimit;
 
   /// True if temporary files should not be deleted.
   const bool SaveTemps;
@@ -252,17 +226,6 @@ public:
   const bool OnlyOneDependencyFile;
 
 private:
-  /// Helpful for debugging, but slows down the driver. So, only turn on when
-  /// needed.
-  const bool VerifyFineGrainedDependencyGraphAfterEveryImport;
-  /// Helpful for debugging, but slows down the driver. So, only turn on when
-  /// needed.
-  const bool EmitFineGrainedDependencyDotFileAfterEveryImport;
-
-  /// (experimental) Enable cross-module incremental build scheduling.
-  const bool EnableCrossModuleIncrementalBuild;
-
-private:
   template <typename T>
   static T *unwrap(const std::unique_ptr<T> &p) {
     return p.get();
@@ -280,22 +243,15 @@ public:
               std::unique_ptr<llvm::opt::InputArgList> InputArgs,
               std::unique_ptr<llvm::opt::DerivedArgList> TranslatedArgs,
               InputFileList InputsWithTypes,
-              std::string CompilationRecordPath,
-              StringRef ArgsHash, llvm::sys::TimePoint<> StartTime,
-              llvm::sys::TimePoint<> LastBuildTime,
               size_t FilelistThreshold,
-              bool EnableIncrementalBuild = false,
               bool EnableBatchMode = false,
               unsigned BatchSeed = 0,
-              Optional<unsigned> BatchCount = None,
-              Optional<unsigned> BatchSizeLimit = None,
+              std::optional<unsigned> BatchCount = std::nullopt,
+              std::optional<unsigned> BatchSizeLimit = std::nullopt,
               bool SaveTemps = false,
               bool ShowDriverTimeCompilation = false,
               std::unique_ptr<UnifiedStatsReporter> Stats = nullptr,
-              bool OnlyOneDependencyFile = false,
-              bool VerifyFineGrainedDependencyGraphAfterEveryImport = false,
-              bool EmitFineGrainedDependencyDotFileAfterEveryImport = false,
-              bool EnableCrossModuleIncrementalBuild = false);
+              bool OnlyOneDependencyFile = false);
   // clang-format on
   ~Compilation();
 
@@ -312,7 +268,7 @@ public:
   }
 
   UnwrappedArrayView<const Action> getActions() const {
-    return llvm::makeArrayRef(Actions);
+    return llvm::ArrayRef(Actions);
   }
 
   template <typename SpecificAction, typename... Args>
@@ -322,9 +278,7 @@ public:
     return newAction;
   }
 
-  UnwrappedArrayView<const Job> getJobs() const {
-    return llvm::makeArrayRef(Jobs);
-  }
+  UnwrappedArrayView<const Job> getJobs() const { return llvm::ArrayRef(Jobs); }
 
   /// To send job list to places that don't truck in fancy array views.
   std::vector<const Job *> getJobsSimply() const {
@@ -348,19 +302,6 @@ public:
     return DerivedOutputFileMap;
   }
 
-  bool getIncrementalBuildEnabled() const {
-    return EnableIncrementalBuild;
-  }
-  void disableIncrementalBuild(Twine why);
-
-  bool getVerifyFineGrainedDependencyGraphAfterEveryImport() const {
-    return VerifyFineGrainedDependencyGraphAfterEveryImport;
-  }
-
-  bool getEmitFineGrainedDependencyDotFileAfterEveryImport() const {
-    return EmitFineGrainedDependencyDotFileAfterEveryImport;
-  }
-
   bool getBatchModeEnabled() const {
     return EnableBatchMode;
   }
@@ -372,13 +313,6 @@ public:
     ContinueBuildingAfterErrors = Value;
   }
 
-  bool getShowIncrementalBuildDecisions() const {
-    return ShowIncrementalBuildDecisions;
-  }
-  void setShowIncrementalBuildDecisions(bool value = true) {
-    ShowIncrementalBuildDecisions = value;
-  }
-
   bool getShowJobLifecycle() const {
     return ShowJobLifecycle;
   }
@@ -388,10 +322,6 @@ public:
 
   bool getShowDriverTimeCompilation() const {
     return ShowDriverTimeCompilation;
-  }
-
-  bool getEnableCrossModuleIncrementalBuild() const {
-    return EnableCrossModuleIncrementalBuild;
   }
 
   size_t getFilelistThreshold() const {
@@ -415,7 +345,7 @@ public:
   /// True if extra work has to be done when tracing through the dependency
   /// graph, either in order to print dependencies or to collect statistics.
   bool getTraceDependencies() const {
-    return getShowIncrementalBuildDecisions() || getStatsReporter();
+    return getStatsReporter();
   }
 
   OutputLevel getOutputLevel() const {
@@ -426,17 +356,9 @@ public:
     return BatchSeed;
   }
 
-  llvm::sys::TimePoint<> getLastBuildTime() const {
-    return LastBuildTime;
-  }
+  std::optional<unsigned> getBatchCount() const { return BatchCount; }
 
-  Optional<unsigned> getBatchCount() const {
-    return BatchCount;
-  }
-
-  Optional<unsigned> getBatchSizeLimit() const {
-    return BatchSizeLimit;
-  }
+  std::optional<unsigned> getBatchSizeLimit() const { return BatchSizeLimit; }
 
   /// Requests the path to a file containing all input source files. This can
   /// be shared across jobs.
@@ -446,17 +368,6 @@ public:
   ///
   /// \sa types::isPartOfSwiftCompilation
   const char *getAllSourcesPath() const;
-
-  /// Retrieve the path to the external swift deps file.
-  ///
-  /// For cross-module incremental builds, this file contains the dependencies
-  /// from all the modules integrated over the prior build.
-  ///
-  /// Currently this patch is relative to the build record, but we may want
-  /// to allow the output file map to customize this at some point.
-  std::string getExternalSwiftDepsFilePath() const {
-    return CompilationRecordPath + ".external";
-  }
 
   /// Asks the Compilation to perform the Jobs which it knows about.
   ///

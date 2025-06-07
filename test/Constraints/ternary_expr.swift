@@ -51,13 +51,16 @@ useD1(i) // expected-error{{cannot convert value of type 'B' to expected argumen
 useD2(i) // expected-error{{cannot convert value of type 'B' to expected argument type 'D2'}}
 
 var x = true ? 1 : 0
-var y = 22 ? 1 : 0 // expected-error{{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+var y = 22 ? 1 : 0 // expected-error{{cannot convert value of type 'Int' to expected condition type 'Bool'}}
 
 _ = x ? x : x // expected-error {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
 _ = true ? x : 1.2 // expected-error {{result values in '? :' expression have mismatching types 'Int' and 'Double'}}
 
 _ = (x: true) ? true : false // expected-error {{cannot convert value of type '(x: Bool)' to expected condition type 'Bool'}}
 _ = (x: 1) ? true : false // expected-error {{cannot convert value of type '(x: Int)' to expected condition type 'Bool'}}
+
+func resultBool() -> Bool { true }
+_ = resultBool ? true : false // expected-error {{function 'resultBool' was used as a property; add () to call it}} {{15-15=()}}
 
 let ib: Bool! = false
 let eb: Bool? = .some(false)

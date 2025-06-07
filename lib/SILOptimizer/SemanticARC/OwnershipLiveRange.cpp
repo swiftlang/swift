@@ -13,6 +13,7 @@
 #include "OwnershipLiveRange.h"
 #include "OwnershipPhiOperand.h"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 
@@ -83,14 +84,14 @@ OwnershipLiveRange::OwnershipLiveRange(SILValue value)
       continue;
     }
 
-    // If we have a subclass of OwnershipForwardingMixin that doesnt directly
+    // If we have a subclass of ForwardingInstruction that doesnt directly
     // forward its operand to the result, treat the use as an unknown consuming
     // use.
     //
     // If we do not directly forward and we have an owned value (which we do
     // here), we could get back a different value. Thus we can not transform
     // such a thing from owned to guaranteed.
-    if (auto *i = OwnershipForwardingMixin::get(op->getUser())) {
+    if (auto *i = ForwardingInstruction::get(op->getUser())) {
       if (!i->preservesOwnership()) {
         tmpUnknownConsumingUses.push_back(op);
         continue;
@@ -105,8 +106,10 @@ OwnershipLiveRange::OwnershipLiveRange(SILValue value)
     // the users force the live range to be alive.
     if (!ti) {
       for (SILValue v : user->getResults()) {
-        if (v->getOwnershipKind() != OwnershipKind::Owned)
+        if (v->getOwnershipKind() != OwnershipKind::Owned &&
+            !isa<BorrowedFromInst>(user)) {
           continue;
+        }
         llvm::copy(v->getUses(), std::back_inserter(worklist));
       }
       continue;
@@ -147,7 +150,7 @@ OwnershipLiveRange::OwnershipLiveRange(SILValue value)
   llvm::copy(tmpForwardingConsumingUses, std::back_inserter(consumingUses));
   llvm::copy(tmpUnknownConsumingUses, std::back_inserter(consumingUses));
 
-  auto cUseArrayRef = llvm::makeArrayRef(consumingUses);
+  auto cUseArrayRef = llvm::ArrayRef(consumingUses);
   destroyingUses = cUseArrayRef.take_front(tmpDestroyingUses.size());
   ownershipForwardingUses = cUseArrayRef.slice(
       tmpDestroyingUses.size(), tmpForwardingConsumingUses.size());
@@ -166,7 +169,7 @@ void OwnershipLiveRange::insertEndBorrowsAtDestroys(
   //
   // TODO: Hoist this out?
   SILInstruction *inst = introducer.value->getDefiningInstruction();
-  Optional<ValueLifetimeAnalysis> analysis;
+  std::optional<ValueLifetimeAnalysis> analysis;
   if (!inst) {
     analysis.emplace(cast<SILArgument>(introducer.value),
                      getAllConsumingInsts());
@@ -296,6 +299,7 @@ static SILValue convertIntroducerToGuaranteed(OwnedValueIntroducer introducer) {
   case OwnedValueIntroducerKind::BeginApply:
   case OwnedValueIntroducerKind::TryApply:
   case OwnedValueIntroducerKind::LoadTake:
+  case OwnedValueIntroducerKind::Move:
   case OwnedValueIntroducerKind::FunctionArgument:
   case OwnedValueIntroducerKind::PartialApplyInit:
   case OwnedValueIntroducerKind::AllocBoxInit:

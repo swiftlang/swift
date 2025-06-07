@@ -19,12 +19,13 @@
 
 #include "ImportEnumInfo.h"
 #include "SwiftLookupTable.h"
-#include "swift/Basic/StringExtras.h"
-#include "swift/Basic/Version.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/Basic/StringExtras.h"
+#include "swift/Basic/Version.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "clang/Sema/Sema.h"
 
 namespace swift {
@@ -38,6 +39,8 @@ enum class ImportedAccessorKind : unsigned {
   PropertySetter,
   SubscriptGetter,
   SubscriptSetter,
+  DereferenceGetter,
+  DereferenceSetter,
 };
 enum { NumImportedAccessorKindBits = 3 };
 
@@ -228,12 +231,16 @@ class ImportedName {
 
     unsigned hasAsyncAlternateInfo: 1;
 
+    /// Whether this declaration had a custom name that was ignored because it
+    /// was invalid.
+    unsigned hasInvalidCustomName : 1;
+
     Info()
         : errorInfo(), selfIndex(), initKind(CtorInitializerKind::Designated),
           accessorKind(ImportedAccessorKind::None), hasCustomName(false),
           droppedVariadic(false), importAsMember(false), hasSelfIndex(false),
           hasErrorInfo(false), hasAsyncInfo(false),
-          hasAsyncAlternateInfo(false) {}
+          hasAsyncAlternateInfo(false), hasInvalidCustomName(false) {}
   } info;
 
 public:
@@ -261,21 +268,21 @@ public:
 
   /// For names that map Objective-C error handling conventions into
   /// throwing Swift methods, describes how the mapping is performed.
-  Optional<ForeignErrorConvention::Info> getErrorInfo() const {
+  std::optional<ForeignErrorConvention::Info> getErrorInfo() const {
     if (info.hasErrorInfo)
       return info.errorInfo;
-    return None;
+    return std::nullopt;
   }
 
   /// For names that map Objective-C methods with completion handlers into
   /// async Swift methods, describes how the mapping is performed.
-  Optional<ForeignAsyncConvention::Info> getAsyncInfo() const {
+  std::optional<ForeignAsyncConvention::Info> getAsyncInfo() const {
     if (info.hasAsyncInfo) {
       assert(!info.hasAsyncAlternateInfo
              && "both regular and alternate async info?");
       return info.asyncInfo;
     }
-    return None;
+    return std::nullopt;
   }
 
   /// For names with a variant that maps Objective-C methods with completion
@@ -286,26 +293,34 @@ public:
   /// and gives you the contents of \c getAsyncInfo() on the async method's
   /// name. It is not set on the async method's name, and it is not set if a
   /// non-async method doesn't have an async equivalent.
-  Optional<ForeignAsyncConvention::Info> getAsyncAlternateInfo() const {
+  std::optional<ForeignAsyncConvention::Info> getAsyncAlternateInfo() const {
     if (info.hasAsyncAlternateInfo) {
       assert(!info.hasAsyncInfo && "both regular and alternate async info?");
       return info.asyncInfo;
     }
-    return None;
+    return std::nullopt;
   }
 
   /// For a declaration name that makes the declaration into an
   /// instance member, the index of the "Self" parameter.
-  Optional<unsigned> getSelfIndex() const {
+  std::optional<unsigned> getSelfIndex() const {
     if (info.hasSelfIndex)
       return info.selfIndex;
-    return None;
+    return std::nullopt;
   }
+
+  /// Retrieve the base name as an identifier, including mapping special
+  /// names like 'init' or 'subscript' to identifiers.
+  Identifier getBaseIdentifier(ASTContext &ctx) const;
 
   /// Whether this name was explicitly specified via a Clang
   /// swift_name attribute.
   bool hasCustomName() const { return info.hasCustomName; }
   void setHasCustomName() { info.hasCustomName = true; }
+
+  /// Whether this declaration had a custom name that was ignored because it
+  /// was invalid.
+  bool hasInvalidCustomName() const { return info.hasInvalidCustomName; }
 
   /// Whether this was one of a special class of Objective-C
   /// initializers for which we drop the variadic argument rather
@@ -324,6 +339,8 @@ public:
     case ImportedAccessorKind::None:
     case ImportedAccessorKind::SubscriptGetter:
     case ImportedAccessorKind::SubscriptSetter:
+    case ImportedAccessorKind::DereferenceGetter:
+    case ImportedAccessorKind::DereferenceSetter:
       return false;
 
     case ImportedAccessorKind::PropertyGetter:
@@ -338,10 +355,29 @@ public:
     case ImportedAccessorKind::None:
     case ImportedAccessorKind::PropertyGetter:
     case ImportedAccessorKind::PropertySetter:
+    case ImportedAccessorKind::DereferenceGetter:
+    case ImportedAccessorKind::DereferenceSetter:
       return false;
 
     case ImportedAccessorKind::SubscriptGetter:
     case ImportedAccessorKind::SubscriptSetter:
+      return true;
+    }
+
+    llvm_unreachable("Invalid ImportedAccessorKind.");
+  }
+
+  bool isDereferenceAccessor() const {
+    switch (getAccessorKind()) {
+    case ImportedAccessorKind::None:
+    case ImportedAccessorKind::PropertyGetter:
+    case ImportedAccessorKind::PropertySetter:
+    case ImportedAccessorKind::SubscriptGetter:
+    case ImportedAccessorKind::SubscriptSetter:
+      return false;
+
+    case ImportedAccessorKind::DereferenceGetter:
+    case ImportedAccessorKind::DereferenceSetter:
       return true;
     }
 
@@ -387,11 +423,14 @@ class NameImporter {
   llvm::DenseMap<std::pair<const clang::ObjCInterfaceDecl *, char>,
                  std::unique_ptr<InheritedNameSet>> allProperties;
 
+  ClangImporter::Implementation *importerImpl;
+
 public:
   NameImporter(ASTContext &ctx, const PlatformAvailability &avail,
-               clang::Sema &cSema)
+               clang::Sema &cSema, ClangImporter::Implementation *importerImpl)
       : swiftCtx(ctx), availability(avail), clangSema(cSema),
-        enumInfos(clangSema.getPreprocessor()) {}
+        enumInfos(clangSema.getPreprocessor()),
+        importerImpl(importerImpl) {}
 
   /// Determine the Swift name for a Clang decl
   ImportedName importName(const clang::NamedDecl *decl,
@@ -427,6 +466,7 @@ public:
 
   ASTContext &getContext() { return swiftCtx; }
   const LangOptions &getLangOpts() const { return swiftCtx.LangOpts; }
+  ClangImporter::Implementation *getImporterImpl() { return importerImpl; }
 
   Identifier getIdentifier(StringRef name) {
     return swiftCtx.getIdentifier(name);
@@ -454,6 +494,10 @@ public:
                             clang::ObjCInterfaceDecl *classDecl,
                             bool forInstance);
 
+  /// Retrieve a purported custom name even if it is invalid.
+  static std::optional<StringRef>
+  findCustomName(const clang::Decl *decl, ImportNameVersion version);
+
 private:
   bool enableObjCInterop() const { return swiftCtx.LangOpts.EnableObjCInterop; }
 
@@ -470,24 +514,22 @@ private:
                          const clang::IdentifierInfo *proposedName,
                          const clang::TypedefNameDecl *cfTypedef);
 
-  Optional<ForeignErrorConvention::Info>
+  std::optional<ForeignErrorConvention::Info>
   considerErrorImport(const clang::ObjCMethodDecl *clangDecl,
                       StringRef &baseName,
                       SmallVectorImpl<StringRef> &paramNames,
                       ArrayRef<const clang::ParmVarDecl *> params,
                       bool isInitializer, bool hasCustomName);
 
-  Optional<ForeignAsyncConvention::Info>
-  considerAsyncImport(const clang::ObjCMethodDecl *clangDecl,
-                      StringRef baseName,
-                      SmallVectorImpl<StringRef> &paramNames,
-                      ArrayRef<const clang::ParmVarDecl *> params,
-                      bool isInitializer,
-                      Optional<unsigned> explicitCompletionHandlerParamIndex,
-                      CustomAsyncName customName,
-                      Optional<unsigned> completionHandlerFlagParamIndex,
-                      bool completionHandlerFlagIsZeroOnError,
-                      Optional<ForeignErrorConvention::Info> errorInfo);
+  std::optional<ForeignAsyncConvention::Info> considerAsyncImport(
+      const clang::ObjCMethodDecl *clangDecl, StringRef baseName,
+      SmallVectorImpl<StringRef> &paramNames,
+      ArrayRef<const clang::ParmVarDecl *> params, bool isInitializer,
+      std::optional<unsigned> explicitCompletionHandlerParamIndex,
+      CustomAsyncName customName,
+      std::optional<unsigned> completionHandlerFlagParamIndex,
+      bool completionHandlerFlagIsZeroOnError,
+      std::optional<ForeignErrorConvention::Info> errorInfo);
 
   EffectiveClangContext determineEffectiveContext(const clang::NamedDecl *,
                                                   const clang::DeclContext *,

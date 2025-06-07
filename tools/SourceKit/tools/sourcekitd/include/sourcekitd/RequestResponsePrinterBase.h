@@ -89,6 +89,8 @@ public:
     OS << Val;
   }
 
+  void visitDouble(double Val) { OS << Val; }
+
   void visitString(llvm::StringRef Str) {
     OS << '\"';
     // Avoid raw_ostream's write_escaped, we don't want to escape unicode

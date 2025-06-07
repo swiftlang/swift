@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle -primary-file %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -Xllvm -sil-full-demangle -primary-file %s | %FileCheck %s
 
 struct B {
   var i : Int, j : Float
@@ -30,7 +30,8 @@ struct D {
 // CHECK-LABEL: sil hidden [ossa] @$s19default_constructor1DV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (@thin D.Type) -> D
 // CHECK: [[THISBOX:%[0-9]+]] = alloc_box ${ var D }
 // CHECK: [[THIS:%[0-9]+]] = mark_uninit
-// CHECK: [[PB_THIS:%.*]] = project_box [[THIS]]
+// CHECK: [[THIS_LIFE:%.*]] = begin_borrow [var_decl] [[THIS]]
+// CHECK: [[PB_THIS:%.*]] = project_box [[THIS_LIFE]]
 // CHECK: [[IADDR:%[0-9]+]] = struct_element_addr [[PB_THIS]] : $*D, #D.i
 // CHECK: [[JADDR:%[0-9]+]] = struct_element_addr [[PB_THIS]] : $*D, #D.j
 // CHECK: [[INIT:%[0-9]+]] = function_ref @$s19default_constructor1DV1iSivpfi
@@ -71,7 +72,7 @@ class F : E { }
 // CHECK: bb0([[ORIGSELF:%[0-9]+]] : @owned $F)
 // CHECK-NEXT: [[SELF_BOX:%[0-9]+]] = alloc_box ${ var F }
 // CHECK-NEXT: [[SELF:%[0-9]+]] = mark_uninitialized [derivedself] [[SELF_BOX]]
-// CHECK-NEXT: [[SELFLIFE:%[^,]+]] = begin_borrow [lexical] [[SELF]]
+// CHECK-NEXT: [[SELFLIFE:%[^,]+]] = begin_borrow [lexical] [var_decl] [[SELF]]
 // CHECK-NEXT: [[PB:%.*]] = project_box [[SELFLIFE]]
 // CHECK-NEXT: store [[ORIGSELF]] to [init] [[PB]] : $*F
 // CHECK-NEXT: [[SELFP:%[0-9]+]] = load [take] [[PB]] : $*F
@@ -96,6 +97,7 @@ struct G {
 
 // CHECK-NOT: default_constructor.G.init()
 // CHECK-LABEL: default_constructor.G.init(bar: Swift.Optional<Swift.Int32>)
+// CHECK-NEXT: // Isolation:
 // CHECK-NEXT: sil hidden [ossa] @$s19default_constructor1GV{{[_0-9a-zA-Z]*}}fC
 // CHECK-NOT: default_constructor.G.init()
 

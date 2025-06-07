@@ -63,7 +63,7 @@ ASTScriptConfiguration::parse(CompilerInstance &compiler,
   // Parse the arguments.
   while (!hadError && !args.empty()) {
     StringRef arg = popArg(nullptr);
-    if (!arg.startswith("-")) {
+    if (!arg.starts_with("-")) {
       setScriptFile(arg);
     } else if (arg == "-f") {
       StringRef filename = popArg("expected path after -f");

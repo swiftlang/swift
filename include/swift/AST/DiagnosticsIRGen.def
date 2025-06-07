@@ -42,14 +42,14 @@ ERROR(no_input_files_for_mt,none,
       "no swift input files for multi-threaded compilation", ())
 
 ERROR(alignment_dynamic_type_layout_unsupported,none,
-      "@_alignment is not supported on types with dynamic layout", ())
+      "'@_alignment' is not supported on types with dynamic layout", ())
 ERROR(alignment_less_than_natural,none,
-      "@_alignment cannot decrease alignment below natural alignment of %0",
+      "'@_alignment' cannot decrease alignment below natural alignment of %0",
       (unsigned))
 ERROR(alignment_more_than_maximum,none,
-      "@_alignment cannot increase alignment above maximum alignment of %0",
+      "'@_alignment' cannot increase alignment above maximum alignment of %0",
       (unsigned))
-
+      
 ERROR(temporary_allocation_size_negative,none,
       "allocation capacity must be greater than or equal to zero", ())
 ERROR(temporary_allocation_size_overflow,none,
@@ -58,6 +58,27 @@ ERROR(temporary_allocation_alignment_not_positive,none,
       "alignment value must be greater than zero", ())
 ERROR(temporary_allocation_alignment_not_power_of_2,none,
       "alignment value must be a power of two", ())
+
+ERROR(explosion_size_oveflow,none,
+      "explosion size too large", ())
+
+NOTE(layout_strings_blocked,none,
+     "Layout string value witnesses have been disabled for module '%0' "
+     "through block list entry", (StringRef))
+
+ERROR(attr_objc_implementation_resilient_property_not_supported, none,
+      "'@implementation' does not support stored properties whose size can "
+      "change due to library evolution; store this value in an object or 'any' "
+      "type",
+      ())
+ERROR(attr_objc_implementation_resilient_property_deployment_target, none,
+      "'@implementation' on %0 %1 does not support stored properties whose "
+      "size can change due to library evolution; raise the minimum deployment "
+      "target to %0 %2 or store this value in an object or 'any' type",
+      (AvailabilityDomain, const AvailabilityRange, const AvailabilityRange))
+
+ERROR(unable_to_load_pass_plugin,none,
+      "unable to load plugin '%0': '%1'", (StringRef, StringRef))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

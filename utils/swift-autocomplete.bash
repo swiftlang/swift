@@ -8,6 +8,10 @@ _swift_complete()
   local tool currentWord prevWord
 
   tool="${COMP_WORDS[0]}"
+  if alias "$tool" >/dev/null; then
+    tool=`alias "$tool" | sed "s/.*'\\(.*\\)'.*/\\1/"`
+  fi
+  
   currentWord="${COMP_WORDS[COMP_CWORD]}"
   prevWord="${COMP_WORDS[COMP_CWORD-1]}"
 
@@ -39,7 +43,6 @@ _swift_complete()
       -disable-sil-ownership-verification \
       -dont-abort-on-memory-lifetime-errors \
       -enable-abc-hoisting \
-      -enable-abcopts \
       -enable-accessed-storage-dump-uses \
       -enable-copyforwarding \
       -enable-destroyhoisting \
@@ -57,7 +60,6 @@ _swift_complete()
       -keep-will-throw-call \
       -looprotate-single-block-loop \
       -looprotate-size-limit \
-      -lslocation-dump-use-new-projection \
       -max-local-apply-recur-depth \
       -max-partial-store-count \
       -optimize-opaque-address-lowering \
@@ -65,7 +67,7 @@ _swift_complete()
       -optremarkgen-visit-implicit-autogen-funcs \
       -print-shortest-path-info \
       -print-swift-mangling-stats \
-      -sil-abcopts-report \
+      -sil-bcopts-report \
       -sil-aggressive-inline \
       -sil-assert-on-exclusivity-failure \
       -sil-break-on-function \
@@ -91,9 +93,9 @@ _swift_complete()
       -sil-loop-region-view-cfg-only-function \
       -sil-loop-region-view-cfg-only-functions \
       -sil-lower-agg-instrs-expand-all \
-      -sil-mandatory-combine-enable-canon-and-simple-dce \
       -sil-merge-stack-slots \
       -sil-opt-pass-count \
+      -sil-pass-count-config-file \
       -sil-opt-remark-ignore-always-infer \
       -sil-optimized-access-markers \
       -sil-ownership-verifier-enable-testing \

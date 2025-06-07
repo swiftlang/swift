@@ -77,16 +77,21 @@ private:
 
     /// Used in the setup function to walk over the CFG.
     bool visited = false;
+
+    /// True for dead-end blocks, i.e. blocks from which there is no path to
+    /// a function exit, e.g. blocks which end with `unreachable` or an
+    /// infinite loop.
+    bool isDeadEnd = false;
   };
 
   /// Data stored for each stack location (= allocation).
   ///
   /// Each stack location is allocated by a single allocation instruction.
   struct StackLoc {
-    StackLoc(SingleValueInstruction *Alloc) : Alloc(Alloc) { }
+    StackLoc(SILInstruction *Alloc) : Alloc(Alloc) {}
 
     /// Back-link to the allocation instruction.
-    SingleValueInstruction *Alloc;
+    SILInstruction *Alloc;
 
     /// Bit-set which represents all alive locations at this allocation.
     /// It obviously includes this location itself. And it includes all "outer"
@@ -95,7 +100,7 @@ private:
   };
 
   /// Mapping from stack allocations (= locations) to bit numbers.
-  llvm::DenseMap<SingleValueInstruction *, unsigned> StackLoc2BitNumbers;
+  llvm::DenseMap<SILInstruction *, unsigned> StackLoc2BitNumbers;
 
   /// The list of stack locations. The index into this array is also the bit
   /// number in the bit-sets.
@@ -137,19 +142,29 @@ private:
   /// Returns true if any deallocations were inserted.
   bool insertDeallocs(const BitVector &AliveBefore, const BitVector &AliveAfter,
                       SILInstruction *InsertionPoint,
-                      Optional<SILLocation> Location);
+                      std::optional<SILLocation> Location);
 
   /// Returns the location bit number for a stack allocation instruction.
   int bitNumberForAlloc(SILInstruction *AllocInst) {
     assert(AllocInst->isAllocatingStack());
-    return StackLoc2BitNumbers[cast<SingleValueInstruction>(AllocInst)];
+    return StackLoc2BitNumbers[AllocInst];
   }
 
   /// Returns the location bit number for a stack deallocation instruction.
   int bitNumberForDealloc(SILInstruction *DeallocInst) {
     assert(DeallocInst->isDeallocatingStack());
-    auto *AllocInst = cast<SingleValueInstruction>(DeallocInst->getOperand(0));
+    auto *AllocInst = getAllocForDealloc(DeallocInst);
     return bitNumberForAlloc(AllocInst);
+  }
+
+  /// Returns the stack allocation instruction for a stack deallocation
+  /// instruction.
+  SILInstruction *getAllocForDealloc(SILInstruction *Dealloc) const {
+    SILValue op = Dealloc->getOperand(0);
+    while (auto *mvi = dyn_cast<MoveValueInst>(op)) {
+      op = mvi->getOperand();
+    }
+    return op->getDefiningInstruction();
   }
 
   /// Insert deallocations at block boundaries.

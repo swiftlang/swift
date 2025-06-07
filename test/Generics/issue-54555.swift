@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -debug-generic-signatures -warn-redundant-requirements 2>&1 | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -debug-generic-signatures 2>&1 | %FileCheck %s
 
 // https://github.com/apple/swift/issues/54555
 
@@ -8,7 +8,7 @@ protocol Swappable1 {
   associatedtype A
   associatedtype B
   associatedtype Swapped : Swappable1
-    where Swapped.B == A, // expected-warning {{redundant same-type constraint 'Self.Swapped.B' == 'Self.A'}}
+    where Swapped.B == A,
           Swapped.A == B,
           Swapped.Swapped == Self
 }

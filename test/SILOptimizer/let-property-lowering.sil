@@ -1,0 +1,313 @@
+// RUN: %target-sil-opt -sil-print-types  %s -update-borrowed-from -let-property-lowering | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+
+class C {
+  @_hasStorage let a: Int
+}
+
+class B {
+}
+
+class D : B {
+  @_hasStorage let a: Int
+}
+
+class E {
+  @_hasStorage let a: Int
+  @_hasStorage let b: Int
+  @_hasStorage var c: Int
+}
+
+sil @unknown_func : $@convention(thin) (@guaranteed C) -> ()
+
+// CHECK-LABEL: sil [ossa] @test_init_store :
+// CHECK:         ref_element_addr %3
+// CHECK-NEXT:    store
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    [[EI:%.*]] = end_init_let_ref %2
+// CHECK-NEXT:    [[B:%.*]] = begin_borrow [[EI]]
+// CHECK-NEXT:    [[A:%.*]] = ref_element_addr [immutable] [[B]]
+// CHECK-NEXT:    load [trivial] [[A]]
+// CHECK:         return [[EI]]
+// CHECK:       } // end sil function 'test_init_store'
+sil [ossa] @test_init_store : $@convention(thin) (@owned C, Int) -> @owned C {
+bb0(%0 : @owned $C, %1 : $Int):
+  %2 = mark_uninitialized [rootself] %0 : $C
+  %3 = begin_borrow %2 : $C
+  %4 = ref_element_addr %3 : $C, #C.a
+  store %1 to [trivial] %4 : $*Int
+  end_borrow %3 : $C
+  %7 = begin_borrow %2 : $C
+  %8 = ref_element_addr %7 : $C, #C.a
+  %9 = load [trivial] %8 : $*Int
+  end_borrow %7 : $C
+  return %2 : $C
+}
+
+// CHECK-LABEL: sil [ossa] @test_let_read :
+// CHECK:         ref_element_addr [immutable] %0
+// CHECK:       } // end sil function 'test_let_read'
+sil [ossa] @test_let_read : $@convention(thin) (@guaranteed C) -> Int {
+bb0(%0 : @guaranteed $C):
+  %1 = ref_element_addr %0 : $C, #C.a
+  %2 = load [trivial] %1 : $*Int
+  return %2 : $Int
+}
+
+// CHECK-LABEL: sil [ossa] @test_init_assign :
+// CHECK:         ref_element_addr %3
+// CHECK-NEXT:    assign
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    [[EI:%.*]] = end_init_let_ref %2
+// CHECK-NEXT:    [[B:%.*]] = begin_borrow [[EI]]
+// CHECK-NEXT:    [[A:%.*]] = ref_element_addr [immutable] [[B]]
+// CHECK-NEXT:    load [trivial] [[A]]
+// CHECK:         return [[EI]]
+// CHECK:       } // end sil function 'test_init_assign'
+sil [ossa] @test_init_assign : $@convention(thin) (@owned C, Int) -> @owned C {
+bb0(%0 : @owned $C, %1 : $Int):
+  %2 = mark_uninitialized [rootself] %0 : $C
+  %3 = begin_borrow %2 : $C
+  %4 = ref_element_addr %3 : $C, #C.a
+  assign %1 to [init] %4 : $*Int
+  end_borrow %3 : $C
+  %7 = begin_borrow %2 : $C
+  %8 = ref_element_addr %7 : $C, #C.a
+  %9 = load [trivial] %8 : $*Int
+  end_borrow %7 : $C
+  return %2 : $C
+}
+
+// CHECK-LABEL: sil [ossa] @test_init_copy_addr :
+// CHECK:         ref_element_addr %3
+// CHECK-NEXT:    copy_addr
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    [[EI:%.*]] = end_init_let_ref %2
+// CHECK-NEXT:    [[B:%.*]] = begin_borrow [[EI]]
+// CHECK-NEXT:    [[A:%.*]] = ref_element_addr [immutable] [[B]]
+// CHECK-NEXT:    load [trivial] [[A]]
+// CHECK:         return [[EI]]
+// CHECK:       } // end sil function 'test_init_copy_addr'
+sil [ossa] @test_init_copy_addr : $@convention(thin) (@owned C, @in Int) -> @owned C {
+bb0(%0 : @owned $C, %1 : $*Int):
+  %2 = mark_uninitialized [rootself] %0 : $C
+  %3 = begin_borrow %2 : $C
+  %4 = ref_element_addr %3 : $C, #C.a
+  copy_addr %1 to [init] %4 : $*Int
+  end_borrow %3 : $C
+  %7 = begin_borrow %2 : $C
+  %8 = ref_element_addr %7 : $C, #C.a
+  %9 = load [trivial] %8 : $*Int
+  end_borrow %7 : $C
+  return %2 : $C
+}
+
+// CHECK-LABEL: sil [ossa] @test_empty :
+// CHECK:         %1 = mark_uninitialized [rootself] %0
+// CHECK-NEXT:    %2 = end_init_let_ref %1
+// CHECK:         return %2
+// CHECK:       } // end sil function 'test_empty'
+sil [ossa] @test_empty : $@convention(thin) (@owned C) -> @owned C {
+bb0(%0 : @owned $C):
+  %1 = mark_uninitialized [rootself] %0 : $C
+  return %1 : $C
+}
+
+// CHECK-LABEL: sil [ossa] @test_multiple_fields :
+// CHECK:         ref_element_addr {{.*}}, #E.a
+// CHECK:         ref_element_addr {{.*}}, #E.b
+// CHECK:         end_borrow
+// CHECK-NEXT:    [[EI:%.*]] = end_init_let_ref
+// CHECK-NEXT:    begin_borrow [[EI]]
+// CHECK:         ref_element_addr {{.*}}, #E.c
+// CHECK:         return [[EI]]
+// CHECK:       } // end sil function 'test_multiple_fields'
+sil [ossa] @test_multiple_fields : $@convention(thin) (@owned E, Int) -> @owned E {
+bb0(%0 : @owned $E, %1 : $Int):
+  %2 = mark_uninitialized [rootself] %0 : $E
+  %3 = begin_borrow %2 : $E
+  %4 = ref_element_addr %3 : $E, #E.a
+  store %1 to [trivial] %4 : $*Int
+  end_borrow %3 : $E
+  %6 = begin_borrow %2 : $E
+  %7 = ref_element_addr %6 : $E, #E.b
+  store %1 to [trivial] %7 : $*Int
+  end_borrow %6 : $E
+  %10 = begin_borrow %2 : $E
+  %11 = ref_element_addr %10 : $E, #E.c
+  store %1 to [trivial] %11 : $*Int
+  end_borrow %10 : $E
+  return %2 : $E
+}
+
+// CHECK-LABEL: sil [ossa] @test_derived :
+// CHECK-NOT:     end_init_let_ref
+// CHECK:         [[B:%.*]] = load_borrow
+// CHECK-NEXT:    ref_element_addr [[B]]
+// CHECK-NOT:     end_init_let_ref
+// CHECK:       } // end sil function 'test_derived'
+sil [ossa] @test_derived : $@convention(thin) (@owned D, Int) -> @owned D {
+bb0(%0 : @owned $D, %1 : $Int):
+  %2 = alloc_stack $D
+  %3 = mark_uninitialized [derivedself] %2 : $*D
+  store %0 to [init] %3 : $*D
+  %5 = load_borrow %3 : $*D
+  %6 = ref_element_addr %5 : $D, #D.a
+  assign %1 to [init] %6 : $*Int
+  end_borrow %5 : $D
+  %9 = load [take] %2 : $*D
+  dealloc_stack %2 : $*D
+  return %9 : $D
+}
+
+// CHECK-LABEL: sil [ossa] @test_multi_block1 :
+// CHECK:       bb1:
+// CHECK:         end_borrow
+// CHECK-NEXT:    [[EI1:%.*]] = end_init_let_ref %2
+// CHECK-NEXT:    br bb3([[EI1]] : $C)
+// CHECK:       bb2:
+// CHECK:         end_borrow
+// CHECK-NEXT:    [[EI2:%.*]] = end_init_let_ref %2
+// CHECK-NEXT:    br bb3([[EI2]] : $C)
+// CHECK:       bb3([[P:%.*]] : @owned $C):
+// CHECK-NEXT:    return [[P]]
+// CHECK:       } // end sil function 'test_multi_block1'
+sil [ossa] @test_multi_block1 : $@convention(thin) (@owned C, Int) -> @owned C {
+bb0(%0 : @owned $C, %1 : $Int):
+  %2 = mark_uninitialized [rootself] %0 : $C
+  cond_br undef, bb1, bb2
+bb1:
+  %3 = begin_borrow %2 : $C
+  %4 = ref_element_addr %3 : $C, #C.a
+  store %1 to [trivial] %4 : $*Int
+  end_borrow %3 : $C
+  br bb3
+bb2:
+  %7 = begin_borrow %2 : $C
+  %8 = ref_element_addr %7 : $C, #C.a
+  store %1 to [trivial] %8 : $*Int
+  end_borrow %7 : $C
+  br bb3
+bb3:
+  return %2 : $C
+}
+
+// CHECK-LABEL: sil [ossa] @test_multi_block2 :
+// CHECK:       bb1:
+// CHECK:         end_borrow
+// CHECK-NEXT:    end_init_let_ref %2
+// CHECK:       bb2:
+// CHECK-NEXT:    end_init_let_ref %2
+// CHECK-NEXT:    unreachable
+// CHECK:       bb3:
+// CHECK:       } // end sil function 'test_multi_block2'
+sil [ossa] @test_multi_block2 : $@convention(thin) (@owned C, Int) -> @owned C {
+bb0(%0 : @owned $C, %1 : $Int):
+  %2 = mark_uninitialized [rootself] %0 : $C
+  cond_br undef, bb1, bb2
+bb1:
+  %3 = begin_borrow %2 : $C
+  %4 = ref_element_addr %3 : $C, #C.a
+  store %1 to [trivial] %4 : $*Int
+  end_borrow %3 : $C
+  br bb3
+bb2:
+  unreachable
+bb3:
+  return %2 : $C
+}
+// CHECK-LABEL: sil [ossa] @test_partial_deinitialization :
+// CHECK:       bb1:
+// CHECK:         end_borrow
+// CHECK-NEXT:    end_init_let_ref %2
+// CHECK:       bb2:
+// CHECK:         end_borrow
+// CHECK-NEXT:    end_init_let_ref %2
+// CHECK:       bb3:
+// CHECK:       } // end sil function 'test_partial_deinitialization'
+sil [ossa] @test_partial_deinitialization : $@convention(thin) (@owned C, Int) -> @owned C {
+bb0(%0 : @owned $C, %1 : $Int):
+  %2 = mark_uninitialized [rootself] %0 : $C
+  cond_br undef, bb1, bb2
+bb1:
+  %3 = begin_borrow %2 : $C
+  %4 = ref_element_addr %3 : $C, #C.a
+  store %1 to [trivial] %4 : $*Int
+  end_borrow %3 : $C
+  br bb3
+bb2:
+  %7 = begin_borrow %2 : $C
+  %8 = ref_element_addr %7 : $C, #C.a
+  %9 = begin_access [deinit] [static] %8 : $*Int
+  destroy_addr %9 : $*Int
+  end_access %9 : $*Int
+  end_borrow %7 : $C
+  unreachable
+bb3:
+  return %2 : $C
+}
+
+// CHECK-LABEL: sil [ossa] @test_store_borrow :
+// CHECK:       bb1:
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    end_init_let_ref %2
+// CHECK:       bb2:
+// CHECK:         end_borrow {{%[0-9]}} : $*C
+// CHECK:         [[B:%.*]] = begin_borrow %2
+// CHECK:         end_borrow [[B]] : $C
+// CHECK-NEXT:    end_init_let_ref %2
+// CHECK:       } // end sil function 'test_store_borrow'
+sil [ossa] @test_store_borrow : $@convention(thin) (@owned C, Int) -> @owned C {
+bb0(%0 : @owned $C, %1 : $Int):
+  %2 = mark_uninitialized [rootself] %0 : $C
+  %3 = begin_borrow %2 : $C
+  %4 = ref_element_addr %3 : $C, #C.a
+  store %1 to [trivial] %4 : $*Int
+  end_borrow %3 : $C
+  %10 = alloc_stack $C
+  %11 = store_borrow %2 to %10 : $*C
+  cond_br undef, bb1, bb2
+bb1:
+  end_borrow %11 : $*C
+  dealloc_stack %10 : $*C
+  return %2 : $C
+bb2:
+  end_borrow %11 : $*C
+  %17 = begin_borrow %2 : $C
+  %18 = ref_element_addr %17 : $C, #C.a
+  %19 = begin_access [deinit] [static] %18 : $*Int
+  destroy_addr %19 : $*Int
+  end_access %19 : $*Int
+  end_borrow %17 : $C
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @test_reborrow :
+// CHECK:       bb1([[A:%.*]] : @reborrow $C):
+// CHECK:         [[R:%.*]] = borrowed [[A]] : $C from (%2 : $C)
+// CHECK:         end_borrow [[R]]
+// CHECK-NEXT:    end_init_let_ref %2
+// CHECK:       } // end sil function 'test_reborrow'
+sil [ossa] @test_reborrow : $@convention(thin) (@owned C, Int) -> @owned C {
+bb0(%0 : @owned $C, %1 : $Int):
+  %2 = mark_uninitialized [rootself] %0 : $C
+  %3 = begin_borrow %2 : $C
+  %4 = ref_element_addr %3 : $C, #C.a
+  store %1 to [trivial] %4 : $*Int
+  br bb1(%3 : $C)
+bb1(%3a : @reborrow $C):
+  end_borrow %3a : $C
+  %7 = begin_borrow %2 : $C
+  %8 = ref_element_addr %7 : $C, #C.a
+  %9 = load [trivial] %8 : $*Int
+  end_borrow %7 : $C
+  return %2 : $C
+}
+

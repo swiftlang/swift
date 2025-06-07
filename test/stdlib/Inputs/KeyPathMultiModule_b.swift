@@ -1,5 +1,18 @@
 import StdlibUnittest
 
+// rdar://125886333
+public struct GenericExternalKeyPathTest<E> {
+    public private(set) var property: String {
+        get {
+            return "\(E.self)"
+        }
+        set {
+        }
+    }
+
+    public init() {}
+}
+
 public struct A {
   public var x: Int { return 0 }
 

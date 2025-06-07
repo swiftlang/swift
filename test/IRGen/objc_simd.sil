@@ -26,6 +26,7 @@ func forceStuff(x: float4, y: float3) -> (Float, Float, Float, Float) {
 // powerpc64-LABEL: define{{( dllexport)?}}{{( protected)?}} <4 x float> @simd_c_args(<4 x float> %0)
 // powerpc64le-LABEL: define{{( dllexport)?}}{{( protected)?}} <4 x float> @simd_c_args(<4 x float> %0)
 // s390x-LABEL: define{{( dllexport)?}}{{( protected)?}} <4 x float> @simd_c_args(<4 x float> %0)
+// wasm32-LABEL: define{{( dllexport)?}}{{( protected)?}} <4 x float> @simd_c_args(<4 x float> %0)
 sil @simd_c_args : $@convention(c) (float4) -> float4 {
 entry(%x : $float4):
   return %x : $float4
@@ -47,26 +48,27 @@ entry(%x : $float4):
 // powerpc64-LABEL: define{{( dllexport)?}}{{( protected)?}} <3 x float> @simd_c_args_float3(<3 x float> %0)
 // powerpc64le-LABEL: define{{( dllexport)?}}{{( protected)?}} <3 x float> @simd_c_args_float3(<3 x float> %0)
 // s390x-LABEL: define{{( dllexport)?}}{{( protected)?}} <3 x float> @simd_c_args_float3(<3 x float> %0)
+// wasm32-LABEL: define{{( dllexport)?}}{{( protected)?}} <3 x float> @simd_c_args_float3(<3 x float> %0)
 sil @simd_c_args_float3 : $@convention(c) (float3) -> float3 {
 entry(%x : $float3):
 // x86_64: [[COERCE:%.*]] = alloca <3 x float>, align 16
-// x86_64: store <3 x float> %0, <3 x float>* [[COERCE]]
-// x86_64: [[COERCED:%.*]] = bitcast <3 x float>* [[COERCE]] to %T4simd6float3V*
+// x86_64: store <3 x float> %0, ptr [[COERCE]]
   return %x : $float3
 }
 
 // x86_64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { float, float, float, float } @simd_native_args(float %0, float %1, float %2, float %3)
-// i386-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @simd_native_args(%T4simd6float4V* noalias nocapture sret({{.*}}) %0, %T4simd6float4V* noalias nocapture dereferenceable({{.*}}) %1)
+// i386-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @simd_native_args(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr noalias {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %1)
 // aarch64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { float, float, float, float } @simd_native_args(float %0, float %1, float %2, float %3)
 // arm64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { float, float, float, float } @simd_native_args(float %0, float %1, float %2, float %3)
-// armv6-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @simd_native_args(%T4simd6float4V* noalias nocapture sret({{.*}}) %0, %T4simd6float4V* noalias nocapture dereferenceable({{.*}}) %1)
+// armv6-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @simd_native_args(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr noalias {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %1)
 // armv7-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { float, float, float, float } @simd_native_args(float %0, float %1, float %2, float %3)
 // armv7s-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { float, float, float, float } @simd_native_args(float %0, float %1, float %2, float %3)
 // armv7k-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { float, float, float, float } @simd_native_args(float %0, float %1, float %2, float %3)
 // arm64_32-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { float, float, float, float } @simd_native_args(float %0, float %1, float %2, float %3)
-// powerpc64-LABEL: define{{( dllexport)?}}{{( protected)?}} void @simd_native_args(%T4simd6float4V* noalias nocapture sret({{.*}}) %0, %T4simd6float4V* noalias nocapture dereferenceable({{.*}}) %1)
+// powerpc64-LABEL: define{{( dllexport)?}}{{( protected)?}} void @simd_native_args(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr noalias {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %1)
 // powerpc64le-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { float, float, float, float } @simd_native_args(float %0, float %1, float %2, float %3)
 // s390x-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { float, float, float, float } @simd_native_args(float %0, float %1, float %2, float %3)
+// wasm32-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { float, float, float, float } @simd_native_args(float %0, float %1, float %2, float %3)
 sil @simd_native_args : $@convention(thin) (float4) -> float4 {
 entry(%x : $float4):
   %f = function_ref @simd_c_args : $@convention(c) (float4) -> float4
@@ -85,6 +87,7 @@ entry(%x : $float4):
 // powerpc64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { float, float, float } @simd_native_args_float3(float %0, float %1, float %2)
 // powerpc64le-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { float, float, float } @simd_native_args_float3(float %0, float %1, float %2)
 // s390x-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { float, float, float } @simd_native_args_float3(float %0, float %1, float %2)
+// wasm32-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { float, float, float } @simd_native_args_float3(float %0, float %1, float %2)
 sil @simd_native_args_float3 : $@convention(thin) (float3) -> float3 {
 entry(%x : $float3):
   %f = function_ref @simd_c_args_float3 : $@convention(c) (float3) -> float3

@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "TypeChecker.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 
 using namespace swift;
@@ -216,6 +217,8 @@ bool CircularityChecker::expandType(CanType type, unsigned depth) {
 
 /// Visit a tuple type and try to expand it one level.
 bool CircularityChecker::expandTuple(CanTupleType tupleType, unsigned depth) {
+  LLVM_DEBUG(llvm::dbgs() << std::string(depth, ' ') << "expanding tuple "
+                          << tupleType << "\n";);
   startExpandingType(tupleType);
 
   for (auto eltType : tupleType.getElementTypes()) {
@@ -229,6 +232,8 @@ bool CircularityChecker::expandTuple(CanTupleType tupleType, unsigned depth) {
 /// Visit a nominal type and try to expand it one level.
 bool CircularityChecker::expandNominal(CanType type, NominalTypeDecl *D,
                                        unsigned depth) {
+  LLVM_DEBUG(llvm::dbgs() << std::string(depth, ' ') << "expanding nominal "
+                          << type << "\n";);
   if (auto S = dyn_cast<StructDecl>(D)) {
     return expandStruct(type, S, depth);
   } else if (auto E = dyn_cast<EnumDecl>(D)) {
@@ -244,8 +249,7 @@ bool CircularityChecker::expandStruct(CanType type, StructDecl *S,
                                       unsigned depth) {
   startExpandingType(type);
 
-  auto subMap = type->getContextSubstitutionMap(
-      S->getModuleContext(), S);
+  auto subMap = type->getContextSubstitutionMap();
 
   for (auto field: S->getStoredProperties()) {
     auto fieldType =field->getValueInterfaceType().subst(subMap);
@@ -268,8 +272,7 @@ bool CircularityChecker::expandEnum(CanType type, EnumDecl *E,
 
   startExpandingType(type);
 
-  auto subMap = type->getContextSubstitutionMap(
-      E->getModuleContext(), E);
+  auto subMap = type->getContextSubstitutionMap();
 
   for (auto elt: E->getAllElements()) {
     // Indirect elements are representational leaves.
@@ -279,7 +282,7 @@ bool CircularityChecker::expandEnum(CanType type, EnumDecl *E,
     if (!elt->hasAssociatedValues())
       continue;
 
-    auto eltType = elt->getArgumentInterfaceType().subst(subMap);
+    auto eltType = elt->getPayloadInterfaceType().subst(subMap);
     if (addMember(type, elt, eltType, depth))
       return true;
   }
@@ -343,7 +346,7 @@ static size_t findCycleIndex(const Path &path) {
 
 static Type getMemberStorageInterfaceType(ValueDecl *member) {
   if (auto elt = dyn_cast<EnumElementDecl>(member)) {
-    return elt->getArgumentInterfaceType();
+    return elt->getPayloadInterfaceType();
   } else {
     return member->getInterfaceType();
   }
@@ -467,8 +470,7 @@ void CircularityChecker::addPathElement(Path &path, ValueDecl *member,
     elt.TupleIndex = 0;
 
     Type memberIfaceType = getMemberStorageInterfaceType(member);
-    elt.Ty = parentType->getTypeOfMember(member->getModuleContext(), member,
-                                         memberIfaceType);
+    elt.Ty = parentType->getTypeOfMember(member, memberIfaceType);
 
   } else {
     auto tupleType = parentType->castTo<TupleType>();
@@ -487,12 +489,6 @@ void CircularityChecker::addPathElement(Path &path, ValueDecl *member,
   // We shouldn't print reference storage types here.
   if (auto ref = elt.Ty->getAs<ReferenceStorageType>()) {
     elt.Ty = ref->getReferentType();
-  }
-
-  // Strip outer parens from the type.  (This is especially common with
-  // enum elements.)
-  if (auto parens = dyn_cast<ParenType>(elt.Ty.getPointer())) {
-    elt.Ty = parens->getSinglyDesugaredType();
   }
 
   path.push_back(elt);
@@ -597,15 +593,15 @@ void CircularityChecker::diagnoseNonWellFoundedEnum(EnumDecl *E) {
       if (!elt->isIndirect() && !E->isIndirect())
         return false;
 
-      auto argTy = elt->getArgumentInterfaceType();
-      if (!argTy)
+      auto payloadTy = elt->getPayloadInterfaceType();
+      if (!payloadTy)
         return false;
 
-      if (auto tuple = argTy->getAs<TupleType>()) {
+      if (auto tuple = payloadTy->getAs<TupleType>()) {
         if (!containsType(tuple, E->getSelfInterfaceType()))
           return false;
-      } else if (auto paren = dyn_cast<ParenType>(argTy.getPointer())) {
-        if (!E->getSelfInterfaceType()->isEqual(paren->getUnderlyingType()))
+      } else {
+        if (!E->getSelfInterfaceType()->isEqual(payloadTy))
           return false;
       }
     }

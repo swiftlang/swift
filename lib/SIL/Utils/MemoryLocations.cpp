@@ -11,29 +11,16 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-memory-locations"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/MemoryLocations.h"
+#include "swift/Basic/SmallBitVector.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
-#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
-
-/// Debug dump a location bit vector.
-void swift::printBitsAsArray(llvm::raw_ostream &OS, const SmallBitVector &bits) {
-  const char *separator = "";
-  OS << '[';
-  for (int idx = bits.find_first(); idx >= 0; idx = bits.find_next(idx)) {
-    OS << separator << idx;
-    separator = ",";
-  }
-  OS << ']';
-}
-
-void swift::dumpBits(const SmallBitVector &bits) {
-  llvm::dbgs() << bits << '\n';
-}
 
 namespace swift {
 namespace {
@@ -101,6 +88,9 @@ static SILValue getBaseValue(SILValue addr) {
     switch (addr->getKind()) {
       case ValueKind::BeginAccessInst:
         addr = cast<BeginAccessInst>(addr)->getOperand();
+        break;
+      case ValueKind::MarkDependenceInst:
+        addr = cast<MarkDependenceInst>(addr)->getValue();
         break;
       default:
         return addr;
@@ -347,6 +337,14 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
         if (!cast<LoadBorrowInst>(user)->getUsersOfType<BranchInst>().empty())
           return false;
         break;
+      case SILInstructionKind::MarkDependenceInst: {
+        auto *mdi = cast<MarkDependenceInst>(user);
+        if (use == &mdi->getAllOperands()[MarkDependenceInst::Dependent]) {
+          if (!analyzeLocationUsesRecursively(mdi, locIdx, collectedVals, subLocationMap))
+            return false;
+        }
+        break;
+      }
       case SILInstructionKind::DebugValueInst:
         if (cast<DebugValueInst>(user)->hasAddrVal())
           break;
@@ -438,7 +436,7 @@ bool MemoryLocations::analyzeAddrProjection(
       // open_existential_addr).
       if (!isa<OpenExistentialAddrInst>(loc->representativeValue))
         return false;
-      assert(loc->representativeValue->getType().isOpenedExistential());
+      assert(loc->representativeValue->getType().is<ExistentialArchetypeType>());
       loc->representativeValue = projection;
     }
   }

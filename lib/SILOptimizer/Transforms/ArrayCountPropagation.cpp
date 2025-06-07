@@ -13,6 +13,7 @@
 
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
@@ -126,6 +127,12 @@ bool ArrayAllocation::recursivelyCollectUses(ValueBase *Def) {
     if (isa<RefCountingInst>(User) || isa<DestroyValueInst>(User) ||
         isa<DebugValueInst>(User))
       continue;
+
+    if (auto mdi = MarkDependenceInstruction(User)) {
+      if (Def == mdi.getBase()) {
+        continue;
+      }
+    }
 
     // Array value projection.
     if (auto *SEI = dyn_cast<StructExtractInst>(User)) {

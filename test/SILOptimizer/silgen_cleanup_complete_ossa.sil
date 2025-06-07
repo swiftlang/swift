@@ -1,0 +1,407 @@
+// RUN: %target-sil-opt -sil-print-types -opt-mode=none -silgen-cleanup -enable-ossa-complete-lifetimes -parse-incomplete-ossa -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK
+
+import Builtin
+
+sil_stage raw
+
+typealias AnyObject = Builtin.AnyObject
+
+protocol Error {}
+
+class Klass {
+  var property: Builtin.Int64
+}
+class SubKlass : Klass {}
+
+class C {}
+
+enum FakeOptional<T> {
+case none
+case some(T)
+}
+
+struct Int {
+  var _value : Builtin.Int32
+}
+
+struct UInt8 {
+  var _value : Builtin.Int8
+}
+
+protocol P : AnyObject {}
+
+struct Err: Error {
+  var i: Int
+}
+
+sil @throwing : $@convention(thin) (UInt8) -> @error_indirect Err
+
+// =============================================================================
+// Test complete OSSA lifetimes
+// =============================================================================
+
+sil @unreachableHandler : $@convention(thin) () -> ()
+
+// CHECK-LABEL: sil [ossa] @testCompleteOSSALifetimes : {{.*}} {
+// CHECK:   [[BOX:%.*]] = alloc_box ${ var FakeOptional<Klass> }, var, name "c"
+// CHECK:   [[BORROW:%.,*]] = begin_borrow [lexical] [[BOX]] : ${ var FakeOptional<Klass> }
+// CHECK: bb2:
+// CHECK:   apply
+// CHECK:   end_borrow [[BORROW]] : ${ var FakeOptional<Klass> }
+// CHECK:   dealloc_box [dead_end] [[BOX]] : ${ var FakeOptional<Klass> }
+// CHECK:   unreachable
+// CHECK-LABEL: } // end sil function 'testCompleteOSSALifetimes'
+sil [ossa] @testCompleteOSSALifetimes : $@convention(thin) (@owned FakeOptional<Klass>) -> () {
+bb0(%0 : @owned $FakeOptional<Klass>):
+  %box = alloc_box ${ var FakeOptional<Klass> }, var, name "c"
+  %borrow = begin_borrow [lexical] %box : ${ var FakeOptional<Klass> }
+  %project = project_box %borrow : ${ var FakeOptional<Klass> }, 0
+  store %0 to [init] %project : $*FakeOptional<Klass>
+  cond_br undef, bb1, bb4
+
+bb1:
+  %access = begin_access [read] [unknown] %project : $*FakeOptional<Klass>
+  %val = load [copy] %access : $*FakeOptional<Klass>
+  end_access %access : $*FakeOptional<Klass>
+  switch_enum %val : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb3, case #FakeOptional.none!enumelt: bb2
+
+bb2:
+  %21 = function_ref @unreachableHandler : $@convention(thin) () -> ()
+  %22 = apply %21() : $@convention(thin) () -> ()
+  unreachable
+
+bb3(%24 : @owned $Klass):
+  destroy_value %24 : $Klass
+  br bb5
+
+bb4:
+  br bb5
+
+bb5:
+  end_borrow %borrow : ${ var FakeOptional<Klass> }
+  destroy_value %box : ${ var FakeOptional<Klass> }
+  %36 = tuple ()
+  return %36 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @testExistentialLifetime : {{.*}} {
+// CHECK-NOT: destroy
+// CHECK-LABEL: } // end sil function 'testExistentialLifetime'
+sil [ossa] @testExistentialLifetime : $@convention(thin) (@owned any P) -> @owned AnyObject {
+bb0(%0 : @owned $any P):
+  %1 = open_existential_ref %0 : $any P to $@opened("34B79428-2E49-11ED-901A-8AC134504E1C", any P) Self
+  %2 = init_existential_ref %1 : $@opened("34B79428-2E49-11ED-901A-8AC134504E1C", any P) Self : $@opened("34B79428-2E49-11ED-901A-8AC134504E1C", any P) Self, $AnyObject
+  return %2 : $AnyObject
+}
+
+// CHECK-LABEL: sil [ossa] @store_borrow : {{.*}} {
+// CHECK:       bb0([[INSTANCE:%[^,]+]] :
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $C
+// CHECK:         [[TOKEN:%[^,]+]] = store_borrow [[INSTANCE]] to [[ADDR]]
+// CHECK:         [[LOAD:%[^,]+]] = load_borrow [[TOKEN]]
+// CHECK:         cond_br undef, {{bb[0-9]+}}, [[DIE:bb[0-9]+]]
+// CHECK:       [[DIE]]:
+// CHECK:         end_borrow [[LOAD]]
+// CHECK:         end_borrow [[TOKEN]]
+// CHECK:         destroy_value [dead_end] [[INSTANCE]]
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'store_borrow'
+sil [ossa] @store_borrow : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+  %addr = alloc_stack $C
+  %token = store_borrow %instance to %addr : $*C
+  %load = load_borrow %token : $*C
+  cond_br undef, exit, die
+exit:
+  end_borrow %load : $C
+  end_borrow %token : $*C
+  dealloc_stack %addr : $*C
+  apply undef(%instance) : $@convention(thin) (@guaranteed C) -> ()
+  destroy_value %instance : $C
+  %retval = tuple ()
+  return %retval : $()
+die:
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @begin_access : {{.*}} {
+// CHECK:         [[ADDR:%[^,]+]] = alloc_stack $C
+// CHECK:         [[ACCESS:%[^,]+]] = begin_access [modify] [static] [[ADDR]]
+// CHECK:         cond_br undef, {{bb[0-9]+}}, [[DIE:bb[0-9]+]]
+// CHECK:       [[DIE]]:
+// CHECK:         end_access [[ACCESS]]
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'begin_access'
+sil [ossa] @begin_access : $@convention(thin) () -> () {
+entry:
+  %addr2 = alloc_stack $C
+  %access = begin_access [static] [modify] %addr2 : $*C
+  apply undef(%access) : $@convention(thin) () -> (@out C)
+  destroy_addr %access : $*C
+  cond_br undef, exit, die
+
+exit:
+  end_access %access : $*C
+  dealloc_stack %addr2 : $*C
+  %retval = tuple ()
+  return %retval : $()
+
+die:
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @unreachable_def : {{.*}} {
+// CHECK:       bb2:
+// CHECK-NEXT:    [[DEF:%[^,]+]] = apply
+// CHECK-NEXT:    br bb3
+// CHECK:       bb3:
+// CHECK-NEXT:    destroy_value [dead_end] [[DEF]]
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'unreachable_def'
+sil [ossa] @unreachable_def : $@convention(thin) () -> () {
+entry:
+  br exit
+
+exit:
+  %retval = tuple ()
+  return %retval : $()
+
+nowhere:
+  %def = apply undef() : $@convention(thin) () -> (@owned C)
+  br die
+
+die:
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @unreachable_def_2 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[C:%[^,]+]] :
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK-NEXT:    destroy_value [dead_end] [[C]]
+// CHECK-NEXT:    unreachable
+// CHECK:       [[RIGHT]]:
+// CHECK-NEXT:    destroy_value [dead_end] [[C]]
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'unreachable_def_2'
+sil [ossa] @unreachable_def_2 : $@convention(thin) () -> () {
+entry:
+  %t = tuple ()
+  return %t : $()
+
+not(%c : @owned $C):
+  cond_br undef, left, right
+
+left:
+  unreachable
+
+right:
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @unreachable_def_3 : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[C:%[^,]+]] :
+// CHECK:         cond_br
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK-NEXT:    destroy_value [dead_end] [[C]]
+// CHECK-NEXT:    unreachable
+// CHECK:       [[RIGHT]]:
+// CHECK-NEXT:    destroy_value [dead_end] [[C]]
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'unreachable_def_3'
+sil [ossa] @unreachable_def_3 : $@convention(thin) () -> () {
+entry:
+  %t = tuple ()
+  return %t : $()
+
+header(%c : @owned $C):
+  br body
+
+body:
+  cond_br undef, die, backedge
+
+backedge:
+  br header(%c)
+
+die:
+  cond_br undef, left, right
+
+left:
+  unreachable
+
+right:
+  unreachable
+}
+
+// Ensure that `header` is completed before `postloop` (postloop would
+// erroneously be added as a root if a search for loops wasn't done).
+// CHECK-LABEL: sil [ossa] @unreachable_def_4 : {{.*}} {
+// CHECK:         [[C2:%[^,]+]] = apply
+// CHECK:       {{bb[0-9]+}}([[C:%[^,]+]] :
+// CHECK:         cond_br
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK-NEXT:    destroy_value [dead_end] [[C2]]
+// CHECK-NEXT:    destroy_value [dead_end] [[C]]
+// CHECK-NEXT:    unreachable
+// CHECK:       [[RIGHT]]:
+// CHECK-NEXT:    destroy_value [dead_end] [[C2]]
+// CHECK-NEXT:    destroy_value [dead_end] [[C]]
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'unreachable_def_4'
+sil [ossa] @unreachable_def_4 : $@convention(thin) () -> () {
+entry:
+  %t = tuple ()
+  return %t : $()
+
+// Put this here so it appears before the loop when iterating over the
+// function's blocks.
+postloop:
+  %c2 = apply undef() : $@convention(thin) () -> (@owned C)
+  br die
+
+header(%c : @owned $C):
+  br body
+
+body:
+  cond_br undef, postloop, backedge
+
+backedge:
+  br header(%c)
+
+die:
+  cond_br undef, left, right
+
+left:
+  unreachable
+
+right:
+  unreachable
+}
+
+// Check that values backwards reachable from dead-end loops are completed.
+// CHECK-LABEL: sil [ossa] @unreachable_def_5 : {{.*}} {
+// CHECK:         apply undef([[C:%[^)]+]])
+// CHECK-NEXT:    extend_lifetime [[C]]
+// CHECK-LABEL: } // end sil function 'unreachable_def_5'
+sil [ossa] @unreachable_def_5 : $@convention(thin) () -> () {
+entry:
+  %t = tuple ()
+  return %t : $()
+
+header:
+  %c = apply undef() : $@convention(thin) () -> (@owned C)
+  br body
+
+body:
+  cond_br undef, die, backedge
+
+backedge:
+  destroy_value %c
+  br header
+
+die:
+  br deadend_header
+
+deadend_header:
+  apply undef(%c) : $@convention(thin) (@guaranteed C) -> ()
+  br deadend_backedge
+
+deadend_backedge:
+  br deadend_header
+}
+
+// CHECK-LABEL: sil [ossa] @unreachable_def_6 : {{.*}} {
+// CHECK:         [[C2:%[^,]+]] = apply
+// CHECK:       {{bb[0-9]+}}([[C:%[^,]+]] : @owned
+// CHECK:       {{bb[0-9]+}}([[C3:%[^,]+]] : @owned
+// CHECK:         cond_br
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK-NEXT:    destroy_value [dead_end] [[C2]]
+// CHECK-NEXT:    destroy_value [dead_end] [[C3]]
+// CHECK-NEXT:    destroy_value [dead_end] [[C]]
+// CHECK-NEXT:    unreachable
+// CHECK:       [[RIGHT]]:
+// CHECK-NEXT:    destroy_value [dead_end] [[C2]]
+// CHECK-NEXT:    destroy_value [dead_end] [[C3]]
+// CHECK-NEXT:    destroy_value [dead_end] [[C]]
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'unreachable_def_6'
+sil [ossa] @unreachable_def_6 : $@convention(thin) () -> () {
+entry:
+  %t = tuple ()
+  return %t : $()
+
+// Put this here so it appears before the loop when iterating over the
+// function's blocks.
+postloop:
+  %c2 = apply undef() : $@convention(thin) () -> (@owned C)
+  br die
+
+header_1(%c : @owned $C):
+  br body_1
+
+body_1:
+  cond_br undef, postloop_1, backedge_1
+
+backedge_1:
+  br header_1(%c)
+
+postloop_1:
+  br postloop
+
+header_2(%c3 : @owned $C):
+  br body_2
+
+body_2:
+  cond_br undef, postloop_2, backedge_2
+
+backedge_2:
+  br header_2(%c3)
+
+postloop_2:
+  br postloop
+
+die:
+  apply undef(%c) : $@convention(thin) (@guaranteed C) -> ()
+  apply undef(%c3) : $@convention(thin) (@guaranteed C) -> ()
+  cond_br undef, left, right
+
+left:
+  unreachable
+
+right:
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @testExtendTrivialToDeadEnd : $@convention(thin) (UInt8) -> () {
+// CHECK: bb0(%0 : $UInt8):
+// CHECK:   [[MV:%.*]] = move_value [var_decl] %0 : $UInt8
+// CHECK:   try_apply %{{.*}}(%{{.*}}, [[MV]]) : $@convention(thin) (UInt8) -> @error_indirect Err, normal bb1, error bb2
+// CHECK: bb1(
+// CHECK:   extend_lifetime [[MV]] : $UInt8
+// CHECK:   return
+// CHECK: bb2:
+// CHECK:   dealloc_stack
+// CHECK:   extend_lifetime [[MV]] : $UInt8
+// CHECK:   unreachable
+// CHECK-LABEL: } // end sil function 'testExtendTrivialToDeadEnd'
+sil [ossa] @testExtendTrivialToDeadEnd : $@convention(thin) (UInt8) -> () {
+bb0(%0 : $UInt8):
+  %mv = move_value [var_decl] %0
+  %e = alloc_stack $Err
+  %f = function_ref @throwing : $@convention(thin) (UInt8) -> @error_indirect Err
+  try_apply %f(%e, %mv) : $@convention(thin) (UInt8) -> @error_indirect Err, normal bb1, error bb2
+
+bb1(%ret : $()):
+  extend_lifetime %mv
+  dealloc_stack %e : $*Err
+  %99 = tuple ()
+  return %99
+
+bb2:
+  dealloc_stack %e : $*Err
+  unreachable
+}

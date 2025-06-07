@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Structs -clang-header-expose-decls=all-public -emit-clang-header-path %t/structs.h
+// RUN: %target-swift-frontend %s -module-name Structs -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/structs.h
 // RUN: %FileCheck %s < %t/structs.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/structs.h)
@@ -44,5 +44,5 @@ public struct B {
 
 // CHECK: class SWIFT_SYMBOL({{.*}}) B final {
 
-// CHECK: inline B A::returnsB() const {
-// CHECK: inline A B::returnsA() const {
+// CHECK: SWIFT_INLINE_THUNK B A::returnsB() const {
+// CHECK: SWIFT_INLINE_THUNK A B::returnsA() const {

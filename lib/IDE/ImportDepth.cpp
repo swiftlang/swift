@@ -12,7 +12,10 @@
 
 #include "swift/IDE/ImportDepth.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/Assertions.h"
 #include "clang/Basic/Module.h"
+
+#include <deque>
 
 using namespace swift;
 using namespace swift::ide;
@@ -34,12 +37,8 @@ ImportDepth::ImportDepth(ASTContext &context,
     auxImports.insert(pair.first);
 
   // Private imports from this module.
-  // FIXME: only the private imports from the current source file.
-  // FIXME: ImportFilterKind::ShadowedByCrossImportOverlay?
   SmallVector<ImportedModule, 16> mainImports;
-  main->getImportedModules(mainImports,
-                           {ModuleDecl::ImportFilterKind::Default,
-                            ModuleDecl::ImportFilterKind::ImplementationOnly});
+  main->getImportedModules(mainImports, ModuleDecl::getImportFilterLocal());
   for (auto &import : mainImports) {
     uint8_t depth = 1;
     if (auxImports.count(import.importedModule->getName().str()))
@@ -67,7 +66,7 @@ ImportDepth::ImportDepth(ASTContext &context,
 
     // Add imports to the worklist.
     SmallVector<ImportedModule, 16> imports;
-    module->getImportedModules(imports);
+    module->getImportedModules(imports, ModuleDecl::ImportFilterKind::Exported);
     for (auto &import : imports) {
       uint8_t next = std::max(depth, uint8_t(depth + 1)); // unsigned wrap
 

@@ -562,6 +562,7 @@ ${Suite}.test("${ArrayType}/init(unsafeUninitializedCapacity:...:)/throwing") {
     }
     expectEqual(5, a.count)
     expectEqual(5, InstanceCountedClass.instanceCounter)
+    withExtendedLifetime(a) {}
 
     a = []
     expectEqual(0, InstanceCountedClass.instanceCounter)

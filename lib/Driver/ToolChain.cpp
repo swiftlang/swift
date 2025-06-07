@@ -17,6 +17,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Driver/ToolChain.h"
 #include "swift/Driver/Compilation.h"
 #include "swift/Driver/Driver.h"
@@ -67,10 +68,15 @@ ToolChain::JobContext::getTemporaryFilePath(const llvm::Twine &name,
   return C.getArgs().MakeArgString(buffer.str());
 }
 
-Optional<Job::ResponseFileInfo>
+std::optional<Job::ResponseFileInfo>
 ToolChain::getResponseFileInfo(const Compilation &C, const char *executablePath,
                                const ToolChain::InvocationInfo &invocationInfo,
                                const ToolChain::JobContext &context) const {
+  // Never use a response file if this is a dummy driver for SourceKit, we
+  // just want the frontend arguments.
+  if (getDriver().isDummyDriverForFrontendInvocation())
+    return std::nullopt;
+
   const bool forceResponseFiles =
       C.getArgs().hasArg(options::OPT_driver_force_response_files);
   assert((invocationInfo.allowsResponseFiles || !forceResponseFiles) &&
@@ -85,7 +91,7 @@ ToolChain::getResponseFileInfo(const Compilation &C, const char *executablePath,
         C.getArgs().MakeArgString(Twine("@") + responseFilePath);
     return {{responseFilePath, responseFileArg}};
   }
-  return None;
+  return std::nullopt;
 }
 
 std::unique_ptr<Job> ToolChain::constructJob(

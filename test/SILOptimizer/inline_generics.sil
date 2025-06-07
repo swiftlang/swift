@@ -147,9 +147,9 @@ sil_vtable MyNumber {}
 // substituting we need to pick up the normal_conformance.
 
 // CHECK-LABEL: sil @test_inlining : $@convention(objc_method) (@owned MyNumber) -> () {
-// CHECK-NOT: Generic specialization information for call-site dootherstuff <MyNumber & SomeProto> conformances <(abstract_conformance protocol=OtherProto)>
+// CHECK-NOT: Generic specialization information for call-site dootherstuff <MyNumber & SomeProto> conformances <(abstract_conformance protocol="OtherProto")>
 // CHECK: Generic specialization information
-// CHECK: (normal_conformance type=MyObject protocol=OtherProto)
+// CHECK: (normal_conformance type="MyObject" protocol="OtherProto"
 // CHECK: end sil function 'test_inlining'
 
 sil @test_inlining : $@convention(objc_method) (@owned MyNumber) -> () {

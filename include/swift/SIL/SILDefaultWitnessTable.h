@@ -98,9 +98,6 @@ public:
   /// Get the linkage of the default witness table.
   SILLinkage getLinkage() const { return Linkage; }
 
-  /// Set the linkage of the default witness table.
-  void setLinkage(SILLinkage l) { Linkage = l; }
-
   void convertToDefinition(ArrayRef<Entry> entries);
 
   ~SILDefaultWitnessTable();

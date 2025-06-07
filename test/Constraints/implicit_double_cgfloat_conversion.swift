@@ -20,7 +20,7 @@ func test_returns_cgfloat(_: Double) -> CGFloat {
 let d: Double    = 0.0
 let cgf: CGFloat = 0.0
 
-// CHECK: test_various_situations_converting_to_cgfloat()
+// CHECK-LABEL: sil hidden [ossa] @$s34implicit_double_cgfloat_conversion038test_various_situations_converting_to_C0yyF : $@convention(thin) () -> () {
 func test_various_situations_converting_to_cgfloat() {
   // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcfC : $@convention(method) (Double, @thin CGFloat.Type) -> CGFloat
   let _: CGFloat = d
@@ -58,6 +58,7 @@ func test_various_situations_converting_to_cgfloat() {
   test_to_cgfloat(test_returns_double(d)) // Two conversions
 
   // Overloads with CGFloat are preferred if that allows to avoid any implicit conversions.
+  // CHECK-LABEL: sil private [ossa] @$s34implicit_double_cgfloat_conversion038test_various_situations_converting_to_C0yyF0E23_loading_tuple_elementsL_6valuesy12CoreGraphics7CGFloatV_AGtz_tF : $@convention(thin) (@inout (CGFloat, CGFloat)) -> () {
   func test_loading_tuple_elements(values: inout (CGFloat, CGFloat)) {
     struct S {
       init(x: Double, y: Double) {}
@@ -69,7 +70,7 @@ func test_various_situations_converting_to_cgfloat() {
   }
 }
 
-// CHECK: test_various_situations_converting_to_double()
+// CHECK-LABEL: sil hidden [ossa] @$s34implicit_double_cgfloat_conversion038test_various_situations_converting_to_B0yyF : $@convention(thin) () -> () {
 func test_various_situations_converting_to_double() {
   // function_ref @$sSd12CoreGraphicsEySdAA7CGFloatVcfC : $@convention(method) (CGFloat, @thin Double.Type) -> Double
   let _: Double = cgf
@@ -102,12 +103,14 @@ func test_various_situations_converting_to_double() {
   test_from_cgfloat(test_returns_cgfloat(cgf)) // Two conversions - argument and result.
 }
 
+// CHECK-LABEL: sil hidden [ossa] @$s34implicit_double_cgfloat_conversion31test_conversions_with_optionals1vy12CoreGraphics7CGFloatVSg_tF : $@convention(thin) (Optional<CGFloat>) -> () {
 func test_conversions_with_optionals(v: CGFloat?) {
   // CHECK: function_ref @$s34implicit_double_cgfloat_conversion31test_conversions_with_optionals1vy12CoreGraphics7CGFloatVSg_tFAFyKXEfu_
   // CHECK: function_ref @$sSd12CoreGraphicsEySdAA7CGFloatVcfC : $@convention(method) (CGFloat, @thin Double.Type) -> Double
   let _: Double = (v ?? 0)
 }
 
+// CHECK-LABEL: sil hidden [ossa] @$s34implicit_double_cgfloat_conversion48test_static_members_are_contextually_convertibleyyF : $@convention(thin) () -> () {
 func test_static_members_are_contextually_convertible() {
   struct S {
     static var testProp: CGFloat { 42 }
@@ -125,6 +128,7 @@ func test_static_members_are_contextually_convertible() {
   }
 }
 
+// CHECK-LABEL: sil hidden [ossa] @$s34implicit_double_cgfloat_conversion25test_narrowing_is_delayed1x1yySd_12CoreGraphics7CGFloatVtF : $@convention(thin) (Double, CGFloat) -> () {
 func test_narrowing_is_delayed(x: Double, y: CGFloat) {
   func test(_: CGFloat) {}
 
@@ -181,6 +185,7 @@ extension CGFloat {
 }
 
 // Make sure that solution with no Double/CGFloat conversions is preferred
+// CHECK-LABEL: sil hidden [ossa] @$s34implicit_double_cgfloat_conversion38test_no_ambiguity_with_unary_operators5width6heighty12CoreGraphics7CGFloatV_AGtF : $@convention(thin) (CGFloat, CGFloat) -> () {
 func test_no_ambiguity_with_unary_operators(width: CGFloat, height: CGFloat) {
   struct R {
     init(x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat) {}
@@ -193,6 +198,7 @@ func test_no_ambiguity_with_unary_operators(width: CGFloat, height: CGFloat) {
   _ = R(x: width / 4, y: -height / 2, width: width, height: height)
 }
 
+// CHECK-LABEL: sil hidden [ossa] @$s34implicit_double_cgfloat_conversion40test_conversions_with_optional_promotion1d3cgfySd_12CoreGraphics7CGFloatVtF : $@convention(thin) (Double, CGFloat) -> () {
 func test_conversions_with_optional_promotion(d: Double, cgf: CGFloat) {
   func test_double(_: Double??, _: Double???) {}
   func test_cgfloat(_: CGFloat??, _: CGFloat???) {}
@@ -217,7 +223,7 @@ func test_multi_argument_conversion_with_optional(d: Double, cgf: CGFloat) {
   test(cgf, d) // Ok (CGFloat -> Double and Double? -> CGFloat?)
 }
 
-extension CGFloat: Hashable {
+extension CGFloat: @retroactive Hashable {
   public func hash(into hasher: inout Hasher) { fatalError() }
 }
 
@@ -332,6 +338,7 @@ func test_implicit_conversion_clash_with_partial_application_check() {
 }
 
 // rdar://99352676
+// CHECK-LABEL: sil hidden [ossa] @$s34implicit_double_cgfloat_conversion20test_init_validationyyF : $@convention(thin) () -> () {
 func test_init_validation() {
   class Foo {
     static let bar = 100.0
@@ -340,5 +347,17 @@ func test_init_validation() {
       return Self.bar
       // CHECK: function_ref @$s12CoreGraphics7CGFloatVyACSdcfC : $@convention(method) (Double, @thin CGFloat.Type) -> CGFloat
     }
+  }
+}
+
+func test_ternary_and_nil_coalescing() {
+  func test(_: Double?) {}
+
+  func ternary(v: CGFloat) {
+    test(true ? v : nil) // Ok
+  }
+
+  func test_nil_coalescing(v: CGFloat?) {
+    test(v ?? 0.0) // Ok
   }
 }

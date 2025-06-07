@@ -18,8 +18,8 @@ func test2(arg1: Int?, arg2: (Int, String)?) {
 
 func test3(arg: Int?) {
   switch arg {
-  case let .some(xRenamed) where xRenamed == 0:
-    print(xRenamed)
+  case let .some(<base>x</base>) where <base>x</base> == 0:
+    print(<base>x</base>)
   case let .some(x) where x == 1,
        let .some(x) where x == 2:
     print(x)

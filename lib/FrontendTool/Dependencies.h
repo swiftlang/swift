@@ -13,25 +13,28 @@
 #ifndef SWIFT_FRONTENDTOOL_DEPENDENCIES_H
 #define SWIFT_FRONTENDTOOL_DEPENDENCIES_H
 
+namespace llvm::vfs {
+class OutputBackend;
+} // namespace llvm::vfs
+
 namespace swift {
 
-class ASTContext;
 class DependencyTracker;
-class DiagnosticEngine;
 class FrontendOptions;
 class InputFile;
 class ModuleDecl;
+class CompilerInstance;
 
 /// Emit the names of the modules imported by \c mainModule.
-bool emitImportedModules(ModuleDecl *mainModule, const FrontendOptions &opts);
-bool emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
-                                  DependencyTracker *depTracker,
-                                  const FrontendOptions &opts,
-                                  const InputFile &input);
+bool emitImportedModules(ModuleDecl *mainModule, const FrontendOptions &opts,
+                         llvm::vfs::OutputBackend &backend);
 bool emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
                                    DependencyTracker *depTracker,
                                    const FrontendOptions &opts,
                                    const InputFile &input);
+
+bool emitFineModuleTraceIfNeeded(CompilerInstance &Instance,
+                                 const FrontendOptions &opts);
 
 } // end namespace swift
 

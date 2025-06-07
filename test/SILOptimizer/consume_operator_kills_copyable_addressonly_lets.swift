@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-move-only -verify %s -parse-stdlib -emit-sil -o /dev/null
+// RUN: %target-swift-frontend -sil-verify-all -verify %s -parse-stdlib -emit-sil -o /dev/null
 
 
 import Swift
@@ -26,33 +26,33 @@ func nonConsumingUse<T>(_ k: T) {}
 //
 
 public func simpleLinearUse<T>(_ x: T) {
-    let y = x // expected-error {{'y' used after being moved}}
-    let _ = _move y // expected-note {{move here}}
-    nonConsumingUse(y) // expected-note {{use here}}
+    let y = x // expected-error {{'y' used after consume}}
+    let _ = consume y // expected-note {{consumed here}}
+    nonConsumingUse(y) // expected-note {{used here}}
 }
 
 // We just emit an error today for the first error in a block.
 public func simpleLinearUse2<T>(_ x: T) {
-    let y = x // expected-error {{'y' used after being moved}}
-    let _ = _move y // expected-note {{move here}}
-    nonConsumingUse(y) // expected-note {{use here}}
+    let y = x // expected-error {{'y' used after consume}}
+    let _ = consume y // expected-note {{consumed here}}
+    nonConsumingUse(y) // expected-note {{used here}}
     nonConsumingUse(y)
 }
 
 public func conditionalUse1<T>(_ x: T) {
     let y = x
     if booleanValue {
-        let _ = _move y
+        let _ = consume y
     } else {
         nonConsumingUse(y)
     }
 }
 
 public func loopUse1<T>(_ x: T) {
-    let y = x  // expected-error {{'y' used after being moved}}
-    let _ = _move y // expected-note {{move here}}
+    let y = x  // expected-error {{'y' used after consume}}
+    let _ = consume y // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        nonConsumingUse(y) // expected-note {{use here}}
+        nonConsumingUse(y) // expected-note {{used here}}
     }
 }
 
@@ -61,15 +61,15 @@ public func loopUse1<T>(_ x: T) {
 //
 
 public func simpleLinearConsumingUse<T>(_ x: T) {
-    let y = x // expected-error {{'y' used after being moved}}
-    let _ = _move y // expected-note {{move here}}
-    consumingUse(y) // expected-note {{use here}}
+    let y = x // expected-error {{'y' used after consume}}
+    let _ = consume y // expected-note {{consumed here}}
+    consumingUse(y) // expected-note {{used here}}
 }
 
 public func conditionalUseOk1<T>(_ x: T) {
     let y = x
     if booleanValue {
-        let _ = _move y
+        let _ = consume y
     } else {
         consumingUse(y)
     }
@@ -78,10 +78,10 @@ public func conditionalUseOk1<T>(_ x: T) {
 // This test makes sure that in the case where we have two consuming uses, with
 // different first level copies, we emit a single diagnostic.
 public func conditionalBadConsumingUse<T>(_ x: T) {
-    let y = x // expected-error {{'y' used after being moved}}
+    let y = x // expected-error {{'y' used after consume}}
     if booleanValue {
-        let _ = _move y // expected-note {{move here}}
-        consumingUse(y) // expected-note {{use here}}
+        let _ = consume y // expected-note {{consumed here}}
+        consumingUse(y) // expected-note {{used here}}
     } else {
         // We shouldn't get any diagnostic on this use.
         consumingUse(y)
@@ -93,25 +93,25 @@ public func conditionalBadConsumingUse<T>(_ x: T) {
 }
 
 public func conditionalBadConsumingUse2<T>(_ x: T) {
-    let y = x // expected-error {{'y' used after being moved}}
+    let y = x // expected-error {{'y' used after consume}}
     if booleanValue {
-        let _ = _move y // expected-note {{move here}}
+        let _ = consume y // expected-note {{consumed here}}
     } else {
         // We shouldn't get any diagnostic on this use.
         consumingUse(y)
     }
 
-    consumingUse(y) // expected-note {{use here}}
+    consumingUse(y) // expected-note {{used here}}
 }
 
 
 // This test makes sure that in the case where we have two consuming uses, with
 // different first level copies, we emit a single diagnostic.
 public func conditionalBadConsumingUseLoop<T>(_ x: T) {
-    let y = x // expected-error {{'y' used after being moved}}
+    let y = x // expected-error {{'y' used after consume}}
     if booleanValue {
-        let _ = _move y // expected-note {{move here}}
-        consumingUse(y) // expected-note {{use here}}
+        let _ = consume y // expected-note {{consumed here}}
+        consumingUse(y) // expected-note {{used here}}
     } else {
         // We shouldn't get any diagnostic on this use.
         consumingUse(y)
@@ -120,7 +120,7 @@ public func conditionalBadConsumingUseLoop<T>(_ x: T) {
     // But this one and the first consumingUse should get a diagnostic.
     //
     // We do not actually emit the diagnostic here since we emit only one
-    // diagnostic per _move at a time.
+    // diagnostic per consume at a time.
     for _ in 0..<1024 {
         consumingUse(y)
     }
@@ -129,16 +129,16 @@ public func conditionalBadConsumingUseLoop<T>(_ x: T) {
 // This test makes sure that in the case where we have two consuming uses, with
 // different first level copies, we emit a single diagnostic.
 public func conditionalBadConsumingUseLoop2<T>(_ x: T) {
-    let y = x // expected-error {{'y' used after being moved}}
+    let y = x // expected-error {{'y' used after consume}}
     if booleanValue {
-        let _ = _move y // expected-note {{move here}}
+        let _ = consume y // expected-note {{consumed here}}
     } else {
         // We shouldn't get any diagnostic on this use.
         consumingUse(y)
     }
 
     for _ in 0..<1024 {
-        consumingUse(y) // expected-note {{use here}}
+        consumingUse(y) // expected-note {{used here}}
     }
 }
 
@@ -146,60 +146,80 @@ public func conditionalBadConsumingUseLoop2<T>(_ x: T) {
 // Parameters
 
 // This is ok, no uses after.
-public func simpleMoveOfParameter<T>(_ x: T) -> () {
-    let _ = _move x // expected-error {{_move applied to value that the compiler does not support checking}}
+public func simpleMoveOfParameter<T>(_ x: T) -> () { // expected-error {{'x' is borrowed and cannot be consumed}}
+    let _ = consume x // expected-note {{consumed here}}
 }
 
 public func simpleMoveOfOwnedParameter<T>(_ x: __owned T) -> () {
-    let _ = _move x
+    let _ = consume x
 }
 
-public func errorSimpleMoveOfParameter<T>(_ x: __owned T) -> () { // expected-error {{'x' used after being moved}}
-    let _ = _move x // expected-note {{move here}}
-    let _ = _move x // expected-note {{use here}}
+public func errorSimpleMoveOfParameter<T>(_ x: __owned T) -> () { // expected-error {{'x' used after consume}}
+    let _ = consume x // expected-note {{consumed here}}
+    let _ = consume x // expected-note {{used here}}
 }
 
-public func errorSimple2MoveOfParameter<T>(_ x: __owned T) -> () { // expected-error {{'x' used after being moved}}
-    let _ = _move x // expected-note {{move here}}
-    let _ = consumingUse(x) // expected-note {{use here}}
+public func errorSimple2MoveOfParameter<T>(_ x: __owned T) -> () { // expected-error {{'x' used after consume}}
+    let _ = consume x // expected-note {{consumed here}}
+    let _ = consumingUse(x) // expected-note {{used here}}
 }
 
 // TODO: I wonder if we could do better for the 2nd error. At least we tell the
 // user it is due to the loop.
-public func errorLoopMultipleMove<T>(_ x: __owned T) -> () { // expected-error {{'x' used after being moved}}
-                                                      // expected-error @-1 {{'x' used after being moved}}
-    let _ = _move x // expected-note {{move here}}
+public func errorLoopMultipleMove<T>(_ x: __owned T) -> () { // expected-error {{'x' used after consume}}
+                                                      // expected-error @-1 {{'x' used after consume}}
+    let _ = consume x // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        let _ = _move x // expected-note {{move here}}
-                         // expected-note @-1 {{use here}}
-                         // expected-note @-2 {{use here}}
+        let _ = consume x // expected-note {{consumed here}}
+                         // expected-note @-1 {{used here}}
+                         // expected-note @-2 {{used here}}
     }
 }
 
-public func errorLoopMoveOfParameter<T>(_ x: __owned T) -> () { // expected-error {{'x' used after being moved}}
-    let _ = _move x // expected-note {{move here}}
+public func errorLoopMoveOfParameter<T>(_ x: __owned T) -> () { // expected-error {{'x' used after consume}}
+    let _ = consume x // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        consumingUse(x) // expected-note {{use here}}
+        consumingUse(x) // expected-note {{used here}}
     }
 }
 
-public func errorLoop2MoveOfParameter<T>(_ x: __owned T) -> () { // expected-error {{'x' used after being moved}}
-    let _ = _move x // expected-note {{move here}}
+public func errorLoop2MoveOfParameter<T>(_ x: __owned T) -> () { // expected-error {{'x' used after consume}}
+    let _ = consume x // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        nonConsumingUse(x) // expected-note {{use here}}
+        nonConsumingUse(x) // expected-note {{used here}}
     }
 }
 
-public func errorSimple2MoveOfParameterNonConsume<T>(_ x: __owned T) -> () { // expected-error {{'x' used after being moved}}
-    let _ = _move x // expected-note {{move here}}
-    let _ = nonConsumingUse(x) // expected-note {{use here}}
+public func errorSimple2MoveOfParameterNonConsume<T>(_ x: __owned T) -> () { // expected-error {{'x' used after consume}}
+    let _ = consume x // expected-note {{consumed here}}
+    let _ = nonConsumingUse(x) // expected-note {{used here}}
 }
 
-public func errorLoopMoveOfParameterNonConsume<T>(_ x: __owned T) -> () { // expected-error {{'x' used after being moved}}
-    let _ = _move x // expected-note {{move here}}
+public func errorLoopMoveOfParameterNonConsume<T>(_ x: __owned T) -> () { // expected-error {{'x' used after consume}}
+    let _ = consume x // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        nonConsumingUse(x) // expected-note {{use here}}
+        nonConsumingUse(x) // expected-note {{used here}}
     }
+}
+
+func consumeConsuming<T>(_ k: consuming T) {
+  _ = consume k
+}
+
+func consumeBorrowing<T>(_ k: borrowing T) { // expected-error{{'k' is borrowed and cannot be consumed}}
+  _ = consume k // expected-note{{consumed here}}
+}
+
+func consumeOwned<T>(_ k: __owned T) {
+  _ = consume k
+}
+
+func consumeShared<T>(_ k: __shared T) { // expected-error {{'k' is borrowed and cannot be consumed}}
+  _ = consume k // expected-note {{consumed here}}
+}
+
+func consumeBare<T>(_ k: T) { // expected-error {{'k' is borrowed and cannot be consumed}}
+  _ = consume k // expected-note {{consumed here}}
 }
 
 ////////////////////////
@@ -207,9 +227,9 @@ public func errorLoopMoveOfParameterNonConsume<T>(_ x: __owned T) -> () { // exp
 ////////////////////////
 
 public func patternMatchIfCaseLet<T>(_ x: T?) {
-    if case let .some(y) = x { // expected-error {{'y' used after being moved}}
-        let _ = _move y // expected-note {{move here}}
-        nonConsumingUse(y) // expected-note {{use here}}
+    if case let .some(y) = x { // expected-error {{'y' used after consume}}
+        let _ = consume y // expected-note {{consumed here}}
+        nonConsumingUse(y) // expected-note {{used here}}
     }
 }
 
@@ -217,28 +237,28 @@ public func patternMatchSwitchLet<T>(_ x: T?) {
     switch x {
     case .none:
         break
-    case .some(let y): // expected-error {{'y' used after being moved}}
-        let _ = _move y // expected-note {{move here}}
-        nonConsumingUse(y) // expected-note {{use here}}
+    case .some(let y): // expected-error {{'y' used after consume}}
+        let _ = consume y // expected-note {{consumed here}}
+        nonConsumingUse(y) // expected-note {{used here}}
     }
 }
 
 public func patternMatchSwitchLet2<T>(_ x: (T?, T?)?) {
     switch x {
-    case .some((.some(let y), _)): // expected-error {{'y' used after being moved}}
-        let _ = _move y // expected-note {{move here}}
-        nonConsumingUse(y) // expected-note {{use here}}
+    case .some((.some(let y), _)): // expected-error {{'y' used after consume}}
+        let _ = consume y // expected-note {{consumed here}}
+        nonConsumingUse(y) // expected-note {{used here}}
     default:
         break
     }
 }
 
-public func patternMatchSwitchLet3<T>(_ x: __owned (T?, T?)?) { // expected-error {{'x' used after being moved}}
-    let _ = _move x // expected-note {{move here}}
-    switch x { // expected-note {{use here}}
-    case .some((.some(_), .some(let z))): // expected-error {{'z' used after being moved}}
-        let _ = _move z // expected-note {{move here}}
-        nonConsumingUse(z) // expected-note {{use here}}
+public func patternMatchSwitchLet3<T>(_ x: __owned (T?, T?)?) { // expected-error {{'x' used after consume}}
+    let _ = consume x // expected-note {{consumed here}}
+    switch x { // expected-note {{used here}}
+    case .some((.some(_), .some(let z))): // expected-error {{'z' used after consume}}
+        let _ = consume z // expected-note {{consumed here}}
+        nonConsumingUse(z) // expected-note {{used here}}
     default:
         break
     }
@@ -258,10 +278,10 @@ public struct Pair<T> {
 // have invalidated a part of pair. We can be less restrictive in the future.
 //
 // TODO: Why are we emitting two uses here.
-public func performMoveOnOneEltOfPair<T>(_ p: __owned Pair<T>) { // expected-error {{'p' used after being moved}}
+public func performMoveOnOneEltOfPair<T>(_ p: __owned Pair<T>) { // expected-error {{'p' used after consume}}
     let _ = p.z // Make sure we don't crash when we access a trivial value from Pair.
-    let _ = _move p // expected-note {{move here}}
-    nonConsumingUse(p.y) // expected-note {{use here}}
+    let _ = consume p // expected-note {{consumed here}}
+    nonConsumingUse(p.y) // expected-note {{used here}}
 }
 
 public class TPair<T> {
@@ -272,7 +292,7 @@ public class TPair<T> {
 public func multipleVarsWithSubsequentBorrows<T : Equatable>(_ p: T) -> Bool {
     let k = p
     let k2 = k
-    let k3 = _move k
+    let k3 = consume k
     return k2 == k3
 }
 
@@ -280,24 +300,24 @@ public func multipleVarsWithSubsequentBorrows<T : Equatable>(_ p: T) -> Bool {
 // Cast Tests //
 ////////////////
 
-public func castTest0<T : SubP1>(_ x: __owned T) -> P { // expected-error {{'x' used after being moved}}
-    let _ = _move x // expected-note {{move here}}
-    return x as P // expected-note {{use here}}
+public func castTest0<T : SubP1>(_ x: __owned T) -> P { // expected-error {{'x' used after consume}}
+    let _ = consume x // expected-note {{consumed here}}
+    return x as P // expected-note {{used here}}
 }
 
-public func castTest1<T : P>(_ x: __owned T) -> SubP2 { // expected-error {{'x' used after being moved}}
-    let _ = _move x // expected-note {{move here}}
-    return x as! SubP2 // expected-note {{use here}}
+public func castTest1<T : P>(_ x: __owned T) -> SubP2 { // expected-error {{'x' used after consume}}
+    let _ = consume x // expected-note {{consumed here}}
+    return x as! SubP2 // expected-note {{used here}}
 }
 
-public func castTest2<T : P>(_ x: __owned T) -> SubP1? { // expected-error {{'x' used after being moved}}
-    let _ = _move x // expected-note {{move here}}
-    return x as? SubP1 // expected-note {{use here}}
+public func castTest2<T : P>(_ x: __owned T) -> SubP1? { // expected-error {{'x' used after consume}}
+    let _ = consume x // expected-note {{consumed here}}
+    return x as? SubP1 // expected-note {{used here}}
 }
 
-public func castTestSwitch1<T : P>(_ x: __owned T) { // expected-error {{'x' used after being moved}}
-    let _ = _move x // expected-note {{move here}}
-    switch x { // expected-note {{use here}}
+public func castTestSwitch1<T : P>(_ x: __owned T) { // expected-error {{'x' used after consume}}
+    let _ = consume x // expected-note {{consumed here}}
+    switch x { // expected-note {{used here}}
     case let k as SubP1:
         print(k)
     default:
@@ -305,9 +325,9 @@ public func castTestSwitch1<T : P>(_ x: __owned T) { // expected-error {{'x' use
     }
 }
 
-public func castTestSwitch2<T : P>(_ x: __owned T) { // expected-error {{'x' used after being moved}}
-    let _ = _move x // expected-note {{move here}}
-    switch x { // expected-note {{use here}}
+public func castTestSwitch2<T : P>(_ x: __owned T) { // expected-error {{'x' used after consume}}
+    let _ = consume x // expected-note {{consumed here}}
+    switch x { // expected-note {{used here}}
     case let k as SubP1:
         print(k)
     case let k as SubP2:
@@ -317,11 +337,11 @@ public func castTestSwitch2<T : P>(_ x: __owned T) { // expected-error {{'x' use
     }
 }
 
-public func castTestSwitchInLoop<T : P>(_ x: __owned T) { // expected-error {{'x' used after being moved}}
-    let _ = _move x // expected-note {{move here}}
+public func castTestSwitchInLoop<T : P>(_ x: __owned T) { // expected-error {{'x' used after consume}}
+    let _ = consume x // expected-note {{consumed here}}
 
     for _ in 0..<1024 {
-        switch x { // expected-note {{use here}}
+        switch x { // expected-note {{used here}}
         case let k as SubP1:
             print(k)
         default:
@@ -330,19 +350,19 @@ public func castTestSwitchInLoop<T : P>(_ x: __owned T) { // expected-error {{'x
     }
 }
 
-public func castTestIfLet<T : P>(_ x: __owned T) { // expected-error {{'x' used after being moved}}
-    let _ = _move x // expected-note {{move here}}
-    if case let k as SubP1 = x { // expected-note {{use here}}
+public func castTestIfLet<T : P>(_ x: __owned T) { // expected-error {{'x' used after consume}}
+    let _ = consume x // expected-note {{consumed here}}
+    if case let k as SubP1 = x { // expected-note {{used here}}
         print(k)
     } else {
         print("no")
     }
 }
 
-public func castTestIfLetInLoop<T : P>(_ x: __owned T) { // expected-error {{'x' used after being moved}}
-    let _ = _move x // expected-note {{move here}}
+public func castTestIfLetInLoop<T : P>(_ x: __owned T) { // expected-error {{'x' used after consume}}
+    let _ = consume x // expected-note {{consumed here}}
     for _ in 0..<1024 {
-        if case let k as SubP1 = x { // expected-note {{use here}}
+        if case let k as SubP1 = x { // expected-note {{used here}}
             print(k)
         } else {
             print("no")
@@ -355,13 +375,27 @@ public enum EnumWithKlass {
     case klass(P)
 }
 
-public func castTestIfLet2(_ x : __owned EnumWithKlass) { // expected-error {{'x' used after being moved}}
-    let _ = _move x // expected-note {{move here}}
-    if case let .klass(k as SubP1) = x { // expected-note {{use here}}
+public func castTestIfLet2(_ x : __owned EnumWithKlass) { // expected-error {{'x' used after consume}}
+    let _ = consume x // expected-note {{consumed here}}
+    if case let .klass(k as SubP1) = x { // expected-note {{used here}}
         print(k)
     } else {
         print("no")
     }
+}
+
+enum rdar125817827<A, B> {
+  case a(A)
+  case b(B)
+}
+
+extension rdar125817827 {
+  func foo() { // expected-error {{'self' is borrowed and cannot be consumed}}
+    switch consume self { // expected-note {{consumed here}}
+    case let .a(a): print(a)
+    case let .b(b): print(b)
+    }
+  }
 }
 
 /////////////////////////
@@ -369,9 +403,9 @@ public func castTestIfLet2(_ x : __owned EnumWithKlass) { // expected-error {{'x
 /////////////////////////
 
 // Emit a better error here. At least we properly error.
-public func partialApplyTest<T>(_ x: __owned T) { // expected-error {{'x' used after being moved}}
-    let _ = _move x // expected-note {{move here}}
-    let f = { // expected-note {{use here}}
+public func partialApplyTest<T>(_ x: __owned T) { // expected-error {{'x' used after consume}}
+    let _ = consume x // expected-note {{consumed here}}
+    let f = { // expected-note {{used here}}
         nonConsumingUse(x)
     }
     f()
@@ -382,9 +416,9 @@ public func partialApplyTest<T>(_ x: __owned T) { // expected-error {{'x' used a
 /////////////////
 
 // TODO: Emit an error in the defer.
-public func deferTest<T>(_ x: __owned T) { // expected-error {{'x' used after being moved}}
-    let _ = _move x // expected-note {{move here}}
-    defer { // expected-note {{use here}}
+public func deferTest<T>(_ x: __owned T) { // expected-error {{'x' used after consume}}
+    let _ = consume x // expected-note {{consumed here}}
+    defer { // expected-note {{used here}}
         nonConsumingUse(x)
     }
     print("do Something")

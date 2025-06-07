@@ -1,11 +1,13 @@
-// RUN: %target-swiftxx-frontend -I %S/Inputs -emit-silgen %s | %FileCheck %s
+// RUN: %target-swiftxx-frontend -I %S/Inputs -Xllvm -sil-print-types -emit-silgen %s | %FileCheck --dump-input-filter=all %s
+
+// REQUIRES: OS=macosx || OS=linux-android
 
 import TypeClassification
 
 // Make sure that "StructWithDestructor" is marked as non-trivial by checking for a
 // "destroy_addr".
 // CHECK-LABEL: sil [ossa] @$s4main24testStructWithDestructoryyF
-// CHECK: [[AS:%.*]] = alloc_stack [lexical] $StructWithDestructor
+// CHECK: [[AS:%.*]] = alloc_stack [lexical] [var_decl] $StructWithDestructor
 // CHECK: [[FN:%.*]] = function_ref @{{_ZN20StructWithDestructorC1Ev|\?\?0StructWithDestructor@@QEAA@XZ}} : $@convention(c) () -> @out StructWithDestructor
 // CHECK: apply [[FN]]([[AS]]) : $@convention(c) () -> @out StructWithDestructor
 // CHECK: destroy_addr [[AS]]
@@ -20,7 +22,7 @@ public func testStructWithDestructor() {
 // Make sure that "HasMemberWithDestructor" is marked as non-trivial by checking
 // for a "destroy_addr".
 // CHECK-LABEL: sil [ossa] @$s4main33testStructWithSubobjectDestructoryyF : $@convention(thin) () -> ()
-// CHECK: [[AS:%.*]] = alloc_stack [lexical] $StructWithSubobjectDestructor
+// CHECK: [[AS:%.*]] = alloc_stack [lexical] [var_decl] $StructWithSubobjectDestructor
 // CHECK: [[FN:%.*]] = function_ref @{{_ZN29StructWithSubobjectDestructorC1Ev|\?\?0StructWithSubobjectDestructor@@QEAA@XZ}} : $@convention(c) () -> @out StructWithSubobjectDestructor
 // CHECK: apply [[FN]]([[AS]]) : $@convention(c) () -> @out StructWithSubobjectDestructor
 // CHECK: destroy_addr [[AS]]
@@ -32,7 +34,7 @@ public func testStructWithSubobjectDestructor() {
 }
 
 // CHECK-LABEL: sil [ossa] @$s4main37testStructWithCopyConstructorAndValueSbyF
-// CHECK: [[AS:%.*]] = alloc_stack [lexical] $StructWithCopyConstructorAndValue
+// CHECK: [[AS:%.*]] = alloc_stack [lexical] [var_decl] $StructWithCopyConstructorAndValue
 // CHECK: [[FN:%.*]] = function_ref @{{_ZN33StructWithCopyConstructorAndValueC1Ei|\?\?0StructWithCopyConstructorAndValue@@QEAA@H@Z}} : $@convention(c) (Int32) -> @out StructWithCopyConstructorAndValue
 // CHECK: apply [[FN]]([[AS]], %{{.*}}) : $@convention(c) (Int32) -> @out StructWithCopyConstructorAndValue
 // CHECK: [[OBJ_VAL_ADDR:%.*]] = struct_element_addr [[AS]] : $*StructWithCopyConstructorAndValue, #StructWithCopyConstructorAndValue.value
@@ -53,10 +55,10 @@ public func testStructWithCopyConstructorAndValue() -> Bool {
 }
 
 // CHECK-LABEL: sil [ossa] @$s4main46testStructWithSubobjectCopyConstructorAndValueSbyF : $@convention(thin) () -> Bool
-// CHECK: [[MEMBER_0:%.*]] = alloc_stack [lexical] $StructWithCopyConstructorAndValue
+// CHECK: [[MEMBER_0:%.*]] = alloc_stack [lexical] [var_decl] $StructWithCopyConstructorAndValue
 // CHECK: [[MAKE_MEMBER_FN:%.*]] = function_ref @{{_ZN33StructWithCopyConstructorAndValueC1Ei|\?\?0StructWithCopyConstructorAndValue@@QEAA@H@Z}} : $@convention(c) (Int32) -> @out StructWithCopyConstructorAndValue
 // CHECK: apply [[MAKE_MEMBER_FN]]([[MEMBER_0]], %{{.*}}) : $@convention(c) (Int32) -> @out StructWithCopyConstructorAndValue
-// CHECK: [[AS:%.*]] = alloc_stack [lexical] $StructWithSubobjectCopyConstructorAndValue
+// CHECK: [[AS:%.*]] = alloc_stack [lexical] [var_decl] $StructWithSubobjectCopyConstructorAndValue
 // CHECK: [[META:%.*]] = metatype $@thin StructWithSubobjectCopyConstructorAndValue.Type
 // CHECK: [[MEMBER_1:%.*]] = alloc_stack $StructWithCopyConstructorAndValue
 // CHECK: copy_addr %0 to [init] [[MEMBER_1]] : $*StructWithCopyConstructorAndValue
@@ -87,14 +89,14 @@ public func testStructWithSubobjectCopyConstructorAndValue() -> Bool {
 
 // testStructWithCopyConstructorAndSubobjectCopyConstructorAndValue()
 // CHECK-LABEL: sil [ossa] @$s4main041testStructWithCopyConstructorAndSubobjectefG5ValueSbyF : $@convention(thin) () -> Bool
-// CHECK: [[MEMBER_0:%.*]] = alloc_stack [lexical] $StructWithCopyConstructorAndValue
+// CHECK: [[MEMBER_0:%.*]] = alloc_stack [lexical] [var_decl] $StructWithCopyConstructorAndValue
 // CHECK: [[CREATE_MEMBER_FN:%.*]] = function_ref @{{_ZN33StructWithCopyConstructorAndValueC1Ei|\?\?0StructWithCopyConstructorAndValue@@QEAA@H@Z}} : $@convention(c) (Int32) -> @out StructWithCopyConstructorAndValue
 // CHECK: apply [[CREATE_MEMBER_FN]]([[MEMBER_0]], %{{.*}}) : $@convention(c) (Int32) -> @out StructWithCopyConstructorAndValue
-// CHECK: [[AS:%.*]] = alloc_stack [lexical] $StructWithCopyConstructorAndSubobjectCopyConstructorAndValue
+// CHECK: [[AS:%.*]] = alloc_stack [lexical] [var_decl] $StructWithCopyConstructorAndSubobjectCopyConstructorAndValue
 // CHECK: [[MEMBER_1:%.*]] = alloc_stack $StructWithCopyConstructorAndValue
 // CHECK: copy_addr [[MEMBER_0]] to [init] [[MEMBER_1]] : $*StructWithCopyConstructorAndValue
-// CHECK: [[FN:%.*]] = function_ref @{{_ZN60StructWithCopyConstructorAndSubobjectCopyConstructorAndValueC1E33StructWithCopyConstructorAndValue|\?\?0StructWithCopyConstructorAndSubobjectCopyConstructorAndValue@@QEAA@UStructWithCopyConstructorAndValue@@@Z}} : $@convention(c) (@in StructWithCopyConstructorAndValue) -> @out StructWithCopyConstructorAndSubobjectCopyConstructorAndValue
-// CHECK: apply [[FN]]([[AS]], [[MEMBER_1]]) : $@convention(c) (@in StructWithCopyConstructorAndValue) -> @out StructWithCopyConstructorAndSubobjectCopyConstructorAndValue
+// CHECK: [[FN:%.*]] = function_ref @{{_ZN60StructWithCopyConstructorAndSubobjectCopyConstructorAndValueC1E33StructWithCopyConstructorAndValue|\?\?0StructWithCopyConstructorAndSubobjectCopyConstructorAndValue@@QEAA@UStructWithCopyConstructorAndValue@@@Z}} : $@convention(c) (@in_cxx StructWithCopyConstructorAndValue) -> @out StructWithCopyConstructorAndSubobjectCopyConstructorAndValue
+// CHECK: apply [[FN]]([[AS]], [[MEMBER_1]]) : $@convention(c) (@in_cxx StructWithCopyConstructorAndValue) -> @out StructWithCopyConstructorAndSubobjectCopyConstructorAndValue
 // CHECK: [[OBJ_MEMBER_ADDR:%.*]] = struct_element_addr [[AS]] : $*StructWithCopyConstructorAndSubobjectCopyConstructorAndValue, #StructWithCopyConstructorAndSubobjectCopyConstructorAndValue.member
 // CHECK: [[MEMBER_2:%.*]] = alloc_stack $StructWithCopyConstructorAndValue
 // CHECK: copy_addr [[OBJ_MEMBER_ADDR]] to [init] [[MEMBER_2]] : $*StructWithCopyConstructorAndValue

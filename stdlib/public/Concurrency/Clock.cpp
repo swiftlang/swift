@@ -21,6 +21,16 @@
 #include <realtimeapiset.h>
 #endif
 
+#if __has_include(<chrono>)
+#define WE_HAVE_STD_CHRONO 1
+#include <chrono>
+
+#if __has_include(<thread>)
+#define WE_HAVE_STD_THIS_THREAD 1
+#include <thread>
+#endif
+#endif // __has_include(<chrono>)
+
 #include "Error.h"
 
 using namespace swift;
@@ -41,19 +51,23 @@ void swift_get_time(
 #elif (defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__wasi__))
       clock_gettime(CLOCK_MONOTONIC, &continuous);
 #elif defined(_WIN32)
-      LARGE_INTEGER freq;
-      QueryPerformanceFrequency(&freq);
-      LARGE_INTEGER count;
-      QueryPerformanceCounter(&count);
-      // Divide count (number of ticks) by frequency (number of ticks per
-      // second) to get the counter in seconds. We also need to multiply the
-      // count by 1,000,000,000 to get nanosecond resolution. By multiplying
-      // first, we maintain high precision. The resulting value is the tick
-      // count in nanoseconds. Use 128-bit math to avoid overflowing.
-      auto quadPart = static_cast<unsigned _BitInt(128)>(count.QuadPart);
-      auto ns = (quadPart * 1'000'000'000) / freq.QuadPart;
-      continuous.tv_sec = ns / 1'000'000'000;
-      continuous.tv_nsec = ns % 1'000'000'000;
+      // This needs to match what swift-corelibs-libdispatch does
+
+      // QueryInterruptTimePrecise() outputs a value measured in 100ns
+      // units. We must divide the output by 10,000,000 to get a value in
+      // seconds and multiply the remainder by 100 to get nanoseconds.
+      ULONGLONG interruptTime;
+      (void)QueryInterruptTimePrecise(&interruptTime);
+      continuous.tv_sec = interruptTime / 10'000'000;
+      continuous.tv_nsec = (interruptTime % 10'000'000) * 100;
+#elif WE_HAVE_STD_CHRONO
+      auto now = std::chrono::steady_clock::now();
+      auto epoch = std::chrono::steady_clock::min();
+      auto timeSinceEpoch = now - epoch;
+      auto sec = std::chrono::duration_cast<std::chrono::seconds>(timeSinceEpoch);
+      auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(timeSinceEpoch - sec);
+      continuous.tv_sec = sec;
+      continuous.tv_nsec = ns;
 #else
 #error Missing platform continuous time definition
 #endif
@@ -72,34 +86,23 @@ void swift_get_time(
 #elif (defined(__OpenBSD__) || defined(__FreeBSD__))
       clock_gettime(CLOCK_UPTIME, &suspending);
 #elif defined(_WIN32)
-      // QueryUnbiasedInterruptTimePrecise() was added in Windows 10 and is, as
-      // the name suggests, more precise than QueryUnbiasedInterruptTime().
-      // Unfortunately, the symbol is not listed in any .lib file in the SDK and
-      // must be looked up dynamically at runtime even if our minimum deployment
-      // target is Windows 10.
-      typedef decltype(QueryUnbiasedInterruptTimePrecise) *QueryUITP_FP;
-      static QueryUITP_FP queryUITP = nullptr;
-      static swift::once_t onceToken;
-      swift::once(onceToken, [] {
-        if (HMODULE hKernelBase = GetModuleHandleW(L"KernelBase.dll")) {
-          queryUITP = reinterpret_cast<QueryUITP_FP>(
-            GetProcAddress(hKernelBase, "QueryUnbiasedInterruptTimePrecise")
-          );
-        }
-      });
+      // This needs to match what swift-corelibs-libdispatch does
 
-      // Call whichever API is available. Both output a value measured in 100ns
+      // QueryUnbiasedInterruptTimePrecise() outputs a value measured in 100ns
       // units. We must divide the output by 10,000,000 to get a value in
       // seconds and multiply the remainder by 100 to get nanoseconds.
       ULONGLONG unbiasedTime;
-      if (queryUITP) {
-        (* queryUITP)(&unbiasedTime);
-      } else {
-        // Fall back to the older, less precise API.
-        (void)QueryUnbiasedInterruptTime(&unbiasedTime);
-      }
+      (void)QueryUnbiasedInterruptTimePrecise(&unbiasedTime);
       suspending.tv_sec = unbiasedTime / 10'000'000;
       suspending.tv_nsec = (unbiasedTime % 10'000'000) * 100;
+#elif WE_HAVE_STD_CHRONO
+      auto now = std::chrono::steady_clock::now();
+      auto epoch = std::chrono::steady_clock::min();
+      auto timeSinceEpoch = now - epoch;
+      auto sec = std::chrono::duration_cast<std::chrono::seconds>(timeSinceEpoch);
+      auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(timeSinceEpoch - sec);
+      suspending.tv_sec = sec;
+      suspending.tv_nsec = ns;
 #else
 #error Missing platform suspending time definition
 #endif
@@ -128,10 +131,13 @@ switch (clock_id) {
 #elif (defined(__OpenBSD__) || defined(__FreeBSD__) || defined(__wasi__))
       clock_getres(CLOCK_MONOTONIC, &continuous);
 #elif defined(_WIN32)
-      LARGE_INTEGER freq;
-      QueryPerformanceFrequency(&freq);
       continuous.tv_sec = 0;
-      continuous.tv_nsec = 1'000'000'000 / freq.QuadPart;
+      continuous.tv_nsec = 100;
+#elif WE_HAVE_STD_CHRONO
+      auto num = std::chrono::steady_clock::period::num;
+      auto den = std::chrono::steady_clock::period::den;
+      continuous.tv_sec = num / den;
+      continuous.tv_nsec = (num * 1000000000ll) % den
 #else
 #error Missing platform continuous time definition
 #endif
@@ -152,6 +158,11 @@ switch (clock_id) {
 #elif defined(_WIN32)
       suspending.tv_sec = 0;
       suspending.tv_nsec = 100;
+#elif WE_HAVE_STD_CHRONO
+      auto num = std::chrono::steady_clock::period::num;
+      auto den = std::chrono::steady_clock::period::den;
+      continuous.tv_sec = num / den;
+      continuous.tv_nsec = (num * 1'000'000'000ll) % den
 #else
 #error Missing platform suspending time definition
 #endif
@@ -162,4 +173,44 @@ switch (clock_id) {
   }
   swift_Concurrency_fatalError(0, "Fatal error: invalid clock ID %d\n",
                                clock_id);
+}
+
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift)
+void swift_sleep(
+  long long seconds,
+  long long nanoseconds) {
+#if defined(_WIN32)
+  ULONGLONG now;
+  (void)QueryInterruptTimePrecise(&now);
+  ULONGLONG delay = seconds * 10'000'000 + nanoseconds / 100;
+  ULONGLONG deadline = now + delay;
+  while (deadline > now) {
+    DWORD dwMsec = delay / 10'000;
+
+    // For sleeps over 15ms, Windows may return up to 15ms early(!);
+    // for sleeps less than 15ms, Windows does a delay koop internally,
+    // which is acceptable here.
+    if (dwMsec > 15)
+      dwMsec += 15;
+
+    (void)SleepEx(dwMsec, TRUE);
+    (void)QueryInterruptTimePrecise(&now);
+    delay = deadline - now;
+  }
+#elif defined(__linux__) || defined(__APPLE__) || defined(__wasi__) \
+  || defined(__OpenBSD) || defined(__FreeBSD__)
+  struct timespec ts;
+  ts.tv_sec = seconds;
+  ts.tv_nsec = nanoseconds;
+  while (nanosleep(&ts, &ts) == -1 && errno == EINTR);
+#elif WE_HAVE_STD_THIS_THREAD && !defined(SWIFT_THREADING_NONE)
+  auto duration
+    = std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+      std::chrono::seconds(seconds) + std::chrono::nanoseconds(nanoseconds)
+    );
+  std::this_thread::sleep_for(duration);
+#else
+  #error Missing platform sleep definition
+#endif
 }

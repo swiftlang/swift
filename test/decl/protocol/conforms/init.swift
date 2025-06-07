@@ -31,7 +31,7 @@ class C1c : P1 {
 
 struct S2 : P1 { } // okay
 
-enum E2 : P1 { } // expected-error{{type 'E2' does not conform to protocol 'P1'}}
+enum E2 : P1 { } // expected-error{{type 'E2' does not conform to protocol 'P1'}} expected-note {{add stubs for conformance}}
 
 final class C2a : P1 { } // okay
 

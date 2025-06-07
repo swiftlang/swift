@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-ide-test  -F %S/Inputs/custom-frameworks -print-module -source-filename %s -module-to-print=APINotesFrameworkTest -function-definitions=false -print-regular-comments -swift-version 5 | %FileCheck -check-prefix=CHECK-SWIFT-5 %s
+// RUN: %target-swift-ide-test  -F %S/Inputs/custom-frameworks -print-module -source-filename %s -module-to-print=APINotesFrameworkTest -function-definitions=false -swift-version 5 | %FileCheck -check-prefix=CHECK-SWIFT-5 %s
 
-// RUN: %target-swift-ide-test  -F %S/Inputs/custom-frameworks -print-module -source-filename %s -module-to-print=APINotesFrameworkTest -function-definitions=false -print-regular-comments -swift-version 4 | %FileCheck -check-prefix=CHECK-SWIFT-4 %s
+// RUN: %target-swift-ide-test  -F %S/Inputs/custom-frameworks -print-module -source-filename %s -module-to-print=APINotesFrameworkTest -function-definitions=false -swift-version 4 | %FileCheck -check-prefix=CHECK-SWIFT-4 %s
 
 // CHECK-SWIFT-5: func jumpTo(x: Double, y: Double, z: Double)
 // CHECK-SWIFT-4: func jumpTo(x: Double, y: Double, z: Double)

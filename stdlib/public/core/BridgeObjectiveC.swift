@@ -95,9 +95,9 @@ internal func _SwiftCreateBridgedArray_DoNotCall(
   values: UnsafePointer<AnyObject>,
   numValues: Int
 ) -> Unmanaged<AnyObject> {
-  let bufPtr = UnsafeBufferPointer(start: values, count: numValues)
-  let bridged = Array(bufPtr)._bridgeToObjectiveCImpl()
-  return Unmanaged<AnyObject>.passRetained(bridged)
+  let bufPtr = unsafe UnsafeBufferPointer(start: values, count: numValues)
+  let bridged = unsafe Array(bufPtr)._bridgeToObjectiveCImpl()
+  return unsafe Unmanaged<AnyObject>.passRetained(bridged)
 }
 
 // Note: This function is not intended to be called from Swift.  The
@@ -110,9 +110,9 @@ internal func _SwiftCreateBridgedMutableArray_DoNotCall(
   values: UnsafePointer<AnyObject>,
   numValues: Int
 ) -> Unmanaged<AnyObject> {
-  let bufPtr = UnsafeBufferPointer(start: values, count: numValues)
-  let bridged = _SwiftNSMutableArray(Array(bufPtr))
-  return Unmanaged<AnyObject>.passRetained(bridged)
+  let bufPtr = unsafe UnsafeBufferPointer(start: values, count: numValues)
+  let bridged = unsafe _SwiftNSMutableArray(Array(bufPtr))
+  return unsafe Unmanaged<AnyObject>.passRetained(bridged)
 }
 
 @_silgen_name("swift_stdlib_connectNSBaseClasses")
@@ -182,6 +182,7 @@ public struct _BridgeableMetatype: _ObjectiveCBridgeable {
   }
 }
 
+extension _BridgeableMetatype: Sendable {}
 
 //===--- Bridging facilities written in Objective-C -----------------------===//
 // Functions that must discover and possibly use an arbitrary type's
@@ -206,7 +207,7 @@ public struct _BridgeableMetatype: _ObjectiveCBridgeable {
 @inlinable
 public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
-    return unsafeBitCast(x, to: AnyObject.self)
+    return unsafe unsafeBitCast(x, to: AnyObject.self)
   }
   return _bridgeAnythingNonVerbatimToObjectiveC(x)
 }
@@ -327,7 +328,7 @@ internal func _bridgeNonVerbatimBoxedValue<NativeType>(
     _ x: UnsafePointer<NativeType>,
     _ result: inout NativeType?
 ) {
-  result = x.pointee
+  result = unsafe x.pointee
 }
 
 /// Runtime optional to conditionally perform a bridge from an object to a value
@@ -406,15 +407,16 @@ public func _getBridgedNonVerbatimObjectiveCType<T>(_: T.Type) -> Any.Type?
 /// because it only needs to reference the results of inout conversions, which
 /// already have writeback-scoped lifetime.
 @frozen
+@unsafe
 public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
-  :  _Pointer {
+  :  @unsafe _Pointer {
 
   public let _rawValue: Builtin.RawPointer
 
   @_transparent
   public // COMPILER_INTRINSIC
   init(_ _rawValue: Builtin.RawPointer) {
-    self._rawValue = _rawValue
+    unsafe self._rawValue = _rawValue
   }
 
   /// Retrieve or set the `Pointee` instance referenced by `self`.
@@ -439,15 +441,15 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
       // optional type, so we actually need to load it as an optional, and
       // explicitly handle the nil case.
       let unmanaged =
-        UnsafePointer<Optional<Unmanaged<AnyObject>>>(_rawValue).pointee
-      return _unsafeReferenceCast(
+        unsafe UnsafePointer<Optional<Unmanaged<AnyObject>>>(_rawValue).pointee
+      return unsafe _unsafeReferenceCast(
         unmanaged?.takeUnretainedValue(),
         to: Pointee.self)
     }
 
     @_transparent nonmutating set {
       // Autorelease the object reference.
-      let object = _unsafeReferenceCast(newValue, to: Optional<AnyObject>.self)
+      let object = unsafe _unsafeReferenceCast(newValue, to: Optional<AnyObject>.self)
       Builtin.retain(object)
       Builtin.autorelease(object)
 
@@ -455,11 +457,11 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
       // memory addressed by this pointer.
       let unmanaged: Optional<Unmanaged<AnyObject>>
       if let object = object {
-        unmanaged = Unmanaged.passUnretained(object)
+        unsafe unmanaged = unsafe Unmanaged.passUnretained(object)
       } else {
-        unmanaged = nil
+        unsafe unmanaged = nil
       }
-      UnsafeMutablePointer<Optional<Unmanaged<AnyObject>>>(_rawValue).pointee =
+      unsafe UnsafeMutablePointer<Optional<Unmanaged<AnyObject>>>(_rawValue).pointee =
         unmanaged
     }
   }
@@ -472,7 +474,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   public subscript(i: Int) -> Pointee {
     @_transparent
     get {
-      return self.advanced(by: i).pointee
+      return unsafe self.advanced(by: i).pointee
     }
   }
 
@@ -486,7 +488,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   ///   the underlying memory's bound type is undefined.
   @_transparent
   public init<U>(@_nonEphemeral _ from: UnsafeMutablePointer<U>) {
-   self._rawValue = from._rawValue
+   unsafe self._rawValue = from._rawValue
   }
 
   /// Explicit construction from an UnsafeMutablePointer.
@@ -501,8 +503,8 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   ///   the underlying memory's bound type is undefined.
   @_transparent
   public init?<U>(@_nonEphemeral _ from: UnsafeMutablePointer<U>?) {
-   guard let unwrapped = from else { return nil }
-   self.init(unwrapped)
+   guard let unwrapped = unsafe from else { return nil }
+   unsafe self.init(unwrapped)
   }
      
   /// Explicit construction from a UnsafePointer.
@@ -516,7 +518,7 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   internal init<U>(
     @_nonEphemeral _ from: UnsafePointer<U>
   ) {
-    self._rawValue = from._rawValue
+    unsafe self._rawValue = from._rawValue
   }
 
   /// Explicit construction from a UnsafePointer.
@@ -532,8 +534,8 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
   internal init?<U>(
     @_nonEphemeral _ from: UnsafePointer<U>?
   ) {
-    guard let unwrapped = from else { return nil }
-    self.init(unwrapped)
+    guard let unwrapped = unsafe from else { return nil }
+    unsafe self.init(unwrapped)
   }
 }
 
@@ -546,7 +548,7 @@ extension UnsafeMutableRawPointer {
   public init<T>(
     @_nonEphemeral _ other: AutoreleasingUnsafeMutablePointer<T>
   ) {
-    _rawValue = other._rawValue
+    _rawValue = unsafe other._rawValue
   }
 
   /// Creates a new raw pointer from an `AutoreleasingUnsafeMutablePointer`
@@ -558,8 +560,8 @@ extension UnsafeMutableRawPointer {
   public init?<T>(
     @_nonEphemeral _ other: AutoreleasingUnsafeMutablePointer<T>?
   ) {
-    guard let unwrapped = other else { return nil }
-    self.init(unwrapped)
+    guard let unwrapped = unsafe other else { return nil }
+    unsafe self.init(unwrapped)
   }
 }
 
@@ -572,7 +574,7 @@ extension UnsafeRawPointer {
   public init<T>(
     @_nonEphemeral _ other: AutoreleasingUnsafeMutablePointer<T>
   ) {
-    _rawValue = other._rawValue
+    _rawValue = unsafe other._rawValue
   }
 
   /// Creates a new raw pointer from an `AutoreleasingUnsafeMutablePointer`
@@ -584,13 +586,15 @@ extension UnsafeRawPointer {
   public init?<T>(
     @_nonEphemeral _ other: AutoreleasingUnsafeMutablePointer<T>?
   ) {
-    guard let unwrapped = other else { return nil }
-    self.init(unwrapped)
+    guard let unwrapped = unsafe other else { return nil }
+    unsafe self.init(unwrapped)
   }
 }
 
-extension AutoreleasingUnsafeMutablePointer { }
+@available(*, unavailable)
+extension AutoreleasingUnsafeMutablePointer: Sendable { }
 
+@unsafe
 internal struct _CocoaFastEnumerationStackBuf {
   // Clang uses 16 pointers.  So do we.
   internal var _item0: UnsafeRawPointer?
@@ -616,24 +620,24 @@ internal struct _CocoaFastEnumerationStackBuf {
   }
 
   internal init() {
-    _item0 = nil
-    _item1 = _item0
-    _item2 = _item0
-    _item3 = _item0
-    _item4 = _item0
-    _item5 = _item0
-    _item6 = _item0
-    _item7 = _item0
-    _item8 = _item0
-    _item9 = _item0
-    _item10 = _item0
-    _item11 = _item0
-    _item12 = _item0
-    _item13 = _item0
-    _item14 = _item0
-    _item15 = _item0
+    unsafe _item0 = nil
+    unsafe _item1 = unsafe _item0
+    unsafe _item2 = unsafe _item0
+    unsafe _item3 = unsafe _item0
+    unsafe _item4 = unsafe _item0
+    unsafe _item5 = unsafe _item0
+    unsafe _item6 = unsafe _item0
+    unsafe _item7 = unsafe _item0
+    unsafe _item8 = unsafe _item0
+    unsafe _item9 = unsafe _item0
+    unsafe _item10 = unsafe _item0
+    unsafe _item11 = unsafe _item0
+    unsafe _item12 = unsafe _item0
+    unsafe _item13 = unsafe _item0
+    unsafe _item14 = unsafe _item0
+    unsafe _item15 = unsafe _item0
 
-    _internalInvariant(MemoryLayout.size(ofValue: self) >=
+    unsafe _internalInvariant(MemoryLayout.size(ofValue: self) >=
                    MemoryLayout<Optional<UnsafeRawPointer>>.size * count)
   }
 }
@@ -647,7 +651,7 @@ public func _getObjCTypeEncoding<T>(_ type: T.Type) -> UnsafePointer<Int8> {
   // This must be `@_transparent` because `Builtin.getObjCTypeEncoding` is
   // only supported by the compiler for concrete types that are representable
   // in ObjC.
-  return UnsafePointer(Builtin.getObjCTypeEncoding(type))
+  return unsafe UnsafePointer(Builtin.getObjCTypeEncoding(type))
 }
 
 #endif

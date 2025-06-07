@@ -7,15 +7,15 @@ import Swift
 sil_scope 2 { loc "simple.swift":1:2 parent @test_debug_value : $@convention(thin) (Int) -> () }
 
 // https://github.com/apple/swift/issues/57215
-// Incorrect source location on 'llvm.dbg.declare' when the input is a SIL file
+// Incorrect source location on '#dbg_declare' when the input is a SIL file
 
 // CHECK: @test_debug_value
 // CHECK-SAME: !dbg ![[FUNC_DI:[0-9]+]]
 sil hidden @test_debug_value : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
-  // CHECK:      @llvm.dbg.declare(metadata i{{[0-9]+}}*
-  // CHECK-SAME:                   metadata ![[VAR_DI:[0-9]+]]
-  // CHECK-SAME:                   ), !dbg ![[LOC_DI:[0-9]+]]
+  // CHECK:      #dbg_declare(ptr
+  // CHECK-SAME:                   ![[VAR_DI:[0-9]+]]
+  // CHECK-SAME:                   , ![[LOC_DI:[0-9]+]]
   debug_value %0 : $Int, let, name "x", argno 1, loc "simple.swift":3:4, scope 2
   %1 = tuple ()
   return %1 : $()

@@ -20,8 +20,8 @@ bb0(%0 :  $*WrapperStruct):
   %1 = load_borrow %0 : $*WrapperStruct
   %func = function_ref @foo1 : $@convention(thin) (@guaranteed WrapperStruct, @in_guaranteed WrapperStruct) -> ()
   %pa = partial_apply [callee_guaranteed] [on_stack] %func(%1, %0) : $@convention(thin) (@guaranteed WrapperStruct, @in_guaranteed WrapperStruct) -> ()
+  destroy_value %pa : $@noescape @callee_guaranteed () -> () 
   end_borrow %1 : $WrapperStruct
-  dealloc_stack %pa : $@noescape @callee_guaranteed () -> () 
   %res = tuple ()
   return %res : $()
 }
@@ -55,7 +55,7 @@ bb0(%0 :  @owned $WrapperStruct):
 //       we run sil-opt with -dont-abort-on-memory-lifetime-error.
 
 // CHECK-LABEL: Begin Error in function caller2
-// CHECK: SIL verification failed: Found load borrow that is invalidated by a local write?!: loadBorrowImmutabilityAnalysis.isImmutable(LBI)
+// CHECK: SIL verification failed: Load borrow invalidated by a local write
 // CHECK-LABEL: End Error in function caller2
 sil [ossa] @caller2 : $@convention(thin) (@owned WrapperStruct) -> () {
 bb0(%0 :  @owned $WrapperStruct):

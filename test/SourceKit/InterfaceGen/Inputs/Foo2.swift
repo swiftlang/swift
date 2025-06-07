@@ -2,7 +2,7 @@
 // Keep this line
 
 import Foundation
-import Darwin
+
 public class NewLineAfterImport {
 }
 /// This is the class base

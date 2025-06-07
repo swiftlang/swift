@@ -48,6 +48,8 @@ class DominanceInfo : public DominatorTreeBase {
 public:
   DominanceInfo(SILFunction *F);
 
+  ~DominanceInfo();
+
   /// Does instruction A properly dominate instruction B?
   bool properlyDominates(SILInstruction *a, SILInstruction *b);
 
@@ -58,6 +60,9 @@ public:
 
   /// Does value A properly dominate instruction B?
   bool properlyDominates(SILValue a, SILInstruction *b);
+
+  /// The nearest block which dominates all the uses of \p value.
+  SILBasicBlock *getLeastCommonAncestorOfUses(SILValue value);
 
   void verify() const;
 
@@ -86,11 +91,15 @@ public:
   void reset() {
     super::reset();
   }
+
+#ifndef NDEBUG
+  void dump() LLVM_ATTRIBUTE_USED { print(llvm::errs()); }
+#endif
 };
 
 /// Compute a single block's dominance frontier.
 ///
-/// Precondition: no critical edges (OSSA)
+/// Precondition: no critical edges
 ///
 /// Postcondition: each block in \p boundary is dominated by \p root and either
 /// exits the function or has a single successor which has a predecessor that is

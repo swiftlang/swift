@@ -12,20 +12,21 @@
 
 #include "swift/SILOptimizer/Utils/DistributedActor.h"
 
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILLocation.h"
 
 namespace swift {
 
 void emitDistributedActorSystemWitnessCall(
-    SILBuilder &B, SILLocation loc, DeclName methodName,
-    SILValue base,
+    SILBuilder &B, SILLocation loc, DeclName methodName, SILValue base,
     // types to be passed through to SubstitutionMap:
     SILType actorType,
     // call arguments, except the base which will be passed last
     ArrayRef<SILValue> args,
-    Optional<std::pair<SILBasicBlock *, SILBasicBlock *>> tryTargets) {
+    std::optional<std::pair<SILBasicBlock *, SILBasicBlock *>> tryTargets) {
   auto &F = B.getFunction();
   auto &M = B.getModule();
   auto &C = F.getASTContext();
@@ -34,26 +35,18 @@ void emitDistributedActorSystemWitnessCall(
   ProtocolDecl *DAS = C.getDistributedActorSystemDecl();
   assert(DAS);
   auto systemASTType = base->getType().getASTType();
-  auto *module = M.getSwiftModule();
   ProtocolConformanceRef systemConfRef;
 
   // If the base is an existential open it.
   if (systemASTType->isAnyExistentialType()) {
-    OpenedArchetypeType *opened;
-    systemASTType = systemASTType->openAnyExistentialType(opened,
-                                                          F.getGenericSignature())
-                        ->getCanonicalType();
+    systemASTType = ExistentialArchetypeType::getAny(systemASTType)
+        ->getCanonicalType();
     base = B.createOpenExistentialAddr(
         loc, base, F.getLoweredType(systemASTType),
         OpenedExistentialAccess::Immutable);
   }
 
-  if (systemASTType->isTypeParameter() || systemASTType->is<ArchetypeType>()) {
-    systemConfRef = ProtocolConformanceRef(DAS);
-  } else {
-    systemConfRef = module->lookupConformance(systemASTType, DAS);
-  }
-
+  systemConfRef = lookupConformance(systemASTType, DAS);
   assert(!systemConfRef.isInvalid() &&
          "Missing conformance to `DistributedActorSystem`");
 
@@ -81,7 +74,7 @@ void emitDistributedActorSystemWitnessCall(
       assert(actorProto);
 
       ProtocolConformanceRef conformance;
-      auto distributedActorConfRef = module->lookupConformance(
+      auto distributedActorConfRef = lookupConformance(
           actorType.getASTType(), actorProto);
       assert(!distributedActorConfRef.isInvalid() &&
              "Missing conformance to `DistributedActor`");
@@ -92,15 +85,15 @@ void emitDistributedActorSystemWitnessCall(
     subs = SubstitutionMap::get(genericSig, subTypes, subConformances);
   }
 
-  Optional<SILValue> temporaryArgumentBuffer;
+  std::optional<SILValue> temporaryArgumentBuffer;
 
   // If the self parameter is indirect but the base is a value, put it
   // into a temporary allocation.
   auto methodSILFnTy = methodSILTy.castTo<SILFunctionType>();
-  Optional<SILValue> temporaryActorSystemBuffer;
+  std::optional<SILValue> temporaryActorSystemBuffer;
   if (methodSILFnTy->getSelfParameter().isFormalIndirect() &&
       !base->getType().isAddress()) {
-    auto buf = B.createAllocStack(loc, base->getType(), None);
+    auto buf = B.createAllocStack(loc, base->getType(), std::nullopt);
     base = B.emitCopyValueOperation(loc, base);
     B.emitStoreValueOperation(
         loc, base, buf, StoreOwnershipQualifier::Init);
@@ -116,7 +109,7 @@ void emitDistributedActorSystemWitnessCall(
     if (params[i].isFormalIndirect() &&
         !arg->getType().isAddress() &&
         !dyn_cast<AnyMetatypeType>(arg->getType().getASTType())) {
-      auto buf = B.createAllocStack(loc, arg->getType(), None);
+      auto buf = B.createAllocStack(loc, arg->getType(), std::nullopt);
       auto argCopy = B.emitCopyValueOperation(loc, arg);
       B.emitStoreValueOperation(
           loc, argCopy, buf, StoreOwnershipQualifier::Init);

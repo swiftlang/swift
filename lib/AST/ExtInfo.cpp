@@ -16,10 +16,11 @@
 
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ExtInfo.h"
+#include "swift/Basic/Assertions.h"
 
 #include "clang/AST/Type.h"
 
-#include "llvm/ADT/Optional.h"
+#include <optional>
 
 namespace swift {
 
@@ -60,11 +61,13 @@ void ClangTypeInfo::dump(llvm::raw_ostream &os,
 
 // MARK: - UnexpectedClangTypeError
 
-Optional<UnexpectedClangTypeError> UnexpectedClangTypeError::checkClangType(
-  SILFunctionTypeRepresentation silRep,
-  const clang::Type *type, bool expectNonnullForCOrBlock, bool expectCanonical) {
+std::optional<UnexpectedClangTypeError>
+UnexpectedClangTypeError::checkClangType(SILFunctionTypeRepresentation silRep,
+                                         const clang::Type *type,
+                                         bool expectNonnullForCOrBlock,
+                                         bool expectCanonical) {
 #ifdef NDEBUG
-  return None;
+  return std::nullopt;
 #else
   bool isBlock = true;
   switch (silRep) {
@@ -76,7 +79,7 @@ Optional<UnexpectedClangTypeError> UnexpectedClangTypeError::checkClangType(
     if (!type) {
       if (expectNonnullForCOrBlock)
         return {{Kind::NullForCOrBlock, type}};
-      return None;
+      return std::nullopt;
     }
     if (expectCanonical && !type->isCanonicalUnqualified())
       return {{Kind::NonCanonical, type}};
@@ -85,12 +88,12 @@ Optional<UnexpectedClangTypeError> UnexpectedClangTypeError::checkClangType(
     if (!isBlock && !(type->isFunctionPointerType()
                       || type->isFunctionReferenceType()))
       return {{Kind::NotFunctionPointerOrReference, type}};
-    return None;
+    return std::nullopt;
   }
   default: {
     if (type)
       return {{Kind::NonnullForNonCOrBlock, type}};
-    return None;
+    return std::nullopt;
   }
   }
 #endif
@@ -102,7 +105,7 @@ void UnexpectedClangTypeError::dump() {
   switch (errorKind) {
   case Kind::NullForCOrBlock: {
     e << "Expected non-null Clang type for @convention(c)/@convention(block)"
-      << " function but found nullptr.";
+      << " function but found nullptr.\n";
     return;
   }
   case Kind::NonnullForNonCOrBlock: {
@@ -181,7 +184,7 @@ SILExtInfo SILExtInfoBuilder::build() const {
 
 // MARK: - SILExtInfo
 
-Optional<UnexpectedClangTypeError> SILExtInfo::checkClangType() const {
+std::optional<UnexpectedClangTypeError> SILExtInfo::checkClangType() const {
   return UnexpectedClangTypeError::checkClangType(
       getRepresentation(), getClangTypeInfo().getType(), true, true);
 }

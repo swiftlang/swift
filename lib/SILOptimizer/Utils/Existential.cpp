@@ -11,8 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Utils/Existential.h"
-#include "swift/AST/Module.h"
+#include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
@@ -117,11 +119,6 @@ static SILInstruction *getStackInitInst(SILValue allocStackAddr,
         if (SingleWrite)
           return nullptr;
         SingleWrite = store;
-        // When we support OSSA here, we need to insert a new copy of the value
-        // before `store` (and make sure that the copy is destroyed when
-        // replacing the apply operand).
-        assert(store->getOwnershipQualifier() ==
-               StoreOwnershipQualifier::Unqualified);
       }
       continue;
     }
@@ -220,13 +217,13 @@ OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
     }
   }
   if (auto *Open = dyn_cast<OpenExistentialAddrInst>(openedVal)) {
-    OpenedArchetype = Open->getType().castTo<OpenedArchetypeType>();
+    OpenedArchetype = Open->getType().castTo<ExistentialArchetypeType>();
     OpenedArchetypeValue = Open;
     ExistentialValue = Open->getOperand();
     return;
   }
   if (auto *Open = dyn_cast<OpenExistentialRefInst>(openedVal)) {
-    OpenedArchetype = Open->getType().castTo<OpenedArchetypeType>();
+    OpenedArchetype = Open->getType().castTo<ExistentialArchetypeType>();
     OpenedArchetypeValue = Open;
     ExistentialValue = Open->getOperand();
     return;
@@ -235,7 +232,7 @@ OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
     auto Ty = Open->getType().getASTType();
     while (auto Metatype = dyn_cast<MetatypeType>(Ty))
       Ty = Metatype.getInstanceType();
-    OpenedArchetype = cast<OpenedArchetypeType>(Ty);
+    OpenedArchetype = cast<ExistentialArchetypeType>(Ty);
     OpenedArchetypeValue = Open;
     ExistentialValue = Open->getOperand();
   }
@@ -249,19 +246,24 @@ void ConcreteExistentialInfo::initializeSubstitutionMap(
   // Construct a single-generic-parameter substitution map directly to the
   // ConcreteType with this existential's full list of conformances.
   //
-  // NOTE: getOpenedExistentialSignature() generates the signature for passing an
+  // NOTE: LocalArchetypeRequirementCollector generates the signature for passing an
   // opened existential as a generic parameter. No opened archetypes are
   // actually involved here--the API is only used as a convenient way to create
   // a substitution map. Since opened archetypes have different conformances
   // than their corresponding existential, ExistentialConformances needs to be
   // filtered when using it with this (phony) generic signature.
-  CanGenericSignature ExistentialSig =
-      M->getASTContext().getOpenedExistentialSignature(ExistentialType,
-                                                       GenericSignature());
+
+  auto &ctx = M->getASTContext();
+  LocalArchetypeRequirementCollector collector(ctx, CanGenericSignature());
+  collector.addOpenedExistential(ExistentialType);
+  auto ExistentialSig = buildGenericSignature(
+      ctx, collector.OuterSig, collector.Params, collector.Requirements,
+      /*allowInverses=*/true).getCanonicalSignature();
+
   ExistentialSubs = SubstitutionMap::get(
       ExistentialSig, [&](SubstitutableType *type) { return ConcreteType; },
-      [&](CanType /*depType*/, Type /*replaceType*/,
-          ProtocolDecl *proto) -> ProtocolConformanceRef {
+      [&](InFlightSubstitution &, Type, ProtocolDecl *proto)
+          -> ProtocolConformanceRef {
         // Directly providing ExistentialConformances to the SubstitutionMap will
         // fail because of the mismatch between opened archetype conformance and
         // existential value conformance. Instead, provide a conformance lookup
@@ -271,7 +273,7 @@ void ConcreteExistentialInfo::initializeSubstitutionMap(
         auto iter =
             llvm::find_if(ExistentialConformances,
                           [&](const ProtocolConformanceRef &conformance) {
-                            return conformance.getRequirement() == proto;
+                            return conformance.getProtocol() == proto;
                           });
         assert(iter != ExistentialConformances.end() && "missing conformance");
         return *iter;
@@ -283,7 +285,7 @@ void ConcreteExistentialInfo::initializeSubstitutionMap(
 /// ConcreteTypeDef to the definition of that type.
 void ConcreteExistentialInfo::initializeConcreteTypeDef(
     SILInstruction *typeConversionInst) {
-  if (!ConcreteType->isOpenedExistential())
+  if (!isa<ExistentialArchetypeType>(ConcreteType))
     return;
 
   assert(isValid());
@@ -388,8 +390,7 @@ ConcreteExistentialInfo::ConcreteExistentialInfo(SILValue existential,
   SILModule *M = existential->getModule();
 
   // We have the open_existential; we still need the conformance.
-  auto ConformanceRef =
-      M->getSwiftModule()->conformsToProtocol(ConcreteTypeCandidate, Protocol);
+  auto ConformanceRef = checkConformance(ConcreteTypeCandidate, Protocol);
   if (ConformanceRef.isInvalid())
     return;
 

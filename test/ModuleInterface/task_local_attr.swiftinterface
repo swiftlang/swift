@@ -1,0 +1,20 @@
+// swift-interface-format-version: 1.0
+// swift-compiler-version: Swift version 6.0
+// swift-module-flags: -swift-version 5 -disable-availability-checking
+
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-typecheck-module-from-interface(%s)
+
+import Swift
+import _Concurrency
+
+@_hasMissingDesignatedInitializers final public class C {
+  @_Concurrency.TaskLocal @_projectedValueProperty($x) public static var x: Swift.Int? {
+    get
+  }
+  public static var $x: _Concurrency.TaskLocal<Swift.Int?> {
+    get
+    @available(*, unavailable, message: "use '$myTaskLocal.withValue(_:do:)' instead")
+    set
+  }
+}

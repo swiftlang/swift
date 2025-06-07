@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5  -disable-availability-checking -enable-actor-data-race-checks | %FileCheck --enable-var-scope %s --check-prefix=CHECK-RAW
-// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5  -disable-availability-checking -enable-actor-data-race-checks > %t.sil
-// RUN: %target-sil-opt -enable-sil-verify-all %t.sil -lower-hop-to-actor  | %FileCheck --enable-var-scope %s --check-prefix=CHECK-CANONICAL
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s -module-name test -swift-version 5  -target %target-swift-5.1-abi-triple -enable-actor-data-race-checks | %FileCheck --enable-var-scope %s --check-prefix=CHECK-RAW
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s -module-name test -swift-version 5  -target %target-swift-5.1-abi-triple -enable-actor-data-race-checks > %t.sil
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %t.sil -lower-hop-to-actor  | %FileCheck --enable-var-scope %s --check-prefix=CHECK-CANONICAL
 // REQUIRES: concurrency
 
 import Swift
@@ -47,7 +47,7 @@ public actor MyActor {
     }
   }
 
-  // CHECK-CANONICAL-LABEL: sil private [ossa] @$s4test7MyActorC0A13LocalFunctionyyF5localL_SiyF : $@convention(thin) (@guaranteed MyActor) -> Int
+  // CHECK-CANONICAL-LABEL: sil private [ossa] @$s4test7MyActorC0A13LocalFunctionyyF5localL_SiyF : $@convention(thin) (@sil_isolated @guaranteed MyActor) -> Int
   // CHECK-CANONICAL: [[CAPTURE:%.*]] = copy_value %0 : $MyActor
   // CHECK-CANONICAL-NEXT: [[BORROWED_CAPTURE:%.*]] = begin_borrow [[CAPTURE]] : $MyActor
   // CHECK-CANONICAL-NEXT: [[EXECUTOR:%.*]] = builtin "buildDefaultActorExecutorRef"<MyActor>([[BORROWED_CAPTURE]] : $MyActor) : $Builtin.Executor

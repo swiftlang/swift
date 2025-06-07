@@ -1,15 +1,15 @@
 // This line tests that IRGen is properly turning the unspecialized builtins
 // into traps.
 //
-// RUN: %target-swift-frontend -emit-ir -parse-as-library -parse-stdlib %s | %FileCheck %s
+// RUN: %target-swift-frontend  -enable-builtin-module -emit-ir -parse-as-library -Xllvm -sil-disable-pass=Simplification %s | %FileCheck %s
 
 // Make sure we are not eliminating these builtins before IRGen runs. As part of
 // the builtin's contract, we expect IRGen to convert them to traps, not
 // anything before.
 //
-// RUN: %target-swift-frontend -emit-sil -parse-as-library -parse-stdlib %s | %FileCheck --check-prefix=SIL %s
+// RUN: %target-swift-frontend  -enable-builtin-module -Xllvm -sil-print-types -emit-sil -parse-as-library -Xllvm -sil-disable-pass=Simplification %s | %FileCheck --check-prefix=SIL %s
 
-import Swift
+import Builtin
 
 // SIL-LABEL: sil [transparent] @$s20polymorphic_builtins11_isConcrete4typeSbxm_tlF : $@convention(thin) <T> (@thick T.Type) -> Bool {
 // SIL: builtin "isConcrete"<T>({{%[0-9]*}} : $@thick T.Type) : $Builtin.Int1

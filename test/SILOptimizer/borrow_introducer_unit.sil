@@ -1,8 +1,11 @@
-// RUN: %target-sil-opt -unit-test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -update-borrowed-from -test-runner -sil-disable-input-verify %s -o /dev/null 2>&1 | %FileCheck %s
+//
+// REQUIRES: swift_in_compiler
 
-sil_stage raw
+sil_stage canonical
 
 import Builtin
+import Swift
 
 struct Trivial {
   var value: Builtin.Int32
@@ -18,54 +21,81 @@ struct PairC {
   var second: C
 }
 
-class C {}
+class C {
+  var field: C
+}
 
 class D : C {}
 
+sil @coro : $@yield_once @convention(thin) () -> @yields @guaranteed C
+
 // The introducer of an introducer is always itself.
 
-// CHECK-LABEL: introducer_identity: find-borrow-introducers with: @trace[0]
+// CHECK-LABEL: introducer_identity: find_borrow_introducers with: %0
 // CHECK: } // end sil function 'introducer_identity'
 // CHECK: Introducers:
 // CHECK-NEXT: %0 = argument of bb0 : $C
-// CHECK-NEXT: introducer_identity: find-borrow-introducers with: @trace[0]
+// CHECK-NEXT: introducer_identity: find_borrow_introducers with: %0
 
-// CHECK-LABEL: introducer_identity: find-borrow-introducers with: @trace[1]
+// CHECK-LABEL: introducer_identity: borrow_introducers with: %0
+// CHECK: } // end sil function 'introducer_identity'
+// CHECK: Borrow introducers for: %0 = argument of bb0 : $C
+// CHECK-NEXT: %0 = argument of bb0 : $C
+// CHECK-NEXT: introducer_identity: borrow_introducers with: %0
+
+// CHECK-LABEL: introducer_identity: find_borrow_introducers with: %borrow1
 // CHECK: } // end sil function 'introducer_identity'
 // CHECK: Introducers:
 // CHECK-NEXT: begin_borrow %0 : $C
-// CHECK-NEXT: introducer_identity: find-borrow-introducers with: @trace[1]
+// CHECK-NEXT: introducer_identity: find_borrow_introducers with: %borrow1
 
-// CHECK-LABEL: introducer_identity: find-borrow-introducers with: @trace[2]
+// CHECK-LABEL: introducer_identity: borrow_introducers with: %borrow1
+// CHECK: } // end sil function 'introducer_identity'
+// CHECK: Borrow introducers for: %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: begin_borrow %0 : $C
+// CHECK-NEXT: introducer_identity: borrow_introducers with: %borrow1
+
+// CHECK-LABEL: introducer_identity: find_borrow_introducers with: %borrow2
 // CHECK: } // end sil function 'introducer_identity'
 // CHECK: Introducers:
 // CHECK-NEXT: load_borrow %1 : $*C
-// CHECK-NEXT: introducer_identity: find-borrow-introducers with: @trace[2]
+// CHECK-NEXT: introducer_identity: find_borrow_introducers with: %borrow2
 
-// CHECK-LABEL: introducer_identity: find-borrow-introducers with: @trace[3]
+// CHECK-LABEL: introducer_identity: borrow_introducers with: %borrow2
+// CHECK: } // end sil function 'introducer_identity'
+// CHECK: Borrow introducers for: {{.*}} = load_borrow %1 : $*C
+// CHECK-NEXT: load_borrow %1 : $*C
+// CHECK-NEXT: introducer_identity: borrow_introducers with: %borrow2
+
+// CHECK-LABEL: introducer_identity: find_borrow_introducers with: %reborrow
 // CHECK: } // end sil function 'introducer_identity'
 // CHECK: Introducers:
 // CHECK-NEXT: argument of bb1 : $C
-// CHECK-NEXT: introducer_identity: find-borrow-introducers with: @trace[3]
+// CHECK-NEXT: introducer_identity: find_borrow_introducers with: %reborrow
 
+// CHECK-LABEL: introducer_identity: borrow_introducers with: %reborrow
+// CHECK: } // end sil function 'introducer_identity'
+// CHECK: Borrow introducers for: %{{.*}} = argument of bb1 : $C
+// CHECK-NEXT: argument of bb1 : $C
+// CHECK-NEXT: introducer_identity: borrow_introducers with: %reborrow
 sil [ossa] @introducer_identity : $@convention(thin) (@guaranteed C, @in C) -> () {
 entry(%0 : @guaranteed $C, %1 : $*C):
-  test_specification "find-borrow-introducers @trace[0]"
-  debug_value [trace] %0 : $C
+  specify_test "find_borrow_introducers %0"
+  specify_test "borrow_introducers %0"
   %borrow1 = begin_borrow %0 : $C
-  test_specification "find-borrow-introducers @trace[1]"
-  debug_value [trace] %borrow1 : $C
+  specify_test "find_borrow_introducers %borrow1"
+  specify_test "borrow_introducers %borrow1"
 
   %borrow2 = load_borrow %1 : $*C
-  test_specification "find-borrow-introducers @trace[2]"
-  debug_value [trace] %borrow2 : $C
+  specify_test "find_borrow_introducers %borrow2"
+  specify_test "borrow_introducers %borrow2"
   end_borrow %borrow2 : $C
 
   br exit(%borrow1 : $C)
 
 exit(%reborrow : @guaranteed $C):
-  test_specification "find-borrow-introducers @trace[3]"
-  debug_value [trace] %reborrow : $C
+  specify_test "find_borrow_introducers %reborrow"
+  specify_test "borrow_introducers %reborrow"
   end_borrow %reborrow : $C
   destroy_addr %1 : $*C
   %retval = tuple ()
@@ -75,10 +105,15 @@ exit(%reborrow : @guaranteed $C):
 // There is no introducer if the guaranteed value is produced from a
 // trivial value.
 
-// CHECK-LABEL: introducer_trivial: find-borrow-introducers with: @trace[0]
+// CHECK-LABEL: introducer_trivial: find_borrow_introducers with: %phi
 // CHECK: } // end sil function 'introducer_trivial'
 // CHECK: Introducers:
-// CHECK-NEXT: introducer_trivial: find-borrow-introducers with: @trace[0]
+// CHECK-NEXT: introducer_trivial: find_borrow_introducers with: %phi
+
+// CHECK-LABEL: introducer_trivial: borrow_introducers with: %phi
+// CHECK: } // end sil function 'introducer_trivial'
+// CHECK: Borrow introducers for:  %2 = argument of bb1 : $FakeOptional<C>
+// CHECK-NEXT: introducer_trivial: borrow_introducers with: %phi
 
 sil [ossa] @introducer_trivial : $@convention(thin) () -> () {
 entry:
@@ -86,30 +121,30 @@ entry:
   br none(%trivial : $FakeOptional<C>)
 
 none(%phi : @guaranteed $FakeOptional<C>):
-  test_specification "find-borrow-introducers @trace[0]"
-  debug_value [trace] %phi : $FakeOptional<C>
+  specify_test "find_borrow_introducers %phi"
+  specify_test "borrow_introducers %phi"
   %retval = tuple ()
   return %retval : $()
 }
 
-// An unreachable phi currently looks like a reborrow.
-//
-// TODO: When we have a reborrow flag, an unreachable phi can be
-// either a reborrow or forwarded, as long as it has no end_borrow.
+// An unreachable phi can be either a reborrow or forwarded, as long as it has no end_borrow.
 
-// CHECK-LABEL: introducer_unreachable: find-borrow-introducers with: @trace[0]
+// CHECK-LABEL: introducer_unreachable: find_borrow_introducers with: %phiCycle
 // CHECK: } // end sil function 'introducer_unreachable'
 // CHECK: Introducers:
-// CHECK-NEXT: argument of bb1 : $C
-// CHECK-NEXT: introducer_unreachable: find-borrow-introducers with: @trace[0]
+// CHECK-NEXT: introducer_unreachable: find_borrow_introducers with: %phiCycle
 
+// CHECK-LABEL: introducer_unreachable: borrow_introducers with: %phiCycle
+// CHECK: } // end sil function 'introducer_unreachable'
+// CHECK: Borrow introducers for: %1 = argument of bb1 : $C
+// CHECK-NEXT: introducer_unreachable: borrow_introducers with: %phiCycle
 sil [ossa] @introducer_unreachable : $@convention(thin) () -> () {
 entry:
   br exit
 
 unreachable_loop(%phiCycle : @guaranteed $C):
-  test_specification "find-borrow-introducers @trace[0]"
-  debug_value [trace] %phiCycle : $C
+  specify_test "find_borrow_introducers %phiCycle"
+  specify_test "borrow_introducers %phiCycle"
   br unreachable_loop(%phiCycle : $C)
 
 exit:
@@ -120,12 +155,17 @@ exit:
 // All data flow paths through phis and aggregates originate from the
 // same function argument.
 
-// CHECK-LABEL: introducer_single: find-borrow-introducers with: @trace[0]
+// CHECK-LABEL: introducer_single: find_borrow_introducers with: %aggregate2
 // CHECK: } // end sil function 'introducer_single'
 // CHECK: Introducers:
 // CHECK-NEXT: %0 = argument of bb0 : $C
-// CHECK-NEXT: introducer_single: find-borrow-introducers with: @trace[0]
+// CHECK-NEXT: introducer_single: find_borrow_introducers with: %aggregate2
 
+// CHECK-LABEL: introducer_single: borrow_introducers with: %aggregate2
+// CHECK: } // end sil function 'introducer_single'
+// CHECK: Borrow introducers for: %12 = struct $PairC (%10 : $C, %11 : $C)
+// CHECK-NEXT: %0 = argument of bb0 : $C
+// CHECK-NEXT: introducer_single: borrow_introducers with: %aggregate2
 sil [ossa] @introducer_single : $@convention(thin) (@guaranteed C) -> () {
 entry(%0 : @guaranteed $C):
   %cast = unconditional_checked_cast %0 : $C to D
@@ -141,8 +181,8 @@ bb1(%payload : @guaranteed $D):
   %first = struct_extract %aggregate : $PairC, #PairC.first
   %second = struct_extract %aggregate : $PairC, #PairC.second
   %aggregate2 = struct $PairC(%first : $C, %second : $C)
-  test_specification "find-borrow-introducers @trace[0]"
-  debug_value [trace] %aggregate2 : $PairC
+  specify_test "find_borrow_introducers %aggregate2"
+  specify_test "borrow_introducers %aggregate2"
   br exit
 
 bb2:
@@ -161,14 +201,21 @@ exit:
 // %reborrow. Therefore, %reborrow is an introducer from separate phi
 // paths, but should only appear in the introducer list once.
 //
-// CHECK-LABEL: introducer_revisit_reborrow: find-borrow-introducers with: @trace[0]
-// CHECK: bb1([[REBORROW:%.*]] : @guaranteed $C
+// CHECK-LABEL: introducer_revisit_reborrow: find_borrow_introducers with: %aggregate2
+// CHECK: bb1([[REBORROW:%.*]] : @reborrow $C
 // CHECK: } // end sil function 'introducer_revisit_reborrow'
 // CHECK: Introducers:
 // CHECK-NEXT: [[REBORROW]] = argument of bb1 : $C
 // CHECK-NEXT: %0 = argument of bb0 : $C
-// CHECK-NEXT: introducer_revisit_reborrow: find-borrow-introducers with: @trace[0]
+// CHECK-NEXT: introducer_revisit_reborrow: find_borrow_introducers with: %aggregate2
 
+// CHECK-LABEL: introducer_revisit_reborrow: borrow_introducers with: %aggregate2
+// CHECK: bb1([[REBORROW:%.*]] : @reborrow $C
+// CHECK: } // end sil function 'introducer_revisit_reborrow'
+// CHECK: Borrow introducers for:  %{{.*}} = struct $PairC (%{{.*}} : $C, %{{.*}} : $C)
+// CHECK-NEXT: %0 = argument of bb0 : $C
+// CHECK-NEXT: [[REBORROW]] = argument of bb1 : $C
+// CHECK-NEXT: introducer_revisit_reborrow: borrow_introducers with: %aggregate2
 sil [ossa] @introducer_revisit_reborrow : $@convention(thin) (@guaranteed C) -> () {
 entry(%0 : @guaranteed $C):
   %borrow1 = begin_borrow %0 : $C
@@ -178,8 +225,8 @@ entry(%0 : @guaranteed $C):
 bb2(%reborrow : @guaranteed $C, %phi : @guaranteed $PairC):
   %first = struct_extract %phi : $PairC, #PairC.first
   %aggregate2 = struct $PairC(%reborrow : $C, %first : $C)
-  test_specification "find-borrow-introducers @trace[0]"
-  debug_value [trace] %aggregate2 : $PairC
+  specify_test "find_borrow_introducers %aggregate2"
+  specify_test "borrow_introducers %aggregate2"
   br exit
 
 exit:
@@ -191,17 +238,27 @@ exit:
 // %phi originates from %0, %borrow1, & %borrow2. %borrow1 is, however,
 // reborrowed in bb2.
 
-// CHECK-LABEL: introducer_multiple_borrow: find-borrow-introducers with: @trace[0]
+// CHECK-LABEL: introducer_multiple_borrow: find_borrow_introducers with: %aggregate2
 // CHECK: begin_borrow %0 : $C  
 // CHECK: [[BORROW2:%.*]] = begin_borrow %0 : $C
-// CHECK: bb1([[REBORROW:%.*]] : @guaranteed $C
+// CHECK: bb1([[REBORROW:%.*]] : @reborrow $C
 // CHECK: } // end sil function 'introducer_multiple_borrow'
 // CHECK: Introducers:
 // CHECK-NEXT: [[REBORROW]] = argument of bb1 : $C
 // CHECK-NEXT: %0 = argument of bb0 : $C
 // CHECK-NEXT: [[BORROW2]] = begin_borrow %0 : $C
-// CHECK-NEXT: introducer_multiple_borrow: find-borrow-introducers with: @trace[0]
+// CHECK-NEXT: introducer_multiple_borrow: find_borrow_introducers with: %aggregate2
 
+// CHECK-LABEL: introducer_multiple_borrow: borrow_introducers with: %aggregate2
+// CHECK: begin_borrow %0 : $C  
+// CHECK: [[BORROW2:%.*]] = begin_borrow %0 : $C
+// CHECK: bb1([[REBORROW:%.*]] : @reborrow $C
+// CHECK: } // end sil function 'introducer_multiple_borrow'
+// CHECK: Borrow introducers for: %{{.*}} = struct $PairC (%{{.*}} : $C, %{{.*}} : $C)
+// CHECK-NEXT: %0 = argument of bb0 : $C
+// CHECK-NEXT: [[BORROW2]] = begin_borrow %0 : $C
+// CHECK-NEXT: [[REBORROW]] = argument of bb1 : $C
+// CHECK-NEXT: introducer_multiple_borrow: borrow_introducers with: %aggregate2
 sil [ossa] @introducer_multiple_borrow : $@convention(thin) (@guaranteed C) -> () {
 entry(%0 : @guaranteed $C):
   %borrow1 = begin_borrow %0 : $C
@@ -212,8 +269,8 @@ entry(%0 : @guaranteed $C):
 bb2(%reborrow : @guaranteed $C, %phi : @guaranteed $PairC):
   %first = struct_extract %phi : $PairC, #PairC.first
   %aggregate2 = struct $PairC(%reborrow : $C, %first : $C)
-  test_specification "find-borrow-introducers @trace[0]"
-  debug_value [trace] %aggregate2 : $PairC
+  specify_test "find_borrow_introducers %aggregate2"
+  specify_test "borrow_introducers %aggregate2"
   br exit
 
 exit:
@@ -222,3 +279,173 @@ exit:
   %retval = tuple ()
   return %retval : $()
 }
+
+// CHECK-LABEL: introducer_dependence: find_borrow_introducers with: %dependent
+// CHECK: Introducers:
+// CHECK: %0 = argument of bb0 : $C
+// CHECK-LABEL: introducer_dependence: find_borrow_introducers with: %dependent
+
+// CHECK-LABEL: introducer_dependence: borrow_introducers with: %dependent
+// CHECK: Borrow introducers for: %{{.*}} = mark_dependence %0 : $C on %1 : $Builtin.NativeObject
+// CHECK: %0 = argument of bb0 : $C
+// CHECK-NEXT: introducer_dependence: borrow_introducers with: %dependent
+sil [ossa] @introducer_dependence : $@convention(thin) (@guaranteed C, @guaranteed Builtin.NativeObject) -> () {
+entry(%0 : @guaranteed $C, %1 : @guaranteed $Builtin.NativeObject):
+  specify_test "find_borrow_introducers %dependent"
+  specify_test "borrow_introducers %dependent"
+  %dependent = mark_dependence %0 : $C on %1 : $Builtin.NativeObject
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: introducer_bridge: find_borrow_introducers with: %bridge
+// CHECK: Introducers:
+// CHECK: %0 = argument of bb0 : $C
+// CHECK-LABEL: introducer_bridge: find_borrow_introducers with: %bridge
+
+// CHECK-LABEL: introducer_bridge: borrow_introducers with: %bridge
+// CHECK: Borrow introducers for: %{{.*}} = ref_to_bridge_object %0 : $C, %1 : $Builtin.Word
+// CHECK: %0 = argument of bb0 : $C
+// CHECK-NEXT: introducer_bridge: borrow_introducers with: %bridge
+sil [ossa] @introducer_bridge : $@convention(thin) (@guaranteed C, Builtin.Word) -> () {
+entry(%0 : @guaranteed $C, %1 : $Builtin.Word):
+  specify_test "find_borrow_introducers %bridge"
+  specify_test "borrow_introducers %bridge"
+  %bridge = ref_to_bridge_object %0 : $C, %1 : $Builtin.Word
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: introducer_begin_apply: borrow_introducers with: %bridge
+// CHECK: Borrow introducers for:   %{{.*}} = ref_to_bridge_object %{{.*}} : $C, %0 : $Builtin.Word
+// CHECK-NEXT: (**%{{.*}}**, %{{.*}}) = begin_apply %{{.*}}() : $@yield_once @convention(thin) () -> @yields @guaranteed C
+// CHECK-NEXT: introducer_begin_apply: borrow_introducers with: %bridge
+sil [ossa] @introducer_begin_apply : $@convention(thin) (Builtin.Word) -> () {
+bb0(%0 : $Builtin.Word):
+  %f = function_ref @coro : $@yield_once @convention(thin) () -> @yields @guaranteed C
+  (%c, %t) = begin_apply %f() : $@yield_once @convention(thin) () -> @yields @guaranteed C
+  specify_test "borrow_introducers %bridge"
+  %bridge = ref_to_bridge_object %c : $C, %0 : $Builtin.Word
+  cond_br undef, bb1, bb2
+bb1:
+  end_apply %t as $()
+  %r = tuple ()
+  return %r : $()
+bb2:
+  abort_apply %t
+  unreachable
+}
+
+// CHECK-LABEL: introducer_example: borrow_introducers with: %borrow0
+// CHECK: Borrow introducers for:   %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT:  %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: introducer_example: borrow_introducers with: %borrow0
+
+// CHECK-LABEL: introducer_example: borrow_introducers with: %first
+// CHECK: Borrow introducers for:   %{{.*}} = struct_extract %{{.*}} : $PairC, #PairC.first
+// CHECK-NEXT:  %{{.*}} = argument of bb0 : $C
+// CHECK-NEXT:  %{{.*}} = begin_borrow %0 : $C
+// CHECK-NEXT: introducer_example: borrow_introducers with: %first
+
+// CHECK-LABEL: introducer_example: borrow_introducers with: %load
+// CHECK-LABEL: Borrow introducers for:   %{{.*}} = load_borrow %{{.*}} : $*C
+// CHECK-NEXT: %{{.*}} = load_borrow %{{.*}} : $*C
+// CHECK-NEXT: introducer_example: borrow_introducers with: %
+sil [ossa] @introducer_example : $@convention(thin) (@owned C, @guaranteed C) -> () {
+bb0(%0 : @owned $C,
+    %1 : @guaranteed $C):
+  %borrow0 = begin_borrow %0 : $C
+  specify_test "borrow_introducers %borrow0"
+  %pair = struct $PairC(%borrow0 : $C, %1 : $C)
+  %first = struct_extract %pair : $PairC, #PairC.first
+  specify_test "borrow_introducers %first"
+  %field = ref_element_addr %first : $C, #C.field
+  %load = load_borrow %field : $*C
+  specify_test "borrow_introducers %load"
+  end_borrow %load : $C
+  end_borrow %borrow0 : $C
+  destroy_value %0 : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: testSelfIntroducer: borrow_introducers with: %phi
+// CHECK: Borrow introducers for: %{{.*}} = argument of bb1 : $D
+// CHECK-NEXT: %{{.*}} = argument of bb1 : $C
+// CHECK-NEXT: testSelfIntroducer: borrow_introducers with: %phi
+
+// CHECK-LABEL: testSelfIntroducer: enclosing_values with: %reborrow
+// CHECK: Enclosing values for: %4 = argument of bb1 : $C
+// CHECK-NEXT: %0 = argument of bb0 : $C
+// CHECK-NEXT: testSelfIntroducer: enclosing_values with: %reborrow
+sil [ossa] @testSelfIntroducer : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %borrow = begin_borrow %0 : $C
+  %d = unconditional_checked_cast %borrow : $C to D
+  br bb1(%borrow : $C, %d : $D)
+ 
+bb1(%reborrow : @guaranteed $C, %phi : @guaranteed $D):
+  specify_test "borrow_introducers %phi"
+  specify_test "enclosing_values %reborrow"
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1(%reborrow : $C, %phi : $D)
+
+bb3:
+  end_borrow %reborrow : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// Test the reborrow cache in EnclosingValues. Here, %reborrow must be
+// visited once on each path, and each time the recursive algorithm
+// must find the enclosing def %0, which maps to a %outer0 on one path
+// and %outer1 on another path. If the cache fails, then we only find
+// one of the outer adjacent phis as an enclosing value for %inner.
+//
+// CHECK-LABEL: testEnclosingRevisitReborrow: enclosing_values with: %inner
+// CHECK: Enclosing values for: %11 = argument of bb4 : $C
+// CHECK-NEXT: %{{.*}} = argument of bb4 : $C
+// CHECK-NEXT: %{{.*}} = argument of bb4 : $C
+// CHECK-NEXT: end running test 1 of 1 on testEnclosingRevisitReborrow: enclosing_values with: %inner
+sil [ossa] @testEnclosingRevisitReborrow : $@convention(thin) (@owned C, @owned C) -> () {
+bb0(%0 : @owned $C, %1 : @owned $C):
+  %borrow = begin_borrow %0 : $C
+  br bb1(%borrow : $C)
+
+bb1(%reborrow : @guaranteed $C):
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb4(%0 : $C, %1 : $C, %reborrow : $C)
+
+bb3:
+  br bb4(%1 : $C, %0 : $C, %reborrow : $C)
+
+bb4(%outer0 : @owned $C, %outer1 : @owned $C, %inner : @guaranteed $C):
+  specify_test "enclosing_values %inner"
+  end_borrow %inner : $C
+  destroy_value %outer0 : $C
+  destroy_value %outer1 : $C
+  %99 = tuple()
+  return %99 : $()
+}
+
+// CHECK-LABEL: Borrow introducers for:   %3 = unchecked_ownership_conversion %2
+// CHECK-NEXT:  %3 = unchecked_ownership_conversion %2
+// CHECK-NEXT:  end running test 1 of 2 on testUncheckedOwnershipConversion: borrow_introducers with: %3
+// CHECK-LABEL: Enclosing values for:   %3 = unchecked_ownership_conversion %2
+// CHECK-NEXT:  end running test 2 of 2 on testUncheckedOwnershipConversion: enclosing_values with: %3
+sil [ossa] @testUncheckedOwnershipConversion : $@convention(thin) (Unmanaged<C>) -> () {
+bb0(%0 : $Unmanaged<C>):
+  %1 = struct_extract %0, #Unmanaged._value
+  %2 = unmanaged_to_ref %1 to $C
+  %3 = unchecked_ownership_conversion %2, @unowned to @guaranteed
+  specify_test "borrow_introducers %3"
+  specify_test "enclosing_values %3"
+  end_borrow %3
+  %8 = tuple ()
+  return %8
+}
+

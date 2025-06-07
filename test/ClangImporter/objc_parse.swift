@@ -315,7 +315,7 @@ func ivars(_ hive: Hive) {
   hive.queen.description() // expected-error{{value of type 'Hive' has no member 'queen'}}
 }
 
-class NSObjectable : NSObjectProtocol { // expected-error {{cannot declare conformance to 'NSObjectProtocol' in Swift; 'NSObjectable' should inherit 'NSObject' instead}}
+class NSObjectable : NSObjectProtocol { // expected-error {{cannot declare conformance to 'NSObjectProtocol' in Swift; 'NSObjectable' should inherit 'NSObject' instead}} expected-note {{add stubs for conformance}}
   @objc var description : String { return "" }
   @objc(conformsToProtocol:) func conforms(to _: Protocol) -> Bool { return false }
   @objc(isKindOfClass:) func isKind(of aClass: AnyClass) -> Bool { return false }
@@ -331,6 +331,11 @@ func customAccessors(_ hive: Hive, bee: Bee) {
   _ = (hive.`guard` as AnyObject).description // okay
   _ = (hive.`guard` as AnyObject).description! // no-warning
   hive.`guard` = bee // no-warning
+}
+
+// Properties with bool don't use the getter.
+func boolProperties(_ hive: Hive) {
+  markUsed(hive.empty)
 }
 
 // instancetype/Dynamic Self invocation.
@@ -375,13 +380,13 @@ class ProtocolAdopter2 : FooProto {
     set { /* do nothing! */ }
   }
 }
-class ProtocolAdopterBad1 : FooProto { // expected-error {{type 'ProtocolAdopterBad1' does not conform to protocol 'FooProto'}}
+class ProtocolAdopterBad1 : FooProto { // expected-error {{type 'ProtocolAdopterBad1' does not conform to protocol 'FooProto'}} expected-note {{add stubs for conformance}}
   @objc var bar: Int = 0 // expected-note {{candidate has non-matching type 'Int'}}
 }
-class ProtocolAdopterBad2 : FooProto { // expected-error {{type 'ProtocolAdopterBad2' does not conform to protocol 'FooProto'}}
+class ProtocolAdopterBad2 : FooProto { // expected-error {{type 'ProtocolAdopterBad2' does not conform to protocol 'FooProto'}} expected-note {{add stubs for conformance}}
   let bar: CInt = 0 // expected-note {{candidate is not settable, but protocol requires it}}
 }
-class ProtocolAdopterBad3 : FooProto { // expected-error {{type 'ProtocolAdopterBad3' does not conform to protocol 'FooProto'}}
+class ProtocolAdopterBad3 : FooProto { // expected-error {{type 'ProtocolAdopterBad3' does not conform to protocol 'FooProto'}} expected-note {{add stubs for conformance}}
   var bar: CInt { // expected-note {{candidate is not settable, but protocol requires it}}
     return 42
   }
@@ -643,24 +648,24 @@ class NewtypeUser {
   @objc func stringNewtype(a: SNTErrorDomain) {} // expected-error {{'SNTErrorDomain' has been renamed to 'ErrorDomain'}}{{31-45=ErrorDomain}}
   @objc func stringNewtypeOptional(a: SNTErrorDomain?) {} // expected-error {{'SNTErrorDomain' has been renamed to 'ErrorDomain'}}{{39-53=ErrorDomain}}
   @objc func intNewtype(a: MyInt) {}
-  @objc func intNewtypeOptional(a: MyInt?) {} // expected-error {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
-  @objc func intNewtypeArray(a: [MyInt]) {} // expected-error {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  @objc func intNewtypeOptional(a: MyInt?) {} // expected-error {{method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
+  @objc func intNewtypeArray(a: [MyInt]) {} // expected-error {{method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-1 {{Swift structs cannot be represented in Objective-C}}
-  @objc func intNewtypeDictionary(a: [MyInt: NSObject]) {} // expected-error {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  @objc func intNewtypeDictionary(a: [MyInt: NSObject]) {} // expected-error {{method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-1 {{Swift structs cannot be represented in Objective-C}}
   @objc func cfNewtype(a: CFNewType) {}
-  @objc func cfNewtypeArray(a: [CFNewType]) {} // expected-error {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  @objc func cfNewtypeArray(a: [CFNewType]) {} // expected-error {{method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-1 {{Swift structs cannot be represented in Objective-C}}
 
   typealias MyTuple = (Int, AnyObject?)
   typealias MyNamedTuple = (a: Int, b: AnyObject?)
   
   @objc func blockWithTypealias(_ input: @escaping (MyTuple) -> MyInt) {}
-  // expected-error@-1{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  // expected-error@-1{{method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2{{function types cannot be represented in Objective-C}}
 
   @objc func blockWithTypealiasWithNames(_ input: (MyNamedTuple) -> MyInt) {}
-  // expected-error@-1{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
+  // expected-error@-1{{method cannot be marked '@objc' because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2{{function types cannot be represented in Objective-C}}
 }
 

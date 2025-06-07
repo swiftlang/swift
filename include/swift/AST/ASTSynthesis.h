@@ -16,6 +16,7 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/ParameterList.h"
 
@@ -40,8 +41,10 @@ inline Type synthesizeType(SynthesisContext &SC, Type type) {
 enum SingletonTypeSynthesizer {
   _any,
   _bridgeObject,
+  _copyable,
   _error,
-  _executor,
+  _executor, // the 'BuiltinExecutor' type
+  _escapable,
   _job,
   _nativeObject,
   _never,
@@ -49,7 +52,13 @@ enum SingletonTypeSynthesizer {
   _rawUnsafeContinuation,
   _void,
   _word,
-  _serialExecutor,
+  _swiftInt,       // Swift.Int
+  _serialExecutor, // the '_Concurrency.SerialExecutor' protocol
+  _taskExecutor,   // the '_Concurrency.TaskExecutor' protocol
+  _actor,          // the '_Concurrency.Actor' protocol
+  _distributedActor,  // the 'Distributed.DistributedActor' protocol
+  _unsafeRawBufferPointer, // UnsafeRawBufferPointer
+  _unconstrainedAny, // any ~Copyable & ~Escapable
 };
 inline Type synthesizeType(SynthesisContext &SC,
                            SingletonTypeSynthesizer kind) {
@@ -66,11 +75,39 @@ inline Type synthesizeType(SynthesisContext &SC,
   case _void: return SC.Context.TheEmptyTupleType;
   case _word: return BuiltinIntegerType::get(BuiltinIntegerWidth::pointer(),
                                              SC.Context);
+  case _swiftInt: return SC.Context.getIntType();
   case _serialExecutor:
     return SC.Context.getProtocol(KnownProtocolKind::SerialExecutor)
       ->getDeclaredInterfaceType();
+  case _taskExecutor:
+    if (auto ty = SC.Context.getProtocol(KnownProtocolKind::TaskExecutor)) {
+      return ty->getDeclaredInterfaceType();
+    } else {
+      return nullptr;
+    }
+  case _actor:
+    return SC.Context.getProtocol(KnownProtocolKind::Actor)
+      ->getDeclaredInterfaceType();
+  case _distributedActor:
+    return SC.Context.getProtocol(KnownProtocolKind::DistributedActor)
+      ->getDeclaredInterfaceType();
+  case _unsafeRawBufferPointer:
+    return SC.Context.getUnsafeRawBufferPointerType();
+  case _copyable:
+    return SC.Context.getProtocol(KnownProtocolKind::Copyable)
+        ->getDeclaredInterfaceType();
+  case _escapable:
+    return SC.Context.getProtocol(KnownProtocolKind::Escapable)
+        ->getDeclaredInterfaceType();
+  case _unconstrainedAny:
+    return SC.Context.getUnconstrainedAnyExistentialType();
   }
 }
+
+enum RepresentationSynthesizer {
+  _thin,
+  _thick
+};
 
 /// A synthesizer which generates an integer type.
 struct IntegerTypeSynthesizer {
@@ -115,6 +152,70 @@ Type synthesizeType(SynthesisContext &SC,
   return MetatypeType::get(synthesizeType(SC, M.Sub));
 }
 
+template <class S>
+struct RepMetatypeTypeSynthesizer {
+  S Sub;
+  RepresentationSynthesizer Rep;
+};
+template <class S>
+constexpr RepMetatypeTypeSynthesizer<S>
+_metatype(S sub, RepresentationSynthesizer rep ) {
+  return {sub, rep};
+}
+template <class S>
+Type synthesizeType(SynthesisContext &SC,
+                    const RepMetatypeTypeSynthesizer<S> &M) {
+  auto instanceType = synthesizeType(SC, M.Sub);
+  return MetatypeType::get(instanceType, synthesizeMetatypeRepresentation(M.Rep));
+}
+
+/// A synthesizer which generates an existential type from a requirement type.
+template <class S>
+struct ExistentialTypeSynthesizer {
+  S Sub;
+};
+template <class S>
+constexpr ExistentialTypeSynthesizer<S> _existential(S sub) {
+  return {sub};
+}
+template <class S>
+Type synthesizeType(SynthesisContext &SC,
+                    const ExistentialTypeSynthesizer<S> &M) {
+  return ExistentialType::get(synthesizeType(SC, M.Sub));
+}
+
+/// A synthesizer which generates an existential type from a requirement type.
+template <class S, class FallbackS>
+struct BincompatIfTypeAvailableTypeSynthesizer {
+  bool condition;
+  S Sub;
+  FallbackS FallbackSub;
+};
+template <class S, class FallbackS>
+constexpr BincompatIfTypeAvailableTypeSynthesizer<S, FallbackS> _bincompatType(
+    bool bincompatCondition, S sub, FallbackS fallbackSub) {
+  return {bincompatCondition, sub, {fallbackSub}};
+}
+template <class S, class FallbackS>
+Type synthesizeType(SynthesisContext &SC,
+                    const BincompatIfTypeAvailableTypeSynthesizer<S, FallbackS> &M) {
+  if (M.condition) {
+    return synthesizeType(SC, M.Sub);
+  } else {
+    return synthesizeType(SC, M.FallbackSub);
+  }
+}
+
+MetatypeRepresentation
+inline synthesizeMetatypeRepresentation(RepresentationSynthesizer rep) {
+  switch (rep) {
+  case _thin: return MetatypeRepresentation::Thin;
+  case _thick: return MetatypeRepresentation::Thick;
+  // TOOD: maybe add _objc?
+  }
+  llvm_unreachable("bad kind");
+}
+
 /// A synthesizer which generates an existential metatype type.
 template <class S>
 struct ExistentialMetatypeTypeSynthesizer {
@@ -128,6 +229,22 @@ template <class S>
 Type synthesizeType(SynthesisContext &SC,
                     const ExistentialMetatypeTypeSynthesizer<S> &M) {
   return ExistentialMetatypeType::get(synthesizeType(SC, M.Sub));
+}
+template <class S>
+struct RepExistentialMetatypeTypeSynthesizer {
+  S Sub;
+  RepresentationSynthesizer Rep;
+};
+template <class S>
+constexpr RepExistentialMetatypeTypeSynthesizer<S>
+_existentialMetatype(S sub, RepresentationSynthesizer rep) {
+  return {sub, rep};
+}
+template <class S>
+Type synthesizeType(SynthesisContext &SC,
+                    const RepExistentialMetatypeTypeSynthesizer<S> &M) {
+  return ExistentialMetatypeType::get(synthesizeType(SC, M.Sub),
+                                      synthesizeMetatypeRepresentation(M.Rep));
 }
 
 /// A synthesizer that generates a MoveOnly wrapper of a type.
@@ -218,10 +335,12 @@ Type synthesizeType(SynthesisContext &SC,
 
 /// Synthesize parameter declarations.
 template <class S>
-ParamDecl *synthesizeParamDecl(SynthesisContext &SC, const S &s) {
+ParamDecl *synthesizeParamDecl(SynthesisContext &SC, const S &s,
+                               const char *label = nullptr) {
+  auto argLabelIdent = (label ? SC.Context.getIdentifier(label) : Identifier());
   auto type = synthesizeType(SC, s);
   auto PD = new (SC.Context) ParamDecl(SourceLoc(), SourceLoc(),
-                                       Identifier(), SourceLoc(),
+                                       argLabelIdent, SourceLoc(),
                                        Identifier(), SC.DC);
   PD->setSpecifier(ParamSpecifier::Default);
   PD->setInterfaceType(type);
@@ -239,7 +358,13 @@ template <class S>
 struct SpecifiedParamSynthesizer { ParamSpecifier specifier; S sub; };
 template <class G>
 constexpr SpecifiedParamSynthesizer<G> _owned(G sub) {
-  return {ParamSpecifier::Owned, sub};
+  // TODO: We should probably synthesize decls to use the standard `consuming`
+  // modifier, once we're certain doing so won't break anything.
+  return {ParamSpecifier::LegacyOwned, sub};
+}
+template <class G>
+constexpr SpecifiedParamSynthesizer<G> _consuming(G sub) {
+  return {ParamSpecifier::Consuming, sub};
 }
 template <class G>
 constexpr SpecifiedParamSynthesizer<G> _inout(G sub) {
@@ -247,21 +372,96 @@ constexpr SpecifiedParamSynthesizer<G> _inout(G sub) {
 }
 template <class S>
 ParamDecl *synthesizeParamDecl(SynthesisContext &SC,
-                               const SpecifiedParamSynthesizer<S> &s) {
-  auto param = synthesizeParamDecl(SC, s.sub);
+                               const SpecifiedParamSynthesizer<S> &s,
+                               const char *label = nullptr) {
+  auto param = synthesizeParamDecl(SC, s.sub, label);
   param->setSpecifier(s.specifier);
   return param;
 }
+
+template <class S>
+struct SendingParamSynthesizer {
+  S sub;
+};
+
+template <class S>
+constexpr SendingParamSynthesizer<S> _sending(S sub) {
+  return {sub};
+}
+
+template <class S>
+ParamDecl *synthesizeParamDecl(SynthesisContext &SC,
+                               const SendingParamSynthesizer<S> &s,
+                               const char *label = nullptr) {
+  auto param = synthesizeParamDecl(SC, s.sub, label);
+  if (SC.Context.LangOpts.hasFeature(Feature::SendingArgsAndResults))
+    param->setSending();
+  return param;
+}
+
 template <class S>
 FunctionType::Param synthesizeParamType(SynthesisContext &SC,
                                         const SpecifiedParamSynthesizer<S> &s) {
   auto param = synthesizeParamType(SC, s.sub);
   auto flags = param.getParameterFlags();
-  if (s.specifier == ParamSpecifier::Owned)
-    flags = flags.withOwned(true);
-  if (s.specifier == ParamSpecifier::InOut)
-    flags = flags.withInOut(true);
+  if (s.specifier != ParamSpecifier::Default)
+    flags = flags.withValueOwnership(s.specifier);
   return param.withFlags(flags);
+}
+
+template <class S>
+void synthesizeDefaultArgument(SynthesisContext &SC, const S &s,
+                               ParamDecl *param) {
+  synthesizeDefaultArgumentFromExpr(SC, s, param);
+}
+template <class S>
+void synthesizeDefaultArgumentFromExpr(SynthesisContext &SC, const S &s,
+                                       ParamDecl *param) {
+  // FIXME: this works except that we tend to crash in diagnostics trying
+  // to render the default argument if you mess up the call.
+  auto expr = synthesizeExpr(SC, s);
+  param->setDefaultArgumentKind(DefaultArgumentKind::Normal);
+  param->setDefaultExpr(expr);
+}
+
+/// Default arguments.
+template <class S, class A>
+struct DefaultedSynthesizer { S sub; A arg; };
+template <class S, class A>
+constexpr DefaultedSynthesizer<S, A> _defaulted(S sub, A arg) {
+  return {sub, arg};
+}
+template <class S, class A>
+ParamDecl *synthesizeParamDecl(SynthesisContext &SC,
+                               const DefaultedSynthesizer<S, A> &s,
+                               const char *label = nullptr) {
+  auto param = synthesizeParamDecl(SC, s.sub, label);
+  synthesizeDefaultArgument(SC, s.arg, param);
+  return param;
+}
+template <class S, class A>
+FunctionType::Param synthesizeParamType(SynthesisContext &SC,
+                                        const DefaultedSynthesizer<S, A> &s) {
+  return synthesizeParamType(s.sub);
+}
+
+/// Labels.
+template <class S>
+struct LabelSynthesizer { const char *label; S sub; };
+template <class S>
+constexpr LabelSynthesizer<S> _label(const char *label, S sub) {
+  return {label, sub};
+}
+template <class S>
+ParamDecl *synthesizeParamDecl(SynthesisContext &SC,
+                               const LabelSynthesizer<S> &s) {
+  return synthesizeParamDecl(SC, s.sub, s.label);
+}
+template <class S>
+FunctionType::Param synthesizeParamType(SynthesisContext &SC,
+                                        const LabelSynthesizer<S> &s) {
+  auto label = SC.Context.getIdentifier(s.label);
+  return synthesizeParamType(SC, s.sub).withLabel(label);
 }
 
 /// Synthesize a parameter list.
@@ -310,22 +510,21 @@ void synthesizeParameterTypes(SynthesisContext &SC,
 }
 
 /// Synthesize function ExtInfo.
-enum FunctionRepresentationSynthesizer {
-  _thin,
-  _thick
-};
 template <class S> struct ThrowsSynthesizer { S sub; };
 template <class S> struct AsyncSynthesizer { S sub; };
 template <class S> struct NoescapeSynthesizer { S sub; };
+template <class S> struct SendableModSynthesizer { S sub; };
 template <class S>
 constexpr ThrowsSynthesizer<S> _throws(S sub) { return {sub}; }
 template <class S>
 constexpr AsyncSynthesizer<S> _async(S sub) { return {sub}; }
 template <class S>
 constexpr NoescapeSynthesizer<S> _noescape(S sub) { return {sub}; }
+template <class S>
+constexpr SendableModSynthesizer<S> _sendable(S sub) { return {sub}; }
 
 inline ASTExtInfo synthesizeExtInfo(SynthesisContext &SC,
-                                    FunctionRepresentationSynthesizer kind) {
+                                    RepresentationSynthesizer kind) {
   switch (kind) {
   case _thin: return ASTExtInfo().withRepresentation(
                                             FunctionTypeRepresentation::Thin);
@@ -347,6 +546,11 @@ template <class S>
 ASTExtInfo synthesizeExtInfo(SynthesisContext &SC,
                              const NoescapeSynthesizer<S> &s) {
   return synthesizeExtInfo(SC, s.sub).withNoEscape();
+}
+template <class S>
+ASTExtInfo synthesizeExtInfo(SynthesisContext &SC,
+                             const SendableModSynthesizer<S> &s) {
+  return synthesizeExtInfo(SC, s.sub).withSendable();
 }
 
 /// Synthesize a function type.
@@ -381,6 +585,36 @@ constexpr OptionalSynthesizer<S> _optional(S sub) { return {sub}; }
 template <class S>
 Type synthesizeType(SynthesisContext &SC, const OptionalSynthesizer<S> &s) {
   return OptionalType::get(synthesizeType(SC, s.sub));
+}
+
+/// Expressions.
+enum SingletonExprSynthesizer {
+  _nil
+};
+inline Expr *synthesizeExpr(SynthesisContext &SC, SingletonExprSynthesizer s) {
+  switch (s) {
+  case _nil:
+    return new (SC.Context) NilLiteralExpr(SourceLoc(), /*implicit*/true);
+  }
+  llvm_unreachable("bad singleton kind");
+}
+inline void synthesizeDefaultArgument(SynthesisContext &SC,
+                                      SingletonExprSynthesizer s,
+                                      ParamDecl *param) {
+  switch (s) {
+  case _nil: {
+    auto expr = synthesizeExpr(SC, s);
+    param->setDefaultArgumentKind(DefaultArgumentKind::NilLiteral);
+    param->setDefaultExpr(expr);
+    return;
+  }
+
+  /*
+  default:
+    synthesizeDefaultArgumentFromExpr(SC, s, param);
+    return;
+   */
+  }
 }
 
 } // end namespace swift

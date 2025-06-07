@@ -18,6 +18,9 @@
 
 namespace llvm {
 class MemoryBuffer;
+namespace vfs {
+class OutputBackend;
+}
 }
 
 namespace swift {
@@ -132,6 +135,7 @@ bool readFineGrainedDependencyGraph(llvm::StringRef path,
 /// Tries to write the dependency graph to the given path name.
 /// Returns true if there was an error.
 bool writeFineGrainedDependencyGraphToPath(DiagnosticEngine &diags,
+                                           llvm::vfs::OutputBackend &backend,
                                            llvm::StringRef path,
                                            const SourceFileDepGraph &g);
 

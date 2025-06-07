@@ -1264,6 +1264,9 @@ UnsafeMutableRawBufferPointerTestSuite.test("UMRBP.initializeMemory.collection.o
     alignment: MemoryLayout<Int>.alignment
   )
   defer { b.deallocate() }
+  let i = b.initializeMemory(as: Int.self, fromContentsOf: s.dropLast())
+  i.deinitialize()
+
   expectCrash {
     let i = b.initializeMemory(as: Int.self, fromContentsOf: s)
     i.deinitialize()

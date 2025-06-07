@@ -10,11 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "SourceKit/Support/Concurrency.h"
 #include "SourceKit/Config/config.h"
+#include "SourceKit/Support/Concurrency.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/thread.h"
+#include <optional>
 
 #include <dispatch/dispatch.h>
 #include <Block.h>
@@ -104,8 +105,8 @@ static void executeBlock(void *Data) {
 
 static void executeOnLargeStackThread(void *Data) {
   static const size_t ThreadStackSize = 8 << 20; // 8 MB.
-  llvm::thread Thread(llvm::Optional<unsigned>(ThreadStackSize),
-                      executeBlock, Data);
+  llvm::thread Thread(std::optional<unsigned>(ThreadStackSize), executeBlock,
+                      Data);
   Thread.join();
 }
 

@@ -42,7 +42,6 @@ namespace constraints {
 
 class Constraint;
 class ConstraintGraph;
-class ConstraintGraphScope;
 class ConstraintSystem;
 class TypeVariableBinding;
 
@@ -57,6 +56,13 @@ public:
 
   /// Retrieve the type variable this node represents.
   TypeVariableType *getTypeVariable() const { return TypeVar; }
+
+  void reset();
+
+  void initTypeVariable(TypeVariableType *typeVar) {
+    ASSERT(!TypeVar);
+    TypeVar = typeVar;
+  }
 
   /// Retrieve the set of constraints that mention this type variable.
   ///
@@ -78,7 +84,25 @@ public:
   /// as this type variable.
   ArrayRef<TypeVariableType *> getEquivalenceClass() const;
 
-  inference::PotentialBindings &getCurrentBindings();
+  inference::PotentialBindings &getPotentialBindings() {
+    DEBUG_ASSERT(forRepresentativeVar());
+    return Potential;
+  }
+
+  void initBindingSet();
+
+  inference::BindingSet &getBindingSet() {
+    ASSERT(hasBindingSet());
+    return *Set;
+  }
+
+  bool hasBindingSet() const {
+    return Set.has_value();
+  }
+
+  void resetBindingSet() {
+    Set.reset();
+  }
 
 private:
   /// Determines whether the type variable associated with this node
@@ -122,23 +146,12 @@ private:
 
   /// Binding Inference {
 
-  /// Infer bindings from the given constraint and notify referenced variables
-  /// about its arrival (if requested). This happens every time a new constraint
-  /// gets added to a constraint graph node.
-  void introduceToInference(Constraint *constraint);
+  /// Perform graph updates that must be undone after we bind a fixed type
+  /// to a type variable.
+  void retractFromInference();
 
-  /// Forget about the given constraint. This happens every time a constraint
-  /// gets removed for a constraint graph.
-  void retractFromInference(Constraint *constraint);
-
-  /// Re-evaluate the given constraint. This happens when there are changes
-  /// in associated type variables e.g. bound/unbound to/from a fixed type,
-  /// equivalence class changes.
-  void reintroduceToInference(Constraint *constraint);
-
-  /// Similar to \c introduceToInference(Constraint *, ...) this method is going
-  /// to notify inference that this type variable has been bound to a concrete
-  /// type.
+  /// Perform graph updates that must be undone before we bind a fixed type
+  /// to a type variable.
   ///
   /// The reason why this can't simplify be a part of \c bindTypeVariable
   /// is related to the fact that it's sometimes expensive to re-compute
@@ -146,15 +159,6 @@ private:
   /// a conformance lookup), so inference has to be delayed until its clear that
   /// type variable has been bound to a valid type and solver can make progress.
   void introduceToInference(Type fixedType);
-
-  /// Opposite of \c introduceToInference(Type)
-  void
-  retractFromInference(Type fixedType,
-                       SmallPtrSetImpl<TypeVariableType *> &referencedVars);
-
-  /// Drop all previously collected bindings and re-infer based on the
-  /// current set constraints associated with this equivalence class.
-  void resetBindingSet();
 
   /// Notify all of the type variables that have this one (or any member of
   /// its equivalence class) referenced in their fixed type.
@@ -164,12 +168,13 @@ private:
   ///
   /// This is useful in situations when type variable gets bound and unbound,
   /// or equivalence class changes.
-  void notifyReferencingVars() const;
+  void notifyReferencingVars(
+      llvm::function_ref<void(ConstraintGraphNode &,
+                              Constraint *)> notification) const;
 
   /// Notify all of the type variables referenced by this one about a change.
   void notifyReferencedVars(
-      llvm::function_ref<void(ConstraintGraphNode &)> notification);
-
+      llvm::function_ref<void(ConstraintGraphNode &)> notification) const;
   /// }
 
   /// The constraint graph this node belongs to.
@@ -178,8 +183,13 @@ private:
   /// The type variable this node represents.
   TypeVariableType *TypeVar;
 
-  /// The set of bindings associated with this type variable.
-  llvm::Optional<inference::PotentialBindings> Bindings;
+  /// The potential bindings for this type variable, updated incrementally by
+  /// the constraint graph.
+  inference::PotentialBindings Potential;
+
+  /// The binding set for this type variable, computed by
+  /// determineBestBindings().
+  std::optional<inference::BindingSet> Set;
 
   /// The vector of constraints that mention this type variable, in a stable
   /// order for iteration.
@@ -206,7 +216,7 @@ private:
 
   /// Print this graph node.
   void print(llvm::raw_ostream &out, unsigned indent,
-             PrintOptions PO = PrintOptions()) const;
+             const PrintOptions &PO = PrintOptions()) const;
 
   SWIFT_DEBUG_DUMP;
 
@@ -216,6 +226,7 @@ private:
   friend class ConstraintGraph;
   friend class ConstraintSystem;
   friend class TypeVariableBinding;
+  friend class SolverTrail;
 };
 
 /// A graph that describes the relationships among the various type variables
@@ -242,59 +253,62 @@ public:
   /// Retrieve the constraint system this graph describes.
   ConstraintSystem &getConstraintSystem() const { return CS; }
 
-  /// Access the node corresponding to the given type variable.
-  ConstraintGraphNode &operator[](TypeVariableType *typeVar) {
-    return lookupNode(typeVar).first;
-  }
+  /// Add a new vertex to the graph.
+  void addTypeVariable(TypeVariableType *typeVar);
 
-  /// Retrieve the node and index corresponding to the given type variable.
-  std::pair<ConstraintGraphNode &, unsigned> 
-  lookupNode(TypeVariableType *typeVar);
+  /// Look up the vertex associated with the given type variable.
+  ConstraintGraphNode &operator[](TypeVariableType *typeVar);
 
   /// Add a new constraint to the graph.
   void addConstraint(Constraint *constraint);
 
+  /// Primitive form for SolverTrail::Change::undo().
+  void addConstraint(TypeVariableType *typeVar, Constraint *constraint);
+
   /// Remove a constraint from the graph.
   void removeConstraint(Constraint *constraint);
+
+  /// Primitive form for SolverTrail::Change::undo().
+  void removeConstraint(TypeVariableType *typeVar, Constraint *constraint);
+
+  /// Prepare to merge the given node into some other node.
+  ///
+  /// This records graph changes that must be undone after the merge has
+  /// been undone.
+  void mergeNodesPre(TypeVariableType *typeVar2);
 
   /// Merge the two nodes for the two given type variables.
   ///
   /// The type variables must actually have been merged already; this
-  /// operation merges the two nodes.
+  /// operation merges the two nodes. This also records graph changes
+  /// that must be undone before the merge can be undone.
   void mergeNodes(TypeVariableType *typeVar1, TypeVariableType *typeVar2);
 
   /// Bind the given type variable to the given fixed type.
   void bindTypeVariable(TypeVariableType *typeVar, Type fixedType);
 
-  /// Describes which constraints \c gatherConstraints should gather.
-  enum class GatheringKind {
-    /// Gather constraints associated with all of the variables within the
-    /// same equivalence class as the given type variable, as well as its
-    /// immediate fixed bindings.
-    EquivalenceClass,
-    /// Gather all constraints that mention this type variable or type variables
-    /// that it is a fixed binding of. Unlike EquivalenceClass, this looks
-    /// through transitive fixed bindings. This can be used to find all the
-    /// constraints that may be affected when binding a type variable.
-    AllMentions,
-  };
+  /// Perform graph updates that must be undone after we bind a fixed type
+  /// to a type variable.
+  void retractFromInference(TypeVariableType *typeVar);
 
-  /// Gather the set of constraints that involve the given type variable,
-  /// i.e., those constraints that will be affected when the type variable
-  /// gets merged or bound to a fixed type.
+  /// Perform graph updates that must be undone before we bind a fixed type
+  /// to a type variable.
+  void introduceToInference(TypeVariableType *typeVar, Type fixedType);
+
+  /// Gather constraints associated with all of the variables within the
+  /// same equivalence class as the given type variable, as well as its
+  /// immediate fixed bindings.
   llvm::TinyPtrVector<Constraint *>
-  gatherConstraints(TypeVariableType *typeVar,
-                    GatheringKind kind,
+  gatherAllConstraints(TypeVariableType *typeVar);
+
+  /// Gather all constraints that mention this type variable or type variables
+  /// that it is a fixed binding of. Unlike EquivalenceClass, this looks
+  /// through transitive fixed bindings. This can be used to find all the
+  /// constraints that may be affected when binding a type variable.
+  llvm::TinyPtrVector<Constraint *>
+  gatherNearbyConstraints(TypeVariableType *typeVar,
                     llvm::function_ref<bool(Constraint *)> acceptConstraint =
                         [](Constraint *constraint) { return true; });
-
-  /// Retrieve the type variables that correspond to nodes in the graph.
-  ///
-  /// The subscript operator can be used to retrieve the nodes that
-  /// correspond to these type variables.
-  ArrayRef<TypeVariableType *> getTypeVariables() const {
-    return TypeVariables;
-  }
 
   /// Describes a single component, as produced by the connected components
   /// algorithm.
@@ -317,12 +331,6 @@ public:
     /// The constraints in this component.
     TinyPtrVector<Constraint *> constraints;
 
-    /// The set of components that this component depends on, such that
-    /// the partial solutions of the those components need to be available
-    /// before this component can be solved.
-    ///
-    SmallVector<unsigned, 2> dependencies;
-
   public:
     Component(unsigned solutionIndex) : solutionIndex(solutionIndex) { }
 
@@ -337,11 +345,6 @@ public:
     const TinyPtrVector<Constraint *> &getConstraints() const {
       return constraints;
     }
-
-    /// Records a component which this component depends on.
-    void recordDependency(const Component &component);
-
-    ArrayRef<unsigned> getDependencies() const { return dependencies; }
 
     unsigned getNumDisjunctions() const { return numDisjunctions; }
   };
@@ -387,7 +390,6 @@ public:
   /// Print the graph.
   void print(ArrayRef<TypeVariableType *> typeVars, llvm::raw_ostream &out);
   void dump(llvm::raw_ostream &out);
-  void dumpActiveScopeChanges(llvm::raw_ostream &out, unsigned indent = 0);
 
   // FIXME: Potentially side-effectful.
   SWIFT_DEBUG_HELPER(void dump());
@@ -409,19 +411,24 @@ public:
 private:
   /// Remove the node corresponding to the given type variable.
   ///
-  /// This operation assumes that the any constraints that refer to
-  /// this type variable have been or will be removed before other
-  /// graph queries are performed.
+  /// This operation assumes that the any constraints that refer to this type
+  /// variable have been or will be removed before other graph queries are
+  /// performed.
   ///
-  /// Note that this change is not recorded and cannot be undone. Use with
-  /// caution.
+  /// Note that this it only meant to be called by SolverTrail::Change::undo().
   void removeNode(TypeVariableType *typeVar);
 
-  /// Unbind the given type variable from the given fixed type.
+  /// Remove an edge from the constraint graph.
   ///
-  /// Note that this change is not recorded and cannot be undone. Use with
-  /// caution.
-  void unbindTypeVariable(TypeVariableType *typeVar, Type fixedType);
+  ///
+  /// Note that this it only meant to be called by SolverTrail::Change::undo().
+  void unrelateTypeVariables(TypeVariableType *typeVar,
+                             TypeVariableType *otherTypeVar);
+
+  /// Retract bindings from the given constraint.
+  ///
+  /// Note that this it only meant to be called by SolverTrail::Change::undo().
+  void retractBindings(TypeVariableType *typeVar, Constraint *constraint);
 
   /// Perform edge contraction on the constraint graph, merging equivalence
   /// classes until a fixed point is reached.
@@ -430,96 +437,17 @@ private:
   /// The constraint system.
   ConstraintSystem &CS;
 
-  /// The type variables in this graph, in stable order.
-  std::vector<TypeVariableType *> TypeVariables;
-
   /// Constraints that are "orphaned" because they contain no type variables.
   SmallVector<Constraint *, 4> OrphanedConstraints;
+
+  /// Unused nodes.
+  SmallVector<ConstraintGraphNode *> FreeList;
 
   /// Increment the number of constraints considered per attempt
   /// to contract constraint graph edges.
   void incrementConstraintsPerContractionCounter();
 
-  /// The kind of change made to the graph.
-  enum class ChangeKind {
-    /// Added a type variable.
-    AddedTypeVariable,
-    /// Added a new constraint.
-    AddedConstraint,
-    /// Removed an existing constraint
-    RemovedConstraint,
-    /// Extended the equivalence class of a type variable.
-    ExtendedEquivalenceClass,
-    /// Added a fixed binding for a type variable.
-    BoundTypeVariable,
-  };
-
-  /// A change made to the constraint graph.
-  ///
-  /// Each change can be undone (once, and in reverse order) by calling the
-  /// undo() method.
-  class Change {
-  public:
-    /// The kind of change.
-    ChangeKind Kind;
-
-    union {
-      TypeVariableType *TypeVar;
-      Constraint *TheConstraint;
-
-      struct {
-        /// The type variable whose equivalence class was extended.
-        TypeVariableType *TypeVar;
-
-        /// The previous size of the equivalence class.
-        unsigned PrevSize;
-      } EquivClass;
-
-      struct {
-        /// The type variable being bound to a fixed type.
-        TypeVariableType *TypeVar;
-
-        /// The fixed type to which the type variable was bound.
-        TypeBase *FixedType;
-      } Binding;
-    };
-
-    Change() : Kind(ChangeKind::AddedTypeVariable), TypeVar(nullptr) { }
-
-    /// Create a change that added a type variable.
-    static Change addedTypeVariable(TypeVariableType *typeVar);
-
-    /// Create a change that added a constraint.
-    static Change addedConstraint(Constraint *constraint);
-
-    /// Create a change that removed a constraint.
-    static Change removedConstraint(Constraint *constraint);
-
-    /// Create a change that extended an equivalence class.
-    static Change extendedEquivalenceClass(TypeVariableType *typeVar,
-                                           unsigned prevSize);
-
-    /// Create a change that bound a type variable to a fixed type.
-    static Change boundTypeVariable(TypeVariableType *typeVar, Type fixed);
-
-    /// Undo this change, reverting the constraint graph to the state it
-    /// had prior to this change.
-    ///
-    /// Changes must be undone in stack order.
-    void undo(ConstraintGraph &cg);
-  };
-
-  /// The currently active scope, or null if we aren't tracking changes made
-  /// to the constraint graph.
-  ConstraintGraphScope *ActiveScope = nullptr;
-
-  /// The set of changes made to this constraint graph.
-  ///
-  /// As the constraint graph is extended and mutated, additional changes are
-  /// introduced into this vector. Each scope
-  llvm::SmallVector<Change, 4> Changes;
-
-  friend class ConstraintGraphScope;
+  friend class SolverTrail;
 };
 
 } // end namespace constraints

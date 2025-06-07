@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -126,25 +126,21 @@ public protocol AdditiveArithmetic: Equatable {
   static func -=(lhs: inout Self, rhs: Self)
 }
 
-public extension AdditiveArithmetic {
+extension AdditiveArithmetic {
   @_alwaysEmitIntoClient
-  static func +=(lhs: inout Self, rhs: Self) {
+  public static func +=(lhs: inout Self, rhs: Self) {
     lhs = lhs + rhs
   }
 
   @_alwaysEmitIntoClient
-  static func -=(lhs: inout Self, rhs: Self) {
+  public static func -=(lhs: inout Self, rhs: Self) {
     lhs = lhs - rhs
   }
 }
 
-public extension AdditiveArithmetic where Self: ExpressibleByIntegerLiteral {
-  /// The zero value.
-  ///
-  /// Zero is the identity element for addition. For any value,
-  /// `x + .zero == x` and `.zero + x == x`.
+extension AdditiveArithmetic where Self: ExpressibleByIntegerLiteral {
   @inlinable @inline(__always)
-  static var zero: Self {
+  public static var zero: Self {
     return 0
   }
 }
@@ -320,23 +316,6 @@ public protocol SignedNumeric: Numeric {
 }
 
 extension SignedNumeric {
-  /// Returns the additive inverse of the specified value.
-  ///
-  /// The negation operator (prefix `-`) returns the additive inverse of its
-  /// argument.
-  ///
-  ///     let x = 21
-  ///     let y = -x
-  ///     // y == -21
-  ///
-  /// The resulting value must be representable in the same type as the
-  /// argument. In particular, negating a signed, fixed-width integer type's
-  /// minimum results in a value that cannot be represented.
-  ///
-  ///     let z = -Int8.min
-  ///     // Overflow error
-  ///
-  /// - Returns: The additive inverse of the argument.
   @_transparent
   public static prefix func - (_ operand: Self) -> Self {
     var result = operand
@@ -344,22 +323,6 @@ extension SignedNumeric {
     return result
   }
 
-  /// Replaces this value with its additive inverse.
-  ///
-  /// The following example uses the `negate()` method to negate the value of
-  /// an integer `x`:
-  ///
-  ///     var x = 21
-  ///     x.negate()
-  ///     // x == -21
-  ///
-  /// The resulting value must be representable within the value's type. In
-  /// particular, negating a signed, fixed-width integer type's minimum
-  /// results in a value that cannot be represented.
-  ///
-  ///     var y = Int8.min
-  ///     y.negate()
-  ///     // Overflow error
   @_transparent
   public mutating func negate() {
     self = 0 - self
@@ -382,7 +345,7 @@ extension SignedNumeric {
 @inlinable
 public func abs<T: SignedNumeric & Comparable>(_ x: T) -> T {
   if T.self == T.Magnitude.self {
-    return unsafeBitCast(x.magnitude, to: T.self)
+    return unsafe unsafeBitCast(x.magnitude, to: T.self)
   }
 
   return x < (0 as T) ? -x : x
@@ -817,12 +780,35 @@ public protocol BinaryInteger :
   ///     let y: Int = 1000000
   ///     Int(x) + y              // 1000021
   ///
+  /// The sum of the two arguments must be representable in the arguments'
+  /// type. In the following example, the result of `21 + 120` is greater than
+  /// the maximum representable `Int8` value:
+  ///
+  ///     x + 120                 // Overflow error
+  ///
+  /// - Note: Overflow checking is not performed in `-Ounchecked` builds.
+  ///
+  /// If you want to opt out of overflow checking and wrap the result in case
+  /// of any overflow, use the overflow addition operator (`&+`).
+  ///
+  ///     x &+ 120                // -115
+  ///
   /// - Parameters:
   ///   - lhs: The first value to add.
   ///   - rhs: The second value to add.
   override static func +(lhs: Self, rhs: Self) -> Self
 
   /// Adds two values and stores the result in the left-hand-side variable.
+  ///
+  /// The sum of the two arguments must be representable in the arguments'
+  /// type. In the following example, the result of `21 + 120` is greater than
+  /// the maximum representable `Int8` value:
+  ///
+  ///     var x: Int8 = 21
+  ///     x += 120
+  ///     // Overflow error
+  ///
+  /// - Note: Overflow checking is not performed in `-Ounchecked` builds.
   ///
   /// - Parameters:
   ///   - lhs: The first value to add.
@@ -846,6 +832,19 @@ public protocol BinaryInteger :
   ///     let y: UInt = 1000000
   ///     y - UInt(x)             // 999979
   ///
+  /// The difference of the two arguments must be representable in the
+  /// arguments' type. In the following example, the result of `21 - 50` is
+  /// less than zero, the minimum representable `UInt8` value:
+  ///
+  ///     x - 50                  // Overflow error
+  ///
+  /// - Note: Overflow checking is not performed in `-Ounchecked` builds.
+  ///
+  /// If you want to opt out of overflow checking and wrap the result in case
+  /// of any overflow, use the overflow subtraction operator (`&-`).
+  ///
+  ///     x &- 50                 // 227
+  ///
   /// - Parameters:
   ///   - lhs: A numeric value.
   ///   - rhs: The value to subtract from `lhs`.
@@ -853,6 +852,16 @@ public protocol BinaryInteger :
 
   /// Subtracts the second value from the first and stores the difference in the
   /// left-hand-side variable.
+  ///
+  /// The difference of the two arguments must be representable in the
+  /// arguments' type. In the following example, the result of `21 - 50` is
+  /// less than zero, the minimum representable `UInt8` value:
+  ///
+  ///     var x: UInt8 = 21
+  ///     x -= 50
+  ///     // Overflow error
+  ///
+  /// - Note: Overflow checking is not performed in `-Ounchecked` builds.
   ///
   /// - Parameters:
   ///   - lhs: A numeric value.
@@ -876,6 +885,19 @@ public protocol BinaryInteger :
   ///     let y: Int = 1000000
   ///     Int(x) * y              // 21000000
   ///
+  /// The product of the two arguments must be representable in the arguments'
+  /// type. In the following example, the result of `21 * 21` is greater than
+  /// the maximum representable `Int8` value:
+  ///
+  ///     x * 21                  // Overflow error
+  ///
+  /// - Note: Overflow checking is not performed in `-Ounchecked` builds.
+  ///
+  /// If you want to opt out of overflow checking and wrap the result in case
+  /// of any overflow, use the overflow multiplication operator (`&*`).
+  ///
+  ///     x &* 21                 // -71
+  ///
   /// - Parameters:
   ///   - lhs: The first value to multiply.
   ///   - rhs: The second value to multiply.
@@ -883,6 +905,16 @@ public protocol BinaryInteger :
 
   /// Multiplies two values and stores the result in the left-hand-side
   /// variable.
+  ///
+  /// The product of the two arguments must be representable in the arguments'
+  /// type. In the following example, the result of `21 * 21` is greater than
+  /// the maximum representable `Int8` value:
+  ///
+  ///     var x: Int8 = 21
+  ///     x *= 21
+  ///     // Overflow error
+  ///
+  /// - Note: Overflow checking is not performed in `-Ounchecked` builds.
   ///
   /// - Parameters:
   ///   - lhs: The first value to multiply.
@@ -1244,11 +1276,6 @@ extension BinaryInteger {
     self = 0
   }
 
-  /// Returns `-1` if this value is negative and `1` if it's positive;
-  /// otherwise, `0`.
-  ///
-  /// - Returns: The sign of this number, expressed as an integer of the same
-  ///   type.
   @inlinable
   public func signum() -> Self {
     return (self > (0 as Self) ? 1 : 0) - (self < (0 as Self) ? 1 : 0)
@@ -1283,20 +1310,6 @@ extension BinaryInteger {
         (UInt.bitWidth &- (word.leadingZeroBitCount &+ 1))
   }
 
-  /// Returns the quotient and remainder of this value divided by the given
-  /// value.
-  ///
-  /// Use this method to calculate the quotient and remainder of a division at
-  /// the same time.
-  ///
-  ///     let x = 1_000_000
-  ///     let (q, r) = x.quotientAndRemainder(dividingBy: 933)
-  ///     // q == 1071
-  ///     // r == 757
-  ///
-  /// - Parameter rhs: The value to divide this value by.
-  /// - Returns: A tuple containing the quotient and remainder of this value
-  ///   divided by `rhs`.
   @inlinable
   public func quotientAndRemainder(dividingBy rhs: Self)
     -> (quotient: Self, remainder: Self) {
@@ -1316,20 +1329,7 @@ extension BinaryInteger {
 //===----------------------------------------------------------------------===//
 //===--- Homogeneous ------------------------------------------------------===//
 //===----------------------------------------------------------------------===//
-  /// Returns the result of performing a bitwise AND operation on the two given
-  /// values.
-  ///
-  /// A bitwise AND operation results in a value that has each bit set to `1`
-  /// where *both* of its arguments have that bit set to `1`. For example:
-  ///
-  ///     let x: UInt8 = 5          // 0b00000101
-  ///     let y: UInt8 = 14         // 0b00001110
-  ///     let z = x & y             // 0b00000100
-  ///     // z == 4
-  ///
-  /// - Parameters:
-  ///   - lhs: An integer value.
-  ///   - rhs: Another integer value.
+
   @_transparent
   public static func & (lhs: Self, rhs: Self) -> Self {
     var lhs = lhs
@@ -1337,21 +1337,6 @@ extension BinaryInteger {
     return lhs
   }
 
-  /// Returns the result of performing a bitwise OR operation on the two given
-  /// values.
-  ///
-  /// A bitwise OR operation results in a value that has each bit set to `1`
-  /// where *one or both* of its arguments have that bit set to `1`. For
-  /// example:
-  ///
-  ///     let x: UInt8 = 5          // 0b00000101
-  ///     let y: UInt8 = 14         // 0b00001110
-  ///     let z = x | y             // 0b00001111
-  ///     // z == 15
-  ///
-  /// - Parameters:
-  ///   - lhs: An integer value.
-  ///   - rhs: Another integer value.
   @_transparent
   public static func | (lhs: Self, rhs: Self) -> Self {
     var lhs = lhs
@@ -1359,21 +1344,6 @@ extension BinaryInteger {
     return lhs
   }
 
-  /// Returns the result of performing a bitwise XOR operation on the two given
-  /// values.
-  ///
-  /// A bitwise XOR operation, also known as an exclusive OR operation, results
-  /// in a value that has each bit set to `1` where *one or the other but not
-  /// both* of its arguments had that bit set to `1`. For example:
-  ///
-  ///     let x: UInt8 = 5          // 0b00000101
-  ///     let y: UInt8 = 14         // 0b00001110
-  ///     let z = x ^ y             // 0b00001011
-  ///     // z == 11
-  ///
-  /// - Parameters:
-  ///   - lhs: An integer value.
-  ///   - rhs: Another integer value.
   @_transparent
   public static func ^ (lhs: Self, rhs: Self) -> Self {
     var lhs = lhs
@@ -1384,55 +1354,7 @@ extension BinaryInteger {
 //===----------------------------------------------------------------------===//
 //===--- Heterogeneous non-masking shift in terms of shift-assignment -----===//
 //===----------------------------------------------------------------------===//
-  /// Returns the result of shifting a value's binary representation the
-  /// specified number of digits to the right.
-  ///
-  /// The `>>` operator performs a *smart shift*, which defines a result for a
-  /// shift of any value.
-  ///
-  /// - Using a negative value for `rhs` performs a left shift using
-  ///   `abs(rhs)`.
-  /// - Using a value for `rhs` that is greater than or equal to the bit width
-  ///   of `lhs` is an *overshift*. An overshift results in `-1` for a
-  ///   negative value of `lhs` or `0` for a nonnegative value.
-  /// - Using any other value for `rhs` performs a right shift on `lhs` by that
-  ///   amount.
-  ///
-  /// The following example defines `x` as an instance of `UInt8`, an 8-bit,
-  /// unsigned integer type. If you use `2` as the right-hand-side value in an
-  /// operation on `x`, the value is shifted right by two bits.
-  ///
-  ///     let x: UInt8 = 30                 // 0b00011110
-  ///     let y = x >> 2
-  ///     // y == 7                         // 0b00000111
-  ///
-  /// If you use `11` as `rhs`, `x` is overshifted such that all of its bits
-  /// are set to zero.
-  ///
-  ///     let z = x >> 11
-  ///     // z == 0                         // 0b00000000
-  ///
-  /// Using a negative value as `rhs` is the same as performing a left shift
-  /// using `abs(rhs)`.
-  ///
-  ///     let a = x >> -3
-  ///     // a == 240                       // 0b11110000
-  ///     let b = x << 3
-  ///     // b == 240                       // 0b11110000
-  ///
-  /// Right shift operations on negative values "fill in" the high bits with
-  /// ones instead of zeros.
-  ///
-  ///     let q: Int8 = -30                 // 0b11100010
-  ///     let r = q >> 2
-  ///     // r == -8                        // 0b11111000
-  ///
-  ///     let s = q >> 11
-  ///     // s == -1                        // 0b11111111
-  ///
-  /// - Parameters:
-  ///   - lhs: The value to shift.
-  ///   - rhs: The number of bits to shift `lhs` to the right.
+
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @_transparent
   public static func >> <RHS: BinaryInteger>(lhs: Self, rhs: RHS) -> Self {
@@ -1441,44 +1363,6 @@ extension BinaryInteger {
     return r
   }
 
-  /// Returns the result of shifting a value's binary representation the
-  /// specified number of digits to the left.
-  ///
-  /// The `<<` operator performs a *smart shift*, which defines a result for a
-  /// shift of any value.
-  ///
-  /// - Using a negative value for `rhs` performs a right shift using
-  ///   `abs(rhs)`.
-  /// - Using a value for `rhs` that is greater than or equal to the bit width
-  ///   of `lhs` is an *overshift*, resulting in zero.
-  /// - Using any other value for `rhs` performs a left shift on `lhs` by that
-  ///   amount.
-  ///
-  /// The following example defines `x` as an instance of `UInt8`, an 8-bit,
-  /// unsigned integer type. If you use `2` as the right-hand-side value in an
-  /// operation on `x`, the value is shifted left by two bits.
-  ///
-  ///     let x: UInt8 = 30                 // 0b00011110
-  ///     let y = x << 2
-  ///     // y == 120                       // 0b01111000
-  ///
-  /// If you use `11` as `rhs`, `x` is overshifted such that all of its bits
-  /// are set to zero.
-  ///
-  ///     let z = x << 11
-  ///     // z == 0                         // 0b00000000
-  ///
-  /// Using a negative value as `rhs` is the same as performing a right shift
-  /// with `abs(rhs)`.
-  ///
-  ///     let a = x << -3
-  ///     // a == 3                         // 0b00000011
-  ///     let b = x >> 3
-  ///     // b == 3                         // 0b00000011
-  ///
-  /// - Parameters:
-  ///   - lhs: The value to shift.
-  ///   - rhs: The number of bits to shift `lhs` to the left.
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @_transparent
   public static func << <RHS: BinaryInteger>(lhs: Self, rhs: RHS) -> Self {
@@ -1549,8 +1433,8 @@ extension BinaryInteger {
     }
 
     result.reverse()
-    return result.withUnsafeBufferPointer {
-      return String._fromASCII($0)
+    return unsafe result.withUnsafeBufferPointer {
+      return unsafe String._fromASCII($0)
     }
   }
 
@@ -1617,17 +1501,15 @@ extension BinaryInteger {
   @inlinable
   @inline(__always)
   public func advanced(by n: Int) -> Self {
-    if !Self.isSigned {
+    if Self.isSigned {
+      return self.bitWidth < n.bitWidth
+        ? Self(Int(truncatingIfNeeded: self) + n)
+        : self + Self(truncatingIfNeeded: n)
+    } else {
       return n < (0 as Int)
-        ? self - Self(-n)
-        : self + Self(n)
+        ? self - Self(UInt(bitPattern: ~n &+ 1))
+        : self + Self(UInt(bitPattern: n))
     }
-    if (self < (0 as Self)) == (n < (0 as Self)) {
-      return self + Self(n)
-    }
-    return self.magnitude < n.magnitude
-      ? Self(Int(self) + n)
-      : self + Self(n)
   }
 }
 
@@ -1789,7 +1671,7 @@ extension BinaryInteger {
 //===--- Ambiguity breakers -----------------------------------------------===//
 //
 // These two versions of the operators are not ordered with respect to one
-// another, but the compiler choses the second one, and that results in infinite
+// another, but the compiler chooses the second one, and that results in infinite
 // recursion.
 //
 //     <T: Comparable>(T, T) -> Bool
@@ -2240,11 +2122,37 @@ where Magnitude: FixedWidthInteger & UnsignedInteger,
   ///     outside the range `0..<lhs.bitWidth`, it is masked to produce a
   ///     value within that range.
   static func &<<=(lhs: inout Self, rhs: Self)
+  
+  /// Returns the product of the two given values, wrapping the result in case
+  /// of any overflow.
+  ///
+  /// The overflow multiplication operator (`&*`) discards any bits that
+  /// overflow the fixed width of the integer type. In the following example,
+  /// the product of `10` and `50` is greater than the maximum representable
+  /// `Int8` value, so the result is the partial value after discarding the
+  /// overflowing bits.
+  ///
+  ///     let x: Int8 = 10 &* 5
+  ///     // x == 50
+  ///     let y: Int8 = 10 &* 50
+  ///     // y == -12 (after overflow)
+  ///
+  /// For more about arithmetic with overflow operators, see [Overflow
+  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
+  ///
+  /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
+  /// [tspl]: https://docs.swift.org/swift-book/
+  ///
+  /// - Parameters:
+  ///   - lhs: The first value to multiply.
+  ///   - rhs: The second value to multiply.
+  @available(SwiftStdlib 6.0, *)
+  static func &*(lhs: Self, rhs: Self) -> Self
 }
 
 extension FixedWidthInteger {
-  /// The number of bits in the binary representation of this value.
   @inlinable
+  @_transparent
   public var bitWidth: Int { return Self.bitWidth }
 
   @inlinable
@@ -2253,11 +2161,6 @@ extension FixedWidthInteger {
     return Self.bitWidth &- (leadingZeroBitCount &+ 1)
   }
 
-  /// Creates an integer from its little-endian representation, changing the
-  /// byte order if necessary.
-  ///
-  /// - Parameter value: A value to use as the little-endian representation of
-  ///   the new integer.
   @inlinable
   public init(littleEndian value: Self) {
 #if _endian(little)
@@ -2267,11 +2170,6 @@ extension FixedWidthInteger {
 #endif
   }
 
-  /// Creates an integer from its big-endian representation, changing the byte
-  /// order if necessary.
-  ///
-  /// - Parameter value: A value to use as the big-endian representation of the
-  ///   new integer.
   @inlinable
   public init(bigEndian value: Self) {
 #if _endian(big)
@@ -2281,11 +2179,6 @@ extension FixedWidthInteger {
 #endif
   }
 
-  /// The little-endian representation of this integer.
-  ///
-  /// If necessary, the byte order of this value is reversed from the typical
-  /// byte order of this integer type. On a little-endian platform, for any
-  /// integer `x`, `x == x.littleEndian`.
   @inlinable
   public var littleEndian: Self {
 #if _endian(little)
@@ -2295,11 +2188,6 @@ extension FixedWidthInteger {
 #endif
   }
 
-  /// The big-endian representation of this integer.
-  ///
-  /// If necessary, the byte order of this value is reversed from the typical
-  /// byte order of this integer type. On a big-endian platform, for any
-  /// integer `x`, `x == x.bigEndian`.
   @inlinable
   public var bigEndian: Self {
 #if _endian(big)
@@ -2368,40 +2256,6 @@ extension FixedWidthInteger {
     return (p11, split(p10).low << (bitWidth/2) | split(p00).low)
   }
 
-  /// Returns the result of shifting a value's binary representation the
-  /// specified number of digits to the right, masking the shift amount to the
-  /// type's bit width.
-  ///
-  /// Use the masking right shift operator (`&>>`) when you need to perform a
-  /// shift and are sure that the shift amount is in the range
-  /// `0..<lhs.bitWidth`. Before shifting, the masking right shift operator
-  /// masks the shift to this range. The shift is performed using this masked
-  /// value.
-  ///
-  /// The following example defines `x` as an instance of `UInt8`, an 8-bit,
-  /// unsigned integer type. If you use `2` as the right-hand-side value in an
-  /// operation on `x`, the shift amount requires no masking.
-  ///
-  ///     let x: UInt8 = 30                 // 0b00011110
-  ///     let y = x &>> 2
-  ///     // y == 7                         // 0b00000111
-  ///
-  /// However, if you use `8` as the shift amount, the method first masks the
-  /// shift amount to zero, and then performs the shift, resulting in no change
-  /// to the original value.
-  ///
-  ///     let z = x &>> 8
-  ///     // z == 30                        // 0b00011110
-  ///
-  /// If the bit width of the shifted integer type is a power of two, masking
-  /// is performed using a bitmask; otherwise, masking is performed using a
-  /// modulo operation.
-  ///
-  /// - Parameters:
-  ///   - lhs: The value to shift.
-  ///   - rhs: The number of bits to shift `lhs` to the right. If `rhs` is
-  ///     outside the range `0..<lhs.bitWidth`, it is masked to produce a
-  ///     value within that range.
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @_transparent
   public static func &>> (lhs: Self, rhs: Self) -> Self {
@@ -2488,40 +2342,6 @@ extension FixedWidthInteger {
     lhs = lhs &>> rhs
   }
 
-  /// Returns the result of shifting a value's binary representation the
-  /// specified number of digits to the left, masking the shift amount to the
-  /// type's bit width.
-  ///
-  /// Use the masking left shift operator (`&<<`) when you need to perform a
-  /// shift and are sure that the shift amount is in the range
-  /// `0..<lhs.bitWidth`. Before shifting, the masking left shift operator
-  /// masks the shift to this range. The shift is performed using this masked
-  /// value.
-  ///
-  /// The following example defines `x` as an instance of `UInt8`, an 8-bit,
-  /// unsigned integer type. If you use `2` as the right-hand-side value in an
-  /// operation on `x`, the shift amount requires no masking.
-  ///
-  ///     let x: UInt8 = 30                 // 0b00011110
-  ///     let y = x &<< 2
-  ///     // y == 120                       // 0b01111000
-  ///
-  /// However, if you use `8` as the shift amount, the method first masks the
-  /// shift amount to zero, and then performs the shift, resulting in no change
-  /// to the original value.
-  ///
-  ///     let z = x &<< 8
-  ///     // z == 30                        // 0b00011110
-  ///
-  /// If the bit width of the shifted integer type is a power of two, masking
-  /// is performed using a bitmask; otherwise, masking is performed using a
-  /// modulo operation.
-  ///
-  /// - Parameters:
-  ///   - lhs: The value to shift.
-  ///   - rhs: The number of bits to shift `lhs` to the left. If `rhs` is
-  ///     outside the range `0..<lhs.bitWidth`, it is masked to produce a
-  ///     value within that range.
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @_transparent
   public static func &<< (lhs: Self, rhs: Self) -> Self {
@@ -2764,23 +2584,6 @@ extension FixedWidthInteger {
 //===----------------------------------------------------------------------===//
 
 extension FixedWidthInteger {
-  /// Returns the inverse of the bits set in the argument.
-  ///
-  /// The bitwise NOT operator (`~`) is a prefix operator that returns a value
-  /// in which all the bits of its argument are flipped: Bits that are `1` in
-  /// the argument are `0` in the result, and bits that are `0` in the argument
-  /// are `1` in the result. This is equivalent to the inverse of a set. For
-  /// example:
-  ///
-  ///     let x: UInt8 = 5        // 0b00000101
-  ///     let notX = ~x           // 0b11111010
-  ///
-  /// Performing a bitwise NOT operation on 0 returns a value with every bit
-  /// set to `1`.
-  ///
-  ///     let allOnes = ~UInt8.min   // 0b11111111
-  ///
-  /// - Complexity: O(1).
   @_transparent
   public static prefix func ~ (x: Self) -> Self {
     return 0 &- x &- 1
@@ -2790,55 +2593,6 @@ extension FixedWidthInteger {
 //=== "Smart right shift", supporting overshifts and negative shifts ------===//
 //===----------------------------------------------------------------------===//
 
-  /// Returns the result of shifting a value's binary representation the
-  /// specified number of digits to the right.
-  ///
-  /// The `>>` operator performs a *smart shift*, which defines a result for a
-  /// shift of any value.
-  ///
-  /// - Using a negative value for `rhs` performs a left shift using
-  ///   `abs(rhs)`.
-  /// - Using a value for `rhs` that is greater than or equal to the bit width
-  ///   of `lhs` is an *overshift*. An overshift results in `-1` for a
-  ///   negative value of `lhs` or `0` for a nonnegative value.
-  /// - Using any other value for `rhs` performs a right shift on `lhs` by that
-  ///   amount.
-  ///
-  /// The following example defines `x` as an instance of `UInt8`, an 8-bit,
-  /// unsigned integer type. If you use `2` as the right-hand-side value in an
-  /// operation on `x`, the value is shifted right by two bits.
-  ///
-  ///     let x: UInt8 = 30                 // 0b00011110
-  ///     let y = x >> 2
-  ///     // y == 7                         // 0b00000111
-  ///
-  /// If you use `11` as `rhs`, `x` is overshifted such that all of its bits
-  /// are set to zero.
-  ///
-  ///     let z = x >> 11
-  ///     // z == 0                         // 0b00000000
-  ///
-  /// Using a negative value as `rhs` is the same as performing a left shift
-  /// using `abs(rhs)`.
-  ///
-  ///     let a = x >> -3
-  ///     // a == 240                       // 0b11110000
-  ///     let b = x << 3
-  ///     // b == 240                       // 0b11110000
-  ///
-  /// Right shift operations on negative values "fill in" the high bits with
-  /// ones instead of zeros.
-  ///
-  ///     let q: Int8 = -30                 // 0b11100010
-  ///     let r = q >> 2
-  ///     // r == -8                        // 0b11111000
-  ///
-  ///     let s = q >> 11
-  ///     // s == -1                        // 0b11111111
-  ///
-  /// - Parameters:
-  ///   - lhs: The value to shift.
-  ///   - rhs: The number of bits to shift `lhs` to the right.
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @_transparent
   public static func >> <
@@ -2888,44 +2642,6 @@ extension FixedWidthInteger {
 //=== "Smart left shift", supporting overshifts and negative shifts -------===//
 //===----------------------------------------------------------------------===//
 
-  /// Returns the result of shifting a value's binary representation the
-  /// specified number of digits to the left.
-  ///
-  /// The `<<` operator performs a *smart shift*, which defines a result for a
-  /// shift of any value.
-  ///
-  /// - Using a negative value for `rhs` performs a right shift using
-  ///   `abs(rhs)`.
-  /// - Using a value for `rhs` that is greater than or equal to the bit width
-  ///   of `lhs` is an *overshift*, resulting in zero.
-  /// - Using any other value for `rhs` performs a left shift on `lhs` by that
-  ///   amount.
-  ///
-  /// The following example defines `x` as an instance of `UInt8`, an 8-bit,
-  /// unsigned integer type. If you use `2` as the right-hand-side value in an
-  /// operation on `x`, the value is shifted left by two bits.
-  ///
-  ///     let x: UInt8 = 30                 // 0b00011110
-  ///     let y = x << 2
-  ///     // y == 120                       // 0b01111000
-  ///
-  /// If you use `11` as `rhs`, `x` is overshifted such that all of its bits
-  /// are set to zero.
-  ///
-  ///     let z = x << 11
-  ///     // z == 0                         // 0b00000000
-  ///
-  /// Using a negative value as `rhs` is the same as performing a right shift
-  /// with `abs(rhs)`.
-  ///
-  ///     let a = x << -3
-  ///     // a == 3                         // 0b00000011
-  ///     let b = x >> 3
-  ///     // b == 3                         // 0b00000011
-  ///
-  /// - Parameters:
-  ///   - lhs: The value to shift.
-  ///   - rhs: The number of bits to shift `lhs` to the left.
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @_transparent
   public static func << <
@@ -2975,6 +2691,7 @@ extension FixedWidthInteger {
 extension FixedWidthInteger {
   @inlinable
   @_semantics("optimize.sil.specialize.generic.partial.never")
+  @_semantics("optimize.sil.inline.constant.arguments")
   public // @testable
   static func _convert<Source: BinaryFloatingPoint>(
     from source: Source
@@ -3008,50 +2725,23 @@ extension FixedWidthInteger {
       isExact)
   }
 
-  /// Creates an integer from the given floating-point value, rounding toward
-  /// zero. Any fractional part of the value passed as `source` is removed.
-  ///
-  ///     let x = Int(21.5)
-  ///     // x == 21
-  ///     let y = Int(-21.5)
-  ///     // y == -21
-  ///
-  /// If `source` is outside the bounds of this type after rounding toward
-  /// zero, a runtime error may occur.
-  ///
-  ///     let z = UInt(-21.5)
-  ///     // Error: ...outside the representable range
-  ///
-  /// - Parameter source: A floating-point value to convert to an integer.
-  ///   `source` must be representable in this type after rounding toward
-  ///   zero.
   @inlinable
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @inline(__always)
   public init<T: BinaryFloatingPoint>(_ source: T) {
     guard let value = Self._convert(from: source).value else {
+      #if !$Embedded
       fatalError("""
         \(T.self) value cannot be converted to \(Self.self) because it is \
         outside the representable range
         """)
+      #else
+      fatalError("value not representable")
+      #endif
     }
     self = value
   }
 
-  /// Creates an integer from the given floating-point value, if it can be
-  /// represented exactly.
-  ///
-  /// If the value passed as `source` is not representable exactly, the result
-  /// is `nil`. In the following example, the constant `x` is successfully
-  /// created from a value of `21.0`, while the attempt to initialize the
-  /// constant `y` from `21.5` fails:
-  ///
-  ///     let x = Int(exactly: 21.0)
-  ///     // x == Optional(21)
-  ///     let y = Int(exactly: 21.5)
-  ///     // y == nil
-  ///
-  /// - Parameter source: A floating-point value to convert to an integer.
   @_semantics("optimize.sil.specialize.generic.partial.never")
   @inlinable
   public init?<T: BinaryFloatingPoint>(exactly source: T) {
@@ -3062,26 +2752,6 @@ extension FixedWidthInteger {
     self = value
   }
 
-  /// Creates a new instance with the representable value that's closest to the
-  /// given integer.
-  ///
-  /// If the value passed as `source` is greater than the maximum representable
-  /// value in this type, the result is the type's `max` value. If `source` is
-  /// less than the smallest representable value in this type, the result is
-  /// the type's `min` value.
-  ///
-  /// In this example, `x` is initialized as an `Int8` instance by clamping
-  /// `500` to the range `-128...127`, and `y` is initialized as a `UInt`
-  /// instance by clamping `-500` to the range `0...UInt.max`.
-  ///
-  ///     let x = Int8(clamping: 500)
-  ///     // x == 127
-  ///     // x == Int8.max
-  ///
-  ///     let y = UInt(clamping: -500)
-  ///     // y == 0
-  ///
-  /// - Parameter source: An integer to convert to this type.
   @inlinable
   @_semantics("optimize.sil.specialize.generic.partial.never")
   public init<Other: BinaryInteger>(clamping source: Other) {
@@ -3094,44 +2764,8 @@ extension FixedWidthInteger {
     else { self = Self(truncatingIfNeeded: source) }
   }
 
-  /// Creates a new instance from the bit pattern of the given instance by
-  /// truncating or sign-extending if needed to fit this type.
-  ///
-  /// When the bit width of `T` (the type of `source`) is equal to or greater
-  /// than this type's bit width, the result is the truncated
-  /// least-significant bits of `source`. For example, when converting a
-  /// 16-bit value to an 8-bit type, only the lower 8 bits of `source` are
-  /// used.
-  ///
-  ///     let p: Int16 = -500
-  ///     // 'p' has a binary representation of 11111110_00001100
-  ///     let q = Int8(truncatingIfNeeded: p)
-  ///     // q == 12
-  ///     // 'q' has a binary representation of 00001100
-  ///
-  /// When the bit width of `T` is less than this type's bit width, the result
-  /// is *sign-extended* to fill the remaining bits. That is, if `source` is
-  /// negative, the result is padded with ones; otherwise, the result is
-  /// padded with zeros.
-  ///
-  ///     let u: Int8 = 21
-  ///     // 'u' has a binary representation of 00010101
-  ///     let v = Int16(truncatingIfNeeded: u)
-  ///     // v == 21
-  ///     // 'v' has a binary representation of 00000000_00010101
-  ///
-  ///     let w: Int8 = -21
-  ///     // 'w' has a binary representation of 11101011
-  ///     let x = Int16(truncatingIfNeeded: w)
-  ///     // x == -21
-  ///     // 'x' has a binary representation of 11111111_11101011
-  ///     let y = UInt16(truncatingIfNeeded: w)
-  ///     // y == 65515
-  ///     // 'y' has a binary representation of 11111111_11101011
-  ///
-  /// - Parameter source: An integer to convert to this type.
   @inlinable // FIXME(inline-always)
-  @inline(__always)
+  @_transparent
   public init<T: BinaryInteger>(truncatingIfNeeded source: T) {
     if Self.bitWidth <= Int.bitWidth {
       self = Self(_truncatingBits: source._lowWord)
@@ -3280,32 +2914,9 @@ extension FixedWidthInteger {
     lhs = lhs &- rhs
   }
 
-  /// Returns the product of the two given values, wrapping the result in case
-  /// of any overflow.
-  ///
-  /// The overflow multiplication operator (`&*`) discards any bits that
-  /// overflow the fixed width of the integer type. In the following example,
-  /// the product of `10` and `50` is greater than the maximum representable
-  /// `Int8` value, so the result is the partial value after discarding the
-  /// overflowing bits.
-  ///
-  ///     let x: Int8 = 10 &* 5
-  ///     // x == 50
-  ///     let y: Int8 = 10 &* 50
-  ///     // y == -12 (after overflow)
-  ///
-  /// For more about arithmetic with overflow operators, see [Overflow
-  /// Operators][overflow] in *[The Swift Programming Language][tspl]*.
-  ///
-  /// [overflow]: https://docs.swift.org/swift-book/LanguageGuide/AdvancedOperators.html#ID37
-  /// [tspl]: https://docs.swift.org/swift-book/
-  ///
-  /// - Parameters:
-  ///   - lhs: The first value to multiply.
-  ///   - rhs: The second value to multiply.
   @_transparent
-  public static func &* (lhs: Self, rhs: Self) -> Self {
-    return lhs.multipliedReportingOverflow(by: rhs).partialValue
+  public static func &*(lhs: Self, rhs: Self) -> Self {
+    return rhs.multipliedReportingOverflow(by: lhs).partialValue
   }
 
   /// Multiplies two values and stores the result in the left-hand-side
@@ -3364,6 +2975,17 @@ extension FixedWidthInteger {
 //===--- UnsignedInteger --------------------------------------------------===//
 //===----------------------------------------------------------------------===//
 
+// Implementor's note: UnsignedInteger should have required Magnitude == Self,
+// because it can necessarily represent the magnitude of every value and every
+// recursive generic constraint should terminate unless there is a good
+// semantic reason for it not to do so.
+//
+// However, we cannot easily add this constraint because it changes the
+// mangling of generics constrained on <T: FixedWidthInteger & UnsignedInteger>
+// to be <T: FixedWidthInteger where T.Magnitude == T>. As a practical matter,
+// every unsigned type will satisfy this constraint, so converting between
+// Magnitude and Self in generic code is acceptable.
+
 /// An integer type that can represent only nonnegative values.
 public protocol UnsignedInteger: BinaryInteger { }
 
@@ -3388,7 +3010,7 @@ extension UnsignedInteger {
   /// This property is always `false` for unsigned integer types.
   @inlinable // FIXME(inline-always)
   public static var isSigned: Bool {
-    @inline(__always)
+    @_transparent
     get { return false }
   }
 }
@@ -3414,8 +3036,7 @@ extension UnsignedInteger where Self: FixedWidthInteger {
   /// - Parameter source: A value to convert to this type of integer. The value
   ///   passed as `source` must be representable in this type.
   @_semantics("optimize.sil.specialize.generic.partial.never")
-  @inlinable // FIXME(inline-always)
-  @inline(__always)
+  @_transparent
   public init<T: BinaryInteger>(_ source: T) {
     // This check is potentially removable by the optimizer
     if T.isSigned {
@@ -3429,24 +3050,8 @@ extension UnsignedInteger where Self: FixedWidthInteger {
     self.init(truncatingIfNeeded: source)
   }
 
-  /// Creates a new instance from the given integer, if it can be represented
-  /// exactly.
-  ///
-  /// If the value passed as `source` is not representable exactly, the result
-  /// is `nil`. In the following example, the constant `x` is successfully
-  /// created from a value of `100`, while the attempt to initialize the
-  /// constant `y` from `1_000` fails because the `Int8` type can represent
-  /// `127` at maximum:
-  ///
-  ///     let x = Int8(exactly: 100)
-  ///     // x == Optional(100)
-  ///     let y = Int8(exactly: 1_000)
-  ///     // y == nil
-  ///
-  /// - Parameter source: A value to convert to this type of integer.
   @_semantics("optimize.sil.specialize.generic.partial.never")
-  @inlinable // FIXME(inline-always)
-  @inline(__always)
+  @_transparent
   public init?<T: BinaryInteger>(exactly source: T) {
     // This check is potentially removable by the optimizer
     if T.isSigned && source < (0 as T) {
@@ -3472,8 +3077,123 @@ extension UnsignedInteger where Self: FixedWidthInteger {
   /// For unsigned integer types, this value is always `0`.
   @_transparent
   public static var min: Self { return 0 }
+  
+  @_alwaysEmitIntoClient
+  public func dividingFullWidth(
+    _ dividend: (high: Self, low: Magnitude)
+  ) -> (quotient: Self, remainder: Self) {
+    // Validate preconditions to guarantee that the quotient is representable.
+    precondition(self != .zero, "Division by zero")
+    precondition(dividend.high < self,
+                 "Dividend.high must be smaller than divisor")
+    // UnsignedInteger should have a Magnitude = Self constraint, but does not,
+    // so we have to do this conversion (we can't easily add the constraint
+    // because it changes how generic signatures constrained to
+    // <FixedWidth & Unsigned> are minimized, which changes the mangling).
+    // In practice, "every" UnsignedInteger type will satisfy this, and if one
+    // somehow manages not to in a way that would break this conversion then
+    // a default implementation of this method never could have worked anyway.
+    let low = Self(dividend.low)
+    
+    // The basic algorithm is taken from Knuth (TAoCP, Vol 2, §4.3.1), using
+    // words that are half the size of Self (so the dividend has four words
+    // and the divisor has two). The fact that the denominator has exactly
+    // two words allows for a slight simplification vs. Knuth's Algorithm D,
+    // in that our computed quotient digit is always exactly right, while
+    // in the more general case it can be one too large, requiring a subsequent
+    // borrow.
+    //
+    // Knuth's algorithm (and any long division, really), requires that the
+    // divisor (self) be normalized (meaning that the high-order bit is set).
+    // We begin by counting the leading zeros so we know how many bits we
+    // have to shift to normalize.
+    let lz = leadingZeroBitCount
+    
+    // If the divisor is actually a power of two, division is just a shift,
+    // which we can handle much more efficiently. So we do a check for that
+    // case and early-out if possible.
+    if (self &- 1) & self == .zero {
+      let shift = Self.bitWidth - 1 - lz
+      let q = low &>> shift | dividend.high &<< -shift
+      let r = low & (self &- 1)
+      return (q, r)
+    }
+    
+    // Shift the divisor left by lz bits to normalize it. We shift the
+    // dividend left by the same amount so that we get the quotient is
+    // preserved (we will have to shift right to recover the remainder).
+    // Note that the right shift `low >> (Self.bitWidth - lz)` is
+    // deliberately a non-masking shift because lz might be zero.
+    let v = self &<< lz
+    let uh = dividend.high &<< lz | low >> (Self.bitWidth - lz)
+    let ul = low &<< lz
+    
+    // Now we have a normalized dividend (uh:ul) and divisor (v). Split
+    // v into half-words (vh:vl) so that we can use the "normal" division
+    // on Self as a word / halfword -> halfword division get one halfword
+    // digit of the quotient at a time.
+    let n_2 = Self.bitWidth/2
+    let mask = Self(1) &<< n_2 &- 1
+    let vh = v &>> n_2
+    let vl = v & mask
+    
+    // For the (fairly-common) special case where vl is zero, we can simplify
+    // the arithmetic quite a bit:
+    if vl == .zero {
+      let qh = uh / vh
+      let residual = (uh &- qh &* vh) &<< n_2 | ul &>> n_2
+      let ql = residual / vh
+      
+      return (
+        // Assemble quotient from half-word digits
+        quotient: qh &<< n_2 | ql,
+        // Compute remainder (we can re-use the residual to make this simpler).
+        remainder: ((residual &- ql &* vh) &<< n_2 | ul & mask) &>> lz
+      )
+    }
+    
+    // Helper function: performs a (1½ word)/word division to produce a
+    // half quotient word q. We'll need to use this twice to generate the
+    // full quotient.
+    //
+    // high is the high word of the quotient for this sub-division.
+    // low is the low half-word of the quotient for this sub-division (the
+    //     high half of low must be zero).
+    //
+    // returns the quotient half-word digit. In a more general setting, this
+    // computed digit might be one too large, which has to be accounted for
+    // later on (see Knuth, Algorithm D), but when the divisor is only two
+    // half-words (as here), that can never happen, because we use the full
+    // divisor in the check for the while loop.
+    func generateHalfDigit(high: Self, low: Self) -> Self {
+      // Get q̂ satisfying a = vh q̂ + r̂ with 0 ≤ r̂ < vh:
+      var (q̂, r̂) = high.quotientAndRemainder(dividingBy: vh)
+      // Knuth's "Theorem A" establishes that q̂ is an approximation to
+      // the quotient digit q, satisfying q ≤ q̂ ≤ q + 2. We adjust it
+      // downward as needed until we have the correct q.
+      while q̂ > mask || q̂ &* vl > (r̂ &<< n_2 | low) {
+        q̂ &-= 1
+        r̂ &+= vh
+        if r̂ > mask { break }
+      }
+      return q̂
+    }
+    
+    // Generate the first quotient digit, subtract off its product with the
+    // divisor to generate the residual, then compute the second quotient
+    // digit from that.
+    let qh = generateHalfDigit(high: uh, low: ul &>> n_2)
+    let residual = (uh &<< n_2 | ul &>> n_2) &- (qh &* v)
+    let ql = generateHalfDigit(high: residual, low: ul & mask)
+    
+    return (
+      // Assemble quotient from half-word digits
+      quotient: qh &<< n_2 | ql,
+      // Compute remainder (we can re-use the residual to make this simpler).
+      remainder: ((residual &<< n_2 | ul & mask) &- (ql &* v)) &>> lz
+    )
+  }
 }
-
 
 //===----------------------------------------------------------------------===//
 //===--- SignedInteger ----------------------------------------------------===//
@@ -3503,7 +3223,7 @@ extension SignedInteger {
   /// This property is always `true` for signed integer types.
   @inlinable // FIXME(inline-always)
   public static var isSigned: Bool {
-    @inline(__always)
+    @_transparent
     get { return true }
   }
 }
@@ -3529,8 +3249,7 @@ extension SignedInteger where Self: FixedWidthInteger {
   /// - Parameter source: A value to convert to this type of integer. The value
   ///   passed as `source` must be representable in this type.
   @_semantics("optimize.sil.specialize.generic.partial.never")
-  @inlinable // FIXME(inline-always)
-  @inline(__always)
+  @_transparent
   public init<T: BinaryInteger>(_ source: T) {
     // This check is potentially removable by the optimizer
     if T.isSigned && source.bitWidth > Self.bitWidth {
@@ -3546,24 +3265,8 @@ extension SignedInteger where Self: FixedWidthInteger {
     self.init(truncatingIfNeeded: source)
   }
 
-  /// Creates a new instance from the given integer, if it can be represented
-  /// exactly.
-  ///
-  /// If the value passed as `source` is not representable exactly, the result
-  /// is `nil`. In the following example, the constant `x` is successfully
-  /// created from a value of `100`, while the attempt to initialize the
-  /// constant `y` from `1_000` fails because the `Int8` type can represent
-  /// `127` at maximum:
-  ///
-  ///     let x = Int8(exactly: 100)
-  ///     // x == Optional(100)
-  ///     let y = Int8(exactly: 1_000)
-  ///     // y == nil
-  ///
-  /// - Parameter source: A value to convert to this type of integer.
   @_semantics("optimize.sil.specialize.generic.partial.never")
-  @inlinable // FIXME(inline-always)
-  @inline(__always)
+  @_transparent
   public init?<T: BinaryInteger>(exactly source: T) {
     // This check is potentially removable by the optimizer
     if T.isSigned && source.bitWidth > Self.bitWidth && source < Self.min {
@@ -3602,6 +3305,40 @@ extension SignedInteger where Self: FixedWidthInteger {
     if other == -1 { return true }
     // Having handled those special cases, this is safe.
     return self % other == 0
+  }
+  
+  @_alwaysEmitIntoClient
+  public func dividingFullWidth(
+    _ dividend: (high: Self, low: Magnitude)
+  ) -> (quotient: Self, remainder: Self) {
+    // Get magnitude of dividend:
+    var magnitudeHigh = Magnitude(truncatingIfNeeded: dividend.high)
+    var magnitudeLow  = dividend.low
+    if dividend.high < .zero {
+      let carry: Bool
+      (magnitudeLow, carry) = (~magnitudeLow).addingReportingOverflow(1)
+      magnitudeHigh = ~magnitudeHigh &+ (carry ? 1 : 0)
+    }
+    // Do division on magnitudes (using unsigned implementation):
+    let (unsignedQuotient, unsignedRemainder) = magnitude.dividingFullWidth(
+      (high: magnitudeHigh, low: magnitudeLow)
+    )
+    // Fixup sign: quotient is negative if dividend and divisor disagree.
+    // We will also trap here if the quotient does not fit in Self.
+    let quotient: Self
+    if self ^ dividend.high < .zero {
+      // It is possible that the quotient is representable but its magnitude
+      // is not representable as Self (if quotient is Self.min), so we have
+      // to handle that case carefully here.
+      precondition(unsignedQuotient <= Self.min.magnitude,
+                   "Quotient is not representable.")
+      quotient = Self(truncatingIfNeeded: 0 &- unsignedQuotient)
+    } else {
+      quotient = Self(unsignedQuotient)
+    }
+    var remainder = Self(unsignedRemainder)
+    if dividend.high < .zero { remainder = 0 &- remainder }
+    return (quotient, remainder)
   }
 }
 

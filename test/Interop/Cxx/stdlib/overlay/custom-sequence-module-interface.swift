@@ -1,4 +1,6 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=CustomSequence -source-filename=x -I %S/Inputs -enable-experimental-cxx-interop -module-cache-path %t | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=CustomSequence -source-filename=x -I %S/Inputs -cxx-interoperability-mode=swift-6 -module-cache-path %t | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=CustomSequence -source-filename=x -I %S/Inputs -cxx-interoperability-mode=upcoming-swift -module-cache-path %t | %FileCheck %s
 
 // CHECK: struct SimpleSequence : CxxConvertibleToCollection {
 // CHECK:   typealias Element = ConstIterator.Pointee
@@ -24,10 +26,10 @@
 // CHECK:   typealias RawIterator = UnsafePointer<Int32>?
 // CHECK: }
 
-// CHECK: struct HasMutatingBeginEnd : CxxConvertibleToCollection {
-// CHECK:   typealias Element = ConstIterator.Pointee
-// CHECK:   typealias Iterator = CxxIterator<HasMutatingBeginEnd>
-// CHECK:   typealias RawIterator = ConstIterator
+// CHECK: struct HasMutatingBeginEnd {
+// CHECK-NOT:   typealias Element = ConstIterator.Pointee
+// CHECK-NOT:   typealias Iterator = CxxIterator<HasMutatingBeginEnd>
+// CHECK-NOT:   typealias RawIterator = ConstIterator
 // CHECK: }
 
 // CHECK: struct HasNoBeginMethod {
@@ -50,9 +52,15 @@
 // CHECK-NOT:   typealias Iterator
 // CHECK-NOT:   typealias RawIterator
 // CHECK: }
-// CHECK: struct __CxxTemplateInst20HasTemplatedIteratorIi12NoDefinitionIiEE {
+// CHECK: struct HasTemplatedIterator<CInt, NoDefinition<CInt>> {
 // CHECK-NOT:   typealias Element
 // CHECK-NOT:   typealias Iterator
 // CHECK-NOT:   typealias RawIterator
 // CHECK: }
-// CHECK: typealias HasUninstantiatableIterator = __CxxTemplateInst20HasTemplatedIteratorIi12NoDefinitionIiEE
+// CHECK: typealias HasUninstantiatableIterator = HasTemplatedIterator<CInt, NoDefinition<CInt>>
+
+// CHECK: struct HasInputOutputConstIterator : CxxConvertibleToCollection {
+// CHECK:   typealias Element = InputOutputConstIterator.Pointee
+// CHECK:   typealias Iterator = CxxIterator<HasInputOutputConstIterator>
+// CHECK:   typealias RawIterator = HasInputOutputConstIterator.iterator
+// CHECK: }

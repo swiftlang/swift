@@ -15,7 +15,7 @@
 #include "swift/Basic/ClusteredBitVector.h"
 
 #include "llvm/ADT/APInt.h"
-#include "llvm/ADT/Optional.h"
+#include <optional>
 
 namespace swift {
 namespace irgen {

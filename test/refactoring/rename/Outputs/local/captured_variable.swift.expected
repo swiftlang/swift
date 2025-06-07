@@ -48,10 +48,10 @@ func test5(_ x: Int) {
 }
 
 func testCaptureVariable() {
-  let capturedVariableRenamed = 0
+  let <base>capturedVariable</base> = 0
 
-  _ = { [capturedVariableRenamed] in
-    print(capturedVariableRenamed)
+  _ = { [<base>capturedVariable</base>] in
+    print(<base>capturedVariable</base>)
   }
 }
 

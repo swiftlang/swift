@@ -1,8 +1,8 @@
 // First parse this and then emit a *.sib. Then read in the *.sib, then recreate
 // RUN: %empty-directory(%t)
-// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name borrow
-// RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name borrow
-// RUN: %target-sil-opt %t/tmp.2.sib -module-name borrow | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %s -emit-sib -o %t/tmp.sib -module-name borrow
+// RUN: %target-sil-opt -sil-print-types %t/tmp.sib -o %t/tmp.2.sib -module-name borrow
+// RUN: %target-sil-opt -sil-print-types %t/tmp.2.sib -module-name borrow | %FileCheck %s
 
 sil_stage canonical
 
@@ -11,6 +11,7 @@ import Builtin
 // CHECK-LABEL: sil [serialized] [ossa] @begin_borrow_test
 // CHECK: begin_borrow [lexical] {{%[^,]+}}
 // CHECK: begin_borrow {{%[^,]+}}
+// CHECK: begin_borrow [var_decl] {{%[^,]+}}
 // CHECK: } // end sil function 'begin_borrow_test'
 sil [serialized] [ossa] @begin_borrow_test : $@convention(thin) () -> () {
   %instance = alloc_ref $C
@@ -18,6 +19,8 @@ sil [serialized] [ossa] @begin_borrow_test : $@convention(thin) () -> () {
   end_borrow %guaranteed_c : $C
   %guaranteed_c2 = begin_borrow %instance : $C
   end_borrow %guaranteed_c2 : $C
+  %guaranteed_c3 = begin_borrow [var_decl] %instance : $C
+  end_borrow %guaranteed_c3 : $C
   destroy_value %instance : $C
   %res = tuple ()
   return %res : $()
@@ -27,7 +30,11 @@ sil [serialized] [ossa] @begin_borrow_test : $@convention(thin) () -> () {
 // CHECK: alloc_stack $Builtin.NativeObject
 // CHECK: alloc_stack [dynamic_lifetime]
 // CHECK: alloc_stack [lexical]
+// CHECK: alloc_stack [var_decl]
 // CHECK: alloc_stack [dynamic_lifetime] [lexical]
+// CHECK: alloc_stack [dynamic_lifetime] [var_decl]
+// CHECK: alloc_stack [lexical] [var_decl]
+// CHECK: alloc_stack [dynamic_lifetime] [lexical] [var_decl]
 // CHECK: } // end sil function 'alloc_stack_test'
 sil [serialized] [ossa] @alloc_stack_test : $@convention(thin) () -> () {
   %instance = alloc_stack $Builtin.NativeObject
@@ -36,8 +43,16 @@ sil [serialized] [ossa] @alloc_stack_test : $@convention(thin) () -> () {
   dealloc_stack %instance2 : $*Builtin.NativeObject
   %instance3 = alloc_stack [lexical] $Builtin.NativeObject
   dealloc_stack %instance3 : $*Builtin.NativeObject
+  %instance5 = alloc_stack [var_decl] $Builtin.NativeObject
+  dealloc_stack %instance5 : $*Builtin.NativeObject
   %instance4 = alloc_stack [lexical] [dynamic_lifetime] $Builtin.NativeObject
   dealloc_stack %instance4 : $*Builtin.NativeObject
+  %instance6 = alloc_stack [dynamic_lifetime] [var_decl] $Builtin.NativeObject
+  dealloc_stack %instance6 : $*Builtin.NativeObject
+  %instance7 = alloc_stack [lexical] [var_decl] $Builtin.NativeObject
+  dealloc_stack %instance7 : $*Builtin.NativeObject
+  %instance8 = alloc_stack [lexical] [var_decl] [dynamic_lifetime] $Builtin.NativeObject
+  dealloc_stack %instance8 : $*Builtin.NativeObject
   %res = tuple ()
   return %res : $()
 }

@@ -1,0 +1,93 @@
+//===--- FeatureAvailability.def - Availability Metaprogramming -*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines macros used for macro-metaprogramming with feature
+// availability.
+//
+//===----------------------------------------------------------------------===//
+
+/// FEATURE(N, V)
+///   N - The name of the feature (in UpperCamelCase).
+///   V - The Swift version number, as a tuple, or FUTURE.
+///
+/// The feature Foo turns into two methods on ASTContext:
+/// getFooRuntimeAvailability(), which returns the exact version provided
+/// here, and getFooAvailability(), which maps that version into a version
+/// of the target OS.  Because both of these methods exist, it is a bad idea
+/// to use a feature name that ends in "Runtime", or people might get very
+/// confused.
+#ifndef FEATURE
+#define FEATURE(N, V)
+#endif
+
+/// FUTURE
+///
+/// The version to use for future support.
+#ifndef FUTURE
+#define FUTURE (99, 99)
+#endif
+
+FEATURE(ObjCMetadataUpdateCallback,                     (5, 0))
+FEATURE(ObjCGetClassHook,                               (5, 0))
+
+FEATURE(OpaqueType,                                     (5, 1))
+FEATURE(ObjCClassStubs,                                 (5, 1))
+FEATURE(BackDeployedConcurrency,                        (5, 1))
+
+FEATURE(TypesInAbstractMetadataState,                   (5, 2))
+
+FEATURE(PrespecializedGenericMetadata,                  (5, 4))
+FEATURE(CompareTypeContextDescriptors,                  (5, 4))
+FEATURE(CompareProtocolConformanceDescriptors,          (5, 4))
+FEATURE(IntermodulePrespecializedGenericMetadata,       (5, 4))
+
+FEATURE(Concurrency,                                    (5, 5))
+
+FEATURE(MultiPayloadEnumTagSinglePayload,               (5, 6))
+FEATURE(ObjCIsUniquelyReferenced,                       (5, 6))
+
+// Metadata and casting support for parameterized existential types
+FEATURE(ParameterizedExistential,                       (5, 7))
+
+FEATURE(VariadicGenericType,                            (5, 9))
+FEATURE(SignedConformsToProtocol,                       (5, 9))
+FEATURE(ConcurrencyDiscardingTaskGroup,                 (5, 9))
+FEATURE(ConcurrencyDistributedActorWithCustomExecutor,  (5, 9))
+FEATURE(SignedDescriptor,                               (5, 9))
+
+FEATURE(ObjCSymbolicReferences,                         (6, 0))
+FEATURE(TypedThrows,                                    (6, 0))
+FEATURE(StaticReadOnlyArrays,                           (6, 0))
+FEATURE(SwiftExceptionPersonality,                      (6, 0))
+// Metadata support for @isolated(any) function types
+FEATURE(IsolatedAny,                                    (6, 0))
+
+FEATURE(NoncopyableGenerics,                            (6, 0))
+FEATURE(InitRawStructMetadata,                          (6, 0))
+
+FEATURE(LayoutStringValueWitnesses,                     (6, 1))
+FEATURE(CreateTaskWithConsumedFunction,                 (6, 1))
+FEATURE(IsolatedDeinit,                                 (6, 1))
+
+FEATURE(ValueGenericType,                               (6, 2))
+FEATURE(InitRawStructMetadata2,                         (6, 2))
+FEATURE(CustomGlobalExecutors,                          (6, 2))
+FEATURE(TaskExecutor,                                   (6, 2))
+
+FEATURE(Differentiation,                                FUTURE)
+FEATURE(ClearSensitive,                                 FUTURE)
+FEATURE(UpdatePureObjCClassMetadata,                    FUTURE)
+// TODO: CoroutineAccessors: Change to correct version number.
+FEATURE(CoroutineAccessors,                             FUTURE)
+
+#undef FEATURE
+#undef FUTURE

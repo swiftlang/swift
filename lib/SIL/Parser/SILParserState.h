@@ -13,8 +13,12 @@
 #ifndef SWIFT_SIL_SILPARSERSTATE_H
 #define SWIFT_SIL_SILPARSERSTATE_H
 
+#include "swift/AST/Identifier.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Parse/ParseSILSupport.h"
+#include "swift/SIL/SILFunction.h"
+
+#include "llvm/ADT/DenseMap.h"
 
 //===----------------------------------------------------------------------===//
 // SILParserState
@@ -25,6 +29,9 @@ namespace swift {
 class Parser;
 class SILModule;
 
+/// The global state of the SIL parser that the ordinary parser needs to
+/// maintain while parsing a SIL file.  Local state, like the value map of
+/// a SIL function, does not need to be kept here.
 class SILParserState : public SILParserStateBase {
 public:
   explicit SILParserState(SILModule &M) : M(M) {}
@@ -51,10 +58,14 @@ public:
   bool parseSILGlobal(Parser &P) override;
   bool parseSILWitnessTable(Parser &P) override;
   bool parseSILDefaultWitnessTable(Parser &P) override;
+  bool parseSILDefaultOverrideTable(Parser &P) override;
   bool parseSILDifferentiabilityWitness(Parser &P) override;
   bool parseSILCoverageMap(Parser &P) override;
   bool parseSILProperty(Parser &P) override;
   bool parseSILScope(Parser &P) override;
+
+  /// Mark potential zombie functions as zombies.
+  void markZombies();
 };
 
 } // end namespace swift

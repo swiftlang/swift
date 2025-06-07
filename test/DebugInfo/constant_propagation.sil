@@ -1,5 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -sil-print-debuginfo -diagnostic-constant-propagation %s | %FileCheck %s
-// REQUIRES: CPU=arm64 || CPU=x86_64
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -sil-print-debuginfo -diagnostic-constant-propagation %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -7,35 +6,52 @@ import Builtin
 import Swift
 import SwiftShims
 
-func foo(x: Int, y: Int) -> Int
-
-sil_scope 1 { loc "file.swift":1:6 parent @foo : $@convention(thin) (Int, Int) -> Int }
+sil_scope 1 { loc "file.swift":1:6 parent @foo : $@convention(thin) (Int64, Int64) -> Int64 }
 
 // Test if debug_value got preserved when %16 is removed in favor of directly using %13
 // CHECK-LABEL: sil {{.*}} @foo
-sil hidden @foo : $@convention(thin) (Int, Int) -> Int {
-bb0(%0 : $Int, %1 : $Int):
+sil hidden @foo : $@convention(thin) (Int64, Int64) -> Int64 {
+bb0(%0 : $Int64, %1 : $Int64):
   %4 = integer_literal $Builtin.Int64, 87, loc "file.swift":2:17, scope 1
-  %9 = struct_extract %0 : $Int, #Int._value, loc "file.swift":2:15, scope 1
+  %9 = struct_extract %0 : $Int64, #Int64._value, loc "file.swift":2:15, scope 1
   %11 = integer_literal $Builtin.Int1, -1, loc "file.swift":2:15, scope 1
   // CHECK: %[[ADD:.+]] = builtin "sadd_with_overflow
   %12 = builtin "sadd_with_overflow_Int64"(%9 : $Builtin.Int64, %4 : $Builtin.Int64, %11 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1), loc "file.swift":2:15, scope 1
   // CHECK: (%[[RESULT:.+]], %{{.*}}) = destructure_tuple %[[ADD]]
   (%13, %14) = destructure_tuple %12 : $(Builtin.Int64, Builtin.Int1), loc "file.swift":2:15, scope 1
-  %16 = struct $Int (%13 : $Builtin.Int64), loc "file.swift":2:15, scope 1
+  %16 = struct $Int64 (%13 : $Builtin.Int64), loc "file.swift":2:15, scope 1
   // In addition to checking if `op_fragment` is generated, we're also checking if "z"'s declared
   // source location, as well as `debug_value`'s instruction source location are preserved.
-  // CHECK: debug_value %[[RESULT]] : $Builtin.Int{{[0-9]+}}, let, name "z"
-  // CHECK-SAME: type $Int
-  // CHECK-SAME: expr op_fragment:#Int._value
+  // CHECK: debug_value %[[RESULT]] : $Builtin.Int64, let, name "z"
+  // CHECK-SAME: type $Int64
+  // CHECK-SAME: expr op_fragment:#Int64._value
   // CHECK-SAME: loc "file.swift":2:9, scope 1
-  debug_value %16 : $Int, let, name "z", loc "file.swift":2:9, scope 1
-  %19 = struct_extract %16 : $Int, #Int._value, loc "file.swift":3:14, scope 1
-  %20 = struct_extract %1 : $Int, #Int._value, loc "file.swift":3:14, scope 1
+  debug_value %16 : $Int64, let, name "z", loc "file.swift":2:9, scope 1
+  %19 = struct_extract %16 : $Int64, #Int64._value, loc "file.swift":3:14, scope 1
+  %20 = struct_extract %1 : $Int64, #Int64._value, loc "file.swift":3:14, scope 1
   %21 = integer_literal $Builtin.Int1, -1, loc "file.swift":3:14, scope 1
   %22 = builtin "sadd_with_overflow_Int64"(%19 : $Builtin.Int64, %20 : $Builtin.Int64, %21 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1), loc "file.swift":3:14, scope 1
   (%23, %24) = destructure_tuple %22 : $(Builtin.Int64, Builtin.Int1), loc "file.swift":3:14, scope 1
-  %26 = struct $Int (%23 : $Builtin.Int64), loc "file.swift":3:14, scope 1
-  return %26 : $Int, loc "file.swift":3:5, scope 1
+  %26 = struct $Int64 (%23 : $Builtin.Int64), loc "file.swift":3:14, scope 1
+  return %26 : $Int64, loc "file.swift":3:5, scope 1
 } // end sil function 'foo'
 
+sil_scope 2 { loc "file.swift":1:6 parent @bar : $@convention(thin) (Int64, Int64) -> Int64 }
+
+// Test if debug_value got preserved when %5 is folded into %0, and %3 removed
+// CHECK-LABEL: sil {{.*}} @bar
+sil hidden @bar : $@convention(thin) (Int64, Int64) -> Int64 {
+bb0(%0 : $Int64, %1 : $Int64):
+  %3 = tuple $(low: Int64, high: Int64) (%0, %1), loc "file.swift":14:5, scope 2
+  // CHECK: debug_value %0 : $Int64, let, name "newValue"
+  // CHECK-SAME: type $(low: Int64, high: Int64)
+  // CHECK-SAME: expr op_tuple_fragment:$(low: Int64, high: Int64):0
+  // CHECK-SAME: "file.swift":14:5, scope 2
+  // CHECK: debug_value %1 : $Int64, let, name "newValue"
+  // CHECK-SAME: type $(low: Int64, high: Int64)
+  // CHECK-SAME: expr op_tuple_fragment:$(low: Int64, high: Int64):1
+  // CHECK-SAME: "file.swift":14:5, scope 2
+  debug_value %3 : $(low: Int64, high: Int64), let, name "newValue", argno 1, loc "file.swift":14:5, scope 2
+  (%5, %6) = destructure_tuple %3 : $(low: Int64, high: Int64), loc "file.swift":15:5, scope 2
+  return %5 : $Int64, loc "file.swift":15:5, scope 2
+} // end sil function 'bar'

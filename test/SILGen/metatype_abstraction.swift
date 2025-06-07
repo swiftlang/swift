@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name Swift -parse-stdlib %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name Swift -parse-stdlib %s | %FileCheck %s
 
 @_semantics("typechecker.type(of:)")
 public func type<T, Metatype>(of value: T) -> Metatype {}
@@ -57,7 +57,8 @@ func genericMetatypeFromGenericMetatype<T>(_ x: GenericMetatype<T>)-> T.Type {
 }
 // CHECK-LABEL: sil hidden [ossa] @$ss026dynamicMetatypeFromGenericB0ys1CCms0dB0VyACGF
 // CHECK:         [[XBOX:%[0-9]+]] = alloc_box ${ var GenericMetatype<C> }
-// CHECK:         [[PX:%[0-9]+]] = project_box [[XBOX]]
+// CHECK:         [[XL:%[0-9]+]] = begin_borrow [var_decl] [[XBOX]]
+// CHECK:         [[PX:%[0-9]+]] = project_box [[XL]]
 // CHECK:         [[READ:%.*]] = begin_access [read] [unknown] [[PX]] : $*GenericMetatype<C>
 // CHECK:         [[ADDR:%.*]] = struct_element_addr [[READ]] : $*GenericMetatype<C>, #GenericMetatype.value
 // CHECK:         [[META:%.*]] = load [trivial] [[ADDR]] : $*@thick C.Type
@@ -94,7 +95,8 @@ func dynamicMetatypeToGeneric(_ x: C.Type) {
 }
 // CHECK-LABEL: sil hidden [ossa] @$ss024dynamicMetatypeToGenericB0yys1CCmF
 // CHECK:         [[XBOX:%[0-9]+]] = alloc_box ${ var @thick C.Type }
-// CHECK:         [[PX:%[0-9]+]] = project_box [[XBOX]]
+// CHECK:         [[XL:%[0-9]+]] = begin_borrow [var_decl] [[XBOX]]
+// CHECK:         [[PX:%[0-9]+]] = project_box [[XL]]
 // CHECK:         [[READ:%.*]] = begin_access [read] [unknown] [[PX]] : $*@thick C.Type
 // CHECK:         [[META:%.*]] = load [trivial] [[READ]] : $*@thick C.Type
 // CHECK:         apply {{%.*}}<C>([[META]]) : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> ()

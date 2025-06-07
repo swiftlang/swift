@@ -13,6 +13,8 @@
 #ifndef SWIFT_BASIC_COMPILER_H
 #define SWIFT_BASIC_COMPILER_H
 
+#include <stddef.h>
+
 #if defined(_MSC_VER) && !defined(__clang__)
 #define SWIFT_COMPILER_IS_MSVC 1
 #else
@@ -81,12 +83,32 @@
 #define SWIFT_ATTRIBUTE_ALWAYS_INLINE
 #endif
 
+// Needed for C++ bridging functions which return types with pointers.
+#if __has_attribute(swift_attr)
+#define SWIFT_IMPORT_UNSAFE __attribute__((swift_attr("import_unsafe")))
+#else
+#define SWIFT_IMPORT_UNSAFE
+#endif
+
+/// Same as `SWIFT_SELF_CONTAINED` in <swift/bridging>.
+#if __has_attribute(swift_attr)
+#define SWIFT_SELF_CONTAINED __attribute__((swift_attr("import_owned")))
+#else
+#define SWIFT_SELF_CONTAINED
+#endif
+
 #ifdef __GNUC__
 #define SWIFT_ATTRIBUTE_NORETURN __attribute__((noreturn))
 #elif defined(_MSC_VER)
 #define SWIFT_ATTRIBUTE_NORETURN __declspec(noreturn)
 #else
 #define SWIFT_ATTRIBUTE_NORETURN
+#endif
+
+#if __has_attribute(unused)
+#define SWIFT_ATTRIBUTE_UNUSED __attribute__((__unused__))
+#else
+#define SWIFT_ATTRIBUTE_UNUSED
 #endif
 
 #ifndef SWIFT_BUG_REPORT_URL
@@ -101,31 +123,6 @@
 
 #define SWIFT_CRASH_BUG_REPORT_MESSAGE \
   "Please " SWIFT_BUG_REPORT_MESSAGE_BASE " and include the crash backtrace."
-
-// Conditionally exclude declarations or statements that are only needed for
-// assertions from release builds (NDEBUG) without cluttering the surrounding
-// code by #ifdefs.
-//
-// struct DoThings  {
-//   SWIFT_ASSERT_ONLY_DECL(unsigned verifyCount = 0);
-//   DoThings() {
-//     SWIFT_ASSERT_ONLY(verifyCount = getNumberOfThingsToDo());
-//   }
-//   void doThings() {
-//     do {
-//       // ... do each thing
-//       SWIFT_ASSERT_ONLY(--verifyCount);
-//     } while (!done());
-//     assert(verifyCount == 0 && "did not do everything");
-//   }
-// };
-#ifdef NDEBUG
-#define SWIFT_ASSERT_ONLY_DECL(...)
-#define SWIFT_ASSERT_ONLY(...) do { } while (false)
-#else
-#define SWIFT_ASSERT_ONLY_DECL(...) __VA_ARGS__
-#define SWIFT_ASSERT_ONLY(...) do { __VA_ARGS__; } while (false)
-#endif
 
 #if defined(__LP64__) || defined(_WIN64)
 #define SWIFT_POINTER_IS_8_BYTES 1
@@ -177,19 +174,27 @@
 #define SWIFT_VFORMAT(fmt)
 #endif
 
-// Tells Swift's ClangImporter to import a C++ type as a foreign reference type.
-#if __has_attribute(swift_attr)
-#define SWIFT_IMPORT_REFERENCE __attribute__((swift_attr("import_reference"))) \
-  __attribute__((swift_attr("retain:immortal")))                               \
-  __attribute__((swift_attr("release:immortal")))
-#else
-#define SWIFT_IMPORT_REFERENCE
-#endif
-
 #if __has_attribute(enum_extensibility)
 #define ENUM_EXTENSIBILITY_ATTR(arg) __attribute__((enum_extensibility(arg)))
 #else
 #define ENUM_EXTENSIBILITY_ATTR(arg)
 #endif
+
+// The 'u8' string literal prefix creates `char` types on C++14/17 but
+// `char8_t` types on C++20. To support compiling in both modes
+// simultaneously, wrap Unicode literals in `SWIFT_UTF8("...")` to ensure
+// that they are interpreted by the compiler as UTF-8 but always return
+// `char` types.
+#if defined(__cplusplus)
+#if defined(__cpp_char8_t)
+inline constexpr char operator""_swift_u8(char8_t c) { return c; }
+inline const char *operator""_swift_u8(const char8_t *p, size_t) {
+  return reinterpret_cast<const char *>(p);
+}
+#define SWIFT_UTF8(literal) u8##literal##_swift_u8
+#else  // !defined(__cpp_char8_t)
+#define SWIFT_UTF8(literal) u8##literal
+#endif // defined(__cpp_char8_t)
+#endif // defined(__cplusplus)
 
 #endif // SWIFT_BASIC_COMPILER_H

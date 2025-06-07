@@ -46,7 +46,6 @@ class MySub : MyCls {
   func #^METHODNAME_OVERRIDE^#
 // METHODNAME_OVERRIDE: Begin completions, 1 items
 // METHODNAME_OVERRIDE-NEXT: Decl[InstanceMethod]/Super/Erase[5]: override func foo() {|}; name=foo()
-// METHODNAME_OVERRIDE-NEXT: End completions
 }
 
 protocol P {
@@ -60,12 +59,10 @@ struct MyStruct : P {
   func #^METHODNAME_CONFORMANCE^#
 // METHODNAME_CONFORMANCE: Begin completions, 1 items
 // METHODNAME_CONFORMANCE-NEXT: Decl[InstanceMethod]/Super: foo() {|}; name=foo()
-// METHODNAME_CONFORMANCE-NEXT: End completions
 
   typealias #^TYPEALIASNAME_CONFORMANCE^#
 // TYPEALIASNAME_CONFORMANCE: Begin completions, 1 items
 // TYPEALIASNAME_CONFORMANCE-NEXT: Decl[AssociatedType]/Super: Assoc = {#(Type)#}; name=Assoc = 
-// TYPEALIASNAME_CONFORMANCE-NEXT: End completions
 }
 struct MyStruct2: P {
   func #^METHODNAME_HASSIG^#() (<#parameters#>} {}

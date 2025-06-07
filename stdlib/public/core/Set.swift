@@ -144,6 +144,7 @@
 /// same copy-on-write optimization that is used when two instances of `Set`
 /// share buffer.
 @frozen
+@_eagerMove
 public struct Set<Element: Hashable> {
   @usableFromInline
   internal var _variant: _Variant
@@ -230,7 +231,7 @@ extension Set: ExpressibleByArrayLiteral {
         // FIXME: Shouldn't this trap?
         continue
       }
-      native._unsafeInsertNew(element, at: bucket)
+      unsafe native._unsafeInsertNew(element, at: bucket)
     }
     self.init(_native: native)
   }
@@ -326,7 +327,7 @@ extension Set: Collection {
   /// Accesses the member at the given position.
   @inlinable
   public subscript(position: Index) -> Element {
-    //FIXME(accessors): Provide a _read
+    // FIXME(accessors): Provide a _read
     get {
       return _variant.element(at: position)
     }
@@ -447,12 +448,14 @@ extension Set: Hashable {
   }
 }
 
+@_unavailableInEmbedded
 extension Set: _HasCustomAnyHashableRepresentation {
   public __consuming func _toCustomAnyHashable() -> AnyHashable? {
     return AnyHashable(_box: _SetAnyHashableBox(self))
   }
 }
 
+@_unavailableInEmbedded
 internal struct _SetAnyHashableBox<Element: Hashable>: _AnyHashableBox {
   internal let _value: Set<Element>
   internal let _canonical: Set<AnyHashable>
@@ -497,7 +500,7 @@ internal struct _SetAnyHashableBox<Element: Hashable>: _AnyHashableBox {
     into result: UnsafeMutablePointer<T>
   ) -> Bool {
     guard let value = _value as? T else { return false }
-    result.initialize(to: value)
+    unsafe result.initialize(to: value)
     return true
   }
 }
@@ -1033,6 +1036,7 @@ extension Set: SetAlgebra {
   }
 }
 
+@_unavailableInEmbedded
 extension Set: CustomStringConvertible, CustomDebugStringConvertible {
   /// A string that represents the contents of the set.
   public var description: String {
@@ -1285,6 +1289,7 @@ extension Set {
 
     @frozen
     @usableFromInline
+    @safe
     internal enum _Variant {
       case native(_HashTable.Index)
 #if _runtime(_ObjC)
@@ -1304,7 +1309,7 @@ extension Set {
     @inlinable
     @inline(__always)
     internal init(_native index: _HashTable.Index) {
-      self.init(_variant: .native(index))
+      self.init(_variant: unsafe .native(index))
     }
 
 #if _runtime(_ObjC)
@@ -1360,7 +1365,7 @@ extension Set.Index {
   internal var _asNative: _HashTable.Index {
     switch _variant {
     case .native(let nativeIndex):
-      return nativeIndex
+      return unsafe nativeIndex
 #if _runtime(_ObjC)
     case .cocoa:
       _preconditionFailure(
@@ -1387,8 +1392,8 @@ extension Set.Index {
         _preconditionFailure(
           "Attempting to access Set elements using an invalid index")
       }
-      let dummy = _HashTable.Index(bucket: _HashTable.Bucket(offset: 0), age: 0)
-      _variant = .native(dummy)
+      let dummy = unsafe _HashTable.Index(bucket: _HashTable.Bucket(offset: 0), age: 0)
+      _variant = unsafe .native(dummy)
       defer { _variant = .cocoa(cocoa) }
       yield &cocoa
     }
@@ -1404,7 +1409,7 @@ extension Set.Index: Equatable {
   ) -> Bool {
     switch (lhs._variant, rhs._variant) {
     case (.native(let lhsNative), .native(let rhsNative)):
-      return lhsNative == rhsNative
+      return unsafe lhsNative == rhsNative
   #if _runtime(_ObjC)
     case (.cocoa(let lhsCocoa), .cocoa(let rhsCocoa)):
       lhs._cocoaPath()
@@ -1424,7 +1429,7 @@ extension Set.Index: Comparable {
   ) -> Bool {
     switch (lhs._variant, rhs._variant) {
     case (.native(let lhsNative), .native(let rhsNative)):
-      return lhsNative < rhsNative
+      return unsafe lhsNative < rhsNative
   #if _runtime(_ObjC)
     case (.cocoa(let lhsCocoa), .cocoa(let rhsCocoa)):
       lhs._cocoaPath()
@@ -1451,9 +1456,9 @@ extension Set.Index: Hashable {
       return
     }
     hasher.combine(0 as UInt8)
-    hasher.combine(_asNative.bucket.offset)
+    unsafe hasher.combine(_asNative.bucket.offset)
 #else
-    hasher.combine(_asNative.bucket.offset)
+    unsafe hasher.combine(_asNative.bucket.offset)
 #endif
   }
 }
@@ -1501,6 +1506,9 @@ extension Set {
 #endif
   }
 }
+
+@available(*, unavailable)
+extension Set.Iterator._Variant: Sendable {}
 
 extension Set.Iterator {
 #if _runtime(_ObjC)

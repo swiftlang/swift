@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -opt-mode=none -silgen-cleanup -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKDEB
-// RUN: %target-sil-opt -opt-mode=speed -silgen-cleanup -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKOPT
+// RUN: %target-sil-opt -sil-print-types -opt-mode=none -silgen-cleanup -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKDEB
+// RUN: %target-sil-opt -sil-print-types -opt-mode=speed -silgen-cleanup -sil-verify-all %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKOPT
 
 import Builtin
 
@@ -361,4 +361,46 @@ bb9(%0 : @owned $Klass):
   destroy_value %copy : $Klass
   destroy_value %0 : $Klass
   return %v : $Builtin.Int64
+}
+
+struct Outer {
+  var middle: Middle
+}
+
+struct Middle {
+  var inner: Inner
+}
+
+struct Inner {
+  var guts: Builtin.AnyObject
+}
+
+sil @getOuter : $@convention(thin) () -> @owned Outer
+sil @takeInner : $@convention(thin) (@owned Inner) -> ()
+
+// CHECK-LABEL: sil [ossa] @narrowLoadThroughProjectionSequence : {{.*}} {
+// CHECK:         [[OUTER_ADDR:%[^,]+]] = project_box
+// CHECK:         [[MIDDLE_ADDR:%[^,]+]] = struct_element_addr [[OUTER_ADDR]]
+// CHECK:         [[INNER_ADDR:%[^,]+]] = struct_element_addr [[MIDDLE_ADDR]]
+// CHECK:         [[INNER_BORROW:%[^,]+]] = load_borrow [[INNER_ADDR]]
+// CHECK:         copy_value [[INNER_BORROW]]
+// CHECK-LABEL: } // end sil function 'narrowLoadThroughProjectionSequence'
+sil [ossa] @narrowLoadThroughProjectionSequence : $@convention(thin) () -> () {
+  %box = alloc_box ${ let Outer }
+  %box_borrow = begin_borrow [lexical] [var_decl] %box : ${ let Outer }
+  %outer_addr = project_box %box_borrow : ${ let Outer }, 0
+  %getOuter = function_ref @getOuter : $@convention(thin) () -> @owned Outer
+  %outer = apply %getOuter() : $@convention(thin) () -> @owned Outer
+  store %outer to [init] %outer_addr : $*Outer
+  %outer_borrow = load_borrow %outer_addr : $*Outer
+  %middle = struct_extract %outer_borrow : $Outer, #Outer.middle
+  %inner = struct_extract %middle : $Middle, #Middle.inner
+  %inner_copy = copy_value %inner : $Inner
+  %takeInner = function_ref @takeInner : $@convention(thin) (@owned Inner) -> ()
+  apply %takeInner(%inner_copy) : $@convention(thin) (@owned Inner) -> ()
+  end_borrow %outer_borrow : $Outer
+  end_borrow %box_borrow : ${ let Outer }
+  dealloc_box %box : ${ let Outer }
+  %retval = tuple ()
+  return %retval : $()
 }

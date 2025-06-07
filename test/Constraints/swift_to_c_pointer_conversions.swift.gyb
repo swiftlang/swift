@@ -59,7 +59,7 @@ func test_${TestPtrSize}_bit_ptrs(sptr: UnsafePointer<Int${TestPtrSize}>,
   % end
 
   % for pointer in ['osptr', 'ouptr']:
-    opt_char_ptr_func(${pointer}) // expected-error {{}}
+    opt_char_ptr_func(${pointer}) // expected-error {{}} expected-note {{arguments to generic parameter 'Wrapped'}}
     const_opt_char_ptr_func(${pointer}) // Ok
     unsigned_opt_char_ptr_func(${pointer}) // expected-error {{}}
     const_opt_unsigned_char_ptr_func(${pointer}) // Ok
@@ -96,13 +96,13 @@ func test_${TestPtrSize}_bit_ptrs(sptr: UnsafePointer<Int${TestPtrSize}>,
   % for pointer in ['osptr', 'ouptr']:
     % for Size in ['16', '32', '64']:
       % if Size == TestPtrSize:
-        opt_int_${TestPtrSize}_ptr_func(${pointer}) // expected-error {{}}
-        opt_uint_${TestPtrSize}_ptr_func(${pointer}) // expected-error {{}}
+        opt_int_${TestPtrSize}_ptr_func(${pointer}) // expected-error {{}} expected-note {{arguments to generic parameter 'Wrapped'}}
+        opt_uint_${TestPtrSize}_ptr_func(${pointer}) // expected-error {{}} expected-note {{arguments to generic parameter 'Wrapped'}}
         const_opt_int_${TestPtrSize}_ptr_func(${pointer}) // Ok
         const_opt_uint_${TestPtrSize}_ptr_func(${pointer}) // Ok
       % else:
-        opt_int_${Size}_ptr_func(${pointer}) // expected-error {{}}
-        opt_uint_${Size}_ptr_func(${pointer}) // expected-error {{}}
+        opt_int_${Size}_ptr_func(${pointer}) // expected-error {{}} expected-note {{arguments to generic parameter 'Wrapped'}}
+        opt_uint_${Size}_ptr_func(${pointer}) // expected-error {{}} expected-note {{arguments to generic parameter 'Wrapped'}}
         const_opt_int_${Size}_ptr_func(${pointer}) // expected-error {{}} expected-note {{}}
         const_opt_uint_${Size}_ptr_func(${pointer}) // expected-error {{}} expected-note {{}}
       % end
@@ -215,7 +215,7 @@ func test_raw_ptr_value_to_optional_promotion(
 func test_raw_ptr_optional_to_optional_conversion(
   riptr: UnsafeRawPointer?,
   rmptr: UnsafeMutableRawPointer?) {
-  opt_char_ptr_func(riptr) // expected-error {{}}
+  opt_char_ptr_func(riptr) // expected-error {{}} expected-note {{arguments to generic parameter 'Wrapped'}}
   const_opt_char_ptr_func(riptr) // Ok
 
   opt_char_ptr_func(rmptr) // Ok
@@ -226,11 +226,11 @@ func test_raw_ptr_optional_to_optional_conversion(
 
   % for Ptr in ['riptr', 'rmptr']:
     % for Size in ['16', '32', '64']:
-      opt_int_${Size}_ptr_func(${Ptr}) // expected-error {{}}
-      opt_uint_${Size}_ptr_func(${Ptr}) // expected-error {{}}
+      opt_int_${Size}_ptr_func(${Ptr}) // expected-error {{}} expected-note {{arguments to generic parameter 'Wrapped'}}
+      opt_uint_${Size}_ptr_func(${Ptr}) // expected-error {{}} expected-note {{arguments to generic parameter 'Wrapped'}}
 
-      const_opt_int_${Size}_ptr_func(${Ptr}) // expected-error {{}}
-      const_opt_uint_${Size}_ptr_func(${Ptr}) // expected-error {{}}
+      const_opt_int_${Size}_ptr_func(${Ptr}) // expected-error {{}} expected-note {{arguments to generic parameter 'Wrapped'}}
+      const_opt_uint_${Size}_ptr_func(${Ptr}) // expected-error {{}} expected-note {{arguments to generic parameter 'Wrapped'}}
     % end
   % end
 }
@@ -294,5 +294,39 @@ func test_inout_to_pointer_conversion() {
   const_uint_${Size}_ptr_func(&x${Size}) // OK
   const_opt_int_${Size}_ptr_func(&x${Size}) // OK
   const_opt_uint_${Size}_ptr_func(&x${Size}) // OK
+% end
+}
+
+func test_array_to_pointer_conversion() {
+% for Size in ['16', '32', '64']:
+  var x${Size}: [Int${Size}] = []
+
+  void_ptr_func(&x${Size}) // Ok
+  const_void_ptr_func(x${Size}) // Ok
+  opt_void_ptr_func(x${Size})
+  // expected-error@-1 {{cannot convert value of type '[Int${Size}]' to expected argument type 'UnsafeMutableRawPointer'}}
+
+  char_ptr_func(x${Size})
+  // expected-error@-1 {{cannot convert value of type '[Int${Size}]' to expected argument type 'UnsafeMutablePointer<CChar>' (aka 'UnsafeMutablePointer<Int8>')}}
+  opt_char_ptr_func(x${Size})
+  // expected-error@-1 {{cannot convert value of type '[Int${Size}]' to expected argument type 'UnsafeMutablePointer<CChar>' (aka 'UnsafeMutablePointer<Int8>')}}
+
+  const_char_ptr_func(x${Size}) // Ok
+  const_opt_char_ptr_func(x${Size}) // Ok
+
+  int_${Size}_ptr_func(x${Size})
+  // expected-error@-1 {{cannot convert value of type '[Int${Size}]' to expected argument type 'UnsafeMutablePointer<Int${Size}>'}}
+  uint_${Size}_ptr_func(x${Size})
+  // expected-error@-1 {{cannot convert value of type '[Int${Size}]' to expected argument type 'UnsafeMutablePointer<UInt${Size}>'}}
+
+  opt_int_${Size}_ptr_func(x${Size})
+  // expected-error@-1 {{cannot convert value of type '[Int${Size}]' to expected argument type 'UnsafeMutablePointer<Int${Size}>'}}
+  opt_uint_${Size}_ptr_func(x${Size})
+  // expected-error@-1 {{cannot convert value of type '[Int${Size}]' to expected argument type 'UnsafeMutablePointer<UInt${Size}>'}}
+
+  const_int_${Size}_ptr_func(x${Size}) // OK
+  const_uint_${Size}_ptr_func(x${Size}) // OK
+  const_opt_int_${Size}_ptr_func(x${Size}) // OK
+  const_opt_uint_${Size}_ptr_func(x${Size}) // OK
 % end
 }

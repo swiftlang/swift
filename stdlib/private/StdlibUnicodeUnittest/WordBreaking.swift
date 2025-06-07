@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// Normalization tests are currently only avaible on Darwin, awaiting a sensible
+// Normalization tests are currently only available on Darwin, awaiting a sensible
 // file API...
 #if _runtime(_ObjC)
 import Foundation

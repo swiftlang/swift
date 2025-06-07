@@ -371,7 +371,7 @@ func testPropertyWrapper() {
 // CHECK13-NEXT:     b = b.bigEndian.bigEndian.byteSwapped
 // CHECK13-NEXT:     print(b + c)</Content>
 // CHECK13-NEXT: <Type>Void</Type>
-// CHECK13-NEXT: <Context>swift_ide_test.(file).foo6().explicit closure discriminator=0</Context>
+// CHECK13-NEXT: <Context>swift_ide_test.(file).foo6().explicit closure discriminator={{[0-9]+}}</Context>
 // CHECK13-NEXT: <Declared>a</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK13-NEXT: <Declared>b</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK13-NEXT: <Declared>c</Declared><OutscopeReference>false</OutscopeReference>
@@ -396,7 +396,7 @@ func testPropertyWrapper() {
 // CHECK14-NEXT:       return 1
 // CHECK14-NEXT:     }()</Content>
 // CHECK14-NEXT: <Type>Int</Type>
-// CHECK14-NEXT: <Context>swift_ide_test.(file).foo6().explicit closure discriminator=0</Context>
+// CHECK14-NEXT: <Context>swift_ide_test.(file).foo6().explicit closure discriminator={{[0-9]+}}</Context>
 // CHECK14-NEXT: <Declared>a</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK14-NEXT: <Declared>b</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK14-NEXT: <Declared>c</Declared><OutscopeReference>false</OutscopeReference>
@@ -418,7 +418,7 @@ func testPropertyWrapper() {
 // CHECK15-NEXT:       let c = a.byteSwapped
 // CHECK15-NEXT:       b = b.bigEndian.bigEndian.byteSwapped</Content>
 // CHECK15-NEXT: <Type>Void</Type>
-// CHECK15-NEXT: <Context>swift_ide_test.(file).foo6().explicit closure discriminator=0.explicit closure discriminator=0</Context>
+// CHECK15-NEXT: <Context>swift_ide_test.(file).foo6().explicit closure discriminator={{[0-9]+}}.explicit closure discriminator={{[0-9]+}}</Context>
 // CHECK15-NEXT: <Declared>a</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK15-NEXT: <Declared>b</Declared><OutscopeReference>true</OutscopeReference>
 // CHECK15-NEXT: <Declared>c</Declared><OutscopeReference>true</OutscopeReference>
@@ -435,7 +435,7 @@ func testPropertyWrapper() {
 // CHECK16-NEXT:       print(b + c)
 // CHECK16-NEXT:       return 1</Content>
 // CHECK16-NEXT: <Type>Int</Type>
-// CHECK16-NEXT: <Context>swift_ide_test.(file).foo6().explicit closure discriminator=0.explicit closure discriminator=0</Context>
+// CHECK16-NEXT: <Context>swift_ide_test.(file).foo6().explicit closure discriminator={{[0-9]+}}.explicit closure discriminator={{[0-9]+}}</Context>
 // CHECK16-NEXT: <Declared>a</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK16-NEXT: <Declared>b</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK16-NEXT: <Declared>c</Declared><OutscopeReference>false</OutscopeReference>
@@ -448,7 +448,7 @@ func testPropertyWrapper() {
 // CHECK17: <Kind>SingleExpression</Kind>
 // CHECK17-NEXT: <Content>print(b + c)</Content>
 // CHECK17-NEXT: <Type>()</Type>
-// CHECK17-NEXT: <Context>swift_ide_test.(file).foo6().explicit closure discriminator=0.explicit closure discriminator=0</Context>
+// CHECK17-NEXT: <Context>swift_ide_test.(file).foo6().explicit closure discriminator={{[0-9]+}}.explicit closure discriminator={{[0-9]+}}</Context>
 // CHECK17-NEXT: <Referenced>b</Referenced><Type>Int</Type>
 // CHECK17-NEXT: <Referenced>c</Referenced><Type>Int</Type>
 // CHECK17-NEXT: <ASTNodes>1</ASTNodes>

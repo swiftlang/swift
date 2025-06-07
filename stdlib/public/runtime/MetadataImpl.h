@@ -40,6 +40,7 @@
 #ifndef SWIFT_RUNTIME_METADATAIMPL_H
 #define SWIFT_RUNTIME_METADATAIMPL_H
 
+#include "swift/Basic/MathUtils.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Runtime/HeapObject.h"
@@ -94,6 +95,7 @@ struct NativeBox {
   static constexpr size_t isPOD = std::is_pod<T>::value;
   static constexpr bool isBitwiseTakable = isPOD;
   static constexpr unsigned numExtraInhabitants = 0;
+  static constexpr bool hasLayoutString = false;
 
   static void destroy(T *value) {
     value->T::~T();
@@ -142,6 +144,7 @@ template <class Impl, class T> struct RetainableBoxBase {
 #else
   static constexpr bool isAtomic = true;
 #endif
+  static constexpr bool hasLayoutString = false;
 
   static void destroy(T *addr) {
     Impl::release(*addr);
@@ -254,6 +257,7 @@ struct WeakRetainableBoxBase {
   static constexpr bool isPOD = false;
   static constexpr bool isBitwiseTakable = false;
   static constexpr unsigned numExtraInhabitants = 0;
+  static constexpr bool hasLayoutString = false;
 
   // The implementation must provide implementations of:
   //   static void destroy(T *);
@@ -465,10 +469,6 @@ struct FunctionPointerBox : NativeBox<void*> {
     return swift_getFunctionPointerExtraInhabitantIndex(src) + 1;
   }
 };
-
-constexpr size_t roundUpToAlignment(size_t offset, size_t alignment) {
-  return ((offset + alignment - 1) & ~(alignment - 1));
-}
 
 // A helper template for building an AggregateBox.  The more natural
 // way to do this would be to left-recurse, but we have to
@@ -699,7 +699,7 @@ template <class Impl, bool isBitwiseTakable, size_t Size, size_t Alignment,
           bool hasExtraInhabitants>
 struct FixedSizeBufferValueWitnesses;
 
-/// A fixed size buffer value witness that can rely on the presents of the extra
+/// A fixed size buffer value witness that can rely on the presence of the extra
 /// inhabitant functions.
 template <class Impl, bool isBitwiseTakable, size_t Size, size_t Alignment>
 struct FixedSizeBufferValueWitnesses<Impl, isBitwiseTakable, Size, Alignment,
@@ -724,7 +724,7 @@ struct FixedSizeBufferValueWitnesses<Impl, isBitwiseTakable, Size, Alignment,
   }
 };
 
-/// A fixed size buffer value witness that cannot rely on the presents of the
+/// A fixed size buffer value witness that cannot rely on the presence of the
 /// extra inhabitant functions.
 template <class Impl, bool isBitwiseTakable, size_t Size, size_t Alignment>
 struct FixedSizeBufferValueWitnesses<Impl, isBitwiseTakable, Size, Alignment,
@@ -776,6 +776,8 @@ struct ValueWitnesses
                        .withInlineStorage(Base::isInline && isBitwiseTakable)
                        .withPOD(isPOD)
                        .withBitwiseTakable(isBitwiseTakable);
+
+  static constexpr bool hasLayoutString = Box::hasLayoutString;
 
   static void destroy(OpaqueValue *value, const Metadata *self) {
     return Box::destroy((typename Box::type*) value);

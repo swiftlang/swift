@@ -270,3 +270,18 @@ bb0(%0 : $*Container):
   %999 = tuple ()
   return %999 : $()
 }
+
+class B {}
+
+// CHECK-LABEL: sil @dead_unconditional_checked_cast
+// CHECK-NOT: unconditional_checked_cast
+// CHECK-LABEL: end sil function 'dead_unconditional_checked_cast'
+sil @dead_unconditional_checked_cast : $@convention(thin) (B, B) -> () {
+bb0(%0 : $B, %1: $B):
+  strong_retain %0: $B
+  apply undef() : $@convention(thin) () -> ()
+  %3 = unconditional_checked_cast %0 : $B to Builtin.NativeObject
+  strong_release %0: $B
+  %5 = tuple()
+  return %5 : $()
+}

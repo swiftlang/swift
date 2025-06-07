@@ -33,6 +33,9 @@ public struct LazyMapSequence<Base: Sequence, Element> {
   }
 }
 
+@available(*, unavailable)
+extension LazyMapSequence: Sendable {}
+
 extension LazyMapSequence {
   @frozen
   public struct Iterator {
@@ -54,6 +57,9 @@ extension LazyMapSequence {
     }
   }
 }
+
+@available(*, unavailable)
+extension LazyMapSequence.Iterator: Sendable {}
 
 extension LazyMapSequence.Iterator: IteratorProtocol, Sequence {
   /// Advances to the next element and returns it, or `nil` if no next element

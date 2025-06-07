@@ -10,10 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/StringRef.h"
+#include <optional>
 
 #ifndef SWIFT_RQM_SYMBOL_H
 #define SWIFT_RQM_SYMBOL_H
@@ -57,7 +57,7 @@ class Term;
 /// This transformation allows DependentMemberTypes to be manipulated as
 /// terms, with the actual concrete type structure remaining opaque to
 /// the requirement machine. This transformation is implemented in
-/// RewriteContext::getConcreteSubstitutionSchema().
+/// RewriteContext::getSubstitutionSchemaFromType().
 ///
 /// For example, the superclass requirement
 /// "T : MyClass<U.X, (Int) -> V.A.B>" is denoted with a symbol
@@ -117,6 +117,10 @@ public:
     /// generic parameter.
     Shape,
 
+    /// A pack element [element].(each T) where 'each T' is a type
+    /// parameter pack.
+    PackElement,
+
     //////
     ////// "Property-like" symbol kinds:
     //////
@@ -136,7 +140,7 @@ public:
 
   static const unsigned NumKinds = 9;
 
-  static const StringRef Kinds[];
+  static const llvm::StringRef Kinds[];
 
 private:
   friend class RewriteContext;
@@ -180,7 +184,7 @@ public:
 
   CanType getConcreteType() const;
 
-  ArrayRef<Term> getSubstitutions() const;
+  llvm::ArrayRef<Term> getSubstitutions() const;
 
   /// Returns an opaque pointer that uniquely identifies this symbol.
   const void *getOpaquePointer() const {
@@ -206,29 +210,29 @@ public:
 
   static Symbol forShape(RewriteContext &ctx);
 
+  static Symbol forPackElement(RewriteContext &Ctx);
+
   static Symbol forLayout(LayoutConstraint layout,
                           RewriteContext &ctx);
 
-  static Symbol forSuperclass(CanType type,
-                              ArrayRef<Term> substitutions,
+  static Symbol forSuperclass(CanType type, llvm::ArrayRef<Term> substitutions,
                               RewriteContext &ctx);
 
   static Symbol forConcreteType(CanType type,
-                                ArrayRef<Term> substitutions,
+                                llvm::ArrayRef<Term> substitutions,
                                 RewriteContext &ctx);
 
   static Symbol forConcreteConformance(CanType type,
-                                       ArrayRef<Term> substitutions,
+                                       llvm::ArrayRef<Term> substitutions,
                                        const ProtocolDecl *proto,
                                        RewriteContext &ctx);
 
   const ProtocolDecl *getRootProtocol() const;
 
-  Optional<int> compare(Symbol other, RewriteContext &ctx) const;
+  std::optional<int> compare(Symbol other, RewriteContext &ctx) const;
 
-  Symbol withConcreteSubstitutions(
-      ArrayRef<Term> substitutions,
-      RewriteContext &ctx) const;
+  Symbol withConcreteSubstitutions(llvm::ArrayRef<Term> substitutions,
+                                   RewriteContext &ctx) const;
 
   Symbol transformConcreteSubstitutions(
       llvm::function_ref<Term(Term)> fn,
@@ -237,6 +241,8 @@ public:
   Symbol prependPrefixToConcreteSubstitutions(
       const MutableTerm &prefix,
       RewriteContext &ctx) const;
+
+  bool containsNameSymbols() const;
 
   void dump(llvm::raw_ostream &out) const;
 

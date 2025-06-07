@@ -1,5 +1,4 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
+// RUN: %batch-code-completion
 
 struct FooStruct {
   var instanceVar : Int
@@ -151,7 +150,6 @@ func testForeachPattern1(_ fooObject: FooStruct) {
 // FOREACH_PATTERN_1-DAG: Keyword/None:                       await; name=await
 // FOREACH_PATTERN_1-DAG: Keyword[var]/None:                  var; name=var
 // FOREACH_PATTERN_1-DAG: Keyword[case]/None:                 case; name=case
-// FOREACH_PATTERN_1: End completions
 }
 
 func testForeachPattern2(_ fooObject: FooStruct) {
@@ -162,7 +160,6 @@ func testForeachPattern2(_ fooObject: FooStruct) {
 // FOREACH_PATTERN_2-DAG: Keyword/None:                       await; name=await
 // FOREACH_PATTERN_2-DAG: Keyword[var]/None:                  var; name=var
 // FOREACH_PATTERN_2-DAG: Keyword[case]/None:                 case; name=case
-// FOREACH_PATTERN_2: End completions
 }
 
 func testForeachPattern3(_ fooObject: FooStruct) {
@@ -172,7 +169,6 @@ func testForeachPattern3(_ fooObject: FooStruct) {
 // FOREACH_PATTERN_3: Begin completions, 2 items
 // FOREACH_PATTERN_3-DAG: Keyword[var]/None:                  var; name=var
 // FOREACH_PATTERN_3-DAG: Keyword[case]/None:                 case; name=case
-// FOREACH_PATTERN_3: End completions
 }
 
 func testForeachPattern4(_ fooObject: FooStruct) {
@@ -385,26 +381,21 @@ func testSwitchCaseWhereExprIJ1(_ fooObject: FooStruct) {
 // COND_NONE-NOT: Begin completions
 // COND_NONE-NOT: End completions
 
-// COND_COMMON: Begin completions
 // COND_COMMON-DAG: Literal[Boolean]/None: true[#Bool#]{{; name=.+$}}
 // COND_COMMON-DAG: Literal[Boolean]/None: false[#Bool#]{{; name=.+$}}
 // COND_COMMON-DAG: Decl[LocalVar]/Local:        fooObject[#FooStruct#]{{; name=.+$}}
 // COND_COMMON-DAG: Decl[LocalVar]/Local:        localInt[#Int#]{{; name=.+$}}
 // COND_COMMON-DAG: Decl[LocalVar]/Local:        localFooObject[#FooStruct#]{{; name=.+$}}
 // COND_COMMON-DAG: Decl[Struct]/CurrModule:     FooStruct[#FooStruct#]{{; name=.+$}}
-// COND_COMMON: End completions
 
-// COND_WHERE_COMMON: Begin completions
 // COND_WHERE_COMMON-DAG: Literal[Boolean]/None/TypeRelation[Convertible]: true[#Bool#]{{; name=.+$}}
 // COND_WHERE_COMMON-DAG: Literal[Boolean]/None/TypeRelation[Convertible]: false[#Bool#]{{; name=.+$}}
 // COND_WHERE_COMMON-DAG: Decl[LocalVar]/Local:        fooObject[#FooStruct#]{{; name=.+$}}
 // COND_WHERE_COMMON-DAG: Decl[LocalVar]/Local:        localInt[#Int#]{{; name=.+$}}
 // COND_WHERE_COMMON-DAG: Decl[LocalVar]/Local:        localFooObject[#FooStruct#]{{; name=.+$}}
 // COND_WHERE_COMMON-DAG: Decl[Struct]/CurrModule:     FooStruct[#FooStruct#]{{; name=.+$}}
-// COND_WHERE_COMMON: End completions
 
 
-// COND-WITH-RELATION: Begin completions
 // COND-WITH-RELATION-DAG: Literal[Boolean]/None/TypeRelation[Convertible]: true[#Bool#]{{; name=.+$}}
 // COND-WITH-RELATION-DAG: Literal[Boolean]/None/TypeRelation[Convertible]: false[#Bool#]{{; name=.+$}}
 // COND-WITH-RELATION-DAG: Decl[LocalVar]/Local:        fooObject[#FooStruct#]{{; name=.+$}}
@@ -416,11 +407,9 @@ func testSwitchCaseWhereExprIJ1(_ fooObject: FooStruct) {
 // COND-WITH-RELATION-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Invalid]: testIfElseIf5({#(fooObject): FooStruct#})[#Void#]{{; name=.+$}}
 // COND-WITH-RELATION-DAG: Decl[FreeFunction]/CurrModule/TypeRelation[Invalid]: testCStyleForIncrIE1({#(fooObject): FooStruct#})[#Void#]{{; name=.+$}}
 
-// COND-WITH-RELATION1: Begin completions
 // COND-WITH-RELATION1-DAG: Decl[InstanceVar]/CurrNominal:      instanceVar[#Int#]{{; name=.+$}}
 // COND-WITH-RELATION1-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: boolGen()[#Bool#]{{; name=.+$}}
 // COND-WITH-RELATION1-DAG: Decl[InstanceMethod]/CurrNominal:   intGen()[#Int#]{{; name=.+$}}
-// COND-WITH-RELATION1: End completions
 
 // WITH_I_INT_LOCAL: Decl[LocalVar]/Local: i[#Int#]{{; name=.+$}}
 
@@ -531,32 +520,23 @@ func testGuardCase(x:FooStruct?) {
   guard case .#^GUARD_CASE_PATTERN_2?check=OPTIONAL_FOOSTRUCT^#some() = x {}
 }
 
-// FOOSTRUCT_DOT: Begin completions
 // FOOSTRUCT_DOT-DAG: Decl[InstanceVar]/CurrNominal:      instanceVar[#Int#];
 // FOOSTRUCT_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   boolGen()[#Bool#];
 // FOOSTRUCT_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   intGen()[#Int#];
-// FOOSTRUCT_DOT: End completions
 
-// FOOSTRUCT_DOT_BOOL: Begin completions
 // FOOSTRUCT_DOT_BOOL-DAG: Decl[InstanceVar]/CurrNominal:      instanceVar[#Int#];
 // FOOSTRUCT_DOT_BOOL-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: boolGen()[#Bool#];
 // FOOSTRUCT_DOT_BOOL-DAG: Decl[InstanceMethod]/CurrNominal:   intGen()[#Int#];
-// FOOSTRUCT_DOT_BOOL: End completions
 
-// FOOSTRUCT_NODOT: Begin completions
 // FOOSTRUCT_NODOT-DAG: Decl[InstanceVar]/CurrNominal:      .instanceVar[#Int#];
 // FOOSTRUCT_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .boolGen()[#Bool#];
 // FOOSTRUCT_NODOT-DAG: Decl[InstanceMethod]/CurrNominal:   .intGen()[#Int#];
-// FOOSTRUCT_NODOT: End completions
 
-// FOOSTRUCT_LOCALVAL: Begin completions
 // FOOSTRUCT_LOCALVAL-DAG: Decl[LocalVar]/Local{{(/TypeRelation\[Convertible\])?}}: boundVal[#FooStruct#];
-// FOOSTRUCT_LOCALVAL: End completions
 
 // OPTIONAL_FOOSTRUCT: Begin completions, 2 items
 // OPTIONAL_FOOSTRUCT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Convertible]: none[#Optional<FooStruct>#]; name=none
 // OPTIONAL_FOOSTRUCT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Convertible]: some({#FooStruct#})[#Optional<FooStruct>#]; name=some()
-// OPTIONAL_FOOSTRUCT: End completions
 
 func returnOpt() -> String? { nil }
 func returnOptTuple() -> (String, String)? { nil}
@@ -567,13 +547,11 @@ func test_rdar86050684() {
     if case (let local4, _)? = returnOptTuple() {
       let (local5, _) = returnOptTuple() ?? ("", "")
       _ = #^RDAR86050684^#
-// RDAR86050684: Begin completions
 // RDAR86050684-DAG: Decl[LocalVar]/Local:               local1[#String#];
 // RDAR86050684-DAG: Decl[LocalVar]/Local:               local2[#String#];
 // RDAR86050684-DAG: Decl[LocalVar]/Local:               local3[#String#];
 // RDAR86050684-DAG: Decl[LocalVar]/Local:               local4[#String#];
 // RDAR86050684-DAG: Decl[LocalVar]/Local:               local5[#String#];
-// RDAR86050684: End completions
     }
   }
 }

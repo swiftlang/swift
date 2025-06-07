@@ -20,7 +20,7 @@ import SIL
 /// One or more "potential" end instructions can be inserted.
 /// Though, not all inserted instructions end up as "end" instructions.
 ///
-/// `InstructionRange` is useful for calculating the liferange of values.
+/// `InstructionRange` is useful for calculating the liverange of values.
 ///
 /// The `InstructionRange` is similar to a `BasicBlockRange`, but defines the range
 /// in a "finer" granularity, i.e. on instructions instead of blocks.
@@ -40,28 +40,58 @@ import SIL
 /// destruct this data structure, e.g. in a `defer {}` block.
 struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
   
-  /// The dominating begin instruction.
-  let begin: Instruction
-  
   /// The underlying block range.
   private(set) var blockRange: BasicBlockRange
 
   private var insertedInsts: InstructionSet
 
+  // For efficiency, this set does not include instructions in blocks which are not the begin or any end block.
+  private var inExclusiveRange: InstructionSet
+
   init(begin beginInst: Instruction, _ context: some Context) {
-    self.begin = beginInst
-    self.blockRange = BasicBlockRange(begin: beginInst.parentBlock, context)
+    self = InstructionRange(beginBlock: beginInst.parentBlock, context)
+    self.inExclusiveRange.insert(beginInst)
+  }
+
+  // Note: 'ends' are simply the instructions to insert in the range. 'self.ends' might not return the same sequence
+  // as this 'ends' argument because 'self.ends' will not include block exits.
+  init<S: Sequence>(begin beginInst: Instruction, ends: S, _ context: some Context) where S.Element: Instruction {
+    self = InstructionRange(begin: beginInst, context)
+    insert(contentsOf: ends)
+  }
+
+  init(for value: Value, _ context: some Context) {
+    if let inst = value.definingInstruction {
+      self = InstructionRange(begin: inst, context)
+    } else if let arg = value as? Argument {
+      self = InstructionRange(beginBlock: arg.parentBlock, context)
+    } else {
+      fatalError("cannot build an instruction range for \(value)")
+    }
+  }
+
+  private init(beginBlock: BasicBlock, _ context: some Context) {
+    self.blockRange = BasicBlockRange(begin: beginBlock, context)
     self.insertedInsts = InstructionSet(context)
+    self.inExclusiveRange = InstructionSet(context)
   }
 
   /// Insert a potential end instruction.
   mutating func insert(_ inst: Instruction) {
     insertedInsts.insert(inst)
+    insertIntoRange(instructions: ReverseInstructionList(first: inst.previous))
     blockRange.insert(inst.parentBlock)
+    if inst.parentBlock != blockRange.begin {
+      // The first time an instruction is inserted in another block than the begin-block we need to insert
+      // instructions from the begin instruction to the end of the begin block.
+      // For subsequent insertions this is a no-op: `insertIntoRange` will return immediately because those
+      // instruction are already inserted.
+      insertIntoRange(instructions: blockRange.begin.instructions.reversed())
+    }
   }
 
   /// Insert a sequence of potential end instructions.
-  mutating func insert<S: Sequence>(contentsOf other: S) where S.Element == Instruction {
+  mutating func insert<S: Sequence>(contentsOf other: S) where S.Element: Instruction {
     for inst in other {
       insert(inst)
     }
@@ -69,19 +99,11 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
 
   /// Returns true if the exclusive range contains `inst`.
   func contains(_ inst: Instruction) -> Bool {
+    if inExclusiveRange.contains(inst) {
+      return true
+    }
     let block = inst.parentBlock
-    if !blockRange.inclusiveRangeContains(block) { return false }
-    var inRange = false
-    if blockRange.contains(block) {
-      if block != blockRange.begin { return true }
-      inRange = true
-    }
-    for i in block.instructions.reversed() {
-      if i == inst { return inRange }
-      if insertedInsts.contains(i) { inRange = true }
-      if i == begin { return false }
-    }
-    fatalError("didn't find instruction in its block")
+    return block != blockRange.begin && blockRange.contains(block)
   }
 
   /// Returns true if the inclusive range contains `inst`.
@@ -89,19 +111,20 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
     contains(inst) || insertedInsts.contains(inst)
   }
 
-  /// Returns true if the range is valid and that's iff the begin instruction
-  /// dominates all instructions of the range.
-  var isValid: Bool {
-    blockRange.isValid &&
-    // Check if there are any inserted instructions before the begin instruction in its block.
-    !ReverseInstructionList(first: begin).dropFirst().contains { insertedInsts.contains($0) }
-  }
-
   /// Returns the end instructions.
+  ///
+  /// Warning: this returns `begin` if no instructions were inserted.
   var ends: LazyMapSequence<LazyFilterSequence<Stack<BasicBlock>>, Instruction> {
     blockRange.ends.map {
       $0.instructions.reversed().first(where: { insertedInsts.contains($0)})!
     }
+  }
+
+  // Returns the exit blocks.
+  var exitBlocks: LazySequence<FlattenSequence<
+                    LazyMapSequence<LazyFilterSequence<Stack<BasicBlock>>,
+                                    LazyFilterSequence<SuccessorArray>>>> {
+    blockRange.exits
   }
 
   /// Returns the exit instructions.
@@ -129,10 +152,22 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
     }
   }
 
+  var begin: Instruction? {
+    blockRange.begin.instructions.first(where: inExclusiveRange.contains)
+  }
+
+  private mutating func insertIntoRange(instructions: ReverseInstructionList) {
+    for inst in instructions {
+      if !inExclusiveRange.insert(inst) {
+        return
+      }
+    }
+  }
+
   var description: String {
-    return (isValid ? "" : "<invalid>\n") +
+    return (blockRange.isValid ? "" : "<invalid>\n") +
       """
-      begin:    \(begin)
+      begin:    \(begin?.description ?? blockRange.begin.name)
       ends:     \(ends.map { $0.description }.joined(separator: "\n          "))
       exits:    \(exits.map { $0.description }.joined(separator: "\n          "))
       interiors:\(interiors.map { $0.description }.joined(separator: "\n          "))
@@ -141,7 +176,127 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
 
   /// TODO: once we have move-only types, make this a real deinit.
   mutating func deinitialize() {
+    inExclusiveRange.deinitialize()
     insertedInsts.deinitialize()
     blockRange.deinitialize()
   }
+}
+
+extension InstructionRange {
+  enum PathOverlap {
+    // range:  ---
+    //          |    pathBegin
+    //          |        |
+    //          |     pathEnd
+    //         ---
+    case containsPath
+
+    // range:  ---
+    //          |    pathBegin
+    //         ---       |
+    //                pathEnd
+    case containsBegin
+
+    //               pathBegin
+    // range:  ---       |
+    //          |     pathEnd
+    //         ---
+    case containsEnd
+
+    //               pathBegin
+    // range:  ---       |
+    //          |        |
+    //         ---       |
+    //                pathEnd
+    case overlappedByPath
+
+    // either:       pathBegin
+    //                   |
+    //                pathEnd
+    // range:  ---
+    //          |
+    //         ---
+    // or:           pathBegin
+    //                   |
+    //                pathEnd
+    case disjoint
+  }
+
+  /// Return true if any exclusive path from `begin` to `end` includes an instruction in this exclusive range.
+  ///
+  /// Returns .containsBegin, if this range has the same begin and end as the path.
+  ///
+  /// Precondition: `begin` dominates `end`.
+  func overlaps(pathBegin: Instruction, pathEnd: Instruction, _ context: some Context) -> PathOverlap {
+    assert(pathBegin != pathEnd, "expect an exclusive path")
+    if contains(pathBegin) {
+      // Note: pathEnd != self.begin here since self.contains(pathBegin)
+      if contains(pathEnd) { return .containsPath }
+      return .containsBegin
+    }
+    if contains(pathEnd) {
+      if let rangeBegin = self.begin, rangeBegin == pathEnd {
+        return .disjoint
+      }
+      return .containsEnd
+    }
+    // Neither end-point is contained. If a backward path walk encouters this range, then it must overlap this
+    // range. Otherwise, it is disjoint.
+    var backwardBlocks = BasicBlockWorklist(context)
+    defer { backwardBlocks.deinitialize() }
+    backwardBlocks.pushIfNotVisited(pathEnd.parentBlock)
+    while let block = backwardBlocks.pop() {
+      if blockRange.inclusiveRangeContains(block) {
+        // This range overlaps with this block, but there are still three possibilities:
+        // (1) range, pathBegin, pathEnd = disjoint         (range might not begin in this block)
+        // (2) pathBegin, pathEnd, range = disjoint         (pathBegin might not be in this block)
+        // (3) pathBegin, range, pathEnd = overlappedByPath (range or pathBegin might not be in this block)
+        //
+        // Walk backward from pathEnd to find either pathBegin or an instruction in this range.
+        // Both this range and the path may or may not begin in this block.
+        let endInBlock = block == pathEnd.parentBlock ? pathEnd : block.terminator
+        for inst in ReverseInstructionList(first: endInBlock) {
+          // Check pathBegin first because the range is exclusive.
+          if inst == pathBegin {
+            break
+          }
+          // Check inclusiveRangeContains() in case the range end is the first instruction in this block.
+          if inclusiveRangeContains(inst) {
+            return .overlappedByPath
+          }
+        }
+        // No instructions in this range occur between pathBegin and pathEnd.
+        return .disjoint
+      }
+      // No range blocks have been reached.
+      if block == pathBegin.parentBlock {
+        return .disjoint
+      }
+      backwardBlocks.pushIfNotVisited(contentsOf: block.predecessors)
+    }
+    fatalError("begin: \(pathBegin)\n  must dominate end: \(pathEnd)")
+  }
+}
+
+let rangeOverlapsPathTest = FunctionTest("range_overlaps_path") {
+  function, arguments, context in
+  let rangeValue = arguments.takeValue()
+  print("Range of: \(rangeValue)")
+  var range = computeLinearLiveness(for: rangeValue, context)
+  defer { range.deinitialize() }
+  let pathInst = arguments.takeInstruction()
+  print("Path begin: \(pathInst)")
+  if let pathBegin = pathInst as? ScopedInstruction {
+    for end in pathBegin.endInstructions {
+      print("Overlap kind:", range.overlaps(pathBegin: pathInst, pathEnd: end, context))
+    }
+    return
+  }
+  if let pathValue = pathInst as? SingleValueInstruction, pathValue.ownership == .owned {
+    for end in pathValue.uses.endingLifetime {
+      print("Overlap kind:", range.overlaps(pathBegin: pathInst, pathEnd: end.instruction, context))
+    }
+    return
+  }
+  print("Test specification error: not a scoped or owned instruction: \(pathInst)")
 }

@@ -49,12 +49,28 @@ TemporaryAllocationTestSuite.test("untypedAllocationOnHeap") {
   }
 }
 
+TemporaryAllocationTestSuite.test("unprotectedUntypedAllocationOnStack") {
+  _withUnprotectedUnsafeTemporaryAllocation(byteCount: 8, alignment: 1) { buffer in
+      expectStackAllocated(buffer.baseAddress!)
+  }
+}
+
+TemporaryAllocationTestSuite.test("unprotectedUntypedAllocationOnHeap") {
+  // EXPECTATION: a very large allocated buffer is heap-allocated. (Note if
+  // swift_stdlib_isStackAllocationSafe() gets fleshed out, this test may need
+  // to be changed.)
+  _withUnprotectedUnsafeTemporaryAllocation(byteCount: 100_000, alignment: 1) { buffer in
+      expectNotStackAllocated(buffer.baseAddress!)
+  }
+}
+
 TemporaryAllocationTestSuite.test("untypedEmptyAllocationIsStackAllocated") {
   withUnsafeTemporaryAllocation(byteCount: 0, alignment: 1) { buffer in
       expectStackAllocated(buffer.baseAddress!)
   }
 }
 
+#if !os(WASI)
 TemporaryAllocationTestSuite.test("crashOnNegativeByteCount") {
   expectCrash {
     let byteCount = Int.random(in: -2 ..< -1)
@@ -68,6 +84,7 @@ TemporaryAllocationTestSuite.test("crashOnNegativeAlignment") {
     withUnsafeTemporaryAllocation(byteCount: 16, alignment: alignment) { _ in }
   }
 }
+#endif
 
 TemporaryAllocationTestSuite.test("untypedAllocationIsAligned") {
   withUnsafeTemporaryAllocation(byteCount: 1, alignment: 8) { buffer in
@@ -94,6 +111,21 @@ TemporaryAllocationTestSuite.test("typedAllocationOnHeap") {
   }
 }
 
+TemporaryAllocationTestSuite.test("unprotectedTypedAllocationOnStack") {
+  _withUnprotectedUnsafeTemporaryAllocation(of: Int.self, capacity: 1) { buffer in
+      expectStackAllocated(buffer.baseAddress!)
+  }
+}
+
+TemporaryAllocationTestSuite.test("unprotectedTypedAllocationOnHeap") {
+  // EXPECTATION: a very large allocated buffer is heap-allocated. (Note if
+  // swift_stdlib_isStackAllocationSafe() gets fleshed out, this test may need
+  // to be changed.)
+  _withUnprotectedUnsafeTemporaryAllocation(of: Int.self, capacity: 100_000) { buffer in
+      expectNotStackAllocated(buffer.baseAddress!)
+  }
+}
+
 TemporaryAllocationTestSuite.test("typedEmptyAllocationIsStackAllocated") {
   withUnsafeTemporaryAllocation(of: Int.self, capacity: 0) { buffer in
       expectStackAllocated(buffer.baseAddress!)
@@ -106,12 +138,14 @@ TemporaryAllocationTestSuite.test("voidAllocationIsStackAllocated") {
   }
 }
 
+#if !os(WASI)
 TemporaryAllocationTestSuite.test("crashOnNegativeValueCount") {
   expectCrash {
     let capacity = Int.random(in: -2 ..< -1)
     withUnsafeTemporaryAllocation(of: Int.self, capacity: capacity) { _ in }
   }
 }
+#endif
 
 TemporaryAllocationTestSuite.test("typedAllocationIsAligned") {
   withUnsafeTemporaryAllocation(of: Int.self, capacity: 1) { buffer in

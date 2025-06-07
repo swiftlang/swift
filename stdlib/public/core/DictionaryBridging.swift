@@ -19,10 +19,10 @@ import SwiftShims
 internal func _stdlib_NSDictionary_allKeys(
   _ object: AnyObject
 ) -> _BridgingBuffer {
-  let nsd = unsafeBitCast(object, to: _NSDictionary.self)
+  let nsd = unsafe unsafeBitCast(object, to: _NSDictionary.self)
   let count = nsd.count
   let storage = _BridgingBuffer(count)
-  nsd.getObjects(nil, andKeys: storage.baseAddress, count: count)
+  unsafe nsd.getObjects(nil, andKeys: storage.baseAddress, count: count)
   return storage
 }
 
@@ -36,11 +36,11 @@ extension _NativeDictionary { // Bridging
     // Temporary var for SOME type safety.
     let nsDictionary: _NSDictionaryCore
 
-    if _storage === __RawDictionaryStorage.empty || count == 0 {
-      nsDictionary = __RawDictionaryStorage.empty
+    if unsafe _storage === __RawDictionaryStorage.empty || count == 0 {
+      unsafe nsDictionary = __RawDictionaryStorage.empty
     } else if _isBridgedVerbatimToObjectiveC(Key.self),
       _isBridgedVerbatimToObjectiveC(Value.self) {
-      nsDictionary = unsafeDowncast(
+      unsafe nsDictionary = unsafeDowncast(
         _storage,
         to: _DictionaryStorage<Key, Value>.self)
     } else {
@@ -53,6 +53,7 @@ extension _NativeDictionary { // Bridging
 
 /// An NSEnumerator that works with any _NativeDictionary of
 /// verbatim bridgeable elements. Used by the various NSDictionary impls.
+@safe
 final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
   : __SwiftNativeNSEnumerator, _NSEnumerator {
 
@@ -70,9 +71,9 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
     _internalInvariant(_isBridgedVerbatimToObjectiveC(Key.self))
     _internalInvariant(_orphanedFoundationSubclassesReparented)
     self.base = base
-    self.bridgedKeys = nil
-    self.nextBucket = base.hashTable.startBucket
-    self.endBucket = base.hashTable.endBucket
+    unsafe self.bridgedKeys = nil
+    unsafe self.nextBucket = base.hashTable.startBucket
+    unsafe self.endBucket = base.hashTable.endBucket
     super.init()
   }
 
@@ -81,18 +82,18 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
     _internalInvariant(!_isBridgedVerbatimToObjectiveC(Key.self))
     _internalInvariant(_orphanedFoundationSubclassesReparented)
     self.base = deferred.native
-    self.bridgedKeys = deferred.bridgeKeys()
-    self.nextBucket = base.hashTable.startBucket
-    self.endBucket = base.hashTable.endBucket
+    unsafe self.bridgedKeys = deferred.bridgeKeys()
+    unsafe self.nextBucket = base.hashTable.startBucket
+    unsafe self.endBucket = base.hashTable.endBucket
     super.init()
   }
 
   private func bridgedKey(at bucket: _HashTable.Bucket) -> AnyObject {
-    _internalInvariant(base.hashTable.isOccupied(bucket))
-    if let bridgedKeys = self.bridgedKeys {
-      return bridgedKeys[bucket]
+    unsafe _internalInvariant(base.hashTable.isOccupied(bucket))
+    if let bridgedKeys = unsafe self.bridgedKeys {
+      return unsafe bridgedKeys[bucket]
     }
-    return _bridgeAnythingToObjectiveC(base.uncheckedKey(at: bucket))
+    return unsafe _bridgeAnythingToObjectiveC(base.uncheckedKey(at: bucket))
   }
 
   @objc
@@ -101,7 +102,7 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
       return nil
     }
     let bucket = nextBucket
-    nextBucket = base.hashTable.occupiedBucket(after: nextBucket)
+    unsafe nextBucket = base.hashTable.occupiedBucket(after: nextBucket)
     return self.bridgedKey(at: bucket)
   }
 
@@ -111,24 +112,24 @@ final internal class _SwiftDictionaryNSEnumerator<Key: Hashable, Value>
     objects: UnsafeMutablePointer<AnyObject>,
     count: Int
   ) -> Int {
-    var theState = state.pointee
-    if theState.state == 0 {
-      theState.state = 1 // Arbitrary non-zero value.
-      theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
-      theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
+    var theState = unsafe state.pointee
+    if unsafe theState.state == 0 {
+      unsafe theState.state = 1 // Arbitrary non-zero value.
+      unsafe theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
+      unsafe theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
     }
 
     if nextBucket == endBucket {
-      state.pointee = theState
+      unsafe state.pointee = theState
       return 0
     }
 
     // Return only a single element so that code can start iterating via fast
     // enumeration, terminate it, and continue via NSEnumerator.
-    let unmanagedObjects = _UnmanagedAnyObjectArray(objects)
-    unmanagedObjects[0] = self.bridgedKey(at: nextBucket)
-    nextBucket = base.hashTable.occupiedBucket(after: nextBucket)
-    state.pointee = theState
+    let unmanagedObjects = unsafe _UnmanagedAnyObjectArray(objects)
+    unsafe unmanagedObjects[0] = self.bridgedKey(at: nextBucket)
+    unsafe nextBucket = base.hashTable.occupiedBucket(after: nextBucket)
+    unsafe state.pointee = theState
     return 1
   }
 }
@@ -180,82 +181,83 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
 
   @nonobjc
   private var _bridgedKeysPtr: UnsafeMutablePointer<AnyObject?> {
-    return _getUnsafePointerToStoredProperties(self)
+    return unsafe _getUnsafePointerToStoredProperties(self)
       .assumingMemoryBound(to: Optional<AnyObject>.self)
   }
 
   @nonobjc
   private var _bridgedValuesPtr: UnsafeMutablePointer<AnyObject?> {
-    return _bridgedKeysPtr + 1
+    return unsafe _bridgedKeysPtr + 1
   }
 
   /// The buffer for bridged keys, if present.
   @nonobjc
   private var _bridgedKeys: __BridgingHashBuffer? {
-    guard let ref = _stdlib_atomicLoadARCRef(object: _bridgedKeysPtr) else {
+    guard let ref = unsafe _stdlib_atomicLoadARCRef(object: _bridgedKeysPtr) else {
       return nil
     }
-    return unsafeDowncast(ref, to: __BridgingHashBuffer.self)
+    return unsafe unsafeDowncast(ref, to: __BridgingHashBuffer.self)
   }
 
   /// The buffer for bridged values, if present.
   @nonobjc
   private var _bridgedValues: __BridgingHashBuffer? {
-    guard let ref = _stdlib_atomicLoadARCRef(object: _bridgedValuesPtr) else {
+    guard let ref = unsafe _stdlib_atomicLoadARCRef(object: _bridgedValuesPtr) else {
       return nil
     }
-    return unsafeDowncast(ref, to: __BridgingHashBuffer.self)
+    return unsafe unsafeDowncast(ref, to: __BridgingHashBuffer.self)
   }
 
   /// Attach a buffer for bridged Dictionary keys.
   @nonobjc
   private func _initializeBridgedKeys(_ storage: __BridgingHashBuffer) {
-    _stdlib_atomicInitializeARCRef(object: _bridgedKeysPtr, desired: storage)
+    unsafe _stdlib_atomicInitializeARCRef(object: _bridgedKeysPtr, desired: storage)
   }
 
   /// Attach a buffer for bridged Dictionary values.
   @nonobjc
   private func _initializeBridgedValues(_ storage: __BridgingHashBuffer) {
-    _stdlib_atomicInitializeARCRef(object: _bridgedValuesPtr, desired: storage)
+    unsafe _stdlib_atomicInitializeARCRef(object: _bridgedValuesPtr, desired: storage)
   }
 
   @nonobjc
   internal func bridgeKeys() -> __BridgingHashBuffer? {
     if _isBridgedVerbatimToObjectiveC(Key.self) { return nil }
-    if let bridgedKeys = _bridgedKeys { return bridgedKeys }
+    if let bridgedKeys = unsafe _bridgedKeys { return unsafe bridgedKeys }
 
     // Allocate and initialize heap storage for bridged keys.
-    let bridged = __BridgingHashBuffer.allocate(
+    let bridged = unsafe __BridgingHashBuffer.allocate(
       owner: native._storage,
       hashTable: native.hashTable)
-    for bucket in native.hashTable {
-      let object = _bridgeAnythingToObjectiveC(native.uncheckedKey(at: bucket))
-      bridged.initialize(at: bucket, to: object)
+    for unsafe bucket in unsafe native.hashTable {
+      let object = unsafe _bridgeAnythingToObjectiveC(
+        native.uncheckedKey(at: bucket))
+      unsafe bridged.initialize(at: bucket, to: object)
     }
 
     // Atomically put the bridged keys in place.
-    _initializeBridgedKeys(bridged)
-    return _bridgedKeys!
+    unsafe _initializeBridgedKeys(bridged)
+    return unsafe _bridgedKeys!
   }
 
   @nonobjc
   internal func bridgeValues() -> __BridgingHashBuffer? {
     if _isBridgedVerbatimToObjectiveC(Value.self) { return nil }
-    if let bridgedValues = _bridgedValues { return bridgedValues }
+    if let bridgedValues = unsafe _bridgedValues { return unsafe bridgedValues }
 
     // Allocate and initialize heap storage for bridged values.
-    let bridged = __BridgingHashBuffer.allocate(
+    let bridged = unsafe __BridgingHashBuffer.allocate(
       owner: native._storage,
       hashTable: native.hashTable)
-    for bucket in native.hashTable {
-      let value = native.uncheckedValue(at: bucket)
+    for unsafe bucket in unsafe native.hashTable {
+      let value = unsafe native.uncheckedValue(at: bucket)
       let cocoaValue = _bridgeAnythingToObjectiveC(value)
-      bridged.initialize(at: bucket, to: cocoaValue)
+      unsafe bridged.initialize(at: bucket, to: cocoaValue)
     }
 
     // Atomically put the bridged values in place.
-    _initializeBridgedValues(bridged)
-    return _bridgedValues!
+    unsafe _initializeBridgedValues(bridged)
+    return unsafe _bridgedValues!
   }
 
   @objc(copyWithZone:)
@@ -270,10 +272,10 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     at bucket: Bucket,
     bridgedKeys: __BridgingHashBuffer?
   ) -> AnyObject {
-    if let bridgedKeys = bridgedKeys {
-      return bridgedKeys[bucket]
+    if let bridgedKeys = unsafe bridgedKeys {
+      return unsafe bridgedKeys[bucket]
     }
-    return _bridgeAnythingToObjectiveC(native.uncheckedKey(at: bucket))
+    return unsafe _bridgeAnythingToObjectiveC(native.uncheckedKey(at: bucket))
   }
 
   @inline(__always)
@@ -281,10 +283,10 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     at bucket: Bucket,
     bridgedValues: __BridgingHashBuffer?
   ) -> AnyObject {
-    if let bridgedValues = bridgedValues {
-      return bridgedValues[bucket]
+    if let bridgedValues = unsafe bridgedValues {
+      return unsafe bridgedValues[bucket]
     }
-    return _bridgeAnythingToObjectiveC(native.uncheckedValue(at: bucket))
+    return unsafe _bridgeAnythingToObjectiveC(native.uncheckedValue(at: bucket))
   }
 
   @objc(objectForKey:)
@@ -294,7 +296,7 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
 
     let (bucket, found) = native.find(nativeKey)
     guard found else { return nil }
-    return _value(at: bucket, bridgedValues: bridgeValues())
+    return unsafe _value(at: bucket, bridgedValues: bridgeValues())
   }
 
   @objc
@@ -319,23 +321,23 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
 
     defer { _fixLifetime(self) }
 
-    switch (_UnmanagedAnyObjectArray(keys), _UnmanagedAnyObjectArray(objects)) {
+    switch unsafe (_UnmanagedAnyObjectArray(keys), _UnmanagedAnyObjectArray(objects)) {
     case (let unmanagedKeys?, let unmanagedObjects?):
-      for bucket in native.hashTable {
-        unmanagedKeys[i] = _key(at: bucket, bridgedKeys: bridgedKeys)
-        unmanagedObjects[i] = _value(at: bucket, bridgedValues: bridgedValues)
+      for unsafe bucket in unsafe native.hashTable {
+        unsafe unmanagedKeys[i] = unsafe _key(at: bucket, bridgedKeys: bridgedKeys)
+        unsafe unmanagedObjects[i] = unsafe _value(at: bucket, bridgedValues: bridgedValues)
         i += 1
         guard i < count else { break }
       }
     case (let unmanagedKeys?, nil):
-      for bucket in native.hashTable {
-        unmanagedKeys[i] = _key(at: bucket, bridgedKeys: bridgedKeys)
+      for unsafe bucket in unsafe native.hashTable {
+        unsafe unmanagedKeys[i] = unsafe _key(at: bucket, bridgedKeys: bridgedKeys)
         i += 1
         guard i < count else { break }
       }
     case (nil, let unmanagedObjects?):
-      for bucket in native.hashTable {
-        unmanagedObjects[i] = _value(at: bucket, bridgedValues: bridgedValues)
+      for unsafe bucket in unsafe native.hashTable {
+        unsafe unmanagedObjects[i] = unsafe _value(at: bucket, bridgedValues: bridgedValues)
         i += 1
         guard i < count else { break }
       }
@@ -359,10 +361,10 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     defer { _fixLifetime(self) }
 
     var stop: UInt8 = 0
-    for bucket in native.hashTable {
-      let key = _key(at: bucket, bridgedKeys: bridgedKeys)
-      let value = _value(at: bucket, bridgedValues: bridgedValues)
-      block(
+    for unsafe bucket in unsafe native.hashTable {
+      let key = unsafe _key(at: bucket, bridgedKeys: bridgedKeys)
+      let value = unsafe _value(at: bucket, bridgedValues: bridgedValues)
+      unsafe block(
         Unmanaged.passUnretained(key),
         Unmanaged.passUnretained(value),
         &stop)
@@ -382,27 +384,27 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     count: Int
   ) -> Int {
     defer { _fixLifetime(self) }
-    let hashTable = native.hashTable
+    let hashTable = unsafe native.hashTable
 
-    var theState = state.pointee
-    if theState.state == 0 {
-      theState.state = 1 // Arbitrary non-zero value.
-      theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
-      theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
-      theState.extra.0 = CUnsignedLong(hashTable.startBucket.offset)
+    var theState = unsafe state.pointee
+    if unsafe theState.state == 0 {
+      unsafe theState.state = 1 // Arbitrary non-zero value.
+      unsafe theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
+      unsafe theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
+      unsafe theState.extra.0 = CUnsignedLong(hashTable.startBucket.offset)
     }
 
     // Test 'objects' rather than 'count' because (a) this is very rare anyway,
     // and (b) the optimizer should then be able to optimize away the
     // unwrapping check below.
-    if _slowPath(objects == nil) {
+    if unsafe _slowPath(objects == nil) {
       return 0
     }
 
-    let unmanagedObjects = _UnmanagedAnyObjectArray(objects!)
-    var bucket = _HashTable.Bucket(offset: Int(theState.extra.0))
-    let endBucket = hashTable.endBucket
-    _precondition(bucket == endBucket || hashTable.isOccupied(bucket),
+    let unmanagedObjects = unsafe _UnmanagedAnyObjectArray(objects!)
+    var bucket = unsafe _HashTable.Bucket(offset: Int(theState.extra.0))
+    let endBucket = unsafe hashTable.endBucket
+    unsafe _precondition(bucket == endBucket || hashTable.isOccupied(bucket),
       "Invalid fast enumeration state")
     var stored = 0
 
@@ -411,12 +413,12 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
     for i in 0..<count {
       if bucket == endBucket { break }
 
-      unmanagedObjects[i] = _key(at: bucket, bridgedKeys: bridgedKeys)
+      unsafe unmanagedObjects[i] = unsafe _key(at: bucket, bridgedKeys: bridgedKeys)
       stored += 1
-      bucket = hashTable.occupiedBucket(after: bucket)
+      unsafe bucket = unsafe hashTable.occupiedBucket(after: bucket)
     }
-    theState.extra.0 = CUnsignedLong(bucket.offset)
-    state.pointee = theState
+    unsafe theState.extra.0 = CUnsignedLong(bucket.offset)
+    unsafe state.pointee = theState
     return stored
   }
 }
@@ -436,6 +438,9 @@ internal struct __CocoaDictionary {
     self.object = object
   }
 }
+
+@available(*, unavailable)
+extension __CocoaDictionary: Sendable {}
 
 extension __CocoaDictionary {
   @usableFromInline
@@ -512,19 +517,19 @@ extension __CocoaDictionary: _DictionaryBuffer {
 
   @usableFromInline
   internal var count: Int {
-    let nsd = unsafeBitCast(object, to: _NSDictionary.self)
+    let nsd = unsafe unsafeBitCast(object, to: _NSDictionary.self)
     return nsd.count
   }
 
   @usableFromInline
   internal func contains(_ key: Key) -> Bool {
-    let nsd = unsafeBitCast(object, to: _NSDictionary.self)
+    let nsd = unsafe unsafeBitCast(object, to: _NSDictionary.self)
     return nsd.object(forKey: key) != nil
   }
 
   @usableFromInline
   internal func lookup(_ key: Key) -> Value? {
-    let nsd = unsafeBitCast(object, to: _NSDictionary.self)
+    let nsd = unsafe unsafeBitCast(object, to: _NSDictionary.self)
     return nsd.object(forKey: key)
   }
 
@@ -533,7 +538,7 @@ extension __CocoaDictionary: _DictionaryBuffer {
   internal func lookup(_ index: Index) -> (key: Key, value: Value) {
     _precondition(index.storage.base.object === self.object, "Invalid index")
     let key: Key = index.storage.allKeys[index._offset]
-    let value: Value = index.storage.base.object.object(forKey: key)!
+    let value: Value = unsafe index.storage.base.object.object(forKey: key)!
     return (key, value)
   }
 
@@ -549,7 +554,7 @@ extension __CocoaDictionary: _DictionaryBuffer {
   func value(at index: Index) -> Value {
     _precondition(index.storage.base.object === self.object, "Invalid index")
     let key = index.storage.allKeys[index._offset]
-    return index.storage.base.object.object(forKey: key)!
+    return unsafe index.storage.base.object.object(forKey: key)!
   }
 }
 
@@ -579,7 +584,7 @@ extension __CocoaDictionary {
       @inline(__always)
       get {
         let storage = _bridgeObject(toNative: _storage)
-        return unsafeDowncast(storage, to: Storage.self)
+        return unsafe unsafeDowncast(storage, to: Storage.self)
       }
     }
 
@@ -623,7 +628,7 @@ extension __CocoaDictionary.Index {
   internal var handleBitPattern: UInt {
     @_effects(readonly)
     get {
-      return unsafeBitCast(storage, to: UInt.self)
+      return unsafe unsafeBitCast(storage, to: UInt.self)
     }
   }
 
@@ -653,7 +658,7 @@ extension __CocoaDictionary.Index {
   internal var age: Int32 {
     @_effects(readonly)
     get {
-      return _HashTable.age(for: storage.base.object)
+      return unsafe _HashTable.age(for: storage.base.object)
     }
   }
 }
@@ -685,6 +690,7 @@ extension __CocoaDictionary.Index: Comparable {
 }
 
 extension __CocoaDictionary: Sequence {
+  @safe
   @usableFromInline
   final internal class Iterator {
     // Cocoa Dictionary iterator has to be a class, otherwise we cannot
@@ -698,19 +704,19 @@ extension __CocoaDictionary: Sequence {
 
     // This stored property should be stored right after
     // `_fastEnumerationState`.  There's code below relying on this.
-    internal var _fastEnumerationStackBuf = _CocoaFastEnumerationStackBuf()
+    internal var _fastEnumerationStackBuf = unsafe _CocoaFastEnumerationStackBuf()
 
     internal let base: __CocoaDictionary
 
     internal var _fastEnumerationStatePtr:
       UnsafeMutablePointer<_SwiftNSFastEnumerationState> {
-      return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
+      return unsafe _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
         to: _SwiftNSFastEnumerationState.self)
     }
 
     internal var _fastEnumerationStackBufPtr:
       UnsafeMutablePointer<_CocoaFastEnumerationStackBuf> {
-      return UnsafeMutableRawPointer(_fastEnumerationStatePtr + 1)
+      return unsafe UnsafeMutableRawPointer(_fastEnumerationStatePtr + 1)
       .assumingMemoryBound(to: _CocoaFastEnumerationStackBuf.self)
     }
 
@@ -733,6 +739,9 @@ extension __CocoaDictionary: Sequence {
   }
 }
 
+@available(*, unavailable)
+extension __CocoaDictionary.Iterator: Sendable {}
+
 extension __CocoaDictionary.Iterator: IteratorProtocol {
   @usableFromInline
   internal typealias Element = (key: AnyObject, value: AnyObject)
@@ -744,12 +753,12 @@ extension __CocoaDictionary.Iterator: IteratorProtocol {
     }
     let base = self.base
     if itemIndex == itemCount {
-      let stackBufCount = _fastEnumerationStackBuf.count
+      let stackBufCount = unsafe _fastEnumerationStackBuf.count
       // We can't use `withUnsafeMutablePointer` here to get pointers to
       // properties, because doing so might introduce a writeback storage, but
       // fast enumeration relies on the pointer identity of the enumeration
       // state struct.
-      itemCount = base.object.countByEnumerating(
+      itemCount = unsafe base.object.countByEnumerating(
         with: _fastEnumerationStatePtr,
         objects: UnsafeMutableRawPointer(_fastEnumerationStackBufPtr)
           .assumingMemoryBound(to: AnyObject.self),
@@ -761,10 +770,10 @@ extension __CocoaDictionary.Iterator: IteratorProtocol {
       itemIndex = 0
     }
     let itemsPtrUP =
-    UnsafeMutableRawPointer(_fastEnumerationState.itemsPtr!)
+    unsafe UnsafeMutableRawPointer(_fastEnumerationState.itemsPtr!)
       .assumingMemoryBound(to: AnyObject.self)
-    let itemsPtr = _UnmanagedAnyObjectArray(itemsPtrUP)
-    let key: AnyObject = itemsPtr[itemIndex]
+    let itemsPtr = unsafe _UnmanagedAnyObjectArray(itemsPtrUP)
+    let key: AnyObject = unsafe itemsPtr[itemIndex]
     itemIndex += 1
     return key
   }
@@ -772,7 +781,7 @@ extension __CocoaDictionary.Iterator: IteratorProtocol {
   @usableFromInline
   internal func next() -> Element? {
     guard let key = nextKey() else { return nil }
-    let value: AnyObject = base.object.object(forKey: key)!
+    let value: AnyObject = unsafe base.object.object(forKey: key)!
     return (key, value)
   }
 }
@@ -800,11 +809,11 @@ extension Dictionary {
       return Dictionary(_native: deferred.native)
     }
 
-    if let nativeStorage = s as? _DictionaryStorage<Key, Value> {
-      return Dictionary(_native: _NativeDictionary(nativeStorage))
+    if let nativeStorage = unsafe s as? _DictionaryStorage<Key, Value> {
+      return Dictionary(_native: unsafe _NativeDictionary(nativeStorage))
     }
 
-    if s === __RawDictionaryStorage.empty {
+    if unsafe s === __RawDictionaryStorage.empty {
       return Dictionary()
     }
 

@@ -1,5 +1,4 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
+// RUN: %batch-code-completion
 
 let topLevelOpt: Int?
 
@@ -10,7 +9,6 @@ do {
   if let #^TOPLEVEL_IF_LET?check=TOPLEVEL^#
 // TOPLEVEL: Begin completions, 1 items
 // TOPLEVEL-DAG: Decl[LocalVar]/Local:               topLevelLocalOpt[#Int?#];
-// TOPLEVEL: End completions
 // FIXME: show 'topLevelOpt'
 }
 
@@ -59,7 +57,6 @@ struct MyStruct<T> {
 // IN_FUNC-DAG: Decl[InstanceVar]/CurrNominal:      propOpt[#Int?#];
 // IN_FUNC-DAG: Decl[InstanceVar]/CurrNominal:      propGenOpt[#T?#];
 // IN_FUNC-NOT: NonOpt
-// IN_FUNC: End completions
     }
 }
 
@@ -71,5 +68,4 @@ func testPreviousElements() {
 // PREV_ELEMENT-DAG: Decl[LocalVar]/Local:               localOptOpt[#Int??#];
 // PREV_ELEMENT-DAG: Decl[LocalVar]/Local:               localOpt[#Int?#];
 // PREV_ELEMENT-NOT: NonOpt
-// PREV_ELEMENT: End completions
 }

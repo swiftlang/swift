@@ -28,6 +28,8 @@ class CustomAttr;
 class Expr;
 class VarDecl;
 class OpaqueValueExpr;
+class PropertyWrapperValuePlaceholderExpr;
+class SubscriptDecl;
 
 /// The kind of property initializer to look for
 enum class PropertyWrapperInitKind {

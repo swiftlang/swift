@@ -25,11 +25,11 @@ three different optimization levels:
 
 - ``-Onone``: This is meant for normal development. It performs minimal
   optimizations and preserves all debug info.
-- ``-O``: This is meant for most production code. The compiler performs
+- ``-Osize``: This is meant for most production code. The compiler performs
   aggressive optimizations that can drastically change the type and amount of
   emitted code. Debug information will be emitted but will be lossy.
-- ``-Osize``: This is a special optimization mode where the compiler prioritizes
-  code size over performance.
+- ``-O``: This is a special optimization mode where the compiler prioritizes
+  performance over code size.
 
 In the Xcode UI, one can modify the current optimization level as follows:
 
@@ -135,7 +135,7 @@ in the following ``C.array1`` and ``D.array1`` will be accessed directly
 
   func usingC(_ c: C) {
     c.array1[i] = ... // Can directly access C.array without going through dynamic dispatch.
-    c.doSomething() = ... // Can directly call C.doSomething without going through virtual dispatch.
+    c.doSomething()   // Can directly call C.doSomething without going through virtual dispatch.
   }
 
   func usingD(_ d: D) {
@@ -548,7 +548,7 @@ alive.
   }
 
 
-.. _Unmanaged.swift: https://github.com/apple/swift/blob/main/stdlib/public/core/Unmanaged.swift
+.. _Unmanaged.swift: https://github.com/swiftlang/swift/blob/main/stdlib/public/core/Unmanaged.swift
 
 Protocols
 =========

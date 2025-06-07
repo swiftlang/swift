@@ -7,9 +7,9 @@ func app() {
         var x : Bool = true
         x = !x
         x = !x
-// CHECK:	.loc	[[FILEID]] [[@LINE+3]] 1
-// CHECK-NOT:.loc
+// CHECK:	.loc	[[FILEID]] [[@LINE+2]] 1
 // CHECK:	ret
 }
 
 app()
+

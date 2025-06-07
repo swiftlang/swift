@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
 
 protocol UID {
     func uid() -> Int
@@ -29,7 +29,7 @@ class Base {}
 func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
   var x = x
   // CHECK: [[XBOX:%.*]] = alloc_box $<τ_0_0 where τ_0_0 : ObjectUID> { var τ_0_0 } <T>
-  // CHECK: [[XLIFETIME:%[^,]+]] = begin_borrow [lexical] [[XBOX]]
+  // CHECK: [[XLIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[XBOX]]
   // CHECK: [[PB:%.*]] = project_box [[XLIFETIME]]
   // -- call x.uid()
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PB]] : $*T
@@ -84,7 +84,7 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int, Int, Int) {
 func getBaseObjectUID<T: UID>(x: T) -> (Int, Int, Int) where T: Base {
   var x = x
   // CHECK: [[XBOX:%.*]] = alloc_box $<τ_0_0 where τ_0_0 : Base, τ_0_0 : UID> { var τ_0_0 } <T>
-  // CHECK: [[XLIFETIME:%[^,]+]] = begin_borrow [lexical] [[XBOX]]
+  // CHECK: [[XLIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[XBOX]]
   // CHECK: [[PB:%.*]] = project_box [[XLIFETIME]]
   // -- call x.uid()
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PB]] : $*T

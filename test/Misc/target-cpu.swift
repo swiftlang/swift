@@ -13,8 +13,8 @@
 // RUN: not %swift -typecheck -target armv7k-apple-watchos2 -Xcc -### %s 2>&1 | %FileCheck -check-prefix=WATCHTARGETCPU1 %s
 // WATCHTARGETCPU1: "-target-cpu" "cortex-a7"
 
-// RUN: not %swift -typecheck -target arm64-apple-watchos2 -Xcc -### %s 2>&1 | %FileCheck -check-prefix=WATCHTARGETCPU2 %s
-// WATCHTARGETCPU2: "-target-cpu" "apple-a7"
+// RUN: not %swift -typecheck -target arm64_32-apple-watchos2 -Xcc -### %s 2>&1 | %FileCheck -check-prefix=WATCHTARGETCPU2 %s
+// WATCHTARGETCPU2: "-target-cpu" "apple-s4"
 
 // RUN: not %swift -typecheck -target armv7s-apple-ios7 -Xcc -### %s 2>&1 | %FileCheck -check-prefix=TARGETCPU2 %s
 // TARGETCPU2: "-target-cpu" "swift"
@@ -40,3 +40,6 @@
 // RUN: not %swift -typecheck -target s390x-unknown-linux-gnu -Xcc -### %s 2>&1 | %FileCheck -check-prefix=S390X_CPU %s
 // S390X_CPU: "-target-cpu" "z13"
 
+// RUN: not %swiftc -typecheck -target x86_64-unknown-windows-msvc -target-cpu haswell -Xcc -### %s 2>&1 | %FileCheck -check-prefix X86_64 %s
+// X86_64: "-target-cpu" "haswell"
+// X86_64: "-tune-cpu" "haswell"

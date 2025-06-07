@@ -10,8 +10,8 @@ extension SLD: ExpressibleByStringLiteral {
     init(stringLiteral value: StringLiteralType) {}
 }
 
-let _ = SLD(stringLiteral: "") // expected-warning{{'init(stringLiteral:)' is deprecated}}
-let _: SLD = "" // expected-warning{{'init(stringLiteral:)' is deprecated}}
+let _ = SLD(stringLiteral: "") // expected-warning{{'init(stringLiteral:)' is deprecated}}{{documentation-file=deprecated-declaration}}
+let _: SLD = "" // expected-warning{{'init(stringLiteral:)' is deprecated}}{{documentation-file=deprecated-declaration}}
 
 
 struct SLU {}
@@ -30,8 +30,8 @@ extension ILD: ExpressibleByIntegerLiteral {
   init(integerLiteral value: IntegerLiteralType) {}
 }
 
-let _ = ILD(integerLiteral: 1) // expected-warning{{'init(integerLiteral:)' is deprecated}}
-let _: ILD = 1 // expected-warning{{'init(integerLiteral:)' is deprecated}}
+let _ = ILD(integerLiteral: 1) // expected-warning{{'init(integerLiteral:)' is deprecated}}{{documentation-file=deprecated-declaration}}
+let _: ILD = 1 // expected-warning{{'init(integerLiteral:)' is deprecated}}{{documentation-file=deprecated-declaration}}
 
 struct ILU {}
 
@@ -51,8 +51,8 @@ extension NLD: ExpressibleByNilLiteral {
   init(nilLiteral: ()) {}
 }
 
-let _: NLD = .init(nilLiteral: ()) // expected-warning{{'init(nilLiteral:)' is deprecated}}
-let _: NLD = nil // expected-warning{{'init(nilLiteral:)' is deprecated}}
+let _: NLD = .init(nilLiteral: ()) // expected-warning{{'init(nilLiteral:)' is deprecated}}{{documentation-file=deprecated-declaration}}
+let _: NLD = nil // expected-warning{{'init(nilLiteral:)' is deprecated}}{{documentation-file=deprecated-declaration}}
 
 struct NLU {}
 
@@ -70,8 +70,8 @@ struct BLD {}
 extension BLD: ExpressibleByBooleanLiteral {
   init(booleanLiteral value: BooleanLiteralType) {}
 }
-let _: BLD = .init(booleanLiteral: false) // expected-warning{{'init(booleanLiteral:)' is deprecated}}
-let _: BLD = false // expected-warning{{'init(booleanLiteral:)' is deprecated}}
+let _: BLD = .init(booleanLiteral: false) // expected-warning{{'init(booleanLiteral:)' is deprecated}}{{documentation-file=deprecated-declaration}}
+let _: BLD = false // expected-warning{{'init(booleanLiteral:)' is deprecated}}{{documentation-file=deprecated-declaration}}
 
 struct BLU {}
 @available(macOS 100, *)
@@ -87,8 +87,8 @@ struct FLD {}
 extension FLD: ExpressibleByFloatLiteral {
   init(floatLiteral value: FloatLiteralType) {}
 }
-let _: FLD = .init(floatLiteral: 0.1) // expected-warning{{'init(floatLiteral:)' is deprecated}}
-let _: FLD = 0.1 // expected-warning{{'init(floatLiteral:)' is deprecated}}
+let _: FLD = .init(floatLiteral: 0.1) // expected-warning{{'init(floatLiteral:)' is deprecated}}{{documentation-file=deprecated-declaration}}
+let _: FLD = 0.1 // expected-warning{{'init(floatLiteral:)' is deprecated}}{{documentation-file=deprecated-declaration}}
 
 struct FLU {}
 @available(macOS 100, *)
@@ -104,8 +104,8 @@ struct ALD {}
 extension ALD: ExpressibleByArrayLiteral {
   init(arrayLiteral elements: Int...) {}
 }
-let _: ALD = .init(arrayLiteral: 1) // expected-warning{{'init(arrayLiteral:)' is deprecated}}
-let _: ALD = [1] // expected-warning{{'init(arrayLiteral:)' is deprecated}}
+let _: ALD = .init(arrayLiteral: 1) // expected-warning{{'init(arrayLiteral:)' is deprecated}}{{documentation-file=deprecated-declaration}}
+let _: ALD = [1] // expected-warning{{'init(arrayLiteral:)' is deprecated}}{{documentation-file=deprecated-declaration}}
 
 struct ALU {}
 @available(macOS 100, *)
@@ -121,8 +121,8 @@ struct DLD {}
 extension DLD: ExpressibleByDictionaryLiteral {
   init(dictionaryLiteral elements: (Int, Int)...) {}
 }
-let _: DLD = .init(dictionaryLiteral: (1,1)) // expected-warning{{'init(dictionaryLiteral:)' is deprecated}}
-let _: DLD = [1: 1] // expected-warning{{'init(dictionaryLiteral:)' is deprecated}}
+let _: DLD = .init(dictionaryLiteral: (1,1)) // expected-warning{{'init(dictionaryLiteral:)' is deprecated}}{{documentation-file=deprecated-declaration}}
+let _: DLD = [1: 1] // expected-warning{{'init(dictionaryLiteral:)' is deprecated}}{{documentation-file=deprecated-declaration}}
 
 struct DLU {}
 @available(macOS 100, *)
@@ -139,8 +139,8 @@ extension USLD: ExpressibleByUnicodeScalarLiteral {
   typealias UnicodeScalarLiteralType = Character
   init(unicodeScalarLiteral value: UnicodeScalarLiteralType) {}
 }
-let _: USLD = .init(unicodeScalarLiteral: "a") // expected-warning{{'init(unicodeScalarLiteral:)' is deprecated}}
-let _: USLD = "a" // expected-warning{{'init(unicodeScalarLiteral:)' is deprecated}}
+let _: USLD = .init(unicodeScalarLiteral: "a") // expected-warning{{'init(unicodeScalarLiteral:)' is deprecated}}{{documentation-file=deprecated-declaration}}
+let _: USLD = "a" // expected-warning{{'init(unicodeScalarLiteral:)' is deprecated}}{{documentation-file=deprecated-declaration}}
 
 struct USLU {}
 @available(macOS 100, *)
@@ -157,8 +157,8 @@ struct GCLD {}
 extension GCLD: ExpressibleByExtendedGraphemeClusterLiteral {
   init(extendedGraphemeClusterLiteral value: Character) {}
 }
-let _: GCLD = .init(extendedGraphemeClusterLiteral: "🇧🇷") // expected-warning{{'init(extendedGraphemeClusterLiteral:)' is deprecated}}
-let _: GCLD = "🇧🇷" // expected-warning{{'init(extendedGraphemeClusterLiteral:)' is deprecated}}
+let _: GCLD = .init(extendedGraphemeClusterLiteral: "🇧🇷") // expected-warning{{'init(extendedGraphemeClusterLiteral:)' is deprecated}}{{documentation-file=deprecated-declaration}}
+let _: GCLD = "🇧🇷" // expected-warning{{'init(extendedGraphemeClusterLiteral:)' is deprecated}}{{documentation-file=deprecated-declaration}}
 
 struct GCLU {}
 @available(macOS 100, *)

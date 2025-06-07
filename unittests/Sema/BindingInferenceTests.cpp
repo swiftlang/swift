@@ -118,17 +118,17 @@ TEST_F(SemaTest, TestIntLiteralBindingInference) {
                    cs.getConstraintLocator({}));
 
   {
-    auto bindings = cs.getBindingsFor(otherTy);
+    cs.getConstraintGraph()[otherTy].initBindingSet();
+    auto &bindings = cs.getConstraintGraph()[otherTy].getBindingSet();
 
     // Make sure that there are no direct bindings or protocol requirements.
 
     ASSERT_EQ(bindings.Bindings.size(), (unsigned)0);
     ASSERT_EQ(bindings.Literals.size(), (unsigned)0);
 
-    llvm::SmallDenseMap<TypeVariableType *, BindingSet> env;
-    env.insert({floatLiteralTy, cs.getBindingsFor(floatLiteralTy)});
+    cs.getConstraintGraph()[floatLiteralTy].initBindingSet();
 
-    bindings.finalize(env);
+    bindings.finalize(/*transitive=*/true);
 
     // Inferred a single transitive binding through `$T_float`.
     ASSERT_EQ(bindings.Bindings.size(), (unsigned)1);
@@ -394,4 +394,44 @@ TEST_F(SemaTest, TestNoDoubleVoidClosureResultInference) {
                    getStdlibType("String"), closureResultLoc);
 
   verifyInference(closureResultWithoutVoid, 3);
+}
+
+TEST_F(SemaTest, TestSupertypeInferenceWithDefaults) {
+  ConstraintSystemOptions options;
+  ConstraintSystem cs(DC, options);
+
+  auto *genericArg = cs.createTypeVariable(
+      cs.getConstraintLocator({}, ConstraintLocator::GenericArgument),
+      /*options=*/0);
+
+  // KeyPath<String, Int> i.e. \.utf8.count or something similar
+  auto keyPath =
+      BoundGenericType::get(Context.getKeyPathDecl(), /*parent=*/Type(),
+                            {getStdlibType("String"), getStdlibType("Int")});
+
+  cs.addConstraint(ConstraintKind::Conversion, keyPath, genericArg,
+                   cs.getConstraintLocator({}));
+
+  cs.addConstraint(ConstraintKind::Defaultable, genericArg, Context.TheAnyType,
+                   cs.getConstraintLocator({}));
+
+  auto bindings = cs.getBindingsFor(genericArg);
+  TypeVarBindingProducer producer(bindings);
+
+  llvm::SmallVector<Type, 4> inferredTypes;
+  while (auto binding = producer()) {
+    ASSERT_TRUE(binding.has_value());
+    inferredTypes.push_back(binding->getType());
+  }
+
+  // The inference should produce 4 types: KeyPath<String, Int>,
+  // PartialKeyPath<String>, AnyKeyPath and Any - in that order.
+
+  ASSERT_EQ(inferredTypes.size(), 4);
+  ASSERT_TRUE(inferredTypes[0]->isEqual(keyPath));
+  ASSERT_TRUE(inferredTypes[1]->isEqual(
+      BoundGenericType::get(Context.getPartialKeyPathDecl(),
+                            /*parent=*/Type(), {getStdlibType("String")})));
+  ASSERT_TRUE(inferredTypes[2]->isEqual(getStdlibType("AnyKeyPath")));
+  ASSERT_TRUE(inferredTypes[3]->isEqual(Context.TheAnyType));
 }

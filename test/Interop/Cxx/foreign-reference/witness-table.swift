@@ -1,8 +1,11 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs/ -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none -Xfrontend -disable-llvm-verify -g)
 //
 // REQUIRES: executable_test
-// REQUIRES: rdar95738946
 // XFAIL: OS=windows-msvc
+
+// Temporarily disable when running with an older runtime (rdar://128681577)
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
 
 import StdlibUnittest
 import WitnessTable
@@ -27,7 +30,18 @@ public struct List<NodeType: ListNode> : Sequence, IteratorProtocol
   }
 }
 
+@available(SwiftStdlib 5.8, *)
 extension CxxLinkedList : ListNode { }
+
+@available(SwiftStdlib 5.8, *)
+extension MyCxxSequence : Sequence, IteratorProtocol { }
+
+class SwiftLinkedList: ListNode {
+  typealias Element = Int
+  func next() -> Int? { return nil }
+}
+
+if #available(SwiftStdlib 5.8, *) {
 
 var WitnessTableTestSuite = TestSuite("Use foreign reference in a generic context")
 
@@ -42,8 +56,6 @@ WitnessTableTestSuite.test("As generic argument to List") {
   expectEqual(count, 4)
 }
 
-extension CxxSequence : Sequence, IteratorProtocol { }
-
 WitnessTableTestSuite.test("As a Sequence") {
   let list = makeSequence()
   var count = 0
@@ -52,6 +64,21 @@ WitnessTableTestSuite.test("As a Sequence") {
     count += 1
   }
   expectEqual(count, 3)
+}
+
+WitnessTableTestSuite.test("As an existential") {
+  let existential: any ListNode = makeLinkedList()
+  let cast: CxxLinkedList? = existential as? CxxLinkedList
+  expectNotNil(cast)
+  expectEqual(cast?.value, 0)
+  expectEqual(cast?.next()?.value, 1)
+  expectEqual(cast?.next()?.next()?.value, 2)
+
+  let notACxxValue: any ListNode = SwiftLinkedList()
+  let invalidCast = notACxxValue as? CxxLinkedList
+  expectNil(invalidCast)
+}
+
 }
 
 runAllTests()

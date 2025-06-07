@@ -39,13 +39,22 @@
 // CHECK-NEXT:  #include <string.h>
 // CHECK-NEXT:  #endif
 // CHECK-NEXT:  #if defined(__cplusplus)
-// CHECK-NEXT:  #if __has_include(<ptrauth.h>)
+// CHECK-NEXT:  #pragma clang diagnostic push
+// CHECK-NEXT:  #pragma clang diagnostic ignored "-Wnon-modular-include-in-framework-module"
+// CHECK-NEXT:  #if defined(__arm64e__) && __has_include(<ptrauth.h>)
 // CHECK-NEXT:  # include <ptrauth.h>
 // CHECK-NEXT:  #else
+// CHECK-NEXT:  #pragma clang diagnostic push
+// CHECK-NEXT:  #pragma clang diagnostic ignored "-Wreserved-macro-identifier"
 // CHECK-NEXT:  # ifndef __ptrauth_swift_value_witness_function_pointer
 // CHECK-NEXT:  #  define __ptrauth_swift_value_witness_function_pointer(x)
 // CHECK-NEXT:  # endif
+// CHECK-NEXT:  # ifndef __ptrauth_swift_class_method_pointer
+// CHECK-NEXT:  # define __ptrauth_swift_class_method_pointer(x)
+// CHECK-NEXT:  # endif
+// CHECK-NEXT:  #pragma clang diagnostic pop
 // CHECK-NEXT:  #endif
+// CHECK-NEXT:  #pragma clang diagnostic pop
 // CHECK-NEXT:  #endif
 
 // CHECK-LABEL: !defined(SWIFT_TYPEDEFS)
@@ -85,25 +94,32 @@
 // CHECK-NEXT:  #if __has_feature(objc_modules)
 
 // CHECK-LABEL: #if defined(__OBJC__)
+// CHECK-EMPTY:
+// CHECK-NEXT:  #endif
+// CHECK-NEXT:  #if __has_attribute(external_source_symbol)
+// CHECK-NEXT:  # pragma clang attribute pop
 // CHECK-NEXT:  #endif
 // CHECK-NEXT:  #if defined(__cplusplus)
+// CHECK-NEXT:  #pragma clang diagnostic push
+// CHECK-NEXT:  #pragma clang diagnostic ignored "-Wnon-modular-include-in-framework-module"
+// CHECK-NEXT:  // Allow user to find the header using additional include paths
+// CHECK-NEXT:  #if __has_include(<swiftToCxx/_SwiftCxxInteroperability.h>)
+// CHECK-NEXT:  #include <swiftToCxx/_SwiftCxxInteroperability.h>
 // CHECK-NEXT:  // Look for the C++ interop support header relative to clang's resource dir:
-// CHECK-NEXT:  //  '<toolchain>/usr/lib/clang/<version>/include/../../../swift/swiftToCxx'.
-// CHECK-NEXT:  #if __has_include(<../../../swift/swiftToCxx/_SwiftCxxInteroperability.h>)
+// CHECK-NEXT:  // '<toolchain>/usr/lib/clang/<version>/include/../../../swift/swiftToCxx'.
+// CHECK-NEXT:  #elif __has_include(<../../../swift/swiftToCxx/_SwiftCxxInteroperability.h>)
 // CHECK-NEXT:  #include <../../../swift/swiftToCxx/_SwiftCxxInteroperability.h>
 // CHECK-NEXT:  #elif __has_include(<../../../../../lib/swift/swiftToCxx/_SwiftCxxInteroperability.h>)
-// CHECK-NEXT:  //  '<toolchain>/usr/local/lib/clang/<version>/include/../../../../../lib/swift/swiftToCxx'.
+// CHECK-NEXT:  // '<toolchain>/usr/local/lib/clang/<version>/include/../../../../../lib/swift/swiftToCxx'.
 // CHECK-NEXT:  #include <../../../../../lib/swift/swiftToCxx/_SwiftCxxInteroperability.h>
-// CHECK-NEXT:  // Alternatively, allow user to find the header using additional include path into '<toolchain>/lib/swift'.
-// CHECK-NEXT:  #elif __has_include(<swiftToCxx/_SwiftCxxInteroperability.h>)
-// CHECK-NEXT:  #include <swiftToCxx/_SwiftCxxInteroperability.h>
 // CHECK-NEXT:  #endif
+// CHECK-NEXT:  #pragma clang diagnostic pop
 // CHECK-NEXT:  #if __has_feature(objc_modules)
 // CHECK:       #ifndef SWIFT_PRINTED_CORE
 // CHECK:       } // namespace swift
 // CHECK-EMPTY:
 // CHECK-NEXT:  #endif
-// CHECK:       namespace empty __attribute__((swift_private)) SWIFT_SYMBOL_MODULE("empty") {
+// CHECK:       namespace empty SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("empty") {
 // CHECK:       } // namespace empty
 // CHECK:       #endif
 

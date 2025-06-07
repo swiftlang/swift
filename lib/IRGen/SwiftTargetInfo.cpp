@@ -17,7 +17,7 @@
 
 #include "SwiftTargetInfo.h"
 #include "IRGenModule.h"
-#include "llvm/ADT/Triple.h"
+#include "llvm/TargetParser/Triple.h"
 #include "llvm/IR/DataLayout.h"
 #include "swift/ABI/System.h"
 #include "swift/AST/ASTContext.h"
@@ -262,6 +262,9 @@ SwiftTargetInfo SwiftTargetInfo::get(IRGenModule &IGM) {
     // FIXME: Complain here? Default target info is unlikely to be correct.
     break;
   }
+
+  if (IGM.getOptions().CustomLeastValidPointerValue != 0)
+    target.LeastValidPointerValue = IGM.getOptions().CustomLeastValidPointerValue;
 
   return target;
 }

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -cse | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -cse | %FileCheck %s
 
 import Builtin
 import Swift
@@ -1356,3 +1356,95 @@ bb0:
   %22 = tuple ()
   return %22 : $()
 }
+
+sil @paable : $@convention(thin) (Builtin.Int64) -> ()
+
+final class FC {
+  @_hasStorage @_hasInitialValue final var storage: Optional<Builtin.Int64>
+}
+
+sil @consume_int64 : $@convention(thin) (Builtin.Int64) -> ()
+
+sil [lazy_getter] [ossa] @partial_apply_on_stack_nesting_violator : $@convention(method) (@guaranteed FC) -> Builtin.Int64 {
+entry(%instance : @guaranteed $FC):
+    %storage_addr = ref_element_addr %instance : $FC, #FC.storage
+    %optional = load [trivial] %storage_addr : $*Optional<Builtin.Int64>
+    switch_enum %optional : $Optional<Builtin.Int64>, case #Optional.some!enumelt: some, case #Optional.none!enumelt: none
+none:
+    %one = integer_literal $Builtin.Int64, 1
+    %optone = enum $Optional<Builtin.Int64>, #Optional.some!enumelt, %one : $Builtin.Int64
+    store %optone to [trivial] %storage_addr : $*Optional<Builtin.Int64>
+    br exit(%one : $Builtin.Int64)
+
+some(%value : $Builtin.Int64):
+    %paable = function_ref @paable : $@convention(thin) (Builtin.Int64) -> ()
+    %first = partial_apply [callee_guaranteed] [on_stack] %paable(%value) : $@convention(thin) (Builtin.Int64) -> ()
+    %second = partial_apply [callee_guaranteed] [on_stack] %paable(%value) : $@convention(thin) (Builtin.Int64) -> ()
+    // Note that the destroy_values do not occur in an order which coincides
+    // with stack disciplined dealloc_stacks.
+    destroy_value %first : $@noescape @callee_guaranteed () -> ()
+    destroy_value %second : $@noescape @callee_guaranteed () -> ()
+    br exit(%value : $Builtin.Int64)
+
+exit(%retval : $Builtin.Int64):
+    return %retval : $Builtin.Int64
+}
+
+// Verify that when inlining partial_apply_on_stack_nesting_violator, the stack
+// nesting of the on_stack closures is fixed.
+// CHECK-LABEL: sil @test_inline_stack_violating_ossa_func : {{.*}} {
+// CHECK:         [[PAABLE:%[^,]+]] = function_ref @paable
+// CHECK:         [[FIRST:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] [[PAABLE]]
+// CHECK:         [[SECOND:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] [[PAABLE]]
+// CHECK:         dealloc_stack [[SECOND]]
+// CHECK:         dealloc_stack [[FIRST]]
+// CHECK-LABEL: } // end sil function 'test_inline_stack_violating_ossa_func'
+sil @test_inline_stack_violating_ossa_func : $@convention(thin) (FC) -> () {
+entry(%instance : $FC):
+    %callee = function_ref @partial_apply_on_stack_nesting_violator : $@convention(method) (@guaranteed FC) -> Builtin.Int64
+    %consume = function_ref @consume_int64 : $@convention(thin) (Builtin.Int64) -> ()
+    %first = apply %callee(%instance) : $@convention(method) (@guaranteed FC) -> Builtin.Int64
+    apply %consume(%first) : $@convention(thin) (Builtin.Int64) -> ()
+    %second = apply %callee(%instance) : $@convention(method) (@guaranteed FC) -> Builtin.Int64
+    apply %consume(%second) : $@convention(thin) (Builtin.Int64) -> ()
+    %retval = tuple ()
+    return %retval : $()
+}
+
+sil_global private @g_token : $Builtin.Word
+sil_global private @g2_token : $Builtin.Word
+
+sil @g_init : $@convention(c) () -> ()
+
+// CHECK-LABEL: sil @cse_builtin_once :
+// CHECK:         builtin
+// CHECK-NOT:     builtin
+// CHECK:       } // end sil function 'cse_builtin_once'
+sil @cse_builtin_once : $@convention(thin) () -> () {
+bb0:
+  %1 = global_addr @g_token : $*Builtin.Word
+  %2 = address_to_pointer %1 : $*Builtin.Word to $Builtin.RawPointer
+  %3 = function_ref @g_init : $@convention(c) () -> ()
+  %4 = builtin "once"(%2 : $Builtin.RawPointer, %3 : $@convention(c) () -> ()) : $()
+  %5 = builtin "once"(%2 : $Builtin.RawPointer, %3 : $@convention(c) () -> ()) : $()
+  %r1 = tuple ()
+  return %r1 : $()
+}
+
+// CHECK-LABEL: sil @dont_cse_builtin_once_different_token :
+// CHECK:         builtin
+// CHECK:         builtin
+// CHECK:       } // end sil function 'dont_cse_builtin_once_different_token'
+sil @dont_cse_builtin_once_different_token : $@convention(thin) () -> () {
+bb0:
+  %1 = global_addr @g_token : $*Builtin.Word
+  %2 = address_to_pointer %1 : $*Builtin.Word to $Builtin.RawPointer
+  %3 = global_addr @g2_token : $*Builtin.Word
+  %4 = address_to_pointer %3 : $*Builtin.Word to $Builtin.RawPointer
+  %5 = function_ref @g_init : $@convention(c) () -> ()
+  %6 = builtin "once"(%2 : $Builtin.RawPointer, %5 : $@convention(c) () -> ()) : $()
+  %7 = builtin "once"(%4 : $Builtin.RawPointer, %5 : $@convention(c) () -> ()) : $()
+  %r1 = tuple ()
+  return %r1 : $()
+}
+

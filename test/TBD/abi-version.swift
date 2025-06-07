@@ -6,7 +6,7 @@
 
 // 1. Emit IR and a TBD for this file
 
-// RUN: %target-swift-frontend -emit-ir -o %t/test.ll %s -emit-tbd-path %t/test.tbd
+// RUN: %target-swift-frontend -emit-ir -o %t/test.ll %s -emit-tbd-path %t/test.tbd -tbd-install_name test
 
 // 2. Concatenate them and FileCheck them both in the same file, so we can capture
 //    the ABI version in a variable.
@@ -19,4 +19,4 @@
 
 // 4. Look in the TBD for the same version listed
 
-// CHECK: swift-abi-version: [[VERSION]]
+// CHECK: "abi": [[VERSION]]

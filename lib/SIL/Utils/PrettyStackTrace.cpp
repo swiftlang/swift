@@ -28,6 +28,10 @@ llvm::cl::opt<bool>
 SILPrintOnError("sil-print-on-error", llvm::cl::init(false),
                 llvm::cl::desc("Printing SIL function bodies in crash diagnostics."));
 
+llvm::cl::opt<bool> SILPrintModuleOnError(
+    "sil-print-module-on-error", llvm::cl::init(false),
+    llvm::cl::desc("Printing SIL module in crash diagnostics."));
+
 static void printLocationDescription(llvm::raw_ostream &out,
                                          SILLocation::FilenameAndLocation loc,
                                          ASTContext &Context) {
@@ -40,7 +44,7 @@ void swift::printSILLocationDescription(llvm::raw_ostream &out,
                                         ASTContext &Context) {
   if (loc.isASTNode()) {
     if (auto decl = loc.getAsASTNode<Decl>()) {
-      printDeclDescription(out, decl, Context);
+      printDeclDescription(out, decl);
     } else if (auto expr = loc.getAsASTNode<Expr>()) {
       printExprDescription(out, expr, Context);
     } else if (auto stmt = loc.getAsASTNode<Stmt>()) {
@@ -91,10 +95,18 @@ void PrettyStackTraceSILFunction::printFunctionInfo(llvm::raw_ostream &out) cons
   }
   if (SILPrintOnError)
     func->print(out);
+  if (SILPrintModuleOnError)
+    func->getModule().print(out, func->getModule().getSwiftModule());
 }
 
 void PrettyStackTraceSILNode::print(llvm::raw_ostream &out) const {
   out << "While " << Action << " SIL node ";
   if (Node)
     out << *Node;
+}
+
+void PrettyStackTraceSILDeclRef::print(llvm::raw_ostream &out) const {
+  out << "While " << action << " SIL decl '";
+  declRef.print(out);
+  out << "'\n";
 }

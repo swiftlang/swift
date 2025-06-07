@@ -44,23 +44,23 @@ internal func _collectAllReferencesInsideObjectImpl(
   if type(of: value) is AnyObject.Type {
     // Object is a class (but not an ObjC-bridged struct)
     let toAnyObject = _unsafeDowncastToAnyObject(fromAny: value)
-    ref = UnsafeRawPointer(Unmanaged.passUnretained(toAnyObject).toOpaque())
+    unsafe ref = unsafe UnsafeRawPointer(Unmanaged.passUnretained(toAnyObject).toOpaque())
     id = ObjectIdentifier(toAnyObject)
   } else if type(of: value) is Builtin.BridgeObject.Type {
-    ref = UnsafeRawPointer(
+    unsafe ref = UnsafeRawPointer(
       Builtin.bridgeToRawPointer(value as! Builtin.BridgeObject))
     id = nil
   } else if type(of: value) is Builtin.NativeObject.Type  {
-    ref = UnsafeRawPointer(
+    unsafe ref = UnsafeRawPointer(
       Builtin.bridgeToRawPointer(value as! Builtin.NativeObject))
     id = nil
   } else if let metatypeInstance = value as? Any.Type {
     // Object is a metatype
     id = ObjectIdentifier(metatypeInstance)
-    ref = nil
+    unsafe ref = nil
   } else {
     id = nil
-    ref = nil
+    unsafe ref = nil
   }
 
   if let theId = id {
@@ -74,8 +74,8 @@ internal func _collectAllReferencesInsideObjectImpl(
   }
 
   // If it is a reference, add it to the result.
-  if let ref = ref {
-    references.append(ref)
+  if let ref = unsafe ref {
+    unsafe references.append(ref)
   }
 
   // Recursively visit the children of the current value.
@@ -84,7 +84,7 @@ internal func _collectAllReferencesInsideObjectImpl(
   for _ in 0..<count {
     let (_, child) = mirror.children[currentIndex]
     mirror.children.formIndex(after: &currentIndex)
-    _collectAllReferencesInsideObjectImpl(
+    unsafe _collectAllReferencesInsideObjectImpl(
       child,
       references: &references,
       visitedItems: &visitedItems)
@@ -125,7 +125,7 @@ struct _RuntimeFunctionCounters {
     var functionNames: [String] = []
     functionNames.reserveCapacity(numRuntimeFunctionCounters)
     for index in 0..<numRuntimeFunctionCounters {
-      let name = String(cString: names[index])
+      let name = unsafe String(cString: names[index])
       functionNames.append(name)
     }
     return functionNames
@@ -156,10 +156,10 @@ struct _RuntimeFunctionCounters {
   public static func collectAllReferencesInsideObject(_ value: Any) ->
     [UnsafeRawPointer] {
     var visited: [ObjectIdentifier: Int] = [:]
-    var references: [UnsafeRawPointer] = []
-    _collectAllReferencesInsideObjectImpl(
+    var references: [UnsafeRawPointer] = unsafe []
+    unsafe _collectAllReferencesInsideObjectImpl(
       value, references: &references, visitedItems: &visited)
-    return references
+    return unsafe references
   }
 
   /// Build a map from counter name to counter index inside the state struct.
@@ -292,9 +292,9 @@ internal struct _RuntimeFunctionCountersState: _RuntimeFunctionCountersStats {
           "0..<\(_RuntimeFunctionCounters.numRuntimeFunctionCounters)")
       }
       var tmpCounters = counters
-      let counter: UInt32 = withUnsafePointer(to: &tmpCounters) { ptr in
-        return ptr.withMemoryRebound(to: UInt32.self, capacity: 64) { buf in
-          return buf[index]
+      let counter: UInt32 = unsafe withUnsafePointer(to: &tmpCounters) { ptr in
+        return unsafe ptr.withMemoryRebound(to: UInt32.self, capacity: 64) { buf in
+          return unsafe buf[index]
         }
       }
       return counter
@@ -306,9 +306,9 @@ internal struct _RuntimeFunctionCountersState: _RuntimeFunctionCountersStats {
         fatalError("Counter index should be in the range " +
           "0..<\(_RuntimeFunctionCounters.numRuntimeFunctionCounters)")
       }
-      withUnsafeMutablePointer(to: &counters) {
-        $0.withMemoryRebound(to: UInt32.self, capacity: 64) {
-          $0[index] = newValue
+      unsafe withUnsafeMutablePointer(to: &counters) {
+        unsafe $0.withMemoryRebound(to: UInt32.self, capacity: 64) {
+          unsafe $0[index] = newValue
         }
       }
     }
@@ -383,7 +383,7 @@ extension _RuntimeFunctionCountersStats {
       print("counter \(i) : " +
         "\(Counters.runtimeFunctionNames[i])" +
         " at offset: " +
-        "\(Counters.runtimeFunctionCountersOffsets[i]):" +
+        "\(unsafe Counters.runtimeFunctionCountersOffsets[i]):" +
         "  \(self[i])", to: &to)
     }
   }
@@ -403,7 +403,7 @@ extension _RuntimeFunctionCountersStats {
       print("counter \(i) : " +
         "\(Counters.runtimeFunctionNames[i])" +
         " at offset: " +
-        "\(Counters.runtimeFunctionCountersOffsets[i]): " +
+        "\(unsafe Counters.runtimeFunctionCountersOffsets[i]): " +
         "before \(self[i]) " +
         "after \(after[i])" + " diff=\(after[i]-self[i])", to: &to)
     }
@@ -464,18 +464,18 @@ struct _ObjectRuntimeFunctionCountersState: _RuntimeFunctionCountersStats {
 
   // Initialize with the counters for a given object.
   public init(_ p: UnsafeRawPointer) {
-    getObjectRuntimeFunctionCounters(p)
+    unsafe getObjectRuntimeFunctionCounters(p)
   }
 
   public init() {
   }
 
   mutating public func getObjectRuntimeFunctionCounters(_ o: UnsafeRawPointer) {
-    _RuntimeFunctionCounters.getObjectRuntimeFunctionCounters(o, &state)
+    unsafe _RuntimeFunctionCounters.getObjectRuntimeFunctionCounters(o, &state)
   }
 
   mutating public func setObjectRuntimeFunctionCounters(_ o: UnsafeRawPointer) {
-    _RuntimeFunctionCounters.setObjectRuntimeFunctionCounters(o, &state)
+    unsafe _RuntimeFunctionCounters.setObjectRuntimeFunctionCounters(o, &state)
   }
 
   public subscript(_ index: String) -> UInt32 {
@@ -506,7 +506,7 @@ func _collectReferencesInsideObject(_ value: Any) -> [UnsafeRawPointer] {
   // Collect all references inside the object
   let refs = _RuntimeFunctionCounters.collectAllReferencesInsideObject(value)
   _RuntimeFunctionCounters.enableRuntimeFunctionCountersUpdates(mode: savedMode)
-  return refs
+  return unsafe refs
 }
 
 /// A helper method to measure how global and per-object function counters
@@ -521,8 +521,8 @@ func _measureRuntimeFunctionCountersDiffs(
       _RuntimeFunctionCounters.disableRuntimeFunctionCountersUpdates()
     let globalCountersBefore = _GlobalRuntimeFunctionCountersState()
     var objectsCountersBefore: [_ObjectRuntimeFunctionCountersState] = []
-    for object in objects {
-      objectsCountersBefore.append(_ObjectRuntimeFunctionCountersState(object))
+    for unsafe object in unsafe objects {
+      unsafe objectsCountersBefore.append(_ObjectRuntimeFunctionCountersState(object))
     }
     // Enable counters updates.
     _RuntimeFunctionCounters.enableRuntimeFunctionCountersUpdates(
@@ -535,8 +535,8 @@ func _measureRuntimeFunctionCountersDiffs(
 
     let globalCountersAfter = _GlobalRuntimeFunctionCountersState()
     var objectsCountersDiff: [_ObjectRuntimeFunctionCountersState] = []
-    for (idx, object) in objects.enumerated() {
-      let objectCountersAfter = _ObjectRuntimeFunctionCountersState(object)
+    for unsafe (idx, object) in unsafe objects.enumerated() {
+      let objectCountersAfter = unsafe _ObjectRuntimeFunctionCountersState(object)
       objectsCountersDiff.append(
         objectsCountersBefore[idx].diff(objectCountersAfter))
     }

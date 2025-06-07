@@ -15,7 +15,6 @@ func test() {
   func1()
     { 1 } #^GLOBALFUNC_SAMELINE^#
 
-// GLOBALFUNC_SAMELINE: Begin completions
 // GLOBALFUNC_SAMELINE-DAG: Pattern/Local/Flair[ArgLabels]: {#fn2:  () -> Void {|}#}[#() -> Void#];
 // GLOBALFUNC_SAMELINE-DAG: Pattern/Local/Flair[ArgLabels]: {#fn3:  (Int) -> Void {<#Int#> in|}#}[#(Int) -> Void#];
 // GLOBALFUNC_SAMELINE-DAG: Pattern/Local/Flair[ArgLabels]: {#fn4:  (Int, String) -> Void {<#Int#>, <#String#> in|}#}[#(Int, String) -> Void#];
@@ -24,5 +23,18 @@ func test() {
 // GLOBALFUNC_SAMELINE-DAG: Pattern/Local/Flair[ArgLabels]: {#fn6:  (Int, String) -> Int {a, b in|}#}[#(Int, String) -> Int#];
 // GLOBALFUNC_SAMELINE-DAG: Pattern/Local/Flair[ArgLabels]: {#fn7:  (inout Int) -> Void {<#inout Int#> in|}#}[#(inout Int) -> Void#];
 // GLOBALFUNC_SAMELINE-DAG: Pattern/Local/Flair[ArgLabels]: {#fn8:  (Int...) -> Void {<#Int...#> in|}#}[#(Int...) -> Void#];
-// GLOBALFUNC_SAMELINE: End completions
+}
+
+func testStringAndMultipleTrailingClosures() {
+  func stringAndClosure(_ key: String, _ body: () -> Void) {}
+
+  func takeClosure(_ x: () -> Void) {}
+
+  takeClosure {
+    stringAndClosure("\(1)") { }#^STRING_AND_MULTIPLE_TRAILING_CLOSURES^#
+  }
+  // STRING_AND_MULTIPLE_TRAILING_CLOSURES: Begin completions
+  // STRING_AND_MULTIPLE_TRAILING_CLOSURES-DAG: Decl[InfixOperatorFunction]/OtherModule[Swift]/IsSystem:  == {#()#}[#Bool#];
+  // STRING_AND_MULTIPLE_TRAILING_CLOSURES-DAG: Keyword[self]/CurrNominal:          .self[#Void#]; name=self
+  // STRING_AND_MULTIPLE_TRAILING_CLOSURES: End completions
 }

@@ -252,7 +252,7 @@ extension Int: _CustomPlaygroundQuickLookable {
   }
 }
 
-#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+#if !(os(Windows) || os(Android) || ($Embedded && !os(Linux) && !(os(macOS) || os(iOS) || os(watchOS) || os(tvOS)))) && (arch(i386) || arch(x86_64))
 extension Float80: CustomReflectable {
   /// A mirror that reflects the Float80 instance.
   public var customMirror: Mirror {
@@ -260,5 +260,21 @@ extension Float80: CustomReflectable {
   }
 }
 #endif
+
+@available(SwiftStdlib 6.0, *)
+extension UInt128: CustomReflectable {
+  /// A mirror that reflects the `UInt128` instance.
+  public var customMirror: Mirror {
+    return Mirror(self, unlabeledChildren: EmptyCollection<Void>())
+  }
+}
+
+@available(SwiftStdlib 6.0, *)
+extension Int128: CustomReflectable {
+  /// A mirror that reflects the `Int128` instance.
+  public var customMirror: Mirror {
+    return Mirror(self, unlabeledChildren: EmptyCollection<Void>())
+  }
+}
 
 #endif

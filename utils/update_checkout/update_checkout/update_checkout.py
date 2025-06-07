@@ -16,6 +16,7 @@ import re
 import sys
 import traceback
 from multiprocessing import Lock, Pool, cpu_count, freeze_support
+from typing import Optional
 
 from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
 
@@ -74,7 +75,7 @@ def check_parallel_results(results, op):
     return fail_count
 
 
-def confirm_tag_in_repo(tag, repo_name):
+def confirm_tag_in_repo(tag, repo_name) -> Optional[str]:
     # type: (str, str) -> str | None
     """Confirm that a given tag exists in a git repository. This function
     assumes that the repository is already a current working directory before
@@ -99,8 +100,15 @@ def confirm_tag_in_repo(tag, repo_name):
 
 
 def find_rev_by_timestamp(timestamp, repo_name, refspec):
+    refspec_exists = True
+    try:
+        shell.run(["git", "rev-parse", "--verify", refspec])
+    except Exception:
+        refspec_exists = False
     args = ["git", "log", "-1", "--format=%H", "--first-parent",
-            '--before=' + timestamp, refspec]
+            '--before=' + timestamp]
+    if refspec_exists:
+        args.append(refspec)
     rev = shell.capture(args).strip()
     if rev:
         return rev
@@ -148,7 +156,7 @@ def get_branch_for_repo(config, repo_name, scheme_name, scheme_map,
 
 def update_single_repository(pool_args):
     source_root, config, repo_name, scheme_name, scheme_map, tag, timestamp, \
-        reset_to_remote, should_clean, cross_repos_pr = pool_args
+        reset_to_remote, should_clean, should_stash, cross_repos_pr = pool_args
     repo_path = os.path.join(source_root, repo_name)
     if not os.path.isdir(repo_path) or os.path.islink(repo_path):
         return
@@ -170,18 +178,34 @@ def update_single_repository(pool_args):
                                                             repo_name,
                                                             checkout_target)
 
-            # The clean option restores a repository to pristine condition.
-            if should_clean:
-                shell.run(['git', 'clean', '-fdx'],
-                          echo=True, prefix=prefix)
-                shell.run(['git', 'submodule', 'foreach', '--recursive',
-                           'git', 'clean', '-fdx'],
-                          echo=True, prefix=prefix)
-                shell.run(['git', 'submodule', 'foreach', '--recursive',
-                           'git', 'reset', '--hard', 'HEAD'],
-                          echo=True, prefix=prefix)
-                shell.run(['git', 'reset', '--hard', 'HEAD'],
-                          echo=True, prefix=prefix)
+            # The '--clean' and '--stash' options
+            # 1. clear the index and working tree ('--stash' stashes those
+            #   changes rather than discarding them)
+            # 2. delete ignored files
+            # 3. abort an ongoing rebase
+            if should_clean or should_stash:
+
+                def run_for_repo_and_each_submodule_rec(cmd):
+                    shell.run(cmd, echo=True, prefix=prefix)
+                    shell.run(
+                        ["git", "submodule", "foreach", "--recursive"] + cmd,
+                        echo=True,
+                        prefix=prefix,
+                    )
+
+                if should_stash:
+                    # Stash tracked and untracked changes.
+                    run_for_repo_and_each_submodule_rec(["git", "stash", "-u"])
+                elif should_clean:
+                    # Delete tracked changes.
+                    run_for_repo_and_each_submodule_rec(
+                        ["git", "reset", "--hard", "HEAD"]
+                    )
+
+                # Delete untracked changes and ignored files.
+                run_for_repo_and_each_submodule_rec(["git", "clean", "-fdx"])
+                del run_for_repo_and_each_submodule_rec
+
                 # It is possible to reset --hard and still be mid-rebase.
                 try:
                     shell.run(['git', 'rebase', '--abort'],
@@ -343,6 +367,7 @@ def update_all_repositories(args, config, scheme_name, scheme_map, cross_repos_p
                    timestamp,
                    args.reset_to_remote,
                    args.clean,
+                   args.stash,
                    cross_repos_pr]
         pool_args.append(my_args)
 
@@ -351,7 +376,7 @@ def update_all_repositories(args, config, scheme_name, scheme_map, cross_repos_p
 
 def obtain_additional_swift_sources(pool_args):
     (args, repo_name, repo_info, repo_branch, remote, with_ssh, scheme_name,
-     skip_history, skip_tags, skip_repository_list) = pool_args
+     skip_history, skip_tags, skip_repository_list, use_submodules) = pool_args
 
     env = dict(os.environ)
     env.update({'GIT_TERMINAL_PROMPT': '0'})
@@ -363,6 +388,11 @@ def obtain_additional_swift_sources(pool_args):
         if skip_history:
             shell.run(['git', 'clone', '--recursive', '--depth', '1',
                        '--branch', repo_branch, remote, repo_name] +
+                      (['--no-tags'] if skip_tags else []),
+                      env=env,
+                      echo=True)
+        elif use_submodules:
+            shell.run(['git', 'submodule', 'add', remote, repo_name] +
                       (['--no-tags'] if skip_tags else []),
                       env=env,
                       echo=True)
@@ -389,7 +419,7 @@ def obtain_additional_swift_sources(pool_args):
 
 def obtain_all_additional_swift_sources(args, config, with_ssh, scheme_name,
                                         skip_history, skip_tags,
-                                        skip_repository_list):
+                                        skip_repository_list, use_submodules):
 
     pool_args = []
     with shell.pushd(args.source_root, dry_run=False, echo=False):
@@ -399,7 +429,20 @@ def obtain_all_additional_swift_sources(args, config, with_ssh, scheme_name,
                       "user")
                 continue
 
-            if os.path.isdir(os.path.join(repo_name, ".git")):
+            if use_submodules:
+              repo_exists = False
+              submodules_status = shell.capture(['git', 'submodule', 'status'],
+                                                echo=False)
+              if submodules_status:
+                for line in submodules_status.splitlines():
+                  if line[0].endswith(repo_name):
+                    repo_exists = True
+                    break
+
+            else:
+              repo_exists = os.path.isdir(os.path.join(repo_name, ".git"))
+
+            if repo_exists:
                 print("Skipping clone of '" + repo_name + "', directory "
                       "already exists")
                 continue
@@ -433,16 +476,25 @@ def obtain_all_additional_swift_sources(args, config, with_ssh, scheme_name,
             if repo_not_in_scheme:
                 continue
 
-            pool_args.append([args, repo_name, repo_info, repo_branch, remote,
+
+            new_args = [args, repo_name, repo_info, repo_branch, remote,
                               with_ssh, scheme_name, skip_history, skip_tags,
-                              skip_repository_list])
+                              skip_repository_list, use_submodules]
 
-    if not pool_args:
-        print("Not cloning any repositories.")
-        return
+            if use_submodules:
+              obtain_additional_swift_sources(new_args)
+            else:
+              pool_args.append(new_args)
 
-    return run_parallel(
-        obtain_additional_swift_sources, pool_args, args.n_processes)
+    # Only use `run_parallel` when submodules are not used, since `.git` dir
+    # can't be accessed concurrently.
+    if not use_submodules:
+      if not pool_args:
+          print("Not cloning any repositories.")
+          return
+
+      return run_parallel(
+          obtain_additional_swift_sources, pool_args, args.n_processes)
 
 
 def dump_repo_hashes(args, config, branch_scheme_name='repro'):
@@ -527,7 +579,7 @@ def full_target_name(repository, target):
 
 def skip_list_for_platform(config, all_repos):
     """Computes a list of repositories to skip when updating or cloning, if not
-    overriden by `--all-repositories` CLI argument.
+    overridden by `--all-repositories` CLI argument.
 
     Args:
         config (Dict[str, Any]): deserialized `update-checkout-config.json`
@@ -567,11 +619,11 @@ repositories.
 """)
     parser.add_argument(
         "--clone",
-        help="Obtain Sources for Swift and Related Projects",
+        help="obtain sources for Swift and related projects",
         action="store_true")
     parser.add_argument(
         "--clone-with-ssh",
-        help="Obtain Sources for Swift and Related Projects via SSH",
+        help="Obtain sources for Swift and related projects via SSH",
         action="store_true")
     parser.add_argument(
         "--skip-history",
@@ -604,9 +656,17 @@ repositories.
         help='Reset each branch to the remote state.',
         action='store_true')
     parser.add_argument(
-        '--clean',
-        help='Clean unrelated files from each repository.',
-        action='store_true')
+        "--clean",
+        help="""Delete tracked and untracked changes, ignored files, and abort
+        an ongoing rebase, if any, before updating a repository.""",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--stash",
+        help="""Stash tracked and untracked changes, delete ignored files, and
+        abort an ongoing rebase, if any, before updating a repository.""",
+        action="store_true",
+    )
     parser.add_argument(
         "--config",
         default=os.path.join(SCRIPT_DIR, os.pardir,
@@ -647,6 +707,10 @@ repositories.
         help="The root directory to checkout repositories",
         default=SWIFT_SOURCE_ROOT,
         dest='source_root')
+    parser.add_argument(
+        "--use-submodules",
+        help="Checkout repositories as git submodules.",
+        action='store_true')
     args = parser.parse_args()
 
     if not args.scheme:
@@ -668,6 +732,7 @@ repositories.
     scheme_name = args.scheme
     github_comment = args.github_comment
     all_repos = args.all_repositories
+    use_submodules = args.use_submodules
 
     with open(args.config) as f:
         config = json.load(f)
@@ -675,7 +740,10 @@ repositories.
 
     cross_repos_pr = {}
     if github_comment:
-        regex_pr = r'(apple/[-a-zA-Z0-9_]+/pull/\d+|apple/[-a-zA-Z0-9_]+#\d+)'
+        regex_pr = r'(apple/[-a-zA-Z0-9_]+/pull/\d+'\
+            r'|apple/[-a-zA-Z0-9_]+#\d+'\
+            r'|swiftlang/[-a-zA-Z0-9_]+/pull/\d+'\
+            r'|swiftlang/[-a-zA-Z0-9_]+#\d+)'
         repos_with_pr = re.findall(regex_pr, github_comment)
         print("Found related pull requests:", str(repos_with_pr))
         repos_with_pr = [pr.replace('/pull/', '#') for pr in repos_with_pr]
@@ -698,7 +766,8 @@ repositories.
                                                             scheme_name,
                                                             skip_history,
                                                             skip_tags,
-                                                            skip_repo_list)
+                                                            skip_repo_list,
+                                                            use_submodules)
 
     swift_repo_path = os.path.join(args.source_root, 'swift')
     if 'swift' not in skip_repo_list and os.path.exists(swift_repo_path):

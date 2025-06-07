@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -enable-lexical-lifetimes %s -mem2reg | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -enable-lexical-lifetimes %s -mem2reg | %FileCheck %s
 
 import Builtin
 import Swift
@@ -7,11 +7,8 @@ import Swift
 // Since it is forwarding, the ownership of the src forwards, but we cannot destroy the dst because it is trivial
 
 // CHECK-LABEL: sil [ossa] @casttotrivial :
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] %0
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] %0
 // CHECK:         [[CAST:%.*]]  = unchecked_bitwise_cast [[LIFETIME_OWNED]] : $AnyObject to $UInt8
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value %0
 // CHECK-NEXT:    destroy_value [[LIFETIME_OWNED]]
 // CHECK-NEXT:    return [[CAST]]
 // CHECK-LABEL: } // end sil function 'casttotrivial'
@@ -32,12 +29,9 @@ bb0(%0 : @owned $AnyObject):
 // To avoid all this spl handling, just use bitwise cast
 
 // CHECK-LABEL: sil [ossa] @casttonontrivial :
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] %0
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] %0
 // CHECK:         [[CAST:%.*]] = unchecked_bitwise_cast [[LIFETIME_OWNED]] : $AnyObject to $String
 // CHECK:         [[COPY:%.*]] = copy_value [[CAST]]
-// CHECK-NEXT:    end_borrow [[LIFETIME]]
-// CHECK-NEXT:    destroy_value %0
 // CHECK-NEXT:    destroy_value [[LIFETIME_OWNED]]
 // CHECK-NEXT:    return [[COPY]]
 // CHECK-LABEL: } // end sil function 'casttonontrivial'
@@ -56,12 +50,9 @@ bb0(%0 : @owned $AnyObject):
 struct Pair { var lhs: AnyObject; var rhs: AnyObject }
 
 // CHECK-LABEL: sil [ossa] @shorteningcast :
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] %0
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] %0
 // CHECK:         [[CAST:%.*]] = unchecked_bitwise_cast [[LIFETIME_OWNED]] : $Pair to $AnyObject
 // CHECK:         [[COPY:%.*]] = copy_value [[CAST]]
-// CHECK:         end_borrow [[LIFETIME]]
-// CHECK:         destroy_value %0
 // CHECK-NEXT:    destroy_value [[LIFETIME_OWNED]]
 // CHECK-NEXT:    return [[COPY]]
 // CHECK-LABEL: } // end sil function 'shorteningcast'
@@ -79,11 +70,8 @@ bb0(%0 : @owned $Pair):
 
 // CHECK-LABEL: sil [ossa] @deadcast :
 // CHECK-LABEL: bb0
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] %0
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = move_value [lexical] %0
 // CHECK-NEXT:    destroy_value [[LIFETIME_OWNED]]
-// CHECK-NEXT:    end_borrow [[LIFETIME]]
-// CHECK-NEXT:    destroy_value %0
 // CHECK-LABEL: } // end sil function 'deadcast'
 sil [ossa] @deadcast : $@convention(thin) (@owned AnyObject) -> () {
 bb0(%0 : @owned $AnyObject):

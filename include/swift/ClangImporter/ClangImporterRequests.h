@@ -16,13 +16,15 @@
 #ifndef SWIFT_CLANG_IMPORTER_REQUESTS_H
 #define SWIFT_CLANG_IMPORTER_REQUESTS_H
 
-#include "swift/AST/SimpleRequest.h"
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/EvaluatorDependencies.h"
-#include "swift/AST/FileUnit.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/SimpleRequest.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/ClangImporter/ClangImporter.h"
+#include "clang/AST/Type.h"
+#include "clang/Basic/Specifiers.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
@@ -30,6 +32,7 @@ namespace swift {
 class Decl;
 class DeclName;
 class EnumDecl;
+enum class ExplicitSafety;
 
 /// The input type for a clang direct lookup request.
 struct ClangDirectLookupDescriptor final {
@@ -131,28 +134,56 @@ private:
 };
 
 /// The input type for a record member lookup request.
+///
+/// These lookups may be requested recursively in the case of inheritance,
+/// for which we separately keep track of the derived class where we started
+/// looking (startDecl) and the access level for the current inheritance.
 struct ClangRecordMemberLookupDescriptor final {
-  NominalTypeDecl *recordDecl;
-  DeclName name;
+  NominalTypeDecl *recordDecl;     // Where we are currently looking
+  NominalTypeDecl *inheritingDecl; // Where we started looking from
+  DeclName name;                   // What we are looking for
+  ClangInheritanceInfo inheritance;
 
   ClangRecordMemberLookupDescriptor(NominalTypeDecl *recordDecl, DeclName name)
-      : recordDecl(recordDecl), name(name) {
+      : recordDecl(recordDecl), inheritingDecl(recordDecl), name(name),
+        inheritance() {
     assert(isa<clang::RecordDecl>(recordDecl->getClangDecl()));
   }
 
   friend llvm::hash_code
   hash_value(const ClangRecordMemberLookupDescriptor &desc) {
-    return llvm::hash_combine(desc.name, desc.recordDecl);
+    return llvm::hash_combine(desc.name, desc.recordDecl, desc.inheritingDecl,
+                              desc.inheritance);
   }
 
   friend bool operator==(const ClangRecordMemberLookupDescriptor &lhs,
                          const ClangRecordMemberLookupDescriptor &rhs) {
-    return lhs.name == rhs.name && lhs.recordDecl == rhs.recordDecl;
+    return lhs.name == rhs.name && lhs.recordDecl == rhs.recordDecl &&
+           lhs.inheritingDecl == rhs.inheritingDecl &&
+           lhs.inheritance == rhs.inheritance;
   }
 
   friend bool operator!=(const ClangRecordMemberLookupDescriptor &lhs,
                          const ClangRecordMemberLookupDescriptor &rhs) {
     return !(lhs == rhs);
+  }
+
+private:
+  friend class ClangRecordMemberLookup;
+
+  // This private constructor should only be used in ClangRecordMemberLookup,
+  // for recursively traversing base classes that inheritingDecl inherites from.
+  ClangRecordMemberLookupDescriptor(NominalTypeDecl *recordDecl, DeclName name,
+                                    NominalTypeDecl *inheritingDecl,
+                                    ClangInheritanceInfo inheritance)
+      : recordDecl(recordDecl), inheritingDecl(inheritingDecl), name(name),
+        inheritance(inheritance) {
+    assert(isa<clang::RecordDecl>(recordDecl->getClangDecl()));
+    assert(isa<clang::CXXRecordDecl>(inheritingDecl->getClangDecl()));
+    assert(inheritance.isInheriting() &&
+           "recursive calls should indicate inheritance");
+    assert(recordDecl != inheritingDecl &&
+           "recursive calls should lookup elsewhere");
   }
 };
 
@@ -207,17 +238,21 @@ void simple_display(llvm::raw_ostream &out,
                     const ClangCategoryLookupDescriptor &desc);
 SourceLoc extractNearestSourceLoc(const ClangCategoryLookupDescriptor &desc);
 
-/// Given a Swift class, find the imported Swift decl representing the
-/// \c \@interface with the given category name. That is, this will return an
-/// \c swift::ExtensionDecl backed by a \c clang::ObjCCategoryDecl, or a
-/// \c swift::ClassDecl backed by a \c clang::ObjCInterfaceDecl, or \c nullptr
-/// if the class is not imported from Clang or it does not have a category by
-/// that name.
+/// Given a Swift class, find the imported Swift decl(s) representing the
+/// \c \@interface with the given category name. An empty \c categoryName
+/// represents the main interface for the class.
 ///
-/// An empty/invalid \c categoryName requests the main interface for the class.
+/// That is, this request will return one of:
+///
+/// \li a single \c swift::ExtensionDecl backed by a \c clang::ObjCCategoryDecl
+/// \li a \c swift::ClassDecl backed by a \c clang::ObjCInterfaceDecl, plus
+///     zero or more \c swift::ExtensionDecl s backed by 
+///     \c clang::ObjCCategoryDecl s (representing ObjC class extensions).
+/// \li an empty list if the class is not imported from Clang or it does not
+///     have a category by that name.
 class ClangCategoryLookupRequest
     : public SimpleRequest<ClangCategoryLookupRequest,
-                           IterableDeclContext *(ClangCategoryLookupDescriptor),
+                           TinyPtrVector<Decl *>(ClangCategoryLookupDescriptor),
                            RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -226,39 +261,46 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  IterableDeclContext *evaluate(Evaluator &evaluator,
+ TinyPtrVector<Decl *> evaluate(Evaluator &evaluator,
                                 ClangCategoryLookupDescriptor desc) const;
 };
 
-/// Links an imported Clang decl to the native Swift decl(s) that implement it
-/// using \c \@_objcImplementation.
+/// Links an \c \@_objcImplementation decl to the imported declaration(s) that
+/// it implements.
+///
+/// There is usually a 1:1 correspondence between interfaces and
+/// implementations, except that a class's main implementation implements
+/// both its main interface and any class extension interfaces. In this
+/// situation, the main class is always the first decl in \c interfaceDecls.
 struct ObjCInterfaceAndImplementation final {
-  Decl *interfaceDecl;
+  llvm::TinyPtrVector<Decl *> interfaceDecls;
   Decl *implementationDecl;
 
-  ObjCInterfaceAndImplementation(Decl *interfaceDecl,
+  ObjCInterfaceAndImplementation(llvm::TinyPtrVector<Decl *> interfaceDecls,
                                  Decl *implementationDecl)
-      : interfaceDecl(interfaceDecl), implementationDecl(implementationDecl)
+      : interfaceDecls(interfaceDecls), implementationDecl(implementationDecl)
   {
-    assert(interfaceDecl && implementationDecl &&
+    assert(!interfaceDecls.empty() && implementationDecl &&
            "interface and implementation are both non-null");
   }
 
   ObjCInterfaceAndImplementation()
-      : interfaceDecl(nullptr), implementationDecl(nullptr) {}
+      : interfaceDecls(), implementationDecl(nullptr) {}
 
-  operator bool() const {
-    return interfaceDecl;
+  bool empty() const {
+    return interfaceDecls.empty();
   }
 
   friend llvm::hash_code
   hash_value(const ObjCInterfaceAndImplementation &pair) {
-    return llvm::hash_combine(pair.interfaceDecl, pair.implementationDecl);
+    return hash_combine(llvm::hash_combine_range(pair.interfaceDecls.begin(),
+                                                 pair.interfaceDecls.end()),
+                        pair.implementationDecl);
   }
 
   friend bool operator==(const ObjCInterfaceAndImplementation &lhs,
                          const ObjCInterfaceAndImplementation &rhs) {
-    return lhs.interfaceDecl == rhs.interfaceDecl
+    return lhs.interfaceDecls == rhs.interfaceDecls
                && lhs.implementationDecl == rhs.implementationDecl;
   }
 
@@ -272,13 +314,12 @@ void simple_display(llvm::raw_ostream &out,
                     const ObjCInterfaceAndImplementation &desc);
 SourceLoc extractNearestSourceLoc(const ObjCInterfaceAndImplementation &desc);
 
-/// Given a \c Decl whose declaration is imported from ObjC but whose
-/// implementation is provided by a Swift \c \@_objcImplementation
-/// \c extension , return both decls, with the imported interface first.
-/// Otherwise return \c {nullptr,nullptr} .
+/// Given a \c Decl , determine if it is an implementation with separate
+/// interfaces imported from ObjC (or vice versa) and if so, return all of the
+/// declarations involved in this relationship. Otherwise return an empty value.
 ///
-/// We retrieve both in a single request because we want to cache the
-/// relationship on both sides to avoid duplicating work.
+/// We perform this lookup in both directions using a single request because
+/// we want to cache the relationship on both sides to avoid duplicating work.
 class ObjCInterfaceAndImplementationRequest
     : public SimpleRequest<ObjCInterfaceAndImplementationRequest,
                            ObjCInterfaceAndImplementation(Decl *),
@@ -296,31 +337,32 @@ private:
  public:
    // Separate caching.
    bool isCached() const { return true; }
-   Optional<ObjCInterfaceAndImplementation> getCachedResult() const;
+   std::optional<ObjCInterfaceAndImplementation> getCachedResult() const;
    void cacheResult(ObjCInterfaceAndImplementation value) const;
 };
 
 enum class CxxRecordSemanticsKind {
   Trivial,
   Owned,
+  MoveOnly,
   Reference,
   Iterator,
-  // An API that has be annotated as explicitly unsafe, but still importable.
-  // TODO: we should rename these APIs.
-  ExplicitlyUnsafe,
-  // A record that is either not copyable or not destructible.
+  // A record that is either not copyable/movable or not destructible.
   MissingLifetimeOperation,
-  // A record that contains a pointer (aka non-trivial type).
-  UnsafePointerMember
+  // A record that has no copy and no move operations
+  UnavailableConstructors,
+  // A C++ record that represents a Swift class type exposed to C++ from Swift.
+  SwiftClassType
 };
 
 struct CxxRecordSemanticsDescriptor final {
   const clang::RecordDecl *decl;
   ASTContext &ctx;
+  ClangImporter::Implementation *importerImpl;
 
-  CxxRecordSemanticsDescriptor(const clang::RecordDecl *decl,
-                               ASTContext &ctx)
-      : decl(decl), ctx(ctx) {}
+  CxxRecordSemanticsDescriptor(const clang::RecordDecl *decl, ASTContext &ctx,
+                               ClangImporter::Implementation *importerImpl)
+      : decl(decl), ctx(ctx), importerImpl(importerImpl) {}
 
   friend llvm::hash_code hash_value(const CxxRecordSemanticsDescriptor &desc) {
     return llvm::hash_combine(desc.decl);
@@ -341,7 +383,13 @@ void simple_display(llvm::raw_ostream &out, CxxRecordSemanticsDescriptor desc);
 SourceLoc extractNearestSourceLoc(CxxRecordSemanticsDescriptor desc);
 
 /// What pattern does this C++ API fit? Uses attributes such as
-/// import_owned and import_as_reference to determine the pattern.
+/// import_owned and import_reference to determine the pattern.
+///
+/// Do not evaluate this request before importing has started. For example, it
+/// is OK to invoke this request when importing a decl, but it is not OK to
+/// evaluate this request when importing names. This is because when importing
+/// names, Clang sema has not yet defined implicit special members, so the
+/// results will be flakey/incorrect.
 class CxxRecordSemantics
     : public SimpleRequest<CxxRecordSemantics,
                            CxxRecordSemanticsKind(CxxRecordSemanticsDescriptor),
@@ -360,12 +408,27 @@ private:
                                   CxxRecordSemanticsDescriptor) const;
 };
 
+/// Does this C++ record represent a Swift type.
+class CxxRecordAsSwiftType
+    : public SimpleRequest<CxxRecordAsSwiftType,
+                           ValueDecl *(CxxRecordSemanticsDescriptor),
+                           RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+  // Source location
+  SourceLoc getNearestLoc() const { return SourceLoc(); };
+
+private:
+  friend SimpleRequest;
+
+  ValueDecl *evaluate(Evaluator &evaluator, CxxRecordSemanticsDescriptor) const;
+};
+
 struct SafeUseOfCxxDeclDescriptor final {
   const clang::Decl *decl;
-  ASTContext &ctx;
 
-  SafeUseOfCxxDeclDescriptor(const clang::Decl *decl, ASTContext &ctx)
-      : decl(decl), ctx(ctx) {}
+  SafeUseOfCxxDeclDescriptor(const clang::Decl *decl) : decl(decl) {}
 
   friend llvm::hash_code hash_value(const SafeUseOfCxxDeclDescriptor &desc) {
     return llvm::hash_combine(desc.decl);
@@ -387,12 +450,9 @@ SourceLoc extractNearestSourceLoc(SafeUseOfCxxDeclDescriptor desc);
 
 class IsSafeUseOfCxxDecl
     : public SimpleRequest<IsSafeUseOfCxxDecl, bool(SafeUseOfCxxDeclDescriptor),
-                           RequestFlags::Cached> {
+                           RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
-
-  // Caching
-  bool isCached() const { return true; }
 
   // Source location
   SourceLoc getNearestLoc() const { return SourceLoc(); };
@@ -437,6 +497,7 @@ SourceLoc extractNearestSourceLoc(CustomRefCountingOperationDescriptor desc);
 struct CustomRefCountingOperationResult {
   enum CustomRefCountingOperationResultKind {
     noAttribute,
+    tooManyAttributes,
     immortal,
     notFound,
     tooManyFound,
@@ -469,6 +530,69 @@ private:
   CustomRefCountingOperationResult
   evaluate(Evaluator &evaluator,
            CustomRefCountingOperationDescriptor desc) const;
+};
+
+enum class CxxEscapability { Escapable, NonEscapable, Unknown };
+
+struct EscapabilityLookupDescriptor final {
+  const clang::Type *type;
+  ClangImporter::Implementation *impl;
+  // Only explicitly ~Escapable annotated types are considered ~Escapable.
+  // This is for backward compatibility, so we continue to import aggregates
+  // containing pointers as Escapable types.
+  bool annotationOnly = true;
+
+  friend llvm::hash_code hash_value(const EscapabilityLookupDescriptor &desc) {
+    return llvm::hash_combine(desc.type);
+  }
+
+  friend bool operator==(const EscapabilityLookupDescriptor &lhs,
+                         const EscapabilityLookupDescriptor &rhs) {
+    return lhs.type == rhs.type && lhs.annotationOnly == rhs.annotationOnly;
+  }
+
+  friend bool operator!=(const EscapabilityLookupDescriptor &lhs,
+                         const EscapabilityLookupDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+class ClangTypeEscapability
+    : public SimpleRequest<ClangTypeEscapability,
+                           CxxEscapability(EscapabilityLookupDescriptor),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+  bool isCached() const { return true; }
+
+private:
+  friend SimpleRequest;
+
+  CxxEscapability evaluate(Evaluator &evaluator,
+                           EscapabilityLookupDescriptor desc) const;
+};
+
+void simple_display(llvm::raw_ostream &out, EscapabilityLookupDescriptor desc);
+SourceLoc extractNearestSourceLoc(EscapabilityLookupDescriptor desc);
+
+/// Determine the safety of the given Clang declaration.
+class ClangDeclExplicitSafety
+    : public SimpleRequest<ClangDeclExplicitSafety,
+                           ExplicitSafety(SafeUseOfCxxDeclDescriptor),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+  // Source location
+  SourceLoc getNearestLoc() const { return SourceLoc(); };
+  bool isCached() const;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ExplicitSafety evaluate(Evaluator &evaluator, SafeUseOfCxxDeclDescriptor desc) const;
 };
 
 #define SWIFT_TYPEID_ZONE ClangImporter

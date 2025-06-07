@@ -17,20 +17,21 @@
 #ifndef SWIFT_CLANGIMPORTER_SWIFTLOOKUPTABLE_H
 #define SWIFT_CLANGIMPORTER_SWIFTLOOKUPTABLE_H
 
+#include "swift/AST/Identifier.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/AST/Identifier.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/Serialization/ASTBitCodes.h"
 #include "clang/Serialization/ModuleFileExtension.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Compiler.h"
 #include <functional>
+#include <optional>
 #include <utility>
 
 namespace llvm {
@@ -282,8 +283,7 @@ const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MAJOR = 1;
 /// Lookup table minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 18; // Unsafe C++ method renaming.
-
+const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 20; // 64-bit clang serialization IDs
 
 /// A lookup table that maps Swift names to the set of Clang
 /// declarations with that particular name.
@@ -325,6 +325,137 @@ public:
   /// ASTContext-independent.
   typedef std::pair<ContextKind, StringRef> StoredContext;
 
+  /// Much like \c SingleEntry , this type references either a named
+  /// declaration or a macro. However, it may reference it by either a direct
+  /// pointer to an AST node, or by one or more serialization IDs.
+  class StoredSingleEntry {
+  public:
+    using SerializationID = clang::serialization::DeclID;
+    using SubmoduleID = clang::serialization::SubmoduleID;
+
+    static_assert(sizeof(SerializationID) >= sizeof(uintptr_t),
+                  "pointer fits into SerializationID");
+    static_assert(sizeof(SerializationID) >=
+                      sizeof(clang::serialization::IdentifierID),
+                  "IdentifierID fits into SerializationID");
+
+  private:
+    /// Either contains a pointer to an AST node or a serialization ID,
+    /// depending on the value of \c IsSerializationID .
+    SerializationID ASTNodeOrSerializationID;
+
+    /// If this is equal to \c IS_DECL , this entry represents a declaration.
+    /// Otherwise it represents a macro, and the value is the associated module
+    /// ID. (Note that the associated module ID is often zero, meaning the ID
+    /// is unused but this \em is a macro.)
+    SubmoduleID IsDeclOrMacroModuleID;
+
+    /// If \c true , \c ASTNodeOrSerializationID is a serialization ID;
+    /// otherwise, it is a pointer to an AST node.
+    bool IsSerializationID;
+    // Note: `IsSerializationID` is intentionally stored out of band so that it
+    // cannot be cleared by reading the wrong value from disk. If you bit-pack
+    // it, take care to force it to the right value when necessary.
+
+    /// Sentinel used in \c IsDeclOrMacroModuleID to indicate that the entry is
+    /// for a decl.
+    static constexpr SubmoduleID IS_DECL =
+        std::numeric_limits<SubmoduleID>::max();
+
+    StoredSingleEntry(void *astNode, SubmoduleID isDeclOrMacroModuleID)
+      : ASTNodeOrSerializationID(reinterpret_cast<uintptr_t>(astNode)),
+        IsDeclOrMacroModuleID(isDeclOrMacroModuleID),
+        IsSerializationID(false)
+    {}
+
+    StoredSingleEntry(SerializationID serializationID,
+                      SubmoduleID isDeclOrMacroModuleID)
+      : ASTNodeOrSerializationID(serializationID),
+        IsDeclOrMacroModuleID(isDeclOrMacroModuleID),
+        IsSerializationID(true)
+    {}
+
+  public:
+    /// Whether the given entry is a declaration entry.
+    bool isDeclEntry() const { return IsDeclOrMacroModuleID == IS_DECL; }
+
+    /// Whether the given entry is a macro entry.
+    bool isMacroEntry() const { return !isDeclEntry(); }
+
+    /// Whether the given entry is a serialization ID.
+    bool isSerializationIDEntry() const { return IsSerializationID; }
+
+    /// Whether the given entry is an AST node.
+    bool isASTNodeEntry() const { return !isSerializationIDEntry(); }
+
+    /// Retrieve the pointer for an entry.
+    void *getASTNode() const {
+      ASSERT(isASTNodeEntry() && "Not an AST node entry");
+      return reinterpret_cast<void *>(
+                  static_cast<uintptr_t>(ASTNodeOrSerializationID));
+    }
+
+    /// Get the serialization ID out of the entry.
+    SerializationID getSerializationID() const {
+      ASSERT(isSerializationIDEntry());
+      return ASTNodeOrSerializationID;
+    }
+
+    /// Get the module ID out of the entry. Do not call on an entry representing a decl.
+    SubmoduleID getModuleID() const {
+      ASSERT(isSerializationIDEntry());
+      ASSERT(isMacroEntry());
+      return IsDeclOrMacroModuleID;
+    }
+
+    /// Convert this entry to an on-disk representation. Do not call on an
+    /// entry backed by an AST node; these cannot be directly represented on
+    /// disk.
+    std::pair<SerializationID, SubmoduleID> getData() const {
+      return { getSerializationID(), IsDeclOrMacroModuleID };
+    }
+
+    /// Encode an empty entry.
+    StoredSingleEntry()
+      : StoredSingleEntry(nullptr, IS_DECL)
+    {}
+
+    /// Encode a Clang named declaration as an entry in the table.
+    StoredSingleEntry(clang::NamedDecl *decl)
+      : StoredSingleEntry(decl, IS_DECL)
+    {}
+
+    /// Encode a Clang macro as an entry in the table.
+    StoredSingleEntry(clang::MacroInfo *macro)
+      : StoredSingleEntry(macro, 0)
+    {}
+
+    /// Encode a Clang macro as an entry in the table.
+    StoredSingleEntry(clang::ModuleMacro *macro)
+      : StoredSingleEntry(macro, 0)
+    {}
+
+    /// Encode a Clang decl as an entry in the table by its serialization ID.
+    static StoredSingleEntry
+    forSerializedDecl(SerializationID serializationID) {
+      return StoredSingleEntry(serializationID, IS_DECL);
+    }
+
+    /// Encode a Clang macro as an entry in the table by its serialization ID
+    /// and, optionally, the serialization ID of the submodule it belongs to.
+    static StoredSingleEntry
+    forSerializedMacro(SerializationID serializationID,
+                       SubmoduleID moduleID = 0) {
+      ASSERT(moduleID != IS_DECL && "oversized clang moduleID");
+      return StoredSingleEntry(serializationID, moduleID);
+    }
+
+    /// Convert the on-disk representation to an entry.
+    StoredSingleEntry(std::pair<SerializationID, SubmoduleID> data)
+      : StoredSingleEntry(data.first, data.second)
+    {}
+  };
+
   /// An entry in the table of C entities indexed by full Swift name.
   struct FullTableEntry {
     /// The context in which the entities with the given name occur, e.g.,
@@ -334,62 +465,8 @@ public:
 
     /// The set of Clang declarations and macros with this name and in
     /// this context.
-    ///
-    /// The low bit indicates whether we have a declaration or macro
-    /// (declaration = unset, macro = set) and the second lowest bit
-    /// indicates whether we have a serialization ID (set = DeclID or
-    /// {IdentifierID,SubmoduleID}, as appropriate) vs. a pointer (unset,
-    /// clang::NamedDecl *, clang::MacroInfo *, clang::ModuleMacro *).
-    /// In the ID case, the upper N-2 bits are the ID value; in the pointer
-    /// case, the lower two bits will always be clear due to the alignment of
-    /// the Clang pointers.
-    llvm::SmallVector<uint64_t, 2> DeclsOrMacros;
+    llvm::SmallVector<StoredSingleEntry, 2> DeclsOrMacros;
   };
-
-  /// Whether the given entry is a macro entry.
-  static bool isMacroEntry(uint64_t entry) { return entry & 0x01; }
-
-  /// Whether the given entry is a declaration entry.
-  static bool isDeclEntry(uint64_t entry) { return !isMacroEntry(entry); }
-
-  /// Whether the given entry is a serialization ID.
-  static bool isSerializationIDEntry(uint64_t entry) { return (entry & 0x02); }
-
-  /// Whether the given entry is an AST node.
-  static bool isASTNodeEntry(uint64_t entry) {
-    return !isSerializationIDEntry(entry);
-  }
-
-  /// Retrieve the pointer for an entry.
-  static void *getPointerFromEntry(uint64_t entry) {
-    assert(isASTNodeEntry(entry) && "Not an AST node entry");
-    const uint64_t mask = ~static_cast<uint64_t>(0x03);
-    return reinterpret_cast<void *>(entry & mask);
-  }
-
-  /// Encode a Clang named declaration as an entry in the table.
-  static uint64_t encodeEntry(clang::NamedDecl *decl) {
-    assert(decl);
-    auto bits = reinterpret_cast<uintptr_t>(decl);
-    assert((bits & 0x03) == 0 && "low bits set?");
-    return bits;
-  }
-
-  // Encode a Clang macro as an entry in the table.
-  static uint64_t encodeEntry(clang::MacroInfo *macro) {
-    assert(macro);
-    auto bits = reinterpret_cast<uintptr_t>(macro);
-    assert((bits & 0x03) == 0 && "low bits set?");
-    return bits | 0x01;
-  }
-
-  // Encode a Clang macro as an entry in the table.
-  static uint64_t encodeEntry(clang::ModuleMacro *macro) {
-    assert(macro);
-    auto bits = reinterpret_cast<uintptr_t>(macro);
-    assert((bits & 0x03) == 0 && "low bits set?");
-    return bits | 0x01;
-  }
 
 private:
   using TableType =
@@ -414,7 +491,8 @@ private:
   ///
   /// The values use the same representation as
   /// FullTableEntry::DeclsOrMacros.
-  llvm::DenseMap<StoredContext, SmallVector<uint64_t, 2>> GlobalsAsMembersIndex;
+  llvm::DenseMap<StoredContext, SmallVector<StoredSingleEntry, 2>>
+    GlobalsAsMembersIndex;
 
   /// The reader responsible for lazily loading the contents of this table.
   SwiftLookupTableReader *Reader;
@@ -437,26 +515,29 @@ private:
   /// present.
   ///
   /// \returns true if the entry was added, false otherwise.
-  bool addLocalEntry(SingleEntry newEntry, SmallVectorImpl<uint64_t> &entries);
+  bool addLocalEntry(SingleEntry newEntry,
+                     SmallVectorImpl<StoredSingleEntry> &entries);
 
 public:
   explicit SwiftLookupTable(SwiftLookupTableReader *reader) : Reader(reader) { }
 
   /// Maps a stored declaration entry to an actual Clang declaration.
-  clang::NamedDecl *mapStoredDecl(uint64_t &entry);
+  clang::NamedDecl *mapStoredDecl(StoredSingleEntry &entry);
 
   /// Maps a stored macro entry to an actual Clang macro.
-  SingleEntry mapStoredMacro(uint64_t &entry, bool assumeModule = false);
+  SingleEntry mapStoredMacro(StoredSingleEntry &entry,
+                             bool assumeModule = false);
 
   /// Maps a stored entry to an actual Clang AST node.
-  SingleEntry mapStored(uint64_t &entry, bool assumeModule = false);
+  SingleEntry mapStored(StoredSingleEntry &entry,
+                        bool assumeModule = false);
 
   /// Translate a Clang DeclContext into a context kind and name.
-  static llvm::Optional<StoredContext> translateDeclContext(
-                                         const clang::DeclContext *dc);
+  static std::optional<StoredContext>
+  translateDeclContext(const clang::DeclContext *dc);
 
   /// Translate a Clang effective context into a context kind and name.
-  llvm::Optional<StoredContext> translateContext(EffectiveClangContext context);
+  std::optional<StoredContext> translateContext(EffectiveClangContext context);
 
   /// Add an entry to the lookup table.
   ///
@@ -489,7 +570,7 @@ private:
   /// all results from all contexts should be produced.
   SmallVector<SingleEntry, 4>
   lookup(SerializedSwiftName baseName,
-         llvm::Optional<StoredContext> searchContext);
+         std::optional<StoredContext> searchContext);
 
   /// Retrieve the set of global declarations that are going to be
   /// imported as the given Swift name into the given context.
@@ -502,7 +583,7 @@ private:
   /// all results from all contexts should be produced.
   SmallVector<SingleEntry, 4>
   lookupGlobalsAsMembersImpl(SerializedSwiftName baseName,
-                             llvm::Optional<StoredContext> searchContext);
+                             std::optional<StoredContext> searchContext);
 
   /// Retrieve the set of global declarations that are going to be imported as
   /// members in the given context.
@@ -527,9 +608,6 @@ public:
   /// Retrieve the set of base names that are stored in the lookup table.
   SmallVector<SerializedSwiftName, 4> allBaseNames();
 
-  /// Retrieve the set of base names that are stored in the globals-as-members lookup table.
-  SmallVector<SerializedSwiftName, 4> allGlobalsAsMembersBaseNames();
-
   /// Lookup Objective-C members with the given base name, regardless
   /// of context.
   SmallVector<clang::NamedDecl *, 4>
@@ -552,7 +630,7 @@ public:
   /// entities should reside.
   SmallVector<SingleEntry, 4>
   lookupGlobalsAsMembers(SerializedSwiftName baseName,
-                         Optional<EffectiveClangContext> searchContext);
+                         EffectiveClangContext searchContext);
 
   SmallVector<SingleEntry, 4>
   allGlobalsAsMembersInContext(EffectiveClangContext context);
@@ -560,11 +638,6 @@ public:
   /// Retrieve the set of global declarations that are going to be
   /// imported as members.
   SmallVector<SingleEntry, 4> allGlobalsAsMembers();
-
-  /// Retrieve the set of base names that are going to be imported as members in the
-  /// given context.
-  SmallVector<SerializedSwiftName, 4>
-  globalsAsMembersBaseNames(EffectiveClangContext context);
 
   /// Deserialize all entries.
   void deserializeAll();

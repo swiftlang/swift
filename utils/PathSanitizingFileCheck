@@ -61,6 +61,11 @@ constants.""")
              "to standard output",
         action="store_true")
 
+    parser.add_argument(
+        "--ignore-runtime-warnings",
+        help="Ignore warnings from the Swift runtime",
+        action="store_true")
+
     args, unknown_args = parser.parse_known_args()
 
     if args.enable_windows_compatibility:
@@ -81,6 +86,16 @@ constants.""")
         stdin = re.sub(re.sub(r'\\/' if sys.version_info[0] < 3 else r'/',
                               slashes_re, re.escape(pattern)),
                        replacement, stdin)
+
+    # Because we force the backtracer on in the tests, we can get runtime
+    # warnings about privileged programs.  Suppress those, and also the
+    # warning it might emit if backtracing isn't supported on the test platform.
+    # Additionally, suppress warnings about unknown backtracer options, since
+    # we might want to add new ones to the lit tests and we should ignore
+    # messages from the system copy of the runtime in that case.
+    if args.ignore_runtime_warnings:
+        stdin = re.sub(r'^swift runtime: (backtrace-on-crash is not '
+                       r'supported|unknown) .*\n', "", stdin, flags=re.M)
 
     if args.dry_run:
         print(stdin)

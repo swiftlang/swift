@@ -1,0 +1,48 @@
+// RUN: %target-sil-opt -enable-experimental-move-only -enable-sil-verify-all -sil-move-only-object-checker %s
+
+//////////////////
+// Declarations //
+//////////////////
+
+class Klass {}
+
+struct CopyableStruct {
+  var k = Klass()
+}
+
+sil @classUseMoveOnlyWithoutEscaping : $@convention(thin) (@guaranteed Klass) -> ()
+
+///////////
+// Tests //
+///////////
+
+// This test makes sure that we eliminate %2 after checking and that
+// sil-verify-all does not trigger.
+sil [ossa] @test_remove_early_copyvalue : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @noImplicitCopy @guaranteed $Klass):
+  %1 = copyable_to_moveonlywrapper [guaranteed] %0 : $Klass
+  %2 = copy_value %1 : $@moveOnly Klass
+  %3 = mark_unresolved_non_copyable_value [no_consume_or_assign] %2 : $@moveOnly Klass
+  debug_value %3 : $@moveOnly Klass, let, name "x2", argno 1
+  %5 = begin_borrow %3 : $@moveOnly Klass
+  %6 = function_ref @classUseMoveOnlyWithoutEscaping : $@convention(thin) (@guaranteed Klass) -> ()
+  %7 = moveonlywrapper_to_copyable [guaranteed] %5 : $@moveOnly Klass
+  %8 = apply %6(%7) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %5 : $@moveOnly Klass
+  destroy_value %3 : $@moveOnly Klass
+  %11 = tuple ()
+  return %11 : $()
+}
+
+sil [ossa] @testSimpleBorrowParameter : $@convention(thin) (@in_guaranteed CopyableStruct) -> () {
+bb0(%0 : @noImplicitCopy $*CopyableStruct):
+  %1 = load_borrow %0 : $*CopyableStruct                       // users: %7, %2
+  %2 = copyable_to_moveonlywrapper [guaranteed] %1 : $CopyableStruct // user: %3
+  %3 = copy_value %2 : $@moveOnly CopyableStruct               // user: %4
+  %4 = mark_unresolved_non_copyable_value [no_consume_or_assign] %3 : $@moveOnly CopyableStruct // users: %6, %5
+  debug_value %4 : $@moveOnly CopyableStruct, let, name "x", argno 1 // id: %5
+  destroy_value %4 : $@moveOnly CopyableStruct                 // id: %6
+  end_borrow %1 : $CopyableStruct                              // id: %7
+  %8 = tuple ()                                   // user: %9
+  return %8 : $()                                 // id: %9
+}

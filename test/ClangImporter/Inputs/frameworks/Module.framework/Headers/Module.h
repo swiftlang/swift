@@ -3,10 +3,14 @@
 #define MODULE_H
 const char *getModuleVersion(void);
 
-@interface Module
+@interface ModuleRoot @end
+
+@interface Module : ModuleRoot
 +(const char *)version; // retrieve module version
 +alloc;
 @end
+
+@protocol ModuleProto @end
 
 #define MODULE_H_MACRO 1
 #__private_macro MODULE_H_MACRO

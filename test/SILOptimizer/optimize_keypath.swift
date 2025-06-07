@@ -1,11 +1,19 @@
 // RUN: %empty-directory(%t) 
-// RUN: %target-swift-frontend -primary-file %s -O -sil-verify-all -emit-sil >%t/output.sil
+// RUN: %target-swift-frontend -primary-file %s -O -sil-verify-all -Xllvm -sil-print-types -emit-sil >%t/output.sil
 // RUN: %FileCheck %s < %t/output.sil
 // RUN: %FileCheck -check-prefix=CHECK-ALL %s < %t/output.sil
 
+// RUN: %target-swift-frontend -primary-file %s -O -sil-verify-all -swift-version 6 -Xllvm -sil-print-types -emit-sil >%t/output6.sil
+// RUN: %FileCheck %s < %t/output6.sil
+// RUN: %FileCheck -check-prefix=CHECK-ALL %s < %t/output6.sil
+
 // RUN: %target-build-swift -O %s -o %t/a.out
-// RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
-// REQUIRES: executable_test,swift_stdlib_no_asserts,optimized_stdlib
+// RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT -check-prefix=CHECK5-OUTPUT
+
+// RUN: %target-build-swift -swift-version 6 -O %s -o %t/a6.out
+// RUN: %target-run %t/a6.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
+
+// REQUIRES: executable_test,optimized_stdlib
 // REQUIRES: CPU=arm64 || CPU=x86_64
 
 // REQUIRES: swift_in_compiler
@@ -28,7 +36,9 @@ struct GenStruct<T : P> : P {
   }
 }
 
+#if !swift(>=6)
 var numGenClassObjs = 0
+#endif
 
 final class GenClass<T : P> : P {
   var ct: T
@@ -39,11 +49,15 @@ final class GenClass<T : P> : P {
   init(_ ct: T) {
     self.ct = ct
     self.gs = .init(ct)
+#if !swift(>=6)
     numGenClassObjs += 1
+#endif
   }
 
   deinit {
+#if !swift(>=6)
     numGenClassObjs -= 1
+#endif
   }
 
   func modifyIt() {
@@ -63,7 +77,9 @@ final class DerivedClass2 : DerivedClass<Int> {
 
 final class SimpleClass : P {
   var i: Int
+#if !swift(>=6)
   static var numObjs = 0
+#endif
   
   var tuple = (0, 1)
   
@@ -78,11 +94,15 @@ final class SimpleClass : P {
   init(_ i: Int, nested: Int? = nil) {
     self.i = i
     self.opt = nested.map { Nested(i: $0) }
+#if !swift(>=6)
     Self.numObjs += 1
+#endif
   }
 
   deinit {
+#if !swift(>=6)
     Self.numObjs -= 1
+#endif
   }
 
   func modifyIt() {
@@ -183,11 +203,10 @@ func testDerivedClass2Read(_ c: DerivedClass2) -> Int {
 }
 
 // CHECK-LABEL: sil {{.*}}testGenClassWrite
-// CHECK: [[S:%[0-9]+]] = alloc_stack $T
 // CHECK: [[E:%[0-9]+]] = ref_element_addr %0
 // CHECK: [[A:%[0-9]+]] = begin_access [modify] [dynamic] [[E]]
 // CHECK: destroy_addr [[A]]
-// CHECK: copy_addr [take] [[S]] to [init] [[A]]
+// CHECK: copy_addr %1 to [init] [[A]]
 // CHECK: end_access [[A]]
 // CHECK: return
 @inline(never)
@@ -331,9 +350,9 @@ func testGetter<T : P>(_ s: GenStruct<T>) -> Int {
 }
 
 // CHECK-LABEL: sil {{.*}} [noinline] {{.*}}testClassMemberGetter
+// CHECK: [[A:%[0-9]+]] = alloc_stack $Int
 // CHECK: [[E:%[0-9]+]] = ref_element_addr
 // CHECK: [[M:%[0-9]+]] = begin_access [read] [dynamic] [[E]]
-// CHECK: [[A:%[0-9]+]] = alloc_stack $Int
 // CHECK: [[F:%[0-9]+]] = function_ref {{.*}}computed
 // CHECK: apply [[F]]<T>([[A]], [[M]])
 // CHECK: end_access
@@ -388,9 +407,8 @@ func testClassMemberComputedModify<T : P>(_ s: inout GenClass<T>) {
 // CHECK: [[F:%[0-9]+]] = select_enum [[O:%[0-9]+]]
 // CHECK: cond_fail [[F]]
 // CHECK: unchecked_enum_data [[O]]
-// CHECK: [[E2:%[0-9]+]] = init_enum_data_addr [[E1:%[0-9]+]]
-// CHECK: store {{%[0-9]+}} to [[E2]]
-// CHECK: inject_enum_addr [[E1]]
+// CHECK: [[E2:%[0-9]+]] = enum $Optional<SimpleStruct.Nested>
+// CHECK: store [[E2]] to {{%[0-9]+}}
 // CHECK: return
 @inline(never)
 @_semantics("optimize.sil.specialize.generic.never")
@@ -405,9 +423,8 @@ func testModifyOptionalForce(_ s: inout SimpleStruct) {
 // CHECK: [[F:%[0-9]+]] = select_enum
 // CHECK: cond_fail [[F]]
 // CHECK: unchecked_enum_data [[E1:%[0-9]+]]
-// CHECK: [[E2:%[0-9]+]] = init_enum_data_addr [[E1:%[0-9]+]]
-// CHECK: store {{%[0-9]+}} to [[E2]]
-// CHECK: inject_enum_addr [[E1]]
+// CHECK: [[E2:%[0-9]+]] = enum $Optional<SimpleClass.Nested>
+// CHECK: store [[E2]] to {{%[0-9]+}}
 // CHECK: end_access
 // CHECK: return
 @inline(never)
@@ -425,7 +442,7 @@ func testModifyOptionalForceClass(_ s: inout SimpleClass) {
 //
 //     Check if value is null
 // CHECK: switch_enum [[O:%[0-9]+]]
-// CHECK: {{bb.}}:
+// CHECK: bb{{.*}}:
 //         Unwrap value
 //     CHECK: [[A1:%[0-9]+]] = alloc_stack
 //     CHECK: store [[O]] to [[A1]]
@@ -456,7 +473,7 @@ func testOptionalChain(_ s: SimpleStruct) -> Int? {
 // CHECK: [[E2:%[0-9]+]] = begin_access [read] [dynamic] [no_nested_conflict] [[E1]]
 //     Check if value is null
 // CHECK: switch_enum [[O:%[0-9]+]]
-// CHECK: {{bb.}}:
+// CHECK: bb{{.*}}:
 //         Unwrap value
 //     CHECK: [[A1:%[0-9]+]] = alloc_stack
 //     CHECK: store [[O]] to [[A1]]
@@ -486,7 +503,7 @@ func testOptionalChainClass(_ s: SimpleClass) -> Int? {
 //
 //     Check if value is null
 // CHECK: switch_enum [[O:%[0-9]+]]
-// CHECK: {{bb.}}:
+// CHECK: bb{{.*}}:
 //         Unwrap value
 //     CHECK: [[A1:%[0-9]+]] = alloc_stack
 //     CHECK: store [[O]] to [[A1]]
@@ -494,7 +511,7 @@ func testOptionalChainClass(_ s: SimpleClass) -> Int? {
 //
 //         Unwrap nested optional
 //     CHECK: switch_enum [[O2:%[0-9]+]]
-//     CHECK: {{bb.}}:
+//     CHECK: bb{{.*}}:
 //         CHECK: [[A2:%[0-9]+]] = alloc_stack
 //         CHECK: store [[O2]] to [[A2]]
 //         CHECK: [[U2:%[0-9]+]] = unchecked_take_enum_data_addr [[A2]]
@@ -601,7 +618,6 @@ func testGenericResult(_ s: inout GenStruct<SimpleStruct>) {
     s[keyPath: kp].i += 1
 }
 
-// CHECK-LABEL: sil {{.*}}testit
 func testit() {
   // CHECK-OUTPUT: GenStructRead: 27
   print("GenStructRead: \(testGenStructRead(GenStruct(SimpleClass(27))).i)")
@@ -709,9 +725,11 @@ func testit() {
 
 testit()
 
-// CHECK-OUTPUT: SimpleClass obj count: 0
+#if !swift(>=6)
+// CHECK5-OUTPUT: SimpleClass obj count: 0
 print("SimpleClass obj count: \(SimpleClass.numObjs)")
-// CHECK-OUTPUT: GenClass obj count: 0
+// CHECK5-OUTPUT: GenClass obj count: 0
 print("GenClass obj count: \(numGenClassObjs)")
+#endif
 
 

@@ -24,12 +24,12 @@ extension String {
     let knownOther = _KnownCocoaString(_nativeStorage)
     switch knownOther {
     case .storage:
-      self = _unsafeUncheckedDowncast(
+      self = unsafe _unsafeUncheckedDowncast(
         _nativeStorage,
         to: __StringStorage.self
       ).asString
     case .shared:
-      self = _unsafeUncheckedDowncast(
+      self = unsafe _unsafeUncheckedDowncast(
         _nativeStorage,
         to: __SharedStringStorage.self
       ).asString
@@ -48,13 +48,16 @@ extension _AbstractStringStorage {
   ) {
     _precondition(aRange.location >= 0 && aRange.length >= 0,
                   "Range out of bounds")
+    // Note: `count` is counting UTF-8 code units, while `aRange` is measured in
+    // UTF-16 offsets. This precondition is a necessary, but not sufficient test
+    // for validity. (More precise checks are done in UTF16View._nativeCopy.)
     _precondition(aRange.location + aRange.length <= Int(count),
                   "Range out of bounds")
 
-    let range = Range(
+    let range = unsafe Range(
       _uncheckedBounds: (aRange.location, aRange.location+aRange.length))
     let str = asString
-    str._copyUTF16CodeUnits(
+    unsafe str._copyUTF16CodeUnits(
       into: UnsafeMutableBufferPointer(start: buffer, count: range.count),
       range: range)
   }
@@ -68,11 +71,11 @@ extension _AbstractStringStorage {
     case (_cocoaASCIIEncoding, true),
          (_cocoaUTF8Encoding, _):
       guard maxLength >= count + 1 else { return 0 }
-      outputPtr.initialize(from: start, count: count)
-      outputPtr[count] = 0
+      unsafe outputPtr.initialize(from: start, count: count)
+      unsafe outputPtr[count] = 0
       return 1
     default:
-      return  _cocoaGetCStringTrampoline(self, outputPtr, maxLength, encoding)
+      return  unsafe _cocoaGetCStringTrampoline(self, outputPtr, maxLength, encoding)
     }
   }
 
@@ -82,7 +85,7 @@ extension _AbstractStringStorage {
     switch (encoding, isASCII) {
     case (_cocoaASCIIEncoding, true),
          (_cocoaUTF8Encoding, _):
-      return start
+      return unsafe start
     default:
       return _cocoaCStringUsingEncodingTrampoline(self, encoding)
     }
@@ -95,7 +98,7 @@ extension _AbstractStringStorage {
     if count != nativeOther.count {
       return 0
     }
-    return (start == nativeOther.start ||
+    return unsafe (start == nativeOther.start ||
       (memcmp(start, nativeOther.start, count) == 0)) ? 1 : 0
   }
 
@@ -115,10 +118,10 @@ extension _AbstractStringStorage {
     let knownOther = _KnownCocoaString(other)
     switch knownOther {
     case .storage:
-      return _nativeIsEqual(
+      return unsafe _nativeIsEqual(
         _unsafeUncheckedDowncast(other, to: __StringStorage.self))
     case .shared:
-      return _nativeIsEqual(
+      return unsafe _nativeIsEqual(
         _unsafeUncheckedDowncast(other, to: __SharedStringStorage.self))
     default:
           // We're allowed to crash, but for compatibility reasons NSCFString allows
@@ -132,10 +135,10 @@ extension _AbstractStringStorage {
 
       // CFString will only give us ASCII bytes here, but that's fine.
       // We already handled non-ASCII UTF8 strings earlier since they're Swift.
-      if let asciiEqual = withCocoaASCIIPointer(other, work: { (ascii) -> Bool in
+      if let asciiEqual = unsafe withCocoaASCIIPointer(other, work: { (ascii) -> Bool in
         // UTF16 length == UTF8 length iff ASCII
         if otherUTF16Length == self.count {
-          return (start == ascii || (memcmp(start, ascii, self.count) == 0))
+          return unsafe (start == ascii || (memcmp(start, ascii, self.count) == 0))
         }
         return false
       }) {
@@ -168,7 +171,7 @@ extension __StringStorage {
   final internal var hash: UInt {
     @_effects(readonly) get {
       if isASCII {
-        return _cocoaHashASCIIBytes(start, length: count)
+        return unsafe _cocoaHashASCIIBytes(start, length: count)
       }
       return _cocoaHashString(self)
     }
@@ -186,7 +189,7 @@ extension __StringStorage {
   final internal func getCharacters(
    _ buffer: UnsafeMutablePointer<UInt16>, range aRange: _SwiftNSRange
   ) {
-    _getCharacters(buffer, aRange)
+    unsafe _getCharacters(buffer, aRange)
   }
 
   @objc(_fastCStringContents:)
@@ -195,7 +198,7 @@ extension __StringStorage {
     _ requiresNulTermination: Int8
   ) -> UnsafePointer<CChar>? {
     if isASCII {
-      return start._asCChar
+      return unsafe start._asCChar
     }
     return nil
   }
@@ -203,7 +206,7 @@ extension __StringStorage {
   @objc(UTF8String)
   @_effects(readonly)
   final internal func _utf8String() -> UnsafePointer<UInt8>? {
-    return start
+    return unsafe start
   }
 
   @objc(cStringUsingEncoding:)
@@ -217,7 +220,7 @@ extension __StringStorage {
   final internal func getCString(
     _ outputPtr: UnsafeMutablePointer<UInt8>, maxLength: Int, encoding: UInt
   ) -> Int8 {
-    return _getCString(outputPtr, maxLength, encoding)
+    return unsafe _getCString(outputPtr, maxLength, encoding)
   }
 
   @objc
@@ -264,7 +267,7 @@ extension __SharedStringStorage {
   final internal var hash: UInt {
     @_effects(readonly) get {
       if isASCII {
-        return _cocoaHashASCIIBytes(start, length: count)
+        return unsafe _cocoaHashASCIIBytes(start, length: count)
       }
       return _cocoaHashString(self)
     }
@@ -282,7 +285,7 @@ extension __SharedStringStorage {
   final internal func getCharacters(
     _ buffer: UnsafeMutablePointer<UInt16>, range aRange: _SwiftNSRange
   ) {
-    _getCharacters(buffer, aRange)
+    unsafe _getCharacters(buffer, aRange)
   }
 
   @objc
@@ -301,7 +304,7 @@ extension __SharedStringStorage {
     _ requiresNulTermination: Int8
   ) -> UnsafePointer<CChar>? {
     if isASCII {
-      return start._asCChar
+      return unsafe start._asCChar
     }
     return nil
   }
@@ -309,7 +312,7 @@ extension __SharedStringStorage {
   @objc(UTF8String)
   @_effects(readonly)
   final internal func _utf8String() -> UnsafePointer<UInt8>? {
-    return start
+    return unsafe start
   }
 
   @objc(cStringUsingEncoding:)
@@ -323,7 +326,7 @@ extension __SharedStringStorage {
   final internal func getCString(
     _ outputPtr: UnsafeMutablePointer<UInt8>, maxLength: Int, encoding: UInt
   ) -> Int8 {
-    return _getCString(outputPtr, maxLength, encoding)
+    return unsafe _getCString(outputPtr, maxLength, encoding)
   }
 
   @objc(isEqualToString:)

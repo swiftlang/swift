@@ -1,4 +1,4 @@
-// RUN: %swift-target-frontend -emit-irgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-irgen %s | %FileCheck %s
 
 // REQUIRES: PTRSIZE=64
 

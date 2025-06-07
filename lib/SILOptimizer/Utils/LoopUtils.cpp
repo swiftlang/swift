@@ -11,11 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-loop-utils"
+#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Utils/LoopUtils.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/LoopInfo.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
@@ -127,8 +129,9 @@ static SILBasicBlock *insertBackedgeBlock(SILLoop *L, DominanceInfo *DT,
   // the backedge block which correspond to any PHI nodes in the header block.
   SmallVector<SILValue, 6> BBArgs;
   for (auto *BBArg : Header->getArguments()) {
-    BBArgs.push_back(BEBlock->createPhiArgument(BBArg->getType(),
-                                                BBArg->getOwnershipKind()));
+    BBArgs.push_back(BEBlock->createPhiArgument(
+        BBArg->getType(), BBArg->getOwnershipKind(), /* decl */ nullptr,
+        BBArg->isReborrow(), BBArg->hasPointerEscape()));
   }
 
   // Arbitrarily pick one of the predecessor's branch locations.
@@ -229,8 +232,8 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I) {
 
   // The deallocation of a stack allocation must be in the loop, otherwise the
   // deallocation will be fed by a phi node of two allocations.
-  if (I->isAllocatingStack()) {
-    for (auto *UI : cast<SingleValueInstruction>(I)->getUses()) {
+  if (auto allocation = I->getStackAllocation()) {
+    for (auto *UI : allocation->getUses()) {
       if (UI->getUser()->isDeallocatingStack()) {
         if (!L->contains(UI->getUser()->getParent()))
           return false;
@@ -244,13 +247,29 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I) {
       SILValue address = dealloc->getOperand();
       if (isa<AllocStackInst>(address) || isa<PartialApplyInst>(address))
         alloc = cast<SingleValueInstruction>(address);
+      else if (isaResultOf<BeginApplyInst>(address))
+        alloc = cast<MultipleValueInstructionResult>(address)->getParent();
     }
     if (auto *dealloc = dyn_cast<DeallocStackRefInst>(I))
       alloc = dealloc->getAllocRef();
 
     return alloc && L->contains(alloc);
   }
-
+  // In OSSA, partial_apply is not considered stack allocating. Nonetheless,
+  // prevent it from being cloned so OSSA lowering can directly convert it to a
+  // single allocation.
+  if (auto *PA = dyn_cast<PartialApplyInst>(I)) {
+    if (PA->isOnStack()) {
+      assert(PA->getFunction()->hasOwnership());
+      return false;
+    }
+  }
+  // Like partial_apply [onstack], mark_dependence [nonescaping] on values
+  // creates a borrow scope. We currently assume that a set of dominated
+  // scope-ending uses can be found.
+  if (auto *MD = dyn_cast<MarkDependenceInst>(I)) {
+    return !MD->isNonEscaping() || MD->getType().isAddress();
+  }
   // CodeGen can't build ssa for objc methods.
   if (auto *Method = dyn_cast<MethodInst>(I)) {
     if (Method->getMember().isForeign) {
@@ -264,9 +283,9 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I) {
 
   // We can't have a phi of two openexistential instructions of different UUID.
   if (isa<OpenExistentialAddrInst>(I) || isa<OpenExistentialRefInst>(I) ||
-      isa<OpenExistentialMetatypeInst>(I) ||
-      isa<OpenExistentialValueInst>(I) || isa<OpenExistentialBoxInst>(I) ||
-      isa<OpenExistentialBoxValueInst>(I)) {
+      isa<OpenExistentialMetatypeInst>(I) || isa<OpenExistentialValueInst>(I) ||
+      isa<OpenExistentialBoxInst>(I) || isa<OpenExistentialBoxValueInst>(I) ||
+      isa<OpenPackElementInst>(I)) {
     SingleValueInstruction *OI = cast<SingleValueInstruction>(I);
     for (auto *UI : OI->getUses())
       if (!L->contains(UI->getUser()))
@@ -274,7 +293,7 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I) {
     return true;
   }
 
-  if (isa<ThrowInst>(I))
+  if (isa<ThrowInst>(I) || isa<ThrowAddrInst>(I))
     return false;
 
   // The entire access must be within the loop.
@@ -290,13 +309,19 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I) {
   // contains an end_apply or abort_apply of an external begin_apply ---
   // because that wouldn't be structurally valid in the first place.
   if (auto BAI = dyn_cast<BeginApplyInst>(I)) {
-    for (auto UI : BAI->getTokenResult()->getUses()) {
-      auto User = UI->getUser();
-      assert(isa<EndApplyInst>(User) || isa<AbortApplyInst>(User));
+    for (auto *Use : BAI->getEndApplyUses()) {
+      auto *User = Use->getUser();
+      assert(isa<EndApplyInst>(User) || isa<AbortApplyInst>(User) ||
+             isa<EndBorrowInst>(User));
       if (!L->contains(User))
         return false;
     }
     return true;
+  }
+
+  if (auto *bi = dyn_cast<BuiltinInst>(I)) {
+    if (bi->getBuiltinInfo().ID == BuiltinValueKind::Once)
+      return false;
   }
 
   if (isa<DynamicMethodBranchInst>(I))
@@ -306,6 +331,17 @@ bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I) {
   if (isa<AwaitAsyncContinuationInst>(I) ||
       isa<GetAsyncContinuationAddrInst>(I) || isa<GetAsyncContinuationInst>(I))
     return false;
+
+  // Bail if there are any begin-borrow instructions which have no corresponding
+  // end-borrow uses. This is the case if the control flow ends in a dead-end block.
+  // After duplicating such a block, the re-borrow flags cannot be recomputed
+  // correctly for inserted phi arguments.
+  if (auto *svi  = dyn_cast<SingleValueInstruction>(I)) {
+    if (auto bv = BorrowedValue(lookThroughBorrowedFromDef(svi))) {
+      if (!bv.hasLocalScopeEndingUses())
+        return false;
+    }
+  }
 
   // Some special cases above that aren't considered isTriviallyDuplicatable
   // return true early.

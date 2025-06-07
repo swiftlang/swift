@@ -13,6 +13,12 @@
 #ifndef SWIFT_BASIC_PROGRAM_H
 #define SWIFT_BASIC_PROGRAM_H
 
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/Support/ErrorOr.h"
+#include "llvm/Support/Program.h"
+#include <optional>
+
 namespace swift {
 
 /// This function executes the program using the arguments provided,
@@ -32,6 +38,29 @@ namespace swift {
 /// value indicating a failure to execute.
 int ExecuteInPlace(const char *Program, const char **args,
                    const char **env = nullptr);
+
+struct ChildProcessInfo {
+  llvm::sys::ProcessInfo ProcessInfo;
+  int Write;
+  int Read;
+
+  ChildProcessInfo(llvm::sys::ProcessInfo ProcessInfo, int Write, int Read)
+      : ProcessInfo(ProcessInfo), Write(Write), Read(Read) {}
+};
+
+/// This function executes the program using the argument provided.
+/// Establish pipes between the current process and the spawned process.
+/// Returned a \c ChildProcessInfo where WriteFileDescriptor is piped to
+/// child's STDIN, and ReadFileDescriptor is piped from child's STDOUT.
+///
+/// \param program Path of the program to be executed
+/// \param args An array of strings that are passed to the program. The first
+/// element should be the name of the program.
+/// \param env An optional array of 'key=value 'strings to use for the program's
+/// environment.
+llvm::ErrorOr<swift::ChildProcessInfo> ExecuteWithPipe(
+    llvm::StringRef program, llvm::ArrayRef<llvm::StringRef> args,
+    std::optional<llvm::ArrayRef<llvm::StringRef>> env = std::nullopt);
 
 } // end namespace swift
 

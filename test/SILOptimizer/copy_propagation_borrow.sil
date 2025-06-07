@@ -1,11 +1,12 @@
-// RUN: %target-sil-opt -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-verify-all -module-name Swift %s | %FileCheck %s
-// RUN: %target-sil-opt -copy-propagation -enable-sil-verify-all -module-name Swift %s | %FileCheck %s --check-prefixes=CHECK-NOSCOPES
+// RUN: %target-sil-opt -sil-print-types -update-borrowed-from -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-verify-all -module-name Swift %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -update-borrowed-from -copy-propagation -enable-sil-verify-all -module-name Swift %s | %FileCheck %s --check-prefixes=CHECK-NOSCOPES
 //
 // Most CopyPropagation tests are still in copy_propagation_opaque.sil.
 //
 // Mandatory copy propagation does not handles borrows yet.
 
 // REQUIRES: asserts
+// REQUIRES: swift_in_compiler
 
 // arm64e checks that there is a sound Swift stdlib but the test compiles itself
 // as `-module Swift` and so that verification fails. (in some ptrauth
@@ -241,13 +242,12 @@ bb3:
 // CHECK-NOT:    copy_value
 // CHECK:   cond_br undef, bb1, bb2
 // CHECK:      bb1:
-// CHECK-NEXT:   [[COPY:%.*]] = copy_value [[OUTERCOPY]] : $C
-// CHECK-NEXT:   apply %{{.*}}([[COPY]]) : $@convention(thin) (@owned C) -> ()
+// CHECK-NEXT:   apply %{{.*}}([[OUTERCOPY]]) : $@convention(thin) (@owned C) -> ()
 // CHECK-NEXT:   br bb3
 // CHECK:      bb2:
+// CHECK-NEXT:   destroy_value [[OUTERCOPY]] : $C
 // CHECK-NEXT:   br bb3
 // CHECK:      bb3:
-// CHECK-NEXT:   destroy_value [[OUTERCOPY]] : $C
 // CHECK-NEXT:   destroy_value %0 : $C
 // CHECK-LABEL: } // end sil function 'testLocalBorrowPostDomDestroy'
 sil [ossa] @testLocalBorrowPostDomDestroy : $@convention(thin) (@owned C) -> () {
@@ -328,10 +328,6 @@ bb3:
 // CHECK-NEXT:  br bb3
 // CHECK:     bb2:
 // CHECK-NEXT:  apply %{{.*}}([[OUTERCOPY]]) : $@convention(thin) (@guaranteed C) -> ()
-//
-// This copy would be eliminated if the outer lifetime were also canonicalized (no unchecked_ownership_conversion)
-// CHECK-NEXT:  [[COPY2:%.*]] = copy_value [[OUTERCOPY]] : $C
-// CHECK-NEXT:  destroy_value [[COPY2]] : $C
 // CHECK-NEXT:  destroy_value %4 : $C
 // CHECK-NEXT:  br bb3
 // CHECK: bb3:
@@ -506,6 +502,7 @@ bb0:
   %copy1 = copy_value %borrow1 : $C
   %borrow2 = begin_borrow %copy1 : $C
   %addr = ref_element_addr %borrow2 : $C, #C.a
+  %ptr = address_to_pointer %addr : $*Int64 to $Builtin.RawPointer
   cond_br undef, bb1, bb2
 bb1:
   // inside use
@@ -569,8 +566,9 @@ bb0(%0 : @guaranteed $HasObject):
 // CHECK:   br bb3([[CP]] : $C, [[BORROW]] : $C)
 // CHECK: bb2:
 // CHECK:   br bb3([[CP]] : $C, [[BORROW]] : $C)
-// CHECK: bb3([[OWNEDPHI:%.*]] : @owned $C, [[BORROWPHI:%.*]] @guaranteed $C
-// CHECK:   end_borrow [[BORROWPHI]]
+// CHECK: bb3([[OWNEDPHI:%.*]] : @owned $C, [[BORROWPHI:%.*]] : @reborrow $C):
+// CHECK:   [[R:%.*]] = borrowed [[BORROWPHI]] : $C from (%0 : $C)
+// CHECK:   end_borrow [[R]]
 // CHECK:   destroy_value [[OWNEDPHI]] : $C
 // CHECK:   destroy_value %0 : $C
 // CHECK-LABEL: } // end sil function 'testSubReborrowExtension'
@@ -608,9 +606,10 @@ bb3(%phi : @owned $C, %borrowphi : @guaranteed $C):
 //
 // CHECK-LABEL: sil [ossa] @testLiveCopyAfterReborrow : $@convention(thin) () -> () {
 // CHECK: [[ALLOC:%.*]] = alloc_ref $C
-// CHECK: bb3([[BORROWPHI:%.*]] : @guaranteed $C):
-// CHECK: [[COPY:%.*]] = copy_value [[BORROWPHI]]
-// CHECK: end_borrow [[BORROWPHI]] : $C
+// CHECK: bb3([[BORROWPHI:%.*]] : @reborrow $C):
+// CHECK: [[R:%.*]] = borrowed [[BORROWPHI]] : $C from (%0 : $C)
+// CHECK: [[COPY:%.*]] = copy_value [[R]]
+// CHECK: end_borrow [[R]] : $C
 // CHECK-NOT: copy_value
 // CHECK-NOT: destroy_value
 // CHECK: apply
@@ -656,9 +655,10 @@ bb3(%borrowphi : @guaranteed $C):
 //
 // CHECK-LABEL: sil [ossa] @testDeadCopyAfterReborrow : $@convention(thin) () -> () {
 // CHECK: [[ALLOC:%.*]] = alloc_ref $C
-// CHECK: bb3([[BORROWPHI:%.*]] : @guaranteed $C):
+// CHECK: bb3([[BORROWPHI:%.*]] : @reborrow $C):
+// CHECK: [[R:%.*]] = borrowed [[BORROWPHI]] : $C from (%0 : $C)
 // CHECK-NOT: copy_value
-// CHECK: end_borrow [[BORROWPHI]] : $C
+// CHECK: end_borrow [[R]] : $C
 // CHECK-NOT: copy_value
 // CHECK: destroy_value [[ALLOC]] : $C
 // CHECK-LABEL: } // end sil function 'testDeadCopyAfterReborrow'
@@ -696,9 +696,10 @@ bb3(%borrowphi : @guaranteed $C):
 //
 // CHECK-LABEL: sil [ossa] @testNestedReborrowOutsideUse : $@convention(thin) () -> () {
 // CHECK:        [[ALLOC:%.*]] = alloc_ref $C
-// CHECK:      bb3([[BORROWPHI:%.*]] : @guaranteed $C):
+// CHECK:      bb3([[BORROWPHI:%.*]] : @reborrow $C):
+// CHECK:        [[R:%.*]] = borrowed [[BORROWPHI]] : $C from (%0 : $C)
 // CHECK-NOT:    copy
-// CHECK:        end_borrow [[BORROWPHI]]
+// CHECK:        end_borrow [[R]]
 // CHECK-NEXT:   destroy_value [[ALLOC]] : $C
 // CHECK-LABEL: } // end sil function 'testNestedReborrowOutsideUse'
 sil [ossa] @testNestedReborrowOutsideUse : $@convention(thin) () -> () {
@@ -742,7 +743,7 @@ bb3(%borrowphi : @guaranteed $C):
 // CHECK: bb2:
 // CHECK:   begin_borrow %0 : $C
 // CHECK:   br bb3(%{{.*}} : $C, %0 : $C)
-// CHECK: bb3(%{{.*}} : @guaranteed $C, [[COPYPHI:%.*]] : @owned $C):
+// CHECK: bb3(%{{.*}} : @reborrow $C, [[COPYPHI:%.*]] : @owned $C):
 // CHECK:   end_borrow
 // CHECK:   destroy_value [[COPYPHI]] : $C
 // CHECK-LABEL: } // end sil function 'testOwnedReborrow'
@@ -1207,28 +1208,21 @@ bb0(%0 : @guaranteed $C):
   return %7 : $()
 }
 
-// visitBorrowScopeUses first looks through this copy, then a normal
-// forwarding operation (convert_function), then an unowned forwarding
-// operation (convert_escape_to_noescape). It must successfully
-// analyze and replace all uses because borrow scope rewriting begins
-// rewriting guaranteed function arguments without checking the uses
-// first.
-//
-// CHECK-NOSCOPES-LABEL: sil [ossa] @testEscapingEscapingCast : $@convention(method) (@guaranteed @callee_guaranteed (Int64) -> Int64) -> () {
-// CHECK-NOSCOPES:      bb0(%0 : @guaranteed $@callee_guaranteed (Int64) -> Int64):
-// CHECK-NOSCOPES-NEXT: %1 = convert_function %0 : $@callee_guaranteed (Int64) -> Int64 to $@callee_guaranteed (Int64) -> (Int64, @error any Error) // user: %2
-// CHECK-NOSCOPES-NEXT: %2 = convert_escape_to_noescape %1 : $@callee_guaranteed (Int64) -> (Int64, @error any Error) to $@noescape @callee_guaranteed (Int64) -> (Int64, @error any Error)
-// CHECK-NOSCOPES-NEXT: = tuple ()
-// CHECK-NOSCOPES-NEXT: return
-// CHECK-NOSCOPES-LABEL: } // end sil function 'testEscapingEscapingCast'
-sil [ossa] @testEscapingEscapingCast : $@convention(method) (@guaranteed @callee_guaranteed (Int64) -> Int64) -> () {
-bb0(%0 : @guaranteed $@callee_guaranteed (Int64) -> Int64):
-  %1 = copy_value %0 : $@callee_guaranteed (Int64) -> Int64
-  %2 = convert_function %1 : $@callee_guaranteed (Int64) -> Int64 to $@callee_guaranteed (Int64) -> (Int64, @error any Error)
-  %3 = copy_value %2 : $@callee_guaranteed (Int64) -> (Int64, @error any Error)
-  %4 = convert_escape_to_noescape %3 : $@callee_guaranteed (Int64) -> (Int64, @error any Error) to $@noescape @callee_guaranteed (Int64) -> (Int64, @error any Error) // user: %29
-  destroy_value %3 : $@callee_guaranteed (Int64) -> (Int64, @error any Error)
-  destroy_value %2 : $@callee_guaranteed (Int64) -> (Int64, @error any Error)
-  %7 = tuple ()
-  return %7 : $()
+// CHECK-LABEL: sil [ossa] @test_updating_borrowed_from :
+// CHECK:         borrowed {{.*}} from (%0 : $HasObject)
+// CHECK-LABEL: } // end sil function 'test_updating_borrowed_from'
+sil [ossa] @test_updating_borrowed_from : $@convention(thin) (@guaranteed HasObject) -> () {
+bb0(%0 : @guaranteed $HasObject):
+  %1 = destructure_struct %0 : $HasObject
+  %2 = copy_value %1 : $C
+  %3 = begin_borrow %2 : $C
+  br bb1(%3 : $C)
+
+bb1(%5 : @reborrow $C):
+  %6 = borrowed %5 : $C from (%2 : $C)
+  end_borrow %6 : $C
+  destroy_value %2 : $C
+  %9 = tuple ()
+  return %9 : $()
 }
+

@@ -196,6 +196,16 @@ extension Equatable {
   }
 }
 
+// Called by the SwiftValue implementation.
+@_silgen_name("_swift_stdlib_Equatable_isEqual_indirect")
+internal func Equatable_isEqual_indirect<T: Equatable>(
+  _ lhs: UnsafePointer<T>,
+  _ rhs: UnsafePointer<T>
+) -> Bool {
+  return unsafe lhs.pointee == rhs.pointee
+}
+
+
 //===----------------------------------------------------------------------===//
 // Reference comparison
 //===----------------------------------------------------------------------===//
@@ -246,6 +256,7 @@ extension Equatable {
 /// - Parameters:
 ///   - lhs: A reference to compare.
 ///   - rhs: Another reference to compare.
+#if !$Embedded
 @inlinable // trivial-implementation
 public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   switch (lhs, rhs) {
@@ -257,6 +268,20 @@ public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
     return false
   }
 }
+#else
+@inlinable // trivial-implementation
+@safe
+public func ===<T: AnyObject, U: AnyObject>(lhs: T?, rhs: U?) -> Bool {
+  switch (lhs, rhs) {
+  case let (l?, r?):
+    return Builtin.bridgeToRawPointer(l) == Builtin.bridgeToRawPointer(r)
+  case (nil, nil):
+    return true
+  default:
+    return false
+  }
+}
+#endif
 
 /// Returns a Boolean value indicating whether two references point to
 /// different object instances.
@@ -268,9 +293,14 @@ public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
 /// - Parameters:
 ///   - lhs: A reference to compare.
 ///   - rhs: Another reference to compare.
+#if !$Embedded
 @inlinable // trivial-implementation
 public func !== (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
   return !(lhs === rhs)
 }
-
-
+#else
+@inlinable // trivial-implementation
+public func !==<T: AnyObject, U: AnyObject>(lhs: T, rhs: U) -> Bool {
+  return !(lhs === rhs)
+}
+#endif

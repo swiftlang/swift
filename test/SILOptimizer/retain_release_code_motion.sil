@@ -1,6 +1,6 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -retain-sinking -late-release-hoisting %s | %FileCheck %s
-// RUN: %target-sil-opt -enable-sil-verify-all -release-hoisting %s | %FileCheck --check-prefix=CHECK-RELEASE-HOISTING %s
-// RUN: %target-sil-opt -enable-sil-verify-all -retain-sinking -retain-sinking -late-release-hoisting %s | %FileCheck --check-prefix=CHECK-MULTIPLE-RS-ROUNDS %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -retain-sinking -late-release-hoisting %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -release-hoisting %s | %FileCheck --check-prefix=CHECK-RELEASE-HOISTING %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -retain-sinking -retain-sinking -late-release-hoisting %s | %FileCheck --check-prefix=CHECK-MULTIPLE-RS-ROUNDS %s
 
 // REQUIRES: swift_in_compiler
 
@@ -48,6 +48,13 @@ class C {}
 class C2  {
  var current: A
  init()
+}
+
+class Y {
+  @_hasStorage public var c: C2 { get }
+}
+
+actor Act {
 }
 
 struct S {
@@ -732,7 +739,7 @@ bb2:
 sil @conditional_metatype_cast : $@convention(thin) () -> AnyObject {
 bb0:
   %0 = metatype $@thick Int.Type
-  checked_cast_br %0 : $@thick Int.Type to AnyObject, bb2, bb1
+  checked_cast_br Int.Type in %0 : $@thick Int.Type to AnyObject, bb2, bb1
 
 bb1:
   unreachable
@@ -846,12 +853,12 @@ bb0(%0 : $_ContiguousArrayBuffer<UInt64>, %1 : $Builtin.Word):
 
 // CHECK-LABEL: sil @dontMoveOverExistentialToClassCast : $@convention(thin) (@guaranteed AnyObject) -> Optional<fuzz>
 // CHECK:    strong_retain %0
-// CHECK:    checked_cast_br %0
+// CHECK:    checked_cast_br AnyObject in %0
 // CHECK:  } // end sil function 'dontMoveOverExistentialToClassCast'
 sil @dontMoveOverExistentialToClassCast : $@convention(thin) (@guaranteed AnyObject) -> Optional<fuzz> {
 bb0(%0 : $AnyObject):
   strong_retain %0 : $AnyObject
-  checked_cast_br %0 : $AnyObject to fuzz, bb1, bb2
+  checked_cast_br AnyObject in %0 : $AnyObject to fuzz, bb1, bb2
 
 bb1(%18 : $fuzz):
   %19 = enum $Optional<fuzz>, #Optional.some!enumelt, %18 : $fuzz
@@ -867,7 +874,7 @@ bb3(%24 : $Optional<fuzz>):
 }
 
 // CHECK-LABEL: sil @moveOverClassToExistentialCast : $@convention(thin) (@guaranteed fuzz) -> Optional<any P>
-// CHECK:    checked_cast_br %0
+// CHECK:    checked_cast_br fuzz in %0
 // CHECK:    enum $Optional<any P>, #Optional.some!enumelt
 // CHECK:    strong_retain %0
 // CHECK-NOT: release
@@ -875,7 +882,7 @@ bb3(%24 : $Optional<fuzz>):
 sil @moveOverClassToExistentialCast : $@convention(thin) (@guaranteed fuzz) -> Optional<P> {
 bb0(%0 : $fuzz):
   strong_retain %0 : $fuzz
-  checked_cast_br %0 : $fuzz to P, bb1, bb2
+  checked_cast_br fuzz in %0 : $fuzz to P, bb1, bb2
 
 bb1(%18 : $P):
   %19 = enum $Optional<P>, #Optional.some!enumelt, %18 : $P
@@ -892,12 +899,12 @@ bb3(%24 : $Optional<P>):
 
 // CHECK-LABEL: sil @dontMoveOverExistentialToExistentialCast : $@convention(thin) (@guaranteed AnyObject) -> Optional<any P>
 // CHECK:    strong_retain %0
-// CHECK:    checked_cast_br %0
+// CHECK:    checked_cast_br AnyObject in %0
 // CHECK:  } // end sil function 'dontMoveOverExistentialToExistentialCast'
 sil @dontMoveOverExistentialToExistentialCast : $@convention(thin) (@guaranteed AnyObject) -> Optional<P> {
 bb0(%0 : $AnyObject):
   strong_retain %0 : $AnyObject
-  checked_cast_br %0 : $AnyObject to P, bb1, bb2
+  checked_cast_br AnyObject in %0 : $AnyObject to P, bb1, bb2
 
 bb1(%18 : $P):
   %19 = enum $Optional<P>, #Optional.some!enumelt, %18 : $P
@@ -1078,3 +1085,56 @@ bb0:
   %12 = tuple ()
   return %12 : $()
 }
+
+// CHECK-LABEL: sil @test_hop_to_executor :
+// CHECK:         strong_retain
+// CHECK:         hop_to_executor
+// CHECK:         strong_release
+// CHECK:       } // end sil function 'test_hop_to_executor'
+sil @test_hop_to_executor : $@convention(thin) @async (@guaranteed Y, @guaranteed Act) -> A {
+bb0(%0 : $Y, %1 : $Act):
+  %2 = ref_element_addr %0 : $Y, #Y.c
+  %3 = load %2 : $*C2
+  strong_retain %3 : $C2
+
+  // This is a synchronization point and any kind of other code might run here,
+  // which potentially can release C2.
+  hop_to_executor %1 : $Act
+
+  %6 = ref_element_addr %3 : $C2, #C2.current
+  %7 = load %6 : $*A
+  strong_release %3 : $C2
+  return %7 : $A
+}
+
+// CHECK-RELEASE-HOISTING-LABEL: sil @hoist_release_over_end_init_let_ref :
+// CHECK-RELEASE-HOISTING:         alloc_ref
+// CHECK-RELEASE-HOISTING-NEXT:    strong_release
+// CHECK-RELEASE-HOISTING-NEXT:    br bb1
+// CHECK-RELEASE-HOISTING:       } // end sil function 'hoist_release_over_end_init_let_ref'
+sil @hoist_release_over_end_init_let_ref : $@convention(thin) (@guaranteed B) -> () {
+bb0(%0 : $B):
+  %1 = alloc_ref $C
+  br bb1
+bb1:
+  %3 = end_init_let_ref %0 : $B
+  strong_release %1 : $C
+  %5 = tuple()
+  return %5 : $()
+}
+
+// CHECK: sil @dont_hoist_release_accross_cast
+// CHECK: retain
+// CHECK: apply
+// CHECK: unconditional_checked_cast
+// CHECK: release
+sil @dont_hoist_release_accross_cast : $@convention(thin) (B, B) -> () {
+bb0(%0 : $B, %1: $B):
+  strong_retain %0: $B
+  apply undef() : $@convention(thin) () -> ()
+  %3 = unconditional_checked_cast %0 : $B to Builtin.NativeObject
+  strong_release %0: $B
+  %5 = tuple()
+  return %5 : $()
+}
+

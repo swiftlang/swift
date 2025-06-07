@@ -19,6 +19,11 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD_INDEPENDENT_2 | %FileCheck %s -check-prefix=KEYWORD_LAST
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD_LAST | %FileCheck %s -check-prefix=KEYWORD_LAST
 
+// NOTE: If you want to test code completion for an experimental feature, please
+// put your tests in complete_decl_attribute_feature_requirement.swift, not
+// here. That file has the infrastructure to test that completions are not
+// offered when the feature is disabled.
+
 struct MyStruct {}
 
 @propertyWrapper
@@ -26,18 +31,36 @@ struct MyPropertyWrapper {
   var wrappedValue: String
 }
 
+@propertyWrapper
+struct MyGenericPropertyWrapper<T> {
+  var wrappedValue: T
+}
+
+
 @resultBuilder
 struct MyResultBuilder {
-  static func buildBlock(_ components: Int) -> Int {
-    return components.first!
+  static func buildBlock(_ component: Int) -> Int {
+    return component
   }
 }
+
+@resultBuilder
+struct MyGenericResultBuilder<T> {
+  static func buildBlock(_ components: Int) -> T {
+    fatalError()
+  }
+}
+
 
 @globalActor
 actor MyGlobalActor {
   static let shared = MyGlobalActor()
 }
 
+@globalActor
+actor MyGenericGlobalActor<T> {
+  static let shared = MyGenericGlobalActor<T>()
+}
 
 @available(#^AVAILABILITY1^#)
 
@@ -51,16 +74,17 @@ actor MyGlobalActor {
 // AVAILABILITY1-NEXT: Keyword/None:                       iOS[#Platform#]; name=iOS{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       tvOS[#Platform#]; name=tvOS{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       watchOS[#Platform#]; name=watchOS{{$}}
+// AVAILABILITY1-NEXT: Keyword/None:                       visionOS[#Platform#]; name=visionOS{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       macOS[#Platform#]; name=macOS{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       iOSApplicationExtension[#Platform#]; name=iOSApplicationExtension{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       tvOSApplicationExtension[#Platform#]; name=tvOSApplicationExtension{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       watchOSApplicationExtension[#Platform#]; name=watchOSApplicationExtension{{$}}
+// AVAILABILITY1-NEXT: Keyword/None:                       visionOSApplicationExtension[#Platform#]; name=visionOSApplicationExtension{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       macOSApplicationExtension[#Platform#]; name=macOSApplicationExtension{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       macCatalyst[#Platform#]; name=macCatalyst
 // AVAILABILITY1-NEXT: Keyword/None:                       macCatalystApplicationExtension[#Platform#]; name=macCatalystApplicationExtension
 // AVAILABILITY1-NEXT: Keyword/None:                       OpenBSD[#Platform#]; name=OpenBSD{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       Windows[#Platform#]; name=Windows{{$}}
-// AVAILABILITY1-NEXT: End completions
 
 @available(*, #^AVAILABILITY2^#)
 
@@ -70,7 +94,6 @@ actor MyGlobalActor {
 // AVAILABILITY2-NEXT:        Keyword/None:                       renamed: [#Specify replacing name#]; name=renamed{{$}}
 // AVAILABILITY2-NEXT:        Keyword/None:                       introduced: [#Specify version number#]; name=introduced{{$}}
 // AVAILABILITY2-NEXT:        Keyword/None:                       deprecated: [#Specify version number#]; name=deprecated{{$}}
-// AVAILABILITY2-NEXT:        End completions
 
 @#^KEYWORD2^# func method(){}
 
@@ -92,12 +115,15 @@ actor MyGlobalActor {
 // KEYWORD2-NEXT:             Keyword/None:                       noDerivative[#Func Attribute#]; name=noDerivative
 // KEYWORD2-NEXT:             Keyword/None:                       Sendable[#Func Attribute#]; name=Sendable
 // KEYWORD2-NEXT:             Keyword/None:                       preconcurrency[#Func Attribute#]; name=preconcurrency
+// KEYWORD2-NEXT:             Keyword/None:                       backDeployed[#Func Attribute#]; name=backDeployed
+// KEYWORD2-NEXT:             Keyword/None:                       lifetime[#Func Attribute#]; name=lifetime
+// KEYWORD2-NEXT:             Keyword/None:                       abi[#Func Attribute#]; name=abi{{$}}
+// KEYWORD2-NEXT:             Keyword/None:                       concurrent[#Func Attribute#]; name=concurrent
 // KEYWORD2-NOT:              Keyword
 // KEYWORD2-DAG:              Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
-// KEYWORD2-DAG:              Decl[Struct]/CurrModule:            MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper
-// KEYWORD2-DAG:              Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#MyResultBuilder#]; name=MyResultBuilder
-// KEYWORD2-DAG:              Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#MyGlobalActor#]; name=MyGlobalActor
-// KEYWORD2:                  End completions
+// KEYWORD2-DAG:              Decl[Struct]/CurrModule:            MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
+// KEYWORD2-DAG:              Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#Result Builder#]; name=MyResultBuilder
+// KEYWORD2-DAG:              Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#Global Actor#]; name=MyGlobalActor
 
 @#^KEYWORD3^# class C {}
 
@@ -117,9 +143,6 @@ actor MyGlobalActor {
 // KEYWORD3-NEXT:             Keyword/None:                       resultBuilder[#Class Attribute#]; name=resultBuilder
 // KEYWORD3-NEXT:             Keyword/None:                       globalActor[#Class Attribute#]; name=globalActor
 // KEYWORD3-NEXT:             Keyword/None:                       preconcurrency[#Class Attribute#]; name=preconcurrency
-// KEYWORD3-NEXT:             Keyword/None:                       typeWrapper[#Class Attribute#]; name=typeWrapper
-// KEYWORD3-NEXT:             Keyword/None:                       runtimeMetadata[#Class Attribute#]; name=runtimeMetadata
-// KEYWORD3-NEXT:             End completions
 
 @#^KEYWORD3_2^#IB class C2 {}
 // Same as KEYWORD3.
@@ -137,9 +160,6 @@ actor MyGlobalActor {
 // KEYWORD4-NEXT:             Keyword/None:                       resultBuilder[#Enum Attribute#]; name=resultBuilder
 // KEYWORD4-NEXT:             Keyword/None:                       globalActor[#Enum Attribute#]; name=globalActor
 // KEYWORD4-NEXT:             Keyword/None:                       preconcurrency[#Enum Attribute#]; name=preconcurrency
-// KEYWORD4-NEXT:             Keyword/None:                       typeWrapper[#Enum Attribute#]; name=typeWrapper
-// KEYWORD4-NEXT:             Keyword/None:                       runtimeMetadata[#Enum Attribute#]; name=runtimeMetadata
-// KEYWORD4-NEXT:             End completions
 
 @#^KEYWORD5^# struct S{}
 // KEYWORD5:                  Begin completions
@@ -153,12 +173,9 @@ actor MyGlobalActor {
 // KEYWORD5-NEXT:             Keyword/None:                       resultBuilder[#Struct Attribute#]; name=resultBuilder
 // KEYWORD5-NEXT:             Keyword/None:                       globalActor[#Struct Attribute#]; name=globalActor
 // KEYWORD5-NEXT:             Keyword/None:                       preconcurrency[#Struct Attribute#]; name=preconcurrency
-// KEYWORD5-NEXT:             Keyword/None:                       typeWrapper[#Struct Attribute#]; name=typeWrapper
-// KEYWORD5-NEXT:             Keyword/None:                       runtimeMetadata[#Struct Attribute#]; name=runtimeMetadata
-// KEYWORD5-NEXT:             End completions
 
 @#^ON_GLOBALVAR^# var globalVar
-// ON_GLOBALVAR: Begin completions
+// ON_GLOBALVAR-DAG: Keyword/None:                       abi[#Var Attribute#]; name=abi
 // ON_GLOBALVAR-DAG: Keyword/None:                       available[#Var Attribute#]; name=available
 // ON_GLOBALVAR-DAG: Keyword/None:                       objc[#Var Attribute#]; name=objc
 // ON_GLOBALVAR-DAG: Keyword/None:                       NSCopying[#Var Attribute#]; name=NSCopying
@@ -174,17 +191,20 @@ actor MyGlobalActor {
 // ON_GLOBALVAR-DAG: Keyword/None:                       noDerivative[#Var Attribute#]; name=noDerivative
 // ON_GLOBALVAR-DAG: Keyword/None:                       exclusivity[#Var Attribute#]; name=exclusivity
 // ON_GLOBALVAR-DAG: Keyword/None:                       preconcurrency[#Var Attribute#]; name=preconcurrency
-// ON_GLOBALVAR-DAG: Keyword/None:                       typeWrapperIgnored[#Var Attribute#]; name=typeWrapperIgnored
+// ON_GLOBALVAR-DAG: Keyword/None:                       backDeployed[#Var Attribute#]; name=backDeployed
+// ON_GLOBALVAR-DAG: Keyword/None:                       concurrent[#Var Attribute#]; name=concurrent
 // ON_GLOBALVAR-NOT: Keyword
 // ON_GLOBALVAR-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
-// ON_GLOBALVAR-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper
-// ON_GLOBALVAR-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#MyResultBuilder#]; name=MyResultBuilder
-// ON_GLOBALVAR-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#MyGlobalActor#]; name=MyGlobalActor
-// ON_GLOBALVAR: End completions
+// ON_GLOBALVAR-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
+// ON_GLOBALVAR-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericPropertyWrapper[#Property Wrapper#]; name=MyGenericPropertyWrapper
+// ON_GLOBALVAR-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#Result Builder#]; name=MyResultBuilder
+// ON_GLOBALVAR-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericResultBuilder[#Result Builder#]; name=MyGenericResultBuilder
+// ON_GLOBALVAR-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#Global Actor#]; name=MyGlobalActor
+// ON_GLOBALVAR-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGenericGlobalActor[#Global Actor#]; name=MyGenericGlobalActor
 
 struct _S {
   @#^ON_INIT^# init()
-// ON_INIT: Begin completions
+// ON_INIT-DAG: Keyword/None:                       abi[#Constructor Attribute#]; name=abi
 // ON_INIT-DAG: Keyword/None:                       available[#Constructor Attribute#]; name=available
 // ON_INIT-DAG: Keyword/None:                       objc[#Constructor Attribute#]; name=objc
 // ON_INIT-DAG: Keyword/None:                       inline[#Constructor Attribute#]; name=inline
@@ -193,10 +213,9 @@ struct _S {
 // ON_INIT-DAG: Keyword/None:                       usableFromInline[#Constructor Attribute#]; name=usableFromInline
 // ON_INIT-DAG: Keyword/None:                       discardableResult[#Constructor Attribute#]; name=discardableResult
 // ON_INIT-DAG: Keyword/None:                       preconcurrency[#Constructor Attribute#]; name=preconcurrency
-// ON_INIT: End completions
 
   @#^ON_PROPERTY^# var foo
-// ON_PROPERTY: Begin completions
+// ON_PROPERTY-DAG: Keyword/None:                       abi[#Var Attribute#]; name=abi
 // ON_PROPERTY-DAG: Keyword/None:                       available[#Var Attribute#]; name=available
 // ON_PROPERTY-DAG: Keyword/None:                       objc[#Var Attribute#]; name=objc
 // ON_PROPERTY-DAG: Keyword/None:                       NSCopying[#Var Attribute#]; name=NSCopying
@@ -212,18 +231,24 @@ struct _S {
 // ON_PROPERTY-DAG: Keyword/None:                       noDerivative[#Var Attribute#]; name=noDerivative
 // ON_PROPERTY-DAG: Keyword/None:                       exclusivity[#Var Attribute#]; name=exclusivity
 // ON_PROPERTY-DAG: Keyword/None:                       preconcurrency[#Var Attribute#]; name=preconcurrency
-// ON_PROPERTY-DAG: Keyword/None:                       typeWrapperIgnored[#Var Attribute#]; name=typeWrapperIgnored
+// ON_PROPERTY-DAG: Keyword/None:                       backDeployed[#Var Attribute#]; name=backDeployed
+// ON_PROPERTY-DAG: Keyword/None:                       concurrent[#Var Attribute#]; name=concurrent
 // ON_PROPERTY-NOT: Keyword
 // ON_PROPERTY-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
-// ON_PROPERTY-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper
-// ON_PROPERTY-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#MyResultBuilder#]; name=MyResultBuilder
-// ON_PROPERTY-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#MyGlobalActor#]; name=MyGlobalActor
+// ON_PROPERTY-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
+// ON_PROPERTY-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericPropertyWrapper[#Property Wrapper#]; name=MyGenericPropertyWrapper
+// ON_PROPERTY-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#Result Builder#]; name=MyResultBuilder
+// ON_PROPERTY-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericResultBuilder[#Result Builder#]; name=MyGenericResultBuilder
+// ON_PROPERTY-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#Global Actor#]; name=MyGlobalActor
+// ON_PROPERTY-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGenericGlobalActor[#Global Actor#]; name=MyGenericGlobalActor
 // ON_PROPERTY-NOT: Decl[PrecedenceGroup]
-// ON_PROPERTY: End completions
+
+  @#^ON_SUBSCR^# subscript
+// ON_SUBSCR-DAG:  Keyword/None:                        abi[#Declaration Attribute#]; name=abi
 
   @#^ON_METHOD^# private
   func foo()
-// ON_METHOD: Begin completions
+// ON_METHOD-DAG: Keyword/None:                       abi[#Func Attribute#]; name=abi
 // ON_METHOD-DAG: Keyword/None:                       available[#Func Attribute#]; name=available
 // ON_METHOD-DAG: Keyword/None:                       objc[#Func Attribute#]; name=objc
 // ON_METHOD-DAG: Keyword/None:                       IBAction[#Func Attribute#]; name=IBAction
@@ -241,24 +266,27 @@ struct _S {
 // ON_METHOD-DAG: Keyword/None:                       Sendable[#Func Attribute#]; name=Sendable
 // ON_METHOD-DAG: Keyword/None:                       noDerivative[#Func Attribute#]; name=noDerivative
 // ON_METHOD-DAG: Keyword/None:                       preconcurrency[#Func Attribute#]; name=preconcurrency
+// ON_METHOD-DAG: Keyword/None:                       backDeployed[#Func Attribute#]; name=backDeployed
+// ON_METHOD-DAG: Keyword/None:                       lifetime[#Func Attribute#]; name=lifetime
+// ON_METHOD-DAG: Keyword/None:                       concurrent[#Func Attribute#]; name=concurrent
 // ON_METHOD-NOT: Keyword
 // ON_METHOD-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
-// ON_METHOD-DAG: Decl[Struct]/CurrModule:            MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper
-// ON_METHOD-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#MyResultBuilder#]; name=MyResultBuilder
-// ON_METHOD-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#MyGlobalActor#]; name=MyGlobalActor
+// ON_METHOD-DAG: Decl[Struct]/CurrModule:            MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
+// ON_METHOD-DAG: Decl[Struct]/CurrModule:            MyGenericPropertyWrapper[#Property Wrapper#]; name=MyGenericPropertyWrapper
+// ON_METHOD-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#Result Builder#]; name=MyResultBuilder
+// ON_METHOD-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericResultBuilder[#Result Builder#]; name=MyGenericResultBuilder
+// ON_METHOD-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#Global Actor#]; name=MyGlobalActor
+// ON_METHOD-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGenericGlobalActor[#Global Actor#]; name=MyGenericGlobalActor
 
 
-// ON_METHOD: End completions
 
   func bar(@#^ON_PARAM_1^#)
-// ON_PARAM: Begin completions
 // ON_PARAM-NOT: Keyword
 // ON_PARAM-DAG: Decl[Struct]/CurrModule:             MyStruct[#MyStruct#]; name=MyStruct
-// ON_PARAM-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper
-// ON_PARAM-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#MyResultBuilder#]; name=MyResultBuilder
-// ON_PARAM-DAG: Decl[Actor]/CurrModule:              MyGlobalActor[#MyGlobalActor#]; name=MyGlobalActor
+// ON_PARAM-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
+// ON_PARAM-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#Result Builder#]; name=MyResultBuilder
+// ON_PARAM-DAG: Decl[Actor]/CurrModule:              MyGlobalActor[#Global Actor#]; name=MyGlobalActor
 // ON_PARAM-NOT: Keyword
-// ON_PARAM: End completions
 
   func bar(
     @#^ON_PARAM_2^#
@@ -278,7 +306,7 @@ struct _S {
 
 
   @#^ON_MEMBER_LAST^#
-// ON_MEMBER_LAST: Begin completions
+// ON_MEMBER_LAST-DAG: Keyword/None:                       abi[#Declaration Attribute#]; name=abi
 // ON_MEMBER_LAST-DAG: Keyword/None:                       available[#Declaration Attribute#]; name=available
 // ON_MEMBER_LAST-DAG: Keyword/None:                       objc[#Declaration Attribute#]; name=objc
 // ON_MEMBER_LAST-DAG: Keyword/None:                       dynamicCallable[#Declaration Attribute#]; name=dynamicCallable
@@ -312,17 +340,20 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Keyword/None:                       Sendable[#Declaration Attribute#]; name=Sendable
 // ON_MEMBER_LAST-DAG: Keyword/None:                       exclusivity[#Declaration Attribute#]; name=exclusivity
 // ON_MEMBER_LAST-DAG: Keyword/None:                       preconcurrency[#Declaration Attribute#]; name=preconcurrency
-// ON_MEMBER_LAST-DAG: Keyword/None:                       typeWrapper[#Declaration Attribute#]; name=typeWrapper
-// ON_MEMBER_LAST-DAG: Keyword/None:                       typeWrapperIgnored[#Declaration Attribute#]; name=typeWrapperIgnored
-// ON_MEMBER_LAST-DAG: Keyword/None:                       runtimeMetadata[#Declaration Attribute#]; name=runtimeMetadata
 // ON_MEMBER_LAST-DAG: Keyword/None:                       attached[#Declaration Attribute#]; name=attached
+// ON_MEMBER_LAST-DAG: Keyword/None:                       freestanding[#Declaration Attribute#]; name=freestanding
+// ON_MEMBER_LAST-DAG: Keyword/None:                       storageRestrictions[#Declaration Attribute#]; name=storageRestrictions
+// ON_MEMBER_LAST-DAG: Keyword/None:                       lifetime[#Declaration Attribute#]; name=lifetime
+// ON_MEMBER_LAST-DAG: Keyword/None:                       concurrent[#Declaration Attribute#]; name=concurrent
 // ON_MEMBER_LAST-NOT: Keyword
 // ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
-// ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper
-// ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#MyResultBuilder#]; name=MyResultBuilder
-// ON_MEMBER_LAST-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#MyGlobalActor#]; name=MyGlobalActor
+// ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
+// ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericPropertyWrapper[#Property Wrapper#]; name=MyGenericPropertyWrapper
+// ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#Result Builder#]; name=MyResultBuilder
+// ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericResultBuilder[#Result Builder#]; name=MyGenericResultBuilder
+// ON_MEMBER_LAST-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#Global Actor#]; name=MyGlobalActor
+// ON_MEMBER_LAST-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGenericGlobalActor[#Global Actor#]; name=MyGenericGlobalActor
 // ON_MEMBER_LAST-NOT: Decl[PrecedenceGroup]
-// ON_MEMBER_LAST: End completions
 }
 
 func takeClosure(_: () -> Void) {
@@ -330,13 +361,13 @@ func takeClosure(_: () -> Void) {
     print("x")
   }
 }
+// FIXME: Not valid in this position (but CompletionLookup can't tell that)
+// IN_CLOSURE-DAG:  Keyword/None:              abi[#Declaration Attribute#]; name=abi
 // FIXME: We should mark MyPropertyWrapper and MyResultBuilder as Unrelated
-// IN_CLOSURE: Begin completions
 // IN_CLOSURE-DAG: Decl[Struct]/CurrModule: MyStruct[#MyStruct#]; name=MyStruct
-// IN_CLOSURE-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper
-// IN_CLOSURE-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#MyResultBuilder#]; name=MyResultBuilder
-// IN_CLOSURE-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#MyGlobalActor#]; name=MyGlobalActor
-// IN_CLOSURE: End completions
+// IN_CLOSURE-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
+// IN_CLOSURE-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#Result Builder#]; name=MyResultBuilder
+// IN_CLOSURE-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#Global Actor#]; name=MyGlobalActor
 
 
 @#^KEYWORD_INDEPENDENT_1^#
@@ -350,8 +381,9 @@ func dummy2() {}
 
 @#^KEYWORD_LAST^#
 
-// KEYWORD_LAST: Begin completions
+// KEYWORD_LAST-DAG: Keyword/None:                       abi[#Declaration Attribute#]; name=abi
 // KEYWORD_LAST-DAG: Keyword/None:                       available[#Declaration Attribute#]; name=available{{$}}
+// KEYWORD_LAST-DAG: Keyword/None:                       freestanding[#Declaration Attribute#]; name=freestanding{{$}}
 // KEYWORD_LAST-DAG: Keyword/None:                       objc[#Declaration Attribute#]; name=objc{{$}}
 // KEYWORD_LAST-DAG: Keyword/None:                       dynamicCallable[#Declaration Attribute#]; name=dynamicCallable
 // KEYWORD_LAST-DAG: Keyword/None:                       main[#Declaration Attribute#]; name=main
@@ -385,13 +417,15 @@ func dummy2() {}
 // KEYWORD_LAST-DAG: Keyword/None:                       Sendable[#Declaration Attribute#]; name=Sendable
 // KEYWORD_LAST-DAG: Keyword/None:                       exclusivity[#Declaration Attribute#]; name=exclusivity
 // KEYWORD_LAST-DAG: Keyword/None:                       preconcurrency[#Declaration Attribute#]; name=preconcurrency
-// KEYWORD_LAST-DAG: Keyword/None:                       typeWrapper[#Declaration Attribute#]; name=typeWrapper
-// KEYWORD_LAST-DAG: Keyword/None:                       typeWrapperIgnored[#Declaration Attribute#]; name=typeWrapperIgnored
-// KEYWORD_LAST-DAG: Keyword/None:                       runtimeMetadata[#Declaration Attribute#]; name=runtimeMetadata
 // KEYWORD_LAST-DAG: Keyword/None:                       attached[#Declaration Attribute#]; name=attached
+// KEYWORD_LAST-DAG: Keyword/None:                       storageRestrictions[#Declaration Attribute#]; name=storageRestrictions
+// KEYWORD_LAST-DAG: Keyword/None:                       lifetime[#Declaration Attribute#]; name=lifetime
+// KEYWORD_LAST-DAG: Keyword/None:                       concurrent[#Declaration Attribute#]; name=concurrent
 // KEYWORD_LAST-NOT: Keyword
 // KEYWORD_LAST-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
-// KEYWORD_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#MyPropertyWrapper#]; name=MyPropertyWrapper
-// KEYWORD_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#MyResultBuilder#]; name=MyResultBuilder
-// KEYWORD_LAST-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#MyGlobalActor#]; name=MyGlobalActor
-// KEYWORD_LAST:                  End completions
+// KEYWORD_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericPropertyWrapper[#Property Wrapper#]; name=MyGenericPropertyWrapper
+// KEYWORD_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
+// KEYWORD_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyGenericResultBuilder[#Result Builder#]; name=MyGenericResultBuilder
+// KEYWORD_LAST-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#Result Builder#]; name=MyResultBuilder
+// KEYWORD_LAST-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGenericGlobalActor[#Global Actor#]; name=MyGenericGlobalActor
+// KEYWORD_LAST-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGlobalActor[#Global Actor#]; name=MyGlobalActor

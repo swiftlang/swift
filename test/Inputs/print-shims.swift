@@ -22,3 +22,9 @@ public func printBool(_ bool: Bool) {
 public func printAny(_ any: Any) {
   print(any)
 }
+
+@_silgen_name("printGenericType")
+public func printGenericType<T>(_ t: T.Type) {
+  print(T.self)
+}
+

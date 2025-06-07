@@ -188,6 +188,8 @@ public struct LazySequence<Base: Sequence> {
   }
 }
 
+extension LazySequence: Sendable where Base: Sendable {}
+
 extension LazySequence: Sequence {
   public typealias Element = Base.Element
   public typealias Iterator = Base.Iterator
@@ -207,7 +209,7 @@ extension LazySequence: Sequence {
   public __consuming func _copyContents(
     initializing buf: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
-    return _base._copyContents(initializing: buf)
+    return unsafe _base._copyContents(initializing: buf)
   }
 
   @inlinable // lazy-performance

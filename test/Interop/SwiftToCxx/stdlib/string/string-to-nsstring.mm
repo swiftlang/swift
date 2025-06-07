@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -typecheck %t/create_string.swift -typecheck -module-name StringCreator -enable-experimental-cxx-interop -emit-clang-header-path %t/StringCreator.h
+// RUN: %target-swift-frontend %t/create_string.swift -module-name StringCreator -enable-experimental-cxx-interop -typecheck -verify -emit-clang-header-path %t/StringCreator.h
 
 // RUN: %target-interop-build-clangxx -std=gnu++20 -fobjc-arc -c %t/string-to-nsstring.mm -I %t -o %t/swift-stdlib-execution.o
 // RUN: %target-build-swift %t/use_foundation.swift %t/create_string.swift -o %t/swift-stdlib-execution -Xlinker %t/swift-stdlib-execution.o -module-name StringCreator -Xfrontend -entry-point-function-name -Xfrontend swiftMain -lc++
@@ -27,15 +27,15 @@ public func createString(_ ptr: UnsafePointer<CChar>) -> String {
 #include "StringCreator.h"
 
 int main() {
-  using namespace Swift;
+  using namespace swift;
   auto emptyString = String::init();
   NSString *nsStr = emptyString;
 }
 
-// CHECKARC: %[[VAL:.*]] = call swiftcc i8* @"$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF"
-// CHECKARC: call i8* @llvm.objc.autorelease(i8* %[[VAL]])
+// CHECKARC: %[[VAL:.*]] = {{(tail )?}}call swiftcc ptr @"$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF"
+// CHECKARC: call ptr @llvm.objc.autorelease(ptr %[[VAL]])
 // CHECKARC: @llvm.objc.
-// CHECKARC-SAME: autorelease(i8*)
+// CHECKARC-SAME: autorelease(ptr
 // CHECKARC-NOT: @llvm.objc.
 
 //--- string-to-nsstring.mm
@@ -45,7 +45,7 @@ int main() {
 #include "StringCreator.h"
 
 int main() {
-  using namespace Swift;
+  using namespace swift;
 
   auto emptyString = String::init();
 

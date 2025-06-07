@@ -1,5 +1,4 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
+// RUN: %batch-code-completion
 
 enum A {
     case one, two
@@ -50,22 +49,16 @@ D().b(s: .#^STR_4?check=STRING^#, i: .#^INT_3?check=INT^#, b: .#^B_3?check=B^#)
 D().b(i: .#^INT_4?check=INT^#, b: .#^B_4?check=B^#)
 D().b(b: .#^B_5?check=B^#)
 
-// INT: Begin completions
 // INT-DAG: Decl[Constructor]/CurrNominal/IsSystem/TypeRelation[Convertible]: init({#bitPattern: UInt#})[#Int#]; name=init(bitPattern:)
-// INT: End completions
 
-// STRING: Begin completions
 // STRING-DAG: Decl[Constructor]/CurrNominal/IsSystem/TypeRelation[Convertible]: init()[#String#]; name=init()
-// STRING: End completions
 
 // A: Begin completions, 3 items
 // A-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: one[#A#]; name=one
 // A-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: two[#A#]; name=two
 // A-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): A#})[#(into: inout Hasher) -> Void#]; name=hash(:)
-// A: End completions
 
 // B: Begin completions, 3 items
 // B-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init({#(value): T#})[#B<T>#]; name=init(:)
 // B-DAG: Decl[StaticMethod]/CurrNominal/TypeRelation[Convertible]: void()[#B<Void>#]; name=void()
 // B-DAG: Decl[StaticMethod]/CurrNominal:     data({#(data): <<error type>>#})[#<<error type>>#]; name=data(:)
-// B: End completions

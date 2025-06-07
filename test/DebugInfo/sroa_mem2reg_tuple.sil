@@ -1,0 +1,80 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -sil-print-debuginfo -sroa %s | %FileCheck --check-prefix=CHECK-SROA %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -sil-print-debuginfo -sroa -mem2reg %s -o %t.sil
+// RUN: %FileCheck --check-prefix=CHECK-MEM2REG %s --input-file=%t.sil
+// RUN: %target-swiftc_driver -Xfrontend -disable-debugger-shadow-copies -g -emit-ir %t.sil | %FileCheck --check-prefix=CHECK-IR %s
+// RUN: %target-swiftc_driver -Xfrontend -disable-debugger-shadow-copies -g -c %t.sil -o %t.o
+// RUN: %llvm-dwarfdump --debug-info %t.o | %FileCheck --check-prefix=CHECK-DWARF %s
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil_scope 2 { loc "sroa.swift":1:6 parent @foo : $@convention(thin) (Int64, Int64) -> Int64 }
+sil_scope 3 { loc "sroa.swift":2:7 parent 2 }
+sil_scope 4 { loc "sroa.swift":2:16 parent 2 }
+
+// foo(in_x:in_y:), loc "sroa.swift":1:6, scope 2
+sil hidden @foo : $@convention(thin) (Int64, Int64) -> Int64 {
+bb0(%0 : $Int64, %1 : $Int64):
+  debug_value %0 : $Int64, let, name "in_x", argno 1, loc "sroa.swift":1:10, scope 2
+  debug_value %1 : $Int64, let, name "in_y", argno 2, loc "sroa.swift":1:21, scope 2
+
+  %4 = alloc_stack $(x: Int64, y: Int64), var, name "my_tup", loc "sroa.swift":2:7, scope 3
+  // Make sure SROA propagate the debug info to the splitted alloc_stack instructions
+  // CHECK-SROA: alloc_stack $Builtin.Int64, var
+  // CHECK-SROA-SAME:        (name "my_tup", loc "sroa.swift":2:7
+  // CHECK-SROA-SAME:        type $(x: Int64, y: Int64), expr op_tuple_fragment:$(x: Int64, y: Int64):0:op_fragment:#Int64._value
+  // CHECK-SROA-SAME:        loc * "<compiler-generated>":0:0
+  // CHECK-SROA: alloc_stack $Builtin.Int64, var
+  // CHECK-SROA-SAME:        (name "my_tup", loc "sroa.swift":2:7
+  // CHECK-SROA-SAME:        type $(x: Int64, y: Int64), expr op_tuple_fragment:$(x: Int64, y: Int64):1:op_fragment:#Int64._value
+  // CHECK-SROA-SAME:        loc * "<compiler-generated>":0:0
+
+  // Make sure the struct fields' SSA values are properly connected to the source variables via op_fragment
+  %5 = tuple_element_addr %4 : $*(x: Int64, y: Int64), 0, loc "sroa.swift":2:16, scope 4
+  %6 = tuple_element_addr %4 : $*(x: Int64, y: Int64), 1, loc "sroa.swift":2:16, scope 4
+  %7 = integer_literal $Builtin.Int64, 0, loc "sroa.swift":2:20, scope 4
+  %8 = struct $Int64 (%7 : $Builtin.Int64), loc "sroa.swift":2:20, scope 4
+  // CHECK-MEM2REG: %[[FIELD_X:[0-9]+]] = struct_extract %[[INT_X:[0-9]+]] : $Int64, #Int64._value, loc "sroa.swift":2:20
+  // CHECK-MEM2REG: debug_value %[[FIELD_X]] : $Builtin.Int64, var, (name "my_tup", loc "sroa.swift":2:7, scope 3), type $(x: Int64, y: Int64), expr op_tuple_fragment:$(x: Int64, y: Int64):0:op_fragment:#Int64._value
+  store %8 to %5 : $*Int64, loc "sroa.swift":2:20, scope 4
+  %10 = integer_literal $Builtin.Int64, 0, loc "sroa.swift":2:26, scope 4
+  %11 = struct $Int64 (%10 : $Builtin.Int64), loc "sroa.swift":2:26, scope 4
+  // CHECK-MEM2REG: %[[FIELD_Y:[0-9]+]] = struct_extract %[[INT_Y:[0-9]+]] : $Int64, #Int64._value, loc "sroa.swift":2:26
+  // CHECK-MEM2REG: debug_value %[[FIELD_Y]] : $Builtin.Int64, var, (name "my_tup", loc "sroa.swift":2:7, scope 3), type $(x: Int64, y: Int64), expr op_tuple_fragment:$(x: Int64, y: Int64):1:op_fragment:#Int64._value
+  store %11 to %6 : $*Int64, loc "sroa.swift":2:26, scope 4
+
+  %14 = tuple_element_addr %4 : $*(x: Int64, y: Int64), 0, loc "sroa.swift":3:12, scope 3
+  store %0 to %14 : $*Int64, loc "sroa.swift":3:12, scope 3
+  %18 = tuple_element_addr %4 : $*(x: Int64, y: Int64), 1, loc "sroa.swift":4:12, scope 3
+  store %1 to %18 : $*Int64, loc "sroa.swift":4:12, scope 3
+
+  // CHECK-IR: #dbg_value(i64 %0
+  // CHECK-IR-SAME:                      ![[MY_TUP_MD:[0-9]+]]
+  // CHECK-IR-SAME:                      !DIExpression(DW_OP_LLVM_fragment, 0, 64)
+  // CHECK-IR: #dbg_value(i64 %1
+  // CHECK-IR-SAME:                      ![[MY_TUP_MD]]
+  // CHECK-IR-SAME:                      !DIExpression(DW_OP_LLVM_fragment, 64, 64)
+
+  // CHECK-IR: #dbg_value(i64 %0, ![[ARG1_MD:[0-9]+]]
+  // CHECK-IR: #dbg_value(i64 %1, ![[ARG2_MD:[0-9]+]]
+
+  dealloc_stack %4 : $*(x: Int64, y: Int64), loc "sroa.swift":2:7, scope 3
+  return %0 : $Int64, loc "sroa.swift":5:3, scope 3
+} // end sil function 'foo'
+
+
+// CHECK-IR: ![[ARG1_MD]] = !DILocalVariable(name: "in_x", arg: 1
+// CHECK-IR-SAME:                            line: 1
+// CHECK-IR: ![[ARG2_MD]] = !DILocalVariable(name: "in_y", arg: 2
+// CHECK-IR-SAME:                            line: 1
+
+// CHECK-IR: ![[MY_TUP_MD]] = !DILocalVariable(name: "my_tup"
+// CHECK-IR-SAME:                              line: 2
+
+// CHECK-DWARF-LABEL:   DW_AT_name    ("foo")
+// CHECK-DWARF:       DW_TAG_variable
+// CHECK-DWARF:         DW_AT_name  ("my_tup")
+// Shouldn't be marked artificial
+// CHECK-DWARF-NOT:     DW_AT_artificial      (true)
+// CHECK-DWARF:       DW_TAG_{{.*}}

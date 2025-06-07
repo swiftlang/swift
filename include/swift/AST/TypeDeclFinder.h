@@ -19,7 +19,7 @@
 namespace swift {
 
 class BoundGenericType;
-class IdentTypeRepr;
+class DeclRefTypeRepr;
 class NominalType;
 class TypeAliasType;
 
@@ -44,7 +44,7 @@ public:
 /// equivalently and where generic arguments can be walked to separately from
 /// the generic type.
 class SimpleTypeDeclFinder : public TypeDeclFinder {
-  /// The function to call when a \c IdentTypeRepr is seen.
+  /// The function to call when a \c TypeDecl is seen.
   llvm::function_ref<Action(const TypeDecl *)> Callback;
 
   Action visitNominalType(NominalType *ty) override;
@@ -57,24 +57,25 @@ public:
     : Callback(callback) {}
 };
 
-/// Walks a \c TypeRepr to find all \c IdentTypeRepr nodes with bound
-/// type declarations.
-///
-/// Subclasses can either override #visitTypeDecl if they only care about
-/// types on their own, or #visitIdentTypeRepr if they want to keep
-/// the TypeRepr around.
-class TypeReprIdentFinder : public ASTWalker {
-  /// The function to call when a \c IdentTypeRepr is seen.
-  llvm::function_ref<bool(const IdentTypeRepr *)> Callback;
+/// Walks a `TypeRepr` and reports all `DeclRefTypeRepr` nodes with bound
+/// type declarations by invoking a given callback. These nodes are reported in
+/// depth- and base-first AST order. For example, nodes in `A<T>.B<U>` will be
+/// reported in the following order: `TAUB`.
+class DeclRefTypeReprFinder : public ASTWalker {
+  /// The function to call when a `DeclRefTypeRepr` is seen.
+  llvm::function_ref<bool(const DeclRefTypeRepr *)> Callback;
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Arguments;
+  }
 
   PostWalkAction walkToTypeReprPost(TypeRepr *TR) override;
 
 public:
-  explicit TypeReprIdentFinder(
-      llvm::function_ref<bool(const IdentTypeRepr *)> callback)
-    : Callback(callback) {}
+  explicit DeclRefTypeReprFinder(
+      llvm::function_ref<bool(const DeclRefTypeRepr *)> callback)
+      : Callback(callback) {}
 };
-
 }
 
 #endif

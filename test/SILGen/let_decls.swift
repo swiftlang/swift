@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name let_decls -Xllvm -sil-full-demangle %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name let_decls -Xllvm -sil-full-demangle %s | %FileCheck %s
 
 func takeClosure(_ a : () -> Int) {}
 
@@ -68,15 +68,16 @@ func test3() {
   // CHECK-NEXT: [[STR:%[0-9]+]] = apply [[GETFN]]()
   let o = getAString()
 
-  // CHECK-NEXT: [[STR_BORROW:%.*]] = begin_borrow [lexical] [[STR]]
+  // CHECK-NEXT: [[STR_MOV:%.*]] = move_value [var_decl] [[STR]]
   // CHECK-NEXT: debug_value
   // CHECK-NOT: destroy_value
 
+  // CHECK: [[STR_BORROW:%.*]] = begin_borrow [[STR_MOV]]
   // CHECK: [[USEFN:%[0-9]+]] = function_ref{{.*}}useAString
   // CHECK-NEXT: [[USE:%[0-9]+]] = apply [[USEFN]]([[STR_BORROW]])
   useAString(o)
   
-  // CHECK: destroy_value [[STR]]
+  // CHECK: destroy_value [[STR_MOV]]
 }
 // CHECK: } // end sil function '{{.*}}test3{{.*}}'
 
@@ -233,7 +234,8 @@ struct WeirdPropertyTest {
 func test_weird_property(_ v : WeirdPropertyTest, i : Int) -> Int {
   var v = v
   // CHECK: [[VBOX:%[0-9]+]] = alloc_box ${ var WeirdPropertyTest }
-  // CHECK: [[PB:%.*]] = project_box [[VBOX]]
+  // CHECK: [[VLIFETIME:%.*]] = begin_borrow [var_decl] [[VBOX]]
+  // CHECK: [[PB:%.*]] = project_box [[VLIFETIME]]
   // CHECK: store %0 to [trivial] [[PB]]
 
   // The setter isn't mutating, so we need to load the box.
@@ -324,7 +326,8 @@ func testLetArchetypeBases<T : SimpleProtocol>(_ p : T) {
 // CHECK-NEXT: debug_value %1 : $*any SimpleProtocol, let, name "b", {{.*}} expr op_deref
 func testDebugValue(_ a : Int, b : SimpleProtocol) -> Int {
 
-  // CHECK-NEXT: debug_value %0 : $Int, let, name "x"
+  // CHECK-NEXT: [[MV:%.*]] = move_value [var_decl] %0 : $Int
+  // CHECK-NEXT: debug_value [[MV]] : $Int, let, name "x"
   let x = a
 
   // CHECK: apply
@@ -332,7 +335,7 @@ func testDebugValue(_ a : Int, b : SimpleProtocol) -> Int {
   
   // CHECK-NOT: destroy_addr
 
-  // CHECK: return %0
+  // CHECK: return [[MV]]
   return x
 }
 
@@ -340,7 +343,7 @@ func testDebugValue(_ a : Int, b : SimpleProtocol) -> Int {
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}testAddressOnlyTupleArgument
 func testAddressOnlyTupleArgument(_ bounds: (start: SimpleProtocol, pastEnd: Int)) {
 // CHECK:       bb0(%0 : $*any SimpleProtocol, %1 : $Int):
-// CHECK-NEXT:    %2 = alloc_stack [lexical] $(start: any SimpleProtocol, pastEnd: Int), let, name "bounds", argno 1
+// CHECK-NEXT:    %2 = alloc_stack [lexical] [var_decl] $(start: any SimpleProtocol, pastEnd: Int), let, name "bounds", argno 1
 // CHECK-NEXT:    %3 = tuple_element_addr %2 : $*(start: any SimpleProtocol, pastEnd: Int), 0
 // CHECK-NEXT:    copy_addr %0 to [init] %3 : $*any SimpleProtocol
 // CHECK-NEXT:    %5 = tuple_element_addr %2 : $*(start: any SimpleProtocol, pastEnd: Int), 1
@@ -367,8 +370,10 @@ func member_ref_abstraction_change(_ x: GenericFunctionStruct<Int, Int>) -> (Int
 }
 
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}call_auto_closure
-// CHECK: bb0([[CLOSURE:%.*]] : $@noescape @callee_guaranteed () -> Bool):
-// CHECK:   apply [[CLOSURE]]() : $@noescape @callee_guaranteed () -> Bool
+// CHECK: bb0([[CLOSURE:%.*]] : @guaranteed $@noescape @callee_guaranteed () -> Bool):
+// CHECK:   [[CLOSUREC:%.*]] = copy_value [[CLOSURE]]
+// CHECK:   [[CLOSUREB:%.*]] = begin_borrow [[CLOSUREC]]
+// CHECK:   apply [[CLOSUREB]]() : $@noescape @callee_guaranteed () -> Bool
 // CHECK: } // end sil function '{{.*}}call_auto_closure{{.*}}'
 func call_auto_closure(x: @autoclosure () -> Bool) -> Bool {
   return x()  // Calls of autoclosures should be marked transparent.
@@ -465,7 +470,8 @@ struct LetPropertyStruct {
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}testLetPropertyAccessOnLValueBase
 // CHECK: bb0(%0 : $LetPropertyStruct):
 // CHECK:  [[ABOX:%[0-9]+]] = alloc_box ${ var LetPropertyStruct }
-// CHECK:  [[A:%[0-9]+]] = project_box [[ABOX]]
+// CHECK:  [[ALIFETIME:%[0-9]+]] = begin_borrow [var_decl] [[ABOX]]
+// CHECK:  [[A:%[0-9]+]] = project_box [[ALIFETIME]]
 // CHECK:   store %0 to [trivial] [[A]] : $*LetPropertyStruct
 // CHECK:   [[READ:%.*]] = begin_access [read] [unknown] [[A]]
 // CHECK:   [[STRUCT:%[0-9]+]] = load [trivial] [[READ]] : $*LetPropertyStruct
@@ -507,7 +513,7 @@ struct LetDeclInStruct {
 func test_unassigned_let_constant() {
   let string : String
 }
-// CHECK: [[S:%[0-9]+]] = alloc_stack [lexical] $String, let, name "string"
+// CHECK: [[S:%[0-9]+]] = alloc_stack [var_decl] $String, let, name "string"
 // CHECK-NEXT:  [[MUI:%[0-9]+]] = mark_uninitialized [var] [[S]] : $*String
 // CHECK-NEXT:  destroy_addr [[MUI]] : $*String
 // CHECK-NEXT:  dealloc_stack [[S]] : $*String

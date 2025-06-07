@@ -14,8 +14,8 @@ Centralized command line and file system interface for the build script.
 # ----------------------------------------------------------------------------
 
 import os
-import pipes
 import platform
+import shlex
 import shutil
 import subprocess
 import sys
@@ -35,7 +35,7 @@ def _fatal_error(message):
 
 
 def _quote(arg):
-    return pipes.quote(str(arg))
+    return shlex.quote(str(arg))
 
 
 def quote_command(args):
@@ -88,8 +88,8 @@ def call(command, stderr=None, env=None, dry_run=None, echo=True):
         subprocess.check_call(command, env=_env, stderr=stderr)
     except subprocess.CalledProcessError as e:
         _fatal_error(
-            "command terminated with a non-zero exit status " +
-            str(e.returncode) + ", aborting")
+            f"command `{command}` terminated with a non-zero exit status "
+            f"{str(e.returncode)}, aborting")
     except OSError as e:
         _fatal_error(
             "could not execute '" + quote_command(command) +
@@ -138,8 +138,8 @@ def capture(command, stderr=None, env=None, dry_run=None, echo=True,
         if optional:
             return None
         _fatal_error(
-            "command terminated with a non-zero exit status " +
-            str(e.returncode) + ", aborting")
+            f"command `{command}` terminated with a non-zero exit status "
+            f"{str(e.returncode)}, aborting")
     except OSError as e:
         if optional:
             return None
@@ -228,8 +228,10 @@ def run(*args, **kwargs):
     my_pipe = subprocess.Popen(
         *args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         universal_newlines=True,
+        encoding='utf-8',
         **kwargs)
     (output, _) = my_pipe.communicate()
+    output = output.encode(encoding='ascii', errors='replace')
     ret = my_pipe.wait()
 
     if lock:
@@ -240,7 +242,7 @@ def run(*args, **kwargs):
         _echo_command(dry_run, *args, env=env, prompt="{0}+ ".format(prefix))
         if output:
             for line in output.splitlines():
-                print("{0}{1}".format(prefix, line))
+                print("{0}{1}".format(prefix, line.decode('utf-8', errors='replace')))
         sys.stdout.flush()
         sys.stderr.flush()
     if lock:

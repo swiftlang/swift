@@ -13,7 +13,7 @@ let arr = [_](repeating: "hi", count: 3)
 func foo(_ arr: [_] = [0]) {} // expected-error {{type placeholder may not appear in top-level parameter}}
 // expected-note@-1 {{replace the placeholder with the inferred type 'Int'}}
 
-let foo = _.foo // expected-error {{type placeholder not allowed here}} expected-error {{could not infer type for placeholder}}
+let foo = _.foo // expected-error {{type placeholder not allowed here}}
 let zero: _ = .zero // expected-error {{cannot infer contextual base in reference to member 'zero'}}
 
 struct S<T> {
@@ -54,7 +54,7 @@ let _: [String: _] = dictionary(ofType: [_: Int].self)
 let _: [_: _] = dictionary(ofType: [String: Int].self)
 let _: [String: Int] = dictionary(ofType: _.self) // expected-error {{type placeholder not allowed here}}
 
-let _: @convention(c) _ = { 0 } // expected-error {{@convention attribute only applies to function types}}
+let _: @convention(c) _ = { 0 } // expected-error {{'@convention' only applies to function types}}
 let _: @convention(c) (_) -> _ = { (x: Double) in 0 }
 let _: @convention(c) (_) -> Int = { (x: Double) in 0 }
 
@@ -110,15 +110,15 @@ extension Bar {
 }
 
 // FIXME: We should probably have better diagnostics for these situations--the user probably meant to use implicit member syntax
-let _: Int = _() // expected-error {{type placeholder not allowed here}} expected-error {{could not infer type for placeholder}}
-let _: () -> Int = { _() } // expected-error 2 {{type placeholder not allowed here}} expected-error {{could not infer type for placeholder}}
-let _: Int = _.init() // expected-error {{type placeholder not allowed here}} expected-error {{could not infer type for placeholder}}
-let _: () -> Int = { _.init() } // expected-error 2 {{type placeholder not allowed here}} expected-error {{could not infer type for placeholder}}
+let _: Int = _() // expected-error {{type placeholder not allowed here}}
+let _: () -> Int = { _() } // expected-error {{type placeholder not allowed here}}
+let _: Int = _.init() // expected-error {{type placeholder not allowed here}}
+let _: () -> Int = { _.init() } // expected-error {{type placeholder not allowed here}}
 
-func returnsInt() -> Int { _() } // expected-error {{type placeholder not allowed here}} expected-error {{could not infer type for placeholder}}
-func returnsIntClosure() -> () -> Int { { _() } } // expected-error 2 {{type placeholder not allowed here}} expected-error {{could not infer type for placeholder}}
-func returnsInt2() -> Int { _.init() }  // expected-error {{type placeholder not allowed here}} expected-error {{could not infer type for placeholder}}
-func returnsIntClosure2() -> () -> Int { { _.init() } } // expected-error 2 {{type placeholder not allowed here}} expected-error {{could not infer type for placeholder}}
+func returnsInt() -> Int { _() } // expected-error {{type placeholder not allowed here}}
+func returnsIntClosure() -> () -> Int { { _() } } // expected-error {{type placeholder not allowed here}}
+func returnsInt2() -> Int { _.init() }  // expected-error {{type placeholder not allowed here}}
+func returnsIntClosure2() -> () -> Int { { _.init() } } // expected-error {{type placeholder not allowed here}}
 
 let _: Int.Type = _ // expected-error {{'_' can only appear in a pattern or on the left side of an assignment}}
 let _: Int.Type = _.self // expected-error {{type placeholder not allowed here}}
@@ -145,17 +145,17 @@ let _ = [_].otherStaticMember.member
 let _ = [_].otherStaticMember.method()
 
 func f(x: Any, arr: [Int]) {
-    // FIXME: Better diagnostics here. Maybe we should suggest replacing placeholders with 'Any'?
+    // TODO: Maybe we should suggest replacing placeholders with 'Any'?
 
-    if x is _ {} // expected-error {{type placeholder not allowed here}} expected-error {{type of expression is ambiguous without more context}}
-    if x is [_] {} // expected-error {{type of expression is ambiguous without more context}}
-    if x is () -> _ {} // expected-error {{type of expression is ambiguous without more context}}
-    if let y = x as? _ {} // expected-error {{type placeholder not allowed here}} expected-error {{type of expression is ambiguous without more context}}
-    if let y = x as? [_] {} // expected-error {{type of expression is ambiguous without more context}}
-    if let y = x as? () -> _ {} // expected-error {{type of expression is ambiguous without more context}}
-    let y1 = x as! _ // expected-error {{type placeholder not allowed here}} expected-error {{type of expression is ambiguous without more context}}
-    let y2 = x as! [_] // expected-error {{type of expression is ambiguous without more context}}
-    let y3 = x as! () -> _ // expected-error {{type of expression is ambiguous without more context}}
+    if x is _ {} // expected-error {{type placeholder not allowed here}}
+    if x is [_] {} // expected-error {{could not infer type for placeholder}}
+    if x is () -> _ {} // expected-error {{could not infer type for placeholder}}
+    if let y = x as? _ {} // expected-error {{type placeholder not allowed here}}
+    if let y = x as? [_] {} // expected-error {{could not infer type for placeholder}}
+    if let y = x as? () -> _ {} // expected-error {{could not infer type for placeholder}}
+    let y1 = x as! _ // expected-error {{type placeholder not allowed here}}
+    let y2 = x as! [_] // expected-error {{could not infer type for placeholder}}
+    let y3 = x as! () -> _ // expected-error {{could not infer type for placeholder}}
 
     switch x {
     case is _: break // expected-error {{type placeholder not allowed here}}
@@ -166,15 +166,22 @@ func f(x: Any, arr: [Int]) {
     case let y as () -> _: break // expected-error {{type placeholder not allowed here}}
     }
 
-    if arr is _ {} // expected-error {{type placeholder not allowed here}} expected-error {{type of expression is ambiguous without more context}}
-    if arr is [_] {} // expected-error {{type of expression is ambiguous without more context}}
-    if arr is () -> _ {} // expected-error {{type of expression is ambiguous without more context}}
-    if let y = arr as? _ {} // expected-error {{type placeholder not allowed here}} expected-error {{type of expression is ambiguous without more context}}
-    if let y = arr as? [_] {} // expected-error {{type of expression is ambiguous without more context}}
-    if let y = arr as? () -> _ {} // expected-error {{type of expression is ambiguous without more context}}
-    let y1 = arr as! _ // expected-error {{type placeholder not allowed here}} expected-error {{type of expression is ambiguous without more context}}
-    let y2 = arr as! [_] // expected-error {{type of expression is ambiguous without more context}}
-    let y3 = arr as! () -> _ // expected-error {{type of expression is ambiguous without more context}}
+    if case is _ = x {} // expected-error {{type placeholder not allowed here}}
+    if case is [_] = x {} // expected-error {{could not infer type for placeholder}}
+    if case is () -> _ = x {} // expected-error {{could not infer type for placeholder}}
+    if case let y as _ = x {} // expected-error {{type placeholder not allowed here}}
+    if case let y as [_] = x {} // expected-error {{could not infer type for placeholder}}
+    if case let y as () -> _ = x {} // expected-error {{could not infer type for placeholder}}
+
+    if arr is _ {} // expected-error {{type placeholder not allowed here}}
+    if arr is [_] {} // expected-error {{could not infer type for placeholder}}
+    if arr is () -> _ {} // expected-error {{could not infer type for placeholder}}
+    if let y = arr as? _ {} // expected-error {{type placeholder not allowed here}}
+    if let y = arr as? [_] {} // expected-error {{could not infer type for placeholder}}
+    if let y = arr as? () -> _ {} // expected-error {{could not infer type for placeholder}}
+    let y1 = arr as! _ // expected-error {{type placeholder not allowed here}}
+    let y2 = arr as! [_] // expected-error {{could not infer type for placeholder}}
+    let y3 = arr as! () -> _ // expected-error {{could not infer type for placeholder}}
 
     switch arr {
     case is _: break // expected-error {{type placeholder not allowed here}}
@@ -270,3 +277,16 @@ func deferredInit(_ c: Bool) {
 // https://github.com/apple/swift/issues/63130
 let _: _  = nil // expected-error{{'nil' requires a contextual type}}
 let _: _? = nil // expected-error{{'nil' requires a contextual type}}
+
+// rdar://106621760 - failed to produce a diagnostic when placeholder type appears in editor placeholder
+do {
+  struct X<T> {
+    init(content: () -> T) {}
+  }
+
+  func test(_: () -> Void) {}
+
+  test {
+    _ = X(content: <#T##() -> _#>) // expected-error {{editor placeholder in source file}}
+  }
+}

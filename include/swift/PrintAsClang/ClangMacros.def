@@ -73,6 +73,9 @@
 #endif
 
 CLANG_MACRO_DEFINED("SWIFT_TYPEDEFS")
+CLANG_MACRO_DEFINED("char8_t")
+CLANG_MACRO_DEFINED("char16_t")
+CLANG_MACRO_DEFINED("char32_t")
 
 #define MAP_SIMD_TYPE(C_TYPE, SCALAR_TYPE, _) \
     CLANG_MACRO_DEFINED("swift_" #C_TYPE "2") \
@@ -133,7 +136,7 @@ CLANG_MACRO_BODY("SWIFT_CLASS", \
         "SWIFT_RUNTIME_NAME(SWIFT_NAME) __attribute__((objc_subclassing_restricted)) " \
         "SWIFT_CLASS_EXTRA\n" \
     "#  define SWIFT_CLASS_NAMED(SWIFT_NAME) " \
-        "__attribute((objc_subclassing_restricted)) SWIFT_COMPILE_NAME(SWIFT_NAME) " \
+        "__attribute__((objc_subclassing_restricted)) SWIFT_COMPILE_NAME(SWIFT_NAME) " \
         "SWIFT_CLASS_EXTRA\n" \
     "# else\n" \
     "#  define SWIFT_CLASS(SWIFT_NAME) " \
@@ -175,7 +178,7 @@ CLANG_MACRO_CONDITIONAL("SWIFT_ENUM_ATTR", "(_extensibility)", \
 CLANG_MACRO_BODY("SWIFT_ENUM", \
     "# define SWIFT_ENUM(_type, _name, _extensibility) " \
         "enum _name : _type _name; " \
-        "enum SWIFT_ENUM_ATTR(_extensibility) SWIFT_ENUM_EXTRA _name: _type\n" \
+        "enum SWIFT_ENUM_ATTR(_extensibility) SWIFT_ENUM_EXTRA _name : _type\n" \
     "# if __has_feature(generalized_swift_name)\n" \
     "#  define SWIFT_ENUM_NAMED(_type, _name, SWIFT_NAME, _extensibility) " \
         "enum _name : _type _name SWIFT_COMPILE_NAME(SWIFT_NAME); " \
@@ -185,6 +188,7 @@ CLANG_MACRO_BODY("SWIFT_ENUM", \
     "#  define SWIFT_ENUM_NAMED(_type, _name, SWIFT_NAME, _extensibility) " \
         "SWIFT_ENUM(_type, _name, _extensibility)\n" \
     "# endif")
+CLANG_MACRO_DEFINED("SWIFT_ENUM_NAMED")
 
 CLANG_MACRO("SWIFT_UNAVAILABLE", , "__attribute__((unavailable))")
 CLANG_MACRO("SWIFT_UNAVAILABLE_MSG", "(msg)", "__attribute__((unavailable(msg)))")
@@ -197,7 +201,7 @@ CLANG_MACRO("SWIFT_DEPRECATED", , "__attribute__((deprecated))")
 CLANG_MACRO("SWIFT_DEPRECATED_MSG", "(...)", "__attribute__((deprecated(__VA_ARGS__)))")
 
 CLANG_MACRO_ALTERNATIVE("SWIFT_DEPRECATED_OBJC", "(Msg)", \
-                        "__has_feature(attribute_diagnost_if_objc)", \
+                        "__has_feature(attribute_diagnose_if_objc)", \
                         "__attribute__((diagnose_if(1, Msg, \"warning\")))", \
                         "SWIFT_DEPRECATED_MSG(Msg)")
 
@@ -223,6 +227,17 @@ CLANG_MACRO("SWIFT_ERROR_RESULT", , "__attribute__((swift_error_result))")
 CLANG_MACRO_DEFINED("SWIFT_IMPORT_STDLIB_SYMBOL")
 
 CLANG_MACRO_CXX("SWIFT_NOEXCEPT", , "noexcept", )
+
+CLANG_MACRO_BODY("SWIFT_C_INLINE_THUNK", \
+    "# if __has_attribute(always_inline)\n" \
+    "# if __has_attribute(nodebug)\n" \
+    "#  define SWIFT_C_INLINE_THUNK inline __attribute__((always_inline)) __attribute__((nodebug))\n" \
+    "# else\n" \
+    "#  define SWIFT_C_INLINE_THUNK inline __attribute__((always_inline))\n" \
+    "# endif\n" \
+    "# else\n" \
+    "#  define SWIFT_C_INLINE_THUNK inline\n"\
+    "# endif")
 
 #undef CLANG_MACRO
 #undef CLANG_MACRO_BODY

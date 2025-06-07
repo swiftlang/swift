@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -disable-availability-checking -I %S/Inputs/custom-modules %s -verify | %FileCheck --enable-var-scope --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -Xllvm -sil-print-types -emit-silgen -checked-async-objc-bridging=off -target %target-swift-5.1-abi-triple -I %S/Inputs/custom-modules %s -verify | %FileCheck --enable-var-scope --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 
@@ -8,13 +8,14 @@ import EffectfulProperties
 // CHECK-LABEL: sil {{.*}}@${{.*}}13testJustAsync
 func testJustAsync(eff : EffProps) async {
   // CHECK: [[RESUME_BUF:%.*]] = alloc_stack $NSObject
-  // CHECK: [[METHOD:%.*]] = objc_method {{.*}} $@convention(objc_method) (@convention(block) (NSObject) -> (), EffProps) -> ()
+  // CHECK: [[METHOD:%.*]] = objc_method {{.*}} $@convention(objc_method) (@convention(block) @Sendable (NSObject) -> (), EffProps) -> ()
   // CHECK: [[CONT:%.*]] = get_async_continuation_addr NSObject, [[RESUME_BUF]]
   // CHECK: [[WRAPPED:%.*]] = struct $UnsafeContinuation<NSObject, Never> ([[CONT]] : $Builtin.RawUnsafeContinuation)
-  // CHECK: [[BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage UnsafeContinuation<NSObject, Never>
+  // CHECK: [[BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage Any
   // CHECK: [[CONT_SLOT:%.*]] = project_block_storage [[BLOCK_STORAGE]]
-  // CHECK: store [[WRAPPED]] to [trivial] [[CONT_SLOT]]
-  // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[NSO_COMPLETION_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeContinuation<NSObject, Never>, NSObject) -> ()
+  // CHECK: [[CONT_SLOT_ADDR:%.*]] = init_existential_addr [[CONT_SLOT]]
+  // CHECK: store [[WRAPPED]] to [trivial] [[CONT_SLOT_ADDR]]
+  // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[NSO_COMPLETION_BLOCK:.*]] : $@convention(c) @Sendable (@inout_aliasable @block_storage Any, NSObject) -> ()
   // CHECK: [[BLOCK:%.*]] = init_block_storage_header [[BLOCK_STORAGE]] {{.*}}, invoke [[BLOCK_IMPL]]
   // CHECK: apply [[METHOD]]([[BLOCK]], %0)
   // CHECK: await_async_continuation [[CONT]] {{.*}}, resume [[RESUME:bb[0-9]+]]
@@ -28,13 +29,14 @@ func testJustAsync(eff : EffProps) async {
 // CHECK-LABEL: sil {{.*}}@${{.*}}15testAsyncThrows
 func testAsyncThrows(eff : EffProps) async {
   // CHECK: [[RESUME_BUF:%.*]] = alloc_stack $Optional<NSObject>
-  // CHECK: [[METHOD:%.*]] = objc_method {{.*}} $@convention(objc_method) (@convention(block) (Optional<NSObject>, Optional<NSError>) -> (), EffProps) -> ()
+  // CHECK: [[METHOD:%.*]] = objc_method {{.*}} $@convention(objc_method) (@convention(block) @Sendable (Optional<NSObject>, Optional<NSError>) -> (), EffProps) -> ()
   // CHECK: [[CONT:%.*]] = get_async_continuation_addr [throws] Optional<NSObject>, [[RESUME_BUF]]
   // CHECK: [[WRAPPED:%.*]] = struct $UnsafeContinuation<Optional<NSObject>, any Error> ([[CONT]] : $Builtin.RawUnsafeContinuation)
-  // CHECK: [[BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage UnsafeContinuation<Optional<NSObject>, any Error>
+  // CHECK: [[BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage Any
   // CHECK: [[CONT_SLOT:%.*]] = project_block_storage [[BLOCK_STORAGE]]
-  // CHECK: store [[WRAPPED]] to [trivial] [[CONT_SLOT]]
-  // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[NSO_COMPLETION_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage UnsafeContinuation<Optional<NSObject>, any Error>, Optional<NSObject>, Optional<NSError>) -> ()
+  // CHECK: [[CONT_SLOT_ADDR:%.*]] = init_existential_addr [[CONT_SLOT]]
+  // CHECK: store [[WRAPPED]] to [trivial] [[CONT_SLOT_ADDR]]
+  // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[NSO_COMPLETION_BLOCK:.*]] : $@convention(c) @Sendable (@inout_aliasable @block_storage Any, Optional<NSObject>, Optional<NSError>) -> ()
   // CHECK: [[BLOCK:%.*]] = init_block_storage_header [[BLOCK_STORAGE]] {{.*}}, invoke [[BLOCK_IMPL]]
   // CHECK: apply [[METHOD]]([[BLOCK]], %0)
   // CHECK: await_async_continuation [[CONT]] {{.*}}, resume [[RESUME:bb[0-9]+]], error [[RESUME_ERROR:bb[0-9]+]]

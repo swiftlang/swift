@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -import-objc-header %S/Inputs/nested_protocol_name.h -typecheck -verify %s
 
 // RUN: echo '#include "nested_protocol_name.h"' > %t.m
-// RUN: %target-swift-ide-test -source-filename %s -print-header -header-to-print %S/Inputs/nested_protocol_name.h -import-objc-header %S/Inputs/nested_protocol_name.h -print-regular-comments --cc-args %target-cc-options -fsyntax-only %t.m -I %S/Inputs > %t.txt
+// RUN: %target-swift-ide-test -source-filename %s -print-header -header-to-print %S/Inputs/nested_protocol_name.h -import-objc-header %S/Inputs/nested_protocol_name.h --cc-args %target-cc-options -fsyntax-only %t.m -I %S/Inputs > %t.txt
 // RUN: %FileCheck -check-prefix=HEADER %s < %t.txt
 
 // rdar://59431058
@@ -11,11 +11,10 @@
 
 // HEADER: class Trunk {
 // HEADER:   init!()
-// HEADER:   class func addLimb(_ limb: Trunk.Branch!)
-// HEADER:   func addLimb(_ limb: Trunk.Branch!)
-// HEADER:   func addLimbs(_ limbs: [Trunk.Branch]!)
+// HEADER:   class func addLimb(_ limb: (any Trunk.Branch)!)
+// HEADER:   func addLimb(_ limb: (any Trunk.Branch)!)
+// HEADER:   func addLimbs(_ limbs: [any Trunk.Branch]!)
 // HEADER: }
-// HEADER: // NS_SWIFT_NAME(Trunk.Branch)
 // HEADER: protocol Branch {
 // HEADER:   func flower()
 // HEADER: }

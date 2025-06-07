@@ -26,11 +26,7 @@
 #define NOMINMAX
 #include <windows.h>
 #else // defined(_WIN32)
-#if __has_include(<sys/errno.h>)
-#include <sys/errno.h>
-#else
 #include <errno.h>
-#endif
 #if __has_include(<sys/resource.h>)
 #include <sys/resource.h>
 #endif
@@ -58,7 +54,9 @@
 #endif // SWIFT_STDLIB_HAS_LOCALE
 
 #include <limits>
+#ifndef SWIFT_THREADING_NONE
 #include <thread>
+#endif
 
 #if defined(__ANDROID__)
 #include <android/api-level.h>
@@ -175,16 +173,21 @@ static locale_t getCLocale() {
 #endif
 #endif // SWIFT_STDLIB_HAS_LOCALE
 
-// TODO: replace this with a float16 implementation instead of calling _float.
-// Argument type will have to stay float, though; only the formatting changes.
-// Note, return type is __swift_ssize_t, not uint64_t as with the other
-// formatters. We'd use this type there if we could, but it's ABI so we can't
-// go back and change it.
+#if SWIFT_DTOA_PASS_FLOAT16_AS_FLOAT
+using _CFloat16Argument = float;
+#else
+using _CFloat16Argument = _Float16;
+#endif
+
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 __swift_ssize_t swift_float16ToString(char *Buffer, size_t BufferLength,
-                                      float Value, bool Debug) {
+                                      _CFloat16Argument Value, bool Debug) {
+#if SWIFT_DTOA_PASS_FLOAT16_AS_FLOAT
   __fp16 v = Value;
   return swift_dtoa_optimal_binary16_p(&v, Buffer, BufferLength);
+#else
+  return swift_dtoa_optimal_binary16_p(&Value, Buffer, BufferLength);
+#endif
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
@@ -535,8 +538,8 @@ __swift_bool swift_stdlib_isStackAllocationSafe(__swift_size_t byteCount,
 
 __swift_bool _swift_stdlib_getCurrentStackBounds(__swift_uintptr_t *outBegin,
                                                  __swift_uintptr_t *outEnd) {
-  llvm::Optional<swift::Thread::StackBounds> bounds =
-    swift::Thread::stackBounds();
+  std::optional<swift::Thread::StackBounds> bounds =
+      swift::Thread::stackBounds();
   if (!bounds)
     return false;
   *outBegin = (uintptr_t)bounds->low;

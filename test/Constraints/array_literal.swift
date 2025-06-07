@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple
 
 struct IntList : ExpressibleByArrayLiteral {
   typealias Element = Int
@@ -126,6 +126,11 @@ func defaultToAny(i: Int, s: String) {
   // expected-error@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
   let _: Int = a1  // expected-error{{value of type '[Any]'}}
 
+  let _ = ([1, "a"])
+  // expected-error@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
+  let _ = [1, true, []]
+  // expected-error@-1:11 {{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
+
   let a2: Array = [1, "a", 3.5]
   // expected-error@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
   let _: Int = a2  // expected-error{{value of type '[Any]'}}
@@ -146,9 +151,7 @@ func defaultToAny(i: Int, s: String) {
   let _: [Any] = [1, "a", 3.5]
   let _: [Any] = [1, "a", [3.5, 3.7, 3.9]]
   let _: [Any] = [1, "a", [3.5, "b", 3]]
-  // expected-warning@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
   let _: [Any] = [1, [2, [3]]]
-  // expected-warning@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
 
   func f1() -> [Any] {
     []
@@ -157,41 +160,25 @@ func defaultToAny(i: Int, s: String) {
   let _: [Any?] = [1, "a", nil, 3.5]
   let _: [Any?] = [1, "a", nil, [3.5, 3.7, 3.9]]
   let _: [Any?] = [1, "a", nil, [3.5, "b", nil]]
-  // expected-warning@-1{{heterogeneous collection literal could only be inferred to '[Any?]'; add explicit type annotation if this is intentional}}
   let _: [Any?] = [1, [2, [3]]]
-  // expected-warning@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
   let _: [Any?] = [1, nil, [2, nil, [3]]]
-  // expected-warning@-1{{heterogeneous collection literal could only be inferred to '[Any?]'; add explicit type annotation if this is intentional}}
 
   let a6 = [B(), C()]
   let _: Int = a6 // expected-error{{value of type '[A]'}}
   
   let a7: some Collection = [1, "Swift"]
-  // expected-warning@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}} {{41-41= as [Any]}}
   let _: (any Sequence)? = [1, "Swift"]
-  // expected-warning@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
   let _: any Sequence = [1, nil, "Swift"]
-  // expected-warning@-1{{heterogeneous collection literal could only be inferred to '[Any?]'; add explicit type annotation if this is intentional}}
-  let _ = [1, true, ([], 1)]
-  // expected-error@-1 {{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
-  // expected-warning@-2 {{empty collection literal requires an explicit type}}
   let _ = true ? [] : []
-  // expected-warning@-1{{empty collection literal requires an explicit type}}
   let _ = (true, ([1, "Swift"]))
-  //expected-warning@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
-  let _ = ([1, true])
-  //expected-error@-1{{heterogeneous collection literal could only be inferred to '[Any]'; add explicit type annotation if this is intentional}}
 
   func f2<T>(_: [T]) {}
 
   func f3<T>() -> [T]? {}
 
   f2([])
-  // expected-warning@-1{{empty collection literal requires an explicit type}}
   f2([1, nil, ""])
-  // expected-warning@-1{{heterogeneous collection literal could only be inferred to '[Any?]'; add explicit type annotation if this is intentional}}
   _ = f3() ?? []
-  // expected-warning@-1{{empty collection literal requires an explicit type}}
 }
 
 func noInferAny(iob: inout B, ioc: inout C) {
@@ -371,6 +358,7 @@ protocol P { }
 struct PArray<T> { }
 
 extension PArray : ExpressibleByArrayLiteral where T: P {
+  // expected-note@-1 {{requirement from conditional conformance of 'PArray<String>' to 'ExpressibleByArrayLiteral'}}
   typealias ArrayLiteralElement = T
 
   init(arrayLiteral elements: T...) { }
@@ -380,7 +368,7 @@ extension Int: P { }
 
 func testConditional(i: Int, s: String) {
   let _: PArray<Int> = [i, i, i]
-  let _: PArray<String> = [s, s, s] // expected-error{{cannot convert value of type '[String]' to specified type 'PArray<String>'}}
+  let _: PArray<String> = [s, s, s] // expected-error{{generic struct 'PArray' requires that 'String' conform to 'P'}}
 }
 
 
@@ -403,5 +391,37 @@ struct TestMultipleOverloadedInits {
   var x: Double
   func foo() {
     let _ = [Float(x), Float(x), Float(x), Float(x)]
+  }
+}
+
+do {
+  struct Section {
+    var rows: [Row<Any>]?
+  }
+
+  struct Row<T> {
+      init(value: T?) {}
+  }
+
+  struct Asset {
+    var orientation: Int32
+  }
+
+  func test(asset: Asset) -> [Section] {
+    return [
+      Section(rows: [
+        Row(value: String(describing: asset.orientation)) // Ok
+      ])
+    ]
+  }
+}
+
+
+do {
+  func f<R>(fn: () -> [R]) -> [R] { [] }
+
+  // Requires collection upcast from Array<(key: String, value: String)> to `Array<(String, String)>`
+  func g(v: [String: String]) {
+    let _: [(String, String)] = f { return Array(v) } + v // Ok
   }
 }

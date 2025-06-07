@@ -1,7 +1,10 @@
+// REQUIRES: rdar143950805
+
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=swift-6)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift)
 //
 // REQUIRES: executable_test
-// REQUIRES: OS=macosx || OS=linux-gnu
 
 import StdlibUnittest
 import CustomSequence
@@ -18,6 +21,12 @@ CxxCollectionTestSuite.test("SimpleCollectionNoSubscript as Swift.Collection") {
   expectEqual(c[0], 1)
   expectEqual(c[1], 2)
   expectEqual(c[4], 5)
+
+  var array: [Int32] = []
+  c.forEach {
+    array.append($0)
+  }
+  expectEqual([1, 2, 3, 4, 5] as [Int32], array)
 }
 
 CxxCollectionTestSuite.test("SimpleCollectionReadOnly as Swift.Collection") {
@@ -28,6 +37,23 @@ CxxCollectionTestSuite.test("SimpleCollectionReadOnly as Swift.Collection") {
   let slice = c[1..<3]
   expectEqual(slice.first, 2)
   expectEqual(slice.last, 3)
+}
+
+CxxCollectionTestSuite.test("SimpleCollectionReadWrite as Swift.MutableCollection") {
+  var c = SimpleCollectionReadWrite()
+  expectEqual(c.first, 1)
+  expectEqual(c.last, 5)
+
+  c.swapAt(0, 4)
+  expectEqual(c.first, 5)
+  expectEqual(c.last, 1)
+
+  c.reverse()
+  expectEqual(c[0], 1)
+  expectEqual(c[1], 4)
+  expectEqual(c[2], 3)
+  expectEqual(c[3], 2)
+  expectEqual(c[4], 5)
 }
 
 CxxCollectionTestSuite.test("SimpleArrayWrapper as Swift.Collection") {
@@ -41,6 +67,24 @@ CxxCollectionTestSuite.test("SimpleArrayWrapper as Swift.Collection") {
   let mapped = c.map { $0 + 1 }
   expectEqual(mapped.first, 11)
   expectEqual(mapped.last, 51)
+}
+
+CxxCollectionTestSuite.test("HasInheritedTemplatedConstRACIterator as Swift.Collection") {
+  let c = HasInheritedTemplatedConstRACIteratorInt()
+  expectEqual(c.first, 1)
+  expectEqual(c.last, 5)
+
+  let reduced = c.reduce(0, +)
+  expectEqual(reduced, 15)
+}
+
+CxxCollectionTestSuite.test("HasInheritedTemplatedConstRACIteratorOutOfLineOps as Swift.Collection") {
+  let c = HasInheritedTemplatedConstRACIteratorOutOfLineOpsInt()
+  expectEqual(c.first, 1)
+  expectEqual(c.last, 3)
+
+  let reduced = c.reduce(0, +)
+  expectEqual(reduced, 6)
 }
 
 runAllTests()

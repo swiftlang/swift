@@ -10,7 +10,6 @@ import helper
 
 {
   _ = MyEnum.#^USER-ACCESS^#
-// USER-ACCESS:          Begin completions
 // USER-ACCESS-DAG:      Keyword[self]/CurrNominal:          self[#MyEnum.Type#]; name=self
 // USER-ACCESS-DAG:      Keyword/CurrNominal:                Type[#MyEnum.Type#]; name=Type
 // USER-ACCESS-DAG:      Decl[EnumElement]/CurrNominal:      foo[#MyEnum#]; name=foo

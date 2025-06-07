@@ -4,9 +4,6 @@
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 
-// Temporarily disabled to unblock PR testing:
-// REQUIRES: rdar80745964
-
 // rdar://76038845
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
@@ -18,7 +15,7 @@ func test_detach_cancel_child_early() async {
   print(#function) // CHECK: test_detach_cancel_child_early
   let h: Task<Bool, Error> = Task.detached {
     async let childCancelled: Bool = { () -> Bool in
-      await Task.sleep(2_000_000_000)
+      try? await Task.sleep(for: .seconds(10)) // we'll be woken up by cancellation
       return Task.isCancelled
     }()
 

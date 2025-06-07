@@ -53,6 +53,9 @@ CFPointeeInfo
 CFPointeeInfo::classifyTypedef(const clang::TypedefNameDecl *typedefDecl) {
   clang::QualType type = typedefDecl->getUnderlyingType();
 
+  if (auto elaborated = type->getAs<clang::ElaboratedType>())
+    type = elaborated->desugar();
+
   if (auto subTypedef = type->getAs<clang::TypedefType>()) {
     if (classifyTypedef(subTypedef->getDecl()))
       return forTypedef(subTypedef->getDecl());
@@ -99,7 +102,7 @@ StringRef importer::getCFTypeName(
   if (auto pointee = CFPointeeInfo::classifyTypedef(decl)) {
     auto name = decl->getName();
     if (pointee.isRecord() || pointee.isTypedef())
-      if (name.endswith(SWIFT_CFTYPE_SUFFIX))
+      if (name.ends_with(SWIFT_CFTYPE_SUFFIX))
         return name.drop_back(strlen(SWIFT_CFTYPE_SUFFIX));
 
     return name;

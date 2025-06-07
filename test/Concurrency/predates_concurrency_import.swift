@@ -1,26 +1,71 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/StrictModule.swiftmodule -module-name StrictModule -swift-version 6 %S/Inputs/StrictModule.swift
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/NonStrictModule.swiftmodule -module-name NonStrictModule %S/Inputs/NonStrictModule.swift
-// RUN: %target-swift-frontend -emit-module -emit-module-path %t/OtherActors.swiftmodule -module-name OtherActors %S/Inputs/OtherActors.swift -disable-availability-checking
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/OtherActors.swiftmodule -module-name OtherActors %S/Inputs/OtherActors.swift -target %target-swift-5.1-abi-triple
 
-// RUN: %target-typecheck-verify-swift -typecheck  -I %t
+// RUN: %target-swift-frontend  -I %t %s -emit-sil -o /dev/null -verify  -parse-as-library -enable-upcoming-feature GlobalConcurrency -Wwarning PreconcurrencyImport
+// RUN: %target-swift-frontend  -I %t %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted -parse-as-library -enable-upcoming-feature GlobalConcurrency -Wwarning PreconcurrencyImport
+// RUN: %target-swift-frontend  -I %t %s -emit-sil -o /dev/null -verify -strict-concurrency=complete  -parse-as-library -enable-upcoming-feature GlobalConcurrency -Wwarning PreconcurrencyImport
+
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_GlobalConcurrency
 
 @preconcurrency import NonStrictModule
 @_predatesConcurrency import StrictModule // expected-warning{{'@_predatesConcurrency' has been renamed to '@preconcurrency'}}
 @preconcurrency import OtherActors
-// expected-remark@-1{{'@preconcurrency' attribute on module 'OtherActors' is unused}}{{1-17=}}
+// expected-warning@-1{{'@preconcurrency' on module 'OtherActors' has no effect}}{{1-17=}}
+
+@preconcurrency
+class MyPredatesConcurrencyClass { }
+
+enum EnumWithPredatesConcurrencyValue {
+  case stored(MyPredatesConcurrencyClass)
+}
 
 func acceptSendable<T: Sendable>(_: T) { }
 
 @available(SwiftStdlib 5.1, *)
 func test(
   ss: StrictStruct, ns: NonStrictClass, oma: OtherModuleActor,
-  ssc: SomeSendableClass
+  ssOpt: StrictStruct?, nsOpt: NonStrictClass?,
+  ssc: SomeSendableClass,
+  mpcc: MyPredatesConcurrencyClass
 ) async {
   acceptSendable(ss) // expected-warning{{type 'StrictStruct' does not conform to the 'Sendable' protocol}}
   acceptSendable(ns) // silence issue entirely
+  acceptSendable(ssOpt) // expected-warning{{type 'StrictStruct' does not conform to the 'Sendable' protocol}}
+  acceptSendable(nsOpt) // silence issue entirely
   acceptSendable(oma) // okay
   acceptSendable(ssc) // okay
+  acceptSendable(mpcc)
 }
+
+let nonStrictGlobal = NonStrictClass() // no warning
+
+let strictGlobal = StrictStruct() // expected-warning{{let 'strictGlobal' is not concurrency-safe because non-'Sendable' type 'StrictStruct' may have shared mutable state}}
+// expected-note@-1{{disable concurrency-safety checks if accesses are protected by an external synchronization mechanism}}
+// expected-note@-2{{add '@MainActor' to make let 'strictGlobal' part of global actor 'MainActor'}}
+
+extension NonStrictClass {
+  @Sendable func f() { }
+}
+
+extension StrictStruct {
+  @Sendable func f() { } // expected-warning{{instance method of non-Sendable type 'StrictStruct' cannot be marked as '@Sendable'}}
+}
+
+
+struct HasStatics {
+  nonisolated static let ns: NonStrictClass = NonStrictClass()
+
+  nonisolated static let ss: StrictStruct = StrictStruct()
+  // expected-warning@-1{{'nonisolated' can not be applied to variable with non-'Sendable' type 'StrictStruct'}}
+  // expected-warning@-2{{static property 'ss' is not concurrency-safe because non-'Sendable' type 'StrictStruct' may have shared mutable state}}
+  // expected-note@-3{{disable concurrency-safety checks if accesses are protected by an external synchronization mechanism}}
+  // expected-note@-4{{add '@MainActor' to make static property 'ss' part of global actor 'MainActor'}}
+}
+
+extension NonStrictClass2: @retroactive MySendableProto { }
+
+extension NonStrictClass3: @retroactive Sendable { }
+// expected-warning@-1{{conformance to 'Sendable' must occur in the same source file as class 'NonStrictClass3'; use '@unchecked Sendable' for retroactive conformance}}

@@ -1,0 +1,297 @@
+// RUN: %target-sil-opt -sil-print-types                                                \
+// RUN:     -sil-move-only-address-checker                             \
+// RUN:     %s                                                         \
+// RUN:     -module-name moveonly_addresschecker                       \
+// RUN:     -enable-experimental-feature MoveOnlyClasses               \
+// RUN:     -enable-sil-verify-all                                     \
+// RUN:     -move-only-address-checker-disable-lifetime-extension=true \
+// RUN: | %FileCheck %s
+
+// REQUIRES: swift_feature_MoveOnlyClasses
+
+import Builtin
+import Swift
+
+struct M: ~Copyable {
+  deinit {}
+}
+
+struct M4: ~Copyable {
+  let s1: M
+  let s2: M
+  let s3: M
+  let s4: M
+}
+
+class C {}
+
+sil @get_M4 : $@convention(thin) () -> @owned M4
+sil @end_2 : $@convention(thin) (@owned M, @owned M) -> ()
+sil @see_addr : $@convention(thin) (@in_guaranteed M) -> ()
+sil @see_addr_2 : $@convention(thin) (@in_guaranteed M, @in_guaranteed M) -> ()
+sil @replace_2 : $@convention(thin) (@inout M, @inout M) -> ()
+sil @get_out_2 : $@convention(thin) () -> (@out M, @out M)
+sil @take_addr_2 : $@convention(thin) (@in M, @in M) -> ()
+sil @getC : $@convention(thin) () -> (@owned C)
+
+/// Two non-contiguous fields (#M4.s2, #M4.s4) are borrowed by @see_addr_2.
+/// Two non-contiguous fields (#M4.s1, #M$.s3) are consumed by @end_2.
+///
+/// Verify that #M4.s2 and #M4.s4 both survive past the apply of @see_addr_2.
+// CHECK-LABEL:  sil [ossa] @rdar110676577 : {{.*}} {
+// CHECK:          [[STACK:%[^,]+]] = alloc_stack $M4
+// CHECK:          [[GET_M4:%[^,]+]] = function_ref @get_M4
+// CHECK:          [[M4:%[^,]+]] = apply [[GET_M4]]() : $@convention(thin) () -> @owned M4
+// CHECK:          store [[M4]] to [init] [[STACK]] : $*M4
+// CHECK:          [[M4_S2_ADDR:%[^,]+]] = struct_element_addr [[STACK]] : $*M4, #M4.s2
+// CHECK:          [[M4_S4_ADDR:%[^,]+]] = struct_element_addr [[STACK]] : $*M4, #M4.s4
+// CHECK:          [[SEE_ADDR_2:%[^,]+]] = function_ref @see_addr_2
+// CHECK:          apply [[SEE_ADDR_2]]([[M4_S2_ADDR]], [[M4_S4_ADDR]])
+// CHECK:          [[M4_S4_ADDR_2:%[^,]+]] = struct_element_addr [[STACK]] : $*M4, #M4.s4
+// CHECK:          destroy_addr [[M4_S4_ADDR_2]]
+// CHECK:          [[M4_S2_ADDR_2:%[^,]+]] = struct_element_addr [[STACK]] : $*M4, #M4.s2
+// CHECK:          destroy_addr [[M4_S2_ADDR_2]]
+// CHECK:          [[M4_S1_ADDR:%[^,]+]] = struct_element_addr [[STACK]] : $*M4, #M4.s1
+// CHECK:          [[M4_S1:%[^,]+]] = load [take] [[M4_S1_ADDR]] : $*M
+// CHECK:          [[M4_S3_ADDR:%[^,]+]] = struct_element_addr [[STACK]] : $*M4, #M4.s3
+// CHECK:          [[M4_S3:%[^,]+]] = load [take] [[M4_S3_ADDR]] : $*M
+// CHECK:          [[END_2:%[^,]+]] = function_ref @end_2
+// CHECK:          apply [[END_2]]([[M4_S1]], [[M4_S3]])
+// CHECK-LABEL: } // end sil function 'rdar110676577'
+sil [ossa] @rdar110676577 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $M4
+  %1 = mark_unresolved_non_copyable_value [consumable_and_assignable] %0 : $*M4
+  %3 = function_ref @get_M4 : $@convention(thin) () -> @owned M4
+  %4 = apply %3() : $@convention(thin) () -> @owned M4
+  store %4 to [init] %1 : $*M4
+  %6 = struct_element_addr %1 : $*M4, #M4.s2
+  %6a = struct_element_addr %1 : $*M4, #M4.s4
+  %see_addr_2 = function_ref @see_addr_2 : $@convention(thin) (@in_guaranteed M, @in_guaranteed M) -> ()
+  apply %see_addr_2(%6, %6a) : $@convention(thin) (@in_guaranteed M, @in_guaranteed M) -> ()
+  %12 = struct_element_addr %1 : $*M4, #M4.s1
+  %13 = load [copy] %12 : $*M
+  %14 = struct_element_addr %1 : $*M4, #M4.s3
+  %15 = load [copy] %14 : $*M
+  %16 = function_ref @end_2 : $@convention(thin) (@owned M, @owned M) -> ()
+  %17 = apply %16(%13, %15) : $@convention(thin) (@owned M, @owned M) -> ()
+  destroy_addr %1 : $*M4
+  dealloc_stack %0 : $*M4
+  %22 = tuple ()
+  return %22 : $()
+}
+
+// Two non-contiguous fields (#M4.s2, #M4.s4) are reinitialized by @replace_2.
+//
+// Verify that #M4.s4 is not destroyed before being passed to replace_2.
+// CHECK-LABEL: sil [ossa] @rdar111356251 : $@convention(thin) () -> () {
+// CHECK:         [[STACK:%[^,]+]] = alloc_stack $M4
+// CHECK:         [[GET_M4:%[^,]+]] = function_ref @get_M4 : $@convention(thin) () -> @owned M4
+// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_M4]]() : $@convention(thin) () -> @owned M4
+// CHECK:         store [[INSTANCE]] to [init] [[STACK]] : $*M4
+// CHECK-NOT:     destroy_addr
+// CHECK:         [[S2_ADDR:%[^,]+]] = struct_element_addr [[STACK]] : $*M4, #M4.s2
+// CHECK:         [[S4_ADDR:%[^,]+]] = struct_element_addr [[STACK]] : $*M4, #M4.s4
+// CHECK:         [[REPLACE_2:%[^,]+]] = function_ref @replace_2 : $@convention(thin) (@inout M, @inout M) -> ()
+// CHECK:         apply [[REPLACE_2]]([[S2_ADDR]], [[S4_ADDR]]) : $@convention(thin) (@inout M, @inout M) -> ()
+// CHECK:         [[S4_ADDR_2:%[^,]+]] = struct_element_addr [[STACK]] : $*M4, #M4.s4
+// CHECK:         destroy_addr [[S4_ADDR_2]] : $*M
+// CHECK:         [[S2_ADDR_2:%[^,]+]] = struct_element_addr [[STACK]] : $*M4, #M4.s2
+// CHECK:         destroy_addr [[S2_ADDR_2]] : $*M
+// CHECK:         [[S1_ADDR:%[^,]+]] = struct_element_addr [[STACK]] : $*M4, #M4.s1
+// CHECK:         [[S1:%[^,]+]] = load [take] [[S1_ADDR]] : $*M
+// CHECK:         [[S3_ADDR:%[^,]+]] = struct_element_addr [[STACK]] : $*M4, #M4.s3
+// CHECK:         [[S3:%[^,]+]] = load [take] [[S3_ADDR]] : $*M
+// CHECK:         [[END_2:%[^,]+]] = function_ref @end_2 : $@convention(thin) (@owned M, @owned M) -> ()
+// CHECK:         apply [[END_2]]([[S1]], [[S3]]) : $@convention(thin) (@owned M, @owned M) -> ()
+// CHECK-LABEL: } // end sil function 'rdar111356251'
+sil [ossa] @rdar111356251 : $@convention(thin) () -> () {
+bb0:
+  %stack_addr = alloc_stack $M4
+  %stack = mark_unresolved_non_copyable_value [consumable_and_assignable] %stack_addr : $*M4
+  %get_M4 = function_ref @get_M4 : $@convention(thin) () -> @owned M4
+  %instance = apply %get_M4() : $@convention(thin) () -> @owned M4
+  store %instance to [init] %stack : $*M4
+  %s2_addr = struct_element_addr %stack : $*M4, #M4.s2
+  %s4_addr = struct_element_addr %stack : $*M4, #M4.s4
+  %replace_2 = function_ref @replace_2 : $@convention(thin) (@inout M, @inout M) -> ()
+  apply %replace_2(%s2_addr, %s4_addr) : $@convention(thin) (@inout M, @inout M) -> ()
+  %12 = struct_element_addr %stack : $*M4, #M4.s1
+  %13 = load [copy] %12 : $*M
+  %14 = struct_element_addr %stack : $*M4, #M4.s3
+  %15 = load [copy] %14 : $*M
+  %16 = function_ref @end_2 : $@convention(thin) (@owned M, @owned M) -> ()
+  %17 = apply %16(%13, %15) : $@convention(thin) (@owned M, @owned M) -> ()
+  destroy_addr %stack : $*M4
+  dealloc_stack %stack_addr : $*M4
+  %22 = tuple ()
+  return %22 : $()
+}
+
+// Two non-contiguous fields (#M4.s2, #M4.s4) are initialized by @get_out_2.
+//
+// Verify that M4.s4 is not leaked after it is set.
+// CHECK-LABEL: sil [ossa] @rdar111391893 : $@convention(thin) () -> () {
+// CHECK:         [[GET_OUT_2:%[^,]+]] = function_ref @get_out_2
+// CHECK:         [[STACK:%[^,]+]] = alloc_stack
+// CHECK:         [[S2_ADDR_1:%[^,]+]] = struct_element_addr [[STACK]]
+// CHECK:         [[S4_ADDR_1:%[^,]+]] = struct_element_addr [[STACK]]
+// CHECK:         apply [[GET_OUT_2]]([[S2_ADDR_1]], [[S4_ADDR_1]])
+// CHECK:         [[S2_ADDR_2:%[^,]+]] = struct_element_addr [[STACK]]
+// CHECK:         [[S4_ADDR_4:%[^,]+]] = struct_element_addr [[STACK]]
+// CHECK:         destroy_addr [[S2_ADDR_2]]
+// CHECK:         destroy_addr [[S4_ADDR_4]]
+// CHECK-LABEL: } // end sil function 'rdar111391893'
+sil [ossa] @rdar111391893 : $@convention(thin) () -> () {
+  %get_out_2 = function_ref @get_out_2 : $@convention(thin) () -> (@out M, @out M)
+  %end_2 = function_ref @end_2 : $@convention(thin) (@owned M, @owned M) -> ()
+  %stack_addr = alloc_stack $M4
+  %stack = mark_unresolved_non_copyable_value [consumable_and_assignable] %stack_addr : $*M4
+  %s2_addr = struct_element_addr %stack : $*M4, #M4.s2
+  %s4_addr = struct_element_addr %stack : $*M4, #M4.s4
+  apply %get_out_2(%s2_addr, %s4_addr) : $@convention(thin) () -> (@out M, @out M)
+  %s1_addr = struct_element_addr %stack : $*M4, #M4.s1
+  %s3_addr = struct_element_addr %stack : $*M4, #M4.s3
+  apply %get_out_2(%s1_addr, %s3_addr) : $@convention(thin) () -> (@out M, @out M)
+  %12 = struct_element_addr %stack : $*M4, #M4.s1
+  %13 = load [copy] %12 : $*M
+  %14 = struct_element_addr %stack : $*M4, #M4.s3
+  %15 = load [copy] %14 : $*M
+  %17 = apply %end_2(%13, %15) : $@convention(thin) (@owned M, @owned M) -> ()
+  destroy_addr %stack : $*M4
+  dealloc_stack %stack_addr : $*M4
+  %22 = tuple ()
+  return %22 : $()
+}
+
+// Two non-contiguous fields (#M4.s2, #M$.s4) are consumed by @take_addr_2.
+// CHECK-LABEL: sil [ossa] @consume_noncontiguous : $@convention(thin) (@in M4) -> () {
+// CHECK:       bb0([[M4:%[^,]+]] :
+// CHECK:         [[S1:%[^,]+]] = struct_element_addr [[M4]] : $*M4, #M4.s1
+// CHECK:         [[S3:%[^,]+]] = struct_element_addr [[M4]] : $*M4, #M4.s3
+// CHECK:         [[TAKE_ADDR_2:%[^,]+]] = function_ref @take_addr_2
+// CHECK:         apply [[TAKE_ADDR_2]]([[S1]], [[S3]])
+// CHECK-LABEL: } // end sil function 'consume_noncontiguous'
+sil [ossa] @consume_noncontiguous : $@convention(thin) (@in M4) -> () {
+entry(%m4_addr : $*M4):
+  %m4 = mark_unresolved_non_copyable_value [consumable_and_assignable] %m4_addr : $*M4
+  %s1 = struct_element_addr %m4 : $*M4, #M4.s1
+  %s2 = struct_element_addr %m4 : $*M4, #M4.s2
+  %s3 = struct_element_addr %m4 : $*M4, #M4.s3
+  %s4 = struct_element_addr %m4 : $*M4, #M4.s4
+  %take_addr_2 = function_ref @take_addr_2 : $@convention(thin) (@in M, @in M) -> ()
+  apply %take_addr_2(%s1, %s3) : $@convention(thin) (@in M, @in M) -> ()
+  destroy_addr %s2 : $*M
+  destroy_addr %s4 : $*M
+  %retval = tuple ()
+  return %retval : $()
+}
+
+struct S : ~Copyable {
+  var o: Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil [ossa] @load_take_copyable : {{.*}} {
+// CHECK:       bb0([[S:%[^,]+]] :
+// CHECK:         [[O_ADDR:%[^,]+]] = struct_element_addr [[S]] : $*S, #S.o
+// CHECK:         [[O:%[^,]+]] = load [take] [[O_ADDR]]
+// CHECK:         [[OM:%[^,]+]] = move_value [[O]]
+// CHECK:         destroy_value [[OM]]
+// CHECK-LABEL: } // end sil function 'load_take_copyable'
+sil [ossa] @load_take_copyable : $@convention(thin) (@in S) -> () {
+bb0(%s_addr : $*S):
+  %s = mark_unresolved_non_copyable_value [consumable_and_assignable] %s_addr : $*S
+  %o_addr = struct_element_addr %s : $*S, #S.o
+  %o = load [take] %o_addr : $*Builtin.NativeObject
+  %om = move_value %o : $Builtin.NativeObject
+  destroy_value %om : $Builtin.NativeObject
+  %retval = tuple ()
+  return %retval : $()
+}
+
+sil @getter : $@convention(thin) (@guaranteed M) -> @owned String
+sil @die : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @owned String) -> Never
+
+// CHECK-LABEL: sil [ossa] @partial_apply_of_borrow_of_deinitless_empty_struct : {{.*}} {
+// CHECK:       bb0([[M_IN:%[^,]+]] :
+// CHECK:         [[STACK:%[^,]+]] = alloc_stack $M
+// CHECK:         store [[M_IN]] to [init] [[STACK]]
+// CHECK:         [[ADDR:%[^,]+]] = drop_deinit [[STACK]]
+// CHECK:         [[MB:%[^,]+]] = load_borrow [[ADDR]]
+// CHECK:         [[GETTER:%[^,]+]] = function_ref @getter
+// CHECK:         [[PA:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] [[GETTER]]([[MB]])
+// CHECK:         [[DIE:%[^,]+]] = function_ref @die
+// CHECK:         apply [[DIE]]([[PA]])
+// CHECK:         destroy_value [dead_end] [[PA]]
+// CHECK:         end_borrow [[MB]]
+// CHECK:         unreachable
+// CHECK-LABEL: } // end sil function 'partial_apply_of_borrow_of_deinitless_empty_struct'
+sil [ossa] @partial_apply_of_borrow_of_deinitless_empty_struct : $@convention(method) (@owned M) -> () {
+bb0(%m_in : @owned $M):
+  %stack = alloc_stack $M
+  %addr1 = mark_unresolved_non_copyable_value [consumable_and_assignable] %stack : $*M
+  store %m_in to [init] %addr1 : $*M
+  %nodeinit = drop_deinit %addr1 : $*M
+  %addr = mark_unresolved_non_copyable_value [no_consume_or_assign] %nodeinit : $*M
+  %m = load [copy] %addr : $*M
+  %mb = begin_borrow %m : $M
+  %getter = function_ref @getter : $@convention(thin) (@guaranteed M) -> @owned String
+  %pa = partial_apply [callee_guaranteed] [on_stack] %getter(%mb) : $@convention(thin) (@guaranteed M) -> @owned String
+  %die = function_ref @die : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @owned String) -> Never
+  apply %die(%pa) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @owned String) -> Never
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @dont_destroy_store_borrowed_addr : {{.*}} {
+// CHECK-NOT:     destroy_addr
+// CHECK-LABEL: } // end sil function 'dont_destroy_store_borrowed_addr'
+sil [ossa] @dont_destroy_store_borrowed_addr : $@convention(thin) (@guaranteed M) -> () {
+bb0(%0 : @guaranteed $M):
+  %stack = alloc_stack $M
+  %mark = mark_unresolved_non_copyable_value [consumable_and_assignable] %stack : $*M
+  %borrow = store_borrow %0 to %mark : $*M
+  %see_addr = function_ref @see_addr : $@convention(thin) (@in_guaranteed M) -> ()
+  apply %see_addr(%borrow) : $@convention(thin) (@in_guaranteed M) -> ()
+  end_borrow %borrow : $*M
+  dealloc_stack %stack : $*M
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @rdar130427564 : {{.*}} {
+// Verify that no instructions were inserted after backedge2's terminator.  (In
+// fact, if they were, the test would crash.)
+// CHECK:       bb2([[C0:%[^,]+]] : @owned $C, [[B0:%[^,]+]] : @reborrow $C):
+// CHECK-NEXT:    [[B0F:%[^,]+]] = borrowed [[B0]] : $C from ([[C0]] : $C)
+// CHECK-NEXT:    end_borrow [[B0F]]
+// CHECK-NEXT:    destroy_value [[C0]]
+// CHECK-NEXT:    br
+// CHECK-LABEL: } // end sil function 'rdar130427564'
+sil [ossa] @rdar130427564 : $@convention(thin) (@in_guaranteed M) -> () {
+entry(%ignore_me : $*M):
+  %ignore_me_2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %ignore_me : $*M
+  br fn
+fn:
+  %getC = function_ref @getC : $@convention(thin) () -> (@owned C)
+  %c = apply %getC() : $@convention(thin) () -> (@owned C)
+  %b = begin_borrow %c : $C
+  br header(%c : $C, %b : $C)
+header(%c0 : @owned $C, %b0 : @reborrow $C):
+  %b0f = borrowed %b0 : $C from (%c0 : $C)
+  end_borrow %b0f : $C
+  destroy_value %c0 : $C
+  br body
+body:
+  br latch
+latch:
+  cond_br undef, backedge, ecit
+backedge:
+  %c1 = apply %getC() : $@convention(thin) () -> (@owned C)
+  %b1 = begin_borrow %c1 : $C
+  br backedge2(%c1 : $C, %b1 : $C)
+backedge2(%c2 : @owned $C, %b2 : @reborrow $C):
+  %b2f = borrowed %b2 : $C from (%c2 : $C)
+  br header(%c2 : $C, %b2f : $C)
+ecit:
+  unreachable
+}

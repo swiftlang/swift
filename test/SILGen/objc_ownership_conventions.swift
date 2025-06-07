@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -module-name objc_ownership_conventions -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -enable-objc-interop | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name objc_ownership_conventions -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -enable-objc-interop | %FileCheck %s
 
 import gizmo
 
@@ -33,7 +33,7 @@ func test5(_ g: Gizmo) {
   Gizmo.inspect(g)
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $Gizmo):
   // CHECK:   [[GIZMO_BOX:%.*]] = alloc_box ${ var Gizmo }
-  // CHECK:   [[GIZMO_BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[GIZMO_BOX]]
+  // CHECK:   [[GIZMO_BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[GIZMO_BOX]]
   // CHECK:   [[GIZMO_BOX_PB:%.*]] = project_box [[GIZMO_BOX_LIFETIME]]
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK:   store [[ARG_COPY]] to [init] [[GIZMO_BOX_PB]]
@@ -57,7 +57,7 @@ func test6(_ g: Gizmo) {
   Gizmo.consume(g)
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $Gizmo):
   // CHECK:   [[GIZMO_BOX:%.*]] = alloc_box ${ var Gizmo }
-  // CHECK:   [[GIZMO_BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[GIZMO_BOX]]
+  // CHECK:   [[GIZMO_BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[GIZMO_BOX]]
   // CHECK:   [[GIZMO_BOX_PB:%.*]] = project_box [[GIZMO_BOX_LIFETIME]]
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK:   store [[ARG_COPY]] to [init] [[GIZMO_BOX_PB]]
@@ -83,7 +83,7 @@ func test7(_ g: Gizmo) {
   g.fork()
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $Gizmo):
   // CHECK:   [[GIZMO_BOX:%.*]] = alloc_box ${ var Gizmo }
-  // CHECK:   [[GIZMO_BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[GIZMO_BOX]]
+  // CHECK:   [[GIZMO_BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[GIZMO_BOX]]
   // CHECK:   [[GIZMO_BOX_PB:%.*]] = project_box [[GIZMO_BOX_LIFETIME]]
   // CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
   // CHECK:   store [[ARG_COPY]] to [init] [[GIZMO_BOX_PB]]

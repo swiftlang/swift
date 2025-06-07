@@ -2,11 +2,13 @@
 
 protocol P<A> {
   associatedtype A
+
+  func f() -> A
 }
 
 func f1(x: any P) -> any P<Int> {
   // FIXME: Bad diagnostic
-  return x // expected-error {{type of expression is ambiguous without more context}}
+  return x // expected-error {{type of expression is ambiguous without a type annotation}}
 }
 
 func f2(x: any P<Int>) -> any P {
@@ -15,7 +17,7 @@ func f2(x: any P<Int>) -> any P {
 
 func f3(x: any P<Int>) -> any P<String> {
   // FIXME: Misleading diagnostic
-  return x // expected-error {{cannot convert return expression of type 'String' to return type 'Int'}}
+  return x // expected-error {{cannot convert return expression of type 'Int' to return type 'String'}}
 }
 
 struct G<T> {}
@@ -37,6 +39,7 @@ func g3(x: G<any P<Int>>) -> G<any P<String>> {
 
 func h1(x: (any P)?) -> (any P<Int>)? {
   return x // expected-error {{cannot convert return expression of type '(any P)?' to return type '(any P<Int>)?'}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('any P' and 'any P<Int>') are expected to be equal}}
 }
 
 func h2(x: (any P<Int>)?) -> (any P)? {
@@ -45,4 +48,8 @@ func h2(x: (any P<Int>)?) -> (any P)? {
 
 func h3(x: (any P<Int>)?) -> (any P<String>)? {
   return x // expected-error {{cannot convert return expression of type '(any P<Int>)?' to return type '(any P<String>)?'}}
+}
+
+func generic1<T>(x: any P<T>) -> T {
+  return x.f()
 }

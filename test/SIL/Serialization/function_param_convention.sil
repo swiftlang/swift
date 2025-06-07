@@ -6,7 +6,7 @@ import Swift
 import FunctionInput
 
 // Make sure we can deserialize a SIL function with these various attributes.
-// CHECK: sil public_external [serialized] {{.*}}[canonical] @foo : $@convention(thin) (@in X, @inout X, @in_guaranteed X, @owned X, X, @guaranteed X) -> @out X {
+// CHECK: sil public_external [serialized] {{.*}}[canonical] [ossa] @foo : $@convention(thin) (@in X, @inout X, @in_guaranteed X, @owned X, X, @guaranteed X) -> @out X {
 
 sil @foo : $@convention(thin) (@in X, @inout X, @in_guaranteed X, @owned X, X, @guaranteed X) -> @out X
 

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/method-in-cxx.swift -typecheck -module-name Methods -clang-header-expose-decls=all-public -emit-clang-header-path %t/methods.h
+// RUN: %target-swift-frontend %S/method-in-cxx.swift -module-name Methods -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/methods.h
 
 // RUN: %target-interop-build-clangxx -c %s -I %t -o %t/swift-methods-execution.o
 // RUN: %target-interop-build-swift %S/method-in-cxx.swift -o %t/swift-methods-execution -Xlinker %t/swift-methods-execution.o -module-name Methods -Xfrontend -entry-point-function-name -Xfrontend swiftMain
@@ -63,5 +63,22 @@ int main() {
 // CHECK-NEXT: PassStructInClassMethod.retStruct 2;
 // CHECK-NEXT: -578, 2, -100, 42, 67, -10101
   }
+
+  {
+    LargeStruct::staticMethod();
+// CHECK-NEXT: LargeStruct.staticMethod;
+    auto largeStruct = ClassWithMethods::staticFinalClassMethod(9075);
+// CHECK-NEXT: ClassWithMethods.staticFinalClassMethod;
+    largeStruct.dump();
+// CHECK-NEXT: 1, -1, -9075, -2, 9075, -456 
+  }
+
+  {
+    auto x = ClassWithNonFinalMethods::classClassMethod(3);
+    assert(x == 5);
+    ClassWithNonFinalMethods::staticClassMethod();
+  }
+// CHECK-NEXT: ClassWithNonFinalMethods.classClassMethod;
+// CHECK-NEXT: ClassWithNonFinalMethods.staticClassMethod;
   return 0;
 }

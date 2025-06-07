@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Driver/Job.h"
@@ -493,7 +494,7 @@ BatchJob::BatchJob(const JobAction &Source,
                    EnvironmentVector ExtraEnvironment,
                    std::vector<FilelistInfo> Infos,
                    ArrayRef<const Job *> Combined, int64_t &NextQuasiPID,
-                   Optional<ResponseFileInfo> ResponseFile)
+                   std::optional<ResponseFileInfo> ResponseFile)
     : Job(Source, std::move(Inputs), std::move(Output), Executable, Arguments,
           ExtraEnvironment, Infos, ResponseFile),
       CombinedJobs(Combined.begin(), Combined.end()),

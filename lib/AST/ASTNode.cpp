@@ -20,6 +20,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Parse/Token.h"
 
@@ -41,6 +42,7 @@ SourceRange ASTNode::getSourceRange() const {
   if (const auto *I = this->dyn_cast<CaseLabelItem *>()) {
     return I->getSourceRange();
   }
+  assert(!isNull() && "Null ASTNode doesn't have a source range");
   llvm_unreachable("unsupported AST node");
 }
 
@@ -77,11 +79,11 @@ bool ASTNode::isImplicit() const {
     return D->isImplicit();
   if (const auto *P = this->dyn_cast<Pattern*>())
     return P->isImplicit();
-  if (const auto *T = this->dyn_cast<TypeRepr*>())
+  if (this->is<TypeRepr *>())
     return false;
-  if (const auto *C = this->dyn_cast<StmtConditionElement *>())
+  if (this->is<StmtConditionElement *>())
     return false;
-  if (const auto *I = this->dyn_cast<CaseLabelItem *>())
+  if (this->is<CaseLabelItem *>())
     return false;
   llvm_unreachable("unsupported AST node");
 }
@@ -122,9 +124,9 @@ void ASTNode::dump(raw_ostream &OS, unsigned Indent) const {
     P->dump(OS, Indent);
   else if (auto T = dyn_cast<TypeRepr*>())
     T->print(OS);
-  else if (auto *C = dyn_cast<StmtConditionElement *>())
+  else if (is<StmtConditionElement *>())
     OS.indent(Indent) << "(statement condition)";
-  else if (auto *I = dyn_cast<CaseLabelItem *>()) {
+  else if (is<CaseLabelItem *>()) {
     OS.indent(Indent) << "(case label item)";
   } else
     llvm_unreachable("unsupported AST node");

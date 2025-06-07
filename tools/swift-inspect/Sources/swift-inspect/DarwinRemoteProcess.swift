@@ -19,11 +19,25 @@ internal final class DarwinRemoteProcess: RemoteProcess {
   public typealias ProcessIdentifier = pid_t
   public typealias ProcessHandle = task_t
 
-  private var task: task_t
+  private var task = Cleanup<task_t> {
+    // task_stop_peeking does nothing if we didn't task_start_peeking first, so
+    // we can call it unconditionally.
+    task_stop_peeking($0)
+    mach_port_deallocate(mach_task_self_, $0)
+  }
 
-  public var process: ProcessHandle { task }
-  public private(set) var context: SwiftReflectionContextRef!
-  private var symbolicator: CSSymbolicatorRef
+  internal var processIdentifier: ProcessIdentifier
+  internal lazy var processName = getProcessName(processId: processIdentifier) ?? "<unknown process>"
+
+  public var process: ProcessHandle { task.value }
+  private var _context = Cleanup<SwiftReflectionContextRef> {
+    swift_reflection_destroyReflectionContext($0)
+  }
+  public var context: SwiftReflectionContextRef! { _context.value }
+
+  private var symbolicator = Cleanup<CSSymbolicatorRef> {
+    CSRelease($0)
+  }
 
   private var swiftCore: CSTypeRef
   private let swiftConcurrency: CSTypeRef
@@ -70,7 +84,7 @@ internal final class DarwinRemoteProcess: RemoteProcess {
   }
 
   func read(address: swift_addr_t, size: Int) -> UnsafeRawPointer? {
-    return task_peek(task, address, mach_vm_size_t(size))
+    return task_peek(task.value, address, mach_vm_size_t(size))
   }
 
   func getAddr(symbolName: String) -> swift_addr_t {
@@ -84,6 +98,8 @@ internal final class DarwinRemoteProcess: RemoteProcess {
     return swift_addr_t(range.location)
   }
 
+  static var Free: FreeFunction? { return nil }
+
   static var ReadBytes: ReadBytesFunction {
     return { (context, address, size, _) in
       let process: DarwinRemoteProcess = DarwinRemoteProcess.fromOpaque(context!)
@@ -94,7 +110,7 @@ internal final class DarwinRemoteProcess: RemoteProcess {
   static var GetStringLength: GetStringLengthFunction {
     return { (context, address) in
       let process: DarwinRemoteProcess = DarwinRemoteProcess.fromOpaque(context!)
-      if let str = task_peek_string(process.task, address) {
+      if let str = task_peek_string(process.task.value, address) {
         return UInt64(strlen(str))
       }
       return 0
@@ -114,32 +130,57 @@ internal final class DarwinRemoteProcess: RemoteProcess {
   }
 
   init?(processId: ProcessIdentifier, forkCorpse: Bool) {
-    var task: task_t = task_t()
-    let taskResult = task_for_pid(mach_task_self_, processId, &task)
+    processIdentifier = processId
+    var processTask: task_t = task_t()
+    let taskResult = task_for_pid(mach_task_self_, processId, &processTask)
     guard taskResult == KERN_SUCCESS else {
-      print("unable to get task for pid \(processId): \(String(cString: mach_error_string(taskResult))) \(hex: taskResult)")
+      print("unable to get task for pid \(processId): \(String(cString: mach_error_string(taskResult))) \(hex: taskResult)",
+        to: &Std.err)
       return nil
     }
+    self.task.value = processTask
 
-    if forkCorpse {
+    // Consult with VMUProcInfo to determine if we should force forkCorpse.
+    let forceForkCorpse: Bool
+    if let procInfoClass = getVMUProcInfoClass() {
+      let procInfo = procInfoClass.init(task: self.task.value)
+      forceForkCorpse = procInfo.shouldAnalyzeWithCorpse
+    } else {
+      // Default to not forcing forkCorpse.
+      forceForkCorpse = false
+    }
+
+    if forkCorpse || forceForkCorpse {
       var corpse = task_t()
-      let corpseResult = task_generate_corpse(task, &corpse)
-      if corpseResult == KERN_SUCCESS {
-        task = corpse
-      } else {
-        print("unable to fork corpse for pid \(processId): \(String(cString: mach_error_string(corpseResult))) \(hex: corpseResult)")
+      let maxRetry = 6
+      for retry in 0..<maxRetry {
+        let corpseResult = task_generate_corpse(task.value, &corpse)
+        if corpseResult == KERN_SUCCESS {
+          task.value = corpse
+          break
+        }
+        if corpseResult != KERN_RESOURCE_SHORTAGE || retry == maxRetry {
+          print("unable to fork corpse for pid \(processId): \(String(cString: mach_error_string(corpseResult))) \(hex: corpseResult)",
+            to: &Std.err)
+          return nil
+        }
+        sleep(UInt32(1 << retry))
       }
     }
 
-    self.task = task
+    self.symbolicator.value = CSSymbolicatorCreateWithTask(self.task.value)
 
-    self.symbolicator = CSSymbolicatorCreateWithTask(self.task)
-    self.swiftCore =
-        CSSymbolicatorGetSymbolOwnerWithNameAtTime(self.symbolicator,
-                                                   "libswiftCore.dylib", kCSNow)
+    self.swiftCore = CSSymbolicatorGetSymbolOwnerWithNameAtTime(
+        self.symbolicator.value, "libswiftCore.dylib", kCSNow)
     self.swiftConcurrency = CSSymbolicatorGetSymbolOwnerWithNameAtTime(
-      symbolicator, "libswift_Concurrency.dylib", kCSNow)
-    _ = task_start_peeking(self.task)
+        self.symbolicator.value, "libswift_Concurrency.dylib", kCSNow)
+
+    if CSIsNull(self.swiftCore) {
+      print("pid \(processId) does not have libswiftCore.dylib loaded")
+      return nil
+    }
+
+    _ = task_start_peeking(self.task.value)
 
     guard let context =
         swift_reflection_createReflectionContextWithDataLayout(self.toOpaqueRef(),
@@ -150,22 +191,17 @@ internal final class DarwinRemoteProcess: RemoteProcess {
                                                                Self.GetSymbolAddress) else {
       return nil
     }
-    self.context = context
+    self._context.value = context
 
-    _ = CSSymbolicatorForeachSymbolOwnerAtTime(self.symbolicator, kCSNow, { owner in
+    _ = CSSymbolicatorForeachSymbolOwnerAtTime(self.symbolicator.value, kCSNow, { owner in
       let address = CSSymbolOwnerGetBaseAddress(owner)
       _ = swift_reflection_addImage(self.context, address)
     })
   }
 
-  deinit {
-    task_stop_peeking(self.task)
-    mach_port_deallocate(mach_task_self_, self.task)
-  }
-
   func symbolicate(_ address: swift_addr_t) -> (module: String?, symbol: String?) {
     let symbol =
-        CSSymbolicatorGetSymbolWithAddressAtTime(self.symbolicator, address, kCSNow)
+        CSSymbolicatorGetSymbolWithAddressAtTime(self.symbolicator.value, address, kCSNow)
 
     let module = CSSymbolGetSymbolOwner(symbol)
     return (CSSymbolOwnerGetName(module), CSSymbolGetName(symbol))
@@ -174,7 +210,7 @@ internal final class DarwinRemoteProcess: RemoteProcess {
   internal func iterateHeap(_ body: (swift_addr_t, UInt64) -> Void) {
     withoutActuallyEscaping(body) {
       withUnsafePointer(to: $0) {
-        task_enumerate_malloc_blocks(self.task,
+        task_enumerate_malloc_blocks(self.task.value,
                                      UnsafeMutableRawPointer(mutating: $0),
                                      CUnsignedInt(MALLOC_PTR_IN_USE_RANGE_TYPE),
                                      { (task, context, type, ranges, count) in
@@ -232,14 +268,14 @@ extension DarwinRemoteProcess {
   }
 
   private func getThreadInfos() -> [ThreadInfo] {
-    guard let threads = PortList(task: self.task) else {
+    guard let threads = PortList(task: self.task.value) else {
       return []
     }
-    return threads.compactMap {
-      guard let info = getThreadInfo(thread: $0) else {
+    return threads.compactMap { t -> ThreadInfo? in
+      guard let info = getThreadInfo(thread: t) else {
         return nil
       }
-      guard let kernelObj = getKernelObject(task: mach_task_self_, port: $0) else {
+      guard let kernelObj = getKernelObject(task: mach_task_self_, port: t) else {
         return nil
       }
       return ThreadInfo(threadID: info.thread_id,
@@ -296,7 +332,7 @@ extension DarwinRemoteProcess {
   }
 
   internal func getThreadID(remotePort: thread_t) -> UInt64? {
-    guard let remoteThreadObj = getKernelObject(task: self.task, port: remotePort) else {
+    guard let remoteThreadObj = getKernelObject(task: self.task.value, port: remotePort) else {
       return nil
     }
     return threadInfos.first{ $0.kernelObject == remoteThreadObj }?.threadID

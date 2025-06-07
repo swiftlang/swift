@@ -106,7 +106,7 @@ func test() throws -> Int {
     try break // expected-error {{'try' cannot be used with 'break'}}
   }
   
-  try throw // expected-error {{'try' must be placed on the thrown expression}} {{3-7=}} {{3-3=try }} expected-error {{expected expression in 'throw' statement}}
+  try throw // expected-error {{'try' must be placed on the thrown expression}} {{+1:3-3=try }} {{3-7=}} expected-error {{expected expression in 'throw' statement}}
   ; // Reset parser.
   
   try return // expected-error {{'try' cannot be used with 'return'}} expected-error {{non-void function should return a value}}

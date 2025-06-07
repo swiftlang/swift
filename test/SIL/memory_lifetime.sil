@@ -1,5 +1,6 @@
 // RUN: %target-sil-opt -o /dev/null %s
 // REQUIRES: asserts
+// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 
@@ -28,6 +29,12 @@ struct Mixed {
   var t: T
   var i: Int
 }
+
+enum KlassOrBool {
+  case value(T)
+  case bool(Bool)
+}
+
 
 sil [ossa] @test_struct : $@convention(thin) (@in Outer) -> @owned T {
 bb0(%0 : $*Outer):
@@ -489,7 +496,7 @@ sil [ossa] @test_non_escaping_closure : $@convention(thin) (@in_guaranteed T) ->
 bb0(%0 :  $*T):
   %func = function_ref @closure : $@convention(thin) (@in_guaranteed T) -> ()
   %pa = partial_apply [callee_guaranteed] [on_stack] %func(%0) : $@convention(thin) (@in_guaranteed T) -> ()
-  dealloc_stack %pa : $@noescape @callee_guaranteed () -> () 
+  destroy_value %pa : $@noescape @callee_guaranteed () -> () 
   %res = tuple ()
   return %res : $()
 }
@@ -499,6 +506,18 @@ bb0(%0 :  $*T):
   %func = function_ref @closure : $@convention(thin) (@in_guaranteed T) -> ()
   %pa = partial_apply %func(%0) : $@convention(thin) (@in_guaranteed T) -> ()
   destroy_value %pa : $@callee_owned () -> ()
+  %res = tuple ()
+  return %res : $()
+}
+
+sil [ossa] @test_non_escaping_closure_with_mark_dependence : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $T
+  %func = function_ref @closure : $@convention(thin) (@in_guaranteed T) -> ()
+  %pa = partial_apply [callee_guaranteed] [on_stack] %func(%0) : $@convention(thin) (@in_guaranteed T) -> ()
+  %pa1 = mark_dependence %pa on %0
+  destroy_value %pa1 : $@noescape @callee_guaranteed () -> () 
+  dealloc_stack %0
   %res = tuple ()
   return %res : $()
 }
@@ -687,7 +706,7 @@ sil [ossa] @begin_apply_in_destroy : $@convention(thin) () -> () {
 entry:
   (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @in U
   destroy_addr %instance : $*Inner
-  end_apply %token
+  end_apply %token as $()
   %retval = tuple ()
   return %retval : $()
 }
@@ -696,7 +715,7 @@ sil [ossa] @begin_apply_in_constant_destroy : $@convention(thin) () -> () {
 entry:
   (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @in_constant U
   destroy_addr %instance : $*Inner
-  end_apply %token
+  end_apply %token as $()
   %retval = tuple ()
   return %retval : $()
 }
@@ -704,25 +723,144 @@ entry:
 sil [ossa] @begin_apply_in_guaranteed_no_destroy : $@convention(thin) () -> () {
 entry:
   (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @in_guaranteed U
-  end_apply %token
+  end_apply %token as $()
   %retval = tuple ()
   return %retval : $()
 }
 
-// CHECK: SIL memory lifetime failure in @begin_apply_inout_destroy: memory is not initialized, but should be
-sil [ossa] @begin_apply_inout_no_destroy : $@convention(thin) () -> () {
-entry:
-  (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @inout U
-  end_apply %token
-  %retval = tuple ()
-  return %retval : $()
+sil @read_inner_b : $@convention(thin) (@in_guaranteed Inner) -> () {
+[%0: read s1]
 }
 
-// CHECK: SIL memory lifetime failure in @begin_apply_inout_aliasable_destroy: memory is not initialized, but should be
-sil [ossa] @begin_apply_inout_aliasable_no_destroy : $@convention(thin) () -> () {
-entry:
-  (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @inout_aliasable U
-  end_apply %token
-  %retval = tuple ()
-  return %retval : $()
+sil [ossa] @test_partial_read_in_argument : $@convention(thin) (@in Inner) -> () {
+bb0(%0: $*Inner):
+  %1 = struct_element_addr %0 : $*Inner, #Inner.a
+  destroy_addr %1 : $*T
+  %3 = function_ref @read_inner_b : $@convention(thin) (@in_guaranteed Inner) -> ()
+  %4 = apply %3(%0) : $@convention(thin) (@in_guaranteed Inner) -> ()
+  %5 = struct_element_addr %0 : $*Inner, #Inner.b
+  destroy_addr %5 : $*T
+  %r = tuple ()
+  return %r : $()
 }
+
+sil [ossa] @test : $@convention(thin) (@guaranteed KlassOrBool) -> () {
+bb0(%0 : @guaranteed $KlassOrBool):
+  %1 = alloc_stack $KlassOrBool                   
+  %2 = copy_value %0 : $KlassOrBool               
+  store %2 to [init] %1 : $*KlassOrBool           
+  %4 = load_borrow %1 : $*KlassOrBool             
+  switch_enum %4 : $KlassOrBool, case #KlassOrBool.bool!enumelt: bb1, case #KlassOrBool.value!enumelt: bb2 
+
+bb1(%6 : $Bool):                                  
+  end_borrow %4 : $KlassOrBool                    
+  %8 = alloc_stack $KlassOrBool                   
+  %9 = load [copy] %1 : $*KlassOrBool             
+  store %9 to [init] %8 : $*KlassOrBool           
+  %11 = load_borrow %8 : $*KlassOrBool            
+  %12 = unchecked_enum_data %11 : $KlassOrBool, #KlassOrBool.bool!enumelt
+  end_borrow %11 : $KlassOrBool                   
+  dealloc_stack %8 : $*KlassOrBool                
+  br bb3                                          
+
+bb2(%16 : @guaranteed $T):                    
+  end_borrow %4 : $KlassOrBool                    
+  %18 = load [take] %1 : $*KlassOrBool            
+  destroy_value %18 : $KlassOrBool                
+  br bb3                                          
+
+bb3:                                              
+  dealloc_stack %1 : $*KlassOrBool                
+  %22 = tuple ()                                  
+  return %22 : $()                                
+} 
+
+sil @$testTrivialThinToThickClosure : $@convention(thin) @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
+sil @$testTrivialThinToThickApply : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+
+// Test alloc_stack of a non-trivial (thick) function.
+// Initialize by storing a thin function, which as ownership .none.
+// Deallocation does not require a destroy_adr.
+sil [ossa] @testTrivialThinToThick : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @$testTrivialThinToThickClosure : $@convention(thin) @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
+  %1 = thin_to_thick_function %0 : $@convention(thin) @substituted <τ_0_0> () -> @out τ_0_0 for <Int> to $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
+  %2 = alloc_stack $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
+  store %1 to [trivial] %2 : $*@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
+  %4 = function_ref @$testTrivialThinToThickApply : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %5 = apply %4<() -> Int>(%2) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  dealloc_stack %2 : $*@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
+  %7 = tuple ()
+  return %7 : $()
+}
+
+sil [ossa] @test_init_enum_switch_value : $@convention(thin) (@in_guaranteed Optional<T>, @in_guaranteed T) -> () {
+bb0(%0 : $*Optional<T>, %1 : $*T):
+  %stk = alloc_stack $Optional<T>
+  %2 = init_enum_data_addr %stk : $*Optional<T>, #Optional.some!enumelt
+  copy_addr %1 to [init] %2 : $*T
+  inject_enum_addr %stk : $*Optional<T>, #Optional.some!enumelt
+  %one = integer_literal $Builtin.Word, 1
+  %two = integer_literal $Builtin.Word, 2
+  switch_value %one : $Builtin.Word, case %one: bb1, case %two: bb2
+
+bb1:
+  destroy_addr %stk : $*Optional<T>
+  dealloc_stack %stk : $*Optional<T>
+  br bb3
+
+bb2:
+  dealloc_stack %stk : $*Optional<T>
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @mark_dependence : $@convention(method) (@owned T, @owned Inner) -> @owned Inner {
+bb0(%0 : @owned $T, %1 : @owned $Inner):
+  %2 = alloc_stack $T
+  store %0 to [init] %2
+  %4 = alloc_stack $Inner
+  store %1 to [init] %4
+  %6 = mark_dependence %4 on %2
+  %7 = begin_access [read] [dynamic] %6
+  %8 = load [take] %7
+  end_access %7
+  dealloc_stack %4
+  destroy_addr %2
+  dealloc_stack %2
+  return %8
+}
+
+sil [ossa] @mark_dependence_addr : $@convention(method) (@owned T, @owned Inner) -> @owned Inner {
+bb0(%0 : @owned $T, %1 : @owned $Inner):
+  %2 = alloc_stack $T
+  store %0 to [init] %2
+  %4 = alloc_stack $Inner
+  store %1 to [init] %4
+  mark_dependence_addr %4 on %2
+  %7 = begin_access [read] [dynamic] %4
+  %8 = load [take] %7
+  end_access %7
+  dealloc_stack %4
+  destroy_addr %2
+  dealloc_stack %2
+  return %8
+}
+
+sil @initfn : $@convention(thin) () -> @out T 
+
+sil [ossa] @inject_enum_case : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Optional<T>
+  %1 = function_ref @initfn : $@convention(thin) () -> @out T 
+  %2 = init_enum_data_addr %0, #Optional.some!enumelt 
+  %3 = apply %1(%2) : $@convention(thin) () -> @out T
+  inject_enum_addr %0, #Optional.some!enumelt
+  destroy_addr %0
+  dealloc_stack %0
+  %10 = tuple ()                                  
+  return %10                                      
+} 

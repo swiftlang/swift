@@ -38,16 +38,17 @@ struct S {
 	}()
 }
 
+// REQUIRES: swift_swift_parser
 // RUN: %empty-directory(%t.result)
-// RUN: %refactor -syntactic-rename -source-filename %s -pos="var-y" -old-name "y" -new-name "yack" >> %t.result/variables_var-y.swift
+// RUN: %refactor -find-rename-ranges -source-filename %s -pos="var-y" -old-name "y" -new-name "yack" >> %t.result/variables_var-y.swift
 // RUN: diff -u %S/Outputs/variables/var-y.swift.expected %t.result/variables_var-y.swift
-// RUN: %refactor -syntactic-rename -source-filename %s -pos="ivar-x" -old-name "x" -new-name "fox" >> %t.result/variables_ivar-x.swift
+// RUN: %refactor -find-rename-ranges -source-filename %s -pos="ivar-x" -old-name "x" -new-name "fox" >> %t.result/variables_ivar-x.swift
 // RUN: diff -u %S/Outputs/variables/ivar-x.swift.expected %t.result/variables_ivar-x.swift
-// RUN: %refactor -syntactic-rename -source-filename %s -pos="pattern-a" -old-name "a" -new-name "axolotl" >> %t.result/variables_pattern-a.swift
+// RUN: %refactor -find-rename-ranges -source-filename %s -pos="pattern-a" -old-name "a" -new-name "axolotl" >> %t.result/variables_pattern-a.swift
 // RUN: diff -u %S/Outputs/variables/pattern-a.swift.expected %t.result/variables_pattern-a.swift
-// RUN: %refactor -syntactic-rename -source-filename %s -pos="var-j" -old-name "j" -new-name "jackalope" >> %t.result/variables_var-j.swift
+// RUN: %refactor -find-rename-ranges -source-filename %s -pos="var-j" -old-name "j" -new-name "jackalope" >> %t.result/variables_var-j.swift
 // RUN: diff -u %S/Outputs/variables/var-j.swift.expected %t.result/variables_var-j.swift
-// RUN: %refactor -syntactic-rename -source-filename %s -pos="pattern-b" -old-name "b" -new-name "bee" >> %t.result/variables_pattern-b.swift
+// RUN: %refactor -find-rename-ranges -source-filename %s -pos="pattern-b" -old-name "b" -new-name "bee" >> %t.result/variables_pattern-b.swift
 // RUN: diff -u %S/Outputs/variables/pattern-b.swift.expected %t.result/variables_pattern-b.swift
-// RUN: %refactor -syntactic-rename -source-filename %s -pos="lazy" -old-name "myVal" -new-name "myNewVal" >> %t.result/variables_lazy.swift
+// RUN: %refactor -find-rename-ranges -source-filename %s -pos="lazy" -old-name "myVal" -new-name "myNewVal" >> %t.result/variables_lazy.swift
 // RUN: diff -u %S/Outputs/variables/lazy.swift.expected %t.result/variables_lazy.swift

@@ -265,7 +265,7 @@ func testWritePrefixIterator() {
   var a = Array(0..<10)
   
   var underflow = (1..<10).makeIterator()
-  var (writtenCount, afterLastWritten) = a.writePrefix(from: underflow) // expected-error {{passing value of type 'IndexingIterator<(Range<Int>)>' to an inout parameter requires explicit '&'}} {{62-62=&}}
+  var (writtenCount, afterLastWritten) = a.writePrefix(from: underflow) // expected-error {{passing value of type 'IndexingIterator<Range<Int>>' to an inout parameter requires explicit '&'}} {{62-62=&}}
 }
 
 // rdar://problem/71356981 - wrong error message for state passed as inout with ampersand within parentheses
@@ -301,4 +301,12 @@ func test_incorrect_inout_at_assignment_source() {
     s.prop = &str // expected-error {{'&' may only be used to pass an argument to inout parameter}}
     s.prop = &val // expected-error {{'&' may only be used to pass an argument to inout parameter}}
   }
+}
+
+// rdar://100369066 - type of expression is ambiguous when `&` is used incorrectly
+func test_invalid_inout_with_restrictions(lhs: inout any BinaryInteger, rhs: any BinaryInteger) {
+  lhs = &rhs // expected-error {{'&' may only be used to pass an argument to inout parameter}}
+
+  var other: (any BinaryInteger)? = nil
+  other = &rhs // expected-error {{'&' may only be used to pass an argument to inout parameter}}
 }

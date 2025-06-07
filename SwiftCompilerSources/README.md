@@ -24,7 +24,7 @@ The bootstrapping mode is cached in the `CMakeCache.txt` file in the Swift build
 
 ### Bootstrapping
 
-The bootstrapping process is completely implemented with CMake dependencies. The build-script is not required to build the whole bootstrapping chain. For example, a `ninja swift-frontend` invocation builds all the required bootstrapping steps required for the final `swift-frontend`.
+The bootstrapping process is completely implemented with CMake dependencies. The build-script is not required to build the whole bootstrapping chain. For example, a `ninja bin/swift-frontend` invocation builds all the required bootstrapping steps required for the final `swift-frontend`.
 
 Bootstrapping involves the following steps:
 
@@ -128,8 +128,6 @@ For example, to add a new instruction class:
 *  register the class in `registerSILClasses()`
 *  if needed, add bridging functions to access the instruction's data fields.
 
-
-No yet implemented instruction classes are mapped to a "placeholder" instruction, e.g `UnimplementedInstruction`. This ensures that optimizations can process any kind of SIL, even if some instructions don't have a representation in Swift yet.
 
 ## The Optimizer
 

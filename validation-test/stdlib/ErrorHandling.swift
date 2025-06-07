@@ -303,7 +303,10 @@ ErrorHandlingTests.test("ErrorHandling/Sequence filter") {
   let initialCount = NoisyCount
   for condition in [true, false] {
     for throwAtCount in 0...3 {
-      let sequence = [Noisy(), Noisy(), Noisy()]
+      let n1 = Noisy()
+      let n2 = Noisy()
+      let n3 = Noisy()
+      let sequence = [n1, n2, n3]
       var loopCount = 0
       do {
         let result: [Noisy] = try sequence.filter { _ in

@@ -23,7 +23,7 @@ struct X1<T> : P1 {
   }
 }
 
-struct GenericStruct<T> { // expected-note 3{{generic type 'GenericStruct' declared here}}
+struct GenericStruct<T> { // expected-note 3{{generic struct 'GenericStruct' declared here}}
   typealias Alias = T
   typealias MetaAlias = T.Type
 

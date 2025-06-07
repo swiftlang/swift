@@ -2,7 +2,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -parse-stdlib -o %t %S/Inputs/def_transparent_std.swift
 // RUN: llvm-bcanalyzer %t/def_transparent_std.swiftmodule | %FileCheck %s
-// RUN: %target-swift-frontend -emit-sil -sil-debug-serialization -parse-stdlib -I %t %s | %FileCheck %s -check-prefix=SIL
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -sil-debug-serialization -parse-stdlib -I %t %s | %FileCheck %s -check-prefix=SIL
 
 // CHECK-NOT: UnknownCode
 
@@ -20,13 +20,10 @@ func test_foo(x: Builtin.Int1, y: Builtin.Int1) -> Builtin.Int1 {
 // SIL: [[TUP:%.*]] = tuple ([[ARG0]] : $Builtin.Int64, [[ARG1]] : $Builtin.NativeObject)
 // SIL: retain_value [[TUP]]
 // SIL: [[CASTED_PTR:%.*]] = pointer_to_address [[ARG2]]
-// SIL: [[CASTED_PTR_0:%.*]] = tuple_element_addr [[CASTED_PTR]] : $*(Builtin.Int64, Builtin.NativeObject), 0
-// SIL: store [[ARG0]] to [[CASTED_PTR_0]]
-// SIL: [[CASTED_PTR_1:%.*]] = tuple_element_addr [[CASTED_PTR]] : $*(Builtin.Int64, Builtin.NativeObject), 1
-// SIL: [[OLD_VALUE:%.*]] = load [[CASTED_PTR_1]]
-// SIL: store [[ARG1]] to [[CASTED_PTR_1]]
-// SIL: strong_release [[OLD_VALUE]]
-// SIL: } // end sil function '$s19def_transparent_std12assign_tuple1x1yyBi64__Bot_BptF' 
+// SIL: [[OLD_VALUE:%.*]] = load [[CASTED_PTR]]
+// SIL: store [[TUP]] to [[CASTED_PTR]]
+// SIL: release_value [[OLD_VALUE]]
+// SIL: } // end sil function '$s19def_transparent_std12assign_tuple1x1yyBi64__Bot_BptF'
 func test_tuple(x: (Builtin.Int64, Builtin.NativeObject),
                 y: Builtin.RawPointer) {
   assign_tuple(x: x, y: y)

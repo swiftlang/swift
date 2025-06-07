@@ -6,9 +6,19 @@
 import ClassBoundProtocol
 
 func f() {
-  let p: P = C()
-  p.funcInClass()
+  let p1: any P1 = D()
+  p1.funcInClass()
+  p1.funcInBaseProtocol()
 
-  let genericP: GenericP = GenericC<Int>()
-  genericP.funcInClass()
+  let p2: any P2 = D()
+  p2.funcInClass()
+  p2.funcInBaseProtocol()
+
+  let genericP1: any GenericP1 = GenericD<Int>()
+  genericP1.funcInClass()
+  genericP1.funcInBaseProtocol()
+
+  let genericP2: any GenericP2 = GenericD<Int>()
+  genericP2.funcInClass()
+  genericP2.funcInBaseProtocol()
 }

@@ -1,6 +1,10 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-concurrency -disable-availability-checking
-// REQUIRES: concurrency
+// RUN: %target-swift-frontend -enable-experimental-concurrency -target %target-swift-5.1-abi-triple -emit-sil -o /dev/null -verify %s
+// RUN: %target-swift-frontend -enable-experimental-concurrency -target %target-swift-5.1-abi-triple -emit-sil -o /dev/null -verify -strict-concurrency=targeted %s
+// RUN: %target-swift-frontend -enable-experimental-concurrency -target %target-swift-5.1-abi-triple -emit-sil -o /dev/null -verify -strict-concurrency=complete %s -verify-additional-prefix complete-and-tns-
+// RUN: %target-swift-frontend -enable-experimental-concurrency -target %target-swift-5.1-abi-triple -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation %s -verify-additional-prefix complete-and-tns-
 
+// REQUIRES: concurrency
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 ////
 // some functions to play with
@@ -106,23 +110,28 @@ enum E {
 }
 
 struct SomeStruct {
-  @MainActor init(asyncMainActor: Int) async {} // expected-note{{calls to initializer 'init(asyncMainActor:)' from outside of its actor context are implicitly asynchronous}}
+  @MainActor init(asyncMainActor: Int) async {}
   @MainActor init(mainActor: Int) {} // expected-note {{calls to initializer 'init(mainActor:)' from outside of its actor context are implicitly asynchronous}}
+
+  // expected-warning@+1 {{'(unsafe)' global actors are deprecated; use '@preconcurrency' instead}}
   @MainActor(unsafe) init(asyncMainActorUnsafe: Int) async {}
+
+  // expected-warning@+2 {{'(unsafe)' global actors are deprecated; use '@preconcurrency' instead}}
+  // expected-complete-and-tns-note@+1 {{calls to initializer 'init(mainActorUnsafe:)' from outside of its actor context are implicitly asynchronous}}
   @MainActor(unsafe) init(mainActorUnsafe: Int) {}
 }
 
-// expected-note@+2 2{{add '@MainActor' to make global function 'globActorTest1()' part of global actor 'MainActor'}}
-// expected-note@+1 2 {{add 'async' to function 'globActorTest1()' to make it asynchronous}}
+// expected-complete-and-tns-note @+3 {{add '@MainActor' to make global function 'globActorTest1()' part of global actor 'MainActor'}}
+// expected-note @+2 {{add '@MainActor' to make global function 'globActorTest1()' part of global actor 'MainActor'}}
+// expected-note @+1 2 {{add 'async' to function 'globActorTest1()' to make it asynchronous}}
 func globActorTest1() {
   _ = SomeStruct(asyncMainActor: 0) // expected-error {{'async' call in a function that does not support concurrency}}
-  // expected-error@-1{{call to main actor-isolated initializer 'init(asyncMainActor:)' in a synchronous nonisolated context}}
 
   _ = SomeStruct(mainActor: 0) // expected-error {{call to main actor-isolated initializer 'init(mainActor:)' in a synchronous nonisolated context}}
 
   _ = SomeStruct(asyncMainActorUnsafe: 0) // expected-error {{'async' call in a function that does not support concurrency}}
 
-  _ = SomeStruct(mainActorUnsafe: 0)
+  _ = SomeStruct(mainActorUnsafe: 0) // expected-complete-and-tns-warning {{call to main actor-isolated initializer 'init(mainActorUnsafe:)' in a synchronous nonisolated context}}
 }
 
 func globActorTestAsyncEdition() async {
@@ -139,10 +148,6 @@ protocol AsyncDefaultConstructable {
   init() async
 }
 
-protocol DefaultConstructable {
-  init() // expected-note {{protocol requires initializer 'init()' with type '()'; do you want to add a stub?}} {{43-43=\n    init() {\n        <#code#>\n    \}\n}}
-}
-
 struct Location {
   var x : Int
   var y : Int
@@ -152,7 +157,10 @@ struct Location {
   }
 }
 
-extension Location: DefaultConstructable {} // expected-error {{type 'Location' does not conform to protocol 'DefaultConstructable'}}
+protocol DefaultConstructable {
+  init() // expected-note {{protocol requires initializer 'init()' with type '()'}} 
+}
+extension Location: DefaultConstructable {} // expected-error {{type 'Location' does not conform to protocol 'DefaultConstructable'}} expected-note {{add stubs for conformance}} {{43-43=\n    init() {\n        <#code#>\n    \}\n}}
 
 extension Location: AsyncDefaultConstructable {}
 

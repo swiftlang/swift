@@ -70,13 +70,12 @@ func foo(s: MyStruct<Int>) {
 // MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/Super:         protoExt_AssocEqInt_None()[#Int#]; name=protoExt_AssocEqInt_None()
 // MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/Super:         protoExt_None_AssocEqInt({#(x): U#})[#Int#]; name=protoExt_None_AssocEqInt(:)
 // MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/Super:         conditional_Int()[#Int#]; name=conditional_Int()
-// MYSTRUCT_INT_DOT: End completions
 
   let _ = MyStruct<Int>.#^META_MYSTRUCT_INT_DOT^#
 // META_MYSTRUCT_INT_DOT: Begin completions, 11 items
 // META_MYSTRUCT_INT_DOT-DAG: Keyword[self]/CurrNominal:          self[#MyStruct<Int>.Type#]; name=self
 // META_MYSTRUCT_INT_DOT-DAG: Keyword/CurrNominal:                Type[#MyStruct<Int>.Type#]; name=Type
-// META_MYSTRUCT_INT_DOT-DAG: Decl[TypeAlias]/CurrNominal:        Assoc[#T#]; name=Assoc
+// META_MYSTRUCT_INT_DOT-DAG: Decl[TypeAlias]/CurrNominal:        Assoc[#Int#]; name=Assoc
 // META_MYSTRUCT_INT_DOT-DAG: Decl[Constructor]/CurrNominal:      init({#int: U#})[#MyStruct<Int>#]; name=init(int:)
 // META_MYSTRUCT_INT_DOT-DAG: Decl[Constructor]/CurrNominal:      init({#withConstrainedGenericParam: SomeProto#})[#MyStruct<Int>#]; name=init(withConstrainedGenericParam:)
 // META_MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/CurrNominal:   methodWithConstrainedGenericParam({#(self): MyStruct<Int>#})[#(x: SomeProto) -> Int#]; name=methodWithConstrainedGenericParam(:)
@@ -85,7 +84,6 @@ func foo(s: MyStruct<Int>) {
 // META_MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/Super:         protoExt_AssocEqInt_None({#(self): MyStruct<Int>#})[#() -> Int#]; name=protoExt_AssocEqInt_None(:)
 // META_MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/Super:         protoExt_None_AssocEqInt({#(self): MyStruct<Int>#})[#(U) -> Int#]; name=protoExt_None_AssocEqInt(:)
 // META_MYSTRUCT_INT_DOT-DAG: Decl[InstanceMethod]/Super:         conditional_Int({#(self): MyStruct<Int>#})[#() -> Int#]; name=conditional_Int(:)
-// META_MYSTRUCT_INT_DOT: End completions
 }
 
 // https://github.com/apple/swift/issues/52344
@@ -123,18 +121,16 @@ func testVegetarian(chef: Chef<Vegetarian>) {
 // CONDITIONAL_OVERLOAD_ARG-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:    hash({#(self): Fruit#})[#(into: inout Hasher) -> Void#]; name=hash(:)
 // CONDITIONAL_OVERLOAD_ARG-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]:    broccoli[#Vegetable#]; name=broccoli
 // CONDITIONAL_OVERLOAD_ARG-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]:    hash({#(self): Vegetable#})[#(into: inout Hasher) -> Void#]; name=hash(:)
-// CONDITIONAL_OVERLOAD_ARG: End completions
 
   var chefMeta: Chef<Vegetarian>.Type = Chef<Vegetarian>.self
   let _ = chefMeta.init(.#^CONDITIONAL_OVERLOAD_INIT_ARG^#)
 
   chef.eat(.#^CONDITIONAL_INAPPLICABLE_ARG^#)
-// Note: 'eat' is from an inapplicable constrained extension. We complete as if the user intends to addess that later
+// Note: 'eat' is from an inapplicable constrained extension. We complete as if the user intends to address that later
 //       (e.g. by adding the missing 'Meat' conformance to 'Vegetarian' - clearly not the intention here - but replace 'Meat' with 'Equatable').
 // CONDITIONAL_INAPPLICABLE_ARG: Begin completions, 2 items
 // CONDITIONAL_INAPPLICABLE_ARG-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: chicken[#Meat#]; name=chicken
 // CONDITIONAL_INAPPLICABLE_ARG-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): Meat#})[#(into: inout Hasher) -> Void#]; name=hash(:)
-// CONDITIONAL_INAPPLICABLE_ARG: End completions
 }
 
 // rdar://problem/53401609
@@ -153,5 +149,4 @@ func testHasIndex(value: MyConcrete) {
 // CONDITIONAL_DEPENDENT_TYPEALIAS: Begin completions, 2 items
 // CONDITIONAL_DEPENDENT_TYPEALIAS-DAG: Keyword[self]/CurrNominal:          self[#MyConcrete#];
 // CONDITIONAL_DEPENDENT_TYPEALIAS-DAG: Decl[InstanceMethod]/Super:         indices()[#Void#];
-// CONDITIONAL_DEPENDENT_TYPEALIAS: End completions
 }

@@ -63,7 +63,8 @@ struct RuntimeTarget<8> {
 };
 
 namespace reflection {
-  class FieldDescriptor;
+  template <typename Runtime>
+  class TargetFieldDescriptor;
 }
 
 /// In-process native runtime target.
@@ -104,7 +105,7 @@ struct InProcess {
 
   template <typename T, bool Nullable = true, typename Offset = int32_t>
 #if SWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER
-  using CompactFunctionPointer = AbsoluteFunctionPointer<T>;
+  using CompactFunctionPointer = AbsoluteFunctionPointer<T, Nullable, Offset>;
 #else
   using CompactFunctionPointer =
       swift::RelativeDirectPointer<T, Nullable, Offset>;

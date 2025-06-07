@@ -191,9 +191,9 @@ class ToolchainTestCase(unittest.TestCase):
             'build_watchos_device')
     test_should_skip_building_watchos_sim =\
         generate_should_skip_building_platform(
-            'watchsimulator-i386',
+            'watchsimulator-x86_64',
             'WATCHOS_SIMULATOR',
-            'swift-test-stdlib-watchsimulator-i386',
+            'swift-test-stdlib-watchsimulator-x86_64',
             'build_watchos_simulator')
 
     def generate_should_build_full_targets_when_test(test_arg_name):
@@ -233,7 +233,7 @@ class ToolchainTestCase(unittest.TestCase):
             'stress_test')
 
     def generate_should_skip_testing_platform(
-            host_target, build_arg_name, test_arg_name):
+            host_target, build_arg_name, test_arg_name, extra_test_arg_name=None):
         def test(self):
             args = self.default_args()
             setattr(args, build_arg_name, True)
@@ -245,6 +245,8 @@ class ToolchainTestCase(unittest.TestCase):
             self.assertEqual(len(before.swift_test_run_targets), 0)
 
             setattr(args, test_arg_name, True)
+            if extra_test_arg_name is not None:
+                setattr(args, extra_test_arg_name, True)
             after = HostSpecificConfiguration(host_target, args)
             self.assertIn('check-swift-{}'.format(host_target),
                           after.swift_test_run_targets)
@@ -290,27 +292,10 @@ class ToolchainTestCase(unittest.TestCase):
     # NOTE: test_watchos_host is not supported in open-source Swift
     test_should_skip_testing_watchos_sim =\
         generate_should_skip_testing_platform(
-            'watchsimulator-i386',
+            'watchsimulator-x86_64',
             'build_watchos_simulator',
-            'test_watchos_simulator')
-
-    def test_should_skip_testing_32bit_watchos(self):
-        host_target = 'watchsimulator-i386'
-        args = self.default_args()
-        args.build_watchos_simulator = True
-        args.test_watchos_simulator = True
-        args.test_watchos_32bit_simulator = False
-        args.host_target = host_target
-        args.stdlib_deployment_targets = [host_target]
-        args.build_stdlib_deployment_targets = 'all'
-
-        before = HostSpecificConfiguration(host_target, args)
-        self.assertEqual(len(before.swift_test_run_targets), 0)
-
-        args.test_watchos_32bit_simulator = True
-        after = HostSpecificConfiguration(host_target, args)
-        self.assertIn('check-swift-watchsimulator-i386',
-                      after.swift_test_run_targets)
+            'test_watchos_simulator',
+            'test_watchos_64bit_simulator')
 
     def generate_should_allow_testing_only_host(
             host_target, build_arg_name, test_arg_name, host_test_arg_name):
@@ -681,7 +666,6 @@ class ToolchainTestCase(unittest.TestCase):
             test_freebsd=False,
             test_ios_host=False,
             test_ios_simulator=False,
-            test_watchos_32bit_simulator=True,
             test_linux=False,
             test_optimize_for_size=False,
             test_optimize_none_with_implicit_dynamic=False,

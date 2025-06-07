@@ -13,10 +13,16 @@
 /// Buffer type for `ArraySlice<Element>`.
 @frozen
 @usableFromInline
+@safe
 internal struct _SliceBuffer<Element>
   : _ArrayBufferProtocol,
     RandomAccessCollection
 {
+  #if $Embedded
+  @usableFromInline
+  typealias AnyObject = Builtin.NativeObject
+  #endif
+
   internal typealias NativeStorage = _ContiguousArrayStorage<Element>
   @usableFromInline
   internal typealias NativeBuffer = _ContiguousArrayBuffer<Element>
@@ -46,7 +52,7 @@ internal struct _SliceBuffer<Element>
     endIndexAndFlags: UInt
   ) {
     self.owner = owner
-    self.subscriptBaseAddress = subscriptBaseAddress
+    unsafe self.subscriptBaseAddress = subscriptBaseAddress
     self.startIndex = startIndex
     self.endIndexAndFlags = endIndexAndFlags
   }
@@ -57,7 +63,7 @@ internal struct _SliceBuffer<Element>
     indices: Range<Int>, hasNativeBuffer: Bool
   ) {
     self.owner = owner
-    self.subscriptBaseAddress = subscriptBaseAddress
+    unsafe self.subscriptBaseAddress = subscriptBaseAddress
     self.startIndex = indices.lowerBound
     let bufferFlag = UInt(hasNativeBuffer ? 1 : 0)
     self.endIndexAndFlags = (UInt(indices.upperBound) << 1) | bufferFlag
@@ -67,8 +73,12 @@ internal struct _SliceBuffer<Element>
   @inlinable
   internal init() {
     let empty = _ContiguousArrayBuffer<Element>()
-    self.owner = empty.owner
-    self.subscriptBaseAddress = empty.firstElementAddress
+    #if $Embedded
+    self.owner = Builtin.castToNativeObject(_emptyArrayStorage)
+    #else
+    self.owner = _emptyArrayStorage
+    #endif
+    unsafe self.subscriptBaseAddress = empty.firstElementAddress
     self.startIndex = empty.startIndex
     self.endIndexAndFlags = 1
     _invariantCheck()
@@ -77,7 +87,7 @@ internal struct _SliceBuffer<Element>
   @inlinable
   internal init(_buffer buffer: NativeBuffer, shiftedToStartIndex: Int) {
     let shift = buffer.startIndex - shiftedToStartIndex
-    self.init(
+    unsafe self.init(
       owner: buffer.owner,
       subscriptBaseAddress: buffer.subscriptBaseAddress + shift,
       indices: shiftedToStartIndex..<shiftedToStartIndex + buffer.count,
@@ -87,7 +97,12 @@ internal struct _SliceBuffer<Element>
   @inlinable // FIXME(sil-serialize-all)
   internal func _invariantCheck() {
     let isNative = _hasNativeBuffer
-    let isNativeStorage: Bool = owner is __ContiguousArrayStorageBase
+    let isNativeStorage: Bool
+    #if !$Embedded
+    isNativeStorage = owner is __ContiguousArrayStorageBase
+    #else
+    isNativeStorage = true
+    #endif
     _internalInvariant(isNativeStorage == isNative)
     if isNative {
       _internalInvariant(count <= nativeBuffer.count)
@@ -102,8 +117,13 @@ internal struct _SliceBuffer<Element>
   @inlinable
   internal var nativeBuffer: NativeBuffer {
     _internalInvariant(_hasNativeBuffer)
+    #if !$Embedded
     return NativeBuffer(
       owner as? __ContiguousArrayStorageBase ?? _emptyArrayStorage)
+    #else
+    return NativeBuffer(unsafe unsafeBitCast(_nativeObject(toNative: owner),
+      to: __ContiguousArrayStorageBase.self))
+    #endif
   }
 
   @inlinable
@@ -135,7 +155,7 @@ internal struct _SliceBuffer<Element>
     let oldCount = count
 
     var native = nativeBuffer
-    let hiddenElementCount = firstElementAddress - native.firstElementAddress
+    let hiddenElementCount = unsafe firstElementAddress - native.firstElementAddress
 
     _internalInvariant(native.count + growth <= native.capacity)
 
@@ -156,17 +176,17 @@ internal struct _SliceBuffer<Element>
   /// identity and count.
   @inlinable
   internal var identity: UnsafeRawPointer {
-    return UnsafeRawPointer(firstElementAddress)
+    return unsafe UnsafeRawPointer(firstElementAddress)
   }
 
   @inlinable
   internal var firstElementAddress: UnsafeMutablePointer<Element> {
-    return subscriptBaseAddress + startIndex
+    return unsafe subscriptBaseAddress + startIndex
   }
 
   @inlinable
   internal var firstElementAddressIfContiguous: UnsafeMutablePointer<Element>? {
-    return firstElementAddress
+    return unsafe firstElementAddress
   }
 
   //===--- Non-essential bits ---------------------------------------------===//
@@ -186,7 +206,7 @@ internal struct _SliceBuffer<Element>
         // function isn't called for subscripting, this won't slow
         // down that case.
         var native = nativeBuffer
-        let offset = self.firstElementAddress - native.firstElementAddress
+        let offset = unsafe self.firstElementAddress - native.firstElementAddress
         let backingCount = native.count
         let myCount = count
 
@@ -241,8 +261,8 @@ internal struct _SliceBuffer<Element>
     _internalInvariant(bounds.upperBound >= bounds.lowerBound)
     _internalInvariant(bounds.upperBound <= endIndex)
     let c = bounds.count
-    target.initialize(from: subscriptBaseAddress + bounds.lowerBound, count: c)
-    return target + c
+    unsafe target.initialize(from: subscriptBaseAddress + bounds.lowerBound, count: c)
+    return unsafe target + c
   }
 
   @inlinable
@@ -252,7 +272,7 @@ internal struct _SliceBuffer<Element>
     _invariantCheck()
     guard buffer.count > 0 else { return (makeIterator(), 0) }
     let c = Swift.min(self.count, buffer.count)
-    buffer.baseAddress!.initialize(
+    unsafe buffer.baseAddress!.initialize(
       from: firstElementAddress,
       count: c)
     _fixLifetime(owner)
@@ -295,8 +315,8 @@ internal struct _SliceBuffer<Element>
       return count
     }
     let n = nativeBuffer
-    let nativeEnd = n.firstElementAddress + n.count
-    if (firstElementAddress + count) == nativeEnd {
+    let nativeEnd = unsafe n.firstElementAddress + n.count
+    if unsafe (firstElementAddress + count) == nativeEnd {
       return count + (n.capacity - n.count)
     }
     return count
@@ -305,7 +325,7 @@ internal struct _SliceBuffer<Element>
   /// Returns `true` if this buffer's storage is uniquely-referenced;
   /// otherwise, returns `false`.
   ///
-  /// This function should only be used for internal sanity checks and for
+  /// This function should only be used for internal soundness checks and for
   /// backward compatibility.
   /// To guard a buffer mutation, use `beginCOWMutation`.
   @inlinable
@@ -354,7 +374,7 @@ internal struct _SliceBuffer<Element>
   internal func getElement(_ i: Int) -> Element {
     _internalInvariant(i >= startIndex, "slice index is out of range (before startIndex)")
     _internalInvariant(i < endIndex, "slice index is out of range")
-    return subscriptBaseAddress[i]
+    return unsafe subscriptBaseAddress[i]
   }
 
   /// Access the element at `position`.
@@ -369,7 +389,7 @@ internal struct _SliceBuffer<Element>
     nonmutating set {
       _internalInvariant(position >= startIndex, "slice index is out of range (before startIndex)")
       _internalInvariant(position < endIndex, "slice index is out of range")
-      subscriptBaseAddress[position] = newValue
+      unsafe subscriptBaseAddress[position] = newValue
     }
   }
 
@@ -379,7 +399,7 @@ internal struct _SliceBuffer<Element>
       _internalInvariant(bounds.lowerBound >= startIndex)
       _internalInvariant(bounds.upperBound >= bounds.lowerBound)
       _internalInvariant(bounds.upperBound <= endIndex)
-      return _SliceBuffer(
+      return unsafe _SliceBuffer(
         owner: owner,
         subscriptBaseAddress: subscriptBaseAddress,
         indices: bounds,
@@ -411,40 +431,67 @@ internal struct _SliceBuffer<Element>
   internal typealias Indices = Range<Int>
 
   //===--- misc -----------------------------------------------------------===//
-  /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
-  /// underlying contiguous storage.
-  @inlinable
-  internal func withUnsafeBufferPointer<R>(
+  // Superseded by the typed-throws version of this function, but retained
+  // for ABI reasons.
+  @usableFromInline
+  @_silgen_name("$ss12_SliceBufferV010withUnsafeB7Pointeryqd__qd__SRyxGKXEKlF")
+  internal func __abi_withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     defer { _fixLifetime(self) }
-    return try body(UnsafeBufferPointer(start: firstElementAddress,
+    return try unsafe body(UnsafeBufferPointer(start: firstElementAddress,
       count: count))
+  }
+
+  /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
+  /// underlying contiguous storage.
+  @_alwaysEmitIntoClient
+  internal func withUnsafeBufferPointer<R, E>(
+    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R {
+    defer { _fixLifetime(self) }
+    return try unsafe body(UnsafeBufferPointer(start: firstElementAddress,
+      count: count))
+  }
+
+  // Superseded by the typed-throws version of this function, but retained
+  // for ABI reasons.
+  @usableFromInline
+  @_silgen_name("$ss12_SliceBufferV017withUnsafeMutableB7Pointeryqd__qd__SryxGKXEKlF")
+  internal mutating func __abi_withUnsafeMutableBufferPointer<R>(
+    _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R {
+    defer { _fixLifetime(self) }
+    return try unsafe body(
+      UnsafeMutableBufferPointer(start: firstElementAddress, count: count))
   }
 
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
   /// over the underlying contiguous storage.
-  @inlinable
-  internal mutating func withUnsafeMutableBufferPointer<R>(
-    _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
-  ) rethrows -> R {
+  @_alwaysEmitIntoClient
+  internal mutating func withUnsafeMutableBufferPointer<R, E>(
+    _ body: (UnsafeMutableBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R {
     defer { _fixLifetime(self) }
-    return try body(
+    return try unsafe body(
       UnsafeMutableBufferPointer(start: firstElementAddress, count: count))
   }
 
   @inlinable
   internal func unsafeCastElements<T>(to type: T.Type) -> _SliceBuffer<T> {
     _internalInvariant(_isClassOrObjCExistential(T.self))
-    let baseAddress = UnsafeMutableRawPointer(self.subscriptBaseAddress)
+    let baseAddress = unsafe UnsafeMutableRawPointer(self.subscriptBaseAddress)
       .assumingMemoryBound(to: T.self)
-    return _SliceBuffer<T>(
+    return unsafe _SliceBuffer<T>(
       owner: self.owner,
       subscriptBaseAddress: baseAddress,
       startIndex: self.startIndex,
       endIndexAndFlags: self.endIndexAndFlags)
   }
 }
+
+@available(*, unavailable)
+extension _SliceBuffer: Sendable {}
 
 extension _SliceBuffer {
   @inlinable
@@ -459,7 +506,7 @@ extension _SliceBuffer {
     let result = _ContiguousArrayBuffer<Element>(
       _uninitializedCount: count,
       minimumCapacity: 0)
-    result.firstElementAddress.initialize(
+    unsafe result.firstElementAddress.initialize(
       from: firstElementAddress, count: count)
     return ContiguousArray(_buffer: result)
   }

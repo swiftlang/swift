@@ -11,4 +11,3 @@ func lazyInClass1(a: FooClass1) {
 // LAZYVAR1:       Begin completions, 2 items
 // LAZYVAR1-NEXT:  Keyword[self]/CurrNominal:          self[#FooClass1#]; name=self
 // LAZYVAR1-NEXT:  Decl[InstanceVar]/CurrNominal:      lazyVar1[#Int#]{{; name=.+$}}
-// LAZYVAR1-NEXT:  End completions

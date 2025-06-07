@@ -2,8 +2,8 @@
 // swift-module-flags: 
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module-path %t/Conformances.swiftmodule -enable-library-evolution -emit-sil -o %t/Conformances.sil -enable-objc-interop -disable-objc-attr-requires-foundation-module %s
-// RUN: %target-swift-frontend -enable-objc-interop -emit-sil -I %t %S/Inputs/ConformancesUser.swift -O | %FileCheck %s
+// RUN: %target-swift-frontend -emit-module-path %t/Conformances.swiftmodule -enable-library-evolution -Xllvm -sil-print-types -emit-sil -o %t/Conformances.sil -enable-objc-interop -disable-objc-attr-requires-foundation-module %s
+// RUN: %target-swift-frontend -enable-objc-interop -Xllvm -sil-print-types -emit-sil -I %t %S/Inputs/ConformancesUser.swift -O | %FileCheck %s
 
 public protocol MyProto {
   init()

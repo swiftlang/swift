@@ -1,4 +1,4 @@
-// swift-tools-version:5.3
+// swift-tools-version:5.9
 //===--- Package.swift.in - SwiftCompiler SwiftPM package -----------------===//
 //
 // This source file is part of the Swift.org open source project
@@ -11,23 +11,20 @@
 //
 //===----------------------------------------------------------------------===//
 
+// To successfully build, you'll need to create a couple of symlinks to an
+// existing Ninja build:
+//
+// ln -s <project-root>/build/<Ninja-Build>/llvm-<os+arch> <project-root>/build/Default/llvm
+// ln -s <project-root>/build/<Ninja-Build>/swift-<os+arch> <project-root>/build/Default/swift
+//
+// where <project-root> is the parent directory of the swift repository.
+//
+// FIXME: We may want to consider generating Package.swift as a part of the
+// build.
+
 import PackageDescription
 
 private extension Target {
-  static let defaultSwiftSettings: [SwiftSetting] = [
-    .unsafeFlags([
-      "-Xfrontend", "-validate-tbd-against-ir=none",
-      "-Xfrontend", "-enable-experimental-cxx-interop",
-      // Bridging modules and headers
-      "-Xcc", "-I", "-Xcc", "../include",
-      // LLVM modules and headers
-      "-Xcc", "-I", "-Xcc", "../../llvm-project/llvm/include",
-      // Clang modules and headers
-      "-Xcc", "-I", "-Xcc", "../../llvm-project/clang/include",
-      "-cross-module-optimization"
-    ]),
-  ]
-
   static func compilerModuleTarget(
     name: String,
     dependencies: [Dependency],
@@ -40,20 +37,34 @@ private extension Target {
         path: path ?? "Sources/\(name)",
         exclude: ["CMakeLists.txt"],
         sources: sources,
-        swiftSettings: defaultSwiftSettings + swiftSettings)
+        swiftSettings: [
+          .interoperabilityMode(.Cxx),
+          .unsafeFlags([
+            "-static",
+            "-Xcc", "-DCOMPILED_WITH_SWIFT", "-Xcc", "-DPURE_BRIDGING_MODE",
+            "-Xcc", "-UIBOutlet", "-Xcc", "-UIBAction", "-Xcc", "-UIBInspectable",
+            "-Xcc", "-I../include",
+            "-Xcc", "-I../../llvm-project/llvm/include",
+            "-Xcc", "-I../../llvm-project/clang/include",
+            "-Xcc", "-I../../build/Default/swift/include",
+            "-Xcc", "-I../../build/Default/llvm/include",
+            "-Xcc", "-I../../build/Default/llvm/tools/clang/include",
+            "-cross-module-optimization",
+          ]),
+        ] + swiftSettings)
     }
 }
 
 let package = Package(
   name: "SwiftCompilerSources",
   platforms: [
-    .macOS("10.9"),
+    .macOS(.v13),
   ],
   products: [
     .library(
       name: "swiftCompilerModules",
       type: .static,
-      targets: ["Basic", "AST", "Parse", "SIL", "Optimizer", "_CompilerRegexParser"]),
+      targets: ["Basic", "AST", "SIL", "Optimizer"]),
   ],
   dependencies: [
   ],
@@ -61,30 +72,17 @@ let package = Package(
   // 'SwiftCompilerSources/Sources/CMakeLists.txt'
   targets: [
     .compilerModuleTarget(
-      name: "_CompilerRegexParser",
-      dependencies: [],
-      path: "_RegexParser_Sources",
-      swiftSettings: [
-        // Workaround until `_CompilerRegexParser` is imported as implementation-only
-        // by `_StringProcessing`.
-        .unsafeFlags([
-          "-Xfrontend",
-          "-disable-implicit-string-processing-module-import"
-        ])]),
-    .compilerModuleTarget(
       name: "Basic",
       dependencies: []),
     .compilerModuleTarget(
       name: "AST",
       dependencies: ["Basic"]),
     .compilerModuleTarget(
-      name: "Parse",
-      dependencies: ["Basic", "AST", "_CompilerRegexParser"]),
-    .compilerModuleTarget(
       name: "SIL",
-      dependencies: ["Basic"]),
+      dependencies: ["Basic", "AST"]),
     .compilerModuleTarget(
       name: "Optimizer",
-      dependencies: ["Basic", "SIL", "Parse"]),
-  ]
+      dependencies: ["Basic", "AST", "SIL"]),
+  ],
+  cxxLanguageStandard: .cxx17
 )

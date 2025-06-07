@@ -1,4 +1,9 @@
-// REQUIRES: rdar92613094
+// RUN: %empty-directory(%t)
+// RUN: split-file %s %t
+// RUN: export SWIFT_BACKTRACE=
 
 // RUN: %{python} %utils/line-directive
-// RUN: %{python} %utils/line-directive -- %{python} -c "print('你好')"
+// RUN: %{python} %utils/line-directive -- %{python} %t/unicode.py
+
+//--- unicode.py
+print('你好')

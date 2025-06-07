@@ -136,6 +136,7 @@
 
 #include "PhiStorageOptimizer.h"
 #include "swift/AST/Decl.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/Basic/Range.h"
 #include "swift/SIL/BasicBlockUtils.h"
@@ -150,6 +151,7 @@
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/StackList.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -352,7 +354,7 @@ static bool isStoreCopy(SILValue value) {
   if (!storeInst)
     return false;
 
-  SSAPrunedLiveness liveness;
+  SSAPrunedLiveness liveness(copyInst->getFunction());
   auto isStoreOutOfRange = [&liveness, storeInst](SILValue root) {
     liveness.initializeDef(root);
     auto summary = liveness.computeSimple();
@@ -362,7 +364,7 @@ static bool isStoreCopy(SILValue value) {
     if (summary.innerBorrowKind != InnerBorrowKind::Contained) {
       return true;
     }
-    if (!liveness.isWithinBoundary(storeInst)) {
+    if (!liveness.isWithinBoundary(storeInst, /*deadEndBlocks=*/nullptr)) {
       return true;
     }
     return false;
@@ -383,6 +385,10 @@ static bool isStoreCopy(SILValue value) {
     // - visit borrow introducers via visitBorrowIntroducers
     // - call ExtendedLiveness.compute on each borrow introducer
     if (llvm::any_of(roots, [&](SILValue root) {
+          // Nothing is out of range of a function argument.
+          if (isa<SILFunctionArgument>(root))
+            return false;
+
           // Handle forwarding phis conservatively rather than recursing.
           if (SILArgument::asPhi(root) && !BorrowedValue(root))
             return true;
@@ -428,28 +434,58 @@ void ValueStorageMap::replaceValue(SILValue oldValue, SILValue newValue) {
 }
 
 #ifndef NDEBUG
-void ValueStorageMap::dump() {
-  llvm::dbgs() << "ValueStorageMap:\n";
+void ValueStorage::print(llvm::raw_ostream &OS) const {
+  OS << "projectedStorageID: " << projectedStorageID << "\n";
+  OS << "projectedOperandNum: " << projectedOperandNum << "\n";
+  OS << "isDefProjection: " << isDefProjection << "\n";
+  OS << "isUseProjection: " << isUseProjection << "\n";
+  OS << "isRewritten: " << isRewritten << "\n";
+  OS << "initializes: " << initializes << "\n";
+}
+void ValueStorage::dump() const { print(llvm::dbgs()); }
+void ValueStorageMap::ValueStoragePair::print(llvm::raw_ostream &OS) const {
+  OS << "value: ";
+  value->print(OS);
+  OS << "address:  ";
+  if (storage.storageAddress)
+    storage.storageAddress->print(OS);
+  else
+    OS << "UNKNOWN!\n";
+  storage.print(OS);
+}
+void ValueStorageMap::ValueStoragePair::dump() const { print(llvm::dbgs()); }
+void ValueStorageMap::printProjections(SILValue value,
+                                       llvm::raw_ostream &OS) const {
+  for (auto *pair : getProjections(value)) {
+    pair->print(OS);
+  }
+}
+void ValueStorageMap::dumpProjections(SILValue value) const {
+  printProjections(value, llvm::dbgs());
+}
+void ValueStorageMap::print(llvm::raw_ostream &OS) const {
+  OS << "ValueStorageMap:\n";
   for (unsigned ordinal : indices(valueVector)) {
     auto &valStoragePair = valueVector[ordinal];
-    llvm::dbgs() << "value: ";
-    valStoragePair.value->dump();
+    OS << "value: ";
+    valStoragePair.value->print(OS);
     auto &storage = valStoragePair.storage;
     if (storage.isUseProjection) {
-      llvm::dbgs() << "  use projection: ";
+      OS << "  use projection: ";
       if (!storage.isRewritten)
-        valueVector[storage.projectedStorageID].value->dump();
+        valueVector[storage.projectedStorageID].value->print(OS);
     } else if (storage.isDefProjection) {
-      llvm::dbgs() << "  def projection: ";
+      OS << "  def projection: ";
       if (!storage.isRewritten)
-        valueVector[storage.projectedStorageID].value->dump();
+        valueVector[storage.projectedStorageID].value->print(OS);
     }
     if (storage.storageAddress) {
-      llvm::dbgs() << "  storage: ";
-      storage.storageAddress->dump();
+      OS << "  storage: ";
+      storage.storageAddress->print(OS);
     }
   }
 }
+void ValueStorageMap::dump() const { print(llvm::dbgs()); }
 #endif
 
 //===----------------------------------------------------------------------===//
@@ -481,7 +517,7 @@ struct AddressLoweringState {
   // Applies with indirect results are removed as they are rewritten. Applies
   // with only indirect arguments are rewritten in a post-pass, only after all
   // parameters are rewritten.
-  SmallBlotSetVector<FullApplySite, 16> indirectApplies;
+  SmallBlotSetVector<ApplySite, 16> indirectApplies;
 
   // unconditional_checked_cast instructions of loadable type which need to be
   // rewritten.
@@ -498,6 +534,12 @@ struct AddressLoweringState {
 
   // Handle moves from a phi's operand storage to the phi storage.
   std::unique_ptr<PhiRewriter> phiRewriter;
+
+  // Projections created for uses, recorded in order to be sunk.
+  //
+  // Not all use projections are recorded in the valueStorageMap.  It's not
+  // legal to reuse use projections for non-canonical users or for phis.
+  SmallVector<SILValue, 16> useProjections;
 
   AddressLoweringState(SILFunction *function, DominanceInfo *domInfo,
                        DeadEndBlocks *deBlocks)
@@ -523,6 +565,38 @@ struct AddressLoweringState {
   SILBuilder getTermBuilder(TermInst *term) const {
     return getBuilder(term->getParent()->end(), term);
   }
+
+  /// The values which must be dominated by some opaque value in order for it
+  /// to reuse the storage allocated for `userValue`.
+  ///
+  /// If that's not possible, returns false.
+  ///
+  /// Precondition: `userValue` must be a value into which a use could be
+  ///               projected, e.g. an aggregation instruction.
+  ///
+  /// Each dominand could be:
+  /// - an address argument
+  /// - an alloc_stack
+  /// - an instruction which opens a type (open_existential_ref, etc.)
+  ///
+  /// Related to getProjectionInsertionPoint.  Specifically, the dominands
+  /// discovered here must all be rediscovered there and must all be dominated
+  /// by the insertion point it returns.
+  void getDominandsForUseProjection(SILValue userValue,
+                                    SmallVectorImpl<SILValue> &dominands) const;
+
+  /// Finds and caches the latest opening instruction of the type of the value
+  /// in \p pair.
+  ///
+  /// @returns nullable instruction
+  SILInstruction *
+  getLatestOpeningInst(const ValueStorageMap::ValueStoragePair *) const;
+
+  /// The latest instruction which opens an archetype involved in the indicated
+  /// type.
+  ///
+  /// @returns nullable instruction
+  SILInstruction *getLatestOpeningInst(SILType ty) const;
 
   PhiRewriter &getPhiRewriter();
 
@@ -572,12 +646,12 @@ static void convertDirectToIndirectFunctionArgs(AddressLoweringState &pass) {
       SILArgument *arg = pass.function->getArgument(argIdx);
       SILType addrType = arg->getType().getAddressType();
       auto loc = SILValue(arg).getLoc();
-      SILValue undefAddress = SILUndef::get(addrType, *pass.function);
+      SILValue undefAddress = SILUndef::get(pass.function, addrType);
       SingleValueInstruction *load;
       if (addrType.isTrivial(*pass.function)) {
         load = argBuilder.createLoad(loc, undefAddress,
                                      LoadOwnershipQualifier::Trivial);
-      } else if (param.isConsumed()) {
+      } else if (param.isConsumedInCallee()) {
         load = argBuilder.createLoad(loc, undefAddress,
                                      LoadOwnershipQualifier::Take);
       } else {
@@ -623,7 +697,9 @@ static unsigned insertIndirectReturnArgs(AddressLoweringState &pass) {
 
   unsigned argIdx = 0;
   for (auto resultTy : pass.loweredFnConv.getIndirectSILResultTypes(typeCtx)) {
-    auto bodyResultTy = pass.function->mapTypeIntoContext(resultTy);
+    auto resultTyInContext = pass.function->mapTypeIntoContext(resultTy);
+    auto bodyResultTy = pass.function->getModule().Types.getLoweredType(
+        resultTyInContext.getASTType(), *pass.function);
     auto var = new (astCtx) ParamDecl(
         SourceLoc(), SourceLoc(), astCtx.getIdentifier("$return_value"),
         SourceLoc(), astCtx.getIdentifier("$return_value"), declCtx);
@@ -664,7 +740,7 @@ public:
   void mapValueStorage();
 
 protected:
-  void checkForIndirectApply(FullApplySite applySite);
+  void checkForIndirectApply(ApplySite applySite);
   void visitValue(SILValue value);
   void canonicalizeReturnValues();
 };
@@ -687,7 +763,7 @@ void OpaqueValueVisitor::mapValueStorage() {
       }
     }
     for (auto &inst : *block) {
-      if (auto apply = FullApplySite::isa(&inst))
+      if (auto apply = ApplySite::isa(&inst))
         checkForIndirectApply(apply);
 
       if (auto *yieldInst = dyn_cast<YieldInst>(&inst)) {
@@ -706,7 +782,7 @@ void OpaqueValueVisitor::mapValueStorage() {
 }
 
 /// Populate `indirectApplies`.
-void OpaqueValueVisitor::checkForIndirectApply(FullApplySite applySite) {
+void OpaqueValueVisitor::checkForIndirectApply(ApplySite applySite) {
   auto calleeConv = applySite.getSubstCalleeConv();
   unsigned calleeArgIdx = applySite.getCalleeArgIndexOfFirstAppliedArg();
   for (Operand &operand : applySite.getArgumentOperands()) {
@@ -872,6 +948,12 @@ static Operand *getProjectedDefOperand(SILValue value) {
 
     return nullptr;
 
+  case ValueKind::MarkUnresolvedNonCopyableValueInst:
+    return &cast<MarkUnresolvedNonCopyableValueInst>(value)->getOperandRef();
+
+  case ValueKind::MoveValueInst:
+    return &cast<MoveValueInst>(value)->getOperandRef();
+
   case ValueKind::MultipleValueInstructionResult: {
     SILInstruction *destructure =
         cast<MultipleValueInstructionResult>(value)->getParent();
@@ -903,6 +985,9 @@ static Operand *getProjectedDefOperand(SILValue value) {
   case ValueKind::OpenExistentialBoxValueInst:
     assert(value->getOwnershipKind() == OwnershipKind::Guaranteed);
     return &cast<SingleValueInstruction>(value)->getAllOperands()[0];
+  case ValueKind::TuplePackExtractInst:
+    assert(value->getOwnershipKind() == OwnershipKind::Guaranteed);
+    return &cast<SingleValueInstruction>(value)->getAllOperands()[1];
   }
 }
 
@@ -925,6 +1010,8 @@ static Operand *getReusedStorageOperand(SILValue value) {
   default:
     break;
 
+  case ValueKind::CopyableToMoveOnlyWrapperValueInst:
+  case ValueKind::MoveOnlyWrapperToCopyableValueInst:
   case ValueKind::OpenExistentialValueInst:
   case ValueKind::OpenExistentialBoxValueInst:
   case ValueKind::UncheckedEnumDataInst:
@@ -1021,7 +1108,7 @@ void ValueStorageMap::recordDefProjection(Operand *oper,
   storage.isDefProjection = true;
 }
 
-// Mark this operand as coalesced with \p useValue storage.
+// Mark this operand as coalesced with \p userValue storage.
 void ValueStorageMap::recordComposingUseProjection(Operand *oper,
                                                    SILValue userValue) {
   auto &storage = getStorage(oper->get());
@@ -1034,8 +1121,9 @@ void ValueStorageMap::recordComposingUseProjection(Operand *oper,
 
   storage.isUseProjection = true;
 
-  if (userValue->getType().getEnumOrBoundGenericEnum()) {
-    storage.initializesEnum = true;
+  if (userValue->getType().getEnumOrBoundGenericEnum() ||
+      userValue->getType().isExistentialType()) {
+    storage.initializes = true;
   }
   assert(!storage.isPhiProjection());
 }
@@ -1095,6 +1183,8 @@ public:
   /// jointly postdominate.
   void finalizeOpaqueStorage();
 
+  void sinkProjections();
+
 protected:
   void allocateValue(SILValue value);
   bool findProjectionIntoUseImpl(SILValue value,
@@ -1110,7 +1200,7 @@ protected:
     return findProjectionIntoUseImpl(value, incomingValues, true);
   }
 
-  bool checkStorageDominates(AllocStackInst *allocInst,
+  bool checkStorageDominates(ArrayRef<SILValue> dominands,
                              ArrayRef<SILValue> incomingValues);
 
   void allocatePhi(PhiValue phi);
@@ -1118,8 +1208,6 @@ protected:
   void removeAllocation(SILValue value);
 
   AllocStackInst *createStackAllocation(SILValue value);
-
-  SILBasicBlock *getLeastCommonAncestorOfUses(SILValue value);
 
   void createStackAllocationStorage(SILValue value) {
     pass.valueStorageMap.getStorage(value).storageAddress =
@@ -1201,6 +1289,55 @@ void OpaqueStorageAllocation::allocateValue(SILValue value) {
   // this value's storage with a branch use.
   createStackAllocationStorage(value);
 }
+SILInstruction *AddressLoweringState::getLatestOpeningInst(
+    const ValueStorageMap::ValueStoragePair *pair) const {
+  if (!pair->storage.latestOpeningInst.has_value()) {
+    auto *loi = getLatestOpeningInst(pair->value->getType());
+    pair->storage.latestOpeningInst = {loi};
+  }
+  return pair->storage.latestOpeningInst.value();
+}
+
+void AddressLoweringState::getDominandsForUseProjection(
+    SILValue userValue, SmallVectorImpl<SILValue> &dominands) const {
+  assert(!getProjectedDefOperand(userValue));
+  assert(!valueStorageMap.getStorage(userValue).isDefProjection);
+  for (auto *pair : valueStorageMap.getProjections(userValue)) {
+    auto const &storage = pair->storage;
+    // Every projection in the chain is a use projection.
+    //
+    // By precondition, `userValue` is a projected-use value for \p use.  That
+    // is
+    //     userValue = aggregate (...)
+    //
+    // So `userValue`'s storage isn't a def-projection.  For if it were, then
+    //     userValue = disaggregate (...)
+    // but no opcode is both an aggregate and a disaggregate.
+    //
+    // So storage(userValue) is either a non-projection or a use-projection.  If
+    // it's non-projection, then we're done.
+    //
+    // If it's a use-projection
+    //    userValue -use-> %p
+    // then every subsequent projection must be a use-projection
+    // [projection_chain_structure].
+    assert(storage.isUseProjection || !storage.isProjection());
+    assert(!(storage.isProjection() && storage.storageAddress) &&
+           "projections have not yet been materialized!?");
+    if (auto *loi = getLatestOpeningInst(pair)) {
+      // In order for an opaque value to reuse the storage of some recursive
+      // aggregate, it must dominate the instructions that open archetypes that
+      // occur at every layer of the aggregation.
+      dominands.push_back(cast<SingleValueInstruction>(loi));
+    }
+    if (!storage.isProjection()) {
+      // Reached the bottom of the projection tower.  There must be storage.
+      assert(storage.storageAddress);
+      dominands.push_back(storage.storageAddress);
+    }
+  }
+  assert(dominands.size() > 0 && "found no storage!?");
+}
 
 /// Find a use of \p value that can provide the value's storage.
 ///
@@ -1212,36 +1349,66 @@ bool OpaqueStorageAllocation::findProjectionIntoUseImpl(
   assert(!getProjectedDefOperand(value) && !getReusedStorageOperand(value));
 
   for (Operand *use : value->getUses()) {
-    // Get the user's value, whose storage we will project into.
+    // Get the user's value, whose storage we would project into.
     SILValue userValue = getProjectedUseValue(use);
     if (!userValue)
       continue;
 
-    assert(!getProjectedDefOperand(userValue)
-           && "storage cannot project in two directions.");
+    assert(!getProjectedDefOperand(userValue) &&
+           "opcode that is both a use projection and def projection!?");
 
     // Avoid handling preposterous types.
     if (use->getOperandNumber() > UINT16_MAX)
       continue;
 
-    // Recurse through all storage projections to find the uniquely allocated
-    // storage. Enum storage cannot be reused across multiple subobjects because
-    // it must be initialized via a single init_enum_data_addr instruction.
-    //
-    // TODO: fix the memory verifier to consider the actual store instructions
-    // to initialize an enum rather than the init_enum_data_addr to reuse enum
-    // storage across multiple subobjects within the payload.
-    auto *baseStorage = pass.valueStorageMap.getBaseStorage(
-        userValue, /*allowInitEnum*/ !intoPhi);
-    if (!baseStorage)
+    // If the user is not a phi (`intoPhi` == false), then it is always*
+    // possible to materialize initialization at the single point at which the
+    // address must be available.  *Subject to the following dominance check.
+    if (intoPhi &&
+        llvm::any_of(pass.valueStorageMap.getProjections(userValue),
+                     [&](auto *pair) { return pair->storage.initializes; })) {
+      // Materializing an address for a coalesced phi (`intoPhi` == true),
+      // however, cannot rematerialize initialization, because that would
+      // require the address to be available on both sides of the phi.  But we
+      // can't create an address phi.
+      //
+      // Concretely, given:
+      //
+      //     left:
+      //       %e1 = init_existential_value %v1
+      //       br merge(%e1 : $P)
+      //     right:
+      //       %e2 = init_existential_value %v2
+      //       br merge(%e2 : $P)
+      //     merge(%e : @owned $P):
+      //
+      // we can't produce a single init_existential_addr instruction in the
+      // `merge` block
+      //
+      //     merge:
+      //       init_existential_addr ???
+      //
+      // because doing so would require an address phi
+      //
+      //     merge(%addr : $*): // invalid!
+      //       init_existential_addr %addr
       continue;
+    }
 
-    if (auto *stackInst =
-            dyn_cast<AllocStackInst>(baseStorage->storageAddress)) {
-      if (!checkStorageDominates(stackInst, incomingValues))
-        continue;
-    } else
-      assert(isa<SILFunctionArgument>(baseStorage->storageAddress));
+    // Recurse through all storage projections to find (1) the point where the
+    // storage has been allocated and (2) any opening instructions involved in
+    // any of those projections' types.
+    //
+    // The base storage address and all of the opened types used by the
+    // projections must dominate `incomingValues` because the address
+    // projections for each `incomingValue` must be materialized no later than
+    // at `incomingValue->getDefiningInsertionPoint()` (but perhaps earlier,
+    // see getProjectionInsertionPoint).
+    SmallVector<SILValue, 4> dominands;
+    pass.getDominandsForUseProjection(userValue, dominands);
+
+    if (!checkStorageDominates(dominands, incomingValues))
+      continue;
 
     LLVM_DEBUG(llvm::dbgs() << "  PROJECT "; value->dump();
                llvm::dbgs() << "  into use "; use->getUser()->dump());
@@ -1253,20 +1420,26 @@ bool OpaqueStorageAllocation::findProjectionIntoUseImpl(
 }
 
 bool OpaqueStorageAllocation::checkStorageDominates(
-    AllocStackInst *allocInst, ArrayRef<SILValue> incomingValues) {
+    ArrayRef<SILValue> dominands, ArrayRef<SILValue> incomingValues) {
 
-  for (SILValue incomingValue : incomingValues) {
-    if (auto *defInst = incomingValue->getDefiningInstruction()) {
-      if (!pass.domInfo->properlyDominates(allocInst, defInst))
+  for (auto dominand : dominands) {
+    for (SILValue incomingValue : incomingValues) {
+      if (auto *defInst = incomingValue->getDefiningInstruction()) {
+        if (!pass.domInfo->properlyDominates(dominand, defInst))
+          return false;
+        continue;
+      }
+      auto *arg = cast<SILArgument>(incomingValue);
+      // Function arguments always dominate.
+      if (isa<SILFunctionArgument>(arg))
+        continue;
+      // Handle both phis and terminator results.
+      auto *bbArg = cast<SILPhiArgument>(incomingValue);
+      // The storage block must strictly dominate the argument block.
+      if (!pass.domInfo->properlyDominates(dominand->getParentBlock(),
+                                           bbArg->getParent())) {
         return false;
-      continue;
-    }
-    // Handle both phis and terminator results.
-    auto *bbArg = cast<SILPhiArgument>(incomingValue);
-    // The storage block must strictly dominate the argument block.
-    if (!pass.domInfo->properlyDominates(allocInst->getParent(),
-                                         bbArg->getParent())) {
-      return false;
+      }
     }
   }
   return true;
@@ -1279,7 +1452,7 @@ void OpaqueStorageAllocation::allocatePhi(PhiValue phi) {
   // The phi operand projections are computed first to give them priority. Then
   // we determine if the phi itself can share storage with one of its users.
   CoalescedPhi coalescedPhi;
-  coalescedPhi.coalesce(phi, pass.valueStorageMap);
+  coalescedPhi.coalesce(phi, pass.valueStorageMap, pass.domInfo);
 
   SmallVector<SILValue, 4> coalescedValues;
   coalescedValues.reserve(coalescedPhi.getCoalescedOperands().size());
@@ -1314,14 +1487,30 @@ void OpaqueStorageAllocation::removeAllocation(SILValue value) {
   pass.deleter.forceDelete(allocInst);
 }
 
-SILBasicBlock *
-OpaqueStorageAllocation::getLeastCommonAncestorOfUses(SILValue value) {
-  SILBasicBlock *lca = nullptr;
-  for (auto *use : value->getUses()) {
-    auto *block = use->getParentBlock();
-    lca = lca ? pass.domInfo->findNearestCommonDominator(lca, block) : block;
-  }
-  return lca;
+SILInstruction *AddressLoweringState::getLatestOpeningInst(SILType ty) const {
+  SILInstruction *latestOpeningInst = nullptr;
+  ty.getASTType().visit([&](CanType type) {
+    auto archetype = dyn_cast<ArchetypeType>(type);
+    if (!archetype)
+      return;
+
+    if (auto openedTy = getLocalArchetypeOf(archetype)) {
+      auto openingVal =
+          getModule()->getRootLocalArchetypeDef(openedTy, function);
+
+      assert(openingVal && "all opened archetypes should be resolved");
+      auto *openingInst = openingVal->getDefiningInstruction();
+      if (latestOpeningInst) {
+        if (domInfo->dominates(openingInst, latestOpeningInst))
+          return;
+
+        assert(domInfo->dominates(latestOpeningInst, openingInst) &&
+               "opened archetypes must dominate their uses");
+      }
+      latestOpeningInst = openingInst;
+    }
+  });
+  return latestOpeningInst;
 }
 
 // Create alloc_stack that dominates an owned value \p value. Create
@@ -1346,29 +1535,8 @@ AllocStackInst *OpaqueStorageAllocation::createStackAllocation(SILValue value) {
   // For opened existential types, allocate stack space at the type
   // definition. Allocating as early as possible provides more opportunity for
   // creating use projections into value. But allocation must be no earlier
-  // then the latest type definition.
-  SILInstruction *latestOpeningInst = nullptr;
-  allocTy.getASTType().visit([&](CanType type) {
-    auto archetype = dyn_cast<ArchetypeType>(type);
-    if (!archetype)
-      return;
-
-    if (auto openedTy = getOpenedArchetypeOf(archetype)) {
-      auto openingVal =
-          pass.getModule()->getRootLocalArchetypeDef(openedTy, pass.function);
-
-      auto *openingInst = openingVal->getDefiningInstruction();
-      assert(openingVal && "all opened archetypes should be resolved");
-      if (latestOpeningInst) {
-        if (pass.domInfo->dominates(openingInst, latestOpeningInst))
-          return;
-
-        assert(pass.domInfo->dominates(latestOpeningInst, openingInst) &&
-               "opened archetypes must dominate their uses");
-      }
-      latestOpeningInst = openingInst;
-    }
-  });
+  // than the latest type definition.
+  auto *latestOpeningInst = pass.getLatestOpeningInst(allocTy);
 
   auto allocPt = latestOpeningInst
                      ? latestOpeningInst->getNextInstruction()->getIterator()
@@ -1382,6 +1550,54 @@ AllocStackInst *OpaqueStorageAllocation::createStackAllocation(SILValue value) {
   return alloc;
 }
 
+namespace {
+enum class SinkResult {
+  NoUsers,
+  Unmoved,
+  Moved,
+};
+SinkResult sinkToUses(SingleValueInstruction *svi, DominanceInfo *domInfo) {
+  // Fast paths for 0 and 1 users.
+
+  if (svi->use_begin() == svi->use_end()) {
+    return SinkResult::NoUsers;
+  }
+
+  if (auto *use = svi->getSingleUse()) {
+    auto *user = use->getUser();
+    if (user == svi->getNextInstruction())
+      return SinkResult::Unmoved;
+    svi->moveBefore(user);
+    return SinkResult::Moved;
+  }
+
+  // Compute the lca and sink the instruction to before its first user or its
+  // end if there are none.
+
+  SILBasicBlock *lca = domInfo->getLeastCommonAncestorOfUses(svi);
+
+  // The lca may contain a user.  Look for the user to insert before it.
+
+  InstructionSet userSet(svi->getFunction());
+  for (auto user : svi->getUsers()) {
+    userSet.insert(user);
+  }
+
+  for (auto &instruction : *lca) {
+    if (userSet.contains(&instruction)) {
+      if (&instruction == svi->getNextInstruction())
+        return SinkResult::Unmoved;
+      svi->moveBefore(&instruction);
+      return SinkResult::Moved;
+    }
+  }
+
+  // No user was found in the lca, move to before the end.
+  svi->moveBefore(&lca->back());
+  return SinkResult::Moved;
+}
+} // end anonymous namespace
+
 void OpaqueStorageAllocation::finalizeOpaqueStorage() {
   SmallVector<SILBasicBlock *, 4> boundary;
   for (auto maybeAlloc : allocs) {
@@ -1392,7 +1608,8 @@ void OpaqueStorageAllocation::finalizeOpaqueStorage() {
     auto *alloc = maybeAlloc.value();
 
     if (allocsToReposition.contains(alloc)) {
-      auto allocPt = &*getLeastCommonAncestorOfUses(alloc)->begin();
+      auto allocPt =
+          &*pass.domInfo->getLeastCommonAncestorOfUses(alloc)->begin();
       alloc->moveBefore(allocPt);
     }
 
@@ -1408,6 +1625,40 @@ void OpaqueStorageAllocation::finalizeOpaqueStorage() {
       deallocBuilder.createDeallocStack(pass.genLoc(), alloc);
     }
     boundary.clear();
+  }
+}
+
+void OpaqueStorageAllocation::sinkProjections() {
+  // First, sink use projections to their uses.  It's necessary to do this
+  // separately from sinking projections in valueStorageMap because not all use
+  // projections are recorded there (those for non-canonical users and those for
+  // phis).
+  //
+  // Done in reverse order because outer projections are materialized first and
+  // so appear in `useProjections` before inner projections, and inner
+  // projections must be sunk first.
+  for (auto projection : llvm::reverse(pass.useProjections)) {
+    assert(projection);
+    auto *svi = dyn_cast<SingleValueInstruction>(projection);
+    assert(svi);
+    auto sank = sinkToUses(svi, pass.domInfo);
+    if (sank == SinkResult::NoUsers) {
+      pass.deleter.forceDelete(svi);
+    }
+  }
+
+  // Second, sink all storage from the valueStorageMap.
+  for (auto pair : llvm::reverse(pass.valueStorageMap)) {
+    auto addr = pair.storage.getMaterializedAddress();
+    if (!pair.storage.isProjection())
+      continue;
+    auto *inst = dyn_cast<SingleValueInstruction>(addr);
+    if (!inst)
+      continue;
+    auto sank = sinkToUses(inst, pass.domInfo);
+    if (sank == SinkResult::NoUsers) {
+      pass.deleter.forceDelete(inst);
+    }
   }
 }
 
@@ -1427,11 +1678,16 @@ namespace {
 /// ReturnRewriter, UseRewriter, and DefRewriter.
 class AddressMaterialization {
   AddressLoweringState &pass;
-  SILBuilder &B;
+  SILBuilder projectionBuilder;
+  SILBuilder &moveBuilder;
 
 public:
-  AddressMaterialization(AddressLoweringState &pass, SILBuilder &B)
-      : pass(pass), B(B) {}
+  AddressMaterialization(AddressLoweringState &pass, SILValue projectedValue,
+                         SILBuilder &moveBuilder)
+      : pass(pass),
+        projectionBuilder(pass.getBuilder(
+            getProjectionInsertionPoint(projectedValue, pass)->getIterator())),
+        moveBuilder(moveBuilder) {}
 
   /// Return the address of the storage for `origValue`. This may involve
   /// materializing projections. Record the materialized address as storage for
@@ -1463,14 +1719,29 @@ protected:
 
   SILValue materializeTupleExtract(SILInstruction *extractInst,
                                    SILValue elementValue, unsigned fieldIdx);
+  SILValue materializeTuplePackExtract(SILInstruction *extractInst,
+                                       SILValue elementValue, SILValue index);
 
   SILValue materializeProjectionIntoUse(Operand *operand, bool intoPhiOperand);
+  SILValue materializeProjectionIntoUseImpl(Operand *operand,
+                                            bool intoPhiOperand);
 
   SILValue materializeComposingUser(SingleValueInstruction *user,
                                     bool intoPhiOperand) {
     return recursivelyMaterializeStorage(pass.valueStorageMap.getStorage(user),
                                          intoPhiOperand);
   }
+
+  /// Where to insert the instructions by means of which the address
+  /// corresponding to userValue should be materialized.
+  ///
+  /// Related to getDominandsForUseProjection.  Specifically, the dominands that
+  /// it discovers must all be rediscovered here and must all be dominated by
+  /// the returned insertion point.
+  ///
+  /// @returns nonnull instruction
+  static SILInstruction *
+  getProjectionInsertionPoint(SILValue userValue, AddressLoweringState &pass);
 };
 } // anonymous namespace
 
@@ -1489,19 +1760,28 @@ void AddressMaterialization::initializeComposingUse(Operand *operand) {
     ValueStorage &storage = pass.valueStorageMap.getStorage(def);
     assert(storage.isRewritten && "Source value should be rewritten");
 
-    if (storage.isUseProjection)
-      return;
+    // If the operand projects into one of its users and this user is that one
+    // into which it projects, then the memory was already initialized.  If it's
+    // another user, however, that memory is _not_initialized.
+    if (storage.isUseProjection) {
+      auto *aggregate = dyn_cast<SingleValueInstruction>(operand->getUser());
+      if (aggregate && (storage.projectedStorageID ==
+                        pass.valueStorageMap.getOrdinal(aggregate))) {
+        return;
+      }
+    }
 
     auto destAddr =
         materializeProjectionIntoUse(operand, /*intoPhiOperand*/ false);
-    B.createCopyAddr(operand->getUser()->getLoc(), storage.storageAddress,
-                     destAddr, IsTake, IsInitialization);
+    moveBuilder.createCopyAddr(operand->getUser()->getLoc(),
+                               storage.storageAddress, destAddr, IsTake,
+                               IsInitialization);
     return;
   }
   SILValue destAddr = materializeProjectionIntoUse(operand,
                                                    /*intoPhiOperand*/ false);
-  B.createTrivialStoreOr(operand->getUser()->getLoc(), operand->get(), destAddr,
-                         StoreOwnershipQualifier::Init);
+  moveBuilder.createTrivialStoreOr(operand->getUser()->getLoc(), operand->get(),
+                                   destAddr, StoreOwnershipQualifier::Init);
 }
 
 // Recursively materialize the address for storage at the point that an operand
@@ -1523,8 +1803,9 @@ void AddressMaterialization::initializeComposingUse(Operand *operand) {
 // storage after materializing the result. In particular, it materializes
 // init_enum_data_addr, but not inject_enum_addr.
 //
-SILValue AddressMaterialization::recursivelyMaterializeStorage(
-    ValueStorage &storage, bool intoPhiOperand = false) {
+SILValue
+AddressMaterialization::recursivelyMaterializeStorage(ValueStorage &storage,
+                                                      bool intoPhiOperand) {
   // If this storage is already materialized, then simply return its
   // address. This not only avoids redundant projections, but is necessary for
   // correctness when emitting init_enum_data_addr.
@@ -1604,6 +1885,11 @@ SILValue AddressMaterialization::materializeDefProjection(SILValue origValue) {
     return materializeTupleExtract(extractInst, origValue,
                                    extractInst->getFieldIndex());
   }
+  case ValueKind::TuplePackExtractInst: {
+    auto *extractInst = cast<TuplePackExtractInst>(origValue);
+    return materializeTuplePackExtract(extractInst, origValue,
+                                       extractInst->getIndex());
+  }
   case ValueKind::SILPhiArgument: {
     // Handle this in the caller. unchecked_take_enum_data_addr is
     // destructive. It cannot be materialized on demand.
@@ -1619,24 +1905,42 @@ SILValue AddressMaterialization::materializeStructExtract(
   SILValue srcAddr = pass.getMaterializedAddress(structVal);
   auto *structType = structVal->getType().getStructOrBoundGenericStruct();
   auto *varDecl = structType->getStoredProperties()[fieldIdx];
-  return B.createStructElementAddr(pass.genLoc(), srcAddr, varDecl,
-                                   elementValue->getType().getAddressType());
+  return projectionBuilder.createStructElementAddr(
+      pass.genLoc(), srcAddr, varDecl,
+      elementValue->getType().getAddressType());
 }
 
 // \p tupleInst is a unary instruction whose first operand is a tuple.
 SILValue AddressMaterialization::materializeTupleExtract(
     SILInstruction *extractInst, SILValue elementValue, unsigned fieldIdx) {
   SILValue srcAddr = pass.getMaterializedAddress(extractInst->getOperand(0));
-  return B.createTupleElementAddr(pass.genLoc(), srcAddr, fieldIdx,
-                                  elementValue->getType().getAddressType());
+  return projectionBuilder.createTupleElementAddr(
+      pass.genLoc(), srcAddr, fieldIdx,
+      elementValue->getType().getAddressType());
+}
+
+SILValue AddressMaterialization::materializeTuplePackExtract(
+    SILInstruction *extractInst, SILValue elementValue, SILValue fieldIdx) {
+  SILValue srcAddr = pass.getMaterializedAddress(extractInst->getOperand(1));
+  return projectionBuilder.createTuplePackElementAddr(
+      pass.genLoc(), fieldIdx, srcAddr,
+      elementValue->getType().getAddressType());
+}
+
+SILValue
+AddressMaterialization::materializeProjectionIntoUse(Operand *operand,
+                                                     bool intoPhiOperand) {
+  auto projection = materializeProjectionIntoUseImpl(operand, intoPhiOperand);
+  pass.useProjections.push_back(projection);
+  return projection;
 }
 
 /// Recursively materialize the address of a subobject that is a member of the
 /// operand's user. The operand's user must be an aggregate struct, tuple, enum,
 /// init_existential_value.
 SILValue
-AddressMaterialization::materializeProjectionIntoUse(Operand *operand,
-                                                     bool intoPhiOperand) {
+AddressMaterialization::materializeProjectionIntoUseImpl(Operand *operand,
+                                                         bool intoPhiOperand) {
   SILInstruction *user = operand->getUser();
   switch (user->getKind()) {
   default:
@@ -1645,9 +1949,9 @@ AddressMaterialization::materializeProjectionIntoUse(Operand *operand,
   case SILInstructionKind::EnumInst: {
     auto *enumInst = cast<EnumInst>(user);
     SILValue enumAddr = materializeComposingUser(enumInst, intoPhiOperand);
-    return B.createInitEnumDataAddr(pass.genLoc(), enumAddr,
-                                    enumInst->getElement(),
-                                    operand->get()->getType().getAddressType());
+    return projectionBuilder.createInitEnumDataAddr(
+        pass.genLoc(), enumAddr, enumInst->getElement(),
+        operand->get()->getType().getAddressType());
   }
   case SILInstructionKind::InitExistentialValueInst: {
     auto *initExistentialValue = cast<InitExistentialValueInst>(user);
@@ -1656,9 +1960,9 @@ AddressMaterialization::materializeProjectionIntoUse(Operand *operand,
     auto canTy = initExistentialValue->getFormalConcreteType();
     auto opaque = Lowering::AbstractionPattern::getOpaque();
     auto &concreteTL = pass.function->getTypeLowering(opaque, canTy);
-    return B.createInitExistentialAddr(pass.genLoc(), containerAddr, canTy,
-                                       concreteTL.getLoweredType(),
-                                       initExistentialValue->getConformances());
+    return projectionBuilder.createInitExistentialAddr(
+        pass.genLoc(), containerAddr, canTy, concreteTL.getLoweredType(),
+        initExistentialValue->getConformances());
   }
   case SILInstructionKind::StructInst: {
     auto *structInst = cast<StructInst>(user);
@@ -1667,7 +1971,7 @@ AddressMaterialization::materializeProjectionIntoUse(Operand *operand,
     std::advance(fieldIter, operand->getOperandNumber());
 
     SILValue structAddr = materializeComposingUser(structInst, intoPhiOperand);
-    return B.createStructElementAddr(
+    return projectionBuilder.createStructElementAddr(
         pass.genLoc(), structAddr, *fieldIter,
         operand->get()->getType().getAddressType());
   }
@@ -1681,11 +1985,52 @@ AddressMaterialization::materializeProjectionIntoUse(Operand *operand,
       return pass.function->getArguments()[resultIdx];
     }
     SILValue tupleAddr = materializeComposingUser(tupleInst, intoPhiOperand);
-    return B.createTupleElementAddr(pass.genLoc(), tupleAddr,
-                                    operand->getOperandNumber(),
-                                    operand->get()->getType().getAddressType());
+    return projectionBuilder.createTupleElementAddr(
+        pass.genLoc(), tupleAddr, operand->getOperandNumber(),
+        operand->get()->getType().getAddressType());
   }
   }
+}
+
+SILInstruction *AddressMaterialization::getProjectionInsertionPoint(
+    SILValue userValue, AddressLoweringState &pass) {
+  SILInstruction *latestOpeningInst = nullptr;
+  SILInstruction *retval = userValue->getDefiningInsertionPoint();
+  for (auto *pair : pass.valueStorageMap.getProjections(userValue)) {
+    auto const &storage = pair->storage;
+    if (storage.storageAddress) {
+      // There's already an address.  Projections should be inserted after it.
+      retval = storage.storageAddress->getNextInstruction();
+      break;
+    }
+    // It's necessary to consider obstructions at every level of aggregation*
+    // because there is no ordering among the opening instructions which
+    // define the types used in the aggregate.
+    //
+    // * Levels above the first projection for which storage has already been
+    //   allocated, however, do not need to be considered _here_ because they
+    //   were already considered when determining where to create that
+    //   instruction, either in getProjectionInsertionPoint or in
+    //   OpaqueStorageAllocation::createStackAllocation.
+    if (auto *loi = pass.getLatestOpeningInst(pair)) {
+      if (latestOpeningInst) {
+        if (pass.domInfo->dominates(loi, latestOpeningInst)) {
+          continue;
+
+          assert(pass.domInfo->dominates(latestOpeningInst, loi));
+        }
+      }
+      latestOpeningInst = loi->getNextInstruction();
+    }
+  }
+  assert(retval);
+  if (latestOpeningInst) {
+    if (pass.domInfo->dominates(retval, latestOpeningInst))
+      retval = latestOpeningInst;
+    else
+      assert(pass.domInfo->dominates(latestOpeningInst, retval));
+  }
+  return retval;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1783,7 +2128,7 @@ void PhiRewriter::materializeOperand(PhiOperand phiOper) {
   auto movePos = findPhiMovePosition(phiOper);
 
   auto builder = pass.getBuilder(movePos.latestMovePos);
-  AddressMaterialization addrMat(pass, builder);
+  AddressMaterialization addrMat(pass, phiOper.getValue(), builder);
 
   auto &phiStorage = pass.valueStorageMap.getStorage(phiOper.getValue());
   SILValue phiAddress =
@@ -1867,13 +2212,11 @@ class CallArgRewriter {
   ApplySite apply;
   SILLocation callLoc;
   SILBuilder argBuilder;
-  AddressMaterialization addrMat;
 
 public:
   CallArgRewriter(ApplySite apply, AddressLoweringState &pass)
       : pass(pass), apply(apply), callLoc(apply.getLoc()),
-        argBuilder(pass.getBuilder(apply.getInstruction()->getIterator())),
-        addrMat(pass, argBuilder) {}
+        argBuilder(pass.getBuilder(apply.getInstruction()->getIterator())) {}
 
   bool rewriteArguments();
 
@@ -1886,14 +2229,17 @@ bool CallArgRewriter::rewriteArguments() {
   bool changed = false;
 
   auto origConv = apply.getSubstCalleeConv();
-  assert(apply.getNumArguments() == origConv.getNumParameters() &&
-         "results should not yet be rewritten");
+  assert((apply.getNumArguments() == origConv.getNumParameters() &&
+          apply.asFullApplySite()) ||
+         (apply.getNumArguments() <= origConv.getNumParameters() &&
+          !apply.asFullApplySite()) &&
+             "results should not yet be rewritten");
 
   for (unsigned argIdx = apply.getCalleeArgIndexOfFirstAppliedArg(),
                 endArgIdx = argIdx + apply.getNumArguments();
        argIdx < endArgIdx; ++argIdx) {
 
-    Operand &operand = apply.getArgumentRef(argIdx);
+    Operand &operand = apply.getArgumentRefAtCalleeArgIndex(argIdx);
     // Ignore arguments that have already been rewritten with an address.
     if (operand.get()->getType().isAddress())
       continue;
@@ -1924,7 +2270,7 @@ void CallArgRewriter::rewriteIndirectArgument(Operand *operand) {
   // Allocate temporary storage for a loadable operand.
   AllocStackInst *allocInst =
       argBuilder.createAllocStack(callLoc, argValue->getType());
-  if (apply.getArgumentConvention(*operand).isOwnedConvention()) {
+  if (apply.getCaptureConvention(*operand).isOwnedConventionInCaller()) {
     argBuilder.createTrivialStoreOr(apply.getLoc(), argValue, allocInst,
                                     StoreOwnershipQualifier::Init);
     apply.insertAfterApplication([&](SILBuilder &callBuilder) {
@@ -1979,7 +2325,6 @@ class ApplyRewriter {
   // For loading results.
   SILBuilder resultBuilder;
 
-  AddressMaterialization addrMat;
   SILFunctionConventions opaqueCalleeConv;
   SILFunctionConventions loweredCalleeConv;
 
@@ -1988,7 +2333,6 @@ public:
       : pass(pass), apply(oldCall), callLoc(oldCall.getLoc()),
         argBuilder(pass.getBuilder(oldCall.getInstruction()->getIterator())),
         resultBuilder(pass.getBuilder(getCallResultInsertionPoint())),
-        addrMat(pass, argBuilder),
         opaqueCalleeConv(oldCall.getSubstCalleeConv()),
         loweredCalleeConv(getLoweredCallConv(oldCall)) {}
 
@@ -2210,6 +2554,7 @@ SILValue ApplyRewriter::materializeIndirectResultAddress(SILValue oldResult,
                                                          SILType argTy) {
   if (oldResult && oldResult->getType().isAddressOnly(*pass.function)) {
     // Results that project into their uses have not yet been materialized.
+    AddressMaterialization addrMat(pass, oldResult, argBuilder);
     addrMat.materializeAddress(oldResult);
 
     auto &storage = pass.valueStorageMap.getStorage(oldResult);
@@ -2252,9 +2597,16 @@ void ApplyRewriter::rewriteApply(ArrayRef<SILValue> newCallArgs) {
   // will be deleted with its destructure_tuple.
 }
 
-/// Emit end_borrows for a an incomplete BorrowedValue with only nonlifetime
+/// Emit end_borrows for an incomplete BorrowedValue with only nonlifetime
 /// ending uses.
 static void emitEndBorrows(SILValue value, AddressLoweringState &pass);
+
+/// Emit end_borrows at the lifetime ends of the guaranteed value which
+/// encloses \p enclosingValue.
+static void
+emitEndBorrowsAtEnclosingGuaranteedBoundary(SILValue lifetimeToEnd,
+                                            SILValue enclosingValue,
+                                            AddressLoweringState &pass);
 
 void ApplyRewriter::convertBeginApplyWithOpaqueYield() {
   // Avoid revisiting this apply.
@@ -2297,7 +2649,7 @@ void ApplyRewriter::convertBeginApplyWithOpaqueYield() {
     if (oldResult.getType().isAddressOnly(*pass.function)) {
       auto info = newCall->getSubstCalleeConv().getYieldInfoForOperandIndex(i);
       assert(info.isFormalIndirect());
-      if (info.isConsumed()) {
+      if (info.isConsumedInCaller()) {
         // Because it is legal to have uses of an owned value produced by a
         // begin_apply after a coroutine's range, AddressLowering must move the
         // value into local storage so that such out-of-coroutine-range uses can
@@ -2305,12 +2657,13 @@ void ApplyRewriter::convertBeginApplyWithOpaqueYield() {
         // terms of the yielded owned storage which is no longer valid beyond
         // the coroutine's range).
         auto &storage = pass.valueStorageMap.getStorage(&oldResult);
+        AddressMaterialization addrMat(pass, &oldResult, argBuilder);
         auto destAddr = addrMat.materializeAddress(&oldResult);
         storage.storageAddress = destAddr;
         storage.markRewritten();
-        resultBuilder.createCopyAddr(callLoc, &newResult, destAddr,
-                                     info.isConsumed() ? IsTake : IsNotTake,
-                                     IsInitialization);
+        resultBuilder.createCopyAddr(
+            callLoc, &newResult, destAddr,
+            info.isConsumedInCaller() ? IsTake : IsNotTake, IsInitialization);
       } else {
         // [in_guaranteed_begin_apply_results] Because OSSA ensures that all
         // uses of a guaranteed value produced by a begin_apply are used within
@@ -2329,7 +2682,10 @@ void ApplyRewriter::convertBeginApplyWithOpaqueYield() {
       SILValue load =
           resultBuilder.emitLoadBorrowOperation(callLoc, &newResult);
       oldResult.replaceAllUsesWith(load);
-      emitEndBorrows(load, pass);
+      for (auto *use : origCall->getEndApplyUses()) {
+        pass.getBuilder(use->getUser()->getIterator())
+            .createEndBorrow(pass.genLoc(), load);
+      }
     } else {
       auto *load = resultBuilder.createTrivialLoadOr(
           callLoc, &newResult, LoadOwnershipQualifier::Take);
@@ -2448,7 +2804,7 @@ void ApplyRewriter::rewriteTryApply(ArrayRef<SILValue> newCallArgs) {
   // Temporarily redirect all uses to Undef. They will be fixed in
   // replaceDirectResults().
   replaceTermResult(
-      SILUndef::get(resultArg->getType().getAddressType(), *pass.function));
+      SILUndef::get(pass.function, resultArg->getType().getAddressType()));
 }
 
 // Replace all formally direct results by rewriting the destructure_tuple.
@@ -2568,7 +2924,8 @@ public:
     }
 
     termBuilder.createCheckedCastAddrBranch(
-        castLoc, CastConsumptionKind::TakeOnSuccess, srcAddr,
+        castLoc, ccb->getCheckedCastOptions(),
+        CastConsumptionKind::TakeOnSuccess, srcAddr,
         ccb->getSourceFormalType(), destAddr, ccb->getTargetFormalType(),
         successBB, failureBB, ccb->getTrueBBCount(), ccb->getFalseBBCount());
 
@@ -2584,7 +2941,7 @@ private:
   SILValue getAddressForCastEntity(SILValue value, bool needsInit) {
     if (value->getType().isAddressOnly(*func)) {
       auto builder = pass.getBuilder(ccb->getIterator());
-      AddressMaterialization addrMat(pass, builder);
+      AddressMaterialization addrMat(pass, value, builder);
       return addrMat.materializeAddress(value);
     }
 
@@ -2627,8 +2984,8 @@ private:
 //===----------------------------------------------------------------------===//
 
 static UnconditionalCheckedCastAddrInst *rewriteUnconditionalCheckedCastInst(
-    UnconditionalCheckedCastInst *uncondCheckedCast, AddressLoweringState &pass,
-    AddressMaterialization *addrMat) {
+    UnconditionalCheckedCastInst *uncondCheckedCast,
+    AddressLoweringState &pass) {
   auto srcVal = uncondCheckedCast->getOperand();
   auto destVal = SILValue(uncondCheckedCast);
   auto srcType = srcVal->getType();
@@ -2657,13 +3014,15 @@ static UnconditionalCheckedCastAddrInst *rewriteUnconditionalCheckedCastInst(
   assert(srcAddr);
   SILValue destAddr;
   if (destAddrOnly) {
-    destAddr = addrMat->materializeAddress(destVal);
+    AddressMaterialization addrMat(pass, destVal, builder);
+    destAddr = addrMat.materializeAddress(destVal);
   } else {
     destAddr = builder.createAllocStack(loc, destType);
   }
   assert(destAddr);
   auto *uccai = builder.createUnconditionalCheckedCastAddr(
-      uncondCheckedCast->getLoc(), srcAddr, srcAddr->getType().getASTType(),
+      uncondCheckedCast->getLoc(), uncondCheckedCast->getCheckedCastOptions(),
+      srcAddr, srcAddr->getType().getASTType(),
       destAddr, destAddr->getType().getASTType());
   auto afterBuilder =
       pass.getBuilder(uncondCheckedCast->getNextInstruction()->getIterator());
@@ -2871,6 +3230,7 @@ void YieldRewriter::rewriteOperand(YieldInst *yieldInst, unsigned index) {
   case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_InoutAliasable:
     return;
+  case ParameterConvention::Indirect_In_CXX:
   case ParameterConvention::Indirect_In:
     ownership = OwnershipKind::Owned;
     break;
@@ -2952,7 +3312,7 @@ class UseRewriter : SILInstructionVisitor<UseRewriter> {
 
   explicit UseRewriter(AddressLoweringState &pass, Operand *use)
       : pass(pass), builder(pass.getBuilder(use->getUser()->getIterator())),
-        addrMat(pass, builder), use(use) {}
+        addrMat(pass, use->get(), builder), use(use) {}
 
 public:
   static void rewriteUse(Operand *use, AddressLoweringState &pass) {
@@ -3033,11 +3393,6 @@ protected:
       bi->setOperand(use->getOperandNumber(), opAddr);
       break;
     }
-    case BuiltinValueKind::Copy: {
-      SILValue opAddr = addrMat.materializeAddress(use->get());
-      bi->setOperand(0, opAddr);
-      break;
-    }
     case BuiltinValueKind::AddressOfBorrowOpaque:
       visitAddressOfBorrowBuiltinInst(bi, /*stackProtected=*/true);
       break;
@@ -3050,7 +3405,23 @@ protected:
     }
   }
 
+  template <typename Introducer>
+  void visitLifetimeIntroducer(Introducer *introducer);
+
   void visitBeginBorrowInst(BeginBorrowInst *borrow);
+
+  void visitCopyableToMoveOnlyWrapperValueInst(
+      CopyableToMoveOnlyWrapperValueInst *inst) {
+    assert(use == getReusedStorageOperand(inst));
+    assert(inst->getType().isAddressOnly(*pass.function));
+    SILValue srcVal = inst->getOperand();
+    SILValue srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;
+
+    auto destAddr =
+        builder.createCopyableToMoveOnlyWrapperAddr(inst->getLoc(), srcAddr);
+
+    markRewritten(inst, destAddr);
+  }
 
   void visitEndBorrowInst(EndBorrowInst *end) {}
 
@@ -3064,7 +3435,7 @@ protected:
   void visitBranchInst(BranchInst *) {
     pass.getPhiRewriter().materializeOperand(use);
 
-    use->set(SILUndef::get(use->get()->getType(), *pass.function));
+    use->set(SILUndef::get(use->get()));
   }
 
   // Copy from an opaque source operand.
@@ -3072,6 +3443,7 @@ protected:
     SILValue srcVal = copyInst->getOperand();
     SILValue srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;
 
+    AddressMaterialization addrMat(pass, copyInst, builder);
     SILValue destAddr = addrMat.materializeAddress(copyInst);
     if (destAddr != srcAddr) {
       builder.createCopyAddr(copyInst->getLoc(), srcAddr, destAddr, IsNotTake,
@@ -3125,14 +3497,34 @@ protected:
   // types.
   void visitOpenExistentialValueInst(OpenExistentialValueInst *openExistential);
 
+  void visitMarkUnresolvedNonCopyableValueInst(
+      MarkUnresolvedNonCopyableValueInst *inst) {
+    assert(use == getProjectedDefOperand(inst));
+
+    auto address = pass.valueStorageMap.getStorage(use->get()).storageAddress;
+    auto *replacement = builder.createMarkUnresolvedNonCopyableValueInst(
+        inst->getLoc(), address, inst->getCheckKind());
+    markRewritten(inst, replacement);
+  }
+
+  void visitMoveValueInst(MoveValueInst *mvi);
+
+  void visitMoveOnlyWrapperToCopyableValueInst(
+      MoveOnlyWrapperToCopyableValueInst *inst) {
+    assert(use == getReusedStorageOperand(inst));
+    assert(inst->getType().isAddressOnly(*pass.function));
+    SILValue srcVal = inst->getOperand();
+    SILValue srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;
+
+    auto destAddr =
+        builder.createMoveOnlyWrapperToCopyableAddr(inst->getLoc(), srcAddr);
+
+    markRewritten(inst, destAddr);
+  }
+
   void visitReturnInst(ReturnInst *returnInst) {
     // Returns are rewritten for any function with indirect results after
     // opaque value rewriting.
-  }
-
-  void visitSelectValueInst(SelectValueInst *selectInst) {
-    // FIXME: Unimplemented
-    llvm::report_fatal_error("Unimplemented SelectValue use.");
   }
 
   void visitStoreBorrowInst(StoreBorrowInst *sbi) {
@@ -3169,6 +3561,22 @@ protected:
     pass.deleter.forceDelete(sei);
   }
 
+  void visitStrongCopyUnownedValueInst(StrongCopyUnownedValueInst *scuvi) {
+    auto sourceAddr = addrMat.materializeAddress(use->get());
+    SILValue value =
+        builder.createLoadUnowned(scuvi->getLoc(), sourceAddr, IsNotTake);
+    scuvi->replaceAllUsesWith(value);
+    pass.deleter.forceDelete(scuvi);
+  }
+
+  void visitStrongCopyWeakValueInst(StrongCopyWeakValueInst *scwvi) {
+    auto sourceAddr = addrMat.materializeAddress(use->get());
+    SILValue value =
+        builder.createLoadWeak(scwvi->getLoc(), sourceAddr, IsNotTake);
+    scwvi->replaceAllUsesWith(value);
+    pass.deleter.forceDelete(scwvi);
+  }
+
   // Extract from an opaque struct.
   void visitStructExtractInst(StructExtractInst *extractInst);
 
@@ -3192,6 +3600,9 @@ protected:
 
   // Extract from an opaque tuple.
   void visitTupleExtractInst(TupleExtractInst *extractInst);
+
+  // Extract from an opaque pack tuple.
+  void visitTuplePackExtractInst(TuplePackExtractInst *extractInst);
 
   void
   visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *uncheckedCastInst) {
@@ -3228,8 +3639,7 @@ protected:
       UnconditionalCheckedCastInst *uncondCheckedCast) {
     assert(uncondCheckedCast->getOperand()->getType().isAddressOnly(
         *pass.function));
-    auto *uccai =
-        rewriteUnconditionalCheckedCastInst(uncondCheckedCast, pass, &addrMat);
+    auto *uccai = rewriteUnconditionalCheckedCastInst(uncondCheckedCast, pass);
     if (uncondCheckedCast->getType().isAddressOnly(*pass.function)) {
       markRewritten(uncondCheckedCast, uccai->getDest());
     }
@@ -3243,6 +3653,7 @@ protected:
 
 void UseRewriter::rewriteDestructure(SILInstruction *destructure) {
   for (auto result : destructure->getResults()) {
+    AddressMaterialization addrMat(pass, result, builder);
     SILValue extractAddr = addrMat.materializeDefProjection(result);
     if (result->getType().isAddressOnly(*pass.function)) {
       assert(use == getProjectedDefOperand(result));
@@ -3262,21 +3673,23 @@ void UseRewriter::rewriteDestructure(SILInstruction *destructure) {
       }
       result->replaceAllUsesWith(loadElement);
       if (guaranteed) {
-        emitEndBorrows(loadElement, pass);
+        emitEndBorrowsAtEnclosingGuaranteedBoundary(
+            loadElement, destructure->getOperand(0), pass);
       }
     }
   }
 }
 
-void UseRewriter::visitBeginBorrowInst(BeginBorrowInst *borrow) {
-  assert(use == getProjectedDefOperand(borrow));
+template <typename Introducer>
+void UseRewriter::visitLifetimeIntroducer(Introducer *introducer) {
+  assert(use == getProjectedDefOperand(introducer));
 
   // Mark the value as rewritten and use the operand's storage.
   auto address = pass.valueStorageMap.getStorage(use->get()).storageAddress;
-  markRewritten(borrow, address);
+  markRewritten(introducer, address);
 
-  // Borrows are irrelevant unless they are marked lexical.
-  if (borrow->isLexical()) {
+  // Lifetime introducers are irrelevant unless they are marked lexical.
+  if (introducer->isLexical()) {
     if (auto base = getAccessBase(address)) {
       if (auto *allocStack = dyn_cast<AllocStackInst>(base)) {
         allocStack->setIsLexical();
@@ -3290,6 +3703,14 @@ void UseRewriter::visitBeginBorrowInst(BeginBorrowInst *borrow) {
     SWIFT_ASSERT_ONLY(address->dump());
     llvm_unreachable("^^^ unknown lexical address producer");
   }
+}
+
+void UseRewriter::visitBeginBorrowInst(BeginBorrowInst *borrow) {
+  visitLifetimeIntroducer(borrow);
+}
+
+void UseRewriter::visitMoveValueInst(MoveValueInst *mvi) {
+  visitLifetimeIntroducer(mvi);
 }
 
 // Opening an opaque existential. Rewrite the opened existentials here on
@@ -3366,7 +3787,7 @@ static void emitEndBorrows(SILValue value, AddressLoweringState &pass) {
   findInnerTransitiveGuaranteedUses(value, &usePoints);
 
   SmallVector<SILBasicBlock *, 4> discoveredBlocks;
-  SSAPrunedLiveness liveness(&discoveredBlocks);
+  SSAPrunedLiveness liveness(value->getFunction(), &discoveredBlocks);
   liveness.initializeDef(value);
   for (auto *use : usePoints) {
     assert(!use->isLifetimeEnding() || isa<EndBorrowInst>(use->getUser()));
@@ -3380,8 +3801,58 @@ static void emitEndBorrows(SILValue value, AddressLoweringState &pass) {
       });
 }
 
+/// Emit end_borrows at the lifetime ends of the guaranteed value which
+/// encloses \p enclosingValue.
+///
+/// precondition: \p enclosingValue must be of opaque type
+static void
+emitEndBorrowsAtEnclosingGuaranteedBoundary(SILValue lifetimeToEnd,
+                                            SILValue enclosingValue,
+                                            AddressLoweringState &pass) {
+  /// It's necessary that enclosingValue be of opaque type.  In practice, this
+  /// is the only situation in which AddressLowering needs to create a borrow
+  /// scope corresponding to some guaranteed value: the enclosingValue is the
+  /// opaque value that AddressLowering is rewriting.
+  ///
+  /// It's required in order to ensure that no introducer of enclosingValue has
+  /// a phi scope-ending use.  That enables just visiting the local scope ending
+  /// uses.
+  ///
+  /// Given: enclosingValue is opaque.
+  ///
+  /// Then every introducer is opaque.  In fact every introducer's type is some
+  /// aggregate in which enclosingValue's type appears.  The reason is that
+  /// representation-changing forwarding guaranteed operations are not allowed
+  /// on opaque values.  (See SIL.rst, Forwarding Address-Only Values).
+  ///
+  /// Thus no introducer is reborrowed.  For suppose that some introducer were
+  /// reborrowed.  Then it would appear as an operand of some phi with
+  /// guaranteed ownership. And that phi would be of opaque type. But that's
+  /// invalid! (See SILVerifier::visitSILPhiArgument.)
+  assert(enclosingValue->getType().isAddressOnly(*pass.function));
+  TinyPtrVector<SILValue> introducers;
+  visitBorrowIntroducers(enclosingValue, [&](SILValue introducer) {
+    introducers.push_back(introducer);
+    return true;
+  });
+  /// Since aggregating instructions (struct, tuple, enum) change
+  /// representation, there can only be a single introducer.
+  assert(introducers.size() == 1);
+  auto introducer = introducers[0];
+  assert(introducer->getType().isAddressOnly(*pass.function));
+  auto borrow = BorrowedValue(introducer);
+  borrow.visitLocalScopeEndingUses([&](Operand *use) {
+    assert(!PhiOperand(use));
+    pass.getBuilder(use->getUser()->getIterator())
+        .createEndBorrow(pass.genLoc(), lifetimeToEnd);
+    return true;
+  });
+}
+
 // Extract from an opaque struct or tuple.
 void UseRewriter::emitExtract(SingleValueInstruction *extractInst) {
+  auto source = extractInst->getOperand(0);
+  AddressMaterialization addrMat(pass, extractInst, builder);
   SILValue extractAddr = addrMat.materializeDefProjection(extractInst);
 
   if (extractInst->getType().isAddressOnly(*pass.function)) {
@@ -3412,7 +3883,7 @@ void UseRewriter::emitExtract(SingleValueInstruction *extractInst) {
   SILValue loadElement =
       builder.emitLoadBorrowOperation(extractInst->getLoc(), extractAddr);
   replaceUsesWithLoad(extractInst, loadElement);
-  emitEndBorrows(loadElement, pass);
+  emitEndBorrowsAtEnclosingGuaranteedBoundary(loadElement, source, pass);
 }
 
 void UseRewriter::visitStructExtractInst(StructExtractInst *extractInst) {
@@ -3421,6 +3892,10 @@ void UseRewriter::visitStructExtractInst(StructExtractInst *extractInst) {
 
 // Extract from an opaque tuple.
 void UseRewriter::visitTupleExtractInst(TupleExtractInst *extractInst) {
+  emitExtract(extractInst);
+}
+
+void UseRewriter::visitTuplePackExtractInst(TuplePackExtractInst *extractInst) {
   emitExtract(extractInst);
 }
 
@@ -3513,9 +3988,6 @@ void UseRewriter::visitUncheckedEnumDataInst(
 
   assert(enumDataInst->getOwnershipKind() != OwnershipKind::Guaranteed);
 
-  // unchecked_enum_data could be a def-projection. It is handled as a
-  // separate allocation to make it clear that it can't be
-  // rematerialized. This means that
   auto srcAddr = pass.valueStorageMap.getStorage(use->get()).storageAddress;
 
   auto loc = enumDataInst->getLoc();
@@ -3546,8 +4018,8 @@ class DefRewriter : SILInstructionVisitor<DefRewriter> {
   ValueStorage &storage;
 
   explicit DefRewriter(AddressLoweringState &pass, SILValue value,
-                       SILBasicBlock::iterator insertPt)
-      : pass(pass), builder(pass.getBuilder(insertPt)), addrMat(pass, builder),
+                       SILBuilder builder, SILValue projectedValue)
+      : pass(pass), builder(builder), addrMat(pass, projectedValue, builder),
         storage(pass.valueStorageMap.getStorage(value)) {
     assert(!storage.isRewritten);
   }
@@ -3555,12 +4027,14 @@ class DefRewriter : SILInstructionVisitor<DefRewriter> {
 public:
   static void rewriteValue(SILValue value, AddressLoweringState &pass) {
     if (auto *inst = value->getDefiningInstruction()) {
-      DefRewriter(pass, value, inst->getIterator()).visit(inst);
+      auto builder = pass.getBuilder(inst->getIterator());
+      DefRewriter(pass, value, builder, value).visit(inst);
     } else {
       // function args are already rewritten.
       auto *blockArg = cast<SILPhiArgument>(value);
       auto insertPt = blockArg->getParent()->begin();
-      DefRewriter(pass, value, insertPt).rewriteArg(blockArg);
+      auto builder = pass.getBuilder(insertPt);
+      DefRewriter(pass, value, builder, blockArg).rewriteArg(blockArg);
     }
   }
 
@@ -3609,14 +4083,6 @@ protected:
 
   void visitBuiltinInst(BuiltinInst *bi) {
     switch (bi->getBuiltinKind().value_or(BuiltinValueKind::None)) {
-    case BuiltinValueKind::Copy: {
-      SILValue addr = addrMat.materializeAddress(bi);
-      builder.createBuiltin(
-          bi->getLoc(), bi->getName(),
-          SILType::getEmptyTupleType(bi->getType().getASTContext()),
-          bi->getSubstitutions(), {addr, bi->getOperand(0)});
-      break;
-    }
     default:
       bi->dump();
       llvm::report_fatal_error("^^^ Unimplemented builtin opaque value def.");
@@ -3642,6 +4108,7 @@ protected:
 
   // Define an opaque enum value.
   void visitEnumInst(EnumInst *enumInst) {
+    AddressMaterialization addrMat(pass, enumInst, builder);
     if (enumInst->hasOperand()) {
       // Handle operands here because loadable operands must also be copied.
       addrMat.initializeComposingUse(&enumInst->getOperandRef());
@@ -3656,6 +4123,7 @@ protected:
   void visitInitExistentialValueInst(
       InitExistentialValueInst *initExistentialValue) {
 
+    AddressMaterialization addrMat(pass, initExistentialValue, builder);
     // Initialize memory for the operand which may be opaque or loadable.
     addrMat.initializeComposingUse(&initExistentialValue->getOperandRef());
   }
@@ -3717,7 +4185,25 @@ protected:
         *pass.function));
     assert(uncondCheckedCast->getType().isAddressOnly(*pass.function));
 
-    rewriteUnconditionalCheckedCastInst(uncondCheckedCast, pass, &addrMat);
+    rewriteUnconditionalCheckedCastInst(uncondCheckedCast, pass);
+  }
+
+  void visitUnownedCopyValueInst(UnownedCopyValueInst *uci) {
+    auto &storage = pass.valueStorageMap.getStorage(uci);
+    auto destAddr = addrMat.recursivelyMaterializeStorage(
+        storage, /*intoPhiOperand=*/false);
+
+    builder.createStoreUnowned(uci->getLoc(), uci->getOperand(), destAddr,
+                               IsInitialization);
+  }
+
+  void visitWeakCopyValueInst(WeakCopyValueInst *wcsvi) {
+    auto &storage = pass.valueStorageMap.getStorage(wcsvi);
+    auto destAddr = addrMat.recursivelyMaterializeStorage(
+        storage, /*intoPhiOperand=*/false);
+
+    builder.createStoreWeak(wcsvi->getLoc(), wcsvi->getOperand(), destAddr,
+                            IsInitialization);
   }
 };
 } // end anonymous namespace
@@ -3728,10 +4214,17 @@ protected:
 
 // Rewrite applies with indirect parameters or results of loadable types which
 // were not visited during opaque value rewriting.
-static void rewriteIndirectApply(FullApplySite apply,
+static void rewriteIndirectApply(ApplySite anyApply,
                                  AddressLoweringState &pass) {
   // If all indirect args were loadable, then they still need to be rewritten.
-  CallArgRewriter(apply, pass).rewriteArguments();
+  CallArgRewriter(anyApply, pass).rewriteArguments();
+
+  auto apply = anyApply.asFullApplySite();
+  if (!apply) {
+    // The "result" of the partial_apply isn't rewritten.
+    assert(anyApply.getKind() == ApplySiteKind::PartialApplyInst);
+    return;
+  }
 
   switch (apply.getKind()) {
   case FullApplySiteKind::ApplyInst:
@@ -3768,8 +4261,7 @@ static void rewriteNonopaqueUnconditionalCheckedCast(
   assert(uncondCheckedCast->getOperand()->getType().isLoadable(*pass.function));
   assert(uncondCheckedCast->getType().isLoadable(*pass.function));
 
-  rewriteUnconditionalCheckedCastInst(uncondCheckedCast, pass,
-                                      /*addrMat=*/nullptr);
+  rewriteUnconditionalCheckedCastInst(uncondCheckedCast, pass);
 }
 
 static void rewriteFunction(AddressLoweringState &pass) {
@@ -3793,10 +4285,20 @@ static void rewriteFunction(AddressLoweringState &pass) {
     if (valueDef->getType().isAddress())
       continue;
 
+    // Collect end_borrows and rewrite them last so that when rewriting other
+    // users the lifetime ends of a borrow introducer can be used.
+    StackList<Operand *> lifetimeEndingUses(pass.function);
     SmallPtrSet<Operand *, 8> originalUses;
     SmallVector<Operand *, 8> uses(valueDef->getUses());
     for (auto *oper : uses) {
       originalUses.insert(oper);
+      if (oper->isLifetimeEnding()) {
+        lifetimeEndingUses.push_back(oper);
+        continue;
+      }
+      UseRewriter::rewriteUse(oper, pass);
+    }
+    for (auto *oper : lifetimeEndingUses) {
       UseRewriter::rewriteUse(oper, pass);
     }
     // Rewrite every new use that was added.
@@ -4006,6 +4508,8 @@ void AddressLowering::runOnFunction(SILFunction *function) {
   rewriteFunction(pass);
 
   allocator.finalizeOpaqueStorage();
+
+  allocator.sinkProjections();
 
   deleteRewrittenInstructions(pass);
 

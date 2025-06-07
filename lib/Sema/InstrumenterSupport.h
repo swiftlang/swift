@@ -42,18 +42,19 @@ class InstrumenterBase {
 protected:
   ASTContext &Context;
   DeclContext *TypeCheckDC;
-  Optional<DeclNameRef> ModuleIdentifier;
-  Optional<DeclNameRef> FileIdentifier;
+  std::optional<DeclNameRef> ModuleIdentifier;
+  std::optional<DeclNameRef> FileIdentifier;
 
   InstrumenterBase(ASTContext &C, DeclContext *DC);
   virtual ~InstrumenterBase() = default;
   virtual void anchor();
   virtual BraceStmt *transformBraceStmt(BraceStmt *BS,
+                                        const ParameterList *PL = nullptr,
                                         bool TopLevel = false) = 0;
 
   /// Create an expression which retrieves a valid ModuleIdentifier or
   /// FileIdentifier, if available.
-  Expr *buildIDArgumentExpr(Optional<DeclNameRef> name, SourceRange SR);
+  Expr *buildIDArgumentExpr(std::optional<DeclNameRef> name, SourceRange SR);
 
   class ClosureFinder : public ASTWalker {
   private:
@@ -61,10 +62,16 @@ protected:
 
   public:
     ClosureFinder(InstrumenterBase &Inst) : I(Inst) {}
+
+    /// Walk only the expansion of the macro.
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
     PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
       if (isa<BraceStmt>(S)) {
-        return Action::SkipChildren(S); // don't walk into brace statements; we
-                           // need to respect nesting!
+        return Action::SkipNode(S); // don't walk into brace statements; we
+                                    // need to respect nesting!
       } else {
         return Action::Continue(S);
       }
@@ -73,8 +80,9 @@ protected:
       if (auto *CE = dyn_cast<ClosureExpr>(E)) {
         BraceStmt *B = CE->getBody();
         if (B) {
-          BraceStmt *NB = I.transformBraceStmt(B);
-          CE->setBody(NB, false);
+          const ParameterList *PL = CE->getParameters();
+          BraceStmt *NB = I.transformBraceStmt(B, PL);
+          CE->setBody(NB);
           // just with the entry and exit logging this is going to
           // be more than a single expression!
         }
@@ -92,7 +100,13 @@ protected:
     parsedExpr = Added<T *>(dyn_cast<T>(E));
     return result;
   }
-  
+
+  // Type-check parsedExpr. Note that parsedExpr could end up being changed to
+  // a different kind of expr by the type checker.
+  bool doTypeCheckExpr(ASTContext &Ctx, DeclContext *DC, Expr *&parsedExpr) {
+    return doTypeCheckImpl(Ctx, DC, parsedExpr);
+  }
+
 private:
   bool doTypeCheckImpl(ASTContext &Ctx, DeclContext *DC, Expr * &parsedExpr);
 };

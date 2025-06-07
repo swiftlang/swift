@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -jumpthread-simplify-cfg | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -jumpthread-simplify-cfg | %FileCheck %s
 
 // Test dominator-based jump-threading with OSSA. This requires
 // -jumpthread-simplify-cfg to enable dominator-based
@@ -48,6 +48,13 @@ enum E {
 	case B
 	case C
 }
+
+enum E2 {
+  case a
+  case b(C)
+  case c(C)
+}
+
 
 class Base { }
 
@@ -395,40 +402,6 @@ bb6:
 // This test checks that SimplifyCFG does not remove a dominated terminator with
 // such a condition.
 
-// CHECK-LABEL: sil @test_checked_cast_br
-// CHECK: select_enum
-// CHECK: checked_cast_br
-// CHECK: integer_literal $Builtin.Int64, 1
-// CHECK: select_enum
-// CHECK: checked_cast_br
-// CHECK: integer_literal $Builtin.Int64, 2
-// CHECK: integer_literal $Builtin.Int64, 3
-// CHECK: return
-sil @test_checked_cast_br : $@convention(thin) (E, @owned Base, @owned Base, @owned Base, @owned Base) -> Builtin.Int64 {
-bb0(%0 : $E, %1 : $Base, %2 : $Base, %3 : $Base, %4 : $Base):
-  %s1 = select_enum %0 : $E, case #E.A!enumelt: %1, default %2 : $Base
-  checked_cast_br %s1 : $Base to Derived1, bb1, bb2
-
-bb1(%a1 : $Derived1):
-  %i1 = integer_literal $Builtin.Int64, 1
-  br bb5(%i1 : $Builtin.Int64)
-
-bb2:
-  %s2 = select_enum %0 : $E, case #E.B!enumelt: %3, default %4 : $Base
-  checked_cast_br %s2 : $Base to Derived1, bb3, bb4
-
-bb3(%a2 : $Derived1):
-  %i2 = integer_literal $Builtin.Int64, 2
-  br bb5(%i2 : $Builtin.Int64)
-
-bb4:
-  %i3 = integer_literal $Builtin.Int64, 3
-  br bb5(%i3 : $Builtin.Int64)
-
-bb5(%a3 : $Builtin.Int64):
-  return %a3 : $Builtin.Int64
-}
-
 // CHECK-LABEL: sil @test_cond_br
 // CHECK: select_enum
 // CHECK: cond_br
@@ -438,8 +411,8 @@ bb5(%a3 : $Builtin.Int64):
 // CHECK: integer_literal $Builtin.Int64, 2
 // CHECK: integer_literal $Builtin.Int64, 3
 // CHECK: return
-sil @test_cond_br : $@convention(thin) (E, @owned Base, @owned Base, @owned Base, @owned Base) -> Builtin.Int64 {
-bb0(%0 : $E, %1 : $Base, %2 : $Base, %3 : $Base, %4 : $Base):
+sil @test_cond_br : $@convention(thin) (E) -> Builtin.Int64 {
+bb0(%0 : $E):
   %t1 = integer_literal $Builtin.Int1, -1
   %f1 = integer_literal $Builtin.Int1, 0
   %s1 = select_enum %0 : $E, case #E.A!enumelt: %t1, default %f1 : $Builtin.Int1
@@ -463,5 +436,161 @@ bb4:
 
 bb5(%a3 : $Builtin.Int64):
   return %a3 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil [ossa] @test_reborrow_flag1 :
+// CHECK-NOT:     @reborrow
+// CHECK:       } // end sil function 'test_reborrow_flag1'
+sil [ossa] @test_reborrow_flag1 : $@convention(thin) (@guaranteed E2) -> () {
+bb0(%0 : @guaranteed $E2):
+  %1 = begin_borrow %0 : $E2
+  switch_enum %1 : $E2, case #E2.b!enumelt: bb1, default bb2
+
+bb1(%3 : @guaranteed $C):
+  br bb3
+
+bb2(%5 : @guaranteed $E2):
+  br bb3
+
+bb3:
+  switch_enum %1 : $E2, case #E2.c!enumelt: bb4, default bb5
+
+bb4(%8 : @guaranteed $C):
+  end_borrow %1 : $E2
+  br bb6
+
+bb5(%11 : @guaranteed $E2):
+  end_borrow %1 : $E2
+  br bb6
+
+bb6:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_reborrow_flag2 :
+// CHECK:         @reborrow
+// CHECK:       } // end sil function 'test_reborrow_flag2'
+sil [ossa] @test_reborrow_flag2 : $@convention(thin) (@guaranteed E2, @in_guaranteed E2) -> () {
+bb0(%0 : @guaranteed $E2, %1 : $*E2):
+  switch_enum %0 : $E2, case #E2.b!enumelt: bb1, default bb2
+
+bb1(%3 : @guaranteed $C):
+  br bb3
+
+bb2(%5 : @guaranteed $E2):
+  br bb3
+
+bb3:
+  %6 = load_borrow %1 : $*E2
+  switch_enum %0 : $E2, case #E2.c!enumelt: bb4, default bb5
+
+bb4(%8 : @guaranteed $C):
+  br bb6
+
+bb5(%11 : @guaranteed $E2):
+  br bb6
+
+bb6:
+  fix_lifetime %6 : $E2
+  end_borrow %6 : $E2
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_begin_borrow_in_duplicated_block :
+// CHECK:         begin_borrow
+// CHECK:         begin_borrow
+// CHECK:         @reborrow
+// CHECK:       } // end sil function 'test_begin_borrow_in_duplicated_block'
+sil [ossa] @test_begin_borrow_in_duplicated_block : $@convention(thin) (@guaranteed E2, @guaranteed E2) -> @owned E2 {
+bb0(%0 : @guaranteed $E2, %1 : @guaranteed $E2):
+  switch_enum %0 : $E2, case #E2.b!enumelt: bb1, default bb2
+
+bb1(%3 : @guaranteed $C):
+  br bb3
+
+bb2(%4 : @guaranteed $E2):
+  br bb3
+
+bb3:
+  %5 = copy_value %1 : $E2
+  %6 = begin_borrow %5 : $E2
+  switch_enum %0 : $E2, case #E2.c!enumelt: bb4, default bb5
+
+bb4(%8 : @guaranteed $C):
+  br bb6
+
+bb5(%11 : @guaranteed $E2):
+  br bb6
+
+bb6:
+  fix_lifetime %6 : $E2
+  end_borrow %6 : $E2
+  return %5 : $E2
+}
+
+// CHECK-LABEL: sil [ossa] @test_begin_borrow_and_unreachable :
+// CHECK-NOT:     @reborrow
+// CHECK:       } // end sil function 'test_begin_borrow_and_unreachable'
+sil [ossa] @test_begin_borrow_and_unreachable : $@convention(thin) (@guaranteed E2, @guaranteed E2) -> () {
+bb0(%0 : @guaranteed $E2, %1 : @guaranteed $E2):
+  switch_enum %0 : $E2, case #E2.b!enumelt: bb1, default bb2
+
+bb1(%3 : @guaranteed $C):
+  br bb3
+
+bb2(%4 : @guaranteed $E2):
+  br bb3
+
+bb3:
+  %5 = copy_value %1 : $E2
+  %6 = begin_borrow %5 : $E2
+  switch_enum %0 : $E2, case #E2.c!enumelt: bb4, default bb5
+
+bb4(%8 : @guaranteed $C):
+  br bb6
+
+bb5(%11 : @guaranteed $E2):
+  br bb6
+
+bb6:
+  fix_lifetime %6 : $E2
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @test_update_borrowed_from :
+// CHECK:       bb3([[A1:%.*]] : @guaranteed $C, [[A2:%.*]] : @reborrow $C):
+// CHECK-DAG:     = borrowed [[A2]] : $C from ()
+// CHECK-DAG:     = borrowed [[A1]] : $C from ([[A2]] : $C)
+// CHECK:       } // end sil function 'test_update_borrowed_from'
+sil [ossa] @test_update_borrowed_from : $@convention(thin) (Builtin.Int1, @inout C) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $*C):
+  cond_br %0, bb2, bb1
+
+bb1:
+  br bb3
+
+bb2:
+  %4 = load [take] %1
+  store %4 to [init] %1
+  br bb3
+
+bb3:
+  %7 = load_borrow %1
+  cond_br %0, bb5, bb4
+
+bb4:
+  br bb6(%7)
+
+bb5:
+  %10 = unchecked_ref_cast %7 to $C
+  br bb6(%10)
+
+bb6(%12 : @guaranteed $C):
+  %13 = borrowed %12 from (%7)
+  end_borrow %7
+  %15 = tuple ()
+  return %15
 }
 

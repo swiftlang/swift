@@ -1,4 +1,4 @@
-//===--- CompatibiltyOverride.h - Back-deploying compatibility fixes --*- C++ -*-===//
+//===--- CompatibilityOverride.h - Back-deploying compatibility fixes --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -57,8 +57,13 @@ namespace swift {
 #define COMPATIBILITY_PAREN_COMPATIBILITY_PAREN2 ()
 
 // Include path computation. Code that includes this file can write
-// `#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH` to include the appropriate
+// `#include "CompatibilityOverrideIncludePath.h"` to include the appropriate
 // .def file for the current library.
+//
+// DISCUSSION: We do not use COMPATIBILITY_OVERRIDE_INCLUDE_PATH directly since
+// #including it can break syntax highlighting in certain editors. By using a
+// different file, we keep the broken-ness to that one file that only #include
+// COMPATIBILITY_OVERRIDE_INCLUDE_PATH.
 #define COMPATIBILITY_OVERRIDE_INCLUDE_PATH_swiftRuntime                       \
   "CompatibilityOverrideRuntime.def"
 #define COMPATIBILITY_OVERRIDE_INCLUDE_PATH_swift_Concurrency                  \
@@ -77,7 +82,7 @@ namespace swift {
 
 #ifdef SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES
 
-# error Back-deployment library must always be built with compatibilty overrides
+# error Back-deployment library must always be built with compatibility overrides
 
 #else // #ifdef SWIFT_RUNTIME_NO_COMPATIBILITY_OVERRIDES
 

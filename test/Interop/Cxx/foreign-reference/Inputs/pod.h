@@ -21,6 +21,8 @@ __attribute__((swift_attr("release:immortal"))) Empty {
   static Empty *create() { return new (malloc(sizeof(Empty))) Empty(); }
 };
 
+void takesConstRefEmpty(const Empty &e) {}
+void takesConstRefEmptyDefaulted(const Empty &e = {}) {}
 void mutateIt(Empty &) {}
 Empty passThroughByValue(Empty x) { return x; }
 
@@ -45,6 +47,8 @@ __attribute__((swift_attr("release:immortal"))) IntPair {
   int test() const { return b - a; }
   int testMutable() { return b - a; }
 
+  IntPair &instancePassThroughByRef(IntPair& ref) { return ref; }
+  static IntPair &staticPassThroughByRef(IntPair& ref) { return ref; }
   static IntPair *create() { return new (malloc(sizeof(IntPair))) IntPair(); }
 };
 
@@ -53,6 +57,7 @@ void mutateIt(IntPair &x) {
   x.b = 4;
 }
 IntPair passThroughByValue(IntPair x) { return x; }
+IntPair &passThroughByRef(IntPair &x) { return x; }
 
 struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:immortal")))
@@ -114,6 +119,17 @@ struct ValueHoldingPair {
       __attribute__((swift_attr("import_unsafe"))) {
     return new (malloc(sizeof(ValueHoldingPair))) ValueHoldingPair();
   }
+};
+
+struct ValueHoldingPairRef {
+  IntPair &pair = *IntPair::create();
+
+  int sub(const IntPair &other) const {
+    return pair.test() - other.test();
+  };
+  const IntPair &max(const IntPair &other) const {
+    return pair.test() > other.test() ? pair : other;
+  };
 };
 
 struct __attribute__((swift_attr("import_reference")))

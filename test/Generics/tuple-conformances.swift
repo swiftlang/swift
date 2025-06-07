@@ -1,8 +1,64 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature VariadicGenerics -parse-stdlib
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature TupleConformances
 
-// REQUIRES: asserts
+// REQUIRES: swift_feature_TupleConformances
 
-import Swift
+extension () {
+  // expected-error@-1 {{tuple extension must be written as extension of '(repeat each Element)'}}
+  // expected-error@-2 {{tuple extension must declare conformance to exactly one protocol}}
+
+  struct Nested {}
+  // expected-error@-1 {{type 'Nested' cannot be nested in tuple extension}}
+}
+
+typealias BadTuple<each Horse> = (repeat each Horse, Int)
+extension BadTuple {}
+// expected-error@-1 {{tuple extension must be written as extension of '(repeat each Horse)'}}
+// expected-error@-2 {{tuple extension must declare conformance to exactly one protocol}}
+
+typealias Tuple<each Element> = (repeat each Element)
+
+protocol Q {}
+
+class C {}
+
+extension Tuple: Q where repeat each Element: Collection, repeat (each Element).Element == (each Element).Index, repeat (each Element).Indices: AnyObject, repeat (each Element).SubSequence: C {}
+// expected-error@-1 {{tuple extension must require that 'each Element' conforms to 'Q'}}
+// expected-error@-2 {{tuple extension cannot require that 'each Element' conforms to 'Collection'}}
+// expected-error@-3 {{tuple extension cannot require that '(each Element).Element' is the same type as '(each Element).Index'}}
+// expected-error@-4 {{tuple extension cannot require that '(each Element).Indices' conforms to 'AnyObject'}}
+// expected-error@-5 {{tuple extension cannot require that '(each Element).SubSequence' subclasses 'C'}}
+
+protocol Base1 {}
+protocol Derived1: Base1 {}
+
+extension Tuple: Derived1 where repeat each Element: Derived1 {}
+// expected-error@-1 {{conditional conformance of type '(repeat each Element)' to protocol 'Derived1' does not imply conformance to inherited protocol 'Base1'}}
+// expected-note@-2 {{did you mean to explicitly state the conformance with relaxed bounds using 'where each Element: Base1'?}}
+// expected-note@-3 {{did you mean to explicitly state the conformance with the same bounds using 'where repeat each Element: Derived1'?}}
+// expected-note@-4 {{did you mean to explicitly state the conformance with different bounds?}}
+// expected-error@-5 {{tuple extension must declare conformance to exactly one protocol}}
+
+protocol Base2 {}
+protocol Derived2: Base2 {}
+
+extension Tuple: Derived2 {}
+// expected-error@-1 {{tuple extension must declare conformance to exactly one protocol}} // FIXME: crappy error
+
+////
+
+protocol P2 {}
+
+typealias FancyTuple1<each Cat: P2> = (repeat each Cat)
+extension FancyTuple1: P2 {}
+
+protocol P3 {}
+
+typealias FancyTuple2<each Cat: C> = (repeat each Cat)
+extension FancyTuple2: P3 {}
+// expected-error@-1 {{tuple extension cannot require that 'each Cat' subclasses 'C'}}
+// expected-error@-2 {{tuple extension must require that 'each Cat' conforms to 'P3'}}
+
+////
 
 protocol P {
   associatedtype A
@@ -11,9 +67,9 @@ protocol P {
   func f()
 }
 
-extension Builtin.TheTupleType: P where each Elements: P {
-  typealias A = (repeat each Elements.A)
-  typealias B = Float
+extension Tuple: P where repeat each Element: P {
+  typealias A = (repeat (each Element).A)
+  typealias B = (repeat (each Element).B)
   func f() {}
 }
 
@@ -30,7 +86,41 @@ func same<T>(_: T, _: T) {}
 
 func useConformance() {
   same(returnsPA((1, 2, 3)), (Int, Int, Int).self)
-  same(returnsPB((1, 2, 3)), Float.self)
+  same(returnsPB((1, 2, 3)), (String, String, String).self)
 
   (1, 2, 3).f()
 }
+
+////
+
+extension Tuple: Equatable where repeat each Element: Equatable {
+  // FIXME: Hack
+  @_disfavoredOverload
+  public static func ==(lhs: Self, rhs: Self) -> Bool {
+    for (l, r) in repeat (each lhs, each rhs) {
+      if l != r { return false }
+    }
+    return true
+  }
+}
+
+extension Tuple: Hashable where repeat each Element: Hashable {
+  public func hash(into hasher: inout Hasher) {
+    for elt in repeat each self {
+      elt.hash(into: &hasher)
+    }
+  }
+}
+
+extension Tuple: Comparable where repeat each Element: Comparable {
+  // FIXME: Hack
+  @_disfavoredOverload
+  public static func <(lhs: Self, rhs: Self) -> Bool {
+    for (l, r) in repeat (each lhs, each rhs) {
+      if l > r { return false }
+      if l < r { return true }
+    }
+    return false
+  }
+}
+

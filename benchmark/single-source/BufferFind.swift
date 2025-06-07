@@ -28,19 +28,34 @@ public var benchmarks: [BenchmarkInfo] = [
     setUpFunction: buffer1000Setup,
     tearDownFunction: bufferTeardown
   ),
-  // size 15, alignment 0
+  // size 128, alignment 0
   BenchmarkInfo(
-    name: "RawBuffer.15.findFirst",
+    name: "RawBuffer.128.findFirst",
     runFunction: run_BufferFindFirst,
-    tags: [.validation, .api],
-    setUpFunction: buffer15Setup,
+    tags: [.validation, .api, .skip],
+    setUpFunction: buffer128Setup,
     tearDownFunction: bufferTeardown
   ),
   BenchmarkInfo(
-    name: "RawBuffer.15.findLast",
+    name: "RawBuffer.128.findLast",
     runFunction: run_BufferFindLast,
     tags: [.validation, .api],
-    setUpFunction: buffer15Setup,
+    setUpFunction: buffer128Setup,
+    tearDownFunction: bufferTeardown
+  ),
+  // size 39, alignment 0
+  BenchmarkInfo(
+    name: "RawBuffer.39.findFirst",
+    runFunction: run_BufferFindFirst,
+    tags: [.validation, .api],
+    setUpFunction: buffer39Setup,
+    tearDownFunction: bufferTeardown
+  ),
+  BenchmarkInfo(
+    name: "RawBuffer.39.findLast",
+    runFunction: run_BufferFindLast,
+    tags: [.validation, .api],
+    setUpFunction: buffer39Setup,
     tearDownFunction: bufferTeardown
   ),
   // size 7, alignment 0
@@ -66,8 +81,12 @@ func buffer1000Setup() {
   bufferSetup(size: 1000, alignment: 0)
 }
 
-func buffer15Setup() {
-  bufferSetup(size: 15, alignment: 0)
+func buffer128Setup() {
+  bufferSetup(size: 128, alignment: 0)
+}
+
+func buffer39Setup() {
+  bufferSetup(size: 39, alignment: 0)
 }
 
 func buffer7Setup() {

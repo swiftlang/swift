@@ -26,6 +26,6 @@
 // RUN: %FileCheck %s < %t/Foo-c.json
 
 // CHECK: "kind": "Root"
-// CHECK-NEXT: "name": "TopLevel"
-// CHECK-NEXT: "printedName": "TopLevel"
+// CHECK-NEXT: "name":
+// CHECK-NEXT: "printedName":
 // CHECK: "kind": "Function"

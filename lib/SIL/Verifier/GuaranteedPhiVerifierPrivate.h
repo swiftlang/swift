@@ -85,7 +85,7 @@ class DeadEndBlocks;
 class GuaranteedPhiVerifier {
   /// A cache of dead-end basic blocks that we use to determine if we can
   /// ignore "leaks".
-  DeadEndBlocks &deadEndBlocks;
+  DeadEndBlocks *deadEndBlocks = nullptr;
   /// The builder that the checker uses to emit error messages, crash if asked
   /// for, or supply back interesting info to the caller.
   LinearLifetimeChecker::ErrorBuilder errorBuilder;
@@ -96,7 +96,7 @@ class GuaranteedPhiVerifier {
       dependentPhiToBaseValueMap;
 
 public:
-  GuaranteedPhiVerifier(const SILFunction *func, DeadEndBlocks &deadEndBlocks,
+  GuaranteedPhiVerifier(const SILFunction *func, DeadEndBlocks *deadEndBlocks,
                         LinearLifetimeChecker::ErrorBuilder errorBuilder)
       : deadEndBlocks(deadEndBlocks), errorBuilder(errorBuilder) {}
 

@@ -1,0 +1,10 @@
+-static
+-lswiftSwiftOnoneSupport
+-ldl
+-lstdc++
+-lm
+-lwasi-emulated-mman
+-lwasi-emulated-signal
+-lwasi-emulated-process-clocks
+-Xlinker --error-limit=0
+-Xlinker --threads=1

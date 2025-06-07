@@ -10,7 +10,7 @@
 
 #if PRIVATE_LIB
 
-public struct HiddenStruct {
+public struct HiddenStruct: Equatable {
   public init() {}
 }
 
@@ -19,7 +19,9 @@ public struct HiddenStruct {
 @_implementationOnly import private_lib
 
 protocol SomeProtocol {
-  associatedtype Value
+  // Make sure we recover from failure when reading the type witness and
+  // associated conformance.
+  associatedtype Value: Equatable
   static var defaultValue: Value { get }
 }
 public struct M: SomeProtocol {

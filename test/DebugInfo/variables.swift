@@ -46,7 +46,7 @@ var unused: Int32 = -1
 
 // Stack variables.
 func foo(_ dt: Float) -> Float {
-  // CHECK-DAG: call void @llvm.dbg.declare
+  // CHECK-DAG: #dbg_declare
   // CHECK-DAG: !DILocalVariable(name: "f"
   let f: Float = 9.78
 
@@ -71,7 +71,7 @@ func myprint(_ p: (i: Int, b: Bool)) {
 myprint(tuple)
 
 // Arrays are represented as an instantiation of Array.
-// CHECK-DAG: ![[ARRAYTY:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Array",
+// CHECK-DAG: ![[ARRAYTY:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "$sSaySi1a_Si1btGD",
 // CHECK-DAG: ![[ARRAY_MEMBER:.*]] = !DIDerivedType(tag: DW_TAG_member, {{.*}}baseType: ![[ARRAYTY]]
 // CHECK-DAG: ![[ARRAY_ELTS:.*]] = !{![[ARRAY_MEMBER]]}
 // CHECK-DAG: ![[ARRAY_CONTAINER:.*]] = !DICompositeType({{.*}}elements: ![[ARRAY_ELTS]]

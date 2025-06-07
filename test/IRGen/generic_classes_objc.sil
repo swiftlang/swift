@@ -78,9 +78,9 @@ class SomeClass{}
 sil_vtable SomeClass {}
 
 // This used to assert.
-sil @repo : $@convention(thin) (@guaranteed Optional< @callee_guaranteed @substituted <τ_0_1> (@in_guaranteed Result<τ_0_1, Error>) -> () for <ObjcGenericClass<SomeClass>>>) -> () {
-bb0(%0 : $Optional< @callee_guaranteed @substituted <τ_0_1> (@in_guaranteed Result<τ_0_1, Error>) -> () for <ObjcGenericClass<SomeClass>> >):
-  debug_value %0 : $Optional<@callee_guaranteed @substituted <τ_0_1> (@in_guaranteed Result<τ_0_1, Error>) -> () for <ObjcGenericClass<SomeClass>>>, let, name "completion", argno 1
+sil @repo : $@convention(thin) (@guaranteed Optional< @callee_guaranteed @substituted <τ_0_1 where τ_0_1 : Copyable, τ_0_1 : Escapable> (@in_guaranteed Result<τ_0_1, Error>) -> () for <ObjcGenericClass<SomeClass>>>) -> () {
+bb0(%0 : $Optional< @callee_guaranteed @substituted <τ_0_1 where τ_0_1 : Copyable, τ_0_1 : Escapable> (@in_guaranteed Result<τ_0_1, Error>) -> () for <ObjcGenericClass<SomeClass>> >):
+  debug_value %0 : $Optional<@callee_guaranteed @substituted <τ_0_1 where τ_0_1 : Copyable, τ_0_1 : Escapable> (@in_guaranteed Result<τ_0_1, Error>) -> () for <ObjcGenericClass<SomeClass>>>, let, name "completion", argno 1
   %2 = tuple ()
   return %2 : $()
 }
@@ -88,9 +88,9 @@ bb0(%0 : $Optional< @callee_guaranteed @substituted <τ_0_1> (@in_guaranteed Res
 struct PlainGeneric<T> {}
 
 // This used to assert.
-sil @repo2 : $@convention(thin) (@guaranteed Optional< @callee_guaranteed @substituted <τ_0_1> (@in_guaranteed Result<τ_0_1, Error>) -> () for <PlainGeneric<ObjcGenericClass<SomeClass>>>>) -> () {
-bb0(%0 : $Optional< @callee_guaranteed @substituted <τ_0_1> (@in_guaranteed Result<τ_0_1, Error>) -> () for <PlainGeneric<ObjcGenericClass<SomeClass>>> >):
-  debug_value %0 : $Optional<@callee_guaranteed @substituted <τ_0_1> (@in_guaranteed Result<τ_0_1, Error>) -> () for <PlainGeneric<ObjcGenericClass<SomeClass>>>>, let, name "completion", argno 1
+sil @repo2 : $@convention(thin) (@guaranteed Optional< @callee_guaranteed @substituted <τ_0_1 where τ_0_1 : Copyable, τ_0_1 : Escapable> (@in_guaranteed Result<τ_0_1, Error>) -> () for <PlainGeneric<ObjcGenericClass<SomeClass>>>>) -> () {
+bb0(%0 : $Optional< @callee_guaranteed @substituted <τ_0_1 where τ_0_1 : Copyable, τ_0_1 : Escapable> (@in_guaranteed Result<τ_0_1, Error>) -> () for <PlainGeneric<ObjcGenericClass<SomeClass>>> >):
+  debug_value %0 : $Optional<@callee_guaranteed @substituted <τ_0_1 where τ_0_1 : Copyable, τ_0_1 : Escapable> (@in_guaranteed Result<τ_0_1, Error>) -> () for <PlainGeneric<ObjcGenericClass<SomeClass>>>>, let, name "completion", argno 1
   %2 = tuple ()
   return %2 : $()
 }

@@ -1,0 +1,63 @@
+// RUN: %target-swift-frontend \
+// RUN:     %s \
+// RUN:     -enable-callee-allocated-coro-abi \
+// RUN:     -module-name Library \
+// RUN:     -emit-ir \
+// RUN:     -enable-experimental-feature CoroutineAccessors \
+// RUN:     -enable-library-evolution \
+// RUN: | %IRGenFileCheck %s
+
+// REQUIRES: swift_feature_CoroutineAccessors
+
+sil_stage canonical
+
+import Builtin
+
+struct Int {
+  var _value: Builtin.Int64
+}
+
+open class B {
+  open var i: Int { read set }
+}
+
+sil @B_i_read : $@yield_once @convention(method) (@guaranteed B) -> @yields Int
+sil @B_i_read2 : $@yield_once_2 @convention(method) (@guaranteed B) -> @yields Int
+sil @B_i_set : $@convention(method) (Int, @guaranteed B) -> ()
+sil @B_i_modify : $@yield_once @convention(method) (@guaranteed B) -> @yields @inout Int
+sil @B_i_modify2 : $@yield_once_2 @convention(method) (@guaranteed B) -> @yields @inout Int
+
+sil_vtable B {
+  #B.i!read: (B) -> () -> () : @B_i_read
+  #B.i!read2: (B) -> () -> () : @B_i_read2
+  #B.i!setter: (B) -> (Int) -> () : @B_i_set
+  #B.i!modify: (B) -> () -> () : @B_i_modify
+  #B.i!modify2: (B) -> () -> () : @B_i_modify2
+}
+
+sil @B_i_read2_default_override : $@yield_once_2 @convention(method) (@guaranteed B) -> @yields Int
+sil @B_i_modify2_default_override : $@yield_once_2 @convention(method) (@guaranteed B) -> @yields @inout Int
+
+sil_default_override_table B {
+  #B.i!read2: #B.i!read: (B) -> () -> () : @B_i_read2_default_override
+  #B.i!modify2: #B.i!modify: (B) -> () -> () : @B_i_modify2_default_override
+}
+
+// CHECK: %swift.method_default_override_descriptor = type { i32, i32, i32 }
+
+// CHECK-LABEL: @"$s7Library1BCMn" = {{.*}}constant <{
+                // Other stuff.
+// CHECK-SAME:  i32
+// CHECK-SAME:  %swift.method_default_override_descriptor
+// CHECK-SAME:  %swift.method_default_override_descriptor
+// CHECK-SAME:}>
+// CHECK-SAME:<{
+                // Eventually...
+// CHECK-SAME:  i32 2
+// CHECK-SAME:  %swift.method_default_override_descriptor {
+// CHECK-SAME:    B_i_read2_default_overrideTwc
+// CHECK-SAME:  }
+// CHECK-SAME:  %swift.method_default_override_descriptor {
+// CHECK-SAME:    B_i_modify2_default_overrideTwc
+// CHECK-SAME:  }
+// CHECK-SAME:}>

@@ -51,6 +51,13 @@ namespace swift {
 /// or false to indicate that matching should exit early.
 template<typename ImplClass>
 class TypeMatcher {
+public:
+  enum class Position : uint8_t {
+    Type,
+    Shape
+  };
+
+private:
   class MatchVisitor : public CanTypeVisitor<MatchVisitor, bool, Type, Type> {
     TypeMatcher &Matcher;
 
@@ -104,6 +111,9 @@ class TypeMatcher {
     TRIVIAL_CASE(BuiltinIntegerType)
     TRIVIAL_CASE(BuiltinFloatType)
     TRIVIAL_CASE(BuiltinVectorType)
+    TRIVIAL_CASE(BuiltinUnboundGenericType)
+    TRIVIAL_CASE(BuiltinFixedArrayType)
+    TRIVIAL_CASE(IntegerType)
 #define SINGLETON_TYPE(SHORT_ID, ID) TRIVIAL_CASE(ID##Type)
 #include "swift/AST/TypeNodes.def"
 
@@ -192,14 +202,39 @@ class TypeMatcher {
 
     bool visitPackExpansionType(CanPackExpansionType firstPE, Type secondType,
                                 Type sugaredFirstType) {
-      if (auto secondInOut = secondType->getAs<PackExpansionType>()) {
-        return this->visit(firstPE.getPatternType(),
-                           secondInOut->getPatternType(),
-                           sugaredFirstType->castTo<PackExpansionType>()
-                             ->getPatternType());
+      if (auto secondExpansion = secondType->getAs<PackExpansionType>()) {
+        if (!this->visit(firstPE.getPatternType(),
+                         secondExpansion->getPatternType(),
+                         sugaredFirstType->castTo<PackExpansionType>()
+                           ->getPatternType())) {
+          return false;
+        }
+
+        Matcher.asDerived().pushPosition(Position::Shape);
+        if (!this->visit(firstPE.getCountType(),
+                         secondExpansion->getCountType(),
+                         sugaredFirstType->castTo<PackExpansionType>()
+                           ->getCountType())) {
+          return false;
+        }
+        Matcher.asDerived().popPosition(Position::Shape);
+
+        return true;
       }
 
       return mismatch(firstPE.getPointer(), secondType, sugaredFirstType);
+    }
+
+    bool visitPackElementType(CanPackElementType firstElement, Type secondType,
+                              Type sugaredFirstType) {
+      if (auto secondElement = secondType->getAs<PackElementType>()) {
+        return this->visit(firstElement.getPackType(),
+                           secondElement->getPackType(),
+                           sugaredFirstType->castTo<PackElementType>()
+                             ->getPackType());
+      }
+
+      return mismatch(firstElement.getPointer(), secondType, sugaredFirstType);
     }
 
     bool visitReferenceStorageType(CanReferenceStorageType firstStorage,
@@ -275,7 +310,7 @@ class TypeMatcher {
         }
       }
 
-      // FIXME: Once OpenedArchetypeType stores substitutions, do something
+      // FIXME: Once ExistentialArchetypeType stores substitutions, do something
       // similar to the above.
 
       if (firstArchetype->isEqual(secondType))
@@ -340,7 +375,8 @@ class TypeMatcher {
         if (firstFunc->isNoEscape() != secondFunc->isNoEscape())
           return mismatch(firstFunc.getPointer(), secondFunc, sugaredFirstType);
 
-        if (firstFunc->isSendable() != secondFunc->isSendable())
+        if (!Matcher.asDerived().allowSendableFunctionMismatch() &&
+            firstFunc->isSendable() != secondFunc->isSendable())
           return mismatch(firstFunc.getPointer(), secondFunc, sugaredFirstType);
 
         auto sugaredFirstFunc = sugaredFirstType->castTo<AnyFunctionType>();
@@ -364,6 +400,13 @@ class TypeMatcher {
                            sugaredFirstFunc->getParams()[i].getOldType()))
             return false;
         }
+
+        // Compare the thrown error types.
+        Type thrownError1 = firstFunc->getEffectiveThrownErrorTypeOrNever();
+        Type thrownError2 = secondFunc->getEffectiveThrownErrorTypeOrNever();
+        if (!this->visit(thrownError1->getCanonicalType(),
+                         thrownError2, thrownError1))
+          return false;
 
         return this->visit(firstFunc.getResult(), secondFunc->getResult(),
                            sugaredFirstFunc->getResult());
@@ -426,10 +469,12 @@ class TypeMatcher {
 
         if (firstArgs.size() == secondArgs.size()) {
           for (unsigned i : indices(firstArgs)) {
-            return this->visit(CanType(firstArgs[i]),
-                               secondArgs[i],
-                               sugaredFirstType->castTo<ParameterizedProtocolType>()
-                                   ->getArgs()[i]);
+            if (!this->visit(CanType(firstArgs[i]),
+                             secondArgs[i],
+                             sugaredFirstType->castTo<ParameterizedProtocolType>()
+                                 ->getArgs()[i])) {
+              return false;
+            }
           }
 
           return true;
@@ -509,6 +554,11 @@ class TypeMatcher {
   };
 
   bool alwaysMismatchTypeParameters() const { return false; }
+
+  bool allowSendableFunctionMismatch() const { return false; }
+
+  void pushPosition(Position pos) {}
+  void popPosition(Position pos) {}
 
   ImplClass &asDerived() { return static_cast<ImplClass &>(*this); }
 

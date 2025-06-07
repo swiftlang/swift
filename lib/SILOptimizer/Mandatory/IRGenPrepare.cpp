@@ -33,6 +33,18 @@
 
 using namespace swift;
 
+// Print the message string of encountered `cond_fail` instructions the first
+// time the message string is encountered.
+static llvm::cl::opt<bool> PrintCondFailMessages(
+  "print-cond-fail-messages", llvm::cl::init(false),
+  llvm::cl::desc("print cond_fail messages"));
+static llvm::cl::opt<bool> IncludeCondFailMessagesFunction(
+  "print-cond-fail-messages-include-function-name", llvm::cl::init(false),
+  llvm::cl::desc("when printing cond_fail messages include"
+                 "the current SIL function name"));
+
+static llvm::DenseSet<StringRef> CondFailMessages;
+
 static bool cleanFunction(SILFunction &fn) {
   bool madeChange = false;
 
@@ -42,6 +54,30 @@ static bool cleanFunction(SILFunction &fn) {
       // instruction gets removed from the block.
       SILInstruction *inst = &*i;
       ++i;
+
+      // Print cond_fail messages the first time a specific cond_fail message
+      // string is encountered.
+      //   Run the swift-frontend in a mode that will generate LLVM IR adding
+      //   the option `-print-cond-fail-messages` will dump all cond_fail
+      //   message strings encountered in the SIL.
+      //   ```
+      //     % swift-frontend -Xllvm -print-cond-fail-messages -emit-ir/-c ...
+      //     ...
+      //     cond_fail message encountered: Range out of bounds
+      //     cond_fail message encountered: Array index is out of range
+      //     ...
+      //   ```
+      if (PrintCondFailMessages) {
+        if (auto CFI = dyn_cast<CondFailInst>(inst)) {
+          auto msg = CFI->getMessage().str();
+          if (IncludeCondFailMessagesFunction) {
+            msg.append(" in ");
+            msg.append(fn.getName().str());
+          }
+          if (CondFailMessages.insert(msg).second)
+            llvm::dbgs() << "cond_fail message encountered: " << msg << "\n";
+        }
+      }
 
       // Remove calls to Builtin.poundAssert() and Builtin.staticReport().
       auto *bi = dyn_cast<BuiltinInst>(inst);
@@ -86,6 +122,15 @@ namespace {
 class IRGenPrepare : public SILFunctionTransform {
   void run() override {
     SILFunction *F = getFunction();
+
+    if (getOptions().EmbeddedSwift) {
+      // In embedded swift all the code is generated in the top-level module.
+      // Even de-serialized functions must be code-gen'd.
+      SILLinkage linkage = F->getLinkage();
+      if (isAvailableExternally(linkage)) {
+        F->setLinkage(SILLinkage::Hidden);
+      }
+    }
 
     bool shouldInvalidate = cleanFunction(*F);
 

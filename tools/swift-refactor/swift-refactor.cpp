@@ -129,10 +129,6 @@ static llvm::cl::opt<bool> EnableExperimentalConcurrency(
     "enable-experimental-concurrency",
     llvm::cl::desc("Whether to enable experimental concurrency or not"));
 
-static llvm::cl::opt<bool> EnableExperimentalStringProcessing(
-    "enable-experimental-string-processing",
-    llvm::cl::desc("Whether to enable experimental string processing or not"));
-
 static llvm::cl::opt<std::string>
     SDK("sdk", llvm::cl::desc("Path to the SDK to build against"));
 
@@ -180,18 +176,18 @@ bool doesFileExist(StringRef Path) {
 struct RefactorLoc {
   unsigned Line;
   unsigned Column;
-  NameUsage Usage;
+  RenameLocUsage Usage;
 };
 
-NameUsage convertToNameUsage(StringRef RoleString) {
+RenameLocUsage convertToNameUsage(StringRef RoleString) {
   if (RoleString == "unknown")
-    return NameUsage::Unknown;
+    return RenameLocUsage::Unknown;
   if (RoleString == "def")
-    return NameUsage::Definition;
+    return RenameLocUsage::Definition;
   if (RoleString == "ref")
-    return NameUsage::Reference;
+    return RenameLocUsage::Reference;
   if (RoleString == "call")
-    return NameUsage::Call;
+    return RenameLocUsage::Call;
   llvm_unreachable("unhandled role string");
 }
 
@@ -205,8 +201,8 @@ std::vector<RefactorLoc> getLocsByLabelOrPosition(StringRef LabelOrLineCol,
   if (LabelOrLineCol.contains(':')) {
     auto LineCol = parseLineCol(LabelOrLineCol);
     if (LineCol.has_value()) {
-      LocResults.push_back({LineCol.value().first,LineCol.value().second,
-        NameUsage::Unknown});
+      LocResults.push_back({LineCol.value().first, LineCol.value().second,
+                            RenameLocUsage::Unknown});
     } else {
       llvm::errs() << "cannot parse position pair.";
     }
@@ -235,7 +231,7 @@ std::vector<RefactorLoc> getLocsByLabelOrPosition(StringRef LabelOrLineCol,
       unsigned ColumnOffset = 0;
       if (Matches[2].length() > 0 && !llvm::to_integer(Matches[2].str(), ColumnOffset))
         continue; // bad column offset
-      auto Usage = NameUsage::Reference;
+      auto Usage = RenameLocUsage::Reference;
       if (Matches[3].length() > 0)
         Usage = convertToNameUsage(Matches[3].str());
       LocResults.push_back({Line, Column + ColumnOffset, Usage});
@@ -246,14 +242,11 @@ std::vector<RefactorLoc> getLocsByLabelOrPosition(StringRef LabelOrLineCol,
 
 std::vector<RenameLoc> getRenameLocs(unsigned BufferID, SourceManager &SM,
                                      ArrayRef<RefactorLoc> Locs,
-                                     StringRef OldName, StringRef NewName,
-                                     bool IsFunctionLike,
-                                     bool IsNonProtocolType) {
+                                     StringRef OldName, StringRef NewName) {
   std::vector<RenameLoc> Renames;
   llvm::transform(Locs, std::back_inserter(Renames),
                   [&](const RefactorLoc &Loc) -> RenameLoc {
-                    return {Loc.Line, Loc.Column,     Loc.Usage,        OldName,
-                            NewName,  IsFunctionLike, IsNonProtocolType};
+                    return {Loc.Line, Loc.Column, Loc.Usage, OldName};
                   });
   return Renames;
 }
@@ -261,16 +254,15 @@ std::vector<RenameLoc> getRenameLocs(unsigned BufferID, SourceManager &SM,
 RangeConfig getRange(unsigned BufferID, SourceManager &SM,
                                    RefactorLoc Start,
                                    RefactorLoc End) {
-    RangeConfig Range;
-    SourceLoc EndLoc = SM.getLocForLineCol(BufferID, End.Line,
-                                           End.Column);
-    Range.BufferId = BufferID;
-    Range.Line = Start.Line;
-    Range.Column = Start.Column;
-    Range.Length = SM.getByteDistance(Range.getStart(SM), EndLoc);
+  RangeConfig Range;
+  SourceLoc EndLoc = SM.getLocForLineCol(BufferID, End.Line, End.Column);
+  Range.BufferID = BufferID;
+  Range.Line = Start.Line;
+  Range.Column = Start.Column;
+  Range.Length = SM.getByteDistance(Range.getStart(SM), EndLoc);
 
-    assert(Range.getEnd(SM) == EndLoc);
-    return Range;
+  assert(Range.getEnd(SM) == EndLoc);
+  return Range;
 }
 
 // This function isn't referenced outside its translation unit, but it
@@ -279,6 +271,65 @@ RangeConfig getRange(unsigned BufferID, SourceManager &SM,
 // address of main, and some platforms can't implement getMainExecutable
 // without being given the address of a function in the main executable).
 void anchorForGetMainExecutable() {}
+
+static StringRef syntacticRenameRangeTag(RefactoringRangeKind Kind) {
+  switch (Kind) {
+  case RefactoringRangeKind::BaseName:
+    return "base";
+  case RefactoringRangeKind::KeywordBaseName:
+    return "keywordBase";
+  case RefactoringRangeKind::ParameterName:
+    return "param";
+  case RefactoringRangeKind::NoncollapsibleParameterName:
+    return "noncollapsibleparam";
+  case RefactoringRangeKind::DeclArgumentLabel:
+    return "arglabel";
+  case RefactoringRangeKind::CallArgumentLabel:
+    return "callarg";
+  case RefactoringRangeKind::CallArgumentColon:
+    return "callcolon";
+  case RefactoringRangeKind::CallArgumentCombined:
+    return "callcombo";
+  case RefactoringRangeKind::SelectorArgumentLabel:
+    return "sel";
+  }
+  llvm_unreachable("unhandled kind");
+}
+
+static int printSyntacticRenameRanges(
+    CancellableResult<std::vector<SyntacticRenameRangeDetails>> RenameRanges,
+    SourceManager &SM, unsigned BufferId, llvm::raw_ostream &OS) {
+  switch (RenameRanges.getKind()) {
+  case CancellableResultKind::Success:
+    break; // Handled below
+  case CancellableResultKind::Failure:
+    OS << RenameRanges.getError();
+    return 1;
+  case CancellableResultKind::Cancelled:
+    OS << "<cancelled>";
+    return 1;
+  }
+  SourceEditOutputConsumer outputConsumer(SM, BufferId, OS);
+  for (auto RangeDetails : RenameRanges.getResult()) {
+    if (RangeDetails.Type == RegionType::Mismatch ||
+        RangeDetails.Type == RegionType::Unmatched) {
+      continue;
+    }
+    for (const auto &Range : RangeDetails.Ranges) {
+      std::string NewText;
+      llvm::raw_string_ostream OS(NewText);
+      StringRef Tag = syntacticRenameRangeTag(Range.RangeKind);
+      OS << "<" << Tag;
+      if (Range.Index.has_value())
+        OS << " index=" << *Range.Index;
+      OS << ">" << Range.Range.str() << "</" << Tag << ">";
+      Replacement Repl{/*Path=*/{}, Range.Range, /*BufferName=*/{}, OS.str(),
+                       /*RegionsWorthNote=*/{}};
+      outputConsumer.SourceEditConsumer::accept(SM, Repl);
+    }
+  }
+  return RenameRanges.getResult().empty();
+}
 
 int main(int argc, char *argv[]) {
   PROGRAM_START(argc, argv);
@@ -299,7 +350,11 @@ int main(int argc, char *argv[]) {
     reinterpret_cast<void *>(&anchorForGetMainExecutable)));
 
   Invocation.setSDKPath(options::SDK);
-  Invocation.setImportSearchPaths(options::ImportPaths);
+  std::vector<SearchPathOptions::SearchPath> ImportPaths;
+  for (const auto &path : options::ImportPaths) {
+    ImportPaths.push_back({path, /*isSystem=*/false});
+  }
+  Invocation.setImportSearchPaths(ImportPaths);
   if (!options::Triple.empty())
     Invocation.setTargetTriple(options::Triple);
 
@@ -315,9 +370,6 @@ int main(int argc, char *argv[]) {
 
   if (options::EnableExperimentalConcurrency)
     Invocation.getLangOptions().EnableExperimentalConcurrency = true;
-
-  if (options::EnableExperimentalStringProcessing)
-    Invocation.getLangOptions().EnableExperimentalStringProcessing = true;
 
   for (auto FileName : options::InputFilenames)
     Invocation.getFrontendOptions().InputsAndOutputs.addInputFile(FileName);
@@ -353,7 +405,7 @@ int main(int argc, char *argv[]) {
   assert(SF && "no source file?");
 
   SourceManager &SM = SF->getASTContext().SourceMgr;
-  unsigned BufferID = SF->getBufferID().value();
+  unsigned BufferID = SF->getBufferID();
   std::string Buffer = SM.getRangeForBuffer(BufferID).str().str();
 
   auto Start = getLocsByLabelOrPosition(options::LineColumnPair, Buffer);
@@ -377,8 +429,9 @@ int main(int argc, char *argv[]) {
 
   if (options::Action == RefactoringKind::FindLocalRenameRanges) {
     RangeConfig Range = getRange(BufferID, SM, StartLoc, EndLoc);
-    FindRenameRangesAnnotatingConsumer Consumer(SM, BufferID, llvm::outs());
-    return findLocalRenameRanges(SF, Range, Consumer, PrintDiags);
+    auto SyntacticRenameRanges = findLocalRenameRanges(SF, Range);
+    return printSyntacticRenameRanges(SyntacticRenameRanges, SM, BufferID,
+                                      llvm::outs());
   }
 
   if (options::Action == RefactoringKind::GlobalRename ||
@@ -399,35 +452,29 @@ int main(int argc, char *argv[]) {
       NewName = "";
     }
 
-    std::vector<RenameLoc>
-    RenameLocs = getRenameLocs(BufferID, SM, Start, options::OldName, NewName,
-                               options::IsFunctionLike.getNumOccurrences(),
-                               options::IsNonProtocolType.getNumOccurrences());
+    std::vector<RenameLoc> RenameLocs =
+        getRenameLocs(BufferID, SM, Start, options::OldName, NewName);
 
-    switch (options::Action) {
-    case RefactoringKind::GlobalRename: {
-      SourceEditOutputConsumer EditConsumer(SM, BufferID, llvm::outs());
-      return syntacticRename(SF, RenameLocs, EditConsumer, PrintDiags);
-    }
-    case RefactoringKind::FindGlobalRenameRanges: {
-      FindRenameRangesAnnotatingConsumer Consumer(SM, BufferID, llvm::outs());
-      return findSyntacticRenameRanges(SF, RenameLocs, Consumer, PrintDiags);
-    }
-    default:
+    if (options::Action != RefactoringKind::FindGlobalRenameRanges) {
       llvm_unreachable("unexpected refactoring kind");
     }
+    auto SyntacticRenameRanges =
+        findSyntacticRenameRanges(SF, RenameLocs, NewName);
+    return printSyntacticRenameRanges(SyntacticRenameRanges, SM, BufferID,
+                                      llvm::outs());
   }
 
   RangeConfig Range = getRange(BufferID, SM, StartLoc, EndLoc);
 
   if (options::Action == RefactoringKind::None) {
-    llvm::SmallVector<RefactoringKind, 32> Kinds;
     bool CollectRangeStartRefactorings = false;
-    collectAvailableRefactorings(SF, Range, CollectRangeStartRefactorings,
-                                 Kinds, {&PrintDiags});
+    auto Refactorings = collectRefactorings(
+        SF, Range, CollectRangeStartRefactorings, {&PrintDiags});
     llvm::outs() << "Action begins\n";
-    for (auto Kind : Kinds) {
-      llvm::outs() << getDescriptiveRefactoringKindName(Kind) << "\n";
+    for (auto Info : Refactorings) {
+      if (Info.AvailableKind == RefactorAvailableKind::Available) {
+        llvm::outs() << getDescriptiveRefactoringKindName(Info.Kind) << "\n";
+      }
     }
     llvm::outs() << "Action ends\n";
     return 0;

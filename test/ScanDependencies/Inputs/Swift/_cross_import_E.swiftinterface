@@ -3,4 +3,5 @@
 import Swift
 import E
 import SubE
+import X
 public func funcCrossImportE() {}

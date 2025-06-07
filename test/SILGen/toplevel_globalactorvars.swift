@@ -1,13 +1,11 @@
-// RUN: %target-swift-emit-silgen -Xllvm -sil-full-demangle -disable-availability-checking -enable-experimental-async-top-level %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -Xllvm -sil-full-demangle -target %target-swift-5.1-abi-triple -enable-experimental-async-top-level %s | %FileCheck %s
 
 // a
 // CHECK-LABEL: sil_global hidden @$s24toplevel_globalactorvars1aSivp : $Int
 
-// CHECK-LABEL: sil hidden [ossa] @async_Main
+// CHECK-LABEL: sil private [ossa] @async_Main
 // CHECK: bb0:
-// CHECK-NEXT: // function_ref
-// CHECK-NEXT: [[GET_MAIN:%.*]] = function_ref @swift_task_getMainExecutor
-// CHECK-NEXT: [[MAIN:%.*]] = apply [[GET_MAIN]]()
+// CHECK-NEXT: [[MAIN:%.*]] = builtin "buildMainActorExecutorRef"() : $Builtin.Executor
 // CHECK-NEXT: [[MAIN_OPTIONAL:%[0-9]+]] = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, [[MAIN]]
 
 actor MyActorImpl {}
@@ -67,9 +65,9 @@ await printFromMyActor(value: a)
 // CHECK: [[PRINTFROMMYACTOR_FUNC:%[0-9]+]] = function_ref @$s24toplevel_globalactorvars16printFromMyActor5valueySi_tF
 // CHECK: [[ACTORREF:%[0-9]+]] = begin_borrow {{%[0-9]+}} : $MyActorImpl
 // CHECK: hop_to_executor [[ACTORREF]] : $MyActorImpl
+// CHECK: end_borrow [[ACTORREF]]
 // CHECK: {{%[0-9]+}} = apply [[PRINTFROMMYACTOR_FUNC]]([[AGLOBAL]])
 // CHECK: hop_to_executor [[MAIN_OPTIONAL]]
-// CHECK: end_borrow [[ACTORREF]]
 
 if a < 10 {
 // CHECK: [[AACCESS:%[0-9]+]] = begin_access [read] [dynamic] [[AREF]] : $*Int
@@ -121,7 +119,7 @@ if a < 10 {
     // CHECK: [[PRINTFROMMYACTOR_FUNC:%[0-9]+]] = function_ref @$s24toplevel_globalactorvars16printFromMyActor5valueySi_tF
     // CHECK: [[ACTORREF:%[0-9]+]] = begin_borrow {{%[0-9]+}} : $MyActorImpl
     // CHECK: hop_to_executor [[ACTORREF]] : $MyActorImpl
+    // CHECK: end_borrow [[ACTORREF]]
     // CHECK: {{%[0-9]+}} = apply [[PRINTFROMMYACTOR_FUNC]]([[AGLOBAL]])
     // CHECK: hop_to_executor [[MAIN_OPTIONAL]]
-    // CHECK: end_borrow [[ACTORREF]]
 }

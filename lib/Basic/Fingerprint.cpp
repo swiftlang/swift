@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Fingerprint.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/Support/Format.h"
@@ -29,7 +30,7 @@ void swift::simple_display(llvm::raw_ostream &out, const Fingerprint &fp) {
   out << fp.getRawValue();
 }
 
-Optional<Fingerprint> Fingerprint::fromString(StringRef value) {
+std::optional<Fingerprint> Fingerprint::fromString(llvm::StringRef value) {
   assert(value.size() == Fingerprint::DIGEST_LENGTH &&
          "Only supports 32-byte hash values!");
   auto fp = Fingerprint::ZERO();
@@ -43,7 +44,7 @@ Optional<Fingerprint> Fingerprint::fromString(StringRef value) {
   }
   // If the input string is not valid hex, the conversion above can fail.
   if (value != fp.getRawValue())
-    return None;
+    return std::nullopt;
 
   return fp;
 }

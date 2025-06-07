@@ -8,12 +8,12 @@ import Builtin
 //
 // In particular, this doesn't test parsing the components that make up the test
 // specification.
-// CHECK-LABEL: sil [ossa] @for_test_specification : {{.*}} {
-// CHECK:       test_specification "try-running-it foo bar 18 false baz"
-// CHECK-LABEL: } // end sil function 'for_test_specification'
-sil [ossa] @for_test_specification : $@convention(thin) () -> () {
+// CHECK-LABEL: sil [ossa] @for_specify_test : {{.*}} {
+// CHECK:       specify_test "try-running-it foo bar 18 false baz"
+// CHECK-LABEL: } // end sil function 'for_specify_test'
+sil [ossa] @for_specify_test : $@convention(thin) () -> () {
 entry:
-  test_specification "try-running-it foo bar 18 false baz"
+  specify_test "try-running-it foo bar 18 false baz"
   %4 = tuple()
   return %4 : $()
 }

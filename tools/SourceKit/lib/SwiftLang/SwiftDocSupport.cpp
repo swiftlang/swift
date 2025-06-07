@@ -141,7 +141,7 @@ public:
     assert(EntitiesStack.empty());
   }
 
-  bool shouldContinuePre(const Decl *D, Optional<BracketOptions> Bracket) {
+  bool shouldContinuePre(const Decl *D, std::optional<BracketOptions> Bracket) {
     assert(Bracket.has_value());
     if (!Bracket.value().shouldOpenExtension(D) &&
         isa<ExtensionDecl>(D))
@@ -149,7 +149,8 @@ public:
     return true;
   }
 
-  bool shouldContinuePost(const Decl *D, Optional<BracketOptions> Bracket) {
+  bool shouldContinuePost(const Decl *D,
+                          std::optional<BracketOptions> Bracket) {
     assert(Bracket.has_value());
     if (!Bracket.value().shouldCloseNominal(D) && isa<NominalTypeDecl>(D))
       return false;
@@ -159,9 +160,10 @@ public:
     return true;
   }
 
-  void printSynthesizedExtensionPre(const ExtensionDecl *ED,
-                                    TypeOrExtensionDecl Target,
-                                    Optional<BracketOptions> Bracket) override {
+  void
+  printSynthesizedExtensionPre(const ExtensionDecl *ED,
+                               TypeOrExtensionDecl Target,
+                               std::optional<BracketOptions> Bracket) override {
     assert(!SynthesizedExtensionInfo.first);
     SynthesizedExtensionInfo = {ED, Target};
     if (!shouldContinuePre(ED, Bracket))
@@ -170,10 +172,9 @@ public:
     EntitiesStack.emplace_back(ED, Target, nullptr, StartOffset, true);
   }
 
-  void
-  printSynthesizedExtensionPost(const ExtensionDecl *ED,
-                                TypeOrExtensionDecl Target,
-                                Optional<BracketOptions> Bracket) override {
+  void printSynthesizedExtensionPost(
+      const ExtensionDecl *ED, TypeOrExtensionDecl Target,
+      std::optional<BracketOptions> Bracket) override {
     assert(SynthesizedExtensionInfo.first);
     SynthesizedExtensionInfo = {nullptr, {}};
     if (!shouldContinuePost(ED, Bracket))
@@ -185,7 +186,8 @@ public:
     TopEntities.push_back(std::move(Entity));
   }
 
-  void printDeclPre(const Decl *D, Optional<BracketOptions> Bracket) override {
+  void printDeclPre(const Decl *D,
+                    std::optional<BracketOptions> Bracket) override {
     if (isa<ParamDecl>(D))
       return; // Parameters are handled specially in addParameters().
     if (!shouldContinuePre(D, Bracket))
@@ -208,7 +210,8 @@ public:
     }
   }
 
-  void printDeclPost(const Decl *D, Optional<BracketOptions> Bracket) override {
+  void printDeclPost(const Decl *D,
+                     std::optional<BracketOptions> Bracket) override {
     if (isa<ParamDecl>(D))
       return; // Parameters are handled specially in addParameters().
     if (!shouldContinuePost(D, Bracket))
@@ -216,6 +219,11 @@ public:
     assert(!EntitiesStack.empty());
     TextEntity Entity = std::move(EntitiesStack.back());
     EntitiesStack.pop_back();
+
+    // We only care about API for documentation purposes.
+    if (!ABIRoleInfo(D).providesAPI())
+      return;
+
     unsigned EndOffset = OS.tell();
     Entity.Range.Length = EndOffset - Entity.Range.Offset;
     if (EntitiesStack.empty()) {
@@ -271,7 +279,6 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info,
   // substitution).
   unsigned TypeContextDepth = 0;
   SubstitutionMap SubMap;
-  ModuleDecl *M = nullptr;
   Type BaseType;
   if (SynthesizedTarget) {
     BaseType = SynthesizedTarget.getBaseNominal()->getDeclaredInterfaceType();
@@ -281,12 +288,8 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info,
         DC = cast<ExtensionDecl>(D)->getExtendedNominal();
       else
         DC = D->getInnermostDeclContext()->getInnermostTypeContext();
-      M = DC->getParentModule();
-      SubMap = BaseType->getContextSubstitutionMap(M, DC);
-      if (!SubMap.empty()) {
-        TypeContextDepth = SubMap.getGenericSignature()
-            .getGenericParams().back()->getDepth() + 1;
-      }
+      SubMap = BaseType->getContextSubstitutionMap(DC);
+      TypeContextDepth = SubMap.getGenericSignature().getNextDepth();
     }
   }
 
@@ -300,9 +303,7 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info,
           return Type(type).subst(SubMap);
         return type;
       },
-      [&](CanType depType, Type substType, ProtocolDecl *proto) {
-        return M->lookupConformance(substType, proto);
-      },
+      LookUpConformanceInModule(),
       SubstFlags::DesugarMemberTypes);
   };
 
@@ -332,7 +333,13 @@ static void initDocGenericParams(const Decl *D, DocEntityInfo &Info,
   if (auto *typeDC = GC->getInnermostTypeContext())
     Proto = typeDC->getSelfProtocolDecl();
 
-  for (auto Req: GenericSig.getRequirements()) {
+  SmallVector<Requirement, 2> Reqs;
+  SmallVector<InverseRequirement, 2> InverseReqs;
+  GenericSig->getRequirementsWithInverses(Reqs, InverseReqs);
+  // FIXME: Handle InverseReqs, or change the above to getRequirements()
+  // and update tests to include Copyable/Escapable
+
+  for (auto Req: Reqs) {
     if (Proto &&
         Req.getKind() == RequirementKind::Conformance &&
         Req.getFirstType()->isEqual(Proto->getSelfInterfaceType()) &&
@@ -424,7 +431,7 @@ static bool initDocEntityInfo(const Decl *D,
     SwiftLangSupport::printDisplayName(VD, NameOS);
     {
       llvm::raw_svector_ostream OS(Info.USR);
-      SwiftLangSupport::printUSR(VD, OS);
+      SwiftLangSupport::printUSR(VD, OS, /*distinguishSynthesizedDecls*/ true);
       if (SynthesizedTarget) {
         OS << SwiftLangSupport::SynthesizedUSRSeparator;
         SwiftLangSupport::printUSR(SynthesizedTargetNTD, OS);
@@ -441,18 +448,15 @@ static bool initDocEntityInfo(const Decl *D,
     SwiftLangSupport::printUSR((const ValueDecl*)DefaultImplementationOf, OS);
   }
 
-  Info.IsUnavailable = AvailableAttr::isUnavailable(D);
-  Info.IsDeprecated = D->getAttrs().getDeprecated(D->getASTContext()) != nullptr;
+  Info.IsUnavailable = D->isUnavailable();
+  Info.IsDeprecated = D->isDeprecated();
   Info.IsOptional = D->getAttrs().hasAttribute<OptionalAttr>();
-  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-    Info.IsAsync = AFD->hasAsync();
-  } else if (auto *Storage = dyn_cast<AbstractStorageDecl>(D)) {
-    if (auto *Getter = Storage->getAccessor(AccessorKind::Get))
-      Info.IsAsync = Getter->hasAsync();
+  if (auto *valueDecl = dyn_cast<ValueDecl>(D)) {
+    Info.IsAsync = valueDecl->isAsync();
   }
 
   if (!IsRef) {
-    llvm::raw_svector_ostream OS(Info.DocComment);
+    llvm::raw_svector_ostream OS(Info.DocCommentAsXML);
 
     {
       llvm::SmallString<128> DocBuffer;
@@ -500,15 +504,17 @@ static bool initDocEntityInfo(const Decl *D,
 
   switch(D->getDeclContext()->getContextKind()) {
     case DeclContextKind::AbstractClosureExpr:
+    case DeclContextKind::SerializedAbstractClosure:
     case DeclContextKind::TopLevelCodeDecl:
+    case DeclContextKind::SerializedTopLevelCodeDecl:
     case DeclContextKind::AbstractFunctionDecl:
     case DeclContextKind::SubscriptDecl:
     case DeclContextKind::EnumElementDecl:
     case DeclContextKind::Initializer:
-    case DeclContextKind::SerializedLocal:
     case DeclContextKind::ExtensionDecl:
     case DeclContextKind::GenericTypeDecl:
     case DeclContextKind::MacroDecl:
+    case DeclContextKind::Package:
       break;
 
     // We report sub-module information only for top-level decls.
@@ -619,7 +625,7 @@ static void reportRelated(ASTContext &Ctx, const Decl *D,
         passExtends(TD, Consumer);
     }
 
-    passInherits(ED->getInherited(), Consumer);
+    passInherits(ED->getInherited().getEntries(), Consumer);
 
   } else if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
 
@@ -627,7 +633,7 @@ static void reportRelated(ASTContext &Ctx, const Decl *D,
       // If underlying type exists, report the inheritance and conformance of the
       // underlying type.
       if (auto NM = Ty->getAnyNominal()) {
-        passInherits(NM->getInherited(), Consumer);
+        passInherits(NM->getInherited().getEntries(), Consumer);
         passConforms(NM->getSatisfiedProtocolRequirements(/*Sorted=*/true),
                      Consumer);
         return;
@@ -647,30 +653,27 @@ static void reportRelated(ASTContext &Ctx, const Decl *D,
   }
 }
 
-static ArrayRef<const DeclAttribute*>
-getDeclAttributes(const Decl *D, std::vector<const DeclAttribute*> &Scratch) {
-  for (auto Attr : D->getAttrs()) {
+static ArrayRef<SemanticAvailableAttr>
+getAvailableAttrs(const Decl *D, std::vector<SemanticAvailableAttr> &Scratch) {
+  for (auto Attr : D->getSemanticAvailableAttrs()) {
     Scratch.push_back(Attr);
   }
+  // FIXME: [availability] Special-casing enums and deprecation here is weird.
   // For enum elements, inherit their parent enum decls' deprecated attributes.
   if (auto *DE = dyn_cast<EnumElementDecl>(D)) {
-    for (auto Attr : DE->getParentEnum()->getAttrs()) {
-      if (auto Avail = dyn_cast<AvailableAttr>(Attr)) {
-        if (Avail->Deprecated || Avail->isUnconditionallyDeprecated()) {
-          Scratch.push_back(Attr);
-        }
+    for (auto Attr : DE->getParentEnum()->getSemanticAvailableAttrs()) {
+      if (Attr.getDeprecated() || Attr.isUnconditionallyDeprecated()) {
+        Scratch.push_back(Attr);
       }
     }
   }
 
-  return llvm::makeArrayRef(Scratch);
+  return llvm::ArrayRef(Scratch);
 }
 
 // Only reports @available.
-// FIXME: Handle all attributes.
-static void reportAttributes(ASTContext &Ctx,
-                             const Decl *D,
-                             DocInfoConsumer &Consumer) {
+static void reportAvailabilityAttributes(ASTContext &Ctx, const Decl *D,
+                                         DocInfoConsumer &Consumer) {
   static UIdent AvailableAttrKind("source.lang.swift.attribute.availability");
   static UIdent PlatformIOS("source.availability.platform.ios");
   static UIdent PlatformMacCatalyst("source.availability.platform.maccatalyst");
@@ -684,55 +687,75 @@ static void reportAttributes(ASTContext &Ctx,
   static UIdent PlatformWatchOSAppExt("source.availability.platform.watchos_app_extension");
   static UIdent PlatformOpenBSD("source.availability.platform.openbsd");
   static UIdent PlatformWindows("source.availability.platform.windows");
-  std::vector<const DeclAttribute*> Scratch;
+  std::vector<SemanticAvailableAttr> Scratch;
 
-  for (auto Attr : getDeclAttributes(D, Scratch)) {
-    if (auto Av = dyn_cast<AvailableAttr>(Attr)) {
-      UIdent PlatformUID;
-      switch (Av->Platform) {
-      case PlatformKind::none:
-        PlatformUID = UIdent(); break;
-      case PlatformKind::iOS:
-        PlatformUID = PlatformIOS; break;
-      case PlatformKind::macCatalyst:
-        PlatformUID = PlatformMacCatalyst; break;
-      case PlatformKind::macOS:
-        PlatformUID = PlatformOSX; break;
-      case PlatformKind::tvOS:
-        PlatformUID = PlatformtvOS; break;
-      case PlatformKind::watchOS:
-        PlatformUID = PlatformWatchOS; break;
-      case PlatformKind::iOSApplicationExtension:
-        PlatformUID = PlatformIOSAppExt; break;
-      case PlatformKind::macCatalystApplicationExtension:
-        PlatformUID = PlatformMacCatalystAppExt; break;
-      case PlatformKind::macOSApplicationExtension:
-        PlatformUID = PlatformOSXAppExt; break;
-      case PlatformKind::tvOSApplicationExtension:
-        PlatformUID = PlatformtvOSAppExt; break;
-      case PlatformKind::watchOSApplicationExtension:
-        PlatformUID = PlatformWatchOSAppExt; break;
-      case PlatformKind::OpenBSD:
-        PlatformUID = PlatformOpenBSD; break;
-      case PlatformKind::Windows:
-        PlatformUID = PlatformWindows; break;
-      }
-
-      AvailableAttrInfo Info;
-      Info.AttrKind = AvailableAttrKind;
-      Info.IsUnavailable = Av->isUnconditionallyUnavailable();
-      Info.IsDeprecated = Av->isUnconditionallyDeprecated();
-      Info.Platform = PlatformUID;
-      Info.Message = Av->Message;
-      if (Av->Introduced)
-        Info.Introduced = *Av->Introduced;
-      if (Av->Deprecated)
-        Info.Deprecated = *Av->Deprecated;
-      if (Av->Obsoleted)
-        Info.Obsoleted = *Av->Obsoleted;
-
-      Consumer.handleAvailableAttribute(Info);
+  for (auto Attr : getAvailableAttrs(D, Scratch)) {
+    UIdent PlatformUID;
+    switch (Attr.getPlatform()) {
+    case PlatformKind::none:
+      PlatformUID = UIdent();
+      break;
+    case PlatformKind::iOS:
+      PlatformUID = PlatformIOS;
+      break;
+    case PlatformKind::macCatalyst:
+      PlatformUID = PlatformMacCatalyst;
+      break;
+    case PlatformKind::macOS:
+      PlatformUID = PlatformOSX;
+      break;
+    case PlatformKind::tvOS:
+      PlatformUID = PlatformtvOS;
+      break;
+    case PlatformKind::watchOS:
+      PlatformUID = PlatformWatchOS;
+      break;
+    case PlatformKind::iOSApplicationExtension:
+      PlatformUID = PlatformIOSAppExt;
+      break;
+    case PlatformKind::visionOS:
+      // FIXME: Formal platform support in SourceKit is needed.
+      PlatformUID = UIdent();
+      break;
+    case PlatformKind::macCatalystApplicationExtension:
+      PlatformUID = PlatformMacCatalystAppExt;
+      break;
+    case PlatformKind::macOSApplicationExtension:
+      PlatformUID = PlatformOSXAppExt;
+      break;
+    case PlatformKind::tvOSApplicationExtension:
+      PlatformUID = PlatformtvOSAppExt;
+      break;
+    case PlatformKind::watchOSApplicationExtension:
+      PlatformUID = PlatformWatchOSAppExt;
+      break;
+    case PlatformKind::visionOSApplicationExtension:
+      // FIXME: Formal platform support in SourceKit is needed.
+      PlatformUID = UIdent();
+      break;
+    case PlatformKind::OpenBSD:
+      PlatformUID = PlatformOpenBSD;
+      break;
+    case PlatformKind::Windows:
+      PlatformUID = PlatformWindows;
+      break;
     }
+    // FIXME: [availability] Handle other availability domains?
+
+    AvailableAttrInfo Info;
+    Info.AttrKind = AvailableAttrKind;
+    Info.IsUnavailable = Attr.isUnconditionallyUnavailable();
+    Info.IsDeprecated = Attr.isUnconditionallyDeprecated();
+    Info.Platform = PlatformUID;
+    Info.Message = Attr.getMessage();
+    if (Attr.getIntroduced())
+      Info.Introduced = Attr.getIntroduced().value();
+    if (Attr.getDeprecated())
+      Info.Deprecated = Attr.getDeprecated().value();
+    if (Attr.getObsoleted())
+      Info.Obsoleted = Attr.getObsoleted().value();
+
+    Consumer.handleAvailableAttribute(Info);
   }
 }
 
@@ -749,7 +772,7 @@ static void reportDocEntities(ASTContext &Ctx,
                                                 : TypeOrExtensionDecl(),
                   Consumer);
     reportDocEntities(Ctx, Entity.SubEntities, Consumer);
-    reportAttributes(Ctx, Entity.Dcl, Consumer);
+    reportAvailabilityAttributes(Ctx, Entity.Dcl, Consumer);
     Consumer.finishSourceEntity(EntInfo.Kind);
   }
 }
@@ -770,6 +793,10 @@ public:
     : SM(SM), BufferID(BufferID), References(References), Consumer(Consumer) {}
 
   bool walkToNodePre(SyntaxNode Node) override {
+    // Ignore things that don't come from this buffer.
+    if (!SM.getRangeForBuffer(BufferID).contains(Node.Range.getStart()))
+      return false;
+
     unsigned Offset = SM.getLocOffsetInBuffer(Node.Range.getStart(), BufferID);
     unsigned Length = Node.Range.getByteLength();
 
@@ -830,6 +857,11 @@ public:
       auto passAnnotation = [&](UIdent Kind, SourceLoc Loc, Identifier Name) {
         if (Loc.isInvalid())
           return;
+
+        // Ignore things that don't come from this buffer.
+        if (!SM.getRangeForBuffer(BufferID).contains(Loc))
+          return;
+
         unsigned Offset = SM.getLocOffsetInBuffer(Loc, BufferID);
         unsigned Length = Name.empty() ? 1 : Name.getLength();
         reportRefsUntil(Offset);
@@ -917,9 +949,13 @@ static void addParameters(ArrayRef<Identifier> &ArgNames,
 
     if (auto typeRepr = param->getTypeRepr()) {
       SourceRange TypeRange = typeRepr->getSourceRange();
-      if (auto InOutTyR = dyn_cast_or_null<InOutTypeRepr>(typeRepr))
-        TypeRange = InOutTyR->getBase()->getSourceRange();
+      if (auto OwnTyR = dyn_cast_or_null<OwnershipTypeRepr>(typeRepr))
+        TypeRange = OwnTyR->getBase()->getSourceRange();
       if (TypeRange.isInvalid())
+        continue;
+
+      // Ignore things that don't come from this buffer.
+      if (!SM.getRangeForBuffer(BufferID).contains(TypeRange.Start))
         continue;
 
       unsigned StartOffs = SM.getLocOffsetInBuffer(TypeRange.Start, BufferID);
@@ -969,15 +1005,24 @@ public:
              llvm::MutableArrayRef<TextEntity*> FuncEnts)
     : SM(SM), BufferID(BufferID), FuncEnts(FuncEnts) {}
 
+  /// Only walk the arguments of a macro, to represent the source as written.
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
+
   PreWalkAction walkToDeclPre(Decl *D) override {
     if (D->isImplicit())
-      return Action::SkipChildren(); // Skip body.
+      return Action::SkipNode(); // Skip body.
 
     if (FuncEnts.empty())
-      return Action::SkipChildren();
+      return Action::SkipNode();
 
     if (!isa<AbstractFunctionDecl>(D) && !isa<SubscriptDecl>(D))
       return Action::Continue();
+
+    // Ignore things that don't come from this buffer.
+    if (!SM.getRangeForBuffer(BufferID).contains(D->getLoc()))
+      return Action::SkipNode();
 
     unsigned Offset = SM.getLocOffsetInBuffer(D->getLoc(), BufferID);
     auto Found = FuncEnts.end();
@@ -990,14 +1035,14 @@ public:
         });
     }
     if (Found == FuncEnts.end() || (*Found)->LocOffset != Offset)
-      return Action::SkipChildren();
+      return Action::SkipNode();
     if (auto FD = dyn_cast<AbstractFunctionDecl>(D)) {
       addParameters(FD, **Found, SM, BufferID);
     } else {
       addParameters(cast<SubscriptDecl>(D), **Found, SM, BufferID);
     }
     FuncEnts = llvm::MutableArrayRef<TextEntity*>(Found+1, FuncEnts.end());
-    return Action::SkipChildren(); // skip body.
+    return Action::SkipNode(); // skip body.
   }
 };
 } // end anonymous namespace
@@ -1012,7 +1057,7 @@ static void addParameterEntities(CompilerInstance &CI,
     auto SF = dyn_cast<SourceFile>(Unit);
     if (!SF)
       continue;
-    FuncWalker Walker(CI.getSourceMgr(), *SF->getBufferID(), FuncEnts);
+    FuncWalker Walker(CI.getSourceMgr(), SF->getBufferID(), FuncEnts);
     SF->walk(Walker);
   }
 }
@@ -1026,7 +1071,7 @@ static void reportSourceAnnotations(const SourceTextInfo &IFaceInfo,
       continue;
 
     SyntaxModelContext SyntaxContext(*SF);
-    DocSyntaxWalker SyntaxWalker(CI.getSourceMgr(), *SF->getBufferID(),
+    DocSyntaxWalker SyntaxWalker(CI.getSourceMgr(), SF->getBufferID(),
                                  IFaceInfo.References, Consumer);
     SyntaxContext.walk(SyntaxWalker);
     SyntaxWalker.finished();
@@ -1045,7 +1090,7 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx, StringRef ModuleName,
     return true;
 
   PrintOptions Options = PrintOptions::printDocInterface();
-  ModuleTraversalOptions TraversalOptions = None;
+  ModuleTraversalOptions TraversalOptions = std::nullopt;
   TraversalOptions |= ModuleTraversal::VisitSubmodules;
   TraversalOptions |= ModuleTraversal::VisitHidden;
 
@@ -1053,7 +1098,8 @@ static bool getModuleInterfaceInfo(ASTContext &Ctx, StringRef ModuleName,
   llvm::raw_svector_ostream OS(Text);
   AnnotatingPrinter Printer(OS);
 
-  printModuleInterface(M, None, TraversalOptions, Printer, Options, true);
+  printModuleInterface(M, std::nullopt, TraversalOptions, Printer, Options,
+                       true);
 
   Info.Text = std::string(OS.str());
   Info.TopEntities = std::move(Printer.TopEntities);
@@ -1132,6 +1178,11 @@ public:
       return true;
     if (isLocal(D))
       return true;
+
+    // Ignore things that don't come from this buffer.
+    if (!SM.getRangeForBuffer(BufferID).contains(D->getSourceRange().Start))
+      return false;
+
     TextRange TR = getTextRange(D->getSourceRange());
     unsigned LocOffset = getOffset(Range.getStart());
     EntitiesStack.emplace_back(D, TypeOrExtensionDecl(), nullptr, TR, LocOffset,
@@ -1152,17 +1203,24 @@ public:
     return true;
   }
 
-  bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type Ty,
+  bool visitDeclReference(ValueDecl *D, SourceRange Range, TypeDecl *CtorTyRef,
+                          ExtensionDecl *ExtTyRef, Type Ty,
                           ReferenceMetaData Data) override {
     if (Data.isImplicit || !Range.isValid())
       return true;
-    unsigned StartOffset = getOffset(Range.getStart());
-    References.emplace_back(D, StartOffset, Range.getByteLength(), Ty);
+    // Ignore things that don't come from this buffer.
+    if (!SM.getRangeForBuffer(BufferID).contains(Range.Start))
+      return true;
+
+    CharSourceRange CharRange = Lexer::getCharSourceRangeFromSourceRange(
+        D->getASTContext().SourceMgr, Range);
+
+    unsigned StartOffset = getOffset(CharRange.getStart());
+    References.emplace_back(D, StartOffset, CharRange.getByteLength(), Ty);
     return true;
   }
 
-  bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
+  bool visitSubscriptReference(ValueDecl *D, SourceRange Range,
                                ReferenceMetaData Data,
                                bool IsOpenBracket) override {
     // Treat both open and close brackets equally
@@ -1217,7 +1275,6 @@ static bool reportSourceDocInfo(CompilerInvocation Invocation,
     Consumer.failed(InstanceSetupError);
     return true;
   }
-  DiagConsumer.setInputBufferIDs(CI.getInputBufferIDs());
 
   ASTContext &Ctx = CI.getASTContext();
   CloseClangModuleFiles scopedCloseFiles(*Ctx.getClangModuleLoader());
@@ -1230,10 +1287,9 @@ static bool reportSourceDocInfo(CompilerInvocation Invocation,
 
   reportDocEntities(Ctx, SourceInfo.TopEntities, Consumer);
   reportSourceAnnotations(SourceInfo, CI, Consumer);
-  for (auto &Diag : DiagConsumer.getDiagnosticsForBuffer(
-                                                CI.getInputBufferIDs().back()))
-    Consumer.handleDiagnostic(Diag);
 
+  auto BufferID = CI.getInputBufferIDs().back();
+  Consumer.handleDiagnostics(DiagConsumer.getDiagnosticsForBuffer(BufferID));
   return false;
 }
 
@@ -1257,9 +1313,8 @@ public:
     std::vector<CategorizedEdits> Results;
     for (unsigned I = 0, N = UIds.size(); I < N; I ++) {
       auto Pair = StartEnds[I];
-      Results.push_back({UIds[I],
-                         llvm::makeArrayRef(AllEdits.data() + Pair.first,
-                                             Pair.second - Pair.first)});
+      Results.push_back({UIds[I], llvm::ArrayRef(AllEdits.data() + Pair.first,
+                                                 Pair.second - Pair.first)});
     }
     Receiver(RequestResult<ArrayRef<CategorizedEdits>>::fromResult(Results));
   }
@@ -1283,8 +1338,9 @@ public:
                         R.EndColumn,
                         R.ArgIndex};
               });
-          return {Start.first, Start.second, End.first,
-                  End.second,  R.Text.str(), std::move(SubRanges)};
+          return {R.Path.str(), Start.first,         Start.second,
+                  End.first,    End.second,          R.BufferName.str(),
+                  R.Text.str(), std::move(SubRanges)};
         });
     unsigned End = AllEdits.size();
     StartEnds.emplace_back(Start, End);
@@ -1310,32 +1366,18 @@ void RequestRefactoringEditConsumer::handleDiagnostic(
   Impl.DiagConsumer.handleDiagnostic(SM, Info);
 }
 
-class RequestRenameRangeConsumer::Implementation {
-  CategorizedRenameRangesReceiver Receiver;
-  std::string ErrBuffer;
-  llvm::raw_string_ostream OS;
-  std::vector<CategorizedRenameRanges> CategorizedRanges;
+/// Translates a vector of \c SyntacticRenameRangeDetails to a vector of
+/// \c CategorizedRenameRanges.
+static std::vector<CategorizedRenameRanges> getCategorizedRenameRanges(
+    std::vector<SyntacticRenameRangeDetails> SyntacticRenameRanges,
+    SourceManager &SM) {
+  std::vector<CategorizedRenameRanges> Result;
 
-public:
-  PrintingDiagnosticConsumer DiagConsumer;
-
-public:
-  Implementation(CategorizedRenameRangesReceiver Receiver)
-      : Receiver(Receiver), OS(ErrBuffer), DiagConsumer(OS) {}
-
-  ~Implementation() {
-    if (DiagConsumer.didErrorOccur()) {
-      Receiver(RequestResult<ArrayRef<CategorizedRenameRanges>>::fromError(OS.str()));
-      return;
-    }
-    Receiver(RequestResult<ArrayRef<CategorizedRenameRanges>>::fromResult(CategorizedRanges));
-  }
-
-  void accept(SourceManager &SM, RegionType RegionType,
-              ArrayRef<ide::RenameRangeDetail> Ranges) {
-    CategorizedRenameRanges Results;
-    Results.Category = SwiftLangSupport::getUIDForRegionType(RegionType);
-    for (const auto &R : Ranges) {
+  for (SyntacticRenameRangeDetails RangeDetails : SyntacticRenameRanges) {
+    CategorizedRenameRanges CategorizedRanges;
+    CategorizedRanges.Category =
+        SwiftLangSupport::getUIDForRegionType(RangeDetails.Type);
+    for (const auto &R : RangeDetails.Ranges) {
       SourceKit::RenameRangeDetail Result;
       std::tie(Result.StartLine, Result.StartColumn) =
           SM.getLineAndColumnInBuffer(R.Range.getStart());
@@ -1344,92 +1386,51 @@ public:
       Result.ArgIndex = R.Index;
       Result.Kind =
           SwiftLangSupport::getUIDForRefactoringRangeKind(R.RangeKind);
-      Results.Ranges.push_back(std::move(Result));
+      CategorizedRanges.Ranges.push_back(std::move(Result));
     }
-    CategorizedRanges.push_back(std::move(Results));
+    Result.push_back(std::move(CategorizedRanges));
   }
-};
 
-RequestRenameRangeConsumer::RequestRenameRangeConsumer(
-    CategorizedRenameRangesReceiver Receiver)
-    : Impl(*new Implementation(Receiver)) {}
-RequestRenameRangeConsumer::~RequestRenameRangeConsumer() { delete &Impl; }
-
-void RequestRenameRangeConsumer::accept(
-    SourceManager &SM, RegionType RegionType,
-    ArrayRef<ide::RenameRangeDetail> Ranges) {
-  Impl.accept(SM, RegionType, Ranges);
+  return Result;
 }
 
-void RequestRenameRangeConsumer::handleDiagnostic(SourceManager &SM,
-                                                  const DiagnosticInfo &Info) {
-  Impl.DiagConsumer.handleDiagnostic(SM, Info);
-}
-
-static NameUsage getNameUsage(RenameType Type) {
-  switch (Type) {
-  case RenameType::Definition:
-    return NameUsage::Definition;
-  case RenameType::Reference:
-    return NameUsage::Reference;
-  case RenameType::Call:
-    return NameUsage::Call;
-  case RenameType::Unknown:
-    return NameUsage::Unknown;
-  }
-}
-
-static std::vector<RenameLoc>
-getSyntacticRenameLocs(ArrayRef<RenameLocations> RenameLocations);
-
-void SwiftLangSupport::
-syntacticRename(llvm::MemoryBuffer *InputBuf,
-                ArrayRef<RenameLocations> RenameLocations,
-                ArrayRef<const char*> Args,
-                CategorizedEditsReceiver Receiver) {
+CancellableResult<std::vector<CategorizedRenameRanges>>
+SwiftLangSupport::findRenameRanges(llvm::MemoryBuffer *InputBuf,
+                                   ArrayRef<RenameLoc> RenameLocs,
+                                   ArrayRef<const char *> Args) {
+  using ResultType = CancellableResult<std::vector<CategorizedRenameRanges>>;
   std::string Error;
   CompilerInstance ParseCI;
   PrintingDiagnosticConsumer PrintDiags;
   ParseCI.addDiagnosticConsumer(&PrintDiags);
   SourceFile *SF = getSyntacticSourceFile(InputBuf, Args, ParseCI, Error);
   if (!SF) {
-    Receiver(RequestResult<ArrayRef<CategorizedEdits>>::fromError(Error));
-    return;
+    return ResultType::failure(Error);
   }
 
-  auto RenameLocs = getSyntacticRenameLocs(RenameLocations);
-  RequestRefactoringEditConsumer EditConsumer(Receiver);
-  swift::ide::syntacticRename(SF, RenameLocs, EditConsumer, EditConsumer);
-}
+  auto SyntacticRenameRanges =
+      swift::ide::findSyntacticRenameRanges(SF, RenameLocs,
+                                            /*NewName=*/StringRef());
 
-void SwiftLangSupport::findRenameRanges(
-    llvm::MemoryBuffer *InputBuf, ArrayRef<RenameLocations> RenameLocations,
-    ArrayRef<const char *> Args, CategorizedRenameRangesReceiver Receiver) {
-  std::string Error;
-  CompilerInstance ParseCI;
-  PrintingDiagnosticConsumer PrintDiags;
-  ParseCI.addDiagnosticConsumer(&PrintDiags);
-  SourceFile *SF = getSyntacticSourceFile(InputBuf, Args, ParseCI, Error);
-  if (!SF) {
-    Receiver(RequestResult<ArrayRef<CategorizedRenameRanges>>::fromError(Error));
-    return;
-  }
-
-  auto RenameLocs = getSyntacticRenameLocs(RenameLocations);
-  RequestRenameRangeConsumer Consumer(Receiver);
-  swift::ide::findSyntacticRenameRanges(SF, RenameLocs, Consumer, Consumer);
+  SourceManager &SM = SF->getASTContext().SourceMgr;
+  return SyntacticRenameRanges.map<std::vector<CategorizedRenameRanges>>(
+      [&SM](auto &SyntacticRenameRanges) {
+        return getCategorizedRenameRanges(SyntacticRenameRanges, SM);
+      });
 }
 
 void SwiftLangSupport::findLocalRenameRanges(
     StringRef Filename, unsigned Line, unsigned Column, unsigned Length,
-    ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
+    ArrayRef<const char *> Args, bool CancelOnSubsequentRequest,
+    SourceKitCancellationToken CancellationToken,
     CategorizedRenameRangesReceiver Receiver) {
+  using ResultType = CancellableResult<std::vector<CategorizedRenameRanges>>;
   std::string Error;
   SwiftInvocationRef Invok =
       ASTMgr->getTypecheckInvocation(Args, Filename, Error);
   if (!Invok) {
     LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
-    Receiver(RequestResult<ArrayRef<CategorizedRenameRanges>>::fromError(Error));
+    Receiver(ResultType::failure(Error));
     return;
   }
 
@@ -1444,17 +1445,22 @@ void SwiftLangSupport::findLocalRenameRanges(
 
     void handlePrimaryAST(ASTUnitRef AstUnit) override {
       auto &SF = AstUnit->getPrimarySourceFile();
-      swift::ide::RangeConfig Range{*SF.getBufferID(), Line, Column, Length};
-      RequestRenameRangeConsumer Consumer(std::move(Receiver));
-      swift::ide::findLocalRenameRanges(&SF, Range, Consumer, Consumer);
+      swift::ide::RangeConfig Range{SF.getBufferID(), Line, Column, Length};
+      SourceManager &SM = SF.getASTContext().SourceMgr;
+      auto SyntacticRenameRanges =
+          swift::ide::findLocalRenameRanges(&SF, Range);
+      auto Result =
+          SyntacticRenameRanges.map<std::vector<CategorizedRenameRanges>>(
+              [&SM](auto &SyntacticRenameRanges) {
+                return getCategorizedRenameRanges(SyntacticRenameRanges, SM);
+              });
+      Receiver(Result);
     }
 
-    void cancelled() override {
-      Receiver(RequestResult<ArrayRef<CategorizedRenameRanges>>::cancelled());
-    }
+    void cancelled() override { Receiver(ResultType::cancelled()); }
 
     void failed(StringRef Error) override {
-      Receiver(RequestResult<ArrayRef<CategorizedRenameRanges>>::fromError(Error));
+      Receiver(ResultType::failure(Error.str()));
     }
   };
 
@@ -1463,8 +1469,8 @@ void SwiftLangSupport::findLocalRenameRanges(
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
-  getASTManager()->processASTAsync(Invok, ASTConsumer, &OncePerASTToken,
-                                   CancellationToken,
+  const void *Once = CancelOnSubsequentRequest ? &OncePerASTToken : nullptr;
+  getASTManager()->processASTAsync(Invok, ASTConsumer, Once, CancellationToken,
                                    llvm::vfs::getRealFileSystem());
 }
 
@@ -1492,7 +1498,7 @@ SourceFile *SwiftLangSupport::getSyntacticSourceFile(
   unsigned BufferID = ParseCI.getInputBufferIDs().back();
   for (auto Unit : ParseCI.getMainModule()->getFiles()) {
     if (auto Current = dyn_cast<SourceFile>(Unit)) {
-      if (Current->getBufferID().value() == BufferID) {
+      if (Current->getBufferID() == BufferID) {
         SF = Current;
         break;
       }
@@ -1501,19 +1507,6 @@ SourceFile *SwiftLangSupport::getSyntacticSourceFile(
   if (!SF)
     Error = "Failed to determine SourceFile for input buffer";
   return SF;
-}
-
-static std::vector<RenameLoc>
-getSyntacticRenameLocs(ArrayRef<RenameLocations> RenameLocations) {
-  std::vector<RenameLoc> RenameLocs;
-  for(const auto &Locations: RenameLocations) {
-    for(const auto &Location: Locations.LineColumnLocs) {
-      RenameLocs.push_back({Location.Line, Location.Column,
-        getNameUsage(Location.Type), Locations.OldName, Locations.NewName,
-        Locations.IsFunctionLike, Locations.IsNonProtocolType});
-    }
-  }
-  return RenameLocs;
 }
 
 void SwiftLangSupport::getDocInfo(llvm::MemoryBuffer *InputBuf,

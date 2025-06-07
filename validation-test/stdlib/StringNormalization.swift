@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,15 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-// rdar://85480347
-// REQUIRES: rdar85480347
-
 // RUN: %empty-directory(%t)
 // RUN: %target-clang -fobjc-arc %S/Inputs/NSSlowString/NSSlowString.m -c -o %t/NSSlowString.o
 // RUN: %target-build-swift -I %S/Inputs/NSSlowString/ %t/NSSlowString.o %s -o %t/a.out
 
 // RUN: %target-codesign %t/a.out
-// RUN: %target-run %t/a.out %S/Inputs/NormalizationTest.txt %S/Inputs/NormalizationTest14.txt
+// RUN: %target-run %t/a.out %S/Inputs/NormalizationTest.txt %S/Inputs/NormalizationTest16.txt
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 // REQUIRES: optimized_stdlib
@@ -97,13 +94,13 @@ tests.test("StringNormalization/ConvertNFK*ToNFKC")
 }
 
 //==------------------------------------------------------------------------==//
-// Newer stdlib with native normalization and supporting Unicode 14
+// Newer stdlib with native normalization and supporting Unicode 16
 //==------------------------------------------------------------------------==//
 
-if #available(SwiftStdlib 5.6, *) {
-  tests.test("StringNormalization14/ConvertToNFC")
+if #available(SwiftStdlib 6.1, *) {
+  tests.test("StringNormalization16/ConvertToNFC")
   .code {
-    for test in normalizationTests14 {
+    for test in normalizationTestsNew {
       expectEqualIterators(
         label: "NFC",
         expected: test.NFC,
@@ -117,9 +114,9 @@ if #available(SwiftStdlib 5.6, *) {
     }
   }
 
-  tests.test("StringNormalization14/ConvertNFK*ToNFKC")
+  tests.test("StringNormalization16/ConvertNFK*ToNFKC")
   .code {
-    for test in normalizationTests14 {
+    for test in normalizationTestsNew {
       expectEqualIterators(
         label: "NFKC",
         expected: test.NFKC,

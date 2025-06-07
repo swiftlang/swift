@@ -1,7 +1,8 @@
-// RUN: %empty-directory(%t)
-// RUN: cp %s %t/main.swift
-// RUN: %target-build-swift -whole-module-optimization -module-name PlaygroundSupport -emit-module-path %t/PlaygroundSupport.swiftmodule -parse-as-library -c -o %t/PlaygroundSupport.o %S/Inputs/SilentPCMacroRuntime.swift %S/Inputs/PlaygroundsRuntime.swift
-// RUN: %target-build-swift -Xfrontend -playground -o %t/main -I=%t %t/PlaygroundSupport.o %t/main.swift
+// -playground
+// RUN: %target-playground-build-run-swift(-swift-version 5 -Xfrontend -playground)
+// RUN: %target-playground-build-run-swift(-swift-version 6 -Xfrontend -playground)
+
+// REQUIRES: executable_test
 
 import PlaygroundSupport
 

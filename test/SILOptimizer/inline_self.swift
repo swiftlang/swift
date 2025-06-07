@@ -4,6 +4,9 @@
 
 // Do not inline C.factory into main. Doing so would lose the ability
 // to materialize local Self metadata.
+
+// REQUIRES: swift_in_compiler
+
 class C {
   required init() {}
 }
@@ -77,9 +80,12 @@ _ = Z().capturesSelf()
 // CHECK: apply [[F]](%{{.+}}, %{{.+}}) : $@convention(method) (Int, @thick C.Type) -> @owned C
 
 // CHECK: [[Z:%.*]] = alloc_ref $Z
+// CHECK: [[C:%.*]] = upcast [[Z]]
+// CHECK: [[EI:%.*]] = end_init_let_ref [[C]]
+// CHECK: [[DC:%.*]] = unchecked_ref_cast [[EI]]
 // CHECK: function_ref inline_self.Z.capturesSelf() -> Self
 // CHECK: [[F:%[0-9]+]] = function_ref @$s11inline_self1ZC12capturesSelfACXDyF : $@convention(method) (@guaranteed Z) -> @owned Z
-// CHECK: apply [[F]]([[Z]]) : $@convention(method) (@guaranteed Z) -> @owned
+// CHECK: apply [[F]]([[DC]]) : $@convention(method) (@guaranteed Z) -> @owned
 // CHECK: return
 
 // CHECK-LABEL: sil hidden @$s11inline_self1ZC16callCapturesSelfACXDyF : $@convention(method)

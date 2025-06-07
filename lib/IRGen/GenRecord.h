@@ -28,7 +28,9 @@
 #include "Outlining.h"
 #include "TypeInfo.h"
 #include "StructLayout.h"
+#include "llvm/Support/MathExtras.h"
 #include "llvm/Support/TrailingObjects.h"
+#include "swift/AST/DiagnosticsIRGen.h"
 
 namespace swift {
 namespace irgen {
@@ -42,8 +44,8 @@ template <class FieldImpl> class RecordField {
   template <class, class, class> friend class RecordTypeBuilder;
 
   /// Begin/End - the range of explosion indexes for this element
-  unsigned Begin : 16;
-  unsigned End : 16;
+  unsigned Begin;
+  unsigned End;
 
 protected:
   explicit RecordField(const TypeInfo &elementTI)
@@ -67,8 +69,8 @@ public:
     return Layout.isEmpty();
   }
 
-  IsPOD_t isPOD() const {
-    return Layout.isPOD();
+  IsTriviallyDestroyable_t isTriviallyDestroyable() const {
+    return Layout.isTriviallyDestroyable();
   }
 
   IsABIAccessible_t isABIAccessible() const {
@@ -122,8 +124,8 @@ private:
   const unsigned NumFields;
   const unsigned AreFieldsABIAccessible : 1;
 
-  mutable Optional<const FieldImpl *> ExtraInhabitantProvidingField;
-  mutable Optional<bool> MayHaveExtraInhabitants;
+  mutable std::optional<const FieldImpl *> ExtraInhabitantProvidingField;
+  mutable std::optional<bool> MayHaveExtraInhabitants;
 
 protected:
   const Impl &asImpl() const { return *static_cast<const Impl*>(this); }
@@ -137,6 +139,13 @@ protected:
         AreFieldsABIAccessible(fieldsABIAccessible) {
     std::uninitialized_copy(fields.begin(), fields.end(),
                             this->template getTrailingObjects<FieldImpl>());
+  }
+
+  void fillWithZerosIfSensitive(IRGenFunction &IGF, Address address, SILType T) const {
+    if (T.isSensitive()) {
+      llvm::Value *size = asImpl().getSize(IGF, T);
+      IGF.emitClearSensitive(address, size);
+    }
   }
 
 public:
@@ -170,7 +179,7 @@ public:
       return emitAssignWithCopyCall(IGF, T, dest, src);
     }
 
-    if (isOutlined || T.hasOpenedExistential()) {
+    if (isOutlined || T.hasParameterizedExistential()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
         if (field.isEmpty())
@@ -193,7 +202,14 @@ public:
       return emitAssignWithTakeCall(IGF, T, dest, src);
     }
 
-    if (isOutlined || T.hasOpenedExistential()) {
+    if (auto rawLayout = T.getRawLayout()) {
+      return handleRawLayout(IGF, dest, src, T, isOutlined, rawLayout,
+            [&](const TypeInfo &ti, SILType type, Address dest, Address src) {
+        ti.assignWithTake(IGF, dest, src, type, isOutlined);
+      });
+    }
+
+    if (isOutlined || T.hasParameterizedExistential()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
         if (field.isEmpty())
@@ -204,6 +220,7 @@ public:
         field.getTypeInfo().assignWithTake(
             IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined);
       }
+      fillWithZerosIfSensitive(IGF, src, T);
     } else {
       this->callOutlinedCopy(IGF, dest, src, T, IsNotInitialization, IsTake);
     }
@@ -212,7 +229,7 @@ public:
   void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
                           SILType T, bool isOutlined) const override {
     // If we're POD, use the generic routine.
-    if (this->isPOD(ResilienceExpansion::Maximal) &&
+    if (this->isTriviallyDestroyable(ResilienceExpansion::Maximal) &&
         isa<LoadableTypeInfo>(this)) {
       return cast<LoadableTypeInfo>(this)->LoadableTypeInfo::initializeWithCopy(
           IGF, dest, src, T, isOutlined);
@@ -223,7 +240,7 @@ public:
       return emitInitializeWithCopyCall(IGF, T, dest, src);
     }
 
-    if (isOutlined || T.hasOpenedExistential()) {
+    if (isOutlined || T.hasParameterizedExistential()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
         if (field.isEmpty())
@@ -240,22 +257,23 @@ public:
   }
 
   void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
-                          SILType T, bool isOutlined) const override {
+                          SILType T, bool isOutlined,
+                          bool zeroizeIfSensitive) const override {
     // If we're bitwise-takable, use memcpy.
     if (this->isBitwiseTakable(ResilienceExpansion::Maximal)) {
       IGF.Builder.CreateMemCpy(
           dest.getAddress(), llvm::MaybeAlign(dest.getAlignment().getValue()),
           src.getAddress(), llvm::MaybeAlign(src.getAlignment().getValue()),
           asImpl().Impl::getSize(IGF, T));
-      return;
-    }
-
-    // If the fields are not ABI-accessible, use the value witness table.
-    if (!AreFieldsABIAccessible) {
+    } else if (!AreFieldsABIAccessible) {
+      // If the fields are not ABI-accessible, use the value witness table.
       return emitInitializeWithTakeCall(IGF, T, dest, src);
-    }
-
-    if (isOutlined || T.hasOpenedExistential()) {
+    } else if (auto rawLayout = T.getRawLayout()) {
+      return handleRawLayout(IGF, dest, src, T, isOutlined, rawLayout,
+            [&](const TypeInfo &ti, SILType type, Address dest, Address src) {
+        ti.initializeWithTake(IGF, dest, src, type, isOutlined, zeroizeIfSensitive);
+      });
+    } else if (isOutlined || T.hasParameterizedExistential()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
         if (field.isEmpty())
@@ -264,10 +282,49 @@ public:
         Address destField = field.projectAddress(IGF, dest, offsets);
         Address srcField = field.projectAddress(IGF, src, offsets);
         field.getTypeInfo().initializeWithTake(
-            IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined);
+            IGF, destField, srcField, field.getType(IGF.IGM, T), isOutlined,
+              zeroizeIfSensitive);
       }
     } else {
       this->callOutlinedCopy(IGF, dest, src, T, IsInitialization, IsTake);
+    }
+    if (zeroizeIfSensitive)
+      fillWithZerosIfSensitive(IGF, src, T);
+  }
+
+  void handleRawLayout(IRGenFunction &IGF, Address dest, Address src, SILType T,
+                       bool isOutlined, RawLayoutAttr *rawLayout,
+                       std::function<void
+                          (const TypeInfo &, SILType, Address, Address)> body) const {
+    if (rawLayout->shouldMoveAsLikeType()) {
+      auto likeType = T.getRawLayoutSubstitutedLikeType();
+      auto loweredLikeType = IGF.IGM.getLoweredType(likeType);
+      auto &likeTypeInfo = IGF.IGM.getTypeInfo(loweredLikeType);
+
+      // Fixup src/dest address element types because currently they are in
+      // terms of the raw layout type's [n x i8] where we're at a point to use
+      // the like type's concrete storage type.
+      src = Address(src.getAddress(), likeTypeInfo.getStorageType(),
+                    src.getAlignment());
+      dest = Address(dest.getAddress(), likeTypeInfo.getStorageType(),
+                     dest.getAlignment());
+
+      // If we're a scalar, then we only need to run the body once.
+      if (rawLayout->getScalarLikeType()) {
+        body(likeTypeInfo, loweredLikeType, dest, src);
+      }
+
+      // Otherwise, emit a loop that calls body N times where N is the count
+      // of the array variant. This could be generic in which case we need to
+      // pull the value out of metadata or it could be a constant integer.
+      if (rawLayout->getArrayLikeTypeAndCount()) {
+        auto countType = T.getRawLayoutSubstitutedCountType()->getCanonicalType();
+
+        IGF.emitLoopOverElements(likeTypeInfo, loweredLikeType, countType,
+                                 dest, src, [&](Address dest, Address src) {
+          body(likeTypeInfo, loweredLikeType, dest, src);
+        });
+      }
     }
   }
 
@@ -278,15 +335,25 @@ public:
       return emitDestroyCall(IGF, T, addr);
     }
 
-    if (isOutlined || T.hasOpenedExistential()) {
+    if (auto rawLayout = T.getRawLayout()) {
+      return handleRawLayout(IGF, Address(), addr, T, isOutlined, rawLayout,
+            [&](const TypeInfo &ti, SILType type, Address dest, Address src) {
+        ti.destroy(IGF, src, type, isOutlined);
+      });
+    }
+
+    if (isOutlined || T.hasParameterizedExistential()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
-        if (field.isPOD())
+        SILType fieldType = field.getType(IGF.IGM, T);
+        if (field.isTriviallyDestroyable() &&
+            !((bool)fieldType && fieldType.isSensitive())) {
           continue;
+        }
 
         field.getTypeInfo().destroy(IGF,
                                     field.projectAddress(IGF, addr, offsets),
-                                    field.getType(IGF.IGM, T), isOutlined);
+                                    fieldType, isOutlined);
       }
     } else {
       this->callOutlinedDestroy(IGF, addr, T);
@@ -485,12 +552,27 @@ public:
   void collectMetadataForOutlining(OutliningMetadataCollector &collector,
                                    SILType T) const override {
     for (auto &field : getFields()) {
-      if (field.isEmpty())
-        continue;
       auto fType = field.getType(collector.IGF.IGM, T);
       field.getTypeInfo().collectMetadataForOutlining(collector, fType);
     }
-    collector.collectTypeMetadataForLayout(T);
+
+    // If we're a raw layout type, collect metadata from our like type and count
+    // as well.
+    if (auto likeType = T.getRawLayoutSubstitutedLikeType()) {
+      auto loweredLikeType = collector.IGF.IGM.getLoweredType(likeType);
+      collector.IGF.IGM.getTypeInfo(loweredLikeType)
+          .collectMetadataForOutlining(collector, loweredLikeType);
+
+      if (auto countType = T.getRawLayoutSubstitutedCountType()) {
+        if (countType->isValueParameter()) {
+          auto loweredCountType = collector.IGF.IGM.getLoweredType(countType);
+          collector.IGF.IGM.getTypeInfo(loweredCountType)
+            .collectMetadataForOutlining(collector, loweredCountType);
+        }
+      }
+    }
+
+    collector.collectTypeMetadata(T);
   }
 };
 
@@ -542,7 +624,6 @@ public:
   }
 
 private:
-  /// Scan the given field info
   static unsigned findUniqueNonEmptyField(ArrayRef<FieldImpl> fields) {
     unsigned result = 0;
     for (auto &field : fields) {
@@ -581,7 +662,7 @@ class RecordTypeInfo<Impl, Base, FieldImpl,
 protected:
   template <class... As> 
   RecordTypeInfo(ArrayRef<FieldImpl> fields, As &&...args)
-    : super(fields, FieldsAreABIAccessible, std::forward<As>(args)...) {}
+    : super(fields, std::forward<As>(args)...) {}
 
   using super::asImpl;
 
@@ -605,7 +686,7 @@ public:
         if (field == &otherField)
           continue;
         auto &ti = otherField.getTypeInfo();
-        if (!ti.isPOD(ResilienceExpansion::Maximal)) {
+        if (!ti.isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
           return false;
         }
       }
@@ -741,6 +822,22 @@ private:
     }
   }
 
+  template <void (LoadableTypeInfo::*Op)(IRGenFunction &IGF, Explosion &in,
+                                         Address addr, bool isOutlined,
+                                         SILType T) const>
+  void forAllFields(IRGenFunction &IGF, Explosion &in, Address addr,
+                    bool isOutlined, SILType T) const {
+    auto offsets = asImpl().getNonFixedOffsets(IGF);
+    for (auto &field : getFields()) {
+      if (field.isEmpty()) continue;
+
+      Address fieldAddr = field.projectAddress(IGF, addr, offsets);
+      (cast<LoadableTypeInfo>(field.getTypeInfo()).*Op)(IGF, in, fieldAddr,
+                                                    isOutlined,
+                                                    field.getType(IGF.IGM, T));
+    }
+  }
+
 public:
   using super::getFields;
 
@@ -755,8 +852,8 @@ public:
   }
 
   void assign(IRGenFunction &IGF, Explosion &e, Address addr,
-              bool isOutlined) const override {
-    forAllFields<&LoadableTypeInfo::assign>(IGF, e, addr, isOutlined);
+              bool isOutlined, SILType T) const override {
+    forAllFields<&LoadableTypeInfo::assign>(IGF, e, addr, isOutlined, T);
   }
 
   void initialize(IRGenFunction &IGF, Explosion &e, Address addr,
@@ -768,10 +865,10 @@ public:
     return ExplosionSize;
   }
 
-  void reexplode(IRGenFunction &IGF, Explosion &src,
+  void reexplode(Explosion &src,
                  Explosion &dest) const override {
     for (auto &field : getFields())
-      cast<LoadableTypeInfo>(field.getTypeInfo()).reexplode(IGF, src, dest);
+      cast<LoadableTypeInfo>(field.getTypeInfo()).reexplode(src, dest);
   }
 
   void copy(IRGenFunction &IGF, Explosion &src,
@@ -782,10 +879,11 @@ public:
   }
 
   void consume(IRGenFunction &IGF, Explosion &src,
-               Atomicity atomicity) const override {
-    for (auto &field : getFields())
+               Atomicity atomicity, SILType T) const override {
+    for (auto &field : getFields()) {
       cast<LoadableTypeInfo>(field.getTypeInfo())
-          .consume(IGF, src, atomicity);
+          .consume(IGF, src, atomicity, field.getType(IGF.IGM, T));
+    }
   }
 
   void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {
@@ -793,7 +891,8 @@ public:
       cast<LoadableTypeInfo>(field.getTypeInfo()).fixLifetime(IGF, src);
   }
   
-  void packIntoEnumPayload(IRGenFunction &IGF,
+  void packIntoEnumPayload(IRGenModule &IGM,
+                           IRBuilder &builder,
                            EnumPayload &payload,
                            Explosion &src,
                            unsigned startOffset) const override {
@@ -802,7 +901,7 @@ public:
         unsigned offset = field.getFixedByteOffset().getValueInBits()
           + startOffset;
         cast<LoadableTypeInfo>(field.getTypeInfo())
-          .packIntoEnumPayload(IGF, payload, src, offset);
+          .packIntoEnumPayload(IGM, builder, payload, src, offset);
       }
     }
   }
@@ -844,14 +943,13 @@ public:
     fields.reserve(astFields.size());
     fieldTypesForLayout.reserve(astFields.size());
 
-    bool loadable = true;
     auto fieldsABIAccessible = FieldsAreABIAccessible;
-
     unsigned explosionSize = 0;
     for (unsigned i : indices(astFields)) {
       auto &astField = astFields[i];
       // Compute the field's type info.
-      auto &fieldTI = IGM.getTypeInfo(asImpl()->getType(astField));
+      auto fieldTy = asImpl()->getType(astField);
+      auto &fieldTI = IGM.getTypeInfo(fieldTy);
       fieldTypesForLayout.push_back(&fieldTI);
 
       if (!fieldTI.isABIAccessible())
@@ -861,13 +959,17 @@ public:
 
       auto loadableFieldTI = dyn_cast<LoadableTypeInfo>(&fieldTI);
       if (!loadableFieldTI) {
-        loadable = false;
         continue;
       }
 
       auto &fieldInfo = fields.back();
       fieldInfo.Begin = explosionSize;
-      explosionSize += loadableFieldTI->getExplosionSize();
+      bool overflow = false;
+      explosionSize = llvm::SaturatingAdd(explosionSize, loadableFieldTI->getExplosionSize(), &overflow);
+      if (overflow) {
+        IGM.Context.Diags.diagnose(SourceLoc(), diag::explosion_size_oveflow);
+      }
+
       fieldInfo.End = explosionSize;
     }
 
@@ -878,13 +980,12 @@ public:
     }
 
     // Create the type info.
-    if (loadable) {
+    if (layout.isLoadable()) {
       assert(layout.isFixedLayout());
-      assert(fieldsABIAccessible);
-      return asImpl()->createLoadable(fields, std::move(layout), explosionSize);
+      return asImpl()->createLoadable(fields, fieldsABIAccessible, std::move(layout), explosionSize
+                                      );
     } else if (layout.isFixedLayout()) {
-      assert(fieldsABIAccessible);
-      return asImpl()->createFixed(fields, std::move(layout));
+      return asImpl()->createFixed(fields, fieldsABIAccessible, std::move(layout));
     } else {
       return asImpl()->createNonFixed(fields, fieldsABIAccessible,
                                       std::move(layout));

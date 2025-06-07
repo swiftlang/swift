@@ -51,13 +51,13 @@ struct Broken {
 var emptyTuple = testShadowing()  // expected-warning {{variable 'emptyTuple' inferred to have type '()'}} \
                                   // expected-note {{add an explicit type annotation to silence this warning}} {{15-15=: ()}}
 
-// rdar://15263687 - Diagnose variables inferenced to 'AnyObject'
+// rdar://15263687 - Diagnose variables inferred to 'AnyObject'
 var ao1 : AnyObject
 var ao2 = ao1
 
 var aot1 : AnyObject.Type
 var aot2 = aot1          // expected-warning {{variable 'aot2' inferred to have type 'any AnyObject.Type', which may be unexpected}} \
-                       // expected-note {{add an explicit type annotation to silence this warning}} {{9-9=: AnyObject.Type}}
+                       // expected-note {{add an explicit type annotation to silence this warning}} {{9-9=: any AnyObject.Type}}
 
 
 for item in [AnyObject]() {  // No warning in for-each loop.
@@ -82,13 +82,15 @@ var arrayOfEmptyTuples = [""].map { print($0) } // expected-warning {{variable '
 var maybeEmpty = Optional(arrayOfEmptyTuples) // expected-warning {{variable 'maybeEmpty' inferred to have type '[()]?'}} \
                                               // expected-note {{add an explicit type annotation to silence this warning}} {{15-15=: [()]?}}
 
-var shouldWarnWithoutSugar = (arrayOfEmptyTuples as Array<()>) // expected-warning {{variable 'shouldWarnWithoutSugar' inferred to have type 'Array<()>'}} \
-                                 // expected-note {{add an explicit type annotation to silence this warning}} {{27-27=: Array<()>}}
+var shouldWarnWithoutSugar = (arrayOfEmptyTuples as Array<()>) // expected-warning {{variable 'shouldWarnWithoutSugar' inferred to have type '[()]'}} \
+                                 // expected-note {{add an explicit type annotation to silence this warning}} {{27-27=: [()]}}
 
 class SomeClass {}
 
-// <rdar://problem/16877304> weak let's should be rejected
-weak let V = SomeClass()  // expected-error {{'weak' must be a mutable variable, because it may change at runtime}}
+weak let V = SomeClass() // ok since SE-0481
+// expected-warning@-1 {{instance will be immediately deallocated because variable 'V' is 'weak'}}
+// expected-note@-2 {{'V' declared here}}
+// expected-note@-3 {{a strong reference is required to prevent the instance from being deallocated}}
 
 let a = b ; let b = a
 // expected-error@-1 {{circular reference}}

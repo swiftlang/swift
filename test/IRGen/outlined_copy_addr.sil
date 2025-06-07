@@ -1,0 +1,27 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
+// RUN: %target-swift-frontend -emit-ir %s -I %t | %FileCheck %s
+
+import Swift
+import resilient_struct
+
+indirect enum E<A, B> {
+    case a(A, B)
+    case b(B)
+    case c(A)
+    case d
+}
+
+// This used to crash when generating the outlined copy function.
+// CHECK: s18outlined_copy_addr1EOyxq_G_S2i16resilient_struct12ResilientIntVIeg_tSgr0_lWOb
+
+sil @test : $@convention(thin) <ItemA, ItemB> () -> () {
+bb0:
+  %1 = alloc_stack $Optional<(E<ItemA, ItemB>, Int, Int, ResilientInt, @callee_guaranteed () -> ())>
+  %2 = alloc_stack $Optional<(E<ItemA, ItemB>, Int, Int, ResilientInt, @callee_guaranteed () -> ())>
+  copy_addr [take] %1 to [init] %2 : $*Optional<(E<ItemA, ItemB>, Int, Int, ResilientInt, @callee_guaranteed () -> ())>
+  dealloc_stack %2 : $*Optional<(E<ItemA, ItemB>, Int, Int, ResilientInt, @callee_guaranteed () -> ())>
+  dealloc_stack %1 : $*Optional<(E<ItemA, ItemB>, Int, Int, ResilientInt, @callee_guaranteed () -> ())>
+  %t = tuple ()
+  return %t: $()
+}

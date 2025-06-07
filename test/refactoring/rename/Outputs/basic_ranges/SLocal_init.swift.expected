@@ -11,7 +11,7 @@ func test() {
     <keywordBase>init</keywordBase>(<arglabel index=0>x</arglabel><param index=0></param>: S1) {}
   }
   func local(a: SLocal) {}
-  local(a: SLocal(x: S1()))
+  local(a: SLocal(<callarg index=0>x</callarg><callcolon index=0>: </callcolon>S1()))
 }
 
 guard let top = Optional.some("top") else {

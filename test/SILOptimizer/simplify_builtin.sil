@@ -1,0 +1,696 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-EARLY
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -late-onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-LATE
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -assert-conf-id=1 -onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-NOASSERTS1
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -assert-conf-id=2 -onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-NOASSERTS2
+
+// REQUIRES: swift_in_compiler
+
+import Swift
+import Builtin
+
+struct S1<T> {
+}
+
+struct S2<T> {
+}
+
+enum E1<T> {
+}
+
+enum E2<T> {
+}
+
+class C1<T> {
+}
+
+class C2<T> : C1<T> {
+}
+
+class A {
+}
+
+sil_global [let] @gg : $Int
+
+// CHECK-LABEL: sil @constantFoldAdd
+// CHECK:         [[A:%.*]] = integer_literal $Builtin.Int64, 12
+// CHECK:         [[C:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK:         [[T:%.*]] = tuple ([[A]] : $Builtin.Int64, [[C]] : $Builtin.Int1)
+// CHECK:         [[R:%.*]] = tuple_extract [[T]] : $(Builtin.Int64, Builtin.Int1), 0
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'constantFoldAdd'
+sil @constantFoldAdd : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 10
+  %1 = integer_literal $Builtin.Int64, 2
+  %2 = integer_literal $Builtin.Int1, 1
+  %3 = builtin "sadd_with_overflow_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %4 = tuple_extract %3 : $(Builtin.Int64, Builtin.Int1), 0
+  return %4 : $Builtin.Int64
+}
+
+// CHECK-LABEL: sil @isConcrete_true
+// CHECK:       bb0(%0 : $@thin Int.Type):
+// CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'isConcrete_true'
+sil @isConcrete_true : $@convention(thin) (@thin Int.Type) -> Builtin.Int1 {
+bb0(%0 : $@thin Int.Type):
+  %1 = builtin "isConcrete"(%0 : $@thin Int.Type) : $Builtin.Int1
+  return %1 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @isConcrete_false
+// CHECK:       bb0(%0 : $@thin T.Type):
+// CHECK-EARLY:   [[R:%.*]] = builtin "isConcrete"<T>(%0 : $@thin T.Type) : $Builtin.Int1
+// CHECK-LATE:    [[R:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'isConcrete_false'
+sil @isConcrete_false : $@convention(thin) <T> (@thin T.Type) -> Builtin.Int1 {
+bb0(%0 : $@thin T.Type):
+  %1 = builtin "isConcrete"<T>(%0 : $@thin T.Type) : $Builtin.Int1
+  return %1 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @same_metatype_same_operand
+// CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:    return [[R]]
+// CHECK:       } // end sil function 'same_metatype_same_operand'
+sil @same_metatype_same_operand : $@convention(thin) <T> (@thick T.Type) -> Builtin.Int1 {
+bb0(%0 : $@thick T.Type):
+  %1 = init_existential_metatype %0 : $@thick T.Type, $@thick Any.Type
+  %3 = builtin "is_same_metatype"(%1 : $@thick Any.Type, %1 : $@thick Any.Type) : $Builtin.Int1
+  return %3 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @unknown_same_metatype_int_and_T
+// CHECK:         [[R:%.*]] = builtin "is_same_metatype"
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'unknown_same_metatype_int_and_T'
+sil @unknown_same_metatype_int_and_T : $@convention(thin) <T> (@thick T.Type) -> Builtin.Int1 {
+bb0(%0 : $@thick T.Type):
+  %1 = metatype $@thick T.Type
+  %2 = metatype $@thick Int.Type
+  %3 = init_existential_metatype %1 : $@thick T.Type, $@thick Any.Type
+  %4 = init_existential_metatype %2 : $@thick Int.Type, $@thick Any.Type
+  %5 = builtin "is_same_metatype"(%3 : $@thick Any.Type, %4 : $@thick Any.Type) : $Builtin.Int1
+  return %5 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @unknown_same_metatype_same_struct_different_T
+// CHECK:         [[R:%.*]] = builtin "is_same_metatype"
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'unknown_same_metatype_same_struct_different_T'
+sil @unknown_same_metatype_same_struct_different_T : $@convention(thin) <T, U> (@thick T.Type, @thick U.Type) -> Builtin.Int1 {
+bb0(%0 : $@thick T.Type, %1 : $@thick U.Type):
+  %2 = metatype $@thick S1<T>.Type
+  %3 = metatype $@thick S1<U>.Type
+  %4 = init_existential_metatype %2 : $@thick S1<T>.Type, $@thick Any.Type
+  %5 = init_existential_metatype %3 : $@thick S1<U>.Type, $@thick Any.Type
+  %6 = builtin "is_same_metatype"(%4 : $@thick Any.Type, %5 : $@thick Any.Type) : $Builtin.Int1
+  return %6 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @same_metatype_same_type
+// CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'same_metatype_same_type'
+sil @same_metatype_same_type : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = metatype $@thick S1<Int>.Type
+  %1 = metatype $@thick S1<Int>.Type
+  %2 = init_existential_metatype %0 : $@thick S1<Int>.Type, $@thick Any.Type
+  %3 = init_existential_metatype %1 : $@thick S1<Int>.Type, $@thick Any.Type
+  %4 = builtin "is_same_metatype"(%2 : $@thick Any.Type, %3 : $@thick Any.Type) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @same_metatype_different_struct_arg
+// CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'same_metatype_different_struct_arg'
+sil @same_metatype_different_struct_arg : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = metatype $@thick S1<Int>.Type
+  %1 = metatype $@thick S1<Float>.Type
+  %2 = init_existential_metatype %0 : $@thick S1<Int>.Type, $@thick Any.Type
+  %3 = init_existential_metatype %1 : $@thick S1<Float>.Type, $@thick Any.Type
+  %4 = builtin "is_same_metatype"(%2 : $@thick Any.Type, %3 : $@thick Any.Type) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @same_metatype_same_tuple
+// CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'same_metatype_same_tuple'
+sil @same_metatype_same_tuple : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = metatype $@thick (Int, Float).Type
+  %1 = metatype $@thick (Int, Float).Type
+  %2 = init_existential_metatype %0 : $@thick (Int, Float).Type, $@thick Any.Type
+  %3 = init_existential_metatype %1 : $@thick (Int, Float).Type, $@thick Any.Type
+  %4 = builtin "is_same_metatype"(%2 : $@thick Any.Type, %3 : $@thick Any.Type) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @same_metatype_different_tuple
+// CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'same_metatype_different_tuple'
+sil @same_metatype_different_tuple : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = metatype $@thick (Int, Float).Type
+  %1 = metatype $@thick (Int, Int).Type
+  %2 = init_existential_metatype %0 : $@thick (Int, Float).Type, $@thick Any.Type
+  %3 = init_existential_metatype %1 : $@thick (Int, Int).Type, $@thick Any.Type
+  %4 = builtin "is_same_metatype"(%2 : $@thick Any.Type, %3 : $@thick Any.Type) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @same_metatype_different_struct
+// CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:    return [[R]]
+// CHECK:       } // end sil function 'same_metatype_different_struct'
+sil @same_metatype_different_struct : $@convention(thin) (@thick S1<Int>.Type, @thick S2<Int>.Type) -> Builtin.Int1 {
+bb0(%0 : $@thick S1<Int>.Type, %1 : $@thick S2<Int>.Type):
+  %2 = init_existential_metatype %0 : $@thick S1<Int>.Type, $@thick Any.Type
+  %3 = init_existential_metatype %1 : $@thick S2<Int>.Type, $@thick Any.Type
+  %4 = builtin "is_same_metatype"(%2 : $@thick Any.Type, %3 : $@thick Any.Type) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @unknown_same_metatype_same_enum_different_T
+// CHECK:         [[R:%.*]] = builtin "is_same_metatype"
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'unknown_same_metatype_same_enum_different_T'
+sil @unknown_same_metatype_same_enum_different_T : $@convention(thin) <T, U> (@thick T.Type, @thick U.Type) -> Builtin.Int1 {
+bb0(%0 : $@thick T.Type, %1 : $@thick U.Type):
+  %2 = metatype $@thick E1<T>.Type
+  %3 = metatype $@thick E1<U>.Type
+  %4 = init_existential_metatype %2 : $@thick E1<T>.Type, $@thick Any.Type
+  %5 = init_existential_metatype %3 : $@thick E1<U>.Type, $@thick Any.Type
+  %6 = builtin "is_same_metatype"(%4 : $@thick Any.Type, %5 : $@thick Any.Type) : $Builtin.Int1
+  return %6 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @same_metatype_different_enum
+// CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:    return [[R]]
+// CHECK:       } // end sil function 'same_metatype_different_enum'
+sil @same_metatype_different_enum : $@convention(thin) (@thick E1<Int>.Type, @thick E2<Int>.Type) -> Builtin.Int1 {
+bb0(%0 : $@thick E1<Int>.Type, %1 : $@thick E2<Int>.Type):
+  %2 = init_existential_metatype %0 : $@thick E1<Int>.Type, $@thick Any.Type
+  %3 = init_existential_metatype %1 : $@thick E2<Int>.Type, $@thick Any.Type
+  %4 = builtin "is_same_metatype"(%2 : $@thick Any.Type, %3 : $@thick Any.Type) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @unknown_same_metatype_same_class_different_T
+// CHECK:         [[R:%.*]] = builtin "is_same_metatype"
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'unknown_same_metatype_same_class_different_T'
+sil @unknown_same_metatype_same_class_different_T : $@convention(thin) <T, U> (@thick T.Type, @thick U.Type) -> Builtin.Int1 {
+bb0(%0 : $@thick T.Type, %1 : $@thick U.Type):
+  %2 = metatype $@thick C1<T>.Type
+  %3 = metatype $@thick C1<U>.Type
+  %4 = init_existential_metatype %2 : $@thick C1<T>.Type, $@thick Any.Type
+  %5 = init_existential_metatype %3 : $@thick C1<U>.Type, $@thick Any.Type
+  %6 = builtin "is_same_metatype"(%4 : $@thick Any.Type, %5 : $@thick Any.Type) : $Builtin.Int1
+  return %6 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @unknown_same_metatype_different_class
+// CHECK:         [[R:%.*]] = builtin "is_same_metatype"
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'unknown_same_metatype_different_class'
+sil @unknown_same_metatype_different_class : $@convention(thin) (@thick C1<Int>.Type, @thick C2<Int>.Type) -> Builtin.Int1 {
+bb0(%0 : $@thick C1<Int>.Type, %1 : $@thick C2<Int>.Type):
+  %2 = init_existential_metatype %0 : $@thick C1<Int>.Type, $@thick Any.Type
+  %3 = init_existential_metatype %1 : $@thick C2<Int>.Type, $@thick Any.Type
+  %4 = builtin "is_same_metatype"(%2 : $@thick Any.Type, %3 : $@thick Any.Type) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @same_metatype_different_concrete_class
+// CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:    return [[R]]
+// CHECK:       } // end sil function 'same_metatype_different_concrete_class'
+sil @same_metatype_different_concrete_class : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = metatype $@thick C1<Int>.Type
+  %1 = metatype $@thick C2<Int>.Type
+  %2 = init_existential_metatype %0 : $@thick C1<Int>.Type, $@thick Any.Type
+  %3 = init_existential_metatype %1 : $@thick C2<Int>.Type, $@thick Any.Type
+  %4 = builtin "is_same_metatype"(%2 : $@thick Any.Type, %3 : $@thick Any.Type) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @same_function_metatype
+// CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:    return [[R]]
+// CHECK:       } // end sil function 'same_function_metatype'
+sil @same_function_metatype : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = metatype $@thick ((Int) -> Bool).Type
+  %1 = metatype $@thick ((Int) -> Bool).Type
+  %2 = init_existential_metatype %0 : $@thick ((Int) -> Bool).Type, $@thick Any.Type
+  %3 = init_existential_metatype %1 : $@thick ((Int) -> Bool).Type, $@thick Any.Type
+  %4 = builtin "is_same_metatype"(%2 : $@thick Any.Type, %3 : $@thick Any.Type) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @different_function_metatype1
+// CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:    return [[R]]
+// CHECK:       } // end sil function 'different_function_metatype1'
+sil @different_function_metatype1 : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = metatype $@thick ((Int) -> Bool).Type
+  %1 = metatype $@thick ((Float) -> Bool).Type
+  %2 = init_existential_metatype %0 : $@thick ((Int) -> Bool).Type, $@thick Any.Type
+  %3 = init_existential_metatype %1 : $@thick ((Float) -> Bool).Type, $@thick Any.Type
+  %4 = builtin "is_same_metatype"(%2 : $@thick Any.Type, %3 : $@thick Any.Type) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @different_function_metatype2
+// CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'different_function_metatype2'
+sil @different_function_metatype2 : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = metatype $@thick ((Int, Int) -> ()).Type
+  %1 = metatype $@thick (((Int, Int)) -> ()).Type
+  %2 = init_existential_metatype %0 : $@thick ((Int, Int) -> ()).Type, $@thick Any.Type
+  %3 = init_existential_metatype %1 : $@thick (((Int, Int)) -> ()).Type, $@thick Any.Type
+  %4 = builtin "is_same_metatype"(%2 : $@thick Any.Type, %3 : $@thick Any.Type) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @unknown_function_metatype1 :
+// CHECK:         [[R:%.*]] = builtin "is_same_metatype"
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'unknown_function_metatype1'
+sil @unknown_function_metatype1 : $@convention(thin) <T> () -> Builtin.Int1 {
+bb0:
+  %0 = metatype $@thick ((T) -> Bool).Type
+  %1 = metatype $@thick ((Int) -> Bool).Type
+  %2 = init_existential_metatype %0, $@thick Any.Type
+  %3 = init_existential_metatype %1, $@thick Any.Type
+  %4 = builtin "is_same_metatype"(%2, %3) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @unknown_function_metatype2 :
+// CHECK:         [[R:%.*]] = builtin "is_same_metatype"
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'unknown_function_metatype2'
+sil @unknown_function_metatype2 : $@convention(thin) <T> () -> Builtin.Int1 {
+bb0:
+  %0 = metatype $@thick ((Int) -> Bool).Type
+  %1 = metatype $@thick ((T) -> Bool).Type
+  %2 = init_existential_metatype %0, $@thick Any.Type
+  %3 = init_existential_metatype %1, $@thick Any.Type
+  %4 = builtin "is_same_metatype"(%2, %3) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @same_metatype_dynamic_self
+// CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:    return [[R]]
+// CHECK:       } // end sil function 'same_metatype_dynamic_self'
+sil @same_metatype_dynamic_self : $@convention(method) (@guaranteed A) -> Builtin.Int1 {
+bb0(%0 : $A):
+  %2 = metatype $@thick @dynamic_self A.Type
+  %3 = init_existential_metatype %2 : $@thick @dynamic_self A.Type, $@thick any Any.Type
+  %5 = metatype $@thick @dynamic_self A.Type
+  %6 = init_existential_metatype %5 : $@thick @dynamic_self A.Type, $@thick any Any.Type
+  %13 = builtin "is_same_metatype"(%3 : $@thick any Any.Type, %6 : $@thick any Any.Type) : $Builtin.Int1
+  return %13 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @unknown_same_metatype_dynamic_self
+// CHECK:         [[R:%.*]] = builtin "is_same_metatype"
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'unknown_same_metatype_dynamic_self'
+sil @unknown_same_metatype_dynamic_self : $@convention(method) (@guaranteed A) -> Builtin.Int1 {
+bb0(%0 : $A):
+  %2 = metatype $@thick @dynamic_self A.Type
+  %3 = init_existential_metatype %2 : $@thick @dynamic_self A.Type, $@thick any Any.Type
+  %5 = metatype $@thick A.Type
+  %6 = init_existential_metatype %5 : $@thick A.Type, $@thick any Any.Type
+  %13 = builtin "is_same_metatype"(%3 : $@thick any Any.Type, %6 : $@thick any Any.Type) : $Builtin.Int1
+  return %13 : $Builtin.Int1
+}
+
+sil_global hidden [let] @g : $Int32
+
+sil [global_init_once_fn] @side_effect_free_init : $@convention(c) () -> () {
+bb0:
+  %1 = global_addr @g : $*Int32
+  %2 = integer_literal $Builtin.Int32, 10
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  debug_step
+  debug_value %1 : $*Int32
+  %6 = tuple ()
+  return %6 : $()
+}
+
+sil [global_init_once_fn] @init_with_side_effect : $@convention(c) () -> () {
+bb0:
+  alloc_global @g
+  %1 = global_addr @g : $*Int32
+  %2 = integer_literal $Builtin.Int32, 10
+  %3 = struct $Int32 (%2 : $Builtin.Int32)
+  store %3 to %1 : $*Int32
+  %6 = tuple ()
+  return %6 : $()
+}
+
+sil [global_init_once_fn] @unknown_init : $@convention(c) () -> ()
+
+// CHECK-LABEL: sil @remove_builtin_once :
+// CHECK-NOT:     builtin
+// CHECK:       } // end sil function 'remove_builtin_once'
+sil @remove_builtin_once : $@convention(thin) (Builtin.RawPointer) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = function_ref @side_effect_free_init : $@convention(c) () -> ()
+  %2 = builtin "once"(%0 : $Builtin.RawPointer, %1 : $@convention(c) () -> ()) : $Builtin.SILToken
+  %3 = global_addr @gg : $*Int depends_on %2
+  %4 = address_to_pointer %3 : $*Int to $Builtin.RawPointer
+  return %4 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @dont_remove_builtin_once_side_effect :
+// CHECK:         builtin
+// CHECK:       } // end sil function 'dont_remove_builtin_once_side_effect'
+sil @dont_remove_builtin_once_side_effect : $@convention(thin) (Builtin.RawPointer) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = function_ref @init_with_side_effect : $@convention(c) () -> ()
+  %2 = builtin "once"(%0 : $Builtin.RawPointer, %1 : $@convention(c) () -> ()) : $Builtin.SILToken
+  return %0 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @dont_remove_builtin_once_unknown :
+// CHECK:         builtin
+// CHECK:       } // end sil function 'dont_remove_builtin_once_unknown'
+sil @dont_remove_builtin_once_unknown : $@convention(thin) (Builtin.RawPointer) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = function_ref @unknown_init : $@convention(c) () -> ()
+  %2 = builtin "once"(%0 : $Builtin.RawPointer, %1 : $@convention(c) () -> ()) : $Builtin.SILToken
+  return %0 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @generic_canBeClass
+// CHECK:         [[TYPE:%.*]] = metatype $@thick T.Type
+// CHECK:         [[B:%.*]] = builtin "canBeClass"<T>([[TYPE]] : $@thick T.Type)
+// CHECK:         [[R:%.*]] = struct $Int8 ([[B]] : $Builtin.Int8)
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'generic_canBeClass'
+sil @generic_canBeClass : $@convention(thin) <T> (@in T) -> Int8 {
+bb0(%0 : $*T):
+  %1 = metatype $@thick T.Type
+  %3 = builtin "canBeClass"<T>(%1 : $@thick T.Type) : $Builtin.Int8
+  %4 = struct $Int8 (%3 : $Builtin.Int8)
+  destroy_addr %0 : $*T
+  return %4 : $Int8
+}
+
+// CHECK-LABEL: sil @int_canBeClass
+// CHECK-NOT:     builtin "canBeClass"
+// CHECK:         [[L:%.*]] = integer_literal $Builtin.Int8, 0
+// CHECK:         [[R:%.*]] = struct $Int8 ([[L]] : $Builtin.Int8)
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'int_canBeClass'
+sil @int_canBeClass : $@convention(thin) () -> Int8 {
+bb0:
+  %1 = metatype $@thick Int.Type
+  %3 = builtin "canBeClass"<Int>(%1 : $@thick Int.Type) : $Builtin.Int8
+  %4 = struct $Int8 (%3 : $Builtin.Int8)
+  return %4 : $Int8
+}
+
+// CHECK-LABEL: sil @class_canBeClass
+// CHECK-NOT:     builtin "canBeClass"
+// CHECK:         [[L:%.*]] = integer_literal $Builtin.Int8, 1
+// CHECK:         [[R:%.*]] = struct $Int8 ([[L]] : $Builtin.Int8)
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'class_canBeClass'
+sil @class_canBeClass : $@convention(thin) () -> Int8 {
+bb0:
+  %1 = metatype $@thick C1<Int>.Type
+  %3 = builtin "canBeClass"<C1<Int>>(%1 : $@thick C1<Int>.Type) : $Builtin.Int8
+  %4 = struct $Int8 (%3 : $Builtin.Int8)
+  return %4 : $Int8
+}
+
+// CHECK-LABEL: sil @remove_assert_configuration
+// CHECK-NOT:     builtin "assert_configuration"
+// CHECK-EARLY:     [[L:%.*]] = integer_literal $Builtin.Int8, 0
+// CHECK-NOASSERTS1: [[L:%.*]] = integer_literal $Builtin.Int8, 1
+// CHECK-NOASSERTS2: [[L:%.*]] = integer_literal $Builtin.Int8, 2
+// CHECK:         [[R:%.*]] = struct $Int8 ([[L]] : $Builtin.Int8)
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'remove_assert_configuration'
+sil @remove_assert_configuration : $@convention(thin) () -> Int8 {
+bb0:
+  %3 = builtin "assert_configuration"() : $Builtin.Int8
+  %4 = struct $Int8 (%3 : $Builtin.Int8)
+  return %4 : $Int8
+}
+
+// CHECK-LABEL: sil @string_null_pointer_check :
+// CHECK:         %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT:    return %0
+// CHECK:       } // end sil function 'string_null_pointer_check'
+sil @string_null_pointer_check : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = string_literal utf8 "hello"
+  %1 = builtin "ptrtoint_Word"(%0 : $Builtin.RawPointer) : $Builtin.Word
+  %2 = builtin "zextOrBitCast_Word_Int64"(%1 : $Builtin.Word) : $Builtin.Int64
+  %3 = integer_literal $Builtin.Int64, 0
+  %4 = builtin "cmp_eq_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @string_null_pointer_check_ne :
+// CHECK:         %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:    return %0
+// CHECK:       } // end sil function 'string_null_pointer_check_ne'
+sil @string_null_pointer_check_ne : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = string_literal utf8 "hello"
+  %1 = builtin "ptrtoint_Word"(%0 : $Builtin.RawPointer) : $Builtin.Word
+  %2 = builtin "zextOrBitCast_Word_Int64"(%1 : $Builtin.Word) : $Builtin.Int64
+  %3 = integer_literal $Builtin.Int64, 0
+  %4 = builtin "cmp_ne_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @string_null_pointer_check_no_integer_literal :
+// CHECK:         %4 = builtin "cmp_eq_Int64"(%3 : $Builtin.Int64, %0 : $Builtin.Int64)
+// CHECK-NEXT:    return %4
+// CHECK:       } // end sil function 'string_null_pointer_check_no_integer_literal'
+sil @string_null_pointer_check_no_integer_literal : $@convention(thin) (Builtin.Int64) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int64):
+  %1 = string_literal utf8 "hello"
+  %2 = builtin "ptrtoint_Word"(%1 : $Builtin.RawPointer) : $Builtin.Word
+  %3 = builtin "zextOrBitCast_Word_Int64"(%2 : $Builtin.Word) : $Builtin.Int64
+  %4 = builtin "cmp_eq_Int64"(%3 : $Builtin.Int64, %0 : $Builtin.Int64) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @string_null_pointer_check_not_zero :
+// CHECK:         %4 = builtin "cmp_eq_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64)
+// CHECK-NEXT:    return %4
+// CHECK:       } // end sil function 'string_null_pointer_check_not_zero'
+sil @string_null_pointer_check_not_zero : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = string_literal utf8 "hello"
+  %1 = builtin "ptrtoint_Word"(%0 : $Builtin.RawPointer) : $Builtin.Word
+  %2 = builtin "zextOrBitCast_Word_Int64"(%1 : $Builtin.Word) : $Builtin.Int64
+  %3 = integer_literal $Builtin.Int64, 123
+  %4 = builtin "cmp_eq_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @string_null_pointer_check_no_string_literal :
+// CHECK:         %4 = builtin "cmp_eq_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64)
+// CHECK-NEXT:    return %4
+// CHECK:       } // end sil function 'string_null_pointer_check_no_string_literal'
+sil @string_null_pointer_check_no_string_literal : $@convention(thin) (Builtin.RawPointer) -> Builtin.Int1 {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = builtin "ptrtoint_Word"(%0 : $Builtin.RawPointer) : $Builtin.Word
+  %2 = builtin "zextOrBitCast_Word_Int64"(%1 : $Builtin.Word) : $Builtin.Int64
+  %3 = integer_literal $Builtin.Int64, 0
+  %4 = builtin "cmp_eq_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @convert_thick_to_thin1
+// CHECK-NOT: metatype $@thick C1<Int>.Type
+// CHECK:     [[L:%.*]] = metatype $@thin C1<Int>.Type
+// CHECK:     [[R:%.*]] = builtin "copyArray"<C1<Int>>([[L:%.*]] : $@thin C1<Int>.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+// CHECK:     return %0 : $Builtin.RawPointer
+sil @convert_thick_to_thin1 : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = metatype $@thick C1<Int>.Type
+  %3 = builtin "copyArray"<C1<Int>>(%2 : $@thick C1<Int>.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+  return %0 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @convert_thick_to_thin2
+// CHECK-NOT: metatype $@thick C1<Int>.Type
+// CHECK:     [[L:%.*]] = metatype $@thin C1<Int>.Type
+// CHECK:     [[R:%.*]] = builtin "takeArrayNoAlias"<C1<Int>>([[L:%.*]] : $@thin C1<Int>.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+// CHECK:     return %0 : $Builtin.RawPointer
+sil @convert_thick_to_thin2 : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = metatype $@thick C1<Int>.Type
+  %3 = builtin "takeArrayNoAlias"<C1<Int>>(%2 : $@thick C1<Int>.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+  return %0 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @convert_thick_to_thin3
+// CHECK-NOT: metatype $@thick C1<Int>.Type
+// CHECK:     [[L:%.*]] = metatype $@thin C1<Int>.Type
+// CHECK:     [[R:%.*]] = builtin "takeArrayFrontToBack"<C1<Int>>([[L:%.*]] : $@thin C1<Int>.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+// CHECK:     return %0 : $Builtin.RawPointer
+sil @convert_thick_to_thin3 : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = metatype $@thick C1<Int>.Type
+  %3 = builtin "takeArrayFrontToBack"<C1<Int>>(%2 : $@thick C1<Int>.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+  return %0 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @convert_thick_to_thin4
+// CHECK-NOT: metatype $@thick C1<Int>.Type
+// CHECK:     [[L:%.*]] = metatype $@thin C1<Int>.Type
+// CHECK:     [[R:%.*]] = builtin "takeArrayBackToFront"<C1<Int>>([[L:%.*]] : $@thin C1<Int>.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+// CHECK:     return %0 : $Builtin.RawPointer
+sil @convert_thick_to_thin4 : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = metatype $@thick C1<Int>.Type
+  %3 = builtin "takeArrayBackToFront"<C1<Int>>(%2 : $@thick C1<Int>.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+  return %0 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @convert_thick_to_thin5
+// CHECK-NOT: metatype $@thick C1<Int>.Type
+// CHECK:     [[L:%.*]] = metatype $@thin C1<Int>.Type
+// CHECK:     [[R:%.*]] = builtin "assignCopyArrayNoAlias"<C1<Int>>([[L:%.*]] : $@thin C1<Int>.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+// CHECK:     return %0 : $Builtin.RawPointer
+sil @convert_thick_to_thin5 : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = metatype $@thick C1<Int>.Type
+  %3 = builtin "assignCopyArrayNoAlias"<C1<Int>>(%2 : $@thick C1<Int>.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+  return %0 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @convert_thick_to_thin6
+// CHECK-NOT: metatype $@thick C1<Int>.Type
+// CHECK:     [[L:%.*]] = metatype $@thin C1<Int>.Type
+// CHECK:     [[R:%.*]] = builtin "assignCopyArrayFrontToBack"<C1<Int>>([[L:%.*]] : $@thin C1<Int>.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+// CHECK:     return %0 : $Builtin.RawPointer
+sil @convert_thick_to_thin6 : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = metatype $@thick C1<Int>.Type
+  %3 = builtin "assignCopyArrayFrontToBack"<C1<Int>>(%2 : $@thick C1<Int>.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+  return %0 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @convert_thick_to_thin7
+// CHECK-NOT: metatype $@thick C1<Int>.Type
+// CHECK:     [[L:%.*]] = metatype $@thin C1<Int>.Type
+// CHECK:     [[R:%.*]] = builtin "assignCopyArrayBackToFront"<C1<Int>>([[L:%.*]] : $@thin C1<Int>.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+// CHECK:     return %0 : $Builtin.RawPointer
+sil @convert_thick_to_thin7 : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = metatype $@thick C1<Int>.Type
+  %3 = builtin "assignCopyArrayBackToFront"<C1<Int>>(%2 : $@thick C1<Int>.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+  return %0 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @convert_thick_to_thin8
+// CHECK-NOT: metatype $@thick C1<Int>.Type
+// CHECK:     [[L:%.*]] = metatype $@thin C1<Int>.Type
+// CHECK:     [[R:%.*]] = builtin "assignTakeArray"<C1<Int>>([[L:%.*]] : $@thin C1<Int>.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+// CHECK:     return %0 : $Builtin.RawPointer
+sil @convert_thick_to_thin8 : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = metatype $@thick C1<Int>.Type
+  %3 = builtin "assignTakeArray"<C1<Int>>(%2 : $@thick C1<Int>.Type, %0 : $Builtin.RawPointer, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+  return %0 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @convert_thick_to_thin9
+// CHECK-NOT: metatype $@thick C1<Int>.Type
+// CHECK:     [[L:%.*]] = metatype $@thin C1<Int>.Type
+// CHECK:     [[R:%.*]] = builtin "destroyArray"<C1<Int>>([[L:%.*]] : $@thin C1<Int>.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+// CHECK:     return %0 : $Builtin.RawPointer
+sil @convert_thick_to_thin9 : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = metatype $@thick C1<Int>.Type
+  %3 = builtin "destroyArray"<C1<Int>>(%2 : $@thick C1<Int>.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+  return %0 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @remove_trivial_destroy_array
+// CHECK-NOT:     builtin
+// CHECK:       } // end sil function 'remove_trivial_destroy_array'
+sil @remove_trivial_destroy_array : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = metatype $@thin Int.Type
+  %3 = builtin "destroyArray"<Int>(%2 : $@thin Int.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+  return %0 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @remove_trivial_destroy_metatype_array :
+// CHECK-NOT:     builtin
+// CHECK:       } // end sil function 'remove_trivial_destroy_metatype_array'
+sil @remove_trivial_destroy_metatype_array : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = metatype $@thin Int.Type.Type
+  %3 = builtin "destroyArray"<Int.Type>(%2 : $@thin Int.Type.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+  return %0 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @sizeof_concrete_type :
+// CHECK:         %0 = integer_literal $Builtin.Word, 4
+// CHECK:         return %0
+// CHECK:       } // end sil function 'sizeof_concrete_type'
+sil @sizeof_concrete_type : $@convention(thin) () -> Builtin.Word {
+bb0:
+  %0 = builtin "sizeof"<Int32>() : $Builtin.Word
+  return %0
+}
+
+// CHECK-LABEL: sil @sizeof_generic_type :
+// CHECK:         %1 = builtin
+// CHECK:         return %1
+// CHECK:       } // end sil function 'sizeof_generic_type'
+sil @sizeof_generic_type : $@convention(thin) <T> (@thick T.Type) -> Builtin.Word {
+bb0(%0 : $@thick T.Type):
+  %1 = builtin "sizeof"<T>() : $Builtin.Word
+  return %1
+}
+
+// CHECK-LABEL: sil @sizeof_metatype :
+// CHECK:         %0 = integer_literal $Builtin.Word, {{(4|8)}}
+// CHECK:         return %0
+// CHECK:       } // end sil function 'sizeof_metatype'
+sil @sizeof_metatype : $@convention(thin) () -> Builtin.Word {
+bb0:
+  %0 = builtin "sizeof"<Bool.Type>() : $Builtin.Word
+  return %0
+}
+
+// CHECK-LABEL: sil @sizeof_function_type :
+// CHECK:         %0 = integer_literal $Builtin.Word, {{(8|16)}}
+// CHECK:         return %0
+// CHECK:       } // end sil function 'sizeof_function_type'
+sil @sizeof_function_type : $@convention(thin) () -> Builtin.Word {
+bb0:
+  %0 = builtin "sizeof"<()->()>() : $Builtin.Word
+  return %0
+}
+
