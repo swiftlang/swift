@@ -150,6 +150,13 @@ public:
     return RemoteAbsolutePointer("", readValue);
   }
 
+  /// Performs the inverse operation of \ref resolvePointer.
+  /// A use-case for this is to turn file addresses into in-process addresses.
+  virtual std::optional<RemoteAddress>
+  resolveRemoteAddress(RemoteAddress address) const {
+    return std::nullopt;
+  }
+
   virtual std::optional<RemoteAbsolutePointer>
   resolvePointerAsSymbol(RemoteAddress address) {
     return std::nullopt;
