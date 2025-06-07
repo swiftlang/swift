@@ -1,4 +1,3 @@
 // {"signature":"(anonymous namespace)::OpaqueUnderlyingTypeChecker::check()"}
-// RUN: not --crash %target-swift-frontend -typecheck %s
-// REQUIRES: asserts
+// RUN: not %target-swift-frontend -typecheck %s
 Array {

@@ -279,10 +279,9 @@ static ConstraintSystem::TypeMatchOptions getDefaultDecompositionOptions(
 }
 
 /// Whether the given parameter requires an argument.
-bool swift::parameterRequiresArgument(
-    ArrayRef<AnyFunctionType::Param> params,
-    const ParameterListInfo &paramInfo,
-    unsigned paramIdx) {
+static bool parameterRequiresArgument(ArrayRef<AnyFunctionType::Param> params,
+                                      const ParameterListInfo &paramInfo,
+                                      unsigned paramIdx) {
   return !paramInfo.hasDefaultArgument(paramIdx)
       && !params[paramIdx].isVariadic();
 }
@@ -374,8 +373,15 @@ static bool matchCallArgumentsImpl(
   auto claim = [&](Identifier expectedName, unsigned argIdx,
                    bool ignoreNameClash = false)  -> unsigned {
     // Make sure we can claim this argument.
-    assert(argIdx != numArgs && "Must have a valid index to claim");
-    assert(!claimedArgs[argIdx] && "Argument already claimed");
+    ASSERT(argIdx != numArgs && "Must have a valid index to claim");
+    ASSERT(!claimedArgs[argIdx] && "Argument already claimed");
+
+    // Prevent recording of an argument label mismatche for an unlabeled
+    // trailing closure. An unlabeled trailing closure is necessarily the first
+    // one and vice versa, per language syntax.
+    if (unlabeledTrailingClosureArgIndex == argIdx) {
+      expectedName = Identifier();
+    }
 
     if (!actualArgNames.empty()) {
       // We're recording argument names; record this one.
