@@ -1373,8 +1373,9 @@ CaptureListEntry CaptureListEntry::createParsed(
     SourceRange ownershipRange, Identifier name, SourceLoc nameLoc,
     SourceLoc equalLoc, Expr *initializer, DeclContext *DC) {
 
-  bool forceVar = ownershipKind == ReferenceOwnership::Weak && !Ctx.LangOpts.hasFeature(Feature::WeakLet);
-  auto introducer = forceVar ? VarDecl::Introducer::Var : VarDecl::Introducer::Let;
+  auto introducer =
+      (ownershipKind != ReferenceOwnership::Weak ? VarDecl::Introducer::Let
+                                                 : VarDecl::Introducer::Var);
   auto *VD =
       new (Ctx) VarDecl(/*isStatic==*/false, introducer, nameLoc, name, DC);
 
