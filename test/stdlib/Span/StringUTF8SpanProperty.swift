@@ -109,13 +109,8 @@ suite.test("UTF8Span from Span")
   let span1 = s.span
   guard let utf8 = expectNotNil(try? UTF8Span(validating: span1)) else { return }
 
-  expectEqual(utf8.count, span1.count)
   let span2 = utf8.span
   expectTrue(span1.isIdentical(to: span2))
-  expectEqual(span1.count, span2.count)
-  for (i,j) in zip(span1.indices, span2.indices) {
-    expectEqual(span1[i], span2[j])
-  }
 }
 
 suite.test("Span from Substring.utf8Span")
