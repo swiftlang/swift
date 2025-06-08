@@ -832,12 +832,25 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
 
   auto checkVersion = [&](std::optional<llvm::VersionTuple> version,
                           SourceRange sourceRange) {
-    if (version && !VersionRange::isValidVersion(*version)) {
+    if (!version)
+      return false;
+
+    if (!VersionRange::isValidVersion(*version)) {
       diags
           .diagnose(attrLoc, diag::availability_unsupported_version_number,
                     *version)
           .highlight(sourceRange);
       return true;
+    }
+
+    // Warn if the version is not a valid one for the domain. For example, macOS
+    // 17 will never exist.
+    if (domain->isVersioned() && !domain->isVersionValid(*version)) {
+      diags
+          .diagnose(attrLoc,
+                    diag::availability_invalid_version_number_for_domain,
+                    *version, *domain)
+          .highlight(sourceRange);
     }
 
     return false;
