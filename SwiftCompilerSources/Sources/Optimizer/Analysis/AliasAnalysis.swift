@@ -148,7 +148,7 @@ struct AliasAnalysis {
          bridgedObj: BridgedValue) -> Bool in
         let context = FunctionPassContext(_bridged: bridgedCtxt)
         let aa = AliasAnalysis(bridged: bridgedAliasAnalysis, context: context)
-        let addr = bridgedAddr.value.allContainedAddresss
+        let addr = bridgedAddr.value.allContainedAddresses
 
         // This is similar to `canReferenceSameFieldFn`, except that all addresses of all objects are
         // considered which are transitively visible from `bridgedObj`.
