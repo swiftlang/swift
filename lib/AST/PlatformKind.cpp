@@ -263,8 +263,8 @@ bool swift::inheritsAvailabilityFromPlatform(PlatformKind Child,
   return false;
 }
 
-static std::optional<llvm::Triple::OSType>
-tripleOSTypeForPlatform(PlatformKind platform) {
+std::optional<llvm::Triple::OSType>
+swift::tripleOSTypeForPlatform(PlatformKind platform) {
   switch (platform) {
   case PlatformKind::macOS:
   case PlatformKind::macOSApplicationExtension:
@@ -296,8 +296,11 @@ tripleOSTypeForPlatform(PlatformKind platform) {
 llvm::VersionTuple
 swift::canonicalizePlatformVersion(PlatformKind platform,
                                    const llvm::VersionTuple &version) {
-  if (auto osType = tripleOSTypeForPlatform(platform))
-    return llvm::Triple::getCanonicalVersionForOS(*osType, version);
+  if (auto osType = tripleOSTypeForPlatform(platform)) {
+    bool isInValidRange = llvm::Triple::isValidVersionForOS(*osType, version);
+    return llvm::Triple::getCanonicalVersionForOS(*osType, version,
+                                                  isInValidRange);
+  }
 
   return version;
 }
