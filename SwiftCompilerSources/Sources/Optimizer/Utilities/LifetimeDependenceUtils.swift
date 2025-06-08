@@ -382,7 +382,7 @@ extension LifetimeDependence.Scope {
 }
 
 extension LifetimeDependence.Scope {
-  /// Ignore "irrelevent" borrow scopes: load_borrow or begin_borrow without [var_decl]
+  /// Ignore "irrelevant" borrow scopes: load_borrow or begin_borrow without [var_decl]
   func ignoreBorrowScope(_ context: some Context) -> LifetimeDependence.Scope? {
     guard case let .borrowed(beginBorrowVal) = self else {
       return nil
@@ -560,7 +560,7 @@ protocol LifetimeDependenceDefUseWalker : ForwardingDefUseWalker,
 }
 
 extension LifetimeDependenceDefUseWalker {
-  // Use a distict context name to avoid rdar://123424566 (Unable to open existential)
+  // Use a distinct context name to avoid rdar://123424566 (Unable to open existential)
   var walkerContext: Context { context }
 }
 
@@ -824,7 +824,7 @@ extension LifetimeDependenceDefUseWalker {
 
 // Helpers
 extension LifetimeDependenceDefUseWalker {
-  // Visit uses of borrowing instruction (operandOwnerhip == .borrow).
+  // Visit uses of borrowing instruction (operandOwnership == .borrow).
   private mutating func visitAllBorrowUses(
     of operand: Operand, by borrowInst: BorrowingInstruction) -> WalkResult {
     switch borrowInst {
@@ -855,7 +855,7 @@ extension LifetimeDependenceDefUseWalker {
     }
   }
 
-  // Visit a dependent local variable (alloc_box), or temporary storage (alloc_stack). The depenedency is typically from
+  // Visit a dependent local variable (alloc_box), or temporary storage (alloc_stack). The dependency is typically from
   // storing a dependent value at `address`, but may be from an outright `mark_dependence_addr`.
   //
   // This handles stores of the entire value and stores into a member. Storing into a member makes the entire aggregate
@@ -1110,7 +1110,7 @@ private struct LifetimeDependenceUsePrinter : LifetimeDependenceDefUseWalker {
 ///
 ///     dependsOn(lvalue.computed) // finds the temporary value directly returned by a getter.
 ///
-/// SILGen emits temporary copies that violate lifetime dependence semantcs. This utility looks through such temporary
+/// SILGen emits temporary copies that violate lifetime dependence semantics. This utility looks through such temporary
 /// copies, stopping at a value that introduces an immutable variable: move_value [var_decl] or begin_borrow [var_decl],
 /// or at an access of a mutable variable: begin_access [read] or begin_access [modify].
 ///
@@ -1238,7 +1238,7 @@ extension LifetimeDependenceUseDefAddressWalker {
       if let addressorSelf = beginAccess.unsafeAddressorSelf {
         return walkUp(newLifetime: addressorSelf)
       }
-      // Ignore the acces scope for trivial values regardless of whether it is singly-initialized. Trivial values do not
+      // Ignore the access scope for trivial values regardless of whether it is singly-initialized. Trivial values do not
       // need to be kept alive in memory and can be safely be overwritten in the same scope. Lifetime dependence only
       // cares that the loaded value is within the lexical scope of the trivial value's variable declaration. Rather
       // than skipping all access scopes, call 'walkUp' on each nested access in case one of them needs to redirect the

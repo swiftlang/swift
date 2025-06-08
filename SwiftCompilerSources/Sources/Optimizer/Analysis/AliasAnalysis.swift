@@ -97,8 +97,8 @@ struct AliasAnalysis {
         return false
       }
     }
-    // Finaly use escape info to check if one address "escapes" to the other address.
-    return v1.allContainedAddresss.canAddressAlias(with: v2.allContainedAddresss, context)
+    // Finally use escape info to check if one address "escapes" to the other address.
+    return v1.allContainedAddresses.canAddressAlias(with: v2.allContainedAddresses, context)
   }
 
   static func register() {
@@ -339,7 +339,7 @@ struct AliasAnalysis {
         return .noEffects
       }
       if destroy.isDeadEnd {
-        // We don't have to take deinit effects into acount for a `destroy_value [dead_end]`.
+        // We don't have to take deinit effects into account for a `destroy_value [dead_end]`.
         // Such destroys are lowered to no-ops and will not call any deinit.
         return .noEffects
       }
@@ -471,7 +471,7 @@ struct AliasAnalysis {
   }
 
   // To avoid quadratic complexity for large functions, we limit the amount of work that the EscapeUtils are
-  // allowed to to. This keeps the complexity linear.
+  // allowed to do. This keeps the complexity linear.
   //
   // This arbitrary limit is good enough for almost all functions. It lets
   // the EscapeUtils do several hundred up/down walks which is much more than needed in most cases.
@@ -481,14 +481,14 @@ struct AliasAnalysis {
       for _ in function.instructions { numInsts += 1 }
       cache.estimatedFunctionSize = numInsts
     }
-    return 1000000 / cache.estimatedFunctionSize!
+    return 1_000_000 / cache.estimatedFunctionSize!
   }
 
   /// Returns true if the `instruction` (which in general writes to memory) is immutable in a certain scope,
   /// defined by `address`.
   ///
   /// That means that even if we don't know anything about `instruction`, we can be sure
-  /// that `instruction` cannot write to `address`, if it's inside the addresse's scope.
+  /// that `instruction` cannot write to `address`, if it's inside the address's scope.
   /// An immutable scope is for example a read-only `begin_access`/`end_access` scope.
   /// Another example is a borrow scope of an immutable copy-on-write buffer.
   private func isImmutable(instruction: Instruction, inScopeOf address: Value) -> Bool {
@@ -797,7 +797,7 @@ private struct FullApplyEffectsVisitor : EscapeVisitorWithResult {
 
 // In contrast to a full apply, the effects of a partial_apply don't depend on the callee
 // (a partial_apply doesn't call anything, it just creates a thick function pointer).
-// The only effects come from capturing the arguments (either consuming or guaranteeed).
+// The only effects come from capturing the arguments (either consuming or guaranteed).
 private struct PartialApplyEffectsVisitor : EscapeVisitorWithResult {
   let partialApply: PartialApplyInst
   var result = SideEffects.Memory.noEffects

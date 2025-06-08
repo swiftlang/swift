@@ -191,8 +191,8 @@ private extension LifetimeDependentApply.LifetimeSourceInfo {
       // (a) the result or yield is never returned from this function
       //
       // (b) the inherited lifetime has a dependence root within this function (it comes from a dependent function
-      // argument or scoped dependence). In this case, when that depedence root is diagnosed, the analysis will find
-      // transtive uses of this apply's result.
+      // argument or scoped dependence). In this case, when that dependence root is diagnosed, the analysis will find
+      // transitive uses of this apply's result.
       //
       // (c) the dependent value is passed to another call with a dependent inout argument, or it is stored to a yielded
       // address of a coroutine that has a dependent inout argument. In this case, a mark_dependence will already be
@@ -346,7 +346,7 @@ func gatherVariableIntroducers(for value: Value, _ context: Context)
 ///
 ///     dependsOn(lvalue.computed) // finds the temporary value directly returned by a getter.
 ///
-/// SILGen emits temporary copies that violate lifetime dependence semantcs. This utility looks through such temporary
+/// SILGen emits temporary copies that violate lifetime dependence semantics. This utility looks through such temporary
 /// copies, stopping at a value that introduces an immutable variable: move_value [var_decl] or begin_borrow [var_decl],
 /// or at an access of a mutable variable: begin_access [read] or begin_access [modify].
 ///
