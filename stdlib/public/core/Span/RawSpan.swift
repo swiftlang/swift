@@ -21,7 +21,7 @@ import Swift
 /// When a `RawSpan` is created, it inherits the lifetime of the container
 /// owning the contiguous memory, ensuring temporal safety and avoiding
 /// use-after-free errors. Operations on `RawSpan` are bounds-checked,
-/// ensuring spcial safety and avoiding buffer overflow errors.
+/// ensuring spatial safety and avoiding buffer overflow errors.
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 @frozen
