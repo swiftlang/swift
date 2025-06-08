@@ -15,6 +15,19 @@ from SwiftIntTypes import all_integer_types
 word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 storagescalarCounts = [2,4,8,16,32,64]
 vectorscalarCounts = storagescalarCounts + [3]
+compares = [
+  ("==", "eq", "equal to"),
+  ("!=", "ne", "not equal to"),
+  ("<",  "lt", "less than"),
+  ("<=", "le", "less than or equal to"),
+  (">=", "ge", "greater than or equal to"),
+  (">",  "gt", "greater than")
+]
+bitwise = [
+  ("&", "and", "and"),
+  ("^", "xor", "exclusive or"),
+  ("|", "or", "inclusive or"),
+]
 }%
 
 %for int in all_integer_types(word_bits):
@@ -77,85 +90,251 @@ extension SIMD${n} where Scalar == ${Scalar} {
   }
   
 %  end
-  /// A vector mask with the result of a pointwise equality comparison.
-  @_alwaysEmitIntoClient
-  public static func .==(a: Self, b: Self) -> SIMDMask<MaskStorage> {
+%  for (op, bi, description) in compares:
+%   if bi != "eq" and bi != "ne":
+%    bi = s + bi
+%   end
+  /// Pointwise compare ${description}.
+  ///
+  /// Each lane of the result is true if that lane of a is ${description} the
+  /// corresponding lane of b, and false otherwise.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMDMask<MaskStorage>()
+  /// for i in 0..<${n} {
+  ///   result[i] = (a[i] ${op} b[i])
+  /// }
+  /// ```
+%   if int.bits == 64 and bi != "eq" and bi != "ne": #PCMPGTQ is SSE4.2
+  #if arch(x86_64) || arch(i386)
+  // PCMPGTQ is SSE4.2, which is not in the default set of extensions.
+  @_alwaysEmitIntoClient @inlinable
+  #else
+  @_alwaysEmitIntoClient @_transparent
+  #endif
+%   else:
+  @_alwaysEmitIntoClient @_transparent
+%   end
+  public static func .${op}(a: Self, b: Self) -> SIMDMask<MaskStorage> {
     SIMDMask<MaskStorage>(${MaskExt}(
-      Builtin.cmp_eq_${Builtin}(a._storage._value, b._storage._value)
+      Builtin.cmp_${bi}_${Builtin}(a._storage._value, b._storage._value)
     ))
   }
   
-  /// A vector mask with the result of a pointwise inequality comparison.
-  @_alwaysEmitIntoClient
-  public static func .!=(a: Self, b: Self) -> SIMDMask<MaskStorage> {
-    SIMDMask<MaskStorage>(${MaskExt}(
-      Builtin.cmp_ne_${Builtin}(a._storage._value, b._storage._value)
-    ))
+  /// Pointwise compare ${description}.
+  ///
+  /// Each lane of the result is true if that lane of a is ${description} b,
+  /// and false otherwise.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMDMask<MaskStorage>()
+  /// for i in 0..<${n} {
+  ///   result[i] = (a[i] ${op} b)
+  /// }
+  /// ```
+%   if int.bits == 64 and bi != "eq" and bi != "ne": #PCMPGTQ is SSE4.2
+  #if arch(x86_64) || arch(i386)
+  // PCMPGTQ is SSE4.2, which is not in the default set of extensions.
+  @_alwaysEmitIntoClient @inlinable
+  #else
+  @_alwaysEmitIntoClient @_transparent
+  #endif
+%   else:
+  @_alwaysEmitIntoClient @_transparent
+%   end
+  public static func .${op}(a: Self, b: Scalar) -> SIMDMask<MaskStorage> {
+    a .${op} Self(repeating: b)
+  }
+
+  /// Pointwise compare ${description}.
+  ///
+  /// Each lane of the result is true if a is ${description} the corresponding
+  /// lane of b, and false otherwise.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMDMask<MaskStorage>()
+  /// for i in 0..<${n} {
+  ///   result[i] = (a ${op} b[i])
+  /// }
+  /// ```
+%   if int.bits == 64 and bi != "eq" and bi != "ne":
+  #if arch(x86_64) || arch(i386)
+  // PCMPGTQ is SSE4.2, which is not in the default set of extensions.
+  @_alwaysEmitIntoClient @inlinable
+  #else
+  @_alwaysEmitIntoClient @_transparent
+  #endif
+%   else:
+  @_alwaysEmitIntoClient @_transparent
+%   end
+  public static func .${op}(a: Scalar, b: Self) -> SIMDMask<MaskStorage> {
+    Self(repeating: a) .${op} b
   }
   
-  /// A vector mask with the result of a pointwise less-than comparison.
-  @_alwaysEmitIntoClient
-  public static func .<(a: Self, b: Self) -> SIMDMask<MaskStorage> {
-    SIMDMask<MaskStorage>(${MaskExt}(
-      Builtin.cmp_${s}lt_${Builtin}(a._storage._value, b._storage._value)
-    ))
+%  end
+  /// Bitwise not
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMD${n}<${Scalar}>()
+  /// for i in 0..<${n} {
+  ///   result[i] = ~a[i]
+  /// }
+  /// ```
+  @_alwaysEmitIntoClient @_transparent
+  public static prefix func ~(a: Self) -> Self {
+    a ^ Self(repeating: ~0)
+  }
+
+%  for (op, bi, description) in bitwise:
+  /// Bitwise ${description}
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMD${n}<${Scalar}>()
+  /// for i in 0..<${n} {
+  ///   result[i] = a[i] ${op} b[i]
+  /// }
+  /// ```
+  @_alwaysEmitIntoClient @_transparent
+  public static func ${op}(a: Self, b: Self) -> Self {
+    Self(Builtin.${bi}_${Builtin}(a._storage._value, b._storage._value))
   }
   
-  /// A vector mask with the result of a pointwise less-than-or-equal-to comparison.
-  @_alwaysEmitIntoClient
-  public static func .<=(a: Self, b: Self) -> SIMDMask<MaskStorage> {
-    SIMDMask<MaskStorage>(${MaskExt}(
-      Builtin.cmp_${s}le_${Builtin}(a._storage._value, b._storage._value)
-    ))
+  /// Bitwise ${description}
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMD${n}<${Scalar}>()
+  /// for i in 0..<${n} {
+  ///   result[i] = a[i] ${op} b
+  /// }
+  /// ```
+  @_alwaysEmitIntoClient @_transparent
+  public static func ${op}(a: Self, b: Scalar) -> Self {
+    a ${op} Self(repeating: b)
   }
   
-  /// A vector mask with the result of a pointwise greater-than comparison.
-  @_alwaysEmitIntoClient
-  public static func .>(a: Self, b: Self) -> SIMDMask<MaskStorage> {
-    SIMDMask<MaskStorage>(${MaskExt}(
-      Builtin.cmp_${s}gt_${Builtin}(a._storage._value, b._storage._value)
-    ))
+  /// Bitwise ${description}
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMD${n}<${Scalar}>()
+  /// for i in 0..<${n} {
+  ///   result[i] = a ${op} b[i]
+  /// }
+  /// ```
+  @_alwaysEmitIntoClient @_transparent
+  public static func ${op}(a: Scalar, b: Self) -> Self {
+    Self(repeating: a) ${op} b
   }
   
-  /// A vector mask with the result of a pointwise greater-than-or-equal-to comparison.
-  @_alwaysEmitIntoClient
-  public static func .>=(a: Self, b: Self) -> SIMDMask<MaskStorage> {
-    SIMDMask<MaskStorage>(${MaskExt}(
-      Builtin.cmp_${s}ge_${Builtin}(a._storage._value, b._storage._value)
-    ))
+  /// In-place bitwise ${description}
+  ///
+  /// Equivalent to:
+  /// ```
+  /// for i in 0..<${n} {
+  ///   a[i] ${op}= b[i]
+  /// }
+  /// ```
+  @_alwaysEmitIntoClient @_transparent
+  public static func ${op}=(a: inout Self, b: Self) {
+    a = a ${op} b
+  }
+  
+  /// In-place bitwise ${description}
+  ///
+  /// Equivalent to:
+  /// ```
+  /// for i in 0..<${n} {
+  ///   a[i] ${op}= b
+  /// }
+  /// ```
+  @_alwaysEmitIntoClient @_transparent
+  public static func ${op}=(a: inout Self, b: Scalar) {
+    a = a ${op} b
+  }
+  
+%  end
+    
+  /// Replaces elements of this vector with elements of `other` in the lanes
+  /// where `mask` is `true`.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// for i in indices {
+  ///   if mask[i] { self[i] = other[i] }
+  /// }
+  /// ```
+  @_alwaysEmitIntoClient @_transparent
+  public mutating func replace(
+    with other: Self,
+    where mask: SIMDMask<MaskStorage>
+  ) {
+    self = replacing(with: other, where: mask)
   }
     
+  /// Returns a copy of this vector, with elements replaced by elements of
+  /// `other` in the lanes where `mask` is `true`.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = Self()
+  /// for i in indices {
+  ///   result[i] = mask[i] ? other[i] : self[i]
+  /// }
+  /// ```
+  @_alwaysEmitIntoClient @_transparent
+  public func replacing(
+    with other: Self,
+    where mask: SIMDMask<MaskStorage>
+  ) -> Self {
+#if hasFeature(BuiltinSelect)
+    return Self(Builtin.select_Vec${storageN}xInt1_${Builtin}(
+      Builtin.trunc_${Builtin}_Vec${storageN}xInt1(mask._storage._storage._value),
+      other._storage._value,
+      self._storage._value
+    ))
+#else
+    let maskAsSelf = unsafe unsafeBitCast(mask._storage, to: Self.self)
+    return self & ~maskAsSelf | other & maskAsSelf
+#endif
+  }
+  
   /// The wrapping sum of two vectors.
-  @_alwaysEmitIntoClient
+  @_alwaysEmitIntoClient @_transparent
   public static func &+(a: Self, b: Self) -> Self {
     Self(Builtin.add_${Builtin}(a._storage._value, b._storage._value))
   }
     
   /// The wrapping difference of two vectors.
-  @_alwaysEmitIntoClient
+  @_alwaysEmitIntoClient @_transparent
   public static func &-(a: Self, b: Self) -> Self {
     Self(Builtin.sub_${Builtin}(a._storage._value, b._storage._value))
   }
     
   /// The pointwise wrapping product of two vectors.
-  @_alwaysEmitIntoClient
+  @_alwaysEmitIntoClient @_transparent
   public static func &*(a: Self, b: Self) -> Self {
     Self(Builtin.mul_${Builtin}(a._storage._value, b._storage._value))
   }
         
   /// Updates the left hand side with the wrapping sum of the two
   /// vectors.
-  @_alwaysEmitIntoClient
+  @_alwaysEmitIntoClient @_transparent
   public static func &+=(a: inout Self, b: Self) { a = a &+ b }
     
   /// Updates the left hand side with the wrapping difference of the two
   /// vectors.
-  @_alwaysEmitIntoClient
+  @_alwaysEmitIntoClient @_transparent
   public static func &-=(a: inout Self, b: Self) { a = a &- b }
     
   /// Updates the left hand side with the pointwise wrapping product of two
   /// vectors.
-  @_alwaysEmitIntoClient
+  @_alwaysEmitIntoClient @_transparent
   public static func &*=(a: inout Self, b: Self) { a = a &* b }
 }
 
