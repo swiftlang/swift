@@ -1,0 +1,243 @@
+//===--- SIMDSignedComparisons.swift.gyb ----------------------*- swift -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2025 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+// RUN: %empty-directory(%t)
+// RUN: %gyb %s -o %t/SIMDSignedComparisons.swift
+// RUN: %target-swift-frontend -primary-file %t/SIMDSignedComparisons.swift -S | %FileCheck %t/SIMDSignedComparisons.swift --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECKOnone-%target-cpu
+// RUN: %target-swift-frontend -primary-file %t/SIMDSignedComparisons.swift -S -O | %FileCheck %t/SIMDSignedComparisons.swift --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECKO-%target-cpu
+
+import Swift
+
+%for bits in [8,16,32,64]:
+% for totalBits in [64,128]:
+%  n = totalBits // bits
+%  if n != 1:
+%   neonSuffix = str(n) + {8:'b',16:'h',32:'s',64:'d'}[bits]
+%   sseSuffix = {8:'b',16:'w',32:'d',64:'q'}[bits]
+func compare_eq${n}x${bits}(
+  _ a: SIMD${n}<Int${bits}>, _ b: SIMD${n}<Int${bits}>
+) -> SIMDMask<SIMD${n}<Int${bits}>> {
+  a .== b
+}
+// CHECK: compare_eq${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECKO-arm64-NEXT: cmeq.${neonSuffix} v0, v0, v1
+// CHECKO-arm64-NEXT: ret
+// CHECKOnone-arm64: cmeq.${neonSuffix}
+// CHECKOnone-arm64: ret
+%   if bits != 64: # no PCMPEQQ until SSE4.1
+// CHECK-x86_64: pcmpeq${sseSuffix}
+%   end
+// CHECK-x86_64: ret
+
+func compare_eq${n}x${bits}(
+  _ a: SIMD${n}<Int${bits}>, scalar b: Int${bits}
+) -> SIMDMask<SIMD${n}<Int${bits}>> {
+  a .== b
+}
+// CHECK: compare_eq${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECKO-arm64-NEXT: dup.${neonSuffix} [[TMP:v[0-9]+]], ${'x' if bits == 64 else 'w'}0
+// CHECKO-arm64-NEXT: cmeq.${neonSuffix} v0
+// CHECKO-arm64-NEXT: ret
+
+func compare_eq${n}x${bits}(
+  scalar a: Int${bits}, _ b: SIMD${n}<Int${bits}>
+) -> SIMDMask<SIMD${n}<Int${bits}>> {
+  a .== b
+}
+// CHECK: compare_eq${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECKO-arm64-NEXT: dup.${neonSuffix} [[TMP:v[0-9]+]], ${'x' if bits == 64 else 'w'}0
+// CHECKO-arm64-NEXT: cmeq.${neonSuffix} v0
+// CHECKO-arm64-NEXT: ret
+
+func compare_ne${n}x${bits}(
+  _ a: SIMD${n}<Int${bits}>, _ b: SIMD${n}<Int${bits}>
+) -> SIMDMask<SIMD${n}<Int${bits}>> {
+  a .!= b
+}
+// CHECK: compare_ne${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECKO-arm64-NEXT: cmeq.${neonSuffix} [[TMP:v[0-9]+]], v0, v1
+// CHECKO-arm64-NEXT: mvn.${totalBits//8}b v0, [[TMP]]
+// CHECKO-arm64-NEXT: ret
+// CHECKOnone-arm64: cmeq.${neonSuffix}
+// CHECKOnone-arm64: mvn.${totalBits//8}b
+// CHECKOnone-arm64: ret
+%   if bits != 64: # no PCMPEQQ until SSE4.1
+// CHECK-x86_64: pcmpeq${sseSuffix}
+// CHECK-x86_64: pxor
+%   end
+// CHECK-x86_64: ret
+
+func compare_ne${n}x${bits}(
+  _ a: SIMD${n}<Int${bits}>, scalar b: Int${bits}
+) -> SIMDMask<SIMD${n}<Int${bits}>> {
+  a .!= b
+}
+// CHECK: compare_ne${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECKO-arm64-NEXT: dup.${neonSuffix} [[TMP1:v[0-9]+]], ${'x' if bits == 64 else 'w'}0
+// CHECKO-arm64-NEXT: cmeq.${neonSuffix} [[TMP2:v[0-9]+]]
+// CHECKO-arm64-NEXT: mvn.${totalBits//8}b v0, [[TMP2]]
+// CHECKO-arm64-NEXT: ret
+
+func compare_ne${n}x${bits}(
+  scalar a: Int${bits}, _ b: SIMD${n}<Int${bits}>
+) -> SIMDMask<SIMD${n}<Int${bits}>> {
+  a .!= b
+}
+// CHECK: compare_ne${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECKO-arm64-NEXT: dup.${neonSuffix} [[TMP:v[0-9]+]], ${'x' if bits == 64 else 'w'}0
+// CHECKO-arm64-NEXT: cmeq.${neonSuffix} [[TMP2:v[0-9]+]]
+// CHECKO-arm64-NEXT: mvn.${totalBits//8}b v0, [[TMP2]]
+// CHECKO-arm64-NEXT: ret
+
+func compare_lt${n}x${bits}(
+  _ a: SIMD${n}<Int${bits}>, _ b: SIMD${n}<Int${bits}>
+) -> SIMDMask<SIMD${n}<Int${bits}>> {
+  a .< b
+}
+// CHECK: compare_lt${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECKO-arm64-NEXT: cmgt.${neonSuffix} v0, v1, v0
+// CHECKO-arm64-NEXT: ret
+// CHECKOnone-arm64: cmgt.${neonSuffix}
+// CHECKOnone-arm64: ret
+%   if bits != 64: # no PCMPGTQ until SSE4.2
+// CHECK-x86_64: pcmpgt${sseSuffix}
+%   end
+// CHECK-x86_64: ret
+
+func compare_lt${n}x${bits}(
+  _ a: SIMD${n}<Int${bits}>, scalar b: Int${bits}
+) -> SIMDMask<SIMD${n}<Int${bits}>> {
+  a .< b
+}
+// CHECK: compare_lt${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECKO-arm64-NEXT: dup.${neonSuffix} [[TMP:v[0-9]+]], ${'x' if bits == 64 else 'w'}0
+// CHECKO-arm64-NEXT: cmgt.${neonSuffix} v0, [[TMP:v[0-9]+]], v0
+// CHECKO-arm64-NEXT: ret
+
+func compare_lt${n}x${bits}(
+  scalar a: Int${bits}, _ b: SIMD${n}<Int${bits}>
+) -> SIMDMask<SIMD${n}<Int${bits}>> {
+  a .< b
+}
+// CHECK: compare_lt${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECKO-arm64-NEXT: dup.${neonSuffix} [[TMP:v[0-9]+]], ${'x' if bits == 64 else 'w'}0
+// CHECKO-arm64-NEXT: cmgt.${neonSuffix} v0, v0, [[TMP:v[0-9]+]]
+// CHECKO-arm64-NEXT: ret
+
+func compare_le${n}x${bits}(
+  _ a: SIMD${n}<Int${bits}>, _ b: SIMD${n}<Int${bits}>
+) -> SIMDMask<SIMD${n}<Int${bits}>> {
+  a .<= b
+}
+// CHECK: compare_le${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECKO-arm64-NEXT: cmge.${neonSuffix} v0, v1, v0
+// CHECKO-arm64-NEXT: ret
+// CHECKOnone-arm64: cmge.${neonSuffix}
+// CHECKOnone-arm64: ret
+%   if bits != 64: # no PCMPGTQ until SSE4.2
+// CHECK-x86_64: pcmpgt${sseSuffix}
+// CHECK-x86_64: pxor
+%   end
+// CHECK-x86_64: ret
+
+func compare_le${n}x${bits}(
+  _ a: SIMD${n}<Int${bits}>, scalar b: Int${bits}
+) -> SIMDMask<SIMD${n}<Int${bits}>> {
+  a .<= b
+}
+// CHECK: compare_le${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECKO-arm64-NEXT: dup.${neonSuffix} [[TMP:v[0-9]+]], ${'x' if bits == 64 else 'w'}0
+// CHECKO-arm64-NEXT: cmge.${neonSuffix} v0, [[TMP:v[0-9]+]], v0
+// CHECKO-arm64-NEXT: ret
+
+func compare_le${n}x${bits}(
+  scalar a: Int${bits}, _ b: SIMD${n}<Int${bits}>
+) -> SIMDMask<SIMD${n}<Int${bits}>> {
+  a .<= b
+}
+// CHECK: compare_le${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECKO-arm64-NEXT: dup.${neonSuffix} [[TMP:v[0-9]+]], ${'x' if bits == 64 else 'w'}0
+// CHECKO-arm64-NEXT: cmge.${neonSuffix} v0, v0, [[TMP:v[0-9]+]]
+// CHECKO-arm64-NEXT: ret
+
+func compare_gt${n}x${bits}(
+  _ a: SIMD${n}<Int${bits}>, _ b: SIMD${n}<Int${bits}>
+) -> SIMDMask<SIMD${n}<Int${bits}>> {
+  a .> b
+}
+// CHECK: compare_gt${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECKO-arm64-NEXT: cmgt.${neonSuffix} v0, v0, v1
+// CHECKO-arm64-NEXT: ret
+// CHECKOnone-arm64: cmgt.${neonSuffix}
+// CHECKOnone-arm64: ret
+%   if bits != 64: # no PCMPGTQ until SSE4.2
+// CHECK-x86_64: pcmpgt${sseSuffix}
+%   end
+// CHECK-x86_64: ret
+
+func compare_gt${n}x${bits}(
+  _ a: SIMD${n}<Int${bits}>, scalar b: Int${bits}
+) -> SIMDMask<SIMD${n}<Int${bits}>> {
+  a .> b
+}
+// CHECK: compare_gt${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECKO-arm64-NEXT: dup.${neonSuffix} [[TMP:v[0-9]+]], ${'x' if bits == 64 else 'w'}0
+// CHECKO-arm64-NEXT: cmgt.${neonSuffix} v0, v0, [[TMP:v[0-9]+]]
+// CHECKO-arm64-NEXT: ret
+
+func compare_gt${n}x${bits}(
+  scalar a: Int${bits}, _ b: SIMD${n}<Int${bits}>
+) -> SIMDMask<SIMD${n}<Int${bits}>> {
+  a .> b
+}
+// CHECK: compare_gt${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECKO-arm64-NEXT: dup.${neonSuffix} [[TMP:v[0-9]+]], ${'x' if bits == 64 else 'w'}0
+// CHECKO-arm64-NEXT: cmgt.${neonSuffix} v0, [[TMP:v[0-9]+]], v0
+// CHECKO-arm64-NEXT: ret
+
+func compare_ge${n}x${bits}(
+  _ a: SIMD${n}<Int${bits}>, _ b: SIMD${n}<Int${bits}>
+) -> SIMDMask<SIMD${n}<Int${bits}>> {
+  a .>= b
+}
+// CHECK: compare_ge${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECKO-arm64-NEXT: cmge.${neonSuffix} v0, v0, v1
+// CHECKO-arm64-NEXT: ret
+// CHECKOnone-arm64: cmge.${neonSuffix}
+// CHECKOnone-arm64: ret
+%   if bits != 64: # no PCMPGTQ until SSE4.2
+// CHECK-x86_64: pcmpgt${sseSuffix}
+// CHECK-x86_64: pxor
+%   end
+// CHECK-x86_64: ret
+
+func compare_ge${n}x${bits}(
+  _ a: SIMD${n}<Int${bits}>, scalar b: Int${bits}
+) -> SIMDMask<SIMD${n}<Int${bits}>> {
+  a .>= b
+}
+// CHECK: compare_ge${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECKO-arm64-NEXT: dup.${neonSuffix} [[TMP:v[0-9]+]], ${'x' if bits == 64 else 'w'}0
+// CHECKO-arm64-NEXT: cmge.${neonSuffix} v0, v0, [[TMP:v[0-9]+]]
+// CHECKO-arm64-NEXT: ret
+
+func compare_ge${n}x${bits}(
+  scalar a: Int${bits}, _ b: SIMD${n}<Int${bits}>
+) -> SIMDMask<SIMD${n}<Int${bits}>> {
+  a .>= b
+}
+// CHECK: compare_ge${n}x${bits}{{[[:alnum:]_]+}}:
+// CHECKO-arm64-NEXT: dup.${neonSuffix} [[TMP:v[0-9]+]], ${'x' if bits == 64 else 'w'}0
+// CHECKO-arm64-NEXT: cmge.${neonSuffix} v0, [[TMP:v[0-9]+]], v0
+// CHECKO-arm64-NEXT: ret
+%  end
+% end
+%end
