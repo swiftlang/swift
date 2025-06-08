@@ -37,12 +37,12 @@ public func ~><T> (lhs: T, rhs: (T) -> Void) -> T {
 }
 
 struct S {
-  @available(macOS 20, *)
+  @available(macOS 50, *)
   func f() {}
 }
 
 let s = S() ~> {
-  if #available(macOS 20.0, *) {
+  if #available(macOS 50.0, *) {
     $0.f()
   }
 }

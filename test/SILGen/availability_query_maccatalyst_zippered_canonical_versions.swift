@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen %s -target %target-cpu-apple-macosx10.15 -target-variant %target-cpu-apple-ios13.0-macabi | %FileCheck %s
-// RUN: %target-swift-emit-silgen %s -target %target-cpu-apple-ios13.0-macabi -target-variant %target-cpu-apple-macosx10.15 | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s -target %target-cpu-apple-macosx10.15 -target-variant %target-cpu-apple-ios13.1-macabi | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s -target %target-cpu-apple-ios13.1-macabi -target-variant %target-cpu-apple-macosx10.15 | %FileCheck %s
 
 
 // REQUIRES: OS=macosx || OS=maccatalyst
