@@ -546,7 +546,7 @@ SubstitutionMap TypeBase::getContextSubstitutionMap() {
 
   Type baseTy(this);
 
-  assert(!baseTy->hasLValueType() &&
+  assert(!baseTy->is<LValueType>() &&
          !baseTy->is<AnyMetatypeType>() &&
          !baseTy->is<ErrorType>());
 
@@ -628,7 +628,7 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
   assert(dc->isTypeContext());
   Type baseTy(this);
 
-  assert(!baseTy->hasLValueType() &&
+  assert(!baseTy->is<LValueType>() &&
          !baseTy->is<AnyMetatypeType>() &&
          !baseTy->is<ErrorType>());
 
