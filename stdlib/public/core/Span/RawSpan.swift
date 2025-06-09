@@ -561,7 +561,7 @@ extension RawSpan {
   @unsafe
   @_alwaysEmitIntoClient
   public func unsafeLoad<T>(
-    fromByteOffset offset: Int = 0, as: T.Type
+    fromByteOffset offset: Int = 0, as type: T.Type
   ) -> T {
     _precondition(
       UInt(bitPattern: offset) <= UInt(bitPattern: _count) &&
@@ -592,7 +592,7 @@ extension RawSpan {
   @unsafe
   @_alwaysEmitIntoClient
   public func unsafeLoad<T>(
-    fromUncheckedByteOffset offset: Int, as: T.Type
+    fromUncheckedByteOffset offset: Int, as type: T.Type
   ) -> T {
     unsafe _start().load(fromByteOffset: offset, as: T.self)
   }
@@ -616,7 +616,7 @@ extension RawSpan {
   @unsafe
   @_alwaysEmitIntoClient
   public func unsafeLoadUnaligned<T: BitwiseCopyable>(
-    fromByteOffset offset: Int = 0, as: T.Type
+    fromByteOffset offset: Int = 0, as type: T.Type
   ) -> T {
     _precondition(
       UInt(bitPattern: offset) <= UInt(bitPattern: _count) &&
@@ -648,7 +648,7 @@ extension RawSpan {
   @unsafe
   @_alwaysEmitIntoClient
   public func unsafeLoadUnaligned<T: BitwiseCopyable>(
-    fromUncheckedByteOffset offset: Int, as: T.Type
+    fromUncheckedByteOffset offset: Int, as type: T.Type
   ) -> T {
     unsafe _start().loadUnaligned(fromByteOffset: offset, as: T.self)
   }
