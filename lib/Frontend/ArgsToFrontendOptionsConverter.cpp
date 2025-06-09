@@ -164,6 +164,9 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.ParallelDependencyScan = Args.hasFlag(OPT_parallel_scan,
                                              OPT_no_parallel_scan,
                                              true);
+  Opts.GenReproducer |= Args.hasArg(OPT_gen_reproducer);
+  Opts.GenReproducerDir = Args.getLastArgValue(OPT_gen_reproducer_dir);
+
   if (const Arg *A = Args.getLastArg(OPT_dependency_scan_cache_path)) {
     Opts.SerializedDependencyScannerCachePath = A->getValue();
   }
