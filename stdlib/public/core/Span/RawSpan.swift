@@ -295,7 +295,7 @@ extension RawSpan {
   ///
   /// - Parameters:
   ///   - pointer: a pointer to the first initialized byte.
-  ///   - count: the number of initialized bytes in the span.
+  ///   - count: the number of initialized elements in the span.
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow pointer)
