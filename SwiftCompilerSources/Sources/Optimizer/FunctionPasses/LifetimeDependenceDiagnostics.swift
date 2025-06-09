@@ -66,7 +66,7 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
       // For now, if the mark_dependence wasn't recognized as a lifetime dependency, or if the dependencies uses are not
       // in scope, conservatively settle it as escaping. For example, it is not uncommon for the pointer value returned
       // by `unsafeAddress` to outlive its `self` argument. This will not be diagnosed as an error, but the
-      // mark_dependence will hanceforth be treated as an unknown use by the optimizer.  In the future, we should not
+      // mark_dependence will henceforth be treated as an unknown use by the optimizer.  In the future, we should not
       // need to set this flag during diagnostics because, for escapable types, mark_dependence [unresolved] will all be
       // settled during an early LifetimeNormalization pass.
       markDep.settleToEscaping(context)
@@ -422,8 +422,8 @@ private struct LifetimeVariable {
 ///
 /// This supports store-to-yield. Storing to a yield is an escape unless the yielded memory location depends on another
 /// lifetime that already depends on the current scope. When setter depends on 'newValue', 'newValue' is stored to the
-/// yielded address, and the yielded addrses depends on the lifetime of 'self'. A mark_dependence should have already
-/// been inserted for that lifetime depenence:
+/// yielded address, and the yielded addresses depends on the lifetime of 'self'. A mark_dependence should have already
+/// been inserted for that lifetime dependence:
 ///
 ///   (%a, %t) = begin_apply %f(%self)
 ///              : $@yield_once @convention(method) (@inout Self) -> _inherit(0) @yields @inout Self.field
@@ -459,7 +459,7 @@ extension DependentAddressUseDefWalker: AddressUseDefWalker {
   }
 }
 
-/// Walk down lifetime depenence uses. For each check that all dependent
+/// Walk down lifetime dependence uses. For each check that all dependent
 /// leaf uses are non-escaping and within the dependence scope. The walk
 /// starts with add address for .access dependencies. The walk can
 /// transition from an address to a value at a load. The walk can
