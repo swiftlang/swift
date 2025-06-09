@@ -258,7 +258,7 @@ TypeRelationCheckRequest::evaluate(Evaluator &evaluator,
 TypePair
 RootAndResultTypeOfKeypathDynamicMemberRequest::evaluate(Evaluator &evaluator,
                                               SubscriptDecl *subscript) const {
-  auto keyPathType = getKeyPathTypeForDynamicMemberLookup(subscript);
+  auto keyPathType = subscript->getDynamicMemberLookupKeyPathType();
   if (!keyPathType)
     return TypePair();
 
