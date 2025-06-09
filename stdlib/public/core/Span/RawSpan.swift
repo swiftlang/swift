@@ -288,14 +288,14 @@ extension RawSpan {
 
   /// Unsafely create a `RawSpan` over initialized memory.
   ///
-  /// The region of memory representing `byteCount` bytes starting at `pointer`
+  /// The region of memory representing `count` bytes starting at `pointer`
   /// must remain valid, initialized and immutable
   /// throughout the lifetime of the newly-created `RawSpan`.
   /// Failure to maintain this invariant results in undefined behaviour.
   ///
   /// - Parameters:
   ///   - pointer: a pointer to the first initialized byte.
-  ///   - byteCount: the number of initialized bytes in the span.
+  ///   - count: the number of initialized bytes in the span.
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow pointer)
