@@ -1146,12 +1146,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
       auto *baseClass = override->getDeclContext()->getSelfClassDecl();
       selfTypeForAccess = selfTypeForAccess->getSuperclassForDecl(baseClass);
 
-      // Error recovery path. We get an ErrorType here if getSuperclassForDecl()
-      // fails (because, for instance, a generic parameter of a generic nominal
-      // type cannot be resolved).
-      if (!selfTypeForAccess->is<ErrorType>()) {
-        subs = selfTypeForAccess->getContextSubstitutionMap(baseClass);
-      }
+      subs = selfTypeForAccess->getContextSubstitutionMap(baseClass);
 
       storage = override;
 
