@@ -52,53 +52,66 @@ endif()
 
 include(FindPackageHandleStandardArgs)
 
-set(NO_CMAKE_FIND_ROOT_PATH_KEYWORD)
+if(NOT DEFINED SwiftCore_USE_STATIC_LIBS)
+  set(SwiftCore_USE_STATIC_LIBS OFF)
+  if(NOT BUILD_SHARED_LIBS AND NOT APPLE)
+    set(SwiftCore_USE_STATIC_LIBS ON)
+  endif()
+endif()
+
 if(APPLE)
-  set(SwiftCore_INCLUDE_DIR_HINTS
+  list(APPEND SwiftCore_INCLUDE_DIR_HINTS
     "${CMAKE_OSX_SYSROOT}/usr/lib/swift")
-  set(SwiftCore_LIBRARY_HINTS
+  list(APPEND SwiftCore_LIBRARY_HINTS
     "${CMAKE_OSX_SYSROOT}/usr/lib/swift")
+  # When building for Apple platforms, SwiftCore always comes from within the
+  # SDK as a tbd for a shared library in the shared cache.
+  list(APPEND SwiftCore_NAMES libswiftCore.tbd)
 elseif(LINUX)
-  if (NOT BUILD_SHARED_LIBS)
-    set(SwiftCore_INCLUDE_DIR_HINTS
+  if (SwiftCore_USE_STATIC_LIBS)
+    list(APPEND SwiftCore_INCLUDE_DIR_HINTS
       "${Swift_SDKROOT}/usr/lib/swift_static/linux-static")
-    set(SwiftCore_LIBRARY_HINTS
+    list(APPEND SwiftCore_LIBRARY_HINTS
       "${Swift_SDKROOT}/usr/lib/swift_static/linux-static")
+    list(APPEND SwiftCore_NAMES libswiftCore.a)
   else()
-    set(SwiftCore_INCLUDE_DIR_HINTS
+    list(APPEND SwiftCore_INCLUDE_DIR_HINTS
       "${Swift_SDKROOT}/usr/lib/swift/linux")
-    set(SwiftCore_LIBRARY_HINTS
+    list(APPEND SwiftCore_LIBRARY_HINTS
       "${Swift_SDKROOT}/usr/lib/swift/linux")
+    list(APPEND SwiftCore_NAMES libswiftCore.so)
   endif()
 elseif(WIN32)
-  set(SwiftCore_INCLUDE_DIR_HINTS
+  list(APPEND SwiftCore_INCLUDE_DIR_HINTS
     "${Swift_SDKROOT}/usr/lib/swift/windows"
     "$ENV{SDKROOT}/usr/lib/swift/windows")
-  set(SwiftCore_LIBRARY_HINTS
+  list(APPEND SwiftCore_LIBRARY_HINTS
     "${Swift_SDKROOT}/usr/lib/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
     "${Swift_SDKROOT}/usr/lib/swift"
     "$ENV{SDKROOT}/usr/lib/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
     "$ENV{SDKROOT}/usr/lib/swift")
+  list(APPEND SwiftCore_NAMES libswiftCore.lib)
 elseif(ANDROID)
-  set(NO_CMAKE_FIND_ROOT_PATH_KEYWORD "NO_CMAKE_FIND_ROOT_PATH")
-  if (NOT BUILD_SHARED_LIBS)
-    set(SwiftCore_INCLUDE_DIR_HINTS
+  if (SwiftCore_USE_STATIC_LIBS)
+    list(APPEND SwiftCore_INCLUDE_DIR_HINTS
       "${Swift_SDKROOT}/usr/lib/swift_static/android"
       "$ENV{SDKROOT}/usr/lib/swift_static/android")
-    set(SwiftCore_LIBRARY_HINTS
+    list(APPEND SwiftCore_LIBRARY_HINTS
       "${Swift_SDKROOT}/usr/lib/swift_static/android/${SwiftCore_ARCH_SUBDIR}"
       "${Swift_SDKROOT}/usr/lib/swift_static"
       "$ENV{SDKROOT}/usr/lib/swift_static/android/${SwiftCore_ARCH_SUBDIR}"
       "$ENV{SDKROOT}/usr/lib/swift_static")
+    list(APPEND SwiftCore_NAMES libswiftCore.a)
   else()
-    set(SwiftCore_INCLUDE_DIR_HINTS
+    list(APPEND SwiftCore_INCLUDE_DIR_HINTS
       "${Swift_SDKROOT}/usr/lib/swift/android"
       "$ENV{SDKROOT}/usr/lib/swift/android")
-    set(SwiftCore_LIBRARY_HINTS
+    list(APPEND SwiftCore_LIBRARY_HINTS
       "${Swift_SDKROOT}/usr/lib/swift/android/${SwiftCore_ARCH_SUBDIR}"
       "${Swift_SDKROOT}/usr/lib/swift"
       "$ENV{SDKROOT}/usr/lib/swift/android/${SwiftCore_ARCH_SUBDIR}"
       "$ENV{SDKROOT}/usr/lib/swift")
+    list(APPEND SwiftCore_NAMES libswiftCore.so)
   endif()
 else()
   message(FATAL_ERROR "FindSwiftCore.cmake module search not implemented for targeted platform\n"
@@ -108,23 +121,22 @@ endif()
 
 find_path(SwiftCore_INCLUDE_DIR
   "Swift.swiftmodule"
-  ${NO_CMAKE_FIND_ROOT_PATH_KEYWORD}
+  NO_CMAKE_FIND_ROOT_PATH
   HINTS
     ${SwiftCore_INCLUDE_DIR_HINTS})
 find_library(SwiftCore_LIBRARY
   NAMES
-    "libswiftCore.tbd"
-    "libswiftCore.lib"
-    "libswiftCore.a"
-    "libswiftCore.so"
-  ${NO_CMAKE_FIND_ROOT_PATH_KEYWORD}
+    ${SwiftCore_NAMES}
+  NO_CMAKE_FIND_ROOT_PATH
   HINTS
     ${SwiftCore_LIBRARY_HINTS})
-if(NOT APPLE AND NOT BUILD_SHARED_LIBS)
-  add_library(swiftCore STATIC IMPORTED GLOBAL)
+
+if(SwiftCore_USE_STATIC_LIBS)
+  set(SwiftCore_SHARED_OR_STATIC STATIC)
 else()
-  add_library(swiftCore SHARED IMPORTED GLOBAL)
+  set(SwiftCore_SHARED_OR_STATIC SHARED)
 endif()
+add_library(swiftCore ${SwiftCore_SHARED_OR_STATIC} IMPORTED GLOBAL)
 
 set_target_properties(swiftCore PROPERTIES
   INTERFACE_INCLUDE_DIRECTORIES "${SwiftCore_INCLUDE_DIR}")
