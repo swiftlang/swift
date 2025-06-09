@@ -273,10 +273,11 @@ static Flags getMethodDescriptorFlags(ValueDecl *fn) {
       return {Flags::Kind::ModifyCoroutine, false};
     case AccessorKind::Modify2:
       return {Flags::Kind::ModifyCoroutine, true};
+    case AccessorKind::DistributedGet:
+      return {Flags::Kind::Getter, false};
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
 #define ACCESSOR(ID) \
     case AccessorKind::ID:
-    case AccessorKind::DistributedGet:
 #include "swift/AST/AccessorKinds.def"
       llvm_unreachable("these accessors never appear in protocols or v-tables");
     }
@@ -1069,13 +1070,6 @@ namespace {
       }
 
       for (auto &entry : pi.getWitnessEntries()) {
-        if (entry.isFunction() &&
-            entry.getFunction().getDecl()->isDistributedGetAccessor()) {
-          // We avoid emitting _distributed_get accessors, as they cannot be
-          // referred to anyway
-          continue;
-        }
-
         if (Resilient) {
           if (entry.isFunction()) {
             // Define the method descriptor.
