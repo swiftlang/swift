@@ -12,7 +12,7 @@
 ///
 /// SIL operates on three kinds of addressable memory:
 ///
-/// 1. Temporary RValues. These are recognied by AddressInitializationWalker. These largely disappear with opaque SIL
+/// 1. Temporary RValues. These are recognized by AddressInitializationWalker. These largely disappear with opaque SIL
 /// values.
 ///
 /// 2. Local variables. These are always introduced by either a VarDeclInstruction or a Function argument with non-nil
@@ -774,7 +774,7 @@ extension LocalVariableReachableAccess {
 
   /// This performs a forward CFG walk to find all uses of this local variable reachable after `begin`.
   ///
-  /// If `lifetime` is true, then this gathers the full known lifetime, includeing destroys and reassignments ignoring
+  /// If `lifetime` is true, then this gathers the full known lifetime, including destroys and reassignments ignoring
   /// escapes.
   ///
   /// If `lifetime` is false, then this returns `false` if the walk ended early because of a reachable escape.

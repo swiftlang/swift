@@ -666,7 +666,7 @@ extension ScopeExtension {
 
     log("Scope fixup for dependent uses:\n\(useRange)")
 
-    // Lifetime dependenent uses may not be dominated by `innermostScope`. The dependent value may be used by a phi or
+    // Lifetime dependent uses may not be dominated by `innermostScope`. The dependent value may be used by a phi or
     // stored into a memory location. The access may be conditional relative to such uses. If any use was not dominated,
     // then `useRange` will include the function entry. There is no way to directly check if `useRange` is
     // valid. `useRange.blockRange.isValid` is not a strong enough check because it will always succeed when
@@ -695,12 +695,12 @@ extension ScopeExtension {
     var extendedUseRange = InstructionRange(begin: useRange.begin!, ends: useRange.ends, context)
 
     // Insert the first instruction of the exit blocks to mimic `useRange`. There is no way to directly copy
-    // `useRange`. Inserting the exit block instructions is innacurate, but for the purpose of canExtend() below, it has
+    // `useRange`. Inserting the exit block instructions is inaccurate, but for the purpose of canExtend() below, it has
     // the same effect as a copy of `useRange`.
     extendedUseRange.insert(contentsOf: useRange.exits)
     defer { extendedUseRange.deinitialize() }
 
-    // Append each scope that needs extention to scopesToExtend from the inner to the outer scope.
+    // Append each scope that needs extension to scopesToExtend from the inner to the outer scope.
     for extScope in scopes.reversed() {
       // An outer scope might not originally cover one of its inner scopes. Therefore, extend 'extendedUseRange' to to
       // cover this scope's end instructions. The extended scope must at least cover the original scopes because the
