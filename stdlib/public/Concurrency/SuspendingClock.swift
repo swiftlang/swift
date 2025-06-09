@@ -88,6 +88,7 @@ extension SuspendingClock: Clock {
   }
 
   /// The suspending clock is monotonic
+  @_spi(CustomDefaultExecutors)
   @available(StdlibDeploymentTarget 6.2, *)
   public var traits: ClockTraits {
     return [.monotonic]

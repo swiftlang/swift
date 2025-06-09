@@ -14,6 +14,8 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: freestanding
 
+@_spi(CustomDefaultExecutors) import _Concurrency
+
 @available(SwiftStdlib 6.2, *)
 final class IsIsolatingExecutor: SerialExecutor {
   init() {}

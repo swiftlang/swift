@@ -101,6 +101,7 @@ extension ContinuousClock: Clock {
   }
 
   /// The continuous clock is continuous and monotonic
+  @_spi(CustomDefaultExecutors)
   @available(StdlibDeploymentTarget 6.2, *)
   public var traits: ClockTraits {
     return [.continuous, .monotonic]

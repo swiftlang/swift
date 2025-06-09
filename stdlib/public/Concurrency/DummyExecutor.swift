@@ -14,6 +14,7 @@ import Swift
 
 // .. Main Executor ............................................................
 
+@_spi(CustomDefaultExecutors)
 @available(SwiftStdlib 6.2, *)
 public final class DummyMainExecutor: MainExecutor, @unchecked Sendable {
   public init() {}
@@ -45,6 +46,7 @@ public final class DummyMainExecutor: MainExecutor, @unchecked Sendable {
 
 // .. Task Executor ............................................................
 
+@_spi(CustomDefaultExecutors)
 @available(SwiftStdlib 6.2, *)
 public final class DummyTaskExecutor: TaskExecutor, @unchecked Sendable {
   public init() {}

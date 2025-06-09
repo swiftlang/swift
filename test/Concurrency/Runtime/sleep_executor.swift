@@ -12,6 +12,7 @@
 
 import Dispatch
 import StdlibUnittest
+@_spi(CustomDefaultExecutors) import _Concurrency
 
 @available(SwiftStdlib 6.2, *)
 actor MyActor {

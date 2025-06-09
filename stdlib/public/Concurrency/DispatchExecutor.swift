@@ -23,6 +23,7 @@ import Swift
 
 // .. Main Executor ............................................................
 
+@_spi(CustomDefaultExecutors)
 @available(StdlibDeploymentTarget 6.2, *)
 public class DispatchMainExecutor: RunLoopExecutor, @unchecked Sendable {
   var threaded = false
@@ -43,6 +44,7 @@ public class DispatchMainExecutor: RunLoopExecutor, @unchecked Sendable {
   }
 }
 
+@_spi(CustomDefaultExecutors)
 @available(StdlibDeploymentTarget 6.2, *)
 extension DispatchMainExecutor: SerialExecutor {
 
@@ -57,6 +59,7 @@ extension DispatchMainExecutor: SerialExecutor {
   }
 }
 
+@_spi(CustomDefaultExecutors)
 @available(StdlibDeploymentTarget 6.2, *)
 extension DispatchMainExecutor: SchedulableExecutor {
   public var asSchedulable: SchedulableExecutor? {
@@ -85,11 +88,13 @@ extension DispatchMainExecutor: SchedulableExecutor {
   }
 }
 
+@_spi(CustomDefaultExecutors)
 @available(StdlibDeploymentTarget 6.2, *)
 extension DispatchMainExecutor: MainExecutor {}
 
 // .. Task Executor ............................................................
 
+@_spi(CustomDefaultExecutors)
 @available(StdlibDeploymentTarget 6.2, *)
 public class DispatchGlobalTaskExecutor: TaskExecutor, SchedulableExecutor,
                                          @unchecked Sendable {
@@ -201,10 +206,12 @@ extension DispatchExecutorProtocol {
 
 }
 
+@_spi(CustomDefaultExecutors)
 @available(StdlibDeploymentTarget 6.2, *)
 extension DispatchGlobalTaskExecutor: DispatchExecutorProtocol {
 }
 
+@_spi(CustomDefaultExecutors)
 @available(StdlibDeploymentTarget 6.2, *)
 extension DispatchMainExecutor: DispatchExecutorProtocol {
 }
