@@ -301,11 +301,11 @@ extension RawSpan {
   @lifetime(borrow pointer)
   public init<T: BitwiseCopyable>(
     _unsafeStart pointer: UnsafePointer<T>,
-    byteCount: Int
+    count: Int
   ) {
-    _precondition(byteCount >= 0, "Count must not be negative")
+    _precondition(count >= 0, "Count must not be negative")
     unsafe self.init(
-      _unchecked: pointer, byteCount: byteCount * MemoryLayout<T>.stride
+      _unchecked: pointer, byteCount: count * MemoryLayout<T>.stride
     )
   }
 
