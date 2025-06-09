@@ -340,6 +340,29 @@ where
   {
     return (lhs * rhs, { (dx, dy) in dx * rhs + dy * lhs })
   }
+
+  @usableFromInline
+  @derivative(of: *=)
+  static func _vjpMultiplyAssign(_ lhs: inout Self, _ rhs: Self) -> (
+    value: Void, pullback: (inout Self) -> Self)
+  {
+    defer { lhs *= rhs }
+    return ((), { [lhs = lhs] v in
+      let drhs = lhs * v
+      v *= rhs
+      return drhs
+    })
+  }
+
+  @usableFromInline
+  @derivative(of: *=)
+  static func _jvpMultiplyAssign(_ lhs: inout Self, _ rhs: Self) -> (
+    value: Void, differential: (inout Self, Self) -> Void)
+  {
+    let oldLhs = lhs
+    lhs *= rhs
+    return ((), { $0 = $0 * rhs + oldLhs * $1 })
+  }
 }
 
 extension ${Self}
