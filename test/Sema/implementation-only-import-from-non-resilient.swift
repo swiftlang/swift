@@ -9,6 +9,8 @@
 
 /// Build a client with and without library-evolution.
 // RUN: %target-swift-frontend -typecheck %t/client-non-resilient.swift -I %t -verify
+// RUN: %target-swift-frontend -typecheck %t/client-non-resilient.swift -I %t -verify \
+// RUN:   -warnings-as-errors -Wwarning ImplementationOnlyDeprecated
 // RUN: %target-swift-frontend -typecheck %t/client-resilient.swift -I %t -verify \
 // RUN:   -enable-library-evolution -swift-version 5
 
