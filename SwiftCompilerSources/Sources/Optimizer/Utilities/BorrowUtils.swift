@@ -465,7 +465,7 @@ func computeBorrowLiveRange(for value: Value, _ context: FunctionPassContext)
   for beginBorrow in value.getBorrowIntroducers(context) {
     /// FIXME: Remove calls to computeKnownLiveness() as soon as lifetime completion runs immediately after
     /// SILGen. Instead, this should compute linear liveness for borrowed value by switching over BeginBorrowValue, just
-    /// like LifetimeDependenc.Scope.computeRange().
+    /// like LifetimeDependence.Scope.computeRange().
     ranges.push((beginBorrow, computeKnownLiveness(for: beginBorrow.value, context)))
   }
   return ranges

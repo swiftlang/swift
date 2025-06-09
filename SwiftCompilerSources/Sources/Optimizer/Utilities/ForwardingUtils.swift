@@ -303,7 +303,7 @@ extension ForwardingDefUseWalker {
 /// gatherLifetimeIntroducers().
 ///
 /// TODO: make the visitor non-escaping once Swift supports stored
-/// non-escaping closues.
+/// non-escaping closures.
 func visitForwardedUses(introducer: Value, _ context: Context,
   visitor: @escaping (ForwardingUseResult) -> WalkResult)
 -> WalkResult {

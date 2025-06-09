@@ -248,7 +248,7 @@ private func removeBridgingCodeInPredecessors(of block: BasicBlock, _ context: F
 /// ```
 ///   switch_enum %0             // returned instruction
 /// some_bb(%1):
-///   %2 = enum #some(%1)        // only in case of ObjC -> Swift briding
+///   %2 = enum #some(%1)        // only in case of ObjC -> Swift bridging
 ///   %3 = apply %bridging(%2)   // returned by `isBridging`
 ///   %4 = enum #some(%3)
 ///   br continue_bb(%4)
@@ -338,7 +338,7 @@ func isBridgeToSwiftCall(_ value: Value) -> ApplyInst? {
   let funcName = bridgingFunc.name
   guard  bridgingFunc.hasSemanticsAttribute("bridgeFromObjectiveC") ||
          // Currently the semantics attribute is not used, so test for specific functions, too.
-         // TODO: remove those checks once the briding functions are annotate with "bridgeFromObjectiveC"
+         // TODO: remove those checks once the bridging functions are annotated with "bridgeFromObjectiveC"
          //       in Foundation.
          //
          // String._unconditionallyBridgeFromObjectiveC(_:)
