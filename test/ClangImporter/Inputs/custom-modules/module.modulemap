@@ -275,3 +275,7 @@ module CommonName {
 module "Weird C Module" {
   header "WeirdCModule.h"
 }
+
+module Aliases {
+  header "Aliases.h"
+}
