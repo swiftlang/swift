@@ -288,7 +288,7 @@ extension RawSpan {
 
   /// Unsafely create a `RawSpan` over initialized memory.
   ///
-  /// The region of memory representing `count` bytes starting at `pointer`
+  /// The region of memory representing `count` elements starting at `pointer`
   /// must remain valid, initialized and immutable
   /// throughout the lifetime of the newly-created `RawSpan`.
   /// Failure to maintain this invariant results in undefined behaviour.
