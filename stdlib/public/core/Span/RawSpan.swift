@@ -664,14 +664,14 @@ extension RawSpan {
     unsafe (self._pointer == other._pointer) && (self._count == other._count)
   }
 
-  /// Returns the offsets where the memory of `span` is located within
+  /// Returns the offsets where the memory of `other` is located within
   /// the memory represented by `self`
   ///
-  /// Note: `span` must be a subrange of `self`
+  /// Note: `other` must be a subrange of `self`
   ///
-  /// Parameters:
-  /// - span: a subrange of `self`
-  /// Returns: A range of offsets within `self`
+  /// - Parameters:
+  ///   - other: a subrange of `self`
+  /// - Returns: A range of offsets within `self`
   @_alwaysEmitIntoClient
   public func byteOffsets(of other: borrowing Self) -> Range<Int>? {
     if other._count > _count { return nil }
