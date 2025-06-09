@@ -28,6 +28,21 @@ using namespace symbolgraphgen;
 
 namespace {
 
+/// Get the fully-qualified module name of the given `ModuleDecl` as a `std::string`.
+///
+/// For example, if `M` is a submodule of `ParentModule` named `SubModule`,
+/// this function would return `"ParentModule.SubModule"`.
+std::string getFullModuleName(const ModuleDecl *M) {
+  if (!M) return {};
+
+  std::string S;
+  llvm::raw_string_ostream OS(S);
+
+  M->getReverseFullModuleName().printForward(OS);
+
+  return S;
+}
+
 /// Compare the two \c ModuleDecl instances to see whether they are the same.
 ///
 /// This does a by-name comparison to consider a module's underlying Clang module to be equivalent
@@ -36,7 +51,7 @@ namespace {
 /// If the `isClangEqual` argument is set to `false`, the modules must also be from the same
 /// compiler, i.e. a Swift module and its underlying Clang module would be considered not equal.
 bool areModulesEqual(const ModuleDecl *lhs, const ModuleDecl *rhs, bool isClangEqual = true) {
-  if (lhs->getNameStr() != rhs->getNameStr())
+  if (getFullModuleName(lhs) != getFullModuleName(rhs))
     return false;
 
   if (!isClangEqual && (lhs->isNonSwiftModule() != rhs->isNonSwiftModule()))
