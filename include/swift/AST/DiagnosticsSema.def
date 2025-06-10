@@ -1248,11 +1248,13 @@ ERROR(module_not_compiled_with_library_evolution,none,
       "module %0 was not compiled with library evolution support; "
       "using it means binary compatibility for %1 can't be guaranteed",
       (Identifier, Identifier))
-WARNING(implementation_only_requires_library_evolution,none,
+GROUPED_WARNING(implementation_only_requires_library_evolution,
+        ImplementationOnlyDeprecated,none,
         "using '@_implementationOnly' without enabling library evolution "
         "for %0 may lead to instability during execution",
         (Identifier))
-WARNING(implementation_only_deprecated,none,
+GROUPED_WARNING(implementation_only_deprecated,
+        ImplementationOnlyDeprecated,none,
         "'@_implementationOnly' is deprecated, use 'internal import' instead",
         ())
 
