@@ -155,6 +155,10 @@ add_custom_command_target(unused_var
 
 add_dependencies(copy_shim_headers symlink_clang_headers_static)
 
+# Add dependency to ensure that the static headers are installed. This is needed because no target
+# depends on the static headers, so they would not be installed otherwise.
+add_dependencies(symlink_clang_headers symlink_clang_headers_static)
+
 if(NOT SWIFT_BUILT_STANDALONE)
   if(TARGET clang-resource-headers) # LLVM > 8
     set(clang_resource_headers clang-resource-headers)
