@@ -104,7 +104,7 @@ bool DerivedConformance::derivesProtocolConformance(
   if (*derivableKind == KnownDerivableProtocolKind::DistributedActor)
     return canDeriveDistributedActor(Nominal, DC);
   if (*derivableKind == KnownDerivableProtocolKind::DistributedActorSystem)
-    return canDeriveDistributedActorSystem(Nominal, DC);
+    return canDeriveDistributedActorSystem(Conformance);
 
   if (*derivableKind == KnownDerivableProtocolKind::AdditiveArithmetic)
     return canDeriveAdditiveArithmetic(Nominal, DC);
