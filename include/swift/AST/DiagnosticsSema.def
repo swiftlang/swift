@@ -5138,6 +5138,9 @@ ERROR(assignment_bang_has_immutable_subcomponent,none,
 NOTE(candidate_is_not_assignable,none,
      "candidate is not assignable: %kind0",
      (const ValueDecl *))
+NOTE(candidate_expects_inout_argument,none,
+     "candidate expects in-out value for parameter #%0 but argument is immutable",
+     (unsigned))
 
 NOTE(change_to_mutating,none,
      "mark %select{method|%1}0 'mutating' to make 'self' mutable",
