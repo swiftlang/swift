@@ -2766,9 +2766,9 @@ NOTE(non_sendable_nominal,none,
 NOTE(add_nominal_sendable_conformance,none,
      "consider making %kind0 conform to the 'Sendable' protocol",
      (const ValueDecl *))
-NOTE(add_generic_parameter_sendable_conformance,none,
-     "consider making generic parameter %0 conform to the 'Sendable' protocol",
-     (Type))
+NOTE(add_generic_parameter_conformance,none,
+     "consider making generic parameter %0 conform to the %1 protocol",
+     (Type, ProtocolDecl *))
 WARNING(add_predates_concurrency_import,none,
      "add '@preconcurrency' to %select{suppress|treat}0 "
      "'Sendable'-related %select{warnings|errors}0 from module %1"
@@ -5895,6 +5895,8 @@ ERROR(concurrent_value_inherit,none,
       (bool, DeclName))
 ERROR(non_sendable_type,none,
       "type %0 does not conform to the 'Sendable' protocol", (Type))
+GROUPED_ERROR(non_sendable_metatype_type,SendableMetatypes,none,
+      "type %0 does not conform to the 'SendableMetatype' protocol", (Type))
 ERROR(sendable_raw_storage,none,
       "struct %0 with '@_rawLayout' does not conform to the 'Sendable' "
       "protocol", (DeclName))

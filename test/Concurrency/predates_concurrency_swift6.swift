@@ -323,3 +323,18 @@ do {
     case test(NS) // expected-warning {{associated value 'test' of 'Sendable'-conforming enum 'E' has non-Sendable type 'NS'}}
   }
 }
+
+func testSendableMetatypeDowngrades() {
+  @preconcurrency
+  func acceptsSendableMetatype<T: SendableMetatype>(_: T.Type) {}
+  func acceptsSendableMetatypeStrict<T: SendableMetatype>(_: T.Type) {}
+
+  func testWarning<T>(t: T.Type) { // expected-note 2 {{consider making generic parameter 'T' conform to the 'SendableMetatype' protocol}} {{21-21=: SendableMetatype}}
+    acceptsSendableMetatype(t) // expected-warning {{type 'T' does not conform to the 'SendableMetatype' protocol}}
+    acceptsSendableMetatypeStrict(t) // expected-error {{type 'T' does not conform to the 'SendableMetatype' protocol}}
+  }
+
+  func testOK<T: P>(t: T.Type) {
+    acceptsSendableMetatype(t) // Ok (because P is `Sendable`
+  }
+}
