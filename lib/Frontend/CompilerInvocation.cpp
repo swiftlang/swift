@@ -798,6 +798,8 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
                                             std::string(Value));
   }
 
+  Opts.ImportModuleFromCAS |= Args.hasArg(OPT_module_import_from_cas);
+
   if (auto *A = Args.getLastArg(OPT_clang_include_tree_root))
     Opts.ClangIncludeTree = A->getValue();
   if (auto *A = Args.getLastArg(OPT_clang_include_tree_filelist))

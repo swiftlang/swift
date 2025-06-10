@@ -244,6 +244,9 @@ def module_can_import_version: MultiArg<["-"], "module-can-import-version", 3>,
   MetaVarName<"<moduleName> <version> <underlyingVersion>">,
   HelpText<"Specify canImport module and versions">;
 
+def module_import_from_cas: Flag<["-"], "module-import-from-cas">,
+  HelpText<"Import modules from CAS instead of file system">;
+
 def disable_cross_import_overlay_search: Flag<["-"], "disable-cross-import-overlay-search">,
   HelpText<"Disable searching for cross import overlay file">;
 
