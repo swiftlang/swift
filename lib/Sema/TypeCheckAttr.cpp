@@ -7845,10 +7845,10 @@ void AttributeChecker::visitInheritActorContextAttr(
         .warnUntilFutureSwiftVersion();
   }
 
-  // Eiether `async` or `@isolated(any)`.
+  // Either `async` or `@isolated(any)`.
   if (!(funcTy->isAsync() || funcTy->getIsolation().isErased())) {
-    diagnose(
-        attr->getLocation(),
+    diagnoseAndRemoveAttr(
+        attr,
         diag::inherit_actor_context_only_on_async_or_isolation_erased_params,
         attr)
         .warnUntilFutureSwiftVersion();
