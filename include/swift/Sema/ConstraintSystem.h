@@ -102,9 +102,7 @@ enum class FreeTypeVariableBinding {
   /// Disallow any binding of such free type variables.
   Disallow,
   /// Allow the free type variables to persist in the solution.
-  Allow,
-  /// Bind the type variables to UnresolvedType to represent the ambiguity.
-  UnresolvedType
+  Allow
 };
 
 /// Describes whether or not a result builder method is supported.
