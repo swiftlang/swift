@@ -874,12 +874,7 @@ include(CMakePushCheckState)
 
 # Print out path and version of any installed commands
 message(STATUS "CMake (${CMAKE_COMMAND}) Version: ${CMAKE_VERSION}")
-if(XCODE)
-  set(version_flag -version)
-else()
-  set(version_flag --version)
-endif()
-execute_process(COMMAND ${CMAKE_MAKE_PROGRAM} ${version_flag}
+execute_process(COMMAND ${CMAKE_MAKE_PROGRAM} --version
   OUTPUT_VARIABLE _CMAKE_MAKE_PROGRAM_VERSION
   OUTPUT_STRIP_TRAILING_WHITESPACE)
 message(STATUS "CMake Make Program (${CMAKE_MAKE_PROGRAM}) Version: ${_CMAKE_MAKE_PROGRAM_VERSION}")
@@ -1146,14 +1141,6 @@ endif()
 #
 # Configure SDKs.
 #
-
-if(XCODE)
-  # FIXME: It used to be the case that Xcode would force
-  # -m${platform}-version-min flags that would conflict with those computed
-  # by build-script. version-min flags are deprecated in favor of -target since
-  # clang-11, so we might be able to undo this.
-  set(SWIFT_SDKS "OSX")
-endif()
 
 # FIXME: the parameters we specify in SWIFT_SDKS are lacking architecture specifics,
 # so we need to hard-code it. For example, the SDK for Android is just 'ANDROID',
@@ -1596,22 +1583,6 @@ add_subdirectory(cmake/modules)
 swift_install_in_component(FILES "LICENSE.txt"
                            DESTINATION "share/swift"
                            COMPONENT license)
-
-# Add a documentation target so that documentation shows up in the
-# Xcode project.
-if(XCODE)
-  add_custom_target(Documentation
-      SOURCES
-        README.md
-        docs)
-
-  file(GLOB SWIFT_TOPLEVEL_HEADERS
-      ${CMAKE_CURRENT_SOURCE_DIR}/include/swift${dir}/*.h
-      ${CMAKE_CURRENT_SOURCE_DIR}/include/swift${dir}/*.td
-      ${CMAKE_CURRENT_SOURCE_DIR}/include/swift${dir}/*.def)
-  add_custom_target(Miscellaneous
-      SOURCES ${SWIFT_TOPLEVEL_HEADERS})
-endif()
 
 # New standard library build
 option(SWIFT_ENABLE_NEW_RUNTIME_BUILD "Build Swift runtimes with new build system" OFF)
