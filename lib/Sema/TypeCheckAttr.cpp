@@ -2367,8 +2367,8 @@ void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
     diagnose(attr->getLocation(), diag::cdecl_not_at_top_level,
              attr);
 
-  // The name must not be empty.
-  if (attr->Name.empty())
+  // @_cdecl name must not be empty.
+  if (attr->Name.empty() && attr->Underscored)
     diagnose(attr->getLocation(), diag::cdecl_empty_name,
              attr);
 

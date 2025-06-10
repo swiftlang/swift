@@ -24,8 +24,7 @@
 // expected-error @-1 {{expected ')' in 'cdecl' attribute}}
 // expected-error @-2 {{expected declaration}}
 
-@cdecl("") // expected-error{{@cdecl symbol name cannot be empty}}
-func emptyName(x: Int) -> Int { return x }
+@cdecl func defaultName() {}
 
 @cdecl("noBody")
 func noBody(x: Int) -> Int // expected-error{{expected '{' in body of function}}
