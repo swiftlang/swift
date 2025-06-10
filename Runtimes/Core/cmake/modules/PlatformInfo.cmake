@@ -1,3 +1,9 @@
+include("${PROJECT_BINARY_DIR}/build/DetectedPlatformInfo.cmake" OPTIONAL)
+
+if(SwiftCore_PLATFORM_INFO_SET)
+  return()
+endif()
+
 if(NOT SwiftCore_SIZEOF_POINTER)
   set(SwiftCore_SIZEOF_POINTER "${CMAKE_SIZEOF_VOID_P}" CACHE STRING "Size of a pointer in bytes")
   message(CONFIGURE_LOG "Stdlib Pointer size: ${CMAKE_SIZEOF_VOID_P}")
@@ -80,3 +86,7 @@ if(SwiftCore_VARIANT_MODULE_TRIPLE)
     message(WARNING "Unknown platform ${platform} for variant availability")
   endif()
 endif()
+
+configure_file("${CMAKE_CURRENT_LIST_DIR}/DetectedPlatformInfo.cmake.in"
+  "${PROJECT_BINARY_DIR}/build/DetectedPlatformInfo.cmake"
+  @ONLY)
