@@ -24,6 +24,7 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Strings.h"
 
@@ -552,6 +553,21 @@ deriveDistributedActorType_ActorSystem(
   return defaultDistributedActorSystemTypeDecl->getDeclaredInterfaceType();
 }
 
+static Type getDistributedActorSystem(DerivedConformance &derived) {
+  auto *assocType = derived.Protocol->getAssociatedType(
+      derived.Context.Id_ActorSystem);
+  if (!assocType)
+    return Type();
+
+  // This is called from inside associated type inference itself, so if we
+  // haven't populate the type witness yet, it won't be found by name
+  // lookup, and calling getTypeWitness() will trigger a request cycle.
+  if (!derived.Conformance->hasTypeWitness(assocType))
+    return Type();
+
+  return derived.Conformance->getTypeWitness(assocType);
+}
+
 static Type
 deriveDistributedActorType_ID(
     DerivedConformance &derived) {
@@ -559,7 +575,7 @@ deriveDistributedActorType_ID(
     return nullptr;
 
   // Look for a type DefaultDistributedActorSystem within the parent context.
-  auto systemTy = getDistributedActorSystemType(derived.Nominal);
+  auto systemTy = getDistributedActorSystem(derived);
 
   // There is no known actor system type, so fail to synthesize.
   if (!systemTy || systemTy->hasError())
@@ -579,7 +595,7 @@ deriveDistributedActorType_SerializationRequirement(
     return nullptr;
 
   // Look for a type DefaultDistributedActorSystem within the parent context.
-  auto systemTy = getDistributedActorSystemType(derived.Nominal);
+  auto systemTy = getDistributedActorSystem(derived);
 
   // There is no known actor system type, so fail to synthesize.
   if (!systemTy || systemTy->hasError())
