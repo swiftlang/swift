@@ -28,7 +28,7 @@
 // CHECK: #endif
 
 // CHECK: /// Enums
-// CHECK: typedef SWIFT_ENUM_NAMED(int, CEnum, "CEnum", closed) {
+// CHECK: typedef SWIFT_ENUM(int, CEnum, closed) {
 // CHECK:   CEnumA = 0,
 // CHECK:   CEnumB = 1,
 // CHECK: };
@@ -84,7 +84,7 @@ func g_nullablePointers(_ x: UnsafeMutableRawPointer,
 
 /// Enums
 
-@cdecl("CEnum")
+@cdecl
 enum CEnum: CInt { case A, B }
 
 @cdecl("CEnumRenamed_CName")
