@@ -319,9 +319,14 @@ clock_and_value_to_time(int clock, long long sec, long long nsec) {
       .tv_sec = sec,
       .tv_nsec = static_cast<long>(nsec)
     };
+#elif defined(__APPLE__)
+    struct timespec ts = { 
+      .tv_sec = static_cast<__darwin_time_t>(sec),
+      .tv_nsec = nsec
+    };
 #else
     struct timespec ts = { 
-      .tv_sec = sec,
+      .tv_sec = static_cast<long>(sec),
       .tv_nsec = nsec
     };
 #endif

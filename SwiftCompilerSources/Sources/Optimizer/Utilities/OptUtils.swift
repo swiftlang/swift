@@ -763,11 +763,14 @@ private struct EscapesToValueVisitor : EscapeVisitor {
 }
 
 extension Function {
+  /// Analyzes the global initializer function and returns global it initializes (from `alloc_global` instruction).
   var initializedGlobal: GlobalVariable? {
-    if !isGlobalInitOnceFunction {
+    guard isGlobalInitOnceFunction,
+          let firstBlock = blocks.first
+    else {
       return nil
     }
-    for inst in entryBlock.instructions {
+    for inst in firstBlock.instructions {
       if let allocGlobal = inst as? AllocGlobalInst {
         return allocGlobal.global
       }
