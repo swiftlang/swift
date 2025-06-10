@@ -51,7 +51,8 @@ getNameForObjC(const ValueDecl *VD, CustomNamesOnly_t customNamesOnly) {
   }
 
   if (auto cdeclAttr = VD->getAttrs().getAttribute<CDeclAttr>())
-    return cdeclAttr->Name;
+    if (!customNamesOnly || !cdeclAttr->Name.empty())
+      return VD->getCDeclName();
 
   if (customNamesOnly)
     return StringRef();

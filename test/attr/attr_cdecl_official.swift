@@ -49,6 +49,8 @@ enum SwiftEnum { case A, B }
 @cdecl("CEnum") enum CEnum: Int { case A, B }
 #endif
 
+@cdecl enum CEnumDefaultName: CInt { case A, B }
+
 @cdecl("CEnumNoRawType") enum CEnumNoRawType { case A, B }
 // expected-error @-1 {{'@cdecl' enum must declare an integer raw type}}
 
