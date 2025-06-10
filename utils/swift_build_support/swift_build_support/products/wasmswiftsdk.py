@@ -69,9 +69,12 @@ class WasmSwiftSDK(product.Product):
             'CMAKE_Swift_COMPILER_TARGET', swift_host_triple)
         swift_testing.cmake_options.define('CMAKE_SYSROOT', wasi_sysroot)
         swift_resource_dir = os.path.join(dest_dir, 'usr', 'lib', 'swift_static')
+        # For statically linked objects in an archive, we have to use singlethreaded
+        # LLVM codegen unit to prevent runtime metadata sections from being stripped
+        # at link-time.
         swift_testing.cmake_options.define(
             'CMAKE_Swift_FLAGS',
-            f'-sdk {wasi_sysroot} -resource-dir {swift_resource_dir}')
+            f'-sdk {wasi_sysroot} -resource-dir {swift_resource_dir} -Xfrontend -enable-single-module-llvm-emission')
         clang_resource_dir = os.path.join(dest_dir, 'usr', 'lib', 'clang')
         swift_testing.cmake_options.define(
             'CMAKE_CXX_FLAGS', f'-resource-dir {clang_resource_dir}')
