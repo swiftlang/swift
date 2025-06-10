@@ -35,6 +35,19 @@
 /// annotated with this macro.
 #define SWIFT_SELF_CONTAINED __attribute__((swift_attr("import_owned")))
 
+/// Specifies that a specific C++ method should be imported as a computed
+/// property. If this macro is specified on a getter, a getter will be
+/// synthesized. If this macro is specified on a setter, both a getter and
+/// setter will be synthesized.
+///
+/// For example:
+///  ```
+///    int getX() SWIFT_COMPUTED_PROPERTY;
+///  ```
+/// Will be imported as `var x: CInt {...}`.
+#define SWIFT_COMPUTED_PROPERTY                                                \
+  __attribute__((swift_attr("import_computed_property")))
+
 #else // #if __has_attribute(swift_attr)
 
 #define SWIFT_SELF_CONTAINED

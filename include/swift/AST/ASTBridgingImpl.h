@@ -43,8 +43,8 @@ swift::Identifier BridgedIdentifier::unbridged() const {
   return swift::Identifier::getFromOpaquePointer(Raw);
 }
 
-bool BridgedIdentifier_isOperator(const BridgedIdentifier ident) {
-  return ident.unbridged().isOperator();
+bool BridgedIdentifier::getIsOperator() const {
+  return unbridged().isOperator();
 }
 
 //===----------------------------------------------------------------------===//
@@ -100,10 +100,6 @@ swift::DeclNameLoc BridgedDeclNameLoc::unbridged() const {
 BridgedASTContext::BridgedASTContext(swift::ASTContext &ctx) : Ctx(&ctx) {}
 
 swift::ASTContext &BridgedASTContext::unbridged() const { return *Ctx; }
-
-void * _Nonnull BridgedASTContext_raw(BridgedASTContext bridged) {
-  return &bridged.unbridged();
-}
 
 BridgedASTContext BridgedASTContext_fromRaw(void * _Nonnull ptr) {
   return *static_cast<swift::ASTContext *>(ptr);
@@ -938,8 +934,8 @@ swift::CaptureListEntry BridgedCaptureListEntry::unbridged() const {
   return swift::CaptureListEntry(PBD);
 }
 
-BridgedVarDecl BridegedCaptureListEntry_getVar(BridgedCaptureListEntry entry) {
-  return entry.unbridged().getVar();
+BridgedVarDecl BridgedCaptureListEntry::getVarDecl() const {
+  return unbridged().getVar();
 }
 
 //===----------------------------------------------------------------------===//
