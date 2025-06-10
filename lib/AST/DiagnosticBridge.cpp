@@ -26,21 +26,6 @@
 using namespace swift;
 
 #if SWIFT_BUILD_SWIFT_SYNTAX
-static BridgedDiagnosticSeverity bridgeDiagnosticSeverity(DiagnosticKind kind) {
-  switch (kind) {
-  case DiagnosticKind::Error:
-    return BridgedDiagnosticSeverity::BridgedError;
-
-  case DiagnosticKind::Warning:
-    return BridgedDiagnosticSeverity::BridgedWarning;
-
-  case DiagnosticKind::Remark:
-    return BridgedDiagnosticSeverity::BridgedRemark;
-
-  case DiagnosticKind::Note:
-    return BridgedDiagnosticSeverity::BridgedNote;
-  }
-}
 
 /// Enqueue a diagnostic with ASTGen's diagnostic rendering.
 static void addQueueDiagnostic(void *queuedDiagnostics,
@@ -52,8 +37,6 @@ static void addQueueDiagnostic(void *queuedDiagnostics,
     DiagnosticEngine::formatDiagnosticText(out, info.FormatString,
                                            info.FormatArgs);
   }
-
-  BridgedDiagnosticSeverity severity = bridgeDiagnosticSeverity(info.Kind);
 
   // Map the highlight ranges.
   SmallVector<BridgedCharSourceRange, 2> highlightRanges;
@@ -72,7 +55,7 @@ static void addQueueDiagnostic(void *queuedDiagnostics,
   swift_ASTGen_addQueuedDiagnostic(
       queuedDiagnostics, perFrontendState,
       text.str(),
-      severity, info.Loc,
+      info.Kind, info.Loc,
       info.Category,
       documentationPath,
       highlightRanges.data(), highlightRanges.size(),
@@ -102,11 +85,9 @@ void DiagnosticBridge::emitDiagnosticWithoutLocation(
                                            info.FormatArgs);
   }
 
-  BridgedDiagnosticSeverity severity = bridgeDiagnosticSeverity(info.Kind);
-
   BridgedStringRef bridgedRenderedString{nullptr, 0};
   swift_ASTGen_renderSingleDiagnostic(
-      perFrontendState, text.str(), severity, info.Category,
+      perFrontendState, text.str(), info.Kind, info.Category,
       llvm::StringRef(info.CategoryDocumentationURL), forceColors ? 1 : 0,
       &bridgedRenderedString);
 
