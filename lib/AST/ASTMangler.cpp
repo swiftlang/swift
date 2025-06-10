@@ -49,6 +49,7 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/AST/Mangle.h"
@@ -3080,7 +3081,7 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl,
 
   auto *nominal = dyn_cast<NominalTypeDecl>(decl);
 
-  if (nominal && isa<BuiltinTupleDecl>(nominal))
+  if (isa_and_nonnull<BuiltinTupleDecl>(nominal))
     return appendOperator("BT");
 
   // Check for certain standard types.
@@ -3131,6 +3132,12 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl,
 
       return false;
     }
+
+    // Mangle `Foo` from `namespace Bar { class Foo; } using Bar::Foo;` the same
+    // way as if we spelled `Bar.Foo` explicitly.
+    if (const auto *usingShadowDecl =
+            dyn_cast<clang::UsingShadowDecl>(namedDecl))
+      namedDecl = usingShadowDecl->getTargetDecl();
 
     // Mangle ObjC classes using their runtime names.
     auto interface = dyn_cast<clang::ObjCInterfaceDecl>(namedDecl);
