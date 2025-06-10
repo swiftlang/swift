@@ -4815,16 +4815,35 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   if (!requirement->isProtocolRequirement())
     return;
 
+  auto &evaluator = getASTContext().evaluator;
+
   // Resolve the type witnesses for all associated types referenced by
   // the requirement. If any are erroneous, don't bother resolving the
   // witness.
-  auto referenced = evaluateOrDefault(getASTContext().evaluator,
+  auto referenced = evaluateOrDefault(evaluator,
                                       ReferencedAssociatedTypesRequest{requirement},
                                       TinyPtrVector<AssociatedTypeDecl *>());
   for (auto assocType : referenced) {
+    // There's a weird cycle break here. If we're in the middle of resolving
+    // type witnesses, we return from here without recording a value witness.
+    // This is handled by not caching the result, and the conformance checker
+    // will then attempt to resolve the value witness later.
+    if (evaluator.hasActiveRequest(TypeWitnessRequest{Conformance, assocType})) {
+      return;
+    }
+
+    if (!Conformance->hasTypeWitness(assocType)) {
+      if (evaluator.hasActiveRequest(ResolveTypeWitnessesRequest{Conformance})) {
+        return;
+      }
+    }
+
     auto typeWitness = Conformance->getTypeWitness(assocType);
     if (!typeWitness)
       return;
+
+    // However, if the type witness was already resolved and it has an error
+    // type, mark the conformance invalid and give up.
     if (typeWitness->hasError()) {
       Conformance->setInvalid();
       return;
