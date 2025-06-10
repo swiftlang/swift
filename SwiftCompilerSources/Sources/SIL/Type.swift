@@ -159,6 +159,9 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     guard let nominal = nominal, !nominal.isResilient(in: function) else {
       return nil
     }
+    if let structDecl = nominal as? StructDecl, structDecl.hasUnreferenceableStorage {
+      return nil
+    }
     return NominalFieldsArray(type: self, function: function)
   }
 
