@@ -1307,7 +1307,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
           if (!clangMangling.empty())
             return clangMangling;
         }
-        return CDeclA->Name.str();
+        return getDecl()->getCDeclName().str();
       }
 
     if (SKind == ASTMangler::SymbolKind::DistributedThunk) {
