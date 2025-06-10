@@ -13,11 +13,12 @@
 #ifndef SWIFT_SIL_LOCATION_H
 #define SWIFT_SIL_LOCATION_H
 
-#include "llvm/ADT/PointerUnion.h"
 #include "swift/AST/ASTNode.h"
-#include "swift/Basic/SourceLoc.h"
-#include "swift/SIL/SILAllocated.h"
 #include "swift/AST/TypeAlignments.h"
+#include "swift/Basic/SourceLoc.h"
+#include "swift/Basic/SwiftBridging.h"
+#include "swift/SIL/SILAllocated.h"
+#include "llvm/ADT/PointerUnion.h"
 
 #include <cstddef>
 #include <type_traits>

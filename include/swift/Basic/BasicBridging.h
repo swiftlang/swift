@@ -38,7 +38,7 @@
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 #include "swift/Basic/BridgedSwiftObject.h"
-#include "swift/Basic/Compiler.h"
+#include "swift/Basic/SwiftBridging.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -53,13 +53,6 @@
 #include "llvm/ADT/APInt.h"
 #include <string>
 #include <vector>
-#endif
-
-// FIXME: We ought to be importing '<swift/bridging>' instead.
-#if __has_attribute(swift_name)
-#define SWIFT_NAME(NAME) __attribute__((swift_name(NAME)))
-#else
-#define SWIFT_NAME(NAME)
 #endif
 
 #if __has_attribute(availability)
