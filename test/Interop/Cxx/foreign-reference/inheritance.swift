@@ -1,8 +1,7 @@
 // REQUIRES: executable_test
-// RUN: %target-run-simple-swift(-cxx-interoperability-mode=default -Xfrontend -disable-availability-checking -I %S/Inputs)
+// RUN: %target-run-simple-swift(-cxx-interoperability-mode=default -Xfrontend -disable-availability-checking -I %S%{fs-sep}Inputs)
 
-// TODO: Fix this lit test failure on windows rdar://145218056
-// XFAIL: OS=windows-msvc
+
 
 import Inheritance
 import StdlibUnittest
