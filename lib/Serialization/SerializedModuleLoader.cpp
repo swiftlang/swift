@@ -373,7 +373,8 @@ SerializedModuleLoaderBase::getMatchingPackageOnlyImportsOfModule(
     if (dotPos != std::string::npos)
       moduleName = moduleName.slice(0, dotPos);
 
-    importedModuleNames.push_back({moduleName.str(), dependency.isExported()});
+    importedModuleNames.push_back({moduleName.str(), dependency.isExported(),
+      dependency.isInternalOrBelow() ? AccessLevel::Internal : AccessLevel::Public});
   }
 
   return importedModuleNames;
@@ -478,8 +479,7 @@ SerializedModuleLoaderBase::getImportsOfModule(
     const ModuleFileSharedCore &loadedModuleFile,
     ModuleLoadingBehavior transitiveBehavior, StringRef packageName,
     bool isTestableImport) {
-  llvm::StringSet<> importedModuleNames;
-  llvm::StringSet<> importedExportedModuleNames;
+  std::vector<ScannerImportStatementInfo> moduleImports;
   std::string importedHeader = "";
   for (const auto &dependency : loadedModuleFile.getDependencies()) {
     if (dependency.isHeader()) {
@@ -513,13 +513,13 @@ SerializedModuleLoaderBase::getImportsOfModule(
     if (moduleName == Ctx.Id_CxxStdlib.str())
       moduleName = "std";
 
-    importedModuleNames.insert(moduleName);
-    if (dependency.isExported())
-      importedExportedModuleNames.insert(moduleName);
+    moduleImports.push_back(ScannerImportStatementInfo(
+        moduleName.str(), dependency.isExported(),
+        dependency.isInternalOrBelow() ? AccessLevel::Internal
+                                       : AccessLevel::Public));
   }
 
-  return SerializedModuleLoaderBase::BinaryModuleImports{importedModuleNames,
-                                                         importedExportedModuleNames,
+  return SerializedModuleLoaderBase::BinaryModuleImports{moduleImports,
                                                          importedHeader};
 }
 
@@ -601,51 +601,33 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
       getImportsOfModule(*loadedModuleFile, ModuleLoadingBehavior::Optional,
                          Ctx.LangOpts.PackageName, isTestableImport);
 
-  auto importedModuleSet = binaryModuleImports->moduleImports;
-  std::vector<ScannerImportStatementInfo> moduleImports;
-  moduleImports.reserve(importedModuleSet.size());
-  llvm::transform(importedModuleSet.keys(), std::back_inserter(moduleImports),
-                  [&binaryModuleImports](llvm::StringRef N) {
-                    return ScannerImportStatementInfo(
-                        N.str(),
-                        binaryModuleImports->exportedModules.contains(N));
-                  });
-
-  auto importedHeader = binaryModuleImports->headerImport;
-  auto &importedOptionalModuleSet = binaryModuleOptionalImports->moduleImports;
-  auto &importedExportedOptionalModuleSet =
-      binaryModuleOptionalImports->exportedModules;
-  std::vector<ScannerImportStatementInfo> optionalModuleImports;
-  for (const auto optionalImportedModule : importedOptionalModuleSet.keys())
-    if (!importedModuleSet.contains(optionalImportedModule))
-      optionalModuleImports.push_back(
-          {optionalImportedModule.str(),
-           importedExportedOptionalModuleSet.contains(optionalImportedModule)});
-
   std::vector<LinkLibrary> linkLibraries;
   {
     linkLibraries.reserve(loadedModuleFile->getLinkLibraries().size());
     llvm::copy(loadedModuleFile->getLinkLibraries(),
                std::back_inserter(linkLibraries));
     if (loadedModuleFile->isFramework())
-      linkLibraries.emplace_back(
-          loadedModuleFile->getName(), LibraryKind::Framework,
-                      loadedModuleFile->isStaticLibrary());
+      linkLibraries.emplace_back(loadedModuleFile->getName(),
+                                 LibraryKind::Framework,
+                                 loadedModuleFile->isStaticLibrary());
   }
 
   // Attempt to resolve the module's defining .swiftinterface path
   std::string definingModulePath =
-       loadedModuleFile->resolveModuleDefiningFilePath(Ctx.SearchPathOpts.getSDKPath());
+      loadedModuleFile->resolveModuleDefiningFilePath(
+          Ctx.SearchPathOpts.getSDKPath());
 
-  std::string userModuleVer = loadedModuleFile->getUserModuleVersion().getAsString();
+  std::string userModuleVer =
+    loadedModuleFile->getUserModuleVersion().getAsString();
   std::vector<serialization::SearchPath> serializedSearchPaths;
   llvm::copy(loadedModuleFile->getSearchPaths(), std::back_inserter(serializedSearchPaths));
-
+  
   // Map the set of dependencies over to the "module dependencies".
   auto dependencies = ModuleDependencyInfo::forSwiftBinaryModule(
-      modulePath.str(), moduleDocPath, sourceInfoPath, moduleImports,
-      optionalModuleImports, linkLibraries, serializedSearchPaths,
-      importedHeader, definingModulePath, isFramework,
+      modulePath.str(), moduleDocPath, sourceInfoPath,
+      binaryModuleImports->moduleImports,
+      binaryModuleOptionalImports->moduleImports, linkLibraries, serializedSearchPaths,
+      binaryModuleImports->headerImport, definingModulePath, isFramework,
       loadedModuleFile->isStaticLibrary(),
       /*module-cache-key*/ "", userModuleVer);
 
