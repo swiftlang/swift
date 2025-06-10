@@ -158,7 +158,7 @@ public enum _DebuggerSupport {
       default:
         return value.map(String.init(reflecting:))
       }
-    case .`class`?:
+    case .`class`?, .foreignReference?:
       switch value {
       case let x as CustomDebugStringConvertible:
         return x.debugDescription
