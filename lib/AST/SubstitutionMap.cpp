@@ -267,6 +267,8 @@ SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
 
   // If the protocol is invertible, fall back to a global lookup instead of
   // evaluating a conformance path, to avoid an infinite substitution issue.
+  //
+  // FIXME: Figure out a more principled way of breaking this cycle.
   if (proto->getInvertibleProtocolKind())
     return swift::lookupConformance(type.subst(*this), proto);
 
