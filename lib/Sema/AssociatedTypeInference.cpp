@@ -597,7 +597,7 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
             checkTypeWitness(memberTypeInContext, assocType, conformance)) {
       nonViable.push_back({typeDecl, checkResult});
     } else {
-      viable.push_back({typeDecl, memberType, nullptr});
+      viable.push_back({typeDecl, memberType});
     }
   }
 

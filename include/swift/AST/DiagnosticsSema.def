@@ -1147,12 +1147,6 @@ ERROR(ambiguous_module_type,none,
 ERROR(use_nonmatching_operator,none,
       "%0 is not a %select{binary|prefix unary|postfix unary}1 operator",
       (DeclNameRef, unsigned))
-ERROR(unsupported_recursion_in_associated_type_reference,none,
-      "unsupported recursion for reference to %kind0 of type %1",
-      (const ValueDecl *, Type))
-ERROR(broken_associated_type_witness,none,
-      "reference to invalid %kind0 of type %1",
-      (const ValueDecl *, Type))
 
 ERROR(unspaced_binary_operator_fixit,none,
       "missing whitespace between %0 and %1 operators",
