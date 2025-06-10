@@ -1,5 +1,5 @@
 // RUN: %target-sil-opt -sil-print-types -update-borrowed-from -test-runner \
-// RUN: -enable-experimental-feature LifetimeDependence \
+// RUN: -enable-experimental-feature Lifetimes \
 // RUN: %s -o /dev/null 2>&1 | %FileCheck %s
 //
 // TODO: when complete lifetime verification become the default for SIL verification,
@@ -7,7 +7,7 @@
 // -disable-ownership-verification
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 
 sil_stage canonical
 
@@ -39,7 +39,7 @@ sil @getC : $@convention(thin) () -> @owned C
 struct NE: ~Escapable {
   var object: C
 
-  @lifetime(borrow object)
+  @_lifetime(borrow object)
   init(object: borrowing C) { self.object = copy object }
 }
 

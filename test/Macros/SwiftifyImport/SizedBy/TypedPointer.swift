@@ -83,7 +83,7 @@ func mutReturnDependence(_ size: CInt, _ ptr: UnsafeMutablePointer<UInt8>) -> Un
 // CHECK-NEXT:     }
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(ptr: copy ptr) @_disfavoredOverload
+// CHECK:      @_alwaysEmitIntoClient @_lifetime(ptr: copy ptr) @_disfavoredOverload
 // CHECK-NEXT: func mutParamNoreturn(_ ptr: inout MutableRawSpan) {
 // CHECK-NEXT:     let size = CInt(exactly: ptr.byteCount)!
 // CHECK-NEXT:     return unsafe ptr.withUnsafeMutableBytes { _ptrPtr in
@@ -91,7 +91,7 @@ func mutReturnDependence(_ size: CInt, _ ptr: UnsafeMutablePointer<UInt8>) -> Un
 // CHECK-NEXT:     }
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(copy ptr) @_disfavoredOverload
+// CHECK:      @_alwaysEmitIntoClient @_lifetime(copy ptr) @_disfavoredOverload
 // CHECK-NEXT: func constReturnDependence(_ ptr: RawSpan) -> RawSpan {
 // CHECK-NEXT:     let size = CInt(exactly: ptr.byteCount)!
 // CHECK-NEXT:     return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: unsafe ptr.withUnsafeBytes { _ptrPtr in
@@ -99,7 +99,7 @@ func mutReturnDependence(_ size: CInt, _ ptr: UnsafeMutablePointer<UInt8>) -> Un
 // CHECK-NEXT:             }, byteCount: Int(size)), copying: ())
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(copy ptr) @lifetime(ptr: copy ptr) @_disfavoredOverload
+// CHECK:      @_alwaysEmitIntoClient @_lifetime(copy ptr) @_lifetime(ptr: copy ptr) @_disfavoredOverload
 // CHECK-NEXT: func mutReturnDependence(_ ptr: inout MutableRawSpan) -> MutableRawSpan {
 // CHECK-NEXT:     let size = CInt(exactly: ptr.byteCount)!
 // CHECK-NEXT:     return unsafe _swiftifyOverrideLifetime(MutableRawSpan(_unsafeStart: unsafe ptr.withUnsafeMutableBytes { _ptrPtr in
