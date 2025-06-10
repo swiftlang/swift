@@ -75,7 +75,7 @@ Register usage
 Stack frame
 ^^^^^^^^^^^
 
-On function entry, ``rsp+8`` is **16-byte aligned**, i.e. the start of the memory
+On function entry, ``rsp+8`` is **16-byte aligned**, that is, the start of the memory
 arguments is 16-byte aligned; the initial stack pointer is shown below as "entry
 ``rsp``",  but a typical non-leaf function will start by doing::
 

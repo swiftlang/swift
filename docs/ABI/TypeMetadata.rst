@@ -12,7 +12,7 @@ including every instantiation of generic types. These metadata records can
 be used by (TODO: reflection and) debugger tools to discover information about
 types. For non-generic nominal types, these metadata records are generated
 statically by the compiler. For instances of generic types, and for intrinsic
-types such as tuples, functions, protocol compositions, etc., metadata records
+types such as tuples, functions, protocol compositions, and so on, metadata records
 are lazily created by the runtime as required. Every type has a unique metadata
 record; two **metadata pointer** values are equal iff the types are equivalent.
 
@@ -143,7 +143,7 @@ contain the following fields:
 Currently we have specialized ABI endpoints to retrieve metadata for functions
 with 0/1/2/3 parameters - `swift_getFunctionTypeMetadata{0|1|2|3}` and the general
 one `swift_getFunctionTypeMetadata` which handles all other function types and
-functions with parameter flags e.g. `(inout Int) -> Void`. Based on the usage
+functions with parameter flags, for example `(inout Int) -> Void`. Based on the usage
 information collected from Swift Standard Library and Overlays as well as Source
 Compatibility Suite it was decided not to have specialized ABI endpoints for
 functions with parameter flags due their minimal use.
@@ -454,7 +454,7 @@ Protocol Conformance Records
 
 A *protocol conformance record* states that a given type conforms to a
 particular protocol. Protocol conformance records are emitted into their own
-section, which is scanned by the Swift runtime when needed (e.g., in response to
+section, which is scanned by the Swift runtime when needed (for example, in response to
 a `swift_conformsToProtocol()` query). Each protocol conformance record
 contains:
 
@@ -517,8 +517,8 @@ A type metadata may be in one of several different dynamic states:
 
 - An **abstract** metadata stores just enough information to allow the
   identity of the type to be recovered: namely, the metadata's kind
-  (e.g. **struct**) and any kind-specific identity information it
-  entails (e.g. the `nominal type descriptor`_ and any generic arguments).
+  (for example, **struct**) and any kind-specific identity information it
+  entails (for example, the `nominal type descriptor`_ and any generic arguments).
 
 - A **layout-complete** metadata additionally stores the components of
   the type's "external layout", necessary to compute the layout of any
@@ -640,7 +640,7 @@ logic, and in practice most metadata will be dynamically complete.
 Note that this rule can be applied without considering the request.
 
 Code outside of the runtime should never attempt to ascertain a
-metadata's current state by inspecting it, e.g. to see if it has a value
+metadata's current state by inspecting it, for example, to see if it has a value
 witness table.  Metadata initialization is not required to use
 synchronization when initializing the metadata record; the necessary
 synchronization is done at a higher level in the structures which record

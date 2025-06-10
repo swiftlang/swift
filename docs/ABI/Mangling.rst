@@ -438,7 +438,7 @@ declarations marked ``private`` declarations will use this mangling; if the
 entity's context is enough to uniquely identify the entity, the simple
 ``identifier`` form is preferred.
 
-Twenty operators of the form 'LA', 'LB', etc. are reserved to described
+Twenty operators of the form 'LA', 'LB', and so on are reserved to described
 entities related to the entity whose name is provided. For example, 'LE' and
 'Le' in the "SC" module are used to represent the structs synthesized by the
 Clang importer for various "error code" enums.
@@ -537,7 +537,7 @@ both circumstances. For example:
     func f5() {}
   }
 
-For intermediate nested types, i.e., those between the top level and the entity,
+For intermediate nested types, that is, those between the top level and the entity,
 any inverses that remain in at the signature of the entity are mangled into
 that entity's generic signature:
 
@@ -1116,7 +1116,7 @@ from any character in a ``<GENERIC-PARAM-COUNT>``.
   retroactive-conformance ::= any-protocol-conformance 'g' INDEX
 
 When a protocol conformance used to satisfy one of a bound generic type's
-generic requirements is retroactive (i.e., it is specified in a module other
+generic requirements is retroactive (that is, it is specified in a module other
 than the module of the conforming type or the conformed-to protocol), it is
 mangled with its offset into the set of conformance requirements, the
 root protocol conformance, and the suffix 'g'.
@@ -1159,7 +1159,7 @@ if the previous character is not an uppercase letter::
   _abc1_def_G2hi       // contains three words 'abc1', 'def' and G2hi
 
 The words of all identifiers, which are encoded in the current mangling are
-enumerated and assigned to a letter: a = first word, b = second word, etc.
+enumerated and assigned to a letter: a = first word, b = second word, and so on.
 
 An identifier containing word substitutions is a sequence of run-length encoded
 sub-strings and references to previously mangled words.
