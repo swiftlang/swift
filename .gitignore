@@ -97,3 +97,4 @@ Runtimes/**/*.inc
 Runtimes/**/*.json
 Runtimes/**/*.modulemap
 Runtimes/**/*.in
+!Runtimes/**/*.cmake.in
