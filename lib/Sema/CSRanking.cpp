@@ -1413,10 +1413,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     auto type1 = types.Type1;
     auto type2 = types.Type2;
 
-    // If either of the types have holes or unresolved type variables, we can't
-    // compare them. `isSubtypeOf` cannot be used with solver-allocated types.
-    if (type1->hasTypeVariableOrPlaceholder() ||
-        type2->hasTypeVariableOrPlaceholder()) {
+    // `isSubtypeOf` cannot be used with solver-allocated types.
+    if (type1->getRecursiveProperties().isSolverAllocated() ||
+        type2->getRecursiveProperties().isSolverAllocated()) {
       identical = false;
       continue;
     }
@@ -1468,12 +1467,15 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // The systems are not considered equivalent.
     identical = false;
 
-    // Archetypes are worse than concrete types
+    // Archetypes are worse than concrete types (i.e. non-placeholder and
+    // non-archetype)
     // FIXME: Total hack.
-    if (type1->is<ArchetypeType>() && !type2->is<ArchetypeType>()) {
+    if (type1->is<ArchetypeType>() && !type2->is<ArchetypeType>() &&
+        !type2->is<PlaceholderType>()) {
       ++score2;
       continue;
-    } else if (type2->is<ArchetypeType>() && !type1->is<ArchetypeType>()) {
+    } else if (type2->is<ArchetypeType>() && !type1->is<ArchetypeType>() &&
+               !type1->is<PlaceholderType>()) {
       ++score1;
       continue;
     }

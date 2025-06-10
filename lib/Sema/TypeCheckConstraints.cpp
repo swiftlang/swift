@@ -1060,9 +1060,10 @@ bool TypeChecker::typesSatisfyConstraint(Type type1, Type type2,
   // avoid lifetime issues for e.g cases where we lazily populate the
   // `ContextSubMap` on `NominalOrBoundGenericNominalType` in the nested arena,
   // since it will be destroyed on leaving.
-  ASSERT(!type1->getRecursiveProperties().isSolverAllocated() &&
-         !type2->getRecursiveProperties().isSolverAllocated() &&
-         "Cannot escape solver-allocated types into a nested ConstraintSystem");
+  CONDITIONAL_ASSERT(
+      !type1->getRecursiveProperties().isSolverAllocated() &&
+      !type2->getRecursiveProperties().isSolverAllocated() &&
+      "Cannot escape solver-allocated types into a nested ConstraintSystem");
 
   ConstraintSystem cs(dc, ConstraintSystemOptions());
   if (openArchetypes) {
