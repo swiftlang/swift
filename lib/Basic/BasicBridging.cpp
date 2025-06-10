@@ -75,13 +75,13 @@ void BridgedOwnedString::destroy() const {
 }
 
 //===----------------------------------------------------------------------===//
-// MARK: Data
+// MARK: BridgedData
 //===----------------------------------------------------------------------===//
 
-void BridgedData_free(BridgedData data) {
-  if (data.BaseAddress == nullptr)
+void BridgedData::free() const {
+  if (BaseAddress == nullptr)
     return;
-  free(const_cast<char *>(data.BaseAddress));
+  ::free(const_cast<char *>(BaseAddress));
 }
 
 //===----------------------------------------------------------------------===//
