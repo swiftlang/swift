@@ -33,6 +33,10 @@ func a0_simple(x: Int, bar y: Int) -> Int { return x }
 // CHECK-LABEL: // My documentation
 // CHECK-LABEL: SWIFT_EXTERN ptrdiff_t simple(ptrdiff_t x, ptrdiff_t y) SWIFT_NOEXCEPT SWIFT_WARN_UNUSED_RESULT;
 
+@cdecl
+func a1_defaultName(x: Int) -> Int { return x }
+// CHECK-LABEL: SWIFT_EXTERN ptrdiff_t a1_defaultName(ptrdiff_t x) SWIFT_NOEXCEPT SWIFT_WARN_UNUSED_RESULT;
+
 @cdecl("primitiveTypes")
 public func b_primitiveTypes(i: Int, ci: CInt, l: CLong, c: CChar, f: Float, d: Double, b: Bool) {}
 // CHECK-LABEL: SWIFT_EXTERN void primitiveTypes(ptrdiff_t i, int ci, long l, char c, float f, double d, bool b) SWIFT_NOEXCEPT;
