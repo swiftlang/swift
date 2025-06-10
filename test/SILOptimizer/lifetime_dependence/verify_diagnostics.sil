@@ -3,11 +3,11 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name Swift \
-// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -o /dev/null
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 
 // Verify diagnostics from the LifetimeDependenceDiagnostics pass.
 
@@ -25,7 +25,7 @@ struct NE : ~Escapable {}
 struct NEObject : ~Escapable {
   var c: C
 
-  @lifetime(immortal)
+  @_lifetime(immortal)
   init()
 }
 

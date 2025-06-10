@@ -1387,7 +1387,7 @@ func getReturnLifetimeAttribute(
     .attribute(
       AttributeSyntax(
         atSign: .atSignToken(),
-        attributeName: IdentifierTypeSyntax(name: "lifetime"),
+        attributeName: IdentifierTypeSyntax(name: "_lifetime"),
         leftParen: .leftParenToken(),
         arguments: .argumentList(LabeledExprListSyntax(args)),
         rightParen: .rightParenToken()))
@@ -1445,7 +1445,7 @@ func containsLifetimeAttr(_ attrs: AttributeListSyntax, for paramName: TokenSynt
     guard let attr = elem.as(AttributeSyntax.self) else {
       continue
     }
-    if attr.attributeName != "lifetime" {
+    if attr.attributeName != "_lifetime" {
       continue
     }
     guard let args = attr.arguments?.as(LabeledExprListSyntax.self) else {
@@ -1479,7 +1479,7 @@ func paramLifetimeAttributes(
       .attribute(
         AttributeSyntax(
           atSign: .atSignToken(),
-          attributeName: IdentifierTypeSyntax(name: "lifetime"),
+          attributeName: IdentifierTypeSyntax(name: "_lifetime"),
           leftParen: .leftParenToken(),
           arguments: .argumentList(LabeledExprListSyntax([LabeledExprSyntax(expression: expr)])),
           rightParen: .rightParenToken())))
