@@ -19,6 +19,7 @@
 // Pure bridging mode does not permit including any C++/llvm/swift headers.
 // See also the comments for `BRIDGING_MODE` in the top-level CMakeLists.txt file.
 //
+#include "swift/AST/DiagnosticKind.h"
 #include "swift/Basic/BasicBridging.h"
 
 #ifdef USED_IN_CPP_SOURCE
@@ -565,15 +566,6 @@ public:
   BridgedDiagnosticFixIt(BridgedSourceLoc start, uint32_t length, BridgedStringRef text);
 };
 
-/// Diagnostic severity when reporting diagnostics.
-enum ENUM_EXTENSIBILITY_ATTR(open) BridgedDiagnosticSeverity : size_t {
-  BridgedFatalError,
-  BridgedError,
-  BridgedWarning,
-  BridgedRemark,
-  BridgedNote,
-};
-
 class BridgedDiagnostic {
 public:
   struct Impl;
@@ -612,7 +604,7 @@ bool BridgedDiagnosticEngine_hadAnyError(BridgedDiagnosticEngine);
 SWIFT_NAME("BridgedDiagnostic.init(at:message:severity:engine:)")
 BridgedDiagnostic BridgedDiagnostic_create(BridgedSourceLoc cLoc,
                                            BridgedStringRef cText,
-                                           BridgedDiagnosticSeverity severity,
+                                           swift::DiagnosticKind severity,
                                            BridgedDiagnosticEngine cDiags);
 
 /// Highlight a source range as part of the diagnostic.
