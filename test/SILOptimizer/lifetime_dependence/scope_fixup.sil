@@ -72,6 +72,9 @@ sil @useNE : $@convention(thin) (@guaranteed NE) -> ()
 
 sil [ossa] @Wrapper_init : $@convention(method) (@owned NE, @thin Wrapper.Type) -> @lifetime(copy 0) @owned Wrapper
 
+sil @yieldWrapper : $@yield_once @convention(method) (@guaranteed NCContainer) -> @lifetime(borrow 0) @yields @guaranteed Wrapper
+sil @yieldNE : $@yield_once @convention(method) (@guaranteed Wrapper) -> @lifetime(copy 0) @yields @guaranteed NE
+
 sil [ossa] @NCContainer_ne_read : $@yield_once @convention(method) (@guaranteed NCContainer) -> @lifetime(borrow 0) @yields @guaranteed NE
 
 sil @yieldRawSpan : $@yield_once @convention(method) (@in_guaranteed A) -> @lifetime(borrow address_for_deps 0) @yields @guaranteed RawSpan
@@ -553,4 +556,60 @@ bb0(%0 : $*Holder):
   %md = mark_dependence [unresolved] %ne on %access
   destroy_value %holder
   return %md
+}
+
+// Test a nested dependent coroutine. The inner coroutine yields a
+// value (NE) that inherits its dependency from the outer yield
+// (Wrapper). All copies of the inner yield must be used within the
+// scope of the outer coroutine. The outer end_apply must be extended
+// below the call to 'useNE'.
+//
+// CHECK-LABEL: sil hidden [ossa] @testCopiedYield : $@convention(thin) (@owned NCContainer) -> () {
+// CHECK: bb0(%0 : @owned $NCContainer):
+// CHECK:   [[BOX:%[0-9]+]] = alloc_box ${ var NCContainer }, var, name "nc"
+// CHECK:   [[ACCESS:%[0-9]+]] = begin_access [read] [unknown]
+// CHECK:   [[LB:%[0-9]+]] = load_borrow [unchecked]
+// CHECK:   ([[YIELD:%[0-9]+]], [[TOKEN:%[0-9]+]]) = begin_apply %7(%6) : $@yield_once @convention(method) (@guaranteed NCContainer) -> @lifetime(borrow 0) @yields @guaranteed Wrapper
+// CHECK:   mark_dependence [unresolved] [[YIELD]] on [[TOKEN]]
+// CHECK:   ([[NE:%[0-9]+]], %{{.*}}) = begin_apply %13(%12) : $@yield_once @convention(method) (@guaranteed Wrapper) -> @lifetime(copy 0) @yields @guaranteed NE
+// CHECK:   destroy_value
+// CHECK:   apply %{{.*}}(%{{.*}}) : $@convention(thin) (@guaranteed NE) -> ()
+// CHECK:   destroy_value %{{.*}}
+// CHECK:   end_apply [[TOKEN]] as $()
+// CHECK:   end_borrow [[LB]]
+// CHECK:   end_access [[ACCESS]]
+// CHECK:   destroy_value [[BOX]]
+// CHECK-LABEL: } // end sil function 'testCopiedYield'
+sil hidden [ossa] @testCopiedYield : $@convention(thin) (@owned NCContainer) -> () {
+bb0(%0 : @owned $NCContainer):
+  %1 = alloc_box ${ var NCContainer }, var, name "nc"
+  %2 = begin_borrow [lexical] [var_decl] %1
+  %3 = project_box %2, 0
+  store %0 to [init] %3
+  %5 = begin_access [read] [unknown] %3
+  %7 = load_borrow [unchecked] %5
+
+  %8 = function_ref @yieldWrapper : $@yield_once @convention(method) (@guaranteed NCContainer) -> @lifetime(borrow 0) @yields @guaranteed Wrapper
+  (%9, %10) = begin_apply %8(%7) : $@yield_once @convention(method) (@guaranteed NCContainer) -> @lifetime(borrow 0) @yields @guaranteed Wrapper
+  %11 = mark_dependence [unresolved] %9 on %10
+  %12 = copy_value %11
+  %13 = end_apply %10 as $()
+  end_borrow %7
+  end_access %5
+  %16 = move_value [var_decl] %12
+
+  %18 = function_ref @yieldNE : $@yield_once @convention(method) (@guaranteed Wrapper) -> @lifetime(copy 0) @yields @guaranteed NE
+  (%19, %20) = begin_apply %18(%16) : $@yield_once @convention(method) (@guaranteed Wrapper) -> @lifetime(copy 0) @yields @guaranteed NE
+  %21 = copy_value %19
+  %22 = end_apply %20 as $()
+  destroy_value %16
+  %23 = move_value [var_decl] %21
+
+  %25 = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
+  %26 = apply %25(%23) : $@convention(thin) (@guaranteed NE) -> ()
+  destroy_value %23
+  end_borrow %2
+  destroy_value %1
+  %31 = tuple ()
+  return %31
 }

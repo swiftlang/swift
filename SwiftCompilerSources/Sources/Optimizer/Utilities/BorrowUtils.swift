@@ -211,6 +211,9 @@ enum BorrowingInstruction : CustomStringConvertible, Hashable {
     return scopedValue
   }
 
+  /// Returns non-nil if this borrowing instruction produces an guaranteed dependent value and does not have immediate
+  /// scope-ending uses. Finding the borrow scope in such cases requires recursively following uses of the guaranteed
+  /// value.
   var dependentValue: Value? {
     switch self {
     case .borrowedFrom(let bfi):
