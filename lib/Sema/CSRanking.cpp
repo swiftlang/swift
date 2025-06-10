@@ -1422,21 +1422,6 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       continue;
     }
 
-    // With introduction of holes it's currently possible to form solutions
-    // with UnresolvedType bindings, we need to account for that in
-    // ranking. If one solution has a hole for a given type variable
-    // it's always worse than any non-hole type other solution might have.
-    if (type1->is<UnresolvedType>() || type2->is<UnresolvedType>()) {
-      if (type1->is<UnresolvedType>()) {
-        ++score2;
-      } else {
-        ++score1;
-      }
-
-      identical = false;
-      continue;
-    }
-
     // If one type is a subtype of the other, but not vice-versa,
     // we prefer the system with the more-constrained type.
     // FIXME: Collapse this check into the second check.
