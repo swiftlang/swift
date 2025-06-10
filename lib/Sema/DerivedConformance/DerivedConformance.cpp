@@ -72,9 +72,10 @@ Type DerivedConformance::getProtocolType() const {
   return Protocol->getDeclaredInterfaceType();
 }
 
-bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
-                                                    NominalTypeDecl *Nominal,
-                                                    ProtocolDecl *Protocol) {
+bool DerivedConformance::derivesProtocolConformance(
+      NormalProtocolConformance *Conformance) {
+  auto *Protocol = Conformance->getProtocol();
+
   const auto derivableKind = Protocol->getKnownDerivableProtocolKind();
   if (!derivableKind)
     return false;
@@ -84,6 +85,9 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
   if (*derivableKind == KnownDerivableProtocolKind::OptionSet) {
     return false;
   }
+
+  auto *DC = Conformance->getDeclContext();
+  auto *Nominal = DC->getSelfNominalTypeDecl();
 
   if (*derivableKind == KnownDerivableProtocolKind::Hashable) {
     // We can always complete a partial Hashable implementation, and we can
@@ -296,10 +300,10 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
 
     auto conformance = lookupConformance(
         nominal->getDeclaredInterfaceType(), proto);
-    if (conformance) {
-      auto DC = conformance.getConcrete()->getDeclContext();
+    if (conformance.isConcrete()) {
       // Check whether this nominal type derives conformances to the protocol.
-      if (!DerivedConformance::derivesProtocolConformance(DC, nominal, proto))
+      if (!DerivedConformance::derivesProtocolConformance(
+            conformance.getConcrete()->getRootNormalConformance()))
         return nullptr;
     }
 

@@ -4731,9 +4731,8 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
 
   // Find the declaration that derives the protocol conformance.
   NominalTypeDecl *derivingTypeDecl = nullptr;
-  auto *nominal = DC->getSelfNominalTypeDecl();
-  if (DerivedConformance::derivesProtocolConformance(DC, nominal, Proto))
-    derivingTypeDecl = nominal;
+  if (DerivedConformance::derivesProtocolConformance(Conformance))
+    derivingTypeDecl = DC->getSelfNominalTypeDecl();
 
   if (!derivingTypeDecl) {
     return ResolveWitnessResult::Missing;
@@ -6890,16 +6889,22 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
     // is implied for enums which already declare a raw type.
     if (auto enumDecl = dyn_cast<EnumDecl>(existingDecl)) {
       if (diag.Protocol->isSpecificProtocol(
-              KnownProtocolKind::RawRepresentable) &&
-          DerivedConformance::derivesProtocolConformance(dc, enumDecl,
-                                                         diag.Protocol) &&
-          enumDecl->hasRawType() &&
-          enumDecl->getInherited().getStartLoc().isValid()) {
-        auto inheritedLoc = enumDecl->getInherited().getStartLoc();
-        Context.Diags.diagnose(
-            inheritedLoc, diag::enum_declares_rawrep_with_raw_type,
-            dc->getDeclaredInterfaceType(), enumDecl->getRawType());
-        continue;
+              KnownProtocolKind::RawRepresentable)) {
+        auto conformance = lookupConformance(
+            enumDecl->getDeclaredInterfaceType(), diag.Protocol);
+        if (!conformance.isConcrete())
+          continue;
+
+        if (DerivedConformance::derivesProtocolConformance(
+              conformance.getConcrete()->getRootNormalConformance()) &&
+            enumDecl->hasRawType() &&
+            enumDecl->getInherited().getStartLoc().isValid()) {
+          auto inheritedLoc = enumDecl->getInherited().getStartLoc();
+          Context.Diags.diagnose(
+              inheritedLoc, diag::enum_declares_rawrep_with_raw_type,
+              dc->getDeclaredInterfaceType(), enumDecl->getRawType());
+          continue;
+        }
       }
     }
 
