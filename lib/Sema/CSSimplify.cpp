@@ -377,6 +377,13 @@ static bool matchCallArgumentsImpl(
     assert(argIdx != numArgs && "Must have a valid index to claim");
     assert(!claimedArgs[argIdx] && "Argument already claimed");
 
+    // Prevent recording of an argument label mismatche for an unlabeled
+    // trailing closure. An unlabeled trailing closure is necessarily the first
+    // one and vice versa, per language syntax.
+    if (unlabeledTrailingClosureArgIndex == argIdx) {
+      expectedName = Identifier();
+    }
+
     if (!actualArgNames.empty()) {
       // We're recording argument names; record this one.
       actualArgNames[argIdx] = expectedName;

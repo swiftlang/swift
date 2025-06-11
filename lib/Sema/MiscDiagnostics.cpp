@@ -2697,8 +2697,10 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
     }
   }
 
+  assert((numMissing + numExtra + numWrong > 0) &&
+         "Should not call this function with nothing to diagnose");
+
   // Emit the diagnostic.
-  assert(numMissing > 0 || numExtra > 0 || numWrong > 0);
   llvm::SmallString<16> haveBuffer; // note: diagOpt has references to this
   llvm::SmallString<16> expectedBuffer; // note: diagOpt has references to this
 
