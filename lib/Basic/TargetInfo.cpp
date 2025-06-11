@@ -145,8 +145,8 @@ void printTripleInfo(const CompilerInvocation &invocation,
   out << "    \"arch\": \"" << swift::getMajorArchitectureName(triple)
       << "\",\n";
 
-  clang::DiagnosticsEngine DE{new clang::DiagnosticIDs(),
-                              new clang::DiagnosticOptions(),
+  clang::DiagnosticOptions diagOpts;
+  clang::DiagnosticsEngine DE{new clang::DiagnosticIDs(), diagOpts,
                               new clang::IgnoringDiagConsumer()};
 
   clang::TargetOptions targetOpts;
