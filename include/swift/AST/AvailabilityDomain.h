@@ -209,6 +209,10 @@ public:
   /// version ranges.
   bool isVersioned() const;
 
+  /// Returns true if the given version is a valid version number for this
+  /// domain. It is an error to call this on an un-versioned domain.
+  bool isVersionValid(const llvm::VersionTuple &version) const;
+
   /// Returns true if availability of the domain can be refined using
   /// `@available` attributes and `if #available` queries. If not, then the
   /// domain's availability is fixed by compilation settings. For example,
