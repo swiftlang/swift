@@ -148,10 +148,10 @@ void printTripleInfo(const CompilerInvocation &invocation,
   clang::DiagnosticsEngine DE{new clang::DiagnosticIDs(),
                               new clang::DiagnosticOptions(),
                               new clang::IgnoringDiagConsumer()};
-  std::shared_ptr<clang::TargetOptions> TO =
-      std::make_shared<clang::TargetOptions>();
-  TO->Triple = triple.str();
-  clang::TargetInfo *TI = clang::TargetInfo::CreateTargetInfo(DE, TO);
+
+  clang::TargetOptions targetOpts;
+  targetOpts.Triple = triple.str();
+  clang::TargetInfo *TI = clang::TargetInfo::CreateTargetInfo(DE, targetOpts);
   out << "    \"pointerWidthInBits\": "
       << TI->getPointerWidth(clang::LangAS::Default) << ",\n";
   out << "    \"pointerWidthInBytes\": "

@@ -1414,7 +1414,7 @@ ClangImporter::create(ASTContext &ctx,
     if (!swiftTargetClangInvocation)
       return nullptr;
     auto targetInfo = clang::TargetInfo::CreateTargetInfo(
-        clangDiags, swiftTargetClangInvocation->TargetOpts);
+        clangDiags, swiftTargetClangInvocation->getTargetOpts());
     // Ensure the target info has configured target-specific defines
     std::string defineBuffer;
     llvm::raw_string_ostream predefines(defineBuffer);
@@ -1426,7 +1426,7 @@ ClangImporter::create(ASTContext &ctx,
   } else {
     // Just use the existing Invocation's directly
     importer->Impl.setSwiftTargetInfo(clang::TargetInfo::CreateTargetInfo(
-        clangDiags, importer->Impl.Invocation->TargetOpts));
+        clangDiags, importer->Impl.Invocation->getTargetOpts()));
     importer->Impl.setSwiftCodeGenOptions(
         new clang::CodeGenOptions(importer->Impl.Invocation->getCodeGenOpts()));
   }
@@ -1445,9 +1445,8 @@ ClangImporter::create(ASTContext &ctx,
   // things here.
 
   // Create the target instance.
-  instance.setTarget(
-    clang::TargetInfo::CreateTargetInfo(clangDiags,
-                                        instance.getInvocation().TargetOpts));
+  instance.setTarget(clang::TargetInfo::CreateTargetInfo(
+      clangDiags, instance.getInvocation().getTargetOpts()));
   if (!instance.hasTarget())
     return nullptr;
 
