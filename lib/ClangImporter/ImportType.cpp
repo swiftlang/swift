@@ -2282,6 +2282,7 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
   }
 
   clang::QualType returnType = desugarIfElaborated(clangDecl->getReturnType());
+  returnType = desugarIfBoundsAttributed(returnType);
   // In C interop mode, the return type of library builtin functions
   // like 'memcpy' from headers like 'string.h' drops
   // any nullability specifiers from their return type, and preserves it on the
@@ -2388,6 +2389,7 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
   ImportDiagnosticAdder addDiag(*this, clangDecl,
                                 clangDecl->getSourceRange().getBegin());
   clang::QualType returnType = desugarIfElaborated(clangDecl->getReturnType());
+  returnType = desugarIfBoundsAttributed(returnType);
 
   ImportedType importedType = importer::findOptionSetEnum(returnType, *this);
 
@@ -2454,6 +2456,7 @@ ClangImporter::Implementation::importParameterType(
     ArrayRef<GenericTypeParamDecl *> genericParams,
     llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn) {
   auto paramTy = desugarIfElaborated(param->getType());
+  paramTy = desugarIfBoundsAttributed(paramTy);
 
   ImportTypeKind importKind = paramIsCompletionHandler
                                   ? ImportTypeKind::CompletionHandlerParameter
