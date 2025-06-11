@@ -651,37 +651,39 @@ protected:
 
     case ParsedLifetimeDependenceKind::Borrow: LLVM_FALLTHROUGH;
     case ParsedLifetimeDependenceKind::Inout: {
-    // @lifetime(borrow x) is valid only for borrowing parameters.
-    // @lifetime(inout x) is valid only for inout parameters.
-    if (!isCompatibleWithOwnership(parsedLifetimeKind, type, loweredOwnership,
-                                   isInterfaceFile())) {
-      diagnose(loc,
-               diag::lifetime_dependence_cannot_use_parsed_borrow_consuming,
-               getNameForParsedLifetimeDependenceKind(parsedLifetimeKind),
-               getOwnershipSpelling(loweredOwnership));
-      return std::nullopt;
-    }
-    return LifetimeDependenceKind::Scope;
-  }
-  case ParsedLifetimeDependenceKind::Inherit:
-    // @lifetime(copy x) is only invalid for Escapable types.
-    if (type->isEscapable()) {
-      if (loweredOwnership == ValueOwnership::Shared) {
-        diagnose(loc, diag::lifetime_dependence_invalid_inherit_escapable_type,
-                 descriptor.getString(), "borrow ");
-      } else if (loweredOwnership == ValueOwnership::InOut) {
-        diagnose(loc, diag::lifetime_dependence_invalid_inherit_escapable_type,
-                 descriptor.getString(), "&");
-      } else {
+      // @lifetime(borrow x) is valid only for borrowing parameters.
+      // @lifetime(&x) is valid only for inout parameters.
+      if (!isCompatibleWithOwnership(parsedLifetimeKind, type, loweredOwnership,
+                                     isInterfaceFile())) {
         diagnose(
+          loc,
+          diag::lifetime_dependence_cannot_use_parsed_borrow_consuming,
+          getNameForParsedLifetimeDependenceKind(parsedLifetimeKind),
+          getOwnershipSpelling(loweredOwnership));
+        return std::nullopt;
+      }
+      return LifetimeDependenceKind::Scope;
+    }
+    case ParsedLifetimeDependenceKind::Inherit: {
+      // @lifetime(copy x) is only invalid for Escapable types.
+      if (type->isEscapable()) {
+        if (loweredOwnership == ValueOwnership::Shared) {
+          diagnose(loc, diag::lifetime_dependence_invalid_inherit_escapable_type,
+                   descriptor.getString(), "borrow ");
+        } else if (loweredOwnership == ValueOwnership::InOut) {
+          diagnose(loc, diag::lifetime_dependence_invalid_inherit_escapable_type,
+                   descriptor.getString(), "&");
+        } else {
+          diagnose(
             loc,
             diag::lifetime_dependence_cannot_use_default_escapable_consuming,
             getOwnershipSpelling(loweredOwnership));
+        }
+        return std::nullopt;
       }
-      return std::nullopt;
+      return LifetimeDependenceKind::Inherit;
     }
-    return LifetimeDependenceKind::Inherit;
-  }
+    }
   }
 
   // Finds the ParamDecl* and its index from a LifetimeDescriptor
