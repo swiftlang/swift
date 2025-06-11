@@ -26,6 +26,7 @@
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
+#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/IRGenOptions.h"
@@ -4206,9 +4207,22 @@ ClangImporter::getSwiftExplicitModuleDirectCC1Args() const {
 
   if (!Impl.SwiftContext.SearchPathOpts.ScannerPrefixMapper.empty()) {
     // Remap all the paths if requested.
+    // FIXME: Should we also do
+    // https://github.com/swiftlang/llvm-project/pull/10723?
     llvm::PrefixMapper Mapper;
-    clang::tooling::dependencies::DepscanPrefixMapping::configurePrefixMapper(
-        Impl.SwiftContext.SearchPathOpts.ScannerPrefixMapper, Mapper);
+    SmallVector<llvm::MappedPrefix> Prefixes;
+    if (auto E = llvm::MappedPrefix::transformJoined(
+            Impl.SwiftContext.SearchPathOpts.ScannerPrefixMapper, Prefixes)) {
+      // Save this string. In general the diagnostic might outlive this
+      // function.
+      auto identifier =
+          Impl.SwiftContext.getIdentifier(llvm::toString(std::move(E)));
+      Impl.SwiftContext.Diags.diagnose(SourceLoc(), diag::error_prefix_mapping,
+                                       identifier.str());
+    }
+    Mapper.addRange(Prefixes);
+    Mapper.sort();
+
     clang::tooling::dependencies::DepscanPrefixMapping::remapInvocationPaths(
         instance, Mapper);
     instance.getFrontendOpts().PathPrefixMappings.clear();
