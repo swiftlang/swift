@@ -2362,7 +2362,6 @@ function Build-ExperimentalRuntime {
         CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
 
         Swift_SDKROOT = (Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental");
-        SwiftCore_ARCH_SUBDIR = $Platform.Architecture.LLVMName;
       }
 
     Build-CMakeProject `
@@ -2381,7 +2380,6 @@ function Build-ExperimentalRuntime {
         CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
 
         Swift_SDKROOT = (Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental");
-        SwiftCore_ARCH_SUBDIR = $Platform.Architecture.LLVMName;
       }
 
     Build-CMakeProject `
@@ -2400,7 +2398,6 @@ function Build-ExperimentalRuntime {
         CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
 
         Swift_SDKROOT = (Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental");
-        SwiftCore_ARCH_SUBDIR = $Platform.Architecture.LLVMName;
       }
   }
 }
