@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -267,10 +267,7 @@ BridgedDerivativeAttr BridgedDerivativeAttr_createParsedImpl(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceRange cRange, BridgedNullableTypeRepr cBaseType,
     BridgedDeclNameRef cOriginalName, BridgedDeclNameLoc cOriginalNameLoc,
-    std::optional<BridgedAccessorKind> cAccessorKind, BridgedArrayRef cParams) {
-  std::optional<AccessorKind> accessorKind;
-  if (cAccessorKind)
-    accessorKind = unbridged(*cAccessorKind);
+    std::optional<swift::AccessorKind> AccessorKind, BridgedArrayRef cParams) {
   SmallVector<ParsedAutoDiffParameter, 2> params;
   for (auto &elem : cParams.unbridged<BridgedParsedAutoDiffParameter>())
     params.push_back(elem.unbridged());
@@ -280,7 +277,7 @@ BridgedDerivativeAttr BridgedDerivativeAttr_createParsedImpl(
                                 cRange.unbridged(), cBaseType.unbridged(),
                                 DeclNameRefWithLoc{cOriginalName.unbridged(),
                                                    cOriginalNameLoc.unbridged(),
-                                                   accessorKind},
+                                                   AccessorKind},
                                 params);
 }
 
@@ -288,10 +285,10 @@ BridgedDerivativeAttr BridgedDerivativeAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceRange cRange, BridgedNullableTypeRepr cBaseType,
     BridgedDeclNameRef cOriginalName, BridgedDeclNameLoc cOriginalNameLoc,
-    BridgedAccessorKind cAccessorKind, BridgedArrayRef cParams) {
+    swift::AccessorKind AccessorKind, BridgedArrayRef cParams) {
   return BridgedDerivativeAttr_createParsedImpl(
       cContext, cAtLoc, cRange, cBaseType, cOriginalName, cOriginalNameLoc,
-      cAccessorKind, cParams);
+      AccessorKind, cParams);
 }
 
 BridgedDerivativeAttr BridgedDerivativeAttr_createParsed(

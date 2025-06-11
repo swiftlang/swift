@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -129,10 +129,6 @@ static StaticSpellingKind unbridged(BridgedStaticSpelling kind) {
   return static_cast<StaticSpellingKind>(kind);
 }
 
-AccessorKind unbridged(BridgedAccessorKind kind) {
-  return static_cast<AccessorKind>(kind);
-}
-
 void BridgedDecl_attachParsedAttrs(BridgedDecl decl,
                                    BridgedDeclAttributes attrs) {
   decl.unbridged()->attachParsedAttrs(attrs.unbridged());
@@ -148,15 +144,15 @@ void BridgedDecl_forEachDeclToHoist(BridgedDecl cDecl,
 
 BridgedAccessorDecl BridgedAccessorDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedAccessorKind cKind, BridgedAbstractStorageDecl cStorage,
+    swift::AccessorKind Kind, BridgedAbstractStorageDecl cStorage,
     BridgedSourceLoc cDeclLoc, BridgedSourceLoc cAccessorKeywordLoc,
     BridgedNullableParameterList cParamList, BridgedSourceLoc cAsyncLoc,
     BridgedSourceLoc cThrowsLoc, BridgedNullableTypeRepr cThrownType) {
   return AccessorDecl::createParsed(
-      cContext.unbridged(), unbridged(cKind), cStorage.unbridged(),
-      cDeclLoc.unbridged(), cAccessorKeywordLoc.unbridged(),
-      cParamList.unbridged(), cAsyncLoc.unbridged(), cThrowsLoc.unbridged(),
-      cThrownType.unbridged(), cDeclContext.unbridged());
+      cContext.unbridged(), Kind, cStorage.unbridged(), cDeclLoc.unbridged(),
+      cAccessorKeywordLoc.unbridged(), cParamList.unbridged(),
+      cAsyncLoc.unbridged(), cThrowsLoc.unbridged(), cThrownType.unbridged(),
+      cDeclContext.unbridged());
 }
 
 static VarDecl::Introducer unbridged(BridgedVarDeclIntroducer introducer) {

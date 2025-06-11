@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022 Apple Inc. and the Swift project authors
+// Copyright (c) 2022 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -19,6 +19,8 @@
 // Pure bridging mode does not permit including any C++/llvm/swift headers.
 // See also the comments for `BRIDGING_MODE` in the top-level CMakeLists.txt file.
 //
+
+#include "swift/AST/AccessorKind.h"
 #include "swift/AST/DiagnosticKind.h"
 #include "swift/Basic/BasicBridging.h"
 
@@ -524,13 +526,6 @@ struct BridgedPatternBindingEntry {
   BridgedNullablePatternBindingInitializer initContext;
 };
 
-enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedAccessorKind {
-#define ACCESSOR(ID) BridgedAccessorKind##ID,
-#include "swift/AST/AccessorKinds.def"
-};
-
-swift::AccessorKind unbridged(BridgedAccessorKind kind);
-
 //===----------------------------------------------------------------------===//
 // MARK: Diagnostic Engine
 //===----------------------------------------------------------------------===//
@@ -971,7 +966,7 @@ BridgedDerivativeAttr BridgedDerivativeAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceRange cRange, BridgedNullableTypeRepr cBaseType,
     BridgedDeclNameRef cOriginalName, BridgedDeclNameLoc cOriginalNameLoc,
-    BridgedAccessorKind cAccessorKind, BridgedArrayRef cParams);
+    swift::AccessorKind AccessorKind, BridgedArrayRef cParams);
 
 SWIFT_NAME("BridgedDerivativeAttr.createParsed(_:atLoc:range:baseType:"
            "originalName:originalNameLoc:params:)")
@@ -1450,7 +1445,7 @@ SWIFT_NAME("BridgedAccessorDecl.createParsed(_:declContext:kind:storage:"
            "throwsSpecifierLoc:thrownType:)")
 BridgedAccessorDecl BridgedAccessorDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedAccessorKind cKind, BridgedAbstractStorageDecl cStorage,
+    swift::AccessorKind Kind, BridgedAbstractStorageDecl cStorage,
     BridgedSourceLoc cDeclLoc, BridgedSourceLoc cAccessorKeywordLoc,
     BridgedNullableParameterList cParamList, BridgedSourceLoc cAsyncLoc,
     BridgedSourceLoc cThrowsLoc, BridgedNullableTypeRepr cThrownType);

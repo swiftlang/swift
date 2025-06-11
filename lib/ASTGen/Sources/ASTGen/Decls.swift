@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -375,7 +375,7 @@ extension ASTGenVisitor {
 // MARK: - AbstractStorageDecl
 
 extension ASTGenVisitor {
-  func generate(accessorSpecifier specifier: TokenSyntax) -> BridgedAccessorKind? {
+  func generate(accessorSpecifier specifier: TokenSyntax) -> swift.AccessorKind? {
     switch specifier.keywordKind {
     case .get:
       return .get
@@ -386,21 +386,21 @@ extension ASTGenVisitor {
     case .willSet:
       return .willSet
     case .unsafeAddress:
-      return .address
+      return .unsafeAddress
     case .unsafeMutableAddress:
-      return .mutableAddress
+      return .unsafeMutableAddress
     case ._read:
-      return .read
+      return ._read
     case ._modify:
-      return .modify
+      return ._modify
     case .`init`:
       return .`init`
     case .read:
       precondition(ctx.langOptsHasFeature(.CoroutineAccessors), "(compiler bug) 'read' accessor should only be parsed with 'CoroutineAccessors' feature")
-      return .read2
+      return .read
     case .modify:
       precondition(ctx.langOptsHasFeature(.CoroutineAccessors), "(compiler bug) 'modify' accessor should only be parsed with 'CoroutineAccessors' feature")
-      return .modify2
+      return .modify
     default:
       self.diagnose(.unknownAccessorSpecifier(specifier))
       return nil

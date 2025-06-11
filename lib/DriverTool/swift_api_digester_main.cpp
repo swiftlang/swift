@@ -852,8 +852,8 @@ public:
       auto *LSub = dyn_cast<SDKNodeDeclSubscript>(Left);
       auto *RSub = dyn_cast<SDKNodeDeclSubscript>(Right);
       SequentialNodeMatcher(LSub->getChildren(), RSub->getChildren(), *this).match();
-#define ACCESSOR(ID)                                                          \
-      singleMatch(LSub->getAccessor(AccessorKind::ID),                        \
+#define ACCESSOR(ID, KEYWORD)                                                  \
+      singleMatch(LSub->getAccessor(AccessorKind::ID),                         \
                   RSub->getAccessor(AccessorKind::ID), *this);
 #include "swift/AST/AccessorKinds.def"
       break;
@@ -863,8 +863,8 @@ public:
       auto *RVar = dyn_cast<SDKNodeDeclVar>(Right);
       // Match property type.
       singleMatch(LVar->getType(), RVar->getType(), *this);
-#define ACCESSOR(ID)                                                          \
-      singleMatch(LVar->getAccessor(AccessorKind::ID),                        \
+#define ACCESSOR(ID, KEYWORD)                                                  \
+      singleMatch(LVar->getAccessor(AccessorKind::ID),                         \
                   RVar->getAccessor(AccessorKind::ID), *this);
 #include "swift/AST/AccessorKinds.def"
       break;
