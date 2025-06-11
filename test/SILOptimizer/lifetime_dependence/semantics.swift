@@ -67,7 +67,7 @@ struct MutableSpan<T>: ~Escapable, ~Copyable {
   let base: UnsafeMutablePointer<T>
   let count: Int
 
-  @_lifetime(&base)
+  @_lifetime(borrow base)
   init(base: UnsafeMutablePointer<T>, count: Int) {
     self.base = base
     self.count = count
@@ -406,7 +406,7 @@ public func testTrivialLocalDeadEnd(p: UnsafePointer<Int>) {
 
 // Test dependence on a borrow of a trivial inout. The access scope can be ignored since we don't care about the
 // in-memory value.
-@_lifetime(borrow p)
+@_lifetime(&p)
 public func testTrivialInoutBorrow(p: inout UnsafePointer<Int>) -> Span<Int> {
   return Span(base: p, count: 1)
 }
@@ -597,7 +597,7 @@ func testNonAddressable(arg: Holder) -> Span<Int> {
 */
 
 /* TODO: rdar://145872854 (SILGen: @addressable inout arguments are copied)
-@_lifetime(borrow arg)
+@_lifetime(&arg)
 func test(arg: inout AddressableInt) -> Span<Int> {
   arg.span()
 }

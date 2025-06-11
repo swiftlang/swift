@@ -38,7 +38,7 @@ struct NonEscapableSelf: ~Escapable {
   @_lifetime(copy self) // OK
   mutating func mutatingMethodNoParamCopy() -> NonEscapableSelf { self }
 
-  @_lifetime(borrow self) // OK
+  @_lifetime(&self) // OK
   mutating func mutatingMethodNoParamBorrow() -> NonEscapableSelf { self }
 
   func methodOneParam(_: Int) -> NonEscapableSelf { self } // OK
@@ -58,7 +58,7 @@ struct NonEscapableSelf: ~Escapable {
   @_lifetime(copy self) // OK
   mutating func mutatingMethodOneParamCopy(_: Int) -> NonEscapableSelf { self }
 
-  @_lifetime(borrow self) // OK
+  @_lifetime(&self) // OK
   mutating func mutatingMethodOneParamBorrow(_: Int) -> NonEscapableSelf { self }
 }
 
@@ -72,7 +72,7 @@ struct EscapableTrivialSelf {
   @_lifetime(self) // OK
   mutating func mutatingMethodNoParamLifetime() -> NEImmortal { NEImmortal() }
 
-  @_lifetime(borrow self) // OK
+  @_lifetime(&self) // OK
   mutating func mutatingMethodNoParamBorrow() -> NEImmortal { NEImmortal() }
 
   @_lifetime(self) // OK
@@ -84,7 +84,7 @@ struct EscapableTrivialSelf {
   @_lifetime(self) // OK
   mutating func mutatingMethodOneParamLifetime(_: Int) -> NEImmortal { NEImmortal() }
 
-  @_lifetime(borrow self)
+  @_lifetime(&self)
   mutating func mutatingMethodOneParamBorrow(_: Int) -> NEImmortal { NEImmortal() }
 }
 
@@ -254,7 +254,7 @@ struct NonescapableSelfAccessors: ~Escapable {
       yield ne
     }
 
-    @_lifetime(borrow self)
+    @_lifetime(&self)
     _modify {
       yield &ne
     }
@@ -314,7 +314,7 @@ struct NonescapableSelfAccessors: ~Escapable {
       ne
     }
 
-    @_lifetime(borrow self)
+    @_lifetime(&self)
     set {
       ne = newValue
     }
@@ -326,7 +326,7 @@ struct NonescapableSelfAccessors: ~Escapable {
       yield ne
     }
 
-    @_lifetime(borrow self)
+    @_lifetime(&self)
     _modify {
       yield &ne
     }
@@ -449,6 +449,6 @@ struct NonEscapableMutableSelf: ~Escapable {
   @_lifetime(copy self) // OK
   mutating func mutatingMethodOneParamCopy(_: NE) {}
 
-  @_lifetime(borrow self)
+  @_lifetime(&self)
   mutating func mutatingMethodOneParamBorrow(_: NE) {}
 }
