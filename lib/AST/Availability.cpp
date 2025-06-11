@@ -164,7 +164,7 @@ static AvailableAttr *createAvailableAttr(AvailabilityDomain Domain,
 }
 
 void AvailabilityInference::applyInferredAvailableAttrs(
-    Decl *ToDecl, ArrayRef<const Decl *> InferredFromDecls, bool includeSwiftToolchain) {
+    Decl *ToDecl, ArrayRef<const Decl *> InferredFromDecls) {
   auto &Context = ToDecl->getASTContext();
 
   // Iterate over the declarations and infer required availability on
@@ -206,7 +206,8 @@ void AvailabilityInference::applyInferredAvailableAttrs(
   // Create an availability attribute for each observed platform and add
   // to ToDecl.
   for (auto &Pair : Inferred) {
-    if (!includeSwiftToolchain && Pair.first.isSwiftToolchain()) continue;
+    // Never include _SwiftToolchain availability when inferring.
+    if (Pair.first.isSwiftToolchain()) continue;
     if (auto Attr = createAvailableAttr(Pair.first, Pair.second, Context))
       Attrs.add(Attr);
   }

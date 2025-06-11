@@ -162,8 +162,7 @@ static ValueDecl *deriveActor_unownedExecutor(DerivedConformance &derived) {
 
   // Don't copy SwiftToolchain availability since the derived conformances can end up in module
   // interfaces.
-  AvailabilityInference::applyInferredAvailableAttrs(
-      property, asAvailableAs, /*includeSwiftToolchain*/false);
+  AvailabilityInference::applyInferredAvailableAttrs(property, asAvailableAs);
 
   auto getter = derived.addGetterToReadOnlyDerivedProperty(property);
   getter->setBodySynthesizer(deriveBodyActor_unownedExecutor);
