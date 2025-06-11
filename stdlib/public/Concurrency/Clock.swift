@@ -146,19 +146,16 @@ extension Clock {
 
 extension Clock {
   // For compatibility, return `nil` if this is not implemented
-  @_spi(CustomDefaultExecutors)
   @available(StdlibDeploymentTarget 6.2, *)
   public func convert(from duration: Duration) -> Swift.Duration? {
     return nil
   }
 
-  @_spi(CustomDefaultExecutors)
   @available(StdlibDeploymentTarget 6.2, *)
   public func convert(from duration: Swift.Duration) -> Duration? {
     return nil
   }
 
-  @_spi(CustomDefaultExecutors)
   @available(StdlibDeploymentTarget 6.2, *)
   public func convert<OtherClock: Clock>(instant: OtherClock.Instant,
                                   from clock: OtherClock) -> Instant? {
@@ -181,7 +178,6 @@ extension Clock {
 }
 
 extension Clock where Duration == Swift.Duration {
-  @_spi(CustomDefaultExecutors)
   @available(StdlibDeploymentTarget 6.2, *)
   public func convert(from duration: Duration) -> Duration? {
     return duration
@@ -239,7 +235,6 @@ public struct ClockTraits: OptionSet {
 @available(StdlibDeploymentTarget 6.2, *)
 extension Clock {
   /// The traits associated with this clock instance.
-  @_spi(CustomDefaultExecutors)
   @available(StdlibDeploymentTarget 6.2, *)
   public var traits: ClockTraits {
     return []
