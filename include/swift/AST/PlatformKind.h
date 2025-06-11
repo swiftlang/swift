@@ -21,6 +21,7 @@
 #include "swift/Config.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/VersionTuple.h"
+#include "llvm/TargetParser/Triple.h"
 #include <optional>
 
 namespace swift {
@@ -90,6 +91,10 @@ PlatformKind targetVariantPlatform(const LangOptions &LangOpts);
 /// should also apply to the "child" platform for declarations without
 /// an explicit attribute for the child.
 bool inheritsAvailabilityFromPlatform(PlatformKind Child, PlatformKind Parent);
+
+/// Returns the LLVM triple OS type for the given platform, if there is one.
+std::optional<llvm::Triple::OSType>
+tripleOSTypeForPlatform(PlatformKind platform);
 
 llvm::VersionTuple canonicalizePlatformVersion(
     PlatformKind platform, const llvm::VersionTuple &version);
