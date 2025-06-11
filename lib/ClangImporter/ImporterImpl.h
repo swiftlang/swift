@@ -2094,6 +2094,22 @@ inline clang::QualType desugarIfElaborated(clang::QualType type) {
   return type;
 }
 
+inline clang::QualType desugarIfBoundsAttributed(clang::QualType type) {
+  if (auto BAT = dyn_cast<clang::BoundsAttributedType>(type))
+    return BAT->desugar();
+  if (auto VT = dyn_cast<clang::ValueTerminatedType>(type))
+    return VT->desugar();
+  if (auto AT = dyn_cast<clang::AttributedType>(type))
+    switch (AT->getAttrKind()) {
+      case clang::attr::PtrUnsafeIndexable:
+      case clang::attr::PtrSingle:
+        return AT->desugar();
+      default:
+        break;
+    }
+  return type;
+}
+
 /// Option set enums are sometimes imported as typedefs which assign a name to
 /// the type, but are unavailable in Swift.
 ///
