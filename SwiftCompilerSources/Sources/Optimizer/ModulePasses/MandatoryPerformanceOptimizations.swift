@@ -44,6 +44,12 @@ let mandatoryPerformanceOptimizations = ModulePass(name: "mandatory-performance-
     // Print errors for generic functions in vtables, which is not allowed in embedded Swift.
     checkVTablesForGenericFunctions(moduleContext)
   }
+
+  // It's not required to set the perf_constraint flag on all functions in embedded mode.
+  // Embedded mode already implies that flag.
+  if !moduleContext.options.enableEmbeddedSwift {
+    setPerformanceConstraintFlags(moduleContext)
+  }
 }
 
 private func optimizeFunctionsTopDown(using worklist: inout FunctionWorklist,
@@ -53,13 +59,6 @@ private func optimizeFunctionsTopDown(using worklist: inout FunctionWorklist,
       if !context.loadFunction(function: f, loadCalleesRecursively: true) {
         return
       }
-
-      // It's not required to set the perf_constraint flag on all functions in embedded mode.
-      // Embedded mode already implies that flag.
-      if !moduleContext.options.enableEmbeddedSwift {
-        f.set(isPerformanceConstraint: true, context)
-      }
-
       optimize(function: f, context, moduleContext, &worklist)
     }
 
@@ -68,6 +67,17 @@ private func optimizeFunctionsTopDown(using worklist: inout FunctionWorklist,
     // We need handle this case with a function signature optimization.
     removeMetatypeArgumentsInCallees(of: f, moduleContext)
 
+    worklist.addCallees(of: f, moduleContext)
+  }
+}
+
+private func setPerformanceConstraintFlags(_ moduleContext: ModulePassContext) {
+  var worklist = FunctionWorklist()
+  for f in moduleContext.functions where f.performanceConstraints != .none && f.isDefinition {
+    worklist.pushIfNotVisited(f)
+  }
+  while let f = worklist.pop() {
+    moduleContext.transform(function: f) { f.set(isPerformanceConstraint: true, $0) }
     worklist.addCallees(of: f, moduleContext)
   }
 }
