@@ -2,6 +2,7 @@ add_swift_host_tool(swift-remoteast-test
   swift-remoteast-test.cpp
   SWIFT_COMPONENT testsuite-tools
   THINLTO_LD64_ADD_FLTO_CODEGEN_ONLY
+  EXPORT_SYMBOLS_WITH_APPLE_LINKER
 )
 target_link_libraries(swift-remoteast-test
                       PRIVATE
