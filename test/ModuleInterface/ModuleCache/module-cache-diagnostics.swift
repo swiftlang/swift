@@ -1,5 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/modulecache)
+// RUN: export SWIFT_BACKTRACE=
 
 // rdar://88830153
 // https://github.com/apple/swift/issues/58134
