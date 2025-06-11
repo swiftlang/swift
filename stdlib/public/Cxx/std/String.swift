@@ -26,7 +26,7 @@ extension std.string {
       // Use the 2 parameter constructor.
       // The MSVC standard library has a enable_if template guard
       // on the 3 parameter constructor, and thus it's not imported into Swift.
-      std.string(buffer, string.utf8.count)
+      unsafe std.string(buffer, string.utf8.count)
 #else
       unsafe std.string(buffer, string.utf8.count, .init())
 #endif
@@ -40,7 +40,7 @@ extension std.string {
       // Use the 2 parameter constructor.
       // The MSVC standard library has a enable_if template guard
       // on the 3 parameter constructor, and thus it's not imported into Swift.
-      self.init(str, UTF8._nullCodeUnitOffset(in: str))
+      unsafe self.init(str, UTF8._nullCodeUnitOffset(in: str))
 #else
       unsafe self.init(str, UTF8._nullCodeUnitOffset(in: str), .init())
 #endif
