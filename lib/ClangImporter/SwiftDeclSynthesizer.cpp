@@ -2563,9 +2563,10 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
   bool passAlignment = false;
   clang::Sema::SFINAETrap trap(clangSema);
   bool findingAllocFuncFailed = clangSema.FindAllocationFunctions(
-      cxxRecordDeclLoc, clang::SourceRange(), clang::Sema::AFS_Both,
-      clang::Sema::AFS_Both, cxxRecordTy, /*IsArray=*/false, passAlignment,
-      clang::MultiExprArg(), operatorNew, operatorDelete,
+      cxxRecordDeclLoc, clang::SourceRange(),
+      clang::AllocationFunctionScope::Both,
+      clang::AllocationFunctionScope::Both, cxxRecordTy, /*IsArray=*/false,
+      passAlignment, clang::MultiExprArg(), operatorNew, operatorDelete,
       /*Diagnose=*/false);
   if (trap.hasErrorOccurred() || findingAllocFuncFailed || !operatorNew ||
       operatorNew->isDeleted() ||
