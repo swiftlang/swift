@@ -328,7 +328,7 @@ private:
       return;
     SmallVector<clang::SourceLocation, 4> IdLocs;
     for (auto &P : Path)
-      IdLocs.push_back(P.second);
+      IdLocs.push_back(P.getLoc());
     handleImport(ImportLoc, IdLocs, Imported);
   }
 
@@ -2291,17 +2291,15 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
   auto realModuleName = SwiftContext.getRealModuleName(path.front().Item).str();
 
   // Convert the Swift import path over to a Clang import path.
-  SmallVector<std::pair<clang::IdentifierInfo *, clang::SourceLocation>, 4>
-      clangPath;
+  SmallVector<clang::IdentifierLoc, 4> clangPath;
   bool isTopModuleComponent = true;
   for (auto component : path) {
     StringRef item = isTopModuleComponent? realModuleName:
                                            component.Item.str();
     isTopModuleComponent = false;
 
-    clangPath.emplace_back(
-        getClangPreprocessor().getIdentifierInfo(item),
-        exportSourceLoc(component.Loc));
+    clangPath.emplace_back(exportSourceLoc(component.Loc),
+                           getClangPreprocessor().getIdentifierInfo(item));
   }
 
   auto &diagEngine = Instance->getDiagnostics();
@@ -2311,14 +2309,13 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
   auto loadModule = [&](clang::ModuleIdPath path,
                         clang::Module::NameVisibilityKind visibility)
       -> clang::ModuleLoadResult {
-    auto importRAII =
-        diagClient.handleImport(clangPath.front().first, diagEngine,
-                                importLoc);
+    auto importRAII = diagClient.handleImport(
+        clangPath.front().getIdentifierInfo(), diagEngine, importLoc);
 
     std::string preservedIndexStorePathOption;
     auto &clangFEOpts = Instance->getFrontendOpts();
     if (!clangFEOpts.IndexStorePath.empty()) {
-      StringRef moduleName = path[0].first->getName();
+      StringRef moduleName = path[0].getIdentifierInfo()->getName();
       // Ignore the SwiftShims module for the index data.
       if (moduleName == SwiftContext.SwiftShimsModuleName.str()) {
         preservedIndexStorePathOption = clangFEOpts.IndexStorePath;
