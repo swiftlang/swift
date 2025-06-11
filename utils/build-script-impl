@@ -2336,7 +2336,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     continue
                 fi
 
-                if [[ "${BUILD_SWIFT_TOOLS}" == "0" ]]; then
+                if [[ "${CROSS_COMPILE_BUILD_SWIFT_TOOLS}" == "0" ]]; then
                     echo "Skipping building Foundation Macros for ${host}, because the host tools are not being built"
                     continue
                 fi
@@ -2925,7 +2925,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     continue
                 fi
 
-                if [[ "${BUILD_SWIFT_TOOLS}" == "0" && "${product}" == "foundation_macros" ]]; then
+                if [[ "${CROSS_COMPILE_BUILD_SWIFT_TOOLS}" == "0" && "${product}" == "foundation_macros" ]]; then
                     echo "Skipping installing Foundation Macros for ${host}, because the host tools are not being built"
                     continue
                 fi
