@@ -371,7 +371,7 @@ struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:rretain")))
 __attribute__((swift_attr("release:rrelease"))) RefType {};
 
-RefType *returnRefType() { return new RefType(); } // expected-warning {{'returnRefType' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
+RefType *returnRefType() { return new RefType(); }
 
 struct __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:dretain")))
@@ -420,10 +420,10 @@ __attribute__((swift_attr("retain:dRetain")))
 __attribute__((swift_attr("release:dRelease"))) DerivedTypeNonDefault
     : public BaseTypeNonDefault {};
 
-BaseTypeNonDefault *createBaseTypeNonDefault() { // expected-warning {{'createBaseTypeNonDefault' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
+BaseTypeNonDefault *createBaseTypeNonDefault() {
   return new BaseTypeNonDefault();
 }
-DerivedTypeNonDefault *createDerivedTypeNonDefault() { // expected-warning {{'createDerivedTypeNonDefault' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
+DerivedTypeNonDefault *createDerivedTypeNonDefault() {
   return new DerivedTypeNonDefault();
 }
 
