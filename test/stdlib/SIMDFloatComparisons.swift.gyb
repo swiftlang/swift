@@ -16,14 +16,14 @@
 import Swift
 
 %for bits in [16,32,64]:
-% if bits == 16:
-%  arch = "-arm64"
-% else:
-%  arch = ""
-% end
 % scalar = {16:'Float16',32:'Float',64:'Double'}[bits]
 % llvm = {16:'half',32:'float',64:'double'}[bits]
 % for totalBits in [64,128]:
+%  if bits == 16 or totalBits == 64:
+%   arch = "-arm64"
+%  else:
+%   arch = ""
+%  end
 %  n = totalBits // bits
 %  if n != 1:
 %   neonSuffix = str(n) + {8:'b',16:'h',32:'s',64:'d'}[bits]
