@@ -5451,8 +5451,7 @@ namespace {
                       { }, dc, nullptr, decl);
       Impl.SwiftContext.evaluator.cacheOutput(ExtendedTypeRequest{result},
                                               objcClass->getDeclaredType());
-      Impl.SwiftContext.evaluator.cacheOutput(ExtendedNominalRequest{result},
-                                              std::move(objcClass));
+      result->setExtendedNominal(objcClass);
 
       Identifier categoryName;
       if (!decl->getName().empty())
@@ -10193,8 +10192,7 @@ ClangImporter::Implementation::importDeclContextOf(
                                    getClangModuleForDecl(decl), nullptr);
   SwiftContext.evaluator.cacheOutput(ExtendedTypeRequest{ext},
                                      nominal->getDeclaredType());
-  SwiftContext.evaluator.cacheOutput(ExtendedNominalRequest{ext},
-                                     std::move(nominal));
+  ext->setExtendedNominal(nominal);
 
   // Record this extension so we can find it later. We do this early because
   // once we've set the member loader, we don't know when the compiler will use
