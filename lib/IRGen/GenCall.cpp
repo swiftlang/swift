@@ -1214,6 +1214,7 @@ namespace {
 
       case clang::Type::ArrayParameter:
       case clang::Type::HLSLAttributedResource:
+      case clang::Type::HLSLInlineSpirv:
         llvm_unreachable("HLSL type in ABI lowering");
 
 

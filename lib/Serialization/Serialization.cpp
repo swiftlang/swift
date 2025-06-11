@@ -6286,6 +6286,9 @@ public:
   void writeTypeCoupledDeclRefInfo(clang::TypeCoupledDeclRefInfo info) {
     llvm_unreachable("TypeCoupledDeclRefInfo shouldn't be reached from swift");
   }
+  void writeHLSLSpirvOperand(clang::SpirvOperand) {
+    llvm_unreachable("SpirvOperand shouldn't be reached from swift");
+  }
 };
 
 }
