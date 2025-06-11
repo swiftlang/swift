@@ -158,3 +158,9 @@ module SimpleStructs {
   requires cplusplus
   export *
 }
+
+module Mirror {
+  header "mirror.h"
+  requires cplusplus
+  export *
+}
