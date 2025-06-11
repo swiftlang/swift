@@ -123,6 +123,7 @@ bool AvailabilityDomain::isVersionValid(
     llvm_unreachable("unexpected domain kind");
   case Kind::SwiftLanguage:
   case Kind::PackageDescription:
+  case Kind::SwiftToolchain:
     return true;
   case Kind::Platform:
     if (auto osType = tripleOSTypeForPlatform(getPlatformKind()))
