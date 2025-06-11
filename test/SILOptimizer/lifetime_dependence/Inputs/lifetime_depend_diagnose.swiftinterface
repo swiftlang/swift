@@ -24,4 +24,24 @@ extension NE {
     return NE(pointer: _pointer)
   }
 }
+
+public struct NCNE<Element>: ~Swift.Copyable & ~Swift.Escapable {
+  var e: Element
+}
+
+extension NCNE where Element : Swift.BitwiseCopyable {
+  // Ensure that lifetime dependence diagnostics accessp the generated _modify accessor:
+  // the getter dependency must match the setter's mewValue dependence.
+  // In this case, the getter has no dependency because the result is BitwiseCopyable. The setter cannot, therefore,
+  // have a borrow dependency no 'newValue' which is produced by the getter.
+  public subscript() -> Element {
+    get {
+      return e
+    }
+    //@lifetime(self: copy self, self: copy newValue)
+    set {
+      e = newValue
+    }
+  }
+}
 #endif

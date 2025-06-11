@@ -2430,6 +2430,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   case DeclKind::Module:
   case DeclKind::OpaqueType:
   case DeclKind::MacroExpansion:
+  case DeclKind::Using:
     llvm_unreachable("should not get here");
     return Type();
 

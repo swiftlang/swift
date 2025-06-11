@@ -474,7 +474,6 @@ public:
   const bool BridgingHeaderExplicitlyRequested;
   const bool DisableOverlayModules;
   const bool EnableClangSPI;
-  const bool UseClangIncludeTree;
   bool importSymbolicCXXDecls;
 
   bool IsReadingBridgingPCH;
@@ -2083,6 +2082,27 @@ bool hasEscapableAttr(const clang::RecordDecl *decl);
 
 bool isViewType(const clang::CXXRecordDecl *decl);
 
+inline const clang::Type *desugarIfElaborated(const clang::Type *type) {
+  if (auto elaborated = dyn_cast<clang::ElaboratedType>(type))
+    return elaborated->desugar().getTypePtr();
+  return type;
+}
+
+inline clang::QualType desugarIfElaborated(clang::QualType type) {
+  if (auto elaborated = dyn_cast<clang::ElaboratedType>(type))
+    return elaborated->desugar();
+  return type;
+}
+
+/// Option set enums are sometimes imported as typedefs which assign a name to
+/// the type, but are unavailable in Swift.
+///
+/// If given such a typedef, this helper function retrieves and imports the
+/// underlying enum type. Returns an empty ImportedType otherwise.
+///
+/// If \a type is an elaborated type, it should be desugared first.
+ImportedType findOptionSetEnum(clang::QualType type,
+                               ClangImporter::Implementation &Impl);
 } // end namespace importer
 } // end namespace swift
 

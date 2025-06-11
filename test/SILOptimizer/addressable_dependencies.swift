@@ -6,14 +6,6 @@
 
 import Builtin
 
-// Copied from the stdlib until we have Builtin.overrideLifetime.
-@_unsafeNonescapableResult
-@lifetime(borrow source)
-internal func _overrideLifetime<T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable>(
-  _ dependent: consuming T, borrowing source: borrowing U) -> T {
-  dependent
-}
-
 struct NodeRef: ~Escapable {
     private var parent: UnsafePointer<Node>
 

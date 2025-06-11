@@ -588,9 +588,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   }
   
   if (Builtin.ID == BuiltinValueKind::FNeg) {
-    llvm::Value *rhs = args.claimNext();
-    llvm::Value *lhs = llvm::ConstantFP::get(rhs->getType(), "-0.0");
-    llvm::Value *v = IGF.Builder.CreateFSub(lhs, rhs);
+    llvm::Value *v = IGF.Builder.CreateFNeg(args.claimNext());
     return out.add(v);
   }
   if (Builtin.ID == BuiltinValueKind::AssumeTrue) {
@@ -896,6 +894,16 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto newValue = args.claimNext();
     auto index = args.claimNext();
     out.add(IGF.Builder.CreateInsertElement(vector, newValue, index));
+    return;
+  }
+  
+  if (Builtin.ID == BuiltinValueKind::Select) {
+    using namespace llvm;
+    
+    auto pred = args.claimNext();
+    auto ifTrue = args.claimNext();
+    auto ifFalse = args.claimNext();
+    out.add(IGF.Builder.CreateSelect(pred, ifTrue, ifFalse));
     return;
   }
   

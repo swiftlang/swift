@@ -5,7 +5,7 @@
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
-// This test checks and validates that when AsyncCallerExecution is enabled, we emit the
+// This test checks and validates that when NonisolatedNonsendingByDefault is enabled, we emit the
 // appropriate diagnostics. It also runs with the mode off so we can validate
 // and compare locally against the normal errors.
 

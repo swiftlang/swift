@@ -61,7 +61,7 @@ namespace irgen {
 
   llvm::Value *emitFastClassCastIfPossible(
       IRGenFunction &IGF, llvm::Value *instance, CanType sourceFormalType,
-      CanType targetFormalType, bool sourceWrappedInOptional,
+      CanType targetFormalType, CheckedCastMode mode, bool sourceWrappedInOptional,
       llvm::BasicBlock *&nilCheckBB, llvm::BasicBlock *&nilMergeBB);
 
   /// Convert a class object to the given destination type,

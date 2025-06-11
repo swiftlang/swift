@@ -12,12 +12,6 @@
 
 // The following modules have to be standalone top-level modules to deal with
 // version 10.0.26100 of the Windows SDK.
-module _malloc [system] [no_undeclared_includes] {
-  use corecrt
-  header "malloc.h"
-  export *
-}
-
 module _complex [system] [no_undeclared_includes] {
   use corecrt
   use std
@@ -25,8 +19,22 @@ module _complex [system] [no_undeclared_includes] {
   export *
 }
 
-module _stddef [system] [no_undeclared_includes] {
-  header "stddef.h"
+module _fenv [system] [no_undeclared_includes] {
+  use _float
+  use corecrt
+  header "fenv.h"
+  export *
+}
+
+module _float [system] [no_undeclared_includes] {
+  use corecrt
+  header "float.h"
+  export *
+}
+
+module _malloc [system] [no_undeclared_includes] {
+  use corecrt
+  header "malloc.h"
   export *
 }
 
@@ -37,11 +45,12 @@ module _stdlib [system] [no_undeclared_includes] {
 }
 
 module ucrt [system] {
-  export _malloc
 
   module C {
     export _complex
-    export _stddef
+    export _fenv
+    export _float
+    export _malloc
     export _stdlib
 
     module ctype {
@@ -50,7 +59,7 @@ module ucrt [system] {
     }
 
     module errno {
-      header "errno.h"
+      textual header "errno.h"
       export *
     }
 
@@ -74,6 +83,11 @@ module ucrt [system] {
       export *
     }
 
+    module malloc {
+      header "malloc.h"
+      export *
+    }
+
     module math {
       header "math.h"
       export *
@@ -81,6 +95,16 @@ module ucrt [system] {
 
     module signal {
       header "signal.h"
+      export *
+    }
+
+    module stdalign {
+      header "stdalign.h"
+      export  *
+    }
+
+    module stddef {
+      textual header "stddef.h"
       export *
     }
 
@@ -98,6 +122,11 @@ module ucrt [system] {
 
     module stdlib {
       header "stdlib.h"
+      export *
+    }
+
+    module stdnoreturn {
+      textual header "stdnoreturn.h"
       export *
     }
 
@@ -187,8 +216,14 @@ module corecrt [system] {
     export *
   }
 
+  module direct {
+    header "corecrt_wdirect.h"
+    export *
+  }
+
   module io {
     header "corecrt_io.h"
+    header "corecrt_wio.h"
     export *
   }
 
@@ -202,8 +237,33 @@ module corecrt [system] {
     export *
   }
 
+  module memory {
+    header "corecrt_memory.h"
+    export *
+  }
+
+  module memcpy {
+    header "corecrt_memcpy_s.h"
+    export *
+  }
+
+  module process {
+    header "corecrt_wprocess.h"
+    export *
+  }
+
+  module search {
+    header "corecrt_search.h"
+    export *
+  }
+
   module share {
     header "corecrt_share.h"
+    export *
+  }
+
+  module ctype {
+    header "corecrt_wctype.h"
     export *
   }
 
@@ -227,4 +287,3 @@ module corecrt [system] {
     export *
   }
 }
-

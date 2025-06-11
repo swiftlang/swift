@@ -484,7 +484,7 @@ void InlineArrayTypeRepr::printImpl(ASTPrinter &Printer,
                                     const PrintOptions &Opts) const {
   Printer << "[";
   printTypeRepr(getCount(), Printer, Opts);
-  Printer << " x ";
+  Printer << " of ";
   printTypeRepr(getElement(), Printer, Opts);
   Printer << "]";
 }

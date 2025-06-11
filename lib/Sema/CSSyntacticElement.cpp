@@ -2744,11 +2744,13 @@ Type constraints::isPlaceholderVar(PatternBindingDecl *PB) {
     return Type();
 
   auto *pattern = PB->getPattern(0);
-  if (auto *typedPattern = dyn_cast<TypedPattern>(pattern)) {
-    auto type = typedPattern->getType();
-    if (type && type->hasPlaceholder())
-      return type;
-  }
+  auto *typedPattern = dyn_cast<TypedPattern>(pattern);
+  if (!typedPattern || !typedPattern->hasType())
+    return Type();
 
-  return Type();
+  auto type = typedPattern->getType();
+  if (!type->hasPlaceholder())
+    return Type();
+
+  return type;
 }

@@ -238,10 +238,6 @@ public:
   const TypeRef *subst(TypeRefBuilder &Builder,
                        const GenericArgumentMap &Subs) const;
 
-  const TypeRef *subst(TypeRefBuilder &Builder,
-                       const GenericArgumentMap &Subs,
-                       bool &DidSubstitute) const;
-
   std::optional<GenericArgumentMap> getSubstMap() const;
 
   virtual ~TypeRef() = default;
@@ -417,6 +413,65 @@ public:
 
   static bool classof(const TypeRef *TR) {
     return TR->getKind() == TypeRefKind::Tuple;
+  }
+};
+
+class PackTypeRef final : public TypeRef {
+protected:
+  std::vector<const TypeRef *> Elements;
+
+  static TypeRefID Profile(const std::vector<const TypeRef *> &Elements) {
+    TypeRefID ID;
+    for (auto Element : Elements)
+      ID.addPointer(Element);
+    return ID;
+  }
+
+public:
+  PackTypeRef(std::vector<const TypeRef *> Elements)
+      : TypeRef(TypeRefKind::Pack), Elements(std::move(Elements)) {}
+
+  template <typename Allocator>
+  static const PackTypeRef *create(Allocator &A,
+                                    std::vector<const TypeRef *> Elements) {
+    FIND_OR_CREATE_TYPEREF(A, PackTypeRef, Elements);
+  }
+
+  const std::vector<const TypeRef *> &getElements() const { return Elements; };
+
+  static bool classof(const TypeRef *TR) {
+    return TR->getKind() == TypeRefKind::Pack;
+  }
+};
+
+class PackExpansionTypeRef final : public TypeRef {
+protected:
+  const TypeRef *Pattern;
+  const TypeRef *Count;
+
+  static TypeRefID Profile(const TypeRef *Pattern, const TypeRef *Count) {
+    TypeRefID ID;
+    ID.addPointer(Pattern);
+    ID.addPointer(Count);
+    return ID;
+  }
+
+public:
+  PackExpansionTypeRef( const TypeRef *Pattern, const TypeRef *Count)
+      : TypeRef(TypeRefKind::PackExpansion), Pattern(Pattern), Count(Count) {}
+
+  template <typename Allocator>
+  static const PackExpansionTypeRef *create(Allocator &A,
+                                 const TypeRef *Pattern, const TypeRef *Count) {
+    FIND_OR_CREATE_TYPEREF(A, PackExpansionTypeRef, Pattern, Count);
+  }
+
+  const TypeRef *getPattern() const { return Pattern; }
+
+  const TypeRef *getCount() const { return Count; }
+
+  static bool classof(const TypeRef *TR) {
+    return TR->getKind() == TypeRefKind::PackExpansion;
   }
 };
 

@@ -244,6 +244,9 @@ def module_can_import_version: MultiArg<["-"], "module-can-import-version", 3>,
   MetaVarName<"<moduleName> <version> <underlyingVersion>">,
   HelpText<"Specify canImport module and versions">;
 
+def module_import_from_cas: Flag<["-"], "module-import-from-cas">,
+  HelpText<"Import modules from CAS instead of file system">;
+
 def disable_cross_import_overlay_search: Flag<["-"], "disable-cross-import-overlay-search">,
   HelpText<"Disable searching for cross import overlay file">;
 
@@ -1453,9 +1456,6 @@ def bridging_header_pch_key : Separate<["-"], "bridging-header-pch-key">,
 
 def no_clang_include_tree: Flag<["-"], "no-clang-include-tree">,
   HelpText<"Do not use clang include tree, fallback to use CAS filesystem to build clang modules">;
-
-def cas_fs: Separate<["-"], "cas-fs">,
-  HelpText<"Root CASID for CAS FileSystem">, MetaVarName<"<cas-id>">;
 
 def clang_include_tree_root: Separate<["-"], "clang-include-tree-root">,
   HelpText<"Clang Include Tree CASID">, MetaVarName<"<cas-id>">;

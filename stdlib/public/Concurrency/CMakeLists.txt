@@ -129,7 +129,6 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   Task+TaskExecutor.swift
   TaskCancellation.swift
   TaskGroup.swift
-  TaskGroup+Embedded.swift
   DiscardingTaskGroup.swift
   TaskLocal.swift
   TaskSleep.swift
@@ -164,6 +163,8 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   PlatformExecutorDarwin.swift
   PlatformExecutorLinux.swift
   PlatformExecutorWindows.swift
+  PlatformExecutorOpenBSD.swift
+  PlatformExecutorFreeBSD.swift
 )
 
 set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_C_SOURCES
@@ -204,6 +205,12 @@ set(LLVM_OPTIONAL_SOURCES
   DispatchGlobalExecutor.cpp
 )
 
+set(SWIFT_CONCURRENCY_GYB_SOURCES
+  Task+init.swift.gyb
+  TaskGroup+addTask.swift.gyb
+  Task+immediate.swift.gyb
+)
+
 add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   ${SWIFT_RUNTIME_CONCURRENCY_C_SOURCES}
   ${SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES}
@@ -212,8 +219,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   ${SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_SWIFT_SOURCES}
 
   GYB_SOURCES
-    TaskGroup+addTask.swift.gyb
-    Task+startSynchronously.swift.gyb
+    ${SWIFT_CONCURRENCY_GYB_SOURCES}
 
   SWIFT_MODULE_DEPENDS_ANDROID Android
   SWIFT_MODULE_DEPENDS_LINUX Glibc
@@ -301,8 +307,10 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
     endif()
 
     set(SWIFT_SDK_embedded_THREADING_PACKAGE none)
+    set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")
     set(SWIFT_SDK_embedded_ARCH_${mod}_MODULE "${mod}")
     set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
+    set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
     set(SWIFT_SDK_embedded_ARCH_${mod}_TRIPLE "${triple}")
 
     # lib/swift/embedded/_Concurrency.swiftmodule
@@ -317,6 +325,9 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES}
       ${SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES}
 
+      GYB_SOURCES
+        ${SWIFT_CONCURRENCY_GYB_SOURCES}
+
       SWIFT_COMPILE_FLAGS
         ${extra_swift_compile_flags} -enable-experimental-feature Embedded
         -parse-stdlib -DSWIFT_CONCURRENCY_EMBEDDED
@@ -326,7 +337,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
         ${extra_c_compile_flags} ${SWIFT_RUNTIME_CONCURRENCY_C_FLAGS} -DSWIFT_CONCURRENCY_EMBEDDED=1 -DSWIFT_RUNTIME_EMBEDDED=1
       MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
       SDK "embedded"
-      ARCHITECTURE "${mod}"
+      ARCHITECTURE "${arch}"
+      ARCHITECTURE_SUBDIR_NAME "${mod}"
       DEPENDS embedded-stdlib-${mod}
       INSTALL_IN_COMPONENT stdlib
       )

@@ -2650,7 +2650,8 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
   // If we're enforcing strict memory safety and this conformance hasn't
   // opted out, look for safe/unsafe witness mismatches.
   if (conformance->getExplicitSafety() == ExplicitSafety::Unspecified &&
-      Context.LangOpts.hasFeature(Feature::StrictMemorySafety)) {
+      Context.LangOpts.hasFeature(Feature::StrictMemorySafety,
+                                  /*allowMigration=*/true)) {
     // Collect all of the unsafe uses for this conformance.
     SmallVector<UnsafeUse, 2> unsafeUses;
     for (auto requirement: Proto->getMembers()) {
@@ -2694,10 +2695,28 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
     }
 
     if (!unsafeUses.empty()) {
-      Context.Diags.diagnose(
+      // Primary diagnostic along with a Fix-It to add @unsafe in the appropriate
+      // place.
+      {
+        auto diag = Context.Diags.diagnose(
           conformance->getLoc(), diag::conformance_involves_unsafe,
-          conformance->getType(), Proto)
-      .fixItInsert(conformance->getProtocolNameLoc(), "@unsafe ");
+          conformance->getType(), Proto);
+        
+        // Find the original explicit conformance, where we can add the Fix-It.
+        auto explicitConformance = conformance;
+        while (explicitConformance->getSourceKind() ==
+                  ConformanceEntryKind::Implied) {
+          explicitConformance =
+            explicitConformance->ProtocolConformance::getImplyingConformance();
+        }
+        
+        if (explicitConformance->getSourceKind() ==
+              ConformanceEntryKind::Explicit) {
+          diag.fixItInsert(explicitConformance->getProtocolNameLoc(),
+                           "@unsafe ");
+        }
+      }
+
       for (const auto& unsafeUse : unsafeUses)
         diagnoseUnsafeUse(unsafeUse);
     }
@@ -3338,6 +3357,16 @@ static bool hasExplicitGlobalActorAttr(ValueDecl *decl) {
   return !globalActorAttr->first->isImplicit();
 }
 
+/// Determine the isolation of a conformance with a known-isolated value witness.
+static ActorIsolation getConformanceIsolationForIsolatedWitness(
+    NormalProtocolConformance *conformance) {
+  if (auto rawIsolation = conformance->getRawIsolation())
+    return *rawIsolation;
+
+  return inferConformanceIsolation(
+      conformance, /*hasKnownIsolatedWitness=*/true);
+}
+
 std::optional<ActorIsolation>
 ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
                                         ValueDecl *witness,
@@ -3402,7 +3431,8 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
   case ActorReferenceResult::EntersActor: {
     // If the conformance itself is isolated to the same isolation domain as
     // the witness, treat this as being in the same concurrency domain.
-    auto conformanceIsolation = Conformance->getIsolation();
+    auto conformanceIsolation =
+        getConformanceIsolationForIsolatedWitness(Conformance);
     if (conformanceIsolation.isGlobalActor() &&
         refResult.isolation == conformanceIsolation) {
       sameConcurrencyDomain = true;
@@ -6651,7 +6681,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   if (!hasDeprecatedUnsafeSendable && SendableConformance) {
     SendableCheck check = SendableCheck::Explicit;
     if (sendableConformancePreconcurrency)
-      check = SendableCheck::ImpliedByStandardProtocol;
+      check = SendableCheck::ImpliedByPreconcurrencyProtocol;
     else if (SendableConformance->getSourceKind() ==
                  ConformanceEntryKind::Synthesized)
       check = SendableCheck::Implicit;
@@ -6665,6 +6695,49 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   for (auto *member : idc->getMembers()) {
     if (auto *valueDecl = dyn_cast<ValueDecl>(member)) {
       (void)getActorIsolation(valueDecl);
+    }
+  }
+
+  // If we are migrating to InferIsolatedConformances, and the
+  // nominal type is global-actor-isolated, look for conformances
+  // that are nonisolated but were not explicitly marked as such.
+  // These conformances will need to be marked 'nonisolated' to
+  // retain their current behavior.
+  if (Context.LangOpts
+          .getFeatureState(Feature::InferIsolatedConformances)
+            .isEnabledForMigration() &&
+      getActorIsolation(const_cast<NominalTypeDecl *>(nominal))
+          .isGlobalActor()) {
+    for (auto conformance : conformances) {
+      auto normal = dyn_cast<NormalProtocolConformance>(conformance);
+      if (!normal)
+        continue;
+
+      // Explicit nonisolated and @preconcurrency suppress this.
+      auto options = normal->getOptions();
+      if (options.contains(ProtocolConformanceFlags::Nonisolated) ||
+          options.contains(ProtocolConformanceFlags::Preconcurrency))
+        continue;
+
+      // Only consider conformances that were explicitly written in the source.
+      if (normal->getSourceKind() != ConformanceEntryKind::Explicit)
+        continue;
+
+      // Only consider conformances to non-marker, nonisolated protocols.
+      auto proto = normal->getProtocol();
+      if (proto->isMarkerProtocol() || getActorIsolation(proto).isActorIsolated())
+        continue;
+
+      // Only nonisolated conformances can be affected.
+      if (!conformance->getIsolation().isNonisolated())
+        continue;
+
+      auto nameLoc = normal->getProtocolNameLoc();
+      if (nameLoc.isValid()) {
+        Context.Diags.diagnose(
+            nameLoc, diag::isolated_conformance_will_become_nonisolated, nominal, proto)
+          .fixItInsert(nameLoc, "nonisolated ");
+      }
     }
   }
 

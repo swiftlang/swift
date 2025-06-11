@@ -75,6 +75,7 @@
 
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/Module.h"
+#include "clang/Basic/TargetInfo.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 
@@ -189,6 +190,7 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
   TRIVIAL_KIND(MissingMember);
   TRIVIAL_KIND(Macro);
   TRIVIAL_KIND(MacroExpansion);
+  TRIVIAL_KIND(Using);
 
    case DeclKind::Enum:
      return cast<EnumDecl>(this)->getGenericParams()
@@ -395,6 +397,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(OpaqueVarType, "type");
   ENTRY(Macro, "macro");
   ENTRY(MacroExpansion, "pound literal");
+  ENTRY(Using, "using");
   }
 #undef ENTRY
   llvm_unreachable("bad DescriptiveDeclKind");
@@ -1015,6 +1018,36 @@ bool Decl::isInMacroExpansionInContext() const {
   return file->getFulfilledMacroRole() != std::nullopt;
 }
 
+bool Decl::isInMacroExpansionFromClangHeader() const {
+  SourceLoc declLoc = getLoc();
+  if (declLoc.isInvalid())
+    return false;
+
+  auto &ctx = getASTContext();
+  auto &SourceMgr = ctx.SourceMgr;
+
+  auto declBufferID = SourceMgr.findBufferContainingLoc(declLoc);
+  auto declGeneratedSourceInfo = SourceMgr.getGeneratedSourceInfo(declBufferID);
+  if (!declGeneratedSourceInfo)
+    return false;
+  CustomAttr *attr = declGeneratedSourceInfo->attachedMacroCustomAttr;
+  if (!attr)
+    return false;
+
+  SourceLoc macroAttrLoc = attr->AtLoc;
+  if (macroAttrLoc.isInvalid())
+    return false;
+
+  auto macroAttrBufferID = SourceMgr.findBufferContainingLoc(macroAttrLoc);
+  auto macroAttrGeneratedSourceInfo =
+      SourceMgr.getGeneratedSourceInfo(macroAttrBufferID);
+  if (!macroAttrGeneratedSourceInfo)
+    return false;
+
+  return macroAttrGeneratedSourceInfo->kind ==
+         GeneratedSourceInfo::AttributeFromClang;
+}
+
 SourceLoc Decl::getLocFromSource() const {
   switch (getKind()) {
 #define DECL(ID, X) \
@@ -1464,9 +1497,9 @@ AvailabilityRange Decl::getAvailabilityForLinkage() const {
 
 bool Decl::isAlwaysWeakImported() const {
   // For a Clang declaration, trust Clang.
-  if (auto clangDecl = getClangDecl()) {
-    return clangDecl->isWeakImported();
-  }
+  if (auto clangDecl = getClangDecl())
+    return clangDecl->isWeakImported(
+        getASTContext().LangOpts.getMinPlatformVersion());
 
   if (getAttrs().hasAttribute<WeakLinkedAttr>())
     return true;
@@ -1676,6 +1709,7 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
   case DeclKind::Missing:
   case DeclKind::MissingMember:
   case DeclKind::MacroExpansion:
+  case DeclKind::Using:
     llvm_unreachable("not a ValueDecl");
 
   case DeclKind::AssociatedType:
@@ -1801,6 +1835,30 @@ bool ImportDecl::isAccessLevelImplicit() const {
     return false;
   }
   return true;
+}
+
+UsingDecl::UsingDecl(SourceLoc usingLoc, SourceLoc specifierLoc,
+                     UsingSpecifier specifier, DeclContext *parent)
+    : Decl(DeclKind::Using, parent), UsingLoc(usingLoc),
+      SpecifierLoc(specifierLoc) {
+  Bits.UsingDecl.Specifier = static_cast<unsigned>(specifier);
+  assert(getSpecifier() == specifier &&
+         "not enough bits in UsingDecl flags for specifier");
+}
+
+std::string UsingDecl::getSpecifierName() const {
+  switch (getSpecifier()) {
+  case UsingSpecifier::MainActor:
+    return "@MainActor";
+  case UsingSpecifier::Nonisolated:
+    return "nonisolated";
+  }
+}
+
+UsingDecl *UsingDecl::create(ASTContext &ctx, SourceLoc usingLoc,
+                             SourceLoc specifierLoc, UsingSpecifier specifier,
+                             DeclContext *parent) {
+  return new (ctx) UsingDecl(usingLoc, specifierLoc, specifier, parent);
 }
 
 void NominalTypeDecl::setConformanceLoader(LazyMemberLoader *lazyLoader,
@@ -3604,6 +3662,7 @@ bool ValueDecl::isInstanceMember() const {
   case DeclKind::Missing:
   case DeclKind::MissingMember:
   case DeclKind::MacroExpansion:
+  case DeclKind::Using:
     llvm_unreachable("Not a ValueDecl");
 
   case DeclKind::Class:
@@ -3855,6 +3914,13 @@ bool swift::conflicting(ASTContext &ctx,
   if (sig1.IsFunction != sig2.IsFunction)
     return true;
 
+  // Gracefully handle the case where value generic arguments were introduced
+  // as a conflicting value with static variables of the same name.
+  if (sig1.IsGenericArg != sig2.IsGenericArg) {
+    *wouldConflictInSwift5 = true;
+    return true;
+  }
+
   // Variables always conflict with non-variables with the same signature.
   // (e.g variables with zero argument functions, variables with type
   //  declarations)
@@ -4033,6 +4099,7 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
   signature.IsNominal = isa<NominalTypeDecl>(this);
   signature.IsTypeAlias = isa<TypeAliasDecl>(this);
   signature.IsMacro = isa<MacroDecl>(this);
+  signature.IsGenericArg = isa<GenericTypeParamDecl>(this);
   signature.HasOpaqueReturnType =
                        !signature.IsVariable && (bool)getOpaqueResultTypeDecl();
 
@@ -4709,6 +4776,7 @@ SourceLoc Decl::getAttributeInsertionLoc(bool forModifier) const {
   case DeclKind::MissingMember:
   case DeclKind::MacroExpansion:
   case DeclKind::BuiltinTuple:
+  case DeclKind::Using:
     // These don't take attributes.
     return SourceLoc();
 
@@ -8879,6 +8947,21 @@ ParamDecl *ParamDecl::clone(const ASTContext &Ctx, ParamDecl *PD) {
   return Clone;
 }
 
+ParamDecl *ParamDecl::cloneAccessor(const ASTContext &Ctx,
+                                    ParamDecl const *subscriptParam,
+                                    DeclContext *Parent) {
+  auto *param = new (Ctx) ParamDecl(
+      subscriptParam->getSpecifierLoc(), subscriptParam->getArgumentNameLoc(),
+      subscriptParam->getArgumentName(), subscriptParam->getNameLoc(),
+      subscriptParam->getName(), /*declContext*/ Parent);
+  param->setOptions(subscriptParam->getOptions());
+
+  // The cloned parameter is implicit.
+  param->setImplicit();
+
+  return param;
+}
+
 ParamDecl *
 ParamDecl::createImplicit(ASTContext &Context, SourceLoc specifierLoc,
                           SourceLoc argumentNameLoc, Identifier argumentName,
@@ -11089,23 +11172,7 @@ AccessorDecl *AccessorDecl::createParsed(
       paramsEnd = indices->getEndLoc();
     }
     for (auto *subscriptParam : *indices) {
-      // Clone the parameter.
-      auto *param = new (ctx) ParamDecl(
-          subscriptParam->getSpecifierLoc(),
-          subscriptParam->getArgumentNameLoc(),
-          subscriptParam->getArgumentName(), subscriptParam->getNameLoc(),
-          subscriptParam->getName(), /*declContext*/ accessor);
-      param->setAutoClosure(subscriptParam->isAutoClosure());
-
-      // The cloned parameter is implicit.
-      param->setImplicit();
-
-      if (subscriptParam->isSending())
-        param->setSending();
-
-      if (subscriptParam->isCallerIsolated())
-        param->setCallerIsolated();
-
+      auto param = ParamDecl::cloneAccessor(ctx, subscriptParam, accessor);
       newParams.push_back(param);
     }
 

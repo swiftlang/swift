@@ -847,6 +847,7 @@ private:
 
   llvm::DIModule *getOrCreateModule(const void *Key, llvm::DIScope *Parent,
                                     StringRef Name, StringRef IncludePath,
+                                    StringRef CompDir,
                                     uint64_t Signature = ~1ULL,
                                     StringRef ASTFile = StringRef()) {
     // Look in the cache first.
@@ -856,6 +857,7 @@ private:
 
     std::string RemappedIncludePath = DebugPrefixMap.remapPath(IncludePath);
     std::string RemappedASTFile = DebugPrefixMap.remapPath(ASTFile);
+    std::string RemappedCompDir = DebugPrefixMap.remapPath(CompDir);
 
     // For Clang modules / PCH, create a Skeleton CU pointing to the PCM/PCH.
     if (!Opts.DisableClangModuleSkeletonCUs) {
@@ -865,7 +867,7 @@ private:
         llvm::DIBuilder DIB(M);
         DIB.createCompileUnit(IGM.ObjCInterop ? llvm::dwarf::DW_LANG_ObjC
                                               : llvm::dwarf::DW_LANG_C99,
-                              DIB.createFile(Name, RemappedIncludePath),
+                              DIB.createFile(Name, RemappedCompDir),
                               TheCU->getProducer(), true, StringRef(), 0,
                               RemappedASTFile, llvm::DICompileUnit::FullDebug,
                               Signature);
@@ -892,12 +894,8 @@ private:
     uint64_t Signature =
       Desc.getSignature() ? Desc.getSignature().truncatedValue() : ~1ULL;
 
-    // Clang modules using fmodule-file-home-is-cwd should have their
-    // include path set to the working directory.
-    auto &HSI =
-        CI.getClangPreprocessor().getHeaderSearchInfo().getHeaderSearchOpts();
-    StringRef IncludePath =
-        HSI.ModuleFileHomeIsCwd ? Opts.DebugCompilationDir : Desc.getPath();
+    StringRef CompDir = Opts.DebugCompilationDir;
+    StringRef IncludePath = Desc.getPath();
 
     // Handle Clang modules.
     if (ClangModule) {
@@ -919,12 +917,13 @@ private:
                                    ClangModule->Parent);
       }
       return getOrCreateModule(ClangModule, Parent, Desc.getModuleName(),
-                               IncludePath, Signature, Desc.getASTFile());
+                               IncludePath, CompDir, Signature,
+                               Desc.getASTFile());
     }
     // Handle PCH.
     return getOrCreateModule(Desc.getASTFile().bytes_begin(), nullptr,
-                             Desc.getModuleName(), IncludePath, Signature,
-                             Desc.getASTFile());
+                             Desc.getModuleName(), IncludePath, CompDir,
+                             Signature, Desc.getASTFile());
   };
 
   static std::optional<ASTSourceDescriptor>
@@ -947,7 +946,7 @@ private:
     // the module on disk is Bar (.swiftmodule or .swiftinterface), and is used
     // for loading and mangling.
     StringRef Name = M->getRealName().str();
-    return getOrCreateModule(M, TheCU, Name, Path);
+    return getOrCreateModule(M, TheCU, Name, Path, Opts.DebugCompilationDir);
   }
 
   TypeAliasDecl *getMetadataType(StringRef ArchetypeName) {
@@ -2543,8 +2542,8 @@ private:
         auto Identifier = IGM.getSILModule().getASTContext().getIdentifier(
             Attribute->ManglingModuleName);
         void *Key = (void *)Identifier.get();
-        Scope =
-            getOrCreateModule(Key, TheCU, Attribute->ManglingModuleName, {});
+        Scope = getOrCreateModule(Key, TheCU, Attribute->ManglingModuleName, {},
+                                  {});
       } else {
         Context = ND->getParent();
       }
@@ -2791,7 +2790,8 @@ IRGenDebugInfoImpl::IRGenDebugInfoImpl(const IRGenOptions &Opts,
   // Create a module for the current compile unit.
   auto *MDecl = IGM.getSwiftModule();
   llvm::sys::path::remove_filename(SourcePath);
-  MainModule = getOrCreateModule(MDecl, TheCU, Opts.ModuleName, SourcePath);
+  MainModule = getOrCreateModule(MDecl, TheCU, Opts.ModuleName, SourcePath,
+                                 Opts.DebugCompilationDir);
   DBuilder.createImportedModule(MainFile, MainModule, MainFile, 0);
 
   // Macro definitions that were defined by the user with "-Xcc -D" on the

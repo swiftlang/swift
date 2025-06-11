@@ -396,8 +396,8 @@ func globalActorConversions3(_ x: @escaping @concurrent (SendableKlass) async ->
   _ = await v5(SendableKlass())
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s21attr_execution_silgen26conversionsFromSyncToAsyncyyyAA16NonSendableKlassCYbc_yAA0jK0CYbScMYccyADYbScMYcctYaF : $@convention(thin) @async (@guaranteed @Sendable @callee_guaranteed (@guaranteed NonSendableKlass) -> (), @guaranteed @Sendable @callee_guaranteed (@guaranteed SendableKlass) -> (), @guaranteed @Sendable @callee_guaranteed (@guaranteed NonSendableKlass) -> ()) -> () {
-// CHECK: bb0([[X:%.*]] : @guaranteed $@Sendable @callee_guaranteed (@guaranteed NonSendableKlass) -> (), [[Y:%.*]] : @guaranteed $@Sendable @callee_guaranteed (@guaranteed SendableKlass) -> (), [[Z:%.*]] : @guaranteed $@Sendable @callee_guaranteed (@guaranteed NonSendableKlass) -> ()):
+// CHECK-LABEL: sil hidden [ossa] @$s21attr_execution_silgen26conversionsFromSyncToAsyncyyyAA16NonSendableKlassCYbc_yAA0jK0CYbScMYcctYaF : $@convention(thin) @async (@guaranteed @Sendable @callee_guaranteed (@guaranteed NonSendableKlass) -> (), @guaranteed @Sendable @callee_guaranteed (@guaranteed SendableKlass) -> ()) -> ()
+// CHECK: bb0([[X:%.*]] : @guaranteed $@Sendable @callee_guaranteed (@guaranteed NonSendableKlass) -> (), [[Y:%.*]] : @guaranteed $@Sendable @callee_guaranteed (@guaranteed SendableKlass) -> ()):
 
 // CHECK:   [[X_C:%.*]] = copy_value [[X]]
 // CHECK:   [[THUNK:%.*]] = function_ref @$s21attr_execution_silgen16NonSendableKlassCIeghg_ScA_pSgACIegHgg_TR : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @guaranteed NonSendableKlass, @guaranteed @Sendable @callee_guaranteed (@guaranteed NonSendableKlass) -> ()) -> ()
@@ -411,19 +411,13 @@ func globalActorConversions3(_ x: @escaping @concurrent (SendableKlass) async ->
 // CHECK:   [[THUNK:%.*]] = function_ref @$s21attr_execution_silgen13SendableKlassCIeghg_ACIegHg_TRScMTU : $@convention(thin) @async (@guaranteed SendableKlass, @guaranteed @Sendable @callee_guaranteed (@guaranteed SendableKlass) -> ()) -> ()
 // CHECK:   [[PAI:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[Y_C]])
 
-// CHECK:   [[Z_C:%.*]] = copy_value [[Z]]
-// CHECK:   [[THUNK:%.*]] = function_ref @$s21attr_execution_silgen16NonSendableKlassCIeghg_ACIegHg_TRScMTU : $@convention(thin) @async (@guaranteed NonSendableKlass, @guaranteed @Sendable @callee_guaranteed (@guaranteed NonSendableKlass) -> ()) -> ()
-// CHECK:   [[PAI:%.*]] = partial_apply [callee_guaranteed] [[THUNK]]([[Z_C]])
-
-// CHECK: } // end sil function '$s21attr_execution_silgen26conversionsFromSyncToAsyncyyyAA16NonSendableKlassCYbc_yAA0jK0CYbScMYccyADYbScMYcctYaF'
+// CHECK: } // end sil function '$s21attr_execution_silgen26conversionsFromSyncToAsyncyyyAA16NonSendableKlassCYbc_yAA0jK0CYbScMYcctYaF'
 
 func conversionsFromSyncToAsync(_ x: @escaping @Sendable (NonSendableKlass) -> Void,
-                                _ y: @escaping @MainActor @Sendable (SendableKlass) -> Void,
-                                _ z: @escaping @MainActor @Sendable (NonSendableKlass) -> Void) async {
+                                _ y: @escaping @MainActor @Sendable (SendableKlass) -> Void) async {
   let _: nonisolated(nonsending) (NonSendableKlass) async -> Void = x
   let _: nonisolated(nonsending) (SendableKlass) async -> Void = y
   let _: @concurrent (SendableKlass) async -> Void = y
-  let _: @concurrent (NonSendableKlass) async -> Void = z
 }
 
 func testThatClosuresAssumeIsolation(fn: inout nonisolated(nonsending) (Int) async -> Void) {
@@ -467,4 +461,15 @@ func testNoIsolationTransfer() {
   // CHECK: [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
   // CHECK: hop_to_executor [[GENERIC_EXECUTOR]]
   testErasure { @concurrent in }
+}
+
+func testClosuresDontAssumeGlobalActorWithMarkedAsConcurrent() {
+  func test(_ fn: @MainActor () async -> Void) {}
+
+  // CHECK-LABEL: sil private [ossa] @$s21attr_execution_silgen55testClosuresDontAssumeGlobalActorWithMarkedAsConcurrentyyFyyYaYbXEfU_
+  // CHECK: [[GENERIC_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt
+  // CHECK-NEXT: hop_to_executor [[GENERIC_EXECUTOR]]
+  // CHECK: } // end sil function '$s21attr_execution_silgen55testClosuresDontAssumeGlobalActorWithMarkedAsConcurrentyyFyyYaYbXEfU_'
+  test { @Sendable @concurrent in
+  }
 }

@@ -66,6 +66,7 @@
 #include "clang/Basic/FileEntry.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/LangStandard.h"
+#include "clang/Basic/MacroBuilder.h"
 #include "clang/Basic/Module.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Basic/TargetInfo.h"
@@ -89,6 +90,7 @@
 #include "clang/Serialization/ASTReader.h"
 #include "clang/Serialization/ASTWriter.h"
 #include "clang/Serialization/ObjectFilePCHContainerReader.h"
+#include "clang/Tooling/DependencyScanning/ModuleDepCollector.h"
 #include "clang/Tooling/DependencyScanning/ScanAndUpdateArgs.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/STLExtras.h"
@@ -1061,27 +1063,6 @@ std::string ClangImporter::getOriginalSourceFile(StringRef PCHFilename) {
       Impl.Instance->getPCHContainerReader(), Impl.Instance->getDiagnostics());
 }
 
-void ClangImporter::addClangInvovcationDependencies(
-    std::vector<std::string> &files) {
-  auto addFiles = [&files](const auto &F) {
-    files.insert(files.end(), F.begin(), F.end());
-  };
-  auto &invocation = *Impl.Invocation;
-  // FIXME: Add file dependencies that are not accounted. The long term solution
-  // is to do a dependency scanning for clang importer and use that directly.
-  SmallVector<std::string, 4> HeaderMapFileNames;
-  Impl.Instance->getPreprocessor().getHeaderSearchInfo().getHeaderMapFileNames(
-      HeaderMapFileNames);
-  addFiles(HeaderMapFileNames);
-  addFiles(invocation.getHeaderSearchOpts().VFSOverlayFiles);
-  // FIXME: Should not depend on working directory. Build system/swift driver
-  // should not pass working directory here but if that option is passed,
-  // repect that and add that into CASFS.
-  auto CWD = invocation.getFileSystemOpts().WorkingDir;
-  if (!CWD.empty())
-    files.push_back(CWD);
-}
-
 std::optional<std::string>
 ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
                               StringRef SwiftPCHHash, bool &isExplicit) {
@@ -1200,7 +1181,7 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
     // to reduce the number of argument passing on the command-line and swift
     // compiler can be more efficient to compute swift cache key without having
     // the knowledge about clang command-line options.
-    if (ctx.CASOpts.EnableCaching) {
+    if (ctx.CASOpts.EnableCaching || ctx.CASOpts.ImportModuleFromCAS) {
       CI->getCASOpts() = ctx.CASOpts.CASOpts;
       // When clangImporter is used to compile (generate .pcm or .pch), need to
       // inherit the include tree from swift args (last one wins) and clear the
@@ -1209,9 +1190,8 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
                clang::frontend::ActionKind::GenerateModule ||
            CI->getFrontendOpts().ProgramAction ==
                clang::frontend::ActionKind::GeneratePCH) &&
-          ctx.ClangImporterOpts.HasClangIncludeTreeRoot) {
-        CI->getFrontendOpts().CASIncludeTreeID =
-            ctx.CASOpts.ClangIncludeTrees.back();
+          !ctx.CASOpts.ClangIncludeTree.empty()) {
+        CI->getFrontendOpts().CASIncludeTreeID = ctx.CASOpts.ClangIncludeTree;
         CI->getFrontendOpts().Inputs.clear();
       }
     }
@@ -1270,7 +1250,7 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
 
   std::vector<std::string> FilteredModuleMapFiles;
   for (auto ModuleMapFile : CI->getFrontendOpts().ModuleMapFiles) {
-    if (ctx.ClangImporterOpts.HasClangIncludeTreeRoot) {
+    if (ctx.CASOpts.HasImmutableFileSystem) {
       // There is no need to add any module map file here. Issue a warning and
       // drop the option.
       Impl.diagnose(SourceLoc(), diag::module_map_ignored, ModuleMapFile);
@@ -1344,48 +1324,10 @@ ClangImporter::create(ASTContext &ctx,
       ctx.SourceMgr.getFileSystem();
 
   ClangInvocationFileMapping fileMapping =
-    getClangInvocationFileMapping(ctx, nullptr, ignoreFileMapping);
+    applyClangInvocationMapping(ctx, nullptr, VFS, ignoreFileMapping);
 
   importer->requiresBuiltinHeadersInSystemModules =
       fileMapping.requiresBuiltinHeadersInSystemModules;
-
-  // Avoid creating indirect file system when using include tree.
-  if (!ctx.ClangImporterOpts.HasClangIncludeTreeRoot) {
-    // Wrap Swift's FS to allow Clang to override the working directory
-    VFS = llvm::vfs::RedirectingFileSystem::create(
-        fileMapping.redirectedFiles, true, *ctx.SourceMgr.getFileSystem());
-    if (importerOpts.DumpClangDiagnostics) {
-      llvm::errs() << "clang importer redirected file mappings:\n";
-      for (const auto &mapping : fileMapping.redirectedFiles) {
-        llvm::errs() << "   mapping real file '" << mapping.second
-                     << "' to virtual file '" << mapping.first << "'\n";
-      }
-      llvm::errs() << "\n";
-    }
-
-    if (!fileMapping.overridenFiles.empty()) {
-      llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> overridenVFS =
-          new llvm::vfs::InMemoryFileSystem();
-      for (const auto &file : fileMapping.overridenFiles) {
-        if (importerOpts.DumpClangDiagnostics) {
-          llvm::errs() << "clang importer overriding file '" << file.first
-                       << "' with the following contents:\n";
-          llvm::errs() << file.second << "\n";
-        }
-        auto contents = ctx.Allocate<char>(file.second.size() + 1);
-        std::copy(file.second.begin(), file.second.end(), contents.begin());
-        // null terminate the buffer.
-        contents[contents.size() - 1] = '\0';
-        overridenVFS->addFile(file.first, 0,
-                              llvm::MemoryBuffer::getMemBuffer(StringRef(
-                                  contents.begin(), contents.size() - 1)));
-      }
-      llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> overlayVFS =
-          new llvm::vfs::OverlayFileSystem(VFS);
-      VFS = overlayVFS;
-      overlayVFS->pushOverlay(overridenVFS);
-    }
-  }
 
   // Create a new Clang compiler invocation.
   {
@@ -1488,8 +1430,14 @@ ClangImporter::create(ASTContext &ctx,
         importer.get(), importerOpts, VFS, *swiftTargetClangArgs);
     if (!swiftTargetClangInvocation)
       return nullptr;
-    importer->Impl.setSwiftTargetInfo(clang::TargetInfo::CreateTargetInfo(
-        clangDiags, swiftTargetClangInvocation->TargetOpts));
+    auto targetInfo = clang::TargetInfo::CreateTargetInfo(
+        clangDiags, swiftTargetClangInvocation->TargetOpts);
+    // Ensure the target info has configured target-specific defines
+    std::string defineBuffer;
+    llvm::raw_string_ostream predefines(defineBuffer);
+    clang::MacroBuilder builder(predefines);
+    targetInfo->getTargetDefines(instance.getLangOpts(), builder);
+    importer->Impl.setSwiftTargetInfo(targetInfo);
     importer->Impl.setSwiftCodeGenOptions(new clang::CodeGenOptions(
         swiftTargetClangInvocation->getCodeGenOpts()));
   } else {
@@ -2749,7 +2697,6 @@ ClangImporter::Implementation::Implementation(
           !ctx.ClangImporterOpts.BridgingHeader.empty()),
       DisableOverlayModules(ctx.ClangImporterOpts.DisableOverlayModules),
       EnableClangSPI(ctx.ClangImporterOpts.EnableClangSPI),
-      UseClangIncludeTree(ctx.ClangImporterOpts.UseClangIncludeTree),
       importSymbolicCXXDecls(
           ctx.LangOpts.hasFeature(Feature::ImportSymbolicCXXDecls)),
       IsReadingBridgingPCH(false),
@@ -4274,15 +4221,14 @@ ClangImporter::getSwiftExplicitModuleDirectCC1Args() const {
   PPOpts.MacroIncludes.clear();
   PPOpts.Includes.clear();
 
-  // CodeGenOptions.
-  auto &CGOpts = instance.getCodeGenOpts();
-  CGOpts.DebugCompilationDir.clear();
+  // Clear benign CodeGenOptions.
+  clang::tooling::dependencies::resetBenignCodeGenOptions(
+      clang::frontend::ActionKind::GenerateModule, instance.getLangOpts(),
+      instance.getCodeGenOpts());
 
-  if (Impl.SwiftContext.ClangImporterOpts.UseClangIncludeTree) {
-    // FileSystemOptions.
-    auto &FSOpts = instance.getFileSystemOpts();
-    FSOpts.WorkingDir.clear();
-  }
+  // FileSystemOptions.
+  auto &FSOpts = instance.getFileSystemOpts();
+  FSOpts.WorkingDir.clear();
 
   if (!Impl.SwiftContext.SearchPathOpts.ScannerPrefixMapper.empty()) {
     // Remap all the paths if requested.
@@ -4430,7 +4376,14 @@ ModuleDecl *ClangModuleUnit::getOverlayModule() const {
     // FIXME: Include proper source location.
     ModuleDecl *M = getParentModule();
     ASTContext &Ctx = M->getASTContext();
-    auto overlay = Ctx.getOverlayModule(this);
+
+    ModuleDecl *overlay = nullptr;
+    // During compilation of a textual interface with no formal C++ interop mode,
+    // i.e. it was built without C++ interop, avoid querying the 'CxxStdlib' overlay
+    // for it, since said overlay was not used during compilation of this module.
+    if (!importer::isCxxStdModule(clangModule) || Ctx.LangOpts.FormalCxxInteropMode)
+      overlay = Ctx.getOverlayModule(this);
+
     if (overlay) {
       Ctx.addLoadedModule(overlay);
     } else {
@@ -4450,7 +4403,8 @@ ModuleDecl *ClangModuleUnit::getOverlayModule() const {
     // If this Clang module is a part of the C++ stdlib, and we haven't loaded
     // the overlay for it so far, it is a split libc++ module (e.g. std_vector).
     // Load the CxxStdlib overlay explicitly.
-    if (!overlay && importer::isCxxStdModule(clangModule)) {
+    if (!overlay && importer::isCxxStdModule(clangModule) &&
+        Ctx.LangOpts.FormalCxxInteropMode) {
       ImportPath::Module::Builder builder(Ctx.Id_CxxStdlib);
       overlay = owner.loadModule(SourceLoc(), std::move(builder).get());
     }

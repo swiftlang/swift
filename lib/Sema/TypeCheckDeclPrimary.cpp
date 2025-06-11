@@ -618,15 +618,15 @@ static void checkGenericParams(GenericContext *ownerCtx) {
 /// Returns \c true if \p current and \p other are in the same source file
 /// \em and \c current appears before \p other in that file.
 static bool isBeforeInSameFile(Decl *current, Decl *other) {
-  if (current->getDeclContext()->getParentSourceFile() !=
-                  other->getDeclContext()->getParentSourceFile())
+  if (current->getDeclContext()->getOutermostParentSourceFile() !=
+                  other->getDeclContext()->getOutermostParentSourceFile())
     return false;
 
-  if (!current->getLoc().isValid())
+  if (current->getLoc().isInvalid() || other->getLoc().isInvalid())
     return false;
 
   return current->getASTContext().SourceMgr
-                        .isBeforeInBuffer(current->getLoc(), other->getLoc());
+                        .isBefore(current->getLoc(), other->getLoc());
 }
 
 template <typename T>
@@ -728,6 +728,20 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
       auto found = nominal->lookupDirect(current->getBaseName(), SourceLoc(),
                                          flags);
       otherDefinitions.append(found.begin(), found.end());
+
+      // Look into the generics of the type. Value generic parameters can appear
+      // as static members of the type.
+      if (auto genericDC = static_cast<Decl *>(nominal)->getAsGenericContext()) {
+        auto gpList = genericDC->getGenericParams();
+
+        if (gpList && !current->getBaseName().isSpecial()) {
+          auto gp = gpList->lookUpGenericParam(current->getBaseIdentifier());
+
+          if (gp && gp->isValue()) {
+            otherDefinitions.push_back(gp);
+          }
+        }
+      }
     }
   } else if (currentDC->isLocalContext()) {
     if (!current->isImplicit()) {
@@ -1136,6 +1150,7 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
       break;
     }
   }
+
   return std::make_tuple<>();
 }
 
@@ -1809,106 +1824,120 @@ static void diagnoseRetroactiveConformances(
     return;
   }
 
-  Type extendedType = ext->getExtendedType();
   NominalTypeDecl *extendedNominalDecl = ext->getExtendedNominal();
-  if (!extendedNominalDecl) {
+  if (!extendedNominalDecl || isa<BuiltinTupleDecl>(extendedNominalDecl))
     return;
-  }
 
   ModuleDecl *extTypeModule = extendedNominalDecl->getParentModule();
 
   // If the type comes from the __ObjC clang header module, don't warn.
-  if (extTypeModule->getName().is(CLANG_HEADER_MODULE_NAME)) {
+  if (extTypeModule->getName().is(CLANG_HEADER_MODULE_NAME))
     return;
-  }
 
   // At this point, we know we're extending a type declared outside this module.
   // We better only be conforming it to protocols declared within this module.
-  llvm::SmallSetVector<ProtocolDecl *, 8> externalProtocols;
+  llvm::SmallMapVector<ProtocolDecl *, bool, 8> protocols;
   llvm::SmallSet<ProtocolDecl *, 8> protocolsWithRetroactiveAttr;
+
+  for (auto *conformance : ext->getLocalConformances()) {
+    auto *proto = conformance->getProtocol();
+    bool inserted = protocols.insert(std::make_pair(
+        proto, conformance->isRetroactive())).second;
+    ASSERT(inserted);
+
+    if (proto->isSpecificProtocol(KnownProtocolKind::SendableMetatype)) {
+      protocolsWithRetroactiveAttr.insert(proto);
+    }
+
+    // Implied conformance to Sendable is a special case that should not be
+    // diagnosed. Pretend it's always @retroactive.
+    if (conformance->getSourceKind() == ConformanceEntryKind::Implied &&
+        proto->isSpecificProtocol(KnownProtocolKind::Sendable) &&
+        extendedNominalDecl->hasClangNode()) {
+      protocolsWithRetroactiveAttr.insert(proto);
+    }
+  }
+
   for (const InheritedEntry &entry : ext->getInherited().getEntries()) {
-    if (entry.getType().isNull() || !entry.getTypeRepr()) {
+    auto inheritedTy = entry.getType();
+    if (inheritedTy.isNull() || !entry.getTypeRepr()) {
       continue;
     }
 
-    auto proto =
-        dyn_cast_or_null<ProtocolDecl>(entry.getType()->getAnyNominal());
-    if (!proto) {  
-      continue;
-    }
-    
-    // As a fallback, to support previous language versions, also allow
-    // this through if the protocol has been explicitly module-qualified.
-    TypeRepr *repr = unwrapAttributedRepr(entry.getTypeRepr());
-    if (isModuleQualified(repr, proto->getParentModule())) {
-      continue;
-    }
+    SmallVector<ProtocolDecl *, 2> protos;
+    if (auto *protoTy = inheritedTy->getAs<ProtocolType>()) {
+      auto *proto = protoTy->getDecl();
 
-    proto->walkInheritedProtocols([&](ProtocolDecl *decl) {
-
-      // Get the original conformance of the extended type to this protocol.
-      auto conformanceRef = lookupConformance(extendedType, decl);
-      if (!conformanceRef.isConcrete()) {
-        return TypeWalker::Action::Continue;
-      }
-      auto conformance = conformanceRef.getConcrete();
-
-      // If that conformance came from this extension, then we warn. Otherwise
-      // we will have diagnosed it on the extension that actually declares this
-      // specific conformance.
-      if (conformance->getDeclContext() != ext) {
-        return TypeWalker::Action::Continue;
+      // As a fallback, to support previous language versions, also allow
+      // this through if the protocol has been explicitly module-qualified.
+      TypeRepr *repr = unwrapAttributedRepr(entry.getTypeRepr());
+      if (isModuleQualified(repr, proto->getParentModule())) {
+        protocolsWithRetroactiveAttr.insert(proto);
+        continue;
       }
 
-      // If this isn't a retroactive conformance, skip it.
-      if (!conformance->isRetroactive()) {
-        // However, if this is the protocol in the inherited type entry,
-        // check to make sure it's not erroneously marked @retroactive when it's
-        // not actually retroactive.
-        if (decl == proto && entry.isRetroactive()) {
-          auto loc =
-              entry.getTypeRepr()->findAttrLoc(TypeAttrKind::Retroactive);
-
-          bool typeInSamePackage = extTypeModule->inSamePackage(module);
-          bool typeIsSameModule =
-              extTypeModule->isSameModuleLookingThroughOverlays(module);
-
-          auto declForDiag = (typeIsSameModule || typeInSamePackage)
-                                 ? extendedNominalDecl
-                                 : proto;
-          bool isSameModule = declForDiag->getParentModule()
-                                  ->isSameModuleLookingThroughOverlays(module);
-
-          diags
-              .diagnose(loc, diag::retroactive_attr_does_not_apply, declForDiag,
-                        isSameModule)
-              .warnUntilSwiftVersion(6)
-              .fixItRemove(SourceRange(loc, loc.getAdvancedLoc(1)));
-          return TypeWalker::Action::Stop;
+      protos.push_back(proto);
+    } else if (auto *compositionTy = inheritedTy->getAs<ProtocolCompositionType>()) {
+      for (auto memberTy : compositionTy->getMembers()) {
+        if (auto *protoTy = memberTy->getAs<ProtocolType>()) {
+          protos.push_back(protoTy->getDecl());
         }
-        return TypeWalker::Action::Continue;
       }
+    } else {
+      continue;
+    }
 
-      // If it's marked @retroactive, no need to warn.
-      if (entry.isRetroactive()) {
-        // Note that we encountered this protocol through a conformance marked
-        // @retroactive in case multiple clauses cause the protocol to be
-        // inherited.
-        protocolsWithRetroactiveAttr.insert(decl);
+    for (auto *proto : protos) {
+      proto->walkInheritedProtocols([&](ProtocolDecl *decl) {
+        // If this isn't a retroactive conformance, skip it.
+        auto found = protocols.find(proto);
+        if (found != protocols.end() && !found->second) {
+          // However, if this is the protocol in the inherited type entry,
+          // check to make sure it's not erroneously marked @retroactive when it's
+          // not actually retroactive.
+          if (decl == proto && entry.isRetroactive()) {
+            auto loc =
+                entry.getTypeRepr()->findAttrLoc(TypeAttrKind::Retroactive);
+
+            bool typeInSamePackage = extTypeModule->inSamePackage(module);
+            bool typeIsSameModule =
+                extTypeModule->isSameModuleLookingThroughOverlays(module);
+
+            auto declForDiag = (typeIsSameModule || typeInSamePackage)
+                                   ? extendedNominalDecl
+                                   : proto;
+            bool isSameModule = declForDiag->getParentModule()
+                                    ->isSameModuleLookingThroughOverlays(module);
+
+            diags
+                .diagnose(loc, diag::retroactive_attr_does_not_apply, declForDiag,
+                          isSameModule)
+                .warnUntilSwiftVersion(6)
+                .fixItRemove(SourceRange(loc, loc.getAdvancedLoc(1)));
+            return TypeWalker::Action::Stop;
+          }
+          return TypeWalker::Action::Continue;
+        }
+
+        // If it's marked @retroactive, no need to warn.
+        if (entry.isRetroactive()) {
+          // Note that we encountered this protocol through a conformance marked
+          // @retroactive in case multiple clauses cause the protocol to be
+          // inherited.
+          protocolsWithRetroactiveAttr.insert(decl);
+          return TypeWalker::Action::Continue;
+        }
+
         return TypeWalker::Action::Continue;
-      }
-
-      // If we've come this far, we know this extension is the first declaration
-      // of the conformance of the extended type to this protocol.
-      externalProtocols.insert(decl);
-
-      return TypeWalker::Action::Continue;
-    });
+      });
+    }
   }
 
   // Remove protocols that are reachable through a @retroactive conformance.
-  for (auto *proto : protocolsWithRetroactiveAttr) {
-    externalProtocols.remove(proto);
+  SmallSetVector<ProtocolDecl *, 4> externalProtocols;
+  for (auto pair : protocols) {
+    if (pair.second && !protocolsWithRetroactiveAttr.count(pair.first))
+      externalProtocols.insert(pair.first);
   }
 
   // If we didn't find any violations, we're done.
@@ -2401,7 +2430,8 @@ public:
 
         // If strict memory safety checking is enabled, check the storage
         // of the nominal type.
-        if (Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety) &&
+        if (Ctx.LangOpts.hasFeature(
+                Feature::StrictMemorySafety, /*allowMigration=*/true) &&
             !isa<ProtocolDecl>(nominal)) {
           checkUnsafeStorage(nominal);
         }
@@ -2477,6 +2507,10 @@ public:
         Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety)) {
       diagnoseUnsafeUse(UnsafeUse::forPreconcurrencyImport(ID));
     }
+  }
+
+  void visitUsingDecl(UsingDecl *UD) {
+    // Nothing to validate yet.
   }
 
   void visitOperatorDecl(OperatorDecl *OD) {

@@ -569,7 +569,7 @@ public:
 
   void visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
     // Add the property descriptor if the decl needs it.
-    if (ASD->exportsPropertyDescriptor()) {
+    if (ASD->getPropertyDescriptorGenericSignature()) {
       Visitor.addPropertyDescriptor(ASD);
     }
 
@@ -804,6 +804,7 @@ public:
     case DeclKind::PostfixOperator:
     case DeclKind::Macro:
     case DeclKind::MacroExpansion:
+    case DeclKind::Using:
       return false;
     case DeclKind::Missing:
       llvm_unreachable("missing decl should not show up here");
@@ -916,6 +917,7 @@ public:
   UNINTERESTING_DECL(PrecedenceGroup)
   UNINTERESTING_DECL(TopLevelCode)
   UNINTERESTING_DECL(Value)
+  UNINTERESTING_DECL(Using)
 
 #undef UNINTERESTING_DECL
 };

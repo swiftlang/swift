@@ -44,6 +44,12 @@ let mandatoryPerformanceOptimizations = ModulePass(name: "mandatory-performance-
     // Print errors for generic functions in vtables, which is not allowed in embedded Swift.
     checkVTablesForGenericFunctions(moduleContext)
   }
+
+  // It's not required to set the perf_constraint flag on all functions in embedded mode.
+  // Embedded mode already implies that flag.
+  if !moduleContext.options.enableEmbeddedSwift {
+    setPerformanceConstraintFlags(moduleContext)
+  }
 }
 
 private func optimizeFunctionsTopDown(using worklist: inout FunctionWorklist,
@@ -53,13 +59,6 @@ private func optimizeFunctionsTopDown(using worklist: inout FunctionWorklist,
       if !context.loadFunction(function: f, loadCalleesRecursively: true) {
         return
       }
-
-      // It's not required to set the perf_constraint flag on all functions in embedded mode.
-      // Embedded mode already implies that flag.
-      if !moduleContext.options.enableEmbeddedSwift {
-        f.set(isPerformanceConstraint: true, context)
-      }
-
       optimize(function: f, context, moduleContext, &worklist)
     }
 
@@ -68,7 +67,18 @@ private func optimizeFunctionsTopDown(using worklist: inout FunctionWorklist,
     // We need handle this case with a function signature optimization.
     removeMetatypeArgumentsInCallees(of: f, moduleContext)
 
-    worklist.addCallees(of: f)
+    worklist.addCallees(of: f, moduleContext)
+  }
+}
+
+private func setPerformanceConstraintFlags(_ moduleContext: ModulePassContext) {
+  var worklist = FunctionWorklist()
+  for f in moduleContext.functions where f.performanceConstraints != .none && f.isDefinition {
+    worklist.pushIfNotVisited(f)
+  }
+  while let f = worklist.pop() {
+    moduleContext.transform(function: f) { f.set(isPerformanceConstraint: true, $0) }
+    worklist.addCallees(of: f, moduleContext)
   }
 }
 
@@ -137,11 +147,17 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
       // We need to de-virtualize deinits of non-copyable types to be able to specialize the deinitializers.
       case let destroyValue as DestroyValueInst:
         if !devirtualizeDeinits(of: destroyValue, simplifyCtxt) {
-          context.diagnosticEngine.diagnose(destroyValue.location.sourceLoc, .deinit_not_visible)
+          // If invoked from SourceKit avoid reporting false positives when WMO is turned off for indexing purposes.
+          if moduleContext.enableWMORequiredDiagnostics {
+            context.diagnosticEngine.diagnose(destroyValue.location.sourceLoc, .deinit_not_visible)
+          }
         }
       case let destroyAddr as DestroyAddrInst:
         if !devirtualizeDeinits(of: destroyAddr, simplifyCtxt) {
-          context.diagnosticEngine.diagnose(destroyAddr.location.sourceLoc, .deinit_not_visible)
+          // If invoked from SourceKit avoid reporting false positives when WMO is turned off for indexing purposes.
+          if moduleContext.enableWMORequiredDiagnostics {
+            context.diagnosticEngine.diagnose(destroyAddr.location.sourceLoc, .deinit_not_visible)
+          }
         }
 
       case let iem as InitExistentialMetatypeInst:
@@ -515,26 +531,38 @@ fileprivate struct FunctionWorklist {
     return
   }
 
-  mutating func addCallees(of function: Function) {
+  mutating func addCallees(of function: Function, _ context: ModulePassContext) {
     for inst in function.instructions {
       switch inst {
-      case let apply as ApplySite:
-        if let callee = apply.referencedFunction {
-          pushIfNotVisited(callee)
+      case let fri as FunctionRefInst:
+        pushIfNotVisited(fri.referencedFunction)
+      case let alloc as AllocRefInst:
+        if context.options.enableEmbeddedSwift {
+          addVTableMethods(forClassType: alloc.type, context)
         }
-      case let bi as BuiltinInst:
-        switch bi.id {
-        case .Once, .OnceWithContext:
-          if let fri = bi.operands[1].value as? FunctionRefInst {
-            pushIfNotVisited(fri.referencedFunction)
+      case let metatype as MetatypeInst:
+        if context.options.enableEmbeddedSwift {
+          let instanceType = metatype.type.loweredInstanceTypeOfMetatype(in: function)
+          if instanceType.isClass {
+            addVTableMethods(forClassType: instanceType, context)
           }
-          break;
-        default:
-          break
         }
+
       default:
         break
       }
+    }
+  }
+
+  mutating func addVTableMethods(forClassType classType: Type, _ context: ModulePassContext) {
+    guard let vtable = classType.isGenericAtAnyLevel ?
+                        context.lookupSpecializedVTable(for: classType) :
+                        context.lookupVTable(for: classType.nominal!)
+    else {
+      return
+    }
+    for entry in vtable.entries where !entry.implementation.isGeneric {
+      pushIfNotVisited(entry.implementation)
     }
   }
 

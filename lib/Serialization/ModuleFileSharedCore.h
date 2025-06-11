@@ -659,6 +659,10 @@ public:
     return MacroModuleNames;
   }
 
+  ArrayRef<serialization::SearchPath> getSearchPaths() const {
+    return SearchPaths;
+  }
+
   /// Get embedded bridging header.
   std::string getEmbeddedHeader() const {
     // Don't include the '\0' in the end.

@@ -1,7 +1,6 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend-dump-parse \
-// RUN:   -enable-experimental-feature ABIAttribute \
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN:   -enable-experimental-feature RawLayout \
@@ -12,7 +11,6 @@
 // RUN:   | %sanitize-address > %t/astgen.ast
 
 // RUN: %target-swift-frontend-dump-parse \
-// RUN:   -enable-experimental-feature ABIAttribute \
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN:   -enable-experimental-feature RawLayout \
@@ -26,7 +24,6 @@
 // RUN: %target-typecheck-verify-swift \
 // RUN:   -module-abi-name ASTGen \
 // RUN:   -enable-experimental-feature ParserASTGen \
-// RUN:   -enable-experimental-feature ABIAttribute \
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN:   -enable-experimental-feature RawLayout \
@@ -38,7 +35,6 @@
 // REQUIRES: executable_test
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_ParserASTGen
-// REQUIRES: swift_feature_ABIAttribute
 // REQUIRES: swift_feature_Extern
 // REQUIRES: swift_feature_LifetimeDependence
 // REQUIRES: swift_feature_RawLayout
@@ -260,3 +256,6 @@ struct LayoutOuter {
 struct AnyEraser: EraserProto {
   init<T: EraserProto>(erasing: T) {}
 }
+
+func takeNone(@_inheritActorContext param: @Sendable () async -> ()) { }
+func takeAlways(@_inheritActorContext(always) param: sending @isolated(any) () -> ()) { }

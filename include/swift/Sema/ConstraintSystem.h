@@ -3484,6 +3484,15 @@ public:
     return nullptr;
   }
 
+  Expr *getSemanticsProvidingParentExpr(Expr *expr) {
+    while (auto *parent = getParentExpr(expr)) {
+      if (parent->getSemanticsProvidingExpr() == parent)
+        return parent;
+      expr = parent;
+    }
+    return nullptr;
+  }
+
   /// Retrieve the depth of the given expression.
   std::optional<unsigned> getExprDepth(Expr *expr) {
     if (auto result = getExprDepthAndParent(expr))

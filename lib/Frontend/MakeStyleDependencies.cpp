@@ -221,6 +221,7 @@ bool swift::emitMakeDependenciesIfNeeded(CompilerInstance &instance,
     if (auto err = CASBackend.storeMakeDependenciesFile(dependenciesFilePath,
                                                         buffer)) {
       instance.getDiags().diagnose(SourceLoc(), diag::error_cas,
+                                   "storing make-style dependency file",
                                    toString(std::move(err)));
       return true;
     }

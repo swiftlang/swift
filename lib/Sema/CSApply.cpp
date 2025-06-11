@@ -1345,8 +1345,32 @@ namespace {
           new (ctx) AutoClosureExpr(/*set body later*/ nullptr, thunkTy, dc);
       thunk->setParameterList(thunkParamList);
       thunk->setThunkKind(AutoClosureExpr::Kind::SingleCurryThunk);
+
+      // TODO: We should do this in the ActorIsolation checker but for now it is
+      // too risky. This is a narrow fix for 6.2.
+      //
+      // The problem that this is working around is given an autoclosure that
+      // returns an autoclosure that partially applies over an instance method,
+      // we do not visit the inner autoclosure in the ActorIsolation checker
+      // meaning that we do not properly call setActorIsolation on the
+      // AbstractClosureExpr that we produce here.
+      switch (thunkTy->getIsolation().getKind()) {
+      case FunctionTypeIsolation::Kind::NonIsolated:
+      case FunctionTypeIsolation::Kind::Parameter:
+      case FunctionTypeIsolation::Kind::Erased:
+        break;
+      case FunctionTypeIsolation::Kind::GlobalActor:
+        thunk->setActorIsolation(ActorIsolation::forGlobalActor(
+            thunkTy->getIsolation().getGlobalActorType()));
+        break;
+      case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+        thunk->setActorIsolation(
+            ActorIsolation::forCallerIsolationInheriting());
+        break;
+      }
+
       cs.cacheType(thunk);
-      
+
       // If the `self` type is existential, it must be opened.
       OpaqueValueExpr *baseOpened = nullptr;
       Expr *origBaseExpr = baseExpr;
@@ -1630,6 +1654,29 @@ namespace {
 
       // Build a member reference.
       auto memberRef = resolveConcreteDeclRef(member, memberLocator);
+
+      // If our member reference is a value generic, then the resulting
+      // expression is the type value one to access the underlying parameter's
+      // value.
+      //
+      // This can occur in code that does something like: 'type(of: x).a' where
+      // 'a' is the static value generic member.
+      if (auto gp = dyn_cast<GenericTypeParamDecl>(member)) {
+        if (gp->isValue()) {
+          auto refType = adjustedOpenedType;
+          auto ref = TypeValueExpr::createForDecl(memberLoc, gp, dc);
+          cs.setType(ref, refType);
+
+          auto gpTy = gp->getDeclaredInterfaceType();
+          auto subs = baseTy->getContextSubstitutionMap();
+          ref->setParamType(gpTy.subst(subs));
+
+          auto result = new (ctx) DotSyntaxBaseIgnoredExpr(base, dotLoc, ref,
+                                                           refType);
+          cs.setType(result, refType);
+          return result;
+        }
+      }
 
       // If we're referring to a member type, it's just a type
       // reference.
@@ -3223,8 +3270,20 @@ namespace {
 
     Expr *visitTypeValueExpr(TypeValueExpr *expr) {
       auto toType = simplifyType(cs.getType(expr));
-      assert(toType->isEqual(expr->getParamDecl()->getValueType()));
+      ASSERT(toType->isEqual(expr->getParamDecl()->getValueType()));
       cs.setType(expr, toType);
+
+      auto declRefRepr = cast<DeclRefTypeRepr>(expr->getRepr());
+      auto resolvedTy =
+          TypeResolution::resolveContextualType(declRefRepr, cs.DC,
+                                             TypeResolverContext::InExpression,
+                                                nullptr, nullptr, nullptr);
+
+      if (!resolvedTy || resolvedTy->hasError())
+        return nullptr;
+
+      expr->setParamType(resolvedTy);
+
       return expr;
     }
 
@@ -6050,15 +6109,20 @@ static bool hasCurriedSelf(ConstraintSystem &cs, ConcreteDeclRef callee,
 }
 
 /// Apply the contextually Sendable flag to the given expression,
-static void applyContextualClosureFlags(Expr *expr, bool implicitSelfCapture,
-                                        bool inheritActorContext,
-                                        bool isPassedToSendingParameter,
+static void applyContextualClosureFlags(Expr *expr, unsigned paramIdx,
+                                        const ParameterListInfo &paramInfo,
                                         bool requiresDynamicIsolationChecking,
                                         bool isMacroArg) {
   if (auto closure = dyn_cast<ClosureExpr>(expr)) {
-    closure->setAllowsImplicitSelfCapture(implicitSelfCapture);
-    closure->setInheritsActorContext(inheritActorContext);
-    closure->setIsPassedToSendingParameter(isPassedToSendingParameter);
+    closure->setAllowsImplicitSelfCapture(
+        paramInfo.isImplicitSelfCapture(paramIdx));
+
+    auto [inheritActorContext, modifier] =
+        paramInfo.inheritsActorContext(paramIdx);
+    closure->setInheritsActorContext(inheritActorContext, modifier);
+
+    closure->setIsPassedToSendingParameter(
+        paramInfo.isSendingParameter(paramIdx));
     closure->setRequiresDynamicIsolationChecking(
         requiresDynamicIsolationChecking);
     closure->setIsMacroArgument(isMacroArg);
@@ -6066,19 +6130,14 @@ static void applyContextualClosureFlags(Expr *expr, bool implicitSelfCapture,
   }
 
   if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
-    applyContextualClosureFlags(captureList->getClosureBody(),
-                                implicitSelfCapture, inheritActorContext,
-                                isPassedToSendingParameter,
-                                requiresDynamicIsolationChecking,
+    applyContextualClosureFlags(captureList->getClosureBody(), paramIdx,
+                                paramInfo, requiresDynamicIsolationChecking,
                                 isMacroArg);
   }
 
   if (auto identity = dyn_cast<IdentityExpr>(expr)) {
-    applyContextualClosureFlags(identity->getSubExpr(), implicitSelfCapture,
-                                inheritActorContext,
-                                isPassedToSendingParameter,
-                                requiresDynamicIsolationChecking,
-                                isMacroArg);
+    applyContextualClosureFlags(identity->getSubExpr(), paramIdx, paramInfo,
+                                requiresDynamicIsolationChecking, isMacroArg);
   }
 }
 
@@ -6204,19 +6263,13 @@ ArgumentList *ExprRewriter::coerceCallArguments(
 
   auto applyFlagsToArgument = [&paramInfo,
                                &closuresRequireDynamicIsolationChecking,
-                               &locator](
-                                  unsigned paramIdx, Expr *argument) {
+                               &locator](unsigned paramIdx, Expr *argument) {
     if (!isClosureLiteralExpr(argument))
       return;
 
-    bool isImplicitSelfCapture = paramInfo.isImplicitSelfCapture(paramIdx);
-    bool inheritsActorContext = paramInfo.inheritsActorContext(paramIdx);
-    bool isPassedToSendingParameter = paramInfo.isSendingParameter(paramIdx);
     bool isMacroArg = isExpr<MacroExpansionExpr>(locator.getAnchor());
 
-    applyContextualClosureFlags(argument, isImplicitSelfCapture,
-                                inheritsActorContext,
-                                isPassedToSendingParameter,
+    applyContextualClosureFlags(argument, paramIdx, paramInfo,
                                 closuresRequireDynamicIsolationChecking,
                                 isMacroArg);
   };
@@ -7690,11 +7743,13 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     // If we have a ClosureExpr, then we can safely propagate a global actor
-    // to the closure without invalidating prior analysis.
+    // to the closure if it's not explicitly marked as `@concurrent` without
+    // invalidating prior analysis.
     fromEI = fromFunc->getExtInfo();
-    if (toEI.getGlobalActor() && !fromEI.getGlobalActor()) {
-      auto newFromFuncType = fromFunc->withExtInfo(
-          fromEI.withGlobalActor(toEI.getGlobalActor()));
+    if (toEI.getGlobalActor() && !fromEI.getGlobalActor() &&
+        !isClosureMarkedAsConcurrent(expr)) {
+      auto newFromFuncType =
+          fromFunc->withExtInfo(fromEI.withGlobalActor(toEI.getGlobalActor()));
       if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
         fromFunc = newFromFuncType->castTo<FunctionType>();
 
@@ -8117,7 +8172,7 @@ Expr *ExprRewriter::convertLiteralInPlace(
     Diag<> brokenProtocolDiag, Diag<> brokenBuiltinProtocolDiag) {
   // If coercing a literal to an unresolved type, we don't try to look up the
   // witness members, just do it.
-  if (type->is<UnresolvedType>()) {
+  if (type->is<UnresolvedType>() || type->is<ErrorType>()) {
     cs.setType(literal, type);
     return literal;
   }
@@ -8610,7 +8665,10 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
                                  AccessSemantics::Ordinary);
   if (!declRef)
     return nullptr;
-  declRef->setImplicit(apply->isImplicit());
+
+  if (!isa<AutoClosureExpr>(declRef))
+    declRef->setImplicit(apply->isImplicit());
+
   apply->setFn(declRef);
 
   // Tail-recur to actually call the constructor.

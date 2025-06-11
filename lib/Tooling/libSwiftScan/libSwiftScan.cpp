@@ -589,45 +589,15 @@ swiftscan_compiler_supported_features_query() {
 //=== Scanner Diagnostics -------------------------------------------------===//
 swiftscan_diagnostic_set_t*
 swiftscan_scanner_diagnostics_query(swiftscan_scanner_t scanner) {
-  DependencyScanningTool *ScanningTool = unwrap(scanner);
-  auto Diagnostics = ScanningTool->getDiagnostics();
-  auto NumDiagnostics = Diagnostics.size();
-
-  swiftscan_diagnostic_set_t *Result = new swiftscan_diagnostic_set_t;
-  Result->count = NumDiagnostics;
-  Result->diagnostics = new swiftscan_diagnostic_info_t[NumDiagnostics];
-
-  for (size_t i = 0; i < NumDiagnostics; ++i) {
-    const auto &Diagnostic = Diagnostics[i];
-    swiftscan_diagnostic_info_s *DiagnosticInfo = new swiftscan_diagnostic_info_s;
-    DiagnosticInfo->message = swift::c_string_utils::create_clone(Diagnostic.Message.c_str());
-    switch (Diagnostic.Severity) {
-    case llvm::SourceMgr::DK_Error:
-      DiagnosticInfo->severity = SWIFTSCAN_DIAGNOSTIC_SEVERITY_ERROR;
-      break;
-    case llvm::SourceMgr::DK_Warning:
-      DiagnosticInfo->severity = SWIFTSCAN_DIAGNOSTIC_SEVERITY_WARNING;
-      break;
-    case llvm::SourceMgr::DK_Note:
-      DiagnosticInfo->severity = SWIFTSCAN_DIAGNOSTIC_SEVERITY_NOTE;
-      break;
-    case llvm::SourceMgr::DK_Remark:
-      DiagnosticInfo->severity = SWIFTSCAN_DIAGNOSTIC_SEVERITY_REMARK;
-      break;
-    }
-    // swiftscan_scanner_diagnostics_query is deprecated,
-    // so it does not support source locations.
-    DiagnosticInfo->source_location = nullptr;
-    Result->diagnostics[i] = DiagnosticInfo;
-  }
-
-  return Result;
+  // This method is deprecated
+  swiftscan_diagnostic_set_t *set = new swiftscan_diagnostic_set_t;
+  set->count = 0;
+  return set;
 }
 
 void
 swiftscan_scanner_diagnostics_reset(swiftscan_scanner_t scanner) {
-  DependencyScanningTool *ScanningTool = unwrap(scanner);
-  ScanningTool->resetDiagnostics();
+  // This method is deprecated
 }
 
 swiftscan_string_ref_t

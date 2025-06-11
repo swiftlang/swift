@@ -12,6 +12,7 @@
 
 #include "FeatureSet.h"
 
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericParamList.h"
@@ -388,7 +389,7 @@ static ABIAttr *getABIAttr(Decl *decl) {
   return decl->getAttrs().getAttribute<ABIAttr>();
 }
 
-static bool usesFeatureABIAttribute(Decl *decl) {
+static bool usesFeatureABIAttributeSE0479(Decl *decl) {
   return getABIAttr(decl) != nullptr;
 }
 
@@ -448,14 +449,6 @@ UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
 UNINTERESTING_FEATURE(CopyBlockOptimization)
 
-static bool usesFeatureSwiftSettings(const Decl *decl) {
-  // We just need to guard `#SwiftSettings`.
-  auto *macro = dyn_cast<MacroDecl>(decl);
-  return macro && macro->isStdlibDecl() &&
-         macro->getMacroRoles().contains(MacroRole::Declaration) &&
-         macro->getBaseIdentifier().is("SwiftSettings");
-}
-
 bool swift::usesFeatureIsolatedDeinit(const Decl *decl) {
   if (auto cd = dyn_cast<ClassDecl>(decl)) {
     return cd->getFormalAccess() == AccessLevel::Open &&
@@ -489,6 +482,54 @@ static bool usesFeatureValueGenerics(Decl *decl) {
   return false;
 }
 
+class UsesTypeValueExpr : public ASTWalker {
+public:
+  bool used = false;
+
+  PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
+    if (isa<TypeValueExpr>(expr)) {
+      used = true;
+      return Action::Stop();
+    }
+
+    return Action::Continue(expr);
+  }
+};
+
+static bool usesFeatureValueGenericsNameLookup(Decl *decl) {
+  // Be conservative and mark any function that has a TypeValueExpr in its body
+  // as having used this feature. It's a little difficult to fine grain this
+  // check because the following:
+  //
+  // func a() -> Int {
+  //   A<123>.n
+  // }
+  //
+  // Would appear to have the same expression as something like:
+  //
+  // extension A where n == 123 {
+  //   func b() -> Int {
+  //     n
+  //   }
+  // }
+
+  auto fn = dyn_cast<AbstractFunctionDecl>(decl);
+
+  if (!fn)
+    return false;
+
+  auto body = fn->getMacroExpandedBody();
+
+  if (!body)
+    return false;
+
+  UsesTypeValueExpr utve;
+
+  body->walk(utve);
+
+  return utve.used;
+}
+
 static bool usesFeatureCoroutineAccessors(Decl *decl) {
   auto accessorDeclUsesFeatureCoroutineAccessors = [](AccessorDecl *accessor) {
     return requiresFeatureCoroutineAccessors(accessor->getAccessorKind());
@@ -507,6 +548,8 @@ static bool usesFeatureCoroutineAccessors(Decl *decl) {
     return false;
   }
 }
+
+UNINTERESTING_FEATURE(GeneralizedIsSameMetaTypeBuiltin)
 
 static bool usesFeatureCustomAvailability(Decl *decl) {
   for (auto attr : decl->getSemanticAvailableAttrs()) {
@@ -572,6 +615,27 @@ static bool usesFeatureAsyncExecutionBehaviorAttributes(Decl *decl) {
   return false;
 }
 
+UNINTERESTING_FEATURE(BuiltinSelect)
+
+static bool usesFeatureAlwaysInheritActorContext(Decl *decl) {
+  auto *VD = dyn_cast<ValueDecl>(decl);
+  if (!VD)
+    return false;
+
+  if (auto *PL = VD->getParameterList()) {
+    return llvm::any_of(*PL, [&](const ParamDecl *P) {
+      auto *attr = P->getAttrs().getAttribute<InheritActorContextAttr>();
+      return attr && attr->isAlways();
+    });
+  }
+
+  return false;
+}
+
+static bool usesFeatureDefaultIsolationPerFile(Decl *D) {
+  return isa<UsingDecl>(D);
+}
+
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
 // ----------------------------------------------------------------------------
@@ -583,7 +647,7 @@ void FeatureSet::collectRequiredFeature(Feature feature,
 
 void FeatureSet::collectSuppressibleFeature(Feature feature,
                                             InsertOrRemove operation) {
-  suppressible.insertOrRemove(numFeatures() - size_t(feature),
+  suppressible.insertOrRemove(Feature::getNumFeatures() - size_t(feature),
                               operation == Insert);
 }
 
@@ -657,8 +721,12 @@ FeatureSet swift::getUniqueFeaturesUsed(Decl *decl) {
   // Remove all the features used by all enclosing declarations.
   Decl *enclosingDecl = decl;
   while (!features.empty()) {
+    // If we were in an @abi attribute, collect from the API counterpart.
+    auto abiRole = ABIRoleInfo(enclosingDecl);
+    if (!abiRole.providesAPI() && abiRole.getCounterpart())
+      enclosingDecl = abiRole.getCounterpart();
     // Find the next outermost enclosing declaration.
-    if (auto accessor = dyn_cast<AccessorDecl>(enclosingDecl))
+    else if (auto accessor = dyn_cast<AccessorDecl>(enclosingDecl))
       enclosingDecl = accessor->getStorage();
     else
       enclosingDecl = enclosingDecl->getDeclContext()->getAsDecl();

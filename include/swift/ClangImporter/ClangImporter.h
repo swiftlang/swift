@@ -65,6 +65,7 @@ namespace tooling {
 namespace dependencies {
   struct ModuleDeps;
   struct TranslationUnitDeps;
+  enum class ModuleOutputKind;
   using ModuleDepsGraph = std::vector<ModuleDeps>;
 }
 }
@@ -211,8 +212,7 @@ public:
                        bool ignoreClangTarget = false);
 
   std::vector<std::string>
-  getClangDepScanningInvocationArguments(ASTContext &ctx,
-      std::optional<StringRef> sourceFileName = std::nullopt);
+  getClangDepScanningInvocationArguments(ASTContext &ctx);
 
   static std::unique_ptr<clang::CompilerInvocation>
   createClangInvocation(ClangImporter *importer,
@@ -474,11 +474,6 @@ public:
   /// Reads the original source file name from PCH.
   std::string getOriginalSourceFile(StringRef PCHFilename);
 
-  /// Add clang dependency file names.
-  ///
-  /// \param files The list of file to append dependencies to.
-  void addClangInvovcationDependencies(std::vector<std::string> &files);
-
   /// Makes a temporary replica of the ClangImporter's CompilerInstance, reads a
   /// module map into the replica and emits a PCM file for one of the modules it
   /// declares. Delegates to clang for everything except construction of the
@@ -499,53 +494,31 @@ public:
   void verifyAllModules() override;
 
   using RemapPathCallback = llvm::function_ref<std::string(StringRef)>;
-  llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
+  using LookupModuleOutputCallback =
+      llvm::function_ref<std::string(const clang::tooling::dependencies::ModuleDeps &,
+                                     clang::tooling::dependencies::ModuleOutputKind)>;
+  
+  static llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
   bridgeClangModuleDependencies(
+      const ASTContext &ctx,
       clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
       clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
       StringRef moduleOutputPath, StringRef stableModuleOutputPath,
+      LookupModuleOutputCallback LookupModuleOutput,
       RemapPathCallback remapPath = nullptr);
 
   llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
   getModuleDependencies(Identifier moduleName, StringRef moduleOutputPath, StringRef sdkModuleOutputPath,
                         const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
-                        clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
+                        const std::vector<std::string> &swiftModuleClangCC1CommandLineArgs,
                         InterfaceSubContextDelegate &delegate,
                         llvm::PrefixMapper *mapper,
                         bool isTestableImport = false) override;
 
-  void recordBridgingHeaderOptions(
-      ModuleDependencyInfo &MDI,
-      const clang::tooling::dependencies::TranslationUnitDeps &deps);
-
-  void getBridgingHeaderOptions(
+  static void getBridgingHeaderOptions(
+      const ASTContext &ctx,
       const clang::tooling::dependencies::TranslationUnitDeps &deps,
       std::vector<std::string> &swiftArgs);
-
-  /// Query dependency information for header dependencies
-  /// of a binary Swift module.
-  ///
-  /// \param moduleID the name of the Swift module whose dependency
-  /// information will be augmented with information about the given
-  /// textual header inputs.
-  ///
-  /// \param headerPath the path to the header to be scanned.
-  ///
-  /// \param clangScanningTool The clang dependency scanner.
-  ///
-  /// \param cache The module dependencies cache to update, with information
-  /// about new Clang modules discovered along the way.
-  ///
-  /// \returns \c true if an error occurred, \c false otherwise
-  bool getHeaderDependencies(
-      ModuleDependencyID moduleID, std::optional<StringRef> headerPath,
-      std::optional<llvm::MemoryBufferRef> sourceBuffer,
-      clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
-      ModuleDependenciesCache &cache,
-      ModuleDependencyIDSetVector &headerClangModuleDependencies,
-      std::vector<std::string> &headerFileInputs,
-      std::vector<std::string> &bridgingHeaderCommandLine,
-      std::optional<std::string> &includeTreeID);
 
   clang::TargetInfo &getModuleAvailabilityTarget() const override;
   clang::ASTContext &getClangASTContext() const override;
@@ -906,9 +879,18 @@ struct ClangInvocationFileMapping {
 /// `suppressDiagnostic` prevents us from emitting warning messages when we
 /// are unable to find headers.
 ClangInvocationFileMapping getClangInvocationFileMapping(
-    ASTContext &ctx,
+    const ASTContext &ctx,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs = nullptr,
     bool suppressDiagnostic = false);
+
+/// Apply the given file mapping to the specified 'fileSystem', used
+/// primarily to inject modulemaps on platforms with non-modularized
+/// platform libraries.
+ClangInvocationFileMapping applyClangInvocationMapping(
+    const ASTContext &ctx,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseVFS,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &fileSystem,
+    bool suppressDiagnostics = false);
 
 /// Information used to compute the access level of inherited C++ members.
 class ClangInheritanceInfo {

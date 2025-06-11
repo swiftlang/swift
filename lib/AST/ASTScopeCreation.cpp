@@ -404,6 +404,7 @@ public:
   VISIT_AND_IGNORE(ParamDecl)
   VISIT_AND_IGNORE(MissingDecl)
   VISIT_AND_IGNORE(MissingMemberDecl)
+  VISIT_AND_IGNORE(UsingDecl)
 
   // This declaration is handled from the PatternBindingDecl
   VISIT_AND_IGNORE(VarDecl)

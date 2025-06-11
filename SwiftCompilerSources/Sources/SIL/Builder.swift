@@ -215,6 +215,13 @@ public struct Builder {
     return notifyNew(cast.getAs(UnconditionalCheckedCastAddrInst.self))
   }
 
+  public func createUncheckedOwnershipConversion(
+    operand: Value, resultOwnership: Ownership
+  ) -> UncheckedOwnershipConversionInst {
+    let uoc = bridged.createUncheckedOwnershipConversion(operand.bridged, resultOwnership._bridged)
+    return notifyNew(uoc.getAs(UncheckedOwnershipConversionInst.self))
+  }
+
   public func createLoad(fromAddress: Value, ownership: LoadInst.LoadOwnership) -> LoadInst {
     let load = bridged.createLoad(fromAddress.bridged, ownership.rawValue)
     return notifyNew(load.getAs(LoadInst.self))
@@ -575,6 +582,7 @@ public struct Builder {
     return notifyNew(endMutation.getAs(EndCOWMutationInst.self))
   }
 
+  @discardableResult
   public func createEndCOWMutationAddr(address: Value) -> EndCOWMutationAddrInst {
     let endMutation = bridged.createEndCOWMutationAddr(address.bridged)
     return notifyNew(endMutation.getAs(EndCOWMutationAddrInst.self))

@@ -1105,8 +1105,7 @@ public:
   bool maybeReadLifetimeDependenceRecord(SmallVectorImpl<uint64_t> &scratch);
 
   // Reads lifetime dependence info from type if present.
-  std::optional<LifetimeDependenceInfo>
-  maybeReadLifetimeDependence(unsigned numParams);
+  std::optional<LifetimeDependenceInfo> maybeReadLifetimeDependence();
 
   // Reads lifetime dependence specifier from decl if present
   bool maybeReadLifetimeEntry(SmallVectorImpl<LifetimeEntry> &specifierList,

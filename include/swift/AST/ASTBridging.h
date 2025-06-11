@@ -1239,6 +1239,18 @@ BridgedNonisolatedAttr_createParsed(BridgedASTContext cContext,
                                     BridgedSourceRange cRange,
                                     BridgedNonIsolatedModifier modifier);
 
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedInheritActorContextModifier {
+  BridgedInheritActorContextModifierNone,
+  BridgedInheritActorContextModifierAlways,
+};
+
+SWIFT_NAME("BridgedInheritActorContextAttr.createParsed(_:atLoc:range:modifier:)")
+BridgedInheritActorContextAttr
+BridgedInheritActorContextAttr_createParsed(BridgedASTContext cContext,
+                                            BridgedSourceLoc cAtLoc,
+                                            BridgedSourceRange cRange,
+                                            BridgedInheritActorContextModifier modifier);
+
 SWIFT_NAME("BridgedObjCAttr.createParsedUnnamed(_:atLoc:attrNameLoc:)")
 BridgedObjCAttr
 BridgedObjCAttr_createParsedUnnamed(BridgedASTContext cContext,
@@ -1701,6 +1713,19 @@ BridgedImportDecl BridgedImportDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cImportKeywordLoc, BridgedImportKind cImportKind,
     BridgedSourceLoc cImportKindLoc, BridgedArrayRef cImportPathElements);
+
+enum ENUM_EXTENSIBILITY_ATTR(open) BridgedUsingSpecifier {
+  BridgedUsingSpecifierMainActor,
+  BridgedUsingSpecifierNonisolated,
+};
+
+SWIFT_NAME("BridgedUsingDecl.createParsed(_:declContext:usingKeywordLoc:"
+           "specifierLoc:specifier:)")
+BridgedUsingDecl BridgedUsingDecl_createParsed(BridgedASTContext cContext,
+                                               BridgedDeclContext cDeclContext,
+                                               BridgedSourceLoc usingKeywordLoc,
+                                               BridgedSourceLoc specifierLoc,
+                                               BridgedUsingSpecifier specifier);
 
 SWIFT_NAME("BridgedSubscriptDecl.createParsed(_:declContext:staticLoc:"
            "staticSpelling:subscriptKeywordLoc:genericParamList:parameterList:"
@@ -3049,8 +3074,6 @@ enum ENUM_EXTENSIBILITY_ATTR(open) BridgedMacroDefinitionKind : size_t {
   BridgedBuiltinExternalMacro,
   /// The builtin definition for the "isolation" macro.
   BridgedBuiltinIsolationMacro,
-  /// The builtin definition for the "SwiftSetting" macro.
-  BridgedBuiltinSwiftSettingsMacro,
 };
 
 struct BridgedASTType {

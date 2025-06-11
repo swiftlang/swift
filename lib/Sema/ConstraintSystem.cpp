@@ -730,7 +730,9 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
   }
 
   if (locator->isLastElement<LocatorPathElt::ArgumentAttribute>()) {
-    return getConstraintLocator(anchor, path.drop_back());
+    auto argLoc = getConstraintLocator(anchor, path.drop_back());
+    return getCalleeLocator(argLoc, lookThroughApply, getType, simplifyType,
+                            getOverloadFor);
   }
 
   // If we have a locator that starts with a key path component element, we
@@ -1414,11 +1416,6 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
   bool async = expr->getAsyncLoc().isValid();
   bool sendable = expr->getAttrs().hasAttribute<SendableAttr>();
 
-  // `@concurrent` attribute is only valid on asynchronous function types.
-  if (expr->getAttrs().hasAttribute<ConcurrentAttr>()) {
-    async = true;
-  }
-
   if (throws || async) {
     return ASTExtInfoBuilder()
       .withThrows(throws, /*FIXME:*/Type())
@@ -1432,11 +1429,17 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
   if (!body)
     return ASTExtInfoBuilder().withSendable(sendable).build();
 
+  // `@concurrent` attribute is only valid on asynchronous function types.
+  bool asyncFromAttr = false;
+  if (expr->getAttrs().hasAttribute<ConcurrentAttr>()) {
+    asyncFromAttr = true;
+  }
+
   auto throwFinder = FindInnerThrows(expr);
   body->walk(throwFinder);
   return ASTExtInfoBuilder()
       .withThrows(throwFinder.foundThrow(), /*FIXME:*/Type())
-      .withAsync(bool(findAsyncNode(expr)))
+      .withAsync(asyncFromAttr || bool(findAsyncNode(expr)))
       .withSendable(sendable)
       .build();
 }

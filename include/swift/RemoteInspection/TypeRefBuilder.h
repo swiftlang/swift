@@ -414,6 +414,15 @@ private:
 
   std::vector<std::unique_ptr<const GenericSignatureRef>> SignatureRefPool;
 
+  /// This builder doesn't perform "on the fly" substitutions, so we preserve
+  /// all pack expansions. We still need an active expansion stack though,
+  /// for the dummy implementation of these methods:
+  /// - beginPackExpansion()
+  /// - advancePackExpansion()
+  /// - createExpandedPackElement()
+  /// - endPackExpansion()
+  std::vector<const TypeRef *> ActivePackExpansions;
+
   TypeConverter TC;
 
 #define TYPEREF(Id, Parent) \
@@ -1133,8 +1142,7 @@ public:
   }
 
   const TypeRef *createPackType(llvm::ArrayRef<const TypeRef *> elements) {
-    // FIXME: Remote mirrors support for variadic generics.
-    return nullptr;
+    return PackTypeRef::create(*this, elements);
   }
 
   const TypeRef *createSILPackType(llvm::ArrayRef<const TypeRef *> elements,
@@ -1144,21 +1152,22 @@ public:
   }
 
   size_t beginPackExpansion(const TypeRef *countType) {
-    // FIXME: Remote mirrors support for variadic generics.
-    return 0;
+    ActivePackExpansions.push_back(countType);
+    return 1;
   }
 
   void advancePackExpansion(size_t index) {
-    // FIXME: Remote mirrors support for variadic generics.
+    assert(index == 0);
   }
 
   const TypeRef *createExpandedPackElement(const TypeRef *patternType) {
-    // FIXME: Remote mirrors support for variadic generics.
-    return nullptr;
+    assert(!ActivePackExpansions.empty());
+    auto countType = ActivePackExpansions.back();
+    return PackExpansionTypeRef::create(*this, patternType, countType);
   }
 
   void endPackExpansion() {
-    // FIXME: Remote mirrors support for variadic generics.
+    ActivePackExpansions.pop_back();
   }
 
   const FunctionTypeRef *createFunctionType(

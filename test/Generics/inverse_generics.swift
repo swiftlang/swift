@@ -365,9 +365,9 @@ func conflict13<T>(_ t: T)
         {}
 
 // expected-warning@+1 {{same-type requirement makes generic parameters 'U' and 'T' equivalent}}
-func conflict14<T, U>(_ t: T, _ u: U)
-  where T: ~Copyable, // expected-error {{'T' required to be 'Copyable' but is marked with '~Copyable'}}
-        U: ~Escapable, // expected-error {{'U' required to be 'Escapable' but is marked with '~Escapable'}}
+func conflict14<T, U>(_ t: borrowing T, _ u: borrowing U)
+  where T: ~Copyable,
+        U: ~Escapable,
         T == U {}
 
 protocol Conflict15 {

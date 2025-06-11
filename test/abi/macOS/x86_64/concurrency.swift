@@ -388,18 +388,11 @@ Added: _$ss33withTaskPriorityEscalationHandler9operation02onC9Escalated9isolatio
 Added: _$sScTss5NeverORszABRs_rlE4nameSSSgvgZ
 Added: _$sScTss5NeverORszABRs_rlE4nameSSSgvpZMV
 Added: _swift_task_getCurrentTaskName
-Added: _$sScG22startTaskSynchronously4name8priority9operationySSSg_ScPSgxyYacntF
-Added: _$sScG37startTaskSynchronouslyUnlessCancelled4name8priority9operationySSSg_ScPSgxyYacntF
+
+// startSynchronously, immediate, addImmediateTask{UnlessCancelled}
+Added: _swift_task_immediate
 Added: _$sScTss5Error_pRs_rlE18startSynchronously4name8priority_ScTyxsAA_pGSSSg_ScPSgxyYaKcntFZ
 Added: _$sScTss5NeverORs_rlE18startSynchronously4name8priority_ScTyxABGSSSg_ScPSgxyYaKcntFZ
-Added: _$sScg22startTaskSynchronously4name8priority9operationySSSg_ScPSgxyYaKcntF
-Added: _$sScg37startTaskSynchronouslyUnlessCancelled4name8priority9operationySSSg_ScPSgxyYaKcntF
-Added: _$ss19DiscardingTaskGroupV05startB13Synchronously4name8priority9operationySSSg_ScPSgyyYacntF
-Added: _$ss19DiscardingTaskGroupV05startB28SynchronouslyUnlessCancelled4name8priority9operationySSSg_ScPSgyyYacntF
-Added: _$ss27ThrowingDiscardingTaskGroupV05startC13Synchronously4name8priority9operationySSSg_ScPSgyyYaKcntF
-Added: _$ss27ThrowingDiscardingTaskGroupV05startC28SynchronouslyUnlessCancelled4name8priority9operationySSSg_ScPSgyyYaKcntF
-
-Added: _swift_task_startSynchronously
 
 // isIsolatingCurrentContext
 Added: _swift_task_invokeSwiftIsIsolatingCurrentContext
@@ -411,24 +404,3 @@ Added: _$sScf25isIsolatingCurrentContextSbSgyFTq
 
 // CoroutineAccessors
 Added: _swift_task_dealloc_through
-
-// SwiftSettings
-Added: _$ss12SwiftSettingVsE16defaultIsolationyABScA_pXpSgFZ
-
-// Hashable for (Throwing)AsyncStream
-Added: _$sScS12ContinuationV7storageScS8_StorageCyx_Gvg
-Added: _$sScS12ContinuationV7storageScS8_StorageCyx_GvpMV
-Added: _$sScS8_StorageCMa
-Added: _$sScS8_StorageCMn
-Added: _$sScS8_StorageCMo
-Added: _$sScS8_StorageCMu
-Added: _$sScS8_StorageCfD
-Added: _$sScS8_StorageCfd
-Added: _$sScs12ContinuationV7storageScs8_StorageCyxq__Gvg
-Added: _$sScs12ContinuationV7storageScs8_StorageCyxq__GvpMV
-Added: _$sScs8_StorageCMa
-Added: _$sScs8_StorageCMn
-Added: _$sScs8_StorageCMo
-Added: _$sScs8_StorageCMu
-Added: _$sScs8_StorageCfD
-Added: _$sScs8_StorageCfd

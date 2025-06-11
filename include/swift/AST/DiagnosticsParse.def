@@ -1568,6 +1568,11 @@ ERROR(attr_unsupported_on_target, none,
 ERROR(attr_name_unsupported_on_target, none,
       "attribute '%0' is unsupported on target '%1'", (StringRef, StringRef))
 
+// abi attribute
+ERROR(attr_abi_incompatible_kind,none,
+      "cannot use %0 in '@abi'",
+      (DescriptiveDeclKind))
+
 // availability
 ERROR(attr_availability_platform,none,
       "expected platform name or '*' for '%0' attribute", (StringRef))
@@ -2174,6 +2179,15 @@ ERROR(nonisolated_nonsending_expected_rparen,PointsToFirstBadToken,
       "expected ')' after 'nonisolated' modifier", ())
 ERROR(nonisolated_nonsending_repeated,none,
       "parameter may have at most one 'nonisolated(nonsending)' specifier", ())
+
+//------------------------------------------------------------------------------
+// MARK: using @<attribute> or using <identifier>
+//------------------------------------------------------------------------------
+ERROR(using_decl_invalid_specifier,PointsToFirstBadToken,
+      "default isolation can only be set to '@MainActor' or 'nonisolated'",
+      ())
+ERROR(experimental_using_decl_disabled,PointsToFirstBadToken,
+      "'using' is an experimental feature that is currently disabled", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

@@ -1537,7 +1537,8 @@ bool swift::checkOverrides(ValueDecl *decl) {
 
   auto &ctx = decl->getASTContext();
   if (overridden.empty() &&
-      ctx.LangOpts.hasFeature(Feature::MemberImportVisibility)) {
+      ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
+                              /*allowMigration=*/true)) {
     // If we didn't find anything, try broadening the search by ignoring missing
     // imports.
     if (!checkPotentialOverrides(decl, overridden,
@@ -2262,7 +2263,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     diagnoseOverrideForAvailability(override, base);
   }
 
-  if (ctx.LangOpts.hasFeature(Feature::StrictMemorySafety)) {
+  if (ctx.LangOpts.hasFeature(Feature::StrictMemorySafety, /*allowMigration=*/true)) {
     // If the override is unsafe but the base declaration is not, then the
     // inheritance itself is unsafe.
     auto subs = SubstitutionMap::getOverrideSubstitutions(base, override);
@@ -2533,7 +2534,8 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // If we didn't find anything, try broadening the search by ignoring missing
   // imports.
   if (overridden.empty() &&
-      ctx.LangOpts.hasFeature(Feature::MemberImportVisibility)) {
+      ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
+                              /*allowMigration=*/true)) {
     overridden = computeOverriddenDecls(decl, true);
     if (!overridden.empty()) {
       auto first = overridden.front();

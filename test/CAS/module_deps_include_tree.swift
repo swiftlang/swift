@@ -41,7 +41,6 @@
 // INCLUDE_TREE_F-NEXT: CHeaders/F.h
 
 // MAIN_CMD: -direct-clang-cc1-module-build
-// MAIN_CMD: -clang-include-tree-root
 // MAIN_CMD: -clang-include-tree-filelist
 
 import C

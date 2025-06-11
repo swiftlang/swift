@@ -406,6 +406,10 @@ SWIFT_REQUEST(TypeChecker, PolymorphicEffectRequirementsRequest,
 SWIFT_REQUEST(TypeChecker, ConformanceHasEffectRequest,
               bool(EffectKind, ProtocolConformanceRef),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, RawConformanceIsolationRequest,
+              std::optional<ActorIsolation>(ProtocolConformance *),
+              SeparatelyCached | SplitCached,
+              NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ConformanceIsolationRequest,
               ActorIsolation(ProtocolConformance *),
               SeparatelyCached | SplitCached,
@@ -627,5 +631,6 @@ SWIFT_REQUEST(TypeChecker, SemanticAvailabilitySpecRequest,
               (const AvailabilitySpec *, const DeclContext *),
               SeparatelyCached, NoLocationInfo)
 
-SWIFT_REQUEST(TypeChecker, SourceFileLangOptionsRequest,
-              SourceFileLangOptions (SourceFile *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, DefaultIsolationInSourceFileRequest,
+              std::optional<DefaultIsolation>(const SourceFile *),
+              Cached, NoLocationInfo)

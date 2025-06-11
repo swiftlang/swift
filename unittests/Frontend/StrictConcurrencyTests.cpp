@@ -42,13 +42,13 @@ static const StrictConcurrencyTestCase strictConcurrencyTestCases[] = {
       {"-enable-upcoming-feature", strictConcurrencyF.name},
       StrictConcurrency::Complete),
   StrictConcurrencyTestCase(
-      {"-enable-upcoming-feature", strictConcurrencyF.name + ":adoption"},
+      {"-enable-upcoming-feature", strictConcurrencyF.name + ":migrate"},
       StrictConcurrency::Minimal),
   StrictConcurrencyTestCase(
       {"-enable-experimental-feature", strictConcurrencyF.name},
       StrictConcurrency::Complete),
   StrictConcurrencyTestCase(
-      {"-enable-experimental-feature", strictConcurrencyF.name + ":adoption"},
+      {"-enable-experimental-feature", strictConcurrencyF.name + ":migrate"},
       StrictConcurrency::Minimal),
   StrictConcurrencyTestCase(
       {"-disable-upcoming-feature", strictConcurrencyF.name},
@@ -73,7 +73,7 @@ static const StrictConcurrencyTestCase strictConcurrencyTestCases[] = {
       StrictConcurrency::Targeted),
   StrictConcurrencyTestCase({
         "-enable-upcoming-feature",
-        strictConcurrencyF.name + "=targeted:adoption",
+        strictConcurrencyF.name + "=targeted:migrate",
       },
       StrictConcurrency::Minimal),
   StrictConcurrencyTestCase(
@@ -81,7 +81,7 @@ static const StrictConcurrencyTestCase strictConcurrencyTestCases[] = {
       StrictConcurrency::Targeted),
   StrictConcurrencyTestCase({
         "-enable-experimental-feature",
-        strictConcurrencyF.name + "=targeted:adoption",
+        strictConcurrencyF.name + "=targeted:migrate",
       },
       StrictConcurrency::Minimal),
   StrictConcurrencyTestCase(

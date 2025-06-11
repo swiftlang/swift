@@ -649,6 +649,25 @@ BridgedNonisolatedAttr_createParsed(BridgedASTContext cContext,
       /*implicit=*/false);
 }
 
+static InheritActorContextModifier
+unbridged(BridgedInheritActorContextModifier modifier) {
+  switch (modifier) {
+  case BridgedInheritActorContextModifierNone:
+    return InheritActorContextModifier::None;
+  case BridgedInheritActorContextModifierAlways:
+    return InheritActorContextModifier::Always;
+  }
+  llvm_unreachable("unhandled enum value");
+}
+
+BridgedInheritActorContextAttr BridgedInheritActorContextAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedInheritActorContextModifier modifier) {
+  return new (cContext.unbridged()) InheritActorContextAttr(
+      cAtLoc.unbridged(), cRange.unbridged(), unbridged(modifier),
+      /*implicit=*/false);
+}
+
 BridgedObjCAttr
 BridgedObjCAttr_createParsedUnnamed(BridgedASTContext cContext,
                                     BridgedSourceLoc cAtLoc,

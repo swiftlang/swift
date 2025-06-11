@@ -131,6 +131,9 @@ class alignas(1 << DeclAlignInBits) ProtocolConformance
   /// conformance definition.
   Type ConformingType;
 
+  friend class ConformanceIsolationRequest;
+  friend class RawConformanceIsolationRequest;
+
 protected:
   // clang-format off
   //
@@ -139,9 +142,16 @@ protected:
   union { uint64_t OpaqueBits;
 
     SWIFT_INLINE_BITFIELD_BASE(ProtocolConformance,
+                               1+1+
                                bitmax(NumProtocolConformanceKindBits, 8),
       /// The kind of protocol conformance.
-      Kind : bitmax(NumProtocolConformanceKindBits, 8)
+      Kind : bitmax(NumProtocolConformanceKindBits, 8),
+
+      /// Whether the "raw" conformance isolation is "inferred", which applies to most conformances.
+      IsRawConformanceInferred : 1,
+
+      /// Whether the computed actor isolation is nonisolated.
+      IsComputedNonisolated : 1
     );
 
     SWIFT_INLINE_BITFIELD_EMPTY(RootProtocolConformance, ProtocolConformance);
@@ -160,9 +170,6 @@ protected:
       /// Whether the preconcurrency attribute is effectful (not redundant) for
       /// this conformance.
       IsPreconcurrencyEffectful : 1,
-
-      /// Whether the computed actor isolation is nonisolated.
-      IsComputedNonisolated : 1,
 
       /// Whether there is an explicit global actor specified for this
       /// conformance.
@@ -198,6 +205,24 @@ protected:
   ProtocolConformance(ProtocolConformanceKind kind, Type conformingType)
     : ConformingType(conformingType) {
     Bits.ProtocolConformance.Kind = unsigned(kind);
+    Bits.ProtocolConformance.IsRawConformanceInferred = false;
+    Bits.ProtocolConformance.IsComputedNonisolated = false;
+  }
+
+  bool isRawConformanceInferred() const {
+    return Bits.ProtocolConformance.IsRawConformanceInferred;
+  }
+
+  void setRawConformanceInferred(bool value = true) {
+    Bits.ProtocolConformance.IsRawConformanceInferred = value;
+  }
+
+  bool isComputedNonisolated() const {
+    return Bits.ProtocolConformance.IsComputedNonisolated;
+  }
+
+  void setComputedNonnisolated(bool value = true) {
+    Bits.ProtocolConformance.IsComputedNonisolated = value;
   }
 
 public:
@@ -245,6 +270,14 @@ public:
   /// If the current conformance is canonical already, it will be returned.
   /// Otherwise a new conformance will be created.
   ProtocolConformance *getCanonicalConformance();
+
+  /// Determine the "raw" actor isolation of this conformance, before applying any inference rules.
+  ///
+  /// Most clients should use `getIsolation()`, unless they are part of isolation inference
+  /// themselves (e.g., conformance checking).
+  ///
+  /// - Returns std::nullopt if the isolation will be inferred.
+  std::optional<ActorIsolation> getRawIsolation() const;
 
   /// Determine the actor isolation of this conformance.
   ActorIsolation getIsolation() const;
@@ -544,6 +577,7 @@ class NormalProtocolConformance : public RootProtocolConformance,
   friend class ValueWitnessRequest;
   friend class TypeWitnessRequest;
   friend class ConformanceIsolationRequest;
+  friend class RawConformanceIsolationRequest;
 
   /// The protocol being conformed to.
   ProtocolDecl *Protocol;
@@ -591,14 +625,6 @@ class NormalProtocolConformance : public RootProtocolConformance,
   // Record the explicitly-specified global actor isolation.
   void setExplicitGlobalActorIsolation(TypeExpr *typeExpr);
 
-  bool isComputedNonisolated() const {
-    return Bits.NormalProtocolConformance.IsComputedNonisolated;
-  }
-
-  void setComputedNonnisolated(bool value = true) {
-    Bits.NormalProtocolConformance.IsComputedNonisolated = value;
-  }
-
 public:
   NormalProtocolConformance(Type conformingType, ProtocolDecl *protocol,
                             SourceLoc loc, DeclContext *dc,
@@ -622,7 +648,6 @@ public:
     Bits.NormalProtocolConformance.HasComputedAssociatedConformances = false;
     Bits.NormalProtocolConformance.SourceKind =
         unsigned(ConformanceEntryKind::Explicit);
-    Bits.NormalProtocolConformance.IsComputedNonisolated = false;
     Bits.NormalProtocolConformance.HasExplicitGlobalActor = false;
     setExplicitGlobalActorIsolation(options.getGlobalActorIsolationType());
   }
@@ -713,6 +738,9 @@ public:
       return ExplicitSafety::Unsafe;
     return ExplicitSafety::Unspecified;
   }
+
+  /// Whether this conformance has explicitly-specified global actor isolation.
+  bool hasExplicitGlobalActorIsolation() const;
 
   /// Determine whether we've lazily computed the associated conformance array
   /// already.

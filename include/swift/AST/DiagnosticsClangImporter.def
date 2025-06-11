@@ -51,10 +51,10 @@ ERROR(emit_pcm_error,Fatal,
 ERROR(dump_pcm_error,Fatal,
    "failed to dump precompiled module '%0'", (StringRef))
 
-WARNING(invalid_swift_name_method,none,
+GROUPED_WARNING(invalid_swift_name_method, ClangDeclarationImport, none,
   "too %select{few|many}0 parameters in swift_name attribute (expected %1; "
   "got %2)", (bool, unsigned, unsigned))
-WARNING(invalid_swift_name_for_decl,none,
+GROUPED_WARNING(invalid_swift_name_for_decl, ClangDeclarationImport, none,
   "custom Swift name '%0' ignored because it is not valid for %kindonly1; "
   "imported as %1 instead",
   (StringRef, ValueDecl *))
@@ -67,20 +67,20 @@ ERROR(swift_name_protocol_static, none, "swift_name cannot be used to define "
 ERROR(swift_name_no_prototype, none,
       "swift_name cannot be used on a non-prototyped function declaration", ())
 
-WARNING(inconsistent_swift_name,none,
+GROUPED_WARNING(inconsistent_swift_name, ClangDeclarationImport, none,
         "inconsistent Swift name for Objective-C %select{method|property}0 "
         "'%1' in '%2' (%3 in '%4' vs. %5 in '%6')",
         (bool, StringRef, StringRef, DeclName, StringRef, DeclName,
          StringRef))
 
-WARNING(swift_name_circular_context_import,none,
+GROUPED_WARNING(swift_name_circular_context_import, ClangDeclarationImport, none,
         "cycle detected while resolving '%0' in swift_name attribute for '%1'",
         (StringRef, StringRef))
 NOTE(swift_name_circular_context_import_other,none,
      "while resolving '%0' in swift_name attribute for '%1'",
      (StringRef, StringRef))
 
-WARNING(unresolvable_clang_decl,none,
+GROUPED_WARNING(unresolvable_clang_decl, ClangDeclarationImport, none,
         "imported declaration '%0' could not be mapped to '%1'",
         (StringRef, StringRef))
 
@@ -88,14 +88,14 @@ NOTE(unresolvable_clang_decl_is_a_framework_bug,none,
      "please report this issue to the owners of '%0'",
      (StringRef))
 
-WARNING(clang_swift_attr_unhandled,none,
+GROUPED_WARNING(clang_swift_attr_unhandled, ClangDeclarationImport, none,
         "ignoring unknown Swift attribute or modifier '%0'", (StringRef))
 
-WARNING(clang_error_code_must_be_sendable,none,
-        "cannot make error code type '%0' non-sendable because Swift errors "
+GROUPED_WARNING(clang_error_code_must_be_sendable, ClangDeclarationImport, none,
+        "cannot make error code type '%0' non-Sendable because Swift errors "
         "are always sendable", (StringRef))
 
-WARNING(clang_ignored_sendable_attr,none,
+GROUPED_WARNING(clang_ignored_sendable_attr, ClangDeclarationImport, none,
         "cannot make type %0 sendable because '@Sendable' and '& Sendable' "
         "cannot be added to it",
         (Type))
@@ -108,18 +108,18 @@ WARNING(implicit_bridging_header_imported_from_module,none,
         "is deprecated and will be removed in a later version of Swift",
         (StringRef, Identifier))
 
-WARNING(import_multiple_mainactor_attr,none,
+GROUPED_WARNING(import_multiple_mainactor_attr, ClangDeclarationImport, none,
       "this attribute for global actor '%0' is invalid; the declaration already has attribute for global actor '%1'",
       (StringRef, StringRef))
 
-WARNING(contradicting_mutation_attrs,none,
+GROUPED_WARNING(contradicting_mutation_attrs, ClangDeclarationImport, none,
         "attribute '%0' is ignored when combined with attribute '%1'",
         (StringRef, StringRef))
 
-WARNING(nonmutating_without_const,none,
+GROUPED_WARNING(nonmutating_without_const, ClangDeclarationImport, none,
         "attribute 'nonmutating' has no effect on non-const method", ())
 
-WARNING(nonmutating_without_mutable_fields,none,
+GROUPED_WARNING(nonmutating_without_mutable_fields, ClangDeclarationImport, none,
         "attribute 'nonmutating' has no effect without any mutable fields", ())
 
 ERROR(module_map_not_found, none, "module map file '%0' not found", (StringRef))
@@ -135,7 +135,7 @@ WARNING(libstdcxx_modulemap_not_found, none,
         "module map for libstdc++ not found for '%0'; C++ stdlib may be unavailable",
         (StringRef))
 
-WARNING(api_pattern_attr_ignored, none,
+GROUPED_WARNING(api_pattern_attr_ignored, ClangDeclarationImport, none,
         "'%0' Swift attribute ignored on type '%1': type is not copyable or destructible",
         (StringRef, StringRef))
 
@@ -226,7 +226,7 @@ ERROR(private_fileid_attr_repeated, none,
  NOTE(private_fileid_attr_here, none,
      "SWIFT_PRIVATE_FILEID annotation found here", ())
 
- WARNING(private_fileid_attr_format_invalid, none,
+ GROUPED_WARNING(private_fileid_attr_format_invalid, ClangDeclarationImport, none,
      "SWIFT_PRIVATE_FILEID annotation on '%0' does not have a valid file ID",
      (StringRef))
  REMARK(private_fileid_attr_format_specification, none,
@@ -302,12 +302,12 @@ ERROR(returns_retained_or_returns_unretained_for_non_cxx_frt_values, none,
 // TODO: In the next C++ interop version, convert this warning into an error and
 // stop importing unannotated C++ APIs that return SWIFT_SHARED_REFERENCE.
 // rdar://138806722
-WARNING(no_returns_retained_returns_unretained, none,
+GROUPED_WARNING(no_returns_retained_returns_unretained, ClangDeclarationImport, none,
         "%0 should be annotated with either SWIFT_RETURNS_RETAINED or "
         "SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE",
         (const clang::NamedDecl *))
 
-WARNING(returns_retained_returns_unretained_on_overloaded_operator, none,
+GROUPED_WARNING(returns_retained_returns_unretained_on_overloaded_operator,  ClangDeclarationImport, none,
         "SWIFT_RETURNS_RETAINED and SWIFT_RETURNS_UNRETAINED is not supported "
         "yet for overloaded C++ %0. Overloaded C++ operators always "
         "return "
@@ -318,7 +318,7 @@ WARNING(returns_retained_returns_unretained_on_overloaded_operator, none,
 // stop importing C++ types that inherit from SWIFT_SHARED_REFERENCE if the
 // Swift compiler cannot find unique retain/release functions.
 // rdar://145194375
-WARNING(cant_infer_frt_in_cxx_inheritance, none,
+GROUPED_WARNING(cant_infer_frt_in_cxx_inheritance, ClangDeclarationImport, none,
         "unable to infer SWIFT_SHARED_REFERENCE for %0, although one of its "
         "transitive base types is marked as SWIFT_SHARED_REFERENCE",
         (const clang::NamedDecl *))
@@ -351,8 +351,12 @@ NOTE(forward_declared_protocol_clashes_with_imported_objc_Swift_protocol, none,
      "its name conflicts with a %1 in module %2",
      (const clang::NamedDecl*, StringRef, StringRef))
 
-WARNING(return_escapable_with_lifetimebound, none, "the returned type '%0' is annotated as escapable; it cannot have lifetime dependencies", (StringRef))
-WARNING(return_nonescapable_without_lifetimebound, none, "the returned type '%0' is annotated as non-escapable; its lifetime dependencies must be annotated", (StringRef))
+GROUPED_WARNING(return_escapable_with_lifetimebound,  ClangDeclarationImport, none,
+     "the returned type '%0' is annotated as escapable; it cannot have lifetime dependencies",
+     (StringRef))
+GROUPED_WARNING(return_nonescapable_without_lifetimebound, ClangDeclarationImport, none,
+     "the returned type '%0' is annotated as non-escapable; its lifetime dependencies must be annotated",
+     (StringRef))
 
 ERROR(unknown_template_parameter,none,
   "template parameter '%0' does not exist", (StringRef))

@@ -80,7 +80,7 @@ public func withDiscardingTaskGroup<GroupResult>(
     discardResults: true
   )
 
-  let _group = Builtin.createTaskGroupWithFlags(flags, GroupResult.self)
+  let _group = Builtin.createTaskGroupWithFlags(flags, Void.self)
   var group = DiscardingTaskGroup(group: _group)
   defer { Builtin.destroyTaskGroup(_group) }
 
@@ -108,7 +108,7 @@ public func _unsafeInheritExecutor_withDiscardingTaskGroup<GroupResult>(
     discardResults: true
   )
 
-  let _group = Builtin.createTaskGroupWithFlags(flags, GroupResult.self)
+  let _group = Builtin.createTaskGroupWithFlags(flags, Void.self)
   var group = DiscardingTaskGroup(group: _group)
   defer { Builtin.destroyTaskGroup(_group) }
 
@@ -347,7 +347,7 @@ public func withThrowingDiscardingTaskGroup<GroupResult>(
       discardResults: true
   )
 
-  let _group = Builtin.createTaskGroupWithFlags(flags, GroupResult.self)
+  let _group = Builtin.createTaskGroupWithFlags(flags, Void.self)
   var group = ThrowingDiscardingTaskGroup<Error>(group: _group)
   defer { Builtin.destroyTaskGroup(_group) }
 
@@ -378,7 +378,7 @@ public func _unsafeInheritExecutor_withThrowingDiscardingTaskGroup<GroupResult>(
       discardResults: true
   )
 
-  let _group = Builtin.createTaskGroupWithFlags(flags, GroupResult.self)
+  let _group = Builtin.createTaskGroupWithFlags(flags, Void.self)
   var group = ThrowingDiscardingTaskGroup<Error>(group: _group)
   defer { Builtin.destroyTaskGroup(_group) }
 

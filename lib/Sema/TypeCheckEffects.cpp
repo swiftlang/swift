@@ -386,7 +386,7 @@ public:
   Type getType() const {
     switch (getKind()) {
     case Kind::Opaque:
-      return getOpaqueFunction()->getType()->lookThroughSingleOptionalType();
+      return getOpaqueFunction()->getType()->lookThroughAllOptionalTypes();
     case Kind::Function: {
       auto *AFD = getFunction();
       if (AFD->hasImplicitSelfDecl() && AppliedSelf)
@@ -395,8 +395,7 @@ public:
     }
     case Kind::Closure: return getClosure()->getType();
     case Kind::Parameter:
-      return getParameter()->getInterfaceType()
-          ->lookThroughSingleOptionalType();
+      return getParameter()->getInterfaceType()->lookThroughAllOptionalTypes();
     }
     llvm_unreachable("bad kind");
   }
@@ -1182,13 +1181,10 @@ public:
              PotentialEffectReason reason, SourceLoc loc,
              bool skipTypeCheck,
              std::optional<EffectKind> onlyEffect = std::nullopt) {
-    ASTContext &ctx = declRef.getDecl()->getASTContext();
-
     Classification result;
     bool considerAsync = !onlyEffect || *onlyEffect == EffectKind::Async;
     bool considerThrows = !onlyEffect || *onlyEffect == EffectKind::Throws;
-    bool considerUnsafe = (!onlyEffect || *onlyEffect == EffectKind::Unsafe) &&
-        ctx.LangOpts.hasFeature(Feature::StrictMemorySafety);
+    bool considerUnsafe = (!onlyEffect || *onlyEffect == EffectKind::Unsafe);
 
     // If we're tracking "unsafe" effects, compute them here.
     if (considerUnsafe) {
@@ -1710,8 +1706,7 @@ public:
         !fnType->isAsync() &&
         !E->isImplicitlyAsync() &&
         !hasAnyConformances &&
-        (fnRef.getExplicitSafety() == ExplicitSafety::Safe ||
-         !ctx.LangOpts.hasFeature(Feature::StrictMemorySafety))) {
+        fnRef.getExplicitSafety() == ExplicitSafety::Safe) {
       return Classification();
     }
 
@@ -1932,7 +1927,6 @@ public:
     // If the safety of the callee is unspecified, check the safety of the
     // arguments specifically.
     if (hasUnspecifiedSafety &&
-        ctx.LangOpts.hasFeature(Feature::StrictMemorySafety) &&
         !(assumedSafeArguments && assumedSafeArguments->contains(E))) {
       classifyApplyEffect(EffectKind::Unsafe);
     }
@@ -3629,9 +3623,9 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
   }
 
   /// Find the top location where we should put the await
-  static Expr *walkToAnchor(Expr *e, llvm::DenseMap<Expr *, Expr *> &parentMap,
-                            bool isInterpolatedString,
-                            bool stopAtAutoClosure) {
+  Expr *walkToAnchor(Expr *e, llvm::DenseMap<Expr *, Expr *> &parentMap,
+                     InterpolatedStringLiteralExpr *interpolatedString,
+                     bool stopAtAutoClosure, EffectKind effect) {
     llvm::SmallPtrSet<Expr *, 4> visited;
     Expr *parent = e;
     Expr *lastParent = e;
@@ -3646,8 +3640,20 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
     if (parent && !isAnchorTooEarly(parent)) {
       return parent;
     }
-    if (isInterpolatedString) {
+    if (interpolatedString) {
       assert(parent == nullptr && "Expected to be at top of expression");
+
+      // If the last parent we found is a call to appendInterpolation, adjust
+      // the anchor location to the interpolated string itself.
+      if (effect == EffectKind::Unsafe) {
+        if (auto callExpr = dyn_cast<CallExpr>(lastParent)) {
+          if (auto calleeDecl = callExpr->getCalledValue()) {
+            if (calleeDecl->getName().matchesRef(Ctx.Id_appendInterpolation))
+              return interpolatedString;
+          }
+        }
+      }
+
       if (ArgumentList *args = lastParent->getArgs()) {
         if (Expr *unaryArg = args->getUnlabeledUnaryExpr())
           return unaryArg;
@@ -4282,8 +4288,9 @@ private:
                  Flags.has(ContextFlags::InAsyncLet))) {
         Expr *expr = E.dyn_cast<Expr*>();
         Expr *anchor = walkToAnchor(expr, parentMap,
-                                    CurContext.isWithinInterpolatedString(),
-                                    /*stopAtAutoClosure=*/true);
+                                    CurContext.getInterpolatedString(),
+                                    /*stopAtAutoClosure=*/true,
+                                    EffectKind::Async);
         if (Flags.has(ContextFlags::StmtExprCoversAwait))
           classification.setDowngradeToWarning(true);
         if (uncoveredAsync.find(anchor) == uncoveredAsync.end())
@@ -4308,8 +4315,9 @@ private:
       if (!Flags.has(ContextFlags::IsUnsafeCovered)) {
         Expr *expr = E.dyn_cast<Expr*>();
         Expr *anchor = walkToAnchor(expr, parentMap,
-                                    CurContext.isWithinInterpolatedString(),
-                                    /*stopAtAutoClosure=*/false);
+                                    CurContext.getInterpolatedString(),
+                                    /*stopAtAutoClosure=*/false,
+                                    EffectKind::Unsafe);
 
         // We don't diagnose uncovered unsafe uses within the next/nextElement
         // call, because they're handled already by the for-in loop checking.
@@ -4553,13 +4561,17 @@ private:
     if (classification.hasUnsafe()) {
       // If there is no such effect, complain.
       if (S->getUnsafeLoc().isInvalid() &&
-          Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety)) {
+          Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety,
+                                  /*allowMigration=*/true)) {
         auto insertionLoc = S->getPattern()->getStartLoc();
         Ctx.Diags.diagnose(S->getForLoc(), diag::for_unsafe_without_unsafe)
           .fixItInsert(insertionLoc, "unsafe ");
+
+        for (const auto &unsafeUse : classification.getUnsafeUses()) {
+          diagnoseUnsafeUse(unsafeUse);
+        }
       }
-    } else if (S->getUnsafeLoc().isValid() &&
-               Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety)) {
+    } else if (S->getUnsafeLoc().isValid()) {
       // Extraneous "unsafe" on the sequence.
       Ctx.Diags.diagnose(S->getUnsafeLoc(), diag::no_unsafe_in_unsafe_for)
         .fixItRemove(S->getUnsafeLoc());
@@ -4604,9 +4616,6 @@ private:
   }
 
   void diagnoseRedundantUnsafe(UnsafeExpr *E) const {
-    if (!Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety))
-      return;
-
     // Silence this warning in the expansion of the _SwiftifyImport macro.
     // This is a hack because it's tricky to determine when to insert "unsafe".
     unsigned bufferID =
@@ -4720,6 +4729,12 @@ private:
           return diag.downgradeToWarning;
         });
 
+    // If there is a single problem, let's attempt to produce a tailed
+    // diagnostic about accessing isolated values outside of their actors.
+    if (errors.size() == 1 &&
+        diagnoseAccessOutsideOfIsolationContext(anchor, errors.front()))
+      return;
+
     Ctx.Diags.diagnose(anchor->getStartLoc(), diag::async_expr_without_await)
       .warnUntilSwiftVersionIf(downgradeToWarning, 6)
       .fixItInsert(loc, insertText)
@@ -4802,9 +4817,79 @@ private:
     }
   }
 
+  /// Check whether the given error points to an attempt to access
+  /// an isolated value or call an isolated function from outside
+  /// its actor and diagnose if so.
+  /// \returns true if problem was diagnosed, false otherwise.
+  bool diagnoseAccessOutsideOfIsolationContext(
+      const Expr *anchor, const DiagnosticInfo &errorInfo) const {
+    auto diagnoseAccessOutsideOfActor = [&](SourceLoc loc,
+                                            ConcreteDeclRef declRef,
+                                            bool isCall = false) {
+      auto declIsolation = getActorIsolation(declRef.getDecl());
+
+      // If the access is to a unspecified/nonisolated value, let's diagnose
+      // it with a generic error/warning about expression being `async`.
+      if (declIsolation.isUnspecified() || declIsolation.isNonisolated())
+        return false;
+
+      const auto &[fixItLoc, insertText] =
+          getFixItForUncoveredSite(anchor, "await");
+
+      Ctx.Diags
+          .diagnose(loc, diag::actor_isolated_access_outside_of_actor_context,
+                    declIsolation, declRef.getDecl(), isCall)
+          .warnUntilSwiftVersionIf(errorInfo.downgradeToWarning, 6)
+          .fixItInsert(fixItLoc, insertText)
+          .highlight(anchor->getSourceRange());
+      return true;
+    };
+
+    switch (errorInfo.reason.getKind()) {
+    case PotentialEffectReason::Kind::AsyncLet:
+    case PotentialEffectReason::Kind::PropertyAccess:
+    case PotentialEffectReason::Kind::SubscriptAccess:
+      if (auto *declRef = dyn_cast<DeclRefExpr>(&errorInfo.expr)) {
+        return diagnoseAccessOutsideOfActor(declRef->getLoc(),
+                                            declRef->getDecl());
+      }
+
+      if (auto *memberRef = dyn_cast<MemberRefExpr>(&errorInfo.expr)) {
+        return diagnoseAccessOutsideOfActor(memberRef->getLoc(),
+                                            memberRef->getDecl());
+      }
+
+      if (auto *lookupExpr = dyn_cast<LookupExpr>(&errorInfo.expr)) {
+        return diagnoseAccessOutsideOfActor(lookupExpr->getLoc(),
+                                            lookupExpr->getMember());
+      }
+
+      break;
+
+    case PotentialEffectReason::Kind::Apply: {
+      auto *call = dyn_cast<ApplyExpr>(&errorInfo.expr);
+      if (call && call->getIsolationCrossing()) {
+        if (auto callee =
+                call->getCalledValue(/*skipFunctionConversions=*/true)) {
+          return diagnoseAccessOutsideOfActor(call->getLoc(), callee,
+                                              /*isCall=*/true);
+        }
+      }
+      break;
+    }
+
+    case PotentialEffectReason::Kind::ByClosure:
+    case PotentialEffectReason::Kind::ByDefaultClosure:
+    case PotentialEffectReason::Kind::ByConformance:
+      break;
+    }
+
+    return false;
+  }
+
   void diagnoseUncoveredUnsafeSite(
       const Expr *anchor, ArrayRef<UnsafeUse> unsafeUses) {
-    if (!Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety))
+    if (!Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety, /*allowMigration=*/true))
       return;
 
     const auto &[loc, insertText] = getFixItForUncoveredSite(anchor, "unsafe");

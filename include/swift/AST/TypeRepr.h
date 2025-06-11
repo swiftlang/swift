@@ -641,7 +641,7 @@ private:
   friend class TypeRepr;
 };
 
-/// An InlineArray type e.g `[2 x Foo]`, sugar for `InlineArray<2, Foo>`.
+/// An InlineArray type e.g `[2 of Foo]`, sugar for `InlineArray<2, Foo>`.
 class InlineArrayTypeRepr : public TypeRepr {
   TypeRepr *Count;
   TypeRepr *Element;

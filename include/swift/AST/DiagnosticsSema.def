@@ -165,15 +165,20 @@ ERROR(init_candidate_inaccessible,none,
       "'%select{private|fileprivate|internal|package|@_spi|@_spi}1' protection level",
       (Type, AccessLevel))
 
-ERROR(candidate_from_missing_import,none,
+GROUPED_ERROR(member_from_missing_import,MemberImportVisibility,none,
       "%kind0 is not available due to missing import of defining module %1",
       (const ValueDecl *, const ModuleDecl *))
-ERROR(candidate_from_missing_imports_2_or_more,none,
+GROUPED_ERROR(member_from_missing_imports_2_or_more,MemberImportVisibility,none,
       "%kind0 is not available due to missing imports of defining modules "
       "%2%select{ and|, }1 %3%select{|, and others}1",
       (const ValueDecl *, bool, const ModuleDecl *, const ModuleDecl *))
 NOTE(candidate_add_import,none,
      "add import of module %0", (const ModuleDecl *))
+
+GROUPED_WARNING(add_required_import_for_member,MemberImportVisibility,none,
+     "import of module %0 is required", (const ModuleDecl *))
+NOTE(decl_from_module_used_here,none,
+     "%kind0 from %1 used here", (const ValueDecl *, const ModuleDecl *))
 
 ERROR(cannot_pass_rvalue_mutating_subelement,none,
       "cannot use mutating member on immutable value: %0",
@@ -859,6 +864,14 @@ ERROR(serialization_failed,none,
 WARNING(can_import_invalid_swiftmodule,none,
         "canImport() evaluated to false due to invalid swiftmodule: %0", (StringRef))
 
+ERROR(map_os_version_from_textual_interface_failed,none,
+      "failed to map OS version from %0 to %1 in %2",
+      (StringRef, StringRef, StringRef))
+
+ERROR(target_os_version_from_textual_interface_invalid,none,
+      "invalid target triple %0 in %1",
+      (StringRef, StringRef))
+
 ERROR(serialization_load_failed,Fatal,
       "failed to load module '%0'", (StringRef))
 ERROR(module_interface_build_failed,Fatal,
@@ -1215,11 +1228,13 @@ ERROR(module_not_compiled_with_library_evolution,none,
       "module %0 was not compiled with library evolution support; "
       "using it means binary compatibility for %1 can't be guaranteed",
       (Identifier, Identifier))
-WARNING(implementation_only_requires_library_evolution,none,
+GROUPED_WARNING(implementation_only_requires_library_evolution,
+        ImplementationOnlyDeprecated,none,
         "using '@_implementationOnly' without enabling library evolution "
         "for %0 may lead to instability during execution",
         (Identifier))
-WARNING(implementation_only_deprecated,none,
+GROUPED_WARNING(implementation_only_deprecated,
+        ImplementationOnlyDeprecated,none,
         "'@_implementationOnly' is deprecated, use 'internal import' instead",
         ())
 
@@ -2327,13 +2342,20 @@ ERROR(alignment_not_power_of_two,none,
 
 // Dependency Scanning
 ERROR(dependency_scan_module_not_found, none, "Unable to find module dependency: '%0'", (StringRef))
+GROUPED_ERROR(dependency_scan_module_not_found_on_specified_search_paths, MissingModuleOnKnownPaths, none,
+              "Compilation search paths unable to resolve module dependency: '%0'", (StringRef))
 NOTE(unresolved_import_location,none,
      "also imported here", ())
 NOTE(dependency_as_imported_by_main_module,none,
      "a dependency of main module '%0'", (StringRef))
 NOTE(dependency_as_imported_by, none,
      "a dependency of %select{Swift|Clang}2 module '%0': '%1'", (StringRef, StringRef, bool))
+NOTE(inherited_search_path_resolves_module,none,
+     "'%0' can be found using a search path that was specified when building module '%1' ('%2'). "
+     "This search path was not explicitly specified on the current compilation.", (StringRef, StringRef, StringRef))
+
 ERROR(clang_dependency_scan_error, none, "Clang dependency scanner failure: %0", (StringRef))
+ERROR(clang_header_dependency_scan_error, none, "Bridging header dependency scan failure: %0", (StringRef))
 
 // Enum annotations
 ERROR(indirect_case_without_payload,none,
@@ -2752,9 +2774,9 @@ NOTE(non_sendable_nominal,none,
 NOTE(add_nominal_sendable_conformance,none,
      "consider making %kind0 conform to the 'Sendable' protocol",
      (const ValueDecl *))
-NOTE(add_generic_parameter_sendable_conformance,none,
-     "consider making generic parameter %0 conform to the 'Sendable' protocol",
-     (Type))
+NOTE(add_generic_parameter_conformance,none,
+     "consider making generic parameter %0 conform to the %1 protocol",
+     (Type, ProtocolDecl *))
 WARNING(add_predates_concurrency_import,none,
      "add '@preconcurrency' to %select{suppress|treat}0 "
      "'Sendable'-related %select{warnings|errors}0 from module %1"
@@ -2771,9 +2793,6 @@ WARNING(remove_package_import,none,
 WARNING(public_decl_needs_sendable,none,
         "public %kind0 does not specify whether it is 'Sendable' or not",
         (const ValueDecl *))
-NOTE(explicit_unchecked_sendable,none,
-     "add '@unchecked Sendable' conformance to %kind0 if this type manually implements concurrency safety",
-     (const ValueDecl *))
 NOTE(explicit_disable_sendable,none,
      "make %kind0 explicitly non-Sendable to suppress this warning",
      (const ValueDecl *))
@@ -4973,6 +4992,8 @@ NOTE(iuo_to_any_coercion_note_func_result,none,
      (const ValueDecl *))
 NOTE(default_optional_to_any,none,
      "provide a default value to avoid this warning", ())
+NOTE(default_optional_parameter,none,
+     "use a default value parameter to avoid this warning", ())
 NOTE(force_optional_to_any,none,
      "force-unwrap the value to avoid this warning", ())
 NOTE(silence_optional_to_any,none,
@@ -4986,28 +5007,28 @@ NOTE(silence_debug_description_in_interpolation_segment_call,none,
      "use 'String(describing:)' to silence this warning", ())
 
 NOTE(noescape_parameter,none,
-    "parameter %1 is implicitly %select{non-escaping|non-sendable}0",
+    "parameter %1 is implicitly %select{non-escaping|non-Sendable}0",
      (unsigned, Identifier))
 NOTE(generic_parameters_always_escaping,none,
      "generic parameters are always considered '@escaping'", ())
 
 ERROR(passing_noattrfunc_to_attrfunc,none,
-      "passing %select{non-escaping|non-sendable}0 parameter %1 to function "
+      "passing %select{non-escaping|non-Sendable}0 parameter %1 to function "
       "expecting %select{an '@escaping'|a '@Sendable'}0 closure",
       (unsigned, Identifier))
 ERROR(converting_noescape_param_to_generic_type,none,
       "converting non-escaping parameter %0 to generic parameter %1 may allow it to escape",
       (Identifier, Type))
 ERROR(assigning_noattrfunc_to_attrfunc,none,
-      "assigning %select{non-escaping|non-sendable}0 parameter %1 to "
+      "assigning %select{non-escaping|non-Sendable}0 parameter %1 to "
       "%select{an '@escaping'|a '@Sendable'}0 closure",
       (unsigned, Identifier))
 ERROR(general_noattrfunc_to_attr,none,
-      "using %select{non-escaping|non-sendable}0 parameter %1 in a context "
+      "using %select{non-escaping|non-Sendable}0 parameter %1 in a context "
       "expecting %select{an '@escaping'|a '@Sendable'}0 closure",
       (unsigned, Identifier))
 ERROR(converting_noattrfunc_to_type,none,
-      "converting %select{non-escaping|non-sendable function}0 value to %1 "
+      "converting %select{non-escaping|non-Sendable function}0 value to %1 "
       "may %select{allow it to escape|introduce data races}0",
       (unsigned, Type))
 NOTE(escape_expected_at_parameter_position,none,
@@ -5023,6 +5044,10 @@ ERROR(converting_func_loses_global_actor,none,
 ERROR(capture_across_type_decl,none,
       "%0 declaration cannot close over value %1 defined in outer scope",
       (DescriptiveDeclKind, Identifier))
+
+ERROR(isolated_any_conversion_to_synchronous_func,none,
+      "converting @isolated(any) function of type %0 to synchronous function type %1 is not allowed",
+      (Type, Type))
 
 ERROR(reference_to_invalid_decl,none,
       "cannot reference invalid declaration %0", (const ValueDecl *))
@@ -5121,6 +5146,9 @@ ERROR(assignment_bang_has_immutable_subcomponent,none,
 NOTE(candidate_is_not_assignable,none,
      "candidate is not assignable: %kind0",
      (const ValueDecl *))
+NOTE(candidate_expects_inout_argument,none,
+     "candidate expects in-out value for parameter #%0 but argument is immutable",
+     (unsigned))
 
 NOTE(change_to_mutating,none,
      "mark %select{method|%1}0 'mutating' to make 'self' mutable",
@@ -5576,6 +5604,9 @@ ERROR(actor_isolated_non_self_reference,none,
         "from a nonisolated autoclosure}2",
         (const ValueDecl *, unsigned, unsigned, Type,
          ActorIsolation))
+ERROR(actor_isolated_access_outside_of_actor_context,none,
+      "%0 %kind1 cannot be %select{accessed|called}2 from outside of the actor",
+      (ActorIsolation, const ValueDecl *, bool))
 ERROR(distributed_actor_isolated_non_self_reference,none,
       "distributed actor-isolated %kind0 can not be accessed from a "
       "nonisolated context",
@@ -5643,15 +5674,15 @@ GROUPED_ERROR(concurrent_access_of_inout_param,SendableClosureCaptures,none,
       "concurrently-executing code",
       (DeclName))
 GROUPED_ERROR(non_sendable_capture,SendableClosureCaptures,none,
-      "capture of %1 with non-sendable type %0 in a '@Sendable' "
+      "capture of %1 with non-Sendable type %0 in a '@Sendable' "
       "%select{local function|closure}2",
       (Type, DeclName, bool))
 ERROR(non_sendable_isolated_capture,none,
-      "capture of %1 with non-sendable type %0 in an isolated "
+      "capture of %1 with non-Sendable type %0 in an isolated "
       "%select{local function|closure}2",
       (Type, DeclName, bool))
-ERROR(non_sendable_metatype_capture,none,
-      "capture of non-sendable type %0 in an isolated "
+GROUPED_ERROR(non_sendable_metatype_capture,SendableMetatypes,none,
+      "capture of non-Sendable type %0 in an isolated "
       "%select{local function|closure}1",
       (Type, bool))
 ERROR(self_capture_deinit_task,none,
@@ -5787,78 +5818,78 @@ NOTE(in_derived_witness, none,
      (DescriptiveDeclKind, DeclName, Type))
 
 ERROR(non_sendable_arg_into_actor,none,
-      "non-sendable type %0 cannot be sent into %2 context in call to %kind1",
+      "non-Sendable type %0 cannot be sent into %2 context in call to %kind1",
       (Type, const ValueDecl *, ActorIsolation))
 ERROR(non_sendable_arg_exits_actor,none,
-      "non-sendable type %0 cannot exit %2 context in call to nonisolated "
+      "non-Sendable type %0 cannot exit %2 context in call to nonisolated "
       "%kind1",
       (Type, const ValueDecl *, ActorIsolation))
 ERROR(non_sendable_param_in_witness,none,
-      "non-sendable parameter type %0 cannot be sent from caller of "
+      "non-Sendable parameter type %0 cannot be sent from caller of "
       "protocol requirement %1 into %2 implementation",
       (Type, const ValueDecl *, ActorIsolation))
 ERROR(non_sendable_param_in_override,none,
-      "non-sendable parameter type %0 cannot be sent from caller of "
+      "non-Sendable parameter type %0 cannot be sent from caller of "
       "superclass %kind1 into %2 override",
       (Type, const ValueDecl *, ActorIsolation))
 ERROR(non_sendable_param_in_objc,none,
-      "non-sendable parameter type %0 of %2 '@objc' %kind1 cannot cross actor "
+      "non-Sendable parameter type %0 of %2 '@objc' %kind1 cannot cross actor "
       "boundary",
       (Type, const ValueDecl *, ActorIsolation))
 
 ERROR(non_sendable_result_into_actor,none,
-      "non-sendable result type %0 cannot be sent from %2 context in call "
+      "non-Sendable result type %0 cannot be sent from %2 context in call "
       "to %kind1",
       (Type, const ValueDecl *, ActorIsolation))
 ERROR(non_sendable_result_exits_actor,none,
-      "non-sendable result type %0 cannot exit %2 context in call to "
+      "non-Sendable result type %0 cannot exit %2 context in call to "
       "nonisolated %kind1",
       (Type, const ValueDecl *, ActorIsolation))
 ERROR(non_sendable_result_in_witness,none,
-      "non-sendable type %0 cannot be returned from %2 implementation "
+      "non-Sendable type %0 cannot be returned from %2 implementation "
       "to caller of protocol requirement %1",
       (Type, const ValueDecl *, ActorIsolation))
 ERROR(non_sendable_result_in_override,none,
-      "non-sendable type %0 cannot be returned from %2 override to "
+      "non-Sendable type %0 cannot be returned from %2 override to "
       "caller of superclass %kind1",
       (Type, const ValueDecl *, ActorIsolation))
 ERROR(non_sendable_result_in_objc,none,
-      "non-sendable type %0 returned by %2 '@objc' %kind1 cannot cross "
+      "non-Sendable type %0 returned by %2 '@objc' %kind1 cannot cross "
       "actor boundary",
       (Type, const ValueDecl *, ActorIsolation))
 
 ERROR(non_sendable_call_result_type,none,
-      "non-sendable result type %0 cannot be sent from %1 context in call "
+      "non-Sendable result type %0 cannot be sent from %1 context in call "
       "to async function",
       (Type, ActorIsolation))
 
 ERROR(non_sendable_property_exits_actor,none,
-      "non-sendable type %0 of %kind1 cannot exit %2 context",
+      "non-Sendable type %0 of %kind1 cannot exit %2 context",
       (Type, const ValueDecl *, ActorIsolation))
 ERROR(non_sendable_property_into_actor,none,
-      "non-sendable type %0 of nonisolated %kind1 cannot be sent to "
+      "non-Sendable type %0 of nonisolated %kind1 cannot be sent to "
       "%2 context",
       (Type, const ValueDecl *, ActorIsolation))
 ERROR(non_sendable_property_in_witness,none,
-      "non-sendable type %0 cannot be returned from %2 implementation "
+      "non-Sendable type %0 cannot be returned from %2 implementation "
       "to caller of protocol requirement %1",
       (Type, const ValueDecl *, ActorIsolation))
 ERROR(non_sendable_property_in_override,none,
-      "non-sendable type %0 cannot be returned from %2 override to "
+      "non-Sendable type %0 cannot be returned from %2 override to "
       "caller of superclass %kind1",
       (Type, const ValueDecl *, ActorIsolation))
 ERROR(non_sendable_property_in_objc,none,
-      "non-sendable type %0 returned by %2 '@objc' %kind1 cannot cross "
+      "non-Sendable type %0 returned by %2 '@objc' %kind1 cannot cross "
       "actor boundary",
       (Type, const ValueDecl *, ActorIsolation))
 
 ERROR(non_sendable_keypath_capture,none,
-      "cannot form key path that captures non-sendable type %0",
+      "cannot form key path that captures non-Sendable type %0",
       (Type))
 ERROR(non_concurrent_type_member,none,
       "%select{stored property %2|associated value %2}1 of "
-      "'Sendable'-conforming %kind3 has non-sendable type %0",
-      (Type, bool, DeclName, const ValueDecl *))
+      "'Sendable'-conforming %kind3 %select{contains|has}4 non-Sendable type %0",
+      (Type, bool, DeclName, const ValueDecl *, bool))
 ERROR(concurrent_value_class_mutable_property,none,
       "stored property %0 of 'Sendable'-conforming %kind1 is mutable",
       (DeclName, const ValueDecl *))
@@ -5875,6 +5906,8 @@ ERROR(concurrent_value_inherit,none,
       (bool, DeclName))
 ERROR(non_sendable_type,none,
       "type %0 does not conform to the 'Sendable' protocol", (Type))
+GROUPED_ERROR(non_sendable_metatype_type,SendableMetatypes,none,
+      "type %0 does not conform to the 'SendableMetatype' protocol", (Type))
 ERROR(sendable_raw_storage,none,
       "struct %0 with '@_rawLayout' does not conform to the 'Sendable' "
       "protocol", (DeclName))
@@ -5951,7 +5984,7 @@ ERROR(nonisolated_lazy,none,
       ())
 
 ERROR(non_sendable_from_deinit,none,
-        "cannot access %1 %2 with a non-sendable type %0 from nonisolated deinit",
+        "cannot access %1 %2 with a non-Sendable type %0 from nonisolated deinit",
         (Type, DescriptiveDeclKind, DeclName))
 
 ERROR(actor_instance_property_wrapper,none,
@@ -6818,14 +6851,18 @@ ERROR(availability_must_occur_alone, none,
       (AvailabilityDomain, bool))
 ERROR(availability_unexpected_version, none,
       "unexpected version number for %0", (AvailabilityDomain))
-WARNING(availability_unrecognized_platform_name,
-        PointsToFirstBadToken, "unrecognized platform name %0", (Identifier))
-WARNING(availability_suggest_platform_name,
-        PointsToFirstBadToken, "unrecognized platform name %0;"
-        " did you mean '%1'?",
+GROUPED_ERROR(availability_unrecognized_platform_name,
+        AvailabilityUnrecognizedName, PointsToFirstBadToken,
+        "unrecognized platform name %0", (Identifier))
+GROUPED_ERROR(availability_suggest_platform_name,
+        AvailabilityUnrecognizedName, PointsToFirstBadToken,
+        "unrecognized platform name %0; did you mean '%1'?",
         (Identifier, StringRef))
 WARNING(availability_unsupported_version_number, none,
         "'%0' is not a supported version number", (llvm::VersionTuple))
+WARNING(availability_invalid_version_number_for_domain, none,
+        "'%0' is not a valid version number for %1",
+        (llvm::VersionTuple, AvailabilityDomain))
 
 WARNING(attr_availability_expected_deprecated_version, none,
        "expected version number with 'deprecated' in '%0' attribute for %1",
@@ -7433,7 +7470,7 @@ ERROR(property_wrapper_effectful,none,
 
 ERROR(property_with_wrapper_conflict_attribute,none,
       "property %0 with a wrapper cannot also be "
-      "%select{lazy|'@NSCopying'|'@NSManaged'|weak|unowned|unmanaged}1",
+      "%select{lazy|'@NSCopying'|'@NSManaged'|'@abi'|weak|unowned|unmanaged}1",
       (Identifier, int))
 ERROR(property_wrapper_not_single_var, none,
       "property wrapper can only apply to a single variable", ())
@@ -8192,8 +8229,8 @@ ERROR(lifetime_dependence_immortal_alone, none,
       "cannot specify any other dependence source along with immortal", ())
 ERROR(lifetime_dependence_invalid_inherit_escapable_type, none,
       "cannot copy the lifetime of an Escapable type, use "
-      "'@lifetime(borrow %0)' instead",
-      (StringRef))
+      "'@lifetime(%1%0)' instead",
+      (StringRef, StringRef))
 ERROR(lifetime_dependence_cannot_use_parsed_borrow_consuming, none,
       "invalid use of %0 dependence with %1 ownership",
       (StringRef, StringRef))
@@ -8213,15 +8250,13 @@ ERROR(lifetime_parameter_requires_inout, none,
 //------------------------------------------------------------------------------
 
 ERROR(lifetime_dependence_feature_required_return, none,
-      "%0 with a ~Escapable result requires "
-      "'-enable-experimental-feature LifetimeDependence'", (StringRef))
+      "%0 cannot return a ~Escapable result", (StringRef))
 ERROR(lifetime_dependence_feature_required_mutating, none,
-      "%0 with ~Escapable 'self' requires "
-      "'-enable-experimental-feature LifetimeDependence'", (StringRef))
+      "%0 cannot have a ~Escapable 'self'", (StringRef))
 ERROR(lifetime_dependence_feature_required_inout, none,
-      "%0 with a ~Escapable 'inout' parameter requires "
-      "'-enable-experimental-feature LifetimeDependence'",
-      // arg list is interchangable with lifetime_dependence_cannot_infer_inout
+      "%0 cannot have a ~Escapable 'inout' parameter %1",
+      // this arg list must be compatible with
+      // lifetime_dependence_cannot_infer_inout
       (StringRef, Identifier))
 
 ERROR(lifetime_dependence_cannot_infer_return, none,
@@ -8430,14 +8465,10 @@ ERROR(attr_abi_mismatched_async,none,
       "cannot give %0 the ABI of %select{a non-async|an async}1 %kindonly0",
       (Decl *, /*abiIsAsync=*/bool))
 
-ERROR(attr_abi_mismatched_pbd_size,none,
-      "cannot give pattern binding the ABI of a binding with "
-      "%select{more|fewer}0 patterns",
-      (/*abiHasExtra=*/bool))
-
-ERROR(attr_abi_mismatched_var,none,
-      "no match for %select{%kind0 in the ABI|ABI %kind0}1",
-      (Decl *, /*isABI=*/bool))
+ERROR(attr_abi_multiple_vars,none,
+      "'abi' attribute can only be applied to a single %0; declare each "
+      "%0 separately",
+      (DescriptiveDeclKind))
 
 ERROR(attr_abi_incompatible_with_silgen_name,none,
       "cannot use '@_silgen_name' and '@abi' on the same %0 because they serve "
@@ -8453,9 +8484,6 @@ ERROR(attr_abi_extra_attr,none,
 ERROR(attr_abi_forbidden_attr,none,
       "unused '%0' %select{attribute|modifier}1 in '@abi'",
       (StringRef, bool))
-REMARK(abi_attr_inferred_attribute,none,
-       "inferred '%0' in '@abi' to match %select{attribute|modifier}1 on API",
-       (StringRef, bool))
 
 ERROR(attr_abi_mismatched_attr,none,
       "'%0' %select{attribute|modifier}1 in '@abi' should match '%2'",
@@ -8494,6 +8522,13 @@ ERROR(attr_abi_no_default_arguments,none,
       "%kind0 in '@abi' should not have a default argument; it does not "
       "affect the parameter's ABI",
       (Decl *))
+
+ERROR(attr_abi_no_macros,none,
+      "%kind0 cannot be expanded in '@abi' attribute",
+      (Decl *))
+ERROR(attr_abi_no_lazy,none,
+      "'lazy' is not compatible with '@abi' attribute",
+      ())
 
 // These macros insert 'final', 'non-final', or nothing depending on both the
 // current decl and its counterpart, such that 'non-final' is used if the
@@ -8541,6 +8576,26 @@ GROUPED_ERROR(isolated_conformance_with_sendable_simple,IsolatedConformances,
 GROUPED_ERROR(isolated_conformance_wrong_domain,IsolatedConformances,none,
       "%0 conformance of %1 to %2 cannot be used in %3 context",
       (ActorIsolation, Type, DeclName, ActorIsolation))
+GROUPED_WARNING(isolated_conformance_will_become_nonisolated,IsolatedConformances,none,
+      "conformance of %0 to %1 should be marked 'nonisolated' to retain its behavior with upcoming feature 'InferIsolatedConformances'",
+      (const ValueDecl *, const ValueDecl *))
+
+//===----------------------------------------------------------------------===//
+// MARK: @_inheritActorContext
+//===----------------------------------------------------------------------===//
+ERROR(inherit_actor_context_only_on_func_types,none,
+      "%0 only applies to parameters with function types (got: %1)",
+      (DeclAttribute, Type))
+
+ERROR(inherit_actor_context_only_on_sending_or_Sendable_params,none,
+      "%0 only applies to 'sending' parameters or parameters with "
+      "'@Sendable' function types",
+      (DeclAttribute))
+
+ERROR(inherit_actor_context_only_on_async_or_isolation_erased_params,none,
+      "%0 only applies to '@isolated(any)' parameters or parameters with "
+      "asynchronous function types",
+      (DeclAttribute))
 
 //===----------------------------------------------------------------------===//
 // MARK: @concurrent and nonisolated(nonsending) attributes
@@ -8628,38 +8683,32 @@ GROUPED_WARNING(
     attr_execution_nonisolated_behavior_will_change_decl, NonisolatedNonsendingByDefault,
     none,
     "feature '%0' will cause nonisolated async %kindbase1 to run on the "
-    "caller's actor; use %2 to preserve behavior",
-    (StringRef, const AbstractFunctionDecl *, DeclAttribute))
+    "caller's actor; use '@concurrent' to preserve behavior",
+    (StringRef, const AbstractFunctionDecl *))
 
 GROUPED_WARNING(
     attr_execution_nonisolated_behavior_will_change_closure,
     NonisolatedNonsendingByDefault, none,
     "feature '%0' will cause nonisolated async closure to run on the caller's "
-    "actor; use %1 to preserve behavior",
-    (StringRef, DeclAttribute))
+    "actor; use '@concurrent' to preserve behavior",
+    (StringRef))
 
 GROUPED_WARNING(
     attr_execution_nonisolated_behavior_will_change_typerepr,
     NonisolatedNonsendingByDefault, none,
     "feature '%0' will cause nonisolated async function type to be treated as "
-    "specified to run on the caller's actor; use %1 to preserve "
+    "specified to run on the caller's actor; use '@concurrent' to preserve "
     "behavior",
-    (StringRef, DeclAttribute))
+    (StringRef))
 
 //===----------------------------------------------------------------------===//
-//                            MARK: SwiftSettings
+// MARK: `using` declaration
 //===----------------------------------------------------------------------===//
+ERROR(invalid_redecl_of_file_isolation,none,
+      "invalid redeclaration of file-level default actor isolation", ())
+NOTE(invalid_redecl_of_file_isolation_prev,none,
+     "default isolation was previously declared here", ())
 
-ERROR(swift_settings_invalid_setting, none,
-      "Unrecognized setting passed to #SwiftSettings", ())
-
-ERROR(swift_settings_must_be_top_level, none,
-      "#SwiftSettings can only be invoked as a top level declaration", ())
-
-ERROR(swift_settings_duplicate_setting, none,
-      "duplicate setting passed to #SwiftSettings", ())
-NOTE(swift_settings_duplicate_setting_original_loc, none,
-     "setting originally passed here", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

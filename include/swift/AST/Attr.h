@@ -230,6 +230,10 @@ protected:
       Modifier : NumNonIsolatedModifierBits
     );
 
+    SWIFT_INLINE_BITFIELD(InheritActorContextAttr, DeclAttribute, NumInheritActorContextKindBits,
+      Modifier : NumInheritActorContextKindBits
+    );
+
     SWIFT_INLINE_BITFIELD_FULL(AllowFeatureSuppressionAttr, DeclAttribute, 1+31,
       : NumPadBits,
       Inverted : 1,
@@ -380,21 +384,14 @@ public:
     /// valid if they match. 
     EquivalentInABIAttr = 1ull << 18,
 
-    /// Attribute can be used in an \c \@abi attribute, but must match
-    /// equivalent on API decl; if omitted, API decl's attribute will be 
-    /// cloned. Use where you would want to use \c EquivalentInABIAttr but 
-    /// repeating the attribute is judged too burdensome.
-    InferredInABIAttr = 1ull << 19,
-
     /// Use for attributes which are \em only valid on declarations that cannot
     /// have an \c @abi attribute, such as \c ImportDecl .
-    UnreachableInABIAttr = 1ull << 20,
+    UnreachableInABIAttr = 1ull << 19,
   };
 
   enum : uint64_t {
     InABIAttrMask = ForbiddenInABIAttr | UnconstrainedInABIAttr
-                  | EquivalentInABIAttr | InferredInABIAttr
-                  | UnreachableInABIAttr
+                  | EquivalentInABIAttr | UnreachableInABIAttr
   };
 
   LLVM_READNONE
@@ -3011,6 +3008,50 @@ public:
   }
 };
 
+/// Represents @_inheritActorContext modifier.
+class InheritActorContextAttr final : public DeclAttribute {
+public:
+  InheritActorContextAttr(SourceLoc atLoc, SourceRange range,
+                          InheritActorContextModifier modifier, bool implicit)
+      : DeclAttribute(DeclAttrKind::InheritActorContext, atLoc, range,
+                      implicit) {
+    Bits.InheritActorContextAttr.Modifier = static_cast<unsigned>(modifier);
+    assert((getModifier() == modifier) && "not enough bits for modifier");
+  }
+
+  InheritActorContextModifier getModifier() const {
+    return static_cast<InheritActorContextModifier>(
+        Bits.InheritActorContextAttr.Modifier);
+  }
+
+  bool isAlways() const {
+    return getModifier() == InheritActorContextModifier::Always;
+  }
+
+  static InheritActorContextAttr *
+  createImplicit(ASTContext &ctx, InheritActorContextModifier modifier =
+                                      InheritActorContextModifier::None) {
+    return new (ctx)
+        InheritActorContextAttr(/*atLoc*/ {}, /*range*/ {}, modifier,
+                                /*implicit=*/true);
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::InheritActorContext;
+  }
+
+  /// Create a copy of this attribute.
+  InheritActorContextAttr *clone(ASTContext &ctx) const {
+    return new (ctx)
+        InheritActorContextAttr(AtLoc, Range, getModifier(), isImplicit());
+  }
+
+  bool isEquivalent(const InheritActorContextAttr *other,
+                    Decl *attachedTo) const {
+    return getModifier() == other->getModifier();
+  }
+};
+
 /// A macro role attribute, spelled with either @attached or @freestanding,
 /// which declares one of the roles that a given macro can inhabit.
 class MacroRoleAttr final
@@ -3584,13 +3625,23 @@ public:
   /// The source range of the `introduced:` version component.
   SourceRange getIntroducedSourceRange() const { return attr->IntroducedRange; }
 
-  /// Returns the effective introduction range indicated by this attribute.
-  /// This may correspond to the version specified by the `introduced:`
-  /// component (remapped or canonicalized if necessary) or it may be "always"
-  /// for an attribute indicating availability in a version-less domain. Returns
-  /// `std::nullopt` if the attribute does not indicate introduction.
+  /// See `getIntroducedDomainAndRange()`.
   std::optional<AvailabilityRange>
-  getIntroducedRange(const ASTContext &Ctx) const;
+  getIntroducedRange(const ASTContext &ctx) const {
+    if (auto domainAndRange = getIntroducedDomainAndRange(ctx))
+      return domainAndRange->getRange();
+    return std::nullopt;
+  }
+
+  /// Returns the effective introduction range indicated by this attribute,
+  /// along with the domain that it applies to (which may be different than the
+  /// domain which the attribute was written with if a remap is required). This
+  /// may correspond to the version specified by the `introduced:` component
+  /// (remapped or canonicalized if necessary) or it may be "always" for an
+  /// attribute indicating availability in a version-less domain. Returns
+  /// `std::nullopt` if the attribute does not indicate introduction.
+  std::optional<AvailabilityDomainAndRange>
+  getIntroducedDomainAndRange(const ASTContext &ctx) const;
 
   /// The version tuple for the `deprecated:` component.
   std::optional<llvm::VersionTuple> getDeprecated() const;
@@ -3598,13 +3649,23 @@ public:
   /// The source range of the `deprecated:` version component.
   SourceRange getDeprecatedSourceRange() const { return attr->DeprecatedRange; }
 
-  /// Returns the effective deprecation range indicated by this attribute.
-  /// This may correspond to the version specified by the `deprecated:`
-  /// component (remapped or canonicalized if necessary) or it may be "always"
-  /// for an unconditional deprecation attribute. Returns `std::nullopt` if the
-  /// attribute does not indicate deprecation.
+  /// See `getDeprecatedDomainAndRange()`.
   std::optional<AvailabilityRange>
-  getDeprecatedRange(const ASTContext &Ctx) const;
+  getDeprecatedRange(const ASTContext &ctx) const {
+    if (auto domainAndRange = getDeprecatedDomainAndRange(ctx))
+      return domainAndRange->getRange();
+    return std::nullopt;
+  }
+
+  /// Returns the effective deprecation range indicated by this attribute, along
+  /// with the domain that it applies to (which may be different than the domain
+  /// which the attribute was written with if a remap is required). This may
+  /// correspond to the version specified by the `deprecated:` component
+  /// (remapped or canonicalized if necessary) or it may be "always" for an
+  /// unconditional deprecation attribute. Returns `std::nullopt` if the
+  /// attribute does not indicate deprecation.
+  std::optional<AvailabilityDomainAndRange>
+  getDeprecatedDomainAndRange(const ASTContext &ctx) const;
 
   /// The version tuple for the `obsoleted:` component.
   std::optional<llvm::VersionTuple> getObsoleted() const;
@@ -3612,13 +3673,23 @@ public:
   /// The source range of the `obsoleted:` version component.
   SourceRange getObsoletedSourceRange() const { return attr->ObsoletedRange; }
 
-  /// Returns the effective obsoletion range indicated by this attribute.
-  /// This always corresponds to the version specified by the `obsoleted:`
-  /// component (remapped or canonicalized if necessary). Returns `std::nullopt`
-  /// if the attribute does not indicate obsoletion (note that unavailability is
-  /// separate from obsoletion.
+  /// See `getObsoletedDomainAndRange()`.
   std::optional<AvailabilityRange>
-  getObsoletedRange(const ASTContext &Ctx) const;
+  getObsoletedRange(const ASTContext &ctx) const {
+    if (auto domainAndRange = getObsoletedDomainAndRange(ctx))
+      return domainAndRange->getRange();
+    return std::nullopt;
+  }
+
+  /// Returns the effective obsoletion range indicated by this attribute, along
+  /// with the domain that it applies to (which may be different than the domain
+  /// which the attribute was written with if a remap is required). This always
+  /// corresponds to the version specified by the `obsoleted:` component
+  /// (remapped or canonicalized if necessary). Returns `std::nullopt` if the
+  /// attribute does not indicate obsoletion (note that unavailability is
+  /// separate from obsoletion.
+  std::optional<AvailabilityDomainAndRange>
+  getObsoletedDomainAndRange(const ASTContext &ctx) const;
 
   /// Returns the `message:` field of the attribute, or an empty string.
   StringRef getMessage() const { return attr->Message; }

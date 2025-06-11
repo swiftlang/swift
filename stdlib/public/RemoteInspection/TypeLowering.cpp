@@ -1744,6 +1744,15 @@ public:
     return true;
   }
 
+  bool visitPackTypeRef(const PackTypeRef *P) {
+    return false;
+  }
+
+  bool visitPackExpansionTypeRef(const PackExpansionTypeRef *PE) {
+    DEBUG_LOG(fprintf(stderr, "Cannot have pack expansion type here: "); PE->dump());
+    return false;
+  }
+
   bool visitFunctionTypeRef(const FunctionTypeRef *F) {
     return true;
   }
@@ -1876,6 +1885,20 @@ public:
     auto result = MetatypeRepresentation::Thin;
     for (auto Element : T->getElements())
       result = combineRepresentations(result, visit(Element));
+    return result;
+  }
+
+  MetatypeRepresentation visitPackTypeRef(const PackTypeRef *P) {
+    auto result = MetatypeRepresentation::Thin;
+    for (auto Element : P->getElements())
+      result = combineRepresentations(result, visit(Element));
+    return result;
+  }
+
+  MetatypeRepresentation visitPackExpansionTypeRef(const PackExpansionTypeRef *PE) {
+    auto result = MetatypeRepresentation::Thin;
+    result = combineRepresentations(result, visit(PE->getPattern()));
+    result = combineRepresentations(result, visit(PE->getCount()));
     return result;
   }
 
@@ -2419,6 +2442,16 @@ public:
       // The label is not going to be relevant/harmful for looking up type info.
       builder.addField("", Element, ExternalTypeInfo);
     return builder.build();
+  }
+
+  const TypeInfo *visitPackTypeRef(const PackTypeRef *P) {
+    DEBUG_LOG(fprintf(stderr, "Cannot have pack type here: "); P->dump());
+    return nullptr;
+  }
+
+  const TypeInfo *visitPackExpansionTypeRef(const PackExpansionTypeRef *PE) {
+    DEBUG_LOG(fprintf(stderr, "Cannot have pack expansion type here: "); PE->dump());
+    return nullptr;
   }
 
   const TypeInfo *visitFunctionTypeRef(const FunctionTypeRef *F) {

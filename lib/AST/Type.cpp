@@ -1353,6 +1353,7 @@ ParameterListInfo::ParameterListInfo(
   propertyWrappers.resize(params.size());
   implicitSelfCapture.resize(params.size());
   inheritActorContext.resize(params.size());
+  alwaysInheritActorContext.resize(params.size());
   variadicGenerics.resize(params.size());
   sendingParameters.resize(params.size());
 
@@ -1409,8 +1410,13 @@ ParameterListInfo::ParameterListInfo(
       implicitSelfCapture.set(i);
     }
 
-    if (param->getAttrs().hasAttribute<InheritActorContextAttr>()) {
-      inheritActorContext.set(i);
+    if (auto *attr =
+            param->getAttrs().getAttribute<InheritActorContextAttr>()) {
+      if (attr->isAlways()) {
+        alwaysInheritActorContext.set(i);
+      } else {
+        inheritActorContext.set(i);
+      }
     }
 
     if (param->getInterfaceType()->is<PackExpansionType>()) {
@@ -1444,10 +1450,18 @@ bool ParameterListInfo::isImplicitSelfCapture(unsigned paramIdx) const {
       : false;
 }
 
-bool ParameterListInfo::inheritsActorContext(unsigned paramIdx) const {
-  return paramIdx < inheritActorContext.size()
-      ? inheritActorContext[paramIdx]
-      : false;
+std::pair<bool, InheritActorContextModifier>
+ParameterListInfo::inheritsActorContext(unsigned paramIdx) const {
+  if (paramIdx >= inheritActorContext.size())
+    return std::make_pair(false, InheritActorContextModifier::None);
+
+  if (inheritActorContext[paramIdx])
+    return std::make_pair(true, InheritActorContextModifier::None);
+
+  if (alwaysInheritActorContext[paramIdx])
+    return std::make_pair(true, InheritActorContextModifier::Always);
+
+  return std::make_pair(false, InheritActorContextModifier::None);
 }
 
 bool ParameterListInfo::isVariadicGenericParameter(unsigned paramIdx) const {

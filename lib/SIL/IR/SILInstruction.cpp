@@ -1096,8 +1096,8 @@ MemoryBehavior SILInstruction::getMemoryBehavior() const {
     llvm_unreachable("Covered switch isn't covered?!");
   }
   
-  if (auto mdi = MarkDependenceInstruction(this)) {
-    if (mdi.getBase()->getType().isAddress())
+  if (auto *mdi = dyn_cast<MarkDependenceInst>(this)) {
+    if (mdi->getBase()->getType().isAddress())
       return MemoryBehavior::MayRead;
     return MemoryBehavior::None;
   }
@@ -1353,7 +1353,7 @@ bool SILInstruction::isDeallocatingStack() const {
 }
 
 static bool typeOrLayoutInvolvesPack(SILType ty, SILFunction const &F) {
-  return ty.hasAnyPack() || ty.isOrContainsPack(F);
+  return ty.isOrContainsPack(F);
 }
 
 bool SILInstruction::mayRequirePackMetadata(SILFunction const &F) const {

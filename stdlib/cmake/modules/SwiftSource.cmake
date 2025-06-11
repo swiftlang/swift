@@ -50,7 +50,7 @@ function(handle_swift_sources
     sourcesvar externalvar name)
   cmake_parse_arguments(SWIFTSOURCES
       "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC;NO_LINK_NAME;IS_FRAGILE;ONLY_SWIFTMODULE;NO_SWIFTMODULE"
-      "SDK;ARCHITECTURE;INSTALL_IN_COMPONENT;DEPLOYMENT_VERSION_OSX;DEPLOYMENT_VERSION_IOS;DEPLOYMENT_VERSION_TVOS;DEPLOYMENT_VERSION_WATCHOS;MACCATALYST_BUILD_FLAVOR;BOOTSTRAPPING;INSTALL_BINARY_SWIFTMODULE"
+      "SDK;ARCHITECTURE;ARCHITECTURE_SUBDIR_NAME;INSTALL_IN_COMPONENT;DEPLOYMENT_VERSION_OSX;DEPLOYMENT_VERSION_IOS;DEPLOYMENT_VERSION_TVOS;DEPLOYMENT_VERSION_WATCHOS;MACCATALYST_BUILD_FLAVOR;BOOTSTRAPPING;INSTALL_BINARY_SWIFTMODULE"
       "DEPENDS;COMPILE_FLAGS;MODULE_NAME;MODULE_DIR;ENABLE_LTO"
       ${ARGN})
   translate_flag(${SWIFTSOURCES_IS_MAIN} "IS_MAIN" IS_MAIN_arg)
@@ -83,6 +83,9 @@ function(handle_swift_sources
   precondition(SWIFTSOURCES_SDK "Should specify an SDK")
   precondition(SWIFTSOURCES_ARCHITECTURE "Should specify an architecture")
   precondition(SWIFTSOURCES_INSTALL_IN_COMPONENT "INSTALL_IN_COMPONENT is required")
+  if (NOT SWIFTSOURCES_ARCHITECTURE_SUBDIR_NAME)
+    set(SWIFTSOURCES_ARCHITECTURE_SUBDIR_NAME "${SWIFTSOURCES_ARCHITECTURE}")
+  endif()
 
   # Clear the result variable.
   set("${dependency_target_out_var_name}" "" PARENT_SCOPE)
@@ -108,12 +111,12 @@ function(handle_swift_sources
   endif()
 
   if(swift_sources)
-    set(objsubdir "/${SWIFTSOURCES_SDK}/${SWIFTSOURCES_ARCHITECTURE}")
+    set(objsubdir "/${SWIFTSOURCES_SDK}/${SWIFTSOURCES_ARCHITECTURE_SUBDIR_NAME}")
 
     get_maccatalyst_build_flavor(maccatalyst_build_flavor
       "${SWIFTSOURCES_SDK}" "${SWIFTSOURCES_MACCATALYST_BUILD_FLAVOR}")
     if(maccatalyst_build_flavor STREQUAL "ios-like")
-      set(objsubdir "/MACCATALYST/${SWIFTSOURCES_ARCHITECTURE}")
+      set(objsubdir "/MACCATALYST/${SWIFTSOURCES_ARCHITECTURE_SUBDIR_NAME}")
     endif()
 
     get_bootstrapping_path(lib_dir
@@ -746,7 +749,9 @@ function(_compile_swift_files
     endif()
 
     set(exclude_binary_swiftmodule_installation_args "")
-    if(NOT SWIFTFILE_INSTALL_BINARY_SWIFTMODULE)
+    if(NOT SWIFTFILE_INSTALL_BINARY_SWIFTMODULE OR
+       (SWIFTFILE_INSTALL_BINARY_SWIFTMODULE STREQUAL "NON_DARWIN_ONLY" AND
+        SWIFTFILE_SDK IN_LIST SWIFT_DARWIN_PLATFORMS))
         list(APPEND
           exclude_binary_swiftmodule_installation_args
           "REGEX" "${SWIFTFILE_MODULE_NAME}.swiftmodule/[^/]*\\.swiftmodule$" EXCLUDE)

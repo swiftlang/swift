@@ -88,7 +88,7 @@ extension CxxSpan {
     unsafe self.init(unsafeMutableBufferPointer.baseAddress!, Size(unsafeMutableBufferPointer.count))
   }
 
-  @available(SwiftStdlib 6.2, *)
+  @available(SwiftCompatibilitySpan 5.0, *)
   @inlinable
   @unsafe
   public init(_ span: Span<Element>) {
@@ -99,7 +99,7 @@ extension CxxSpan {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
 extension Span {
   @_alwaysEmitIntoClient
   @unsafe
@@ -115,7 +115,7 @@ extension Span {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
 extension MutableSpan {
   @_alwaysEmitIntoClient
   @unsafe
@@ -151,7 +151,7 @@ extension CxxMutableSpan {
     unsafe self.init(unsafeMutableBufferPointer.baseAddress!, Size(unsafeMutableBufferPointer.count))
   }
 
-  @available(SwiftStdlib 6.2, *)
+  @available(SwiftCompatibilitySpan 5.0, *)
   @inlinable
   @unsafe
   public init(_ span: consuming MutableSpan<Element>) {

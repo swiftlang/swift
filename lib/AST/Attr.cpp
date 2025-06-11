@@ -61,7 +61,7 @@ static_assert(IsTriviallyDestructible<DeclAttributes>::value,
                 DeclAttribute::APIBreakingToRemove | DeclAttribute::APIStableToRemove), \
                 #Name " needs to specify either APIBreakingToRemove or APIStableToRemove"); \
   static_assert(DeclAttribute::hasOneBehaviorFor##Id(DeclAttribute::InABIAttrMask), \
-                #Name " needs to specify exactly one of ForbiddenInABIAttr, UnconstrainedInABIAttr, EquivalentInABIAttr, InferredInABIAttr, or UnreachableInABIAttr");
+                #Name " needs to specify exactly one of ForbiddenInABIAttr, UnconstrainedInABIAttr, EquivalentInABIAttr, or UnreachableInABIAttr");
 #include "swift/AST/DeclAttr.def"
 
 #define TYPE_ATTR(_, Id)                                                       \
@@ -1531,6 +1531,18 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DeclAttrKind::InheritActorContext: {
+    Printer.printAttrName("@_inheritActorContext");
+    switch (cast<InheritActorContextAttr>(this)->getModifier()) {
+    case InheritActorContextModifier::None:
+      break;
+    case InheritActorContextModifier::Always:
+      Printer << "(always)";
+      break;
+    }
+    break;
+  }
+
   case DeclAttrKind::MacroRole: {
     auto Attr = cast<MacroRoleAttr>(this);
 
@@ -1912,6 +1924,13 @@ StringRef DeclAttribute::getAttrName() const {
       return "nonisolated(unsafe)";
     case NonIsolatedModifier::NonSending:
       return "nonisolated(nonsending)";
+    }
+  case DeclAttrKind::InheritActorContext:
+    switch (cast<InheritActorContextAttr>(this)->getModifier()) {
+    case InheritActorContextModifier::None:
+      return "_inheritActorContext";
+    case InheritActorContextModifier::Always:
+      return "_inheritActorContext(always)";
     }
   case DeclAttrKind::MacroRole:
     switch (cast<MacroRoleAttr>(this)->getMacroSyntax()) {
@@ -2341,16 +2360,13 @@ static StringRef getLinkerModuleName(StringRef OriginalModuleName) {
 }
 
 OriginallyDefinedInAttr::OriginallyDefinedInAttr(
-    SourceLoc AtLoc, SourceRange Range,
-    StringRef OriginalModuleName,
-    PlatformKind Platform,
-    const llvm::VersionTuple MovedVersion, bool Implicit)
-  : DeclAttribute(DeclAttrKind::OriginallyDefinedIn, AtLoc, Range,
-                  Implicit),
-    ManglingModuleName(getManglingModuleName(OriginalModuleName)),
-    LinkerModuleName(getLinkerModuleName(OriginalModuleName)),
-    Platform(Platform),
-    MovedVersion(MovedVersion) {}
+    SourceLoc AtLoc, SourceRange Range, StringRef OriginalModuleName,
+    PlatformKind Platform, const llvm::VersionTuple MovedVersion, bool Implicit)
+    : DeclAttribute(DeclAttrKind::OriginallyDefinedIn, AtLoc, Range, Implicit),
+      ManglingModuleName(getManglingModuleName(OriginalModuleName)),
+      LinkerModuleName(getLinkerModuleName(OriginalModuleName)),
+      Platform(Platform),
+      MovedVersion(canonicalizePlatformVersion(Platform, MovedVersion)) {}
 
 std::optional<OriginallyDefinedInAttr::ActiveVersion>
 OriginallyDefinedInAttr::isActivePlatform(const ASTContext &ctx) const {

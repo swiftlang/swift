@@ -767,65 +767,88 @@ Type ASTBuilder::createExistentialMetatypeType(
 Type ASTBuilder::createConstrainedExistentialType(
     Type base, ArrayRef<BuiltRequirement> constraints,
     ArrayRef<BuiltInverseRequirement> inverseRequirements) {
-  Type constrainedBase;
+  llvm::SmallDenseMap<Identifier, Type> primaryAssociatedTypes;
+  llvm::SmallDenseSet<Identifier> claimed;
 
-  if (auto baseTy = base->getAs<ProtocolType>()) {
-    auto baseDecl = baseTy->getDecl();
-    llvm::SmallDenseMap<Identifier, Type> cmap;
-    for (const auto &req : constraints) {
-      switch (req.getKind()) {
-      case RequirementKind::SameShape:
-        llvm_unreachable("Same-shape requirement not supported here");
-      case RequirementKind::Conformance:
-      case RequirementKind::Superclass:
-      case RequirementKind::Layout:
-        continue;
+  for (const auto &req : constraints) {
+    switch (req.getKind()) {
+    case RequirementKind::SameShape:
+    case RequirementKind::Conformance:
+    case RequirementKind::Superclass:
+    case RequirementKind::Layout:
+      break;
 
-      case RequirementKind::SameType:
-        if (auto *DMT = req.getFirstType()->getAs<DependentMemberType>())
-          cmap[DMT->getName()] = req.getSecondType();
+    case RequirementKind::SameType: {
+      if (auto *memberTy = req.getFirstType()->getAs<DependentMemberType>()) {
+        if (memberTy->getBase()->is<GenericTypeParamType>()) {
+          // This is the only case we understand so far.
+          primaryAssociatedTypes[memberTy->getName()] = req.getSecondType();
+          continue;
+        }
       }
+      break;
     }
+    }
+
+    // If we end here, we didn't recognize this requirement.
+    return Type();
+  }
+
+  auto maybeFormParameterizedProtocolType = [&](ProtocolType *protoTy) -> Type {
+    auto *proto = protoTy->getDecl();
+
     llvm::SmallVector<Type, 4> args;
-    for (auto *assocTy : baseDecl->getPrimaryAssociatedTypes()) {
-      auto argTy = cmap.find(assocTy->getName());
-      if (argTy == cmap.end()) {
-        return Type();
-      }
-      args.push_back(argTy->getSecond());
+    for (auto *assocTy : proto->getPrimaryAssociatedTypes()) {
+      auto found = primaryAssociatedTypes.find(assocTy->getName());
+      if (found == primaryAssociatedTypes.end())
+        return protoTy;
+      args.push_back(found->second);
+      claimed.insert(found->first);
     }
 
     // We may not have any arguments because the constrained existential is a
     // plain protocol with an inverse requirement.
-    if (args.empty()) {
-      constrainedBase =
-          ProtocolType::get(baseDecl, baseTy, base->getASTContext());
-    } else {
-      constrainedBase =
-          ParameterizedProtocolType::get(base->getASTContext(), baseTy, args);
-    }
-  } else if (base->isAny()) {
-    // The only other case should be that we got an empty PCT, which is equal to
-    // the Any type. The other constraints should have been encoded in the
-    // existential's generic signature (and arrive as BuiltInverseRequirement).
-    constrainedBase = base;
+    if (args.empty())
+      return protoTy;
+
+    return ParameterizedProtocolType::get(Ctx, protoTy, args);
+  };
+
+  SmallVector<Type, 2> members;
+  bool hasExplicitAnyObject = false;
+  InvertibleProtocolSet inverses;
+
+  // We're given either a single protocol type, or a composition of protocol
+  // types. Transform each protocol type to add arguments, if necessary.
+  if (auto protoTy = base->getAs<ProtocolType>()) {
+    members.push_back(maybeFormParameterizedProtocolType(protoTy));
   } else {
-    return Type();
+    auto compositionTy = base->castTo<ProtocolCompositionType>();
+    hasExplicitAnyObject = compositionTy->hasExplicitAnyObject();
+    ASSERT(compositionTy->getInverses().empty());
+
+    for (auto member : compositionTy->getMembers()) {
+      if (auto *protoTy = member->getAs<ProtocolType>()) {
+        members.push_back(maybeFormParameterizedProtocolType(protoTy));
+        continue;
+      }
+      ASSERT(member->getClassOrBoundGenericClass());
+      members.push_back(member);
+    }
   }
 
-  assert(constrainedBase);
+  // Make sure that all arguments were actually used.
+  ASSERT(claimed.size() == primaryAssociatedTypes.size());
 
   // Handle inverse requirements.
   if (!inverseRequirements.empty()) {
-    InvertibleProtocolSet inverseSet;
     for (const auto &inverseReq : inverseRequirements) {
-      inverseSet.insert(inverseReq.getKind());
+      inverses.insert(inverseReq.getKind());
     }
-    constrainedBase = ProtocolCompositionType::get(
-        Ctx, { constrainedBase }, inverseSet, /*hasExplicitAnyObject=*/false);
   }
 
-  return ExistentialType::get(constrainedBase);
+  return ExistentialType::get(ProtocolCompositionType::get(
+      Ctx, members, inverses, hasExplicitAnyObject));
 }
 
 Type ASTBuilder::createSymbolicExtendedExistentialType(NodePointer shapeNode,

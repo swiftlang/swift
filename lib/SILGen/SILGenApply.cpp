@@ -3040,6 +3040,11 @@ static void emitDelayedArguments(SILGenFunction &SGF,
   // up in parallel, with empty spots being dropped into 'args'
   // wherever there's a delayed argument to insert.
   //
+  // Note that siteArgs has exactly one empty element for each
+  // delayed argument, even if the argument actually expands to
+  // zero or multiple SIL values. In such cases, we may have to
+  // remove or add elements to fill in the actual argument values.
+  //
   // Note that this also begins the formal accesses in evaluation order.
   for (auto argsIt = args.begin(); argsIt != args.end(); ++argsIt) {
     auto &siteArgs = *argsIt;
@@ -3047,6 +3052,10 @@ static void emitDelayedArguments(SILGenFunction &SGF,
     for (size_t i = 0; i < siteArgs.size(); ) {
       auto &siteArg = siteArgs[i];
       
+      // Skip slots in the argument array that we've already filled in.
+      // Note that this takes advantage of the "exactly one element"
+      // assumption above, since default arguments might have () type
+      // and therefore expand to no actual argument slots.
       if (siteArg) {
         ++i;
         continue;
@@ -3057,6 +3066,7 @@ static void emitDelayedArguments(SILGenFunction &SGF,
 
       if (defaultArgIsolation && delayedArg.isDefaultArg()) {
         isolatedArgs.push_back(std::make_tuple(delayedNext, argsIt, i));
+        ++i;
         if (++delayedNext == delayedArgs.end()) {
           goto done;
         } else {
@@ -3127,14 +3137,44 @@ done:
       SGF.emitHopToTargetExecutor(loc, executor);
     }
 
-    size_t argsEmitted = 0;
+    // The index saved in isolatedArgs is the index where we're
+    // supposed to fill in the argument in siteArgs. It should point
+    // to a single null element, which we will replace with zero or
+    // more actual argument values. This replacement can invalidate
+    // later indices, so we need to apply an adjustment as we go.
+    //
+    // That adjustment only applies within the right siteArgs and
+    // must be reset when we change siteArgs. Fortunately, emission
+    // is always left-to-right and never revisits a siteArgs.
+    size_t indexAdjustment = 0;
+    auto indexAdjustmentSite = args.begin();
+
     for (auto &isolatedArg : isolatedArgs) {
       auto &delayedArg = *std::get<0>(isolatedArg);
-      auto &siteArgs = *std::get<1>(isolatedArg);
-      auto argIndex = std::get<2>(isolatedArg) + argsEmitted;
-      auto origIndex = argIndex;
+      auto site = std::get<1>(isolatedArg);
+      auto &siteArgs = *site;
+      size_t argIndex = std::get<2>(isolatedArg);
+
+      // Apply the current index adjustment if we haven't changed
+      // sites.
+      if (indexAdjustmentSite == site) {
+        argIndex += indexAdjustment;
+
+      // Otherwise, reset the current index adjustment.
+      } else {
+        indexAdjustment = 0;
+      }
+
+      assert(!siteArgs[argIndex] &&
+             "overwriting an existing arg during delayed isolated "
+             "argument emission");
+
+      size_t origIndex = argIndex;
       delayedArg.emit(SGF, siteArgs, argIndex);
-      argsEmitted += (argIndex - origIndex);
+
+      // Accumulate the adjustment. Note that the adjustment can
+      // be negative, and we end up relying on modular unsigned math.
+      indexAdjustment += (argIndex - origIndex - 1);
     }
   }
 
@@ -5819,9 +5859,16 @@ RValue SILGenFunction::emitApply(
     // we left during the first pass.
     auto &completionArgSlot = const_cast<ManagedValue &>(args[completionIndex]);
 
+    // We have already lowered foreign self/moved it into position at this
+    // point, so we know that self will be back.
+    ManagedValue self;
+    if (substFnType->hasSelfParam()) {
+      self = args.back();
+    }
+
     auto origFormalType = *calleeTypeInfo.origFormalType;
     completionArgSlot = resultPlan->emitForeignAsyncCompletionHandler(
-        *this, origFormalType, loc);
+        *this, origFormalType, self, loc);
   }
   if (auto foreignError = calleeTypeInfo.foreign.error) {
     unsigned errorParamIndex =

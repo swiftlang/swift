@@ -428,7 +428,8 @@ static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
 
   for (auto &inst : *header) {
     if (auto *bfi = dyn_cast<BorrowedFromInst>(&inst)) {
-      valueMap[bfi] = valueMap[bfi->getBorrowedValue()];
+      auto mappedValue = valueMap[bfi->getBorrowedValue()];
+      valueMap[bfi] = mappedValue;
     } else if (SILInstruction *cloned = inst.clone(preheaderBranch)) {
       mapOperands(cloned, valueMap);
 

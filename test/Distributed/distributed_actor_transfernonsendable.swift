@@ -65,6 +65,19 @@ distributed actor MyDistributedActor {
       // expected-note @-1 {{'self'-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
     }
   }
+
+
+  func doSomething() async { }
+
+  // Make sure that we consider asLocalActor's result to be the same actor as
+  // its actor parameter.
+  func testAsLocalActorForwards() async {
+    await withTaskGroup { group in
+      group.addTask {
+        await self.doSomething()
+      }
+    }
+  }
 }
 
 /////////////////////////////////

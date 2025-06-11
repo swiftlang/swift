@@ -162,16 +162,15 @@ static Statistic numSemaRequests(UIdentFromSKDUID(KindStatNumSemaRequests),
 
 void sourcekitd::initializeService(
     llvm::StringRef swiftExecutablePath, StringRef runtimeLibPath,
-    StringRef diagnosticDocumentationPath,
     std::function<void(sourcekitd_response_t)> postNotification) {
   INITIALIZE_LLVM();
   initializeSwiftModules();
   llvm::EnablePrettyStackTrace();
-  GlobalCtx = new SourceKit::Context(
-      swiftExecutablePath, runtimeLibPath, diagnosticDocumentationPath,
-      SourceKit::createSwiftLangSupport, [](SourceKit::Context &Ctx) {
-        return std::make_shared<PluginSupport>();
-      });
+  GlobalCtx = new SourceKit::Context(swiftExecutablePath, runtimeLibPath,
+                                     SourceKit::createSwiftLangSupport,
+                                     [](SourceKit::Context &Ctx) {
+                                       return std::make_shared<PluginSupport>();
+                                     });
   auto noteCenter = GlobalCtx->getNotificationCenter();
 
   noteCenter->addDocumentUpdateNotificationReceiver([postNotification](StringRef DocumentName) {
@@ -331,6 +330,7 @@ editorOpenHeaderInterface(StringRef Name, StringRef HeaderName,
 static void
 editorOpenSwiftSourceInterface(StringRef Name, StringRef SourceName,
                                ArrayRef<const char *> Args,
+                               bool CancelOnSubsequentRequest,
                                SourceKitCancellationToken CancellationToken,
                                ResponseReceiver Rec, bool EnableDeclarations);
 
@@ -1053,8 +1053,13 @@ static void handleRequestEditorOpenSwiftSourceInterface(
     // Reporting the declarations array is off by default
     bool EnableDeclarations =
         Req.getOptionalInt64(KeyEnableDeclarations).value_or(false);
+    // For backwards compatibility, the default is 1.
+    int64_t CancelOnSubsequentRequest = 1;
+    Req.getInt64(KeyCancelOnSubsequentRequest, CancelOnSubsequentRequest,
+                 /*isOptional=*/true);
     return editorOpenSwiftSourceInterface(
-        *Name, *FileName, Args, CancellationToken, Rec, EnableDeclarations);
+        *Name, *FileName, Args, CancelOnSubsequentRequest, CancellationToken,
+        Rec, EnableDeclarations);
   }
 }
 
@@ -1705,8 +1710,15 @@ handleRequestSemanticRefactoring(const RequestDict &Req,
         Info.Line = Line;
         Info.Column = Column;
         Info.Length = Length;
+
+        // For backwards compatibility, the default is 1.
+        int64_t CancelOnSubsequentRequest = 1;
+        Req.getInt64(KeyCancelOnSubsequentRequest, CancelOnSubsequentRequest,
+                     /*isOptional=*/true);
+
         return Lang.semanticRefactoring(
-            *PrimaryFilePath, Info, Args, CancellationToken,
+            *PrimaryFilePath, Info, Args, CancelOnSubsequentRequest,
+            CancellationToken,
             [Rec](const RequestResult<ArrayRef<CategorizedEdits>> &Result) {
               Rec(createCategorizedEditsResponse(Result));
             });
@@ -1782,9 +1794,15 @@ handleRequestCollectVariableType(const RequestDict &Req,
                          [](int64_t v) -> unsigned { return v; });
     int64_t FullyQualified = false;
     Req.getInt64(KeyFullyQualified, FullyQualified, /*isOptional=*/true);
+
+    // For backwards compatibility, the default is 1.
+    int64_t CancelOnSubsequentRequest = 1;
+    Req.getInt64(KeyCancelOnSubsequentRequest, CancelOnSubsequentRequest,
+                 /*isOptional=*/true);
+
     return Lang.collectVariableTypes(
         *PrimaryFilePath, InputBufferName, Args, Offset, Length, FullyQualified,
-        CancellationToken,
+        CancelOnSubsequentRequest, CancellationToken,
         [Rec](const RequestResult<VariableTypesInFile> &Result) {
           reportVariableTypeInfo(Result, Rec);
         });
@@ -1814,9 +1832,15 @@ handleRequestFindLocalRenameRanges(const RequestDict &Req,
       return Rec(createErrorRequestInvalid("'key.column' is required"));
     Req.getInt64(KeyLength, Length, /*isOptional=*/true);
 
+    // For backwards compatibility, the default is 1.
+    int64_t CancelOnSubsequentRequest = 1;
+    Req.getInt64(KeyCancelOnSubsequentRequest, CancelOnSubsequentRequest,
+                 /*isOptional=*/true);
+
     LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
     return Lang.findLocalRenameRanges(
-        *PrimaryFilePath, Line, Column, Length, Args, CancellationToken,
+        *PrimaryFilePath, Line, Column, Length, Args, CancelOnSubsequentRequest,
+        CancellationToken,
         [Rec](const CancellableResult<std::vector<CategorizedRenameRanges>>
                   &Result) {
           Rec(createCategorizedRenameRangesResponse(Result));
@@ -3686,6 +3710,7 @@ static sourcekitd_response_t editorOpenInterface(
 static void
 editorOpenSwiftSourceInterface(StringRef Name, StringRef HeaderName,
                                ArrayRef<const char *> Args,
+                               bool CancelOnSubsequentRequest,
                                SourceKitCancellationToken CancellationToken,
                                ResponseReceiver Rec, bool EnableDeclarations) {
   SKEditorConsumerOptions Opts;
@@ -3694,8 +3719,9 @@ editorOpenSwiftSourceInterface(StringRef Name, StringRef HeaderName,
   Opts.EnableDeclarations = EnableDeclarations;
   auto EditC = std::make_shared<SKEditorConsumer>(Rec, Opts);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.editorOpenSwiftSourceInterface(Name, HeaderName, Args, CancellationToken,
-                                      EditC);
+  Lang.editorOpenSwiftSourceInterface(Name, HeaderName, Args,
+                                      CancelOnSubsequentRequest,
+                                      CancellationToken, EditC);
 }
 
 static void

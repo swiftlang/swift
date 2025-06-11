@@ -2137,7 +2137,7 @@ Parser::parseAttributeArguments(SourceLoc attrLoc, StringRef attrName,
   }
 
   return parseList(tok::r_paren, parensRange.Start, parensRange.End,
-                   /*allow sep after last*/ true,
+                   /*AllowSepAfterLast=*/true,
                    {diag::attr_expected_rparen, {attrName, isModifier}},
                    parseArg);
 }
@@ -2570,7 +2570,7 @@ ParserResult<LifetimeAttr> Parser::parseLifetimeAttribute(SourceLoc atLoc,
   if (!Context.LangOpts.hasFeature(Feature::LifetimeDependence) &&
       !Context.SourceMgr.isImportMacroGeneratedLoc(atLoc)) {
     diagnose(loc, diag::requires_experimental_feature, "@lifetime", false,
-             getFeatureName(Feature::LifetimeDependence));
+             Feature::LifetimeDependence.getName());
     status.setIsParseError();
     return status;
   }
@@ -3243,7 +3243,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     StringRef AttrName = "@_originallyDefinedIn";
     bool SuppressLaterDiags = false;
     bool ParsedUnrecognizedPlatformName = false;
-    if (parseList(tok::r_paren, LeftLoc, RightLoc, false,
+    if (parseList(tok::r_paren, LeftLoc, RightLoc,
+                  /*AllowSepAfterLast=*/false,
                   diag::originally_defined_in_missing_rparen,
                   [&]() -> ParserStatus {
       SWIFT_DEFER {
@@ -3357,9 +3358,18 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     }
 
     if (abiDecl) {
-      Attributes.add(new (Context) ABIAttr(abiDecl,
-                                           AtLoc, { Loc, rParenLoc },
-                                           /*implicit=*/false));
+      auto attr = new (Context) ABIAttr(abiDecl, AtLoc, { Loc, rParenLoc },
+                                        /*implicit=*/false);
+
+      // Diagnose syntactically invalid abiDecl kind here to match behavior of
+      // Swift parser.
+      if (!attr->canAppearOnDecl(abiDecl) && !isa<PatternBindingDecl>(abiDecl)){
+        diagnose(abiDecl->getLoc(), diag::attr_abi_incompatible_kind,
+                 abiDecl->getDescriptiveKind());
+        attr->setInvalid();
+      }
+
+      Attributes.add(attr);
     }
 
     break;
@@ -3760,6 +3770,25 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       Attributes.add(new (Context) NonisolatedAttr(AtLoc, AttrRange, *Modifier,
                                                    /*implicit*/ false));
     }
+    break;
+  }
+  case DeclAttrKind::InheritActorContext: {
+    AttrRange = Loc;
+    std::optional<InheritActorContextModifier> Modifier(
+        InheritActorContextModifier::None);
+    Modifier = parseSingleAttrOption<InheritActorContextModifier>(
+        *this, Loc, AttrRange, AttrName, DK,
+        {{Context.Id_always, InheritActorContextModifier::Always}}, *Modifier,
+        ParameterizedDeclAttributeKind::InheritActorContext);
+    if (!Modifier) {
+      return makeParserSuccess();
+    }
+
+    if (!DiscardAttribute) {
+      Attributes.add(new (Context) InheritActorContextAttr(
+          AtLoc, AttrRange, *Modifier, /*implicit=*/false));
+    }
+
     break;
   }
   case DeclAttrKind::MacroRole: {
@@ -4967,7 +4996,7 @@ ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
   SourceLoc rParenLoc;
   bool foundParamId = false;
   status = parseList(
-      tok::r_paren, lParenLoc, rParenLoc, /*AllowSepAfterLast*/ false,
+      tok::r_paren, lParenLoc, rParenLoc, /*AllowSepAfterLast=*/false,
       diag::expected_rparen_after_lifetime_dependence, [&]() -> ParserStatus {
         ParserStatus listStatus;
         foundParamId = true;
@@ -5305,7 +5334,7 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
     if (Tok.isContextualKeyword("sending")) {
       if (!P.Context.LangOpts.hasFeature(Feature::SendingArgsAndResults)) {
         P.diagnose(Tok, diag::requires_experimental_feature, Tok.getRawText(),
-                   false, getFeatureName(Feature::SendingArgsAndResults));
+                   false, Feature::SendingArgsAndResults.getName());
       }
 
       // Only allow for 'sending' to be written once.
@@ -5329,7 +5358,7 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
       if (!P.Context.LangOpts.hasFeature(Feature::LifetimeDependence)) {
         P.diagnose(Tok, diag::requires_experimental_feature,
                    "lifetime dependence specifier", false,
-                   getFeatureName(Feature::LifetimeDependence));
+                   Feature::LifetimeDependence.getName());
       }
       P.consumeToken(); // consume '@'
       auto loc = P.consumeToken(); // consume 'lifetime'
@@ -5884,6 +5913,17 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes,
     }
   }
 
+  // `using @<attribute>` or `using <identifier>`.
+  if (Tok.isContextualKeyword("using")) {
+    // `using` declarations don't support attributes or modifiers.
+    if (hadAttrsOrModifiers)
+      return false;
+
+    return !Tok2.isAtStartOfLine() &&
+           (Tok2.is(tok::at_sign) || Tok2.is(tok::identifier) ||
+            Tok2.is(tok::code_complete));
+  }
+
   // If the next token is obviously not the start of a decl, bail early.
   if (!isKeywordPossibleDeclStart(Context.LangOpts, Tok2))
     return false;
@@ -6238,6 +6278,17 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
       break;
     }
 
+    // `using @<attribute>` or `using <identifier>`
+    if (Tok.isContextualKeyword("using")) {
+      auto nextToken = peekToken();
+      if (!nextToken.isAtStartOfLine() &&
+          (nextToken.is(tok::at_sign) || nextToken.is(tok::identifier) ||
+           nextToken.is(tok::code_complete))) {
+        DeclResult = parseDeclUsing(Flags, Attributes);
+        break;
+      }
+    }
+
     if (Flags.contains(PD_HasContainerType) &&
         IsAtStartOfLineOrPreviousHadSemi) {
 
@@ -6583,6 +6634,68 @@ ParserResult<ImportDecl> Parser::parseDeclImport(ParseDeclOptions Flags,
                                 KindLoc, importPath.get());
   ID->attachParsedAttrs(Attributes);
   return DCC.fixupParserResult(ID);
+}
+
+/// Parse an `using` declaration.
+///
+/// \verbatim
+///   decl-using:
+///     'using' (@<attribute> | <modifier>)
+/// \endverbatim
+ParserResult<UsingDecl> Parser::parseDeclUsing(ParseDeclOptions Flags,
+                                               DeclAttributes &Attributes) {
+  assert(Tok.isContextualKeyword("using"));
+  DebuggerContextChange DCC(*this);
+
+  if (!Context.LangOpts.hasFeature(Feature::DefaultIsolationPerFile)) {
+    diagnose(Tok, diag::experimental_using_decl_disabled);
+  }
+
+  SourceLoc UsingLoc = consumeToken();
+
+  if (Tok.is(tok::code_complete)) {
+    if (CodeCompletionCallbacks) {
+      CodeCompletionCallbacks->completeUsingDecl();
+    }
+    return makeParserCodeCompletionStatus();
+  }
+
+  SourceLoc AtLoc;
+  // @<<attribute>>
+  if (Tok.is(tok::at_sign))
+    AtLoc = consumeToken();
+
+  SourceLoc SpecifierLoc;
+  Identifier RawSpecifier;
+
+  if (parseIdentifier(RawSpecifier, SpecifierLoc,
+                      /*diagnoseDollarPrefix=*/false,
+                      diag::expected_identifier_in_decl, "using"))
+    return nullptr;
+
+  std::optional<UsingSpecifier> Specifier =
+      llvm::StringSwitch<std::optional<UsingSpecifier>>(RawSpecifier.str())
+          .Case("MainActor", UsingSpecifier::MainActor)
+          .Case("nonisolated", UsingSpecifier::Nonisolated)
+          .Default(std::nullopt);
+
+  if (!Specifier) {
+    diagnose(SpecifierLoc, diag::using_decl_invalid_specifier);
+    return nullptr;
+  }
+
+  // Complain the `using` not being at top-level only after the specifier
+  // has been consumed, otherwise the specifier is going to be interpreted
+  // as a start of another declaration.
+  if (!CodeCompletionCallbacks && !DCC.movedToTopLevel() &&
+      !(Flags & PD_AllowTopLevel)) {
+    diagnose(UsingLoc, diag::decl_inner_scope);
+    return nullptr;
+  }
+
+  auto *UD = UsingDecl::create(Context, UsingLoc, AtLoc ? AtLoc : SpecifierLoc,
+                               *Specifier, CurDeclContext);
+  return DCC.fixupParserResult(UD);
 }
 
 /// Parse an inheritance clause.
@@ -8737,12 +8850,12 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
   SourceLoc NameLoc;
   if (Tok.isAnyOperator() || Tok.isAny(tok::exclaim_postfix, tok::amp_prefix)) {
     // If the name is an operator token that ends in '<' and the following token
-    // is an identifier, split the '<' off as a separate token. This allows
-    // things like 'func ==<T>(x:T, y:T) {}' to parse as '==' with generic type
-    // variable '<T>' as expected.
+    // is an identifier or 'let', split the '<' off as a separate token. This
+    // allows things like 'func ==<T>(x:T, y:T) {}' to parse as '==' with
+    // generic type variable '<T>' as expected.
     auto NameStr = Tok.getText();
     if (NameStr.size() > 1 && NameStr.back() == '<' &&
-        peekToken().is(tok::identifier)) {
+        peekToken().isAny(tok::identifier, tok::kw_let)) {
       NameStr = NameStr.slice(0, NameStr.size() - 1);
     }
     SimpleName = Context.getIdentifier(NameStr);
@@ -9516,6 +9629,11 @@ ParserStatus Parser::parsePrimaryAssociatedTypeList(
 
     // Parse the comma, if the list continues.
     HasNextParam = consumeIf(tok::comma);
+    
+    // The list ends if we find a trailing comma
+    if (startsWithGreater(Tok)) {
+      break;
+    }
   } while (HasNextParam);
 
   return Result;

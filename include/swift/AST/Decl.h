@@ -213,7 +213,8 @@ enum class DescriptiveDeclKind : uint8_t {
   OpaqueResultType,
   OpaqueVarType,
   Macro,
-  MacroExpansion
+  MacroExpansion,
+  Using
 };
 
 /// Describes which spelling was used in the source for the 'static' or 'class'
@@ -267,6 +268,16 @@ static_assert(uint8_t(SelfAccessKind::LastSelfAccessKind) <
               "Self Access Kind is too small to fit in SelfAccess kind bits. "
               "Please expand ");
 
+enum class UsingSpecifier : uint8_t {
+  MainActor,
+  Nonisolated,
+  LastSpecifier = Nonisolated,
+};
+enum : unsigned {
+  NumUsingSpecifierBits =
+      countBitsUsed(static_cast<unsigned>(UsingSpecifier::LastSpecifier))
+};
+
 /// Diagnostic printing of \c SelfAccessKind.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SelfAccessKind SAK);
 
@@ -310,6 +321,9 @@ struct OverloadSignature {
   /// Whether this is a macro.
   unsigned IsMacro : 1;
 
+  /// Whether this is a generic argument.
+  unsigned IsGenericArg : 1;
+
   /// Whether this signature is part of a protocol extension.
   unsigned InProtocolExtension : 1;
 
@@ -323,8 +337,10 @@ struct OverloadSignature {
   OverloadSignature()
       : UnaryOperator(UnaryOperatorKind::None), IsInstanceMember(false),
         IsVariable(false), IsFunction(false), IsAsyncFunction(false),
-        IsDistributed(false), InProtocolExtension(false),
-        InExtensionOfGenericType(false), HasOpaqueReturnType(false) { }
+        IsDistributed(false), IsEnumElement(false), IsNominal(false),
+        IsTypeAlias(false), IsMacro(false), IsGenericArg(false),
+        InProtocolExtension(false), InExtensionOfGenericType(false),
+        HasOpaqueReturnType(false) { }
 };
 
 /// Determine whether two overload signatures conflict.
@@ -825,6 +841,10 @@ protected:
     NumPathElements : 8
   );
 
+  SWIFT_INLINE_BITFIELD(UsingDecl, Decl, NumUsingSpecifierBits,
+    Specifier : NumUsingSpecifierBits
+  );
+
   SWIFT_INLINE_BITFIELD(ExtensionDecl, Decl, 4+1,
     /// An encoding of the default and maximum access level for this extension.
     /// The value 4 corresponds to AccessLevel::Public
@@ -1148,6 +1168,10 @@ public:
   /// \Note this method returns \c false if this declaration was
   /// constructed from a serialized module.
   bool isInMacroExpansionInContext() const;
+
+  /// Whether this declaration is within a macro expansion relative to
+  /// its decl context, and the macro was attached to a node imported from clang.
+  bool isInMacroExpansionFromClangHeader() const;
 
   /// Returns the appropriate kind of entry point to generate for this class,
   /// based on its attributes.
@@ -6272,9 +6296,12 @@ public:
   /// Otherwise, its override must be referenced.
   bool isValidKeyPathComponent() const;
 
-  /// True if the storage exports a property descriptor for key paths in
-  /// other modules.
-  bool exportsPropertyDescriptor() const;
+  /// If the storage exports a property descriptor for key paths in other
+  /// modules, this returns the generic signature in which its member methods
+  /// are emitted. If the storage does not export a property descriptor,
+  /// returns `std::nullopt`.
+  std::optional<GenericSignature>
+  getPropertyDescriptorGenericSignature() const;
 
   /// True if any of the accessors to the storage is private or fileprivate.
   bool hasPrivateAccessor() const;
@@ -6990,6 +7017,10 @@ public:
 
   /// Create a an identical copy of this ParamDecl.
   static ParamDecl *clone(const ASTContext &Ctx, ParamDecl *PD);
+
+  static ParamDecl *cloneAccessor(const ASTContext &Ctx,
+                                  ParamDecl const *subscriptParam,
+                                  DeclContext *Parent);
 
   static ParamDecl *
   createImplicit(ASTContext &Context, SourceLoc specifierLoc,
@@ -9720,6 +9751,34 @@ public:
   static bool classof(const FreestandingMacroExpansion *expansion) {
     return expansion->getFreestandingMacroKind() == FreestandingMacroKind::Decl;
   }
+};
+
+/// UsingDecl - This represents a single `using` declaration, e.g.:
+///   using @MainActor
+class UsingDecl : public Decl {
+  friend class Decl;
+
+private:
+  SourceLoc UsingLoc, SpecifierLoc;
+
+  UsingDecl(SourceLoc usingLoc, SourceLoc specifierLoc,
+            UsingSpecifier specifier, DeclContext *parent);
+
+public:
+  UsingSpecifier getSpecifier() const {
+    return static_cast<UsingSpecifier>(Bits.UsingDecl.Specifier);
+  }
+
+  std::string getSpecifierName() const;
+
+  SourceLoc getLocFromSource() const { return UsingLoc; }
+  SourceRange getSourceRange() const { return {UsingLoc, SpecifierLoc}; }
+
+  static UsingDecl *create(ASTContext &ctx, SourceLoc usingLoc,
+                           SourceLoc specifierLoc, UsingSpecifier specifier,
+                           DeclContext *parent);
+
+  static bool classof(const Decl *D) { return D->getKind() == DeclKind::Using; }
 };
 
 inline void

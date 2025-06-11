@@ -261,7 +261,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     arguments.push_back("-color-diagnostics");
   }
 
-  inputArgs.AddAllArgs(arguments, options::OPT_I);
+  inputArgs.addAllArgs(arguments, {options::OPT_I, options::OPT_Isystem});
   inputArgs.addAllArgs(arguments, {options::OPT_F, options::OPT_Fsystem});
   inputArgs.AddAllArgs(arguments, options::OPT_vfsoverlay);
 
@@ -284,12 +284,15 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
                                    options::OPT_disable_experimental_feature,
                                    options::OPT_enable_upcoming_feature,
                                    options::OPT_disable_upcoming_feature});
-  inputArgs.AddLastArg(arguments, options::OPT_strict_memory_safety);
+  inputArgs.AddLastArg(arguments, options::OPT_strict_memory_safety,
+                       options::OPT_strict_memory_safety_migrate);
   inputArgs.AddLastArg(arguments, options::OPT_warn_implicit_overrides);
   inputArgs.AddLastArg(arguments, options::OPT_typo_correction_limit);
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension_library);
   inputArgs.AddLastArg(arguments, options::OPT_enable_library_evolution);
+  inputArgs.AddLastArg(arguments, options::OPT_default_isolation);
+  inputArgs.AddLastArg(arguments, options::OPT_default_isolation_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_require_explicit_availability);
   inputArgs.AddLastArg(arguments, options::OPT_require_explicit_availability_target);
   inputArgs.AddLastArg(arguments, options::OPT_require_explicit_availability_EQ);
@@ -377,10 +380,6 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   if (!globalRemapping.empty()) {
     arguments.push_back("-debug-prefix-map");
     arguments.push_back(inputArgs.MakeArgString(globalRemapping));
-  }
-
-  if (inputArgs.hasArg(options::OPT_executor_factory)) {
-    inputArgs.AddLastArg(arguments, options::OPT_executor_factory);
   }
 
   // Pass through the values passed to -Xfrontend.
@@ -758,8 +757,8 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
     return "-emit-imported-modules";
   case file_types::TY_JSONDependencies:
     return "-scan-dependencies";
-  case file_types::TY_JSONFeatures:
-    return "-emit-supported-features";
+  case file_types::TY_JSONArguments:
+    return "-emit-supported-arguments";
   case file_types::TY_IndexData:
     return "-typecheck";
   case file_types::TY_Remapping:
@@ -1045,7 +1044,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_ClangModuleFile:
     case file_types::TY_IndexData:
     case file_types::TY_JSONDependencies:
-    case file_types::TY_JSONFeatures:
+    case file_types::TY_JSONArguments:
       llvm_unreachable("Cannot be output from backend job");
     case file_types::TY_Swift:
     case file_types::TY_dSYM:

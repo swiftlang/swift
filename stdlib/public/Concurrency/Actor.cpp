@@ -2510,22 +2510,31 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
 }
 
 SWIFT_CC(swift)
-static void swift_task_startSynchronouslyImpl(AsyncTask* task) {
+static void
+swift_task_immediateImpl(AsyncTask *task,
+                         SerialExecutorRef targetExecutor) {
   swift_retain(task);
+  if (targetExecutor.isGeneric()) {
+  // If the target is generic, it means that the closure did not specify
+  // an isolation explicitly. According to the "start synchronously" rules,
+  // we should therefore ignore the global and just start running on the
+  // caller immediately.
+  SerialExecutorRef executor = SerialExecutorRef::forSynchronousStart();
 
-  auto currentTracking = ExecutorTrackingInfo::current();
-  if (currentTracking) {
-    auto currentExecutor = currentTracking->getActiveExecutor();
-    AsyncTask * originalTask = _swift_task_clearCurrent();
-
-    swift_job_run(task, currentExecutor);
-    _swift_task_setCurrent(originalTask);
+  auto originalTask = ActiveTask::swap(task);
+  swift_job_run(task, executor);
+  _swift_task_setCurrent(originalTask);
   } else {
-    auto originalTask = ActiveTask::swap(task);
-    assert(!originalTask);
+    assert(swift_task_isCurrentExecutor(targetExecutor) &&
+           "'immediate' must only be invoked when it is correctly in "
+           "the same isolation already, but wasn't!");
 
-    SerialExecutorRef executor = SerialExecutorRef::forSynchronousStart();
-     swift_job_run(task, executor);
+    // We can run synchronously, we're on the expected executor so running in
+    // the caller context is going to be in the same context as the requested
+    // "caller" context.
+    AsyncTask *originalTask = _swift_task_clearCurrent();
+
+    swift_job_run(task, targetExecutor);
     _swift_task_setCurrent(originalTask);
   }
 }

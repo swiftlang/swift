@@ -849,6 +849,10 @@ IsSetterMutatingRequest::evaluate(Evaluator &evaluator,
 OpaqueReadOwnership
 OpaqueReadOwnershipRequest::evaluate(Evaluator &evaluator,
                                      AbstractStorageDecl *storage) const {
+  auto abiRole = ABIRoleInfo(storage);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->getOpaqueReadOwnership();
+
   enum class DiagKind {
     BorrowedAttr,
     NoncopyableType
@@ -3847,6 +3851,10 @@ void HasStorageRequest::cacheResult(bool hasStorage) const {
 StorageImplInfo
 StorageImplInfoRequest::evaluate(Evaluator &evaluator,
                                  AbstractStorageDecl *storage) const {
+  auto abiRole = ABIRoleInfo(storage);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->getImplInfo();
+
   if (auto *param = dyn_cast<ParamDecl>(storage)) {
     return StorageImplInfo::getSimpleStored(
       param->isImmutableInFunctionBody()

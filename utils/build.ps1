@@ -1758,6 +1758,7 @@ function Get-CompilersDefines([Hashtable] $Platform, [switch] $Test) {
     Python3_INCLUDE_DIR = "$PythonRoot\include";
     Python3_LIBRARY = "$PythonRoot\libs\$PythonLibName.lib";
     Python3_ROOT_DIR = $PythonRoot;
+    SWIFT_TOOLCHAIN_VERSION = "${ToolchainIdentifier}";
     SWIFT_BUILD_SWIFT_SYNTAX = "YES";
     SWIFT_CLANG_LOCATION = (Get-PinnedToolchainToolsDir);
     SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY = "YES";
@@ -2821,6 +2822,7 @@ function Build-PackageManager([Hashtable] $Platform) {
       LLBuild_DIR = (Get-ProjectCMakeModules $Platform LLBuild);
       ArgumentParser_DIR = (Get-ProjectCMakeModules $Platform ArgumentParser);
       SwiftDriver_DIR = (Get-ProjectCMakeModules $Platform Driver);
+      SwiftBuild_DIR = (Get-ProjectCMakeModules $Platform Build);
       SwiftCrypto_DIR = (Get-ProjectCMakeModules $Platform Crypto);
       SwiftCollections_DIR = (Get-ProjectCMakeModules $Platform Collections);
       SwiftASN1_DIR = (Get-ProjectCMakeModules $Platform ASN1);
@@ -2943,8 +2945,10 @@ function Build-SourceKitLSP([Hashtable] $Platform) {
       TSC_DIR = (Get-ProjectCMakeModules $Platform ToolsSupportCore);
       LLBuild_DIR = (Get-ProjectCMakeModules $Platform LLBuild);
       ArgumentParser_DIR = (Get-ProjectCMakeModules $Platform ArgumentParser);
+      SwiftASN1_DIR = (Get-ProjectCMakeModules $Platform ASN1);
       SwiftCrypto_DIR = (Get-ProjectCMakeModules $Platform Crypto);
       SwiftCollections_DIR = (Get-ProjectCMakeModules $Platform Collections);
+      SwiftBuild_DIR = (Get-ProjectCMakeModules $Platform Build);
       SwiftPM_DIR = (Get-ProjectCMakeModules $Platform PackageManager);
       LMDB_DIR = (Get-ProjectCMakeModules $Platform LMDB);
       IndexStoreDB_DIR = (Get-ProjectCMakeModules $Platform IndexStoreDB);
@@ -2983,6 +2987,9 @@ function Test-SourceKitLSP {
     "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform Crypto)\swift",
     "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform Crypto)\lib",
     "-Xlinker", "$(Get-ProjectBinaryCache $BuildPlatform Crypto)\lib\CCryptoBoringSSL.lib",
+    # swift-asn1
+    "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform ASN1)\swift",
+    "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform ASN1)\lib",
     # swift-package-manager
     "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform PackageManager)\swift",
     "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform PackageManager)\lib",

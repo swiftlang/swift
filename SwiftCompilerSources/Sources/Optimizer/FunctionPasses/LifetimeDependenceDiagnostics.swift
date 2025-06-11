@@ -72,12 +72,16 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
       markDep.settleToEscaping()
       continue
     }
-    if let apply = instruction as? FullApplySite {
-      // Handle ~Escapable results that do not have a lifetime dependence. This includes implicit initializers and
-      // @_unsafeNonescapableResult.
+    if let apply = instruction as? FullApplySite, !apply.hasResultDependence {
+      // Handle ~Escapable results that do not have a lifetime dependence. This includes implicit initializers, calls to
+      // closures, and @_unsafeNonescapableResult.
       apply.resultOrYields.forEach {
-        if let lifetimeDep = LifetimeDependence(unsafeApplyResult: $0,
-                                                context) {
+        if let lifetimeDep = LifetimeDependence(unsafeApplyResult: $0, apply: apply, context) {
+          _ = analyze(dependence: lifetimeDep, context)
+        }
+      }
+      apply.indirectResultOperands.forEach {
+        if let lifetimeDep = LifetimeDependence(unsafeApplyResult: $0.value, apply: apply, context) {
           _ = analyze(dependence: lifetimeDep, context)
         }
       }
@@ -237,10 +241,12 @@ private struct DiagnoseDependence {
     onError()
 
     // Identify the escaping variable.
-    let escapingVar = LifetimeVariable(dependent: operand.value, context)
+    let escapingVar = LifetimeVariable(usedBy: operand, context)
     if let varDecl = escapingVar.varDecl {
       // Use the variable location, not the access location.
-      diagnose(varDecl.nameLoc, .lifetime_variable_outside_scope, escapingVar.name ?? "")
+      // Variable names like $return_value and $implicit_value don't have source locations.
+      let sourceLoc = varDecl.nameLoc ?? escapingVar.sourceLoc
+      diagnose(sourceLoc, .lifetime_variable_outside_scope, escapingVar.name ?? "")
     } else if let sourceLoc = escapingVar.sourceLoc {
       diagnose(sourceLoc, .lifetime_value_outside_scope)
     } else {
@@ -263,7 +269,7 @@ private struct DiagnoseDependence {
 
   // Identify the dependence scope. If no source location is found, bypass this diagnostic.
   func reportScope() {
-    let parentVar = LifetimeVariable(dependent: dependence.parentValue, context)
+    let parentVar = LifetimeVariable(definedBy: dependence.parentValue, context)
     // First check if the dependency is limited to an access scope. If the access has no source location then
     // fall-through to report possible dependence on an argument.
     if parentVar.isAccessScope, let accessLoc = parentVar.sourceLoc {
@@ -310,7 +316,22 @@ private struct LifetimeVariable {
     return varDecl?.userFacingName
   }
 
-  init(dependent value: Value, _ context: some Context) {
+  init(usedBy operand: Operand, _ context: some Context) {
+    self = .init(dependent: operand.value, context)
+    // variable names like $return_value and $implicit_value don't have source locations.
+    // For @out arguments, the operand's location is the best answer.
+    // Otherwise, fall back to the function's location.
+    self.sourceLoc = self.sourceLoc ?? operand.instruction.location.sourceLoc
+      ?? operand.instruction.parentFunction.location.sourceLoc
+  }
+
+  init(definedBy value: Value, _ context: some Context) {
+    self = .init(dependent: value, context)
+    // Fall back to the function's location.
+    self.sourceLoc = self.sourceLoc ?? value.parentFunction.location.sourceLoc
+  }
+
+  private init(dependent value: Value, _ context: some Context) {
     guard let introducer = getFirstVariableIntroducer(of: value, context) else {
       return
     }

@@ -5,9 +5,9 @@
 // FRT or SWIFT_SHARED_REFERENCE type
 struct FRTStruct {
   // Friend function declarations
-  friend FRTStruct *returnInstanceOfFRTStruct(int v); // expected-warning {{'returnInstanceOfFRTStruct' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
-  friend FRTStruct *returnInstanceOfFRTStructWithAttrReturnsRetained(int v); // expected-warning {{'returnInstanceOfFRTStructWithAttrReturnsRetained' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
-  friend FRTStruct *returnInstanceOfFRTStructWithAttrReturnsUnretained(int v); // expected-warning {{'returnInstanceOfFRTStructWithAttrReturnsUnretained' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
+  friend FRTStruct *returnInstanceOfFRTStruct(int v);
+  friend FRTStruct *returnInstanceOfFRTStructWithAttrReturnsRetained(int v);
+  friend FRTStruct *returnInstanceOfFRTStructWithAttrReturnsUnretained(int v);
 } __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:retainFRTStruct")))
 __attribute__((swift_attr("release:releaseFRTStruct")));
@@ -179,12 +179,12 @@ __attribute__((swift_attr("unsafe")));
 
 // C++ APIs returning cxx frts (for testing diagnostics)
 struct StructWithAPIsReturningCxxFrt {
-  static FRTStruct *_Nonnull StaticMethodReturningCxxFrt(); // expected-warning {{'StaticMethodReturningCxxFrt' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}} 
+  static FRTStruct *_Nonnull StaticMethodReturningCxxFrt();
   static FRTStruct *_Nonnull StaticMethodReturningCxxFrtWithAnnotation()
       __attribute__((swift_attr("returns_retained")));
 };
 
-FRTStruct *_Nonnull global_function_returning_cxx_frt(); // expected-warning {{'global_function_returning_cxx_frt' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
+FRTStruct *_Nonnull global_function_returning_cxx_frt();
 FRTStruct *_Nonnull global_function_returning_cxx_frt_with_annotations()
     __attribute__((swift_attr("returns_retained")));
 
@@ -303,7 +303,7 @@ public:
   operator-(const FRTOverloadedOperators &other);
 };
 
-FRTOverloadedOperators *_Nonnull returnFRTOverloadedOperators(); // expected-warning {{'returnFRTOverloadedOperators' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
+FRTOverloadedOperators *_Nonnull returnFRTOverloadedOperators();
 
 void retain_FRTOverloadedOperators(FRTOverloadedOperators *_Nonnull v);
 void release_FRTOverloadedOperators(FRTOverloadedOperators *_Nonnull v);

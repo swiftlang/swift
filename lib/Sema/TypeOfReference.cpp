@@ -1557,6 +1557,13 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
     // Wrap it in a metatype.
     memberTy = MetatypeType::get(memberTy);
 
+    // If this is a value generic, undo the wrapping. 'substMemberTypeWithBase'
+    // returns the underlying value type of the value generic (e.g. 'Int').
+    if (isa<GenericTypeParamDecl>(value) &&
+        cast<GenericTypeParamDecl>(value)->isValue()) {
+      memberTy = memberTy->castTo<MetatypeType>()->getInstanceType();
+    }
+
     auto openedType = FunctionType::get({baseObjParam}, memberTy);
     return { openedType, openedType, memberTy, memberTy, Type() };
   }
@@ -2691,7 +2698,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       increaseScore(SK_Unavailable, locator);
 
     // If the declaration is from a module that hasn't been imported, note that.
-    if (getASTContext().LangOpts.hasFeature(Feature::MemberImportVisibility)) {
+    if (getASTContext().LangOpts.hasFeature(Feature::MemberImportVisibility,
+                                            /*allowMigration=*/true)) {
       if (!useDC->isDeclImported(decl))
         increaseScore(SK_MissingImport, locator);
     }

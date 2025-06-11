@@ -252,6 +252,9 @@ bool noncopyable::memInstMustReinitialize(Operand *memOper) {
     auto *CAI = cast<ExplicitCopyAddrInst>(memInst);
     return CAI->getDest() == address && !CAI->isInitializationOfDest();
   }
+  case SILInstructionKind::MarkDependenceAddrInst: {
+    return true;
+  }
   case SILInstructionKind::YieldInst: {
     auto *yield = cast<YieldInst>(memInst);
     return yield->getYieldInfoForOperand(*memOper).isIndirectInOut();
@@ -297,6 +300,7 @@ bool noncopyable::memInstMustConsume(Operand *memOper) {
            (CAI->getDest() == address && !CAI->isInitializationOfDest());
   }
   case SILInstructionKind::DestroyAddrInst:
+  case SILInstructionKind::EndLifetimeInst:
     return true;
   case SILInstructionKind::DropDeinitInst:
     assert(memOper->get()->getType().isValueTypeWithDeinit());

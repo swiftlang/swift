@@ -253,15 +253,12 @@ public struct NoncopyableSelfAccessors : ~Copyable & ~Escapable {
     _modify
   }
   
-  // FIXME: rdar://150073405 ([SILGen] support synthesized _modify on top of borrowed getters with library evolution)
-  /*
   public var neComputedBorrow: lifetime_depend_infer.NE {
     @lifetime(borrow self)
     get
     @lifetime(&self)
     set
   }
-  */
   
   public var neYieldedBorrow: lifetime_depend_infer.NE {
     @lifetime(borrow self)

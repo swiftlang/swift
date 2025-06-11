@@ -764,7 +764,8 @@ static StringRef getModuleName(const ValueDecl *VD,
   // overlay's declaring module as the owning module.
   if (ModuleDecl *Declaring = MD->getDeclaringModuleIfCrossImportOverlay())
     MD = Declaring;
-  return MD->getNameStr();
+
+  return MD->getPublicModuleName(/*onlyIfImported=*/false).str();
 }
 
 struct DeclInfo {
@@ -876,11 +877,6 @@ static void setLocationInfoForClangNode(ClangNode ClangNode,
   }
 }
 
-static unsigned getCharLength(SourceManager &SM, SourceRange TokenRange) {
-  SourceLoc CharEndLoc = Lexer::getLocForEndOfToken(SM, TokenRange.End);
-  return SM.getByteDistance(TokenRange.Start, CharEndLoc);
-}
-
 static void setLocationInfo(const ValueDecl *VD,
                             LocationInfo &Location) {
   ASTContext &Ctx = VD->getASTContext();
@@ -890,29 +886,24 @@ static void setLocationInfo(const ValueDecl *VD,
 
   auto Loc = VD->getLoc(/*SerializedOK=*/true);
   if (Loc.isValid()) {
-    auto getParameterListRange =
-        [&](const ValueDecl *VD) -> std::optional<unsigned> {
-      if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {
-        SourceRange R = FD->getParameterListSourceRange();
-        if (R.isValid())
-          return getCharLength(SM, R);
-      }
-      return std::nullopt;
-    };
-    unsigned NameLen;
-    if (auto SigLen = getParameterListRange(VD)) {
-      NameLen = SigLen.value();
-    } else if (VD->hasName()) {
-      NameLen = VD->getBaseName().userFacingName().size();
-    } else {
-      NameLen = getCharLength(SM, Loc);
+    // For most cases we just want the range of the name itself. One exception
+    // is for functions, where we also want to include the parameter list.
+    SourceRange Range = Loc;
+    if (auto *FD = dyn_cast<AbstractFunctionDecl>(VD)) {
+      if (auto R = FD->getParameterListSourceRange())
+        Range = R;
     }
 
-    auto [DeclBufID, DeclLoc] =
-        VD->getModuleContext()->getOriginalLocation(Loc);
+    auto [DeclBufID, DeclRange] =
+        VD->getModuleContext()->getOriginalRange(Range);
+
+    auto DeclCharRange =
+        Lexer::getCharSourceRangeFromSourceRange(SM, DeclRange);
+    auto DeclLoc = DeclCharRange.getStart();
+
     Location.Filename = SM.getIdentifierForBuffer(DeclBufID);
     Location.Offset = SM.getLocOffsetInBuffer(DeclLoc, DeclBufID);
-    Location.Length = NameLen;
+    Location.Length = DeclCharRange.getByteLength();
     std::tie(Location.Line, Location.Column) =
         SM.getLineAndColumnInBuffer(DeclLoc, DeclBufID);
     if (auto GeneratedSourceInfo = SM.getGeneratedSourceInfo(DeclBufID)) {
@@ -2775,7 +2766,8 @@ static RefactoringKind getIDERefactoringKind(SemanticRefactoringInfo Info) {
 
 void SwiftLangSupport::semanticRefactoring(
     StringRef PrimaryFilePath, SemanticRefactoringInfo Info,
-    ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
+    ArrayRef<const char *> Args, bool CancelOnSubsequentRequest,
+    SourceKitCancellationToken CancellationToken,
     CategorizedEditsReceiver Receiver) {
   std::string Error;
   SwiftInvocationRef Invok =
@@ -2833,7 +2825,8 @@ void SwiftLangSupport::semanticRefactoring(
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
-  getASTManager()->processASTAsync(Invok, std::move(Consumer), &OncePerASTToken,
+  const void *Once = CancelOnSubsequentRequest ? &OncePerASTToken : nullptr;
+  getASTManager()->processASTAsync(Invok, std::move(Consumer), Once,
                                    CancellationToken,
                                    llvm::vfs::getRealFileSystem());
 }
@@ -2917,6 +2910,7 @@ void SwiftLangSupport::collectVariableTypes(
     StringRef PrimaryFilePath, StringRef InputBufferName,
     ArrayRef<const char *> Args, std::optional<unsigned> Offset,
     std::optional<unsigned> Length, bool FullyQualified,
+    bool CancelOnSubsequentRequest,
     SourceKitCancellationToken CancellationToken,
     std::function<void(const RequestResult<VariableTypesInFile> &)> Receiver) {
   std::string Error;
@@ -2996,7 +2990,8 @@ void SwiftLangSupport::collectVariableTypes(
   /// FIXME: When request cancellation is implemented and Xcode adopts it,
   /// don't use 'OncePerASTToken'.
   static const char OncePerASTToken = 0;
-  getASTManager()->processASTAsync(Invok, std::move(Collector),
-                                   &OncePerASTToken, CancellationToken,
+  const void *Once = CancelOnSubsequentRequest ? &OncePerASTToken : nullptr;
+  getASTManager()->processASTAsync(Invok, std::move(Collector), Once,
+                                   CancellationToken,
                                    llvm::vfs::getRealFileSystem());
 }

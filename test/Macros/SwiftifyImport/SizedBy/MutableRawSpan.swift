@@ -7,9 +7,10 @@
 func myFunc(_ ptr: UnsafeMutableRawPointer, _ size: CInt) {
 }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(ptr: copy ptr)
+// CHECK:      @_alwaysEmitIntoClient @lifetime(ptr: copy ptr) @_disfavoredOverload
 // CHECK-NEXT: func myFunc(_ ptr: inout MutableRawSpan) {
+// CHECK-NEXT:     let size = CInt(exactly: ptr.byteCount)!
 // CHECK-NEXT:     return unsafe ptr.withUnsafeMutableBytes { _ptrPtr in
-// CHECK-NEXT:         return unsafe myFunc(_ptrPtr.baseAddress!, CInt(exactly: ptr.byteCount)!)
+// CHECK-NEXT:       return unsafe myFunc(_ptrPtr.baseAddress!, size)
 // CHECK-NEXT:     }
 // CHECK-NEXT: }

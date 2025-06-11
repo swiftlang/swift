@@ -2,7 +2,7 @@
 
 // REQUIRES: concurrency
 
-// This test checks for typecheck-only diagnostics involving non-sendable
+// This test checks for typecheck-only diagnostics involving non-Sendable
 // metatypes.
 
 protocol Q {
@@ -21,9 +21,9 @@ func testSendableExistential() {
 nonisolated func acceptMeta<T>(_: T.Type) { }
 
 nonisolated func staticCallThroughMetaVal<T: Q>(_: T.Type) {
-  let x = T.self // expected-warning{{capture of non-sendable type 'T.Type' in an isolated closure}}
+  let x = T.self // expected-warning{{capture of non-Sendable type 'T.Type' in an isolated closure}}
   Task.detached {
-    x.g() // expected-warning{{capture of non-sendable type 'T.Type' in an isolated closure}}
+    x.g() // expected-warning{{capture of non-Sendable type 'T.Type' in an isolated closure}}
   }
 }
 
@@ -35,21 +35,21 @@ nonisolated func captureThroughMetaValMoReqs<T>(_: T.Type) {
 }
 
 nonisolated func passMetaVal<T: Q>(_: T.Type) {
-  let x = T.self // expected-warning{{capture of non-sendable type 'T.Type' in an isolated closure}}
+  let x = T.self // expected-warning{{capture of non-Sendable type 'T.Type' in an isolated closure}}
   Task.detached {
-    acceptMeta(x) // expected-warning{{capture of non-sendable type}}
+    acceptMeta(x) // expected-warning{{capture of non-Sendable type}}
   }
 }
 
 nonisolated func staticCallThroughMeta<T: Q>(_: T.Type) {
   Task.detached {
-    T.g() // expected-warning{{capture of non-sendable type}}
+    T.g() // expected-warning{{capture of non-Sendable type}}
   }
 }
 
 nonisolated func passMeta<T: Q>(_: T.Type) {
   Task.detached {
-    acceptMeta(T.self) // expected-warning{{capture of non-sendable type 'T.Type' in an isolated closure}}
+    acceptMeta(T.self) // expected-warning{{capture of non-Sendable type 'T.Type' in an isolated closure}}
   }
 }
 
@@ -96,7 +96,7 @@ struct GenericThingy<Element> {
     searchMe(<)
 
     let _: (Element, Element) -> Bool = (>)
-    let _: @Sendable (Element, Element) -> Bool = (>) // expected-error{{converting non-sendable function value to '@Sendable (Element, Element) -> Bool' may introduce data races}}
+    let _: @Sendable (Element, Element) -> Bool = (>) // expected-error{{converting non-Sendable function value to '@Sendable (Element, Element) -> Bool' may introduce data races}}
   }
 }
 
@@ -119,11 +119,11 @@ class Holder: @unchecked Sendable {
 }
 
 enum E: Sendable {
-case q(Q.Type, Int) // expected-warning{{associated value 'q' of 'Sendable'-conforming enum 'E' has non-sendable type 'any Q.Type'}}
+case q(Q.Type, Int) // expected-warning{{associated value 'q' of 'Sendable'-conforming enum 'E' contains non-Sendable type 'any Q.Type'}}
 }
 
 struct S: Sendable {
-  var tuple: ([Q.Type], Int) // expected-warning{{stored property 'tuple' of 'Sendable'-conforming struct 'S' has non-sendable type '([any Q.Type], Int)'}}
+  var tuple: ([Q.Type], Int) // expected-warning{{stored property 'tuple' of 'Sendable'-conforming struct 'S' contains non-Sendable type 'any Q.Type'}}
 }
 
 extension Q {
@@ -145,5 +145,46 @@ extension GenericS: Sendable where T: Sendable { }
 final class TestStaticMembers<T> {
   init(_: T) {
     let _: @Sendable () -> GenericS<Int> = GenericS.h // Ok
+  }
+}
+
+// Downgrade use of static member references on non-Sendable base to a warning until next major mode to maintain source compatibility.
+do {
+  struct S<U> {
+    static func test(_: U, _: U) -> Bool { false }
+  }
+
+  func compute<T>(_: S<T>, _: @escaping @Sendable (T, T) -> Bool) {}
+
+  func test<T: Comparable>(s: S<T>) {
+    compute(s, >) // expected-warning {{converting non-Sendable function value to '@Sendable (T, T) -> Bool' may introduce data races}}
+    compute(s, S.test) // expected-warning {{capture of non-Sendable type 'T.Type' in an isolated closure}}
+  }
+}
+
+infix operator <=> : ComparisonPrecedence
+
+struct TestUnapplied<U> : Comparable {
+  static func <(_: TestUnapplied<U>, _: TestUnapplied<U>) -> Bool { false }
+}
+
+extension TestUnapplied {
+  static func <=>(_: Self, _: @escaping @Sendable (U, U) -> Bool) {}
+}
+
+func testUnappliedWithOpetator<T: Comparable>(v: TestUnapplied<T>) {
+  v<=>(>) // expected-error {{converting non-Sendable function value to '@Sendable (T, T) -> Bool' may introduce data races}}
+}
+
+protocol P {}
+
+func acceptClosure(_: () -> Void) {}
+
+@MainActor
+func f<T: P>(_: T.Type) {
+  acceptClosure {
+    Task {
+      _ = T.self // okay to capture T.Type in this closure.
+    }
   }
 }

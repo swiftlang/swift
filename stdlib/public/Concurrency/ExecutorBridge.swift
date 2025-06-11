@@ -132,3 +132,6 @@ internal func _dispatchAssertMainQueue()
 internal func _getDispatchQueueForExecutor(
   _ executor: UnownedSerialExecutor
 ) -> OpaquePointer?
+
+@_silgen_name("swift_createDefaultExecutorsOnce")
+func _createDefaultExecutorsOnce()

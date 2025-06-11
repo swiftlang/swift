@@ -1,6 +1,5 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature ABIAttribute -parse-as-library -Rabi-inference
+// RUN: %target-typecheck-verify-swift -parse-as-library
 
-// REQUIRES: swift_feature_ABIAttribute
 // REQUIRES: objc_interop
 
 import Foundation

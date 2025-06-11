@@ -247,7 +247,6 @@ extension ASTGenVisitor {
         .ibSegueAction,
         .implementationOnly,
         .implicitSelfCapture,
-        .inheritActorContext,
         .inheritsConvenienceInitializers,
         .inlinable,
         .isolated,
@@ -310,6 +309,9 @@ extension ASTGenVisitor {
       case .referenceOwnership:
         // TODO: Diagnose.
         return handle(self.generateReferenceOwnershipAttr(attribute: node, attrName: attrName)?.asDeclAttribute)
+      case .inheritActorContext:
+        return handle(self.generateInheritActorContextAttr(attribute: node)?.asDeclAttribute)
+
       case .async,
         .consuming,
         .borrowing,
@@ -1397,6 +1399,28 @@ extension ASTGenVisitor {
         }
       },
       valueIfOmitted: BridgedNonIsolatedModifier.none
+    )
+    guard let modifier else {
+      return nil
+    }
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node),
+      modifier: modifier
+    )
+  }
+
+  func generateInheritActorContextAttr(attribute node: AttributeSyntax) -> BridgedInheritActorContextAttr? {
+    let modifier: BridgedInheritActorContextModifier? = self.generateSingleAttrOption(
+      attribute: node,
+      {
+        switch $0.rawText {
+        case "always": return .always
+        default: return nil
+        }
+      },
+      valueIfOmitted: BridgedInheritActorContextModifier.none
     )
     guard let modifier else {
       return nil

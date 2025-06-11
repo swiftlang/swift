@@ -21,6 +21,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Feature.h"
@@ -60,7 +61,7 @@ void NonisolatedNonsendingByDefaultMigrationTarget::diagnose() const {
   const auto feature = Feature::NonisolatedNonsendingByDefault;
 
   ASSERT(node);
-  ASSERT(ctx.LangOpts.getFeatureState(feature).isEnabledForAdoption());
+  ASSERT(ctx.LangOpts.getFeatureState(feature).isEnabledForMigration());
 
   ValueDecl *decl = nullptr;
   ClosureExpr *closure = nullptr;
@@ -150,7 +151,7 @@ void NonisolatedNonsendingByDefaultMigrationTarget::diagnose() const {
 
   const ConcurrentAttr attr(/*implicit=*/true);
 
-  const auto featureName = getFeatureName(feature);
+  const auto featureName = feature.getName();
   if (decl) {
     // Diagnose the function, but slap the attribute on the storage declaration
     // instead if the function is an accessor.
@@ -168,22 +169,84 @@ void NonisolatedNonsendingByDefaultMigrationTarget::diagnose() const {
     ctx.Diags
         .diagnose(functionDecl->getLoc(),
                   diag::attr_execution_nonisolated_behavior_will_change_decl,
-                  featureName, functionDecl, &attr)
+                  featureName, functionDecl)
         .fixItInsertAttribute(
             decl->getAttributeInsertionLoc(/*forModifier=*/false), &attr);
-  } else if (closure) {
-    ctx.Diags
-        .diagnose(closure->getLoc(),
-                  diag::attr_execution_nonisolated_behavior_will_change_closure,
-                  featureName, &attr)
-        .fixItAddAttribute(&attr, closure);
-  } else {
+  } else if (functionRepr) {
     ctx.Diags
         .diagnose(
             functionRepr->getStartLoc(),
             diag::attr_execution_nonisolated_behavior_will_change_typerepr,
-            featureName, &attr)
+            featureName)
         .fixItInsertAttribute(functionRepr->getStartLoc(), &attr);
+  } else {
+    auto diag = ctx.Diags.diagnose(
+        closure->getLoc(),
+        diag::attr_execution_nonisolated_behavior_will_change_closure,
+        featureName);
+    diag.fixItAddAttribute(&attr, closure);
+
+    // The following cases fail to compile together with `@concurrent` in
+    // Swift 5 or Swift 6 mode due to parser and type checker behaviors:
+    // 1. - Explicit parameter list
+    //    - Explicit result type
+    //    - No explicit `async` effect
+    // 2. - Explicit parenthesized parameter list
+    //    - No capture list
+    //    - No explicit result type
+    //    - No explicit effect
+    //
+    // Work around these issues by adding inferred effects together with the
+    // attribute.
+
+    // If there's an explicit `async` effect, we're good.
+    if (closure->getAsyncLoc().isValid()) {
+      return;
+    }
+
+    auto *params = closure->getParameters();
+    // FIXME: We need a better way to distinguish an implicit parameter list.
+    bool hasExplicitParenthesizedParamList =
+        params->getLParenLoc().isValid() &&
+        params->getLParenLoc() != closure->getStartLoc();
+
+    // If the parameter list is implicit, we're good.
+    if (!hasExplicitParenthesizedParamList) {
+      if (params->size() == 0) {
+        return;
+      } else if ((*params)[0]->isImplicit()) {
+        return;
+      }
+    }
+
+    // At this point we must proceed if there is an explicit result type.
+    // If there is both no explicit result type and the second case does not
+    // apply for any other reason, we're good.
+    if (!closure->hasExplicitResultType() &&
+        (!hasExplicitParenthesizedParamList ||
+         closure->getBracketRange().isValid() ||
+         closure->getThrowsLoc().isValid())) {
+      return;
+    }
+
+    // Compute the insertion location.
+    SourceLoc effectsInsertionLoc = closure->getThrowsLoc();
+    if (effectsInsertionLoc.isInvalid() && closure->hasExplicitResultType()) {
+      effectsInsertionLoc = closure->getArrowLoc();
+    }
+
+    if (effectsInsertionLoc.isInvalid()) {
+      effectsInsertionLoc = closure->getInLoc();
+    }
+
+    ASSERT(effectsInsertionLoc);
+
+    std::string fixIt = "async ";
+    if (closure->getThrowsLoc().isInvalid() && closure->isBodyThrowing()) {
+      fixIt += "throws ";
+    }
+
+    diag.fixItInsert(effectsInsertionLoc, fixIt);
   }
 }
 

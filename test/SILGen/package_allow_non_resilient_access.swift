@@ -130,7 +130,7 @@
 // RUN: -allow-non-resilient-access \
 // RUN: %t/Utils.package.swiftinterface -o %t/Utils.swiftmodule \
 // RUN: 2>&1 | %FileCheck %s --check-prefix=CHECK-DIAG-INTERFACE
-// CHECK-DIAG-INTERFACE: warning: ignoring -allow-non-resilient-access (overriden by -compile-module-from-interface or -typecheck-module-from-interface)
+// CHECK-DIAG-INTERFACE: warning: ignoring -allow-non-resilient-access (overriden by -compile-module-from-interface)
 // RUN: llvm-bcanalyzer --dump %t/Utils.swiftmodule | %FileCheck %s --check-prefix=CHECK-OFF
 // CHECK-OFF-NOT: ALLOW_NON_RESILIENT_ACCESS
 

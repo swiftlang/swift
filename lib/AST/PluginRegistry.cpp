@@ -213,6 +213,7 @@ LoadedExecutablePlugin::PluginProcess::~PluginProcess() {
 #else
   close(input);
   close(output);
+  kill(process.Pid, SIGTERM);
 #endif
 
   // Set `SecondsToWait` non-zero so it waits for the timeout and kill it after

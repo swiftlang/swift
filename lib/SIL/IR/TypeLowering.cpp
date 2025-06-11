@@ -2290,12 +2290,14 @@ namespace {
 
     TypeLowering *handleTrivial(CanType type,
                                 RecursiveProperties properties) {
+      properties = mergeHasPack(HasPack_t(type->hasAnyPack()), properties);
       auto silType = SILType::getPrimitiveObjectType(type);
       return new (TC) TrivialTypeLowering(silType, properties, Expansion);
     }
 
     TypeLowering *handleReference(CanType type,
                                   RecursiveProperties properties) {
+      properties = mergeHasPack(HasPack_t(type->hasAnyPack()), properties);
       auto silType = SILType::getPrimitiveObjectType(type);
       if (type.isForeignReferenceType() &&
           type->getReferenceCounting() == ReferenceCounting::None)
@@ -2307,6 +2309,7 @@ namespace {
 
     TypeLowering *handleMoveOnlyReference(CanType type,
                                           RecursiveProperties properties) {
+      properties = mergeHasPack(HasPack_t(type->hasAnyPack()), properties);
       auto silType = SILType::getPrimitiveObjectType(type);
       return new (TC)
           MoveOnlyReferenceTypeLowering(silType, properties, Expansion);
@@ -2314,6 +2317,7 @@ namespace {
 
     TypeLowering *handleMoveOnlyAddressOnly(CanType type,
                                             RecursiveProperties properties) {
+      properties = mergeHasPack(HasPack_t(type->hasAnyPack()), properties);
       if (!TC.Context.SILOpts.EnableSILOpaqueValues &&
           !TypeLoweringForceOpaqueValueLowering) {
         auto silType = SILType::getPrimitiveAddressType(type);
@@ -2326,13 +2330,15 @@ namespace {
     }
 
     TypeLowering *handleReference(CanType type) {
+      auto properties = RecursiveProperties::forReference();
+      properties = mergeHasPack(HasPack_t(type->hasAnyPack()), properties);
       auto silType = SILType::getPrimitiveObjectType(type);
-      return new (TC) ReferenceTypeLowering(
-          silType, RecursiveProperties::forReference(), Expansion);
+      return new (TC) ReferenceTypeLowering(silType, properties, Expansion);
     }
 
     TypeLowering *handleAddressOnly(CanType type,
                                     RecursiveProperties properties) {
+      properties = mergeHasPack(HasPack_t(type->hasAnyPack()), properties);
       if (!TC.Context.SILOpts.EnableSILOpaqueValues &&
           !TypeLoweringForceOpaqueValueLowering) {
         auto silType = SILType::getPrimitiveAddressType(type);
@@ -2347,6 +2353,7 @@ namespace {
     
     TypeLowering *handleInfinite(CanType type,
                                  RecursiveProperties properties) {
+      properties = mergeHasPack(HasPack_t(type->hasAnyPack()), properties);
       // Infinite types cannot actually be instantiated, so treat them as
       // opaque for code generation purposes.
       properties.setAddressOnly();
@@ -2735,6 +2742,7 @@ namespace {
     template <class LoadableLoweringClass>
     TypeLowering *handleAggregateByProperties(CanType type,
                                               RecursiveProperties props) {
+      props = mergeHasPack(HasPack_t(type->hasAnyPack()), props);
       if (props.isAddressOnly()) {
         return handleAddressOnly(type, props);
       }
@@ -4675,6 +4683,24 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   };
 
   collectConstantCaptures(fn);
+
+  // @_inheritActorContext(always) attribute allows implicit
+  // capture of isolation parameter from the context. This
+  // cannot be done as part of computing captures because
+  // isolation is not available at that point because it in
+  // turn depends on captures sometimes.
+  if (auto *closure = fn.getClosureExpr()) {
+    if (closure->alwaysInheritsActorContext()) {
+      auto isolation = closure->getActorIsolation();
+      if (isolation.isActorInstanceIsolated()) {
+        if (auto *var = isolation.getActorInstance()) {
+          recordCapture(CapturedValue(var, /*flags=*/0, SourceLoc()));
+        } else if (auto *actorExpr = isolation.getActorInstanceExpr()) {
+          recordCapture(CapturedValue(actorExpr, /*flags=*/0));
+        }
+      }
+    }
+  }
 
   SmallVector<CapturedValue, 4> resultingCaptures;
   for (auto capturePair : varCaptures) {

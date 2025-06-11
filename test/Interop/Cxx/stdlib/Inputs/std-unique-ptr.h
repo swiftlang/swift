@@ -2,6 +2,7 @@
 #define TEST_INTEROP_CXX_STDLIB_INPUTS_STD_UNIQUE_PTR_H
 
 #include <memory>
+#include <string>
 
 struct NonCopyable {
     NonCopyable(int x) : x(x) {}
@@ -29,6 +30,10 @@ std::unique_ptr<int> makeInt() {
   return std::make_unique<int>(42);
 }
 
+std::unique_ptr<std::string> makeString() {
+  return std::make_unique<std::string>("Unique string");
+}
+
 std::unique_ptr<int[]> makeArray() {
   int *array = new int[3];
   array[0] = 1;
@@ -53,6 +58,12 @@ private:
 
 std::unique_ptr<HasDtor> makeDtor() {
   return std::make_unique<HasDtor>();
+}
+
+std::shared_ptr<int> makeIntShared() { return std::make_unique<int>(42); }
+
+std::shared_ptr<std::string> makeStringShared() {
+  return std::make_unique<std::string>("Shared string");
 }
 
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_STD_UNIQUE_PTR_H

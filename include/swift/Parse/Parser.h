@@ -1223,6 +1223,9 @@ public:
   ParserResult<ImportDecl> parseDeclImport(ParseDeclOptions Flags,
                                            DeclAttributes &Attributes);
 
+  ParserResult<UsingDecl> parseDeclUsing(ParseDeclOptions Flags,
+                                         DeclAttributes &Attributes);
+
   /// Parse an inheritance clause into a vector of InheritedEntry's.
   ///
   /// \param allowClassRequirement whether to permit parsing of 'class'

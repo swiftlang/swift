@@ -1783,7 +1783,8 @@ resolveUnqualifiedIdentTypeRepr(const TypeResolution &resolution,
   // If the look up did not yield any results, try again but allow members from
   // modules that are not directly imported to be accessible.
   bool didIgnoreMissingImports = false;
-  if (!globals && ctx.LangOpts.hasFeature(Feature::MemberImportVisibility)) {
+  if (!globals && ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
+                                          /*allowMigration=*/true)) {
     lookupOptions |= NameLookupFlags::IgnoreMissingImports;
     globals = TypeChecker::lookupUnqualifiedType(DC, id, repr->getLoc(),
                                                  lookupOptions);
@@ -2046,8 +2047,8 @@ static Type resolveQualifiedIdentTypeRepr(const TypeResolution &resolution,
         DC, parentTy, repr->getNameRef(), repr->getLoc(), lookupOptions);
 
     // If no members were found, try ignoring missing imports.
-    if (!memberTypes &&
-        ctx.LangOpts.hasFeature(Feature::MemberImportVisibility)) {
+    if (!memberTypes && ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
+                                                /*allowMigration=*/true)) {
       lookupOptions |= NameLookupFlags::IgnoreMissingImports;
       memberTypes = TypeChecker::lookupMemberType(
           DC, parentTy, repr->getNameRef(), repr->getLoc(), lookupOptions);
@@ -2418,6 +2419,11 @@ namespace {
   class TypeAttrSet {
     const ASTContext &ctx;
 
+    /// FIXME:
+    ///  `nonisolated(nonsending)` is modeled as a separate `TypeRepr`, but
+    ///  needs to be considered together with subsequent attributes.
+    CallerIsolatedTypeRepr *nonisolatedNonsendingAttr;
+
     llvm::TinyPtrVector<CustomAttr*> customAttrs;
     EnumMap<TypeAttrKind, TypeAttribute *> typeAttrs;
 
@@ -2429,7 +2435,9 @@ namespace {
 #endif
 
   public:
-    TypeAttrSet(const ASTContext &ctx) : ctx(ctx) {}
+    TypeAttrSet(const ASTContext &ctx,
+                CallerIsolatedTypeRepr *nonisolatedNonsendingAttr = nullptr)
+        : ctx(ctx), nonisolatedNonsendingAttr(nonisolatedNonsendingAttr) {}
 
     TypeAttrSet(const TypeAttrSet &) = delete;
     TypeAttrSet &operator=(const TypeAttrSet &) = delete;
@@ -2447,6 +2455,10 @@ namespace {
     /// Accumulate attributes from the given array.  Duplicate attributes
     /// will be diagnosed.
     void accumulate(ArrayRef<TypeOrCustomAttr> attrs);
+
+    CallerIsolatedTypeRepr *getNonisolatedNonsendingAttr() const {
+      return nonisolatedNonsendingAttr;
+    }
 
     /// Return all of the custom attributes.
     ArrayRef<CustomAttr*> getCustomAttrs() const {
@@ -2547,8 +2559,16 @@ namespace {
   }
 
   template <class AttrClass>
-  AttrClass *getWithoutClaiming(TypeAttrSet *attrs) {
+  std::enable_if_t<std::is_base_of_v<TypeAttribute, AttrClass>, AttrClass *>
+  getWithoutClaiming(TypeAttrSet *attrs) {
     return (attrs ? getWithoutClaiming<AttrClass>(*attrs) : nullptr);
+  }
+
+  template <class AttrClass>
+  std::enable_if_t<std::is_same_v<AttrClass, CallerIsolatedTypeRepr>,
+                   CallerIsolatedTypeRepr *>
+  getWithoutClaiming(TypeAttrSet *attrs) {
+    return attrs ? attrs->getNonisolatedNonsendingAttr() : nullptr;
   }
 } // end anonymous namespace
 
@@ -4247,12 +4267,21 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   };
 
   if (auto concurrentAttr = claim<ConcurrentTypeAttr>(attrs)) {
+    if (auto *nonisolatedNonsendingAttr =
+            getWithoutClaiming<CallerIsolatedTypeRepr>(attrs)) {
+      diagnoseInvalid(
+          nonisolatedNonsendingAttr, nonisolatedNonsendingAttr->getStartLoc(),
+          diag::cannot_use_nonisolated_nonsending_together_with_concurrent,
+          nonisolatedNonsendingAttr);
+    }
+
     checkExecutionBehaviorAttribute(concurrentAttr);
+
     if (!repr->isInvalid())
       isolation = FunctionTypeIsolation::forNonIsolated();
-  } else {
+  } else if (!getWithoutClaiming<CallerIsolatedTypeRepr>(attrs)) {
     if (ctx.LangOpts.getFeatureState(Feature::NonisolatedNonsendingByDefault)
-            .isEnabledForAdoption()) {
+            .isEnabledForMigration()) {
       // Diagnose only in the interface stage, which is run once.
       if (inStage(TypeResolutionStage::Interface)) {
         warnAboutNewNonisolatedAsyncExecutionBehavior(ctx, repr, isolation);
@@ -5281,7 +5310,20 @@ TypeResolver::resolveSendingTypeRepr(SendingTypeRepr *repr,
 NeverNullType
 TypeResolver::resolveCallerIsolatedTypeRepr(CallerIsolatedTypeRepr *repr,
                                             TypeResolutionOptions options) {
-  Type type = resolveType(repr->getBase(), options);
+  Type type;
+  {
+    TypeAttrSet attrs(getASTContext(), repr);
+
+    auto *baseRepr = repr->getBase();
+    if (auto *attrRepr = dyn_cast<AttributedTypeRepr>(baseRepr)) {
+      baseRepr = attrs.accumulate(attrRepr);
+    }
+
+    type = resolveAttributedType(baseRepr, options, attrs);
+
+    attrs.diagnoseUnclaimed(resolution, options, type);
+  }
+
   if (type->hasError())
     return ErrorType::get(getASTContext());
 
@@ -5295,15 +5337,6 @@ TypeResolver::resolveCallerIsolatedTypeRepr(CallerIsolatedTypeRepr *repr,
   if (!fnType->isAsync()) {
     diagnoseInvalid(repr, repr->getStartLoc(),
                     diag::nonisolated_nonsending_only_on_async, repr);
-  }
-
-  if (auto *ATR = dyn_cast<AttributedTypeRepr>(repr->getBase())) {
-    if (ATR->get(TypeAttrKind::Concurrent)) {
-      diagnoseInvalid(
-          repr, repr->getStartLoc(),
-          diag::cannot_use_nonisolated_nonsending_together_with_concurrent,
-          repr);
-    }
   }
 
   switch (fnType->getIsolation().getKind()) {
@@ -5361,7 +5394,7 @@ TypeResolver::resolveInlineArrayType(InlineArrayTypeRepr *repr,
   auto argOptions = options.withoutContext().withContext(
       TypeResolverContext::ValueGenericArgument);
 
-  // It's possible the user accidentally wrote '[Int x 4]', correct that here.
+  // It's possible the user accidentally wrote '[Int of 4]', correct that here.
   auto *countRepr = repr->getCount();
   auto *eltRepr = repr->getElement();
   if (!isa<IntegerTypeRepr>(countRepr) && isa<IntegerTypeRepr>(eltRepr)) {
@@ -5984,11 +6017,7 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
       continue;
     }
 
-    // FIXME: Support compositions involving parameterized protocol types,
-    // like 'any Collection<String> & Sendable', etc.
-    if (ty->is<ParameterizedProtocolType>() &&
-        !options.isConstraintImplicitExistential() &&
-        options.getContext() != TypeResolverContext::ExistentialConstraint) {
+    if (ty->is<ParameterizedProtocolType>()) {
       checkMember(tyR->getStartLoc(), ty);
       Members.push_back(ty);
       continue;
@@ -6341,6 +6370,18 @@ Type TypeChecker::substMemberTypeWithBase(TypeDecl *member,
     resultType = TypeAliasType::get(aliasDecl, sugaredBaseTy, {}, resultType);
   }
 
+  // However, if overload resolution finds a value generic decl from name
+  // lookup, replace the returned member type to be the underlying value type
+  // of the generic.
+  //
+  // This can occur in code that does something like: 'type(of: x).a' where
+  // 'a' is the static value generic member.
+  if (auto gp = dyn_cast<GenericTypeParamDecl>(member)) {
+    if (gp->isValue()) {
+      resultType = gp->getValueType();
+    }
+  }
+
   return resultType;
 }
 
@@ -6566,7 +6607,7 @@ private:
     // A missing `any` or `some` is always diagnosed if this feature not
     // disabled.
     auto featureState = ctx.LangOpts.getFeatureState(Feature::ExistentialAny);
-    if (featureState.isEnabled() || featureState.isEnabledForAdoption()) {
+    if (featureState.isEnabled() || featureState.isEnabledForMigration()) {
       return true;
     }
 
@@ -6659,13 +6700,13 @@ private:
                                       /*isAlias=*/isa<TypeAliasDecl>(decl)));
     }
 
-    // If `ExistentialAny` is enabled in adoption mode, warn unconditionally.
+    // If `ExistentialAny` is enabled in migration mode, warn unconditionally.
     // Otherwise, warn until the feature's coming-of-age language mode.
     const auto feature = Feature::ExistentialAny;
-    if (Ctx.LangOpts.getFeatureState(feature).isEnabledForAdoption()) {
+    if (Ctx.LangOpts.getFeatureState(feature).isEnabledForMigration()) {
       diag->limitBehavior(DiagnosticBehavior::Warning);
     } else {
-      diag->warnUntilSwiftVersion(getFeatureLanguageVersion(feature).value());
+      diag->warnUntilSwiftVersion(feature.getLanguageVersion().value());
     }
 
     emitInsertAnyFixit(*diag, T);

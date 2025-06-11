@@ -2151,6 +2151,7 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::Extension:
   case DeclKind::Module:
   case DeclKind::PrecedenceGroup:
+  case DeclKind::Using:
     if (D->getASTContext().LangOpts.AllowModuleWithCompilerErrors)
       return false;
     llvm_unreachable("decl should never be a member");
@@ -2738,10 +2739,10 @@ void Serializer::writeLifetimeDependencies(
 
     auto abbrCode = DeclTypeAbbrCodes[LifetimeDependenceLayout::Code];
     LifetimeDependenceLayout::emitRecord(
-        Out, ScratchRecord, abbrCode, info.getTargetIndex(), info.isImmortal(),
+        Out, ScratchRecord, abbrCode, info.getTargetIndex(),
+        info.getParamIndicesLength(), info.isImmortal(),
         info.hasInheritLifetimeParamIndices(),
-        info.hasScopeLifetimeParamIndices(),
-        info.hasAddressableParamIndices(),
+        info.hasScopeLifetimeParamIndices(), info.hasAddressableParamIndices(),
         paramIndices);
     paramIndices.clear();
   }
@@ -3468,6 +3469,16 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       auto *theAttr = cast<NonisolatedAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[NonisolatedDeclAttrLayout::Code];
       NonisolatedDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode,
+          static_cast<uint8_t>(theAttr->getModifier()), theAttr->isImplicit());
+      return;
+    }
+
+    case DeclAttrKind::InheritActorContext: {
+      auto *theAttr = cast<InheritActorContextAttr>(DA);
+      auto abbrCode =
+          S.DeclTypeAbbrCodes[InheritActorContextDeclAttrLayout::Code];
+      InheritActorContextDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode,
           static_cast<uint8_t>(theAttr->getModifier()), theAttr->isImplicit());
       return;
@@ -5193,9 +5204,6 @@ public:
         case BuiltinMacroKind::IsolationMacro:
           builtinID = 2;
           break;
-        case BuiltinMacroKind::SwiftSettingsMacro:
-          builtinID = 3;
-          break;
         }
         break;
       }
@@ -5260,6 +5268,10 @@ public:
 
   void visitImportDecl(const ImportDecl *) {
     llvm_unreachable("import decls should not be serialized");
+  }
+
+  void visitUsingDecl(const UsingDecl *) {
+    llvm_unreachable("using decls should not be serialized");
   }
 
   void visitEnumCaseDecl(const EnumCaseDecl *) {
@@ -6956,7 +6968,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
 
     for (auto D : fileDecls) {
       if (isa<ImportDecl>(D) || isa<MacroExpansionDecl>(D) ||
-          isa<TopLevelCodeDecl>(D)) {
+          isa<TopLevelCodeDecl>(D) || isa<UsingDecl>(D)) {
         continue;
       }
 

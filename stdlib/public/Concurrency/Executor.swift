@@ -377,7 +377,7 @@ extension SerialExecutor {
   #if SWIFT_CONCURRENCY_USES_DISPATCH
   @available(SwiftStdlib 6.2, *)
   private var _dispatchQueue: OpaquePointer? {
-    return _getDispatchQueueForExecutor(self.asUnownedSerialExecutor())
+    return unsafe _getDispatchQueueForExecutor(self.asUnownedSerialExecutor())
   }
   #endif
 
@@ -387,8 +387,8 @@ extension SerialExecutor {
       return true
     }
     #if SWIFT_CONCURRENCY_USES_DISPATCH
-    if let rhsQueue = rhs._dispatchQueue {
-      if let ourQueue = _dispatchQueue, ourQueue == rhsQueue {
+    if let rhsQueue = unsafe rhs._dispatchQueue {
+      if let ourQueue = unsafe _dispatchQueue, ourQueue == rhsQueue {
         return true
       }
       return false
@@ -583,12 +583,23 @@ public protocol ExecutorFactory {
 }
 
 @available(SwiftStdlib 6.2, *)
+typealias DefaultExecutorFactory = PlatformExecutorFactory
+
+@available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_createExecutors")
 public func _createExecutors<F: ExecutorFactory>(factory: F.Type) {
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   MainActor._executor = factory.mainExecutor
   #endif
   Task._defaultExecutor = factory.defaultExecutor
+}
+
+@available(SwiftStdlib 6.2, *)
+@_silgen_name("swift_createDefaultExecutors")
+func _createDefaultExecutors() {
+  if Task._defaultExecutor == nil {
+    _createExecutors(factory: DefaultExecutorFactory.self)
+  }
 }
 
 #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -603,9 +614,8 @@ extension MainActor {
   /// executor is a fatal error.
   @available(SwiftStdlib 6.2, *)
   public static var executor: any MainExecutor {
-    if _executor == nil {
-      _executor = PlatformExecutorFactory.mainExecutor
-    }
+    // It would be good if there was a Swift way to do this
+    _createDefaultExecutorsOnce()
     return _executor!
   }
 }
@@ -622,9 +632,8 @@ extension Task where Success == Never, Failure == Never {
   /// executor is a fatal error.
   @available(SwiftStdlib 6.2, *)
   public static var defaultExecutor: any TaskExecutor {
-    if _defaultExecutor == nil {
-      _defaultExecutor = PlatformExecutorFactory.defaultExecutor
-    }
+    // It would be good if there was a Swift way to do this
+    _createDefaultExecutorsOnce()
     return _defaultExecutor!
   }
 }

@@ -184,7 +184,6 @@ public:
   IGNORED_ATTR(AtRethrows)
   IGNORED_ATTR(AtReasync)
   IGNORED_ATTR(ImplicitSelfCapture)
-  IGNORED_ATTR(InheritActorContext)
   IGNORED_ATTR(Preconcurrency)
   IGNORED_ATTR(BackDeployed)
   IGNORED_ATTR(Documentation)
@@ -418,8 +417,10 @@ public:
   void visitNonisolatedAttr(NonisolatedAttr *attr);
   void visitIsolatedAttr(IsolatedAttr *attr);
 
+  void visitInheritActorContextAttr(InheritActorContextAttr *attr);
+
   void visitNoImplicitCopyAttr(NoImplicitCopyAttr *attr);
-  
+
   void visitAlwaysEmitConformanceMetadataAttr(AlwaysEmitConformanceMetadataAttr *attr);
 
   void visitExtractConstantsFromMembersAttr(ExtractConstantsFromMembersAttr *attr);
@@ -1094,6 +1095,11 @@ void AttributeChecker::visitLazyAttr(LazyAttr *attr) {
   // are already lazily initialized).
   if (VD->isStatic() || varDC->isModuleScopeContext())
     diagnoseAndRemoveAttr(attr, diag::lazy_on_already_lazy_global);
+
+  // 'lazy' can't be used in or with `@abi` because it has auxiliary decls.
+  auto abiRole = ABIRoleInfo(D);
+  if (!abiRole.providesABI() || !abiRole.providesAPI())
+    diagnoseAndRemoveAttr(attr, diag::attr_abi_no_lazy);
 }
 
 bool AttributeChecker::visitAbstractAccessControlAttr(
@@ -1651,7 +1657,7 @@ static bool hasObjCImplementationFeature(Decl *D, ObjCImplementationAttr *attr,
   // syntax, or you're using Feature::CImplementation. Either way, no go.
   ctx.Diags.diagnose(attr->getLocation(), diag::requires_experimental_feature,
                      attr->getAttrName(), attr->isDeclModifier(),
-                     getFeatureName(requiredFeature));
+                     requiredFeature.getName());
   return false;
 }
 
@@ -1863,7 +1869,7 @@ void TypeChecker::checkDeclAttributes(Decl *D) {
             && !D->getASTContext().LangOpts.hasFeature(*feature)) {
         Checker.diagnoseAndRemoveAttr(attr, diag::requires_experimental_feature,
                                       attr->getAttrName(), false,
-                                      getFeatureName(*feature));
+                                      feature->getName());
         continue;
       }
     }
@@ -4401,6 +4407,12 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
         }
       }
 
+      // Macros can't be attached to ABI-only decls. (If we diagnosed above,
+      // don't bother with this.)
+      if (attr->isValid() && !ABIRoleInfo(D).providesAPI()) {
+        diagnoseAndRemoveAttr(attr, diag::attr_abi_no_macros, macro);
+      }
+
       return;
     }
 
@@ -4482,16 +4494,25 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   // function, storage with an explicit getter, or parameter of function type.
   if (nominal->getAttrs().hasAttribute<ResultBuilderAttr>()) {
     ValueDecl *decl;
+    ValueDecl *abiRelevantDecl;
     if (auto param = dyn_cast<ParamDecl>(D)) {
       decl = param;
+      abiRelevantDecl = dyn_cast<ValueDecl>(
+                            param->getDeclContext()->getAsDecl());
     } else if (auto func = dyn_cast<FuncDecl>(D)) {
       decl = func;
+      abiRelevantDecl = func;
     } else if (auto storage = dyn_cast<AbstractStorageDecl>(D)) {
       decl = storage;
+      abiRelevantDecl = storage;
 
       // Check whether this is a storage declaration that is not permitted
       // to have a result builder attached.
       auto shouldDiagnose = [&]() -> bool {
+        // We'll diagnose use in @abi later.
+        if (!ABIRoleInfo(abiRelevantDecl).providesAPI())
+          return false;
+
         // An uninitialized stored property in a struct can have a function
         // builder attached.
         if (auto var = dyn_cast<VarDecl>(decl)) {
@@ -4532,6 +4553,14 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
                diag::result_builder_attribute_not_allowed_here,
                nominal->getName());
       attr->setInvalid();
+      return;
+    }
+
+    // Result builders shouldn't be applied to an ABI-only decl because they
+    // have no ABI effect.
+    if (!ABIRoleInfo(abiRelevantDecl).providesAPI()) {
+      diagnoseAndRemoveAttr(attr, diag::attr_abi_forbidden_attr,
+                            nominal->getNameStr(), /*isModifier=*/false);
       return;
     }
 
@@ -7789,6 +7818,40 @@ void AttributeChecker::visitAsyncAttr(AsyncAttr *attr) {
       attr->setInvalid();
       return;
     }
+  }
+}
+
+void AttributeChecker::visitInheritActorContextAttr(
+    InheritActorContextAttr *attr) {
+  auto *P = dyn_cast<ParamDecl>(D);
+  if (!P)
+    return;
+
+  auto paramTy = P->getInterfaceType();
+  auto *funcTy =
+      paramTy->lookThroughAllOptionalTypes()->getAs<AnyFunctionType>();
+  if (!funcTy) {
+    diagnoseAndRemoveAttr(attr, diag::inherit_actor_context_only_on_func_types,
+                          attr, paramTy);
+    return;
+  }
+
+  // The type has to be either `@Sendable` or `sending` _and_
+  // `async` or `@isolated(any)`.
+  if (!(funcTy->isSendable() || P->isSending())) {
+    diagnose(attr->getLocation(),
+             diag::inherit_actor_context_only_on_sending_or_Sendable_params,
+             attr)
+        .warnUntilFutureSwiftVersion();
+  }
+
+  // Eiether `async` or `@isolated(any)`.
+  if (!(funcTy->isAsync() || funcTy->getIsolation().isErased())) {
+    diagnose(
+        attr->getLocation(),
+        diag::inherit_actor_context_only_on_async_or_isolation_erased_params,
+        attr)
+        .warnUntilFutureSwiftVersion();
   }
 }
 

@@ -128,13 +128,6 @@ Func withThrowingTaskGroup(of:returning:body:) has parameter 2 type change from 
 Func withTaskGroup(of:returning:body:) has been renamed to Func withTaskGroup(of:returning:isolation:body:)
 Func withTaskGroup(of:returning:body:) has mangled name changing from '_Concurrency.withTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, body: (inout Swift.TaskGroup<A>) async -> B) async -> B' to '_Concurrency.withTaskGroup<A, B where A: Swift.Sendable>(of: A.Type, returning: B.Type, isolation: isolated Swift.Optional<Swift.Actor>, body: (inout Swift.TaskGroup<A>) async -> B) async -> B'
 
-// Hashable for (Throwing)AsyncStream
-// These are just @usableFromInline:
-Var AsyncStream.Continuation.storage is a new API without '@available'
-Var AsyncThrowingStream.Continuation.storage is a new API without '@available'
-Class AsyncStream._Storage is a new API without '@available'
-Class AsyncThrowingStream._Storage is a new API without '@available'
-
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
 
 

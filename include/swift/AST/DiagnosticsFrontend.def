@@ -59,9 +59,9 @@ GROUPED_WARNING(cannot_disable_feature_with_mode, StrictLanguageFeatures, none,
                 "'%0' argument '%1' cannot specify a mode",
                 (StringRef, StringRef))
 
-GROUPED_WARNING(feature_does_not_support_adoption_mode, StrictLanguageFeatures,
+GROUPED_WARNING(feature_does_not_support_migration_mode, StrictLanguageFeatures,
                 none,
-                "feature '%0' does not support adoption mode",
+                "feature '%0' does not support migration mode",
                 (StringRef))
 
 ERROR(error_unknown_library_level, none,
@@ -193,6 +193,8 @@ ERROR(cannot_emit_ir_skipping_function_bodies,none,
 WARNING(emit_reference_dependencies_without_primary_file,none,
         "ignoring -emit-reference-dependencies (requires -primary-file)", ())
 
+WARNING(ignoring_option_obsolete,none,
+        "ignoring '%0'; this option is obsolete", (StringRef))
 WARNING(ignoring_option_requires_option,none,
         "ignoring %0 (requires %1)", (StringRef, StringRef))
 WARNING(warn_ignore_option_overriden_by,none,
@@ -518,14 +520,21 @@ REMARK(matching_output_produced,none,
 
 // Caching related diagnostics
 ERROR(error_caching_no_cas_fs, none,
-    "caching is enabled without -cas-fs option, input is not immutable", ())
+    "caching is enabled without CAS file-system options, input is not immutable", ())
 ERROR(error_prefix_mapping, none, "cannot create scanner prefix mapping: '%0'", (StringRef))
 
 REMARK(replay_output, none, "replay output file '%0': key '%1'", (StringRef, StringRef))
 REMARK(output_cache_miss, none, "cache miss for input file '%0': key '%1'", (StringRef, StringRef))
 
 // CAS related diagnostics
-ERROR(error_cas, none, "CAS error encountered: %0", (StringRef))
+ERROR(error_invalid_cas_id, none, "CAS cannot parse id '%0': %1", (StringRef, StringRef))
+ERROR(error_cas, none, "CAS error encountered during %0: %1", (StringRef, StringRef))
+ERROR(error_cas_fs_creation, none, "cannot create CAS filesystem: %0", (StringRef))
+ERROR(error_cache_key_creation, none, "cannot create cache key for compilation %0: %1", (StringRef, StringRef))
+ERROR(error_cas_file_ref, none, "cannot load file %0 from CAS filesystem", (StringRef))
+ERROR(error_cas_conflict_options, none, "cannot setup CAS due to conflicting '-cas-*' options", ())
+ERROR(error_cas_initialization, none, "CAS cannot be initialized from the specified '-cas-*' options: %0", (StringRef))
+ERROR(error_cas_malformed_input, none, "CAS input '%0' is malformed: %1", (StringRef, StringRef))
 WARNING(cache_replay_failed, none, "cache replay failed: %0", (StringRef))
 
 ERROR(error_failed_cached_diag, none, "failed to serialize cached diagnostics: %0", (StringRef))
@@ -617,6 +626,17 @@ ERROR(ast_format_requires_dump_ast,none,
 
 ERROR(unknown_dump_ast_format,none,
       "unknown format '%0' requested with '-dump-ast-format'", (StringRef))
+
+WARNING(dependency_scan_unexpected_variant, none,
+        "unexpected module variant during dependency scanning on module '%0', "
+        "compilation of this target is likely to fail or succeed in a way that is not deterministic", (StringRef))
+NOTE(dependency_scan_unexpected_variant_context_hash_note, none,
+     "first module context hash: '%0', second module context hash: '%1'", (StringRef, StringRef))
+NOTE(dependency_scan_unexpected_variant_module_map_note, none,
+     "first module module map: '%0', second module module map: '%1'", (StringRef, StringRef))
+NOTE(dependency_scan_unexpected_variant_extra_arg_note, none,
+     "%select{first|second}0 module command-line has extra argument: '%1'", (bool, StringRef))
+
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

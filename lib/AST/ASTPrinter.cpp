@@ -383,6 +383,11 @@ PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
         }
       }
 
+      // The `using` declarations are private to the file at the moment
+      // and shouldn't appear in swift interfaces.
+      if (isa<UsingDecl>(D))
+        return false;
+
       return ShouldPrintChecker::shouldPrint(D, options);
     }
   };
@@ -3058,6 +3063,11 @@ void PrintAST::visitImportDecl(ImportDecl *decl) {
                    [&] { Printer << "."; });
 }
 
+void PrintAST::visitUsingDecl(UsingDecl *decl) {
+  Printer.printIntroducerKeyword("using", Options, " ");
+  Printer << decl->getSpecifierName();
+}
+
 void PrintAST::printExtendedTypeName(TypeLoc ExtendedTypeLoc) {
   bool OldFullyQualifiedTypesIfAmbiguous =
     Options.FullyQualifiedTypesIfAmbiguous;
@@ -3289,8 +3299,8 @@ suppressingFeatureCoroutineAccessors(PrintOptions &options,
 }
 
 static void
-suppressingFeatureABIAttribute(PrintOptions &options,
-                               llvm::function_ref<void()> action) {
+suppressingFeatureABIAttributeSE0479(PrintOptions &options,
+                                     llvm::function_ref<void()> action) {
   llvm::SaveAndRestore<bool> scope1(options.PrintSyntheticSILGenName, true);
   ExcludeAttrRAII scope2(options.ExcludeAttrList, DeclAttrKind::ABI);
   action();
@@ -3338,7 +3348,7 @@ static void printCompatibilityCheckIf(ASTPrinter &printer, bool isElseIf,
     } else {
       first = false;
     }
-    printer << "$" << getFeatureName(feature);
+    printer << "$" << Feature(feature).getName();
   }
 
 #ifndef NDEBUG
@@ -3496,11 +3506,13 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
   if (decl->isStatic())
     printStaticKeyword(decl->getCorrectStaticSpelling());
 
+  bool printAsVar = false;
   if (anyVar) {
-    Printer << (anyVar->isSettable(anyVar->getDeclContext()) ? "var " : "let ");
-  } else {
-    Printer << "let ";
+    printAsVar = (anyVar->isSettable(anyVar->getDeclContext()) ||
+                  isInObjCImpl(anyVar));
   }
+
+  Printer << (printAsVar ? "var " : "let ");
 
   bool isFirst = true;
   for (auto idx : range(decl->getNumPatternEntries())) {
@@ -3939,9 +3951,9 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
     // Map all non-let specifiers to 'var'.  This is not correct, but
     // SourceKit relies on this for info about parameter decls.
     
-    Printer.printIntroducerKeyword(
-      decl->getIntroducer() == VarDecl::Introducer::Let ? "let" : "var",
-      Options, " ");
+    bool printAsVar = (decl->getIntroducer() != VarDecl::Introducer::Let ||
+                       isInObjCImpl(decl));
+    Printer.printIntroducerKeyword(printAsVar ? "var" : "let", Options, " ");
   }
   printContextIfNeeded(decl);
   recordDeclLoc(decl,
@@ -4796,9 +4808,6 @@ void PrintAST::visitMacroDecl(MacroDecl *decl) {
           break;
         case BuiltinMacroKind::IsolationMacro:
           Printer << "IsolationMacro";
-          break;
-        case BuiltinMacroKind::SwiftSettingsMacro:
-          Printer << "SwiftSettingsMacro";
           break;
         }
         break;
@@ -6012,6 +6021,11 @@ class TypePrinter : public TypeVisitor<TypePrinter> {
       Name = Mod->getASTContext().getIdentifier(ExportedModuleName);
     }
 
+    StringRef PublicModuleName = File->getPublicModuleName();
+    if (Options.UsePublicModuleNames && !PublicModuleName.empty()) {
+      Name = Mod->getASTContext().getIdentifier(PublicModuleName);
+    }
+
     if (Options.UseOriginallyDefinedInModuleNames) {
       Decl *D = Ty->getDecl();
       for (auto attr: D->getAttrs().getAttributes<OriginallyDefinedInAttr>()) {
@@ -7102,7 +7116,7 @@ public:
     } else {
       Printer << "[";
       visit(T->getCountType());
-      Printer << " x ";
+      Printer << " of ";
       visit(T->getElementType());
       Printer << "]";
     }

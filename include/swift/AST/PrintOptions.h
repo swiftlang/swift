@@ -234,6 +234,12 @@ struct PrintOptions {
   /// \see FileUnit::getExportedModuleName
   bool UseExportedModuleNames = false;
 
+  /// If true, printed module names will use the "public" (for documentation)
+  /// name, which may be different from the regular name.
+  ///
+  /// \see FileUnit::getPublicModuleName
+  bool UsePublicModuleNames = false;
+
   /// Use the original module name to qualify a symbol.
   bool UseOriginallyDefinedInModuleNames = false;
 
@@ -588,7 +594,7 @@ struct PrintOptions {
   bool AlwaysDesugarArraySliceTypes = false;
 
   /// Whether to always desugar inline array types from
-  /// `[<count> x <element>]` to `InlineArray<count, element>`
+  /// `[<count> of <element>]` to `InlineArray<count, element>`
   bool AlwaysDesugarInlineArrayTypes = false;
 
   /// Whether to always desugar dictionary types
@@ -704,6 +710,7 @@ struct PrintOptions {
     result.MapCrossImportOverlaysToDeclaringModule = true;
     result.PrintCurrentMembersOnly = false;
     result.SuppressExpandedMacros = true;
+    result.UsePublicModuleNames = true;
     return result;
   }
 

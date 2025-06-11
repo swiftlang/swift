@@ -13,6 +13,7 @@
 #include "swift/SILOptimizer/Utils/SILIsolationInfo.h"
 
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Expr.h"
 #include "swift/SIL/AddressWalker.h"
 #include "swift/SIL/ApplySite.h"
@@ -899,7 +900,7 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
   if (auto *isolatedArg = llvm::cast_or_null<SILFunctionArgument>(
           fArg->getFunction()->maybeGetIsolatedArgument())) {
     auto astType = isolatedArg->getType().getASTType();
-    if (auto *nomDecl = astType->lookThroughAllOptionalTypes()->getAnyActor()) {
+    if (astType->lookThroughAllOptionalTypes()->getAnyActor()) {
       return SILIsolationInfo::getActorInstanceIsolated(fArg, isolatedArg);
     }
   }
@@ -1332,6 +1333,30 @@ SILValue ActorInstance::lookThroughInsts(SILValue value) {
             ei->getFunction()->getASTContext().getOptionalDecl()) {
           value = lookThroughInsts(ei->getOperand());
           continue;
+        }
+      }
+    }
+
+    // See if this is distributed asLocalActor. In such a case, we want to
+    // consider the result actor to be the same actor as the input isolated
+    // parameter.
+    if (auto fas = FullApplySite::isa(svi)) {
+      if (auto *functionRef = fas.getReferencedFunctionOrNull()) {
+        if (auto declRef = functionRef->getDeclRef()) {
+          if (auto *accessor =
+                  dyn_cast_or_null<AccessorDecl>(declRef.getFuncDecl())) {
+            if (auto asLocalActorDecl =
+                    getDistributedActorAsLocalActorComputedProperty(
+                        functionRef->getDeclContext()->getParentModule())) {
+              if (auto asLocalActorGetter =
+                      asLocalActorDecl->getAccessor(AccessorKind::Get);
+                  asLocalActorGetter && asLocalActorGetter == accessor) {
+                value = lookThroughInsts(
+                    fas.getIsolatedArgumentOperandOrNullPtr()->get());
+                continue;
+              }
+            }
+          }
         }
       }
     }

@@ -66,3 +66,6 @@ case something
 
 @attached(peer, names: overloaded)
 public macro AcceptedDotted(_: Something) = #externalMacro(module: "MacroDefinition", type: "EmptyPeerMacro")
+
+@attached(peer, names: overloaded)
+public macro ExpandTypeError() = #externalMacro(module: "MacroDefinition", type: "ExpandTypeErrorMacro")

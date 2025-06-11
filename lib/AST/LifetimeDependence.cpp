@@ -309,13 +309,21 @@ public:
 
     if (!ctx.LangOpts.hasFeature(Feature::LifetimeDependence)
         && !ctx.SourceMgr.isImportMacroGeneratedLoc(returnLoc)) {
+
+      // Infer inout dependencies without requiring a feature flag. On
+      // returning, 'lifetimeDependencies' contains any inferred
+      // dependencies. This does not issue any diagnostics because any invalid
+      // usage should generate a missing feature flag diagnostic instead.
+      inferInoutParams();
+
       diagnoseMissingResultDependencies(
         diag::lifetime_dependence_feature_required_return.ID);
       diagnoseMissingSelfDependencies(
         diag::lifetime_dependence_feature_required_mutating.ID);
       diagnoseMissingInoutDependencies(
         diag::lifetime_dependence_feature_required_inout.ID);
-      return std::nullopt;
+
+      return currentDependencies();
     }
 
     if (afd->getAttrs().hasAttribute<LifetimeAttr>()) {
@@ -657,8 +665,18 @@ protected:
   case ParsedLifetimeDependenceKind::Inherit:
     // @lifetime(copy x) is only invalid for Escapable types.
     if (type->isEscapable()) {
-      diagnose(loc, diag::lifetime_dependence_invalid_inherit_escapable_type,
-               descriptor.getString());
+      if (loweredOwnership == ValueOwnership::Shared) {
+        diagnose(loc, diag::lifetime_dependence_invalid_inherit_escapable_type,
+                 descriptor.getString(), "borrow ");
+      } else if (loweredOwnership == ValueOwnership::InOut) {
+        diagnose(loc, diag::lifetime_dependence_invalid_inherit_escapable_type,
+                 descriptor.getString(), "&");
+      } else {
+        diagnose(
+            loc,
+            diag::lifetime_dependence_cannot_use_default_escapable_consuming,
+            getOwnershipSpelling(loweredOwnership));
+      }
       return std::nullopt;
     }
     return LifetimeDependenceKind::Inherit;
@@ -851,20 +869,28 @@ protected:
       return;
     }
 
-    // Infer mutating methods.
-    if (hasImplicitSelfParam()) {
-      if (isDiagnosedNonEscapable(dc->getSelfTypeInContext())) {
-        assert(!isInit() && "class initializers have Escapable self");
-        auto *selfDecl = afd->getImplicitSelfDecl();
-        if (selfDecl->isInOut()) {
-          // Mutating methods (excluding initializers)
-          inferMutatingSelf(selfDecl);
-          return;
-        }
-      }
-    }
+    // Infer mutating non-Escapable methods (excluding initializers).
+    inferMutatingSelf();
+
     // Infer inout parameters.
     inferInoutParams();
+  }
+
+  /// If the current function is a mutating method and 'self' is non-Escapable,
+  /// return 'self's ParamDecl.
+  bool isMutatingNonEscapableSelf() {
+    if (!hasImplicitSelfParam())
+      return false;
+
+    if (!isDiagnosedNonEscapable(dc->getSelfTypeInContext()))
+      return false;
+
+    assert(!isInit() && "class initializers have Escapable self");
+    auto *selfDecl = afd->getImplicitSelfDecl();
+    if (!selfDecl->isInOut())
+      return false;
+
+    return true;
   }
 
   // Infer method dependence: result depends on self. This includes _modify.
@@ -1069,10 +1095,13 @@ protected:
     pushDeps(createDeps(resultIndex).add(*candidateParamIndex,
                                          *candidateLifetimeKind));
   }
-  
+
   // Infer a mutating 'self' dependency when 'self' is non-Escapable and the
   // result is 'void'.
-  void inferMutatingSelf(ParamDecl *selfDecl) {
+  void inferMutatingSelf() {
+    if (!isMutatingNonEscapableSelf()) {
+      return;
+    }
     // Handle implicit setters before diagnosing mutating methods. This
     // does not include global accessors, which have no implicit 'self'.
     if (auto accessor = dyn_cast<AccessorDecl>(afd)) {
@@ -1126,12 +1155,19 @@ protected:
       if (paramTypeInContext->hasError()) {
         return;
       }
-      auto kind = inferLifetimeDependenceKind(paramTypeInContext,
-                                              param->getValueOwnership());
+      auto targetDeps =
+        createDeps(selfIndex).add(selfIndex, LifetimeDependenceKind::Inherit);
 
-      pushDeps(createDeps(selfIndex)
-                   .add(selfIndex, LifetimeDependenceKind::Inherit)
-                   .add(newValIdx, *kind));
+      // The 'newValue' dependence kind must match the getter's dependence kind
+      // because generated the implementation '_modify' accessor composes the
+      // getter's result with the setter's 'newValue'. In particular, if the
+      // result type is Escapable then the getter does not have any lifetime
+      // dependency, so the setter cannot depend on 'newValue'.
+      if (!paramTypeInContext->isEscapable()) {
+        targetDeps = std::move(targetDeps)
+          .add(newValIdx, LifetimeDependenceKind::Inherit);
+      }
+      pushDeps(std::move(targetDeps));
       break;
     }
     case AccessorKind::MutableAddress:
@@ -1154,8 +1190,59 @@ protected:
   // Infer 'inout' parameter dependency when the only parameter is
   // non-Escapable.
   //
-  // This is needed for most generic Builtin functions.
+  // This supports the common case in which the user of a non-Escapable type,
+  // such as MutableSpan, wants to modify the span's contents without modifying
+  // the span value itself. It should be possible to use MutableSpan this way
+  // without requiring any knowledge of lifetime annotations. The tradeoff is
+  // that it makes authoring non-Escapable types less safe. For example, a
+  // MutableSpan method could update the underlying unsafe pointer and forget to
+  // declare a dependence on the incoming pointer.
+  //
+  // Disallowing other non-Escapable parameters rules out the easy mistake of
+  // programmers attempting to trivially reassign the inout parameter. There's
+  // is no way to rule out the possibility that they derive another
+  // non-Escapable value from an Escapable parameteter. So they can still write
+  // the following and will get a lifetime diagnostic:
+  //
+  //     func reassign(s: inout MutableSpan<Int>, a: [Int]) {
+  //       s = a.mutableSpan
+  //     }
+  //
+  // Do not issue any diagnostics. This inference is triggered even when the
+  // feature is disabled!
   void inferInoutParams() {
+    if (isMutatingNonEscapableSelf()) {
+      return;
+    }
+    std::optional<unsigned> candidateParamIndex;
+    bool hasNonEscapableParameter = false;
+    if (hasImplicitSelfParam()
+        && isDiagnosedNonEscapable(dc->getSelfTypeInContext())) {
+      hasNonEscapableParameter = true;
+    }
+    for (unsigned paramIndex : range(afd->getParameters()->size())) {
+      auto *param = afd->getParameters()->get(paramIndex);
+      if (isDiagnosedNonEscapable(
+            afd->mapTypeIntoContext(param->getInterfaceType()))) {
+        if (param->isInOut()) {
+          if (hasNonEscapableParameter)
+            return;
+          candidateParamIndex = paramIndex;
+          continue;
+        }
+        if (candidateParamIndex)
+          return;
+
+        hasNonEscapableParameter = true;
+      }
+    }
+    if (candidateParamIndex) {
+      pushDeps(createDeps(*candidateParamIndex).add(
+                 *candidateParamIndex, LifetimeDependenceKind::Inherit));
+    }
+  }
+
+  void inferUnambiguousInoutParams() {
     if (afd->getParameters()->size() != 1) {
       return;
     }
@@ -1174,7 +1261,7 @@ protected:
 
   void inferBuiltin() {
     // Normal inout parameter inference works for most generic Builtins.
-    inferInoutParams();
+    inferUnambiguousInoutParams();
     if (!lifetimeDependencies.empty()) {
       return;
     }

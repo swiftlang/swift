@@ -173,6 +173,37 @@ func shufflevector_test(_ src: Builtin.FPIEEE32) -> Builtin.Vec4xFPIEEE32 {
   )
 }
 
+func scalar_select_test(
+  _ predicate: Builtin.Int1,
+  _ trueValue: Builtin.Int32,
+  _ falseValue: Builtin.Int32
+) -> Builtin.Int32 {
+  // CHECK: scalar_select_test
+  // CHECK: select i1 %{{[0-9]+}}, i32 %{{[0-9]+}}, i32 %{{[0-9]+}}
+  Builtin.select_Int1_Int32(predicate, trueValue, falseValue)
+}
+
+func scalar_select_test_ii(
+  _ predicate: Builtin.Int1,
+  _ trueValue: Builtin.Vec4xInt32,
+  _ falseValue: Builtin.Vec4xInt32
+) -> Builtin.Vec4xInt32 {
+  // CHECK: scalar_select_test_ii
+  // CHECK: select i1 %{{[0-9]+}}, <4 x i32> %{{[0-9]+}}, <4 x i32> %{{[0-9]+}}
+  Builtin.select_Int1_Vec4xInt32(predicate, trueValue, falseValue)
+}
+
+func vector_select_test(
+  _ predicate: Builtin.Vec8xInt32,
+  _ trueValue: Builtin.Vec8xInt32,
+  _ falseValue: Builtin.Vec8xInt32
+) -> Builtin.Vec8xInt32 {
+  // CHECK: vector_select_test
+  // CHECK: select <8 x i1> %{{[0-9]+}}, <8 x i32> %{{[0-9]+}}, <8 x i32> %{{[0-9]+}}
+  let p = Builtin.trunc_Vec8xInt32_Vec8xInt1(predicate)
+  return Builtin.select_Vec8xInt1_Vec8xInt32(p, trueValue, falseValue)
+}
+
 func intrinsic_test(_ i32: inout Builtin.Int32, i16: inout Builtin.Int16,
                     _ v8i16: Builtin.Vec8xInt16) {
   // CHECK: intrinsic_test
@@ -329,9 +360,9 @@ func fneg_test(_ half: Builtin.FPIEEE16,
                double: Builtin.FPIEEE64)
   -> (Builtin.FPIEEE16, Builtin.FPIEEE32, Builtin.FPIEEE64)
 {
-  // CHECK: fsub half 0xH8000, {{%.*}}
-  // CHECK: fsub float -0.000000e+00, {{%.*}}
-  // CHECK: fsub double -0.000000e+00, {{%.*}}
+  // CHECK: fneg half
+  // CHECK: fneg float
+  // CHECK: fneg double
   return (Builtin.fneg_FPIEEE16(half),
           Builtin.fneg_FPIEEE32(single),
           Builtin.fneg_FPIEEE64(double))

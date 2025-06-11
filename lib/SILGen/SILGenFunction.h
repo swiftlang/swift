@@ -543,7 +543,9 @@ public:
     
     PreparedAddressableBuffer(SILInstruction *insertPoint)
       : insertPoint(insertPoint)
-    {}
+    {
+      ASSERT(insertPoint && "null insertion point provided");
+    }
     
     PreparedAddressableBuffer(PreparedAddressableBuffer &&other)
       : insertPoint(other.insertPoint)
@@ -2624,8 +2626,7 @@ public:
   void collectThunkParams(
       SILLocation loc, SmallVectorImpl<ManagedValue> &params,
       SmallVectorImpl<ManagedValue> *indirectResultParams = nullptr,
-      SmallVectorImpl<ManagedValue> *indirectErrorParams = nullptr,
-      ThunkGenOptions options = {});
+      SmallVectorImpl<ManagedValue> *indirectErrorParams = nullptr);
 
   /// Build the type of a function transformation thunk.
   CanSILFunctionType buildThunkType(CanSILFunctionType &sourceType,

@@ -4045,6 +4045,7 @@ struct ParameterListInfo {
   SmallBitVector propertyWrappers;
   SmallBitVector implicitSelfCapture;
   SmallBitVector inheritActorContext;
+  SmallBitVector alwaysInheritActorContext;
   SmallBitVector variadicGenerics;
   SmallBitVector sendingParameters;
 
@@ -4071,7 +4072,8 @@ public:
 
   /// Whether the given parameter is a closure that should inherit the
   /// actor context from the context in which it was created.
-  bool inheritsActorContext(unsigned paramIdx) const;
+  std::pair<bool, InheritActorContextModifier>
+  inheritsActorContext(unsigned paramIdx) const;
 
   bool isVariadicGenericParameter(unsigned paramIdx) const;
 
@@ -5198,12 +5200,12 @@ public:
   /// Given an existing ExtInfo, and a set of interface parameters and results
   /// destined for a new SILFunctionType, return a new ExtInfo with only the
   /// lifetime dependencies relevant after substitution.
-  static ExtInfo
-  getSubstLifetimeDependencies(GenericSignature genericSig,
-                               ExtInfo origExtInfo,
-                               ArrayRef<SILParameterInfo> params,
-                               ArrayRef<SILYieldInfo> yields,
-                               ArrayRef<SILResultInfo> results);
+  static ExtInfo getSubstLifetimeDependencies(GenericSignature genericSig,
+                                              ExtInfo origExtInfo,
+                                              ASTContext &context,
+                                              ArrayRef<SILParameterInfo> params,
+                                              ArrayRef<SILYieldInfo> yields,
+                                              ArrayRef<SILResultInfo> results);
 
   /// Return a structurally-identical function type with a slightly tweaked
   /// ExtInfo.
@@ -6287,7 +6289,7 @@ public:
   }
 };
 
-/// An InlineArray type e.g `[2 x Foo]`, sugar for `InlineArray<2, Foo>`.
+/// An InlineArray type e.g `[2 of Foo]`, sugar for `InlineArray<2, Foo>`.
 class InlineArrayType : public SyntaxSugarType {
   Type Count;
   Type Elt;

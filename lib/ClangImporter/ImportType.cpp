@@ -425,17 +425,15 @@ namespace {
     ImportResult VisitDynamicRangePointerType(
         const clang::DynamicRangePointerType *type) {
       // DynamicRangePointerType is a clang type representing a pointer with
-      // an "ended_by" type attribute for -fbounds-safety. For now, we don't
-      // import these into Swift.
-      return Type();
+      // an "ended_by" type attribute for -fbounds-safety.
+      return Visit(type->desugar());
     }
 
     ImportResult VisitValueTerminatedType(
         const clang::ValueTerminatedType *type) {
       // ValueTerminatedType is a clang type representing a pointer with
-      // a "terminated_by" type attribute for -fbounds-safety. For now, we don't
-      // import these into Swift.
-      return Type();
+      // a "terminated_by" type attribute for -fbounds-safety.
+      return Visit(type->desugar());
     }
 
     ImportResult VisitMemberPointerType(const clang::MemberPointerType *type) {
@@ -2255,10 +2253,7 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
     OptionalityOfReturn = OTK_ImplicitlyUnwrappedOptional;
   }
 
-  clang::QualType returnType = clangDecl->getReturnType();
-  if (auto elaborated =
-          dyn_cast<clang::ElaboratedType>(returnType))
-    returnType = elaborated->desugar();
+  clang::QualType returnType = desugarIfElaborated(clangDecl->getReturnType());
   // In C interop mode, the return type of library builtin functions
   // like 'memcpy' from headers like 'string.h' drops
   // any nullability specifiers from their return type, and preserves it on the
@@ -2296,19 +2291,9 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
           ->isTemplateTypeParmType())
     OptionalityOfReturn = OTK_None;
 
-  if (auto typedefType = dyn_cast<clang::TypedefType>(returnType)) {
-    if (isUnavailableInSwift(typedefType->getDecl())) {
-      if (auto clangEnum = findAnonymousEnumForTypedef(SwiftContext, typedefType)) {
-        // If this fails, it means that we need a stronger predicate for
-        // determining the relationship between an enum and typedef.
-        assert(clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
-               typedefType->getCanonicalTypeInternal());
-        if (auto swiftEnum = importDecl(*clangEnum, CurrentVersion)) {
-          return {cast<TypeDecl>(swiftEnum)->getDeclaredInterfaceType(), false};
-        }
-      }
-    }
-  }
+  ImportedType optionSetEnum = importer::findOptionSetEnum(returnType, *this);
+  if (optionSetEnum)
+    return optionSetEnum;
 
   // Import the underlying result type.
   if (clangDecl) {
@@ -2376,27 +2361,11 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
 
   // Only eagerly import the return type if it's not too expensive (the current
   // heuristic for that is if it's not a record type).
-  ImportedType importedType;
   ImportDiagnosticAdder addDiag(*this, clangDecl,
                                 clangDecl->getSourceRange().getBegin());
-  clang::QualType returnType = clangDecl->getReturnType();
-  if (auto elaborated = dyn_cast<clang::ElaboratedType>(returnType))
-    returnType = elaborated->desugar();
+  clang::QualType returnType = desugarIfElaborated(clangDecl->getReturnType());
 
-  if (auto typedefType = dyn_cast<clang::TypedefType>(returnType)) {
-    if (isUnavailableInSwift(typedefType->getDecl())) {
-      if (auto clangEnum = findAnonymousEnumForTypedef(SwiftContext, typedefType)) {
-        // If this fails, it means that we need a stronger predicate for
-        // determining the relationship between an enum and typedef.
-        assert(clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
-               typedefType->getCanonicalTypeInternal());
-        if (auto swiftEnum = importDecl(*clangEnum, CurrentVersion)) {
-          importedType = {cast<TypeDecl>(swiftEnum)->getDeclaredInterfaceType(),
-                          false};
-        }
-      }
-    }
-  }
+  ImportedType importedType = importer::findOptionSetEnum(returnType, *this);
 
   if (auto templateType =
           dyn_cast<clang::TemplateTypeParmType>(returnType)) {
@@ -2460,9 +2429,7 @@ ClangImporter::Implementation::importParameterType(
     std::optional<unsigned> completionHandlerErrorParamIndex,
     ArrayRef<GenericTypeParamDecl *> genericParams,
     llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn) {
-  auto paramTy = param->getType();
-  if (auto elaborated = dyn_cast<clang::ElaboratedType>(paramTy))
-    paramTy = elaborated->desugar();
+  auto paramTy = desugarIfElaborated(param->getType());
 
   ImportTypeKind importKind = paramIsCompletionHandler
                                   ? ImportTypeKind::CompletionHandlerParameter
@@ -2475,23 +2442,8 @@ ClangImporter::Implementation::importParameterType(
   bool isConsuming = false;
   bool isParamTypeImplicitlyUnwrapped = false;
 
-  // Sometimes we import unavailable typedefs as enums. If that's the case,
-  // use the enum, not the typedef here.
-  if (auto typedefType = dyn_cast<clang::TypedefType>(paramTy.getTypePtr())) {
-    if (isUnavailableInSwift(typedefType->getDecl())) {
-      if (auto clangEnum =
-              findAnonymousEnumForTypedef(SwiftContext, typedefType)) {
-        // If this fails, it means that we need a stronger predicate for
-        // determining the relationship between an enum and typedef.
-        assert(clangEnum.value()
-                   ->getIntegerType()
-                   ->getCanonicalTypeInternal() ==
-               typedefType->getCanonicalTypeInternal());
-        if (auto swiftEnum = importDecl(*clangEnum, CurrentVersion)) {
-          swiftParamTy = cast<TypeDecl>(swiftEnum)->getDeclaredInterfaceType();
-        }
-      }
-    }
+  if (auto optionSetEnum = importer::findOptionSetEnum(paramTy, *this)) {
+    swiftParamTy = optionSetEnum.getType();
   } else if (isa<clang::PointerType>(paramTy) &&
              isa<clang::TemplateTypeParmType>(paramTy->getPointeeType())) {
     auto pointeeType = paramTy->getPointeeType();
@@ -3211,26 +3163,8 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
 
   ImportDiagnosticAdder addImportDiag(*this, clangDecl,
                                       clangDecl->getLocation());
-  clang::QualType resultType = clangDecl->getReturnType();
-  if (auto elaborated = dyn_cast<clang::ElaboratedType>(resultType))
-    resultType = elaborated->desugar();
-
-  ImportedType importedType;
-  if (auto typedefType = dyn_cast<clang::TypedefType>(resultType.getTypePtr())) {
-    if (isUnavailableInSwift(typedefType->getDecl())) {
-      if (auto clangEnum = findAnonymousEnumForTypedef(SwiftContext, typedefType)) {
-        // If this fails, it means that we need a stronger predicate for
-        // determining the relationship between an enum and typedef.
-        assert(clangEnum.value()->getIntegerType()->getCanonicalTypeInternal() ==
-               typedefType->getCanonicalTypeInternal());
-        if (auto swiftEnum = importDecl(*clangEnum, CurrentVersion)) {
-          importedType = {cast<TypeDecl>(swiftEnum)->getDeclaredInterfaceType(),
-                          false};
-        }
-      }
-    }
-  }
-
+  clang::QualType resultType = desugarIfElaborated(clangDecl->getReturnType());
+  ImportedType importedType = importer::findOptionSetEnum(resultType, *this);
   if (!importedType)
     importedType = importType(resultType, resultKind, addImportDiag,
                               allowNSUIntegerAsIntInResult, Bridgeability::Full,
@@ -3478,9 +3412,6 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
           importedType.isImplicitlyUnwrapped()};
 }
 
-ImportedType findOptionSetType(clang::QualType type,
-                               ClangImporter::Implementation &Impl);
-
 ImportedType ClangImporter::Implementation::importAccessorParamsAndReturnType(
     const DeclContext *dc, const clang::ObjCPropertyDecl *property,
     const clang::ObjCMethodDecl *clangDecl, bool isFromSystemModule,
@@ -3506,11 +3437,11 @@ ImportedType ClangImporter::Implementation::importAccessorParamsAndReturnType(
   if (!origDC)
     return {Type(), false};
 
-  auto fieldType = isGetter ? clangDecl->getReturnType()
-                            : clangDecl->getParamDecl(0)->getType();
-
+  auto fieldType =
+      desugarIfElaborated(isGetter ? clangDecl->getReturnType()
+                                   : clangDecl->getParamDecl(0)->getType());
   // Import the property type, independent of what kind of accessor this is.
-  ImportedType importedType = findOptionSetType(fieldType, *this);
+  ImportedType importedType = importer::findOptionSetEnum(fieldType, *this);
   if (!importedType)
     importedType = importPropertyType(property, isFromSystemModule);
   if (!importedType)
