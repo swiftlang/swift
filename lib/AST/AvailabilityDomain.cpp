@@ -109,6 +109,26 @@ bool AvailabilityDomain::isVersioned() const {
   }
 }
 
+bool AvailabilityDomain::isVersionValid(
+    const llvm::VersionTuple &version) const {
+  ASSERT(isVersioned());
+
+  switch (getKind()) {
+  case Kind::Universal:
+  case Kind::Embedded:
+    llvm_unreachable("unexpected domain kind");
+  case Kind::SwiftLanguage:
+  case Kind::PackageDescription:
+    return true;
+  case Kind::Platform:
+    if (auto osType = tripleOSTypeForPlatform(getPlatformKind()))
+      return llvm::Triple::isValidVersionForOS(*osType, version);
+    return true;
+  case Kind::Custom:
+    return true;
+  }
+}
+
 bool AvailabilityDomain::supportsContextRefinement() const {
   switch (getKind()) {
   case Kind::Universal:
