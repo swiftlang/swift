@@ -347,7 +347,7 @@ namespace {
 
       // ARM SVE builtin types that don't have Swift equivalents.
 #define SVE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
-#include "clang/Basic/AArch64SVEACLETypes.def"
+#include "clang/Basic/AArch64ACLETypes.def"
         return Type();
 
       // PPC SVE builtin types that don't have Swift equivalents.
