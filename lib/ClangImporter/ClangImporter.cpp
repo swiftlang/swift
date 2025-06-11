@@ -966,10 +966,8 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
   // FIXME: The following attempts to do an initial ReadAST invocation to verify
   // the PCH, without causing trouble for the existing CompilerInstance.
   // Look into combining creating the ASTReader along with verification + update
-  // if necessary, so that we can create and use one ASTReader in the common case
-  // when there is no need for update.
-  clang::CompilerInstance CI(Impl.Instance->getPCHContainerOperations(),
-                             &Impl.Instance->getModuleCache());
+  // if necessary, so that we can create and use one ASTReader in the common
+  // case when there is no need for update.
   auto invocation =
       std::make_shared<clang::CompilerInvocation>(*Impl.Invocation);
   invocation->getPreprocessorOpts().DisablePCHOrModuleValidation =
@@ -985,7 +983,9 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
   invocation->getPreprocessorOpts().RemappedFileBuffers.clear();
 
   clang::DiagnosticOptions diagOpts;
-  CI.setInvocation(std::move(invocation));
+  clang::CompilerInstance CI(std::move(invocation),
+                             Impl.Instance->getPCHContainerOperations(),
+                             &Impl.Instance->getModuleCache());
   CI.setTarget(&Impl.Instance->getTarget());
   CI.setDiagnostics(&*clang::CompilerInstance::createDiagnostics(
       Impl.Instance->getVirtualFileSystem(), diagOpts));
@@ -1363,12 +1363,10 @@ ClangImporter::create(ASTContext &ctx,
         std::make_unique<clang::ObjectFilePCHContainerWriter>());
     PCHContainerOperations->registerReader(
         std::make_unique<clang::ObjectFilePCHContainerReader>());
-    importer->Impl.Instance.reset(
-        new clang::CompilerInstance(std::move(PCHContainerOperations)));
+    importer->Impl.Instance.reset(new clang::CompilerInstance(
+        importer->Impl.Invocation, std::move(PCHContainerOperations)));
   }
   auto &instance = *importer->Impl.Instance;
-  instance.setInvocation(importer->Impl.Invocation);
-
   if (tracker)
     instance.addDependencyCollector(tracker->getClangCollector());
 
@@ -1898,9 +1896,8 @@ std::string ClangImporter::getBridgingHeaderContents(
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
 
   clang::CompilerInstance rewriteInstance(
-    Impl.Instance->getPCHContainerOperations(),
-    &Impl.Instance->getModuleCache());
-  rewriteInstance.setInvocation(invocation);
+      std::move(invocation), Impl.Instance->getPCHContainerOperations(),
+      &Impl.Instance->getModuleCache());
   rewriteInstance.createDiagnostics(fileManager.getVirtualFileSystem(),
                                     new clang::IgnoringDiagConsumer);
   rewriteInstance.setFileManager(&fileManager);
@@ -2004,9 +2001,8 @@ ClangImporter::cloneCompilerInstanceForPrecompiling() {
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
 
   auto clonedInstance = std::make_unique<clang::CompilerInstance>(
-    Impl.Instance->getPCHContainerOperations(),
-    &Impl.Instance->getModuleCache());
-  clonedInstance->setInvocation(std::move(invocation));
+      std::move(invocation), Impl.Instance->getPCHContainerOperations(),
+      &Impl.Instance->getModuleCache());
   clonedInstance->createDiagnostics(fileManager.getVirtualFileSystem(),
                                     &Impl.Instance->getDiagnosticClient(),
                                     /*ShouldOwnClient=*/false);
