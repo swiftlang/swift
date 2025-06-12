@@ -40,11 +40,11 @@ protocol ParamInfo: CustomStringConvertible {
   var dependencies: [LifetimeDependence] { get set }
 
   func getBoundsCheckedThunkBuilder(
-    _ base: BoundsCheckedThunkBuilder, _ funcDecl: FunctionDeclSyntax
+    _ base: BoundsCheckedThunkBuilder, _ funcDecl: FunctionParts
   ) -> BoundsCheckedThunkBuilder
 }
 
-func tryGetParamName(_ funcDecl: FunctionDeclSyntax, _ expr: SwiftifyExpr) -> TokenSyntax? {
+func tryGetParamName(_ funcDecl: FunctionParts, _ expr: SwiftifyExpr) -> TokenSyntax? {
   switch expr {
   case .param(let i):
     let funcParam = getParam(funcDecl, i - 1)
@@ -55,7 +55,7 @@ func tryGetParamName(_ funcDecl: FunctionDeclSyntax, _ expr: SwiftifyExpr) -> To
   }
 }
 
-func getSwiftifyExprType(_ funcDecl: FunctionDeclSyntax, _ expr: SwiftifyExpr) -> TypeSyntax {
+func getSwiftifyExprType(_ funcDecl: FunctionParts, _ expr: SwiftifyExpr) -> TypeSyntax {
   switch expr {
   case .param(let i):
     let funcParam = getParam(funcDecl, i - 1)
@@ -79,7 +79,7 @@ struct CxxSpan: ParamInfo {
   }
 
   func getBoundsCheckedThunkBuilder(
-    _ base: BoundsCheckedThunkBuilder, _ funcDecl: FunctionDeclSyntax
+    _ base: BoundsCheckedThunkBuilder, _ funcDecl: FunctionParts
   ) -> BoundsCheckedThunkBuilder {
     switch pointerIndex {
     case .param(let i):
@@ -115,7 +115,7 @@ struct CountedBy: ParamInfo {
   }
 
   func getBoundsCheckedThunkBuilder(
-    _ base: BoundsCheckedThunkBuilder, _ funcDecl: FunctionDeclSyntax
+    _ base: BoundsCheckedThunkBuilder, _ funcDecl: FunctionParts
   ) -> BoundsCheckedThunkBuilder {
     switch pointerIndex {
     case .param(let i):
@@ -424,14 +424,14 @@ func getParam(_ signature: FunctionSignatureSyntax, _ paramIndex: Int) -> Functi
   }
 }
 
-func getParam(_ funcDecl: FunctionDeclSyntax, _ paramIndex: Int) -> FunctionParameterSyntax {
+func getParam(_ funcDecl: FunctionParts, _ paramIndex: Int) -> FunctionParameterSyntax {
   return getParam(funcDecl.signature, paramIndex)
 }
 
 struct FunctionCallBuilder: BoundsCheckedThunkBuilder {
-  let base: FunctionDeclSyntax
+  let base: FunctionParts
 
-  init(_ function: FunctionDeclSyntax) {
+  init(_ function: FunctionParts) {
     base = function
   }
 
@@ -491,14 +491,18 @@ struct FunctionCallBuilder: BoundsCheckedThunkBuilder {
       FunctionCallExprSyntax(
         calledExpression: functionRef, leftParen: .leftParenToken(),
         arguments: LabeledExprListSyntax(labeledArgs), rightParen: .rightParenToken()))
-    return "unsafe \(call)"
+    if base.name.tokenKind == .keyword(.`init`) {
+      return "unsafe self.\(call)"
+    } else {
+      return "unsafe \(call)"
+    }
   }
 }
 
 struct CxxSpanThunkBuilder: SpanBoundsThunkBuilder, ParamBoundsThunkBuilder {
   public let base: BoundsCheckedThunkBuilder
   public let index: Int
-  public let funcDecl: FunctionDeclSyntax
+  public let funcDecl: FunctionParts
   public let typeMappings: [String: String]
   public let node: SyntaxProtocol
   public let nonescaping: Bool
@@ -549,7 +553,7 @@ struct CxxSpanThunkBuilder: SpanBoundsThunkBuilder, ParamBoundsThunkBuilder {
 
 struct CxxSpanReturnThunkBuilder: SpanBoundsThunkBuilder {
   public let base: BoundsCheckedThunkBuilder
-  public let funcDecl: FunctionDeclSyntax
+  public let funcDecl: FunctionParts
   public let typeMappings: [String: String]
   public let node: SyntaxProtocol
   let isParameter: Bool = false
@@ -588,7 +592,7 @@ struct CxxSpanReturnThunkBuilder: SpanBoundsThunkBuilder {
 protocol BoundsThunkBuilder: BoundsCheckedThunkBuilder {
   var oldType: TypeSyntax { get }
   var newType: TypeSyntax { get throws }
-  var funcDecl: FunctionDeclSyntax { get }
+  var funcDecl: FunctionParts { get }
 }
 
 extension BoundsThunkBuilder {
@@ -700,7 +704,7 @@ extension ParamBoundsThunkBuilder {
 struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
   public let base: BoundsCheckedThunkBuilder
   public let countExpr: ExprSyntax
-  public let funcDecl: FunctionDeclSyntax
+  public let funcDecl: FunctionParts
   public let nonescaping: Bool
   public let isSizedBy: Bool
   public let dependencies: [LifetimeDependence]
@@ -768,7 +772,7 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
   public let base: BoundsCheckedThunkBuilder
   public let index: Int
   public let countExpr: ExprSyntax
-  public let funcDecl: FunctionDeclSyntax
+  public let funcDecl: FunctionParts
   public let nonescaping: Bool
   public let isSizedBy: Bool
   let isParameter: Bool = true
@@ -1267,22 +1271,22 @@ func parseMacroParam(
   }
 }
 
-func checkArgs(_ args: [ParamInfo], _ funcDecl: FunctionDeclSyntax) throws {
+func checkArgs(_ args: [ParamInfo], _ funcComponents: FunctionParts) throws {
   var argByIndex: [Int: ParamInfo] = [:]
   var ret: ParamInfo? = nil
-  let paramCount = funcDecl.signature.parameterClause.parameters.count
+  let paramCount = funcComponents.signature.parameterClause.parameters.count
   try args.forEach { pointerInfo in
     switch pointerInfo.pointerIndex {
     case .param(let i):
       if i < 1 || i > paramCount {
         let noteMessage =
           paramCount > 0
-          ? "function \(funcDecl.name) has parameter indices 1..\(paramCount)"
-          : "function \(funcDecl.name) has no parameters"
+          ? "function \(funcComponents.name) has parameter indices 1..\(paramCount)"
+          : "function \(funcComponents.name) has no parameters"
         throw DiagnosticError(
           "pointer index out of bounds", node: pointerInfo.original,
           notes: [
-            Note(node: Syntax(funcDecl.name), message: MacroExpansionNoteMessage(noteMessage))
+            Note(node: Syntax(funcComponents.name), message: MacroExpansionNoteMessage(noteMessage))
           ])
       }
       if argByIndex[i] != nil {
@@ -1346,7 +1350,7 @@ func isInout(_ type: TypeSyntax) -> Bool {
 }
 
 func getReturnLifetimeAttribute(
-  _ funcDecl: FunctionDeclSyntax,
+  _ funcDecl: FunctionParts,
   _ dependencies: [SwiftifyExpr: [LifetimeDependence]]
 ) -> [AttributeListSyntax.Element] {
   let returnDependencies = dependencies[.`return`, default: []]
@@ -1503,9 +1507,9 @@ class CountExprRewriter: SyntaxRewriter {
   }
 }
 
-func renameParameterNamesIfNeeded(_ funcDecl: FunctionDeclSyntax) -> (FunctionDeclSyntax, CountExprRewriter) {
-  let params = funcDecl.signature.parameterClause.parameters
-  let funcName = funcDecl.name.withoutBackticks.trimmed.text
+func renameParameterNamesIfNeeded(_ funcComponents: FunctionParts) -> (FunctionParts, CountExprRewriter) {
+  let params = funcComponents.signature.parameterClause.parameters
+  let funcName = funcComponents.name.withoutBackticks.trimmed.text
   let shouldRename = params.contains(where: { param in
     let paramName = param.name.trimmed.text
     return paramName == "_" || paramName == funcName || "`\(paramName)`" == funcName
@@ -1529,13 +1533,32 @@ func renameParameterNamesIfNeeded(_ funcDecl: FunctionDeclSyntax) -> (FunctionDe
     }
     return newParam
   }
-  let newDecl = if renamedParams.count > 0 {
-    funcDecl.with(\.signature.parameterClause.parameters, FunctionParameterListSyntax(newParams))
+  let newSig = if renamedParams.count > 0 {
+    funcComponents.signature.with(\.parameterClause.parameters, FunctionParameterListSyntax(newParams))
   } else {
     // Keeps source locations for diagnostics, in the common case where nothing was renamed
-    funcDecl
+    funcComponents.signature
   }
-  return (newDecl, CountExprRewriter(renamedParams))
+  return (FunctionParts(signature: newSig, name: funcComponents.name, attributes: funcComponents.attributes),
+          CountExprRewriter(renamedParams))
+}
+
+struct FunctionParts {
+  let signature: FunctionSignatureSyntax
+  let name: TokenSyntax
+  let attributes: AttributeListSyntax
+}
+
+func deconstructFunction(_ declaration: some DeclSyntaxProtocol) throws -> FunctionParts {
+  if let origFuncDecl = declaration.as(FunctionDeclSyntax.self) {
+    return FunctionParts(signature: origFuncDecl.signature, name: origFuncDecl.name,
+                         attributes: origFuncDecl.attributes)
+  }
+  if let origInitDecl = declaration.as(InitializerDeclSyntax.self) {
+    return FunctionParts(signature: origInitDecl.signature, name: origInitDecl.initKeyword,
+                         attributes: origInitDecl.attributes)
+  }
+  throw DiagnosticError("@_SwiftifyImport only works on functions and initializers", node: declaration)
 }
 
 /// A macro that adds safe(r) wrappers for functions with unsafe pointer types.
@@ -1551,10 +1574,8 @@ public struct SwiftifyImportMacro: PeerMacro {
     in context: some MacroExpansionContext
   ) throws -> [DeclSyntax] {
     do {
-      guard let origFuncDecl = declaration.as(FunctionDeclSyntax.self) else {
-        throw DiagnosticError("@_SwiftifyImport only works on functions", node: declaration)
-      }
-      let (funcDecl, rewriter) = renameParameterNamesIfNeeded(origFuncDecl)
+      let origFuncComponents = try deconstructFunction(declaration)
+      let (funcComponents, rewriter) = renameParameterNamesIfNeeded(origFuncComponents)
 
       let argumentList = node.arguments!.as(LabeledExprListSyntax.self)!
       var arguments = [LabeledExprSyntax](argumentList)
@@ -1570,10 +1591,10 @@ public struct SwiftifyImportMacro: PeerMacro {
       var lifetimeDependencies: [SwiftifyExpr: [LifetimeDependence]] = [:]
       var parsedArgs = try arguments.compactMap {
         try parseMacroParam(
-          $0, funcDecl.signature, rewriter, nonescapingPointers: &nonescapingPointers,
+          $0, funcComponents.signature, rewriter, nonescapingPointers: &nonescapingPointers,
           lifetimeDependencies: &lifetimeDependencies)
       }
-      parsedArgs.append(contentsOf: try parseCxxSpansInSignature(funcDecl.signature, typeMappings))
+      parsedArgs.append(contentsOf: try parseCxxSpansInSignature(funcComponents.signature, typeMappings))
       setNonescapingPointers(&parsedArgs, nonescapingPointers)
       setLifetimeDependencies(&parsedArgs, lifetimeDependencies)
       // We only transform non-escaping spans.
@@ -1584,7 +1605,7 @@ public struct SwiftifyImportMacro: PeerMacro {
           return true
         }
       }
-      try checkArgs(parsedArgs, funcDecl)
+      try checkArgs(parsedArgs, funcComponents)
       parsedArgs.sort { a, b in
         // make sure return value cast to Span happens last so that withUnsafeBufferPointer
         // doesn't return a ~Escapable type
@@ -1596,12 +1617,12 @@ public struct SwiftifyImportMacro: PeerMacro {
         }
         return paramOrReturnIndex(a.pointerIndex) < paramOrReturnIndex(b.pointerIndex)
       }
-      let baseBuilder = FunctionCallBuilder(funcDecl)
+      let baseBuilder = FunctionCallBuilder(funcComponents)
 
       let builder: BoundsCheckedThunkBuilder = parsedArgs.reduce(
         baseBuilder,
         { (prev, parsedArg) in
-          parsedArg.getBoundsCheckedThunkBuilder(prev, funcDecl)
+          parsedArg.getBoundsCheckedThunkBuilder(prev, funcComponents)
         })
       let newSignature = try builder.buildFunctionSignature([:], nil)
       var eliminatedArgs = Set<Int>()
@@ -1610,15 +1631,22 @@ public struct SwiftifyImportMacro: PeerMacro {
       let checks = (basicChecks + compoundChecks).map { e in
         CodeBlockItemSyntax(leadingTrivia: "\n", item: e)
       }
-      let call = CodeBlockItemSyntax(
-        item: CodeBlockItemSyntax.Item(
-          ReturnStmtSyntax(
-            returnKeyword: .keyword(.return, trailingTrivia: " "),
-            expression: try builder.buildFunctionCall([:]))))
+      var call : CodeBlockItemSyntax
+      if declaration.is(InitializerDeclSyntax.self) {
+        call = CodeBlockItemSyntax(
+          item: CodeBlockItemSyntax.Item(
+              try builder.buildFunctionCall([:])))
+      } else {
+        call = CodeBlockItemSyntax(
+          item: CodeBlockItemSyntax.Item(
+            ReturnStmtSyntax(
+              returnKeyword: .keyword(.return, trailingTrivia: " "),
+              expression: try builder.buildFunctionCall([:]))))
+      }
       let body = CodeBlockSyntax(statements: CodeBlockItemListSyntax(checks + [call]))
-      let returnLifetimeAttribute = getReturnLifetimeAttribute(funcDecl, lifetimeDependencies)
+      let returnLifetimeAttribute = getReturnLifetimeAttribute(funcComponents, lifetimeDependencies)
       let lifetimeAttrs =
-        returnLifetimeAttribute + paramLifetimeAttributes(newSignature, funcDecl.attributes)
+        returnLifetimeAttribute + paramLifetimeAttributes(newSignature, funcComponents.attributes)
       let availabilityAttr = try getAvailability(newSignature, spanAvailability)
       let disfavoredOverload: [AttributeListSyntax.Element] =
         [
@@ -1627,13 +1655,7 @@ public struct SwiftifyImportMacro: PeerMacro {
               atSign: .atSignToken(),
               attributeName: IdentifierTypeSyntax(name: "_disfavoredOverload")))
         ]
-      let newFunc =
-        funcDecl
-        .with(\.signature, newSignature)
-        .with(\.body, body)
-        .with(
-          \.attributes,
-          funcDecl.attributes.filter { e in
+      let attributes = funcComponents.attributes.filter { e in
             switch e {
             case .attribute(let attr):
               // don't apply this macro recursively, and avoid dupe _alwaysEmitIntoClient
@@ -1649,9 +1671,23 @@ public struct SwiftifyImportMacro: PeerMacro {
           ]
             + availabilityAttr
             + lifetimeAttrs
-            + disfavoredOverload)
-        .with(\.leadingTrivia, node.leadingTrivia + .docLineComment("/// This is an auto-generated wrapper for safer interop\n"))
-      return [DeclSyntax(newFunc)]
+            + disfavoredOverload
+      let trivia = node.leadingTrivia + .docLineComment("/// This is an auto-generated wrapper for safer interop\n")
+      if let origFuncDecl = declaration.as(FunctionDeclSyntax.self) {
+        return [DeclSyntax(origFuncDecl
+                  .with(\.signature, newSignature)
+                  .with(\.body, body)
+                  .with(\.attributes, AttributeListSyntax(attributes))
+                  .with(\.leadingTrivia, trivia))]
+      } 
+      if let origInitDecl = declaration.as(InitializerDeclSyntax.self) {
+        return [DeclSyntax(origInitDecl
+                  .with(\.signature, newSignature)
+                  .with(\.body, body)
+                  .with(\.attributes, AttributeListSyntax(attributes))
+                  .with(\.leadingTrivia, trivia))]
+      }
+      return []
     } catch let error as DiagnosticError {
       context.diagnose(
         Diagnostic(
@@ -1716,6 +1752,9 @@ extension FunctionParameterSyntax {
 
 extension TokenSyntax {
   public var withoutBackticks: TokenSyntax {
+    if self.identifier == nil {
+      return self
+    }
     return .identifier(self.identifier!.name)
   }
 
