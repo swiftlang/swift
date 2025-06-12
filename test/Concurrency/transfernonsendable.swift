@@ -2045,3 +2045,23 @@ func indirectEnumTestCase<T>(_ e: MyEnum<T>) async -> Bool {
         return false
     }
 }
+
+/// Make sure that we properly infer the location of the capture of self in func
+/// d().
+func inferLocationOfCapturedTaskIsolatedSelfCorrectly() {
+  class A {
+    var block:  @MainActor () -> Void = {}
+  }
+  class B {
+    let a = A()
+
+    func d() {
+      a.block = c // expected-warning {{converting non-Sendable function value to '@MainActor @Sendable () -> Void' may introduce data races}}
+      // expected-tns-warning @-1 {{sending 'self' risks causing data races}}
+      // expected-tns-note @-2 {{task-isolated 'self' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+    }
+
+    @MainActor
+    func c() {}
+  }
+}
