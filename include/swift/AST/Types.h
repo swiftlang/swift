@@ -3583,13 +3583,13 @@ protected:
     Bits.AnyFunctionType.NumParams = NumParams;
     assert(Bits.AnyFunctionType.NumParams == NumParams && "Params dropped!");
     
-    if (Info) {
+    if (Info && CONDITIONAL_ASSERT_enabled()) {
       unsigned maxLifetimeTarget = NumParams + 1;
       if (auto outputFn = Output->getAs<AnyFunctionType>()) {
         maxLifetimeTarget += outputFn->getNumParams();
       }
       for (auto &dep : Info->getLifetimeDependencies()) {
-        assert(dep.getTargetIndex() < maxLifetimeTarget);
+        ASSERT(dep.getTargetIndex() < maxLifetimeTarget);
       }
     }
   }
