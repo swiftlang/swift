@@ -109,7 +109,7 @@ func pointerDepends(on x: Builtin.RawPointer) -> NERawPointer {
 // CHECK: [[NE:%[0-9]+]] = apply %{{.*}}([[PTR]]) : $@convention(thin) (Builtin.RawPointer) -> @lifetime(borrow 0) @owned NERawPointer
 // CHECK: mark_dependence [unresolved] [[NE]] on %0
 // CHECK-LABEL: } // end sil function '$s4test0A22BuiltinAddressOfBorrow6holderAA12NERawPointerVAA9IntHolderVz_tF'
-@_lifetime(borrow holder)
+@_lifetime(&holder)
 func testBuiltinAddressOfBorrow(holder: inout IntHolder) -> NERawPointer {
   pointerDepends(on: Builtin.addressOfBorrow(holder))
 }

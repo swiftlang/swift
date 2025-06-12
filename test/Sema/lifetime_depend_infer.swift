@@ -40,7 +40,7 @@ struct NonEscapableSelf: ~Escapable {
   @_lifetime(copy self) // OK
   mutating func mutatingMethodNoParamCopy() -> NonEscapableSelf { self }
 
-  @_lifetime(borrow self) // OK
+  @_lifetime(&self) // OK
   mutating func mutatingMethodNoParamBorrow() -> NonEscapableSelf { self }
 
   func methodOneParam(_: Int) -> NonEscapableSelf { self } // expected-error{{a method with a ~Escapable result requires '@_lifetime(...)'}}
@@ -63,7 +63,7 @@ struct NonEscapableSelf: ~Escapable {
   @_lifetime(copy self) // OK
   mutating func mutatingMethodOneParamCopy(_: Int) -> NonEscapableSelf { self }
 
-  @_lifetime(borrow self) // OK
+  @_lifetime(&self) // OK
   mutating func mutatingMethodOneParamBorrow(_: Int) -> NonEscapableSelf { self }
 }
 
@@ -87,7 +87,7 @@ struct EscapableTrivialSelf {
   @_lifetime(copy self) // expected-error{{cannot copy the lifetime of an Escapable type, use '@_lifetime(&self)' instead}}
   mutating func mutatingMethodNoParamCopy() -> NEImmortal { NEImmortal() }
 
-  @_lifetime(borrow self)
+  @_lifetime(&self)
   mutating func mutatingMethodNoParamBorrow() -> NEImmortal { NEImmortal() }
 
   func methodOneParam(_: Int) -> NEImmortal { NEImmortal() } // expected-error{{a method with a ~Escapable result requires '@_lifetime(...)'}}
@@ -109,7 +109,7 @@ struct EscapableTrivialSelf {
   @_lifetime(copy self) // expected-error{{cannot copy the lifetime of an Escapable type, use '@_lifetime(&self)' instead}}
   mutating func mutatingMethodOneParamCopy(_: Int) -> NEImmortal { NEImmortal() }
 
-  @_lifetime(borrow self)
+  @_lifetime(&self)
   mutating func mutatingMethodOneParamBorrow(_: Int) -> NEImmortal { NEImmortal() }
 }
 
@@ -341,7 +341,7 @@ struct NonescapableSelfAccessors: ~Escapable {
       yield ne
     }
 
-    @_lifetime(borrow self)
+    @_lifetime(&self)
     _modify {
       yield &ne
     }
@@ -401,7 +401,7 @@ struct NonescapableSelfAccessors: ~Escapable {
       ne
     }
 
-    @_lifetime(borrow self)
+    @_lifetime(&self)
     set {
       ne = newValue
     }
@@ -413,7 +413,7 @@ struct NonescapableSelfAccessors: ~Escapable {
       yield ne
     }
 
-    @_lifetime(borrow self)
+    @_lifetime(&self)
     _modify {
       yield &ne
     }
@@ -533,7 +533,7 @@ struct NonEscapableMutableSelf: ~Escapable {
   @_lifetime(self: copy self) // OK
   mutating func mutatingMethodNoParamCopy() {}
 
-  @_lifetime(self: borrow self) // expected-error{{invalid use of borrow dependence on the same inout parameter}}
+  @_lifetime(self: &self) // expected-error{{invalid use of borrow dependence on the same inout parameter}}
   mutating func mutatingMethodNoParamBorrow() {}
 
   mutating func mutatingMethodOneParam(_: NE) {} // expected-error{{a mutating method with a ~Escapable 'self' requires '@_lifetime(self: ...)'}}
@@ -544,6 +544,6 @@ struct NonEscapableMutableSelf: ~Escapable {
   @_lifetime(copy self) // OK
   mutating func mutatingMethodOneParamCopy(_: NE) {}
 
-  @_lifetime(borrow self)
+  @_lifetime(&self)
   mutating func mutatingMethodOneParamBorrow(_: NE) {}
 }

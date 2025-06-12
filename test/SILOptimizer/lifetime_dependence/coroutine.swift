@@ -40,7 +40,7 @@ struct Wrapper : ~Escapable {
     _read {
       yield _view
     }
-    @_lifetime(borrow self)
+    @_lifetime(&self)
     _modify {
       yield &_view
     }
