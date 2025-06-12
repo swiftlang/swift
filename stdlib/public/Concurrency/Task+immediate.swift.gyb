@@ -79,8 +79,6 @@ extension Task where Failure == ${FAILURE_TYPE} {
   public static func immediate(
     name: String? = nil,
     priority: TaskPriority? = nil,
-    % # NOTE: This closure cannot be 'sending' because we'll trigger ' pattern that the region based isolation checker does not understand how to check'
-    % #       In this case: `func syncOnMyGlobalActor() { Task.immediate { @MyGlobalActor in } }`
     @_implicitSelfCapture @_inheritActorContext(always) operation: sending @isolated(any) @escaping () async throws -> Success
   ) -> Task<Success, ${FAILURE_TYPE}> {
 
