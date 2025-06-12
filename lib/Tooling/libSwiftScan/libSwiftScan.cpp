@@ -35,9 +35,9 @@ void swiftscan_macro_dependency_dispose(
     return;
 
   for (unsigned i = 0; i < macro->count; ++i) {
-    swiftscan_string_dispose(macro->macro_dependencies[i]->moduleName);
-    swiftscan_string_dispose(macro->macro_dependencies[i]->libraryPath);
-    swiftscan_string_dispose(macro->macro_dependencies[i]->executablePath);
+    swiftscan_string_dispose(macro->macro_dependencies[i]->module_name);
+    swiftscan_string_dispose(macro->macro_dependencies[i]->library_path);
+    swiftscan_string_dispose(macro->macro_dependencies[i]->executable_path);
     delete macro->macro_dependencies[i];
   }
   delete[] macro->macro_dependencies;
@@ -240,12 +240,17 @@ swiftscan_link_library_set_t *swiftscan_module_info_get_link_libraries(
   return info->link_libraries;
 }
 
+swiftscan_import_info_set_t *swiftscan_module_info_get_imports(
+    swiftscan_dependency_info_t info) {
+  return info->imports;
+}
+
 swiftscan_module_details_t
 swiftscan_module_info_get_details(swiftscan_dependency_info_t info) {
   return info->details;
 }
 
-//=== Link Library Info query APIs -----------------------------------===//
+//=== Link Library Info query APIs ---------------------------------------===//
 
 swiftscan_string_ref_t
 swiftscan_link_library_info_get_link_name(swiftscan_link_library_info_t info) {
@@ -267,7 +272,23 @@ swiftscan_link_library_info_get_should_force_load(swiftscan_link_library_info_t 
   return info->forceLoad;
 }
 
-//=== Swift Textual Module Details query APIs -----------------------------===//
+//=== Import Details Query APIs ------------------------------------------===//
+swiftscan_source_location_set_t *
+swiftscan_import_info_get_source_locations(swiftscan_import_info_t info) {
+  return info->source_locations;
+}
+
+swiftscan_string_ref_t
+swiftscan_import_info_get_identifier(swiftscan_import_info_t info) {
+  return info->import_identifier;
+}
+
+swiftscan_access_level_t
+swiftscan_import_info_get_access_level(swiftscan_import_info_t info) {
+  return info->access_level;
+}
+
+//=== Swift Textual Module Details query APIs ----------------------------===//
 
 swiftscan_dependency_info_kind_t
 swiftscan_module_detail_get_kind(swiftscan_module_details_t details) {
