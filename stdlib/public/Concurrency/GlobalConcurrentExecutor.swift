@@ -31,7 +31,6 @@ import Swift
 ///
 /// Customizing the global concurrent executor is currently not supported.
 @available(SwiftStdlib 6.0, *)
-@available(*, deprecated, renamed: "Task.defaultExecutor")
 @_unavailableInEmbedded
 public var globalConcurrentExecutor: any TaskExecutor {
   get {
