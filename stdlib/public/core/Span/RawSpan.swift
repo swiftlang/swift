@@ -288,14 +288,14 @@ extension RawSpan {
 
   /// Unsafely create a `RawSpan` over initialized memory.
   ///
-  /// The region of memory representing `byteCount` bytes starting at `pointer`
+  /// The region of memory representing `count` elements starting at `pointer`
   /// must remain valid, initialized and immutable
   /// throughout the lifetime of the newly-created `RawSpan`.
   /// Failure to maintain this invariant results in undefined behaviour.
   ///
   /// - Parameters:
   ///   - pointer: a pointer to the first initialized byte.
-  ///   - byteCount: the number of initialized bytes in the span.
+  ///   - count: the number of initialized elements in the span.
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(borrow pointer)
@@ -561,7 +561,7 @@ extension RawSpan {
   @unsafe
   @_alwaysEmitIntoClient
   public func unsafeLoad<T>(
-    fromByteOffset offset: Int = 0, as: T.Type
+    fromByteOffset offset: Int = 0, as type: T.Type
   ) -> T {
     _precondition(
       UInt(bitPattern: offset) <= UInt(bitPattern: _count) &&
@@ -592,7 +592,7 @@ extension RawSpan {
   @unsafe
   @_alwaysEmitIntoClient
   public func unsafeLoad<T>(
-    fromUncheckedByteOffset offset: Int, as: T.Type
+    fromUncheckedByteOffset offset: Int, as type: T.Type
   ) -> T {
     unsafe _start().load(fromByteOffset: offset, as: T.self)
   }
@@ -616,7 +616,7 @@ extension RawSpan {
   @unsafe
   @_alwaysEmitIntoClient
   public func unsafeLoadUnaligned<T: BitwiseCopyable>(
-    fromByteOffset offset: Int = 0, as: T.Type
+    fromByteOffset offset: Int = 0, as type: T.Type
   ) -> T {
     _precondition(
       UInt(bitPattern: offset) <= UInt(bitPattern: _count) &&
@@ -648,7 +648,7 @@ extension RawSpan {
   @unsafe
   @_alwaysEmitIntoClient
   public func unsafeLoadUnaligned<T: BitwiseCopyable>(
-    fromUncheckedByteOffset offset: Int, as: T.Type
+    fromUncheckedByteOffset offset: Int, as type: T.Type
   ) -> T {
     unsafe _start().loadUnaligned(fromByteOffset: offset, as: T.self)
   }
@@ -664,14 +664,14 @@ extension RawSpan {
     unsafe (self._pointer == other._pointer) && (self._count == other._count)
   }
 
-  /// Returns the offsets where the memory of `span` is located within
+  /// Returns the offsets where the memory of `other` is located within
   /// the memory represented by `self`
   ///
-  /// Note: `span` must be a subrange of `self`
+  /// Note: `other` must be a subrange of `self`
   ///
-  /// Parameters:
-  /// - span: a subrange of `self`
-  /// Returns: A range of offsets within `self`
+  /// - Parameters:
+  ///   - other: a subrange of `self`
+  /// - Returns: A range of offsets within `self`
   @_alwaysEmitIntoClient
   public func byteOffsets(of other: borrowing Self) -> Range<Int>? {
     if other._count > _count { return nil }
