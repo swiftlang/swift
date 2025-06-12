@@ -2061,7 +2061,8 @@ public:
   NominalTypeDecl *getExtendedNominal() const;
 
   /// Compute the nominal type declaration that is being extended.
-  NominalTypeDecl *computeExtendedNominal() const;
+  NominalTypeDecl *computeExtendedNominal(
+      bool excludeMacroExpansions=false) const;
 
   /// \c hasBeenBound means nothing if this extension can never been bound
   /// because it is not at the top level.
