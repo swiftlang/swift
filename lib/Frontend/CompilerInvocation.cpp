@@ -270,7 +270,7 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
     RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
   }
 
-  if (!SearchPathOpts.SkipSDKImportPaths && !SearchPathOpts.getSDKPath().empty()) {
+  if (!SearchPathOpts.SkipSDKImportPaths && Triple.isOSDarwin() && !SearchPathOpts.getSDKPath().empty()) {
     const char *swiftDir = FrontendOpts.UseSharedResourceFolder
       ? "swift" : "swift_static";
 
@@ -283,18 +283,6 @@ static void updateRuntimeLibraryPaths(SearchPathOptions &SearchPathOpts,
 
     LibPath = SearchPathOpts.getSDKPath();
     llvm::sys::path::append(LibPath, "usr", "lib", swiftDir);
-    if (!Triple.isOSDarwin()) {
-      // Use the non-architecture suffixed form with directory-layout
-      // swiftmodules.
-      llvm::sys::path::append(LibPath, getPlatformNameForTriple(Triple));
-      RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
-
-      // Compatibility with older releases - use the architecture suffixed form
-      // for pre-directory-layout multi-architecture layout.  Note that some
-      // platforms (e.g. Windows) will use this even with directory layout in
-      // older releases.
-      llvm::sys::path::append(LibPath, swift::getMajorArchitectureName(Triple));
-    }
     RuntimeLibraryImportPaths.push_back(std::string(LibPath.str()));
   }
   SearchPathOpts.setRuntimeLibraryImportPaths(RuntimeLibraryImportPaths);
@@ -2290,6 +2278,7 @@ static bool validateSwiftModuleFileArgumentAndAdd(const std::string &swiftModule
 
 static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
                                 DiagnosticEngine &Diags,
+                                const llvm::Triple &Triple,
                                 const CASOptions &CASOpts,
                                 const FrontendOptions &FrontendOpts,
                                 StringRef workingDirectory) {
@@ -2424,6 +2413,18 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
 
   if (const Arg *A = Args.getLastArg(OPT_resource_dir))
     Opts.RuntimeResourcePath = A->getValue();
+  else if (!Triple.isOSDarwin() && Args.hasArg(OPT_sdk)) {
+    llvm::SmallString<128> SDKResourcePath(Opts.getSDKPath());
+    llvm::sys::path::append(
+        SDKResourcePath, "usr", "lib",
+        FrontendOpts.UseSharedResourceFolder ? "swift" : "swift_static");
+    // Check for eg <sdkRoot>/usr/lib/swift/
+    if (llvm::sys::fs::exists(SDKResourcePath))
+      Opts.RuntimeResourcePath = SDKResourcePath.str();
+    else
+      Diags.diagnose(SourceLoc(), diag::warning_no_resource_dir_in_sdk,
+                     Opts.RuntimeResourcePath);
+  }
 
   Opts.SkipAllImplicitImportPaths |= Args.hasArg(OPT_nostdimport);
   Opts.SkipSDKImportPaths |= Args.hasArg(OPT_nostdlibimport);
@@ -4084,7 +4085,7 @@ bool CompilerInvocation::parseArgs(
 
   ParseSymbolGraphArgs(SymbolGraphOpts, ParsedArgs, Diags, LangOpts);
 
-  if (ParseSearchPathArgs(SearchPathOpts, ParsedArgs, Diags,
+  if (ParseSearchPathArgs(SearchPathOpts, ParsedArgs, Diags, LangOpts.Target,
                           CASOpts, FrontendOpts, workingDirectory)) {
     return true;
   }
