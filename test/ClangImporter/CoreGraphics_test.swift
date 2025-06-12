@@ -105,7 +105,9 @@ public func testRenames(transform: CGAffineTransform, context: CGContext,
   blackHole(point.applying(transform))
   var rect = rect.applying(transform)
   blackHole(size.applying(transform))
+// CHECK:   %{{.*}} = {{(tail )?}}call { double, double } @CGPointApplyAffineTransform(double %{{.*}}, double %{{.*}}, ptr {{.*}})
 // CHECK:   call void @CGRectApplyAffineTransform(ptr {{.*}}, ptr {{.*}}, ptr {{.*}})
+// CHECK:   %{{.*}} = {{(tail )?}}call { double, double } @CGSizeApplyAffineTransform(double %{{.*}}, double %{{.*}}, ptr {{.*}})
 
   context.concatenate(transform)
   context.rotate(by: CGFloat.pi)

@@ -276,10 +276,6 @@ module "Weird C Module" {
   header "WeirdCModule.h"
 }
 
-module Aliases {
-  header "Aliases.h"
-}
-
 module RetroactiveVersioning {
   header "versioning.h"
 }
