@@ -861,8 +861,6 @@ bool SemaAnnotator::passCallAsFunctionReference(ValueDecl *D, SourceLoc Loc,
 
 bool SemaAnnotator::
 passReference(ValueDecl *D, Type Ty, DeclNameLoc Loc, ReferenceMetaData Data) {
-  SourceManager &SM = D->getASTContext().SourceMgr;
-  SourceLoc BaseStart = Loc.getBaseNameLoc(), BaseEnd = BaseStart;
   return passReference(D, Ty, Loc.getBaseNameLoc(), Loc.getSourceRange(), Data);
 }
 
