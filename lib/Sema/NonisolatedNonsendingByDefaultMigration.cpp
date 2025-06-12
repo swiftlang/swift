@@ -73,6 +73,11 @@ void NonisolatedNonsendingByDefaultMigrationTarget::diagnose() const {
       return;
     }
 
+    // Only diagnose declarations from the current module.
+    if (decl->getModuleContext() != ctx.MainModule) {
+      return;
+    }
+
     // If the attribute cannot appear on this kind of declaration, we can't
     // diagnose it.
     if (!DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::Concurrent,
@@ -153,10 +158,6 @@ void NonisolatedNonsendingByDefaultMigrationTarget::diagnose() const {
 
   const auto featureName = feature.getName();
   if (decl) {
-    // Only diagnose declarations from the current module.
-    if (decl->getModuleContext() != ctx.MainModule)
-      return;
-
     // Diagnose the function, but slap the attribute on the storage declaration
     // instead if the function is an accessor.
     auto *functionDecl = dyn_cast<AbstractFunctionDecl>(decl);
