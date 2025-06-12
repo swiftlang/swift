@@ -41,7 +41,7 @@ func withIsolatedTaskCancellationHandler<T: Sendable>(
 /// `Observations` conforms to `AsyncSequence`, providing a intutive and safe mechanism to track changes to
 /// types that are marked as `@Observable` by using Swift Concurrency to indicate transactional boundaries
 /// starting from the willSet of the first mutation to the next suspension point of the safe access.
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.2, *)
 public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Sendable {
   public enum Iteration: Sendable {
     case next(Element)
