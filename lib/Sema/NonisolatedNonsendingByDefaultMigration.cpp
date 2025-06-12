@@ -105,6 +105,12 @@ void NonisolatedNonsendingByDefaultMigrationTarget::diagnose() const {
       return;
     }
 
+    // A special declaration that was either synthesized by the compiler
+    // or a macro expansion.
+    if (decl->getBaseName().hasDollarPrefix()) {
+      return;
+    }
+
     // If the attribute cannot appear on this kind of declaration, we can't
     // diagnose it.
     if (!DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::Concurrent,
