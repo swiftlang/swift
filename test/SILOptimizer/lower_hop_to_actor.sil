@@ -307,3 +307,17 @@ bb0(%0 : @guaranteed $Optional<any Actor>):
   return %r
 }
 
+// CHECK-LABEL: sil [ossa] @optional_none :
+// CHECK:         %0 = enum
+// CHECK-NEXT:    %1 = begin_borrow %0
+// CHECK-NEXT:    switch_enum %1
+// CHECK:         mark_dependence
+// CHECK-NEXT:    end_borrow %1
+// CHECKL:      } // end sil function '@optional_none'
+sil [ossa] @optional_none : $@convention(thin) @async () -> () {
+bb0:
+  %0 = enum $Optional<any Actor>, #Optional.none!enumelt
+  hop_to_executor %0
+  %r = tuple ()
+  return %r
+}
