@@ -377,6 +377,12 @@ namespace {
 ValueDecl *importDeclAlias(ClangImporter::Implementation &clang,
                            swift::DeclContext *DC, const clang::ValueDecl *D,
                            Identifier alias) {
+  if (DC->getASTContext().LangOpts.Target.isOSDarwin() &&
+      DC->getParentModule()->getName().str() == StringRef("_stdio") &&
+      llvm::any_of(llvm::ArrayRef<StringRef>{"stdin", "stdout", "stderr"},
+                   [alias = alias.str()](StringRef Id) { return alias == Id; }))
+    return nullptr;
+
   // Variadic functions cannot be imported into Swift.
   // FIXME(compnerd) emit a diagnostic for the missing diagnostic.
   if (const auto *FD = dyn_cast<clang::FunctionDecl>(D))
