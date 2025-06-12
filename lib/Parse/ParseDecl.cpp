@@ -2564,28 +2564,22 @@ parseLifetimeDescriptor(Parser &P,
   }
 }
 
-ParserResult<LifetimeAttr> Parser::parseLifetimeAttribute(SourceLoc atLoc,
+ParserResult<LifetimeAttr> Parser::parseLifetimeAttribute(StringRef attrName,
+                                                          SourceLoc atLoc,
                                                           SourceLoc loc) {
   ParserStatus status;
-  if (!Context.LangOpts.hasFeature(Feature::LifetimeDependence) &&
-      !Context.SourceMgr.isImportMacroGeneratedLoc(atLoc)) {
-    diagnose(loc, diag::requires_experimental_feature, "@lifetime", false,
-             Feature::LifetimeDependence.getName());
-    status.setIsParseError();
-    return status;
-  }
 
   auto lifetimeEntry = parseLifetimeEntry(loc);
   if (lifetimeEntry.isNull()) {
     status.setIsParseError();
     return status;
   }
+
   return ParserResult<LifetimeAttr>(LifetimeAttr::create(
       Context, atLoc, SourceRange(loc, lifetimeEntry.get()->getEndLoc()),
-      /* implicit */ false, lifetimeEntry.get()));
+      /* implicit */ false, lifetimeEntry.get(),
+      attrName.compare("_lifetime") == 0));
 }
-
-
 
 /// Parses a (possibly optional) argument for an attribute containing a single, arbitrary identifier.
 ///
@@ -3970,7 +3964,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
   case DeclAttrKind::Lifetime: {
-    auto Attr = parseLifetimeAttribute(AtLoc, Loc);
+    auto Attr = parseLifetimeAttribute(AttrName, AtLoc, Loc);
     Status |= Attr;
     if (Attr.isNonNull())
       Attributes.add(Attr.get());
@@ -5355,7 +5349,8 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
     }
 
     if (P.isSILLifetimeDependenceToken()) {
-      if (!P.Context.LangOpts.hasFeature(Feature::LifetimeDependence)) {
+      if (!P.Context.LangOpts.hasFeature(Feature::LifetimeDependence) &&
+          !P.Context.LangOpts.hasFeature(Feature::Lifetimes)) {
         P.diagnose(Tok, diag::requires_experimental_feature,
                    "lifetime dependence specifier", false,
                    Feature::LifetimeDependence.getName());

@@ -1683,7 +1683,11 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
   case DeclAttrKind::Lifetime: {
     auto *attr = cast<LifetimeAttr>(this);
-    Printer << attr->getLifetimeEntry()->getString();
+    if (!attr->isUnderscored() || Options.SuppressLifetimes) {
+      Printer << "@lifetime" << attr->getLifetimeEntry()->getString();
+    } else {
+      Printer << "@_lifetime" << attr->getLifetimeEntry()->getString();
+    }
     break;
   }
 
@@ -1951,7 +1955,7 @@ StringRef DeclAttribute::getAttrName() const {
       return "_allowFeatureSuppression";
     }
   case DeclAttrKind::Lifetime:
-    return "lifetime";
+    return cast<LifetimeAttr>(this)->isUnderscored() ? "_lifetime" : "lifetime";
   }
   llvm_unreachable("bad DeclAttrKind");
 }
@@ -3144,8 +3148,15 @@ isEquivalent(const AllowFeatureSuppressionAttr *other, Decl *attachedTo) const {
 
 LifetimeAttr *LifetimeAttr::create(ASTContext &context, SourceLoc atLoc,
                                    SourceRange baseRange, bool implicit,
-                                   LifetimeEntry *entry) {
-  return new (context) LifetimeAttr(atLoc, baseRange, implicit, entry);
+                                   LifetimeEntry *entry, bool isUnderscored) {
+  return new (context)
+      LifetimeAttr(atLoc, baseRange, implicit, entry, isUnderscored);
+}
+
+std::string LifetimeAttr::getString() const {
+  return (isUnderscored() ? std::string("@_lifetime")
+                          : std::string("@lifetime")) +
+         getLifetimeEntry()->getString();
 }
 
 bool LifetimeAttr::isEquivalent(const LifetimeAttr *other,

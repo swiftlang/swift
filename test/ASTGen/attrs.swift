@@ -2,7 +2,7 @@
 
 // RUN: %target-swift-frontend-dump-parse \
 // RUN:   -enable-experimental-feature Extern \
-// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature RawLayout \
 // RUN:   -enable-experimental-feature SymbolLinkageMarkers \
 // RUN:   -enable-experimental-concurrency \
@@ -12,7 +12,7 @@
 
 // RUN: %target-swift-frontend-dump-parse \
 // RUN:   -enable-experimental-feature Extern \
-// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature RawLayout \
 // RUN:   -enable-experimental-feature SymbolLinkageMarkers \
 // RUN:   -enable-experimental-concurrency \
@@ -25,7 +25,7 @@
 // RUN:   -module-abi-name ASTGen \
 // RUN:   -enable-experimental-feature ParserASTGen \
 // RUN:   -enable-experimental-feature Extern \
-// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature RawLayout \
 // RUN:   -enable-experimental-feature SymbolLinkageMarkers \
 // RUN:   -enable-experimental-concurrency \
@@ -36,7 +36,7 @@
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_ParserASTGen
 // REQUIRES: swift_feature_Extern
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_RawLayout
 // REQUIRES: swift_feature_SymbolLinkageMarkers
 
@@ -211,13 +211,13 @@ struct OpTest {
 
 struct E {}
 struct NE : ~Escapable {}
-@lifetime(copy ne) func derive(_ ne: NE) -> NE { ne }
-@lifetime(borrow ne1, copy ne2) func derive(_ ne1: NE, _ ne2: NE) -> NE {
+@_lifetime(copy ne) func derive(_ ne: NE) -> NE { ne }
+@_lifetime(borrow ne1, copy ne2) func derive(_ ne1: NE, _ ne2: NE) -> NE {
   if (Int.random(in: 1..<100) < 50) { return ne1 }
   return ne2
 }
-@lifetime(borrow borrow) func testNameConflict(_ borrow: E) -> NE { NE() }
-@lifetime(result: copy source) func testTarget(_ result: inout NE, _ source: consuming NE) { result = source }
+@_lifetime(borrow borrow) func testNameConflict(_ borrow: E) -> NE { NE() }
+@_lifetime(result: copy source) func testTarget(_ result: inout NE, _ source: consuming NE) { result = source }
 
 actor MyActor {
   nonisolated let constFlag: Bool = false

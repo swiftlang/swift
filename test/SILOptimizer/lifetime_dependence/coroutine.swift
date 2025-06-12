@@ -1,19 +1,19 @@
 // RUN: %target-swift-frontend %s -emit-sil \
-// RUN: -enable-experimental-feature LifetimeDependence \
+// RUN: -enable-experimental-feature Lifetimes \
 // RUN: | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 
 struct View : ~Escapable {
   let ptr: UnsafeRawBufferPointer
   let c: Int
-  @lifetime(borrow ptr)
+  @_lifetime(borrow ptr)
   init(_ ptr: UnsafeRawBufferPointer, _ c: Int) {
     self.ptr = ptr
     self.c = c
   }
-  @lifetime(copy otherBV)
+  @_lifetime(copy otherBV)
   init(_ otherBV: borrowing View) {
     self.ptr = otherBV.ptr
     self.c = otherBV.c
@@ -24,7 +24,7 @@ struct View : ~Escapable {
   }
   // This overload requires a separate label because overloading
   // on borrowing/consuming attributes is not allowed
-  @lifetime(copy k)
+  @_lifetime(copy k)
   init(consumingView k: consuming View) {
     self.ptr = k.ptr
     self.c = k.c
@@ -36,16 +36,16 @@ struct Wrapper : ~Escapable {
 
   // Nested coroutine access.
   var view: View {
-    @lifetime(copy self)
+    @_lifetime(copy self)
     _read {
       yield _view
     }
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     _modify {
       yield &_view
     }
   }
-  @lifetime(copy view)
+  @_lifetime(copy view)
   init(_ view: consuming View) {
     self._view = view
   }

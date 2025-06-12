@@ -1165,19 +1165,17 @@ extension ASTGenVisitor {
   ///   @lifetime(self)
   ///   ```
   func generateLifetimeAttr(attribute node: AttributeSyntax) -> BridgedLifetimeAttr? {
-    guard self.ctx.langOptsHasFeature(.LifetimeDependence) else {
-      // TODO: Diagnose
-      fatalError("@lifetime attribute requires 'LifetimeDependence' feature")
-    }
     guard let entry = self.generateLifetimeEntry(attribute: node) else {
       // TODO: Diagnose?
       return nil
     }
+
     return .createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
       range: self.generateAttrSourceRange(node),
-      entry: entry
+      entry: entry,
+      isUnderscored: node.attributeName.as(IdentifierTypeSyntax.self)?.name.text == "_lifetime"
     )
   }
 
