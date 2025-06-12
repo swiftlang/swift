@@ -68,18 +68,6 @@ set(SWIFT_COMPILER_SOURCES_SDK_FLAGS_default)
 if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
   set(sdk_path "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
   list(APPEND SWIFT_COMPILER_SOURCES_SDK_FLAGS_default "-sdk" "${sdk_path}")
-  if(NOT EXISTS "${sdk_path}/usr/include/c++")
-    # Darwin SDKs in Xcode 12 or older do not include libc++, which prevents clang from finding libc++ when invoked
-    # from ClangImporter. This results in build errors. To workaround this, let's explicitly pass the path to libc++
-    # to clang.
-    message(WARNING "Building with an outdated Darwin SDK: libc++ missing from the ${SWIFT_HOST_VARIANT_SDK} SDK. Will use libc++ from the toolchain.")
-    get_filename_component(absolute_libcxx_path "${CMAKE_C_COMPILER}/../../include/c++/v1" REALPATH)
-    if (EXISTS "${absolute_libcxx_path}")
-      list(APPEND SWIFT_COMPILER_SOURCES_SDK_FLAGS_default "-Xcc" "-isystem" "-Xcc" "${absolute_libcxx_path}")
-    else()
-      message(ERROR "libc++ not found in the toolchain.")
-    endif()
-  endif()
 elseif(BOOTSTRAPPING_MODE STREQUAL "CROSSCOMPILE")
   list(APPEND SWIFT_COMPILER_SOURCES_SDK_FLAGS_default "-sdk" "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
 endif()
