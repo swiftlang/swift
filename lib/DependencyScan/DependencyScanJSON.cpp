@@ -77,6 +77,11 @@ void writeJSONValue(llvm::raw_ostream &out, bool value, unsigned indentLevel) {
   out.write_escaped(value ? "true" : "false");
 }
 
+/// Write a boolean value as JSON.
+void writeJSONValue(llvm::raw_ostream &out, uint32_t value, unsigned indentLevel) {
+  out.write_escaped(std::to_string(value));
+}
+
 /// Write a JSON array.
 template <typename T>
 void writeJSONValue(llvm::raw_ostream &out, ArrayRef<T> values,
@@ -226,6 +231,90 @@ void writeLinkLibraries(llvm::raw_ostream &out,
   out << "\n";
 }
 
+void writeImportInfos(llvm::raw_ostream &out,
+                      const swiftscan_import_info_set_t *imports,
+                      unsigned indentLevel, bool trailingComma) {
+  out.indent(indentLevel * 2);
+  out << "\"imports\": ";
+  out << "[\n";
+
+  for (size_t i = 0; i < imports->count; ++i) {
+    const auto &iInfo = *imports->imports[i];
+    out.indent((indentLevel + 1) * 2);
+    out << "{\n";
+    auto entryIndentLevel = ((indentLevel + 2) * 2);
+    out.indent(entryIndentLevel);
+    out << "\"identifier\": ";
+    writeJSONValue(out, iInfo.import_identifier, indentLevel);
+    out << ",\n";
+    out.indent(entryIndentLevel);
+    out << "\"accessLevel\": ";
+    switch (iInfo.access_level) {
+      case SWIFTSCAN_ACCESS_LEVEL_PRIVATE:
+        writeJSONValue(out, StringRef("private"), entryIndentLevel);
+        break;
+      case SWIFTSCAN_ACCESS_LEVEL_FILEPRIVATE:
+        writeJSONValue(out, StringRef("fileprivate"), entryIndentLevel);
+        break;
+      case SWIFTSCAN_ACCESS_LEVEL_INTERNAL:
+        writeJSONValue(out, StringRef("internal"), entryIndentLevel);
+        break;
+      case SWIFTSCAN_ACCESS_LEVEL_PACKAGE:
+        writeJSONValue(out, StringRef("package"), entryIndentLevel);
+        break;
+      case SWIFTSCAN_ACCESS_LEVEL_PUBLIC:
+        writeJSONValue(out, StringRef("public"), entryIndentLevel);
+        break;
+    }
+
+    if (iInfo.source_locations->count) {
+      out << ",\n";
+      out.indent(entryIndentLevel);
+      out << "\"importLocations\": ";
+      out << "[\n";
+      auto slIndentLevel = ((entryIndentLevel + 4));
+      for (size_t i = 0; i < iInfo.source_locations->count; ++i) {
+        out.indent(entryIndentLevel + 2);
+        out << "{\n";
+        const auto &sl = *iInfo.source_locations->source_locations[i];
+        out.indent(slIndentLevel);
+        out << "\"bufferIdentifier\": ";
+        writeJSONValue(out, sl.buffer_identifier, indentLevel);
+        out << ",\n";
+        out.indent(slIndentLevel);
+        out << "\"linuNumber\": ";
+        writeJSONValue(out, sl.line_number, indentLevel);
+        out << ",\n";
+        out.indent(slIndentLevel);
+        out << "\"columnNumber\": ";
+        writeJSONValue(out, sl.column_number, indentLevel);
+        out << "\n";
+        out.indent(entryIndentLevel + 2);
+        out << "}";
+        if (i != iInfo.source_locations->count - 1)
+          out << ",";
+        out << "\n";
+      }
+      out.indent(entryIndentLevel);
+      out << "]\n";
+    } else {
+      out << "\n";
+    }
+    out.indent((indentLevel + 1) * 2);
+    out << "}";
+    if (i != imports->count - 1)
+      out << ",";
+    out << "\n";
+  }
+
+  out.indent(indentLevel * 2);
+  out << "]";
+
+  if (trailingComma)
+    out << ",";
+  out << "\n";
+}
+
 static void
 writeMacroDependencies(llvm::raw_ostream &out,
                        const swiftscan_macro_dependency_set_t *macro_deps,
@@ -243,15 +332,15 @@ writeMacroDependencies(llvm::raw_ostream &out,
     auto entryIndentLevel = ((indentLevel + 2) * 2);
     out.indent(entryIndentLevel);
     out << "\"moduleName\": ";
-    writeJSONValue(out, macroInfo.moduleName, indentLevel);
+    writeJSONValue(out, macroInfo.module_name, indentLevel);
     out << ",\n";
     out.indent(entryIndentLevel);
     out << "\"libraryPath\": ";
-    writeJSONValue(out, macroInfo.libraryPath, entryIndentLevel);
+    writeJSONValue(out, macroInfo.library_path, entryIndentLevel);
     out << ",\n";
     out.indent(entryIndentLevel);
     out << "\"executablePath\": ";
-    writeJSONValue(out, macroInfo.executablePath, entryIndentLevel);
+    writeJSONValue(out, macroInfo.executable_path, entryIndentLevel);
     out << "\n";
     out.indent((indentLevel + 1) * 2);
     out << "}";
@@ -368,6 +457,8 @@ void writeJSON(llvm::raw_ostream &out,
                         /*trailingComma=*/true);
       writeLinkLibraries(out, moduleInfo.link_libraries,
                          3, /*trailingComma=*/true);
+      writeImportInfos(out, moduleInfo.imports,
+                       3, /*trailingComma=*/true);
     }
     // Swift and Clang-specific details.
     out.indent(3 * 2);
