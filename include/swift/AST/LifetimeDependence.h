@@ -236,12 +236,12 @@ public:
         paramIndicesLength = inheritLifetimeParamIndices->getCapacity();
       }
       if (scopeLifetimeParamIndices) {
-        assert(paramIndicesLength == 0 ||
+        ASSERT(paramIndicesLength == 0 ||
                paramIndicesLength == scopeLifetimeParamIndices->getCapacity());
         paramIndicesLength = scopeLifetimeParamIndices->getCapacity();
       }
       if (addressableParamIndices) {
-        assert(paramIndicesLength == 0 ||
+        ASSERT(paramIndicesLength == 0 ||
                paramIndicesLength == addressableParamIndices->getCapacity());
         paramIndicesLength = addressableParamIndices->getCapacity();
       }
