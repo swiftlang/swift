@@ -2382,12 +2382,18 @@ ERROR(alignment_not_power_of_two,none,
 
 // Dependency Scanning
 ERROR(dependency_scan_module_not_found, none, "Unable to find module dependency: '%0'", (StringRef))
+GROUPED_ERROR(dependency_scan_module_not_found_on_specified_search_paths, MissingModuleOnKnownPaths, none,
+              "Compilation search paths unable to resolve module dependency: '%0'", (StringRef))
 NOTE(unresolved_import_location,none,
      "also imported here", ())
 NOTE(dependency_as_imported_by_main_module,none,
      "a dependency of main module '%0'", (StringRef))
 NOTE(dependency_as_imported_by, none,
      "a dependency of %select{Swift|Clang}2 module '%0': '%1'", (StringRef, StringRef, bool))
+NOTE(inherited_search_path_resolves_module,none,
+     "'%0' can be found using a search path that was specified when building module '%1' ('%2'). "
+     "This search path was not explicitly specified on the current compilation.", (StringRef, StringRef, StringRef))
+
 ERROR(clang_dependency_scan_error, none, "Clang dependency scanner failure: %0", (StringRef))
 ERROR(clang_header_dependency_scan_error, none, "Bridging header dependency scan failure: %0", (StringRef))
 

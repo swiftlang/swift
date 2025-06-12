@@ -22,6 +22,7 @@
 #include "swift/AST/LinkLibrary.h"
 #include "swift/Basic/CXXStdlibKind.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Serialization/Validation.h"
 #include "clang/CAS/CASOptions.h"
 #include "clang/Tooling/DependencyScanning/DependencyScanningService.h"
 #include "clang/Tooling/DependencyScanning/DependencyScanningTool.h"
@@ -406,15 +407,18 @@ public:
       StringRef sourceInfoPath,
       ArrayRef<ScannerImportStatementInfo> moduleImports,
       ArrayRef<ScannerImportStatementInfo> optionalModuleImports,
-      ArrayRef<LinkLibrary> linkLibraries, StringRef headerImport,
-      StringRef definingModuleInterface, bool isFramework, bool isStatic,
-      StringRef moduleCacheKey, StringRef userModuleVersion)
+      ArrayRef<LinkLibrary> linkLibraries,
+      ArrayRef<serialization::SearchPath> serializedSearchPaths,
+      StringRef headerImport, StringRef definingModuleInterface,
+      bool isFramework, bool isStatic, StringRef moduleCacheKey,
+      StringRef userModuleVersion)
       : ModuleDependencyInfoStorageBase(ModuleDependencyKind::SwiftBinary,
                                         moduleImports, optionalModuleImports,
                                         linkLibraries, moduleCacheKey),
         compiledModulePath(compiledModulePath), moduleDocPath(moduleDocPath),
         sourceInfoPath(sourceInfoPath), headerImport(headerImport),
         definingModuleInterfacePath(definingModuleInterface),
+        serializedSearchPaths(serializedSearchPaths),
         isFramework(isFramework), isStatic(isStatic),
         userModuleVersion(userModuleVersion) {}
 
@@ -440,6 +444,9 @@ public:
 
   /// Source files on which the header inputs depend.
   std::vector<std::string> headerSourceFiles;
+
+  /// Search paths this module was built with which got serialized
+  std::vector<serialization::SearchPath> serializedSearchPaths;
 
   /// (Clang) modules on which the header inputs depend.
   std::vector<ModuleDependencyID> headerModuleDependencies;
@@ -613,15 +620,17 @@ public:
       StringRef sourceInfoPath,
       ArrayRef<ScannerImportStatementInfo> moduleImports,
       ArrayRef<ScannerImportStatementInfo> optionalModuleImports,
-      ArrayRef<LinkLibrary> linkLibraries, StringRef headerImport,
-      StringRef definingModuleInterface, bool isFramework,
-      bool isStatic, StringRef moduleCacheKey, StringRef userModuleVer) {
+      ArrayRef<LinkLibrary> linkLibraries,
+      ArrayRef<serialization::SearchPath> serializedSearchPaths,
+      StringRef headerImport, StringRef definingModuleInterface,
+      bool isFramework, bool isStatic, StringRef moduleCacheKey,
+      StringRef userModuleVer) {
     return ModuleDependencyInfo(
         std::make_unique<SwiftBinaryModuleDependencyStorage>(
             compiledModulePath, moduleDocPath, sourceInfoPath, moduleImports,
-            optionalModuleImports, linkLibraries, headerImport,
-            definingModuleInterface,isFramework, isStatic, moduleCacheKey,
-            userModuleVer));
+            optionalModuleImports, linkLibraries, serializedSearchPaths,
+            headerImport, definingModuleInterface,isFramework, isStatic,
+            moduleCacheKey, userModuleVer));
   }
 
   /// Describe the main Swift module.
