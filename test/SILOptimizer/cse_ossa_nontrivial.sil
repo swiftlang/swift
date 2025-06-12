@@ -13,6 +13,16 @@ class SuperKlass {}
 
 class Klass : SuperKlass {}
 
+extension Klass: Equatable {
+  static func ==(lhs: Klass, rhs: Klass) -> Bool {
+    true
+  }
+}
+
+extension Klass: Hashable {
+  func hash(into hasher: inout Hasher) {}
+}
+
 struct NonTrivialStruct {
   var val:Klass
 }
@@ -1125,4 +1135,38 @@ bb0:
   destroy_value %0 : $NonTrivialStruct
   %res = tuple ()
   return %res : $()
+}
+
+sil @get_nontrivialstruct_in : $@convention(thin) () -> @out NonTrivialStruct
+
+sil @swift_getAtKeyPath : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
+
+// Check that we can trivially eliminate the stored property keypath 2nd use.
+//
+// CHECK-LABEL: sil [ossa] @keypath_test1 : $@convention(thin) () -> () {
+// CHECK:         keypath $KeyPath<NonTrivialStruct, Klass>
+// CHECK-NOT:     keypath
+// CHECK-LABEL: } // end sil function 'keypath_test1'
+sil [ossa] @keypath_test1 : $@convention(thin) () -> () {
+bb0:
+  %1 = keypath $KeyPath<NonTrivialStruct, Klass>, (root $NonTrivialStruct; stored_property #NonTrivialStruct.val : $Klass)
+  %2 = function_ref @get_nontrivialstruct_in : $@convention(thin) () -> @out NonTrivialStruct
+  %nts = alloc_stack $NonTrivialStruct
+  %3 = apply %2(%nts) : $@convention(thin) () -> @out NonTrivialStruct
+  %4 = function_ref @swift_getAtKeyPath : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
+  %5 = alloc_stack $Klass
+  %6 = apply %4<NonTrivialStruct, Klass>(%5, %nts, %1) : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
+  destroy_addr %5 : $*Klass
+  dealloc_stack %5 : $*Klass
+  destroy_value %1 : $KeyPath<NonTrivialStruct, Klass>
+  %7 = keypath $KeyPath<NonTrivialStruct, Klass>, (root $NonTrivialStruct; stored_property #NonTrivialStruct.val : $Klass)
+  %8 = alloc_stack $Klass
+  %9 = apply %4<NonTrivialStruct, Klass>(%8, %nts, %7) : $@convention(thin) <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0, @guaranteed KeyPath<τ_0_0, τ_0_1>) -> @out τ_0_1
+  destroy_addr %8 : $*Klass
+  dealloc_stack %8 : $*Klass
+  destroy_value %7 : $KeyPath<NonTrivialStruct, Klass>
+  destroy_addr %nts : $*NonTrivialStruct
+  dealloc_stack %nts : $*NonTrivialStruct
+  %10 = tuple ()
+  return %10 : $()
 }
