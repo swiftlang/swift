@@ -89,7 +89,7 @@ struct Wrapper : ~Escapable {
       yield _view
     }
 // CHECK: sil hidden @$s28implicit_lifetime_dependence7WrapperV4viewAA10BufferViewVvM : $@yield_once @convention(method) (@inout Wrapper) -> @lifetime(borrow 0) @yields @inout BufferView {
-    @_lifetime(borrow self)
+    @_lifetime(&self)
     _modify {
       yield &_view
     }
