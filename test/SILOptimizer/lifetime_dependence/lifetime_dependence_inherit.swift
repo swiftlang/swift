@@ -58,7 +58,7 @@ struct NEBV : ~Escapable {
     _read {
       yield bv
     }
-    @_lifetime(borrow self)
+    @_lifetime(&self)
     _modify {
       yield &bv
     }
