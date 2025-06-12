@@ -9,7 +9,6 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
-// REQUIRES: OS=macosx
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_SymbolLinkageMarkers
 
