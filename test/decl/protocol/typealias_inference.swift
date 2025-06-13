@@ -12,10 +12,13 @@ protocol BaseProtocol {
   init(closure: Closure)
 }
 
-struct Base<Value>: BaseProtocol {
+struct Base<Value>: BaseProtocol { // expected-error {{circular reference}}
+// expected-note@-1 {{through reference here}}
   private let closure: Closure
 
-  init(closure: Closure) { //expected-error {{reference to invalid type alias 'Closure' of type 'Base<Value>'}}
+  init(closure: Closure) {
+  // expected-note@-1 {{while resolving type 'Closure'}}
+  // expected-note@-2 2{{through reference here}}
     self.closure = closure
   }
 }

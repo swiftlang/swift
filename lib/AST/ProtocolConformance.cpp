@@ -587,17 +587,6 @@ NormalProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
      return { witnessType, nullptr };
   }
 
-  // If this conformance is in a state where it is inferring type witnesses but
-  // we didn't find anything, fail.
-  //
-  // FIXME: This is unsound, because we may not have diagnosed anything but
-  // still end up with an ErrorType in the AST.
-  if (getDeclContext()->getASTContext().evaluator.hasActiveRequest(
-         ResolveTypeWitnessesRequest{
-             const_cast<NormalProtocolConformance *>(this)})) {
-    return { Type(), nullptr };
-  }
-
   return evaluateOrDefault(
       assocType->getASTContext().evaluator,
       TypeWitnessRequest{const_cast<NormalProtocolConformance *>(this),

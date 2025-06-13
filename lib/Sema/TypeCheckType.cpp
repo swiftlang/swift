@@ -1351,38 +1351,6 @@ static void diagnoseUnboundGenericType(Type ty, SourceLoc loc) {
   }
 }
 
-// Produce a diagnostic if the type we referenced was an
-// associated type but the type itself was erroneous. We'll produce a
-// diagnostic here if the diagnostic for the bad type witness would show up in
-// a different context.
-static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
-                                           Type parentTy,
-                                           SourceLoc loc,
-                                           TypeDecl *typeDecl) {
-  auto protocol = dyn_cast<ProtocolDecl>(typeDecl->getDeclContext());
-
-  // If we weren't given a conformance, go look it up.
-  ProtocolConformance *conformance = nullptr;
-  if (protocol) {
-    auto conformanceRef = lookupConformance(parentTy, protocol);
-    if (conformanceRef.isConcrete())
-      conformance = conformanceRef.getConcrete();
-  }
-
-  // If any errors have occurred, don't bother diagnosing this cross-file
-  // issue.
-  ASTContext &ctx = dc->getASTContext();
-  if (ctx.Diags.hadAnyError())
-    return;
-
-  auto diagCode =
-    (!protocol || (conformance && !conformance->getConditionalRequirementsIfAvailable()))
-          ? diag::unsupported_recursion_in_associated_type_reference
-          : diag::broken_associated_type_witness;
-
-  ctx.Diags.diagnose(loc, diagCode, typeDecl, parentTy);
-}
-
 /// Returns a valid type or ErrorType in case of an error.
 static Type resolveTypeDecl(TypeDecl *typeDecl, DeclContext *foundDC,
                             const TypeResolution &resolution,
@@ -1392,16 +1360,6 @@ static Type resolveTypeDecl(TypeDecl *typeDecl, DeclContext *foundDC,
   // depends on the current context and where the type was found.
   Type type = resolution.resolveTypeInContext(typeDecl, foundDC,
                                               repr->hasGenericArgList());
-
-  if (type->hasError() && foundDC &&
-      (isa<AssociatedTypeDecl>(typeDecl) || isa<TypeAliasDecl>(typeDecl))) {
-    auto fromDC = resolution.getDeclContext();
-    assert(fromDC && "No declaration context for type resolution?");
-    maybeDiagnoseBadConformanceRef(fromDC, foundDC->getDeclaredInterfaceType(),
-                                   repr->getNameLoc().getBaseNameLoc(),
-                                   typeDecl);
-  }
-
   return applyGenericArguments(type, resolution, silContext, repr);
 }
 
@@ -1934,8 +1892,7 @@ static Type resolveQualifiedIdentTypeRepr(const TypeResolution &resolution,
   const auto parentRange = repr->getBase()->getSourceRange();
   auto isExtensionBinding = options.is(TypeResolverContext::ExtensionBinding);
 
-  auto maybeDiagnoseBadMemberType = [&](TypeDecl *member, Type memberType,
-                                        AssociatedTypeDecl *inferredAssocType) {
+  auto maybeDiagnoseBadMemberType = [&](TypeDecl *member, Type memberType) {
     bool hasUnboundOpener = !!resolution.getUnboundTypeOpener();
 
     // Type aliases might require adjustment due to @preconcurrency.
@@ -1985,13 +1942,6 @@ static Type resolveQualifiedIdentTypeRepr(const TypeResolution &resolution,
       }
     }
 
-    // Diagnose a bad conformance reference if we need to.
-    if (!options.contains(TypeResolutionFlags::SilenceErrors) &&
-        inferredAssocType && memberType->hasError()) {
-      maybeDiagnoseBadConformanceRef(DC, parentTy, repr->getLoc(),
-                                     inferredAssocType);
-    }
-
     // If there are generic arguments, apply them now.
     return applyGenericArguments(memberType, resolution, silContext, repr);
   };
@@ -2021,7 +1971,7 @@ static Type resolveQualifiedIdentTypeRepr(const TypeResolution &resolution,
   if (auto *typeDecl = repr->getBoundDecl()) {
     auto memberType =
       TypeChecker::substMemberTypeWithBase(typeDecl, parentTy);
-    return maybeDiagnoseBadMemberType(typeDecl, memberType, nullptr);
+    return maybeDiagnoseBadMemberType(typeDecl, memberType);
   }
 
   // Phase 1: Find and bind the type declaration.
@@ -2063,7 +2013,6 @@ static Type resolveQualifiedIdentTypeRepr(const TypeResolution &resolution,
   // If we didn't find anything, complain.
   Type memberType;
   TypeDecl *member = nullptr;
-  AssociatedTypeDecl *inferredAssocType = nullptr;
   if (!memberTypes) {
     // If we're not allowed to complain or we couldn't fix the
     // source, bail out.
@@ -2078,11 +2027,10 @@ static Type resolveQualifiedIdentTypeRepr(const TypeResolution &resolution,
   } else {
     memberType = memberTypes.back().MemberType;
     member = memberTypes.back().Member;
-    inferredAssocType = memberTypes.back().InferredAssociatedType;
     repr->setValue(member, nullptr);
   }
 
-  return maybeDiagnoseBadMemberType(member, memberType, inferredAssocType);
+  return maybeDiagnoseBadMemberType(member, memberType);
 }
 
 static bool isDefaultNoEscapeContext(TypeResolutionOptions options) {
