@@ -2458,6 +2458,13 @@ ClangImporter::Implementation::importParameterType(
   auto paramTy = desugarIfElaborated(param->getType());
   paramTy = desugarIfBoundsAttributed(paramTy);
 
+  // If this type has a _Nullable/_Nonnull attribute, drop it, since we already
+  // have that information in optionalityOfParam.
+  if (auto attributedTy = dyn_cast<clang::AttributedType>(paramTy)) {
+    if (attributedTy->getImmediateNullability())
+      clang::AttributedType::stripOuterNullability(paramTy);
+  }
+
   ImportTypeKind importKind = paramIsCompletionHandler
                                   ? ImportTypeKind::CompletionHandlerParameter
                                   : ImportTypeKind::Parameter;
@@ -2485,6 +2492,17 @@ ClangImporter::Implementation::importParameterType(
       addImportDiagnosticFn(Diagnostic(diag::bridged_pointer_type_not_found,
                                        pointerKind));
       return std::nullopt;
+    }
+    switch (optionalityOfParam) {
+    case OTK_Optional:
+      swiftParamTy = OptionalType::get(swiftParamTy);
+      break;
+    case OTK_ImplicitlyUnwrappedOptional:
+      swiftParamTy = OptionalType::get(swiftParamTy);
+      isParamTypeImplicitlyUnwrapped = true;
+      break;
+    case OTK_None:
+      break;
     }
   } else if (isa<clang::ReferenceType>(paramTy) &&
              isa<clang::TemplateTypeParmType>(paramTy->getPointeeType())) {
@@ -2734,8 +2752,6 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     }
 
     bool knownNonNull = !nonNullArgs.empty() && nonNullArgs[index];
-    // Specialized templates need to match the args/result exactly.
-    knownNonNull |= clangDecl->isFunctionTemplateSpecialization();
 
     // Check nullability of the parameter.
     OptionalTypeKind optionalityOfParam =
