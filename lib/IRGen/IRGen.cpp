@@ -132,6 +132,9 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx) {
   // FIXME: We should do this entirely through Clang, for consistency.
   TargetOptions TargetOpts;
 
+  // Linker support for this is not widespread enough.
+  TargetOpts.SupportIndirectSymViaGOTPCRel_AArch64_ELF = false;
+
   // Explicitly request debugger tuning for LLDB which is the default
   // on Darwin platforms but not on others.
   TargetOpts.DebuggerTuning = llvm::DebuggerKind::LLDB;
