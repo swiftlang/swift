@@ -130,7 +130,7 @@ extension SourceManager {
     fixItChanges: [FixIt.Change] = []
   ) {
     // Map severity
-    let bridgedSeverity = severity.bridged
+    let bridgedSeverity: swift.DiagnosticKind = severity.bridged
 
     // Emit the diagnostic
     var mutableMessage = message
