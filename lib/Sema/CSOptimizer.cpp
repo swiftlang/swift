@@ -1840,6 +1840,24 @@ ConstraintSystem::selectDisjunction() {
           // based on number of favored/active choices.
           if (*firstScore != *secondScore)
             return *firstScore > *secondScore;
+
+          // If the scores are the same and both disjunctions are operators
+          // they could be ranked purely based on whether the candidates
+          // were speculative or not. The one with more context always wins.
+          //
+          // Consider the following situation:
+          //
+          // func test(_: Int) { ... }
+          // func test(_: String) { ... }
+          //
+          // test("a" + "b" + "c")
+          //
+          // In this case we should always prefer ... + "c" over "a" + "b"
+          // because it would fail and prune the other overload if parameter
+          // type (aka contextual type) is `Int`.
+          if (isFirstOperator && isSecondOperator &&
+              isFirstSpeculative != isSecondSpeculative)
+            return isSecondSpeculative;
         }
 
         // Use favored choices only if disjunction score is higher
