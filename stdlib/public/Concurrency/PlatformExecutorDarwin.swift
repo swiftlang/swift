@@ -14,6 +14,7 @@
 
 import Swift
 
+@_spi(CustomDefaultExecutors)
 @available(StdlibDeploymentTarget 6.2, *)
 public struct PlatformExecutorFactory: ExecutorFactory {
   public static var mainExecutor: any MainExecutor {
