@@ -1129,3 +1129,6 @@ Added: _$ss8DurationV11nanosecondsyABSdFZ
 Added: _$ss11InlineArrayVsRi__rlE8_storagexq_BVvM
 Added: _$ss11InlineArrayVsRi__rlE8_storagexq_BVvs
 
+// lengthOfBytes(using:)/maximumLengthOfBytes(for:)
+Added: __swift_stdlib_NSStringLengthOfBytesInEncodingTrampoline
+Added: __swift_stdlib_NSStringMaximumLengthForEncodingTrampoline
