@@ -46,5 +46,5 @@ SWIFT_REQUEST(ClangImporter, ClangTypeEscapability,
               CxxEscapability(EscapabilityLookupDescriptor), Cached,
               NoLocationInfo)
 SWIFT_REQUEST(ClangImporter, ClangDeclExplicitSafety,
-              ExplicitSafety(SafeUseOfCxxDeclDescriptor), Cached,
+              ExplicitSafety(CxxDeclExplicitSafetyDescriptor), Cached,
               NoLocationInfo)
