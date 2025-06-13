@@ -450,7 +450,7 @@ inferTypeFromInitializerResultType(ConstraintSystem &cs,
   return {instanceTy, /*hasFailable=*/false};
 }
 
-/// If the given expression represents a chain of operators that only have
+/// If the given expression represents a chain of operators that have
 /// only literals as arguments, attempt to deduce a potential type of the
 /// chain. For example if chain has only integral literals it's going to
 /// be `Int`, if there are some floating-point literals mixed in - it's going
@@ -1007,13 +1007,9 @@ static void determineBestChoicesInContext(
         if (typeVar->getImpl().isFunctionResult()) {
           auto *resultLoc = typeVar->getImpl().getLocator();
 
-          // We don't want to try and infer parts of operator
-          // chains.
-          if (!isOperator) {
-            if (auto type = inferTypeOfArithmeticOperatorChain(
-                    cs.DC, resultLoc->getAnchor())) {
-              types.push_back({type, /*fromLiteral=*/true});
-            }
+          if (auto type = inferTypeOfArithmeticOperatorChain(
+                  cs.DC, resultLoc->getAnchor())) {
+            types.push_back({type, /*fromLiteral=*/true});
           }
 
           auto binding =
