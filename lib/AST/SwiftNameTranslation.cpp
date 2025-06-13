@@ -16,6 +16,7 @@
 
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/LazyResolver.h"
@@ -47,6 +48,9 @@ getNameForObjC(const ValueDecl *VD, CustomNamesOnly_t customNamesOnly) {
       return name->getSelectorPieces().front().str();
     }
   }
+
+  if (auto cdeclAttr = VD->getAttrs().getAttribute<CDeclAttr>())
+    return cdeclAttr->Name;
 
   if (customNamesOnly)
     return StringRef();

@@ -2385,8 +2385,14 @@ private:
   }
 
   void maybePrintTagKeyword(const TypeDecl *NTD) {
-    if (isa<EnumDecl>(NTD) && !NTD->hasClangNode()) {
-      os << "enum ";
+    if (auto *ED = dyn_cast<EnumDecl>(NTD); !NTD->hasClangNode()) {
+      if (ED->getAttrs().hasAttribute<CDeclAttr>()) {
+        // We should be able to use the tag macro for all printed enums but
+        // for now restrict it to @cdecl to guard it behind the feature flag.
+        os << "SWIFT_ENUM_TAG ";
+      } else {
+        os << "enum ";
+      }
       return;
     }
 
@@ -3016,9 +3022,17 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
        (outputLang == OutputLanguageMode::C))
     return false;
 
-  // C output mode only accepts @cdecl functions.
+  // C output mode only prints @cdecl functions and enums.
   if (outputLang == OutputLanguageMode::C &&
-      !cdeclKind) {
+      !cdeclKind && !isa<EnumDecl>(VD)) {
+    return false;
+  }
+
+  // The C mode prints @cdecl enums and reject other enums,
+  // while other modes accept other enums and reject @cdecl ones.
+  if (isa<EnumDecl>(VD) &&
+      VD->getAttrs().hasAttribute<CDeclAttr>() !=
+        (outputLang == OutputLanguageMode::C)) {
     return false;
   }
 
