@@ -73,6 +73,11 @@ void NonisolatedNonsendingByDefaultMigrationTarget::diagnose() const {
       return;
     }
 
+    // Only diagnose declarations from the current module.
+    if (decl->getModuleContext() != ctx.MainModule) {
+      return;
+    }
+
     // If the attribute cannot appear on this kind of declaration, we can't
     // diagnose it.
     if (!DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::Concurrent,
