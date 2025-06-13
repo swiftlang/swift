@@ -62,8 +62,9 @@
 #include "clang/AST/DeclObjCCommon.h"
 #include "clang/AST/Expr.h"
 #include "clang/AST/PrettyPrinter.h"
-#include "clang/AST/StmtVisitor.h"
 #include "clang/AST/RecordLayout.h"
+#include "clang/AST/RecursiveASTVisitor.h"
+#include "clang/AST/StmtVisitor.h"
 #include "clang/AST/Type.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Basic/TargetInfo.h"
@@ -9119,6 +9120,24 @@ namespace {
   };
 } // namespace
 
+namespace {
+// Searches for template instantiations that are not behind type aliases.
+// FIXME: make sure the generated code compiles for template
+// instantiations that are not behind type aliases.
+struct UnaliasedInstantiationVisitor
+    : clang::RecursiveASTVisitor<UnaliasedInstantiationVisitor> {
+  bool hasUnaliasedInstantiation = false;
+
+  bool TraverseTypedefType(const clang::TypedefType *) { return true; }
+
+  bool
+  VisitTemplateSpecializationType(const clang::TemplateSpecializationType *) {
+    hasUnaliasedInstantiation = true;
+    return false;
+  }
+};
+} // namespace
+
 // Don't try to transform any Swift types that _SwiftifyImport doesn't know how
 // to handle.
 static bool SwiftifiableCountedByPointerType(Type swiftType) {
@@ -9172,6 +9191,13 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
 
   if (ClangDecl->getNumParams() != MappedDecl->getParameters()->size())
     return;
+
+  {
+    UnaliasedInstantiationVisitor visitor;
+    visitor.TraverseType(ClangDecl->getType());
+    if (visitor.hasUnaliasedInstantiation)
+      return;
+  }
 
   llvm::SmallString<128> MacroString;
   // We only attach the macro if it will produce an overload. Any __counted_by

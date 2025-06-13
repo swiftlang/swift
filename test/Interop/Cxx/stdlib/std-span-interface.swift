@@ -3,7 +3,7 @@
 // RUN: %FileCheck %s < %t/interface.swift
 
 // Make sure we trigger typechecking and SIL diagnostics
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Lifetimes -cxx-interoperability-mode=default -strict-memory-safety -warnings-as-errors -Xcc -std=c++20 %s
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -I %S/Inputs -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Lifetimes -cxx-interoperability-mode=default -strict-memory-safety -warnings-as-errors -verify -Xcc -std=c++20 %s
 
 // REQUIRES: swift_feature_SafeInteropWrappers
 // REQUIRES: swift_feature_Lifetimes
@@ -34,15 +34,10 @@ import CxxStdlib
 // CHECK-NEXT: }
 // CHECK: struct SpanWithoutTypeAlias {
 // CHECK-NEXT:   init()
-// CHECK-NEXT:   /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:   @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-// CHECK-NEXT:   @_lifetime(borrow self)
-// CHECK-NEXT:   @_alwaysEmitIntoClient @_disfavoredOverload public mutating func bar() -> Span<CInt>
 // CHECK-NEXT:   mutating func bar() -> std.{{.*}}span<__cxxConst<CInt>, _C{{.*}}_{{.*}}>
-// CHECK-NEXT:   /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:   @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-// CHECK-NEXT:   @_alwaysEmitIntoClient @_disfavoredOverload public mutating func foo(_ s: Span<CInt>)
 // CHECK-NEXT:   mutating func foo(_ s: std.{{.*}}span<__cxxConst<CInt>, _C{{.*}}_{{.*}}>)
+// CHECK-NEXT:   mutating func otherTemplatedType(_ copy: ConstSpanOfInt, _: S<CInt>)
+// CHECK-NEXT:   mutating func otherTemplatedType2(_ copy: ConstSpanOfInt, _: UnsafeMutablePointer<S<CInt>>!)
 // CHECK-NEXT: }
 
 // CHECK:      /// This is an auto-generated wrapper for safer interop
@@ -150,7 +145,7 @@ func callMethodWithSafeWrapper(_ x: inout X, s: Span<CInt>) {
 }
 
 func callFooBar(_ x: inout SpanWithoutTypeAlias, _ s: ConstSpanOfInt) {
-    let _: Span<CInt> = x.bar()
+    let _: Span<CInt> = x.bar() // expected-error {{cannot convert value of type}}
     unsafe x.foo(s)
 }
 
@@ -241,4 +236,12 @@ func callMixedFuncWithSafeWrapper7(_ p: UnsafeBufferPointer<CInt>) {
 @_lifetime(span: copy span)
 func callMutableKeyword(_ span: inout MutableSpan<CInt>) {
     mutableKeyword(&span)
+}
+
+func callSpanWithoutTypeAlias(_ span: Span<CInt>) {
+  spanWithoutTypeAlias(span) // expected-error {{cannot convert value of type}}
+}
+
+func callMutableSpanWithoutTypeAlias(_ span: consuming MutableSpan<CInt>) {
+  mutableSpanWithoutTypeAlias(&span) // expected-error {{cannot convert value of type}}
 }
