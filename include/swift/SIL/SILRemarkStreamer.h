@@ -107,7 +107,7 @@ llvm::remarks::Remark SILRemarkStreamer::toLLVMRemark(
   llvmRemark.RemarkType = toRemarkType<RemarkT>();
   llvmRemark.PassName = optRemark.getPassName();
   llvmRemark.RemarkName = optRemark.getIdentifier();
-  llvmRemark.FunctionName = optRemark.getDemangledFunctionName();
+  llvmRemark.FunctionName = optRemark.getFunction()->getName();
   llvmRemark.Loc =
       toRemarkLocation(optRemark.getLocation(), getASTContext().SourceMgr);
 

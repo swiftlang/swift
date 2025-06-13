@@ -30,7 +30,7 @@ public var global = Klass() // expected-remark {{heap allocated ref of type 'Kla
 // CHECK-NEXT: Name:            sil.memory
 // CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift', 
 // CHECK-NEXT:                    Line: [[# @LINE + 42 ]], Column: 12 }
-// CHECK-NEXT: Function:        'getGlobal()'
+// CHECK-NEXT: Function:        '$s4null9getGlobalAA5KlassCyF'
 // CHECK-NEXT: Args:
 // CHECK-NEXT:   - String:          'begin exclusive access to value of type '''
 // CHECK-NEXT:   - ValueType:       Klass
@@ -45,7 +45,7 @@ public var global = Klass() // expected-remark {{heap allocated ref of type 'Kla
 // CHECK-NEXT: Name:            sil.memory
 // CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift', 
 // CHECK-NEXT:                    Line: [[# @LINE + 27 ]], Column: 12 }
-// CHECK-NEXT: Function:        'getGlobal()'
+// CHECK-NEXT: Function:        '$s4null9getGlobalAA5KlassCyF'
 // CHECK-NEXT: Args:
 // CHECK-NEXT:   - String:          'end exclusive access to value of type '''
 // CHECK-NEXT:   - ValueType:       Klass
@@ -60,7 +60,7 @@ public var global = Klass() // expected-remark {{heap allocated ref of type 'Kla
 // CHECK-NEXT: Name:            sil.memory
 // CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift',
 // CHECK-NEXT:                    Line: [[# @LINE + 12]], Column: 5 }
-// CHECK-NEXT: Function:        'getGlobal()'
+// CHECK-NEXT: Function:        '$s4null9getGlobalAA5KlassCyF'
 // CHECK-NEXT: Args:
 // CHECK-NEXT:   - String:          'retain of type '''
 // CHECK-NEXT:   - ValueType:       Klass
@@ -85,7 +85,7 @@ public func getGlobal() -> Klass {
 // CHECK-NEXT: Name:            sil.memory
 // CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift', 
 // CHECK-NEXT:                    Line: [[# @LINE + 51 ]], Column: 11 }
-// CHECK-NEXT: Function:        'useGlobal()'
+// CHECK-NEXT: Function:        '$s4null9useGlobalyyF'
 // CHECK-NEXT: Args:
 // CHECK-NEXT:   - String:          'heap allocated ref of type '''
 // CHECK-NEXT:   - ValueType:
@@ -96,7 +96,7 @@ public func getGlobal() -> Klass {
 // CHECK-NEXT: Name:            sil.memory
 // CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift', 
 // CHECK-NEXT:                    Line: [[# @LINE + 40 ]], Column: 5 }
-// CHECK-NEXT: Function:        'useGlobal()'
+// CHECK-NEXT: Function:        '$s4null9useGlobalyyF'
 // CHECK-NEXT: Args:
 // CHECK-NEXT:   - String:          'retain of type '''
 // CHECK-NEXT:   - ValueType:       Klass
@@ -110,7 +110,7 @@ public func getGlobal() -> Klass {
 // CHECK-NEXT: Name:            sil.memory
 // CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift', 
 // CHECK-NEXT:                    Line: [[# @LINE + 26 ]], Column: 12 }
-// CHECK-NEXT: Function:        'useGlobal()'
+// CHECK-NEXT: Function:        '$s4null9useGlobalyyF'
 // CHECK-NEXT: Args:
 // CHECK-NEXT:   - String:          'release of type '''
 // CHECK-NEXT:   - ValueType:
@@ -121,7 +121,7 @@ public func getGlobal() -> Klass {
 // CHECK-NEXT: Name:            sil.memory
 // CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift', 
 // CHECK-NEXT:                    Line: [[# @LINE + 15 ]], Column: 12 }
-// CHECK-NEXT: Function:        'useGlobal()'
+// CHECK-NEXT: Function:        '$s4null9useGlobalyyF'
 // CHECK-NEXT: Args:
 // CHECK-NEXT:   - String:          'release of type '''
 // CHECK-NEXT:   - ValueType:       Klass
