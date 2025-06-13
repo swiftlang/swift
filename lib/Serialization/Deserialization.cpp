@@ -3054,9 +3054,10 @@ ModuleDecl *ModuleFile::getModule(ModuleID MID) {
 }
 
 ModuleDecl *ModuleFile::getModule(ImportPath::Module name,
-                                  bool allowLoading) {
+                                  bool allowLoading, const std::string caller) {
   if (name.empty() || name.front().Item.empty())
     return getContext().TheBuiltinModule;
+  llvm::dbgs() << "getModule called from " << caller << "\n";
 
   // FIXME: duplicated from ImportResolver::getModule
   Identifier parentName = FileContext->getParentModule()->getName();
