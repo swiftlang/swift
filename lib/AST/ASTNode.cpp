@@ -157,3 +157,29 @@ FUNC(Expr)
 FUNC(Decl)
 FUNC(Pattern)
 #undef FUNC
+
+SourceRange swift::getUnexpandedMacroRange(const SourceManager &SM,
+                                           SourceRange range) {
+  unsigned bufferID = SM.findBufferContainingLoc(range.Start);
+  SourceRange outerRange;
+  while (const auto *info = SM.getGeneratedSourceInfo(bufferID)) {
+    switch (info->kind) {
+#define MACRO_ROLE(Name, Description)                                          \
+  case GeneratedSourceInfo::Name##MacroExpansion:
+#include "swift/Basic/MacroRoles.def"
+      if (auto *customAttr = info->attachedMacroCustomAttr)
+        outerRange = customAttr->getRange();
+      else
+        outerRange =
+            ASTNode::getFromOpaqueValue(info->astNode).getSourceRange();
+      bufferID = SM.findBufferContainingLoc(outerRange.Start);
+      continue;
+    case GeneratedSourceInfo::ReplacedFunctionBody:
+    case GeneratedSourceInfo::PrettyPrinted:
+    case GeneratedSourceInfo::DefaultArgument:
+    case GeneratedSourceInfo::AttributeFromClang:
+      return SourceRange();
+    }
+  }
+  return outerRange;
+}
