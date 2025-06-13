@@ -47,7 +47,7 @@ extension ConstantVPrintFInterpolation {
   public mutating func appendInterpolation(
     _ pointer: @autoclosure @escaping () -> UnsafeRawBufferPointer
   ) {
-    appendInterpolation(pointer().baseAddress!)
+    unsafe appendInterpolation(pointer().baseAddress!)
   }
 
   /// Defines interpolation for UnsafeRawPointer.
@@ -64,7 +64,7 @@ extension ConstantVPrintFInterpolation {
     _ pointer: @autoclosure @escaping () -> UnsafeRawPointer
   ) {
     formatString += "%p"
-    arguments.append(pointer)
+    unsafe arguments.append(pointer)
   }
 }
 
@@ -734,7 +734,7 @@ extension UnsafeRawPointer: CVarArg {
   /// appropriately interpreted by C varargs.
   @inlinable // c-abi
   public var _cVarArgEncoding: [Int] {
-    return _encodeBitsAsWords(self)
+    return unsafe _encodeBitsAsWords(self)
   }
 }
 
@@ -758,8 +758,8 @@ extension ConstantVPrintFArguments {
   @_optimize(none)
   internal mutating func append(_ value: @escaping () -> String) {
     argumentClosures.append({ continuation in
-      value().withCString { str in
-        continuation(str._cVarArgEncoding)
+      unsafe value().withCString { str in
+        unsafe continuation(str._cVarArgEncoding)
       }
     })
   }
@@ -817,15 +817,15 @@ internal func constant_vprintf_backend_recurse(
   if let closure = argumentClosures.first {
     closure { newArg in
       args.append(contentsOf: newArg)
-      constant_vprintf_backend_recurse(
+      unsafe constant_vprintf_backend_recurse(
         fmt: fmt,
         argumentClosures: argumentClosures.dropFirst(),
         args: &args
       )
     }
   } else {
-    _ = withVaList(args) { valist in
-      _swift_stdlib_vprintf(fmt, valist)
+    _ = unsafe withVaList(args) { valist in
+      unsafe _swift_stdlib_vprintf(fmt, valist)
     }
   }
 }
@@ -839,14 +839,14 @@ internal func constant_vprintf_backend(
   if let closure = argumentClosures.first {
     closure { newArg in
       args.append(contentsOf: newArg)
-      constant_vprintf_backend_recurse(
+      unsafe constant_vprintf_backend_recurse(
         fmt: fmt,
         argumentClosures: argumentClosures.dropFirst(),
         args: &args
       )
     }
   } else {
-    constant_vprintf_backend_recurse(
+    unsafe constant_vprintf_backend_recurse(
       fmt: fmt,
       argumentClosures: ArraySlice(argumentClosures),
       args: &args
@@ -864,7 +864,7 @@ public func print(_ message: ConstantVPrintFMessage) {
   let argumentClosures = message.interpolation.arguments.argumentClosures
   if Bool(_builtinBooleanLiteral: Builtin.ifdef_SWIFT_STDLIB_PRINT_DISABLED()) { return }
   let formatStringPointer = _getGlobalStringTablePointer(formatString)
-  constant_vprintf_backend(
+  unsafe constant_vprintf_backend(
     fmt: formatStringPointer,
     argumentClosures: argumentClosures
   )
