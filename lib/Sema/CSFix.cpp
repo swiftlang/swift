@@ -185,9 +185,12 @@ CoerceToCheckedCast *CoerceToCheckedCast::attempt(ConstraintSystem &cs,
                                                   Type fromType, Type toType,
                                                   bool useConditionalCast,
                                                   ConstraintLocator *locator) {
-  // If any of the types has a type variable, don't add the fix.
-  if (fromType->hasTypeVariable() || toType->hasTypeVariable())
+  // If any of the types have type variables or placeholders, don't add the fix.
+  // `typeCheckCheckedCast` doesn't support checking such types.
+  if (fromType->hasTypeVariableOrPlaceholder() ||
+      toType->hasTypeVariableOrPlaceholder()) {
     return nullptr;
+  }
 
   auto anchor = locator->getAnchor();
   if (auto *assignExpr = getAsExpr<AssignExpr>(anchor))

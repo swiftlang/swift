@@ -4872,29 +4872,16 @@ bool ConstraintSystem::generateConstraints(
         return convertTypeLocator;
       };
 
-      // Substitute type variables in for placeholder types (and unresolved
-      // types, if allowed).
-      if (allowFreeTypeVariables == FreeTypeVariableBinding::UnresolvedType) {
-        convertType = convertType.transformRec([&](Type type) -> std::optional<Type> {
-          if (type->is<UnresolvedType>() || type->is<PlaceholderType>()) {
-            return Type(createTypeVariable(getLocator(type),
-                                           TVO_CanBindToNoEscape |
-                                               TVO_PrefersSubtypeBinding |
-                                               TVO_CanBindToHole));
-          }
-          return std::nullopt;
-        });
-      } else {
-        convertType = convertType.transformRec([&](Type type) -> std::optional<Type> {
-          if (type->is<PlaceholderType>()) {
-            return Type(createTypeVariable(getLocator(type),
-                                           TVO_CanBindToNoEscape |
-                                               TVO_PrefersSubtypeBinding |
-                                               TVO_CanBindToHole));
-          }
-          return std::nullopt;
-        });
-      }
+      // Substitute type variables in for placeholder types.
+      convertType = convertType.transformRec([&](Type type) -> std::optional<Type> {
+        if (type->is<PlaceholderType>()) {
+          return Type(createTypeVariable(getLocator(type),
+                                         TVO_CanBindToNoEscape |
+                                             TVO_PrefersSubtypeBinding |
+                                             TVO_CanBindToHole));
+        }
+        return std::nullopt;
+      });
 
       addContextualConversionConstraint(expr, convertType, ctp,
                                         convertTypeLocator);
