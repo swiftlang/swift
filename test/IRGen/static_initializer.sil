@@ -1,6 +1,9 @@
 // RUN: %target-swift-frontend %s -emit-ir | %FileCheck %s -check-prefix CHECK -check-prefix CHECK-%target-abi -check-prefix CHECK-%target-abi-%target-cpu
 
-// REQUIRES: CPU=arm64 || CPU=x86_64
+// REQUIRES: CPU=aarch64 || CPU=arm64 || CPU=x86_64
+
+// Android x86_64 doesn't expose Float80.
+// UNSUPPORTED: OS=linux-android && CPU=x86_64
 
 // Generated from
 // var x : Int32 = 2

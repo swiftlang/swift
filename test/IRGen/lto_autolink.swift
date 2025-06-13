@@ -19,8 +19,8 @@ import empty
 
 
 // RUN: %target-swift-frontend -target %target-cpu-apple-macosx10.15 -emit-module -parse-stdlib -o %t -module-name empty -module-link-name empty %S/../Inputs/empty.swift
-// RUN: %target-swift-emit-ir -target %target-cpu-apple-macosx10.15 -lto=llvm-full -parse-stdlib -I %t -I %S/Inputs -DTEST_CLANG_OPTIONS_MERGE %s | %FileCheck %s --check-prefix CHECK-MACHO-MERGE
-// RUN: %target-swift-emit-ir -target %target-cpu-apple-macosx10.15 -lto=llvm-thin -parse-stdlib -I %t -I %S/Inputs -DTEST_CLANG_OPTIONS_MERGE %s | %FileCheck %s --check-prefix CHECK-MACHO-MERGE
+// RUN: %target-swift-emit-ir -target %target-cpu-apple-macosx10.15 -lto=llvm-full -parse-stdlib -nostdimport -I %t -I %S/Inputs -DTEST_CLANG_OPTIONS_MERGE %s | %FileCheck %s --check-prefix CHECK-MACHO-MERGE
+// RUN: %target-swift-emit-ir -target %target-cpu-apple-macosx10.15 -lto=llvm-thin -parse-stdlib -nostdimport -I %t -I %S/Inputs -DTEST_CLANG_OPTIONS_MERGE %s | %FileCheck %s --check-prefix CHECK-MACHO-MERGE
 
 // CHECK-MACHO-MERGE-DAG: !llvm.linker.options = !{
 // CHECK-MACHO-MERGE-DAG: !{{[0-9]+}} = !{!"-lempty"}
@@ -28,8 +28,8 @@ import empty
 
 
 // RUN: %target-swift-frontend -target %target-cpu-unknown-linux-gnu -emit-module -parse-stdlib -o %t -module-name empty -module-link-name empty %S/../Inputs/empty.swift
-// RUN: %target-swift-emit-ir -target %target-cpu-unknown-linux-gnu -lto=llvm-full -parse-stdlib -I %t -I %S/Inputs -DTEST_CLANG_OPTIONS_MERGE %s | %FileCheck %s --check-prefix CHECK-ELF-MERGE
-// RUN: %target-swift-emit-ir -target %target-cpu-unknown-linux-gnu -lto=llvm-thin -parse-stdlib -I %t -I %S/Inputs -DTEST_CLANG_OPTIONS_MERGE %s | %FileCheck %s --check-prefix CHECK-ELF-MERGE
+// RUN: %target-swift-emit-ir -target %target-cpu-unknown-linux-gnu -lto=llvm-full -parse-stdlib -nostdimport -I %t -I %S/Inputs -DTEST_CLANG_OPTIONS_MERGE %s | %FileCheck %s --check-prefix CHECK-ELF-MERGE
+// RUN: %target-swift-emit-ir -target %target-cpu-unknown-linux-gnu -lto=llvm-thin -parse-stdlib -nostdimport -I %t -I %S/Inputs -DTEST_CLANG_OPTIONS_MERGE %s | %FileCheck %s --check-prefix CHECK-ELF-MERGE
 
 // CHECK-ELF-MERGE-DAG: !llvm.dependent-libraries = !{
 // CHECK-ELF-MERGE-DAG: !{{[0-9]+}} = !{!"empty"}
@@ -43,8 +43,5 @@ import AutolinkElfCPragma
 import AutolinkModuleMapLink
 #endif
 
-// UNSUPPORTED: OS=macosx && CPU=arm64
-// UNSUPPORTED: OS=ios && CPU=arm64e
 // UNSUPPORTED: OS=watchos && (CPU=arm64_32 || CPU=armv7k)
-// UNSUPPORTED: OS=linux-gnu && CPU=aarch64
 // UNSUPPORTED: CPU=wasm32
