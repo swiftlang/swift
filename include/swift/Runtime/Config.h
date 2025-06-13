@@ -554,17 +554,6 @@ swift_auth_code(T value, unsigned extra) {
 #endif
 }
 
-template <typename T>
-SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE static inline T
-swift_auth_code_function(T value, unsigned extra) {
-#if SWIFT_PTRAUTH
-  return (T)ptrauth_auth_function((void *)value,
-                                  ptrauth_key_function_pointer, extra);
-#else
-  return value;
-#endif
-}
-
 /// Does this platform support backtrace-on-crash?
 #ifdef __APPLE__
 #  include <TargetConditionals.h>
