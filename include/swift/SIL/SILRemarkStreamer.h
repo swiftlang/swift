@@ -72,6 +72,10 @@ public:
   /// \c llvm::remarks::RemarkStreamer with the given \c LLVMContext.
   void intoLLVMContext(llvm::LLVMContext &Ctx) &;
 
+  std::unique_ptr<llvm::raw_fd_ostream> releaseStream() {
+    return std::move(remarkStream);
+  }
+
 public:
   /// Emit a remark through the streamer.
   template <typename RemarkT>
