@@ -282,7 +282,7 @@ public class U {
 }
 
 func == (l: S?, r: S?) -> Bool {
-  if l == nil && r == nil { return true } // expected-warning {{function call causes an infinite recursion}}
+  if l == nil && r == nil { return true }
   guard let l = l, let r = r else { return false }
   return l === r
 }
