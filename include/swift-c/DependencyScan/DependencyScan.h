@@ -495,6 +495,10 @@ swiftscan_scanner_diagnostics_query(swiftscan_scanner_t scanner);
 SWIFTSCAN_PUBLIC void
 swiftscan_scanner_diagnostics_reset(swiftscan_scanner_t scanner);
 
+SWIFTSCAN_PUBLIC swiftscan_string_set_t *
+swiftscan_scanner_get_invalid_negative_stat_cached_paths(
+    swiftscan_scanner_t scanner);
+
 SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_diagnostic_get_message(swiftscan_diagnostic_info_t diagnostic);
 
