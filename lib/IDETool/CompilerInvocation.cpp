@@ -267,15 +267,12 @@ bool ide::initCompilerInvocation(
 bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
                                          CompilerInvocation &Invok,
                                          std::string &Error) {
-  llvm::IntrusiveRefCntPtr<clang::DiagnosticOptions> DiagOpts{
-    new clang::DiagnosticOptions()
-  };
-
   const auto VFS = llvm::vfs::getRealFileSystem();
 
   clang::TextDiagnosticBuffer DiagBuf;
+  clang::DiagnosticOptions DiagOpts;
   llvm::IntrusiveRefCntPtr<clang::DiagnosticsEngine> ClangDiags =
-      clang::CompilerInstance::createDiagnostics(*VFS, DiagOpts.get(), &DiagBuf,
+      clang::CompilerInstance::createDiagnostics(*VFS, DiagOpts, &DiagBuf,
                                                  /*ShouldOwnClient=*/false);
 
   // Clang expects this to be like an actual command line. So we need to pass in

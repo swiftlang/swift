@@ -620,7 +620,7 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
       clang::LookupResult R(S, {{tok.getIdentifierInfo()}, {}},
                             clang::Sema::LookupAnyName);
       if (S.LookupName(R, S.TUScope))
-        if (R.getResultKind() == clang::LookupResult::LookupResultKind::Found)
+        if (R.getResultKind() == clang::LookupResultKind::Found)
           if (const auto *VD = dyn_cast<clang::ValueDecl>(R.getFoundDecl()))
             return importDeclAlias(impl, DC, VD, name);
     }
