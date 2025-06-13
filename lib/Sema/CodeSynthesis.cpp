@@ -1364,6 +1364,8 @@ evaluator::SideEffect
 ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
                                        NominalTypeDecl *target,
                                        ImplicitMemberAction action) const {
+  ASSERT(!isa<ProtocolDecl>(target));
+
   // FIXME: This entire request is a layering violation made of smaller,
   // finickier layering violations. See rdar://56844567
 

@@ -6363,6 +6363,9 @@ ConstructorDecl *NominalTypeDecl::getDefaultInitializer() const {
 }
 
 void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
+  if (isa<ProtocolDecl>(this))
+    return;
+
   // Silently break cycles here because we can't be sure when and where a
   // request to synthesize will come from yet.
   // FIXME: rdar://56844567
