@@ -2935,31 +2935,35 @@ function Build-PackageManager([Hashtable] $Platform) {
     "$SourceCache\swiftpm"
   }
 
-  Build-CMakeProject `
-    -Src $SrcDir `
-    -Bin (Get-ProjectBinaryCache $Platform PackageManager) `
-    -InstallTo "$($Platform.ToolchainInstallRoot)\usr" `
-    -Platform $Platform `
-    -UseBuiltCompilers C,Swift `
-    -SwiftSDK (Get-SwiftSDK Windows) `
-    -Defines @{
-      BUILD_SHARED_LIBS = "YES";
-      CMAKE_Swift_FLAGS = @("-DCRYPTO_v2");
-      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
-      SwiftSystem_DIR = (Get-ProjectCMakeModules $Platform System);
-      TSC_DIR = (Get-ProjectCMakeModules $Platform ToolsSupportCore);
-      LLBuild_DIR = (Get-ProjectCMakeModules $Platform LLBuild);
-      ArgumentParser_DIR = (Get-ProjectCMakeModules $Platform ArgumentParser);
-      SwiftDriver_DIR = (Get-ProjectCMakeModules $Platform Driver);
-      SwiftBuild_DIR = (Get-ProjectCMakeModules $Platform Build);
-      SwiftCrypto_DIR = (Get-ProjectCMakeModules $Platform Crypto);
-      SwiftCollections_DIR = (Get-ProjectCMakeModules $Platform Collections);
-      SwiftASN1_DIR = (Get-ProjectCMakeModules $Platform ASN1);
-      SwiftCertificates_DIR = (Get-ProjectCMakeModules $Platform Certificates);
-      SwiftSyntax_DIR = (Get-ProjectCMakeModules $Platform Compilers);
-      SQLite3_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
-      SQLite3_LIBRARY = "$BinaryCache\$($Platform.Triple)\usr\lib\SQLite3.lib";
-    }
+  Invoke-IsolatingEnvVars {
+    $env:SWIFTPM_SWBUILD_FRAMEWORK=1
+
+    Build-CMakeProject `
+      -Src $SrcDir `
+      -Bin (Get-ProjectBinaryCache $Platform PackageManager) `
+      -InstallTo "$($Platform.ToolchainInstallRoot)\usr" `
+      -Platform $Platform `
+      -UseBuiltCompilers C,Swift `
+      -SwiftSDK (Get-SwiftSDK Windows) `
+      -Defines @{
+        BUILD_SHARED_LIBS = "YES";
+        CMAKE_Swift_FLAGS = @("-DCRYPTO_v2");
+        CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+        SwiftSystem_DIR = (Get-ProjectCMakeModules $Platform System);
+        TSC_DIR = (Get-ProjectCMakeModules $Platform ToolsSupportCore);
+        LLBuild_DIR = (Get-ProjectCMakeModules $Platform LLBuild);
+        ArgumentParser_DIR = (Get-ProjectCMakeModules $Platform ArgumentParser);
+        SwiftDriver_DIR = (Get-ProjectCMakeModules $Platform Driver);
+        SwiftBuild_DIR = (Get-ProjectCMakeModules $Platform Build);
+        SwiftCrypto_DIR = (Get-ProjectCMakeModules $Platform Crypto);
+        SwiftCollections_DIR = (Get-ProjectCMakeModules $Platform Collections);
+        SwiftASN1_DIR = (Get-ProjectCMakeModules $Platform ASN1);
+        SwiftCertificates_DIR = (Get-ProjectCMakeModules $Platform Certificates);
+        SwiftSyntax_DIR = (Get-ProjectCMakeModules $Platform Compilers);
+        SQLite3_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
+        SQLite3_LIBRARY = "$BinaryCache\$($Platform.Triple)\usr\lib\SQLite3.lib";
+      }
+  }
 }
 
 function Build-Markdown([Hashtable] $Platform) {
