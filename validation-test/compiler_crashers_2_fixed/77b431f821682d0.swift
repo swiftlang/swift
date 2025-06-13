@@ -1,4 +1,3 @@
 // {"signature":"swift::ProtocolConformanceRef::forEachMissingConformance(llvm::function_ref<bool (swift::BuiltinProtocolConformance*)>) const"}
-// RUN: not --crash %target-swift-frontend -typecheck %s
-// REQUIRES: rdar152763265
+// RUN: not %target-swift-frontend -typecheck %s
 .a == .!   == b /  c
