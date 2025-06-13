@@ -22,6 +22,7 @@
 #include "llvm/BinaryFormat/MachO.h"
 #include "llvm/BinaryFormat/ELF.h"
 #include "llvm/Object/COFF.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/Memory.h"
 #include "llvm/ADT/STLExtras.h"
 
@@ -1276,6 +1277,15 @@ public:
     }
   }
 
+  llvm::Expected<const TypeInfo &>
+  getTypeInfo(const TypeRef &TR, remote::TypeInfoProvider *ExternalTypeInfo) {
+    auto &TC = getBuilder().getTypeConverter();
+    const TypeInfo *TI = TC.getTypeInfo(&TR, ExternalTypeInfo);
+    if (!TI)
+      return llvm::createStringError(TC.takeLastError());
+    return *TI;
+  }
+  
   /// Given a typeref, attempt to calculate the unaligned start of this
   /// instance's fields. For example, for a type without a superclass, the start
   /// of the instance fields would after the word for the isa pointer and the
