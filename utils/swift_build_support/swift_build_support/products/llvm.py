@@ -357,9 +357,6 @@ class LLVM(cmake_product.CMakeProduct):
         if self.args.build_embedded_stdlib and system() == "Darwin":
             # Ask for Mach-O cross-compilation builtins (for Embedded Swift)
             llvm_cmake_options.define(
-                'COMPILER_RT_FORCE_BUILD_BAREMETAL_MACHO_BUILTINS_ARCHS:STRING',
-                'armv6 armv6m armv7 armv7m armv7em')
-            llvm_cmake_options.define(
                 f'BUILTINS_{builtins_runtimes_target_for_darwin}_'
                 'COMPILER_RT_FORCE_BUILD_BAREMETAL_MACHO_BUILTINS_ARCHS:'
                 'STRING', 'armv6 armv6m armv7 armv7m armv7em')
@@ -369,28 +366,13 @@ class LLVM(cmake_product.CMakeProduct):
 
         if self.args.build_compiler_rt and \
                 not self.is_cross_compile_target(host_target):
-            if self.args.llvm_build_compiler_rt_with_use_runtimes:
-                llvm_enable_runtimes.append('compiler-rt')
-                # This accounts for previous incremental runs that may have set
-                # those in the LLVM CMakeCache.txt
-                llvm_cmake_options.undefine('LLVM_TOOL_COMPILER_RT_BUILD')
-                llvm_cmake_options.undefine('LLVM_BUILD_EXTERNAL_COMPILER_RT')
-            else:
-                # No need to unset anything,
-                # since we set LLVM_ENABLE_RUNTIMES explicitly
-                llvm_enable_projects.append('compiler-rt')
-                llvm_cmake_options.define(
-                    'LLVM_TOOL_COMPILER_RT_BUILD:BOOL', 'TRUE')
-                llvm_cmake_options.define(
-                    'LLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL', 'TRUE')
-        else:
-            if not self.args.llvm_build_compiler_rt_with_use_runtimes:
-                # No need to unset anything,
-                # since we set LLVM_ENABLE_RUNTIMES explicitly
-                llvm_cmake_options.define(
-                    'LLVM_TOOL_COMPILER_RT_BUILD:BOOL', 'FALSE')
-                llvm_cmake_options.define(
-                    'LLVM_BUILD_EXTERNAL_COMPILER_RT:BOOL', 'FALSE')
+            llvm_enable_runtimes.append('compiler-rt')
+
+        # This accounts for previous incremental runs using the old
+        # way of build compiler_rt that may have set
+        # those in the LLVM CMakeCache.txt
+        llvm_cmake_options.undefine('LLVM_TOOL_COMPILER_RT_BUILD')
+        llvm_cmake_options.undefine('LLVM_BUILD_EXTERNAL_COMPILER_RT')
 
         if self.args.build_clang_tools_extra:
             llvm_enable_projects.append('clang-tools-extra')
@@ -572,10 +554,9 @@ class LLVM(cmake_product.CMakeProduct):
            self.args.llvm_install_components != 'all':
             install_targets = []
             components = self.args.llvm_install_components.split(';')
-            if self.args.llvm_build_compiler_rt_with_use_runtimes and \
-               'compiler-rt' in components:
+            if 'compiler-rt' in components:
                 # This is a courtesy fallback to avoid breaking downstream presets
-                # we are not aware of
+                # that are still using the old compiler-rt install component
                 components.remove('compiler-rt')
                 components.append('builtins')
                 components.append('runtimes')
@@ -586,7 +567,7 @@ class LLVM(cmake_product.CMakeProduct):
             for component in components:
                 if self.is_cross_compile_target(host_target) \
                    or not self.args.build_compiler_rt:
-                    if component in ['compiler-rt', 'builtins', 'runtimes']:
+                    if component in ['builtins', 'runtimes']:
                         continue
                 install_targets.append('install-{}'.format(component))
 
