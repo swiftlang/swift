@@ -92,7 +92,15 @@ func test_discardingTaskGroup_bigReturn() async {
   let array = await withDiscardingTaskGroup { group in
     group.addTask {}
     try? await Task.sleep(until: .now + .milliseconds(100), clock: .continuous)
-    return InlineArray<32768, Int>(repeating: 12345)
+
+    // InlineArray.init(repeating:) uses a lot of stack space with optimizations
+    // disabled, so set one up in a less friendly but less stack-consuming way.
+    let ptr = UnsafeMutablePointer<InlineArray<32768, Int>>.allocate(capacity: 1)
+    ptr.withMemoryRebound(to: Int.self, capacity: 32768) {
+      $0.initialize(repeating: 12345, count: 32768)
+    }
+    // Deliberately leak `ptr` to avoid needing to save any temporaries.
+    return ptr.pointee
   }
 
   // CHECK: Huge return value produced: 12345 12345
