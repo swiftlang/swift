@@ -1413,11 +1413,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     auto type1 = types.Type1;
     auto type2 = types.Type2;
 
-    // If either of the types still contains type variables, we can't
-    // compare them.
-    // FIXME: This is really unfortunate. More type variable sharing
-    // (when it's sound) would help us do much better here.
-    if (type1->hasTypeVariable() || type2->hasTypeVariable()) {
+    // `isSubtypeOf` cannot be used with solver-allocated types.
+    if (type1->getRecursiveProperties().isSolverAllocated() ||
+        type2->getRecursiveProperties().isSolverAllocated()) {
       identical = false;
       continue;
     }

@@ -4910,8 +4910,12 @@ static bool
 repairViaBridgingCast(ConstraintSystem &cs, Type fromType, Type toType,
                       SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
                       ConstraintLocatorBuilder locator) {
-  if (fromType->hasTypeVariable() || toType->hasTypeVariable())
+  // Don't check if any of the types have type variables or placeholders,
+  // `typeCheckCheckedCast` doesn't support checking solver-allocated types.
+  if (fromType->hasTypeVariableOrPlaceholder() ||
+      toType->hasTypeVariableOrPlaceholder()) {
     return false;
+  }
 
   auto objectType1 = fromType->getOptionalObjectType();
   auto objectType2 = toType->getOptionalObjectType();
@@ -9373,10 +9377,12 @@ static ConstraintFix *maybeWarnAboutExtraneousCast(
   if (locator.endsWith<LocatorPathElt::GenericArgument>())
     return nullptr;
 
-  // Both types have to be fixed.
-  if (fromType->hasTypeVariable() || toType->hasTypeVariable() ||
-      fromType->hasPlaceholder() || toType->hasPlaceholder())
+  // Both types have to be resolved, `typeCheckCheckedCast` doesn't support
+  // checking solver-allocated types.
+  if (fromType->hasTypeVariableOrPlaceholder() ||
+      toType->hasTypeVariableOrPlaceholder()) {
     return nullptr;
+  }
 
   SmallVector<LocatorPathElt, 4> path;
   auto anchor = locator.getLocatorParts(path);
