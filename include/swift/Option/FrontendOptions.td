@@ -258,10 +258,6 @@ def const_gather_protocols_file
   : Separate<["-"], "const-gather-protocols-file">, MetaVarName<"<path>">,
     HelpText<"Specify a list of protocols for extraction of conformances' const values'">;
 
-def placeholder_dependency_module_map
-  : Separate<["-"], "placeholder-dependency-module-map-file">, MetaVarName<"<path>">,
-    HelpText<"Specify a JSON file containing information of external Swift module dependencies">;
-
 def import_prescan : Flag<["-"], "import-prescan">,
    HelpText<"When performing a dependency scan, only identify all imports of the main Swift module sources">;
 

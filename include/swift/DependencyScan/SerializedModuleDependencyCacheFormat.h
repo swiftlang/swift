@@ -39,7 +39,7 @@ using llvm::BCVBR;
 
 /// Every .moddepcache file begins with these 4 bytes, for easy identification.
 const unsigned char MODULE_DEPENDENCY_CACHE_FORMAT_SIGNATURE[] = {'I', 'M', 'D','C'};
-const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MAJOR = 9;
+const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MAJOR = 10;
 /// Increment this on every change.
 const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MINOR = 3;
 
@@ -112,7 +112,6 @@ enum {
   OPTIONAL_IMPORT_STATEMENT_ARRAY_NODE,
   SWIFT_INTERFACE_MODULE_DETAILS_NODE,
   SWIFT_SOURCE_MODULE_DETAILS_NODE,
-  SWIFT_PLACEHOLDER_MODULE_DETAILS_NODE,
   SWIFT_BINARY_MODULE_DETAILS_NODE,
   CLANG_MODULE_DETAILS_NODE,
   IDENTIFIER_NODE,
@@ -208,7 +207,6 @@ using OptionalImportStatementArrayLayout =
 // - SwiftInterfaceModuleDetails
 // - SwiftSourceModuleDetails
 // - SwiftBinaryModuleDetails
-// - SwiftPlaceholderModuleDetails
 // - ClangModuleDetails
 using ModuleInfoLayout =
     BCRecordLayout<MODULE_NODE,                    // ID
@@ -271,13 +269,6 @@ using SwiftBinaryModuleDetailsLayout =
                    IsStaticField,                    // isStatic
                    IdentifierIDField,                // moduleCacheKey
                    IdentifierIDField                 // UserModuleVersion
-                   >;
-
-using SwiftPlaceholderModuleDetailsLayout =
-    BCRecordLayout<SWIFT_PLACEHOLDER_MODULE_DETAILS_NODE, // ID
-                   FileIDField,                           // compiledModulePath
-                   FileIDField,                           // moduleDocPath
-                   FileIDField                            // moduleSourceInfoPath
                    >;
 
 using ClangModuleDetailsLayout =

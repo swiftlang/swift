@@ -104,8 +104,7 @@ findPathToDependency(ModuleDependencyID dependency,
 static bool isSwiftDependencyKind(ModuleDependencyKind Kind) {
   return Kind == ModuleDependencyKind::SwiftInterface ||
          Kind == ModuleDependencyKind::SwiftSource ||
-         Kind == ModuleDependencyKind::SwiftBinary ||
-         Kind == ModuleDependencyKind::SwiftPlaceholder;
+         Kind == ModuleDependencyKind::SwiftBinary;
 }
 
 // The Swift compiler does not have a concept of a working directory.
@@ -1371,8 +1370,7 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
                                     Identifier moduleIdentifier) {
     auto moduleName = moduleIdentifier.str();
     if (cache.hasDependency(moduleName, ModuleDependencyKind::SwiftInterface) ||
-        cache.hasDependency(moduleName, ModuleDependencyKind::SwiftBinary) ||
-        cache.hasDependency(moduleName, ModuleDependencyKind::SwiftPlaceholder))
+        cache.hasDependency(moduleName, ModuleDependencyKind::SwiftBinary))
       return;
 
     auto moduleDependencies = withDependencyScanningWorker(
@@ -1713,10 +1711,6 @@ void ModuleDependencyScanner::diagnoseScannerFailure(
         moduleFilePath =
             entryNode->getAsSwiftBinaryModule()->compiledModulePath;
         break;
-      case swift::ModuleDependencyKind::SwiftPlaceholder:
-        moduleFilePath =
-            entryNode->getAsPlaceholderDependencyModule()->compiledModulePath;
-        break;
       case swift::ModuleDependencyKind::Clang:
         moduleFilePath = entryNode->getAsClangModule()->moduleMapFile;
         isClang = true;
@@ -1750,9 +1744,6 @@ static std::string getModuleDefiningPath(const ModuleDependencyInfo &info) {
     break;
   case swift::ModuleDependencyKind::SwiftBinary:
     path = info.getAsSwiftBinaryModule()->compiledModulePath;
-    break;
-  case swift::ModuleDependencyKind::SwiftPlaceholder:
-    path = info.getAsPlaceholderDependencyModule()->compiledModulePath;
     break;
   case swift::ModuleDependencyKind::Clang:
     path = info.getAsClangModule()->moduleMapFile;

@@ -134,7 +134,6 @@ void writeEncodedModuleIdJSONValue(llvm::raw_ostream &out,
   out << "{\n";
   static const std::string textualPrefix("swiftTextual");
   static const std::string binaryPrefix("swiftBinary");
-  static const std::string placeholderPrefix("swiftPlaceholder");
   static const std::string clangPrefix("clang");
   std::string valueStr = get_C_string(value);
   std::string moduleKind;
@@ -146,10 +145,6 @@ void writeEncodedModuleIdJSONValue(llvm::raw_ostream &out,
     // FIXME: rename to be consistent in the clients (swift-driver)
     moduleKind = "swiftPrebuiltExternal";
     moduleName = valueStr.substr(binaryPrefix.size() + 1);
-  } else if (!valueStr.compare(0, placeholderPrefix.size(),
-                               placeholderPrefix)) {
-    moduleKind = "swiftPlaceholder";
-    moduleName = valueStr.substr(placeholderPrefix.size() + 1);
   } else {
     moduleKind = "clang";
     moduleName = valueStr.substr(clangPrefix.size() + 1);
@@ -365,13 +360,6 @@ getAsTextualDependencyModule(swiftscan_module_details_t details) {
   return nullptr;
 }
 
-static const swiftscan_swift_placeholder_details_t *
-getAsPlaceholderDependencyModule(swiftscan_module_details_t details) {
-  if (details->kind == SWIFTSCAN_DEPENDENCY_INFO_SWIFT_PLACEHOLDER)
-    return &details->swift_placeholder_details;
-  return nullptr;
-}
-
 static const swiftscan_swift_binary_details_t *
 getAsBinaryDependencyModule(swiftscan_module_details_t details) {
   if (details->kind == SWIFTSCAN_DEPENDENCY_INFO_SWIFT_BINARY)
@@ -418,8 +406,6 @@ void writeJSON(llvm::raw_ostream &out,
     out << ",\n";
     out.indent(2 * 2);
     out << "{\n";
-    auto swiftPlaceholderDeps =
-        getAsPlaceholderDependencyModule(moduleInfo.details);
     auto swiftTextualDeps = getAsTextualDependencyModule(moduleInfo.details);
     auto swiftBinaryDeps = getAsBinaryDependencyModule(moduleInfo.details);
     auto clangDeps = getAsClangDependencyModule(moduleInfo.details);
@@ -432,9 +418,7 @@ void writeJSON(llvm::raw_ostream &out,
         std::string(get_C_string(moduleInfo.module_name));
     std::string moduleName =
         moduleKindAndName.substr(moduleKindAndName.find(":") + 1);
-    if (swiftPlaceholderDeps)
-      modulePath = get_C_string(swiftPlaceholderDeps->compiled_module_path);
-    else if (swiftBinaryDeps)
+    if (swiftBinaryDeps)
       modulePath = get_C_string(swiftBinaryDeps->compiled_module_path);
     else if (clangDeps || swiftTextualDeps)
       modulePath = get_C_string(moduleInfo.module_path);
@@ -590,25 +574,6 @@ void writeJSON(llvm::raw_ostream &out,
                           "swiftOverlayDependencies", 5,
                           /*trailingComma=*/false);
       }
-    } else if (swiftPlaceholderDeps) {
-      out << "\"swiftPlaceholder\": {\n";
-
-      // Module doc file
-      if (swiftPlaceholderDeps->module_doc_path.data &&
-          get_C_string(swiftPlaceholderDeps->module_doc_path)[0] != '\0')
-        writeJSONSingleField(out, "moduleDocPath",
-                             swiftPlaceholderDeps->module_doc_path,
-                             /*indentLevel=*/5,
-                             /*trailingComma=*/true);
-
-      // Module Source Info file
-      if (swiftPlaceholderDeps->module_source_info_path.data &&
-          get_C_string(swiftPlaceholderDeps->module_source_info_path)[0] !=
-              '\0')
-        writeJSONSingleField(out, "moduleSourceInfoPath",
-                             swiftPlaceholderDeps->module_source_info_path,
-                             /*indentLevel=*/5,
-                             /*trailingComma=*/false);
     } else if (swiftBinaryDeps) {
       bool hasOverlayDependencies =
         swiftBinaryDeps->swift_overlay_module_dependencies &&

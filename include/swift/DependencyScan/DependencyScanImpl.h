@@ -43,7 +43,6 @@ struct swiftscan_dependency_info_s {
   /// "swiftInterface"
   /// "swiftSource"
   /// "swiftBinary"
-  /// "swiftPlaceholder"
   /// "clang""
   swiftscan_string_ref_t module_name;
 
@@ -192,19 +191,6 @@ typedef struct {
   swiftscan_string_ref_t user_module_version;
 } swiftscan_swift_binary_details_t;
 
-/// Swift placeholder modules carry additional details that specify their
-/// module doc path and source info paths.
-typedef struct {
-  /// The path to the pre-compiled binary module
-  swiftscan_string_ref_t compiled_module_path;
-
-  /// The path to the .swiftModuleDoc file.
-  swiftscan_string_ref_t module_doc_path;
-
-  /// The path to the .swiftSourceInfo file.
-  swiftscan_string_ref_t module_source_info_path;
-} swiftscan_swift_placeholder_details_t;
-
 /// Clang modules are built from a module map file.
 typedef struct {
   /// The path to the module map used to build this module.
@@ -231,7 +217,6 @@ struct swiftscan_module_details_s {
   union {
     swiftscan_swift_textual_details_t swift_textual_details;
     swiftscan_swift_binary_details_t swift_binary_details;
-    swiftscan_swift_placeholder_details_t swift_placeholder_details;
     swiftscan_clang_details_t clang_details;
   };
 };

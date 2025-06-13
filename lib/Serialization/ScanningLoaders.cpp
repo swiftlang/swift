@@ -83,56 +83,6 @@ std::error_code SwiftModuleScanner::findModuleFilesInDirectory(
   return dependencies.getError();
 }
 
-bool PlaceholderSwiftModuleScanner::findModule(
-    ImportPath::Element moduleID, SmallVectorImpl<char> *moduleInterfacePath,
-    SmallVectorImpl<char> *moduleInterfaceSourcePath,
-    std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
-    std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
-    bool skipBuildingInterface, bool isTestableDependencyLookup,
-    bool &isFramework, bool &isSystemModule) {
-  StringRef moduleName = Ctx.getRealModuleName(moduleID.Item).str();
-  auto it = PlaceholderDependencyModuleMap.find(moduleName);
-  if (it == PlaceholderDependencyModuleMap.end()) {
-    return false;
-  }
-  auto &moduleInfo = it->getValue();
-  auto dependencies = ModuleDependencyInfo::forPlaceholderSwiftModuleStub(
-      moduleInfo.modulePath,
-      moduleInfo.moduleDocPath.has_value() ? moduleInfo.moduleDocPath.value()
-                                           : "",
-      moduleInfo.moduleSourceInfoPath.has_value()
-          ? moduleInfo.moduleSourceInfoPath.value()
-          : "");
-  this->dependencies = std::move(dependencies);
-  return true;
-}
-
-void PlaceholderSwiftModuleScanner::parsePlaceholderModuleMap(
-    StringRef fileName) {
-  ExplicitModuleMapParser parser(Allocator);
-  llvm::StringMap<ExplicitClangModuleInputInfo> ClangDependencyModuleMap;
-  llvm::StringMap<std::string> ModuleAliases;
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> fileBufOrErr =
-      llvm::MemoryBuffer::getFile(fileName);
-  if (!fileBufOrErr) {
-    Ctx.Diags.diagnose(SourceLoc(), diag::explicit_swift_module_map_missing,
-                       fileName);
-    return;
-  }
-  auto result = parser.parseSwiftExplicitModuleMap(
-      (*fileBufOrErr)->getMemBufferRef(), PlaceholderDependencyModuleMap,
-      ClangDependencyModuleMap, ModuleAliases);
-  if (result == std::errc::invalid_argument) {
-    Ctx.Diags.diagnose(SourceLoc(),
-                       diag::placeholder_dependency_module_map_corrupted,
-                       fileName);
-  } else if (result == std::errc::no_such_file_or_directory) {
-    Ctx.Diags.diagnose(
-        SourceLoc(), diag::placeholder_dependency_module_map_missing, fileName);
-  }
-}
-
 static std::vector<std::string> getCompiledCandidates(ASTContext &ctx,
                                                       StringRef moduleName,
                                                       StringRef interfacePath) {
@@ -297,36 +247,20 @@ ModuleDependencyVector SerializedModuleLoaderBase::getModuleDependencies(
   auto modulePath = builder.get();
   auto moduleId = modulePath.front().Item;
 
-  // Instantiate dependency scanning "loaders".
-  SmallVector<std::unique_ptr<SwiftModuleScanner>, 2> scanners;
-  // Placeholder dependencies must be resolved first, to prevent the
-  // ModuleDependencyScanner from first discovering artifacts of a previous
-  // build. Such artifacts are captured as compiledModuleCandidates in the
-  // dependency graph of the placeholder dependency module itself.
-  // FIXME: submodules?
-  scanners.push_back(std::make_unique<PlaceholderSwiftModuleScanner>(
-      Ctx, LoadMode, moduleId, Ctx.SearchPathOpts.PlaceholderDependencyModuleMap,
-      delegate, moduleOutputPath, sdkModuleOutputPath));
-  scanners.push_back(std::make_unique<SwiftModuleScanner>(
+  auto scanner = std::make_unique<SwiftModuleScanner>(
       Ctx, LoadMode, moduleId, delegate, moduleOutputPath, sdkModuleOutputPath,
-      swiftModuleClangCC1CommandLineArgs,
-      SwiftModuleScanner::MDS_plain));
+      swiftModuleClangCC1CommandLineArgs, SwiftModuleScanner::MDS_plain);
 
   // Check whether there is a module with this name that we can import.
-  assert(isa<PlaceholderSwiftModuleScanner>(scanners[0].get()) &&
-         "Expected PlaceholderSwiftModuleScanner as the first dependency "
-         "scanner loader.");
-  for (auto &scanner : scanners) {
-    if (scanner->canImportModule(modulePath, SourceLoc(), nullptr,
-                                 isTestableDependencyLookup)) {
+  if (scanner->canImportModule(modulePath, SourceLoc(), nullptr,
+                               isTestableDependencyLookup)) {
 
-      ModuleDependencyVector moduleDependnecies;
-      moduleDependnecies.push_back(
-          std::make_pair(ModuleDependencyID{moduleName.str().str(),
-                                            scanner->dependencies->getKind()},
-                         *(scanner->dependencies)));
-      return moduleDependnecies;
-    }
+    ModuleDependencyVector moduleDependnecies;
+    moduleDependnecies.push_back(
+        std::make_pair(ModuleDependencyID{moduleName.str().str(),
+                                          scanner->dependencies->getKind()},
+                       *(scanner->dependencies)));
+    return moduleDependnecies;
   }
 
   return {};

@@ -83,51 +83,6 @@ public:
     return MDS->getKind() == MDS_plain;
   }
 };
-
-/// A ModuleLoader that loads placeholder dependency module stubs specified in
-/// -placeholder-dependency-module-map-file
-/// This loader is used only in dependency scanning to inform the scanner that a
-/// set of modules constitute placeholder dependencies that are not visible to
-/// the scanner but will nevertheless be provided by the scanner's clients. This
-/// "loader" will not attempt to load any module files.
-class PlaceholderSwiftModuleScanner : public SwiftModuleScanner {
-  /// Scan the given placeholder module map
-  void parsePlaceholderModuleMap(StringRef fileName);
-
-  llvm::StringMap<ExplicitSwiftModuleInputInfo> PlaceholderDependencyModuleMap;
-  llvm::BumpPtrAllocator Allocator;
-
-public:
-  PlaceholderSwiftModuleScanner(ASTContext &ctx, ModuleLoadingMode LoadMode,
-                                Identifier moduleName,
-                                StringRef PlaceholderDependencyModuleMap,
-                                InterfaceSubContextDelegate &astDelegate,
-                                StringRef moduleOutputPath,
-                                StringRef sdkModuleOutputPath)
-      : SwiftModuleScanner(ctx, LoadMode, moduleName, astDelegate,
-                           moduleOutputPath, sdkModuleOutputPath, {},
-                           MDS_placeholder) {
-    // FIXME: Find a better place for this map to live, to avoid
-    // doing the parsing on every module.
-    if (!PlaceholderDependencyModuleMap.empty()) {
-      parsePlaceholderModuleMap(PlaceholderDependencyModuleMap);
-    }
-  }
-
-  virtual bool
-  findModule(ImportPath::Element moduleID,
-             SmallVectorImpl<char> *moduleInterfacePath,
-             SmallVectorImpl<char> *moduleInterfaceSourcePath,
-             std::unique_ptr<llvm::MemoryBuffer> *moduleBuffer,
-             std::unique_ptr<llvm::MemoryBuffer> *moduleDocBuffer,
-             std::unique_ptr<llvm::MemoryBuffer> *moduleSourceInfoBuffer,
-             bool skipBuildingInterface, bool isTestableDependencyLookup,
-             bool &isFramework, bool &isSystemModule) override;
-
-  static bool classof(const SwiftModuleScanner *MDS) {
-    return MDS->getKind() == MDS_placeholder;
-  }
-};
 } // namespace swift
 
 #endif // SWIFT_SCANNINGLOADERS_H
