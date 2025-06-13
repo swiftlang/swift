@@ -79,9 +79,10 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   -SourceCache %SourceRoot% ^
   -BinaryCache %BuildRoot% ^
   -ImageRoot %BuildRoot% ^
-  %WindowsSDKsArg% ^
+  -WindowsSDKs X86 ^
   %SkipPackagingArg% ^
   %TestArg% ^
+  -SkipPackaging ^
   -Stage %PackageRoot% ^
   -Summary || (exit /b 1)
 
