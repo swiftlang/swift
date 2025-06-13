@@ -63,6 +63,9 @@ struct swiftscan_dependency_info_s {
   /// The list of link libraries for this module.
   swiftscan_link_library_set_t *link_libraries;
 
+  /// The list of source import infos.
+  swiftscan_import_info_set_t *imports;
+
   /// Specific details of a particular kind of module.
   swiftscan_module_details_t details;
 };
@@ -74,10 +77,16 @@ struct swiftscan_link_library_info_s {
   bool forceLoad;
 };
 
+struct swiftscan_import_info_s {
+  swiftscan_string_ref_t import_identifier;
+  swiftscan_source_location_set_t *source_locations;
+  swiftscan_access_level_t access_level;
+};
+
 struct swiftscan_macro_dependency_s {
-  swiftscan_string_ref_t moduleName;
-  swiftscan_string_ref_t libraryPath;
-  swiftscan_string_ref_t executablePath;
+  swiftscan_string_ref_t module_name;
+  swiftscan_string_ref_t library_path;
+  swiftscan_string_ref_t executable_path;
 };
 
 /// Swift modules to be built from a module interface, may have a bridging

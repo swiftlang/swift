@@ -337,7 +337,7 @@ enum E2<T> {
 extension E2: Sendable where T: Sendable { }
 
 final class C1: Sendable {
-  let nc: NotConcurrent? = nil // expected-warning{{stored property 'nc' of 'Sendable'-conforming class 'C1' has non-Sendable type 'NotConcurrent?'}}
+  let nc: NotConcurrent? = nil // expected-warning{{stored property 'nc' of 'Sendable'-conforming class 'C1' contains non-Sendable type 'NotConcurrent'}}
   var x: Int = 0 // expected-warning{{stored property 'x' of 'Sendable'-conforming class 'C1' is mutable}}
   let i: Int = 0
 }

@@ -216,6 +216,7 @@ KNOWN_SETTINGS=(
     swift-runtime-enable-leak-checker             "0"               "Enable leaks checking routines in the runtime"
     swift-stdlib-enable-assertions                "1"               "enable assertions in Swift"
     swift-stdlib-enable-debug-preconditions-in-release "0"          "Enable _debugPrecondition checks in the stdlib in Release configurations"
+    swift-stdlib-enable-strict-availability       "0"               "enable strict availability checking in the stdlib"
     swift-tools-enable-lto                        ""                "enable LTO compilation of Swift tools. *NOTE* This does not include the swift standard library and runtime. Must be set to one of 'thin' or 'full'"
     extra-swift-args                              ""                "Extra arguments to pass to swift modules which match regex. Assumed to be a flattened cmake list consisting of [module_regexp, args, module_regexp, args, ...]"
     report-statistics                             "0"               "set to 1 to generate compilation statistics files for swift libraries"
@@ -292,6 +293,7 @@ KNOWN_SETTINGS=(
     cross-compile-install-prefixes                ""                "semicolon-separated list of install prefixes to use for the cross-compiled hosts. The list expands, so if there are more cross-compile hosts than prefixes, unmatched hosts use the last prefix in the list"
     cross-compile-deps-path                       ""                "path for CMake to look for cross-compiled library dependencies, such as libXML2"
     cross-compile-append-host-target-to-destdir   "1"               "turns on appending the host target name of each cross-compiled toolchain to its install-destdir, to keep them separate from the natively-built toolchain"
+    cross-compile-build-swift-tools               "1"               "set to 1 to cross-compile the Swift host tools, like the Swift compiler"
     skip-merge-lipo-cross-compile-tools           ""                "set to skip running merge-lipo after installing cross-compiled host Swift tools"
     coverage-db                                   ""                "If set, coverage database to use when prioritizing testing"
     skip-local-host-install                       ""                "If we are cross-compiling multiple targets, skip an install pass locally if the hosts match"
@@ -1693,6 +1695,12 @@ for host in "${ALL_HOSTS[@]}"; do
                         "${cmake_options[@]}"
                         -DLLVM_TABLEGEN=$(build_directory "${LOCAL_HOST}" llvm)/bin/llvm-tblgen
                         -DSWIFT_INCLUDE_TEST_BINARIES:BOOL=FALSE
+                        -DSWIFT_INCLUDE_TOOLS:BOOL=$(true_false "${CROSS_COMPILE_BUILD_SWIFT_TOOLS}")
+                    )
+                else
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_INCLUDE_TOOLS:BOOL=$(true_false "${BUILD_SWIFT_TOOLS}")
                     )
                 fi
 
@@ -1738,6 +1746,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_STDLIB_BUILD_TYPE:STRING="${SWIFT_STDLIB_BUILD_TYPE}"
                     -DSWIFT_STDLIB_ASSERTIONS:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_ASSERTIONS}")
                     -DSWIFT_STDLIB_ENABLE_DEBUG_PRECONDITIONS_IN_RELEASE=$(true_false "${SWIFT_STDLIB_ENABLE_DEBUG_PRECONDITIONS_IN_RELEASE}")
+                    -DSWIFT_STDLIB_ENABLE_STRICT_AVAILABILITY:BOOL=$(true_false "${SWIFT_STDLIB_ENABLE_STRICT_AVAILABILITY}")
                     -DSWIFT_ENABLE_DISPATCH:BOOL=$(true_false "${SWIFT_ENABLE_DISPATCH}")
                     -DSWIFT_IMPLICIT_CONCURRENCY_IMPORT:BOOL=$(true_false "${SWIFT_IMPLICIT_CONCURRENCY_IMPORT}")
                     -DSWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT:BOOL=$(true_false "${SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT}")
@@ -1765,7 +1774,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DSWIFT_NATIVE_LLVM_TOOLS_PATH:STRING="${native_llvm_tools_path}"
                     -DSWIFT_NATIVE_CLANG_TOOLS_PATH:STRING="${native_clang_tools_path}"
                     -DSWIFT_NATIVE_SWIFT_TOOLS_PATH:STRING="${native_swift_tools_path}"
-                    -DSWIFT_INCLUDE_TOOLS:BOOL=$(true_false "${BUILD_SWIFT_TOOLS}")
                     -DSWIFT_BUILD_CLANG_OVERLAYS:BOOL=$(true_false "${BUILD_SWIFT_CLANG_OVERLAYS}")
                     -DSWIFT_BUILD_REMOTE_MIRROR:BOOL=$(true_false "${BUILD_SWIFT_REMOTE_MIRROR}")
                     -DSWIFT_STDLIB_SIL_DEBUGGING:BOOL=$(true_false "${BUILD_SIL_DEBUGGING_STDLIB}")
@@ -1917,6 +1925,13 @@ for host in "${ALL_HOSTS[@]}"; do
                 fi
 
                 if [ "${SWIFT_FREESTANDING_TRIPLE_NAME}" ] ; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DSWIFT_FREESTANDING_TRIPLE_NAME:STRING="${SWIFT_FREESTANDING_TRIPLE_NAME}"
+                    )
+                fi
+
+                if [ "${SWIFT_FREESTANDING_AVAILABILITY_NAME}" ] ; then
                     cmake_options=(
                         "${cmake_options[@]}"
                         -DSWIFT_FREESTANDING_TRIPLE_NAME:STRING="${SWIFT_FREESTANDING_TRIPLE_NAME}"
@@ -2316,7 +2331,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     continue
                 fi
 
-                if [[ "${BUILD_SWIFT_TOOLS}" == "0" ]]; then
+                if [[ "${CROSS_COMPILE_BUILD_SWIFT_TOOLS}" == "0" ]]; then
                     echo "Skipping building Foundation Macros for ${host}, because the host tools are not being built"
                     continue
                 fi
@@ -2905,7 +2920,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     continue
                 fi
 
-                if [[ "${BUILD_SWIFT_TOOLS}" == "0" && "${product}" == "foundation_macros" ]]; then
+                if [[ "${CROSS_COMPILE_BUILD_SWIFT_TOOLS}" == "0" && "${product}" == "foundation_macros" ]]; then
                     echo "Skipping installing Foundation Macros for ${host}, because the host tools are not being built"
                     continue
                 fi

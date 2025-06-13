@@ -33,6 +33,7 @@
 #include "swift/IDE/SourceEntityWalker.h"
 #include "swift/IDE/Utils.h"
 #include "swift/Markup/Markup.h"
+#include "swift/Parse/Lexer.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallVector.h"
@@ -875,10 +876,10 @@ private:
     llvm_unreachable("Can't find the generic parameter in the extended type");
   }
 
-  bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type T,
+  bool visitDeclReference(ValueDecl *D, SourceRange Range, TypeDecl *CtorTyRef,
+                          ExtensionDecl *ExtTyRef, Type T,
                           ReferenceMetaData Data) override {
-    SourceLoc Loc = Range.getStart();
+    SourceLoc Loc = Range.Start;
 
     if (Loc.isInvalid() || isSuppressed(Loc))
       return true;
@@ -918,15 +919,18 @@ private:
     // report an occurrence of `foo` in `_foo` and '$foo').
     if (auto *VD = dyn_cast<VarDecl>(D)) {
       if (auto *Wrapped = VD->getOriginalWrappedProperty()) {
-        assert(Range.getByteLength() > 1);
-        if (Range.str().front() == '`') {
-          assert(Range.getByteLength() > 3);
-          assert(Range.str().starts_with("`_") ||
-                 Range.str().starts_with("`$"));
+        CharSourceRange CharRange = Lexer::getCharSourceRangeFromSourceRange(
+            D->getASTContext().SourceMgr, Range);
+        assert(CharRange.getByteLength() > 1);
+        if (CharRange.str().front() == '`') {
+          assert(CharRange.getByteLength() > 3);
+          assert(CharRange.str().starts_with("`_") ||
+                 CharRange.str().starts_with("`$"));
           auto AfterBacktick = Loc.getAdvancedLoc(2);
           reportRef(Wrapped, AfterBacktick, Info, std::nullopt);
         } else {
-          assert(Range.str().front() == '_' || Range.str().front() == '$');
+          assert(CharRange.str().front() == '_' ||
+                 CharRange.str().front() == '$');
           auto AfterDollar = Loc.getAdvancedLoc(1);
           reportRef(Wrapped, AfterDollar, Info, std::nullopt);
         }
@@ -960,7 +964,7 @@ private:
     return finishSourceEntity(Info.symInfo, Info.roles);
   }
 
-  bool visitCallAsFunctionReference(ValueDecl *D, CharSourceRange Range,
+  bool visitCallAsFunctionReference(ValueDecl *D, SourceRange Range,
                                     ReferenceMetaData Data) override {
     // Index implicit callAsFunction reference.
     return visitDeclReference(D, Range, /*CtorTyRef*/ nullptr,

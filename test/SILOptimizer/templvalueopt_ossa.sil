@@ -1,9 +1,10 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -temp-lvalue-opt | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -temp-lvalue-elimination | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
 import Swift
 import Builtin
+import SwiftShims
 
 // CHECK-LABEL: sil [ossa] @test_enum_with_initialize :
 // CHECK:      bb0(%0 : $*Optional<Any>, %1 : $*Any):
@@ -84,14 +85,14 @@ struct AddressOnlyPayload {
 //
 // CHECK-LABEL: sil [ossa] @test_initialize_struct :
 // CHECK:      bb0(%0 : $*TestStruct, %1 : $*Any, %2 : $Int):
-// HECK-NEXT:   [[E:%[0-9]+]] = struct_element_addr %0
-// HECK-NEXT:   [[LEFT:%[0-9]+]] = init_enum_data_addr [[E]]
-// HECK-NEXT:   [[A:%[0-9]+]] = struct_element_addr [[LEFT]]
-// HECK-NEXT:   copy_addr [take] %1 to [init] [[A]]
-// HECK-NEXT:   [[I:%[0-9]+]] = struct_element_addr [[LEFT]]
-// HECK-NEXT:   store %2 to [trivial] [[I]]
-// HECK-NEXT:   inject_enum_addr [[E]]
-// HECK-NOT:    copy_addr
+// CHECK-NEXT:   [[E:%[0-9]+]] = struct_element_addr %0
+// CHECK-NEXT:   [[LEFT:%[0-9]+]] = init_enum_data_addr [[E]]
+// CHECK-NEXT:   [[A:%[0-9]+]] = struct_element_addr [[LEFT]]
+// CHECK-NEXT:   copy_addr [take] %1 to [init] [[A]]
+// CHECK-NEXT:   [[I:%[0-9]+]] = struct_element_addr [[LEFT]]
+// CHECK-NEXT:   store %2 to [trivial] [[I]]
+// CHECK-NEXT:   inject_enum_addr [[E]]
+// CHECK-NOT:    copy_addr
 // CHECK: } // end sil function 'test_initialize_struct'
 sil [ossa] @test_initialize_struct : $@convention(method) (@in Any, Int) -> @out TestStruct {
 bb0(%0 : $*TestStruct, %1 : $*Any, %2 : $Int):
@@ -165,14 +166,14 @@ struct StructWithEnum : Proto {
 
 // CHECK-LABEL: sil [ossa] @move_projections :
 // CHECK:      bb0(%0 : $*any Proto, %1 : $*Any):
-// HECK-NEXT:   [[S:%[0-9]+]] = init_existential_addr %0 : $*any Proto, $StructWithEnum
-// HECK-NEXT:   [[E:%[0-9]+]] = struct_element_addr [[S]] : $*StructWithEnum, #StructWithEnum.e
-// HECK-NEXT:   [[ENUMA:%[0-9]+]] = init_enum_data_addr [[E]] : $*Enum, #Enum.A!enumelt
-// HECK-NEXT:   [[OPTIONAL:%[0-9]+]] = init_enum_data_addr [[ENUMA]] : $*Optional<Any>, #Optional.some!enumelt
-// HECK-NEXT:   copy_addr [take] %1 to [init] [[OPTIONAL]] : $*Any
-// HECK-NEXT:   inject_enum_addr [[ENUMA]] : $*Optional<Any>, #Optional.some!enumelt
-// HECK-NEXT:   inject_enum_addr [[E]] : $*Enum, #Enum.A!enumelt
-// HECK-NOT:    copy_addr
+// CHECK-NEXT:   [[S:%[0-9]+]] = init_existential_addr %0 : $*any Proto, $StructWithEnum
+// CHECK-NEXT:   [[E:%[0-9]+]] = struct_element_addr [[S]] : $*StructWithEnum, #StructWithEnum.e
+// CHECK-NEXT:   [[ENUMA:%[0-9]+]] = init_enum_data_addr [[E]] : $*Enum, #Enum.A!enumelt
+// CHECK-NEXT:   [[OPTIONAL:%[0-9]+]] = init_enum_data_addr [[ENUMA]] : $*Optional<Any>, #Optional.some!enumelt
+// CHECK-NEXT:   copy_addr [take] %1 to [init] [[OPTIONAL]] : $*Any
+// CHECK-NEXT:   inject_enum_addr [[ENUMA]] : $*Optional<Any>, #Optional.some!enumelt
+// CHECK-NEXT:   inject_enum_addr [[E]] : $*Enum, #Enum.A!enumelt
+// CHECK-NOT:    copy_addr
 // CHECK: } // end sil function 'move_projections'
 sil [ossa] @move_projections : $@convention(thin) (@in Any) -> @out Proto {
 bb0(%0 : $*Proto, %1 : $*Any):
@@ -401,5 +402,231 @@ bb0(%0 : $*TwoFields, %1 : @owned $Child):
   dealloc_stack %2
   %8 = tuple ()
   return %8
+}
+
+// CHECK-LABEL: sil [ossa] @multi_block :
+// CHECK:       bb0({{.*}}):
+// CHECK-NEXT:    [[SA:%.*]] = struct_element_addr %0
+// CHECK-NEXT:    destroy_addr [[SA]]
+// CHECK-NEXT:    cond_br
+// CHECK:       bb1:
+// CHECK:         store {{.*}} to [init] [[SA]]
+// CHECK:       bb2:
+// CHECK:         store {{.*}} to [init] [[SA]]
+// CHECK:       bb3:
+// CHECK-NEXT:    tuple
+// CHECK-NEXT:    return
+// CHECK-LABEL: } // end sil function 'multi_block'
+sil [ossa] @multi_block : $@convention(thin) (@inout TwoFields, @guaranteed Child, @guaranteed Child) -> () {
+bb0(%0 : $*TwoFields, %1 : @guaranteed $Child, %2 : @guaranteed $Child):
+  %3 = alloc_stack $Child
+  cond_br undef, bb1, bb2
+
+bb1:
+  %5 = copy_value %1
+  store %5 to [init] %3
+  br bb3
+
+bb2:
+  %8 = copy_value %2
+  store %8 to [init] %3
+  br bb3
+
+bb3:
+  %11 = struct_element_addr %0, #TwoFields.a
+  copy_addr [take] %3 to %11
+  dealloc_stack %3
+  %14 = tuple ()
+  return %14
+}
+
+// CHECK-LABEL: sil [ossa] @multi_block_with_mutation :
+// CHECK:       bb0({{.*}}):
+// CHECK-NEXT:    alloc_stack
+// CHECK-LABEL: } // end sil function 'multi_block_with_mutation'
+sil [ossa] @multi_block_with_mutation : $@convention(thin) (@inout TwoFields, @guaranteed Child, @guaranteed Child) -> () {
+bb0(%0 : $*TwoFields, %1 : @guaranteed $Child, %2 : @guaranteed $Child):
+  %3 = alloc_stack $Child
+  %4 = struct_element_addr %0, #TwoFields.a
+  cond_br undef, bb1, bb2
+
+bb1:
+  %5 = copy_value %1
+  store %5 to [init] %3
+  br bb3
+
+bb2:
+  %8 = copy_value %2
+  store %8 to [init] %3
+  %10 = copy_value %2
+  store %10 to [assign] %4
+  br bb3
+
+bb3:
+  copy_addr [take] %3 to %4
+  dealloc_stack %3
+  %14 = tuple ()
+  return %14
+}
+
+// CHECK-LABEL: sil [ossa] @multi_block_with_multiple_deallocs :
+// CHECK:       bb0({{.*}}):
+// CHECK-NEXT:    alloc_stack
+// CHECK-LABEL: } // end sil function 'multi_block_with_multiple_deallocs'
+sil [ossa] @multi_block_with_multiple_deallocs : $@convention(thin) (@inout TwoFields, @guaranteed Child, @guaranteed Child) -> () {
+bb0(%0 : $*TwoFields, %1 : @guaranteed $Child, %2 : @guaranteed $Child):
+  %3 = alloc_stack $Child
+  %4 = struct_element_addr %0, #TwoFields.a
+  %5 = struct_element_addr %0, #TwoFields.b
+  cond_br undef, bb1, bb2
+
+bb1:
+  %6 = copy_value %1
+  store %6 to [init] %3
+  copy_addr [take] %3 to %4
+  dealloc_stack %3
+  br bb3
+
+bb2:
+  %8 = copy_value %2
+  store %8 to [init] %3
+  copy_addr [take] %3 to %5
+  dealloc_stack %3
+  br bb3
+
+bb3:
+  %14 = tuple ()
+  return %14
+}
+
+// CHECK-LABEL: sil [ossa] @copy_addr_not_in_dealloc_block :
+// CHECK:       bb0({{.*}}):
+// CHECK-NEXT:    alloc_stack
+// CHECK-LABEL: } // end sil function 'copy_addr_not_in_dealloc_block'
+sil [ossa] @copy_addr_not_in_dealloc_block : $@convention(thin) (@inout TwoFields, @guaranteed Child, @guaranteed Child) -> () {
+bb0(%0 : $*TwoFields, %1 : @guaranteed $Child, %2 : @guaranteed $Child):
+  %3 = alloc_stack $Child
+  %4 = struct_element_addr %0, #TwoFields.a
+  %5 = struct_element_addr %0, #TwoFields.b
+  cond_br undef, bb1, bb2
+
+bb1:
+  %6 = copy_value %1
+  store %6 to [init] %3
+  copy_addr [take] %3 to %4
+  br bb3
+
+bb2:
+  %8 = copy_value %2
+  store %8 to [init] %3
+  copy_addr [take] %3 to %5
+  br bb3
+
+bb3:
+  dealloc_stack %3
+  %14 = tuple ()
+  return %14
+}
+
+// CHECK-LABEL: sil [ossa] @empty :
+// CHECK:       bb0({{.*}}):
+// CHECK-NEXT:    alloc_stack
+// CHECK-LABEL: } // end sil function 'empty'
+sil [ossa] @empty : $@convention(thin) () -> @out () {
+bb0(%0 : $*()):
+  %1 = alloc_stack $()
+  copy_addr [take] %1 to %0
+  dealloc_stack %1
+  %4 = tuple ()
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @load_store :
+// CHECK:       bb0({{.*}}):
+// CHECK-NEXT:    [[A:%.*]] = struct_element_addr %0 : $*TwoFields, #TwoFields.a
+// CHECK-NEXT:    destroy_addr [[A]]
+// CHECK-NEXT:    store %1 to [init] [[A]]
+// CHECK-NEXT:    tuple
+// CHECK-NEXT:    return
+// CHECK-LABEL: } // end sil function 'load_store'
+sil [ossa] @load_store : $@convention(thin) (@inout TwoFields, @owned Child) -> () {
+bb0(%0 : $*TwoFields, %1 : @owned $Child):
+  %2 = alloc_stack $Child
+  store %1 to [init] %2
+  %4 = load [take] %2
+  dealloc_stack %2
+  %6 = struct_element_addr %0, #TwoFields.a
+  store %4 to [assign] %6
+  %8 = tuple ()
+  return %8
+}
+
+// CHECK-LABEL: sil [ossa] @load_store_with_mutation :
+// CHECK:         alloc_stack
+// CHECK-LABEL: } // end sil function 'load_store_with_mutation'
+sil [ossa] @load_store_with_mutation : $@convention(thin) (@inout TwoFields, @owned Child, @owned TwoFields) -> () {
+bb0(%0 : $*TwoFields, %1 : @owned $Child, %2 : @owned $TwoFields):
+  %3 = alloc_stack $Child
+  store %1 to [init] %3
+  %4 = load [take] %3
+  dealloc_stack %3
+  %6 = struct_element_addr %0, #TwoFields.a
+  store %2 to [assign] %0
+  store %4 to [assign] %6
+  %8 = tuple ()
+  return %8
+}
+
+// CHECK-LABEL: sil [ossa] @load_store_trivial :
+// CHECK:       bb0({{.*}}):
+// CHECK-NEXT:    store %1 to [trivial] %0
+// CHECK-NEXT:    tuple
+// CHECK-NEXT:    return
+// CHECK-LABEL: } // end sil function 'load_store_trivial'
+sil [ossa] @load_store_trivial : $@convention(thin) (@inout Int, Int) -> () {
+bb0(%0 : $*Int, %1 : $Int):
+  %2 = alloc_stack $Int
+  store %1 to [trivial] %2
+  %4 = load [trivial] %2
+  dealloc_stack %2
+  store %4 to [trivial] %0
+  %8 = tuple ()
+  return %8
+}
+
+// CHECK-LABEL: sil [ossa] @copy_addr_trivial :
+// CHECK:       bb0({{.*}}):
+// CHECK-NEXT:    store %1 to [trivial] %0
+// CHECK-NEXT:    tuple
+// CHECK-NEXT:    return
+// CHECK-LABEL: } // end sil function 'copy_addr_trivial'
+sil [ossa] @copy_addr_trivial : $@convention(thin) (@inout Int, Int) -> () {
+bb0(%0 : $*Int, %1 : $Int):
+  %2 = alloc_stack $Int
+  store %1 to [trivial] %2
+  copy_addr %2 to %0
+  dealloc_stack %2
+  %8 = tuple ()
+  return %8
+}
+
+// CHECK-LABEL: sil [ossa] @projections_outside_liverange :
+// CHECK-NOT:     alloc_stack
+// CHECK-LABEL: } // end sil function 'projections_outside_liverange'
+sil [ossa] @projections_outside_liverange : $@convention(thin) (@guaranteed __ContiguousArrayStorageBase) -> () {
+bb0(%0 : @guaranteed $__ContiguousArrayStorageBase):
+  %1 = alloc_stack $Int
+  %2 = ref_element_addr %0, #__ContiguousArrayStorageBase.countAndCapacity
+  %3 = struct_element_addr %2, #_ArrayBody._storage
+  %4 = struct_element_addr %3, #_SwiftArrayBodyStorage.count
+  %5 = struct_element_addr %4, #Int._value
+  %6 = load [trivial] %5
+  %7 = struct $Int (%6)
+  store %7 to [trivial] %1
+  %9 = load [trivial] %1
+  store %9 to [trivial] %4
+  dealloc_stack %1
+  %12 = tuple ()
+  return %12
 }
 

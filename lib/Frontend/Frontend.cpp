@@ -821,7 +821,8 @@ bool CompilerInstance::setUpModuleLoaders() {
   if (ExplicitModuleBuild ||
       !Invocation.getSearchPathOptions().ExplicitSwiftModuleMapPath.empty() ||
       !Invocation.getSearchPathOptions().ExplicitSwiftModuleInputs.empty()) {
-    if (Invocation.getCASOptions().EnableCaching)
+    if (Invocation.getCASOptions().EnableCaching ||
+        Invocation.getCASOptions().ImportModuleFromCAS)
       ESML = ExplicitCASModuleLoader::create(
           *Context, getObjectStore(), getActionCache(), getDependencyTracker(),
           MLM, Invocation.getSearchPathOptions().ExplicitSwiftModuleMapPath,

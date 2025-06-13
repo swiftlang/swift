@@ -258,10 +258,36 @@ static bool usesFeatureSendingArgsAndResults(Decl *decl) {
   return false;
 }
 
+static bool findUnderscoredLifetimeAttr(Decl *decl) {
+  auto hasUnderscoredLifetimeAttr = [](Decl *decl) {
+    if (!decl->getAttrs().hasAttribute<LifetimeAttr>()) {
+      return false;
+    }
+    // Since we ban mixing @lifetime and @_lifetime on the same decl, checking
+    // any one LifetimeAttr on the decl is sufficient.
+    // FIXME: Implement the ban.
+    return decl->getAttrs().getAttribute<LifetimeAttr>()->isUnderscored();
+  };
+
+  switch (decl->getKind()) {
+  case DeclKind::Var: {
+    auto *var = cast<VarDecl>(decl);
+    return llvm::any_of(var->getAllAccessors(), hasUnderscoredLifetimeAttr);
+  }
+  default:
+    return hasUnderscoredLifetimeAttr(decl);
+  }
+}
+
 static bool usesFeatureLifetimeDependence(Decl *decl) {
   if (decl->getAttrs().hasAttribute<LifetimeAttr>()) {
+    if (findUnderscoredLifetimeAttr(decl)) {
+      // Experimental feature Lifetimes will guard the decl.
+      return false;
+    }
     return true;
   }
+
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl)) {
     return afd->getInterfaceType()
       ->getAs<AnyFunctionType>()
@@ -271,6 +297,10 @@ static bool usesFeatureLifetimeDependence(Decl *decl) {
     return !varDecl->getTypeInContext()->isEscapable();
   }
   return false;
+}
+
+static bool usesFeatureLifetimes(Decl *decl) {
+  return findUnderscoredLifetimeAttr(decl);
 }
 
 static bool usesFeatureInoutLifetimeDependence(Decl *decl) {
@@ -643,7 +673,12 @@ static bool usesFeatureAlwaysInheritActorContext(Decl *decl) {
   return false;
 }
 
+static bool usesFeatureDefaultIsolationPerFile(Decl *D) {
+  return isa<UsingDecl>(D);
+}
+
 UNINTERESTING_FEATURE(BuiltinSelect)
+UNINTERESTING_FEATURE(BuiltinInterleave)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

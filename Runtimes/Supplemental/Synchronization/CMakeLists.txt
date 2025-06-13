@@ -58,14 +58,27 @@ option(${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION "Generate ABI resilient runtime 
 option(${PROJECT_NAME}_ENABLE_PRESPECIALIZATION "Enable generic metadata prespecialization"
   ${SwiftCore_ENABLE_PRESPECIALIZATION})
 
+option(${PROJECT_NAME}_SINGLE_THREADED_MODE "Build Synchronization assuming it will be used in an environment with only a single thread" OFF)
+
 add_compile_options(
   $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
   $<$<COMPILE_LANGUAGE:Swift>:-nostdlibimport>
   $<$<COMPILE_LANGUAGE:Swift>:-enable-builtin-module>
   $<$<COMPILE_LANGUAGE:Swift>:-strict-memory-safety>
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature NoncopyableGenerics2>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SuppressedAssociatedTypes>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SE427NoInferenceOnExtension>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature NonescapableTypes>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature LifetimeDependence>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature InoutLifetimeDependence>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature LifetimeDependenceMutableAccessors>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-upcoming-feature MemberImportVisibility>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature RawLayout>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature StaticExclusiveOnly>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature Extern>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enforce-exclusivity=unchecked>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -target-min-inlining-version -Xfrontend min>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-lexical-lifetimes=false>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
 
@@ -84,12 +97,19 @@ add_library(swiftSynchronization
   Atomics/WordPair.swift
   Atomics/AtomicStorage.swift
   Atomics/AtomicIntegers.swift
-  Cell.swift
-  Mutex/Mutex.swift
-  $<$<PLATFORM_ID:Darwin>:Mutex/DarwinImpl.swift>
-  $<$<PLATFORM_ID:Linux>:Mutex/LinuxImpl.swift>
-  $<$<PLATFORM_ID:WASI>:Mutex/SpinLoopHint.swift>
-  $<$<PLATFORM_ID:Windows>:Mutex/WindowsImpl.swift>)
+  Cell.swift)
+
+# Determine Mutex definition
+if(${PROJECT_NAME}_SINGLE_THREADED_MODE)
+  target_sources(swiftSynchronization PRIVATE Mutex/MutexUnavailable.swift)
+else()
+  target_sources(swiftSynchronization PRIVATE
+    Mutex/Mutex.swift
+    $<$<PLATFORM_ID:Darwin>:Mutex/DarwinImpl.swift>
+    $<$<PLATFORM_ID:Android,Linux>:Mutex/LinuxImpl.swift>
+    $<$<PLATFORM_ID:Android,WASI>:Mutex/SpinLoopHint.swift>
+    $<$<PLATFORM_ID:Windows>:Mutex/WindowsImpl.swift>)
+endif()
 
 set_target_properties(swiftSynchronization PROPERTIES
   Swift_MODULE_NAME Synchronization)

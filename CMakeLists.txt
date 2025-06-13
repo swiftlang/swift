@@ -336,6 +336,8 @@ set(SWIFT_COMPILER_VERSION "" CACHE STRING
     "The internal version of the Swift compiler")
 set(CLANG_COMPILER_VERSION "" CACHE STRING
     "The internal version of the Clang compiler")
+set(SWIFT_TOOLCHAIN_VERSION "" CACHE STRING
+    "The Swift compiler tag")
 
 option(SWIFT_DISABLE_DEAD_STRIPPING
       "Turn off Darwin-specific dead stripping for Swift host tools." FALSE)
@@ -461,6 +463,10 @@ endif()
 option(SWIFT_STDLIB_ASSERTIONS
     "Enable internal checks for the Swift standard library (useful for debugging the library itself, does not affect checks required for safety)"
     "${SWIFT_STDLIB_ASSERTIONS_default}")
+
+option(SWIFT_STDLIB_ENABLE_STRICT_AVAILABILITY
+       "Enable strict availability; this will cause things to break at desk or in CI if the host OS is a lower version than some `@availability` annotations in the runtime code"
+       FALSE)
 
 option(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER
        "Use the host compiler and not the internal clang to build the swift runtime"
@@ -868,12 +874,7 @@ include(CMakePushCheckState)
 
 # Print out path and version of any installed commands
 message(STATUS "CMake (${CMAKE_COMMAND}) Version: ${CMAKE_VERSION}")
-if(XCODE)
-  set(version_flag -version)
-else()
-  set(version_flag --version)
-endif()
-execute_process(COMMAND ${CMAKE_MAKE_PROGRAM} ${version_flag}
+execute_process(COMMAND ${CMAKE_MAKE_PROGRAM} --version
   OUTPUT_VARIABLE _CMAKE_MAKE_PROGRAM_VERSION
   OUTPUT_STRIP_TRAILING_WHITESPACE)
 message(STATUS "CMake Make Program (${CMAKE_MAKE_PROGRAM}) Version: ${_CMAKE_MAKE_PROGRAM_VERSION}")
@@ -1141,14 +1142,6 @@ endif()
 # Configure SDKs.
 #
 
-if(XCODE)
-  # FIXME: It used to be the case that Xcode would force
-  # -m${platform}-version-min flags that would conflict with those computed
-  # by build-script. version-min flags are deprecated in favor of -target since
-  # clang-11, so we might be able to undo this.
-  set(SWIFT_SDKS "OSX")
-endif()
-
 # FIXME: the parameters we specify in SWIFT_SDKS are lacking architecture specifics,
 # so we need to hard-code it. For example, the SDK for Android is just 'ANDROID',
 # and we have to specify SWIFT_SDK_ANDROID_ARCHITECTURES separately.
@@ -1404,8 +1397,9 @@ endif()
 
 if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
   message(STATUS "Building Swift standard library and overlays for SDKs: ${SWIFT_SDKS}")
-  message(STATUS "  Build type:       ${SWIFT_STDLIB_BUILD_TYPE}")
-  message(STATUS "  Assertions:       ${SWIFT_STDLIB_ASSERTIONS}")
+  message(STATUS "  Build type:               ${SWIFT_STDLIB_BUILD_TYPE}")
+  message(STATUS "  Assertions:               ${SWIFT_STDLIB_ASSERTIONS}")
+  message(STATUS "  Strict availability:      ${SWIFT_STDLIB_ENABLE_STRICT_AVAILABILITY}")
   message(STATUS "")
 
   message(STATUS "Building Swift runtime with:")
@@ -1590,22 +1584,6 @@ swift_install_in_component(FILES "LICENSE.txt"
                            DESTINATION "share/swift"
                            COMPONENT license)
 
-# Add a documentation target so that documentation shows up in the
-# Xcode project.
-if(XCODE)
-  add_custom_target(Documentation
-      SOURCES
-        README.md
-        docs)
-
-  file(GLOB SWIFT_TOPLEVEL_HEADERS
-      ${CMAKE_CURRENT_SOURCE_DIR}/include/swift${dir}/*.h
-      ${CMAKE_CURRENT_SOURCE_DIR}/include/swift${dir}/*.td
-      ${CMAKE_CURRENT_SOURCE_DIR}/include/swift${dir}/*.def)
-  add_custom_target(Miscellaneous
-      SOURCES ${SWIFT_TOPLEVEL_HEADERS})
-endif()
-
 # New standard library build
 option(SWIFT_ENABLE_NEW_RUNTIME_BUILD "Build Swift runtimes with new build system" OFF)
 if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
@@ -1633,6 +1611,12 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
         set(stdlib_deployment_version_flag -DCMAKE_OSX_DEPLOYMENT_TARGET=${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION})
       endif()
 
+      if(sdk STREQUAL "OSX" AND SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION VERSION_LESS "10.15")
+        set(build_concurrency NO)
+      else()
+        set(build_concurrency YES)
+      endif()
+
       ExternalProject_Add("${stdlib_target}-core"
         SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Runtimes/Core"
         # TODO: Add this once we're ready to start swapping out the libraries
@@ -1658,7 +1642,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DCMAKE_COLOR_DIAGNOSTICS:BOOLEAN=${CMAKE_COLOR_DIAGNOSTICS}
           -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
           -DSwiftCore_INSTALL_NESTED_SUBDIR=YES
-          -DSwiftCore_ENABLE_CONCURRENCY=YES)
+          -DSwiftCore_ENABLE_CONCURRENCY=${build_concurrency})
       if(NOT ${CMAKE_CROSSCOMPILING})
         add_dependencies("${stdlib_target}-core" swift-frontend)
       endif()

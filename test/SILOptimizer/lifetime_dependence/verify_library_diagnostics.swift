@@ -7,11 +7,11 @@
 // RUN:   -enable-builtin-module \
 // RUN:   -module-name test \
 // RUN:   -define-availability "Span 0.1:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999" \
-// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature AddressableParameters
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_AddressableParameters
 
 // Test diagnostic output for interesting corner cases. Similar to semantics.swift, but this tests corner cases in the
@@ -23,22 +23,14 @@ public struct NE : ~Escapable {
 }
 
 public struct NEImmortal: ~Escapable {
-  @lifetime(immortal)
+  @_lifetime(immortal)
   public init() {}
 }
 
 class C {}
 
-// Test diagnostics on keypath getter.
-//
-// rdar://150073405 ([SILGen] support synthesized _modify on top of borrowed getters with library evolution)
-//
-// This produces the error:
-// <unknown>:0: error: unexpected error produced: lifetime-dependent value returned by generated thunk
-// '$s4test17ImplicitAccessorsV10neComputedAA10NEImmortalVvpACTK'
-//
-// Since this error has no source file, we can't verify the diagnostic!
-/*
+// Test that we don't implicitly try to create a keypath getter, since
+// ~Escapable types are not yet supported by keypaths.
 public struct ImplicitAccessors {
   let c: C
 
@@ -50,16 +42,15 @@ public struct ImplicitAccessors {
     }
   }
 }
- */
 
 public struct NoncopyableImplicitAccessors : ~Copyable & ~Escapable {
   public var ne: NE
 
   public var neComputedBorrow: NE {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     get { ne }
 
-    @lifetime(&self)
+    @_lifetime(&self)
     set {
       ne = newValue
     }

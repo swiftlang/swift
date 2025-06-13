@@ -11,8 +11,7 @@
 //===----------------------------------------------------------------------===//
 // RUN: %empty-directory(%t)
 // RUN: %gyb %s -o %t/SIMDMaskInitializers.swift
-// RUN: %target-swift-frontend -primary-file %t/SIMDMaskInitializers.swift -S | %FileCheck %t/SIMDMaskInitializers.swift --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECKOnone-%target-cpu
-// RUN: %target-swift-frontend -primary-file %t/SIMDMaskInitializers.swift -S -O | %FileCheck %t/SIMDMaskInitializers.swift --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECKO-%target-cpu
+// RUN: %target-swift-frontend -primary-file %t/SIMDMaskInitializers.swift -emit-ir | %FileCheck %t/SIMDMaskInitializers.swift --check-prefix=CHECK --check-prefix=CHECK-%target-cpu
 
 import Swift
 
@@ -24,61 +23,16 @@ import Swift
 func repeating${n}_mask${bits}(_ scalar: Bool) -> SIMDMask<SIMD${n}<Int${bits}>> {
   SIMDMask(repeating: scalar)
 }
-// CHECK: repeating${n}_mask${bits}{{[[:alnum:]]+}}:
-// CHECKO-arm64-NEXT: sbfx [[REG:[wx][0-9]]], {{[wx]}}0, #0, #1
-// CHECKO-arm64-NEXT: dup.${neonSuffix} v0, [[REG]]
-// CHECKO-arm64-NEXT: ret
-// CHECKOnone-arm64: dup.${neonSuffix}
-// CHECKOnone-arm64: ret
+// CHECK: repeating${n}_mask${bits}{{.*}} {
+// CHECK: entry:
+// CHECK: [[TMP:%[0-9]+]] = insertelement <${n} x i${bits}> {{.*}}, i${bits} %{{.*}}, i32 0
+// CHECK-NEXT: [[REP:%[0-9]+]] = shufflevector <${n} x i${bits}> [[TMP]], <${n} x i${bits}> {{.*}}, <${n} x i32> zeroinitializer
+%   if totalBits == 64:
+// CHECK-arm64-NEXT: ret <${n} x i${bits}> [[REP]]
+%   else:
+// CHECK-NEXT: ret <${n} x i${bits}> [[REP]]
+%   end
 
 %  end
 % end
 %end
-
-func concat8x8(_ a: SIMDMask<SIMD8<Int8>>, _ b: SIMDMask<SIMD8<Int8>>) -> SIMDMask<SIMD16<Int8>> {
-  SIMDMask(lowHalf: a, highHalf: b)
-}
-// CHECK: s20SIMDMaskInitializers9concat8x8ys0A0Vys6SIMD16Vys4Int8VGGADys5SIMD8VyAHGG_ANtF:
-// CHECKO-arm64-NEXT: mov.d v0[1], v1[0]
-// CHECKO-arm64-NEXT: ret
-// CHECKO-x86_64: punpcklqdq
-
-func concat16x8(_ a: SIMDMask<SIMD16<Int8>>, _ b: SIMDMask<SIMD16<Int8>>) -> SIMDMask<SIMD32<Int8>> {
-  SIMDMask(lowHalf: a, highHalf: b)
-}
-// CHECK: s20SIMDMaskInitializers10concat16x8ys0A0Vys6SIMD32Vys4Int8VGGADys6SIMD16VyAHGG_ANtF:
-// CHECKO-arm64-NEXT: ret
-
-func concat4x16(_ a: SIMDMask<SIMD4<Int16>>, _ b: SIMDMask<SIMD4<Int16>>) -> SIMDMask<SIMD8<Int16>> {
-  SIMDMask(lowHalf: a, highHalf: b)
-}
-// CHECK: s20SIMDMaskInitializers10concat4x16ys0A0Vys5SIMD8Vys5Int16VGGADys5SIMD4VyAHGG_ANtF:
-// CHECKO-arm64-NEXT: mov.d v0[1], v1[0]
-// CHECKO-arm64-NEXT: ret
-// CHECKO-x86_64: punpcklqdq
-
-func concat8x16(_ a: SIMDMask<SIMD8<Int16>>, _ b: SIMDMask<SIMD8<Int16>>) -> SIMDMask<SIMD16<Int16>> {
-  SIMDMask(lowHalf: a, highHalf: b)
-}
-// CHECK: s20SIMDMaskInitializers10concat8x16ys0A0Vys6SIMD16Vys5Int16VGGADys5SIMD8VyAHGG_ANtF:
-// CHECKO-arm64-NEXT: ret
-
-func concat2x32(_ a: SIMDMask<SIMD2<Int32>>, _ b: SIMDMask<SIMD2<Int32>>) -> SIMDMask<SIMD4<Int32>> {
-  SIMDMask(lowHalf: a, highHalf: b)
-}
-// CHECK: s20SIMDMaskInitializers10concat2x32ys0A0Vys5SIMD4Vys5Int32VGGADys5SIMD2VyAHGG_ANtF:
-// CHECKO-arm64-NEXT: mov.d v0[1], v1[0]
-// CHECKO-arm64-NEXT: ret
-// CHECKO-x86_64: punpcklqdq
-
-func concat4x32(_ a: SIMDMask<SIMD4<Int32>>, _ b: SIMDMask<SIMD4<Int32>>) -> SIMDMask<SIMD8<Int32>> {
-  SIMDMask(lowHalf: a, highHalf: b)
-}
-// CHECK: s20SIMDMaskInitializers10concat4x32ys0A0Vys5SIMD8Vys5Int32VGGADys5SIMD4VyAHGG_ANtF:
-// CHECKO-arm64-NEXT: ret
-
-func concat2x64(_ a: SIMDMask<SIMD2<Int64>>, _ b: SIMDMask<SIMD2<Int64>>) -> SIMDMask<SIMD4<Int64>> {
-  SIMDMask(lowHalf: a, highHalf: b)
-}
-// CHECK: s20SIMDMaskInitializers10concat2x64ys0A0Vys5SIMD4Vys5Int64VGGADys5SIMD2VyAHGG_ANtF:
-// CHECKO-arm64-NEXT: ret

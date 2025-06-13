@@ -41,7 +41,7 @@ using llvm::BCVBR;
 const unsigned char MODULE_DEPENDENCY_CACHE_FORMAT_SIGNATURE[] = {'I', 'M', 'D','C'};
 const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MAJOR = 9;
 /// Increment this on every change.
-const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MINOR = 2;
+const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MINOR = 3;
 
 /// Various identifiers in this format will rely on having their strings mapped
 /// using this ID.
@@ -67,6 +67,9 @@ using IsExportedImport = BCFixed<1>;
 using LineNumberField = BCFixed<32>;
 using ColumnNumberField = BCFixed<32>;
 
+/// Access level of an import
+using AccessLevelField = BCFixed<8>;
+
 /// Arrays of various identifiers, distinguished for readability
 using IdentifierIDArryField = llvm::BCArray<IdentifierIDField>;
 using ModuleIDArryField = llvm::BCArray<IdentifierIDField>;
@@ -78,6 +81,7 @@ using ModuleCacheKeyIDField = IdentifierIDField;
 using ImportArrayIDField = IdentifierIDField;
 using LinkLibrariesArrayIDField = IdentifierIDField;
 using MacroDependenciesArrayIDField = IdentifierIDField;
+using SearchPathArrayIDField = IdentifierIDField;
 using FlagIDArrayIDField = IdentifierIDField;
 using DependencyIDArrayIDField = IdentifierIDField;
 using SourceLocationIDArrayIDField = IdentifierIDField;
@@ -101,6 +105,8 @@ enum {
   LINK_LIBRARY_ARRAY_NODE,
   MACRO_DEPENDENCY_NODE,
   MACRO_DEPENDENCY_ARRAY_NODE,
+  SEARCH_PATH_NODE,
+  SEARCH_PATH_ARRAY_NODE,
   IMPORT_STATEMENT_NODE,
   IMPORT_STATEMENT_ARRAY_NODE,
   OPTIONAL_IMPORT_STATEMENT_ARRAY_NODE,
@@ -169,6 +175,17 @@ using MacroDependencyLayout =
 using MacroDependencyArrayLayout =
     BCRecordLayout<MACRO_DEPENDENCY_ARRAY_NODE, IdentifierIDArryField>;
 
+// A record for a serialized search pathof a given dependency
+// node (Swift binary module dependency only).
+using SearchPathLayout =
+    BCRecordLayout<SEARCH_PATH_NODE,             // ID
+                   IdentifierIDField,            // path
+                   IsFrameworkField,             // isFramework
+                   IsSystemField                 // isSystem
+                   >;
+using SearchPathArrayLayout =
+    BCRecordLayout<SEARCH_PATH_ARRAY_NODE, IdentifierIDArryField>;
+
 // A record capturing information about a given 'import' statement
 // captured in a dependency node, including its source location.
 using ImportStatementLayout =
@@ -178,7 +195,8 @@ using ImportStatementLayout =
                    LineNumberField,              // lineNumber
                    ColumnNumberField,            // columnNumber
                    IsOptionalImport,             // isOptional
-                   IsExportedImport              // isExported
+                   IsExportedImport,             // isExported
+                   AccessLevelField              // accessLevel
                    >;
 using ImportStatementArrayLayout =
     BCRecordLayout<IMPORT_STATEMENT_ARRAY_NODE, IdentifierIDArryField>;
@@ -248,6 +266,7 @@ using SwiftBinaryModuleDetailsLayout =
                    FileIDField,                      // definingInterfacePath
                    IdentifierIDField,                // headerModuleDependencies
                    FileIDArrayIDField,               // headerSourceFiles
+                   SearchPathArrayIDField,           // serializedSearchPaths
                    IsFrameworkField,                 // isFramework
                    IsStaticField,                    // isStatic
                    IdentifierIDField,                // moduleCacheKey

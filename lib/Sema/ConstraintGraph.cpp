@@ -987,7 +987,7 @@ void ConstraintGraph::incrementConstraintsPerContractionCounter() {
 #pragma mark Debugging output
 
 void ConstraintGraphNode::print(llvm::raw_ostream &out, unsigned indent,
-                                PrintOptions PO) const {
+                                const PrintOptions &PO) const {
   out.indent(indent);
   Type(TypeVar).print(out, PO);
   out << ":\n";

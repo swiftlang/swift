@@ -11,3 +11,11 @@ FunctionIntroducedIn10_16AppExt()
 FunctionIntroducedIn11_0AppExt()
 // expected-error@-1 {{'FunctionIntroducedIn11_0AppExt()' is only available in application extensions for macOS 11.0 or newer}}
 // expected-note@-2 {{add 'if #available' version check}}
+
+FunctionIntroducedIn16_0AppExt()
+// expected-error@-1 {{'FunctionIntroducedIn16_0AppExt()' is only available in application extensions for macOS 26.0 or newer}}
+// expected-note@-2 {{add 'if #available' version check}}
+
+FunctionIntroducedIn26_0AppExt()
+// expected-error@-1 {{'FunctionIntroducedIn26_0AppExt()' is only available in application extensions for macOS 26.0 or newer}}
+// expected-note@-2 {{add 'if #available' version check}}

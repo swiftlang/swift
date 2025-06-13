@@ -720,6 +720,12 @@ public:
     return getRecursiveProperties().hasTypeVariable();
   }
 
+  // Convenience for checking whether the given type either has a type
+  // variable or placeholder.
+  bool hasTypeVariableOrPlaceholder() const {
+    return hasTypeVariable() || hasPlaceholder();
+  }
+
   /// Determine where this type is a type variable or a dependent
   /// member root in a type variable.
   bool isTypeVariableOrMember();
@@ -3583,13 +3589,13 @@ protected:
     Bits.AnyFunctionType.NumParams = NumParams;
     assert(Bits.AnyFunctionType.NumParams == NumParams && "Params dropped!");
     
-    if (Info) {
+    if (Info && CONDITIONAL_ASSERT_enabled()) {
       unsigned maxLifetimeTarget = NumParams + 1;
       if (auto outputFn = Output->getAs<AnyFunctionType>()) {
         maxLifetimeTarget += outputFn->getNumParams();
       }
       for (auto &dep : Info->getLifetimeDependencies()) {
-        assert(dep.getTargetIndex() < maxLifetimeTarget);
+        ASSERT(dep.getTargetIndex() < maxLifetimeTarget);
       }
     }
   }
@@ -6299,7 +6305,7 @@ public:
   }
 };
 
-/// An InlineArray type e.g `[2 x Foo]`, sugar for `InlineArray<2, Foo>`.
+/// An InlineArray type e.g `[2 of Foo]`, sugar for `InlineArray<2, Foo>`.
 class InlineArrayType : public SyntaxSugarType {
   Type Count;
   Type Elt;

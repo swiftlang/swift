@@ -132,6 +132,7 @@ class alignas(1 << DeclAlignInBits) ProtocolConformance
   Type ConformingType;
 
   friend class ConformanceIsolationRequest;
+  friend class RawConformanceIsolationRequest;
 
 protected:
   // clang-format off
@@ -141,10 +142,13 @@ protected:
   union { uint64_t OpaqueBits;
 
     SWIFT_INLINE_BITFIELD_BASE(ProtocolConformance,
-                               1+
+                               1+1+
                                bitmax(NumProtocolConformanceKindBits, 8),
       /// The kind of protocol conformance.
       Kind : bitmax(NumProtocolConformanceKindBits, 8),
+
+      /// Whether the "raw" conformance isolation is "inferred", which applies to most conformances.
+      IsRawIsolationInferred : 1,
 
       /// Whether the computed actor isolation is nonisolated.
       IsComputedNonisolated : 1
@@ -201,7 +205,16 @@ protected:
   ProtocolConformance(ProtocolConformanceKind kind, Type conformingType)
     : ConformingType(conformingType) {
     Bits.ProtocolConformance.Kind = unsigned(kind);
+    Bits.ProtocolConformance.IsRawIsolationInferred = false;
     Bits.ProtocolConformance.IsComputedNonisolated = false;
+  }
+
+  bool isRawIsolationInferred() const {
+    return Bits.ProtocolConformance.IsRawIsolationInferred;
+  }
+
+  void setRawConformanceInferred(bool value = true) {
+    Bits.ProtocolConformance.IsRawIsolationInferred = value;
   }
 
   bool isComputedNonisolated() const {
@@ -257,6 +270,14 @@ public:
   /// If the current conformance is canonical already, it will be returned.
   /// Otherwise a new conformance will be created.
   ProtocolConformance *getCanonicalConformance();
+
+  /// Determine the "raw" actor isolation of this conformance, before applying any inference rules.
+  ///
+  /// Most clients should use `getIsolation()`, unless they are part of isolation inference
+  /// themselves (e.g., conformance checking).
+  ///
+  /// - Returns std::nullopt if the isolation will be inferred.
+  std::optional<ActorIsolation> getRawIsolation() const;
 
   /// Determine the actor isolation of this conformance.
   ActorIsolation getIsolation() const;
@@ -552,6 +573,7 @@ class NormalProtocolConformance : public RootProtocolConformance,
   friend class ValueWitnessRequest;
   friend class TypeWitnessRequest;
   friend class ConformanceIsolationRequest;
+  friend class RawConformanceIsolationRequest;
 
   /// The protocol being conformed to.
   ProtocolDecl *Protocol;

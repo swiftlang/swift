@@ -217,6 +217,13 @@ set(SWIFT_CONCURRENCY_GYB_SOURCES
   TaskGroup+addTask.swift.gyb
   Task+immediate.swift.gyb)
 
+# Build with a minimum deployment target of 10.15
+if(SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX VERSION_LESS "10.15")
+  set(osx_deployment_target "10.15")
+else()
+  set(osx_deployment_target "${SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX}")
+endif()
+
 add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   ${SWIFT_RUNTIME_CONCURRENCY_C_SOURCES}
   ${SWIFT_RUNTIME_CONCURRENCY_EXECUTOR_SOURCES}
@@ -241,6 +248,8 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   INCORPORATE_OBJECT_LIBRARIES_SHARED_ONLY
     ${swift_concurrency_incorporate_object_libraries_so}
   LINK_LIBRARIES ${swift_concurrency_link_libraries}
+
+  DEPLOYMENT_VERSION_OSX ${osx_deployment_target}
 
   C_COMPILE_FLAGS
     -Dswift_Concurrency_EXPORTS ${SWIFT_RUNTIME_CONCURRENCY_C_FLAGS}

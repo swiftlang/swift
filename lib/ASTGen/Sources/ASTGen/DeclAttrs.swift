@@ -179,6 +179,8 @@ extension ASTGenVisitor {
         return handle(self.generateSILGenNameAttr(attribute: node)?.asDeclAttribute)
       case .specialize:
         return handle(self.generateSpecializeAttr(attribute: node, attrName: attrName)?.asDeclAttribute)
+      case .specialized:
+        return handle(self.generateSpecializedAttr(attribute: node, attrName: attrName)?.asDeclAttribute)
       case .spiAccessControl:
         return handle(self.generateSPIAccessControlAttr(attribute: node)?.asDeclAttribute)
       case .storageRestrictions:
@@ -1167,19 +1169,17 @@ extension ASTGenVisitor {
   ///   @lifetime(self)
   ///   ```
   func generateLifetimeAttr(attribute node: AttributeSyntax) -> BridgedLifetimeAttr? {
-    guard self.ctx.langOptsHasFeature(.LifetimeDependence) else {
-      // TODO: Diagnose
-      fatalError("@lifetime attribute requires 'LifetimeDependence' feature")
-    }
     guard let entry = self.generateLifetimeEntry(attribute: node) else {
       // TODO: Diagnose?
       return nil
     }
+
     return .createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
       range: self.generateAttrSourceRange(node),
-      entry: entry
+      entry: entry,
+      isUnderscored: node.attributeName.as(IdentifierTypeSyntax.self)?.name.text == "_lifetime"
     )
   }
 
@@ -1871,7 +1871,40 @@ extension ASTGenVisitor {
 
   /// E.g.:
   ///   ```
-  ///   @_specialize(exporeted: true, T == Int)
+  ///   @specialized(T == Int)
+  ///   ```
+  func generateSpecializedAttr(attribute node: AttributeSyntax, attrName: SyntaxText) -> BridgedSpecializedAttr? {
+    guard
+      let arg = node.arguments?.as(SpecializedAttributeArgumentSyntax.self)
+    else {
+      // TODO: Diagnose
+      return nil
+    }
+    let exported: Bool? = nil
+    let kind: BridgedSpecializationKind? = nil
+    var whereClause: BridgedTrailingWhereClause? = nil
+    let targetFunction: BridgedDeclNameRef? = nil
+    let spiGroups: [BridgedIdentifier] = []
+    let availableAttrs: [BridgedAvailableAttr] = []
+
+    whereClause = self.generate(genericWhereClause: arg.genericWhereClause)
+
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node),
+      whereClause: whereClause.asNullable,
+      exported: exported ?? false,
+      kind: kind ?? .full,
+      taretFunction: targetFunction ?? BridgedDeclNameRef(),
+      spiGroups: spiGroups.lazy.bridgedArray(in: self),
+      availableAttrs: availableAttrs.lazy.bridgedArray(in: self)
+    )
+  }
+
+  /// E.g.:
+  ///   ```
+  ///   @_specialize(exported: true, T == Int)
   ///   ```
   func generateSpecializeAttr(attribute node: AttributeSyntax, attrName: SyntaxText) -> BridgedSpecializeAttr? {
     guard
@@ -1880,7 +1913,6 @@ extension ASTGenVisitor {
       // TODO: Diagnose
       return nil
     }
-
     var exported: Bool?
     var kind: BridgedSpecializationKind? = nil
     var whereClause: BridgedTrailingWhereClause? = nil
@@ -1891,7 +1923,7 @@ extension ASTGenVisitor {
     while let arg = args.popFirst() {
       switch arg {
       case .genericWhereClause(let arg):
-        whereClause =  self.generate(genericWhereClause: arg)
+        whereClause = self.generate(genericWhereClause: arg)
       case .specializeTargetFunctionArgument(let arg):
         if targetFunction != nil {
           // TODO: Diangose.

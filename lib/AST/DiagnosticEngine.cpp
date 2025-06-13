@@ -313,18 +313,12 @@ InFlightDiagnostic::fixItReplaceChars(SourceLoc Start, SourceLoc End,
   return *this;
 }
 
-SourceLoc
-DiagnosticEngine::getBestAddImportFixItLoc(const Decl *Member,
-                                           SourceFile *sourceFile) const {
+SourceLoc DiagnosticEngine::getBestAddImportFixItLoc(SourceFile *SF) const {
   auto &SM = SourceMgr;
 
   SourceLoc bestLoc;
-
-  auto SF =
-      sourceFile ? sourceFile : Member->getDeclContext()->getParentSourceFile();
-  if (!SF) {
+  if (!SF)
     return bestLoc;
-  }
 
   for (auto item : SF->getTopLevelItems()) {
     // If we found an import declaration, we want to insert after it.
@@ -356,30 +350,21 @@ DiagnosticEngine::getBestAddImportFixItLoc(const Decl *Member,
 
 InFlightDiagnostic &InFlightDiagnostic::fixItAddImport(StringRef ModuleName) {
   assert(IsActive && "Cannot modify an inactive diagnostic");
-  auto Member = Engine->ActiveDiagnostic->getDecl();
-  SourceLoc bestLoc = Engine->getBestAddImportFixItLoc(Member);
+  auto decl = Engine->ActiveDiagnostic->getDecl();
+  if (!decl)
+    return *this;
 
-  if (bestLoc.isValid()) {
-    llvm::SmallString<64> importText;
+  auto bestLoc = Engine->getBestAddImportFixItLoc(
+      decl->getDeclContext()->getOutermostParentSourceFile());
+  if (!bestLoc.isValid())
+    return *this;
 
-    // @_spi imports.
-    if (Member->isSPI()) {
-      auto spiGroups = Member->getSPIGroups();
-      if (!spiGroups.empty()) {
-        importText += "@_spi(";
-        importText += spiGroups[0].str();
-        importText += ") ";
-      }
-    }
+  llvm::SmallString<64> importText;
+  importText += "import ";
+  importText += ModuleName;
+  importText += "\n";
 
-    importText += "import ";
-    importText += ModuleName;
-    importText += "\n";
-
-    return fixItInsert(bestLoc, importText);
-  }
-
-  return *this;
+  return fixItInsert(bestLoc, importText);
 }
 
 InFlightDiagnostic &

@@ -1746,22 +1746,26 @@ ERROR(attr_warn_unused_result_expected_rparen,none,
 
 // _specialize
 ERROR(attr_specialize_missing_colon,none,
-      "missing ':' after %0 in '_specialize' attribute", (StringRef))
+      "missing ':' after %0 in %select{'_specialize'|'specialized'}1 attribute", (StringRef, bool))
 
 ERROR(attr_specialize_missing_comma,none,
-      "missing ',' in '_specialize' attribute", ())
+      "missing ',' in %select{'_specialize'|'specialized'}0 attribute", (bool))
 
 ERROR(attr_specialize_unknown_parameter_name,none,
-      "unknown parameter %0 in '_specialize attribute'", (StringRef))
+      "unknown parameter %0 in %select{'_specialize'|'specialized'}1 attribute", (StringRef, bool))
+ERROR(attr_specialize_unsupported_parameter_name,none,
+      "unsupported parameter %0 in 'specialized attribute'", (StringRef))
 
 ERROR(attr_specialize_expected_bool_value,none,
-      "expected a boolean true or false value in '_specialize' attribute", ())
+      "expected a boolean true or false value in %select{'_specialize'|'specialized'}0 attribute", (bool))
 
 ERROR(attr_specialize_missing_parameter_label_or_where_clause,none,
       "expected a parameter label or a where clause in '_specialize' attribute", ())
+ERROR(attr_specialized_missing_where_clause,none,
+      "expected a where clause in 'specialized' attribute", ())
 
 ERROR(attr_specialize_parameter_already_defined,none,
-      "parameter '%0' was already defined in '_specialize' attribute", (StringRef))
+      "parameter '%0' was already defined in %select{'_specialize'|'specialized'}1 attribute", (StringRef, bool))
 
 ERROR(attr_specialize_expected_partial_or_full,none,
       "expected 'partial' or 'full' as values of the 'kind' parameter in '_specialize' attribute", ())
@@ -2182,6 +2186,15 @@ ERROR(nonisolated_nonsending_expected_rparen,PointsToFirstBadToken,
       "expected ')' after 'nonisolated' modifier", ())
 ERROR(nonisolated_nonsending_repeated,none,
       "parameter may have at most one 'nonisolated(nonsending)' specifier", ())
+
+//------------------------------------------------------------------------------
+// MARK: using @<attribute> or using <identifier>
+//------------------------------------------------------------------------------
+ERROR(using_decl_invalid_specifier,PointsToFirstBadToken,
+      "default isolation can only be set to '@MainActor' or 'nonisolated'",
+      ())
+ERROR(experimental_using_decl_disabled,PointsToFirstBadToken,
+      "'using' is an experimental feature that is currently disabled", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

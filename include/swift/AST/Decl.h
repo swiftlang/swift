@@ -213,7 +213,8 @@ enum class DescriptiveDeclKind : uint8_t {
   OpaqueResultType,
   OpaqueVarType,
   Macro,
-  MacroExpansion
+  MacroExpansion,
+  Using
 };
 
 /// Describes which spelling was used in the source for the 'static' or 'class'
@@ -266,6 +267,16 @@ static_assert(uint8_t(SelfAccessKind::LastSelfAccessKind) <
                   (NumSelfAccessKindBits << 1),
               "Self Access Kind is too small to fit in SelfAccess kind bits. "
               "Please expand ");
+
+enum class UsingSpecifier : uint8_t {
+  MainActor,
+  Nonisolated,
+  LastSpecifier = Nonisolated,
+};
+enum : unsigned {
+  NumUsingSpecifierBits =
+      countBitsUsed(static_cast<unsigned>(UsingSpecifier::LastSpecifier))
+};
 
 /// Diagnostic printing of \c SelfAccessKind.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SelfAccessKind SAK);
@@ -825,6 +836,10 @@ protected:
 
     /// The number of elements in this path.
     NumPathElements : 8
+  );
+
+  SWIFT_INLINE_BITFIELD(UsingDecl, Decl, NumUsingSpecifierBits,
+    Specifier : NumUsingSpecifierBits
   );
 
   SWIFT_INLINE_BITFIELD(ExtensionDecl, Decl, 4+1,
@@ -2046,7 +2061,8 @@ public:
   NominalTypeDecl *getExtendedNominal() const;
 
   /// Compute the nominal type declaration that is being extended.
-  NominalTypeDecl *computeExtendedNominal() const;
+  NominalTypeDecl *computeExtendedNominal(
+      bool excludeMacroExpansions=false) const;
 
   /// \c hasBeenBound means nothing if this extension can never been bound
   /// because it is not at the top level.
@@ -6276,9 +6292,12 @@ public:
   /// Otherwise, its override must be referenced.
   bool isValidKeyPathComponent() const;
 
-  /// True if the storage exports a property descriptor for key paths in
-  /// other modules.
-  bool exportsPropertyDescriptor() const;
+  /// If the storage exports a property descriptor for key paths in other
+  /// modules, this returns the generic signature in which its member methods
+  /// are emitted. If the storage does not export a property descriptor,
+  /// returns `std::nullopt`.
+  std::optional<GenericSignature>
+  getPropertyDescriptorGenericSignature() const;
 
   /// True if any of the accessors to the storage is private or fileprivate.
   bool hasPrivateAccessor() const;
@@ -9732,6 +9751,34 @@ public:
   static bool classof(const FreestandingMacroExpansion *expansion) {
     return expansion->getFreestandingMacroKind() == FreestandingMacroKind::Decl;
   }
+};
+
+/// UsingDecl - This represents a single `using` declaration, e.g.:
+///   using @MainActor
+class UsingDecl : public Decl {
+  friend class Decl;
+
+private:
+  SourceLoc UsingLoc, SpecifierLoc;
+
+  UsingDecl(SourceLoc usingLoc, SourceLoc specifierLoc,
+            UsingSpecifier specifier, DeclContext *parent);
+
+public:
+  UsingSpecifier getSpecifier() const {
+    return static_cast<UsingSpecifier>(Bits.UsingDecl.Specifier);
+  }
+
+  std::string getSpecifierName() const;
+
+  SourceLoc getLocFromSource() const { return UsingLoc; }
+  SourceRange getSourceRange() const { return {UsingLoc, SpecifierLoc}; }
+
+  static UsingDecl *create(ASTContext &ctx, SourceLoc usingLoc,
+                           SourceLoc specifierLoc, UsingSpecifier specifier,
+                           DeclContext *parent);
+
+  static bool classof(const Decl *D) { return D->getKind() == DeclKind::Using; }
 };
 
 inline void

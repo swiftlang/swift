@@ -27,4 +27,4 @@ import Method
 func test(s: UnsafeMutableBufferPointer<Float>) {
   var foo = Foo()
   foo.bar(s)
-}    
+}

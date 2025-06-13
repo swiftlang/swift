@@ -496,6 +496,8 @@ std::optional<BraceStmt *> applyResultBuilderBodyTransform(FuncDecl *func,
 
 bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
 
+void collectReferencedGenericParams(Type ty, SmallPtrSet<CanType, 4> &referenced);
+
 Type typeCheckParameterDefault(Expr *&defaultValue, DeclContext *DC,
                                Type paramType, bool isAutoClosure,
                                bool atCallerSide);

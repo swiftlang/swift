@@ -932,7 +932,7 @@ class ModuleInterfaceLoaderImpl {
           return std::make_error_code(std::errc::not_supported);
         } else if (isInResourceDir(adjacentMod) &&
                    loadMode == ModuleLoadingMode::PreferSerialized &&
-                   !version::isCurrentCompilerTagged() &&
+                   version::getCurrentCompilerSerializationTag().empty() &&
                    rebuildInfo.getOrInsertCandidateModule(adjacentMod)
                            .serializationStatus !=
                        serialization::Status::SDKMismatch &&
@@ -1547,7 +1547,7 @@ static bool readSwiftInterfaceVersionAndArgs(
 
   if (extractCompilerFlagsFromInterface(interfacePath, SB, ArgSaver,
                                         interfaceInfo.Arguments,
-                                        preferredTarget)) {
+                                        preferredTarget, &Diags)) {
     InterfaceSubContextDelegateImpl::diagnose(
         interfacePath, diagnosticLoc, SM, &Diags,
         diag::error_extracting_version_from_module_interface);

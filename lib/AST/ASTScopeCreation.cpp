@@ -404,6 +404,7 @@ public:
   VISIT_AND_IGNORE(ParamDecl)
   VISIT_AND_IGNORE(MissingDecl)
   VISIT_AND_IGNORE(MissingMemberDecl)
+  VISIT_AND_IGNORE(UsingDecl)
 
   // This declaration is handled from the PatternBindingDecl
   VISIT_AND_IGNORE(VarDecl)
@@ -661,7 +662,7 @@ void ScopeCreator::addChildrenForKnownAttributes(Decl *decl,
     if (isa<DifferentiableAttr>(attr))
       relevantAttrs.push_back(attr);
 
-    if (isa<SpecializeAttr>(attr))
+    if (isa<AbstractSpecializeAttr>(attr))
       relevantAttrs.push_back(attr);
 
     if (isa<CustomAttr>(attr))
@@ -679,7 +680,7 @@ void ScopeCreator::addChildrenForKnownAttributes(Decl *decl,
     if (auto *diffAttr = dyn_cast<DifferentiableAttr>(attr)) {
       constructExpandAndInsert<DifferentiableAttributeScope>(
           parent, diffAttr, decl);
-    } else if (auto *specAttr = dyn_cast<SpecializeAttr>(attr)) {
+    } else if (auto *specAttr = dyn_cast<AbstractSpecializeAttr>(attr)) {
       if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl)) {
         constructExpandAndInsert<SpecializeAttributeScope>(
             parent, specAttr, afd);

@@ -187,11 +187,14 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
         clangModuleDep.IsSystem);
 
     std::vector<ModuleDependencyID> directDependencyIDs;
-    for (const auto &DepInfo : clangModuleDep.ClangModuleDeps) {
-      auto moduleName = DepInfo.ID.ModuleName;
-      dependencies.addModuleImport(moduleName, DepInfo.Exported, &alreadyAddedModules);
+    for (const auto &moduleName : clangModuleDep.ClangModuleDeps) {
+      // FIXME: This assumes, conservatively, that all Clang module imports
+      // are exported. We need to fix this once the clang scanner gains the appropriate
+      // API to query this.
+      dependencies.addModuleImport(moduleName.ModuleName, /* isExported */ true,
+                                   AccessLevel::Public, &alreadyAddedModules);
       // It is safe to assume that all dependencies of a Clang module are Clang modules.
-      directDependencyIDs.push_back({moduleName, ModuleDependencyKind::Clang});
+      directDependencyIDs.push_back({moduleName.ModuleName, ModuleDependencyKind::Clang});
     }
     dependencies.setImportedClangDependencies(directDependencyIDs);
     result.push_back(std::make_pair(ModuleDependencyID{clangModuleDep.ID.ModuleName,

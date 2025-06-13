@@ -402,6 +402,7 @@ struct BridgedDeclObj {
   BRIDGED_INLINE bool GenericType_isGenericAtAnyLevel() const;
   BRIDGED_INLINE bool NominalType_isGlobalActor() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj NominalType_getValueTypeDestructor() const;
+  BRIDGED_INLINE bool Enum_hasRawType() const;
   BRIDGED_INLINE bool Struct_hasUnreferenceableStorage() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType Class_getSuperclass() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj Class_getDestructor() const;
@@ -1164,10 +1165,11 @@ BridgedLifetimeEntry BridgedLifetimeEntry_createParsed(
     BridgedASTContext cContext, BridgedSourceRange cRange,
     BridgedArrayRef cSources, BridgedLifetimeDescriptor cTarget);
 
-SWIFT_NAME("BridgedLifetimeAttr.createParsed(_:atLoc:range:entry:)")
+SWIFT_NAME(
+    "BridgedLifetimeAttr.createParsed(_:atLoc:range:entry:isUnderscored:)")
 BridgedLifetimeAttr BridgedLifetimeAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceRange cRange, BridgedLifetimeEntry cEntry);
+    BridgedSourceRange cRange, BridgedLifetimeEntry cEntry, bool isUnderscored);
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedMacroSyntax {
   BridgedMacroSyntaxFreestanding,
@@ -1390,6 +1392,15 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedSpecializationKind : uint8_t {
 SWIFT_NAME("BridgedSpecializeAttr.createParsed(_:atLoc:range:whereClause:"
            "exported:kind:taretFunction:spiGroups:availableAttrs:)")
 BridgedSpecializeAttr BridgedSpecializeAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedNullableTrailingWhereClause cWhereClause,
+    bool exported, BridgedSpecializationKind cKind,
+    BridgedDeclNameRef cTargetFunction, BridgedArrayRef cSPIGroups,
+    BridgedArrayRef cAvailableAttrs);
+
+SWIFT_NAME("BridgedSpecializedAttr.createParsed(_:atLoc:range:whereClause:"
+           "exported:kind:taretFunction:spiGroups:availableAttrs:)")
+BridgedSpecializedAttr BridgedSpecializedAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceRange cRange, BridgedNullableTrailingWhereClause cWhereClause,
     bool exported, BridgedSpecializationKind cKind,
@@ -1733,6 +1744,19 @@ BridgedImportDecl BridgedImportDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cImportKeywordLoc, BridgedImportKind cImportKind,
     BridgedSourceLoc cImportKindLoc, BridgedArrayRef cImportPathElements);
+
+enum ENUM_EXTENSIBILITY_ATTR(open) BridgedUsingSpecifier {
+  BridgedUsingSpecifierMainActor,
+  BridgedUsingSpecifierNonisolated,
+};
+
+SWIFT_NAME("BridgedUsingDecl.createParsed(_:declContext:usingKeywordLoc:"
+           "specifierLoc:specifier:)")
+BridgedUsingDecl BridgedUsingDecl_createParsed(BridgedASTContext cContext,
+                                               BridgedDeclContext cDeclContext,
+                                               BridgedSourceLoc usingKeywordLoc,
+                                               BridgedSourceLoc specifierLoc,
+                                               BridgedUsingSpecifier specifier);
 
 SWIFT_NAME("BridgedSubscriptDecl.createParsed(_:declContext:staticLoc:"
            "staticSpelling:subscriptKeywordLoc:genericParamList:parameterList:"

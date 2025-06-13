@@ -17,6 +17,7 @@ import SwiftShims
 // functionality and guidance for efficiently working with Strings.
 //
 @frozen
+@_addressableForDependencies
 public // SPI(corelibs-foundation)
 struct _StringGuts: @unchecked Sendable {
   @usableFromInline

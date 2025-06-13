@@ -221,6 +221,10 @@ OptionalBridgedDeclObj BridgedDeclObj::NominalType_getValueTypeDestructor() cons
   return {getAs<swift::NominalTypeDecl>()->getValueTypeDestructor()};
 }
 
+bool BridgedDeclObj::Enum_hasRawType() const {
+  return getAs<swift::EnumDecl>()->hasRawType();
+}
+
 bool BridgedDeclObj::Struct_hasUnreferenceableStorage() const {
   return getAs<swift::StructDecl>()->hasUnreferenceableStorage();
 }

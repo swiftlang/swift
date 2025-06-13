@@ -1532,7 +1532,8 @@ bool swift::checkOverrides(ValueDecl *decl) {
 
   auto &ctx = decl->getASTContext();
   if (overridden.empty() &&
-      ctx.LangOpts.hasFeature(Feature::MemberImportVisibility)) {
+      ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
+                              /*allowMigration=*/true)) {
     // If we didn't find anything, try broadening the search by ignoring missing
     // imports.
     if (!checkPotentialOverrides(decl, overridden,
@@ -1657,6 +1658,7 @@ namespace  {
     UNINTERESTING_ATTR(SwiftNativeObjCRuntimeBase)
     UNINTERESTING_ATTR(ShowInInterface)
     UNINTERESTING_ATTR(Specialize)
+    UNINTERESTING_ATTR(Specialized)
     UNINTERESTING_ATTR(SpecializeExtension)
     UNINTERESTING_ATTR(DynamicReplacement)
     UNINTERESTING_ATTR(PrivateImport)
@@ -2528,7 +2530,8 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // If we didn't find anything, try broadening the search by ignoring missing
   // imports.
   if (overridden.empty() &&
-      ctx.LangOpts.hasFeature(Feature::MemberImportVisibility)) {
+      ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
+                              /*allowMigration=*/true)) {
     overridden = computeOverriddenDecls(decl, true);
     if (!overridden.empty()) {
       auto first = overridden.front();

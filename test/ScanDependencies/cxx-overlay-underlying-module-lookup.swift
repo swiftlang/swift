@@ -3,9 +3,6 @@
 // RUN: %target-swift-frontend -scan-dependencies -o %t/deps.json %s -cxx-interoperability-mode=default -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import
 // RUN: %validate-json %t/deps.json | %FileCheck %s
 
-// rdar://151780437: libstdc++ VFS modulemap redirects not functioning with EBM enabled
-// REQUIRES: OS=macosx
-
 import CxxStdlib
 
 // CHECK: "mainModuleName": "deps"

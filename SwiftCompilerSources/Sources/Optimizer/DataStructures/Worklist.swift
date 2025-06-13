@@ -93,5 +93,20 @@ extension InstructionWorklist {
       }
     }
   }
+
+  mutating func pushSuccessors(of inst: Instruction, ignoring ignoreInst: Instruction) {
+    if let succ = inst.next {
+      if succ != ignoreInst {
+        pushIfNotVisited(succ)
+      }
+    } else {
+      for succBlock in inst.parentBlock.successors {
+        let firstInst = succBlock.instructions.first!
+        if firstInst != ignoreInst {
+          pushIfNotVisited(firstInst)
+        }
+      }
+    }
+  }
 }
 

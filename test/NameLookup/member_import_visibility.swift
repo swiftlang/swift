@@ -14,13 +14,16 @@ import members_C
 
 func testExtensionMembers(x: X, y: Y<Z>) {
   x.XinA()
+  x.XinA_spi() // expected-error{{'XinA_spi' is inaccessible due to '@_spi' protection level}}
   y.YinA()
 
   x.XinB() // expected-member-visibility-error{{instance method 'XinB()' is not available due to missing import of defining module 'members_B'}}
   x.XinB_package() // expected-member-visibility-error{{instance method 'XinB_package()' is not available due to missing import of defining module 'members_B'}}
+  x.XinB_spi() // expected-error{{'XinB_spi' is inaccessible due to '@_spi' protection level}}
   y.YinB() // expected-member-visibility-error{{instance method 'YinB()' is not available due to missing import of defining module 'members_B'}}
 
   x.XinC()
+  x.XinC_spi() // expected-error{{'XinC_spi' is inaccessible due to '@_spi' protection level}}
   y.YinC()
 
   _ = X(true)

@@ -825,8 +825,7 @@ Func _SliceBuffer.withUnsafeMutableBufferPointer(_:) has mangled name changing f
 Struct String.Index has added a conformance to an existing protocol CustomDebugStringConvertible
 
 Struct CollectionOfOne is now with @_addressableForDependencies
-Struct String.UTF8View is now with @_addressableForDependencies
-Struct Substring.UTF8View is now with @_addressableForDependencies
+Struct _StringGuts is now with @_addressableForDependencies
 
 Enum _SwiftifyInfo is a new API without '@available'
 Enum _SwiftifyExpr is a new API without '@available'
@@ -857,6 +856,10 @@ Var UnsafeMutableBufferPointer.indices has mangled name changing from 'Swift.Uns
 Var UnsafeMutableBufferPointer.indices is now with @_preInverseGenerics
 Func !=(_:_:) has been removed
 Func ==(_:_:) has been removed
+Func ==(_:_:) has generic signature change from to <T where T : Swift.RawRepresentable, T.RawValue : Swift.Equatable>
+Func ==(_:_:) has mangled name changing from 'Swift.== infix(Swift.Optional<Any.Type>, Swift.Optional<Any.Type>) -> Swift.Bool' to 'Swift.== infix<A where A: Swift.RawRepresentable, A.RawValue: Swift.Equatable>(A, A) -> Swift.Bool'
+Func ==(_:_:) has parameter 0 type change from (any Any.Type)? to τ_0_0
+Func ==(_:_:) has parameter 1 type change from (any Any.Type)? to τ_0_0                              
 Func type(of:) has been removed
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)

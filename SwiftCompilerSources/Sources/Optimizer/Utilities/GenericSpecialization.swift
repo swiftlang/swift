@@ -175,7 +175,7 @@ func specializeWitnessTable(for conformance: Conformance,
 }
 
 /// Specializes the default methods of a non-generic witness table.
-/// Default implementations (in protocol extentions) of non-generic protocol methods have a generic
+/// Default implementations (in protocol extensions) of non-generic protocol methods have a generic
 /// self argument. Specialize such methods with the concrete type. Note that it is important to also
 /// specialize inherited conformances so that the concrete self type is correct, even for derived classes.
 private func specializeDefaultMethods(for conformance: Conformance,
@@ -238,7 +238,7 @@ private func specializeDefaultMethods(for conformance: Conformance,
 
 private extension Function {
   // True, if this is a non-generic method which might have a generic self argument.
-  // Default implementations (in protocol extentions) of non-generic protocol methods have a generic
+  // Default implementations (in protocol extensions) of non-generic protocol methods have a generic
   // self argument.
   func isNonGenericWitnessMethod(_ context: some Context) -> Bool {
     switch loweredFunctionType.invocationGenericSignatureOfFunction.genericParameters.count {

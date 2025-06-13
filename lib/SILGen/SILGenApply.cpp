@@ -1717,6 +1717,37 @@ public:
     return false;
   }
 
+  static bool addsNonIsolatedNonSendingToAsyncFn(FunctionConversionExpr *fce) {
+    CanType oldTy = fce->getSubExpr()->getType()->getCanonicalType();
+    CanType newTy = fce->getType()->getCanonicalType();
+
+    if (auto oldFnTy = dyn_cast<AnyFunctionType>(oldTy)) {
+      if (auto newFnTy = dyn_cast<AnyFunctionType>(newTy)) {
+        // old type and new type MUST both be async
+        if (!oldFnTy->hasEffect(EffectKind::Async) ||
+            !newFnTy->hasEffect(EffectKind::Async))
+          return false;
+
+        // old type MUST NOT have nonisolated(nonsending).
+        if (oldFnTy->getIsolation().isNonIsolatedCaller())
+          return false;
+
+        // new type MUST nonisolated(nonsending)
+        if (!newFnTy->getIsolation().isNonIsolatedCaller())
+          return false;
+
+        // See if setting isolation of old type to nonisolated(nonsending)
+        // yields the new type.
+        auto addedNonIsolatedNonSending = oldFnTy->getExtInfo().withIsolation(
+            FunctionTypeIsolation::forNonIsolatedCaller());
+
+        return oldFnTy->withExtInfo(addedNonIsolatedNonSending) == newFnTy;
+      }
+    }
+
+    return false;
+  }
+
   /// Ignore parentheses and implicit conversions.
   static Expr *ignoreParensAndImpConversions(Expr *expr) {
     while (true) {
@@ -1736,6 +1767,8 @@ public:
           // skip over a specific, known no-op function conversion, if it exists
           if (auto funcConv = dyn_cast<FunctionConversionExpr>(nextSubExpr)) {
             if (addsGlobalActorToAsyncFn(funcConv))
+              nextSubExpr = funcConv->getSubExpr();
+            else if (addsNonIsolatedNonSendingToAsyncFn(funcConv))
               nextSubExpr = funcConv->getSubExpr();
           }
 
@@ -1774,7 +1807,7 @@ public:
 
     auto openExistential = dyn_cast<OpenExistentialExpr>(arg);
     if (openExistential)
-      arg = openExistential->getSubExpr();
+      arg = ignoreParensAndImpConversions(openExistential->getSubExpr());
 
     auto dynamicMemberRef = dyn_cast<DynamicMemberRefExpr>(arg);
     if (!dynamicMemberRef)

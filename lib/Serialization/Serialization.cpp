@@ -2146,6 +2146,7 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::Extension:
   case DeclKind::Module:
   case DeclKind::PrecedenceGroup:
+  case DeclKind::Using:
     if (D->getASTContext().LangOpts.AllowModuleWithCompilerErrors)
       return false;
     llvm_unreachable("decl should never be a member");
@@ -2733,10 +2734,10 @@ void Serializer::writeLifetimeDependencies(
 
     auto abbrCode = DeclTypeAbbrCodes[LifetimeDependenceLayout::Code];
     LifetimeDependenceLayout::emitRecord(
-        Out, ScratchRecord, abbrCode, info.getTargetIndex(), info.isImmortal(),
+        Out, ScratchRecord, abbrCode, info.getTargetIndex(),
+        info.getParamIndicesLength(), info.isImmortal(),
         info.hasInheritLifetimeParamIndices(),
-        info.hasScopeLifetimeParamIndices(),
-        info.hasAddressableParamIndices(),
+        info.hasScopeLifetimeParamIndices(), info.hasAddressableParamIndices(),
         paramIndices);
     paramIndices.clear();
   }
@@ -3201,9 +3202,10 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DeclAttrKind::Specialized:
     case DeclAttrKind::Specialize: {
       auto abbrCode = S.DeclTypeAbbrCodes[SpecializeDeclAttrLayout::Code];
-      auto attr = cast<SpecializeAttr>(DA);
+      auto attr = cast<AbstractSpecializeAttr>(DA);
       auto *afd = cast<AbstractFunctionDecl>(D);
       auto *targetFunDecl = attr->getTargetFunctionDecl(afd);
 
@@ -3223,7 +3225,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
 
       auto numAvailabilityAttrs = attr->getAvailableAttrs().size();
       SpecializeDeclAttrLayout::emitRecord(
-          S.Out, S.ScratchRecord, abbrCode, (unsigned)attr->isExported(),
+          S.Out, S.ScratchRecord, abbrCode, (unsigned)attr->isPublic(),
+          (unsigned)attr->isExported(),
           (unsigned)attr->getSpecializationKind(),
           S.addGenericSignatureRef(attr->getSpecializedSignature(afd)),
           S.addDeclRef(targetFunDecl), numSPIGroups, numAvailabilityAttrs,
@@ -4140,8 +4143,8 @@ public:
 
   void noteUseOfExportedPrespecialization(const AbstractFunctionDecl *afd) {
     bool hasNoted = false;
-    for (auto *A : afd->getAttrs().getAttributes<SpecializeAttr>()) {
-      auto *SA = cast<SpecializeAttr>(A);
+    for (auto *A : afd->getAttrs().getAttributes<AbstractSpecializeAttr>()) {
+      auto *SA = cast<AbstractSpecializeAttr>(A);
       if (!SA->isExported())
         continue;
       if (SA->getTargetFunctionDecl(afd)) {
@@ -5271,6 +5274,10 @@ public:
 
   void visitImportDecl(const ImportDecl *) {
     llvm_unreachable("import decls should not be serialized");
+  }
+
+  void visitUsingDecl(const UsingDecl *) {
+    llvm_unreachable("using decls should not be serialized");
   }
 
   void visitEnumCaseDecl(const EnumCaseDecl *) {
@@ -6969,7 +6976,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
 
     for (auto D : fileDecls) {
       if (isa<ImportDecl>(D) || isa<MacroExpansionDecl>(D) ||
-          isa<TopLevelCodeDecl>(D)) {
+          isa<TopLevelCodeDecl>(D) || isa<UsingDecl>(D)) {
         continue;
       }
 

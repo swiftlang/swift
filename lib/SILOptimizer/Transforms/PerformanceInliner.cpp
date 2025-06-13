@@ -524,6 +524,14 @@ static bool hasConstantArguments(FullApplySite fas) {
   return true;
 }
 
+static bool hasConstantEnumArgument(FullApplySite fas) {
+  for (SILValue arg : fas.getArguments()) {
+    if (isa<EnumInst>(arg))
+      return true;
+  }
+  return false;
+}
+
 bool SILPerformanceInliner::isProfitableToInline(
     FullApplySite AI, Weight CallerWeight, ConstantTracker &callerTracker,
     int &NumCallerBlocks,
@@ -594,6 +602,13 @@ bool SILPerformanceInliner::isProfitableToInline(
 
   if (Callee->hasSemanticsAttr(semantics::OPTIMIZE_SIL_INLINE_CONSTANT_ARGUMENTS) &&
       hasConstantArguments(AI)) {
+    return true;
+  }
+
+  // If there is a "constant" enum argument to a synthesized enum comparison,
+  // we can always inline it, because most of it will be constant folded anyway.
+  if (Callee->hasSemanticsAttr(semantics::DERIVED_ENUM_EQUALS) &&
+      hasConstantEnumArgument(AI)) {
     return true;
   }
 

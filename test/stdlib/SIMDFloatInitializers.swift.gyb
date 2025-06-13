@@ -11,17 +11,18 @@
 //===----------------------------------------------------------------------===//
 // RUN: %empty-directory(%t)
 // RUN: %gyb %s -o %t/SIMDFloatInitializers.swift
-// RUN: %target-swift-frontend -primary-file %t/SIMDFloatInitializers.swift -S | %FileCheck %t/SIMDFloatInitializers.swift --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECKOnone-%target-cpu
-// RUN: %target-swift-frontend -primary-file %t/SIMDFloatInitializers.swift -S -O | %FileCheck %t/SIMDFloatInitializers.swift --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECKO-%target-cpu
-
-// Disable this test for now because aEIC/transparent functions still are not
-// correctly differentiable, and so these inits are suppressed in the stdlib.
-// REQUIRES: differentiable-aEIC-transparent
+// RUN: %target-swift-frontend -primary-file %t/SIMDFloatInitializers.swift -emit-ir | %FileCheck %t/SIMDFloatInitializers.swift --check-prefix=CHECK --check-prefix=CHECK-%target-cpu
 
 import Swift
 
 %for bits in [16,32,64]:
+% if bits == 16:
+%  arch = "-arm64"
+% else:
+%  arch = ""
+% end
 % scalar = {16:'Float16',32:'Float',64:'Double'}[bits]
+% llvm = {16:'half',32:'float',64:'double'}[bits]
 % for totalBits in [64,128]:
 %  n = totalBits // bits
 %  if n != 1:
@@ -35,51 +36,18 @@ func repeating${n}x${bits}(_ scalar: ${scalar}) -> SIMD${n}<${scalar}> {
 }
 %   if bits == 16:
 #endif
-// CHECK-arm64: repeating${n}x${bits}{{[[:alnum:]]+}}:
-%   else:
-// CHECK: repeating${n}x${bits}{{[[:alnum:]]+}}:
 %   end
-// CHECKO-arm64-NEXT: dup.${neonSuffix} v0, v0[0]
-// CHECKO-arm64-NEXT: ret
-// CHECKOnone-arm64: dup.${neonSuffix}
-// CHECKOnone-arm64: ret
+
+// CHECK${arch}: repeating${n}x${bits}{{.*}} {
+// CHECK${arch}: entry:
+// CHECK${arch}: [[TMP:%[0-9]+]] = insertelement <${n} x ${llvm}> {{.*}} ${llvm} %0, i32 0
+// CHECK${arch}-NEXT: [[REP:%[0-9]+]] = shufflevector <${n} x ${llvm}> [[TMP]], <${n} x ${llvm}> {{.*}}, <${n} x i32> zeroinitializer
+%   if totalBits == 64:
+// CHECK-arm64-NEXT: ret <${n} x ${llvm}> [[REP]]
+%   else:
+// CHECK${arch}-NEXT: ret <${n} x ${llvm}> [[REP]]
+%   end
 
 %  end
 % end
 %end
-
-#if arch(arm64)
-@available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, *)
-func concat4x16(_ a: SIMD4<Float16>, _ b: SIMD4<Float16>) -> SIMD8<Float16> {
-  SIMD8(lowHalf: a, highHalf: b)
-}
-// CHECK-arm64: s21SIMDFloatInitializers10concat4x16ys5SIMD8Vys7Float16VGs5SIMD4VyAFG_AJtF:
-// CHECKO-arm64-NEXT: mov.d v0[1], v1[0]
-// CHECKO-arm64-NEXT: ret
-
-@available(macOS 11.0, iOS 14.0, tvOS 14.0, watchOS 7.0, *)
-func concat8x16(_ a: SIMD8<Float16>, _ b: SIMD8<Float16>) -> SIMD16<Float16> {
-  SIMD16(lowHalf: a, highHalf: b)
-}
-// CHECK-arm64: s21SIMDFloatInitializers10concat8x16ys6SIMD16Vys7Float16VGs5SIMD8VyAFG_AJtF:
-// CHECKO-arm64-NEXT: ret
-#endif
-
-func concat2x32(_ a: SIMD2<Float>, _ b: SIMD2<Float>) -> SIMD4<Float> {
-  SIMD4(lowHalf: a, highHalf: b)
-}
-// CHECK: s21SIMDFloatInitializers10concat2x32ys5SIMD4VySfGs5SIMD2VySfG_AHtF:
-// CHECKO-arm64-NEXT: mov.d v0[1], v1[0]
-// CHECKO-arm64-NEXT: ret
-
-func concat4x32(_ a: SIMD4<Float>, _ b: SIMD4<Float>) -> SIMD8<Float> {
-  SIMD8(lowHalf: a, highHalf: b)
-}
-// CHECK: s21SIMDFloatInitializers10concat4x32ys5SIMD8VySfGs5SIMD4VySfG_AHtF:
-// CHECKO-arm64-NEXT: ret
-
-func concat2x64(_ a: SIMD2<Double>, _ b: SIMD2<Double>) -> SIMD4<Double> {
-  SIMD4(lowHalf: a, highHalf: b)
-}
-// CHECK: s21SIMDFloatInitializers10concat2x64ys5SIMD4VySdGs5SIMD2VySdG_AHtF:
-// CHECKO-arm64-NEXT: ret

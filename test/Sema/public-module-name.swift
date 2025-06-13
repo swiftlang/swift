@@ -30,7 +30,7 @@
 // RUN: cat %t/LibCore.swiftinterface | %FileCheck --check-prefix=CHECK-FLAG %s
 // RUN: cat %t/LibMiddle.swiftinterface | %FileCheck --check-prefix=CHECK-FLAG %s
 // CHECK-FLAG: swift-module-flags-ignorable:
-// CHECK-SAME-FLAG: -public-module-name Lib
+// CHECK-FLAG-SAME: -public-module-name Lib
 
 /// Build clients against binary swiftmodules.
 /// First errors in files, then diagnostics in other files.

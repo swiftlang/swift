@@ -401,7 +401,9 @@ public:
   void visitPostfixAttr(PostfixAttr *attr) { checkOperatorAttribute(attr); }
   void visitPrefixAttr(PrefixAttr *attr) { checkOperatorAttribute(attr); }
 
+  void visitSpecializedAttr(SpecializedAttr *attr);
   void visitSpecializeAttr(SpecializeAttr *attr);
+  void visitAbstractSpecializeAttr(AbstractSpecializeAttr *attr);
 
   void visitFixedLayoutAttr(FixedLayoutAttr *attr);
   void visitUsableFromInlineAttr(UsableFromInlineAttr *attr);
@@ -3324,7 +3326,7 @@ void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
 
 /// Ensure that the requirements provided by the @_specialize attribute
 /// can be supported by the SIL EagerSpecializer pass.
-static void checkSpecializeAttrRequirements(SpecializeAttr *attr,
+static void checkSpecializeAttrRequirements(AbstractSpecializeAttr *attr,
                                             GenericSignature originalSig,
                                             GenericSignature specializedSig,
                                             ASTContext &ctx) {
@@ -3334,7 +3336,8 @@ static void checkSpecializeAttrRequirements(SpecializeAttr *attr,
   for (auto specializedReq : specializedReqs) {
     if (!specializedReq.getFirstType()->is<GenericTypeParamType>()) {
       ctx.Diags.diagnose(attr->getLocation(),
-                         diag::specialize_attr_only_generic_param_req);
+                         diag::specialize_attr_only_generic_param_req,
+												 attr->isPublic());
       hadError = true;
       continue;
     }
@@ -3346,14 +3349,17 @@ static void checkSpecializeAttrRequirements(SpecializeAttr *attr,
     case RequirementKind::Conformance:
     case RequirementKind::Superclass:
       ctx.Diags.diagnose(attr->getLocation(),
-                         diag::specialize_attr_unsupported_kind_of_req);
+                         attr->isPublic() ?
+												 diag::specialized_attr_unsupported_kind_of_req :
+												 diag::specialize_attr_unsupported_kind_of_req);
       hadError = true;
       break;
 
     case RequirementKind::SameType:
       if (specializedReq.getSecondType()->isTypeParameter()) {
         ctx.Diags.diagnose(attr->getLocation(),
-                           diag::specialize_attr_non_concrete_same_type_req);
+                           diag::specialize_attr_non_concrete_same_type_req,
+													 attr->isPublic());
         hadError = true;
       }
       break;
@@ -3391,38 +3397,48 @@ static void checkSpecializeAttrRequirements(SpecializeAttr *attr,
 
   ctx.Diags.diagnose(
       attr->getLocation(), diag::specialize_attr_type_parameter_count_mismatch,
-      gotCount, expectedCount);
+      gotCount, expectedCount, attr->isPublic());
 
   for (auto paramTy : unspecializedParams) {
     ctx.Diags.diagnose(attr->getLocation(),
                        diag::specialize_attr_missing_constraint,
-                       paramTy->getName());
+                       paramTy->getName(),
+											 attr->isPublic());
   }
 }
 
-/// Type check that a set of requirements provided by @_specialize.
+/// Type check that a set of requirements provided by @_specialize/@specialize.
 /// Store the set of requirements in the attribute.
+void AttributeChecker::visitSpecializedAttr(SpecializedAttr *attr) {
+  visitAbstractSpecializeAttr(attr);
+}
 void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
+  visitAbstractSpecializeAttr(attr);
+}
+void AttributeChecker::visitAbstractSpecializeAttr(AbstractSpecializeAttr *attr) {
   auto *FD = cast<AbstractFunctionDecl>(D);
   auto genericSig = FD->getGenericSignature();
   auto *trailingWhereClause = attr->getTrailingWhereClause();
 
   if (!trailingWhereClause) {
     // Report a missing "where" clause.
-    diagnose(attr->getLocation(), diag::specialize_missing_where_clause);
+    diagnose(attr->getLocation(), diag::specialize_missing_where_clause,
+						 attr->isPublic());
     return;
   }
 
   if (trailingWhereClause->getRequirements().empty()) {
     // Report an empty "where" clause.
-    diagnose(attr->getLocation(), diag::specialize_empty_where_clause);
+    diagnose(attr->getLocation(), diag::specialize_empty_where_clause,
+						 attr->isPublic());
     return;
   }
 
   if (!genericSig) {
     // Only generic functions are permitted to have trailing where clauses.
     diagnose(attr->getLocation(),
-             diag::specialize_attr_nongeneric_trailing_where, FD->getName())
+             diag::specialize_attr_nongeneric_trailing_where, FD->getName(),
+             attr->isPublic())
         .highlight(trailingWhereClause->getSourceRange());
     return;
   }
@@ -3433,7 +3449,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
 GenericSignature
 SerializeAttrGenericSignatureRequest::evaluate(Evaluator &evaluator,
                                                const AbstractFunctionDecl *FD,
-                                               SpecializeAttr *attr) const {
+                                               AbstractSpecializeAttr *attr) const {
   if (attr->specializedSignature)
     return attr->specializedSignature;
 
@@ -3489,7 +3505,7 @@ SerializeAttrGenericSignatureRequest::evaluate(Evaluator &evaluator,
 std::optional<GenericSignature>
 SerializeAttrGenericSignatureRequest::getCachedResult() const {
   const auto &storage = getStorage();
-  SpecializeAttr *attr = std::get<1>(storage);
+  AbstractSpecializeAttr *attr = std::get<1>(storage);
   if (auto signature = attr->specializedSignature)
     return signature;
   return std::nullopt;
@@ -3498,7 +3514,7 @@ SerializeAttrGenericSignatureRequest::getCachedResult() const {
 void SerializeAttrGenericSignatureRequest::cacheResult(
     GenericSignature signature) const {
   const auto &storage = getStorage();
-  SpecializeAttr *attr = std::get<1>(storage);
+  AbstractSpecializeAttr *attr = std::get<1>(storage);
   attr->specializedSignature = signature;
 }
 
@@ -3932,7 +3948,7 @@ findReplacedFunction(DeclNameRef replacedFunctionName,
 static AbstractFunctionDecl *
 findTargetFunction(DeclNameRef targetFunctionName,
                    const AbstractFunctionDecl *base,
-                   SpecializeAttr * attr, DiagnosticEngine *diags) {
+                   AbstractSpecializeAttr * attr, DiagnosticEngine *diags) {
   return findSimilarFunction(targetFunctionName, base, attr, diags,
                              false /*forDynamicReplacement*/);
 }
@@ -5286,11 +5302,6 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
   case ReferenceOwnershipOptionality::Allowed:
     break;
   case ReferenceOwnershipOptionality::Required:
-    if (var->isLet()) {
-      var->diagnose(diag::invalid_ownership_is_let, ownershipKind);
-      attr->setInvalid();
-    }
-
     if (!isOptional) {
       attr->setInvalid();
 
@@ -5607,7 +5618,7 @@ DynamicallyReplacedDeclRequest::evaluate(Evaluator &evaluator,
 ValueDecl *
 SpecializeAttrTargetDeclRequest::evaluate(Evaluator &evaluator,
                                           const ValueDecl *vd,
-                                          SpecializeAttr *attr) const {
+                                          AbstractSpecializeAttr *attr) const {
   if (auto *lazyResolver = attr->resolver) {
     auto *decl =
         lazyResolver->loadTargetFunctionDecl(attr, attr->resolverContextData);
@@ -7878,10 +7889,10 @@ void AttributeChecker::visitInheritActorContextAttr(
         .warnUntilFutureSwiftVersion();
   }
 
-  // Eiether `async` or `@isolated(any)`.
+  // Either `async` or `@isolated(any)`.
   if (!(funcTy->isAsync() || funcTy->getIsolation().isErased())) {
-    diagnose(
-        attr->getLocation(),
+    diagnoseAndRemoveAttr(
+        attr,
         diag::inherit_actor_context_only_on_async_or_isolation_erased_params,
         attr)
         .warnUntilFutureSwiftVersion();
@@ -8214,7 +8225,28 @@ void AttributeChecker::visitWeakLinkedAttr(WeakLinkedAttr *attr) {
                         Ctx.LangOpts.Target.str());
 }
 
-void AttributeChecker::visitLifetimeAttr(LifetimeAttr *attr) {}
+void AttributeChecker::visitLifetimeAttr(LifetimeAttr *attr) {
+  if (!attr->isUnderscored()) {
+    // Allow @lifetime only in the stdlib, cxx and backward compatibility
+    // modules under -enable-experimental-feature LifetimeDependence
+    if (!Ctx.MainModule->isStdlibModule() && !Ctx.MainModule->isCxxModule() &&
+        Ctx.MainModule->getABIName() != Ctx.StdlibModuleName) {
+      Ctx.Diags.diagnose(attr->getLocation(), diag::use_lifetime_underscored);
+    }
+    if (!Ctx.LangOpts.hasFeature(Feature::LifetimeDependence)) {
+      diagnose(attr->getLocation(), diag::requires_experimental_feature,
+               "@lifetime", false, Feature::LifetimeDependence.getName());
+    }
+  } else {
+    // Allow @_lifetime under -enable-experimental-feature Lifetimes
+    if (!Ctx.LangOpts.hasFeature(Feature::Lifetimes) &&
+        !Ctx.SourceMgr.isImportMacroGeneratedLoc(attr->getLocation())) {
+      diagnose(attr->getLocation(), diag::requires_experimental_feature,
+               "@_lifetime",
+               false, Feature::Lifetimes.getName());
+    }
+  }
+}
 
 void AttributeChecker::visitAddressableSelfAttr(AddressableSelfAttr *attr) {
   if (!Ctx.LangOpts.hasFeature(Feature::AddressableParameters)) {

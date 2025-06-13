@@ -170,8 +170,7 @@ protected:
                  bool isTestableImport, bool isCandidateForTextualModule);
 
   struct BinaryModuleImports {
-    llvm::StringSet<> moduleImports;
-    llvm::StringSet<> exportedModules;
+    std::vector<ScannerImportStatementInfo> moduleImports;
     std::string headerImport;
   };
 
@@ -580,7 +579,8 @@ public:
 bool extractCompilerFlagsFromInterface(
     StringRef interfacePath, StringRef buffer, llvm::StringSaver &ArgSaver,
     SmallVectorImpl<const char *> &SubArgs,
-    std::optional<llvm::Triple> PreferredTarget = std::nullopt);
+    std::optional<llvm::Triple> PreferredTarget = std::nullopt,
+    DiagnosticEngine *diagEngine = nullptr);
 
 /// Extract the user module version number from an interface file.
 llvm::VersionTuple extractUserModuleVersionFromInterface(StringRef moduleInterfacePath);

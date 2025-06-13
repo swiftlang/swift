@@ -128,6 +128,32 @@ public:
       collectAbortApply(abortApply);
       endBorrowInsertPts.push_back(&*std::next(abortApply->getIterator()));
     }
+
+    // We may have a mark_dependence/mark_dependence_addr on the coroutine's
+    // token. This is needed to represent lifetime dependence on values created
+    // within the coroutine. Delete such mark_dependence instructions since the
+    // dependencies on values created within the coroutine will be exposed after
+    // inlining.
+    if (BeginApply->getCalleeFunction()
+            ->getLoweredFunctionType()
+            ->hasLifetimeDependencies()) {
+      SmallVector<SILInstruction *> toDelete;
+      for (auto *tokenUser : BeginApply->getTokenResult()->getUsers()) {
+        auto mdi = MarkDependenceInstruction(tokenUser);
+        if (!mdi) {
+          continue;
+        }
+        assert(mdi.isNonEscaping());
+        if (auto *valueMDI = dyn_cast<MarkDependenceInst>(*mdi)) {
+          valueMDI->replaceAllUsesWith(valueMDI->getValue());
+        }
+        toDelete.push_back(*mdi);
+      }
+
+      for (auto *inst : toDelete) {
+        inst->eraseFromParent();
+      }
+    }
   }
 
   // Split the basic block before the end/abort_apply. We will insert code

@@ -1720,7 +1720,8 @@ namespace {
     /// Prints a type as a field. If writing a parsable output format, the
     /// `PrintOptions` are ignored and the type is written as a USR; otherwise,
     /// the type is stringified using the `PrintOptions`.
-    void printTypeField(Type Ty, Label label, PrintOptions opts = PrintOptions(),
+    void printTypeField(Type Ty, Label label,
+                        const PrintOptions &opts = PrintOptions(),
                         TerminalColor Color = TypeColor) {
       if (Writer.isParsable()) {
         printField(typeUSR(Ty), label, Color);
@@ -2112,6 +2113,11 @@ namespace {
 
       printImportPath(ID, Label::always("module"));
       printFoot();
+    }
+
+    void visitUsingDecl(UsingDecl *UD, Label label) {
+      printCommon(UD, "using_decl", label);
+      printFieldQuoted(UD->getSpecifierName(), Label::always("specifier"));
     }
 
     void visitExtensionDecl(ExtensionDecl *ED, Label label) {
@@ -5430,7 +5436,16 @@ public:
     printFoot();
   }
   void visitSpecializeAttr(SpecializeAttr *Attr, Label label) {
-    printCommon(Attr, "specialize_attr", label);
+    visitAbstractSpecializeAttr(Attr, label);
+  }
+
+  void visitSpecializedAttr(SpecializedAttr *Attr, Label label) {
+    visitAbstractSpecializeAttr(Attr, label);
+  }
+
+  void visitAbstractSpecializeAttr(AbstractSpecializeAttr *Attr, Label label) {
+    printCommon(Attr, Attr->isPublic() ? "specialized_attr" :
+                  "specialize_attr", label);
     printFlag(Attr->isExported(), "exported");
     printFlag(Attr->isFullSpecialization(), "full");
     printFlag(Attr->isPartialSpecialization(), "partial");

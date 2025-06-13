@@ -503,6 +503,9 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
        peekToken().isContextualPunctuator("~")) &&
       !peekToken().isAtStartOfLine()) {
     ParserResult<TypeRepr> ty = parseType();
+    if (ty.isNull())
+      return nullptr;
+
     auto *typeExpr = new (Context) TypeExpr(ty.get());
     return makeParserResult(typeExpr);
   }

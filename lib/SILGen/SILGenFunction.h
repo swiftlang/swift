@@ -543,7 +543,9 @@ public:
     
     PreparedAddressableBuffer(SILInstruction *insertPoint)
       : insertPoint(insertPoint)
-    {}
+    {
+      ASSERT(insertPoint && "null insertion point provided");
+    }
     
     PreparedAddressableBuffer(PreparedAddressableBuffer &&other)
       : insertPoint(other.insertPoint)

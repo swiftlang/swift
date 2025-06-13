@@ -1015,13 +1015,13 @@ function(_compile_swift_files
   # need to work around this by avoiding long command line arguments. This can
   # be achieved by writing the list of file paths to a file, then reading that
   # list in the Python script.
-  string(REPLACE ";" "'\n'" source_files_quoted "${source_files}")
-  string(SHA1 file_name "'${source_files_quoted}'")
+  string(REPLACE ";" "\n" source_files_quoted "${source_files}")
+  string(SHA1 file_name "${source_files_quoted}")
   set(file_path_target "filelist-${file_name}")
   set(file_path "${CMAKE_CURRENT_BINARY_DIR}/${file_name}.txt")
 
   if (NOT TARGET ${file_path_target})
-    file(WRITE "${file_path}.tmp" "'${source_files_quoted}'")
+    file(WRITE "${file_path}.tmp" "${source_files_quoted}")
     add_custom_command_target(unused_var
       COMMAND ${CMAKE_COMMAND} -E copy_if_different "${file_path}.tmp" "${file_path}"
       CUSTOM_TARGET_NAME ${file_path_target}

@@ -1,3 +1,6 @@
+/// @cdecl attribute
+/// This test shouldn't require the objc runtime.
+
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %s \
 // RUN:   -enable-experimental-feature CDecl -disable-objc-interop
 
@@ -31,7 +34,9 @@ enum SwiftEnum { case A, B }
 #endif
 
 @cdecl("swiftStruct")
-func swiftStruct(x: SwiftStruct) {} // expected-error{{cannot be represented}} expected-note{{Swift struct}}
+func swiftStruct(x: SwiftStruct) {}
+// expected-error @-1 {{global function cannot be marked '@cdecl' because the type of the parameter cannot be represented in C}}
+// expected-note @-2 {{Swift structs cannot be represented in C}}
 
 @cdecl("swiftEnum")
 func swiftEnum(x: SwiftEnum) {} // expected-error{{cannot be represented}} expected-note{{non-'@objc' enum}}
@@ -65,9 +70,97 @@ func acceptedPointers(_ x: UnsafeMutablePointer<Int>,
 
 @cdecl("rejectedPointers")
 func rejectedPointers( // expected-error 6 {{global function cannot be marked '@cdecl' because the type of the parameter}}
-    x: UnsafePointer<String>, // expected-note {{Swift structs cannot be represented in Objective-C}} // FIXME: Should reference C.
-    y: CVaListPointer, // expected-note {{Swift structs cannot be represented in Objective-C}}
-    z: UnsafeBufferPointer<Int>, // expected-note {{Swift structs cannot be represented in Objective-C}}
-    u: UnsafeMutableBufferPointer<Int>, // expected-note {{Swift structs cannot be represented in Objective-C}}
-    v: UnsafeRawBufferPointer, // expected-note {{Swift structs cannot be represented in Objective-C}}
-    t: UnsafeMutableRawBufferPointer) {} // expected-note {{Swift structs cannot be represented in Objective-C}}
+    x: UnsafePointer<String>, // expected-note {{Swift structs cannot be represented in C}}
+    y: CVaListPointer, // expected-note {{Swift structs cannot be represented in C}}
+    z: UnsafeBufferPointer<Int>, // expected-note {{Swift structs cannot be represented in C}}
+    u: UnsafeMutableBufferPointer<Int>, // expected-note {{Swift structs cannot be represented in C}}
+    v: UnsafeRawBufferPointer, // expected-note {{Swift structs cannot be represented in C}}
+    t: UnsafeMutableRawBufferPointer) {} // expected-note {{Swift structs cannot be represented in C}}
+
+@cdecl("genericParam")
+func genericParam<I>(i: I) {}
+// expected-error @-1 {{global function cannot be marked '@cdecl' because it has generic parameters}}
+
+@cdecl("variadic")
+func variadic(_: Int...) {}
+// expected-error @-1 {{global function cannot be marked '@cdecl' because it has a variadic parameter}}
+
+@cdecl("tupleParamEmpty")
+func tupleParamEmpty(a: ()) {}
+// expected-error @-1 {{global function cannot be marked '@cdecl' because the type of the parameter cannot be represented in C}}
+// expected-note @-2 {{empty tuple type cannot be represented in C}}
+
+@cdecl("tupleParam")
+func tupleParam(a: (Int, Float)) {}
+// expected-error @-1 {{global function cannot be marked '@cdecl' because the type of the parameter cannot be represented in C}}
+// expected-note @-2 {{tuples cannot be represented in C}}
+
+@cdecl("emptyTupleReturn")
+func emptyTupleReturn() -> () {}
+
+@cdecl("tupleReturn")
+func tupleReturn() -> (Int, Float) { (1, 2.0) }
+// expected-error @-1 {{global function cannot be marked '@cdecl' because its result type cannot be represented in C}}
+// expected-note @-2 {{tuples cannot be represented in C}}
+
+@cdecl("funcAcceptsThrowingFunc")
+func funcAcceptsThrowingFunc(fn: (String) throws -> Int) { }
+// expected-error @-1 {{global function cannot be marked '@cdecl' because the type of the parameter cannot be represented in C}}
+// expected-note @-2 {{throwing function types cannot be represented in C}}
+
+@cdecl("funcAcceptsThrowingFuncReturn")
+func funcAcceptsThrowingFuncReturn() -> (String) throws -> Int { fatalError() }
+// expected-error @-1 {{global function cannot be marked '@cdecl' because its result type cannot be represented in C}}
+// expected-note @-2 {{throwing function types cannot be represented in C}}
+
+@cdecl("bar")
+func bar(f: (SwiftEnum) -> SwiftStruct) {}
+// expected-error @-1 {{global function cannot be marked '@cdecl' because the type of the parameter cannot be represented in C}}
+// expected-note @-2 {{function types cannot be represented in C unless their parameters and returns can be}}
+
+@cdecl("bas")
+func bas(f: (SwiftEnum) -> ()) {}
+// expected-error @-1 {{global function cannot be marked '@cdecl' because the type of the parameter cannot be represented in C}}
+// expected-note @-2 {{function types cannot be represented in C unless their parameters and returns can be}}
+
+@cdecl("zim")
+func zim(f: () -> SwiftStruct) {}
+// expected-error @-1 {{global function cannot be marked '@cdecl' because the type of the parameter cannot be represented in C}}
+// expected-note @-2 {{function types cannot be represented in C unless their parameters and returns can be}}
+
+@cdecl("zang")
+func zang(f: (SwiftEnum, SwiftStruct) -> ()) {}
+// expected-error @-1 {{global function cannot be marked '@cdecl' because the type of the parameter cannot be represented in C}}
+// expected-note @-2 {{function types cannot be represented in C unless their parameters and returns can be}}
+
+@cdecl("zang_zang")
+  func zangZang(f: (Int...) -> ()) {}
+// expected-error @-1 {{global function cannot be marked '@cdecl' because the type of the parameter cannot be represented in C}}
+// expected-note @-2 {{function types cannot be represented in C unless their parameters and returns can be}}
+
+@cdecl("array")
+func array(i: [Int]) {}
+// expected-error @-1 {{global function cannot be marked '@cdecl' because the type of the parameter cannot be represented in C}}
+// expected-note @-2 {{Swift structs cannot be represented in C}}
+
+class SwiftClass {}
+@cdecl("swiftClass")
+func swiftClass(p: SwiftClass) {}
+// expected-error @-1 {{global function cannot be marked '@cdecl' because the type of the parameter cannot be represented in C}}
+// expected-note @-2 {{classes cannot be represented in C}}
+
+protocol SwiftProtocol {}
+@cdecl("swiftProtocol")
+func swiftProtocol(p: SwiftProtocol) {}
+// expected-error @-1 {{global function cannot be marked '@cdecl' because the type of the parameter cannot be represented in C}}
+// expected-note @-2 {{protocols cannot be represented in C}}
+
+@cdecl("swiftErrorProtocol")
+func swiftErrorProtocol(e: Error) {}
+// expected-error @-1 {{global function cannot be marked '@cdecl' because the type of the parameter cannot be represented in C}}
+// expected-note @-2 {{protocols cannot be represented in C}}
+
+@cdecl("anyParam")
+func anyParam(e:Any) {}
+// expected-error @-1 {{global function cannot be marked '@cdecl' because the type of the parameter cannot be represented in C}}
+// expected-note @-2 {{protocols cannot be represented in C}}

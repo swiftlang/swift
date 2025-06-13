@@ -373,7 +373,8 @@ SerializedModuleLoaderBase::getMatchingPackageOnlyImportsOfModule(
     if (dotPos != std::string::npos)
       moduleName = moduleName.slice(0, dotPos);
 
-    importedModuleNames.push_back({moduleName.str(), dependency.isExported()});
+    importedModuleNames.push_back({moduleName.str(), dependency.isExported(),
+      dependency.isInternalOrBelow() ? AccessLevel::Internal : AccessLevel::Public});
   }
 
   return importedModuleNames;
@@ -478,8 +479,7 @@ SerializedModuleLoaderBase::getImportsOfModule(
     const ModuleFileSharedCore &loadedModuleFile,
     ModuleLoadingBehavior transitiveBehavior, StringRef packageName,
     bool isTestableImport) {
-  llvm::StringSet<> importedModuleNames;
-  llvm::StringSet<> importedExportedModuleNames;
+  std::vector<ScannerImportStatementInfo> moduleImports;
   std::string importedHeader = "";
   for (const auto &dependency : loadedModuleFile.getDependencies()) {
     if (dependency.isHeader()) {
@@ -513,13 +513,13 @@ SerializedModuleLoaderBase::getImportsOfModule(
     if (moduleName == Ctx.Id_CxxStdlib.str())
       moduleName = "std";
 
-    importedModuleNames.insert(moduleName);
-    if (dependency.isExported())
-      importedExportedModuleNames.insert(moduleName);
+    moduleImports.push_back(ScannerImportStatementInfo(
+        moduleName.str(), dependency.isExported(),
+        dependency.isInternalOrBelow() ? AccessLevel::Internal
+                                       : AccessLevel::Public));
   }
 
-  return SerializedModuleLoaderBase::BinaryModuleImports{importedModuleNames,
-                                                         importedExportedModuleNames,
+  return SerializedModuleLoaderBase::BinaryModuleImports{moduleImports,
                                                          importedHeader};
 }
 
@@ -601,48 +601,34 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
       getImportsOfModule(*loadedModuleFile, ModuleLoadingBehavior::Optional,
                          Ctx.LangOpts.PackageName, isTestableImport);
 
-  auto importedModuleSet = binaryModuleImports->moduleImports;
-  std::vector<ScannerImportStatementInfo> moduleImports;
-  moduleImports.reserve(importedModuleSet.size());
-  llvm::transform(importedModuleSet.keys(), std::back_inserter(moduleImports),
-                  [&binaryModuleImports](llvm::StringRef N) {
-                    return ScannerImportStatementInfo(
-                        N.str(),
-                        binaryModuleImports->exportedModules.contains(N));
-                  });
-
-  auto importedHeader = binaryModuleImports->headerImport;
-  auto &importedOptionalModuleSet = binaryModuleOptionalImports->moduleImports;
-  auto &importedExportedOptionalModuleSet =
-      binaryModuleOptionalImports->exportedModules;
-  std::vector<ScannerImportStatementInfo> optionalModuleImports;
-  for (const auto optionalImportedModule : importedOptionalModuleSet.keys())
-    if (!importedModuleSet.contains(optionalImportedModule))
-      optionalModuleImports.push_back(
-          {optionalImportedModule.str(),
-           importedExportedOptionalModuleSet.contains(optionalImportedModule)});
-
   std::vector<LinkLibrary> linkLibraries;
   {
     linkLibraries.reserve(loadedModuleFile->getLinkLibraries().size());
     llvm::copy(loadedModuleFile->getLinkLibraries(),
                std::back_inserter(linkLibraries));
     if (loadedModuleFile->isFramework())
-      linkLibraries.emplace_back(
-          loadedModuleFile->getName(), LibraryKind::Framework,
-                      loadedModuleFile->isStaticLibrary());
+      linkLibraries.emplace_back(loadedModuleFile->getName(),
+                                 LibraryKind::Framework,
+                                 loadedModuleFile->isStaticLibrary());
   }
 
   // Attempt to resolve the module's defining .swiftinterface path
   std::string definingModulePath =
-       loadedModuleFile->resolveModuleDefiningFilePath(Ctx.SearchPathOpts.getSDKPath());
+      loadedModuleFile->resolveModuleDefiningFilePath(
+          Ctx.SearchPathOpts.getSDKPath());
 
-  std::string userModuleVer = loadedModuleFile->getUserModuleVersion().getAsString();
+  std::string userModuleVer =
+    loadedModuleFile->getUserModuleVersion().getAsString();
+  std::vector<serialization::SearchPath> serializedSearchPaths;
+  llvm::copy(loadedModuleFile->getSearchPaths(), std::back_inserter(serializedSearchPaths));
+  
   // Map the set of dependencies over to the "module dependencies".
   auto dependencies = ModuleDependencyInfo::forSwiftBinaryModule(
-      modulePath.str(), moduleDocPath, sourceInfoPath, moduleImports,
-      optionalModuleImports, linkLibraries, importedHeader,
-      definingModulePath, isFramework, loadedModuleFile->isStaticLibrary(),
+      modulePath.str(), moduleDocPath, sourceInfoPath,
+      binaryModuleImports->moduleImports,
+      binaryModuleOptionalImports->moduleImports, linkLibraries, serializedSearchPaths,
+      binaryModuleImports->headerImport, definingModulePath, isFramework,
+      loadedModuleFile->isStaticLibrary(),
       /*module-cache-key*/ "", userModuleVer);
 
   for (auto &macro : loadedModuleFile->getExternalMacros()) {
@@ -1470,30 +1456,70 @@ static std::optional<StringRef> getFlagsFromInterfaceFile(StringRef &file,
 bool swift::extractCompilerFlagsFromInterface(
     StringRef interfacePath, StringRef buffer, llvm::StringSaver &ArgSaver,
     SmallVectorImpl<const char *> &SubArgs,
-    std::optional<llvm::Triple> PreferredTarget) {
+    std::optional<llvm::Triple> PreferredTarget, DiagnosticEngine *Diag) {
   auto FlagMatch = getFlagsFromInterfaceFile(buffer, SWIFT_MODULE_FLAGS_KEY);
   if (!FlagMatch)
     return true;
   llvm::cl::TokenizeGNUCommandLine(*FlagMatch, ArgSaver, SubArgs);
 
-  // If the target triple parsed from the Swift interface file differs
-  // only in subarchitecture from the compatible target triple, then
-  // we have loaded a Swift interface from a different-but-compatible
-  // architecture slice. Use the compatible subarchitecture.
-  if (PreferredTarget) {
-    for (unsigned I = 1; I < SubArgs.size(); ++I) {
-      if (strcmp(SubArgs[I - 1], "-target") != 0 &&
-          strcmp(SubArgs[I - 1], "-target-variant") != 0)
-        continue;
+  for (unsigned I = 1; I < SubArgs.size(); ++I) {
+    if (strcmp(SubArgs[I - 1], "-target") != 0 &&
+        strcmp(SubArgs[I - 1], "-target-variant") != 0)
+      continue;
 
-      llvm::Triple triple(SubArgs[I]);
-      if (triple.getArch() != PreferredTarget->getArch())
-        continue;
-      if (triple.getSubArch() == PreferredTarget->getSubArch())
-        continue;
+    llvm::Triple triple(SubArgs[I]);
+    bool shouldModify = false;
+    // If the target triple parsed from the swiftinterface file differs
+    // only in subarchitecture from the compatible target triple, then
+    // we have loaded a Swift interface from a different-but-compatible
+    // architecture slice. Use the compatible subarchitecture.
+    if (PreferredTarget && triple.getArch() == PreferredTarget->getArch() &&
+        triple.getSubArch() != PreferredTarget->getSubArch()) {
       triple.setArch(PreferredTarget->getArch(), PreferredTarget->getSubArch());
-      SubArgs[I] = ArgSaver.save(triple.str()).data();
+      shouldModify = true;
     }
+
+    // Diagnose if the version in the target triple parsed from the
+    // swiftinterface is invalid for the OS.
+    const llvm::VersionTuple originalVer = triple.getOSVersion();
+    bool isValidVersion =
+        llvm::Triple::isValidVersionForOS(triple.getOS(), originalVer);
+    if (!isValidVersion) {
+      if (Diag) {
+        Diag->diagnose(SourceLoc(),
+                       diag::target_os_version_from_textual_interface_invalid,
+                       triple.str(), interfacePath);
+      }
+      break;
+    }
+
+    // Canonicalize the version in the target triple parsed from the
+    // swiftinterface.
+    llvm::VersionTuple newVer = llvm::Triple::getCanonicalVersionForOS(
+        triple.getOS(), originalVer, isValidVersion);
+    if (originalVer != newVer) {
+      std::string originalOSName = triple.getOSName().str();
+      std::string originalVerStr = originalVer.getAsString();
+      std::string newVerStr = newVer.getAsString();
+      const int OSNameWithoutVersionLength =
+          originalOSName.size() - originalVerStr.size();
+      if (!StringRef(originalOSName).ends_with(originalVerStr) ||
+          (OSNameWithoutVersionLength <= 0)) {
+        if (Diag) {
+          Diag->diagnose(SourceLoc(),
+                         diag::map_os_version_from_textual_interface_failed,
+                         originalVerStr, newVerStr, interfacePath);
+        }
+        break;
+      }
+      llvm::SmallString<64> buffer(
+          originalOSName.substr(0, OSNameWithoutVersionLength));
+      buffer.append(newVerStr);
+      triple.setOSName(buffer.str());
+      shouldModify = true;
+    }
+    if (shouldModify)
+      SubArgs[I] = ArgSaver.save(triple.str()).data();
   }
 
   auto IgnFlagMatch =

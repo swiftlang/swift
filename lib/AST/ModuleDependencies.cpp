@@ -116,14 +116,34 @@ bool ModuleDependencyInfo::isTestableImport(StringRef moduleName) const {
 }
 
 void ModuleDependencyInfo::addOptionalModuleImport(
-    StringRef module, bool isExported, llvm::StringSet<> *alreadyAddedModules) {
-  if (!alreadyAddedModules || alreadyAddedModules->insert(module).second)
-    storage->optionalModuleImports.push_back({module.str(), isExported});
+    StringRef module, bool isExported, AccessLevel accessLevel,
+    llvm::StringSet<> *alreadyAddedModules) {
+
+  if (alreadyAddedModules && alreadyAddedModules->contains(module)) {
+    // Find a prior import of this module and add import location
+    // and adjust whether or not this module is ever imported as exported
+    // as well as the access level
+    for (auto &existingImport : storage->optionalModuleImports) {
+      if (existingImport.importIdentifier == module) {
+        existingImport.isExported |= isExported;
+        existingImport.accessLevel = std::max(existingImport.accessLevel,
+                                              accessLevel);
+        break;
+      }
+    }
+  } else {
+    if (alreadyAddedModules)
+      alreadyAddedModules->insert(module);
+
+    storage->optionalModuleImports.push_back(
+         {module.str(), isExported, accessLevel});
+  }
 }
 
 void ModuleDependencyInfo::addModuleImport(
-    StringRef module, bool isExported, llvm::StringSet<> *alreadyAddedModules,
-    const SourceManager *sourceManager, SourceLoc sourceLocation) {
+    StringRef module, bool isExported, AccessLevel accessLevel,
+    llvm::StringSet<> *alreadyAddedModules, const SourceManager *sourceManager,
+    SourceLoc sourceLocation) {
   auto scannerImportLocToDiagnosticLocInfo =
       [&sourceManager](SourceLoc sourceLocation) {
         auto lineAndColumnNumbers =
@@ -138,13 +158,16 @@ void ModuleDependencyInfo::addModuleImport(
   if (alreadyAddedModules && alreadyAddedModules->contains(module)) {
     // Find a prior import of this module and add import location
     // and adjust whether or not this module is ever imported as exported
+    // as well as the access level
     for (auto &existingImport : storage->moduleImports) {
       if (existingImport.importIdentifier == module) {
         if (validSourceLocation) {
           existingImport.addImportLocation(
-            scannerImportLocToDiagnosticLocInfo(sourceLocation));
+              scannerImportLocToDiagnosticLocInfo(sourceLocation));
         }
         existingImport.isExported |= isExported;
+        existingImport.accessLevel = std::max(existingImport.accessLevel,
+                                              accessLevel);
         break;
       }
     }
@@ -154,16 +177,18 @@ void ModuleDependencyInfo::addModuleImport(
 
     if (validSourceLocation)
       storage->moduleImports.push_back(ScannerImportStatementInfo(
-          module.str(), isExported, scannerImportLocToDiagnosticLocInfo(sourceLocation)));
+          module.str(), isExported, accessLevel,
+          scannerImportLocToDiagnosticLocInfo(sourceLocation)));
     else
       storage->moduleImports.push_back(
-         ScannerImportStatementInfo(module.str(), isExported));
+          ScannerImportStatementInfo(module.str(), isExported, accessLevel));
   }
 }
 
 void ModuleDependencyInfo::addModuleImport(
-    ImportPath::Module module, bool isExported, llvm::StringSet<> *alreadyAddedModules,
-    const SourceManager *sourceManager, SourceLoc sourceLocation) {
+    ImportPath::Module module, bool isExported, AccessLevel accessLevel,
+    llvm::StringSet<> *alreadyAddedModules, const SourceManager *sourceManager,
+    SourceLoc sourceLocation) {
   std::string ImportedModuleName = module.front().Item.str().str();
   auto submodulePath = module.getSubmodulePath();
   if (submodulePath.size() > 0 && !submodulePath[0].Item.empty()) {
@@ -172,11 +197,12 @@ void ModuleDependencyInfo::addModuleImport(
     // module named "Foo_Private". ClangImporter has special support for this.
     if (submoduleComponent.Item.str() == "Private")
       addOptionalModuleImport(ImportedModuleName + "_Private",
+                              isExported, accessLevel,
                               alreadyAddedModules);
   }
 
-  addModuleImport(ImportedModuleName, isExported, alreadyAddedModules,
-                  sourceManager, sourceLocation);
+  addModuleImport(ImportedModuleName, isExported, accessLevel,
+                  alreadyAddedModules, sourceManager, sourceLocation);
 }
 
 void ModuleDependencyInfo::addModuleImports(
@@ -205,6 +231,7 @@ void ModuleDependencyInfo::addModuleImports(
         continue;
 
       addModuleImport(realPath, importDecl->isExported(),
+                      importDecl->getAccessLevel(),
                       &alreadyAddedModules, sourceManager,
                       importDecl->getLoc());
 
@@ -497,6 +524,18 @@ SwiftDependencyScanningService::SwiftDependencyScanningService() {
       // already so it is safe to turn on all optimizations.
       clang::tooling::dependencies::ScanningOptimizations::All);
   SharedFilesystemCache.emplace();
+}
+
+llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
+SwiftDependencyScanningService::getClangScanningFS(ASTContext &ctx) const {
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseFileSystem =
+      llvm::vfs::createPhysicalFileSystem();
+  ClangInvocationFileMapping fileMapping =
+    applyClangInvocationMapping(ctx, nullptr, baseFileSystem, false);
+
+  if (CAS)
+    return llvm::cas::createCASProvidingFileSystem(CAS, baseFileSystem);
+  return baseFileSystem;
 }
 
 bool

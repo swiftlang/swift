@@ -170,17 +170,19 @@ void ObjCReason::setAttrInvalid() const {
 static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
                                                Type T,
                                                SourceRange TypeRange,
-                                               DiagnosticBehavior behavior) {
+                                               DiagnosticBehavior behavior,
+                                               ObjCReason reason) {
   auto &diags = DC->getASTContext().Diags;
+  auto language = reason.getForeignLanguage();
 
   // Special diagnostic for tuples.
   if (T->is<TupleType>()) {
     if (T->isVoid())
-      diags.diagnose(TypeRange.Start, diag::not_objc_empty_tuple)
+      diags.diagnose(TypeRange.Start, diag::not_objc_empty_tuple, language)
           .highlight(TypeRange)
           .limitBehavior(behavior);
     else
-      diags.diagnose(TypeRange.Start, diag::not_objc_tuple)
+      diags.diagnose(TypeRange.Start, diag::not_objc_tuple, language)
           .highlight(TypeRange)
           .limitBehavior(behavior);
     return;
@@ -188,6 +190,12 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
 
   // Special diagnostic for classes.
   if (auto *CD = T->getClassOrBoundGenericClass()) {
+    if (language == ForeignLanguage::C) {
+      diags.diagnose(TypeRange.Start, diag::cdecl_incompatible_with_classes)
+          .limitBehavior(behavior);
+      return;
+    }
+
     if (!CD->isObjC())
       diags.diagnose(TypeRange.Start, diag::not_objc_swift_class)
           .highlight(TypeRange)
@@ -199,12 +207,14 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   if (auto *SD = T->getStructOrBoundGenericStruct()) {
     if (isa_and_nonnull<clang::CXXRecordDecl>(SD->getClangDecl())) {
       // This can be a non-trivial C++ record.
-      diags.diagnose(TypeRange.Start, diag::not_objc_non_trivial_cxx_class)
+      diags.diagnose(TypeRange.Start, diag::not_objc_non_trivial_cxx_class,
+                     language)
           .highlight(TypeRange)
           .limitBehavior(behavior);
       return;
     }
-    diags.diagnose(TypeRange.Start, diag::not_objc_swift_struct)
+    diags.diagnose(TypeRange.Start, diag::not_objc_swift_struct,
+                   language)
         .highlight(TypeRange)
         .limitBehavior(behavior);
     return;
@@ -220,6 +230,13 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
 
   // Special diagnostic for protocols and protocol compositions.
   if (T->isExistentialType()) {
+    // No protocol is representable in C.
+    if (language == ForeignLanguage::C) {
+      diags.diagnose(TypeRange.Start, diag::cdecl_incompatible_with_protocols)
+          .limitBehavior(behavior);
+      return;
+    }
+
     if (T->isAny()) {
       // Any is not @objc.
       diags.diagnose(TypeRange.Start,
@@ -267,7 +284,8 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   }
 
   if (T->is<ArchetypeType>() || T->isTypeParameter()) {
-    diags.diagnose(TypeRange.Start, diag::not_objc_generic_type_param)
+    diags.diagnose(TypeRange.Start, diag::not_objc_generic_type_param,
+                   language)
         .highlight(TypeRange)
         .limitBehavior(behavior);
     return;
@@ -275,20 +293,23 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
 
   if (auto fnTy = T->getAs<FunctionType>()) {
     if (fnTy->getExtInfo().isAsync()) {
-      diags.diagnose(TypeRange.Start, diag::not_objc_function_type_async)
+      diags.diagnose(TypeRange.Start, diag::not_objc_function_type_async,
+                     language)
         .highlight(TypeRange)
         .limitBehavior(behavior);
       return;
     }
 
     if (fnTy->getExtInfo().isThrowing()) {
-      diags.diagnose(TypeRange.Start, diag::not_objc_function_type_throwing)
+      diags.diagnose(TypeRange.Start, diag::not_objc_function_type_throwing,
+                     language)
         .highlight(TypeRange)
         .limitBehavior(behavior);
       return;
     }
 
-    diags.diagnose(TypeRange.Start, diag::not_objc_function_type_param)
+    diags.diagnose(TypeRange.Start, diag::not_objc_function_type_param,
+                   language)
       .highlight(TypeRange)
       .limitBehavior(behavior);
     return;
@@ -305,13 +326,13 @@ static void diagnoseFunctionParamNotRepresentable(
     softenIfAccessNote(AFD, Reason.getAttr(),
       AFD->diagnose(diag::objc_invalid_on_func_single_param_type,
                     AFD, getObjCDiagnosticAttrKind(Reason),
-                    (unsigned)language)
+                    language)
           .limitBehavior(behavior));
   } else {
     softenIfAccessNote(AFD, Reason.getAttr(),
       AFD->diagnose(diag::objc_invalid_on_func_param_type,
                     AFD, ParamIndex + 1, getObjCDiagnosticAttrKind(Reason),
-                    (unsigned)language)
+                    language)
           .limitBehavior(behavior));
   }
   SourceRange SR;
@@ -319,11 +340,12 @@ static void diagnoseFunctionParamNotRepresentable(
   if (P->hasAttachedPropertyWrapper()) {
     auto wrapperTy = P->getPropertyWrapperBackingPropertyType();
     SR = P->getOutermostAttachedPropertyWrapper()->getRange();
-    diagnoseTypeNotRepresentableInObjC(AFD, wrapperTy, SR, behavior);
+    diagnoseTypeNotRepresentableInObjC(AFD, wrapperTy, SR, behavior, Reason);
   } else {
     if (auto typeRepr = P->getTypeRepr())
       SR = typeRepr->getSourceRange();
-    diagnoseTypeNotRepresentableInObjC(AFD, P->getTypeInContext(), SR, behavior);
+    diagnoseTypeNotRepresentableInObjC(AFD, P->getTypeInContext(), SR,
+                                       behavior, Reason);
   }
   Reason.describe(AFD);
 }
@@ -345,7 +367,7 @@ static bool isParamListRepresentableInLanguage(const AbstractFunctionDecl *AFD,
     if (param->isVariadic()) {
       softenIfAccessNote(AFD, Reason.getAttr(),
         diags.diagnose(param->getStartLoc(), diag::objc_invalid_on_func_variadic,
-                       getObjCDiagnosticAttrKind(Reason))
+                       AFD, getObjCDiagnosticAttrKind(Reason))
           .highlight(param->getSourceRange())
           .limitBehavior(behavior));
       Reason.describe(AFD);
@@ -358,7 +380,7 @@ static bool isParamListRepresentableInLanguage(const AbstractFunctionDecl *AFD,
       softenIfAccessNote(AFD, Reason.getAttr(),
         diags.diagnose(param->getStartLoc(), diag::objc_invalid_on_func_inout,
                        AFD, getObjCDiagnosticAttrKind(Reason),
-                       (unsigned)language)
+                       language)
           .highlight(param->getSourceRange())
           .limitBehavior(behavior));
       Reason.describe(AFD);
@@ -800,11 +822,11 @@ bool swift::isRepresentableInLanguage(
       softenIfAccessNote(AFD, Reason.getAttr(),
        AFD->diagnose(diag::objc_invalid_on_func_result_type,
                      FD, getObjCDiagnosticAttrKind(Reason),
-                     (unsigned)language)
+                     language)
             .limitBehavior(behavior));
       diagnoseTypeNotRepresentableInObjC(FD, ResultType,
                                          FD->getResultTypeSourceRange(),
-                                         behavior);
+                                         behavior, Reason);
       Reason.describe(FD);
       return false;
     }
@@ -857,11 +879,11 @@ bool swift::isRepresentableInLanguage(
         softenIfAccessNote(AFD, Reason.getAttr(),
           AFD->diagnose(diag::objc_invalid_on_func_result_type,
                         FD, getObjCDiagnosticAttrKind(Reason),
-                        (unsigned)language)
+                        language)
               .limitBehavior(behavior));
         diagnoseTypeNotRepresentableInObjC(FD, type,
                                            FD->getResultTypeSourceRange(),
-                                           behavior);
+                                           behavior, Reason);
         Reason.describe(FD);
 
         return true;
@@ -1168,7 +1190,7 @@ bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
           .limitBehavior(behavior));
     diagnoseTypeNotRepresentableInObjC(VD->getDeclContext(),
                                        VD->getInterfaceType(),
-                                       TypeRange, behavior);
+                                       TypeRange, behavior, Reason);
     Reason.describe(VD);
   }
 
@@ -1256,7 +1278,7 @@ bool swift::isRepresentableInObjC(const SubscriptDecl *SD, ObjCReason Reason) {
     diagnoseTypeNotRepresentableInObjC(SD->getDeclContext(),
                                        !IndexResult ? IndexType
                                                     : ElementType,
-                                       TypeRange, behavior);
+                                       TypeRange, behavior, Reason);
     Reason.describe(SD);
   }
 

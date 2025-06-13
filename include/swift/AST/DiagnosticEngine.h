@@ -475,9 +475,6 @@ namespace swift {
 
     static const char *fixItStringFor(const FixItID id);
 
-    /// Get the best location where an 'import' fixit might be offered.
-    SourceLoc getBestAddImportFixItLoc(const Decl *Member) const;
-
     /// Add a token-based replacement fix-it to the currently-active
     /// diagnostic.
     template <typename... ArgTypes>
@@ -1195,11 +1192,7 @@ namespace swift {
     SourceLoc getDefaultDiagnosticLoc() const {
       return bufferIndirectlyCausingDiagnostic;
     }
-    SourceLoc getBestAddImportFixItLoc(const Decl *Member,
-                                       SourceFile *sourceFile) const;
-    SourceLoc getBestAddImportFixItLoc(const Decl *Member) const {
-      return getBestAddImportFixItLoc(Member, nullptr);
-    }
+    SourceLoc getBestAddImportFixItLoc(SourceFile *sf) const;
   };
 
   inline SourceManager &InFlightDiagnostic::getSourceManager() {

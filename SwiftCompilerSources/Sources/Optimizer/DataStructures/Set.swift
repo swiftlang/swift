@@ -268,6 +268,14 @@ struct OperandSet : IntrusiveSet {
   }
 }
 
+extension InstructionSet {
+  mutating func insert<I: Instruction>(contentsOf source: some Sequence<I>) {
+    for inst in source {
+      _ = insert(inst)
+    }
+  }
+}
+
 extension IntrusiveSet {
   mutating func insert(contentsOf source: some Sequence<Element>) {
     for element in source {

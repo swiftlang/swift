@@ -1,9 +1,10 @@
-// RUN: %target-sil-opt -sil-print-types -opt-mode=none  -enable-sil-verify-all %s -compute-side-effects -destroy-addr-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKDEB --check-prefix=CHECK-DEB
-// RUN: %target-sil-opt -sil-print-types -opt-mode=speed -enable-sil-verify-all %s -compute-side-effects -destroy-addr-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKOPT --check-prefix=CHECK-OPT
+// RUN: %target-sil-opt -sil-print-types -enable-experimental-feature Lifetimes -opt-mode=none  -enable-sil-verify-all %s -compute-side-effects -destroy-addr-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKDEB --check-prefix=CHECK-DEB
+// RUN: %target-sil-opt -sil-print-types -enable-experimental-feature Lifetimes -opt-mode=speed -enable-sil-verify-all %s -compute-side-effects -destroy-addr-hoisting | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECKOPT --check-prefix=CHECK-OPT
 //
 // TODO: migrate the remaining tests from destroy_hoisting.sil.
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_Lifetimes
 
 sil_stage canonical
 
@@ -1223,4 +1224,95 @@ bb0(%0 : @owned $Nontrivial):
   destroy_value %0 : $Nontrivial
   %14 = tuple ()
   return %14 : $()
+}
+
+struct Regular {
+  var storage: Builtin.NativeObject
+}
+struct NEGutless: ~Escapable {
+  let ptr: UnsafeRawPointer?
+}
+struct NEMarker : ~Escapable {}
+struct NEAggregate: ~Escapable {
+  var ne: NEGutless
+  let regular: Regular
+
+  @_lifetime(copy ne) init(ne: NEMarker)
+}
+
+// CHECK-LABEL: sil [ossa] @no_destructure_nonescapable : {{.*}} {
+// CHECK:       bb0([[AGGREGATE:%[^,]+]] :
+// CHECK:       destroy_addr [[AGGREGATE]]
+// CHECK-LABEL: } // end sil function 'no_destructure_nonescapable'
+sil [ossa] @no_destructure_nonescapable : $@convention(method) (@in NEAggregate) -> () {
+bb0(%aggregate : $*NEAggregate):
+  %regular = struct_element_addr %aggregate, #NEAggregate.regular
+  %regular_copy = alloc_stack $Regular
+  copy_addr %regular to [init] %regular_copy
+  destroy_addr %regular_copy
+  dealloc_stack %regular_copy
+  destroy_addr %aggregate
+  %retval = tuple ()
+  return %retval
+}
+
+struct NCGutless: ~Copyable {
+  let ptr: UnsafeRawPointer?
+}
+struct NCAggregate: ~Copyable {
+  var ne: NCGutless
+  let regular: Regular
+  deinit {}
+}
+
+// CHECK-LABEL: sil [ossa] @no_destructure_noncopyable : {{.*}} {
+// CHECK:       bb0([[AGGREGATE:%[^,]+]] :
+// CHECK:       destroy_addr [[AGGREGATE]]
+// CHECK-LABEL: } // end sil function 'no_destructure_noncopyable'
+sil [ossa] @no_destructure_noncopyable : $@convention(method) (@in NCAggregate) -> () {
+bb0(%aggregate : $*NCAggregate):
+  %regular = struct_element_addr %aggregate, #NCAggregate.regular
+  %regular_copy = alloc_stack $Regular
+  copy_addr %regular to [init] %regular_copy
+  destroy_addr %regular_copy
+  dealloc_stack %regular_copy
+  destroy_addr %aggregate
+  %retval = tuple ()
+  return %retval
+}
+
+// CHECK-LABEL: sil [ossa] @nohoist_ieda : {{.*}} {
+// CHECK:         [[IEDA:%[^,]+]] = init_enum_data_addr
+// CHECK:         tuple
+// CHECK-NEXT:    destroy_addr [[IEDA]]
+// CHECK-LABEL: } // end sil function 'nohoist_ieda'
+sil [ossa] @nohoist_ieda : $@convention(thin) () -> @out TwoCases {
+bb0(%out : $*TwoCases):
+  %ieda = init_enum_data_addr %out, #TwoCases.A!enumelt
+  apply undef(%ieda) : $@convention(thin) () -> @out X
+  %retval = tuple ()
+  destroy_addr %ieda
+  apply undef(%ieda) : $@convention(thin) () -> @out X
+  inject_enum_addr %out, #TwoCases.A!enumelt
+  return %retval
+}
+
+// CHECK-LABEL: sil [ossa] @nohoist_ieda_2 : {{.*}} {
+// CHECK:         [[IEDA:%[^,]+]] = init_enum_data_addr
+// CHECK:         tuple
+// CHECK:         [[CTM:%[^,]+]] = copyable_to_moveonlywrapper_addr [[IEDA]]
+// CHECK:         [[MTC:%[^,]+]] = moveonlywrapper_to_copyable_addr [[CTM]]
+// CHECK-NEXT:    destroy_addr [[MTC]]
+// CHECK-LABEL: } // end sil function 'nohoist_ieda_2'
+sil [ossa] @nohoist_ieda_2 : $@convention(thin) () -> @out TwoCases {
+bb0(%out : $*TwoCases):
+  %ieda = init_enum_data_addr %out, #TwoCases.A!enumelt
+  apply undef(%ieda) : $@convention(thin) () -> @out X
+  %retval = tuple ()
+  %ctm = copyable_to_moveonlywrapper_addr %ieda
+  %mtc = moveonlywrapper_to_copyable_addr %ctm
+  destroy_addr %mtc
+  apply undef(%ieda) : $@convention(thin) () -> @out X
+  inject_enum_addr %out, #TwoCases.A!enumelt
+  return %retval
 }

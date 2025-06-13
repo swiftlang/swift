@@ -1402,7 +1402,7 @@ public:
           AccessPath::Index::forSubObjectProjection(projIdx.Index));
     } else {
       // Ignore everything in getAccessProjectionOperand that is an access
-      // projection with no affect on the access path.
+      // projection with no effect on the access path.
       assert(isa<OpenExistentialAddrInst>(projectedAddr) ||
              isa<InitEnumDataAddrInst>(projectedAddr) ||
              isa<UncheckedTakeEnumDataAddrInst>(projectedAddr)
@@ -1437,7 +1437,7 @@ AccessPathWithBase AccessPathWithBase::computeInScope(SILValue address) {
 }
 
 bool swift::visitProductLeafAccessPathNodes(
-    SILValue address, TypeExpansionContext tec, SILModule &module,
+    SILValue address, TypeExpansionContext tec, SILFunction &function,
     std::function<void(AccessPath::PathNode, SILType)> visitor) {
   auto rootPath = AccessPath::compute(address);
   if (!rootPath.isValid()) {
@@ -1461,7 +1461,8 @@ bool swift::visitProductLeafAccessPathNodes(
         visitor(AccessPath::PathNode(node), silType);
         continue;
       }
-      if (decl->isCxxNonTrivial()) {
+      if (decl->isCxxNonTrivial() || !silType.isEscapable(function) ||
+          silType.isMoveOnly()) {
         visitor(AccessPath::PathNode(node), silType);
         continue;
       }
@@ -1469,7 +1470,8 @@ bool swift::visitProductLeafAccessPathNodes(
       for (auto *field : decl->getStoredProperties()) {
         auto *fieldNode = node->getChild(index);
         worklist.push_back(
-            {silType.getFieldType(field, module, tec), fieldNode});
+            {silType.getFieldType(field, function.getModule(), tec),
+             fieldNode});
         ++index;
       }
     } else {
@@ -1980,7 +1982,7 @@ AccessPathDefUseTraversal::visitSingleValueUser(SingleValueInstruction *svi,
     return IgnoredUse;
 
   // open_existential_addr and unchecked_take_enum_data_addr are classified as
-  // access projections, but they also modify memory. Both see through them and
+  // access projections, but they also modify memory. Both look through them and
   // also report them as uses.
   case SILInstructionKind::OpenExistentialAddrInst:
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst:

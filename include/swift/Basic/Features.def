@@ -266,6 +266,7 @@ LANGUAGE_FEATURE(GeneralizedIsSameMetaTypeBuiltin, 465, "Builtin.is_same_metatyp
 SUPPRESSIBLE_LANGUAGE_FEATURE(ABIAttributeSE0479, 479, "@abi attribute on functions, initializers, properties, and subscripts")
 LANGUAGE_FEATURE(AlwaysInheritActorContext, 472, "@_inheritActorContext(always)")
 LANGUAGE_FEATURE(BuiltinSelect, 0, "Builtin.select")
+LANGUAGE_FEATURE(BuiltinInterleave, 0, "Builtin.interleave and Builtin.deinterleave")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -287,7 +288,7 @@ UPCOMING_FEATURE(GlobalActorIsolatedTypesUsability, 0434, 6)
 // Swift 7
 MIGRATABLE_UPCOMING_FEATURE(ExistentialAny, 335, 7)
 UPCOMING_FEATURE(InternalImportsByDefault, 409, 7)
-UPCOMING_FEATURE(MemberImportVisibility, 444, 7)
+MIGRATABLE_UPCOMING_FEATURE(MemberImportVisibility, 444, 7)
 MIGRATABLE_UPCOMING_FEATURE(InferIsolatedConformances, 470, 7)
 MIGRATABLE_UPCOMING_FEATURE(NonisolatedNonsendingByDefault, 461, 7)
 
@@ -497,7 +498,7 @@ EXPERIMENTAL_FEATURE(CustomAvailability, true)
 /// Syntax sugar features for concurrency.
 EXPERIMENTAL_FEATURE(ConcurrencySyntaxSugar, true)
 
-/// Enable syntax sugar type '[3 x Int]' for Inline Array
+/// Enable syntax sugar type '[3 of Int]' for Inline Array
 EXPERIMENTAL_FEATURE(InlineArrayTypeSugar, false)
 
 /// Allow declaration of compile-time values
@@ -520,6 +521,13 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ExtensibleAttribute, false)
 
 /// Allow use of `Module::name` syntax
 EXPERIMENTAL_FEATURE(ModuleSelector, false)
+
+/// Allow use of `using` declaration that control default isolation
+/// in a file scope.
+EXPERIMENTAL_FEATURE(DefaultIsolationPerFile, false)
+
+/// Enable @_lifetime attribute
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(Lifetimes, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

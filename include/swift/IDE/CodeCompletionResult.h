@@ -190,6 +190,7 @@ enum class CodeCompletionKeywordKind : uint8_t {
 enum class CompletionKind : uint8_t {
   None,
   Import,
+  Using,
   UnresolvedMember,
   DotExpr,
   StmtOrExpr,

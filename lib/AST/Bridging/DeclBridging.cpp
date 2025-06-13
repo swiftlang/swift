@@ -637,6 +637,17 @@ BridgedImportDecl BridgedImportDecl_createParsed(
       std::move(builder).get());
 }
 
+BridgedUsingDecl BridgedUsingDecl_createParsed(BridgedASTContext cContext,
+                                               BridgedDeclContext cDeclContext,
+                                               BridgedSourceLoc usingKeywordLoc,
+                                               BridgedSourceLoc specifierLoc,
+                                               BridgedUsingSpecifier specifier) {
+  ASTContext &ctx = cContext.unbridged();
+  return UsingDecl::create(
+      ctx, usingKeywordLoc.unbridged(), specifierLoc.unbridged(),
+      static_cast<UsingSpecifier>(specifier), cDeclContext.unbridged());
+}
+
 BridgedSubscriptDecl BridgedSubscriptDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cStaticLoc, BridgedStaticSpelling cStaticSpelling,

@@ -273,10 +273,11 @@ static Flags getMethodDescriptorFlags(ValueDecl *fn) {
       return {Flags::Kind::ModifyCoroutine, false};
     case AccessorKind::Modify2:
       return {Flags::Kind::ModifyCoroutine, true};
+    case AccessorKind::DistributedGet:
+      return {Flags::Kind::Getter, false};
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
 #define ACCESSOR(ID) \
     case AccessorKind::ID:
-    case AccessorKind::DistributedGet:
 #include "swift/AST/AccessorKinds.def"
       llvm_unreachable("these accessors never appear in protocols or v-tables");
     }
@@ -1069,13 +1070,6 @@ namespace {
       }
 
       for (auto &entry : pi.getWitnessEntries()) {
-        if (entry.isFunction() &&
-            entry.getFunction().getDecl()->isDistributedGetAccessor()) {
-          // We avoid emitting _distributed_get accessors, as they cannot be
-          // referred to anyway
-          continue;
-        }
-
         if (Resilient) {
           if (entry.isFunction()) {
             // Define the method descriptor.
@@ -2415,7 +2409,7 @@ namespace {
       B.addInt32(numImmediateMembers);
 
       // uint32_t NumFields;
-      B.addInt32(getNumFields(getType()));
+      B.addInt32(countExportableFields(IGM, getType()));
 
       // uint32_t FieldOffsetVectorOffset;
       B.addInt32(getFieldVectorOffset() / IGM.getPointerSize());
@@ -3157,7 +3151,7 @@ emitInitializeFieldOffsetVector(SILType T, llvm::Value *metadata,
   }
 
   // Collect the stored properties of the type.
-  unsigned numFields = getNumFields(target);
+  unsigned numFields = countExportableFields(IGM, target);
 
   // Fill out an array with the field type metadata records.
   Address fields = createAlloca(
@@ -3170,6 +3164,9 @@ emitInitializeFieldOffsetVector(SILType T, llvm::Value *metadata,
   forEachField(IGM, target, [&](Field field) {
     assert(field.isConcrete() &&
            "initializing offset vector for type with missing member?");
+    if (!isExportableField(field))
+      return;
+
     SILType propTy = field.getType(IGM, T);
     llvm::Value *fieldLayout = emitTypeLayoutRef(*this, propTy, collector);
     Address fieldLayoutAddr =
@@ -3277,7 +3274,7 @@ static void emitInitializeFieldOffsetVectorWithLayoutString(
       emitAddressOfFieldOffsetVector(IGF, metadata, target).getAddress();
 
   // Collect the stored properties of the type.
-  unsigned numFields = getNumFields(target);
+  unsigned numFields = countExportableFields(IGM, target);
 
   // Ask the runtime to lay out the struct or class.
   auto numFieldsV = IGM.getSize(Size(numFields));
@@ -3300,6 +3297,9 @@ static void emitInitializeFieldOffsetVectorWithLayoutString(
   forEachField(IGM, target, [&](Field field) {
     assert(field.isConcrete() &&
            "initializing offset vector for type with missing member?");
+    if (!isExportableField(field))
+      return;
+
     SILType propTy = field.getType(IGM, T);
     llvm::Value *fieldMetatype;
     llvm::Value *fieldTag;

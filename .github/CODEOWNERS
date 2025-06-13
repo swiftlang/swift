@@ -286,6 +286,7 @@
 
 # utils
 /utils/*windows*                                              @compnerd
+/utils/build.ps1                                              @compnerd
 /utils/build_swift/                                           @etcwilde @justice-adams-apple @shahmishal
 /utils/generate-xcode                                         @hamishknight
 /utils/gyb_sourcekit_support/                                 @bnbarham @hamishknight @rintaro

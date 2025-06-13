@@ -32,8 +32,16 @@ import Swift
 @available(SwiftStdlib 6.2, *)
 extension Task where Failure == ${FAILURE_TYPE} {
 
+  // FIXME: This method is left in place to give adopters time to switch to `immediate` but it's going
+  // to be removed soon, since this spelling was rejected as part of SE-0472 proposal.
   @available(SwiftStdlib 6.2, *)
   @available(*, deprecated, renamed: "immediate")
+  // Used to preserve the symbols as originally declared without `@isolated(any)` attribute on `operation:`.
+  % if FAILURE_TYPE == "Error":
+  @_silgen_name("$sScTss5Error_pRs_rlE18startSynchronously4name8priority_ScTyxsAA_pGSSSg_ScPSgxyYaKcntFZ")
+  % elif FAILURE_TYPE == "Never":
+  @_silgen_name("$sScTss5NeverORs_rlE18startSynchronously4name8priority_ScTyxABGSSSg_ScPSgxyYaKcntFZ")
+  % end
   @discardableResult
   public static func startSynchronously(
     name: String? = nil,
@@ -71,8 +79,6 @@ extension Task where Failure == ${FAILURE_TYPE} {
   public static func immediate(
     name: String? = nil,
     priority: TaskPriority? = nil,
-    % # NOTE: This closure cannot be 'sending' because we'll trigger ' pattern that the region based isolation checker does not understand how to check'
-    % #       In this case: `func syncOnMyGlobalActor() { Task.immediate { @MyGlobalActor in } }`
     @_implicitSelfCapture @_inheritActorContext(always) operation: sending @isolated(any) @escaping () async throws -> Success
   ) -> Task<Success, ${FAILURE_TYPE}> {
 

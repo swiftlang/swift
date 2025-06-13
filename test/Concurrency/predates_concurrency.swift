@@ -357,3 +357,39 @@ do {
     }
   }
 }
+
+func testSendableMetatypeDowngrades() {
+  @preconcurrency
+  func acceptsSendableMetatype<T: SendableMetatype>(_: T.Type) {}
+  func acceptsSendableMetatypeStrict<T: SendableMetatype>(_: T.Type) {}
+
+  func test<T>(t: T.Type) { // expected-complete-tns-note 2 {{consider making generic parameter 'T' conform to the 'SendableMetatype' protocol}} {{14-14=: SendableMetatype}}
+    acceptsSendableMetatype(t)
+    // expected-complete-tns-warning@-1 {{type 'T' does not conform to the 'SendableMetatype' protocol}}
+    acceptsSendableMetatypeStrict(t)
+    // expected-complete-tns-warning@-1 {{type 'T' does not conform to the 'SendableMetatype' protocol}}
+  }
+}
+
+do {
+  func test(@_inheritActorContext _: @Sendable () -> Void) async {
+    // expected-warning@-1 {{@_inheritActorContext only applies to '@isolated(any)' parameters or parameters with asynchronous function types; this will be an error in a future Swift language mode}}
+  }
+
+  @MainActor
+  @preconcurrency
+  class Test {
+    struct V {}
+
+    var value: V? // expected-note {{property declared here}}
+
+    func run() async {
+      await test {
+        if let value {
+          // expected-warning@-1 {{main actor-isolated property 'value' can not be referenced from a Sendable closure; this is an error in the Swift 6 language mode}}
+          print(value)
+        }
+      }
+    }
+  }
+}

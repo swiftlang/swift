@@ -22,7 +22,7 @@ class NonSendable : Hashable {
 final class CondSendable<T> : Hashable {
   init(_: T) {}
   init(_: Int) {}
-  init(_: T, other: T = 42) {}
+  init<U>(_: T, other: U = 42) {}
   init<Q>(_: [Q] = []) {}
 
   static func == (x: CondSendable, y: CondSendable) -> Bool { false }

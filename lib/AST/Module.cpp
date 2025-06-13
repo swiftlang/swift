@@ -847,14 +847,14 @@ SourceFile *ModuleDecl::getSourceFileContainingLocation(SourceLoc loc) {
   return nullptr;
 }
 
-std::pair<unsigned, SourceLoc>
-ModuleDecl::getOriginalLocation(SourceLoc loc) const {
-  assert(loc.isValid());
+std::pair<unsigned, SourceRange>
+ModuleDecl::getOriginalRange(SourceRange range) const {
+  assert(range.isValid());
 
   SourceManager &SM = getASTContext().SourceMgr;
-  unsigned bufferID = SM.findBufferContainingLoc(loc);
+  unsigned bufferID = SM.findBufferContainingLoc(range.Start);
 
-  SourceLoc startLoc = loc;
+  auto startRange = range;
   unsigned startBufferID = bufferID;
   while (const GeneratedSourceInfo *info =
              SM.getGeneratedSourceInfo(bufferID)) {
@@ -866,12 +866,12 @@ ModuleDecl::getOriginalLocation(SourceLoc loc) const {
       // Location was within a macro expansion, return the expansion site, not
       // the insertion location.
       if (info->attachedMacroCustomAttr) {
-        loc = info->attachedMacroCustomAttr->getLocation();
+        range = info->attachedMacroCustomAttr->getRange();
       } else {
         ASTNode expansionNode = ASTNode::getFromOpaqueValue(info->astNode);
-        loc = expansionNode.getStartLoc();
+        range = expansionNode.getSourceRange();
       }
-      bufferID = SM.findBufferContainingLoc(loc);
+      bufferID = SM.findBufferContainingLoc(range.Start);
       break;
     }
     case GeneratedSourceInfo::DefaultArgument:
@@ -883,11 +883,11 @@ ModuleDecl::getOriginalLocation(SourceLoc loc) const {
     case GeneratedSourceInfo::PrettyPrinted:
     case GeneratedSourceInfo::AttributeFromClang:
       // No original location, return the original buffer/location
-      return {startBufferID, startLoc};
+      return {startBufferID, startRange};
     }
   }
 
-  return {bufferID, loc};
+  return {bufferID, range};
 }
 
 ArrayRef<SourceFile *>
@@ -2017,6 +2017,10 @@ bool ModuleDecl::isStdlibModule() const {
   return !getParent() && getName() == getASTContext().StdlibModuleName;
 }
 
+bool ModuleDecl::isCxxModule() const {
+  return !getParent() && getName() == getASTContext().Id_Cxx;
+}
+
 bool ModuleDecl::isConcurrencyModule() const {
   return !getParent() && getName() == getASTContext().Id_Concurrency;
 }
@@ -3109,7 +3113,7 @@ bool SourceFile::isImportedAsSPI(const ValueDecl *targetDecl) const {
   return false;
 }
 
-bool ModuleDecl::isImportedAsSPI(const SpecializeAttr *attr,
+bool ModuleDecl::isImportedAsSPI(const AbstractSpecializeAttr *attr,
                                  const ValueDecl *targetDecl) const {
   auto declSPIGroups = attr->getSPIGroups();
   if (shouldImplicitImportAsSPI(declSPIGroups))
@@ -3827,6 +3831,12 @@ bool SourceFile::FileIDStr::matches(const SourceFile *file) const {
 
   return moduleName == file->getParentModule()->getNameStr() &&
          fileName == llvm::sys::path::filename(file->getFilename());
+}
+
+std::optional<DefaultIsolation> SourceFile::getDefaultIsolation() const {
+  auto &ctx = getASTContext();
+  return evaluateOrDefault(
+      ctx.evaluator, DefaultIsolationInSourceFileRequest{this}, std::nullopt);
 }
 
 namespace {

@@ -45,6 +45,7 @@ namespace swift {
 
   struct DiagnosticBehavior;
   class DiagnosticEngine;
+  class FrontendOptions;
 
   /// Kind of implicit platform conditions.
   enum class PlatformConditionKind {
@@ -320,6 +321,8 @@ namespace swift {
     /// Flags for use by tests
     ///
 
+    bool UseStaticStandardLibrary = false;
+
     /// Enable Objective-C Runtime interop code generation and build
     /// configuration options.
     bool EnableObjCInterop = true;
@@ -339,7 +342,8 @@ namespace swift {
     std::optional<version::Version> FormalCxxInteropMode;
 
     void setCxxInteropFromArgs(llvm::opt::ArgList &Args,
-                               swift::DiagnosticEngine &Diags);
+                               swift::DiagnosticEngine &Diags,
+                               const FrontendOptions &FrontendOpts);
 
     /// The C++ standard library used for the current build. This can differ
     /// from the default C++ stdlib on a particular platform when `-Xcc
@@ -873,12 +877,16 @@ namespace swift {
 
     /// Returns whether the given feature is enabled.
     ///
-    /// If allowMigration is set, also returns true when the feature has been enabled for migration.
+    /// If allowMigration is set, also returns true when the feature has been
+    /// enabled for migration.
     bool hasFeature(Feature feature, bool allowMigration = false) const;
 
     /// Returns whether a feature with the given name is enabled. Returns
     /// `false` if a feature by this name is not known.
     bool hasFeature(llvm::StringRef featureName) const;
+
+    /// Returns whether the given feature is enabled for migration.
+    bool isMigratingToFeature(Feature feature) const;
 
     /// Enables the given feature (enables in migration mode if `forMigration`
     /// is `true`).

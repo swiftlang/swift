@@ -221,6 +221,11 @@ static DeclRefTypeRepr *translateExprToDeclRefTypeRepr(Expr *E, ASTContext &C) {
     }
 
     DeclRefTypeRepr *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *udre) {
+      if (!udre->getName().isSimpleName() ||
+          udre->getName().isOperator() ||
+          udre->getName().isSpecial())
+        return nullptr;
+
       return UnqualifiedIdentTypeRepr::create(C, udre->getNameLoc(),
                                               udre->getName());
     }

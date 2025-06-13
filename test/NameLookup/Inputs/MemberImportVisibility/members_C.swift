@@ -5,6 +5,9 @@ import members_B
 extension X {
   public func XinC() { }
 
+  @_spi(C)
+  public func XinC_spi() { }
+
   public var propXinC: Bool { return true }
 
   public static func <>(a: Self, b: Self) -> Self { a }

@@ -842,6 +842,7 @@ DECL_ATTR(lifetime, Lifetime,
   OnAccessor | OnConstructor | OnFunc | OnSubscript,
   LongAttribute | ABIBreakingToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove | AllowMultipleAttributes | EquivalentInABIAttr,
   161)
+DECL_ATTR_ALIAS(_lifetime, Lifetime)
 
 SIMPLE_DECL_ATTR(_addressableSelf, AddressableSelf,
   OnAccessor | OnConstructor | OnFunc | OnSubscript,
@@ -892,8 +893,13 @@ SIMPLE_DECL_ATTR(preEnumExtensibility, PreEnumExtensibility,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove | UnconstrainedInABIAttr,
   171)
 DECL_ATTR_FEATURE_REQUIREMENT(PreEnumExtensibility, ExtensibleAttribute)
-  
-LAST_DECL_ATTR(PreEnumExtensibility)
+
+DECL_ATTR(specialized, Specialized,
+  OnConstructor | OnFunc | OnAccessor,
+  AllowMultipleAttributes | LongAttribute | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  172)
+
+LAST_DECL_ATTR(Specialized)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

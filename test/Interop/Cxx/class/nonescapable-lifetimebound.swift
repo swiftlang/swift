@@ -73,7 +73,7 @@ View getViewFromEither(View view1 [[clang::lifetimebound]], View view2 [[clang::
 struct SWIFT_NONESCAPABLE TestAnnotationTranslation {
     TestAnnotationTranslation() : member(nullptr) {}
     TestAnnotationTranslation(const int *p [[clang::lifetimebound]]) : member(p) {}
-    TestAnnotationTranslation(const TestAnnotationTranslation& [[clang::lifetimebound]]) = default;
+    TestAnnotationTranslation(const TestAnnotationTranslation& other [[clang::lifetimebound]]) = default;
 private:
     const int *member;
 };
