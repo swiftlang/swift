@@ -2591,14 +2591,14 @@ KeyPathExpr::Component KeyPathExpr::Component::forSubscript(
     ASTContext &ctx, ConcreteDeclRef subscript, ArgumentList *argList,
     Type elementType, ArrayRef<ProtocolConformanceRef> indexHashables) {
   return Component(subscript, argList, indexHashables, Kind::Subscript,
-                   elementType, argList->getLParenLoc());
+                   elementType, argList->getStartLoc());
 }
 
 KeyPathExpr::Component
 KeyPathExpr::Component::forUnresolvedSubscript(ASTContext &ctx,
                                                ArgumentList *argList) {
   return Component({}, argList, {}, Kind::UnresolvedSubscript, Type(),
-                   argList->getLParenLoc());
+                   argList->getStartLoc());
 }
 
 KeyPathExpr::Component::Component(
