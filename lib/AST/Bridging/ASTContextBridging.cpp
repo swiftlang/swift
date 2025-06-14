@@ -14,6 +14,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AvailabilitySpec.h"
+#include "llvm/Support/ErrorHandling.h"
 
 using namespace swift;
 
@@ -107,6 +108,12 @@ BridgedEndianness
 BridgedASTContext_langOptsTargetEndianness(BridgedASTContext cContext) {
   return cContext.unbridged().LangOpts.Target.isLittleEndian() ? EndianLittle
                                                                : EndianBig;
+}
+
+bool BridgedASTContext_langOptsIsActiveTargetObjectFileFormat(
+    BridgedASTContext cContext, BridgedStringRef cName) {
+  return cContext.unbridged().LangOpts.checkPlatformCondition(
+      PlatformConditionKind::ObjectFileFormat, cName.unbridged());
 }
 
 /// Convert an array of numbers into a form we can use in Swift.
