@@ -2067,6 +2067,12 @@ namespace {
       }
 
       StringRef name = field.getName();
+      std::string typeEnc;
+      if (field.getKind() == Field::Var) {
+        auto *varDecl = field.getVarDecl();
+        if (varDecl->isObjC() && varDecl->hasStorage())
+          getObjCEncodingForPropertyType(IGM, varDecl, typeEnc);
+      }
       const TypeInfo &storageTI = pair.second.getType();
       auto fields = ivars.beginStruct();
 
@@ -2079,7 +2085,7 @@ namespace {
       fields.add(IGM.getAddrOfGlobalString(name));
 
       // TODO: clang puts this in __TEXT,__objc_methtype,cstring_literals
-      fields.add(IGM.getAddrOfGlobalString(""));
+      fields.add(IGM.getAddrOfGlobalString(typeEnc));
 
       Size size;
       Alignment alignment;
