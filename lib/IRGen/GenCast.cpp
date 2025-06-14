@@ -545,8 +545,8 @@ llvm::Value *irgen::emitMetatypeToAnyObjectDowncast(IRGenFunction &IGF,
 /// Emit a checked cast to a protocol or protocol composition.
 void irgen::emitScalarExistentialDowncast(
     IRGenFunction &IGF, llvm::Value *value, SILType srcType, SILType destType,
-    CheckedCastMode mode, std::optional<MetatypeRepresentation> metatypeKind,
-    Explosion &ex) {
+    CheckedCastMode mode, bool sourceWrappedInOptional,
+    std::optional<MetatypeRepresentation> metatypeKind, Explosion &ex) {
   auto srcInstanceType = srcType.getASTType();
   auto destInstanceType = destType.getASTType();
   while (auto metatypeType = dyn_cast<ExistentialMetatypeType>(
@@ -801,7 +801,36 @@ void irgen::emitScalarExistentialDowncast(
   for (auto proto : witnessTableProtos)
     args.push_back(proto);
 
-  auto valueAndWitnessTables = IGF.Builder.CreateCall(fn, args);
+  llvm::BasicBlock *nilCheckedCont = nullptr;
+  llvm::BasicBlock *nilBB = nullptr;
+  llvm::BasicBlock *nonNilBB = nullptr;
+  if (sourceWrappedInOptional) {
+    nilBB = IGF.createBasicBlock("is-nil");
+    nonNilBB = IGF.createBasicBlock("is-non-nil");
+    nilCheckedCont = IGF.createBasicBlock("nil-checked-cont");
+
+    auto isNotNil = IGF.Builder.CreateICmpNE(
+        metadataValue, llvm::ConstantPointerNull::get(
+                           cast<llvm::PointerType>(IGF.IGM.Int8PtrTy)));
+
+    IGF.Builder.CreateCondBr(isNotNil, nonNilBB, nilBB);
+    IGF.Builder.emitBlock(nilBB);
+    IGF.Builder.CreateBr(nilCheckedCont);
+    IGF.Builder.emitBlock(nonNilBB);
+  }
+
+  llvm::Value *valueAndWitnessTables = IGF.Builder.CreateCall(fn, args);
+
+  if (nilCheckedCont) {
+    IGF.Builder.CreateBr(nilCheckedCont);
+    IGF.Builder.emitBlock(nilCheckedCont);
+    auto *returnTy = valueAndWitnessTables->getType();
+    auto failureVal = llvm::Constant::getNullValue(returnTy);
+    auto phi = IGF.Builder.CreatePHI(returnTy, 2);
+    phi->addIncoming(valueAndWitnessTables, nonNilBB);
+    phi->addIncoming(failureVal, nilBB);
+    valueAndWitnessTables = phi;
+  }
 
   resultValue = IGF.Builder.CreateExtractValue(valueAndWitnessTables, 0);
   if (resultValue->getType() != resultType)
@@ -946,10 +975,9 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
 
     // Casts to existential metatypes.
     if (auto existential = targetLoweredType.getAs<ExistentialMetatypeType>()) {
-      emitScalarExistentialDowncast(IGF, metatypeVal, sourceLoweredType,
-                                    targetLoweredType, mode,
-                                    existential->getRepresentation(),
-                                    out);
+      emitScalarExistentialDowncast(
+          IGF, metatypeVal, sourceLoweredType, targetLoweredType, mode,
+          sourceWrappedInOptional, existential->getRepresentation(), out);
       return;
 
     // Casts to concrete metatypes.
@@ -1024,9 +1052,10 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
 
   if (targetFormalType.isExistentialType()) {
     Explosion outRes;
-    emitScalarExistentialDowncast(
-        IGF, instance, sourceLoweredType, targetLoweredType, mode,
-        /*not a metatype*/ std::nullopt, outRes);
+    emitScalarExistentialDowncast(IGF, instance, sourceLoweredType,
+                                  targetLoweredType, mode,
+                                  /*sourceWrappedInOptional*/ false,
+                                  /*not a metatype*/ std::nullopt, outRes);
     returnNilCheckedResult(IGF.Builder, outRes);
     return;
   }
