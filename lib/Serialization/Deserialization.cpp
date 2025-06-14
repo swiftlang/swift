@@ -5420,8 +5420,7 @@ public:
     ctx.evaluator.cacheOutput(ExtendedTypeRequest{extension},
                               std::move(extendedType));
     auto nominal = dyn_cast_or_null<NominalTypeDecl>(MF.getDecl(extendedNominalID));
-    ctx.evaluator.cacheOutput(ExtendedNominalRequest{extension},
-                              std::move(nominal));
+    extension->setExtendedNominal(nominal);
 
     if (isImplicit)
       extension->setImplicit();

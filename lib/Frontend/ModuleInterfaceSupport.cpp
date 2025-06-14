@@ -799,8 +799,7 @@ public:
 
     ctx.evaluator.cacheOutput(ExtendedTypeRequest{extension},
                               nominal->getDeclaredType());
-    ctx.evaluator.cacheOutput(ExtendedNominalRequest{extension},
-                              const_cast<NominalTypeDecl *>(nominal));
+    extension->setExtendedNominal(const_cast<NominalTypeDecl *>(nominal));
 
     extension->print(printer, printOptions);
     printer << "\n";

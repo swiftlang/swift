@@ -1125,6 +1125,9 @@ enum class DirectlyReferencedTypeLookupFlags {
   /// Include members that would normally be excluded because they come from
   /// modules that have not been imported directly.
   IgnoreMissingImports = 1 << 3,
+
+  /// Whenther we should exclude macro expansions.
+  ExcludeMacroExpansions = 1 << 4,
 };
 
 using DirectlyReferencedTypeLookupOptions =
@@ -3065,6 +3068,10 @@ static DirectlyReferencedTypeDecls directReferencesForUnqualifiedTypeLookup(
           DirectlyReferencedTypeLookupFlags::IgnoreMissingImports))
     options |= UnqualifiedLookupFlags::IgnoreMissingImports;
 
+  if (typeLookupOptions.contains(
+          DirectlyReferencedTypeLookupFlags::ExcludeMacroExpansions))
+    options |= UnqualifiedLookupFlags::ExcludeMacroExpansions;
+
   // Manually exclude macro expansions here since the source location
   // is overridden below.
   if (namelookup::isInMacroArgument(dc->getParentSourceFile(), loc))
@@ -3146,6 +3153,10 @@ static llvm::TinyPtrVector<TypeDecl *> directReferencesForQualifiedTypeLookup(
     if (typeLookupOptions.contains(
             DirectlyReferencedTypeLookupFlags::IgnoreMissingImports))
       options |= NL_IgnoreMissingImports;
+
+    if (typeLookupOptions.contains(
+            DirectlyReferencedTypeLookupFlags::ExcludeMacroExpansions))
+      options |= NL_ExcludeMacroExpansions;
 
     // Look through the type declarations we were given, resolving them down
     // to nominal type declarations, module declarations, and
@@ -3574,7 +3585,8 @@ ProtocolRequirementsRequest::evaluate(Evaluator &evaluator,
 
 NominalTypeDecl *
 ExtendedNominalRequest::evaluate(Evaluator &evaluator,
-                                 ExtensionDecl *ext) const {
+                                 ExtensionDecl *ext,
+                                 bool excludeMacroExpansions) const {
   auto typeRepr = ext->getExtendedTypeRepr();
   if (!typeRepr) {
     // We must've seen 'extension { ... }' during parsing.
@@ -3583,9 +3595,15 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
 
   ASTContext &ctx = ext->getASTContext();
   auto options = defaultDirectlyReferencedTypeLookupOptions;
+
   if (ext->isInSpecializeExtensionContext()) {
     options |= DirectlyReferencedTypeLookupFlags::AllowUsableFromInline;
   }
+
+  if (excludeMacroExpansions) {
+    options |= DirectlyReferencedTypeLookupFlags::ExcludeMacroExpansions;
+  }
+
   DirectlyReferencedTypeDecls referenced = directReferencesForTypeRepr(
       evaluator, ctx, typeRepr, ext->getParent(), options);
 

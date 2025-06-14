@@ -7175,8 +7175,7 @@ ProtocolConformance *swift::deriveImplicitSendableConformance(
 
       ctx.evaluator.cacheOutput(ExtendedTypeRequest{extension},
                                 nominal->getDeclaredType());
-      ctx.evaluator.cacheOutput(ExtendedNominalRequest{extension},
-                                std::move(nominal));
+      extension->setExtendedNominal(nominal);
       nominal->addExtension(extension);
 
       // Make it accessible to getTopLevelDecls()
