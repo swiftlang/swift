@@ -43,6 +43,7 @@ enum CoreFoundation {
 
 // .. Main Executor ............................................................
 
+@_spi(CustomDefaultExecutors)
 @available(StdlibDeploymentTarget 6.2, *)
 public final class CFMainExecutor: DispatchMainExecutor, @unchecked Sendable {
 
@@ -58,6 +59,7 @@ public final class CFMainExecutor: DispatchMainExecutor, @unchecked Sendable {
 
 // .. Task Executor ............................................................
 
+@_spi(CustomDefaultExecutors)
 @available(StdlibDeploymentTarget 6.2, *)
 public final class CFTaskExecutor: DispatchGlobalTaskExecutor,
                                    @unchecked Sendable {

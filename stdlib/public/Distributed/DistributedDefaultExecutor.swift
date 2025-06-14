@@ -40,6 +40,7 @@ internal final class DistributedRemoteActorReferenceExecutor: SerialExecutor {
   public func asUnownedSerialExecutor() -> UnownedSerialExecutor {
     unsafe UnownedSerialExecutor(ordinary: self)
   }
+
 }
 
 /// Obtain the unowned `SerialExecutor` that is used by by remote distributed actor references.

@@ -38,11 +38,13 @@ public protocol Executor: AnyObject, Sendable {
 
   #if !$Embedded
   /// `true` if this is the main executor.
+  @_spi(CustomDefaultExecutors)
   @available(StdlibDeploymentTarget 6.2, *)
   var isMainExecutor: Bool { get }
   #endif
 }
 
+@_spi(CustomDefaultExecutors)
 @available(StdlibDeploymentTarget 6.2, *)
 public protocol SchedulableExecutor: Executor {
 
@@ -63,6 +65,7 @@ public protocol SchedulableExecutor: Executor {
   /// - tolerance: The maximum additional delay permissible before the
   ///              job is executed.  `nil` means no limit.
   /// - clock:     The clock used for the delay.
+  @_spi(CustomDefaultExecutors)
   @available(StdlibDeploymentTarget 6.2, *)
   func enqueue<C: Clock>(_ job: consuming ExecutorJob,
                          after delay: C.Duration,
@@ -83,6 +86,7 @@ public protocol SchedulableExecutor: Executor {
   /// - tolerance: The maximum additional delay permissible before the
   ///              job is executed.  `nil` means no limit.
   /// - clock:     The clock used for the delay..
+  @_spi(CustomDefaultExecutors)
   @available(StdlibDeploymentTarget 6.2, *)
   func enqueue<C: Clock>(_ job: consuming ExecutorJob,
                          at instant: C.Instant,
@@ -160,6 +164,7 @@ extension SchedulableExecutor {
 
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
+  @_spi(CustomDefaultExecutors)
   @available(StdlibDeploymentTarget 6.2, *)
   public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
                                 after delay: C.Duration,
@@ -171,6 +176,7 @@ extension SchedulableExecutor {
             tolerance: tolerance, clock: clock)
   }
 
+  @_spi(CustomDefaultExecutors)
   @available(StdlibDeploymentTarget 6.2, *)
   public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
                                 at instant: C.Instant,
@@ -360,6 +366,7 @@ public protocol SerialExecutor: Executor {
   /// The default implementation returns `nil` is used to indicate that it is "unknown" if the current context is
   /// isolated by this serial executor. The runtime then _may_ proceed to invoke `checkIsolated()` as a last-resort
   /// attempt to verify the isolation of the current context.
+  @_spi(CustomDefaultExecutors)
   @available(StdlibDeploymentTarget 6.2, *)
   func isIsolatingCurrentContext() -> Bool?
 
@@ -369,6 +376,7 @@ public protocol SerialExecutor: Executor {
 extension SerialExecutor {
 
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  @_spi(CustomDefaultExecutors)
   @available(StdlibDeploymentTarget 6.2, *)
   public var isMainExecutor: Bool { return MainActor.executor._isSameExecutor(self) }
   #endif
@@ -515,6 +523,7 @@ extension SerialExecutor {
 @available(StdlibDeploymentTarget 6.2, *)
 extension SerialExecutor where Self: Equatable {
 
+  @_spi(CustomDefaultExecutors)
   @available(StdlibDeploymentTarget 6.2, *)
   public func isSameExclusiveExecutionContext(other: Self) -> Bool {
     return self == other
@@ -527,6 +536,7 @@ extension SerialExecutor where Self: Equatable {
 /// The idea here is that some executors may work by running a loop
 /// that processes events of some sort; we want a way to enter that loop,
 /// and we would also like a way to trigger the loop to exit.
+@_spi(CustomDefaultExecutors)
 @available(StdlibDeploymentTarget 6.2, *)
 public protocol RunLoopExecutor: Executor {
   /// Run the executor's run loop.
@@ -558,6 +568,7 @@ public protocol RunLoopExecutor: Executor {
   func stop()
 }
 
+@_spi(CustomDefaultExecutors)
 @available(StdlibDeploymentTarget 6.2, *)
 extension RunLoopExecutor {
 
@@ -570,6 +581,7 @@ extension RunLoopExecutor {
 
 /// The main executor must conform to these three protocols; we have to
 /// make this a protocol for compatibility with Embedded Swift.
+@_spi(CustomDefaultExecutors)
 @available(StdlibDeploymentTarget 6.2, *)
 public protocol MainExecutor: RunLoopExecutor, SerialExecutor {
 }
@@ -577,6 +589,7 @@ public protocol MainExecutor: RunLoopExecutor, SerialExecutor {
 
 /// An ExecutorFactory is used to create the default main and task
 /// executors.
+@_spi(CustomDefaultExecutors)
 @available(StdlibDeploymentTarget 6.2, *)
 public protocol ExecutorFactory {
   #if !$Embedded
@@ -590,9 +603,11 @@ public protocol ExecutorFactory {
   static var defaultExecutor: any TaskExecutor { get }
 }
 
+@_spi(CustomDefaultExecutors)
 @available(StdlibDeploymentTarget 6.2, *)
-typealias DefaultExecutorFactory = PlatformExecutorFactory
+public typealias DefaultExecutorFactory = PlatformExecutorFactory
 
+@_spi(CustomDefaultExecutors)
 @available(StdlibDeploymentTarget 6.2, *)
 @_silgen_name("swift_createExecutors")
 public func _createExecutors<F: ExecutorFactory>(factory: F.Type) {
@@ -620,6 +635,7 @@ extension MainActor {
   ///
   /// Attempting to set this after the first `enqueue` on the main
   /// executor is a fatal error.
+  @_spi(CustomDefaultExecutors)
   @available(StdlibDeploymentTarget 6.2, *)
   public static var executor: any MainExecutor {
     // It would be good if there was a Swift way to do this
@@ -638,6 +654,7 @@ extension Task where Success == Never, Failure == Never {
   ///
   /// Attempting to set this after the first `enqueue` on the global
   /// executor is a fatal error.
+  @_spi(CustomDefaultExecutors)
   @available(StdlibDeploymentTarget 6.2, *)
   public static var defaultExecutor: any TaskExecutor {
     // It would be good if there was a Swift way to do this
@@ -658,6 +675,7 @@ extension Task where Success == Never, Failure == Never {
   ///   3. The task executor for the current thread
   ///
   ///  If none of these exist, returns the default executor.
+  @_spi(CustomDefaultExecutors)
   @available(StdlibDeploymentTarget 6.2, *)
   @_unavailableInEmbedded
   public static var currentExecutor: any Executor {
@@ -672,6 +690,7 @@ extension Task where Success == Never, Failure == Never {
   }
 
   /// Get the preferred executor for the current `Task`, if any.
+  @_spi(CustomDefaultExecutors)
   @available(StdlibDeploymentTarget 6.2, *)
   public static var preferredExecutor: (any TaskExecutor)? {
     if let taskExecutor = unsafe _getPreferredTaskExecutor().asTaskExecutor() {
@@ -684,6 +703,7 @@ extension Task where Success == Never, Failure == Never {
   ///
   /// This follows the same logic as `currentExecutor`, except that it ignores
   /// any executor that isn't a `SchedulableExecutor`.
+  @_spi(CustomDefaultExecutors)
   @available(StdlibDeploymentTarget 6.2, *)
   @_unavailableInEmbedded
   public static var currentSchedulableExecutor: (any SchedulableExecutor)? {
@@ -760,6 +780,7 @@ public struct UnownedSerialExecutor: Sendable {
 
   /// Automatically opt-in to complex equality semantics if the Executor
   /// implements `Equatable`.
+  @_spi(CustomDefaultExecutors)
   @available(SwiftStdlib 6.2, *)
   @inlinable
   public init<E: SerialExecutor>(_ executor: __shared E) {
@@ -776,6 +797,7 @@ public struct UnownedSerialExecutor: Sendable {
     unsafe _executor_isComplexEquality(self)
   }
 
+  @_spi(CustomDefaultExecutors)
   @available(StdlibDeploymentTarget 6.2, *)
   public func asSerialExecutor() -> (any SerialExecutor)? {
     return unsafe unsafeBitCast(executor, to: (any SerialExecutor)?.self)
@@ -807,12 +829,14 @@ public struct UnownedTaskExecutor: Sendable {
     unsafe self.executor = Builtin.buildOrdinaryTaskExecutorRef(executor)
   }
 
+  @_spi(CustomDefaultExecutors)
   @available(SwiftStdlib 6.2, *)
   @inlinable
   public init<E: TaskExecutor>(_ executor: __shared E) {
     unsafe self.executor = Builtin.buildOrdinaryTaskExecutorRef(executor)
   }
 
+  @_spi(CustomDefaultExecutors)
   @available(StdlibDeploymentTarget 6.2, *)
   public func asTaskExecutor() -> (any TaskExecutor)? {
     return unsafe unsafeBitCast(executor, to: (any TaskExecutor)?.self)

@@ -13,6 +13,7 @@
 import Dispatch
 import StdlibUnittest
 import _Concurrency
+@_spi(CustomDefaultExecutors) import _Concurrency
 
 import Foundation
 import Darwin

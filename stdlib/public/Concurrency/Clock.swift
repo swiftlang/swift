@@ -43,6 +43,7 @@ public protocol Clock<Duration>: Sendable {
 #endif
 
   /// The traits associated with this clock instance.
+  @_spi(CustomDefaultExecutors)
   @available(StdlibDeploymentTarget 6.2, *)
   var traits: ClockTraits { get }
 
@@ -59,6 +60,7 @@ public protocol Clock<Duration>: Sendable {
   ///
   /// Returns: A `Swift.Duration` representing the equivalent duration, or
   ///          `nil` if this function is not supported.
+  @_spi(CustomDefaultExecutors)
   @available(StdlibDeploymentTarget 6.2, *)
   func convert(from duration: Duration) -> Swift.Duration?
 
@@ -70,6 +72,7 @@ public protocol Clock<Duration>: Sendable {
   ///
   /// Returns: A `Duration` representing the equivalent duration, or
   ///          `nil` if this function is not supported.
+  @_spi(CustomDefaultExecutors)
   @available(StdlibDeploymentTarget 6.2, *)
   func convert(from duration: Swift.Duration) -> Duration?
 
@@ -82,6 +85,7 @@ public protocol Clock<Duration>: Sendable {
   ///
   /// Returns: An `Instant` representing the equivalent instant, or
   ///          `nil` if this function is not supported.
+  @_spi(CustomDefaultExecutors)
   @available(StdlibDeploymentTarget 6.2, *)
   func convert<OtherClock: Clock>(instant: OtherClock.Instant,
                                   from clock: OtherClock) -> Instant?
@@ -140,17 +144,19 @@ extension Clock {
   }
 }
 
-@available(StdlibDeploymentTarget 6.2, *)
 extension Clock {
   // For compatibility, return `nil` if this is not implemented
+  @available(StdlibDeploymentTarget 6.2, *)
   public func convert(from duration: Duration) -> Swift.Duration? {
     return nil
   }
 
+  @available(StdlibDeploymentTarget 6.2, *)
   public func convert(from duration: Swift.Duration) -> Duration? {
     return nil
   }
 
+  @available(StdlibDeploymentTarget 6.2, *)
   public func convert<OtherClock: Clock>(instant: OtherClock.Instant,
                                   from clock: OtherClock) -> Instant? {
     let ourNow = now
@@ -171,8 +177,8 @@ extension Clock {
   }
 }
 
-@available(StdlibDeploymentTarget 6.2, *)
 extension Clock where Duration == Swift.Duration {
+  @available(StdlibDeploymentTarget 6.2, *)
   public func convert(from duration: Duration) -> Duration? {
     return duration
   }
@@ -207,6 +213,7 @@ extension Clock {
 /// clocks best matches the clock that the user is trying to specify a
 /// time or delay in.  Executors are expected to do this on a best effort
 /// basis.
+@_spi(CustomDefaultExecutors)
 @available(StdlibDeploymentTarget 6.2, *)
 public struct ClockTraits: OptionSet {
   public let rawValue: UInt32
