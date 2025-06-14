@@ -965,7 +965,7 @@ fileprivate func run_BridgedNSStringLength(_ asciiBase: Bool, _ enc: UInt, _ n: 
   let str = asciiBase ? bridgedASCIIString : bridgedUTF8String
   for _ in 0 ..< n * 100 {
     for i in 0..<100 {
-      blackHole(str.lengthOfBytes(using: enc))
+      blackHole(str!.lengthOfBytes(using: enc))
     }
   }
 }
