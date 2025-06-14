@@ -901,7 +901,7 @@ public func run_BridgedNSDictionaryEnumerate(_ n: Int) {
 public func run_BridgedNSArrayBufferAccess(_ n: Int) {
   #if _runtime(_ObjC)
   for _ in 0 ..< n {
-    for i in 0..<1000 {
+    for _ in 0..<1000 {
       let tmp = nsArray as! [NSObject]
       blackHole(tmp)
       blackHole(tmp.withContiguousStorageIfAvailable {
@@ -918,7 +918,7 @@ public func run_BridgedNSArrayRepeatedBufferAccess(_ n: Int) {
   for _ in 0 ..< n {
     let tmp = nsArray as! [NSObject]
     blackHole(tmp)
-    for i in 0..<1000 {
+    for _ in 0..<1000 {
       blackHole(tmp.withContiguousStorageIfAvailable {
         $0[0]
       })
@@ -1002,7 +1002,7 @@ public func run_BridgedNSStringLengthUTF8_UTF16(_ n: Int) {
 
 @inline(__always)
 fileprivate func run_BridgedNSStringMaxLength(_ asciiBase: Bool, _ enc: UInt, _ n: Int) {
-  let str = asciiBase ? bridgedASCIIString : bridgedUTF8String
+  let str = asciiBase ? bridgedASCIIString! : bridgedUTF8String!
   for _ in 0 ..< n * 100 {
     for i in 0..<100 {
       blackHole(str.maximumLengthOfBytes(using: enc))
