@@ -8232,11 +8232,14 @@ ERROR(lifetime_dependence_immortal_alone, none,
       "cannot specify any other dependence source along with immortal", ())
 ERROR(lifetime_dependence_invalid_inherit_escapable_type, none,
       "cannot copy the lifetime of an Escapable type, use "
-      "'@_lifetime(%1%0)' instead",
+      "'@_lifetime(%0%1)' instead",
       (StringRef, StringRef))
-ERROR(lifetime_dependence_cannot_use_parsed_borrow_consuming, none,
+ERROR(lifetime_dependence_parsed_borrow_with_ownership, none,
       "invalid use of %0 dependence with %1 ownership",
       (StringRef, StringRef))
+NOTE(lifetime_dependence_parsed_borrow_with_ownership_fix, none,
+     "use '@_lifetime(%0%1)' instead",
+     (StringRef, StringRef))
 ERROR(lifetime_dependence_cannot_use_default_escapable_consuming, none,
       "invalid lifetime dependence on an Escapable value with %0 ownership",
       (StringRef))
