@@ -499,7 +499,7 @@ public:
   bool SkipSDKImportPaths = false;
 
   /// Scanner Prefix Mapper.
-  std::vector<std::string> ScannerPrefixMapper;
+  std::vector<std::pair<std::string, std::string>> ScannerPrefixMapper;
 
   /// Verify resolved plugin is not changed.
   bool ResolvedPluginVerification = false;
