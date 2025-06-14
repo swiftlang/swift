@@ -12,6 +12,7 @@ struct NotClass {}
 class A {}
 class B: A {}
 final class F: A {}
+protocol Q {}
 
 sil_vtable A {}
 sil_vtable B {}
@@ -434,4 +435,25 @@ bb2:
 
 bb3(%11 : $Optional<C & PAnyObject>):
   return %11 : $Optional<C & PAnyObject>
+}
+
+// CHECK-LABEL: define{{.*}} @checked_cast_optional_metatype
+// CHECK: [[COND:%.*]] = icmp ne ptr {{%.*}}, null
+// CHECK-NEXT: br i1 [[COND]], label %is-non-nil, label %is-nil
+// CHECK: nil-checked-cont:
+// CHECK:   %4 = phi { ptr, ptr } [ {{%.*}}, %is-non-nil ], [ zeroinitializer, %is-nil ]
+sil @checked_cast_optional_metatype : $@convention(thin) (Optional<@thick any Any.Type>) -> Optional<@thick any Q.Type> {
+bb0(%0 : $Optional<@thick any Any.Type>):
+  checked_cast_br Optional<any Any.Type> in %0 to any Q.Type, bb1, bb2
+
+bb1(%3 : $@thick any Q.Type):
+  %4 = enum $Optional<@thick any Q.Type>, #Optional.some!enumelt, %3
+  br bb3(%4)
+
+bb2:
+  %6 = enum $Optional<@thick any Q.Type>, #Optional.none!enumelt
+  br bb3(%6)
+
+bb3(%8 : $Optional<@thick any Q.Type>):
+  return %8
 }
