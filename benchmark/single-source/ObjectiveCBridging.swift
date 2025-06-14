@@ -1000,7 +1000,7 @@ public func run_BridgedNSStringLengthUTF8_UTF16(_ n: Int) {
 
 @inline(__always)
 fileprivate func run_BridgedNSStringMaxLength(_ asciiBase: Bool, _ enc: UInt, _ n: Int) {
-  let str = asciiBase ? bridgedASCIIString : bridgedUTF8String
+  let str = asciiBase ? bridgedASCIIString! : bridgedUTF8String!
   for _ in 0 ..< n * 100 {
     for i in 0..<100 {
       blackHole(str.maximumLengthOfBytes(using: enc))
