@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_protocol.swiftmodule -module-name=resilient_protocol %S/../Inputs/resilient_protocol.swift
 // RUN: %target-swift-frontend -I %t -emit-ir -Xllvm -sil-disable-pass=Simplification -enable-library-evolution %s | %FileCheck %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -I %t -emit-ir -Xllvm -sil-disable-pass=Simplification -enable-library-evolution -O %s
 
 sil_stage canonical
 
@@ -140,9 +141,7 @@ protocol InternalProtocol {
 sil @defaultC : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> () {
 bb0(%0 : $*Self):
   // CHECK-NEXT: %[[SELF:.*]] = alloca ptr
-  // CHECK-NEXT:%[[SELF2:.*]] = alloca ptr
   // CHECK-NEXT: store ptr %Self, ptr %[[SELF]]
-  // CHECK-NEXT: store ptr %SelfWitnessTable, ptr %[[SELF2]]
   // CHECK-NEXT: ret void
   %result = tuple ()
   return %result : $()
@@ -156,9 +155,7 @@ bb0(%0 : $*Self):
 
   // Make sure we can emit direct references to other default implementations
   // CHECK-NEXT: %[[SELF:.*]] = alloca ptr
-  // CHECK-NEXT:%[[SELF2:.*]] = alloca ptr
   // CHECK-NEXT: store ptr %Self, ptr %[[SELF]]
-  // CHECK-NEXT: store ptr %SelfWitnessTable, ptr %[[SELF2]]
   // CHECK-NEXT: call swiftcc void @defaultC(ptr noalias swiftself %0, ptr %Self, ptr %SelfWitnessTable)
   %fn1 = function_ref @defaultC : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
   %ignore1 = apply %fn1<Self>(%0) : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@in_guaranteed Self) -> ()
@@ -196,9 +193,7 @@ bb0(%0 : $@thick Self.Type):
 
   // Make sure we can emit direct references to other default implementations
   // CHECK-NEXT: %[[SELF:.*]] = alloca ptr
-  // CHECK-NEXT:%[[SELF2:.*]] = alloca ptr
   // CHECK-NEXT: store ptr %Self, ptr %[[SELF]]
-  // CHECK-NEXT: store ptr %SelfWitnessTable, ptr %[[SELF2]]
   // CHECK-NEXT: call swiftcc void @defaultF(ptr swiftself %0, ptr %Self, ptr %SelfWitnessTable)
   %fn1 = function_ref @defaultF : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@thick Self.Type) -> ()
   %ignore1 = apply %fn1<Self>(%0) : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@thick Self.Type) -> ()
@@ -234,9 +229,7 @@ bb0(%0 : $@thick Self.Type):
 sil @defaultF : $@convention(witness_method: ResilientProtocol) <Self where Self : ResilientProtocol> (@thick Self.Type) -> () {
 bb0(%0 : $@thick Self.Type):
   // CHECK-NEXT: %[[SELF:.*]] = alloca ptr
-  // CHECK-NEXT:%[[SELF2:.*]] = alloca ptr
   // CHECK-NEXT: store ptr %Self, ptr %[[SELF]]
-  // CHECK-NEXT: store ptr %SelfWitnessTable, ptr %[[SELF2]]
   // CHECK-NEXT: ret void
   %result = tuple ()
   return %result : $()
