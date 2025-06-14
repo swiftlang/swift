@@ -75,15 +75,17 @@ var invalidSubject = 0
 private(42) // expected-error{{expected 'set' as subject of 'private' modifier}} {{9-11=set}}
 var invalidSubject2 = 0
 
-private(a bunch of random tokens) // expected-error{{expected 'set' as subject of 'private' modifier}} expected-error{{expected declaration}}
+private(a bunch of random tokens) // expected-error{{expected 'set' as subject of 'private' modifier}} {{9-33=set}} expected-error{{expected declaration}}
 var invalidSubject3 = 0
-
 
 package(get) // expected-error{{expected 'set' as subject of 'package' modifier}} {{9-12=set}}
 var invalidSubject4 = 0
 
 package(42) // expected-error{{expected 'set' as subject of 'package' modifier}} {{9-11=set}}
 var invalidSubject5 = 0
+
+private((((get)))) // expected-error{{expected 'set' as subject of 'private' modifier}} {{9-18=set}} expected-error{{expected declaration}}
+var invalidSubject6 = 0
 
 private(set // expected-error{{expected ')' in 'private' modifier}} {{12-12=)}}
 var unterminatedSubject = 0

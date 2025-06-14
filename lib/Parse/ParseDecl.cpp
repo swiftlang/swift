@@ -2894,7 +2894,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       break;
     }
 
-    auto LParenLoc = consumeAttributeLParen();
+    consumeAttributeLParen();
+    auto LParenEndLoc = getEndOfPreviousLoc();
 
     if (Tok.is(tok::code_complete)) {
       if (CodeCompletionCallbacks) {
@@ -2908,28 +2909,39 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     // Parse the subject.
     if (!Tok.isContextualKeyword("set")) {
       auto diag = diagnose(Loc, diag::attr_access_expected_set, AttrName);
-      
-      if (Tok.is(tok::l_paren)) {
-        return makeParserSuccess();
-      }
 
       // Minimal recovery: if there's a single token and then an r_paren,
       // consume them both. If there's just an r_paren, consume that.
       if (Tok.is(tok::r_paren)) {
         auto SetLoc = consumeToken(tok::r_paren);
         diag.fixItInsert(SetLoc, "set");
-      } else if (peekToken().is(tok::r_paren)) {
+      } else if (Tok.isNot(tok::l_paren) && peekToken().is(tok::r_paren)) {
         auto SetLoc = consumeToken();
         diag.fixItReplace(SetLoc, "set");
         consumeToken(tok::r_paren);
-      } else if (isStartOfSwiftDecl()) {
-        diag.fixItInsertAfter(LParenLoc, "set)");
       } else {
-        BacktrackingScope Scope(*this);
-        auto InvalidTokLoc = consumeToken();
+        BacktrackingScope backtrack(*this);
+        auto StartLoc = LParenEndLoc;
+        auto EndLoc = LParenEndLoc;
         
-        if (isStartOfSwiftDecl())
-          diag.fixItReplace(InvalidTokLoc, "set)");
+        int OpenParens = 1;
+        while (!Tok.isAtStartOfLine() && !isStartOfSwiftDecl()) {
+          if (Tok.is(tok::l_paren))
+            OpenParens++;
+          else if (Tok.is(tok::r_paren))
+            OpenParens--;
+          
+          if (OpenParens == 0)
+            break;
+          
+          consumeToken();
+          EndLoc = getEndOfPreviousLoc();
+        }
+
+        if (!Tok.isAtStartOfLine() || isStartOfSwiftDecl()) {
+          diag.fixItReplaceChars(StartLoc, EndLoc,
+                                 OpenParens > 0 ? "set)" : "set");
+        }
       }
       
       return makeParserSuccess();
