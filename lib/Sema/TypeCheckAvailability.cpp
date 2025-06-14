@@ -1693,6 +1693,7 @@ bool shouldHideDomainNameForConstraintDiagnostic(
   case AvailabilityDomain::Kind::Embedded:
   case AvailabilityDomain::Kind::Custom:
   case AvailabilityDomain::Kind::PackageDescription:
+  case AvailabilityDomain::Kind::SwiftToolchain:
     return true;
   case AvailabilityDomain::Kind::Platform:
     return false;

@@ -5145,6 +5145,7 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
   bool hasValidSpecs = false;
   bool allValidSpecsArePlatform = true;
   std::optional<SourceLoc> wildcardLoc;
+  std::optional<SemanticAvailabilitySpec> swiftToolchainAvailability;
   llvm::SmallSet<AvailabilityDomain, 8> seenDomains;
   for (auto spec : info->getSemanticAvailabilitySpecs(DC)) {
     auto parsedSpec = spec.getParsedSpec();
@@ -5156,6 +5157,12 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
     auto domain = spec.getDomain();
     auto loc = parsedSpec->getStartLoc();
     bool hasVersion = !spec.getVersion().empty();
+
+    if (domain.isSwiftToolchain()) {
+      // Save this spec for later in case it's in a condition on its own
+      swiftToolchainAvailability = spec;
+      continue;
+    }
 
     if (!domain.supportsQueries()) {
       diags.diagnose(loc, diag::availability_query_not_allowed, domain,
@@ -5201,6 +5208,20 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
     hasValidSpecs = true;
     if (!domain.isPlatform())
       allValidSpecsArePlatform = false;
+  }
+
+  if (!hasValidSpecs && swiftToolchainAvailability) {
+    // Swift Toolchain availability is meant to be used in macros with platform availability,
+    // but if it appears on its own it should be diagnosed.
+    auto spec = *swiftToolchainAvailability;
+    auto parsedSpec = spec.getParsedSpec();
+    auto domain = spec.getDomain();
+    auto loc = parsedSpec->getStartLoc();
+    bool hasVersion = !spec.getVersion().empty();
+
+    diags.diagnose(loc, diag::availability_query_not_allowed, domain,
+                   hasVersion, queryName);
+    return true;
   }
 
   if (info->isUnavailability()) {
