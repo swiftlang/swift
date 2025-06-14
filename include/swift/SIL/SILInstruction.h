@@ -8903,10 +8903,10 @@ public:
 
 /// Shared API for MarkDependenceInst and MarkDependenceAddrInst.
 class MarkDependenceInstruction {
-  const SILInstruction *inst = nullptr;
+  SILInstruction *inst = nullptr;
 
 public:
-  explicit MarkDependenceInstruction(const SILInstruction *inst) {
+  explicit MarkDependenceInstruction(SILInstruction *inst) {
     switch (inst->getKind()) {
     case SILInstructionKind::MarkDependenceInst:
     case SILInstructionKind::MarkDependenceAddrInst:
@@ -8967,6 +8967,11 @@ public:
     }
     return false;
   }
+
+  SILInstruction *operator->() { return inst; }
+  SILInstruction *operator->() const { return inst; }
+  SILInstruction *operator*() { return inst; }
+  SILInstruction *operator*() const { return inst; }
 };
 
 /// Promote an Objective-C block that is on the stack to the heap, or simply
