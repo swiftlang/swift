@@ -365,7 +365,7 @@ SIMPLE_DECL_ATTR(_show_in_interface, ShowInInterface,
   62)
 
 DECL_ATTR(_cdecl, CDecl,
-  OnFunc | OnAccessor,
+  OnFunc | OnAccessor | OnEnum,
   LongAttribute | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   63)
 DECL_ATTR_ALIAS(cdecl, CDecl)
