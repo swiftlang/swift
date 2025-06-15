@@ -317,6 +317,11 @@ struct FunctionPassContext : MutatingContext {
     return DeadEndBlocksAnalysis(bridged: bridgeDEA)
   }
 
+  var destructorAnalysis: DestructorAnalysis {
+    let bridgeAnalysis = _bridged.getDestructorAnalysis()
+    return DestructorAnalysis(bridged: bridgeAnalysis)
+  }
+
   var dominatorTree: DominatorTree {
     let bridgedDT = _bridged.getDomTree()
     return DominatorTree(bridged: bridgedDT)
