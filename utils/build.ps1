@@ -3465,10 +3465,9 @@ if (-not $SkipBuild -and -not $IsCrossCompiling) {
 
 if (-not $SkipPackaging) {
   Invoke-BuildStep Build-Installer $HostPlatform
-}
-
-if ($Stage) {
-  Copy-BuildArtifactsToStage $HostPlatform
+  if ($Stage) {
+    Copy-BuildArtifactsToStage $HostPlatform
+  }
 }
 
 if (-not $IsCrossCompiling) {
