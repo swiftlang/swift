@@ -48,6 +48,7 @@ public:
     // (swift_retain, etc.). Link them in so they can be referenced in IRGen.
     if (M.getOptions().EmbeddedSwift && LinkEmbeddedRuntime) {
       linkEmbeddedRuntimeFromStdlib();
+      linkEmbeddedConcurrencyHookImpls();
     }
 
     // In embedded Swift, we need to explicitly link any @_used globals and
@@ -78,6 +79,26 @@ public:
 
       // swift_retainCount is not part of private contract between the compiler and runtime, but we still need to link it
       linkEmbeddedRuntimeFunctionByName("swift_retainCount", { RefCounting });
+  }
+
+  void linkEmbeddedConcurrencyHookImpls() {
+    using namespace RuntimeConstants;
+
+    // Note: we ignore errors here, because, depending on the exact situation
+    //
+    //    (a) We might not have Concurrency anyway, and
+    //
+    //    (b) The Impl function might be implemented in C++.
+    //
+    // Also, the hook Impl functions are marked as internal, unlike the
+    // runtime functions, which are public.
+
+#define SWIFT_CONCURRENCY_HOOK(RETURNS, NAME, ...)                  \
+  linkUsedFunctionByName(#NAME "Impl", SILLinkage::HiddenExternal)
+#define SWIFT_CONCURRENCY_HOOK0(RETURNS, NAME)                      \
+  linkUsedFunctionByName(#NAME "Impl", SILLinkage::HiddenExternal)
+
+    #include "swift/Runtime/ConcurrencyHooks.def"
   }
 
   void linkEmbeddedRuntimeFunctionByName(StringRef name,
