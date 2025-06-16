@@ -3451,7 +3451,7 @@ if (-not $SkipBuild) {
 
 Install-HostToolchain
 
-if ($IncludeNoAsserts) {
+if (-not $SkipBuild -and $IncludeNoAsserts) {
   Build-NoAssertsToolchain
 }
 
