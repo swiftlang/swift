@@ -2780,7 +2780,11 @@ function Build-ToolsSupportCore([Hashtable] $Platform) {
     -SwiftSDK (Get-SwiftSDK Windows) `
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
+      CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+
+      Foundation_DIR = $(Get-ProjectCMakeModules $Platform DynamicFoundation);
+      XCTest_DIR = (Get-ProjectCMakeModules $Platform XCTest);
     }
 }
 
