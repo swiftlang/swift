@@ -23,10 +23,11 @@ namespace swift {
 // diagnostics.
 enum class ENUM_EXTENSIBILITY_ATTR(closed) AccessorKind {
 #define ACCESSOR(ID, KEYWORD) ID SWIFT_NAME(#KEYWORD),
+#define INIT_ACCESSOR(ID, KEYWORD)                                             \
+  ID, // FIXME: We should be able to remove this once Linux CI host Swift is
+      // upgraded to 6.0
 #define LAST_ACCESSOR(ID) Last = ID
 #include "swift/AST/AccessorKinds.def"
-#undef ACCESSOR
-#undef LAST_ACCESSOR
 };
 
 } // namespace swift

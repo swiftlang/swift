@@ -22,6 +22,7 @@
 
 #include "swift/AST/AccessorKind.h"
 #include "swift/AST/DiagnosticKind.h"
+#include "swift/AST/DiagnosticList.h"
 #include "swift/Basic/BasicBridging.h"
 
 #ifdef USED_IN_CPP_SOURCE
@@ -530,13 +531,6 @@ struct BridgedPatternBindingEntry {
 // MARK: Diagnostic Engine
 //===----------------------------------------------------------------------===//
 
-// NOTE: This must be the same underlying value as C++ 'swift::DiagID' defined
-// in 'DiagnosticList.cpp'.
-enum ENUM_EXTENSIBILITY_ATTR(open) BridgedDiagID : uint32_t {
-#define DIAG(KIND, ID, Group, Options, Text, Signature) BridgedDiagID_##ID,
-#include "swift/AST/DiagnosticsAll.def"
-};
-
 class BridgedDiagnosticArgument {
   int64_t storage[3];
 
@@ -579,7 +573,7 @@ public:
 SWIFT_NAME("BridgedDiagnosticEngine.diagnose(self:at:_:_:highlightAt:"
            "highlightLength:fixIts:)")
 void BridgedDiagnosticEngine_diagnose(
-    BridgedDiagnosticEngine, BridgedSourceLoc loc, BridgedDiagID diagID,
+    BridgedDiagnosticEngine, BridgedSourceLoc loc, swift::DiagID diagID,
     BridgedArrayRef arguments, BridgedSourceLoc highlightStart,
     uint32_t hightlightLength, BridgedArrayRef fixIts);
 

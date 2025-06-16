@@ -394,7 +394,7 @@ extension ASTGenVisitor {
     case ._modify:
       return ._modify
     case .`init`:
-      return .`init`
+      return .Init
     case .read:
       precondition(ctx.langOptsHasFeature(.CoroutineAccessors), "(compiler bug) 'read' accessor should only be parsed with 'CoroutineAccessors' feature")
       return .read

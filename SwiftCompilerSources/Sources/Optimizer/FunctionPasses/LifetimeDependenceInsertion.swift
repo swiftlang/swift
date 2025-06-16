@@ -263,7 +263,7 @@ private func insertResultDependencies(for apply: LifetimeDependentApply, _ conte
 }
 
 private func diagnoseUnknownDependenceSource(sourceLoc: SourceLoc?, _ context: FunctionPassContext) {
-  context.diagnosticEngine.diagnose(.lifetime_value_outside_scope, [], at: sourceLoc)
+  context.diagnosticEngine.diagnose(.lifetime_value_outside_scope, at: sourceLoc)
 }
 
 private func insertParameterDependencies(apply: LifetimeDependentApply, target: Operand,
