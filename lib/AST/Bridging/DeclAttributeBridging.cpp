@@ -568,26 +568,12 @@ BridgedNonSendableAttr BridgedNonSendableAttr_createParsed(
       NonSendableAttr(cAtLoc.unbridged(), cRange.unbridged(), unbridged(cKind));
 }
 
-static NonIsolatedModifier unbridged(BridgedNonIsolatedModifier modifier) {
-  switch (modifier) {
-  case BridgedNonIsolatedModifierNone:
-    return NonIsolatedModifier::None;
-  case BridgedNonIsolatedModifierUnsafe:
-    return NonIsolatedModifier::Unsafe;
-  case BridgedNonIsolatedModifierNonSending:
-    return NonIsolatedModifier::NonSending;
-  }
-  llvm_unreachable("unhandled enum value");
-}
-
-BridgedNonisolatedAttr
-BridgedNonisolatedAttr_createParsed(BridgedASTContext cContext,
-                                    BridgedSourceLoc cAtLoc,
-                                    BridgedSourceRange cRange,
-                                    BridgedNonIsolatedModifier modifier) {
-  return new (cContext.unbridged()) NonisolatedAttr(
-      cAtLoc.unbridged(), cRange.unbridged(), unbridged(modifier),
-      /*implicit=*/false);
+BridgedNonisolatedAttr BridgedNonisolatedAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, swift::NonIsolatedModifier modifier) {
+  return new (cContext.unbridged())
+      NonisolatedAttr(cAtLoc.unbridged(), cRange.unbridged(), modifier,
+                      /*implicit=*/false);
 }
 
 BridgedInheritActorContextAttr BridgedInheritActorContextAttr_createParsed(

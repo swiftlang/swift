@@ -1400,16 +1400,16 @@ extension ASTGenVisitor {
 
   // FIXME: This is a decl modifier
   func generateNonisolatedAttr(attribute node: AttributeSyntax) -> BridgedNonisolatedAttr? {
-    let modifier: BridgedNonIsolatedModifier? = self.generateSingleAttrOption(
+    let modifier: swift.NonIsolatedModifier? = self.generateSingleAttrOption(
       attribute: node,
       {
         switch $0.rawText {
         case "unsafe": return .unsafe
-        case "nonsending": return .nonSending
+        case "nonsending": return .nonsending
         default: return nil
         }
       },
-      valueIfOmitted: BridgedNonIsolatedModifier.none
+      valueIfOmitted: swift.NonIsolatedModifier.none
     )
     guard let modifier else {
       return nil
@@ -2446,12 +2446,12 @@ extension ASTGenVisitor {
   }
 
   func generateNonisolatedAttr(declModifier node: DeclModifierSyntax) -> BridgedNonisolatedAttr? {
-    let modifier: BridgedNonIsolatedModifier
+    let modifier: swift.NonIsolatedModifier
     switch node.detail?.detail.rawText {
     case "unsafe":
       modifier = .unsafe
     case "nonsending":
-      modifier = .nonSending
+      modifier = .nonsending
     case nil:
       modifier = .none
     case let text?:

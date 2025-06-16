@@ -112,10 +112,10 @@ enum class ExternKind: uint8_t {
   Last_ExternKind = Wasm
 };
 
-enum class NonIsolatedModifier : uint8_t {
-  None = 0,
-  Unsafe,
-  NonSending,
+enum class ENUM_EXTENSIBILITY_ATTR(closed) NonIsolatedModifier : uint8_t {
+  None SWIFT_NAME("none") = 0,
+  Unsafe SWIFT_NAME("unsafe"),
+  NonSending SWIFT_NAME("nonsending"),
   Last_NonIsolatedModifier = NonSending
 };
 

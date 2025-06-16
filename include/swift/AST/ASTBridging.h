@@ -1200,18 +1200,10 @@ BridgedNonSendableAttr BridgedNonSendableAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceRange cRange, BridgedNonSendableKind cKind);
 
-enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedNonIsolatedModifier {
-  BridgedNonIsolatedModifierNone,
-  BridgedNonIsolatedModifierUnsafe,
-  BridgedNonIsolatedModifierNonSending
-};
-
 SWIFT_NAME("BridgedNonisolatedAttr.createParsed(_:atLoc:range:modifier:)")
-BridgedNonisolatedAttr
-BridgedNonisolatedAttr_createParsed(BridgedASTContext cContext,
-                                    BridgedSourceLoc cAtLoc,
-                                    BridgedSourceRange cRange,
-                                    BridgedNonIsolatedModifier modifier);
+BridgedNonisolatedAttr BridgedNonisolatedAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, swift::NonIsolatedModifier modifier);
 
 SWIFT_NAME("BridgedInheritActorContextAttr.createParsed(_:atLoc:range:modifier:)")
 BridgedInheritActorContextAttr BridgedInheritActorContextAttr_createParsed(
