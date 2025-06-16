@@ -40,6 +40,12 @@ if(NOT DEFINED SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT OR NOT SWIFT_BUILD_
     add_custom_target(embedded-builtin_float)
     add_dependencies(embedded-libraries embedded-builtin_float)
   
+    set(SWIFT_ENABLE_REFLECTION OFF)
+    set(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT OFF)
+    set(SWIFT_STDLIB_STABLE_ABI OFF)
+    set(SWIFT_STDLIB_ENABLE_OBJC_INTEROP OFF)
+    set(SWIFT_STDLIB_ENABLE_VECTOR_TYPES OFF)
+
     foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
       string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
       list(GET list 0 arch)
@@ -49,9 +55,6 @@ if(NOT DEFINED SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT OR NOT SWIFT_BUILD_
       set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")
       set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
       set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
-      set(SWIFT_SDK_embedded_PATH ${SWIFT_SDK_OSX_PATH})
-      set(SWIFT_SDK_embedded_ARCH_${arch}_PATH ${SWIFT_SDK_OSX_PATH})
-      set(SWIFT_SDK_embedded_USE_ISYSROOT TRUE)
       add_swift_target_library_single(
         embedded-builtin_float-${mod}
         swift_Builtin_float
