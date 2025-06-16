@@ -271,10 +271,7 @@ class LLVM(cmake_product.CMakeProduct):
                     'llvm-size'
                 ])
         else:
-            # We build LLVMTestingSupport unconditionally
-            # to support scenarios where tests are run
-            # outside of `build-script` (e.g. with `run-test`)
-            build_targets = ['all', 'LLVMTestingSupport']
+            build_targets = ['all']
 
             if self.args.llvm_ninja_targets_for_cross_compile_hosts and \
                self.is_cross_compile_target(host_target):
@@ -421,6 +418,12 @@ class LLVM(cmake_product.CMakeProduct):
         if not self.args.llvm_include_tests:
             llvm_cmake_options.define('LLVM_INCLUDE_TESTS', 'NO')
             llvm_cmake_options.define('CLANG_INCLUDE_TESTS', 'NO')
+
+        if ("-DLLVM_INCLUDE_TESTS=NO" not in llvm_cmake_options
+            and "-DLLVM_INCLUDE_TESTS:BOOL=FALSE" not in llvm_cmake_options):
+            # This supports scenarios where tests are run
+            # outside of `build-script` (e.g. with `run-test`)
+            build_targets.append('LLVMTestingSupport')
 
         build_root = os.path.dirname(self.build_dir)
         host_machine_target = targets.StdlibDeploymentTarget.host_target().name
