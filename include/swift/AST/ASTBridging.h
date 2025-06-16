@@ -2532,19 +2532,15 @@ public:
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCustomAttr castToCustomAttr() const;
 };
 
-// Bridged type attribute kinds, which mirror TypeAttrKind exactly.
-enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedTypeAttrKind {
-#define TYPE_ATTR(_, CLASS) BridgedTypeAttrKind##CLASS,
-#include "swift/AST/TypeAttr.def"
-  BridgedTypeAttrKindNone,
-};
+BRIDGED_OPTIONAL(swift::TypeAttrKind, TypeAttrKind)
 
-SWIFT_NAME("BridgedTypeAttrKind.init(from:)")
-BridgedTypeAttrKind BridgedTypeAttrKind_fromString(BridgedStringRef cStr);
+SWIFT_NAME("BridgedOptionalTypeAttrKind.init(from:)")
+BridgedOptionalTypeAttrKind
+BridgedOptionalTypeAttrKind_fromString(BridgedStringRef cStr);
 
 SWIFT_NAME("BridgedTypeAttribute.createSimple(_:kind:atLoc:nameLoc:)")
 BridgedTypeAttribute BridgedTypeAttribute_createSimple(
-    BridgedASTContext cContext, BridgedTypeAttrKind cKind,
+    BridgedASTContext cContext, swift::TypeAttrKind kind,
     BridgedSourceLoc cAtLoc, BridgedSourceLoc cNameLoc);
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedIsolatedTypeAttrIsolationKind {

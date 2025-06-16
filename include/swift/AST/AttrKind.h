@@ -149,7 +149,7 @@ enum : unsigned {
 };
 
 // Define enumerators for each type attribute, e.g. TypeAttrKind::Weak.
-enum class TypeAttrKind {
+enum class ENUM_EXTENSIBILITY_ATTR(closed) TypeAttrKind {
 #define TYPE_ATTR(_, CLASS) CLASS,
 #define LAST_TYPE_ATTR(CLASS) Last_TypeAttr = CLASS,
 #include "swift/AST/TypeAttr.def"
