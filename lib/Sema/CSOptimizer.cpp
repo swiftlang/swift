@@ -451,25 +451,26 @@ inferTypeFromInitializerResultType(ConstraintSystem &cs,
 }
 
 /// If the given expression represents a chain of operators that have
-/// only literals as arguments, attempt to deduce a potential type of the
-/// chain. For example if chain has only integral literals it's going to
-/// be `Int`, if there are some floating-point literals mixed in - it's going
-/// to be `Double`.
-static Type inferTypeOfArithmeticOperatorChain(DeclContext *dc, ASTNode node) {
-  auto binaryOp = getAsExpr<BinaryExpr>(node);
-  if (!binaryOp)
-    return Type();
-
+/// only declaration/member references and/or literals as arguments,
+/// attempt to deduce a potential type of the chain. For example if
+/// chain has only integral literals it's going to be `Int`, if there
+/// are some floating-point literals mixed in - it's going to be `Double`.
+static Type inferTypeOfArithmeticOperatorChain(ConstraintSystem &cs,
+                                               ASTNode node) {
   class OperatorChainAnalyzer : public ASTWalker {
     ASTContext &C;
     DeclContext *DC;
+    ConstraintSystem &CS;
 
-    llvm::SmallPtrSet<Type, 2> literals;
+    llvm::SmallPtrSet<llvm::PointerIntPair<Type, 1>, 2> candidates;
 
     bool unsupported = false;
 
     PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
       if (isa<BinaryExpr>(expr))
+        return Action::Continue(expr);
+
+      if (isa<PrefixUnaryExpr>(expr) || isa<PostfixUnaryExpr>(expr))
         return Action::Continue(expr);
 
       if (isa<ParenExpr>(expr))
@@ -487,17 +488,7 @@ static Type inferTypeOfArithmeticOperatorChain(DeclContext *dc, ASTNode node) {
       if (auto *LE = dyn_cast<LiteralExpr>(expr)) {
         if (auto *P = TypeChecker::getLiteralProtocol(C, LE)) {
           if (auto defaultTy = TypeChecker::getDefaultType(P, DC)) {
-            if (defaultTy->isInt()) {
-              // Don't add `Int` if `Double` is already in the list.
-              if (literals.contains(C.getDoubleType()))
-                return Action::Continue(expr);
-            } else if (defaultTy->isDouble()) {
-              // A single use of a floating-point literal flips the
-              // type of the entire chain to `Double`.
-              (void)literals.erase(C.getIntType());
-            }
-
-            literals.insert(defaultTy);
+            addCandidateType(defaultTy, /*literal=*/true);
             // String interpolation expressions have `TapExpr`
             // as their children, no reason to walk them.
             return Action::SkipChildren(expr);
@@ -505,22 +496,59 @@ static Type inferTypeOfArithmeticOperatorChain(DeclContext *dc, ASTNode node) {
         }
       }
 
+      if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
+        auto memberTy = CS.getType(UDE);
+        if (!memberTy->hasTypeVariable()) {
+          addCandidateType(memberTy, /*literal=*/false);
+          return Action::SkipChildren(expr);
+        }
+      }
+
+      if (auto *DRE = dyn_cast<DeclRefExpr>(expr)) {
+        auto declTy = CS.getType(DRE);
+        if (!declTy->hasTypeVariable()) {
+          addCandidateType(declTy, /*literal=*/false);
+          return Action::SkipChildren(expr);
+        }
+      }
+
       unsupported = true;
       return Action::Stop();
     }
 
+    void addCandidateType(Type type, bool literal) {
+      if (literal) {
+        if (type->isInt()) {
+          // Floating-point types always subsume Int in operator chains.
+          if (llvm::any_of(candidates, [](const auto &candidate) {
+                auto ty = candidate.getPointer();
+                return isFloatType(ty) || ty->isCGFloat();
+              }))
+            return;
+        } else if (isFloatType(type) || type->isCGFloat()) {
+          // A single use of a floating-point literal flips the
+          // type of the entire chain to it.
+          (void)candidates.erase({C.getIntType(), /*literal=*/true});
+        }
+      }
+
+      candidates.insert({type, literal});
+    }
+
   public:
-    OperatorChainAnalyzer(DeclContext *DC) : C(DC->getASTContext()), DC(DC) {}
+    OperatorChainAnalyzer(ConstraintSystem &CS)
+        : C(CS.getASTContext()), DC(CS.DC), CS(CS) {}
 
     Type chainType() const {
       if (unsupported)
         return Type();
-      return literals.size() != 1 ? Type() : *literals.begin();
+      return candidates.size() != 1 ? Type()
+                                    : (*candidates.begin()).getPointer();
     }
   };
 
-  OperatorChainAnalyzer analyzer(dc);
-  binaryOp->walk(analyzer);
+  OperatorChainAnalyzer analyzer(cs);
+  node.walk(analyzer);
 
   return analyzer.chainType();
 }
@@ -695,7 +723,7 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
   // For chains like `1 + 2 * 3` it's easy to deduce the type because
   // we know what literal types are preferred.
   if (isa<BinaryExpr>(argument)) {
-    auto chainTy = inferTypeOfArithmeticOperatorChain(cs.DC, argument);
+    auto chainTy = inferTypeOfArithmeticOperatorChain(cs, argument);
     if (!chainTy)
       return DisjunctionInfo::none();
 
@@ -1008,7 +1036,7 @@ static void determineBestChoicesInContext(
           auto *resultLoc = typeVar->getImpl().getLocator();
 
           if (auto type = inferTypeOfArithmeticOperatorChain(
-                  cs.DC, resultLoc->getAnchor())) {
+                  cs, resultLoc->getAnchor())) {
             types.push_back({type, /*fromLiteral=*/true});
           }
 
@@ -1830,7 +1858,7 @@ ConstraintSystem::selectDisjunction() {
 
         // Not all of the non-operator disjunctions are supported by the
         // ranking algorithm, so to prevent eager selection of operators
-        // when anything concrete is known about them, let's reset the score
+        // when nothing concrete is known about them, let's reset the score
         // and compare purely based on number of choices.
         if (isFirstOperator != isSecondOperator) {
           if (isFirstOperator && isFirstSpeculative)
