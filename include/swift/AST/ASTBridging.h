@@ -24,6 +24,7 @@
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/DiagnosticKind.h"
 #include "swift/AST/DiagnosticList.h"
+#include "swift/AST/GenericTypeParamKind.h"
 #include "swift/AST/LayoutConstraintKind.h"
 #include "swift/Basic/BasicBridging.h"
 
@@ -2928,15 +2929,6 @@ BridgedRequirementRepr BridgedRequirementRepr_createLayoutConstraint(
     BridgedLayoutConstraint cLayout, BridgedSourceLoc cLayoutLoc,
     bool isExpansionPattern);
 
-enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedGenericTypeParamKind : size_t {
-  /// A regular generic type parameter: 'T'
-  BridgedGenericTypeParamKindType = 0,
-  /// A generic parameter pack: 'each T'
-  BridgedGenericTypeParamKindPack,
-  /// A generic value parameter: 'let T'
-  BridgedGenericTypeParamKindValue,
-};
-
 SWIFT_NAME("BridgedGenericParamList.createParsed(_:leftAngleLoc:parameters:"
            "genericWhereClause:rightAngleLoc:)")
 BridgedGenericParamList BridgedGenericParamList_createParsed(
@@ -2952,7 +2944,7 @@ BridgedGenericTypeParamDecl BridgedGenericTypeParamDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cSpecifierLoc, BridgedIdentifier cName,
     BridgedSourceLoc cNameLoc, BridgedNullableTypeRepr opaqueInheritedType,
-    size_t index, BridgedGenericTypeParamKind paramKind);
+    size_t index, swift::GenericTypeParamKind paramKind);
 
 SWIFT_NAME(
     "BridgedTrailingWhereClause.createParsed(_:whereKeywordLoc:requirements:)")
