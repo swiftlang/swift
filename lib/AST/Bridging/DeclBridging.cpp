@@ -586,8 +586,8 @@ BridgedPrecedenceGroupDecl BridgedPrecedenceGroupDecl_createParsed(
     BridgedSourceLoc cPrecedencegroupKeywordLoc, BridgedIdentifier cName,
     BridgedSourceLoc cNameLoc, BridgedSourceLoc cLeftBraceLoc,
     BridgedSourceLoc cAssociativityKeywordLoc,
-    BridgedSourceLoc cAssociativityValueLoc,
-    BridgedAssociativity cAssociativity, BridgedSourceLoc cAssignmentKeywordLoc,
+    BridgedSourceLoc cAssociativityValueLoc, swift::Associativity associativity,
+    BridgedSourceLoc cAssignmentKeywordLoc,
     BridgedSourceLoc cAssignmentValueLoc, bool isAssignment,
     BridgedSourceLoc cHigherThanKeywordLoc, BridgedArrayRef cHigherThanNames,
     BridgedSourceLoc cLowerThanKeywordLoc, BridgedArrayRef cLowerThanNames,
@@ -609,9 +609,9 @@ BridgedPrecedenceGroupDecl BridgedPrecedenceGroupDecl_createParsed(
       cDeclContext.unbridged(), cPrecedencegroupKeywordLoc.unbridged(),
       cNameLoc.unbridged(), cName.unbridged(), cLeftBraceLoc.unbridged(),
       cAssociativityKeywordLoc.unbridged(), cAssociativityValueLoc.unbridged(),
-      static_cast<Associativity>(cAssociativity),
-      cAssignmentKeywordLoc.unbridged(), cAssignmentValueLoc.unbridged(),
-      isAssignment, cHigherThanKeywordLoc.unbridged(), higherThanNames,
+      associativity, cAssignmentKeywordLoc.unbridged(),
+      cAssignmentValueLoc.unbridged(), isAssignment,
+      cHigherThanKeywordLoc.unbridged(), higherThanNames,
       cLowerThanKeywordLoc.unbridged(), lowerThanNames,
       cRightBraceLoc.unbridged());
 }

@@ -927,7 +927,7 @@ extension ASTGenVisitor {
 
 // MARK: - PrecedenceGroupDecl
 
-extension BridgedAssociativity {
+extension swift.Associativity {
   fileprivate init?(from keyword: Keyword?) {
     switch keyword {
     case .none?: self = .none
@@ -991,9 +991,9 @@ extension ASTGenVisitor {
       }
     }
 
-    let associativityValue: BridgedAssociativity
+    let associativityValue: swift.Associativity
     if let token = body.associativity?.value {
-      if let value = BridgedAssociativity(from: token.keywordKind) {
+      if let value = swift.Associativity(from: token.keywordKind) {
         associativityValue = value
       } else {
         self.diagnose(.unexpectedTokenKind(token: token))

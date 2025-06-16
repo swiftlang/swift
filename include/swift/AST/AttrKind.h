@@ -29,19 +29,19 @@ class StringRef;
 namespace swift {
 
 /// The associativity of a binary operator.
-enum class Associativity : uint8_t {
+enum class ENUM_EXTENSIBILITY_ATTR(closed) Associativity : uint8_t {
   /// Non-associative operators cannot be written next to other
   /// operators with the same precedence.  Relational operators are
   /// typically non-associative.
-  None,
+  None SWIFT_NAME("none"),
 
   /// Left-associative operators associate to the left if written next
   /// to other left-associative operators of the same precedence.
-  Left,
+  Left SWIFT_NAME("left"),
 
   /// Right-associative operators associate to the right if written
   /// next to other right-associative operators of the same precedence.
-  Right
+  Right SWIFT_NAME("right")
 };
 
 /// Returns the in-source spelling of the given associativity.

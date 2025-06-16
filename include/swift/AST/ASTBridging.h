@@ -1672,12 +1672,6 @@ BridgedOperatorDecl BridgedOperatorDecl_createParsed(
     BridgedSourceLoc cColonLoc, BridgedIdentifier cPrecedenceGroupName,
     BridgedSourceLoc cPrecedenceGroupLoc);
 
-enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedAssociativity {
-  BridgedAssociativityNone,
-  BridgedAssociativityLeft,
-  BridgedAssociativityRight,
-};
-
 SWIFT_NAME("BridgedPrecedenceGroupDecl.createParsed(declContext:"
            "precedencegroupKeywordLoc:name:nameLoc:leftBraceLoc:"
            "associativityLabelLoc:associativityValueLoc:associativity:"
@@ -1689,8 +1683,8 @@ BridgedPrecedenceGroupDecl BridgedPrecedenceGroupDecl_createParsed(
     BridgedSourceLoc cPrecedencegroupKeywordLoc, BridgedIdentifier cName,
     BridgedSourceLoc cNameLoc, BridgedSourceLoc cLeftBraceLoc,
     BridgedSourceLoc cAssociativityKeywordLoc,
-    BridgedSourceLoc cAssociativityValueLoc,
-    BridgedAssociativity cAssociativity, BridgedSourceLoc cAssignmentKeywordLoc,
+    BridgedSourceLoc cAssociativityValueLoc, swift::Associativity associativity,
+    BridgedSourceLoc cAssignmentKeywordLoc,
     BridgedSourceLoc cAssignmentValueLoc, bool isAssignment,
     BridgedSourceLoc cHigherThanKeywordLoc, BridgedArrayRef cHigherThanNames,
     BridgedSourceLoc cLowerThanKeywordLoc, BridgedArrayRef cLowerThanNames,
