@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -106,7 +106,41 @@ protected:
 class DeclAttributes;
 enum class DeclKind : uint8_t;
 
-  /// Represents one declaration attribute.
+enum : unsigned {
+  NumInlineKindBits =
+      countBitsUsed(static_cast<unsigned>(InlineKind::Last_InlineKind))
+};
+
+enum : unsigned {
+  NumEffectsKindBits =
+      countBitsUsed(static_cast<unsigned>(EffectsKind::Last_EffectsKind))
+};
+
+enum : unsigned {
+  NumExposureKindBits =
+      countBitsUsed(static_cast<unsigned>(ExposureKind::Last_ExposureKind))
+};
+
+enum : unsigned {
+  NumExternKindBits =
+      countBitsUsed(static_cast<unsigned>(ExternKind::Last_ExternKind))
+};
+
+enum : unsigned {
+  NumNonIsolatedModifierBits = countBitsUsed(
+      static_cast<unsigned>(NonIsolatedModifier::Last_NonIsolatedModifier))
+};
+
+enum : unsigned {
+  NumInheritActorContextKindBits = countBitsUsed(static_cast<unsigned>(
+      InheritActorContextModifier::Last_InheritActorContextKind))
+};
+
+enum : unsigned { NumDeclAttrKindBits = countBitsUsed(NumDeclAttrKinds - 1) };
+
+enum : unsigned { NumTypeAttrKindBits = countBitsUsed(NumTypeAttrKinds - 1) };
+
+/// Represents one declaration attribute.
 class DeclAttribute : public AttributeBase {
   friend class DeclAttributes;
 
@@ -3465,6 +3499,9 @@ public:
     return true;
   }
 };
+
+/// The kind of unary operator, if any.
+enum class UnaryOperatorKind : uint8_t { None, Prefix, Postfix };
 
 /// Attributes that may be applied to declarations.
 class DeclAttributes {

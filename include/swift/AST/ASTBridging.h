@@ -21,6 +21,7 @@
 //
 
 #include "swift/AST/AccessorKind.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/DiagnosticKind.h"
 #include "swift/AST/DiagnosticList.h"
 #include "swift/Basic/BasicBridging.h"
@@ -830,14 +831,11 @@ public:
 // MARK: DeclAttributes
 //===----------------------------------------------------------------------===//
 
-enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedDeclAttrKind {
-#define DECL_ATTR(_, CLASS, ...) BridgedDeclAttrKind##CLASS,
-#include "swift/AST/DeclAttr.def"
-  BridgedDeclAttrKindNone,
-};
+BRIDGED_OPTIONAL(swift::DeclAttrKind, DeclAttrKind)
 
-SWIFT_NAME("BridgedDeclAttrKind.init(from:)")
-BridgedDeclAttrKind BridgedDeclAttrKind_fromString(BridgedStringRef cStr);
+SWIFT_NAME("BridgedOptionalDeclAttrKind.init(from:)")
+BridgedOptionalDeclAttrKind
+BridgedOptionalDeclAttrKind_fromString(BridgedStringRef cStr);
 
 struct BridgedDeclAttributes {
   BridgedNullableDeclAttribute chain;
@@ -850,10 +848,10 @@ struct BridgedDeclAttributes {
 };
 
 SWIFT_NAME("BridgedDeclAttribute.shouldBeRejectedByParser(_:)")
-bool BridgedDeclAttribute_shouldBeRejectedByParser(BridgedDeclAttrKind cKind);
+bool BridgedDeclAttribute_shouldBeRejectedByParser(swift::DeclAttrKind kind);
 
 SWIFT_NAME("BridgedDeclAttribute.isDeclModifier(_:)")
-bool BridgedDeclAttribute_isDeclModifier(BridgedDeclAttrKind cKind);
+bool BridgedDeclAttribute_isDeclModifier(swift::DeclAttrKind kind);
 
 SWIFT_NAME("BridgedDeclAttributes.add(self:_:)")
 void BridgedDeclAttributes_add(BridgedDeclAttributes *_Nonnull attrs,
@@ -861,7 +859,7 @@ void BridgedDeclAttributes_add(BridgedDeclAttributes *_Nonnull attrs,
 
 SWIFT_NAME("BridgedDeclAttribute.createSimple(_:kind:atLoc:nameLoc:)")
 BridgedDeclAttribute BridgedDeclAttribute_createSimple(
-    BridgedASTContext cContext, BridgedDeclAttrKind cKind,
+    BridgedASTContext cContext, swift::DeclAttrKind kind,
     BridgedSourceLoc cAtLoc, BridgedSourceLoc cNameLoc);
 
 SWIFT_NAME("BridgedABIAttr.createParsed(_:atLoc:range:abiDecl:)")

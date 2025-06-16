@@ -89,5 +89,12 @@
 #define SWIFT_NAME(_name)
 #endif
 
+#if __has_attribute(availability)
+#define SWIFT_UNAVAILABLE(msg)                                                 \
+  __attribute__((availability(swift, unavailable, message = msg)))
+#else
+#define SWIFT_UNAVAILABLE(msg)
+#endif
+
 #endif // SWIFT_BASIC_SWIFT_BRIDGING_H
 

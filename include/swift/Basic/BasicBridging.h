@@ -55,13 +55,6 @@
 #include <vector>
 #endif
 
-#if __has_attribute(availability)
-#define SWIFT_UNAVAILABLE(msg) \
-  __attribute__((availability(swift, unavailable, message=msg)))
-#else
-#define SWIFT_UNAVAILABLE(msg)
-#endif
-
 #ifdef PURE_BRIDGING_MODE
 // In PURE_BRIDGING_MODE, briding functions are not inlined
 #define BRIDGED_INLINE

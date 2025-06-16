@@ -68,51 +68,28 @@ ParsedAutoDiffParameter BridgedParsedAutoDiffParameter::unbridged() const {
   }
 #include "swift/AST/DeclAttr.def"
 
-BridgedDeclAttrKind BridgedDeclAttrKind_fromString(BridgedStringRef cStr) {
+BridgedOptionalDeclAttrKind
+BridgedOptionalDeclAttrKind_fromString(BridgedStringRef cStr) {
   auto optKind = DeclAttribute::getAttrKindFromString(cStr.unbridged());
-  if (!optKind)
-    return BridgedDeclAttrKindNone;
-  switch (*optKind) {
-#define DECL_ATTR(_, CLASS, ...)                                               \
-  case DeclAttrKind::CLASS:                                                    \
-    return BridgedDeclAttrKind##CLASS;
-#include "swift/AST/DeclAttr.def"
+  if (!optKind) {
+    return BridgedOptionalDeclAttrKind();
   }
-}
-
-std::optional<DeclAttrKind> unbridged(BridgedDeclAttrKind kind) {
-  switch (kind) {
-#define DECL_ATTR(_, CLASS, ...)                                               \
-  case BridgedDeclAttrKind##CLASS:                                             \
-    return DeclAttrKind::CLASS;
-#include "swift/AST/DeclAttr.def"
-  case BridgedDeclAttrKindNone:
-    return std::nullopt;
-  }
-  llvm_unreachable("unhandled enum value");
+  return *optKind;
 }
 
 BridgedDeclAttribute BridgedDeclAttribute_createSimple(
-    BridgedASTContext cContext, BridgedDeclAttrKind cKind,
+    BridgedASTContext cContext, swift::DeclAttrKind kind,
     BridgedSourceLoc cAtLoc, BridgedSourceLoc cAttrLoc) {
-  auto optKind = unbridged(cKind);
-  assert(optKind && "creating attribute of invalid kind?");
-  return DeclAttribute::createSimple(cContext.unbridged(), *optKind,
+  return DeclAttribute::createSimple(cContext.unbridged(), kind,
                                      cAtLoc.unbridged(), cAttrLoc.unbridged());
 }
 
-bool BridgedDeclAttribute_shouldBeRejectedByParser(BridgedDeclAttrKind cKind) {
-  auto optKind = unbridged(cKind);
-  if (!optKind)
-    return false;
-  return DeclAttribute::shouldBeRejectedByParser(*optKind);
+bool BridgedDeclAttribute_shouldBeRejectedByParser(swift::DeclAttrKind kind) {
+  return DeclAttribute::shouldBeRejectedByParser(kind);
 }
 
-bool BridgedDeclAttribute_isDeclModifier(BridgedDeclAttrKind cKind) {
-  auto optKind = unbridged(cKind);
-  if (!optKind)
-    return false;
-  return DeclAttribute::isDeclModifier(*optKind);
+bool BridgedDeclAttribute_isDeclModifier(swift::DeclAttrKind kind) {
+  return DeclAttribute::isDeclModifier(kind);
 }
 
 void BridgedDeclAttributes_add(BridgedDeclAttributes *cAttrs,

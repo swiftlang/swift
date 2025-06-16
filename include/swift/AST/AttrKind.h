@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -17,10 +17,14 @@
 #ifndef SWIFT_ATTRKIND_H
 #define SWIFT_ATTRKIND_H
 
-#include "swift/Basic/InlineBitfield.h"
-#include "swift/Basic/LLVM.h"
-#include "swift/Config.h"
-#include "llvm/Support/DataTypes.h"
+/// This header is included in a bridging header. Be *very* careful with what
+/// you include here! See include caveats in `ASTBridging.h`.
+#include "swift/Basic/SwiftBridging.h"
+#include <stdint.h>
+
+namespace llvm {
+class StringRef;
+}
 
 namespace swift {
 
@@ -41,14 +45,8 @@ enum class Associativity : uint8_t {
 };
 
 /// Returns the in-source spelling of the given associativity.
-StringRef getAssociativitySpelling(Associativity value);
-
-/// The kind of unary operator, if any.
-enum class UnaryOperatorKind : uint8_t {
-  None,
-  Prefix,
-  Postfix
-};
+SWIFT_UNAVAILABLE("Unavailable in Swift")
+llvm::StringRef getAssociativitySpelling(Associativity value);
 
 /// Access control levels.
 // These are used in diagnostics and with < and similar operations,
@@ -74,17 +72,14 @@ enum class AccessLevel : uint8_t {
 };
 
 /// Returns the in-source spelling of the given access level.
-StringRef getAccessLevelSpelling(AccessLevel value);
+SWIFT_UNAVAILABLE("Unavailable in Swift")
+llvm::StringRef getAccessLevelSpelling(AccessLevel value);
 
 enum class InlineKind : uint8_t {
   Never = 0,
   Always = 1,
   Last_InlineKind = Always
 };
-
-enum : unsigned { NumInlineKindBits =
-  countBitsUsed(static_cast<unsigned>(InlineKind::Last_InlineKind)) };
-
 
 /// This enum represents the possible values of the @_effects attribute.
 /// These values are ordered from the strongest guarantee to the weakest,
@@ -99,19 +94,9 @@ enum class EffectsKind : uint8_t {
   Last_EffectsKind = Unspecified
 };
 
-enum : unsigned { NumEffectsKindBits =
-  countBitsUsed(static_cast<unsigned>(EffectsKind::Last_EffectsKind)) };
-
 /// This enum represents the possible values of the @_expose attribute.
-enum class ExposureKind: uint8_t {
-  Cxx,
-  Wasm,
-  Last_ExposureKind = Wasm
-};
+enum class ExposureKind : uint8_t { Cxx, Wasm, Last_ExposureKind = Wasm };
 
-enum : unsigned { NumExposureKindBits =
-  countBitsUsed(static_cast<unsigned>(ExposureKind::Last_ExposureKind)) };
-  
 /// This enum represents the possible values of the @_extern attribute.
 enum class ExternKind: uint8_t {
   /// Reference an externally defined C function.
@@ -127,19 +112,11 @@ enum class ExternKind: uint8_t {
   Last_ExternKind = Wasm
 };
 
-enum : unsigned { NumExternKindBits =
-  countBitsUsed(static_cast<unsigned>(ExternKind::Last_ExternKind)) };
-
 enum class NonIsolatedModifier : uint8_t {
   None = 0,
   Unsafe,
   NonSending,
   Last_NonIsolatedModifier = NonSending
-};
-
-enum : unsigned {
-  NumNonIsolatedModifierBits = countBitsUsed(
-      static_cast<unsigned>(NonIsolatedModifier::Last_NonIsolatedModifier))
 };
 
 enum class InheritActorContextModifier : uint8_t {
@@ -153,22 +130,17 @@ enum class InheritActorContextModifier : uint8_t {
   Last_InheritActorContextKind = Always
 };
 
-enum : unsigned {
-  NumInheritActorContextKindBits = countBitsUsed(static_cast<unsigned>(
-      InheritActorContextModifier::Last_InheritActorContextKind))
-};
-
-enum class DeclAttrKind : unsigned {
+enum class ENUM_EXTENSIBILITY_ATTR(closed) DeclAttrKind : unsigned {
 #define DECL_ATTR(_, CLASS, ...) CLASS,
 #define LAST_DECL_ATTR(CLASS) Last_DeclAttr = CLASS,
 #include "swift/AST/DeclAttr.def"
 };
 
-StringRef getDeclAttrKindID(DeclAttrKind kind);
+SWIFT_UNAVAILABLE("Unavailable in Swift")
+llvm::StringRef getDeclAttrKindID(DeclAttrKind kind);
 
 enum : unsigned {
-  NumDeclAttrKinds = static_cast<unsigned>(DeclAttrKind::Last_DeclAttr) + 1,
-  NumDeclAttrKindBits = countBitsUsed(NumDeclAttrKinds - 1),
+  NumDeclAttrKinds = static_cast<unsigned>(DeclAttrKind::Last_DeclAttr) + 1
 };
 
 // Define enumerators for each type attribute, e.g. TypeAttrKind::Weak.
@@ -179,8 +151,7 @@ enum class TypeAttrKind {
 };
 
 enum : unsigned {
-  NumTypeAttrKinds = static_cast<unsigned>(TypeAttrKind::Last_TypeAttr) + 1,
-  NumTypeAttrKindBits = countBitsUsed(NumTypeAttrKinds - 1),
+  NumTypeAttrKinds = static_cast<unsigned>(TypeAttrKind::Last_TypeAttr) + 1
 };
 
 } // end namespace swift

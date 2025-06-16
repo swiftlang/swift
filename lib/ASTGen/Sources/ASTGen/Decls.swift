@@ -726,10 +726,10 @@ extension ASTGenVisitor {
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
     )
     if signature.isReasync {
-      attrs.attributes.add(BridgedDeclAttribute.createSimple(self.ctx, kind: .reasync, atLoc: nil, nameLoc: signature.asyncLoc))
+      attrs.attributes.add(BridgedDeclAttribute.createSimple(self.ctx, kind: .Reasync, atLoc: nil, nameLoc: signature.asyncLoc))
     }
     if signature.isRethrows {
-      attrs.attributes.add(BridgedDeclAttribute.createSimple(self.ctx, kind: .rethrows, atLoc: nil, nameLoc: signature.throwsLoc))
+      attrs.attributes.add(BridgedDeclAttribute.createSimple(self.ctx, kind: .Rethrows, atLoc: nil, nameLoc: signature.throwsLoc))
     }
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 
@@ -763,10 +763,10 @@ extension ASTGenVisitor {
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
     )
     if signature.isReasync {
-      attrs.attributes.add(BridgedDeclAttribute.createSimple(self.ctx, kind: .reasync, atLoc: nil, nameLoc: signature.asyncLoc))
+      attrs.attributes.add(BridgedDeclAttribute.createSimple(self.ctx, kind: .Reasync, atLoc: nil, nameLoc: signature.asyncLoc))
     }
     if signature.isRethrows {
-      attrs.attributes.add(BridgedDeclAttribute.createSimple(self.ctx, kind: .rethrows, atLoc: nil, nameLoc: signature.throwsLoc))
+      attrs.attributes.add(BridgedDeclAttribute.createSimple(self.ctx, kind: .Rethrows, atLoc: nil, nameLoc: signature.throwsLoc))
     }
     decl.asDecl.attachParsedAttrs(attrs.attributes)
     
