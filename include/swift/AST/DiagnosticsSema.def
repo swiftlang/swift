@@ -1436,10 +1436,10 @@ ERROR(did_not_call_function_value,none,
       ())
 ERROR(did_not_call_function,none,
       "function %0 was used as a property; add () to call it",
-      (Identifier))
+      (DeclBaseName))
 ERROR(did_not_call_method,none,
       "method %0 was used as a property; add () to call it",
-      (Identifier))
+      (DeclBaseName))
 
 ERROR(init_not_instance_member_use_assignment,none,
       "'init' is a member of the type; use assignment "
