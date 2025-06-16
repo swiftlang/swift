@@ -901,21 +901,13 @@ void BridgedAvailableAttr_setIsGroupedWithWildcard(BridgedAvailableAttr cAttr);
 SWIFT_NAME("BridgedAvailableAttr.setIsGroupTerminator(self:)")
 void BridgedAvailableAttr_setIsGroupTerminator(BridgedAvailableAttr cAttr);
 
-enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedAccessLevel {
-  BridgedAccessLevelPrivate,
-  BridgedAccessLevelFilePrivate,
-  BridgedAccessLevelInternal,
-  BridgedAccessLevelPackage,
-  BridgedAccessLevelPublic,
-  BridgedAccessLevelOpen,
-  BridgedAccessLevelNone,
-};
+BRIDGED_OPTIONAL(swift::AccessLevel, AccessLevel)
 
 SWIFT_NAME("BridgedAccessControlAttr.createParsed(_:range:accessLevel:)")
 BridgedAccessControlAttr
 BridgedAccessControlAttr_createParsed(BridgedASTContext cContext,
                                       BridgedSourceRange cRange,
-                                      BridgedAccessLevel cAccessLevel);
+                                      swift::AccessLevel accessLevel);
 
 SWIFT_NAME("BridgedAlignmentAttr.createParsed(_:atLoc:range:value:)")
 BridgedAlignmentAttr
@@ -981,7 +973,7 @@ SWIFT_NAME("BridgedDocumentationAttr.createParsed(_:atLoc:range:metadata:"
 BridgedDocumentationAttr BridgedDocumentationAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceRange cRange, BridgedStringRef cMetadata,
-    BridgedAccessLevel cAccessLevel);
+    BridgedOptionalAccessLevel accessLevel);
 
 SWIFT_NAME(
     "BridgedDynamicReplacementAttr.createParsed(_:atLoc:attrNameLoc:lParenLoc:"
@@ -1351,7 +1343,7 @@ SWIFT_NAME("BridgedSetterAccessAttr.createParsed(_:range:accessLevel:)")
 BridgedSetterAccessAttr
 BridgedSetterAccessAttr_createParsed(BridgedASTContext cContext,
                                      BridgedSourceRange cRange,
-                                     BridgedAccessLevel cAccessLevel);
+                                     swift::AccessLevel accessLevel);
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedSpecializationKind : uint8_t {
   BridgedSpecializationKindFull,

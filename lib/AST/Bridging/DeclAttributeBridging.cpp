@@ -152,26 +152,6 @@ void BridgedAvailableAttr_setIsGroupTerminator(BridgedAvailableAttr cAttr) {
   cAttr.unbridged()->setIsGroupTerminator();
 }
 
-static std::optional<AccessLevel> unbridge(BridgedAccessLevel level) {
-  switch (level) {
-  case BridgedAccessLevelPrivate:
-    return AccessLevel::Private;
-  case BridgedAccessLevelFilePrivate:
-    return AccessLevel::FilePrivate;
-  case BridgedAccessLevelInternal:
-    return AccessLevel::Internal;
-  case BridgedAccessLevelPackage:
-    return AccessLevel::Package;
-  case BridgedAccessLevelPublic:
-    return AccessLevel::Public;
-  case BridgedAccessLevelOpen:
-    return AccessLevel::Open;
-  case BridgedAccessLevelNone:
-    return std::nullopt;
-  }
-  llvm_unreachable("unhandled BridgedAccessLevel");
-}
-
 BridgedABIAttr BridgedABIAttr_createParsed(BridgedASTContext cContext,
                                            BridgedSourceLoc atLoc,
                                            BridgedSourceRange range,
@@ -185,9 +165,9 @@ BridgedABIAttr BridgedABIAttr_createParsed(BridgedASTContext cContext,
 BridgedAccessControlAttr
 BridgedAccessControlAttr_createParsed(BridgedASTContext cContext,
                                       BridgedSourceRange cRange,
-                                      BridgedAccessLevel cAccessLevel) {
+                                      swift::AccessLevel accessLevel) {
   return new (cContext.unbridged()) AccessControlAttr(
-      /*atLoc=*/{}, cRange.unbridged(), unbridge(cAccessLevel).value());
+      /*atLoc=*/{}, cRange.unbridged(), accessLevel);
 }
 
 BridgedAlignmentAttr
@@ -306,10 +286,14 @@ BridgedDynamicReplacementAttr BridgedDynamicReplacementAttr_createParsed(
 BridgedDocumentationAttr BridgedDocumentationAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceRange cRange, BridgedStringRef cMetadata,
-    BridgedAccessLevel cAccessLevel) {
+    BridgedOptionalAccessLevel accessLevel) {
+  std::optional<swift::AccessLevel> optAccessLevel;
+  if (accessLevel.getHasValue()) {
+    optAccessLevel.emplace(accessLevel.getValue());
+  }
   return new (cContext.unbridged()) DocumentationAttr(
       cAtLoc.unbridged(), cRange.unbridged(), cMetadata.unbridged(),
-      unbridge(cAccessLevel), /*implicit=*/false);
+      optAccessLevel, /*implicit=*/false);
 }
 
 static EffectsKind unbridged(BridgedEffectsKind kind) {
@@ -808,9 +792,9 @@ BridgedSemanticsAttr BridgedSemanticsAttr_createParsed(
 BridgedSetterAccessAttr
 BridgedSetterAccessAttr_createParsed(BridgedASTContext cContext,
                                      BridgedSourceRange cRange,
-                                     BridgedAccessLevel cAccessLevel) {
+                                     swift::AccessLevel accessLevel) {
   return new (cContext.unbridged()) SetterAccessAttr(
-      /*atLoc=*/{}, cRange.unbridged(), unbridge(cAccessLevel).value());
+      /*atLoc=*/{}, cRange.unbridged(), accessLevel);
 }
 
 static SpecializeAttr::SpecializationKind

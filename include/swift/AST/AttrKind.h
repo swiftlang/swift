@@ -51,24 +51,24 @@ llvm::StringRef getAssociativitySpelling(Associativity value);
 /// Access control levels.
 // These are used in diagnostics and with < and similar operations,
 // so please do not reorder existing values.
-enum class AccessLevel : uint8_t {
+enum class ENUM_EXTENSIBILITY_ATTR(closed) AccessLevel : uint8_t {
   /// Private access is limited to the current scope.
-  Private = 0,
+  Private SWIFT_NAME("private") = 0,
   /// File-private access is limited to the current file.
-  FilePrivate,
+  FilePrivate SWIFT_NAME("fileprivate"),
   /// Internal access is limited to the current module.
-  Internal,
+  Internal SWIFT_NAME("internal"),
   /// Package access is not limited, but some capabilities may be
   /// restricted outside of the current package containing modules.
   /// It's similar to Public in that it's accessible from other modules
   /// and subclassable only within the defining module as long as
   /// the modules are in the same package.
-  Package,
+  Package SWIFT_NAME("package"),
   /// Public access is not limited, but some capabilities may be
   /// restricted outside of the current module.
-  Public,
+  Public SWIFT_NAME("public"),
   /// Open access is not limited, and all capabilities are unrestricted.
-  Open,
+  Open SWIFT_NAME("open"),
 };
 
 /// Returns the in-source spelling of the given access level.

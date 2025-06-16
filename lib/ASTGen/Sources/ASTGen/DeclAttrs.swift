@@ -767,13 +767,13 @@ extension ASTGenVisitor {
       return nil
     }
 
-    var visibility: BridgedAccessLevel = .none
+    var visibility: swift.AccessLevel?
     var metadata: BridgedStringRef? = nil
 
     while let arg = args.popFirst() {
       switch arg.label.rawText {
       case "visibility":
-        guard visibility == .none else {
+        guard visibility == nil else {
           // TODO: Diagnose duplicated 'visibility" arguments
           continue
         }
@@ -787,7 +787,7 @@ extension ASTGenVisitor {
         case .package: visibility = .package
         case .internal: visibility = .internal
         case .private: visibility = .private
-        case .fileprivate: visibility = .filePrivate
+        case .fileprivate: visibility = .fileprivate
         default:
           // TODO: Diagnose
           continue
@@ -821,7 +821,7 @@ extension ASTGenVisitor {
       atLoc: self.generateSourceLoc(node.atSign),
       range: self.generateAttrSourceRange(node),
       metadata: metadata ?? "",
-      accessLevel: visibility
+      accessLevel: visibility == nil ? .init() : .init(visibility!)
     )
   }
 
@@ -2395,7 +2395,7 @@ extension ASTGenVisitor {
     case .private:
       return self.generateAccessControlAttr(declModifier: node, level: .private)
     case .fileprivate:
-      return self.generateAccessControlAttr(declModifier: node, level: .filePrivate)
+      return self.generateAccessControlAttr(declModifier: node, level: .fileprivate)
     case .internal:
       return self.generateAccessControlAttr(declModifier: node, level: .internal)
     case .package:
@@ -2423,7 +2423,7 @@ extension ASTGenVisitor {
     }
   }
 
-  func generateAccessControlAttr(declModifier node: DeclModifierSyntax, level: BridgedAccessLevel)
+  func generateAccessControlAttr(declModifier node: DeclModifierSyntax, level: swift.AccessLevel)
     -> BridgedDeclAttribute?
   {
     if let detail = node.detail {
