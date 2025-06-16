@@ -102,6 +102,10 @@ nonisolated struct S1: GloballyIsolated {
 nonisolated protocol Refined: GloballyIsolated {}
 nonisolated protocol WhyNot {}
 
+nonisolated protocol NonisolatedWithMembers {
+  func test()
+}
+
 struct A: Refined {
   var x: NonSendable
   init(x: NonSendable) {
@@ -168,6 +172,16 @@ struct NonisolatedStruct {
   func callK2() {
     // expected-error@+1 {{call to main actor-isolated instance method 'k2()' in a synchronous nonisolated context}}
     return IsolatedCFlipped().k2()
+  }
+}
+
+@MainActor
+struct TestIsolated : NonisolatedWithMembers {
+  var x: NonSendable // expected-note {{property declared here}}
+
+  // requirement behaves as if it's explicitly `nonisolated` which gets inferred onto the witness
+  func test() {
+    _ = x // expected-error {{main actor-isolated property 'x' can not be referenced from a nonisolated context}}
   }
 }
 
