@@ -338,20 +338,10 @@ BridgedExposeAttr BridgedExposeAttr_createParsed(BridgedASTContext cContext,
                  kind, /*Implicit=*/false);
 }
 
-static ExternKind unbridged(BridgedExternKind kind) {
-  switch (kind) {
-  case BridgedExternKindC:
-    return ExternKind::C;
-  case BridgedExternKindWasm:
-    return ExternKind::Wasm;
-  }
-  llvm_unreachable("unhandled enum value");
-}
-
 BridgedExternAttr BridgedExternAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceRange cRange, BridgedSourceLoc cLParenLoc,
-    BridgedSourceLoc cRParenLoc, BridgedExternKind cKind,
+    BridgedSourceLoc cRParenLoc, swift::ExternKind kind,
     BridgedStringRef cModuleName, BridgedStringRef cName) {
   std::optional<StringRef> moduleName = cModuleName.unbridged();
   if (moduleName->empty())
@@ -363,7 +353,7 @@ BridgedExternAttr BridgedExternAttr_createParsed(
 
   return new (cContext.unbridged())
       ExternAttr(moduleName, name, cAtLoc.unbridged(), cLParenLoc.unbridged(),
-                 cRParenLoc.unbridged(), cRange.unbridged(), unbridged(cKind),
+                 cRParenLoc.unbridged(), cRange.unbridged(), kind,
                  /*Implicit=*/false);
 }
 

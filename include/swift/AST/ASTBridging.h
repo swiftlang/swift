@@ -1012,17 +1012,12 @@ BridgedExposeAttr BridgedExposeAttr_createParsed(BridgedASTContext cContext,
                                                  BridgedStringRef cName,
                                                  swift::ExposureKind kind);
 
-enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedExternKind {
-  BridgedExternKindC,
-  BridgedExternKindWasm,
-};
-
 SWIFT_NAME("BridgedExternAttr.createParsed(_:atLoc:range:lParenLoc:rParenLoc:"
            "kind:moduleName:name:)")
 BridgedExternAttr BridgedExternAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceRange cRange, BridgedSourceLoc cLParenLoc,
-    BridgedSourceLoc cRParenLoc, BridgedExternKind cKind,
+    BridgedSourceLoc cRParenLoc, swift::ExternKind kind,
     BridgedStringRef cModuleName, BridgedStringRef cName);
 
 SWIFT_NAME("BridgedImplementsAttr.createParsed(_:atLoc:range:protocolType:"

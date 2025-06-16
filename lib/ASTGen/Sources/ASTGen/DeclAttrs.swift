@@ -950,10 +950,10 @@ extension ASTGenVisitor {
   ///   ```
   func generateExternAttr(attribute node: AttributeSyntax) -> BridgedExternAttr? {
     return self.generateWithLabeledExprListArguments(attribute: node) { args in
-      let kind: BridgedExternKind? = self.generateConsumingPlainIdentifierAttrOption(args: &args) {
+      let kind: swift.ExternKind? = self.generateConsumingPlainIdentifierAttrOption(args: &args) {
         switch $0.rawText {
         case "c":
-          return .C
+          return .c
         case "wasm":
           return .wasm
         default:
@@ -968,7 +968,7 @@ extension ASTGenVisitor {
       let moduleName: BridgedStringRef?
       let symbolName: BridgedStringRef?
       switch kind {
-      case .C:
+      case .c:
         moduleName = nil
         symbolName = args.isEmpty ? nil : self.generateConsumingSimpleStringLiteralAttrOption(args: &args)
       case .wasm:

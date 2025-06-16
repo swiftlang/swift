@@ -102,17 +102,17 @@ enum class ENUM_EXTENSIBILITY_ATTR(closed) ExposureKind : uint8_t {
 };
 
 /// This enum represents the possible values of the @_extern attribute.
-enum class ExternKind: uint8_t {
+enum class ENUM_EXTENSIBILITY_ATTR(closed) ExternKind : uint8_t {
   /// Reference an externally defined C function.
   /// The imported function has C function pointer representation,
   /// and is called using the C calling convention.
-  C,
+  C SWIFT_NAME("c"),
   /// Reference an externally defined function through WebAssembly's
   /// import mechanism.
   /// This does not specify the calling convention and can be used
   /// with other extern kinds together.
   /// Effectively, this is no-op on non-WebAssembly targets.
-  Wasm,
+  Wasm SWIFT_NAME("wasm"),
   Last_ExternKind = Wasm
 };
 
