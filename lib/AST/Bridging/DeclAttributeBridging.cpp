@@ -328,24 +328,14 @@ BridgedExclusivityAttr BridgedExclusivityAttr_createParsed(
       ExclusivityAttr(cAtLoc.unbridged(), cRange.unbridged(), unbridged(cMode));
 }
 
-static ExposureKind unbridged(BridgedExposureKind kind) {
-  switch (kind) {
-  case BridgedExposureKindCxx:
-    return ExposureKind::Cxx;
-  case BridgedExposureKindWasm:
-    return ExposureKind::Wasm;
-  }
-  llvm_unreachable("unhandled enum value");
-}
-
 BridgedExposeAttr BridgedExposeAttr_createParsed(BridgedASTContext cContext,
                                                  BridgedSourceLoc cAtLoc,
                                                  BridgedSourceRange cRange,
                                                  BridgedStringRef cName,
-                                                 BridgedExposureKind cKind) {
+                                                 swift::ExposureKind kind) {
   return new (cContext.unbridged())
       ExposeAttr(cName.unbridged(), cAtLoc.unbridged(), cRange.unbridged(),
-                 unbridged(cKind), /*Implicit=*/false);
+                 kind, /*Implicit=*/false);
 }
 
 static ExternKind unbridged(BridgedExternKind kind) {

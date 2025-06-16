@@ -95,7 +95,11 @@ enum class ENUM_EXTENSIBILITY_ATTR(closed) EffectsKind : uint8_t {
 };
 
 /// This enum represents the possible values of the @_expose attribute.
-enum class ExposureKind : uint8_t { Cxx, Wasm, Last_ExposureKind = Wasm };
+enum class ENUM_EXTENSIBILITY_ATTR(closed) ExposureKind : uint8_t {
+  Cxx SWIFT_NAME("cxx"),
+  Wasm SWIFT_NAME("wasm"),
+  Last_ExposureKind = Wasm
+};
 
 /// This enum represents the possible values of the @_extern attribute.
 enum class ExternKind: uint8_t {

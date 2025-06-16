@@ -907,7 +907,7 @@ extension ASTGenVisitor {
     // FIXME: SwiftParser should parse the argument as LabeledExprListArguments
     return self.generateWithLabeledExprListArguments(attribute: node) { args in
       // Exposure kind.
-      let kind: BridgedExposureKind? = self.generateConsumingPlainIdentifierAttrOption(args: &args) {
+      let kind: swift.ExposureKind? = self.generateConsumingPlainIdentifierAttrOption(args: &args) {
         switch $0.rawText {
         case "Cxx":
           return .cxx

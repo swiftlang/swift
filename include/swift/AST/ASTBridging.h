@@ -1005,17 +1005,12 @@ BridgedExclusivityAttr BridgedExclusivityAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceRange cRange, BridgedExclusivityAttrMode cMode);
 
-enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedExposureKind {
-  BridgedExposureKindCxx,
-  BridgedExposureKindWasm,
-};
-
 SWIFT_NAME("BridgedExposeAttr.createParsed(_:atLoc:range:name:kind:)")
 BridgedExposeAttr BridgedExposeAttr_createParsed(BridgedASTContext cContext,
                                                  BridgedSourceLoc cAtLoc,
                                                  BridgedSourceRange cRange,
                                                  BridgedStringRef cName,
-                                                 BridgedExposureKind cKind);
+                                                 swift::ExposureKind kind);
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedExternKind {
   BridgedExternKindC,
