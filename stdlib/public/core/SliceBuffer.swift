@@ -304,8 +304,9 @@ internal struct _SliceBuffer<Element>
   /// `startIndex ≤ index < endIndex`
   @inlinable
   internal func _checkValidSubscript(_ index: Int) {
-    _precondition(
-      index >= startIndex && index < endIndex, "Index out of bounds")
+    let translatedIndex = UInt(bitPattern: index &- startIndex)
+    let translatedEnd = UInt(bitPattern: endIndex &- startIndex)
+    _precondition(translatedIndex < translatedEnd, "Index out of bounds")
   }
 
   @inlinable
