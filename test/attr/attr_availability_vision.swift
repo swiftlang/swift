@@ -41,12 +41,12 @@ class DeprecatedClass { }
 
 func functionWithDeprecatedParameter(p: DeprecatedClass) { } // expected-warning{{'DeprecatedClass' was deprecated in visionOS 2.0: Use BetterClass instead}}
 
-@available(visionOS, introduced: 2.0, deprecated: 4.0,
+@available(visionOS, introduced: 2.0, deprecated: 2.1,
            message: "Use BetterClass instead")
-class DeprecatedClassIn3_0 { }
+class DeprecatedClassIn2_1 { }
 
 // Elements deprecated later than the minimum deployment target (which is 2.0, in this case) should not generate warnings
-func functionWithDeprecatedLaterParameter(p: DeprecatedClassIn3_0) { }
+func functionWithDeprecatedLaterParameter(p: DeprecatedClassIn2_1) { }
 
 // Treat visionOS as an alias for iOS in availability queries
 

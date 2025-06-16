@@ -891,6 +891,14 @@ ERROR(serialization_failed,none,
 WARNING(can_import_invalid_swiftmodule,none,
         "canImport() evaluated to false due to invalid swiftmodule: %0", (StringRef))
 
+ERROR(map_os_version_from_textual_interface_failed,none,
+      "failed to map OS version from %0 to %1 in %2",
+      (StringRef, StringRef, StringRef))
+
+ERROR(target_os_version_from_textual_interface_invalid,none,
+      "invalid target triple %0 in %1",
+      (StringRef, StringRef))
+
 ERROR(serialization_load_failed,Fatal,
       "failed to load module '%0'", (StringRef))
 ERROR(module_interface_build_failed,Fatal,
@@ -2374,12 +2382,18 @@ ERROR(alignment_not_power_of_two,none,
 
 // Dependency Scanning
 ERROR(dependency_scan_module_not_found, none, "Unable to find module dependency: '%0'", (StringRef))
+GROUPED_ERROR(dependency_scan_module_not_found_on_specified_search_paths, MissingModuleOnKnownPaths, none,
+              "Compilation search paths unable to resolve module dependency: '%0'", (StringRef))
 NOTE(unresolved_import_location,none,
      "also imported here", ())
 NOTE(dependency_as_imported_by_main_module,none,
      "a dependency of main module '%0'", (StringRef))
 NOTE(dependency_as_imported_by, none,
      "a dependency of %select{Swift|Clang}2 module '%0': '%1'", (StringRef, StringRef, bool))
+NOTE(inherited_search_path_resolves_module,none,
+     "'%0' can be found using a search path that was specified when building module '%1' ('%2'). "
+     "This search path was not explicitly specified on the current compilation.", (StringRef, StringRef, StringRef))
+
 ERROR(clang_dependency_scan_error, none, "Clang dependency scanner failure: %0", (StringRef))
 ERROR(clang_header_dependency_scan_error, none, "Bridging header dependency scan failure: %0", (StringRef))
 
@@ -6929,6 +6943,9 @@ GROUPED_ERROR(availability_suggest_platform_name,
         (Identifier, StringRef))
 WARNING(availability_unsupported_version_number, none,
         "'%0' is not a supported version number", (llvm::VersionTuple))
+WARNING(availability_invalid_version_number_for_domain, none,
+        "'%0' is not a valid version number for %1",
+        (llvm::VersionTuple, AvailabilityDomain))
 
 WARNING(attr_availability_expected_deprecated_version, none,
        "expected version number with 'deprecated' in '%0' attribute for %1",
@@ -8302,11 +8319,14 @@ ERROR(lifetime_dependence_immortal_alone, none,
       "cannot specify any other dependence source along with immortal", ())
 ERROR(lifetime_dependence_invalid_inherit_escapable_type, none,
       "cannot copy the lifetime of an Escapable type, use "
-      "'@_lifetime(%1%0)' instead",
+      "'@_lifetime(%0%1)' instead",
       (StringRef, StringRef))
-ERROR(lifetime_dependence_cannot_use_parsed_borrow_consuming, none,
+ERROR(lifetime_dependence_parsed_borrow_with_ownership, none,
       "invalid use of %0 dependence with %1 ownership",
       (StringRef, StringRef))
+NOTE(lifetime_dependence_parsed_borrow_with_ownership_fix, none,
+     "use '@_lifetime(%0%1)' instead",
+     (StringRef, StringRef))
 ERROR(lifetime_dependence_cannot_use_default_escapable_consuming, none,
       "invalid lifetime dependence on an Escapable value with %0 ownership",
       (StringRef))

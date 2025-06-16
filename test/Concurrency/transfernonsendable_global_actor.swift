@@ -205,10 +205,8 @@ struct Clock {
   let ns = customActorIsolatedGlobal
 
   let _ = { @MainActor in
-    // TODO: The type checker seems to think that the isolation here is
-    // nonisolated instead of custom actor isolated.
     print(ns) // expected-tns-warning {{sending 'ns' risks causing data races}}
-    // expected-tns-note @-1 {{global actor 'CustomActor'-isolated 'ns' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+    // expected-tns-note @-1 {{global actor 'CustomActor'-isolated 'ns' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later global actor 'CustomActor'-isolated uses}}
     // expected-complete-warning @-2 {{capture of 'ns' with non-Sendable type 'NonSendableKlass' in a '@Sendable' closure}}
   }
 

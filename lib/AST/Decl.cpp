@@ -2079,11 +2079,14 @@ NominalTypeDecl *ExtensionDecl::getExtendedNominal() const {
       "Extension must have already been bound (by bindExtensions)");
 }
 
-NominalTypeDecl *ExtensionDecl::computeExtendedNominal() const {
+NominalTypeDecl *ExtensionDecl::computeExtendedNominal(
+    bool excludeMacroExpansions) const {
   ASTContext &ctx = getASTContext();
-  return evaluateOrDefault(
-      ctx.evaluator, ExtendedNominalRequest{const_cast<ExtensionDecl *>(this)},
-      nullptr);
+  return evaluateOrDefault(ctx.evaluator,
+                           ExtendedNominalRequest{
+                               const_cast<ExtensionDecl *>(this),
+                               excludeMacroExpansions},
+                           nullptr);
 }
 
 bool ExtensionDecl::canNeverBeBound() const {

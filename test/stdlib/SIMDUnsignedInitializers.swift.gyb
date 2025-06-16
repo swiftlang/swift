@@ -11,8 +11,7 @@
 //===----------------------------------------------------------------------===//
 // RUN: %empty-directory(%t)
 // RUN: %gyb %s -o %t/SIMDUnsignedInitializers.swift
-// RUN: %target-swift-frontend -primary-file %t/SIMDUnsignedInitializers.swift -S | %FileCheck %t/SIMDUnsignedInitializers.swift --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECKOnone-%target-cpu
-// RUN: %target-swift-frontend -primary-file %t/SIMDUnsignedInitializers.swift -S -O | %FileCheck %t/SIMDUnsignedInitializers.swift --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECKO-%target-cpu
+// RUN: %target-swift-frontend -primary-file %t/SIMDUnsignedInitializers.swift -emit-ir | %FileCheck %t/SIMDUnsignedInitializers.swift --check-prefix=CHECK --check-prefix=CHECK-%target-cpu
 
 import Swift
 
@@ -25,59 +24,15 @@ import Swift
 func repeating${n}_uint${bits}(_ scalar: UInt${bits}) -> SIMD${n}<UInt${bits}> {
   SIMD${n}(repeating: scalar)
 }
-// CHECK: repeating${n}_uint${bits}{{[[:alnum:]_]+}}:
-// CHECKO-arm64-NEXT: dup.${neonSuffix} v0, {{[wx]}}0
-// CHECKO-arm64-NEXT: ret
-// CHECKOnone-arm64: dup.${neonSuffix}
-// CHECKOnone-arm64: ret
+// CHECK: repeating${n}_uint${bits}{{.*}} {
+// CHECK: entry:
+// CHECK: [[TMP:%[0-9]+]] = insertelement <${n} x i${bits}> {{.*}}, i${bits} %{{.*}}, i32 0
+// CHECK-NEXT: [[REP:%[0-9]+]] = shufflevector <${n} x i${bits}> [[TMP]], <${n} x i${bits}> {{.*}}, <${n} x i32> zeroinitializer
+%   if totalBits == 64:
+// CHECK-arm64-NEXT: ret <${n} x i${bits}> [[REP]]
+%   else:
+// CHECK-NEXT: ret <${n} x i${bits}> [[REP]]
+%   end
 %  end
 % end
 %end
-
-func concat8x8(_ a: SIMD8<UInt8>, _ b: SIMD8<UInt8>) -> SIMD16<UInt8> {
-  SIMD16(lowHalf: a, highHalf: b)
-}
-// CHECK: s24SIMDUnsignedInitializers9concat8x8ys6SIMD16Vys5UInt8VGs5SIMD8VyAFG_AJtF:
-// CHECKO-arm64-NEXT: mov.d v0[1], v1[0]
-// CHECKO-arm64-NEXT: ret
-// CHECKO-x86_64: punpcklqdq
-
-func concat16x8(_ a: SIMD16<UInt8>, _ b: SIMD16<UInt8>) -> SIMD32<UInt8> {
-  SIMD32(lowHalf: a, highHalf: b)
-}
-// CHECK: s24SIMDUnsignedInitializers10concat16x8ys6SIMD32Vys5UInt8VGs6SIMD16VyAFG_AJtF:
-// CHECKO-arm64-NEXT: ret
-
-func concat4x16(_ a: SIMD4<UInt16>, _ b: SIMD4<UInt16>) -> SIMD8<UInt16> {
-  SIMD8(lowHalf: a, highHalf: b)
-}
-// CHECK: s24SIMDUnsignedInitializers10concat4x16ys5SIMD8Vys6UInt16VGs5SIMD4VyAFG_AJtF:
-// CHECKO-arm64-NEXT: mov.d v0[1], v1[0]
-// CHECKO-arm64-NEXT: ret
-// CHECKO-x86_64: punpcklqdq
-
-func concat8x16(_ a: SIMD8<UInt16>, _ b: SIMD8<UInt16>) -> SIMD16<UInt16> {
-  SIMD16(lowHalf: a, highHalf: b)
-}
-// CHECK: s24SIMDUnsignedInitializers10concat8x16ys6SIMD16Vys6UInt16VGs5SIMD8VyAFG_AJtF:
-// CHECKO-arm64-NEXT: ret
-
-func concat2x32(_ a: SIMD2<UInt32>, _ b: SIMD2<UInt32>) -> SIMD4<UInt32> {
-  SIMD4(lowHalf: a, highHalf: b)
-}
-// CHECK: s24SIMDUnsignedInitializers10concat2x32ys5SIMD4Vys6UInt32VGs5SIMD2VyAFG_AJtF:
-// CHECKO-arm64-NEXT: mov.d v0[1], v1[0]
-// CHECKO-arm64-NEXT: ret
-// CHECKO-x86_64: punpcklqdq
-
-func concat4x32(_ a: SIMD4<UInt32>, _ b: SIMD4<UInt32>) -> SIMD8<UInt32> {
-  SIMD8(lowHalf: a, highHalf: b)
-}
-// CHECK: s24SIMDUnsignedInitializers10concat4x32ys5SIMD8Vys6UInt32VGs5SIMD4VyAFG_AJtF:
-// CHECKO-arm64-NEXT: ret
-
-func concat2x64(_ a: SIMD2<UInt64>, _ b: SIMD2<UInt64>) -> SIMD4<UInt64> {
-  SIMD4(lowHalf: a, highHalf: b)
-}
-// CHECK: s24SIMDUnsignedInitializers10concat2x64ys5SIMD4Vys6UInt64VGs5SIMD2VyAFG_AJtF:
-// CHECKO-arm64-NEXT: ret

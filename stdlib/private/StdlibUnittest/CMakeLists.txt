@@ -11,6 +11,9 @@ endif()
 
 set(swift_stdlib_unittest_compile_flags
   "-Xfrontend" "-disable-objc-attr-requires-foundation-module")
+
+list(APPEND swift_stdlib_unittest_compile_flags "-enable-experimental-feature" "Lifetimes")
+
 if (SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
   list(APPEND swift_stdlib_unittest_compile_flags "-DSWIFT_RUNTIME_ENABLE_LEAK_CHECKER")
 endif()

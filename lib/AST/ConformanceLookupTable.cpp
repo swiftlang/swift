@@ -862,8 +862,6 @@ DeclContext *ConformanceLookupTable::getConformingContext(
       Type classTy = nominal->getDeclaredInterfaceType();
       do {
         Type superclassTy = classTy->getSuperclassForDecl(superclassDecl);
-        if (superclassTy->is<ErrorType>())
-          return nullptr;
         auto inheritedConformance = swift::lookupConformance(
             superclassTy, protocol, /*allowMissing=*/false);
         if (inheritedConformance)
@@ -936,8 +934,6 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
     // declared.
     auto *conformingClass = cast<ClassDecl>(conformingNominal);
     Type superclassTy = type->getSuperclassForDecl(conformingClass);
-    if (superclassTy->is<ErrorType>())
-      return nullptr;
 
     // Look up the inherited conformance.
     auto inheritedConformance = swift::lookupConformance(

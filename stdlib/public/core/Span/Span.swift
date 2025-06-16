@@ -714,12 +714,12 @@ extension Span where Element: ~Copyable {
     unsafe (self._pointer == other._pointer) && (self._count == other._count)
   }
 
-  /// Returns the indices within `self` where the memory represented by `span`
-  /// is located, or `nil` if `span` is not located within `self`.
+  /// Returns the indices within `self` where the memory represented by `other`
+  /// is located, or `nil` if `other` is not located within `self`.
   ///
-  /// Parameters:
-  /// - span: a span that may be a subrange of `self`
-  /// Returns: A range of indices within `self`, or `nil`
+  /// - Parameters:
+  /// - other: a span that may be a subrange of `self`
+  /// - Returns: A range of indices within `self`, or `nil`
   @_alwaysEmitIntoClient
   public func indices(of other: borrowing Self) -> Range<Index>? {
     if other._count > _count { return nil }

@@ -1134,8 +1134,7 @@ static void bindArchetypesFromContext(
     if (parentDC->isTypeContext()) {
       if (parentDC != outerDC && parentDC->getSelfProtocolDecl()) {
         auto selfTy = parentDC->getSelfInterfaceType();
-        auto contextTy = cs.getASTContext().TheUnresolvedType;
-        bindPrimaryArchetype(selfTy, contextTy);
+        bindPrimaryArchetype(selfTy, ErrorType::get(cs.getASTContext()));
       }
       continue;
     }

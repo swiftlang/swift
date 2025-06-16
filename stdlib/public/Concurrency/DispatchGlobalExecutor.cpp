@@ -314,22 +314,10 @@ clock_and_value_to_time(int clock, long long sec, long long nsec) {
   case swift_clock_id_continuous:
     return value | DISPATCH_UP_OR_MONOTONIC_TIME_MASK;
   case swift_clock_id_wall: {
-#if defined(_WIN32)
-    struct timespec ts = { 
-      .tv_sec = sec,
-      .tv_nsec = static_cast<long>(nsec)
+    struct timespec ts = {
+      .tv_sec = static_cast<decltype(ts.tv_sec)>(sec),
+      .tv_nsec = static_cast<decltype(ts.tv_nsec)>(nsec)
     };
-#elif defined(__APPLE__)
-    struct timespec ts = { 
-      .tv_sec = static_cast<__darwin_time_t>(sec),
-      .tv_nsec = nsec
-    };
-#else
-    struct timespec ts = { 
-      .tv_sec = static_cast<long>(sec),
-      .tv_nsec = nsec
-    };
-#endif
     return dispatch_walltime(&ts, 0);
   }
   }

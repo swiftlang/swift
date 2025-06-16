@@ -2409,7 +2409,7 @@ namespace {
       B.addInt32(numImmediateMembers);
 
       // uint32_t NumFields;
-      B.addInt32(getNumFields(getType()));
+      B.addInt32(countExportableFields(IGM, getType()));
 
       // uint32_t FieldOffsetVectorOffset;
       B.addInt32(getFieldVectorOffset() / IGM.getPointerSize());
