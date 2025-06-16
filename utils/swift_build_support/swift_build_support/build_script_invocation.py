@@ -623,7 +623,7 @@ class BuildScriptInvocation(object):
         # Swift still needs a few LLVM targets like tblgen to be built for it to be
         # configured. Instead, handle this in the product for now.
         builder.add_product(products.LLVM,
-                            is_enabled=self.args.build_llvm or self.args.build_swift)
+                            is_enabled=self.args.build_llvm or self.args.build_swift or self.args.build_lldb)
 
         builder.add_product(products.StaticSwiftLinuxConfig,
                             is_enabled=self.args.install_static_linux_config)
