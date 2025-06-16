@@ -932,16 +932,19 @@ protected:
     if (!useLazyInference() && afd->getParameters()->size() > 0) {
       return;
     }
-    if (!nonEscapableSelf && isBitwiseCopyable(selfTypeInContext, ctx)) {
-      diagnose(returnLoc,
-               diag::lifetime_dependence_cannot_infer_bitwisecopyable,
-               diagnosticQualifier(), "self");
-      return;
-    }
-    if (!useLazyInference()) {
-      // Do not infer LifetimeDependenceKind::Inherit unless this is an implicit
-      // getter, which simply returns a stored property.
-      if (nonEscapableSelf && !isImplicitOrSIL()) {
+    // Allow inference for implicit getters, which simply return a stored,
+    // property, and for implicit _read/_modify, which cannot be defined
+    // explicitly alongside a regular getter.
+    if (!useLazyInference() && !isImplicitOrSIL()) {
+      // Require explicit @_lifetime(borrow self) for UnsafePointer-like self.
+      if (!nonEscapableSelf && isBitwiseCopyable(selfTypeInContext, ctx)) {
+        diagnose(returnLoc,
+                 diag::lifetime_dependence_cannot_infer_bitwisecopyable,
+                 diagnosticQualifier(), "self");
+        return;
+      }
+      // Require explicit @_lifetime(copy or borrow) for non-Escapable self.
+      if (nonEscapableSelf) {
         diagnose(returnLoc, diag::lifetime_dependence_cannot_infer_kind,
                  diagnosticQualifier(), "self");
         return;
