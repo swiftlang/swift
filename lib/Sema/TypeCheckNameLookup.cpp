@@ -325,9 +325,6 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclNameRef name,
                                    NameLookupOptions options) {
   auto &ctx = dc->getASTContext();
 
-  // HACK: Synthesize CodingKeys if needed.
-  synthesizeCodingKeysIfNeededForUnqualifiedLookup(ctx, dc, name);
-
   auto ulOptions = convertToUnqualifiedLookupOptions(options) |
                    UnqualifiedLookupFlags::TypeLookup;
   {
@@ -336,8 +333,15 @@ TypeChecker::lookupUnqualifiedType(DeclContext *dc, DeclNameRef name,
         name, dc, loc,
         ulOptions - UnqualifiedLookupFlags::AllowProtocolMembers);
 
-    auto lookup =
-        evaluateOrDefault(ctx.evaluator, UnqualifiedLookupRequest{desc}, {});
+    UnqualifiedLookupRequest req(desc);
+    auto lookup = evaluateOrDefault(ctx.evaluator, req, {});
+
+    // HACK: Try synthesize CodingKeys if we got an empty result.
+    if (lookup.allResults().empty() && name.isSimpleName(ctx.Id_CodingKeys)) {
+      synthesizeCodingKeysIfNeededForUnqualifiedLookup(ctx, dc, name);
+      lookup = evaluateOrDefault(ctx.evaluator, req, {});
+    }
+
     if (!lookup.allResults().empty())
       return lookup;
   }

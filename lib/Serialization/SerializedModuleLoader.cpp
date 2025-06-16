@@ -1479,43 +1479,27 @@ bool swift::extractCompilerFlagsFromInterface(
       shouldModify = true;
     }
 
-    // Diagnose if the version in the target triple parsed from the
-    // swiftinterface is invalid for the OS.
-    const llvm::VersionTuple originalVer = triple.getOSVersion();
-    bool isValidVersion =
-        llvm::Triple::isValidVersionForOS(triple.getOS(), originalVer);
-    if (!isValidVersion) {
+    // Canonicalize the version in the target triple parsed from the
+    // swiftinterface.
+    auto canonicalTriple = getCanonicalTriple(triple);
+    if (!canonicalTriple.has_value()) {
       if (Diag) {
+        const llvm::VersionTuple OSVersion = triple.getOSVersion();
+        const bool isOSVersionInValidRange =
+            llvm::Triple::isValidVersionForOS(triple.getOS(), OSVersion);
+        const llvm::VersionTuple canonicalVersion =
+            llvm::Triple::getCanonicalVersionForOS(
+                triple.getOS(), triple.getOSVersion(), isOSVersionInValidRange);
         Diag->diagnose(SourceLoc(),
-                       diag::target_os_version_from_textual_interface_invalid,
-                       triple.str(), interfacePath);
+                       diag::map_os_version_from_textual_interface_failed,
+                       OSVersion.getAsString(), canonicalVersion.getAsString(),
+                       interfacePath);
       }
       break;
     }
-
-    // Canonicalize the version in the target triple parsed from the
-    // swiftinterface.
-    llvm::VersionTuple newVer = llvm::Triple::getCanonicalVersionForOS(
-        triple.getOS(), originalVer, isValidVersion);
-    if (originalVer != newVer) {
-      std::string originalOSName = triple.getOSName().str();
-      std::string originalVerStr = originalVer.getAsString();
-      std::string newVerStr = newVer.getAsString();
-      const int OSNameWithoutVersionLength =
-          originalOSName.size() - originalVerStr.size();
-      if (!StringRef(originalOSName).ends_with(originalVerStr) ||
-          (OSNameWithoutVersionLength <= 0)) {
-        if (Diag) {
-          Diag->diagnose(SourceLoc(),
-                         diag::map_os_version_from_textual_interface_failed,
-                         originalVerStr, newVerStr, interfacePath);
-        }
-        break;
-      }
-      llvm::SmallString<64> buffer(
-          originalOSName.substr(0, OSNameWithoutVersionLength));
-      buffer.append(newVerStr);
-      triple.setOSName(buffer.str());
+    // Update the triple to use if it differs.
+    if (!areTriplesStrictlyEqual(triple, *canonicalTriple)) {
+      triple = *canonicalTriple;
       shouldModify = true;
     }
     if (shouldModify)
