@@ -24,6 +24,7 @@
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/DiagnosticKind.h"
 #include "swift/AST/DiagnosticList.h"
+#include "swift/AST/LayoutConstraintKind.h"
 #include "swift/Basic/BasicBridging.h"
 
 #ifdef USED_IN_CPP_SOURCE
@@ -2851,19 +2852,6 @@ BridgedIdentifier BridgedPattern_getBoundName(BridgedPattern cPattern);
 // MARK: Generics
 //===----------------------------------------------------------------------===//
 
-enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedLayoutConstraintKind {
-  BridgedLayoutConstraintKindUnknownLayout,
-  BridgedLayoutConstraintKindTrivialOfExactSize,
-  BridgedLayoutConstraintKindTrivialOfAtMostSize,
-  BridgedLayoutConstraintKindTrivial,
-  BridgedLayoutConstraintKindClass,
-  BridgedLayoutConstraintKindNativeClass,
-  BridgedLayoutConstraintKindRefCountedObject,
-  BridgedLayoutConstraintKindNativeRefCountedObject,
-  BridgedLayoutConstraintKindBridgeObject,
-  BridgedLayoutConstraintKindTrivialStride,
-};
-
 class BridgedLayoutConstraint {
   swift::LayoutConstraintInfo *_Nullable raw;
 
@@ -2879,7 +2867,7 @@ public:
   bool getIsNull() const;
 
   SWIFT_COMPUTED_PROPERTY
-  BridgedLayoutConstraintKind getKind() const;
+  swift::LayoutConstraintKind getKind() const;
 
   BRIDGED_INLINE
   SWIFT_COMPUTED_PROPERTY
@@ -2901,13 +2889,13 @@ BridgedLayoutConstraint_getLayoutConstraint(BridgedASTContext cContext,
 SWIFT_NAME("BridgedLayoutConstraint.getLayoutConstraint(_:kind:)")
 BridgedLayoutConstraint
 BridgedLayoutConstraint_getLayoutConstraint(BridgedASTContext cContext,
-                                            BridgedLayoutConstraintKind cKind);
+                                            swift::LayoutConstraintKind kind);
 
 SWIFT_NAME(
     "BridgedLayoutConstraint.getLayoutConstraint(_:kind:size:alignment:)")
 BridgedLayoutConstraint
 BridgedLayoutConstraint_getLayoutConstraint(BridgedASTContext cContext,
-                                            BridgedLayoutConstraintKind cKind,
+                                            swift::LayoutConstraintKind kind,
                                             size_t size, size_t alignment);
 
 enum ENUM_EXTENSIBILITY_ATTR(open) BridgedRequirementReprKind : size_t {

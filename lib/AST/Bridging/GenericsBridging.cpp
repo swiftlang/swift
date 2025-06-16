@@ -157,45 +157,6 @@ BridgedRequirementRepr BridgedRequirementRepr_createLayoutConstraint(
   };
 }
 
-static swift::LayoutConstraintKind
-unbridged(BridgedLayoutConstraintKind cKind) {
-  switch (cKind) {
-#define CASE(Kind)                                                             \
-  case BridgedLayoutConstraintKind##Kind:                                      \
-    return swift::LayoutConstraintKind::Kind;
-    CASE(UnknownLayout)
-    CASE(TrivialOfExactSize)
-    CASE(TrivialOfAtMostSize)
-    CASE(Trivial)
-    CASE(Class)
-    CASE(NativeClass)
-    CASE(RefCountedObject)
-    CASE(NativeRefCountedObject)
-    CASE(BridgeObject)
-    CASE(TrivialStride)
-#undef CASE
-  }
-}
-
-static BridgedLayoutConstraintKind bridge(swift::LayoutConstraintKind kind) {
-  switch (kind) {
-#define CASE(Kind)                                                             \
-  case swift::LayoutConstraintKind::Kind:                                      \
-    return BridgedLayoutConstraintKind##Kind;
-    CASE(UnknownLayout)
-    CASE(TrivialOfExactSize)
-    CASE(TrivialOfAtMostSize)
-    CASE(Trivial)
-    CASE(Class)
-    CASE(NativeClass)
-    CASE(RefCountedObject)
-    CASE(NativeRefCountedObject)
-    CASE(BridgeObject)
-    CASE(TrivialStride)
-#undef CASE
-  }
-}
-
 BridgedLayoutConstraint
 BridgedLayoutConstraint_getLayoutConstraint(BridgedASTContext cContext,
                                             BridgedIdentifier cID) {
@@ -204,19 +165,18 @@ BridgedLayoutConstraint_getLayoutConstraint(BridgedASTContext cContext,
 
 BridgedLayoutConstraint
 BridgedLayoutConstraint_getLayoutConstraint(BridgedASTContext cContext,
-                                            BridgedLayoutConstraintKind cKind) {
-  return LayoutConstraint::getLayoutConstraint(unbridged(cKind),
-                                               cContext.unbridged());
+                                            swift::LayoutConstraintKind kind) {
+  return LayoutConstraint::getLayoutConstraint(kind, cContext.unbridged());
 }
 
 BridgedLayoutConstraint
 BridgedLayoutConstraint_getLayoutConstraint(BridgedASTContext cContext,
-                                            BridgedLayoutConstraintKind cKind,
+                                            swift::LayoutConstraintKind kind,
                                             size_t size, size_t alignment) {
-  return LayoutConstraint::getLayoutConstraint(unbridged(cKind), size,
-                                               alignment, cContext.unbridged());
+  return LayoutConstraint::getLayoutConstraint(kind, size, alignment,
+                                               cContext.unbridged());
 }
 
-BridgedLayoutConstraintKind BridgedLayoutConstraint::getKind() const {
-  return bridge(unbridged()->getKind());
+swift::LayoutConstraintKind BridgedLayoutConstraint::getKind() const {
+  return unbridged()->getKind();
 }
