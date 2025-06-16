@@ -1906,7 +1906,8 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
           return Type();
 
         baseTy = baseTy->getRValueType();
-        if (!baseTy->getAnyNominal() && !baseTy->is<ExistentialType>())
+        if (!baseTy->getAnyNominal() && !baseTy->is<ExistentialType>() &&
+            !baseTy->is<OpaqueTypeArchetypeType>())
           return Type();
       }
 
