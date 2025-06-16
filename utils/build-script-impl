@@ -175,7 +175,6 @@ KNOWN_SETTINGS=(
     skip-clean-xctest                             "0"               "skip cleaning the xctest build"
 
     ## Test Options
-    llvm-include-tests                            "1"               "Set to true to generate testing targets for LLVM. Set to true by default."
     long-test                                     "0"               "set to run the long test suite"
     only-executable-test                          ""                "only run the executable variant of the swift lit tests"
     stress-test                                   "0"               "set to run the stress test suite"
