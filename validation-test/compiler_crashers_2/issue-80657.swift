@@ -1,3 +1,4 @@
+// {"signature":"(anonymous namespace)::Verifier::verifyChecked(swift::VarDecl*)"}
 // RUN: not --crash %target-swift-frontend -emit-sil %s
 
 // https://github.com/swiftlang/swift/issues/80657
