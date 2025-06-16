@@ -362,7 +362,7 @@ public:
   }
 
   bool hasDollarPrefix() const {
-    return getIdentifier().hasDollarPrefix();
+    return !isSpecial() && getIdentifier().hasDollarPrefix();
   }
 
   /// A representation of the name to be displayed to users. May be ambiguous
