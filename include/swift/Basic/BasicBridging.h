@@ -131,6 +131,10 @@ typedef uintptr_t SwiftUInt;
 void assertFail(const char * _Nonnull msg, const char * _Nonnull file,
                 SwiftUInt line, const char * _Nonnull function);
 
+BRIDGED_INLINE
+SWIFT_UNAVAILABLE("Unavailable in Swift")
+void ASSERT_inBridgingHeader(bool condition);
+
 //===----------------------------------------------------------------------===//
 // MARK: ArrayRef
 //===----------------------------------------------------------------------===//
@@ -261,22 +265,42 @@ public:
 } SWIFT_SELF_CONTAINED;
 
 //===----------------------------------------------------------------------===//
-// MARK: BridgedOptionalInt
+// MARK: BridgedOptional
 //===----------------------------------------------------------------------===//
 
-struct BridgedOptionalInt {
-  SwiftInt value;
-  bool hasValue;
+// FIXME: We should be able to make this a template once
+// https://github.com/swiftlang/swift/issues/82258 is fixed.
+#define BRIDGED_OPTIONAL(TYPE, SUFFIX)                                         \
+  class SWIFT_CONFORMS_TO_PROTOCOL(Swift.ExpressibleByNilLiteral)              \
+      BridgedOptional##SUFFIX {                                                \
+    TYPE _value;                                                               \
+    bool _hasValue;                                                            \
+                                                                               \
+  public:                                                                      \
+    SWIFT_NAME("init(nilLiteral:)")                                            \
+    BridgedOptional##SUFFIX(void) : _hasValue(false) {}                        \
+    BridgedOptional##SUFFIX(TYPE value) : _value(value), _hasValue(true) {}    \
+                                                                               \
+    SWIFT_COMPUTED_PROPERTY                                                    \
+    TYPE getValue() const {                                                    \
+      ASSERT_inBridgingHeader(_hasValue);                                      \
+      return _value;                                                           \
+    }                                                                          \
+                                                                               \
+    SWIFT_COMPUTED_PROPERTY                                                    \
+    bool getHasValue() const { return _hasValue; }                             \
+  };
+BRIDGED_OPTIONAL(SwiftInt, Int)
 
 #ifdef USED_IN_CPP_SOURCE
-  static BridgedOptionalInt getFromAPInt(llvm::APInt i) {
-    if (i.getSignificantBits() <= std::min(std::numeric_limits<SwiftInt>::digits, 64)) {
-      return {(SwiftInt)i.getSExtValue(), true};
-    }
-    return {0, false};
+inline BridgedOptionalInt getFromAPInt(llvm::APInt i) {
+  if (i.getSignificantBits() <=
+      std::min(std::numeric_limits<SwiftInt>::digits, 64)) {
+    return {(SwiftInt)i.getSExtValue()};
   }
+  return {};
+}
 #endif
-};
 
 //===----------------------------------------------------------------------===//
 // MARK: OStream
