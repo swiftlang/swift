@@ -735,17 +735,14 @@ swift::LayoutConstraint BridgedLayoutConstraint::unbridged() const {
   return raw;
 }
 
-bool BridgedLayoutConstraint_isNull(BridgedLayoutConstraint cConstraint) {
-  return cConstraint.unbridged().isNull();
+bool BridgedLayoutConstraint::getIsNull() const { return unbridged().isNull(); }
+
+bool BridgedLayoutConstraint::getIsKnownLayout() const {
+  return unbridged()->isKnownLayout();
 }
 
-bool BridgedLayoutConstraint_isKnownLayout(
-    BridgedLayoutConstraint cConstraint) {
-  return cConstraint.unbridged()->isKnownLayout();
-}
-
-bool BridgedLayoutConstraint_isTrivial(BridgedLayoutConstraint cConstraint) {
-  return cConstraint.unbridged()->isTrivial();
+bool BridgedLayoutConstraint::getIsTrivial() const {
+  return unbridged()->isTrivial();
 }
 
 //===----------------------------------------------------------------------===//

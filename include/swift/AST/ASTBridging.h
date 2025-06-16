@@ -2874,6 +2874,22 @@ public:
   SWIFT_UNAVAILABLE("Use the factory methods")
   BRIDGED_INLINE BridgedLayoutConstraint(swift::LayoutConstraint constraint);
 
+  BRIDGED_INLINE
+  SWIFT_COMPUTED_PROPERTY
+  bool getIsNull() const;
+
+  SWIFT_COMPUTED_PROPERTY
+  BridgedLayoutConstraintKind getKind() const;
+
+  BRIDGED_INLINE
+  SWIFT_COMPUTED_PROPERTY
+  bool getIsKnownLayout() const;
+
+  BRIDGED_INLINE
+  SWIFT_COMPUTED_PROPERTY
+  bool getIsTrivial() const;
+
+  SWIFT_UNAVAILABLE("Unavailable in Swift")
   BRIDGED_INLINE swift::LayoutConstraint unbridged() const;
 };
 
@@ -2893,22 +2909,6 @@ BridgedLayoutConstraint
 BridgedLayoutConstraint_getLayoutConstraint(BridgedASTContext cContext,
                                             BridgedLayoutConstraintKind cKind,
                                             size_t size, size_t alignment);
-
-SWIFT_NAME("getter:BridgedLayoutConstraint.isNull(self:)")
-BRIDGED_INLINE bool
-BridgedLayoutConstraint_isNull(BridgedLayoutConstraint cConstraint);
-
-SWIFT_NAME("getter:BridgedLayoutConstraint.kind(self:)")
-BridgedLayoutConstraintKind
-BridgedLayoutConstraint_getKind(BridgedLayoutConstraint cConstraint);
-
-SWIFT_NAME("getter:BridgedLayoutConstraint.isKnownLayout(self:)")
-BRIDGED_INLINE bool
-BridgedLayoutConstraint_isKnownLayout(BridgedLayoutConstraint cConstraint);
-
-SWIFT_NAME("getter:BridgedLayoutConstraint.isTrivial(self:)")
-BRIDGED_INLINE bool
-BridgedLayoutConstraint_isTrivial(BridgedLayoutConstraint cConstraint);
 
 enum ENUM_EXTENSIBILITY_ATTR(open) BridgedRequirementReprKind : size_t {
   BridgedRequirementReprKindTypeConstraint,
