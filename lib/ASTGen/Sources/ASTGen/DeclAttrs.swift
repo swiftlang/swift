@@ -1423,7 +1423,7 @@ extension ASTGenVisitor {
   }
 
   func generateInheritActorContextAttr(attribute node: AttributeSyntax) -> BridgedInheritActorContextAttr? {
-    let modifier: BridgedInheritActorContextModifier? = self.generateSingleAttrOption(
+    let modifier: swift.InheritActorContextModifier? = self.generateSingleAttrOption(
       attribute: node,
       {
         switch $0.rawText {
@@ -1431,7 +1431,7 @@ extension ASTGenVisitor {
         default: return nil
         }
       },
-      valueIfOmitted: BridgedInheritActorContextModifier.none
+      valueIfOmitted: swift.InheritActorContextModifier.none
     )
     guard let modifier else {
       return nil

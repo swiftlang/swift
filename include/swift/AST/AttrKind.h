@@ -119,16 +119,17 @@ enum class NonIsolatedModifier : uint8_t {
   Last_NonIsolatedModifier = NonSending
 };
 
-enum class InheritActorContextModifier : uint8_t {
-  /// Inherit the actor execution context if the isolated parameter was
-  /// captured by the closure, context is nonisolated or isolated to a
-  /// global actor.
-  None = 0,
-  /// Always inherit the actor context, even when the isolated parameter
-  /// for the context is not closed over explicitly.
-  Always,
-  Last_InheritActorContextKind = Always
-};
+enum class ENUM_EXTENSIBILITY_ATTR(closed)
+    InheritActorContextModifier : uint8_t {
+      /// Inherit the actor execution context if the isolated parameter was
+      /// captured by the closure, context is nonisolated or isolated to a
+      /// global actor.
+      None SWIFT_NAME("none") = 0,
+      /// Always inherit the actor context, even when the isolated parameter
+      /// for the context is not closed over explicitly.
+      Always SWIFT_NAME("always"),
+      Last_InheritActorContextKind = Always
+    };
 
 enum class ENUM_EXTENSIBILITY_ATTR(closed) DeclAttrKind : unsigned {
 #define DECL_ATTR(_, CLASS, ...) CLASS,
