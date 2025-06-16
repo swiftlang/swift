@@ -84,14 +84,14 @@ enum class InlineKind : uint8_t {
 /// This enum represents the possible values of the @_effects attribute.
 /// These values are ordered from the strongest guarantee to the weakest,
 /// so please do not reorder existing values.
-enum class EffectsKind : uint8_t {
-  ReadNone,
-  ReadOnly,
-  ReleaseNone,
-  ReadWrite,
-  Unspecified,
-  Custom,
-  Last_EffectsKind = Unspecified
+enum class ENUM_EXTENSIBILITY_ATTR(closed) EffectsKind : uint8_t {
+  ReadNone SWIFT_NAME("readnone"),
+  ReadOnly SWIFT_NAME("readonly"),
+  ReleaseNone SWIFT_NAME("releasenone"),
+  ReadWrite SWIFT_NAME("readwrite"),
+  Unspecified SWIFT_NAME("unspecified"),
+  Custom SWIFT_NAME("custom"),
+  Last_EffectsKind = Custom
 };
 
 /// This enum represents the possible values of the @_expose attribute.

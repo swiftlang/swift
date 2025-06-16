@@ -838,16 +838,16 @@ extension ASTGenVisitor {
       // TODO: Diagnose?
       return nil
     }
-    let effectKind: BridgedEffectsKind
+    let effectKind: swift.EffectsKind
     switch arguments.first!.rawText {
     case "readonly":
-      effectKind = .readOnly
+      effectKind = .readonly
     case "readnone":
-      effectKind = .readNone
+      effectKind = .readnone
     case "releasenone":
-      effectKind = .releaseNone
+      effectKind = .releasenone
     case "readwrite":
-      effectKind = .readWrite
+      effectKind = .readwrite
     default:
       effectKind = .custom
     }

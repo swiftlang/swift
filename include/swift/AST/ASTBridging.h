@@ -983,19 +983,10 @@ BridgedDynamicReplacementAttr BridgedDynamicReplacementAttr_createParsed(
     BridgedSourceLoc cAttrNameLoc, BridgedSourceLoc cLParenLoc,
     BridgedDeclNameRef cReplacedFunction, BridgedSourceLoc cRParenLoc);
 
-enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedEffectsKind {
-  BridgedEffectsKindReadNone,
-  BridgedEffectsKindReadOnly,
-  BridgedEffectsKindReleaseNone,
-  BridgedEffectsKindReadWrite,
-  BridgedEffectsKindUnspecified,
-  BridgedEffectsKindCustom,
-};
-
 SWIFT_NAME("BridgedEffectsAttr.createParsed(_:atLoc:range:effectKind:)")
 BridgedEffectsAttr BridgedEffectsAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceRange cRange, BridgedEffectsKind cEffectKind);
+    BridgedSourceRange cRange, swift::EffectsKind effectKind);
 
 SWIFT_NAME("BridgedEffectsAttr.createParsed(_:atLoc:range:customString:"
            "customStringLoc:)")

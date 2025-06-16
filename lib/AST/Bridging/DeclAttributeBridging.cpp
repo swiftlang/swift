@@ -296,29 +296,11 @@ BridgedDocumentationAttr BridgedDocumentationAttr_createParsed(
       optAccessLevel, /*implicit=*/false);
 }
 
-static EffectsKind unbridged(BridgedEffectsKind kind) {
-  switch (kind) {
-  case BridgedEffectsKindReadNone:
-    return EffectsKind::ReadNone;
-  case BridgedEffectsKindReadOnly:
-    return EffectsKind::ReadOnly;
-  case BridgedEffectsKindReleaseNone:
-    return EffectsKind::ReleaseNone;
-  case BridgedEffectsKindReadWrite:
-    return EffectsKind::ReadWrite;
-  case BridgedEffectsKindUnspecified:
-    return EffectsKind::Unspecified;
-  case BridgedEffectsKindCustom:
-    return EffectsKind::Custom;
-  }
-  llvm_unreachable("unhandled kind");
-}
-
 BridgedEffectsAttr BridgedEffectsAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceRange cRange, BridgedEffectsKind cEffectKind) {
-  return new (cContext.unbridged()) EffectsAttr(
-      cAtLoc.unbridged(), cRange.unbridged(), unbridged(cEffectKind));
+    BridgedSourceRange cRange, swift::EffectsKind effectKind) {
+  return new (cContext.unbridged())
+      EffectsAttr(cAtLoc.unbridged(), cRange.unbridged(), effectKind);
 }
 
 BridgedEffectsAttr BridgedEffectsAttr_createParsed(
