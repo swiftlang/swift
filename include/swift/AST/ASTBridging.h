@@ -1037,16 +1037,11 @@ BridgedImplementsAttr BridgedImplementsAttr_createParsed(
     BridgedSourceRange cRange, BridgedTypeRepr cProtocolType,
     BridgedDeclNameRef cMemberName, BridgedDeclNameLoc cMemberNameLoc);
 
-enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedInlineKind {
-  BridgedInlineKindNever,
-  BridgedInlineKindAlways,
-};
-
 SWIFT_NAME("BridgedInlineAttr.createParsed(_:atLoc:range:kind:)")
 BridgedInlineAttr BridgedInlineAttr_createParsed(BridgedASTContext cContext,
                                                  BridgedSourceLoc cAtLoc,
                                                  BridgedSourceRange cRange,
-                                                 BridgedInlineKind cKind);
+                                                 swift::InlineKind kind);
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedParsedLifetimeDependenceKind {
   BridgedParsedLifetimeDependenceKindDefault,

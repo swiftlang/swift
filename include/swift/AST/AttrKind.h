@@ -75,9 +75,9 @@ enum class ENUM_EXTENSIBILITY_ATTR(closed) AccessLevel : uint8_t {
 SWIFT_UNAVAILABLE("Unavailable in Swift")
 llvm::StringRef getAccessLevelSpelling(AccessLevel value);
 
-enum class InlineKind : uint8_t {
-  Never = 0,
-  Always = 1,
+enum class ENUM_EXTENSIBILITY_ATTR(closed) InlineKind : uint8_t {
+  Never SWIFT_NAME("never") = 0,
+  Always SWIFT_NAME("always") = 1,
   Last_InlineKind = Always
 };
 

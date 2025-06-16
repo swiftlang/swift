@@ -1047,7 +1047,7 @@ extension ASTGenVisitor {
   ///   @inline(__always)
   ///   ```
   func generateInlineAttr(attribute node: AttributeSyntax) -> BridgedInlineAttr? {
-    let kind: BridgedInlineKind? = self.generateSingleAttrOption(
+    let kind: swift.InlineKind? = self.generateSingleAttrOption(
       attribute: node,
       {
         switch $0.rawText {

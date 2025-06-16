@@ -387,22 +387,12 @@ BridgedImplementsAttr BridgedImplementsAttr_createParsed(
                                 cMemberNameLoc.unbridged());
 }
 
-static InlineKind unbridged(BridgedInlineKind kind) {
-  switch (kind) {
-  case BridgedInlineKindNever:
-    return InlineKind::Never;
-  case BridgedInlineKindAlways:
-    return InlineKind::Always;
-  }
-  llvm_unreachable("unhandled enum value");
-}
-
 BridgedInlineAttr BridgedInlineAttr_createParsed(BridgedASTContext cContext,
                                                  BridgedSourceLoc cAtLoc,
                                                  BridgedSourceRange cRange,
-                                                 BridgedInlineKind cKind) {
+                                                 swift::InlineKind kind) {
   return new (cContext.unbridged())
-      InlineAttr(cAtLoc.unbridged(), cRange.unbridged(), unbridged(cKind));
+      InlineAttr(cAtLoc.unbridged(), cRange.unbridged(), kind);
 }
 
 static swift::ParsedLifetimeDependenceKind
