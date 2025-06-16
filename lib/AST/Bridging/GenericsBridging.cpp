@@ -98,15 +98,15 @@ BridgedTrailingWhereClause_createParsed(BridgedASTContext cContext,
 
 RequirementRepr BridgedRequirementRepr::unbridged() const {
   switch (Kind) {
-  case BridgedRequirementReprKindTypeConstraint:
+  case RequirementReprKind::TypeConstraint:
     return RequirementRepr::getTypeConstraint(
         FirstType.unbridged(), SeparatorLoc.unbridged(), SecondType.unbridged(),
         IsExpansionPattern);
-  case BridgedRequirementReprKindSameType:
+  case RequirementReprKind::SameType:
     return RequirementRepr::getSameType(
         FirstType.unbridged(), SeparatorLoc.unbridged(), SecondType.unbridged(),
         IsExpansionPattern);
-  case BridgedRequirementReprKindLayoutConstraint:
+  case RequirementReprKind::LayoutConstraint:
     return RequirementRepr::getLayoutConstraint(
         FirstType.unbridged(), SeparatorLoc.unbridged(),
         {LayoutConstraint.unbridged(), LayoutConstraintLoc.unbridged()},
@@ -119,7 +119,7 @@ BridgedRequirementRepr BridgedRequirementRepr_createTypeConstraint(
     BridgedTypeRepr cConstraint, bool isExpansionPattern) {
   return {
       /*SeparatorLoc=*/cColonLoc,
-      /*Kind=*/BridgedRequirementReprKindTypeConstraint,
+      /*Kind=*/RequirementReprKind::TypeConstraint,
       /*FirstType=*/cSubject,
       /*SecondType=*/cConstraint.unbridged(),
       /*LayoutConstraint=*/{},
@@ -133,7 +133,7 @@ BridgedRequirementRepr BridgedRequirementRepr_createSameType(
     BridgedTypeRepr cSecondType, bool isExpansionPattern) {
   return {
       /*SeparatorLoc=*/cEqualLoc,
-      /*Kind=*/BridgedRequirementReprKindSameType,
+      /*Kind=*/RequirementReprKind::SameType,
       /*FirstType=*/cFirstType,
       /*SecondType=*/cSecondType.unbridged(),
       /*LayoutConstraint=*/{},
@@ -148,7 +148,7 @@ BridgedRequirementRepr BridgedRequirementRepr_createLayoutConstraint(
     bool isExpansionPattern) {
   return {
       /*SeparatorLoc=*/cColonLoc,
-      /*Kind=*/BridgedRequirementReprKindLayoutConstraint,
+      /*Kind=*/RequirementReprKind::LayoutConstraint,
       /*FirstType=*/cSubject,
       /*SecondType=*/nullptr,
       /*LayoutConstraint=*/cLayout,

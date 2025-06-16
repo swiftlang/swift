@@ -77,6 +77,7 @@ class CanType;
 class TypeBase;
 class StmtConditionElement;
 class SubstitutionMap;
+enum class RequirementReprKind : unsigned;
 }
 
 struct BridgedASTType;
@@ -2898,15 +2899,9 @@ BridgedLayoutConstraint_getLayoutConstraint(BridgedASTContext cContext,
                                             swift::LayoutConstraintKind kind,
                                             size_t size, size_t alignment);
 
-enum ENUM_EXTENSIBILITY_ATTR(open) BridgedRequirementReprKind : size_t {
-  BridgedRequirementReprKindTypeConstraint,
-  BridgedRequirementReprKindSameType,
-  BridgedRequirementReprKindLayoutConstraint,
-};
-
 struct BridgedRequirementRepr {
   BridgedSourceLoc SeparatorLoc;
-  BridgedRequirementReprKind Kind;
+  swift::RequirementReprKind Kind;
   BridgedTypeRepr FirstType;
   BridgedNullableTypeRepr SecondType;
   BridgedLayoutConstraint LayoutConstraint;
