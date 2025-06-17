@@ -242,6 +242,34 @@ nonisolated class K: GloballyIsolated {
   }
 }
 
+@MainActor
+protocol GloballyIsolatedWithRequirements {
+  var x: NonSendable { get set } // expected-note {{property declared here}}
+  func test() // expected-note {{calls to instance method 'test()' from outside of its actor context are implicitly asynchronous}}
+}
+
+nonisolated class K2: GloballyIsolatedWithRequirements {
+  var x: NonSendable
+
+  func test() {}
+
+  func testNonWitness() {}
+
+  init(x: NonSendable) {
+    self.x = x // okay
+    test() // okay
+    testNonWitness() // okay
+  }
+
+  func test<T: GloballyIsolatedWithRequirements>(t: T, s: K2) {
+    _ = s.x // okay
+    _ = t.x // expected-error {{main actor-isolated property 'x' can not be referenced from a nonisolated context}}
+
+    s.test() // okay
+    t.test() // expected-error {{call to main actor-isolated instance method 'test()' in a synchronous nonisolated context}}
+  }
+}
+
 // MARK: - Storage of non-Sendable
 
 class KlassA {
