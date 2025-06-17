@@ -318,6 +318,36 @@ struct Accessors {
   }
 }
 
+struct TrivialAccessors {
+  let p: UnsafeRawPointer
+
+  // The implicit _read/_modify accessors must be inferred. They cannot be written explicitly because a getter is
+  // already defined.
+  var neComputed: NEImmortal {
+    @_lifetime(borrow self)
+    get { // OK
+      NEImmortal()
+    }
+
+    @_lifetime(&self)
+    set { // OK (no dependency)
+    }
+  }
+
+  var neYielded: NEImmortal {
+    @_lifetime(borrow self)
+    _read { // OK
+      yield NEImmortal()
+    }
+
+    @_lifetime(&self)
+    _modify { // OK
+      var ne = NEImmortal()
+      yield &ne
+    }
+  }
+}
+
 struct NonescapableSelfAccessors: ~Escapable {
   var ne: NE
 
