@@ -26,6 +26,7 @@
 #include "swift/AST/DiagnosticList.h"
 #include "swift/AST/GenericTypeParamKind.h"
 #include "swift/AST/LayoutConstraintKind.h"
+#include "swift/AST/PlatformKind.h"
 #include "swift/Basic/BasicBridging.h"
 
 #ifdef USED_IN_CPP_SOURCE
@@ -67,7 +68,6 @@ class MacroIntroducedDeclName;
 enum class MacroIntroducedDeclNameKind;
 enum class ParamSpecifier : uint8_t;
 class ParsedAutoDiffParameter;
-enum class PlatformKind : uint8_t;
 class ProtocolConformanceRef;
 class RegexLiteralPatternFeature;
 class RegexLiteralPatternFeatureKind;
@@ -88,7 +88,6 @@ struct BridgedSubstitutionMap;
 struct BridgedGenericSignature;
 struct BridgedConformance;
 class BridgedParameterList;
-enum BridgedPlatformKind : size_t;
 
 // Forward declare the underlying AST node type for each wrapper.
 namespace swift {
@@ -683,20 +682,14 @@ BridgedClosureExpr_asDeclContext(BridgedClosureExpr cClosure);
 // MARK: Availability
 //===----------------------------------------------------------------------===//
 
-enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedPlatformKind : size_t {
-  BridgedPlatformKind_None,
-#define AVAILABILITY_PLATFORM(X, PrettyName) BridgedPlatformKind_##X,
-#include "swift/AST/PlatformKinds.def"
-};
+BRIDGED_OPTIONAL(swift::PlatformKind, PlatformKind)
 
-SWIFT_NAME("BridgedPlatformKind.init(from:)")
-BridgedPlatformKind BridgedPlatformKind_fromString(BridgedStringRef cStr);
+SWIFT_NAME("BridgedOptionalPlatformKind.init(from:)")
+BridgedOptionalPlatformKind PlatformKind_fromString(BridgedStringRef cStr);
 
-SWIFT_NAME("BridgedPlatformKind.init(from:)")
-BridgedPlatformKind
-BridgedPlatformKind_fromIdentifier(BridgedIdentifier cIdent);
-
-swift::PlatformKind unbridge(BridgedPlatformKind cPlatform);
+SWIFT_NAME("BridgedOptionalPlatformKind.init(from:)")
+BridgedOptionalPlatformKind
+PlatformKind_fromIdentifier(BridgedIdentifier cIdent);
 
 SWIFT_NAME("BridgedAvailabilityMacroMap.has(self:name:)")
 bool BridgedAvailabilityMacroMap_hasName(BridgedAvailabilityMacroMap map,
@@ -931,7 +924,7 @@ SWIFT_NAME(
     "BridgedBackDeployedAttr.createParsed(_:atLoc:range:platform:version:)")
 BridgedBackDeployedAttr BridgedBackDeployedAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceRange cRange, BridgedPlatformKind cPlatform,
+    BridgedSourceRange cRange, swift::PlatformKind platform,
     BridgedVersionTuple cVersion);
 
 SWIFT_NAME("BridgedCDeclAttr.createParsed(_:atLoc:range:name:)")
@@ -1161,7 +1154,7 @@ SWIFT_NAME("BridgedOriginallyDefinedInAttr.createParsed(_:atLoc:range:"
 BridgedOriginallyDefinedInAttr BridgedOriginallyDefinedInAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceRange cRange, BridgedStringRef cModuleName,
-    BridgedPlatformKind cPlatform, BridgedVersionTuple cVersion);
+    swift::PlatformKind platform, BridgedVersionTuple cVersion);
 
 SWIFT_NAME("BridgedStorageRestrictionsAttr.createParsed(_:atLoc:range:"
            "initializes:accesses:)")

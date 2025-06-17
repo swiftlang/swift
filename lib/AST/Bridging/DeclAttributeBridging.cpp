@@ -194,11 +194,11 @@ BridgedAllowFeatureSuppressionAttr_createParsed(BridgedASTContext cContext,
 
 BridgedBackDeployedAttr BridgedBackDeployedAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceRange cRange, BridgedPlatformKind cPlatform,
+    BridgedSourceRange cRange, swift::PlatformKind platform,
     BridgedVersionTuple cVersion) {
-  return new (cContext.unbridged()) BackDeployedAttr(
-      cAtLoc.unbridged(), cRange.unbridged(), unbridge(cPlatform),
-      cVersion.unbridged(), /*Implicit=*/false);
+  return new (cContext.unbridged())
+      BackDeployedAttr(cAtLoc.unbridged(), cRange.unbridged(), platform,
+                       cVersion.unbridged(), /*Implicit=*/false);
 }
 
 BridgedCDeclAttr BridgedCDeclAttr_createParsed(BridgedASTContext cContext,
@@ -485,10 +485,10 @@ BridgedMacroRoleAttr BridgedMacroRoleAttr_createParsed(
 BridgedOriginallyDefinedInAttr BridgedOriginallyDefinedInAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceRange cRange, BridgedStringRef cModuleName,
-    BridgedPlatformKind cPlatform, BridgedVersionTuple cVersion) {
+    swift::PlatformKind platform, BridgedVersionTuple cVersion) {
   return new (cContext.unbridged()) OriginallyDefinedInAttr(
-      cAtLoc.unbridged(), cRange.unbridged(), cModuleName.unbridged(),
-      unbridge(cPlatform), cVersion.unbridged(),
+      cAtLoc.unbridged(), cRange.unbridged(), cModuleName.unbridged(), platform,
+      cVersion.unbridged(),
       /*Implicit=*/false);
 }
 
