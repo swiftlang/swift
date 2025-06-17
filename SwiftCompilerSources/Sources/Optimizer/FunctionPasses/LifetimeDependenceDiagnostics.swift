@@ -66,18 +66,22 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
       // For now, if the mark_dependence wasn't recognized as a lifetime dependency, or if the dependencies uses are not
       // in scope, conservatively settle it as escaping. For example, it is not uncommon for the pointer value returned
       // by `unsafeAddress` to outlive its `self` argument. This will not be diagnosed as an error, but the
-      // mark_dependence will hanceforth be treated as an unknown use by the optimizer.  In the future, we should not
+      // mark_dependence will henceforth be treated as an unknown use by the optimizer.  In the future, we should not
       // need to set this flag during diagnostics because, for escapable types, mark_dependence [unresolved] will all be
       // settled during an early LifetimeNormalization pass.
       markDep.settleToEscaping(context)
       continue
     }
-    if let apply = instruction as? FullApplySite {
-      // Handle ~Escapable results that do not have a lifetime dependence. This includes implicit initializers and
-      // @_unsafeNonescapableResult.
+    if let apply = instruction as? FullApplySite, !apply.hasResultDependence {
+      // Handle ~Escapable results that do not have a lifetime dependence. This includes implicit initializers, calls to
+      // closures, and @_unsafeNonescapableResult.
       apply.resultOrYields.forEach {
-        if let lifetimeDep = LifetimeDependence(unsafeApplyResult: $0,
-                                                context) {
+        if let lifetimeDep = LifetimeDependence(unsafeApplyResult: $0, apply: apply, context) {
+          _ = analyze(dependence: lifetimeDep, context)
+        }
+      }
+      apply.indirectResultOperands.forEach {
+        if let lifetimeDep = LifetimeDependence(unsafeApplyResult: $0.value, apply: apply, context) {
           _ = analyze(dependence: lifetimeDep, context)
         }
       }
@@ -237,10 +241,12 @@ private struct DiagnoseDependence {
     onError()
 
     // Identify the escaping variable.
-    let escapingVar = LifetimeVariable(dependent: operand.value, context)
+    let escapingVar = LifetimeVariable(usedBy: operand, context)
     if let varDecl = escapingVar.varDecl {
       // Use the variable location, not the access location.
-      diagnose(varDecl.nameLoc, .lifetime_variable_outside_scope, escapingVar.name ?? "")
+      // Variable names like $return_value and $implicit_value don't have source locations.
+      let sourceLoc = varDecl.nameLoc ?? escapingVar.sourceLoc
+      diagnose(sourceLoc, .lifetime_variable_outside_scope, escapingVar.name ?? "")
     } else if let sourceLoc = escapingVar.sourceLoc {
       diagnose(sourceLoc, .lifetime_value_outside_scope)
     } else {
@@ -263,7 +269,7 @@ private struct DiagnoseDependence {
 
   // Identify the dependence scope. If no source location is found, bypass this diagnostic.
   func reportScope() {
-    let parentVar = LifetimeVariable(dependent: dependence.parentValue, context)
+    let parentVar = LifetimeVariable(definedBy: dependence.parentValue, context)
     // First check if the dependency is limited to an access scope. If the access has no source location then
     // fall-through to report possible dependence on an argument.
     if parentVar.isAccessScope, let accessLoc = parentVar.sourceLoc {
@@ -310,7 +316,22 @@ private struct LifetimeVariable {
     return varDecl?.userFacingName
   }
 
-  init(dependent value: Value, _ context: some Context) {
+  init(usedBy operand: Operand, _ context: some Context) {
+    self = .init(dependent: operand.value, context)
+    // variable names like $return_value and $implicit_value don't have source locations.
+    // For @out arguments, the operand's location is the best answer.
+    // Otherwise, fall back to the function's location.
+    self.sourceLoc = self.sourceLoc ?? operand.instruction.location.sourceLoc
+      ?? operand.instruction.parentFunction.location.sourceLoc
+  }
+
+  init(definedBy value: Value, _ context: some Context) {
+    self = .init(dependent: value, context)
+    // Fall back to the function's location.
+    self.sourceLoc = self.sourceLoc ?? value.parentFunction.location.sourceLoc
+  }
+
+  private init(dependent value: Value, _ context: some Context) {
     guard let introducer = getFirstVariableIntroducer(of: value, context) else {
       return
     }
@@ -401,8 +422,8 @@ private struct LifetimeVariable {
 ///
 /// This supports store-to-yield. Storing to a yield is an escape unless the yielded memory location depends on another
 /// lifetime that already depends on the current scope. When setter depends on 'newValue', 'newValue' is stored to the
-/// yielded address, and the yielded addrses depends on the lifetime of 'self'. A mark_dependence should have already
-/// been inserted for that lifetime depenence:
+/// yielded address, and the yielded addresses depends on the lifetime of 'self'. A mark_dependence should have already
+/// been inserted for that lifetime dependence:
 ///
 ///   (%a, %t) = begin_apply %f(%self)
 ///              : $@yield_once @convention(method) (@inout Self) -> _inherit(0) @yields @inout Self.field
@@ -438,7 +459,7 @@ extension DependentAddressUseDefWalker: AddressUseDefWalker {
   }
 }
 
-/// Walk down lifetime depenence uses. For each check that all dependent
+/// Walk down lifetime dependence uses. For each check that all dependent
 /// leaf uses are non-escaping and within the dependence scope. The walk
 /// starts with add address for .access dependencies. The walk can
 /// transition from an address to a value at a load. The walk can

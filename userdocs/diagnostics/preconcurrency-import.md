@@ -1,6 +1,4 @@
-# Extraneous @preconcurrency imports
+# Extraneous @preconcurrency imports (PreconcurrencyImport)
 
-
-This diagnostic group includes warnings that diagnose `@preconcurrency import`
-declarations that don't need `@preconcurrency`. It is an experimental warning
-that is currently disabled.
+Warnings that diagnose `@preconcurrency import` declarations that don't need `@preconcurrency`,
+experimental and disabled by default.

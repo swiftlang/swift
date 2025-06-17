@@ -240,7 +240,7 @@ extension InstructionRange {
       }
       return .containsEnd
     }
-    // Neither end-point is contained. If a backward path walk encouters this range, then it must overlap this
+    // Neither end-point is contained. If a backward path walk encounters this range, then it must overlap this
     // range. Otherwise, it is disjoint.
     var backwardBlocks = BasicBlockWorklist(context)
     defer { backwardBlocks.deinitialize() }

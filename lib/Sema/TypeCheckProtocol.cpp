@@ -3353,6 +3353,16 @@ static bool hasExplicitGlobalActorAttr(ValueDecl *decl) {
   return !globalActorAttr->first->isImplicit();
 }
 
+/// Determine the isolation of a conformance with a known-isolated value witness.
+static ActorIsolation getConformanceIsolationForIsolatedWitness(
+    NormalProtocolConformance *conformance) {
+  if (auto rawIsolation = conformance->getRawIsolation())
+    return *rawIsolation;
+
+  return inferConformanceIsolation(
+      conformance, /*hasKnownIsolatedWitness=*/true);
+}
+
 std::optional<ActorIsolation>
 ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
                                         ValueDecl *witness,
@@ -3416,7 +3426,8 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
   case ActorReferenceResult::EntersActor: {
     // If the conformance itself is isolated to the same isolation domain as
     // the witness, treat this as being in the same concurrency domain.
-    auto conformanceIsolation = Conformance->getIsolation();
+    auto conformanceIsolation =
+        getConformanceIsolationForIsolatedWitness(Conformance);
     if (conformanceIsolation.isGlobalActor() &&
         refResult.isolation == conformanceIsolation) {
       sameConcurrencyDomain = true;
@@ -6677,7 +6688,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   if (!hasDeprecatedUnsafeSendable && SendableConformance) {
     SendableCheck check = SendableCheck::Explicit;
     if (sendableConformancePreconcurrency)
-      check = SendableCheck::ImpliedByStandardProtocol;
+      check = SendableCheck::ImpliedByPreconcurrencyProtocol;
     else if (SendableConformance->getSourceKind() ==
                  ConformanceEntryKind::Synthesized)
       check = SendableCheck::Implicit;

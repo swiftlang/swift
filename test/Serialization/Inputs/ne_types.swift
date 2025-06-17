@@ -3,13 +3,13 @@ public struct Something {
   public struct View<T: BitwiseCopyable> : ~Copyable, ~Escapable {
     var ptr: UnsafeBufferPointer<T>
     
-    @lifetime(borrow ptr)
+    @_lifetime(borrow ptr)
     public init(ptr: borrowing UnsafeBufferPointer<T>) {
       self.ptr = copy ptr
     }
     
     public var span: Span<T> {
-      @lifetime(borrow self)
+      @_lifetime(borrow self)
       borrowing get {
         Span(_unsafeElements: ptr)
       }
@@ -19,13 +19,13 @@ public struct Something {
   public struct MutableView<T: BitwiseCopyable> : ~Copyable, ~Escapable {
     var ptr: UnsafeMutableBufferPointer<T>
     
-    @lifetime(borrow ptr)
+    @_lifetime(borrow ptr)
     public init(ptr: borrowing UnsafeMutableBufferPointer<T>) {
       self.ptr = copy ptr
     }
     
     public var mutableSpan: MutableSpan<T> {
-      @lifetime(&self)
+      @_lifetime(&self)
       mutating get {
         MutableSpan(_unsafeElements: ptr)
       }
@@ -37,13 +37,13 @@ public struct Something {
     self.ptr = ptr
   }
   
-  @lifetime(borrow self)
+  @_lifetime(borrow self)
   public func view<T>(of type: T.Type = T.self) -> View<T> {
     let tp = ptr.assumingMemoryBound(to: T.self)
     return __overrideLifetime(View(ptr: .init(tp)), borrowing: self)
   }
   
-  @lifetime(&self)
+  @_lifetime(&self)
   public mutating func mutableView<T>(of type: T.Type = T.self) -> MutableView<T> {
     let tp = ptr.assumingMemoryBound(to: T.self)
     return __overrideLifetime(MutableView(ptr: tp), mutating: &self)
@@ -54,7 +54,7 @@ public struct Something {
 @_unsafeNonescapableResult
 @_alwaysEmitIntoClient
 @_transparent
-@lifetime(borrow source)
+@_lifetime(borrow source)
 public func __overrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
@@ -70,7 +70,7 @@ public func __overrideLifetime<
 @_unsafeNonescapableResult
 @_alwaysEmitIntoClient
 @_transparent
-@lifetime(copy source)
+@_lifetime(copy source)
 public func __overrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
@@ -86,7 +86,7 @@ public func __overrideLifetime<
 @_unsafeNonescapableResult
 @_alwaysEmitIntoClient
 @_transparent
-@lifetime(&source)
+@_lifetime(&source)
 public func __overrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(

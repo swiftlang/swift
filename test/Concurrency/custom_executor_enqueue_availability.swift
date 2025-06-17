@@ -26,10 +26,12 @@ final class OldExecutorOldStdlib: SerialExecutor {
 /// availability, since in this case the UnownedJob version needs to exist.
 @available(SwiftStdlib 5.1, *)
 final class BothExecutorOldStdlib: SerialExecutor {
-  func enqueue(_ job: UnownedJob) {} // expected-note{{'enqueue' declared here}}
+  func enqueue(_ job: UnownedJob) {}
 
+  // This no longer warns, because of the use of StdlibDeploymentTarget in the
+  // runtime.
   @available(SwiftStdlib 5.9, *)
-  func enqueue(_ job: __owned ExecutorJob) {} // expected-warning{{'Executor.enqueue(ExecutorJob)' will never be used, due to the presence of 'enqueue(UnownedJob)'}}
+  func enqueue(_ job: __owned ExecutorJob) {}
 
   func asUnownedSerialExecutor() -> UnownedSerialExecutor {
     UnownedSerialExecutor(ordinary: self)

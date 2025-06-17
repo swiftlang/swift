@@ -45,7 +45,7 @@ using namespace irgen;
 static DynamicCastFlags getDynamicCastFlags(
     CastConsumptionKind consumptionKind,
     CheckedCastMode mode,
-    CastingIsolatedConformances isolatedConformances
+    CheckedCastInstOptions options
 ) {
   DynamicCastFlags flags = DynamicCastFlags::Default;
 
@@ -56,7 +56,7 @@ static DynamicCastFlags getDynamicCastFlags(
   if (shouldTakeOnSuccess(consumptionKind))
     flags |= DynamicCastFlags::TakeOnSuccess;
 
-  switch (isolatedConformances) {
+  switch (options.isolatedConformances()) {
   case CastingIsolatedConformances::Allow:
     break;
   case CastingIsolatedConformances::Prohibit:
@@ -75,11 +75,10 @@ llvm::Value *irgen::emitCheckedCast(IRGenFunction &IGF,
                                     CanType targetType,
                                     CastConsumptionKind consumptionKind,
                                     CheckedCastMode mode,
-                            CastingIsolatedConformances isolatedConformances) {
+                                    CheckedCastInstOptions options) {
   // TODO: attempt to specialize this based on the known types.
 
-  DynamicCastFlags flags = getDynamicCastFlags(consumptionKind, mode,
-                                               isolatedConformances);
+  DynamicCastFlags flags = getDynamicCastFlags(consumptionKind, mode, options);
 
   // Cast both addresses to opaque pointer type.
   dest = IGF.Builder.CreateElementBitCast(dest, IGF.IGM.OpaqueTy);
@@ -860,7 +859,7 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
                                   SILType targetLoweredType,
                                   CanType targetFormalType,
                                   CheckedCastMode mode,
-                              CastingIsolatedConformances isolatedConformances,
+                                  CheckedCastInstOptions options,
                                   Explosion &out) {
   assert(sourceLoweredType.isObject());
   assert(targetLoweredType.isObject());
@@ -990,7 +989,7 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
                                                src, sourceFormalType,
                                                dest, targetFormalType,
                                                CastConsumptionKind::TakeAlways,
-                                               mode, isolatedConformances);
+                                               mode, options);
         llvm::Value *successResult = IGF.Builder.CreateLoad(dest);
         llvm::Value *failureResult = llvm::ConstantPointerNull::get(destPtrType);
         llvm::Value *result = IGF.Builder.CreateSelect(success, successResult, failureResult);

@@ -692,6 +692,9 @@ private:
   llvm::DenseMap<std::pair<ValueDecl *, DeclContext *>, ValueDecl *>
       clonedBaseMembers;
 
+  // Store all methods that result from cloning a base member
+  llvm::DenseSet<ValueDecl *> clonedMembers;
+
 public:
   llvm::DenseMap<const clang::ParmVarDecl*, FuncDecl*> defaultArgGenerators;
 
@@ -699,6 +702,8 @@ public:
 
   ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
                                   ClangInheritanceInfo inheritance);
+
+  bool isClonedMemberDecl(ValueDecl *decl);
 
   static size_t getImportedBaseMemberDeclArity(const ValueDecl *valueDecl);
 
@@ -1756,7 +1761,7 @@ public:
   }
 
   void importSwiftAttrAttributes(Decl *decl);
-  void swiftify(FuncDecl *MappedDecl);
+  void swiftify(AbstractFunctionDecl *MappedDecl);
 
   /// Find the lookup table that corresponds to the given Clang module.
   ///
@@ -2094,6 +2099,22 @@ inline const clang::Type *desugarIfElaborated(const clang::Type *type) {
 inline clang::QualType desugarIfElaborated(clang::QualType type) {
   if (auto elaborated = dyn_cast<clang::ElaboratedType>(type))
     return elaborated->desugar();
+  return type;
+}
+
+inline clang::QualType desugarIfBoundsAttributed(clang::QualType type) {
+  if (auto BAT = dyn_cast<clang::BoundsAttributedType>(type))
+    return BAT->desugar();
+  if (auto VT = dyn_cast<clang::ValueTerminatedType>(type))
+    return VT->desugar();
+  if (auto AT = dyn_cast<clang::AttributedType>(type))
+    switch (AT->getAttrKind()) {
+      case clang::attr::PtrUnsafeIndexable:
+      case clang::attr::PtrSingle:
+        return AT->desugar();
+      default:
+        break;
+    }
   return type;
 }
 

@@ -1,15 +1,15 @@
 // RUN: %target-swift-frontend %s -emit-sil -O \
 // RUN:   -disable-availability-checking \
-// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   | %FileCheck %s --check-prefix=CHECK-SIL
 
 // RUN: %target-swift-frontend %s -emit-ir -O \
 // RUN:   -disable-availability-checking \
-// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   | %FileCheck %s  --check-prefix=CHECK-IR
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_stdlib_no_asserts, optimized_stdlib
 
 // Bounds check should be eliminated
@@ -328,7 +328,7 @@ public func mutate_span(_ v: inout Span<Int>) { }
 // CHECK-SIL-NOT: cond_fail {{.*}}, "Index out of bounds"
 // CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s23span_bounds_check_tests06inout_A33_sum_iterate_to_unknown_with_trapySis4SpanVySiGz_SitF'
-@lifetime(v: copy v)
+@_lifetime(v: copy v)
 public func inout_span_sum_iterate_to_unknown_with_trap(_ v: inout Span<Int>, _ n: Int) -> Int {
   var sum = 0
   for i in 0...n {
@@ -343,7 +343,7 @@ public func inout_span_sum_iterate_to_unknown_with_trap(_ v: inout Span<Int>, _ 
 // CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
 // CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s23span_bounds_check_tests06inout_A41_sum_iterate_to_unknown_with_trap_dontoptySis4SpanVySiGz_SitF'
-@lifetime(v: copy v)
+@_lifetime(v: copy v)
 public func inout_span_sum_iterate_to_unknown_with_trap_dontopt(_ v: inout Span<Int>, _ n: Int) -> Int {
   var sum = 0
   for i in 0...n {

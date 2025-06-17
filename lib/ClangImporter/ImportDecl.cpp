@@ -62,8 +62,9 @@
 #include "clang/AST/DeclObjCCommon.h"
 #include "clang/AST/Expr.h"
 #include "clang/AST/PrettyPrinter.h"
-#include "clang/AST/StmtVisitor.h"
 #include "clang/AST/RecordLayout.h"
+#include "clang/AST/RecursiveASTVisitor.h"
+#include "clang/AST/StmtVisitor.h"
 #include "clang/AST/Type.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Basic/TargetInfo.h"
@@ -136,7 +137,6 @@ createFuncOrAccessor(ClangImporter::Implementation &impl, SourceLoc funcLoc,
                                     genericParams, dc, clangNode);
   }
   impl.importSwiftAttrAttributes(decl);
-  impl.swiftify(decl);
 
   return decl;
 }
@@ -4333,6 +4333,7 @@ namespace {
       }
 
       recordObjCOverride(result);
+      Impl.swiftify(result);
     }
 
     static bool hasComputedPropertyAttr(const clang::Decl *decl) {
@@ -9145,19 +9146,61 @@ struct CountedByExpressionValidator
 };
 } // namespace
 
-static bool SwiftifiableCAT(const clang::CountAttributedType *CAT) {
-  return CAT && CountedByExpressionValidator().Visit(CAT->getCountExpr());
-}
-
-static bool SwiftifiablePointerType(Type swiftType) {
-  // don't try to transform any Swift types that _SwiftifyImport doesn't know how to handle
+// Don't try to transform any Swift types that _SwiftifyImport doesn't know how
+// to handle.
+static bool SwiftifiableCountedByPointerType(Type swiftType) {
   Type nonnullType = swiftType->lookThroughSingleOptionalType();
   PointerTypeKind PTK;
-  return nonnullType->isOpaquePointer() ||
-    (nonnullType->getAnyPointerElementType(PTK) && PTK != PTK_AutoreleasingUnsafeMutablePointer);
+  return nonnullType->getAnyPointerElementType(PTK) &&
+    (PTK == PTK_UnsafePointer || PTK == PTK_UnsafeMutablePointer);
+}
+static bool SwiftifiableSizedByPointerType(const clang::ASTContext &ctx,
+                                           Type swiftType,
+                                           const clang::CountAttributedType *CAT) {
+  Type nonnullType = swiftType->lookThroughSingleOptionalType();
+  if (nonnullType->isOpaquePointer())
+    return true;
+  PointerTypeKind PTK;
+  if (!nonnullType->getAnyPointerElementType(PTK))
+    return false;
+  if (PTK == PTK_UnsafeRawPointer || PTK == PTK_UnsafeMutableRawPointer)
+    return true;
+  if (PTK != PTK_UnsafePointer && PTK != PTK_UnsafeMutablePointer)
+    return false;
+  // We have a pointer to a type with a size. Verify that it is char-sized.
+  auto PtrT = CAT->getAs<clang::PointerType>();
+  auto PointeeT = PtrT->getPointeeType();
+  return ctx.getTypeSizeInChars(PointeeT).isOne();
+}
+static bool SwiftifiableCAT(const clang::ASTContext &ctx,
+                            const clang::CountAttributedType *CAT,
+                            Type swiftType) {
+  return CAT && CountedByExpressionValidator().Visit(CAT->getCountExpr()) &&
+    (CAT->isCountInBytes() ?
+       SwiftifiableSizedByPointerType(ctx, swiftType, CAT)
+     : SwiftifiableCountedByPointerType(swiftType));
 }
 
-void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
+namespace {
+
+// Searches for template instantiations that are not behind type aliases.
+// FIXME: make sure the generated code compiles for template
+// instantiations that are not behind type aliases.
+struct UnaliasedInstantiationVisitor
+    : clang::RecursiveASTVisitor<UnaliasedInstantiationVisitor> {
+  bool hasUnaliasedInstantiation = false;
+
+  bool TraverseTypedefType(const clang::TypedefType *) { return true; }
+
+  bool
+  VisitTemplateSpecializationType(const clang::TemplateSpecializationType *) {
+    hasUnaliasedInstantiation = true;
+    return false;
+  }
+};
+} // namespace
+
+void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
   if (!SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers))
     return;
   auto ClangDecl =
@@ -9165,8 +9208,21 @@ void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
   if (!ClangDecl)
     return;
 
+  // FIXME: for private macro generated functions we do not serialize the
+  // SILFunction's body anywhere triggering assertions.
+  if (ClangDecl->getAccess() == clang::AS_protected ||
+      ClangDecl->getAccess() == clang::AS_private)
+    return;
+
   if (ClangDecl->getNumParams() != MappedDecl->getParameters()->size())
     return;
+
+  {
+    UnaliasedInstantiationVisitor visitor;
+    visitor.TraverseType(ClangDecl->getType());
+    if (visitor.hasUnaliasedInstantiation)
+      return;
+  }
 
   llvm::SmallString<128> MacroString;
   // We only attach the macro if it will produce an overload. Any __counted_by
@@ -9190,11 +9246,17 @@ void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
           return false;
         };
     SwiftifyInfoPrinter printer(getClangASTContext(), SwiftContext, out);
-    Type swiftReturnTy = MappedDecl->getResultInterfaceType();
+    Type swiftReturnTy;
+    if (const auto *funcDecl = dyn_cast<FuncDecl>(MappedDecl))
+      swiftReturnTy = funcDecl->getResultInterfaceType();
+    else if (const auto *ctorDecl = dyn_cast<ConstructorDecl>(MappedDecl))
+      swiftReturnTy = ctorDecl->getResultInterfaceType();
+    else
+      ABORT("Unexpected AbstractFunctionDecl subclass.");
     bool returnIsStdSpan = registerStdSpanTypeMapping(
         swiftReturnTy, ClangDecl->getReturnType());
     auto *CAT = ClangDecl->getReturnType()->getAs<clang::CountAttributedType>();
-    if (SwiftifiableCAT(CAT) && SwiftifiablePointerType(swiftReturnTy)) {
+    if (SwiftifiableCAT(getClangASTContext(), CAT, swiftReturnTy)) {
       printer.printCountedBy(CAT, SwiftifyInfoPrinter::RETURN_VALUE_INDEX);
       attachMacro = true;
     }
@@ -9211,7 +9273,7 @@ void ClangImporter::Implementation::swiftify(FuncDecl *MappedDecl) {
       Type swiftParamTy = swiftParam->getInterfaceType();
       bool paramHasBoundsInfo = false;
       auto *CAT = clangParamTy->getAs<clang::CountAttributedType>();
-      if (SwiftifiableCAT(CAT) && SwiftifiablePointerType(swiftParamTy)) {
+      if (SwiftifiableCAT(getClangASTContext(), CAT, swiftParamTy)) {
         printer.printCountedBy(CAT, index);
         attachMacro = paramHasBoundsInfo = true;
       }

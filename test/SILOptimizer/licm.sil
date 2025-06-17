@@ -23,6 +23,10 @@ struct S {
   var s: String
 }
 
+struct Pair  {
+  var t: (a: Int, b: Int)
+}
+
 // globalArray
 sil_global @globalArray : $Storage
 
@@ -1703,4 +1707,31 @@ bb4(%14 : @reborrow $S):
   %r = tuple()
   return %r
 }
+
+// Just check that LICM doesn't produce invalid SIL because of a tuple type mismatch.
+// CHECK-LABEL: sil [ossa] @split_load_of_labeld_tuples :
+// CHECK-LABEL: } // end sil function 'split_load_of_labeld_tuples'
+sil [ossa] @split_load_of_labeld_tuples : $@convention(thin) (@inout Pair, Int) -> () {
+bb0(%0 : $*Pair, %1 : $Int):
+  br bb1
+
+bb1:
+  cond_br undef, bb3, bb2
+
+bb2:
+  %4 = load [trivial] %0
+  %5 = struct_element_addr %0, #Pair.t
+  %6 = tuple_element_addr %5, 0
+  %7 = alloc_stack $Int
+  store %1 to [trivial] %7
+  %9 = load [trivial] %7
+  store %9 to [trivial] %6
+  dealloc_stack %7
+  br bb1
+
+bb3:
+  %13 = tuple ()
+  return %13
+}
+
 

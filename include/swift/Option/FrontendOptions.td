@@ -244,6 +244,9 @@ def module_can_import_version: MultiArg<["-"], "module-can-import-version", 3>,
   MetaVarName<"<moduleName> <version> <underlyingVersion>">,
   HelpText<"Specify canImport module and versions">;
 
+def module_import_from_cas: Flag<["-"], "module-import-from-cas">,
+  HelpText<"Import modules from CAS instead of file system">;
+
 def disable_cross_import_overlay_search: Flag<["-"], "disable-cross-import-overlay-search">,
   HelpText<"Disable searching for cross import overlay file">;
 
@@ -1186,6 +1189,10 @@ def enable_cond_fail_message_annotation : Flag<["-"], "enable-cond-fail-message-
 
 def disable_cond_fail_message_annotation : Flag<["-"], "dissable-cond-fail-message-annotation">,
   HelpText<"Disable cond_fail message annotation.">;
+
+def min_valid_pointer_value : Joined<["-"], "min-valid-pointer-value=">,
+  MetaVarName<"<value>">,
+  HelpText<"Overrides the target's least valid pointer value.'">;
 
 let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIgnorable] in {
   def enable_pack_metadata_stack_promotion :

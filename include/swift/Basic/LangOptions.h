@@ -45,6 +45,7 @@ namespace swift {
 
   struct DiagnosticBehavior;
   class DiagnosticEngine;
+  class FrontendOptions;
 
   /// Kind of implicit platform conditions.
   enum class PlatformConditionKind {
@@ -320,6 +321,8 @@ namespace swift {
     /// Flags for use by tests
     ///
 
+    bool UseStaticStandardLibrary = false;
+
     /// Enable Objective-C Runtime interop code generation and build
     /// configuration options.
     bool EnableObjCInterop = true;
@@ -339,7 +342,8 @@ namespace swift {
     std::optional<version::Version> FormalCxxInteropMode;
 
     void setCxxInteropFromArgs(llvm::opt::ArgList &Args,
-                               swift::DiagnosticEngine &Diags);
+                               swift::DiagnosticEngine &Diags,
+                               const FrontendOptions &FrontendOpts);
 
     /// The C++ standard library used for the current build. This can differ
     /// from the default C++ stdlib on a particular platform when `-Xcc

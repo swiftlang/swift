@@ -1089,7 +1089,14 @@ StringRef LiteralExpr::getLiteralKindDescription() const {
   llvm_unreachable("Unhandled literal");
 }
 
-IntegerLiteralExpr * IntegerLiteralExpr::createFromUnsigned(ASTContext &C, unsigned value, SourceLoc loc) {
+void BuiltinLiteralExpr::setBuiltinInitializer(
+    ConcreteDeclRef builtinInitializer) {
+  ASSERT(builtinInitializer);
+  BuiltinInitializer = builtinInitializer;
+}
+
+IntegerLiteralExpr * IntegerLiteralExpr::createFromUnsigned(
+    ASTContext &C, unsigned value, SourceLoc loc) {
   llvm::SmallString<8> Scratch;
   llvm::APInt(sizeof(unsigned)*8, value).toString(Scratch, 10, /*signed*/ false);
   auto Text = C.AllocateCopy(StringRef(Scratch));
@@ -1366,11 +1373,8 @@ CaptureListEntry CaptureListEntry::createParsed(
     SourceRange ownershipRange, Identifier name, SourceLoc nameLoc,
     SourceLoc equalLoc, Expr *initializer, DeclContext *DC) {
 
-  auto introducer =
-      (ownershipKind != ReferenceOwnership::Weak ? VarDecl::Introducer::Let
-                                                 : VarDecl::Introducer::Var);
   auto *VD =
-      new (Ctx) VarDecl(/*isStatic==*/false, introducer, nameLoc, name, DC);
+      new (Ctx) VarDecl(/*isStatic==*/false, VarDecl::Introducer::Let, nameLoc, name, DC);
 
   if (ownershipKind != ReferenceOwnership::Strong)
     VD->getAttrs().add(

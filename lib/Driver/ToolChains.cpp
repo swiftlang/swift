@@ -261,7 +261,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     arguments.push_back("-color-diagnostics");
   }
 
-  inputArgs.AddAllArgs(arguments, options::OPT_I);
+  inputArgs.addAllArgs(arguments, {options::OPT_I, options::OPT_Isystem});
   inputArgs.addAllArgs(arguments, {options::OPT_F, options::OPT_Fsystem});
   inputArgs.AddAllArgs(arguments, options::OPT_vfsoverlay);
 

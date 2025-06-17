@@ -211,6 +211,9 @@ enum BorrowingInstruction : CustomStringConvertible, Hashable {
     return scopedValue
   }
 
+  /// Returns non-nil if this borrowing instruction produces an guaranteed dependent value and does not have immediate
+  /// scope-ending uses. Finding the borrow scope in such cases requires recursively following uses of the guaranteed
+  /// value.
   var dependentValue: Value? {
     switch self {
     case .borrowedFrom(let bfi):
@@ -462,7 +465,7 @@ func computeBorrowLiveRange(for value: Value, _ context: FunctionPassContext)
   for beginBorrow in value.getBorrowIntroducers(context) {
     /// FIXME: Remove calls to computeKnownLiveness() as soon as lifetime completion runs immediately after
     /// SILGen. Instead, this should compute linear liveness for borrowed value by switching over BeginBorrowValue, just
-    /// like LifetimeDependenc.Scope.computeRange().
+    /// like LifetimeDependence.Scope.computeRange().
     ranges.push((beginBorrow, computeKnownLiveness(for: beginBorrow.value, context)))
   }
   return ranges

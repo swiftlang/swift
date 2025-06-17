@@ -1564,10 +1564,11 @@ BridgedCanType BridgedInstruction::UnconditionalCheckedCast_getTargetFormalType(
   return {getAs<swift::UnconditionalCheckedCastInst>()->getTargetFormalType()};    
 }
 
-BridgedInstruction::CastingIsolatedConformances
-BridgedInstruction::UnconditionalCheckedCast_getIsolatedConformances() const {
-  return static_cast<BridgedInstruction::CastingIsolatedConformances>(
-      getAs<swift::UnconditionalCheckedCastInst>()->getIsolatedConformances());
+BridgedInstruction::CheckedCastInstOptions
+BridgedInstruction::UnconditionalCheckedCast_getCheckedCastOptions() const {
+  return BridgedInstruction::CheckedCastInstOptions{
+      getAs<swift::UnconditionalCheckedCastInst>()->getCheckedCastOptions()
+        .getStorage()};
 }
 
 BridgedCanType BridgedInstruction::UnconditionalCheckedCastAddr_getSourceFormalType() const {
@@ -1578,10 +1579,11 @@ BridgedCanType BridgedInstruction::UnconditionalCheckedCastAddr_getTargetFormalT
   return {getAs<swift::UnconditionalCheckedCastAddrInst>()->getTargetFormalType()};    
 }
 
-BridgedInstruction::CastingIsolatedConformances
-BridgedInstruction::UnconditionalCheckedCastAddr_getIsolatedConformances() const {
-  return static_cast<BridgedInstruction::CastingIsolatedConformances>(
-      getAs<swift::UnconditionalCheckedCastAddrInst>()->getIsolatedConformances());
+BridgedInstruction::CheckedCastInstOptions
+BridgedInstruction::UnconditionalCheckedCastAddr_getCheckedCastOptions() const {
+  return BridgedInstruction::CheckedCastInstOptions{
+      getAs<swift::UnconditionalCheckedCastAddrInst>()->getCheckedCastOptions()
+        .getStorage()};
 }
 
 BridgedBasicBlock BridgedInstruction::CheckedCastBranch_getSuccessBlock() const {
@@ -1592,10 +1594,11 @@ BridgedBasicBlock BridgedInstruction::CheckedCastBranch_getFailureBlock() const 
   return {getAs<swift::CheckedCastBranchInst>()->getFailureBB()};
 }
 
-BridgedInstruction::CastingIsolatedConformances
-BridgedInstruction::CheckedCastBranch_getIsolatedConformances() const {
-  return static_cast<BridgedInstruction::CastingIsolatedConformances>(
-      getAs<swift::CheckedCastBranchInst>()->getIsolatedConformances());
+BridgedInstruction::CheckedCastInstOptions
+BridgedInstruction::CheckedCastBranch_getCheckedCastOptions() const {
+  return BridgedInstruction::CheckedCastInstOptions{
+      getAs<swift::CheckedCastBranchInst>()->getCheckedCastOptions()
+        .getStorage()};
 }
 
 BridgedCanType BridgedInstruction::CheckedCastAddrBranch_getSourceFormalType() const {
@@ -1626,10 +1629,11 @@ BridgedInstruction::CastConsumptionKind BridgedInstruction::CheckedCastAddrBranc
            getAs<swift::CheckedCastAddrBranchInst>()->getConsumptionKind());
 }
 
-BridgedInstruction::CastingIsolatedConformances
-BridgedInstruction::CheckedCastAddrBranch_getIsolatedConformances() const {
-  return static_cast<BridgedInstruction::CastingIsolatedConformances>(
-      getAs<swift::CheckedCastAddrBranchInst>()->getIsolatedConformances());
+BridgedInstruction::CheckedCastInstOptions
+BridgedInstruction::CheckedCastAddrBranch_getCheckedCastOptions() const {
+  return BridgedInstruction::CheckedCastInstOptions{
+      getAs<swift::CheckedCastAddrBranchInst>()->getCheckedCastOptions()
+        .getStorage()};
 }
 
 BridgedSubstitutionMap BridgedInstruction::ApplySite_getSubstitutionMap() const {
@@ -2190,13 +2194,13 @@ BridgedInstruction BridgedBuilder::createUpcast(BridgedValue op, BridgedType typ
 BridgedInstruction BridgedBuilder::createCheckedCastAddrBranch(
     BridgedValue source, BridgedCanType sourceFormalType,
     BridgedValue destination, BridgedCanType targetFormalType,
-    BridgedInstruction::CastingIsolatedConformances isolatedConformances,
+    BridgedInstruction::CheckedCastInstOptions options,
     BridgedInstruction::CastConsumptionKind consumptionKind,
     BridgedBasicBlock successBlock, BridgedBasicBlock failureBlock) const
 {
   return {unbridged().createCheckedCastAddrBranch(
             regularLoc(),
-            (swift::CastingIsolatedConformances)isolatedConformances,
+            swift::CheckedCastInstOptions(options.storage),
             (swift::CastConsumptionKind)consumptionKind,
             source.getSILValue(), sourceFormalType.unbridged(),
             destination.getSILValue(), targetFormalType.unbridged(),
@@ -2204,13 +2208,13 @@ BridgedInstruction BridgedBuilder::createCheckedCastAddrBranch(
 }
 
 BridgedInstruction BridgedBuilder::createUnconditionalCheckedCastAddr(
-    BridgedInstruction::CastingIsolatedConformances isolatedConformances,
+    BridgedInstruction::CheckedCastInstOptions options,
     BridgedValue source, BridgedCanType sourceFormalType,
     BridgedValue destination, BridgedCanType targetFormalType) const
 {
   return {unbridged().createUnconditionalCheckedCastAddr(
             regularLoc(),
-            (swift::CastingIsolatedConformances)isolatedConformances,
+            swift::CheckedCastInstOptions(options.storage),
             source.getSILValue(), sourceFormalType.unbridged(),
             destination.getSILValue(), targetFormalType.unbridged())};
 }

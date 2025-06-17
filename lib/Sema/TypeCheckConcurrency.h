@@ -327,6 +327,11 @@ bool diagnoseNonSendableTypesInReference(
 void diagnoseMissingSendableConformance(
     SourceLoc loc, Type type, const DeclContext *fromDC, bool preconcurrency);
 
+/// Produce a diagnostic for a missing conformance to SendableMetatype
+void diagnoseMissingSendableMetatypeConformance(SourceLoc loc, Type type,
+                                                const DeclContext *fromDC,
+                                                bool preconcurrency);
+
 /// If the given nominal type is public and does not explicitly
 /// state whether it conforms to Sendable, provide a diagnostic.
 void diagnoseMissingExplicitSendable(NominalTypeDecl *nominal);
@@ -353,7 +358,7 @@ enum class SendableCheck {
 
   /// Sendable conformance was implied by a protocol that inherits from
   /// Sendable and also predates concurrency.
-  ImpliedByStandardProtocol,
+  ImpliedByPreconcurrencyProtocol,
 
   /// Implicit conformance to Sendable.
   Implicit,
@@ -367,7 +372,7 @@ enum class SendableCheck {
 static inline bool isImplicitSendableCheck(SendableCheck check) {
   switch (check) {
   case SendableCheck::Explicit:
-  case SendableCheck::ImpliedByStandardProtocol:
+  case SendableCheck::ImpliedByPreconcurrencyProtocol:
     return false;
 
   case SendableCheck::Implicit:
@@ -777,6 +782,13 @@ bool checkIsolatedConformancesInContext(
 bool checkIsolatedConformancesInContext(
     Type type, SourceLoc loc, const DeclContext *dc,
     HandleConformanceIsolationFn handleBad = doNotDiagnoseConformanceIsolation);
+
+/// For a protocol conformance that does not have a "raw" isolation, infer its isolation.
+///
+/// - hasKnownIsolatedWitness: indicates when it is known that there is an actor-isolated witness, meaning
+///   that this operation will not look at other witnesses to determine if they are all nonisolated.
+ActorIsolation inferConformanceIsolation(
+    NormalProtocolConformance *conformance, bool hasKnownIsolatedWitness);
 
 } // end namespace swift
 

@@ -58,6 +58,8 @@ option(${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION "Generate ABI resilient runtime 
 option(${PROJECT_NAME}_ENABLE_PRESPECIALIZATION "Enable generic metadata prespecialization"
   ${SwiftCore_ENABLE_PRESPECIALIZATION})
 
+option(${PROJECT_NAME}_SINGLE_THREADED_MODE "Build Synchronization assuming it will be used in an environment with only a single thread" OFF)
+
 add_compile_options(
   $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
   $<$<COMPILE_LANGUAGE:Swift>:-nostdlibimport>
@@ -95,12 +97,19 @@ add_library(swiftSynchronization
   Atomics/WordPair.swift
   Atomics/AtomicStorage.swift
   Atomics/AtomicIntegers.swift
-  Cell.swift
-  Mutex/Mutex.swift
-  $<$<PLATFORM_ID:Darwin>:Mutex/DarwinImpl.swift>
-  $<$<PLATFORM_ID:Linux>:Mutex/LinuxImpl.swift>
-  $<$<PLATFORM_ID:WASI>:Mutex/SpinLoopHint.swift>
-  $<$<PLATFORM_ID:Windows>:Mutex/WindowsImpl.swift>)
+  Cell.swift)
+
+# Determine Mutex definition
+if(${PROJECT_NAME}_SINGLE_THREADED_MODE)
+  target_sources(swiftSynchronization PRIVATE Mutex/MutexUnavailable.swift)
+else()
+  target_sources(swiftSynchronization PRIVATE
+    Mutex/Mutex.swift
+    $<$<PLATFORM_ID:Darwin>:Mutex/DarwinImpl.swift>
+    $<$<PLATFORM_ID:Android,Linux>:Mutex/LinuxImpl.swift>
+    $<$<PLATFORM_ID:Android,WASI>:Mutex/SpinLoopHint.swift>
+    $<$<PLATFORM_ID:Windows>:Mutex/WindowsImpl.swift>)
+endif()
 
 set_target_properties(swiftSynchronization PROPERTIES
   Swift_MODULE_NAME Synchronization)

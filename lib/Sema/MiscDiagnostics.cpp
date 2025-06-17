@@ -1748,15 +1748,23 @@ public:
       return false;
     }
 
-    // Require `LoadExpr`s when validating the self binding.
+    // Require that the RHS of the `let self = self` condition
+    // refers to a variable defined in a capture list.
     // This lets us reject invalid examples like:
     //
-    //   let `self` = self ?? .somethingElse
+    //   var `self` = self ?? .somethingElse
     //   guard let self = self else { return }
     //   method() // <- implicit self is not allowed
     //
-    return conditionalStmt->rebindsSelf(Ctx, /*requiresCaptureListRef*/ false,
-                                        /*requireLoadExpr*/ true);
+    // In 5.10, instead of this check, compiler was checking that RHS of the
+    // self binding is loaded from a mutable variable. This is incorrect, but
+    // before SE-0481 compiler was trying to maintain this behavior in Swift 5
+    // mode for source compatibility. After SE-0481 this does not work
+    // anymore, because even in Swift 5 mode `weak self` capture is not mutable.
+    // So we have to introduce a breaking change as part of the SE-0481, and use
+    // proper check for capture list even in Swift 5 mode.
+    //
+    return conditionalStmt->rebindsSelf(Ctx, /*requiresCaptureListRef*/ true);
   }
 
   static bool
@@ -2693,8 +2701,10 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
     }
   }
 
+  ASSERT((numMissing + numExtra + numWrong > 0) &&
+         "Should not call this function with nothing to diagnose");
+
   // Emit the diagnostic.
-  assert(numMissing > 0 || numExtra > 0 || numWrong > 0);
   llvm::SmallString<16> haveBuffer; // note: diagOpt has references to this
   llvm::SmallString<16> expectedBuffer; // note: diagOpt has references to this
 
@@ -4002,11 +4012,6 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       isWrittenLet = (access & RK_Written) != 0;
       access &= ~RK_Written;
     }
-    
-    // If this variable has WeakStorageType, then it can be mutated in ways we
-    // don't know.
-    if (var->getInterfaceType()->is<WeakStorageType>())
-      access |= RK_Written;
     
     // Diagnose variables that were never used (other than their
     // initialization).

@@ -682,6 +682,9 @@ void importer::getNormalInvocationArguments(
     }
   }
 
+  if (LangOpts.UseStaticStandardLibrary)
+    invocationArgStrs.push_back("-DSWIFT_STATIC_STDLIB");
+
   // If we support SendingArgsAndResults, set the -D flag to signal that it
   // is supported.
   if (LangOpts.hasFeature(Feature::SendingArgsAndResults))
@@ -1161,7 +1164,7 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
     // to reduce the number of argument passing on the command-line and swift
     // compiler can be more efficient to compute swift cache key without having
     // the knowledge about clang command-line options.
-    if (ctx.CASOpts.EnableCaching) {
+    if (ctx.CASOpts.EnableCaching || ctx.CASOpts.ImportModuleFromCAS) {
       CI->getCASOpts() = ctx.CASOpts.CASOpts;
       // When clangImporter is used to compile (generate .pcm or .pch), need to
       // inherit the include tree from swift args (last one wins) and clear the
@@ -4365,7 +4368,14 @@ ModuleDecl *ClangModuleUnit::getOverlayModule() const {
     // FIXME: Include proper source location.
     ModuleDecl *M = getParentModule();
     ASTContext &Ctx = M->getASTContext();
-    auto overlay = Ctx.getOverlayModule(this);
+
+    ModuleDecl *overlay = nullptr;
+    // During compilation of a textual interface with no formal C++ interop mode,
+    // i.e. it was built without C++ interop, avoid querying the 'CxxStdlib' overlay
+    // for it, since said overlay was not used during compilation of this module.
+    if (!importer::isCxxStdModule(clangModule) || Ctx.LangOpts.FormalCxxInteropMode)
+      overlay = Ctx.getOverlayModule(this);
+
     if (overlay) {
       Ctx.addLoadedModule(overlay);
     } else {
@@ -4385,7 +4395,8 @@ ModuleDecl *ClangModuleUnit::getOverlayModule() const {
     // If this Clang module is a part of the C++ stdlib, and we haven't loaded
     // the overlay for it so far, it is a split libc++ module (e.g. std_vector).
     // Load the CxxStdlib overlay explicitly.
-    if (!overlay && importer::isCxxStdModule(clangModule)) {
+    if (!overlay && importer::isCxxStdModule(clangModule) &&
+        Ctx.LangOpts.FormalCxxInteropMode) {
       ImportPath::Module::Builder builder(Ctx.Id_CxxStdlib);
       overlay = owner.loadModule(SourceLoc(), std::move(builder).get());
     }
@@ -6288,7 +6299,8 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
          cast<NominalTypeDecl>(recordDecl)->getCurrentMembersWithoutLoading()) {
       auto namedMember = dyn_cast<ValueDecl>(member);
       if (!namedMember || !namedMember->hasName() ||
-          namedMember->getName().getBaseName() != name)
+          namedMember->getName().getBaseName() != name ||
+          clangModuleLoader->isClonedMemberDecl(namedMember))
         continue;
 
       auto *imported = clangModuleLoader->importBaseMemberDecl(
@@ -7641,9 +7653,22 @@ ValueDecl *ClangImporter::Implementation::importBaseMemberDecl(
   if (known == clonedBaseMembers.end()) {
     ValueDecl *cloned = cloneBaseMemberDecl(decl, newContext, inheritance);
     known = clonedBaseMembers.insert({key, cloned}).first;
+    clonedMembers.insert(cloned);
   }
 
   return known->second;
+}
+
+bool ClangImporter::Implementation::isClonedMemberDecl(ValueDecl *decl) {
+  // If this is a cloned decl, we don't want to reclone it
+  // Otherwise, we may end up with multiple copies of the same method
+  if (!decl->hasClangNode()) {
+    // Skip decls with a clang node as those will never be a clone
+    auto result = clonedMembers.find(decl);
+    return result != clonedMembers.end();
+  }
+
+  return false;
 }
 
 size_t ClangImporter::Implementation::getImportedBaseMemberDeclArity(
@@ -7660,6 +7685,10 @@ ValueDecl *
 ClangImporter::importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
                                     ClangInheritanceInfo inheritance) {
   return Impl.importBaseMemberDecl(decl, newContext, inheritance);
+}
+
+bool ClangImporter::isClonedMemberDecl(ValueDecl *decl) {
+  return Impl.isClonedMemberDecl(decl);
 }
 
 void ClangImporter::diagnoseTopLevelValue(const DeclName &name) {

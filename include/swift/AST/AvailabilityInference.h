@@ -81,11 +81,6 @@ public:
       const SemanticAvailableAttr &attr, const ASTContext &ctx,
       AvailabilityDomain &domain, llvm::VersionTuple &platformVer);
 
-  static void
-  updateAvailabilityDomainForFallback(const SemanticAvailableAttr &attr,
-                                      const ASTContext &ctx,
-                                      AvailabilityDomain &domain);
-
   /// For the attribute's before version, update the platform and version
   /// values to the re-mapped platform's, if using a fallback platform.
   /// Returns `true` if a remap occured.

@@ -682,7 +682,8 @@ static void diagnoseCxxInteropCompatMode(Arg *verArg, ArgList &Args,
 }
 
 void LangOptions::setCxxInteropFromArgs(ArgList &Args,
-                                        swift::DiagnosticEngine &Diags) {
+                                        swift::DiagnosticEngine &Diags,
+                                        const FrontendOptions &FrontendOpts) {
   if (Arg *A = Args.getLastArg(options::OPT_cxx_interoperability_mode)) {
     if (Args.hasArg(options::OPT_enable_experimental_cxx_interop)) {
       Diags.diagnose(SourceLoc(), diag::dont_enable_interop_and_compat);
@@ -737,7 +738,12 @@ void LangOptions::setCxxInteropFromArgs(ArgList &Args,
     // version, and is either 4, 5, 6, or 7 (even though only 5.9 and 6.* make
     // any sense). For now, we don't actually care about the version, so we'll
     // just use version 6 (i.e., 'swift-6') to mean that C++ interop mode is on.
-    if (EnableCXXInterop)
+    //
+    // FIXME: We always declare the 'Darwin' module as formally having been built
+    // without C++Interop, for compatibility with prior versions. Once we are certain
+    // that we are only building against modules built with support of
+    // '-formal-cxx-interoperability-mode', this hard-coded check should be removed.
+    if (EnableCXXInterop && (FrontendOpts.ModuleName.compare("Darwin") != 0))
       FormalCxxInteropMode = {6};
     else
       FormalCxxInteropMode = std::nullopt;
@@ -793,6 +799,8 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
     Opts.CASOpts.PluginOptions.emplace_back(std::string(Name),
                                             std::string(Value));
   }
+
+  Opts.ImportModuleFromCAS |= Args.hasArg(OPT_module_import_from_cas);
 
   if (auto *A = Args.getLastArg(OPT_clang_include_tree_root))
     Opts.ClangIncludeTree = A->getValue();
@@ -1560,11 +1568,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_clang_target_variant))
     Opts.ClangTargetVariant = llvm::Triple(A->getValue());
 
-  Opts.setCxxInteropFromArgs(Args, Diags);
+  Opts.setCxxInteropFromArgs(Args, Diags, FrontendOpts);
   if (!Args.hasArg(options::OPT_formal_cxx_interoperability_mode))
     ModuleInterfaceOpts.PublicFlags.IgnorableFlags +=
         " " + printFormalCxxInteropVersion(Opts);
 
+  Opts.UseStaticStandardLibrary = Args.hasArg(OPT_use_static_resource_dir);
   Opts.EnableObjCInterop =
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
                    Target.isOSDarwin() && !Opts.hasFeature(Feature::Embedded));
@@ -3499,6 +3508,21 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   Opts.UseSampleProfile = ProfileSampleUse ? ProfileSampleUse->getValue() : "";
 
   Opts.DebugInfoForProfiling |= Args.hasArg(OPT_debug_info_for_profiling);
+
+
+  if (const Arg *A = Args.getLastArg(OPT_min_valid_pointer_value)) {
+    // The LeastValidPointerValue is hard-coded in the runtime. Therefore it
+    // can only safely customized in embedded swift - which doesn't have a runtime.
+    if (!LangOpts.hasFeature(Feature::Embedded)) {
+      Diags.diagnose(SourceLoc(), diag::min_ptr_value_without_embedded);
+      return true;
+    }
+    if (StringRef(A->getValue()).getAsInteger(0, Opts.CustomLeastValidPointerValue)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      return true;
+    }
+  }
 
   Opts.PrintInlineTree |= Args.hasArg(OPT_print_llvm_inline_tree);
   // Always producing all outputs when caching is enabled.

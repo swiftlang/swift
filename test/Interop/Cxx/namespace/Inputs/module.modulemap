@@ -69,3 +69,8 @@ module MembersTransitive {
   header "members-transitive.h"
   requires cplusplus
 }
+
+module UsingFromNamespace {
+  header "using-from-namespace.h"
+  requires cplusplus
+}

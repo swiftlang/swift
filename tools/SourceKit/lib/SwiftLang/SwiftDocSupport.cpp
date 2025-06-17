@@ -1207,21 +1207,24 @@ public:
     return true;
   }
 
-  bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef, Type Ty,
+  bool visitDeclReference(ValueDecl *D, SourceRange Range, TypeDecl *CtorTyRef,
+                          ExtensionDecl *ExtTyRef, Type Ty,
                           ReferenceMetaData Data) override {
     if (Data.isImplicit || !Range.isValid())
       return true;
     // Ignore things that don't come from this buffer.
-    if (!SM.getRangeForBuffer(BufferID).contains(Range.getStart()))
+    if (!SM.getRangeForBuffer(BufferID).contains(Range.Start))
       return true;
 
-    unsigned StartOffset = getOffset(Range.getStart());
-    References.emplace_back(D, StartOffset, Range.getByteLength(), Ty);
+    CharSourceRange CharRange = Lexer::getCharSourceRangeFromSourceRange(
+        D->getASTContext().SourceMgr, Range);
+
+    unsigned StartOffset = getOffset(CharRange.getStart());
+    References.emplace_back(D, StartOffset, CharRange.getByteLength(), Ty);
     return true;
   }
 
-  bool visitSubscriptReference(ValueDecl *D, CharSourceRange Range,
+  bool visitSubscriptReference(ValueDecl *D, SourceRange Range,
                                ReferenceMetaData Data,
                                bool IsOpenBracket) override {
     // Treat both open and close brackets equally

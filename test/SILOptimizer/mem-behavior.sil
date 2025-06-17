@@ -1250,11 +1250,16 @@ bb0(%0 : $Builtin.RawPointer):
 // CHECK-NEXT:      debug_value %0 : $*Int, let, name "x"
 // CHECK-NEXT:      %1 = alloc_stack $Int
 // CHECK-NEXT:    r=0,w=0
+// CHECK:       PAIR #2.
+// CHECK-NEXT:      debug_value undef : $*Int, let, name "y"
+// CHECK-NEXT:      %0 = alloc_stack $Int
+// CHECK-NEXT:    r=0,w=0
 sil @test_debug_value : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_stack $Int
   %1 = alloc_stack $Int
   debug_value %0 : $*Int, let, name "x"
+  debug_value undef : $*Int, let, name "y"
   dealloc_stack %1 : $*Int
   dealloc_stack %0 : $*Int
   %r = tuple ()
@@ -1433,6 +1438,34 @@ bb0:
   destroy_addr %0 : $*C
   dealloc_stack %0 : $*C
   return %5 : $()
+}
+
+// CHECK-LABEL: @builtin_initializer_and_class
+// CHECK:       PAIR #0.
+// CHECK-NEXT:      %3 = builtin "zeroInitializer"(%2 : $*Int32) : $()
+// CHECK-NEXT:      %1 = ref_element_addr %0 : $C, #C.prop
+// CHECK-NEXT:    r=0,w=0
+// CHECK:       PAIR #1.
+// CHECK-NEXT:      %3 = builtin "zeroInitializer"(%2 : $*Int32) : $()
+// CHECK-NEXT:      %2 = alloc_stack $Int32
+// CHECK-NEXT:    r=0,w=1
+// CHECK:       PAIR #2.
+// CHECK-NEXT:      %4 = builtin "prepareInitialization"(%2 : $*Int32) : $()
+// CHECK-NEXT:      %1 = ref_element_addr %0 : $C, #C.prop
+// CHECK-NEXT:    r=0,w=0
+// CHECK:       PAIR #3.
+// CHECK-NEXT:      %4 = builtin "prepareInitialization"(%2 : $*Int32) : $()
+// CHECK-NEXT:      %2 = alloc_stack $Int32
+// CHECK-NEXT:    r=0,w=1
+sil @builtin_initializer_and_class : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : $C):
+  %1 = ref_element_addr %0, #C.prop
+  %2 = alloc_stack $Int32
+  %3 = builtin "zeroInitializer"(%2 : $*Int32) : $()
+  %4 = builtin "prepareInitialization"(%2 : $*Int32) : $()
+  dealloc_stack %2
+  %6 = tuple ()
+  return %6
 }
 
 // CHECK-LABEL: @test_stored_pointer
