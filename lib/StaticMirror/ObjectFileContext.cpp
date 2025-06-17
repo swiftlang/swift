@@ -322,9 +322,9 @@ Image::resolvePointer(uint64_t Addr, uint64_t pointerValue) const {
   // 32 bits.
   if (isMachOWithPtrAuth()) {
     return remote::RemoteAbsolutePointer(
-        "", HeaderAddress + (pointerValue & 0xffffffffull));
+        remote::RemoteAddress(HeaderAddress + (pointerValue & 0xffffffffull)));
   } else {
-    return remote::RemoteAbsolutePointer("", pointerValue);
+    return remote::RemoteAbsolutePointer(remote::RemoteAddress(pointerValue));
   }
 }
 
@@ -333,7 +333,8 @@ remote::RemoteAbsolutePointer Image::getDynamicSymbol(uint64_t Addr) const {
   if (found == DynamicRelocations.end())
     return nullptr;
   return remote::RemoteAbsolutePointer(found->second.Symbol,
-                                       found->second.Offset);
+                                       found->second.Offset,
+                                       remote::RemoteAddress((uint64_t)0));
 }
 
 std::pair<const Image *, uint64_t>
@@ -526,8 +527,8 @@ ObjectMemoryReader::resolvePointer(reflection::RemoteAddress Addr,
   // Mix in the image index again to produce a remote address pointing into the
   // same image.
   return remote::RemoteAbsolutePointer(
-      "", encodeImageIndexAndAddress(
-              image, resolved.getResolvedAddress().getAddressData()));
+      remote::RemoteAddress(encodeImageIndexAndAddress(
+          image, resolved.getResolvedAddress().getAddressData())));
 }
 
 remote::RemoteAbsolutePointer
