@@ -386,7 +386,6 @@ public var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?> {
 #endif // SWIFT_STDLIB_HAS_ENVIRON
 
 #if os(FreeBSD)
-public let inet_pton = __inet_pton
 @inlinable public func inet_pton(_ af: CInt, _ src: UnsafePointer<CChar>!, _ dst: UnsafeMutableRawPointer!) -> CInt {
   __inet_pton(af, src, dst)
 }
