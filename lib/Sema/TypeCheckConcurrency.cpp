@@ -5130,6 +5130,13 @@ getIsolationFromWitnessedRequirements(ValueDecl *value) {
   if (dc->getSelfProtocolDecl())
     return std::nullopt;
 
+  // Prevent isolation inference from requirements if the conforming type
+  // has an explicit `nonisolated` attribute.
+  if (auto *NTD = dc->getSelfNominalTypeDecl()) {
+    if (NTD->getAttrs().hasAttribute<NonisolatedAttr>())
+      return std::nullopt;
+  }
+
   // Walk through each of the conformances in this context, collecting any
   // requirements that have actor isolation.
   auto conformances = idc->getLocalConformances( // note this
