@@ -1240,9 +1240,10 @@ ExplicitSafety Decl::getExplicitSafety() const {
   // If this declaration is from C, ask the Clang importer.
   if (auto clangDecl = getClangDecl()) {
     ASTContext &ctx = getASTContext();
-    return evaluateOrDefault(ctx.evaluator,
-                             ClangDeclExplicitSafety({clangDecl}),
-                             ExplicitSafety::Unspecified);
+    return evaluateOrDefault(
+        ctx.evaluator,
+        ClangDeclExplicitSafety({clangDecl, isa<ClassDecl>(this)}),
+        ExplicitSafety::Unspecified);
   }
   
   // Inference: Check the enclosing context, unless this is a type.
