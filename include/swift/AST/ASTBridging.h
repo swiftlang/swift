@@ -19,6 +19,7 @@
 // Pure bridging mode does not permit including any C++/llvm/swift headers.
 // See also the comments for `BRIDGING_MODE` in the top-level CMakeLists.txt file.
 //
+#include "swift/AST/DiagnosticKind.h"
 #include "swift/Basic/BasicBridging.h"
 
 #ifdef USED_IN_CPP_SOURCE
@@ -118,17 +119,15 @@ public:
   BridgedIdentifier(const void *_Nullable raw) : Raw(raw) {}
 
   BRIDGED_INLINE BridgedIdentifier(swift::Identifier ident);
-
   BRIDGED_INLINE swift::Identifier unbridged() const;
+
+  SWIFT_COMPUTED_PROPERTY
+  const void *_Nullable getRaw() const { return Raw; }
+
+  BRIDGED_INLINE
+  SWIFT_COMPUTED_PROPERTY
+  bool getIsOperator() const;
 };
-
-SWIFT_NAME("getter:BridgedIdentifier.raw(self:)")
-inline const void *_Nullable BridgedIdentifier_raw(BridgedIdentifier ident) {
-  return ident.Raw;
-}
-
-SWIFT_NAME("getter:BridgedIdentifier.isOperator(self:)")
-BRIDGED_INLINE bool BridgedIdentifier_isOperator(const BridgedIdentifier);
 
 struct BridgedLocatedIdentifier {
   SWIFT_NAME("name")
@@ -236,6 +235,11 @@ BridgedDeclNameLoc_createParsed(
 // MARK: ASTContext
 //===----------------------------------------------------------------------===//
 
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedEndianness : size_t {
+  EndianLittle,
+  EndianBig,
+};
+
 class BridgedASTContext {
   swift::ASTContext * _Nonnull Ctx;
 
@@ -245,16 +249,30 @@ public:
 
   SWIFT_UNAVAILABLE("Use '.raw' instead")
   BRIDGED_INLINE swift::ASTContext &unbridged() const;
+
+  SWIFT_COMPUTED_PROPERTY
+  void *_Nonnull getRaw() const { return Ctx; }
+
+  SWIFT_COMPUTED_PROPERTY
+  unsigned getMajorLanguageVersion() const;
+
+  SWIFT_COMPUTED_PROPERTY
+  unsigned getLangOptsTargetPointerBitWidth() const;
+
+  SWIFT_COMPUTED_PROPERTY
+  bool getLangOptsAttachCommentsToDecls() const;
+
+  SWIFT_COMPUTED_PROPERTY
+  BridgedEndianness getLangOptsTargetEndianness() const;
+
+  SWIFT_COMPUTED_PROPERTY
+  BridgedAvailabilityMacroMap getAvailabilityMacroMap() const;
 };
 
 #define IDENTIFIER_WITH_NAME(Name, _) \
 SWIFT_NAME("getter:BridgedASTContext.id_" #Name "(self:)") \
 BRIDGED_INLINE BridgedIdentifier BridgedASTContext_id_##Name(BridgedASTContext bridged);
 #include "swift/AST/KnownIdentifiers.def"
-
-SWIFT_NAME("getter:BridgedASTContext.raw(self:)")
-BRIDGED_INLINE
-void * _Nonnull BridgedASTContext_raw(BridgedASTContext bridged);
 
 SWIFT_NAME("BridgedASTContext.init(raw:)")
 BRIDGED_INLINE
@@ -282,9 +300,6 @@ BridgedASTContext_getDollarIdentifier(BridgedASTContext cContext, size_t idx);
 SWIFT_NAME("BridgedASTContext.langOptsHasFeature(self:_:)")
 bool BridgedASTContext_langOptsHasFeature(BridgedASTContext cContext,
                                           BridgedFeature feature);
-
-SWIFT_NAME("getter:BridgedASTContext.majorLanguageVersion(self:)")
-unsigned BridgedASTContext_majorLanguageVersion(BridgedASTContext cContext);
 
 SWIFT_NAME("BridgedASTContext.langOptsCustomConditionSet(self:_:)")
 bool BridgedASTContext_langOptsCustomConditionSet(BridgedASTContext cContext,
@@ -318,24 +333,9 @@ SWIFT_NAME("BridgedASTContext.langOptsIsActiveTargetPtrAuth(self:_:)")
 bool BridgedASTContext_langOptsIsActiveTargetPtrAuth(BridgedASTContext cContext,
                                                      BridgedStringRef cName);
 
-SWIFT_NAME("getter:BridgedASTContext.langOptsTargetPointerBitWidth(self:)")
-unsigned BridgedASTContext_langOptsTargetPointerBitWidth(BridgedASTContext cContext);
-
 SWIFT_NAME("BridgedASTContext.langOptsGetTargetAtomicBitWidths(self:_:)")
 SwiftInt BridgedASTContext_langOptsGetTargetAtomicBitWidths(BridgedASTContext cContext,
                                                       SwiftInt* _Nullable * _Nonnull cComponents);
-
-enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedEndianness : size_t {
-  EndianLittle,
-  EndianBig,
-};
-
-SWIFT_NAME("getter:BridgedASTContext.langOptsAttachCommentsToDecls(self:)")
-bool BridgedASTContext_langOptsAttachCommentsToDecls(
-    BridgedASTContext cContext);
-
-SWIFT_NAME("getter:BridgedASTContext.langOptsTargetEndianness(self:)")
-BridgedEndianness BridgedASTContext_langOptsTargetEndianness(BridgedASTContext cContext);
 
 SWIFT_NAME("BridgedASTContext.langOptsGetLanguageVersion(self:_:)")
 SwiftInt BridgedASTContext_langOptsGetLanguageVersion(BridgedASTContext cContext,
@@ -344,10 +344,6 @@ SwiftInt BridgedASTContext_langOptsGetLanguageVersion(BridgedASTContext cContext
 SWIFT_NAME("BridgedASTContext.langOptsGetCompilerVersion(self:_:)")
 SwiftInt BridgedASTContext_langOptsGetCompilerVersion(BridgedASTContext cContext,
                                                       SwiftInt* _Nullable * _Nonnull cComponents);
-
-SWIFT_NAME("getter:BridgedASTContext.availabilityMacroMap(self:)")
-BridgedAvailabilityMacroMap
-BridgedASTContext_getAvailabilityMacroMap(BridgedASTContext cContext);
 
 /* Deallocate an array of Swift int values that was allocated in C++. */
 void deallocateIntBuffer(SwiftInt * _Nullable cComponents);
@@ -442,7 +438,7 @@ public:
     return BridgedASTNode(e.unbridged(), BridgedASTNodeKindExpr);
   }
 
-  SWIFT_UNAVAILABLE("use .kind")
+  SWIFT_COMPUTED_PROPERTY
   BridgedASTNodeKind getKind() const {
     return static_cast<BridgedASTNodeKind>(opaque & 0x7);
   }
@@ -453,11 +449,6 @@ public:
 
   BRIDGED_INLINE swift::ASTNode unbridged() const;
 };
-
-SWIFT_NAME("getter:BridgedASTNode.kind(self:)")
-inline BridgedASTNodeKind BridgedASTNode_getKind(BridgedASTNode node) {
-  return node.getKind();
-}
 
 // Declare `.asDecl` on each BridgedXXXDecl type, which upcasts a wrapper for
 // a Decl subclass to a BridgedDecl.
@@ -575,15 +566,6 @@ public:
   BridgedDiagnosticFixIt(BridgedSourceLoc start, uint32_t length, BridgedStringRef text);
 };
 
-/// Diagnostic severity when reporting diagnostics.
-enum ENUM_EXTENSIBILITY_ATTR(open) BridgedDiagnosticSeverity : size_t {
-  BridgedFatalError,
-  BridgedError,
-  BridgedWarning,
-  BridgedRemark,
-  BridgedNote,
-};
-
 class BridgedDiagnostic {
 public:
   struct Impl;
@@ -622,7 +604,7 @@ bool BridgedDiagnosticEngine_hadAnyError(BridgedDiagnosticEngine);
 SWIFT_NAME("BridgedDiagnostic.init(at:message:severity:engine:)")
 BridgedDiagnostic BridgedDiagnostic_create(BridgedSourceLoc cLoc,
                                            BridgedStringRef cText,
-                                           BridgedDiagnosticSeverity severity,
+                                           swift::DiagnosticKind severity,
                                            BridgedDiagnosticEngine cDiags);
 
 /// Highlight a source range as part of the diagnostic.
@@ -1930,8 +1912,11 @@ class BridgedCaptureListEntry {
 
 public:
   BRIDGED_INLINE BridgedCaptureListEntry(swift::CaptureListEntry CLE);
-
   BRIDGED_INLINE swift::CaptureListEntry unbridged() const;
+
+  BRIDGED_INLINE
+  SWIFT_COMPUTED_PROPERTY
+  BridgedVarDecl getVarDecl() const;
 };
 
 SWIFT_NAME("BridgedCaptureListEntry.createParsed(_:declContext:ownership:"
@@ -1942,10 +1927,6 @@ BridgedCaptureListEntry BridegedCaptureListEntry_createParsed(
     BridgedSourceRange cOwnershipRange, BridgedIdentifier cName,
     BridgedSourceLoc cNameLoc, BridgedSourceLoc cEqualLoc,
     BridgedExpr cInitializer);
-
-SWIFT_NAME("getter:BridgedCaptureListEntry.varDecl(self:)")
-BRIDGED_INLINE BridgedVarDecl
-BridegedCaptureListEntry_getVar(BridgedCaptureListEntry entry);
 
 SWIFT_NAME("BridgedCaptureListExpr.createParsed(_:captureList:closure:)")
 BridgedCaptureListExpr BridgedCaptureListExpr_createParsed(BridgedASTContext cContext,
