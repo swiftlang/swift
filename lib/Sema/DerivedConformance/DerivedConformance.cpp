@@ -272,6 +272,9 @@ void DerivedConformance::diagnoseIfSynthesisUnsupportedForDecl(
     shouldDiagnose = !isa<EnumDecl>(nominal);
   }
 
+  if (isa<BuiltinTupleDecl>(nominal))
+    shouldDiagnose = false;
+
   if (shouldDiagnose) {
     auto &ctx = nominal->getASTContext();
     ctx.Diags.diagnose(nominal->getLoc(),

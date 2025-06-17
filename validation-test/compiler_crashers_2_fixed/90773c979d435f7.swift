@@ -1,5 +1,5 @@
 // {"signature":"swift::isOverrideBasedOnType(swift::ValueDecl const*, swift::Type, swift::ValueDecl const*)"}
-// RUN: not --crash %target-swift-frontend -typecheck %s
+// RUN: not %target-swift-frontend -typecheck %s
 struct a < b {
   protocol c { associatedtype d init(e : d
   }

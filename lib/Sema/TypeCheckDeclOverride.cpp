@@ -217,6 +217,9 @@ bool swift::isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
         return false;
     }
 
+    if (declTy->is<ErrorType>())
+      return false;
+
     auto fnType1 = declTy->castTo<AnyFunctionType>();
     auto fnType2 = parentDeclTy->castTo<AnyFunctionType>();
     return AnyFunctionType::equalParams(fnType1->getParams(),
