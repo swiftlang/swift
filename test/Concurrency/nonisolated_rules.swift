@@ -185,6 +185,27 @@ struct TestIsolated : NonisolatedWithMembers {
   }
 }
 
+@MainActor
+protocol Root {
+  func testRoot()
+}
+
+nonisolated protocol Child : Root {
+  func testChild()
+}
+
+struct TestDifferentLevels : Child {
+  func testRoot() {}
+  func testChild() {}
+  func testNonWitness() {}
+}
+
+nonisolated func testRequirementsOnMultipleNestingLevels(t: TestDifferentLevels) {
+  t.testRoot() // okay
+  t.testChild() // okay
+  t.testNonWitness() // okay
+}
+
 // MARK: - Extensions
 
 nonisolated extension GloballyIsolated {
