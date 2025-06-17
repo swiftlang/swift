@@ -286,6 +286,12 @@ public:
     }
   }
 
+  LifetimeDependenceChecker(EnumElementDecl *eed)
+      : decl(eed), dc(eed->getDeclContext()), ctx(dc->getASTContext()) {
+    auto *paramList = eed->getParameterList();
+    resultIndex = paramList ? eed->getParameterList()->size() + 1 : 1;
+  }
+
   std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
   currentDependencies() const {
     if (lifetimeDependencies.empty()) {
@@ -349,6 +355,45 @@ public:
         diag::lifetime_dependence_cannot_infer_inout.ID);
     }
     return currentDependencies();
+  }
+
+  std::optional<llvm::ArrayRef<LifetimeDependenceInfo>> checkEnumElementDecl() {
+    auto *eed = cast<EnumElementDecl>(decl);
+    auto enumType = eed->getParentEnum()->mapTypeIntoContext(
+        eed->getParentEnum()->getDeclaredInterfaceType());
+    // Escapable enum, bailout.
+    if (!isDiagnosedNonEscapable(enumType)) {
+      return std::nullopt;
+    }
+    auto *params = eed->getParameterList();
+    // No payload, bailout.
+    if (!params) {
+      return std::nullopt;
+    }
+
+    auto resultIndex = params->size() + /*selfType*/ 1;
+    auto capacity = resultIndex + 1;
+    SmallBitVector inheritIndices(capacity);
+    SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
+
+    // Add all indices of ~Escapable parameters as lifetime dependence sources.
+    for (size_t i = 0; i < params->size(); i++) {
+      auto paramType = params->get(i)->getTypeInContext();
+      if (!isDiagnosedNonEscapable(paramType)) {
+        continue;
+      }
+      inheritIndices.set(i);
+    }
+    if (inheritIndices.none()) {
+      return std::nullopt;
+    }
+    auto lifetimeDependenceInfo = LifetimeDependenceInfo(
+        IndexSubset::get(eed->getASTContext(), inheritIndices), nullptr,
+        resultIndex,
+        /*isImmortal*/ false);
+    lifetimeDependencies.push_back(lifetimeDependenceInfo);
+
+    return eed->getASTContext().AllocateCopy(lifetimeDependencies);
   }
 
 protected:
@@ -1417,8 +1462,12 @@ protected:
 };
 
 std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
-LifetimeDependenceInfo::get(AbstractFunctionDecl *afd) {
-  return LifetimeDependenceChecker(afd).checkFuncDecl();
+LifetimeDependenceInfo::get(ValueDecl *decl) {
+  if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl)) {
+    return LifetimeDependenceChecker(afd).checkFuncDecl();
+  }
+  auto *eed = cast<EnumElementDecl>(decl);
+  return LifetimeDependenceChecker(eed).checkEnumElementDecl();
 }
 
 // This implements the logic for SIL type descriptors similar to source-level
