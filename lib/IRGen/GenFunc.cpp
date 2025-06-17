@@ -1492,7 +1492,8 @@ public:
     auto prototype = subIGF.IGM.getOpaquePtr(
       subIGF.IGM.getAddrOfContinuationPrototype(
         cast<SILFunctionType>(
-          unsubstType->mapTypeOutOfContext()->getCanonicalType())));
+          unsubstType->mapTypeOutOfContext()->getCanonicalType()),
+        origType->getInvocationGenericSignature()));
 
     
     // Use free as our allocator.
