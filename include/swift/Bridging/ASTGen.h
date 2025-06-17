@@ -28,7 +28,7 @@ void swift_ASTGen_addQueuedSourceFile(
 void swift_ASTGen_addQueuedDiagnostic(
     void *_Nonnull queued, void *_Nonnull state,
     BridgedStringRef text,
-    BridgedDiagnosticSeverity severity,
+    swift::DiagnosticKind severity,
     BridgedSourceLoc sourceLoc,
     BridgedStringRef categoryName,
     BridgedStringRef documentationPath,
@@ -38,7 +38,7 @@ void swift_ASTGen_addQueuedDiagnostic(
 void swift_ASTGen_renderSingleDiagnostic(
     void *_Nonnull state,
     BridgedStringRef text,
-    BridgedDiagnosticSeverity severity,
+    swift::DiagnosticKind severity,
     BridgedStringRef categoryName,
     BridgedStringRef documentationPath,
     ssize_t colorize,
