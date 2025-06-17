@@ -355,9 +355,10 @@ func testScopedOfInheritedWithLet(_ arg: [Int] ) {
   // TODO: should be // ✅ Safe: 'copySpan' result should be borrowed over `result`
   // rdar://128821299 ([nonescaping] extend borrowed arguments that are the source of a scoped dependence)
   let result = reborrowSpan(copySpan(span)) // expected-error {{lifetime-dependent variable 'result' escapes its scope}}
-  // expected-note @-1{{it depends on the lifetime of this parent value}}  
+  // expected-note @-1{{it depends on the lifetime of this parent value}}
+  // expected-note @-2{{this use of the lifetime-dependent value is out of scope}}
   _ = result
-} // expected-note {{this use of the lifetime-dependent value is out of scope}}
+}
 
 // Test a scoped dependence on an inherited inout argument.
 //
@@ -452,6 +453,14 @@ func testInoutBorrow(a: inout [Int]) -> Span<Int> {
 @_lifetime(&a)
 func testInoutMutableBorrow(a: inout [Int]) -> MutableSpan<Int> {
   a.mutableSpan()
+}
+
+func testInoutTemporaryBorrow(a: inout [Int]) {
+  let span = a.span()
+  parse(span)
+  // 'read' access ends here even though span is still alive
+  // because span has no user-defined deinit.
+  a.append(10)
 }
 
 // =============================================================================
