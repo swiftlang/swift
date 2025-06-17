@@ -1769,6 +1769,28 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
+  if (const Arg *A = Args.getLastArg(OPT_requirement_machine_max_concrete_size)) {
+    unsigned limit;
+    if (StringRef(A->getValue()).getAsInteger(10, limit)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      HadError = true;
+    } else {
+      Opts.RequirementMachineMaxConcreteSize = limit;
+    }
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_requirement_machine_max_type_differences)) {
+    unsigned limit;
+    if (StringRef(A->getValue()).getAsInteger(10, limit)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      HadError = true;
+    } else {
+      Opts.RequirementMachineMaxTypeDifferences = limit;
+    }
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_requirement_machine_max_split_concrete_equiv_class_attempts)) {
     unsigned limit;
     if (StringRef(A->getValue()).getAsInteger(10, limit)) {

@@ -580,9 +580,17 @@ namespace swift {
     /// algorithm.
     unsigned RequirementMachineMaxRuleLength = 12;
 
-    /// Maximum concrete type nesting depth for requirement machine property map
-    /// algorithm.
+    /// Maximum concrete type nesting depth (when type is viewed as a tree) for
+    /// requirement machine property map algorithm.
     unsigned RequirementMachineMaxConcreteNesting = 30;
+
+    /// Maximum concrete type size (total number of nodes in the type tree) for
+    /// requirement machine property map algorithm.
+    unsigned RequirementMachineMaxConcreteSize = 4000;
+
+    /// Maximum number of "type difference" structures for the requirement machine
+    /// property map algorithm.
+    unsigned RequirementMachineMaxTypeDifferences = 4000;
 
     /// Maximum number of attempts to make when splitting concrete equivalence
     /// classes.

@@ -50,7 +50,13 @@ enum class CompletionResult {
   MaxRuleLength,
 
   /// Maximum concrete type nesting depth exceeded.
-  MaxConcreteNesting
+  MaxConcreteNesting,
+
+  /// Maximum concrete type size exceeded.
+  MaxConcreteSize,
+
+  /// Maximum type difference count exceeded.
+  MaxTypeDifferences,
 };
 
 /// A term rewrite system for working with types in a generic signature.
@@ -107,13 +113,16 @@ class RewriteSystem final {
   /// identities among rewrite rules discovered while resolving critical pairs.
   unsigned RecordLoops : 1;
 
-  /// The length of the longest initial rule, used for the MaxRuleLength
-  /// completion non-termination heuristic.
+  /// The length of the longest initial rule, for the MaxRuleLength limit.
   unsigned LongestInitialRule : 16;
 
-  /// The most deeply nested concrete type appearing in an initial rule, used
-  /// for the MaxConcreteNesting completion non-termination heuristic.
-  unsigned DeepestInitialRule : 16;
+  /// The most deeply nested concrete type appearing in an initial rule,
+  /// for the MaxConcreteNesting limit.
+  unsigned MaxNestingOfInitialRule : 16;
+
+  /// The largest concrete type by total tree node count that appears in an
+  /// initial rule, for the MaxConcreteSize limit.
+  unsigned MaxSizeOfInitialRule : 16;
 
 public:
   explicit RewriteSystem(RewriteContext &ctx);
@@ -143,8 +152,12 @@ public:
     return LongestInitialRule;
   }
 
-  unsigned getDeepestInitialRule() const {
-    return DeepestInitialRule;
+  unsigned getMaxNestingOfInitialRule() const {
+    return MaxNestingOfInitialRule;
+  }
+
+  unsigned getMaxSizeOfInitialRule() const {
+    return MaxSizeOfInitialRule;
   }
 
   ArrayRef<const ProtocolDecl *> getProtocols() const {
@@ -310,6 +323,10 @@ public:
   bool computeTypeDifference(Term term, Symbol lhs, Symbol rhs,
                              std::optional<unsigned> &lhsDifferenceID,
                              std::optional<unsigned> &rhsDifferenceID);
+
+  unsigned getTypeDifferenceCount() const {
+    return Differences.size();
+  }
 
   const TypeDifference &getTypeDifference(unsigned index) const;
 
