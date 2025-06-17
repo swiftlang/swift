@@ -36,14 +36,14 @@ internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
   let simd4ASCIIMask = SIMD4<UInt>(repeating: wordASCIIMask)
   let simd4Zero = SIMD4<UInt>(repeating: 0)
 
-  // Bytes up to beginning of a word
+  // Process individual bytes until word-aligned
   while Int(bitPattern: ptr + i) % stride != 0 && i < count {
     guard ptr[i] & byteASCIIMask == 0 else { return false }
     i &+= 1
   }
 
-  // Words up to beginning of a 4-word
-  while Int(bitPattern: ptr + i) % simd4UintStride != 0 && (i &+ stride) <= count {
+  // Process words until SIMD4-aligned or not enough bytes for SIMD4
+  while Int(bitPattern: ptr + i) % simd4UintStride != 0 && (i &+ simd4UintStride) <= count {
     let word: UInt = (ptr + i).withMemoryRebound(to: UInt.self, capacity: 1) { $0.pointee }
     guard word & wordASCIIMask == 0 else { return false }
     i &+= stride
