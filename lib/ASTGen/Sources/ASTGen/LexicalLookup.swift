@@ -58,7 +58,7 @@ public func unqualifiedLookup(
   if let sourceFileCache = sourceFile.pointee.lookupCache {
     lookupCache = sourceFileCache
   } else {
-    lookupCache = LookupCache(drop: 4)
+    lookupCache = LookupCache(capacity: 100, drop: 4)
     sourceFile.pointee.lookupCache = lookupCache
   }
 
@@ -214,6 +214,7 @@ private func sllConsumedResults(
     with: LookupConfig(finishInSequentialScope: finishInSequentialScope, configuredRegions: configuredRegions),
     cache: cache
   )
+  cache.evictEntriesWithoutHit()
 
   // Early reordering of macro declaration parameters with its generic parameters.
   var results: [LookupResult] = []
