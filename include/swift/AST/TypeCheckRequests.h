@@ -5114,8 +5114,7 @@ public:
 class LifetimeDependenceInfoRequest
     : public SimpleRequest<
           LifetimeDependenceInfoRequest,
-          std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>(
-              AbstractFunctionDecl *),
+          std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>(ValueDecl *),
           RequestFlags::SeparatelyCached | RequestFlags::SplitCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -5124,7 +5123,7 @@ private:
   friend SimpleRequest;
 
   std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
-  evaluate(Evaluator &evaluator, AbstractFunctionDecl *AFD) const;
+  evaluate(Evaluator &evaluator, ValueDecl *AFD) const;
 
 public:
   // Separate caching.
