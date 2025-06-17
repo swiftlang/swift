@@ -19,9 +19,11 @@
 #ifndef SWIFT_DEMANGLING_DEMANGLE_H
 #define SWIFT_DEMANGLING_DEMANGLE_H
 
+#include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/Errors.h"
 #include "swift/Demangling/ManglingFlavor.h"
 #include "swift/Demangling/NamespaceMacros.h"
+#include "swift/Strings.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Compiler.h"
 
@@ -817,6 +819,141 @@ llvm::StringRef makeSymbolicMangledNameStringRef(const char *base);
 std::string mangledNameForTypeMetadataAccessor(
     llvm::StringRef moduleName, llvm::StringRef typeName, Node::Kind typeKind,
     Mangle::ManglingFlavor Flavor = Mangle::ManglingFlavor::Default);
+
+/// Base class for printing a Swift demangled node tree.
+///
+/// NodePrinter is used to convert demangled Swift symbol nodes into
+/// human-readable string representations. It handles formatting, indentation,
+/// and Swift-specific syntax.
+class NodePrinter {
+protected:
+  DemanglerPrinter Printer;
+  DemangleOptions Options;
+  bool SpecializationPrefixPrinted = false;
+  bool isValid = true;
+
+public:
+  NodePrinter(DemangleOptions options) : Options(options) {}
+
+  std::string printRoot(NodePointer root) {
+    isValid = true;
+    print(root, 0);
+    if (isValid)
+      return std::move(Printer).str();
+    return "";
+  }
+
+protected:
+  static const unsigned MaxDepth = 768;
+
+  /// Called when the node tree in valid.
+  ///
+  /// The demangler already catches most error cases and mostly produces valid
+  /// node trees. But some cases are difficult to catch in the demangler and
+  /// instead the NodePrinter bails.
+  void setInvalid() { isValid = false; }
+
+  void printChildren(Node::iterator begin, Node::iterator end, unsigned depth,
+                     const char *sep = nullptr);
+
+  void printChildren(NodePointer Node, unsigned depth,
+                     const char *sep = nullptr);
+
+  NodePointer getFirstChildOfKind(NodePointer Node, Node::Kind kind);
+
+  void printBoundGenericNoSugar(NodePointer Node, unsigned depth);
+
+  void printOptionalIndex(NodePointer node);
+
+  static bool isSwiftModule(NodePointer node) {
+    return (node->getKind() == Node::Kind::Module &&
+            node->getText() == STDLIB_NAME);
+  }
+
+  static bool isIdentifier(NodePointer node, StringRef desired) {
+    return (node->getKind() == Node::Kind::Identifier &&
+            node->getText() == desired);
+  }
+
+  bool printContext(NodePointer Context);
+
+  enum class SugarType {
+    None,
+    Optional,
+    ImplicitlyUnwrappedOptional,
+    Array,
+    Dictionary
+  };
+
+  enum class TypePrinting { NoType, WithColon, FunctionStyle };
+
+  /// Determine whether this is a "simple" type, from the type-simple
+  /// production.
+  bool isSimpleType(NodePointer Node);
+
+  void printWithParens(NodePointer type, unsigned depth);
+
+  SugarType findSugar(NodePointer Node);
+
+  void printBoundGeneric(NodePointer Node, unsigned depth);
+
+  NodePointer getChildIf(NodePointer Node, Node::Kind Kind);
+
+  void printFunctionParameters(NodePointer LabelList, NodePointer ParameterType,
+                               unsigned depth, bool showTypes);
+
+  void printFunctionType(NodePointer LabelList, NodePointer node,
+                         unsigned depth);
+
+  void printImplFunctionType(NodePointer fn, unsigned depth);
+
+  void printGenericSignature(NodePointer Node, unsigned depth);
+
+  void printFunctionSigSpecializationParams(NodePointer Node, unsigned depth);
+
+  void printSpecializationPrefix(NodePointer node, StringRef Description,
+                                 unsigned depth,
+                                 StringRef ParamPrefix = StringRef());
+
+  /// The main big print function.
+  NodePointer print(NodePointer Node, unsigned depth,
+                    bool asPrefixContext = false);
+
+  NodePointer printAbstractStorage(NodePointer Node, unsigned depth,
+                                   bool asPrefixContent, StringRef ExtraName);
+
+  /// Utility function to print entities.
+  ///
+  /// \param Entity The entity node to print
+  /// \param depth The depth in the print() call tree.
+  /// \param asPrefixContext Should the entity printed as a context which as a
+  ///        prefix to another entity, e.g. the Abc in Abc.def()
+  /// \param TypePr How should the type of the entity be printed, if at all.
+  ///        E.g. with a colon for properties or as a function type.
+  /// \param hasName Does the entity has a name, e.g. a function in contrast to
+  ///        an initializer.
+  /// \param ExtraName An extra name added to the entity name (if any).
+  /// \param ExtraIndex An extra index added to the entity name (if any),
+  ///        e.g. closure #1
+  /// \param OverwriteName If non-empty, print this name instead of the one
+  ///        provided by the node. Gets printed even if hasName is false.
+  /// \return If a non-null node is returned it's a context which must be
+  ///         printed in postfix-form after the entity: "<entity> in <context>".
+  NodePointer printEntity(NodePointer Entity, unsigned depth,
+                          bool asPrefixContext, TypePrinting TypePr,
+                          bool hasName, StringRef ExtraName = "",
+                          int ExtraIndex = -1, StringRef OverwriteName = "");
+
+  /// Print the type of an entity.
+  ///
+  /// \param Entity The entity.
+  /// \param type The type of the entity.
+  /// \param genericFunctionTypeList If not null, the generic argument types
+  ///           which is printed in the generic signature.
+  /// \param depth The depth in the print() call tree.
+  void printEntityType(NodePointer Entity, NodePointer type,
+                       NodePointer genericFunctionTypeList, unsigned depth);
+};
 
 SWIFT_END_INLINE_NAMESPACE
 } // end namespace Demangle
