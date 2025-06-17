@@ -135,6 +135,36 @@ class WasmSwiftSDK(product.Product):
             shell.call([self.toolchain.cmake, '--install', '.', '--prefix', '/', '--component', 'development'],
                        env={'DESTDIR': wasi_sysroot})
 
+    def _build_foundation(self, swift_host_triple, has_pthread, wasi_sysroot):
+        source_root = os.path.dirname(self.source_dir)
+        host_toolchain = self.native_toolchain_path(self.args.host_target)
+
+        foundation = CMakeProduct(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir=os.path.join(
+                os.path.dirname(self.source_dir), 'swift-corelibs-foundation'),
+            build_dir=os.path.join(self.build_dir, 'foundation', swift_host_triple))
+        self._append_platform_cmake_options(
+            foundation.cmake_options, swift_host_triple, has_pthread, wasi_sysroot, [])
+        foundation.cmake_options.define('BUILD_SHARED_LIBS', 'FALSE')
+        foundation.cmake_options.define('FOUNDATION_BUILD_TOOLS', 'FALSE')
+        foundation.cmake_options.define('_SwiftCollections_SourceDIR', os.path.join(source_root, 'swift-collections'))
+        foundation.cmake_options.define('_SwiftFoundation_SourceDIR', os.path.join(source_root, 'swift-foundation'))
+        foundation.cmake_options.define('_SwiftFoundationICU_SourceDIR', os.path.join(source_root, 'swift-foundation-icu'))
+        foundation.cmake_options.define('SwiftFoundation_MACRO', os.path.join(host_toolchain, 'lib', 'swift', 'host', 'plugins'))
+
+        foundation.cmake_options.define('LIBXML2_INCLUDE_DIR', os.path.join(wasi_sysroot, 'include', 'libxml2'))
+        foundation.cmake_options.define('LIBXML2_LIBRARY', os.path.join(wasi_sysroot, 'lib'))
+
+        foundation.build_with_cmake([], self.args.build_variant, [],
+                                     prefer_native_toolchain=True)
+
+        dest_dir = self._target_package_path(swift_host_triple)
+        with shell.pushd(foundation.build_dir):
+            shell.call([self.toolchain.cmake, '--install', '.', '--prefix', '/usr'],
+                       env={'DESTDIR': dest_dir})
+
     def _build_swift_testing(self, swift_host_triple, has_pthread, wasi_sysroot):
         swift_testing = CMakeProduct(
             args=self.args,
@@ -182,6 +212,7 @@ class WasmSwiftSDK(product.Product):
                            env={'DESTDIR': clang_dir})
 
         self._build_libxml2(swift_host_triple, has_pthread, wasi_sysroot)
+        self._build_foundation(swift_host_triple, has_pthread, wasi_sysroot)
         # Build swift-testing
         self._build_swift_testing(swift_host_triple, has_pthread, wasi_sysroot)
 
