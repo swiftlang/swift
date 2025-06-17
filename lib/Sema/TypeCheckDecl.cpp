@@ -2941,7 +2941,7 @@ static ArrayRef<Decl *> evaluateMembersRequest(
     }
   }
 
-  if (nominal) {
+  if (nominal && !isa<ProtocolDecl>(nominal)) {
     // If the type conforms to Encodable or Decodable, even via an extension,
     // the CodingKeys enum is synthesized as a member of the type itself.
     // Force it into existence.

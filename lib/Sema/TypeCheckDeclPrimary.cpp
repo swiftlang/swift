@@ -3226,11 +3226,13 @@ public:
 
     // Temporary restriction until we figure out pattern matching and
     // enum case construction with packs.
-    if (auto genericSig = ED->getGenericSignature()) {
-      for (auto paramTy : genericSig.getGenericParams()) {
-        if (paramTy->isParameterPack()) {
-          ED->diagnose(diag::enum_with_pack);
-          break;
+    if (!ED->isSynthesized()) {
+      if (auto genericSig = ED->getGenericSignature()) {
+        for (auto paramTy : genericSig.getGenericParams()) {
+          if (paramTy->isParameterPack()) {
+            ED->diagnose(diag::enum_with_pack);
+            break;
+          }
         }
       }
     }
