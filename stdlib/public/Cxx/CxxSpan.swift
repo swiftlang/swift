@@ -66,7 +66,7 @@ public protocol CxxSpan<Element> {
   associatedtype Size: BinaryInteger
 
   init()
-  init(_ unsafePointer : UnsafePointer<Element>, _ count: Size)
+  init(_ unsafePointer: UnsafePointer<Element>!, _ count: Size)
 
   func size() -> Size
   func __dataUnsafe() -> UnsafePointer<Element>?
@@ -136,7 +136,7 @@ public protocol CxxMutableSpan<Element> {
   associatedtype Size: BinaryInteger
 
   init()
-  init(_ unsafeMutablePointer : UnsafeMutablePointer<Element>, _ count: Size)
+  init(_ unsafeMutablePointer: UnsafeMutablePointer<Element>!, _ count: Size)
 
   func size() -> Size
   func __dataUnsafe() -> UnsafeMutablePointer<Element>?
