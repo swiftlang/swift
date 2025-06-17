@@ -617,5 +617,4 @@ func testBorrowedAddressableIntReturn(arg: Holder) -> Span<Int> {
   // todo-error @-1{{lifetime-dependent value escapes its scope}
   // todo-note  @-2{{it depends on the lifetime of this parent value}}
 } // todo-note  {{this use causes the lifetime-dependent value to escape}}
-
 */

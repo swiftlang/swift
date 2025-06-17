@@ -3540,27 +3540,198 @@ Expr *ArgumentSource::findStorageReferenceExprForBorrow() && {
 ManagedValue
 SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
                                                      ValueOwnership ownership) {
+  if (!arg.isExpr()) {
+    return ManagedValue();
+  }
+
   // If the function takes an addressable parameter, and its argument is
   // a reference to an addressable declaration with compatible ownership,
   // forward the address along in-place.
-  if (arg.isExpr()) {
-    auto origExpr = std::move(arg).asKnownExpr();
-    auto expr = origExpr;
-    
-    if (auto le = dyn_cast<LoadExpr>(expr)) {
-      expr = le->getSubExpr();
-    }
-    if (auto dre = dyn_cast<DeclRefExpr>(expr)) {
-      if (auto param = dyn_cast<VarDecl>(dre->getDecl())) {
-        if (auto addr = getLocalVariableAddressableBuffer(param, expr,
-                                                          ownership)) {
-          return ManagedValue::forBorrowedAddressRValue(addr);
-        }
+  auto origExpr = std::move(arg).asKnownExpr();
+  auto expr = origExpr;
+  
+  // If the expression does not have a stable address to return, then restore
+  // the ArgumentSource and return a null value to the caller.
+  auto notAddressable = [&] {
+    arg = ArgumentSource(origExpr);
+    return ManagedValue();
+  };
+  
+  if (auto le = dyn_cast<LoadExpr>(expr)) {
+    expr = le->getSubExpr();
+  }
+  if (auto dre = dyn_cast<DeclRefExpr>(expr)) {
+    if (auto param = dyn_cast<VarDecl>(dre->getDecl())) {
+      if (auto addr = getLocalVariableAddressableBuffer(param, expr,
+                                                        ownership)) {
+        return ManagedValue::forBorrowedAddressRValue(addr);
       }
     }
-    arg = ArgumentSource(origExpr);
   }
-  return ManagedValue();
+  
+  // Property or subscript member accesses may also be addressable.
+  
+  AccessKind accessKind;
+  switch (ownership) {
+  case ValueOwnership::Shared:
+  case ValueOwnership::Default:
+    accessKind = AccessKind::Read;
+    break;
+  case ValueOwnership::Owned:
+  case ValueOwnership::InOut:
+    accessKind = AccessKind::ReadWrite;
+    break;
+  }
+
+  LookupExpr *lookupExpr;
+  AbstractStorageDecl *memberStorage;
+  SubstitutionMap subs;
+  AccessSemantics accessSemantics;
+  PreparedArguments indices;
+
+  if (auto mre = dyn_cast<MemberRefExpr>(expr)) {
+    lookupExpr = mre;
+    memberStorage = dyn_cast<VarDecl>(mre->getMember().getDecl());
+    subs = mre->getMember().getSubstitutions();
+    accessSemantics = mre->getAccessSemantics();
+  } else if (auto se = dyn_cast<SubscriptExpr>(expr)) {
+    lookupExpr = se;
+    auto subscriptDecl = cast<SubscriptDecl>(se->getMember().getDecl());
+    memberStorage = subscriptDecl;
+    subs = se->getMember().getSubstitutions();
+    accessSemantics = se->getAccessSemantics();
+    
+    indices = PreparedArguments(
+      subscriptDecl->getInterfaceType()->castTo<AnyFunctionType>()
+                   ->getParams(),
+      se->getArgs());
+  } else {
+    return notAddressable();
+  }
+  
+  if (!memberStorage) {
+    return notAddressable();
+  }
+  
+  auto strategy = memberStorage->getAccessStrategy(accessSemantics, accessKind,
+    SGM.M.getSwiftModule(), F.getResilienceExpansion(),
+    std::make_pair<>(expr->getSourceRange(), FunctionDC),
+    /*old abi (doesn't matter here)*/ false);
+
+  switch (strategy.getKind()) {
+  case AccessStrategy::Storage: {
+    auto vd = cast<VarDecl>(memberStorage);
+    // TODO: Is it possible and/or useful for class storage to be
+    // addressable?
+    if (!vd->getDeclContext()->getInnermostTypeContext()
+         ->getDeclaredTypeInContext()->getStructOrBoundGenericStruct()) {
+      return notAddressable();
+    }
+  
+    // If the storage holds the fully-abstracted representation of the
+    // type, then we can use its address.
+    auto absBaseTy = getLoweredType(AbstractionPattern::getOpaque(),
+                 lookupExpr->getBase()->getType()->getWithoutSpecifierType());
+    auto memberTy = absBaseTy.getFieldType(vd, &F);
+    auto absMemberTy = getLoweredType(AbstractionPattern::getOpaque(),
+                            lookupExpr->getType()->getWithoutSpecifierType());
+    
+    if (memberTy.getAddressType() != absMemberTy.getAddressType()) {
+      // The storage is not fully abstracted, so it can't serve as a
+      // stable address.
+      return notAddressable();
+    }
+    
+    // Otherwise, we can project the field address from the stable address
+    // of the base, if it has one. Try to get the stable address for the
+    // base.
+    auto baseAddr = tryEmitAddressableParameterAsAddress(
+      ArgumentSource(lookupExpr->getBase()), ownership);
+      
+    if (!baseAddr) {
+      return notAddressable();
+    }
+    
+    // Project the field's address.
+    auto fieldAddr = B.createStructElementAddr(lookupExpr,
+                                               baseAddr.getValue(), vd);
+    return ManagedValue::forBorrowedAddressRValue(fieldAddr);
+  }
+  
+  case AccessStrategy::DirectToAccessor:
+  case AccessStrategy::DispatchToAccessor: {
+    // Non-addressor accessors don't produce stable addresses.
+    if (strategy.getAccessor() != AccessorKind::Address
+        && strategy.getAccessor() != AccessorKind::MutableAddress) {
+      return notAddressable();
+    }
+    // TODO: Non-yielding borrow/mutate accessors can also be considered
+    // addressable when we have those.
+    
+    auto addressor = memberStorage->getAccessor(strategy.getAccessor());
+    auto addressorRef = SILDeclRef(addressor, SILDeclRef::Kind::Func);
+    auto absMemberTy = getLoweredType(AbstractionPattern::getOpaque(),
+                               lookupExpr->getType()->getWithoutSpecifierType())
+      .getAddressType();
+
+    // Evaluate the base in the current formal access scope.
+    ManagedValue base;
+    // If the addressor wants the base addressable, try to honor that
+    // request.
+    auto addressorSelf = addressor->getImplicitSelfDecl();
+    if (addressorSelf->isAddressable()
+        || getTypeLowering(lookupExpr->getBase()->getType()
+                                     ->getWithoutSpecifierType())
+            .getRecursiveProperties().isAddressableForDependencies()) {
+      ValueOwnership baseOwnership = addressorSelf->isInOut()
+        ? ValueOwnership::InOut
+        : ValueOwnership::Shared;
+      
+      base = tryEmitAddressableParameterAsAddress(
+        ArgumentSource(lookupExpr->getBase()), baseOwnership);
+    }
+    
+    // Otherwise, project the base as an lvalue.
+    if (!base) {
+      SGFAccessKind silAccess;
+      switch (accessKind) {
+      case AccessKind::Read:
+        silAccess = SGFAccessKind::BorrowedAddressRead;
+        break;
+      case AccessKind::ReadWrite:
+      case AccessKind::Write:
+        silAccess = SGFAccessKind::ReadWrite;
+        break;
+      }
+      
+      LValue lv = emitLValue(lookupExpr, silAccess);
+      
+      drillToLastComponent(lookupExpr->getBase(), std::move(lv), base);
+    }
+    
+    // Materialize the base outside of the scope of the addressor call,
+    // since the returned address may depend on the materialized
+    // representation, even if it isn't transitively addressable.
+    auto baseTy = lookupExpr->getBase()->getType()->getCanonicalType();
+    ArgumentSource baseArg = prepareAccessorBaseArgForFormalAccess(
+      lookupExpr->getBase(), base, baseTy, addressorRef);
+    
+    // Invoke the addressor to directly produce the address.
+    return emitAddressorAccessor(lookupExpr,
+       addressorRef, subs,
+       std::move(baseArg),
+       /*super*/ false, /*direct accessor use*/ true,
+       std::move(indices),
+       absMemberTy, /*on self*/ false);
+  }
+  
+  case AccessStrategy::MaterializeToTemporary:
+  case AccessStrategy::DispatchToDistributedThunk:
+    // These strategies never produce a value with a stable address.
+    return notAddressable();
+  }
+  
+  llvm_unreachable("uncovered switch!");
 }
 
 namespace {
@@ -7285,6 +7456,34 @@ ArgumentSource AccessorBaseArgPreparer::prepare() {
   return prepareAccessorObjectBaseArg();
 }
 
+ArgumentSource SILGenFunction::prepareAccessorBaseArgForFormalAccess(
+                                                      SILLocation loc,
+                                                      ManagedValue base,
+                                                      CanType baseFormalType,
+                                                      SILDeclRef accessor) {
+  if (!base) {
+    return ArgumentSource();
+  }
+    
+  base = base.formalAccessBorrow(*this, loc);
+  // If the base needs to be materialized, do so in
+  // the outer formal evaluation scope, since an addressor or
+  // other dependent value may want to point into the materialization.
+  auto &baseInfo = getConstantInfo(getTypeExpansionContext(), accessor);
+
+  if (!baseInfo.FormalPattern.isForeign()) {
+    auto baseFnTy = baseInfo.SILFnType;
+
+    if (baseFnTy->getSelfParameter().isFormalIndirect()
+        && base.getType().isObject()
+        && silConv.useLoweredAddresses()) {
+      base = base.formallyMaterialize(*this, loc);
+    }
+  }
+
+  return prepareAccessorBaseArg(loc, base, baseFormalType, accessor);
+}
+
 ArgumentSource SILGenFunction::prepareAccessorBaseArg(SILLocation loc,
                                                       ManagedValue base,
                                                       CanType baseFormalType,
@@ -7604,10 +7803,7 @@ ManagedValue SILGenFunction::emitAddressorAccessor(
 
   emission.addCallSite(loc, std::move(subscriptIndices));
 
-  // Unsafe{Mutable}Pointer<T> or
-  // (Unsafe{Mutable}Pointer<T>, Builtin.UnknownPointer) or
-  // (Unsafe{Mutable}Pointer<T>, Builtin.NativePointer) or
-  // (Unsafe{Mutable}Pointer<T>, Builtin.NativePointer?) or
+  // Result must be Unsafe{Mutable}Pointer<T>
   SmallVector<ManagedValue, 2> results;
   emission.apply().getAll(results);
 
