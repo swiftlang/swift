@@ -5138,6 +5138,11 @@ getIsolationFromWitnessedRequirements(ValueDecl *value) {
       std::tuple<ProtocolConformance *, ActorIsolation, ValueDecl *>;
   SmallVector<IsolatedRequirement, 2> isolatedRequirements;
   for (auto conformance : conformances) {
+    auto *implied =
+        conformance->getSourceKind() == ConformanceEntryKind::Implied
+            ? conformance->getImplyingConformance()
+            : nullptr;
+
     auto protocol = conformance->getProtocol();
     for (auto found : protocol->lookupDirect(value->getName())) {
       if (!isa<ProtocolDecl>(found->getDeclContext()))
@@ -5146,6 +5151,19 @@ getIsolationFromWitnessedRequirements(ValueDecl *value) {
       auto requirement = dyn_cast<ValueDecl>(found);
       if (!requirement || isa<TypeDecl>(requirement))
         continue;
+
+      // The conformance implied by an explicitly stated nonisolated protocol
+      // makes all of the requirements nonisolated.
+      if (implied &&
+          implied->getSourceKind() == ConformanceEntryKind::Explicit) {
+        auto protocol = implied->getProtocol();
+        if (protocol->getAttrs().hasAttribute<NonisolatedAttr>()) {
+          isolatedRequirements.push_back(IsolatedRequirement{
+              implied, ActorIsolation::forNonisolated(/*unsafe=*/false),
+              requirement});
+          continue;
+        }
+      }
 
       auto requirementIsolation = getActorIsolation(requirement);
       switch (requirementIsolation) {
