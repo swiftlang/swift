@@ -20,34 +20,6 @@
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 //===----------------------------------------------------------------------===//
-// MARK: BridgedArrayRef
-//===----------------------------------------------------------------------===//
-
-const void *_Nullable BridgedArrayRef_data(BridgedArrayRef arr) {
-  return arr.Data;
-}
-
-SwiftInt BridgedArrayRef_count(BridgedArrayRef arr) {
-  return static_cast<SwiftInt>(arr.Length);
-}
-
-bool BridgedArrayRef_isEmpty(BridgedArrayRef arr) {
-  return arr.Length == 0;
-}
-
-//===----------------------------------------------------------------------===//
-// MARK: BridgedData
-//===----------------------------------------------------------------------===//
-
-const char *_Nullable BridgedData_baseAddress(BridgedData data) {
-  return data.BaseAddress;
-}
-
-SwiftInt BridgedData_count(BridgedData data) {
-  return static_cast<SwiftInt>(data.Length);
-}
-
-//===----------------------------------------------------------------------===//
 // MARK: BridgedStringRef
 //===----------------------------------------------------------------------===//
 
@@ -58,36 +30,11 @@ llvm::StringRef BridgedStringRef::unbridged() const {
   return llvm::StringRef(Data, Length);
 }
 
-const uint8_t *_Nullable BridgedStringRef_data(BridgedStringRef str) {
-  return (const uint8_t *)str.unbridged().data();
-}
-
-SwiftInt BridgedStringRef_count(BridgedStringRef str) {
-  return (SwiftInt)str.unbridged().size();
-}
-
-bool BridgedStringRef_empty(BridgedStringRef str) {
-  return str.unbridged().empty();
-}
-
 //===----------------------------------------------------------------------===//
 // MARK: BridgedOwnedString
 //===----------------------------------------------------------------------===//
 
 llvm::StringRef BridgedOwnedString::unbridgedRef() const { return llvm::StringRef(Data, Length); }
-
-const uint8_t *_Nullable BridgedOwnedString_data(BridgedOwnedString str) {
-  auto *data = str.unbridgedRef().data();
-  return (const uint8_t *)(data ? data : "");
-}
-
-SwiftInt BridgedOwnedString_count(BridgedOwnedString str) {
-  return (SwiftInt)str.unbridgedRef().size();
-}
-
-bool BridgedOwnedString_empty(BridgedOwnedString str) {
-  return str.unbridgedRef().empty();
-}
 
 //===----------------------------------------------------------------------===//
 // MARK: BridgedSourceLoc
@@ -99,10 +46,6 @@ BridgedSourceLoc::BridgedSourceLoc(swift::SourceLoc loc)
 swift::SourceLoc BridgedSourceLoc::unbridged() const {
   return swift::SourceLoc(
       llvm::SMLoc::getFromPointer(static_cast<const char *>(Raw)));
-}
-
-bool BridgedSourceLoc_isValid(BridgedSourceLoc loc) {
-  return loc.getOpaquePointerValue() != nullptr;
 }
 
 BridgedSourceLoc BridgedSourceLoc::advancedBy(size_t n) const {
