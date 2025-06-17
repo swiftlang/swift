@@ -230,10 +230,12 @@ static ParamDecl *createMemberwiseInitParameter(DeclContext *DC,
     // memberwise initializer will be in terms of the backing storage
     // type.
     if (var->isPropertyMemberwiseInitializedWithWrappedType()) {
-      varInterfaceType = var->getPropertyWrapperInitValueInterfaceType();
+      if (auto initTy = var->getPropertyWrapperInitValueInterfaceType()) {
+        varInterfaceType = initTy;
 
-      auto initInfo = var->getPropertyWrapperInitializerInfo();
-      isAutoClosure = initInfo.getWrappedValuePlaceholder()->isAutoClosure();
+        auto initInfo = var->getPropertyWrapperInitializerInfo();
+        isAutoClosure = initInfo.getWrappedValuePlaceholder()->isAutoClosure();
+      }
     } else {
       varInterfaceType = backingPropertyType;
     }
