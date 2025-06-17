@@ -983,7 +983,7 @@ void ConstraintSystem::Candidate::applySolutions(
 }
 
 void ConstraintSystem::shrink(Expr *expr) {
-  if (getASTContext().TypeCheckerOpts.SolverDisableShrink)
+  if (getASTContext().TypeCheckerOpts.DisableConstraintSolverPerformanceHacks)
     return;
 
   using DomainMap = llvm::SmallDenseMap<Expr *, ArrayRef<ValueDecl *>>;
