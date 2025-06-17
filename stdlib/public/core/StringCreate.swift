@@ -17,11 +17,9 @@ internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
 
   // NOTE: Avoiding for-in syntax to avoid bounds checks
   //
-  // TODO(String performance): please remove this SIMD-ization when Swift compiler will be smart enough
-  // to vectorize this simple loop on its own:
-  // for i in 0..<count where ptr[i] & byteASCIIMask != 0 {
-  //   return false
-  // }
+  // TODO(String performance): Remove this manual SIMD-ization when Swift compiler
+  // becomes smart enough to auto-vectorize simple loops like:
+  // for i in 0..<count where ptr[i] & 0x80 != 0 { return false }
 
   let ptr = input.baseAddress._unsafelyUnwrappedUnchecked
   var i = 0
@@ -36,6 +34,7 @@ internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
   assert(count >= 0, "Buffer count must be non-negative")
   _debugPrecondition(ptr != nil, "Buffer base address must be valid")
 
+  // ASCII validation masks: check high bit (0x80) in each byte
   let wordASCIIMask = UInt(truncatingIfNeeded: 0x8080_8080_8080_8080 as UInt64)
   let byteASCIIMask = UInt8(truncatingIfNeeded: 0x80 as UInt8)
   let simd4ASCIIMask = SIMD4<UInt>(repeating: wordASCIIMask)
@@ -55,7 +54,7 @@ internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
     i &+= stride
   }
 
-  // Full 4-words
+  // Process SIMD4 chunks - main optimization for bulk ASCII validation
   while (i &+ simd4UintStride) <= count {
     _debugPrecondition(Int(bitPattern: ptr + i) % simd4UintStride == 0, "SIMD4 access must be aligned")
     _debugPrecondition(i + simd4UintStride <= count, "SIMD4 access must be within bounds")
@@ -64,7 +63,7 @@ internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
     i &+= simd4UintStride
   }
 
-  // Full words
+  // Process remaining full words that don't fit in SIMD4 chunks
   while (i &+ stride) <= count {
     _debugPrecondition(i + stride <= count, "Word access must be within bounds")
     let word: UInt = (ptr + i).withMemoryRebound(to: UInt.self, capacity: 1) { $0.pointee }
@@ -72,7 +71,7 @@ internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
     i &+= stride
   }
 
-  // Rest bytes up to end
+  // Process final individual bytes
   while i < count {
     guard ptr[i] & byteASCIIMask == 0 else { return false }
     i &+= 1
