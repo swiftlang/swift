@@ -4219,14 +4219,14 @@ namespace {
             for (auto param : attr->params()) {
               // FIXME: Swift assumes no escaping to globals. We should diagnose
               // this.
-              if (param == clang::LifetimeCaptureByAttr::GLOBAL ||
-                  param == clang::LifetimeCaptureByAttr::UNKNOWN ||
-                  param == clang::LifetimeCaptureByAttr::INVALID)
+              if (param == clang::LifetimeCaptureByAttr::Global ||
+                  param == clang::LifetimeCaptureByAttr::Unknown ||
+                  param == clang::LifetimeCaptureByAttr::Invalid)
                 continue;
 
               paramHasAnnotation[idx] = true;
               if (isa<clang::CXXMethodDecl>(decl) &&
-                  param == clang::LifetimeCaptureByAttr::THIS) {
+                  param == clang::LifetimeCaptureByAttr::This) {
                 auto [it, inserted] = inheritedArgDependences.try_emplace(
                     result->getSelfIndex(), SmallBitVector(dependencyVecSize));
                 it->second[idx] = true;

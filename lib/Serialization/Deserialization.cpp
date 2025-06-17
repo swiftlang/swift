@@ -8478,6 +8478,9 @@ public:
   clang::TypeCoupledDeclRefInfo readTypeCoupledDeclRefInfo() {
     llvm_unreachable("TypeCoupledDeclRefInfo shouldn't be reached from swift");
   }
+  clang::SpirvOperand readHLSLSpirvOperand() {
+    llvm_unreachable("SpirvOperand shouldn't be reached from swift");
+  }
 };
 
 } // end anonymous namespace

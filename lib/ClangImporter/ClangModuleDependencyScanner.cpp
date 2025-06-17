@@ -228,8 +228,8 @@ void ClangImporter::getBridgingHeaderOptions(
   // Round-trip clang args to canonicalize and clear the options that swift
   // compiler doesn't need.
   clang::CompilerInvocation depsInvocation;
-  clang::DiagnosticsEngine clangDiags(new clang::DiagnosticIDs(),
-                                      new clang::DiagnosticOptions(),
+  clang::DiagnosticOptions diagOpts;
+  clang::DiagnosticsEngine clangDiags(new clang::DiagnosticIDs(), diagOpts,
                                       new clang::IgnoringDiagConsumer());
 
   llvm::SmallVector<const char *> clangArgs;

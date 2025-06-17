@@ -61,6 +61,10 @@ public:
     asImpl().writeUInt64(uint64_t(value));
   }
 
+  void writeUnsignedOrNone(clang::UnsignedOrNone value) {
+    asImpl().writeUInt64(uint64_t(value.toInternalRepresentation()));
+  }
+
   void writeSelector(clang::Selector selector) {
     if (selector.isNull()) {
       asImpl().writeUInt64(0);
