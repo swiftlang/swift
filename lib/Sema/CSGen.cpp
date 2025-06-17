@@ -1168,11 +1168,13 @@ namespace {
                                   /*trailingClosureMatching=*/std::nullopt,
                                   CurDC, fnLocator);
 
-      Type fixedOutputType =
-          CS.getFixedTypeRecursive(outputTy, /*wantRValue=*/false);
-      if (!fixedOutputType->isTypeVariableOrMember()) {
-        CS.setFavoredType(anchor, fixedOutputType.getPointer());
-        outputTy = fixedOutputType;
+      if (CS.performanceHacksEnabled()) {
+        Type fixedOutputType =
+            CS.getFixedTypeRecursive(outputTy, /*wantRValue=*/false);
+        if (!fixedOutputType->isTypeVariableOrMember()) {
+          CS.setFavoredType(anchor, fixedOutputType.getPointer());
+          outputTy = fixedOutputType;
+        }
       }
 
       return outputTy;
@@ -1614,9 +1616,11 @@ namespace {
             }
           }
 
-          if (!knownType->hasPlaceholder()) {
-            // Set the favored type for this expression to the known type.
-            CS.setFavoredType(E, knownType.getPointer());
+          if (CS.performanceHacksEnabled()) {
+            if (!knownType->hasPlaceholder()) {
+              // Set the favored type for this expression to the known type.
+              CS.setFavoredType(E, knownType.getPointer());
+            }
           }
         }
       }
@@ -2085,8 +2089,10 @@ namespace {
                               CS.getASTContext());
       }
 
-      if (auto favoredTy = CS.getFavoredType(expr->getSubExpr())) {
-        CS.setFavoredType(expr, favoredTy);
+      if (CS.performanceHacksEnabled()) {
+        if (auto favoredTy = CS.getFavoredType(expr->getSubExpr())) {
+          CS.setFavoredType(expr, favoredTy);
+        }
       }
       return CS.getType(expr->getSubExpr());
     }
@@ -3373,11 +3379,13 @@ namespace {
 
       // If we ended up resolving the result type variable to a concrete type,
       // set it as the favored type for this expression.
-      Type fixedType =
-          CS.getFixedTypeRecursive(resultType, /*wantRvalue=*/true);
-      if (!fixedType->isTypeVariableOrMember()) {
-        CS.setFavoredType(expr, fixedType.getPointer());
-        resultType = fixedType;
+      if (CS.performanceHacksEnabled()) {
+        Type fixedType =
+            CS.getFixedTypeRecursive(resultType, /*wantRvalue=*/true);
+        if (!fixedType->isTypeVariableOrMember()) {
+          CS.setFavoredType(expr, fixedType.getPointer());
+          resultType = fixedType;
+        }
       }
 
       return resultType;
@@ -5184,7 +5192,7 @@ ConstraintSystem::applyPropertyWrapperToParameter(
 }
 
 void ConstraintSystem::optimizeConstraints(Expr *e) {
-  if (getASTContext().TypeCheckerOpts.DisableConstraintSolverPerformanceHacks)
+  if (!performanceHacksEnabled())
     return;
   
   SmallVector<Expr *, 16> linkedExprs;

@@ -638,9 +638,6 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
   if (choice.isUnavailable() && !CS.shouldAttemptFixes())
     return skip("unavailable");
 
-  if (ctx.TypeCheckerOpts.DisableConstraintSolverPerformanceHacks)
-    return false;
-
   // If the solver already found a solution with a better overload choice that
   // can be unconditionally substituted by the current choice, skip the current
   // choice.
@@ -726,14 +723,9 @@ bool swift::isSIMDOperator(ValueDecl *value) {
 
 bool DisjunctionStep::shortCircuitDisjunctionAt(
     Constraint *currentChoice, Constraint *lastSuccessfulChoice) const {
-  auto &ctx = CS.getASTContext();
-
   // Anything without a fix is better than anything with a fix.
   if (currentChoice->getFix() && !lastSuccessfulChoice->getFix())
     return true;
-
-  if (ctx.TypeCheckerOpts.DisableConstraintSolverPerformanceHacks)
-    return false;
 
   if (auto restriction = currentChoice->getRestriction()) {
     // Non-optional conversions are better than optional-to-optional

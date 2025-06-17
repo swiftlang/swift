@@ -684,6 +684,9 @@ private:
   // chained together. If so, disable choices which differ
   // from currently selected representative.
   void pruneOverloadSet(Constraint *disjunction) {
+    if (!CS.performanceHacksEnabled())
+      return;
+
     auto *choice = disjunction->getNestedConstraints().front();
     if (choice->getKind() != ConstraintKind::BindOverload)
       return;

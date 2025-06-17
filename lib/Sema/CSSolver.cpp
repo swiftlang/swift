@@ -74,8 +74,7 @@ Solution ConstraintSystem::finalize() {
 
   // Update the best score we've seen so far.
   auto &ctx = getASTContext();
-  assert(ctx.TypeCheckerOpts.DisableConstraintSolverPerformanceHacks ||
-         !solverState->BestScore || CurrentScore <= *solverState->BestScore);
+  assert(!solverState->BestScore || CurrentScore <= *solverState->BestScore);
 
   if (!solverState->BestScore || CurrentScore <= *solverState->BestScore) {
     solverState->BestScore = CurrentScore;
@@ -983,7 +982,7 @@ void ConstraintSystem::Candidate::applySolutions(
 }
 
 void ConstraintSystem::shrink(Expr *expr) {
-  if (getASTContext().TypeCheckerOpts.DisableConstraintSolverPerformanceHacks)
+  if (!performanceHacksEnabled())
     return;
 
   using DomainMap = llvm::SmallDenseMap<Expr *, ArrayRef<ValueDecl *>>;
