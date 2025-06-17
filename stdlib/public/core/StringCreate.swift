@@ -30,7 +30,6 @@ internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
   let stride = MemoryLayout<UInt>.stride
   let simd4UintStride = MemoryLayout<SIMD4<UInt>>.stride
   assert(simd4UintStride == stride * 4) // Memory layout of SIMD4<UInt> should match one of 4 UInt words
-  let address = Int(bitPattern: ptr)
 
   let wordASCIIMask = UInt(truncatingIfNeeded: 0x8080_8080_8080_8080 as UInt64)
   let byteASCIIMask = UInt8(truncatingIfNeeded: 0x80 as UInt8)
@@ -38,34 +37,28 @@ internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
   let simd4Zero = SIMD4<UInt>(repeating: 0)
 
   // Bytes up to beginning of a word
-  while (address &+ i) % stride != 0 && i < count {
+  while Int(bitPattern: ptr + i) % stride != 0 && i < count {
     guard ptr[i] & byteASCIIMask == 0 else { return false }
     i &+= 1
   }
 
   // Words up to beginning of a 4-word
-  while (address &+ i) % simd4UintStride != 0 && (i &+ stride) <= count {
-    let word: UInt = UnsafePointer(
-      bitPattern: address &+ i
-    )._unsafelyUnwrappedUnchecked.pointee
+  while Int(bitPattern: ptr + i) % simd4UintStride != 0 && (i &+ stride) <= count {
+    let word: UInt = (ptr + i).withMemoryRebound(to: UInt.self, capacity: 1) { $0.pointee }
     guard word & wordASCIIMask == 0 else { return false }
     i &+= stride
   }
 
   // Full 4-words
   while (i &+ simd4UintStride) <= count {
-    let simd4: SIMD4<UInt> = UnsafePointer<SIMD4<UInt>>(
-      bitPattern: address &+ i
-    )._unsafelyUnwrappedUnchecked.pointee
+    let simd4: SIMD4<UInt> = (ptr + i).withMemoryRebound(to: SIMD4<UInt>.self, capacity: 1) { $0.pointee }
     guard simd4 & simd4ASCIIMask == simd4Zero else { return false }
     i &+= simd4UintStride
   }
 
   // Full words
   while (i &+ stride) <= count {
-    let word: UInt = UnsafePointer(
-      bitPattern: address &+ i
-    )._unsafelyUnwrappedUnchecked.pointee
+    let word: UInt = (ptr + i).withMemoryRebound(to: UInt.self, capacity: 1) { $0.pointee }
     guard word & wordASCIIMask == 0 else { return false }
     i &+= stride
   }
