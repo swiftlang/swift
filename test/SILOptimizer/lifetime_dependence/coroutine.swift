@@ -40,7 +40,7 @@ struct Wrapper : ~Escapable {
     _read {
       yield _view
     }
-    @_lifetime(borrow self)
+    @_lifetime(&self)
     _modify {
       yield &_view
     }
@@ -87,17 +87,18 @@ func use(_ o : borrowing View) {}
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [static] [[NC]]
 // CHECK:   [[NCVAL:%.*]] = load [[ACCESS]] 
 // CHECK:   ([[WRAPPER:%.*]], [[TOKEN1:%.*]]) = begin_apply %{{.*}}([[NCVAL]]) : $@yield_once @convention(method) (@guaranteed NCContainer) -> @lifetime(borrow 0) @yields @guaranteed Wrapper
-// CHECK:   retain_value [[WRAPPER]]
-// CHECK:   debug_value [[WRAPPER]], let, name "wrapper"
+// CHECK:   [[MDI:%.*]] = mark_dependence [nonescaping] [[WRAPPER]] on [[ACCESS]]
+// CHECK:   retain_value [[MDI]]
+// CHECK:   debug_value [[MDI]], let, name "wrapper"
 //       let view = wrapper.view
-// CHECK:   ([[VIEW:%.*]], [[TOKEN2:%.*]]) = begin_apply %{{.*}}([[WRAPPER]]) : $@yield_once @convention(method) (@guaranteed Wrapper) -> @lifetime(copy 0) @yields @guaranteed View
+// CHECK:   ([[VIEW:%.*]], [[TOKEN2:%.*]]) = begin_apply %{{.*}}([[MDI]]) : $@yield_once @convention(method) (@guaranteed Wrapper) -> @lifetime(copy 0) @yields @guaranteed View
 // CHECK:   retain_value [[VIEW]]
 // CHECK:   end_apply [[TOKEN2]] as $()
 // CHECK:   debug_value [[VIEW]], let, name "view"
 //       use(view)
 // CHECK:   apply %{{.*}}([[VIEW]]) : $@convention(thin) (@guaranteed View) -> ()
 // CHECK:   release_value [[VIEW]]
-// CHECK:   release_value [[WRAPPER]]
+// CHECK:   release_value [[MDI]]
 // CHECK:   end_apply [[TOKEN1]] as $()
 // CHECK:   end_access [[ACCESS]]
 // CHECK:   destroy_addr [[NC]]

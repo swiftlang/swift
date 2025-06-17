@@ -145,9 +145,13 @@ extension LifetimeDependentApply {
       case .inherit:
         continue
       case .scope:
+        // FIXME: For yields with a scoped lifetime dependence, dependence on parameter operands is redundant,
+        // since we introduce dependence on the begin_apply's token as well.
+        // This can lead to duplicate lifetime dependence diagnostics in some cases.
+        // However this is neccessary for safety when begin_apply gets inlined which will delete the dependence on the token.
         for yieldedValue in beginApply.yieldedValues {
           let targetKind = yieldedValue.type.isAddress ? TargetKind.yieldAddress : TargetKind.yield
-          info.sources.push(LifetimeSource(targetKind: targetKind, convention: .inherit, value: operand.value))
+          info.sources.push(LifetimeSource(targetKind: targetKind, convention: dep, value: operand.value))
         }
       }
     }

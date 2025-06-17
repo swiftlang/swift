@@ -30,7 +30,36 @@ func invalidDuplicateLifetimeDependence1(_ ne: borrowing NE) -> NE {
 class Klass {}
 
 @_lifetime(borrow x) // expected-error{{invalid use of borrow dependence with consuming ownership}}
-func invalidDependence(_ x: consuming Klass) -> NE {
+func invalidDependenceConsumeKlass(_ x: consuming Klass) -> NE {
+  NE()
+}
+
+@_lifetime(&x) // expected-error{{invalid use of & dependence with borrowing ownership}}
+               // expected-note @-1{{use '@_lifetime(borrow x)' instead}}
+func invalidDependenceBorrowKlass(_ x: borrowing Klass) -> NE {
+  NE()
+}
+
+@_lifetime(borrow x) // expected-error{{invalid use of borrow dependence with inout ownership}}
+                     // expected-note @-1{{use '@_lifetime(&x)' instead}}
+func invalidDependenceInoutKlass(_ x: inout Klass) -> NE {
+  NE()
+}
+
+@_lifetime(borrow x) // OK
+func invalidDependenceConsumeInt(_ x: consuming Int) -> NE {
+  NE()
+}
+
+@_lifetime(&x) // expected-error{{invalid use of & dependence with borrowing ownership}}
+               // expected-note @-1{{use '@_lifetime(borrow x)' instead}}
+func invalidDependenceBorrowInt(_ x: borrowing Int) -> NE {
+  NE()
+}
+
+@_lifetime(borrow x) // expected-error{{invalid use of borrow dependence with inout ownership}}
+                     // expected-note @-1{{use '@_lifetime(&x)' instead}}
+func invalidDependenceInoutInt(_ x: inout Int) -> NE {
   NE()
 }
 
