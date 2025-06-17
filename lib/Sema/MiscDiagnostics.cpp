@@ -6268,9 +6268,9 @@ diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
         note.fixItRemove(duplicated.first->getSourceRange());
         if (duplicatedEltIdx < commanLocs.size()) {
           note.fixItRemove(commanLocs[duplicatedEltIdx]);
-        } else {
+        } else if (!commanLocs.empty()) {
           // For the last element remove the previous comma.
-          note.fixItRemove(commanLocs[duplicatedEltIdx - 1]);
+          note.fixItRemove(commanLocs[commanLocs.size() - 1]);
         }
       };
 
