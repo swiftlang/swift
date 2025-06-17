@@ -80,61 +80,6 @@ class WasmSwiftSDK(product.Product):
         cmake_options.define('CMAKE_RANLIB', os.path.join(
             native_toolchain_path, 'bin', 'llvm-ranlib'))
 
-    def _build_libxml2(self, swift_host_triple, has_pthread, wasi_sysroot):
-        libxml2 = CMakeProduct(
-            args=self.args,
-            toolchain=self.toolchain,
-            source_dir=os.path.join(
-                os.path.dirname(self.source_dir), 'libxml2'),
-            build_dir=os.path.join(self.build_dir, 'libxml2', swift_host_triple))
-        self._append_platform_cmake_options(
-            libxml2.cmake_options, swift_host_triple, has_pthread, wasi_sysroot, [])
-        libxml2.cmake_options.define('LIBXML2_WITH_C14N', 'FALSE')
-        libxml2.cmake_options.define('LIBXML2_WITH_CATALOG', 'FALSE')
-        libxml2.cmake_options.define('LIBXML2_WITH_DEBUG', 'FALSE')
-        libxml2.cmake_options.define('LIBXML2_WITH_DOCB', 'FALSE')
-        libxml2.cmake_options.define('LIBXML2_WITH_FTP', 'FALSE')
-        libxml2.cmake_options.define('LIBXML2_WITH_HTML', 'FALSE')
-        libxml2.cmake_options.define('LIBXML2_WITH_HTTP', 'FALSE')
-        libxml2.cmake_options.define('LIBXML2_WITH_ICONV', 'FALSE')
-        libxml2.cmake_options.define('LIBXML2_WITH_ICU', 'FALSE')
-        libxml2.cmake_options.define('LIBXML2_WITH_ISO8859X', 'FALSE')
-        libxml2.cmake_options.define('LIBXML2_WITH_LEGACY', 'FALSE')
-        libxml2.cmake_options.define('LIBXML2_WITH_LZMA', 'FALSE')
-        libxml2.cmake_options.define('LIBXML2_WITH_MEM_DEBUG', 'FALSE')
-        libxml2.cmake_options.define('LIBXML2_WITH_MODULES', 'FALSE')
-        libxml2.cmake_options.define('LIBXML2_WITH_OUTPUT', 'TRUE')
-        libxml2.cmake_options.define('LIBXML2_WITH_PATTERN', 'FALSE')
-        libxml2.cmake_options.define('LIBXML2_WITH_PROGRAMS', 'FALSE')
-        libxml2.cmake_options.define('LIBXML2_WITH_PUSH', 'TRUE')
-        libxml2.cmake_options.define('LIBXML2_WITH_PYTHON', 'FALSE')
-        libxml2.cmake_options.define('LIBXML2_WITH_READER', 'FALSE')
-        libxml2.cmake_options.define('LIBXML2_WITH_REGEXPS', 'TRUE')
-        libxml2.cmake_options.define('LIBXML2_WITH_RUN_DEBUG', 'FALSE')
-        libxml2.cmake_options.define('LIBXML2_WITH_SAX1', 'FALSE')
-        libxml2.cmake_options.define('LIBXML2_WITH_SCHEMAS', 'FALSE')
-        libxml2.cmake_options.define('LIBXML2_WITH_SCHEMATRON', 'FALSE')
-        libxml2.cmake_options.define('LIBXML2_WITH_TESTS', 'FALSE')
-        libxml2.cmake_options.define('LIBXML2_WITH_TREE', 'TRUE')
-        libxml2.cmake_options.define('LIBXML2_WITH_VALID', 'TRUE')
-        libxml2.cmake_options.define('LIBXML2_WITH_WRITER', 'FALSE')
-        libxml2.cmake_options.define('LIBXML2_WITH_XINCLUDE', 'FALSE')
-        libxml2.cmake_options.define('LIBXML2_WITH_XPATH', 'TRUE')
-        libxml2.cmake_options.define('LIBXML2_WITH_XPTR', 'FALSE')
-        libxml2.cmake_options.define('LIBXML2_WITH_ZLIB', 'FALSE')
-        libxml2.cmake_options.define('BUILD_SHARED_LIBS', 'FALSE')
-
-        cmake_thread_enabled = 'TRUE' if has_pthread else 'FALSE'
-        libxml2.cmake_options.define('LIBXML2_WITH_THREAD_ALLOC', cmake_thread_enabled)
-        libxml2.cmake_options.define('LIBXML2_WITH_THREADS', cmake_thread_enabled)
-        libxml2.cmake_options.define('HAVE_PTHREAD_H', cmake_thread_enabled)
-
-        libxml2.build_with_cmake([], self.args.build_variant, [],
-                                 prefer_native_toolchain=True)
-        with shell.pushd(libxml2.build_dir):
-            shell.call([self.toolchain.cmake, '--install', '.', '--prefix', '/', '--component', 'development'],
-                       env={'DESTDIR': wasi_sysroot})
-
     def _build_swift_testing(self, swift_host_triple, has_pthread, wasi_sysroot):
         swift_testing = CMakeProduct(
             args=self.args,
@@ -180,8 +125,6 @@ class WasmSwiftSDK(product.Product):
                 shell.call([self.toolchain.cmake, '--install', '.',
                             '--component', 'clang_rt.builtins-wasm32'],
                            env={'DESTDIR': clang_dir})
-
-        self._build_libxml2(swift_host_triple, has_pthread, wasi_sysroot)
         # Build swift-testing
         self._build_swift_testing(swift_host_triple, has_pthread, wasi_sysroot)
 

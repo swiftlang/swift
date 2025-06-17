@@ -1428,27 +1428,9 @@ namespace {
     {
       AccessorArgs result;
       if (base) {
-        // Borrow the base, because we may need it again to invoke other
-        // accessors.
-        base = base.formalAccessBorrow(SGF, loc);
-        // If the base needs to be materialized, do so in
-        // the outer formal evaluation scope, since an addressor or
-        // other dependent value may want to point into the materialization.
-        auto &baseInfo = SGF.getConstantInfo(SGF.getTypeExpansionContext(),
-                                             accessor);
-                                             
-        if (!baseInfo.FormalPattern.isForeign()) {
-          auto baseFnTy = baseInfo.SILFnType;
-          
-          if (baseFnTy->getSelfParameter().isFormalIndirect()
-              && base.getType().isObject()
-              && SGF.silConv.useLoweredAddresses()) {
-            base = base.formallyMaterialize(SGF, loc);
-          }
-        }
-        
-        result.base = SGF.prepareAccessorBaseArg(loc, base, BaseFormalType,
-                                                 accessor);
+        result.base = SGF.prepareAccessorBaseArgForFormalAccess(loc, base,
+                                                                BaseFormalType,
+                                                                accessor);
       }
 
       if (!Indices.isNull())
@@ -5356,17 +5338,16 @@ static ManagedValue drillIntoComponent(SILGenFunction &SGF,
 
 /// Find the last component of the given lvalue and derive a base
 /// location for it.
-static PathComponent &&
-drillToLastComponent(SILGenFunction &SGF,
-                     SILLocation loc,
-                     LValue &&lv,
-                     ManagedValue &addr,
-                     TSanKind tsanKind = TSanKind::None) {
+PathComponent &&
+SILGenFunction::drillToLastComponent(SILLocation loc,
+                                     LValue &&lv,
+                                     ManagedValue &addr,
+                                     TSanKind tsanKind) {
   assert(lv.begin() != lv.end() &&
          "lvalue must have at least one component");
 
   for (auto i = lv.begin(), e = lv.end() - 1; i != e; ++i) {
-    addr = drillIntoComponent(SGF, loc, std::move(**i), addr, tsanKind);
+    addr = drillIntoComponent(*this, loc, std::move(**i), addr, tsanKind);
   }
 
   return std::move(**(lv.end() - 1));
@@ -5378,7 +5359,7 @@ static ArgumentSource emitBaseValueForAccessor(SILGenFunction &SGF,
                                                SILDeclRef accessor) {
   ManagedValue base;
   PathComponent &&component =
-    drillToLastComponent(SGF, loc, std::move(lvalue), base);
+    SGF.drillToLastComponent(loc, std::move(lvalue), base);
   base = drillIntoComponent(SGF, loc, std::move(component), base,
                             TSanKind::None);
 
@@ -5402,7 +5383,7 @@ RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
 
     ManagedValue addr;
     PathComponent &&component =
-        drillToLastComponent(*this, loc, std::move(src), addr);
+        drillToLastComponent(loc, std::move(src), addr);
 
     // If the last component is physical, drill down and load from it.
     if (component.isPhysical()) {
@@ -5606,7 +5587,7 @@ ManagedValue SILGenFunction::emitAddressOfLValue(SILLocation loc,
 
   ManagedValue addr;
   PathComponent &&component =
-    drillToLastComponent(*this, loc, std::move(src), addr, tsanKind);
+    drillToLastComponent(loc, std::move(src), addr, tsanKind);
 
   addr = drillIntoComponent(*this, loc, std::move(component), addr, tsanKind);
   assert(addr.getType().isAddress() &&
@@ -5624,7 +5605,7 @@ ManagedValue SILGenFunction::emitBorrowedLValue(SILLocation loc,
 
   ManagedValue base;
   PathComponent &&component =
-    drillToLastComponent(*this, loc, std::move(src), base, tsanKind);
+    drillToLastComponent(loc, std::move(src), base, tsanKind);
 
   auto value =
     drillIntoComponent(*this, loc, std::move(component), base, tsanKind);
@@ -5641,7 +5622,7 @@ ManagedValue SILGenFunction::emitConsumedLValue(SILLocation loc, LValue &&src,
 
   ManagedValue base;
   PathComponent &&component =
-      drillToLastComponent(*this, loc, std::move(src), base, tsanKind);
+      drillToLastComponent(loc, std::move(src), base, tsanKind);
 
   auto value =
       drillIntoComponent(*this, loc, std::move(component), base, tsanKind);
@@ -5769,7 +5750,7 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc,
   // properties we need to write back to.
   ManagedValue destAddr;
   PathComponent &&component =
-    drillToLastComponent(*this, loc, std::move(dest), destAddr);
+    drillToLastComponent(loc, std::move(dest), destAddr);
   
   // Write to the tail component.
   if (component.isPhysical()) {
