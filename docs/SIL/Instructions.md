@@ -2615,11 +2615,11 @@ except:
     instead of its normal results.
 
 The final (in the case of `@yield_once`) or penultimate (in the case of
-`@yield_once_2`) result of a `begin_apply` is a "token", a special
-value which can only be used as the operand of an `end_apply` or
-`abort_apply` instruction. Before this second instruction is executed,
-the coroutine is said to be "suspended", and the token represents a
-reference to its suspended activation record.
+`@yield_once_2`) result of a `begin_apply` is a "token", a special value which
+can only be used as the operand of an `end_apply`, `abort_apply`, or
+`end_borrow` instruction. Before this second instruction is executed, the
+coroutine is said to be "suspended", and the token represents a reference to its
+suspended activation record.
 
 If the coroutine's kind `yield_once_2`, its final result is an address
 of a "token", representing the allocation done by the callee
