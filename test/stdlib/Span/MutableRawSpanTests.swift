@@ -514,3 +514,26 @@ suite.test("extracting suffixes")
     expectEqual(span.extracting(droppingFirst: 1).byteCount, b.count)
   }
 }
+
+suite.test("MutableRawSpan from UnsafeMutableRawBufferPointer")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  let capacity = 4
+  let b = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: capacity*MemoryLayout<Int64>.stride,
+    alignment: MemoryLayout<Int64>.alignment
+  )
+  defer {
+    b.deallocate()
+  }
+  _ = b.initializeMemory(as: Int64.self, fromContentsOf: 0..<Int64(capacity))
+
+  var span = b.mutableBytes
+  span.storeBytes(of: 3, toByteOffset: 10, as: UInt16.self)
+
+  _ = consume span
+
+  let v = b.load(fromByteOffset: 8, as: Int64.self)
+  expectNotEqual(v, 1)
+}
