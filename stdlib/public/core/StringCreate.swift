@@ -29,7 +29,12 @@ internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
   let count = input.count
   let stride = MemoryLayout<UInt>.stride
   let simd4UintStride = MemoryLayout<SIMD4<UInt>>.stride
-  assert(simd4UintStride == stride * 4) // Memory layout of SIMD4<UInt> should match one of 4 UInt words
+
+  // Safety assertions for memory layout and operations
+  assert(simd4UintStride == stride * 4, "SIMD4<UInt> must be exactly 4 UInt words")
+  assert(stride >= 4, "UInt stride must be at least 4 bytes")
+  assert(count >= 0, "Buffer count must be non-negative")
+  _debugPrecondition(ptr != nil, "Buffer base address must be valid")
 
   let wordASCIIMask = UInt(truncatingIfNeeded: 0x8080_8080_8080_8080 as UInt64)
   let byteASCIIMask = UInt8(truncatingIfNeeded: 0x80 as UInt8)
@@ -44,6 +49,7 @@ internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
 
   // Process words until SIMD4-aligned or not enough bytes for SIMD4
   while Int(bitPattern: ptr + i) % simd4UintStride != 0 && (i &+ simd4UintStride) <= count {
+    _debugPrecondition(i + stride <= count, "Word access must be within bounds")
     let word: UInt = (ptr + i).withMemoryRebound(to: UInt.self, capacity: 1) { $0.pointee }
     guard word & wordASCIIMask == 0 else { return false }
     i &+= stride
@@ -51,6 +57,8 @@ internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
 
   // Full 4-words
   while (i &+ simd4UintStride) <= count {
+    _debugPrecondition(Int(bitPattern: ptr + i) % simd4UintStride == 0, "SIMD4 access must be aligned")
+    _debugPrecondition(i + simd4UintStride <= count, "SIMD4 access must be within bounds")
     let simd4: SIMD4<UInt> = (ptr + i).withMemoryRebound(to: SIMD4<UInt>.self, capacity: 1) { $0.pointee }
     guard simd4 & simd4ASCIIMask == simd4Zero else { return false }
     i &+= simd4UintStride
@@ -58,6 +66,7 @@ internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
 
   // Full words
   while (i &+ stride) <= count {
+    _debugPrecondition(i + stride <= count, "Word access must be within bounds")
     let word: UInt = (ptr + i).withMemoryRebound(to: UInt.self, capacity: 1) { $0.pointee }
     guard word & wordASCIIMask == 0 else { return false }
     i &+= stride
