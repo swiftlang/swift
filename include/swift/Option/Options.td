@@ -33,7 +33,7 @@ def ModuleWrapOption : OptionFlag;
 def NoDriverOption : OptionFlag;
 
 // Some options should not be available depending on whether this is the
-// interactive driver 'swift', or the batch compiler 'swiftc'.
+// interactive driver 'swift', or the aot compiler 'swiftc'.
 def NoInteractiveOption : OptionFlag;
 def NoBatchOption : OptionFlag;
 
