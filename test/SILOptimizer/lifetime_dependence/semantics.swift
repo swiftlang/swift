@@ -609,5 +609,5 @@ func testBorrowedAddressableInt(arg: Holder) -> Int {
 func testBorrowedAddressableIntReturn(arg: Holder) -> Span<Int> {
   arg.addressableInt.span()
   // expected-error @-1{{lifetime-dependent value escapes its scope}}
-  // expected-note  @-3{{it depends on the lifetime of argument 'arg'}}
+  // expected-note  @-2{{it depends on the lifetime of this parent value}}
 } // expected-note  {{this use causes the lifetime-dependent value to escape}}

@@ -44,6 +44,7 @@ class ConsumableManagedValue;
 class LogicalPathComponent;
 class LValue;
 class ManagedValue;
+class PathComponent;
 class PreparedArguments;
 class RValue;
 class CalleeTypeInfo;
@@ -1978,6 +1979,10 @@ public:
   ArgumentSource prepareAccessorBaseArg(SILLocation loc, ManagedValue base,
                                         CanType baseFormalType,
                                         SILDeclRef accessor);
+  ArgumentSource prepareAccessorBaseArgForFormalAccess(SILLocation loc,
+                                                       ManagedValue base,
+                                                       CanType baseFormalType,
+                                                       SILDeclRef accessor);
 
   RValue emitGetAccessor(
       SILLocation loc, SILDeclRef getter, SubstitutionMap substitutions,
@@ -2201,7 +2206,12 @@ public:
 
   RValue emitLoadOfLValue(SILLocation loc, LValue &&src, SGFContext C,
                           bool isBaseLValueGuaranteed = false);
-
+  PathComponent &&
+  drillToLastComponent(SILLocation loc,
+                       LValue &&lv,
+                       ManagedValue &addr,
+                       TSanKind tsanKind = TSanKind::None);
+                     
   /// Emit a reference to a method from within another method of the type.
   std::tuple<ManagedValue, SILType>
   emitSiblingMethodRef(SILLocation loc,
