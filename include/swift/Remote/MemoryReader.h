@@ -147,7 +147,7 @@ public:
   virtual RemoteAbsolutePointer resolvePointer(RemoteAddress address,
                                                uint64_t readValue) {
     // Default implementation returns the read value as is.
-    return RemoteAbsolutePointer("", readValue);
+    return RemoteAbsolutePointer(RemoteAddress(readValue));
   }
 
   /// Performs the inverse operation of \ref resolvePointer.
@@ -166,7 +166,7 @@ public:
   virtual RemoteAbsolutePointer getSymbol(RemoteAddress address) {
     if (auto symbol = resolvePointerAsSymbol(address))
       return *symbol;
-    return RemoteAbsolutePointer("", address.getAddressData());
+    return RemoteAbsolutePointer(address);
   }
 
   /// Lookup a dynamic symbol name (ie dynamic loader binding) for the given
