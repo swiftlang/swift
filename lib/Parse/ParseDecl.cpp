@@ -6337,8 +6337,8 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
           DescriptiveKind = DescriptiveDeclKind::StaticProperty;
           break;
         case StaticSpellingKind::KeywordClass:
-          llvm_unreachable("kw_class is only parsed as a modifier if it's "
-                           "followed by a keyword");
+          DescriptiveKind = DescriptiveDeclKind::ClassProperty;
+          break;
         }
 
         diagnose(Tok.getLoc(), diag::expected_keyword_in_decl, "var",
@@ -6366,8 +6366,7 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
             DescriptiveKind = DescriptiveDeclKind::StaticMethod;
             break;
           case StaticSpellingKind::KeywordClass:
-            llvm_unreachable("kw_class is only parsed as a modifier if it's "
-                             "followed by a keyword");
+            DescriptiveKind = DescriptiveDeclKind::ClassMethod;
           }
         }
 
