@@ -286,6 +286,8 @@ swift::tripleOSTypeForPlatform(PlatformKind platform) {
   case PlatformKind::visionOS:
   case PlatformKind::visionOSApplicationExtension:
     return llvm::Triple::XROS;
+  case PlatformKind::FreeBSD:
+    return llvm::Triple::FreeBSD;
   case PlatformKind::OpenBSD:
     return llvm::Triple::OpenBSD;
   case PlatformKind::Windows:

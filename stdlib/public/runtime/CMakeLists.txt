@@ -93,8 +93,7 @@ set(swift_runtime_backtracing_sources
   Backtrace.cpp
   BacktraceUtils.cpp
   CrashHandlerMacOS.cpp
-  CrashHandlerLinux.cpp
-)
+  CrashHandlerLinux.cpp)
 
 # Acknowledge that the following sources are known.
 set(LLVM_OPTIONAL_SOURCES

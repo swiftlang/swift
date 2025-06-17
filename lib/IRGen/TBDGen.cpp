@@ -245,9 +245,9 @@ getLinkerPlatformId(OriginallyDefinedInAttr::ActiveVersion Ver,
   switch(Ver.Platform) {
   case swift::PlatformKind::none:
     llvm_unreachable("cannot find platform kind");
-  case swift::PlatformKind::OpenBSD:
-    llvm_unreachable("not used for this platform");
   case swift::PlatformKind::FreeBSD:
+    llvm_unreachable("not used for this platform");
+  case swift::PlatformKind::OpenBSD:
     llvm_unreachable("not used for this platform");
   case swift::PlatformKind::Windows:
     llvm_unreachable("not used for this platform");
