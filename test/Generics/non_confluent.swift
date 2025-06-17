@@ -99,11 +99,12 @@ protocol M2 {
     where B.A == A.B, C.A == A, A.C == A  // expected-error *{{is not a member type}}
 }
 
-// FIXME: This should be rejected
 protocol M3 {
+// expected-error@-1 {{cannot build rewrite system for protocol; rule length limit exceeded}}
+// expected-note@-2 {{failed rewrite rule is }}
   associatedtype A: M3
   associatedtype B: M3
-    where A.A.A == A, A.B.B.A == B.B
+    where A.A.A == A, A.B.B.A == B.B  // expected-error *{{is not a member type}}
 }
 
 protocol M4 {

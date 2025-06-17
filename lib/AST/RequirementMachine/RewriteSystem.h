@@ -219,7 +219,7 @@ public:
   //////////////////////////////////////////////////////////////////////////////
 
   /// Pairs of rules which have already been checked for overlap.
-  llvm::DenseSet<std::pair<unsigned, unsigned>> CheckedOverlaps;
+  llvm::DenseSet<std::tuple<unsigned, unsigned, unsigned>> CheckedOverlaps;
 
   std::pair<CompletionResult, unsigned>
   performKnuthBendix(unsigned maxRuleCount, unsigned maxRuleLength);
