@@ -328,8 +328,7 @@ public:
   /// Builds LifetimeDependenceInfo from a swift decl, either from the explicit
   /// lifetime dependence specifiers or by inference based on types and
   /// ownership modifiers.
-  static std::optional<ArrayRef<LifetimeDependenceInfo>>
-  get(AbstractFunctionDecl *decl);
+  static std::optional<ArrayRef<LifetimeDependenceInfo>> get(ValueDecl *decl);
 
   /// Builds LifetimeDependenceInfo from SIL
   static std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
