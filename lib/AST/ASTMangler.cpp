@@ -4713,8 +4713,6 @@ void ASTMangler::appendDistributedThunk(
                                                        false);
   // TODO: add a flag to skip class/struct information from parameter types
 
-  BaseEntitySignature base(thunk);
-
   // Since computed property SILDeclRef's refer to the "originator"
   // of the thunk, we need to mangle distributed thunks of accessors
   // specially.
@@ -4736,6 +4734,8 @@ void ASTMangler::appendDistributedThunk(
     thunk = storage->getDistributedThunk();
     assert(thunk);
   }
+
+  BaseEntitySignature base(thunk);
   assert(isa<AbstractFunctionDecl>(thunk) &&
          "distributed thunk to mangle must be function decl");
   assert(thunk->getContextKind() == DeclContextKind::AbstractFunctionDecl);
