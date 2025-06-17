@@ -1436,10 +1436,10 @@ ERROR(did_not_call_function_value,none,
       ())
 ERROR(did_not_call_function,none,
       "function %0 was used as a property; add () to call it",
-      (Identifier))
+      (DeclBaseName))
 ERROR(did_not_call_method,none,
       "method %0 was used as a property; add () to call it",
-      (Identifier))
+      (DeclBaseName))
 
 ERROR(init_not_instance_member_use_assignment,none,
       "'init' is a member of the type; use assignment "
@@ -3781,9 +3781,6 @@ ERROR(enum_non_integer_convertible_raw_type_no_value,none,
       "expressible by integer or string literal", ())
 ERROR(enum_raw_value_not_unique,none,
       "raw value for enum case is not unique", ())
-ERROR(enum_raw_value_magic_literal,none,
-      "use of '%0' literal as raw value for enum case is not supported",
-      (StringRef))
 NOTE(enum_raw_value_used_here,none,
      "raw value previously used here", ())
 NOTE(enum_raw_value_incrementing_from_here,none,

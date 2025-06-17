@@ -6337,8 +6337,8 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
           DescriptiveKind = DescriptiveDeclKind::StaticProperty;
           break;
         case StaticSpellingKind::KeywordClass:
-          llvm_unreachable("kw_class is only parsed as a modifier if it's "
-                           "followed by a keyword");
+          DescriptiveKind = DescriptiveDeclKind::ClassProperty;
+          break;
         }
 
         diagnose(Tok.getLoc(), diag::expected_keyword_in_decl, "var",
@@ -6366,8 +6366,7 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
             DescriptiveKind = DescriptiveDeclKind::StaticMethod;
             break;
           case StaticSpellingKind::KeywordClass:
-            llvm_unreachable("kw_class is only parsed as a modifier if it's "
-                             "followed by a keyword");
+            DescriptiveKind = DescriptiveDeclKind::ClassMethod;
           }
         }
 
@@ -9229,6 +9228,20 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   return DCC.fixupParserResult(Status, ED);
 }
 
+static bool isValidEnumRawValueLiteral(LiteralExpr *expr) {
+  if (expr == nullptr)
+    return false;
+
+  if (!isa<IntegerLiteralExpr>(expr) &&
+      !isa<FloatLiteralExpr>(expr) &&
+      !isa<StringLiteralExpr>(expr) &&
+      !isa<BooleanLiteralExpr>(expr) &&
+      !isa<NilLiteralExpr>(expr))
+    return false;
+
+  return true;
+}
+
 /// Parse a 'case' of an enum.
 ///
 /// \verbatim
@@ -9346,8 +9359,7 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
       }
       // The raw value must be syntactically a simple literal.
       LiteralRawValueExpr = dyn_cast<LiteralExpr>(RawValueExpr.getPtrOrNull());
-      if (!LiteralRawValueExpr
-          || isa<InterpolatedStringLiteralExpr>(LiteralRawValueExpr)) {
+      if (!isValidEnumRawValueLiteral(LiteralRawValueExpr)) {
         diagnose(RawValueExpr.getPtrOrNull()->getLoc(),
                  diag::nonliteral_enum_case_raw_value);
         LiteralRawValueExpr = nullptr;

@@ -720,3 +720,25 @@ suite.test("extracting suffixes")
     expectEqual(span.extracting(droppingFirst: 1).count, b.count)
   }
 }
+
+suite.test("MutableSpan from UnsafeMutableBufferPointer")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  let capacity = 4
+  let b = UnsafeMutableBufferPointer<Int>.allocate(capacity: capacity)
+  defer {
+    b.deallocate()
+  }
+  _ = b.initialize(fromContentsOf: 0..<capacity)
+
+  var span = b.mutableSpan
+  expectEqual(span.count, capacity)
+
+  span.swapAt(0, 3)
+  span.swapAt(1, 2)
+
+  _ = consume span
+
+  expectTrue(b.elementsEqual((0..<capacity).reversed()))
+}

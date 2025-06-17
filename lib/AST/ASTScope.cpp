@@ -356,6 +356,8 @@ SourceRange NominalTypeScope::getBraces() const { return decl->getBraces(); }
 
 NullablePtr<NominalTypeDecl>
 ExtensionScope::getCorrespondingNominalTypeDecl() const {
+  if (!decl->hasBeenBound())
+    return nullptr;
   return decl->getExtendedNominal();
 }
 

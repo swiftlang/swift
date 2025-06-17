@@ -2996,9 +2996,10 @@ LazyStoragePropertyRequest::evaluate(Evaluator &evaluator,
   addMemberToContextIfNeeded(PBD, VD->getDeclContext(), Storage);
 
   // Make sure the original init is marked as subsumed.
-  auto *originalPBD = VD->getParentPatternBinding();
-  auto originalIndex = originalPBD->getPatternEntryIndexForVarDecl(VD);
-  originalPBD->setInitializerSubsumed(originalIndex);
+  if (auto *originalPBD = VD->getParentPatternBinding()) {
+    auto originalIndex = originalPBD->getPatternEntryIndexForVarDecl(VD);
+    originalPBD->setInitializerSubsumed(originalIndex);
+  }
 
   return Storage;
 }
