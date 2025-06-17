@@ -3568,6 +3568,43 @@ NodePointer NodePrinter::printEntity(NodePointer Entity, unsigned depth,
   return PostfixContext;
 }
 
+void NodePrinter::printFunctionName(bool hasName,
+                                    llvm::StringRef &OverwriteName,
+                                    llvm::StringRef &ExtraName,
+                                    bool MultiWordName, int &ExtraIndex,
+                                    swift::Demangle::NodePointer Entity,
+                                    unsigned int depth) {
+  if (hasName || !OverwriteName.empty()) {
+    if (!ExtraName.empty() && MultiWordName) {
+      Printer << ExtraName;
+      if (ExtraIndex >= 0)
+        Printer << ExtraIndex;
+
+      Printer << " of ";
+      ExtraName = "";
+      ExtraIndex = -1;
+    }
+    size_t CurrentPos = Printer.getStringRef().size();
+    if (!OverwriteName.empty()) {
+      Printer << OverwriteName;
+    } else {
+      auto Name = Entity->getChild(1);
+      if (Name->getKind() != Node::Kind::PrivateDeclName)
+        print(Name, depth + 1);
+
+      if (auto PrivateName = getChildIf(Entity, Node::Kind::PrivateDeclName))
+        print(PrivateName, depth + 1);
+    }
+    if (Printer.getStringRef().size() != CurrentPos && !ExtraName.empty())
+      Printer << '.';
+  }
+  if (!ExtraName.empty()) {
+    Printer << ExtraName;
+    if (ExtraIndex >= 0)
+      Printer << ExtraIndex;
+  }
+}
+
 void NodePrinter::printEntityType(NodePointer Entity, NodePointer type,
                                   NodePointer genericFunctionTypeList,
                                   unsigned depth) {
@@ -3751,7 +3788,15 @@ std::string Demangle::nodeToString(NodePointer root,
   if (!root)
     return "";
 
-  return NodePrinter(options).printRoot(root);
+  NodePrinter printer = NodePrinter(options);
+  nodeToString(root, &printer);
+  return printer.takeString();
+}
+
+void Demangle::nodeToString(NodePointer root, NodePrinter *printer) {
+  if (!root)
+    return;
+  printer->printRoot(root);
 }
 
 #endif
