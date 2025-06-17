@@ -557,7 +557,8 @@ EXPECTED_OPTIONS = [
     SetOption('--no-swift-stdlib-strict-availability',
               dest='swift_stdlib_strict_availability', value=False),
 
-    SetFalseOption('--no-llvm-include-tests', dest='llvm_include_tests'),
+    DisableOption('--no-llvm-include-tests', dest='llvm_include_tests'),
+    EnableOption('--llvm-include-tests', dest='llvm_include_tests'),
 
     SetTrueOption('--install-back-deploy-concurrency',
                   dest='install_backdeployconcurrency'),
