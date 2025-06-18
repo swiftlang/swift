@@ -489,22 +489,6 @@ private extension Instruction {
     }
     return nil
   }
-
-  /// Returns the next interesting location. As it is impossible to set a
-  /// breakpoint on a meta instruction, those are skipped.
-  /// However, we don't want to take a location with different inlining
-  /// information than this instruction, so in that case, we will return the
-  /// location of the meta instruction. If the meta instruction is the only
-  /// instruction in the basic block, we also take its location.
-  var locationOfNextNonMetaInstruction: Location {
-    let location = self.location
-    guard !location.isInlined,
-          let nextLocation = nextNonMetaInstruction?.location,
-          !nextLocation.isInlined else {
-      return location
-    }
-    return nextLocation
-  }
 }
 
 extension Builder {
@@ -524,7 +508,7 @@ extension Builder {
   init(before insPnt: Instruction, _ context: some MutatingContext) {
     context.verifyIsTransforming(function: insPnt.parentFunction)
     self.init(insertAt: .before(insPnt),
-              location: insPnt.locationOfNextNonMetaInstruction,
+              location: insPnt.location,
               context.notifyInstructionChanged, context._bridged.asNotificationHandler())
   }
 
@@ -556,7 +540,7 @@ extension Builder {
   /// TODO: this is incorrect for terminator instructions. Instead use `Builder.insert(after:location:_:insertFunc)`
   /// from OptUtils.swift. Rename this to afterNonTerminator.
   init(after insPnt: Instruction, _ context: some MutatingContext) {
-    self.init(after: insPnt, location: insPnt.locationOfNextNonMetaInstruction, context)
+    self.init(after: insPnt, location: insPnt.location, context)
   }
 
   /// Creates a builder which inserts at the end of `block`, using a custom `location`.
@@ -580,7 +564,7 @@ extension Builder {
     context.verifyIsTransforming(function: block.parentFunction)
     let firstInst = block.instructions.first!
     self.init(insertAt: .before(firstInst),
-              location: firstInst.locationOfNextNonMetaInstruction,
+              location: firstInst.location,
               context.notifyInstructionChanged, context._bridged.asNotificationHandler())
   }
 
