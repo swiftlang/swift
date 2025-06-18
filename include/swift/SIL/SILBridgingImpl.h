@@ -820,14 +820,6 @@ void BridgedFunction::setThunk(ThunkKind kind) const {
   getFunction()->setThunk((swift::IsThunk_t)kind);
 }
 
-bool BridgedFunction::isSerialized() const {
-  return getFunction()->isSerialized();
-}
-
-bool BridgedFunction::isAnySerialized() const {
-  return getFunction()->isAnySerialized();
-}
-
 BridgedFunction::SerializedKind BridgedFunction::getSerializedKind() const {
   return (SerializedKind)getFunction()->getSerializedKind();
 }

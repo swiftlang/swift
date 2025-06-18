@@ -163,9 +163,23 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
       bridged.hasSemanticsAttr(BridgedStringRef(data: buffer.baseAddress!, count: buffer.count))
     }
   }
-  public var isSerialized: Bool { bridged.isSerialized() }
+  public var isSerialized: Bool {
+    switch serializedKind {
+    case .notSerialized, .serializedForPackage:
+      return false
+    case .serialized:
+      return true
+    }
+  }
 
-  public var isAnySerialized: Bool { bridged.isAnySerialized() }
+  public var isAnySerialized: Bool {
+    switch serializedKind {
+    case .notSerialized:
+      return false
+    case .serialized, .serializedForPackage:
+      return true
+    }
+  }
 
   public enum SerializedKind {
     case notSerialized, serialized, serializedForPackage
