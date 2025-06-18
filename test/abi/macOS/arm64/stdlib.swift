@@ -933,8 +933,6 @@ Added: _$ss10ArraySliceV11mutableSpans07MutableD0VyxGvr
 Added: _$ss15ContiguousArrayV11mutableSpans07MutableD0VyxGvr
 Added: _$ss11InlineArrayVsRi__rlE11mutableSpans07MutableD0Vyq_Gvr
 Added: _$ss15CollectionOfOneV11mutableSpans07MutableE0VyxGvr
-Added: _$sSrsRi_zrlE11mutableSpans07MutableB0VyxGvr
-Added: _$sSw12mutableBytess14MutableRawSpanVvr
 
 // _SwiftifyInfo enum for _SwiftifyImports macro
 Added: _$ss13_SwiftifyExprO5paramyABSicABmFWC
