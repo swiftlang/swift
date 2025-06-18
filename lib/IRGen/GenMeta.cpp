@@ -1394,12 +1394,13 @@ namespace {
 
       // Create placeholders for the counts of the conditional requirements
       // for each conditional conformance to a supressible protocol.
-      unsigned numProtocols = countBitsUsed(protocols.rawBits());
+      unsigned numProtocols = 0;
       using PlaceholderPosition =
           ConstantAggregateBuilderBase::PlaceholderPosition;
       SmallVector<PlaceholderPosition, 2> countPlaceholders;
-      for (unsigned i : range(0, numProtocols)) {
-        (void)i;
+      for (auto kind : protocols) {
+        (void)kind;
+        numProtocols++;
         countPlaceholders.push_back(
             B.addPlaceholderWithSize(IGM.Int16Ty));
       }
