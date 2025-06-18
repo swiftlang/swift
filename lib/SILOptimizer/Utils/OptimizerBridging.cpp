@@ -649,30 +649,34 @@ void BridgedCloner::recordFoldedValue(BridgedValue origValue, BridgedValue mappe
 }
 
 namespace swift {
-  class ClosureSpecializationCloner: public SILClonerWithScopes<ClosureSpecializationCloner> {
-    friend class SILInstructionVisitor<ClosureSpecializationCloner>;
-    friend class SILCloner<ClosureSpecializationCloner>;
-  public: 
-    using SuperTy = SILClonerWithScopes<ClosureSpecializationCloner>;
-    ClosureSpecializationCloner(SILFunction &emptySpecializedFunction): SuperTy(emptySpecializedFunction) {}
+  class SpecializationCloner: public SILClonerWithScopes<SpecializationCloner> {
+    friend class SILInstructionVisitor<SpecializationCloner>;
+    friend class SILCloner<SpecializationCloner>;
+  public:
+    using SuperTy = SILClonerWithScopes<SpecializationCloner>;
+    SpecializationCloner(SILFunction &emptySpecializedFunction): SuperTy(emptySpecializedFunction) {}
   };
 } // namespace swift
 
 BridgedSpecializationCloner::BridgedSpecializationCloner(BridgedFunction emptySpecializedFunction): 
-  closureSpecCloner(new ClosureSpecializationCloner(*emptySpecializedFunction.getFunction())) {}
+  cloner(new SpecializationCloner(*emptySpecializedFunction.getFunction())) {}
 
 BridgedFunction BridgedSpecializationCloner::getCloned() const {
-  return { &closureSpecCloner->getBuilder().getFunction() };
+  return { &cloner->getBuilder().getFunction() };
 }
 
 BridgedBasicBlock BridgedSpecializationCloner::getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const {
-  return { closureSpecCloner->getOpBasicBlock(originalBasicBlock.unbridged()) };
+  return { cloner->getOpBasicBlock(originalBasicBlock.unbridged()) };
 }
 
 void BridgedSpecializationCloner::cloneFunctionBody(BridgedFunction originalFunction, BridgedBasicBlock clonedEntryBlock, BridgedValueArray clonedEntryBlockArgs) const {
   llvm::SmallVector<swift::SILValue, 16> clonedEntryBlockArgsStorage;
   auto clonedEntryBlockArgsArrayRef = clonedEntryBlockArgs.getValues(clonedEntryBlockArgsStorage);
-  closureSpecCloner->cloneFunctionBody(originalFunction.getFunction(), clonedEntryBlock.unbridged(), clonedEntryBlockArgsArrayRef);
+  cloner->cloneFunctionBody(originalFunction.getFunction(), clonedEntryBlock.unbridged(), clonedEntryBlockArgsArrayRef);
+}
+
+void BridgedSpecializationCloner::cloneFunctionBody(BridgedFunction originalFunction) const {
+  cloner->cloneFunction(originalFunction.getFunction());
 }
 
 void BridgedBuilder::destroyCapturedArgs(BridgedInstruction partialApply) const {
