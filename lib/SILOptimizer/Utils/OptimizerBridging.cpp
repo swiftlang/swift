@@ -290,14 +290,13 @@ BridgedOwnedString BridgedPassContext::mangleAsyncRemoved(BridgedFunction functi
   return BridgedOwnedString(Mangler.mangle());
 }
 
-BridgedOwnedString BridgedPassContext::mangleWithDeadArgs(const SwiftInt * _Nullable deadArgs,
-                                                          SwiftInt numDeadArgs,
+BridgedOwnedString BridgedPassContext::mangleWithDeadArgs(BridgedArrayRef bridgedDeadArgIndices,
                                                           BridgedFunction function) const {
   SILFunction *f = function.getFunction();
   Mangle::FunctionSignatureSpecializationMangler Mangler(f->getASTContext(),
       Demangle::SpecializationPass::FunctionSignatureOpts,
       f->getSerializedKind(), f);
-  for (SwiftInt idx = 0; idx < numDeadArgs; idx++) {
+  for (SwiftInt idx : bridgedDeadArgIndices.unbridged<SwiftInt>()) {
     Mangler.setArgumentDead((unsigned)idx);
   }
   return BridgedOwnedString(Mangler.mangle());

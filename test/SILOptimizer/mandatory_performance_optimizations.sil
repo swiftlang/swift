@@ -203,7 +203,7 @@ bb3:
 }
 
 // CHECK-LABEL: sil [no_locks] [perf_constraint] [ossa] @remove_metatype_arg :
-// CHECK:         [[F:%.*]] = function_ref @$s12metatype_argTf4dnn_n : $@convention(thin) (Int, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
+// CHECK:         [[F:%.*]] = function_ref @$s12metatype_argTf4ndn_n : $@convention(thin) (Int, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
 // CHECK:         [[A:%.*]] = apply [[F]](%0, %1) : $@convention(thin) (Int, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject
 // CHECK:         return [[A]]
 // CHECK:       } // end sil function 'remove_metatype_arg'
@@ -223,7 +223,7 @@ bb0(%0 : $Int, %1 : $@thick Int.Type, %2 : @owned $Builtin.NativeObject):
 }
 
 // CHECK-LABEL: sil [no_locks] [perf_constraint] [ossa] @remove_metatype_arg_throws :
-// CHECK:         [[F:%.*]] = function_ref @$s19metatype_arg_throwsTf4dnn_n : $@convention(thin) (Int, @owned Builtin.NativeObject) -> (@owned Builtin.NativeObject, @error any Error)
+// CHECK:         [[F:%.*]] = function_ref @$s19metatype_arg_throwsTf4ndn_n : $@convention(thin) (Int, @owned Builtin.NativeObject) -> (@owned Builtin.NativeObject, @error any Error)
 // CHECK:         try_apply [[F]](%0, %1) : $@convention(thin) (Int, @owned Builtin.NativeObject) -> (@owned Builtin.NativeObject, @error any Error), normal bb1, error bb2
 // CHECK:       bb1([[R:%.*]] : @owned $Builtin.NativeObject):
 // CHECK:         return [[R]]

@@ -250,9 +250,7 @@ struct BridgedPassContext {
   bool specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const;
   BridgedOwnedString mangleOutlinedVariable(BridgedFunction function) const;
   BridgedOwnedString mangleAsyncRemoved(BridgedFunction function) const;
-  BridgedOwnedString mangleWithDeadArgs(const SwiftInt * _Nullable deadArgs,
-                                                            SwiftInt numDeadArgs,
-                                                            BridgedFunction function) const;
+  BridgedOwnedString mangleWithDeadArgs(BridgedArrayRef bridgedDeadArgIndices, BridgedFunction function) const;
   BridgedOwnedString mangleWithClosureArgs(BridgedValueArray closureArgs,
                                                                BridgedArrayRef closureArgIndices,
                                                                BridgedFunction applySiteCallee) const;
