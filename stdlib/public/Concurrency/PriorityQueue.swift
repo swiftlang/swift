@@ -124,7 +124,7 @@ struct PriorityQueue<T> {
   private mutating func upHeap(ndx: Int) {
     var theNdx = ndx
     while theNdx > 0 {
-      let parentNdx = (theNdx - 1) / 2
+      let parentNdx = theNdx / 2
 
       if !compare(storage[theNdx], storage[parentNdx]) {
         break
@@ -151,13 +151,13 @@ struct PriorityQueue<T> {
   private mutating func downHeap(ndx:  Int) {
     var theNdx = ndx
     while true {
-      let leftNdx = 2 * theNdx + 1
+      let leftNdx = 2 * theNdx
 
       if leftNdx >= storage.count {
         break
       }
 
-      let rightNdx = 2 * theNdx + 2
+      let rightNdx = 2 * theNdx + 1
       var largestNdx = theNdx
 
       if compare(storage[leftNdx], storage[largestNdx]) {
