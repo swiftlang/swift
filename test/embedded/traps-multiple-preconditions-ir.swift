@@ -36,16 +36,16 @@ public func test(i: Int) {
 
 // "Production builds" - We expect 4 separate trap blocks in the IR.
 // CHECK-NOMESSAGE: define {{.*}}void @"$e4main4test1iySi_tF"(i64 %0) {{.*}}{
-// CHECK-NOMESSAGE:   tail call void asm sideeffect "", "n"(i32 0) #3
+// CHECK-NOMESSAGE:   tail call void asm sideeffect "", "n"(i32 0)
 // CHECK-NOMESSAGE:   tail call void @llvm.trap()
 // CHECK-NOMESSAGE:   unreachable
-// CHECK-NOMESSAGE:   tail call void asm sideeffect "", "n"(i32 1) #3
+// CHECK-NOMESSAGE:   tail call void asm sideeffect "", "n"(i32 1)
 // CHECK-NOMESSAGE:   tail call void @llvm.trap()
 // CHECK-NOMESSAGE:   unreachable
-// CHECK-NOMESSAGE:   tail call void asm sideeffect "", "n"(i32 2) #3
+// CHECK-NOMESSAGE:   tail call void asm sideeffect "", "n"(i32 2)
 // CHECK-NOMESSAGE:   tail call void @llvm.trap()
 // CHECK-NOMESSAGE:   unreachable
-// CHECK-NOMESSAGE:   tail call void asm sideeffect "", "n"(i32 3) #3
+// CHECK-NOMESSAGE:   tail call void asm sideeffect "", "n"(i32 3)
 // CHECK-NOMESSAGE:   tail call void @llvm.trap()
 // CHECK-NOMESSAGE:   unreachable
 // CHECK-NOMESSAGE: }
