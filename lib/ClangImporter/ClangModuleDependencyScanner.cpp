@@ -267,15 +267,3 @@ void ClangImporter::getBridgingHeaderOptions(
     swiftArgs.push_back(*Tree);
   }
 }
-
-ModuleDependencyVector
-ClangImporter::getModuleDependencies(Identifier moduleName,
-                                     StringRef moduleOutputPath,
-                                     StringRef sdkModuleOutputPath,
-                                     const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
-                                     const std::vector<std::string> &swiftModuleClangCC1CommandLineArgs,
-                                     InterfaceSubContextDelegate &delegate,
-                                     llvm::PrefixMapper *mapper,
-                                     bool isTestableImport) {
-  return {};
-}

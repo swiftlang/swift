@@ -59,14 +59,14 @@ bool prescanDependencies(CompilerInstance &instance);
 /// Scans the dependencies of the main module of \c instance.
 llvm::ErrorOr<swiftscan_dependency_graph_t>
 performModuleScan(CompilerInstance &instance,
-                  DependencyScanDiagnosticCollector *diagnostics,
-                  ModuleDependenciesCache &cache);
+                  ModuleDependenciesCache &cache,
+                  DependencyScanDiagnosticCollector *diagnostics = nullptr);
 
 /// Scans the main module of \c instance for all direct module imports
 llvm::ErrorOr<swiftscan_import_set_t>
 performModulePrescan(CompilerInstance &instance,
-                     DependencyScanDiagnosticCollector *diagnostics,
-                     ModuleDependenciesCache &cache);
+                     ModuleDependenciesCache &cache,
+                     DependencyScanDiagnosticCollector *diagnostics = nullptr);
 
 namespace incremental {
 /// For the given module dependency graph captured in the 'cache',

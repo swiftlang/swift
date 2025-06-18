@@ -1069,10 +1069,8 @@ private:
 
 // MARK: ModuleDependenciesCache
 /// This "local" dependencies cache persists only for the duration of a given
-/// scanning action, and wraps an instance of a `SwiftDependencyScanningService`
-/// which may carry cached scanning information from prior scanning actions.
-/// This cache maintains a store of references to all dependencies found within
-/// the current scanning action (with their values stored in the global Cache).
+/// scanning action, and maintains a store of references to all dependencies
+/// found within the current scanning action.
 class ModuleDependenciesCache {
 private:
   SwiftDependencyScanningService &globalScanningService;
@@ -1084,10 +1082,6 @@ private:
   std::string mainScanModuleName;
   /// The context hash of the current scanning invocation
   std::string scannerContextHash;
-  /// The location of where the explicitly-built modules will be output to
-  std::string moduleOutputPath;
-  /// The location of where the explicitly-built SDK modules will be output to
-  std::string sdkModuleOutputPath;
   /// The timestamp of the beginning of the scanning query action
   /// using this cache
   const llvm::sys::TimePoint<> scanInitializationTime;
@@ -1102,8 +1096,6 @@ private:
 public:
   ModuleDependenciesCache(SwiftDependencyScanningService &globalScanningService,
                           const std::string &mainScanModuleName,
-                          const std::string &moduleOutputPath,
-                          const std::string &sdkModuleOutputPath,
                           const std::string &scanningContextHash);
   ModuleDependenciesCache(const ModuleDependenciesCache &) = delete;
   ModuleDependenciesCache &operator=(const ModuleDependenciesCache &) = delete;
@@ -1137,8 +1129,6 @@ public:
   void addSeenClangModule(clang::tooling::dependencies::ModuleID newModule) {
     alreadySeenClangModules.insert(newModule);
   }
-  StringRef getModuleOutputPath() const { return moduleOutputPath; }
-  StringRef getSDKModuleOutputPath() const { return sdkModuleOutputPath; }
 
   /// Query all dependencies
   ModuleDependencyIDSetVector
