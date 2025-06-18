@@ -87,7 +87,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   /// Returns true if the function is a definition and not only an external declaration.
   ///
-  /// This is the case if the functioun contains a body, i.e. some basic blocks.
+  /// This is the case if the function contains a body, i.e. some basic blocks.
   public var isDefinition: Bool { blocks.first != nil }
 
   public var blocks : BasicBlockList { BasicBlockList(first: bridged.getFirstBlock().block) }
