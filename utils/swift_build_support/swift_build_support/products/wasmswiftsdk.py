@@ -164,6 +164,14 @@ class WasmSwiftSDK(product.Product):
         with shell.pushd(foundation.build_dir):
             shell.call([self.toolchain.cmake, '--install', '.', '--prefix', '/usr'],
                        env={'DESTDIR': dest_dir})
+        # DEBUG: Print the contents of .ninja_log file
+        ninja_log_path = os.path.join(foundation.build_dir, '.ninja_log')
+        print(f"DEBUG CI: Contents of {ninja_log_path}:")
+        if os.path.exists(ninja_log_path):
+            with open(ninja_log_path, 'r') as ninja_log_file:
+                print(ninja_log_file.read())
+        else:
+            print(f"DEBUG CI: {ninja_log_path} does not exist!?")
 
     def _build_swift_testing(self, swift_host_triple, has_pthread, wasi_sysroot):
         swift_testing = CMakeProduct(
