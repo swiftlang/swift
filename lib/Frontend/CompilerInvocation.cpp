@@ -2441,8 +2441,6 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
   for (auto A: Args.filtered(OPT_candidate_module_file)) {
     Opts.CandidateCompiledModules.push_back(resolveSearchPath(A->getValue()));
   }
-  if (const Arg *A = Args.getLastArg(OPT_placeholder_dependency_module_map))
-    Opts.PlaceholderDependencyModuleMap = A->getValue();
 
   if (const Arg *A = Args.getLastArg(OPT_const_gather_protocols_file))
     Opts.ConstGatherProtocolListFilePath = A->getValue();
