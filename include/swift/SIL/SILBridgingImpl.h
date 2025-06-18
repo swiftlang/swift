@@ -2400,6 +2400,19 @@ BridgedInstruction BridgedBuilder::createTryApply(BridgedValue function, Bridged
       arguments.getValues(argValues), normalBB.unbridged(), errorBB.unbridged(), applyOpts, specInfo.data)};
 }
 
+BridgedInstruction BridgedBuilder::createBeginApply(BridgedValue function, BridgedSubstitutionMap subMap,
+                               BridgedValueArray arguments, bool isNonThrowing, bool isNonAsync,
+                               BridgedGenericSpecializationInformation specInfo) const {
+  llvm::SmallVector<swift::SILValue, 16> argValues;
+  swift::ApplyOptions applyOpts;
+  if (isNonThrowing) { applyOpts |= swift::ApplyFlags::DoesNotThrow; }
+  if (isNonAsync) { applyOpts |= swift::ApplyFlags::DoesNotAwait; }
+
+  return {unbridged().createBeginApply(
+      regularLoc(), function.getSILValue(), subMap.unbridged(),
+      arguments.getValues(argValues), applyOpts, specInfo.data)};
+}
+
 BridgedInstruction BridgedBuilder::createWitnessMethod(BridgedCanType lookupType,
                                         BridgedConformance conformance,
                                         BridgedDeclRef member, BridgedType methodType) const {
@@ -2548,6 +2561,10 @@ BridgedInstruction BridgedBuilder::createDestructureTuple(BridgedValue str) cons
   return {unbridged().createDestructureTuple(regularLoc(), str.getSILValue())};
 }
 
+BridgedInstruction BridgedBuilder::createProjectBox(BridgedValue box, SwiftInt fieldIdx) const {
+  return {unbridged().createProjectBox(regularLoc(), box.getSILValue(), (unsigned)fieldIdx)};
+}
+
 BridgedInstruction BridgedBuilder::createStore(BridgedValue src, BridgedValue dst,
                                SwiftInt ownership) const {
   return {unbridged().createStore(regularLoc(), src.getSILValue(),
@@ -2601,6 +2618,19 @@ BridgedInstruction BridgedBuilder::createMarkDependenceAddr(BridgedValue value, 
       regularLoc(), value.getSILValue(), base.getSILValue(),
       swift::MarkDependenceKind(kind))};
 }
+
+BridgedInstruction BridgedBuilder::createMarkUninitialized(BridgedValue value, SwiftInt kind) const {
+  return {unbridged().createMarkUninitialized(
+      regularLoc(), value.getSILValue(), (swift::MarkUninitializedInst::Kind)kind)};
+}
+
+BridgedInstruction BridgedBuilder::createMarkUnresolvedNonCopyableValue(BridgedValue value,
+                                                                        SwiftInt checkKind, bool isStrict) const {
+  return {unbridged().createMarkUnresolvedNonCopyableValueInst(
+      regularLoc(), value.getSILValue(), (swift::MarkUnresolvedNonCopyableValueInst::CheckKind)checkKind,
+      (swift::MarkUnresolvedNonCopyableValueInst::IsStrict_t)isStrict)};
+}
+
 
 BridgedInstruction BridgedBuilder::createEndAccess(BridgedValue value) const {
   return {unbridged().createEndAccess(regularLoc(), value.getSILValue(), false)};
