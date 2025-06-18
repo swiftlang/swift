@@ -36,7 +36,6 @@ typedef enum {
   // SwiftInterface and SwiftSource.
   SWIFTSCAN_DEPENDENCY_INFO_SWIFT_TEXTUAL = 0,
   SWIFTSCAN_DEPENDENCY_INFO_SWIFT_BINARY = 1,
-  SWIFTSCAN_DEPENDENCY_INFO_SWIFT_PLACEHOLDER = 2,
   SWIFTSCAN_DEPENDENCY_INFO_CLANG = 3
 } swiftscan_dependency_info_kind_t;
 
@@ -310,7 +309,8 @@ swiftscan_swift_binary_detail_get_module_cache_key(
 SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_swift_binary_detail_get_user_module_version(
     swiftscan_module_details_t details);
-//=== Swift Placeholder Module Details query APIs -------------------------===//
+
+//=== Swift Placeholder Module Details query APIs - DEPRECATED -----------===//
 
 SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_swift_placeholder_detail_get_compiled_module_path(

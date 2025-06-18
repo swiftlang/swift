@@ -360,14 +360,6 @@ ERROR(explicit_swift_module_map_corrupted,none,
       "explicit Swift module map from %0 is malformed",
       (StringRef))
 
-ERROR(placeholder_dependency_module_map_missing,none,
-      "cannot open Swift placeholder dependency module map from %0",
-      (StringRef))
-
-ERROR(placeholder_dependency_module_map_corrupted,none,
-      "Swift placeholder dependency module map from %0 is malformed",
-      (StringRef))
-
 ERROR(const_extract_protocol_list_input_file_missing,none,
       "cannot open constant extraction protocol list input file from %0",
       (StringRef))

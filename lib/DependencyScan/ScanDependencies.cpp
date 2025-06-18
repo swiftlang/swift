@@ -92,10 +92,6 @@ public:
   // Resolve the dependencies for the current moduleID. Return true on error.
   bool resolve(const std::set<ModuleDependencyID> &dependencies,
                std::optional<std::set<ModuleDependencyID>> bridgingHeaderDeps) {
-    // No need to resolve dependency for placeholder.
-    if (moduleID.Kind == ModuleDependencyKind::SwiftPlaceholder)
-      return false;
-
     // If the dependency is already finalized, nothing needs to be done.
     if (resolvingDepInfo.isFinalized())
       return false;
@@ -114,13 +110,6 @@ public:
         auto binaryDepDetails = depInfo.getAsSwiftBinaryModule();
         assert(binaryDepDetails && "Expected Swift Binary Module dependency.");
         if (handleSwiftBinaryModuleDependency(depModuleID, *binaryDepDetails))
-          return true;
-      } break;
-      case swift::ModuleDependencyKind::SwiftPlaceholder: {
-        auto placeholderDetails = depInfo.getAsPlaceholderDependencyModule();
-        assert(placeholderDetails && "Expected Swift Placeholder dependency.");
-        if (handleSwiftPlaceholderModuleDependency(depModuleID,
-                                                   *placeholderDetails))
           return true;
       } break;
       case swift::ModuleDependencyKind::Clang: {
@@ -195,9 +184,6 @@ private:
   bool finalize(ModuleDependencyInfo &depInfo,
                 const SwiftInterfaceModuleOutputPathResolution::ResultTy
                     &swiftInterfaceModuleOutputPath) {
-    if (resolvingDepInfo.isSwiftPlaceholderModule())
-      return false;
-
     if (resolvingDepInfo.isSwiftInterfaceModule())
       depInfo.setOutputPathAndHash(
           swiftInterfaceModuleOutputPath.outputPath.str().str(),
@@ -284,15 +270,6 @@ private:
       }
     }
     addMacroDependencies(depModuleID, binaryDepDetails);
-    return false;
-  }
-
-  bool handleSwiftPlaceholderModuleDependency(
-      ModuleDependencyID depModuleID,
-      const SwiftPlaceholderModuleDependencyStorage &placeholderDetails) {
-    if (!resolvingDepInfo.isSwiftSourceModule())
-      commandline.push_back("-swift-module-file=" + depModuleID.ModuleName +
-                            "=" + placeholderDetails.compiledModulePath);
     return false;
   }
 
@@ -721,9 +698,6 @@ static void bridgeDependencyIDs(const ArrayRef<ModuleDependencyID> dependencies,
     case ModuleDependencyKind::SwiftBinary:
       dependencyKindAndName = "swiftBinary";
       break;
-    case ModuleDependencyKind::SwiftPlaceholder:
-      dependencyKindAndName = "swiftPlaceholder";
-      break;
     case ModuleDependencyKind::Clang:
       dependencyKindAndName = "clang";
       break;
@@ -776,7 +750,6 @@ generateFullDependencyGraph(const CompilerInstance &instance,
     const auto &moduleID = allModules[i];
     auto &moduleDependencyInfo = cache.findKnownDependency(moduleID);
     // Collect all the required pieces to build a ModuleInfo
-    auto swiftPlaceholderDeps = moduleDependencyInfo.getAsPlaceholderDependencyModule();
     auto swiftTextualDeps = moduleDependencyInfo.getAsSwiftInterfaceModule();
     auto swiftSourceDeps = moduleDependencyInfo.getAsSwiftSourceModule();
     auto swiftBinaryDeps = moduleDependencyInfo.getAsSwiftBinaryModule();
@@ -788,8 +761,6 @@ generateFullDependencyGraph(const CompilerInstance &instance,
     std::string modulePath;
     if (swiftTextualDeps)
       modulePath = swiftTextualDeps->moduleOutputPath;
-    else if (swiftPlaceholderDeps)
-      modulePath = swiftPlaceholderDeps->compiledModulePath;
     else if (swiftBinaryDeps)
       modulePath = swiftBinaryDeps->compiledModulePath;
     else if (clangDeps)
@@ -904,12 +875,6 @@ generateFullDependencyGraph(const CompilerInstance &instance,
             create_clone(swiftSourceDeps->chainedBridgingHeaderPath.c_str()),
             create_clone(
                 swiftSourceDeps->chainedBridgingHeaderContent.c_str())};
-      } else if (swiftPlaceholderDeps) {
-        details->kind = SWIFTSCAN_DEPENDENCY_INFO_SWIFT_PLACEHOLDER;
-        details->swift_placeholder_details = {
-            create_clone(swiftPlaceholderDeps->compiledModulePath.c_str()),
-            create_clone(swiftPlaceholderDeps->moduleDocPath.c_str()),
-            create_clone(swiftPlaceholderDeps->sourceInfoPath.c_str())};
       } else if (swiftBinaryDeps) {
         details->kind = SWIFTSCAN_DEPENDENCY_INFO_SWIFT_BINARY;
         // Create an overlay dependencies set according to the output format
@@ -1346,8 +1311,6 @@ swift::dependencies::createEncodedModuleKindAndName(ModuleDependencyID id) {
     return "swiftTextual:" + id.ModuleName;
   case ModuleDependencyKind::SwiftBinary:
     return "swiftBinary:" + id.ModuleName;
-  case ModuleDependencyKind::SwiftPlaceholder:
-    return "swiftPlaceholder:" + id.ModuleName;
   case ModuleDependencyKind::Clang:
     return "clang:" + id.ModuleName;
   default:
