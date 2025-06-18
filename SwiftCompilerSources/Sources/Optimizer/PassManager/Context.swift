@@ -419,18 +419,17 @@ struct FunctionPassContext : MutatingContext {
     return gv.globalVar
   }
 
-  func createFunctionForClosureSpecialization(from applySiteCallee: Function, withName specializedFunctionName: String, 
-                                              withParams specializedParameters: [ParameterInfo], 
-                                              withSerialization isSerialized: Bool) -> Function 
+  func createSpecializedFunctionDeclaration(from original: Function, withName specializedFunctionName: String, 
+                                            withParams specializedParameters: [ParameterInfo],
+                                            makeThin: Bool = false,
+                                            makeBare: Bool = false) -> Function
   {
     return specializedFunctionName._withBridgedStringRef { nameRef in
       let bridgedParamInfos = specializedParameters.map { $0._bridged }
 
       return bridgedParamInfos.withUnsafeBufferPointer { paramBuf in
-        _bridged.ClosureSpecializer_createEmptyFunctionWithSpecializedSignature(nameRef, paramBuf.baseAddress, 
-                                                                                paramBuf.count, 
-                                                                                applySiteCallee.bridged, 
-                                                                                isSerialized).function
+        _bridged.createSpecializedFunctionDeclaration(nameRef, paramBuf.baseAddress, paramBuf.count,
+                                                      original.bridged, makeThin, makeBare).function
       }
     }
   }

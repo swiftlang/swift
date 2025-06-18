@@ -392,11 +392,12 @@ struct BridgedPassContext {
   BRIDGED_INLINE bool enableAddressDependencies() const;
 
   // Closure specializer
-  SWIFT_IMPORT_UNSAFE BridgedFunction ClosureSpecializer_createEmptyFunctionWithSpecializedSignature(BridgedStringRef specializedName,
+  SWIFT_IMPORT_UNSAFE BridgedFunction createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
                                                         const BridgedParameterInfo * _Nullable specializedBridgedParams,
                                                         SwiftInt paramCount,
-                                                        BridgedFunction bridgedApplySiteCallee,
-                                                        bool isSerialized) const;
+                                                        BridgedFunction bridgedOriginal,
+                                                        bool makeThin,
+                                                        bool makeBare) const;
 
   bool completeLifetime(BridgedValue value) const;
 };

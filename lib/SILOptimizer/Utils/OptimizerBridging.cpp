@@ -452,13 +452,14 @@ void BridgedPassContext::moveFunctionBody(BridgedFunction sourceFunc, BridgedFun
 }
 
 BridgedFunction BridgedPassContext::
-ClosureSpecializer_createEmptyFunctionWithSpecializedSignature(BridgedStringRef specializedName,
-                                            const BridgedParameterInfo * _Nullable specializedBridgedParams,
-                                            SwiftInt paramCount,
-                                            BridgedFunction bridgedApplySiteCallee,
-                                            bool isSerialized)  const {
-  auto *applySiteCallee = bridgedApplySiteCallee.getFunction();
-  auto applySiteCalleeType = applySiteCallee->getLoweredFunctionType();
+createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
+                                     const BridgedParameterInfo * _Nullable specializedBridgedParams,
+                                     SwiftInt paramCount,
+                                     BridgedFunction bridgedOriginal,
+                                     bool makeThin,
+                                     bool makeBare)  const {
+  auto *original = bridgedOriginal.getFunction();
+  auto originalType = original->getLoweredFunctionType();
 
   llvm::SmallVector<SILParameterInfo> specializedParams;
   for (unsigned idx = 0; idx < paramCount; ++idx) {
@@ -468,18 +469,19 @@ ClosureSpecializer_createEmptyFunctionWithSpecializedSignature(BridgedStringRef 
   // The specialized function is always a thin function. This is important
   // because we may add additional parameters after the Self parameter of
   // witness methods. In this case the new function is not a method anymore.
-  auto extInfo = applySiteCalleeType->getExtInfo();
-  extInfo = extInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
+  auto extInfo = originalType->getExtInfo();
+  if (makeThin)
+    extInfo = extInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
 
   auto ClonedTy = SILFunctionType::get(
-      applySiteCalleeType->getInvocationGenericSignature(), extInfo,
-      applySiteCalleeType->getCoroutineKind(),
-      applySiteCalleeType->getCalleeConvention(), specializedParams,
-      applySiteCalleeType->getYields(), applySiteCalleeType->getResults(),
-      applySiteCalleeType->getOptionalErrorResult(),
-      applySiteCalleeType->getPatternSubstitutions(),
-      applySiteCalleeType->getInvocationSubstitutions(),
-      applySiteCallee->getModule().getASTContext());
+      originalType->getInvocationGenericSignature(), extInfo,
+      originalType->getCoroutineKind(),
+      originalType->getCalleeConvention(), specializedParams,
+      originalType->getYields(), originalType->getResults(),
+      originalType->getOptionalErrorResult(),
+      originalType->getPatternSubstitutions(),
+      originalType->getInvocationSubstitutions(),
+      original->getModule().getASTContext());
 
   SILOptFunctionBuilder functionBuilder(*invocation->getTransform());
 
@@ -493,23 +495,23 @@ ClosureSpecializer_createEmptyFunctionWithSpecializedSignature(BridgedStringRef 
       // It's also important to disconnect this specialized function from any
       // classes (the classSubclassScope), because that may incorrectly
       // influence the linkage.
-      getSpecializedLinkage(applySiteCallee, applySiteCallee->getLinkage()), specializedName.unbridged(),
-      ClonedTy, applySiteCallee->getGenericEnvironment(),
-      applySiteCallee->getLocation(), IsBare, applySiteCallee->isTransparent(),
-      isSerialized ? IsSerialized : IsNotSerialized, IsNotDynamic, IsNotDistributed,
-      IsNotRuntimeAccessible, applySiteCallee->getEntryCount(),
-      applySiteCallee->isThunk(),
+      getSpecializedLinkage(original, original->getLinkage()), specializedName.unbridged(),
+      ClonedTy, original->getGenericEnvironment(),
+      original->getLocation(), makeBare ? IsBare : original->isBare(), original->isTransparent(),
+      original->getSerializedKind(), IsNotDynamic, IsNotDistributed,
+      IsNotRuntimeAccessible, original->getEntryCount(),
+      original->isThunk(),
       /*classSubclassScope=*/SubclassScope::NotApplicable,
-      applySiteCallee->getInlineStrategy(), applySiteCallee->getEffectsKind(),
-      applySiteCallee, applySiteCallee->getDebugScope());
+      original->getInlineStrategy(), original->getEffectsKind(),
+      original, original->getDebugScope());
   
-  if (!applySiteCallee->hasOwnership()) {
+  if (!original->hasOwnership()) {
     specializedApplySiteCallee->setOwnershipEliminated();
   }
   
-  for (auto &Attr : applySiteCallee->getSemanticsAttrs())
+  for (auto &Attr : original->getSemanticsAttrs())
     specializedApplySiteCallee->addSemanticsAttr(Attr);
-  
+
   return {specializedApplySiteCallee};
 }
 
