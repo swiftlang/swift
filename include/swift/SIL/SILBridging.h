@@ -514,6 +514,8 @@ struct BridgedFunction {
   BRIDGED_INLINE ThunkKind isThunk() const;
   BRIDGED_INLINE void setThunk(ThunkKind) const;
   BRIDGED_INLINE bool needsStackProtection() const;
+  BRIDGED_INLINE bool shouldOptimize() const;
+  BRIDGED_INLINE bool isReferencedInModule() const;
   BRIDGED_INLINE bool wasDeserializedCanonical() const;
   BRIDGED_INLINE void setNeedStackProtection(bool needSP) const;
   BRIDGED_INLINE void setIsPerformanceConstraint(bool isPerfConstraint) const;

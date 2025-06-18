@@ -844,6 +844,14 @@ bool BridgedFunction::needsStackProtection() const {
   return getFunction()->needsStackProtection();
 }
 
+bool BridgedFunction::shouldOptimize() const {
+  return getFunction()->shouldOptimize();
+}
+
+bool BridgedFunction::isReferencedInModule() const {
+  return getFunction()->getRefCount() != 0;
+}
+
 bool BridgedFunction::wasDeserializedCanonical() const {
   return getFunction()->wasDeserializedCanonical();
 }

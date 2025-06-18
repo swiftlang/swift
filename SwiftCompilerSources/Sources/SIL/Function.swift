@@ -36,6 +36,14 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     hasher.combine(ObjectIdentifier(self))
   }
 
+  /// True if this function is referenced from anywhere within the module,
+  /// e.g. from a `function_ref` instruction.
+  public var isReferencedInModule: Bool { bridged.isReferencedInModule() }
+
+  /// True if this function should be optimized, i.e. the module is compiled with optimizations
+  /// and the function has no `@_optimize(none)` attribute.
+  public var shouldOptimize: Bool { bridged.shouldOptimize() }
+
   public var wasDeserializedCanonical: Bool { bridged.wasDeserializedCanonical() }
 
   public var isTrapNoReturn: Bool { bridged.isTrapNoReturn() }
