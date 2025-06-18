@@ -2,7 +2,6 @@
 
 Notes related to information about a missing module dependency.
 
-
 ## Overview
 
 This diagnostic group covers notes related to displaying information about a missing module dependency which the compiler is able to locate as present on a search path found in a loaded Swift binary module, but which is not specified to the current compilation.
