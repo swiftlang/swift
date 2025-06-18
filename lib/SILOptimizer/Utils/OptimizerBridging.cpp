@@ -336,6 +336,20 @@ BridgedOwnedString BridgedPassContext::mangleWithClosureArgs(
   return BridgedOwnedString(mangler.mangle());
 }
 
+BridgedOwnedString BridgedPassContext::mangleWithBoxToStackPromotedArgs(
+  BridgedArrayRef bridgedPromotedArgIndices,
+  BridgedFunction bridgedOriginalFunction
+) const {
+  auto *original = bridgedOriginalFunction.getFunction();
+  Mangle::FunctionSignatureSpecializationMangler mangler(original->getASTContext(),
+                                                         Demangle::SpecializationPass::AllocBoxToStack,
+                                                         original->getSerializedKind(), original);
+  for (SwiftInt i : bridgedPromotedArgIndices.unbridged<SwiftInt>()) {
+    mangler.setArgumentBoxToStack((unsigned)i);
+  }
+  return BridgedOwnedString(mangler.mangle());
+}
+
 BridgedGlobalVar BridgedPassContext::createGlobalVariable(BridgedStringRef name, BridgedType type, BridgedLinkage linkage, bool isLet) const {
   auto *global = SILGlobalVariable::create(
       *invocation->getPassManager()->getModule(),

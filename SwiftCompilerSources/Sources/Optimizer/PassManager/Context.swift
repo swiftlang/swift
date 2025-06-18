@@ -412,6 +412,12 @@ struct FunctionPassContext : MutatingContext {
     }
   }
 
+  func mangle(withBoxToStackPromotedArguments argIndices: [Int], from original: Function) -> String {
+    argIndices.withBridgedArrayRef { bridgedArgIndices in
+      String(taking: _bridged.mangleWithBoxToStackPromotedArgs(bridgedArgIndices, original.bridged))
+    }
+  }
+
   func createGlobalVariable(name: String, type: Type, linkage: Linkage, isLet: Bool) -> GlobalVariable {
     let gv = name._withBridgedStringRef {
       _bridged.createGlobalVariable($0, type.bridged, linkage.bridged, isLet)
