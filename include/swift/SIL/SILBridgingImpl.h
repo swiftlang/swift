@@ -2117,7 +2117,25 @@ swift::SILBuilder BridgedBuilder::unbridged() const {
 }
 
 swift::SILLocation BridgedBuilder::regularLoc() const {
-  return swift::RegularLocation(loc.getLoc().getLocation());
+  auto l = loc.getLoc().getLocation();
+  switch (l.getKind()) {
+    case swift::SILLocation::ReturnKind:
+    case swift::SILLocation::ImplicitReturnKind:
+    case swift::SILLocation::ArtificialUnreachableKind:
+      return swift::RegularLocation(l);
+    default:
+      return l;
+  }
+}
+
+swift::SILLocation BridgedBuilder::returnLoc() const {
+  auto l = loc.getLoc().getLocation();
+  switch (l.getKind()) {
+    case swift::SILLocation::ArtificialUnreachableKind:
+      return swift::RegularLocation(l);
+    default:
+      return l;
+  }
 }
 
 BridgedInstruction BridgedBuilder::createBuiltin(BridgedStringRef name, BridgedType type,
@@ -2399,7 +2417,7 @@ BridgedInstruction BridgedBuilder::createWitnessMethod(BridgedCanType lookupType
 
 
 BridgedInstruction BridgedBuilder::createReturn(BridgedValue op) const {
-  return {unbridged().createReturn(regularLoc(), op.getSILValue())};
+  return {unbridged().createReturn(returnLoc(), op.getSILValue())};
 }
 
 BridgedInstruction BridgedBuilder::createThrow(BridgedValue op) const {
@@ -2465,7 +2483,7 @@ BridgedInstruction BridgedBuilder::createBranch(BridgedBasicBlock destBlock, Bri
 }
 
 BridgedInstruction BridgedBuilder::createUnreachable() const {
-  return {unbridged().createUnreachable(regularLoc())};
+  return {unbridged().createUnreachable(loc.getLoc().getLocation())};
 }
 
 BridgedInstruction BridgedBuilder::createObject(BridgedType type,

@@ -1151,6 +1151,7 @@ struct BridgedBuilder{
 
   BRIDGED_INLINE swift::SILBuilder unbridged() const;
   BRIDGED_INLINE swift::SILLocation regularLoc() const;
+  BRIDGED_INLINE swift::SILLocation returnLoc() const;
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createBuiltin(BridgedStringRef name,
                                                                       BridgedType type,
