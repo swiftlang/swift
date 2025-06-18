@@ -39,6 +39,13 @@ struct NCContainer : ~Copyable {
   var wrapper: Wrapper { get } // _read
 }
 
+struct NCWrapper : ~Copyable, ~Escapable {
+  @_hasStorage let a: NE { get }
+  deinit
+}
+
+sil @NCWrapper_getNE : $@convention(method) (@guaranteed NCWrapper) -> @lifetime(borrow 0) @owned NE
+
 struct TrivialHolder {
   var pointer: UnsafeRawPointer
 }
@@ -85,6 +92,12 @@ sil @readAccess : $@yield_once @convention(method) (@guaranteed Holder) -> @life
 
 sil @yieldInoutHolder : $@yield_once @convention(method) (@inout Holder) -> @yields @inout Holder
 sil @yieldInoutNE : $@yield_once @convention(method) (@inout Holder) -> @lifetime(borrow 0) @owned NE
+
+class C {
+  @_hasStorage @_hasInitialValue private var nc: NCWrapper? { get set }
+}
+
+sil @C_read : $@yield_once @convention(method) (@guaranteed C) -> @yields @guaranteed Optional<NCWrapper>
 
 // NCContainer.wrapper._read:
 //   var wrapper: Wrapper {
@@ -612,4 +625,57 @@ bb0(%0 : @owned $NCContainer):
   destroy_value %1
   %31 = tuple ()
   return %31
+}
+
+// rdar://153479358 (Compiler crash when force-unwrapping optional ~Copyable type)
+//
+// Handle dead end coroutines: begin_apply -> end_borrow
+// CHECK-LABEL: sil hidden [ossa] @testReadDeadEnd : $@convention(method) (@guaranteed C) -> () {
+// CHECK: bb0(%0 : @guaranteed $C):
+// CHECK:   ({{.*}}, [[TOKEN:%[0-9]+]]) = begin_apply %{{.*}}(%0) : $@yield_once @convention(method) (@guaranteed C) -> @yields @guaranteed Optional<NCWrapper>
+// CHECK:   switch_enum %{{.*}}, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
+// CHECK: bb1:
+// CHECK:   destroy_value [dead_end]
+// CHECK:   end_borrow [[TOKEN]]
+// CHECK:   unreachable
+// CHECK: bb2(%{{.*}} : @guaranteed $NCWrapper):
+// CHECK:   mark_dependence [unresolved]
+// CHECK:   destroy_value
+// CHECK:   destroy_value
+// CHECK:   end_apply [[TOKEN]] as $()
+// CHECK-LABEL: } // end sil function 'testReadDeadEnd'
+sil hidden [ossa] @testReadDeadEnd : $@convention(method) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  // FIXME: I don't know how to print a lifetime-dependent class method in SIL.
+  // %2 = class_method %0, #C.nc!read : (C) -> () -> (), $@yield_once @convention(method) (@guaranteed C) -> @yields @guaranteed Optional<NCWrapper>
+  %2 = function_ref @C_read : $@yield_once @convention(method) (@guaranteed C) -> @yields @guaranteed Optional<NCWrapper>
+  (%3, %4) = begin_apply %2(%0) : $@yield_once @convention(method) (@guaranteed C) -> @yields @guaranteed Optional<NCWrapper>
+  %5 = copy_value %3
+  %6 = mark_unresolved_non_copyable_value [no_consume_or_assign] %5
+  %7 = alloc_stack $Optional<NCWrapper>
+  %8 = mark_unresolved_non_copyable_value [no_consume_or_assign] %7
+  %9 = store_borrow %6 to %8
+  %10 = load_borrow [unchecked] %9
+  switch_enum %10, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
+
+bb1:
+  end_borrow %10
+  end_borrow %9
+  destroy_value [dead_end] %6
+  end_borrow %4
+  unreachable
+
+bb2(%25 : @guaranteed $NCWrapper):
+  %26 = function_ref @NCWrapper_getNE : $@convention(method) (@guaranteed NCWrapper) -> @lifetime(borrow 0) @owned NE
+  %27 = apply %26(%25) : $@convention(method) (@guaranteed NCWrapper) -> @lifetime(borrow 0) @owned NE
+  %28 = mark_dependence [unresolved] %27 on %3
+  end_borrow %10
+  end_borrow %9
+  destroy_value %6
+  %32 = end_apply %4 as $()
+  dealloc_stack %7
+  %34 = move_value [var_decl] %28
+  destroy_value %34
+  %37 = tuple ()
+  return %37
 }
