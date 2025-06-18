@@ -398,5 +398,12 @@ DependencyScanningTool::initCompilerInstanceForScan(
                            scannerDiagnosticsCollector};
 }
 
+std::vector<StringRef>
+DependencyScanningTool::getInvalidNegativeStatCachedPaths() {
+  assert(ScanningService &&
+         "Must have a service to obtain invalid negative stat cached paths!");
+  return ScanningService->getInvalidNegativeStatCachedPaths();
+}
+
 } // namespace dependencies
 } // namespace swift

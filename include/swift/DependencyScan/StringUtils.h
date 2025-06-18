@@ -35,6 +35,11 @@ swiftscan_string_set_t *create_set(const std::vector<std::string> &strings);
 /// create_clone routine.
 swiftscan_string_set_t *create_set(int count, const char **strings);
 
+/// Create an array of swiftscan_string_ref_t objects from an array of
+/// llvm:::StringRefs.
+swiftscan_string_set_t *
+create_set(const std::vector<llvm::StringRef> &stringRefs);
+
 /// Create an empty array of swiftscan_string_ref_t objects
 swiftscan_string_set_t *create_empty_set();
 
