@@ -610,7 +610,7 @@ func _createDefaultExecutors() {
   }
 }
 
-#if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 extension MainActor {
   @available(StdlibDeploymentTarget 6.2, *)
   static var _executor: (any MainExecutor)? = nil
@@ -627,7 +627,7 @@ extension MainActor {
     return _executor!
   }
 }
-#endif // !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+#endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
 extension Task where Success == Never, Failure == Never {
   @available(StdlibDeploymentTarget 6.2, *)
