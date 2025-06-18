@@ -1,5 +1,5 @@
 // {"signature":"createImplicitConstructor(swift::NominalTypeDecl*, ImplicitConstructorKind, swift::ASTContext&)"}
-// RUN: not --crash %target-swift-frontend -typecheck %s
+// RUN: not %target-swift-frontend -typecheck -swift-version 5 %s
 struct a @propertyWrapper struct b < c {
   wrappedValue : c
 } @propertyWrapper struct d {
