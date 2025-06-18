@@ -1315,6 +1315,6 @@ class AllocBoxToStack : public SILFunctionTransform {
 };
 } // end anonymous namespace
 
-SILTransform *swift::createAllocBoxToStack() {
+SILTransform *swift::createLegacyAllocBoxToStack() {
   return new AllocBoxToStack();
 }
