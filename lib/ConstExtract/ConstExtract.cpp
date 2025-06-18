@@ -414,7 +414,7 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
       assert(!decl->hasDefaultExpr());
       switch (decl->getDefaultArgumentKind()) {
       case DefaultArgumentKind::NilLiteral:
-        return std::make_shared<RawLiteralValue>("nil");
+        return std::make_shared<NilLiteralValue>();
       case DefaultArgumentKind::EmptyArray:
         return std::make_shared<ArrayValue>(
             std::vector<std::shared_ptr<CompileTimeValue>>());
