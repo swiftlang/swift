@@ -1106,6 +1106,23 @@ extension ContiguousArray {
       initializingWith: initializer))
   }
 
+  //FIXME: typed throws
+  @_alwaysEmitIntoClient
+  @available(SwiftStdlib 6.2, *)
+  public init(
+    capacity: Int,
+    initializingWith initializer: (inout OutputSpan<Element>) throws -> Void
+  ) rethrows {
+    try unsafe self.init(
+      unsafeUninitializedCapacity: capacity,
+      initializingWith: { (buffer, count) in
+        var output = unsafe OutputSpan(buffer: buffer, initializedCount: 0)
+        try initializer(&output)
+        count = unsafe output.finalize(for: buffer)
+      }
+    )
+  }
+
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
   @usableFromInline
@@ -1247,15 +1264,10 @@ extension ContiguousArray {
     @lifetime(&self)
     @_alwaysEmitIntoClient
     mutating get {
-      // _makeMutableAndUnique*() inserts begin_cow_mutation.
-      // LifetimeDependence analysis inserts call to end_cow_mutation_addr since we cannot schedule it in the stdlib for mutableSpan property.
-#if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
-      // We have runtime verification to check if begin_cow_mutation/end_cow_mutation are properly nested in asserts build of stdlib,
-      // disable checking whenever it is turned on since the compiler generated `end_cow_mutation_addr` is conservative and cannot be verified.
-      _makeMutableAndUniqueUnchecked()
-#else
       _makeMutableAndUnique()
-#endif
+      // NOTE: We don't have the ability to schedule a call to
+      //       ContiguousArrayBuffer.endCOWMutation().
+      //       rdar://146785284 (lifetime analysis for end of mutation)
       let pointer = unsafe _buffer.firstElementAddress
       let count = _buffer.mutableCount
       let span = unsafe MutableSpan(_unsafeStart: pointer, count: count)

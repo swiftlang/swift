@@ -235,6 +235,25 @@ extension InlineArray where Element: ~Copyable {
     fatalError()
 #endif
   }
+
+  @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
+  public init<E: Error>(
+    initializingWith initializer: (inout OutputSpan<Element>) throws(E) -> Void
+  ) throws(E) {
+#if $BuiltinEmplaceTypedThrows
+    _storage = try Builtin.emplace { (rawPtr) throws(E) -> () in
+      let buffer = unsafe Self._initializationBuffer(start: rawPtr)
+      _internalInvariant(Self.count == buffer.count)
+      var output = unsafe OutputSpan(buffer: buffer, initializedCount: 0)
+      try initializer(&output)
+      let initialized = unsafe output.finalize(for: buffer)
+      _precondition(count == initialized, "InlineArray initialization underflow")
+    }
+#else
+    fatalError()
+#endif
+  }
 }
 
 @available(SwiftStdlib 6.2, *)
@@ -480,6 +499,25 @@ extension InlineArray where Element: ~Copyable {
       let span = unsafe MutableSpan(_unsafeStart: pointer, count: count)
       return unsafe _overrideLifetime(span, mutating: &self)
     }
+  }
+}
+
+@available(SwiftStdlib 6.2, *)
+extension InlineArray where Element: BitwiseCopyable {
+
+  @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
+  public consuming func _consume<E: Error, Result: ~Copyable>(
+    _ body: (inout OutputSpan<Element>) throws(E) -> Result
+  ) throws(E) -> Result {
+    var span = unsafe OutputSpan(
+      _uncheckedBuffer: _mutableBuffer, initializedCount: count
+    )
+    defer {
+      _precondition(span.count == 0, "must consume all elements")
+    }
+    //FIXME: discard self
+    return try body(&span)
   }
 }
 
