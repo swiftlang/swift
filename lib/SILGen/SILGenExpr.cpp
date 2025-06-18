@@ -2756,8 +2756,6 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *e,
          "RValueEmitter shouldn't be called on lvalues");
   assert(isa<VarDecl>(e->getMember().getDecl()));
 
-  // Everything else should use the l-value logic.
-
   // Any writebacks for this access are tightly scoped.
   FormalEvaluationScope scope(SGF);
 
