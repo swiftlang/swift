@@ -26,6 +26,7 @@
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 
@@ -535,8 +536,9 @@ void BridgedPassContext::SSAUpdater_initialize(
 void BridgedPassContext::addFunctionToPassManagerWorklist(
     BridgedFunction newFunction, BridgedFunction oldFunction) const {
   swift::SILPassManager *pm = invocation->getPassManager();
-  pm->addFunctionToWorklist(newFunction.getFunction(),
-                            oldFunction.getFunction());
+  if (llvm::isa<swift::SILFunctionTransform>(invocation->getTransform())) {
+    pm->addFunctionToWorklist(newFunction.getFunction(), oldFunction.getFunction());
+  }
 }
 
 void BridgedPassContext::SSAUpdater_addAvailableValue(BridgedBasicBlock block, BridgedValue value) const {
