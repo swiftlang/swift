@@ -166,393 +166,348 @@ static StringRef toString(ValueWitnessKind k) {
   }
   printer_unreachable("bad value witness kind");
 }
+} // end anonymous namespace
 
-class NodePrinter {
-private:
-  DemanglerPrinter Printer;
-  DemangleOptions Options;
-  bool SpecializationPrefixPrinted = false;
-  bool isValid = true;
-
-public:
-  NodePrinter(DemangleOptions options) : Options(options) {}
-
-  std::string printRoot(NodePointer root) {
-    isValid = true;
-    print(root, 0);
-    if (isValid)
-      return std::move(Printer).str();
-    return "";
+void NodePrinter::printChildren(Node::iterator begin, Node::iterator end,
+                                unsigned depth, const char *sep) {
+  for (; begin != end;) {
+    print(*begin, depth + 1);
+    ++begin;
+    if (sep && begin != end)
+      Printer << sep;
   }
+}
 
-private:
-  static const unsigned MaxDepth = 768;
+void NodePrinter::printChildren(NodePointer Node, unsigned depth,
+                                const char *sep) {
+  if (!Node)
+    return;
+  Node::iterator begin = Node->begin(), end = Node->end();
+  printChildren(begin, end, depth, sep);
+}
 
-  /// Called when the node tree in valid.
-  ///
-  /// The demangler already catches most error cases and mostly produces valid
-  /// node trees. But some cases are difficult to catch in the demangler and
-  /// instead the NodePrinter bails.
-  void setInvalid() { isValid = false; }
-
-  void printChildren(Node::iterator begin, Node::iterator end, unsigned depth,
-                     const char *sep = nullptr) {
-    for (; begin != end;) {
-      print(*begin, depth + 1);
-      ++begin;
-      if (sep && begin != end)
-        Printer << sep;
-    }
-  }
-
-  void printChildren(NodePointer Node, unsigned depth,
-                     const char *sep = nullptr) {
-    if (!Node)
-      return;
-    Node::iterator begin = Node->begin(), end = Node->end();
-    printChildren(begin, end, depth, sep);
-  }
-
-  NodePointer getFirstChildOfKind(NodePointer Node, Node::Kind kind) {
-    if (!Node)
-      return nullptr;
-    for (NodePointer child : *Node) {
-      if (child && child->getKind() == kind)
-        return child;
-    }
+NodePointer NodePrinter::getFirstChildOfKind(NodePointer Node,
+                                             Node::Kind kind) {
+  if (!Node)
     return nullptr;
+  for (NodePointer child : *Node) {
+    if (child && child->getKind() == kind)
+      return child;
   }
+  return nullptr;
+}
 
-  void printBoundGenericNoSugar(NodePointer Node, unsigned depth) {
-    if (Node->getNumChildren() < 2)
-      return;
-    NodePointer typelist = Node->getChild(1);
-    print(Node->getChild(0), depth + 1);
-    Printer << "<";
-    printChildren(typelist, depth, ", ");
-    Printer << ">";
-  }
+void NodePrinter::printBoundGenericNoSugar(NodePointer Node, unsigned depth) {
+  if (Node->getNumChildren() < 2)
+    return;
+  NodePointer typelist = Node->getChild(1);
+  print(Node->getChild(0), depth + 1);
+  Printer << "<";
+  printChildren(typelist, depth, ", ");
+  Printer << ">";
+}
 
-  void printOptionalIndex(NodePointer node) {
-    assert(node->getKind() == Node::Kind::Index ||
-           node->getKind() == Node::Kind::UnknownIndex);
-    if (node->hasIndex())
-      Printer << "#" << node->getIndex() << " ";
-  }
+static bool isExistentialType(NodePointer node) {
+  return (node->getKind() == Node::Kind::ExistentialMetatype ||
+          node->getKind() == Node::Kind::ProtocolList ||
+          node->getKind() == Node::Kind::ProtocolListWithClass ||
+          node->getKind() == Node::Kind::ProtocolListWithAnyObject);
+}
 
-  static bool isSwiftModule(NodePointer node) {
-    return (node->getKind() == Node::Kind::Module &&
-            node->getText() == STDLIB_NAME);
-  }
-  
-  bool printContext(NodePointer Context) {
-    if (!Options.QualifyEntities)
+void NodePrinter::printOptionalIndex(NodePointer node) {
+  assert(node->getKind() == Node::Kind::Index ||
+         node->getKind() == Node::Kind::UnknownIndex);
+  if (node->hasIndex())
+    Printer << "#" << node->getIndex() << " ";
+}
+
+bool NodePrinter::printContext(NodePointer Context) {
+  if (!Options.QualifyEntities)
+    return false;
+
+  if (Context->getKind() == Node::Kind::Module) {
+    if (Context->getText() == swift::STDLIB_NAME)
+      return Options.DisplayStdlibModule;
+    if (Context->getText() == swift::MANGLING_MODULE_OBJC)
+      return Options.DisplayObjCModule;
+    if (Context->getText() == Options.HidingCurrentModule)
       return false;
+    if (Context->getText().starts_with(LLDB_EXPRESSIONS_MODULE_NAME_PREFIX))
+      return Options.DisplayDebuggerGeneratedModule;
+  }
+  return true;
+}
 
-    if (Context->getKind() == Node::Kind::Module) {
-      if (Context->getText() == swift::STDLIB_NAME)
-        return Options.DisplayStdlibModule;
-      if (Context->getText() == swift::MANGLING_MODULE_OBJC)
-        return Options.DisplayObjCModule;
-      if (Context->getText() == Options.HidingCurrentModule)
-        return false;
-      if (Context->getText().starts_with(LLDB_EXPRESSIONS_MODULE_NAME_PREFIX))
-        return Options.DisplayDebuggerGeneratedModule;
-    }
+bool NodePrinter::isSimpleType(NodePointer Node) {
+  switch (Node->getKind()) {
+  case Node::Kind::AssociatedType:
+  case Node::Kind::AssociatedTypeRef:
+  case Node::Kind::BoundGenericClass:
+  case Node::Kind::BoundGenericEnum:
+  case Node::Kind::BoundGenericStructure:
+  case Node::Kind::BoundGenericProtocol:
+  case Node::Kind::BoundGenericOtherNominalType:
+  case Node::Kind::BoundGenericTypeAlias:
+  case Node::Kind::BoundGenericFunction:
+  case Node::Kind::BuiltinTypeName:
+  case Node::Kind::BuiltinTupleType:
+  case Node::Kind::BuiltinFixedArray:
+  case Node::Kind::Class:
+  case Node::Kind::DependentGenericType:
+  case Node::Kind::DependentMemberType:
+  case Node::Kind::DependentGenericParamType:
+  case Node::Kind::DynamicSelf:
+  case Node::Kind::Enum:
+  case Node::Kind::ErrorType:
+  case Node::Kind::ExistentialMetatype:
+  case Node::Kind::Metatype:
+  case Node::Kind::MetatypeRepresentation:
+  case Node::Kind::Module:
+  case Node::Kind::Tuple:
+  case Node::Kind::Pack:
+  case Node::Kind::SILPackDirect:
+  case Node::Kind::SILPackIndirect:
+  case Node::Kind::ConstrainedExistentialRequirementList:
+  case Node::Kind::ConstrainedExistentialSelf:
+  case Node::Kind::Protocol:
+  case Node::Kind::ProtocolSymbolicReference:
+  case Node::Kind::ReturnType:
+  case Node::Kind::SILBoxType:
+  case Node::Kind::SILBoxTypeWithLayout:
+  case Node::Kind::Structure:
+  case Node::Kind::OtherNominalType:
+  case Node::Kind::TupleElementName:
+  case Node::Kind::TypeAlias:
+  case Node::Kind::TypeList:
+  case Node::Kind::LabelList:
+  case Node::Kind::TypeSymbolicReference:
+  case Node::Kind::SugaredOptional:
+  case Node::Kind::SugaredArray:
+  case Node::Kind::SugaredInlineArray:
+  case Node::Kind::SugaredDictionary:
+  case Node::Kind::SugaredParen:
+  case Node::Kind::Integer:
+  case Node::Kind::NegativeInteger:
     return true;
-  }
 
-  static bool isIdentifier(NodePointer node, StringRef desired) {
-    return (node->getKind() == Node::Kind::Identifier &&
-            node->getText() == desired);
-  }
-  
-  enum class SugarType {
-    None,
-    Optional,
-    ImplicitlyUnwrappedOptional,
-    Array,
-    Dictionary
-  };
+  case Node::Kind::Type:
+    return isSimpleType(Node->getChild(0));
 
-  enum class TypePrinting {
-    NoType,
-    WithColon,
-    FunctionStyle
-  };
+  case Node::Kind::ProtocolList:
+    return Node->getChild(0)->getNumChildren() <= 1;
 
-  /// Determine whether this is a "simple" type, from the type-simple
-  /// production.
-  bool isSimpleType(NodePointer Node) {
-    switch (Node->getKind()) {
-    case Node::Kind::AssociatedType:
-    case Node::Kind::AssociatedTypeRef:
-    case Node::Kind::BoundGenericClass:
-    case Node::Kind::BoundGenericEnum:
-    case Node::Kind::BoundGenericStructure:
-    case Node::Kind::BoundGenericProtocol:
-    case Node::Kind::BoundGenericOtherNominalType:
-    case Node::Kind::BoundGenericTypeAlias:
-    case Node::Kind::BoundGenericFunction:
-    case Node::Kind::BuiltinTypeName:
-    case Node::Kind::BuiltinTupleType:
-    case Node::Kind::BuiltinFixedArray:
-    case Node::Kind::Class:
-    case Node::Kind::DependentGenericType:
-    case Node::Kind::DependentMemberType:
-    case Node::Kind::DependentGenericParamType:
-    case Node::Kind::DynamicSelf:
-    case Node::Kind::Enum:
-    case Node::Kind::ErrorType:
-    case Node::Kind::ExistentialMetatype:
-    case Node::Kind::Metatype:
-    case Node::Kind::MetatypeRepresentation:
-    case Node::Kind::Module:
-    case Node::Kind::Tuple:
-    case Node::Kind::Pack:
-    case Node::Kind::SILPackDirect:
-    case Node::Kind::SILPackIndirect:
-    case Node::Kind::ConstrainedExistentialRequirementList:
-    case Node::Kind::ConstrainedExistentialSelf:
-    case Node::Kind::Protocol:
-    case Node::Kind::ProtocolSymbolicReference:
-    case Node::Kind::ReturnType:
-    case Node::Kind::SILBoxType:
-    case Node::Kind::SILBoxTypeWithLayout:
-    case Node::Kind::Structure:
-    case Node::Kind::OtherNominalType:
-    case Node::Kind::TupleElementName:
-    case Node::Kind::TypeAlias:
-    case Node::Kind::TypeList:
-    case Node::Kind::LabelList:
-    case Node::Kind::TypeSymbolicReference:
-    case Node::Kind::SugaredOptional:
-    case Node::Kind::SugaredArray:
-    case Node::Kind::SugaredInlineArray:
-    case Node::Kind::SugaredDictionary:
-    case Node::Kind::SugaredParen:
-    case Node::Kind::Integer:
-    case Node::Kind::NegativeInteger:
-      return true;
+  case Node::Kind::ProtocolListWithAnyObject:
+    return Node->getChild(0)->getChild(0)->getNumChildren() == 0;
 
-    case Node::Kind::Type:
-      return isSimpleType(Node->getChild(0));
-
-    case Node::Kind::ProtocolList:
-      return Node->getChild(0)->getNumChildren() <= 1;
-
-    case Node::Kind::ProtocolListWithAnyObject:
-      return Node->getChild(0)->getChild(0)->getNumChildren() == 0;
-
-    case Node::Kind::ConstrainedExistential:
-    case Node::Kind::PackElement:
-    case Node::Kind::PackElementLevel:
-    case Node::Kind::PackExpansion:
-    case Node::Kind::ProtocolListWithClass:
-    case Node::Kind::AccessorAttachedMacroExpansion:
-    case Node::Kind::AccessorFunctionReference:
-    case Node::Kind::Allocator:
-    case Node::Kind::ArgumentTuple:
-    case Node::Kind::AssociatedConformanceDescriptor:
-    case Node::Kind::AssociatedTypeDescriptor:
-    case Node::Kind::AssociatedTypeMetadataAccessor:
-    case Node::Kind::AssociatedTypeWitnessTableAccessor:
-    case Node::Kind::AsyncRemoved:
-    case Node::Kind::AutoClosureType:
-    case Node::Kind::BaseConformanceDescriptor:
-    case Node::Kind::BaseWitnessTableAccessor:
-    case Node::Kind::BodyAttachedMacroExpansion:
-    case Node::Kind::ClangType:
-    case Node::Kind::ClassMetadataBaseOffset:
-    case Node::Kind::CFunctionPointer:
-    case Node::Kind::ConformanceAttachedMacroExpansion:
-    case Node::Kind::Constructor:
-    case Node::Kind::CoroutineContinuationPrototype:
-    case Node::Kind::CurryThunk:
-    case Node::Kind::SILThunkIdentity:
-    case Node::Kind::DispatchThunk:
-    case Node::Kind::Deallocator:
-    case Node::Kind::IsolatedDeallocator:
-    case Node::Kind::DeclContext:
-    case Node::Kind::DefaultArgumentInitializer:
-    case Node::Kind::DefaultAssociatedTypeMetadataAccessor:
-    case Node::Kind::DefaultAssociatedConformanceAccessor:
-    case Node::Kind::DependentAssociatedTypeRef:
-    case Node::Kind::DependentGenericSignature:
-    case Node::Kind::DependentGenericParamPackMarker:
-    case Node::Kind::DependentGenericParamCount:
-    case Node::Kind::DependentGenericConformanceRequirement:
-    case Node::Kind::DependentGenericLayoutRequirement:
-    case Node::Kind::DependentGenericSameTypeRequirement:
-    case Node::Kind::DependentGenericSameShapeRequirement:
-    case Node::Kind::DependentPseudogenericSignature:
-    case Node::Kind::Destructor:
-    case Node::Kind::DidSet:
-    case Node::Kind::DirectMethodReferenceAttribute:
-    case Node::Kind::Directness:
-    case Node::Kind::DynamicAttribute:
-    case Node::Kind::EscapingAutoClosureType:
-    case Node::Kind::EscapingObjCBlock:
-    case Node::Kind::NoEscapeFunctionType:
-    case Node::Kind::ExplicitClosure:
-    case Node::Kind::Extension:
-    case Node::Kind::ExtensionAttachedMacroExpansion:
-    case Node::Kind::EnumCase:
-    case Node::Kind::FieldOffset:
-    case Node::Kind::FreestandingMacroExpansion:
-    case Node::Kind::FullObjCResilientClassStub:
-    case Node::Kind::FullTypeMetadata:
-    case Node::Kind::Function:
-    case Node::Kind::FunctionSignatureSpecialization:
-    case Node::Kind::FunctionSignatureSpecializationParam:
-    case Node::Kind::FunctionSignatureSpecializationReturn:
-    case Node::Kind::FunctionSignatureSpecializationParamKind:
-    case Node::Kind::FunctionSignatureSpecializationParamPayload:
-    case Node::Kind::FunctionType:
-    case Node::Kind::GenericProtocolWitnessTable:
-    case Node::Kind::GenericProtocolWitnessTableInstantiationFunction:
-    case Node::Kind::GenericPartialSpecialization:
-    case Node::Kind::GenericPartialSpecializationNotReAbstracted:
-    case Node::Kind::GenericSpecialization:
-    case Node::Kind::GenericSpecializationNotReAbstracted:
-    case Node::Kind::GenericSpecializationInResilienceDomain:
-    case Node::Kind::GenericSpecializationParam:
-    case Node::Kind::GenericSpecializationPrespecialized:
-    case Node::Kind::InlinedGenericFunction:
-    case Node::Kind::GenericTypeMetadataPattern:
-    case Node::Kind::Getter:
-    case Node::Kind::Global:
-    case Node::Kind::GlobalGetter:
-    case Node::Kind::Identifier:
-    case Node::Kind::Index:
-    case Node::Kind::InitAccessor:
-    case Node::Kind::IVarInitializer:
-    case Node::Kind::IVarDestroyer:
-    case Node::Kind::ImplDifferentiabilityKind:
-    case Node::Kind::ImplEscaping:
-    case Node::Kind::ImplErasedIsolation:
-    case Node::Kind::ImplSendingResult:
-    case Node::Kind::ImplConvention:
-    case Node::Kind::ImplParameterResultDifferentiability:
-    case Node::Kind::ImplParameterSending:
-    case Node::Kind::ImplFunctionAttribute:
-    case Node::Kind::ImplFunctionConvention:
-    case Node::Kind::ImplFunctionConventionName:
-    case Node::Kind::ImplFunctionType:
-    case Node::Kind::ImplCoroutineKind:
-    case Node::Kind::ImplInvocationSubstitutions:
-    case Node::Kind::ImplPatternSubstitutions:
-    case Node::Kind::ImplicitClosure:
-    case Node::Kind::ImplParameter:
-    case Node::Kind::ImplResult:
-    case Node::Kind::ImplYield:
-    case Node::Kind::ImplErrorResult:
-    case Node::Kind::InOut:
-    case Node::Kind::InfixOperator:
-    case Node::Kind::Initializer:
-    case Node::Kind::Isolated:
-    case Node::Kind::Sending:
-    case Node::Kind::CompileTimeLiteral:
-    case Node::Kind::ConstValue:
-    case Node::Kind::PropertyWrapperBackingInitializer:
-    case Node::Kind::PropertyWrapperInitFromProjectedValue:
-    case Node::Kind::KeyPathGetterThunkHelper:
-    case Node::Kind::KeyPathSetterThunkHelper:
-    case Node::Kind::KeyPathUnappliedMethodThunkHelper:
-    case Node::Kind::KeyPathAppliedMethodThunkHelper:
-    case Node::Kind::KeyPathEqualsThunkHelper:
-    case Node::Kind::KeyPathHashThunkHelper:
-    case Node::Kind::LazyProtocolWitnessTableAccessor:
-    case Node::Kind::LazyProtocolWitnessTableCacheVariable:
-    case Node::Kind::LocalDeclName:
-    case Node::Kind::Macro:
-    case Node::Kind::MacroExpansionLoc:
-    case Node::Kind::MacroExpansionUniqueName:
-    case Node::Kind::MaterializeForSet:
-    case Node::Kind::MemberAttributeAttachedMacroExpansion:
-    case Node::Kind::MemberAttachedMacroExpansion:
-    case Node::Kind::MergedFunction:
-    case Node::Kind::Metaclass:
-    case Node::Kind::MethodDescriptor:
-    case Node::Kind::MethodLookupFunction:
-    case Node::Kind::ModifyAccessor:
-    case Node::Kind::Modify2Accessor:
-    case Node::Kind::NativeOwningAddressor:
-    case Node::Kind::NativeOwningMutableAddressor:
-    case Node::Kind::NativePinningAddressor:
-    case Node::Kind::NativePinningMutableAddressor:
-    case Node::Kind::NominalTypeDescriptor:
-    case Node::Kind::NominalTypeDescriptorRecord:
-    case Node::Kind::NonObjCAttribute:
-    case Node::Kind::Number:
-    case Node::Kind::ObjCAsyncCompletionHandlerImpl:
-    case Node::Kind::ObjCAttribute:
-    case Node::Kind::ObjCBlock:
-    case Node::Kind::ObjCMetadataUpdateFunction:
-    case Node::Kind::ObjCResilientClassStub:
-    case Node::Kind::OpaqueTypeDescriptor:
-    case Node::Kind::OpaqueTypeDescriptorRecord:
-    case Node::Kind::OpaqueTypeDescriptorAccessor:
-    case Node::Kind::OpaqueTypeDescriptorAccessorImpl:
-    case Node::Kind::OpaqueTypeDescriptorAccessorKey:
-    case Node::Kind::OpaqueTypeDescriptorAccessorVar:
-    case Node::Kind::Owned:
-    case Node::Kind::OwningAddressor:
-    case Node::Kind::OwningMutableAddressor:
-    case Node::Kind::PartialApplyForwarder:
-    case Node::Kind::PartialApplyObjCForwarder:
-    case Node::Kind::PeerAttachedMacroExpansion:
-    case Node::Kind::PostfixOperator:
-    case Node::Kind::PreambleAttachedMacroExpansion:
-    case Node::Kind::PredefinedObjCAsyncCompletionHandlerImpl:
-    case Node::Kind::PrefixOperator:
-    case Node::Kind::PrivateDeclName:
-    case Node::Kind::PropertyDescriptor:
-    case Node::Kind::ProtocolConformance:
-    case Node::Kind::ProtocolConformanceDescriptor:
-    case Node::Kind::ProtocolConformanceDescriptorRecord:
-    case Node::Kind::MetadataInstantiationCache:
-    case Node::Kind::ProtocolDescriptor:
-    case Node::Kind::ProtocolDescriptorRecord:
-    case Node::Kind::ProtocolRequirementsBaseDescriptor:
-    case Node::Kind::ProtocolSelfConformanceDescriptor:
-    case Node::Kind::ProtocolSelfConformanceWitness:
-    case Node::Kind::ProtocolSelfConformanceWitnessTable:
-    case Node::Kind::ProtocolWitness:
-    case Node::Kind::ProtocolWitnessTable:
-    case Node::Kind::ProtocolWitnessTableAccessor:
-    case Node::Kind::ProtocolWitnessTablePattern:
-    case Node::Kind::ReabstractionThunk:
-    case Node::Kind::ReabstractionThunkHelper:
-    case Node::Kind::ReabstractionThunkHelperWithSelf:
-    case Node::Kind::ReabstractionThunkHelperWithGlobalActor:
-    case Node::Kind::ReadAccessor:
-    case Node::Kind::Read2Accessor:
-    case Node::Kind::RelatedEntityDeclName:
-    case Node::Kind::RetroactiveConformance:
-    case Node::Kind::Setter:
-    case Node::Kind::Shared:
-    case Node::Kind::SILBoxLayout:
-    case Node::Kind::SILBoxMutableField:
-    case Node::Kind::SILBoxImmutableField:
-    case Node::Kind::IsSerialized:
-    case Node::Kind::DroppedArgument:
-    case Node::Kind::SpecializationPassID:
-    case Node::Kind::Static:
-    case Node::Kind::Subscript:
-    case Node::Kind::Suffix:
-    case Node::Kind::ThinFunctionType:
-    case Node::Kind::TupleElement:
-    case Node::Kind::TypeMangling:
-    case Node::Kind::TypeMetadata:
-    case Node::Kind::TypeMetadataAccessFunction:
-    case Node::Kind::TypeMetadataCompletionFunction:
-    case Node::Kind::TypeMetadataInstantiationCache:
-    case Node::Kind::TypeMetadataInstantiationFunction:
-    case Node::Kind::TypeMetadataSingletonInitializationCache:
-    case Node::Kind::TypeMetadataDemanglingCache:
-    case Node::Kind::TypeMetadataLazyCache:
-    case Node::Kind::UncurriedFunctionType:
+  case Node::Kind::ConstrainedExistential:
+  case Node::Kind::PackElement:
+  case Node::Kind::PackElementLevel:
+  case Node::Kind::PackExpansion:
+  case Node::Kind::ProtocolListWithClass:
+  case Node::Kind::AccessorAttachedMacroExpansion:
+  case Node::Kind::AccessorFunctionReference:
+  case Node::Kind::Allocator:
+  case Node::Kind::ArgumentTuple:
+  case Node::Kind::AssociatedConformanceDescriptor:
+  case Node::Kind::AssociatedTypeDescriptor:
+  case Node::Kind::AssociatedTypeMetadataAccessor:
+  case Node::Kind::AssociatedTypeWitnessTableAccessor:
+  case Node::Kind::AsyncRemoved:
+  case Node::Kind::AutoClosureType:
+  case Node::Kind::BaseConformanceDescriptor:
+  case Node::Kind::BaseWitnessTableAccessor:
+  case Node::Kind::BodyAttachedMacroExpansion:
+  case Node::Kind::ClangType:
+  case Node::Kind::ClassMetadataBaseOffset:
+  case Node::Kind::CFunctionPointer:
+  case Node::Kind::ConformanceAttachedMacroExpansion:
+  case Node::Kind::Constructor:
+  case Node::Kind::CoroutineContinuationPrototype:
+  case Node::Kind::CurryThunk:
+  case Node::Kind::SILThunkIdentity:
+  case Node::Kind::DispatchThunk:
+  case Node::Kind::Deallocator:
+  case Node::Kind::IsolatedDeallocator:
+  case Node::Kind::DeclContext:
+  case Node::Kind::DefaultArgumentInitializer:
+  case Node::Kind::DefaultAssociatedTypeMetadataAccessor:
+  case Node::Kind::DefaultAssociatedConformanceAccessor:
+  case Node::Kind::DependentAssociatedTypeRef:
+  case Node::Kind::DependentGenericSignature:
+  case Node::Kind::DependentGenericParamPackMarker:
+  case Node::Kind::DependentGenericParamCount:
+  case Node::Kind::DependentGenericConformanceRequirement:
+  case Node::Kind::DependentGenericLayoutRequirement:
+  case Node::Kind::DependentGenericSameTypeRequirement:
+  case Node::Kind::DependentGenericSameShapeRequirement:
+  case Node::Kind::DependentPseudogenericSignature:
+  case Node::Kind::Destructor:
+  case Node::Kind::DidSet:
+  case Node::Kind::DirectMethodReferenceAttribute:
+  case Node::Kind::Directness:
+  case Node::Kind::DynamicAttribute:
+  case Node::Kind::EscapingAutoClosureType:
+  case Node::Kind::EscapingObjCBlock:
+  case Node::Kind::NoEscapeFunctionType:
+  case Node::Kind::ExplicitClosure:
+  case Node::Kind::Extension:
+  case Node::Kind::ExtensionAttachedMacroExpansion:
+  case Node::Kind::EnumCase:
+  case Node::Kind::FieldOffset:
+  case Node::Kind::FreestandingMacroExpansion:
+  case Node::Kind::FullObjCResilientClassStub:
+  case Node::Kind::FullTypeMetadata:
+  case Node::Kind::Function:
+  case Node::Kind::FunctionSignatureSpecialization:
+  case Node::Kind::FunctionSignatureSpecializationParam:
+  case Node::Kind::FunctionSignatureSpecializationReturn:
+  case Node::Kind::FunctionSignatureSpecializationParamKind:
+  case Node::Kind::FunctionSignatureSpecializationParamPayload:
+  case Node::Kind::FunctionType:
+  case Node::Kind::GenericProtocolWitnessTable:
+  case Node::Kind::GenericProtocolWitnessTableInstantiationFunction:
+  case Node::Kind::GenericPartialSpecialization:
+  case Node::Kind::GenericPartialSpecializationNotReAbstracted:
+  case Node::Kind::GenericSpecialization:
+  case Node::Kind::GenericSpecializationNotReAbstracted:
+  case Node::Kind::GenericSpecializationInResilienceDomain:
+  case Node::Kind::GenericSpecializationParam:
+  case Node::Kind::GenericSpecializationPrespecialized:
+  case Node::Kind::InlinedGenericFunction:
+  case Node::Kind::GenericTypeMetadataPattern:
+  case Node::Kind::Getter:
+  case Node::Kind::Global:
+  case Node::Kind::GlobalGetter:
+  case Node::Kind::Identifier:
+  case Node::Kind::Index:
+  case Node::Kind::InitAccessor:
+  case Node::Kind::IVarInitializer:
+  case Node::Kind::IVarDestroyer:
+  case Node::Kind::ImplDifferentiabilityKind:
+  case Node::Kind::ImplEscaping:
+  case Node::Kind::ImplErasedIsolation:
+  case Node::Kind::ImplSendingResult:
+  case Node::Kind::ImplConvention:
+  case Node::Kind::ImplParameterResultDifferentiability:
+  case Node::Kind::ImplParameterSending:
+  case Node::Kind::ImplFunctionAttribute:
+  case Node::Kind::ImplFunctionConvention:
+  case Node::Kind::ImplFunctionConventionName:
+  case Node::Kind::ImplFunctionType:
+  case Node::Kind::ImplCoroutineKind:
+  case Node::Kind::ImplInvocationSubstitutions:
+  case Node::Kind::ImplPatternSubstitutions:
+  case Node::Kind::ImplicitClosure:
+  case Node::Kind::ImplParameter:
+  case Node::Kind::ImplResult:
+  case Node::Kind::ImplYield:
+  case Node::Kind::ImplErrorResult:
+  case Node::Kind::InOut:
+  case Node::Kind::InfixOperator:
+  case Node::Kind::Initializer:
+  case Node::Kind::Isolated:
+  case Node::Kind::Sending:
+  case Node::Kind::CompileTimeLiteral:
+  case Node::Kind::ConstValue:
+  case Node::Kind::PropertyWrapperBackingInitializer:
+  case Node::Kind::PropertyWrapperInitFromProjectedValue:
+  case Node::Kind::KeyPathGetterThunkHelper:
+  case Node::Kind::KeyPathSetterThunkHelper:
+  case Node::Kind::KeyPathUnappliedMethodThunkHelper:
+  case Node::Kind::KeyPathAppliedMethodThunkHelper:
+  case Node::Kind::KeyPathEqualsThunkHelper:
+  case Node::Kind::KeyPathHashThunkHelper:
+  case Node::Kind::LazyProtocolWitnessTableAccessor:
+  case Node::Kind::LazyProtocolWitnessTableCacheVariable:
+  case Node::Kind::LocalDeclName:
+  case Node::Kind::Macro:
+  case Node::Kind::MacroExpansionLoc:
+  case Node::Kind::MacroExpansionUniqueName:
+  case Node::Kind::MaterializeForSet:
+  case Node::Kind::MemberAttributeAttachedMacroExpansion:
+  case Node::Kind::MemberAttachedMacroExpansion:
+  case Node::Kind::MergedFunction:
+  case Node::Kind::Metaclass:
+  case Node::Kind::MethodDescriptor:
+  case Node::Kind::MethodLookupFunction:
+  case Node::Kind::ModifyAccessor:
+  case Node::Kind::Modify2Accessor:
+  case Node::Kind::NativeOwningAddressor:
+  case Node::Kind::NativeOwningMutableAddressor:
+  case Node::Kind::NativePinningAddressor:
+  case Node::Kind::NativePinningMutableAddressor:
+  case Node::Kind::NominalTypeDescriptor:
+  case Node::Kind::NominalTypeDescriptorRecord:
+  case Node::Kind::NonObjCAttribute:
+  case Node::Kind::Number:
+  case Node::Kind::ObjCAsyncCompletionHandlerImpl:
+  case Node::Kind::ObjCAttribute:
+  case Node::Kind::ObjCBlock:
+  case Node::Kind::ObjCMetadataUpdateFunction:
+  case Node::Kind::ObjCResilientClassStub:
+  case Node::Kind::OpaqueTypeDescriptor:
+  case Node::Kind::OpaqueTypeDescriptorRecord:
+  case Node::Kind::OpaqueTypeDescriptorAccessor:
+  case Node::Kind::OpaqueTypeDescriptorAccessorImpl:
+  case Node::Kind::OpaqueTypeDescriptorAccessorKey:
+  case Node::Kind::OpaqueTypeDescriptorAccessorVar:
+  case Node::Kind::Owned:
+  case Node::Kind::OwningAddressor:
+  case Node::Kind::OwningMutableAddressor:
+  case Node::Kind::PartialApplyForwarder:
+  case Node::Kind::PartialApplyObjCForwarder:
+  case Node::Kind::PeerAttachedMacroExpansion:
+  case Node::Kind::PostfixOperator:
+  case Node::Kind::PreambleAttachedMacroExpansion:
+  case Node::Kind::PredefinedObjCAsyncCompletionHandlerImpl:
+  case Node::Kind::PrefixOperator:
+  case Node::Kind::PrivateDeclName:
+  case Node::Kind::PropertyDescriptor:
+  case Node::Kind::ProtocolConformance:
+  case Node::Kind::ProtocolConformanceDescriptor:
+  case Node::Kind::ProtocolConformanceDescriptorRecord:
+  case Node::Kind::MetadataInstantiationCache:
+  case Node::Kind::ProtocolDescriptor:
+  case Node::Kind::ProtocolDescriptorRecord:
+  case Node::Kind::ProtocolRequirementsBaseDescriptor:
+  case Node::Kind::ProtocolSelfConformanceDescriptor:
+  case Node::Kind::ProtocolSelfConformanceWitness:
+  case Node::Kind::ProtocolSelfConformanceWitnessTable:
+  case Node::Kind::ProtocolWitness:
+  case Node::Kind::ProtocolWitnessTable:
+  case Node::Kind::ProtocolWitnessTableAccessor:
+  case Node::Kind::ProtocolWitnessTablePattern:
+  case Node::Kind::ReabstractionThunk:
+  case Node::Kind::ReabstractionThunkHelper:
+  case Node::Kind::ReabstractionThunkHelperWithSelf:
+  case Node::Kind::ReabstractionThunkHelperWithGlobalActor:
+  case Node::Kind::ReadAccessor:
+  case Node::Kind::Read2Accessor:
+  case Node::Kind::RelatedEntityDeclName:
+  case Node::Kind::RetroactiveConformance:
+  case Node::Kind::Setter:
+  case Node::Kind::Shared:
+  case Node::Kind::SILBoxLayout:
+  case Node::Kind::SILBoxMutableField:
+  case Node::Kind::SILBoxImmutableField:
+  case Node::Kind::IsSerialized:
+  case Node::Kind::DroppedArgument:
+  case Node::Kind::SpecializationPassID:
+  case Node::Kind::Static:
+  case Node::Kind::Subscript:
+  case Node::Kind::Suffix:
+  case Node::Kind::ThinFunctionType:
+  case Node::Kind::TupleElement:
+  case Node::Kind::TypeMangling:
+  case Node::Kind::TypeMetadata:
+  case Node::Kind::TypeMetadataAccessFunction:
+  case Node::Kind::TypeMetadataCompletionFunction:
+  case Node::Kind::TypeMetadataInstantiationCache:
+  case Node::Kind::TypeMetadataInstantiationFunction:
+  case Node::Kind::TypeMetadataSingletonInitializationCache:
+  case Node::Kind::TypeMetadataDemanglingCache:
+  case Node::Kind::TypeMetadataLazyCache:
+  case Node::Kind::UncurriedFunctionType:
 #define REF_STORAGE(Name, ...) \
     case Node::Kind::Name:
 #include "swift/AST/ReferenceStorage.def"
@@ -667,587 +622,535 @@ private:
       return false;
     }
     printer_unreachable("bad node kind");
-  }
+}
 
-  void printWithParens(NodePointer type, unsigned depth) {
-    bool needs_parens = !isSimpleType(type);
-    if (needs_parens)
-      Printer << "(";
-    print(type, depth + 1);
-    if (needs_parens)
-      Printer << ")";
-  }
+void NodePrinter::printWithParens(NodePointer type, unsigned depth) {
+  bool needs_parens = !isSimpleType(type);
+  if (needs_parens)
+    Printer << "(";
+  print(type, depth + 1);
+  if (needs_parens)
+    Printer << ")";
+}
 
-  SugarType findSugar(NodePointer Node) {
-    if (Node->getNumChildren() == 1 &&
-        Node->getKind() == Node::Kind::Type)
-      return findSugar(Node->getChild(0));
-    
-    if (Node->getNumChildren() != 2)
-      return SugarType::None;
-    
-    if (Node->getKind() != Node::Kind::BoundGenericEnum &&
-        Node->getKind() != Node::Kind::BoundGenericStructure)
-      return SugarType::None;
+NodePrinter::SugarType NodePrinter::findSugar(NodePointer Node) {
+  if (Node->getNumChildren() == 1 && Node->getKind() == Node::Kind::Type)
+    return findSugar(Node->getChild(0));
 
-    auto unboundType = Node->getChild(0)->getChild(0); // drill through Type
-    auto typeArgs = Node->getChild(1);
-    
-    if (Node->getKind() == Node::Kind::BoundGenericEnum) {
-      // Swift.Optional
-      if (isIdentifier(unboundType->getChild(1), "Optional") &&
-          typeArgs->getNumChildren() == 1 &&
-          isSwiftModule(unboundType->getChild(0))) {
-        return SugarType::Optional;
-      }
+  if (Node->getNumChildren() != 2)
+    return SugarType::None;
 
-      // Swift.ImplicitlyUnwrappedOptional
-      if (isIdentifier(unboundType->getChild(1), 
-                       "ImplicitlyUnwrappedOptional") &&
-          typeArgs->getNumChildren() == 1 &&
-          isSwiftModule(unboundType->getChild(0))) {
-        return SugarType::ImplicitlyUnwrappedOptional;
-      }
+  if (Node->getKind() != Node::Kind::BoundGenericEnum &&
+      Node->getKind() != Node::Kind::BoundGenericStructure)
+    return SugarType::None;
 
-      return SugarType::None;
-    }
+  auto unboundType = Node->getChild(0)->getChild(0); // drill through Type
+  auto typeArgs = Node->getChild(1);
 
-    assert(Node->getKind() == Node::Kind::BoundGenericStructure);
-
-    // Array
-    if (isIdentifier(unboundType->getChild(1), "Array") &&
+  if (Node->getKind() == Node::Kind::BoundGenericEnum) {
+    // Swift.Optional
+    if (isIdentifier(unboundType->getChild(1), "Optional") &&
         typeArgs->getNumChildren() == 1 &&
         isSwiftModule(unboundType->getChild(0))) {
-      return SugarType::Array;
+      return SugarType::Optional;
     }
 
-    // Dictionary
-    if (isIdentifier(unboundType->getChild(1), "Dictionary") &&
-        typeArgs->getNumChildren() == 2 &&
+    // Swift.ImplicitlyUnwrappedOptional
+    if (isIdentifier(unboundType->getChild(1), "ImplicitlyUnwrappedOptional") &&
+        typeArgs->getNumChildren() == 1 &&
         isSwiftModule(unboundType->getChild(0))) {
-      return SugarType::Dictionary;
+      return SugarType::ImplicitlyUnwrappedOptional;
     }
 
     return SugarType::None;
   }
 
-  void printBoundGeneric(NodePointer Node, unsigned depth) {
-    if (Node->getNumChildren() < 2)
-      return;
-    if (Node->getNumChildren() != 2) {
-      printBoundGenericNoSugar(Node, depth);
-      return;
-    }
+  assert(Node->getKind() == Node::Kind::BoundGenericStructure);
 
-    if (!Options.SynthesizeSugarOnTypes ||
-        Node->getKind() == Node::Kind::BoundGenericClass)
-    {
-      // no sugar here
-      printBoundGenericNoSugar(Node, depth);
-      return;
-    }
-
-    // Print the conforming type for a "bound" protocol node "as" the protocol
-    // type.
-    if (Node->getKind() == Node::Kind::BoundGenericProtocol) {
-      printChildren(Node->getChild(1), depth);
-      Printer << " as ";
-      print(Node->getChild(0), depth + 1);
-      return;
-    }
-
-    SugarType sugarType = findSugar(Node);
-    
-    switch (sugarType) {
-      case SugarType::None:
-        printBoundGenericNoSugar(Node, depth);
-        break;
-      case SugarType::Optional:
-      case SugarType::ImplicitlyUnwrappedOptional: {
-        NodePointer type = Node->getChild(1)->getChild(0);
-        printWithParens(type, depth);
-        Printer << (sugarType == SugarType::Optional ? "?" : "!");
-        break;
-      }
-      case SugarType::Array: {
-        NodePointer type = Node->getChild(1)->getChild(0);
-        Printer << "[";
-        print(type, depth + 1);
-        Printer << "]";
-        break;
-      }
-      case SugarType::Dictionary: {
-        NodePointer keyType = Node->getChild(1)->getChild(0);
-        NodePointer valueType = Node->getChild(1)->getChild(1);
-        Printer << "[";
-        print(keyType, depth + 1);
-        Printer << " : ";
-        print(valueType, depth + 1);
-        Printer << "]";
-        break;
-      }
-    }
+  // Array
+  if (isIdentifier(unboundType->getChild(1), "Array") &&
+      typeArgs->getNumChildren() == 1 &&
+      isSwiftModule(unboundType->getChild(0))) {
+    return SugarType::Array;
   }
 
-  NodePointer getChildIf(NodePointer Node, Node::Kind Kind) {
-    auto result =
-        std::find_if(Node->begin(), Node->end(), [&](NodePointer child) {
-          return child->getKind() == Kind;
-        });
-    return result != Node->end() ? *result : nullptr;
+  // Dictionary
+  if (isIdentifier(unboundType->getChild(1), "Dictionary") &&
+      typeArgs->getNumChildren() == 2 &&
+      isSwiftModule(unboundType->getChild(0))) {
+    return SugarType::Dictionary;
   }
 
-  void printFunctionParameters(NodePointer LabelList, NodePointer ParameterType,
-                               unsigned depth, bool showTypes) {
-    if (ParameterType->getKind() != Node::Kind::ArgumentTuple) {
-      setInvalid();
-      return;
-    }
+  return SugarType::None;
+}
 
-    NodePointer Parameters = ParameterType->getFirstChild();
-    assert(Parameters->getKind() == Node::Kind::Type);
-    Parameters = Parameters->getFirstChild();
-    if (Parameters->getKind() != Node::Kind::Tuple) {
-      // only a single not-named parameter
-      if (showTypes) {
+void NodePrinter::printBoundGeneric(NodePointer Node, unsigned depth) {
+  if (Node->getNumChildren() < 2)
+    return;
+  if (Node->getNumChildren() != 2) {
+    printBoundGenericNoSugar(Node, depth);
+    return;
+  }
+
+  if (!Options.SynthesizeSugarOnTypes ||
+      Node->getKind() == Node::Kind::BoundGenericClass) {
+    // no sugar here
+    printBoundGenericNoSugar(Node, depth);
+    return;
+  }
+
+  // Print the conforming type for a "bound" protocol node "as" the protocol
+  // type.
+  if (Node->getKind() == Node::Kind::BoundGenericProtocol) {
+    printChildren(Node->getChild(1), depth);
+    Printer << " as ";
+    print(Node->getChild(0), depth + 1);
+    return;
+  }
+
+  SugarType sugarType = findSugar(Node);
+
+  switch (sugarType) {
+  case SugarType::None:
+    printBoundGenericNoSugar(Node, depth);
+    break;
+  case SugarType::Optional:
+  case SugarType::ImplicitlyUnwrappedOptional: {
+    NodePointer type = Node->getChild(1)->getChild(0);
+    printWithParens(type, depth);
+    Printer << (sugarType == SugarType::Optional ? "?" : "!");
+    break;
+  }
+  case SugarType::Array: {
+    NodePointer type = Node->getChild(1)->getChild(0);
+    Printer << "[";
+    print(type, depth + 1);
+    Printer << "]";
+    break;
+  }
+  case SugarType::Dictionary: {
+    NodePointer keyType = Node->getChild(1)->getChild(0);
+    NodePointer valueType = Node->getChild(1)->getChild(1);
+    Printer << "[";
+    print(keyType, depth + 1);
+    Printer << " : ";
+    print(valueType, depth + 1);
+    Printer << "]";
+    break;
+  }
+  }
+}
+
+NodePointer NodePrinter::getChildIf(NodePointer Node, Node::Kind Kind) {
+  auto result =
+      std::find_if(Node->begin(), Node->end(),
+                   [&](NodePointer child) { return child->getKind() == Kind; });
+  return result != Node->end() ? *result : nullptr;
+}
+
+void NodePrinter::printFunctionParameters(NodePointer LabelList,
+                                          NodePointer ParameterType,
+                                          unsigned depth, bool showTypes) {
+  if (ParameterType->getKind() != Node::Kind::ArgumentTuple) {
+    setInvalid();
+    return;
+  }
+
+  NodePointer Parameters = ParameterType->getFirstChild();
+  assert(Parameters->getKind() == Node::Kind::Type);
+  Parameters = Parameters->getFirstChild();
+  if (Parameters->getKind() != Node::Kind::Tuple) {
+    // only a single not-named parameter
+    if (showTypes) {
+      Printer << '(';
+      print(Parameters, depth + 1);
+      Printer << ')';
+    } else {
+      Printer << "(_:)";
+    }
+    return;
+  }
+
+  auto getLabelFor = [&](NodePointer Param, unsigned Index) -> std::string {
+    auto Label = LabelList->getChild(Index);
+    assert(Label && (Label->getKind() == Node::Kind::Identifier ||
+                     Label->getKind() == Node::Kind::FirstElementMarker));
+    return Label->getKind() == Node::Kind::Identifier ? Label->getText().str()
+                                                      : "_";
+  };
+
+  unsigned ParamIndex = 0;
+  bool hasLabels = LabelList && LabelList->getNumChildren() > 0;
+
+  Printer << '(';
+  llvm::interleave(
+      Parameters->begin(), Parameters->end(),
+      [&](NodePointer Param) {
+        assert(Param->getKind() == Node::Kind::TupleElement);
+
+        if (hasLabels) {
+          Printer << getLabelFor(Param, ParamIndex) << ':';
+        } else if (!showTypes) {
+          if (auto Label = getChildIf(Param, Node::Kind::TupleElementName))
+            Printer << Label->getText() << ":";
+          else
+            Printer << "_:";
+        }
+
+        if (hasLabels && showTypes)
+          Printer << ' ';
+
+        ++ParamIndex;
+
+        if (showTypes)
+          print(Param, depth + 1);
+      },
+      [&]() { Printer << (showTypes ? ", " : ""); });
+  Printer << ')';
+}
+
+void NodePrinter::printFunctionType(NodePointer LabelList, NodePointer node,
+                                    unsigned depth) {
+  if (node->getNumChildren() < 2) {
+    setInvalid();
+    return;
+  }
+
+  auto printConventionWithMangledCType = [this, node,
+                                          depth](const char *convention) {
+    Printer << "@convention(" << convention;
+    if (node->getFirstChild()->getKind() == Node::Kind::ClangType) {
+      Printer << ", mangledCType: \"";
+      print(node->getFirstChild(), depth + 1);
+      Printer << '"';
+    }
+    Printer << ") ";
+  };
+
+  switch (node->getKind()) {
+  case Node::Kind::FunctionType:
+  case Node::Kind::UncurriedFunctionType:
+  case Node::Kind::NoEscapeFunctionType:
+    break;
+  case Node::Kind::AutoClosureType:
+  case Node::Kind::EscapingAutoClosureType:
+    Printer << "@autoclosure ";
+    break;
+  case Node::Kind::ThinFunctionType:
+    Printer << "@convention(thin) ";
+    break;
+  case Node::Kind::CFunctionPointer:
+    printConventionWithMangledCType("c");
+    break;
+  case Node::Kind::EscapingObjCBlock:
+    Printer << "@escaping ";
+    LLVM_FALLTHROUGH;
+  case Node::Kind::ObjCBlock:
+    printConventionWithMangledCType("block");
+    break;
+  default:
+    assert(false && "Unhandled function type in printFunctionType!");
+  }
+
+  unsigned argIndex = node->getNumChildren() - 2;
+  unsigned startIndex = 0;
+  bool isSendable = false, isAsync = false, hasSendingResult = false;
+  auto diffKind = MangledDifferentiabilityKind::NonDifferentiable;
+  if (node->getChild(startIndex)->getKind() == Node::Kind::ClangType) {
+    // handled earlier
+    ++startIndex;
+  }
+
+  // Be sure to check for function signature components in the same
+  // order that they're added by the demangler, which is the reverse
+  // of the order that they appear in the mangling grammar.
+
+  if (node->getChild(startIndex)->getKind() ==
+      Node::Kind::SendingResultFunctionType) {
+    ++startIndex;
+    hasSendingResult = true;
+  }
+
+  // function-isolation; note that these can't actually both appear.
+  if (node->getChild(startIndex)->getKind() ==
+      Node::Kind::IsolatedAnyFunctionType) {
+    print(node->getChild(startIndex), depth + 1);
+    ++startIndex;
+  }
+
+  Node *nonIsolatedCallerNode = nullptr;
+  if (node->getChild(startIndex)->getKind() ==
+      Node::Kind::NonIsolatedCallerFunctionType) {
+    nonIsolatedCallerNode = node->getChild(startIndex);
+    ++startIndex;
+  }
+
+  if (node->getChild(startIndex)->getKind() ==
+      Node::Kind::GlobalActorFunctionType) {
+    print(node->getChild(startIndex), depth + 1);
+    ++startIndex;
+  }
+
+  if (node->getChild(startIndex)->getKind() ==
+      Node::Kind::DifferentiableFunctionType) {
+    diffKind =
+        (MangledDifferentiabilityKind)node->getChild(startIndex)->getIndex();
+    ++startIndex;
+  }
+
+  Node *thrownErrorNode = nullptr;
+  if (node->getChild(startIndex)->getKind() == Node::Kind::ThrowsAnnotation ||
+      node->getChild(startIndex)->getKind() ==
+          Node::Kind::TypedThrowsAnnotation) {
+    thrownErrorNode = node->getChild(startIndex);
+    ++startIndex;
+  }
+
+  if (node->getChild(startIndex)->getKind() ==
+      Node::Kind::ConcurrentFunctionType) {
+    ++startIndex;
+    isSendable = true;
+  }
+  if (node->getChild(startIndex)->getKind() == Node::Kind::AsyncAnnotation) {
+    ++startIndex;
+    isAsync = true;
+  }
+
+  switch (diffKind) {
+  case MangledDifferentiabilityKind::Forward:
+    Printer << "@differentiable(_forward) ";
+    break;
+  case MangledDifferentiabilityKind::Reverse:
+    Printer << "@differentiable(reverse) ";
+    break;
+  case MangledDifferentiabilityKind::Linear:
+    Printer << "@differentiable(_linear) ";
+    break;
+  case MangledDifferentiabilityKind::Normal:
+    Printer << "@differentiable ";
+    break;
+  case MangledDifferentiabilityKind::NonDifferentiable:
+    break;
+  }
+
+  if (nonIsolatedCallerNode)
+    print(nonIsolatedCallerNode, depth + 1);
+
+  if (isSendable)
+    Printer << "@Sendable ";
+
+  printFunctionParameters(LabelList, node->getChild(argIndex), depth,
+                          Options.ShowFunctionArgumentTypes);
+
+  if (!Options.ShowFunctionArgumentTypes)
+    return;
+
+  if (isAsync)
+    Printer << " async";
+
+  if (thrownErrorNode) {
+    print(thrownErrorNode, depth + 1);
+  }
+
+  Printer << " -> ";
+
+  if (hasSendingResult)
+    Printer << "sending ";
+
+  print(node->getChild(argIndex + 1), depth + 1);
+}
+
+void NodePrinter::printImplFunctionType(NodePointer fn, unsigned depth) {
+  NodePointer patternSubs = nullptr;
+  NodePointer invocationSubs = nullptr;
+  NodePointer sendingResult = nullptr;
+  enum State { Attrs, Inputs, Results } curState = Attrs;
+  auto transitionTo = [&](State newState) {
+    assert(newState >= curState);
+    for (; curState != newState; curState = State(curState + 1)) {
+      switch (curState) {
+      case Attrs:
+        if (patternSubs) {
+          Printer << "@substituted ";
+          print(patternSubs->getChild(0), depth + 1);
+          Printer << ' ';
+        }
         Printer << '(';
-        print(Parameters, depth + 1);
-        Printer << ')';
-      } else {
-        Printer << "(_:)";
-      }
-      return;
-    }
-
-    auto getLabelFor = [&](NodePointer Param, unsigned Index) -> std::string {
-      auto Label = LabelList->getChild(Index);
-      assert(Label && (Label->getKind() == Node::Kind::Identifier ||
-                       Label->getKind() == Node::Kind::FirstElementMarker));
-      return Label->getKind() == Node::Kind::Identifier ? Label->getText().str()
-                                                        : "_";
-    };
-
-    unsigned ParamIndex = 0;
-    bool hasLabels = LabelList && LabelList->getNumChildren() > 0;
-
-    Printer << '(';
-    llvm::interleave(
-        Parameters->begin(), Parameters->end(),
-        [&](NodePointer Param) {
-          assert(Param->getKind() == Node::Kind::TupleElement);
-
-          if (hasLabels) {
-            Printer << getLabelFor(Param, ParamIndex) << ':';
-          } else if (!showTypes) {
-            if (auto Label = getChildIf(Param, Node::Kind::TupleElementName))
-              Printer << Label->getText() << ":";
-            else
-              Printer << "_:";
-          }
-
-          if (hasLabels && showTypes)
-            Printer << ' ';
-
-          ++ParamIndex;
-
-          if (showTypes)
-            print(Param, depth + 1);
-        },
-        [&]() { Printer << (showTypes ? ", " : ""); });
-    Printer << ')';
-  }
-
-  void printFunctionType(NodePointer LabelList, NodePointer node,
-                         unsigned depth) {
-    if (node->getNumChildren() < 2) {
-      setInvalid();
-      return;
-    }
-
-    auto printConventionWithMangledCType = [this, node,
-                                            depth](const char *convention) {
-      Printer << "@convention(" << convention;
-      if (node->getFirstChild()->getKind() == Node::Kind::ClangType) {
-        Printer << ", mangledCType: \"";
-        print(node->getFirstChild(), depth + 1);
-        Printer << '"';
-      }
-      Printer << ") ";
-    };
-
-    switch (node->getKind()) {
-    case Node::Kind::FunctionType:
-    case Node::Kind::UncurriedFunctionType:
-    case Node::Kind::NoEscapeFunctionType:
-      break;
-    case Node::Kind::AutoClosureType:
-    case Node::Kind::EscapingAutoClosureType:
-      Printer << "@autoclosure "; break;
-    case Node::Kind::ThinFunctionType:
-      Printer << "@convention(thin) "; break;
-    case Node::Kind::CFunctionPointer:
-      printConventionWithMangledCType("c");
-      break;
-    case Node::Kind::EscapingObjCBlock:
-      Printer << "@escaping ";
-      LLVM_FALLTHROUGH;
-    case Node::Kind::ObjCBlock:
-      printConventionWithMangledCType("block");
-      break;
-    default:
-      assert(false && "Unhandled function type in printFunctionType!");
-    }
-
-    unsigned argIndex = node->getNumChildren() - 2;
-    unsigned startIndex = 0;
-    bool isSendable = false, isAsync = false, hasSendingResult = false;
-    auto diffKind = MangledDifferentiabilityKind::NonDifferentiable;
-    if (node->getChild(startIndex)->getKind() == Node::Kind::ClangType) {
-      // handled earlier
-      ++startIndex;
-    }
-
-    // Be sure to check for function signature components in the same
-    // order that they're added by the demangler, which is the reverse
-    // of the order that they appear in the mangling grammar.
-
-    if (node->getChild(startIndex)->getKind() ==
-        Node::Kind::SendingResultFunctionType) {
-      ++startIndex;
-      hasSendingResult = true;
-    }
-
-    // function-isolation; note that these can't actually both appear.
-    if (node->getChild(startIndex)->getKind()
-            == Node::Kind::IsolatedAnyFunctionType) {
-      print(node->getChild(startIndex), depth + 1);
-      ++startIndex;
-    }
-
-    Node *nonIsolatedCallerNode = nullptr;
-    if (node->getChild(startIndex)->getKind() ==
-          Node::Kind::NonIsolatedCallerFunctionType) {
-      nonIsolatedCallerNode = node->getChild(startIndex);
-      ++startIndex;
-    }
-
-    if (node->getChild(startIndex)->getKind() ==
-          Node::Kind::GlobalActorFunctionType) {
-      print(node->getChild(startIndex), depth + 1);
-      ++startIndex;
-    }
-
-    if (node->getChild(startIndex)->getKind() ==
-        Node::Kind::DifferentiableFunctionType) {
-      diffKind =
-          (MangledDifferentiabilityKind)node->getChild(startIndex)->getIndex();
-      ++startIndex;
-    }
-
-    Node *thrownErrorNode = nullptr;
-    if (node->getChild(startIndex)->getKind() == Node::Kind::ThrowsAnnotation ||
-        node->getChild(startIndex)->getKind()
-          == Node::Kind::TypedThrowsAnnotation) {
-      thrownErrorNode = node->getChild(startIndex);
-      ++startIndex;
-    }
-
-    if (node->getChild(startIndex)->getKind()
-            == Node::Kind::ConcurrentFunctionType) {
-      ++startIndex;
-      isSendable = true;
-    }
-    if (node->getChild(startIndex)->getKind() == Node::Kind::AsyncAnnotation) {
-      ++startIndex;
-      isAsync = true;
-    }
-
-    switch (diffKind) {
-    case MangledDifferentiabilityKind::Forward:
-      Printer << "@differentiable(_forward) ";
-      break;
-    case MangledDifferentiabilityKind::Reverse:
-      Printer << "@differentiable(reverse) ";
-      break;
-    case MangledDifferentiabilityKind::Linear:
-      Printer << "@differentiable(_linear) ";
-      break;
-    case MangledDifferentiabilityKind::Normal:
-      Printer << "@differentiable ";
-      break;
-    case MangledDifferentiabilityKind::NonDifferentiable:
-      break;
-    }
-
-    if (nonIsolatedCallerNode)
-      print(nonIsolatedCallerNode, depth + 1);
-
-    if (isSendable)
-      Printer << "@Sendable ";
-
-    printFunctionParameters(LabelList, node->getChild(argIndex), depth,
-                            Options.ShowFunctionArgumentTypes);
-
-    if (!Options.ShowFunctionArgumentTypes)
-      return;
-
-    if (isAsync)
-      Printer << " async";
-
-    if (thrownErrorNode) {
-      print(thrownErrorNode, depth + 1);
-    }
-
-    Printer << " -> ";
-
-    if (hasSendingResult)
-      Printer << "sending ";
-
-    print(node->getChild(argIndex + 1), depth + 1);
-  }
-
-  void printImplFunctionType(NodePointer fn, unsigned depth) {
-    NodePointer patternSubs = nullptr;
-    NodePointer invocationSubs = nullptr;
-    NodePointer sendingResult = nullptr;
-    enum State { Attrs, Inputs, Results } curState = Attrs;
-    auto transitionTo = [&](State newState) {
-      assert(newState >= curState);
-      for (; curState != newState; curState = State(curState + 1)) {
-        switch (curState) {
-        case Attrs:
-          if (patternSubs) {
-            Printer << "@substituted ";
-            print(patternSubs->getChild(0), depth + 1);
-            Printer << ' ';
-          }
-          Printer << '(';
-          continue;
-        case Inputs:
-          Printer << ") -> ";
-          if (sendingResult) {
-            print(sendingResult, depth + 1);
-            Printer << " ";
-          }
-          Printer << "(";
-          continue;
-        case Results: printer_unreachable("no state after Results");
+        continue;
+      case Inputs:
+        Printer << ") -> ";
+        if (sendingResult) {
+          print(sendingResult, depth + 1);
+          Printer << " ";
         }
-        printer_unreachable("bad state");
+        Printer << "(";
+        continue;
+      case Results:
+        printer_unreachable("no state after Results");
       }
-    };
-
-    for (auto &child : *fn) {
-      if (child->getKind() == Node::Kind::ImplParameter) {
-        if (curState == Inputs) Printer << ", ";
-        transitionTo(Inputs);
-        print(child, depth + 1);
-      } else if (child->getKind() == Node::Kind::ImplResult
-                 || child->getKind() == Node::Kind::ImplYield
-                 || child->getKind() == Node::Kind::ImplErrorResult) {
-        if (curState == Results) Printer << ", ";
-        transitionTo(Results);
-        print(child, depth + 1);
-      } else if (child->getKind() == Node::Kind::ImplPatternSubstitutions) {
-        patternSubs = child;
-      } else if (child->getKind() == Node::Kind::ImplInvocationSubstitutions) {
-        invocationSubs = child;
-      } else if (child->getKind() == Node::Kind::ImplSendingResult) {
-        sendingResult = child;
-      } else {
-        assert(curState == Attrs);
-        print(child, depth + 1);
-        Printer << ' ';
-      }
+      printer_unreachable("bad state");
     }
-    transitionTo(Results);
-    Printer << ')';
+  };
 
-    if (patternSubs) {
-      Printer << " for <";
-      printChildren(patternSubs->getChild(1), depth);
-      Printer << '>';
-    }
-    if (invocationSubs) {
-      Printer << " for <";
-      printChildren(invocationSubs->getChild(0), depth);
-      Printer << '>';
+  for (auto &child : *fn) {
+    if (child->getKind() == Node::Kind::ImplParameter) {
+      if (curState == Inputs)
+        Printer << ", ";
+      transitionTo(Inputs);
+      print(child, depth + 1);
+    } else if (child->getKind() == Node::Kind::ImplResult ||
+               child->getKind() == Node::Kind::ImplYield ||
+               child->getKind() == Node::Kind::ImplErrorResult) {
+      if (curState == Results)
+        Printer << ", ";
+      transitionTo(Results);
+      print(child, depth + 1);
+    } else if (child->getKind() == Node::Kind::ImplPatternSubstitutions) {
+      patternSubs = child;
+    } else if (child->getKind() == Node::Kind::ImplInvocationSubstitutions) {
+      invocationSubs = child;
+    } else if (child->getKind() == Node::Kind::ImplSendingResult) {
+      sendingResult = child;
+    } else {
+      assert(curState == Attrs);
+      print(child, depth + 1);
+      Printer << ' ';
     }
   }
+  transitionTo(Results);
+  Printer << ')';
 
-  void printGenericSignature(NodePointer Node, unsigned depth) {
-    Printer << '<';
-
-    unsigned numChildren = Node->getNumChildren();
-
-    unsigned numGenericParams = 0;
-    for (; numGenericParams < numChildren; ++numGenericParams) {
-      if (Node->getChild(numGenericParams)->getKind()
-               != Node::Kind::DependentGenericParamCount) {
-        break;
-      }
-    }
-
-    unsigned firstRequirement = numGenericParams;
-    for (; firstRequirement < numChildren; ++firstRequirement) {
-      auto child = Node->getChild(firstRequirement);
-      if (child->getKind() == Node::Kind::Type)
-        child = child->getChild(0);
-      if (child->getKind() != Node::Kind::DependentGenericParamPackMarker &&
-          child->getKind() != Node::Kind::DependentGenericParamValueMarker) {
-        break;
-      }
-    }
-
-    auto isGenericParamPack = [&](unsigned depth, unsigned index) {
-      for (unsigned i = numGenericParams; i < firstRequirement; ++i) {
-        auto child = Node->getChild(i);
-        if (child->getKind() != Node::Kind::DependentGenericParamPackMarker)
-          continue;
-        child = child->getChild(0);
-
-        if (child->getKind() != Node::Kind::Type)
-          continue;
-
-        child = child->getChild(0);
-        if (child->getKind() != Node::Kind::DependentGenericParamType)
-          continue;
-
-        if (index == child->getChild(0)->getIndex() &&
-            depth == child->getChild(1)->getIndex()) {
-          return true;
-        }
-      }
-
-      return false;
-    };
-
-    auto isGenericParamValue = [&](unsigned depth, unsigned index) {
-      for (unsigned i = numGenericParams; i < firstRequirement; ++i) {
-        auto child = Node->getChild(i);
-        if (child->getKind() != Node::Kind::DependentGenericParamValueMarker)
-          continue;
-        child = child->getChild(0);
-
-        if (child->getKind() != Node::Kind::Type)
-          continue;
-
-        auto param = child->getChild(0);
-        auto type = child->getChild(1);
-        if (param->getKind() != Node::Kind::DependentGenericParamType)
-          continue;
-
-        if (index == param->getChild(0)->getIndex() &&
-            depth == param->getChild(1)->getIndex()) {
-          return std::make_pair(true, type);
-        }
-      }
-
-      return std::make_pair(false, NodePointer());
-    };
-
-    unsigned gpDepth = 0;
-    for (; gpDepth < numGenericParams; ++gpDepth) {
-      if (gpDepth != 0)
-        Printer << "><";
-
-      unsigned count = Node->getChild(gpDepth)->getIndex();
-      for (unsigned index = 0; index < count; ++index) {
-        if (index != 0)
-          Printer << ", ";
-
-        // Limit the number of printed generic parameters. In practice this
-        // it will never be exceeded. The limit is only important for malformed
-        // symbols where count can be really huge.
-        if (index >= 128) {
-          Printer << "...";
-          break;
-        }
-
-        if (isGenericParamPack(gpDepth, index))
-          Printer << "each ";
-
-        auto value = isGenericParamValue(gpDepth, index);
-
-        if (value.first)
-          Printer << "let ";
-
-        // FIXME: Depth won't match when a generic signature applies to a
-        // method in generic type context.
-        Printer << Options.GenericParameterName(gpDepth, index);
-
-        if (value.second) {
-          Printer << ": ";
-          print(value.second, depth + 1);
-        }
-      }
-    }
-
-    if (firstRequirement != numChildren) {
-      if (Options.DisplayWhereClauses) {
-        Printer << " where ";
-        for (unsigned i = firstRequirement; i < numChildren; ++i) {
-          if (i > firstRequirement)
-            Printer << ", ";
-          print(Node->getChild(i), depth + 1);
-        }
-      }
-    }
+  if (patternSubs) {
+    Printer << " for <";
+    printChildren(patternSubs->getChild(1), depth);
     Printer << '>';
   }
+  if (invocationSubs) {
+    Printer << " for <";
+    printChildren(invocationSubs->getChild(0), depth);
+    Printer << '>';
+  }
+}
 
-  void printFunctionSigSpecializationParams(NodePointer Node, unsigned depth);
+void NodePrinter::printGenericSignature(NodePointer Node, unsigned depth) {
+  Printer << '<';
 
-  void printSpecializationPrefix(NodePointer node, StringRef Description,
-                                 unsigned depth,
-                                 StringRef ParamPrefix = StringRef());
+  unsigned numChildren = Node->getNumChildren();
 
-  /// The main big print function.
-  NodePointer print(NodePointer Node, unsigned depth,
-                    bool asPrefixContext = false);
+  unsigned numGenericParams = 0;
+  for (; numGenericParams < numChildren; ++numGenericParams) {
+    if (Node->getChild(numGenericParams)->getKind() !=
+        Node::Kind::DependentGenericParamCount) {
+      break;
+    }
+  }
 
-  NodePointer printAbstractStorage(NodePointer Node, unsigned depth,
-                                   bool asPrefixContent, StringRef ExtraName);
+  unsigned firstRequirement = numGenericParams;
+  for (; firstRequirement < numChildren; ++firstRequirement) {
+    auto child = Node->getChild(firstRequirement);
+    if (child->getKind() == Node::Kind::Type)
+      child = child->getChild(0);
+    if (child->getKind() != Node::Kind::DependentGenericParamPackMarker &&
+        child->getKind() != Node::Kind::DependentGenericParamValueMarker) {
+      break;
+    }
+  }
 
-  /// Utility function to print entities.
-  ///
-  /// \param Entity The entity node to print
-  /// \param depth The depth in the print() call tree.
-  /// \param asPrefixContext Should the entity printed as a context which as a
-  ///        prefix to another entity, e.g. the Abc in Abc.def()
-  /// \param TypePr How should the type of the entity be printed, if at all.
-  ///        E.g. with a colon for properties or as a function type.
-  /// \param hasName Does the entity has a name, e.g. a function in contrast to
-  ///        an initializer.
-  /// \param ExtraName An extra name added to the entity name (if any).
-  /// \param ExtraIndex An extra index added to the entity name (if any),
-  ///        e.g. closure #1
-  /// \param OverwriteName If non-empty, print this name instead of the one
-  ///        provided by the node. Gets printed even if hasName is false.
-  /// \return If a non-null node is returned it's a context which must be
-  ///         printed in postfix-form after the entity: "<entity> in <context>".
-  NodePointer printEntity(NodePointer Entity, unsigned depth,
-                          bool asPrefixContext, TypePrinting TypePr,
-                          bool hasName, StringRef ExtraName = "",
-                          int ExtraIndex = -1, StringRef OverwriteName = "");
+  auto isGenericParamPack = [&](unsigned depth, unsigned index) {
+    for (unsigned i = numGenericParams; i < firstRequirement; ++i) {
+      auto child = Node->getChild(i);
+      if (child->getKind() != Node::Kind::DependentGenericParamPackMarker)
+        continue;
+      child = child->getChild(0);
 
-  /// Print the type of an entity.
-  ///
-  /// \param Entity The entity.
-  /// \param type The type of the entity.
-  /// \param genericFunctionTypeList If not null, the generic argument types
-  ///           which is printed in the generic signature.
-  /// \param depth The depth in the print() call tree.
-  void printEntityType(NodePointer Entity, NodePointer type,
-                       NodePointer genericFunctionTypeList, unsigned depth);
-};
-} // end anonymous namespace
+      if (child->getKind() != Node::Kind::Type)
+        continue;
 
-static bool isExistentialType(NodePointer node) {
-  return (node->getKind() == Node::Kind::ExistentialMetatype ||
-          node->getKind() == Node::Kind::ProtocolList ||
-          node->getKind() == Node::Kind::ProtocolListWithClass ||
-          node->getKind() == Node::Kind::ProtocolListWithAnyObject);
+      child = child->getChild(0);
+      if (child->getKind() != Node::Kind::DependentGenericParamType)
+        continue;
+
+      if (index == child->getChild(0)->getIndex() &&
+          depth == child->getChild(1)->getIndex()) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  auto isGenericParamValue = [&](unsigned depth, unsigned index) {
+    for (unsigned i = numGenericParams; i < firstRequirement; ++i) {
+      auto child = Node->getChild(i);
+      if (child->getKind() != Node::Kind::DependentGenericParamValueMarker)
+        continue;
+      child = child->getChild(0);
+
+      if (child->getKind() != Node::Kind::Type)
+        continue;
+
+      auto param = child->getChild(0);
+      auto type = child->getChild(1);
+      if (param->getKind() != Node::Kind::DependentGenericParamType)
+        continue;
+
+      if (index == param->getChild(0)->getIndex() &&
+          depth == param->getChild(1)->getIndex()) {
+        return std::make_pair(true, type);
+      }
+    }
+
+    return std::make_pair(false, NodePointer());
+  };
+
+  unsigned gpDepth = 0;
+  for (; gpDepth < numGenericParams; ++gpDepth) {
+    if (gpDepth != 0)
+      Printer << "><";
+
+    unsigned count = Node->getChild(gpDepth)->getIndex();
+    for (unsigned index = 0; index < count; ++index) {
+      if (index != 0)
+        Printer << ", ";
+
+      // Limit the number of printed generic parameters. In practice this
+      // it will never be exceeded. The limit is only important for malformed
+      // symbols where count can be really huge.
+      if (index >= 128) {
+        Printer << "...";
+        break;
+      }
+
+      if (isGenericParamPack(gpDepth, index))
+        Printer << "each ";
+
+      auto value = isGenericParamValue(gpDepth, index);
+
+      if (value.first)
+        Printer << "let ";
+
+      // FIXME: Depth won't match when a generic signature applies to a
+      // method in generic type context.
+      Printer << Options.GenericParameterName(gpDepth, index);
+
+      if (value.second) {
+        Printer << ": ";
+        print(value.second, depth + 1);
+      }
+    }
+  }
+
+  if (firstRequirement != numChildren) {
+    if (Options.DisplayWhereClauses) {
+      Printer << " where ";
+      for (unsigned i = firstRequirement; i < numChildren; ++i) {
+        if (i > firstRequirement)
+          Printer << ", ";
+        print(Node->getChild(i), depth + 1);
+      }
+    }
+  }
+  Printer << '>';
 }
 
 /// Print the relevant parameters and return the new index.
