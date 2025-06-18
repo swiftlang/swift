@@ -252,7 +252,7 @@ void LifetimeDependenceInfo::getConcatenatedData(
 }
 
 class LifetimeDependenceChecker {
-  AbstractFunctionDecl *afd;
+  ValueDecl *decl;
 
   DeclContext *dc;
   ASTContext &ctx;
@@ -273,9 +273,8 @@ class LifetimeDependenceChecker {
   bool performedDiagnostics = false;
 
 public:
-  LifetimeDependenceChecker(AbstractFunctionDecl *afd):
-    afd(afd), dc(afd->getDeclContext()), ctx(dc->getASTContext())
-  {
+  LifetimeDependenceChecker(AbstractFunctionDecl *afd)
+      : decl(afd), dc(afd->getDeclContext()), ctx(dc->getASTContext()) {
     auto resultTypeRepr = afd->getResultTypeRepr();
     returnLoc = resultTypeRepr ? resultTypeRepr->getLoc() : afd->getLoc();
 
@@ -292,13 +291,14 @@ public:
     if (lifetimeDependencies.empty()) {
       return std::nullopt;
     }
-    return afd->getASTContext().AllocateCopy(lifetimeDependencies);
+    return decl->getASTContext().AllocateCopy(lifetimeDependencies);
   }
 
   std::optional<llvm::ArrayRef<LifetimeDependenceInfo>> checkFuncDecl() {
-    assert(isa<FuncDecl>(afd) || isa<ConstructorDecl>(afd));
+    assert(isa<FuncDecl>(decl) || isa<ConstructorDecl>(decl));
     assert(lifetimeDependencies.empty());
 
+    auto *afd = cast<AbstractFunctionDecl>(decl);
     // Handle Builtins first because, even though Builtins require
     // LifetimeDependence, we don't force the experimental feature
     // to be enabled when importing the Builtin module.
@@ -367,9 +367,7 @@ protected:
     return ctx.Diags.diagnose(decl, Diagnostic(id, std::move(args)...));
   }
 
-  bool isInit() const {
-    return isa<ConstructorDecl>(afd);
-  }
+  bool isInit() const { return isa<ConstructorDecl>(decl); }
 
   // For initializers, the implicit self parameter is ignored and instead shows
   // up as the result type.
@@ -381,11 +379,13 @@ protected:
   // the extra formal self parameter, a dependency targeting the formal result
   // index would incorrectly target the SIL metatype parameter.
   bool hasImplicitSelfParam() const {
+    auto *afd = cast<AbstractFunctionDecl>(decl);
     return !isInit() && afd->hasImplicitSelfDecl();
   }
 
   // In SIL, implicit initializers and accessors become explicit.
   bool isImplicitOrSIL() const {
+    auto *afd = cast<AbstractFunctionDecl>(decl);
     if (afd->isImplicit()) {
       return true;
     }
@@ -404,7 +404,7 @@ protected:
   bool isInterfaceFile() const {
     // TODO: remove this check once all compilers that are rev-locked to the
     // stdlib print the 'copy' dependence kind in the interface (Aug '25)
-    if (auto *sf = afd->getParentSourceFile()) {
+    if (auto *sf = decl->getDeclContext()->getParentSourceFile()) {
       if (sf->Kind == SourceFileKind::Interface) {
         return true;
       }
@@ -418,6 +418,7 @@ protected:
   }
 
   std::string diagnosticQualifier() const {
+    auto *afd = cast<AbstractFunctionDecl>(decl);
     if (afd->isImplicit()) {
       if (isInit()) {
         return "an implicit initializer";
@@ -462,6 +463,7 @@ protected:
   // initializers, the inout self parameter is actually considered the result
   // type so is not handled here.
   void diagnoseMissingSelfDependencies(DiagID diagID) {
+    auto *afd = cast<AbstractFunctionDecl>(decl);
     if (!hasImplicitSelfParam()) {
       return;
     }
@@ -482,6 +484,7 @@ protected:
   }
   
   void diagnoseMissingInoutDependencies(DiagID diagID) {
+    auto *afd = cast<AbstractFunctionDecl>(decl);
     unsigned paramIndex = 0;
     for (auto *param : *afd->getParameters()) {
       SWIFT_DEFER { paramIndex++; };
@@ -528,6 +531,7 @@ protected:
 
   bool isCompatibleWithOwnership(LifetimeDependenceKind kind, Type type,
                                  ValueOwnership ownership) const {
+    auto *afd = cast<AbstractFunctionDecl>(decl);
     if (kind == LifetimeDependenceKind::Inherit) {
       return true;
     }
@@ -568,6 +572,7 @@ protected:
   };
 
   TargetDeps createDeps(unsigned targetIndex) {
+    auto *afd = cast<AbstractFunctionDecl>(decl);
     unsigned capacity = afd->hasImplicitSelfDecl()
       ? (afd->getParameters()->size() + 1)
       : afd->getParameters()->size();
@@ -598,6 +603,7 @@ protected:
   }
 
   Type getResultOrYield() const {
+    auto *afd = cast<AbstractFunctionDecl>(decl);
     if (auto *accessor = dyn_cast<AccessorDecl>(afd)) {
       if (accessor->isCoroutine()) {
         auto yieldTyInContext = accessor->mapTypeIntoContext(
@@ -617,11 +623,12 @@ protected:
 
   std::optional<LifetimeDependenceKind>
   getDependenceKindFromDescriptor(LifetimeDescriptor descriptor,
-                                  ParamDecl *decl) {
+                                  ParamDecl *paramDecl) {
+    auto *afd = cast<AbstractFunctionDecl>(decl);
     auto loc = descriptor.getLoc();
-    auto type = decl->getTypeInContext();
+    auto type = paramDecl->getTypeInContext();
     auto parsedLifetimeKind = descriptor.getParsedLifetimeDependenceKind();
-    auto ownership = decl->getValueOwnership();
+    auto ownership = paramDecl->getValueOwnership();
     auto loweredOwnership = ownership != ValueOwnership::Default
                                 ? ownership
                                 : getLoweredOwnership(afd);
@@ -703,6 +710,7 @@ protected:
   // Finds the ParamDecl* and its index from a LifetimeDescriptor
   std::optional<std::pair<ParamDecl *, unsigned>>
   getParamDeclFromDescriptor(LifetimeDescriptor descriptor) {
+    auto *afd = cast<AbstractFunctionDecl>(decl);
     switch (descriptor.getDescriptorKind()) {
     case LifetimeDescriptor::DescriptorKind::Named: {
       unsigned paramIndex = 0;
@@ -751,6 +759,7 @@ protected:
   }
 
   std::optional<ArrayRef<LifetimeDependenceInfo>> checkAttribute() {
+    auto *afd = cast<AbstractFunctionDecl>(decl);
     SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
     llvm::SmallSet<unsigned, 1> lifetimeDependentTargets;
     auto lifetimeAttrs = afd->getAttrs().getAttributes<LifetimeAttr>();
@@ -775,6 +784,7 @@ protected:
 
   std::optional<LifetimeDependenceInfo>
   checkAttributeEntry(LifetimeEntry *entry) {
+    auto *afd = cast<AbstractFunctionDecl>(decl);
     auto capacity = afd->hasImplicitSelfDecl()
       ? (afd->getParameters()->size() + 1)
       : afd->getParameters()->size();
@@ -896,6 +906,7 @@ protected:
   /// If the current function is a mutating method and 'self' is non-Escapable,
   /// return 'self's ParamDecl.
   bool isMutatingNonEscapableSelf() {
+    auto *afd = cast<AbstractFunctionDecl>(decl);
     if (!hasImplicitSelfParam())
       return false;
 
@@ -912,6 +923,7 @@ protected:
 
   // Infer method dependence: result depends on self. This includes _modify.
   void inferNonEscapableResultOnSelf() {
+    auto *afd = cast<AbstractFunctionDecl>(decl);
     Type selfTypeInContext = dc->getSelfTypeInContext();
     if (selfTypeInContext->hasError()) {
       return;
@@ -963,6 +975,7 @@ protected:
 
   std::optional<LifetimeDependenceKind>
   inferLifetimeDependenceKind(Type sourceType, ValueOwnership ownership) {
+    auto *afd = cast<AbstractFunctionDecl>(decl);
     if (!sourceType->isEscapable()) {
       return LifetimeDependenceKind::Inherit;
     }
@@ -985,6 +998,7 @@ protected:
   // to an implicit setter, because the implementation is simply an assignment
   // to stored property.
   void inferImplicitInit() {
+    auto *afd = cast<AbstractFunctionDecl>(decl);
     if (afd->getParameters()->size() == 0) {
       // Empty ~Escapable types can be implicitly initialized without any
       // dependencies. In SIL, implicit initializers become explicit. Set
@@ -1024,6 +1038,7 @@ protected:
   // inference if any exist, infer scoped dependency, or infer no
   // dependency. Implicit setters for Escapable properties are not inferred.
   void inferNonEscapableResultOnParam() {
+    auto *afd = cast<AbstractFunctionDecl>(decl);
     // This is only called when there is no 'self' argument that can be the
     // source of a dependence.
     assert(!hasImplicitSelfParam());
@@ -1073,6 +1088,7 @@ protected:
   // Lazy inference for .swiftinterface backward compatibility and
   // experimentation. Inference cases can be added but not removed.
   void lazillyInferNonEscapableResultOnParam() {
+    auto *afd = cast<AbstractFunctionDecl>(decl);
     std::optional<unsigned> candidateParamIndex;
     std::optional<LifetimeDependenceKind> candidateLifetimeKind;
     unsigned paramIndex = 0;
@@ -1119,6 +1135,7 @@ protected:
   // Infer a mutating 'self' dependency when 'self' is non-Escapable and the
   // result is 'void'.
   void inferMutatingSelf() {
+    auto *afd = cast<AbstractFunctionDecl>(decl);
     if (!isMutatingNonEscapableSelf()) {
       return;
     }
@@ -1144,6 +1161,7 @@ protected:
 
   // Infer a mutating accessor's non-Escapable 'self' dependencies.
   void inferMutatingAccessor(AccessorDecl *accessor) {
+    auto *afd = cast<AbstractFunctionDecl>(decl);
     if (!isImplicitOrSIL() && !useLazyInference()) {
       // Explicit setters require explicit lifetime dependencies.
       return;
@@ -1231,6 +1249,7 @@ protected:
   // Do not issue any diagnostics. This inference is triggered even when the
   // feature is disabled!
   void inferInoutParams() {
+    auto *afd = cast<AbstractFunctionDecl>(decl);
     if (isMutatingNonEscapableSelf()) {
       return;
     }
@@ -1263,6 +1282,7 @@ protected:
   }
 
   void inferUnambiguousInoutParams() {
+    auto *afd = cast<AbstractFunctionDecl>(decl);
     if (afd->getParameters()->size() != 1) {
       return;
     }
@@ -1280,6 +1300,7 @@ protected:
   }
 
   void inferBuiltin() {
+    auto *afd = cast<AbstractFunctionDecl>(decl);
     // Normal inout parameter inference works for most generic Builtins.
     inferUnambiguousInoutParams();
     if (!lifetimeDependencies.empty()) {
