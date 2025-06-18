@@ -1063,10 +1063,11 @@ static StringRef getPrintedName(SDKContext &Ctx, Type Ty,
   llvm::raw_string_ostream OS(S);
   PrintOptions PO = getTypePrintOpts(Ctx.getOpts());
   PO.SkipAttributes = true;
+  NonRecursivePrintOptions OPO;
   if (IsImplicitlyUnwrappedOptional)
-    PO.PrintOptionalAsImplicitlyUnwrapped = true;
+    OPO |= NonRecursivePrintOption::ImplicitlyUnwrappedOptional;
 
-  Ty.print(OS, PO);
+  Ty.print(OS, PO, OPO);
   return Ctx.buffer(OS.str());
 }
 
