@@ -141,8 +141,8 @@ private func isOperandOfRecursiveCall(_ op: Operand) -> Bool {
   if let applySite = inst as? FullApplySite,
      let callee = applySite.referencedFunction,
      callee == inst.parentFunction,
-     let argIdx = applySite.calleeArgumentIndex(of: op),
-     op.value == callee.arguments[argIdx] {
+     let calleeArg = applySite.calleeArgument(of: op, in: callee),
+     op.value == calleeArg {
     return true
   }
   return false
