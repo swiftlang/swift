@@ -1370,6 +1370,10 @@ bool BridgedInstruction::AllocStackInst_isLexical() const {
   return getAs<swift::AllocStackInst>()->isLexical();
 }
 
+bool BridgedInstruction::AllocBoxInst_hasDynamicLifetime() const {
+  return getAs<swift::AllocBoxInst>()->hasDynamicLifetime();
+}
+
 bool BridgedInstruction::AllocRefInstBase_isObjc() const {
   return getAs<swift::AllocRefInstBase>()->isObjC();
 }
@@ -1494,6 +1498,14 @@ bool BridgedInstruction::ExplicitCopyAddrInst_isInitializationOfDest() const {
 
 SwiftInt BridgedInstruction::MarkUninitializedInst_getKind() const {
   return (SwiftInt)getAs<swift::MarkUninitializedInst>()->getMarkUninitializedKind();
+}
+
+SwiftInt BridgedInstruction::MarkUnresolvedNonCopyableValue_getCheckKind() const {
+  return (SwiftInt)getAs<swift::MarkUnresolvedNonCopyableValueInst>()->getCheckKind();
+}
+
+bool BridgedInstruction::MarkUnresolvedNonCopyableValue_isStrict() const {
+  return getAs<swift::MarkUnresolvedNonCopyableValueInst>()->isStrict();
 }
 
 void BridgedInstruction::RefCountingInst_setIsAtomic(bool isAtomic) const {

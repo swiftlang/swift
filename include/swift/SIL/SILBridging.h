@@ -799,6 +799,7 @@ struct BridgedInstruction {
   BRIDGED_INLINE bool AllocStackInst_isFromVarDecl() const;
   BRIDGED_INLINE bool AllocStackInst_usesMoveableValueDebugInfo() const;
   BRIDGED_INLINE bool AllocStackInst_isLexical() const;
+  BRIDGED_INLINE bool AllocBoxInst_hasDynamicLifetime() const;
   BRIDGED_INLINE bool AllocRefInstBase_isObjc() const;
   BRIDGED_INLINE bool AllocRefInstBase_canAllocOnStack() const;
   BRIDGED_INLINE SwiftInt AllocRefInstBase_getNumTailTypes() const;
@@ -828,6 +829,8 @@ struct BridgedInstruction {
   BRIDGED_INLINE bool ExplicitCopyAddrInst_isTakeOfSrc() const;
   BRIDGED_INLINE bool ExplicitCopyAddrInst_isInitializationOfDest() const;
   BRIDGED_INLINE SwiftInt MarkUninitializedInst_getKind() const;
+  BRIDGED_INLINE SwiftInt MarkUnresolvedNonCopyableValue_getCheckKind() const;
+  BRIDGED_INLINE bool MarkUnresolvedNonCopyableValue_isStrict() const;
   BRIDGED_INLINE void RefCountingInst_setIsAtomic(bool isAtomic) const;
   BRIDGED_INLINE bool RefCountingInst_getIsAtomic() const;
   BRIDGED_INLINE SwiftInt CondBranchInst_getNumTrueArgs() const;
