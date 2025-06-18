@@ -56,7 +56,7 @@ struct Validator {
 	    
 	    // Get first value (initial)
 	    let first = await iterator.next()
-	    #expect(first == 0)
+	    expectEqual(first, 0)
 	    
 	    // Modify the model in a separate task
 	    Task {
@@ -66,7 +66,7 @@ struct Validator {
 	    
 	    // Get second value (after change)
 	    let second = await iterator.next()
-	    #expect(second == 42)
+	    expectEqual(second, 42)
     }
 
     suite.test("Multiple property tracking") {
@@ -80,7 +80,7 @@ struct Validator {
 	    
 	    // Get initial value
 	    let first = await iterator.next()
-	    #expect(first == "test:0")
+	    expectEqual(first, "test:0")
 	    
 	    // Modify both properties
 	    Task {
@@ -90,7 +90,7 @@ struct Validator {
 	    }
 	    
 	    let second = await iterator.next()
-	    #expect(second == "updated:100")
+	    expectEqual(second, "updated:100")
     }
 
     suite.test("Error handling in emit closure") {
@@ -108,7 +108,7 @@ struct Validator {
 	    
 	    // First iteration should succeed
 	    let first = try await iterator.next()
-	    #expect(first == 0)
+	    expectEqual(first, 0)
 	    
 	    // Enable error throwing and trigger change
 	    Task {
@@ -129,7 +129,7 @@ struct Validator {
 	    
 	    // Sequence should be terminated after error
 	    let afterError = try await iterator.next()
-	    #expect(afterError == nil)
+	    expectEqual(afterError, nil)
     }
 
     suite.test("Concurrent observers") {
@@ -174,10 +174,10 @@ struct Validator {
 	    await changeTask.value
 	    
 	    // Both iterators should see the same progression of values
-	    #expect(result1.count == 3)
-	    #expect(result2.count == 3)
-	    #expect(result1[0] == 0) // Initial value
-	    #expect(result2[0] == 0) // Initial value
+	    expectEqual(result1.count, 3)
+	    expectEqual(result2.count, 3)
+	    expectEqual(result1[0], 0) // Initial value
+	    expectEqual(result2[0], 0) // Initial value
     }
 
     suite.test("Task cancellation behavior") {
@@ -213,8 +213,8 @@ struct Validator {
 	    let result = await task.value
 	    
 	    // Should only have gotten the initial value before cancellation
-	    #expect(result.count == 1)
-	    #expect(result[0] == 0)
+	    expectEqual(result.count, 1)
+	    expectEqual(result[0], 0)
     }
 
     suite.test("Rapid successive changes") {
@@ -228,7 +228,7 @@ struct Validator {
 	    
 	    // Get initial value
 	    let first = await iterator.next()
-	    #expect(first == 0)
+	    expectEqual(first, 0)
 	    
 	    // Make rapid changes
 	    Task {
@@ -240,7 +240,7 @@ struct Validator {
 	    
 	    // Should get the final state after all rapid changes
 	    let second = await iterator.next()
-	    #expect(second == 5)
+	    expectEqual(second, 5)
     }
 
     suite.test("Empty sequence behavior") {
@@ -251,7 +251,7 @@ struct Validator {
 	    
 	    var iterator = observations.makeAsyncIterator()
 	    let result = await iterator.next()
-	    #expect(result == nil)
+	    expectEqual(result, nil)
     }
 
     runAllTests()
