@@ -656,6 +656,18 @@ extension Argument {
   }
 }
 
+extension FunctionArgument {
+  /// Copies the following flags from `arg`:
+  /// 1. noImplicitCopy
+  /// 2. lifetimeAnnotation
+  /// 3. closureCapture
+  /// 4. parameterPack
+  func copyFlags(from arg: FunctionArgument, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.copyFlags(arg.bridged)
+  }
+}
+
 extension AllocRefInstBase {
   func setIsStackAllocatable(_ context: some MutatingContext) {
     context.notifyInstructionsChanged()

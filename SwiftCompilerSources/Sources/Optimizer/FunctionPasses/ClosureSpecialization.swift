@@ -710,7 +710,7 @@ private extension SpecializationCloner {
       .forEach { _, arg in
         let clonedEntryBlockArgType = arg.type.getLoweredType(in: clonedFunction)
         let clonedEntryBlockArg = clonedEntryBlock.addFunctionArgument(type: clonedEntryBlockArgType, self.context)
-        clonedEntryBlockArg.copyFlags(from: arg as! FunctionArgument)
+        clonedEntryBlockArg.copyFlags(from: arg as! FunctionArgument, self.context)
       }
   }
 

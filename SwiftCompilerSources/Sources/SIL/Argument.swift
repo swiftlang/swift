@@ -83,15 +83,6 @@ final public class FunctionArgument : Argument {
   public var resultDependence: LifetimeDependenceConvention? {
     parentFunction.argumentConventions[resultDependsOn: index]
   }
-
-  /// Copies the following flags from `arg`:
-  /// 1. noImplicitCopy
-  /// 2. lifetimeAnnotation
-  /// 3. closureCapture
-  /// 4. parameterPack
-  public func copyFlags(from arg: FunctionArgument) {
-    bridged.copyFlags(arg.bridged)
-  }
 }
 
 public struct Phi {
