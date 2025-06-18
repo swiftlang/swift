@@ -122,10 +122,18 @@ public struct Builder {
     }
   }
 
-  public func createAllocStack(_ type: Type, hasDynamicLifetime: Bool = false,
+  public func createAllocStack(_ type: Type,
+                               debugVariable: DebugVariableInstruction.DebugVariable? = nil,
+                               hasDynamicLifetime: Bool = false,
                                isLexical: Bool = false, isFromVarDecl: Bool = false,
                                usesMoveableValueDebugInfo: Bool = false) -> AllocStackInst {
-    let dr = bridged.createAllocStack(type.bridged, hasDynamicLifetime, isLexical,
+    let bridgedDebugVar: OptionalBridgedSILDebugVariable
+    if let debugVariable = debugVariable {
+      bridgedDebugVar = OptionalBridgedSILDebugVariable(debugVariable)
+    } else {
+      bridgedDebugVar = OptionalBridgedSILDebugVariable()
+    }
+    let dr = bridged.createAllocStack(type.bridged, bridgedDebugVar, hasDynamicLifetime, isLexical,
                                       isFromVarDecl, usesMoveableValueDebugInfo)
     return notifyNew(dr.getAs(AllocStackInst.self))
   }
