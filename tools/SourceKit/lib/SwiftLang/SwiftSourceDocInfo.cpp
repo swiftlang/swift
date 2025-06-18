@@ -900,8 +900,8 @@ static void setLocationInfoForRange(SourceManager &SM, SourceRange R,
         SM.getLineAndColumnInBuffer(CR.getStart(), BufID);
 }
 
-static void setLocationInfo(const ValueDecl *VD,
-                            LocationInfo &Location) {
+static LocationInfo getDeclLocationInfo(const ValueDecl *VD) {
+  LocationInfo Location;
   ASTContext &Ctx = VD->getASTContext();
   SourceManager &SM = Ctx.SourceMgr;
   auto *Importer = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
@@ -963,7 +963,7 @@ static void setLocationInfo(const ValueDecl *VD,
           // original file might be tricky.
           setLocationInfoForRange(SM, VDRange, VDBufID, Location);
         }
-        return;
+        return Location;
       case GeneratedSourceInfo::AttributeFromClang:
         // This buffer was generated for an imported ClangNode, so set location
         // info according to that.
@@ -971,11 +971,11 @@ static void setLocationInfo(const ValueDecl *VD,
           setLocationInfoForClangNode(node, Importer, Location);
         else
           setLocationInfoForRange(SM, VDRange, VDBufID, Location);
-        return;
+        return Location;
       case GeneratedSourceInfo::DefaultArgument:
       case GeneratedSourceInfo::PrettyPrinted:
         setLocationInfoForRange(SM, VDRange, VDBufID, Location);
-        return;
+        return Location;
       }
       llvm_unreachable("All switch cases either explicitly continue or return");
     }
@@ -984,6 +984,7 @@ static void setLocationInfo(const ValueDecl *VD,
   } else if (auto CNode = VD->getClangNode()) {
     setLocationInfoForClangNode(CNode, Importer, Location);
   }
+  return Location;
 }
 
 static llvm::Error
@@ -1142,7 +1143,7 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
           Lang.getIFaceGenContexts().find(Symbol.ModuleName, Invoc))
     Symbol.ModuleInterfaceName = IFaceGenRef->getDocumentName();
 
-  setLocationInfo(DInfo.OriginalProperty, Symbol.Location);
+  Symbol.Location = getDeclLocationInfo(DInfo.OriginalProperty);
   if (!Symbol.Location.Filename.empty()) {
     mapLocToLatestSnapshot(Lang, Symbol.Location, PreviousSnaps);
     if (Symbol.Location.Filename.empty()) {
