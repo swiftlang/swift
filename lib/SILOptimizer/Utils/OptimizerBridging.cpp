@@ -156,6 +156,11 @@ void BridgedPassContext::inlineFunction(BridgedInstruction apply, bool mandatory
                               funcBuilder, deleter);
 }
 
+void BridgedPassContext::eraseFunction(BridgedFunction function) const {
+  invocation->getPassManager()->notifyWillDeleteFunction(function.getFunction());
+  invocation->getPassManager()->getModule()->eraseFunction(function.getFunction());
+}
+
 static const irgen::TypeInfo &getTypeInfoOfBuiltin(swift::SILType type, irgen::IRGenModule &IGM) {
   SILType lowered = IGM.getLoweredType(swift::Lowering::AbstractionPattern::getOpaque(), type.getASTType());
   return IGM.getTypeInfo(lowered);

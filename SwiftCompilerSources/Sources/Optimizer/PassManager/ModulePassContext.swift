@@ -206,6 +206,10 @@ struct ModulePassContext : Context, CustomStringConvertible {
     }
   }
 
+  func erase(function: Function) {
+    _bridged.eraseFunction(function.bridged)
+  }
+
   func notifyFunctionTablesChanged() {
     _bridged.asNotificationHandler().notifyChanges(.functionTablesChanged)
   }

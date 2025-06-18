@@ -262,6 +262,7 @@ struct BridgedPassContext {
   void inlineFunction(BridgedInstruction apply, bool mandatoryInline) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue getSILUndef(BridgedType type) const;
   BRIDGED_INLINE bool eliminateDeadAllocations(BridgedFunction f) const;
+  void eraseFunction(BridgedFunction function) const;
 
   BRIDGED_INLINE bool shouldExpand(BridgedType type) const;
 

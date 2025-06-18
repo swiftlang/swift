@@ -1463,6 +1463,10 @@ bool BridgedInstruction::BeginAccessInst_isUnsafe() const {
   return getAs<swift::BeginAccessInst>()->getEnforcement() == swift::SILAccessEnforcement::Unsafe;
 }
 
+void BridgedInstruction::BeginAccess_setAccessKind(SwiftInt accessKind) const {
+  getAs<swift::BeginAccessInst>()->setAccessKind((swift::SILAccessKind)accessKind);
+}
+
 bool BridgedInstruction::CopyAddrInst_isTakeOfSrc() const {
   return getAs<swift::CopyAddrInst>()->isTakeOfSrc();
 }
@@ -1807,6 +1811,14 @@ BridgedArgument BridgedBasicBlock::addBlockArgument(BridgedType type, BridgedVal
 
 BridgedArgument BridgedBasicBlock::addFunctionArgument(BridgedType type) const {
   return {unbridged()->createFunctionArgument(type.unbridged())};
+}
+
+BridgedArgument BridgedBasicBlock::insertFunctionArgument(SwiftInt atPosition, BridgedType type,
+                                                          BridgedValue::Ownership ownership,
+                                                          OptionalBridgedDeclObj decl) const {
+  return {unbridged()->insertFunctionArgument((unsigned)atPosition, type.unbridged(),
+                                              BridgedValue::unbridge(ownership),
+                                              decl.getAs<swift::ValueDecl>())};
 }
 
 void BridgedBasicBlock::eraseArgument(SwiftInt index) const {

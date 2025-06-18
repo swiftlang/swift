@@ -609,6 +609,14 @@ extension BasicBlock {
     return bridged.addFunctionArgument(type.bridged).argument as! FunctionArgument
   }
 
+  func insertFunctionArgument(atPosition: Int, type: Type, ownership: Ownership, decl: ValueDecl? = nil,
+                              _ context: some MutatingContext) -> FunctionArgument
+  {
+    context.notifyInstructionsChanged()
+    return bridged.insertFunctionArgument(atPosition, type.bridged, ownership._bridged,
+                                          (decl as Decl?).bridged).argument as! FunctionArgument
+  }
+
   func eraseArgument(at index: Int, _ context: some MutatingContext) {
     context.notifyInstructionsChanged()
     bridged.eraseArgument(index)
@@ -787,6 +795,14 @@ extension MarkDependenceInstruction {
   func settleToEscaping(_ context: some MutatingContext) {
     context.notifyInstructionsChanged()
     bridged.MarkDependenceInstruction_settleToEscaping()
+    context.notifyInstructionChanged(self)
+  }
+}
+
+extension BeginAccessInst {
+  func set(accessKind: BeginAccessInst.AccessKind, context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.BeginAccess_setAccessKind(accessKind.rawValue)
     context.notifyInstructionChanged(self)
   }
 }
