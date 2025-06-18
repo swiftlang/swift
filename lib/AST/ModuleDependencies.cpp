@@ -573,7 +573,8 @@ void swift::dependencies::registerCxxInteropLibraries(
                       return mainModuleName == Name;
                     })) {
     // Only link with CxxStdlib on platforms where the overlay is available.
-    if (Target.isOSDarwin() || Target.isOSLinux() || Target.isOSWindows())
+    if (Target.isOSDarwin() || Target.isOSLinux() || Target.isOSWindows() ||
+        Target.isOSFreeBSD())
       RegistrationCallback(LinkLibrary{"swiftCxxStdlib", LibraryKind::Library,
                                        hasStaticCxxStdlib});
   }
