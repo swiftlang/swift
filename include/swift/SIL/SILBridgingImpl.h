@@ -593,8 +593,8 @@ bool BridgedArgument::FunctionArgument_isClosureCapture() const {
     getArgument())->isClosureCapture();
 }
 
-OptionalBridgedDeclObj BridgedArgument::getVarDecl() const {
-  return {llvm::dyn_cast_or_null<swift::VarDecl>(getArgument()->getDecl())};
+OptionalBridgedDeclObj BridgedArgument::getDecl() const {
+  return {getArgument()->getDecl()};
 }
 
 void BridgedArgument::copyFlags(BridgedArgument fromArgument) const {

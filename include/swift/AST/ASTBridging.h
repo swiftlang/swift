@@ -370,6 +370,16 @@ void registerBridgedDecl(BridgedStringRef bridgedClassName, SwiftMetatype metaty
 
 struct OptionalBridgedDeclObj {
   OptionalSwiftObject obj;
+
+  OptionalBridgedDeclObj(OptionalSwiftObject obj) : obj(obj) {}
+
+#ifdef USED_IN_CPP_SOURCE
+  template <class D> D *_Nullable getAs() const {
+    if (obj)
+      return llvm::cast<D>(static_cast<swift::Decl *>(obj));
+    return nullptr;
+  }
+#endif
 };
 
 struct BridgedDeclObj {

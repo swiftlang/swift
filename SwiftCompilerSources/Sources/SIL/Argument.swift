@@ -34,8 +34,10 @@ public class Argument : Value, Hashable {
 
   public var isLexical: Bool { false }
 
+  public var decl: ValueDecl? { bridged.getDecl().getAs(ValueDecl.self) }
+
   public func findVarDecl() -> VarDecl? {
-    if let varDecl = bridged.getVarDecl().getAs(VarDecl.self) {
+    if let varDecl = decl as? VarDecl {
       return varDecl
     }
     return findVarDeclFromDebugUsers()
