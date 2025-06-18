@@ -348,10 +348,6 @@ bool BridgedType::isReferenceCounted(BridgedFunction f) const {
   return unbridged().isReferenceCounted(f.getFunction());
 }
 
-bool BridgedType::isBox() const {
-  return unbridged().is<swift::SILBoxType>();
-}
-
 bool BridgedType::containsNoEscapeFunction() const {
   return unbridged().containsNoEscapeFunction();
 }
@@ -384,14 +380,18 @@ SwiftInt BridgedType::getCaseIdxOfEnumType(BridgedStringRef name) const {
   return unbridged().getCaseIdxOfEnumType(name.unbridged());
 }
 
-SwiftInt BridgedType::getNumBoxFields() const {
-  return unbridged().castTo<swift::SILBoxType>()->getLayout()->getFields().size();
+SwiftInt BridgedType::getNumBoxFields(BridgedCanType boxTy) {
+  return boxTy.unbridged()->castTo<swift::SILBoxType>()->getLayout()->getFields().size();
 }
 
-BridgedType BridgedType::getBoxFieldType(SwiftInt idx, BridgedFunction f) const {
+BridgedType BridgedType::getBoxFieldType(BridgedCanType boxTy, SwiftInt idx, BridgedFunction f) {
   auto *fn = f.getFunction();
-  return swift::getSILBoxFieldType(fn->getTypeExpansionContext(), unbridged().castTo<swift::SILBoxType>(),
+  return swift::getSILBoxFieldType(fn->getTypeExpansionContext(), boxTy.unbridged()->castTo<swift::SILBoxType>(),
                                    fn->getModule().Types, idx);
+}
+
+bool BridgedType::getBoxFieldIsMutable(BridgedCanType boxTy, SwiftInt idx) {
+  return boxTy.unbridged()->castTo<swift::SILBoxType>()->getLayout()->getFields()[idx].isMutable();
 }
 
 SwiftInt BridgedType::getNumNominalFields() const {

@@ -546,6 +546,10 @@ bool BridgedASTType::isBuiltinFixedArray() const {
   return unbridged()->is<swift::BuiltinFixedArrayType>();
 }
 
+bool BridgedASTType::isBox() const {
+  return unbridged()->is<swift::SILBoxType>();
+}
+
 BridgedASTType BridgedASTType::getBuiltinVectorElementType() const {
   return {unbridged()->castTo<swift::BuiltinVectorType>()->getElementType().getPointer()};
 }

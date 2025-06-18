@@ -252,7 +252,6 @@ struct BridgedType {
   BRIDGED_INLINE bool isNonTrivialOrContainsRawPointer(BridgedFunction f) const;
   BRIDGED_INLINE bool isLoadable(BridgedFunction f) const;
   BRIDGED_INLINE bool isReferenceCounted(BridgedFunction f) const;
-  BRIDGED_INLINE bool isBox() const;
   BRIDGED_INLINE bool containsNoEscapeFunction() const;
   BRIDGED_INLINE bool isEmpty(BridgedFunction f) const;
   BRIDGED_INLINE bool isMoveOnly() const;
@@ -261,8 +260,10 @@ struct BridgedType {
   BRIDGED_INLINE bool isMarkedAsImmortal() const;
   BRIDGED_INLINE bool isAddressableForDeps(BridgedFunction f) const;
   BRIDGED_INLINE SwiftInt getCaseIdxOfEnumType(BridgedStringRef name) const;
-  BRIDGED_INLINE SwiftInt getNumBoxFields() const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getBoxFieldType(SwiftInt idx, BridgedFunction f) const;
+  static BRIDGED_INLINE SwiftInt getNumBoxFields(BridgedCanType boxTy);
+  static SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getBoxFieldType(BridgedCanType boxTy,
+                                                                        SwiftInt idx, BridgedFunction f);
+  static BRIDGED_INLINE bool getBoxFieldIsMutable(BridgedCanType boxTy, SwiftInt idx);
   BRIDGED_INLINE SwiftInt getNumNominalFields() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getFieldType(SwiftInt idx, BridgedFunction f) const;
   BRIDGED_INLINE SwiftInt getFieldIdxOfNominalType(BridgedStringRef name) const;
