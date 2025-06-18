@@ -1188,6 +1188,13 @@ bool SILType::isAddressableForDeps(const SILFunction &function) const {
   return tl.getRecursiveProperties().isAddressableForDependencies();
 }
 
+CustomDeinitStatus SILType::hasCustomDeinit(const SILFunction &function) const {
+  auto contextType =
+    hasTypeParameter() ? function.mapTypeIntoContext(*this) : *this;
+  auto &tl = function.getTypeLowering(contextType);
+  return tl.getRecursiveProperties().hasCustomDeinit();
+}
+
 intptr_t SILType::getFieldIdxOfNominalType(StringRef fieldName) const {
   auto *nominal = getNominalOrBoundGenericNominal();
   if (!nominal)

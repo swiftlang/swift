@@ -260,6 +260,7 @@ struct BridgedType {
   BRIDGED_INLINE bool isExactSuperclassOf(BridgedType t) const;
   BRIDGED_INLINE bool isMarkedAsImmortal() const;
   BRIDGED_INLINE bool isAddressableForDeps(BridgedFunction f) const;
+  BRIDGED_INLINE bool hasCustomDeinit(BridgedFunction f) const;
   BRIDGED_INLINE SwiftInt getCaseIdxOfEnumType(BridgedStringRef name) const;
   BRIDGED_INLINE SwiftInt getNumBoxFields() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getBoxFieldType(SwiftInt idx, BridgedFunction f) const;

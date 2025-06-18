@@ -205,6 +205,7 @@ public:
       LexicalFlag                    = 1 << 7,
       HasPackFlag                    = 1 << 8,
       AddressableForDependenciesFlag = 1 << 9,
+      CustomDeinitFlag               = 1 << 10,
     };
     // clang-format on
 
@@ -222,7 +223,8 @@ public:
             IsNotTypeExpansionSensitive,
         HasRawPointer_t hasRawPointer = DoesNotHaveRawPointer,
         IsLexical_t isLexical = IsNotLexical, HasPack_t hasPack = HasNoPack,
-        IsAddressableForDependencies_t isAFD = IsNotAddressableForDependencies)
+        IsAddressableForDependencies_t isAFD = IsNotAddressableForDependencies,
+        CustomDeinitStatus customDeinit = HasOnlyDefaultDeinit)
         : Flags((isTrivial ? 0U : NonTrivialFlag) |
                 (isFixedABI ? 0U : NonFixedABIFlag) |
                 (isAddressOnly ? AddressOnlyFlag : 0U) |
@@ -231,7 +233,8 @@ public:
                 (hasRawPointer ? HasRawPointerFlag : 0U) |
                 (isLexical ? LexicalFlag : 0U) |
                 (hasPack ? HasPackFlag : 0U) |
-                (isAFD ? AddressableForDependenciesFlag : 0U)) {}
+                (isAFD ? AddressableForDependenciesFlag : 0U) |
+                (customDeinit ? CustomDeinitFlag : 0U)) {}
 
     constexpr bool operator==(RecursiveProperties p) const {
       return Flags == p.Flags;
@@ -254,13 +257,14 @@ public:
 
     static constexpr RecursiveProperties forReference() {
       return {IsNotTrivial, IsFixedABI, IsNotAddressOnly, IsNotResilient,
-              IsNotTypeExpansionSensitive, DoesNotHaveRawPointer, IsLexical};
+              IsNotTypeExpansionSensitive, DoesNotHaveRawPointer, IsLexical,
+              HasNoPack, IsNotAddressableForDependencies, MayHaveCustomDeinit};
     }
 
     static constexpr RecursiveProperties forOpaque() {
       return {IsNotTrivial, IsNotFixedABI, IsAddressOnly, IsNotResilient,
               IsNotTypeExpansionSensitive, HasRawPointer, IsLexical,
-              HasNoPack, IsAddressableForDependencies};
+              HasNoPack, IsAddressableForDependencies, MayHaveCustomDeinit};
     }
 
     static constexpr RecursiveProperties forResilient() {
@@ -305,6 +309,9 @@ public:
       return IsAddressableForDependencies_t(
                                 (Flags & AddressableForDependenciesFlag) != 0);
     }
+    CustomDeinitStatus hasCustomDeinit() const {
+      return CustomDeinitStatus((Flags & CustomDeinitFlag) != 0);
+    }
 
     void setNonTrivial() { Flags |= NonTrivialFlag; }
     void setIsOrContainsRawPointer() { Flags |= HasRawPointerFlag; }
@@ -323,6 +330,12 @@ public:
     void setHasPack() { Flags |= HasPackFlag; }
     void setAddressableForDependencies() {
       Flags |= AddressableForDependenciesFlag;
+    }
+    void setMayHaveCustomDeinit() {
+      Flags |= CustomDeinitFlag;
+    }
+    void setHasOnlyDefaultDeinit() {
+      Flags &= ~CustomDeinitFlag;
     }
   };
 
