@@ -227,9 +227,7 @@ extension Hasher {
           remaining -= c
         }
       }
-      _internalInvariant(
-        remaining == 0 ||
-        Int(bitPattern: data) & (MemoryLayout<UInt64>.alignment - 1) == 0)
+      _internalInvariant(remaining == 0 || data._isWellAligned(for: UInt64.self))
 
       // Load as many aligned words as there are in the input buffer
       while remaining >= MemoryLayout<UInt64>.size {
