@@ -46,6 +46,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Basic/SourceLoc.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/Basic/Version.h"
@@ -8670,17 +8671,16 @@ bool importer::hasSameUnderlyingType(const clang::Type *a,
 }
 
 SourceFile &ClangImporter::Implementation::getClangSwiftAttrSourceFile(
-    ModuleDecl &module,
-    StringRef attributeText,
-    bool cached
-) {
+    Decl *MappedDecl, StringRef attributeText, bool cached) {
+  auto *module = MappedDecl->getDeclContext()->getParentModule();
+
   ::TinyPtrVector<SourceFile *> *sourceFiles = nullptr;
   if (cached) {
     sourceFiles = &ClangSwiftAttrSourceFiles[attributeText];
 
     // Check whether we've already created a source file.
     for (auto sourceFile : *sourceFiles) {
-      if (sourceFile->getParentModule() == &module)
+      if (sourceFile->getParentModule() == module)
         return *sourceFile;
     }
   }
@@ -8690,20 +8690,17 @@ SourceFile &ClangImporter::Implementation::getClangSwiftAttrSourceFile(
   auto &sourceMgr = SwiftContext.SourceMgr;
   auto bufferID = sourceMgr.addMemBufferCopy(attributeText);
 
-  // Note that this is for an attribute.
-  sourceMgr.setGeneratedSourceInfo(
-      bufferID,
-      {
-        GeneratedSourceInfo::AttributeFromClang,
-        CharSourceRange(),
-        sourceMgr.getRangeForBuffer(bufferID),
-        &module
-      }
-  );
+  auto info = GeneratedSourceInfo{GeneratedSourceInfo::AttributeFromClang,
+                                  CharSourceRange(),
+                                  sourceMgr.getRangeForBuffer(bufferID)};
+  info.astNode = static_cast<void *>(module);
+  info.clangNode = MappedDecl->getClangNode();
+
+  sourceMgr.setGeneratedSourceInfo(bufferID, info);
 
   // Create the source file.
-  auto sourceFile = new (SwiftContext)
-      SourceFile(module, SourceFileKind::Library, bufferID);
+  auto sourceFile =
+      new (SwiftContext) SourceFile(*module, SourceFileKind::Library, bufferID);
 
   if (cached)
     sourceFiles->push_back(sourceFile);
@@ -8726,8 +8723,8 @@ void ClangImporter::Implementation::importNontrivialAttribute(
   bool cached = true;
   while (true) {
     // Dig out a source file we can use for parsing.
-    auto &sourceFile = getClangSwiftAttrSourceFile(
-        *MappedDecl->getDeclContext()->getParentModule(), AttrString, cached);
+    auto &sourceFile =
+        getClangSwiftAttrSourceFile(MappedDecl, AttrString, cached);
 
     auto topLevelDecls = sourceFile.getTopLevelDecls();
 
