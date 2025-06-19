@@ -329,6 +329,11 @@ module WinSDK [system] {
     link "Mpr.Lib"
   }
 
+  module NTAPI {
+    header "winternl.h"
+    export *
+  }
+
   module Security {
     header "../shared/sddl.h"
 
