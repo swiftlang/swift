@@ -255,12 +255,12 @@ fileprivate class _Lock {
     unsafe self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
     unsafe self.underlying.initialize(to: os_unfair_lock())
     #elseif os(Windows)
-    self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
-    InitializeSRWLock(self.underlying)
+    unsafe self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
+    unsafe InitializeSRWLock(self.underlying)
     #elseif os(WASI)
     // WASI environment has only a single thread
     #else
-    self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
+    unsafe self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
     guard unsafe pthread_mutex_init(self.underlying, nil) == 0 else {
       fatalError("pthread_mutex_init failed")
     }
@@ -292,7 +292,7 @@ fileprivate class _Lock {
     #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS) || os(visionOS)
     unsafe os_unfair_lock_lock(self.underlying)
     #elseif os(Windows)
-    AcquireSRWLockExclusive(self.underlying)
+    unsafe AcquireSRWLockExclusive(self.underlying)
     #elseif os(WASI)
     // WASI environment has only a single thread
     #else
@@ -305,7 +305,7 @@ fileprivate class _Lock {
       #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS) || os(visionOS)
       unsafe os_unfair_lock_unlock(self.underlying)    
       #elseif os(Windows)
-      ReleaseSRWLockExclusive(self.underlying)
+      unsafe ReleaseSRWLockExclusive(self.underlying)
       #elseif os(WASI)
       // WASI environment has only a single thread
       #else
