@@ -1823,6 +1823,7 @@ function Get-CompilersDefines([Hashtable] $Platform, [string] $Variant, [switch]
     CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
     CMAKE_Swift_FLAGS = $SwiftFlags;
     LibXml2_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\libxml2-2.11.5";
+    LLDB_LIBXML2_VERSION = "2.11.5";
     LLDB_PYTHON_EXE_RELATIVE_PATH = "python.exe";
     LLDB_PYTHON_EXT_SUFFIX = ".pyd";
     LLDB_PYTHON_RELATIVE_PATH = "lib/site-packages";

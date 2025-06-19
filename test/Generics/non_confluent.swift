@@ -52,3 +52,65 @@ protocol P3 : P3Base where T == S<U> {
 // expected-error@-1 {{cannot build rewrite system for protocol; rule length limit exceeded}}
 // expected-note@-2 {{failed rewrite rule is [P3:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[concrete: S<S<S<S<S<S<S<S<S<S<S<S<S<S<[P3:U]>>>>>>>>>>>>>>] => [P3:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T]}}
 }
+
+protocol Exponential {
+// expected-error@-1 {{cannot build rewrite system for protocol; concrete type size limit exceeded}}
+// expected-note@-2 {{failed rewrite rule is }}
+  associatedtype A where A == (A, A)
+}
+
+class Base<T> {}
+
+class Derived<T, U> : Base<(T, U)> {}
+
+protocol TooManyDifferences {
+// expected-error@-1 {{cannot build rewrite system for protocol; concrete type difference limit exceeded}}
+// expected-note@-2 {{failed rewrite rule is }}
+  associatedtype A1 where A1: Derived<B, C>, A2: Base<B>, A1 == A2
+  associatedtype A2
+  associatedtype B
+  associatedtype C
+}
+
+protocol M0 {
+// expected-error@-1 {{cannot build rewrite system for protocol; rule length limit exceeded}}
+// expected-note@-2 {{failed rewrite rule is }}
+  associatedtype A: M0
+  associatedtype B: M0
+  associatedtype C: M0
+    where A.B == Self, C.A == B.C  // expected-error *{{is not a member type}}
+}
+
+protocol M1 {
+// expected-error@-1 {{cannot build rewrite system for protocol; rule length limit exceeded}}
+// expected-note@-2 {{failed rewrite rule is }}
+  associatedtype A: M1
+  associatedtype B: M1
+  associatedtype C: M1
+    where C.A.C == A, A.B.A == A  // expected-error *{{is not a member type}}
+}
+
+protocol M2 {
+// expected-error@-1 {{cannot build rewrite system for protocol; rule length limit exceeded}}
+// expected-note@-2 {{failed rewrite rule is }}
+  associatedtype A: M2
+  associatedtype B: M2
+  associatedtype C: M2
+    where B.A == A.B, C.A == A, A.C == A  // expected-error *{{is not a member type}}
+}
+
+protocol M3 {
+// expected-error@-1 {{cannot build rewrite system for protocol; rule length limit exceeded}}
+// expected-note@-2 {{failed rewrite rule is }}
+  associatedtype A: M3
+  associatedtype B: M3
+    where A.A.A == A, A.B.B.A == B.B  // expected-error *{{is not a member type}}
+}
+
+protocol M4 {
+// expected-error@-1 {{cannot build rewrite system for protocol; rule length limit exceeded}}
+// expected-note@-2 {{failed rewrite rule is }}
+  associatedtype A: M4
+  associatedtype B: M4
+    where B.A.A == A.A.B, A.B.A == A.A  // expected-error *{{is not a member type}}
+}

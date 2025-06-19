@@ -447,6 +447,14 @@ def requirement_machine_max_concrete_nesting : Joined<["-"], "requirement-machin
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Set the maximum concrete type nesting depth before giving up">;
 
+def requirement_machine_max_concrete_size : Joined<["-"], "requirement-machine-max-concrete-size=">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Set the maximum concrete type total size before giving up">;
+
+def requirement_machine_max_type_differences : Joined<["-"], "requirement-machine-max-type-differences=">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Set the maximum number of type difference structures allocated before giving up">;
+
 def requirement_machine_max_split_concrete_equiv_class_attempts : Joined<["-"], "requirement-machine-max-split-concrete-equiv-class-attempts=">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Set the maximum concrete number of attempts at splitting "
