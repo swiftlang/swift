@@ -1245,7 +1245,7 @@ extension _StringObject {
       countAndFlags: countAndFlags)
 #elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     self.init(
-      variant: .immortal(start: bufPtr.baseAddress._unsafelyUnwrappedUnchecked),
+      variant: unsafe .immortal(start: bufPtr.baseAddress._unsafelyUnwrappedUnchecked),
       discriminator: Nibbles.largeImmortal(),
       countAndFlags: countAndFlags)
 #else

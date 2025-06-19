@@ -76,7 +76,7 @@ public struct UInt128: Sendable {
   public var _value: Builtin.Int128 {
     @_transparent
     get {
-      unsafeBitCast(self, to: Builtin.Int128.self)
+      unsafe unsafeBitCast(self, to: Builtin.Int128.self)
     }
 
     @_transparent
@@ -88,7 +88,7 @@ public struct UInt128: Sendable {
   @available(SwiftStdlib 6.0, *)
   @_transparent
   public init(_ _value: Builtin.Int128) {
-    self = unsafeBitCast(_value, to: Self.self)
+    self = unsafe unsafeBitCast(_value, to: Self.self)
   }
 #endif
 

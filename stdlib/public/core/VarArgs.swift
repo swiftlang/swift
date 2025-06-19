@@ -609,7 +609,7 @@ final internal class __VaListBuilder {
     // We may need to retain an object that provides a pointer value.
     if let obj = arg as? _CVarArgObject {
       arg = obj._cVarArgObject
-      retainer.append(arg)
+      unsafe retainer.append(arg)
     }
 #endif
 
