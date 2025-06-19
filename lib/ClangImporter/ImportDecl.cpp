@@ -9074,10 +9074,11 @@ private:
     out << "\"";
     llvm::SaveAndRestore<bool> hasAvailbilitySeparatorRestore(firstParam, true);
     for (auto attr : D->getSemanticAvailableAttrs(/*includingInactive=*/true)) {
+      if (attr.getDomain().isSwiftToolchain()) continue;
       auto introducedOpt = attr.getIntroduced();
       if (!introducedOpt.has_value()) continue;
       printSeparator();
-      out << prettyPlatformString(attr.getPlatform()) << " " << introducedOpt.value();
+      out << attr.getDomain().getNameForAttributePrinting() << " " << introducedOpt.value();
     }
     out << "\"";
   }

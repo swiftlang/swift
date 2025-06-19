@@ -5036,7 +5036,7 @@ void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
           foundWildcard) {
         // Only platform availability is allowed to be written groups with more
         // than one member.
-        if (!domain.isPlatform()) {
+        if (!domain.isPlatform() && !domain.isSwiftToolchain()) {
           diagnose(loc, diag::availability_must_occur_alone, domain,
                    domain.isVersioned());
           continue;

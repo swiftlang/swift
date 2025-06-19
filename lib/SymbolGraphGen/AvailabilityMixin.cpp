@@ -28,6 +28,9 @@ StringRef getDomain(const SemanticAvailableAttr &AvAttr) {
   if (AvAttr.getDomain().isSwiftLanguage())
     return { "Swift" };
 
+  if (AvAttr.getDomain().isSwiftToolchain())
+    return { "SwiftToolchain" };
+
   // Platform-specific availability.
   switch (AvAttr.getPlatform()) {
     case swift::PlatformKind::iOS:

@@ -806,6 +806,8 @@ static ValueDecl *deriveDistributedActor_unownedExecutor(DerivedConformance &der
   if (auto enclosingDecl = property->getInnermostDeclWithAvailability())
     asAvailableAs.push_back(enclosingDecl);
 
+  // Don't copy SwiftToolchain availability since the derived conformances can end up in module
+  // interfaces.
   AvailabilityInference::applyInferredAvailableAttrs(property, asAvailableAs);
 
   auto getter = derived.addGetterToReadOnlyDerivedProperty(property);

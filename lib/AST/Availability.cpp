@@ -206,6 +206,8 @@ void AvailabilityInference::applyInferredAvailableAttrs(
   // Create an availability attribute for each observed platform and add
   // to ToDecl.
   for (auto &Pair : Inferred) {
+    // Never include _SwiftToolchain availability when inferring.
+    if (Pair.first.isSwiftToolchain()) continue;
     if (auto Attr = createAvailableAttr(Pair.first, Pair.second, Context))
       Attrs.add(Attr);
   }
