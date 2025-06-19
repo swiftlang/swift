@@ -21,6 +21,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "swift/Basic/Debug.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/AST/TypeAlignments.h"
 
 namespace llvm {
@@ -98,6 +99,12 @@ namespace swift {
       return llvm::hash_value(N.getOpaqueValue());
     }
   };
+
+  /// Find the outermost range that \p range was originally generated from.
+  /// Returns an invalid source range if \p range wasn't generated from a macro.
+  SourceRange getUnexpandedMacroRange(const SourceManager &SM,
+                                      SourceRange range);
+
 } // namespace swift
 
 namespace llvm {
