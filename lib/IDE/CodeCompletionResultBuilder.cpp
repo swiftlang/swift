@@ -311,9 +311,12 @@ void CodeCompletionResultBuilder::addCallArgument(
       Ty = funcTy->getResult();
   }
 
+  NonRecursivePrintOptions nrOptions;
+  if (IsIUO)
+    nrOptions |= NonRecursivePrintOption::ImplicitlyUnwrappedOptional;
+
   PrintOptions PO;
   PO.SkipAttributes = true;
-  PO.PrintOptionalAsImplicitlyUnwrapped = IsIUO;
   PO.OpaqueReturnTypePrinting =
       PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
   if (ContextTy)
@@ -323,11 +326,11 @@ void CodeCompletionResultBuilder::addCallArgument(
       CodeCompletionStringPrinter printer(*this);
       auto TL = TypeLoc::withoutLoc(Ty);
       printer.printTypePre(TL);
-      Ty->print(printer, PO);
+      Ty->print(printer, PO, nrOptions);
       printer.printTypePost(TL);
     });
   } else {
-    std::string TypeName = Ty->getString(PO);
+    std::string TypeName = Ty->getString(PO, nrOptions);
     addChunkWithText(ChunkKind::CallArgumentType, TypeName);
   }
 
@@ -410,6 +413,7 @@ void CodeCompletionResultBuilder::withNestedGroup(
 
 void CodeCompletionResultBuilder::addTypeAnnotation(Type T,
                                                     const PrintOptions &PO,
+                                                    NonRecursivePrintOptions nrOptions,
                                                     StringRef suffix) {
   T = T->getReferenceStorageReferent();
 
@@ -423,13 +427,13 @@ void CodeCompletionResultBuilder::addTypeAnnotation(Type T,
                       CodeCompletionStringPrinter printer(*this);
                       auto TL = TypeLoc::withoutLoc(T);
                       printer.printTypePre(TL);
-                      T->print(printer, PO);
+                      T->print(printer, PO, nrOptions);
                       printer.printTypePost(TL);
                       if (!suffix.empty())
                         printer.printText(suffix);
                     });
   } else {
-    auto str = T.getString(PO);
+    auto str = T.getString(PO, nrOptions);
     if (!suffix.empty())
       str += suffix.str();
     addTypeAnnotation(str);

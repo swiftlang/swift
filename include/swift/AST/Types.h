@@ -1497,8 +1497,10 @@ public:
 
   SWIFT_DEBUG_DUMPER(print());
   void print(raw_ostream &OS,
-             const PrintOptions &PO = PrintOptions()) const;
-  void print(ASTPrinter &Printer, const PrintOptions &PO) const;
+             const PrintOptions &PO = PrintOptions(),
+             NonRecursivePrintOptions nrOptions = std::nullopt) const;
+  void print(ASTPrinter &Printer, const PrintOptions &PO,
+             NonRecursivePrintOptions nrOptions = std::nullopt) const;
 
   /// Can this type be written in source at all?
   ///
@@ -1511,7 +1513,8 @@ public:
   bool hasSimpleTypeRepr() const;
 
   /// Return the name of the type as a string, for use in diagnostics only.
-  std::string getString(const PrintOptions &PO = PrintOptions()) const;
+  std::string getString(const PrintOptions &PO = PrintOptions(),
+                        NonRecursivePrintOptions nrOptions = std::nullopt) const;
 
   /// Return the name of the type, adding parens in cases where
   /// appending or prepending text to the result would cause that text
@@ -1520,7 +1523,8 @@ public:
   /// the type would make it appear that it's appended to "Float" as
   /// opposed to the entire type.
   std::string
-  getStringAsComponent(const PrintOptions &PO = PrintOptions()) const;
+  getStringAsComponent(const PrintOptions &PO = PrintOptions(),
+                       NonRecursivePrintOptions nrOptions = std::nullopt) const;
 
   /// Return whether this type is or can be substituted for a bridgeable
   /// object type.
