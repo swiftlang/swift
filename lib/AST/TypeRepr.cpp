@@ -319,19 +319,22 @@ InlineArrayTypeRepr *InlineArrayTypeRepr::create(ASTContext &ctx,
 }
 
 static void printTypeRepr(const TypeRepr *TyR, ASTPrinter &Printer,
-                          const PrintOptions &Opts) {
+                          const PrintOptions &Opts,
+                          NonRecursivePrintOptions nrOpts = std::nullopt) {
   if (TyR == nullptr)
     Printer << "<null>";
   else
-    TyR->print(Printer, Opts);
+    TyR->print(Printer, Opts, nrOpts);
 }
 
-void TypeRepr::print(raw_ostream &OS, const PrintOptions &Opts) const {
+void TypeRepr::print(raw_ostream &OS, const PrintOptions &opts,
+                     NonRecursivePrintOptions nrOpts) const {
   StreamPrinter Printer(OS);
-  print(Printer, Opts);
+  print(Printer, opts, nrOpts);
 }
 
-void TypeRepr::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
+void TypeRepr::print(ASTPrinter &Printer, const PrintOptions &opts,
+                     NonRecursivePrintOptions nrOpts) const {
   Printer.printTypePre(TypeLoc(const_cast<TypeRepr *>(this)));
   SWIFT_DEFER {
     Printer.printTypePost(TypeLoc(const_cast<TypeRepr *>(this)));
@@ -341,7 +344,7 @@ void TypeRepr::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
 #define TYPEREPR(CLASS, PARENT) \
   case TypeReprKind::CLASS: { \
     auto Ty = static_cast<const CLASS##TypeRepr*>(this); \
-    return Ty->printImpl(Printer, Opts); \
+    return Ty->printImpl(Printer, opts, nrOpts); \
   }
 #include "swift/AST/TypeReprNodes.def"
   }
@@ -349,7 +352,8 @@ void TypeRepr::print(ASTPrinter &Printer, const PrintOptions &Opts) const {
 }
 
 void ErrorTypeRepr::printImpl(ASTPrinter &Printer,
-                              const PrintOptions &Opts) const {
+                              const PrintOptions &opts,
+                              NonRecursivePrintOptions nrOpts) const {
   Printer << "<<error type>>";
 }
 
@@ -386,9 +390,13 @@ ReferenceOwnership AttributedTypeRepr::getSILOwnership() const {
 }
 
 void AttributedTypeRepr::printImpl(ASTPrinter &Printer,
-                                   const PrintOptions &Opts) const {
-  printAttrs(Printer, Opts);
-  printTypeRepr(Ty, Printer, Opts);
+                                   const PrintOptions &opts,
+                                   NonRecursivePrintOptions nrOpts) const {
+  printAttrs(Printer, opts);
+
+  // Consider the non-recursive options to still apply to the type
+  // modified by the attribute.
+  printTypeRepr(Ty, Printer, opts, nrOpts);
 }
 
 void AttributedTypeRepr::printAttrs(llvm::raw_ostream &OS) const {
@@ -402,7 +410,7 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
     if (auto customAttr = attr.dyn_cast<CustomAttr*>()) {
       Printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
       Printer << "@";
-      customAttr->getTypeRepr()->print(Printer, Options);
+      customAttr->getTypeRepr()->print(Printer, Options, std::nullopt);
       Printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
     } else {
       auto typeAttr = attr.get<TypeAttribute*>();
@@ -415,9 +423,10 @@ void AttributedTypeRepr::printAttrs(ASTPrinter &Printer,
 }
 
 void DeclRefTypeRepr::printImpl(ASTPrinter &Printer,
-                                const PrintOptions &Opts) const {
+                                const PrintOptions &opts,
+                                NonRecursivePrintOptions nrOpts) const {
   if (auto *qualIdentTR = dyn_cast<QualifiedIdentTypeRepr>(this)) {
-    printTypeRepr(qualIdentTR->getBase(), Printer, Opts);
+    printTypeRepr(qualIdentTR->getBase(), Printer, opts);
     Printer << ".";
   }
 
@@ -434,14 +443,15 @@ void DeclRefTypeRepr::printImpl(ASTPrinter &Printer,
     Printer << "<";
     interleave(
         getGenericArgs(),
-        [&](TypeRepr *Arg) { printTypeRepr(Arg, Printer, Opts); },
+        [&](TypeRepr *Arg) { printTypeRepr(Arg, Printer, opts); },
         [&] { Printer << ", "; });
     Printer << ">";
   }
 }
 
 void FunctionTypeRepr::printImpl(ASTPrinter &Printer,
-                                 const PrintOptions &Opts) const {
+                                 const PrintOptions &Opts,
+                                 NonRecursivePrintOptions nrOpts) const {
   Printer.callPrintStructurePre(PrintStructureKind::FunctionType);
   printTypeRepr(ArgsTy, Printer, Opts);
   if (isAsync()) {
@@ -481,7 +491,8 @@ void FunctionTypeRepr::printImpl(ASTPrinter &Printer,
 }
 
 void InlineArrayTypeRepr::printImpl(ASTPrinter &Printer,
-                                    const PrintOptions &Opts) const {
+                                    const PrintOptions &Opts,
+                                    NonRecursivePrintOptions nrOpts) const {
   Printer << "[";
   printTypeRepr(getCount(), Printer, Opts);
   Printer << " of ";
@@ -490,14 +501,16 @@ void InlineArrayTypeRepr::printImpl(ASTPrinter &Printer,
 }
 
 void ArrayTypeRepr::printImpl(ASTPrinter &Printer,
-                              const PrintOptions &Opts) const {
+                              const PrintOptions &Opts,
+                              NonRecursivePrintOptions nrOpts) const {
   Printer << "[";
   printTypeRepr(getBase(), Printer, Opts);
   Printer << "]";
 }
 
 void DictionaryTypeRepr::printImpl(ASTPrinter &Printer,
-                                   const PrintOptions &Opts) const {
+                                   const PrintOptions &Opts,
+                                   NonRecursivePrintOptions nrOpts) const {
   Printer << "[";
   printTypeRepr(Key, Printer, Opts);
   Printer << " : ";
@@ -506,13 +519,15 @@ void DictionaryTypeRepr::printImpl(ASTPrinter &Printer,
 }
 
 void OptionalTypeRepr::printImpl(ASTPrinter &Printer,
-                                 const PrintOptions &Opts) const {
+                                 const PrintOptions &Opts,
+                                 NonRecursivePrintOptions nrOpts) const {
   printTypeRepr(Base, Printer, Opts);
   Printer << "?";
 }
 
 void ImplicitlyUnwrappedOptionalTypeRepr::printImpl(ASTPrinter &Printer,
-                                          const PrintOptions &Opts) const {
+                                 const PrintOptions &Opts,
+                                 NonRecursivePrintOptions nrOpts) const {
   printTypeRepr(Base, Printer, Opts);
   Printer << "!";
 }
@@ -743,20 +758,23 @@ SourceLoc LifetimeDependentTypeRepr::getLocImpl() const {
 }
 
 void LifetimeDependentTypeRepr::printImpl(ASTPrinter &Printer,
-                                          const PrintOptions &Opts) const {
+                                          const PrintOptions &Opts,
+                                          NonRecursivePrintOptions nrOpts) const {
   Printer << " ";
   Printer << getLifetimeEntry()->getString();
-  printTypeRepr(getBase(), Printer, Opts);
+  printTypeRepr(getBase(), Printer, Opts, nrOpts);
 }
 
 void VarargTypeRepr::printImpl(ASTPrinter &Printer,
-                               const PrintOptions &Opts) const {
+                               const PrintOptions &Opts,
+                               NonRecursivePrintOptions nrOpts) const {
   printTypeRepr(Element, Printer, Opts);
   Printer << "...";
 }
 
 void PackTypeRepr::printImpl(ASTPrinter &Printer,
-                             const PrintOptions &Opts) const {
+                             const PrintOptions &Opts,
+                             NonRecursivePrintOptions nrOpts) const {
   Printer.printKeyword("Pack", Opts);
   Printer << "{";
   auto elts = getElements();
@@ -768,19 +786,22 @@ void PackTypeRepr::printImpl(ASTPrinter &Printer,
 }
 
 void PackExpansionTypeRepr::printImpl(ASTPrinter &Printer,
-                                      const PrintOptions &Opts) const {
+                                      const PrintOptions &Opts,
+                                      NonRecursivePrintOptions nrOpts) const {
   Printer.printKeyword("repeat", Opts, /*Suffix=*/" ");
   printTypeRepr(Pattern, Printer, Opts);
 }
 
 void PackElementTypeRepr::printImpl(ASTPrinter &Printer,
-                                    const PrintOptions &Opts) const {
+                                    const PrintOptions &Opts,
+                                    NonRecursivePrintOptions nrOpts) const {
   Printer.printKeyword("each", Opts, /*Suffix=*/" ");
   printTypeRepr(PackType, Printer, Opts);
 }
 
 void TupleTypeRepr::printImpl(ASTPrinter &Printer,
-                              const PrintOptions &Opts) const {
+                              const PrintOptions &Opts,
+                              NonRecursivePrintOptions nrOpts) const {
   Printer.callPrintStructurePre(PrintStructureKind::TupleType);
   SWIFT_DEFER { Printer.printStructurePost(PrintStructureKind::TupleType); };
 
@@ -822,7 +843,8 @@ CompositionTypeRepr *CompositionTypeRepr::create(const ASTContext &C,
 }
 
 void CompositionTypeRepr::printImpl(ASTPrinter &Printer,
-                                    const PrintOptions &Opts) const {
+                                    const PrintOptions &Opts,
+                                    NonRecursivePrintOptions nrOpts) const {
   if (getTypes().empty()) {
     Printer.printKeyword("Any", Opts);
   } else {
@@ -832,25 +854,29 @@ void CompositionTypeRepr::printImpl(ASTPrinter &Printer,
 }
 
 void MetatypeTypeRepr::printImpl(ASTPrinter &Printer,
-                                 const PrintOptions &Opts) const {
+                                 const PrintOptions &Opts,
+                                 NonRecursivePrintOptions nrOpts) const {
   printTypeRepr(Base, Printer, Opts);
   Printer << ".Type";
 }
 
 void ProtocolTypeRepr::printImpl(ASTPrinter &Printer,
-                                 const PrintOptions &Opts) const {
+                                 const PrintOptions &Opts,
+                                 NonRecursivePrintOptions nrOpts) const {
   printTypeRepr(Base, Printer, Opts);
   Printer << ".Protocol";
 }
 
 void OpaqueReturnTypeRepr::printImpl(ASTPrinter &Printer,
-                                     const PrintOptions &Opts) const {
+                                     const PrintOptions &Opts,
+                                     NonRecursivePrintOptions nrOpts) const {
   Printer.printKeyword("some", Opts, /*Suffix=*/" ");
   printTypeRepr(Constraint, Printer, Opts);
 }
 
 void ExistentialTypeRepr::printImpl(ASTPrinter &Printer,
-                                    const PrintOptions &Opts) const {
+                                    const PrintOptions &Opts,
+                                    NonRecursivePrintOptions nrOpts) const {
   Printer.printKeyword("any", Opts, /*Suffix=*/" ");
   printTypeRepr(Constraint, Printer, Opts);
 }
@@ -868,20 +894,23 @@ SourceLoc NamedOpaqueReturnTypeRepr::getLocImpl() const {
 }
 
 void NamedOpaqueReturnTypeRepr::printImpl(ASTPrinter &Printer,
-                                          const PrintOptions &Opts) const {
+                                  const PrintOptions &Opts,
+                                  NonRecursivePrintOptions nrOpts) const {
   GenericParams->print(Printer, Opts);
   Printer << ' ';
   printTypeRepr(Base, Printer, Opts);
 }
 
 void InverseTypeRepr::printImpl(ASTPrinter &Printer,
-                                const PrintOptions &Opts) const {
+                                const PrintOptions &Opts,
+                                NonRecursivePrintOptions nrOpts) const {
   Printer << "~";
   printTypeRepr(Constraint, Printer, Opts);
 }
 
 void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
-                                  const PrintOptions &Opts) const {
+                                  const PrintOptions &Opts,
+                                  NonRecursivePrintOptions nrOpts) const {
   switch (getKind()) {
 #define TYPEREPR(CLASS, PARENT) case TypeReprKind::CLASS:
 #define SPECIFIER_TYPEREPR(CLASS, PARENT)
@@ -912,7 +941,7 @@ void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
     Printer.printKeyword("@const", Opts, " ");
     break;
   }
-  printTypeRepr(Base, Printer, Opts);
+  printTypeRepr(Base, Printer, Opts, nrOpts);
 }
 
 StringRef OwnershipTypeRepr::getSpecifierSpelling() const {
@@ -924,33 +953,39 @@ ValueOwnership OwnershipTypeRepr::getValueOwnership() const {
 }
 
 void CallerIsolatedTypeRepr::printImpl(ASTPrinter &Printer,
-                                       const PrintOptions &Opts) const {
+                                const PrintOptions &Opts,
+                                NonRecursivePrintOptions nrOpts) const {
   Printer.printKeyword("nonisolated(nonsending)", Opts);
 }
 
 void PlaceholderTypeRepr::printImpl(ASTPrinter &Printer,
-                                    const PrintOptions &Opts) const {
+                                    const PrintOptions &Opts,
+                                    NonRecursivePrintOptions nrOpts) const {
   Printer.printText("_");
 }
 
 void FixedTypeRepr::printImpl(ASTPrinter &Printer,
-                              const PrintOptions &Opts) const {
-  getType().print(Printer, Opts);
+                              const PrintOptions &Opts,
+                              NonRecursivePrintOptions nrOpts) const {
+  getType().print(Printer, Opts, nrOpts);
 }
 
 void SelfTypeRepr::printImpl(ASTPrinter &Printer,
-                             const PrintOptions &Opts) const {
-  getType().print(Printer, Opts);
+                             const PrintOptions &Opts,
+                             NonRecursivePrintOptions nrOpts) const {
+  getType().print(Printer, Opts, nrOpts);
 }
 
 void SILBoxTypeRepr::printImpl(ASTPrinter &Printer,
-                               const PrintOptions &Opts) const {
+                               const PrintOptions &Opts,
+                               NonRecursivePrintOptions nrOpts) const {
   // TODO
   Printer.printKeyword("sil_box", Opts);
 }
 
 void IntegerTypeRepr::printImpl(ASTPrinter &Printer,
-                                const PrintOptions &Opts) const {
+                                const PrintOptions &Opts,
+                                NonRecursivePrintOptions nrOpts) const {
   Printer.printText(getValue());
 }
 

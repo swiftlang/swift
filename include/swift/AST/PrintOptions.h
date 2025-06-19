@@ -16,6 +16,7 @@
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/TypeOrExtensionDecl.h"
+#include "swift/Basic/OptionSet.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallSet.h"
@@ -123,6 +124,14 @@ struct ShouldPrintChecker {
   bool shouldPrint(const Pattern *P, const PrintOptions &Options);
   virtual ~ShouldPrintChecker() = default;
 };
+
+/// Type-printing options which should only be applied to the outermost
+/// type.
+enum class NonRecursivePrintOption: uint32_t {
+  /// Print `Optional<T>` as `T!`.
+  ImplicitlyUnwrappedOptional = 1 << 0,
+};
+using NonRecursivePrintOptions = OptionSet<NonRecursivePrintOption>;
 
 /// Options for printing AST nodes.
 ///
@@ -585,13 +594,6 @@ public:
   /// collision between two modules, which isn't supported by this workaround
   /// yet.
   llvm::SmallSet<StringRef, 4> *AliasModuleNamesTargets = nullptr;
-
-  /// When printing an Optional<T>, rather than printing 'T?', print
-  /// 'T!'. Used as a modifier only when we know we're printing
-  /// something that was declared as an implicitly unwrapped optional
-  /// at the top level. This is stripped out of the printing options
-  /// for optionals that are nested within other optionals.
-  bool PrintOptionalAsImplicitlyUnwrapped = false;
 
   /// Replaces the name of private and internal properties of types with '_'.
   bool OmitNameOfInaccessibleProperties = false;
