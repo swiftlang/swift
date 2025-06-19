@@ -195,7 +195,6 @@ class WasmLLVMRuntimeLibs(cmake_product.CMakeProduct):
         if enable_wasi_threads:
             c_flags.append('-pthread')
             cxx_flags.append('-pthread')
-        self.cmake_options.define('LIBCXX_ENABLE_THREADS:BOOL', cmake_has_threads)
         cmake.cmake_options.define('CMAKE_C_FLAGS', ' '.join(c_flags))
         cmake.cmake_options.define('CMAKE_CXX_FLAGS', ' '.join(cxx_flags))
 
