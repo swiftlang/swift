@@ -7344,17 +7344,20 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // match `$T3` and propagate `Pack{Int}` to `$T2`.
   //
   // This is also important for situations like: `$T2 conv (Int, $T_exp)`
-  // becuase expansion could be defaulted to an empty pack which means
+  // because expansion could be defaulted to an empty pack which means
   // that under substitution that element would disappear and the type
   // would be just `(Int)`.
   //
-  // Notable exception here is `Any` which doesn't require wrapping and
-  // would be handled by existental promotion in cases where it's allowed.
+  // Notable exceptions here are: `Any` which doesn't require wrapping and
+  // would be handled by an existential promotion in cases where it's allowed,
+  // and `Optional<T>` which would be handled by optional injection.
   if (isTupleWithUnresolvedPackExpansion(origType1) ||
       isTupleWithUnresolvedPackExpansion(origType2)) {
     if (isa<TupleType>(desugar1) != isa<TupleType>(desugar2) &&
         !isa<InOutType>(desugar1) &&
         !isa<InOutType>(desugar2) &&
+        !desugar1->getOptionalObjectType() &&
+        !desugar2->getOptionalObjectType() &&
         !desugar1->isAny() &&
         !desugar2->isAny()) {
       return matchTypes(

@@ -76,3 +76,17 @@ func badCallToZip<each T, each U>(t: repeat each T, u: repeat each U) {
   // expected-error@-1 {{global function 'zip(t:u:)' requires the type packs 'each T' and 'each U' have the same shape}}
   // expected-error@-2 {{pack expansion requires that 'each U' and 'each T' have the same shape}}
 }
+
+do {
+  func test<A, B, each C>(
+    _: A,
+    _: B,
+    _: repeat each C
+  ) throws -> (A, B, repeat each C) {
+    fatalError()
+  }
+
+  func test() {
+    guard let _ = try? test(1, 2, 3) else { return } // Ok
+  }
+}
