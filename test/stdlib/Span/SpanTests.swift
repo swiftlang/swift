@@ -247,7 +247,7 @@ suite.test("_elementsEqual(_: Span)")
   let capacity = 4
   let a = Array<Int>(unsafeUninitializedCapacity: capacity) {
     for i in $0.indices {
-      $0.initializeElement(at: i, to: .random(in: 0..<10))
+      $0.initializeElement(at: i, to: i)
     }
     $1 = $0.count
   }

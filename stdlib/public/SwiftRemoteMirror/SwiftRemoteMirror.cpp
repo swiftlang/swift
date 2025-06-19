@@ -101,8 +101,8 @@ struct SwiftReflectionContext {
   }
 
   // Call fn with a pointer to context.
-  template <typename T, typename Fn>
-  T withContext(const Fn &fn) {
+  template <typename Fn>
+  auto withContext(const Fn &fn) {
     return std::visit([&](auto &&context) { return fn(context.get()); },
                       this->context);
   }
@@ -253,7 +253,7 @@ ReflectionSection<Iterator> reflectionSectionFromLocalAndRemote(
 void
 swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
                                    swift_reflection_info_t Info) {
-  ContextRef->withContext<void>([&](auto *Context) {
+  ContextRef->withContext([&](auto *Context) {
     // The `offset` fields must be zero.
     if (Info.field.offset != 0
         || Info.associated_types.offset != 0
@@ -284,7 +284,7 @@ swift_reflection_addReflectionInfo(SwiftReflectionContextRef ContextRef,
 void swift_reflection_addReflectionMappingInfo(
     SwiftReflectionContextRef ContextRef,
     swift_reflection_mapping_info_t Info) {
-  return ContextRef->withContext<void>([&](auto *Context) {
+  return ContextRef->withContext([&](auto *Context) {
     ReflectionInfo ContextInfo{
         reflectionSectionFromLocalAndRemote<FieldDescriptorIterator>(
             Info.field),
@@ -308,7 +308,7 @@ void swift_reflection_addReflectionMappingInfo(
 int
 swift_reflection_addImage(SwiftReflectionContextRef ContextRef,
                           swift_addr_t imageStart) {
-  return ContextRef->withContext<int>([&](auto *Context) {
+  return ContextRef->withContext([&](auto *Context) {
     return Context->addImage(RemoteAddress(imageStart)).has_value();
   });
 }
@@ -316,7 +316,7 @@ swift_reflection_addImage(SwiftReflectionContextRef ContextRef,
 int
 swift_reflection_readIsaMask(SwiftReflectionContextRef ContextRef,
                              uintptr_t *outIsaMask) {
-  return ContextRef->withContext<int>([&](auto *Context) {
+  return ContextRef->withContext([&](auto *Context) {
     auto isaMask = Context->readIsaMask();
     if (isaMask) {
       *outIsaMask = *isaMask;
@@ -330,7 +330,7 @@ swift_reflection_readIsaMask(SwiftReflectionContextRef ContextRef,
 swift_typeref_t
 swift_reflection_typeRefForMetadata(SwiftReflectionContextRef ContextRef,
                                     uintptr_t Metadata) {
-  return ContextRef->withContext<swift_typeref_t>([&](auto *Context) {
+  return ContextRef->withContext([&](auto *Context) {
     auto TR = Context->readTypeFromMetadata(Metadata);
     return reinterpret_cast<swift_typeref_t>(TR);
   });
@@ -338,21 +338,21 @@ swift_reflection_typeRefForMetadata(SwiftReflectionContextRef ContextRef,
 
 int
 swift_reflection_ownsObject(SwiftReflectionContextRef ContextRef, uintptr_t Object) {
-  return ContextRef->withContext<int>([&](auto *Context) {
+  return ContextRef->withContext([&](auto *Context) {
     return Context->ownsObject(RemoteAddress(Object));
   });
 }
 
 int
 swift_reflection_ownsAddress(SwiftReflectionContextRef ContextRef, uintptr_t Address) {
-  return ContextRef->withContext<int>([&](auto *Context) {
+  return ContextRef->withContext([&](auto *Context) {
     return Context->ownsAddress(RemoteAddress(Address));
   });
 }
 
 int
 swift_reflection_ownsAddressStrict(SwiftReflectionContextRef ContextRef, uintptr_t Address) {
-  return ContextRef->withContext<int>([&](auto *Context) {
+  return ContextRef->withContext([&](auto *Context) {
     return Context->ownsAddress(RemoteAddress(Address), false);
   });
 }
@@ -360,7 +360,7 @@ swift_reflection_ownsAddressStrict(SwiftReflectionContextRef ContextRef, uintptr
 uintptr_t
 swift_reflection_metadataForObject(SwiftReflectionContextRef ContextRef,
                                    uintptr_t Object) {
-  return ContextRef->withContext<uintptr_t>([&](auto *Context) -> uintptr_t {
+  return ContextRef->withContext([&](auto *Context) -> uintptr_t {
     auto MetadataAddress = Context->readMetadataFromInstance(Object);
     if (!MetadataAddress)
       return 0;
@@ -371,21 +371,21 @@ swift_reflection_metadataForObject(SwiftReflectionContextRef ContextRef,
 swift_reflection_ptr_t
 swift_reflection_metadataNominalTypeDescriptor(SwiftReflectionContextRef ContextRef,
                                                swift_reflection_ptr_t MetadataAddress) {
-  return ContextRef->withContext<swift_reflection_ptr_t>([&](auto *Context) {
+  return ContextRef->withContext([&](auto *Context) {
     return Context->nominalTypeDescriptorFromMetadata(MetadataAddress);
   });
 }
 
 int swift_reflection_metadataIsActor(SwiftReflectionContextRef ContextRef,
                                      swift_reflection_ptr_t Metadata) {
-  return ContextRef->withContext<int>(
+  return ContextRef->withContext(
       [&](auto *Context) { return Context->metadataIsActor(Metadata); });
 }
 
 swift_typeref_t
 swift_reflection_typeRefForInstance(SwiftReflectionContextRef ContextRef,
                                     uintptr_t Object) {
-  return ContextRef->withContext<swift_typeref_t>(
+  return ContextRef->withContext(
       [&](auto *Context) -> swift_typeref_t {
         auto MetadataAddress = Context->readMetadataFromInstance(Object);
         if (!MetadataAddress)
@@ -399,7 +399,7 @@ swift_typeref_t
 swift_reflection_typeRefForMangledTypeName(SwiftReflectionContextRef ContextRef,
                                            const char *MangledTypeName,
                                            uint64_t Length) {
-  return ContextRef->withContext<swift_typeref_t>([&](auto *Context) {
+  return ContextRef->withContext([&](auto *Context) {
     auto TR =
         Context->readTypeFromMangledName(MangledTypeName, Length).getType();
     return reinterpret_cast<swift_typeref_t>(TR);
@@ -440,7 +440,7 @@ SWIFT_REMOTE_MIRROR_LINKAGE
 char *
 swift_reflection_copyDemangledNameForProtocolDescriptor(
   SwiftReflectionContextRef ContextRef, swift_reflection_ptr_t Proto) {
-  return ContextRef->withContext<char *>([&](auto *Context) {
+  return ContextRef->withContext([&](auto *Context) {
 
     Demangle::Demangler Dem;
     auto Demangling = Context->readDemanglingForContextDescriptor(Proto, Dem);
@@ -627,7 +627,7 @@ static const char *returnableCString(SwiftReflectionContextRef ContextRef,
 swift_typeinfo_t
 swift_reflection_infoForTypeRef(SwiftReflectionContextRef ContextRef,
                                 swift_typeref_t OpaqueTypeRef) {
-  return ContextRef->withContext<swift_typeinfo_t>([&](auto *Context) {
+  return ContextRef->withContext([&](auto *Context) {
     auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
     auto TI = Context->getTypeInfo(TR, nullptr);
     return convertTypeInfo(TI);
@@ -638,7 +638,7 @@ swift_childinfo_t
 swift_reflection_childOfTypeRef(SwiftReflectionContextRef ContextRef,
                                 swift_typeref_t OpaqueTypeRef,
                                 unsigned Index) {
-  return ContextRef->withContext<swift_childinfo_t>([&](auto *Context) {
+  return ContextRef->withContext([&](auto *Context) {
     auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
     auto *TI = Context->getTypeInfo(TR, nullptr);
     return convertChild(TI, Index);
@@ -648,7 +648,7 @@ swift_reflection_childOfTypeRef(SwiftReflectionContextRef ContextRef,
 swift_typeinfo_t
 swift_reflection_infoForMetadata(SwiftReflectionContextRef ContextRef,
                                  uintptr_t Metadata) {
-  return ContextRef->withContext<swift_typeinfo_t>([&](auto *Context) {
+  return ContextRef->withContext([&](auto *Context) {
     auto *TI = Context->getMetadataTypeInfo(Metadata, nullptr);
     return convertTypeInfo(TI);
   });
@@ -658,7 +658,7 @@ swift_childinfo_t
 swift_reflection_childOfMetadata(SwiftReflectionContextRef ContextRef,
                                  uintptr_t Metadata,
                                  unsigned Index) {
-  return ContextRef->withContext<swift_childinfo_t>([&](auto *Context) {
+  return ContextRef->withContext([&](auto *Context) {
     auto *TI = Context->getMetadataTypeInfo(Metadata, nullptr);
     return convertChild(TI, Index);
   });
@@ -667,7 +667,7 @@ swift_reflection_childOfMetadata(SwiftReflectionContextRef ContextRef,
 swift_typeinfo_t
 swift_reflection_infoForInstance(SwiftReflectionContextRef ContextRef,
                                  uintptr_t Object) {
-  return ContextRef->withContext<swift_typeinfo_t>([&](auto *Context) {
+  return ContextRef->withContext([&](auto *Context) {
     auto *TI = Context->getInstanceTypeInfo(Object, nullptr);
     return convertTypeInfo(TI);
   });
@@ -677,7 +677,7 @@ swift_childinfo_t
 swift_reflection_childOfInstance(SwiftReflectionContextRef ContextRef,
                                  uintptr_t Object,
                                  unsigned Index) {
-  return ContextRef->withContext<swift_childinfo_t>([&](auto *Context) {
+  return ContextRef->withContext([&](auto *Context) {
     auto *TI = Context->getInstanceTypeInfo(Object, nullptr);
     return convertChild(TI, Index);
   });
@@ -688,7 +688,7 @@ int swift_reflection_projectExistential(SwiftReflectionContextRef ContextRef,
                                         swift_typeref_t ExistentialTypeRef,
                                         swift_typeref_t *InstanceTypeRef,
                                         swift_addr_t *StartOfInstanceData) {
-  return ContextRef->withContext<int>([&](auto *Context) {
+  return ContextRef->withContext([&](auto *Context) {
     auto ExistentialTR = reinterpret_cast<const TypeRef *>(ExistentialTypeRef);
     auto RemoteExistentialAddress = RemoteAddress(ExistentialAddress);
     const TypeRef *InstanceTR = nullptr;
@@ -711,7 +711,7 @@ int swift_reflection_projectExistentialAndUnwrapClass(SwiftReflectionContextRef 
                                         swift_typeref_t ExistentialTypeRef,
                                         swift_typeref_t *InstanceTypeRef,
                                         swift_addr_t *StartOfInstanceData) {
-  return ContextRef->withContext<int>([&](auto *Context) {
+  return ContextRef->withContext([&](auto *Context) {
     auto ExistentialTR = reinterpret_cast<const TypeRef *>(ExistentialTypeRef);
     auto RemoteExistentialAddress = RemoteAddress(ExistentialAddress);
     auto Pair = Context->projectExistentialAndUnwrapClass(
@@ -730,7 +730,7 @@ int swift_reflection_projectEnumValue(SwiftReflectionContextRef ContextRef,
                                       swift_addr_t EnumAddress,
                                       swift_typeref_t EnumTypeRef,
                                       int *CaseIndex) {
-  return ContextRef->withContext<int>([&](auto *Context) {
+  return ContextRef->withContext([&](auto *Context) {
     auto EnumTR = reinterpret_cast<const TypeRef *>(EnumTypeRef);
     auto RemoteEnumAddress = RemoteAddress(EnumAddress);
     if (!Context->projectEnumValue(RemoteEnumAddress, EnumTR, CaseIndex,
@@ -758,7 +758,7 @@ void swift_reflection_dumpTypeRef(swift_typeref_t OpaqueTypeRef) {
 
 void swift_reflection_dumpInfoForTypeRef(SwiftReflectionContextRef ContextRef,
                                          swift_typeref_t OpaqueTypeRef) {
-  ContextRef->withContext<void>([&](auto *Context) {
+  ContextRef->withContext([&](auto *Context) {
     auto TR = reinterpret_cast<const TypeRef *>(OpaqueTypeRef);
     auto TI = Context->getTypeInfo(TR, nullptr);
     if (TI == nullptr) {
@@ -790,7 +790,7 @@ void swift_reflection_dumpInfoForTypeRef(SwiftReflectionContextRef ContextRef,
 
 void swift_reflection_dumpInfoForMetadata(SwiftReflectionContextRef ContextRef,
                                           uintptr_t Metadata) {
-  ContextRef->withContext<void>([&](auto *Context) {
+  ContextRef->withContext([&](auto *Context) {
     auto TI = Context->getMetadataTypeInfo(Metadata, nullptr);
     if (TI == nullptr) {
       std::cout << "<null type info>\n";
@@ -802,7 +802,7 @@ void swift_reflection_dumpInfoForMetadata(SwiftReflectionContextRef ContextRef,
 
 void swift_reflection_dumpInfoForInstance(SwiftReflectionContextRef ContextRef,
                                           uintptr_t Object) {
-  ContextRef->withContext<void>([&](auto *Context) {
+  ContextRef->withContext([&](auto *Context) {
     auto TI = Context->getInstanceTypeInfo(Object, nullptr);
     if (TI == nullptr) {
       std::cout << "<null type info>\n";
@@ -829,7 +829,7 @@ const char *swift_reflection_iterateConformanceCache(
                swift_reflection_ptr_t Proto,
                void *ContextPtr),
   void *ContextPtr) {
-  return ContextRef->withContext<const char *>([&](auto *Context) {
+  return ContextRef->withContext([&](auto *Context) {
     auto Error = Context->iterateConformances([&](auto Type, auto Proto) {
       Call(Type, Proto, ContextPtr);
     });
@@ -842,7 +842,7 @@ const char *swift_reflection_iterateMetadataAllocations(
   void (*Call)(swift_metadata_allocation_t Allocation,
                void *ContextPtr),
   void *ContextPtr) {
-  return ContextRef->withContext<const char *>([&](auto *Context) {
+  return ContextRef->withContext([&](auto *Context) {
     auto Error = Context->iterateMetadataAllocations([&](auto Allocation) {
       swift_metadata_allocation CAllocation;
       CAllocation.Tag = Allocation.Tag;
@@ -877,7 +877,7 @@ static MetadataAllocation<Runtime> convertMetadataAllocation(
 swift_reflection_ptr_t swift_reflection_allocationMetadataPointer(
   SwiftReflectionContextRef ContextRef,
   swift_metadata_allocation_t Allocation) {
-  return ContextRef->withContext<swift_reflection_ptr_t>([&](auto *Context) {
+  return ContextRef->withContext([&](auto *Context) {
     auto ConvertedAllocation = convertMetadataAllocation(Context, Allocation);
     return Context->allocationMetadataPointer(ConvertedAllocation);
   });
@@ -885,7 +885,7 @@ swift_reflection_ptr_t swift_reflection_allocationMetadataPointer(
 
 const char *swift_reflection_metadataAllocationTagName(
     SwiftReflectionContextRef ContextRef, swift_metadata_allocation_tag_t Tag) {
-  return ContextRef->withContext<const char *>([&](auto *Context) {
+  return ContextRef->withContext([&](auto *Context) {
     auto Result = Context->metadataAllocationTagName(Tag);
     return returnableCString(ContextRef, Result);
   });
@@ -895,7 +895,7 @@ int swift_reflection_metadataAllocationCacheNode(
     SwiftReflectionContextRef ContextRef,
     swift_metadata_allocation_t Allocation,
     swift_metadata_cache_node_t *OutNode) {
-  return ContextRef->withContext<int>([&](auto *Context) {
+  return ContextRef->withContext([&](auto *Context) {
     auto ConvertedAllocation = convertMetadataAllocation(Context, Allocation);
 
     auto Result = Context->metadataAllocationCacheNode(ConvertedAllocation);
@@ -911,7 +911,7 @@ int swift_reflection_metadataAllocationCacheNode(
 const char *swift_reflection_iterateMetadataAllocationBacktraces(
     SwiftReflectionContextRef ContextRef,
     swift_metadataAllocationBacktraceIterator Call, void *ContextPtr) {
-  return ContextRef->withContext<const char *>([&](auto *Context) {
+  return ContextRef->withContext([&](auto *Context) {
     auto Error = Context->iterateMetadataAllocationBacktraces(
         [&](auto AllocationPtr, auto Count, auto Ptrs) {
           // Ptrs is an array of StoredPointer, but the callback expects an
@@ -931,68 +931,66 @@ const char *swift_reflection_iterateMetadataAllocationBacktraces(
 swift_async_task_slab_return_t
 swift_reflection_asyncTaskSlabPointer(SwiftReflectionContextRef ContextRef,
                                       swift_reflection_ptr_t AsyncTaskPtr) {
-  return ContextRef->withContext<swift_async_task_slab_return_t>(
-      [&](auto *Context) {
-        // We only care about the AllocatorSlabPtr field. Disable child task and
-        // async backtrace iteration to save wasted work.
-        unsigned ChildTaskLimit = 0;
-        unsigned AsyncBacktraceLimit = 0;
+  return ContextRef->withContext([&](auto *Context) {
+    // We only care about the AllocatorSlabPtr field. Disable child task and
+    // async backtrace iteration to save wasted work.
+    unsigned ChildTaskLimit = 0;
+    unsigned AsyncBacktraceLimit = 0;
 
-        auto [Error, TaskInfo] = Context->asyncTaskInfo(
-            AsyncTaskPtr, ChildTaskLimit, AsyncBacktraceLimit);
+    auto [Error, TaskInfo] = Context->asyncTaskInfo(
+        AsyncTaskPtr, ChildTaskLimit, AsyncBacktraceLimit);
 
-        swift_async_task_slab_return_t Result = {};
-        if (Error) {
-          Result.Error = returnableCString(ContextRef, Error);
-        }
-        Result.SlabPtr = TaskInfo.AllocatorSlabPtr;
-        return Result;
-      });
+    swift_async_task_slab_return_t Result = {};
+    if (Error) {
+      Result.Error = returnableCString(ContextRef, Error);
+    }
+    Result.SlabPtr = TaskInfo.AllocatorSlabPtr;
+    return Result;
+  });
 }
 
 swift_async_task_slab_allocations_return_t
 swift_reflection_asyncTaskSlabAllocations(SwiftReflectionContextRef ContextRef,
                                           swift_reflection_ptr_t SlabPtr) {
-  return ContextRef->withContext<swift_async_task_slab_allocations_return_t>(
-      [&](auto *Context) {
-        auto [Error, Info] = Context->asyncTaskSlabAllocations(SlabPtr);
+  return ContextRef->withContext([&](auto *Context) {
+    auto [Error, Info] = Context->asyncTaskSlabAllocations(SlabPtr);
 
-        swift_async_task_slab_allocations_return_t Result = {};
-        if (Result.Error) {
-          Result.Error = returnableCString(ContextRef, Error);
-          return Result;
-        }
+    swift_async_task_slab_allocations_return_t Result = {};
+    if (Result.Error) {
+      Result.Error = returnableCString(ContextRef, Error);
+      return Result;
+    }
 
-        Result.NextSlab = Info.NextSlab;
-        Result.SlabSize = Info.SlabSize;
+    Result.NextSlab = Info.NextSlab;
+    Result.SlabSize = Info.SlabSize;
 
-        auto *Chunks = ContextRef->allocateTemporaryObject<
-            std::vector<swift_async_task_allocation_chunk_t>>();
-        Chunks->reserve(Info.Chunks.size());
-        for (auto &Chunk : Info.Chunks) {
-          swift_async_task_allocation_chunk_t ConvertedChunk;
-          ConvertedChunk.Start = Chunk.Start;
-          ConvertedChunk.Length = Chunk.Length;
+    auto *Chunks = ContextRef->allocateTemporaryObject<
+        std::vector<swift_async_task_allocation_chunk_t>>();
+    Chunks->reserve(Info.Chunks.size());
+    for (auto &Chunk : Info.Chunks) {
+      swift_async_task_allocation_chunk_t ConvertedChunk;
+      ConvertedChunk.Start = Chunk.Start;
+      ConvertedChunk.Length = Chunk.Length;
 
-          // This pedantry is required to properly template over *Context.
-          ConvertedChunk.Kind = convertAllocationChunkKind<
-              typename std::pointer_traits<decltype(Context)>::element_type>(
-              Chunk.Kind);
+      // This pedantry is required to properly template over *Context.
+      ConvertedChunk.Kind = convertAllocationChunkKind<
+          typename std::pointer_traits<decltype(Context)>::element_type>(
+          Chunk.Kind);
 
-          Chunks->push_back(ConvertedChunk);
-        }
+      Chunks->push_back(ConvertedChunk);
+    }
 
-        Result.ChunkCount = Chunks->size();
-        Result.Chunks = Chunks->data();
+    Result.ChunkCount = Chunks->size();
+    Result.Chunks = Chunks->data();
 
-        return Result;
-      });
+    return Result;
+  });
 }
 
 swift_async_task_info_t
 swift_reflection_asyncTaskInfo(SwiftReflectionContextRef ContextRef,
                                swift_reflection_ptr_t AsyncTaskPtr) {
-  return ContextRef->withContext<swift_async_task_info_t>([&](auto *Context) {
+  return ContextRef->withContext([&](auto *Context) {
     // Limit the child task and async backtrace iteration to semi-reasonable
     // numbers to avoid doing excessive work on bad data.
     unsigned ChildTaskLimit = 1000000;
@@ -1053,7 +1051,7 @@ swift_reflection_asyncTaskInfo(SwiftReflectionContextRef ContextRef,
 swift_actor_info_t
 swift_reflection_actorInfo(SwiftReflectionContextRef ContextRef,
                            swift_reflection_ptr_t ActorPtr) {
-  return ContextRef->withContext<swift_actor_info_t>([&](auto *Context) {
+  return ContextRef->withContext([&](auto *Context) {
     auto [Error, ActorInfo] = Context->actorInfo(ActorPtr);
 
     swift_actor_info_t Result = {};
@@ -1074,7 +1072,7 @@ swift_reflection_actorInfo(SwiftReflectionContextRef ContextRef,
 swift_reflection_ptr_t
 swift_reflection_nextJob(SwiftReflectionContextRef ContextRef,
                          swift_reflection_ptr_t JobPtr) {
-  return ContextRef->withContext<swift_reflection_ptr_t>([&](auto *Context) {
+  return ContextRef->withContext([&](auto *Context) {
     return Context->nextJob(JobPtr);
   });
 }

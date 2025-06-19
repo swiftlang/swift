@@ -549,7 +549,7 @@ extension DistributedActorSystem {
         errorCode: .typeDeserializationFailure)
     }
 
-    guard let resultBuffer = _openExistential(returnTypeFromTypeInfo, do: unsafe doAllocateReturnTypeBuffer) else {
+    guard let resultBuffer = _openExistential(returnTypeFromTypeInfo, do: doAllocateReturnTypeBuffer) else {
       throw ExecuteDistributedTargetError(
         message: "Failed to allocate buffer for distributed target return type",
         errorCode: .typeDeserializationFailure)

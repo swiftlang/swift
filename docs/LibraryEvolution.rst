@@ -365,8 +365,7 @@ the following changes are permitted:
   an existing property (unless the struct is marked ``@frozen``; see below).
   This is effectively the same as modifying the body of a setter.
 - Removing any non-ABI-public members, including stored properties.
-- Adding a conformance to an ABI-public protocol *that was introduced in the
-  same release* (see below).
+- Adding a conformance to an ABI-public protocol (see below about availability).
 - Adding or removing a conformance to a non-ABI-public protocol.
 - Adding ``@dynamicCallable`` to the struct.
 
@@ -382,17 +381,9 @@ target for the library is an error.
 It is not safe to add or remove ``mutating`` or ``nonmutating`` from a member
 or accessor within a struct.
 
-If a conformance is added to a type in version 1.1 of a library, it's important
-that it isn't accessed in version 1.0. This means that it is only safe to add
-new conformances to ABI-public protocols when the protocol is introduced, and
-not after. If the protocol comes from a separate module, there is no safe way
-to conform to it.
-
-.. admonition:: TODO
-
-    Coming up with a way to do this, either with availability annotations for
-    protocol conformances or a way to emit a fallback copy of the conformance
-    for clients on older library versions to use, is highly desired.
+When introducing a new conformance of an existing type to an existing protocol,
+it is important to annotate the conformance with availability. This is achieved
+by declaring the conformance on an extension and annotating the extension.
 
 
 Methods and Initializers

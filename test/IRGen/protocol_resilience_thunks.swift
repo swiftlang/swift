@@ -52,20 +52,20 @@ public protocol MyResilientProtocol {
 // CHECK-NEXT: [[RESULT:%.*]] = call swiftcc i1 [[WITNESS]](ptr noalias swiftself %0, ptr %1, ptr %2)
 // CHECK-NEXT: ret i1 [[RESULT]]
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s26protocol_resilience_thunks19MyResilientProtocolP10returnsAnyypyFTj"(ptr noalias nocapture sret({{.*}}) %0, ptr noalias swiftself %1, ptr %2, ptr %3)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s26protocol_resilience_thunks19MyResilientProtocolP10returnsAnyypyFTj"(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr noalias swiftself %1, ptr %2, ptr %3)
 // CHECK:      [[WITNESS_ADDR:%.*]] = getelementptr inbounds ptr, ptr %3, i32 3
 // CHECK-NEXT: [[WITNESS:%.*]] = load ptr, ptr [[WITNESS_ADDR]]
 // CHECK-arm64e-NEXT: ptrtoint ptr [[WITNESS_ADDR]] to i64
 // CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend
-// CHECK-NEXT: call swiftcc void [[WITNESS]](ptr noalias nocapture sret({{.*}}) %0, ptr noalias swiftself %1, ptr %2, ptr %3)
+// CHECK-NEXT: call swiftcc void [[WITNESS]](ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr noalias swiftself %1, ptr %2, ptr %3)
 // CHECK-NEXT: ret void
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s26protocol_resilience_thunks19MyResilientProtocolP12throwingFuncyyKFTj"(ptr noalias swiftself %0, ptr{{( noalias nocapture( swifterror)? dereferenceable\(.\))?}} %1, ptr %2, ptr %3)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s26protocol_resilience_thunks19MyResilientProtocolP12throwingFuncyyKFTj"(ptr noalias swiftself %0, ptr{{( noalias( nocapture)?( swifterror)?( captures\(none\))? dereferenceable\(.\))?}} %1, ptr %2, ptr %3)
 // CHECK:      [[WITNESS_ADDR:%.*]] = getelementptr inbounds ptr, ptr %3, i32 4
 // CHECK-NEXT: [[WITNESS:%.*]] = load ptr, ptr [[WITNESS_ADDR]]
 // CHECK-arm64e-NEXT: ptrtoint ptr [[WITNESS_ADDR]] to i64
 // CHECK-arm64e-NEXT: call i64 @llvm.ptrauth.blend
-// CHECK-NEXT: call swiftcc void [[WITNESS]](ptr noalias swiftself %0, ptr{{( noalias nocapture( swifterror)? dereferenceable\(.\))?}} %1, ptr %2, ptr %3)
+// CHECK-NEXT: call swiftcc void [[WITNESS]](ptr noalias swiftself %0, ptr{{( noalias( nocapture)?( swifterror)?( captures\(none\))? dereferenceable\(.\))?}} %1, ptr %2, ptr %3)
 // CHECK-NEXT: ret void
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s26protocol_resilience_thunks19MyResilientProtocolP11genericFuncyqd__qd__lFTj"(ptr noalias sret({{.*}}) %0, ptr noalias %1, ptr %2, ptr noalias swiftself %3, ptr %4, ptr %5)

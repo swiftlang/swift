@@ -829,12 +829,8 @@ struct AsyncTask::PrivateStorage {
     // result of the task
     auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
     while (true) {
-      // Task is completing
       assert(oldStatus.getInnermostRecord() == NULL &&
              "Status records should have been removed by this time!");
-      assert(!oldStatus.isStatusRecordLocked() &&
-             "Task is completing, cannot be locked anymore!");
-
       assert(oldStatus.isRunning());
 
       // Remove drainer, enqueued and override bit if any
@@ -857,6 +853,8 @@ struct AsyncTask::PrivateStorage {
         break;
       }
     }
+
+    _swift_tsan_release(task);
 
     // Destroy and deallocate any remaining task local items since the task is
     // completed. We need to do this before we destroy the task local

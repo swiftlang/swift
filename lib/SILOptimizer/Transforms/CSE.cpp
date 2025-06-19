@@ -839,8 +839,7 @@ bool CSE::processLazyPropertyGetters(SILFunction &F) {
 /// archetypes. Replace such types by performing type substitutions
 /// according to the provided type substitution map.
 static void updateBasicBlockArgTypes(SILBasicBlock *BB,
-                                     ArchetypeType *OldOpenedArchetype,
-                                     ArchetypeType *NewOpenedArchetype,
+                                     InstructionCloner &Cloner,
                                      InstructionWorklist &usersToHandle) {
   // Check types of all BB arguments.
   for (auto *Arg : BB->getSILPhiArguments()) {
@@ -850,15 +849,8 @@ static void updateBasicBlockArgTypes(SILBasicBlock *BB,
     // Try to apply substitutions to it and if it produces a different type,
     // use this type as new type of the BB argument.
     auto OldArgType = Arg->getType();
-    auto NewArgType = OldArgType.subst(BB->getModule(),
-                                       [&](SubstitutableType *type) -> Type {
-                                         if (type == OldOpenedArchetype)
-                                           return NewOpenedArchetype;
-                                         return type;
-                                       },
-                                       MakeAbstractConformanceForGenericType(),
-                                       CanGenericSignature(),
-                                       SubstFlags::SubstituteLocalArchetypes);
+
+    auto NewArgType = Cloner.getOpType(OldArgType);
     if (NewArgType == Arg->getType())
       continue;
     // Replace the type of this BB argument. The type of a BBArg
@@ -910,13 +902,14 @@ bool CSE::processOpenExistentialRef(OpenExistentialRefInst *Inst,
     usersToHandle.pushIfNotVisited(User);
   }
 
+  auto *OldEnv = OldOpenedArchetype->getGenericEnvironment();
+  auto *NewEnv = NewOpenedArchetype->getGenericEnvironment();
+
   // Now process candidates.
   // Use a cloner. It makes copying the instruction and remapping of
   // opened archetypes trivial.
   InstructionCloner Cloner(Inst->getFunction());
-  Cloner.registerLocalArchetypeRemapping(
-      OldOpenedArchetype->getGenericEnvironment(),
-      NewOpenedArchetype->getGenericEnvironment());
+  Cloner.registerLocalArchetypeRemapping(OldEnv, NewEnv);
   auto &Builder = Cloner.getBuilder();
 
   // Now clone each candidate and replace the opened archetype
@@ -931,8 +924,7 @@ bool CSE::processOpenExistentialRef(OpenExistentialRefInst *Inst,
         if (Successor->args_empty())
           continue;
         // If a BB has any arguments, update their types if necessary.
-        updateBasicBlockArgTypes(Successor, OldOpenedArchetype,
-                                 NewOpenedArchetype, usersToHandle);
+        updateBasicBlockArgTypes(Successor, Cloner, usersToHandle);
       }
     }
 
@@ -948,10 +940,7 @@ bool CSE::processOpenExistentialRef(OpenExistentialRefInst *Inst,
 
       // Check if the result type depends on this specific opened existential.
       auto ResultDependsOnOldOpenedArchetype =
-          result->getType().getASTType().findIf(
-              [&OldOpenedArchetype](Type t) -> bool {
-                return (CanType(t) == OldOpenedArchetype);
-              });
+          result->getType().getASTType()->hasLocalArchetypeFromEnvironment(OldEnv);
 
       // If it does, the candidate depends on the opened existential.
       if (ResultDependsOnOldOpenedArchetype) {

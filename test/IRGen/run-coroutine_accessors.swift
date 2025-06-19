@@ -99,11 +99,14 @@
 
 //--- Library.swift
 
+// TODO: CoroutineAccessors: Change to X.Y
+@available(SwiftStdlib 9999, *)
 public protocol ResilientWrapping {
   associatedtype Wrapped
   var wrapped: Wrapped { read set }
   var wrapped2: Wrapped { read set }
 }
+@available(SwiftStdlib 9999, *)
 extension ResilientWrapping {
   public var wrapped2: Wrapped {
     read {
@@ -115,6 +118,7 @@ extension ResilientWrapping {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 public struct ResilientBoxtional<T> : ResilientWrapping {
   var storage: T?
   public init(_ t: T?) {
@@ -132,6 +136,7 @@ public struct ResilientBoxtional<T> : ResilientWrapping {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 open class ResilientWrappingClass<Wrapped> {
   public init() {}
   open var wrapped: Wrapped {
@@ -144,6 +149,7 @@ open class ResilientWrappingClass<Wrapped> {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 open class ResilientWrappingSubclass<X : ResilientWrapping> : ResilientWrappingClass<X.Wrapped> {
   public init(_ impl: X) { self.impl = impl }
   var impl: X
@@ -161,6 +167,7 @@ open class ResilientWrappingSubclass<X : ResilientWrapping> : ResilientWrappingC
 
 import Library
 
+@available(SwiftStdlib 9999, *)
 struct MaybePtrBox<T> {
   private var ptr: UnsafeMutablePointer<T>
 
@@ -216,6 +223,7 @@ struct MaybePtrBox<T> {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 struct Boxtional<T> : ResilientWrapping {
   var storage: T?
   init(_ t: T?) {
@@ -233,6 +241,7 @@ struct Boxtional<T> : ResilientWrapping {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 class NonresilientResilientWrappingSubclass<X : ResilientWrapping> : ResilientWrappingClass<X.Wrapped> {
   init(_ impl: X) { 
     self.impl = impl
@@ -249,10 +258,12 @@ class NonresilientResilientWrappingSubclass<X : ResilientWrapping> : ResilientWr
   }
 }
 
+@available(SwiftStdlib 9999, *)
 protocol AsyncMutatable {
   mutating func mutate() async
 }
 
+@available(SwiftStdlib 9999, *)
 struct Stringg : AsyncMutatable {
   var value: String
   mutating func mutate() async {
@@ -260,10 +271,12 @@ struct Stringg : AsyncMutatable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 protocol Mutatable {
   mutating func mutate()
 }
 
+@available(SwiftStdlib 9999, *)
 struct Stringgg : Mutatable {
   var value: String
   mutating func mutate() {
@@ -271,11 +284,13 @@ struct Stringgg : Mutatable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 protocol Wrapping {
   associatedtype Wrapped
   var wrapped: Wrapped { read set }
 }
 
+@available(SwiftStdlib 9999, *)
 extension MaybePtrBox : Wrapping {
   typealias Wrapped = T?
   var wrapped: T? {
@@ -287,8 +302,10 @@ extension MaybePtrBox : Wrapping {
     }
   }
 }
+@available(SwiftStdlib 9999, *)
 extension MaybePtrBox : ResilientWrapping {}
 
+@available(SwiftStdlib 9999, *)
 class WrappingClass<Wrapped> {
   var wrapped: Wrapped {
     read {
@@ -300,6 +317,7 @@ class WrappingClass<Wrapped> {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 class WrappingSubclass<X : Wrapping> : WrappingClass<X.Wrapped> {
   init(_ impl: X) { self.impl = impl }
   var impl: X
@@ -313,6 +331,7 @@ class WrappingSubclass<X : Wrapping> : WrappingClass<X.Wrapped> {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension Optional : Mutatable where Wrapped : Mutatable {
   mutating func mutate() {
     switch (self) {
@@ -325,6 +344,7 @@ extension Optional : Mutatable where Wrapped : Mutatable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 @main
 struct M {
   static func sync_mutate<T : Mutatable>(_ t: inout T?) {

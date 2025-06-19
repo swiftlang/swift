@@ -354,7 +354,7 @@ internal func _adHocPrint_unlocked<T, TargetStream: TextOutputStream>(
         }
         target.write(")")
       case .enum:
-        if let cString = unsafe _getEnumCaseName(value),
+        if let cString = _getEnumCaseName(value),
             let caseName = unsafe String(validatingCString: cString) {
           // Write the qualified type name in debugPrint.
           if isDebugPrint {
@@ -381,6 +381,10 @@ internal func _adHocPrint_unlocked<T, TargetStream: TextOutputStream>(
             target.write(")")
           }
         }
+      case .foreignReference:
+        printTypeName(mirror.subjectType)
+        // FRT has no children
+        target.write("()")
       default:
         target.write(_typeName(mirror.subjectType))
     }
@@ -389,7 +393,7 @@ internal func _adHocPrint_unlocked<T, TargetStream: TextOutputStream>(
     printTypeName(metatypeValue)
   } else {
     // Fall back to the type or an opaque summary of the kind
-    if let cString = unsafe _opaqueSummary(mirror.subjectType),
+    if let cString = _opaqueSummary(mirror.subjectType),
         let opaqueSummary = unsafe String(validatingCString: cString) {
       target.write(opaqueSummary)
     } else {
@@ -526,14 +530,14 @@ internal func _dumpPrint_unlocked<T, TargetStream: TextOutputStream>(
 
   if let displayStyle = mirror.displayStyle {
     switch displayStyle {
-    case .`class`, .`struct`:
+    case .`class`, .`struct`, .foreignReference:
       // Classes and structs without custom representations are displayed as
       // their fully qualified type name
       target.write(_typeName(mirror.subjectType, qualified: true))
       return
     case .`enum`:
       target.write(_typeName(mirror.subjectType, qualified: true))
-      if let cString = unsafe _getEnumCaseName(value),
+      if let cString = _getEnumCaseName(value),
           let caseName = unsafe String(validatingCString: cString) {
         target.write(".")
         target.write(caseName)

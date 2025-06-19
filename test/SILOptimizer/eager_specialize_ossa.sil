@@ -886,7 +886,7 @@ bb0(%0 : $*Self, %1 : $*Self, %2 : $@thick Self.Type):
 
 // Check that a specialization for _Trivial(32) uses direct loads and stores
 // instead of value witness functions to load and store the value of a generic type.
-// CHECK-IRGEN-LABEL: define linkonce_odr hidden swiftcc void @"$s16eager_specialize18copyValueAndReturn_1sxx_xztlFxxxRlze31_lIetilr_Tp5"(ptr noalias nocapture sret(i32) %0, ptr noalias nocapture dereferenceable(4) %1, ptr nocapture dereferenceable(4) %2, ptr %S
+// CHECK-IRGEN-LABEL: define linkonce_odr hidden swiftcc void @"$s16eager_specialize18copyValueAndReturn_1sxx_xztlFxxxRlze31_lIetilr_Tp5"(ptr noalias{{( nocapture)?}} sret(i32){{( captures\(none\))?}} %0, ptr noalias {{(nocapture|captures\(none\))}} dereferenceable(4) %1, ptr {{(nocapture|captures\(none\))}} dereferenceable(4) %2, ptr %S
 // CHECK-IRGEN: entry:
 // CHECK-IRGEN:       %3 = load i32, ptr %2
 // CHECK-IRGEN-NEXT:  store i32 %3, ptr %0
@@ -895,7 +895,7 @@ bb0(%0 : $*Self, %1 : $*Self, %2 : $@thick Self.Type):
 
 // Check that a specialization for _Trivial(64) uses direct loads and stores
 // instead of value witness functions to load and store the value of a generic type.
-// CHECK-IRGEN-LABEL: define linkonce_odr hidden swiftcc void @"$s16eager_specialize18copyValueAndReturn_1sxx_xztlFxxxRlze63_lIetilr_Tp5"(ptr noalias nocapture sret(i64) %0, ptr noalias nocapture dereferenceable(8) %1, ptr nocapture dereferenceable(8) %2, ptr %S
+// CHECK-IRGEN-LABEL: define linkonce_odr hidden swiftcc void @"$s16eager_specialize18copyValueAndReturn_1sxx_xztlFxxxRlze63_lIetilr_Tp5"(ptr noalias{{( nocapture)?}} sret(i64){{( captures\(none\))?}} %0, ptr noalias {{(nocapture|captures\(none\))}} dereferenceable(8) %1, ptr {{(nocapture|captures\(none\))}} dereferenceable(8) %2, ptr %S
 // CHECK-IRGEN: entry:
 // CHECK-IRGEN:        %3 = load i64, ptr %2
 // CHECK-IRGEN-NEXT:   store i64 %3, ptr %0

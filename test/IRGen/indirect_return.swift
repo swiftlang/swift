@@ -14,12 +14,16 @@ protocol Number {}
 extension Int: Number {}
 
 // Make sure that the absence of the sret attribute matches.
-// CHECK: define hidden swiftcc void @"$s15indirect_return3fooSS_S2SAA6Number_pAaC_ptyF"(ptr noalias nocapture
+// CHECK: define hidden swiftcc void @"$s15indirect_return3fooSS_S2SAA6Number_pAaC_ptyF"(ptr noalias
+// CHECK-NOT: sret
+// CHECK-SAME: {
 func foo() -> (String, String, String, Number, Number) {
     return ("1", "2", "3", 42, 7)
 }
 // CHECK-LABEL: define{{.*}}testCall
 func testCall() {
-// CHECK: call swiftcc void @"$s15indirect_return3fooSS_S2SAA6Number_pAaC_ptyF"(ptr noalias nocapture %{{.*}}
+// CHECK: call swiftcc void @"$s15indirect_return3fooSS_S2SAA6Number_pAaC_ptyF"(ptr noalias
+// CHECK-NOT: sret
+// CHECK-SAME: ){{$}}
   print(foo())
 }

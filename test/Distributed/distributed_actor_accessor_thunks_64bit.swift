@@ -116,15 +116,15 @@ public distributed actor MyOtherActor {
 // CHECK: missing-witness1:
 // CHECK-NEXT: call void @llvm.trap()
 // CHECK-NEXT: unreachable
-// CHECK: call swiftcc void @"$s27FakeDistributedActorSystems0A17InvocationDecoderC18decodeNextArgumentxyKSeRzSERzlF"(ptr noalias sret(%swift.opaque) [[ARG_0_VALUE_BUF]], ptr %arg_type, ptr [[ENCODABLE_WITNESS]], ptr [[DECODABLE_WITNESS]], ptr swiftself [[DECODER]], ptr noalias nocapture swifterror dereferenceable(8) %swifterror)
+// CHECK: call swiftcc void @"$s27FakeDistributedActorSystems0A17InvocationDecoderC18decodeNextArgumentxyKSeRzSERzlF"(ptr noalias sret(%swift.opaque) [[ARG_0_VALUE_BUF]], ptr %arg_type, ptr [[ENCODABLE_WITNESS]], ptr [[DECODABLE_WITNESS]], ptr swiftself [[DECODER]], ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %swifterror)
 
 // CHECK: store ptr null, ptr %swifterror
-// CHECK-NEXT: %._value = getelementptr inbounds %TSi, ptr [[ARG_0_VALUE_BUF]], i32 0, i32 0
+// CHECK-NEXT: %._value = getelementptr inbounds{{.*}} %TSi, ptr [[ARG_0_VALUE_BUF]], i32 0, i32 0
 // CHECK-NEXT: [[ARG_VAL:%.*]] = load i64, ptr %._value
 
 /// Setup task context for async call to `simple1` thunk
 
-// CHECK-DIRECT: [[CONTEXT_SIZE:%.*]] = load i32, ptr getelementptr inbounds (%swift.async_func_pointer, ptr @"$s27distributed_actor_accessors7MyActorC7simple1yySiYaKFTETu", i32 0, i32 1)
+// CHECK-DIRECT: [[CONTEXT_SIZE:%.*]] = load i32, ptr getelementptr inbounds{{.*}} (%swift.async_func_pointer, ptr @"$s27distributed_actor_accessors7MyActorC7simple1yySiYaKFTETu", i32 0, i32 1)
 // CHECK-INDIRECT: [[ADDR:%[0-9]+]] = load ptr, ptr inttoptr (i64 and (i64 ptrtoint (ptr @"$s27distributed_actor_accessors7MyActorC7simple1yySiYaKFTETu" to i64), i64 -2) to ptr)
 // CHECK-INDIRECT-NEXT: [[SELECT:%[0-9]+]] = select i1 true, ptr @"$s27distributed_actor_accessors7MyActorC7simple1yySiYaKFTETu", ptr [[ADDR]]
 // CHECK-INDIRECT-NEXT: [[LOAD:%[0-9]+]] = getelementptr inbounds %swift.async_func_pointer, ptr [[SELECT]], i32 0, i32 1
@@ -141,7 +141,8 @@ public distributed actor MyOtherActor {
 // CHECK-SAME: ptr [[ACTOR]])
 
 // CHECK-NEXT: [[TASK_REF:%.*]] = extractvalue { ptr, ptr } [[THUNK_RESULT]], 0
-// CHECK-NEXT: {{.*}} = call ptr @__swift_async_resume_project_context(ptr [[TASK_REF]])
+// CHECK-NEXT: [[CALLER_ASYNC_CTXT:%.*]] = load ptr, ptr [[TASK_REF]]
+// CHECK-NEXT: store ptr [[CALLER_ASYNC_CTXT]], ptr
 // CHECK: {{.*}} = call i1 (ptr, i1, ...) @llvm.coro.end.async({{.*}}, ptr {{.*}}, ptr {{.*}})
 
 /// ---> Thunk and distributed method accessor for `simple2`
@@ -155,7 +156,7 @@ public distributed actor MyOtherActor {
 
 /// Setup task context for async call to `simple2` thunk
 
-// CHECK-DIRECT: [[CONTEXT_SIZE:%.*]] = load i32, ptr getelementptr inbounds (%swift.async_func_pointer, ptr @"$s27distributed_actor_accessors7MyActorC7simple2ySSSiYaKFTETu", i32 0, i32 1)
+// CHECK-DIRECT: [[CONTEXT_SIZE:%.*]] = load i32, ptr getelementptr inbounds{{.*}} (%swift.async_func_pointer, ptr @"$s27distributed_actor_accessors7MyActorC7simple2ySSSiYaKFTETu", i32 0, i32 1)
 // CHECK-INDIRECT: [[ADDR:%[0-9]+]] = load ptr, ptr inttoptr (i64 and (i64 ptrtoint (ptr @"$s27distributed_actor_accessors7MyActorC7simple2ySSSiYaKFTETu" to i64), i64 -2) to ptr), align 8
 // CHECK-INDIRECT-NEXT: [[SELECT:%[0-9]+]] = select i1 true, ptr @"$s27distributed_actor_accessors7MyActorC7simple2ySSSiYaKFTETu", ptr [[ADDR]]
 // CHECK-INDIRECT-NEXT: [[LOAD:%[0-9]+]] = getelementptr inbounds %swift.async_func_pointer, ptr [[SELECT]], i32 0, i32 1
@@ -172,7 +173,8 @@ public distributed actor MyOtherActor {
 // CHECK-SAME: ptr [[ACTOR]])
 
 // CHECK-NEXT: [[TASK_REF:%.*]] = extractvalue { ptr, i64, ptr, ptr } [[THUNK_RESULT]], 0
-// CHECK-NEXT: {{.*}} = call ptr @__swift_async_resume_project_context(ptr [[TASK_REF]])
+// CHECK-NEXT: [[CALLER_ASYNC_CTXT:%.*]] = load ptr, ptr [[TASK_REF]]
+// CHECK-NEXT:  store ptr [[CALLER_ASYNC_CTXT]], ptr
 
 /// Extract information about `String` from result and call `end`
 
@@ -197,7 +199,7 @@ public distributed actor MyOtherActor {
 
 // CHECK: [[ARG_SIZE:%.*]] = and i64 {{.*}}, -16
 // CHECK: [[ARG_BUF:%.*]] = call swiftcc ptr @swift_task_alloc(i64 [[ARG_SIZE]])
-// CHECK: %._guts = getelementptr inbounds %TSS, ptr [[ARG_BUF]], i32 0, i32 0
+// CHECK: %._guts = getelementptr inbounds{{.*}} %TSS, ptr [[ARG_BUF]], i32 0, i32 0
 
 // CHECK: [[STR_SIZE:%.*]] = load i64, ptr %._guts._object._countAndFlagsBits._value
 // CHECK: [[STR_VAL:%.*]] = load ptr, ptr %._guts._object._object
@@ -208,7 +210,7 @@ public distributed actor MyOtherActor {
 // CHECK-INDIRECT-NEXT: [[SELECT:%[0-9]+]] = select i1 true, ptr @"$s27distributed_actor_accessors7MyActorC7simple3ySiSSYaKFTETu", ptr [[ADDR]]
 // CHECK-INDIRECT-NEXT: [[LOAD:%[0-9]+]] = getelementptr inbounds %swift.async_func_pointer, ptr [[SELECT]], i32 0, i32 1
 // CHECK-INDIRECT-NEXT: [[CONTEXT_SIZE:%.*]] = load i32, ptr [[LOAD]]
-// CHECK-DIRECT: [[CONTEXT_SIZE:%.*]] = load i32, ptr getelementptr inbounds (%swift.async_func_pointer, ptr @"$s27distributed_actor_accessors7MyActorC7simple3ySiSSYaKFTETu", i32 0, i32 1)
+// CHECK-DIRECT: [[CONTEXT_SIZE:%.*]] = load i32, ptr getelementptr inbounds{{.*}} (%swift.async_func_pointer, ptr @"$s27distributed_actor_accessors7MyActorC7simple3ySiSSYaKFTETu", i32 0, i32 1)
 // CHECK-NEXT: [[CONTEXT_SIZE_64:%.*]] = zext i32 [[CONTEXT_SIZE]] to i64
 // CHECK-NEXT: [[THUNK_ASYNC_CONTEXT:%.*]] = call swiftcc ptr @swift_task_alloc(i64 [[CONTEXT_SIZE_64]])
 
@@ -222,9 +224,10 @@ public distributed actor MyOtherActor {
 // CHECK-SAME: ptr [[ACTOR]])
 
 // CHECK-NEXT: [[TASK_REF:%.*]] = extractvalue { ptr, i64, ptr } [[THUNK_RESULT]], 0
-// CHECK-NEXT: {{.*}} = call ptr @__swift_async_resume_project_context(ptr [[TASK_REF]])
+// CHECK-NEXT: [[CALLER_ASYNC_CTXT:%.*]] = load ptr, ptr [[TASK_REF]]
+// CHECK-NEXT:  store ptr [[CALLER_ASYNC_CTXT]], ptr
 // CHECK: [[INT_RES:%.*]] = extractvalue { ptr, i64, ptr } [[THUNK_RESULT]], 1
-// CHECK: %._value = getelementptr inbounds %TSi, ptr [[RESULT_BUFF]], i32 0, i32 0
+// CHECK: %._value = getelementptr inbounds{{.*}} %TSi, ptr [[RESULT_BUFF]], i32 0, i32 0
 // CHECK: store i64 [[INT_RES]], ptr %._value
 // CHECK: {{.*}} = call i1 (ptr, i1, ...) @llvm.coro.end.async({{.*}}, ptr {{.*}}, ptr {{.*}})
 
@@ -255,14 +258,15 @@ public distributed actor MyOtherActor {
 // CHECK: [[ARG_1_SIZE:%.*]] = and i64 {{.*}}, -16
 // CHECK-NEXT: [[ARG_1_BUF:%.*]] = call swiftcc ptr @swift_task_alloc(i64 [[ARG_1_SIZE]])
 
-// CHECK: %._value = getelementptr inbounds %TSi, ptr [[ARG_1_BUF]], i32 0, i32 0
+// CHECK: %._value = getelementptr inbounds{{.*}} %TSi, ptr [[ARG_1_BUF]], i32 0, i32 0
 // CHECK-NEXT: [[NATIVE_INT_VAL:%.*]] = load i64, ptr %._value
 
 /// Call distributed thunk with extracted arguments.
 
 // CHECK: [[THUNK_RESULT:%.*]] = call { ptr, i64, ptr } (i32, ptr, ptr, ...) @llvm.coro.suspend.async.sl_p0i64p0s({{.*}}, ptr {{.*}}, i64 [[NATIVE_ENUM_VAL]], i64 [[NATIVE_INT_VAL]], ptr {{.*}})
 // CHECK-NEXT: [[TASK_REF:%.*]] = extractvalue { ptr, i64, ptr } [[THUNK_RESULT]], 0
-// CHECK-NEXT: {{.*}} = call ptr @__swift_async_resume_project_context(ptr [[TASK_REF]])
+// CHECK-NEXT: [[CALLER_ASYNC_CTXT:%.*]] = load ptr, ptr [[TASK_REF]]
+// CHECK-NEXT:  store ptr [[CALLER_ASYNC_CTXT]], ptr
 // CHECK: [[ENUM_RESULT:%.*]] = extractvalue { ptr, i64, ptr } [[THUNK_RESULT]], 1
 // CHECK: store i64 [[ENUM_RESULT]], ptr [[RESULT_BUFF]]
 
@@ -283,7 +287,7 @@ public distributed actor MyOtherActor {
 // CHECK: [[ARG_0_SIZE:%.*]] = and i64 {{.*}}, -16
 // CHECK-NEXT: [[ARG_0_BUF:%.*]] = call swiftcc ptr @swift_task_alloc(i64 [[ARG_0_SIZE]])
 
-// CHECK: %._buffer = getelementptr inbounds %TSa, ptr [[ARG_0_BUF]], i32 0, i32 0
+// CHECK: %._buffer = getelementptr inbounds{{.*}} %TSa, ptr [[ARG_0_BUF]], i32 0, i32 0
 // CHECK: [[NATIVE_ARR_VAL:%.*]] = load ptr, ptr %._buffer._storage
 
 /// -> Obj
@@ -298,9 +302,9 @@ public distributed actor MyOtherActor {
 // CHECK: [[ARG_2_SIZE:%.*]] = and i64 {{.*}}, -16
 // CHECK-NEXT: [[ARG_2_BUF:%.*]] = call swiftcc ptr @swift_task_alloc(i64 [[ARG_2_SIZE]])
 
-// CHECK: [[NATIVE_OPT_VAL_0_PTR:%.*]] = getelementptr inbounds { i64, i64 }, ptr [[ARG_2_BUF]], i32 0, i32 0
+// CHECK: [[NATIVE_OPT_VAL_0_PTR:%.*]] = getelementptr inbounds{{.*}} { i64, i64 }, ptr [[ARG_2_BUF]], i32 0, i32 0
 // CHECK-NEXT: [[NATIVE_OPT_VAL_0:%.*]] = load i64, ptr [[NATIVE_OPT_VAL_0_PTR]]
-// CHECK-NEXT: [[NATIVE_OPT_VAL_1_PTR:%.*]] = getelementptr inbounds { i64, i64 }, ptr [[ARG_2_BUF]], i32 0, i32 1
+// CHECK-NEXT: [[NATIVE_OPT_VAL_1_PTR:%.*]] = getelementptr inbounds{{.*}} { i64, i64 }, ptr [[ARG_2_BUF]], i32 0, i32 1
 // CHECK-NEXT: [[NATIVE_OPT_VAL_1:%.*]] = load i64, ptr [[NATIVE_OPT_VAL_1_PTR]]
 
 /// -> LargeStruct (passed indirectly)
@@ -331,8 +335,8 @@ public distributed actor MyOtherActor {
 // CHECK: [[ARG_1_SIZE:%.*]] = and i64 {{.*}}, -16
 // CHECK-NEXT: [[ARG_1_BUF:%.*]] = call swiftcc ptr @swift_task_alloc(i64 [[ARG_1_SIZE]])
 
-// CHECK: %._buffer = getelementptr inbounds %TSa, ptr [[ARG_1_BUF]], i32 0, i32 0
-// CHECK-NEXT: %._buffer._storage = getelementptr inbounds [[ARRAY_TYPE:%.*]], ptr %._buffer, i32 0, i32 0
+// CHECK: %._buffer = getelementptr inbounds{{.*}} %TSa, ptr [[ARG_1_BUF]], i32 0, i32 0
+// CHECK-NEXT: %._buffer._storage = getelementptr inbounds{{.*}} [[ARRAY_TYPE:%.*]], ptr %._buffer, i32 0, i32 0
 // CHECK: [[TYPED_ARG_1:%.*]] = load ptr, ptr %._buffer._storage
 
 /// ---> Load generic argument substitutions from the caller-provided buffer
@@ -376,7 +380,7 @@ public distributed actor MyOtherActor {
 // CHECK-NEXT: {{.*}} = call ptr @llvm.coro.begin(token {{%.*}}, ptr null)
 // CHECK-NEXT: store ptr {{.*}}, ptr {{.*}}
 // CHECK-NEXT: store ptr null, ptr %swifterror
-// CHECK-DIRECT-NEXT: {{.*}} = load i32, ptr getelementptr inbounds (%swift.async_func_pointer, ptr @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyYaKFTETu", i32 0, i32 1)
+// CHECK-DIRECT-NEXT: {{.*}} = load i32, ptr getelementptr inbounds{{.*}} (%swift.async_func_pointer, ptr @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyYaKFTETu", i32 0, i32 1)
 // CHECK-INDIRECT-NEXT: [[ADDR:%[0-9]+]] = load ptr, ptr inttoptr (i64 and (i64 ptrtoint (ptr @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyYaKFTETu" to i64), i64 -2) to ptr), align 8
 // CHECK-INDIRECT-NEXT: [[SELECT:%[0-9]+]] = select i1 true, ptr @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyYaKFTETu", ptr [[ADDR]]
 // CHECK-INDIRECT-NEXT: [[LOAD:%[0-9]+]] = getelementptr inbounds %swift.async_func_pointer, ptr [[SELECT]], i32 0, i32 1

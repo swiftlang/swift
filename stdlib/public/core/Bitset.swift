@@ -45,7 +45,7 @@ extension _UnsafeBitset {
     _internalInvariant(element >= 0)
     // Note: We perform on UInts to get faster unsigned math (shifts).
     let element = UInt(bitPattern: element)
-    let capacity = unsafe UInt(bitPattern: Word.capacity)
+    let capacity = UInt(bitPattern: Word.capacity)
     return Int(bitPattern: element / capacity)
   }
 
@@ -55,7 +55,7 @@ extension _UnsafeBitset {
     _internalInvariant(element >= 0)
     // Note: We perform on UInts to get faster unsigned math (masking).
     let element = UInt(bitPattern: element)
-    let capacity = unsafe UInt(bitPattern: Word.capacity)
+    let capacity = UInt(bitPattern: Word.capacity)
     return Int(bitPattern: element % capacity)
   }
 
@@ -68,8 +68,8 @@ extension _UnsafeBitset {
   @inlinable
   @inline(__always)
   internal static func join(word: Int, bit: Int) -> Int {
-    unsafe _internalInvariant(bit >= 0 && bit < Word.capacity)
-    return unsafe word &* Word.capacity &+ bit
+    _internalInvariant(bit >= 0 && bit < Word.capacity)
+    return word &* Word.capacity &+ bit
   }
 }
 
@@ -84,7 +84,7 @@ extension _UnsafeBitset {
   internal var capacity: Int {
     @inline(__always)
     get {
-      return unsafe wordCount &* Word.capacity
+      return wordCount &* Word.capacity
     }
   }
 
@@ -199,7 +199,7 @@ extension _UnsafeBitset {
 
     @inlinable
     internal init(_ value: UInt) {
-      unsafe self.value = value
+      self.value = value
     }
   }
 }
@@ -217,7 +217,7 @@ extension _UnsafeBitset.Word {
   @inline(__always)
   internal func uncheckedContains(_ bit: Int) -> Bool {
     _internalInvariant(bit >= 0 && bit < UInt.bitWidth)
-    return unsafe value & (1 &<< bit) != 0
+    return value & (1 &<< bit) != 0
   }
 
   @inlinable
@@ -226,8 +226,8 @@ extension _UnsafeBitset.Word {
   internal mutating func uncheckedInsert(_ bit: Int) -> Bool {
     _internalInvariant(bit >= 0 && bit < UInt.bitWidth)
     let mask: UInt = 1 &<< bit
-    let inserted = unsafe value & mask == 0
-    unsafe value |= mask
+    let inserted = value & mask == 0
+    value |= mask
     return inserted
   }
 
@@ -237,8 +237,8 @@ extension _UnsafeBitset.Word {
   internal mutating func uncheckedRemove(_ bit: Int) -> Bool {
     _internalInvariant(bit >= 0 && bit < UInt.bitWidth)
     let mask: UInt = 1 &<< bit
-    let removed = unsafe value & mask != 0
-    unsafe value &= ~mask
+    let removed = value & mask != 0
+    value &= ~mask
     return removed
   }
 }
@@ -248,8 +248,8 @@ extension _UnsafeBitset.Word {
   var minimum: Int? {
     @inline(__always)
     get {
-      guard unsafe value != 0 else { return nil }
-      return unsafe value.trailingZeroBitCount
+      guard value != 0 else { return nil }
+      return value.trailingZeroBitCount
     }
   }
 
@@ -257,8 +257,8 @@ extension _UnsafeBitset.Word {
   var maximum: Int? {
     @inline(__always)
     get {
-      guard unsafe value != 0 else { return nil }
-      return unsafe _UnsafeBitset.Word.capacity &- 1 &- value.leadingZeroBitCount
+      guard value != 0 else { return nil }
+      return _UnsafeBitset.Word.capacity &- 1 &- value.leadingZeroBitCount
     }
   }
 
@@ -266,32 +266,32 @@ extension _UnsafeBitset.Word {
   var complement: _UnsafeBitset.Word {
     @inline(__always)
     get {
-      return unsafe _UnsafeBitset.Word(~value)
+      return _UnsafeBitset.Word(~value)
     }
   }
 
   @inlinable
   @inline(__always)
   internal func subtracting(elementsBelow bit: Int) -> _UnsafeBitset.Word {
-    unsafe _internalInvariant(bit >= 0 && bit < _UnsafeBitset.Word.capacity)
+    _internalInvariant(bit >= 0 && bit < _UnsafeBitset.Word.capacity)
     let mask = UInt.max &<< bit
-    return unsafe _UnsafeBitset.Word(value & mask)
+    return _UnsafeBitset.Word(value & mask)
   }
 
   @inlinable
   @inline(__always)
   internal func intersecting(elementsBelow bit: Int) -> _UnsafeBitset.Word {
-    unsafe _internalInvariant(bit >= 0 && bit < _UnsafeBitset.Word.capacity)
+    _internalInvariant(bit >= 0 && bit < _UnsafeBitset.Word.capacity)
     let mask: UInt = (1 as UInt &<< bit) &- 1
-    return unsafe _UnsafeBitset.Word(value & mask)
+    return _UnsafeBitset.Word(value & mask)
   }
 
   @inlinable
   @inline(__always)
   internal func intersecting(elementsAbove bit: Int) -> _UnsafeBitset.Word {
-    unsafe _internalInvariant(bit >= 0 && bit < _UnsafeBitset.Word.capacity)
+    _internalInvariant(bit >= 0 && bit < _UnsafeBitset.Word.capacity)
     let mask = (UInt.max &<< bit) &<< 1
-    return unsafe _UnsafeBitset.Word(value & mask)
+    return _UnsafeBitset.Word(value & mask)
   }
 }
 
@@ -300,7 +300,7 @@ extension _UnsafeBitset.Word {
   internal static var empty: _UnsafeBitset.Word {
     @inline(__always)
     get {
-      return unsafe _UnsafeBitset.Word(0)
+      return _UnsafeBitset.Word(0)
     }
   }
 
@@ -308,7 +308,7 @@ extension _UnsafeBitset.Word {
   internal static var allBits: _UnsafeBitset.Word {
     @inline(__always)
     get {
-      return unsafe _UnsafeBitset.Word(UInt.max)
+      return _UnsafeBitset.Word(UInt.max)
     }
   }
 }
@@ -324,19 +324,19 @@ extension _UnsafeBitset.Word: @unsafe Sequence, @unsafe IteratorProtocol {
 
   @inlinable
   internal var count: Int {
-    return unsafe value.nonzeroBitCount
+    return value.nonzeroBitCount
   }
 
   @inlinable
   internal var underestimatedCount: Int {
-    return unsafe count
+    return count
   }
 
   @inlinable
   internal var isEmpty: Bool {
     @inline(__always)
     get {
-      return unsafe value == 0
+      return value == 0
     }
   }
 
@@ -344,9 +344,9 @@ extension _UnsafeBitset.Word: @unsafe Sequence, @unsafe IteratorProtocol {
   /// and also destructively clear it.
   @inlinable
   internal mutating func next() -> Int? {
-    guard unsafe value != 0 else { return nil }
-    let bit = unsafe value.trailingZeroBitCount
-    unsafe value &= value &- 1       // Clear lowest nonzero bit.
+    guard value != 0 else { return nil }
+    let bit = value.trailingZeroBitCount
+    value &= value &- 1       // Clear lowest nonzero bit.
     return bit
   }
 }

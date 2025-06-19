@@ -19,6 +19,11 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD_INDEPENDENT_2 | %FileCheck %s -check-prefix=KEYWORD_LAST
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD_LAST | %FileCheck %s -check-prefix=KEYWORD_LAST
 
+// NOTE: If you want to test code completion for an experimental feature, please
+// put your tests in complete_decl_attribute_feature_requirement.swift, not
+// here. That file has the infrastructure to test that completions are not
+// offered when the feature is disabled.
+
 struct MyStruct {}
 
 @propertyWrapper
@@ -78,6 +83,7 @@ actor MyGenericGlobalActor<T> {
 // AVAILABILITY1-NEXT: Keyword/None:                       macOSApplicationExtension[#Platform#]; name=macOSApplicationExtension{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       macCatalyst[#Platform#]; name=macCatalyst
 // AVAILABILITY1-NEXT: Keyword/None:                       macCatalystApplicationExtension[#Platform#]; name=macCatalystApplicationExtension
+// AVAILABILITY1-NEXT: Keyword/None:                       FreeBSD[#Platform#]; name=FreeBSD{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       OpenBSD[#Platform#]; name=OpenBSD{{$}}
 // AVAILABILITY1-NEXT: Keyword/None:                       Windows[#Platform#]; name=Windows{{$}}
 
@@ -111,7 +117,10 @@ actor MyGenericGlobalActor<T> {
 // KEYWORD2-NEXT:             Keyword/None:                       Sendable[#Func Attribute#]; name=Sendable
 // KEYWORD2-NEXT:             Keyword/None:                       preconcurrency[#Func Attribute#]; name=preconcurrency
 // KEYWORD2-NEXT:             Keyword/None:                       backDeployed[#Func Attribute#]; name=backDeployed
-// KEYWORD2-NEXT              Keyword/None:                       lifetime[#Func Attribute#]; name=lifetime
+// KEYWORD2-NEXT:             Keyword/None:                       lifetime[#Func Attribute#]; name=lifetime
+// KEYWORD2-NEXT:             Keyword/None:                       abi[#Func Attribute#]; name=abi{{$}}
+// KEYWORD2-NEXT:             Keyword/None:                       concurrent[#Func Attribute#]; name=concurrent
+// KEYWORD2-NOT:              Keyword
 // KEYWORD2-DAG:              Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
 // KEYWORD2-DAG:              Decl[Struct]/CurrModule:            MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
 // KEYWORD2-DAG:              Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyResultBuilder[#Result Builder#]; name=MyResultBuilder
@@ -167,6 +176,7 @@ actor MyGenericGlobalActor<T> {
 // KEYWORD5-NEXT:             Keyword/None:                       preconcurrency[#Struct Attribute#]; name=preconcurrency
 
 @#^ON_GLOBALVAR^# var globalVar
+// ON_GLOBALVAR-DAG: Keyword/None:                       abi[#Var Attribute#]; name=abi
 // ON_GLOBALVAR-DAG: Keyword/None:                       available[#Var Attribute#]; name=available
 // ON_GLOBALVAR-DAG: Keyword/None:                       objc[#Var Attribute#]; name=objc
 // ON_GLOBALVAR-DAG: Keyword/None:                       NSCopying[#Var Attribute#]; name=NSCopying
@@ -195,6 +205,7 @@ actor MyGenericGlobalActor<T> {
 
 struct _S {
   @#^ON_INIT^# init()
+// ON_INIT-DAG: Keyword/None:                       abi[#Constructor Attribute#]; name=abi
 // ON_INIT-DAG: Keyword/None:                       available[#Constructor Attribute#]; name=available
 // ON_INIT-DAG: Keyword/None:                       objc[#Constructor Attribute#]; name=objc
 // ON_INIT-DAG: Keyword/None:                       inline[#Constructor Attribute#]; name=inline
@@ -205,6 +216,7 @@ struct _S {
 // ON_INIT-DAG: Keyword/None:                       preconcurrency[#Constructor Attribute#]; name=preconcurrency
 
   @#^ON_PROPERTY^# var foo
+// ON_PROPERTY-DAG: Keyword/None:                       abi[#Var Attribute#]; name=abi
 // ON_PROPERTY-DAG: Keyword/None:                       available[#Var Attribute#]; name=available
 // ON_PROPERTY-DAG: Keyword/None:                       objc[#Var Attribute#]; name=objc
 // ON_PROPERTY-DAG: Keyword/None:                       NSCopying[#Var Attribute#]; name=NSCopying
@@ -232,8 +244,12 @@ struct _S {
 // ON_PROPERTY-DAG: Decl[Actor]/CurrModule/TypeRelation[Convertible]: MyGenericGlobalActor[#Global Actor#]; name=MyGenericGlobalActor
 // ON_PROPERTY-NOT: Decl[PrecedenceGroup]
 
+  @#^ON_SUBSCR^# subscript
+// ON_SUBSCR-DAG:  Keyword/None:                        abi[#Declaration Attribute#]; name=abi
+
   @#^ON_METHOD^# private
   func foo()
+// ON_METHOD-DAG: Keyword/None:                       abi[#Func Attribute#]; name=abi
 // ON_METHOD-DAG: Keyword/None:                       available[#Func Attribute#]; name=available
 // ON_METHOD-DAG: Keyword/None:                       objc[#Func Attribute#]; name=objc
 // ON_METHOD-DAG: Keyword/None:                       IBAction[#Func Attribute#]; name=IBAction
@@ -291,6 +307,7 @@ struct _S {
 
 
   @#^ON_MEMBER_LAST^#
+// ON_MEMBER_LAST-DAG: Keyword/None:                       abi[#Declaration Attribute#]; name=abi
 // ON_MEMBER_LAST-DAG: Keyword/None:                       available[#Declaration Attribute#]; name=available
 // ON_MEMBER_LAST-DAG: Keyword/None:                       objc[#Declaration Attribute#]; name=objc
 // ON_MEMBER_LAST-DAG: Keyword/None:                       dynamicCallable[#Declaration Attribute#]; name=dynamicCallable
@@ -328,7 +345,6 @@ struct _S {
 // ON_MEMBER_LAST-DAG: Keyword/None:                       freestanding[#Declaration Attribute#]; name=freestanding
 // ON_MEMBER_LAST-DAG: Keyword/None:                       storageRestrictions[#Declaration Attribute#]; name=storageRestrictions
 // ON_MEMBER_LAST-DAG: Keyword/None:                       lifetime[#Declaration Attribute#]; name=lifetime
-// ON_MEMBER_LAST-DAG: Keyword/None:                       extensible[#Declaration Attribute#]; name=extensible
 // ON_MEMBER_LAST-DAG: Keyword/None:                       concurrent[#Declaration Attribute#]; name=concurrent
 // ON_MEMBER_LAST-NOT: Keyword
 // ON_MEMBER_LAST-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct
@@ -346,6 +362,8 @@ func takeClosure(_: () -> Void) {
     print("x")
   }
 }
+// FIXME: Not valid in this position (but CompletionLookup can't tell that)
+// IN_CLOSURE-DAG:  Keyword/None:              abi[#Declaration Attribute#]; name=abi
 // FIXME: We should mark MyPropertyWrapper and MyResultBuilder as Unrelated
 // IN_CLOSURE-DAG: Decl[Struct]/CurrModule: MyStruct[#MyStruct#]; name=MyStruct
 // IN_CLOSURE-DAG: Decl[Struct]/CurrModule/TypeRelation[Convertible]: MyPropertyWrapper[#Property Wrapper#]; name=MyPropertyWrapper
@@ -364,6 +382,7 @@ func dummy2() {}
 
 @#^KEYWORD_LAST^#
 
+// KEYWORD_LAST-DAG: Keyword/None:                       abi[#Declaration Attribute#]; name=abi
 // KEYWORD_LAST-DAG: Keyword/None:                       available[#Declaration Attribute#]; name=available{{$}}
 // KEYWORD_LAST-DAG: Keyword/None:                       freestanding[#Declaration Attribute#]; name=freestanding{{$}}
 // KEYWORD_LAST-DAG: Keyword/None:                       objc[#Declaration Attribute#]; name=objc{{$}}
@@ -402,7 +421,6 @@ func dummy2() {}
 // KEYWORD_LAST-DAG: Keyword/None:                       attached[#Declaration Attribute#]; name=attached
 // KEYWORD_LAST-DAG: Keyword/None:                       storageRestrictions[#Declaration Attribute#]; name=storageRestrictions
 // KEYWORD_LAST-DAG: Keyword/None:                       lifetime[#Declaration Attribute#]; name=lifetime
-// KEYWORD_LAST-DAG: Keyword/None:                       extensible[#Declaration Attribute#]; name=extensible
 // KEYWORD_LAST-DAG: Keyword/None:                       concurrent[#Declaration Attribute#]; name=concurrent
 // KEYWORD_LAST-NOT: Keyword
 // KEYWORD_LAST-DAG: Decl[Struct]/CurrModule:            MyStruct[#MyStruct#]; name=MyStruct

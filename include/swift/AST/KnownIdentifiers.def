@@ -325,6 +325,7 @@ IDENTIFIER(SerializationRequirement)
 IDENTIFIER_WITH_NAME(builderSelf, "$builderSelf")
 
 // Attribute options
+IDENTIFIER(always)
 IDENTIFIER_(_always)
 IDENTIFIER_(assumed)
 IDENTIFIER(checked)

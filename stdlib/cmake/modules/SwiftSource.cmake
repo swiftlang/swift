@@ -50,7 +50,7 @@ function(handle_swift_sources
     sourcesvar externalvar name)
   cmake_parse_arguments(SWIFTSOURCES
       "IS_MAIN;IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;EMBED_BITCODE;STATIC;NO_LINK_NAME;IS_FRAGILE;ONLY_SWIFTMODULE;NO_SWIFTMODULE"
-      "SDK;ARCHITECTURE;INSTALL_IN_COMPONENT;DEPLOYMENT_VERSION_OSX;DEPLOYMENT_VERSION_IOS;DEPLOYMENT_VERSION_TVOS;DEPLOYMENT_VERSION_WATCHOS;MACCATALYST_BUILD_FLAVOR;BOOTSTRAPPING;INSTALL_BINARY_SWIFTMODULE"
+      "SDK;ARCHITECTURE;ARCHITECTURE_SUBDIR_NAME;INSTALL_IN_COMPONENT;DEPLOYMENT_VERSION_OSX;DEPLOYMENT_VERSION_IOS;DEPLOYMENT_VERSION_TVOS;DEPLOYMENT_VERSION_WATCHOS;MACCATALYST_BUILD_FLAVOR;BOOTSTRAPPING;INSTALL_BINARY_SWIFTMODULE"
       "DEPENDS;COMPILE_FLAGS;MODULE_NAME;MODULE_DIR;ENABLE_LTO"
       ${ARGN})
   translate_flag(${SWIFTSOURCES_IS_MAIN} "IS_MAIN" IS_MAIN_arg)
@@ -83,6 +83,9 @@ function(handle_swift_sources
   precondition(SWIFTSOURCES_SDK "Should specify an SDK")
   precondition(SWIFTSOURCES_ARCHITECTURE "Should specify an architecture")
   precondition(SWIFTSOURCES_INSTALL_IN_COMPONENT "INSTALL_IN_COMPONENT is required")
+  if (NOT SWIFTSOURCES_ARCHITECTURE_SUBDIR_NAME)
+    set(SWIFTSOURCES_ARCHITECTURE_SUBDIR_NAME "${SWIFTSOURCES_ARCHITECTURE}")
+  endif()
 
   # Clear the result variable.
   set("${dependency_target_out_var_name}" "" PARENT_SCOPE)
@@ -108,12 +111,12 @@ function(handle_swift_sources
   endif()
 
   if(swift_sources)
-    set(objsubdir "/${SWIFTSOURCES_SDK}/${SWIFTSOURCES_ARCHITECTURE}")
+    set(objsubdir "/${SWIFTSOURCES_SDK}/${SWIFTSOURCES_ARCHITECTURE_SUBDIR_NAME}")
 
     get_maccatalyst_build_flavor(maccatalyst_build_flavor
       "${SWIFTSOURCES_SDK}" "${SWIFTSOURCES_MACCATALYST_BUILD_FLAVOR}")
     if(maccatalyst_build_flavor STREQUAL "ios-like")
-      set(objsubdir "/MACCATALYST/${SWIFTSOURCES_ARCHITECTURE}")
+      set(objsubdir "/MACCATALYST/${SWIFTSOURCES_ARCHITECTURE_SUBDIR_NAME}")
     endif()
 
     get_bootstrapping_path(lib_dir
@@ -636,6 +639,7 @@ function(_compile_swift_files
   list(APPEND swift_flags "-enable-experimental-feature" "NonescapableTypes")
   list(APPEND swift_flags "-enable-experimental-feature" "LifetimeDependence")
   list(APPEND swift_flags "-enable-experimental-feature" "InoutLifetimeDependence")
+  list(APPEND swift_flags "-enable-experimental-feature" "LifetimeDependenceMutableAccessors")
 
   list(APPEND swift_flags "-enable-upcoming-feature" "MemberImportVisibility")
 
@@ -745,7 +749,9 @@ function(_compile_swift_files
     endif()
 
     set(exclude_binary_swiftmodule_installation_args "")
-    if(NOT SWIFTFILE_INSTALL_BINARY_SWIFTMODULE)
+    if(NOT SWIFTFILE_INSTALL_BINARY_SWIFTMODULE OR
+       (SWIFTFILE_INSTALL_BINARY_SWIFTMODULE STREQUAL "NON_DARWIN_ONLY" AND
+        SWIFTFILE_SDK IN_LIST SWIFT_DARWIN_PLATFORMS))
         list(APPEND
           exclude_binary_swiftmodule_installation_args
           "REGEX" "${SWIFTFILE_MODULE_NAME}.swiftmodule/[^/]*\\.swiftmodule$" EXCLUDE)
@@ -922,9 +928,9 @@ function(_compile_swift_files
   endif()
 
   set(custom_env "PYTHONIOENCODING=UTF8")
-  if(SWIFTFILE_IS_STDLIB OR
+  if(SWIFT_INCLUDE_TOOLS AND (SWIFTFILE_IS_STDLIB OR
      # Linux "hosttools" build require builder's runtime before building the runtime.
-     (BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS" AND SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
+     (BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS" AND SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD"))
   )
     get_bootstrapping_swift_lib_dir(bs_lib_dir "${SWIFTFILE_BOOTSTRAPPING}")
     if(bs_lib_dir)
@@ -1009,13 +1015,13 @@ function(_compile_swift_files
   # need to work around this by avoiding long command line arguments. This can
   # be achieved by writing the list of file paths to a file, then reading that
   # list in the Python script.
-  string(REPLACE ";" "'\n'" source_files_quoted "${source_files}")
-  string(SHA1 file_name "'${source_files_quoted}'")
+  string(REPLACE ";" "\n" source_files_quoted "${source_files}")
+  string(SHA1 file_name "${source_files_quoted}")
   set(file_path_target "filelist-${file_name}")
   set(file_path "${CMAKE_CURRENT_BINARY_DIR}/${file_name}.txt")
 
   if (NOT TARGET ${file_path_target})
-    file(WRITE "${file_path}.tmp" "'${source_files_quoted}'")
+    file(WRITE "${file_path}.tmp" "${source_files_quoted}")
     add_custom_command_target(unused_var
       COMMAND ${CMAKE_COMMAND} -E copy_if_different "${file_path}.tmp" "${file_path}"
       CUSTOM_TARGET_NAME ${file_path_target}

@@ -317,8 +317,6 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
       options::OPT_emit_reference_dependencies_path);
   auto serializedDiagnostics = getSupplementaryFilenamesFromArguments(
       options::OPT_serialize_diagnostics_path);
-  auto fixItsOutput = getSupplementaryFilenamesFromArguments(
-      options::OPT_emit_fixits_path);
   auto loadedModuleTrace = getSupplementaryFilenamesFromArguments(
       options::OPT_emit_loaded_module_trace_path);
   auto TBD = getSupplementaryFilenamesFromArguments(options::OPT_emit_tbd_path);
@@ -343,7 +341,7 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
       options::OPT_save_optimization_record_path);
   if (!clangHeaderOutput || !moduleOutput || !moduleDocOutput ||
       !dependenciesFile || !referenceDependenciesFile ||
-      !serializedDiagnostics || !fixItsOutput || !loadedModuleTrace || !TBD ||
+      !serializedDiagnostics || !loadedModuleTrace || !TBD ||
       !moduleInterfaceOutput || !privateModuleInterfaceOutput || !packageModuleInterfaceOutput ||
       !moduleSourceInfoOutput || !moduleSummaryOutput || !abiDescriptorOutput ||
       !moduleSemanticInfoOutput || !optRecordOutput) {
@@ -361,7 +359,6 @@ SupplementaryOutputPathsComputer::getSupplementaryOutputPathsFromArguments()
     sop.DependenciesFilePath = (*dependenciesFile)[i];
     sop.ReferenceDependenciesFilePath = (*referenceDependenciesFile)[i];
     sop.SerializedDiagnosticsPath = (*serializedDiagnostics)[i];
-    sop.FixItsOutputPath = (*fixItsOutput)[i];
     sop.LoadedModuleTracePath = (*loadedModuleTrace)[i];
     sop.TBDPath = (*TBD)[i];
     sop.ModuleInterfaceOutputPath = (*moduleInterfaceOutput)[i];
@@ -451,7 +448,7 @@ static bool shouldEmitFineModuleTrace(FrontendOptions::ActionType action) {
   case swift::FrontendOptions::ActionType::DumpPCM:
   case swift::FrontendOptions::ActionType::ScanDependencies:
   case swift::FrontendOptions::ActionType::PrintVersion:
-  case swift::FrontendOptions::ActionType::PrintFeature:
+  case swift::FrontendOptions::ActionType::PrintArguments:
     return false;
   }
 }

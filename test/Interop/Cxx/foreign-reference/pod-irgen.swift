@@ -9,18 +9,15 @@ import POD
 // CHECK-LABEL: define {{.*}}swiftcc void @"$s4main4testyyF"
 
 // CHECK: [[X:%.*]] = alloca ptr
-// CHECK: [[TMP:%.*]] = alloca ptr
 
 // CHECK: [[CREATED:%.*]] = call ptr @{{_ZN7IntPair6createEv|"\?create\@IntPair\@\@SAPEAU1\@XZ"}}()
 // CHECK: store ptr [[CREATED]], ptr [[X]]
 
-// CHECK: [[B_FIELD:%.*]] = getelementptr inbounds %TSo7IntPairV, ptr [[CREATED]], i32 0, i32 1
-// CHECK: [[INT_VALUE:%.*]] = getelementptr inbounds %Ts5Int32V, ptr [[B_FIELD]], i32 0, i32 0
+// CHECK: [[B_FIELD:%.*]] = getelementptr inbounds{{.*}} %TSo7IntPairV, ptr [[CREATED]], i32 0, i32 1
+// CHECK: [[INT_VALUE:%.*]] = getelementptr inbounds{{.*}} %Ts5Int32V, ptr [[B_FIELD]], i32 0, i32 0
 // CHECK: store i32 42, ptr [[INT_VALUE]], align 4
 
-// CHECK: store ptr [[CREATED]], ptr [[TMP]]
-// CHECK: [[TMP_LOAD:%.*]] = load ptr, ptr [[TMP]]
-// CHECK: call i32 @{{_ZNK7IntPair4testEv|"\?test\@IntPair\@\@QEBAHXZ"}}(ptr [[TMP_LOAD]])
+// CHECK: call i32 @{{_ZNK7IntPair4testEv|"\?test\@IntPair\@\@QEBAHXZ"}}(ptr [[CREATED]])
 
 // CHECK: ret void
 

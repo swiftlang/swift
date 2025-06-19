@@ -402,7 +402,7 @@ extension MutableCollection where Self: BidirectionalCollection {
       (bufferPointer) -> Int in
       let unsafeBufferPivot = try unsafe bufferPointer._partitionImpl(
         by: belongsInSecondPartition)
-      return unsafe unsafeBufferPivot - bufferPointer.startIndex
+      return unsafeBufferPivot - bufferPointer.startIndex
     }
     if let offset = maybeOffset {
       return index(startIndex, offsetBy: offset)

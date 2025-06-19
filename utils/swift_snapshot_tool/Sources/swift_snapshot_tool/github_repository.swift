@@ -43,6 +43,16 @@ enum Platform: String, EnumerableFlag {
 
 enum Branch: String, EnumerableFlag {
   case development
-  case release50 = "5.0"
-  case release60 = "6.0"
+  case release_5_0 = "5.0"
+  case release_6_0 = "6.0"
+  case release_6_2 = "6.2"
+
+  var tagPrefix: String {
+    switch self {
+    case .development:
+       "swift-\(rawValue.uppercased())"
+    default:
+       "swift-\(rawValue.uppercased())-DEVELOPMENT"
+    }
+  }
 }

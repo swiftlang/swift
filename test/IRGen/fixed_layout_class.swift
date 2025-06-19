@@ -12,7 +12,7 @@ import fixed_layout_class
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s16class_resilience20useRootClassPropertyyy013fixed_layout_A0026OutsideParentWithResilientF0CF"(ptr %0)
 public func useRootClassProperty(_ o: OutsideParentWithResilientProperty) {
-  // CHECK: getelementptr inbounds %T18fixed_layout_class34OutsideParentWithResilientPropertyC, ptr %0, i32 0, i32 1
+  // CHECK: getelementptr inbounds{{.*}} %T18fixed_layout_class34OutsideParentWithResilientPropertyC, ptr %0, i32 0, i32 1
   let a = o.p
   // CHECK: load [[INT]], ptr @"$s18fixed_layout_class34OutsideParentWithResilientPropertyC1s16resilient_struct4SizeVvpWvd"
   let b = o.s
@@ -23,9 +23,9 @@ public func useRootClassProperty(_ o: OutsideParentWithResilientProperty) {
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s16class_resilience19useSubclassPropertyyy013fixed_layout_A012OutsideChildCF"(ptr %0)
 public func useSubclassProperty(_ o: OutsideChild) {
-  // CHECK: getelementptr inbounds %T18fixed_layout_class13OutsideParentC, ptr {{%[0-9]+}}, i32 0, i32 1
+  // CHECK: getelementptr inbounds{{.*}} %T18fixed_layout_class13OutsideParentC, ptr {{%[0-9]+}}, i32 0, i32 1
   let a = o.property
-  // CHECK: getelementptr inbounds %T18fixed_layout_class12OutsideChildC, ptr %0, i32 0, i32 2
+  // CHECK: getelementptr inbounds{{.*}} %T18fixed_layout_class12OutsideChildC, ptr %0, i32 0, i32 2
   let b = o.childProperty
   // CHECK: ret void
 }
@@ -51,7 +51,7 @@ public func useGenericRootClassProperty<A>(_ o: GenericOutsideParent<A>) {
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s16class_resilience27useGenericRootClassPropertyyy013fixed_layout_A00D13OutsideParentCySiGF"(ptr %0)
 public func useGenericRootClassProperty(_ o: GenericOutsideParent<Int>) {
-  // CHECK: getelementptr inbounds %T18fixed_layout_class20GenericOutsideParentCySiG, ptr %0, i32 0, i32 1
+  // CHECK: getelementptr inbounds{{.*}} %T18fixed_layout_class20GenericOutsideParentCySiG, ptr %0, i32 0, i32 1
   let a = o.property
 
   // CHECK: ret void
@@ -87,10 +87,10 @@ public func useGenericSubclassProperty<A>(_ o: GenericOutsideChild<A>) {
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s16class_resilience26useGenericSubclassPropertyyy013fixed_layout_A00D12OutsideChildCySiGF"(ptr %0)
 public func useGenericSubclassProperty(_ o: GenericOutsideChild<Int>) {
-  // CHECK: getelementptr inbounds %T18fixed_layout_class20GenericOutsideParentCySiG, ptr %0, i32 0, i32 1
+  // CHECK: getelementptr inbounds{{.*}} %T18fixed_layout_class20GenericOutsideParentCySiG, ptr %0, i32 0, i32 1
   let a = o.property
 
-  // CHECK: getelementptr inbounds %T18fixed_layout_class19GenericOutsideChildCySiG, ptr %0, i32 0, i32 2
+  // CHECK: getelementptr inbounds{{.*}} %T18fixed_layout_class19GenericOutsideChildCySiG, ptr %0, i32 0, i32 2
   let b = o.childProperty
 
   // CHECK: ret void

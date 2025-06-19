@@ -137,3 +137,24 @@ _ = { @MainActor @concurrent in
 _ = { @concurrent () -> Int in
   // expected-error@-1 {{@concurrent on non-async closure}}
 }
+
+// Make sure that explicit use of `@concurrent` doesn't interfere with inference of `throws` from the body.
+do {
+    func acceptsThrowing(_ body: () async throws -> Void) async {
+    }
+
+  struct Invocation {
+    func throwingFn() async throws {
+    }
+  }
+
+  func test(invocation: Invocation) async {
+    await acceptsThrowing({ @concurrent in try await invocation.throwingFn() }) // Ok
+    await acceptsThrowing({ @concurrent [invocation] in try await invocation.throwingFn() }) // Ok
+
+    await acceptsThrowing({ @concurrent in // Ok
+      _ = 42
+      try await invocation.throwingFn()
+    })
+  }
+}

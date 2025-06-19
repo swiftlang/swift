@@ -1,5 +1,7 @@
 # Unsafe mutable global and static variables
 
+Mutable global and static variables that can be accessed from anywhere can cause data races in your program. Resolve this error by making the state immutable or protecting it with a global actor.
+
 Concurrency checking prohibits mutable global and static variables that are `nonisolated` because they can be accessed from arbitrary concurrency domains at once and lead to data races.
 
 For example:

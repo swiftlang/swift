@@ -23,7 +23,7 @@
 // CHECK-arm64e: call i64 @llvm.ptrauth.blend
 // CHECK-arm64e: [[VWT:%.*]] = inttoptr i64 {{%.*}} to ptr
 //   Allocate 'copy'.
-// CHECK: [[SIZE_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[VWT]], i32 0, i32 8
+// CHECK: [[SIZE_ADDR:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[VWT]], i32 0, i32 8
 // CHECK: [[SIZE:%.*]] = load [[INT]], ptr [[SIZE_ADDR]]
 // CHECK: [[ALLOCA:%.*]] = alloca i8, [[INT]] [[SIZE]],
 //   Perform 'initializeWithCopy' via the VWT instead of trying to inline it.

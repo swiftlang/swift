@@ -1385,7 +1385,7 @@ static bool hasConversions(Type type) {
     return true;
 
   if (auto *structTy = type->getAs<BoundGenericStructType>()) {
-    if (auto eltTy = structTy->isArrayType()) {
+    if (auto eltTy = structTy->getArrayElementType()) {
       return hasConversions(eltTy);
     } else if (auto pair = ConstraintSystem::isDictionaryType(structTy)) {
       return hasConversions(pair->second);

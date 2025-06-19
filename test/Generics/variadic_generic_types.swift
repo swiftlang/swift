@@ -116,3 +116,16 @@ func packExpansionInScalarArgument<each T>(_: repeat each T) {
   typealias A<U> = U
   typealias One = A<repeat each T> // expected-error {{pack expansion 'repeat each T' can only appear in a function parameter list, tuple element, or generic argument of a variadic type}}
 }
+
+// Make sure we diagnose instead of silently dropping the same-type requirement
+// https://github.com/apple/swift/issues/70432
+
+struct WithPack<each T> {}
+
+// FIXME: The diagnostics are misleading.
+
+extension WithPack<Int, Int> {}
+// expected-error@-1 {{same-element requirements are not yet supported}}
+
+extension WithPack where (repeat each T) == (Int, Int) {}
+// expected-error@-1 {{generic signature requires types '(repeat each T)' and '(Int, Int)' to be the same}}

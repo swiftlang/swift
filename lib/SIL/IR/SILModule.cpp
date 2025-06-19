@@ -240,14 +240,28 @@ void SILModule::flushDeletedInsts() {
 
 SILWitnessTable *
 SILModule::lookUpWitnessTable(const ProtocolConformance *C) {
+  // First try to lookup a specialized witness table for that conformance.
+  if (auto *wt = lookUpWitnessTable(C, /*isSpecialized=*/true)) {
+    return wt;
+  }
+  return lookUpWitnessTable(C, /*isSpecialized=*/false);
+}
+
+SILWitnessTable *
+SILModule::lookUpWitnessTable(const ProtocolConformance *C, bool isSpecialized) {
   assert(C && "null conformance passed to lookUpWitnessTable");
 
-  // Attempt to lookup the witness table from the table.
-  auto found = WitnessTableMap.find(C);
-  if (found == WitnessTableMap.end())
-    return nullptr;
-
-  return found->second;
+  if (isSpecialized) {
+    // First try to lookup a specialized witness table for that conformance.
+    auto foundSpec = specializedWitnessTableMap.find(C);
+    if (foundSpec != specializedWitnessTableMap.end())
+      return foundSpec->second;
+  } else if (auto *rootConf = dyn_cast<RootProtocolConformance>(C)) {
+    auto found = WitnessTableMap.find(rootConf);
+    if (found != WitnessTableMap.end())
+      return found->second;
+  }
+  return nullptr;
 }
 
 SILDefaultWitnessTable *
@@ -287,7 +301,9 @@ void SILModule::deleteWitnessTable(SILWitnessTable *Wt) {
   auto Conf = Wt->getConformance();
   assert(lookUpWitnessTable(Conf) == Wt);
   getSILLoader()->invalidateWitnessTable(Wt);
-  WitnessTableMap.erase(Conf);
+  specializedWitnessTableMap.erase(Conf);
+  if (auto *rootConf = dyn_cast<RootProtocolConformance>(Conf))
+    WitnessTableMap.erase(rootConf);
   witnessTables.erase(Wt);
 }
 
@@ -579,14 +595,23 @@ SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
     linker.processConformance(C);
   }
   ProtocolConformance *conf = C.getConcrete();
-  if (auto *inheritedC = dyn_cast<InheritedProtocolConformance>(conf))
-    conf = inheritedC->getInheritedConformance();
+  SILWitnessTable *wt = nullptr;
 
-  if (!isa<SpecializedProtocolConformance>(conf) || !lookupInSpecializedWitnessTable) {
-    conf = conf->getRootConformance();
+  if (lookupInSpecializedWitnessTable) {
+    wt = lookUpWitnessTable(conf);
+    if (!wt) {
+      if (auto *inheritedC = dyn_cast<InheritedProtocolConformance>(conf)) {
+        conf = inheritedC->getInheritedConformance();
+        wt = lookUpWitnessTable(conf);
+      }
+      if (!wt && !isa<SpecializedProtocolConformance>(conf)) {
+        conf = conf->getRootConformance();
+        wt = lookUpWitnessTable(conf);
+      }
+    }
+  } else {
+    wt = lookUpWitnessTable(conf->getRootConformance());
   }
-
-  SILWitnessTable *wt = lookUpWitnessTable(conf);
 
   if (!wt) {
     LLVM_DEBUG(llvm::dbgs() << "        Failed speculative lookup of "
@@ -814,14 +839,15 @@ void SILModule::notifyAddedInstruction(SILInstruction *inst) {
     SILValue &val = RootLocalArchetypeDefs[{genericEnv, inst->getFunction()}];
     if (val) {
       if (!isa<PlaceholderValue>(val)) {
-        // Print a useful error message (and not just abort with an assert).
-        llvm::errs() << "re-definition of local environment in function "
-                     << inst->getFunction()->getName() << ":\n";
-        inst->print(llvm::errs());
-        llvm::errs() << "previously defined in function "
-                     << val->getFunction()->getName() << ":\n";
-        val->print(llvm::errs());
-        abort();
+        ABORT([&](auto &out) {
+          // Print a useful error message (and not just abort with an assert).
+          out << "re-definition of local environment in function "
+              << inst->getFunction()->getName() << ":\n";
+          inst->print(out);
+          out << "previously defined in function "
+              << val->getFunction()->getName() << ":\n";
+          val->print(out);
+        });
       }
       // The local environment was unresolved so far. Replace the placeholder
       // by inst.

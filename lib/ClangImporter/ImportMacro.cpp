@@ -20,6 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
@@ -31,6 +32,7 @@
 #include "clang/Lex/MacroInfo.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Sema/DelayedDiagnostic.h"
+#include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
 #include "clang/StaticAnalyzer/Core/PathSensitive/APSIntType.h"
 #include "llvm/ADT/SmallString.h"
@@ -371,6 +373,110 @@ getIntegerConstantForMacroToken(ClangImporter::Implementation &impl,
   return std::nullopt;
 }
 
+namespace {
+ValueDecl *importDeclAlias(ClangImporter::Implementation &clang,
+                           swift::DeclContext *DC, const clang::ValueDecl *D,
+                           Identifier alias) {
+  if (DC->getASTContext().LangOpts.Target.isOSDarwin() &&
+      DC->getParentModule()->getName().str() == StringRef("_stdio") &&
+      llvm::any_of(llvm::ArrayRef<StringRef>{"stdin", "stdout", "stderr"},
+                   [alias = alias.str()](StringRef Id) { return alias == Id; }))
+    return nullptr;
+
+  // Variadic functions cannot be imported into Swift.
+  // FIXME(compnerd) emit a diagnostic for the missing diagnostic.
+  if (const auto *FD = dyn_cast<clang::FunctionDecl>(D))
+    if (FD->isVariadic())
+      return nullptr;
+
+  // Ignore self-referential macros.
+  if (D->getName() == alias.str())
+    return nullptr;
+
+  swift::ValueDecl *VD =
+      dyn_cast_or_null<ValueDecl>(clang.importDecl(D, clang.CurrentVersion));
+  if (VD == nullptr)
+    return nullptr;
+
+  // If the imported decl is named identically, avoid the aliasing.
+  if (VD->getBaseIdentifier().str() == alias.str())
+    return nullptr;
+
+  swift::ASTContext &Ctx = DC->getASTContext();
+  ImportedType Ty =
+      clang.importType(D->getType(), ImportTypeKind::Abstract,
+                       [&clang, &D](Diagnostic &&Diag) {
+                         clang.addImportDiagnostic(D, std::move(Diag),
+                                                   D->getLocation());
+                       }, /*AllowsNSUIntegerAsInt*/true,
+                       Bridgeability::None, { });
+  swift::Type GetterTy = FunctionType::get({}, Ty.getType(), ASTExtInfo{});
+  swift::Type SetterTy =
+      FunctionType::get({AnyFunctionType::Param(Ty.getType())},
+                        Ctx.TheEmptyTupleType, ASTExtInfo{});
+
+  /* Storage */
+  swift::VarDecl *V =
+      new (Ctx) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Var,
+                        SourceLoc(), alias, DC);
+  V->setAccess(swift::AccessLevel::Public);
+  V->setInterfaceType(Ty.getType());
+  V->getAttrs().add(new (Ctx) TransparentAttr(/*Implicit*/true));
+  V->getAttrs().add(new (Ctx) InlineAttr(InlineKind::Always));
+
+  /* Accessor */
+  swift::AccessorDecl *G = nullptr;
+  {
+    G = AccessorDecl::createImplicit(Ctx, AccessorKind::Get, V, false, false,
+                                     TypeLoc(), GetterTy, DC);
+    G->setAccess(swift::AccessLevel::Public);
+    G->setInterfaceType(GetterTy);
+    G->setIsTransparent(true);
+    G->setParameters(ParameterList::createEmpty(Ctx));
+
+    DeclRefExpr *DRE =
+        new (Ctx) DeclRefExpr(ConcreteDeclRef(VD), {}, /*Implicit*/true,
+                              AccessSemantics::Ordinary, Ty.getType());
+    ReturnStmt *RS = ReturnStmt::createImplicit(Ctx, DRE);
+
+    G->setBody(BraceStmt::createImplicit(Ctx, {RS}),
+               AbstractFunctionDecl::BodyKind::TypeChecked);
+  }
+
+  swift::AccessorDecl *S = nullptr;
+  if (isa<clang::VarDecl>(D) &&
+      !cast<clang::VarDecl>(D)->getType().isConstQualified()) {
+    S = AccessorDecl::createImplicit(Ctx, AccessorKind::Set, V, false, false,
+                                     TypeLoc(), Ctx.TheEmptyTupleType, DC);
+    S->setAccess(swift::AccessLevel::Public);
+    S->setInterfaceType(SetterTy);
+    S->setIsTransparent(true);
+    S->setParameters(ParameterList::create(Ctx, {
+      ParamDecl::createImplicit(Ctx, Identifier(), Ctx.getIdentifier("newValue"),
+                                Ty.getType(), DC)
+    }));
+
+    DeclRefExpr *LHS =
+        new (Ctx) DeclRefExpr(ConcreteDeclRef(VD), {}, /*Implicit*/true,
+                              AccessSemantics::Ordinary, Ty.getType());
+    DeclRefExpr *RHS =
+        new (Ctx) DeclRefExpr(S->getParameters()->get(0), {}, /*Implicit*/true,
+                              AccessSemantics::Ordinary, Ty.getType());
+    AssignExpr *AE = new (Ctx) AssignExpr(LHS, SourceLoc(), RHS, true);
+    AE->setType(Ctx.TheEmptyTupleType);
+    S->setBody(BraceStmt::createImplicit(Ctx, {AE}),
+               AbstractFunctionDecl::BodyKind::TypeChecked);
+  }
+
+  /* Bind */
+  V->setImplInfo(S ? StorageImplInfo::getMutableComputed()
+                   : StorageImplInfo::getImmutableComputed());
+  V->setAccessors(SourceLoc(), S ? ArrayRef{G,S} : ArrayRef{G}, SourceLoc());
+
+  return V;
+}
+}
+
 static ValueDecl *importMacro(ClangImporter::Implementation &impl,
                               llvm::SmallSet<StringRef, 4> &visitedMacros,
                               DeclContext *DC, Identifier name,
@@ -509,7 +615,14 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
         }
       }
 
-      // FIXME: If the identifier refers to a declaration, alias it?
+      /* Create an alias for any Decl */
+      clang::Sema &S = impl.getClangSema();
+      clang::LookupResult R(S, {{tok.getIdentifierInfo()}, {}},
+                            clang::Sema::LookupAnyName);
+      if (S.LookupName(R, S.TUScope))
+        if (R.getResultKind() == clang::LookupResult::LookupResultKind::Found)
+          if (const auto *VD = dyn_cast<clang::ValueDecl>(R.getFoundDecl()))
+            return importDeclAlias(impl, DC, VD, name);
     }
 
     // TODO(https://github.com/apple/swift/issues/57735): Seems rare to have a single token that is neither a literal nor an identifier, but add diagnosis.

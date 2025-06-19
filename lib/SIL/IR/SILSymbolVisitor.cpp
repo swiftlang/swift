@@ -472,7 +472,7 @@ public:
 
   void visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
     // Add exported prespecialized symbols.
-    for (auto *attr : AFD->getAttrs().getAttributes<SpecializeAttr>()) {
+    for (auto *attr : AFD->getAttrs().getAttributes<AbstractSpecializeAttr>()) {
       if (!attr->isExported())
         continue;
 
@@ -569,7 +569,7 @@ public:
 
   void visitAbstractStorageDecl(AbstractStorageDecl *ASD) {
     // Add the property descriptor if the decl needs it.
-    if (ASD->exportsPropertyDescriptor()) {
+    if (ASD->getPropertyDescriptorGenericSignature()) {
       Visitor.addPropertyDescriptor(ASD);
     }
 
@@ -804,6 +804,7 @@ public:
     case DeclKind::PostfixOperator:
     case DeclKind::Macro:
     case DeclKind::MacroExpansion:
+    case DeclKind::Using:
       return false;
     case DeclKind::Missing:
       llvm_unreachable("missing decl should not show up here");
@@ -835,7 +836,6 @@ public:
                   V.Ctx.getOpts().WitnessMethodElimination} {}
 
         void addMethod(SILDeclRef declRef) {
-          // TODO: alternatively maybe prevent adding distributed thunk here rather than inside those?
           if (Resilient || WitnessMethodElimination) {
             Visitor.addDispatchThunk(declRef);
             Visitor.addMethodDescriptor(declRef);
@@ -917,6 +917,7 @@ public:
   UNINTERESTING_DECL(PrecedenceGroup)
   UNINTERESTING_DECL(TopLevelCode)
   UNINTERESTING_DECL(Value)
+  UNINTERESTING_DECL(Using)
 
 #undef UNINTERESTING_DECL
 };

@@ -106,7 +106,7 @@ struct _RuntimeFunctionCounters {
   public static let runtimeFunctionNames =
     getRuntimeFunctionNames()
   public static let runtimeFunctionCountersOffsets =
-    unsafe _RuntimeFunctionCounters.getRuntimeFunctionCountersOffsets()
+    _RuntimeFunctionCounters.getRuntimeFunctionCountersOffsets()
   public static let numRuntimeFunctionCounters =
     Int(_RuntimeFunctionCounters.getNumRuntimeFunctionCounters())
   public static let runtimeFunctionNameToIndex: [String: Int] =
@@ -119,7 +119,7 @@ struct _RuntimeFunctionCounters {
     UnsafePointer<UnsafePointer<CChar>>
 
   public static func getRuntimeFunctionNames() -> [String] {
-    let names = unsafe _RuntimeFunctionCounters._getRuntimeFunctionNames()
+    let names = _RuntimeFunctionCounters._getRuntimeFunctionNames()
     let numRuntimeFunctionCounters =
       Int(_RuntimeFunctionCounters.getNumRuntimeFunctionCounters())
     var functionNames: [String] = []
@@ -504,7 +504,7 @@ public // @testable
 func _collectReferencesInsideObject(_ value: Any) -> [UnsafeRawPointer] {
   let savedMode = _RuntimeFunctionCounters.disableRuntimeFunctionCountersUpdates()
   // Collect all references inside the object
-  let refs = unsafe _RuntimeFunctionCounters.collectAllReferencesInsideObject(value)
+  let refs = _RuntimeFunctionCounters.collectAllReferencesInsideObject(value)
   _RuntimeFunctionCounters.enableRuntimeFunctionCountersUpdates(mode: savedMode)
   return unsafe refs
 }

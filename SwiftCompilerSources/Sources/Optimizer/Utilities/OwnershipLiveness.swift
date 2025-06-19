@@ -84,7 +84,7 @@ func computeKnownLiveness(for definingValue: Value, visitInnerUses: Bool = false
                                         visitInnerUses: visitInnerUses, context).acquireRange
 }
 
-/// If any interior pointer may escape, then record the first instance here. If 'ignoseEscape' is true, this
+/// If any interior pointer may escape, then record the first instance here. If 'ignoreEscape' is true, this
 /// immediately aborts the walk, so further instances are unavailable.
 ///
 /// .escaping may either be a non-address operand with
@@ -685,7 +685,7 @@ extension InteriorUseWalker: AddressUseVisitor {
       if handleInner(borrowed: ba) == .abortWalk {
         return .abortWalk
       }
-      return ba.endOperands.walk { useVisitor($0) }
+      return ba.scopeEndingOperands.walk { useVisitor($0) }
     case let ba as BeginApplyInst:
       if handleInner(borrowed: ba.token) == .abortWalk {
         return .abortWalk

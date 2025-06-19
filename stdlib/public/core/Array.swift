@@ -355,6 +355,17 @@ extension Array {
     }
   }
 
+#if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
+  @inlinable
+  @_semantics("array.make_mutable")
+  @_effects(notEscaping self.**)
+  internal mutating func _makeMutableAndUniqueUnchecked() {
+    if _slowPath(!_buffer.beginCOWMutationUnchecked()) {
+      _buffer = _buffer._consumeAndCreateNew()
+    }
+  }
+#endif
+
   /// Marks the end of an Array mutation.
   ///
   /// After a call to `_endMutation` the buffer must not be mutated until a call
@@ -951,6 +962,7 @@ extension Array: RangeReplaceableCollection {
   /// Entry point for `Array` literal construction; builds and returns
   /// an Array of `count` uninitialized elements.
   @inlinable
+  @unsafe
   @_semantics("array.uninitialized")
   internal static func _allocateUninitialized(
     _ count: Int
@@ -966,6 +978,7 @@ extension Array: RangeReplaceableCollection {
   ///
   /// - Precondition: `storage is _ContiguousArrayStorage`.
   @inlinable
+  @unsafe
   @_semantics("array.uninitialized")
   @_effects(escaping storage => return.0.value**)
   @_effects(escaping storage.class*.value** => return.0.value**.class*.value**)
@@ -1735,10 +1748,15 @@ extension Array {
     @lifetime(&self)
     @_alwaysEmitIntoClient
     mutating get {
+      // _makeMutableAndUnique*() inserts begin_cow_mutation.
+      // LifetimeDependence analysis inserts call to end_cow_mutation_addr since we cannot schedule it in the stdlib for mutableSpan property.
+#if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
+      // We have runtime verification to check if begin_cow_mutation/end_cow_mutation are properly nested in asserts build of stdlib,
+      // disable checking whenever it is turned on since the compiler generated `end_cow_mutation_addr` is conservative and cannot be verified.
+      _makeMutableAndUniqueUnchecked()
+#else
       _makeMutableAndUnique()
-      // NOTE: We don't have the ability to schedule a call to
-      //       ContiguousArrayBuffer.endCOWMutation().
-      //       rdar://146785284 (lifetime analysis for end of mutation)
+#endif
       let pointer = unsafe _buffer.firstElementAddress
       let count = _buffer.mutableCount
       let span = unsafe MutableSpan(_unsafeStart: pointer, count: count)

@@ -37,7 +37,8 @@ struct ClangBuildArgsProvider {
                           (output: AbsolutePath?, args: [Command.Argument])] = [:]
     for command in parsed {
       guard command.command.executable.knownCommand == .clang,
-            let relFilePath = command.file.removingPrefix(repoPath)
+            command.file.exists,
+            let relFilePath = command.file.realPath.removingPrefix(repoPath)
       else {
         continue
       }
@@ -50,17 +51,24 @@ struct ClangBuildArgsProvider {
       commandsToAdd[relFilePath] = (output, command.command.args)
     }
     for (path, (output, commandArgs)) in commandsToAdd {
-      // Only include arguments that have known flags.
-      args.insert(commandArgs.filter({ $0.flag != nil }), for: path)
+      let commandArgs = commandArgs.filter { arg in
+        // Only include arguments that have known flags.
+        // Ignore `-fdiagnostics-color`, we don't want ANSI escape sequences
+        // in Xcode build logs.
+        guard let flag = arg.flag, flag != .fDiagnosticsColor else {
+          return false
+        }
+        return true
+      }
+      args.insert(commandArgs, for: path)
       outputs[path] = output
     }
   }
 
   /// Retrieve the arguments at a given path, including those in the parent.
   func getArgs(for path: RelativePath) -> BuildArgs {
-    // Sort the arguments to get a deterministic ordering.
     // FIXME: We ought to get the command from the arg tree.
-    .init(for: .clang, args: args.getArgs(for: path).sorted())
+    .init(for: .clang, args: args.getArgs(for: path))
   }
 
   /// Retrieve the arguments at a given path, excluding those already covered
@@ -68,7 +76,7 @@ struct ClangBuildArgsProvider {
   func getUniqueArgs(
     for path: RelativePath, parent: RelativePath, infer: Bool = false
   ) -> BuildArgs {
-    var fileArgs: Set<Command.Argument> = []
+    var fileArgs: [Command.Argument] = []
     if hasBuildArgs(for: path) {
       fileArgs = args.getUniqueArgs(for: path, parent: parent)
     } else if infer {
@@ -78,14 +86,8 @@ struct ClangBuildArgsProvider {
         fileArgs = args.getUniqueArgs(for: component, parent: parent)
       }
     }
-    // Sort the arguments to get a deterministic ordering.
     // FIXME: We ought to get the command from the arg tree.
-    return .init(for: .clang, args: fileArgs.sorted())
-  }
-
-  /// Whether the given path has any unique args not covered by `parent`.
-  func hasUniqueArgs(for path: RelativePath, parent: RelativePath) -> Bool {
-    args.hasUniqueArgs(for: path, parent: parent)
+    return .init(for: .clang, args: fileArgs)
   }
 
   /// Whether the given file has build arguments.

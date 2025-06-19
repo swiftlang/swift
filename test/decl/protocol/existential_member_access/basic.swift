@@ -506,8 +506,6 @@ do {
     func invariant11() -> Struct<${type}>.InnerGeneric<Void>
     // https://github.com/apple/swift/issues/61934
     func invariant12() -> any Sequence<${type}>
-    // FIXME
-    // expected-error@+1 {{non-protocol, non-class type 'Sequence<${type}>' cannot be used within a protocol-constrained type}}
     func invariant13() -> any P & Sequence<${type}>
     func invariant14() -> (any Sequence<${type}>).Type
     func invariant15() -> any (P & Class<${type}>).Type

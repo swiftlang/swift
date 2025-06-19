@@ -56,9 +56,10 @@ func readDefinedConstMember() -> CInt {
 }
 
 // CHECK: sil hidden @$s4main22readDefinedConstMembers5Int32VyF : $@convention(thin) () -> Int32
-// CHECK: [[ADDR:%.*]] = global_addr @{{_ZN21WithConstStaticMember7definedE|\?defined@WithConstStaticMember@@2HB}} : $*Int32
-// CHECK: [[VALUE:%.*]] = load [[ADDR]] : $*Int32
-// CHECK: return [[VALUE]] : $Int32
+// CHECK: [[VALUE:%.*]] = integer_literal $Builtin.Int32, 48
+// CHECK: [[STRUCT:%.*]] = struct $Int32 ([[VALUE]] : $Builtin.Int32)
+// CHECK: return [[STRUCT]] : $Int32
+
 func readDefinedOutOfLineConstMember() -> CInt {
   return WithConstStaticMember.definedOutOfLine
 }

@@ -63,6 +63,7 @@ private extension Instruction {
          is BeginAccessInst,
          is EndAccessInst,
          is EndCOWMutationInst,
+         is EndCOWMutationAddrInst,
          is CopyValueInst,
          is DestroyValueInst,
          is StrongReleaseInst,

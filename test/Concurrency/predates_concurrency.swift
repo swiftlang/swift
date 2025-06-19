@@ -27,7 +27,7 @@ struct X {
 
 @MainActor func onMainActor() { }
 
-func testInAsync(x: X, plainClosure: () -> Void) async { // expected-note 2{{parameter 'plainClosure' is implicitly non-sendable}}
+func testInAsync(x: X, plainClosure: () -> Void) async { // expected-note 2{{parameter 'plainClosure' is implicitly non-Sendable}}
   let _: Int = unsafelySendableClosure // expected-error{{type '(@Sendable () -> Void) -> ()'}}
   let _: Int = unsafelyMainActorClosure // expected-error{{type '(@MainActor () -> Void) -> ()'}}
   let _: Int = unsafelyDoEverythingClosure // expected-error{{type '(@MainActor @Sendable () -> Void) -> ()'}}
@@ -41,9 +41,9 @@ func testInAsync(x: X, plainClosure: () -> Void) async { // expected-note 2{{par
   let _: Int = x[{ onMainActor() }] // expected-error{{type '@Sendable () -> Void'}}
   let _: Int = X[statically: { onMainActor() }] // expected-error{{type '@Sendable () -> Void'}}
 
-  unsafelySendableClosure(plainClosure) // expected-warning {{passing non-sendable parameter 'plainClosure' to function expecting a @Sendable closure}}
+  unsafelySendableClosure(plainClosure) // expected-warning {{passing non-Sendable parameter 'plainClosure' to function expecting a '@Sendable' closure}}
   unsafelyMainActorClosure(plainClosure)
-  unsafelyDoEverythingClosure(plainClosure) // expected-warning {{passing non-sendable parameter 'plainClosure' to function expecting a @Sendable closure}}
+  unsafelyDoEverythingClosure(plainClosure) // expected-warning {{passing non-Sendable parameter 'plainClosure' to function expecting a '@Sendable' closure}}
 }
 
 func testElsewhere(x: X) {
@@ -111,16 +111,13 @@ func testCalls(x: X) {
 }
 
 func testCallsWithAsync() async {
-  onMainActorAlways() // expected-warning{{expression is 'async' but is not marked with 'await'}}
-  // expected-note@-1{{calls to global function 'onMainActorAlways()' from outside of its actor context are implicitly asynchronous}}
+  onMainActorAlways() // expected-warning{{main actor-isolated global function 'onMainActorAlways()' cannot be called from outside of the actor}} {{3-3=await }}
 
   let _: () -> Void = onMainActorAlways // expected-warning {{converting function value of type '@MainActor () -> ()' to '() -> Void' loses global actor 'MainActor'}}
 
-  let c = MyModelClass() // expected-minimal-targeted-warning{{expression is 'async' but is not marked with 'await'}}
-  // expected-minimal-targeted-note@-1{{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
+  let c = MyModelClass() // expected-minimal-targeted-warning{{main actor-isolated initializer 'init()' cannot be called from outside of the actor}} {{11-11=await }}
 
-  c.f() // expected-warning{{expression is 'async' but is not marked with 'await'}}
-  // expected-note@-1{{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+  c.f() // expected-warning{{main actor-isolated instance method 'f()' cannot be called from outside of the actor}} {{3-3=await }}
 }
 
 // ---------------------------------------------------------------------------
@@ -133,25 +130,25 @@ class NS { } // expected-note{{class 'NS' does not conform to the 'Sendable' pro
 // expected-complete-tns-note @-1 2{{class 'NS' does not conform to the 'Sendable' protocol}}
 
 struct S1: P {
-  var ns: NS // expected-complete-tns-warning {{stored property 'ns' of 'Sendable'-conforming struct 'S1' has non-sendable type 'NS'}}
+  var ns: NS // expected-complete-tns-warning {{stored property 'ns' of 'Sendable'-conforming struct 'S1' has non-Sendable type 'NS'}}
 }
 
 struct S2: Q {
-  var ns: NS // expected-complete-tns-warning {{stored property 'ns' of 'Sendable'-conforming struct 'S2' has non-sendable type 'NS'}}
+  var ns: NS // expected-complete-tns-warning {{stored property 'ns' of 'Sendable'-conforming struct 'S2' has non-Sendable type 'NS'}}
 }
 
 struct S3: Q, Sendable {
-  var ns: NS // expected-warning{{stored property 'ns' of 'Sendable'-conforming struct 'S3' has non-sendable type 'NS'}}
+  var ns: NS // expected-warning{{stored property 'ns' of 'Sendable'-conforming struct 'S3' has non-Sendable type 'NS'}}
 }
 
 // ---------------------------------------------------------------------------
 // Historical attribute names do nothing (but are permitted)
 // ---------------------------------------------------------------------------
 func aFailedExperiment(@_unsafeSendable _ body: @escaping () -> Void) { }
-// expected-warning@-1{{'_unsafeSendable' attribute has been removed in favor of @preconcurrency}}
+// expected-warning@-1{{'_unsafeSendable' attribute has been removed in favor of '@preconcurrency'}}
 
 func anothingFailedExperiment(@_unsafeMainActor _ body: @escaping () -> Void) { }
-// expected-warning@-1{{'_unsafeMainActor' attribute has been removed in favor of @preconcurrency}}
+// expected-warning@-1{{'_unsafeMainActor' attribute has been removed in favor of '@preconcurrency'}}
 
 // ---------------------------------------------------------------------------
 // Random bugs
@@ -201,9 +198,9 @@ class C { // expected-complete-tns-note {{'C' does not conform to the 'Sendable'
     func doNext() { // expected-complete-tns-warning {{concurrently-executed local function 'doNext()' must be marked as '@Sendable'}}
       doPreconcurrency {
         self.ev?.scheduleTask(deadline: i, doNext)
-        // expected-complete-tns-warning @-1 {{capture of 'self' with non-sendable type 'C' in a '@Sendable' closure}}
-        // expected-complete-tns-warning @-2 {{converting non-sendable function value to '@Sendable () throws -> ()' may introduce data races}}
-        // expected-complete-tns-warning @-3 {{capture of 'doNext()' with non-sendable type '() -> ()' in a '@Sendable' closure}}
+        // expected-complete-tns-warning @-1 {{capture of 'self' with non-Sendable type 'C' in a '@Sendable' closure}}
+        // expected-complete-tns-warning @-2 {{converting non-Sendable function value to '@Sendable () throws -> ()' may introduce data races}}
+        // expected-complete-tns-warning @-3 {{capture of 'doNext()' with non-Sendable type '() -> ()' in a '@Sendable' closure}}
         // expected-complete-tns-note @-4 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
         return
       }
@@ -356,6 +353,42 @@ do {
       switch kp { // Ok
       case Test.KeyPath.member: break // Ok
       default: break
+      }
+    }
+  }
+}
+
+func testSendableMetatypeDowngrades() {
+  @preconcurrency
+  func acceptsSendableMetatype<T: SendableMetatype>(_: T.Type) {}
+  func acceptsSendableMetatypeStrict<T: SendableMetatype>(_: T.Type) {}
+
+  func test<T>(t: T.Type) { // expected-complete-tns-note 2 {{consider making generic parameter 'T' conform to the 'SendableMetatype' protocol}} {{14-14=: SendableMetatype}}
+    acceptsSendableMetatype(t)
+    // expected-complete-tns-warning@-1 {{type 'T' does not conform to the 'SendableMetatype' protocol}}
+    acceptsSendableMetatypeStrict(t)
+    // expected-complete-tns-warning@-1 {{type 'T' does not conform to the 'SendableMetatype' protocol}}
+  }
+}
+
+do {
+  func test(@_inheritActorContext _: @Sendable () -> Void) async {
+    // expected-warning@-1 {{@_inheritActorContext only applies to '@isolated(any)' parameters or parameters with asynchronous function types; this will be an error in a future Swift language mode}}
+  }
+
+  @MainActor
+  @preconcurrency
+  class Test {
+    struct V {}
+
+    var value: V? // expected-note {{property declared here}}
+
+    func run() async {
+      await test {
+        if let value {
+          // expected-warning@-1 {{main actor-isolated property 'value' can not be referenced from a Sendable closure; this is an error in the Swift 6 language mode}}
+          print(value)
+        }
       }
     }
   }

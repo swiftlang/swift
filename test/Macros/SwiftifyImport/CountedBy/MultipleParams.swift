@@ -6,7 +6,9 @@
 func myFunc(_ ptr: UnsafePointer<CInt>, _ len: CInt, _ ptr2: UnsafePointer<CInt>, _ len2: CInt) {
 }
 
-// CHECK:      @_alwaysEmitIntoClient
+// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
 // CHECK-NEXT: func myFunc(_ ptr: UnsafeBufferPointer<CInt>, _ ptr2: UnsafeBufferPointer<CInt>) {
-// CHECK-NEXT:     return unsafe myFunc(ptr.baseAddress!, CInt(exactly: ptr.count)!, ptr2.baseAddress!, CInt(exactly: ptr2.count)!)
+// CHECK-NEXT:     let len = CInt(exactly: unsafe ptr.count)!
+// CHECK-NEXT:     let len2 = CInt(exactly: unsafe ptr2.count)!
+// CHECK-NEXT:     return unsafe myFunc(ptr.baseAddress!, len, ptr2.baseAddress!, len2)
 // CHECK-NEXT: }

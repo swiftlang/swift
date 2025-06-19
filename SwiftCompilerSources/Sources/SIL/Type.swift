@@ -59,6 +59,8 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     return bridged.isReferenceCounted(function.bridged)
   }
 
+  public var isBox: Bool { bridged.isBox() }
+
   public var isMoveOnly: Bool { bridged.isMoveOnly() }
 
   /// Return true if this type conforms to Escapable.
@@ -78,7 +80,13 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     !isNoEscapeFunction && isEscapable(in: function)
   }
 
-  public var builtinVectorElementType: Type { canonicalType.builtinVectorElementType.silType! }
+  public func builtinVectorElementType(in function: Function) -> Type {
+    canonicalType.builtinVectorElementType.loweredType(in: function)
+  }
+
+  public func builtinFixedArrayElementType(in function: Function, maximallyAbstracted: Bool = false) -> Type {
+    canonicalType.builtinFixedArrayElementType.loweredType(in: function, maximallyAbstracted: maximallyAbstracted)
+  }
 
   public var superClassType: Type? { canonicalType.superClassType?.silType }
 
@@ -108,6 +116,21 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     bridged.getFunctionTypeWithNoEscape(withNoEscape).type
   }
 
+  /// True if a function with this type can be code-generated in Embedded Swift.
+  /// These are basically all non-generic functions. But also certain generic functions are supported:
+  /// Generic function arguments which have a class-bound type are valid in Embedded Swift, because for
+  /// such arguments, no metadata is needed, except the isa-pointer of the class.
+  public var hasValidSignatureForEmbedded: Bool {
+    let genericSignature = invocationGenericSignatureOfFunction
+    for genParam in genericSignature.genericParameters {
+      let mappedParam = genericSignature.mapTypeIntoContext(genParam)
+      if mappedParam.isArchetype && !mappedParam.archetypeRequiresClass {
+        return false
+      }
+    }
+    return true
+  }
+
   //===--------------------------------------------------------------------===//
   //                           Aggregates
   //===--------------------------------------------------------------------===//
@@ -125,10 +148,18 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     return TupleElementArray(type: self)
   }
 
+  public func getBoxFields(in function: Function) -> BoxFieldsArray {
+    precondition(isBox)
+    return BoxFieldsArray(type: self, function: function)
+  }
+
   /// Returns nil if the nominal is a resilient type because in this case the complete list
   /// of fields is not known.
   public func getNominalFields(in function: Function) -> NominalFieldsArray? {
     guard let nominal = nominal, !nominal.isResilient(in: function) else {
+      return nil
+    }
+    if let structDecl = nominal as? StructDecl, structDecl.hasUnreferenceableStorage {
       return nil
     }
     return NominalFieldsArray(type: self, function: function)
@@ -264,6 +295,24 @@ public struct TupleElementArray : RandomAccessCollection, FormattedLikeArray {
 
   public subscript(_ index: Int) -> Type {
     type.bridged.getTupleElementType(index).type
+  }
+}
+
+public struct BoxFieldsArray : RandomAccessCollection, FormattedLikeArray {
+  fileprivate let type: Type
+  fileprivate let function: Function
+
+  public var startIndex: Int { return 0 }
+  public var endIndex: Int { Int(type.bridged.getNumBoxFields()) }
+
+  public subscript(_ index: Int) -> Type {
+    type.bridged.getBoxFieldType(index, function.bridged).type
+  }
+}
+
+extension Type: DiagnosticArgument {
+  public func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void) {
+    rawType._withBridgedDiagnosticArgument(fn)
   }
 }
 

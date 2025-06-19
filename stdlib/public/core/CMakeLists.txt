@@ -57,7 +57,6 @@ split_embedded_sources(
   EMBEDDED CollectionAlgorithms.swift
   EMBEDDED Comparable.swift
   EMBEDDED CompilerProtocols.swift
-  EMBEDDED SwiftSettings.swift
   EMBEDDED Sendable.swift
   EMBEDDED ContiguousArray.swift
   EMBEDDED ContiguouslyStored.swift
@@ -259,7 +258,7 @@ split_embedded_sources(
   OUT_LIST_NORMAL SWIFTLIB_GYB_SOURCES
 
     NORMAL AtomicInt.swift.gyb
-    NORMAL FloatingPointParsing.swift.gyb
+  EMBEDDED FloatingPointParsing.swift.gyb
   EMBEDDED FloatingPointTypes.swift.gyb
   EMBEDDED IntegerTypes.swift.gyb
   EMBEDDED LegacyInt128.swift.gyb
@@ -269,11 +268,21 @@ split_embedded_sources(
   )
 
 if(SWIFT_STDLIB_ENABLE_VECTOR_TYPES)
+  split_embedded_sources(
+    OUT_LIST_EMBEDDED SWIFTLIB_EMBEDDED_VECTOR_GYB_SOURCES
+    OUT_LIST_NORMAL SWIFTLIB_VECTOR_GYB_SOURCES
+    
+    EMBEDDED SIMDIntegerConcreteOperations.swift.gyb
+    EMBEDDED SIMDFloatConcreteOperations.swift.gyb
+    EMBEDDED SIMDMaskConcreteOperations.swift.gyb
+    EMBEDDED SIMDVectorTypes.swift.gyb
+  )
+
   list(APPEND SWIFTLIB_SOURCES SIMDVector.swift)
-  list(APPEND SWIFTLIB_GYB_SOURCES SIMDConcreteOperations.swift.gyb SIMDVectorTypes.swift.gyb)
+  list(APPEND SWIFTLIB_GYB_SOURCES ${SWIFTLIB_VECTOR_GYB_SOURCES})
 
   list(APPEND SWIFTLIB_EMBEDDED_SOURCES SIMDVector.swift)
-  list(APPEND SWIFTLIB_EMBEDDED_GYB_SOURCES SIMDConcreteOperations.swift.gyb SIMDVectorTypes.swift.gyb)
+  list(APPEND SWIFTLIB_EMBEDDED_GYB_SOURCES ${SWIFTLIB_EMBEDDED_VECTOR_GYB_SOURCES})
 endif()
 
 # Freestanding and Linux/Android builds both have failures to resolve.

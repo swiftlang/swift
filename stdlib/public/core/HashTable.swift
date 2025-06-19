@@ -142,7 +142,7 @@ extension _HashTable {
     @inlinable
     @inline(__always)
     internal init(offset: Int) {
-      unsafe self.offset = offset
+      self.offset = offset
     }
 
     @inlinable
@@ -172,7 +172,7 @@ extension _HashTable.Bucket: Equatable {
   @inline(__always)
   internal
   static func == (lhs: _HashTable.Bucket, rhs: _HashTable.Bucket) -> Bool {
-    return unsafe lhs.offset == rhs.offset
+    return lhs.offset == rhs.offset
   }
 }
 
@@ -181,7 +181,7 @@ extension _HashTable.Bucket: Comparable {
   @inline(__always)
   internal
   static func < (lhs: _HashTable.Bucket, rhs: _HashTable.Bucket) -> Bool {
-    return unsafe lhs.offset < rhs.offset
+    return lhs.offset < rhs.offset
   }
 }
 
@@ -199,7 +199,7 @@ extension _HashTable {
     @inlinable
     @inline(__always)
     internal init(bucket: Bucket, age: Int32) {
-      unsafe self.bucket = unsafe bucket
+      unsafe self.bucket = bucket
       unsafe self.age = age
     }
   }
@@ -316,7 +316,7 @@ extension _HashTable {
     var word = word
     while unsafe word < wordCount {
       if let bit = unsafe words[word].minimum {
-        return unsafe Bucket(word: word, bit: bit)
+        return Bucket(word: word, bit: bit)
       }
       word += 1
     }
@@ -326,9 +326,9 @@ extension _HashTable {
   @inlinable
   internal func occupiedBucket(after bucket: Bucket) -> Bucket {
     _internalInvariant(isValid(bucket))
-    let word = unsafe bucket.word
+    let word = bucket.word
     if let bit = unsafe words[word].intersecting(elementsAbove: bucket.bit).minimum {
-      return unsafe Bucket(word: word, bit: bit)
+      return Bucket(word: word, bit: bit)
     }
     return unsafe _firstOccupiedBucket(fromWord: word + 1)
   }
@@ -370,13 +370,13 @@ extension _HashTable {
     _internalInvariant(isValid(bucket))
     // Note that if we have only a single partial word, its out-of-bounds bits
     // are guaranteed to be all set, so the formula below gives correct results.
-    var word = unsafe bucket.word
+    var word = bucket.word
     if let bit =
       unsafe words[word]
         .complement
         .intersecting(elementsBelow: bucket.bit)
         .maximum {
-      return unsafe Bucket(word: word, bit: bit)
+      return Bucket(word: word, bit: bit)
     }
     var wrap = false
     while true {
@@ -387,7 +387,7 @@ extension _HashTable {
         word = unsafe wordCount - 1
       }
       if let bit = unsafe words[word].complement.maximum {
-        return unsafe Bucket(word: word, bit: bit)
+        return Bucket(word: word, bit: bit)
       }
     }
     fatalError()
@@ -398,13 +398,13 @@ extension _HashTable {
     _internalInvariant(isValid(bucket))
     // Note that if we have only a single partial word, its out-of-bounds bits
     // are guaranteed to be all set, so the formula below gives correct results.
-    var word = unsafe bucket.word
+    var word = bucket.word
     if let bit =
       unsafe words[word]
         .complement
         .subtracting(elementsBelow: bucket.bit)
         .minimum {
-      return unsafe Bucket(word: word, bit: bit)
+      return Bucket(word: word, bit: bit)
     }
     var wrap = false
     while true {
@@ -415,7 +415,7 @@ extension _HashTable {
         word = 0
       }
       if let bit = unsafe words[word].complement.minimum {
-        return unsafe Bucket(word: word, bit: bit)
+        return Bucket(word: word, bit: bit)
       }
     }
     fatalError()
@@ -438,7 +438,7 @@ extension _HashTable {
   internal func insertNew(hashValue: Int) -> Bucket {
     let hole = unsafe nextHole(atOrAfter: idealBucket(forHashValue: hashValue))
     unsafe insert(hole)
-    return unsafe hole
+    return hole
   }
 
   /// Insert a new entry for an element at `index`.
@@ -473,7 +473,7 @@ extension _HashTable {
     // If we've put a hole in a chain of contiguous elements, some element after
     // the hole may belong where the new hole is.
 
-    var hole = unsafe bucket
+    var hole = bucket
     var candidate = unsafe self.bucket(wrappedAfter: hole)
 
     guard unsafe _isOccupied(candidate) else {
@@ -489,17 +489,17 @@ extension _HashTable {
     // Relocate out-of-place elements in the chain, repeating until we get to
     // the end of the chain.
     while unsafe _isOccupied(candidate) {
-      let candidateHash = unsafe delegate.hashValue(at: candidate)
+      let candidateHash = delegate.hashValue(at: candidate)
       let ideal = unsafe idealBucket(forHashValue: candidateHash)
 
       // Does this element belong between start and hole?  We need two
       // separate tests depending on whether [start, hole] wraps around the
       // end of the storage.
-      let c0 = unsafe ideal >= start
-      let c1 = unsafe ideal <= hole
-      if unsafe start <= hole ? (c0 && c1) : (c0 || c1) {
-        unsafe delegate.moveEntry(from: candidate, to: hole)
-        unsafe hole = unsafe candidate
+      let c0 = ideal >= start
+      let c1 = ideal <= hole
+      if start <= hole ? (c0 && c1) : (c0 || c1) {
+        delegate.moveEntry(from: candidate, to: hole)
+        hole = candidate
       }
       unsafe candidate = unsafe self.bucket(wrappedAfter: candidate)
     }

@@ -6,7 +6,7 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_LifetimeDependence
 
-sil_stage canonical
+sil_stage raw
 
 import Builtin
 
@@ -90,6 +90,34 @@ entry(%0 : @owned $C):
   destroy_value %move : $C
   %99 = tuple()
   return %99 : $()
+}
+
+sil hidden [ossa] @testRootForTemp : $@convention(thin) () -> () {
+bb0:
+  %varC = alloc_box ${ var C }, var, name "ne"
+  %borrowC = begin_borrow [lexical] [var_decl] %varC
+  %addrC = project_box %borrowC, 0
+
+  %finit = function_ref @getC : $@convention(thin) () -> @owned C
+  %newC = apply %finit() : $@convention(thin) () -> @owned C
+  store %newC to [init] %addrC
+
+  %accessC = begin_access [read] [unknown] %addrC
+  %tempC = load [copy] %accessC
+  end_access %accessC
+  specify_test "lifetime_dependence_root %tempC"
+// CHECK-LABEL: testRootForTemp: lifetime_dependence_root with: %tempC
+// CHECK: Lifetime dependence roots of: {{%.*}} = load [copy] %{{.*}} : $*C
+// CHECK: root: %{{.*}} = begin_access [read] [unknown] %{{.*}} : $*C
+// CHECK-LABEL: end running test 1 of 1 on testRootForTemp: lifetime_dependence_root with: %tempC
+
+  destroy_value %tempC
+
+  end_borrow %borrowC
+  destroy_value %varC
+
+  %99 = tuple ()
+  return %99
 }
 
 sil [ossa] @dependence_scope : $@convention(thin) (@owned C, @owned D, @guaranteed D, @in_guaranteed D, @inout D) -> () {
@@ -224,6 +252,7 @@ bb0(%0 : @guaranteed $NE):
 
 // CHECK-LABEL: dependence_coroutine: lifetime_dependence_use with: %0
 // CHECK: LifetimeDependence uses of: %0 = argument of bb0 : $NE
+// CHECK-NEXT: Leaf use: operand #0 of   destroy_value %{{.*}} : $NE
 // CHECK-NEXT: Leaf use: operand #0 of   %{{.*}} = end_apply %{{.*}} as $()
 // CHECK-NEXT: dependence_coroutine: lifetime_dependence_use with: %0
 sil [ossa] @dependence_coroutine : $@convention(thin) (@guaranteed NE) -> () {

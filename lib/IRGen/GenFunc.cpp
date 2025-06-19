@@ -78,8 +78,10 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/IRGen/Linking.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/Basic/CodeGenOptions.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/Constants.h"
@@ -862,6 +864,40 @@ CanType irgen::getArgumentLoweringType(CanType type, SILParameterInfo paramInfo,
   llvm_unreachable("unhandled convention");
 }
 
+llvm::Constant *irgen::getCoroFrameAllocStubFn(IRGenModule &IGM) {
+  return IGM.getOrCreateHelperFunction(
+    "__swift_coroFrameAllocStub", IGM.Int8PtrTy,
+    {IGM.SizeTy, IGM.Int64Ty},
+    [&](IRGenFunction &IGF) {
+      auto parameters = IGF.collectParameters();
+      auto *size = parameters.claimNext();
+      auto coroAllocPtr = IGF.IGM.getCoroFrameAllocFn();
+      auto coroAllocFn = dyn_cast<llvm::Function>(coroAllocPtr);
+      coroAllocFn->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
+      auto *coroFrameAllocFn = IGF.IGM.getOpaquePtr(coroAllocPtr);
+      auto *nullSwiftCoroFrameAlloc = IGF.Builder.CreateCmp(
+        llvm::CmpInst::Predicate::ICMP_NE, coroFrameAllocFn,
+        llvm::ConstantPointerNull::get(
+            cast<llvm::PointerType>(coroFrameAllocFn->getType())));
+      auto *coroFrameAllocReturn = IGF.createBasicBlock("return-coroFrameAlloc");
+      auto *mallocReturn = IGF.createBasicBlock("return-malloc");
+      IGF.Builder.CreateCondBr(nullSwiftCoroFrameAlloc, coroFrameAllocReturn, mallocReturn);
+
+      IGF.Builder.emitBlock(coroFrameAllocReturn);
+      auto *mallocTypeId = parameters.claimNext();
+      auto *coroFrameAllocCall = IGF.Builder.CreateCall(IGF.IGM.getCoroFrameAllocFunctionPointer(), {size, mallocTypeId});
+      IGF.Builder.CreateRet(coroFrameAllocCall);
+
+      IGF.Builder.emitBlock(mallocReturn);
+      auto *mallocCall = IGF.Builder.CreateCall(IGF.IGM.getMallocFunctionPointer(), {size});
+      IGF.Builder.CreateRet(mallocCall);
+    },
+    /*setIsNoInline=*/false,
+    /*forPrologue=*/false,
+    /*isPerformanceConstraint=*/false,
+    /*optionalLinkageOverride=*/nullptr, llvm::CallingConv::C);
+}
+
 static Size getOffsetOfOpaqueIsolationField(IRGenModule &IGM,
                                       const LoadableTypeInfo &isolationTI) {
   auto offset = IGM.RefCountedStructSize;
@@ -1465,9 +1501,7 @@ public:
     // Call the right 'llvm.coro.id.retcon' variant.
     llvm::Value *buffer = origParams.claimNext();
     llvm::Value *id;
-    if (subIGF.IGM.getOptions().EmitTypeMallocForCoroFrame
-        && !llvm::Triple(subIGF.IGM.Triple).isOSLinux()
-        && !llvm::Triple(subIGF.IGM.Triple).isOSWindows()) {
+    if (subIGF.IGM.getOptions().EmitTypeMallocForCoroFrame) {
       // Use swift_coroFrameAllocStub to emit our allocator.
       auto coroAllocFn = subIGF.IGM.getOpaquePtr(getCoroFrameAllocStubFn(subIGF.IGM));
       auto mallocTypeId = subIGF.getMallocTypeId();
@@ -2717,14 +2751,17 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
     = IGF.getTypeInfoForLowered(blockTy).as<BlockStorageTypeInfo>();
 
   Address headerAddr = storageTL.projectBlockHeader(IGF, storage);
-  
+
   //
   // Initialize the "isa" pointer, which is _NSConcreteStackBlock.
   auto NSConcreteStackBlock =
       IGF.IGM.getModule()->getOrInsertGlobal("_NSConcreteStackBlock",
                                              IGF.IGM.ObjCClassStructTy);
-  ApplyIRLinkage(IRLinkage::ExternalImport)
-      .to(cast<llvm::GlobalVariable>(NSConcreteStackBlock));
+  swift::ClangImporter *CI =
+      static_cast<ClangImporter *>(IGF.IGM.Context.getClangModuleLoader());
+  if (!CI->getCodeGenOpts().StaticClosure)
+    ApplyIRLinkage(IRLinkage::ExternalImport)
+        .to(cast<llvm::GlobalVariable>(NSConcreteStackBlock));
 
   //
   // Set the flags.
@@ -2810,8 +2847,7 @@ void irgen::emitBlockHeader(IRGenFunction &IGF,
                           IGF.Builder.CreateStructGEP(headerAddr, 4, layout));
 }
 
-llvm::Value *
-IRGenFunction::emitAsyncResumeProjectContext(llvm::Value *calleeContext) {
+llvm::Value *IRGenFunction::popAsyncContext(llvm::Value *calleeContext) {
   auto addr = Builder.CreateBitOrPointerCast(calleeContext, IGM.Int8PtrPtrTy);
   Address callerContextAddr(addr, IGM.Int8PtrTy, IGM.getPointerAlignment());
   llvm::Value *callerContext = Builder.CreateLoad(callerContextAddr);
@@ -2820,6 +2856,13 @@ IRGenFunction::emitAsyncResumeProjectContext(llvm::Value *calleeContext) {
         PointerAuthInfo::emit(*this, schema, addr, PointerAuthEntity());
     callerContext = emitPointerAuthAuth(*this, callerContext, authInfo);
   }
+  return callerContext;
+}
+
+llvm::Value *
+IRGenFunction::emitAsyncResumeProjectContext(llvm::Value *calleeContext) {
+  auto  callerContext = popAsyncContext(calleeContext);
+
   // TODO: remove this once all platforms support lowering the intrinsic.
   // At the time of this writing only arm64 supports it.
   if (IGM.TargetInfo.canUseSwiftAsyncContextAddrIntrinsic()) {

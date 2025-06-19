@@ -348,7 +348,7 @@ entry(%K: $*Keymaster):
     return undef : $()
 }
 
-// CHECK: define {{.*}}swiftcc ptr @get_cell_addr(ptr %"Cell<T>", ptr {{.*}} swiftself [[SELF:%.*]])
+// CHECK: define {{.*}}swiftcc ptr @get_cell_addr(ptr %"Cell<T>", ptr {{.*}} swiftself{{.*}} [[SELF:%.*]])
 // CHECK-NEXT:   entry:
 // CHECK-NEXT:     ret ptr [[SELF]]
 sil @get_cell_addr : $@convention(method) <T> (@in_guaranteed Cell<T>) -> UnsafeMutablePointer<T> {
@@ -430,7 +430,7 @@ entry(%0 : $*Cell<T>):
 //===----------------------------------------------------------------------===//
 
 // CHECK-LABEL: define {{.*}} void @"$s10raw_layout18ConcreteMoveAsLikeVwxx"(ptr {{.*}} %object, ptr %ConcreteMoveAsLike)
-// CHECK:         [[OBJ_CELL:%.*]] = getelementptr inbounds %T10raw_layout18ConcreteMoveAsLikeV, ptr %object, i32 0, i32 0
+// CHECK:         [[OBJ_CELL:%.*]] = getelementptr inbounds{{.*}} %T10raw_layout18ConcreteMoveAsLikeV, ptr %object, i32 0, i32 0
 // CHECK:         {{invoke void|invoke ptr|call void|call ptr}} @{{.*}}(ptr [[OBJ_CELL]])
 
 //===----------------------------------------------------------------------===//
@@ -438,8 +438,8 @@ entry(%0 : $*Cell<T>):
 //===----------------------------------------------------------------------===//
 
 // CHECK-LABEL: define {{.*}} ptr @"$s10raw_layout18ConcreteMoveAsLikeVwtk"(ptr {{.*}} %dest, ptr {{.*}} %src, ptr %ConcreteMoveAsLike)
-// CHECK:         [[DEST_CELL:%.*]] = getelementptr inbounds %T10raw_layout18ConcreteMoveAsLikeV, ptr %dest, i32 0, i32 0
-// CHECK:         [[SRC_CELL:%.*]] = getelementptr inbounds %T10raw_layout18ConcreteMoveAsLikeV, ptr %src, i32 0, i32 0
+// CHECK:         [[DEST_CELL:%.*]] = getelementptr inbounds{{.*}} %T10raw_layout18ConcreteMoveAsLikeV, ptr %dest, i32 0, i32 0
+// CHECK:         [[SRC_CELL:%.*]] = getelementptr inbounds{{.*}} %T10raw_layout18ConcreteMoveAsLikeV, ptr %src, i32 0, i32 0
 // CHECK:         {{invoke void|invoke ptr|call ptr}} @{{.*}}(ptr [[DEST_CELL]], ptr [[SRC_CELL]])
 
 //===----------------------------------------------------------------------===//
@@ -447,8 +447,8 @@ entry(%0 : $*Cell<T>):
 //===----------------------------------------------------------------------===//
 
 // CHECK-LABEL: define {{.*}} ptr @"$s10raw_layout18ConcreteMoveAsLikeVwta"(ptr {{.*}} %dest, ptr {{.*}} %src, ptr %ConcreteMoveAsLike)
-// CHECK:         [[DEST_CELL:%.*]] = getelementptr inbounds %T10raw_layout18ConcreteMoveAsLikeV, ptr %dest, i32 0, i32 0
-// CHECK:         [[SRC_CELL:%.*]] = getelementptr inbounds %T10raw_layout18ConcreteMoveAsLikeV, ptr %src, i32 0, i32 0
+// CHECK:         [[DEST_CELL:%.*]] = getelementptr inbounds{{.*}} %T10raw_layout18ConcreteMoveAsLikeV, ptr %dest, i32 0, i32 0
+// CHECK:         [[SRC_CELL:%.*]] = getelementptr inbounds{{.*}} %T10raw_layout18ConcreteMoveAsLikeV, ptr %src, i32 0, i32 0
 // CHECK:         {{invoke void|invoke ptr|call ptr}} @{{.*}}(ptr [[DEST_CELL]], ptr [[SRC_CELL]])
 
 //===----------------------------------------------------------------------===//
@@ -469,7 +469,7 @@ entry(%0 : $*Cell<T>):
 // CHECK:         store {{i64|i32}} [[NEW_I]], ptr [[I_ALLOCA]]
 // CHECK:         [[T_ADDR:%.*]] = getelementptr inbounds ptr, ptr %"SmallVectorOf2MovesAsLike<T>", {{i64|i32}} 2
 // CHECK-NEXT:    [[T:%.*]] = load ptr, ptr [[T_ADDR]]
-// CHECK:         [[STRIDE_GEP:%.*]] = getelementptr inbounds %swift.vwtable, ptr {{%.*}}, i32 0, i32 9
+// CHECK:         [[STRIDE_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr {{%.*}}, i32 0, i32 9
 // CHECK-NEXT:    [[STRIDE:%.*]] = load {{i64|i32}}, ptr [[STRIDE_GEP]]
 // CHECK:         [[OFFSET:%.*]] = mul {{i64|i32}} [[I]], [[STRIDE]]
 // CHECK-NEXT:    [[OBJ_ELT:%.*]] = getelementptr inbounds i8, ptr %object, {{i64|i32}} [[OFFSET]]
@@ -498,7 +498,7 @@ entry(%0 : $*Cell<T>):
 // CHECK:         store {{i64|i32}} [[NEW_I]], ptr [[I_ALLOCA]]
 // CHECK:         [[T_ADDR:%.*]] = getelementptr inbounds ptr, ptr %"SmallVectorOf2MovesAsLike<T>", {{i64|i32}} 2
 // CHECK-NEXT:    [[T:%.*]] = load ptr, ptr [[T_ADDR]]
-// CHECK:         [[STRIDE_GEP:%.*]] = getelementptr inbounds %swift.vwtable, ptr {{%.*}}, i32 0, i32 9
+// CHECK:         [[STRIDE_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr {{%.*}}, i32 0, i32 9
 // CHECK-NEXT:    [[STRIDE:%.*]] = load {{i64|i32}}, ptr [[STRIDE_GEP]]
 // CHECK:         [[OFFSET_0:%.*]] = mul {{i64|i32}} [[I]], [[STRIDE]]
 // CHECK-NEXT:    [[SRC_ELT_0:%.*]] = getelementptr inbounds i8, ptr %src, {{i64|i32}} [[OFFSET_0]]
@@ -528,7 +528,7 @@ entry(%0 : $*Cell<T>):
 // CHECK:         store {{i64|i32}} [[NEW_I]], ptr [[I_ALLOCA]]
 // CHECK:         [[T_ADDR:%.*]] = getelementptr inbounds ptr, ptr %"SmallVectorOf2MovesAsLike<T>", {{i64|i32}} 2
 // CHECK-NEXT:    [[T:%.*]] = load ptr, ptr [[T_ADDR]]
-// CHECK:         [[STRIDE_GEP:%.*]] = getelementptr inbounds %swift.vwtable, ptr {{%.*}}, i32 0, i32 9
+// CHECK:         [[STRIDE_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr {{%.*}}, i32 0, i32 9
 // CHECK-NEXT:    [[STRIDE:%.*]] = load {{i64|i32}}, ptr [[STRIDE_GEP]]
 // CHECK:         [[OFFSET_0:%.*]] = mul {{i64|i32}} [[I]], [[STRIDE]]
 // CHECK-NEXT:    [[SRC_ELT_0:%.*]] = getelementptr inbounds i8, ptr %src, {{i64|i32}} [[OFFSET_0]]
@@ -546,7 +546,7 @@ entry(%0 : $*Cell<T>):
 
 // CHECK-LABEL: define {{.*}} void @"$s10raw_layout30ConcreteSmallVectorMovesAsLikeVwxx"(ptr {{.*}} %object, ptr %ConcreteSmallVectorMovesAsLike)
 // CHECK:         [[I_ALLOCA:%.*]] = alloca {{i64|i32}}
-// CHECK:         [[OBJ_VECTOR:%.*]] = getelementptr inbounds %T10raw_layout30ConcreteSmallVectorMovesAsLikeV, ptr %object, i32 0, i32 0
+// CHECK:         [[OBJ_VECTOR:%.*]] = getelementptr inbounds{{.*}} %T10raw_layout30ConcreteSmallVectorMovesAsLikeV, ptr %object, i32 0, i32 0
 // CHECK:         store {{i64|i32}} 0, ptr [[I_ALLOCA]]
 // CHECK:         br label %[[COND_BR:.*]]
 
@@ -573,8 +573,8 @@ entry(%0 : $*Cell<T>):
 
 // CHECK-LABEL: define {{.*}} ptr @"$s10raw_layout30ConcreteSmallVectorMovesAsLikeVwtk"(ptr {{.*}} %dest, ptr {{.*}} %src, ptr %ConcreteSmallVectorMovesAsLike)
 // CHECK:         [[I_ALLOCA:%.*]] = alloca {{i64|i32}}
-// CHECK:         [[DEST_VECTOR:%.*]] = getelementptr inbounds %T10raw_layout30ConcreteSmallVectorMovesAsLikeV, ptr %dest, i32 0, i32 0
-// CHECK:         [[SRC_VECTOR:%.*]] = getelementptr inbounds %T10raw_layout30ConcreteSmallVectorMovesAsLikeV, ptr %src, i32 0, i32 0
+// CHECK:         [[DEST_VECTOR:%.*]] = getelementptr inbounds{{.*}} %T10raw_layout30ConcreteSmallVectorMovesAsLikeV, ptr %dest, i32 0, i32 0
+// CHECK:         [[SRC_VECTOR:%.*]] = getelementptr inbounds{{.*}} %T10raw_layout30ConcreteSmallVectorMovesAsLikeV, ptr %src, i32 0, i32 0
 // CHECK:         store {{i64|i32}} 0, ptr [[I_ALLOCA]]
 // CHECK:         br label %[[COND_BR:.*]]
 
@@ -602,8 +602,8 @@ entry(%0 : $*Cell<T>):
 
 // CHECK-LABEL: define {{.*}} ptr @"$s10raw_layout30ConcreteSmallVectorMovesAsLikeVwta"(ptr {{.*}} %dest, ptr {{.*}} %src, ptr %ConcreteSmallVectorMovesAsLike)
 // CHECK:         [[I_ALLOCA:%.*]] = alloca {{i64|i32}}
-// CHECK:         [[DEST_VECTOR:%.*]] = getelementptr inbounds %T10raw_layout30ConcreteSmallVectorMovesAsLikeV, ptr %dest, i32 0, i32 0
-// CHECK:         [[SRC_VECTOR:%.*]] = getelementptr inbounds %T10raw_layout30ConcreteSmallVectorMovesAsLikeV, ptr %src, i32 0, i32 0
+// CHECK:         [[DEST_VECTOR:%.*]] = getelementptr inbounds{{.*}} %T10raw_layout30ConcreteSmallVectorMovesAsLikeV, ptr %dest, i32 0, i32 0
+// CHECK:         [[SRC_VECTOR:%.*]] = getelementptr inbounds{{.*}} %T10raw_layout30ConcreteSmallVectorMovesAsLikeV, ptr %src, i32 0, i32 0
 // CHECK:         store {{i64|i32}} 0, ptr [[I_ALLOCA]]
 // CHECK:         br label %[[COND_BR:.*]]
 
@@ -655,7 +655,7 @@ entry(%0 : $*Cell<T>):
 // CHECK:         store {{i64|i32}} [[NEW_I]], ptr [[I_ALLOCA]]
 // CHECK:         [[T_ADDR:%.*]] = getelementptr inbounds ptr, ptr %"VectorMovesAsLike<T, N>", {{i64|i32}} 2
 // CHECK-NEXT:    [[T:%.*]] = load ptr, ptr [[T_ADDR]]
-// CHECK:         [[STRIDE_GEP:%.*]] = getelementptr inbounds %swift.vwtable, ptr {{%.*}}, i32 0, i32 9
+// CHECK:         [[STRIDE_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr {{%.*}}, i32 0, i32 9
 // CHECK-NEXT:    [[STRIDE:%.*]] = load {{i64|i32}}, ptr [[STRIDE_GEP]]
 // CHECK:         [[OFFSET:%.*]] = mul {{i64|i32}} [[I]], [[STRIDE]]
 // CHECK-NEXT:    [[OBJECT:%.*]] = getelementptr inbounds i8, ptr %object, {{i64|i32}} [[OFFSET]]
@@ -687,7 +687,7 @@ entry(%0 : $*Cell<T>):
 // CHECK:         store {{i64|i32}} [[NEW_I]], ptr [[I_ALLOCA]]
 // CHECK:         [[T_ADDR:%.*]] = getelementptr inbounds ptr, ptr %"VectorMovesAsLike<T, N>", {{i64|i32}} 2
 // CHECK-NEXT:    [[T:%.*]] = load ptr, ptr [[T_ADDR]]
-// CHECK:         [[STRIDE_GEP:%.*]] = getelementptr inbounds %swift.vwtable, ptr {{%.*}}, i32 0, i32 9
+// CHECK:         [[STRIDE_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr {{%.*}}, i32 0, i32 9
 // CHECK-NEXT:    [[STRIDE:%.*]] = load {{i64|i32}}, ptr [[STRIDE_GEP]]
 // CHECK:         [[OFFSET_0:%.*]] = mul {{i64|i32}} [[I]], [[STRIDE]]
 // CHECK-NEXT:    [[SRC_ELT_0:%.*]] = getelementptr inbounds i8, ptr %src, {{i64|i32}} [[OFFSET_0]]
@@ -720,7 +720,7 @@ entry(%0 : $*Cell<T>):
 // CHECK:         store {{i64|i32}} [[NEW_I]], ptr [[I_ALLOCA]]
 // CHECK:         [[T_ADDR:%.*]] = getelementptr inbounds ptr, ptr %"VectorMovesAsLike<T, N>", {{i64|i32}} 2
 // CHECK-NEXT:    [[T:%.*]] = load ptr, ptr [[T_ADDR]]
-// CHECK:         [[STRIDE_GEP:%.*]] = getelementptr inbounds %swift.vwtable, ptr {{%.*}}, i32 0, i32 9
+// CHECK:         [[STRIDE_GEP:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr {{%.*}}, i32 0, i32 9
 // CHECK-NEXT:    [[STRIDE:%.*]] = load {{i64|i32}}, ptr [[STRIDE_GEP]]
 // CHECK:         [[OFFSET_0:%.*]] = mul {{i64|i32}} [[I]], [[STRIDE]]
 // CHECK-NEXT:    [[SRC_ELT_0:%.*]] = getelementptr inbounds i8, ptr %src, {{i64|i32}} [[OFFSET_0]]
@@ -738,7 +738,7 @@ entry(%0 : $*Cell<T>):
 
 // CHECK-LABEL: define {{.*}} void @"$s10raw_layout25ConcreteVectorMovesAsLikeVwxx"(ptr {{.*}} %object, ptr %ConcreteVectorMovesAsLike)
 // CHECK:         [[I_ALLOCA:%.*]] = alloca {{i64|i32}}
-// CHECK:         [[OBJ_VECTOR:%.*]] = getelementptr inbounds %T10raw_layout25ConcreteVectorMovesAsLikeV, ptr %object, i32 0, i32 0
+// CHECK:         [[OBJ_VECTOR:%.*]] = getelementptr inbounds{{.*}} %T10raw_layout25ConcreteVectorMovesAsLikeV, ptr %object, i32 0, i32 0
 // CHECK:         store {{i64|i32}} 0, ptr [[I_ALLOCA]]
 // CHECK:         br label %[[COND_BR:.*]]
 
@@ -765,8 +765,8 @@ entry(%0 : $*Cell<T>):
 
 // CHECK-LABEL: define {{.*}} ptr @"$s10raw_layout25ConcreteVectorMovesAsLikeVwtk"(ptr {{.*}} %dest, ptr {{.*}} %src, ptr %ConcreteVectorMovesAsLike)
 // CHECK:         [[I_ALLOCA:%.*]] = alloca {{i64|i32}}
-// CHECK:         [[DEST_VECTOR:%.*]] = getelementptr inbounds %T10raw_layout25ConcreteVectorMovesAsLikeV, ptr %dest, i32 0, i32 0
-// CHECK:         [[SRC_VECTOR:%.*]] = getelementptr inbounds %T10raw_layout25ConcreteVectorMovesAsLikeV, ptr %src, i32 0, i32 0
+// CHECK:         [[DEST_VECTOR:%.*]] = getelementptr inbounds{{.*}} %T10raw_layout25ConcreteVectorMovesAsLikeV, ptr %dest, i32 0, i32 0
+// CHECK:         [[SRC_VECTOR:%.*]] = getelementptr inbounds{{.*}} %T10raw_layout25ConcreteVectorMovesAsLikeV, ptr %src, i32 0, i32 0
 // CHECK:         store {{i64|i32}} 0, ptr [[I_ALLOCA]]
 // CHECK:         br label %[[COND_BR:.*]]
 
@@ -794,8 +794,8 @@ entry(%0 : $*Cell<T>):
 
 // CHECK-LABEL: define {{.*}} ptr @"$s10raw_layout25ConcreteVectorMovesAsLikeVwta"(ptr {{.*}} %dest, ptr {{.*}} %src, ptr %ConcreteVectorMovesAsLike)
 // CHECK:         [[I_ALLOCA:%.*]] = alloca {{i64|i32}}
-// CHECK:         [[DEST_VECTOR:%.*]] = getelementptr inbounds %T10raw_layout25ConcreteVectorMovesAsLikeV, ptr %dest, i32 0, i32 0
-// CHECK:         [[SRC_VECTOR:%.*]] = getelementptr inbounds %T10raw_layout25ConcreteVectorMovesAsLikeV, ptr %src, i32 0, i32 0
+// CHECK:         [[DEST_VECTOR:%.*]] = getelementptr inbounds{{.*}} %T10raw_layout25ConcreteVectorMovesAsLikeV, ptr %dest, i32 0, i32 0
+// CHECK:         [[SRC_VECTOR:%.*]] = getelementptr inbounds{{.*}} %T10raw_layout25ConcreteVectorMovesAsLikeV, ptr %src, i32 0, i32 0
 // CHECK:         store {{i64|i32}} 0, ptr [[I_ALLOCA]]
 // CHECK:         br label %[[COND_BR:.*]]
 

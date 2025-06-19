@@ -23,6 +23,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/Sema/Concurrency.h"
 
 #include <cassert>
@@ -326,6 +327,11 @@ bool diagnoseNonSendableTypesInReference(
 void diagnoseMissingSendableConformance(
     SourceLoc loc, Type type, const DeclContext *fromDC, bool preconcurrency);
 
+/// Produce a diagnostic for a missing conformance to SendableMetatype
+void diagnoseMissingSendableMetatypeConformance(SourceLoc loc, Type type,
+                                                const DeclContext *fromDC,
+                                                bool preconcurrency);
+
 /// If the given nominal type is public and does not explicitly
 /// state whether it conforms to Sendable, provide a diagnostic.
 void diagnoseMissingExplicitSendable(NominalTypeDecl *nominal);
@@ -352,7 +358,7 @@ enum class SendableCheck {
 
   /// Sendable conformance was implied by a protocol that inherits from
   /// Sendable and also predates concurrency.
-  ImpliedByStandardProtocol,
+  ImpliedByPreconcurrencyProtocol,
 
   /// Implicit conformance to Sendable.
   Implicit,
@@ -366,7 +372,7 @@ enum class SendableCheck {
 static inline bool isImplicitSendableCheck(SendableCheck check) {
   switch (check) {
   case SendableCheck::Explicit:
-  case SendableCheck::ImpliedByStandardProtocol:
+  case SendableCheck::ImpliedByPreconcurrencyProtocol:
     return false;
 
   case SendableCheck::Implicit:
@@ -442,6 +448,37 @@ namespace detail {
   struct Identity {
     typedef T type;
   };
+}
+
+/// Diagnose any non-Sendable types that occur within the given type, using
+/// the given diagnostic.
+///
+/// \returns \c true if any errors were produced, \c false if no diagnostics or
+/// only warnings and notes were produced or if a decl contains a sending
+/// parameter or result
+template <typename... DiagArgs>
+bool diagnoseNonSendableTypesWithSendingCheck(
+    ValueDecl *decl, Type type, SendableCheckContext fromContext,
+    Type derivedConformance, SourceLoc typeLoc, SourceLoc diagnoseLoc,
+    Diag<Type, DiagArgs...> diag,
+    typename detail::Identity<DiagArgs>::type... diagArgs) {
+  if (auto param = dyn_cast<ParamDecl>(decl)) {
+    if (param->isSending()) {
+      return false;
+    }
+  }
+  if (auto *func = dyn_cast<FuncDecl>(decl)) {
+    if (func->hasSendingResult())
+      return false;
+  }
+  if (auto *subscript = dyn_cast<SubscriptDecl>(decl)) {
+    if (isa_and_nonnull<SendingTypeRepr>(subscript->getResultTypeRepr()))
+      return false;
+  }
+
+  return diagnoseNonSendableTypes(
+      type, fromContext, derivedConformance, typeLoc, diagnoseLoc, diag,
+      std::forward<decltype(diagArgs)>(diagArgs)...);
 }
 
 /// Diagnose any non-Sendable types that occur within the given type, using
@@ -702,12 +739,22 @@ void introduceUnsafeInheritExecutorReplacements(
 void introduceUnsafeInheritExecutorReplacements(
     const DeclContext *dc, Type base, SourceLoc loc, LookupResult &result);
 
+/// Function that attempts to handle all of the "bad" conformance isolation
+/// found somewhere, and returns true if it handled them. If not, returns
+/// false so that the conformances can be diagnose.
+using HandleConformanceIsolationFn =
+  llvm::function_ref<bool(ArrayRef<ActorIsolation>)>;
+
+/// Function used as a default HandleConformanceIsolationFn.
+bool doNotDiagnoseConformanceIsolation(ArrayRef<ActorIsolation>);
+
 /// Check for correct use of isolated conformances in the given reference.
 ///
 /// This checks that any isolated conformances that occur in the given
 /// declaration reference match the isolated of the context.
 bool checkIsolatedConformancesInContext(
-    ConcreteDeclRef declRef, SourceLoc loc, const DeclContext *dc);
+    ConcreteDeclRef declRef, SourceLoc loc, const DeclContext *dc,
+    HandleConformanceIsolationFn handleBad = doNotDiagnoseConformanceIsolation);
 
 /// Check for correct use of isolated conformances in the set given set of
 /// protocol conformances.
@@ -716,7 +763,8 @@ bool checkIsolatedConformancesInContext(
 /// declaration reference match the isolated of the context.
 bool checkIsolatedConformancesInContext(
     ArrayRef<ProtocolConformanceRef> conformances, SourceLoc loc,
-    const DeclContext *dc);
+    const DeclContext *dc,
+    HandleConformanceIsolationFn handleBad = doNotDiagnoseConformanceIsolation);
 
 /// Check for correct use of isolated conformances in the given substitution
 /// map.
@@ -724,14 +772,23 @@ bool checkIsolatedConformancesInContext(
 /// This checks that any isolated conformances that occur in the given
 /// substitution map match the isolated of the context.
 bool checkIsolatedConformancesInContext(
-    SubstitutionMap subs, SourceLoc loc, const DeclContext *dc);
+    SubstitutionMap subs, SourceLoc loc, const DeclContext *dc,
+    HandleConformanceIsolationFn handleBad = doNotDiagnoseConformanceIsolation);
 
 /// Check for correct use of isolated conformances in the given type.
 ///
 /// This checks that any isolated conformances that occur in the given
 /// type match the isolated of the context.
 bool checkIsolatedConformancesInContext(
-    Type type, SourceLoc loc, const DeclContext *dc);
+    Type type, SourceLoc loc, const DeclContext *dc,
+    HandleConformanceIsolationFn handleBad = doNotDiagnoseConformanceIsolation);
+
+/// For a protocol conformance that does not have a "raw" isolation, infer its isolation.
+///
+/// - hasKnownIsolatedWitness: indicates when it is known that there is an actor-isolated witness, meaning
+///   that this operation will not look at other witnesses to determine if they are all nonisolated.
+ActorIsolation inferConformanceIsolation(
+    NormalProtocolConformance *conformance, bool hasKnownIsolatedWitness);
 
 } // end namespace swift
 

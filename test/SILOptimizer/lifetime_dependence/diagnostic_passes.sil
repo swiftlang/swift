@@ -1,5 +1,5 @@
 // RUN: %target-sil-opt %s \
-// RUN:     -diagnostics -sil-verify-all \
+// RUN:     -diagnostics -sil-verify-all -sil-disable-pass=onone-simplification \
 // RUN:     -enable-experimental-feature LifetimeDependence \
 // RUN:     | %FileCheck %s
 

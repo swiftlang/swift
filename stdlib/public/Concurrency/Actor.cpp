@@ -256,8 +256,6 @@ void swift::runJobInEstablishedExecutorContext(Job *job) {
 #if SWIFT_OBJC_INTEROP
   objc_autoreleasePoolPop(pool);
 #endif
-
-  _swift_tsan_release(job);
 }
 
 void swift::adoptTaskVoucher(AsyncTask *task) {
@@ -410,9 +408,6 @@ static void _swift_task_debug_dumpIsCurrentExecutorFlags(
   if (options.contains(swift_task_is_current_executor_flag::Assert))
     SWIFT_TASK_DEBUG_LOG("%s swift_task_is_current_executor_flag::%s",
                          hint, "Assert");
-  if (options.contains(swift_task_is_current_executor_flag::UseIsIsolatingCurrentContext))
-    SWIFT_TASK_DEBUG_LOG("%s swift_task_is_current_executor_flag::%s",
-                         hint, "UseIsIsolatingCurrentContext");
 }
 
 // Shimming call to Swift runtime because Swift Embedded does not have
@@ -470,13 +465,6 @@ swift_task_is_current_executor_flag swift_bincompat_selectDefaultIsCurrentExecut
       // Remove the assert option which is what would cause the "crash" mode
       options = swift_task_is_current_executor_flag(
         options & ~swift_task_is_current_executor_flag::Assert);
-    } else if (strcmp(modeStr, "isIsolatingCurrentContext") == 0) {
-      options = swift_task_is_current_executor_flag(
-        options | swift_task_is_current_executor_flag::UseIsIsolatingCurrentContext);
-      // When we're using the isIsolatingCurrentContext we don't want to use crashing APIs,
-      // so disable it explicitly.
-      options = swift_task_is_current_executor_flag(
-        options & ~swift_task_is_current_executor_flag::Assert);
     } else if (strcmp(modeStr, "crash") == 0 ||
                strcmp(modeStr, "swift6") == 0) {
       options = swift_task_is_current_executor_flag(
@@ -501,37 +489,11 @@ extern "C" SWIFT_CC(swift) void _swift_task_enqueueOnExecutor(
     Job *job, HeapObject *executor, const Metadata *executorType,
     const SerialExecutorWitnessTable *wtable);
 
-/// Check the executor's witness table for specific information about e.g.
-/// being able ignore `checkIsolated` and only call `isIsolatingCurrentContext`.
-static swift_task_is_current_executor_flag
-_getIsolationCheckingOptionsFromExecutorWitnessTable(const SerialExecutorWitnessTable *_wtable) {
-  const WitnessTable* wtable = reinterpret_cast<const WitnessTable*>(_wtable);
-  auto description = wtable->getDescription();
-  if (!description) {
-    return swift_task_is_current_executor_flag::None;
-  }
-
-  if (description->hasNonDefaultSerialExecutorIsIsolatingCurrentContext()) {
-    // The specific executor has implemented `isIsolatingCurrentContext` and
-    // we do not have to call `checkIsolated`.
-    return swift_task_is_current_executor_flag::UseIsIsolatingCurrentContext;
-  }
-
-  // No changes to the checking mode.
-  return swift_task_is_current_executor_flag::None;
-}
-
 SWIFT_CC(swift)
 static bool swift_task_isCurrentExecutorWithFlagsImpl(
     SerialExecutorRef expectedExecutor,
     swift_task_is_current_executor_flag flags) {
   auto current = ExecutorTrackingInfo::current();
-  if (expectedExecutor.getIdentity() && expectedExecutor.hasSerialExecutorWitnessTable()) {
-    if (auto *wtable = expectedExecutor.getSerialExecutorWitnessTable()) {
-      auto executorSpecificMode = _getIsolationCheckingOptionsFromExecutorWitnessTable(wtable);
-      flags = swift_task_is_current_executor_flag(flags | executorSpecificMode);
-    }
-  }
 
   auto options = SwiftTaskIsCurrentExecutorOptions(flags);
   _swift_task_debug_dumpIsCurrentExecutorFlags(__FUNCTION__, flags);
@@ -551,16 +513,28 @@ static bool swift_task_isCurrentExecutorWithFlagsImpl(
     // We cannot use 'complexEquality' as it requires two executor instances,
     // and we do not have a 'current' executor here.
 
-    if (options.contains(swift_task_is_current_executor_flag::UseIsIsolatingCurrentContext)) {
-      SWIFT_TASK_DEBUG_LOG("executor checking mode option: UseIsIsolatingCurrentContext; invoke (%p).isIsolatingCurrentContext",
-                           expectedExecutor.getIdentity());
-      // The executor has the most recent 'isIsolatingCurrentContext' API
-      // so available so we prefer calling that to 'checkIsolated'.
-      auto result = swift_task_isIsolatingCurrentContext(expectedExecutor);
+    // Invoke the 'isIsolatingCurrentContext', if "undecided" (i.e. nil), we need to make further calls
+    SWIFT_TASK_DEBUG_LOG("executor checking, invoke (%p).isIsolatingCurrentContext",
+                         expectedExecutor.getIdentity());
+    // The executor has the most recent 'isIsolatingCurrentContext' API
+    // so available so we prefer calling that to 'checkIsolated'.
+    auto isIsolatingCurrentContextDecision =
+        getIsIsolatingCurrentContextDecisionFromInt(
+            swift_task_isIsolatingCurrentContext(expectedExecutor));
 
-      SWIFT_TASK_DEBUG_LOG("executor checking mode option: UseIsIsolatingCurrentContext; invoke (%p).isIsolatingCurrentContext => %s",
-                     expectedExecutor.getIdentity(), result ? "pass" : "fail");
-      return result;
+    SWIFT_TASK_DEBUG_LOG("executor checking mode option: UseIsIsolatingCurrentContext; invoke (%p).isIsolatingCurrentContext => %s",
+                   expectedExecutor.getIdentity(), getIsIsolatingCurrentContextDecisionNameStr(isIsolatingCurrentContextDecision));
+    switch (isIsolatingCurrentContextDecision) {
+      case IsIsolatingCurrentContextDecision::Isolated:
+        // We know for sure that this serial executor is isolating this context, return the decision.
+        return true;
+      case IsIsolatingCurrentContextDecision::NotIsolated:
+        // We know for sure that this serial executor is NOT isolating this context, return this decision.
+        return false;
+      case IsIsolatingCurrentContextDecision::Unknown:
+        // We don't know, so we have to continue trying to check using other methods.
+        // This most frequently would happen if a serial executor did not implement isIsolatingCurrentContext.
+        break;
     }
 
     // Otherwise, as last resort, let the expected executor check using
@@ -669,18 +643,21 @@ static bool swift_task_isCurrentExecutorWithFlagsImpl(
 
   // Invoke the 'isIsolatingCurrentContext' function if we can; If so, we can
   // avoid calling the `checkIsolated` because their result will be the same.
-  if (options.contains(swift_task_is_current_executor_flag::UseIsIsolatingCurrentContext)) {
-    SWIFT_TASK_DEBUG_LOG("executor checking: can call (%p).isIsolatingCurrentContext",
-      expectedExecutor.getIdentity());
+  SWIFT_TASK_DEBUG_LOG("executor checking: call (%p).isIsolatingCurrentContext",
+    expectedExecutor.getIdentity());
 
-    bool checkResult = swift_task_isIsolatingCurrentContext(expectedExecutor);
+  const auto isIsolatingCurrentContextDecision =
+    getIsIsolatingCurrentContextDecisionFromInt(swift_task_isIsolatingCurrentContext(expectedExecutor));
 
-    SWIFT_TASK_DEBUG_LOG("executor checking: can call (%p).isIsolatingCurrentContext => %p",
-      expectedExecutor.getIdentity(), checkResult ? "pass" : "fail");
-    return checkResult;
-  } else {
-    SWIFT_TASK_DEBUG_LOG("executor checking: can NOT call (%p).isIsolatingCurrentContext",
-                         expectedExecutor.getIdentity());
+  SWIFT_TASK_DEBUG_LOG("executor checking: can call (%p).isIsolatingCurrentContext => %p",
+    expectedExecutor.getIdentity(), getIsIsolatingCurrentContextDecisionNameStr(isIsolatingCurrentContextDecision));
+  switch (isIsolatingCurrentContextDecision) {
+  case IsIsolatingCurrentContextDecision::Isolated:
+    return true;
+  case IsIsolatingCurrentContextDecision::NotIsolated:
+    return false;
+  case IsIsolatingCurrentContextDecision::Unknown:
+    break;
   }
 
   // This provides a last-resort check by giving the expected SerialExecutor the
@@ -1161,8 +1138,8 @@ public:
 #endif
   }
 
-  Job *getFirstUnprioritisedJob() const { return FirstJob; }
-  ActiveActorStatus withFirstUnprioritisedJob(Job *firstJob) const {
+  Job *getFirstUnprioritizedJob() const { return FirstJob; }
+  ActiveActorStatus withFirstUnprioritizedJob(Job *firstJob) const {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
     return ActiveActorStatus(Flags, DrainLock, firstJob);
 #else
@@ -1207,7 +1184,7 @@ public:
       break;
     }
     concurrency::trace::actor_state_changed(
-        actor, getFirstUnprioritisedJob(), traceState, distributedActorIsRemote,
+        actor, getFirstUnprioritizedJob(), traceState, distributedActorIsRemote,
         isMaxPriorityEscalated(), static_cast<uint8_t>(getMaxPriority()));
   }
 };
@@ -1391,7 +1368,7 @@ public:
   /// new priority
   void enqueueStealer(Job *job, JobPriority priority);
 
-  /// Dequeues one job from `prioritisedJobs`.
+  /// Dequeues one job from `prioritizedJobs`.
   /// The calling thread must be holding the actor lock while calling this
   Job *drainOne();
 
@@ -1580,9 +1557,9 @@ void DefaultActorImpl::enqueue(Job *job, JobPriority priority) {
     auto newState = oldState;
 
     // Link this into the queue in the atomic state
-    Job *currentHead = oldState.getFirstUnprioritisedJob();
+    Job *currentHead = oldState.getFirstUnprioritizedJob();
     setNextJob(job, currentHead);
-    newState = newState.withFirstUnprioritisedJob(job);
+    newState = newState.withFirstUnprioritizedJob(job);
 
     if (oldState.isIdle()) {
       // Schedule the actor
@@ -1763,13 +1740,13 @@ void DefaultActorImpl::processIncomingQueue() {
   while (true) {
     // If there aren't any new jobs in the incoming queue, we can return
     // immediately without updating the status.
-    if (!oldState.getFirstUnprioritisedJob()) {
+    if (!oldState.getFirstUnprioritizedJob()) {
       return;
     }
     assert(oldState.isAnyRunning());
 
     auto newState = oldState;
-    newState = newState.withFirstUnprioritisedJob(nullptr);
+    newState = newState.withFirstUnprioritizedJob(nullptr);
 
     if (_status().compare_exchange_weak(
             oldState, newState,
@@ -1782,7 +1759,7 @@ void DefaultActorImpl::processIncomingQueue() {
     }
   }
 
-  handleUnprioritizedJobs(oldState.getFirstUnprioritisedJob());
+  handleUnprioritizedJobs(oldState.getFirstUnprioritizedJob());
 }
 
 // Called with actor lock held on current thread
@@ -1950,7 +1927,7 @@ void DefaultActorImpl::destroy() {
   // Tasks on an actor are supposed to keep the actor alive until they start
   // running and we can only get here if ref count of the object = 0 which means
   // there should be no more tasks enqueued on the actor.
-  assert(!oldState.getFirstUnprioritisedJob() && "actor has queued jobs at destruction");
+  assert(!oldState.getFirstUnprioritizedJob() && "actor has queued jobs at destruction");
 
   if (oldState.isIdle()) {
     assert(prioritizedJobs.empty() && "actor has queued jobs at destruction");
@@ -2058,7 +2035,7 @@ retry:;
       }
 
       assert(oldState.getMaxPriority() == JobPriority::Unspecified);
-      assert(!oldState.getFirstUnprioritisedJob());
+      assert(!oldState.getFirstUnprioritizedJob());
       // We cannot assert here that prioritizedJobs is empty,
       // because lock is not held yet. Raise a flag to assert after getting the lock.
       assertNoJobs = true;
@@ -2077,7 +2054,7 @@ retry:;
     // check for higher priority jobs that could have been scheduled in the
     // meantime. And processing is more efficient when done in larger batches.
     if (asDrainer) {
-      newState = newState.withFirstUnprioritisedJob(nullptr);
+      newState = newState.withFirstUnprioritizedJob(nullptr);
     }
 
     // This needs an acquire since we are taking a lock
@@ -2090,7 +2067,7 @@ retry:;
       }
       traceActorStateTransition(this, oldState, newState, distributedActorIsRemote);
       if (asDrainer) {
-        handleUnprioritizedJobs(oldState.getFirstUnprioritisedJob());
+        handleUnprioritizedJobs(oldState.getFirstUnprioritizedJob());
       }
       return true;
     }
@@ -2141,7 +2118,7 @@ bool DefaultActorImpl::unlock(bool forceUnlock)
 
     auto newState = oldState;
     // Lock is still held at this point, so it is safe to access prioritizedJobs
-    if (!prioritizedJobs.empty() || oldState.getFirstUnprioritisedJob()) {
+    if (!prioritizedJobs.empty() || oldState.getFirstUnprioritizedJob()) {
       // There is work left to do, don't unlock the actor
       if (!forceUnlock) {
         SWIFT_TASK_DEBUG_LOG("Unlock-ing actor %p failed", this);
@@ -2532,8 +2509,8 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
 
 SWIFT_CC(swift)
 static void
-swift_task_startSynchronouslyImpl(AsyncTask *task,
-                                  SerialExecutorRef targetExecutor) {
+swift_task_immediateImpl(AsyncTask *task,
+                         SerialExecutorRef targetExecutor) {
   swift_retain(task);
   if (targetExecutor.isGeneric()) {
   // If the target is generic, it means that the closure did not specify
@@ -2547,7 +2524,7 @@ swift_task_startSynchronouslyImpl(AsyncTask *task,
   _swift_task_setCurrent(originalTask);
   } else {
     assert(swift_task_isCurrentExecutor(targetExecutor) &&
-           "startSynchronously must only be invoked when it is correctly in "
+           "'immediate' must only be invoked when it is correctly in "
            "the same isolation already, but wasn't!");
 
     // We can run synchronously, we're on the expected executor so running in
@@ -2597,7 +2574,7 @@ static void swift_task_deinitOnExecutorImpl(void *object,
                                             SerialExecutorRef newExecutor,
                                             size_t rawFlags) {
   // Sign the function pointer
-  work = swift_auth_code_function(
+  work = swift_auth_code(
       work, SpecialPointerAuthDiscriminators::DeinitWorkFunction);
   // If the current executor is compatible with running the new executor,
   // we can just immediately continue running with the resume function

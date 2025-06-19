@@ -21,10 +21,8 @@ import POD
 
 // CHECK: [[ACCESS_3:%.*]] = begin_access [read] [unknown] [[BOX]] : $*IntPair
 // CHECK: [[X_2:%.*]] = load [trivial] [[ACCESS_3]] : $*IntPair
-// CHECK: [[TMP:%.*]] = alloc_stack $IntPair
-// CHECK: store [[X_2]] to [trivial] [[TMP]]
-// CHECK: [[TEST_FN:%.*]] = function_ref @{{_ZNK7IntPair4testEv|\?test\@IntPair\@\@QEBAHXZ}} : $@convention(cxx_method) (@in_guaranteed IntPair) -> Int32
-// CHECK: apply [[TEST_FN]]([[TMP]]) : $@convention(cxx_method) (@in_guaranteed IntPair) -> Int32
+// CHECK: [[TEST_FN:%.*]] = function_ref @{{_ZNK7IntPair4testEv|\?test\@IntPair\@\@QEBAHXZ}} : $@convention(cxx_method) (IntPair) -> Int32
+// CHECK: apply [[TEST_FN]]([[X_2]]) : $@convention(cxx_method) (IntPair) -> Int32
 
 // CHECK: return
 // CHECK-LABEL: end sil function '$s4main4testyyF'
@@ -36,4 +34,4 @@ public func test() {
 
 // CHECK-LABEL: sil{{ \[available .*\] | }}[clang IntPair.create] @{{_ZN7IntPair6createEv|\?create\@IntPair\@\@SAPEAU1\@XZ}} : $@convention(c) () -> IntPair
 
-// CHECK-LABEL: sil{{ \[available .*\] | }}[clang IntPair.test] @{{_ZNK7IntPair4testEv|\?test\@IntPair\@\@QEBAHXZ}} : $@convention(cxx_method) (@in_guaranteed IntPair) -> Int32
+// CHECK-LABEL: sil{{ \[available .*\] | }}[clang IntPair.test] @{{_ZNK7IntPair4testEv|\?test\@IntPair\@\@QEBAHXZ}} : $@convention(cxx_method) (IntPair) -> Int32

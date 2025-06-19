@@ -28,17 +28,17 @@ import PrivateStoredMembers
 // CHECK-EXEC: swiftcc void @"$s{{[^ ]+}}8makeUseryyF"() #0 {
 public func makeUser() {
   let ptr = UnsafeMutablePointer<MyStruct>.allocate(capacity: 1)
-  // CHECK-EXEC: %.publicEndVar = getelementptr inbounds [[MYSTRUCT]], ptr %{{[0-9]+}}, i32 0, i32 [[PUBLIC_END_VAR_IDX:12]]
-  // CHECK-EXEC: %.publicEndVar._value = getelementptr inbounds %Ts5Int64V, ptr %.publicEndVar, i32 0, i32 0
+  // CHECK-EXEC: %.publicEndVar = getelementptr inbounds{{.*}} [[MYSTRUCT]], ptr %{{[0-9]+}}, i32 0, i32 [[PUBLIC_END_VAR_IDX:12]]
+  // CHECK-EXEC: %.publicEndVar._value = getelementptr inbounds{{.*}} %Ts5Int64V, ptr %.publicEndVar, i32 0, i32 0
   // CHECK-EXEC: store i64 4, ptr %.publicEndVar._value
   ptr.pointee.publicEndVar = 4
 
-  // CHECK-EXEC: %.publicEndVar1 = getelementptr inbounds [[MYSTRUCT]], ptr %{{[0-9]+}}, i32 0, i32 [[PUBLIC_END_VAR_IDX]]
-  // CHECK-EXEC: %.publicEndVar1._value = getelementptr inbounds %Ts5Int64V, ptr %.publicEndVar1, i32 0, i32 0
+  // CHECK-EXEC: %.publicEndVar1 = getelementptr inbounds{{.*}} [[MYSTRUCT]], ptr %{{[0-9]+}}, i32 0, i32 [[PUBLIC_END_VAR_IDX]]
+  // CHECK-EXEC: %.publicEndVar1._value = getelementptr inbounds{{.*}} %Ts5Int64V, ptr %.publicEndVar1, i32 0, i32 0
   // CHECK-EXEC: [[PUBLIC_END_VAR_LOAD:%[0-9]+]] = load i64, ptr %.publicEndVar1._value, align 8
 
-  // CHECK-EXEC: %.publicVar = getelementptr inbounds [[MYSTRUCT]], ptr %{{[0-9]+}}, i32 0, i32 0
-  // CHECK-EXEC: %.publicVar._value = getelementptr inbounds %Ts5Int64V, ptr %.publicVar, i32 0, i32 0
+  // CHECK-EXEC: %.publicVar = getelementptr inbounds{{.*}} [[MYSTRUCT]], ptr %{{[0-9]+}}, i32 0, i32 0
+  // CHECK-EXEC: %.publicVar._value = getelementptr inbounds{{.*}} %Ts5Int64V, ptr %.publicVar, i32 0, i32 0
   // CHECK-EXEC: store i64 [[PUBLIC_END_VAR_LOAD]], ptr %.publicVar._value, align 8
   ptr.pointee.publicVar = ptr.pointee.publicEndVar
   ptr.deallocate()

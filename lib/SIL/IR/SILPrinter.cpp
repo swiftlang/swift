@@ -332,11 +332,27 @@ void SILDeclRef::print(raw_ostream &OS) const {
     auto *accessor = dyn_cast<AccessorDecl>(getDecl());
     if (!accessor) {
       printValueDecl(getDecl(), OS);
+      if (isDistributed()) {
+        OS << "!distributed";
+        OS << "(" << getDecl() << ")";
+      }
+      if (isDistributedThunk()) {
+        OS << "!distributed_thunk";
+        OS << "(" << getDecl() << ")";
+      }
       isDot = false;
       break;
     }
 
     printValueDecl(accessor->getStorage(), OS);
+    if (isDistributed()) {
+      OS << "!distributed";
+      OS << "(" << getDecl() << ")";
+    }
+    if (isDistributedThunk()) {
+      OS << "!distributed_thunk";
+      OS << "(" << getDecl() << ")";
+    }
     switch (accessor->getAccessorKind()) {
     case AccessorKind::WillSet:
       OS << "!willSet";
@@ -1024,8 +1040,8 @@ public:
 
   //===--------------------------------------------------------------------===//
   // SILInstruction Printing Logic
-  void printCastingIsolatedConformancesIfNeeded(CastingIsolatedConformances flag) {
-    switch (flag) {
+  void printCheckedCastInstOptions(CheckedCastInstOptions options) {
+    switch (options.isolatedConformances()) {
     case CastingIsolatedConformances::Allow:
       break;
 
@@ -2091,13 +2107,13 @@ public:
   }
 
   void visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *CI) {
-    printCastingIsolatedConformancesIfNeeded(CI->getIsolatedConformances());
+    printCheckedCastInstOptions(CI->getCheckedCastOptions());
     *this << getIDAndType(CI->getOperand()) << " to " << CI->getTargetFormalType();
     printForwardingOwnershipKind(CI, CI->getOperand());
   }
   
   void visitCheckedCastBranchInst(CheckedCastBranchInst *CI) {
-    printCastingIsolatedConformancesIfNeeded(CI->getIsolatedConformances());
+    printCheckedCastInstOptions(CI->getCheckedCastOptions());
     if (CI->isExact())
       *this << "[exact] ";
     *this << CI->getSourceFormalType() << " in ";
@@ -2112,14 +2128,14 @@ public:
   }
 
   void visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *CI) {
-    printCastingIsolatedConformancesIfNeeded(CI->getIsolatedConformances());
+    printCheckedCastInstOptions(CI->getCheckedCastOptions());
     *this << CI->getSourceFormalType() << " in " << getIDAndType(CI->getSrc())
           << " to " << CI->getTargetFormalType() << " in "
           << getIDAndType(CI->getDest());
   }
 
   void visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CI) {
-    printCastingIsolatedConformancesIfNeeded(CI->getIsolatedConformances());
+    printCheckedCastInstOptions(CI->getCheckedCastOptions());
     *this << getCastConsumptionKindName(CI->getConsumptionKind()) << ' '
           << CI->getSourceFormalType() << " in " << getIDAndType(CI->getSrc())
           << " to " << CI->getTargetFormalType() << " in "
@@ -2500,6 +2516,9 @@ public:
     printFullContext(EI->getField()->getDeclContext(), PrintState.OS);
     *this << EI->getField()->getName().get();
   }
+  void visitVectorBaseAddrInst(VectorBaseAddrInst *vbai) {
+    *this << getIDAndType(vbai->getVector());
+  }
   void visitRefElementAddrInst(RefElementAddrInst *EI) {
     *this << (EI->isImmutable() ? "[immutable] " : "")
           << getIDAndType(EI->getOperand()) << ", #";
@@ -2761,6 +2780,9 @@ public:
   void visitEndCOWMutationInst(EndCOWMutationInst *ECMI) {
     if (ECMI->doKeepUnique())
       *this << "[keep_unique] ";
+    *this << getIDAndType(ECMI->getOperand());
+  }
+  void visitEndCOWMutationAddrInst(EndCOWMutationAddrInst *ECMI) {
     *this << getIDAndType(ECMI->getOperand());
   }
   void visitEndInitLetRefInst(EndInitLetRefInst *I) {
@@ -4373,6 +4395,9 @@ void SILWitnessTable::print(llvm::raw_ostream &OS, bool Verbose) const {
   printLinkage(OS, getLinkage(), /*isDefinition*/ isDefinition());
   printSerializedKind(OS, getSerializedKind());
 
+  if (isSpecialized())
+    OS << "[specialized] ";
+
   getConformance()->printName(OS, Options);
   Options.GenericSig =
     getConformance()->getDeclContext()->getGenericSignatureOfContext()
@@ -4640,7 +4665,7 @@ void SILDebugScope::print(SILModule &Mod) const {
 void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
   SILPrintContext Ctx(OS);
   // Print other types as their Swift representation.
-  PrintOptions SubPrinter = PrintOptions::printSIL();
+  PrintOptions options = PrintOptions::printSIL();
   auto exported = isExported() ? "true" : "false";
   auto kind = isPartialSpecialization() ? "partial" : "full";
 
@@ -4674,7 +4699,7 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
         requirements,
         [&](Requirement req) {
           if (!genericSig) {
-            req.print(OS, SubPrinter);
+            req.print(OS, options);
             return;
           }
 
@@ -4692,13 +4717,15 @@ void SILSpecializeAttr::print(llvm::raw_ostream &OS) const {
           if (req.getKind() != RequirementKind::Layout) {
             auto SecondTy = genericSig->getSugaredType(req.getSecondType());
             Requirement ReqWithDecls(req.getKind(), FirstTy, SecondTy);
-            ReqWithDecls.print(OS, SubPrinter);
+            ReqWithDecls.print(OS, options);
           } else {
             Requirement ReqWithDecls(req.getKind(), FirstTy,
                                      req.getLayoutConstraint());
-            auto SubPrinterCopy = SubPrinter;
-            SubPrinterCopy.PrintInternalLayoutName = erased;
-            ReqWithDecls.print(OS, SubPrinterCopy);
+
+            PrintOptions::OverrideScope scope(options);
+            OVERRIDE_PRINT_OPTION(scope, PrintInternalLayoutName, erased);
+
+            ReqWithDecls.print(OS, options);
           }
         },
         [&] { OS << ", "; });

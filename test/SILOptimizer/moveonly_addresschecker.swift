@@ -1,22 +1,27 @@
 // RUN: %target-swift-emit-sil -sil-verify-all -verify \
 // RUN: -enable-experimental-feature NoImplicitCopy \
 // RUN: -enable-experimental-feature MoveOnlyClasses \
-// RUN: -enable-experimental-feature LifetimeDependence \
+// RUN: -enable-experimental-feature Lifetimes \
+// RUN: -enable-experimental-feature BuiltinModule \
 // RUN: -Xllvm -sil-print-final-ossa-module %s | %FileCheck %s
 
 // RUN: %target-swift-emit-sil -O -sil-verify-all -verify \
 // RUN: -enable-experimental-feature NoImplicitCopy \
 // RUN: -enable-experimental-feature MoveOnlyClasses \
-// RUN: -enable-experimental-feature LifetimeDependence \
+// RUN: -enable-experimental-feature Lifetimes \
+// RUN: -enable-experimental-feature BuiltinModule \
 // RUN: %s
 
 // REQUIRES: swift_feature_MoveOnlyClasses
 // REQUIRES: swift_feature_NoImplicitCopy
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
+// REQUIRES: swift_feature_BuiltinModule
 
 // This file contains tests that used to crash due to verifier errors. It must
 // be separate from moveonly_addresschecker_diagnostics since when we fail on
 // the diagnostics in that file, we do not actually run the verifier.
+
+import Builtin
 
 struct TestTrivialReturnValue : ~Copyable {
     var i: Int = 5
@@ -64,15 +69,22 @@ struct TestCoroAccessorOfCoroAccessor<T : ~Escapable> : ~Copyable & ~Escapable {
   var t: T
 
   var inner: TestCoroAccessorOfCoroAccessor<T> {
-    @lifetime(copy self)
+    @_lifetime(copy self)
     _read {
       fatalError()
     }
   }
   var outer: TestCoroAccessorOfCoroAccessor<T> {
-    @lifetime(copy self)
+    @_lifetime(copy self)
     _read {
       yield inner
     }
   }
+}
+
+@usableFromInline
+internal func unsafeBitCast<T: ~Escapable & ~Copyable, U>(
+   _ x: consuming T, to type: U.Type
+) -> U {
+   Builtin.reinterpretCast(x)
 }

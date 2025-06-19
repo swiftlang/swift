@@ -20,5 +20,5 @@ public func test() {
   var args: (Int, Int, Int, Int) = (0, 0, 0, 0)
   let n = 2
   let value = 42
-  unsafeWriteArray(type(of: args.0), array: &args, index: n, value: value) // expected-note {{called from here}}
+  unsafeWriteArray(type(of: args.0), array: &args, index: n, value: value) // expected-note {{generic specialization called here}}
 }

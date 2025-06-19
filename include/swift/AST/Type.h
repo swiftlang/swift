@@ -88,9 +88,9 @@ struct QueryTypeSubstitutionMap {
 };
 
 /// Function used to resolve conformances.
-using GenericFunction = auto(CanType dependentType,
-                             Type conformingReplacementType,
-                             ProtocolDecl *conformedProtocol)
+using GenericFunction = auto(InFlightSubstitution &IFS,
+                             Type dependentType,
+                             ProtocolDecl *proto)
                             -> ProtocolConformanceRef;
 using LookupConformanceFn = llvm::function_ref<GenericFunction>;
   
@@ -100,9 +100,9 @@ class LookUpConformanceInModule {
 public:
   explicit LookUpConformanceInModule() {}
 
-  ProtocolConformanceRef operator()(CanType dependentType,
-                                    Type conformingReplacementType,
-                                    ProtocolDecl *conformedProtocol) const;
+  ProtocolConformanceRef operator()(InFlightSubstitution &IFS,
+                                    Type dependentType,
+                                    ProtocolDecl *proto) const;
 };
 
 /// Functor class suitable for use as a \c LookupConformanceFn that provides
@@ -110,9 +110,9 @@ public:
 /// type is an opaque generic type.
 class MakeAbstractConformanceForGenericType {
 public:
-  ProtocolConformanceRef operator()(CanType dependentType,
-                                    Type conformingReplacementType,
-                                    ProtocolDecl *conformedProtocol) const;
+  ProtocolConformanceRef operator()(InFlightSubstitution &IFS,
+                                    Type dependentType,
+                                    ProtocolDecl *proto) const;
 };
   
 /// Flags that can be passed when substituting into a type.
@@ -161,7 +161,7 @@ inline SubstOptions operator|(SubstFlags lhs, SubstFlags rhs) {
 
 /// Enumeration describing foreign languages to which Swift may be
 /// bridged.
-enum class ForeignLanguage {
+enum class ForeignLanguage : uint8_t {
   C,
   ObjectiveC,
 };
@@ -347,11 +347,14 @@ public:
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os, unsigned indent = 0) const;
 
-  void print(raw_ostream &OS, const PrintOptions &PO = PrintOptions()) const;
-  void print(ASTPrinter &Printer, const PrintOptions &PO) const;
+  void print(raw_ostream &OS, const PrintOptions &PO = PrintOptions(),
+             NonRecursivePrintOptions OPO = std::nullopt) const;
+  void print(ASTPrinter &Printer, const PrintOptions &PO,
+             NonRecursivePrintOptions OPO = std::nullopt) const;
 
   /// Return the name of the type as a string, for use in diagnostics only.
-  std::string getString(const PrintOptions &PO = PrintOptions()) const;
+  std::string getString(const PrintOptions &PO = PrintOptions(),
+                        NonRecursivePrintOptions OPO = std::nullopt) const;
 
   /// Return the name of the type, adding parens in cases where
   /// appending or prepending text to the result would cause that text
@@ -360,7 +363,8 @@ public:
   /// the type would make it appear that it's appended to "Float" as
   /// opposed to the entire type.
   std::string
-  getStringAsComponent(const PrintOptions &PO = PrintOptions()) const;
+  getStringAsComponent(const PrintOptions &PO = PrintOptions(),
+                       NonRecursivePrintOptions OPO = std::nullopt) const;
 
   /// Computes the join between two types.
   ///

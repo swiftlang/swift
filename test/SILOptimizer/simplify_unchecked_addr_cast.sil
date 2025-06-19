@@ -1,0 +1,73 @@
+// RUN: %target-sil-opt %s -onone-simplification -simplify-instruction=unchecked_addr_cast | %FileCheck %s
+// RUN: %target-sil-opt %s -simplification -simplify-instruction=unchecked_addr_cast | %FileCheck %s
+
+import Swift
+import Builtin
+
+// CHECK-LABEL: sil [ossa] @same_type :
+// CHECK-NOT:     unchecked_addr_cast
+// CHECK:         %1 = load [trivial] %0
+// CHECK:      } // end sil function 'same_type'
+sil [ossa] @same_type : $@convention(thin) (@inout Int) -> Int {
+bb0(%0 : $*Int):
+  %1 = unchecked_addr_cast %0 to $*Int
+  %2 = load [trivial] %1
+  return %2
+}
+
+// CHECK-LABEL: sil [ossa] @not_same_type :
+// CHECK:         %1 = unchecked_addr_cast %0 to $*Float
+// CHECK:         %2 = load [trivial] %1
+// CHECK:      } // end sil function 'not_same_type'
+sil [ossa] @not_same_type : $@convention(thin) (@inout Int) -> Float {
+bb0(%0 : $*Int):
+  %1 = unchecked_addr_cast %0 to $*Float
+  %2 = load [trivial] %1
+  return %2
+}
+
+// CHECK-LABEL: sil [ossa] @double_cast :
+// CHECK:         %1 = unchecked_addr_cast %0 to $*Bool
+// CHECK:         %2 = load [trivial] %1
+// CHECK:      } // end sil function 'double_cast'
+sil [ossa] @double_cast : $@convention(thin) (@inout Int) -> Bool {
+bb0(%0 : $*Int):
+  %1 = unchecked_addr_cast %0 to $*Float
+  %2 = unchecked_addr_cast %1 to $*Bool
+  %3 = load [trivial] %2
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @vector_base :
+// CHECK:         %1 = vector_base_addr %0
+// CHECK:         %2 = load [trivial] %1
+// CHECK:      } // end sil function 'vector_base'
+sil [ossa] @vector_base : $@convention(thin) (@inout Builtin.FixedArray<10, Int>) -> Int {
+bb0(%0 : $*Builtin.FixedArray<10, Int>):
+  %1 = unchecked_addr_cast %0 to $*Int
+  %2 = load [trivial] %1
+  return %2
+}
+
+// CHECK-LABEL: sil [ossa] @vector_base_wrong_type :
+// CHECK:         %1 = unchecked_addr_cast %0 to $*Bool
+// CHECK:         %2 = load [trivial] %1
+// CHECK:      } // end sil function 'vector_base_wrong_type'
+sil [ossa] @vector_base_wrong_type : $@convention(thin) (@inout Builtin.FixedArray<10, Int>) -> Bool {
+bb0(%0 : $*Builtin.FixedArray<10, Int>):
+  %1 = unchecked_addr_cast %0 to $*Bool
+  %2 = load [trivial] %1
+  return %2
+}
+
+// CHECK-LABEL: sil [ossa] @vector_base_function_type :
+// CHECK:         %1 = vector_base_addr %0
+// CHECK:         %2 = load [copy] %1
+// CHECK:      } // end sil function 'vector_base_function_type'
+sil [ossa] @vector_base_function_type : $@convention(thin) (@inout Builtin.FixedArray<10, ()->()>) -> @owned @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()> {
+bb0(%0 : $*Builtin.FixedArray<10, ()->()>):
+  %1 = unchecked_addr_cast %0 to $*@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <()>
+  %2 = load [copy] %1
+  return %2
+}
+

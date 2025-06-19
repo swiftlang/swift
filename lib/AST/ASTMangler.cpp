@@ -49,6 +49,7 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/AST/Mangle.h"
@@ -299,7 +300,7 @@ std::string ASTMangler::mangleWitnessTable(const ProtocolConformance *C) {
   if (auto *sc = dyn_cast<SpecializedProtocolConformance>(C)) {
     appendProtocolConformance(sc);
     appendOperator("WP");
-  } else if (isa<NormalProtocolConformance>(C)) {
+  } else if (isa<NormalProtocolConformance>(C) || isa<InheritedProtocolConformance>(C)) {
     appendProtocolConformance(C);
     appendOperator("WP");
   } else if (isa<SelfProtocolConformance>(C)) {
@@ -395,7 +396,7 @@ std::string ASTMangler::mangleKeyPathGetterThunkHelper(
       sub = sub.transformRec([](Type t) -> std::optional<Type> {
         if (auto *openedExistential = t->getAs<ExistentialArchetypeType>()) {
           auto &ctx = openedExistential->getASTContext();
-          return GenericTypeParamType::getType(0, 0, ctx);
+          return ctx.TheSelfType;
         }
         return std::nullopt;
       });
@@ -431,7 +432,7 @@ std::string ASTMangler::mangleKeyPathSetterThunkHelper(
       sub = sub.transformRec([](Type t) -> std::optional<Type> {
         if (auto *openedExistential = t->getAs<ExistentialArchetypeType>()) {
           auto &ctx = openedExistential->getASTContext();
-          return GenericTypeParamType::getType(0, 0, ctx);
+          return ctx.TheSelfType;
         }
         return std::nullopt;
       });
@@ -1006,7 +1007,7 @@ ASTMangler::mangleAnyDecl(const ValueDecl *Decl,
 
   // We have a custom prefix, so finalize() won't verify for us. If we're not
   // in invalid code (coming from an IDE caller) verify manually.
-  if (!Decl->isInvalid())
+  if (CONDITIONAL_ASSERT_enabled() && !prefix && !Decl->isInvalid())
     verify(Storage.str(), Flavor);
   return finalize();
 }
@@ -1026,7 +1027,7 @@ std::string ASTMangler::mangleAccessorEntityAsUSR(AccessorKind kind,
   appendAccessorEntity(getCodeForAccessorKind(kind), decl, isStatic);
   // We have a custom prefix, so finalize() won't verify for us. If we're not
   // in invalid code (coming from an IDE caller) verify manually.
-  if (!decl->isInvalid())
+  if (CONDITIONAL_ASSERT_enabled() && !decl->isInvalid())
     verify(Storage.str().drop_front(USRPrefix.size()), Flavor);
   return finalize();
 }
@@ -1446,8 +1447,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
     case TypeKind::BuiltinUnsafeValueBuffer:
       return appendOperator("BB");
     case TypeKind::BuiltinUnboundGeneric:
-      llvm::errs() << "Don't know how to mangle a BuiltinUnboundGenericType\n";
-      abort();
+      ABORT("Don't know how to mangle a BuiltinUnboundGenericType");
     case TypeKind::Locatable: {
       auto loc = cast<LocatableType>(tybase);
       return appendType(loc->getSinglyDesugaredType(), sig, forDecl);
@@ -1613,7 +1613,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       // ExtendedExistentialTypeShapes consider existential metatypes to
       // be part of the existential, so if we're symbolically referencing
       // shapes, we need to handle that at this level.
-      if (EMT->hasParameterizedExistential()) {
+      if (EMT->getExistentialLayout().needsExtendedShape(AllowInverses)) {
         auto referent = SymbolicReferent::forExtendedExistentialTypeShape(EMT);
         if (canSymbolicReference(referent)) {
           appendSymbolicExtendedExistentialType(referent, EMT, sig, forDecl);
@@ -1622,7 +1622,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
       }
 
       if (EMT->getInstanceType()->isExistentialType() &&
-          EMT->hasParameterizedExistential())
+          EMT->getExistentialLayout().needsExtendedShape(AllowInverses))
         appendConstrainedExistential(EMT->getInstanceType(), sig, forDecl);
       else
         appendType(EMT->getInstanceType(), sig, forDecl);
@@ -1678,8 +1678,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
           return appendType(strippedTy, sig, forDecl);
       }
 
-      if (PCT->hasParameterizedExistential()
-          || (PCT->hasInverse() && AllowInverses))
+      if (PCT->getExistentialLayout().needsExtendedShape(AllowInverses))
         return appendConstrainedExistential(PCT, sig, forDecl);
 
       // We mangle ProtocolType and ProtocolCompositionType using the
@@ -1693,7 +1692,8 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
 
     case TypeKind::Existential: {
       auto *ET = cast<ExistentialType>(tybase);
-      if (ET->hasParameterizedExistential()) {
+
+      if (ET->getExistentialLayout().needsExtendedShape(AllowInverses)) {
         auto referent = SymbolicReferent::forExtendedExistentialTypeShape(ET);
         if (canSymbolicReference(referent)) {
           appendSymbolicExtendedExistentialType(referent, ET, sig, forDecl);
@@ -1703,6 +1703,7 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
         return appendConstrainedExistential(ET->getConstraintType(), sig,
                                             forDecl);
       }
+
       return appendType(ET->getConstraintType(), sig, forDecl);
     }
 
@@ -1755,9 +1756,10 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
     case TypeKind::PackArchetype:
     case TypeKind::ElementArchetype:
     case TypeKind::ExistentialArchetype:
-      llvm::errs() << "Cannot mangle free-standing archetype: ";
-      tybase->dump(llvm::errs());
-      abort();
+      ABORT([&](auto &out) {
+        out << "Cannot mangle free-standing archetype: ";
+        tybase->dump(out);
+      });
 
     case TypeKind::OpaqueTypeArchetype: {
       auto opaqueType = cast<OpaqueTypeArchetypeType>(tybase);
@@ -3079,7 +3081,7 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl,
 
   auto *nominal = dyn_cast<NominalTypeDecl>(decl);
 
-  if (nominal && isa<BuiltinTupleDecl>(nominal))
+  if (isa_and_nonnull<BuiltinTupleDecl>(nominal))
     return appendOperator("BT");
 
   // Check for certain standard types.
@@ -3130,6 +3132,12 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl,
 
       return false;
     }
+
+    // Mangle `Foo` from `namespace Bar { class Foo; } using Bar::Foo;` the same
+    // way as if we spelled `Bar.Foo` explicitly.
+    if (const auto *usingShadowDecl =
+            dyn_cast<clang::UsingShadowDecl>(namedDecl))
+      namedDecl = usingShadowDecl->getTargetDecl();
 
     // Mangle ObjC classes using their runtime names.
     auto interface = dyn_cast<clang::ObjCInterfaceDecl>(namedDecl);
@@ -4467,8 +4475,7 @@ static unsigned conformanceRequirementIndex(
     ++result;
   }
 
-  llvm::errs() <<"Conformance access path step is missing from requirements";
-  abort();
+  ABORT("Conformance access path step is missing from requirements");
 }
 
 void ASTMangler::appendDependentProtocolConformance(
@@ -4572,9 +4579,10 @@ void ASTMangler::appendAnyProtocolConformance(
   } else if (conformance.isPack()) {
     appendPackProtocolConformance(conformance.getPack(), genericSig);
   } else {
-    llvm::errs() << "Bad conformance in mangler: ";
-    conformance.dump(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "Bad conformance in mangler: ";
+      conformance.dump(out);
+    });
   }
 }
 
@@ -5274,15 +5282,11 @@ static void extractExistentialInverseRequirements(
 
   auto &ctx = PCT->getASTContext();
 
-  // Form a parameter referring to the existential's Self.
-  auto existentialSelf =
-      GenericTypeParamType::getType(/*depth=*/0, /*index=*/0, ctx);
-
   for (auto ip : PCT->getInverses()) {
     auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
     assert(proto);
     ASSERT(!getABIDecl(proto) && "can't use @abi on inverse protocols");
-    inverses.push_back({existentialSelf, proto, SourceLoc()});
+    inverses.push_back({ctx.TheSelfType, proto, SourceLoc()});
   }
 }
 
@@ -5429,6 +5433,7 @@ ASTMangler::BaseEntitySignature::BaseEntitySignature(const Decl *decl)
     case DeclKind::PrefixOperator:
     case DeclKind::PostfixOperator:
     case DeclKind::MacroExpansion:
+    case DeclKind::Using:
       break;
     };
   }

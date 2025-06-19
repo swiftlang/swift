@@ -214,10 +214,6 @@ struct ProjectOptions: ParsableArguments {
       folder references to be used for compatible targets. This allows new
       source files to be added to a target without needing to regenerate the
       project.
-      
-      Only supported for targets that have no per-file build settings. This
-      unfortunately means some Clang targes such as 'lib/Basic' and 'stdlib' 
-      cannot currently use buildable folders.
       """
   )
   var useBuildableFolders: Bool = true

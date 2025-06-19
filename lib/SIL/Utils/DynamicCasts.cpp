@@ -741,7 +741,10 @@ swift::classifyDynamicCast(SILFunction *function,
           if (targetClass->isSuperclassOf(sourceClass))
             return DynamicCastFeasibility::WillSucceed;
 
-          return DynamicCastFeasibility::WillFail;
+          // In case of ObjectiveC classes, the runtime type can differ from its
+          // declared type. Therefore a cast between (compile-time) unrelated
+          // classes may succeed at runtime.
+          return DynamicCastFeasibility::MaySucceed;
         }
       }
 
@@ -749,6 +752,12 @@ swift::classifyDynamicCast(SILFunction *function,
       auto hierarchyResult = classifyClassHierarchyCast(source, target);
       if (hierarchyResult != DynamicCastFeasibility::WillFail)
         return hierarchyResult;
+
+      // In case of ObjectiveC classes, the runtime type can differ from its
+      // declared type. Therefore a cast between (compile-time) unrelated
+      // classes may succeed at runtime.
+      if (sourceClass->hasClangNode())
+        return DynamicCastFeasibility::MaySucceed;
 
       // As a backup, consider whether either type is a CF class type
       // with an NS bridged equivalent.
@@ -1313,7 +1322,7 @@ bool swift::emitSuccessfulIndirectUnconditionalCast(
     }
 
     B.createUnconditionalCheckedCastAddr(loc,
-                                         CastingIsolatedConformances::Allow,
+                                         CheckedCastInstOptions(),
                                          src, sourceFormalType,
                                          dest, targetFormalType);
     return true;
@@ -1419,7 +1428,7 @@ bool swift::canIRGenUseScalarCheckedCastInstructions(SILModule &M,
 /// using a scalar cast operation.
 void swift::emitIndirectConditionalCastWithScalar(
     SILBuilder &B, ModuleDecl *M, SILLocation loc,
-    CastingIsolatedConformances isolatedConformances,
+    CheckedCastInstOptions options,
     CastConsumptionKind consumption,
     SILValue srcAddr, CanType sourceFormalType,
     SILValue destAddr, CanType targetFormalType,
@@ -1458,7 +1467,7 @@ void swift::emitIndirectConditionalCastWithScalar(
   })();
 
   auto *ccb = B.createCheckedCastBranch(
-      loc, /*exact*/ false, isolatedConformances, srcValue, sourceFormalType,
+      loc, /*exact*/ false, options, srcValue, sourceFormalType,
       targetLoweredType, targetFormalType, scalarSuccBB, scalarFailBB,
       TrueCount, FalseCount);
 

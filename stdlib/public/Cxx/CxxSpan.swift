@@ -12,8 +12,8 @@
 import Builtin
 
 @usableFromInline
-internal func unsafeBitCast<T: ~Escapable, U>(
-   _ x: T, to type: U.Type
+internal func unsafeBitCast<T: ~Escapable & ~Copyable, U>(
+   _ x: consuming T, to type: U.Type
 ) -> U {
   Builtin.reinterpretCast(x)
 }
@@ -66,7 +66,7 @@ public protocol CxxSpan<Element> {
   associatedtype Size: BinaryInteger
 
   init()
-  init(_ unsafePointer : UnsafePointer<Element>, _ count: Size)
+  init(_ unsafePointer: UnsafePointer<Element>!, _ count: Size)
 
   func size() -> Size
   func __dataUnsafe() -> UnsafePointer<Element>?
@@ -88,7 +88,7 @@ extension CxxSpan {
     unsafe self.init(unsafeMutableBufferPointer.baseAddress!, Size(unsafeMutableBufferPointer.count))
   }
 
-  @available(SwiftStdlib 6.2, *)
+  @available(SwiftCompatibilitySpan 5.0, *)
   @inlinable
   @unsafe
   public init(_ span: Span<Element>) {
@@ -99,7 +99,7 @@ extension CxxSpan {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
 extension Span {
   @_alwaysEmitIntoClient
   @unsafe
@@ -115,7 +115,7 @@ extension Span {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
 extension MutableSpan {
   @_alwaysEmitIntoClient
   @unsafe
@@ -136,10 +136,10 @@ public protocol CxxMutableSpan<Element> {
   associatedtype Size: BinaryInteger
 
   init()
-  init(_ unsafeMutablePointer : UnsafeMutablePointer<Element>, _ count: Size)
+  init(_ unsafeMutablePointer: UnsafeMutablePointer<Element>!, _ count: Size)
 
   func size() -> Size
-  func __dataUnsafe() -> UnsafeMutablePointer<Element>
+  func __dataUnsafe() -> UnsafeMutablePointer<Element>?
 }
 
 extension CxxMutableSpan {
@@ -149,5 +149,15 @@ extension CxxMutableSpan {
     unsafe precondition(unsafeMutableBufferPointer.baseAddress != nil, 
                   "UnsafeMutableBufferPointer should not point to nil")
     unsafe self.init(unsafeMutableBufferPointer.baseAddress!, Size(unsafeMutableBufferPointer.count))
+  }
+
+  @available(SwiftCompatibilitySpan 5.0, *)
+  @inlinable
+  @unsafe
+  public init(_ span: consuming MutableSpan<Element>) {
+    let (p, c) = unsafe unsafeBitCast(span, to: (UnsafeMutableRawPointer?, Int).self)
+    unsafe precondition(p != nil, "Span should not point to nil")
+    let binding = unsafe p!.bindMemory(to: Element.self, capacity: c)
+    unsafe self.init(binding, Size(c))
   }
 }

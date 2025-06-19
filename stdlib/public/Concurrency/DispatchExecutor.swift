@@ -23,7 +23,7 @@ import Swift
 
 // .. Main Executor ............................................................
 
-@available(SwiftStdlib 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 public class DispatchMainExecutor: RunLoopExecutor, @unchecked Sendable {
   var threaded = false
 
@@ -43,7 +43,7 @@ public class DispatchMainExecutor: RunLoopExecutor, @unchecked Sendable {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 extension DispatchMainExecutor: SerialExecutor {
 
   public func enqueue(_ job: consuming ExecutorJob) {
@@ -57,7 +57,7 @@ extension DispatchMainExecutor: SerialExecutor {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 extension DispatchMainExecutor: SchedulableExecutor {
   public var asSchedulable: SchedulableExecutor? {
     return self
@@ -85,12 +85,12 @@ extension DispatchMainExecutor: SchedulableExecutor {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 extension DispatchMainExecutor: MainExecutor {}
 
 // .. Task Executor ............................................................
 
-@available(SwiftStdlib 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 public class DispatchGlobalTaskExecutor: TaskExecutor, SchedulableExecutor,
                                          @unchecked Sendable {
   public init() {}
@@ -130,7 +130,7 @@ public class DispatchGlobalTaskExecutor: TaskExecutor, SchedulableExecutor,
 ///
 /// It is used to help convert instants and durations from arbitrary `Clock`s
 /// to Dispatch's time base.
-@available(SwiftStdlib 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 protocol DispatchExecutorProtocol: Executor {
 
   /// Convert an `Instant` from the specified clock to a tuple identifying
@@ -158,15 +158,24 @@ enum DispatchClockID: CInt {
   case suspending = 2
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 extension DispatchExecutorProtocol {
+
+  func clamp(_ components: (seconds: Int64, attoseconds: Int64))
+    -> (seconds: Int64, attoseconds: Int64) {
+    if components.seconds < 0
+         || components.seconds == 0 && components.attoseconds < 0 {
+      return (seconds: 0, attoseconds: 0)
+    }
+    return (seconds: components.seconds, attoseconds: components.attoseconds)
+  }
 
   func timestamp<C: Clock>(for instant: C.Instant, clock: C)
     -> (clockID: DispatchClockID, seconds: Int64, nanoseconds: Int64) {
     if clock.traits.contains(.continuous) {
         let dispatchClock: ContinuousClock = .continuous
         let instant = dispatchClock.convert(instant: instant, from: clock)!
-        let (seconds, attoseconds) = instant._value.components
+        let (seconds, attoseconds) = clamp(instant._value.components)
         let nanoseconds = attoseconds / 1_000_000_000
         return (clockID: .continuous,
                 seconds: Int64(seconds),
@@ -174,7 +183,7 @@ extension DispatchExecutorProtocol {
     } else {
         let dispatchClock: SuspendingClock = .suspending
         let instant = dispatchClock.convert(instant: instant, from: clock)!
-        let (seconds, attoseconds) = instant._value.components
+        let (seconds, attoseconds) = clamp(instant._value.components)
         let nanoseconds = attoseconds / 1_000_000_000
         return (clockID: .suspending,
                 seconds: Int64(seconds),
@@ -185,18 +194,18 @@ extension DispatchExecutorProtocol {
   func delay<C: Clock>(from duration: C.Duration, clock: C)
     -> (seconds: Int64, nanoseconds: Int64) {
     let swiftDuration = clock.convert(from: duration)!
-    let (seconds, attoseconds) = swiftDuration.components
+    let (seconds, attoseconds) = clamp(swiftDuration.components)
     let nanoseconds = attoseconds / 1_000_000_000
     return (seconds: seconds, nanoseconds: nanoseconds)
   }
 
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 extension DispatchGlobalTaskExecutor: DispatchExecutorProtocol {
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(StdlibDeploymentTarget 6.2, *)
 extension DispatchMainExecutor: DispatchExecutorProtocol {
 }
 

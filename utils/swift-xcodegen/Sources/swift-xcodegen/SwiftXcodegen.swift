@@ -84,7 +84,7 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
 
     // Check to see if we have a separate runnable build dir.
     let runnableBuildDirPath = 
-      self.runnableBuildDir?.absoluteInWorkingDir.resolvingSymlinks
+      self.runnableBuildDir?.absoluteInWorkingDir.realPath
     let runnableBuildDir = try runnableBuildDirPath.map {
       try NinjaBuildDir(at: $0, projectRootDir: ninja.projectRootDir)
         .buildDir(for: .swift)
@@ -204,7 +204,7 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
       if self.addClangToolsExtra {
         spec.addClangTargets(
           below: "../clang-tools-extra", addingPrefix: "extra-",
-          mayHaveUnbuildableFiles: true
+          mayHaveUnbuildableFiles: true, excluding: ["test"]
         )
         if self.addTestFolders {
           spec.addReference(to: "../clang-tools-extra/test")
@@ -332,7 +332,7 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
   }
 
   func generate() async throws {
-    let buildDirPath = buildDir.absoluteInWorkingDir.resolvingSymlinks
+    let buildDirPath = buildDir.absoluteInWorkingDir.realPath
     log.info("Generating project for '\(buildDirPath)'...")
 
     let projectRootDir = self.projectRootDir?.absoluteInWorkingDir

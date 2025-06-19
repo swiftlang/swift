@@ -65,8 +65,10 @@ public:
     return std::nullopt;
   }
 
-  virtual ManagedValue emitForeignAsyncCompletionHandler(
-      SILGenFunction &SGF, AbstractionPattern origFormalType, SILLocation loc) {
+  virtual ManagedValue
+  emitForeignAsyncCompletionHandler(SILGenFunction &SGF,
+                                    AbstractionPattern origFormalType,
+                                    ManagedValue self, SILLocation loc) {
     return {};
   }
 };

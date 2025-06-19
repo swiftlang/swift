@@ -11,7 +11,9 @@ func iAmImpliedUnsafe() -> UnsafeType? { nil }
 @unsafe
 func labeledUnsafe(_: UnsafeType) {
   unsafe iAmUnsafe()
-  let _ = unsafe iAmImpliedUnsafe()
+  let _ = iAmImpliedUnsafe() // okay, since the unsafety is captured in the result type
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  let _ = iAmImpliedUnsafe // expected-note{{reference to global function 'iAmImpliedUnsafe()' involves unsafe type 'UnsafeType'}}
 }
 
 
@@ -19,7 +21,7 @@ class C {
   func method() { } // expected-note{{overridden declaration is here}}
 }
 
-class D1: C { // expected-note{{make class 'D1' @unsafe to allow unsafe overrides of safe superclass methods}}{{1-1=@unsafe }}
+class D1: C { // expected-note{{make class 'D1' '@unsafe' to allow unsafe overrides of safe superclass methods}}{{1-1=@unsafe }}
   @unsafe
   override func method() { } // expected-warning{{override of safe instance method with unsafe instance method}}{{documentation-file=strict-memory-safety}}
 }
@@ -142,9 +144,12 @@ struct UnsafeSequence: @unsafe IteratorProtocol, @unsafe Sequence {
 }
 
 func forEachLoop(us: UnsafeSequence) {
+  // expected-note@+1{{reference to unsafe instance method 'next()'}}
   for _ in us { } // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{documentation-file=strict-memory-safety}}{{12-12=unsafe }}
-  // expected-note@-1{{@unsafe conformance of 'UnsafeSequence' to protocol 'Sequence' involves unsafe code}}
+  // expected-note@-1{{'@unsafe' conformance of 'UnsafeSequence' to protocol 'Sequence' involves unsafe code}}
   // expected-warning@-2{{for-in loop uses unsafe constructs but is not marked with 'unsafe'}}{{documentation-file=strict-memory-safety}}
+
+  // expected-note@+1{{reference to unsafe instance method 'next()'}}
   for _ in unsafe us { }
   // expected-warning@-1{{for-in loop uses unsafe constructs but is not marked with 'unsafe'}}{{documentation-file=strict-memory-safety}}
 }

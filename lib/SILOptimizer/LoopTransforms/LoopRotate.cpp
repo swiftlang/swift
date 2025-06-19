@@ -428,7 +428,11 @@ static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
 
   for (auto &inst : *header) {
     if (auto *bfi = dyn_cast<BorrowedFromInst>(&inst)) {
-      valueMap[bfi] = valueMap[bfi->getBorrowedValue()];
+      // Don't do valueMap[bfi] = valueMap[bfi->getBorrowedValue()]
+      // The subscript operator returns a reference into the map. Due to the
+      // assignment the map might get "reallocated" from under us.
+      auto mappedValue = valueMap[bfi->getBorrowedValue()];
+      valueMap[bfi] = mappedValue;
     } else if (SILInstruction *cloned = inst.clone(preheaderBranch)) {
       mapOperands(cloned, valueMap);
 
@@ -485,6 +489,12 @@ namespace {
 class LoopRotation : public SILFunctionTransform {
 
   void run() override {
+#ifndef SWIFT_ENABLE_SWIFT_IN_SWIFT
+    // This pass results in verification failures when Swift sources are not
+    // enabled.
+    LLVM_DEBUG(llvm::dbgs() << "Loop Rotate disabled in C++-only Swift compiler\n");
+    return;
+#endif // !SWIFT_ENABLE_SWIFT_IN_SWIFT
     SILFunction *f = getFunction();
     SILLoopAnalysis *loopAnalysis = PM->getAnalysis<SILLoopAnalysis>();
     DominanceAnalysis *domAnalysis = PM->getAnalysis<DominanceAnalysis>();

@@ -121,38 +121,43 @@
     LANGUAGE_FEATURE(FeatureName, SENumber, Description)
 #endif
 
-// An upcoming feature that supports adoption mode.
+// An upcoming feature that supports migration mode.
 //
 // If the feature is source-breaking and provides for a
-// mechanical code migration, it should implement adoption mode.
+// mechanical code migration, it should implement migration mode.
 //
-// Adoption mode is a feature-oriented code migration mechanism: a mode
+// Migration mode is a feature-oriented code migration mechanism: a mode
 // of operation that should produce compiler warnings with attached
 // fix-its that can be applied to preserve the behavior of the code once
 // the upcoming feature is enacted.
 // These warnings must belong to a diagnostic group named after the
-// feature. Adoption mode itself *and* the fix-its it produces must be
+// feature. Migration mode itself *and* the fix-its it produces must be
 // source and binary compatible with how the code is compiled when the
 // feature is disabled.
-#ifndef ADOPTABLE_UPCOMING_FEATURE
+#ifndef MIGRATABLE_UPCOMING_FEATURE
   #if defined(UPCOMING_FEATURE)
-    #define ADOPTABLE_UPCOMING_FEATURE(FeatureName, SENumber, Version)         \
+    #define MIGRATABLE_UPCOMING_FEATURE(FeatureName, SENumber, Version)         \
       UPCOMING_FEATURE(FeatureName, SENumber, Version)
   #else
-    #define ADOPTABLE_UPCOMING_FEATURE(FeatureName, SENumber, Version)         \
+    #define MIGRATABLE_UPCOMING_FEATURE(FeatureName, SENumber, Version)         \
       LANGUAGE_FEATURE(FeatureName, SENumber, #FeatureName)
   #endif
 #endif
 
-// See `ADOPTABLE_UPCOMING_FEATURE`.
-#ifndef ADOPTABLE_EXPERIMENTAL_FEATURE
+// See `MIGRATABLE_UPCOMING_FEATURE`.
+#ifndef MIGRATABLE_EXPERIMENTAL_FEATURE
   #if defined(EXPERIMENTAL_FEATURE)
-    #define ADOPTABLE_EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)       \
+    #define MIGRATABLE_EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)       \
       EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)
   #else
-    #define ADOPTABLE_EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)       \
+    #define MIGRATABLE_EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)       \
       LANGUAGE_FEATURE(FeatureName, 0, #FeatureName)
   #endif
+#endif
+
+#ifndef MIGRATABLE_OPTIONAL_LANGUAGE_FEATURE
+  #define MIGRATABLE_OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Name)   \
+      OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, #Name)
 #endif
 
 #ifndef UPCOMING_FEATURE
@@ -256,6 +261,13 @@ LANGUAGE_FEATURE(RawIdentifiers, 451, "Raw identifiers")
 LANGUAGE_FEATURE(SendableCompletionHandlers, 463, "Objective-C completion handler parameters are imported as @Sendable")
 LANGUAGE_FEATURE(AsyncExecutionBehaviorAttributes, 0, "@concurrent and nonisolated(nonsending)")
 LANGUAGE_FEATURE(IsolatedConformances, 407, "Global-actor isolated conformances")
+LANGUAGE_FEATURE(ValueGenericsNameLookup, 452, "Value generics appearing as static members for namelookup")
+LANGUAGE_FEATURE(GeneralizedIsSameMetaTypeBuiltin, 465, "Builtin.is_same_metatype with support for noncopyable/nonescapable types")
+SUPPRESSIBLE_LANGUAGE_FEATURE(ABIAttributeSE0479, 479, "@abi attribute on functions, initializers, properties, and subscripts")
+LANGUAGE_FEATURE(AlwaysInheritActorContext, 472, "@_inheritActorContext(always)")
+LANGUAGE_FEATURE(BuiltinSelect, 0, "Builtin.select")
+LANGUAGE_FEATURE(BuiltinInterleave, 0, "Builtin.interleave and Builtin.deinterleave")
+LANGUAGE_FEATURE(BuiltinVectorsExternC, 0, "Extern C support for Builtin vector types")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -275,16 +287,17 @@ UPCOMING_FEATURE(NonfrozenEnumExhaustivity, 192, 6)
 UPCOMING_FEATURE(GlobalActorIsolatedTypesUsability, 0434, 6)
 
 // Swift 7
-ADOPTABLE_UPCOMING_FEATURE(ExistentialAny, 335, 7)
+MIGRATABLE_UPCOMING_FEATURE(ExistentialAny, 335, 7)
 UPCOMING_FEATURE(InternalImportsByDefault, 409, 7)
-UPCOMING_FEATURE(MemberImportVisibility, 444, 7)
-UPCOMING_FEATURE(InferIsolatedConformances, 470, 7)
+MIGRATABLE_UPCOMING_FEATURE(MemberImportVisibility, 444, 7)
+MIGRATABLE_UPCOMING_FEATURE(InferIsolatedConformances, 470, 7)
+MIGRATABLE_UPCOMING_FEATURE(NonisolatedNonsendingByDefault, 461, 7)
 
 // Optional language features / modes
 
 /// Diagnose uses of language constructs and APIs that can violate memory
 /// safety.
-OPTIONAL_LANGUAGE_FEATURE(StrictMemorySafety, 458, "Strict memory safety")
+MIGRATABLE_OPTIONAL_LANGUAGE_FEATURE(StrictMemorySafety, 458, "Strict memory safety")
 
 // Experimental features
 
@@ -373,11 +386,6 @@ EXPERIMENTAL_FEATURE(ParserASTGen, false)
 /// corresponding syntax tree.
 EXPERIMENTAL_FEATURE(BuiltinMacros, false)
 
-/// Import C++ class templates as semantically-meaningless symbolic
-/// Swift types and C++ methods as symbolic functions with blank
-/// signatures.
-EXPERIMENTAL_FEATURE(ImportSymbolicCXXDecls, false)
-
 /// Generate bindings for functions that 'throw' in the C++ section of the generated Clang header.
 EXPERIMENTAL_FEATURE(GenerateBindingsForThrowingFunctionsInCXX, false)
 
@@ -421,6 +429,7 @@ EXPERIMENTAL_FEATURE(LifetimeDependence, true)
 
 /// Enable inout lifetime dependence - @lifetime(&arg)
 EXPERIMENTAL_FEATURE(InoutLifetimeDependence, true)
+EXPERIMENTAL_FEATURE(LifetimeDependenceMutableAccessors, true)
 
 /// Enable the `@_staticExclusiveOnly` attribute.
 EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)
@@ -484,27 +493,20 @@ EXPERIMENTAL_FEATURE(CoroutineAccessorsUnwindOnCallerError, false)
 EXPERIMENTAL_FEATURE(AddressableParameters, true)
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(AddressableTypes, true)
 
-/// Allow the @abi attribute.
-SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ABIAttribute, true)
-
-/// Functions with nonisolated isolation inherit their isolation from the
-/// calling context.
-ADOPTABLE_EXPERIMENTAL_FEATURE(AsyncCallerExecution, false)
-
 /// Allow custom availability domains to be defined and referenced.
 EXPERIMENTAL_FEATURE(CustomAvailability, true)
-
-/// Allow SwiftSettings
-EXPERIMENTAL_FEATURE(SwiftSettings, false)
 
 /// Syntax sugar features for concurrency.
 EXPERIMENTAL_FEATURE(ConcurrencySyntaxSugar, true)
 
-/// Enable syntax sugar type '[3 x Int]' for Inline Array
+/// Enable syntax sugar type '[3 of Int]' for Inline Array
 EXPERIMENTAL_FEATURE(InlineArrayTypeSugar, false)
 
 /// Allow declaration of compile-time values
 EXPERIMENTAL_FEATURE(CompileTimeValues, true)
+
+/// Allow declaration of compile-time values
+EXPERIMENTAL_FEATURE(CompileTimeValuesPreview, false)
 
 /// Allow function body macros applied to closures.
 EXPERIMENTAL_FEATURE(ClosureBodyMacro, true)
@@ -512,11 +514,28 @@ EXPERIMENTAL_FEATURE(ClosureBodyMacro, true)
 /// Allow declarations of Swift runtime symbols using @_silgen_name.
 EXPERIMENTAL_FEATURE(AllowRuntimeSymbolDeclarations, true)
 
+/// Allow use of `@cdecl`
+EXPERIMENTAL_FEATURE(CDecl, false)
+
+/// Allow use of `@extensible` on public enums
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ExtensibleAttribute, false)
+
+/// Allow use of `Module::name` syntax
+EXPERIMENTAL_FEATURE(ModuleSelector, false)
+
+/// Allow use of `using` declaration that control default isolation
+/// in a file scope.
+EXPERIMENTAL_FEATURE(DefaultIsolationPerFile, false)
+
+/// Enable @_lifetime attribute
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(Lifetimes, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
-#undef ADOPTABLE_UPCOMING_FEATURE
-#undef ADOPTABLE_EXPERIMENTAL_FEATURE
+#undef MIGRATABLE_UPCOMING_FEATURE
+#undef MIGRATABLE_EXPERIMENTAL_FEATURE
+#undef MIGRATABLE_OPTIONAL_LANGUAGE_FEATURE
 #undef BASELINE_LANGUAGE_FEATURE
 #undef OPTIONAL_LANGUAGE_FEATURE
 #undef CONDITIONALLY_SUPPRESSIBLE_EXPERIMENTAL_FEATURE

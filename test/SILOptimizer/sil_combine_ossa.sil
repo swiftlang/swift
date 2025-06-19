@@ -5411,6 +5411,16 @@ bb1(%10 : @owned $Optional<@callee_guaranteed () -> ()>, %11 : @guaranteed $Opti
   return %12 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @not_dead_mark_dependence_addr :
+// CHECK:         mark_dependence_addr %0 : $*B on %1
+// CHECK-LABEL: } // end sil function 'not_dead_mark_dependence_addr'
+sil [ossa] @not_dead_mark_dependence_addr : $@convention(thin) (@inout B, @in_guaranteed B) -> @owned B {
+bb0(%0 : $*B, %1 : $*B):
+  mark_dependence_addr %0 on %1
+  %3 = load [copy] %0
+  return %3
+}
+
 // CHECK-LABEL: sil [ossa] @remove_borrow_of_thin_function :
 // CHECK:         [[F:%.*]] = function_ref @unknown
 // CHECK:         [[T:%.*]] = thin_to_thick_function [[F]]

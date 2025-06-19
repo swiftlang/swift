@@ -1,4 +1,3 @@
-
 //===--- Decl.cpp - Swift Language Decl ASTs ------------------------------===//
 //
 // This source file is part of the Swift.org open source project
@@ -15,7 +14,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Strings.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
@@ -24,6 +22,7 @@
 #include "swift/AST/AccessRequests.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/ConformanceLookup.h"
@@ -64,6 +63,7 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Parse/Lexer.h" // FIXME: Bad dependency
+#include "swift/Strings.h"
 #include "clang/Lex/MacroInfo.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -75,6 +75,7 @@
 
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/Module.h"
+#include "clang/Basic/TargetInfo.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclObjC.h"
 
@@ -188,6 +189,7 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
   TRIVIAL_KIND(MissingMember);
   TRIVIAL_KIND(Macro);
   TRIVIAL_KIND(MacroExpansion);
+  TRIVIAL_KIND(Using);
 
   case DeclKind::TypeAlias:
     return cast<TypeAliasDecl>(this)->getGenericParams()
@@ -399,6 +401,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(OpaqueVarType, "type");
   ENTRY(Macro, "macro");
   ENTRY(MacroExpansion, "pound literal");
+  ENTRY(Using, "using");
   }
 #undef ENTRY
   llvm_unreachable("bad DescriptiveDeclKind");
@@ -1019,6 +1022,36 @@ bool Decl::isInMacroExpansionInContext() const {
   return file->getFulfilledMacroRole() != std::nullopt;
 }
 
+bool Decl::isInMacroExpansionFromClangHeader() const {
+  SourceLoc declLoc = getLoc();
+  if (declLoc.isInvalid())
+    return false;
+
+  auto &ctx = getASTContext();
+  auto &SourceMgr = ctx.SourceMgr;
+
+  auto declBufferID = SourceMgr.findBufferContainingLoc(declLoc);
+  auto declGeneratedSourceInfo = SourceMgr.getGeneratedSourceInfo(declBufferID);
+  if (!declGeneratedSourceInfo)
+    return false;
+  CustomAttr *attr = declGeneratedSourceInfo->attachedMacroCustomAttr;
+  if (!attr)
+    return false;
+
+  SourceLoc macroAttrLoc = attr->AtLoc;
+  if (macroAttrLoc.isInvalid())
+    return false;
+
+  auto macroAttrBufferID = SourceMgr.findBufferContainingLoc(macroAttrLoc);
+  auto macroAttrGeneratedSourceInfo =
+      SourceMgr.getGeneratedSourceInfo(macroAttrBufferID);
+  if (!macroAttrGeneratedSourceInfo)
+    return false;
+
+  return macroAttrGeneratedSourceInfo->kind ==
+         GeneratedSourceInfo::AttributeFromClang;
+}
+
 SourceLoc Decl::getLocFromSource() const {
   switch (getKind()) {
 #define DECL(ID, X) \
@@ -1211,17 +1244,20 @@ ExplicitSafety Decl::getExplicitSafety() const {
   // If this declaration is from C, ask the Clang importer.
   if (auto clangDecl = getClangDecl()) {
     ASTContext &ctx = getASTContext();
-    return evaluateOrDefault(ctx.evaluator,
-                             ClangDeclExplicitSafety({clangDecl}),
-                             ExplicitSafety::Unspecified);
+    return evaluateOrDefault(
+        ctx.evaluator,
+        ClangDeclExplicitSafety({clangDecl, isa<ClassDecl>(this)}),
+        ExplicitSafety::Unspecified);
   }
   
-  // Inference: Check the enclosing context.
-  if (auto enclosingDC = getDeclContext()) {
-    // Is this an extension with @safe or @unsafe on it?
-    if (auto ext = dyn_cast<ExtensionDecl>(enclosingDC)) {
-      if (auto extSafety = getExplicitSafetyFromAttrs(ext))
-        return *extSafety;
+  // Inference: Check the enclosing context, unless this is a type.
+  if (!isa<TypeDecl>(this)) {
+    if (auto enclosingDC = getDeclContext()) {
+      // Is this an extension with @safe or @unsafe on it?
+      if (auto ext = dyn_cast<ExtensionDecl>(enclosingDC)) {
+        if (auto extSafety = getExplicitSafetyFromAttrs(ext))
+          return *extSafety;
+      }
     }
   }
 
@@ -1466,9 +1502,9 @@ AvailabilityRange Decl::getAvailabilityForLinkage() const {
 
 bool Decl::isAlwaysWeakImported() const {
   // For a Clang declaration, trust Clang.
-  if (auto clangDecl = getClangDecl()) {
-    return clangDecl->isWeakImported();
-  }
+  if (auto clangDecl = getClangDecl())
+    return clangDecl->isWeakImported(
+        getASTContext().LangOpts.getMinPlatformVersion());
 
   if (getAttrs().hasAttribute<WeakLinkedAttr>())
     return true;
@@ -1678,6 +1714,7 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
   case DeclKind::Missing:
   case DeclKind::MissingMember:
   case DeclKind::MacroExpansion:
+  case DeclKind::Using:
     llvm_unreachable("not a ValueDecl");
 
   case DeclKind::AssociatedType:
@@ -1803,6 +1840,30 @@ bool ImportDecl::isAccessLevelImplicit() const {
     return false;
   }
   return true;
+}
+
+UsingDecl::UsingDecl(SourceLoc usingLoc, SourceLoc specifierLoc,
+                     UsingSpecifier specifier, DeclContext *parent)
+    : Decl(DeclKind::Using, parent), UsingLoc(usingLoc),
+      SpecifierLoc(specifierLoc) {
+  Bits.UsingDecl.Specifier = static_cast<unsigned>(specifier);
+  assert(getSpecifier() == specifier &&
+         "not enough bits in UsingDecl flags for specifier");
+}
+
+std::string UsingDecl::getSpecifierName() const {
+  switch (getSpecifier()) {
+  case UsingSpecifier::MainActor:
+    return "@MainActor";
+  case UsingSpecifier::Nonisolated:
+    return "nonisolated";
+  }
+}
+
+UsingDecl *UsingDecl::create(ASTContext &ctx, SourceLoc usingLoc,
+                             SourceLoc specifierLoc, UsingSpecifier specifier,
+                             DeclContext *parent) {
+  return new (ctx) UsingDecl(usingLoc, specifierLoc, specifier, parent);
 }
 
 void NominalTypeDecl::setConformanceLoader(LazyMemberLoader *lazyLoader,
@@ -2019,11 +2080,14 @@ NominalTypeDecl *ExtensionDecl::getExtendedNominal() const {
       "Extension must have already been bound (by bindExtensions)");
 }
 
-NominalTypeDecl *ExtensionDecl::computeExtendedNominal() const {
+NominalTypeDecl *ExtensionDecl::computeExtendedNominal(
+    bool excludeMacroExpansions) const {
   ASTContext &ctx = getASTContext();
-  return evaluateOrDefault(
-      ctx.evaluator, ExtendedNominalRequest{const_cast<ExtensionDecl *>(this)},
-      nullptr);
+  return evaluateOrDefault(ctx.evaluator,
+                           ExtendedNominalRequest{
+                               const_cast<ExtensionDecl *>(this),
+                               excludeMacroExpansions},
+                           nullptr);
 }
 
 bool ExtensionDecl::canNeverBeBound() const {
@@ -2493,6 +2557,19 @@ StringRef PatternBindingEntry::getInitStringRepresentation(
   auto &ctx = getAnchoringVarDecl()->getASTContext();
   auto init = getOriginalInit();
   return extractInlinableText(ctx, init, scratch);
+}
+
+SourceLoc PatternBindingDecl::getStartLoc() const {
+  if (StaticLoc.isValid())
+    return StaticLoc;
+
+  if (VarLoc.isValid())
+    return VarLoc;
+
+  if (getPatternList().empty())
+    return SourceLoc();
+
+  return getPatternList().front().getStartLoc();
 }
 
 SourceRange PatternBindingDecl::getSourceRange() const {
@@ -3026,9 +3103,11 @@ getDirectWriteAccessStrategy(const AbstractStorageDecl *storage) {
   llvm_unreachable("bad impl kind");
 }
 
-static AccessStrategy
-getOpaqueReadAccessStrategy(const AbstractStorageDecl *storage, bool dispatch,
-                            bool useOldABI);
+static AccessStrategy getOpaqueReadAccessStrategy(
+    const AbstractStorageDecl *storage, bool dispatch, ModuleDecl *module,
+    ResilienceExpansion expansion,
+    std::optional<std::pair<SourceRange, const DeclContext *>> location,
+    bool useOldABI);
 static AccessStrategy
 getOpaqueWriteAccessStrategy(const AbstractStorageDecl *storage, bool dispatch);
 
@@ -3043,7 +3122,9 @@ getDirectReadWriteAccessStrategy(const AbstractStorageDecl *storage) {
     // If the storage isDynamic (and not @objc) use the accessors.
     if (storage->shouldUseNativeDynamicDispatch())
       return AccessStrategy::getMaterializeToTemporary(
-          getOpaqueReadAccessStrategy(storage, false, false),
+          getOpaqueReadAccessStrategy(storage, false, nullptr,
+                                      ResilienceExpansion::Minimal,
+                                      std::nullopt, false),
           getOpaqueWriteAccessStrategy(storage, false));
     return AccessStrategy::getStorage();
   }
@@ -3080,15 +3161,61 @@ getDirectReadWriteAccessStrategy(const AbstractStorageDecl *storage) {
   llvm_unreachable("bad impl kind");
 }
 
-static AccessStrategy
-getOpaqueReadAccessStrategy(const AbstractStorageDecl *storage, bool dispatch,
-                            bool useOldABI) {
+static bool mayReferenceUseCoroutineAccessorOnStorage(
+    ModuleDecl *module, ResilienceExpansion expansion,
+    std::optional<std::pair<SourceRange, const DeclContext *>> reference,
+    const AbstractStorageDecl *storage) {
+  assert(storage);
+  ASTContext &ctx = storage->getASTContext();
+  assert(ctx.LangOpts.hasFeature(Feature::CoroutineAccessors));
+
+  // For triples without platforms, coroutine accessors are always available.
+  auto domain = ctx.getTargetAvailabilityDomain();
+  if (domain.isUniversal())
+    return true;
+
+  // A non-resilient access to storage can always use the coroutine accessor,
+  // provided it exists.  Such an access is compiled with the version of the
+  // module that includes the accessor.
+  bool resilient = [&] {
+    if (module)
+      return storage->isResilient(module, expansion);
+    else
+      return storage->isResilient();
+  }();
+  if (!resilient)
+    return true;
+
+  // Without knowing where the storage is referenced, it can't be known that
+  // a coroutine accessor is available.
+  if (!reference) {
+    return false;
+  }
+
+  // A resilient access to storage may only use a coroutine accessor if the
+  // storage became available no earlier than the feature.
+  auto referenceAvailability = AvailabilityContext::forLocation(
+                                   reference->first.Start, reference->second)
+                                   .getPlatformRange();
+  auto featureAvailability =
+      storage->getASTContext().getCoroutineAccessorsAvailability();
+
+  return referenceAvailability.isContainedIn(featureAvailability);
+}
+
+static AccessStrategy getOpaqueReadAccessStrategy(
+    const AbstractStorageDecl *storage, bool dispatch, ModuleDecl *module,
+    ResilienceExpansion expansion,
+    std::optional<std::pair<SourceRange, const DeclContext *>> location,
+    bool useOldABI) {
   if (useOldABI) {
     assert(storage->requiresOpaqueRead2Coroutine());
     assert(storage->requiresOpaqueReadCoroutine());
     return AccessStrategy::getAccessor(AccessorKind::Read, dispatch);
   }
-  if (storage->requiresOpaqueRead2Coroutine())
+  if (storage->requiresOpaqueRead2Coroutine() &&
+      mayReferenceUseCoroutineAccessorOnStorage(module, expansion, location,
+                                                storage))
     return AccessStrategy::getAccessor(AccessorKind::Read2, dispatch);
   if (storage->requiresOpaqueReadCoroutine())
     return AccessStrategy::getAccessor(AccessorKind::Read, dispatch);
@@ -3102,41 +3229,53 @@ getOpaqueWriteAccessStrategy(const AbstractStorageDecl *storage, bool dispatch) 
   return AccessStrategy::getAccessor(AccessorKind::Set, dispatch);
 }
 
-static AccessStrategy
-getOpaqueReadWriteAccessStrategy(const AbstractStorageDecl *storage,
-                                 bool dispatch, bool useOldABI) {
+static AccessStrategy getOpaqueReadWriteAccessStrategy(
+    const AbstractStorageDecl *storage, bool dispatch, ModuleDecl *module,
+    ResilienceExpansion expansion,
+    std::optional<std::pair<SourceRange, const DeclContext *>> location,
+    bool useOldABI) {
   if (useOldABI) {
     assert(storage->requiresOpaqueModify2Coroutine());
     assert(storage->requiresOpaqueModifyCoroutine());
     return AccessStrategy::getAccessor(AccessorKind::Modify, dispatch);
   }
-  if (storage->requiresOpaqueModify2Coroutine())
+  if (storage->requiresOpaqueModify2Coroutine() &&
+      mayReferenceUseCoroutineAccessorOnStorage(module, expansion, location,
+                                                storage))
     return AccessStrategy::getAccessor(AccessorKind::Modify2, dispatch);
   if (storage->requiresOpaqueModifyCoroutine())
     return AccessStrategy::getAccessor(AccessorKind::Modify, dispatch);
   return AccessStrategy::getMaterializeToTemporary(
-      getOpaqueReadAccessStrategy(storage, dispatch, false),
+      getOpaqueReadAccessStrategy(storage, dispatch, nullptr,
+                                  ResilienceExpansion::Minimal, location,
+                                  false),
       getOpaqueWriteAccessStrategy(storage, dispatch));
 }
 
-static AccessStrategy
-getOpaqueAccessStrategy(const AbstractStorageDecl *storage,
-                        AccessKind accessKind, bool dispatch, bool useOldABI) {
+static AccessStrategy getOpaqueAccessStrategy(
+    const AbstractStorageDecl *storage, AccessKind accessKind, bool dispatch,
+    ModuleDecl *module, ResilienceExpansion expansion,
+    std::optional<std::pair<SourceRange, const DeclContext *>> location,
+    bool useOldABI) {
   switch (accessKind) {
   case AccessKind::Read:
-    return getOpaqueReadAccessStrategy(storage, dispatch, useOldABI);
+    return getOpaqueReadAccessStrategy(storage, dispatch, module, expansion,
+                                       location, useOldABI);
   case AccessKind::Write:
     assert(!useOldABI);
     return getOpaqueWriteAccessStrategy(storage, dispatch);
   case AccessKind::ReadWrite:
-    return getOpaqueReadWriteAccessStrategy(storage, dispatch, useOldABI);
+    return getOpaqueReadWriteAccessStrategy(storage, dispatch, module,
+                                            expansion, location, useOldABI);
   }
   llvm_unreachable("bad access kind");
 }
 
 AccessStrategy AbstractStorageDecl::getAccessStrategy(
     AccessSemantics semantics, AccessKind accessKind, ModuleDecl *module,
-    ResilienceExpansion expansion, bool useOldABI) const {
+    ResilienceExpansion expansion,
+    std::optional<std::pair<SourceRange, const DeclContext *>> location,
+    bool useOldABI) const {
   switch (semantics) {
   case AccessSemantics::DirectToStorage:
     assert(hasStorage() || getASTContext().Diags.hadAnyError());
@@ -3153,11 +3292,11 @@ AccessStrategy AbstractStorageDecl::getAccessStrategy(
       // accessors are dynamically dispatched, and we cannot do direct access.
       if (isPolymorphic(this))
         return getOpaqueAccessStrategy(this, accessKind, /*dispatch*/ true,
-                                       useOldABI);
+                                       module, expansion, location, useOldABI);
 
       if (shouldUseNativeDynamicDispatch())
         return getOpaqueAccessStrategy(this, accessKind, /*dispatch*/ false,
-                                       useOldABI);
+                                       module, expansion, location, useOldABI);
 
       // If the storage is resilient from the given module and resilience
       // expansion, we cannot use direct access.
@@ -3180,7 +3319,7 @@ AccessStrategy AbstractStorageDecl::getAccessStrategy(
 
       if (resilient)
         return getOpaqueAccessStrategy(this, accessKind, /*dispatch*/ false,
-                                       useOldABI);
+                                       module, expansion, location, useOldABI);
     }
 
     LLVM_FALLTHROUGH;
@@ -3198,6 +3337,15 @@ AccessStrategy AbstractStorageDecl::getAccessStrategy(
 
   }
   llvm_unreachable("bad access semantics");
+}
+
+bool AbstractStorageDecl::isAccessedViaPhysicalStorage(
+    AccessSemantics semantics, AccessKind accessKind, ModuleDecl *module,
+    ResilienceExpansion expansion) const {
+  return getAccessStrategy(semantics, accessKind, module, expansion,
+                           /*location=*/std::nullopt,
+                           /*useOldABI=*/false)
+             .getKind() == AccessStrategy::Kind::Storage;
 }
 
 bool AbstractStorageDecl::requiresOpaqueAccessors() const {
@@ -3535,6 +3683,7 @@ bool ValueDecl::isInstanceMember() const {
   case DeclKind::Missing:
   case DeclKind::MissingMember:
   case DeclKind::MacroExpansion:
+  case DeclKind::Using:
     llvm_unreachable("Not a ValueDecl");
 
   case DeclKind::Class:
@@ -3786,6 +3935,13 @@ bool swift::conflicting(ASTContext &ctx,
   if (sig1.IsFunction != sig2.IsFunction)
     return true;
 
+  // Gracefully handle the case where value generic arguments were introduced
+  // as a conflicting value with static variables of the same name.
+  if (sig1.IsGenericArg != sig2.IsGenericArg) {
+    *wouldConflictInSwift5 = true;
+    return true;
+  }
+
   // Variables always conflict with non-variables with the same signature.
   // (e.g variables with zero argument functions, variables with type
   //  declarations)
@@ -3964,6 +4120,7 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
   signature.IsNominal = isa<NominalTypeDecl>(this);
   signature.IsTypeAlias = isa<TypeAliasDecl>(this);
   signature.IsMacro = isa<MacroDecl>(this);
+  signature.IsGenericArg = isa<GenericTypeParamDecl>(this);
   signature.HasOpaqueReturnType =
                        !signature.IsVariable && (bool)getOpaqueResultTypeDecl();
 
@@ -4640,6 +4797,7 @@ SourceLoc Decl::getAttributeInsertionLoc(bool forModifier) const {
   case DeclKind::MissingMember:
   case DeclKind::MacroExpansion:
   case DeclKind::BuiltinTuple:
+  case DeclKind::Using:
     // These don't take attributes.
     return SourceLoc();
 
@@ -6209,6 +6367,9 @@ ConstructorDecl *NominalTypeDecl::getDefaultInitializer() const {
 }
 
 void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
+  if (isa<ProtocolDecl>(this))
+    return;
+
   // Silently break cycles here because we can't be sure when and where a
   // request to synthesize will come from yet.
   // FIXME: rdar://56844567
@@ -8807,6 +8968,21 @@ ParamDecl *ParamDecl::clone(const ASTContext &Ctx, ParamDecl *PD) {
   return Clone;
 }
 
+ParamDecl *ParamDecl::cloneAccessor(const ASTContext &Ctx,
+                                    ParamDecl const *subscriptParam,
+                                    DeclContext *Parent) {
+  auto *param = new (Ctx) ParamDecl(
+      subscriptParam->getSpecifierLoc(), subscriptParam->getArgumentNameLoc(),
+      subscriptParam->getArgumentName(), subscriptParam->getNameLoc(),
+      subscriptParam->getName(), /*declContext*/ Parent);
+  param->setOptions(subscriptParam->getOptions());
+
+  // The cloned parameter is implicit.
+  param->setImplicit();
+
+  return param;
+}
+
 ParamDecl *
 ParamDecl::createImplicit(ASTContext &Context, SourceLoc specifierLoc,
                           SourceLoc argumentNameLoc, Identifier argumentName,
@@ -8938,6 +9114,12 @@ void ParamDecl::setTypeRepr(TypeRepr *repr) {
           setSending(true);
         unwrappedType = STR->getBase();
         continue;
+      }
+
+      if (auto *callerIsolated =
+              dyn_cast<CallerIsolatedTypeRepr>(unwrappedType)) {
+        setCallerIsolated(true);
+        unwrappedType = callerIsolated->getBase();
       }
 
       break;
@@ -10190,30 +10372,20 @@ SourceRange AbstractFunctionDecl::getSignatureSourceRange() const {
   if (isImplicit())
     return SourceRange();
 
-  SourceLoc endLoc;
+  SourceRange thrownTypeRange;
+  if (auto *typeRepr = getThrownTypeRepr())
+    thrownTypeRange = typeRepr->getSourceRange();
 
   // name(parameter list...) async throws(E)
-  if (auto *typeRepr = getThrownTypeRepr())
-    endLoc = typeRepr->getSourceRange().End;
-  if (endLoc.isInvalid())
-    endLoc = getThrowsLoc();
-  if (endLoc.isInvalid())
-    endLoc = getAsyncLoc();
-
-  if (endLoc.isInvalid())
-    return getParameterListSourceRange();
-  return SourceRange(getNameLoc(), endLoc);
+  return SourceRange::combine(getParameterListSourceRange(), getAsyncLoc(),
+                              getThrowsLoc(), thrownTypeRange);
 }
 
 SourceRange AbstractFunctionDecl::getParameterListSourceRange() const {
   if (isImplicit())
     return SourceRange();
 
-  auto endLoc = getParameters()->getSourceRange().End;
-  if (endLoc.isInvalid())
-    return getNameLoc();
-
-  return SourceRange(getNameLoc(), endLoc);
+  return SourceRange::combine(getNameLoc(), getParameters()->getSourceRange());
 }
 
 std::optional<Fingerprint> AbstractFunctionDecl::getBodyFingerprint() const {
@@ -10441,6 +10613,15 @@ AbstractFunctionDecl::getObjCSelector(DeclName preferredName,
 
 bool AbstractFunctionDecl::isObjCInstanceMethod() const {
   return isInstanceMember() || isa<ConstructorDecl>(this);
+}
+
+std::optional<ForeignLanguage> AbstractFunctionDecl::getCDeclKind() const {
+  auto attr = getAttrs().getAttribute<CDeclAttr>();
+  if (!attr)
+    return std::nullopt;
+
+  return attr->Underscored ? ForeignLanguage::ObjectiveC
+                           : ForeignLanguage::C;
 }
 
 bool AbstractFunctionDecl::needsNewVTableEntry() const {
@@ -10957,7 +11138,7 @@ AccessorDecl *AccessorDecl::createImplicit(ASTContext &ctx,
       ctx, /*declLoc=*/SourceLoc(),
       /*accessorKeywordLoc=*/SourceLoc(), accessorKind,
       storage, async, /*asyncLoc=*/SourceLoc(),
-      /*throws=*/true, /*throwsLoc=*/SourceLoc(),
+      /*throws=*/throws, /*throwsLoc=*/SourceLoc(),
       thrownType, parent,
       /*clangNode=*/ClangNode());
   D->setImplicit();
@@ -11011,20 +11192,7 @@ AccessorDecl *AccessorDecl::createParsed(
       paramsEnd = indices->getEndLoc();
     }
     for (auto *subscriptParam : *indices) {
-      // Clone the parameter.
-      auto *param = new (ctx) ParamDecl(
-          subscriptParam->getSpecifierLoc(),
-          subscriptParam->getArgumentNameLoc(),
-          subscriptParam->getArgumentName(), subscriptParam->getNameLoc(),
-          subscriptParam->getName(), /*declContext*/ accessor);
-      param->setAutoClosure(subscriptParam->isAutoClosure());
-
-      // The cloned parameter is implicit.
-      param->setImplicit();
-
-      if (subscriptParam->isSending())
-        param->setSending();
-
+      auto param = ParamDecl::cloneAccessor(ctx, subscriptParam, accessor);
       newParams.push_back(param);
     }
 
@@ -11324,33 +11492,62 @@ DestructorDecl *DestructorDecl::getSuperDeinit() const {
   return nullptr;
 }
 
+SourceLoc FuncDecl::getStartLoc() const {
+  if (StaticLoc)
+    return StaticLoc;
+
+  if (FuncLoc)
+    return FuncLoc;
+
+  auto nameLoc = getNameLoc();
+  if (nameLoc)
+    return nameLoc;
+
+  auto sigStart = getSignatureSourceRange().Start;
+  if (sigStart)
+    return sigStart;
+
+  auto resultTyStart = getResultTypeSourceRange().Start;
+  if (resultTyStart)
+    return resultTyStart;
+
+  auto genericWhereStart = getGenericTrailingWhereClauseSourceRange().Start;
+  if (genericWhereStart)
+    return genericWhereStart;
+
+  auto bodyStart = getOriginalBodySourceRange().Start;
+  if (bodyStart)
+    return bodyStart;
+
+  return SourceLoc();
+}
+
+SourceLoc FuncDecl::getEndLoc() const {
+  auto bodyEnd = getOriginalBodySourceRange().End;
+  if (bodyEnd)
+    return bodyEnd;
+
+  auto genericWhereEnd = getGenericTrailingWhereClauseSourceRange().End;
+  if (genericWhereEnd)
+    return genericWhereEnd;
+
+  auto resultTyEnd = getResultTypeSourceRange().End;
+  if (resultTyEnd)
+    return resultTyEnd;
+
+  auto sigEnd = getSignatureSourceRange().End;
+  if (sigEnd)
+    return sigEnd;
+
+  return getStartLoc();
+}
+
 SourceRange FuncDecl::getSourceRange() const {
   SourceLoc startLoc = getStartLoc();
-
   if (startLoc.isInvalid())
     return SourceRange();
 
-  if (getBodyKind() == BodyKind::Unparsed)
-    return { startLoc, BodyRange.End };
-
-  SourceLoc endLoc = getOriginalBodySourceRange().End;
-  if (endLoc.isInvalid()) {
-    if (isa<AccessorDecl>(this))
-      return startLoc;
-
-    if (getBodyKind() == BodyKind::Synthesize)
-      return SourceRange();
-
-    endLoc = getGenericTrailingWhereClauseSourceRange().End;
-  }
-  if (endLoc.isInvalid())
-    endLoc = getResultTypeSourceRange().End;
-  if (endLoc.isInvalid())
-    endLoc = getSignatureSourceRange().End;
-  if (endLoc.isInvalid())
-    endLoc = startLoc;
-
-  return { startLoc, endLoc };
+  return { startLoc, getEndLoc() };
 }
 
 EnumElementDecl::EnumElementDecl(SourceLoc IdentifierLoc, DeclName Name,

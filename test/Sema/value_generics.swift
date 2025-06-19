@@ -51,6 +51,8 @@ func c<let M: Int>(with a: A<M>) {} // OK
 func d<T>(with a: A<T>) {} // expected-error {{cannot pass type 'T' as a value for generic value 'N'}}
 func e(with a: A<Int>) {} // expected-error {{cannot pass type 'Int' as a value for generic value 'N'}}
 
+func *<let X: Int, let Y: Int>(l: A<X>, r: A<Y>) -> Int { l.int * r.int }
+
 struct Generic<T: ~Copyable & ~Escapable> {}
 struct GenericWithIntParam<T: ~Copyable & ~Escapable, let N: Int> {}
 
@@ -119,3 +121,71 @@ func testC4<let T: Int>(with c: C<T, T>) {
 }
 
 struct D<let N: Int & P> {} // expected-error {{non-protocol, non-class type 'Int' cannot be used within a protocol-constrained type}}
+
+struct E<A, let b: Int> { // expected-note {{'b' previously declared here}}
+  static var b: Int { // expected-warning {{redeclaration of 'b' is deprecated and will be an error in Swift 5}}
+                      // expected-note@-1 {{'b' declared here}}
+    123
+  }
+
+  let b: String // expected-note {{'b' previously declared here}}
+                // expected-note@-1 {{'b' declared here}}
+
+  func b() {} // expected-error {{invalid redeclaration of 'b()'}}
+              // expected-note@-1 {{'b' declared here}}
+
+  func dumb() -> Int {
+    Self.b // OK
+  }
+
+  static func dumb2() -> Int {
+    Self.b // OK
+  }
+}
+
+func testE1() -> Int {
+  E<Int, 123>.b // OK
+}
+
+func testE2() -> Int {
+  E<Int, 123>.A // expected-error {{type 'E<Int, 123>' has no member 'A'}}
+}
+
+func testE3<let c: Int>(_: E<Int, c>.Type) -> Int {
+  E<Int, c>.b // OK
+}
+
+func testShadowing<let a: Int>(_: A<a>) {
+  var a: String {
+    "123"
+  }
+
+  let x: String = a // OK
+  let y: Int = a // expected-error {{cannot convert value of type 'String' to specified type 'Int'}}
+
+  print(a) // OK
+  print(a.self) // OK
+}
+
+class F<let n: Int> {}
+class G: F<3> {}
+
+func hello() -> Int {
+  G.n // OK
+}
+
+func testTypeOf() -> Int {
+  let x = E<Int, 123>(b: "")
+  return type(of: x).b // OK
+}
+
+func testTypeOf2<let c: Int>(_: E<Int, c>.Type) -> Int {
+  let x = E<Int, c>(b: "")
+  return type(of: x).b // OK
+}
+
+struct H<let I: Int> { // expected-note {{'I' previously declared here}}
+  struct I {} // expected-warning {{redeclaration of 'I' is deprecated and will be an error in Swift 5}}
+}
+
+typealias J = E<Int, 123>.b // expected-error {{static property 'b' is not a member type of 'E<Int, 123>'}}

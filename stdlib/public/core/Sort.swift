@@ -530,10 +530,10 @@ extension UnsafeMutableBufferPointer {
     buffer: UnsafeMutablePointer<Element>,
     by areInIncreasingOrder: (Element, Element) throws -> Bool
   ) rethrows -> Bool {
-    unsafe _internalInvariant(runs[i - 1].upperBound == runs[i].lowerBound)
-    let low = unsafe runs[i - 1].lowerBound
-    let middle = unsafe runs[i].lowerBound
-    let high = unsafe runs[i].upperBound
+    _internalInvariant(runs[i - 1].upperBound == runs[i].lowerBound)
+    let low = runs[i - 1].lowerBound
+    let middle = runs[i].lowerBound
+    let high = runs[i].upperBound
     
     try unsafe _merge(
       low: baseAddress! + low,
@@ -542,8 +542,8 @@ extension UnsafeMutableBufferPointer {
       buffer: buffer,
       by: areInIncreasingOrder)
     
-    unsafe runs[i - 1] = unsafe low..<high
-    unsafe runs.remove(at: i)
+    runs[i - 1] = low..<high
+    runs.remove(at: i)
 
     return true
   }
@@ -588,30 +588,30 @@ extension UnsafeMutableBufferPointer {
     // for the entirety of `runs`.
     
     // The invariant is always in place for a single element.
-    while unsafe runs.count > 1 {
-      var lastIndex = unsafe runs.count - 1
+    while runs.count > 1 {
+      var lastIndex = runs.count - 1
       
       // Check for the three invariant-breaking conditions, and break out of
       // the while loop if none are met.
-      if unsafe lastIndex >= 3 &&
+      if lastIndex >= 3 &&
         (runs[lastIndex - 3].count <=
           runs[lastIndex - 2].count + runs[lastIndex - 1].count)
       {
         // Second-to-last three runs do not follow W > X + Y.
         // Always merge Y with the smaller of X or Z.
-        if unsafe runs[lastIndex - 2].count < runs[lastIndex].count {
+        if runs[lastIndex - 2].count < runs[lastIndex].count {
           lastIndex -= 1
         }
-      } else if unsafe lastIndex >= 2 &&
+      } else if lastIndex >= 2 &&
         (runs[lastIndex - 2].count <=
           runs[lastIndex - 1].count + runs[lastIndex].count)
       {
         // Last three runs do not follow X > Y + Z.
         // Always merge Y with the smaller of X or Z.
-        if unsafe runs[lastIndex - 2].count < runs[lastIndex].count {
+        if runs[lastIndex - 2].count < runs[lastIndex].count {
           lastIndex -= 1
         }
-      } else if unsafe runs[lastIndex - 1].count <= runs[lastIndex].count {
+      } else if runs[lastIndex - 1].count <= runs[lastIndex].count {
         // Last two runs do not follow Y > Z, so merge Y and Z.
         // This block is intentionally blank--the merge happens below.
       } else {
@@ -645,7 +645,7 @@ extension UnsafeMutableBufferPointer {
     buffer: UnsafeMutablePointer<Element>,
     by areInIncreasingOrder: (Element, Element) throws -> Bool
   ) rethrows -> Bool {
-    while unsafe runs.count > 1 {
+    while runs.count > 1 {
       try unsafe _mergeRuns(
         &runs, at: runs.count - 1, buffer: buffer, by: areInIncreasingOrder)
     }
@@ -677,7 +677,7 @@ extension UnsafeMutableBufferPointer {
     // closure, since the buffer is guaranteed to be uninitialized at exit.
     _ = try unsafe Array<Element>(_unsafeUninitializedCapacity: count / 2) {
       buffer, _ in
-      var runs: [Range<Index>] = unsafe []
+      var runs: [Range<Index>] = []
       
       var start = startIndex
       while start < endIndex {
@@ -690,24 +690,24 @@ extension UnsafeMutableBufferPointer {
         
         // If the current run is shorter than the minimum length, use the
         // insertion sort to extend it.
-        if unsafe end < endIndex && end - start < minimumRunLength {
+        if end < endIndex && end - start < minimumRunLength {
           let newEnd = Swift.min(endIndex, start + minimumRunLength)
           try unsafe _insertionSort(
             within: start..<newEnd, sortedEnd: end, by: areInIncreasingOrder)
-          unsafe end = newEnd
+          end = newEnd
         }
         
         // Append this run and merge down as needed to maintain the `runs`
         // invariants.
-        unsafe runs.append(start..<end)
+        runs.append(start..<end)
         try unsafe _mergeTopRuns(
           &runs, buffer: buffer.baseAddress!, by: areInIncreasingOrder)
-        start = unsafe end
+        start = end
       }
       
       try unsafe _finalizeRuns(
         &runs, buffer: buffer.baseAddress!, by: areInIncreasingOrder)
-      unsafe _internalInvariant(runs.count == 1, "Didn't complete final merge")
+      _internalInvariant(runs.count == 1, "Didn't complete final merge")
     }
   }
 }

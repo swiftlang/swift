@@ -583,6 +583,18 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
       return unsafe _overrideLifetime(span, borrowing: self)
     }
   }
+%if Mutable:
+
+  @unsafe
+  @available(SwiftStdlib 6.2, *)
+  public var mutableSpan: MutableSpan<Element> {
+    @lifetime(borrow self)
+    @_alwaysEmitIntoClient
+    get {
+      unsafe MutableSpan(_unsafeElements: self)
+    }
+  }
+%end
 }
 
 extension Unsafe${Mutable}BufferPointer {
@@ -1300,7 +1312,7 @@ extension UnsafeMutableBufferPointer where Element: ~Copyable {
   ///   - index: The index of the element to initialize
   @_alwaysEmitIntoClient
   public func initializeElement(at index: Index, to value: consuming Element) {
-    _debugPrecondition(unsafe startIndex <= index && index < endIndex)
+    _debugPrecondition(startIndex <= index && index < endIndex)
     let p = unsafe baseAddress._unsafelyUnwrappedUnchecked.advanced(by: index)
     unsafe p.initialize(to: value)
   }
@@ -1317,7 +1329,7 @@ extension UnsafeMutableBufferPointer where Element: ~Copyable {
   /// - Returns: The instance referenced by this index in this buffer.
   @_alwaysEmitIntoClient
   public func moveElement(from index: Index) -> Element {
-    _debugPrecondition(unsafe startIndex <= index && index < endIndex)
+    _debugPrecondition(startIndex <= index && index < endIndex)
     return unsafe baseAddress._unsafelyUnwrappedUnchecked.advanced(by: index).move()
   }
 
@@ -1331,7 +1343,7 @@ extension UnsafeMutableBufferPointer where Element: ~Copyable {
   ///   - index: The index of the buffer element to deinitialize.
   @_alwaysEmitIntoClient
   public func deinitializeElement(at index: Index) {
-    _debugPrecondition(unsafe startIndex <= index && index < endIndex)
+    _debugPrecondition(startIndex <= index && index < endIndex)
     let p = unsafe baseAddress._unsafelyUnwrappedUnchecked.advanced(by: index)
     unsafe p.deinitialize(count: 1)
   }

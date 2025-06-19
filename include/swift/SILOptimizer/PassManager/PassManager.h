@@ -138,7 +138,7 @@ public:
   void freeOperandSet(OperandSet *set);
 
   /// The top-level API to erase an instruction, called from the Swift pass.
-  void eraseInstruction(SILInstruction *inst);
+  void eraseInstruction(SILInstruction *inst, bool salvageDebugInfo);
 
   /// Called by the pass when changes are made to the SIL.
   void notifyChanges(SILAnalysis::InvalidationKind invalidationKind);

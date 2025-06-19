@@ -15,7 +15,7 @@ func dup<T>(_ x: T) -> (T, T) { var x = x; return (x,x) }
 //   Allocate a local variable for 'x'.
 // CHECK: [[VWT_ADDR:%.*]] = getelementptr inbounds ptr, ptr %T, i64 -1
 // CHECK: [[VWT:%.*]] = load ptr, ptr [[VWT_ADDR]]
-// CHECK: [[SIZE_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[VWT]], i32 0, i32 8
+// CHECK: [[SIZE_ADDR:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[VWT]], i32 0, i32 8
 // CHECK: [[SIZE:%.*]] = load i64, ptr [[SIZE_ADDR]]
 // CHECK: [[X_ALLOCA:%.*]] = alloca i8, {{.*}} [[SIZE]], align 16
 // Debug info shadow copy.

@@ -158,6 +158,7 @@ public:
   UNREACHABLE(MissingMember);
   UNREACHABLE(GenericTypeParam);
   UNREACHABLE(Param);
+  UNREACHABLE(Using);
 
 #undef UNREACHABLE
 

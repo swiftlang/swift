@@ -218,9 +218,9 @@ func class_protocol_field_struct_fields
 func class_generic_field_class_fields<T>
 (_ x:ClassGenericFieldClass<T>) -> (Int, T, Int) {
   return (x.x, x.y, x.z)
-  // CHECK: getelementptr inbounds %T22class_bounded_generics017ClassGenericFieldD0C, ptr %0, i32 0, i32 1
-  // CHECK: getelementptr inbounds %T22class_bounded_generics017ClassGenericFieldD0C, ptr %0, i32 0, i32 2
-  // CHECK: getelementptr inbounds %T22class_bounded_generics017ClassGenericFieldD0C, ptr %0, i32 0, i32 3
+  // CHECK: getelementptr inbounds{{.*}} %T22class_bounded_generics017ClassGenericFieldD0C, ptr %0, i32 0, i32 1
+  // CHECK: getelementptr inbounds{{.*}} %T22class_bounded_generics017ClassGenericFieldD0C, ptr %0, i32 0, i32 2
+  // CHECK: getelementptr inbounds{{.*}} %T22class_bounded_generics017ClassGenericFieldD0C, ptr %0, i32 0, i32 3
 }
 
 // CHECK-LABEL: define hidden swiftcc { i64, ptr, ptr, i64 } @"$s22class_bounded_generics0a16_protocol_field_A7_fields{{[_0-9a-zA-Z]*}}F"(ptr %0)

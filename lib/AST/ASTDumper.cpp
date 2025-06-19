@@ -200,6 +200,33 @@ private:
   virtual void anchor() override {}
 };
 
+/// Replaces any local archetypes in the given type with their equivalent
+/// existential upper bounds so that they can be passed to the AST mangler. This
+/// loses information but is probably sufficient for most questions about these
+/// types that consumers of the JSON AST would ask.
+Type replaceLocalArchetypesWithExistentials(Type type) {
+  return type.transformRec([&](TypeBase *t) -> std::optional<Type> {
+    if (auto LAT = dyn_cast<LocalArchetypeType>(t)) {
+      return LAT->getExistentialType();
+    }
+    return std::nullopt;
+  });
+}
+
+/// Replaces any opaque type archetypes in the given type with their equivalent
+/// existential upper bounds. This is used when dumping the mapping of all
+/// opaque types in the source file so that their conformances can be more
+/// easily reasoned about without having to find the declaring opaque result
+/// type deeper in the AST.
+Type replaceOpaqueArchetypesWithExistentials(Type type) {
+  return type.transformRec([&](TypeBase *t) -> std::optional<Type> {
+    if (auto OT = dyn_cast<OpaqueTypeArchetypeType>(t)) {
+      return OT->getExistentialType();
+    }
+    return std::nullopt;
+  });
+}
+
 /// Returns the USR of the given declaration. Gracefully returns an empty
 /// string if D is null or invalid.
 std::string declUSR(const Decl *D) {
@@ -234,14 +261,10 @@ std::string typeUSR(Type type) {
     return "";
 
   if (type->hasArchetype()) {
-    // We can't generate USRs for types that contain archetypes. Replace them
-    // with their interface types.
-    type = type.transformRec([&](TypeBase *t) -> std::optional<Type> {
-      if (auto AT = dyn_cast<ArchetypeType>(t)) {
-        return AT->getInterfaceType();
-      }
-      return std::nullopt;
-    });
+    type = type->mapTypeOutOfContext();
+  }
+  if (type->hasLocalArchetype()) {
+    type = replaceLocalArchetypesWithExistentials(type);
   }
 
   std::string usr;
@@ -628,6 +651,21 @@ static StringRef getDumpString(ExplicitSafety safety) {
     return "unsafe";
   }
 }
+static StringRef getDumpString(ConformanceEntryKind kind) {
+  switch (kind) {
+  case ConformanceEntryKind::Inherited:
+    return "inherited";
+  case ConformanceEntryKind::Explicit:
+    return "explicit";
+  case ConformanceEntryKind::PreMacroExpansion:
+    return "pre_macro_expansion";
+  case ConformanceEntryKind::Synthesized:
+    return "synthesized";
+  case ConformanceEntryKind::Implied:
+    return "implied";
+  }
+  llvm_unreachable("unhandled ConformanceEntryKind");
+}
 static StringRef getDumpString(StringRef s) {
   return s;
 }
@@ -767,8 +805,6 @@ namespace {
     virtual void printSourceRange(const SourceRange R, const ASTContext *Ctx,
                                   Label label) = 0;
 
-    virtual bool hasNonStandardOutput() const = 0;
-
     /// Indicates whether the output format is meant to be parsable. Parsable
     /// output should use structure rather than stringification to convey
     /// detailed information, and generally provides more information than the
@@ -860,10 +896,6 @@ namespace {
         escaping_ostream escOS(OS);
         R.print(escOS, Ctx->SourceMgr, /*PrintText=*/false);
       }, label, RangeColor);
-    }
-
-    bool hasNonStandardOutput() const override {
-      return &OS != &llvm::errs() && &OS != &llvm::dbgs();
     }
 
     bool isParsable() const override { return false; }
@@ -976,8 +1008,6 @@ namespace {
       OS.attributeEnd();
     }
 
-    bool hasNonStandardOutput() const override { return true; }
-
     bool isParsable() const override { return true; }
   };
 
@@ -1007,10 +1037,6 @@ namespace {
         : Writer(writer), MemberLoading(memberLoading),
           GetTypeOfExpr(getTypeOfExpr), GetTypeOfTypeRepr(getTypeOfTypeRepr),
           GetTypeOfKeyPathComponent(getTypeOfKeyPathComponent) {}
-
-    bool hasNonStandardOutput() {
-      return Writer.hasNonStandardOutput();
-    }
 
     bool isTypeChecked() const {
       return MemberLoading == ASTDumpMemberLoading::TypeChecked;
@@ -1251,6 +1277,40 @@ namespace {
     void printRec(const ProtocolConformance *conformance,
                   VisitedConformances &visited, Label label);
 
+    // Print a field that describes the actor isolation associated with an AST
+    // node.
+    void printIsolation(const ActorIsolation &isolation) {
+      switch (isolation) {
+      case ActorIsolation::Unspecified:
+      case ActorIsolation::NonisolatedUnsafe:
+        break;
+
+      case ActorIsolation::Nonisolated:
+        printFlag(true, "nonisolated", CapturesColor);
+        break;
+
+      case ActorIsolation::Erased:
+        printFlag(true, "dynamically_isolated", CapturesColor);
+        break;
+
+      case ActorIsolation::CallerIsolationInheriting:
+        printFlag(true, "isolated_to_caller_isolation", CapturesColor);
+        break;
+
+      case ActorIsolation::ActorInstance:
+        printReferencedDeclWithContextField(isolation.getActorInstance(),
+                                            Label::always("actor_isolated"),
+                                            CapturesColor);
+        break;
+
+      case ActorIsolation::GlobalActor:
+        printTypeField(isolation.getGlobalActor(),
+                       Label::always("global_actor_isolated"), PrintOptions(),
+                       CapturesColor);
+        break;
+      }
+    }
+
     /// Print a requirement node.
     void visitRequirement(const Requirement &requirement, Label label) {
       printHead("requirement", ASTNodeColor, label);
@@ -1262,13 +1322,19 @@ namespace {
 
       printField(requirement.getKind(), Label::optional("kind"));
 
-      if (requirement.getKind() != RequirementKind::Layout
-            && requirement.getSecondType())
-        printTypeField(requirement.getSecondType(),
-                       Label::optional("second_type"), opts);
-      else if (requirement.getLayoutConstraint())
+      switch (requirement.getKind()) {
+      case RequirementKind::Layout:
         printFieldQuoted(requirement.getLayoutConstraint(),
                          Label::optional("layout"));
+        break;
+      case RequirementKind::Conformance:
+        printReferencedDeclField(requirement.getProtocolDecl(),
+                                 Label::optional("protocol"));
+        break;
+      default:
+        printTypeField(requirement.getSecondType(),
+                       Label::optional("second_type"), opts);
+      }
 
       printFoot();
     }
@@ -1654,7 +1720,8 @@ namespace {
     /// Prints a type as a field. If writing a parsable output format, the
     /// `PrintOptions` are ignored and the type is written as a USR; otherwise,
     /// the type is stringified using the `PrintOptions`.
-    void printTypeField(Type Ty, Label label, PrintOptions opts = PrintOptions(),
+    void printTypeField(Type Ty, Label label,
+                        const PrintOptions &opts = PrintOptions(),
                         TerminalColor Color = TypeColor) {
       if (Writer.isParsable()) {
         printField(typeUSR(Ty), label, Color);
@@ -1917,6 +1984,62 @@ namespace {
       }
     }
 
+    void printInheritance(const IterableDeclContext *DC) {
+      if (!(Writer.isParsable() && isTypeChecked())) {
+        // If the output is not parsable or we're not type-checked, just print
+        // the inheritance list as written.
+        switch (DC->getIterableContextKind()) {
+        case IterableDeclContextKind::NominalTypeDecl:
+          printInherited(cast<NominalTypeDecl>(DC)->getInherited());
+          break;
+        case IterableDeclContextKind::ExtensionDecl:
+          printInherited(cast<ExtensionDecl>(DC)->getInherited());
+          break;
+        }
+        return;
+      }
+
+      // For parsable, type-checked output, print a more structured
+      // representation of the data.
+      printRecArbitrary(
+          [&](Label label) {
+            printHead("inheritance", FieldLabelColor, label);
+
+            SmallPtrSet<const ProtocolConformance *, 4> dumped;
+            printList(
+                DC->getLocalConformances(),
+                [&](auto conformance, Label label) {
+                  printRec(conformance, dumped, label);
+                },
+                Label::always("conformances"));
+
+            if (auto CD = dyn_cast<ClassDecl>(DC); CD && CD->hasSuperclass()) {
+              printTypeField(CD->getSuperclass(),
+                             Label::always("superclass_type"));
+            }
+
+            if (auto ED = dyn_cast<EnumDecl>(DC); ED && ED->hasRawType()) {
+              printTypeField(ED->getRawType(), Label::always("raw_type"));
+            }
+
+            if (auto PD = dyn_cast<ProtocolDecl>(DC)) {
+              printList(
+                  PD->getAllInheritedProtocols(),
+                  [&](auto inherited, Label label) {
+                    printReferencedDeclField(inherited, label);
+                  },
+                  Label::always("protocols"));
+              if (PD->hasSuperclass()) {
+                printReferencedDeclField(PD->getSuperclassDecl(),
+                                         Label::always("superclass_decl_usr"));
+              }
+            }
+
+            printFoot();
+          },
+          Label::always("inherits"));
+    }
+
     void printInherited(InheritedTypes Inherited) {
       if (Writer.isParsable()) {
         printList(
@@ -1990,6 +2113,11 @@ namespace {
 
       printImportPath(ID, Label::always("module"));
       printFoot();
+    }
+
+    void visitUsingDecl(UsingDecl *UD, Label label) {
+      printCommon(UD, "using_decl", label);
+      printFieldQuoted(UD->getSpecifierName(), Label::always("specifier"));
     }
 
     void visitExtensionDecl(ExtensionDecl *ED, Label label) {
@@ -2252,13 +2380,13 @@ namespace {
       switch (IDC->getIterableContextKind()) {
       case IterableDeclContextKind::NominalTypeDecl: {
         const auto NTD = cast<NominalTypeDecl>(IDC);
-        printInherited(NTD->getInherited());
+        printInheritance(NTD);
         printWhereRequirements(NTD);
         break;
       }
       case IterableDeclContextKind::ExtensionDecl:
         const auto ED = cast<ExtensionDecl>(IDC);
-        printInherited(ED->getInherited());
+        printInheritance(ED);
         printWhereRequirements(ED);
         break;
       }
@@ -2287,6 +2415,27 @@ namespace {
         break;
       }
       printFoot();
+    }
+
+    // Prints a mapping from the declared interface types of the opaque types to
+    // their equivalent existential type. This loses some information, but it is
+    // meant to make it easier to determine which protocols an opaque type
+    // conforms to when such a type appears elsewhere in an expression dump,
+    // farther away from where the opaque type is declared.
+    void printOpaqueTypeMapping(ArrayRef<OpaqueTypeDecl *> opaqueDecls) {
+      printRecArbitrary(
+          [&](Label label) {
+            printHead("opaque_to_existential_mapping", FieldLabelColor, label);
+            for (const auto OTD : opaqueDecls) {
+              Type interfaceType = OTD->getDeclaredInterfaceType();
+              Type existentialType =
+                  replaceOpaqueArchetypesWithExistentials(interfaceType);
+              printTypeField(existentialType,
+                             Label::always(typeUSR(interfaceType)));
+            }
+            printFoot();
+          },
+          Label::always("opaque_to_existential_mapping"));
     }
 
     void visitSourceFile(const SourceFile &SF) {
@@ -2357,6 +2506,15 @@ namespace {
             }
           },
           Label::optional("items"));
+
+      if (Writer.isParsable() && isTypeChecked()) {
+        SmallVector<OpaqueTypeDecl *, 4> opaqueDecls;
+        SF.getOpaqueReturnTypeDecls(opaqueDecls);
+        if (!opaqueDecls.empty()) {
+          printOpaqueTypeMapping(opaqueDecls);
+        }
+      }
+
       printFoot();
     }
 
@@ -2850,11 +3008,6 @@ void swift::printContext(raw_ostream &os, DeclContext *dc) {
       PrintWithColorRAII(os, DiscriminatorColor)
         << "autoclosure discriminator=";
     }
-
-    // If we aren't printing to standard error or the debugger output stream,
-    // this client expects to see the computed discriminator. Compute it now.
-    if (&os != &llvm::errs() && &os != &llvm::dbgs())
-      (void)ACE->getDiscriminator();
 
     PrintWithColorRAII(os, DiscriminatorColor) << ACE->getRawDiscriminator();
     break;
@@ -3930,47 +4083,17 @@ public:
     printFoot();
   }
 
-  void printClosure(AbstractClosureExpr *E, char const *name,
-                                  Label label) {
+  void printClosure(AbstractClosureExpr *E, char const *name, Label label) {
     printCommon(E, name, label);
 
-    // If we aren't printing to standard error or the debugger output stream,
-    // this client expects to see the computed discriminator. Compute it now.
-    if (hasNonStandardOutput())
-      (void)E->getDiscriminator();
+    // If we're dumping the type-checked AST, compute the discriminator if
+    // needed. Otherwise, print the cached discriminator.
+    auto discriminator = isTypeChecked() ? E->getDiscriminator()
+                                         : E->getRawDiscriminator();
 
-    printField(E->getRawDiscriminator(), Label::always("discriminator"),
+    printField(discriminator, Label::always("discriminator"),
                DiscriminatorColor);
-
-    switch (auto isolation = E->getActorIsolation()) {
-    case ActorIsolation::Unspecified:
-    case ActorIsolation::NonisolatedUnsafe:
-      break;
-
-    case ActorIsolation::Nonisolated:
-      printFlag(true, "nonisolated", CapturesColor);
-      break;
-
-    case ActorIsolation::Erased:
-      printFlag(true, "dynamically_isolated", CapturesColor);
-      break;
-
-    case ActorIsolation::CallerIsolationInheriting:
-      printFlag(true, "isolated_to_caller_isolation", CapturesColor);
-      break;
-
-    case ActorIsolation::ActorInstance:
-      printReferencedDeclWithContextField(isolation.getActorInstance(),
-                                          Label::always("actor_isolated"),
-                                          CapturesColor);
-      break;
-
-    case ActorIsolation::GlobalActor:
-      printTypeField(isolation.getGlobalActor(),
-                     Label::always("global_actor_isolated"), PrintOptions(),
-                     CapturesColor);
-      break;
-    }
+    printIsolation(E->getActorIsolation());
 
     if (auto captureInfo = E->getCachedCaptureInfo()) {
       printCaptureInfoField(captureInfo, Label::optional("captures"));
@@ -4859,7 +4982,6 @@ public:
   TRIVIAL_ATTR_PRINTER(ImplicitSelfCapture, implicit_self_capture)
   TRIVIAL_ATTR_PRINTER(Indirect, indirect)
   TRIVIAL_ATTR_PRINTER(Infix, infix)
-  TRIVIAL_ATTR_PRINTER(InheritActorContext, inherit_actor_context)
   TRIVIAL_ATTR_PRINTER(InheritsConvenienceInitializers,
                        inherits_convenience_initializers)
   TRIVIAL_ATTR_PRINTER(Inlinable, inlinable)
@@ -4927,6 +5049,7 @@ public:
   TRIVIAL_ATTR_PRINTER(WeakLinked, weak_linked)
   TRIVIAL_ATTR_PRINTER(Extensible, extensible)
   TRIVIAL_ATTR_PRINTER(Concurrent, concurrent)
+  TRIVIAL_ATTR_PRINTER(PreEnumExtensibility, preEnumExtensibility)
 
 #undef TRIVIAL_ATTR_PRINTER
 
@@ -5183,6 +5306,12 @@ public:
     printFlag(Attr->isNonSending(), "nonsending");
     printFoot();
   }
+  void visitInheritActorContextAttr(InheritActorContextAttr *Attr,
+                                    Label label) {
+    printCommon(Attr, "inherit_actor_context_attr", label);
+    printFlag(Attr->isAlways(), "always");
+    printFoot();
+  }
   void visitObjCAttr(ObjCAttr *Attr, Label label) {
     printCommon(Attr, "objc_attr", label);
     if (Attr->hasName())
@@ -5307,7 +5436,16 @@ public:
     printFoot();
   }
   void visitSpecializeAttr(SpecializeAttr *Attr, Label label) {
-    printCommon(Attr, "specialize_attr", label);
+    visitAbstractSpecializeAttr(Attr, label);
+  }
+
+  void visitSpecializedAttr(SpecializedAttr *Attr, Label label) {
+    visitAbstractSpecializeAttr(Attr, label);
+  }
+
+  void visitAbstractSpecializeAttr(AbstractSpecializeAttr *Attr, Label label) {
+    printCommon(Attr, Attr->isPublic() ? "specialized_attr" :
+                  "specialize_attr", label);
     printFlag(Attr->isExported(), "exported");
     printFlag(Attr->isFullSpecialization(), "full");
     printFlag(Attr->isPartialSpecialization(), "partial");
@@ -5552,6 +5690,9 @@ public:
       printTypeField(conformance->getType(), Label::always("type"));
       printReferencedDeclField(conformance->getProtocol(),
                                Label::always("protocol"));
+      printField(conformance->getSourceKind(), Label::optional("source_kind"));
+      printFlag(conformance->isRetroactive(), "retroactive");
+      printIsolation(conformance->getIsolation());
       if (!Writer.isParsable())
         printFlag(!shouldPrintDetails, "<details printed above>");
     };
@@ -5561,6 +5702,16 @@ public:
         auto normal = cast<NormalProtocolConformance>(conformance);
 
         printCommon("normal_conformance");
+        printFlag(normal->isPreconcurrency(), "preconcurrency");
+        if (normal->isPreconcurrency() && normal->isComplete()) {
+          printFlag(normal->isPreconcurrencyEffectful(),
+                    "effectful_preconcurrency");
+        }
+        printFlag(normal->isRetroactive(), "retroactive");
+        printFlag(normal->isUnchecked(), "unchecked");
+        if (normal->getExplicitSafety() != ExplicitSafety::Unspecified)
+          printField(normal->getExplicitSafety(), Label::always("safety"));
+
         if (!shouldPrintDetails)
           break;
 
@@ -5775,27 +5926,33 @@ public:
 
 void PrintBase::printRec(SubstitutionMap map, VisitedConformances &visited,
                          Label label) {
-  printRecArbitrary([&](Label label) {
-    PrintConformance(Writer)
-        .visitSubstitutionMap(map, SubstitutionMap::DumpStyle::Full, visited,
-                              label);
-  }, label);
+  printRecArbitrary(
+      [&](Label label) {
+        PrintConformance(Writer, MemberLoading)
+            .visitSubstitutionMap(map, SubstitutionMap::DumpStyle::Full,
+                                  visited, label);
+      },
+      label);
 }
 
 void PrintBase::printRec(const ProtocolConformanceRef &ref,
                          VisitedConformances &visited, Label label) {
-  printRecArbitrary([&](Label label) {
-    PrintConformance(Writer)
-          .visitProtocolConformanceRef(ref, visited, label);
-  }, label);
+  printRecArbitrary(
+      [&](Label label) {
+        PrintConformance(Writer, MemberLoading)
+            .visitProtocolConformanceRef(ref, visited, label);
+      },
+      label);
 }
 
 void PrintBase::printRec(const ProtocolConformance *conformance,
                          VisitedConformances &visited, Label label) {
-  printRecArbitrary([&](Label label) {
-    PrintConformance(Writer)
-        .visitProtocolConformance(conformance, visited, label);
-  }, label);
+  printRecArbitrary(
+      [&](Label label) {
+        PrintConformance(Writer, MemberLoading)
+            .visitProtocolConformance(conformance, visited, label);
+      },
+      label);
 }
 
 } // end anonymous namespace

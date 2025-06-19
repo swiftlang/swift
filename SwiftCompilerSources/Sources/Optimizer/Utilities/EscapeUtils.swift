@@ -519,7 +519,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       if operand == copyAddr.sourceOperand {
         return walkUp(address: copyAddr.destination, path: path)
       } else {
-        if !copyAddr.isInitializationOfDest {
+        if !copyAddr.isInitializationOfDestination {
           if handleDestroy(of: operand.value, path: path.with(knownType: nil)) == .abortWalk {
             return .abortWalk
           }

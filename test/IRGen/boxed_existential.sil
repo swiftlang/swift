@@ -81,7 +81,7 @@ entry(%b : $Error):
   // CHECK: [[ADDR:%.*]] = load {{.*}} [[OUT_ADDR]]
   %a = project_existential_box $SomeError in %b : $Error
 
-  // CHECK: [[GEP1:%.*]] = getelementptr inbounds %T17boxed_existential9SomeErrorV, ptr %2, i32 0, i32 1
+  // CHECK: [[GEP1:%.*]] = getelementptr inbounds{{.*}} %T17boxed_existential9SomeErrorV, ptr %2, i32 0, i32 1
   // CHECK: [[GEP2:%.*]] = getelementptr inbounds {{.*}} [[GEP1]], i32 0, i32 0
   %c = struct_element_addr %a : $*SomeError, #SomeError._code
 

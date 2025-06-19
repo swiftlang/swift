@@ -1233,7 +1233,7 @@ bb0(%0 : $*MyArray<MyStruct>):
 
 // CHECK-LABEL: @load_trivial_from_store :
 // CHECK:         [[B:%.*]] = begin_borrow %0
-// CHECK:         [[I:%.*]] = struct_extract %2 : $Agg3, #Agg3.i
+// CHECK:         [[I:%.*]] = struct_extract [[B]] : $Agg3, #Agg3.i
 // CHECK:         end_borrow [[B]]
 // CHECK:         store %0 to [assign] %1
 // CHECK:         return [[I]]
@@ -1248,7 +1248,7 @@ bb0(%0 : @owned $Agg3, %1 : $*Agg3):
 
 // CHECK-LABEL: @load_copy_from_store :
 // CHECK:         [[B:%.*]] = begin_borrow %0
-// CHECK:         [[K:%.*]] = struct_extract %2 : $Agg3, #Agg3.k
+// CHECK:         [[K:%.*]] = struct_extract [[B]] : $Agg3, #Agg3.k
 // CHECK:         [[C:%.*]] = copy_value [[K]]
 // CHECK:         end_borrow [[B]]
 // CHECK:         store %0 to [assign] %1
@@ -1261,6 +1261,65 @@ bb0(%0 : @owned $Agg3, %1 : $*Agg3):
   %4 = load [copy] %3 : $*Klass
   return %4 : $Klass
 }
+
+// CHECK-LABEL: @copyaddr_trivial_from_store :
+// CHECK:         [[B:%.*]] = begin_borrow %1
+// CHECK:         [[I:%.*]] = struct_extract [[B]] : $Agg3, #Agg3.i
+// CHECK:         end_borrow [[B]]
+// CHECK:         store %1 to [assign] %2
+// CHECK:         store [[I]] to [trivial] %0
+// CHECK:       } // end sil function 'copyaddr_trivial_from_store'
+sil [ossa] @copyaddr_trivial_from_store : $@convention(thin) (@owned Agg3, @inout Agg3) -> @out Int {
+bb0(%0 : $*Int, %1 : @owned $Agg3, %2 : $*Agg3):
+  store %1 to [assign] %2
+  %3 = struct_element_addr %2, #Agg3.i
+  copy_addr %3 to %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: @copyaddr_copy_from_store :
+// CHECK:         [[B:%.*]] = begin_borrow %1
+// CHECK:         [[K:%.*]] = struct_extract [[B]] : $Agg3, #Agg3.k
+// CHECK:         [[C:%.*]] = copy_value [[K]]
+// CHECK:         end_borrow [[B]]
+// CHECK:         store %1 to [assign] %2
+// CHECK:         store [[C]] to [init] %0
+// CHECK:       } // end sil function 'copyaddr_copy_from_store'
+sil [ossa] @copyaddr_copy_from_store : $@convention(thin) (@owned Agg3, @inout Agg3) -> @out Klass {
+bb0(%0 : $*Klass, %1 : @owned $Agg3, %2 : $*Agg3):
+  store %1 to [assign] %2
+  %3 = struct_element_addr %2, #Agg3.k
+  copy_addr %3 to [init] %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @split_copyaddr :
+// CHECK:         [[A:%.*]] = tuple_element_addr %0 : $*(Agg3, Klass), 0
+// CHECK:         [[KA:%.*]] = struct_element_addr %11 : $*Agg3, #Agg3.k
+// CHECK:         store %1 to [init] [[KA]] : $*Klass
+// CHECK:         [[KI:%.*]] = struct_element_addr %11 : $*Agg3, #Agg3.i
+// CHECK:         store %2 to [trivial] [[KI]] : $*Int
+// CHECK:         [[I:%.*]] = tuple_element_addr %0 : $*(Agg3, Klass), 1
+// CHECK:         store %3 to [init] [[I]] : $*Klass
+// CHECK:       } // end sil function 'split_copyaddr'
+sil [ossa] @split_copyaddr : $@convention(thin) (@owned Klass, Int, @owned Klass) -> @out (Agg3, Klass) {
+bb0(%0 : $*(Agg3, Klass), %1 : @owned $Klass, %2 : $Int, %3 : @owned $Klass):
+  %4 = alloc_stack $(Agg3, Klass)
+  %5 = tuple_element_addr %4, 0
+  %6 = tuple_element_addr %4, 1
+  %7 = struct_element_addr %5, #Agg3.k
+  %8 = struct_element_addr %5, #Agg3.i
+  store %1 to [init] %7
+  store %2 to [trivial] %8
+  store %3 to [init] %6
+  copy_addr [take] %4 to [init] %0
+  dealloc_stack %4
+  %r = tuple ()
+  return %r
+}
+
 // CHECK-LABEL: @load_take_from_store_assign :
 // CHECK:         [[DS:%.*]] = destructure_struct %0
 // CHECK:         [[TADDR:%.*]] =  struct_element_addr %1 : $*Agg2, #Agg2.t
@@ -1279,6 +1338,26 @@ bb0(%0 : @owned $Agg2, %1 : $*Agg2, %2 : @owned $Klass):
   %6 = load [take] %4 : $*Klass
   store %2 to [init] %4 : $*Klass
   return %6 : $Klass
+}
+
+// CHECK-LABEL: @copyaddr_take_from_store_assign :
+// CHECK:         [[DS:%.*]] = destructure_struct %1
+// CHECK:         [[TADDR:%.*]] =  struct_element_addr %2 : $*Agg2, #Agg2.t
+// CHECK:         ([[T0:%.*]], [[T1:%.*]]) = destructure_tuple [[DS]]
+// CHECK:         [[TA0:%.*]] = tuple_element_addr [[TADDR]] : $*(Klass, Klass), 0
+// CHECK:         destroy_addr [[TA0]]
+// CHECK:         [[TA1:%.*]] = tuple_element_addr [[TADDR]] : $*(Klass, Klass), 1
+// CHECK:         store [[T0]] to [init] %0
+// CHECK:       } // end sil function 'copyaddr_take_from_store_assign'
+sil [ossa] @copyaddr_take_from_store_assign : $@convention(thin) (@owned Agg2, @inout Agg2, @owned Klass) -> @out Klass {
+bb0(%0: $*Klass, %1 : @owned $Agg2, %2 : $*Agg2, %3 : @owned $Klass):
+  store %1 to [assign] %2
+  %4 = struct_element_addr %2, #Agg2.t
+  %5 = tuple_element_addr %4, 0
+  copy_addr [take] %5 to [init] %0
+  store %3 to [init] %5
+  %r = tuple ()
+  return %r
 }
 
 // CHECK-LABEL: @load_take_from_store_init :

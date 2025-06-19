@@ -273,7 +273,7 @@ SILValue LowerHopToActor::emitGetExecutor(SILBuilderWithScope &B,
   if (auto wrappedActor = actorType->getOptionalObjectType()) {
     assert(makeOptional);
 
-    if (B.hasOwnership() && actor->getOwnershipKind() == OwnershipKind::Owned) {
+    if (B.hasOwnership() && actor->getOwnershipKind() != OwnershipKind::Guaranteed) {
       actor = B.createBeginBorrow(loc, actor);
       needEndBorrow = true;
     }

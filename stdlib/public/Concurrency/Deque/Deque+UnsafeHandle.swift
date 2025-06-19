@@ -63,7 +63,7 @@ extension _Deque._UnsafeHandle {
 
   var startSlot: Slot {
     get { unsafe _header.pointee.startSlot }
-    nonmutating set { unsafe _header.pointee.startSlot = unsafe newValue }
+    nonmutating set { unsafe _header.pointee.startSlot = newValue }
   }
 
   func ptr(at slot: Slot) -> UnsafeMutablePointer<Element> {
@@ -99,28 +99,28 @@ extension _Deque._UnsafeHandle {
 
   internal func slot(after slot: Slot) -> Slot {
     unsafe assert(slot.position < capacity)
-    let position = unsafe slot.position + 1
+    let position = slot.position + 1
     if unsafe position >= capacity {
-      return unsafe Slot(at: 0)
+      return Slot(at: 0)
     }
-    return unsafe Slot(at: position)
+    return Slot(at: position)
   }
 
   internal func slot(before slot: Slot) -> Slot {
     unsafe assert(slot.position < capacity)
-    if unsafe slot.position == 0 { return unsafe Slot(at: capacity - 1) }
-    return unsafe Slot(at: slot.position - 1)
+    if slot.position == 0 { return unsafe Slot(at: capacity - 1) }
+    return Slot(at: slot.position - 1)
   }
 
   internal func slot(_ slot: Slot, offsetBy delta: Int) -> Slot {
     unsafe assert(slot.position <= capacity)
-    let position = unsafe slot.position + delta
+    let position = slot.position + delta
     if delta >= 0 {
       if unsafe position >= capacity { return unsafe Slot(at: position - capacity) }
     } else {
       if position < 0 { return unsafe Slot(at: position + capacity) }
     }
-    return unsafe Slot(at: position)
+    return Slot(at: position)
   }
 
   internal var endSlot: Slot {
@@ -139,7 +139,7 @@ extension _Deque._UnsafeHandle {
     // random-access subscript operations. (Up to 2x on some microbenchmarks.)
     let position = unsafe startSlot.position &+ offset
     guard unsafe position < capacity else { return unsafe Slot(at: position &- capacity) }
-    return unsafe Slot(at: position)
+    return Slot(at: position)
   }
 }
 
@@ -199,9 +199,9 @@ extension _Deque._UnsafeHandle {
     from source: UnsafeBufferPointer<Element>
   ) -> Slot {
     unsafe assert(start.position + source.count <= capacity)
-    guard source.count > 0 else { return unsafe start }
+    guard source.count > 0 else { return start }
     unsafe ptr(at: start).initialize(from: source.baseAddress!, count: source.count)
-    return unsafe Slot(at: start.position + source.count)
+    return Slot(at: start.position + source.count)
   }
 
   @discardableResult
@@ -210,9 +210,9 @@ extension _Deque._UnsafeHandle {
     from source: UnsafeMutableBufferPointer<Element>
   ) -> Slot {
     unsafe assert(start.position + source.count <= capacity)
-    guard source.count > 0 else { return unsafe start }
+    guard source.count > 0 else { return start }
     unsafe ptr(at: start).moveInitialize(from: source.baseAddress!, count: source.count)
-    return unsafe Slot(at: start.position + source.count)
+    return Slot(at: start.position + source.count)
   }
 
   @discardableResult
@@ -224,7 +224,7 @@ extension _Deque._UnsafeHandle {
     assert(count >= 0)
     unsafe assert(source.position + count <= self.capacity)
     unsafe assert(target.position + count <= self.capacity)
-    guard count > 0 else { return unsafe (source, target) }
+    guard count > 0 else { return (source, target) }
     unsafe ptr(at: target).moveInitialize(from: ptr(at: source), count: count)
     return unsafe (slot(source, offsetBy: count), slot(target, offsetBy: count))
   }
@@ -451,7 +451,7 @@ extension _Deque._UnsafeHandle {
   ) -> _UnsafeMutableWrappedBuffer<Element> {
     unsafe assert(start.position <= capacity)
     unsafe assert(end.position <= capacity)
-    if unsafe start < end {
+    if start < end {
       return unsafe .init(start: ptr(at: start), count: end.position - start.position)
     }
     return unsafe .init(

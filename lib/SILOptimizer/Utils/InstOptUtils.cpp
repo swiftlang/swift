@@ -963,6 +963,9 @@ static bool useHasTransitiveOwnership(const SILInstruction *inst) {
   if (isa<ConvertEscapeToNoEscapeInst>(inst))
     return true;
 
+  if (isa<MarkDependenceInst>(inst))
+    return true;
+
   // Look through copy_value, begin_borrow, move_value. They are inert for our
   // purposes, but we need to look through it.
   return isa<CopyValueInst>(inst) || isa<BeginBorrowInst>(inst) ||
@@ -1095,13 +1098,16 @@ void swift::getConsumedPartialApplyArgs(PartialApplyInst *pai,
   }
 }
 
-bool swift::collectDestroys(SingleValueInstruction *inst,
-                            SmallVectorImpl<Operand *> &destroys) {
+static bool collectDestroysRecursively(SingleValueInstruction *inst,
+                                       SmallVectorImpl<Operand *> &destroys,
+                                       InstructionSet &visited) {
   bool isDead = true;
   for (Operand *use : inst->getUses()) {
     SILInstruction *user = use->getUser();
+    if (!visited.insert(user))
+      continue;
     if (useHasTransitiveOwnership(user)) {
-      if (!collectDestroys(cast<SingleValueInstruction>(user), destroys))
+      if (!collectDestroysRecursively(cast<SingleValueInstruction>(user), destroys, visited))
         isDead = false;
       destroys.push_back(use);
     } else if (useDoesNotKeepValueAlive(user)) {
@@ -1111,6 +1117,12 @@ bool swift::collectDestroys(SingleValueInstruction *inst,
     }
   }
   return isDead;
+}
+
+bool swift::collectDestroys(SingleValueInstruction *inst,
+                            SmallVectorImpl<Operand *> &destroys) {
+  InstructionSet visited(inst->getFunction());
+  return collectDestroysRecursively(inst, destroys, visited);
 }
 
 /// Move the original arguments of the partial_apply into newly created

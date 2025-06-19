@@ -387,9 +387,9 @@ void CanonicalizeOSSALifetime::extendLivenessToDeadEnds() {
 
 void CanonicalizeOSSALifetime::extendLivenessToDeinitBarriers() {
   SmallVector<SILInstruction *, 8> ends;
-  if (currentLexicalLifetimeEnds.size() > 0) {
+  if (endingLifetimeAtExplicitEnds()) {
     visitExtendedUnconsumedBoundary(
-        currentLexicalLifetimeEnds,
+        explicitLifetimeEnds,
         [&ends](auto *instruction, auto lifetimeEnding) {
           instruction->visitSubsequentInstructions([&](auto *next) {
             ends.push_back(next);
@@ -1406,10 +1406,12 @@ bool CanonicalizeOSSALifetime::computeLiveness() {
     clear();
     return false;
   }
-  if (respectsDeinitBarriers()) {
-    extendLexicalLivenessToDeadEnds();
+  if (respectsDeadEnds()) {
+    if (respectsDeinitBarriers()) {
+      extendLexicalLivenessToDeadEnds();
+    }
+    extendLivenessToDeadEnds();
   }
-  extendLivenessToDeadEnds();
   if (respectsDeinitBarriers()) {
     extendLivenessToDeinitBarriers();
   }

@@ -38,7 +38,7 @@ public struct BigBigStruct {
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testBitfieldInBlock
-// CHECK:         call void {{%.*}}(ptr noalias nocapture sret({{.*}}) {{%.*}}, ptr {{%.*}}, ptr byval({{.*}}) align 8 {{%.*}})
+// CHECK:         call void {{%.*}}(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} {{%.*}}, ptr {{%.*}}, ptr byval({{.*}}) align 8 {{%.*}})
 sil @testBitfieldInBlock : $@convention(thin) (@owned @convention(block) (BitfieldOne) -> BitfieldOne, BitfieldOne) -> BitfieldOne  {
 entry(%b : $@convention(block) (BitfieldOne) -> BitfieldOne, %x : $BitfieldOne):
   %r = apply %b(%x) : $@convention(block) (BitfieldOne) -> BitfieldOne
@@ -46,7 +46,7 @@ entry(%b : $@convention(block) (BitfieldOne) -> BitfieldOne, %x : $BitfieldOne):
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testTupleExtract
-// CHECK:         call void {{%.*}}(ptr noalias nocapture sret({{.*}}) {{%.*}}, ptr {{%.*}}, ptr byval({{.*}}) align 8 {{%.*}})
+// CHECK:         call void {{%.*}}(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} {{%.*}}, ptr {{%.*}}, ptr byval({{.*}}) align 8 {{%.*}})
 sil @testTupleExtract : $@convention(thin) (@owned (BitfieldOne, @convention(block) (BitfieldOne) -> BitfieldOne), BitfieldOne) -> BitfieldOne  {
 entry(%b : $(BitfieldOne, @convention(block) (BitfieldOne) -> (BitfieldOne)), %x : $BitfieldOne):
   %a = tuple_extract %b : $(BitfieldOne, @convention(block) (BitfieldOne) -> (BitfieldOne)), 1
@@ -54,9 +54,9 @@ entry(%b : $(BitfieldOne, @convention(block) (BitfieldOne) -> (BitfieldOne)), %x
   return %r : $BitfieldOne
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testBigTempStruct(ptr noalias nocapture sret({{.*}}) %0, ptr %1, ptr %Element)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testBigTempStruct(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr %1, ptr %Element)
 // CHECK: [[ALLOC:%.*]] = alloca %T22big_types_corner_cases13BigTempStructV
-// CHECK: call swiftcc void @testBigTempStruct(ptr noalias nocapture sret({{.*}}) [[ALLOC]], ptr %1, ptr %Element)
+// CHECK: call swiftcc void @testBigTempStruct(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} [[ALLOC]], ptr %1, ptr %Element)
 // CHECK: ret void
 sil @testBigTempStruct : $@convention(method) <Element> (@guaranteed _ArrayBuffer<Element>) -> @owned BigTempStruct<Element> {
 bb0(%0 : $_ArrayBuffer<Element>):
@@ -66,9 +66,9 @@ bb0(%0 : $_ArrayBuffer<Element>):
   return %9 : $BigTempStruct<Element>
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testTryApply(ptr noalias nocapture sret({{.*}}) %0, ptr %1, ptr %2, ptr swiftself %3, ptr noalias nocapture swifterror dereferenceable(8) %4)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testTryApply(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr %1, ptr %2, ptr swiftself %3, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable(8) %4)
 // CHECK: [[ALLOC:%.*]] = alloca %T22big_types_corner_cases9BigStructV
-// CHECK: call swiftcc void {{.*}}(ptr noalias nocapture sret({{.*}}) [[ALLOC]]
+// CHECK: call swiftcc void {{.*}}(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} [[ALLOC]]
 // CHECK: ret void
 sil @testTryApply : $@convention(thin)(() -> (@owned BigStruct, @error Error)) -> (@owned BigStruct, @error Error) {
 bb0(%0 : $() -> (@owned BigStruct, @error Error)):
@@ -82,8 +82,8 @@ bb2(%err : $Error):
   throw %err : $Error
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testFuncWithModBlockStorageApply(ptr nocapture dereferenceable({{.*}}) %0, ptr noalias nocapture dereferenceable({{.*}})
-// CHECK: call swiftcc void {{.*}}(ptr noalias nocapture dereferenceable({{.*}}) %1
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @testFuncWithModBlockStorageApply(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0, ptr noalias {{(nocapture|captures\(none\))}} dereferenceable({{.*}})
+// CHECK: call swiftcc void {{.*}}(ptr noalias {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %1
 // CHECK: ret void
 sil @testFuncWithModBlockStorageApply : $@convention(thin) (@inout_aliasable @block_storage @callee_owned (@owned BigStruct) -> (), BigStruct) -> () {
 // %0                                             // user: %5
@@ -109,7 +109,7 @@ sil public_external @c_return_func : $@convention(thin) () -> () -> @owned BigSt
 // CHECK: [[RET:%.*]] = insertvalue { ptr, ptr } { ptr @"$s17part_apply_calleeTA", ptr undef }, ptr
 // CHECK: ret { ptr, ptr } [[RET]]
 
-// CHECK-LABEL: define internal swiftcc void @"$s17part_apply_calleeTA"(ptr noalias nocapture sret({{.*}}) %0, i64 %1, ptr swiftself %2)
+// CHECK-LABEL: define internal swiftcc void @"$s17part_apply_calleeTA"(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, i64 %1, ptr swiftself %2)
 // CHECK: ret void
 
 sil @part_apply_caller : $@convention(thin) () -> @owned @callee_owned (@owned Builtin.Int64) -> @owned BigStruct {
@@ -174,12 +174,12 @@ sil @get_optional_none : $@convention(method) <τ_0_0> (@thin Optional<τ_0_0>.T
 sil @short_circuit_operation : $@convention(thin) <τ_0_0> (@in Optional<τ_0_0>, @owned @callee_owned () -> (@out τ_0_0, @error Error)) -> (@out τ_0_0, @error Error)
 sil @autoclosure_partialapply : $@convention(thin) (@owned @callee_owned () -> (BigStruct, @error Error)) -> (@out BigStruct, @error Error)
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @closure(ptr noalias nocapture sret({{.*}}) %0, ptr %1)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @closure(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr %1)
 // CHECK-64: [[ALLOC1:%.*]] = alloca %T22big_types_corner_cases9BigStructV
 // CHECK-64: [[ALLOC2:%.*]] = alloca %T22big_types_corner_cases9BigStructV
 // CHECK-64: [[ALLOC3:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
 // CHECK-64: [[ALLOC4:%.*]] = alloca %T22big_types_corner_cases9BigStructVSg
-// CHECK-64: call swiftcc void @"$s22big_types_corner_cases8SuperSubC1fyyFAA9BigStructVycfU_AFyKXKfu_TA"(ptr noalias nocapture sret({{.*}}) [[ALLOC1]], ptr swiftself {{.*}}, ptr nocapture swifterror %swifterror)
+// CHECK-64: call swiftcc void @"$s22big_types_corner_cases8SuperSubC1fyyFAA9BigStructVycfU_AFyKXKfu_TA"(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} [[ALLOC1]], ptr swiftself {{.*}}, ptr{{( nocapture)?}} swifterror{{( captures\(none\))?}} %swifterror)
 // CHECK: ret void
 sil @closure : $@convention(thin) (@owned SuperSub) -> BigStruct {
 bb0(%0 : $SuperSub):
@@ -218,7 +218,7 @@ sil @returnBigStruct : $@convention(thin) () -> @owned BigStruct
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @closureToConvert()
 // CHECK: entry:
 // CHECK:   [[ALLOC:%.*]] = alloca %T22big_types_corner_cases9BigStructV
-// CHECK:   call swiftcc void @returnBigStruct(ptr noalias nocapture sret({{.*}}) [[ALLOC]])
+// CHECK:   call swiftcc void @returnBigStruct(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} [[ALLOC]])
 // CHECK:   ret void
 // CHECK-LABEL: }
 sil @closureToConvert : $@convention(thin) () -> () {
@@ -246,11 +246,11 @@ bb0:
 
 sil @convertToThickHelper : $@convention(thin) (@owned BigStruct) -> ()
 
-// CHECK-LABAL: define {{.*}} swiftcc void @convertToThick(ptr noalias nocapture dereferenceable({{.*}}) %0)
+// CHECK-LABAL: define {{.*}} swiftcc void @convertToThick(ptr noalias {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0)
 // CHECK: entry:
 // CHECK:   [[ALLOC:%.*]] = alloca %T22big_types_corner_cases9BigStructV, align 4
 // CHECK:   call void @llvm.memcpy.p0.p0.i64
-// CHECK:   call swiftcc void @convertToThickHelper(ptr noalias nocapture dereferenceable({{.*}}) [[ALLOC]], ptr swiftself null)
+// CHECK:   call swiftcc void @convertToThickHelper(ptr noalias {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) [[ALLOC]], ptr swiftself null)
 // CHECK:   ret void
 // CHECK-LABEL: }
 sil @convertToThick : $@convention(thin) (@in BigStruct) -> () {

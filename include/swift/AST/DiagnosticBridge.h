@@ -46,6 +46,10 @@ public:
   void enqueueDiagnostic(SourceManager &SM, const DiagnosticInfo &Info,
                          unsigned innermostBufferID);
 
+  /// Emit a single diagnostic without location information.
+  void emitDiagnosticWithoutLocation(
+      const DiagnosticInfo &Info, llvm::raw_ostream &out, bool forceColors);
+
   /// Flush all enqueued diagnostics.
   void flush(llvm::raw_ostream &OS, bool includeTrailingBreak,
              bool forceColors);

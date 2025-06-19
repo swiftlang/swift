@@ -56,31 +56,26 @@ extern "C" SWIFT_CC(swift) void swift_task_checkIsolatedImpl(
 
 
 extern "C" SWIFT_CC(swift)
-bool _swift_task_isIsolatingCurrentContextSwift(
+int8_t _swift_task_isIsolatingCurrentContextSwift(
   HeapObject *executor,
   const Metadata *executorType,
   const SerialExecutorWitnessTable *witnessTable
 );
 
-extern "C" SWIFT_CC(swift) bool swift_task_isIsolatingCurrentContextImpl(
+extern "C" SWIFT_CC(swift) int8_t
+swift_task_isIsolatingCurrentContextImpl(
     SerialExecutorRef executor) {
   HeapObject *identity = executor.getIdentity();
 
   // We might be being called with an actor rather than a "proper"
   // SerialExecutor; in that case, we won't have a SerialExecutor witness
   // table.
-  if (executor.hasSerialExecutorWitnessTable()) {
-    return _swift_task_isIsolatingCurrentContextSwift(
-        identity, swift_getObjectType(identity),
-        executor.getSerialExecutorWitnessTable());
-  } else {
-    const Metadata *objectType = swift_getObjectType(executor.getIdentity());
-    auto typeName = swift_getTypeName(objectType, true);
+  if (!executor.hasSerialExecutorWitnessTable())
+    return static_cast<uint8_t>(IsIsolatingCurrentContextDecision::Unknown);
 
-    swift_Concurrency_fatalError(
-        0, "Incorrect actor executor assumption; expected '%.*s' executor.\n",
-        (int)typeName.length, typeName.data);
-  }
+  return _swift_task_isIsolatingCurrentContextSwift(
+      identity, swift_getObjectType(identity),
+      executor.getSerialExecutorWitnessTable());
 }
 
 extern "C" SWIFT_CC(swift) bool swift_task_isMainExecutorImpl(

@@ -133,7 +133,7 @@ public class UnavailableClass {}
 // using the minimum deployment target.
 //
 
-internal func internalFn( // expected-note 3 {{add @available attribute to enclosing global function}}
+internal func internalFn( // expected-note 3 {{add '@available' attribute to enclosing global function}}
   _: NoAvailable,
   _: BeforeInliningTarget,
   _: AtInliningTarget,
@@ -164,7 +164,7 @@ internal func internalFn( // expected-note 3 {{add @available attribute to enclo
 // but the function's signature should be checked with the inlining target.
 //
 
-public func deployedUseNoAvailable( // expected-note 5 {{add @available attribute}}
+public func deployedUseNoAvailable( // expected-note 5 {{add '@available' attribute}}
   _: NoAvailable,
   _: BeforeInliningTarget,
   _: AtInliningTarget,
@@ -337,7 +337,7 @@ public func alwaysUnavailable(
 }
 
 @_spi(Private)
-public func spiDeployedUseNoAvailable( // expected-note 3 {{add @available attribute}}
+public func spiDeployedUseNoAvailable( // expected-note 3 {{add '@available' attribute}}
   _: NoAvailable,
   _: BeforeInliningTarget,
   _: AtInliningTarget,
@@ -368,7 +368,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add @available attri
 // using the minimum inlining target.
 //
 
-@inlinable public func inlinedUseNoAvailable( // expected-note 13 {{add @available attribute}}
+@inlinable public func inlinedUseNoAvailable( // expected-note 13 {{add '@available' attribute}}
   _: NoAvailable,
   _: BeforeInliningTarget,
   _: AtInliningTarget,
@@ -584,7 +584,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add @available attri
 }
 
 @_spi(Private)
-@inlinable public func spiInlinedUseNoAvailable( // expected-note 3 {{add @available attribute}}
+@inlinable public func spiInlinedUseNoAvailable( // expected-note 3 {{add '@available' attribute}}
   _: NoAvailable,
   _: BeforeInliningTarget,
   _: AtInliningTarget,
@@ -610,7 +610,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add @available attri
 
 // MARK: - @inlinable global property accessors
 
-@inlinable public var inlinedNoAvailableGlobal: Any { // expected-note 3 {{add @available attribute to enclosing var}}
+@inlinable public var inlinedNoAvailableGlobal: Any { // expected-note 3 {{add '@available' attribute to enclosing var}}
   _ = NoAvailable()
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
@@ -625,7 +625,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add @available attri
   return ()
 }
 
-@inlinable public var inlinedNoAvailableGlobalExplicitGetter: Any { // expected-note 3 {{add @available attribute to enclosing var}}
+@inlinable public var inlinedNoAvailableGlobalExplicitGetter: Any { // expected-note 3 {{add '@available' attribute to enclosing var}}
   get {
     _ = NoAvailable()
     _ = BeforeInliningTarget()
@@ -658,7 +658,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add @available attri
   return ()
 }
 
-@inlinable public var inlinedGlobalGetterAtDeploymentTarget: Any { // expected-note {{add @available attribute to enclosing var}}
+@inlinable public var inlinedGlobalGetterAtDeploymentTarget: Any { // expected-note {{add '@available' attribute to enclosing var}}
   @available(macOS 10.15, *)
   get {
     _ = NoAvailable()
@@ -677,7 +677,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add @available attri
 }
 
 @_spi(Private)
-@inlinable public var inlinedNoAvailableSPIGlobal: Any { // expected-note {{add @available attribute to enclosing var}}
+@inlinable public var inlinedNoAvailableSPIGlobal: Any { // expected-note {{add '@available' attribute to enclosing var}}
   _ = NoAvailable()
   _ = BeforeInliningTarget()
   _ = AtInliningTarget()
@@ -692,7 +692,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add @available attri
   return ()
 }
 
-@inlinable public var inlinedNoAvailableGlobalSPISetter: Any { // expected-note {{add @available attribute to enclosing var}}
+@inlinable public var inlinedNoAvailableGlobalSPISetter: Any { // expected-note {{add '@available' attribute to enclosing var}}
   get {
     fatalError()
   }
@@ -750,7 +750,7 @@ public func spiDeployedUseNoAvailable( // expected-note 3 {{add @available attri
 
 // @_alwaysEmitIntoClient acts like @inlinable.
 
-@_alwaysEmitIntoClient public func aEICUseNoAvailable( // expected-note 8 {{add @available attribute}}
+@_alwaysEmitIntoClient public func aEICUseNoAvailable( // expected-note 8 {{add '@available' attribute}}
   _: NoAvailable,
   _: BeforeInliningTarget,
   _: AtInliningTarget,
@@ -822,7 +822,7 @@ public func backDeployedToInliningTarget(
 
 // Default arguments act like @inlinable when in a public function.
 
-public func defaultArgsUseNoAvailable( // expected-note 3 {{add @available attribute}}
+public func defaultArgsUseNoAvailable( // expected-note 3 {{add '@available' attribute}}
   _: Any = NoAvailable.self,
   _: Any = BeforeInliningTarget.self,
   _: Any = AtInliningTarget.self,
@@ -831,7 +831,7 @@ public func defaultArgsUseNoAvailable( // expected-note 3 {{add @available attri
   _: Any = AfterDeploymentTarget.self // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
 ) {}
 
-func defaultArgsUseInternal( // expected-note {{add @available attribute}}
+func defaultArgsUseInternal( // expected-note {{add '@available' attribute}}
   _: Any = NoAvailable.self,
   _: Any = BeforeInliningTarget.self,
   _: Any = AtInliningTarget.self,
@@ -852,7 +852,7 @@ public func defaultArgsUseUnavailable(
 ) {}
 
 @_spi(Private)
-public func spiDefaultArgsUseNoAvailable( // expected-note 1 {{add @available attribute}}
+public func spiDefaultArgsUseNoAvailable( // expected-note 1 {{add '@available' attribute}}
   _: Any = NoAvailable.self,
   _: Any = BeforeInliningTarget.self,
   _: Any = AtInliningTarget.self,
@@ -862,7 +862,7 @@ public func spiDefaultArgsUseNoAvailable( // expected-note 1 {{add @available at
 ) {}
 
 // Verify that complex default argument expressions are checked appropriately.
-public func defaultArgsClosureExprNoAvailable( // expected-note 3 {{add @available attribute}}
+public func defaultArgsClosureExprNoAvailable( // expected-note 3 {{add '@available' attribute}}
   _: Int = {
     _ = NoAvailable.self
     _ = BeforeInliningTarget.self
@@ -883,7 +883,7 @@ public func defaultArgsClosureExprNoAvailable( // expected-note 3 {{add @availab
   }()
 ) {}
 
-func defaultArgsClosureExprInternal( // expected-note {{add @available attribute}}
+func defaultArgsClosureExprInternal( // expected-note {{add '@available' attribute}}
   _: Int = {
     _ = NoAvailable.self
     _ = BeforeInliningTarget.self
@@ -909,7 +909,7 @@ public struct PropertyWrapper<T> {
   public init(_ value: T) { self.wrappedValue = value }
 }
 
-public struct PublicStruct { // expected-note 20 {{add @available attribute}}
+public struct PublicStruct { // expected-note 20 {{add '@available' attribute}}
   // Public property declarations are exposed.
   public var aPublic: NoAvailable,
              bPublic: BeforeInliningTarget,
@@ -1088,7 +1088,7 @@ public struct PublicStruct { // expected-note 20 {{add @available attribute}}
   }
 }
 
-public struct PublicStructWithWrappers { // expected-note 4 {{add @available attribute}}
+public struct PublicStructWithWrappers { // expected-note 4 {{add '@available' attribute}}
   // The property type is inferred from the initializer expression. The
   // expressions themselves will not be exposed.
   @PropertyWrapper public var aExplicitInit = NoAvailable()
@@ -1126,7 +1126,7 @@ public struct PublicStructWithWrappers { // expected-note 4 {{add @available att
   @PropertyWrapper(AfterDeploymentTarget()) public var fAnyAlt: Any // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
 }
 
-@frozen public struct FrozenPublicStruct { // expected-note 9 {{add @available attribute}}
+@frozen public struct FrozenPublicStruct { // expected-note 9 {{add '@available' attribute}}
   // Public declarations are exposed.
   public var aPublic: NoAvailable,
              bPublic: BeforeInliningTarget,
@@ -1180,7 +1180,7 @@ public struct UnavailablePublicStruct {
 }
 
 @_spi(Private)
-public struct SPIStruct { // expected-note 3 {{add @available attribute}}
+public struct SPIStruct { // expected-note 3 {{add '@available' attribute}}
   public var aPublic: NoAvailable,
              bPublic: BeforeInliningTarget,
              cPublic: AtInliningTarget,
@@ -1203,7 +1203,7 @@ public struct SPIStruct { // expected-note 3 {{add @available attribute}}
       fInternal: AfterDeploymentTarget = .init() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
 }
 
-internal struct InternalStruct { // expected-note 2 {{add @available attribute}}
+internal struct InternalStruct { // expected-note 2 {{add '@available' attribute}}
   // Internal declarations act like non-inlinable.
   var aInternal: NoAvailable = .init(),
       bInternal: BeforeInliningTarget = .init(),
@@ -1244,8 +1244,8 @@ internal struct InternalStruct { // expected-note 2 {{add @available attribute}}
 
 extension NoAvailable {}
 
-extension NoAvailable { // expected-note {{add @available attribute to enclosing extension}}
-  func internalFuncInExtension( // expected-note {{add @available attribute to enclosing instance method}}
+extension NoAvailable { // expected-note {{add '@available' attribute to enclosing extension}}
+  func internalFuncInExtension( // expected-note {{add '@available' attribute to enclosing instance method}}
     _: NoAvailable,
     _: BeforeInliningTarget,
     _: AtInliningTarget,
@@ -1255,8 +1255,8 @@ extension NoAvailable { // expected-note {{add @available attribute to enclosing
   ) {}
 }
 
-extension NoAvailable { // expected-note 3 {{add @available attribute to enclosing extension}}
-  public func publicFuncInExtension( // expected-note 3 {{add @available attribute to enclosing instance method}}
+extension NoAvailable { // expected-note 3 {{add '@available' attribute to enclosing extension}}
+  public func publicFuncInExtension( // expected-note 3 {{add '@available' attribute to enclosing instance method}}
     _: NoAvailable,
     _: BeforeInliningTarget,
     _: AtInliningTarget,
@@ -1270,8 +1270,8 @@ extension NoAvailable { // expected-note 3 {{add @available attribute to enclosi
 
 extension BetweenTargets {}
 
-extension BetweenTargets { // expected-note {{add @available attribute to enclosing extension}}
-  func internalFuncInExtension( // expected-note {{add @available attribute to enclosing instance method}}
+extension BetweenTargets { // expected-note {{add '@available' attribute to enclosing extension}}
+  func internalFuncInExtension( // expected-note {{add '@available' attribute to enclosing instance method}}
     _: NoAvailable,
     _: BeforeInliningTarget,
     _: AtInliningTarget,
@@ -1281,8 +1281,8 @@ extension BetweenTargets { // expected-note {{add @available attribute to enclos
   ) {}
 }
 
-extension BetweenTargets { // expected-note 2 {{add @available attribute to enclosing extension}}
-  public func publicFuncInExtension( // expected-note 2 {{add @available attribute to enclosing instance method}}
+extension BetweenTargets { // expected-note 2 {{add '@available' attribute to enclosing extension}}
+  public func publicFuncInExtension( // expected-note 2 {{add '@available' attribute to enclosing instance method}}
     _: NoAvailable,
     _: BeforeInliningTarget,
     _: AtInliningTarget,
@@ -1294,7 +1294,7 @@ extension BetweenTargets { // expected-note 2 {{add @available attribute to encl
 
 @available(macOS 10.15, *)
 extension BetweenTargets {
-  public func publicFuncInExtensionWithExplicitAvailability( // expected-note {{add @available attribute to enclosing instance method}}
+  public func publicFuncInExtensionWithExplicitAvailability( // expected-note {{add '@available' attribute to enclosing instance method}}
     _: NoAvailable,
     _: BeforeInliningTarget,
     _: AtInliningTarget,
@@ -1304,7 +1304,7 @@ extension BetweenTargets {
   ) {}
 }
 
-extension BetweenTargets { // expected-note {{add @available attribute to enclosing extension}}
+extension BetweenTargets { // expected-note {{add '@available' attribute to enclosing extension}}
   @available(macOS 10.15, *)
   public func publicFuncWithExplicitAvailabilityInExtension(
     _: NoAvailable,
@@ -1317,8 +1317,8 @@ extension BetweenTargets { // expected-note {{add @available attribute to enclos
 }
 
 @_spi(Private)
-extension BetweenTargets { // expected-note {{add @available attribute to enclosing extension}}
-  public func inheritedSPIFuncInExtension( // expected-note {{add @available attribute to enclosing instance method}}
+extension BetweenTargets { // expected-note {{add '@available' attribute to enclosing extension}}
+  public func inheritedSPIFuncInExtension( // expected-note {{add '@available' attribute to enclosing instance method}}
     _: NoAvailable,
     _: BeforeInliningTarget,
     _: AtInliningTarget,
@@ -1367,8 +1367,8 @@ internal struct BetweenTargetsInternal {}
 
 extension BetweenTargetsInternal {}
 
-extension BetweenTargetsInternal { // expected-note {{add @available attribute to enclosing extension}}
-  func internalFuncInExtension( // expected-note {{add @available attribute to enclosing instance method}}
+extension BetweenTargetsInternal { // expected-note {{add '@available' attribute to enclosing extension}}
+  func internalFuncInExtension( // expected-note {{add '@available' attribute to enclosing instance method}}
     _: NoAvailable,
     _: BeforeInliningTarget,
     _: AtInliningTarget,
@@ -1378,8 +1378,8 @@ extension BetweenTargetsInternal { // expected-note {{add @available attribute t
   ) {}
 }
 
-extension BetweenTargetsInternal { // expected-note {{add @available attribute to enclosing extension}}
-  public func publicFuncInExtension( // expected-note {{add @available attribute to enclosing instance method}}
+extension BetweenTargetsInternal { // expected-note {{add '@available' attribute to enclosing extension}}
+  public func publicFuncInExtension( // expected-note {{add '@available' attribute to enclosing instance method}}
     _: NoAvailable,
     _: BeforeInliningTarget,
     _: AtInliningTarget,
@@ -1391,12 +1391,12 @@ extension BetweenTargetsInternal { // expected-note {{add @available attribute t
 
 // MARK: Extensions on AfterDeploymentTarget
 
-// expected-error@+1 {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note@+1 {{add @available attribute to enclosing extension}}
+// expected-error@+1 {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note@+1 {{add '@available' attribute to enclosing extension}}
 extension AfterDeploymentTarget {}
 
 // expected-error@+1 {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
-extension AfterDeploymentTarget { // expected-note 2 {{add @available attribute to enclosing extension}}
-  func internalFuncInExtension( // expected-note {{add @available attribute to enclosing instance method}}
+extension AfterDeploymentTarget { // expected-note 2 {{add '@available' attribute to enclosing extension}}
+  func internalFuncInExtension( // expected-note {{add '@available' attribute to enclosing instance method}}
     _: NoAvailable,
     _: BeforeInliningTarget,
     _: AtInliningTarget,
@@ -1407,8 +1407,8 @@ extension AfterDeploymentTarget { // expected-note 2 {{add @available attribute 
 }
 
 // expected-error@+1 {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
-extension AfterDeploymentTarget { // expected-note 2 {{add @available attribute to enclosing extension}}
-  public func publicFuncInExtension( // expected-note {{add @available attribute to enclosing instance method}}
+extension AfterDeploymentTarget { // expected-note 2 {{add '@available' attribute to enclosing extension}}
+  public func publicFuncInExtension( // expected-note {{add '@available' attribute to enclosing instance method}}
     _: NoAvailable,
     _: BeforeInliningTarget,
     _: AtInliningTarget,
@@ -1439,8 +1439,8 @@ public enum BetweenTargetsEnum {
 
 extension BetweenTargetsEnum.Nested {}
 
-extension BetweenTargetsEnum.Nested { // expected-note {{add @available attribute to enclosing extension}}
-  func internalFuncInExtension( // expected-note {{add @available attribute to enclosing instance method}}
+extension BetweenTargetsEnum.Nested { // expected-note {{add '@available' attribute to enclosing extension}}
+  func internalFuncInExtension( // expected-note {{add '@available' attribute to enclosing instance method}}
     _: NoAvailable,
     _: BeforeInliningTarget,
     _: AtInliningTarget,
@@ -1450,8 +1450,8 @@ extension BetweenTargetsEnum.Nested { // expected-note {{add @available attribut
   ) {}
 }
 
-extension BetweenTargetsEnum.Nested { // expected-note 2 {{add @available attribute to enclosing extension}}
-  public func publicFuncInExtension( // expected-note 2 {{add @available attribute to enclosing instance method}}
+extension BetweenTargetsEnum.Nested { // expected-note 2 {{add '@available' attribute to enclosing extension}}
+  public func publicFuncInExtension( // expected-note 2 {{add '@available' attribute to enclosing instance method}}
     _: NoAvailable,
     _: BeforeInliningTarget,
     _: AtInliningTarget,
@@ -1470,7 +1470,7 @@ extension BeforeInliningTarget: InternalProto {}
 extension AtInliningTarget: InternalProto {}
 extension BetweenTargets: InternalProto {}
 extension AtDeploymentTarget: InternalProto {}
-extension AfterDeploymentTarget: InternalProto {} // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add @available attribute to enclosing extension}}
+extension AfterDeploymentTarget: InternalProto {} // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add '@available' attribute to enclosing extension}}
 
 public protocol PublicProto {}
 
@@ -1479,21 +1479,21 @@ extension BeforeInliningTarget: PublicProto {}
 extension AtInliningTarget: PublicProto {}
 extension BetweenTargets: PublicProto {}
 extension AtDeploymentTarget: PublicProto {}
-extension AfterDeploymentTarget: PublicProto {} // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add @available attribute to enclosing extension}}
+extension AfterDeploymentTarget: PublicProto {} // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add '@available' attribute to enclosing extension}}
 
 
 // MARK: - Associated types
 
-public protocol NoAvailableProtoWithAssoc { // expected-note 3 {{add @available attribute to enclosing protocol}}
+public protocol NoAvailableProtoWithAssoc { // expected-note 3 {{add '@available' attribute to enclosing protocol}}
   associatedtype A: NoAvailableProto
   associatedtype B: BeforeInliningTargetProto
   associatedtype C: AtInliningTargetProto
   associatedtype D: BetweenTargetsProto // expected-error {{'BetweenTargetsProto' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
-  // expected-note@-1{{add @available attribute to enclosing associated type}}
+  // expected-note@-1{{add '@available' attribute to enclosing associated type}}
   associatedtype E: AtDeploymentTargetProto // expected-error {{'AtDeploymentTargetProto' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
-  // expected-note@-1{{add @available attribute to enclosing associated type}}
+  // expected-note@-1{{add '@available' attribute to enclosing associated type}}
   associatedtype F: AfterDeploymentTargetProto // expected-error {{'AfterDeploymentTargetProto' is only available in}}
-  // expected-note@-1{{add @available attribute to enclosing associated type}}
+  // expected-note@-1{{add '@available' attribute to enclosing associated type}}
 }
 
 @available(macOS 10.9, *)
@@ -1502,11 +1502,11 @@ public protocol BeforeInliningTargetProtoWithAssoc {
   associatedtype B: BeforeInliningTargetProto
   associatedtype C: AtInliningTargetProto
   associatedtype D: BetweenTargetsProto // expected-error {{'BetweenTargetsProto' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
-  // expected-note@-1{{add @available attribute to enclosing associated type}}
+  // expected-note@-1{{add '@available' attribute to enclosing associated type}}
   associatedtype E: AtDeploymentTargetProto // expected-error {{'AtDeploymentTargetProto' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
-  // expected-note@-1{{add @available attribute to enclosing associated type}}
+  // expected-note@-1{{add '@available' attribute to enclosing associated type}}
   associatedtype F: AfterDeploymentTargetProto // expected-error {{'AfterDeploymentTargetProto' is only available in}}
-  // expected-note@-1{{add @available attribute to enclosing associated type}}
+  // expected-note@-1{{add '@available' attribute to enclosing associated type}}
 }
 
 @available(macOS 10.10, *)
@@ -1515,11 +1515,11 @@ public protocol AtInliningTargetProtoWithAssoc {
   associatedtype B: BeforeInliningTargetProto
   associatedtype C: AtInliningTargetProto
   associatedtype D: BetweenTargetsProto // expected-error {{'BetweenTargetsProto' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}}
-  // expected-note@-1{{add @available attribute to enclosing associated type}}
+  // expected-note@-1{{add '@available' attribute to enclosing associated type}}
   associatedtype E: AtDeploymentTargetProto // expected-error {{'AtDeploymentTargetProto' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
-  // expected-note@-1{{add @available attribute to enclosing associated type}}
+  // expected-note@-1{{add '@available' attribute to enclosing associated type}}
   associatedtype F: AfterDeploymentTargetProto // expected-error {{'AfterDeploymentTargetProto' is only available in}}
-  // expected-note@-1{{add @available attribute to enclosing associated type}}
+  // expected-note@-1{{add '@available' attribute to enclosing associated type}}
 }
 
 @available(macOS 10.14.5, *)
@@ -1529,9 +1529,9 @@ public protocol BetweenTargetsProtoWithAssoc {
   associatedtype C: AtInliningTargetProto
   associatedtype D: BetweenTargetsProto
   associatedtype E: AtDeploymentTargetProto // expected-error {{'AtDeploymentTargetProto' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}}
-  // expected-note@-1{{add @available attribute to enclosing associated type}}
+  // expected-note@-1{{add '@available' attribute to enclosing associated type}}
   associatedtype F: AfterDeploymentTargetProto // expected-error {{'AfterDeploymentTargetProto' is only available in}}
-  // expected-note@-1{{add @available attribute to enclosing associated type}}
+  // expected-note@-1{{add '@available' attribute to enclosing associated type}}
 }
 
 @available(macOS 10.15, *)
@@ -1542,7 +1542,7 @@ public protocol AtDeploymentTargetProtoWithAssoc {
   associatedtype D: BetweenTargetsProto
   associatedtype E: AtDeploymentTargetProto
   associatedtype F: AfterDeploymentTargetProto // expected-error {{'AfterDeploymentTargetProto' is only available in}}
-  // expected-note@-1{{add @available attribute to enclosing associated type}}
+  // expected-note@-1{{add '@available' attribute to enclosing associated type}}
 }
 
 @available(macOS 11, *)
@@ -1567,25 +1567,25 @@ public protocol UnavailableProtoWithAssoc {
 }
 
 @_spi(Private)
-public protocol SPINoAvailableProtoWithAssoc { // expected-note 1 {{add @available attribute to enclosing protocol}}
+public protocol SPINoAvailableProtoWithAssoc { // expected-note 1 {{add '@available' attribute to enclosing protocol}}
   associatedtype A: NoAvailableProto
   associatedtype B: BeforeInliningTargetProto
   associatedtype C: AtInliningTargetProto
   associatedtype D: BetweenTargetsProto
   associatedtype E: AtDeploymentTargetProto
   associatedtype F: AfterDeploymentTargetProto // expected-error {{'AfterDeploymentTargetProto' is only available in}}
-  // expected-note@-1{{add @available attribute to enclosing associated type}}
+  // expected-note@-1{{add '@available' attribute to enclosing associated type}}
 }
 
 // MARK: - Type aliases
 
-public enum PublicNoAvailableEnumWithTypeAliases { // expected-note 3 {{add @available attribute to enclosing enum}}
+public enum PublicNoAvailableEnumWithTypeAliases { // expected-note 3 {{add '@available' attribute to enclosing enum}}
   public typealias A = NoAvailable
   public typealias B = BeforeInliningTarget
   public typealias C = AtInliningTarget
-  public typealias D = BetweenTargets // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add @available attribute to enclosing type alias}}
-  public typealias E = AtDeploymentTarget // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add @available attribute to enclosing type alias}}
-  public typealias F = AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add @available attribute to enclosing type alias}}
+  public typealias D = BetweenTargets // expected-error {{'BetweenTargets' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add '@available' attribute to enclosing type alias}}
+  public typealias E = AtDeploymentTarget // expected-error {{'AtDeploymentTarget' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note {{add '@available' attribute to enclosing type alias}}
+  public typealias F = AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add '@available' attribute to enclosing type alias}}
 }
 
 @available(macOS, unavailable)
@@ -1600,27 +1600,27 @@ public enum UnavailableEnumWithTypeAliases {
 }
 
 @_spi(Private)
-public enum SPIEnumWithTypeAliases { // expected-note 1 {{add @available attribute to enclosing enum}}
+public enum SPIEnumWithTypeAliases { // expected-note 1 {{add '@available' attribute to enclosing enum}}
   public typealias A = NoAvailable
   public typealias B = BeforeInliningTarget
   public typealias C = AtInliningTarget
   public typealias D = BetweenTargets
   public typealias E = AtDeploymentTarget
-  public typealias F = AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add @available attribute to enclosing type alias}}
+  public typealias F = AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add '@available' attribute to enclosing type alias}}
 }
 
-enum InternalNoAvailableEnumWithTypeAliases { // expected-note {{add @available attribute to enclosing enum}}
+enum InternalNoAvailableEnumWithTypeAliases { // expected-note {{add '@available' attribute to enclosing enum}}
   public typealias A = NoAvailable
   public typealias B = BeforeInliningTarget
   public typealias C = AtInliningTarget
   public typealias D = BetweenTargets
   public typealias E = AtDeploymentTarget
-  public typealias F = AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add @available attribute to enclosing type alias}}
+  public typealias F = AfterDeploymentTarget // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add '@available' attribute to enclosing type alias}}
 }
 
 // MARK: - Enums with payloads
 
-public enum PublicNoAvailableEnumWithPayloads { // expected-note 5 {{add @available attribute to enclosing enum}}
+public enum PublicNoAvailableEnumWithPayloads { // expected-note 5 {{add '@available' attribute to enclosing enum}}
   case aNoAvailable(NoAvailable),
        bNoAvailable(BeforeInliningTarget),
        cNoAvailable(AtInliningTarget),
@@ -1661,12 +1661,12 @@ public enum NoAvailableEnumWithClasses {
   public class InheritsNoAvailable: NoAvailableClass {}
   public class InheritsBeforeInliningTarget: BeforeInliningTargetClass {}
   public class InheritsAtInliningTarget: AtInliningTargetClass {}
-  public class InheritsBetweenTargets: BetweenTargetsClass {} // expected-error {{'BetweenTargetsClass' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note 2 {{add @available attribute to enclosing class}}
-  public class InheritsAtDeploymentTarget: AtDeploymentTargetClass {} // expected-error {{'AtDeploymentTargetClass' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note 2 {{add @available attribute to enclosing class}}
-  public class InheritsAfterDeploymentTarget: AfterDeploymentTargetClass {} // expected-error {{'AfterDeploymentTargetClass' is only available in macOS 11 or newer}} expected-note 2 {{add @available attribute to enclosing class}}
+  public class InheritsBetweenTargets: BetweenTargetsClass {} // expected-error {{'BetweenTargetsClass' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note 2 {{add '@available' attribute to enclosing class}}
+  public class InheritsAtDeploymentTarget: AtDeploymentTargetClass {} // expected-error {{'AtDeploymentTargetClass' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note 2 {{add '@available' attribute to enclosing class}}
+  public class InheritsAfterDeploymentTarget: AfterDeploymentTargetClass {} // expected-error {{'AfterDeploymentTargetClass' is only available in macOS 11 or newer}} expected-note 2 {{add '@available' attribute to enclosing class}}
   
   @usableFromInline
-  class UFIInheritsBetweenTargets: BetweenTargetsClass {} // expected-error {{'BetweenTargetsClass' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note 2 {{add @available attribute to enclosing class}}
+  class UFIInheritsBetweenTargets: BetweenTargetsClass {} // expected-error {{'BetweenTargetsClass' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note 2 {{add '@available' attribute to enclosing class}}
 }
 
 @_spi(Private)
@@ -1677,7 +1677,7 @@ public enum SPIEnumWithClasses {
   public class InheritsBetweenTargets: BetweenTargetsClass {}
   public class InheritsAtDeploymentTarget: AtDeploymentTargetClass {}
   // FIXME: Duplicate 'add @available' note is emitted
-  public class InheritsAfterDeploymentTarget: AfterDeploymentTargetClass {} // expected-error {{'AfterDeploymentTargetClass' is only available in}} expected-note 2 {{add @available attribute to enclosing class}}
+  public class InheritsAfterDeploymentTarget: AfterDeploymentTargetClass {} // expected-error {{'AfterDeploymentTargetClass' is only available in}} expected-note 2 {{add '@available' attribute to enclosing class}}
 }
 
 @available(macOS, unavailable)

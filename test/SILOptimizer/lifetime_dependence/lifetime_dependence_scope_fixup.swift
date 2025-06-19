@@ -1,9 +1,23 @@
-// RUN: %target-swift-frontend %s -Xllvm -sil-print-types -emit-sil \
-// RUN: -enable-experimental-feature LifetimeDependence \
+// RUN: %target-swift-frontend %s -Xllvm -sil-print-types -Xllvm -sil-disable-pass=onone-simplification -emit-sil \
+// RUN: -enable-experimental-feature Lifetimes \
 // RUN: | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
+
+/// Unsafely discard any lifetime dependency on the `dependent` argument. Return
+/// a value identical to `dependent` that inherits all lifetime dependencies from
+/// the `source` argument.
+@_unsafeNonescapableResult
+@_transparent
+@_lifetime(copy source)
+internal func _overrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T, copying source: borrowing U
+) -> T {
+  dependent
+}
 
 struct NCContainer : ~Copyable {
   let ptr: UnsafeRawBufferPointer
@@ -17,12 +31,12 @@ struct NCContainer : ~Copyable {
 struct View : ~Escapable {
   let ptr: UnsafeRawBufferPointer
   let c: Int
-  @lifetime(borrow ptr)
+  @_lifetime(borrow ptr)
   init(_ ptr: UnsafeRawBufferPointer, _ c: Int) {
     self.ptr = ptr
     self.c = c
   }
-  @lifetime(copy otherBV)
+  @_lifetime(copy otherBV)
   init(_ otherBV: borrowing View) {
     self.ptr = otherBV.ptr
     self.c = otherBV.c
@@ -33,7 +47,7 @@ struct View : ~Escapable {
   }
   // This overload requires a separate label because overloading
   // on borrowing/consuming attributes is not allowed
-  @lifetime(copy k)
+  @_lifetime(copy k)
   init(consumingView k: consuming View) {
     self.ptr = k.ptr
     self.c = k.c
@@ -51,11 +65,11 @@ struct NCMutableContainer : ~Copyable {
 
 struct MutableView : ~Copyable, ~Escapable {
   let ptr: UnsafeMutableRawBufferPointer
-  @lifetime(borrow ptr)
+  @_lifetime(borrow ptr)
   init(_ ptr: UnsafeMutableRawBufferPointer) {
     self.ptr = ptr
   }
-  @lifetime(copy otherBV)
+  @_lifetime(copy otherBV)
   init(_ otherBV: borrowing MutableView) {
     self.ptr = otherBV.ptr
   }
@@ -65,7 +79,7 @@ struct MutableView : ~Copyable, ~Escapable {
 }
 
 extension MutableView {
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func update() -> Self {
     return unsafe MutableView(ptr)
   }
@@ -79,17 +93,17 @@ func consume(_ o : consuming View) {}
 func use(_ o : borrowing MutableView) {}
 func consume(_ o : consuming MutableView) {}
 
-@lifetime(copy x)
+@_lifetime(copy x)
 func getConsumingView(_ x: consuming View) -> View {
   return View(consumingView: x)
 }
 
-@lifetime(borrow x)
+@_lifetime(borrow x)
 func getBorrowingView(_ x: borrowing View) -> View {
   return View(x.ptr, x.c)
 }
 
-@lifetime(borrow x)
+@_lifetime(borrow x)
 func getBorrowingView(_ x: borrowing NCContainer) -> View {
   return View(x.ptr, x.c)
 }
@@ -206,16 +220,16 @@ func test8(_ a: inout Array<Int>) {
 struct Wrapper : ~Escapable {
   var _view: View
   var view: View {
-    @lifetime(copy self)
+    @_lifetime(copy self)
     _read {
       yield _view
     }
-    @lifetime(borrow self)
+    @_lifetime(&self)
     _modify {
       yield &_view
     }
   }
-  @lifetime(copy view)
+  @_lifetime(copy view)
   init(_ view: consuming View) {
     self._view = view
   }
@@ -231,9 +245,11 @@ func test9() {
   }
 }
 
-@lifetime(copy x)
+@_lifetime(copy x)
 func getViewTuple(_ x: borrowing View) -> (View, View) {
-  return (View(x.ptr, x.c), View(x.ptr, x.c))
+  let x1 = View(x.ptr, x.c)
+  let x2 = View(x.ptr, x.c)
+  return (_overrideLifetime(x1, copying: x), _overrideLifetime(x2, copying: x))
 }
 
 public func test10() {
@@ -283,4 +299,31 @@ func testReassignment(b: UnsafeMutableRawBufferPointer) {
 
   sub = span.update()
   use(sub)
+}
+
+
+// Coroutine nested in a mutable access scope.
+//
+// rdar://150275147 (Invalid SIL after lifetime dependence fixup involving coroutines)
+struct ArrayWrapper {
+  private var a: [Int]
+
+  var array: [Int] {
+    _read {
+      yield a
+    }
+    _modify {
+      yield &a
+    }
+  }
+}
+
+@_silgen_name("gms")
+func getMutableSpan(_: inout [Int]) -> MutableSpan<Int>
+
+func testWrite(_ w: inout ArrayWrapper) {
+  var span = getMutableSpan(&w.array)
+  for i in span.indices {
+    span[i] = 0
+  }
 }

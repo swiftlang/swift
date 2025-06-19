@@ -51,7 +51,7 @@ func withCheckedContinuation_2a() async -> NonSendableKlass {
 
 @MainActor
 func withCheckedContinuation_3() async {
-  // x is main actor isolated since withCheckedContinuation is #isolated.
+  // x is MainActor isolated since withCheckedContinuation is #isolated.
   let x = await withCheckedContinuation { continuation in
     let x = NonSendableKlass()
     continuation.resume(returning: x)
@@ -80,7 +80,7 @@ func withCheckedContinuation_3a() async {
 
 @MainActor
 func withCheckedContinuation_4() async {
-  // x is main actor isolated since withCheckedContinuation is #isolated.
+  // x is MainActor isolated since withCheckedContinuation is #isolated.
   let y = NonSendableKlass()
   let x = await withCheckedContinuation { continuation in
     continuation.resume(returning: y)
@@ -95,7 +95,7 @@ func withCheckedContinuation_4() async {
 }
 
 func withCheckedContinuation_4a() async {
-  // x is main actor isolated since withCheckedContinuation is #isolated.
+  // x is MainActor isolated since withCheckedContinuation is #isolated.
   let y = NonSendableKlass()
   let x = await withCheckedContinuation { continuation in
     continuation.resume(returning: y)
@@ -182,7 +182,7 @@ func withUnsafeContinuation_2a() async -> NonSendableKlass {
 
 @MainActor
 func withUnsafeContinuation_3() async {
-  // x is main actor isolated since withUnsafeContinuation is #isolated.
+  // x is MainActor isolated since withUnsafeContinuation is #isolated.
   let x = await withUnsafeContinuation { continuation in
     let x = NonSendableKlass()
     continuation.resume(returning: x)
@@ -209,7 +209,7 @@ func withUnsafeContinuation_3a() async {
 
 @MainActor
 func withUnsafeContinuation_4() async {
-  // x is main actor isolated since withUnsafeContinuation is #isolated.
+  // x is MainActor isolated since withUnsafeContinuation is #isolated.
   let y = NonSendableKlass()
   let x = await withUnsafeContinuation { continuation in
     continuation.resume(returning: y)
@@ -224,7 +224,7 @@ func withUnsafeContinuation_4() async {
 }
 
 func withUnsafeContinuation_4a() async {
-  // x is main actor isolated since withUnsafeContinuation is #isolated.
+  // x is MainActor isolated since withUnsafeContinuation is #isolated.
   let y = NonSendableKlass()
   let x = await withUnsafeContinuation { continuation in
     continuation.resume(returning: y)

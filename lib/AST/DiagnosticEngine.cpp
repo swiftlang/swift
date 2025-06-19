@@ -313,18 +313,12 @@ InFlightDiagnostic::fixItReplaceChars(SourceLoc Start, SourceLoc End,
   return *this;
 }
 
-SourceLoc
-DiagnosticEngine::getBestAddImportFixItLoc(const Decl *Member,
-                                           SourceFile *sourceFile) const {
+SourceLoc DiagnosticEngine::getBestAddImportFixItLoc(SourceFile *SF) const {
   auto &SM = SourceMgr;
 
   SourceLoc bestLoc;
-
-  auto SF =
-      sourceFile ? sourceFile : Member->getDeclContext()->getParentSourceFile();
-  if (!SF) {
+  if (!SF)
     return bestLoc;
-  }
 
   for (auto item : SF->getTopLevelItems()) {
     // If we found an import declaration, we want to insert after it.
@@ -356,30 +350,21 @@ DiagnosticEngine::getBestAddImportFixItLoc(const Decl *Member,
 
 InFlightDiagnostic &InFlightDiagnostic::fixItAddImport(StringRef ModuleName) {
   assert(IsActive && "Cannot modify an inactive diagnostic");
-  auto Member = Engine->ActiveDiagnostic->getDecl();
-  SourceLoc bestLoc = Engine->getBestAddImportFixItLoc(Member);
+  auto decl = Engine->ActiveDiagnostic->getDecl();
+  if (!decl)
+    return *this;
 
-  if (bestLoc.isValid()) {
-    llvm::SmallString<64> importText;
+  auto bestLoc = Engine->getBestAddImportFixItLoc(
+      decl->getDeclContext()->getOutermostParentSourceFile());
+  if (!bestLoc.isValid())
+    return *this;
 
-    // @_spi imports.
-    if (Member->isSPI()) {
-      auto spiGroups = Member->getSPIGroups();
-      if (!spiGroups.empty()) {
-        importText += "@_spi(";
-        importText += spiGroups[0].str();
-        importText += ") ";
-      }
-    }
+  llvm::SmallString<64> importText;
+  importText += "import ";
+  importText += ModuleName;
+  importText += "\n";
 
-    importText += "import ";
-    importText += ModuleName;
-    importText += "\n";
-
-    return fixItInsert(bestLoc, importText);
-  }
-
-  return *this;
+  return fixItInsert(bestLoc, importText);
 }
 
 InFlightDiagnostic &
@@ -393,15 +378,17 @@ InFlightDiagnostic::fixItAddAttribute(const DeclAttribute *Attr,
                                       const ClosureExpr *E) {
   ASSERT(!E->isImplicit());
 
-  SourceLoc insertionLoc;
+  SourceLoc insertionLoc = E->getBracketRange().Start;
 
-  if (auto *paramList = E->getParameters()) {
-    // HACK: Don't set insertion loc to param list start loc if it's equal to
-    // closure start loc (meaning it's implicit).
-    // FIXME: Don't set the start loc of an implicit param list, or put an
-    // isImplicit bit on ParameterList.
-    if (paramList->getStartLoc() != E->getStartLoc()) {
-      insertionLoc = paramList->getStartLoc();
+  if (insertionLoc.isInvalid()) {
+    if (auto *paramList = E->getParameters()) {
+      // HACK: Don't set insertion loc to param list start loc if it's equal to
+      // closure start loc (meaning it's implicit).
+      // FIXME: Don't set the start loc of an implicit param list, or put an
+      // isImplicit bit on ParameterList.
+      if (paramList->getStartLoc() != E->getStartLoc()) {
+        insertionLoc = paramList->getStartLoc();
+      }
     }
   }
 
@@ -412,9 +399,20 @@ InFlightDiagnostic::fixItAddAttribute(const DeclAttribute *Attr,
   if (insertionLoc.isValid()) {
     return fixItInsert(insertionLoc, "%0 ", {Attr});
   } else {
-    insertionLoc = E->getBody()->getLBraceLoc();
+    auto *body = E->getBody();
+
+    insertionLoc = body->getLBraceLoc();
     ASSERT(insertionLoc.isValid());
-    return fixItInsertAfter(insertionLoc, " %0 in ", {Attr});
+
+    StringRef fixIt = " %0 in";
+    // If the first token in the body literally begins with the next char after
+    // '{', play it safe with a trailing space.
+    if (body->getContentStartLoc() ==
+        insertionLoc.getAdvancedLoc(/*ByteOffset=*/1)) {
+      fixIt = " %0 in ";
+    }
+
+    return fixItInsertAfter(insertionLoc, fixIt, {Attr});
   }
 }
 
@@ -452,7 +450,7 @@ InFlightDiagnostic::limitBehaviorUntilSwiftVersion(
     // version. We do this before limiting the behavior, because
     // wrapIn will result in the behavior of the wrapping diagnostic.
     if (limit >= DiagnosticBehavior::Warning) {
-      if (majorVersion > 6) {
+      if (majorVersion >= version::Version::getFutureMajorLanguageVersion()) {
         wrapIn(diag::error_in_a_future_swift_lang_mode);
       } else {
         wrapIn(diag::error_in_swift_lang_mode, majorVersion);
@@ -470,6 +468,11 @@ InFlightDiagnostic::limitBehaviorUntilSwiftVersion(
   }
 
   return *this;
+}
+
+InFlightDiagnostic &InFlightDiagnostic::warnUntilFutureSwiftVersion() {
+  using namespace version;
+  return warnUntilSwiftVersion(Version::getFutureMajorLanguageVersion());
 }
 
 InFlightDiagnostic &

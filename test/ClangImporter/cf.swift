@@ -118,6 +118,7 @@ func testOutParametersGood() {
 func testOutParametersBad() {
   let fridge: CCRefrigerator?
   CCRefrigeratorCreateIndirect(fridge) // expected-error {{cannot convert value of type 'CCRefrigerator?' to expected argument type 'UnsafeMutablePointer<CCRefrigerator?>?'}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('CCRefrigerator' and 'UnsafeMutablePointer<CCRefrigerator?>') are expected to be equal}}
 
   let power: CCPowerSupply?
   CCRefrigeratorGetPowerSupplyIndirect(0, power)
@@ -128,13 +129,16 @@ func testOutParametersBad() {
   CCRefrigeratorGetItemUnaudited(0, 0, item)
   // expected-error@-1:34 {{cannot convert value of type 'Int' to expected argument type 'CCRefrigerator'}}
   // expected-error@-2:40 {{cannot convert value of type 'CCItem?' to expected argument type 'UnsafeMutablePointer<Unmanaged<CCItem>?>?'}}
+  // expected-note@-3 {{arguments to generic parameter 'Wrapped' ('CCItem' and 'UnsafeMutablePointer<Unmanaged<CCItem>?>') are expected to be equal}}
 }
 
 func nameCollisions() {
   var objc: MyProblematicObject?
   var cf: MyProblematicObjectRef?
   cf = objc // expected-error {{cannot assign value of type 'MyProblematicObject?' to type 'MyProblematicObjectRef?'}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('MyProblematicObject' and 'MyProblematicObjectRef') are expected to be equal}}
   objc = cf // expected-error {{cannot assign value of type 'MyProblematicObjectRef?' to type 'MyProblematicObject?'}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('MyProblematicObjectRef' and 'MyProblematicObject') are expected to be equal}}
 
   var cfAlias: MyProblematicAliasRef?
   cfAlias = cf // okay
@@ -142,7 +146,9 @@ func nameCollisions() {
 
   var otherAlias: MyProblematicAlias?
   otherAlias = cfAlias // expected-error {{cannot assign value of type 'MyProblematicAliasRef?' (aka 'Optional<MyProblematicObjectRef>') to type 'MyProblematicAlias?' (aka 'Optional<Float>')}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('MyProblematicAliasRef' (aka 'MyProblematicObjectRef') and 'MyProblematicAlias' (aka 'Float')) are expected to be equal}}
   cfAlias = otherAlias // expected-error {{cannot assign value of type 'MyProblematicAlias?' (aka 'Optional<Float>') to type 'MyProblematicAliasRef?' (aka 'Optional<MyProblematicObjectRef>')}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('MyProblematicAlias' (aka 'Float') and 'MyProblematicAliasRef' (aka 'MyProblematicObjectRef')) are expected to be equal}}
 
   func isOptionalFloat(_: inout Optional<Float>) {}
   isOptionalFloat(&otherAlias) // okay
@@ -161,11 +167,11 @@ func testNonConstVoid() {
 
 class NuclearFridge: CCRefrigerator {} // expected-error {{cannot inherit from Core Foundation type 'CCRefrigerator'}}
 extension CCRefrigerator {
-  @objc func foo() {} // expected-error {{method cannot be marked @objc because Core Foundation types are not classes in Objective-C}}
+  @objc func foo() {} // expected-error {{method cannot be marked '@objc' because Core Foundation types are not classes in Objective-C}}
   func bar() {} // okay, implicitly non-objc
 }
 
 protocol SwiftProto {}
 @objc protocol ObjCProto {}
-extension CCRefrigerator: ObjCProto {} // expected-error {{Core Foundation class 'CCRefrigerator' cannot conform to @objc protocol 'ObjCProto' because Core Foundation types are not classes in Objective-C}}
+extension CCRefrigerator: ObjCProto {} // expected-error {{Core Foundation class 'CCRefrigerator' cannot conform to '@objc' protocol 'ObjCProto' because Core Foundation types are not classes in Objective-C}}
 extension CCRefrigerator: SwiftProto {}

@@ -1,7 +1,6 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature ABIAttribute
+// RUN: %target-typecheck-verify-swift
 
 // UNSUPPORTED: OS=windows-msvc
-// REQUIRES: swift_feature_ABIAttribute
 
 @_weakLinked public func f() { }
 

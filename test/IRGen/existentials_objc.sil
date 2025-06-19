@@ -22,11 +22,11 @@ bb0(%0 : $*Any, %1 : $T):
   return %3 : $()
 }
 
-// CHECK-DAG:   define{{( protected)?}} swiftcc void @init_opaque_existential(ptr noalias nocapture sret({{.*}}) %0, ptr %1, ptr %T) {{.*}} {
-// CHECK:         [[T0:%.*]] = getelementptr inbounds [[ANY:%Any]], ptr %0, i32 0, i32 1
+// CHECK-DAG:   define{{( protected)?}} swiftcc void @init_opaque_existential(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr %1, ptr %T) {{.*}} {
+// CHECK:         [[T0:%.*]] = getelementptr inbounds{{.*}} [[ANY:%Any]], ptr %0, i32 0, i32 1
 // CHECK-NEXT:    store ptr %T, ptr [[T0]], align 8
-// CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds [[ANY]], ptr %0, i32 0, i32 0
-// CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds [[ANY]], ptr %0, i32 0, i32 0
+// CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds{{.*}} [[ANY]], ptr %0, i32 0, i32 0
+// CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds{{.*}} [[ANY]], ptr %0, i32 0, i32 0
 // CHECK-NEXT:    store ptr %1, ptr [[T0]], align 8
 // CHECK-NEXT:    ret void
 
@@ -37,7 +37,7 @@ bb0(%0 : $*Any, %1 : $*Any):
   return %3 : $()
 }
 
-// CHECK-DAG:   define{{( protected)?}} swiftcc void @take_opaque_existential(ptr noalias nocapture sret({{.*}}) %0, ptr noalias nocapture dereferenceable({{.*}}) %1) {{.*}} {
+// CHECK-DAG:   define{{( protected)?}} swiftcc void @take_opaque_existential(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr noalias {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %1) {{.*}} {
 // CHECK: call ptr @"$sypWOb"(ptr %1, ptr %0)
 // CHECK-NEXT:    ret void
 
@@ -68,12 +68,12 @@ entry(%s : $CP):
   // CHECK: [[U2:%.*]] = alloca [[UREF]], align 8
 
   store_unowned %s to [init] %u1 : $*@sil_unowned CP
-  // CHECK: [[T0:%.*]] = getelementptr inbounds [[UREF]], ptr [[U1]], i32 0, i32 1
+  // CHECK: [[T0:%.*]] = getelementptr inbounds{{.*}} [[UREF]], ptr [[U1]], i32 0, i32 1
   // CHECK: store ptr %1, ptr [[T0]], align 8
-  // CHECK: [[T0:%.*]] = getelementptr inbounds [[UREF]], ptr [[U1]], i32 0, i32 0
+  // CHECK: [[T0:%.*]] = getelementptr inbounds{{.*}} [[UREF]], ptr [[U1]], i32 0, i32 0
   // CHECK: call ptr @swift_unknownObjectUnownedInit(ptr returned [[T0]], ptr %0)
 
-  // CHECK: [[T0:%.*]] = getelementptr inbounds [[UREF]], ptr [[U1]], i32 0, i32 0
+  // CHECK: [[T0:%.*]] = getelementptr inbounds{{.*}} [[UREF]], ptr [[U1]], i32 0, i32 0
   // CHECK: [[T1:%.*]] = call ptr @swift_unknownObjectUnownedLoadStrong(ptr [[T0]])
   %t = load_unowned %u1 : $*@sil_unowned CP
   // CHECK: call void @swift_unknownObjectRelease(ptr [[T1]])
@@ -105,29 +105,29 @@ entry(%w : $*@sil_weak CP?, %a : $CP?):
 
   // CHECK: [[SRC_REF:%.*]] = inttoptr {{.*}} ptr
   // CHECK: [[SRC_WITNESS:%.*]] = inttoptr {{.*}} ptr
-  // CHECK: [[DEST_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, ptr }, ptr %0, i32 0, i32 1
+  // CHECK: [[DEST_WITNESS_ADDR:%.*]] = getelementptr inbounds{{.*}} { %swift.weak, ptr }, ptr %0, i32 0, i32 1
   // CHECK: store ptr [[SRC_WITNESS]], ptr [[DEST_WITNESS_ADDR]]
-  // CHECK: [[DEST_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, ptr }, ptr %0, i32 0, i32 0
+  // CHECK: [[DEST_REF_ADDR:%.*]] = getelementptr inbounds{{.*}} { %swift.weak, ptr }, ptr %0, i32 0, i32 0
   // CHECK: call ptr @swift_unknownObjectWeakInit(ptr returned [[DEST_REF_ADDR]], ptr [[SRC_REF]])
   store_weak %a to [init] %w : $*@sil_weak CP?
 
   // CHECK: [[SRC_REF:%.*]] = inttoptr {{.*}} ptr
   // CHECK: [[SRC_WITNESS:%.*]] = inttoptr {{.*}} ptr
-  // CHECK: [[DEST_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, ptr }, ptr %0, i32 0, i32 1
+  // CHECK: [[DEST_WITNESS_ADDR:%.*]] = getelementptr inbounds{{.*}} { %swift.weak, ptr }, ptr %0, i32 0, i32 1
   // CHECK: store ptr [[SRC_WITNESS]], ptr [[DEST_WITNESS_ADDR]]
-  // CHECK: [[DEST_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, ptr }, ptr %0, i32 0, i32 0
+  // CHECK: [[DEST_REF_ADDR:%.*]] = getelementptr inbounds{{.*}} { %swift.weak, ptr }, ptr %0, i32 0, i32 0
   // CHECK: call ptr @swift_unknownObjectWeakAssign(ptr returned [[DEST_REF_ADDR]], ptr [[SRC_REF]])
   store_weak %a to                  %w : $*@sil_weak CP?
 
-  // CHECK: [[SRC_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, ptr }, ptr %0, i32 0, i32 0
+  // CHECK: [[SRC_REF_ADDR:%.*]] = getelementptr inbounds{{.*}} { %swift.weak, ptr }, ptr %0, i32 0, i32 0
   // CHECK: [[DEST_REF:%.*]] = call ptr @swift_unknownObjectWeakTakeStrong(ptr [[SRC_REF_ADDR]])
-  // CHECK: [[SRC_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, ptr }, ptr %0, i32 0, i32 1
+  // CHECK: [[SRC_WITNESS_ADDR:%.*]] = getelementptr inbounds{{.*}} { %swift.weak, ptr }, ptr %0, i32 0, i32 1
   // CHECK: [[DEST_WITNESS:%.*]] = load ptr, ptr [[SRC_WITNESS_ADDR]]
   %b = load_weak [take] %w : $*@sil_weak CP?
 
-  // CHECK: [[SRC_REF_ADDR:%.*]] = getelementptr inbounds { %swift.weak, ptr }, ptr %0, i32 0, i32 0
+  // CHECK: [[SRC_REF_ADDR:%.*]] = getelementptr inbounds{{.*}} { %swift.weak, ptr }, ptr %0, i32 0, i32 0
   // CHECK: [[DEST_REF:%.*]] = call ptr @swift_unknownObjectWeakLoadStrong(ptr [[SRC_REF_ADDR]])
-  // CHECK: [[SRC_WITNESS_ADDR:%.*]] = getelementptr inbounds { %swift.weak, ptr }, ptr %0, i32 0, i32 1
+  // CHECK: [[SRC_WITNESS_ADDR:%.*]] = getelementptr inbounds{{.*}} { %swift.weak, ptr }, ptr %0, i32 0, i32 1
   // CHECK: [[DEST_WITNESS:%.*]] = load ptr, ptr [[SRC_WITNESS_ADDR]]
   %c = load_weak        %w : $*@sil_weak CP?
 

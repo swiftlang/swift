@@ -249,7 +249,7 @@ extension HasAvailableConformance1 : Horse {}
 // See the other test case in test/Sema/conformance_availability_warn.swift for
 // the same example for -swift-version 5.
 
-func passAvailableConformance1(x: HasAvailableConformance1) { // expected-note 6{{add @available attribute to enclosing global function}}
+func passAvailableConformance1(x: HasAvailableConformance1) { // expected-note 6{{add '@available' attribute to enclosing global function}}
   takesHorse(x) // expected-error {{conformance of 'HasAvailableConformance1' to 'Horse' is only available in macOS 100 or newer}}
   // expected-note@-1 {{add 'if #available' version check}}
 
@@ -310,7 +310,7 @@ struct AssocConformanceDeprecated : Rider {
 struct AssocConformanceAvailable1 : Rider {
 // expected-error@-1 {{conformance of 'HasAvailableConformance1' to 'Horse' is only available in macOS 100 or newer}}
 // expected-note@-2 {{in associated type 'Self.H' (inferred as 'HasAvailableConformance1')}}
-// expected-note@-3 {{add @available attribute to enclosing struct}}
+// expected-note@-3 {{add '@available' attribute to enclosing struct}}
   typealias H = HasAvailableConformance1
 }
 
@@ -324,7 +324,7 @@ struct AssocConformanceAvailable3 {}
 extension AssocConformanceAvailable3 : Rider {
 // expected-error@-1 {{conformance of 'HasAvailableConformance1' to 'Horse' is only available in macOS 100 or newer}}
 // expected-note@-2 {{in associated type 'Self.H' (inferred as 'HasAvailableConformance1')}}
-// expected-note@-3 {{add @available attribute to enclosing extension}}
+// expected-note@-3 {{add '@available' attribute to enclosing extension}}
   typealias H = HasAvailableConformance1
 }
 
@@ -348,14 +348,14 @@ struct ConformsToSaddle2 : Saddle {
 
 struct ConformsToSaddle3 : Saddle {
   // expected-error@-1 {{conformance of 'HasAvailableConformance3' to 'Horse' is only available in macOS 200 or newer}}
-  // expected-note@-2 {{add @available attribute to enclosing struct}}
+  // expected-note@-2 {{add '@available' attribute to enclosing struct}}
   // expected-note@-3 {{in associated type 'Self.H' (inferred as 'HasAvailableConformance3'}}
   typealias H = HasAvailableConformance3
 }
 
 struct ConformsToSaddle4 : Saddle {
   // expected-error@-1 {{conformance of 'HasAvailableConformance3' to 'Horse' is only available in macOS 200 or newer}}
-  // expected-note@-2 {{add @available attribute to enclosing struct}}
+  // expected-note@-2 {{add '@available' attribute to enclosing struct}}
   // expected-note@-3 {{in associated type 'Self.H' (inferred as 'HasAvailableConformance3'}}
   @available(macOS 200, *)
   typealias H = HasAvailableConformance3
@@ -374,14 +374,14 @@ struct ConformsToBarn2 : Barn {
 
 struct ConformsToBarn3 : Barn {
   // expected-error@-1 {{conformance of 'HasAvailableConformance3' to 'Horse' is only available in macOS 200 or newer}}
-  // expected-note@-2 {{add @available attribute to enclosing struct}}
+  // expected-note@-2 {{add '@available' attribute to enclosing struct}}
   // expected-note@-3 {{in associated type 'Self.H' (inferred as 'HasAvailableConformance3'}}
   typealias H = HasAvailableConformance3
 }
 
 struct ConformsToBarn4 : Barn {
   // expected-error@-1 {{conformance of 'HasAvailableConformance3' to 'Horse' is only available in macOS 200 or newer}}
-  // expected-note@-2 {{add @available attribute to enclosing struct}}
+  // expected-note@-2 {{add '@available' attribute to enclosing struct}}
   // expected-note@-3 {{in associated type 'Self.H' (inferred as 'HasAvailableConformance3'}}
   @available(macOS 200, *)
   typealias H = HasAvailableConformance3
@@ -443,7 +443,7 @@ struct UnavailableHashable {
 extension UnavailableHashable : Hashable {}
 
 func usesUnavailableHashable(_ c: UnavailableHashable) {
-  // expected-note@-1 2 {{add @available attribute to enclosing global function}}
+  // expected-note@-1 2 {{add '@available' attribute to enclosing global function}}
   _ = Set([c])
   // expected-error@-1 2 {{conformance of 'UnavailableHashable' to 'Hashable' is only available in macOS 100 or newer}}
   // expected-note@-2 2 {{add 'if #available' version check}}

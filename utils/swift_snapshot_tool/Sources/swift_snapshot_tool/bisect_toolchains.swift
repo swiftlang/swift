@@ -17,8 +17,10 @@ struct BisectToolchains: AsyncParsableCommand {
   static let configuration = CommandConfiguration(
     commandName: "bisect",
     discussion: """
-      Bisects on exit status of attached script. Passes in name of swift as the
-      environment variables \(environmentVariables).
+      Bisects on swift snapshots downloaded from swift.org via an exit status of
+      a script. Script is passed paths into the downloaded snapshot via
+      environment variables and is expected to compile and or run swift programs
+      using the snapshot artifacts.
       """)
 
   @Flag var platform: Platform = .osx
@@ -34,13 +36,16 @@ struct BisectToolchains: AsyncParsableCommand {
 
   @Option(
     help: """
-      The script that should be run. It runs a specific swift compilation and
-      optionally program using the passed in environment variables
-      \(environmentVariables)
+      The script that should be run. It should run a specific swift compilation and
+      or program. Paths into the snapshots are passed in via the environment variables \(environmentVariables).
       """)
   var script: String
 
-  @Option(help: "Oldest Date. Expected to Pass. We use the first snapshot produced before the given date")
+  @Option(help:
+            """
+            Expected to Pass. We use the first snapshot produced before the
+            given date if a snapshot at this specific date does not exist
+            """)
   var oldDate: String
 
   var oldDateAsDate: Date {
@@ -54,9 +59,10 @@ struct BisectToolchains: AsyncParsableCommand {
   }
 
   @Option(help: """
-    Newest Date. Expected to fail. If not set, use newest snapshot. We use the
-    first snapshot after new date
-    """)
+            Expected to fail. If not set, defaults to use newest snapshot. If a
+            date is specified and a snapshot does not exist for that date, the
+            first snapshot before the specified date is used.
+            """)
   var newDate: String?
 
   var newDateAsDate: Date? {
@@ -95,7 +101,7 @@ struct BisectToolchains: AsyncParsableCommand {
     // just say 50 toolchains ago. To get a few weeks worth. This is easier than
     // writing dates a lot.
     let oldDateAsDate = self.oldDateAsDate
-    guard let goodTagIndex = tags.firstIndex(where: { $0.tag.date(branch: self.branch) < oldDateAsDate }) else {
+    guard let goodTagIndex = tags.firstIndex(where: { $0.tag.date(branch: self.branch) <= oldDateAsDate }) else {
       log("Failed to find tag with date: \(oldDateAsDate)")
       fatalError()
     }

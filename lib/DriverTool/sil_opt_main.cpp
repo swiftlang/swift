@@ -831,7 +831,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   }
 
   // If we have strict concurrency set as a feature and were told to turn off
-  // region based isolation... do so now.
+  // region-based isolation... do so now.
   if (Invocation.getLangOptions().hasFeature(Feature::StrictConcurrency)) {
     Invocation.getLangOptions().enableFeature(Feature::RegionBasedIsolation);
   }

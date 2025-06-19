@@ -822,7 +822,7 @@ extension UnsafeBufferPointer: @unsafe AtomicRepresentable where Element: ~Copya
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation
   ) -> UnsafeBufferPointer<Element> {
-    let wp = unsafe WordPair.decodeAtomicRepresentation(representation)
+    let wp = WordPair.decodeAtomicRepresentation(representation)
 
     return unsafe UnsafeBufferPointer<Element>(
       start: UnsafePointer<Element>(bitPattern: wp.first),
@@ -890,7 +890,7 @@ where Element: ~Copyable
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation
   ) -> UnsafeMutableBufferPointer<Element> {
-    let wp = unsafe WordPair.decodeAtomicRepresentation(representation)
+    let wp = WordPair.decodeAtomicRepresentation(representation)
 
     return unsafe UnsafeMutableBufferPointer<Element>(
       start: UnsafeMutablePointer<Element>(bitPattern: wp.first),
@@ -956,7 +956,7 @@ extension UnsafeRawBufferPointer: @unsafe AtomicRepresentable {
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation
   ) -> UnsafeRawBufferPointer {
-    let wp = unsafe WordPair.decodeAtomicRepresentation(representation)
+    let wp = WordPair.decodeAtomicRepresentation(representation)
 
     return unsafe UnsafeRawBufferPointer(
       start: UnsafeRawPointer(bitPattern: wp.first),
@@ -1022,7 +1022,7 @@ extension UnsafeMutableRawBufferPointer: @unsafe AtomicRepresentable {
   public static func decodeAtomicRepresentation(
     _ representation: consuming AtomicRepresentation
   ) -> UnsafeMutableRawBufferPointer {
-    let wp = unsafe WordPair.decodeAtomicRepresentation(representation)
+    let wp = WordPair.decodeAtomicRepresentation(representation)
 
     return unsafe UnsafeMutableRawBufferPointer(
       start: UnsafeMutableRawPointer(bitPattern: wp.first),

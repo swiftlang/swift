@@ -217,6 +217,10 @@ enum class ImportTypeAttr : uint8_t {
   ///
   /// This ensures that the parameter is not marked as Unmanaged.
   CFUnretainedOutParameter = 1 << 5,
+
+  /// Type should be imported as though declaration was marked with
+  /// \c __attribute__((swift_attr("sending"))) .
+  Sending = 1 << 6,
 };
 
 /// Find and iterate over swift attributes embedded in the type
@@ -474,8 +478,6 @@ public:
   const bool BridgingHeaderExplicitlyRequested;
   const bool DisableOverlayModules;
   const bool EnableClangSPI;
-  const bool UseClangIncludeTree;
-  bool importSymbolicCXXDecls;
 
   bool IsReadingBridgingPCH;
   llvm::SmallVector<clang::serialization::SubmoduleID, 2> PCHImportedSubmodules;
@@ -690,6 +692,9 @@ private:
   llvm::DenseMap<std::pair<ValueDecl *, DeclContext *>, ValueDecl *>
       clonedBaseMembers;
 
+  // Store all methods that result from cloning a base member
+  llvm::DenseSet<ValueDecl *> clonedMembers;
+
 public:
   llvm::DenseMap<const clang::ParmVarDecl*, FuncDecl*> defaultArgGenerators;
 
@@ -697,6 +702,8 @@ public:
 
   ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
                                   ClangInheritanceInfo inheritance);
+
+  bool isClonedMemberDecl(ValueDecl *decl);
 
   static size_t getImportedBaseMemberDeclArity(const ValueDecl *valueDecl);
 
@@ -1058,9 +1065,9 @@ public:
   StringRef getSwiftNameFromClangName(StringRef name);
 
   /// Retrieve the placeholder source file for use in parsing Swift attributes
-  /// in the given module.
-  SourceFile &getClangSwiftAttrSourceFile(
-      ModuleDecl &module, StringRef attributeText, bool cached);
+  /// of the given Decl.
+  SourceFile &getClangSwiftAttrSourceFile(Decl *MappedDecl,
+                                          StringRef attributeText, bool cached);
 
   /// Create attribute with given text and attach it to decl, creating or
   /// retrieving a chached source file as needed.
@@ -1685,7 +1692,7 @@ public:
     llvm_unreachable("unimplemented for ClangImporter");
   }
 
-  ValueDecl *loadTargetFunctionDecl(const SpecializeAttr *attr,
+  ValueDecl *loadTargetFunctionDecl(const AbstractSpecializeAttr *attr,
                                     uint64_t contextData) override {
     llvm_unreachable("unimplemented for ClangImporter");
   }
@@ -1754,7 +1761,7 @@ public:
   }
 
   void importSwiftAttrAttributes(Decl *decl);
-  void swiftify(FuncDecl *MappedDecl);
+  void swiftify(AbstractFunctionDecl *MappedDecl);
 
   /// Find the lookup table that corresponds to the given Clang module.
   ///
@@ -2083,6 +2090,43 @@ bool hasEscapableAttr(const clang::RecordDecl *decl);
 
 bool isViewType(const clang::CXXRecordDecl *decl);
 
+inline const clang::Type *desugarIfElaborated(const clang::Type *type) {
+  if (auto elaborated = dyn_cast<clang::ElaboratedType>(type))
+    return elaborated->desugar().getTypePtr();
+  return type;
+}
+
+inline clang::QualType desugarIfElaborated(clang::QualType type) {
+  if (auto elaborated = dyn_cast<clang::ElaboratedType>(type))
+    return elaborated->desugar();
+  return type;
+}
+
+inline clang::QualType desugarIfBoundsAttributed(clang::QualType type) {
+  if (auto BAT = dyn_cast<clang::BoundsAttributedType>(type))
+    return BAT->desugar();
+  if (auto VT = dyn_cast<clang::ValueTerminatedType>(type))
+    return VT->desugar();
+  if (auto AT = dyn_cast<clang::AttributedType>(type))
+    switch (AT->getAttrKind()) {
+      case clang::attr::PtrUnsafeIndexable:
+      case clang::attr::PtrSingle:
+        return AT->desugar();
+      default:
+        break;
+    }
+  return type;
+}
+
+/// Option set enums are sometimes imported as typedefs which assign a name to
+/// the type, but are unavailable in Swift.
+///
+/// If given such a typedef, this helper function retrieves and imports the
+/// underlying enum type. Returns an empty ImportedType otherwise.
+///
+/// If \a type is an elaborated type, it should be desugared first.
+ImportedType findOptionSetEnum(clang::QualType type,
+                               ClangImporter::Implementation &Impl);
 } // end namespace importer
 } // end namespace swift
 

@@ -323,23 +323,16 @@ bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
     }
 
     while (auto overrides = decl->getOverriddenDecl()) {
-      overridden.insert(overrides);
-
-      // Because initializers from Objective-C base classes have greater
-      // visibility than initializers written in Swift classes, we can
-      // have a "break" in the set of declarations we found, where
-      // C.init overrides B.init overrides A.init, but only C.init and
-      // A.init are in the chain. Make sure we still remove A.init from the
-      // set in this case.
-      if (decl->getBaseName().isConstructor()) {
-        /// FIXME: Avoid the possibility of an infinite loop by fixing the root
-        ///        cause instead (incomplete circularity detection).
-        assert(decl != overrides && "Circular class inheritance?");
-        decl = overrides;
-        continue;
+      if (!overridden.insert(overrides).second) {
+        // If we've already seen a decl then there's no need to visit the decls
+        // that it overrides since they should already be in the set. This also
+        // prevents infinite loops in the case that the AST contains an
+        // override chain with a cycle due to circular inheritance.
+        break;
       }
 
-      break;
+      DEBUG_ASSERT(decl != overrides && "Circular class inheritance?");
+      decl = overrides;
     }
   }
 
@@ -1132,6 +1125,9 @@ enum class DirectlyReferencedTypeLookupFlags {
   /// Include members that would normally be excluded because they come from
   /// modules that have not been imported directly.
   IgnoreMissingImports = 1 << 3,
+
+  /// Whenther we should exclude macro expansions.
+  ExcludeMacroExpansions = 1 << 4,
 };
 
 using DirectlyReferencedTypeLookupOptions =
@@ -2317,6 +2313,13 @@ void NominalTypeDecl::recordObjCMethod(AbstractFunctionDecl *method,
   if (!ObjCMethodLookup && !createObjCMethodLookup())
     return;
 
+  // Only record API decls.
+  Decl *abiRoleDecl = method;
+  if (auto accessor = dyn_cast<AccessorDecl>(method))
+    abiRoleDecl = accessor->getStorage();
+  if (!ABIRoleInfo(abiRoleDecl).providesAPI())
+    return;
+
   // Record the method.
   bool isInstanceMethod = method->isObjCInstanceMethod();
   auto &vec = (*ObjCMethodLookup)[{selector, isInstanceMethod}].Methods;
@@ -2371,7 +2374,9 @@ ObjCCategoryNameMap ClassDecl::getObjCCategoryNameMap() {
 /// the given context.
 static bool shouldRequireImportsInContext(const DeclContext *lookupContext) {
   auto &ctx = lookupContext->getASTContext();
-  if (!ctx.LangOpts.hasFeature(Feature::MemberImportVisibility))
+
+  if (!ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
+                               /*allowMigration=*/true))
     return false;
 
   // Code outside of the main module (which is often synthesized) isn't subject
@@ -2739,6 +2744,18 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
       }
     }
 
+    // Qualified name lookup can find generic value parameters.
+    auto gpList = current->getGenericParams();
+
+    // .. But not in type contexts (yet)
+    if (!(options & NL_OnlyTypes) && gpList && !member.isSpecial()) {
+      auto gp = gpList->lookUpGenericParam(member.getBaseIdentifier());
+
+      if (gp && gp->isValue()) {
+        decls.push_back(gp);
+      }
+    }
+
     // If we're not looking at a protocol and we're not supposed to
     // visit the protocols that this type conforms to, skip the next
     // step.
@@ -3051,6 +3068,10 @@ static DirectlyReferencedTypeDecls directReferencesForUnqualifiedTypeLookup(
           DirectlyReferencedTypeLookupFlags::IgnoreMissingImports))
     options |= UnqualifiedLookupFlags::IgnoreMissingImports;
 
+  if (typeLookupOptions.contains(
+          DirectlyReferencedTypeLookupFlags::ExcludeMacroExpansions))
+    options |= UnqualifiedLookupFlags::ExcludeMacroExpansions;
+
   // Manually exclude macro expansions here since the source location
   // is overridden below.
   if (namelookup::isInMacroArgument(dc->getParentSourceFile(), loc))
@@ -3132,6 +3153,10 @@ static llvm::TinyPtrVector<TypeDecl *> directReferencesForQualifiedTypeLookup(
     if (typeLookupOptions.contains(
             DirectlyReferencedTypeLookupFlags::IgnoreMissingImports))
       options |= NL_IgnoreMissingImports;
+
+    if (typeLookupOptions.contains(
+            DirectlyReferencedTypeLookupFlags::ExcludeMacroExpansions))
+      options |= NL_ExcludeMacroExpansions;
 
     // Look through the type declarations we were given, resolving them down
     // to nominal type declarations, module declarations, and
@@ -3560,7 +3585,8 @@ ProtocolRequirementsRequest::evaluate(Evaluator &evaluator,
 
 NominalTypeDecl *
 ExtendedNominalRequest::evaluate(Evaluator &evaluator,
-                                 ExtensionDecl *ext) const {
+                                 ExtensionDecl *ext,
+                                 bool excludeMacroExpansions) const {
   auto typeRepr = ext->getExtendedTypeRepr();
   if (!typeRepr) {
     // We must've seen 'extension { ... }' during parsing.
@@ -3569,9 +3595,15 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
 
   ASTContext &ctx = ext->getASTContext();
   auto options = defaultDirectlyReferencedTypeLookupOptions;
+
   if (ext->isInSpecializeExtensionContext()) {
     options |= DirectlyReferencedTypeLookupFlags::AllowUsableFromInline;
   }
+
+  if (excludeMacroExpansions) {
+    options |= DirectlyReferencedTypeLookupFlags::ExcludeMacroExpansions;
+  }
+
   DirectlyReferencedTypeDecls referenced = directReferencesForTypeRepr(
       evaluator, ctx, typeRepr, ext->getParent(), options);
 
@@ -3579,7 +3611,8 @@ ExtendedNominalRequest::evaluate(Evaluator &evaluator,
   // inaccessible due to missing imports. The missing imports will be diagnosed
   // elsewhere.
   if (referenced.first.empty() &&
-      ctx.LangOpts.hasFeature(Feature::MemberImportVisibility)) {
+      ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
+                              /*allowMigration=*/true)) {
     options |= DirectlyReferencedTypeLookupFlags::IgnoreMissingImports;
     referenced = directReferencesForTypeRepr(evaluator, ctx, typeRepr,
                                              ext->getParent(), options);

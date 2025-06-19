@@ -425,3 +425,23 @@ bb0(%0 : $member_id_t):
   %13 = tuple ()
   return %13 : $()
 }
+
+struct Z {
+  var r: String
+  var p: X
+}
+
+// CHECK: sil @test17 : $@convention(thin) (@owned String) -> () {
+// CHECK: bb0(%0 : $String):
+// CHECK:   [[T0:%.*]] = alloc_stack $String
+// CHECK:   store %0 to [[T0]] : $*String
+// CHECK:   [[T1:%.*]] = unchecked_addr_cast [[T0]] : $*String to $*Z
+// CHECK:   release_value_addr [[T1]] : $*Z
+
+sil @test17: $@convention(thin) (@owned String) -> () {
+bb0(%0 : $String):
+  %1 = unchecked_bitwise_cast %0 : $String to $Z
+  release_value %1 : $Z
+  %13 = tuple ()
+  return %13 : $()
+}

@@ -12,7 +12,7 @@ func exposeWithoutArgs() {}
 @_expose(CplusPlus) // expected-error {{expected '_expose' option such as 'Cxx'}}
 func incorrectLangSpecifier() {}
 
-@_expose(Cxx) @_cdecl("test") // expected-error {{@_expose attribute cannot be applied to an '@_cdecl' declaration}}
+@_expose(Cxx) @_cdecl("test") // expected-error {{'@_expose' cannot be applied to an '@_cdecl' declaration}}
 func cdeclAndExpose() {}
 
 func hasNested() {
@@ -21,13 +21,13 @@ func hasNested() {
 }
 
 struct NotExposedStruct {
-    @_expose(Cxx) // expected-error {{@_expose attribute cannot be applied inside of unexposed declaration 'NotExposedStruct'}}
+    @_expose(Cxx) // expected-error {{'@_expose' cannot be applied inside of unexposed declaration 'NotExposedStruct'}}
     func errorOnInnerExpose() {}
 }
 
 @_expose(Cxx)
 struct ExposedStruct {
-    @_expose(Cxx, "create") // expected-error {{invalid declaration name 'create' specified in an @_expose attribute; exposed initializer name must start with 'init'}}
+    @_expose(Cxx, "create") // expected-error {{invalid declaration name 'create' specified in '@_expose'; exposed initializer name must start with 'init'}}
     init() {}
 
     @_expose(Cxx, "initWith")
@@ -41,8 +41,8 @@ func exposeToCxxCxx() {}
 @_expose(wasm, "with_name") func wasmName() {}
 @_expose(wasm, "") func wasmEmptyNameOk() {}
 
-@_expose(wasm) struct WasmErrorOnStruct { // expected-error {{@_expose attribute with 'wasm' can only be applied to global functions}}
-  @_expose(wasm) func errorOnMethod() {} // expected-error {{@_expose attribute with 'wasm' can only be applied to global functions}}
+@_expose(wasm) struct WasmErrorOnStruct { // expected-error {{'@_expose' with 'wasm' can only be applied to global functions}}
+  @_expose(wasm) func errorOnMethod() {} // expected-error {{'@_expose' with 'wasm' can only be applied to global functions}}
 }
 
 func wasmNested() {

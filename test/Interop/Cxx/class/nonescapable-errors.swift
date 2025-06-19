@@ -109,24 +109,24 @@ public func importInvalid(_ x: Invalid) {
 }
 
 // CHECK: error: a function with a ~Escapable result needs a parameter to depend on
-// CHECK-NO-LIFETIMES: test.swift:11:32: error: a function with a ~Escapable result requires '-enable-experimental-feature LifetimeDependence'
+// CHECK-NO-LIFETIMES: test.swift:11:32: error: a function cannot return a ~Escapable result
 public func noAnnotations() -> View {
-    // CHECK: nonescapable.h:16:7: warning: the returned type 'Owner' is annotated as escapable; it cannot have lifetime dependencies
-    // CHECK-NO-LIFETIMES: nonescapable.h:16:7: warning: the returned type 'Owner' is annotated as escapable; it cannot have lifetime dependencies
+    // CHECK: nonescapable.h:16:7: warning: the returned type 'Owner' is annotated as escapable; it cannot have lifetime dependencies [#ClangDeclarationImport]
+    // CHECK-NO-LIFETIMES: nonescapable.h:16:7: warning: the returned type 'Owner' is annotated as escapable; it cannot have lifetime dependencies [#ClangDeclarationImport]
     f(nil)
-    // CHECK: nonescapable.h:20:7: warning: the returned type 'Owner' is annotated as escapable; it cannot have lifetime dependencies
-    // CHECK-NO-LIFETIMES: nonescapable.h:20:7: warning: the returned type 'Owner' is annotated as escapable; it cannot have lifetime dependencies
+    // CHECK: nonescapable.h:20:7: warning: the returned type 'Owner' is annotated as escapable; it cannot have lifetime dependencies [#ClangDeclarationImport]
+    // CHECK-NO-LIFETIMES: nonescapable.h:20:7: warning: the returned type 'Owner' is annotated as escapable; it cannot have lifetime dependencies [#ClangDeclarationImport]
     // No duplicate warning for f2:
     // CHECK-NOT: nonescapable.h:20
     f2(nil, nil)
-    // CHECK: nonescapable.h:24:6: warning: the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated
-    // CHECK-NO-LIFETIMES: nonescapable.h:24:6: warning: the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated
-    // CHECK-NO-LIFETIMES: nonescapable.h:24:6: error: a function with a ~Escapable result requires '-enable-experimental-feature LifetimeDependence'
+    // CHECK: nonescapable.h:24:6: warning: the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated [#ClangDeclarationImport]
+    // CHECK-NO-LIFETIMES: nonescapable.h:24:6: warning: the returned type 'View' is annotated as non-escapable; its lifetime dependencies must be annotated [#ClangDeclarationImport]
+    // CHECK-NO-LIFETIMES: nonescapable.h:24:6: error: a function cannot return a ~Escapable result
     g(nil)
     h1(nil)
-    // CHECK-NO-LIFETIMES: nonescapable.h:34:21: error: a function with a ~Escapable result requires '-enable-experimental-feature LifetimeDependence'
+    // CHECK-NO-LIFETIMES: nonescapable.h:34:21: error: a function cannot return a ~Escapable result
     h2(nil)
-    // CHECK-NO-LIFETIMES: nonescapable.h:35:21: error: a function with a ~Escapable result requires '-enable-experimental-feature LifetimeDependence'
+    // CHECK-NO-LIFETIMES: nonescapable.h:35:21: error: a function cannot return a ~Escapable result
     h3(nil)
     i1()
     // CHECK: nonescapable.h:39:39: error: template parameter 'Missing' does not exist
@@ -135,18 +135,18 @@ public func noAnnotations() -> View {
     // CHECK: nonescapable.h:45:33: error: template parameter 'S' expected to be a type parameter
     // CHECK-NO-LIFETIMES: nonescapable.h:45:33: error: template parameter 'S' expected to be a type parameter
     j1()
-    // CHECK-NO-LIFETIMES: nonescapable.h:63:41: error: a function with a ~Escapable result requires '-enable-experimental-feature LifetimeDependence'
+    // CHECK-NO-LIFETIMES: nonescapable.h:63:41: error: a function cannot return a ~Escapable result
     j2()
-    // CHECK-NO-LIFETIMES: nonescapable.h:64:41: error: a function with a ~Escapable result requires '-enable-experimental-feature LifetimeDependence'
+    // CHECK-NO-LIFETIMES: nonescapable.h:64:41: error: a function cannot return a ~Escapable result
     j3()
     k1();
-    // CHECK-NO-LIFETIMES: nonescapable.h:70:15: error: a function with a ~Escapable result requires '-enable-experimental-feature LifetimeDependence'
+    // CHECK-NO-LIFETIMES: nonescapable.h:70:15: error: a function cannot return a ~Escapable result
     k2();
-    // CHECK-NO-LIFETIMES: nonescapable.h:71:22: error: a function with a ~Escapable result requires '-enable-experimental-feature LifetimeDependence'
+    // CHECK-NO-LIFETIMES: nonescapable.h:71:22: error: a function cannot return a ~Escapable result
     k3();
     l1();
     // CHECK: nonescapable.h:77:12: error: a function with a ~Escapable result needs a parameter to depend on
-    // CHECK-NO-LIFETIMES: nonescapable.h:77:12: error: a function with a ~Escapable result requires '-enable-experimental-feature LifetimeDependence'
+    // CHECK-NO-LIFETIMES: nonescapable.h:77:12: error: a function cannot return a ~Escapable result
     l2();
     return View()
 }

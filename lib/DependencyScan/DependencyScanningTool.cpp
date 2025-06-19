@@ -74,6 +74,8 @@ void DependencyScanDiagnosticCollector::handleDiagnostic(SourceManager &SM,
 
 void DependencyScanDiagnosticCollector::addDiagnostic(
     SourceManager &SM, const DiagnosticInfo &Info) {
+  llvm::sys::SmartScopedLock<true> Lock(ScanningDiagnosticConsumerStateLock);
+
   // Determine what kind of diagnostic we're emitting.
   llvm::SourceMgr::DiagKind SMKind;
   switch (Info.Kind) {
@@ -127,12 +129,6 @@ void DependencyScanDiagnosticCollector::addDiagnostic(
     Diagnostics.push_back(
       ScannerDiagnosticInfo{FormattedMessage, SMKind, std::nullopt});
   }
-}
-
-void LockingDependencyScanDiagnosticCollector::addDiagnostic(
-    SourceManager &SM, const DiagnosticInfo &Info) {
-  llvm::sys::SmartScopedLock<true> Lock(ScanningDiagnosticConsumerStateLock);
-  DependencyScanDiagnosticCollector::addDiagnostic(SM, Info);
 }
 
 swiftscan_diagnostic_set_t *mapCollectedDiagnosticsForOutput(
@@ -222,6 +218,7 @@ static swiftscan_dependency_graph_t generateHollowDiagnosticOutput(
                                           c_string_utils::create_empty_set(),
                                           c_string_utils::create_empty_set(),
                                           c_string_utils::create_empty_set(),
+                                          c_string_utils::create_empty_set(),
                                           c_string_utils::create_null(),
                                           false,
                                           false,
@@ -240,6 +237,13 @@ static swiftscan_dependency_graph_t generateHollowDiagnosticOutput(
   hollowLinkLibrarySet->count = 0;
   hollowLinkLibrarySet->link_libraries = nullptr;
   hollowMainModuleInfo->link_libraries = hollowLinkLibrarySet;
+
+  // Empty Import set
+  swiftscan_import_info_set_t *hollowImportInfoSet =
+      new swiftscan_import_info_set_t;
+  hollowImportInfoSet->count = 0;
+  hollowImportInfoSet->imports = nullptr;
+  hollowMainModuleInfo->imports = hollowImportInfoSet;
 
   // Populate the diagnostic info
   hollowResult->diagnostics =
@@ -262,16 +266,16 @@ static swiftscan_import_set_t generateHollowDiagnosticOutputImportSet(
 
 DependencyScanningTool::DependencyScanningTool()
     : ScanningService(std::make_unique<SwiftDependencyScanningService>()),
-      CDC(), Alloc(), Saver(Alloc) {}
+      Alloc(), Saver(Alloc) {}
 
 llvm::ErrorOr<swiftscan_dependency_graph_t>
 DependencyScanningTool::getDependencies(
     ArrayRef<const char *> Command,
-    const llvm::StringSet<> &PlaceholderModules,
     StringRef WorkingDirectory) {
   // There may be errors as early as in instance initialization, so we must ensure
   // we can catch those.
-  auto ScanDiagnosticConsumer = std::make_shared<DependencyScanDiagnosticCollector>();
+  auto ScanDiagnosticConsumer =
+    std::make_shared<DependencyScanDiagnosticCollector>();
 
   // The primary instance used to scan the query Swift source-code
   auto QueryContextOrErr = initCompilerInstanceForScan(Command,
@@ -328,18 +332,6 @@ DependencyScanningTool::getImports(ArrayRef<const char *> Command,
   return std::move(*DependenciesOrErr);
 }
 
-std::vector<
-    DependencyScanDiagnosticCollector::ScannerDiagnosticInfo>
-DependencyScanningTool::getDiagnostics() {
-  llvm::sys::SmartScopedLock<true> Lock(DependencyScanningToolStateLock);
-  return CDC.Diagnostics;
-}
-
-void DependencyScanningTool::resetDiagnostics() {
-  llvm::sys::SmartScopedLock<true> Lock(DependencyScanningToolStateLock);
-  CDC.reset();
-}
-
 llvm::ErrorOr<ScanQueryInstance>
 DependencyScanningTool::initCompilerInstanceForScan(
     ArrayRef<const char *> CommandArgs,
@@ -355,10 +347,6 @@ DependencyScanningTool::initCompilerInstanceForScan(
 
   // State unique to an individual scan
   auto Instance = std::make_unique<CompilerInstance>();
-
-  // FIXME: The shared CDC must be deprecated once all clients have switched
-  // to using per-scan diagnostic output embedded in the `swiftscan_dependency_graph_s`
-  Instance->addDiagnosticConsumer(&CDC);
   Instance->addDiagnosticConsumer(scannerDiagnosticsCollector.get());
 
   // Basic error checking on the arguments

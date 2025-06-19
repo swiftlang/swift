@@ -70,11 +70,13 @@ public:
   /// \returns The appropriate clang type on success, nullptr on failure.
   ///
   /// Precondition: The representation argument must be C-compatible.
-  const clang::Type *getFunctionType(
-    ArrayRef<AnyFunctionType::Param> params, Type resultTy,
-    AnyFunctionType::Representation repr);
+  template <bool templateArgument>
+  const clang::Type *getFunctionType(ArrayRef<AnyFunctionType::Param> params,
+                                     Type resultTy,
+                                     AnyFunctionType::Representation repr);
 
   /// Compute the C function type for a SIL function type.
+  template <bool templateArgument>
   const clang::Type *getFunctionType(ArrayRef<SILParameterInfo> params,
                                      std::optional<SILResultInfo> result,
                                      SILFunctionType::Representation repr);
@@ -125,11 +127,11 @@ private:
 
   clang::QualType convertClangDecl(Type type, const clang::Decl *decl);
 
-  clang::QualType convertSIMDType(CanType scalarType, unsigned width,
-                                  bool templateArgument);
+  template <bool templateArgument>
+  clang::QualType convertSIMDType(CanType scalarType, unsigned width);
 
-  clang::QualType convertPointerType(CanType pointeeType, PointerKind kind,
-                                     bool templateArgument);
+  template <bool templateArgument>
+  clang::QualType convertPointerType(CanType pointeeType, PointerKind kind);
 
   void registerExportedClangDecl(Decl *swiftDecl,
                                  const clang::Decl *clangDecl);
@@ -148,14 +150,17 @@ private:
   clang::QualType visitBoundGenericClassType(BoundGenericClassType *type);
   clang::QualType visitBoundGenericType(BoundGenericType *type);
   clang::QualType visitEnumType(EnumType *type);
+  template <bool templateArgument = false>
   clang::QualType visitFunctionType(FunctionType *type);
   clang::QualType visitProtocolCompositionType(ProtocolCompositionType *type);
   clang::QualType visitExistentialType(ExistentialType *type);
   clang::QualType visitBuiltinRawPointerType(BuiltinRawPointerType *type);
   clang::QualType visitBuiltinIntegerType(BuiltinIntegerType *type);
   clang::QualType visitBuiltinFloatType(BuiltinFloatType *type);
+  clang::QualType visitBuiltinVectorType(BuiltinVectorType *type);
   clang::QualType visitArchetypeType(ArchetypeType *type);
   clang::QualType visitDependentMemberType(DependentMemberType *type);
+  template <bool templateArgument = false>
   clang::QualType visitSILFunctionType(SILFunctionType *type);
   clang::QualType visitGenericTypeParamType(GenericTypeParamType *type);
   clang::QualType visitDynamicSelfType(DynamicSelfType *type);

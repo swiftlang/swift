@@ -3,58 +3,16 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature LifetimeDependence
+// RUN:   -enable-experimental-feature Lifetimes
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_LifetimeDependence
-
-/// Unsafely discard any lifetime dependency on the `dependent` argument. Return
-/// a value identical to `dependent` with a lifetime dependency on the caller's
-/// borrow scope of the `source` argument.
-@_unsafeNonescapableResult
-@_transparent
-@lifetime(borrow source)
-internal func _overrideLifetime<
-  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
->(
-  _ dependent: consuming T, borrowing source: borrowing U
-) -> T {
-  dependent
-}
-
-/// Unsafely discard any lifetime dependency on the `dependent` argument. Return
-/// a value identical to `dependent` that inherits all lifetime dependencies from
-/// the `source` argument.
-@_unsafeNonescapableResult
-@_transparent
-@lifetime(copy source)
-internal func _overrideLifetime<
-  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
->(
-  _ dependent: consuming T, copying source: borrowing U
-) -> T {
-  dependent
-}
-
-/// Unsafely discard any lifetime dependency on the `dependent` argument. Return
-/// a value identical to `dependent` that inherits all lifetime dependencies from
-/// the `source` argument.
-@_unsafeNonescapableResult
-@_transparent
-@lifetime(&source)
-internal func _overrideLifetime<
-  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
->(
-  _ dependent: consuming T, mutating source: inout U
-) -> T {
-  dependent
-}
+// REQUIRES: swift_feature_Lifetimes
 
 struct MutableSpan : ~Escapable, ~Copyable {
   let base: UnsafeMutableRawPointer
   let count: Int
 
-  @lifetime(borrow p)
+  @_lifetime(borrow p)
   init(_ p: UnsafeMutableRawPointer, _ c: Int) {
     self.base = p
     self.count = c
@@ -76,7 +34,7 @@ struct MutableSpan : ~Escapable, ~Copyable {
     var base: UnsafeMutableRawPointer
     var count: Int
 
-    @lifetime(borrow base)
+    @_lifetime(borrow base)
     init(base: UnsafeMutableRawPointer, count: Int) {
       self.base = base
       self.count = count
@@ -92,8 +50,11 @@ struct MutableSpan : ~Escapable, ~Copyable {
   }
 
   var iterator: Iter {
-    @lifetime(copy self)
-    get { Iter(base: base, count: count) }
+    @_lifetime(copy self)
+    get {
+      let newIter = Iter(base: base, count: count)
+      return _overrideLifetime(newIter, copying: self)
+    }
   }
 }
 
@@ -112,7 +73,7 @@ struct NC : ~Copyable {
   let c: Int
 
   // Requires a mutable borrow.
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating func getMutableSpan() -> MutableSpan {
     MutableSpan(p, c)
   }

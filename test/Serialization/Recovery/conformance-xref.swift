@@ -68,7 +68,7 @@ public protocol ProtoUser {
 // CHECK-REMARK-REQUIREMENT: Conformances:
 // Skipping implicits.
 // CHECK-REMARK-REQUIREMENT: (specialized_conformance type="OneToAThousand.Impl" protocol="SimpleProto"
-// CHECK-REMARK-REQUIREMENT:   (normal_conformance type="Counter<T>" protocol="SimpleProto" lazy))
+// CHECK-REMARK-REQUIREMENT:   (normal_conformance type="Counter<T>" protocol="SimpleProto"{{.*}} lazy))
   associatedtype Impl
 #else
   associatedtype Impl: SimpleProto

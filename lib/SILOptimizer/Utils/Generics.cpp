@@ -601,7 +601,7 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
 
     // Check only the substitutions for the generic parameters.
     // Ignore any dependent types, etc.
-    auto Replacement = Type(GP).subst(CalleeParamSubMap);
+    auto Replacement = Type(GP).subst(CalleeParamSubMap)->getCanonicalType();
     if (!Replacement->is<ArchetypeType>())
       HasNonArchetypeGenericParams = true;
 

@@ -184,7 +184,6 @@ public:
   IGNORED_ATTR(AtRethrows)
   IGNORED_ATTR(AtReasync)
   IGNORED_ATTR(ImplicitSelfCapture)
-  IGNORED_ATTR(InheritActorContext)
   IGNORED_ATTR(Preconcurrency)
   IGNORED_ATTR(BackDeployed)
   IGNORED_ATTR(Documentation)
@@ -254,6 +253,14 @@ public:
     if (E->getFormalAccess() < AccessLevel::Package) {
       diagnoseAndRemoveAttr(attr, diag::extensible_attr_on_internal_type,
                             E->getName(), E->getFormalAccess());
+      return;
+    }
+  }
+
+  void visitPreEnumExtensibilityAttr(PreEnumExtensibilityAttr *attr) {
+    if (!D->getAttrs().hasAttribute<ExtensibleAttr>()) {
+      diagnoseAndRemoveAttr(
+          attr, diag::pre_enum_extensibility_without_extensible, attr);
       return;
     }
   }
@@ -394,7 +401,9 @@ public:
   void visitPostfixAttr(PostfixAttr *attr) { checkOperatorAttribute(attr); }
   void visitPrefixAttr(PrefixAttr *attr) { checkOperatorAttribute(attr); }
 
+  void visitSpecializedAttr(SpecializedAttr *attr);
   void visitSpecializeAttr(SpecializeAttr *attr);
+  void visitAbstractSpecializeAttr(AbstractSpecializeAttr *attr);
 
   void visitFixedLayoutAttr(FixedLayoutAttr *attr);
   void visitUsableFromInlineAttr(UsableFromInlineAttr *attr);
@@ -434,8 +443,10 @@ public:
   void visitNonisolatedAttr(NonisolatedAttr *attr);
   void visitIsolatedAttr(IsolatedAttr *attr);
 
+  void visitInheritActorContextAttr(InheritActorContextAttr *attr);
+
   void visitNoImplicitCopyAttr(NoImplicitCopyAttr *attr);
-  
+
   void visitAlwaysEmitConformanceMetadataAttr(AlwaysEmitConformanceMetadataAttr *attr);
 
   void visitExtractConstantsFromMembersAttr(ExtractConstantsFromMembersAttr *attr);
@@ -1110,6 +1121,11 @@ void AttributeChecker::visitLazyAttr(LazyAttr *attr) {
   // are already lazily initialized).
   if (VD->isStatic() || varDC->isModuleScopeContext())
     diagnoseAndRemoveAttr(attr, diag::lazy_on_already_lazy_global);
+
+  // 'lazy' can't be used in or with `@abi` because it has auxiliary decls.
+  auto abiRole = ABIRoleInfo(D);
+  if (!abiRole.providesABI() || !abiRole.providesAPI())
+    diagnoseAndRemoveAttr(attr, diag::attr_abi_no_lazy);
 }
 
 bool AttributeChecker::visitAbstractAccessControlAttr(
@@ -1260,7 +1276,7 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
             diagnose(attr->getLocation(),
                      diag::access_control_non_objc_open_member, VD)
                 .fixItReplace(attr->getRange(), "public")
-                .warnUntilSwiftVersion(7);
+                .warnUntilFutureSwiftVersion();
           }
         }
       }
@@ -2368,16 +2384,23 @@ static bool canDeclareSymbolName(StringRef symbol, ModuleDecl *fromModule) {
 void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
   // Only top-level func decls are currently supported.
   if (D->getDeclContext()->isTypeContext())
-    diagnose(attr->getLocation(), diag::cdecl_not_at_top_level);
+    diagnose(attr->getLocation(), diag::cdecl_not_at_top_level,
+             attr);
 
   // The name must not be empty.
   if (attr->Name.empty())
-    diagnose(attr->getLocation(), diag::cdecl_empty_name);
+    diagnose(attr->getLocation(), diag::cdecl_empty_name,
+             attr);
 
   // The standard library can use @_cdecl to implement runtime functions.
   if (!canDeclareSymbolName(attr->Name, D->getModuleContext())) {
       diagnose(attr->getLocation(), diag::reserved_runtime_symbol_name,
                attr->Name);
+  }
+
+  if (!attr->Underscored &&
+      !Ctx.LangOpts.hasFeature(Feature::CDecl)) {
+    Ctx.Diags.diagnose(attr->getLocation(), diag::cdecl_feature_required);
   }
 }
 
@@ -3303,7 +3326,7 @@ void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
 
 /// Ensure that the requirements provided by the @_specialize attribute
 /// can be supported by the SIL EagerSpecializer pass.
-static void checkSpecializeAttrRequirements(SpecializeAttr *attr,
+static void checkSpecializeAttrRequirements(AbstractSpecializeAttr *attr,
                                             GenericSignature originalSig,
                                             GenericSignature specializedSig,
                                             ASTContext &ctx) {
@@ -3313,7 +3336,8 @@ static void checkSpecializeAttrRequirements(SpecializeAttr *attr,
   for (auto specializedReq : specializedReqs) {
     if (!specializedReq.getFirstType()->is<GenericTypeParamType>()) {
       ctx.Diags.diagnose(attr->getLocation(),
-                         diag::specialize_attr_only_generic_param_req);
+                         diag::specialize_attr_only_generic_param_req,
+												 attr->isPublic());
       hadError = true;
       continue;
     }
@@ -3325,14 +3349,17 @@ static void checkSpecializeAttrRequirements(SpecializeAttr *attr,
     case RequirementKind::Conformance:
     case RequirementKind::Superclass:
       ctx.Diags.diagnose(attr->getLocation(),
-                         diag::specialize_attr_unsupported_kind_of_req);
+                         attr->isPublic() ?
+												 diag::specialized_attr_unsupported_kind_of_req :
+												 diag::specialize_attr_unsupported_kind_of_req);
       hadError = true;
       break;
 
     case RequirementKind::SameType:
       if (specializedReq.getSecondType()->isTypeParameter()) {
         ctx.Diags.diagnose(attr->getLocation(),
-                           diag::specialize_attr_non_concrete_same_type_req);
+                           diag::specialize_attr_non_concrete_same_type_req,
+													 attr->isPublic());
         hadError = true;
       }
       break;
@@ -3370,38 +3397,48 @@ static void checkSpecializeAttrRequirements(SpecializeAttr *attr,
 
   ctx.Diags.diagnose(
       attr->getLocation(), diag::specialize_attr_type_parameter_count_mismatch,
-      gotCount, expectedCount);
+      gotCount, expectedCount, attr->isPublic());
 
   for (auto paramTy : unspecializedParams) {
     ctx.Diags.diagnose(attr->getLocation(),
                        diag::specialize_attr_missing_constraint,
-                       paramTy->getName());
+                       paramTy->getName(),
+											 attr->isPublic());
   }
 }
 
-/// Type check that a set of requirements provided by @_specialize.
+/// Type check that a set of requirements provided by @_specialize/@specialize.
 /// Store the set of requirements in the attribute.
+void AttributeChecker::visitSpecializedAttr(SpecializedAttr *attr) {
+  visitAbstractSpecializeAttr(attr);
+}
 void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
+  visitAbstractSpecializeAttr(attr);
+}
+void AttributeChecker::visitAbstractSpecializeAttr(AbstractSpecializeAttr *attr) {
   auto *FD = cast<AbstractFunctionDecl>(D);
   auto genericSig = FD->getGenericSignature();
   auto *trailingWhereClause = attr->getTrailingWhereClause();
 
   if (!trailingWhereClause) {
     // Report a missing "where" clause.
-    diagnose(attr->getLocation(), diag::specialize_missing_where_clause);
+    diagnose(attr->getLocation(), diag::specialize_missing_where_clause,
+						 attr->isPublic());
     return;
   }
 
   if (trailingWhereClause->getRequirements().empty()) {
     // Report an empty "where" clause.
-    diagnose(attr->getLocation(), diag::specialize_empty_where_clause);
+    diagnose(attr->getLocation(), diag::specialize_empty_where_clause,
+						 attr->isPublic());
     return;
   }
 
   if (!genericSig) {
     // Only generic functions are permitted to have trailing where clauses.
     diagnose(attr->getLocation(),
-             diag::specialize_attr_nongeneric_trailing_where, FD->getName())
+             diag::specialize_attr_nongeneric_trailing_where, FD->getName(),
+             attr->isPublic())
         .highlight(trailingWhereClause->getSourceRange());
     return;
   }
@@ -3412,7 +3449,7 @@ void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
 GenericSignature
 SerializeAttrGenericSignatureRequest::evaluate(Evaluator &evaluator,
                                                const AbstractFunctionDecl *FD,
-                                               SpecializeAttr *attr) const {
+                                               AbstractSpecializeAttr *attr) const {
   if (attr->specializedSignature)
     return attr->specializedSignature;
 
@@ -3468,7 +3505,7 @@ SerializeAttrGenericSignatureRequest::evaluate(Evaluator &evaluator,
 std::optional<GenericSignature>
 SerializeAttrGenericSignatureRequest::getCachedResult() const {
   const auto &storage = getStorage();
-  SpecializeAttr *attr = std::get<1>(storage);
+  AbstractSpecializeAttr *attr = std::get<1>(storage);
   if (auto signature = attr->specializedSignature)
     return signature;
   return std::nullopt;
@@ -3477,7 +3514,7 @@ SerializeAttrGenericSignatureRequest::getCachedResult() const {
 void SerializeAttrGenericSignatureRequest::cacheResult(
     GenericSignature signature) const {
   const auto &storage = getStorage();
-  SpecializeAttr *attr = std::get<1>(storage);
+  AbstractSpecializeAttr *attr = std::get<1>(storage);
   attr->specializedSignature = signature;
 }
 
@@ -3911,7 +3948,7 @@ findReplacedFunction(DeclNameRef replacedFunctionName,
 static AbstractFunctionDecl *
 findTargetFunction(DeclNameRef targetFunctionName,
                    const AbstractFunctionDecl *base,
-                   SpecializeAttr * attr, DiagnosticEngine *diags) {
+                   AbstractSpecializeAttr * attr, DiagnosticEngine *diags) {
   return findSimilarFunction(targetFunctionName, base, attr, diags,
                              false /*forDynamicReplacement*/);
 }
@@ -4261,8 +4298,25 @@ void AttributeChecker::visitImplementsAttr(ImplementsAttr *attr) {
   ProtocolDecl *PD = attr->getProtocol(DC);
 
   if (!PD) {
-    diagnose(attr->getLocation(), diag::implements_attr_non_protocol_type)
-      .highlight(attr->getProtocolTypeRepr()->getSourceRange());
+    // `ImplementsAttr::getProtocol()` returns `nullptr` both when a type fails
+    // to resolve, and when it resolves to something other than a protocol.
+    // Due to layering concerns, it doesn't resolve in a way that emits
+    // diagnostics.
+    //
+    // Distinguish between these situations by trying to resolve the type again.
+    // If it doesn't resolve, TypeResolution will have diagnosed the problem; if
+    // it does, it must have resolved to a non-protocol, so emit a diagnostic to
+    // that effect.
+    TypeResolutionOptions options(TypeResolverContext::None);
+    auto resolvedType = TypeResolution::resolveContextualType(
+        attr->getProtocolTypeRepr(), DC, options,
+        // Unbound generics and placeholders are not allowed within this attr.
+        /*unboundTyOpener*/ nullptr, /*placeholderHandler*/ nullptr,
+        /*packElementOpener*/ nullptr);
+
+    if (resolvedType && !resolvedType->hasError())
+      diagnose(attr->getLocation(), diag::implements_attr_non_protocol_type)
+        .highlight(attr->getProtocolTypeRepr()->getSourceRange());
     return;
   }
 
@@ -4399,6 +4453,12 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
         }
       }
 
+      // Macros can't be attached to ABI-only decls. (If we diagnosed above,
+      // don't bother with this.)
+      if (attr->isValid() && !ABIRoleInfo(D).providesAPI()) {
+        diagnoseAndRemoveAttr(attr, diag::attr_abi_no_macros, macro);
+      }
+
       return;
     }
 
@@ -4480,16 +4540,25 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   // function, storage with an explicit getter, or parameter of function type.
   if (nominal->getAttrs().hasAttribute<ResultBuilderAttr>()) {
     ValueDecl *decl;
+    ValueDecl *abiRelevantDecl;
     if (auto param = dyn_cast<ParamDecl>(D)) {
       decl = param;
+      abiRelevantDecl = dyn_cast<ValueDecl>(
+                            param->getDeclContext()->getAsDecl());
     } else if (auto func = dyn_cast<FuncDecl>(D)) {
       decl = func;
+      abiRelevantDecl = func;
     } else if (auto storage = dyn_cast<AbstractStorageDecl>(D)) {
       decl = storage;
+      abiRelevantDecl = storage;
 
       // Check whether this is a storage declaration that is not permitted
       // to have a result builder attached.
       auto shouldDiagnose = [&]() -> bool {
+        // We'll diagnose use in @abi later.
+        if (!ABIRoleInfo(abiRelevantDecl).providesAPI())
+          return false;
+
         // An uninitialized stored property in a struct can have a function
         // builder attached.
         if (auto var = dyn_cast<VarDecl>(decl)) {
@@ -4530,6 +4599,14 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
                diag::result_builder_attribute_not_allowed_here,
                nominal->getName());
       attr->setInvalid();
+      return;
+    }
+
+    // Result builders shouldn't be applied to an ABI-only decl because they
+    // have no ABI effect.
+    if (!ABIRoleInfo(abiRelevantDecl).providesAPI()) {
+      diagnoseAndRemoveAttr(attr, diag::attr_abi_forbidden_attr,
+                            nominal->getNameStr(), /*isModifier=*/false);
       return;
     }
 
@@ -5225,11 +5302,6 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
   case ReferenceOwnershipOptionality::Allowed:
     break;
   case ReferenceOwnershipOptionality::Required:
-    if (var->isLet()) {
-      var->diagnose(diag::invalid_ownership_is_let, ownershipKind);
-      attr->setInvalid();
-    }
-
     if (!isOptional) {
       attr->setInvalid();
 
@@ -5546,7 +5618,7 @@ DynamicallyReplacedDeclRequest::evaluate(Evaluator &evaluator,
 ValueDecl *
 SpecializeAttrTargetDeclRequest::evaluate(Evaluator &evaluator,
                                           const ValueDecl *vd,
-                                          SpecializeAttr *attr) const {
+                                          AbstractSpecializeAttr *attr) const {
   if (auto *lazyResolver = attr->resolver) {
     auto *decl =
         lazyResolver->loadTargetFunctionDecl(attr, attr->resolverContextData);
@@ -6929,6 +7001,13 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
     return true;
   }
 
+  if (originalAFD->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() !=
+      derivative->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>()) {
+    diags.diagnose(derivative->getLoc(),
+                   diag::derivative_attr_always_emit_into_client_mismatch);
+    return true;
+  }
+
   // Get the resolved differentiability parameter indices.
   auto *resolvedDiffParamIndices = attr->getParameterIndices();
 
@@ -7786,6 +7865,40 @@ void AttributeChecker::visitAsyncAttr(AsyncAttr *attr) {
   }
 }
 
+void AttributeChecker::visitInheritActorContextAttr(
+    InheritActorContextAttr *attr) {
+  auto *P = dyn_cast<ParamDecl>(D);
+  if (!P)
+    return;
+
+  auto paramTy = P->getInterfaceType();
+  auto *funcTy =
+      paramTy->lookThroughAllOptionalTypes()->getAs<AnyFunctionType>();
+  if (!funcTy) {
+    diagnoseAndRemoveAttr(attr, diag::inherit_actor_context_only_on_func_types,
+                          attr, paramTy);
+    return;
+  }
+
+  // The type has to be either `@Sendable` or `sending` _and_
+  // `async` or `@isolated(any)`.
+  if (!(funcTy->isSendable() || P->isSending())) {
+    diagnose(attr->getLocation(),
+             diag::inherit_actor_context_only_on_sending_or_Sendable_params,
+             attr)
+        .warnUntilFutureSwiftVersion();
+  }
+
+  // Either `async` or `@isolated(any)`.
+  if (!(funcTy->isAsync() || funcTy->getIsolation().isErased())) {
+    diagnoseAndRemoveAttr(
+        attr,
+        diag::inherit_actor_context_only_on_async_or_isolation_erased_params,
+        attr)
+        .warnUntilFutureSwiftVersion();
+  }
+}
+
 void AttributeChecker::visitMarkerAttr(MarkerAttr *attr) {
   auto proto = dyn_cast<ProtocolDecl>(D);
   if (!proto)
@@ -8112,7 +8225,28 @@ void AttributeChecker::visitWeakLinkedAttr(WeakLinkedAttr *attr) {
                         Ctx.LangOpts.Target.str());
 }
 
-void AttributeChecker::visitLifetimeAttr(LifetimeAttr *attr) {}
+void AttributeChecker::visitLifetimeAttr(LifetimeAttr *attr) {
+  if (!attr->isUnderscored()) {
+    // Allow @lifetime only in the stdlib, cxx and backward compatibility
+    // modules under -enable-experimental-feature LifetimeDependence
+    if (!Ctx.MainModule->isStdlibModule() && !Ctx.MainModule->isCxxModule() &&
+        Ctx.MainModule->getABIName() != Ctx.StdlibModuleName) {
+      Ctx.Diags.diagnose(attr->getLocation(), diag::use_lifetime_underscored);
+    }
+    if (!Ctx.LangOpts.hasFeature(Feature::LifetimeDependence)) {
+      diagnose(attr->getLocation(), diag::requires_experimental_feature,
+               "@lifetime", false, Feature::LifetimeDependence.getName());
+    }
+  } else {
+    // Allow @_lifetime under -enable-experimental-feature Lifetimes
+    if (!Ctx.LangOpts.hasFeature(Feature::Lifetimes) &&
+        !Ctx.SourceMgr.isImportMacroGeneratedLoc(attr->getLocation())) {
+      diagnose(attr->getLocation(), diag::requires_experimental_feature,
+               "@_lifetime",
+               false, Feature::Lifetimes.getName());
+    }
+  }
+}
 
 void AttributeChecker::visitAddressableSelfAttr(AddressableSelfAttr *attr) {
   if (!Ctx.LangOpts.hasFeature(Feature::AddressableParameters)) {
@@ -8329,9 +8463,10 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
   if (attr->Rename.empty())
     return nullptr;
 
+  auto &ctx = attached->getASTContext();
   auto attachedContext = attached->getDeclContext();
   auto parsedName = parseDeclName(attr->Rename);
-  auto nameRef = parsedName.formDeclNameRef(attached->getASTContext());
+  auto nameRef = parsedName.formDeclNameRef(ctx);
 
   // Handle types separately
   if (isa<NominalTypeDecl>(attached)) {
@@ -8340,7 +8475,7 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
 
     SmallVector<ValueDecl *, 1> lookupResults;
     attachedContext->lookupQualified(attachedContext->getParentModule(),
-                                     nameRef.withoutArgumentLabels(),
+                                     nameRef.withoutArgumentLabels(ctx),
                                      attr->getLocation(), NL_OnlyTypes,
                                      lookupResults);
     if (lookupResults.size() == 1)

@@ -77,3 +77,17 @@ public protocol HasRethrowingMap: Sequence {
 }
 
 extension Array: HasRethrowingMap {}
+
+// rdar://149438520 -- incorrect handling of subtype relation between type parameter and Never
+protocol DependentThrowing {
+  associatedtype E: Error
+  func f() throws(E)
+}
+
+extension DependentThrowing {
+  func f() {}
+}
+
+struct DefaultDependentThrowing: DependentThrowing {
+  typealias E = Error
+}

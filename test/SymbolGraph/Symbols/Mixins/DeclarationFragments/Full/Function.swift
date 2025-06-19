@@ -41,12 +41,12 @@ public func foo<S>(f: @escaping () -> (), ext int: Int = 2, s: S) where S: Seque
 // FOO-NEXT:          "spelling": ": "
 // FOO-NEXT:        },
 // FOO-NEXT:        {
-// FOO-NEXT:          "kind": "keyword",
-// FOO-NEXT:          "spelling": "@escaping"
+// FOO-NEXT:          "kind": "attribute",
+// FOO-NEXT:          "spelling": "@escaping "
 // FOO-NEXT:        },
 // FOO-NEXT:        {
 // FOO-NEXT:          "kind": "text",
-// FOO-NEXT:          "spelling": " () -> (), "
+// FOO-NEXT:          "spelling": "() -> (), "
 // FOO-NEXT:        },
 // FOO-NEXT:        {
 // FOO-NEXT:          "kind": "externalParam",

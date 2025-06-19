@@ -263,6 +263,13 @@ func sb3() {
     }
 }
 
+func nestedOpaques0() -> some BinaryInteger { 2 }
+func nestedOpaques1() -> some FixedWidthInteger & SignedInteger { 2 }
+func nestedOpaques2() -> (some BinaryInteger, some Sequence) { (2, []) }
+func nestedOpaques3() -> (some BinaryInteger, some Sequence<Double>) { (2, []) }
+func nestedOpaques4() -> (some BinaryInteger)? { Bool.random() ? 2 : nil }
+func nestedOpaques5() -> [some BinaryInteger] { [2] }
+
 // Expressions
 
 func zz1() throws {
@@ -341,9 +348,8 @@ struct Pack<each T> {
     func f(_ t: repeat each T) {
         repeat g(each t)
     }
+    func g<U>(_ t: U) {}
 }
-// FIXME: USR generation crashes if this is a member of Pack<each T> above!
-func g<U>(_ t: U) {}
 
 func tuplify<each T>(_ value: repeat each T) -> (repeat each T) {
   return (repeat each value)
@@ -351,6 +357,17 @@ func tuplify<each T>(_ value: repeat each T) -> (repeat each T) {
 func example<each T>(_ value: repeat each T) {
   let abstractTuple = tuplify(repeat each value)
   repeat print(each abstractTuple)
+}
+
+func anySeq<T>(_ type: T.Type = T.self) -> any Sequence<T> { [] }
+func anySeqUser() {
+    let s = anySeq(Int.self)
+    let iter = s.makeIterator()
+}
+func opaqueSeq<T>(_ type: T.Type = T.self) -> some Sequence<T> { [] }
+func opaqueSeqUser() {
+    let s = opaqueSeq(Int.self)
+    let iter = s.makeIterator()
 }
 
 let x = 10

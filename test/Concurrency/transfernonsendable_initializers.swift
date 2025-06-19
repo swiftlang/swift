@@ -81,10 +81,9 @@ func initActorWithSyncNonIsolatedInit2(_ k: NonSendableKlass) {
 
 actor ActorWithAsyncIsolatedInit {
   init(_ newK: NonSendableKlass) async {
-    // TODO: This should say actor isolated.
     let _ = { @MainActor in
       print(newK) // expected-error {{sending 'newK' risks causing data races}}
-      // expected-note @-1 {{'self'-isolated 'newK' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-note @-1 {{'self'-isolated 'newK' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later actor-isolated uses}}
     }
   }
 }
@@ -110,7 +109,7 @@ func initActorWithAsyncIsolatedInit2(_ k: NonSendableKlass) async {
 }
 
 ////////////////////////////////
-// MARK: Actor Isolated Class //
+// MARK: Actor-Isolated Class //
 ////////////////////////////////
 
 @CustomActor
@@ -150,7 +149,7 @@ class ClassWithAsyncIsolatedInit {
   init(_ newK: NonSendableKlass) async {
     let _ = { @MainActor in
       print(newK) // expected-error {{sending 'newK' risks causing data races}}
-      // expected-note @-1 {{global actor 'CustomActor'-isolated 'newK' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-note @-1 {{global actor 'CustomActor'-isolated 'newK' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later global actor 'CustomActor'-isolated uses}}
     }
   }
 }

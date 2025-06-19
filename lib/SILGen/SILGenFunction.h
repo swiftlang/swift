@@ -44,6 +44,7 @@ class ConsumableManagedValue;
 class LogicalPathComponent;
 class LValue;
 class ManagedValue;
+class PathComponent;
 class PreparedArguments;
 class RValue;
 class CalleeTypeInfo;
@@ -543,7 +544,9 @@ public:
     
     PreparedAddressableBuffer(SILInstruction *insertPoint)
       : insertPoint(insertPoint)
-    {}
+    {
+      ASSERT(insertPoint && "null insertion point provided");
+    }
     
     PreparedAddressableBuffer(PreparedAddressableBuffer &&other)
       : insertPoint(other.insertPoint)
@@ -877,7 +880,7 @@ public:
   FunctionTypeInfo getFunctionTypeInfo(CanAnyFunctionType fnType);
 
   /// A helper method that calls getFunctionTypeInfo that also marks global
-  /// actor isolated async closures that are not sendable as sendable.
+  /// actor-isolated async closures that are not sendable as sendable.
   FunctionTypeInfo getClosureTypeInfo(AbstractClosureExpr *expr);
 
   bool isEmittingTopLevelCode() { return IsEmittingTopLevelCode; }
@@ -1976,6 +1979,10 @@ public:
   ArgumentSource prepareAccessorBaseArg(SILLocation loc, ManagedValue base,
                                         CanType baseFormalType,
                                         SILDeclRef accessor);
+  ArgumentSource prepareAccessorBaseArgForFormalAccess(SILLocation loc,
+                                                       ManagedValue base,
+                                                       CanType baseFormalType,
+                                                       SILDeclRef accessor);
 
   RValue emitGetAccessor(
       SILLocation loc, SILDeclRef getter, SubstitutionMap substitutions,
@@ -2199,7 +2206,12 @@ public:
 
   RValue emitLoadOfLValue(SILLocation loc, LValue &&src, SGFContext C,
                           bool isBaseLValueGuaranteed = false);
-
+  PathComponent &&
+  drillToLastComponent(SILLocation loc,
+                       LValue &&lv,
+                       ManagedValue &addr,
+                       TSanKind tsanKind = TSanKind::None);
+                     
   /// Emit a reference to a method from within another method of the type.
   std::tuple<ManagedValue, SILType>
   emitSiblingMethodRef(SILLocation loc,
@@ -2624,8 +2636,7 @@ public:
   void collectThunkParams(
       SILLocation loc, SmallVectorImpl<ManagedValue> &params,
       SmallVectorImpl<ManagedValue> *indirectResultParams = nullptr,
-      SmallVectorImpl<ManagedValue> *indirectErrorParams = nullptr,
-      ThunkGenOptions options = {});
+      SmallVectorImpl<ManagedValue> *indirectErrorParams = nullptr);
 
   /// Build the type of a function transformation thunk.
   CanSILFunctionType buildThunkType(CanSILFunctionType &sourceType,

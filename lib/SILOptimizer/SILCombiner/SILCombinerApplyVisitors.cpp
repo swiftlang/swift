@@ -1222,23 +1222,11 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
         NewArgs.push_back(cast);
         // Form a new set of substitutions where the argument is
         // replaced with a concrete type.
-        NewCallSubs = NewCallSubs.subst(
-            [&](SubstitutableType *type) -> Type {
-              if (type == OAI.OpenedArchetype)
-                return CEI.ConcreteType;
-              return type;
-            },
-            [&](CanType origTy, Type substTy,
-                ProtocolDecl *proto) -> ProtocolConformanceRef {
-              if (origTy->isEqual(OAI.OpenedArchetype)) {
-                assert(substTy->isEqual(CEI.ConcreteType));
-                // Do a conformance lookup on this witness requirement using the
-                // existential's conformances. The witness requirement may be a
-                // base type of the existential's requirements.
-                return CEI.lookupExistentialConformance(proto);
-              }
-              return ProtocolConformanceRef::forAbstract(substTy, proto);
-            }, SubstFlags::SubstituteLocalArchetypes);
+        ReplaceExistentialArchetypesWithConcreteTypes replacer(
+            OAI.OpenedArchetype->getGenericEnvironment(),
+            CEI.ExistentialSubs);
+        NewCallSubs = NewCallSubs.subst(replacer, replacer,
+                                        SubstFlags::SubstituteLocalArchetypes);
         continue;
       }
       // Otherwise, use the original argument.
@@ -1263,23 +1251,11 @@ SILInstruction *SILCombiner::createApplyWithConcreteType(
 
     // Form a new set of substitutions where the argument is
     // replaced with a concrete type.
-    NewCallSubs = NewCallSubs.subst(
-        [&](SubstitutableType *type) -> Type {
-          if (type == OAI.OpenedArchetype)
-            return CEI.ConcreteType;
-          return type;
-        },
-        [&](CanType origTy, Type substTy,
-            ProtocolDecl *proto) -> ProtocolConformanceRef {
-          if (origTy->isEqual(OAI.OpenedArchetype)) {
-            assert(substTy->isEqual(CEI.ConcreteType));
-            // Do a conformance lookup on this witness requirement using the
-            // existential's conformances. The witness requirement may be a
-            // base type of the existential's requirements.
-            return CEI.lookupExistentialConformance(proto);
-          }
-          return ProtocolConformanceRef::forAbstract(substTy, proto);
-        }, SubstFlags::SubstituteLocalArchetypes);
+    ReplaceExistentialArchetypesWithConcreteTypes replacer(
+        OAI.OpenedArchetype->getGenericEnvironment(),
+        CEI.ExistentialSubs);
+    NewCallSubs = NewCallSubs.subst(replacer, replacer,
+                                    SubstFlags::SubstituteLocalArchetypes);
   }
 
   // We need to make sure that we can a) update Apply to use the new args and b)
@@ -1544,8 +1520,14 @@ SILInstruction *SILCombiner::legacyVisitApplyInst(ApplyInst *AI) {
     return nullptr;
 
   SILValue callee = AI->getCallee();
-  if (auto *cee = dyn_cast<ConvertEscapeToNoEscapeInst>(callee)) {
-    callee = cee->getOperand();
+  for (;;) {
+    if (auto *cee = dyn_cast<ConvertEscapeToNoEscapeInst>(callee)) {
+      callee = cee->getOperand();
+    } else if (auto *mdi = dyn_cast<MarkDependenceInst>(callee)) {
+      callee = mdi->getValue();
+    } else {
+      break;
+    }
   }
   if (auto *CFI = dyn_cast<ConvertFunctionInst>(callee))
     return optimizeApplyOfConvertFunctionInst(AI, CFI);

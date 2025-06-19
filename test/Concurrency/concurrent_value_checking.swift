@@ -99,9 +99,8 @@ extension A1 {
     _ = await self.asynchronous(nil)
 
     // Across to a different actor, so Sendable restriction is enforced.
-    _ = other.localLet // expected-warning{{non-sendable type 'NotConcurrent' of property 'localLet' cannot exit actor-isolated context}}
-    // expected-warning@-1 {{expression is 'async' but is not marked with 'await'}}
-    // expected-note@-2 {{property access is 'async'}}
+    _ = other.localLet // expected-warning{{non-Sendable type 'NotConcurrent' of property 'localLet' cannot exit actor-isolated context}}
+    // expected-warning@-1 {{actor-isolated property 'localLet' cannot be accessed from outside of the actor}} {{9-9=await }}
     _ = await other.synchronous() // expected-tns-warning {{non-Sendable 'NotConcurrent?'-typed result can not be returned from actor-isolated instance method 'synchronous()' to actor-isolated context}}
     _ = await other.asynchronous(nil)
   }
@@ -138,16 +137,13 @@ enum E {
 }
 
 func globalTest() async {
-  // expected-warning@+2 {{expression is 'async' but is not marked with 'await'}}
-  // expected-note@+1 {{property access is 'async'}}
-  let a = globalValue // expected-warning{{non-sendable type 'NotConcurrent?' of let 'globalValue' cannot exit global actor 'SomeGlobalActor'-isolated context}}
-  await globalAsync(a) // expected-tns-warning {{sending 'a' risks causing data races}}
-  // expected-tns-note @-1 {{sending global actor 'SomeGlobalActor'-isolated 'a' to global actor 'SomeGlobalActor'-isolated global function 'globalAsync' risks causing data races between global actor 'SomeGlobalActor'-isolated and local nonisolated uses}}
-  await globalSync(a) // expected-tns-note {{access can happen concurrently}}
+  // expected-warning@+1 {{global actor 'SomeGlobalActor'-isolated let 'globalValue' cannot be accessed from outside of the actor}} {{11-11=await }}
+  let a = globalValue // expected-warning{{non-Sendable type 'NotConcurrent?' of let 'globalValue' cannot exit global actor 'SomeGlobalActor'-isolated context}}
+  await globalAsync(a)
+  await globalSync(a)
 
-  // expected-warning@+2 {{expression is 'async' but is not marked with 'await'}}
-  // expected-note@+1 {{property access is 'async'}}
-  let _ = E.notSafe // expected-warning{{non-sendable type 'NotConcurrent?' of static property 'notSafe' cannot exit global actor 'SomeGlobalActor'-isolated context}}
+  // expected-warning@+1 {{global actor 'SomeGlobalActor'-isolated static property 'notSafe' cannot be accessed from outside of the actor}} {{11-11=await }}
+  let _ = E.notSafe // expected-warning{{non-Sendable type 'NotConcurrent?' of static property 'notSafe' cannot exit global actor 'SomeGlobalActor'-isolated context}}
 
 #if ALLOW_TYPECHECKER_ERRORS
   // expected-typechecker-error@+3 {{expression is 'async' but is not marked with 'await'}}
@@ -155,7 +151,7 @@ func globalTest() async {
   // expected-typechecker-note@+1 {{property access is 'async'}}
   globalAsync(E.notSafe)
 
-  // expected-typechecker-warning@-2 {{non-sendable type 'NotConcurrent?' of static property 'notSafe' cannot exit global actor 'SomeGlobalActor'-isolated context}}
+  // expected-typechecker-warning@-2 {{non-Sendable type 'NotConcurrent?' of static property 'notSafe' cannot exit global actor 'SomeGlobalActor'-isolated context}}
 #endif
 }
 
@@ -175,12 +171,10 @@ class ClassWithGlobalActorInits { // expected-tns-note 2{{class 'ClassWithGlobal
 
 @MainActor
 func globalTestMain(nc: NotConcurrent) async {
-  // expected-warning@+2 {{expression is 'async' but is not marked with 'await'}}
-  // expected-note@+1 {{property access is 'async'}}
-  let a = globalValue // expected-warning {{non-sendable type 'NotConcurrent?' of let 'globalValue' cannot exit global actor 'SomeGlobalActor'-isolated context}}
-  await globalAsync(a) // expected-tns-warning {{sending 'a' risks causing data races}}
-  // expected-tns-note @-1 {{sending global actor 'SomeGlobalActor'-isolated 'a' to global actor 'SomeGlobalActor'-isolated global function 'globalAsync' risks causing data races between global actor 'SomeGlobalActor'-isolated and local main actor-isolated uses}}
-  await globalSync(a) // expected-tns-note {{access can happen concurrently}}
+  // expected-warning@+1 {{global actor 'SomeGlobalActor'-isolated let 'globalValue' cannot be accessed from outside of the actor}} {{11-11=await }}
+  let a = globalValue // expected-warning {{non-Sendable type 'NotConcurrent?' of let 'globalValue' cannot exit global actor 'SomeGlobalActor'-isolated context}}
+  await globalAsync(a)
+  await globalSync(a)
   _ = await ClassWithGlobalActorInits(nc)
   // expected-tns-warning @-1 {{non-Sendable 'ClassWithGlobalActorInits'-typed result can not be returned from global actor 'SomeGlobalActor'-isolated initializer 'init(_:)' to main actor-isolated context}}
   // expected-tns-warning @-2 {{sending 'nc' risks causing data races}}
@@ -210,8 +204,8 @@ func testConcurrency() {
     print(y) // okay
   }
   acceptConcurrent {
-    print(x) // expected-warning{{capture of 'x' with non-sendable type 'NotConcurrent' in a '@Sendable' closure}}
-    print(y) // expected-warning{{capture of 'y' with non-sendable type 'NotConcurrent' in a '@Sendable' closure}}
+    print(x) // expected-warning{{capture of 'x' with non-Sendable type 'NotConcurrent' in a '@Sendable' closure}}
+    print(y) // expected-warning{{capture of 'y' with non-Sendable type 'NotConcurrent' in a '@Sendable' closure}}
     // expected-warning@-1{{reference to captured var 'y' in concurrently-executing code}}
   }
 }
@@ -247,7 +241,7 @@ class HasNC {
 }
 
 func testKeyPaths(dict: [NC: Int], nc: NC) {
-  _ = \HasNC.dict[nc] // expected-warning{{cannot form key path that captures non-sendable type 'NC'}}
+  _ = \HasNC.dict[nc] // expected-warning{{cannot form key path that captures non-Sendable type 'NC'}}
 }
 
 // ----------------------------------------------------------------------
@@ -259,7 +253,7 @@ actor ANI {
 }
 
 func testANI(ani: ANI) async {
-  _ = ani.nc // expected-warning{{non-sendable type 'NC' of property 'nc' cannot exit nonisolated context}}
+  _ = ani.nc // expected-warning{{non-Sendable type 'NC' of property 'nc' cannot exit nonisolated context}}
 }
 
 // ----------------------------------------------------------------------
@@ -270,7 +264,7 @@ protocol AsyncProto {
 }
 
 extension A1: AsyncProto {
-  func asyncMethod(_: NotConcurrent) async { } // expected-warning{{non-sendable parameter type 'NotConcurrent' cannot be sent from caller of protocol requirement 'asyncMethod' into actor-isolated implementation}}
+  func asyncMethod(_: NotConcurrent) async { } // expected-warning{{non-Sendable parameter type 'NotConcurrent' cannot be sent from caller of protocol requirement 'asyncMethod' into actor-isolated implementation}}
 }
 
 protocol MainActorProto {
@@ -279,7 +273,7 @@ protocol MainActorProto {
 
 class SomeClass: MainActorProto {
   @SomeGlobalActor
-  func asyncMainMethod(_: NotConcurrent) async { } // expected-warning{{non-sendable parameter type 'NotConcurrent' cannot be sent from caller of protocol requirement 'asyncMainMethod' into global actor 'SomeGlobalActor'-isolated implementation}}
+  func asyncMainMethod(_: NotConcurrent) async { } // expected-warning{{non-Sendable parameter type 'NotConcurrent' cannot be sent from caller of protocol requirement 'asyncMainMethod' into global actor 'SomeGlobalActor'-isolated implementation}}
 }
 
 // ----------------------------------------------------------------------
@@ -308,7 +302,7 @@ func acceptConcurrentUnary<T>(_: @Sendable (T) -> T) { }
 func concurrentClosures<T: SendableMetatype>(_: T) { // expected-note{{consider making generic parameter 'T' conform to the 'Sendable' protocol}} {{44-44= & Sendable}}
   acceptConcurrentUnary { (x: T) in
     _ = x // ok
-    acceptConcurrentUnary { _ in x } // expected-warning{{capture of 'x' with non-sendable type 'T' in a '@Sendable' closure}}
+    acceptConcurrentUnary { _ in x } // expected-warning{{capture of 'x' with non-Sendable type 'T' in a '@Sendable' closure}}
     let y: T? = nil
     return y!
   }
@@ -318,11 +312,11 @@ func concurrentClosures<T: SendableMetatype>(_: T) { // expected-note{{consider 
 // Sendable checking
 // ----------------------------------------------------------------------
 struct S1: Sendable {
-  var nc: NotConcurrent // expected-warning{{stored property 'nc' of 'Sendable'-conforming struct 'S1' has non-sendable type 'NotConcurrent'}}
+  var nc: NotConcurrent // expected-warning{{stored property 'nc' of 'Sendable'-conforming struct 'S1' has non-Sendable type 'NotConcurrent'}}
 }
 
 struct S2<T>: Sendable { // expected-note{{consider making generic parameter 'T' conform to the 'Sendable' protocol}} {{12-12=: Sendable}}
-  var nc: T // expected-warning{{stored property 'nc' of 'Sendable'-conforming generic struct 'S2' has non-sendable type 'T'}}
+  var nc: T // expected-warning{{stored property 'nc' of 'Sendable'-conforming generic struct 'S2' has non-Sendable type 'T'}}
 }
 
 struct S3<T> {
@@ -333,7 +327,7 @@ struct S3<T> {
 extension S3: Sendable where T: Sendable { }
 
 enum E1: Sendable {
-  case payload(NotConcurrent) // expected-warning{{associated value 'payload' of 'Sendable'-conforming enum 'E1' has non-sendable type 'NotConcurrent'}}
+  case payload(NotConcurrent) // expected-warning{{associated value 'payload' of 'Sendable'-conforming enum 'E1' has non-Sendable type 'NotConcurrent'}}
 }
 
 enum E2<T> {
@@ -343,7 +337,7 @@ enum E2<T> {
 extension E2: Sendable where T: Sendable { }
 
 final class C1: Sendable {
-  let nc: NotConcurrent? = nil // expected-warning{{stored property 'nc' of 'Sendable'-conforming class 'C1' has non-sendable type 'NotConcurrent?'}}
+  let nc: NotConcurrent? = nil // expected-warning{{stored property 'nc' of 'Sendable'-conforming class 'C1' contains non-Sendable type 'NotConcurrent'}}
   var x: Int = 0 // expected-warning{{stored property 'x' of 'Sendable'-conforming class 'C1' is mutable}}
   let i: Int = 0
 }
@@ -475,7 +469,7 @@ enum E12<T>: UnsafeSendable { // expected-warning{{'UnsafeSendable' is deprecate
 func testSendableOptionalInference(nc: NotConcurrent) {
   var fn: (@Sendable () -> Void)? = nil
   fn = {
-    print(nc) // expected-warning{{capture of 'nc' with non-sendable type 'NotConcurrent' in a '@Sendable' closure}}
+    print(nc) // expected-warning{{capture of 'nc' with non-Sendable type 'NotConcurrent' in a '@Sendable' closure}}
   }
   _ = fn
 }

@@ -173,6 +173,57 @@ func shufflevector_test(_ src: Builtin.FPIEEE32) -> Builtin.Vec4xFPIEEE32 {
   )
 }
 
+func scalar_select_test(
+  _ predicate: Builtin.Int1,
+  _ trueValue: Builtin.Int32,
+  _ falseValue: Builtin.Int32
+) -> Builtin.Int32 {
+  // CHECK: scalar_select_test
+  // CHECK: select i1 %{{[0-9]+}}, i32 %{{[0-9]+}}, i32 %{{[0-9]+}}
+  Builtin.select_Int1_Int32(predicate, trueValue, falseValue)
+}
+
+func scalar_select_test_ii(
+  _ predicate: Builtin.Int1,
+  _ trueValue: Builtin.Vec4xInt32,
+  _ falseValue: Builtin.Vec4xInt32
+) -> Builtin.Vec4xInt32 {
+  // CHECK: scalar_select_test_ii
+  // CHECK: select i1 %{{[0-9]+}}, <4 x i32> %{{[0-9]+}}, <4 x i32> %{{[0-9]+}}
+  Builtin.select_Int1_Vec4xInt32(predicate, trueValue, falseValue)
+}
+
+func vector_select_test(
+  _ predicate: Builtin.Vec8xInt32,
+  _ trueValue: Builtin.Vec8xInt32,
+  _ falseValue: Builtin.Vec8xInt32
+) -> Builtin.Vec8xInt32 {
+  // CHECK: vector_select_test
+  // CHECK: select <8 x i1> %{{[0-9]+}}, <8 x i32> %{{[0-9]+}}, <8 x i32> %{{[0-9]+}}
+  let p = Builtin.trunc_Vec8xInt32_Vec8xInt1(predicate)
+  return Builtin.select_Vec8xInt1_Vec8xInt32(p, trueValue, falseValue)
+}
+
+func interleave_test(
+  _ evens: Builtin.Vec8xInt16,
+  _ odds: Builtin.Vec8xInt16
+) -> (Builtin.Vec8xInt16, Builtin.Vec8xInt16) {
+  // CHECK: interleave_test
+  // CHECK: shufflevector <8 x i16> %{{[0-9]+}}, <8 x i16> %{{[0-9]+}}, <8 x i32> <i32 0, i32 8, i32 1, i32 9, i32 2, i32 10, i32 3, i32 11>
+  // CHECK: shufflevector <8 x i16> %{{[0-9]+}}, <8 x i16> %{{[0-9]+}}, <8 x i32> <i32 4, i32 12, i32 5, i32 13, i32 6, i32 14, i32 7, i32 15>
+  return Builtin.interleave_Vec8xInt16(evens, odds)
+}
+
+func deinterleave_test(
+  _ low: Builtin.Vec8xInt16,
+  _ high: Builtin.Vec8xInt16
+) -> (Builtin.Vec8xInt16, Builtin.Vec8xInt16) {
+  // CHECK: deinterleave_test
+  // CHECK: shufflevector <8 x i16> %{{[0-9]+}}, <8 x i16> %{{[0-9]+}}, <8 x i32> <i32 0, i32 2, i32 4, i32 6, i32 8, i32 10, i32 12, i32 14>
+  // CHECK: shufflevector <8 x i16> %{{[0-9]+}}, <8 x i16> %{{[0-9]+}}, <8 x i32> <i32 1, i32 3, i32 5, i32 7, i32 9, i32 11, i32 13, i32 15>
+  return Builtin.deinterleave_Vec8xInt16(low, high)
+}
+
 func intrinsic_test(_ i32: inout Builtin.Int32, i16: inout Builtin.Int16,
                     _ v8i16: Builtin.Vec8xInt16) {
   // CHECK: intrinsic_test
@@ -212,11 +263,11 @@ func sizeof_alignof_metatype_test() {
 
 // CHECK: define hidden {{.*}}void @"$s8builtins27generic_sizeof_alignof_testyyxlF"
 func generic_sizeof_alignof_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[T:%.*]], i32 0, i32 8
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[T:%.*]], i32 0, i32 8
   // CHECK-NEXT: [[SIZE:%.*]] = load i64, ptr [[T0]]
   // CHECK-NEXT: store i64 [[SIZE]], ptr [[S:%.*]]
   var s = Builtin.sizeof(T.self)
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[T:%.*]], i32 0, i32 10
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[T:%.*]], i32 0, i32 10
   // CHECK-NEXT: [[FLAGS:%.*]] = load i32, ptr [[T0]]
   // CHECK-NEXT: [[T2:%.*]] = zext i32 [[FLAGS]] to i64
   // CHECK-NEXT: [[T3:%.*]] = and i64 [[T2]], 255
@@ -227,7 +278,7 @@ func generic_sizeof_alignof_test<T>(_: T) {
 
 // CHECK: define hidden {{.*}}void @"$s8builtins21generic_strideof_testyyxlF"
 func generic_strideof_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[T:%.*]], i32 9
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[T:%.*]], i32 9
   // CHECK-NEXT: [[STRIDE:%.*]] = load i64, ptr [[T0]]
   // CHECK-NEXT: store i64 [[STRIDE]], ptr [[S:%.*]]
   var s = Builtin.strideof(T.self)
@@ -329,9 +380,9 @@ func fneg_test(_ half: Builtin.FPIEEE16,
                double: Builtin.FPIEEE64)
   -> (Builtin.FPIEEE16, Builtin.FPIEEE32, Builtin.FPIEEE64)
 {
-  // CHECK: fsub half 0xH8000, {{%.*}}
-  // CHECK: fsub float -0.000000e+00, {{%.*}}
-  // CHECK: fsub double -0.000000e+00, {{%.*}}
+  // CHECK: fneg half
+  // CHECK: fneg float
+  // CHECK: fneg double
   return (Builtin.fneg_FPIEEE16(half),
           Builtin.fneg_FPIEEE32(single),
           Builtin.fneg_FPIEEE64(double))
@@ -638,11 +689,11 @@ func zeroInitializerEmpty() {
 // isUnique variants
 // ----------------------------------------------------------------------------
 
-// CHECK: define hidden {{.*}}void @"$s8builtins26acceptsBuiltinNativeObjectyyBoSgzF"(ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK: define hidden {{.*}}void @"$s8builtins26acceptsBuiltinNativeObjectyyBoSgzF"(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 func acceptsBuiltinNativeObject(_ ref: inout Builtin.NativeObject?) {}
 
 // native
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BoSgzF"(ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BoSgzF"(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK:      %[[LD_RC:.+]] = load ptr, ptr %0
 // CHECK-NEXT: %[[RET:.+]] = call zeroext i1 @swift_isUniquelyReferenced_native(ptr %[[LD_RC]])
@@ -652,7 +703,7 @@ func isUnique(_ ref: inout Builtin.NativeObject?) -> Bool {
 }
 
 // native nonNull
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BozF"(ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BozF"(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK:      %[[LD_RC:.+]] = load ptr, ptr %0
 // CHECK:      %[[RET:.+]] = call zeroext i1 @swift_isUniquelyReferenced_nonNull_native(ptr %[[LD_RC]])
@@ -661,13 +712,13 @@ func isUnique(_ ref: inout Builtin.NativeObject) -> Bool {
   return Builtin.isUnique(&ref)
 }
 
-// CHECK: define hidden {{.*}}void @"$s8builtins16acceptsAnyObjectyyyXlSgzF"(ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK: define hidden {{.*}}void @"$s8builtins16acceptsAnyObjectyyyXlSgzF"(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 func acceptsAnyObject(_ ref: inout Builtin.AnyObject?) {}
 
 // ObjC
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_yXlSgzF"(ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_yXlSgzF"(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
-// CHECK:      [[ADDR:%.+]] = getelementptr inbounds [[OPTIONAL_ANYOBJECT_TY:%.*]], ptr %0, i32 0, i32 0
+// CHECK:      [[ADDR:%.+]] = getelementptr inbounds{{.*}} [[OPTIONAL_ANYOBJECT_TY:%.*]], ptr %0, i32 0, i32 0
 // CHECK-NEXT: [[REF:%.+]] = load ptr, ptr [[ADDR]]
 // CHECK-objc-NEXT: [[RESULT:%.+]] = call zeroext i1 @swift_isUniquelyReferenced{{(NonObjC)?}}(ptr [[REF]])
 // CHECK-native-NEXT: [[RESULT:%.+]] = call zeroext i1 @swift_isUniquelyReferenced_native(ptr [[REF]])
@@ -678,9 +729,9 @@ func isUnique(_ ref: inout Builtin.AnyObject?) -> Bool {
 
 // ObjC nonNull
 // CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_yXlzF"
-// CHECK-SAME:    (ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-SAME:    (ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
-// CHECK:      [[ADDR:%.+]] = getelementptr inbounds %AnyObject, ptr %0, i32 0, i32 0
+// CHECK:      [[ADDR:%.+]] = getelementptr inbounds{{.*}} %AnyObject, ptr %0, i32 0, i32 0
 // CHECK:      [[REF:%.+]] = load ptr, ptr [[ADDR]]
 // CHECK-objc-NEXT: [[RESULT:%.+]] = call zeroext i1 @swift_isUniquelyReferenced{{(NonObjC)?}}_nonNull(ptr [[REF]])
 // CHECK-native-NEXT: [[RESULT:%.+]] = call zeroext i1 @swift_isUniquelyReferenced_nonNull_native(ptr [[REF]])
@@ -690,7 +741,7 @@ func isUnique(_ ref: inout Builtin.AnyObject) -> Bool {
 }
 
 // BridgeObject nonNull
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BbzF"(ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins8isUniqueyBi1_BbzF"(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK:      %[[LD:.+]] = load ptr, ptr %0
 // CHECK:      %[[RET:.+]] = call zeroext i1 @swift_isUniquelyReferenced{{(NonObjC)?}}_nonNull_bridgeObject(ptr %[[LD]])
@@ -706,7 +757,7 @@ func assumeTrue(_ x: Builtin.Int1) {
   Builtin.assume_Int1(x)
 }
 // BridgeObject nonNull
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins15isUnique_nativeyBi1_BbzF"(ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins15isUnique_nativeyBi1_BbzF"(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK:      %[[LD:.+]] = load ptr, ptr %0
 // CHECK-NEXT: %[[RET:.+]] = call zeroext i1 @swift_isUniquelyReferenced_nonNull_native(ptr %[[LD]])
@@ -716,7 +767,7 @@ func isUnique_native(_ ref: inout Builtin.BridgeObject) -> Bool {
 }
 
 // ImplicitlyUnwrappedOptional argument to isUnique.
-// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins11isUniqueIUOyBi1_BoSgzF"(ptr nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK-LABEL: define hidden {{.*}}i1 @"$s8builtins11isUniqueIUOyBi1_BoSgzF"(ptr {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK: call zeroext i1 @swift_isUniquelyReferenced_native(ptr
 // CHECK: ret i1
@@ -733,7 +784,7 @@ func COWBufferForReading(_ ref: __owned C) -> C {
 
 // CHECK-LABEL: define {{.*}} @{{.*}}generic_ispod_test
 func generic_ispod_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[T:%.*]], i32 10
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[T:%.*]], i32 10
   // CHECK-NEXT: [[FLAGS:%.*]] = load i32, ptr [[T0]]
   // CHECK-NEXT: [[ISNOTPOD:%.*]] = and i32 [[FLAGS]], 65536
   // CHECK-NEXT: [[ISPOD:%.*]] = icmp eq i32 [[ISNOTPOD]], 0
@@ -752,7 +803,7 @@ func ispod_test() {
 
 // CHECK-LABEL: define {{.*}} @{{.*}}generic_isbitwisetakable_test
 func generic_isbitwisetakable_test<T>(_: T) {
-  // CHECK:      [[T0:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[T:%.*]], i32 10
+  // CHECK:      [[T0:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[T:%.*]], i32 10
   // CHECK-NEXT: [[FLAGS:%.*]] = load i32, ptr [[T0]]
   // CHECK-NEXT: [[ISNOTBITWISETAKABLE:%.*]] = and i32 [[FLAGS]], 1048576
   // CHECK-NEXT: [[ISBITWISETAKABLE:%.*]] = icmp eq i32 [[ISNOTBITWISETAKABLE]], 0

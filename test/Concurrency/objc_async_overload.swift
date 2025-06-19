@@ -43,10 +43,10 @@ func asyncWithAwait() async {
 // completion handler's implicit `@Sendable` isn't respected.
 extension Delegate {
   nonisolated func makeRequest(_ req: Request??, completionHandler: (() -> Void)? = nil) {
-    // expected-note@-1 {{parameter 'completionHandler' is implicitly non-sendable}}
+    // expected-note@-1 {{parameter 'completionHandler' is implicitly non-Sendable}}
     if let req = (req ?? nil) {
       makeRequest1(req, completionHandler: completionHandler)
-      // expected-warning@-1 {{passing non-sendable parameter 'completionHandler' to function expecting a @Sendable closure}}
+      // expected-warning@-1 {{passing non-Sendable parameter 'completionHandler' to function expecting a '@Sendable' closure}}
     }
   }
 }

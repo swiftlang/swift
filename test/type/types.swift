@@ -219,3 +219,18 @@ do {
     subscript(_: inout Double...) -> Bool { true } // expected-error {{'inout' may only be used on function or initializer parameters}}
   }
 }
+
+let tupleTypeWithTrailingComma: (
+  bar: String,
+  quux: String,
+)
+
+let _ = (bar: String, quux: String,).self
+
+let closureTypeWithTrailingCommas: (
+  String,
+  String,
+) -> (
+  bar: String,
+  quux: String,
+)

@@ -181,3 +181,122 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
     blockRange.deinitialize()
   }
 }
+
+extension InstructionRange {
+  enum PathOverlap {
+    // range:  ---
+    //          |    pathBegin
+    //          |        |
+    //          |     pathEnd
+    //         ---
+    case containsPath
+
+    // range:  ---
+    //          |    pathBegin
+    //         ---       |
+    //                pathEnd
+    case containsBegin
+
+    //               pathBegin
+    // range:  ---       |
+    //          |     pathEnd
+    //         ---
+    case containsEnd
+
+    //               pathBegin
+    // range:  ---       |
+    //          |        |
+    //         ---       |
+    //                pathEnd
+    case overlappedByPath
+
+    // either:       pathBegin
+    //                   |
+    //                pathEnd
+    // range:  ---
+    //          |
+    //         ---
+    // or:           pathBegin
+    //                   |
+    //                pathEnd
+    case disjoint
+  }
+
+  /// Return true if any exclusive path from `begin` to `end` includes an instruction in this exclusive range.
+  ///
+  /// Returns .containsBegin, if this range has the same begin and end as the path.
+  ///
+  /// Precondition: `begin` dominates `end`.
+  func overlaps(pathBegin: Instruction, pathEnd: Instruction, _ context: some Context) -> PathOverlap {
+    assert(pathBegin != pathEnd, "expect an exclusive path")
+    if contains(pathBegin) {
+      // Note: pathEnd != self.begin here since self.contains(pathBegin)
+      if contains(pathEnd) { return .containsPath }
+      return .containsBegin
+    }
+    if contains(pathEnd) {
+      if let rangeBegin = self.begin, rangeBegin == pathEnd {
+        return .disjoint
+      }
+      return .containsEnd
+    }
+    // Neither end-point is contained. If a backward path walk encounters this range, then it must overlap this
+    // range. Otherwise, it is disjoint.
+    var backwardBlocks = BasicBlockWorklist(context)
+    defer { backwardBlocks.deinitialize() }
+    backwardBlocks.pushIfNotVisited(pathEnd.parentBlock)
+    while let block = backwardBlocks.pop() {
+      if blockRange.inclusiveRangeContains(block) {
+        // This range overlaps with this block, but there are still three possibilities:
+        // (1) range, pathBegin, pathEnd = disjoint         (range might not begin in this block)
+        // (2) pathBegin, pathEnd, range = disjoint         (pathBegin might not be in this block)
+        // (3) pathBegin, range, pathEnd = overlappedByPath (range or pathBegin might not be in this block)
+        //
+        // Walk backward from pathEnd to find either pathBegin or an instruction in this range.
+        // Both this range and the path may or may not begin in this block.
+        let endInBlock = block == pathEnd.parentBlock ? pathEnd : block.terminator
+        for inst in ReverseInstructionList(first: endInBlock) {
+          // Check pathBegin first because the range is exclusive.
+          if inst == pathBegin {
+            break
+          }
+          // Check inclusiveRangeContains() in case the range end is the first instruction in this block.
+          if inclusiveRangeContains(inst) {
+            return .overlappedByPath
+          }
+        }
+        // No instructions in this range occur between pathBegin and pathEnd.
+        return .disjoint
+      }
+      // No range blocks have been reached.
+      if block == pathBegin.parentBlock {
+        return .disjoint
+      }
+      backwardBlocks.pushIfNotVisited(contentsOf: block.predecessors)
+    }
+    fatalError("begin: \(pathBegin)\n  must dominate end: \(pathEnd)")
+  }
+}
+
+let rangeOverlapsPathTest = FunctionTest("range_overlaps_path") {
+  function, arguments, context in
+  let rangeValue = arguments.takeValue()
+  print("Range of: \(rangeValue)")
+  var range = computeLinearLiveness(for: rangeValue, context)
+  defer { range.deinitialize() }
+  let pathInst = arguments.takeInstruction()
+  print("Path begin: \(pathInst)")
+  if let pathBegin = pathInst as? ScopedInstruction {
+    for end in pathBegin.endInstructions {
+      print("Overlap kind:", range.overlaps(pathBegin: pathInst, pathEnd: end, context))
+    }
+    return
+  }
+  if let pathValue = pathInst as? SingleValueInstruction, pathValue.ownership == .owned {
+    for end in pathValue.uses.endingLifetime {
+      print("Overlap kind:", range.overlaps(pathBegin: pathInst, pathEnd: end.instruction, context))
+    }
+    return
+  }
+  print("Test specification error: not a scoped or owned instruction: \(pathInst)")
+}

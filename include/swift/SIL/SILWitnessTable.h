@@ -181,7 +181,9 @@ private:
   /// whether or not entries is empty since you can have an empty witness table
   /// that is not a declaration.
   bool IsDeclaration;
- 
+
+  bool specialized;
+
   /// Whether or not this witness table is serialized, which allows
   /// devirtualization from another module.
   unsigned SerializedKind : 2;
@@ -190,11 +192,12 @@ private:
   SILWitnessTable(SILModule &M, SILLinkage Linkage, SerializedKind_t Serialized,
                   StringRef name, ProtocolConformance *conformance,
                   ArrayRef<Entry> entries,
-                  ArrayRef<ProtocolConformanceRef> conditionalConformances);
+                  ArrayRef<ProtocolConformanceRef> conditionalConformances,
+                  bool specialized);
 
   /// Private constructor for making SILWitnessTable declarations.
   SILWitnessTable(SILModule &M, SILLinkage Linkage, StringRef Name,
-                  ProtocolConformance *conformance);
+                  ProtocolConformance *conformance, bool specialized);
 
   void addWitnessTable();
 
@@ -203,11 +206,13 @@ public:
   static SILWitnessTable *
   create(SILModule &M, SILLinkage Linkage, SerializedKind_t SerializedKind,
          ProtocolConformance *conformance, ArrayRef<Entry> entries,
-         ArrayRef<ProtocolConformanceRef> conditionalConformances);
+         ArrayRef<ProtocolConformanceRef> conditionalConformances,
+         bool specialized);
 
   /// Create a new SILWitnessTable declaration.
   static SILWitnessTable *create(SILModule &M, SILLinkage Linkage,
-                                 ProtocolConformance *conformance);
+                                 ProtocolConformance *conformance,
+                                 bool specialized);
 
   ~SILWitnessTable();
   
@@ -237,6 +242,9 @@ public:
 
   /// Returns true if this witness table is a definition.
   bool isDefinition() const { return !isDeclaration(); }
+
+  // Returns true, if this is a specialized witness table (currently only used in embedded mode).
+  bool isSpecialized() const { return specialized; }
 
   /// Returns true if this witness table is going to be (or was) serialized.
   bool isSerialized() const {

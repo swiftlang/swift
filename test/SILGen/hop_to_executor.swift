@@ -324,6 +324,8 @@ func testGlobalActorFuncValue(_ fn: @RedActor () -> Void) async {
 }
 
 func acceptAsyncSendableClosureInheriting<T>(@_inheritActorContext _: @Sendable () async -> T) { }
+func acceptAsyncSendableClosureAlwaysInheriting<T>(@_inheritActorContext(always) _: @Sendable () async -> T) { }
+func acceptAsyncSendableClosureAlwaysInheritingErased<T>(@_inheritActorContext(always) _: sending @isolated(any) () async -> T) { }
 
 extension MyActor {
   func synchronous() { }
@@ -337,6 +339,66 @@ extension MyActor {
     acceptAsyncSendableClosureInheriting {
       synchronous()
     }
+  }
+
+  // CHECK-LABEL: sil private [ossa] @$s4test7MyActorC0A16AlwaysInheritingyyFyyYaYbXEfU_
+  // CHECK: debug_value [[SELF:%[0-9]+]] : $MyActor
+  // CHECK-NEXT: [[COPY:%[0-9]+]] = copy_value [[SELF]] : $MyActor
+  // CHECK-NEXT: [[BORROW:%[0-9]+]] = begin_borrow [[COPY]] : $MyActor
+  // CHECK-NEXT: hop_to_executor [[BORROW]] : $MyActor
+  func testAlwaysInheriting() {
+    acceptAsyncSendableClosureAlwaysInheriting {
+    }
+  }
+}
+
+func testIsolatedParameterWithInheritActorContext(_ isolation: isolated (any Actor)?) {
+  // CHECK-LABEL: sil private [ossa] @$s4test0A40IsolatedParameterWithInheritActorContextyyScA_pSgYiFyyYaYbXEfU_
+  // CHECK: debug_value [[ISOLATION:%[0-9]+]] : $Optional<any Actor>
+  // CHECK-NEXT: [[COPY:%[0-9]+]] = copy_value [[ISOLATION]] : $Optional<any Actor>
+  // CHECK-NEXT: [[BORROW:%[0-9]+]] = begin_borrow [[COPY]] : $Optional<any Actor>
+  // CHECK-NEXT: hop_to_executor [[BORROW]] : $Optional<any Actor>
+  acceptAsyncSendableClosureAlwaysInheriting {
+  }
+
+  // CHECK-LABEL: sil private [ossa] @$s4test0A40IsolatedParameterWithInheritActorContextyyScA_pSgYiFyyYaYbScMYcXEfU0_
+  // CHECK: hop_to_executor {{.*}} : $MainActor
+  acceptAsyncSendableClosureAlwaysInheriting { @MainActor in
+    // CHECK-LABEL: sil private [ossa] @$s4test0A40IsolatedParameterWithInheritActorContextyyScA_pSgYiFyyYaYbScMYcXEfU0_yyYaYbXEfU_
+    // CHECK: hop_to_executor {{.*}} : $MainActor
+    acceptAsyncSendableClosureAlwaysInheriting {
+    }
+  }
+
+  // CHECK-LABEL: sil private [ossa] @$s4test0A40IsolatedParameterWithInheritActorContextyyScA_pSgYiFyyYaYbXEfU1_
+  // CHECK: debug_value [[ISOLATION:%[0-9]+]] : $Optional<any Actor>
+  // CHECK-NEXT: [[COPY:%[0-9]+]] = copy_value [[ISOLATION]] : $Optional<any Actor>
+  // CHECK-NEXT: [[BORROW:%[0-9]+]] = begin_borrow [[COPY]] : $Optional<any Actor>
+  // CHECK-NEXT: hop_to_executor [[BORROW]] : $Optional<any Actor>
+  acceptAsyncSendableClosureAlwaysInheriting {
+    // CHECK-LABEL: sil private [ossa] @$s4test0A40IsolatedParameterWithInheritActorContextyyScA_pSgYiFyyYaYbXEfU1_yyYaYbXEfU_
+    // CHECK: debug_value [[ISOLATION:%[0-9]+]] : $Optional<any Actor>
+    // CHECK-NEXT: [[COPY:%[0-9]+]] = copy_value [[ISOLATION]] : $Optional<any Actor>
+    // CHECK-NEXT: [[BORROW:%[0-9]+]] = begin_borrow [[COPY]] : $Optional<any Actor>
+    // CHECK-NEXT: hop_to_executor [[BORROW]] : $Optional<any Actor>
+    acceptAsyncSendableClosureAlwaysInheriting {
+    }
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test0a17IsolatedParamWithB3AnyyyScA_pYiF
+// CHECK: [[CLOSURE_REF:%.*]] = function_ref @$s4test0a17IsolatedParamWithB3AnyyyScA_pYiFyyYaXEfU_
+// CHECK-NEXT: [[ISOLATION_COPY_1:%.*]] = copy_value %0 : $any Actor
+// CHECK-NEXT: [[ISOLATION_COPY_2:%.*]] = copy_value [[ISOLATION_COPY_1]] : $any Actor
+// CHECK-NEXT: [[DYNAMIC_ISOLATION:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[ISOLATION_COPY_2]] : $any Actor
+// CHECK-NEXT: [[CLOSURE_WITH_APPLIED_ISOLATION:%.*]] = partial_apply [callee_guaranteed] [isolated_any] [[CLOSURE_REF]]([[DYNAMIC_ISOLATION]], [[ISOLATION_COPY_1]])
+func testIsolatedParamWithIsolatedAny(_ isolation: isolated any Actor) {
+  // CHECK-LABEL: sil private [ossa] @$s4test0a17IsolatedParamWithB3AnyyyScA_pYiFyyYaXEfU_
+  // CHECK: bb0(%0 : $*(), [[DYNAMIC_ISOLATION:%[0-9]+]] : @guaranteed $Optional<any Actor>, [[CAPTURED_ISOLATION:%[0-9]+]] : @closureCapture @guaranteed $any Actor):
+  // CHECK: [[COPY:%[0-9]+]] = copy_value [[CAPTURED_ISOLATION]] : $any Actor
+  // CHECK-NEXT: [[BORROW:%[0-9]+]] = begin_borrow [[COPY]] : $any Actor
+  // CHECK-NEXT: hop_to_executor [[BORROW]] : $any Actor
+  acceptAsyncSendableClosureAlwaysInheritingErased {
   }
 }
 

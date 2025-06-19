@@ -157,14 +157,6 @@ public:
   }
 
   void addMethodDescriptor(SILDeclRef declRef) override {
-    if (declRef.isDistributedThunk()) {
-      auto afd = declRef.getAbstractFunctionDecl();
-      auto DC = afd->getDeclContext();
-      if (isa<ProtocolDecl>(DC)) {
-        return;
-      }
-    }
-
     addLinkEntity(LinkEntity::forMethodDescriptor(declRef));
   }
 

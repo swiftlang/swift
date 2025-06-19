@@ -97,8 +97,8 @@ struct AliasAnalysis {
         return false
       }
     }
-    // Finaly use escape info to check if one address "escapes" to the other address.
-    return v1.allContainedAddresss.canAddressAlias(with: v2.allContainedAddresss, context)
+    // Finally use escape info to check if one address "escapes" to the other address.
+    return v1.allContainedAddresses.canAddressAlias(with: v2.allContainedAddresses, context)
   }
 
   static func register() {
@@ -148,7 +148,7 @@ struct AliasAnalysis {
          bridgedObj: BridgedValue) -> Bool in
         let context = FunctionPassContext(_bridged: bridgedCtxt)
         let aa = AliasAnalysis(bridged: bridgedAliasAnalysis, context: context)
-        let addr = bridgedAddr.value.allContainedAddresss
+        let addr = bridgedAddr.value.allContainedAddresses
 
         // This is similar to `canReferenceSameFieldFn`, except that all addresses of all objects are
         // considered which are transitively visible from `bridgedObj`.
@@ -253,8 +253,17 @@ struct AliasAnalysis {
     case let storeBorrow as StoreBorrowInst:
       return memLoc.mayAlias(with: storeBorrow.destination, self) ? .init(write: true) : .noEffects
 
-    case let mdi as MarkDependenceInstruction:
+    case let mdi as MarkDependenceInst:
       if mdi.base.type.isAddress && memLoc.mayAlias(with: mdi.base, self) {
+        return .init(read: true)
+      }
+      return .noEffects
+
+    case let mdai as MarkDependenceAddrInst:
+      if memLoc.mayAlias(with: mdai.address, self) {
+        return .init(read: true, write: true)
+      }
+      if mdai.base.type.isAddress && memLoc.mayAlias(with: mdai.base, self) {
         return .init(read: true)
       }
       return .noEffects
@@ -262,8 +271,8 @@ struct AliasAnalysis {
     case let copy as SourceDestAddrInstruction:
       let mayRead = memLoc.mayAlias(with: copy.source, self)
       let mayWrite = memLoc.mayAlias(with: copy.destination, self)
-      var effects = SideEffects.Memory(read: mayRead, write: mayWrite || (mayRead && copy.isTakeOfSrc))
-      if !copy.isInitializationOfDest {
+      var effects = SideEffects.Memory(read: mayRead, write: mayWrite || (mayRead && copy.isTakeOfSource))
+      if !copy.isInitializationOfDestination {
         effects.merge(with: defaultEffects(of: copy, on: memLoc))
       }
       return effects
@@ -318,7 +327,8 @@ struct AliasAnalysis {
       return defaultEffects(of: endBorrow, on: memLoc)
 
     case let debugValue as DebugValueInst:
-      if debugValue.operand.value.type.isAddress && memLoc.mayAlias(with: debugValue.operand.value, self) {
+      let v = debugValue.operand.value
+      if v.type.isAddress, !(v is Undef), memLoc.mayAlias(with: v, self) {
         return .init(read: true)
       } else {
         return .noEffects
@@ -329,7 +339,7 @@ struct AliasAnalysis {
         return .noEffects
       }
       if destroy.isDeadEnd {
-        // We don't have to take deinit effects into acount for a `destroy_value [dead_end]`.
+        // We don't have to take deinit effects into account for a `destroy_value [dead_end]`.
         // Such destroys are lowered to no-ops and will not call any deinit.
         return .noEffects
       }
@@ -358,7 +368,7 @@ struct AliasAnalysis {
       return defaultEffects(of: endBorrow, on: memLoc)
     case .box, .class, .tail:
       // Check if the memLoc is "derived" from the begin_borrow, i.e. is an interior pointer.
-      var walker = FindBeginBorrowWalker(beginBorrow: endBorrow.borrow as! BorrowIntroducingInstruction)
+      var walker = FindBeginBorrowWalker(beginBorrow: endBorrow.borrow as! BeginBorrowInstruction)
       return walker.visitAccessStorageRoots(of: accessPath) ? .noEffects : .worstEffects
     }
   }
@@ -425,6 +435,11 @@ struct AliasAnalysis {
       }
       let callee = builtin.operands[1].value
       return context.calleeAnalysis.getSideEffects(ofCallee: callee).memory
+    case .PrepareInitialization, .ZeroInitializer:
+      if builtin.arguments.count == 1, memLoc.mayAlias(with: builtin.arguments[0], self) {
+        return .init(write: true)
+      }
+      return .noEffects
     default:
       return defaultEffects(of: builtin, on: memLoc)
     }
@@ -456,7 +471,7 @@ struct AliasAnalysis {
   }
 
   // To avoid quadratic complexity for large functions, we limit the amount of work that the EscapeUtils are
-  // allowed to to. This keeps the complexity linear.
+  // allowed to do. This keeps the complexity linear.
   //
   // This arbitrary limit is good enough for almost all functions. It lets
   // the EscapeUtils do several hundred up/down walks which is much more than needed in most cases.
@@ -466,14 +481,14 @@ struct AliasAnalysis {
       for _ in function.instructions { numInsts += 1 }
       cache.estimatedFunctionSize = numInsts
     }
-    return 1000000 / cache.estimatedFunctionSize!
+    return 1_000_000 / cache.estimatedFunctionSize!
   }
 
   /// Returns true if the `instruction` (which in general writes to memory) is immutable in a certain scope,
   /// defined by `address`.
   ///
   /// That means that even if we don't know anything about `instruction`, we can be sure
-  /// that `instruction` cannot write to `address`, if it's inside the addresse's scope.
+  /// that `instruction` cannot write to `address`, if it's inside the address's scope.
   /// An immutable scope is for example a read-only `begin_access`/`end_access` scope.
   /// Another example is a borrow scope of an immutable copy-on-write buffer.
   private func isImmutable(instruction: Instruction, inScopeOf address: Value) -> Bool {
@@ -613,6 +628,14 @@ private enum ImmutableScope {
       if beginAccess.isUnsafe {
         return nil
       }
+
+      // This is a workaround for a bug in the move-only checker: rdar://151841926.
+      // The move-only checker sometimes inserts destroy_addr within read-only static access scopes.
+      // TODO: remove this once the bug is fixed.
+      if beginAccess.isStatic {
+        return nil
+      }
+
       switch beginAccess.accessKind {
       case .read:
         self = .readAccess(beginAccess)
@@ -704,7 +727,7 @@ private enum ImmutableScope {
 }
 
 private struct FindBeginBorrowWalker : ValueUseDefWalker {
-  let beginBorrow: BorrowIntroducingInstruction
+  let beginBorrow: BeginBorrowInstruction
   var walkUpCache = WalkerCache<Path>()
 
   mutating func walkUp(value: Value, path: SmallProjectionPath) -> WalkResult {
@@ -774,7 +797,7 @@ private struct FullApplyEffectsVisitor : EscapeVisitorWithResult {
 
 // In contrast to a full apply, the effects of a partial_apply don't depend on the callee
 // (a partial_apply doesn't call anything, it just creates a thick function pointer).
-// The only effects come from capturing the arguments (either consuming or guaranteeed).
+// The only effects come from capturing the arguments (either consuming or guaranteed).
 private struct PartialApplyEffectsVisitor : EscapeVisitorWithResult {
   let partialApply: PartialApplyInst
   var result = SideEffects.Memory.noEffects

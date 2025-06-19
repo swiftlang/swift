@@ -191,12 +191,14 @@ ModuleDecl *TypeChecker::getStdlibModule(const DeclContext *dc) {
 }
 
 void swift::bindExtensions(ModuleDecl &mod) {
+  bool excludeMacroExpansions = true;
+
   // Utility function to try and resolve the extended type without diagnosing.
   // If we succeed, we go ahead and bind the extension. Otherwise, return false.
   auto tryBindExtension = [&](ExtensionDecl *ext) -> bool {
     assert(!ext->canNeverBeBound() &&
            "Only extensions that can ever be bound get here.");
-    if (auto nominal = ext->computeExtendedNominal()) {
+    if (auto nominal = ext->computeExtendedNominal(excludeMacroExpansions)) {
       nominal->addExtension(ext);
       return true;
     }
@@ -228,20 +230,28 @@ void swift::bindExtensions(ModuleDecl &mod) {
       visitTopLevelDecl(D);
   }
 
-  // Phase 2 - repeatedly go through the worklist and attempt to bind each
-  // extension there, removing it from the worklist if we succeed.
-  bool changed;
-  do {
-    changed = false;
+  auto tryBindExtensions = [&]() {
+    // Phase 2 - repeatedly go through the worklist and attempt to bind each
+    // extension there, removing it from the worklist if we succeed.
+    bool changed;
+    do {
+      changed = false;
 
-    auto last = std::remove_if(worklist.begin(), worklist.end(),
-                               tryBindExtension);
-    if (last != worklist.end()) {
-      worklist.erase(last, worklist.end());
-      changed = true;
-    }
-  } while(changed);
+      auto last = std::remove_if(worklist.begin(), worklist.end(),
+                                 tryBindExtension);
+      if (last != worklist.end()) {
+        worklist.erase(last, worklist.end());
+        changed = true;
+      }
+    } while(changed);
+  };
 
+  tryBindExtensions();
+
+  // If that fails, try again, but this time expand macros.
+  excludeMacroExpansions = false;
+  tryBindExtensions();
+  
   // Any remaining extensions are invalid. They will be diagnosed later by
   // typeCheckDecl().
 }
@@ -283,10 +293,6 @@ TypeCheckPrimaryFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
     // checking.
     (void)AvailabilityScope::getOrBuildForSourceFile(*SF);
 
-    // Before we type check any of the top level code decls, generate the per
-    // file language options.
-    (void)SF->getLanguageOptions();
-
     // Type check the top-level elements of the source file.
     for (auto D : SF->getTopLevelDecls()) {
       if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
@@ -322,7 +328,7 @@ TypeCheckPrimaryFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
     SF->typeCheckDelayedFunctions();
   }
 
-  // If region based isolation is enabled, we diagnose unnecessary
+  // If region-based isolation is enabled, we diagnose unnecessary
   // preconcurrency imports in the SIL pipeline in the
   // DiagnoseUnnecessaryPreconcurrencyImports pass.
   if (!Ctx.LangOpts.hasFeature(Feature::RegionBasedIsolation))

@@ -194,15 +194,12 @@ StdVectorTestSuite.test("VectorOfInt to span").require(.stdlib_6_2).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
 
   let v = Vector([1, 2, 3])
-  // FIXME: remove 'withExtendedLifetime' once lifetime analysis is fixed.
-  withExtendedLifetime(v) {
-    let s = $0.span
-    expectEqual(s.count, 3)
-    expectFalse(s.isEmpty)
-    expectEqual(s[0], 1)
-    expectEqual(s[1], 2)
-    expectEqual(s[2], 3)
-  }
+  let s = v.span
+  expectEqual(s.count, 3)
+  expectFalse(s.isEmpty)
+  expectEqual(s[0], 1)
+  expectEqual(s[1], 2)
+  expectEqual(s[2], 3)
 }
 
 runAllTests()

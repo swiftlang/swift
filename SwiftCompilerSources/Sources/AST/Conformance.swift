@@ -17,7 +17,7 @@ import ASTBridging
 /// members to the type (or extension) members that provide the functionality for the concrete type.
 ///
 ///  TODO: Ideally, `Conformance` should be an enum
-public struct Conformance: CustomStringConvertible, NoReflectionChildren {
+public struct Conformance: CustomStringConvertible, Hashable, NoReflectionChildren {
   public let bridged: BridgedConformance
 
   public init(bridged: BridgedConformance) {
@@ -26,6 +26,14 @@ public struct Conformance: CustomStringConvertible, NoReflectionChildren {
 
   public var description: String {
     return String(taking: bridged.getDebugDescription())
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(bridged.opaqueValue)
+  }
+
+  public static func ==(lhs: Conformance, rhs: Conformance) -> Bool {
+    lhs.bridged.opaqueValue == rhs.bridged.opaqueValue
   }
 
   public var isConcrete: Bool { bridged.isConcrete() }
@@ -37,7 +45,7 @@ public struct Conformance: CustomStringConvertible, NoReflectionChildren {
     return Type(bridged: bridged.getType())
   }
 
-  public var proto: ProtocolDecl {
+  public var `protocol`: ProtocolDecl {
     return bridged.getRequirement().getAs(ProtocolDecl.self)
   }
   public var isSpecialized: Bool {

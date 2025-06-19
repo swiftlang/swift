@@ -1,12 +1,13 @@
 #pragma once
+#include "visibility.h"
 #include <functional>
 
 // FRT or SWIFT_SHARED_REFERENCE type
 struct FRTStruct {
   // Friend function declarations
-  friend FRTStruct *returnInstanceOfFRTStruct(int v); // expected-warning {{'returnInstanceOfFRTStruct' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
-  friend FRTStruct *returnInstanceOfFRTStructWithAttrReturnsRetained(int v); // expected-warning {{'returnInstanceOfFRTStructWithAttrReturnsRetained' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
-  friend FRTStruct *returnInstanceOfFRTStructWithAttrReturnsUnretained(int v); // expected-warning {{'returnInstanceOfFRTStructWithAttrReturnsUnretained' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
+  friend FRTStruct *returnInstanceOfFRTStruct(int v);
+  friend FRTStruct *returnInstanceOfFRTStructWithAttrReturnsRetained(int v);
+  friend FRTStruct *returnInstanceOfFRTStructWithAttrReturnsUnretained(int v);
 } __attribute__((swift_attr("import_reference")))
 __attribute__((swift_attr("retain:retainFRTStruct")))
 __attribute__((swift_attr("release:releaseFRTStruct")));
@@ -178,12 +179,12 @@ __attribute__((swift_attr("unsafe")));
 
 // C++ APIs returning cxx frts (for testing diagnostics)
 struct StructWithAPIsReturningCxxFrt {
-  static FRTStruct *_Nonnull StaticMethodReturningCxxFrt(); // expected-warning {{'StaticMethodReturningCxxFrt' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}} 
+  static FRTStruct *_Nonnull StaticMethodReturningCxxFrt();
   static FRTStruct *_Nonnull StaticMethodReturningCxxFrtWithAnnotation()
       __attribute__((swift_attr("returns_retained")));
 };
 
-FRTStruct *_Nonnull global_function_returning_cxx_frt(); // expected-warning {{'global_function_returning_cxx_frt' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
+FRTStruct *_Nonnull global_function_returning_cxx_frt();
 FRTStruct *_Nonnull global_function_returning_cxx_frt_with_annotations()
     __attribute__((swift_attr("returns_retained")));
 
@@ -302,7 +303,7 @@ public:
   operator-(const FRTOverloadedOperators &other);
 };
 
-FRTOverloadedOperators *_Nonnull returnFRTOverloadedOperators(); // expected-warning {{'returnFRTOverloadedOperators' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
+FRTOverloadedOperators *_Nonnull returnFRTOverloadedOperators();
 
 void retain_FRTOverloadedOperators(FRTOverloadedOperators *_Nonnull v);
 void release_FRTOverloadedOperators(FRTOverloadedOperators *_Nonnull v);
@@ -326,3 +327,126 @@ public:
   FRTStruct *_Nonnull VirtualMethodReturningFRTUnowned() override
       __attribute__((swift_attr("returns_unretained")));
 };
+
+SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
+
+namespace DefaultOwnershipConventionOnCXXForeignRefType {
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:defRetain2")))
+__attribute__((swift_attr("release:defRelease2"))) 
+__attribute__((swift_attr("returned_as_unretained_by_default"))) RefTyDefUnretained {};
+
+RefTyDefUnretained *returnRefTyDefUnretained() {
+  return new RefTyDefUnretained();
+}
+} // namespace DefaultOwnershipConventionOnCXXForeignRefType
+
+void defRetain2(
+    DefaultOwnershipConventionOnCXXForeignRefType::RefTyDefUnretained *v) {};
+void defRelease2(
+    DefaultOwnershipConventionOnCXXForeignRefType::RefTyDefUnretained *v) {};
+
+namespace FunctionAnnotationHasPrecedence {
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:defaultRetain1")))
+__attribute__((swift_attr("release:defaultRelease1")))
+__attribute__((swift_attr("returned_as_unretained_by_default"))) RefTyDefUnretained {};
+
+RefTyDefUnretained *returnRefTyDefUnretained() {
+  return new RefTyDefUnretained();
+}
+RefTyDefUnretained *returnRefTyDefUnretainedAnnotatedRetained()
+    __attribute__((swift_attr("returns_retained"))) {
+  return new RefTyDefUnretained();
+}
+
+} // namespace FunctionAnnotationHasPrecedence
+
+void defaultRetain1(FunctionAnnotationHasPrecedence::RefTyDefUnretained *v) {};
+void defaultRelease1(FunctionAnnotationHasPrecedence::RefTyDefUnretained *v) {};
+
+namespace DefaultOwnershipSuppressUnannotatedAPIWarning {
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:rretain")))
+__attribute__((swift_attr("release:rrelease"))) RefType {};
+
+RefType *returnRefType() { return new RefType(); }
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:dretain")))
+__attribute__((swift_attr("release:drelease"))) 
+__attribute__((swift_attr("returned_as_unretained_by_default"))) RefTyDefUnretained {};
+
+RefTyDefUnretained *returnRefTyDefUnretainedd() { return new RefTyDefUnretained(); }
+
+} // namespace DefaultOwnershipSuppressUnannotatedAPIWarning
+
+void rretain(DefaultOwnershipSuppressUnannotatedAPIWarning::RefType *v) {};
+void rrelease(DefaultOwnershipSuppressUnannotatedAPIWarning::RefType *v) {};
+
+void dretain(
+    DefaultOwnershipSuppressUnannotatedAPIWarning::RefTyDefUnretained *v) {};
+void drelease(
+    DefaultOwnershipSuppressUnannotatedAPIWarning::RefTyDefUnretained *v) {};
+
+namespace DefaultOwnershipInheritance {
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:baseRetain")))
+__attribute__((swift_attr("release:baseRelease")))
+__attribute__((swift_attr("returned_as_unretained_by_default"))) BaseType {};
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:derivedRetain")))
+__attribute__((swift_attr("release:derivedRelease"))) DerivedType
+    : public BaseType {};
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:derivedRetain2")))
+__attribute__((swift_attr("release:derivedRelease2"))) DerivedType2
+    : public DerivedType {};
+
+BaseType *createBaseType() { return new BaseType(); }
+DerivedType *createDerivedType() { return new DerivedType(); }
+DerivedType2 *createDerivedType2() { return new DerivedType2(); }
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:bRetain")))
+__attribute__((swift_attr("release:bRelease"))) BaseTypeNonDefault {};
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:dRetain")))
+__attribute__((swift_attr("release:dRelease"))) DerivedTypeNonDefault
+    : public BaseTypeNonDefault {};
+
+BaseTypeNonDefault *createBaseTypeNonDefault() {
+  return new BaseTypeNonDefault();
+}
+DerivedTypeNonDefault *createDerivedTypeNonDefault() {
+  return new DerivedTypeNonDefault();
+}
+
+DerivedTypeNonDefault *createDerivedTypeNonDefaultUnretained()
+    __attribute__((swift_attr("returns_unretained"))) {
+  return new DerivedTypeNonDefault();
+}
+
+} // namespace DefaultOwnershipInheritance
+
+void baseRetain(DefaultOwnershipInheritance::BaseType *v) {};
+void baseRelease(DefaultOwnershipInheritance::BaseType *v) {};
+
+void derivedRetain(DefaultOwnershipInheritance::DerivedType *v) {};
+void derivedRelease(DefaultOwnershipInheritance::DerivedType *v) {};
+
+void derivedRetain2(DefaultOwnershipInheritance::DerivedType2 *v) {};
+void derivedRelease2(DefaultOwnershipInheritance::DerivedType2 *v) {};
+
+void bRetain(DefaultOwnershipInheritance::BaseTypeNonDefault *v) {};
+void bRelease(DefaultOwnershipInheritance::BaseTypeNonDefault *v) {};
+
+void dRetain(DefaultOwnershipInheritance::DerivedTypeNonDefault *v) {};
+void dRelease(DefaultOwnershipInheritance::DerivedTypeNonDefault *v) {};
+
+SWIFT_END_NULLABILITY_ANNOTATIONS

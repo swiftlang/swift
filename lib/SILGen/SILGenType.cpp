@@ -602,7 +602,7 @@ public:
 
     // Otherwise if we have no witness table yet, create it.
     return SILWitnessTable::create(SGM.M, Linkage, SerializedKind, Conformance,
-                                   Entries, ConditionalConformances);
+                                   Entries, ConditionalConformances, /*specialized=*/false);
   }
 
   void addProtocolConformanceDescriptor() {
@@ -903,6 +903,12 @@ SILFunction *SILGenModule::emitProtocolWitness(
                           witness.getEnterIsolation());
 
   emitLazyConformancesForFunction(f);
+
+  if (auto isolation = getSILFunctionTypeActorIsolation(
+          reqtSubstTy, requirement, witnessRef)) {
+    f->setActorIsolation(*isolation);
+  }
+
   return f;
 }
 
@@ -1008,7 +1014,7 @@ public:
 
     // Create the witness table.
     (void) SILWitnessTable::create(SGM.M, linkage, serialized, conformance,
-                                   entries, /*conditional*/ {});
+                                   entries, /*conditional*/ {}, /*specialized=*/false);
   }
 
   void addProtocolConformanceDescriptor() {}

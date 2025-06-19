@@ -23,7 +23,7 @@ public struct S<T> {
 // CHECK-LLVM:         [[G_METADATA_PACK:%[^,]+]] = alloca [1 x ptr]
 // CHECK-LLVM:         call void @llvm.lifetime.start.p0(
 // CHECK-LLVM-SAME:        ptr [[G_METADATA_PACK]])
-// CHECK-LLVM:         [[G_METADATA_PACK_T_SLOT:%[^,]+]] = getelementptr inbounds [1 x ptr], ptr [[G_METADATA_PACK]]
+// CHECK-LLVM:         [[G_METADATA_PACK_T_SLOT:%[^,]+]] = getelementptr inbounds{{.*}} [1 x ptr], ptr [[G_METADATA_PACK]]
 // CHECK-LLVM:         store ptr [[T_METADATA]], ptr [[G_METADATA_PACK_T_SLOT]]
 // CHECK-LLVM:         [[G_METADATA_RESPONSE:%[^,]+]] = call swiftcc %swift.metadata_response @"$s35pack_metadata_marker_inserter_onone1GVMa"(
 // CHECK-LLVM-SAME:        ptr [[G_METADATA_PACK]])
@@ -72,7 +72,7 @@ public func consume2S<T>(_: consuming S<T>, _: consuming S<T>) {}
 // CHECK-LLVM:         [[S_METADATA:%[^,]+]] = extractvalue %swift.metadata_response [[S_METADATA_RESPONSE]]
 // CHECK-LLVM:         [[S_VWT_ADDR:%[^,]+]] = getelementptr inbounds ptr, ptr [[S_METADATA]], [[INT]] -1
 // CHECK-LLVM:         [[S_VWT:%[^,]+]] = load ptr, ptr [[S_VWT_ADDR]]
-// CHECK-LLVM:         [[S_SIZE_ADDR:%[^,]+]] = getelementptr inbounds %swift.vwtable, ptr 
+// CHECK-LLVM:         [[S_SIZE_ADDR:%[^,]+]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr 
 //  HECK-LLVM-SAME:        [[S_VWT]]
 // CHECK-LLVM:         [[S_SIZE:%[^,]+]] = load [[INT]], ptr [[S_SIZE_ADDR]]
 // CHECK-LLVM:         [[COPY_1_ADDR:%[^,]+]] = alloca i8, [[INT]] [[S_SIZE]]
@@ -83,7 +83,7 @@ public func consume2S<T>(_: consuming S<T>, _: consuming S<T>) {}
 // CHECK-LLVM-SAME:        ptr [[COPY_2_ADDR]])
 // CHECK-LLVM:         call void @llvm.lifetime.start.p0(
 // CHECK-LLVM-SAME:        ptr [[G_METADATA_PACK]])
-// CHECK-LLVM:         [[G_METADATA_PACK_T_SLOT:%[^,]+]] = getelementptr inbounds [1 x ptr], ptr [[G_METADATA_PACK]]
+// CHECK-LLVM:         [[G_METADATA_PACK_T_SLOT:%[^,]+]] = getelementptr inbounds{{.*}} [1 x ptr], ptr [[G_METADATA_PACK]]
 // CHECK-LLVM:         store ptr [[T_METADATA]], ptr [[G_METADATA_PACK_T_SLOT]]
 // CHECK-LLVM:         [[G_METADATA_RESPONSE:%[^,]+]] = call swiftcc %swift.metadata_response @"$s35pack_metadata_marker_inserter_onone1GVMa"(
 // CHECK-LLVM-SAME:        ptr [[G_METADATA_PACK]])

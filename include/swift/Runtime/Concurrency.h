@@ -777,12 +777,12 @@ bool swift_task_invokeSwiftCheckIsolated(SerialExecutorRef executor);
 
 /// Invoke an executor's `isIsolatingCurrentContext` implementation;
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-bool swift_task_isIsolatingCurrentContext(SerialExecutorRef executor);
+int8_t swift_task_isIsolatingCurrentContext(SerialExecutorRef executor);
 
 /// Invoke a Swift executor's `isIsolatingCurrentContext` implementation; returns
 /// `true` if it invoked the Swift implementation, `false` otherwise.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-bool swift_task_invokeSwiftIsIsolatingCurrentContext(SerialExecutorRef executor);
+int8_t swift_task_invokeSwiftIsIsolatingCurrentContext(SerialExecutorRef executor);
 
 /// A count in nanoseconds.
 using JobDelay = unsigned long long;
@@ -1041,12 +1041,6 @@ enum swift_task_is_current_executor_flag : uint64_t {
   /// The routine MUST NOT assert on failure.
   /// Even at the cost of not calling 'checkIsolated' if it is available.
   MustNotAssert = 0x10,
-
-  /// The routine should use 'isIsolatingCurrentContext' function on the
-  /// 'expected' executor instead of `checkIsolated`.
-  ///
-  /// This is a variant of `MustNotAssert`
-  UseIsIsolatingCurrentContext = 0x20,
 };
 
 SWIFT_EXPORT_FROM(swift_Concurrency)
@@ -1069,7 +1063,7 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_startOnMainActor(AsyncTask* job);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_task_startSynchronously(AsyncTask* job, SerialExecutorRef targetExecutor);
+void swift_task_immediate(AsyncTask* job, SerialExecutorRef targetExecutor);
 
 /// Donate this thread to the global executor until either the
 /// given condition returns true or we've run out of cooperative
@@ -1080,7 +1074,8 @@ void swift_task_donateThreadToGlobalExecutorUntil(bool (*condition)(void*),
 
 enum swift_clock_id : int {
   swift_clock_id_continuous = 1,
-  swift_clock_id_suspending = 2
+  swift_clock_id_suspending = 2,
+  swift_clock_id_wall = 3
 };
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)

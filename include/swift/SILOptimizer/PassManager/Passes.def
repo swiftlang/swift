@@ -140,6 +140,13 @@ PASS(StackPromotion, "stack-promotion",
      "Stack Promotion of Class Objects")
 PASS(UpdateBorrowedFrom, "update-borrowed-from",
      "Test pass for update borrowed-from instructions")
+PASS(MandatoryTempRValueElimination, "mandatory-temp-rvalue-elimination",
+     "Mandatory remove short-lived immutable temporary copies")
+PASS(TempRValueElimination, "temp-rvalue-elimination",
+     "Remove short-lived immutable temporary copies")
+PASS(TempLValueElimination, "temp-lvalue-elimination",
+     "Remove short-lived immutable temporary l-values")
+
 // NOTE - ExperimentalSwiftBasedClosureSpecialization and AutodiffClosureSpecialization are a WIP
 PASS(ExperimentalSwiftBasedClosureSpecialization, "experimental-swift-based-closure-specialization",
      "General closure-specialization pass written in Swift")
@@ -160,6 +167,8 @@ MODULE_PASS(StackProtection, "stack-protection",
      "Decides which functions need stack protectors")
 MODULE_PASS(DiagnoseUnknownConstValues, "diagnose-unknown-const-values",
      "Diagnose any '@const' entities which could not be simplified to a compile-time value")
+MODULE_PASS(EmbeddedSwiftDiagnostics, "embedded-swift-diagnostics",
+     "Diagnose violations of Embedded Swift language restrictions")
 
 IRGEN_PASS(AllocStackHoisting, "alloc-stack-hoisting",
            "SIL alloc_stack Hoisting")
@@ -399,10 +408,6 @@ LEGACY_PASS(PerformanceSILLinker, "performance-linker",
      "Deserialize all referenced SIL functions")
 LEGACY_PASS(RawSILInstLowering, "raw-sil-inst-lowering",
      "Lower all raw SIL instructions to canonical equivalents.")
-LEGACY_PASS(TempLValueOpt, "temp-lvalue-opt",
-     "Remove short-lived immutable temporary l-values")
-LEGACY_PASS(TempRValueOpt, "temp-rvalue-opt",
-     "Remove short-lived immutable temporary copies")
 LEGACY_PASS(IRGenPrepare, "irgen-prepare",
      "Cleanup SIL in preparation for IRGen")
 LEGACY_PASS(SendNonSendable, "send-non-sendable",

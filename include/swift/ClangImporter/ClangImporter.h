@@ -19,6 +19,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "clang/AST/Attr.h"
 #include "clang/Basic/Specifiers.h"
 #include "llvm/Support/VirtualFileSystem.h"
 
@@ -64,12 +65,14 @@ namespace tooling {
 namespace dependencies {
   struct ModuleDeps;
   struct TranslationUnitDeps;
+  enum class ModuleOutputKind;
   using ModuleDepsGraph = std::vector<ModuleDeps>;
 }
 }
 }
 
 namespace swift {
+enum class ResultConvention : uint8_t;
 class ASTContext;
 class CompilerInvocation;
 class ClangImporterOptions;
@@ -209,8 +212,7 @@ public:
                        bool ignoreClangTarget = false);
 
   std::vector<std::string>
-  getClangDepScanningInvocationArguments(ASTContext &ctx,
-      std::optional<StringRef> sourceFileName = std::nullopt);
+  getClangDepScanningInvocationArguments(ASTContext &ctx);
 
   static std::unique_ptr<clang::CompilerInvocation>
   createClangInvocation(ClangImporter *importer,
@@ -472,11 +474,6 @@ public:
   /// Reads the original source file name from PCH.
   std::string getOriginalSourceFile(StringRef PCHFilename);
 
-  /// Add clang dependency file names.
-  ///
-  /// \param files The list of file to append dependencies to.
-  void addClangInvovcationDependencies(std::vector<std::string> &files);
-
   /// Makes a temporary replica of the ClangImporter's CompilerInstance, reads a
   /// module map into the replica and emits a PCM file for one of the modules it
   /// declares. Delegates to clang for everything except construction of the
@@ -497,53 +494,31 @@ public:
   void verifyAllModules() override;
 
   using RemapPathCallback = llvm::function_ref<std::string(StringRef)>;
-  llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
+  using LookupModuleOutputCallback =
+      llvm::function_ref<std::string(const clang::tooling::dependencies::ModuleDeps &,
+                                     clang::tooling::dependencies::ModuleOutputKind)>;
+  
+  static llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
   bridgeClangModuleDependencies(
+      const ASTContext &ctx,
       clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
       clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
       StringRef moduleOutputPath, StringRef stableModuleOutputPath,
+      LookupModuleOutputCallback LookupModuleOutput,
       RemapPathCallback remapPath = nullptr);
 
   llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
   getModuleDependencies(Identifier moduleName, StringRef moduleOutputPath, StringRef sdkModuleOutputPath,
                         const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
-                        clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
+                        const std::vector<std::string> &swiftModuleClangCC1CommandLineArgs,
                         InterfaceSubContextDelegate &delegate,
                         llvm::PrefixMapper *mapper,
                         bool isTestableImport = false) override;
 
-  void recordBridgingHeaderOptions(
-      ModuleDependencyInfo &MDI,
-      const clang::tooling::dependencies::TranslationUnitDeps &deps);
-
-  void getBridgingHeaderOptions(
+  static void getBridgingHeaderOptions(
+      const ASTContext &ctx,
       const clang::tooling::dependencies::TranslationUnitDeps &deps,
       std::vector<std::string> &swiftArgs);
-
-  /// Query dependency information for header dependencies
-  /// of a binary Swift module.
-  ///
-  /// \param moduleID the name of the Swift module whose dependency
-  /// information will be augmented with information about the given
-  /// textual header inputs.
-  ///
-  /// \param headerPath the path to the header to be scanned.
-  ///
-  /// \param clangScanningTool The clang dependency scanner.
-  ///
-  /// \param cache The module dependencies cache to update, with information
-  /// about new Clang modules discovered along the way.
-  ///
-  /// \returns \c true if an error occurred, \c false otherwise
-  bool getHeaderDependencies(
-      ModuleDependencyID moduleID, std::optional<StringRef> headerPath,
-      std::optional<llvm::MemoryBufferRef> sourceBuffer,
-      clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
-      ModuleDependenciesCache &cache,
-      ModuleDependencyIDSetVector &headerClangModuleDependencies,
-      std::vector<std::string> &headerFileInputs,
-      std::vector<std::string> &bridgingHeaderCommandLine,
-      std::optional<std::string> &includeTreeID);
 
   clang::TargetInfo &getModuleAvailabilityTarget() const override;
   clang::ASTContext &getClangASTContext() const override;
@@ -682,6 +657,8 @@ public:
   ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
                                   ClangInheritanceInfo inheritance) override;
 
+  bool isClonedMemberDecl(ValueDecl *decl) override;
+
   /// Emits diagnostics for any declarations named name
   /// whose direct declaration context is a TU.
   void diagnoseTopLevelValue(const DeclName &name) override;
@@ -689,12 +666,6 @@ public:
   /// Emit diagnostics for declarations named name that are members
   /// of the provided baseType.
   void diagnoseMemberValue(const DeclName &name, const Type &baseType) override;
-
-  /// Enable the symbolic import experimental feature for the given callback.
-  void withSymbolicFeatureEnabled(llvm::function_ref<void(void)> callback);
-
-  /// Returns true when the symbolic import experimental feature is enabled.
-  bool isSymbolicImportEnabled() const;
 
   const clang::TypedefType *getTypeDefForCXXCFOptionsDefinition(
       const clang::Decl *candidateDecl) override;
@@ -786,6 +757,104 @@ bool declIsCxxOnly(const Decl *decl);
 
 /// Is this DeclContext an `enum` that represents a C++ namespace?
 bool isClangNamespace(const DeclContext *dc);
+
+/// For some \a templatedClass that inherits from \a base, whether they are
+/// derived from the same class template.
+///
+/// This kind of circular inheritance can happen when a templated class inherits
+/// from a specialization of itself, e.g.:
+///
+///     template <typename T> class C;
+///     template <> class C<void> { /* ... */ };
+///     template <typename T> class C<T> : C<void> { /* ... */ };
+///
+/// Checking for this kind of scenario is necessary for avoiding infinite
+/// recursion during symbolic imports (importSymbolicCXXDecls), where
+/// specialized class templates are instead imported as unspecialized.
+bool isSymbolicCircularBase(const clang::CXXRecordDecl *templatedClass,
+                            const clang::RecordDecl *base);
+
+/// Match a `[[swift_attr("...")]]` annotation on the given Clang decl.
+///
+/// \param decl The Clang declaration to inspect.
+/// \param patterns List of (attribute name, value) pairs.
+/// \returns The value for the first matching attribute, or `std::nullopt`.
+template <typename T>
+std::optional<T>
+matchSwiftAttr(const clang::Decl *decl,
+               llvm::ArrayRef<std::pair<llvm::StringRef, T>> patterns) {
+  if (!decl || !decl->hasAttrs())
+    return std::nullopt;
+
+  for (const auto *attr : decl->getAttrs()) {
+    if (const auto *swiftAttr = llvm::dyn_cast<clang::SwiftAttrAttr>(attr)) {
+      for (const auto &p : patterns) {
+        if (swiftAttr->getAttribute() == p.first)
+          return p.second;
+      }
+    }
+  }
+  return std::nullopt;
+}
+
+/// Like `matchSwiftAttr`, but also searches C++ base classes.
+///
+/// \param decl The Clang declaration to inspect.
+/// \param patterns List of (attribute name, value) pairs.
+/// \returns The matched value from this decl or its bases, or `std::nullopt`.
+template <typename T>
+std::optional<T> matchSwiftAttrConsideringInheritance(
+    const clang::Decl *decl,
+    llvm::ArrayRef<std::pair<llvm::StringRef, T>> patterns) {
+  if (!decl)
+    return std::nullopt;
+
+  if (auto match = matchSwiftAttr<T>(decl, patterns))
+    return match;
+
+  if (const auto *recordDecl = llvm::dyn_cast<clang::CXXRecordDecl>(decl)) {
+    std::optional<T> result;
+    recordDecl->forallBases([&](const clang::CXXRecordDecl *base) -> bool {
+      if (auto baseMatch = matchSwiftAttr<T>(base, patterns)) {
+        result = baseMatch;
+        return false;
+      }
+
+      return true;
+    });
+
+    return result;
+  }
+
+  return std::nullopt;
+}
+
+/// Matches a `swift_attr("...")` on the record type pointed to by the given
+/// Clang type, searching base classes if it's a C++ class.
+///
+/// \param type A Clang pointer type.
+/// \param patterns List of attribute name-value pairs to match.
+/// \returns Matched value or std::nullopt.
+template <typename T>
+std::optional<T> matchSwiftAttrOnRecordPtr(
+    const clang::QualType &type,
+    llvm::ArrayRef<std::pair<llvm::StringRef, T>> patterns) {
+  if (const auto *ptrType = type->getAs<clang::PointerType>()) {
+    if (const auto *recordDecl = ptrType->getPointeeType()->getAsRecordDecl()) {
+      return matchSwiftAttrConsideringInheritance<T>(recordDecl, patterns);
+    }
+  }
+  return std::nullopt;
+}
+
+/// Determines the C++ reference ownership convention for the return value
+/// using `SWIFT_RETURNS_(UN)RETAINED` on the API; falls back to
+/// `SWIFT_RETURNED_AS_(UN)RETAINED_BY_DEFAULT` on the pointee record type.
+///
+/// \param decl The Clang function or method declaration to inspect.
+/// \returns Matched `ResultConvention`, or `std::nullopt` if none applies.
+std::optional<ResultConvention>
+getCxxRefConventionWithAttrs(const clang::Decl *decl);
 } // namespace importer
 
 struct ClangInvocationFileMapping {
@@ -806,9 +875,18 @@ struct ClangInvocationFileMapping {
 /// `suppressDiagnostic` prevents us from emitting warning messages when we
 /// are unable to find headers.
 ClangInvocationFileMapping getClangInvocationFileMapping(
-    ASTContext &ctx,
+    const ASTContext &ctx,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs = nullptr,
     bool suppressDiagnostic = false);
+
+/// Apply the given file mapping to the specified 'fileSystem', used
+/// primarily to inject modulemaps on platforms with non-modularized
+/// platform libraries.
+ClangInvocationFileMapping applyClangInvocationMapping(
+    const ASTContext &ctx,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseVFS,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &fileSystem,
+    bool suppressDiagnostics = false);
 
 /// Information used to compute the access level of inherited C++ members.
 class ClangInheritanceInfo {

@@ -42,12 +42,12 @@ ERROR(no_input_files_for_mt,none,
       "no swift input files for multi-threaded compilation", ())
 
 ERROR(alignment_dynamic_type_layout_unsupported,none,
-      "@_alignment is not supported on types with dynamic layout", ())
+      "'@_alignment' is not supported on types with dynamic layout", ())
 ERROR(alignment_less_than_natural,none,
-      "@_alignment cannot decrease alignment below natural alignment of %0",
+      "'@_alignment' cannot decrease alignment below natural alignment of %0",
       (unsigned))
 ERROR(alignment_more_than_maximum,none,
-      "@_alignment cannot increase alignment above maximum alignment of %0",
+      "'@_alignment' cannot increase alignment above maximum alignment of %0",
       (unsigned))
       
 ERROR(temporary_allocation_size_negative,none,

@@ -68,6 +68,7 @@
 #include "llvm/Support/SaveAndRestore.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
+#include <optional>
 
 using namespace swift;
 
@@ -847,49 +848,6 @@ SourceFile *ModuleDecl::getSourceFileContainingLocation(SourceLoc loc) {
   return nullptr;
 }
 
-std::pair<unsigned, SourceLoc>
-ModuleDecl::getOriginalLocation(SourceLoc loc) const {
-  assert(loc.isValid());
-
-  SourceManager &SM = getASTContext().SourceMgr;
-  unsigned bufferID = SM.findBufferContainingLoc(loc);
-
-  SourceLoc startLoc = loc;
-  unsigned startBufferID = bufferID;
-  while (const GeneratedSourceInfo *info =
-             SM.getGeneratedSourceInfo(bufferID)) {
-    switch (info->kind) {
-#define MACRO_ROLE(Name, Description)  \
-    case GeneratedSourceInfo::Name##MacroExpansion:
-#include "swift/Basic/MacroRoles.def"
-    {
-      // Location was within a macro expansion, return the expansion site, not
-      // the insertion location.
-      if (info->attachedMacroCustomAttr) {
-        loc = info->attachedMacroCustomAttr->getLocation();
-      } else {
-        ASTNode expansionNode = ASTNode::getFromOpaqueValue(info->astNode);
-        loc = expansionNode.getStartLoc();
-      }
-      bufferID = SM.findBufferContainingLoc(loc);
-      break;
-    }
-    case GeneratedSourceInfo::DefaultArgument:
-      // No original location as it's not actually in any source file
-    case GeneratedSourceInfo::ReplacedFunctionBody:
-      // There's not really any "original" location for locations within
-      // replaced function bodies. The body is actually different code to the
-      // original file.
-    case GeneratedSourceInfo::PrettyPrinted:
-    case GeneratedSourceInfo::AttributeFromClang:
-      // No original location, return the original buffer/location
-      return {startBufferID, startLoc};
-    }
-  }
-
-  return {bufferID, loc};
-}
-
 ArrayRef<SourceFile *>
 PrimarySourceFilesRequest::evaluate(Evaluator &evaluator,
                                     ModuleDecl *mod) const {
@@ -1431,11 +1389,11 @@ SourceFile::getExternalRawLocsForDecl(const Decl *D) const {
   bool InGeneratedBuffer =
       !SM.rangeContainsTokenLoc(SM.getRangeForBuffer(BufferID), MainLoc);
   if (InGeneratedBuffer) {
-    unsigned UnderlyingBufferID;
-    std::tie(UnderlyingBufferID, MainLoc) =
-        D->getModuleContext()->getOriginalLocation(MainLoc);
-    if (BufferID != UnderlyingBufferID)
-      return std::nullopt;
+    if (auto R = getUnexpandedMacroRange(SM, MainLoc)) {
+      if (BufferID != SM.findBufferContainingLoc(R.Start))
+        return std::nullopt;
+      MainLoc = R.Start;
+    }
   }
 
   auto setLoc = [&](ExternalSourceLocs::RawLoc &RawLoc, SourceLoc Loc) {
@@ -2015,6 +1973,10 @@ StringRef ModuleDecl::getModuleLoadedFilename() const {
 
 bool ModuleDecl::isStdlibModule() const {
   return !getParent() && getName() == getASTContext().StdlibModuleName;
+}
+
+bool ModuleDecl::isCxxModule() const {
+  return !getParent() && getName() == getASTContext().Id_Cxx;
 }
 
 bool ModuleDecl::isConcurrencyModule() const {
@@ -3109,7 +3071,7 @@ bool SourceFile::isImportedAsSPI(const ValueDecl *targetDecl) const {
   return false;
 }
 
-bool ModuleDecl::isImportedAsSPI(const SpecializeAttr *attr,
+bool ModuleDecl::isImportedAsSPI(const AbstractSpecializeAttr *attr,
                                  const ValueDecl *targetDecl) const {
   auto declSPIGroups = attr->getSPIGroups();
   if (shouldImplicitImportAsSPI(declSPIGroups))
@@ -3829,6 +3791,12 @@ bool SourceFile::FileIDStr::matches(const SourceFile *file) const {
          fileName == llvm::sys::path::filename(file->getFilename());
 }
 
+std::optional<DefaultIsolation> SourceFile::getDefaultIsolation() const {
+  auto &ctx = getASTContext();
+  return evaluateOrDefault(
+      ctx.evaluator, DefaultIsolationInSourceFileRequest{this}, std::nullopt);
+}
+
 namespace {
 class LocalTypeDeclCollector : public ASTWalker {
   SmallVectorImpl<TypeDecl *> &results;
@@ -4180,283 +4148,4 @@ version::Version ModuleDecl::getLanguageVersionBuiltWith() const {
   }
 
   return version::Version();
-}
-
-//===----------------------------------------------------------------------===//
-//                            MARK: SwiftSettings
-//===----------------------------------------------------------------------===//
-
-static llvm::cl::opt<bool> AllowForDuplicateSwiftSettings(
-    "swift-settings-allow-duplicates",
-    llvm::cl::desc("Option that allows for duplicate SwiftSettings. Just for "
-                   "compiler testing"),
-    llvm::cl::Hidden);
-
-namespace {
-
-enum class SwiftSettingKind {
-  Unknown = 0,
-  DefaultIsolation,
-
-  LastKind = DefaultIsolation,
-};
-
-struct SwiftSettingsWalker : ASTWalker {
-  SourceFile &sf;
-  ASTContext &ctx;
-  SourceFileLangOptions result;
-
-  SmallVector<Expr *, 1> swiftSettingIndexToOriginalExprMap;
-
-  SwiftSettingsWalker(SourceFile &sf, ASTContext &ctx)
-      : sf(sf), ctx(ctx), result() {
-    // NOTE: We do not store a value for Unknown.
-    for (unsigned i : range(unsigned(SwiftSettingKind::LastKind))) {
-      (void)i;
-      swiftSettingIndexToOriginalExprMap.push_back(nullptr);
-    }
-  }
-
-  Expr *&getOriginalSwiftSetting(SwiftSettingKind kind) {
-    assert(kind != SwiftSettingKind::Unknown);
-    return swiftSettingIndexToOriginalExprMap[unsigned(kind) - 1];
-  }
-
-  /// Given a specific CallExpr, pattern matches the CallExpr's first argument
-  /// to validate it is MainActor.self. Returns CanType() if the CallExpr has
-  /// multiple parameters or if its first parameter is not a MainActor.self.
-  ///
-  /// This is used when pattern matching against
-  /// .defaultIsolation(MainActor.self).
-  CanType patternMatchDefaultIsolationMainActor(CallExpr *callExpr);
-
-  /// Validates that macroExpr is a well formed "SwiftSettings" macro. Returns
-  /// true if we can process it and false otherwise.
-  bool isSwiftSettingsMacroExpr(MacroExpansionExpr *macroExpr);
-
-  /// Given a specific \p arg to a SwiftSettings macro, attempt to lookup the
-  /// static method on SwiftSetting. Returns nullptr on failure.
-  std::optional<std::pair<CallExpr *, FuncDecl *>>
-  getSwiftSettingArgDecl(Argument arg);
-
-  PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
-    // First see if we have a "SwiftSettings" macro expansion expr. If we do not
-    // there is no further work to do... just continue.
-    auto *macroExpr = dyn_cast<MacroExpansionExpr>(expr);
-    if (!macroExpr || !isSwiftSettingsMacroExpr(macroExpr))
-      return Action::SkipChildren(expr);
-
-    // Ok, we found our SwiftSettingsMacro. Lets start pattern matching.
-    bool emittedDiagnostic = false;
-    for (auto arg : *macroExpr->getArgs()) {
-      // If we did not find any macro, we emit an unknown macro error. We use
-      // SWIFT_DEFER so we can use early exits below and ensure we always
-      // perform the check.
-      bool foundValidArg = false;
-      SWIFT_DEFER {
-        if (!foundValidArg) {
-          emittedDiagnostic = true;
-          ctx.Diags.diagnose(arg.getStartLoc(),
-                             diag::swift_settings_invalid_setting);
-        }
-      };
-
-      auto calleeFuncDecl = getSwiftSettingArgDecl(arg);
-      if (!calleeFuncDecl)
-        continue;
-      CallExpr *callExpr;
-      FuncDecl *funcDecl;
-      std::tie(callExpr, funcDecl) = *calleeFuncDecl;
-
-      auto kind =
-          llvm::StringSwitch<SwiftSettingKind>(
-              funcDecl->getBaseIdentifier().get())
-              .Case("defaultIsolation", SwiftSettingKind::DefaultIsolation)
-              .Default(SwiftSettingKind::Unknown);
-      switch (kind) {
-      case SwiftSettingKind::Unknown:
-        // Emit error.
-        continue;
-
-      case SwiftSettingKind::DefaultIsolation:
-        auto *&expr =
-            getOriginalSwiftSetting(SwiftSettingKind::DefaultIsolation);
-
-        // If we already have an expr, emit an error and continue.
-        if (!AllowForDuplicateSwiftSettings && expr) {
-          ctx.Diags.diagnose(arg.getStartLoc(),
-                             diag::swift_settings_duplicate_setting);
-          ctx.Diags.diagnose(
-              expr->getLoc(),
-              diag::swift_settings_duplicate_setting_original_loc);
-          foundValidArg = true;
-          continue;
-        }
-
-        // Otherwise, set things up appropriately.
-        if (auto actor = patternMatchDefaultIsolationMainActor(callExpr)) {
-          expr = callExpr;
-          result.defaultIsolation = actor;
-          foundValidArg = true;
-          continue;
-        }
-
-        if (isa<NilLiteralExpr>(callExpr->getArgs()->getExpr(0))) {
-          expr = callExpr;
-          result.defaultIsolation = {Type()};
-          foundValidArg = true;
-          continue;
-        }
-
-        continue;
-      }
-    }
-
-    return Action::SkipChildren(expr);
-  }
-};
-
-} // namespace
-
-bool SwiftSettingsWalker::isSwiftSettingsMacroExpr(
-    MacroExpansionExpr *macroExpr) {
-  // First make sure we actually have a macro with the name SwiftSettings.
-  if (!macroExpr->getMacroName().getBaseName().getIdentifier().is(
-          "SwiftSettings"))
-    return false;
-
-  // Ok, we found a SwiftSettings macro. Perform an unqualified lookup to find
-  // the decl.
-  SmallVector<MacroDecl *, 1> macroDecls;
-  namelookup::forEachPotentialResolvedMacro(
-      sf.getModuleScopeContext(), macroExpr->getMacroName(),
-      MacroRole::Declaration,
-      [&](MacroDecl *decl, const MacroRoleAttr *) -> void {
-        macroDecls.push_back(decl);
-      });
-
-  // If we have multiple macroDecls, we must have some other macro called
-  // SwiftSettings. Let that take precedence and do not emit anything. The
-  // user can always specify Swift.SwiftSettings if needed?
-  if (macroDecls.size() != 1)
-    return false;
-
-  // Ok, we only found one macroDecl. Make sure that it is from the stdlib. If
-  // not, something weird is happening... we can just skip the children.
-  auto *macroDecl = macroDecls.pop_back_val();
-  if (!macroDecl->isStdlibDecl())
-    return false;
-
-  // Validate the form of our macroDef. We use assert instead of ASSERT since we
-  // go through the request evaluator when we call getDefinition().
-#ifndef NDEBUG
-  auto macroDef = macroDecl->getDefinition();
-  assert(macroDef.kind == MacroDefinition::Kind::Builtin &&
-         macroDef.getBuiltinKind() == BuiltinMacroKind::SwiftSettingsMacro &&
-         "SwiftSettings macro from the stdlib that is not the actual builtin "
-         "macro?!");
-#endif
-
-  // We found a good SwiftSettings macro!
-  return true;
-}
-
-std::optional<std::pair<CallExpr *, FuncDecl *>>
-SwiftSettingsWalker::getSwiftSettingArgDecl(Argument arg) {
-  auto *callExpr = dyn_cast<CallExpr>(arg.getExpr());
-  if (!callExpr)
-    return {};
-
-  auto *directCallee =
-      dyn_cast<UnresolvedMemberExpr>(callExpr->getDirectCallee());
-  if (!directCallee)
-    return {};
-
-  // Now lookup our swiftSettingDecl.
-  NominalTypeDecl *swiftSettingsDecl = nullptr;
-  {
-    SmallVector<ValueDecl *, 1> decls;
-    ctx.lookupInSwiftModule("SwiftSetting", decls);
-
-    // We should always have only one decl and it should be a nominal type
-    // decl.
-    if (decls.size() != 1)
-      return {};
-    swiftSettingsDecl = dyn_cast<NominalTypeDecl>(decls.pop_back_val());
-    if (!swiftSettingsDecl)
-      return {};
-  }
-  assert(swiftSettingsDecl);
-
-  // We have our callee, perform qualified name lookup for it on
-  // SwiftSetting.
-  DirectLookupDescriptor lookupDesc{
-      swiftSettingsDecl, directCallee->getName().getFullName(),
-      NominalTypeDecl::LookupDirectFlags::ExcludeMacroExpansions};
-  auto lookup =
-      evaluateOrDefault(ctx.evaluator, DirectLookupRequest{lookupDesc, {}}, {});
-  if (lookup.empty())
-    return {};
-
-  auto *f = dyn_cast<FuncDecl>(lookup.front());
-  if (!f)
-    return {};
-
-  return {{callExpr, f}};
-}
-
-CanType
-SwiftSettingsWalker::patternMatchDefaultIsolationMainActor(CallExpr *callExpr) {
-  // Grab the dot self expr.
-  auto *selfExpr = dyn_cast<DotSelfExpr>(callExpr->getArgs()->getExpr(0));
-  if (!selfExpr)
-    return CanType();
-
-  // Then validate we have something that is MainActor.
-  auto *declRefExpr = dyn_cast<UnresolvedDeclRefExpr>(selfExpr->getSubExpr());
-  if (!declRefExpr ||
-      !declRefExpr->getName().getBaseName().getIdentifier().is("MainActor"))
-    return CanType();
-
-  // Then use unqualified lookup descriptor to find our MainActor.
-  UnqualifiedLookupDescriptor lookupDesc{
-      declRefExpr->getName(), sf.getModuleScopeContext(), SourceLoc(),
-      UnqualifiedLookupFlags::ExcludeMacroExpansions};
-  auto lookup = evaluateOrDefault(ctx.evaluator,
-                                  UnqualifiedLookupRequest{lookupDesc}, {});
-  if (lookup.allResults().empty())
-    return CanType();
-
-  // Then grab our nominal type decl and make sure it is from the concurrency
-  // module.
-  auto *nomDecl =
-      dyn_cast<NominalTypeDecl>(lookup.allResults().front().getValueDecl());
-  if (!nomDecl)
-    return CanType();
-  auto *nomDeclDC = nomDecl->getDeclContext();
-  auto *nomDeclModule = nomDecl->getParentModule();
-  if (!nomDeclDC->isModuleScopeContext() || !nomDeclModule->isConcurrencyModule())
-    return CanType();
-
-  return nomDecl->getDeclaredType()->getCanonicalType();
-}
-
-SourceFileLangOptions
-SourceFileLangOptionsRequest::evaluate(Evaluator &evaluator,
-                                       SourceFile *f) const {
-  SwiftSettingsWalker walker(*f, f->getASTContext());
-
-  if (!f->getASTContext().LangOpts.hasFeature(Feature::SwiftSettings))
-    return walker.result;
-
-  for (auto *decl : f->getTopLevelDecls())
-    decl->walk(walker);
-
-  return walker.result;
-}
-
-SourceFileLangOptions SourceFile::getLanguageOptions() const {
-  auto &eval = getASTContext().evaluator;
-  auto *self = const_cast<SourceFile *>(this);
-  return evaluateOrDefault(eval, SourceFileLangOptionsRequest{self}, {});
 }

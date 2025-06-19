@@ -16,6 +16,7 @@ import re
 import sys
 import traceback
 from multiprocessing import Lock, Pool, cpu_count, freeze_support
+from typing import Optional
 
 from build_swift.build_swift.constants import SWIFT_SOURCE_ROOT
 
@@ -74,7 +75,7 @@ def check_parallel_results(results, op):
     return fail_count
 
 
-def confirm_tag_in_repo(tag, repo_name):
+def confirm_tag_in_repo(tag, repo_name) -> Optional[str]:
     # type: (str, str) -> str | None
     """Confirm that a given tag exists in a git repository. This function
     assumes that the repository is already a current working directory before
@@ -99,8 +100,15 @@ def confirm_tag_in_repo(tag, repo_name):
 
 
 def find_rev_by_timestamp(timestamp, repo_name, refspec):
+    refspec_exists = True
+    try:
+        shell.run(["git", "rev-parse", "--verify", refspec])
+    except Exception:
+        refspec_exists = False
     args = ["git", "log", "-1", "--format=%H", "--first-parent",
-            '--before=' + timestamp, refspec]
+            '--before=' + timestamp]
+    if refspec_exists:
+        args.append(refspec)
     rev = shell.capture(args).strip()
     if rev:
         return rev
@@ -368,7 +376,7 @@ def update_all_repositories(args, config, scheme_name, scheme_map, cross_repos_p
 
 def obtain_additional_swift_sources(pool_args):
     (args, repo_name, repo_info, repo_branch, remote, with_ssh, scheme_name,
-     skip_history, skip_tags, skip_repository_list) = pool_args
+     skip_history, skip_tags, skip_repository_list, use_submodules) = pool_args
 
     env = dict(os.environ)
     env.update({'GIT_TERMINAL_PROMPT': '0'})
@@ -380,6 +388,11 @@ def obtain_additional_swift_sources(pool_args):
         if skip_history:
             shell.run(['git', 'clone', '--recursive', '--depth', '1',
                        '--branch', repo_branch, remote, repo_name] +
+                      (['--no-tags'] if skip_tags else []),
+                      env=env,
+                      echo=True)
+        elif use_submodules:
+            shell.run(['git', 'submodule', 'add', remote, repo_name] +
                       (['--no-tags'] if skip_tags else []),
                       env=env,
                       echo=True)
@@ -406,7 +419,7 @@ def obtain_additional_swift_sources(pool_args):
 
 def obtain_all_additional_swift_sources(args, config, with_ssh, scheme_name,
                                         skip_history, skip_tags,
-                                        skip_repository_list):
+                                        skip_repository_list, use_submodules):
 
     pool_args = []
     with shell.pushd(args.source_root, dry_run=False, echo=False):
@@ -416,7 +429,20 @@ def obtain_all_additional_swift_sources(args, config, with_ssh, scheme_name,
                       "user")
                 continue
 
-            if os.path.isdir(os.path.join(repo_name, ".git")):
+            if use_submodules:
+              repo_exists = False
+              submodules_status = shell.capture(['git', 'submodule', 'status'],
+                                                echo=False)
+              if submodules_status:
+                for line in submodules_status.splitlines():
+                  if line[0].endswith(repo_name):
+                    repo_exists = True
+                    break
+
+            else:
+              repo_exists = os.path.isdir(os.path.join(repo_name, ".git"))
+
+            if repo_exists:
                 print("Skipping clone of '" + repo_name + "', directory "
                       "already exists")
                 continue
@@ -450,16 +476,25 @@ def obtain_all_additional_swift_sources(args, config, with_ssh, scheme_name,
             if repo_not_in_scheme:
                 continue
 
-            pool_args.append([args, repo_name, repo_info, repo_branch, remote,
+
+            new_args = [args, repo_name, repo_info, repo_branch, remote,
                               with_ssh, scheme_name, skip_history, skip_tags,
-                              skip_repository_list])
+                              skip_repository_list, use_submodules]
 
-    if not pool_args:
-        print("Not cloning any repositories.")
-        return
+            if use_submodules:
+              obtain_additional_swift_sources(new_args)
+            else:
+              pool_args.append(new_args)
 
-    return run_parallel(
-        obtain_additional_swift_sources, pool_args, args.n_processes)
+    # Only use `run_parallel` when submodules are not used, since `.git` dir
+    # can't be accessed concurrently.
+    if not use_submodules:
+      if not pool_args:
+          print("Not cloning any repositories.")
+          return
+
+      return run_parallel(
+          obtain_additional_swift_sources, pool_args, args.n_processes)
 
 
 def dump_repo_hashes(args, config, branch_scheme_name='repro'):
@@ -672,6 +707,10 @@ repositories.
         help="The root directory to checkout repositories",
         default=SWIFT_SOURCE_ROOT,
         dest='source_root')
+    parser.add_argument(
+        "--use-submodules",
+        help="Checkout repositories as git submodules.",
+        action='store_true')
     args = parser.parse_args()
 
     if not args.scheme:
@@ -693,6 +732,7 @@ repositories.
     scheme_name = args.scheme
     github_comment = args.github_comment
     all_repos = args.all_repositories
+    use_submodules = args.use_submodules
 
     with open(args.config) as f:
         config = json.load(f)
@@ -726,7 +766,8 @@ repositories.
                                                             scheme_name,
                                                             skip_history,
                                                             skip_tags,
-                                                            skip_repo_list)
+                                                            skip_repo_list,
+                                                            use_submodules)
 
     swift_repo_path = os.path.join(args.source_root, 'swift')
     if 'swift' not in skip_repo_list and os.path.exists(swift_repo_path):

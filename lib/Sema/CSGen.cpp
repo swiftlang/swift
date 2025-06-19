@@ -1085,7 +1085,12 @@ namespace {
           baseObjTy = baseObjTy->getWithoutSpecifierType();
         }
 
-        if (auto elementTy = baseObjTy->isArrayType()) {
+        auto elementTy = baseObjTy->getArrayElementType();
+
+        if (!elementTy)
+          elementTy = baseObjTy->getInlineArrayElementType();
+
+        if (elementTy) {
 
           if (auto arraySliceTy = 
                 dyn_cast<ArraySliceType>(baseObjTy.getPointer())) {
@@ -1723,9 +1728,6 @@ namespace {
     }
 
     Type visitTypeValueExpr(TypeValueExpr *E) {
-      auto ty = E->getParamDecl()->getDeclaredInterfaceType();
-      auto paramType = CS.DC->mapTypeIntoContext(ty);
-      E->setParamType(paramType);
       return E->getParamDecl()->getValueType();
     }
 
@@ -1936,7 +1938,11 @@ namespace {
       SmallVector<Type, 2> specializationArgTypes;
       auto options =
           TypeResolutionOptions(TypeResolverContext::InExpression);
-      for (auto specializationArg : specializationArgs) {
+      ConstraintLocatorBuilder locBuilder(locator);
+      for (auto idx : indices(specializationArgs)) {
+        auto specializationArg = specializationArgs[idx];
+        auto argLocator =
+            locBuilder.withPathElement(LocatorPathElt::GenericArgument(idx));
         PackExpansionExpr *elementEnv = nullptr;
         if (!OuterExpansions.empty()) {
           options |= TypeResolutionFlags::AllowPackReferences;
@@ -1945,9 +1951,9 @@ namespace {
         auto result = TypeResolution::resolveContextualType(
             specializationArg, CurDC, options,
             // Introduce type variables for unbound generics.
-            OpenUnboundGenericType(CS, locator),
-            HandlePlaceholderType(CS, locator),
-            OpenPackElementType(CS, locator, elementEnv));
+            OpenUnboundGenericType(CS, argLocator),
+            HandlePlaceholderType(CS, argLocator),
+            OpenPackElementType(CS, argLocator, elementEnv));
         if (result->hasError()) {
           auto &ctxt = CS.getASTContext();
           result = PlaceholderType::get(ctxt, specializationArg);
@@ -2154,18 +2160,28 @@ namespace {
       };
 
       // If a contextual type exists for this expression, apply it directly.
-      if (contextualType && contextualType->isArrayType()) {
+      if (contextualType &&
+          (contextualType->getArrayElementType() ||
+           contextualType->getInlineArrayElementType())) {
         // Now that we know we're actually going to use the type, get the
         // version for use in a constraint.
         contextualType = CS.getContextualType(expr, /*forConstraint=*/true);
         // FIXME: This is the wrong place to be opening the opaque type.
         contextualType = CS.openOpaqueType(
             contextualType, contextualPurpose, locator, /*ownerDecl=*/nullptr);
-        Type arrayElementType = contextualType->isArrayType();
+
+        Type eltType;
+
+        if (contextualType->isArray())
+          eltType = contextualType->getArrayElementType();
+
+        if (contextualType->isInlineArray())
+          eltType = contextualType->getInlineArrayElementType();
+
         CS.addConstraint(ConstraintKind::LiteralConformsTo, contextualType,
                          arrayProto->getDeclaredInterfaceType(),
                          locator);
-        joinElementTypes(arrayElementType);
+        joinElementTypes(eltType);
         return contextualType;
       }
 
@@ -4056,8 +4072,8 @@ namespace {
     }
 
     /// Lookup all macros with the given macro name.
-    SmallVector<OverloadChoice, 1> lookupMacros(Identifier moduleName,
-                                                Identifier macroName,
+    SmallVector<OverloadChoice, 1> lookupMacros(DeclName moduleName,
+                                                DeclName macroName,
                                                 FunctionRefInfo functionRefInfo,
                                                 MacroRoles roles) {
       SmallVector<OverloadChoice, 1> choices;
@@ -4088,8 +4104,8 @@ namespace {
       CS.associateArgumentList(locator, expr->getArgs());
 
       // Look up the macros with this name.
-      auto moduleIdent = expr->getModuleName().getBaseIdentifier();
-      auto macroIdent = expr->getMacroName().getBaseIdentifier();
+      auto moduleIdent = expr->getModuleName().getBaseName();
+      auto macroIdent = expr->getMacroName().getBaseName();
       FunctionRefInfo functionRefInfo = FunctionRefInfo::singleBaseNameApply();
       auto macros = lookupMacros(moduleIdent, macroIdent, functionRefInfo,
                                  expr->getMacroRoles());
@@ -4860,29 +4876,16 @@ bool ConstraintSystem::generateConstraints(
         return convertTypeLocator;
       };
 
-      // Substitute type variables in for placeholder types (and unresolved
-      // types, if allowed).
-      if (allowFreeTypeVariables == FreeTypeVariableBinding::UnresolvedType) {
-        convertType = convertType.transformRec([&](Type type) -> std::optional<Type> {
-          if (type->is<UnresolvedType>() || type->is<PlaceholderType>()) {
-            return Type(createTypeVariable(getLocator(type),
-                                           TVO_CanBindToNoEscape |
-                                               TVO_PrefersSubtypeBinding |
-                                               TVO_CanBindToHole));
-          }
-          return std::nullopt;
-        });
-      } else {
-        convertType = convertType.transformRec([&](Type type) -> std::optional<Type> {
-          if (type->is<PlaceholderType>()) {
-            return Type(createTypeVariable(getLocator(type),
-                                           TVO_CanBindToNoEscape |
-                                               TVO_PrefersSubtypeBinding |
-                                               TVO_CanBindToHole));
-          }
-          return std::nullopt;
-        });
-      }
+      // Substitute type variables in for placeholder types.
+      convertType = convertType.transformRec([&](Type type) -> std::optional<Type> {
+        if (type->is<PlaceholderType>()) {
+          return Type(createTypeVariable(getLocator(type),
+                                         TVO_CanBindToNoEscape |
+                                             TVO_PrefersSubtypeBinding |
+                                             TVO_CanBindToHole));
+        }
+        return std::nullopt;
+      });
 
       addContextualConversionConstraint(expr, convertType, ctp,
                                         convertTypeLocator);

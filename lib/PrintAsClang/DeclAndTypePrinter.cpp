@@ -1795,6 +1795,9 @@ public:
       case PlatformKind::visionOSApplicationExtension:
         plat = "visionos_app_extension";
         break;
+      case PlatformKind::FreeBSD:
+        plat = "freebsd";
+        break;
       case PlatformKind::OpenBSD:
         plat = "openbsd";
         break;
@@ -2289,6 +2292,14 @@ private:
     return false;
   }
 
+  std::optional<PrimitiveTypeMapping::ClangTypeInfo>
+  getKnownType(const TypeDecl *typeDecl) {
+    if (outputLang == OutputLanguageMode::C)
+      return owningPrinter.typeMapping.getKnownCTypeInfo(typeDecl);
+
+    return owningPrinter.typeMapping.getKnownObjCTypeInfo(typeDecl);
+  }
+
   /// If \p typeDecl is one of the standard library types used to map in Clang
   /// primitives and basic types, print out the appropriate spelling and
   /// return true.
@@ -2297,8 +2308,7 @@ private:
   /// for interfacing with C and Objective-C.
   bool printIfKnownSimpleType(const TypeDecl *typeDecl,
                               std::optional<OptionalTypeKind> optionalKind) {
-    auto knownTypeInfo =
-        owningPrinter.typeMapping.getKnownObjCTypeInfo(typeDecl);
+    auto knownTypeInfo = getKnownType(typeDecl);
     if (!knownTypeInfo)
       return false;
     os << knownTypeInfo->name;
@@ -2997,6 +3007,22 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
       return false;
     if (!isEnumExposableToCxx(VD, *this))
       return false;
+  }
+
+  // In C output mode print only the C variant `@cdecl` (no `@_cdecl`),
+  // while in other modes print only `@_cdecl`.
+  std::optional<ForeignLanguage> cdeclKind = std::nullopt;
+  if (auto *FD = dyn_cast<AbstractFunctionDecl>(VD))
+    cdeclKind = FD->getCDeclKind();
+  if (cdeclKind &&
+      (*cdeclKind == ForeignLanguage::C) !=
+       (outputLang == OutputLanguageMode::C))
+    return false;
+
+  // C output mode only accepts @cdecl functions.
+  if (outputLang == OutputLanguageMode::C &&
+      !cdeclKind) {
+    return false;
   }
 
   if (VD->getAttrs().hasAttribute<ImplementationOnlyAttr>())

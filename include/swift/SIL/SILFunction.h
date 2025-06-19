@@ -1218,6 +1218,8 @@ public:
   // Used by the MemoryLifetimeVerifier
   bool argumentMayRead(Operand *argOp, SILValue addr);
 
+  bool isDeinitBarrier();
+
   Purpose getSpecialPurpose() const { return specialPurpose; }
 
   /// Get this function's global_init attribute.

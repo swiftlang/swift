@@ -589,6 +589,7 @@ private:
     case Node::Kind::OutlinedRetain:
     case Node::Kind::OutlinedRelease:
     case Node::Kind::OutlinedInitializeWithTake:
+    case Node::Kind::OutlinedInitializeWithTakeNoValueWitness:
     case Node::Kind::OutlinedInitializeWithCopy:
     case Node::Kind::OutlinedAssignWithTake:
     case Node::Kind::OutlinedAssignWithCopy:
@@ -615,6 +616,7 @@ private:
     case Node::Kind::DependentProtocolConformanceAssociated:
     case Node::Kind::DependentProtocolConformanceInherited:
     case Node::Kind::DependentProtocolConformanceRoot:
+    case Node::Kind::DependentProtocolConformanceOpaque:
     case Node::Kind::ProtocolConformanceRefInTypeModule:
     case Node::Kind::ProtocolConformanceRefInProtocolModule:
     case Node::Kind::ProtocolConformanceRefInOtherModule:
@@ -1516,6 +1518,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::OutlinedInitializeWithTake:
+  case Node::Kind::OutlinedInitializeWithTakeNoValueWitness:
     Printer << "outlined init with take of ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
@@ -3285,6 +3288,12 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << " to ";
     print(Node->getChild(1), depth + 1);
     return nullptr;
+  case Node::Kind::DependentProtocolConformanceOpaque:
+    Printer << "opaque result conformance ";
+    print(Node->getChild(0), depth + 1);
+    Printer << " of ";
+    print(Node->getChild(1), depth + 1);
+    return nullptr;
   case Node::Kind::ProtocolConformanceRefInTypeModule:
     Printer << "protocol conformance ref (type's module) ";
     printChildren(Node, depth);
@@ -3309,7 +3318,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::SugaredInlineArray: {
     Printer << "[";
     print(Node->getChild(0), depth + 1);
-    Printer << " x ";
+    Printer << " of ";
     print(Node->getChild(1), depth + 1);
     Printer << "]";
     return nullptr;

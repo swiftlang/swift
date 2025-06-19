@@ -59,9 +59,9 @@ entry:
 
   //   Write the spilled objects to the buffer.
   // CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 {{.*}}, ptr [[SPILLS]])
-  // CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds [[SPILLS_T]], ptr [[SPILLS]], i32 0, i32 0
+  // CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds{{.*}} [[SPILLS_T]], ptr [[SPILLS]], i32 0, i32 0
   // CHECK-NEXT:    store ptr [[R2]], ptr [[T0]]
-  // CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds [[SPILLS_T]], ptr [[SPILLS]], i32 0, i32 1
+  // CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds{{.*}} [[SPILLS_T]], ptr [[SPILLS]], i32 0, i32 1
   // CHECK-NEXT:    store ptr [[R3]], ptr [[T0]]
 
   //   Suspend.
@@ -101,7 +101,7 @@ sil [ossa] @test_simple_call : $(Builtin.Int1) -> () {
 entry(%flag : $Builtin.Int1):
   //   Allocate the buffer.
   // CHECK:         [[T0:%.*]] = alloca {{\[}}[[BUFFER_SIZE]] x i8], align [[BUFFER_ALIGN]]
-  // CHECK-NEXT:    [[BUFFER:%.*]] = getelementptr inbounds {{\[}}[[BUFFER_SIZE]] x i8], ptr [[T0]], i32 0, i32 0
+  // CHECK-NEXT:    [[BUFFER:%.*]] = getelementptr inbounds{{.*}} {{\[}}[[BUFFER_SIZE]] x i8], ptr [[T0]], i32 0, i32 0
   // CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 [[BUFFER_SIZE]], ptr [[BUFFER]])
 
   // CHECK-NEXT:    [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s18yield_once_biggish12SomeSubclassCMa"([[INT]] 0)
@@ -115,9 +115,9 @@ entry(%flag : $Builtin.Int1):
   // CHECK-NEXT:    [[R0_ORIG:%.*]] = extractvalue [[RAMP_RESULT_T]] [[RAMP_RESULT]], 1
   // CHECK-NEXT:    [[R1_ORIG:%.*]] = extractvalue [[RAMP_RESULT_T]] [[RAMP_RESULT]], 2
   // CHECK-NEXT:    [[SPILLS:%.*]] = extractvalue [[RAMP_RESULT_T]] [[RAMP_RESULT]], 3
-  // CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds [[SPILLS_T]], ptr [[SPILLS]], i32 0, i32 0
+  // CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds{{.*}} [[SPILLS_T]], ptr [[SPILLS]], i32 0, i32 0
   // CHECK-NEXT:    [[R2_ORIG:%.*]] = load ptr, ptr [[T0]], align
-  // CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds [[SPILLS_T]], ptr [[SPILLS]], i32 0, i32 1
+  // CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds{{.*}} [[SPILLS_T]], ptr [[SPILLS]], i32 0, i32 1
   // CHECK-NEXT:    [[R3_ORIG:%.*]] = load ptr, ptr [[T0]], align
   %0 = function_ref @test_simple : $@convention(thin) @yield_once <T: SomeClass> () -> (@yields @owned Biggish<T>)
   (%value, %token) = begin_apply %0<SomeSubclass>() : $@convention(thin) @yield_once <T: SomeClass> () -> (@yields @owned Biggish<T>)

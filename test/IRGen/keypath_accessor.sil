@@ -10,7 +10,7 @@ public struct Blah {
 }
 
 // CHECK: define{{.*}} swiftcc void @"$simple_getter"(
-// CHECK-SAME: ptr{{.*}} sret(%TSi) %0,
+// CHECK-SAME: ptr{{.*}} sret(%TSi){{( captures\(none\))?}} %0,
 // CHECK-SAME: ptr{{.*}} %1,
 // CHECK-SAME: ptr{{.*}} %2, [[INT]] %3)
 sil @$simple_getter : $@convention(keypath_accessor_getter) (@in_guaranteed Blah) -> @out Int {

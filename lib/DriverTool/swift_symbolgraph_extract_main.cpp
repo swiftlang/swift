@@ -203,26 +203,19 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
             .Default(AccessLevel::Public);
   }
 
-  if (auto *A = ParsedArgs.getLastArg(OPT_allow_availability_platforms)) {
+  if (auto *A = ParsedArgs.getLastArg(OPT_allow_availability_platforms,
+        OPT_block_availability_platforms)) {
     llvm::SmallVector<StringRef> AvailabilityPlatforms;
     StringRef(A->getValue())
         .split(AvailabilityPlatforms, ',', /*MaxSplits*/ -1,
                /*KeepEmpty*/ false);
     Options.AvailabilityPlatforms = llvm::DenseSet<StringRef>(
         AvailabilityPlatforms.begin(), AvailabilityPlatforms.end());
-    Options.AvailabilityIsBlockList = false;
-  } else if (auto *A =
-                 ParsedArgs.getLastArg(OPT_block_availability_platforms)) {
-    llvm::SmallVector<StringRef> AvailabilityPlatforms;
-    StringRef(A->getValue())
-        .split(AvailabilityPlatforms, ',', /*MaxSplits*/ -1,
-               /*KeepEmpty*/ false);
-    Options.AvailabilityPlatforms = llvm::DenseSet<StringRef>(
-        AvailabilityPlatforms.begin(), AvailabilityPlatforms.end());
-    Options.AvailabilityIsBlockList = true;
+    Options.AvailabilityIsBlockList = A->getOption().matches(OPT_block_availability_platforms);
   }
 
-  Invocation.getLangOptions().setCxxInteropFromArgs(ParsedArgs, Diags);
+  Invocation.getLangOptions().setCxxInteropFromArgs(ParsedArgs, Diags,
+                                                    Invocation.getFrontendOptions());
 
   std::string InstanceSetupError;
   if (CI.setup(Invocation, InstanceSetupError)) {

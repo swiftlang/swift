@@ -136,7 +136,7 @@ MacroDefinition MacroDefinitionRequest::evaluate(
       SM.getEntireTextForBuffer(sourceFile->getBufferID());
   StringRef macroDeclText =
       SM.extractText(Lexer::getCharSourceRangeFromSourceRange(
-          SM, macro->getSourceRangeIncludingAttrs()));
+          SM, macro->getSourceRange()));
 
   auto checkResult = swift_Macros_checkMacroDefinition(
       &ctx.Diags, sourceFileText, macroDeclText, &externalMacroName,
@@ -183,9 +183,6 @@ MacroDefinition MacroDefinitionRequest::evaluate(
 
   case BridgedBuiltinIsolationMacro:
     return MacroDefinition::forBuiltin(BuiltinMacroKind::IsolationMacro);
-
-  case BridgedBuiltinSwiftSettingsMacro:
-    return MacroDefinition::forBuiltin(BuiltinMacroKind::SwiftSettingsMacro);
   }
 
   // Type-check the macro expansion.
@@ -285,7 +282,7 @@ initializePlugin(ASTContext &ctx, CompilerPlugin *plugin, StringRef libraryPath,
   if (!libraryPath.empty()) {
 #if SWIFT_BUILD_SWIFT_SYNTAX
     llvm::SmallString<128> resolvedLibraryPath;
-    auto fs = ctx.ClangImporterOpts.HasClangIncludeTreeRoot
+    auto fs = ctx.CASOpts.HasImmutableFileSystem
                   ? llvm::vfs::getRealFileSystem()
                   : ctx.SourceMgr.getFileSystem();
     if (auto err = fs->getRealPath(libraryPath, resolvedLibraryPath)) {
@@ -606,7 +603,8 @@ static void diagnoseInvalidDecl(Decl *decl,
       isa<OperatorDecl>(decl) ||
       isa<PrecedenceGroupDecl>(decl) ||
       isa<MacroDecl>(decl) ||
-      isa<ExtensionDecl>(decl)) {
+      isa<ExtensionDecl>(decl) ||
+      isa<UsingDecl>(decl)) {
     decl->diagnose(diag::invalid_decl_in_macro_expansion, decl);
     decl->setInvalid();
 
@@ -1154,14 +1152,6 @@ evaluateFreestandingMacro(FreestandingMacroExpansion *expansion,
           adjustMacroExpansionBufferName(*discriminator));
       break;
     }
-
-    case BuiltinMacroKind::SwiftSettingsMacro: {
-      // Just insert empty scratch space. We are not expanding to anything.
-      std::string scratchSpace;
-      evaluatedSource = llvm::MemoryBuffer::getMemBufferCopy(
-          scratchSpace, adjustMacroExpansionBufferName(*discriminator));
-      break;
-    }
     }
     break;
   }
@@ -1279,9 +1269,6 @@ std::optional<unsigned> swift::expandMacroExpr(MacroExpansionExpr *mee) {
       expandedExpr = new (ctx) CurrentContextIsolationExpr(
           macroBufferRange.getStart(), expandedType);
       break;
-
-    case BuiltinMacroKind::SwiftSettingsMacro:
-      break;
     }
   }
 
@@ -1395,6 +1382,12 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     }
   }
 
+  // Macros are so spectacularly not valid in an `@abi` attribute that we cannot
+  // even attempt to expand them.
+  if (!ABIRoleInfo(attachedTo).providesAPI()) {
+    return nullptr;
+  }
+
   ASTContext &ctx = dc->getASTContext();
 
   auto moduleDecl = dc->getParentModule();
@@ -1494,7 +1487,6 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
     switch (macroDef.getBuiltinKind()) {
     case BuiltinMacroKind::ExternalMacro:
     case BuiltinMacroKind::IsolationMacro:
-    case BuiltinMacroKind::SwiftSettingsMacro:
       // FIXME: Error here.
       return nullptr;
     }
@@ -1647,7 +1639,6 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro,
     switch (macroDef.getBuiltinKind()) {
     case BuiltinMacroKind::ExternalMacro:
     case BuiltinMacroKind::IsolationMacro:
-    case BuiltinMacroKind::SwiftSettingsMacro:
       // FIXME: Error here.
       return nullptr;
     }
@@ -2146,8 +2137,8 @@ std::optional<unsigned> swift::expandExtensions(CustomAttr *attr,
     for (auto i : inheritedTypes.getIndices()) {
       auto constraint =
           TypeResolution::forInterface(
-              extension->getDeclContext(),
-              TypeResolverContext::GenericRequirement,
+              extension,
+              TypeResolverContext::Inherited,
               /*unboundTyOpener*/ nullptr,
               /*placeholderHandler*/ nullptr,
               /*packElementOpener*/ nullptr)

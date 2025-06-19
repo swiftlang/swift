@@ -11,3 +11,9 @@ arr.withUnsafeBufferPointer { ubpointer in
     let _ = ConstSpanOfInt(ubpointer.baseAddress!, ubpointer.count) 
     // expected-warning@-1 {{'init(_:_:)' is deprecated: use 'init(_:)' instead.}}
 }
+
+arr.withUnsafeBufferPointer { ubpointer in 
+    // FIXME: this crashes the compiler once we import span's templated ctors as Swift generics.
+    let _ = ConstSpanOfInt(ubpointer.baseAddress, ubpointer.count)
+    // expected-warning@-1 {{'init(_:_:)' is deprecated: use 'init(_:)' instead.}}
+}

@@ -15,6 +15,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/SourceManager.h"
 
 using namespace swift;
 
@@ -78,6 +79,14 @@ void BridgedDiagnosticEngine_diagnose(
   }
 }
 
+BridgedSourceLoc BridgedDiagnostic_getLocationFromExternalSource(
+    BridgedDiagnosticEngine bridgedEngine, BridgedStringRef path,
+    SwiftInt line, SwiftInt column) {
+  auto *d = bridgedEngine.unbridged();
+  auto loc = d->SourceMgr.getLocFromExternalSource(path.unbridged(), line, column);
+  return BridgedSourceLoc(loc.getOpaquePointerValue());
+}
+
 bool BridgedDiagnosticEngine_hadAnyError(
     BridgedDiagnosticEngine bridgedEngine) {
   return bridgedEngine.unbridged()->hadAnyError();
@@ -109,7 +118,7 @@ struct BridgedDiagnostic::Impl {
 
 BridgedDiagnostic BridgedDiagnostic_create(BridgedSourceLoc cLoc,
                                            BridgedStringRef cText,
-                                           BridgedDiagnosticSeverity severity,
+                                           DiagnosticKind severity,
                                            BridgedDiagnosticEngine cDiags) {
   StringRef origText = cText.unbridged();
   BridgedDiagnostic::Impl::Allocator alloc;
@@ -119,19 +128,16 @@ BridgedDiagnostic BridgedDiagnostic_create(BridgedSourceLoc cLoc,
 
   Diag<StringRef> diagID;
   switch (severity) {
-  case BridgedDiagnosticSeverity::BridgedError:
+  case DiagnosticKind::Error:
     diagID = diag::bridged_error;
     break;
-  case BridgedDiagnosticSeverity::BridgedFatalError:
-    diagID = diag::bridged_fatal_error;
-    break;
-  case BridgedDiagnosticSeverity::BridgedNote:
+  case DiagnosticKind::Note:
     diagID = diag::bridged_note;
     break;
-  case BridgedDiagnosticSeverity::BridgedRemark:
+  case DiagnosticKind::Remark:
     diagID = diag::bridged_remark;
     break;
-  case BridgedDiagnosticSeverity::BridgedWarning:
+  case DiagnosticKind::Warning:
     diagID = diag::bridged_warning;
     break;
   }

@@ -26,6 +26,7 @@
 #include "GenDecl.h"
 #include "GenMeta.h"
 #include "GenOpaque.h"
+#include "GenPointerAuth.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
@@ -277,8 +278,7 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM) {
   SmallVector<GenericFunctionType::Param, 8> parameters;
 
   // A generic parameter that represents instance of invocation decoder.
-  auto *decoderType =
-      GenericTypeParamType::getType(/*depth=*/ 0, /*index=*/ 0, Context);
+  auto decoderType = Context.TheSelfType;
 
   // decoder
   parameters.push_back(GenericFunctionType::Param(
@@ -589,9 +589,26 @@ static llvm::Value *lookupWitnessTable(IRGenFunction &IGF, llvm::Value *witness,
   assert(Lowering::TypeConverter::protocolRequiresWitnessTable(protocol));
 
   auto &IGM = IGF.IGM;
-  auto *protocolDescriptor = IGM.getAddrOfProtocolDescriptor(protocol);
+  llvm::Value *protocolDescriptor = IGM.getAddrOfProtocolDescriptor(protocol);
+
+  bool signedProtocolDescriptor = IGM.getAvailabilityRange().isContainedIn(
+    IGM.Context.getSignedConformsToProtocolAvailability());
+
+  auto conformsToProtocolFunctionPointer = signedProtocolDescriptor ?
+    IGM.getConformsToProtocol2FunctionPointer() :
+    IGM.getConformsToProtocolFunctionPointer();
+
+  // Sign the protocol descriptor.
+  auto schema = IGF.IGM.getOptions().PointerAuth.ProtocolDescriptorsAsArguments;
+  if (schema && signedProtocolDescriptor) {
+    auto authInfo = PointerAuthInfo::emit(
+        IGF, schema, nullptr,
+        PointerAuthEntity::Special::ProtocolDescriptorAsArgument);
+    protocolDescriptor = emitPointerAuthSign(IGF, protocolDescriptor, authInfo);
+  }
+
   auto *witnessTable = IGF.Builder.CreateCall(
-      IGM.getConformsToProtocolFunctionPointer(), {witness, protocolDescriptor});
+      conformsToProtocolFunctionPointer, {witness, protocolDescriptor});
 
   auto failBB = IGF.createBasicBlock("missing-witness");
   auto contBB = IGF.createBasicBlock("");

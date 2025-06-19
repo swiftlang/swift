@@ -1127,7 +1127,7 @@ func rdar17170728() {
   }
 
   let _ = [i, j, k].reduce(0 as Int?) { // expected-error {{missing argument label 'into:' in call}}
-    // expected-error@-1 {{cannot convert value of type 'Int?' to expected argument type '(inout @escaping (Bool, Bool) -> Bool?, Int?) throws -> ()'}}
+    // expected-error@-1 {{cannot convert value of type 'Int?' to expected argument type '(inout (Bool, Bool) -> Bool?, Int?) throws -> ()'}}
     $0 && $1 ? $0 + $1 : ($0 ? $0 : ($1 ? $1 : nil))
     // expected-error@-1 {{binary operator '+' cannot be applied to two 'Bool' operands}}
   }

@@ -529,8 +529,16 @@ void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
 
   unsigned numAttrs = NoBody ? 0 : F.getSpecializeAttrs().size();
   auto resilience = F.getModule().getSwiftModule()->getResilienceStrategy();
-  bool serializeDerivedEffects = (resilience != ResilienceStrategy::Resilient) &&
-                                 !F.hasSemanticsAttr("optimize.no.crossmodule");
+  bool serializeDerivedEffects =
+    // We must not serialize computed effects if library evolution is turned on,
+    // because the copy of the function, which is emitted into the current module,
+    // might have different effects in different versions of the library.
+    (resilience != ResilienceStrategy::Resilient ||
+    // But we can serialize computed effects for @alwaysEmitIntoClient functions,
+    // even when library evolution is enabled, because no copy of the function is
+    // emitted in the original module.
+    F.getLinkage() == SILLinkage::PublicNonABI) &&
+    !F.hasSemanticsAttr("optimize.no.crossmodule");
 
   F.visitArgEffects(
     [&](int effectIdx, int argumentIndex, bool isDerived) {
@@ -1706,6 +1714,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::IsUniqueInst:
   case SILInstructionKind::BeginCOWMutationInst:
   case SILInstructionKind::EndCOWMutationInst:
+  case SILInstructionKind::EndCOWMutationAddrInst:
   case SILInstructionKind::EndInitLetRefInst:
   case SILInstructionKind::HopToExecutorInst:
   case SILInstructionKind::ExtractExecutorInst:
@@ -2168,6 +2177,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::UncheckedTrivialBitCastInst:
   case SILInstructionKind::UncheckedBitwiseCastInst:
   case SILInstructionKind::UncheckedValueCastInst:
+  case SILInstructionKind::VectorBaseAddrInst:
   case SILInstructionKind::BridgeObjectToRefInst:
   case SILInstructionKind::BridgeObjectToWordInst:
   case SILInstructionKind::UpcastInst:
@@ -2226,9 +2236,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   // Checked Conversion instructions.
   case SILInstructionKind::UnconditionalCheckedCastInst: {
     auto CI = cast<UnconditionalCheckedCastInst>(&SI);
-    unsigned flags = 0;
-    if (CI->getIsolatedConformances() == CastingIsolatedConformances::Prohibit)
-      flags |= 0x01;
+    unsigned flags = CI->getCheckedCastOptions().getStorage();
     ValueID listOfValues[] = {
       addValueRef(CI->getOperand()),
       S.addTypeRef(CI->getSourceLoweredType().getRawASTType()),
@@ -2247,9 +2255,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   }
   case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
     auto CI = cast<UnconditionalCheckedCastAddrInst>(&SI);
-    unsigned flags = 0;
-    if (CI->getIsolatedConformances() == CastingIsolatedConformances::Prohibit)
-      flags |= 0x01;
+    unsigned flags = CI->getCheckedCastOptions().getStorage();
     ValueID listOfValues[] = {
       S.addTypeRef(CI->getSourceFormalType()),
       addValueRef(CI->getSrc()),
@@ -2770,8 +2776,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     unsigned flags = 0;
     if (CBI->isExact())
       flags |= 0x01;
-    if (CBI->getIsolatedConformances() == CastingIsolatedConformances::Prohibit)
-      flags |= 0x02;
+    flags |= (CBI->getCheckedCastOptions().getStorage() << 1);
     ValueID listOfValues[] = {
       flags,
       S.addTypeRef(CBI->getSourceFormalType()),
@@ -2795,9 +2800,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::CheckedCastAddrBranchInst: {
     auto CBI = cast<CheckedCastAddrBranchInst>(&SI);
     unsigned flags =
-      toStableCastConsumptionKind(CBI->getConsumptionKind()) << 1;
-    if (CBI->getIsolatedConformances() == CastingIsolatedConformances::Prohibit)
-      flags |= 0x01;
+      toStableCastConsumptionKind(CBI->getConsumptionKind()) << 8;
+    flags |= CBI->getCheckedCastOptions().getStorage();
     ValueID listOfValues[] = {
       flags,
       S.addTypeRef(CBI->getSourceFormalType()),
@@ -3362,6 +3366,7 @@ void SILSerializer::writeSILWitnessTable(const SILWitnessTable &wt) {
     SILAbbrCodes[WitnessTableLayout::Code],
     toStableSILLinkage(wt.getLinkage()),
     unsigned(wt.isDeclaration()),
+    unsigned(wt.isSpecialized()),
     unsigned(wt.getSerializedKind()),
     conformanceID);
 

@@ -43,7 +43,6 @@ struct swiftscan_dependency_info_s {
   /// "swiftInterface"
   /// "swiftSource"
   /// "swiftBinary"
-  /// "swiftPlaceholder"
   /// "clang""
   swiftscan_string_ref_t module_name;
 
@@ -63,6 +62,9 @@ struct swiftscan_dependency_info_s {
   /// The list of link libraries for this module.
   swiftscan_link_library_set_t *link_libraries;
 
+  /// The list of source import infos.
+  swiftscan_import_info_set_t *imports;
+
   /// Specific details of a particular kind of module.
   swiftscan_module_details_t details;
 };
@@ -74,10 +76,16 @@ struct swiftscan_link_library_info_s {
   bool forceLoad;
 };
 
+struct swiftscan_import_info_s {
+  swiftscan_string_ref_t import_identifier;
+  swiftscan_source_location_set_t *source_locations;
+  swiftscan_access_level_t access_level;
+};
+
 struct swiftscan_macro_dependency_s {
-  swiftscan_string_ref_t moduleName;
-  swiftscan_string_ref_t libraryPath;
-  swiftscan_string_ref_t executablePath;
+  swiftscan_string_ref_t module_name;
+  swiftscan_string_ref_t library_path;
+  swiftscan_string_ref_t executable_path;
 };
 
 /// Swift modules to be built from a module interface, may have a bridging
@@ -101,6 +109,9 @@ typedef struct {
   /// (Swift) module dependencies by means of being overlays of
   /// Clang module dependencies
   swiftscan_string_set_t *swift_overlay_module_dependencies;
+
+  /// Directly-imported in source module dependencies
+  swiftscan_string_set_t *source_import_module_dependencies;
 
   /// Options to the compile command required to build this module interface
   swiftscan_string_set_t *command_line;
@@ -180,19 +191,6 @@ typedef struct {
   swiftscan_string_ref_t user_module_version;
 } swiftscan_swift_binary_details_t;
 
-/// Swift placeholder modules carry additional details that specify their
-/// module doc path and source info paths.
-typedef struct {
-  /// The path to the pre-compiled binary module
-  swiftscan_string_ref_t compiled_module_path;
-
-  /// The path to the .swiftModuleDoc file.
-  swiftscan_string_ref_t module_doc_path;
-
-  /// The path to the .swiftSourceInfo file.
-  swiftscan_string_ref_t module_source_info_path;
-} swiftscan_swift_placeholder_details_t;
-
 /// Clang modules are built from a module map file.
 typedef struct {
   /// The path to the module map used to build this module.
@@ -219,7 +217,6 @@ struct swiftscan_module_details_s {
   union {
     swiftscan_swift_textual_details_t swift_textual_details;
     swiftscan_swift_binary_details_t swift_binary_details;
-    swiftscan_swift_placeholder_details_t swift_placeholder_details;
     swiftscan_clang_details_t clang_details;
   };
 };

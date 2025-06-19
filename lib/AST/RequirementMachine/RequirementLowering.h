@@ -50,6 +50,13 @@ void desugarRequirement(Requirement req, SourceLoc loc,
 void inferRequirements(Type type, ModuleDecl *module, DeclContext *dc,
                        SmallVectorImpl<StructuralRequirement> &result);
 
+void realizeTypeRequirement(DeclContext *dc,
+                            Type subjectType,
+                            Type constraintType,
+                            SourceLoc loc,
+                            SmallVectorImpl<StructuralRequirement> &result,
+                            SmallVectorImpl<RequirementError> &errors);
+
 void realizeRequirement(DeclContext *dc,
                         Requirement req, RequirementRepr *reqRepr,
                         bool shouldInferRequirements,
@@ -64,6 +71,7 @@ void realizeInheritedRequirements(TypeDecl *decl, Type type,
 void applyInverses(ASTContext &ctx,
                    ArrayRef<Type> gps,
                    ArrayRef<InverseRequirement> inverseList,
+                   ArrayRef<StructuralRequirement> explicitRequirements,
                    SmallVectorImpl<StructuralRequirement> &result,
                    SmallVectorImpl<RequirementError> &errors);
 

@@ -67,6 +67,7 @@ private func registerSwiftPasses() {
   registerPass(diagnoseUnknownConstValues, { diagnoseUnknownConstValues.run($0)})
   registerPass(readOnlyGlobalVariablesPass, { readOnlyGlobalVariablesPass.run($0) })
   registerPass(stackProtection, { stackProtection.run($0) })
+  registerPass(embeddedSwiftDiagnostics, { embeddedSwiftDiagnostics.run($0) })
 
   // Function passes
   registerPass(asyncDemotion, { asyncDemotion.run($0) })
@@ -99,6 +100,9 @@ private func registerSwiftPasses() {
   registerPass(lifetimeDependenceInsertionPass, { lifetimeDependenceInsertionPass.run($0) })
   registerPass(lifetimeDependenceScopeFixupPass, { lifetimeDependenceScopeFixupPass.run($0) })
   registerPass(copyToBorrowOptimization, { copyToBorrowOptimization.run($0) })
+  registerPass(tempRValueElimination, { tempRValueElimination.run($0) })
+  registerPass(mandatoryTempRValueElimination, { mandatoryTempRValueElimination.run($0) })
+  registerPass(tempLValueElimination, { tempLValueElimination.run($0) })
   registerPass(generalClosureSpecialization, { generalClosureSpecialization.run($0) })
   registerPass(autodiffClosureSpecialization, { autodiffClosureSpecialization.run($0) })
 
@@ -120,9 +124,12 @@ private func registerSwiftPasses() {
   registerForSILCombine(DestructureTupleInst.self, { run(DestructureTupleInst.self, $0) })
   registerForSILCombine(TypeValueInst.self, { run(TypeValueInst.self, $0) })
   registerForSILCombine(ClassifyBridgeObjectInst.self, { run(ClassifyBridgeObjectInst.self, $0) })
+  registerForSILCombine(MarkDependenceInst.self,    { run(MarkDependenceInst.self, $0) })
+  registerForSILCombine(MarkDependenceAddrInst.self, { run(MarkDependenceAddrInst.self, $0) })
   registerForSILCombine(PointerToAddressInst.self,  { run(PointerToAddressInst.self, $0) })
   registerForSILCombine(UncheckedEnumDataInst.self, { run(UncheckedEnumDataInst.self, $0) })
   registerForSILCombine(WitnessMethodInst.self,     { run(WitnessMethodInst.self, $0) })
+  registerForSILCombine(UncheckedAddrCastInst.self, { run(UncheckedAddrCastInst.self, $0) })
   registerForSILCombine(UnconditionalCheckedCastInst.self, { run(UnconditionalCheckedCastInst.self, $0) })
   registerForSILCombine(AllocStackInst.self,        { run(AllocStackInst.self, $0) })
   registerForSILCombine(ApplyInst.self,             { run(ApplyInst.self, $0) })

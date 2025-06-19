@@ -18,10 +18,10 @@ var globalAvailableOn99_52: Int = 11
 let ignored1: Int = globalAvailableOn10_9
 
 let ignored2: Int = globalAvailableOn99_51 // expected-error {{'globalAvailableOn99_51' is only available in macOS 99.51 or newer}}
-    // expected-note@-1 {{add @available attribute to enclosing let}}
+    // expected-note@-1 {{add '@available' attribute to enclosing let}}
 
 let ignored3: Int = globalAvailableOn99_52 // expected-error {{'globalAvailableOn99_52' is only available in macOS 99.52 or newer}}
-    // expected-note@-1 {{add @available attribute to enclosing let}}
+    // expected-note@-1 {{add '@available' attribute to enclosing let}}
 
 @available(OSX, introduced: 99.51)
 func useFromOtherOn99_51() {

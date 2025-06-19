@@ -196,8 +196,9 @@ public:
 #define CONTEXTUAL_SIMPLE_DECL_ATTR(KW, ...) CONTEXTUAL_CASE(KW)
 #include "swift/AST/DeclAttr.def"
 #undef CONTEXTUAL_CASE
-      .Case("macro", true)
-      .Default(false);
+        .Case("macro", true)
+        .Case("using", true)
+        .Default(false);
   }
 
   bool isContextualPunctuator(StringRef ContextPunc) const {

@@ -245,6 +245,8 @@ getLinkerPlatformId(OriginallyDefinedInAttr::ActiveVersion Ver,
   switch(Ver.Platform) {
   case swift::PlatformKind::none:
     llvm_unreachable("cannot find platform kind");
+  case swift::PlatformKind::FreeBSD:
+    llvm_unreachable("not used for this platform");
   case swift::PlatformKind::OpenBSD:
     llvm_unreachable("not used for this platform");
   case swift::PlatformKind::Windows:
@@ -708,6 +710,9 @@ public:
     apigen::APIAvailability availability;
     auto access = apigen::APIAccess::Public;
     if (decl) {
+      if (!shouldRecordDecl(decl))
+        return;
+
       availability = getAvailability(decl);
       if (isSPI(decl))
         access = apigen::APIAccess::Private;
@@ -733,6 +738,9 @@ public:
     auto access = apigen::APIAccess::Public;
     auto decl = method.hasDecl() ? method.getDecl() : nullptr;
     if (decl) {
+      if (!shouldRecordDecl(decl))
+        return;
+
       availability = getAvailability(decl);
       if (decl->getDescriptiveKind() == DescriptiveDeclKind::ClassMethod)
         isInstanceMethod = false;
@@ -752,7 +760,7 @@ public:
   }
 
 private:
-  apigen::APILoc getAPILocForDecl(const Decl *decl) {
+  apigen::APILoc getAPILocForDecl(const Decl *decl) const {
     if (!decl)
       return defaultLoc;
 
@@ -766,6 +774,15 @@ private:
     auto displayName = SM.getDisplayNameForLoc(loc);
 
     return apigen::APILoc(std::string(displayName), line, col);
+  }
+
+  bool shouldRecordDecl(const Decl *decl) const {
+    // We cannot reason about API access for Clang declarations from header
+    // files as we don't know the header group. API records for header
+    // declarations should be deferred to Clang tools.
+    if (getAPILocForDecl(decl).getFilename().ends_with_insensitive(".h"))
+      return false;
+    return true;
   }
 
   /// Follow the naming schema that IRGen uses for Categories (see
@@ -809,6 +826,9 @@ private:
   }
 
   apigen::ObjCInterfaceRecord *addOrGetObjCInterface(const ClassDecl *decl) {
+    if (!shouldRecordDecl(decl))
+      return nullptr;
+
     auto entry = classMap.find(decl);
     if (entry != classMap.end())
       return entry->second;
@@ -847,6 +867,9 @@ private:
   }
 
   apigen::ObjCCategoryRecord *addOrGetObjCCategory(const ExtensionDecl *decl) {
+    if (!shouldRecordDecl(decl))
+      return nullptr;
+
     auto entry = categoryMap.find(decl);
     if (entry != categoryMap.end())
       return entry->second;

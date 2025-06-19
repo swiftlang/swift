@@ -31,8 +31,8 @@ struct ClangTarget {
 }
 
 extension RepoBuildDir {
-  func getCSourceFilePaths(for path: RelativePath) throws -> [RelativePath] {
-    try getAllRepoSubpaths(of: path).filter(\.isCSourceLike)
+  func getClangSourceFilePaths(for path: RelativePath) throws -> [RelativePath] {
+    try getAllRepoSubpaths(of: path).filter(\.isClangSource)
   }
 
   func getHeaderFilePaths(for path: RelativePath) throws -> [RelativePath] {
@@ -45,7 +45,7 @@ extension RepoBuildDir {
     let path = target.path
     let name = target.name
 
-    let sourcePaths = try getCSourceFilePaths(for: path)
+    let sourcePaths = try getClangSourceFilePaths(for: path)
     let headers = try getHeaderFilePaths(for: path)
     if sourcePaths.isEmpty && headers.isEmpty {
       return nil

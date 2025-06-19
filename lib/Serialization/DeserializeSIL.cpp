@@ -2452,6 +2452,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                       getSILType(Ty2, (SILValueCategory)TyCategory2, Fn)));
     break;
   }
+  case SILInstructionKind::VectorBaseAddrInst: {
+    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND);
+    ResultInst = Builder.createVectorBaseAddr(
+        Loc,
+        getLocalValue(
+            Builder.maybeGetFunction(), ValID,
+            getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2, Fn)));
+    break;
+  }
   case SILInstructionKind::IndexAddrInst: {
     auto Ty = MF->getType(TyID);
     auto Ty2 = MF->getType(TyID2);
@@ -2558,10 +2567,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   }
   // Checked Conversion instructions.
   case SILInstructionKind::UnconditionalCheckedCastInst: {
-    auto isolatedConformances = (ListOfValues[4] & 0x01)
-        ? CastingIsolatedConformances::Prohibit
-        : CastingIsolatedConformances::Allow;
-
+    CheckedCastInstOptions options(ListOfValues[4]);
     SILType srcLoweredType = getSILType(MF->getType(ListOfValues[1]),
                                         (SILValueCategory)ListOfValues[2], Fn);
     SILValue src = getLocalValue(Builder.maybeGetFunction(), ListOfValues[0],
@@ -2572,7 +2578,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     CanType targetFormalType =
         MF->getType(ListOfValues[3])->getCanonicalType();
     ResultInst = Builder.createUnconditionalCheckedCast(
-        Loc, isolatedConformances, src, targetLoweredType, targetFormalType);
+        Loc, options, src, targetLoweredType, targetFormalType);
     break;
   }
 
@@ -2723,6 +2729,15 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
             Builder.maybeGetFunction(), ValID,
             getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn)),
         keepUnique != 0);
+    break;
+  }
+
+  case SILInstructionKind::EndCOWMutationAddrInst: {
+    assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
+    ResultInst = Builder.createEndCOWMutationAddr(
+        Loc, getLocalValue(Builder.maybeGetFunction(), ValID,
+                           getSILType(MF->getType(TyID),
+                                      (SILValueCategory)TyCategory, Fn)));
     break;
   }
 
@@ -3536,9 +3551,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     // Format: the cast kind, a typed value, a BasicBlock ID for success,
     // a BasicBlock ID for failure. Uses SILOneTypeValuesLayout.
     bool isExact = (ListOfValues[0] & 0x01) != 0;
-    auto isolatedConformances = (ListOfValues[0] & 0x02)
-        ? CastingIsolatedConformances::Prohibit
-        : CastingIsolatedConformances::Allow;
+    CheckedCastInstOptions options(ListOfValues[0] >> 1);
     CanType sourceFormalType = MF->getType(ListOfValues[1])->getCanonicalType();
     SILType opTy = getSILType(MF->getType(ListOfValues[3]),
                               (SILValueCategory)ListOfValues[4], Fn);
@@ -3551,7 +3564,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     auto *failureBB = getBBForReference(Fn, ListOfValues[7]);
 
     ResultInst =
-        Builder.createCheckedCastBranch(Loc, isExact, isolatedConformances,
+        Builder.createCheckedCastBranch(Loc, isExact, options,
                                         op, sourceFormalType,
                                         targetLoweredType, targetFormalType,
                                         successBB, failureBB,
@@ -3560,10 +3573,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
   }
   case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
     // ignore attr.
-    auto isolatedConformances = (ListOfValues[6] & 0x01)
-        ? CastingIsolatedConformances::Prohibit
-        : CastingIsolatedConformances::Allow;
-
+    CheckedCastInstOptions options(ListOfValues[6]);
     CanType srcFormalType = MF->getType(ListOfValues[0])->getCanonicalType();
     SILType srcLoweredType = getSILType(MF->getType(ListOfValues[2]),
                                        (SILValueCategory)ListOfValues[3], Fn);
@@ -3577,15 +3587,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                                   targetLoweredType);
 
     ResultInst = Builder.createUnconditionalCheckedCastAddr(
-        Loc, isolatedConformances, src, srcFormalType, dest, targetFormalType);
+        Loc, options, src, srcFormalType, dest, targetFormalType);
     break;
   }
   case SILInstructionKind::CheckedCastAddrBranchInst: {
     unsigned flags = ListOfValues[0];
-    auto isolatedConformances = flags & 0x01
-      ? CastingIsolatedConformances::Prohibit
-      : CastingIsolatedConformances::Allow;
-    CastConsumptionKind consumption = getCastConsumptionKind(flags >> 1);
+    CheckedCastInstOptions options(flags & 0xFF);
+    CastConsumptionKind consumption = getCastConsumptionKind(flags >> 8);
 
     CanType srcFormalType = MF->getType(ListOfValues[1])->getCanonicalType();
     SILType srcLoweredType = getSILType(MF->getType(ListOfValues[3]),
@@ -3603,7 +3611,7 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     auto *successBB = getBBForReference(Fn, ListOfValues[7]);
     auto *failureBB = getBBForReference(Fn, ListOfValues[8]);
     ResultInst = Builder.createCheckedCastAddrBranch(
-        Loc, isolatedConformances, consumption, src, srcFormalType, dest,
+        Loc, options, consumption, src, srcFormalType, dest,
         targetFormalType, successBB, failureBB);
     break;
   }
@@ -4591,9 +4599,10 @@ llvm::Expected<SILWitnessTable *>
 
   unsigned RawLinkage;
   unsigned IsDeclaration;
+  unsigned IsSpecialized;
   unsigned Serialized;
   ProtocolConformanceID conformance;
-  WitnessTableLayout::readRecord(scratch, RawLinkage, IsDeclaration,
+  WitnessTableLayout::readRecord(scratch, RawLinkage, IsDeclaration, IsSpecialized,
                                  Serialized, conformance);
   auto Linkage = fromStableSILLinkage(RawLinkage);
   if (!Linkage) {
@@ -4621,7 +4630,7 @@ llvm::Expected<SILWitnessTable *>
                                     theConformance);
 
   if (!existingWt)
-    existingWt = SILMod.lookUpWitnessTable(theConformance);
+    existingWt = SILMod.lookUpWitnessTable(theConformance, IsSpecialized != 0);
   auto wT = existingWt;
 
   // If we have an existing witness table, verify that the conformance matches
@@ -4636,7 +4645,7 @@ llvm::Expected<SILWitnessTable *>
 
   } else {
     // Otherwise, create a new witness table declaration.
-    wT = SILWitnessTable::create(SILMod, *Linkage, theConformance);
+    wT = SILWitnessTable::create(SILMod, *Linkage, theConformance, IsSpecialized != 0);
     if (Callback)
       Callback->didDeserialize(MF->getAssociatedModule(), wT);
   }

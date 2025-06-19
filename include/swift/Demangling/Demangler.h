@@ -596,6 +596,7 @@ protected:
   NodePointer demangleDependentProtocolConformanceInherited();
   NodePointer popDependentAssociatedConformance();
   NodePointer demangleDependentProtocolConformanceAssociated();
+  NodePointer demangleDependentProtocolConformanceOpaque();
   NodePointer demangleThunkOrSpecialization();
   NodePointer demangleGenericSpecialization(Node::Kind SpecKind,
                                             NodePointer droppedArguments);

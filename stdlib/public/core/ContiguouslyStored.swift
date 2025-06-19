@@ -42,7 +42,7 @@ extension Array: _HasContiguousBytes {
   }
 }
 extension ContiguousArray: _HasContiguousBytes {}
-extension UnsafeBufferPointer: _HasContiguousBytes {
+extension UnsafeBufferPointer: @unsafe _HasContiguousBytes {
   @inlinable @inline(__always)
   @safe
   func withUnsafeBytes<R>(
@@ -53,7 +53,7 @@ extension UnsafeBufferPointer: _HasContiguousBytes {
     return try unsafe body(UnsafeRawBufferPointer(start: ptr, count: len))
   }
 }
-extension UnsafeMutableBufferPointer: _HasContiguousBytes {
+extension UnsafeMutableBufferPointer: @unsafe _HasContiguousBytes {
   @inlinable @inline(__always)
   @safe
   func withUnsafeBytes<R>(
@@ -64,7 +64,7 @@ extension UnsafeMutableBufferPointer: _HasContiguousBytes {
     return try unsafe body(UnsafeRawBufferPointer(start: ptr, count: len))
   }
 }
-extension UnsafeRawBufferPointer: _HasContiguousBytes {
+extension UnsafeRawBufferPointer: @unsafe _HasContiguousBytes {
   @inlinable @inline(__always)
   @safe
   func withUnsafeBytes<R>(
@@ -73,7 +73,7 @@ extension UnsafeRawBufferPointer: _HasContiguousBytes {
     return try unsafe body(self)
   }
 }
-extension UnsafeMutableRawBufferPointer: _HasContiguousBytes {
+extension UnsafeMutableRawBufferPointer: @unsafe _HasContiguousBytes {
   @inlinable @inline(__always)
   @safe
   func withUnsafeBytes<R>(

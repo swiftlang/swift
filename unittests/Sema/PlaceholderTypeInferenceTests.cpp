@@ -49,7 +49,7 @@ TEST_F(SemaTest, TestPlaceholderInferenceForArrayLiteral) {
 
   auto &solution = solutions[0];
 
-  auto eltTy = solution.simplifyType(solution.getType(arrayExpr))->isArrayType();
+  auto eltTy = solution.simplifyType(solution.getType(arrayExpr))->getArrayElementType();
   ASSERT_TRUE(eltTy);
   ASSERT_TRUE(eltTy->is<StructType>());
   ASSERT_EQ(eltTy->getAs<StructType>()->getDecl(), intTypeDecl);

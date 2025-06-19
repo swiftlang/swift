@@ -67,7 +67,7 @@ where Self : CodingType,
   print(Self.ValueType.self)
 }
 
-// OSIZE: define internal swiftcc ptr @"$s21same_type_constraints12GenericKlazzCyxq_GAA1EAA4DataAaEP_AA0F4TypePWT"(ptr readnone %"GenericKlazz<T, R>.Data", ptr nocapture readonly %"GenericKlazz<T, R>", ptr nocapture readnone %"GenericKlazz<T, R>.E") [[ATTRS:#[0-9]+]] {
+// OSIZE: define internal swiftcc ptr @"$s21same_type_constraints12GenericKlazzCyxq_GAA1EAA4DataAaEP_AA0F4TypePWT"(ptr readnone %"GenericKlazz<T, R>.Data", ptr{{( nocapture)?}} readonly{{( captures\(none\))?}} %"GenericKlazz<T, R>", ptr{{( nocapture)?}} readnone{{( captures\(none\))?}} %"GenericKlazz<T, R>.E") [[ATTRS:#[0-9]+]] {
 // OSIZE: [[ATTRS]] = {{{.*}}noinline
 
 // Check that same-typing two generic parameters together lowers correctly.

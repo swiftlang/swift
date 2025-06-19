@@ -50,6 +50,8 @@ extension Context {
 
   var moduleIsSerialized: Bool { _bridged.moduleIsSerialized() }
 
+  var moduleHasLoweredAddresses: Bool { _bridged.moduleHasLoweredAddresses() }
+
   /// Enable diagnostics requiring WMO (for @noLocks, @noAllocation
   /// annotations, Embedded Swift, and class specialization). SourceKit is the
   /// only consumer that has this disabled today (as it disables WMO
@@ -138,7 +140,10 @@ extension MutatingContext {
     return _bridged.createBlockAfter(block.bridged).block
   }
 
-  func erase(instruction: Instruction) {
+  /// Removes and deletes `instruction`.
+  /// If `salvageDebugInfo` is true, compensating `debug_value` instructions are inserted for certain
+  /// kind of instructions.
+  func erase(instruction: Instruction, salvageDebugInfo: Bool = true) {
     if !instruction.isInStaticInitializer {
       verifyIsTransforming(function: instruction.parentFunction)
     }
@@ -150,7 +155,7 @@ extension MutatingContext {
     }
     notifyInstructionsChanged()
 
-    _bridged.eraseInstruction(instruction.bridged)
+    _bridged.eraseInstruction(instruction.bridged, salvageDebugInfo)
   }
 
   func erase(instructionIncludingAllUsers inst: Instruction) {
@@ -162,7 +167,9 @@ extension MutatingContext {
         erase(instructionIncludingAllUsers: use.instruction)
       }
     }
-    erase(instruction: inst)
+    // We rely that after deleting the instruction its operands have no users.
+    // Therefore `salvageDebugInfo` must be turned off because we cannot insert debug_value instructions.
+    erase(instruction: inst, salvageDebugInfo: false)
   }
 
   func erase<S: Sequence>(instructions: S) where S.Element: Instruction {
@@ -322,6 +329,10 @@ struct FunctionPassContext : MutatingContext {
 
   var swiftArrayDecl: NominalTypeDecl {
     _bridged.getSwiftArrayDecl().getAs(NominalTypeDecl.self)
+  }
+
+  var swiftMutableSpan: NominalTypeDecl {
+    _bridged.getSwiftMutableSpanDecl().getAs(NominalTypeDecl.self)
   }
 
   func loadFunction(name: StaticString, loadCalleesRecursively: Bool) -> Function? {
@@ -747,6 +758,34 @@ extension PointerToAddressInst {
   func set(alignment: Int?, _ context: some MutatingContext) {
     context.notifyInstructionsChanged()
     bridged.PointerToAddressInst_setAlignment(UInt64(alignment ?? 0))
+    context.notifyInstructionChanged(self)
+  }
+}
+
+extension CopyAddrInst {
+  func set(isTakeOfSource: Bool, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.CopyAddrInst_setIsTakeOfSrc(isTakeOfSource)
+    context.notifyInstructionChanged(self)
+  }
+
+  func set(isInitializationOfDestination: Bool, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.CopyAddrInst_setIsInitializationOfDest(isInitializationOfDestination)
+    context.notifyInstructionChanged(self)
+  }
+}
+
+extension MarkDependenceInstruction {
+  func resolveToNonEscaping(_ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.MarkDependenceInstruction_resolveToNonEscaping()
+    context.notifyInstructionChanged(self)
+  }
+
+  func settleToEscaping(_ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.MarkDependenceInstruction_settleToEscaping()
     context.notifyInstructionChanged(self)
   }
 }

@@ -22,13 +22,11 @@ var suite = TestSuite("StringUTF8StorageProperty")
 defer { runAllTests() }
 
 suite.test("Span from Small String")
-.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
 .require(.stdlib_6_2).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
 
   let s = "A small string.".utf8
   let u = Array(s)
-  expectCrashLater()
   let span = s.span
 
   let count = span.count
@@ -56,13 +54,11 @@ suite.test("Span from Large Native String")
 }
 
 suite.test("Span from Small String's Substring")
-.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
 .require(.stdlib_6_2).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
 
   let s = "A small string.".dropFirst(8).utf8
   let u = Array("string.".utf8)
-  expectCrashLater()
   let span = s.span
 
   let count = span.count
@@ -87,5 +83,47 @@ suite.test("Span from Large Native String's Substring")
 
   for i in span.indices {
     expectEqual(span[i], u[i])
+  }
+}
+
+suite.test("Span from String.utf8Span")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  let s = String(200)
+  let utf8span = s.utf8Span
+  let span1 = utf8span.span
+  let utf8view = s.utf8
+  let span2 = utf8view.span
+  expectEqual(span1.count, span2.count)
+  for (i,j) in zip(span1.indices, span2.indices) {
+    expectEqual(span1[i], span2[j])
+  }
+}
+
+suite.test("UTF8Span from Span")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  let s = String(200).utf8
+  let span1 = s.span
+  guard let utf8 = expectNotNil(try? UTF8Span(validating: span1)) else { return }
+
+  let span2 = utf8.span
+  expectTrue(span1.isIdentical(to: span2))
+}
+
+suite.test("Span from Substring.utf8Span")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  let s = String(22000).dropFirst().dropLast()
+  let utf8span = s.utf8Span
+  let span1 = utf8span.span
+  let utf8view = s.utf8
+  let span2 = utf8view.span
+  expectEqual(span1.count, span2.count)
+  for (i,j) in zip(span1.indices, span2.indices) {
+    expectEqual(span1[i], span2[j])
   }
 }

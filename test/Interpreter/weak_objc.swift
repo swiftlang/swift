@@ -47,3 +47,29 @@ func testObjCClass() {
 }
 
 testObjCClass()
+
+func testObjCWeakLet() {
+  print("testObjCWeakLet")                // CHECK: testObjCWeakLet
+
+  var c : ObjCClassBase = ObjCClass()     // CHECK: ObjCClass Created
+  weak let w : ObjCClassBase? = c
+  printState(w)                           // CHECK-NEXT: is present
+  c = ObjCClassBase()                     // CHECK-NEXT: ObjCClass Destroyed
+  printState(w)                           // CHECK-NEXT: is nil
+}
+
+testObjCWeakLet()
+
+func testObjCWeakLetCapture() {
+  print("testObjCWeakLetCapture")         // CHECK: testObjCWeakLetCapture
+
+  var c : ObjCClassBase = ObjCClass()     // CHECK: ObjCClass Created
+  let closure: () -> ObjCClassBase? = { [weak c] in c }
+  printState(closure())                   // CHECK-NEXT: is present
+  printState(closure())                   // CHECK-NEXT: is present
+  c = ObjCClassBase()                     // CHECK-NEXT: ObjCClass Destroyed
+  printState(closure())                   // CHECK-NEXT: is nil
+  printState(closure())                   // CHECK-NEXT: is nil
+}
+
+testObjCWeakLetCapture()

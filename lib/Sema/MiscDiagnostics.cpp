@@ -1504,11 +1504,10 @@ DeferredDiags swift::findSyntacticErrorForConsume(
         break;
       }
       partial = true;
-      AccessStrategy strategy =
-          vd->getAccessStrategy(mre->getAccessSemantics(), AccessKind::Read,
-                                module, ResilienceExpansion::Minimal,
-                                /*useOldABI=*/false);
-      if (strategy.getKind() != AccessStrategy::Storage) {
+      auto isAccessedViaStorage = vd->isAccessedViaPhysicalStorage(
+          mre->getAccessSemantics(), AccessKind::Read, module,
+          ResilienceExpansion::Minimal);
+      if (!isAccessedViaStorage) {
         if (noncopyable) {
           result.emplace_back(loc, diag::consume_expression_non_storage);
           result.emplace_back(mre->getLoc(),
@@ -1749,15 +1748,23 @@ public:
       return false;
     }
 
-    // Require `LoadExpr`s when validating the self binding.
+    // Require that the RHS of the `let self = self` condition
+    // refers to a variable defined in a capture list.
     // This lets us reject invalid examples like:
     //
-    //   let `self` = self ?? .somethingElse
+    //   var `self` = self ?? .somethingElse
     //   guard let self = self else { return }
     //   method() // <- implicit self is not allowed
     //
-    return conditionalStmt->rebindsSelf(Ctx, /*requiresCaptureListRef*/ false,
-                                        /*requireLoadExpr*/ true);
+    // In 5.10, instead of this check, compiler was checking that RHS of the
+    // self binding is loaded from a mutable variable. This is incorrect, but
+    // before SE-0481 compiler was trying to maintain this behavior in Swift 5
+    // mode for source compatibility. After SE-0481 this does not work
+    // anymore, because even in Swift 5 mode `weak self` capture is not mutable.
+    // So we have to introduce a breaking change as part of the SE-0481, and use
+    // proper check for capture list even in Swift 5 mode.
+    //
+    return conditionalStmt->rebindsSelf(Ctx, /*requiresCaptureListRef*/ true);
   }
 
   static bool
@@ -2240,11 +2247,12 @@ public:
         invalidImplicitSelfShouldOnlyWarn510(base, closure)) {
       warnUntilVersion.emplace(6);
     }
-    // Prior to Swift 7, downgrade to a warning if we're in a macro to preserve
-    // compatibility with the Swift 6 diagnostic behavior where we previously
-    // skipped diagnosing.
-    if (!Ctx.isSwiftVersionAtLeast(7) && isInMacro())
-      warnUntilVersion.emplace(7);
+    // Prior to the next language mode, downgrade to a warning if we're in a
+    // macro to preserve compatibility with the Swift 6 diagnostic behavior
+    // where we previously skipped diagnosing.
+    auto futureVersion = version::Version::getFutureMajorLanguageVersion();
+    if (!Ctx.isSwiftVersionAtLeast(futureVersion) && isInMacro())
+      warnUntilVersion.emplace(futureVersion);
 
     auto diag = Ctx.Diags.diagnose(loc, ID, std::move(Args)...);
     if (warnUntilVersion)
@@ -2693,8 +2701,10 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
     }
   }
 
+  ASSERT((numMissing + numExtra + numWrong > 0) &&
+         "Should not call this function with nothing to diagnose");
+
   // Emit the diagnostic.
-  assert(numMissing > 0 || numExtra > 0 || numWrong > 0);
   llvm::SmallString<16> haveBuffer; // note: diagOpt has references to this
   llvm::SmallString<16> expectedBuffer; // note: diagOpt has references to this
 
@@ -4002,11 +4012,6 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       isWrittenLet = (access & RK_Written) != 0;
       access &= ~RK_Written;
     }
-    
-    // If this variable has WeakStorageType, then it can be mutated in ways we
-    // don't know.
-    if (var->getInterfaceType()->is<WeakStorageType>())
-      access |= RK_Written;
     
     // Diagnose variables that were never used (other than their
     // initialization).
@@ -5600,7 +5605,7 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
               segment->getCalledValue(/*skipFunctionConversions=*/true), kind))
         if (auto firstArg =
                 getFirstArgIfUnintendedInterpolation(segment->getArgs(), kind))
-          diagnoseUnintendedInterpolation(firstArg, kind);
+          diagnoseUnintendedInterpolation(segment, firstArg, kind);
     }
 
     bool interpolationWouldBeUnintended(ConcreteDeclRef appendMethod,
@@ -5666,12 +5671,39 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
       return firstArg;
     }
 
-    void diagnoseUnintendedInterpolation(Expr * arg, UnintendedInterpolationKind kind) {
+    std::string baseInterpolationTypeName(CallExpr *segment) {
+      if (auto selfApplyExpr = dyn_cast<SelfApplyExpr>(segment->getFn())) {
+        auto baseType = selfApplyExpr->getBase()->getType();
+        return baseType->getWithoutSpecifierType()->getString();
+      }
+      return "unknown";
+    }
+    
+    void diagnoseUnintendedInterpolation(CallExpr *segment,
+                                         Expr * arg,
+                                         UnintendedInterpolationKind kind) {
       Ctx.Diags
           .diagnose(arg->getStartLoc(),
                     diag::debug_description_in_string_interpolation_segment,
                     (bool)kind)
           .highlight(arg->getSourceRange());
+
+      if (kind == UnintendedInterpolationKind::Optional) {
+        auto wrappedArgType = arg->getType()->getRValueType()->getOptionalObjectType();
+        auto baseTypeName = baseInterpolationTypeName(segment);
+        
+        // Suggest using a default value parameter, but only for non-string values
+        // when the base interpolation type is the default.
+        if (!wrappedArgType->isString() && baseTypeName == "DefaultStringInterpolation")
+          Ctx.Diags.diagnose(arg->getLoc(), diag::default_optional_parameter)
+            .highlight(arg->getSourceRange())
+            .fixItInsertAfter(arg->getEndLoc(), ", default: <#default value#>");
+
+        // Suggest providing a default value using the nil-coalescing operator.
+        Ctx.Diags.diagnose(arg->getLoc(), diag::default_optional_to_any)
+          .highlight(arg->getSourceRange())
+          .fixItInsertAfter(arg->getEndLoc(), " ?? <#default value#>");
+      }
 
       // Suggest 'String(describing: <expr>)'.
       auto argStart = arg->getStartLoc();
@@ -5682,13 +5714,6 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
           .highlight(arg->getSourceRange())
           .fixItInsert(argStart, "String(describing: ")
           .fixItInsertAfter(arg->getEndLoc(), ")");
-
-      if (kind == UnintendedInterpolationKind::Optional) {
-        // Suggest inserting a default value.
-        Ctx.Diags.diagnose(arg->getLoc(), diag::default_optional_to_any)
-          .highlight(arg->getSourceRange())
-          .fixItInsertAfter(arg->getEndLoc(), " ?? <#default value#>");
-      }
     }
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
@@ -6243,9 +6268,9 @@ diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
         note.fixItRemove(duplicated.first->getSourceRange());
         if (duplicatedEltIdx < commanLocs.size()) {
           note.fixItRemove(commanLocs[duplicatedEltIdx]);
-        } else {
+        } else if (!commanLocs.empty()) {
           // For the last element remove the previous comma.
-          note.fixItRemove(commanLocs[duplicatedEltIdx - 1]);
+          note.fixItRemove(commanLocs[commanLocs.size() - 1]);
         }
       };
 
@@ -6302,7 +6327,8 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
   };
 
   auto &ctx = DC->getASTContext();
-  if (!ctx.LangOpts.hasFeature(Feature::MemberImportVisibility))
+  if (!ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
+                               /*allowMigration=*/true))
     return;
 
   DiagnoseWalker walker(DC);
@@ -6316,7 +6342,8 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
 /// Emit diagnostics for syntactic restrictions on a given expression.
 void swift::performSyntacticExprDiagnostics(const Expr *E,
                                             const DeclContext *DC,
-                                            bool isExprStmt) {
+                                            bool isExprStmt,
+                                            bool isConstInitExpr) {
   auto &ctx = DC->getASTContext();
   TypeChecker::diagnoseSelfAssignment(E);
   diagSyntacticUseRestrictions(E, DC, isExprStmt);
@@ -6333,6 +6360,9 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   if (ctx.LangOpts.EnableObjCInterop)
     diagDeprecatedObjCSelectors(DC, E);
   diagnoseConstantArgumentRequirement(E, DC);
+  if (ctx.LangOpts.hasFeature(Feature::CompileTimeValues) &&
+      !ctx.LangOpts.hasFeature(Feature::CompileTimeValuesPreview))
+    diagnoseInvalidConstExpressions(E, DC, isConstInitExpr);
   diagUnqualifiedAccessToMethodNamedSelf(E, DC);
   diagnoseDictionaryLiteralDuplicateKeyEntries(E, DC);
   diagnoseMissingMemberImports(E, DC);

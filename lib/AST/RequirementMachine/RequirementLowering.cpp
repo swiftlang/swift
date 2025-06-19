@@ -159,6 +159,7 @@
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Defer.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SetVector.h"
 #include "Diagnostics.h"
@@ -450,6 +451,7 @@ static void desugarSameShapeRequirement(
       !req.getSecondType()->isParameterPack()) {
     errors.push_back(RequirementError::forInvalidShapeRequirement(
         req, loc));
+    return;
   }
 
   result.emplace_back(RequirementKind::SameShape,
@@ -511,11 +513,12 @@ void swift::rewriting::desugarRequirements(
 // Requirement realization and inference.
 //
 
-static void realizeTypeRequirement(DeclContext *dc,
-                                   Type subjectType, Type constraintType,
-                                   SourceLoc loc,
-                                   SmallVectorImpl<StructuralRequirement> &result,
-                                   SmallVectorImpl<RequirementError> &errors) {
+void swift::rewriting::realizeTypeRequirement(DeclContext *dc,
+                                 Type subjectType,
+                                 Type constraintType,
+                                 SourceLoc loc,
+                                 SmallVectorImpl<StructuralRequirement> &result,
+                                 SmallVectorImpl<RequirementError> &errors) {
   // The GenericSignatureBuilder allowed the right hand side of a
   // conformance or superclass requirement to reference a protocol
   // typealias whose underlying type was a protocol or class.
@@ -798,106 +801,6 @@ void swift::rewriting::realizeRequirement(
   }
 }
 
-void swift::rewriting::applyInverses(
-    ASTContext &ctx,
-    ArrayRef<Type> gps,
-    ArrayRef<InverseRequirement> inverseList,
-    SmallVectorImpl<StructuralRequirement> &result,
-    SmallVectorImpl<RequirementError> &errors) {
-
-  // No inverses to even validate.
-  if (inverseList.empty())
-    return;
-
-  const bool allowInverseOnAssocType =
-      ctx.LangOpts.hasFeature(Feature::SuppressedAssociatedTypes);
-
-  // Summarize the inverses and diagnose ones that are incorrect.
-  llvm::DenseMap<CanType, InvertibleProtocolSet> inverses;
-  for (auto inverse : inverseList) {
-    auto canSubject = inverse.subject->getCanonicalType();
-
-    // Inverses on associated types are experimental.
-    if (!allowInverseOnAssocType && canSubject->is<DependentMemberType>()) {
-      // Special exception: allow if we're building the stdlib.
-      if (!ctx.MainModule->isStdlibModule()) {
-        errors.push_back(RequirementError::forInvalidInverseSubject(inverse));
-        continue;
-      }
-    }
-
-    // Noncopyable checking support for parameter packs is not implemented yet.
-    if (canSubject->isParameterPack()) {
-      errors.push_back(RequirementError::forInvalidInverseSubject(inverse));
-      continue;
-    }
-
-    // Value generics never have inverse requirements (or the positive thereof).
-    if (canSubject->isValueParameter()) {
-      continue;
-    }
-
-    // WARNING: possible quadratic behavior, but should be OK in practice.
-    auto notInScope = llvm::none_of(gps, [=](Type t) {
-      return t->getCanonicalType() == canSubject;
-    });
-
-    // If the inverse is on a subject that wasn't permitted by our caller, then
-    // remove and diagnose as an error. This can happen when an inner context
-    // has a constraint on some outer generic parameter, e.g.,
-    //
-    //     protocol P {
-    //       func f() where Self: ~Copyable
-    //     }
-    //
-    if (notInScope) {
-      errors.push_back(
-          RequirementError::forInvalidInverseOuterSubject(inverse));
-      continue;
-    }
-
-    auto state = inverses.getOrInsertDefault(canSubject);
-
-    // Check if this inverse has already been seen.
-    auto inverseKind = inverse.getKind();
-    if (state.contains(inverseKind))
-      continue;
-
-    state.insert(inverseKind);
-    inverses[canSubject] = state;
-  }
-
-  // Fast-path: if there are no valid inverses, then there are no requirements
-  // to be removed.
-  if (inverses.empty())
-    return;
-
-  // Scan the structural requirements and cancel out any inferred requirements
-  // based on the inverses we saw.
-  result.erase(llvm::remove_if(result, [&](StructuralRequirement structReq) {
-    auto req = structReq.req;
-
-    if (req.getKind() != RequirementKind::Conformance)
-      return false;
-
-    // Only consider requirements involving an invertible protocol.
-    auto proto = req.getProtocolDecl()->getInvertibleProtocolKind();
-    if (!proto)
-      return false;
-
-    // See if this subject is in-scope.
-    auto subject = req.getFirstType()->getCanonicalType();
-    auto result = inverses.find(subject);
-    if (result == inverses.end())
-      return false;
-
-    // We now have found the inferred constraint 'Subject : Proto'.
-    // So, remove it if we have recorded a 'Subject : ~Proto'.
-    auto recordedInverses = result->getSecond();
-    return recordedInverses.contains(*proto);
-  }), result.end());
-}
-
 /// Collect structural requirements written in the inheritance clause of an
 /// AssociatedTypeDecl, GenericTypeParamDecl, or ProtocolDecl.
 void swift::rewriting::realizeInheritedRequirements(
@@ -1002,7 +905,8 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
 
     SmallVector<StructuralRequirement, 2> defaults;
     InverseRequirement::expandDefaults(ctx, needsDefaultRequirements, defaults);
-    applyInverses(ctx, needsDefaultRequirements, inverses, defaults, errors);
+    applyInverses(ctx, needsDefaultRequirements, inverses, result,
+                  defaults, errors);
     result.append(defaults);
 
     diagnoseRequirementErrors(ctx, errors,
@@ -1076,7 +980,8 @@ StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
       && !proto->isSpecificProtocol(KnownProtocolKind::Sendable))
     InverseRequirement::expandDefaults(ctx, needsDefaultRequirements, defaults);
 
-  applyInverses(ctx, needsDefaultRequirements, inverses, defaults, errors);
+  applyInverses(ctx, needsDefaultRequirements, inverses, result,
+                defaults, errors);
   result.append(defaults);
 
   diagnoseRequirementErrors(ctx, errors,

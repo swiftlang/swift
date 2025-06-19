@@ -497,7 +497,7 @@ ERROR(expected_precedencegroup_relation,none,
 ERROR(expected_sil_keyword,none,
       "expected SIL keyword", ())
 ERROR(inout_not_attribute, none,
-      "@inout is no longer an attribute", ())
+      "'inout' is no longer an attribute", ())
 ERROR(only_allowed_in_sil,none,
       "'%0' only allowed in SIL modules", (StringRef))
 ERROR(expected_sil_type,none,
@@ -520,7 +520,7 @@ ERROR(silfunc_and_silarg_have_incompatible_sil_value_ownership,none,
       "Function type specifies: '@%0'. SIL argument specifies: '@%1'.",
       (StringRef, StringRef))
 ERROR(sil_arg_both_lexical_and_eagerMove,none,
-      "Function argument is annotated both @_eagerMove and @_noEagerMove, "
+      "Function argument is annotated both '@_eagerMove' and '@_noEagerMove', "
       "but these are incompatible alternatives", ())
 ERROR(expected_sil_colon,none,
       "expected ':' before %0", (StringRef))
@@ -1571,6 +1571,11 @@ ERROR(attr_unsupported_on_target, none,
 ERROR(attr_name_unsupported_on_target, none,
       "attribute '%0' is unsupported on target '%1'", (StringRef, StringRef))
 
+// abi attribute
+ERROR(attr_abi_incompatible_kind,none,
+      "cannot use %0 in '@abi'",
+      (DescriptiveDeclKind))
+
 // availability
 ERROR(attr_availability_platform,none,
       "expected platform name or '*' for '%0' attribute", (StringRef))
@@ -1627,14 +1632,14 @@ ERROR(attr_availability_duplicate,none,
 
 // originallyDefinedIn
 ERROR(originally_defined_in_missing_rparen,none,
-      "expected ')' in @_originallyDefinedIn argument list", ())
+      "expected ')' in '@_originallyDefinedIn' argument list", ())
 
 ERROR(originally_defined_in_need_original_module_name,none,
       "expected 'module: \"original\"' in the first argument to "
-      "@_originallyDefinedIn", ())
+      "'@_originallyDefinedIn'", ())
 
 ERROR(originally_defined_in_need_nonempty_module_name,none,
-      "original module name cannot be empty in @_originallyDefinedIn", ())
+      "original module name cannot be empty in '@_originallyDefinedIn'", ())
 
 // backDeploy
 ERROR(attr_back_deploy_expected_before_label,none,
@@ -1665,25 +1670,25 @@ ERROR(convention_attribute_witness_method_expected_protocol,none,
 
 // objc
 ERROR(attr_objc_missing_colon,none,
-      "missing ':' after selector piece in @objc attribute", ())
+      "missing ':' after selector piece in '@objc'", ())
 ERROR(attr_objc_expected_rparen,none,
-      "expected ')' after name for @objc", ())
+      "expected ')' after name for '@objc'", ())
 ERROR(attr_objc_empty_name,none,
-      "expected name within parentheses of @objc attribute", ())
+      "expected name within parentheses of '@objc'", ())
 
 ERROR(attr_dynamic_replacement_expected_rparen,none,
-      "expected ')' after function name for @_dynamicReplacement", ())
+      "expected ')' after function name for '@_dynamicReplacement'", ())
 ERROR(attr_dynamic_replacement_expected_function,none,
-      "expected a function name in @_dynamicReplacement(for:)", ())
+      "expected a function name in '@_dynamicReplacement(for:)'", ())
 ERROR(attr_dynamic_replacement_expected_for,none,
       "expected 'for' in '_dynamicReplacement' attribute", ())
 ERROR(attr_dynamic_replacement_expected_colon,none,
-      "expected ':' after @_dynamicReplacement(for", ())
+      "expected ':' after '@_dynamicReplacement(for'", ())
 
 ERROR(attr_type_eraser_expected_type_name,none,
-      "expected a type name in @_typeEraser()", ())
+      "expected a type name in '@_typeEraser()'", ())
 ERROR(attr_type_eraser_expected_rparen,none,
-      "expected ')' after type name for @_typeEraser", ())
+      "expected ')' after type name for '@_typeEraser'", ())
 
 ERROR(expected_thrown_error_type,none,
       "expected thrown error type after 'throws('", ())
@@ -1701,13 +1706,13 @@ ERROR(attr_isolated_expected_kind,none,
       "expected 'any' as the isolation kind", ())
 
 ERROR(attr_private_import_expected_rparen,none,
-      "expected ')' after function name for @_private", ())
+      "expected ')' after function name for '@_private'", ())
 ERROR(attr_private_import_expected_sourcefile, none,
       "expected 'sourceFile' in '_private' attribute", ())
 ERROR(attr_private_import_expected_sourcefile_name,none,
-      "expected a source file name in @_private(sourceFile:)", ())
+      "expected a source file name in '@_private(sourceFile:)'", ())
 ERROR(attr_private_import_expected_colon,none,
-      "expected ':' after @_private(sourceFile", ())
+      "expected ':' after '@_private(sourceFile'", ())
 
 // opened
 ERROR(opened_attribute_expected_lparen,none,
@@ -1741,22 +1746,26 @@ ERROR(attr_warn_unused_result_expected_rparen,none,
 
 // _specialize
 ERROR(attr_specialize_missing_colon,none,
-      "missing ':' after %0 in '_specialize' attribute", (StringRef))
+      "missing ':' after %0 in %select{'_specialize'|'specialized'}1 attribute", (StringRef, bool))
 
 ERROR(attr_specialize_missing_comma,none,
-      "missing ',' in '_specialize' attribute", ())
+      "missing ',' in %select{'_specialize'|'specialized'}0 attribute", (bool))
 
 ERROR(attr_specialize_unknown_parameter_name,none,
-      "unknown parameter %0 in '_specialize attribute'", (StringRef))
+      "unknown parameter %0 in %select{'_specialize'|'specialized'}1 attribute", (StringRef, bool))
+ERROR(attr_specialize_unsupported_parameter_name,none,
+      "unsupported parameter %0 in 'specialized attribute'", (StringRef))
 
 ERROR(attr_specialize_expected_bool_value,none,
-      "expected a boolean true or false value in '_specialize' attribute", ())
+      "expected a boolean true or false value in %select{'_specialize'|'specialized'}0 attribute", (bool))
 
 ERROR(attr_specialize_missing_parameter_label_or_where_clause,none,
       "expected a parameter label or a where clause in '_specialize' attribute", ())
+ERROR(attr_specialized_missing_where_clause,none,
+      "expected a where clause in 'specialized' attribute", ())
 
 ERROR(attr_specialize_parameter_already_defined,none,
-      "parameter '%0' was already defined in '_specialize' attribute", (StringRef))
+      "parameter '%0' was already defined in %select{'_specialize'|'specialized'}1 attribute", (StringRef, bool))
 
 ERROR(attr_specialize_expected_partial_or_full,none,
       "expected 'partial' or 'full' as values of the 'kind' parameter in '_specialize' attribute", ())
@@ -1828,18 +1837,18 @@ ERROR(sil_inst_autodiff_expected_differentiability_witness_kind,PointsToFirstBad
       "'[vjp]', or '[transpose]'", ())
 
 WARNING(warn_attr_unsafe_removed,none,
-        "'%0' attribute has been removed in favor of @preconcurrency",
+        "'%0' attribute has been removed in favor of '@preconcurrency'",
         (StringRef))
 
 // _documentation
 ERROR(documentation_attr_expected_argument,none,
-      "@_documentation attribute expected 'visibility' or 'metadata' argument",
+      "'_documentation' attribute expected 'visibility' or 'metadata' argument",
       ())
 ERROR(documentation_attr_unknown_argument,none,
       "unknown argument '%0', expected 'visibility' or 'metadata'",
       (StringRef))
 ERROR(documentation_attr_expected_access_level,none,
-      "@_documentation attribute's 'visibility' argument expected an access level",
+      "'_documentation' attribute's 'visibility' argument expected an access level",
       ())
 ERROR(documentation_attr_unknown_access_level,none,
       "unknown visibility '%0', expected an access level keyword",
@@ -1847,26 +1856,26 @@ ERROR(documentation_attr_unknown_access_level,none,
 ERROR(documentation_attr_duplicate_visibility,none,
       "cannot give more than one visibility to the same item", ())
 ERROR(documentation_attr_metadata_expected_text,none,
-      "@_documentation attribute's 'metadata' argument expected an identifier or "
+      "'_documentation' attribute's 'metadata' argument expected an identifier or "
       "quoted string",
       ())
 ERROR(documentation_attr_duplicate_metadata,none,
       "cannot give more than one metadata argument to the same item", ())
 
 ERROR(attr_rawlayout_expected_label,none,
-      "expected %0 argument to @_rawLayout attribute", (StringRef))
+      "expected %0 argument to '@_rawLayout'", (StringRef))
 ERROR(attr_rawlayout_expected_integer_size,none,
-      "expected integer literal size in @_rawLayout attribute", ())
+      "expected integer literal size in '@_rawLayout'", ())
 ERROR(attr_rawlayout_expected_integer_alignment,none,
-      "expected integer literal alignment in @_rawLayout attribute", ())
+      "expected integer literal alignment in '@_rawLayout'", ())
 ERROR(attr_rawlayout_expected_params,none,
-      "expected %1 argument after %0 argument in @_rawLayout attribute", (StringRef, StringRef))
+      "expected %1 argument after %0 argument in '@_rawLayout'", (StringRef, StringRef))
 
 ERROR(attr_extern_expected_label,none,
-      "expected %0 argument to @_extern attribute", (StringRef))
+      "expected %0 argument to '@_extern'", (StringRef))
 
 ERROR(attr_expected_feature_name,none,
-      "expected feature name in @%0 attribute", (StringRef))
+      "expected feature name in '@%0'", (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Generics parsing diagnostics
@@ -2059,13 +2068,13 @@ ERROR(macro_role_syntax_mismatch,PointsToFirstBadToken,
       "%select{a freestanding|an attached}0 macro cannot have the %1 role",
       (bool, Identifier))
 ERROR(macro_attribute_unknown_label,PointsToFirstBadToken,
-      "@%select{freestanding|attached}0 has no argument with label %1",
+      "'@%select{freestanding|attached}0' has no argument with label %1",
       (bool, Identifier))
 ERROR(macro_attribute_duplicate_label,PointsToFirstBadToken,
-      "@%select{freestanding|attached}0 already has an argument with "
+      "'@%select{freestanding|attached}0' already has an argument with "
       "label %1", (bool, StringRef))
 ERROR(macro_attribute_missing_label,none,
-      "@%select{freestanding|attached}0 argument is missing label '%1'",
+      "'@%select{freestanding|attached}0' argument is missing label '%1'",
       (bool, StringRef))
 ERROR(macro_attribute_unknown_name_kind,PointsToFirstBadToken,
       "unknown introduced name kind %0", (Identifier))
@@ -2076,7 +2085,8 @@ ERROR(macro_attribute_introduced_name_requires_argument,PointsToFirstBadToken,
 ERROR(macro_attribute_introduced_name_requires_no_argument,PointsToFirstBadToken,
       "introduced name kind %0 must not have an argument", (Identifier))
 WARNING(macro_expression_attribute_removed,PointsToFirstBadToken,
-      "@expression has been removed in favor of @freestanding(expression)", ())
+      "'@expression' has been removed in favor of '@freestanding(expression)'",
+      ())
 
 ERROR(unexpected_attribute_expansion,PointsToFirstBadToken,
       "unexpected token '%0' in expanded attribute list",
@@ -2112,16 +2122,16 @@ ERROR(init_accessor_is_not_in_the_primary_declaration,none,
       ())
 
 ERROR(missing_storage_restrictions_attr_label,none,
-      "missing label in @storageRestrictions attribute", ())
+      "missing label in '@storageRestrictions'", ())
 
 ERROR(invalid_storage_restrictions_attr_label,none,
-      "unexpected label %0 in @storageRestrictions attribute", (Identifier))
+      "unexpected label %0 in '@storageRestrictions'", (Identifier))
 
 ERROR(duplicate_storage_restrictions_attr_label,none,
-      "duplicate label %0 in @storageRestrictions attribute", (Identifier))
+      "duplicate label %0 in '@storageRestrictions'", (Identifier))
 
 ERROR(storage_restrictions_attr_expected_name,none,
-      "expected property name in @storageRestrictions list", ())
+      "expected property name in '@storageRestrictions' list", ())
 
 ERROR(requires_experimental_feature, none,
       "'%0' %select{attribute|parameter specifier}1 is only valid when experimental feature "
@@ -2176,6 +2186,15 @@ ERROR(nonisolated_nonsending_expected_rparen,PointsToFirstBadToken,
       "expected ')' after 'nonisolated' modifier", ())
 ERROR(nonisolated_nonsending_repeated,none,
       "parameter may have at most one 'nonisolated(nonsending)' specifier", ())
+
+//------------------------------------------------------------------------------
+// MARK: using @<attribute> or using <identifier>
+//------------------------------------------------------------------------------
+ERROR(using_decl_invalid_specifier,PointsToFirstBadToken,
+      "default isolation can only be set to '@MainActor' or 'nonisolated'",
+      ())
+ERROR(experimental_using_decl_disabled,PointsToFirstBadToken,
+      "'using' is an experimental feature that is currently disabled", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

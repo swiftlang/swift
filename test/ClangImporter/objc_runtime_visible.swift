@@ -3,7 +3,7 @@
 import ObjCRuntimeVisible
 
 extension A {
-  @objc func foo() { } // expected-error{{instance method cannot be marked @objc because class 'A' is only visible via the Objective-C runtime}}
+  @objc func foo() { } // expected-error{{instance method cannot be marked '@objc' because class 'A' is only visible via the Objective-C runtime}}
   func bar() {} // okay, implicitly non-objc
 }
 
@@ -16,5 +16,5 @@ class B : A { } // expected-error{{cannot inherit from class 'A' because it is o
 protocol SwiftProto {}
 @objc protocol ObjCProto {}
 
-extension A: ObjCProto {} // expected-error {{class 'A' cannot conform to @objc protocol 'ObjCProto' because the class is only visible via the Objective-C runtime}}
+extension A: ObjCProto {} // expected-error {{class 'A' cannot conform to '@objc' protocol 'ObjCProto' because the class is only visible via the Objective-C runtime}}
 extension A: SwiftProto {} // okay

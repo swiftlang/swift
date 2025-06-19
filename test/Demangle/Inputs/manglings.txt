@@ -298,6 +298,8 @@ _T0SqWOC ---> outlined init with copy of Swift.Optional
 _T0SqWOD ---> outlined assign with take of Swift.Optional
 _T0SqWOF ---> outlined assign with copy of Swift.Optional
 _T0SqWOH ---> outlined destroy of Swift.Optional
+_T0SqWOB ---> outlined init with take of Swift.Optional
+_T0SqWOb ---> outlined init with take of Swift.Optional
 _T03nix6testitSaySiGyFTv_ ---> outlined variable #0 of nix.testit() -> [Swift.Int]
 _T03nix6testitSaySiGyFTv_r ---> outlined read-only object #0 of nix.testit() -> [Swift.Int]
 _T03nix6testitSaySiGyFTv0_ ---> outlined variable #1 of nix.testit() -> [Swift.Int]
@@ -497,3 +499,4 @@ _$s15raw_identifiers0020pathfoo_yuEHaaCiJskayyF ---> raw_identifiers.`path://foo
 _$s15raw_identifiers10FontWeightO009_100_FpEpdyyFZ ---> static raw_identifiers.FontWeight.`100`() -> ()
 $s7Library1BC1iSivxTwd ---> default override of Library.B.i.modify2 : Swift.Int
 $s7Library1BC1iSivxTwdTwc ---> coro function pointer to default override of Library.B.i.modify2 : Swift.Int
+$s3use1xAA3OfPVy3lib1GVyAA1fQryFQOyQo_GAjE1PAAxAeKHD1_AIHO_HCg_Gvp ---> use.x : use.OfP<lib.G<<<opaque return type of use.f() -> some>>.0>>

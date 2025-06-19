@@ -1089,7 +1089,14 @@ StringRef LiteralExpr::getLiteralKindDescription() const {
   llvm_unreachable("Unhandled literal");
 }
 
-IntegerLiteralExpr * IntegerLiteralExpr::createFromUnsigned(ASTContext &C, unsigned value, SourceLoc loc) {
+void BuiltinLiteralExpr::setBuiltinInitializer(
+    ConcreteDeclRef builtinInitializer) {
+  ASSERT(builtinInitializer);
+  BuiltinInitializer = builtinInitializer;
+}
+
+IntegerLiteralExpr * IntegerLiteralExpr::createFromUnsigned(
+    ASTContext &C, unsigned value, SourceLoc loc) {
   llvm::SmallString<8> Scratch;
   llvm::APInt(sizeof(unsigned)*8, value).toString(Scratch, 10, /*signed*/ false);
   auto Text = C.AllocateCopy(StringRef(Scratch));
@@ -1366,11 +1373,8 @@ CaptureListEntry CaptureListEntry::createParsed(
     SourceRange ownershipRange, Identifier name, SourceLoc nameLoc,
     SourceLoc equalLoc, Expr *initializer, DeclContext *DC) {
 
-  auto introducer =
-      (ownershipKind != ReferenceOwnership::Weak ? VarDecl::Introducer::Let
-                                                 : VarDecl::Introducer::Var);
   auto *VD =
-      new (Ctx) VarDecl(/*isStatic==*/false, introducer, nameLoc, name, DC);
+      new (Ctx) VarDecl(/*isStatic==*/false, VarDecl::Introducer::Let, nameLoc, name, DC);
 
   if (ownershipKind != ReferenceOwnership::Strong)
     VD->getAttrs().add(
@@ -1994,9 +1998,10 @@ unsigned AbstractClosureExpr::getDiscriminator() const {
   }
 
   if (getRawDiscriminator() == InvalidDiscriminator) {
-    llvm::errs() << "Closure does not have an assigned discriminator:\n";
-    dump(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "Closure does not have an assigned discriminator:\n";
+      this->dump(out);
+    });
   }
 
   return getRawDiscriminator();
@@ -2441,11 +2446,22 @@ bool Expr::isSelfExprOf(const AbstractFunctionDecl *AFD, bool sameBase) const {
   return false;
 }
 
-TypeValueExpr *TypeValueExpr::createForDecl(DeclNameLoc loc, 
-                                            GenericTypeParamDecl *paramDecl) {
-  auto &ctx = paramDecl->getASTContext();
+TypeValueExpr *TypeValueExpr::createForDecl(DeclNameLoc loc, TypeDecl *decl,
+                                            DeclContext *dc) {
+  auto &ctx = decl->getASTContext();
   ASSERT(loc.isValid());
-  return new (ctx) TypeValueExpr(loc, paramDecl);
+  auto repr = UnqualifiedIdentTypeRepr::create(ctx, loc, decl->createNameRef());
+  repr->setValue(decl, dc);
+  return new (ctx) TypeValueExpr(repr);
+}
+
+GenericTypeParamDecl *TypeValueExpr::getParamDecl() const {
+  auto declRefRepr = cast<DeclRefTypeRepr>(getRepr());
+  return cast<GenericTypeParamDecl>(declRefRepr->getBoundDecl());
+}
+
+SourceRange TypeValueExpr::getSourceRange() const {
+  return getRepr()->getSourceRange();
 }
 
 ExistentialArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {

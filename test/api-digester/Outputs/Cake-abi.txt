@@ -49,8 +49,8 @@ cake: Constructor S1.init(_:) has parameter 0 type change from Swift.Int to Swif
 cake: Func C1.foo2(_:) has parameter 0 type change from Swift.Int to () -> ()
 cake: Func C7.foo(_:_:) has removed default argument from parameter 0
 cake: Func C7.foo(_:_:) has removed default argument from parameter 1
-cake: Func EscapingFunctionType.addedEscaping(_:) has added @escaping in parameter 0
-cake: Func EscapingFunctionType.removedEscaping(_:) has removed @escaping in parameter 0
+cake: Func EscapingFunctionType.addedEscaping(_:) has added '@escaping' in parameter 0
+cake: Func EscapingFunctionType.removedEscaping(_:) has removed '@escaping' in parameter 0
 cake: Func Somestruct2.foo1(_:) has parameter 0 type change from cake.C3 to cake.C1
 cake: Func Zoo.getCurrentAnimalInlinable() has return type change from [cake.Cat] to [cake.Dog]
 cake: Func ownershipChange(_:_:) has parameter 0 changing from InOut to Default
@@ -59,41 +59,41 @@ cake: Func returnFunctionTypeOwnershipChange() has return type change from (cake
 cake: Var Zoo.current has declared type change from cake.Cat to cake.Dog
 
 /* Decl Attribute changes */
-cake: Accessor GlobalLetChangedToVar.Modify() is a new API without @available attribute
-cake: Accessor GlobalLetChangedToVar.Set() is a new API without @available attribute
-cake: Accessor fixedLayoutStruct2.BecomeFixedBinaryOrder.Modify() is a new API without @available attribute
-cake: Accessor fixedLayoutStruct2.BecomeFixedBinaryOrder.Set() is a new API without @available attribute
-cake: AssociatedType RequirementChanges.addedTypeWithDefault is a new API without @available attribute
-cake: AssociatedType RequirementChanges.addedTypeWithoutDefault is a new API without @available attribute
-cake: Class C0 is a new API without @available attribute
-cake: Class C8 is a new API without @available attribute
-cake: Constructor AddingNewDesignatedInit.init(_:) is a new API without @available attribute
-cake: Constructor C1.init(_:) is a new API without @available attribute
-cake: Constructor ClassWithMissingDesignatedInits.init() is a new API without @available attribute
-cake: Constructor SubclassWithMissingDesignatedInits.init() is a new API without @available attribute
+cake: Accessor GlobalLetChangedToVar.Modify() is a new API without '@available'
+cake: Accessor GlobalLetChangedToVar.Set() is a new API without '@available'
+cake: Accessor fixedLayoutStruct2.BecomeFixedBinaryOrder.Modify() is a new API without '@available'
+cake: Accessor fixedLayoutStruct2.BecomeFixedBinaryOrder.Set() is a new API without '@available'
+cake: AssociatedType RequirementChanges.addedTypeWithDefault is a new API without '@available'
+cake: AssociatedType RequirementChanges.addedTypeWithoutDefault is a new API without '@available'
+cake: Class C0 is a new API without '@available'
+cake: Class C8 is a new API without '@available'
+cake: Constructor AddingNewDesignatedInit.init(_:) is a new API without '@available'
+cake: Constructor C1.init(_:) is a new API without '@available'
+cake: Constructor ClassWithMissingDesignatedInits.init() is a new API without '@available'
+cake: Constructor SubclassWithMissingDesignatedInits.init() is a new API without '@available'
 cake: Enum IceKind is now without @frozen
-cake: EnumElement FrozenKind.AddedCase is a new API without @available attribute
-cake: EnumElement FutureKind.FineToAdd is a new API without @available attribute
+cake: EnumElement FrozenKind.AddedCase is a new API without '@available'
+cake: EnumElement FutureKind.FineToAdd is a new API without '@available'
 cake: Func C1.foo1() is now not static
 cake: Func FinalFuncContainer.NewFinalFunc() is now with final
 cake: Func FinalFuncContainer.NoLongerFinalFunc() is now without final
-cake: Func Float.floatHigher() is a new API without @available attribute
-cake: Func FutureKind.==(_:_:) is a new API without @available attribute
-cake: Func FutureKind.hash(into:) is a new API without @available attribute
+cake: Func Float.floatHigher() is a new API without '@available'
+cake: Func FutureKind.==(_:_:) is a new API without '@available'
+cake: Func FutureKind.hash(into:) is a new API without '@available'
 cake: Func HasMutatingMethodClone.foo() has self access kind changing from Mutating to NonMutating
-cake: Func RequirementChanges.addedFunc() is a new API without @available attribute
+cake: Func RequirementChanges.addedFunc() is a new API without '@available'
 cake: Func S1.foo1() has self access kind changing from NonMutating to Mutating
 cake: Func S1.foo3() is now static
 cake: Func _NoResilientClass.NoLongerFinalFunc() is now without final
-cake: Func fixedLayoutStruct.OKChange() is a new API without @available attribute
-cake: Protocol P4 is a new API without @available attribute
+cake: Func fixedLayoutStruct.OKChange() is a new API without '@available'
+cake: Protocol P4 is a new API without '@available'
 cake: Struct C6 is now with @frozen
 cake: Var C1.CIIns1 changes from weak to strong
 cake: Var C1.CIIns2 changes from strong to weak
-cake: Var FutureKind.hashValue is a new API without @available attribute
-cake: Var RequirementChanges.addedVar is a new API without @available attribute
-cake: Var fixedLayoutStruct.$__lazy_storage_$_lazy_d is a new API without @available attribute
-cake: Var fixedLayoutStruct.c is a new API without @available attribute
+cake: Var FutureKind.hashValue is a new API without '@available'
+cake: Var RequirementChanges.addedVar is a new API without '@available'
+cake: Var fixedLayoutStruct.$__lazy_storage_$_lazy_d is a new API without '@available'
+cake: Var fixedLayoutStruct.c is a new API without '@available'
 
 /* Fixed-layout Type Changes */
 cake: EnumElement FrozenKind.AddedCase is added to a non-resilient type

@@ -31,3 +31,9 @@ public struct DeclRef: CustomStringConvertible, NoReflectionChildren {
     lhs.bridged.isEqualTo(rhs.bridged)
   }
 }
+
+extension DeclRef: DiagnosticArgument {
+  public func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void) {
+    fn(bridged.asDiagnosticArgument())
+  }
+}

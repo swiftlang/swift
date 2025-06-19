@@ -12,7 +12,7 @@
 ///
 /// SIL operates on three kinds of addressable memory:
 ///
-/// 1. Temporary RValues. These are recognied by AddressInitializationWalker. These largely disappear with opaque SIL
+/// 1. Temporary RValues. These are recognized by AddressInitializationWalker. These largely disappear with opaque SIL
 /// values.
 ///
 /// 2. Local variables. These are always introduced by either a VarDeclInstruction or a Function argument with non-nil
@@ -69,6 +69,7 @@ struct LocalVariableAccess: CustomStringConvertible {
     case dependenceSource // A value/address depends on this local here (like a load)
     case dependenceDest  // This local depends on another value/address here (like a store)
     case store       // 'var' initialization and destruction
+    case storeBorrow // scoped initialization of temporaries
     case apply       // indirect arguments
     case escape      // alloc_box captures
   }
@@ -103,7 +104,7 @@ struct LocalVariableAccess: CustomStringConvertible {
       }
     case .load, .dependenceSource, .dependenceDest:
       return false
-    case .incomingArgument, .outgoingArgument, .store, .inoutYield:
+    case .incomingArgument, .outgoingArgument, .store, .storeBorrow, .inoutYield:
       return true
     case .apply:
       let apply = instruction as! FullApplySite
@@ -146,6 +147,8 @@ struct LocalVariableAccess: CustomStringConvertible {
       str += "dependenceDest"
     case .store:
       str += "store"
+    case .storeBorrow:
+      str += "storeBorrow"
     case .apply:
       str += "apply"
     case .escape:
@@ -178,9 +181,9 @@ class LocalVariableAccessInfo: CustomStringConvertible {
       case .`init`, .modify:
         break // lazily compute full assignment
       }
-      case .load, .dependenceSource, .dependenceDest:
+    case .load, .dependenceSource, .dependenceDest:
       self._isFullyAssigned = false
-    case .store:
+    case .store, .storeBorrow:
       if let store = localAccess.instruction as? StoringInstruction {
         self._isFullyAssigned = LocalVariableAccessInfo.isBase(address: store.destination)
       } else {
@@ -421,12 +424,17 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
   // temporaries do not have access scopes, so we need to walk down any projection that may be used to initialize the
   // temporary.
   mutating func projectedAddressUse(of operand: Operand, into value: Value) -> WalkResult {
-    // Intercept mark_dependence destination to record an access point which can be used like a store when finding all
-    // uses that affect the base after the point that the dependence was marked.
     if let md = value as? MarkDependenceInst {
-      assert(operand == md.valueOperand)
-      visit(LocalVariableAccess(.dependenceDest, operand))
-      // walk down the forwarded address as usual...
+      if operand == md.valueOperand {
+        // Intercept mark_dependence destination to record an access point which can be used like a store when finding
+        // all uses that affect the base after the point that the dependence was marked.
+        visit(LocalVariableAccess(.dependenceDest, operand))
+        // walk down the forwarded address as usual...
+      } else {
+        // A dependence is similar to loading from its source. Downstream uses are not accesses of the original local.
+        visit(LocalVariableAccess(.dependenceSource, operand))
+        return .continueWalk
+      }
     }
     return walkDownAddressUses(address: value)
   }
@@ -441,6 +449,9 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
       return .continueWalk
     case is LoadBorrowInst:
       visit(LocalVariableAccess(.load, operand))
+      return .continueWalk
+    case is StoreBorrowInst:
+      visit(LocalVariableAccess(.storeBorrow, operand))
       return .continueWalk
     default:
       // A StoreBorrow should be guarded by an access scope.
@@ -763,7 +774,7 @@ extension LocalVariableReachableAccess {
 
   /// This performs a forward CFG walk to find all uses of this local variable reachable after `begin`.
   ///
-  /// If `lifetime` is true, then this gathers the full known lifetime, includeing destroys and reassignments ignoring
+  /// If `lifetime` is true, then this gathers the full known lifetime, including destroys and reassignments ignoring
   /// escapes.
   ///
   /// If `lifetime` is false, then this returns `false` if the walk ended early because of a reachable escape.

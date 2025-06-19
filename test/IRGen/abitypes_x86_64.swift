@@ -11,9 +11,9 @@ import c_gadget
 // x86_64: store float %1,
 // x86_64: store float %2,
 // x86_64: store float %3,
-// x86_64: [[T0:%.*]] = getelementptr inbounds { <2 x float>, <2 x float> }, ptr [[COERCED]], i32 0, i32 0
+// x86_64: [[T0:%.*]] = getelementptr inbounds{{.*}} { <2 x float>, <2 x float> }, ptr [[COERCED]], i32 0, i32 0
 // x86_64: [[FIRST_HALF:%.*]] = load <2 x float>, ptr [[T0]], align 8
-// x86_64: [[T0:%.*]] = getelementptr inbounds { <2 x float>, <2 x float> }, ptr [[COERCED]], i32 0, i32 1
+// x86_64: [[T0:%.*]] = getelementptr inbounds{{.*}} { <2 x float>, <2 x float> }, ptr [[COERCED]], i32 0, i32 1
 // x86_64: [[SECOND_HALF:%.*]] = load <2 x float>, ptr [[T0]], align 8
 // x86_64: [[RESULT:%.*]] = call float @MyRect_Area(<2 x float> [[FIRST_HALF]], <2 x float> [[SECOND_HALF]])
 // x86_64: ret float [[RESULT]]

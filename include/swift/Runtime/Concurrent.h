@@ -750,7 +750,12 @@ public:
 
   /// Clear the hash table, freeing (when safe) all memory currently used for
   /// indices and elements.
-  void clear() {
+  ///
+  /// - addFreedNodes: if nonempty, this function will be called with the head
+  /// of the free list. The function may add additional nodes to the free
+  /// list, which will be freed when it is safe to do so.
+  void clear(std::function<void(ConcurrentFreeListNode *&)> addFreedNodes
+                 = nullptr) {
     typename MutexTy::ScopedLock guard(WriterLock);
 
     IndexStorage indices = Indices.load(std::memory_order_relaxed);
@@ -765,6 +770,9 @@ public:
     if (auto *ptr = indices.pointer())
       ConcurrentFreeListNode::add(&FreeList, ptr);
     ConcurrentFreeListNode::add(&FreeList, elements);
+
+    if (addFreedNodes)
+      addFreedNodes(FreeList);
 
     deallocateFreeListIfSafe();
   }

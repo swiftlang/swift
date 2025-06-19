@@ -1,8 +1,9 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-5.7-abi-triple %S/../Inputs/FakeDistributedActorSystems.swift
 // RUN: %target-build-swift -module-name dist -target %target-swift-5.7-abi-triple -parse-as-library -j2 -parse-as-library -plugin-path %swift-plugin-dir -I %t %s %S/../Inputs/FakeDistributedActorSystems.swift -o %t/a.out
 // RUN: %target-codesign %t/a.out
-// RUN: %target-run %t/a.out
+
+// RUN: %target-run %t/a.out PARAMETER_TYPE
+// RUN: %target-run %t/a.out RETURN_TYPE
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -17,7 +18,6 @@
 
 import Darwin
 import Distributed
-import FakeDistributedActorSystems
 import Foundation
 
 typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
@@ -1052,20 +1052,39 @@ struct BigGeneric<T>: Codable {
 }
 
 distributed actor D {
+  public distributed func getBigGeneric(_ value: BigGeneric<TypeXXXX>) {}
   public distributed func getBigGeneric() -> BigGeneric<TypeXXXX> {
-    return BigGeneric()
-  }
+     return BigGeneric()
+   }
 }
 
-func attempt(n: Int) {
-  var fname = "$s4dist1DC13getBigGenericAA0cD0VyAA8Type\(n)VGyF"
+func attempt(_ mode: Mode, n: Int) {
+  var funcName_returnType = "$s4dist1DC13getBigGenericAA0cD0VyAA8Type\(n)VGyF"
+  var funcName_param = "$s4dist1DC13getBigGenericyyAA0cD0VyAA8Type\(n)VGF"
 
   func tryLookup() {
-    let t = fname.withUTF8 {
-      __getReturnTypeInfo($0.baseAddress!, UInt($0.count), nil, nil)
-    }
+    let t: (any Any.Type)? =
+      switch mode {
+      case .returnType:
+        funcName_returnType.withUTF8 {
+          __getReturnTypeInfo($0.baseAddress!, UInt($0.count), nil, nil)
+        }
+
+      case .paramType:
+        funcName_param.withUTF8 { nameBuf in
+          var type: Any.Type?
+          withUnsafeMutablePointer(to: &type) { typePtr in
+            let ret = __getParameterTypeInfo(nameBuf.baseAddress!, UInt(nameBuf.count), nil, nil, typePtr._rawValue, 1)
+            if ret != 1 {
+              fatalError("Decoded \(ret) parameters, expected 1")
+            }
+          }
+          return type
+        }
+      }
+
     guard let t else {
-      print("couldn't look up type for: \(fname)")
+      print("couldn't look up type for mode: \(mode)")
       exit(1)
     }
     func examineType<T>(_t: T.Type) {
@@ -1081,10 +1100,23 @@ func attempt(n: Int) {
   }
 }
 
+enum Mode: String {
+  case returnType = "RETURN_TYPE"
+  case paramType = "PARAMETER_TYPE"
+}
+
 @main struct Main {
   static func main() {
-    for i in 1000...1999 {
-      attempt(n: i)
+    if CommandLine.arguments.count < 2 {
+      fatalError("Expected explicit mode in command line arguments, was: \(CommandLine.arguments)")
     }
+
+    let mode = Mode.init(rawValue: CommandLine.arguments.dropFirst().first!)!
+    print("Checking in mode: \(mode)...")
+
+    for i in 1000...1999 {
+      attempt(mode, n: i)
+    }
+    print("Passed in mode: \(mode)!")
   }
 }

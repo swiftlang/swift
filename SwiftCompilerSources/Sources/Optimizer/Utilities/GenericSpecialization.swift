@@ -50,7 +50,7 @@ private struct VTableSpecializer {
     let classDecl = classType.nominal! as! ClassDecl
     guard let origVTable = context.lookupVTable(for: classDecl) else {
       if context.enableWMORequiredDiagnostics {
-        context.diagnosticEngine.diagnose(errorLocation.sourceLoc, .cannot_specialize_class, classType)
+        context.diagnosticEngine.diagnose(.cannot_specialize_class, classType, at: errorLocation)
       }
       return
     }
@@ -79,7 +79,7 @@ private struct VTableSpecializer {
   }
 
   private func specializeEntries(of vTable: VTable, _ notifyNewFunction: (Function) -> ()) -> [VTable.Entry] {
-    return vTable.entries.compactMap { entry in
+    return vTable.entries.map { entry in
       if !entry.implementation.isGeneric {
         return entry
       }
@@ -91,8 +91,7 @@ private struct VTableSpecializer {
             context.loadFunction(function: entry.implementation, loadCalleesRecursively: true),
             let specializedMethod = context.specialize(function: entry.implementation, for: methodSubs) else
       {
-        context.diagnosticEngine.diagnose(entry.methodDecl.location.sourceLoc, .non_final_generic_class_function)
-        return nil
+        return entry
       }
       notifyNewFunction(specializedMethod)
 
@@ -106,16 +105,29 @@ private struct VTableSpecializer {
   }
 }
 
-func specializeWitnessTable(forConformance conformance: Conformance,
-                            errorLocation: Location,
+/// Specializes a witness table of `conformance` for the concrete type of the conformance.
+func specializeWitnessTable(for conformance: Conformance,
                             _ context: ModulePassContext,
                             _ notifyNewWitnessTable: (WitnessTable) -> ())
 {
-  let genericConformance = conformance.genericConformance
-  guard let witnessTable = context.lookupWitnessTable(for: genericConformance) else {
+  if let existingSpecialization = context.lookupWitnessTable(for: conformance),
+         existingSpecialization.isSpecialized
+  {
+    return
+  }
+
+  let baseConf = conformance.isInherited ? conformance.inheritedConformance: conformance
+  if !baseConf.isSpecialized {
+    var visited = Set<Conformance>()
+    specializeDefaultMethods(for: conformance, visited: &visited, context, notifyNewWitnessTable)
+    return
+  }
+
+  guard let witnessTable = context.lookupWitnessTable(for: baseConf.genericConformance) else {
     fatalError("no witness table found")
   }
   assert(witnessTable.isDefinition, "No witness table available")
+  let substitutions = baseConf.specializedSubstitutions
 
   let newEntries = witnessTable.entries.map { origEntry in
     switch origEntry {
@@ -125,13 +137,14 @@ func specializeWitnessTable(forConformance conformance: Conformance,
       guard let origMethod = witness else {
         return origEntry
       }
-      let methodSubs = conformance.specializedSubstitutions.getMethodSubstitutions(for: origMethod)
+      let methodSubs = substitutions.getMethodSubstitutions(for: origMethod,
+                         // Generic self types need to be handled specially (see `getMethodSubstitutions`)
+                         selfType: origMethod.hasGenericSelf(context) ? conformance.type.canonical : nil)
 
       guard !methodSubs.conformances.contains(where: {!$0.isValid}),
             context.loadFunction(function: origMethod, loadCalleesRecursively: true),
             let specializedMethod = context.specialize(function: origMethod, for: methodSubs) else
       {
-        context.diagnosticEngine.diagnose(errorLocation.sourceLoc, .cannot_specialize_witness_method, requirement)
         return origEntry
       }
       return .method(requirement: requirement, witness: specializedMethod)
@@ -139,24 +152,115 @@ func specializeWitnessTable(forConformance conformance: Conformance,
       let baseConf = context.getSpecializedConformance(of: witness,
                                                        for: conformance.type,
                                                        substitutions: conformance.specializedSubstitutions)
-      specializeWitnessTable(forConformance: baseConf, errorLocation: errorLocation, context, notifyNewWitnessTable)
+      specializeWitnessTable(for: baseConf, context, notifyNewWitnessTable)
       return .baseProtocol(requirement: requirement, witness: baseConf)
     case .associatedType(let requirement, let witness):
       let substType = witness.subst(with: conformance.specializedSubstitutions)
       return .associatedType(requirement: requirement, witness: substType)
     case .associatedConformance(let requirement, let assocConf):
-      // FIXME: let concreteAssociateConf = assocConf.subst(with: conformance.specializedSubstitutions)
-      let concreteAssociateConf = conformance.getAssociatedConformance(ofAssociatedType: requirement.rawType, to: assocConf.proto)
+      // TODO: once we have the API, replace this with:
+      //       let concreteAssociateConf = assocConf.subst(with: conformance.specializedSubstitutions)
+      let concreteAssociateConf = conformance.getAssociatedConformance(ofAssociatedType: requirement.rawType,
+                                                                       to: assocConf.protocol)
       if concreteAssociateConf.isSpecialized {
-        specializeWitnessTable(forConformance: concreteAssociateConf,
-                               errorLocation: errorLocation,
-                               context, notifyNewWitnessTable)
+        specializeWitnessTable(for: concreteAssociateConf, context, notifyNewWitnessTable)
       }
       return .associatedConformance(requirement: requirement,
                                     witness: concreteAssociateConf)
     }
   }
-  let newWT = context.createWitnessTable(entries: newEntries,conformance: conformance,
-                                         linkage: .shared, serialized: false)
+  let newWT = context.createSpecializedWitnessTable(entries: newEntries,conformance: conformance,
+                                                    linkage: .shared, serialized: false)
   notifyNewWitnessTable(newWT)
+}
+
+/// Specializes the default methods of a non-generic witness table.
+/// Default implementations (in protocol extensions) of non-generic protocol methods have a generic
+/// self argument. Specialize such methods with the concrete type. Note that it is important to also
+/// specialize inherited conformances so that the concrete self type is correct, even for derived classes.
+private func specializeDefaultMethods(for conformance: Conformance,
+                                      visited: inout Set<Conformance>,
+                                      _ context: ModulePassContext,
+                                      _ notifyNewWitnessTable: (WitnessTable) -> ())
+{
+  // Avoid infinite recursion, which may happen if an associated conformance is the conformance itself.
+  guard visited.insert(conformance).inserted,
+        let witnessTable = context.lookupWitnessTable(for: conformance.rootConformance)
+  else {
+    return
+  }
+
+  assert(witnessTable.isDefinition, "No witness table available")
+
+  var specialized = false
+
+  let newEntries = witnessTable.entries.map { origEntry in
+    switch origEntry {
+    case .invalid:
+      return WitnessTable.Entry.invalid
+    case .method(let requirement, let witness):
+      guard let origMethod = witness,
+            // Is it a generic method where only self is generic (= a default witness method)?
+            origMethod.isGeneric, origMethod.isNonGenericWitnessMethod(context)
+      else {
+        return origEntry
+      }
+      // Replace the generic self type with the concrete type.
+      let methodSubs = SubstitutionMap(genericSignature: origMethod.genericSignature,
+                                       replacementTypes: [conformance.type])
+
+      guard !methodSubs.conformances.contains(where: {!$0.isValid}),
+            context.loadFunction(function: origMethod, loadCalleesRecursively: true),
+            let specializedMethod = context.specialize(function: origMethod, for: methodSubs) else
+      {
+        return origEntry
+      }
+      specialized = true
+      return .method(requirement: requirement, witness: specializedMethod)
+    case .baseProtocol(_, let witness):
+      specializeDefaultMethods(for: witness, visited: &visited, context, notifyNewWitnessTable)
+      return origEntry
+    case .associatedType:
+      return origEntry
+    case .associatedConformance(_, let assocConf):
+      specializeDefaultMethods(for: assocConf, visited: &visited, context, notifyNewWitnessTable)
+      return origEntry
+    }
+  }
+  // If the witness table does not contain any default methods, there is no need to create a
+  // specialized witness table.
+  if specialized {
+    let newWT = context.createSpecializedWitnessTable(entries: newEntries,conformance: conformance,
+                                                      linkage: .shared, serialized: false)
+    notifyNewWitnessTable(newWT)
+  }
+}
+
+private extension Function {
+  // True, if this is a non-generic method which might have a generic self argument.
+  // Default implementations (in protocol extensions) of non-generic protocol methods have a generic
+  // self argument.
+  func isNonGenericWitnessMethod(_ context: some Context) -> Bool {
+    switch loweredFunctionType.invocationGenericSignatureOfFunction.genericParameters.count {
+    case 0:
+      return true
+    case 1:
+      return hasGenericSelf(context)
+    default:
+      return false
+    }
+  }
+
+  // True, if the self argument is a generic parameter.
+  func hasGenericSelf(_ context: some Context) -> Bool {
+    let convention = FunctionConvention(for: loweredFunctionType,
+                                        hasLoweredAddresses: context.moduleHasLoweredAddresses)
+    if convention.hasSelfParameter,
+       let selfParam = convention.parameters.last,
+       selfParam.type.isGenericTypeParameter
+    {
+      return true
+    }
+    return false
+  }
 }

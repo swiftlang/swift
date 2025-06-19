@@ -7,7 +7,7 @@ struct MyBase {
   }
 }
 
-// CHECK-AST: (func_decl {{.*}} implicit "$main()" interface_type="(MyBase.Type) -> () throws -> ()" access=internal static
+// CHECK-AST: (func_decl {{.*}} implicit range=[{{.*}}:[[@LINE-6]]:1 - line:[[@LINE-6]]:1] "$main()" interface_type="(MyBase.Type) -> () throws -> ()" access=internal static
 // CHECK-AST-NEXT:  (parameter "self" {{.*}})
 // CHECK-AST-NEXT:  (parameter_list)
 // CHECK-AST-NEXT:  (brace_stmt implicit

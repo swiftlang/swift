@@ -188,7 +188,6 @@ add_library(swiftCore
   StringWordBreaking.swift
   Substring.swift
   SwiftNativeNSArray.swift
-  SwiftSettings.swift
   TemporaryAllocation.swift
   ThreadLocalStorage.swift
   UIntBuffer.swift
@@ -260,13 +259,19 @@ if(NOT LINUX AND NOT ANDROID)
 endif()
 
 if(SwiftCore_ENABLE_COMMANDLINE_SUPPORT)
-  target_sources(swiftCore PRIVATE CommandLine.swift)
-  target_link_libraries(swiftCore PRIVATE swiftCommandLineSupport)
+  target_sources(swiftCore PRIVATE
+    CommandLine.swift)
 endif()
 
 if(SwiftCore_ENABLE_VECTOR_TYPES)
-  gyb_expand(SIMDConcreteOperations.swift.gyb
-    SIMDConcreteOperations.swift
+  gyb_expand(SIMDFloatConcreteOperations.swift.gyb
+    SIMDFloatConcreteOperations.swift
+    FLAGS "-DCMAKE_SIZEOF_VOID_P=${SwiftCore_SIZEOF_POINTER}")
+  gyb_expand(SIMDIntegerConcreteOperations.swift.gyb
+    SIMDIntegerConcreteOperations.swift
+    FLAGS "-DCMAKE_SIZEOF_VOID_P=${SwiftCore_SIZEOF_POINTER}")
+  gyb_expand(SIMDMaskConcreteOperations.swift.gyb
+    SIMDMaskConcreteOperations.swift
     FLAGS "-DCMAKE_SIZEOF_VOID_P=${SwiftCore_SIZEOF_POINTER}")
   gyb_expand(SIMDVectorTypes.swift.gyb
     SIMDVectorTypes.swift
@@ -274,13 +279,19 @@ if(SwiftCore_ENABLE_VECTOR_TYPES)
 
   target_sources(swiftCore PRIVATE
     SIMDVector.swift
-    "${CMAKE_CURRENT_BINARY_DIR}/SIMDConcreteOperations.swift"
+    "${CMAKE_CURRENT_BINARY_DIR}/SIMDFloatConcreteOperations.swift"
+    "${CMAKE_CURRENT_BINARY_DIR}/SIMDIntegerConcreteOperations.swift"
+    "${CMAKE_CURRENT_BINARY_DIR}/SIMDMaskConcreteOperations.swift"
     "${CMAKE_CURRENT_BINARY_DIR}/SIMDVectorTypes.swift")
 endif()
 
 set_target_properties(swiftCore PROPERTIES
   Swift_MODULE_NAME Swift
   LINKER_LANGUAGE CXX)
+if(NOT BUILD_SHARED_LIBS AND CMAKE_STATIC_LIBRARY_PREFIX_Swift)
+  set_target_properties(swiftCore PROPERTIES
+    PREFIX ${CMAKE_STATIC_LIBRARY_PREFIX_Swift})
+endif()
 
 target_compile_definitions(swiftCore
   PRIVATE
@@ -301,7 +312,8 @@ target_compile_options(swiftCore PRIVATE
   $<$<COMPILE_LANGUAGE:Swift>:-nostdimport>
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -group-info-path -Xfrontend ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-objc-attr-requires-foundation-module>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -require-explicit-availability=ignore>")
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -require-explicit-availability=ignore>"
+  "$<$<AND:$<PLATFORM_ID:Darwin>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -previous-module-installname-map-file -Xfrontend ${CMAKE_CURRENT_SOURCE_DIR}/PreviousModuleInstallName.json>")
 if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "MinSizeRel")
   # Using these in MinSizeRel would result in a 15% increase in the binary size
   target_compile_options(swiftCore PRIVATE

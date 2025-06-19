@@ -515,6 +515,10 @@ TypeExpr *NormalProtocolConformance::getExplicitGlobalActorIsolation() const {
   return ctx.getGlobalCache().conformanceExplicitGlobalActorIsolation[this];
 }
 
+bool NormalProtocolConformance::hasExplicitGlobalActorIsolation() const {
+  return Bits.NormalProtocolConformance.HasExplicitGlobalActor;
+}
+
 void
 NormalProtocolConformance::setExplicitGlobalActorIsolation(TypeExpr *typeExpr) {
   if (!typeExpr) {
@@ -733,6 +737,13 @@ NormalProtocolConformance::getWitnessUncached(ValueDecl *requirement) const {
     return Witness();
   }
   return entry->second;
+}
+
+ProtocolConformanceRef
+SelfProtocolConformance::getAssociatedConformance(Type assocType,
+                                                  ProtocolDecl *protocol) const {
+  ASSERT(assocType->isEqual(protocol->getSelfInterfaceType()));
+  return lookupConformance(getType(), protocol);
 }
 
 Witness SelfProtocolConformance::getWitness(ValueDecl *requirement) const {
@@ -979,9 +990,12 @@ static bool isVanishingTupleConformance(
 
   auto replacementTypes = substitutions.getReplacementTypes();
   assert(replacementTypes.size() == 1);
-  auto packType = replacementTypes[0]->castTo<PackType>();
 
-  return (packType->getNumElements() == 1 &&
+  // This might not be an actual pack type with an invalid tuple conformance.
+  auto packType = replacementTypes[0]->getAs<PackType>();
+
+  return (packType &&
+          packType->getNumElements() == 1 &&
           !packType->getElementTypes()[0]->is<PackExpansionType>());
 }
 

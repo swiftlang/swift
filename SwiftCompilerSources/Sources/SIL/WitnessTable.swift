@@ -111,6 +111,9 @@ public struct WitnessTable : CustomStringConvertible, NoReflectionChildren {
 
   public var isDefinition: Bool { !bridged.isDeclaration() }
 
+  // True, if this is a specialized witness table (currently only used in embedded mode).
+  public var isSpecialized: Bool { bridged.isSpecialized() }
+
   public var description: String {
     return String(taking: bridged.getDebugDescription())
   }

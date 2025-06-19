@@ -57,8 +57,8 @@ struct Feature {
   /// Determine the in-source name of the given feature.
   llvm::StringRef getName() const;
 
-  /// Determine whether the given feature supports adoption mode.
-  bool isAdoptable() const;
+  /// Determine whether the given feature supports migration mode.
+  bool isMigratable() const;
 
   /// Determine whether this feature should be included in the
   /// module interface

@@ -17,10 +17,10 @@
 #ifndef SWIFT_ABI_EXECUTOR_H
 #define SWIFT_ABI_EXECUTOR_H
 
-#include <inttypes.h>
 #include "swift/ABI/Actor.h"
 #include "swift/ABI/HeapObject.h"
 #include "swift/Runtime/Casting.h"
+#include <inttypes.h>
 
 namespace swift {
 class AsyncContext;
@@ -77,10 +77,10 @@ class SerialExecutorRef {
     /// Executor that may need to participate in complex "same context" checks,
     /// by invoking `isSameExclusiveExecutionContext` when comparing execution contexts.
     ComplexEquality = 0b01,
-    /// Mark this executor as the one used by `Task.startSynchronously`,
+    /// Mark this executor as the one used by `Task.immediate`,
     /// It cannot participate in switching.
     // TODO: Perhaps make this a generic "cannot switch" rather than start synchronously specific.
-    StartSynchronously = 0b10,
+    Immediate = 0b10,
   };
 
   static_assert(static_cast<uintptr_t>(ExecutorKind::Ordinary) == 0);
@@ -107,12 +107,12 @@ public:
 
   static SerialExecutorRef forSynchronousStart() {
     auto wtable = reinterpret_cast<uintptr_t>(nullptr) |
-                  static_cast<uintptr_t>(ExecutorKind::StartSynchronously);
+                  static_cast<uintptr_t>(ExecutorKind::Immediate);
     return SerialExecutorRef(nullptr, wtable);
   }
   bool isForSynchronousStart() const {
     return getIdentity() == nullptr &&
-           getExecutorKind() == ExecutorKind::StartSynchronously;
+           getExecutorKind() == ExecutorKind::Immediate;
   }
 
   /// Given a pointer to a serial executor and its SerialExecutor
@@ -412,6 +412,23 @@ public:
   /// The expected size of the context.
   uint32_t ExpectedContextSize;
 };
+
+/// Type-safe wrapper around the return value of `isIsolatingCurrentContext`.
+enum class IsIsolatingCurrentContextDecision : int8_t {
+  // The function call could not determine if the current context is isolated
+  // by this executor or not. Default value for executors which do not implement
+  // `isIsolatingCurrentContext`.
+  Unknown = -1,
+  // The current context is definitely not isolated by this executor.
+  NotIsolated = 0,
+  // The current context is definitely isolated by this executor.
+  Isolated = 1,
+};
+
+IsIsolatingCurrentContextDecision
+getIsIsolatingCurrentContextDecisionFromInt(int8_t value);
+
+StringRef getIsIsolatingCurrentContextDecisionNameStr(IsIsolatingCurrentContextDecision decision);
 
 }
 

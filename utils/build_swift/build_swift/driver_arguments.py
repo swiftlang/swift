@@ -94,6 +94,9 @@ def _apply_default_arguments(args):
     if args.foundation_build_variant is None:
         args.foundation_build_variant = args.build_variant
 
+    if args.foundation_tests_build_variant is None:
+        args.foundation_tests_build_variant = args.build_variant
+
     if args.libdispatch_build_variant is None:
         args.libdispatch_build_variant = args.build_variant
 
@@ -128,6 +131,9 @@ def _apply_default_arguments(args):
 
     if args.lldb_assertions is None:
         args.lldb_assertions = args.assertions
+
+    if args.swift_stdlib_strict_availability is None:
+        args.swift_stdlib_strict_availability = False
 
     # --ios-all etc are not supported by open-source Swift.
     if args.ios_all:
@@ -592,6 +598,12 @@ def create_argument_parser():
                 'will get little benefit from it (e.g. tools for '
                 'bootstrapping or debugging Swift)')
 
+    option('--extra-swift-cmake-options', append,
+           type=argparse.ShellSplitType(),
+           help='Pass additional CMake options to the Swift build. '
+                'Can be passed multiple times to add multiple options.',
+           default=[])
+
     option('--dsymutil-jobs', store_int,
            default=defaults.DSYMUTIL_JOBS,
            metavar='COUNT',
@@ -955,6 +967,12 @@ def create_argument_parser():
            const='Debug',
            help='build the Debug variant of Foundation')
 
+    option('--foundation-tests-build-type', store('foundation_tests_build_variant'),
+           choices=['Debug', 'Release'],
+           default=None,
+           help='build the Foundation tests in a certain variant '
+                '(Debug builds much faster)')
+
     option('--debug-libdispatch', store('libdispatch_build_variant'),
            const='Debug',
            help='build the Debug variant of libdispatch')
@@ -1028,6 +1046,14 @@ def create_argument_parser():
     option('--no-llbuild-assertions', store('llbuild_assertions'),
            const=False,
            help='disable assertions in llbuild')
+
+    option('--swift-stdlib-strict-availability', store,
+           const=True,
+           help='enable strict availability checking in the Swift standard library (you want this OFF for CI or at-desk builds)')
+    option('--no-swift-stdlib-strict-availability',
+           store('swift_stdlib_strict_availability'),
+           const=False,
+           help='disable strict availability checking in the Swift standard library (you want this OFF for CI or at-desk builds)')
 
     # -------------------------------------------------------------------------
     in_group('Select the CMake generator')
@@ -1395,14 +1421,27 @@ def create_argument_parser():
                 'Can be called multiple times '
                 'to add multiple such options.')
 
-    option('--no-llvm-include-tests', toggle_false('llvm_include_tests'),
-           help='do not generate testing targets for LLVM')
+    with mutually_exclusive_group():
+        set_defaults(llvm_include_tests=True)
+
+        option('--no-llvm-include-tests', toggle_false('llvm_include_tests'),
+               help='do not generate testing targets for LLVM')
+
+        option('--llvm-include-tests', toggle_true('llvm_include_tests'),
+               help='generate testing targets for LLVM')
 
     option('--llvm-cmake-options', append,
            type=argparse.ShellSplitType(),
            help='CMake options used for llvm in the form of comma '
                 'separated options "-DCMAKE_VAR1=YES,-DCMAKE_VAR2=/tmp". Can '
                 'be called multiple times to add multiple such options.')
+    option('--extra-llvm-cmake-options', append,
+           type=argparse.ShellSplitType(),
+           help='Pass additional CMake options to the LLVM build. '
+                'Can be passed multiple times to add multiple options. '
+                'These are the last arguments passed to CMake and can override '
+                'existing options.',
+           default=[])
 
     # -------------------------------------------------------------------------
     in_group('Build settings for Android')

@@ -520,7 +520,7 @@ struct ASTContext::Implementation {
   llvm::DenseMap<const AbstractFunctionDecl *, SourceRange> OriginalBodySourceRanges;
 
   /// Macro discriminators per context.
-  llvm::DenseMap<std::pair<const void *, Identifier>, unsigned>
+  llvm::DenseMap<std::pair<const void *, DeclBaseName>, unsigned>
       NextMacroDiscriminator;
 
   /// Local and closure discriminators per context.
@@ -817,6 +817,8 @@ ASTContext::ASTContext(
       TheAnyType(ProtocolCompositionType::theAnyType(*this)),
       TheUnconstrainedAnyType(
           ProtocolCompositionType::theUnconstrainedAnyType(*this)),
+      TheSelfType(CanGenericTypeParamType(
+          GenericTypeParamType::getType(0, 0, *this))),
 #define SINGLETON_TYPE(SHORT_ID, ID) \
     The##SHORT_ID##Type(new (*this, AllocationArena::Permanent) \
                           ID##Type(*this)),
@@ -2151,15 +2153,14 @@ void ASTContext::addModuleInterfaceChecker(
   getImpl().InterfaceChecker = std::move(checker);
 }
 
-void ASTContext::setModuleAliases(const llvm::StringMap<StringRef> &aliasMap) {
+void ASTContext::setModuleAliases(
+    const llvm::StringMap<std::string> &aliasMap) {
   // This setter should be called only once after ASTContext has been initialized
   assert(ModuleAliasMap.empty());
-  
-  for (auto k: aliasMap.keys()) {
-    auto v = aliasMap.lookup(k);
-    if (!v.empty()) {
-      addModuleAlias(k, v);
-    }
+
+  for (auto &entry : aliasMap) {
+    if (!entry.getValue().empty())
+      addModuleAlias(entry.getKey(), entry.getValue());
   }
 }
 
@@ -2197,59 +2198,6 @@ Identifier ASTContext::getRealModuleName(Identifier key, ModuleAliasLookupOption
 
   // Otherwise return the value found (whether the key is an alias or real name)
   return value.first;
-}
-
-namespace {
-  static StringRef pathStringFromSearchPath(
-      const SearchPathOptions::SearchPath &next) {
-    return next.Path;
-  }
-}
-
-std::vector<std::string> ASTContext::getDarwinImplicitFrameworkSearchPaths()
-const {
-  assert(LangOpts.Target.isOSDarwin());
-  return SearchPathOpts.getDarwinImplicitFrameworkSearchPaths();
-}
-
-llvm::StringSet<> ASTContext::getAllModuleSearchPathsSet()
-const {
-  llvm::StringSet<> result;
-
-  // Import and framework paths are "special", they contain more than path
-  // strings, but path strings are all we care about here.
-  using SearchPathView = ArrayRefView<SearchPathOptions::SearchPath, StringRef,
-                                      pathStringFromSearchPath>;
-
-  SearchPathView importPathsOnly{SearchPathOpts.getImportSearchPaths()};
-  result.insert(importPathsOnly.begin(), importPathsOnly.end());
-
-  SearchPathView frameworkPathsOnly{SearchPathOpts.getFrameworkSearchPaths()};
-  result.insert(frameworkPathsOnly.begin(), frameworkPathsOnly.end());
-
-  if (LangOpts.Target.isOSDarwin()) {
-    auto implicitFrameworkSearchPaths = getDarwinImplicitFrameworkSearchPaths();
-    result.insert(implicitFrameworkSearchPaths.begin(),
-                  implicitFrameworkSearchPaths.end());
-  }
-  result.insert(SearchPathOpts.RuntimeLibraryImportPaths.begin(),
-                SearchPathOpts.RuntimeLibraryImportPaths.end());
-
-  // ClangImporter special-cases the path for SwiftShims, so do the same here
-  // If there are no shims in the resource dir, add a search path in the SDK.
-  SmallString<128> shimsPath(SearchPathOpts.RuntimeResourcePath);
-  llvm::sys::path::append(shimsPath, "shims");
-  if (!llvm::sys::fs::exists(shimsPath)) {
-    shimsPath = SearchPathOpts.getSDKPath();
-    llvm::sys::path::append(shimsPath, "usr", "lib", "swift", "shims");
-  }
-  result.insert(shimsPath.str());
-
-  // Clang system modules are found in the SDK root
-  SmallString<128> clangSysRootPath(SearchPathOpts.getSDKPath());
-  llvm::sys::path::append(clangSysRootPath, "usr", "include");
-  result.insert(clangSysRootPath.str());
-  return result;
 }
 
 void ASTContext::loadExtensions(NominalTypeDecl *nominal,
@@ -2338,8 +2286,8 @@ unsigned ASTContext::getNextMacroDiscriminator(
     MacroDiscriminatorContext context,
     DeclBaseName baseName
 ) {
-  std::pair<const void *, Identifier> key(
-      context.getOpaqueValue(), baseName.getIdentifier());
+  std::pair<const void *, DeclBaseName> key(
+      context.getOpaqueValue(), baseName);
   return getImpl().NextMacroDiscriminator[key]++;
 }
 
@@ -3543,6 +3491,12 @@ TypeAliasType *TypeAliasType::get(TypeAliasDecl *typealias, Type parent,
   auto &ctx = underlying->getASTContext();
   auto arena = getArena(properties);
 
+  // Typealiases can't meaningfully be unsafe; it's the underlying type that
+  // matters.
+  properties.removeIsUnsafe();
+  if (underlying->isUnsafe())
+    properties |= RecursiveTypeProperties::IsUnsafe;
+
   // Profile the type.
   llvm::FoldingSetNodeID id;
   TypeAliasType::Profile(id, typealias, parent, genericArgs, underlying);
@@ -3623,7 +3577,13 @@ void LocatableType::Profile(llvm::FoldingSetNodeID &id, SourceLoc loc,
 Type ErrorType::get(const ASTContext &C) { return C.TheErrorType; }
 
 Type ErrorType::get(Type originalType) {
-  assert(originalType);
+  ASSERT(originalType);
+  // We don't currently support solver-allocated error types, if we want
+  // this in the future we'll need to adjust `Solution::simplifyType` to fold
+  // them into regular ErrorTypes. Additionally, any clients of
+  // `typesSatisfyConstraint` will need to be taught not to pass such types.
+  ASSERT(!originalType->getRecursiveProperties().isSolverAllocated() &&
+         "Solver-allocated error types not supported");
 
   auto originalProperties = originalType->getRecursiveProperties();
   auto arena = getArena(originalProperties);
@@ -3634,14 +3594,8 @@ Type ErrorType::get(Type originalType) {
 
   void *mem = ctx.Allocate(sizeof(ErrorType) + sizeof(Type),
                            alignof(ErrorType), arena);
-  RecursiveTypeProperties properties = RecursiveTypeProperties::HasError;
-
-  // We need to preserve the solver allocated bit, to ensure any wrapping
-  // types are solver allocated too.
-  if (originalProperties.isSolverAllocated())
-    properties |= RecursiveTypeProperties::SolverAllocated;
-
-  return entry = new (mem) ErrorType(ctx, originalType, properties);
+  return entry = new (mem) ErrorType(ctx, originalType,
+                                     RecursiveTypeProperties::HasError);
 }
 
 void ErrorUnionType::Profile(llvm::FoldingSetNodeID &id, ArrayRef<Type> terms) {
@@ -3925,7 +3879,7 @@ PackElementType::PackElementType(Type packType, unsigned level,
     packType(packType), level(level) {
   assert(packType->isParameterPack() ||
          packType->is<PackArchetypeType>() ||
-         packType->is<TypeVariableType>());
+         packType->isTypeVariableOrMember());
   assert(level > 0);
 }
 
@@ -4190,6 +4144,54 @@ void UnboundGenericType::Profile(llvm::FoldingSetNodeID &ID,
   ID.AddPointer(Parent.getPointer());
 }
 
+/// The safety of a parent type does not have an impact on a nested type within
+/// it. This produces the recursive properties of a given type that should
+/// be propagated to a nested type, which won't include any "IsUnsafe" bit
+/// determined based on the declaration itself.
+static RecursiveTypeProperties getRecursivePropertiesAsParent(Type type) {
+  if (!type)
+    return RecursiveTypeProperties();
+
+  // We only need to do anything interesting at all for unsafe types.
+  auto properties = type->getRecursiveProperties();
+  if (!properties.isUnsafe())
+    return properties;
+
+  if (auto nominal = type->getAnyNominal()) {
+    // If the nominal wasn't itself unsafe, then we got the unsafety from
+    // something else (e.g., a generic argument), so it won't change.
+    if (nominal->getExplicitSafety() != ExplicitSafety::Unsafe)
+      return properties;
+  }
+
+  // Drop the "unsafe" bit. We have to recompute it without considering the
+  // enclosing nominal type.
+  properties.removeIsUnsafe();
+
+  // Check generic arguments of parent types.
+  while (type) {
+    // Merge from the generic arguments.
+    if (auto boundGeneric = type->getAs<BoundGenericType>()) {
+      for (auto genericArg : boundGeneric->getGenericArgs())
+        properties |= genericArg->getRecursiveProperties();
+    }
+
+    if (auto nominalOrBound = type->getAs<NominalOrBoundGenericNominalType>()) {
+      type = nominalOrBound->getParent();
+      continue;
+    }
+
+    if (auto unbound = type->getAs<UnboundGenericType>()) {
+      type = unbound->getParent();
+      continue;
+    }
+
+    break;
+  };
+
+  return properties;
+}
+
 UnboundGenericType *UnboundGenericType::
 get(GenericTypeDecl *TheDecl, Type Parent, const ASTContext &C) {
   llvm::FoldingSetNodeID ID;
@@ -4198,7 +4200,7 @@ get(GenericTypeDecl *TheDecl, Type Parent, const ASTContext &C) {
   RecursiveTypeProperties properties;
   if (TheDecl->getExplicitSafety() == ExplicitSafety::Unsafe)
     properties |= RecursiveTypeProperties::IsUnsafe;
-  if (Parent) properties |= Parent->getRecursiveProperties();
+  properties |= getRecursivePropertiesAsParent(Parent);
 
   auto arena = getArena(properties);
 
@@ -4252,7 +4254,7 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
   RecursiveTypeProperties properties;
   if (TheDecl->getExplicitSafety() == ExplicitSafety::Unsafe)
     properties |= RecursiveTypeProperties::IsUnsafe;
-  if (Parent) properties |= Parent->getRecursiveProperties();
+  properties |= getRecursivePropertiesAsParent(Parent);
   for (Type Arg : GenericArgs) {
     properties |= Arg->getRecursiveProperties();
   }
@@ -4335,7 +4337,7 @@ EnumType *EnumType::get(EnumDecl *D, Type Parent, const ASTContext &C) {
   RecursiveTypeProperties properties;
   if (D->getExplicitSafety() == ExplicitSafety::Unsafe)
     properties |= RecursiveTypeProperties::IsUnsafe;
-  if (Parent) properties |= Parent->getRecursiveProperties();
+  properties |= getRecursivePropertiesAsParent(Parent);
   auto arena = getArena(properties);
 
   auto *&known = C.getImpl().getArena(arena).EnumTypes[{D, Parent}];
@@ -4353,7 +4355,7 @@ StructType *StructType::get(StructDecl *D, Type Parent, const ASTContext &C) {
   RecursiveTypeProperties properties;
   if (D->getExplicitSafety() == ExplicitSafety::Unsafe)
     properties |= RecursiveTypeProperties::IsUnsafe;
-  if (Parent) properties |= Parent->getRecursiveProperties();
+  properties |= getRecursivePropertiesAsParent(Parent);
   auto arena = getArena(properties);
 
   auto *&known = C.getImpl().getArena(arena).StructTypes[{D, Parent}];
@@ -4371,7 +4373,7 @@ ClassType *ClassType::get(ClassDecl *D, Type Parent, const ASTContext &C) {
   RecursiveTypeProperties properties;
   if (D->getExplicitSafety() == ExplicitSafety::Unsafe)
     properties |= RecursiveTypeProperties::IsUnsafe;
-  if (Parent) properties |= Parent->getRecursiveProperties();
+  properties |= getRecursivePropertiesAsParent(Parent);
   auto arena = getArena(properties);
 
   auto *&known = C.getImpl().getArena(arena).ClassTypes[{D, Parent}];
@@ -5045,8 +5047,8 @@ GenericTypeParamType *GenericTypeParamType::get(Identifier name,
                                                 Type valueType,
                                                 const ASTContext &ctx) {
   llvm::FoldingSetNodeID id;
-  GenericTypeParamType::Profile(id, paramKind, depth, index, valueType,
-                                name);
+  GenericTypeParamType::Profile(id, paramKind, depth, index, /*weight=*/0,
+                                valueType, name);
 
   void *insertPos;
   if (auto gpTy = ctx.getImpl().GenericParamTypes.FindNodeOrInsertPos(id, insertPos))
@@ -5056,8 +5058,8 @@ GenericTypeParamType *GenericTypeParamType::get(Identifier name,
   if (paramKind == GenericTypeParamKind::Pack)
     props |= RecursiveTypeProperties::HasParameterPack;
 
-  auto canType = GenericTypeParamType::get(paramKind, depth, index, valueType,
-                                           ctx);
+  auto canType = GenericTypeParamType::get(paramKind, depth, index, /*weight=*/0,
+                                           valueType, ctx);
 
   auto result = new (ctx, AllocationArena::Permanent)
       GenericTypeParamType(name, canType, ctx);
@@ -5076,10 +5078,10 @@ GenericTypeParamType *GenericTypeParamType::get(GenericTypeParamDecl *param) {
 
 GenericTypeParamType *GenericTypeParamType::get(GenericTypeParamKind paramKind,
                                                 unsigned depth, unsigned index,
-                                                Type valueType,
+                                                unsigned weight, Type valueType,
                                                 const ASTContext &ctx) {
   llvm::FoldingSetNodeID id;
-  GenericTypeParamType::Profile(id, paramKind, depth, index, valueType,
+  GenericTypeParamType::Profile(id, paramKind, depth, index, weight, valueType,
                                 Identifier());
 
   void *insertPos;
@@ -5091,7 +5093,7 @@ GenericTypeParamType *GenericTypeParamType::get(GenericTypeParamKind paramKind,
     props |= RecursiveTypeProperties::HasParameterPack;
 
   auto result = new (ctx, AllocationArena::Permanent)
-      GenericTypeParamType(paramKind, depth, index, valueType, props, ctx);
+      GenericTypeParamType(paramKind, depth, index, weight, valueType, props, ctx);
   ctx.getImpl().GenericParamTypes.InsertNode(result, insertPos);
   return result;
 }
@@ -5100,14 +5102,21 @@ GenericTypeParamType *GenericTypeParamType::getType(unsigned depth,
                                                     unsigned index,
                                                     const ASTContext &ctx) {
   return GenericTypeParamType::get(GenericTypeParamKind::Type, depth, index,
-                                   /*valueType*/ Type(), ctx);
+                                   /*weight=*/0, /*valueType=*/Type(), ctx);
+}
+
+GenericTypeParamType *GenericTypeParamType::getOpaqueResultType(unsigned depth,
+                                                                unsigned index,
+                                                                const ASTContext &ctx) {
+  return GenericTypeParamType::get(GenericTypeParamKind::Type, depth, index,
+                                   /*weight=*/1, /*valueType=*/Type(), ctx);
 }
 
 GenericTypeParamType *GenericTypeParamType::getPack(unsigned depth,
                                                     unsigned index,
                                                     const ASTContext &ctx) {
   return GenericTypeParamType::get(GenericTypeParamKind::Pack, depth, index,
-                                   /*valueType*/ Type(), ctx);
+                                   /*weight=*/0, /*valueType=*/Type(), ctx);
 }
 
 GenericTypeParamType *GenericTypeParamType::getValue(unsigned depth,
@@ -5115,7 +5124,7 @@ GenericTypeParamType *GenericTypeParamType::getValue(unsigned depth,
                                                      Type valueType,
                                                      const ASTContext &ctx) {
   return GenericTypeParamType::get(GenericTypeParamKind::Value, depth, index,
-                                   valueType, ctx);
+                                   /*weight=*/0, valueType, ctx);
 }
 
 ArrayRef<GenericTypeParamType *>
@@ -5538,7 +5547,7 @@ ProtocolType *ProtocolType::get(ProtocolDecl *D, Type Parent,
   RecursiveTypeProperties properties;
   if (D->getExplicitSafety() == ExplicitSafety::Unsafe)
     properties |= RecursiveTypeProperties::IsUnsafe;
-  if (Parent) properties |= Parent->getRecursiveProperties();
+  properties |= getRecursivePropertiesAsParent(Parent);
   auto arena = getArena(properties);
 
   auto *&known = C.getImpl().getArena(arena).ProtocolTypes[{D, Parent}];
@@ -5810,9 +5819,10 @@ ProtocolConformanceRef ProtocolConformanceRef::forAbstract(
     break;
 
   default:
-    llvm::errs() << "Abstract conformance with bad subject type:\n";
-    conformingType->dump(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "Abstract conformance with bad subject type:\n";
+      conformingType->dump(out);
+    });
   }
 
   // Figure out which arena this should go in.
@@ -6522,13 +6532,16 @@ const clang::Type *
 ASTContext::getClangFunctionType(ArrayRef<AnyFunctionType::Param> params,
                                  Type resultTy,
                                  FunctionTypeRepresentation trueRep) {
-  return getClangTypeConverter().getFunctionType(params, resultTy, trueRep);
+  return getClangTypeConverter().getFunctionType</*templateArgument=*/false>(
+      params, resultTy, trueRep);
 }
 
 const clang::Type *ASTContext::getCanonicalClangFunctionType(
     ArrayRef<SILParameterInfo> params, std::optional<SILResultInfo> result,
     SILFunctionType::Representation trueRep) {
-  auto *ty = getClangTypeConverter().getFunctionType(params, result, trueRep);
+  auto *ty =
+      getClangTypeConverter().getFunctionType</*templateArgument=*/false>(
+          params, result, trueRep);
   return ty ? ty->getCanonicalTypeInternal().getTypePtr() : nullptr;
 }
 
@@ -6585,8 +6598,7 @@ CanGenericSignature ASTContext::getSingleGenericParameterSignature() const {
   if (auto theSig = getImpl().SingleGenericParameterSignature)
     return theSig;
 
-  auto param = GenericTypeParamType::getType(/*depth*/ 0, /*index*/ 0, *this);
-  auto sig = GenericSignature::get(param, { });
+  auto sig = GenericSignature::get({TheSelfType}, { });
   auto canonicalSig = CanGenericSignature(sig);
   getImpl().SingleGenericParameterSignature = canonicalSig;
   return canonicalSig;

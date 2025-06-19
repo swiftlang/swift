@@ -16,6 +16,7 @@
 
 #include "GenStruct.h"
 
+#include "IRGen.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
@@ -42,6 +43,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
+#include "llvm/Support/Error.h"
 #include <iterator>
 
 #include "GenDecl.h"
@@ -1459,6 +1461,14 @@ private:
     unsigned fieldOffset = layout.getFieldOffset(clangField->getFieldIndex());
     assert(!clangField->isBitField());
     Size offset( SubobjectAdjustment.getValue() + fieldOffset / 8);
+    std::optional<clang::CharUnits> dataSize;
+    if (clangField->hasAttr<clang::NoUniqueAddressAttr>()) {
+      if (const auto *rd = clangField->getType()->getAsRecordDecl()) {
+        // Clang can store the next field in the padding of this one.
+        const auto &fieldLayout = ClangContext.getASTRecordLayout(rd);
+        dataSize = fieldLayout.getDataSize();
+      }
+    }
 
     // If we have a Swift import of this type, use our lowered information.
     if (swiftField) {
@@ -1470,7 +1480,9 @@ private:
     }
 
     // Otherwise, add it as an opaque blob.
-    auto fieldSize = isZeroSized ? clang::CharUnits::Zero() : ClangContext.getTypeSizeInChars(clangField->getType());
+    auto fieldTypeSize = ClangContext.getTypeSizeInChars(clangField->getType());
+    auto fieldSize = isZeroSized ? clang::CharUnits::Zero()
+                                 : dataSize.value_or(fieldTypeSize);
     return addOpaqueField(offset, Size(fieldSize.getQuantity()));
   }
 

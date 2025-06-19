@@ -2146,6 +2146,22 @@ not replace this reference with a not uniquely reference object.
 
 For details see [Copy-on-Write Representation](SIL.md#Copy-on-Write-Representation).
 
+### end_cow_mutation_addr
+
+```
+sil-instruction ::= 'end_cow_mutation_addr' sil-operand
+
+end_cow_mutation_addr %0 : $*T
+// %0 must be of an address $*T type
+```
+
+This instruction marks the end of mutation of an address. The address could be
+an opaque archetype, a struct, tuple or enum type and the end_cow_mutation_addr
+will apply to all members contained within it.
+It is currently only generated in cases where we maybe deriving a MutableSpan from
+`%0` since it is not possible to schedule an `end_cow_mutation` in the standard
+library automatically for Array.mutableSpan etc.
+
 ### destroy_not_escaped_closure
 
 ```
@@ -2599,11 +2615,11 @@ except:
     instead of its normal results.
 
 The final (in the case of `@yield_once`) or penultimate (in the case of
-`@yield_once_2`) result of a `begin_apply` is a "token", a special
-value which can only be used as the operand of an `end_apply` or
-`abort_apply` instruction. Before this second instruction is executed,
-the coroutine is said to be "suspended", and the token represents a
-reference to its suspended activation record.
+`@yield_once_2`) result of a `begin_apply` is a "token", a special value which
+can only be used as the operand of an `end_apply`, `abort_apply`, or
+`end_borrow` instruction. Before this second instruction is executed, the
+coroutine is said to be "suspended", and the token represents a reference to its
+suspended activation record.
 
 If the coroutine's kind `yield_once_2`, its final result is an address
 of a "token", representing the allocation done by the callee
@@ -3450,6 +3466,20 @@ vector (%a : $T, %b : $T, ...)
 Constructs a statically initialized vector of elements. This instruction
 can only appear as final instruction in a global variable static
 initializer list.
+
+### vector_base_addr
+
+```
+sil-instruction ::= 'vector_base_addr' sil-operand
+
+%1 = vector_base_addr %0 : $*Builtin.FixedArray<N, Element>
+// %0 must have type $*Builtin.FixedArray
+// %1 will be of the element type of the Builtin.FixedArray
+```
+
+Derives the address of the first element of a vector, i.e. a `Builtin.FixedArray`,
+from the address of the vector itself.
+Addresses of other vector elements can then be derived with `index_addr`.
 
 ### ref_element_addr
 

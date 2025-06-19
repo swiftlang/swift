@@ -14,8 +14,11 @@
 #include <dispatch/dispatch.h>
 #endif
 
+#include "swift/Threading/Once.h"
+
 #include "Error.h"
 #include "ExecutorBridge.h"
+#include "TaskPrivate.h"
 
 using namespace swift;
 
@@ -25,6 +28,13 @@ using namespace swift;
 extern "C" SWIFT_CC(swift)
 void _swift_exit(int result) {
   exit(result);
+}
+
+extern "C" SWIFT_CC(swift)
+void swift_createDefaultExecutorsOnce() {
+  static swift::once_t createExecutorsOnce;
+
+  swift::once(createExecutorsOnce, swift_createDefaultExecutors);
 }
 
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -64,6 +74,15 @@ extern "C" SWIFT_CC(swift)
 void swift_dispatchAssertMainQueue() {
   dispatch_assert_queue(dispatch_get_main_queue());
 }
-#endif // SWIFT_CONCURRENCY_ENABLE_DISPATCH
+
+extern "C" SWIFT_CC(swift)
+void *swift_getDispatchQueueForExecutor(SerialExecutorRef executor) {
+  if (executor.getRawImplementation() == (uintptr_t)_swift_task_getDispatchQueueSerialExecutorWitnessTable()) {
+    return executor.getIdentity();
+  }
+  return nullptr;
+}
+
+#endif // SWIFT_CONCURRENCY_USES_DISPATCH
 
 #pragma clang diagnostic pop

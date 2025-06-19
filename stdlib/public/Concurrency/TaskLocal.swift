@@ -178,7 +178,7 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   /// or if the task-local has no value bound, this will return the `defaultValue`
   /// of the task local.
   public func get() -> Value {
-    guard let rawValue = unsafe _taskLocalValueGet(key: key) else {
+    guard let rawValue = _taskLocalValueGet(key: key) else {
       return self.defaultValue
     }
 

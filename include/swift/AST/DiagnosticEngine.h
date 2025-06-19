@@ -390,6 +390,17 @@ namespace swift {
       return limitBehaviorUntilSwiftVersion(limit, languageMode);
     }
 
+    /// Limit the diagnostic behavior to warning until the next future
+    /// language mode.
+    ///
+    /// This should be preferred over passing the next major version to
+    /// `warnUntilSwiftVersion` to make it easier to find and update clients
+    /// when a new language mode is introduced.
+    ///
+    /// This helps stage in fixes for stricter diagnostics as warnings
+    /// until the next major language version.
+    InFlightDiagnostic &warnUntilFutureSwiftVersion();
+
     /// Limit the diagnostic behavior to warning until the specified version.
     ///
     /// This helps stage in fixes for stricter diagnostics as warnings
@@ -463,9 +474,6 @@ namespace swift {
     InFlightDiagnostic &highlightChars(CharSourceRange Range);
 
     static const char *fixItStringFor(const FixItID id);
-
-    /// Get the best location where an 'import' fixit might be offered.
-    SourceLoc getBestAddImportFixItLoc(const Decl *Member) const;
 
     /// Add a token-based replacement fix-it to the currently-active
     /// diagnostic.
@@ -1184,11 +1192,7 @@ namespace swift {
     SourceLoc getDefaultDiagnosticLoc() const {
       return bufferIndirectlyCausingDiagnostic;
     }
-    SourceLoc getBestAddImportFixItLoc(const Decl *Member,
-                                       SourceFile *sourceFile) const;
-    SourceLoc getBestAddImportFixItLoc(const Decl *Member) const {
-      return getBestAddImportFixItLoc(Member, nullptr);
-    }
+    SourceLoc getBestAddImportFixItLoc(SourceFile *sf) const;
   };
 
   inline SourceManager &InFlightDiagnostic::getSourceManager() {

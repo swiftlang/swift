@@ -70,19 +70,37 @@ BridgedDeclNameLoc BridgedDeclNameLoc_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cBaseNameLoc,
     BridgedSourceLoc cLParenLoc, BridgedArrayRef cLabelLocs,
     BridgedSourceLoc cRParenLoc) {
+  return BridgedDeclNameLoc_createParsed(
+       cContext, BridgedSourceLoc(), cBaseNameLoc, cLParenLoc, cLabelLocs,
+       cRParenLoc);
+}
+
+BridgedDeclNameLoc BridgedDeclNameLoc_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cModuleSelectorLoc,
+    BridgedSourceLoc cBaseNameLoc, BridgedSourceLoc cLParenLoc,
+    BridgedArrayRef cLabelLocs, BridgedSourceLoc cRParenLoc) {
 
   ASTContext &context = cContext.unbridged();
   SmallVector<SourceLoc, 4> labelLocs;
   for (auto &cLabelLoc : cLabelLocs.unbridged<BridgedSourceLoc>())
     labelLocs.push_back(cLabelLoc.unbridged());
 
-  return DeclNameLoc(context, cBaseNameLoc.unbridged(), cLParenLoc.unbridged(),
+  return DeclNameLoc(context, cModuleSelectorLoc.unbridged(),
+                     cBaseNameLoc.unbridged(), cLParenLoc.unbridged(),
                      labelLocs, cRParenLoc.unbridged());
 }
 
 BridgedDeclNameLoc
 BridgedDeclNameLoc_createParsed(BridgedSourceLoc cBaseNameLoc) {
   return DeclNameLoc(cBaseNameLoc.unbridged());
+}
+
+BridgedDeclNameLoc
+BridgedDeclNameLoc_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cModuleSelectorLoc,
+    BridgedSourceLoc cBaseNameLoc) {
+  return DeclNameLoc(cContext.unbridged(), cModuleSelectorLoc.unbridged(),
+                     cBaseNameLoc.unbridged());
 }
 
 //===----------------------------------------------------------------------===//
@@ -617,6 +635,17 @@ BridgedImportDecl BridgedImportDecl_createParsed(
       context, cDeclContext.unbridged(), cImportKeywordLoc.unbridged(),
       static_cast<ImportKind>(cImportKind), cImportKindLoc.unbridged(),
       std::move(builder).get());
+}
+
+BridgedUsingDecl BridgedUsingDecl_createParsed(BridgedASTContext cContext,
+                                               BridgedDeclContext cDeclContext,
+                                               BridgedSourceLoc usingKeywordLoc,
+                                               BridgedSourceLoc specifierLoc,
+                                               BridgedUsingSpecifier specifier) {
+  ASTContext &ctx = cContext.unbridged();
+  return UsingDecl::create(
+      ctx, usingKeywordLoc.unbridged(), specifierLoc.unbridged(),
+      static_cast<UsingSpecifier>(specifier), cDeclContext.unbridged());
 }
 
 BridgedSubscriptDecl BridgedSubscriptDecl_createParsed(

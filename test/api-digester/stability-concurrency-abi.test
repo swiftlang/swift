@@ -111,7 +111,7 @@ Func SerialExecutor.enqueue(_:) has been added as a protocol requirement
 // while adding a new overload that accepts `Job` with new availability.
 // The ABI checker seems to be confused by this case.
 // rdar://106833284 (ABI checker confused with overload getting deprecated)
-Func Executor.enqueue(_:) is a new API without @available attribute
+Func Executor.enqueue(_:) is a new API without '@available'
 
 // Adopt #isolation in TaskLocal.withValue APIs
 Func TaskLocal.withValue(_:operation:file:line:) has been renamed to Func withValue(_:operation:isolation:file:line:)

@@ -12,7 +12,7 @@ struct SameSizeStride { var x, y: Builtin.Int32 }
 // This type has unequal stride and size.
 struct DifferentSizeStride { var x: Builtin.Int32, y: Builtin.Int16 }
 
-// CHECK: define{{( protected)?}} {{.*}}void @same_size_stride(ptr noalias nocapture dereferenceable({{.*}}) %0, i64 %1) {{.*}} {
+// CHECK: define{{( protected)?}} {{.*}}void @same_size_stride(ptr noalias {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0, i64 %1) {{.*}} {
 // CHECK:   getelementptr inbounds %T8indexing14SameSizeStrideV, ptr %0, i64 %1
 sil @same_size_stride : $@convention(thin) (@in SameSizeStride, Builtin.Word) -> () {
 entry(%p : $*SameSizeStride, %i: $Builtin.Word):
@@ -20,7 +20,7 @@ entry(%p : $*SameSizeStride, %i: $Builtin.Word):
   return undef : $()
 }
 
-// CHECK:      define{{( protected)?}} {{.*}}void @different_size_stride(ptr noalias nocapture dereferenceable({{.*}}) %0, i64 %1) {{.*}} {
+// CHECK:      define{{( protected)?}} {{.*}}void @different_size_stride(ptr noalias {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0, i64 %1) {{.*}} {
 // CHECK:   %2 = mul nsw i64 %1, 8
 // CHECK-NEXT:   %3 = getelementptr inbounds i8, ptr %0, i64 %2
 sil @different_size_stride : $@convention(thin) (@in DifferentSizeStride, Builtin.Word) -> () {
@@ -29,7 +29,7 @@ entry(%p : $*DifferentSizeStride, %i: $Builtin.Word):
   return undef : $()
 }
 
-// CHECK:      define{{( protected)?}} {{.*}}void @zero_size(ptr noalias nocapture %0, i64 %1) {{.*}} {
+// CHECK:      define{{( protected)?}} {{.*}}void @zero_size(ptr noalias {{(nocapture|captures\(none\))}} %0, i64 %1) {{.*}} {
 // CHECK:   %2 = mul nsw i64 %1, 1
 // CHECK-NEXT:   %3 = getelementptr inbounds i8, ptr %0, i64 %2
 sil @zero_size : $@convention(thin) (@in (), Builtin.Word) -> () {
@@ -41,7 +41,7 @@ entry(%p : $*(), %i: $Builtin.Word):
 // CHECK:      define{{( protected)?}} {{.*}}void @dynamic_size(ptr noalias %0, i64 %1, ptr %T) {{.*}} {
 // CHECK:   [[T1:%.*]] = getelementptr inbounds ptr, ptr %T, i64 -1
 // CHECK-NEXT:   [[VWT:%T.valueWitnesses]] = load ptr, ptr [[T1]], align 8
-// CHECK:        [[STRIDE_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[VWT]], i32 0, i32 9
+// CHECK:        [[STRIDE_ADDR:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[VWT]], i32 0, i32 9
 // CHECK:        [[STRIDE:%.*]] = load i64, ptr [[STRIDE_ADDR]]
 // CHECK-NEXT:   [[T0:%.*]] = mul nsw i64 %1, [[STRIDE]]
 // CHECK-NEXT:   getelementptr inbounds i8, ptr %0, i64 [[T0]]

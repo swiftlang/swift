@@ -1,11 +1,11 @@
 // RUN: %target-swift-frontend %s -swift-version 6 -verify -verify-additional-prefix disabled- -c
-// RUN: %target-swift-frontend %s -swift-version 6 -verify -enable-experimental-feature AsyncCallerExecution -verify-additional-prefix enable- -c -verify-additional-prefix enabled-
+// RUN: %target-swift-frontend %s -swift-version 6 -verify -enable-upcoming-feature NonisolatedNonsendingByDefault -verify-additional-prefix enable- -c -verify-additional-prefix enabled-
 
 // REQUIRES: asserts
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_AsyncCallerExecution
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
-// This test checks and validates that when AsyncCallerExecution is enabled, we emit the
+// This test checks and validates that when NonisolatedNonsendingByDefault is enabled, we emit the
 // appropriate diagnostics. It also runs with the mode off so we can validate
 // and compare locally against the normal errors.
 

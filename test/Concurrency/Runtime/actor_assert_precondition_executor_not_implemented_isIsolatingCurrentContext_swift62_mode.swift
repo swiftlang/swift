@@ -30,7 +30,7 @@ final class IsIsolatingExecutor: SerialExecutor {
     print("called: checkIsolated")
   }
 
-  func isIsolatingCurrentContext() -> Bool {
+  func isIsolatingCurrentContext() -> Bool? {
     print("called: isIsolatingCurrentContext")
     return true
   }

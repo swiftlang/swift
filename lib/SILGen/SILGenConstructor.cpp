@@ -1114,8 +1114,15 @@ void SILGenFunction::emitClassConstructorInitializer(ConstructorDecl *ctor) {
                                    /*ignored parameters*/ 1);
 
   SILType selfTy = getLoweredLoadableType(selfDecl->getTypeInContext());
-  ManagedValue selfArg = B.createInputFunctionArgument(selfTy, selfDecl);
-  
+  // Force a lexical lifetime for the self argument of an eagerMove class' init
+  // to ensure that the body of its deinit always runs after the body of that
+  // init.
+  LifetimeAnnotation annotation = selfTy.getLifetime(F).isEagerMove()
+                                      ? LifetimeAnnotation::Lexical
+                                      : LifetimeAnnotation::None;
+  ManagedValue selfArg = B.createInputFunctionArgument(
+      selfTy, selfDecl, /*isNoImplicitCopy=*/false, annotation);
+
   // is this a designated initializer for a distributed actor?
   const bool isDesignatedDistActorInit =
     selfClassDecl->isDistributedActor() && !isDelegating;

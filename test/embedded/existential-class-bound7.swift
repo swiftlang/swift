@@ -9,20 +9,20 @@ public protocol P: AnyObject {
 }
 
 final public class Class: P {
-  public func foo<T>(t: T) {}
+  public func foo<T>(t: T) {} // expected-error {{a protocol type cannot contain a generic method 'foo(t:)' in embedded Swift}}
 }
 
 
 public func testClass() -> P {
-  return Class() // expected-error {{an existential type cannot contain a generic method 'foo(t:)' in embedded Swift}}
+  return Class() // expected-note {{protocol type value created here}}
 }
 
 final public class GenClass<X>: P {
-  public func foo<T>(t: T) {}
+  public func foo<T>(t: T) {} // expected-error {{a protocol type cannot contain a generic method 'foo(t:)' in embedded Swift}}
 }
 
 
 public func testGenClass() -> P {
-  return GenClass<Int>() // expected-error {{an existential type cannot contain a generic method 'foo(t:)' in embedded Swift}}
+  return GenClass<Int>() // expected-note {{protocol type value created here}}
 }
 

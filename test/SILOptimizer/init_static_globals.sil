@@ -98,8 +98,6 @@ sil_global [let] @g7 : $TwoFields
 // CHECK-NEXT:  }
 sil_global [let] @g8 : $UnsafePointer<Int32>
 
-sil_global [let] @g9 : $TwoFields
-
 // CHECK-LABEL: sil_global [let] @inline_array1 : $InlineArray<3, Int32> = {
 // CHECK-NEXT:    %0 = integer_literal $Builtin.Int32, 1
 // CHECK-NEXT:    %1 = struct $Int32 (%0)
@@ -107,7 +105,8 @@ sil_global [let] @g9 : $TwoFields
 // CHECK-NEXT:    %3 = struct $Int32 (%2)
 // CHECK-NEXT:    %4 = integer_literal $Builtin.Int32, 3
 // CHECK-NEXT:    %5 = struct $Int32 (%4)
-// CHECK-NEXT:    %initval = vector (%1, %3, %5)
+// CHECK-NEXT:    %6 = vector (%1, %3, %5)
+// CHECK-NEXT:    %initval = struct $InlineArray<3, Int32> (%6)
 // CHECK-NEXT:  }
 sil_global [let] @inline_array1 : $InlineArray<3, Int32>
 
@@ -127,7 +126,8 @@ sil_global [let] @inline_array1 : $InlineArray<3, Int32>
 // CHECK-NEXT:    %12 = integer_literal $Builtin.Int32, 60
 // CHECK-NEXT:    %13 = struct $Int32 (%12)
 // CHECK-NEXT:    %14 = tuple (%11, %13)
-// CHECK-NEXT:    %initval = vector (%4, %9, %14)
+// CHECK-NEXT:    %15 = vector (%4, %9, %14)
+// CHECK-NEXT:    %initval = struct $InlineArray<3, (Int32, Int32)> (%15)
 // CHECK-NEXT:  }
 sil_global [let] @inline_array2 : $InlineArray<3, (Int32, Int32)>
 
@@ -143,6 +143,10 @@ sil_global [let] @empty_inline_array : $InlineArray<0, Int32>
 // CHECK-LABEL: sil_global [let] @inline_array_empty_elements : $InlineArray<3, ()>{{$}}
 sil_global [let] @inline_array_empty_elements : $InlineArray<3, ()>
 
+// CHECK-LABEL: sil_global [let] @gint : $Int32 = {
+// CHECK-NEXT:    %0 = integer_literal $Builtin.Int32, 1
+// CHECK-NEXT:    %initval = struct $Int32 (%0)
+// CHECK-NEXT:  }
 sil_global [let] @gint : $Int32
 
 sil @unknownfunc : $@convention(thin) () -> ()
@@ -282,34 +286,6 @@ bb0:
   return %10 : $()
 }
 
-// CHECK-LABEL: sil [global_init_once_fn] [ossa] @merge_stores_but_no_global_init :
-// CHECK:         [[GA:%.*]] = global_addr @g9 : $*TwoFields
-// CHECK:         [[L10:%.*]] = integer_literal $Builtin.Int32, 10
-// CHECK:         [[I10:%.*]] = struct $Int32 ([[L10]])
-// CHECK:         [[L11:%.*]] = integer_literal $Builtin.Int32, 11
-// CHECK:         [[I11:%.*]] = struct $Int32 ([[L11]])
-// CHECK:         [[TF:%.*]] = struct $TwoFields ([[I11]], [[I10]])
-// CHECK:         store [[TF]] to [trivial] [[GA]]
-// CHECK:         function_ref
-// CHECK:       } // end sil function 'merge_stores_but_no_global_init'
-sil [global_init_once_fn] [ossa] @merge_stores_but_no_global_init : $@convention(c) () -> () {
-bb0:
-  alloc_global @g9
-  %1 = global_addr @g9 : $*TwoFields
-  %2 = integer_literal $Builtin.Int32, 10
-  %3 = struct $Int32 (%2 : $Builtin.Int32)
-  %4 = struct_element_addr %1 : $*TwoFields, #TwoFields.b
-  store %3 to [trivial] %4 : $*Int32
-  %6 = integer_literal $Builtin.Int32, 11
-  %7 = struct $Int32 (%6 : $Builtin.Int32)
-  %8 = struct_element_addr %1 : $*TwoFields, #TwoFields.a
-  store %7 to [trivial] %8 : $*Int32
-  %f = function_ref @unknownfunc : $@convention(thin) () -> ()
-  %a = apply %f() : $@convention(thin) () -> ()
-  %10 = tuple ()
-  return %10 : $()
-}
-
 // CHECK-LABEL: sil [global_init_once_fn] [ossa] @globalinit_wrong_separate_stores :
 // CHECK:         alloc_global
 // CHECK:         store
@@ -350,15 +326,14 @@ bb0(%0 : $Builtin.RawPointer):
 
 // CHECK-LABEL: sil [global_init_once_fn] [ossa] @globalinit_inline_array :
 // CHECK-NOT:     alloc_global
-// CHECK-NOT:     alloc_stack
-// CHECK-NOT:     store
+// CHECK-NOT:     global_addr
 // CHECK:       } // end sil function 'globalinit_inline_array'
 sil [global_init_once_fn] [ossa] @globalinit_inline_array : $@convention(c) (Builtin.RawPointer) -> () {
 bb0(%0 : $Builtin.RawPointer):
   alloc_global @inline_array1
   %2 = global_addr @inline_array1 : $*InlineArray<3, Int32>
-  %3 = alloc_stack $InlineArray<3, Int32>
-  %4 = unchecked_addr_cast %3 to $*Int32
+  %3 = alloc_stack $Builtin.FixedArray<3, Int32>
+  %4 = vector_base_addr %3
   %5 = integer_literal $Builtin.Int32, 1
   %6 = struct $Int32 (%5)
   store %6 to [trivial] %4
@@ -373,23 +348,23 @@ bb0(%0 : $Builtin.RawPointer):
   %16 = struct $Int32 (%15)
   store %16 to [trivial] %14
   %18 = load [trivial] %3
+  %19 = struct $InlineArray<3, Int32> (%18)
   dealloc_stack %3
-  store %18 to [trivial] %2
+  store %19 to [trivial] %2
   %21 = tuple ()
   return %21
 }
 
 // CHECK-LABEL: sil [global_init_once_fn] [ossa] @globalinit_inline_array_of_tuples :
 // CHECK-NOT:     alloc_global
-// CHECK-NOT:     alloc_stack
-// CHECK-NOT:     store
+// CHECK-NOT:     global_addr
 // CHECK:       } // end sil function 'globalinit_inline_array_of_tuples'
 sil [global_init_once_fn] [ossa] @globalinit_inline_array_of_tuples : $@convention(c) (Builtin.RawPointer) -> () {
 bb0(%0 : $Builtin.RawPointer):
   alloc_global @inline_array2
   %2 = global_addr @inline_array2 : $*InlineArray<3, (Int32, Int32)>
-  %3 = alloc_stack $InlineArray<3, (Int32, Int32)>
-  %4 = unchecked_addr_cast %3 to $*(Int32, Int32)
+  %3 = alloc_stack $Builtin.FixedArray<3, (Int32, Int32)>
+  %4 = vector_base_addr %3
   %5 = tuple_element_addr %4, 0
   %6 = tuple_element_addr %4, 1
   %7 = integer_literal $Builtin.Int32, 10
@@ -419,8 +394,9 @@ bb0(%0 : $Builtin.RawPointer):
   %31 = struct $Int32 (%30)
   store %31 to [trivial] %26
   %33 = load [trivial] %3
+  %34 = struct $InlineArray<3, (Int32, Int32)> (%33)
   dealloc_stack %3
-  store %33 to [trivial] %2
+  store %34 to [trivial] %2
   %36 = tuple ()
   return %36
 }
@@ -434,8 +410,8 @@ sil [global_init_once_fn] [ossa] @no_globalinit_double_store: $@convention(c) (B
 bb0(%0 : $Builtin.RawPointer):
   alloc_global @inline_array3
   %2 = global_addr @inline_array3 : $*InlineArray<2, Int32>
-  %3 = alloc_stack $InlineArray<2, Int32>
-  %4 = unchecked_addr_cast %3 to $*Int32
+  %3 = alloc_stack $Builtin.FixedArray<2, Int32>
+  %4 = vector_base_addr %3
   %5 = integer_literal $Builtin.Int32, 1
   %6 = struct $Int32 (%5)
   store %6 to [trivial] %4
@@ -446,8 +422,9 @@ bb0(%0 : $Builtin.RawPointer):
   store %11 to [trivial] %9
   store %6 to [trivial] %9
   %18 = load [trivial] %3
+  %19 = struct $InlineArray<2, Int32> (%18)
   dealloc_stack %3
-  store %18 to [trivial] %2
+  store %19 to [trivial] %2
   %21 = tuple ()
   return %21
 }
@@ -461,8 +438,8 @@ sil [global_init_once_fn] [ossa] @no_globalinit_extra_load: $@convention(c) (Bui
 bb0(%0 : $Builtin.RawPointer):
   alloc_global @inline_array4
   %2 = global_addr @inline_array4 : $*InlineArray<2, Int32>
-  %3 = alloc_stack $InlineArray<2, Int32>
-  %4 = unchecked_addr_cast %3 to $*Int32
+  %3 = alloc_stack $Builtin.FixedArray<2, Int32>
+  %4 = vector_base_addr %3
   %5 = integer_literal $Builtin.Int32, 1
   %6 = struct $Int32 (%5)
   store %6 to [trivial] %4
@@ -471,23 +448,23 @@ bb0(%0 : $Builtin.RawPointer):
   %10 = load [trivial] %4
   store %10 to [trivial] %9
   %18 = load [trivial] %3
+  %19 = struct $InlineArray<2, Int32> (%18)
   dealloc_stack %3
-  store %18 to [trivial] %2
+  store %19 to [trivial] %2
   %21 = tuple ()
   return %21
 }
 
-// CHECK-LABEL: sil [global_init_once_fn] [ossa] @no_globalinit_no_load :
-// CHECK:         alloc_global
-// CHECK:         alloc_stack
-// CHECK:         store
-// CHECK:       } // end sil function 'no_globalinit_no_load'
-sil [global_init_once_fn] [ossa] @no_globalinit_no_load: $@convention(c) (Builtin.RawPointer) -> () {
+// CHECK-LABEL: sil [global_init_once_fn] [ossa] @globalinit_no_load :
+// CHECK-NOT:     alloc_global
+// CHECK-NOT:     global_addr
+// CHECK:       } // end sil function 'globalinit_no_load'
+sil [global_init_once_fn] [ossa] @globalinit_no_load: $@convention(c) (Builtin.RawPointer) -> () {
 bb0(%0 : $Builtin.RawPointer):
   alloc_global @gint
   %2 = global_addr @gint : $*Int32
-  %3 = alloc_stack $InlineArray<2, Int32>
-  %4 = unchecked_addr_cast %3 to $*Int32
+  %3 = alloc_stack $Builtin.FixedArray<2, Int32>
+  %4 = vector_base_addr %3
   %5 = integer_literal $Builtin.Int32, 1
   %6 = struct $Int32 (%5)
   store %6 to [trivial] %4
@@ -511,11 +488,12 @@ sil [global_init_once_fn] [ossa] @no_globalinit_empty_inline_array : $@conventio
 bb0(%0 : $Builtin.RawPointer):
   alloc_global @empty_inline_array
   %2 = global_addr @empty_inline_array : $*InlineArray<0, Int32>
-  %3 = alloc_stack $InlineArray<0, Int32>
-  %4 = unchecked_addr_cast %3 to $*Int32
+  %3 = alloc_stack $Builtin.FixedArray<0, Int32>
+  %4 = vector_base_addr %3
   %18 = load [trivial] %3
+  %19 = struct $InlineArray<0, Int32> (%18)
   dealloc_stack %3
-  store %18 to [trivial] %2
+  store %19 to [trivial] %2
   %21 = tuple ()
   return %21
 }
@@ -529,15 +507,16 @@ sil [global_init_once_fn] [ossa] @no_globalinit_inline_array_empty_elements : $@
 bb0(%0 : $Builtin.RawPointer):
   alloc_global @inline_array_empty_elements
   %2 = global_addr @inline_array_empty_elements : $*InlineArray<3, ()>
-  %3 = alloc_stack $InlineArray<3, ()>
-  %4 = unchecked_addr_cast %3 to $*()
+  %3 = alloc_stack $Builtin.FixedArray<3, ()>
+  %4 = vector_base_addr %3
   %13 = integer_literal $Builtin.Word, 2
   %14 = index_addr %4, %13
   %15 = tuple ()
   store %15 to [trivial] %14
   %18 = load [trivial] %3
+  %19 = struct $InlineArray<3, ()> (%18)
   dealloc_stack %3
-  store %18 to [trivial] %2
+  store %19 to [trivial] %2
   %21 = tuple ()
   return %21
 }

@@ -45,7 +45,9 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   public var isConvertPointerToPointerArgument: Bool { bridged.isConvertPointerToPointerArgument() }
 
   public var specializationLevel: Int { bridged.specializationLevel() }
-  
+
+  public var isSpecialization: Bool { bridged.isSpecialization() }
+
   public var hasOwnership: Bool { bridged.hasOwnership() }
 
   public var hasLoweredAddresses: Bool { bridged.hasLoweredAddresses() }
@@ -187,7 +189,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
     // If Package-CMO is enabled, we serialize package, public, and @usableFromInline decls as
     // [serialized_for_package].
-    // Their bodies must not, however, leak into @inlinable functons (that are [serialized])
+    // Their bodies must not, however, leak into @inlinable functions (that are [serialized])
     // since they are inlined outside of their defining module.
     //
     // If this callee is [serialized_for_package], the caller must be either non-serialized
@@ -217,6 +219,13 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     default:
       fatalError()
     }
+  }
+
+  public var accessorKindName: String? {
+    guard bridged.isAccessor() else {
+      return nil
+    }
+    return StringRef(bridged: bridged.getAccessorName()).string
   }
 
   /// True, if the function runs with a swift 5.1 runtime.
@@ -574,6 +583,10 @@ extension Function {
                                                 atIndex: calleeArgIdx,
                                                 withConvention: convention)
         return effects.memory.read
+      },
+      // isDeinitBarrier
+      { (f: BridgedFunction) -> Bool in
+        return f.function.getSideEffects().isDeinitBarrier
       }
     )
   }

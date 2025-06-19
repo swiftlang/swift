@@ -17,6 +17,9 @@ infix operator <>
 extension X {
   public func XinA() { }
 
+  @_spi(A)
+  public func XinA_spi() { }
+
   public var propXinA: Bool { return true }
 
   public static func <<<(a: Self, b: Self) -> Self { a }

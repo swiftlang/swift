@@ -21,6 +21,8 @@
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 
+#include <cstdint>
+
 namespace swift {
 
 class DeclNameLoc;

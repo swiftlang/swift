@@ -1175,16 +1175,18 @@ void ModuleFile::collectBasicSourceFileInfo(
     auto fingerprintIncludingTypeMembers =
       Fingerprint::fromString(fpStrIncludingTypeMembers);
     if (!fingerprintIncludingTypeMembers) {
-      llvm::errs() << "Unconvertible fingerprint including type members'"
-                   << fpStrIncludingTypeMembers << "'\n";
-      abort();
+      ABORT([&](auto &out) {
+        out << "Unconvertible fingerprint including type members '"
+            << fpStrIncludingTypeMembers << "'";
+      });
     }
     auto fingerprintExcludingTypeMembers =
       Fingerprint::fromString(fpStrExcludingTypeMembers);
     if (!fingerprintExcludingTypeMembers) {
-      llvm::errs() << "Unconvertible fingerprint excluding type members'"
-                   << fpStrExcludingTypeMembers << "'\n";
-      abort();
+      ABORT([&](auto &out) {
+        out << "Unconvertible fingerprint excluding type members '"
+            << fpStrExcludingTypeMembers << "'";
+      });
     }
     callback(BasicSourceFileInfo(filePath,
                                  fingerprintIncludingTypeMembers.value(),

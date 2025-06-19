@@ -481,11 +481,15 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
       continue;
     }
 
+    auto abiRole = ABIRoleInfo(var);
+    bool hasOrIsABI = !abiRole.providesAPI() || !abiRole.providesABI();
+
     // Note: Getting the semantic attrs here would trigger a request cycle.
     auto attachedAttrs = var->getAttrs();
 
     // Check for conflicting attributes.
-    if (attachedAttrs.hasAttribute<LazyAttr>() ||
+    if (hasOrIsABI ||
+        attachedAttrs.hasAttribute<LazyAttr>() ||
         attachedAttrs.hasAttribute<NSCopyingAttr>() ||
         attachedAttrs.hasAttribute<NSManagedAttr>() ||
         (attachedAttrs.hasAttribute<ReferenceOwnershipAttr>() &&
@@ -498,9 +502,11 @@ AttachedPropertyWrappersRequest::evaluate(Evaluator &evaluator,
         whichKind = 1;
       else if (attachedAttrs.hasAttribute<NSManagedAttr>())
         whichKind = 2;
+      else if (hasOrIsABI)
+        whichKind = 3;
       else {
         auto attr = attachedAttrs.getAttribute<ReferenceOwnershipAttr>();
-        whichKind = 2 + static_cast<unsigned>(attr->get());
+        whichKind = 3 + static_cast<unsigned>(attr->get());
       }
       var->diagnose(diag::property_with_wrapper_conflict_attribute,
                     var->getName(), whichKind);

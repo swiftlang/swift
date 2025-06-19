@@ -6,7 +6,7 @@
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_StrictConcurrency
 
-@preconcurrency import unsafe_swift_decls // expected-warning{{@preconcurrency import is not memory-safe because it can silently introduce data races}}
+@preconcurrency import unsafe_swift_decls // expected-warning{{'@preconcurrency' import is not memory-safe because it can silently introduce data races}}
 
 class C: @unchecked Sendable {
   var counter: Int = 0

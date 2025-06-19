@@ -1107,6 +1107,7 @@ public:
   virtual void
   editorOpenSwiftSourceInterface(StringRef Name, StringRef SourceName,
                                  ArrayRef<const char *> Args,
+                                 bool CancelOnSubsequentRequest,
                                  SourceKitCancellationToken CancellationToken,
                                  std::shared_ptr<EditorConsumer> Consumer) = 0;
 
@@ -1216,12 +1217,14 @@ public:
   virtual void
   findLocalRenameRanges(StringRef Filename, unsigned Line, unsigned Column,
                         unsigned Length, ArrayRef<const char *> Args,
+                        bool CancelOnSubsequentRequest,
                         SourceKitCancellationToken CancellationToken,
                         CategorizedRenameRangesReceiver Receiver) = 0;
 
   virtual void semanticRefactoring(StringRef PrimaryFilePath,
                                    SemanticRefactoringInfo Info,
                                    ArrayRef<const char *> Args,
+                                   bool CancelOnSubsequentRequest,
                                    SourceKitCancellationToken CancellationToken,
                                    CategorizedEditsReceiver Receiver) = 0;
 
@@ -1240,6 +1243,7 @@ public:
       StringRef PrimaryFilePath, StringRef InputBufferName,
       ArrayRef<const char *> Args, std::optional<unsigned> Offset,
       std::optional<unsigned> Length, bool FullyQualified,
+      bool CancelOnSubsequentRequest,
       SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<VariableTypesInFile> &)>
           Receiver) = 0;

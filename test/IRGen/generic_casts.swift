@@ -39,12 +39,12 @@ func allToInt<T>(_ x: T) -> Int {
   // CHECK: [[INT_TEMP:%.*]] = alloca %TSi,
   // CHECK: [[VWT_ADDR:%.*]] = getelementptr inbounds ptr, ptr %T, i64 -1
   // CHECK: [[VWT:%.*]] = load ptr, ptr [[VWT_ADDR]]
-  // CHECK: [[SIZE_ADDR:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[VWT]], i32 0, i32 8
+  // CHECK: [[SIZE_ADDR:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[VWT]], i32 0, i32 8
   // CHECK: [[SIZE:%.*]] = load i64, ptr [[SIZE_ADDR]]
   // CHECK: [[T_ALLOCA:%.*]] = alloca i8, {{.*}} [[SIZE]], align 16
   // CHECK: [[TEMP:%.*]] = call ptr {{.*}}(ptr noalias [[T_ALLOCA]], ptr noalias %0, ptr %T)
   // CHECK: call zeroext i1 @swift_dynamicCast(ptr [[INT_TEMP]], ptr [[T_ALLOCA]], ptr %T, ptr @"$sSiN", i64 7)
-  // CHECK: [[T0:%.*]] = getelementptr inbounds %TSi, ptr [[INT_TEMP]], i32 0, i32 0
+  // CHECK: [[T0:%.*]] = getelementptr inbounds{{.*}} %TSi, ptr [[INT_TEMP]], i32 0, i32 0
   // CHECK: [[INT_RESULT:%.*]] = load i64, ptr [[T0]],
   // CHECK: ret i64 [[INT_RESULT]]
 }
@@ -52,13 +52,13 @@ func allToInt<T>(_ x: T) -> Int {
 // CHECK: define hidden swiftcc void @"$s13generic_casts8intToAllyxSilF"(ptr noalias sret({{.*}}) %0, i64 %1, ptr %T) {{.*}} {
 func intToAll<T>(_ x: Int) -> T {
   // CHECK: [[INT_TEMP:%.*]] = alloca %TSi,
-  // CHECK: [[T0:%.*]] = getelementptr inbounds %TSi, ptr [[INT_TEMP]], i32 0, i32 0
+  // CHECK: [[T0:%.*]] = getelementptr inbounds{{.*}} %TSi, ptr [[INT_TEMP]], i32 0, i32 0
   // CHECK: store i64 %1, ptr [[T0]],
   // CHECK: call zeroext i1 @swift_dynamicCast(ptr %0, ptr [[INT_TEMP]], ptr @"$sSiN", ptr %T, i64 7)
   return x as! T
 }
 
-// CHECK: define hidden swiftcc i64 @"$s13generic_casts8anyToIntySiypF"(ptr noalias nocapture dereferenceable({{.*}}) %0) {{.*}} {
+// CHECK: define hidden swiftcc i64 @"$s13generic_casts8anyToIntySiypF"(ptr noalias {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0) {{.*}} {
 func anyToInt(_ x: Any) -> Int {
   return x as! Int
 }
@@ -104,7 +104,7 @@ func classExistentialToOpaqueArchetype<T>(_ x: ObjCProto1) -> T {
 protocol P {}
 protocol Q {}
 
-// CHECK: define hidden swiftcc void @"$s13generic_casts19compositionToMemberyAA1P_pAaC_AA1QpF{{.*}}"(ptr noalias nocapture sret({{.*}}) %0, ptr noalias nocapture dereferenceable({{.*}}) %1) {{.*}} {
+// CHECK: define hidden swiftcc void @"$s13generic_casts19compositionToMemberyAA1P_pAaC_AA1QpF{{.*}}"(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} %0, ptr noalias {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %1) {{.*}} {
 func compositionToMember(_ a: P & Q) -> P {
   return a
 }

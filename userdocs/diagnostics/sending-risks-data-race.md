@@ -1,5 +1,7 @@
 # Sending value risks causing data races
 
+Sharing mutable state between concurrent tasks can cause data races in your program. Resolve this error by only accessing mutable state in one task at a time.
+
 If a type does not conform to `Sendable` the compiler will enforce that each instance of that type is only accessed by one concurrency domain at a time. The `sending 'x' risks causing data races` error indicates that your code can access a non-`Sendable` value from multiple concurrency domains at once.
 
 For example, if a value can be accessed from the main actor, it's invalid to send the same instance to another concurrency domain while the main actor can still access it. This mistake is common when calling an `async` function on a class from the main actor:
@@ -49,4 +51,4 @@ func onMainActor(person: Person) async {
 
 This eliminates the risk of data-races because `printNameConcurrently` continues to run on the main actor, so all access to `person` is serialized.
 
-You can also enable the `AsyncCallerExecution` upcoming feature to make `nonisolated(nonsending)` the default for async functions on non-`Sendable` types.
+You can also enable the `NonisolatedNonsendingByDefault` upcoming feature to make `nonisolated(nonsending)` the default for async functions on non-`Sendable` types.

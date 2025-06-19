@@ -182,9 +182,12 @@
       "FloatingPointTypes.swift",
       "FloatingPointRandom.swift"],
     "Vector": [
-      "SIMDConcreteOperations.swift",
+      "SIMDIntegerConcreteOperations.swift",
+      "SIMDFloatConcreteOperations.swift",
+      "SIMDMaskConcreteOperations.swift",
       "SIMDVector.swift",
-      "SIMDVectorTypes.swift"]}
+      "SIMDVectorTypes.swift"
+    ]}
   ],
   "Optional": [
     "Optional.swift"
@@ -269,8 +272,7 @@
     "EmbeddedRuntime.swift",
     "EmbeddedStubs.swift",
     "EmbeddedPrint.swift",
-    "InlineArray.swift",
-    "SwiftSettings.swift"
+    "InlineArray.swift"
   ],
   "Result": [
     "Result.swift"

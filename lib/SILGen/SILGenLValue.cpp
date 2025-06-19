@@ -1428,27 +1428,9 @@ namespace {
     {
       AccessorArgs result;
       if (base) {
-        // Borrow the base, because we may need it again to invoke other
-        // accessors.
-        base = base.formalAccessBorrow(SGF, loc);
-        // If the base needs to be materialized, do so in
-        // the outer formal evaluation scope, since an addressor or
-        // other dependent value may want to point into the materialization.
-        auto &baseInfo = SGF.getConstantInfo(SGF.getTypeExpansionContext(),
-                                             accessor);
-                                             
-        if (!baseInfo.FormalPattern.isForeign()) {
-          auto baseFnTy = baseInfo.SILFnType;
-          
-          if (baseFnTy->getSelfParameter().isFormalIndirect()
-              && base.getType().isObject()
-              && SGF.silConv.useLoweredAddresses()) {
-            base = base.formallyMaterialize(SGF, loc);
-          }
-        }
-        
-        result.base = SGF.prepareAccessorBaseArg(loc, base, BaseFormalType,
-                                                 accessor);
+        result.base = SGF.prepareAccessorBaseArgForFormalAccess(loc, base,
+                                                                BaseFormalType,
+                                                                accessor);
       }
 
       if (!Indices.isNull())
@@ -3115,10 +3097,12 @@ public:
 
     assert(!e->getType()->is<LValueType>());
 
+    auto pair = std::make_pair<>(e->getSourceRange(), SGF.FunctionDC);
+
     auto accessSemantics = e->getAccessSemantics();
     AccessStrategy strategy = var->getAccessStrategy(
         accessSemantics, getFormalAccessKind(accessKind),
-        SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion(),
+        SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion(), pair,
         /*useOldABI=*/false);
 
     auto baseFormalType = getBaseFormalType(e->getBase());
@@ -3396,7 +3380,7 @@ static LValue emitLValueForNonMemberVarDecl(
   auto access = getFormalAccessKind(accessKind);
   auto strategy = var->getAccessStrategy(
       semantics, access, SGF.SGM.M.getSwiftModule(),
-      SGF.F.getResilienceExpansion(), /*useOldABI=*/false);
+      SGF.F.getResilienceExpansion(), std::nullopt, /*useOldABI=*/false);
 
   lv.addNonMemberVarComponent(SGF, loc, var, subs, options, accessKind,
                               strategy, formalRValueType, actorIso);
@@ -4032,6 +4016,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
   AccessStrategy strategy = var->getAccessStrategy(
       accessSemantics, getFormalAccessKind(accessKind),
       SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion(),
+      std::make_pair<>(e->getSourceRange(), SGF.FunctionDC),
       /*useOldABI=*/isSynthesizedDefaultImplementionThunk(SGF));
 
   bool isOnSelfParameter = isCallToSelfOfCurrentFunction(SGF, e);
@@ -4053,6 +4038,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
       strategy = var->getAccessStrategy(
           accessSemantics, getFormalAccessKind(accessKind),
           SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion(),
+          std::make_pair<>(e->getSourceRange(), SGF.FunctionDC),
           /*useOldABI=*/false);
     }
   }
@@ -4254,6 +4240,7 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
   auto strategy = decl->getAccessStrategy(
       accessSemantics, getFormalAccessKind(accessKind),
       SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion(),
+      std::make_pair<>(e->getSourceRange(), SGF.FunctionDC),
       /*useOldABI=*/isSynthesizedDefaultImplementionThunk(SGF));
 
   bool isOnSelfParameter = isCallToSelfOfCurrentFunction(SGF, e);
@@ -4274,6 +4261,7 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
       strategy = decl->getAccessStrategy(
           accessSemantics, getFormalAccessKind(accessKind),
           SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion(),
+          std::make_pair<>(e->getSourceRange(), SGF.FunctionDC),
           /*useOldABI=*/false);
     }
   }
@@ -4744,7 +4732,7 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
 
   AccessStrategy strategy = ivar->getAccessStrategy(
       semantics, getFormalAccessKind(accessKind), SGM.M.getSwiftModule(),
-      F.getResilienceExpansion(), /*useOldABI=*/false);
+      F.getResilienceExpansion(), std::nullopt, /*useOldABI=*/false);
 
   auto baseAccessKind =
     getBaseAccessKind(SGM, ivar, accessKind, strategy, baseFormalType,
@@ -5350,17 +5338,16 @@ static ManagedValue drillIntoComponent(SILGenFunction &SGF,
 
 /// Find the last component of the given lvalue and derive a base
 /// location for it.
-static PathComponent &&
-drillToLastComponent(SILGenFunction &SGF,
-                     SILLocation loc,
-                     LValue &&lv,
-                     ManagedValue &addr,
-                     TSanKind tsanKind = TSanKind::None) {
+PathComponent &&
+SILGenFunction::drillToLastComponent(SILLocation loc,
+                                     LValue &&lv,
+                                     ManagedValue &addr,
+                                     TSanKind tsanKind) {
   assert(lv.begin() != lv.end() &&
          "lvalue must have at least one component");
 
   for (auto i = lv.begin(), e = lv.end() - 1; i != e; ++i) {
-    addr = drillIntoComponent(SGF, loc, std::move(**i), addr, tsanKind);
+    addr = drillIntoComponent(*this, loc, std::move(**i), addr, tsanKind);
   }
 
   return std::move(**(lv.end() - 1));
@@ -5372,7 +5359,7 @@ static ArgumentSource emitBaseValueForAccessor(SILGenFunction &SGF,
                                                SILDeclRef accessor) {
   ManagedValue base;
   PathComponent &&component =
-    drillToLastComponent(SGF, loc, std::move(lvalue), base);
+    SGF.drillToLastComponent(loc, std::move(lvalue), base);
   base = drillIntoComponent(SGF, loc, std::move(component), base,
                             TSanKind::None);
 
@@ -5396,7 +5383,7 @@ RValue SILGenFunction::emitLoadOfLValue(SILLocation loc, LValue &&src,
 
     ManagedValue addr;
     PathComponent &&component =
-        drillToLastComponent(*this, loc, std::move(src), addr);
+        drillToLastComponent(loc, std::move(src), addr);
 
     // If the last component is physical, drill down and load from it.
     if (component.isPhysical()) {
@@ -5460,7 +5447,7 @@ RValue SILGenFunction::emitRValueForStorageLoad(
     bool isBaseGuaranteed) {
   AccessStrategy strategy = storage->getAccessStrategy(
       semantics, AccessKind::Read, SGM.M.getSwiftModule(),
-      F.getResilienceExpansion(), /*useOldABI=*/false);
+      F.getResilienceExpansion(), std::nullopt, /*useOldABI=*/false);
 
   // If we should call an accessor of some kind, do so.
   if (strategy.getKind() != AccessStrategy::Storage) {
@@ -5600,7 +5587,7 @@ ManagedValue SILGenFunction::emitAddressOfLValue(SILLocation loc,
 
   ManagedValue addr;
   PathComponent &&component =
-    drillToLastComponent(*this, loc, std::move(src), addr, tsanKind);
+    drillToLastComponent(loc, std::move(src), addr, tsanKind);
 
   addr = drillIntoComponent(*this, loc, std::move(component), addr, tsanKind);
   assert(addr.getType().isAddress() &&
@@ -5618,7 +5605,7 @@ ManagedValue SILGenFunction::emitBorrowedLValue(SILLocation loc,
 
   ManagedValue base;
   PathComponent &&component =
-    drillToLastComponent(*this, loc, std::move(src), base, tsanKind);
+    drillToLastComponent(loc, std::move(src), base, tsanKind);
 
   auto value =
     drillIntoComponent(*this, loc, std::move(component), base, tsanKind);
@@ -5635,7 +5622,7 @@ ManagedValue SILGenFunction::emitConsumedLValue(SILLocation loc, LValue &&src,
 
   ManagedValue base;
   PathComponent &&component =
-      drillToLastComponent(*this, loc, std::move(src), base, tsanKind);
+      drillToLastComponent(loc, std::move(src), base, tsanKind);
 
   auto value =
       drillIntoComponent(*this, loc, std::move(component), base, tsanKind);
@@ -5763,7 +5750,7 @@ void SILGenFunction::emitAssignToLValue(SILLocation loc,
   // properties we need to write back to.
   ManagedValue destAddr;
   PathComponent &&component =
-    drillToLastComponent(*this, loc, std::move(dest), destAddr);
+    drillToLastComponent(loc, std::move(dest), destAddr);
   
   // Write to the tail component.
   if (component.isPhysical()) {

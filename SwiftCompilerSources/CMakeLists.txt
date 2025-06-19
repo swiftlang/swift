@@ -101,18 +101,11 @@ function(add_swift_compiler_modules_library name)
   set(swift_compile_options
       "-color-diagnostics"
       "-Xfrontend" "-validate-tbd-against-ir=none"
-      "${cxx_interop_flag}"
+      "-cxx-interoperability-mode=default"
       "-Xfrontend" "-disable-target-os-checking"
       "-Xcc" "-std=c++17"
       "-Xcc" "-DCOMPILED_WITH_SWIFT" "-Xcc" "-DSWIFT_TARGET"
       "-Xcc" "-UIBOutlet" "-Xcc" "-UIBAction" "-Xcc" "-UIBInspectable")
-
-  # Prior to 5.9, we have to use the experimental flag for C++ interop.
-  if (CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.9)
-    list(APPEND swift_compile_options "-Xfrontend" "-enable-experimental-cxx-interop")
-  else()
-    list(APPEND swift_compile_options "-cxx-interoperability-mode=default")
-  endif()
 
   if (NOT BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
     if(SWIFT_MIN_RUNTIME_VERSION)
@@ -286,12 +279,6 @@ function(add_swift_compiler_modules_library name)
   endforeach()
 
   # Create a static library containing all module object files.
-  if (XCODE)
-    # Xcode does not compile libraries that contain only object files.
-    # Therefore, it fails to create the static library. As a workaround,
-    # we add an empty source file force_lib.c to the target.
-    set(all_obj_files force_lib.c ${all_obj_files})
-  endif()
   add_library(${name} STATIC ${all_obj_files})
   add_dependencies(${name} ${all_module_targets})
   set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
@@ -341,7 +328,7 @@ else()
         message(FATAL_ERROR "The Swift compiler (${CMAKE_Swift_COMPILER}) differs from the Swift compiler in SWIFT_NATIVE_SWIFT_TOOLS_PATH (${SWIFT_NATIVE_SWIFT_TOOLS_PATH}/swiftc).")
       endif()
 
-      set(min_supported_swift_version 5.8)
+      set(min_supported_swift_version 5.9)
       if(CMAKE_Swift_COMPILER_VERSION VERSION_LESS "${min_supported_swift_version}")
         message(FATAL_ERROR
             "Outdated Swift compiler: building with host tools requires Swift ${min_supported_swift_version} or newer. "

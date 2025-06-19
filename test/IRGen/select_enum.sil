@@ -7,30 +7,34 @@ enum SinglePayloadSingleEmpty {
   case DataCase(Builtin.Word)
 }
 
-// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @select_enum_SinglePayloadSingleEmpty(ptr noalias nocapture dereferenceable({{.*}}) %0)
+// CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @select_enum_SinglePayloadSingleEmpty(ptr noalias {{(nocapture|captures\(none\))}} dereferenceable({{.*}}) %0)
 sil @select_enum_SinglePayloadSingleEmpty : $@convention(thin) (@in SinglePayloadSingleEmpty) -> () {
 bb0(%0 : $*SinglePayloadSingleEmpty):
   %1 = load %0 : $*SinglePayloadSingleEmpty
   // CHECK: [[PAYLOAD1:%[0-9]+]] = load [[WORD_TY:(i32|i64)]], ptr
-  // CHECK: [[TAG1:%[0-9]+]] = load i1, ptr
+  // CHECK: [[TAG1:%[0-9]+]] = load i8, ptr
+  // CHECK: [[TAG1_TRUNC0:%.*]] = icmp eq i8 [[TAG1]], 1
 
   %2 = integer_literal $Builtin.Int32, 2
   %3 = integer_literal $Builtin.Int32, 3
 
-  // CHECK:   select i1 [[TAG1]], i32 2, i32 3
+  // CHECK:   select i1 [[TAG1_TRUNC0]], i32 2, i32 3
   %4 = select_enum %1 : $SinglePayloadSingleEmpty, case #SinglePayloadSingleEmpty.EmptyCase!enumelt: %2, case #SinglePayloadSingleEmpty.DataCase!enumelt: %3 : $Builtin.Int32
 
-  // CHECK: [[V3:%[0-9]+]] = xor i1 [[TAG1]], true
+  // CHECK: [[TAG1_TRUNC1:%.*]] = icmp eq i8 [[TAG1]], 1
+  // CHECK: [[V3:%[0-9]+]] = xor i1 [[TAG1_TRUNC1]], true
   // CHECK-NEXT:   select i1 [[V3]], i32 3, i32 2
   %5 = select_enum %1 : $SinglePayloadSingleEmpty, case #SinglePayloadSingleEmpty.DataCase!enumelt: %3, case #SinglePayloadSingleEmpty.EmptyCase!enumelt: %2 : $Builtin.Int32
 
   // CHECK: [[PAYLOAD0:%[0-9]+]] = load [[WORD_TY:(i32|i64)]], ptr
-  // CHECK: [[TAG0:%[0-9]+]] = load i1, ptr
+  // CHECK: [[TAG0:%[0-9]+]] = load i8, ptr
+  // CHECK: [[TAG0_TRUNC0:%.*]] = icmp eq i8 [[TAG0]], 1
 
-  // CHECK:   select i1 [[TAG0]], i32 2, i32 3
+  // CHECK:   select i1 [[TAG0_TRUNC0]], i32 2, i32 3
   %6 = select_enum_addr %0 : $*SinglePayloadSingleEmpty, case #SinglePayloadSingleEmpty.EmptyCase!enumelt: %2, case #SinglePayloadSingleEmpty.DataCase!enumelt: %3 : $Builtin.Int32
 
-  // CHECK-NEXT:   select i1 [[TAG1]], i32 2, i32 3
+  // CHECK: [[TAG1_TRUNC2:%.*]] = icmp eq i8 [[TAG1]], 1
+  // CHECK-NEXT:   select i1 [[TAG1_TRUNC2]], i32 2, i32 3
   %7 = select_enum %1 : $SinglePayloadSingleEmpty, case #SinglePayloadSingleEmpty.EmptyCase!enumelt: %2, default %3 : $Builtin.Int32
 
   return undef : $()
@@ -45,17 +49,17 @@ enum MyOptional<T> {
 
 sil @select_enum_TwoCasesNoPayload :$ @convention(thin) (@in TwoCasesNoPayload, @in MyOptional<TwoCasesNoPayload>) -> () {
 bb0(%0 : $*TwoCasesNoPayload, %10 : $*MyOptional<TwoCasesNoPayload>):
-// CHECK: [[PAYLOAD1:%[0-9]+]] = load i1, ptr
+// CHECK: [[PAYLOAD1:%[0-9]+]] = load i8, ptr
   %1 = load %0 : $*TwoCasesNoPayload
 
   %2 = integer_literal $Builtin.Int32, 2
   %3 = integer_literal $Builtin.Int32, 42
 
-  // CHECK-NEXT: [[V2:%[0-9]+]] = icmp eq i1 [[PAYLOAD1]], false
+  // CHECK-NEXT: [[V2:%[0-9]+]] = icmp eq i8 [[PAYLOAD1]], 0
   // CHECK-NEXT:   select i1 [[V2]], i32 2, i32 42
   %4 = select_enum %1 : $TwoCasesNoPayload, case #TwoCasesNoPayload.X!enumelt: %2, case #TwoCasesNoPayload.Y!enumelt: %3 : $Builtin.Int32
 
-  // CHECK-NEXT: [[V2:%[0-9]+]] = icmp eq i1 [[PAYLOAD1]], true
+  // CHECK-NEXT: [[V2:%[0-9]+]] = icmp eq i8 [[PAYLOAD1]], 1
   // CHECK-NEXT:   select i1 [[V2]], i32 42, i32 2
   %5 = select_enum %1 : $TwoCasesNoPayload, case #TwoCasesNoPayload.Y!enumelt: %3, default %2 : $Builtin.Int32
 
@@ -82,7 +86,7 @@ enum NoPayloadSingleton {
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i1 @testOptionalOfNoPayloadSingleton(i8 %0)
 sil @testOptionalOfNoPayloadSingleton : $@convention(thin) (MyOptional<NoPayloadSingleton>) -> Builtin.Int1 {
 bb0(%0 : $MyOptional<NoPayloadSingleton>):
-// CHECK:  [[NATIVECCTRUNC:%.*]] = trunc i8 %0 to i1
+// CHECK:  [[NATIVECCTRUNC:%.*]] = icmp eq i8 %0, 1
 // CHECK:  [[NOT:%.*]] = xor i1 [[NATIVECCTRUNC]], true
 // CHECK:  ret i1 [[NOT]]
   %4 = integer_literal $Builtin.Int1, -1          // users: %6, %7

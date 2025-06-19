@@ -304,12 +304,12 @@ extension _Pointer /*: Strideable*/ {
 
 extension _Pointer /*: Hashable */ {
   @inlinable
-  public func hash(into hasher: inout Hasher) {
+  @safe public func hash(into hasher: inout Hasher) {
     hasher.combine(UInt(bitPattern: self))
   }
 
   @inlinable
-  public func _rawHashValue(seed: Int) -> Int {
+  @safe public func _rawHashValue(seed: Int) -> Int {
     return Hasher._hash(seed: seed, UInt(bitPattern: self))
   }
 }
@@ -317,14 +317,14 @@ extension _Pointer /*: Hashable */ {
 @_unavailableInEmbedded
 extension _Pointer /*: CustomDebugStringConvertible */ {
   /// A textual representation of the pointer, suitable for debugging.
-  public var debugDescription: String {
+  @safe public var debugDescription: String {
     return _rawPointerToString(_rawValue)
   }
 }
 
 #if SWIFT_ENABLE_REFLECTION
 extension _Pointer /*: CustomReflectable */ {
-  public var customMirror: Mirror {
+  @safe public var customMirror: Mirror {
     let ptrValue = UInt64(
       bitPattern: Int64(Int(Builtin.ptrtoint_Word(_rawValue))))
     return Mirror(self, children: ["pointerValue": ptrValue])
@@ -434,7 +434,7 @@ func _convertConstArrayToPointerArgument<
   FromElement,
   ToPointer: _Pointer
 >(_ arr: [FromElement]) -> (AnyObject?, ToPointer) {
-  let (owner, opaquePointer) = unsafe arr._cPointerArgs()
+  let (owner, opaquePointer) = arr._cPointerArgs()
 
   let validPointer: ToPointer
   if let addr = unsafe opaquePointer {
@@ -453,7 +453,7 @@ func _convertConstArrayToPointerArgument<
   FromElement,
   ToPointer: _Pointer
 >(_ arr: [FromElement]) -> (Builtin.NativeObject?, ToPointer) {
-  let (owner, opaquePointer) = unsafe arr._cPointerArgs()
+  let (owner, opaquePointer) = arr._cPointerArgs()
 
   let validPointer: ToPointer
   if let addr = unsafe opaquePointer {

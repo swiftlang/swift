@@ -26,15 +26,14 @@ TEST(ASTDumper, ArchetypeType) {
   TestContext C;
   auto &ctx = C.Ctx;
 
-  auto *genericParamTy = GenericTypeParamType::getType(0, 0, ctx);
-  auto sig = buildGenericSignature(ctx, nullptr, {genericParamTy}, {},
+  auto sig = buildGenericSignature(ctx, nullptr, {ctx.TheSelfType}, {},
                                    /*allowInverses=*/true);
 
   TypeBase *archetype = nullptr;
   {
     llvm::SmallVector<ProtocolDecl *> protocols;
     archetype = PrimaryArchetypeType::getNew(ctx, sig.getGenericEnvironment(),
-                                             genericParamTy, protocols, Type(),
+                                             ctx.TheSelfType, protocols, Type(),
                                              nullptr);
   }
 

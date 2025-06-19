@@ -26,6 +26,7 @@
 using namespace swift;
 
 #if SWIFT_BUILD_SWIFT_SYNTAX
+
 /// Enqueue a diagnostic with ASTGen's diagnostic rendering.
 static void addQueueDiagnostic(void *queuedDiagnostics,
                                void *perFrontendState,
@@ -35,25 +36,6 @@ static void addQueueDiagnostic(void *queuedDiagnostics,
     llvm::raw_svector_ostream out(text);
     DiagnosticEngine::formatDiagnosticText(out, info.FormatString,
                                            info.FormatArgs);
-  }
-
-  BridgedDiagnosticSeverity severity;
-  switch (info.Kind) {
-  case DiagnosticKind::Error:
-    severity = BridgedDiagnosticSeverity::BridgedError;
-    break;
-
-  case DiagnosticKind::Warning:
-    severity = BridgedDiagnosticSeverity::BridgedWarning;
-    break;
-
-  case DiagnosticKind::Remark:
-    severity = BridgedDiagnosticSeverity::BridgedRemark;
-    break;
-
-  case DiagnosticKind::Note:
-    severity = BridgedDiagnosticSeverity::BridgedNote;
-    break;
   }
 
   // Map the highlight ranges.
@@ -73,7 +55,7 @@ static void addQueueDiagnostic(void *queuedDiagnostics,
   swift_ASTGen_addQueuedDiagnostic(
       queuedDiagnostics, perFrontendState,
       text.str(),
-      severity, info.Loc,
+      info.Kind, info.Loc,
       info.Category,
       documentationPath,
       highlightRanges.data(), highlightRanges.size(),
@@ -84,6 +66,37 @@ static void addQueueDiagnostic(void *queuedDiagnostics,
   // bridging of `Note` structure and new serialization.
   for (auto *childNote : info.ChildDiagnosticInfo) {
     addQueueDiagnostic(queuedDiagnostics, perFrontendState, *childNote, SM);
+  }
+}
+
+void DiagnosticBridge::emitDiagnosticWithoutLocation(
+    const DiagnosticInfo &info, llvm::raw_ostream &out, bool forceColors) {
+  ASSERT(queuedDiagnostics == nullptr);
+
+  // If we didn't have per-frontend state before, create it now.
+  if (!perFrontendState) {
+    perFrontendState = swift_ASTGen_createPerFrontendDiagnosticState();
+  }
+
+  llvm::SmallString<256> text;
+  {
+    llvm::raw_svector_ostream out(text);
+    DiagnosticEngine::formatDiagnosticText(out, info.FormatString,
+                                           info.FormatArgs);
+  }
+
+  BridgedStringRef bridgedRenderedString{nullptr, 0};
+  swift_ASTGen_renderSingleDiagnostic(
+      perFrontendState, text.str(), info.Kind, info.Category,
+      llvm::StringRef(info.CategoryDocumentationURL), forceColors ? 1 : 0,
+      &bridgedRenderedString);
+
+  auto renderedString = bridgedRenderedString.unbridged();
+  if (renderedString.data()) {
+    out << "<unknown>:0: ";
+    out.write(renderedString.data(), renderedString.size());
+    swift_ASTGen_freeBridgedString(renderedString);
+    out << "\n";
   }
 }
 

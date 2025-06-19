@@ -71,7 +71,14 @@ public:
   ActorInstance() : ActorInstance(SILValue(), Kind::Value) {}
 
   static ActorInstance getForValue(SILValue value) {
+    if (!value)
+      return ActorInstance();
     value = lookThroughInsts(value);
+    if (!value->getType()
+             .getASTType()
+             ->lookThroughAllOptionalTypes()
+             ->isAnyActorType())
+      return ActorInstance();
     return ActorInstance(value, Kind::Value);
   }
 
@@ -96,7 +103,7 @@ public:
     return value.getPointer();
   }
 
-  SILValue maybeGetValue() const {
+  LLVM_ATTRIBUTE_USED SILValue maybeGetValue() const {
     if (getKind() != Kind::Value)
       return SILValue();
     return getValue();
@@ -132,6 +139,10 @@ public:
   bool operator!=(const ActorInstance &other) const {
     return !(*this == other);
   }
+
+  void print(llvm::raw_ostream &os) const;
+
+  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 };
 
 /// The isolation info inferred for a specific SILValue. Use
@@ -372,6 +383,21 @@ public:
             ActorIsolation::forActorInstanceSelf(typeDecl)};
   }
 
+  static SILIsolationInfo
+  getActorInstanceIsolated(SILValue isolatedValue,
+                           const SILFunctionArgument *actorInstance) {
+    assert(actorInstance);
+    auto *varDecl =
+        llvm::dyn_cast_if_present<VarDecl>(actorInstance->getDecl());
+    if (!varDecl)
+      return {};
+    return {isolatedValue, actorInstance,
+            actorInstance->isSelf()
+                ? ActorIsolation::forActorInstanceSelf(varDecl)
+                : ActorIsolation::forActorInstanceParameter(
+                      varDecl, actorInstance->getIndex())};
+  }
+
   static SILIsolationInfo getActorInstanceIsolated(SILValue isolatedValue,
                                                    ActorInstance actorInstance,
                                                    NominalTypeDecl *typeDecl) {
@@ -460,7 +486,7 @@ public:
   /// for the isolated values if any to not match.
   ///
   /// This is useful if one has two non-Sendable values projected from the same
-  /// actor or global actor isolated value. E.x.: two different ref_element_addr
+  /// actor or global-actor-isolated value. E.x.: two different ref_element_addr
   /// from the same actor.
   bool hasSameIsolation(const SILIsolationInfo &other) const;
 

@@ -49,18 +49,18 @@
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
 
-Func _prespecialize() is a new API without @available attribute
-Func _stdlib_isOSVersionAtLeastOrVariantVersionAtLeast(_:_:_:_:_:_:) is a new API without @available attribute
-Func _diagnoseUnavailableCodeReached() is a new API without @available attribute
+Func _prespecialize() is a new API without '@available'
+Func _stdlib_isOSVersionAtLeastOrVariantVersionAtLeast(_:_:_:_:_:_:) is a new API without '@available'
+Func _diagnoseUnavailableCodeReached() is a new API without '@available'
 
 // These functions are not actually added to the ABI, but they had been a part of
 // the ABI exposed by the runtime library, so this is not breakage.
 // They are now referenced by @_extern(c) declarations in the standard library, but
 // api-digester cannot match them with the baseline symbols in the baseline runtime
 // library, which were not exposed by the baseline stdlib module.
-Func _swift_retainCount(_:) is a new API without @available attribute
-Func _swift_unownedRetainCount(_:) is a new API without @available attribute
-Func _swift_weakRetainCount(_:) is a new API without @available attribute
+Func _swift_retainCount(_:) is a new API without '@available'
+Func _swift_unownedRetainCount(_:) is a new API without '@available'
+Func _swift_weakRetainCount(_:) is a new API without '@available'
 // And these were temporarily added as ABI in https://github.com/apple/swift/pull/69352,
 // but then https://github.com/apple/swift/pull/71694 made them @_aeic before
 // they shipped anywhere, but not before they got into the ABI baseline. Fun!
@@ -130,13 +130,13 @@ Func _SequenceBox._map(_:) is now without rethrows
 Func UnsafeMutableRawBufferPointer.storeBytes(of:toByteOffset:as:) has been removed
 Func UnsafeMutableRawPointer.storeBytes(of:toByteOffset:as:) has been removed
 Func UnsafeMutableBufferPointer.assign(repeating:) has been removed
-Func UnsafeMutableBufferPointer.update(repeating:) is a new API without @available attribute
+Func UnsafeMutableBufferPointer.update(repeating:) is a new API without '@available'
 Func UnsafeMutablePointer.assign(from:count:) has been removed
-Func UnsafeMutablePointer.update(from:count:) is a new API without @available attribute
+Func UnsafeMutablePointer.update(from:count:) is a new API without '@available'
 Func UnsafeMutablePointer.assign(repeating:count:) has been removed
-Func UnsafeMutablePointer.update(repeating:count:) is a new API without @available attribute
+Func UnsafeMutablePointer.update(repeating:count:) is a new API without '@available'
 Func UnsafeMutablePointer.moveAssign(from:count:) has been removed
-Func UnsafeMutablePointer.moveUpdate(from:count:) is a new API without @available attribute
+Func UnsafeMutablePointer.moveUpdate(from:count:) is a new API without '@available'
 
 // These haven't actually been removed; they were renamed at the source level while
 // retaining their old mangled name. The source break was accepted as part of se-0370.
@@ -146,7 +146,7 @@ Func UnsafeMutableBufferPointer.initialize(from:) has return type change from (�
 // This hasn't actually been removed; it was renamed at the source level while
 // retaining its old mangled/silgen name. The old source-level name is preserved
 // as an @_alwaysEmitIntoClient function. The source break was accepted as part of se-0405.
-Constructor String.init(validatingCString:) is a new API without @available attribute
+Constructor String.init(validatingCString:) is a new API without '@available'
 Constructor String.init(validatingUTF8:) has been removed
 
 // These haven't actually been removed; they are simply marked unavailable.
@@ -825,10 +825,11 @@ Func _SliceBuffer.withUnsafeMutableBufferPointer(_:) has mangled name changing f
 Struct String.Index has added a conformance to an existing protocol CustomDebugStringConvertible
 
 Struct CollectionOfOne is now with @_addressableForDependencies
+Struct _StringGuts is now with @_addressableForDependencies
 
-Enum _SwiftifyInfo is a new API without @available attribute
-Enum _SwiftifyExpr is a new API without @available attribute
-Enum _DependenceType is a new API without @available attribute
+Enum _SwiftifyInfo is a new API without '@available'
+Enum _SwiftifyExpr is a new API without '@available'
+Enum _DependenceType is a new API without '@available'
 
 Protocol CodingKey has added inherited protocol SendableMetatype
 Protocol Error has added inherited protocol SendableMetatype
@@ -855,6 +856,10 @@ Var UnsafeMutableBufferPointer.indices has mangled name changing from 'Swift.Uns
 Var UnsafeMutableBufferPointer.indices is now with @_preInverseGenerics
 Func !=(_:_:) has been removed
 Func ==(_:_:) has been removed
+Func ==(_:_:) has generic signature change from to <T where T : Swift.RawRepresentable, T.RawValue : Swift.Equatable>
+Func ==(_:_:) has mangled name changing from 'Swift.== infix(Swift.Optional<Any.Type>, Swift.Optional<Any.Type>) -> Swift.Bool' to 'Swift.== infix<A where A: Swift.RawRepresentable, A.RawValue: Swift.Equatable>(A, A) -> Swift.Bool'
+Func ==(_:_:) has parameter 0 type change from (any Any.Type)? to τ_0_0
+Func ==(_:_:) has parameter 1 type change from (any Any.Type)? to τ_0_0                              
 Func type(of:) has been removed
 
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)

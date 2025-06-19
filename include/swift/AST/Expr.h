@@ -267,7 +267,7 @@ protected:
     Kind : 2
   );
 
-  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1+1+1+1+1+1+1+1+1,
     /// True if closure parameters were synthesized from anonymous closure
     /// variables.
     HasAnonymousClosureVars : 1,
@@ -276,9 +276,11 @@ protected:
     /// on each member reference.
     ImplicitSelfCapture : 1,
 
-    /// True if this @Sendable async closure parameter should implicitly
-    /// inherit the actor context from where it was formed.
+    /// True if this closure parameter should implicitly inherit the actor
+    /// context from where it was formed.
     InheritActorContext : 1,
+    /// The kind for inheritance - none or always at the moment.
+    InheritActorContextKind : 1,
 
     /// True if this closure's actor isolation behavior was determined by an
     /// \c \@preconcurrency declaration.
@@ -295,7 +297,12 @@ protected:
     /// isolation checks when it either specifies or inherits isolation
     /// and was passed as an argument to a function that is not fully 
     /// concurrency checked.
-    RequiresDynamicIsolationChecking : 1
+    RequiresDynamicIsolationChecking : 1,
+
+    /// Whether this closure was type-checked as an argument to a macro. This
+    /// is only populated after type-checking, and only exists for diagnostic
+    /// logic. Do not add more uses of this.
+    IsMacroArgument : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(BindOptionalExpr, Expr, 16,
@@ -689,9 +696,7 @@ public:
 
   /// Set the builtin initializer that will be used to construct the
   /// literal.
-  void setBuiltinInitializer(ConcreteDeclRef builtinInitializer) {
-    BuiltinInitializer = builtinInitializer;
-  }
+  void setBuiltinInitializer(ConcreteDeclRef builtinInitializer);
 };
 
 /// The 'nil' literal.
@@ -1449,23 +1454,25 @@ public:
 };
 
 class TypeValueExpr : public Expr {
-  GenericTypeParamDecl *paramDecl;
-  DeclNameLoc loc;
+  TypeRepr *repr;
   Type paramType;
 
-  /// Create a \c TypeValueExpr from a given generic value param decl.
-  TypeValueExpr(DeclNameLoc loc, GenericTypeParamDecl *paramDecl) :
-      Expr(ExprKind::TypeValue, /*implicit*/ false), paramDecl(paramDecl),
-      loc(loc), paramType(nullptr) {}
+  /// Create a \c TypeValueExpr from a given type representation.
+  TypeValueExpr(TypeRepr *repr) :
+      Expr(ExprKind::TypeValue, /*implicit*/ false), repr(repr),
+      paramType(nullptr) {}
 
 public:
-  /// Create a \c TypeValueExpr for a given \c GenericTypeParamDecl.
+  /// Create a \c TypeValueExpr for a given \c TypeDecl.
   ///
   /// The given location must be valid.
-  static TypeValueExpr *createForDecl(DeclNameLoc Loc, GenericTypeParamDecl *D);
+  static TypeValueExpr *createForDecl(DeclNameLoc loc, TypeDecl *d,
+                                      DeclContext *dc);
 
-  GenericTypeParamDecl *getParamDecl() const {
-    return paramDecl;
+  GenericTypeParamDecl *getParamDecl() const;
+
+  TypeRepr *getRepr() const {
+    return repr;
   }
 
   /// Retrieves the corresponding parameter type of the value referenced by this
@@ -1480,9 +1487,7 @@ public:
     this->paramType = paramType;
   }
 
-  SourceRange getSourceRange() const {
-    return loc.getSourceRange();
-  }
+  SourceRange getSourceRange() const;
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::TypeValue;
@@ -4313,9 +4318,11 @@ public:
     Bits.ClosureExpr.HasAnonymousClosureVars = false;
     Bits.ClosureExpr.ImplicitSelfCapture = false;
     Bits.ClosureExpr.InheritActorContext = false;
+    Bits.ClosureExpr.InheritActorContextKind = 0;
     Bits.ClosureExpr.IsPassedToSendingParameter = false;
     Bits.ClosureExpr.NoGlobalActorAttribute = false;
     Bits.ClosureExpr.RequiresDynamicIsolationChecking = false;
+    Bits.ClosureExpr.IsMacroArgument = false;
   }
 
   SourceRange getSourceRange() const;
@@ -4360,8 +4367,29 @@ public:
     return Bits.ClosureExpr.InheritActorContext;
   }
 
-  void setInheritsActorContext(bool value = true) {
+  /// Whether this closure should _always_ implicitly inherit the actor context
+  /// regardless of whether the isolation parameter is captured or not.
+  bool alwaysInheritsActorContext() const {
+    if (!inheritsActorContext())
+      return false;
+    return getInheritActorIsolationModifier() ==
+           InheritActorContextModifier::Always;
+  }
+
+  void setInheritsActorContext(bool value = true,
+                               InheritActorContextModifier modifier =
+                                   InheritActorContextModifier::None) {
     Bits.ClosureExpr.InheritActorContext = value;
+    Bits.ClosureExpr.InheritActorContextKind = uint8_t(modifier);
+    assert((static_cast<InheritActorContextModifier>(
+                Bits.ClosureExpr.InheritActorContextKind) == modifier) &&
+           "not enough bits for modifier");
+  }
+
+  InheritActorContextModifier getInheritActorIsolationModifier() const {
+    assert(inheritsActorContext());
+    return static_cast<InheritActorContextModifier>(
+        Bits.ClosureExpr.InheritActorContextKind);
   }
 
   /// Whether the closure's concurrency behavior was determined by an
@@ -4392,6 +4420,17 @@ public:
 
   void setRequiresDynamicIsolationChecking(bool value = true) {
     Bits.ClosureExpr.RequiresDynamicIsolationChecking = value;
+  }
+
+  /// Whether this closure was type-checked as an argument to a macro. This
+  /// is only populated after type-checking, and only exists for diagnostic
+  /// logic. Do not add more uses of this.
+  bool isMacroArgument() const {
+    return Bits.ClosureExpr.IsMacroArgument;
+  }
+
+  void setIsMacroArgument(bool value = true) {
+    Bits.ClosureExpr.IsMacroArgument = value;
   }
 
   /// Determine whether this closure expression has an

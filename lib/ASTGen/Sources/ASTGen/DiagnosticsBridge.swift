@@ -120,7 +120,7 @@ public func emitDiagnostic(
 }
 
 extension DiagnosticSeverity {
-  public var bridged: BridgedDiagnosticSeverity {
+  public var bridged: swift.DiagnosticKind {
     switch self {
     case .error: return .error
     case .note: return .note
@@ -177,10 +177,9 @@ fileprivate struct SimpleDiagnostic: DiagnosticMessage {
   }
 }
 
-extension BridgedDiagnosticSeverity {
+extension swift.DiagnosticKind {
   var asSeverity: DiagnosticSeverity {
     switch self {
-    case .fatalError: return .error
     case .error: return .error
     case .warning: return .warning
     case .remark: return .remark
@@ -250,7 +249,7 @@ public func addQueuedDiagnostic(
   queuedDiagnosticsPtr: UnsafeMutableRawPointer,
   perFrontendDiagnosticStatePtr: UnsafeMutableRawPointer,
   text: BridgedStringRef,
-  severity: BridgedDiagnosticSeverity,
+  severity: swift.DiagnosticKind,
   cLoc: BridgedSourceLoc,
   categoryName: BridgedStringRef,
   documentationPath: BridgedStringRef,
@@ -423,6 +422,60 @@ public func addQueuedDiagnostic(
   )
 
   queuedDiagnostics.pointee.grouped.addDiagnostic(diagnostic)
+}
+
+/// Render a single diagnostic that has no source location information.
+@_cdecl("swift_ASTGen_renderSingleDiagnostic")
+public func renderSingleDiagnostic(
+  perFrontendDiagnosticStatePtr: UnsafeMutableRawPointer,
+  text: BridgedStringRef,
+  severity: swift.DiagnosticKind,
+  categoryName: BridgedStringRef,
+  documentationPath: BridgedStringRef,
+  colorize: Int,
+  renderedStringOutPtr: UnsafeMutablePointer<BridgedStringRef>
+) {
+  let diagnosticState = perFrontendDiagnosticStatePtr.assumingMemoryBound(
+    to: PerFrontendDiagnosticState.self
+  )
+
+  let documentationPath = String(bridged: documentationPath)
+  let documentationURL: String? = if !documentationPath.isEmpty {
+      // If this looks doesn't look like a URL, prepend file://.
+      documentationPath.looksLikeURL ? documentationPath : "file://\(documentationPath)"
+    } else {
+      nil
+    }
+
+  let categoryName = String(bridged: categoryName)
+  // If the data comes from serialized diagnostics, it's possible that
+  // the category name is empty because StringRef() is serialized into
+  // an empty string.
+  let category: DiagnosticCategory? = if !categoryName.isEmpty {
+      DiagnosticCategory(
+        name: categoryName,
+        documentationURL: documentationURL
+      )
+    } else {
+      nil
+    }
+
+  // Note that we referenced this category.
+  if let category {
+    diagnosticState.pointee.referencedCategories.insert(category)
+  }
+
+  let formatter = DiagnosticsFormatter(colorize: colorize != 0)
+
+  let renderedStr = formatter.formattedMessage(
+    SimpleDiagnostic(
+      message: String(bridged: text),
+      severity: severity.asSeverity,
+      category: category
+    )
+  )
+
+  renderedStringOutPtr.pointee = allocateBridgedString(renderedStr)
 }
 
 /// Render the queued diagnostics into a UTF-8 string.

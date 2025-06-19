@@ -68,17 +68,17 @@ func acceptP(_: some P) { }
 
 func testConformance(i: Int) {
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
-  acceptP(i) // expected-note{{@unsafe conformance of 'Int' to protocol 'P' involves unsafe code}}
+  acceptP(i) // expected-note{{'@unsafe' conformance of 'Int' to protocol 'P' involves unsafe code}}
 }
 
 func returnsOpaqueP() -> some P {
   5 // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}
-  // expected-note@-1{{@unsafe conformance of 'Int' to protocol 'P' involves unsafe code}}
+  // expected-note@-1{{'@unsafe' conformance of 'Int' to protocol 'P' involves unsafe code}}
 }
 
 func returnsExistentialP() -> any P {
   5 // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}
-  // expected-note@-1{{@unsafe conformance of 'Int' to protocol 'P' involves unsafe code}}
+  // expected-note@-1{{'@unsafe' conformance of 'Int' to protocol 'P' involves unsafe code}}
 }
 
 // FIXME: Should work even if the IteratorProtocol conformance is safe
@@ -89,10 +89,12 @@ struct UnsafeAsSequence: @unsafe Sequence, @unsafe IteratorProtocol {
 func testUnsafeAsSequenceForEach() {
   let uas = UnsafeAsSequence()
 
+  // expected-note@+2{{reference to unsafe instance method 'next()'}}
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{12-12=unsafe }}
   for _ in uas { } // expected-note{{conformance}}
   // expected-warning@-1{{for-in loop uses unsafe constructs but is not marked with 'unsafe'}}{{documentation-file=strict-memory-safety}}{{7-7=unsafe }}
 
+  // expected-note@+1{{reference to unsafe instance method 'next()'}}
   for _ in unsafe uas { } // expected-warning{{for-in loop uses unsafe constructs but is not marked with 'unsafe'}}{{documentation-file=strict-memory-safety}}{{7-7=unsafe }}
 
   for unsafe _ in unsafe uas { } // okay
@@ -118,6 +120,7 @@ struct SequenceWithUnsafeIterator: Sequence {
 func testUnsafeIteratorForEach() {
   let swui = SequenceWithUnsafeIterator()
 
+  // expected-note@+1{{reference to unsafe instance method 'next()'}}
   for _ in swui { } // expected-warning{{for-in loop uses unsafe constructs but is not marked with 'unsafe'}}{{7-7=unsafe }}
   for unsafe _ in swui { } // okay, it's only the iterator that's unsafe
 }
@@ -142,7 +145,7 @@ func casting(value: Any, i: Int) {
   _ = unsafe value as! UnsafeType
 
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
-  _ = i as any P // expected-note{{@unsafe conformance of 'Int' to protocol 'P' involves unsafe code}}
+  _ = i as any P // expected-note{{'@unsafe' conformance of 'Int' to protocol 'P' involves unsafe code}}
 }
 
 func metatypes() {
@@ -200,6 +203,8 @@ func unsafeFun() {
   _ = color
 
   if unsafe { }
+
+  _ = unsafe ? 1 : 0
 }
 
 func moreUnsafeFunc(unsafe: [Int]) {
@@ -216,6 +221,13 @@ func yetMoreUnsafeFunc(unsafe: () -> Void) {
 
   _ = unsafe ()
   // expected-warning@-1{{no unsafe operations occur within 'unsafe' expression}}
+}
+
+func yetMoreMoreUnsafeFunc(unsafe: Int?) {
+  _ = unsafe!
+  if let unsafe {
+    _ = unsafe + 1
+  }
 }
 
 // @safe suppresses unsafe-type-related diagnostics on an entity
@@ -270,4 +282,103 @@ struct UnsafeWrapTest {
 }
 
 @safe @unsafe
-struct ConfusedStruct { } // expected-error{{struct 'ConfusedStruct' cannot be both @safe and @unsafe}}
+struct ConfusedStruct { } // expected-error{{struct 'ConfusedStruct' cannot be both '@safe' and '@unsafe'}}
+
+@unsafe
+struct UnsafeContainingUnspecified {
+  typealias A = Int
+
+  func getA() -> A { 0 }
+
+  @safe
+  struct Y {
+    var value: Int
+  }
+
+  func f() {
+    _ = Y(value: 5)
+  }
+}
+
+
+@unsafe func f(x: UnsafeContainingUnspecified) {
+  let a = unsafe x.getA()
+  _ = a
+}
+
+extension Slice {
+  // Make sure we aren't diagnosing the 'defer' as unsafe.
+  public func withContiguousMutableStorageIfAvailable<R, Element>(
+    _ body: (_ buffer: inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R? where Base == UnsafeMutableBufferPointer<Element> {
+    try unsafe base.withContiguousStorageIfAvailable { buffer in
+      let start = unsafe base.baseAddress?.advanced(by: startIndex)
+      var slice = unsafe UnsafeMutableBufferPointer(start: start, count: count)
+      defer {
+      }
+      return try unsafe body(&slice)
+    }
+  }
+}
+
+@unsafe enum SomeEnum {
+  case first
+  case second
+}
+
+@unsafe var someEnumValue: SomeEnum = unsafe .first
+
+func testSwitch(se: SomeEnum) {
+  switch unsafe se {
+  case unsafe someEnumValue: break
+  default: break
+  }
+
+  switch unsafe se {
+  case someEnumValue: break
+    // expected-warning@-1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{8-8=unsafe }}
+    // expected-note@-2{{argument #0 in call to operator function '~=' has unsafe type 'SomeEnum'}}
+    // expected-note@-3{{argument #1 in call to operator function '~=' has unsafe type 'SomeEnum'}}
+    // expected-note@-4{{reference to unsafe type 'SomeEnum'}}
+    // expected-note@-5{{reference to unsafe var 'someEnumValue'}}
+    // expected-note@-6{{reference to let '$match' involves unsafe type 'SomeEnum'}}
+  default: break
+  }
+
+  // expected-note@+2{{reference to parameter 'se' involves unsafe type 'SomeEnum'}}
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{10-10=unsafe }}
+  switch se {
+  case unsafe someEnumValue: break
+  default: break
+  }
+
+  if case someEnumValue = unsafe se { }
+    // expected-warning@-1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{11-11=unsafe }}
+    // expected-note@-2{{argument #0 in call to operator function '~=' has unsafe type 'SomeEnum'}}
+    // expected-note@-3{{argument #1 in call to operator function '~=' has unsafe type 'SomeEnum'}}
+    // expected-note@-4{{reference to unsafe type 'SomeEnum'}}
+    // expected-note@-5{{reference to unsafe var 'someEnumValue'}}
+    // expected-note@-6{{reference to let '$match' involves unsafe type 'SomeEnum'}}
+
+  if case unsafe someEnumValue = unsafe se { }
+}
+
+@unsafe class SomeClass {}
+@unsafe class SomeClassWrapper { }
+
+protocol Associated {
+    associatedtype Associated
+}
+
+protocol CustomAssociated: Associated { }
+
+// expected-warning@+1{{conformance of 'SomeClass' to protocol 'Associated' involves unsafe code}}{{22-22=@unsafe }}
+extension SomeClass: CustomAssociated {
+  typealias Associated = SomeClassWrapper // expected-note{{unsafe type 'SomeClass.Associated' (aka 'SomeClassWrapper') cannot satisfy safe associated type 'Associated'}}
+}
+
+func testInterpolation(ptr: UnsafePointer<Int>) {
+  _ = "Hello \(unsafe ptr)" // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{7-7=unsafe }}
+  // expected-note@-1{{reference to unsafe type 'UnsafePointer<Int>'}}
+  // expected-note@-2{{argument #0 in call to instance method 'appendInterpolation' has unsafe type 'UnsafePointer<Int>'}}
+}

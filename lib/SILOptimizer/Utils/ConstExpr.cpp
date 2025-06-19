@@ -1785,8 +1785,8 @@ ConstExprFunctionState::evaluateInstructionAndGetNext(
     // Set up basic block arguments.
     for (unsigned i = 0, e = br->getNumArgs(); i != e; ++i) {
       auto argument = getConstantValue(br->getArg(i));
-      if (!argument.isConstant())
-        return {std::nullopt, argument};
+      // Do not fail if an argument is not constant because we still know enough to know what the next instruction will be.
+      // Failure may occur later, however, if/when this unknown argument value is used by an instruction in the target basic block.
       setValue(destBB->getArgument(i), argument);
     }
     // Set the instruction pointer to the first instruction of the block.

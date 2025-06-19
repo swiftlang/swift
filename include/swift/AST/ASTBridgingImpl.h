@@ -20,6 +20,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IfConfigClauseRangeInfo.h"
 #include "swift/AST/MacroDeclaration.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -42,8 +43,8 @@ swift::Identifier BridgedIdentifier::unbridged() const {
   return swift::Identifier::getFromOpaquePointer(Raw);
 }
 
-bool BridgedIdentifier_isOperator(const BridgedIdentifier ident) {
-  return ident.unbridged().isOperator();
+bool BridgedIdentifier::getIsOperator() const {
+  return unbridged().isOperator();
 }
 
 //===----------------------------------------------------------------------===//
@@ -99,10 +100,6 @@ swift::DeclNameLoc BridgedDeclNameLoc::unbridged() const {
 BridgedASTContext::BridgedASTContext(swift::ASTContext &ctx) : Ctx(&ctx) {}
 
 swift::ASTContext &BridgedASTContext::unbridged() const { return *Ctx; }
-
-void * _Nonnull BridgedASTContext_raw(BridgedASTContext bridged) {
-  return &bridged.unbridged();
-}
 
 BridgedASTContext BridgedASTContext_fromRaw(void * _Nonnull ptr) {
   return *static_cast<swift::ASTContext *>(ptr);
@@ -180,6 +177,10 @@ BridgedDeclObj BridgedDeclObj::getModuleContext() const {
   return {unbridged()->getModuleContext()};
 }
 
+OptionalBridgedDeclObj BridgedDeclObj::getParent() const {
+  return {unbridged()->getDeclContext()->getAsDecl()};
+}
+
 BridgedStringRef BridgedDeclObj::Type_getName() const {
   return getAs<swift::TypeDecl>()->getName().str();
 }
@@ -216,6 +217,10 @@ OptionalBridgedDeclObj BridgedDeclObj::NominalType_getValueTypeDestructor() cons
   return {getAs<swift::NominalTypeDecl>()->getValueTypeDestructor()};
 }
 
+bool BridgedDeclObj::Enum_hasRawType() const {
+  return getAs<swift::EnumDecl>()->hasRawType();
+}
+
 bool BridgedDeclObj::Struct_hasUnreferenceableStorage() const {
   return getAs<swift::StructDecl>()->hasUnreferenceableStorage();
 }
@@ -226,6 +231,10 @@ BridgedASTType BridgedDeclObj::Class_getSuperclass() const {
 
 BridgedDeclObj BridgedDeclObj::Class_getDestructor() const {
   return {getAs<swift::ClassDecl>()->getDestructor()};
+}
+
+bool BridgedDeclObj::ProtocolDecl_requiresClass() const {
+  return getAs<swift::ProtocolDecl>()->requiresClass();
 }
 
 bool BridgedDeclObj::AbstractFunction_isOverridden() const {
@@ -402,6 +411,10 @@ BridgedCanType BridgedASTType::getCanonicalType() const {
   return unbridged()->getCanonicalType();
 }
 
+BridgedDiagnosticArgument BridgedASTType::asDiagnosticArgument() const {
+  return swift::DiagnosticArgument(unbridged());
+}
+
 bool BridgedASTType::hasArchetype() const {
   return unbridged()->hasArchetype();
 }
@@ -423,6 +436,18 @@ bool BridgedASTType::hasLocalArchetype() const {
   return unbridged()->hasLocalArchetype();
 }
 
+bool BridgedASTType::hasDynamicSelf() const {
+  return unbridged()->hasDynamicSelfType();
+}
+
+bool BridgedASTType::isArchetype() const {
+  return unbridged()->is<swift::ArchetypeType>();
+}
+
+bool BridgedASTType::archetypeRequiresClass() const {
+  return unbridged()->castTo<swift::ArchetypeType>()->requiresClass();
+}
+
 bool BridgedASTType::isExistentialArchetype() const {
   return unbridged()->is<swift::ExistentialArchetypeType>();
 }
@@ -441,6 +466,10 @@ bool BridgedASTType::isDynamicSelf() const {
 
 bool BridgedASTType::isClassExistential() const {
   return unbridged()->isClassExistentialType();
+}
+
+bool BridgedASTType::isGenericTypeParam() const {
+  return unbridged()->is<swift::GenericTypeParamType>();
 }
 
 bool BridgedASTType::isEscapable() const {
@@ -513,8 +542,20 @@ bool BridgedASTType::isBuiltinVector() const {
   return unbridged()->is<swift::BuiltinVectorType>();
 }
 
+bool BridgedASTType::isBuiltinFixedArray() const {
+  return unbridged()->is<swift::BuiltinFixedArrayType>();
+}
+
 BridgedASTType BridgedASTType::getBuiltinVectorElementType() const {
   return {unbridged()->castTo<swift::BuiltinVectorType>()->getElementType().getPointer()};
+}
+
+BridgedCanType BridgedASTType::getBuiltinFixedArrayElementType() const {
+  return unbridged()->castTo<swift::BuiltinFixedArrayType>()->getElementType();
+}
+
+BridgedCanType BridgedASTType::getBuiltinFixedArraySizeType() const {
+  return unbridged()->castTo<swift::BuiltinFixedArrayType>()->getSize();
 }
 
 bool BridgedASTType::isBuiltinFixedWidthInteger(SwiftInt width) const {
@@ -529,6 +570,10 @@ bool BridgedASTType::isOptional() const {
 
 bool BridgedASTType::isUnownedStorageType() const {
   return unbridged()->is<swift::UnownedStorageType>();
+}
+
+bool BridgedASTType::isBuiltinType() const {
+  return unbridged()->isBuiltinType();
 }
 
 OptionalBridgedDeclObj BridgedASTType::getNominalOrBoundGenericNominal() const {
@@ -547,12 +592,20 @@ BridgedASTType BridgedASTType::getInstanceTypeOfMetatype() const {
   return {unbridged()->getAs<swift::AnyMetatypeType>()->getInstanceType().getPointer()};
 }
 
+BridgedASTType BridgedASTType::getStaticTypeOfDynamicSelf() const {
+  return {unbridged()->getAs<swift::DynamicSelfType>()->getSelfType().getPointer()};
+}
+
 BridgedASTType BridgedASTType::getSuperClassType() const {
   return {unbridged()->getSuperclass().getPointer()};
 }
 
 BridgedASTType::MetatypeRepresentation BridgedASTType::getRepresentationOfMetatype() const {
   return MetatypeRepresentation(unbridged()->getAs<swift::AnyMetatypeType>()->getRepresentation());
+}
+
+BridgedOptionalInt BridgedASTType::getValueOfIntegerType() const {
+  return BridgedOptionalInt::getFromAPInt(unbridged()->getAs<swift::IntegerType>()->getValue());
 }
 
 BridgedSubstitutionMap BridgedASTType::getContextSubstitutionMap() const {
@@ -565,17 +618,6 @@ BridgedGenericSignature BridgedASTType::getInvocationGenericSignatureOfFunctionT
 
 BridgedASTType BridgedASTType::subst(BridgedSubstitutionMap substMap) const {
   return {unbridged().subst(substMap.unbridged()).getPointer()};
-}
-
-
-BridgedASTType BridgedASTType::subst(BridgedASTType fromType, BridgedASTType toType) const {
-  auto *fromTy = fromType.unbridged()->castTo<swift::SubstitutableType>();
-  swift::Type toTy = toType.unbridged();
-  return {unbridged().subst([fromTy, toTy](swift::SubstitutableType *t) -> swift::Type {
-    if (t == fromTy)
-      return toTy;
-    return t;
-  }, swift::LookUpConformanceInModule(), swift::SubstFlags::SubstituteLocalArchetypes).getPointer()};
 }
 
 BridgedConformance BridgedASTType::checkConformance(BridgedDeclObj proto) const {
@@ -593,6 +635,9 @@ static_assert((int)BridgedASTType::MetatypeRepresentation::ObjC == (int)swift::M
 //===----------------------------------------------------------------------===//
 // MARK: BridgedCanType
 //===----------------------------------------------------------------------===//
+
+BridgedCanType::BridgedCanType() : type(nullptr) {
+}
 
 BridgedCanType::BridgedCanType(swift::CanType ty) : type(ty.getPointer()) {
 }
@@ -795,6 +840,10 @@ BridgedASTTypeArray BridgedGenericSignature::getGenericParams() const {
   return {unbridged().getGenericParams()};
 }
 
+BridgedASTType BridgedGenericSignature::mapTypeIntoContext(BridgedASTType type) const {
+  return {unbridged().getGenericEnvironment()->mapTypeIntoContext(type.unbridged()).getPointer()};
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: BridgedFingerprint
 //===----------------------------------------------------------------------===//
@@ -885,8 +934,8 @@ swift::CaptureListEntry BridgedCaptureListEntry::unbridged() const {
   return swift::CaptureListEntry(PBD);
 }
 
-BridgedVarDecl BridegedCaptureListEntry_getVar(BridgedCaptureListEntry entry) {
-  return entry.unbridged().getVar();
+BridgedVarDecl BridgedCaptureListEntry::getVarDecl() const {
+  return unbridged().getVar();
 }
 
 //===----------------------------------------------------------------------===//

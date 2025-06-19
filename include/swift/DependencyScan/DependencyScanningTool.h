@@ -40,6 +40,7 @@ private:
     std::optional<ScannerImportStatementInfo::ImportDiagnosticLocationInfo> ImportLocation;
   };
   std::vector<ScannerDiagnosticInfo> Diagnostics;
+  llvm::sys::SmartMutex<true> ScanningDiagnosticConsumerStateLock;
 
   void handleDiagnostic(SourceManager &SM, const DiagnosticInfo &Info) override;
 
@@ -55,19 +56,6 @@ public:
   }
 };
 
-/// Locking variant of the above diagnostic collector that guards accesses to
-/// its state with a lock.
-class LockingDependencyScanDiagnosticCollector
-    : public DependencyScanDiagnosticCollector {
-private:
-  void addDiagnostic(SourceManager &SM, const DiagnosticInfo &Info) override;
-  llvm::sys::SmartMutex<true> ScanningDiagnosticConsumerStateLock;
-
-public:
-  friend DependencyScanningTool;
-  LockingDependencyScanDiagnosticCollector() {}
-};
-
 /// Given a set of arguments to a print-target-info frontend tool query, produce the
 /// JSON target info.
 llvm::ErrorOr<swiftscan_string_ref_t> getTargetInfo(ArrayRef<const char *> Command,
@@ -80,14 +68,12 @@ public:
   /// Construct a dependency scanning tool.
   DependencyScanningTool();
 
-  /// Collect the full module dependency graph for the input, ignoring any
-  /// placeholder modules.
+  /// Collect the full module dependency graph for the input.
   ///
   /// \returns a \c StringError with the diagnostic output if errors
   /// occurred, \c swiftscan_dependency_result_t otherwise.
   llvm::ErrorOr<swiftscan_dependency_graph_t>
   getDependencies(ArrayRef<const char *> Command,
-                  const llvm::StringSet<> &PlaceholderModules,
                   StringRef WorkingDirectory);
 
   /// Collect the set of imports for the input module
@@ -96,11 +82,6 @@ public:
   /// occurred, \c swiftscan_prescan_result_t otherwise.
   llvm::ErrorOr<swiftscan_import_set_t>
   getImports(ArrayRef<const char *> Command, StringRef WorkingDirectory);
-
-  /// Query diagnostics consumed so far.
-  std::vector<DependencyScanDiagnosticCollector::ScannerDiagnosticInfo> getDiagnostics();
-  /// Discared the collection of diagnostics encountered so far.
-  void resetDiagnostics();
 
   /// Using the specified invocation command, instantiate a CompilerInstance
   /// that will be used for this scan.
@@ -116,9 +97,6 @@ private:
 
   /// Shared state mutual-exclusivity lock
   llvm::sys::SmartMutex<true> DependencyScanningToolStateLock;
-
-  /// A shared consumer that accumulates encountered diagnostics.
-  LockingDependencyScanDiagnosticCollector CDC;
   llvm::BumpPtrAllocator Alloc;
   llvm::StringSaver Saver;
 };

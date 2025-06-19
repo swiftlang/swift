@@ -15,17 +15,17 @@ entry:
   unreachable
 }
 
-// CHECK-LABEL-i386:   define{{( dllexport)?}}{{( protected)?}} swiftcc void @does_throw(ptr swiftself %0, ptr %1) {{.*}} {
-// CHECK-LABEL-x86_64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @does_throw(ptr swiftself %0, ptr swifterror %1) {{.*}} {
-// CHECK-LABEL-armv7:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @does_throw(ptr swiftself %0, ptr swifterror %1) {{.*}} {
-// CHECK-LABEL-armv7s: define{{( dllexport)?}}{{( protected)?}} swiftcc void @does_throw(ptr swiftself %0, ptr swifterror %1) {{.*}} {
-// CHECK-LABEL-armv7k: define{{( dllexport)?}}{{( protected)?}} swiftcc void @does_throw(ptr swiftself %0, ptr swifterror %1) {{.*}} {
-// CHECK-LABEL-arm64:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @does_throw(ptr swiftself %0, ptr swifterror %1) {{.*}} {
-// CHECK-LABEL-arm64e:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @does_throw(ptr swiftself %0, ptr swifterror %1) {{.*}} {
-// CHECK-LABEL-aarch64:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @does_throw(ptr swiftself %0, ptr swifterror %1) {{.*}} {
-// CHECK-LABEL-arm64_32:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @does_throw(ptr swiftself %0, ptr swifterror %1) {{.*}} {
-// CHECK-LABEL-arm64e:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @does_throw(ptr swiftself %0, ptr swifterror %1) {{.*}} {
-// CHECK-LABEL-wasm32:  define swiftcc void @does_throw(ptr swiftself %0, ptr swifterror %1) {{.*}} {
+// CHECK-i386-LABEL:   define{{( dllexport)?}}{{( protected)?}} swiftcc void @does_throw(ptr swiftself %0, ptr %1) {{.*}} {
+// CHECK-x86_64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @does_throw(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.}}) %1) {{.*}} {
+// CHECK-armv7-LABEL:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @does_throw(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.}}) %1) {{.*}} {
+// CHECK-armv7s-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @does_throw(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.}}) %1) {{.*}} {
+// CHECK-armv7k-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @does_throw(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.}}) %1) {{.*}} {
+// CHECK-arm64-LABEL:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @does_throw(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.}}) %1) {{.*}} {
+// CHECK-arm64e-LABEL:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @does_throw(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.}}) %1) {{.*}} {
+// CHECK-aarch64-LABEL:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @does_throw(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.}}) %1) {{.*}} {
+// CHECK-arm64_32-LABEL:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @does_throw(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.}}) %1) {{.*}} {
+// CHECK-arm64e-LABEL:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @does_throw(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.}}) %1) {{.*}} {
+// CHECK-wasm32-LABEL:  define swiftcc void @does_throw(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.}}) %1) {{.*}} {
 sil @does_throw : $@convention(thin) () -> @error Error {
   // CHECK: [[T0:%.*]] = call swiftcc ptr @create_error()
   %0 = function_ref @create_error : $@convention(thin) () -> @owned Error
@@ -40,17 +40,17 @@ sil @does_throw : $@convention(thin) () -> @error Error {
   throw %1 : $Error
 }
 
-// CHECK-LABEL-i386:   define{{( dllexport)?}}{{( protected)?}} swiftcc void @doesnt_throw(ptr swiftself %0, ptr %1) {{.*}} {
-// CHECK-LABEL-x86_64: define{{( dllexport)?}}{{( protected)?}} swiftcc void @doesnt_throw(ptr swiftself %0, ptr swifterror %1) {{.*}} {
-// CHECK-LABEL-armv7:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @doesnt_throw(ptr swiftself %0, ptr swifterror %1) {{.*}} {
-// CHECK-LABEL-armv7s: define{{( dllexport)?}}{{( protected)?}} swiftcc void @doesnt_throw(ptr swiftself %0, ptr swifterror %1) {{.*}} {
-// CHECK-LABEL-armv7k: define{{( dllexport)?}}{{( protected)?}} swiftcc void @doesnt_throw(ptr swiftself %0, ptr swifterror %1) {{.*}} {
-// CHECK-LABEL-arm64:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @doesnt_throw(ptr swiftself %0, ptr swifterror %1) {{.*}} {
-// CHECK-LABEL-arm64e:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @doesnt_throw(ptr swiftself %0, ptr swifterror %1) {{.*}} {
-// CHECK-LABEL-aarch64:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @doesnt_throw(ptr swiftself %0, ptr swifterror %1) {{.*}} {
-// CHECK-LABEL-arm64e:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @doesnt_throw(ptr swiftself %0, ptr swifterror %1) {{.*}} {
-// CHECK-LABEL-arm64_32:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @doesnt_throw(ptr swiftself %0, ptr swifterror %1) {{.*}} {
-// CHECK-LABEL-wasm32: define swiftcc void @doesnt_throw(ptr swiftself %0, ptr swifterror %1) {{.*}} {
+// CHECK-i386-LABEL:   define{{( dllexport)?}}{{( protected)?}} swiftcc void @doesnt_throw(ptr swiftself %0, ptr %1) {{.*}} {
+// CHECK-x86_64-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @doesnt_throw(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.}}) %1) {{.*}} {
+// CHECK-armv7-LABEL:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @doesnt_throw(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.}}) %1) {{.*}} {
+// CHECK-armv7s-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @doesnt_throw(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.}}) %1) {{.*}} {
+// CHECK-armv7k-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @doesnt_throw(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.}}) %1) {{.*}} {
+// CHECK-arm64-LABEL:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @doesnt_throw(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.}}) %1) {{.*}} {
+// CHECK-arm64e-LABEL:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @doesnt_throw(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.}}) %1) {{.*}} {
+// CHECK-aarch64-LABEL:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @doesnt_throw(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.}}) %1) {{.*}} {
+// CHECK-arm64e-LABEL:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @doesnt_throw(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.}}) %1) {{.*}} {
+// CHECK-arm64_32-LABEL:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @doesnt_throw(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.}}) %1) {{.*}} {
+// CHECK-wasm32-LABEL: define swiftcc void @doesnt_throw(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.}}) %1) {{.*}} {
 sil @doesnt_throw : $@convention(thin) () -> @error Error {
   //   We don't have to do anything here because the caller always
   //   zeroes the error slot before a call.
@@ -79,8 +79,8 @@ entry(%0 : $AnyObject):
   // CHECK-wasm32:      [[ERRORSLOT:%.*]] = alloca [[SWIFTERROR:.*]] ptr, align
   // CHECK-NEXT: store ptr null, ptr [[ERRORSLOT]], align
 
-  // CHECK-objc-NEXT: [[RESULT:%.*]] = call swiftcc ptr @try_apply_helper(ptr %0, ptr swiftself undef, ptr noalias nocapture [[SWIFTERROR]]{{( )?}}dereferenceable({{.}}) [[ERRORSLOT]])
-  // CHECK-native-NEXT: [[RESULT:%.*]] = call swiftcc ptr @try_apply_helper(ptr %0, ptr swiftself undef, ptr noalias nocapture [[SWIFTERROR]]{{( )?}}dereferenceable({{.}}) [[ERRORSLOT]])
+  // CHECK-objc-NEXT: [[RESULT:%.*]] = call swiftcc ptr @try_apply_helper(ptr %0, ptr swiftself undef, ptr noalias{{( nocapture)?}} [[SWIFTERROR]]{{( )?}}{{(captures\(none\) )?}}dereferenceable({{.}}) [[ERRORSLOT]])
+  // CHECK-native-NEXT: [[RESULT:%.*]] = call swiftcc ptr @try_apply_helper(ptr %0, ptr swiftself undef, ptr noalias{{( nocapture)?}} [[SWIFTERROR]]{{( )?}}{{(captures\(none\) )?}}dereferenceable({{.}}) [[ERRORSLOT]])
   // CHECK-NEXT: [[ERR:%.*]] = load ptr, ptr [[ERRORSLOT]], align
   // CHECK-NEXT: [[T0:%.*]] = icmp ne ptr [[ERR]], null
   // CHECK-NEXT: ptrtoint ptr [[ERR]] to i
@@ -116,7 +116,7 @@ enum ColorError : Error {
 }
 
 // CHECK-LABEL: TestCallToWillThrowCallBack
-// CHECK: call swiftcc void @swift_willThrow(ptr swiftself undef, ptr noalias nocapture readonly [[SWIFTERROR]]{{( )?}}dereferenceable({{.}}) %2)
+// CHECK: call swiftcc void @swift_willThrow(ptr swiftself undef, ptr noalias{{( nocapture)?}} readonly [[SWIFTERROR]]{{( )?}}{{(captures\(none\) )?}}dereferenceable({{.}}) %2)
 // CHECK: store ptr %0
 // CHECK: ret i64 undef
 sil hidden @TestCallToWillThrowCallBack : $@convention(thin) (@owned Error) -> (Int64, @error Error) {
@@ -130,8 +130,8 @@ bb0(%0 : $Error):
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { ptr, ptr } @partial_apply_single(ptr %0)
 // CHECK:       insertvalue { ptr, ptr } { ptr @"$s27partial_apply_single_helperTA{{(\.ptrauth)?}}", ptr undef },
 
-// CHECK: define internal swiftcc void @"$s27partial_apply_single_helperTA"(ptr swiftself %0, ptr noalias nocapture{{( )?}}[[SWIFTERROR]]{{( )?}}dereferenceable({{.}}) %1)
-// CHECK:  tail call swiftcc void @partial_apply_single_helper(ptr {{%.*}}, ptr swiftself undef, ptr noalias nocapture{{( )?}}[[SWIFTERROR]]{{( )?}}dereferenceable({{.}}){{( )?}}{{%.*}})
+// CHECK: define internal swiftcc void @"$s27partial_apply_single_helperTA"(ptr swiftself %0, ptr noalias{{( nocapture)?}} [[SWIFTERROR]]{{( )?}}{{(captures\(none\) )?}}dereferenceable({{.}}) %1)
+// CHECK:  tail call swiftcc void @partial_apply_single_helper(ptr {{%.*}}, ptr swiftself undef, ptr noalias{{( nocapture)?}} [[SWIFTERROR]]{{( )?}}{{(captures\(none\) )?}}dereferenceable({{.}}){{( )?}}{{%.*}})
 // CHECK-NEXT:  ret void
 sil @partial_apply_single : $@convention(thin) (@owned A) -> @callee_owned () -> @error Error {
 entry(%0 : $A):

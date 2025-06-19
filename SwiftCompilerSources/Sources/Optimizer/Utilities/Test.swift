@@ -160,17 +160,19 @@ public func registerOptimizerTests() {
     enclosingValuesTest,
     forwardingDefUseTest,
     forwardingUseDefTest,
+    gatherCallSitesTest,
     interiorLivenessTest,
+    lifetimeDependenceRootTest,
     lifetimeDependenceScopeTest,
     lifetimeDependenceUseTest,
     linearLivenessTest,
     localVariableReachableUsesTest,
     localVariableReachingAssignmentsTest,
     parseTestSpecificationTest,
-    variableIntroducerTest,
-    gatherCallSitesTest,
+    rangeOverlapsPathTest,
+    rewrittenCallerBodyTest,
     specializedFunctionSignatureAndBodyTest,
-    rewrittenCallerBodyTest
+    variableIntroducerTest
   )
 
   // Finally register the thunk they all call through.

@@ -213,14 +213,14 @@ private extension AllocStackInst {
         builder.createCheckedCastAddrBranch(
           source: newAlloc, sourceFormalType: concreteFormalType,
           destination: cab.destination, targetFormalType: cab.targetFormalType,
-          isolatedConformances: cab.isolatedConformances,
+          options: cab.checkedCastOptions,
           consumptionKind: cab.consumptionKind,
           successBlock: cab.successBlock, failureBlock: cab.failureBlock)
         context.erase(instruction: cab)
       case let ucca as UnconditionalCheckedCastAddrInst:
         let builder = Builder(before: ucca, context)
         builder.createUnconditionalCheckedCastAddr(
-          isolatedConformances: ucca.isolatedConformances,
+          options: ucca.checkedCastOptions,
           source: newAlloc, sourceFormalType: concreteFormalType,
           destination: ucca.destination, targetFormalType: ucca.targetFormalType)
         context.erase(instruction: ucca)

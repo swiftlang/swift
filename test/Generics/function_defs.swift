@@ -289,7 +289,7 @@ func badTypeConformance3<T>(_: T) where (T) -> () : EqualComparable { }
 // expected-error@-1{{type '(T) -> ()' in conformance requirement does not refer to a generic parameter or associated type}}
 
 func badTypeConformance4<T>(_: T) where @escaping (inout T) throws -> () : EqualComparable { }
-// expected-error@-1 {{@escaping attribute may only be used in function parameter position}}
+// expected-error@-1 {{'@escaping' may only be used in function parameter position}}
 
 func badTypeConformance5<T>(_: T) where T & Sequence : EqualComparable { }
 // expected-error@-1 {{non-protocol, non-class type 'T' cannot be used within a protocol-constrained type}}

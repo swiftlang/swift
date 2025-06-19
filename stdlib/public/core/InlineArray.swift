@@ -46,7 +46,7 @@
 @_addressableForDependencies
 public struct InlineArray<let count: Int, Element: ~Copyable>: ~Copyable {
   @usableFromInline
-  internal let _storage: Builtin.FixedArray<count, Element>
+  internal var _storage: Builtin.FixedArray<count, Element>
 }
 
 @available(SwiftStdlib 6.2, *)
@@ -69,7 +69,7 @@ extension InlineArray where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   internal var _address: UnsafePointer<Element> {
-    unsafe UnsafePointer<Element>(Builtin.unprotectedAddressOfBorrow(self))
+    unsafe UnsafePointer<Element>(Builtin.unprotectedAddressOfBorrow(_storage))
   }
 
   /// Returns a buffer pointer over the entire array.
@@ -86,7 +86,7 @@ extension InlineArray where Element: ~Copyable {
   @_transparent
   internal var _mutableAddress: UnsafeMutablePointer<Element> {
     mutating get {
-      unsafe UnsafeMutablePointer<Element>(Builtin.unprotectedAddressOf(&self))
+      unsafe UnsafeMutablePointer<Element>(Builtin.unprotectedAddressOf(&_storage))
     }
   }
 
@@ -106,6 +106,7 @@ extension InlineArray where Element: ~Copyable {
   /// Converts the given raw pointer, which points at an uninitialized array
   /// instance, to a mutable buffer suitable for initialization.
   @available(SwiftStdlib 6.2, *)
+  @unsafe
   @_alwaysEmitIntoClient
   @_transparent
   internal static func _initializationBuffer(
@@ -146,7 +147,7 @@ extension InlineArray where Element: ~Copyable {
   @_alwaysEmitIntoClient
   public init<E: Error>(_ body: (Index) throws(E) -> Element) throws(E) {
 #if $BuiltinEmplaceTypedThrows
-    self = try Builtin.emplace { (rawPtr) throws(E) -> () in
+    _storage = try Builtin.emplace { (rawPtr) throws(E) -> () in
       let buffer = unsafe Self._initializationBuffer(start: rawPtr)
 
       for i in 0 ..< count {
@@ -203,7 +204,7 @@ extension InlineArray where Element: ~Copyable {
     //        and take the underlying value within the closure.
     var o: Element? = first
 
-    self = try Builtin.emplace { (rawPtr) throws(E) -> () in
+    _storage = try Builtin.emplace { (rawPtr) throws(E) -> () in
       let buffer = unsafe Self._initializationBuffer(start: rawPtr)
 
       guard Self.count > 0 else {
@@ -246,11 +247,15 @@ extension InlineArray where Element: Copyable {
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public init(repeating value: Element) {
-    self = Builtin.emplace {
+#if $ValueGenericsNameLookup
+    _storage = Builtin.emplace {
       let buffer = unsafe Self._initializationBuffer(start: $0)
 
       unsafe buffer.initialize(repeating: value)
     }
+#else
+    fatalError()
+#endif
   }
 }
 
@@ -271,14 +276,6 @@ extension InlineArray where Element: ~Copyable {
   /// argument.
   @available(SwiftStdlib 6.2, *)
   public typealias Index = Int
-
-  // FIXME: Remove when SE-0452 "Integer Generic Parameters" is implemented.
-  @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
-  @_transparent
-  public static var count: Int {
-    count
-  }
 
   /// The number of elements in the array.
   ///

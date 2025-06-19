@@ -263,6 +263,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   }
 
   P.addDiagnoseUnknownConstValues();
+  P.addEmbeddedSwiftDiagnostics();
   P.addPerformanceDiagnostics();
 }
 
@@ -430,7 +431,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   P.addDCE();
 
   // Optimize copies from a temporary (an "l-value") to a destination.
-  P.addTempLValueOpt();
+  P.addTempLValueElimination();
 
   // Split up opaque operations (copy_addr, retain_value, etc.).
   P.addLowerAggregateInstrs();
@@ -579,7 +580,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   P.addEarlyCodeMotion();
   P.addReleaseHoisting();
   P.addARCSequenceOpts();
-  P.addTempRValueOpt();
+  P.addTempRValueElimination();
 
   P.addSimplifyCFG();
   if (OpLevel == OptimizationLevelKind::LowLevel) {
@@ -635,7 +636,7 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   P.addDeadFunctionAndGlobalElimination();
 
   // Cleanup after SILGen: remove trivial copies to temporaries.
-  P.addTempRValueOpt();
+  P.addTempRValueElimination();
   // Cleanup after SILGen: remove unneeded borrows/copies.
   if (P.getOptions().CopyPropagation == CopyPropagationOption::On) {
     P.addComputeSideEffects();
@@ -655,7 +656,7 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
   // Cleanup after SILGen: remove trivial copies to temporaries. This version of
   // temp-rvalue opt is here so that we can hit copies from non-ossa code that
   // is linked in from the stdlib.
-  P.addTempRValueOpt();
+  P.addTempRValueElimination();
 
   // Add the outliner pass (Osize).
   P.addOutliner();
@@ -1080,6 +1081,9 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
 
   // Now that we have serialized, propagate debug info.
   P.addMovedAsyncVarDebugInfoPropagator();
+
+  // Even at Onone it's important to remove copies of structs, especially if they are large.
+  P.addMandatoryTempRValueElimination();
 
   // If we are asked to stop optimizing before lowering ownership, do so now.
   if (P.Options.StopOptimizationBeforeLoweringOwnership)

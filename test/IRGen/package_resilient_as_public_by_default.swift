@@ -87,7 +87,7 @@ public class PublicClassWithPbProperties {
 // CHECK: define{{.*}} swiftcc {{.*}} @"$s18package_resilience27PublicClassWithPbPropertiesC5colors5Int32Vvg"(ptr swiftself %0)
 // CHECK:       [[OFFSET:%.*]] = load {{i32|i64}}, ptr @"$s18package_resilience27PublicClassWithPbPropertiesC5colors5Int32VvpWvd"
 // CHECK-NEXT:  [[PTR:%.*]] = getelementptr inbounds i8, ptr {{.*}}, {{i32|i64}} [[OFFSET]]
-// CHECK-NEXT:  [[VALUE:%.*]] = getelementptr inbounds %Ts5Int32V, ptr [[PTR]]
+// CHECK-NEXT:  [[VALUE:%.*]] = getelementptr inbounds{{.*}} %Ts5Int32V, ptr [[PTR]]
 // CHECK-NEXT:  [[RET:%.*]] = load {{i32|i64}}, ptr [[VALUE]]
 // CHECK-NEXT:  ret {{i32|i64}} [[RET]]
 
@@ -126,7 +126,7 @@ package class PkgClassWithPublicProperties {
 // CHECK: define{{.*}} swiftcc {{.*}} @"$s18package_resilience28PkgClassWithPublicPropertiesC5colors5Int32Vvg"(ptr swiftself %0)
 // CHECK:       [[OFFSET:%.*]] = load {{i32|i64}}, ptr @"$s18package_resilience28PkgClassWithPublicPropertiesC5colors5Int32VvpWvd"
 // CHECK-NEXT:  [[PTR:%.*]] = getelementptr inbounds i8, ptr {{.*}}, {{i32|i64}} [[OFFSET]]
-// CHECK-NEXT:  [[VALUE:%.*]] = getelementptr inbounds %Ts5Int32V, ptr [[PTR]]
+// CHECK-NEXT:  [[VALUE:%.*]] = getelementptr inbounds{{.*}} %Ts5Int32V, ptr [[PTR]]
 // CHECK-NEXT:  [[RET:%.*]] = load {{i32|i64}}, ptr [[VALUE]]
 // CHECK-NEXT:  ret {{i32|i64}} [[RET]]
 
@@ -162,7 +162,7 @@ package class PkgWithPackageProperties {
 // CHECK: define{{.*}} swiftcc {{.*}} @"$s18package_resilience24PkgWithPackagePropertiesC5colors5Int32Vvg"(ptr swiftself %0)
 // CHECK:       [[OFFSET:%.*]] = load {{i32|i64}}, ptr @"$s18package_resilience24PkgWithPackagePropertiesC5colors5Int32VvpWvd"
 // CHECK-NEXT:  [[PTR:%.*]] = getelementptr inbounds i8, ptr {{.*}}, {{i32|i64}} [[OFFSET]]
-// CHECK-NEXT:  [[VALUE:%.*]] = getelementptr inbounds %Ts5Int32V, ptr [[PTR]]
+// CHECK-NEXT:  [[VALUE:%.*]] = getelementptr inbounds{{.*}} %Ts5Int32V, ptr [[PTR]]
 // CHECK-NEXT:  [[RET:%.*]] = load {{i32|i64}}, ptr [[VALUE]]
 // CHECK-NEXT:  ret {{i32|i64}} [[RET]]
 
@@ -182,12 +182,12 @@ public class PublicClassWithFrozenPbProperties {
 // PublicClassWithFrozenPbProperties.p getter
 
 // CHECK: define{{.*}} swiftcc { {{i32|i64}}, {{i32|i64}} } @"$s18package_resilience33PublicClassWithFrozenPbPropertiesC1p16resilient_struct0fC5PointVvg"(ptr swiftself %0)
-// CHECK:      [[T1:%.*]] = getelementptr inbounds %T18package_resilience33PublicClassWithFrozenPbPropertiesC, ptr {{.*}}
-// CHECK-NEXT: [[X:%.*]] = getelementptr inbounds %T16resilient_struct17FrozenPublicPointV, ptr [[T1]]
-// CHECK-NEXT: [[XVAL:%.*]] = getelementptr inbounds %TSi, ptr [[X]]
+// CHECK:      [[T1:%.*]] = getelementptr inbounds{{.*}} %T18package_resilience33PublicClassWithFrozenPbPropertiesC, ptr {{.*}}
+// CHECK-NEXT: [[X:%.*]] = getelementptr inbounds{{.*}} %T16resilient_struct17FrozenPublicPointV, ptr [[T1]]
+// CHECK-NEXT: [[XVAL:%.*]] = getelementptr inbounds{{.*}} %TSi, ptr [[X]]
 // CHECK-NEXT: [[T2:%.*]] = load {{i32|i64}}, ptr [[XVAL]]
-// CHECK-NEXT: [[Y:%.*]] = getelementptr inbounds %T16resilient_struct17FrozenPublicPointV, ptr [[T1]]
-// CHECK-NEXT: [[YVAL:%.*]] = getelementptr inbounds %TSi, ptr [[Y]]
+// CHECK-NEXT: [[Y:%.*]] = getelementptr inbounds{{.*}} %T16resilient_struct17FrozenPublicPointV, ptr [[T1]]
+// CHECK-NEXT: [[YVAL:%.*]] = getelementptr inbounds{{.*}} %TSi, ptr [[Y]]
 // CHECK-NEXT: [[T3:%.*]] = load {{i32|i64}}, ptr [[YVAL]]
 // CHECK-NEXT: [[T4:%.*]] = insertvalue {{.*}} undef, {{i32|i64}} [[T2]], 0
 // CHECK-NEXT: [[T5:%.*]] = insertvalue {{.*}} [[T4]], {{i32|i64}} [[T3]], 1
@@ -197,8 +197,8 @@ public class PublicClassWithFrozenPbProperties {
 // PublicClassWithFrozenPbProperties.color getter
 
 // CHECK: define{{.*}} swiftcc {{i32|64}} @"$s18package_resilience33PublicClassWithFrozenPbPropertiesC5colors5Int32Vvg"(ptr swiftself %0)
-// CHECK:      [[T1:%.*]] = getelementptr inbounds %T18package_resilience33PublicClassWithFrozenPbPropertiesC, ptr {{.*}}
-// CHECK-NEXT: [[VAL:%.*]] = getelementptr inbounds %Ts5Int32V, ptr [[T1]]
+// CHECK:      [[T1:%.*]] = getelementptr inbounds{{.*}} %T18package_resilience33PublicClassWithFrozenPbPropertiesC, ptr {{.*}}
+// CHECK-NEXT: [[VAL:%.*]] = getelementptr inbounds{{.*}} %Ts5Int32V, ptr [[T1]]
 // CHECK-NEXT: [[T2:%.*]] = load {{i32|i64}}, ptr [[VAL]]
 // CHECK-NEXT: ret {{i32|i64}} [[T2]]
 
@@ -219,12 +219,12 @@ package class PkgClassWithFrozenPublicProperties {
 // PkgClassWithFrozenPublicProperties.p getter
 
 // CHECK: define{{.*}} swiftcc { i64, i64 } @"$s18package_resilience34PkgClassWithFrozenPublicPropertiesC1p16resilient_struct0fG5PointVvg"(ptr swiftself %0)
-// CHECK:      [[T1:%.*]] = getelementptr inbounds %T18package_resilience34PkgClassWithFrozenPublicPropertiesC, ptr {{.*}}
-// CHECK-NEXT: [[X:%.*]] = getelementptr inbounds %T16resilient_struct17FrozenPublicPointV, ptr [[T1]]
-// CHECK-NEXT: [[XVAL:%.*]] = getelementptr inbounds %TSi, ptr [[X]]
+// CHECK:      [[T1:%.*]] = getelementptr inbounds{{.*}} %T18package_resilience34PkgClassWithFrozenPublicPropertiesC, ptr {{.*}}
+// CHECK-NEXT: [[X:%.*]] = getelementptr inbounds{{.*}} %T16resilient_struct17FrozenPublicPointV, ptr [[T1]]
+// CHECK-NEXT: [[XVAL:%.*]] = getelementptr inbounds{{.*}} %TSi, ptr [[X]]
 // CHECK-NEXT: [[T2:%.*]] = load {{i32|i64}}, ptr [[XVAL]]
-// CHECK-NEXT: [[Y:%.*]] = getelementptr inbounds %T16resilient_struct17FrozenPublicPointV, ptr [[T1]]
-// CHECK-NEXT: [[YVAL:%.*]] = getelementptr inbounds %TSi, ptr [[Y]]
+// CHECK-NEXT: [[Y:%.*]] = getelementptr inbounds{{.*}} %T16resilient_struct17FrozenPublicPointV, ptr [[T1]]
+// CHECK-NEXT: [[YVAL:%.*]] = getelementptr inbounds{{.*}} %TSi, ptr [[Y]]
 // CHECK-NEXT: [[T3:%.*]] = load {{i32|i64}}, ptr [[YVAL]]
 // CHECK-NEXT: [[T4:%.*]] = insertvalue { i64, i64 } undef, i64 [[T2]], 0
 // CHECK-NEXT: [[T5:%.*]] = insertvalue { i64, i64 } %4, i64 [[T3]], 1
@@ -233,8 +233,8 @@ package class PkgClassWithFrozenPublicProperties {
 // PkgClassWithFrozenPublicProperties.color getter
 
 // CHECK: define{{.*}} swiftcc {{i32|64}} @"$s18package_resilience34PkgClassWithFrozenPublicPropertiesC5colors5Int32Vvg"(ptr swiftself %0) #0 {
-// CHECK:      [[T1:%.*]] = getelementptr inbounds %T18package_resilience34PkgClassWithFrozenPublicPropertiesC, ptr {{.*}}
-// CHECK-NEXT: [[VAL:%.*]] = getelementptr inbounds %Ts5Int32V, ptr [[T1]]
+// CHECK:      [[T1:%.*]] = getelementptr inbounds{{.*}} %T18package_resilience34PkgClassWithFrozenPublicPropertiesC, ptr {{.*}}
+// CHECK-NEXT: [[VAL:%.*]] = getelementptr inbounds{{.*}} %Ts5Int32V, ptr [[T1]]
 // CHECK-NEXT: [[T2:%.*]] = load {{i32|i64}}, ptr [[VAL]]
 // CHECK-NEXT: ret {{i32|i64}} [[T2]]
 
@@ -269,7 +269,7 @@ public class PublicClassWithEnumIndirectCases {
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc {{.*}} @"$s18package_resilience32PublicClassWithEnumIndirectCasesC5colors5Int32Vvg"(ptr swiftself %0)
 // CHECK:      [[OFFSET:%.*]] = load {{i32|i64}}, ptr @"$s18package_resilience32PublicClassWithEnumIndirectCasesC5colors5Int32VvpWvd",
 // CHECK-NEXT: [[PTR:%.*]] = getelementptr inbounds i8, ptr {{.*}}, {{i32|i64}} [[OFFSET]]
-// CHECK-NEXT: [[VALUE:%.*]] = getelementptr inbounds %Ts5Int32V, ptr [[PTR]]
+// CHECK-NEXT: [[VALUE:%.*]] = getelementptr inbounds{{.*}} %Ts5Int32V, ptr [[PTR]]
 // CHECK-NEXT: [[RET:%.*]] = load {{i32|i64}}, ptr [[VALUE]]
 // CHECK-NEXT: ret {{i32|i64}} [[RET]]
 
@@ -302,7 +302,7 @@ package class PkgClassWithEnumIndirectCases {
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc {{i32|64}} @"$s18package_resilience29PkgClassWithEnumIndirectCasesC5colors5Int32Vvg"(ptr swiftself %0)
 // CHECK:      [[OFFSET:%.*]] = load {{i32|i64}}, ptr @"$s18package_resilience29PkgClassWithEnumIndirectCasesC5colors5Int32VvpWvd",
 // CHECK-NEXT: [[PTR:%.*]] = getelementptr inbounds i8, ptr {{.*}}, {{i32|i64}} [[OFFSET]]
-// CHECK-NEXT: [[VALUE:%.*]] = getelementptr inbounds %Ts5Int32V, ptr [[PTR]]
+// CHECK-NEXT: [[VALUE:%.*]] = getelementptr inbounds{{.*}} %Ts5Int32V, ptr [[PTR]]
 // CHECK-NEXT: [[RET:%.*]] = load {{i32|i64}}, ptr [[VALUE]]
 // CHECK-NEXT: ret {{i32|i64}} [[RET]]
 
@@ -339,8 +339,8 @@ public class PublicClassConcreteChild : PublicClassGenericParent<Int> {
 // PublicClassConcreteChild.x getter
 
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc {{.*}} @"$s18package_resilience24PublicClassConcreteChildC1xSivg"(ptr swiftself %0)
-// CHECK:      [[PTR:%.*]] = getelementptr inbounds %T18package_resilience24PublicClassConcreteChildC, ptr {{.*}}
-// CHECK-NEXT: [[VAL:%.*]] = getelementptr inbounds %TSi, ptr [[PTR]]
+// CHECK:      [[PTR:%.*]] = getelementptr inbounds{{.*}} %T18package_resilience24PublicClassConcreteChildC, ptr {{.*}}
+// CHECK-NEXT: [[VAL:%.*]] = getelementptr inbounds{{.*}} %TSi, ptr [[PTR]]
 // CHECK-NEXT: [[RET:%.*]] = load {{i32|i64}}, ptr [[VAL]]
 // CHECK-NEXT: ret {{i32|i64}} [[RET]]
 
@@ -379,8 +379,8 @@ package class PkgClassConcreteChild : PkgClassGenericParent<Int> {
 // PkgClassConcreteChild.x getter
 
 // CHECK: define{{( dllexport)?}}{{( protected)?}} swiftcc {{.*}} @"$s18package_resilience21PkgClassConcreteChildC1xSivg"(ptr swiftself %0)
-// CHECK:      [[PTR:%.*]] = getelementptr inbounds %T18package_resilience21PkgClassConcreteChildC, ptr {{.*}}
-// CHECK-NEXT: [[VAL:%.*]] = getelementptr inbounds %TSi, ptr [[PTR]]
+// CHECK:      [[PTR:%.*]] = getelementptr inbounds{{.*}} %T18package_resilience21PkgClassConcreteChildC, ptr {{.*}}
+// CHECK-NEXT: [[VAL:%.*]] = getelementptr inbounds{{.*}} %TSi, ptr [[PTR]]
 // CHECK-NEXT: [[RET:%.*]] = load {{i32|i64}}, ptr [[VAL]]
 // CHECK-NEXT: ret {{i32|i64}} [[RET]]
 
@@ -470,7 +470,7 @@ package class PkgClassWithResilientThenEmpty {
 // CHECK: define{{.*}} swiftcc {{.*}} @"$s18package_resilience35memoryLayoutDotSizeWithPublicStructSiyF"()
 public func memoryLayoutDotSizeWithPublicStruct() -> Int {
   // CHECK: [[FIELD_VALUE:%.*]] = load ptr, ptr {{.*}},
-  // CHECK-NEXT: [[FIELD_PTR:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[FIELD_VALUE]],
+  // CHECK-NEXT: [[FIELD_PTR:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[FIELD_VALUE]],
   // CHECK-NEXT: [[SIZE:%.*]] = load {{i32|i64}}, ptr [[FIELD_PTR]],
   // CHECK-NEXT: ret {{i32|i64}} [[SIZE]]
   return MemoryLayout<PublicSize>.size
@@ -479,7 +479,7 @@ public func memoryLayoutDotSizeWithPublicStruct() -> Int {
 // CHECK: define{{.*}} swiftcc {{.*}} @"$s18package_resilience32memoryLayoutDotSizeWithPkgStructSiyF"()
 package func memoryLayoutDotSizeWithPkgStruct() -> Int {
 // CHECK: [[FIELD_VALUE:%.*]] = load ptr, ptr {{.*}},
-// CHECK-NEXT: [[FIELD_PTR:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[FIELD_VALUE]],
+// CHECK-NEXT: [[FIELD_PTR:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[FIELD_VALUE]],
 // CHECK-NEXT: [[SIZE:%.*]] = load {{i32|i64}}, ptr [[FIELD_PTR]],
 // CHECK-NEXT: ret {{i32|i64}} [[SIZE]]
   return MemoryLayout<Size>.size
@@ -495,7 +495,7 @@ public func memoryLayoutDotSizeWithFrozenPublicStruct() -> Int {
 // CHECK: define{{.*}} swiftcc {{.*}} @"$s18package_resilience37memoryLayoutDotStrideWithPublicStructSiyF"()
 public func memoryLayoutDotStrideWithPublicStruct() -> Int {
 // CHECK: [[FIELD_VALUE:%.*]] = load ptr, ptr {{.*}},
-// CHECK-NEXT: [[FIELD_PTR:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[FIELD_VALUE]],
+// CHECK-NEXT: [[FIELD_PTR:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[FIELD_VALUE]],
 // CHECK-NEXT: [[STRIDE:%.*]] = load {{i32|i64}}, ptr [[FIELD_PTR]],
 // CHECK-NEXT: ret {{i32|i64}} [[STRIDE]]
   return MemoryLayout<PublicSize>.stride
@@ -504,7 +504,7 @@ public func memoryLayoutDotStrideWithPublicStruct() -> Int {
 // CHECK: define{{.*}} swiftcc {{.*}} @"$s18package_resilience34memoryLayoutDotStrideWithPkgStructSiyF"()
 package func memoryLayoutDotStrideWithPkgStruct() -> Int {
 // CHECK: [[FIELD_VALUE:%.*]] = load ptr, ptr {{.*}},
-// CHECK-NEXT: [[FIELD_PTR:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[FIELD_VALUE]],
+// CHECK-NEXT: [[FIELD_PTR:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[FIELD_VALUE]],
 // CHECK-NEXT: [[STRIDE:%.*]] = load {{i32|i64}}, ptr [[FIELD_PTR]],
 // CHECK-NEXT: ret {{i32|i64}} [[STRIDE]]
   return MemoryLayout<Size>.stride
@@ -520,7 +520,7 @@ public func memoryLayoutDotStrideWithFrozenPublicStruct() -> Int {
 // CHECK: define{{.*}} swiftcc {{.*}} @"$s18package_resilience40memoryLayoutDotAlignmentWithPublicStructSiyF"()
 public func memoryLayoutDotAlignmentWithPublicStruct() -> Int {
 // CHECK: [[FIELD_VALUE:%.*]] = load ptr, ptr {{.*}},
-// CHECK-NEXT: [[FIELD_PTR:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[FIELD_VALUE]],
+// CHECK-NEXT: [[FIELD_PTR:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[FIELD_VALUE]],
 // CHECK-NEXT:  [[FIELD_FLAGS:%.*]] = load {{i32|i64}}, ptr [[FIELD_PTR]],
 // CHECK-NEXT:  [[FIELD_ADDR:%.*]] = zext {{i32|i64}} [[FIELD_FLAGS]] to {{i32|i64}}
 // CHECK-NEXT:  [[FIELD_MASK:%.*]] = and {{i32|i64}} [[FIELD_ADDR]]
@@ -532,7 +532,7 @@ public func memoryLayoutDotAlignmentWithPublicStruct() -> Int {
 // CHECK: define{{.*}} swiftcc {{.*}} @"$s18package_resilience43memoryLayoutDotAlignmentWithResilientStructSiyF"()
 package func memoryLayoutDotAlignmentWithResilientStruct() -> Int {
 // CHECK: [[FIELD_VALUE:%.*]] = load ptr, ptr {{.*}},
-// CHECK-NEXT: [[FIELD_PTR:%.*]] = getelementptr inbounds %swift.vwtable, ptr [[FIELD_VALUE]],
+// CHECK-NEXT: [[FIELD_PTR:%.*]] = getelementptr inbounds{{.*}} %swift.vwtable, ptr [[FIELD_VALUE]],
 // CHECK-NEXT:  [[FIELD_FLAGS:%.*]] = load {{i32|i64}}, ptr [[FIELD_PTR]],
 // CHECK-NEXT:  [[FIELD_ADDR:%.*]] = zext {{i32|i64}} [[FIELD_FLAGS]] to {{i32|i64}}
 // CHECK-NEXT:  [[FIELD_MASK:%.*]] = and {{i32|i64}} [[FIELD_ADDR]]

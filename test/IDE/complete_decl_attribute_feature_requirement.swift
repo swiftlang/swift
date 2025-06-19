@@ -3,11 +3,17 @@
 // it's enabled. When a feature becomes non-experimental, move its test cases
 // into the normal complete_decl_attribute.swift test file.
 
+// NOTE: There are currently no experimental features that need code completion
+// testing, but this test file is being left in place for when it's needed
+// again. At that time, please remove the ABIAttribute tests.
+// REQUIRES: new_use_case
+
 // REQUIRES: asserts
 
 // RUN: %batch-code-completion -filecheck-additional-suffix _DISABLED
 // RUN: %batch-code-completion -filecheck-additional-suffix _ENABLED \
-// RUN:        -enable-experimental-feature ABIAttribute
+// RUN:        -enable-experimental-feature ABIAttribute \
+// RUN:        -enable-experimental-feature ExtensibleAttribute
 
 // NOTE: Please do not include the ", N items" after "Begin completions". The
 // item count creates needless merge conflicts given that an "End completions"
@@ -34,6 +40,8 @@
 // KEYWORD4:              Begin completions
 // KEYWORD4_ENABLED-NOT:  Keyword/None:              abi[#{{.*}} Attribute#]; name=abi
 // KEYWORD4_DISABLED-NOT: Keyword/None:              abi[#{{.*}} Attribute#]; name=abi
+// KEYWORD4_ENABLED-DAG:  Keyword/None:              extensible[#{{.*}} Attribute#]; name=extensible
+// KEYWORD4_DISABLED-NOT: Keyword/None:              extensible[#{{.*}} Attribute#]; name=extensible
 // KEYWORD4:              End completions
 
 @#^KEYWORD5^# struct S{}

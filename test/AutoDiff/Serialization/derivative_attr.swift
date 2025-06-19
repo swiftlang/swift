@@ -141,7 +141,7 @@ extension S {
     self
   }
 
-  // CHECK: @derivative(of: subscript, wrt: self)
+  // CHECK: @derivative(of: subscript(_:), wrt: self)
   @derivative(of: subscript(_:), wrt: self)
   func derivativeSubscript<T: Differentiable>(x: T) -> (value: S, differential: (S) -> S) {
     (self, { $0 })

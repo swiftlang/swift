@@ -1,4 +1,18 @@
+// This regression test was originally written because the Swift compiler would
+// crash when it tried to instantiate C++ function templates with various types.
+// In particular, instantiating them with Swift types was problematic.
+//
+// Aside from validating that we can successfully instantiate function templates
+// with basic primitive types (e.g., Bool, Int32) and imported C/ObjC/C++ types,
+// this regression test aims to document the current status of C++ function
+// template instantiation.
+//
+// With the following, we check the happy path, that we _can_ successfully emit
+// SIL for certain template instantiations:
 // RUN: %target-swift-emit-ir %s -I %S/Inputs -cxx-interoperability-mode=default -disable-availability-checking | %FileCheck %s
+//
+// Some instantiations still cause Swift compiler crashes. These are documented
+// with "FIXME" comments.
 
 import FunctionTemplates
 
@@ -32,8 +46,8 @@ func takesPtrToStruct(x: UnsafePointer<PlainStruct>) { takesValue(x) }
 func takesPtrToClass(x: UnsafePointer<CxxClass>) { takesValue(x) }
 // CHECK: define {{.*}} void @{{.*}}takesPtrToClass{{.*}}
 
-// TODO: this does not work because this round-trips to UnsafePointer<FRT?>
-// func takesPtrToFRT(x: UnsafePointer<FRT>) { takesValue(x) }
+func takesPtrToFRT(x: UnsafePointer<FRT>) { takesValue(x) }
+// CHECK: define {{.*}} void @{{.*}}takesPtrToFRT{{.*}}
 
 func takesMutPtrToStruct(x: UnsafeMutablePointer<PlainStruct>) { takesValue(x) }
 // CHECK: define {{.*}} void @{{.*}}takesMutPtrToStruct{{.*}}
@@ -41,12 +55,42 @@ func takesMutPtrToStruct(x: UnsafeMutablePointer<PlainStruct>) { takesValue(x) }
 func takesMutPtrToClass(x: UnsafeMutablePointer<CxxClass>) { takesValue(x) }
 // CHECK: define {{.*}} void @{{.*}}takesMutPtrToClass{{.*}}
 
-// TODO: this does not work because this round-trips to UnsafeMutablePointer<FRT?>
-// func takesMutPtrToFRT(x: UnsafeMutablePointer<FRT>) { takesValue(x) }
+func takesMutPtrToFRT(x: UnsafeMutablePointer<FRT>) { takesValue(x) }
+// CHECK: define {{.*}} void @{{.*}}takesMutPtrToFRT{{.*}}
 
-// TODO: optional pointers are not yet supported but they should be
-// func takesCPtr() { takesValue(intPtr) }
-func takesCPtr() { let swiftPtr = intPtr!; takesValue(swiftPtr) }
+func takesCPtr() {
+  takesValue(intPtr)
 
-// TODO: function pointers are not yet supported but they should be
-// func takesCFnPtr() { takesValue(functionPtr) }
+  // It's fine if we dereference it, though
+  takesValue(intPtr!)
+}
+
+func takesCFnPtr() {
+  takesValue(get42) // function symbol
+  // FIXME: optional pointers are not yet supported but they should be; this crashes
+  // takesValue(functionPtrGet42)
+  takesValue(functionPtrGet42!) // dereferenced nullable function pointer
+  takesValue(nonNullFunctionPtrGet42) // non-null function symbol
+}
+
+func takesRecursively() { takesValue(takesRecursively) }
+func takesRecursiveClosure() { takesValue({() in takesRecursiveClosure()}) }
+func takesSwiftClosure() { takesValue({() in ()}) }
+func takesTakesTrue() { takesValue(takesTrue) }
+
+func takesSwiftClosureReturningBool() { takesValue({() -> Bool in true}) }
+func takesSwiftClosureTakingBool() { takesValue({(x: Bool) in ()}) }
+func takesTakesBool() { takesValue(takesBool) }
+
+func takesSwiftClosureReturningPlainStruct() { takesValue({() -> PlainStruct in PlainStruct(x: 42)}) }
+func takesSwiftClosureTakingPlainStruct() { takesValue({(x: PlainStruct) in takesValue(x)}) }
+func takesTakesPlainStruct() { takesValue(takesPlainStruct) }
+
+func takesSwiftClosureReturningCxxClass() { takesValue({() -> CxxClass in CxxClass(x: 42)}) }
+func takesSwiftClosureTakingCxxClass() { takesValue({(x: CxxClass) in takesValue(x)}) }
+func takesTakesCxxClass() { takesValue(takesCxxClass) }
+
+func takesSwiftClosureReturningFRT() { takesValue({() -> FRT in FRT()}) }
+func takesSwiftClosureTakingFRT() { takesValue({(x: FRT) in takesValue(x)}) }
+
+func takesTakesFRT() { takesValue(takesFRT) }

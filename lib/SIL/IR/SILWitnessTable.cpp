@@ -49,11 +49,19 @@ NominalTypeDecl *SILWitnessTable::getConformingNominal() const {
 }
 
 void SILWitnessTable::addWitnessTable() {
-  // Make sure we have not seen this witness table yet.
-  assert(Mod.WitnessTableMap.find(Conformance) ==
-         Mod.WitnessTableMap.end() && "Attempting to create duplicate "
-         "witness table.");
-  Mod.WitnessTableMap[Conformance] = this;
+  if (isSpecialized()) {
+    // Make sure we have not seen this witness table yet.
+    assert(Mod.specializedWitnessTableMap.find(Conformance) ==
+           Mod.specializedWitnessTableMap.end() && "Attempting to create duplicate "
+           "witness table.");
+    Mod.specializedWitnessTableMap[Conformance] = this;
+  } else {
+    // Make sure we have not seen this witness table yet.
+    assert(Mod.WitnessTableMap.find(cast<RootProtocolConformance>(Conformance)) ==
+           Mod.WitnessTableMap.end() && "Attempting to create duplicate "
+           "witness table.");
+    Mod.WitnessTableMap[cast<RootProtocolConformance>(Conformance)] = this;
+  }
   Mod.witnessTables.push_back(this);
 }
 
@@ -61,7 +69,8 @@ SILWitnessTable *SILWitnessTable::create(
     SILModule &M, SILLinkage Linkage, SerializedKind_t SerializedKind,
     ProtocolConformance *Conformance,
     ArrayRef<SILWitnessTable::Entry> entries,
-    ArrayRef<ProtocolConformanceRef> conditionalConformances) {
+    ArrayRef<ProtocolConformanceRef> conditionalConformances,
+    bool specialized) {
   assert(Conformance && "Cannot create a witness table for a null "
          "conformance.");
 
@@ -74,7 +83,7 @@ SILWitnessTable *SILWitnessTable::create(
   void *buf = M.allocate(sizeof(SILWitnessTable), alignof(SILWitnessTable));
   SILWitnessTable *wt = ::new (buf)
       SILWitnessTable(M, Linkage, SerializedKind, Name.str(), Conformance, entries,
-                      conditionalConformances);
+                      conditionalConformances, specialized);
 
   wt->addWitnessTable();
 
@@ -84,7 +93,8 @@ SILWitnessTable *SILWitnessTable::create(
 
 SILWitnessTable *
 SILWitnessTable::create(SILModule &M, SILLinkage Linkage,
-                        ProtocolConformance *Conformance) {
+                        ProtocolConformance *Conformance,
+                        bool specialized) {
   assert(Conformance && "Cannot create a witness table for a null "
          "conformance.");
 
@@ -95,7 +105,7 @@ SILWitnessTable::create(SILModule &M, SILLinkage Linkage,
   // Allocate the witness table and initialize it.
   void *buf = M.allocate(sizeof(SILWitnessTable), alignof(SILWitnessTable));
   SILWitnessTable *wt = ::new (buf) SILWitnessTable(M, Linkage, Name.str(),
-                                                    Conformance);
+                                                    Conformance, specialized);
 
   wt->addWitnessTable();
 
@@ -106,17 +116,17 @@ SILWitnessTable::create(SILModule &M, SILLinkage Linkage,
 SILWitnessTable::SILWitnessTable(
     SILModule &M, SILLinkage Linkage, SerializedKind_t SerializedKind, StringRef N,
     ProtocolConformance *Conformance, ArrayRef<Entry> entries,
-    ArrayRef<ProtocolConformanceRef> conditionalConformances)
+    ArrayRef<ProtocolConformanceRef> conditionalConformances, bool specialized)
     : Mod(M), Name(N), Linkage(Linkage), Conformance(Conformance), Entries(),
-      ConditionalConformances(), IsDeclaration(true),
+      ConditionalConformances(), IsDeclaration(true), specialized(specialized),
       SerializedKind(SerializedKind) {
   convertToDefinition(entries, conditionalConformances, SerializedKind);
 }
 
 SILWitnessTable::SILWitnessTable(SILModule &M, SILLinkage Linkage, StringRef N,
-                                 ProtocolConformance *Conformance)
+                                 ProtocolConformance *Conformance, bool specialized)
     : Mod(M), Name(N), Linkage(Linkage), Conformance(Conformance), Entries(),
-      ConditionalConformances(), IsDeclaration(true),
+      ConditionalConformances(), IsDeclaration(true), specialized(specialized),
       SerializedKind(IsNotSerialized) {}
 
 SILWitnessTable::~SILWitnessTable() {

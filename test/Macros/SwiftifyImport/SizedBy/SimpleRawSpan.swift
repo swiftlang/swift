@@ -7,9 +7,10 @@
 func myFunc(_ ptr: UnsafeRawPointer, _ size: CInt) {
 }
 
-// CHECK:      @_alwaysEmitIntoClient
+// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
 // CHECK-NEXT: func myFunc(_ ptr: RawSpan) {
+// CHECK-NEXT:     let size = CInt(exactly: ptr.byteCount)!
 // CHECK-NEXT:     return unsafe ptr.withUnsafeBytes { _ptrPtr in
-// CHECK-NEXT:         return unsafe myFunc(_ptrPtr.baseAddress!, CInt(exactly: ptr.byteCount)!)
+// CHECK-NEXT:       return unsafe myFunc(_ptrPtr.baseAddress!, size)
 // CHECK-NEXT:     }
 // CHECK-NEXT: }

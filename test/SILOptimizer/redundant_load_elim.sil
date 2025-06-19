@@ -1386,3 +1386,45 @@ bb0(%0 : $*B, %1 : $*B):
   return %3
 }
 
+// CHECK-LABEL: sil @copyaddr_after_store :
+// CHECK:         [[S:%.*]] = alloc_stack $B
+// CHECK:         store %1 to [[S]]
+// CHECK:         store %1 to %0
+// CHECK-LABEL: } // end sil function 'copyaddr_after_store'
+sil @copyaddr_after_store : $@convention(thin) (@owned B) -> @out B {
+bb0(%0 : $*B, %1 : $B):
+  %2 = alloc_stack $B
+  store %1 to %2
+  copy_addr [take] %2 to [init] %0
+  dealloc_stack %2
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil @dont_remove_copying_copyaddr :
+// CHECK:         copy_addr
+// CHECK-LABEL: } // end sil function 'dont_remove_copying_copyaddr'
+sil @dont_remove_copying_copyaddr : $@convention(thin) (@owned B) -> @out B {
+bb0(%0 : $*B, %1 : $B):
+  %2 = alloc_stack $B
+  store %1 to %2
+  copy_addr %2 to [init] %0
+  destroy_addr %2
+  dealloc_stack %2
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil @dont_remove_assigning_copyaddr :
+// CHECK:         copy_addr
+// CHECK-LABEL: } // end sil function 'dont_remove_assigning_copyaddr'
+sil @dont_remove_assigning_copyaddr : $@convention(thin) (@inout B, @owned B) -> () {
+bb0(%0 : $*B, %1 : $B):
+  %2 = alloc_stack $B
+  store %1 to %2
+  copy_addr [take] %2 to %0
+  dealloc_stack %2
+  %r = tuple ()
+  return %r
+}
+

@@ -387,8 +387,11 @@ static bool getModuleInterfaceInfo(
       Options.SkipInlineCXXNamespace = true;
     }
   }
+  // Skip submodules but include any exported modules that have the same public
+  // module name as this module.
   ModuleTraversalOptions TraversalOptions =
-      std::nullopt; // Don't print submodules.
+      ModuleTraversal::VisitMatchingExported;
+
   SmallString<128> Text;
   llvm::raw_svector_ostream OS(Text);
   AnnotatingPrinter Printer(Info, OS);
@@ -850,6 +853,7 @@ public:
 
 void SwiftLangSupport::editorOpenSwiftSourceInterface(
     StringRef Name, StringRef SourceName, ArrayRef<const char *> Args,
+    bool CancelOnSubsequentRequest,
     SourceKitCancellationToken CancellationToken,
     std::shared_ptr<EditorConsumer> Consumer) {
   std::string Error;
@@ -861,7 +865,8 @@ void SwiftLangSupport::editorOpenSwiftSourceInterface(
   auto AstConsumer = std::make_shared<PrimaryFileInterfaceConsumer>(Name,
     SourceName, IFaceGenContexts, Consumer, Invocation);
   static const char OncePerASTToken = 0;
-  getASTManager()->processASTAsync(Invocation, AstConsumer, &OncePerASTToken,
+  const void *Once = CancelOnSubsequentRequest ? &OncePerASTToken : nullptr;
+  getASTManager()->processASTAsync(Invocation, AstConsumer, Once,
                                    CancellationToken,
                                    llvm::vfs::getRealFileSystem());
 }

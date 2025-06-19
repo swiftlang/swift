@@ -24,7 +24,7 @@ extension HasAvailableConformance1 : Horse {}
 // See the other test case in test/Sema/conformance_availability.swift for the
 // same example but with -swift-version 6.
 
-func passAvailableConformance1(x: HasAvailableConformance1) { // expected-note 6{{add @available attribute to enclosing global function}}
+func passAvailableConformance1(x: HasAvailableConformance1) { // expected-note 6{{add '@available' attribute to enclosing global function}}
   takesHorse(x) // expected-warning {{conformance of 'HasAvailableConformance1' to 'Horse' is only available in macOS 100 or newer; this is an error in the Swift 6 language mode}}
   // expected-note@-1 {{add 'if #available' version check}}
 

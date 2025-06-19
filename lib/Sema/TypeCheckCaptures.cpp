@@ -395,13 +395,11 @@ public:
     // If this is a direct reference to underlying storage, then this is a
     // capture of the storage address - not a capture of the getter/setter.
     if (auto var = dyn_cast<VarDecl>(D)) {
-      if (var->getAccessStrategy(DRE->getAccessSemantics(),
-                                 var->supportsMutation() ? AccessKind::ReadWrite
-                                                         : AccessKind::Read,
-                                 CurDC->getParentModule(),
-                                 CurDC->getResilienceExpansion(),
-                                 /*useOldABI=*/false)
-              .getKind() == AccessStrategy::Storage)
+      if (var->isAccessedViaPhysicalStorage(
+              DRE->getAccessSemantics(),
+              var->supportsMutation() ? AccessKind::ReadWrite
+                                      : AccessKind::Read,
+              CurDC->getParentModule(), CurDC->getResilienceExpansion()))
         Flags |= CapturedValue::IsDirect;
     }
 
@@ -789,8 +787,9 @@ CaptureInfo CaptureInfoRequest::evaluate(Evaluator &evaluator,
         std::optional<ForeignAsyncConvention> asyncConvention;
         std::optional<ForeignErrorConvention> errorConvention;
         if (!AFD->isObjC() &&
-            isRepresentableInObjC(AFD, ObjCReason::MemberOfObjCMembersClass,
-                                  asyncConvention, errorConvention)) {
+            isRepresentableInLanguage(AFD,
+                                      ObjCReason::MemberOfObjCMembersClass,
+                                      asyncConvention, errorConvention)) {
           AFD->diagnose(
                    diag::objc_generic_extension_using_type_parameter_try_objc)
             .fixItInsert(AFD->getAttributeInsertionLoc(false), "@objc ");

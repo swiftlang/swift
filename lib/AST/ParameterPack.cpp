@@ -307,8 +307,6 @@ static CanPackType getReducedShapeOfPack(const ASTContext &ctx,
     }
 
     // Use () as a placeholder for scalar shape.
-    assert(!elt->template is<PackArchetypeType>() &&
-           "Pack archetype outside of a pack expansion");
     elts.push_back(ctx.TheEmptyTupleType);
   }
 
@@ -382,10 +380,11 @@ unsigned ParameterList::getOrigParamIndex(SubstitutionMap subMap,
     remappedIndex -= substCount;
   }
 
-  llvm::errs() << "Invalid substituted argument index: " << substIndex << "\n";
-  subMap.dump(llvm::errs());
-  dump(llvm::errs());
-  abort();
+  ABORT([&](auto &out) {
+    out << "Invalid substituted argument index: " << substIndex << "\n";
+    subMap.dump(out);
+    dump(out);
+  });
 }
 
 /// <T...> Foo<T, Pack{Int, String}> => Pack{T..., Int, String}

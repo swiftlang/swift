@@ -229,7 +229,7 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
         isa<PackElementSetInst>(user) || isa<PackElementGetInst>(user) ||
         isa<DeinitExistentialAddrInst>(user) || isa<LoadBorrowInst>(user) ||
         isa<TupleAddrConstructorInst>(user) || isa<DeallocPackInst>(user) ||
-        isa<MergeIsolationRegionInst>(user)) {
+        isa<MergeIsolationRegionInst>(user) || isa<EndCOWMutationAddrInst>(user)) {
       callVisitUse(op);
       continue;
     }
@@ -249,6 +249,7 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
         isa<BeginAccessInst>(user) || isa<TailAddrInst>(user) ||
         isa<IndexAddrInst>(user) || isa<StoreBorrowInst>(user) ||
         isa<UncheckedAddrCastInst>(user) ||
+        isa<VectorBaseAddrInst>(user) ||
         isa<MarkUnresolvedNonCopyableValueInst>(user) ||
         isa<MarkUninitializedInst>(user) || isa<DropDeinitInst>(user) ||
         isa<ProjectBlockStorageInst>(user) || isa<UpcastInst>(user) ||
@@ -287,6 +288,7 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
         case BuiltinValueKind::GenericXor:
         case BuiltinValueKind::TaskRunInline:
         case BuiltinValueKind::ZeroInitializer:
+        case BuiltinValueKind::PrepareInitialization:
         case BuiltinValueKind::GetEnumTag:
         case BuiltinValueKind::InjectEnumTag:
         case BuiltinValueKind::AddressOfRawLayout:

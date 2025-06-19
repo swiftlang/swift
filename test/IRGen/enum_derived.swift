@@ -48,8 +48,8 @@ extension def_enum.TrafficLight : Error {}
 
 extension def_enum.Term : Error {}
 
-// CHECK-NORMAL-LABEL: define hidden {{.*}}i64 @"$s12enum_derived7PhantomO8rawValues5Int64Vvg"(i8 %0, ptr nocapture readnone %T) local_unnamed_addr
-// CHECK-TESTABLE-LABEL: define{{( dllexport)?}}{{( protected)?}} {{.*}}i64 @"$s12enum_derived7PhantomO8rawValues5Int64Vvg"(i8 %0, ptr nocapture readnone %T)
+// CHECK-NORMAL-LABEL: define hidden {{.*}}i64 @"$s12enum_derived7PhantomO8rawValues5Int64Vvg"(i8 %0, ptr{{( nocapture)?}} readnone{{( captures\(none\))?}} %T) local_unnamed_addr
+// CHECK-TESTABLE-LABEL: define{{( dllexport)?}}{{( protected)?}} {{.*}}i64 @"$s12enum_derived7PhantomO8rawValues5Int64Vvg"(i8 %0, ptr{{( nocapture)?}} readnone{{( captures\(none\))?}} %T)
 
 enum Phantom<T> : Int64 {
   case Up

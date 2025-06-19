@@ -50,8 +50,19 @@ extension ClassDecl {
 }
 
 extension SubstitutionMap {
-  public func getMethodSubstitutions(for method: Function) -> SubstitutionMap {
-    return SubstitutionMap(bridged: method.bridged.getMethodSubstitutions(bridged))
+  /// Returns the substitutions to specialize a method.
+  ///
+  /// If this is a default witness methods (`selfType` != nil) it has generic self type. In this case
+  /// the generic self parameter is at depth 0 and the actual generic parameters of the substitution map
+  /// are at depth + 1, e.g:
+  /// ```
+  ///     @convention(witness_method: P) <τ_0_0><τ_1_0 where τ_0_0 : GenClass<τ_1_0>.T>
+  ///                                       ^      ^
+  ///                                    self      params of substitution map at depth + 1
+  /// ```
+  public func getMethodSubstitutions(for method: Function, selfType: CanonicalType? = nil) -> SubstitutionMap {
+    return SubstitutionMap(bridged: method.bridged.getMethodSubstitutions(bridged,
+                                                                          selfType?.bridged ?? BridgedCanType()))
   }
 }
 
@@ -60,5 +71,21 @@ extension Conformance {
   /// the isolation in `function`.
   public func matchesActorIsolation(in function: Function) -> Bool {
     return function.bridged.conformanceMatchesActorIsolation(bridged)
+  }
+}
+
+extension DiagnosticEngine {
+  public func diagnose(_ id: DiagID, _ args: DiagnosticArgument..., at location: Location) {
+    diagnose(id, args, at: location.getSourceLocation(diagnosticEngine: self))
+  }
+
+  public func diagnose(_ id: DiagID, _ args: [DiagnosticArgument], at location: Location) {
+    diagnose(id, args, at: location.getSourceLocation(diagnosticEngine: self))
+  }
+}
+
+extension Diagnostic where SourceLocation == Location {
+  public init(_ id: DiagID, _ arguments: DiagnosticArgument..., at location: Location) {
+    self.init(id, arguments, at: location)
   }
 }

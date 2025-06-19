@@ -168,6 +168,9 @@ class WasmStdlib(cmake_product.CMakeProduct):
         self.cmake_options.define(
             'SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING', 'TRUE')
         self.cmake_options.define(
+            'SWIFT_SDK_embedded_ARCH_wasm32_PATH:PATH',
+            self._wasi_sysroot_path("wasm32-wasi"))
+        self.cmake_options.define(
             'SWIFT_SDK_embedded_ARCH_wasm32-unknown-wasip1_PATH:PATH',
             self._wasi_sysroot_path("wasm32-wasi"))
 

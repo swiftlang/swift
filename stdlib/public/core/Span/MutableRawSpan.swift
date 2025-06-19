@@ -171,7 +171,7 @@ extension RawSpan {
   @_alwaysEmitIntoClient
   @lifetime(borrow mutableRawSpan)
   public init(_mutableRawSpan mutableRawSpan: borrowing MutableRawSpan) {
-    let (start, count) = unsafe (mutableRawSpan._start(), mutableRawSpan._count)
+    let (start, count) = (mutableRawSpan._start(), mutableRawSpan._count)
     let span = unsafe RawSpan(_unsafeStart: start, byteCount: count)
     self = unsafe _overrideLifetime(span, borrowing: mutableRawSpan)
   }
@@ -238,7 +238,7 @@ extension MutableRawSpan {
   @unsafe
   @_alwaysEmitIntoClient
   public func unsafeLoad<T>(
-    fromByteOffset offset: Int = 0, as: T.Type
+    fromByteOffset offset: Int = 0, as type: T.Type
   ) -> T {
     _precondition(
       UInt(bitPattern: offset) <= UInt(bitPattern: _count) &&
@@ -269,7 +269,7 @@ extension MutableRawSpan {
   @unsafe
   @_alwaysEmitIntoClient
   public func unsafeLoad<T>(
-    fromUncheckedByteOffset offset: Int, as: T.Type
+    fromUncheckedByteOffset offset: Int, as type: T.Type
   ) -> T {
     unsafe _start().load(fromByteOffset: offset, as: T.self)
   }
@@ -293,7 +293,7 @@ extension MutableRawSpan {
   @unsafe
   @_alwaysEmitIntoClient
   public func unsafeLoadUnaligned<T: BitwiseCopyable>(
-    fromByteOffset offset: Int = 0, as: T.Type
+    fromByteOffset offset: Int = 0, as type: T.Type
   ) -> T {
     _precondition(
       UInt(bitPattern: offset) <= UInt(bitPattern: _count) &&
@@ -323,7 +323,7 @@ extension MutableRawSpan {
   @unsafe
   @_alwaysEmitIntoClient
   public func unsafeLoadUnaligned<T: BitwiseCopyable>(
-    fromUncheckedByteOffset offset: Int, as: T.Type
+    fromUncheckedByteOffset offset: Int, as type: T.Type
   ) -> T {
     unsafe _start().loadUnaligned(fromByteOffset: offset, as: T.self)
   }
@@ -588,10 +588,14 @@ extension MutableRawSpan {
   @_alwaysEmitIntoClient
   @lifetime(&self)
   mutating public func extracting(first maxLength: Int) -> Self {
+#if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(maxLength >= 0, "Can't have a prefix of negative length")
     let newCount = min(maxLength, byteCount)
     let newSpan = unsafe Self(_unchecked: _pointer, byteCount: newCount)
     return unsafe _overrideLifetime(newSpan, mutating: &self)
+#else
+    fatalError("Unsupported compiler")
+#endif
   }
 
   /// Returns a span over all but the given number of trailing elements.
@@ -611,11 +615,15 @@ extension MutableRawSpan {
   @_alwaysEmitIntoClient
   @lifetime(&self)
   mutating public func extracting(droppingLast k: Int) -> Self {
+#if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(k >= 0, "Can't drop a negative number of elements")
     let droppedCount = min(k, byteCount)
     let newCount = byteCount &- droppedCount
     let newSpan = unsafe Self(_unchecked: _pointer, byteCount: newCount)
     return unsafe _overrideLifetime(newSpan, mutating: &self)
+#else
+    fatalError("Unsupported compiler")
+#endif
   }
 
   /// Returns a span containing the final elements of the span,
@@ -660,11 +668,15 @@ extension MutableRawSpan {
   @_alwaysEmitIntoClient
   @lifetime(&self)
   mutating public func extracting(droppingFirst k: Int) -> Self {
+#if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(k >= 0, "Can't drop a negative number of bytes")
     let droppedCount = min(k, byteCount)
     let newStart = unsafe _pointer?.advanced(by: droppedCount)
     let newCount = byteCount &- droppedCount
     let newSpan = unsafe Self(_unchecked: newStart, byteCount: newCount)
     return unsafe _overrideLifetime(newSpan, mutating: &self)
+#else
+    fatalError("Unsupported compiler")
+#endif
   }
 }

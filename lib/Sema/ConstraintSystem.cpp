@@ -730,7 +730,9 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
   }
 
   if (locator->isLastElement<LocatorPathElt::ArgumentAttribute>()) {
-    return getConstraintLocator(anchor, path.drop_back());
+    auto argLoc = getConstraintLocator(anchor, path.drop_back());
+    return getCalleeLocator(argLoc, lookThroughApply, getType, simplifyType,
+                            getOverloadFor);
   }
 
   // If we have a locator that starts with a key path component element, we
@@ -1414,11 +1416,6 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
   bool async = expr->getAsyncLoc().isValid();
   bool sendable = expr->getAttrs().hasAttribute<SendableAttr>();
 
-  // `@concurrent` attribute is only valid on asynchronous function types.
-  if (expr->getAttrs().hasAttribute<ConcurrentAttr>()) {
-    async = true;
-  }
-
   if (throws || async) {
     return ASTExtInfoBuilder()
       .withThrows(throws, /*FIXME:*/Type())
@@ -1432,11 +1429,17 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
   if (!body)
     return ASTExtInfoBuilder().withSendable(sendable).build();
 
+  // `@concurrent` attribute is only valid on asynchronous function types.
+  bool asyncFromAttr = false;
+  if (expr->getAttrs().hasAttribute<ConcurrentAttr>()) {
+    asyncFromAttr = true;
+  }
+
   auto throwFinder = FindInnerThrows(expr);
   body->walk(throwFinder);
   return ASTExtInfoBuilder()
       .withThrows(throwFinder.foundThrow(), /*FIXME:*/Type())
-      .withAsync(bool(findAsyncNode(expr)))
+      .withAsync(asyncFromAttr || bool(findAsyncNode(expr)))
       .withSendable(sendable)
       .build();
 }
@@ -1692,7 +1695,7 @@ struct TypeSimplifier {
             auto elementAssocTy = arrayProto->getAssociatedTypeMembers()[0];
 
             if (proto == arrayProto && assocType == elementAssocTy) {
-              return lookupBaseType->isArrayType();
+              return lookupBaseType->getInlineArrayElementType();
             }
           }
 
@@ -4407,11 +4410,9 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
 
       // Check what access strategy is used for a read-write access. It must be
       // direct-to-storage in order for the conversion to be non-ephemeral.
-      auto access = asd->getAccessStrategy(
+      return asd->isAccessedViaPhysicalStorage(
           AccessSemantics::Ordinary, AccessKind::ReadWrite,
-          DC->getParentModule(), DC->getResilienceExpansion(),
-          /*useOldABI=*/false);
-      return access.getKind() == AccessStrategy::Storage;
+          DC->getParentModule(), DC->getResilienceExpansion());
     };
 
     SourceRange range;
@@ -5175,7 +5176,7 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
       case ActorIsolation::Erased:
         llvm_unreachable("storage cannot have opaque isolation");
 
-      // A reference to an actor isolated state makes key path non-Sendable.
+      // A reference to an actor-isolated state makes key path non-Sendable.
       case ActorIsolation::ActorInstance:
       case ActorIsolation::GlobalActor:
         isSendable = false;

@@ -68,7 +68,6 @@ class CMemoryReader final : public MemoryReader {
   // Check to see if an address has bits outside the ptrauth mask. This suggests
   // that we're likely failing to strip a signed pointer when reading from it.
   bool hasSignatureBits(RemoteAddress address) {
-    return false;
     uint64_t addressData = address.getAddressData();
     return addressData != (addressData & getPtrauthMask());
   }

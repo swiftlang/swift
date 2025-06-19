@@ -74,9 +74,3 @@ extension AnyPath: ExpressibleByArgument {
     self.init(rawPath)
   }
 }
-
-extension StringProtocol {
-  func hasExtension(_ ext: FileExtension) -> Bool {
-    FilePath(String(self)).extension == ext.rawValue
-  }
-}

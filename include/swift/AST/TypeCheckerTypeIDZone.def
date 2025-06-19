@@ -96,7 +96,7 @@ SWIFT_REQUEST(TypeChecker, ABIMembersRequest,
 SWIFT_REQUEST(TypeChecker, AllMembersRequest,
               ArrayRef<Decl *>(IterableDeclContext *), Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SpecializeAttrTargetDeclRequest,
-              ValueDecl *(const ValueDecl *, SpecializeAttr *),
+              ValueDecl *(const ValueDecl *, AbstractSpecializeAttr *),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, EnumRawValuesRequest,
               evaluator::SideEffect (EnumDecl *, TypeResolutionStage),
@@ -406,8 +406,12 @@ SWIFT_REQUEST(TypeChecker, PolymorphicEffectRequirementsRequest,
 SWIFT_REQUEST(TypeChecker, ConformanceHasEffectRequest,
               bool(EffectKind, ProtocolConformanceRef),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, RawConformanceIsolationRequest,
+              std::optional<ActorIsolation>(NormalProtocolConformance *),
+              SeparatelyCached | SplitCached,
+              NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ConformanceIsolationRequest,
-              ActorIsolation(ProtocolConformance *),
+              ActorIsolation(NormalProtocolConformance *),
               SeparatelyCached | SplitCached,
               NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResolveTypeRequest,
@@ -550,6 +554,9 @@ SWIFT_REQUEST(TypeChecker, IsNonUserModuleRequest,
 SWIFT_REQUEST(TypeChecker, TypeCheckObjCImplementationRequest,
               unsigned(ExtensionDecl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, TypeCheckCDeclAttributeRequest,
+              evaluator::SideEffect(FuncDecl *, CDeclAttr *),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasInitAccessorRequest,
               bool(AbstractStorageDecl *), Cached,
               NoLocationInfo)
@@ -561,7 +568,7 @@ SWIFT_REQUEST(TypeChecker, ExpandChildAvailabilityScopesRequest,
               std::vector<AvailabilityScope *>(AvailabilityScope *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, SerializeAttrGenericSignatureRequest,
-              GenericSignature(Decl *, SpecializeAttr *),
+              GenericSignature(Decl *, AbstractSpecializeAttr *),
               SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, IsFunctionBodySkippedRequest,
               bool(const AbstractFunctionDecl *),
@@ -627,5 +634,6 @@ SWIFT_REQUEST(TypeChecker, SemanticAvailabilitySpecRequest,
               (const AvailabilitySpec *, const DeclContext *),
               SeparatelyCached, NoLocationInfo)
 
-SWIFT_REQUEST(TypeChecker, SourceFileLangOptionsRequest,
-              SourceFileLangOptions (SourceFile *), Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, DefaultIsolationInSourceFileRequest,
+              std::optional<DefaultIsolation>(const SourceFile *),
+              Cached, NoLocationInfo)

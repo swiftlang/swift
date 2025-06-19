@@ -21,7 +21,7 @@ import Swift
 /// When a `Span` is created, it inherits the lifetime of the container
 /// owning the contiguous memory, ensuring temporal safety and avoiding
 /// use-after-free errors. Operations on `Span` are bounds-checked,
-/// ensuring spcial safety and avoiding buffer overflow errors.
+/// ensuring spatial safety and avoiding buffer overflow errors.
 @frozen
 @safe
 @available(SwiftCompatibilitySpan 5.0, *)
@@ -714,12 +714,12 @@ extension Span where Element: ~Copyable {
     unsafe (self._pointer == other._pointer) && (self._count == other._count)
   }
 
-  /// Returns the indices within `self` where the memory represented by `span`
-  /// is located, or `nil` if `span` is not located within `self`.
+  /// Returns the indices within `self` where the memory represented by `other`
+  /// is located, or `nil` if `other` is not located within `self`.
   ///
-  /// Parameters:
-  /// - span: a span that may be a subrange of `self`
-  /// Returns: A range of indices within `self`, or `nil`
+  /// - Parameters:
+  /// - other: a span that may be a subrange of `self`
+  /// - Returns: A range of indices within `self`, or `nil`
   @_alwaysEmitIntoClient
   public func indices(of other: borrowing Self) -> Range<Index>? {
     if other._count > _count { return nil }
@@ -764,7 +764,8 @@ extension Span where Element: ~Copyable {
   public func _extracting(first maxLength: Int) -> Self {
     _precondition(maxLength >= 0, "Can't have a prefix of negative length")
     let newCount = min(maxLength, count)
-    return unsafe Self(_unchecked: _pointer, count: newCount)
+    let newSpan = unsafe Self(_unchecked: _pointer, count: newCount)
+    return unsafe _overrideLifetime(newSpan, copying: self)
   }
 
   /// Returns a span over all but the given number of trailing elements.
@@ -786,7 +787,8 @@ extension Span where Element: ~Copyable {
   public func _extracting(droppingLast k: Int) -> Self {
     _precondition(k >= 0, "Can't drop a negative number of elements")
     let droppedCount = min(k, count)
-    return unsafe Self(_unchecked: _pointer, count: count &- droppedCount)
+    let newSpan = unsafe Self(_unchecked: _pointer, count: count &- droppedCount)
+    return unsafe _overrideLifetime(newSpan, copying: self)
   }
 
   /// Returns a span containing the final elements of the span,

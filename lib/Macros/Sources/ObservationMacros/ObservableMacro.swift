@@ -109,6 +109,15 @@ public struct ObservableMacro {
       trailingTrivia: .space
     )
   }
+
+  static var trackedAttribute: AttributeSyntax {
+    AttributeSyntax(
+      leadingTrivia: .space,
+      atSign: .atSignToken(),
+      attributeName: IdentifierTypeSyntax(name: .identifier(trackedMacroName)),
+      trailingTrivia: .space
+    )
+  }
 }
 
 struct ObservationDiagnostic: DiagnosticMessage {
@@ -142,8 +151,13 @@ extension DiagnosticsError {
   }
 }
 
+
+struct LocalMacroExpansionContext<Context: MacroExpansionContext> {
+  var context: Context
+}
+
 extension DeclModifierListSyntax {
-  func privatePrefixed(_ prefix: String) -> DeclModifierListSyntax {
+  func privatePrefixed(_ prefix: String, in context: LocalMacroExpansionContext<some MacroExpansionContext>) -> DeclModifierListSyntax {
     let modifier: DeclModifierSyntax = DeclModifierSyntax(name: "private", trailingTrivia: .space)
     return [modifier] + filter {
       switch $0.name.tokenKind {
@@ -170,7 +184,7 @@ extension DeclModifierListSyntax {
 }
 
 extension TokenSyntax {
-  func privatePrefixed(_ prefix: String) -> TokenSyntax {
+  func privatePrefixed(_ prefix: String, in context: LocalMacroExpansionContext<some MacroExpansionContext>) -> TokenSyntax {
     switch tokenKind {
     case .identifier(let identifier):
       return TokenSyntax(.identifier(prefix + identifier), leadingTrivia: leadingTrivia, trailingTrivia: trailingTrivia, presence: presence)
@@ -180,8 +194,58 @@ extension TokenSyntax {
   }
 }
 
+extension CodeBlockSyntax {
+  func locationAnnotated(in context: LocalMacroExpansionContext<some MacroExpansionContext>) -> CodeBlockSyntax {
+    guard let firstStatement = statements.first, let loc = context.context.location(of: firstStatement) else {
+      return self
+    }
+    
+    return CodeBlockSyntax(
+      leadingTrivia: leadingTrivia,
+      leftBrace: leftBrace,
+      statements: CodeBlockItemListSyntax {
+        "#sourceLocation(file: \(loc.file), line: \(loc.line))"
+        statements
+        "#sourceLocation()"
+      },
+      rightBrace: rightBrace,
+      trailingTrivia: trailingTrivia
+    )
+  }
+}
+
+
+extension AccessorDeclSyntax {
+  func locationAnnotated(in context: LocalMacroExpansionContext<some MacroExpansionContext>) -> AccessorDeclSyntax {
+    return AccessorDeclSyntax(
+      leadingTrivia: leadingTrivia,
+      attributes: attributes,
+      modifier: modifier,
+      accessorSpecifier: accessorSpecifier,
+      parameters: parameters,
+      effectSpecifiers: effectSpecifiers,
+      body: body?.locationAnnotated(in: context),
+      trailingTrivia: trailingTrivia
+    )
+  }
+}
+
+extension AccessorBlockSyntax {
+  func locationAnnotated(in context: LocalMacroExpansionContext<some MacroExpansionContext>) -> AccessorBlockSyntax {
+    switch accessors {
+    case .accessors(let accessorList):
+      let remapped = AccessorDeclListSyntax {
+        accessorList.map { $0.locationAnnotated(in: context) }
+      }
+      return AccessorBlockSyntax(accessors: .accessors(remapped))
+    case .getter(let codeBlockList):
+      return AccessorBlockSyntax(accessors: .getter(codeBlockList))
+    }
+  }
+}
+
 extension PatternBindingListSyntax {
-  func privatePrefixed(_ prefix: String) -> PatternBindingListSyntax {
+  func privatePrefixed(_ prefix: String, in context: LocalMacroExpansionContext<some MacroExpansionContext>) -> PatternBindingListSyntax {
     var bindings = self.map { $0 }
     for index in 0..<bindings.count {
       let binding = bindings[index]
@@ -190,12 +254,12 @@ extension PatternBindingListSyntax {
           leadingTrivia: binding.leadingTrivia,
           pattern: IdentifierPatternSyntax(
             leadingTrivia: identifier.leadingTrivia,
-            identifier: identifier.identifier.privatePrefixed(prefix),
+            identifier: identifier.identifier.privatePrefixed(prefix, in: context),
             trailingTrivia: identifier.trailingTrivia
           ),
           typeAnnotation: binding.typeAnnotation,
           initializer: binding.initializer,
-          accessorBlock: binding.accessorBlock,
+          accessorBlock: binding.accessorBlock?.locationAnnotated(in: context),
           trailingComma: binding.trailingComma,
           trailingTrivia: binding.trailingTrivia)
         
@@ -207,14 +271,20 @@ extension PatternBindingListSyntax {
 }
 
 extension VariableDeclSyntax {
-  func privatePrefixed(_ prefix: String, addingAttribute attribute: AttributeSyntax) -> VariableDeclSyntax {
-    let newAttributes = attributes + [.attribute(attribute)]
+  func privatePrefixed(_ prefix: String, addingAttribute attribute: AttributeSyntax, removingAttribute toRemove: AttributeSyntax, in context: LocalMacroExpansionContext<some MacroExpansionContext>) -> VariableDeclSyntax {
+    let newAttributes = attributes.filter { attribute in
+      switch attribute {
+      case .attribute(let attr):
+        attr.attributeName.identifier != toRemove.attributeName.identifier
+      default: true
+      }
+    } + [.attribute(attribute)]
     return VariableDeclSyntax(
       leadingTrivia: leadingTrivia,
       attributes: newAttributes,
-      modifiers: modifiers.privatePrefixed(prefix),
+      modifiers: modifiers.privatePrefixed(prefix, in: context),
       bindingSpecifier: TokenSyntax(bindingSpecifier.tokenKind, leadingTrivia: .space, trailingTrivia: .space, presence: .present),
-      bindings: bindings.privatePrefixed(prefix),
+      bindings: bindings.privatePrefixed(prefix, in: context),
       trailingTrivia: trailingTrivia
     )
   }
@@ -311,7 +381,7 @@ extension ObservableMacro: ExtensionMacro {
     }
 
     let decl: DeclSyntax = """
-        extension \(raw: type.trimmedDescription): \(raw: qualifiedConformanceName) {}
+        extension \(raw: type.trimmedDescription): nonisolated \(raw: qualifiedConformanceName) {}
         """
     let ext = decl.cast(ExtensionDeclSyntax.self)
 
@@ -417,12 +487,12 @@ extension ObservationTrackedMacro: PeerMacro {
       return []
     }
     
-    if property.hasMacroApplication(ObservableMacro.ignoredMacroName) ||
-       property.hasMacroApplication(ObservableMacro.trackedMacroName) {
+    if property.hasMacroApplication(ObservableMacro.ignoredMacroName) {
       return []
     }
     
-    let storage = DeclSyntax(property.privatePrefixed("_", addingAttribute: ObservableMacro.ignoredAttribute))
+    let localContext = LocalMacroExpansionContext(context: context)
+    let storage = DeclSyntax(property.privatePrefixed("_", addingAttribute: ObservableMacro.ignoredAttribute, removingAttribute: ObservableMacro.trackedAttribute, in: localContext))
     return [storage]
   }
 }

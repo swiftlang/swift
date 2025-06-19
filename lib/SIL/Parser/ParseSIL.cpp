@@ -681,7 +681,7 @@ static bool parseDeclSILOptional(
     SILFunction::Purpose *specialPurpose, Inline_t *inlineStrategy,
     OptimizationMode *optimizationMode, PerformanceConstraints *perfConstraints,
     bool *isPerformanceConstraint, bool *markedAsUsed, StringRef *section,
-    bool *isLet, bool *isWeakImported, bool *needStackProtection,
+    bool *isLet, bool *isWeakImported, bool *needStackProtection, bool *isSpecialized,
     AvailabilityRange *availability, bool *isWithoutActuallyEscapingThunk,
     SmallVectorImpl<std::string> *Semantics,
     SmallVectorImpl<ParsedSpecAttr> *SpecAttrs, ValueDecl **ClangDecl,
@@ -725,6 +725,8 @@ static bool parseDeclSILOptional(
       *hasOwnershipSSA = true;
     else if (needStackProtection && SP.P.Tok.getText() == "stack_protection")
       *needStackProtection = true;
+    else if (isSpecialized && SP.P.Tok.getText() == "specialized")
+      *isSpecialized = true;
     else if (isThunk && SP.P.Tok.getText() == "thunk")
       *isThunk = IsThunk;
     else if (isThunk && SP.P.Tok.getText() == "signature_optimized_thunk")
@@ -889,12 +891,15 @@ static bool parseDeclSILOptional(
       SpecAttr.requirements = {};
       SpecAttr.exported = false;
       SpecAttr.kind = SILSpecializeAttr::SpecializationKind::Full;
-      SpecializeAttr *Attr;
+      AbstractSpecializeAttr *Attr;
       StringRef targetFunctionName;
       ModuleDecl *module = nullptr;
+      bool isPublic = false; // In SIL we don't care to disambiguate @specialize
+                             // and @_specialize. We use the "more permissive"
+                             // non-public version when parsing SIL.
       AvailabilityRange availability = AvailabilityRange::alwaysAvailable();
       if (!SP.P.parseSpecializeAttribute(
-              tok::r_square, AtLoc, Loc, Attr, &availability,
+              tok::r_square, AtLoc, Loc, isPublic, Attr, &availability,
               [&targetFunctionName](Parser &P) -> bool {
                 if (P.Tok.getKind() != tok::string_literal) {
                   P.diagnose(P.Tok, diag::expected_in_attribute_list);
@@ -1874,9 +1879,10 @@ SubstitutionMap getApplySubstitutionsFromParsed(
         // Provide the replacement type.
         return parses[index].replacement;
       },
-      [&](CanType dependentType, Type replacementType,
+      [&](InFlightSubstitution &IFS, Type dependentType,
           ProtocolDecl *proto) -> ProtocolConformanceRef {
-        replacementType = replacementType->getReferenceStorageReferent();
+        auto replacementType = dependentType.subst(IFS)
+            ->getReferenceStorageReferent();
         if (auto conformance = lookupConformance(replacementType, proto))
           return conformance;
 
@@ -3468,6 +3474,12 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     ResultVal = B.createEndCOWMutation(InstLoc, Val, keepUnique);
     break;
   }
+  case SILInstructionKind::EndCOWMutationAddrInst: {
+    if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createEndCOWMutationAddr(InstLoc, Val);
+    break;
+  }
   case SILInstructionKind::DestroyNotEscapedClosureInst: {
     bool IsObjcVerificationType = false;
     if (parseSILOptional(IsObjcVerificationType, *this, "objc"))
@@ -4380,12 +4392,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   }
 
   case SILInstructionKind::CheckedCastAddrBranchInst: {
-    auto isolatedConformances = CastingIsolatedConformances::Allow;
-    StringRef attrName;
-    while (parseSILOptional(attrName, *this)) {
-      if (attrName == "prohibit_isolated_conformances")
-        isolatedConformances = CastingIsolatedConformances::Prohibit;
-    }
+    CheckedCastInstOptions options = parseCheckedCastInstOptions(nullptr);
 
     Identifier consumptionKindToken;
     SourceLoc consumptionKindLoc;
@@ -4415,7 +4422,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       return true;
 
     ResultVal = B.createCheckedCastAddrBranch(
-        InstLoc, isolatedConformances, consumptionKind, SourceAddr, SourceType,
+        InstLoc, options, consumptionKind, SourceAddr, SourceType,
         DestAddr, TargetType,
         getBBForReference(SuccessBBName, SuccessBBLoc),
         getBBForReference(FailureBBName, FailureBBLoc));
@@ -4430,28 +4437,18 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
 
   case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
-    auto isolatedConformances = CastingIsolatedConformances::Allow;
-    StringRef attrName;
-    while (parseSILOptional(attrName, *this)) {
-      if (attrName == "prohibit_isolated_conformances")
-        isolatedConformances = CastingIsolatedConformances::Prohibit;
-    }
+    CheckedCastInstOptions options = parseCheckedCastInstOptions(nullptr);
 
     if (parseSourceAndDestAddress() || parseSILDebugLocation(InstLoc, B))
       return true;
 
     ResultVal = B.createUnconditionalCheckedCastAddr(
-        InstLoc, isolatedConformances, SourceAddr, SourceType,
+        InstLoc, options, SourceAddr, SourceType,
         DestAddr, TargetType);
     break;
   }
   case SILInstructionKind::UnconditionalCheckedCastInst: {
-    auto isolatedConformances = CastingIsolatedConformances::Allow;
-    StringRef attrName;
-    while (parseSILOptional(attrName, *this)) {
-      if (attrName == "prohibit_isolated_conformances")
-        isolatedConformances = CastingIsolatedConformances::Prohibit;
-    }
+    CheckedCastInstOptions options = parseCheckedCastInstOptions(nullptr);
 
     if (parseTypedValueRef(Val, B) || parseVerbatim("to") ||
         parseASTType(TargetType))
@@ -4464,7 +4461,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
     auto opaque = Lowering::AbstractionPattern::getOpaque();
     ResultVal = B.createUnconditionalCheckedCast(
-        InstLoc, isolatedConformances, Val,
+        InstLoc, options, Val,
         F->getLoweredType(opaque, TargetType), TargetType,
         forwardingOwnership);
     break;
@@ -4472,16 +4469,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
   case SILInstructionKind::CheckedCastBranchInst: {
     bool isExact = false;
-    auto isolatedConformances = CastingIsolatedConformances::Allow;
-    StringRef attrName;
-    
-    while (parseSILOptional(attrName, *this)) {
-      if (attrName == "prohibit_isolated_conformances")
-        isolatedConformances = CastingIsolatedConformances::Prohibit;
-
-      if (attrName == "exact")
-        isExact = true;
-    }
+    CheckedCastInstOptions options = parseCheckedCastInstOptions(&isExact);
 
     if (parseASTType(SourceType) || parseVerbatim("in"))
       return true;
@@ -4498,7 +4486,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
     auto opaque = Lowering::AbstractionPattern::getOpaque();
     ResultVal = B.createCheckedCastBranch(
-        InstLoc, isExact, isolatedConformances, Val, SourceType,
+        InstLoc, isExact, options, Val, SourceType,
         F->getLoweredType(opaque, TargetType), TargetType,
         getBBForReference(SuccessBBName, SuccessBBLoc),
         getBBForReference(FailureBBName, FailureBBLoc), forwardingOwnership);
@@ -5880,6 +5868,12 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
           parseTypedValueRef(IndexVal, B) || parseSILDebugLocation(InstLoc, B))
         return true;
       ResultVal = B.createIndexAddr(InstLoc, Val, IndexVal, needsStackProtection);
+      break;
+    }
+    case SILInstructionKind::VectorBaseAddrInst: {
+      if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
+        return true;
+      ResultVal = B.createVectorBaseAddr(InstLoc, Val);
       break;
     }
     case SILInstructionKind::TailAddrInst: {
@@ -7337,7 +7331,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
           &objCReplacementFor, &specialPurpose, &inlineStrategy,
           &optimizationMode, &perfConstr, &isPerformanceConstraint,
           &markedAsUsed, &section, nullptr, &isWeakImported,
-          &needStackProtection, &availability, &isWithoutActuallyEscapingThunk,
+          &needStackProtection, nullptr, &availability, &isWithoutActuallyEscapingThunk,
           &Semantics, &SpecAttrs, &ClangDecl, &MRK, FunctionState, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       P.parseIdentifier(FnName, FnNameLoc, /*diagnoseDollarPrefix=*/false,
@@ -7592,7 +7586,7 @@ bool SILParserState::parseSILGlobal(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            &isLet, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, State, M) ||
+                           nullptr, nullptr, nullptr, nullptr, State, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
       P.parseIdentifier(GlobalName, NameLoc, /*diagnoseDollarPrefix=*/false,
                         diag::expected_sil_value_name) ||
@@ -7645,7 +7639,7 @@ bool SILParserState::parseSILProperty(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, SP, M))
+                           nullptr, nullptr, nullptr, SP, M))
     return true;
   
   ValueDecl *VD;
@@ -7715,7 +7709,7 @@ bool SILParserState::parseSILVTable(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, VTableState, M))
+                           nullptr, nullptr, nullptr, VTableState, M))
     return true;
 
 
@@ -7838,7 +7832,7 @@ bool SILParserState::parseSILMoveOnlyDeinit(Parser &parser) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, moveOnlyDeinitTableState, M))
+                           nullptr, nullptr, nullptr, moveOnlyDeinitTableState, M))
     return true;
 
   // Parse the class name.
@@ -8065,6 +8059,23 @@ ProtocolConformanceRef SILParser::parseProtocolConformance(
   }
 
   return parseProtocolConformanceHelper(proto, genericSig, genericParams);
+}
+
+CheckedCastInstOptions SILParser::parseCheckedCastInstOptions(bool *isExact) {
+  CheckedCastInstOptions options;
+  StringRef attrName;
+
+  while (parseSILOptional(attrName, *this)) {
+    if (attrName == "prohibit_isolated_conformances") {
+      options = options.withIsolatedConformances(
+                  CastingIsolatedConformances::Prohibit);
+    }
+
+    if (attrName == "exact" && isExact)
+      *isExact = true;
+  }
+
+  return options;
 }
 
 ProtocolConformanceRef SILParser::parseProtocolConformanceHelper(
@@ -8360,12 +8371,13 @@ bool SILParserState::parseSILWitnessTable(Parser &P) {
   parseSILLinkage(Linkage, P);
 
   SerializedKind_t isSerialized = IsNotSerialized;
+  bool isSpecialized = false;
   if (parseDeclSILOptional(nullptr, &isSerialized, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, nullptr, WitnessState, M))
+                           nullptr, nullptr, &isSpecialized, nullptr, nullptr, nullptr,
+                           nullptr, nullptr, nullptr, WitnessState, M))
     return true;
 
   // Parse the protocol conformance.
@@ -8378,14 +8390,18 @@ bool SILParserState::parseSILWitnessTable(Parser &P) {
   WitnessState.ContextGenericSig = witnessSig;
   WitnessState.ContextGenericParams = witnessParams;
 
-  // FIXME: should we really allow a specialized or inherited conformance here?
-  RootProtocolConformance *theConformance = nullptr;
-  if (conf.isConcrete())
-    theConformance = conf.getConcrete()->getRootConformance();
+  ProtocolConformance *theConformance = nullptr;
+  if (conf.isConcrete()) {
+    if (isSpecialized) {
+      theConformance = conf.getConcrete();
+    } else {
+      theConformance = conf.getConcrete()->getRootConformance();
+    }
+  }
 
   SILWitnessTable *wt = nullptr;
   if (theConformance) {
-    wt = M.lookUpWitnessTable(theConformance);
+    wt = M.lookUpWitnessTable(theConformance, isSpecialized);
     assert((!wt || wt->isDeclaration()) &&
            "Attempting to create duplicate witness table.");
   }
@@ -8397,7 +8413,7 @@ bool SILParserState::parseSILWitnessTable(Parser &P) {
       Linkage = SILLinkage::PublicExternal;
     // We ignore empty witness table without normal protocol conformance.
     if (!wt && theConformance)
-      wt = SILWitnessTable::create(M, *Linkage, theConformance);
+      wt = SILWitnessTable::create(M, *Linkage, theConformance, isSpecialized);
     return false;
   }
 
@@ -8433,7 +8449,7 @@ bool SILParserState::parseSILWitnessTable(Parser &P) {
     Linkage = SILLinkage::Public;
 
   if (!wt)
-    wt = SILWitnessTable::create(M, *Linkage, theConformance);
+    wt = SILWitnessTable::create(M, *Linkage, theConformance, isSpecialized);
   else
     wt->setLinkage(*Linkage);
   wt->convertToDefinition(witnessEntries, conditionalConformances,

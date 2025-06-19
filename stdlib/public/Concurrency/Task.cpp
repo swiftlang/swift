@@ -382,6 +382,11 @@ static SerialExecutorRef executorForEnqueuedJob(Job *job) {
     return swift_task_getMainExecutor();
   }
 
+  if (auto identity = reinterpret_cast<HeapObject *>(jobQueue)) {
+    return SerialExecutorRef::forOrdinary(
+      identity, _swift_task_getDispatchQueueSerialExecutorWitnessTable());
+  }
+
   return SerialExecutorRef::generic();
 #endif
 }
@@ -1758,7 +1763,8 @@ swift_task_addCancellationHandlerImpl(
     void *context) {
   void *allocation =
       swift_task_alloc(sizeof(CancellationNotificationStatusRecord));
-  auto unsigned_handler = swift_auth_code(handler, 3848);
+  auto unsigned_handler = swift_auth_code(handler,
+      SpecialPointerAuthDiscriminators::CancellationNotificationFunction);
   auto *record = ::new (allocation)
       CancellationNotificationStatusRecord(unsigned_handler, context);
 
@@ -1812,8 +1818,10 @@ swift_task_addPriorityEscalationHandlerImpl(
     void *context) {
   void *allocation =
       swift_task_alloc(sizeof(EscalationNotificationStatusRecord));
+  auto unsigned_handler = swift_auth_code(handler,
+      SpecialPointerAuthDiscriminators::EscalationNotificationFunction);
   auto *record = ::new (allocation)
-      EscalationNotificationStatusRecord(handler, context);
+      EscalationNotificationStatusRecord(unsigned_handler, context);
 
   addStatusRecordToSelf(record, [&](ActiveTaskStatus oldStatus, ActiveTaskStatus& newStatus) {
     return true;

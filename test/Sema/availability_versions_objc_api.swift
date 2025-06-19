@@ -8,7 +8,7 @@ import Foundation
 
 // Tests for uses of version-based potential unavailability imported from ObjC APIs.
 func callUnavailableObjC() {
-      // expected-note@-1 5{{add @available attribute to enclosing global function}}
+      // expected-note@-1 5{{add '@available' attribute to enclosing global function}}
   _ = NSAvailableOn51() // expected-error {{'NSAvailableOn51' is only available in macOS 51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
   
@@ -37,11 +37,11 @@ func callUnavailableObjC() {
 // Declarations with Objective-C-originated potentially unavailable APIs
 
 func functionWithObjCParam(o: NSAvailableOn51) { // expected-error {{'NSAvailableOn51' is only available in macOS 51 or newer}}
-    // expected-note@-1 {{add @available attribute to enclosing global function}}
+    // expected-note@-1 {{add '@available' attribute to enclosing global function}}
 }
 
 class ClassExtendingUnvailableClass : NSAvailableOn51 { // expected-error {{'NSAvailableOn51' is only available in macOS 51 or newer}}
-    // expected-note@-1 {{add @available attribute to enclosing class}}
+    // expected-note@-1 {{add '@available' attribute to enclosing class}}
 }
 
 // We allow classes to conform to potentially unavailable protocols
@@ -70,7 +70,7 @@ let _: NSEnumWithUnavailableElement = .third // expected-error {{'third' is only
 // Differing availability on getters and setters imported from ObjC.
 
 func gettersAndSettersFromObjC(o: NSAvailableOn10_9) {
-      // expected-note@-1 6{{add @available attribute to enclosing global function}}
+      // expected-note@-1 6{{add '@available' attribute to enclosing global function}}
   let _: Int = o.propertyOn51WithSetterOn52After  // expected-error {{'propertyOn51WithSetterOn52After' is only available in macOS 51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
 
@@ -98,7 +98,7 @@ func gettersAndSettersFromObjC(o: NSAvailableOn10_9) {
 // Globals from Objective-C
 
 func useGlobalsFromObjectiveC() {
-      // expected-note@-1 3{{add @available attribute to enclosing global function}}
+      // expected-note@-1 3{{add '@available' attribute to enclosing global function}}
   _ = globalStringAvailableOn51 // expected-error {{'globalStringAvailableOn51' is only available in macOS 51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
 
@@ -166,7 +166,7 @@ class UserClass : UnannotatedFrameworkProtocol {
 }
 
 func callViaUnannotatedFrameworkProtocol(p: UnannotatedFrameworkProtocol) {
-      // expected-note@-1 {{add @available attribute to enclosing global function}}
+      // expected-note@-1 {{add '@available' attribute to enclosing global function}}
   let _ = p.returnSomething() // expected-error {{'returnSomething()' is only available in macOS 51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
 }

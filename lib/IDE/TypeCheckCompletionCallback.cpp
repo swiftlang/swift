@@ -58,7 +58,7 @@ Type swift::ide::getTypeForCompletion(const constraints::Solution &S,
   }
 
   if (!S.hasType(Node)) {
-    assert(false && "Expression wasn't type checked?");
+    CONDITIONAL_ASSERT(false && "Expression wasn't type checked?");
     return nullptr;
   }
 

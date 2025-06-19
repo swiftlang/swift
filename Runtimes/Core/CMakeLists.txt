@@ -78,14 +78,15 @@ set(SwiftCore_VENDOR_MODULE_DIR "${SwiftCore_CMAKE_MODULES_DIR}/vendor"
 include(GNUInstallDirs)
 include(CheckSymbolExists)
 include(CheckIncludeFileCXX)
-include(AvailabilityMacros)
 include(CompilerSettings)
 include(DefaultSettings)
 include(EmitSwiftInterface)
+include(InstallSwiftInterface)
 include(PlatformInfo)
 include(gyb)
 include(ResourceEmbedding)
 include(CatalystSupport)
+include(AvailabilityMacros)
 
 check_symbol_exists("asl_log" "asl.h" SwiftCore_HAS_ASL)
 check_symbol_exists("dladdr" "dlfcn.h" SwiftCore_HAS_DLADDR)
@@ -103,7 +104,6 @@ defaulted_option(SwiftCore_ENABLE_OBJC_INTEROP "Enable runtime ObjC interop")
 defaulted_option(SwiftCore_ENABLE_TYPE_PRINTING "Enable printing type names")
 defaulted_option(SwiftCore_ENABLE_VECTOR_TYPES "Enable vector support")
 defaulted_option(SwiftCore_ENABLE_REFLECTION "Enable runtime support for mirrors and reflection support")
-defaulted_option(SwiftCore_ENABLE_COMMANDLINE_SUPPORT "Enable command line argument support")
 defaulted_option(SwiftCore_ENABLE_RUNTIME_FUNCTION_COUNTERS "Enable runtime function counter support")
 defaulted_option(SwiftCore_ENABLE_STDIN "Enable functions that use stdin support")
 defaulted_option(SwiftCore_ENABLE_ENVIRONMENT "Enable environment variable support")
@@ -115,6 +115,7 @@ defaulted_option(SwiftCore_ENABLE_BACKDEPLOYMENT_SUPPORT "Add symbols for runtim
 defaulted_option(SwiftCore_ENABLE_STDLIB_TRACING "Enable tracing in the runtime. Assumes the presence of os_log(3) and the os_signpost(3) API.")
 defaulted_option(SwiftCore_ENABLE_CONCURRENCY "Enable Concurrency runtime support")
 defaulted_set(SwiftCore_CONCURRENCY_GLOBAL_EXECUTOR STRING "Default Concurrency global executor implementation")
+option(SwiftCore_ENABLE_COMMANDLINE_SUPPORT "Enable command line argument support" ON)
 option(SwiftCore_ENABLE_UNICODE_DATA "Include unicode data in Swift runtimes" ON)
 option(SwiftCore_ENABLE_SHORT_MANGLING_LOOKUPS "Build with fast-path context descriptor lookups based on well-known short manglings." ON)
 option(SwiftCore_ENABLE_FILESYSTEM_SUPPORT "Build for systems that have a filesystem" ON)
@@ -125,6 +126,7 @@ defaulted_option(SwiftCore_ENABLE_BACKTRACING "Enable backtracing runtime suppor
 defaulted_set(SwiftCore_BACKTRACER_PATH STRING "Set a fixed path to the Swift backtracer")
 defaulted_option(SwiftCore_ENABLE_FATALERROR_BACKTRACE "Build stdlib fatalError with backtrace output")
 defaulted_option(SwiftCore_ENABLE_PRESPECIALIZATION "Enable generic metadata prespecialization")
+defaulted_option(SwiftCore_ENABLE_STRICT_AVAILABILITY "Enable strict availability; this will cause things to break at desk or in CI if the host OS is a lower version than some `@availability` annotations in the runtime code")
 
 option(SwiftCore_ENABLE_CLOBBER_FREED_OBJECTS "" OFF)
 option(SwiftCore_ENABLE_RUNTIME_LEAK_CHECKER "" OFF)
@@ -159,7 +161,7 @@ add_compile_definitions(
   $<$<BOOL:${SwiftCore_HAS_DARWIN_LIBMALLOC}>:-DSWIFT_STDLIB_HAS_DARWIN_LIBMALLOC> # Anything that includes include/swift/Runtime/Config.h
   $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_THREADING_${SwiftCore_THREADING_PACKAGE}>
   $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_RUNTIME_ENABLE_LEAK_CHECKER=$<BOOL:${SwiftCore_ENABLE_RUNTIME_LEAK_CHECKER}>>
-  $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_RUNTIME_CLOBBER_FREED_OBJECTS=$<BOOL:${SwiftCore_ENABLE_CLOBBER_FREED_OBJECTS}>>)
+  $<$<BOOL:${SwiftCore_ENABLE_CLOBBER_FREED_OBJECTS}>:-DSWIFT_RUNTIME_CLOBBER_FREED_OBJECTS>)
 
 add_compile_options(
   $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>
@@ -208,8 +210,10 @@ add_subdirectory(Demangling)
 add_subdirectory(Threading)
 add_subdirectory(runtime)
 add_subdirectory(stubs)
-add_subdirectory(CommandLineSupport)
 add_subdirectory(core)
+if(SwiftCore_ENABLE_COMMANDLINE_SUPPORT)
+  add_subdirectory(CommandLineSupport)
+endif()
 if(SwiftCore_ENABLE_ONONESUPPORT)
   add_subdirectory(SwiftOnoneSupport)
 endif()

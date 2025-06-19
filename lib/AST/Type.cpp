@@ -320,6 +320,8 @@ ExistentialLayout::ExistentialLayout(CanProtocolType type) {
                            !protoDecl->isMarkerProtocol());
   representsAnyObject = false;
 
+  inverses = InvertibleProtocolSet();
+
   protocols.push_back(protoDecl);
   expandDefaults(protocols, InvertibleProtocolSet(), type->getASTContext());
 }
@@ -353,7 +355,7 @@ ExistentialLayout::ExistentialLayout(CanProtocolCompositionType type) {
     protocols.push_back(protoDecl);
   }
 
-  auto inverses = type->getInverses();
+  inverses = type->getInverses();
   expandDefaults(protocols, inverses, type->getASTContext());
 
   representsAnyObject = [&]() {
@@ -431,6 +433,16 @@ Type ExistentialLayout::getSuperclass() const {
   }
 
   return Type();
+}
+
+bool ExistentialLayout::needsExtendedShape(bool allowInverses) const {
+  if (!getParameterizedProtocols().empty())
+    return true;
+
+  if (allowInverses && hasInverses())
+    return true;
+
+  return false;
 }
 
 bool TypeBase::isObjCExistentialType() {
@@ -829,15 +841,28 @@ CanType CanType::wrapInOptionalTypeImpl(CanType type) {
   return type->wrapInOptionalType()->getCanonicalType();
 }
 
-Type TypeBase::isArrayType() {
-  if (auto boundStruct = getAs<BoundGenericStructType>()) {
-    if (isArray())
-      return boundStruct->getGenericArgs()[0];
+Type TypeBase::getArrayElementType() {
+  if (!isArray())
+    return Type();
 
-    if (isInlineArray())
-      return boundStruct->getGenericArgs()[1];
-  }
-  return Type();
+  if (!is<BoundGenericStructType>())
+    return Type();
+
+  // Array<T>
+  auto boundStruct = castTo<BoundGenericStructType>();
+  return boundStruct->getGenericArgs()[0];
+}
+
+Type TypeBase::getInlineArrayElementType() {
+  if (!isInlineArray())
+    return Type();
+
+  if (!is<BoundGenericStructType>())
+    return Type();
+
+  // InlineArray<n, T>
+  auto boundStruct = castTo<BoundGenericStructType>();
+  return boundStruct->getGenericArgs()[1];
 }
 
 Type TypeBase::getAnyPointerElementType(PointerTypeKind &PTK) {
@@ -1353,6 +1378,7 @@ ParameterListInfo::ParameterListInfo(
   propertyWrappers.resize(params.size());
   implicitSelfCapture.resize(params.size());
   inheritActorContext.resize(params.size());
+  alwaysInheritActorContext.resize(params.size());
   variadicGenerics.resize(params.size());
   sendingParameters.resize(params.size());
 
@@ -1409,8 +1435,13 @@ ParameterListInfo::ParameterListInfo(
       implicitSelfCapture.set(i);
     }
 
-    if (param->getAttrs().hasAttribute<InheritActorContextAttr>()) {
-      inheritActorContext.set(i);
+    if (auto *attr =
+            param->getAttrs().getAttribute<InheritActorContextAttr>()) {
+      if (attr->isAlways()) {
+        alwaysInheritActorContext.set(i);
+      } else {
+        inheritActorContext.set(i);
+      }
     }
 
     if (param->getInterfaceType()->is<PackExpansionType>()) {
@@ -1444,10 +1475,18 @@ bool ParameterListInfo::isImplicitSelfCapture(unsigned paramIdx) const {
       : false;
 }
 
-bool ParameterListInfo::inheritsActorContext(unsigned paramIdx) const {
-  return paramIdx < inheritActorContext.size()
-      ? inheritActorContext[paramIdx]
-      : false;
+std::pair<bool, InheritActorContextModifier>
+ParameterListInfo::inheritsActorContext(unsigned paramIdx) const {
+  if (paramIdx >= inheritActorContext.size())
+    return std::make_pair(false, InheritActorContextModifier::None);
+
+  if (inheritActorContext[paramIdx])
+    return std::make_pair(true, InheritActorContextModifier::None);
+
+  if (alwaysInheritActorContext[paramIdx])
+    return std::make_pair(true, InheritActorContextModifier::Always);
+
+  return std::make_pair(false, InheritActorContextModifier::None);
 }
 
 bool ParameterListInfo::isVariadicGenericParameter(unsigned paramIdx) const {
@@ -1736,7 +1775,8 @@ CanType TypeBase::computeCanonicalType() {
     auto &C = gpDecl->getASTContext();
     Result =
         GenericTypeParamType::get(gp->getParamKind(), gp->getDepth(),
-                                  gp->getIndex(), gp->getValueType(),
+                                  gp->getIndex(), gp->getWeight(),
+                                  gp->getValueType(),
                                   C);
     break;
   }
@@ -2081,8 +2121,9 @@ GenericTypeParamType::GenericTypeParamType(GenericTypeParamDecl *param,
   : SubstitutableType(TypeKind::GenericTypeParam, nullptr, props),
     Decl(param) {
   ASSERT(param->getDepth() != GenericTypeParamDecl::InvalidDepth);
-  Depth = param->getDepth();
   IsDecl = true;
+  Depth = param->getDepth();
+  Weight = 0;
   Index = param->getIndex();
   ParamKind = param->getParamKind();
   ValueType = param->getValueType();
@@ -2095,8 +2136,9 @@ GenericTypeParamType::GenericTypeParamType(Identifier name,
                         canType->getRecursiveProperties()),
       Decl(nullptr) {
   Name = name;
-  Depth = canType->getDepth();
   IsDecl = false;
+  Depth = canType->getDepth();
+  Weight = canType->getWeight();
   Index = canType->getIndex();
   ParamKind = canType->getParamKind();
   ValueType = canType->getValueType();
@@ -2106,13 +2148,14 @@ GenericTypeParamType::GenericTypeParamType(Identifier name,
 
 GenericTypeParamType::GenericTypeParamType(GenericTypeParamKind paramKind,
                                            unsigned depth, unsigned index,
-                                           Type valueType,
+                                           unsigned weight, Type valueType,
                                            RecursiveTypeProperties props,
                                            const ASTContext &ctx)
     : SubstitutableType(TypeKind::GenericTypeParam, &ctx, props),
       Decl(nullptr) {
-  Depth = depth;
   IsDecl = false;
+  Depth = depth;
+  Weight = weight;
   Index = index;
   ParamKind = paramKind;
   ValueType = valueType;
@@ -2133,8 +2176,10 @@ Identifier GenericTypeParamType::getName() const {
   if (!isCanonical())
     return Name;
 
-  // Otherwise, we're canonical. Produce an anonymous '<tau>_n_n' name.
+  return getCanonicalName();
+}
 
+Identifier GenericTypeParamType::getCanonicalName() const {
   // getASTContext() doesn't actually mutate an already-canonical type.
   auto &C = const_cast<GenericTypeParamType*>(this)->getASTContext();
   auto &names = C.CanonicalGenericTypeParamTypeNames;
@@ -2161,6 +2206,15 @@ Type GenericTypeParamType::getValueType() const {
     return getDecl()->getValueType();
 
   return ValueType;
+}
+
+GenericTypeParamType *GenericTypeParamType::withDepth(unsigned depth) const {
+  return GenericTypeParamType::get(getParamKind(),
+                                   depth,
+                                   getIndex(),
+                                   getWeight(),
+                                   getValueType(),
+                                   getASTContext());
 }
 
 const llvm::fltSemantics &BuiltinFloatType::getAPFloatSemantics() const {
@@ -4789,7 +4843,8 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
     if (!resultTan)
       return llvm::make_error<DerivativeFunctionTypeError>(
         this, DerivativeFunctionTypeError::Kind::NonDifferentiableResult,
-        std::make_pair(originalResultType, unsigned(originalResult.index)));
+        DerivativeFunctionTypeError::TypeAndIndex(
+          originalResultType, unsigned(originalResult.index)));
 
     if (!originalResult.isSemanticResultParameter)
       resultTanTypes.push_back(resultTan->getType());
@@ -4819,7 +4874,7 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
             this,
             DerivativeFunctionTypeError::Kind::
                 NonDifferentiableDifferentiabilityParameter,
-            std::make_pair(paramType, i));
+            DerivativeFunctionTypeError::TypeAndIndex(paramType, i));
 
       differentialParams.push_back(AnyFunctionType::Param(
           paramTan->getType(), Identifier(), diffParam.getParameterFlags()));
@@ -4867,7 +4922,7 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
             this,
             DerivativeFunctionTypeError::Kind::
                 NonDifferentiableDifferentiabilityParameter,
-            std::make_pair(paramType, i));
+            DerivativeFunctionTypeError::TypeAndIndex(paramType, i));
 
       if (diffParam.isAutoDiffSemanticResult()) {
         if (paramType->isVoid())

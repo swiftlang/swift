@@ -387,9 +387,9 @@ func taskIsolatedInsideError(_ x: @escaping @MainActor () async -> ()) {
 @MainActor func actorIsolatedInsideError(_ x: @escaping @MainActor () async -> ()) {
   func fakeInit(operation: sending @escaping () async -> ()) {}
 
-  // We do not get an error here since fakeInit is main actor isolated since it
+  // We do not get an error here since fakeInit is MainActor isolated since it
   // is defined within this function. As a result, we are sending a @MainActor
-  // isolated thing to a MainActor isolated thing.
+  // isolated thing to a MainActor-isolated thing.
   fakeInit(operation: x)
 }
 
@@ -439,7 +439,7 @@ func testNoCrashWhenSendingNoEscapeClosure() async {
 func testInOutSendingReinit(_ x: inout sending NonSendableKlass) async {
   await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
   // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
-} // expected-note {{'inout sending' parameter must be reinitialized before function exit with a non-actor isolated value}}
+} // expected-note {{'inout sending' parameter must be reinitialized before function exit with a non-actor-isolated value}}
 
 func testInOutSendingReinit2(_ x: inout sending NonSendableKlass) async {
   await transferToMain(x)
@@ -450,7 +450,7 @@ func testInOutSendingReinit3(_ x: inout sending NonSendableKlass) async throws {
   await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
   // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
 
-  try throwingFunction() // expected-note {{'inout sending' parameter must be reinitialized before function exit with a non-actor isolated value}}
+  try throwingFunction() // expected-note {{'inout sending' parameter must be reinitialized before function exit with a non-actor-isolated value}}
 
   x = NonSendableKlass()
 }
@@ -463,7 +463,7 @@ func testInOutSendingReinit4(_ x: inout sending NonSendableKlass) async throws {
     try throwingFunction()
     x = NonSendableKlass()
   } catch {
-    throw MyError() // expected-note {{'inout sending' parameter must be reinitialized before function exit with a non-actor isolated value}}
+    throw MyError() // expected-note {{'inout sending' parameter must be reinitialized before function exit with a non-actor-isolated value}}
   }
 
   x = NonSendableKlass()
@@ -476,7 +476,7 @@ func testInOutSendingReinit5(_ x: inout sending NonSendableKlass) async throws {
   do {
     try throwingFunction()
   } catch {
-    throw MyError() // expected-note {{'inout sending' parameter must be reinitialized before function exit with a non-actor isolated value}}
+    throw MyError() // expected-note {{'inout sending' parameter must be reinitialized before function exit with a non-actor-isolated value}}
   }
 
   x = NonSendableKlass()
@@ -489,9 +489,9 @@ func testInOutSendingReinit6(_ x: inout sending NonSendableKlass) async throws {
   do {
     try throwingFunction()
   } catch {
-    throw MyError() // expected-note {{'inout sending' parameter must be reinitialized before function exit with a non-actor isolated value}}
+    throw MyError() // expected-note {{'inout sending' parameter must be reinitialized before function exit with a non-actor-isolated value}}
   }
-} // expected-note {{'inout sending' parameter must be reinitialized before function exit with a non-actor isolated value}}
+} // expected-note {{'inout sending' parameter must be reinitialized before function exit with a non-actor-isolated value}}
 
 actor InOutSendingWrongIsolationActor {
   var ns = NonSendableKlass()

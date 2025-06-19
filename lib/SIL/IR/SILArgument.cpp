@@ -37,6 +37,7 @@ SILArgument::SILArgument(ValueKind subClassKind,
   sharedUInt8().SILArgument.reborrow = reborrow;
   sharedUInt8().SILArgument.pointerEscape = pointerEscape;
   inputParentBlock->insertArgument(inputParentBlock->args_end(), this);
+  ASSERT(!type.hasTypeParameter());
 }
 
 SILFunction *SILArgument::getFunction() {

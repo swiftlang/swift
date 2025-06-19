@@ -255,8 +255,13 @@ private:
       VTableEntryCache;
 
   /// Lookup table for SIL witness tables from conformances.
-  llvm::DenseMap<const ProtocolConformance *, SILWitnessTable *>
+  llvm::DenseMap<const RootProtocolConformance *, SILWitnessTable *>
   WitnessTableMap;
+
+  /// Lookup table for specialized witness tables from conformances.
+  /// Currently only used in embedded mode.
+  llvm::DenseMap<const ProtocolConformance *, SILWitnessTable *>
+  specializedWitnessTableMap;
 
   /// The list of SILWitnessTables in the module.
   WitnessTableListType witnessTables;
@@ -866,15 +871,16 @@ public:
   /// i.e. it can be linked by linkFunction.
   bool hasFunction(StringRef Name);
 
-  /// Look up the SILWitnessTable representing the lowering of a protocol
-  /// conformance, and collect the substitutions to apply to the referenced
-  /// witnesses, if any.
-  ///
-  /// \arg C The protocol conformance mapped key to use to lookup the witness
-  ///        table.
-  /// \arg deserializeLazily If we cannot find the witness table should we
-  ///                        attempt to lazily deserialize it.
+  /// Look up the SILWitnessTable representing the lowering of a conformance `C`.
+  /// If a specialized witness table exists for the conformance, return the specialized table.
+  /// Specialized witness tables are currently only used in embedded mode.
   SILWitnessTable *lookUpWitnessTable(const ProtocolConformance *C);
+
+  /// Look up the SILWitnessTable representing the lowering of a conformance `C`.
+  /// The `isSpecialized` flag specifies if only non-specialized or specialized witness
+  /// tables are looked up.
+  /// Specialized witness tables are currently only used in embedded mode.
+  SILWitnessTable *lookUpWitnessTable(const ProtocolConformance *C, bool isSpecialized);
 
   /// Attempt to lookup \p Member in the witness table for \p C.
   ///

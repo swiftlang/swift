@@ -36,3 +36,9 @@ public func test_compose_closure() -> Int32 {
   return gs
 }
 
+// CHECK-LABEL: sil @$s12sil_combine122remove_partial_applies_3key5valueySDySSSiGSgz_SSSitF :
+// CHECK-NOT:     partial_apply
+// CHECK:       } // end sil function '$s12sil_combine122remove_partial_applies_3key5valueySDySSSiGSgz_SSSitF'
+public func remove_partial_applies(_ dict: inout [String: Int]?, key: String, value: Int) {
+  dict?[key, default: value] = value 
+}

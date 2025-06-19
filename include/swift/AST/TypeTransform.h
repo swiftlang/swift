@@ -358,7 +358,8 @@ case TypeKind::Id:
             }
           });
         if (didRemoveLifetimeDependencies) {
-          extInfo = extInfo.withLifetimeDependencies(substDependenceInfos);
+          extInfo = extInfo.withLifetimeDependencies(
+              ctx.AllocateCopy(substDependenceInfos));
         }
       }
 
@@ -939,7 +940,8 @@ case TypeKind::Id:
           });
 
         if (didRemoveLifetimeDependencies) {
-          extInfo = extInfo->withLifetimeDependencies(substDependenceInfos);
+          extInfo = extInfo->withLifetimeDependencies(
+              ctx.AllocateCopy(substDependenceInfos));
         }
       }
 
@@ -1175,6 +1177,12 @@ case TypeKind::Id:
 
     if (transformedPack.getPointer() == element->getPackType().getPointer())
       return element;
+
+    if (!transformedPack->isParameterPack() &&
+        !transformedPack->is<PackArchetypeType>() &&
+        !transformedPack->isTypeVariableOrMember()) {
+      return transformedPack;
+    }
 
     return PackElementType::get(transformedPack, element->getLevel());
   }

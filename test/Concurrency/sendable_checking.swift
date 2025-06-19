@@ -38,7 +38,7 @@ func acceptSendableFn(_: @Sendable @escaping () -> Void) { }
 func testCV(
   ns1: NS1, ns1array: [NS1], ns2: NS2, ns3: NS3, ns4: NS4,
   fn: @escaping () -> Void
-  // expected-note @-1 {{parameter 'fn' is implicitly non-sendable}}
+  // expected-note @-1 {{parameter 'fn' is implicitly non-Sendable}}
 ) {
   acceptCV(ns1) // expected-warning {{conformance of 'NS1' to 'Sendable' is unavailable}}
 
@@ -54,14 +54,14 @@ func testCV(
   acceptCV(fn) // expected-complete-and-tns-warning {{type '() -> Void' does not conform to the 'Sendable' protocol}}
   // expected-complete-and-tns-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 
-  acceptSendableFn(fn) // expected-warning{{passing non-sendable parameter 'fn' to function expecting a @Sendable closure}}
+  acceptSendableFn(fn) // expected-warning{{passing non-Sendable parameter 'fn' to function expecting a '@Sendable' closure}}
 }
 
 @available(SwiftStdlib 5.1, *)
 func testCV(
   ns1: NS1, ns1array: [NS1], ns2: NS2, ns3: NS3, ns4: NS4,
   fn: @escaping () -> Void
-  // expected-note@-1{{parameter 'fn' is implicitly non-sendable}}
+  // expected-note@-1{{parameter 'fn' is implicitly non-Sendable}}
 ) async {
   acceptCV(ns1) // expected-warning{{conformance of 'NS1' to 'Sendable' is unavailable}}
   acceptCV(ns1array) // expected-warning{{conformance of 'NS1' to 'Sendable' is unavailable}}
@@ -71,7 +71,7 @@ func testCV(
   acceptCV(ns4) // expected-warning{{type 'NS4' does not conform to the 'Sendable' protocol}}
   acceptCV(fn) // expected-warning{{type '() -> Void' does not conform to the 'Sendable' protocol}}
   // expected-note@-1{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
-  acceptSendableFn(fn) // expected-warning{{passing non-sendable parameter 'fn' to function expecting a @Sendable closure}}
+  acceptSendableFn(fn) // expected-warning{{passing non-Sendable parameter 'fn' to function expecting a '@Sendable' closure}}
 }
 
 // rdar://83942484 - spurious Sendable diagnostics
@@ -144,15 +144,15 @@ protocol P {
   func foo(x : () -> ()) -> () {}
 
   func bar(x : () -> ()) -> () {}
-  // expected-warning@-1 {{non-sendable parameter type '() -> ()' cannot be sent from caller of protocol requirement 'bar(x:)' into actor-isolated implementation}}
+  // expected-warning@-1 {{non-Sendable parameter type '() -> ()' cannot be sent from caller of protocol requirement 'bar(x:)' into actor-isolated implementation}}
 
   func foo2<T>(x : T) -> () {}
 
   func bar2<T>(x : T) -> () {}
-  // expected-warning@-1 {{non-sendable parameter type 'T' cannot be sent from caller of protocol requirement 'bar2(x:)' into actor-isolated implementation}}
+  // expected-warning@-1 {{non-Sendable parameter type 'T' cannot be sent from caller of protocol requirement 'bar2(x:)' into actor-isolated implementation}}
 
   func bar3<T: Equatable>(x : T) -> () {}
-  // expected-warning@-1 {{non-sendable parameter type 'T' cannot be sent from caller of protocol requirement 'bar3(x:)' into actor-isolated implementation}}
+  // expected-warning@-1 {{non-Sendable parameter type 'T' cannot be sent from caller of protocol requirement 'bar3(x:)' into actor-isolated implementation}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -183,15 +183,15 @@ class Sub : Super {
   override nonisolated func foo(x : () -> ()) async {}
 
   override nonisolated func bar(x : () -> ()) async {}
-  // expected-warning@-1 {{non-sendable parameter type '() -> ()' cannot be sent from caller of superclass instance method 'bar(x:)' into nonisolated override}}
+  // expected-warning@-1 {{non-Sendable parameter type '() -> ()' cannot be sent from caller of superclass instance method 'bar(x:)' into nonisolated override}}
 
   override nonisolated func foo2<T>(x: T) async {}
 
   override nonisolated func bar2<T>(x: T) async {}
-  // expected-warning@-1 {{non-sendable parameter type 'T' cannot be sent from caller of superclass instance method 'bar2(x:)' into nonisolated override}}
+  // expected-warning@-1 {{non-Sendable parameter type 'T' cannot be sent from caller of superclass instance method 'bar2(x:)' into nonisolated override}}
 
   override nonisolated func bar3<T>(x: T) async {}
-  // expected-warning@-1 {{non-sendable parameter type 'T' cannot be sent from caller of superclass instance method 'bar3(x:)' into nonisolated override}}
+  // expected-warning@-1 {{non-Sendable parameter type 'T' cannot be sent from caller of superclass instance method 'bar3(x:)' into nonisolated override}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -228,8 +228,8 @@ class SuperWUnsafeSubscript {
 class SubWUnsafeSubscript : SuperWUnsafeSubscript {
   override nonisolated subscript<T>(x : T) -> Int {
     get async {
-      // expected-warning@-2{{non-sendable parameter type 'T' cannot be sent from caller of superclass subscript 'subscript(_:)' into nonisolated override}}
-      // expected-warning@-2{{non-sendable parameter type 'T' cannot be sent from caller of superclass getter for subscript 'subscript(_:)' into nonisolated override}}
+      // expected-warning@-2{{non-Sendable parameter type 'T' cannot be sent from caller of superclass subscript 'subscript(_:)' into nonisolated override}}
+      // expected-warning@-2{{non-Sendable parameter type 'T' cannot be sent from caller of superclass getter for subscript 'subscript(_:)' into nonisolated override}}
       // there really shouldn't be two warnings produced here, see rdar://110846040 (Sendable diagnostics reported twice for subscript getters)
       return 0
     }
@@ -281,10 +281,10 @@ final class NonSendable {
     // expected-tns-note @-2 {{sending task-isolated 'self' to main actor-isolated instance method 'update()' risks causing data races between main actor-isolated and task-isolated uses}}
 
     _ = await x
-    // expected-warning@-1 {{non-sendable type 'NonSendable' cannot be sent into main actor-isolated context in call to property 'x'}}
+    // expected-warning@-1 {{non-Sendable type 'NonSendable' cannot be sent into main actor-isolated context in call to property 'x'}}
 
     _ = await self.x
-      // expected-warning@-1 {{non-sendable type 'NonSendable' cannot be sent into main actor-isolated context in call to property 'x'}}
+      // expected-warning@-1 {{non-Sendable type 'NonSendable' cannot be sent into main actor-isolated context in call to property 'x'}}
   }
 
   @MainActor
@@ -296,7 +296,7 @@ final class NonSendable {
   var z: Int { 0 }
 }
 
-// This is not an error since t.update and t.x are both main actor isolated. We
+// This is not an error since t.update and t.x are both MainActor isolated. We
 // still get the returning main actor-isolated property 'x' error though.
 @available(SwiftStdlib 5.1, *)
 func testNonSendableBaseArg() async {
@@ -306,7 +306,7 @@ func testNonSendableBaseArg() async {
   // expected-tns-note @-2 {{sending 't' to main actor-isolated instance method 'update()' risks causing data races between main actor-isolated and local nonisolated uses}}
 
   _ = await t.x
-  // expected-warning @-1 {{non-sendable type 'NonSendable' cannot be sent into main actor-isolated context in call to property 'x'}}
+  // expected-warning @-1 {{non-Sendable type 'NonSendable' cannot be sent into main actor-isolated context in call to property 'x'}}
   // expected-tns-note @-2 {{access can happen concurrently}}
 }
 
@@ -321,7 +321,7 @@ func testNonSendableBaseArg2() async {
   // expected-tns-note @-4 {{sending 't' to main actor-isolated instance method 'update()' risks causing data races between main actor-isolated and local nonisolated uses}}
 
   _ = await t.y
-  // expected-warning @-1 {{non-sendable type 'NonSendable' cannot be sent into global actor 'CustomActor'-isolated context in call to property 'y'}}
+  // expected-warning @-1 {{non-Sendable type 'NonSendable' cannot be sent into global actor 'CustomActor'-isolated context in call to property 'y'}}
   // expected-tns-note @-2 {{access can happen concurrently}}
 }
 
@@ -364,7 +364,7 @@ func testLocalCaptures() {
   @Sendable
   func a2() -> NonSendable {
     return ns
-    // expected-complete-and-tns-warning @-1 {{capture of 'ns' with non-sendable type 'NonSendable' in a '@Sendable' local function}}
+    // expected-complete-and-tns-warning @-1 {{capture of 'ns' with non-Sendable type 'NonSendable' in a '@Sendable' local function}}
   }
 }
 
@@ -446,8 +446,8 @@ struct DowngradeForPreconcurrency {
     preconcurrencyContext {
       Task {
         completion()
-        // expected-warning@-1 {{capture of 'completion' with non-sendable type '@MainActor () -> Void' in a '@Sendable' closure}}
-        // expected-warning@-2 {{capture of 'completion' with non-sendable type '@MainActor () -> Void' in an isolated closure}}
+        // expected-warning@-1 {{capture of 'completion' with non-Sendable type '@MainActor () -> Void' in a '@Sendable' closure}}
+        // expected-warning@-2 {{capture of 'completion' with non-Sendable type '@MainActor () -> Void' in an isolated closure}}
         // expected-note@-3 2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
         // expected-warning@-4 {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
         // expected-note@-5 {{calls to parameter 'completion' from outside of its actor context are implicitly asynchronous}}
@@ -459,9 +459,8 @@ struct DowngradeForPreconcurrency {
   func createStream() -> AsyncStream<NonSendable> {
     AsyncStream<NonSendable> {
       self.x
-      // expected-warning@-1 {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
-      // expected-note@-2 {{property access is 'async'}}
-      // expected-warning@-3 {{non-sendable type 'NonSendable' of property 'x' cannot exit main actor-isolated context; this is an error in the Swift 6 language mode}}
+      // expected-warning@-1 {{main actor-isolated property 'x' cannot be accessed from outside of the actor; this is an error in the Swift 6 language mode}} {{7-7=await }}
+      // expected-warning@-2 {{non-Sendable type 'NonSendable' of property 'x' cannot exit main actor-isolated context; this is an error in the Swift 6 language mode}}
     }
   }
 }

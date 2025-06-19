@@ -90,13 +90,6 @@
 #define SWIFT_IMPORT_UNSAFE
 #endif
 
-/// Same as `SWIFT_SELF_CONTAINED` in <swift/bridging>.
-#if __has_attribute(swift_attr)
-#define SWIFT_SELF_CONTAINED __attribute__((swift_attr("import_owned")))
-#else
-#define SWIFT_SELF_CONTAINED
-#endif
-
 #ifdef __GNUC__
 #define SWIFT_ATTRIBUTE_NORETURN __attribute__((noreturn))
 #elif defined(_MSC_VER)

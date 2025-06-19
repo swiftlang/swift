@@ -1073,7 +1073,7 @@ struct UseAfterSendDiagnosticInferrer::AutoClosureWalker : ASTWalker {
           continue;
         }
 
-        // Otherwise, we are calling an actor isolated function in the async
+        // Otherwise, we are calling an actor-isolated function in the async
         // let. Emit a better error.
 
         // See if we can find a valueDecl/name for our callee so we can
@@ -1857,30 +1857,23 @@ bool SentNeverSendableDiagnosticInferrer::initForSendingPartialApply(
 bool SentNeverSendableDiagnosticInferrer::initForIsolatedPartialApply(
     Operand *op, AbstractClosureExpr *ace,
     std::optional<ActorIsolation> actualCallerIsolation) {
-  SmallVector<std::tuple<CapturedValue, unsigned, ApplyIsolationCrossing>, 8>
-      foundCapturedIsolationCrossing;
-  ace->getIsolationCrossing(foundCapturedIsolationCrossing);
-  if (foundCapturedIsolationCrossing.empty())
+  auto diagnosticPair = findClosureUse(op);
+  if (!diagnosticPair)
     return false;
 
-  // We use getASTAppliedArgIndex instead of getAppliedArgIndex to ensure that
-  // we ignore for our indexing purposes any implicit initial parameters like
-  // isolated(any).
-  unsigned opIndex = ApplySite(op->getUser()).getASTAppliedArgIndex(*op);
-  for (auto &p : foundCapturedIsolationCrossing) {
-    if (std::get<1>(p) == opIndex) {
-      auto loc = RegularLocation(std::get<0>(p).getLoc());
-      auto crossing = std::get<2>(p);
-      auto declIsolation = crossing.getCallerIsolation();
-      auto closureIsolation = crossing.getCalleeIsolation();
-      if (!bool(declIsolation) && actualCallerIsolation) {
-        declIsolation = *actualCallerIsolation;
-      }
-      diagnosticEmitter.emitNamedFunctionArgumentClosure(
-          loc, std::get<0>(p).getDecl()->getBaseIdentifier(),
-          ApplyIsolationCrossing(declIsolation, closureIsolation));
-      return true;
-    }
+  auto *diagnosticOp = diagnosticPair->first;
+
+  ApplyIsolationCrossing crossing(
+      *op->getFunction()->getActorIsolation(),
+      *diagnosticOp->getFunction()->getActorIsolation());
+
+  // We do not need to worry about failing to infer a name here since we are
+  // going to be returning some form of a SILFunctionArgument which is always
+  // easy to find a name for.
+  if (auto rootValueAndName = inferNameAndRootHelper(op->get())) {
+    diagnosticEmitter.emitNamedFunctionArgumentClosure(
+        diagnosticOp->getUser()->getLoc(), rootValueAndName->first, crossing);
+    return true;
   }
 
   return false;

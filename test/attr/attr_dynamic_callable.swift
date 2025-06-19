@@ -98,7 +98,7 @@ func testFunction(a: CallableReturningFunction) {
 //===----------------------------------------------------------------------===//
 
 // Arguments' type may not be variadic.
-// expected-error @+1 {{@dynamicCallable attribute requires 'Invalid1' to have either a valid 'dynamicallyCall(withArguments:)' method or 'dynamicallyCall(withKeywordArguments:)' method}} {{documentation-file=dynamic-callable-requirements}}
+// expected-error @+1 {{'@dynamicCallable' requires 'Invalid1' to have either a valid 'dynamicallyCall(withArguments:)' method or 'dynamicallyCall(withKeywordArguments:)' method}} {{documentation-file=dynamic-callable-requirements}}
 @dynamicCallable
 struct Invalid1 {
   func dynamicallyCall(withArguments arguments: [Int]...) -> Int {
@@ -107,7 +107,7 @@ struct Invalid1 {
 }
 
 // Keyword arguments' key type must be ExpressibleByStringLiteral.
-// expected-error @+1 {{@dynamicCallable attribute requires 'Invalid2' to have either a valid 'dynamicallyCall(withArguments:)' method or 'dynamicallyCall(withKeywordArguments:)' method}} {{documentation-file=dynamic-callable-requirements}}
+// expected-error @+1 {{'@dynamicCallable' requires 'Invalid2' to have either a valid 'dynamicallyCall(withArguments:)' method or 'dynamicallyCall(withKeywordArguments:)' method}} {{documentation-file=dynamic-callable-requirements}}
 @dynamicCallable
 struct Invalid2 {
   func dynamicallyCall(
@@ -128,8 +128,8 @@ protocol NoKeywordProtocol {
 }
 
 func testInvalidKeywordCall(x: NoKeyword, y: NoKeywordProtocol & AnyObject) {
-  x(a: 1, b: 2) // expected-error {{@dynamicCallable type 'NoKeyword' cannot be applied with keyword arguments; missing 'dynamicCall(withKeywordArguments:)' method}} {{documentation-file=dynamic-callable-requirements}}
-  y(a: 1, b: 2) // expected-error {{@dynamicCallable type 'any NoKeywordProtocol & AnyObject' cannot be applied with keyword arguments; missing 'dynamicCall(withKeywordArguments:)' method}} {{documentation-file=dynamic-callable-requirements}}
+  x(a: 1, b: 2) // expected-error {{'@dynamicCallable' type 'NoKeyword' cannot be applied with keyword arguments; missing 'dynamicCall(withKeywordArguments:)' method}} {{documentation-file=dynamic-callable-requirements}}
+  y(a: 1, b: 2) // expected-error {{'@dynamicCallable' type 'any NoKeywordProtocol & AnyObject' cannot be applied with keyword arguments; missing 'dynamicCall(withKeywordArguments:)' method}} {{documentation-file=dynamic-callable-requirements}}
 }
 
 // expected-error @+1 {{'@dynamicCallable' attribute cannot be applied to this declaration}}
@@ -147,7 +147,7 @@ func NotAllowedOnFunc() {}
 // @dynamicCallable cannot be declared on a base class and fulfilled with a
 // derived class.
 
-// expected-error @+1 {{@dynamicCallable attribute requires 'InvalidBase' to have either a valid 'dynamicallyCall(withArguments:)' method or 'dynamicallyCall(withKeywordArguments:)' method}}
+// expected-error @+1 {{'@dynamicCallable' requires 'InvalidBase' to have either a valid 'dynamicallyCall(withArguments:)' method or 'dynamicallyCall(withKeywordArguments:)' method}}
 @dynamicCallable
 class InvalidBase {}
 

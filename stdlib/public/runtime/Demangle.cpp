@@ -465,6 +465,69 @@ _buildDemanglingForNominalType(const Metadata *type, Demangle::Demangler &Dem) {
   return _buildDemanglingForContext(description, demangledGenerics, Dem);
 }
 
+static Demangle::NodePointer
+_replaceGeneralizationArg(Demangle::NodePointer type,
+                          SubstGenericParametersFromMetadata substitutions,
+                          Demangle::Demangler &Dem) {
+  assert(type->getKind() == Node::Kind::Type);
+  auto genericParam = type->getChild(0);
+
+  if (genericParam->getKind() != Node::Kind::DependentGenericParamType)
+    return type;
+
+  auto depth = genericParam->getChild(0)->getIndex();
+  auto index = genericParam->getChild(1)->getIndex();
+
+  auto arg = substitutions.getMetadata(depth, index);
+  assert(arg.isMetadata());
+  return _swift_buildDemanglingForMetadata(arg.getMetadata(), Dem);
+}
+
+static Demangle::NodePointer
+_buildDemanglingForExtendedExistential(const Metadata *type,
+                                       Demangle::Demangler &Dem) {
+  auto ee = cast<ExtendedExistentialTypeMetadata>(type);
+
+  auto demangledExistential = Dem.demangleType(ee->Shape->ExistentialType.get(),
+                                               ResolveToDemanglingForContext(Dem));
+
+  if (!ee->Shape->hasGeneralizationSignature())
+    return demangledExistential;
+
+  SubstGenericParametersFromMetadata substitutions(ee->Shape,
+                                              ee->getGeneralizationArguments());
+
+  // Dig out the requirement list.
+  auto constrainedExistential = demangledExistential->getChild(0);
+  assert(constrainedExistential->getKind() == Node::Kind::ConstrainedExistential);
+  auto reqList = constrainedExistential->getChild(1);
+  assert(reqList->getKind() == Node::Kind::ConstrainedExistentialRequirementList);
+
+  auto newReqList = Dem.createNode(Node::Kind::ConstrainedExistentialRequirementList);
+
+  for (auto req : *reqList) {
+    // Currently, the only requirements that can create generalization arguments
+    // are same types.
+    if (req->getKind() != Node::Kind::DependentGenericSameTypeRequirement) {
+      newReqList->addChild(req, Dem);
+      continue;
+    }
+
+    auto lhs = _replaceGeneralizationArg(req->getChild(0), substitutions, Dem);
+    auto rhs = _replaceGeneralizationArg(req->getChild(1), substitutions, Dem);
+
+    auto newReq = Dem.createNode(Node::Kind::DependentGenericSameTypeRequirement);
+    newReq->addChild(lhs, Dem);
+    newReq->addChild(rhs, Dem);
+
+    newReqList->addChild(newReq, Dem);
+  }
+
+  constrainedExistential->replaceChild(1, newReqList);
+
+  return demangledExistential;
+}
+
 // Build a demangled type tree for a type.
 //
 // FIXME: This should use MetadataReader.h.
@@ -596,13 +659,7 @@ swift::_swift_buildDemanglingForMetadata(const Metadata *type,
     return proto_list;
   }
   case MetadataKind::ExtendedExistential: {
-    // FIXME: Implement this by demangling the extended existential and
-    // substituting the generalization arguments into the demangle tree.
-    // For now, unconditional casts will report '<<< invalid type >>>' when
-    // they fail.
-    // TODO: for clients that need to guarantee round-tripping, demangle
-    // to a SymbolicExtendedExistentialType.
-    return nullptr;
+    return _buildDemanglingForExtendedExistential(type, Dem);
   }
   case MetadataKind::ExistentialMetatype: {
     auto metatype = static_cast<const ExistentialMetatypeMetadata *>(type);

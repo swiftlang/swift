@@ -1,4 +1,4 @@
-//===--- MetadataRequest.cpp - IR generation for metadata requests --------===//
+//===--- GenericArguments.h - IR generation for metadata requests ---------===//
 //
 // This source file is part of the Swift.org open source project
 //

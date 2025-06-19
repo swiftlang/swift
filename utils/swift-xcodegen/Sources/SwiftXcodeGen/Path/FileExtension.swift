@@ -11,17 +11,23 @@
 //===----------------------------------------------------------------------===//
 
 public enum FileExtension: String {
+  case asm
   case c
+  case cc
+  case cl
   case cpp
   case def
   case gyb
   case h
+  case inc
   case m
   case md
   case mm
   case modulemap
   case o
+  case proto
   case rst
+  case s
   case swift
   case swiftmodule
   case td

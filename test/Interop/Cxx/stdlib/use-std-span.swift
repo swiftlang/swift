@@ -687,6 +687,30 @@ StdSpanTestSuite.test("Convert between Swift and C++ span types")
       expectEqual(cxxSpan[2], 3)
     }
   }
+  do {
+    var arr: [Int32] = [1, 2, 3]
+    arr.withUnsafeMutableBufferPointer{ ubpointer in
+      let s = SpanOfInt(ubpointer.baseAddress!, ubpointer.count)
+      let swiftSpan = MutableSpan(_unsafeCxxSpan: s)
+      expectEqual(swiftSpan.count, 3)
+      expectFalse(swiftSpan.isEmpty)
+      expectEqual(swiftSpan[0], 1)
+      expectEqual(swiftSpan[1], 2)
+      expectEqual(swiftSpan[2], 3)
+    }
+  }
+  do {
+    var arr: [Int32] = [1, 2, 3]
+    arr.withUnsafeMutableBufferPointer{ ubpointer in
+      let s = MutableSpan(_unsafeElements: ubpointer)
+      let cxxSpan = SpanOfInt(s)
+      expectEqual(cxxSpan.size(), 3)
+      expectFalse(cxxSpan.empty())
+      expectEqual(cxxSpan[0], 1)
+      expectEqual(cxxSpan[1], 2)
+      expectEqual(cxxSpan[2], 3)
+    }
+  }
 }
 
 runAllTests()

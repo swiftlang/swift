@@ -64,7 +64,7 @@ struct PropertyWrapperLValueness;
 struct PropertyWrapperMutability;
 class RequirementRepr;
 class ReturnStmt;
-class SpecializeAttr;
+class AbstractSpecializeAttr;
 class TrailingWhereClause;
 class TypeAliasDecl;
 class TypeLoc;
@@ -475,9 +475,31 @@ public:
   bool isCached() const { return true; }
 };
 
+class RawConformanceIsolationRequest :
+    public SimpleRequest<RawConformanceIsolationRequest,
+                         std::optional<ActorIsolation>(NormalProtocolConformance *),
+                         RequestFlags::SeparatelyCached |
+                         RequestFlags::SplitCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  std::optional<ActorIsolation>
+  evaluate(Evaluator &evaluator, NormalProtocolConformance *conformance) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  std::optional<std::optional<ActorIsolation>> getCachedResult() const;
+  void cacheResult(std::optional<ActorIsolation> result) const;
+};
+
 class ConformanceIsolationRequest :
     public SimpleRequest<ConformanceIsolationRequest,
-                         ActorIsolation(ProtocolConformance *),
+                         ActorIsolation(NormalProtocolConformance *),
                          RequestFlags::SeparatelyCached |
                          RequestFlags::SplitCached> {
 public:
@@ -488,7 +510,7 @@ private:
 
   // Evaluation.
   ActorIsolation
-  evaluate(Evaluator &evaluator, ProtocolConformance *conformance) const;
+  evaluate(Evaluator &evaluator, NormalProtocolConformance *conformance) const;
 
 public:
   // Separate caching.
@@ -648,7 +670,7 @@ struct WhereClauseOwner {
   /// The source of the where clause, which can be a generic parameter list
   /// or a declaration that can have a where clause.
   llvm::PointerUnion<GenericParamList *, TrailingWhereClause *,
-                     SpecializeAttr *, DifferentiableAttr *>
+                     AbstractSpecializeAttr *, DifferentiableAttr *>
       source;
 
   WhereClauseOwner() : dc(nullptr) {}
@@ -662,7 +684,7 @@ struct WhereClauseOwner {
   WhereClauseOwner(DeclContext *dc, TrailingWhereClause *where)
       : dc(dc), source(where) {}
 
-  WhereClauseOwner(DeclContext *dc, SpecializeAttr *attr)
+  WhereClauseOwner(DeclContext *dc, AbstractSpecializeAttr *attr)
       : dc(dc), source(attr) {}
 
   WhereClauseOwner(DeclContext *dc, DifferentiableAttr *attr)
@@ -3311,7 +3333,7 @@ public:
 
 class SpecializeAttrTargetDeclRequest
     : public SimpleRequest<SpecializeAttrTargetDeclRequest,
-                           ValueDecl *(const ValueDecl *, SpecializeAttr *),
+                           ValueDecl *(const ValueDecl *, AbstractSpecializeAttr *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3321,7 +3343,7 @@ private:
 
   // Evaluation.
   ValueDecl *evaluate(Evaluator &evaluator, const ValueDecl *vd,
-                      SpecializeAttr *attr) const;
+                      AbstractSpecializeAttr *attr) const;
 
 public:
   // Caching.
@@ -4853,6 +4875,25 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Check @cdecl-style attributes for compatibility with the foreign language.
+class TypeCheckCDeclAttributeRequest
+    : public SimpleRequest<TypeCheckCDeclAttributeRequest,
+                           evaluator::SideEffect(FuncDecl *FD,
+                                                 CDeclAttr *attr),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect
+  evaluate(Evaluator &evaluator, FuncDecl *FD, CDeclAttr *attr) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 void simple_display(llvm::raw_ostream &out, ASTNode node);
 void simple_display(llvm::raw_ostream &out, Type value);
 void simple_display(llvm::raw_ostream &out, const TypeRepr *TyR);
@@ -4937,7 +4978,7 @@ public:
 class SerializeAttrGenericSignatureRequest
     : public SimpleRequest<SerializeAttrGenericSignatureRequest,
                            GenericSignature(const AbstractFunctionDecl *,
-                                            SpecializeAttr *),
+                                            AbstractSpecializeAttr *),
                            RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -4947,7 +4988,7 @@ private:
 
   GenericSignature evaluate(Evaluator &evaluator,
                             const AbstractFunctionDecl *decl,
-                            SpecializeAttr *attr) const;
+                            AbstractSpecializeAttr *attr) const;
 
 public:
   // Separate caching.
@@ -5313,24 +5354,21 @@ public:
   void cacheResult(std::optional<SemanticAvailabilitySpec> value) const;
 };
 
-class SourceFileLangOptionsRequest
-    : public SimpleRequest<SourceFileLangOptionsRequest,
-                           SourceFileLangOptions(SourceFile *),
+class DefaultIsolationInSourceFileRequest
+    : public SimpleRequest<DefaultIsolationInSourceFileRequest,
+                           std::optional<DefaultIsolation>(const SourceFile *),
                            RequestFlags::Cached> {
-
 public:
   using SimpleRequest::SimpleRequest;
 
 private:
   friend SimpleRequest;
 
-  SourceFileLangOptions evaluate(Evaluator &evaluator,
-                                 SourceFile *sourceFile) const;
+  std::optional<DefaultIsolation> evaluate(Evaluator &evaluator,
+                                           const SourceFile *file) const;
 
 public:
   bool isCached() const { return true; }
-  std::optional<SourceFileLangOptions> getCachedResult() const;
-  void cacheResult(SourceFileLangOptions value) const;
 };
 
 #define SWIFT_TYPEID_ZONE TypeChecker

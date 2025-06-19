@@ -29,7 +29,7 @@ func test(
 
   takesAutoclosure(rawPtr, a) // expected-error {{cannot perform pointer conversion of value of type '[Int]' to autoclosure result type 'UnsafeRawPointer'}}
   takesAutoclosure(ptr, a) // expected-error {{cannot perform pointer conversion of value of type '[Int]' to autoclosure result type 'UnsafePointer<Int>'}}
-  takesAutoclosure(optPtr, b) // expected-error {{cannot perform pointer conversion of value of type '[Int]?' to autoclosure result type 'UnsafePointer<Int>?'}}
+  takesAutoclosure(optPtr, b) // expected-error {{conflicting arguments to generic parameter 'T' ('UnsafePointer<Int>?' vs. '[Int]?')}}
 
   takesAutoclosure(rawPtr, s) // expected-error {{cannot perform pointer conversion of value of type 'String' to autoclosure result type 'UnsafeRawPointer'}}
   takesAutoclosure(ptrI8, s) // expected-error {{cannot perform pointer conversion of value of type 'String' to autoclosure result type 'UnsafePointer<Int8>'}}

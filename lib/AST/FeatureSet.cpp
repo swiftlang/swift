@@ -12,6 +12,7 @@
 
 #include "FeatureSet.h"
 
+#include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericParamList.h"
@@ -108,7 +109,6 @@ UNINTERESTING_FEATURE(UnqualifiedLookupValidation)
 UNINTERESTING_FEATURE(ImplicitSome)
 UNINTERESTING_FEATURE(ParserASTGen)
 UNINTERESTING_FEATURE(BuiltinMacros)
-UNINTERESTING_FEATURE(ImportSymbolicCXXDecls)
 UNINTERESTING_FEATURE(GenerateBindingsForThrowingFunctionsInCXX)
 UNINTERESTING_FEATURE(ReferenceBindings)
 UNINTERESTING_FEATURE(BuiltinModule)
@@ -123,8 +123,11 @@ UNINTERESTING_FEATURE(Volatile)
 UNINTERESTING_FEATURE(SuppressedAssociatedTypes)
 UNINTERESTING_FEATURE(StructLetDestructuring)
 UNINTERESTING_FEATURE(MacrosOnImports)
-UNINTERESTING_FEATURE(AsyncCallerExecution)
+UNINTERESTING_FEATURE(NonisolatedNonsendingByDefault)
 UNINTERESTING_FEATURE(KeyPathWithMethodMembers)
+
+// TODO: Return true for inlinable function bodies with module selectors in them
+UNINTERESTING_FEATURE(ModuleSelector)
 
 static bool usesFeatureNonescapableTypes(Decl *decl) {
   auto containsNonEscapable =
@@ -255,10 +258,36 @@ static bool usesFeatureSendingArgsAndResults(Decl *decl) {
   return false;
 }
 
+static bool findUnderscoredLifetimeAttr(Decl *decl) {
+  auto hasUnderscoredLifetimeAttr = [](Decl *decl) {
+    if (!decl->getAttrs().hasAttribute<LifetimeAttr>()) {
+      return false;
+    }
+    // Since we ban mixing @lifetime and @_lifetime on the same decl, checking
+    // any one LifetimeAttr on the decl is sufficient.
+    // FIXME: Implement the ban.
+    return decl->getAttrs().getAttribute<LifetimeAttr>()->isUnderscored();
+  };
+
+  switch (decl->getKind()) {
+  case DeclKind::Var: {
+    auto *var = cast<VarDecl>(decl);
+    return llvm::any_of(var->getAllAccessors(), hasUnderscoredLifetimeAttr);
+  }
+  default:
+    return hasUnderscoredLifetimeAttr(decl);
+  }
+}
+
 static bool usesFeatureLifetimeDependence(Decl *decl) {
   if (decl->getAttrs().hasAttribute<LifetimeAttr>()) {
+    if (findUnderscoredLifetimeAttr(decl)) {
+      // Experimental feature Lifetimes will guard the decl.
+      return false;
+    }
     return true;
   }
+
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl)) {
     return afd->getInterfaceType()
       ->getAs<AnyFunctionType>()
@@ -268,6 +297,10 @@ static bool usesFeatureLifetimeDependence(Decl *decl) {
     return !varDecl->getTypeInContext()->isEscapable();
   }
   return false;
+}
+
+static bool usesFeatureLifetimes(Decl *decl) {
+  return findUnderscoredLifetimeAttr(decl);
 }
 
 static bool usesFeatureInoutLifetimeDependence(Decl *decl) {
@@ -291,6 +324,23 @@ static bool usesFeatureInoutLifetimeDependence(Decl *decl) {
   default:
     return hasInoutLifetimeDependence(decl);
   }
+}
+
+static bool usesFeatureLifetimeDependenceMutableAccessors(Decl *decl) {
+  if (!isa<VarDecl>(decl)) {
+    return false;
+  }
+  auto var = cast<VarDecl>(decl);
+  if (!var->isGetterMutating()) {
+    return false;
+  }
+  if (auto dc = var->getDeclContext()) {
+    if (auto nominal = dc->getSelfNominalTypeDecl()) {
+      auto sig = nominal->getGenericSignature();
+      return !var->getInterfaceType()->isEscapable(sig);
+    }
+  }
+  return false;
 }
 
 UNINTERESTING_FEATURE(DynamicActorIsolation)
@@ -370,7 +420,7 @@ static ABIAttr *getABIAttr(Decl *decl) {
   return decl->getAttrs().getAttribute<ABIAttr>();
 }
 
-static bool usesFeatureABIAttribute(Decl *decl) {
+static bool usesFeatureABIAttributeSE0479(Decl *decl) {
   return getABIAttr(decl) != nullptr;
 }
 
@@ -388,8 +438,17 @@ static bool usesFeatureCompileTimeValues(Decl *decl) {
          decl->getAttrs().hasAttribute<ConstInitializedAttr>();
 }
 
+static bool usesFeatureCompileTimeValuesPreview(Decl *decl) {
+  return false;
+}
+
 static bool usesFeatureClosureBodyMacro(Decl *decl) {
   return false;
+}
+
+static bool usesFeatureCDecl(Decl *decl) {
+  auto attr = decl->getAttrs().getAttribute<CDeclAttr>();
+  return attr && !attr->Underscored;
 }
 
 static bool usesFeatureMemorySafetyAttributes(Decl *decl) {
@@ -429,14 +488,6 @@ UNINTERESTING_FEATURE(SuppressCXXForeignReferenceTypeInitializers)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
 
-static bool usesFeatureSwiftSettings(const Decl *decl) {
-  // We just need to guard `#SwiftSettings`.
-  auto *macro = dyn_cast<MacroDecl>(decl);
-  return macro && macro->isStdlibDecl() &&
-         macro->getMacroRoles().contains(MacroRole::Declaration) &&
-         macro->getBaseIdentifier().is("SwiftSettings");
-}
-
 bool swift::usesFeatureIsolatedDeinit(const Decl *decl) {
   if (auto cd = dyn_cast<ClassDecl>(decl)) {
     return cd->getFormalAccess() == AccessLevel::Open &&
@@ -470,6 +521,54 @@ static bool usesFeatureValueGenerics(Decl *decl) {
   return false;
 }
 
+class UsesTypeValueExpr : public ASTWalker {
+public:
+  bool used = false;
+
+  PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
+    if (isa<TypeValueExpr>(expr)) {
+      used = true;
+      return Action::Stop();
+    }
+
+    return Action::Continue(expr);
+  }
+};
+
+static bool usesFeatureValueGenericsNameLookup(Decl *decl) {
+  // Be conservative and mark any function that has a TypeValueExpr in its body
+  // as having used this feature. It's a little difficult to fine grain this
+  // check because the following:
+  //
+  // func a() -> Int {
+  //   A<123>.n
+  // }
+  //
+  // Would appear to have the same expression as something like:
+  //
+  // extension A where n == 123 {
+  //   func b() -> Int {
+  //     n
+  //   }
+  // }
+
+  auto fn = dyn_cast<AbstractFunctionDecl>(decl);
+
+  if (!fn)
+    return false;
+
+  auto body = fn->getMacroExpandedBody();
+
+  if (!body)
+    return false;
+
+  UsesTypeValueExpr utve;
+
+  body->walk(utve);
+
+  return utve.used;
+}
+
 static bool usesFeatureCoroutineAccessors(Decl *decl) {
   auto accessorDeclUsesFeatureCoroutineAccessors = [](AccessorDecl *accessor) {
     return requiresFeatureCoroutineAccessors(accessor->getAccessorKind());
@@ -488,6 +587,8 @@ static bool usesFeatureCoroutineAccessors(Decl *decl) {
     return false;
   }
 }
+
+UNINTERESTING_FEATURE(GeneralizedIsSameMetaTypeBuiltin)
 
 static bool usesFeatureCustomAvailability(Decl *decl) {
   for (auto attr : decl->getSemanticAvailableAttrs()) {
@@ -552,6 +653,33 @@ static bool usesFeatureAsyncExecutionBehaviorAttributes(Decl *decl) {
 
   return false;
 }
+
+static bool usesFeatureExtensibleAttribute(Decl *decl) {
+  return decl->getAttrs().hasAttribute<ExtensibleAttr>();
+}
+
+static bool usesFeatureAlwaysInheritActorContext(Decl *decl) {
+  auto *VD = dyn_cast<ValueDecl>(decl);
+  if (!VD)
+    return false;
+
+  if (auto *PL = VD->getParameterList()) {
+    return llvm::any_of(*PL, [&](const ParamDecl *P) {
+      auto *attr = P->getAttrs().getAttribute<InheritActorContextAttr>();
+      return attr && attr->isAlways();
+    });
+  }
+
+  return false;
+}
+
+static bool usesFeatureDefaultIsolationPerFile(Decl *D) {
+  return isa<UsingDecl>(D);
+}
+
+UNINTERESTING_FEATURE(BuiltinSelect)
+UNINTERESTING_FEATURE(BuiltinInterleave)
+UNINTERESTING_FEATURE(BuiltinVectorsExternC)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
@@ -638,8 +766,12 @@ FeatureSet swift::getUniqueFeaturesUsed(Decl *decl) {
   // Remove all the features used by all enclosing declarations.
   Decl *enclosingDecl = decl;
   while (!features.empty()) {
+    // If we were in an @abi attribute, collect from the API counterpart.
+    auto abiRole = ABIRoleInfo(enclosingDecl);
+    if (!abiRole.providesAPI() && abiRole.getCounterpart())
+      enclosingDecl = abiRole.getCounterpart();
     // Find the next outermost enclosing declaration.
-    if (auto accessor = dyn_cast<AccessorDecl>(enclosingDecl))
+    else if (auto accessor = dyn_cast<AccessorDecl>(enclosingDecl))
       enclosingDecl = accessor->getStorage();
     else
       enclosingDecl = enclosingDecl->getDeclContext()->getAsDecl();

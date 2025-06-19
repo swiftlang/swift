@@ -3,10 +3,20 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature LifetimeDependence
+// RUN:   -enable-experimental-feature Lifetimes
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
+
+@_unsafeNonescapableResult
+@_lifetime(copy source)
+internal func _overrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T, copying source: borrowing U
+) -> T {
+  dependent
+}
 
 // Some container-ish thing.
 struct CN: ~Copyable {
@@ -21,7 +31,7 @@ struct BV : ~Escapable {
 
   public var isEmpty: Bool { i == 0 }
 
-  @lifetime(borrow p)
+  @_lifetime(borrow p)
   init(_ p: UnsafeRawPointer, _ i: Int) {
     self.p = p
     self.i = i
@@ -38,16 +48,17 @@ struct MBV : ~Escapable, ~Copyable {
   let p: UnsafeRawPointer
   let i: Int
   
-  @lifetime(borrow p)
+  @_lifetime(borrow p)
   init(_ p: UnsafeRawPointer, _ i: Int) {
     self.p = p
     self.i = i
   }
 
   // Requires a borrow.
-  @lifetime(copy self)
+  @_lifetime(copy self)
   borrowing func getBV() -> BV {
-    BV(p, i)
+    let bv = BV(p, i)
+    return _overrideLifetime(bv, copying: self)
   }
 }
 
@@ -55,32 +66,32 @@ struct MBV : ~Escapable, ~Copyable {
 struct NEBV : ~Escapable {
   var bv: BV
 
-  @lifetime(copy bv)
+  @_lifetime(copy bv)
   init(_ bv: consuming BV) {
     self.bv = bv
   }
 }
 
 // Propagate a borrow.
-@lifetime(copy container)
+@_lifetime(copy container)
 func bv_get_borrow(container: borrowing MBV) -> BV {
   container.getBV()
 }
 
 // Copy a borrow.
-@lifetime(copy container)
+@_lifetime(copy container)
 func bv_get_copy(container: borrowing MBV) -> BV {
   return container.getBV()
 }
 
 // Recognize nested accesses as part of the same dependence scope.
-@lifetime(copy container)
+@_lifetime(copy container)
 func bv_get_mutate(container: inout MBV) -> BV {
   container.getBV()
 }
 
 // Create and decompose a nonescapable aggregate.
-@lifetime(borrow cn)
+@_lifetime(borrow cn)
 func ne_wrap_and_extract_member(cn: borrowing CN) -> BV {
   let bv = BV(cn)
   let ne = NEBV(bv)

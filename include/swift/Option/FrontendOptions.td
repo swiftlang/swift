@@ -244,6 +244,9 @@ def module_can_import_version: MultiArg<["-"], "module-can-import-version", 3>,
   MetaVarName<"<moduleName> <version> <underlyingVersion>">,
   HelpText<"Specify canImport module and versions">;
 
+def module_import_from_cas: Flag<["-"], "module-import-from-cas">,
+  HelpText<"Import modules from CAS instead of file system">;
+
 def disable_cross_import_overlay_search: Flag<["-"], "disable-cross-import-overlay-search">,
   HelpText<"Disable searching for cross import overlay file">;
 
@@ -254,10 +257,6 @@ def explicit_swift_module_map
 def const_gather_protocols_file
   : Separate<["-"], "const-gather-protocols-file">, MetaVarName<"<path>">,
     HelpText<"Specify a list of protocols for extraction of conformances' const values'">;
-
-def placeholder_dependency_module_map
-  : Separate<["-"], "placeholder-dependency-module-map-file">, MetaVarName<"<path>">,
-    HelpText<"Specify a JSON file containing information of external Swift module dependencies">;
 
 def import_prescan : Flag<["-"], "import-prescan">,
    HelpText<"When performing a dependency scan, only identify all imports of the main Swift module sources">;
@@ -447,6 +446,14 @@ def requirement_machine_max_rule_length : Joined<["-"], "requirement-machine-max
 def requirement_machine_max_concrete_nesting : Joined<["-"], "requirement-machine-max-concrete-nesting=">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
   HelpText<"Set the maximum concrete type nesting depth before giving up">;
+
+def requirement_machine_max_concrete_size : Joined<["-"], "requirement-machine-max-concrete-size=">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Set the maximum concrete type total size before giving up">;
+
+def requirement_machine_max_type_differences : Joined<["-"], "requirement-machine-max-type-differences=">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
+  HelpText<"Set the maximum number of type difference structures allocated before giving up">;
 
 def requirement_machine_max_split_concrete_equiv_class_attempts : Joined<["-"], "requirement-machine-max-split-concrete-equiv-class-attempts=">,
   Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
@@ -1187,6 +1194,10 @@ def enable_cond_fail_message_annotation : Flag<["-"], "enable-cond-fail-message-
 def disable_cond_fail_message_annotation : Flag<["-"], "dissable-cond-fail-message-annotation">,
   HelpText<"Disable cond_fail message annotation.">;
 
+def min_valid_pointer_value : Joined<["-"], "min-valid-pointer-value=">,
+  MetaVarName<"<value>">,
+  HelpText<"Overrides the target's least valid pointer value.'">;
+
 let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIgnorable] in {
   def enable_pack_metadata_stack_promotion :
     Joined<["-"], "enable-pack-metadata-stack-promotion=">,
@@ -1454,9 +1465,6 @@ def bridging_header_pch_key : Separate<["-"], "bridging-header-pch-key">,
 def no_clang_include_tree: Flag<["-"], "no-clang-include-tree">,
   HelpText<"Do not use clang include tree, fallback to use CAS filesystem to build clang modules">;
 
-def cas_fs: Separate<["-"], "cas-fs">,
-  HelpText<"Root CASID for CAS FileSystem">, MetaVarName<"<cas-id>">;
-
 def clang_include_tree_root: Separate<["-"], "clang-include-tree-root">,
   HelpText<"Clang Include Tree CASID">, MetaVarName<"<cas-id>">;
 def clang_include_tree_filelist: Separate<["-"], "clang-include-tree-filelist">,
@@ -1491,7 +1499,7 @@ def platform_c_calling_convention_EQ :
 
 def disable_sending_args_and_results_with_region_isolation : Flag<["-"],
   "disable-sending-args-and-results-with-region-based-isolation">,
-  HelpText<"Disable sending args and results when region based isolation is enabled. Only enabled with asserts">,
+  HelpText<"Disable sending args and results when region-based isolation is enabled. Only enabled with asserts">,
   Flags<[HelpHidden]>;
 
 def scanner_module_validation: Flag<["-"], "scanner-module-validation">,

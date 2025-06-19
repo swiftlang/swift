@@ -42,12 +42,39 @@ nonisolated class CNonIsolated: P {
   @MainActor func f() { } // expected-note{{main actor-isolated instance method 'f()' cannot satisfy nonisolated requirement}}
 }
 
+// Synthesized conformances
+struct EquatableStruct: Equatable {
+  var state: Int = 0
+}
+
+struct HashableStruct: Hashable {
+  var state: Int = 0
+}
+
+enum RawRepresentableEnum: Int {
+case one
+case two
+}
+
+class CodableClass: Codable {
+  var state: Int = 0
+}
+
+class OtherClass {
+  var otherState: any Encodable.Type = CodableClass.self
+}
+
+struct Landmark: Codable {
+  var name: String
+  var foundingYear: Int
+}
+
 func acceptSendablePMeta<T: Sendable & P>(_: T.Type) { }
 func acceptSendableQMeta<T: Sendable & Q>(_: T.Type) { }
 
 nonisolated func testConformancesFromNonisolated() {
-  let _: any P = CExplicitMainActor() // expected-error{{main actor-isolated conformance of 'CExplicitMainActor' to 'P' cannot be used in nonisolated context}}
-  let _: any P = CImplicitMainActor() // expected-error{{main actor-isolated conformance of 'CImplicitMainActor' to 'P' cannot be used in nonisolated context}}
+  let _: any P = CExplicitMainActor() // okay
+  let _: any P = CImplicitMainActor() // okay
 
   let _: any P = CNonIsolated()
   let _: any P = CImplicitMainActorNonisolatedConformance()
@@ -55,4 +82,10 @@ nonisolated func testConformancesFromNonisolated() {
   // Okay, these are nonisolated conformances.
   let _: any Q = CExplicitMainActor()
   let _: any Q = CImplicitMainActor()
+
+  // Error, these are main-actor-isolated conformances
+  let _: any Equatable.Type = EquatableStruct.self // expected-error{{main actor-isolated conformance of 'EquatableStruct' to 'Equatable' cannot be used in nonisolated context}}
+  let _: any Hashable.Type = HashableStruct.self // expected-error{{main actor-isolated conformance of 'HashableStruct' to 'Hashable' cannot be used in nonisolated context}}
+  let _: any RawRepresentable.Type = RawRepresentableEnum.self
+  let _: any Encodable.Type = CodableClass.self // expected-error{{main actor-isolated conformance of 'CodableClass' to 'Encodable' cannot be used in nonisolated context}}
 }

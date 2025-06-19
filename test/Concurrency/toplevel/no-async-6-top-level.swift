@@ -24,9 +24,8 @@ func isolatedSync() {
 func nonIsolatedAsync() async {
   await print(a)
   a = a + 10 // expected-error{{main actor-isolated var 'a' can not be mutated from a nonisolated context}}
-  // expected-note@-1{{property access is 'async'}}
-  // expected-error@-2{{expression is 'async' but is not marked with 'await'}}
-  // expected-note@-3{{consider declaring an isolated method on 'MainActor' to perform the mutation}}
+  // expected-error@-1{{main actor-isolated var 'a' cannot be accessed from outside of the actor}} {{7-7=await }}
+  // expected-note@-2{{consider declaring an isolated method on 'MainActor' to perform the mutation}}
 }
 
 @MainActor

@@ -8,7 +8,7 @@
 // RUN:   -verify-additional-prefix default-swift-mode- \
 // RUN:   -verify-additional-prefix explicit-any-
 
-// RUN: %target-typecheck-verify-swift -enable-upcoming-feature ExistentialAny:adoption \
+// RUN: %target-typecheck-verify-swift -enable-upcoming-feature ExistentialAny:migrate \
 //        To verify that the message is not followed by
 //        "; this will be an error ...".
 // RUN:   -verify-additional-prefix default-swift-mode- \
@@ -90,7 +90,7 @@ protocol HasAssoc {
 
 do {
   enum MyError: Error {
-    case bad(Any) // expected-swift-6-error {{associated value 'bad' of 'Sendable'-conforming enum 'MyError' has non-sendable type 'Any'}}
+    case bad(Any) // expected-swift-6-warning {{associated value 'bad' of 'Sendable'-conforming enum 'MyError' has non-Sendable type 'Any'}}
   }
 
   func checkIt(_ js: Any) throws {

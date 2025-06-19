@@ -42,7 +42,7 @@ entry:
   // CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 {{.*}}, ptr [[TEMP]])
   %temp = alloc_stack $Indirect<C>
 
-  // CHECK-NEXT:    call swiftcc void @make_indirect(ptr noalias nocapture sret({{.*}}) [[TEMP]], ptr %C)
+  // CHECK-NEXT:    call swiftcc void @make_indirect(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} [[TEMP]], ptr %C)
   %make = function_ref @make_indirect : $@convention(thin) <T: SomeClass> () -> (@out Indirect<T>)
   apply %make<C>(%temp) : $@convention(thin) <T: SomeClass> () -> (@out Indirect<T>)
 
@@ -88,7 +88,7 @@ sil @test_simple_call : $(Builtin.Int1) -> () {
 entry(%flag : $Builtin.Int1):
   //   Allocate the buffer.
   // CHECK:         [[T0:%.*]] = alloca {{\[}}[[BUFFER_SIZE]] x i8], align [[BUFFER_ALIGN]]
-  // CHECK-NEXT:    [[BUFFER:%.*]] = getelementptr inbounds {{\[}}[[BUFFER_SIZE]] x i8], ptr [[T0]], i32 0, i32 0
+  // CHECK-NEXT:    [[BUFFER:%.*]] = getelementptr inbounds{{.*}} {{\[}}[[BUFFER_SIZE]] x i8], ptr [[T0]], i32 0, i32 0
   // CHECK-NEXT:    call void @llvm.lifetime.start.p0(i64 [[BUFFER_SIZE]], ptr [[BUFFER]])
 
   // CHECK-NEXT:    [[TMP:%.*]] = call swiftcc %swift.metadata_response @"$s19yield_once_indirect12SomeSubclassCMa"([[INT]] 0)

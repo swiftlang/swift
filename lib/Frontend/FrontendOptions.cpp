@@ -58,7 +58,7 @@ bool FrontendOptions::needsProperModuleName(ActionType action) {
   case ActionType::Immediate:
   case ActionType::REPL:
   case ActionType::PrintVersion:
-  case ActionType::PrintFeature:
+  case ActionType::PrintArguments:
     return false;
   case ActionType::EmitAssembly:
   case ActionType::EmitIRGen:
@@ -82,7 +82,7 @@ bool FrontendOptions::shouldActionOnlyParse(ActionType action) {
   case ActionType::EmitImportedModules:
   case ActionType::ScanDependencies:
   case ActionType::PrintVersion:
-  case ActionType::PrintFeature:
+  case ActionType::PrintArguments:
     return true;
   default:
     return false;
@@ -103,7 +103,7 @@ bool FrontendOptions::doesActionRequireSwiftStandardLibrary(ActionType action) {
   case ActionType::DumpPCM:
   case ActionType::CompileModuleFromInterface:
   case ActionType::TypecheckModuleFromInterface:
-  case ActionType::PrintFeature:
+  case ActionType::PrintArguments:
     return false;
   case ActionType::ResolveImports:
   case ActionType::Typecheck:
@@ -138,7 +138,7 @@ bool FrontendOptions::doesActionRequireInputs(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:
   case ActionType::PrintVersion:
-  case ActionType::PrintFeature:
+  case ActionType::PrintArguments:
     return false;
   case ActionType::REPL:
   case ActionType::Parse:
@@ -181,7 +181,7 @@ bool FrontendOptions::doesActionPerformEndOfPipelineActions(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:
   case ActionType::PrintVersion:
-  case ActionType::PrintFeature:
+  case ActionType::PrintArguments:
   case ActionType::EmitPCH:
   case ActionType::EmitPCM:
   case ActionType::DumpPCM:
@@ -226,7 +226,7 @@ bool FrontendOptions::supportCompilationCaching(ActionType action) {
   switch (action) {
   case ActionType::NoneAction:
   case ActionType::PrintVersion:
-  case ActionType::PrintFeature:
+  case ActionType::PrintArguments:
   case ActionType::DumpPCM:
   case ActionType::REPL:
   case ActionType::Parse:
@@ -362,8 +362,8 @@ FrontendOptions::formatForPrincipalOutputFileForAction(ActionType action) {
 
   case ActionType::ScanDependencies:
     return TY_JSONDependencies;
-  case ActionType::PrintFeature:
-    return TY_JSONFeatures;
+  case ActionType::PrintArguments:
+    return TY_JSONArguments;
   }
   llvm_unreachable("unhandled action");
 }
@@ -386,7 +386,7 @@ bool FrontendOptions::canActionEmitDependencies(ActionType action) {
   case ActionType::REPL:
   case ActionType::DumpPCM:
   case ActionType::PrintVersion:
-  case ActionType::PrintFeature:
+  case ActionType::PrintArguments:
     return false;
   case ActionType::ResolveImports:
   case ActionType::Typecheck:
@@ -432,7 +432,7 @@ bool FrontendOptions::canActionEmitReferenceDependencies(ActionType action) {
   case ActionType::DumpPCM:
   case ActionType::ScanDependencies:
   case ActionType::PrintVersion:
-  case ActionType::PrintFeature:
+  case ActionType::PrintArguments:
     return false;
   case ActionType::Typecheck:
   case ActionType::MergeModules:
@@ -482,7 +482,7 @@ bool FrontendOptions::canActionEmitModuleSummary(ActionType action) {
   case ActionType::MergeModules:
   case ActionType::EmitModuleOnly:
   case ActionType::PrintVersion:
-  case ActionType::PrintFeature:
+  case ActionType::PrintArguments:
     return false;
   case ActionType::EmitSIL:
   case ActionType::EmitLoweredSIL:
@@ -519,7 +519,7 @@ bool FrontendOptions::canActionEmitClangHeader(ActionType action) {
   case ActionType::DumpPCM:
   case ActionType::ScanDependencies:
   case ActionType::PrintVersion:
-  case ActionType::PrintFeature:
+  case ActionType::PrintArguments:
     return false;
   case ActionType::Typecheck:
   case ActionType::MergeModules:
@@ -560,7 +560,7 @@ bool FrontendOptions::canActionEmitLoadedModuleTrace(ActionType action) {
   case ActionType::DumpPCM:
   case ActionType::ScanDependencies:
   case ActionType::PrintVersion:
-  case ActionType::PrintFeature:
+  case ActionType::PrintArguments:
     return false;
   case ActionType::ResolveImports:
   case ActionType::Typecheck:
@@ -610,7 +610,7 @@ bool FrontendOptions::canActionEmitModuleSemanticInfo(ActionType action) {
   case ActionType::DumpPCM:
   case ActionType::ScanDependencies:
   case ActionType::PrintVersion:
-  case ActionType::PrintFeature:
+  case ActionType::PrintArguments:
   case ActionType::EmitSIL:
   case ActionType::EmitLoweredSIL:
   case ActionType::EmitSIBGen:
@@ -653,7 +653,7 @@ bool FrontendOptions::canActionEmitConstValues(ActionType action) {
   case ActionType::DumpPCM:
   case ActionType::ScanDependencies:
   case ActionType::PrintVersion:
-  case ActionType::PrintFeature:
+  case ActionType::PrintArguments:
     return false;
   case ActionType::Typecheck:
   case ActionType::MergeModules:
@@ -698,7 +698,7 @@ bool FrontendOptions::canActionEmitModule(ActionType action) {
   case ActionType::DumpPCM:
   case ActionType::ScanDependencies:
   case ActionType::PrintVersion:
-  case ActionType::PrintFeature:
+  case ActionType::PrintArguments:
     return false;
   case ActionType::MergeModules:
   case ActionType::EmitModuleOnly:
@@ -744,7 +744,7 @@ bool FrontendOptions::canActionEmitInterface(ActionType action) {
   case ActionType::EmitPCM:
   case ActionType::DumpPCM:
   case ActionType::ScanDependencies:
-  case ActionType::PrintFeature:
+  case ActionType::PrintArguments:
     return false;
   case ActionType::ResolveImports:
   case ActionType::Typecheck:
@@ -787,7 +787,7 @@ bool FrontendOptions::canActionEmitAPIDescriptor(ActionType action) {
   case ActionType::EmitPCM:
   case ActionType::DumpPCM:
   case ActionType::ScanDependencies:
-  case ActionType::PrintFeature:
+  case ActionType::PrintArguments:
     return false;
   case ActionType::ResolveImports:
   case ActionType::Typecheck:
@@ -838,7 +838,7 @@ bool FrontendOptions::doesActionProduceOutput(ActionType action) {
   case ActionType::EmitPCM:
   case ActionType::DumpPCM:
   case ActionType::ScanDependencies:
-  case ActionType::PrintFeature:
+  case ActionType::PrintArguments:
     return true;
 
   case ActionType::TypecheckModuleFromInterface:
@@ -889,7 +889,7 @@ bool FrontendOptions::doesActionProduceTextualOutput(ActionType action) {
   case ActionType::DumpPCM:
   case ActionType::ScanDependencies:
   case ActionType::PrintVersion:
-  case ActionType::PrintFeature:
+  case ActionType::PrintArguments:
     return true;
   }
   llvm_unreachable("unhandled action");
@@ -916,7 +916,7 @@ bool FrontendOptions::doesActionGenerateSIL(ActionType action) {
   case ActionType::DumpPCM:
   case ActionType::ScanDependencies:
   case ActionType::PrintVersion:
-  case ActionType::PrintFeature:
+  case ActionType::PrintArguments:
     return false;
   case ActionType::EmitSILGen:
   case ActionType::EmitSIBGen:
@@ -967,7 +967,7 @@ bool FrontendOptions::doesActionGenerateIR(ActionType action) {
   case ActionType::DumpPCM:
   case ActionType::ScanDependencies:
   case ActionType::PrintVersion:
-  case ActionType::PrintFeature:
+  case ActionType::PrintArguments:
     return false;
   case ActionType::Immediate:
   case ActionType::REPL:
@@ -1011,7 +1011,7 @@ bool FrontendOptions::doesActionBuildModuleFromInterface(ActionType action) {
   case ActionType::DumpPCM:
   case ActionType::ScanDependencies:
   case ActionType::PrintVersion:
-  case ActionType::PrintFeature:
+  case ActionType::PrintArguments:
   case ActionType::Immediate:
   case ActionType::REPL:
   case ActionType::EmitIRGen:

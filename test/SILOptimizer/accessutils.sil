@@ -27,6 +27,10 @@ struct Ptr {
   var p: Int64
 }
 
+struct VectorStruct {
+  var a: Builtin.FixedArray<100, Int64>
+}
+
 class C {}
 
 sil @_getC : $@convention(thin) () -> @owned C
@@ -705,5 +709,22 @@ bb0(%0 : @guaranteed $List):
   %4 = pointer_to_address %3 to [strict] $*Int64
   %6 = load [trivial] %4 : $*Int64
   return %6 : $Int64
+}
+
+// CHECK-LABEL: Accesses for vectors
+// CHECK:       Value:   %4 = index_addr %2 : $*Int64, %3 : $Builtin.Int64
+// CHECK-NEXT:    Scope: base
+// CHECK-NEXT:    Base: argument - %0 = argument of bb0 : $*VectorStruct
+// CHECK-NEXT:    Path: "s0.b.i5"
+// CHECK-NEXT:     no Storage paths
+// CHECK-LABEL: End accesses for vectors
+sil [ossa] @vectors : $@convention(thin) (@in_guaranteed VectorStruct) -> Int64 {
+bb0(%0 : $*VectorStruct):
+  %1 = struct_element_addr %0, #VectorStruct.a
+  %2 = vector_base_addr %1
+  %3 = integer_literal $Builtin.Int64, 5
+  %4 = index_addr %2, %3
+  %5 = load [trivial] %4
+  return %5
 }
 

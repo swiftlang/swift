@@ -7,7 +7,7 @@ class NonSendableType {
 }
 
 // rdar://94699928 - don't emit sendable diagnostics in non-'complete' mode
-// for deinits of actor or global-actor isolated types
+// for deinits of actor- or global-actor-isolated types
 
 @available(SwiftStdlib 5.1, *)
 @MainActor class AwesomeUIView {}

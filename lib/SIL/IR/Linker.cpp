@@ -141,6 +141,20 @@ void SILLinkerVisitor::maybeAddFunctionToWorklist(
       // are also set to IsSerialized.
       Worklist.push_back(F);
     }
+
+    if (F->markedAsAlwaysEmitIntoClient()) {
+      // For @_alwaysEmitIntoClient functions, we need to lookup its
+      // differentiability witness and, if present, ask SILLoader to obtain its
+      // definition. Otherwise, a linker error would occur due to undefined
+      // reference to these symbols.
+      for (SILDifferentiabilityWitness *witness :
+           F->getModule().lookUpDifferentiabilityWitnessesForFunction(
+               F->getName())) {
+        F->getModule().getSILLoader()->lookupDifferentiabilityWitness(
+            witness->getKey());
+      }
+    }
+
     return;
   }
 
@@ -159,9 +173,23 @@ void SILLinkerVisitor::maybeAddFunctionToWorklist(
   // HiddenExternal linkage when they are declarations, then they
   // become Shared after the body has been deserialized.
   // So try deserializing HiddenExternal functions too.
-  if (linkage == SILLinkage::HiddenExternal)
-    return deserializeAndPushToWorklist(F);
-  
+  if (linkage == SILLinkage::HiddenExternal) {
+    deserializeAndPushToWorklist(F);
+    if (!F->markedAsAlwaysEmitIntoClient())
+      return;
+    // For @_alwaysEmitIntoClient functions, we need to lookup its
+    // differentiability witness and, if present, ask SILLoader to obtain its
+    // definition. Otherwise, a linker error would occur due to undefined
+    // reference to these symbols.
+    for (SILDifferentiabilityWitness *witness :
+         F->getModule().lookUpDifferentiabilityWitnessesForFunction(
+             F->getName())) {
+      F->getModule().getSILLoader()->lookupDifferentiabilityWitness(
+          witness->getKey());
+    }
+    return;
+  }
+
   // Update the linkage of the function in case it's different in the serialized
   // SIL than derived from the AST. This can be the case with cross-module-
   // optimizations.
@@ -299,7 +327,8 @@ void SILLinkerVisitor::visitProtocolConformance(
 
       SILLinkage linkage = getLinkageForProtocolConformance(rootC, NotForDefinition);
       WT = SILWitnessTable::create(Mod, linkage,
-                                   const_cast<RootProtocolConformance *>(rootC));
+                                   const_cast<RootProtocolConformance *>(rootC),
+                                   /*specialized=*/ false);
     }
     // If the module is at or past the Lowered stage, then we can't do any
     // further deserialization, since pre-IRGen SIL lowering changes the types

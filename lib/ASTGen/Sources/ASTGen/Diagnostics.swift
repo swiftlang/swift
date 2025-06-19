@@ -146,6 +146,13 @@ extension ASTGenDiagnostic {
       message: "expressions are not allowed at the top level"
     )
   }
+
+  static func invalidDefaultIsolationSpecifier(_ specifier: some SyntaxProtocol) -> Self {
+    Self(
+      node: specifier,
+      message: "default isolation can only be set to '@MainActor' or 'nonisolated'"
+    )
+  }
 }
 
 /// DeclAttributes diagnostics

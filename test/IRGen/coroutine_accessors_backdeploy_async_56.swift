@@ -32,7 +32,7 @@
 //                  #if SWIFT_POINTER_IS_8_BYTES
 //                  Task.Reserved64
 //                  #endif
-// CHECK-SAME-64:   ptr
+// CHECK-64-SAME:   ptr
 //                  Task.Status
 // CHECK-SAME:      [2 x ptr]
 // CHECK-SAME:      ptr
@@ -126,7 +126,7 @@ public var i: Int {
 
 // CHECK-LABEL: define{{.*}} void @increment_i_async(
 //                  ptr swiftasync %0
-// CHECK-SAME:      ptr nocapture swiftself dereferenceable({{8|4}}) %1
+// CHECK-SAME:      ptr{{( nocapture)?}} swiftself{{( captures\(none\))?}} dereferenceable({{8|4}}) %1
 // CHECK-SAME:  )
 // CHECK-SAME:  {
 //      :         [[SIZE_32:%[^,]+]] = load i32

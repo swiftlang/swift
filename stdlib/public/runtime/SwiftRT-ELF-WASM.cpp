@@ -13,6 +13,7 @@
 #include "ImageInspectionCommon.h"
 #include "swift/shims/MetadataSections.h"
 #include "swift/Runtime/Backtrace.h"
+#include "swift/Runtime/Config.h"
 
 #include <cstddef>
 #include <new>
@@ -84,6 +85,7 @@ namespace {
 static swift::MetadataSections sections{};
 }
 
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_BEGIN
 __attribute__((__constructor__))
 static void swift_image_constructor() {
 #define SWIFT_SECTION_RANGE(name)                                              \
@@ -119,3 +121,4 @@ static void swift_image_constructor() {
 
   swift_addNewDSOImage(&sections);
 }
+SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END

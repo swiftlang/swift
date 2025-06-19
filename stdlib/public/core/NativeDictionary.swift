@@ -120,6 +120,7 @@ extension _NativeDictionary { // Primitive fields
 extension _NativeDictionary { // Low-level unchecked operations
   @inlinable
   @inline(__always)
+  @unsafe
   internal func uncheckedKey(at bucket: Bucket) -> Key {
     defer { _fixLifetime(self) }
     unsafe _internalInvariant(hashTable.isOccupied(bucket))
@@ -128,6 +129,7 @@ extension _NativeDictionary { // Low-level unchecked operations
 
   @inlinable
   @inline(__always)
+  @unsafe
   internal func uncheckedValue(at bucket: Bucket) -> Value {
     defer { _fixLifetime(self) }
     unsafe _internalInvariant(hashTable.isOccupied(bucket))
@@ -136,6 +138,7 @@ extension _NativeDictionary { // Low-level unchecked operations
 
   @inlinable // FIXME(inline-always) was usableFromInline
   @inline(__always)
+  @unsafe
   internal func uncheckedInitialize(
     at bucket: Bucket,
     toKey key: __owned Key,
@@ -148,6 +151,7 @@ extension _NativeDictionary { // Low-level unchecked operations
 
   @inlinable // FIXME(inline-always) was usableFromInline
   @inline(__always)
+  @unsafe
   internal func uncheckedDestroy(at bucket: Bucket) {
     defer { _fixLifetime(self) }
     unsafe _internalInvariant(hashTable.isValid(bucket))
@@ -300,7 +304,7 @@ extension _NativeDictionary {
         let key = _forceBridgeFromObjectiveC(cocoa.key, Key.self)
         let (bucket, found) = find(key)
         if found {
-          return unsafe bucket
+          return bucket
         }
       }
       _preconditionFailure(
@@ -331,7 +335,7 @@ extension _NativeDictionary: _DictionaryBuffer {
   internal func index(after index: Index) -> Index {
 #if _runtime(_ObjC)
     guard _fastPath(index._isNative) else {
-      let _ = unsafe validatedBucket(for: index)
+      let _ = validatedBucket(for: index)
       let i = index._asCocoa
       return Index(_cocoa: i.dictionary.index(after: i))
     }
@@ -384,7 +388,7 @@ extension _NativeDictionary: _DictionaryBuffer {
   @inlinable
   @inline(__always)
   func lookup(_ index: Index) -> (key: Key, value: Value) {
-    let bucket = unsafe validatedBucket(for: index)
+    let bucket = validatedBucket(for: index)
     let key = unsafe self.uncheckedKey(at: bucket)
     let value = unsafe self.uncheckedValue(at: bucket)
     return (key, value)
@@ -393,14 +397,14 @@ extension _NativeDictionary: _DictionaryBuffer {
   @inlinable
   @inline(__always)
   func key(at index: Index) -> Key {
-    let bucket = unsafe validatedBucket(for: index)
+    let bucket = validatedBucket(for: index)
     return unsafe self.uncheckedKey(at: bucket)
   }
 
   @inlinable
   @inline(__always)
   func value(at index: Index) -> Value {
-    let bucket = unsafe validatedBucket(for: index)
+    let bucket = validatedBucket(for: index)
     return unsafe self.uncheckedValue(at: bucket)
   }
 }
@@ -429,14 +433,14 @@ extension _NativeDictionary {
           } else {
             // **Insertion.** Insert the new entry at the correct place.  Note
             // that `mutatingFind` already ensured that we have enough capacity.
-            unsafe _insert(at: bucket, key: key, value: value)
+            _insert(at: bucket, key: key, value: value)
           }
         } else {
           if found {
             // **Removal.** We've already deinitialized the value; deinitialize
             // the key too and register the removal.
             unsafe (_keys + bucket.offset).deinitialize(count: 1)
-            unsafe _delete(at: bucket)
+            _delete(at: bucket)
           } else {
             // Noop
           }
@@ -477,7 +481,7 @@ extension _NativeDictionary { // Insertions
       // elements -- these imply that the Element type violates Hashable
       // requirements. This is generally more costly than a direct insertion,
       // because we'll need to compare elements in case of hash collisions.
-      let (bucket, found) = unsafe find(key, hashValue: hashValue)
+      let (bucket, found) = find(key, hashValue: hashValue)
       guard !found else {
         #if !$Embedded
         KEY_TYPE_OF_DICTIONARY_VIOLATES_HASHABLE_REQUIREMENTS(Key.self)
@@ -512,7 +516,7 @@ extension _NativeDictionary { // Insertions
       unsafe (_values + bucket.offset).pointee = value
     } else {
       _precondition(count < capacity)
-      unsafe _insert(at: bucket, key: key, value: value)
+      _insert(at: bucket, key: key, value: value)
     }
   }
 
@@ -546,7 +550,7 @@ extension _NativeDictionary { // Insertions
     let rehashed = ensureUnique(
       isUnique: isUnique,
       capacity: count + (found ? 0 : 1))
-    guard rehashed else { return unsafe (bucket, found) }
+    guard rehashed else { return (bucket, found) }
     let (b, f) = find(key)
     if f != found {
       #if !$Embedded
@@ -555,7 +559,7 @@ extension _NativeDictionary { // Insertions
       fatalError("duplicate keys in a Dictionary")
       #endif
     }
-    return unsafe (b, found)
+    return (b, found)
   }
 
   @inlinable
@@ -581,7 +585,7 @@ extension _NativeDictionary { // Insertions
       unsafe (_values + bucket.offset).initialize(to: value)
       return oldValue
     }
-    unsafe _insert(at: bucket, key: key, value: value)
+    _insert(at: bucket, key: key, value: value)
     return nil
   }
 
@@ -595,7 +599,7 @@ extension _NativeDictionary { // Insertions
     if found {
       unsafe (_values + bucket.offset).pointee = value
     } else {
-      unsafe _insert(at: bucket, key: key, value: value)
+      _insert(at: bucket, key: key, value: value)
     }
   }
 }
@@ -716,6 +720,7 @@ extension _NativeDictionary { // Deletion
 
   @inlinable
   @_semantics("optimize.sil.specialize.generic.size.never")
+  @unsafe
   internal mutating func uncheckedRemove(
     at bucket: Bucket,
     isUnique: Bool
@@ -725,7 +730,7 @@ extension _NativeDictionary { // Deletion
     _internalInvariant(!rehashed)
     let oldKey = unsafe (_keys + bucket.offset).move()
     let oldValue = unsafe (_values + bucket.offset).move()
-    unsafe _delete(at: bucket)
+    _delete(at: bucket)
     return (oldKey, oldValue)
   }
 
@@ -763,7 +768,7 @@ extension _NativeDictionary { // High-level operations
     for unsafe bucket in unsafe hashTable {
       let key = unsafe self.uncheckedKey(at: bucket)
       let value = unsafe self.uncheckedValue(at: bucket)
-      try unsafe result._insert(at: bucket, key: key, value: transform(value))
+      try result._insert(at: bucket, key: key, value: transform(value))
     }
     return result
   }
@@ -790,7 +795,7 @@ extension _NativeDictionary { // High-level operations
           #endif
         }
       } else {
-        unsafe _insert(at: bucket, key: key, value: value)
+        _insert(at: bucket, key: key, value: value)
       }
     }
   }
@@ -818,7 +823,7 @@ extension _NativeDictionary { // High-level operations
           #endif
         }
       } else {
-        unsafe _insert(at: bucket, key: key, value: value)
+        _insert(at: bucket, key: key, value: value)
       }
     }
   }
@@ -837,7 +842,7 @@ extension _NativeDictionary { // High-level operations
       if found {
         unsafe _values[bucket.offset].append(value)
       } else {
-        unsafe _insert(at: bucket, key: key, value: [value])
+        _insert(at: bucket, key: key, value: [value])
       }
     }
   }

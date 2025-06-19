@@ -68,10 +68,11 @@ public:
       assert(it != substTypes.end());
       return it->second;
     };
-    auto lookupConformance = [&](CanType dependentType,
-                                 Type conformingReplacementType,
+    auto lookupConformance = [&](InFlightSubstitution &IFS,
+                                 Type dependentType,
                                  ProtocolDecl *conformedProtocol) {
-      auto it = substConformances.find({dependentType, conformedProtocol});
+      auto it = substConformances.find(
+          {dependentType->getCanonicalType(), conformedProtocol});
       assert(it != substConformances.end());
       return it->second;
     };

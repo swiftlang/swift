@@ -1,11 +1,19 @@
-if(SWIFT_BUILD_SDK_OVERLAY)
-set(swift_stdlib_unittest_darwin_dependencies Darwin)
-else()
 set(swift_stdlib_unittest_darwin_dependencies)
+
+if((SWIFT_BUILD_CLANG_OVERLAYS
+    OR SWIFT_BUILD_TEST_SUPPORT_MODULES)
+   AND (NOT DEFINED SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT
+        OR NOT SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT))
+  # This library imports Darwin from the SDK, which re-exports
+  # _Builtin_float which is part of this build.
+  list(APPEND swift_stdlib_unittest_darwin_dependencies _Builtin_float)
 endif()
 
 set(swift_stdlib_unittest_compile_flags
   "-Xfrontend" "-disable-objc-attr-requires-foundation-module")
+
+list(APPEND swift_stdlib_unittest_compile_flags "-enable-experimental-feature" "Lifetimes")
+
 if (SWIFT_RUNTIME_ENABLE_LEAK_CHECKER)
   list(APPEND swift_stdlib_unittest_compile_flags "-DSWIFT_RUNTIME_ENABLE_LEAK_CHECKER")
 endif()
