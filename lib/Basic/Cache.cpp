@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if defined(__APPLE__)
+#if !defined(__APPLE__)
 #include "Darwin/Cache-Mac.inc"
 #else
 
