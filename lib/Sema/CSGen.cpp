@@ -1933,7 +1933,11 @@ namespace {
       SmallVector<Type, 2> specializationArgTypes;
       auto options =
           TypeResolutionOptions(TypeResolverContext::InExpression);
-      for (auto specializationArg : specializationArgs) {
+      ConstraintLocatorBuilder locBuilder(locator);
+      for (auto idx : indices(specializationArgs)) {
+        auto specializationArg = specializationArgs[idx];
+        auto argLocator =
+            locBuilder.withPathElement(LocatorPathElt::GenericArgument(idx));
         PackExpansionExpr *elementEnv = nullptr;
         if (!OuterExpansions.empty()) {
           options |= TypeResolutionFlags::AllowPackReferences;
@@ -1942,9 +1946,9 @@ namespace {
         auto result = TypeResolution::resolveContextualType(
             specializationArg, CurDC, options,
             // Introduce type variables for unbound generics.
-            OpenUnboundGenericType(CS, locator),
-            HandlePlaceholderType(CS, locator),
-            OpenPackElementType(CS, locator, elementEnv));
+            OpenUnboundGenericType(CS, argLocator),
+            HandlePlaceholderType(CS, argLocator),
+            OpenPackElementType(CS, argLocator, elementEnv));
         if (result->hasError()) {
           auto &ctxt = CS.getASTContext();
           result = PlaceholderType::get(ctxt, specializationArg);

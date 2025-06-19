@@ -76,3 +76,12 @@ do {
   // expected-error@+1:13 {{cannot specialize non-generic type 'module<Swift>'}}{{none}}
   func f(_: Swift<Int>) {}
 }
+
+func overloadedGenericFn<T, U>(_ x: T, _ y: U) {} // expected-note {{found this candidate}}
+func overloadedGenericFn<T, U>(_ x: T, _ y: U, z: Int = 0) {} // expected-note {{found this candidate}}
+
+// Make sure we don't crash.
+func testSpecializedOverloaded() {
+  struct S<T> {}
+  _ = overloadedGenericFn<S, S> // expected-error {{no exact matches}}
+}
