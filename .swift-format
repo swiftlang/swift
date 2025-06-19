@@ -6,6 +6,7 @@
     },
     "lineBreakBeforeEachArgument": true,
     "indentConditionalCompilationBlocks": false,
+    "prioritizeKeepingFunctionOutputTogether": true,
     "rules": {
         "AlwaysUseLowerCamelCase": false,
         "AmbiguousTrailingClosureOverload": false,
