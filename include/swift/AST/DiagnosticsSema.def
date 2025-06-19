@@ -3441,7 +3441,7 @@ WARNING(associated_type_override_typealias,none,
 
 ERROR(requirement_machine_completion_failed,none,
       "cannot build rewrite system for %select{generic signature|protocol}0; "
-      "%select{%error|rule count|rule length|concrete nesting}1 limit exceeded",
+      "%select{%error|rule count|rule length|concrete type nesting|concrete type size|concrete type difference}1 limit exceeded",
       (unsigned, unsigned))
 NOTE(requirement_machine_completion_rule,none,
      "failed rewrite rule is %0", (StringRef))

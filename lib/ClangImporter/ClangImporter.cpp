@@ -2557,6 +2557,10 @@ PlatformAvailability::PlatformAvailability(const LangOptions &langOpts)
   case PlatformKind::visionOSApplicationExtension:
     break;
 
+  case PlatformKind::FreeBSD:
+    deprecatedAsUnavailableMessage = "";
+    break;
+
   case PlatformKind::OpenBSD:
     deprecatedAsUnavailableMessage = "";
     break;
@@ -2603,6 +2607,9 @@ bool PlatformAvailability::isPlatformRelevant(StringRef name) const {
   case PlatformKind::visionOSApplicationExtension:
     return name == "xros" || name == "xros_app_extension" ||
            name == "visionos" || name == "visionos_app_extension";
+
+  case PlatformKind::FreeBSD:
+    return name == "freebsd";
 
   case PlatformKind::OpenBSD:
     return name == "openbsd";
@@ -2673,6 +2680,10 @@ bool PlatformAvailability::treatDeprecatedAsUnavailable(
   case PlatformKind::visionOS:
   case PlatformKind::visionOSApplicationExtension:
     // No deprecation filter on xrOS
+    return false;
+
+  case PlatformKind::FreeBSD:
+    // No deprecation filter on FreeBSD
     return false;
 
   case PlatformKind::OpenBSD:
