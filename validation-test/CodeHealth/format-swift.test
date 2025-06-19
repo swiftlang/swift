@@ -1,0 +1,24 @@
+# RUN: export PATH="%original_path_env"
+# RUN: export SWIFT_BACKTRACE=
+
+# REQUIRES: OS=macosx
+# REQUIRES: standalone_build
+# REQUIRES: target-same-as-host
+
+# First set up a temporary repository containing the directories to format.
+# RUN: %empty-directory(%t)
+# RUN: %empty-directory(%t/swift)
+# R UN: cp -R %swift_src_root/lib %t/swift/lib
+# R UN: cp -R %swift_src_root/SwiftCompilerSources %t/swift/SwiftCompilerSources
+# RUN: cp -R %swift_src_root/utils %t/swift/utils
+# RUN: git -C %t/swift init --quiet
+# RUN: git -C %t/swift add .
+# RUN: git -C %t/swift commit -m 'Initial commit' --author='swift_test <no-reply@swift.org>' --quiet
+
+# Format the files in the temporary repository in place and check for a
+# difference.
+# RUN: xcrun swift-format --recursive --parallel --in-place --configuration %swift_src_root/.swift-format %t/swift
+# RUN: GIT_PAGER='' git -C %t/swift diff --exit-code '*.swift'
+
+# Clean up.
+# RUN: rm -rf %t/swift
