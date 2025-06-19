@@ -40,8 +40,7 @@ private:
   ModuleDependencyVector scanFilesystemForClangModuleDependency(
       Identifier moduleName,
       const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
-          &alreadySeenModules,
-      llvm::PrefixMapper *prefixMapper);
+          &alreadySeenModules);
 
   /// Retrieve the module dependencies for the Swift module with the given name.
   ModuleDependencyVector scanFilesystemForSwiftModuleDependency(
@@ -89,6 +88,17 @@ private:
   // Swift and Clang module loaders acting as scanners.
   std::unique_ptr<SwiftModuleScanner> swiftModuleScannerLoader;
 
+  /// The location of where the explicitly-built modules will be output to
+  std::string moduleOutputPath;
+  /// The location of where the explicitly-built SDK modules will be output to
+  std::string sdkModuleOutputPath;
+
+  // CAS instance.
+  std::shared_ptr<llvm::cas::ObjectStore> CAS;
+  std::shared_ptr<llvm::cas::ActionCache> ActionCache;
+  /// File prefix mapper.
+  std::shared_ptr<llvm::PrefixMapper> PrefixMapper;
+
   // Base command line invocation for clang scanner queries (both module and header)
   std::vector<std::string> clangScanningBaseCommandLineArgs;
   // Command line invocation for clang by-name module lookups
@@ -98,15 +108,6 @@ private:
   std::vector<std::string> swiftModuleClangCC1CommandLineArgs;
   // Working directory for clang module lookup queries
   std::string clangScanningWorkingDirectoryPath;
-
-  /// The location of where the explicitly-built modules will be output to
-  std::string moduleOutputPath;
-  /// The location of where the explicitly-built SDK modules will be output to
-  std::string sdkModuleOutputPath;
-
-  // CAS instance.
-  std::shared_ptr<llvm::cas::ObjectStore> CAS;
-  std::shared_ptr<llvm::cas::ActionCache> ActionCache;
   // Restrict access to the parent scanner class.
   friend class ModuleDependencyScanner;
 };
@@ -221,6 +222,8 @@ private:
   unsigned NumThreads;
   std::list<std::unique_ptr<ModuleDependencyScanningWorker>> Workers;
   llvm::DefaultThreadPool ScanningThreadPool;
+  /// File prefix mapper.
+  std::shared_ptr<llvm::PrefixMapper> PrefixMapper;
   /// Protect worker access.
   std::mutex WorkersLock;
   /// Count of filesystem queries performed

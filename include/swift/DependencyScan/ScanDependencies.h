@@ -58,13 +58,15 @@ bool prescanDependencies(CompilerInstance &instance);
 // MARK: Dependency scanning execution
 /// Scans the dependencies of the main module of \c instance.
 llvm::ErrorOr<swiftscan_dependency_graph_t>
-performModuleScan(CompilerInstance &instance,
+performModuleScan(SwiftDependencyScanningService &service,
+                  CompilerInstance &instance,
                   ModuleDependenciesCache &cache,
                   DependencyScanDiagnosticCollector *diagnostics = nullptr);
 
 /// Scans the main module of \c instance for all direct module imports
 llvm::ErrorOr<swiftscan_import_set_t>
-performModulePrescan(CompilerInstance &instance,
+performModulePrescan(SwiftDependencyScanningService &service,
+                     CompilerInstance &instance,
                      ModuleDependenciesCache &cache,
                      DependencyScanDiagnosticCollector *diagnostics = nullptr);
 
@@ -75,6 +77,7 @@ namespace incremental {
 /// than the serialized dependency graph, it is considered invalidated and must
 /// be re-scanned.
 void validateInterModuleDependenciesCache(
+    const SwiftDependencyScanningService &service,
     const ModuleDependencyID &rootModuleID, ModuleDependenciesCache &cache,
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
     DiagnosticEngine &diags, bool emitRemarks = false);
@@ -83,7 +86,8 @@ void validateInterModuleDependenciesCache(
 /// with respect to their inputs. Upon encountering such a module, add it to the
 /// set of invalidated modules, along with the path from the root to this
 /// module.
-void outOfDateModuleScan(const ModuleDependencyID &sourceModuleID,
+void outOfDateModuleScan(const SwiftDependencyScanningService &service,
+                         const ModuleDependencyID &sourceModuleID,
                          const ModuleDependenciesCache &cache,
                          const llvm::sys::TimePoint<> &cacheTimeStamp,
                          llvm::vfs::FileSystem &fs, DiagnosticEngine &diags,
@@ -93,6 +97,7 @@ void outOfDateModuleScan(const ModuleDependencyID &sourceModuleID,
 /// Validate whether all inputs of a given module dependency
 /// are older than the cache serialization time.
 bool verifyModuleDependencyUpToDate(
+    const SwiftDependencyScanningService &service,
     const ModuleDependencyID &moduleID, const ModuleDependenciesCache &cache,
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
     DiagnosticEngine &diags, bool emitRemarks);

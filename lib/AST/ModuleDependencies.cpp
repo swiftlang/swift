@@ -781,10 +781,8 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
 }
 
 ModuleDependenciesCache::ModuleDependenciesCache(
-    SwiftDependencyScanningService &globalScanningService,
     const std::string &mainScanModuleName, const std::string &scannerContextHash)
-    : globalScanningService(globalScanningService),
-      mainScanModuleName(mainScanModuleName),
+    : mainScanModuleName(mainScanModuleName),
       scannerContextHash(scannerContextHash),
       scanInitializationTime(std::chrono::system_clock::now()) {
   for (auto kind = ModuleDependencyKind::FirstKind;

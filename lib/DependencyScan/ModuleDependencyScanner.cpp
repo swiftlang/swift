@@ -192,53 +192,61 @@ static std::vector<std::string> inputSpecificClangScannerCommand(
   return result;
 }
 
+static std::string remapPath(llvm::PrefixMapper *PrefixMapper, StringRef Path) {
+  if (!PrefixMapper)
+    return Path.str();
+  return PrefixMapper->mapToString(Path);
+}
+
 ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
     SwiftDependencyScanningService &globalScanningService,
     const CompilerInvocation &ScanCompilerInvocation,
     const SILOptions &SILOptions, ASTContext &ScanASTContext,
     swift::DependencyTracker &DependencyTracker, DiagnosticEngine &Diagnostics)
-    : clangScanningTool(
+    : workerCompilerInvocation(
+          std::make_unique<CompilerInvocation>(ScanCompilerInvocation)),
+      workerASTContext(std::unique_ptr<ASTContext>(
+          ASTContext::get(workerCompilerInvocation->getLangOptions(),
+                          workerCompilerInvocation->getTypeCheckerOptions(),
+                          workerCompilerInvocation->getSILOptions(),
+                          workerCompilerInvocation->getSearchPathOptions(),
+                          workerCompilerInvocation->getClangImporterOptions(),
+                          workerCompilerInvocation->getSymbolGraphOptions(),
+                          workerCompilerInvocation->getCASOptions(),
+                          workerCompilerInvocation->getSerializationOptions(),
+                          ScanASTContext.SourceMgr, Diagnostics))),
+      scanningASTDelegate(std::make_unique<InterfaceSubContextDelegateImpl>(
+          workerASTContext->SourceMgr, &workerASTContext->Diags,
+          workerASTContext->SearchPathOpts, workerASTContext->LangOpts,
+          workerASTContext->ClangImporterOpts, workerASTContext->CASOpts,
+          workerCompilerInvocation->getFrontendOptions(),
+          /* buildModuleCacheDirIfAbsent */ false,
+          getModuleCachePathFromClang(
+              ScanASTContext.getClangModuleLoader()->getClangInstance()),
+          workerCompilerInvocation->getFrontendOptions()
+              .PrebuiltModuleCachePath,
+          workerCompilerInvocation->getFrontendOptions()
+              .BackupModuleInterfaceDir,
+          workerCompilerInvocation->getFrontendOptions()
+              .SerializeModuleInterfaceDependencyHashes,
+          workerCompilerInvocation->getFrontendOptions()
+              .shouldTrackSystemDependencies(),
+          RequireOSSAModules_t(SILOptions))),
+      clangScanningTool(
           *globalScanningService.ClangScanningService,
-          globalScanningService.getClangScanningFS(ScanASTContext)) {
-  // Create a scanner-specific Invocation and ASTContext.
-  workerCompilerInvocation =
-      std::make_unique<CompilerInvocation>(ScanCompilerInvocation);
-  workerASTContext = std::unique_ptr<ASTContext>(
-      ASTContext::get(workerCompilerInvocation->getLangOptions(),
-                      workerCompilerInvocation->getTypeCheckerOptions(),
-                      workerCompilerInvocation->getSILOptions(),
-                      workerCompilerInvocation->getSearchPathOptions(),
-                      workerCompilerInvocation->getClangImporterOptions(),
-                      workerCompilerInvocation->getSymbolGraphOptions(),
-                      workerCompilerInvocation->getCASOptions(),
-                      workerCompilerInvocation->getSerializationOptions(),
-                      ScanASTContext.SourceMgr, Diagnostics));
+          globalScanningService.getClangScanningFS(ScanASTContext)),
+      moduleOutputPath(workerCompilerInvocation->getFrontendOptions()
+                           .ExplicitModulesOutputPath),
+      sdkModuleOutputPath(workerCompilerInvocation->getFrontendOptions()
+                              .ExplicitSDKModulesOutputPath),
+      CAS(globalScanningService.CAS),
+      ActionCache(globalScanningService.ActionCache),
+      PrefixMapper(globalScanningService.Mapper) {
   auto loader = std::make_unique<PluginLoader>(
       *workerASTContext, /*DepTracker=*/nullptr,
       workerCompilerInvocation->getFrontendOptions().CacheReplayPrefixMap,
       workerCompilerInvocation->getFrontendOptions().DisableSandbox);
   workerASTContext->setPluginLoader(std::move(loader));
-
-  // Configure the interface scanning AST delegate.
-  auto ClangModuleCachePath = getModuleCachePathFromClang(
-      ScanASTContext.getClangModuleLoader()->getClangInstance());
-  auto &FEOpts = workerCompilerInvocation->getFrontendOptions();
-  auto &SPOpts = workerCompilerInvocation->getSearchPathOptions();
-  scanningASTDelegate = std::make_unique<InterfaceSubContextDelegateImpl>(
-      workerASTContext->SourceMgr, &workerASTContext->Diags,
-      workerASTContext->SearchPathOpts, workerASTContext->LangOpts,
-      workerASTContext->ClangImporterOpts, workerASTContext->CASOpts, FEOpts,
-      /*buildModuleCacheDirIfAbsent*/ false, ClangModuleCachePath,
-      FEOpts.PrebuiltModuleCachePath, FEOpts.BackupModuleInterfaceDir,
-      FEOpts.SerializeModuleInterfaceDependencyHashes,
-      FEOpts.shouldTrackSystemDependencies(), RequireOSSAModules_t(SILOptions));
-
-  moduleOutputPath = FEOpts.ExplicitModulesOutputPath;
-  sdkModuleOutputPath = FEOpts.ExplicitSDKModulesOutputPath;
-
-  // Set up CAS instance.
-  CAS = globalScanningService.CAS;
-  ActionCache = globalScanningService.ActionCache;
 
   // Set up the required command-line arguments and working directory
   // configuration required for clang dependency scanner queries
@@ -267,10 +275,11 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
     swiftModuleClangCC1CommandLineArgs.push_back("-fno-implicit-module-maps");
   }
 
-  // Set up the scanning Swift module loader for Swift scanning.
+  // Set up the Swift module loader for Swift queries.
   swiftModuleScannerLoader = std::make_unique<SwiftModuleScanner>(
-      *workerASTContext, SPOpts.ModuleLoadMode, *scanningASTDelegate,
-      moduleOutputPath, sdkModuleOutputPath,
+      *workerASTContext,
+      workerCompilerInvocation->getSearchPathOptions().ModuleLoadMode,
+      *scanningASTDelegate, moduleOutputPath, sdkModuleOutputPath,
       swiftModuleClangCC1CommandLineArgs);
 }
 
@@ -285,8 +294,7 @@ ModuleDependencyVector
 ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
     Identifier moduleName,
     const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
-        &alreadySeenModules,
-    llvm::PrefixMapper *prefixMapper) {
+        &alreadySeenModules) {
   auto lookupModuleOutput =
       [this](const clang::tooling::dependencies::ModuleDeps &MD,
              const clang::tooling::dependencies::ModuleOutputKind MOK)
@@ -314,12 +322,8 @@ ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
 
   return ClangImporter::bridgeClangModuleDependencies(
       *workerASTContext, clangScanningTool, *clangModuleDependencies,
-      moduleOutputPath, sdkModuleOutputPath, lookupModuleOutput,
-      [&](StringRef path) {
-        if (prefixMapper)
-          return prefixMapper->mapToString(path);
-        return path.str();
-      });
+      lookupModuleOutput,
+      [&](StringRef path) { return remapPath(PrefixMapper.get(), path); });
 }
 
 bool ModuleDependencyScanningWorker::scanHeaderDependenciesOfSwiftModule(
@@ -353,10 +357,8 @@ bool ModuleDependencyScanningWorker::scanHeaderDependenciesOfSwiftModule(
 
     // Record module dependencies for each new module we found.
     auto bridgedDeps = ClangImporter::bridgeClangModuleDependencies(
-        ctx, clangScanningTool, dependencies->ModuleGraph, moduleOutputPath,
-        sdkModuleOutputPath, lookupModuleOutput, [&cache](StringRef path) {
-          return cache.getScanService().remapPath(path);
-        });
+        ctx, clangScanningTool, dependencies->ModuleGraph, lookupModuleOutput,
+        [this](StringRef path) { return remapPath(PrefixMapper.get(), path); });
     cache.recordDependencies(bridgedDeps, ctx.Diags);
 
     llvm::copy(dependencies->FileDeps, std::back_inserter(headerFileInputs));
@@ -461,7 +463,8 @@ ModuleDependencyScanner::ModuleDependencyScanner(
       NumThreads(ParallelScan
                      ? llvm::hardware_concurrency().compute_thread_count()
                      : 1),
-      ScanningThreadPool(llvm::hardware_concurrency(NumThreads)) {
+      ScanningThreadPool(llvm::hardware_concurrency(NumThreads)),
+      PrefixMapper(ScanningService.Mapper) {
   // TODO: Make num threads configurable
   for (size_t i = 0; i < NumThreads; ++i)
     Workers.emplace_front(std::make_unique<ModuleDependencyScanningWorker>(
@@ -996,11 +999,10 @@ void ModuleDependencyScanner::resolveAllClangModuleDependencies(
         }
 
         auto moduleDependencies = withDependencyScanningWorker(
-            [&cache, &seenClangModules,
+            [&seenClangModules,
              moduleIdentifier](ModuleDependencyScanningWorker *ScanningWorker) {
               return ScanningWorker->scanFilesystemForClangModuleDependency(
-                  moduleIdentifier, seenClangModules,
-                  cache.getScanService().getPrefixMapper());
+                  moduleIdentifier, seenClangModules);
             });
 
         // Update the `moduleLookupResult` and cache all discovered dependencies
@@ -1370,10 +1372,9 @@ void ModuleDependencyScanner::resolveSwiftOverlayDependenciesForModule(
       return;
 
     auto moduleDependencies = withDependencyScanningWorker(
-        [&cache,
-         moduleIdentifier](ModuleDependencyScanningWorker *ScanningWorker) {
+        [moduleIdentifier](ModuleDependencyScanningWorker *ScanningWorker) {
           return ScanningWorker->scanFilesystemForSwiftModuleDependency(
-              moduleIdentifier, cache.getScanService().getPrefixMapper());
+              moduleIdentifier, /* isTestableImport */ false);
         });
     swiftOverlayLookupResult.insert_or_assign(moduleName, moduleDependencies);
   };
@@ -1507,7 +1508,7 @@ void ModuleDependencyScanner::resolveCrossImportOverlayDependencies(
     mainDep.addAuxiliaryFile(entry.second);
     cmdCopy.push_back("-swift-module-cross-import");
     cmdCopy.push_back(entry.first);
-    auto overlayPath = cache.getScanService().remapPath(entry.second);
+    auto overlayPath = remapPath(PrefixMapper.get(), entry.second);
     cmdCopy.push_back(overlayPath);
   }
   mainDep.updateCommandLine(cmdCopy);
@@ -1776,7 +1777,7 @@ ModuleDependencyScanner::attemptToFindResolvingSerializedSearchPath(
     // paths. That's fine because we are diagnosing a scan failure here, but
     // worth being aware of.
     result = withDependencyScanningWorker(
-        [this, &binaryModInfo, &moduleImport, &cache,
+        [this, &binaryModInfo, &moduleImport,
          &binaryDepID](ModuleDependencyScanningWorker *ScanningWorker)
             -> std::optional<std::pair<ModuleDependencyID, std::string>> {
           ModuleDependencyVector result;
@@ -1786,14 +1787,13 @@ ModuleDependencyScanner::attemptToFindResolvingSerializedSearchPath(
 
           result = ScanningWorker->scanFilesystemForSwiftModuleDependency(
               getModuleImportIdentifier(moduleImport.importIdentifier),
-              cache.getScanService().getPrefixMapper());
+              /* isTestableImport */ false);
           if (!result.empty())
             return std::make_pair(binaryDepID,
                                   getModuleDefiningPath(result[0].second));
 
           result = ScanningWorker->scanFilesystemForClangModuleDependency(
-              getModuleImportIdentifier(moduleImport.importIdentifier), {},
-              cache.getScanService().getPrefixMapper());
+              getModuleImportIdentifier(moduleImport.importIdentifier), {});
           if (!result.empty())
             return std::make_pair(binaryDepID,
                                   getModuleDefiningPath(result[0].second));

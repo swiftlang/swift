@@ -992,7 +992,7 @@ class SwiftDependencyScanningService {
   std::shared_ptr<llvm::cas::ActionCache> ActionCache;
 
   /// File prefix mapper.
-  std::unique_ptr<llvm::PrefixMapper> Mapper;
+  std::shared_ptr<llvm::PrefixMapper> Mapper;
 
   /// The global file system cache.
   std::optional<
@@ -1073,7 +1073,6 @@ private:
 /// found within the current scanning action.
 class ModuleDependenciesCache {
 private:
-  SwiftDependencyScanningService &globalScanningService;
   /// Discovered dependencies
   ModuleDependenciesKindMap ModuleDependenciesMap;
   /// Set containing all of the Clang modules that have already been seen.
@@ -1094,8 +1093,7 @@ private:
   getDependencyReferencesMap(ModuleDependencyKind kind) const;
 
 public:
-  ModuleDependenciesCache(SwiftDependencyScanningService &globalScanningService,
-                          const std::string &mainScanModuleName,
+  ModuleDependenciesCache(const std::string &mainScanModuleName,
                           const std::string &scanningContextHash);
   ModuleDependenciesCache(const ModuleDependenciesCache &) = delete;
   ModuleDependenciesCache &operator=(const ModuleDependenciesCache &) = delete;
@@ -1116,12 +1114,6 @@ public:
   /// Whether we have cached dependency information for the given Swift module.
   bool hasSwiftDependency(StringRef moduleName) const;
 
-  SwiftDependencyScanningService &getScanService() {
-    return globalScanningService;
-  }
-  const SwiftDependencyScanningService &getScanService() const {
-    return globalScanningService;
-  }
   const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &
   getAlreadySeenClangModules() const {
     return alreadySeenClangModules;

@@ -85,7 +85,6 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
     const ASTContext &ctx,
     clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
     clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
-    StringRef moduleOutputPath, StringRef stableModuleOutputPath,
     LookupModuleOutputCallback lookupModuleOutput,
     RemapPathCallback callback) {
   ModuleDependencyVector result;
