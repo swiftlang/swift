@@ -681,6 +681,7 @@ enum Project {
   ToolsSupportCore
   LLBuild
   ArgumentParser
+  SQLite
   Driver
   Crypto
   Collections
@@ -2722,10 +2723,10 @@ function Build-ExperimentalSDK([Hashtable] $Platform) {
 function Build-SQLite([Hashtable] $Platform) {
   Build-CMakeProject `
     -Src $SourceCache\swift-toolchain-sqlite `
-    -Bin "$BinaryCache\$($Platform.Triple)\sqlite" `
-    -InstallTo "$BinaryCache\$($Platform.Triple)\usr" `
+    -Bin (Get-ProjectBinaryCache $Platform SQLite) `
     -Platform $Platform `
     -UseMSVCCompilers C `
+    -BuildTargets default `
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
     }
@@ -2765,8 +2766,8 @@ function Build-Build([Hashtable] $Platform) {
       SwiftDriver_DIR = (Get-ProjectCMakeModules $Platform Driver);
       SwiftSystem_DIR = (Get-ProjectCMakeModules $Platform System);
       TSC_DIR = (Get-ProjectCMakeModules $Platform ToolsSupportCore);
-      SQLite3_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
-      SQLite3_LIBRARY = "$BinaryCache\$($Platform.Triple)\usr\lib\SQLite3.lib";
+      SQLite3_INCLUDE_DIR = "$SourceCache\swift-toolchain-sqlite\Sources\CSQLite\include";
+      SQLite3_LIBRARY = "$(Get-ProjectBinaryCache $Platform SQLite)\SQLite3.lib";
     } + $ArchSpecificOptions)
 }
 
@@ -2800,8 +2801,8 @@ function Build-LLBuild([Hashtable] $Platform) {
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
       LLBUILD_SUPPORT_BINDINGS = "Swift";
-      SQLite3_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
-      SQLite3_LIBRARY = "$BinaryCache\$($Platform.Triple)\usr\lib\SQLite3.lib";
+      SQLite3_INCLUDE_DIR = "$SourceCache\swift-toolchain-sqlite\Sources\CSQLite\include";
+      SQLite3_LIBRARY = "$(Get-ProjectBinaryCache $Platform SQLite)\SQLite3.lib";
     }
 }
 
@@ -2830,8 +2831,8 @@ function Test-LLBuild {
         FILECHECK_EXECUTABLE = ([IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform BuildTools), "bin", "FileCheck.exe"));
         LIT_EXECUTABLE = "$SourceCache\llvm-project\llvm\utils\lit\lit.py";
         LLBUILD_SUPPORT_BINDINGS = "Swift";
-        SQLite3_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
-        SQLite3_LIBRARY = "$BinaryCache\$($Platform.Triple)\usr\lib\SQLite3.lib";
+        SQLite3_INCLUDE_DIR = "$SourceCache\swift-toolchain-sqlite\Sources\CSQLite\include";
+        SQLite3_LIBRARY = "$(Get-ProjectBinaryCache $Platform SQLite)\SQLite3.lib";
       }
   }
 }
@@ -2865,8 +2866,8 @@ function Build-Driver([Hashtable] $Platform) {
       TSC_DIR = (Get-ProjectCMakeModules $Platform ToolsSupportCore);
       LLBuild_DIR = (Get-ProjectCMakeModules $Platform LLBuild);
       ArgumentParser_DIR = (Get-ProjectCMakeModules $Platform ArgumentParser);
-      SQLite3_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
-      SQLite3_LIBRARY = "$BinaryCache\$($Platform.Triple)\usr\lib\SQLite3.lib";
+      SQLite3_INCLUDE_DIR = "$SourceCache\swift-toolchain-sqlite\Sources\CSQLite\include";
+      SQLite3_LIBRARY = "$(Get-ProjectBinaryCache $Platform SQLite)\SQLite3.lib";
       SWIFT_DRIVER_BUILD_TOOLS = "YES";
       LLVM_DIR = "$(Get-ProjectBinaryCache $Platform Compilers)\lib\cmake\llvm";
       Clang_DIR = "$(Get-ProjectBinaryCache $Platform Compilers)\lib\cmake\clang";
@@ -2961,8 +2962,8 @@ function Build-PackageManager([Hashtable] $Platform) {
       SwiftASN1_DIR = (Get-ProjectCMakeModules $Platform ASN1);
       SwiftCertificates_DIR = (Get-ProjectCMakeModules $Platform Certificates);
       SwiftSyntax_DIR = (Get-ProjectCMakeModules $Platform Compilers);
-      SQLite3_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
-      SQLite3_LIBRARY = "$BinaryCache\$($Platform.Triple)\usr\lib\SQLite3.lib";
+      SQLite3_INCLUDE_DIR = "$SourceCache\swift-toolchain-sqlite\Sources\CSQLite\include";
+      SQLite3_LIBRARY = "$(Get-ProjectBinaryCache $Platform SQLite)\SQLite3.lib";
     }
 }
 
