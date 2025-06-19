@@ -298,6 +298,8 @@
 /utils/swift_build_support/products/sourcekitlsp.py           @bnbarham @hamishknight @rintaro
 /utils/swift_build_support/products/swiftformat.py            @allevato @bnbarham @hamishknight @rintaro
 /utils/swift_build_support/products/swiftsyntax.py            @bnbarham @hamishknight @rintaro
+/utils/swift_build_support/products/wasm*                     @bnbarham @MaxDesiatov @kateinoigakukun
+/utils/swift_build_support/products/wasi*                     @bnbarham @MaxDesiatov @kateinoigakukun
 /utils/update-checkout*                                       @etcwilde @justice-adams-apple @shahmishal
 /utils/update_checkout/                                       @etcwilde @justice-adams-apple @shahmishal
 /utils/update_checkout/update-checkout-config.json            @shahmishal
