@@ -5,6 +5,7 @@
 // RUN: %target-run %t/a.out | %FileCheck %s --check-prefix=OUT
 
 // REQUIRES: executable_test,optimized_stdlib
+// REQUIRES: PTRSIZE=64
 
 enum E: String {
   case a, b, c, long_case_name_for_testing, d, e

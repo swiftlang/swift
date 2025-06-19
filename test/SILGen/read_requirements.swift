@@ -33,7 +33,7 @@ public struct U : ~Copyable {}
 public protocol P1 : ~Copyable {
   @_borrowed
   var ubgs: U { get set }
-// CHECK-LABEL sil [ossa] @$s17read_requirements2P1P4ubgsAA1UVvy : {{.*}} {
+// CHECK-LABEL: sil {{.*}} [ossa] @$s17read_requirements2P1P4ubgsAA1UVvy : {{.*}} {
 // CHECK:      bb0(
 // CHECK-SAME:     [[SELF_UNCHECKED:%[^:]+]]
 // CHECK-SAME: ):

@@ -813,6 +813,15 @@ ClangTypeConverter::visitBuiltinFloatType(BuiltinFloatType *type) {
   llvm_unreachable("cannot translate floating-point format to C");
 }
 
+clang::QualType
+ClangTypeConverter::visitBuiltinVectorType(BuiltinVectorType *type) {
+  auto &clangCtx = ClangASTContext;
+  auto eltTy = visit(type->getElementType());
+  return clangCtx.getVectorType(
+    eltTy, type->getNumElements(), clang::VectorKind::Generic
+  );
+}
+
 clang::QualType ClangTypeConverter::visitArchetypeType(ArchetypeType *type) {
   // We see these in the case where we invoke an @objc function
   // through a protocol.
@@ -881,8 +890,15 @@ ClangTypeConverter::convertClangDecl(Type type, const clang::Decl *clangDecl) {
 
   if (auto clangTypeDecl = dyn_cast<clang::TypeDecl>(clangDecl)) {
     auto qualType = ctx.getTypeDeclType(clangTypeDecl);
-    if (type->isForeignReferenceType())
+    if (type->isForeignReferenceType()) {
       qualType = ctx.getPointerType(qualType);
+      auto nonNullAttr = new (ctx) clang::TypeNonNullAttr(
+          ctx,
+          clang::AttributeCommonInfo(
+              clang::SourceRange(), clang::AttributeCommonInfo::AT_TypeNonNull,
+              clang::AttributeCommonInfo::Form::Implicit()));
+      qualType = ctx.getAttributedType(nonNullAttr, qualType, qualType);
+    }
 
     return qualType.getUnqualifiedType();
   }

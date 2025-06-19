@@ -625,10 +625,10 @@ ManagedValue SILGenBuilder::createEnum(SILLocation loc, ManagedValue payload,
 }
 
 ManagedValue SILGenBuilder::createUnconditionalCheckedCast(
-    SILLocation loc, CastingIsolatedConformances isolatedConformances,
+    SILLocation loc, CheckedCastInstOptions options,
     ManagedValue op, SILType destLoweredTy, CanType destFormalTy) {
   SILValue result =
-      createUnconditionalCheckedCast(loc, isolatedConformances,
+      createUnconditionalCheckedCast(loc, options,
                                      op.forward(SGF),
                                      destLoweredTy, destFormalTy);
   return SGF.emitManagedRValueWithCleanup(result);
@@ -636,7 +636,7 @@ ManagedValue SILGenBuilder::createUnconditionalCheckedCast(
 
 void SILGenBuilder::createCheckedCastBranch(
     SILLocation loc, bool isExact,
-    CastingIsolatedConformances isolatedConformances,
+    CheckedCastInstOptions options,
     ManagedValue op,
     CanType sourceFormalTy,
     SILType destLoweredTy,
@@ -650,7 +650,7 @@ void SILGenBuilder::createCheckedCastBranch(
                                          destFormalTy)) {
     op = op.ensurePlusOne(SGF, loc);
   }
-  createCheckedCastBranch(loc, isExact, isolatedConformances,
+  createCheckedCastBranch(loc, isExact, options,
                           op.forward(SGF), sourceFormalTy,
                           destLoweredTy, destFormalTy, trueBlock, falseBlock,
                           Target1Count, Target2Count);

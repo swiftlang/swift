@@ -90,7 +90,7 @@ protocol HasAssoc {
 
 do {
   enum MyError: Error {
-    case bad(Any) // expected-swift-6-error {{associated value 'bad' of 'Sendable'-conforming enum 'MyError' has non-Sendable type 'Any'}}
+    case bad(Any) // expected-swift-6-warning {{associated value 'bad' of 'Sendable'-conforming enum 'MyError' has non-Sendable type 'Any'}}
   }
 
   func checkIt(_ js: Any) throws {

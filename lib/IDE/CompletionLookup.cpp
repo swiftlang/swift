@@ -387,6 +387,23 @@ void CompletionLookup::addImportModuleNames() {
   }
 }
 
+void CompletionLookup::addUsingSpecifiers() {
+  for (unsigned i = 0,
+                n = static_cast<unsigned>(UsingSpecifier::LastSpecifier) + 1;
+       i != n; ++i) {
+    CodeCompletionResultBuilder Builder = makeResultBuilder(
+        CodeCompletionResultKind::Keyword, SemanticContextKind::None);
+    switch (static_cast<UsingSpecifier>(i)) {
+    case UsingSpecifier::MainActor:
+      Builder.addTextChunk("@MainActor");
+      break;
+    case UsingSpecifier::Nonisolated:
+      Builder.addTextChunk("nonisolated");
+      break;
+    }
+  }
+}
+
 SemanticContextKind
 CompletionLookup::getSemanticContext(const Decl *D, DeclVisibilityKind Reason,
                                      DynamicLookupInfo dynamicLookupInfo) {
@@ -556,13 +573,15 @@ void CompletionLookup::addTypeAnnotationForImplicitlyUnwrappedOptional(
     suffix = "?";
   }
 
+  NonRecursivePrintOptions nrOptions =
+    NonRecursivePrintOption::ImplicitlyUnwrappedOptional;
+
   PrintOptions PO;
-  PO.PrintOptionalAsImplicitlyUnwrapped = true;
   PO.OpaqueReturnTypePrinting =
       PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
   if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
     PO.setBaseType(typeContext->getDeclaredTypeInContext());
-  Builder.addTypeAnnotation(eraseArchetypes(T, genericSig), PO, suffix);
+  Builder.addTypeAnnotation(eraseArchetypes(T, genericSig), PO, nrOptions, suffix);
   Builder.setResultTypes(T);
   Builder.setTypeContext(expectedTypeContext, CurrDeclContext);
 }
@@ -1466,10 +1485,13 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
     bool IsIUO = !IsImplicitlyCurriedInstanceMethod &&
                  FD->isImplicitlyUnwrappedOptional();
 
+    NonRecursivePrintOptions nrOptions;
+    if (IsIUO)
+      nrOptions |= NonRecursivePrintOption::ImplicitlyUnwrappedOptional;
+
     PrintOptions PO;
     PO.OpaqueReturnTypePrinting =
         PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
-    PO.PrintOptionalAsImplicitlyUnwrapped = IsIUO;
     if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
       PO.setBaseType(typeContext->getDeclaredTypeInContext());
     Type AnnotationTy =
@@ -1491,7 +1513,7 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
             // What's left is the result type.
             if (AnnotationTy->isVoid())
               AnnotationTy = Ctx.getVoidDecl()->getDeclaredInterfaceType();
-            AnnotationTy.print(printer, PO);
+            AnnotationTy.print(printer, PO, nrOptions);
             printer.printTypePost(TL);
           });
     } else {
@@ -1507,7 +1529,7 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
       // What's left is the result type.
       if (AnnotationTy->isVoid())
         AnnotationTy = Ctx.getVoidDecl()->getDeclaredInterfaceType();
-      AnnotationTy.print(OS, PO);
+      AnnotationTy.print(OS, PO, nrOptions);
       Builder.addTypeAnnotation(TypeStr);
     }
 

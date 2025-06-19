@@ -205,8 +205,10 @@ public:
 
   //*** Allocation Routines ************************************************/
 
-  void print(raw_ostream &OS, const PrintOptions &Opts = PrintOptions()) const;
-  void print(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  void print(raw_ostream &OS, const PrintOptions &opts = PrintOptions(),
+             NonRecursivePrintOptions nrOpts = std::nullopt) const;
+  void print(ASTPrinter &Printer, const PrintOptions &opts,
+             NonRecursivePrintOptions nrOpts = std::nullopt) const;
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &OS, unsigned indent = 0) const;
 };
@@ -252,7 +254,8 @@ public:
 private:
   SourceLoc getStartLocImpl() const { return Range.Start; }
   SourceLoc getEndLocImpl() const { return Range.End; }
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
+                 NonRecursivePrintOptions nrOpts) const;
   friend class TypeRepr;
 };
 
@@ -303,7 +306,7 @@ public:
   ReferenceOwnership getSILOwnership() const;
 
   void printAttrs(llvm::raw_ostream &OS) const;
-  void printAttrs(ASTPrinter &Printer, const PrintOptions &Options) const;
+  void printAttrs(ASTPrinter &Printer, const PrintOptions &options) const;
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Attributed;
@@ -321,7 +324,8 @@ private:
   }
   SourceLoc getEndLocImpl() const { return Ty->getEndLoc(); }
   SourceLoc getLocImpl() const { return Ty->getLoc(); }
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
+                 NonRecursivePrintOptions nrOpts) const;
   friend class TypeRepr;
 };
 
@@ -417,7 +421,8 @@ protected:
   SourceLoc getLocImpl() const;
   SourceLoc getEndLocImpl() const;
 
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts,
+                 NonRecursivePrintOptions nrOpts) const;
 
   friend class TypeRepr;
 };
@@ -610,7 +615,8 @@ private:
   SourceLoc getEndLocImpl() const { return RetTy->getEndLoc(); }
   SourceLoc getLocImpl() const { return ArrowLoc; }
 
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
+                 NonRecursivePrintOptions nrOpts) const;
   friend class TypeRepr;
 };
 
@@ -637,11 +643,12 @@ public:
 private:
   SourceLoc getStartLocImpl() const { return Brackets.Start; }
   SourceLoc getEndLocImpl() const { return Brackets.End; }
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
+                 NonRecursivePrintOptions nrOpts) const;
   friend class TypeRepr;
 };
 
-/// An InlineArray type e.g `[2 x Foo]`, sugar for `InlineArray<2, Foo>`.
+/// An InlineArray type e.g `[2 of Foo]`, sugar for `InlineArray<2, Foo>`.
 class InlineArrayTypeRepr : public TypeRepr {
   TypeRepr *Count;
   TypeRepr *Element;
@@ -666,7 +673,8 @@ public:
 private:
   SourceLoc getStartLocImpl() const { return Brackets.Start; }
   SourceLoc getEndLocImpl() const { return Brackets.End; }
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
+                 NonRecursivePrintOptions nrOpts) const;
   friend class TypeRepr;
 };
 
@@ -699,7 +707,8 @@ public:
 private:
   SourceLoc getStartLocImpl() const { return Brackets.Start; }
   SourceLoc getEndLocImpl() const { return Brackets.End; }
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
+                 NonRecursivePrintOptions nrOpts) const;
   friend class TypeRepr;
 };
 
@@ -731,7 +740,8 @@ private:
   SourceLoc getLocImpl() const {
     return QuestionLoc.isValid() ? QuestionLoc : Base->getLoc();
   }
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
+                 NonRecursivePrintOptions nrOpts) const;
   friend class TypeRepr;
 };
 
@@ -760,7 +770,8 @@ private:
   SourceLoc getStartLocImpl() const { return Base->getStartLoc(); }
   SourceLoc getEndLocImpl() const { return ExclamationLoc; }
   SourceLoc getLocImpl() const { return ExclamationLoc; }
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
+                 NonRecursivePrintOptions nrOpts) const;
   friend class TypeRepr;
 };
 
@@ -801,7 +812,8 @@ private:
   SourceLoc getStartLocImpl() const { return Element->getEndLoc(); }
   SourceLoc getEndLocImpl() const { return EllipsisLoc; }
   SourceLoc getLocImpl() const { return EllipsisLoc; }
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
+                 NonRecursivePrintOptions nrOpts) const;
   friend class TypeRepr;
 };
 
@@ -832,7 +844,8 @@ private:
   SourceLoc getStartLocImpl() const { return RepeatLoc; }
   SourceLoc getEndLocImpl() const { return Pattern->getEndLoc(); }
   SourceLoc getLocImpl() const { return RepeatLoc; }
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
+                 NonRecursivePrintOptions nrOpts) const;
   friend class TypeRepr;
 };
 
@@ -880,7 +893,8 @@ private:
   SourceLoc getStartLocImpl() const { return KeywordLoc; }
   SourceLoc getEndLocImpl() const { return BraceLocs.End; }
   SourceLoc getLocImpl() const { return KeywordLoc; }
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
+                 NonRecursivePrintOptions nrOpts) const;
   friend class TypeRepr;
 };
 
@@ -915,7 +929,8 @@ private:
   SourceLoc getStartLocImpl() const { return EachLoc; }
   SourceLoc getEndLocImpl() const { return PackType->getEndLoc(); }
   SourceLoc getLocImpl() const { return EachLoc; }
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
+                 NonRecursivePrintOptions nrOpts) const;
   friend class TypeRepr;
 };
 
@@ -1010,7 +1025,8 @@ public:
 private:
   SourceLoc getStartLocImpl() const { return Parens.Start; }
   SourceLoc getEndLocImpl() const { return Parens.End; }
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
+                 NonRecursivePrintOptions nrOpts) const;
   friend class TypeRepr;
 };
 
@@ -1066,7 +1082,8 @@ private:
   SourceLoc getStartLocImpl() const { return FirstTypeLoc; }
   SourceLoc getLocImpl() const { return CompositionRange.Start; }
   SourceLoc getEndLocImpl() const { return CompositionRange.End; }
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
+                 NonRecursivePrintOptions nrOpts) const;
   friend class TypeRepr;
 };
 
@@ -1095,7 +1112,8 @@ private:
   SourceLoc getStartLocImpl() const { return Base->getStartLoc(); }
   SourceLoc getEndLocImpl() const { return MetaLoc; }
   SourceLoc getLocImpl() const { return MetaLoc; }
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
+                 NonRecursivePrintOptions nrOpts) const;
   friend class TypeRepr;
 };
 
@@ -1124,7 +1142,8 @@ private:
   SourceLoc getStartLocImpl() const { return Base->getStartLoc(); }
   SourceLoc getEndLocImpl() const { return ProtocolLoc; }
   SourceLoc getLocImpl() const { return ProtocolLoc; }
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
+                 NonRecursivePrintOptions nrOpts) const;
   friend class TypeRepr;
 };
 
@@ -1155,7 +1174,8 @@ public:
 private:
   SourceLoc getStartLocImpl() const { return SpecifierLoc; }
   SourceLoc getEndLocImpl() const { return Base->getEndLoc(); }
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
+                 NonRecursivePrintOptions nrOpts) const;
   friend class TypeRepr;
 };
 
@@ -1274,7 +1294,8 @@ private:
   SourceLoc getStartLocImpl() const { return Loc; }
   SourceLoc getEndLocImpl() const { return Base->getEndLoc(); }
   SourceLoc getLocImpl() const { return Base->getLoc(); }
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
+                 NonRecursivePrintOptions nrOpts) const;
   friend class TypeRepr;
 };
 
@@ -1311,7 +1332,8 @@ public:
 private:
   SourceLoc getStartLocImpl() const { return Loc; }
   SourceLoc getEndLocImpl() const { return Loc; }
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
+                 NonRecursivePrintOptions nrOpts) const;
   friend class TypeRepr;
 };
 
@@ -1338,7 +1360,8 @@ public:
 private:
   SourceLoc getStartLocImpl() const { return Loc; }
   SourceLoc getEndLocImpl() const { return Loc; }
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
+                 NonRecursivePrintOptions nrOpts) const;
   friend class TypeRepr;
 };
 
@@ -1391,7 +1414,8 @@ private:
   SourceLoc getStartLocImpl() const { return OpaqueLoc; }
   SourceLoc getEndLocImpl() const { return Constraint->getEndLoc(); }
   SourceLoc getLocImpl() const { return OpaqueLoc; }
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
+                 NonRecursivePrintOptions nrOpts) const;
   friend class TypeRepr;
 };
 
@@ -1426,7 +1450,8 @@ private:
   SourceLoc getStartLocImpl() const;
   SourceLoc getEndLocImpl() const;
   SourceLoc getLocImpl() const;
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
+                 NonRecursivePrintOptions nrOpts) const;
   friend class TypeRepr;
 };
 
@@ -1455,7 +1480,8 @@ private:
   SourceLoc getStartLocImpl() const { return AnyLoc; }
   SourceLoc getEndLocImpl() const { return Constraint->getEndLoc(); }
   SourceLoc getLocImpl() const { return AnyLoc; }
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
+                 NonRecursivePrintOptions nrOpts) const;
   friend class TypeRepr;
 };
 
@@ -1483,7 +1509,8 @@ private:
   SourceLoc getStartLocImpl() const { return TildeLoc; }
   SourceLoc getEndLocImpl() const { return Constraint->getEndLoc(); }
   SourceLoc getLocImpl() const { return TildeLoc; }
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
+                 NonRecursivePrintOptions nrOpts) const;
   friend class TypeRepr;
 };
 
@@ -1511,7 +1538,8 @@ public:
     SourceLoc getStartLocImpl() const { return UnderscoreLoc; }
     SourceLoc getEndLocImpl() const { return UnderscoreLoc; }
     SourceLoc getLocImpl() const { return UnderscoreLoc; }
-    void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+    void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
+                 NonRecursivePrintOptions nrOpts) const;
     friend class TypeRepr;
 };
 
@@ -1600,7 +1628,8 @@ private:
   SourceLoc getStartLocImpl() const;
   SourceLoc getEndLocImpl() const;
   SourceLoc getLocImpl() const;
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
+                 NonRecursivePrintOptions nrOpts) const;
   friend TypeRepr;
 };
 
@@ -1627,7 +1656,8 @@ private:
   SourceLoc getStartLocImpl() const;
   SourceLoc getEndLocImpl() const;
   SourceLoc getLocImpl() const;
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
+                 NonRecursivePrintOptions nrOpts) const;
   friend class TypeRepr;
 };
 
@@ -1668,7 +1698,8 @@ private:
 
   SourceLoc getEndLocImpl() const { return Loc; }
   SourceLoc getLocImpl() const { return Loc; }
-  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
+                 NonRecursivePrintOptions nrOpts) const;
   friend class TypeRepr;
 };
 

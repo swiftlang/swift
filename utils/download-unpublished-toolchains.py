@@ -15,6 +15,7 @@ Utility to download unpublished toolchains
 
 import argparse
 import os
+import re
 import sys
 import tarfile
 import urllib.request
@@ -38,7 +39,7 @@ def get_latest_toolchain_url(build_url):
     lines = body.split('\n')
     toolchain = [x for x in lines if 'Toolchain:' in x]
     if len(toolchain) > 0:
-        toolchain_url = toolchain[0].removeprefix('Toolchain: ')
+        toolchain_url = re.sub(r'.+Toolchain: (.+)$', r'\1', toolchain[0])
     return toolchain_url
 
 
@@ -90,6 +91,12 @@ def parse_args():
         help="Untar the toolchain in the output directory",
     )
 
+    parser.add_argument(
+        "--dry-run",
+        default=False,
+        action='store_true',
+        help="Infer the toolchain URL but don't download it")
+
     return parser.parse_args()
 
 
@@ -105,13 +112,15 @@ def main():
     if not toolchain_url:
         print(f"Error: Unable to find toolchain for {args.platform}.")
         return -1
-    print(f"[Downloading] {toolchain_url}")
-    output_path = download_toolchain(toolchain_url, args.output_dir)
-    print(f"[Toolchain] {output_path}")
+    print(f"[Toolchain URL] {toolchain_url}")
 
-    if args.untar:
-        untar_toolchain(args.output_dir, output_path)
-        print(f"[Extracted] {args.output_dir}/usr")
+    if not args.dry_run:
+        output_path = download_toolchain(toolchain_url, args.output_dir)
+        print(f"[Toolchain] {output_path}")
+
+        if args.untar:
+            untar_toolchain(args.output_dir, output_path)
+            print(f"[Extracted] {args.output_dir}/usr")
 
 
 if __name__ == "__main__":

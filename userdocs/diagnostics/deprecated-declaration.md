@@ -1,7 +1,8 @@
-# Deprecated Declaration Warnings (`DeprecatedDeclaration`)
+# Deprecated declaration warnings (DeprecatedDeclaration)
 
+Warnings related to deprecated APIs that may be removed in future versions and should be replaced with more current alternatives.
 
-This diagnostic group includes warnings related to deprecated APIs that may be removed in future versions and should be replaced with more current alternatives.
+## Overview
 
 The `DeprecatedDeclaration` group covers the following warnings:
 - Use of a function annotated with `@available(<platform>, deprecated: <version>)`
@@ -65,10 +66,3 @@ The `DeprecatedDeclaration` group covers the following warnings:
     func enqueue(_ job: __owned Job) {} // 'Executor.enqueue(Job)' is deprecated as a protocol requirement; conform type 'C' to 'Executor' by implementing 'func enqueue(ExecutorJob)' instead
   }
   ```
-
-## Usage Example
-
-```sh
-swiftc -Werror DeprecatedDeclaration file.swift
-swiftc -warnings-as-errors -Wwarning DeprecatedDeclaration file.swift
-```

@@ -92,10 +92,6 @@ public:
   // Resolve the dependencies for the current moduleID. Return true on error.
   bool resolve(const std::set<ModuleDependencyID> &dependencies,
                std::optional<std::set<ModuleDependencyID>> bridgingHeaderDeps) {
-    // No need to resolve dependency for placeholder.
-    if (moduleID.Kind == ModuleDependencyKind::SwiftPlaceholder)
-      return false;
-
     // If the dependency is already finalized, nothing needs to be done.
     if (resolvingDepInfo.isFinalized())
       return false;
@@ -114,13 +110,6 @@ public:
         auto binaryDepDetails = depInfo.getAsSwiftBinaryModule();
         assert(binaryDepDetails && "Expected Swift Binary Module dependency.");
         if (handleSwiftBinaryModuleDependency(depModuleID, *binaryDepDetails))
-          return true;
-      } break;
-      case swift::ModuleDependencyKind::SwiftPlaceholder: {
-        auto placeholderDetails = depInfo.getAsPlaceholderDependencyModule();
-        assert(placeholderDetails && "Expected Swift Placeholder dependency.");
-        if (handleSwiftPlaceholderModuleDependency(depModuleID,
-                                                   *placeholderDetails))
           return true;
       } break;
       case swift::ModuleDependencyKind::Clang: {
@@ -195,9 +184,6 @@ private:
   bool finalize(ModuleDependencyInfo &depInfo,
                 const SwiftInterfaceModuleOutputPathResolution::ResultTy
                     &swiftInterfaceModuleOutputPath) {
-    if (resolvingDepInfo.isSwiftPlaceholderModule())
-      return false;
-
     if (resolvingDepInfo.isSwiftInterfaceModule())
       depInfo.setOutputPathAndHash(
           swiftInterfaceModuleOutputPath.outputPath.str().str(),
@@ -284,15 +270,6 @@ private:
       }
     }
     addMacroDependencies(depModuleID, binaryDepDetails);
-    return false;
-  }
-
-  bool handleSwiftPlaceholderModuleDependency(
-      ModuleDependencyID depModuleID,
-      const SwiftPlaceholderModuleDependencyStorage &placeholderDetails) {
-    if (!resolvingDepInfo.isSwiftSourceModule())
-      commandline.push_back("-swift-module-file=" + depModuleID.ModuleName +
-                            "=" + placeholderDetails.compiledModulePath);
     return false;
   }
 
@@ -721,9 +698,6 @@ static void bridgeDependencyIDs(const ArrayRef<ModuleDependencyID> dependencies,
     case ModuleDependencyKind::SwiftBinary:
       dependencyKindAndName = "swiftBinary";
       break;
-    case ModuleDependencyKind::SwiftPlaceholder:
-      dependencyKindAndName = "swiftPlaceholder";
-      break;
     case ModuleDependencyKind::Clang:
       dependencyKindAndName = "clang";
       break;
@@ -747,10 +721,10 @@ static swiftscan_macro_dependency_set_t *createMacroDependencySet(
   unsigned SI = 0;
   for (auto &entry : macroDeps) {
     set->macro_dependencies[SI] = new swiftscan_macro_dependency_s;
-    set->macro_dependencies[SI]->moduleName = create_clone(entry.first.c_str());
-    set->macro_dependencies[SI]->libraryPath =
+    set->macro_dependencies[SI]->module_name = create_clone(entry.first.c_str());
+    set->macro_dependencies[SI]->library_path =
         create_clone(entry.second.LibraryPath.c_str());
-    set->macro_dependencies[SI]->executablePath =
+    set->macro_dependencies[SI]->executable_path =
         create_clone(entry.second.ExecutablePath.c_str());
     ++ SI;
   }
@@ -776,7 +750,6 @@ generateFullDependencyGraph(const CompilerInstance &instance,
     const auto &moduleID = allModules[i];
     auto &moduleDependencyInfo = cache.findKnownDependency(moduleID);
     // Collect all the required pieces to build a ModuleInfo
-    auto swiftPlaceholderDeps = moduleDependencyInfo.getAsPlaceholderDependencyModule();
     auto swiftTextualDeps = moduleDependencyInfo.getAsSwiftInterfaceModule();
     auto swiftSourceDeps = moduleDependencyInfo.getAsSwiftSourceModule();
     auto swiftBinaryDeps = moduleDependencyInfo.getAsSwiftBinaryModule();
@@ -788,8 +761,6 @@ generateFullDependencyGraph(const CompilerInstance &instance,
     std::string modulePath;
     if (swiftTextualDeps)
       modulePath = swiftTextualDeps->moduleOutputPath;
-    else if (swiftPlaceholderDeps)
-      modulePath = swiftPlaceholderDeps->compiledModulePath;
     else if (swiftBinaryDeps)
       modulePath = swiftBinaryDeps->compiledModulePath;
     else if (clangDeps)
@@ -904,12 +875,6 @@ generateFullDependencyGraph(const CompilerInstance &instance,
             create_clone(swiftSourceDeps->chainedBridgingHeaderPath.c_str()),
             create_clone(
                 swiftSourceDeps->chainedBridgingHeaderContent.c_str())};
-      } else if (swiftPlaceholderDeps) {
-        details->kind = SWIFTSCAN_DEPENDENCY_INFO_SWIFT_PLACEHOLDER;
-        details->swift_placeholder_details = {
-            create_clone(swiftPlaceholderDeps->compiledModulePath.c_str()),
-            create_clone(swiftPlaceholderDeps->moduleDocPath.c_str()),
-            create_clone(swiftPlaceholderDeps->sourceInfoPath.c_str())};
       } else if (swiftBinaryDeps) {
         details->kind = SWIFTSCAN_DEPENDENCY_INFO_SWIFT_BINARY;
         // Create an overlay dependencies set according to the output format
@@ -976,6 +941,37 @@ generateFullDependencyGraph(const CompilerInstance &instance,
       linkLibrarySet->link_libraries[i] = llInfo;
     }
     moduleInfo->link_libraries = linkLibrarySet;
+
+    // Create source import infos set for this module
+    auto imports = moduleDependencyInfo.getModuleImports();
+    swiftscan_import_info_set_t *importInfoSet =
+        new swiftscan_import_info_set_t;
+    importInfoSet->count = imports.size();
+    importInfoSet->imports = new swiftscan_import_info_t[importInfoSet->count];
+    for (size_t i = 0; i < imports.size(); ++i) {
+      const auto &ii = imports[i];
+      swiftscan_import_info_s *iInfo = new swiftscan_import_info_s;
+      iInfo->import_identifier = create_clone(ii.importIdentifier.c_str());
+      iInfo->access_level = static_cast<swiftscan_access_level_t>(ii.accessLevel);
+
+      const auto &sourceLocations = ii.importLocations;
+      swiftscan_source_location_set_t *sourceLocSet =
+          new swiftscan_source_location_set_t;
+      sourceLocSet->count = sourceLocations.size();
+      sourceLocSet->source_locations =
+          new swiftscan_source_location_t[sourceLocSet->count];
+      for (size_t j = 0; j < sourceLocations.size(); ++j) {
+        const auto &sl = sourceLocations[j];
+        swiftscan_source_location_s *slInfo = new swiftscan_source_location_s;
+        slInfo->buffer_identifier = create_clone(sl.bufferIdentifier.c_str());
+        slInfo->line_number = sl.lineNumber;
+        slInfo->column_number = sl.columnNumber;
+        sourceLocSet->source_locations[j] = slInfo;
+      }
+      iInfo->source_locations = sourceLocSet;
+      importInfoSet->imports[i] = iInfo;
+    }
+    moduleInfo->imports = importInfoSet;
   }
 
   swiftscan_dependency_graph_t result = new swiftscan_dependency_graph_s;
@@ -1315,8 +1311,6 @@ swift::dependencies::createEncodedModuleKindAndName(ModuleDependencyID id) {
     return "swiftTextual:" + id.ModuleName;
   case ModuleDependencyKind::SwiftBinary:
     return "swiftBinary:" + id.ModuleName;
-  case ModuleDependencyKind::SwiftPlaceholder:
-    return "swiftPlaceholder:" + id.ModuleName;
   case ModuleDependencyKind::Clang:
     return "clang:" + id.ModuleName;
   default:

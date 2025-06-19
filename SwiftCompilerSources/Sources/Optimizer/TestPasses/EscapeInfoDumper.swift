@@ -109,7 +109,7 @@ let addressEscapeInfoDumper = FunctionPass(name: "dump-addr-escape-info") {
   for value in valuesToCheck {
     print("value:\(value)")
     for apply in applies {
-      if value.allContainedAddresss.isEscaping(using: Visitor(apply: apply), context) {
+      if value.allContainedAddresses.isEscaping(using: Visitor(apply: apply), context) {
         print("  ==> \(apply)")
       } else {
         print("  -   \(apply)")
@@ -127,8 +127,8 @@ let addressEscapeInfoDumper = FunctionPass(name: "dump-addr-escape-info") {
         print(lhs)
         print(rhs)
 
-        let projLhs = lhs.allContainedAddresss
-        let projRhs = rhs.allContainedAddresss
+        let projLhs = lhs.allContainedAddresses
+        let projRhs = rhs.allContainedAddresses
         let mayAlias = projLhs.canAddressAlias(with: projRhs, context)
         if mayAlias != projRhs.canAddressAlias(with: projLhs, context) {
           fatalError("canAddressAlias(with:) must be symmetric")

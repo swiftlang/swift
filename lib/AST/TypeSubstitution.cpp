@@ -446,8 +446,13 @@ Type TypeSubstituter::transformDependentMemberType(DependentMemberType *dependen
 
   auto result = conformance.getTypeWitness(assocType, IFS.getOptions());
   if (result->is<ErrorType>()) {
+    // Substitute the base type for the original ErrorType for type printing.
+    // Avoid doing this if the substitutions introduce type variables or
+    // placeholders since ErrorTypes can't be solver-allocated currently (and
+    // type variables aren't helpful when printing anyway).
     auto substBase = origBase.subst(IFS);
-    return DependentMemberType::get(ErrorType::get(substBase), assocType);
+    if (!substBase->hasTypeVariableOrPlaceholder())
+      return DependentMemberType::get(ErrorType::get(substBase), assocType);
   }
   return result;
 }
@@ -523,14 +528,20 @@ Type TypeBase::getSuperclassForDecl(const ClassDecl *baseClass,
     t = t->getSuperclass(useArchetypes);
   }
 
-#ifndef NDEBUG
-  auto *currentClass = getConcreteTypeForSuperclassTraversing(this)
-      ->getClassOrBoundGenericClass();
-  assert(baseClass->isSuperclassOf(currentClass) &&
-         "no inheritance relationship between given classes");
-#endif
+  if (CONDITIONAL_ASSERT_enabled()) {
+    auto *currentClass = getConcreteTypeForSuperclassTraversing(this)
+        ->getClassOrBoundGenericClass();
+    ASSERT(baseClass->isSuperclassOf(currentClass) &&
+           "no inheritance relationship between given classes");
+  }
 
-  return ErrorType::get(this);
+  // We can end up here if the AST is invalid, because then
+  // getSuperclassDecl() might resolve to a decl, and yet
+  // getSuperclass() is just an ErrorType. Make sure we still
+  // return a nominal type as the result though, and not an
+  // ErrorType, because that's what callers expect.
+  return baseClass->getDeclaredInterfaceType()
+      .subst(SubstitutionMap())->getCanonicalType();
 }
 
 SubstitutionMap TypeBase::getContextSubstitutionMap() {
@@ -546,7 +557,7 @@ SubstitutionMap TypeBase::getContextSubstitutionMap() {
 
   Type baseTy(this);
 
-  assert(!baseTy->hasLValueType() &&
+  assert(!baseTy->is<LValueType>() &&
          !baseTy->is<AnyMetatypeType>() &&
          !baseTy->is<ErrorType>());
 
@@ -628,7 +639,7 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
   assert(dc->isTypeContext());
   Type baseTy(this);
 
-  assert(!baseTy->hasLValueType() &&
+  assert(!baseTy->is<LValueType>() &&
          !baseTy->is<AnyMetatypeType>() &&
          !baseTy->is<ErrorType>());
 
@@ -753,7 +764,9 @@ TypeBase::getContextSubstitutions(const DeclContext *dc,
 SubstitutionMap TypeBase::getContextSubstitutionMap(
     const DeclContext *dc,
     GenericEnvironment *genericEnv) {
-  if (dc == getAnyNominal() && genericEnv == nullptr)
+  auto *nominal = getAnyNominal();
+  if (dc == nominal && !isa<ProtocolDecl>(nominal) &&
+      genericEnv == nullptr)
     return getContextSubstitutionMap();
 
   auto genericSig = dc->getGenericSignatureOfContext();

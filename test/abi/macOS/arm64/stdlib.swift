@@ -918,7 +918,6 @@ Added: _$ss11MutableSpanVMa
 Added: _$ss11MutableSpanVMn
 Added: _$ss11MutableSpanVsRi_zrlE6_countSivg
 Added: _$ss11MutableSpanVsRi_zrlE8_pointerSvSgvg
-Added: _$ss11MutableSpanVsRi_zrlE10_uncheckedAByxGSryxG_tcfC
 Added: _$ss14MutableRawSpanV6_countSivg
 Added: _$ss14MutableRawSpanV8_pointerSvSgvg
 Added: _$ss14MutableRawSpanVMa
@@ -935,6 +934,8 @@ Added: _$ss10ArraySliceV11mutableSpans07MutableD0VyxGvr
 Added: _$ss15ContiguousArrayV11mutableSpans07MutableD0VyxGvr
 Added: _$ss11InlineArrayVsRi__rlE11mutableSpans07MutableD0Vyq_Gvr
 Added: _$ss15CollectionOfOneV11mutableSpans07MutableE0VyxGvr
+Added: _$sSrsRi_zrlE11mutableSpans07MutableB0VyxGvr
+Added: _$sSw12mutableBytess14MutableRawSpanVvr
 
 // _SwiftifyInfo enum for _SwiftifyImports macro
 Added: _$ss13_SwiftifyExprO5paramyABSicABmFWC
@@ -1050,7 +1051,6 @@ Added: __swift_stdlib_CreateIndirectTaggedPointerString
 // Span backward deployment
 Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss11MutableSpanVMa$
 Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss11MutableSpanVMn$
-Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss11MutableSpanVsRi_zrlE10_uncheckedAByxGSryxG_tcfC$
 Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss11MutableSpanVsRi_zrlE6_countSivg$
 Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss11MutableSpanVsRi_zrlE8_pointerSvSgvg$
 Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss14MutableRawSpanV6_countSivg$
@@ -1087,3 +1087,6 @@ Added: _$ss8UTF8SpanV10_countMasks6UInt64VvpZMV
 Added: _$ss8UTF8SpanV10_flagsMasks6UInt64VvpZMV
 Added: _$ss8UTF8SpanV7_nfcBits6UInt64VvpZMV
 Added: _$ss8UTF8SpanV9_asciiBits6UInt64VvpZMV
+
+// printing foreign reference types requires a new displayStyle: .foreign
+Added: _$ss6MirrorV12DisplayStyleO16foreignReferenceyA2DmFWC

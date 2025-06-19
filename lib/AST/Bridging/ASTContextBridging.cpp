@@ -36,8 +36,8 @@ bool BridgedASTContext_langOptsHasFeature(BridgedASTContext cContext,
   return cContext.unbridged().LangOpts.hasFeature((Feature)feature);
 }
 
-unsigned BridgedASTContext_majorLanguageVersion(BridgedASTContext cContext) {
-  return cContext.unbridged().LangOpts.EffectiveLanguageVersion[0];
+unsigned BridgedASTContext::getMajorLanguageVersion() const {
+  return unbridged().LangOpts.EffectiveLanguageVersion[0];
 }
 
 bool BridgedASTContext_langOptsCustomConditionSet(BridgedASTContext cContext,
@@ -90,23 +90,20 @@ bool BridgedASTContext_langOptsIsActiveTargetPtrAuth(BridgedASTContext cContext,
       PlatformConditionKind::PtrAuth, cName.unbridged());
 }
 
-unsigned
-BridgedASTContext_langOptsTargetPointerBitWidth(BridgedASTContext cContext) {
-  return cContext.unbridged().LangOpts.Target.isArch64Bit()   ? 64
-         : cContext.unbridged().LangOpts.Target.isArch32Bit() ? 32
-         : cContext.unbridged().LangOpts.Target.isArch16Bit() ? 16
-                                                              : 0;
+unsigned BridgedASTContext::getLangOptsTargetPointerBitWidth() const {
+  return unbridged().LangOpts.Target.isArch64Bit()   ? 64
+         : unbridged().LangOpts.Target.isArch32Bit() ? 32
+         : unbridged().LangOpts.Target.isArch16Bit() ? 16
+                                                     : 0;
 }
 
-bool BridgedASTContext_langOptsAttachCommentsToDecls(
-    BridgedASTContext cContext) {
-  return cContext.unbridged().LangOpts.AttachCommentsToDecls;
+bool BridgedASTContext::getLangOptsAttachCommentsToDecls() const {
+  return unbridged().LangOpts.AttachCommentsToDecls;
 }
 
-BridgedEndianness
-BridgedASTContext_langOptsTargetEndianness(BridgedASTContext cContext) {
-  return cContext.unbridged().LangOpts.Target.isLittleEndian() ? EndianLittle
-                                                               : EndianBig;
+BridgedEndianness BridgedASTContext::getLangOptsTargetEndianness() const {
+  return unbridged().LangOpts.Target.isLittleEndian() ? EndianLittle
+                                                      : EndianBig;
 }
 
 /// Convert an array of numbers into a form we can use in Swift.
@@ -179,7 +176,6 @@ bool BridgedASTContext_canImport(BridgedASTContext cContext,
       versionKind == CanImportUnderlyingVersion);
 }
 
-BridgedAvailabilityMacroMap
-BridgedASTContext_getAvailabilityMacroMap(BridgedASTContext cContext) {
-  return &cContext.unbridged().getAvailabilityMacroMap();
+BridgedAvailabilityMacroMap BridgedASTContext::getAvailabilityMacroMap() const {
+  return &unbridged().getAvailabilityMacroMap();
 }

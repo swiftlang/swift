@@ -262,7 +262,7 @@ class PluginDiagnosticsEngine {
     fixItChanges: [PluginMessage.Diagnostic.FixIt.Change] = []
   ) {
     // Map severity
-    let bridgedSeverity: BridgedDiagnosticSeverity
+    let bridgedSeverity: swift.DiagnosticKind
     switch severity {
     case .error: bridgedSeverity = .error
     case .note: bridgedSeverity = .note

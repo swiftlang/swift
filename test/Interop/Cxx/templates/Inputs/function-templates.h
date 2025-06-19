@@ -120,7 +120,9 @@ template <class T> bool constLvalueReferenceToBool(const T &t) { return t; }
 
 template <class T> void forwardingReference(T &&) {}
 
-template <class T> void PointerTemplateParameter(T*){}
+template <class T> bool pointerTemplateParameter(T *t) { return t; }
+template <class T> bool pointerTemplateParameterNonnull(T *_Nonnull t) { return t; }
+template <class T> bool pointerTemplateParameterNullable(T *_Nullable t) { return t; }
 
 template <typename F> void callFunction(F f) { f(); }
 template <typename F, typename T> void callFunctionWithParam(F f, T t) { f(t); }

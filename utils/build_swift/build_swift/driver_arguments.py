@@ -132,6 +132,9 @@ def _apply_default_arguments(args):
     if args.lldb_assertions is None:
         args.lldb_assertions = args.assertions
 
+    if args.swift_stdlib_strict_availability is None:
+        args.swift_stdlib_strict_availability = False
+
     # --ios-all etc are not supported by open-source Swift.
     if args.ios_all:
         raise ValueError('error: --ios-all is unavailable in open-source '
@@ -1044,6 +1047,14 @@ def create_argument_parser():
            const=False,
            help='disable assertions in llbuild')
 
+    option('--swift-stdlib-strict-availability', store,
+           const=True,
+           help='enable strict availability checking in the Swift standard library (you want this OFF for CI or at-desk builds)')
+    option('--no-swift-stdlib-strict-availability',
+           store('swift_stdlib_strict_availability'),
+           const=False,
+           help='disable strict availability checking in the Swift standard library (you want this OFF for CI or at-desk builds)')
+
     # -------------------------------------------------------------------------
     in_group('Select the CMake generator')
 
@@ -1410,8 +1421,14 @@ def create_argument_parser():
                 'Can be called multiple times '
                 'to add multiple such options.')
 
-    option('--no-llvm-include-tests', toggle_false('llvm_include_tests'),
-           help='do not generate testing targets for LLVM')
+    with mutually_exclusive_group():
+        set_defaults(llvm_include_tests=True)
+
+        option('--no-llvm-include-tests', toggle_false('llvm_include_tests'),
+               help='do not generate testing targets for LLVM')
+
+        option('--llvm-include-tests', toggle_true('llvm_include_tests'),
+               help='generate testing targets for LLVM')
 
     option('--llvm-cmake-options', append,
            type=argparse.ShellSplitType(),
@@ -1425,11 +1442,6 @@ def create_argument_parser():
                 'These are the last arguments passed to CMake and can override '
                 'existing options.',
            default=[])
-
-    option('--llvm-build-compiler-rt-with-use-runtimes', toggle_true, default=True,
-           help='Switch to LLVM_ENABLE_RUNTIMES as the mechanism to build compiler-rt'
-                'It will become the default with LLVM 21, this flag is '
-                'meant to stage its introduction and account for edge cases')
 
     # -------------------------------------------------------------------------
     in_group('Build settings for Android')

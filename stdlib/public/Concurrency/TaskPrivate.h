@@ -854,6 +854,8 @@ struct AsyncTask::PrivateStorage {
       }
     }
 
+    _swift_tsan_release(task);
+
     // Destroy and deallocate any remaining task local items since the task is
     // completed. We need to do this before we destroy the task local
     // deallocator.

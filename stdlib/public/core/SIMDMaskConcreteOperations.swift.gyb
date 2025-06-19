@@ -36,19 +36,6 @@ extension SIMDMask where Storage == ${Vector} {
     _storage = ${Vector}(repeating: scalar ? -1 : 0)
   }
   
-%  if n >= 4:
-  @_alwaysEmitIntoClient @_transparent
-  public init(
-    lowHalf: SIMDMask<SIMD${n//2}<${Scalar}>>,
-    highHalf: SIMDMask<SIMD${n//2}<${Scalar}>>
-  ) {
-    _storage = ${Vector}(
-      lowHalf: lowHalf._storage,
-      highHalf: highHalf._storage
-    )
-  }
-  
-%  end
   @_alwaysEmitIntoClient
   internal static var allTrue: Self {
     let zero = ${Vector}()

@@ -34,6 +34,9 @@ public:
   /// Skip replaying outputs from cache.
   bool CacheSkipReplay = false;
 
+  /// Import modules from CAS.
+  bool ImportModuleFromCAS = false;
+
   /// CASOptions
   clang::CASOptions CASOpts;
 

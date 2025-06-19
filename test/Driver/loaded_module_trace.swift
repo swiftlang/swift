@@ -12,6 +12,7 @@
 // CHECK: "version":2
 // CHECK: "name":"loaded_module_trace"
 // CHECK: "arch":"{{[^"]*}}"
+// CHECK: "languageMode":"4"
 // CHECK: "strictMemorySafety":false
 // CHECK: "swiftmodules":[
 // CHECK-DAG: "{{[^"]*\\[/\\]}}Module2.swiftmodule"

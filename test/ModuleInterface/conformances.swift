@@ -230,11 +230,11 @@ extension PrivateProtoConformer : PrivateProto {
 // NEGATIVE-NOT: extension {{(Swift.)?}}Bool{{.+}}Equatable
 
 
-@available(macOS 10.97, iOS 22, *)
+@available(macOS 10.97, iOS 13.22, *)
 @available(tvOS, unavailable)
 @available(swift 4.2.123)
 public struct NestedAvailabilityOuter {
-  @available(iOS 23, *)
+  @available(iOS 13.23, *)
   public struct Inner: PrivateSubProto {}
 }
 
@@ -244,7 +244,7 @@ public struct NestedAvailabilityOuter {
 // CHECK: @available(*, unavailable)
 // CHECK-NEXT: extension conformances.NonSendable : @unchecked Swift.Sendable {
 
-// CHECK-END: @available(macOS 10.97, iOS 23, *)
+// CHECK-END: @available(macOS 10.97, iOS 13.23, *)
 // CHECK-END: @available(tvOS, unavailable)
 // CHECK-END: extension conformances.NestedAvailabilityOuter.Inner : conformances.PublicBaseProto {}
 

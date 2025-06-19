@@ -1169,19 +1169,17 @@ extension ASTGenVisitor {
   ///   @lifetime(self)
   ///   ```
   func generateLifetimeAttr(attribute node: AttributeSyntax) -> BridgedLifetimeAttr? {
-    guard self.ctx.langOptsHasFeature(.LifetimeDependence) else {
-      // TODO: Diagnose
-      fatalError("@lifetime attribute requires 'LifetimeDependence' feature")
-    }
     guard let entry = self.generateLifetimeEntry(attribute: node) else {
       // TODO: Diagnose?
       return nil
     }
+
     return .createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
       range: self.generateAttrSourceRange(node),
-      entry: entry
+      entry: entry,
+      isUnderscored: node.attributeName.as(IdentifierTypeSyntax.self)?.name.text == "_lifetime"
     )
   }
 
@@ -1877,19 +1875,19 @@ extension ASTGenVisitor {
   ///   ```
   func generateSpecializedAttr(attribute node: AttributeSyntax, attrName: SyntaxText) -> BridgedSpecializedAttr? {
     guard
-      var arg = node.arguments?.as(SpecializedAttributeArgumentSyntax.self)
+      let arg = node.arguments?.as(SpecializedAttributeArgumentSyntax.self)
     else {
       // TODO: Diagnose
       return nil
     }
-    var exported: Bool?
-    var kind: BridgedSpecializationKind? = nil
+    let exported: Bool? = nil
+    let kind: BridgedSpecializationKind? = nil
     var whereClause: BridgedTrailingWhereClause? = nil
-    var targetFunction: BridgedDeclNameRef? = nil
-    var spiGroups: [BridgedIdentifier] = []
-    var availableAttrs: [BridgedAvailableAttr] = []
+    let targetFunction: BridgedDeclNameRef? = nil
+    let spiGroups: [BridgedIdentifier] = []
+    let availableAttrs: [BridgedAvailableAttr] = []
 
-    whereClause =  self.generate(genericWhereClause: arg.genericWhereClause)
+    whereClause = self.generate(genericWhereClause: arg.genericWhereClause)
 
     return .createParsed(
       self.ctx,
@@ -1925,7 +1923,7 @@ extension ASTGenVisitor {
     while let arg = args.popFirst() {
       switch arg {
       case .genericWhereClause(let arg):
-        whereClause =  self.generate(genericWhereClause: arg)
+        whereClause = self.generate(genericWhereClause: arg)
       case .specializeTargetFunctionArgument(let arg):
         if targetFunction != nil {
           // TODO: Diangose.

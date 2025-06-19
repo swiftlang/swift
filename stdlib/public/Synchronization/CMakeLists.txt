@@ -59,6 +59,13 @@ set(SWIFT_SYNCHRONIZATION_LINUX_SOURCES
   Mutex/SpinLoopHint.swift
 )
 
+# FreeBSD sources
+
+set(SWIFT_SYNCHRONIZATION_FREEBSD_SOURCES
+  Mutex/FreeBSDImpl.swift
+  Mutex/Mutex.swift
+)
+
 # Wasm sources
 
 set(SWIFT_SYNCHRONIZATION_WASM_SOURCES
@@ -106,6 +113,8 @@ add_swift_target_library(swiftSynchronization ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES
     ${SWIFT_SYNCHRONIZATION_WASM_SOURCES}
   SWIFT_SOURCES_DEPENDS_WINDOWS
     ${SWIFT_SYNCHRONIZATION_WINDOWS_SOURCES}
+  SWIFT_SOURCES_DEPENDS_FREEBSD
+    ${SWIFT_SYNCHRONIZATION_FREEBSD_SOURCES}
   SWIFT_SOURCES_DEPENDS_FREESTANDING
     Mutex/MutexUnavailable.swift
 
@@ -129,6 +138,8 @@ add_swift_target_library(swiftSynchronization ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES
     Android
   SWIFT_MODULE_DEPENDS_WINDOWS
     WinSDK
+  SWIFT_MODULE_DEPENDS_FREEBSD
+    Glibc
 
   SWIFT_COMPILE_FLAGS
     ${SWIFT_SYNCHRNOIZATION_SWIFT_FLAGS}
@@ -147,6 +158,12 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   add_custom_target(embedded-synchronization)
   add_dependencies(embedded-libraries embedded-synchronization)
 
+  set(SWIFT_ENABLE_REFLECTION OFF)
+  set(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT OFF)
+  set(SWIFT_STDLIB_STABLE_ABI OFF)
+  set(SWIFT_STDLIB_ENABLE_OBJC_INTEROP OFF)
+  set(SWIFT_STDLIB_ENABLE_VECTOR_TYPES OFF)
+
   foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
     string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
     list(GET list 0 arch)
@@ -157,13 +174,10 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     if("${arch}" MATCHES "avr")
       continue()
     endif()
-    
+
     set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")
     set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
     set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
-    set(SWIFT_SDK_embedded_PATH ${SWIFT_SDK_OSX_PATH})
-    set(SWIFT_SDK_embedded_ARCH_${arch}_PATH ${SWIFT_SDK_OSX_PATH})
-    set(SWIFT_SDK_embedded_USE_ISYSROOT TRUE)
     add_swift_target_library_single(
       embedded-synchronization-${mod}
       swiftSynchronization

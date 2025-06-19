@@ -263,6 +263,9 @@ SwiftTargetInfo SwiftTargetInfo::get(IRGenModule &IGM) {
     break;
   }
 
+  if (IGM.getOptions().CustomLeastValidPointerValue != 0)
+    target.LeastValidPointerValue = IGM.getOptions().CustomLeastValidPointerValue;
+
   return target;
 }
 

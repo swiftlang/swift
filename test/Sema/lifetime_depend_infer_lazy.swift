@@ -1,8 +1,8 @@
 // RUN: %target-typecheck-verify-swift \
-// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-lifetime-dependence-inference
 
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 
 // Coverage testing for LifetimeDependence inferrence logic. The tests are grouped according to the design of
 // LifetimeDependenceChecker.
@@ -12,7 +12,7 @@ class C {}
 struct NE: ~Escapable {}
 
 struct NEImmortal: ~Escapable {
-  @lifetime(immortal)
+  @_lifetime(immortal)
   init() {}
 }
 
@@ -23,68 +23,68 @@ struct NEImmortal: ~Escapable {
 struct NonEscapableSelf: ~Escapable {
   func methodNoParam() -> NonEscapableSelf { self } // OK
 
-  @lifetime(self) // OK
+  @_lifetime(self) // OK
   func methodNoParamLifetime() -> NonEscapableSelf { self }
 
-  @lifetime(copy self) // OK
+  @_lifetime(copy self) // OK
   func methodNoParamCopy() -> NonEscapableSelf { self }
 
-  @lifetime(borrow self) // OK
+  @_lifetime(borrow self) // OK
   func methodNoParamBorrow() -> NonEscapableSelf { self }
 
-  @lifetime(self) // OK
+  @_lifetime(self) // OK
   mutating func mutatingMethodNoParamLifetime() -> NonEscapableSelf { self }
 
-  @lifetime(copy self) // OK
+  @_lifetime(copy self) // OK
   mutating func mutatingMethodNoParamCopy() -> NonEscapableSelf { self }
 
-  @lifetime(borrow self) // OK
+  @_lifetime(&self) // OK
   mutating func mutatingMethodNoParamBorrow() -> NonEscapableSelf { self }
 
   func methodOneParam(_: Int) -> NonEscapableSelf { self } // OK
 
-  @lifetime(self) // OK
+  @_lifetime(self) // OK
   func methodOneParamLifetime(_: Int) -> NonEscapableSelf { self }
 
-  @lifetime(copy self) // OK
+  @_lifetime(copy self) // OK
   func methodOneParamCopy(_: Int) -> NonEscapableSelf { self }
 
-  @lifetime(borrow self) // OK
+  @_lifetime(borrow self) // OK
   func methodOneParamBorrow(_: Int) -> NonEscapableSelf { self }
 
-  @lifetime(self) // OK
+  @_lifetime(self) // OK
   mutating func mutatingMethodOneParamLifetime(_: Int) -> NonEscapableSelf { self }
 
-  @lifetime(copy self) // OK
+  @_lifetime(copy self) // OK
   mutating func mutatingMethodOneParamCopy(_: Int) -> NonEscapableSelf { self }
 
-  @lifetime(borrow self) // OK
+  @_lifetime(&self) // OK
   mutating func mutatingMethodOneParamBorrow(_: Int) -> NonEscapableSelf { self }
 }
 
 struct EscapableTrivialSelf {
-  @lifetime(self) // OK
+  @_lifetime(self) // OK
   func methodNoParamLifetime() -> NEImmortal { NEImmortal() }
 
-  @lifetime(borrow self) // OK
+  @_lifetime(borrow self) // OK
   func methodNoParamBorrow() -> NEImmortal { NEImmortal() }
 
-  @lifetime(self) // OK
+  @_lifetime(self) // OK
   mutating func mutatingMethodNoParamLifetime() -> NEImmortal { NEImmortal() }
 
-  @lifetime(borrow self) // OK
+  @_lifetime(&self) // OK
   mutating func mutatingMethodNoParamBorrow() -> NEImmortal { NEImmortal() }
 
-  @lifetime(self) // OK
+  @_lifetime(self) // OK
   func methodOneParamLifetime(_: Int) -> NEImmortal { NEImmortal() }
 
-  @lifetime(borrow self) // OK
+  @_lifetime(borrow self) // OK
   func methodOneParamBorrow(_: Int) -> NEImmortal { NEImmortal() }
 
-  @lifetime(self) // OK
+  @_lifetime(self) // OK
   mutating func mutatingMethodOneParamLifetime(_: Int) -> NEImmortal { NEImmortal() }
 
-  @lifetime(borrow self)
+  @_lifetime(&self)
   mutating func mutatingMethodOneParamBorrow(_: Int) -> NEImmortal { NEImmortal() }
 }
 
@@ -95,34 +95,34 @@ struct EscapableNonTrivialSelf {
 
   func methodNoParam() -> NEImmortal { NEImmortal() } // OK
 
-  @lifetime(self) // OK
+  @_lifetime(self) // OK
   func methodNoParamLifetime() -> NEImmortal { NEImmortal() }
 
-  @lifetime(borrow self) // OK
+  @_lifetime(borrow self) // OK
   func methodNoParamBorrow() -> NEImmortal { NEImmortal() }
 
   func mutatingMethodNoParam() -> NEImmortal { NEImmortal() } // OK
 
-  @lifetime(self)
+  @_lifetime(self)
   mutating func mutatingMethodNoParamLifetime() -> NEImmortal { NEImmortal() }
 
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating func mutatingMethodNoParamBorrow() -> NEImmortal { NEImmortal() }
 
   func methodOneParam(_: Int) -> NEImmortal { NEImmortal() } // OK
 
-  @lifetime(self) // OK
+  @_lifetime(self) // OK
   func methodOneParamLifetime(_: Int) -> NEImmortal { NEImmortal() }
 
-  @lifetime(borrow self) // OK
+  @_lifetime(borrow self) // OK
   func methodOneParamBorrow(_: Int) -> NEImmortal { NEImmortal() }
 
   mutating func mutatingMethodOneParam(_: Int) -> NEImmortal { NEImmortal() } // OK
 
-  @lifetime(self) // OK
+  @_lifetime(self) // OK
   mutating func mutatingMethodOneParamLifetime(_: Int) -> NEImmortal { NEImmortal() }
 
-  @lifetime(&self) // OK
+  @_lifetime(&self) // OK
   mutating func mutatingMethodOneParamBorrow(_: Int) -> NEImmortal { NEImmortal() }
 }
 
@@ -159,40 +159,40 @@ struct NonescapableInoutInitializers: ~Escapable {
   init(c: inout C) { self.c = copy c } // OK
 }
 
-@lifetime(immortal)
+@_lifetime(immortal)
 func noParamImmortal() -> NEImmortal { NEImmortal() } // OK
 
-@lifetime(c)
+@_lifetime(c)
 func oneParamLifetime(c: C) -> NEImmortal { NEImmortal() }
 
 func oneParamBorrow(c: borrowing C) -> NEImmortal { NEImmortal() } // OK
 
-@lifetime(c)
+@_lifetime(c)
 func oneParamBorrowLifetime(c: borrowing C) -> NEImmortal { NEImmortal() } // OK
 
 func oneParamInout(c: inout C) -> NEImmortal { NEImmortal() } // OK
 
-@lifetime(c)
+@_lifetime(c)
 func oneParamInoutLifetime(c: inout C) -> NEImmortal { NEImmortal() } // OK
 
-@lifetime(c)
+@_lifetime(c)
 func twoParamsLifetime(c: C, _: Int) -> NEImmortal { NEImmortal() }
 
 func twoParamsBorrow(c: borrowing C, _: Int) -> NEImmortal { NEImmortal() } // OK
 
 func neParam(ne: NE) -> NE { ne } // OK
 
-@lifetime(ne) // OK
+@_lifetime(ne) // OK
 func neParamLifetime(ne: NE) -> NE { ne }
 
 func neParamBorrow(ne: borrowing NE) -> NE { copy ne } // OK
 
-@lifetime(ne) // OK
+@_lifetime(ne) // OK
 func neParamBorrowLifetime(ne: borrowing NE) -> NE { copy ne }
 
 func neParamConsume(ne: consuming NE) -> NE { ne } // OK
 
-@lifetime(ne) // OK
+@_lifetime(ne) // OK
 func neParamConsumeLifetime(ne: consuming NE) -> NE { ne }
 
 func neTwoParam(ne: NE, _:Int) -> NE { ne } // OK
@@ -234,7 +234,7 @@ struct Accessors {
 struct NonescapableSelfAccessors: ~Escapable {
   var ne: NE
 
-  @lifetime(immortal)
+  @_lifetime(immortal)
   init() {
     ne = NE()
   }
@@ -254,79 +254,79 @@ struct NonescapableSelfAccessors: ~Escapable {
       yield ne
     }
 
-    @lifetime(borrow self)
+    @_lifetime(&self)
     _modify {
       yield &ne
     }
   }
 
   var neComputedLifetime: NE {
-    @lifetime(self) // OK
+    @_lifetime(self) // OK
     get {
       ne
     }
 
-    @lifetime(self) // OK
+    @_lifetime(self) // OK
     set {
       ne = newValue
     }
   }
 
   var neYieldedLifetime: NE {
-    @lifetime(self) // OK
+    @_lifetime(self) // OK
     _read {
       yield ne
     }
 
-    @lifetime(self) // OK
+    @_lifetime(self) // OK
     _modify {
       yield &ne
     }
   }
 
   var neComputedCopy: NE {
-    @lifetime(copy self)
+    @_lifetime(copy self)
     get {
       ne
     }
 
-    @lifetime(copy self)
+    @_lifetime(copy self)
     set {
       ne = newValue
     }
   }
 
   var neYieldedCopy: NE {
-    @lifetime(copy self)
+    @_lifetime(copy self)
     _read {
       yield ne
     }
 
-    @lifetime(copy self)
+    @_lifetime(copy self)
     _modify {
       yield &ne
     }
   }
 
   var neComputedBorrow: NE {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     get {
       ne
     }
 
-    @lifetime(borrow self)
+    @_lifetime(&self)
     set {
       ne = newValue
     }
   }
 
   var neYieldedBorrow: NE {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     _read {
       yield ne
     }
 
-    @lifetime(borrow self)
+    @_lifetime(&self)
     _modify {
       yield &ne
     }
@@ -351,79 +351,79 @@ struct NoncopyableSelfAccessors: ~Copyable & ~Escapable {
       yield ne
     }
 
-    @lifetime(&self)
+    @_lifetime(&self)
     _modify {
       yield &ne
     }
   }
 
   var neComputedLifetime: NE {
-    @lifetime(self) // OK
+    @_lifetime(self) // OK
     get {
       ne
     }
 
-    @lifetime(self) // OK
+    @_lifetime(self) // OK
     set {
       ne = newValue
     }
   }
 
   var neYieldedLifetime: NE {
-    @lifetime(self) // OK
+    @_lifetime(self) // OK
     _read {
       yield ne
     }
 
-    @lifetime(self) // OK
+    @_lifetime(self) // OK
     _modify {
       yield &ne
     }
   }
 
   var neComputedCopy: NE {
-    @lifetime(copy self)
+    @_lifetime(copy self)
     get {
       ne
     }
 
-    @lifetime(copy self)
+    @_lifetime(copy self)
     set {
       ne = newValue
     }
   }
 
   var neYieldedCopy: NE {
-    @lifetime(copy self)
+    @_lifetime(copy self)
     _read {
       yield ne
     }
 
-    @lifetime(copy self)
+    @_lifetime(copy self)
     _modify {
       yield &ne
     }
   }
 
   var neComputedBorrow: NE {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     get {
       ne
     }
 
-    @lifetime(&self)
+    @_lifetime(&self)
     set {
       ne = newValue
     }
   }
 
   var neYieldedBorrow: NE {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     _read {
       yield ne
     }
 
-    @lifetime(&self)
+    @_lifetime(&self)
     _modify {
       yield &ne
     }
@@ -437,18 +437,18 @@ struct NoncopyableSelfAccessors: ~Copyable & ~Escapable {
 struct NonEscapableMutableSelf: ~Escapable {
   mutating func mutatingMethodNoParam() {} // OK
 
-  @lifetime(self: self) // OK
+  @_lifetime(self: self) // OK
   mutating func mutatingMethodNoParamLifetime() {}
 
-  @lifetime(self: copy self) // OK
+  @_lifetime(self: copy self) // OK
   mutating func mutatingMethodNoParamCopy() {}
 
-  @lifetime(self: self) // OK
+  @_lifetime(self: self) // OK
   mutating func mutatingMethodOneParamLifetime(_: NE) {}
 
-  @lifetime(copy self) // OK
+  @_lifetime(copy self) // OK
   mutating func mutatingMethodOneParamCopy(_: NE) {}
 
-  @lifetime(borrow self)
+  @_lifetime(&self)
   mutating func mutatingMethodOneParamBorrow(_: NE) {}
 }

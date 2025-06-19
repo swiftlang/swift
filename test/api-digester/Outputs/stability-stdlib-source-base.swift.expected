@@ -363,8 +363,6 @@ Func ContiguousArray.withUnsafeMutableBufferPointer(_:) is now without rethrows
 
 // Adoption of @_addressableForDependencies
 Struct CollectionOfOne is now with @_addressableForDependencies
-Struct String.UTF8View is now with @_addressableForDependencies
-Struct Substring.UTF8View is now with @_addressableForDependencies
 
 Protocol CodingKey has added inherited protocol SendableMetatype
 Protocol Error has added inherited protocol SendableMetatype

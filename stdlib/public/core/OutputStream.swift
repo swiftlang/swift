@@ -381,6 +381,10 @@ internal func _adHocPrint_unlocked<T, TargetStream: TextOutputStream>(
             target.write(")")
           }
         }
+      case .foreignReference:
+        printTypeName(mirror.subjectType)
+        // FRT has no children
+        target.write("()")
       default:
         target.write(_typeName(mirror.subjectType))
     }
@@ -526,7 +530,7 @@ internal func _dumpPrint_unlocked<T, TargetStream: TextOutputStream>(
 
   if let displayStyle = mirror.displayStyle {
     switch displayStyle {
-    case .`class`, .`struct`:
+    case .`class`, .`struct`, .foreignReference:
       // Classes and structs without custom representations are displayed as
       // their fully qualified type name
       target.write(_typeName(mirror.subjectType, qualified: true))

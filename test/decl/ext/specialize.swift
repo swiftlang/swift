@@ -86,3 +86,9 @@ class State {
 extension Test.Key<State> {
   static let state = Self<State>()
 }
+
+protocol P {}
+struct S: P {}
+
+extension Sequence<any P> where Self == [S] {}
+// expected-error@-1 {{generic signature requires types 'S' and 'any P' to be the same}}

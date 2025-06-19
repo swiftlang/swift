@@ -2376,7 +2376,7 @@ FUNCTION(TaskCreate,
               RefCountedPtrTy),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Concurrency),
-         MEMEFFECTS(ArgMemOnly))
+         MEMEFFECTS(ReadOnly))
 
 // void swift_task_switch(AsyncContext *resumeContext,
 //                        TaskContinuationFunction *resumeFunction,

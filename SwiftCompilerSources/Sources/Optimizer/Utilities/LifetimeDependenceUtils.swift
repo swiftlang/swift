@@ -165,16 +165,12 @@ extension LifetimeDependence {
   //
   // This is necessary because inserting a mark_dependence placeholder for such an unsafe dependence would illegally
   // have the same base and value operand.
-  //
-  // TODO: handle indirect results
-  init?(unsafeApplyResult value: Value, _ context: some Context) {
+  init?(unsafeApplyResult value: Value, apply: FullApplySite, _ context: some Context) {
     if value.isEscapable {
       return nil
     }
-    if (value.definingInstructionOrTerminator as! FullApplySite).hasResultDependence {
-      return nil
-    }
-    assert(value.ownership == .owned, "unsafe apply result must be owned")
+    assert(!apply.hasResultDependence, "mark_dependence should be used instead")
+    assert(value.ownership == .owned || value.type.isAddress, "unsafe apply result must be owned")
     self.scope = Scope(base: value, context)
     self.dependentValue = value
     self.markDepInst = nil
@@ -386,7 +382,7 @@ extension LifetimeDependence.Scope {
 }
 
 extension LifetimeDependence.Scope {
-  /// Ignore "irrelevent" borrow scopes: load_borrow or begin_borrow without [var_decl]
+  /// Ignore "irrelevant" borrow scopes: load_borrow or begin_borrow without [var_decl]
   func ignoreBorrowScope(_ context: some Context) -> LifetimeDependence.Scope? {
     guard case let .borrowed(beginBorrowVal) = self else {
       return nil
@@ -564,7 +560,7 @@ protocol LifetimeDependenceDefUseWalker : ForwardingDefUseWalker,
 }
 
 extension LifetimeDependenceDefUseWalker {
-  // Use a distict context name to avoid rdar://123424566 (Unable to open existential)
+  // Use a distinct context name to avoid rdar://123424566 (Unable to open existential)
   var walkerContext: Context { context }
 }
 
@@ -578,8 +574,8 @@ extension LifetimeDependenceDefUseWalker {
     }
     let root = dependence.dependentValue
     if root.type.isAddress { 
-      // The root address may be an escapable mark_dependence that guards its address uses (unsafeAddress), or an
-      // allocation or incoming argument. In all these cases, it is sufficient to walk down the address uses.
+      // The root address may be an escapable mark_dependence that guards its address uses (unsafeAddress), an
+      // allocation, an incoming argument, or an outgoing argument. In all these cases, walk down the address uses.
       return walkDownAddressUses(of: root)
     }
     return walkDownUses(of: root, using: nil)
@@ -828,7 +824,7 @@ extension LifetimeDependenceDefUseWalker {
 
 // Helpers
 extension LifetimeDependenceDefUseWalker {
-  // Visit uses of borrowing instruction (operandOwnerhip == .borrow).
+  // Visit uses of borrowing instruction (operandOwnership == .borrow).
   private mutating func visitAllBorrowUses(
     of operand: Operand, by borrowInst: BorrowingInstruction) -> WalkResult {
     switch borrowInst {
@@ -838,9 +834,15 @@ extension LifetimeDependenceDefUseWalker {
       return walkDownUses(of: bfi, using: operand)
     case let .storeBorrow(sbi):
       return walkDownAddressUses(of: sbi)
-    case .beginApply:
-      // Skip the borrow scope; the type system enforces non-escapable
-      // arguments.
+    case let .beginApply(bai):
+      // First, visit the uses of any non-Escapable yields. The yielded value may be copied and used outside the
+      // coroutine scope.  Now, visit the uses of the begin_apply token. This adds the coroutine scope itself to the
+      for yield in bai.yieldedValues {
+        if walkDownUses(of: yield, using: operand) == .abortWalk {
+          return .abortWalk
+        }
+      }
+      // lifetime to account for the scope of any arguments.
       return visitInnerBorrowUses(of: borrowInst, operand: operand)
     case .partialApply, .markDependence:
       fatalError("OwnershipUseVisitor should bypass partial_apply [on_stack] "
@@ -853,7 +855,7 @@ extension LifetimeDependenceDefUseWalker {
     }
   }
 
-  // Visit a dependent local variable (alloc_box), or temporary storage (alloc_stack). The depenedency is typically from
+  // Visit a dependent local variable (alloc_box), or temporary storage (alloc_stack). The dependency is typically from
   // storing a dependent value at `address`, but may be from an outright `mark_dependence_addr`.
   //
   // This handles stores of the entire value and stores into a member. Storing into a member makes the entire aggregate
@@ -974,7 +976,8 @@ extension LifetimeDependenceDefUseWalker {
 
   private mutating func visitAppliedUse(of operand: Operand, by apply: FullApplySite) -> WalkResult {
     if let conv = apply.convention(of: operand), conv.isIndirectOut {
-      return leafUse(of: operand)
+      // This apply initializes an allocation.
+      return dependentUse(of: operand, dependentAddress: operand.value)
     }
     if apply.isCallee(operand: operand) {
       return leafUse(of: operand)
@@ -1107,7 +1110,7 @@ private struct LifetimeDependenceUsePrinter : LifetimeDependenceDefUseWalker {
 ///
 ///     dependsOn(lvalue.computed) // finds the temporary value directly returned by a getter.
 ///
-/// SILGen emits temporary copies that violate lifetime dependence semantcs. This utility looks through such temporary
+/// SILGen emits temporary copies that violate lifetime dependence semantics. This utility looks through such temporary
 /// copies, stopping at a value that introduces an immutable variable: move_value [var_decl] or begin_borrow [var_decl],
 /// or at an access of a mutable variable: begin_access [read] or begin_access [modify].
 ///
@@ -1235,7 +1238,7 @@ extension LifetimeDependenceUseDefAddressWalker {
       if let addressorSelf = beginAccess.unsafeAddressorSelf {
         return walkUp(newLifetime: addressorSelf)
       }
-      // Ignore the acces scope for trivial values regardless of whether it is singly-initialized. Trivial values do not
+      // Ignore the access scope for trivial values regardless of whether it is singly-initialized. Trivial values do not
       // need to be kept alive in memory and can be safely be overwritten in the same scope. Lifetime dependence only
       // cares that the loaded value is within the lexical scope of the trivial value's variable declaration. Rather
       // than skipping all access scopes, call 'walkUp' on each nested access in case one of them needs to redirect the

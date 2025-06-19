@@ -67,6 +67,16 @@ func testClosureOverWeak() {
   takeClosure { bC!.f() }
 }
 
+func testClosureOverWeakLet() {
+  weak let bC = C()
+  takeClosure { bC!.f() }
+}
+
+func testClosureOverWeakCapture() {
+  let bC = C()
+  takeClosure { [weak bC] in bC!.f() }
+}
+
 class CC {
   weak var x: CC?
 

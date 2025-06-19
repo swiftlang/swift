@@ -243,9 +243,9 @@ extension Value {
   /// struct S { var c1: C; var c2: C }
   /// let s: S
   ///
-  /// `s.allContainedAddresss` refers to `s.c1.x`, `s.c1.y`, `s.c2.x` and `s.c2.y`
+  /// `s.allContainedAddresses` refers to `s.c1.x`, `s.c1.y`, `s.c2.x` and `s.c2.y`
   ///
-  public var allContainedAddresss: ProjectedValue {
+  public var allContainedAddresses: ProjectedValue {
     if type.isAddress {
       // This is the regular case: the path selects any sub-fields of an address.
       return at(SmallProjectionPath(.anyValueFields))

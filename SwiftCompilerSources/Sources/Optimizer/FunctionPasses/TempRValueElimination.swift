@@ -66,30 +66,6 @@ private func removeTempRValues(in function: Function, keepDebugInfo: Bool, _ con
   }
 }
 
-private protocol CopyLikeInstruction: Instruction {
-  var sourceAddress: Value { get }
-  var destinationAddress: Value { get }
-  var isTakeOfSource: Bool { get }
-  var isInitializationOfDestination: Bool { get }
-  var loadingInstruction: Instruction { get }
-}
-
-extension CopyAddrInst: CopyLikeInstruction {
-  var sourceAddress: Value { source }
-  var destinationAddress: Value { destination }
-  var loadingInstruction: Instruction { self }
-}
-
-// A `store` which has a `load` as source operand. This is basically the same as a `copy_addr`.
-extension StoreInst: CopyLikeInstruction {
-  var sourceAddress: Value { load.address }
-  var destinationAddress: Value { destination }
-  var isTakeOfSource: Bool { load.loadOwnership == .take }
-  var isInitializationOfDestination: Bool { storeOwnership != .assign }
-  var loadingInstruction: Instruction { load }
-  private var load: LoadInst { source as! LoadInst }
-}
-
 private func tryEliminate(copy: CopyLikeInstruction, keepDebugInfo: Bool, _ context: FunctionPassContext) {
 
   guard let (allocStack, lastUseOfAllocStack) =

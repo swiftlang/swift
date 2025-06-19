@@ -234,7 +234,6 @@ EXPECTED_DEFAULTS = {
     'lldb_build_variant': 'Debug',
     'lldb_build_with_xcode': '0',
     'llvm_assertions': True,
-    'llvm_build_compiler_rt_with_use_runtimes': True,
     'llvm_build_variant': 'Debug',
     'llvm_cmake_options': [],
     'llvm_enable_modules': False,
@@ -274,6 +273,7 @@ EXPECTED_DEFAULTS = {
     'swift_profile_instr_use': None,
     'swift_runtime_fixed_backtracer_path': None,
     'swift_stdlib_assertions': True,
+    'swift_stdlib_strict_availability': False,
     'swift_stdlib_build_variant': 'Debug',
     'swift_tools_ld64_lto_codegen_only_for_supporting_targets': False,
     'swift_tools_max_parallel_lto_link_jobs':
@@ -553,7 +553,12 @@ EXPECTED_OPTIONS = [
     SetOption('--skip-test-early-swift-driver',
               dest='test_early_swift_driver', value=False),
 
-    SetFalseOption('--no-llvm-include-tests', dest='llvm_include_tests'),
+    SetOption('--swift-stdlib-strict-availability', value=True),
+    SetOption('--no-swift-stdlib-strict-availability',
+              dest='swift_stdlib_strict_availability', value=False),
+
+    DisableOption('--no-llvm-include-tests', dest='llvm_include_tests'),
+    EnableOption('--llvm-include-tests', dest='llvm_include_tests'),
 
     SetTrueOption('--install-back-deploy-concurrency',
                   dest='install_backdeployconcurrency'),
@@ -860,7 +865,6 @@ EXPECTED_OPTIONS = [
     AppendOption('--llvm-ninja-targets-for-cross-compile-hosts'),
     AppendOption('--llvm-cmake-options'),
     AppendOption('--extra-llvm-cmake-options'),
-    EnableOption('--llvm-build-compiler-rt-with-use-runtimes'),
     AppendOption('--darwin-symroot-path-filters'),
 
     UnsupportedOption('--build-jobs'),

@@ -141,6 +141,20 @@ void SILLinkerVisitor::maybeAddFunctionToWorklist(
       // are also set to IsSerialized.
       Worklist.push_back(F);
     }
+
+    if (F->markedAsAlwaysEmitIntoClient()) {
+      // For @_alwaysEmitIntoClient functions, we need to lookup its
+      // differentiability witness and, if present, ask SILLoader to obtain its
+      // definition. Otherwise, a linker error would occur due to undefined
+      // reference to these symbols.
+      for (SILDifferentiabilityWitness *witness :
+           F->getModule().lookUpDifferentiabilityWitnessesForFunction(
+               F->getName())) {
+        F->getModule().getSILLoader()->lookupDifferentiabilityWitness(
+            witness->getKey());
+      }
+    }
+
     return;
   }
 

@@ -7,6 +7,7 @@
 // RUN:   -emit-module -emit-module-path %t/MultiFileModule.swiftmodule -module-name MultiFileModule
 
 // RUN: %target-build-swift -I%t %s -o %t/a.out %target-rpath(%t)
+// RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 
 // RUN: %target-build-swift -I%t %s -emit-ir | %FileCheck %s

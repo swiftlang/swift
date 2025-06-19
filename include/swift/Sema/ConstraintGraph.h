@@ -216,7 +216,7 @@ private:
 
   /// Print this graph node.
   void print(llvm::raw_ostream &out, unsigned indent,
-             PrintOptions PO = PrintOptions()) const;
+             const PrintOptions &PO = PrintOptions()) const;
 
   SWIFT_DEBUG_DUMP;
 

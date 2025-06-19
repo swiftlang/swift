@@ -15,7 +15,7 @@ public struct MutableSpan<Element: ~Copyable>: ~Copyable & ~Escapable {
   }
 
   @usableFromInline @inline(__always)
-  @lifetime(borrow start)
+  @_lifetime(borrow start)
   init(
     _unchecked start: UnsafeMutableRawPointer?,
     count: Int
@@ -33,7 +33,7 @@ extension MutableSpan where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
   @usableFromInline @inline(__always)
-  @lifetime(borrow elements)
+  @_lifetime(borrow elements)
   internal init(
     _unchecked elements: UnsafeMutableBufferPointer<Element>
   ) {
@@ -42,7 +42,7 @@ extension MutableSpan where Element: ~Copyable {
   }
 
   @_alwaysEmitIntoClient
-  @lifetime(borrow buffer)
+  @_lifetime(borrow buffer)
   public init(
     _unsafeElements buffer: UnsafeMutableBufferPointer<Element>
   ) {
@@ -56,7 +56,7 @@ extension MutableSpan where Element: ~Copyable {
   }
 
   @_alwaysEmitIntoClient
-  @lifetime(borrow start)
+  @_lifetime(borrow start)
   public init(
     _unsafeStart start: UnsafeMutablePointer<Element>,
     count: Int
@@ -72,7 +72,7 @@ extension MutableSpan where Element: ~Copyable {
 extension MutableSpan {
 
   @_alwaysEmitIntoClient
-  @lifetime(borrow elements)
+  @_lifetime(borrow elements)
   public init(
     _unsafeElements elements: borrowing Slice<UnsafeMutableBufferPointer<Element>>
   ) {
@@ -86,7 +86,7 @@ extension MutableSpan {
 extension MutableSpan where Element: BitwiseCopyable {
 
   @_alwaysEmitIntoClient
-  @lifetime(borrow buffer)
+  @_lifetime(borrow buffer)
   public init(
     _unsafeBytes buffer: UnsafeMutableRawBufferPointer
   ) {
@@ -107,7 +107,7 @@ extension MutableSpan where Element: BitwiseCopyable {
   }
 
   @_alwaysEmitIntoClient
-  @lifetime(borrow pointer)
+  @_lifetime(borrow pointer)
   public init(
     _unsafeStart pointer: UnsafeMutableRawPointer,
     byteCount: Int
@@ -119,7 +119,7 @@ extension MutableSpan where Element: BitwiseCopyable {
   }
 
   @_alwaysEmitIntoClient
-  @lifetime(borrow buffer)
+  @_lifetime(borrow buffer)
   public init(
     _unsafeBytes buffer: borrowing Slice<UnsafeMutableRawBufferPointer>
   ) {
@@ -133,7 +133,7 @@ extension MutableSpan where Element: BitwiseCopyable {
 extension Span where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
-  @lifetime(borrow mutableSpan)
+  @_lifetime(borrow mutableSpan)
   public init(_unsafeMutableSpan mutableSpan: borrowing MutableSpan<Element>) {
     let pointer = mutableSpan._pointer?.assumingMemoryBound(to: Element.self)
     let buffer = UnsafeBufferPointer(start: pointer, count: mutableSpan.count)
@@ -147,7 +147,7 @@ extension MutableSpan where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
   public var storage: Span<Element> {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     borrowing get {
       Span(_unsafeMutableSpan: self)
     }
@@ -165,7 +165,7 @@ extension MutableSpan where Element: ~Copyable {
 extension RawSpan {
 
   @_alwaysEmitIntoClient
-  @lifetime(borrow mutableSpan)
+  @_lifetime(borrow mutableSpan)
   public init<Element: BitwiseCopyable>(
     _unsafeMutableSpan mutableSpan: borrowing MutableSpan<Element>
   ) {
@@ -240,12 +240,12 @@ extension MutableSpan where Element: ~Copyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public subscript(_ position: Index) -> Element {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     _read {
       precondition(indices.contains(position), "index out of bounds")
       yield self[unchecked: position]
     }
-    @lifetime(&self)
+    @_lifetime(&self)
     _modify {
       precondition(indices.contains(position), "index out of bounds")
       yield &self[unchecked: position]
@@ -265,7 +265,7 @@ extension MutableSpan where Element: ~Copyable {
     unsafeAddress {
       UnsafePointer(_unsafeAddressOfElement(unchecked: position))
     }
-    @lifetime(self: copy self)
+    @_lifetime(self: copy self)
     unsafeMutableAddress {
       _unsafeAddressOfElement(unchecked: position)
     }
@@ -285,14 +285,14 @@ extension MutableSpan where Element: ~Copyable {
 @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension MutableSpan where Element: ~Copyable {
 
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func swapAt(_ i: Index, _ j: Index) {
     precondition(indices.contains(Index(i)))
     precondition(indices.contains(Index(j)))
     swapAt(unchecked: i, unchecked: j)
   }
 
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func swapAt(unchecked i: Index, unchecked j: Index) {
     let pi = _unsafeAddressOfElement(unchecked: i)
     let pj = _unsafeAddressOfElement(unchecked: j)
@@ -317,7 +317,7 @@ extension MutableSpan where Element: BitwiseCopyable {
       precondition(indices.contains(position))
       return self[unchecked: position]
     }
-    @lifetime(self: copy self)
+    @_lifetime(self: copy self)
     set {
       precondition(indices.contains(position))
       self[unchecked: position] = newValue
@@ -338,7 +338,7 @@ extension MutableSpan where Element: BitwiseCopyable {
       let offset = position&*MemoryLayout<Element>.stride
       return _start().loadUnaligned(fromByteOffset: offset, as: Element.self)
     }
-    @lifetime(self: copy self)
+    @_lifetime(self: copy self)
     set {
       let offset = position&*MemoryLayout<Element>.stride
       _start().storeBytes(of: newValue, toByteOffset: offset, as: Element.self)
@@ -359,7 +359,7 @@ extension MutableSpan where Element: ~Copyable {
 
   //FIXME: mark closure parameter as non-escaping
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func withUnsafeMutableBufferPointer<E: Error, Result: ~Copyable>(
     _ body: (UnsafeMutableBufferPointer<Element>) throws(E) -> Result
   ) throws(E) -> Result {
@@ -388,7 +388,7 @@ extension MutableSpan where Element: BitwiseCopyable {
 
   //FIXME: mark closure parameter as non-escaping
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func withUnsafeMutableBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeMutableRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
@@ -405,7 +405,7 @@ extension MutableSpan where Element: BitwiseCopyable {
 extension MutableSpan {
 
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func update(repeating repeatedValue: Element) {
     _start().withMemoryRebound(to: Element.self, capacity: count) {
       $0.update(repeating: repeatedValue, count: count)
@@ -413,7 +413,7 @@ extension MutableSpan {
   }
 
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func update<S: Sequence>(
     from source: S
   ) -> (unwritten: S.Iterator, index: Index) where S.Element == Element {
@@ -423,7 +423,7 @@ extension MutableSpan {
   }
 
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func update(
     from elements: inout some IteratorProtocol<Element>
   ) -> Index {
@@ -437,7 +437,7 @@ extension MutableSpan {
   }
 
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func update(
     fromContentsOf source: some Collection<Element>
   ) -> Index {
@@ -458,7 +458,7 @@ extension MutableSpan {
   }
 
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func update(fromContentsOf source: Span<Element>) -> Index {
     guard !source.isEmpty else { return 0 }
     precondition(
@@ -474,7 +474,7 @@ extension MutableSpan {
   }
 
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func update(
     fromContentsOf source: borrowing MutableSpan<Element>
   ) -> Index {
@@ -487,7 +487,7 @@ extension MutableSpan {
 extension MutableSpan where Element: BitwiseCopyable {
 
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func update(
     repeating repeatedValue: Element
   ) where Element: BitwiseCopyable {
@@ -500,7 +500,7 @@ extension MutableSpan where Element: BitwiseCopyable {
   }
 
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func update<S: Sequence>(
     from source: S
   ) -> (unwritten: S.Iterator, index: Index)
@@ -511,7 +511,7 @@ extension MutableSpan where Element: BitwiseCopyable {
   }
 
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func update(
     from elements: inout some IteratorProtocol<Element>
   ) -> Index {
@@ -525,7 +525,7 @@ extension MutableSpan where Element: BitwiseCopyable {
   }
 
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func update(
     fromContentsOf source: some Collection<Element>
   ) -> Index where Element: BitwiseCopyable {
@@ -546,7 +546,7 @@ extension MutableSpan where Element: BitwiseCopyable {
   }
 
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func update(
     fromContentsOf source: Span<Element>
   ) -> Index where Element: BitwiseCopyable {
@@ -564,7 +564,7 @@ extension MutableSpan where Element: BitwiseCopyable {
   }
 
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func update(
     fromContentsOf source: borrowing MutableSpan<Element>
   ) -> Index where Element: BitwiseCopyable {
@@ -605,7 +605,7 @@ public struct OutputSpan<Element: ~Copyable>: ~Copyable, ~Escapable {
   }
 
   @usableFromInline @inline(__always)
-  @lifetime(borrow start)
+  @_lifetime(borrow start)
   init(
     _unchecked start: UnsafeMutableRawPointer?,
     capacity: Int,
@@ -625,7 +625,7 @@ extension OutputSpan: Sendable {}
 extension OutputSpan where Element: ~Copyable  {
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(borrow buffer)
+  @_lifetime(borrow buffer)
   public init(
     _uncheckedBuffer buffer: UnsafeMutableBufferPointer<Element>,
     initializedCount: Int
@@ -649,7 +649,7 @@ extension OutputSpan where Element: ~Copyable  {
   ///                       at the beginning of `buffer`.
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(borrow buffer)
+  @_lifetime(borrow buffer)
   public init(
     buffer: UnsafeMutableBufferPointer<Element>,
     initializedCount: Int
@@ -708,7 +708,7 @@ extension UnsafeMutableBufferPointer  where Element: ~Copyable {
 extension OutputSpan where Element: ~Copyable  {
 
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func append(_ value: consuming Element) {
     precondition(_initialized < capacity, "Output buffer overflow")
     let p = _start.advanced(by: _initialized&*MemoryLayout<Element>.stride)
@@ -738,7 +738,7 @@ extension OutputSpan where Element: ~Copyable  {
 extension OutputSpan {
 
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func append(repeating repeatedValue: Element, count: Int) {
     let available = capacity &- _initialized
     precondition(
@@ -754,7 +754,7 @@ extension OutputSpan {
   }
 
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func append<S>(
     from elements: S
   ) -> S.Iterator where S: Sequence, S.Element == Element {
@@ -764,7 +764,7 @@ extension OutputSpan {
   }
 
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func append(
     from elements: inout some IteratorProtocol<Element>
   ) {
@@ -777,7 +777,7 @@ extension OutputSpan {
   }
 
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func append(
     fromContentsOf source: some Collection<Element>
   ) {
@@ -804,7 +804,7 @@ extension OutputSpan {
   }
 
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func append(
     fromContentsOf source: Span<Element>
   ) {
@@ -823,7 +823,7 @@ extension OutputSpan {
   }
 
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func append(fromContentsOf source: borrowing MutableSpan<Element>) {
     source.withUnsafeBufferPointer { append(fromContentsOf: $0) }
   }
@@ -833,7 +833,7 @@ extension OutputSpan {
 extension OutputSpan where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func moveAppend(
     fromContentsOf source: consuming Self
   ) {
@@ -852,7 +852,7 @@ extension OutputSpan where Element: ~Copyable {
   }
 
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func moveAppend(
     fromContentsOf source: UnsafeMutableBufferPointer<Element>
   ) {
@@ -865,7 +865,7 @@ extension OutputSpan where Element: ~Copyable {
 extension OutputSpan {
 
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func moveAppend(
     fromContentsOf source: Slice<UnsafeMutableBufferPointer<Element>>
   ) {
@@ -883,7 +883,7 @@ extension OutputSpan where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
   public var span: Span<Element> {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     borrowing get {
       let pointer = _pointer?.assumingMemoryBound(to: Element.self)
       let buffer = UnsafeBufferPointer(start: pointer, count: _initialized)
@@ -894,7 +894,7 @@ extension OutputSpan where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
   public var mutableSpan: MutableSpan<Element> {
-    @lifetime(&self)
+    @_lifetime(&self)
     mutating get { // the accessor must provide a mutable projection
       let pointer = _pointer?.assumingMemoryBound(to: Element.self)
       let buffer = UnsafeMutableBufferPointer(start: pointer, count: _initialized)
@@ -934,7 +934,7 @@ extension Span {
 
 //  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 //  public static var empty: Span {
-//    @lifetime(immortal)
+//    @_lifetime(immortal)
 //    get {
 //      let nilBasedBuffer = UnsafeBufferPointer<Element>(start: nil, count: 0)
 //      let span = Span(_unsafeElements: nilBasedBuffer)
@@ -943,7 +943,7 @@ extension Span {
 //  }
 //
 //  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
-//  @lifetime(immortal)
+//  @_lifetime(immortal)
 //  public init() {
 //    let nilBasedBuffer = UnsafeBufferPointer<Element>(start: nil, count: 0)
 //    let span = Span(_unsafeElements: nilBasedBuffer)

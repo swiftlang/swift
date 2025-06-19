@@ -442,7 +442,7 @@ StringRef getAccessorKindString(AccessorKind value);
 /// may be called multiple times if the declaration uses suppressible
 /// features.
 void printWithCompatibilityFeatureChecks(ASTPrinter &printer,
-                                         PrintOptions &options,
+                                         const PrintOptions &options,
                                          Decl *decl,
                                          llvm::function_ref<void()> printBody);
 

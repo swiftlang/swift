@@ -85,9 +85,32 @@ func test_discardingTaskGroup_neverConsume(sleepBeforeGroupWaitAll: Duration) as
   print("all tasks: \(allTasks)")
 }
 
+func test_discardingTaskGroup_bigReturn() async {
+  print(">>> \(#function)")
+
+  // Test returning a very large value to ensure we don't overflow memory.
+  let array = await withDiscardingTaskGroup { group in
+    group.addTask {}
+    try? await Task.sleep(until: .now + .milliseconds(100), clock: .continuous)
+
+    // InlineArray.init(repeating:) uses a lot of stack space with optimizations
+    // disabled, so set one up in a less friendly but less stack-consuming way.
+    let ptr = UnsafeMutablePointer<InlineArray<32768, Int>>.allocate(capacity: 1)
+    ptr.withMemoryRebound(to: Int.self, capacity: 32768) {
+      $0.initialize(repeating: 12345, count: 32768)
+    }
+    // Deliberately leak `ptr` to avoid needing to save any temporaries.
+    return ptr.pointee
+  }
+
+  // CHECK: Huge return value produced: 12345 12345
+  print("Huge return value produced:", array[0], array[32767])
+}
+
 @main struct Main {
   static func main() async {
     await test_discardingTaskGroup_neverConsume()
     await test_discardingTaskGroup_neverConsume(sleepBeforeGroupWaitAll: .milliseconds(500))
+    await test_discardingTaskGroup_bigReturn()
   }
 }

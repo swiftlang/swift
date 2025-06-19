@@ -13,6 +13,7 @@
 #ifndef SWIFT_BASIC_SOURCEMANAGER_H
 #define SWIFT_BASIC_SOURCEMANAGER_H
 
+#include "swift/AST/ClangNode.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/SourceLoc.h"
 #include "clang/Basic/FileManager.h"
@@ -22,6 +23,7 @@
 #include "llvm/Support/SourceMgr.h"
 #include <map>
 #include <optional>
+#include <utility>
 #include <vector>
 
 namespace swift {
@@ -122,6 +124,10 @@ public:
   /// Contains the ancestors of this source buffer, starting with the root source
   /// buffer and ending at this source buffer.
   mutable llvm::ArrayRef<unsigned> ancestors = llvm::ArrayRef<unsigned>();
+
+  /// Clang node where this buffer comes from. This should be set when this is
+  /// an 'AttributeFromClang'.
+  ClangNode clangNode = ClangNode();
 };
 
 /// This class manages and owns source buffers.

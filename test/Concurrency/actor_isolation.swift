@@ -1752,3 +1752,29 @@ actor UserDefinedActorSelfDotMethod {
     return functionRef // expected-error {{cannot convert return expression of type '(isolated Self) -> () -> ()' to return type '(UserDefinedActorSelfDotMethod) -> @isolated(any) () -> Void'}}
   }
 }
+
+func requireSendableInheritContext(@_inheritActorContext _: @Sendable () -> ()) {}
+// expected-warning@-1 {{@_inheritActorContext only applies to '@isolated(any)' parameters or parameters with asynchronous function types; this will be an error in a future Swift language mode}}
+
+actor InvalidInheritedActorIsolation {
+  func actorFunction() {} // expected-note {{calls to instance method 'actorFunction()' from outside of its actor context are implicitly asynchronous}}
+
+  func test() {
+    requireSendableInheritContext {
+      self.actorFunction()
+      // expected-error@-1 {{call to actor-isolated instance method 'actorFunction()' in a synchronous nonisolated context}}
+    }
+  }
+}
+
+@MainActor
+class InvalidInheritedGlobalActorIsolation {
+  func mainActorFunction() {} // expected-note {{calls to instance method 'mainActorFunction()' from outside of its actor context are implicitly asynchronous}}
+
+  func test() {
+    requireSendableInheritContext {
+      self.mainActorFunction()
+      // expected-error@-1 {{call to main actor-isolated instance method 'mainActorFunction()' in a synchronous nonisolated context}}
+    }
+  }
+}

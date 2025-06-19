@@ -10,6 +10,8 @@
 #
 # ----------------------------------------------------------------------------
 
+import os
+
 from build_swift.build_swift.constants import SWIFT_REPO_NAME
 
 from . import cmark
@@ -170,6 +172,11 @@ updated without updating swift.py?")
         if self.args.clang_compiler_version is not None:
             clang_compiler_version = self.args.clang_compiler_version
             r.define('CLANG_COMPILER_VERSION', str(clang_compiler_version))
+
+        toolchain_version = os.environ.get('TOOLCHAIN_VERSION')
+        if toolchain_version:
+            r.define('SWIFT_TOOLCHAIN_VERSION', toolchain_version)
+
         return r
 
     @property

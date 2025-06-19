@@ -990,9 +990,12 @@ static bool isVanishingTupleConformance(
 
   auto replacementTypes = substitutions.getReplacementTypes();
   assert(replacementTypes.size() == 1);
-  auto packType = replacementTypes[0]->castTo<PackType>();
 
-  return (packType->getNumElements() == 1 &&
+  // This might not be an actual pack type with an invalid tuple conformance.
+  auto packType = replacementTypes[0]->getAs<PackType>();
+
+  return (packType &&
+          packType->getNumElements() == 1 &&
           !packType->getElementTypes()[0]->is<PackExpansionType>());
 }
 

@@ -716,9 +716,8 @@ struct BridgedInstruction {
     CopyOnSuccess
   };
 
-  enum class CastingIsolatedConformances {
-    Allow,
-    Prohibit
+  struct CheckedCastInstOptions {
+    uint8_t storage;
   };
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef CondFailInst_getMessage() const;
@@ -831,22 +830,22 @@ struct BridgedInstruction {
   BRIDGED_INLINE void LoadInst_setOwnership(SwiftInt ownership) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType UnconditionalCheckedCast_getSourceFormalType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType UnconditionalCheckedCast_getTargetFormalType() const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE CastingIsolatedConformances
-      UnconditionalCheckedCast_getIsolatedConformances() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE CheckedCastInstOptions
+      UnconditionalCheckedCast_getCheckedCastOptions() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType UnconditionalCheckedCastAddr_getSourceFormalType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType UnconditionalCheckedCastAddr_getTargetFormalType() const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE CastingIsolatedConformances
-      UnconditionalCheckedCastAddr_getIsolatedConformances() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE CheckedCastInstOptions
+      UnconditionalCheckedCastAddr_getCheckedCastOptions() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock CheckedCastBranch_getSuccessBlock() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock CheckedCastBranch_getFailureBlock() const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE CastingIsolatedConformances
-      CheckedCastBranch_getIsolatedConformances() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE CheckedCastInstOptions
+      CheckedCastBranch_getCheckedCastOptions() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType CheckedCastAddrBranch_getSourceFormalType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType CheckedCastAddrBranch_getTargetFormalType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock CheckedCastAddrBranch_getSuccessBlock() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock CheckedCastAddrBranch_getFailureBlock() const;
-  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE CastingIsolatedConformances
-      CheckedCastAddrBranch_getIsolatedConformances() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE CheckedCastInstOptions
+      CheckedCastAddrBranch_getCheckedCastOptions() const;
   BRIDGED_INLINE void CheckedCastBranch_updateSourceFormalTypeFromOperandLoweredType() const;
   BRIDGED_INLINE CastConsumptionKind CheckedCastAddrBranch_getConsumptionKind() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap ApplySite_getSubstitutionMap() const;
@@ -1176,11 +1175,11 @@ struct BridgedBuilder{
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createCheckedCastAddrBranch(
       BridgedValue source, BridgedCanType sourceFormalType,
       BridgedValue destination, BridgedCanType targetFormalType,
-      BridgedInstruction::CastingIsolatedConformances isolatedConformances,
+      BridgedInstruction::CheckedCastInstOptions options,
       BridgedInstruction::CastConsumptionKind consumptionKind,
       BridgedBasicBlock successBlock, BridgedBasicBlock failureBlock) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUnconditionalCheckedCastAddr(
-        BridgedInstruction::CastingIsolatedConformances isolatedConformances,
+        BridgedInstruction::CheckedCastInstOptions options,
         BridgedValue source, BridgedCanType sourceFormalType,
         BridgedValue destination, BridgedCanType targetFormalType) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUncheckedOwnershipConversion(

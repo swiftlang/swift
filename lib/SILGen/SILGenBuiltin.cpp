@@ -477,29 +477,6 @@ static ManagedValue emitBuiltinUnprotectedAddressOf(SILGenFunction &SGF,
                                       /*stackProtected=*/ false);
 }
 
-// Like `tryEmitAddressableParameterAsAddress`, but also handles struct element projections.
-static SILValue emitAddressOf(Expr *e, SILGenFunction &SGF, SILLocation loc) {
-
-  if (auto *memberRef = dyn_cast<MemberRefExpr>(e)) {
-    VarDecl *fieldDecl = dyn_cast<VarDecl>(memberRef->getDecl().getDecl());
-    if (!fieldDecl)
-      return SILValue();
-    SILValue addr = emitAddressOf(memberRef->getBase(), SGF, loc);
-    if (!addr)
-      return SILValue();
-    if (addr->getType().getStructOrBoundGenericStruct() != fieldDecl->getDeclContext())
-      return SILValue();
-    return SGF.B.createStructElementAddr(loc, addr, fieldDecl);
-  }
-
-  if (auto addressableAddr = SGF.tryEmitAddressableParameterAsAddress(
-                                                      ArgumentSource(e),
-                                                      ValueOwnership::Shared)) {
-    return addressableAddr.getValue();
-  }
-  return SILValue();
-}
-
 /// Specialized emitter for Builtin.addressOfBorrow.
 static ManagedValue emitBuiltinAddressOfBorrowBuiltins(SILGenFunction &SGF,
                                                SILLocation loc,
@@ -514,11 +491,15 @@ static ManagedValue emitBuiltinAddressOfBorrowBuiltins(SILGenFunction &SGF,
 
   auto argument = (*argsOrError)[0];
 
+  SILValue addr;
   // Try to borrow the argument at +0 indirect.
   // If the argument is a reference to a borrowed addressable parameter, then
   // use that parameter's stable address.
-  SILValue addr = emitAddressOf(argument, SGF, loc);
-  if (!addr) {
+  if (auto addressableAddr = SGF.tryEmitAddressableParameterAsAddress(
+                                                      ArgumentSource(argument),
+                                                      ValueOwnership::Shared)) {
+    addr = addressableAddr.getValue();
+  } else {
     // We otherwise only support the builtin applied to values that
     // are naturally emitted borrowed in memory. (But it would probably be good
     // to phase this out since it's not really well-defined how long

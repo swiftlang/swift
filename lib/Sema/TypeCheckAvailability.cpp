@@ -1727,7 +1727,7 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
 
   auto type = rootConf->getType();
   auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
-  auto domain = constraint.getDomain();
+  auto domainAndRange = constraint.getDomainAndRange(ctx);
   auto attr = constraint.getAttr();
 
   // Downgrade unavailable Sendable conformance diagnostics where
@@ -1738,8 +1738,8 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
   EncodedDiagnosticMessage EncodedMessage(attr.getMessage());
   diags
       .diagnose(loc, diag::conformance_availability_unavailable, type, proto,
-                shouldHideDomainNameForConstraintDiagnostic(constraint), domain,
-                EncodedMessage.Message)
+                shouldHideDomainNameForConstraintDiagnostic(constraint),
+                domainAndRange.getDomain(), EncodedMessage.Message)
       .limitBehaviorWithPreconcurrency(behavior, preconcurrency)
       .warnUntilSwiftVersionIf(warnIfConformanceUnavailablePreSwift6, 6);
 
@@ -1752,12 +1752,13 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
     break;
   case AvailabilityConstraint::Reason::UnavailableForDeployment:
     diags.diagnose(ext, diag::conformance_availability_introduced_in_version,
-                   type, proto, domain, attr.getIntroducedRange(ctx).value());
+                   type, proto, domainAndRange.getDomain(),
+                   domainAndRange.getRange());
     break;
   case AvailabilityConstraint::Reason::Obsoleted:
     diags
         .diagnose(ext, diag::conformance_availability_obsoleted, type, proto,
-                  domain, attr.getObsoletedRange(ctx).value())
+                  domainAndRange.getDomain(), domainAndRange.getRange())
         .highlight(attr.getParsedAttr()->getRange());
     break;
   case AvailabilityConstraint::Reason::PotentiallyUnavailable:
@@ -2115,7 +2116,7 @@ bool diagnoseExplicitUnavailability(
   SourceLoc Loc = R.Start;
   ASTContext &ctx = D->getASTContext();
   auto &diags = ctx.Diags;
-  auto domain = constraint.getDomain();
+  auto domainAndRange = constraint.getDomainAndRange(ctx);
 
   // TODO: Consider removing this.
   // ObjC keypaths components weren't checked previously, so errors are demoted
@@ -2151,14 +2152,11 @@ bool diagnoseExplicitUnavailability(
     // Skip the note emitted below.
     return true;
   } else {
-    auto unavailableDiagnosticDomain = domain;
-    AvailabilityInference::updateAvailabilityDomainForFallback(
-        Attr, ctx, unavailableDiagnosticDomain);
     EncodedDiagnosticMessage EncodedMessage(message);
     diags
         .diagnose(Loc, diag::availability_decl_unavailable, D,
                   shouldHideDomainNameForConstraintDiagnostic(constraint),
-                  unavailableDiagnosticDomain, EncodedMessage.Message)
+                  domainAndRange.getDomain(), EncodedMessage.Message)
         .highlight(R)
         .limitBehavior(limit);
   }
@@ -2171,14 +2169,14 @@ bool diagnoseExplicitUnavailability(
     break;
   case AvailabilityConstraint::Reason::UnavailableForDeployment:
     diags
-        .diagnose(D, diag::availability_introduced_in_version, D, domain,
-                  Attr.getIntroducedRange(ctx).value())
+        .diagnose(D, diag::availability_introduced_in_version, D,
+                  domainAndRange.getDomain(), domainAndRange.getRange())
         .highlight(sourceRange);
     break;
   case AvailabilityConstraint::Reason::Obsoleted:
     diags
-        .diagnose(D, diag::availability_obsoleted, D, domain,
-                  Attr.getObsoletedRange(ctx).value())
+        .diagnose(D, diag::availability_obsoleted, D,
+                  domainAndRange.getDomain(), domainAndRange.getRange())
         .highlight(sourceRange);
     break;
   case AvailabilityConstraint::Reason::PotentiallyUnavailable:
@@ -2891,23 +2889,25 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
     return false;
 
   // Diagnose (and possibly signal) for potential unavailability
-  auto domain = constraint->getDomain();
-  auto requiredRange = constraint->getPotentiallyUnavailableRange(ctx);
-  if (!requiredRange)
+  if (!constraint->isPotentiallyAvailable())
     return false;
+
+  auto domainAndRange = constraint->getDomainAndRange(ctx);
+  auto domain = domainAndRange.getDomain();
+  auto requiredRange = domainAndRange.getRange();
 
   if (Flags.contains(
           DeclAvailabilityFlag::
               AllowPotentiallyUnavailableAtOrBelowDeploymentTarget) &&
-      requiresDeploymentTargetOrEarlier(domain, *requiredRange, ctx))
+      requiresDeploymentTargetOrEarlier(domain, requiredRange, ctx))
     return false;
 
   if (accessor) {
     bool forInout = Flags.contains(DeclAvailabilityFlag::ForInout);
     diagnosePotentialAccessorUnavailability(accessor, R, DC, domain,
-                                            *requiredRange, forInout);
+                                            requiredRange, forInout);
   } else {
-    if (!diagnosePotentialUnavailability(D, R, DC, domain, *requiredRange))
+    if (!diagnosePotentialUnavailability(D, R, DC, domain, requiredRange))
       return false;
   }
 
@@ -3320,8 +3320,15 @@ void swift::diagnoseTypeAvailability(const TypeRepr *TR, Type T, SourceLoc loc,
 static void diagnoseMissingConformance(
     SourceLoc loc, Type type, ProtocolDecl *proto, const DeclContext *fromDC,
     bool preconcurrency) {
-  assert(proto->isSpecificProtocol(KnownProtocolKind::Sendable));
-  diagnoseMissingSendableConformance(loc, type, fromDC, preconcurrency);
+  assert(proto->isSpecificProtocol(KnownProtocolKind::Sendable) ||
+         proto->isSpecificProtocol(KnownProtocolKind::SendableMetatype));
+
+  if (proto->isSpecificProtocol(KnownProtocolKind::Sendable))
+    diagnoseMissingSendableConformance(loc, type, fromDC, preconcurrency);
+
+  if (proto->isSpecificProtocol(KnownProtocolKind::SendableMetatype))
+    diagnoseMissingSendableMetatypeConformance(loc, type, fromDC,
+                                               preconcurrency);
 }
 
 bool
@@ -3412,11 +3419,11 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
       }
 
       // Diagnose (and possibly signal) for potential unavailability
-      if (auto requiredRange =
-              constraint->getPotentiallyUnavailableRange(ctx)) {
+      if (constraint->isPotentiallyAvailable()) {
+        auto domainAndRange = constraint->getDomainAndRange(ctx);
         if (diagnosePotentialUnavailability(rootConf, ext, loc, DC,
-                                            constraint->getDomain(),
-                                            *requiredRange)) {
+                                            domainAndRange.getDomain(),
+                                            domainAndRange.getRange())) {
           maybeEmitAssociatedTypeNote();
           return true;
         }

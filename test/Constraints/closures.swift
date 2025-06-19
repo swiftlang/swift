@@ -803,7 +803,6 @@ overloaded { print("hi"); print("bye") } // multiple expression closure without 
 // expected-error@-1 {{ambiguous use of 'overloaded'}}
 
 func not_overloaded(_ handler: () -> Int) {}
-// expected-note@-1 {{'not_overloaded' declared here}}
 
 not_overloaded { } // empty body
 // expected-error@-1 {{cannot convert value of type '()' to closure result type 'Int'}}
@@ -1156,7 +1155,7 @@ struct R_76250381<Result, Failure: Error> {
 func rdar77022842(argA: Bool? = nil, argB: Bool? = nil) {
   if let a = argA ?? false, if let b = argB ?? {
     // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'Bool'}}
-    // expected-error@-2 {{closure passed to parameter of type 'Bool?' that does not accept a closure}}
+    // expected-error@-2 {{cannot convert value of type 'Bool?' to expected argument type '(() -> ())?'}}
     // expected-error@-3 {{cannot convert value of type 'Void' to expected condition type 'Bool'}}
     // expected-error@-4 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
     // expected-error@-5 {{'if' must have an unconditional 'else' to be used as expression}}
@@ -1335,5 +1334,35 @@ func rdar143338891() {
     func test() {
       _ = { [weak self] in takesAny(self) }
     }
+  }
+}
+
+do {
+  struct V {
+    init(value: @autoclosure @escaping () -> any Hashable) { }
+    init(other: @autoclosure @escaping () -> String) { }
+  }
+
+  let _ = V(value: { [Int]() }) // expected-error {{add () to forward '@autoclosure' parameter}} {{31-31=()}}
+  let _ = V(other: { [Int]() }) // expected-error {{cannot convert value of type '[Int]' to closure result type 'String'}}
+}
+
+// https://github.com/swiftlang/swift/issues/81770
+do {
+  func test(_: Int) {}
+  func test(_: Int = 42, _: (Int) -> Void) {}
+
+  test {
+    if let _ = $0.missing { // expected-error {{value of type 'Int' has no member 'missing'}}
+    }
+  }
+
+  test {
+    if let _ = (($0.missing)) { // expected-error {{value of type 'Int' has no member 'missing'}}
+    }
+  }
+
+  test { // expected-error {{invalid conversion from throwing function of type '(Int) throws -> Void' to non-throwing function type '(Int) -> Void'}}
+    try $0.missing // expected-error {{value of type 'Int' has no member 'missing'}}
   }
 }

@@ -848,6 +848,37 @@ llvm::VersionTuple swift::getTargetSDKVersion(clang::DarwinSDKInfo &SDKInfo,
   return SDKVersion;
 }
 
+std::optional<llvm::Triple>
+swift::getCanonicalTriple(const llvm::Triple &triple) {
+  llvm::Triple Result = triple;
+  // Non-darwin targets do not require canonicalization.
+  if (!triple.isOSDarwin())
+    return Result;
+
+  // If the OS versions stay the same, return back the same triple.
+  const llvm::VersionTuple inputOSVersion = triple.getOSVersion();
+  const bool isOSVersionInValidRange =
+      llvm::Triple::isValidVersionForOS(triple.getOS(), inputOSVersion);
+  const llvm::VersionTuple canonicalVersion =
+      llvm::Triple::getCanonicalVersionForOS(
+          triple.getOS(), triple.getOSVersion(), isOSVersionInValidRange);
+  if (canonicalVersion == triple.getOSVersion())
+    return Result;
+
+  const std::string inputOSName = triple.getOSName().str();
+  const std::string inputOSVersionAsStr = inputOSVersion.getAsString();
+  const int platformNameLength =
+      inputOSName.size() - inputOSVersionAsStr.size();
+  if (!StringRef(inputOSName).ends_with(inputOSVersionAsStr) ||
+      (platformNameLength <= 0))
+    return std::nullopt;
+
+  llvm::SmallString<64> buffer(inputOSName.substr(0, platformNameLength));
+  buffer.append(canonicalVersion.getAsString());
+  Result.setOSName(buffer.str());
+  return Result;
+}
+
 static std::string getPlistEntry(const llvm::Twine &Path, StringRef KeyName) {
   auto BufOrErr = llvm::MemoryBuffer::getFile(Path);
   if (!BufOrErr) {

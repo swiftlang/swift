@@ -53,7 +53,7 @@ class G<T> {
   @_specialize(where T == T) // expected-error{{too few generic parameters are specified in '_specialize' attribute (got 0, but expected 1)}}
   // expected-note@-1 {{missing constraint for 'T' in '_specialize' attribute}}
   @_specialize(where T == S<T>)
-  // expected-error@-1 {{cannot build rewrite system for generic signature; concrete nesting limit exceeded}}
+  // expected-error@-1 {{cannot build rewrite system for generic signature; concrete type nesting limit exceeded}}
   // expected-note@-2 {{failed rewrite rule is τ_0_0.[concrete: S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<τ_0_0>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>] => τ_0_0}}
   // expected-error@-3 {{too few generic parameters are specified in '_specialize' attribute (got 0, but expected 1)}}
   // expected-note@-4 {{missing constraint for 'T' in '_specialize' attribute}}

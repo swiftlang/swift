@@ -189,7 +189,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
     // If Package-CMO is enabled, we serialize package, public, and @usableFromInline decls as
     // [serialized_for_package].
-    // Their bodies must not, however, leak into @inlinable functons (that are [serialized])
+    // Their bodies must not, however, leak into @inlinable functions (that are [serialized])
     // since they are inlined outside of their defining module.
     //
     // If this callee is [serialized_for_package], the caller must be either non-serialized

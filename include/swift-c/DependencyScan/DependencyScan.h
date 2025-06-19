@@ -25,7 +25,7 @@
 /// SWIFTSCAN_VERSION_MINOR should increase when there are API additions.
 /// SWIFTSCAN_VERSION_MAJOR is intended for "major" source/ABI breaking changes.
 #define SWIFTSCAN_VERSION_MAJOR 2
-#define SWIFTSCAN_VERSION_MINOR 1
+#define SWIFTSCAN_VERSION_MINOR 2
 
 SWIFTSCAN_BEGIN_DECLS
 
@@ -36,7 +36,6 @@ typedef enum {
   // SwiftInterface and SwiftSource.
   SWIFTSCAN_DEPENDENCY_INFO_SWIFT_TEXTUAL = 0,
   SWIFTSCAN_DEPENDENCY_INFO_SWIFT_BINARY = 1,
-  SWIFTSCAN_DEPENDENCY_INFO_SWIFT_PLACEHOLDER = 2,
   SWIFTSCAN_DEPENDENCY_INFO_CLANG = 3
 } swiftscan_dependency_info_kind_t;
 
@@ -48,6 +47,9 @@ typedef struct swiftscan_dependency_info_s *swiftscan_dependency_info_t;
 
 /// Opaque container to a link library info.
 typedef struct swiftscan_link_library_info_s *swiftscan_link_library_info_t;
+
+/// Opaque container to an import info.
+typedef struct swiftscan_import_info_s *swiftscan_import_info_t;
 
 /// Opaque container to a macro dependency.
 typedef struct swiftscan_macro_dependency_s *swiftscan_macro_dependency_t;
@@ -76,6 +78,18 @@ typedef struct {
   size_t count;
 } swiftscan_link_library_set_t;
 
+/// Set of details about source imports
+typedef struct {
+  swiftscan_import_info_t *imports;
+  size_t count;
+} swiftscan_import_info_set_t;
+
+/// Set of source location infos
+typedef struct {
+  swiftscan_source_location_t *source_locations;
+  size_t count;
+} swiftscan_source_location_set_t;
+
 /// Set of macro dependency
 typedef struct {
   swiftscan_macro_dependency_t *macro_dependencies;
@@ -88,6 +102,15 @@ typedef enum {
   SWIFTSCAN_DIAGNOSTIC_SEVERITY_NOTE = 2,
   SWIFTSCAN_DIAGNOSTIC_SEVERITY_REMARK = 3
 } swiftscan_diagnostic_severity_t;
+
+// Must maintain consistency with swift::AccessLevel
+typedef enum {
+  SWIFTSCAN_ACCESS_LEVEL_PRIVATE = 0,
+  SWIFTSCAN_ACCESS_LEVEL_FILEPRIVATE = 1,
+  SWIFTSCAN_ACCESS_LEVEL_INTERNAL = 2,
+  SWIFTSCAN_ACCESS_LEVEL_PACKAGE = 3,
+  SWIFTSCAN_ACCESS_LEVEL_PUBLIC = 4
+} swiftscan_access_level_t;
 
 typedef struct {
   swiftscan_diagnostic_info_t *diagnostics;
@@ -148,10 +171,23 @@ swiftscan_module_info_get_direct_dependencies(swiftscan_dependency_info_t info);
 SWIFTSCAN_PUBLIC swiftscan_link_library_set_t *
 swiftscan_module_info_get_link_libraries(swiftscan_dependency_info_t info);
 
+SWIFTSCAN_PUBLIC swiftscan_import_info_set_t *
+swiftscan_module_info_get_imports(swiftscan_dependency_info_t info);
+
 SWIFTSCAN_PUBLIC swiftscan_module_details_t
 swiftscan_module_info_get_details(swiftscan_dependency_info_t info);
 
-//=== Link Library Info Functions ------------------------------------===//
+//=== Import Details Functions -------------------------------------------===//
+SWIFTSCAN_PUBLIC swiftscan_source_location_set_t *
+swiftscan_import_info_get_source_locations(swiftscan_import_info_t info);
+
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
+swiftscan_import_info_get_identifier(swiftscan_import_info_t info);
+
+SWIFTSCAN_PUBLIC swiftscan_access_level_t
+swiftscan_import_info_get_access_level(swiftscan_import_info_t info);
+
+//=== Link Library Info Functions ----------------------------------------===//
 SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_link_library_info_get_link_name(
     swiftscan_link_library_info_t info);
@@ -273,7 +309,8 @@ swiftscan_swift_binary_detail_get_module_cache_key(
 SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_swift_binary_detail_get_user_module_version(
     swiftscan_module_details_t details);
-//=== Swift Placeholder Module Details query APIs -------------------------===//
+
+//=== Swift Placeholder Module Details query APIs - DEPRECATED -----------===//
 
 SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_swift_placeholder_detail_get_compiled_module_path(

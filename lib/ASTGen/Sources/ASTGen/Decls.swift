@@ -69,6 +69,8 @@ extension ASTGenVisitor {
       return self.generate(typeAliasDecl: node)?.asDecl
     case .variableDecl(let node):
       return self.generate(variableDecl: node)
+    case .usingDecl(let node):
+      return self.generate(usingDecl: node)?.asDecl
     }
   }
 
@@ -1080,6 +1082,37 @@ extension ASTGenVisitor {
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
     return decl
+  }
+}
+
+extension ASTGenVisitor {
+  func generate(usingDecl node: UsingDeclSyntax) -> BridgedUsingDecl? {
+    var specifier: BridgedUsingSpecifier? = nil
+
+    switch node.specifier {
+    case .attribute(let attr):
+      if let identifier = attr.attributeName.as(IdentifierTypeSyntax.self),
+         identifier.name.tokenKind == .identifier("MainActor") {
+        specifier = .mainActor
+      }
+    case .modifier(let modifier):
+      if case .identifier("nonisolated") = modifier.tokenKind {
+        specifier = .nonisolated
+      }
+    }
+
+    guard let specifier else {
+      self.diagnose(.invalidDefaultIsolationSpecifier(node.specifier))
+      return nil
+    }
+
+    return BridgedUsingDecl.createParsed(
+      self.ctx,
+      declContext: self.declContext,
+      usingKeywordLoc: self.generateSourceLoc(node.usingKeyword),
+      specifierLoc: self.generateSourceLoc(node.specifier),
+      specifier: specifier
+    )
   }
 }
 

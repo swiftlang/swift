@@ -260,18 +260,16 @@ checkAvailability(const EnumElementDecl *elt,
   if (!constraint->isActiveForRuntimeQueries(C))
     return true;
 
-  auto domain = constraint->getDomain();
+  auto domainAndRange = constraint->getDomainAndRange(C);
 
   // Only platform version constraints are supported currently.
   // FIXME: [availability] Support non-platform domain availability checks
-  if (!domain.isPlatform())
+  if (!domainAndRange.getDomain().isPlatform())
     return true;
 
   // It's conditionally available; create a version constraint and return true.
-  auto range = constraint->getPotentiallyUnavailableRange(C);
-
-  ASSERT(range);
-  versionCheck.emplace(domain.getPlatformKind(), range->getRawMinimumVersion());
+  versionCheck.emplace(domainAndRange.getDomain().getPlatformKind(),
+                       domainAndRange.getRange().getRawMinimumVersion());
   return true;
 }
 

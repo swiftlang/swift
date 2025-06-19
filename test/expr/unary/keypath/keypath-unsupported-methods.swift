@@ -46,3 +46,16 @@ func f_56996() {
   _ = \Int.byteSwapped.signum() // expected-error {{key path cannot refer to instance method 'signum()'}}
   _ = \Int.byteSwapped.init() // expected-error {{key path cannot refer to initializer 'init()'}}
 }
+
+postfix operator ^
+postfix func ^ <T>(_ x: T) -> T { x }
+
+func unsupportedOperator() {
+  struct S {
+    var x: Int
+  }
+  _ = \.^ // expected-error {{invalid component of Swift key path}}
+  _ = \S^ // expected-error {{invalid component of Swift key path}}
+  _ = \S.x^ // expected-error {{invalid component of Swift key path}}
+  _ = \.x^ // expected-error {{invalid component of Swift key path}}
+}

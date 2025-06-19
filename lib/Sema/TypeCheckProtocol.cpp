@@ -2691,10 +2691,28 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
     }
 
     if (!unsafeUses.empty()) {
-      Context.Diags.diagnose(
+      // Primary diagnostic along with a Fix-It to add @unsafe in the appropriate
+      // place.
+      {
+        auto diag = Context.Diags.diagnose(
           conformance->getLoc(), diag::conformance_involves_unsafe,
-          conformance->getType(), Proto)
-      .fixItInsert(conformance->getProtocolNameLoc(), "@unsafe ");
+          conformance->getType(), Proto);
+        
+        // Find the original explicit conformance, where we can add the Fix-It.
+        auto explicitConformance = conformance;
+        while (explicitConformance->getSourceKind() ==
+                  ConformanceEntryKind::Implied) {
+          explicitConformance =
+            explicitConformance->ProtocolConformance::getImplyingConformance();
+        }
+        
+        if (explicitConformance->getSourceKind() ==
+              ConformanceEntryKind::Explicit) {
+          diag.fixItInsert(explicitConformance->getProtocolNameLoc(),
+                           "@unsafe ");
+        }
+      }
+
       for (const auto& unsafeUse : unsafeUses)
         diagnoseUnsafeUse(unsafeUse);
     }
@@ -3335,6 +3353,16 @@ static bool hasExplicitGlobalActorAttr(ValueDecl *decl) {
   return !globalActorAttr->first->isImplicit();
 }
 
+/// Determine the isolation of a conformance with a known-isolated value witness.
+static ActorIsolation getConformanceIsolationForIsolatedWitness(
+    NormalProtocolConformance *conformance) {
+  if (auto rawIsolation = conformance->getRawIsolation())
+    return *rawIsolation;
+
+  return inferConformanceIsolation(
+      conformance, /*hasKnownIsolatedWitness=*/true);
+}
+
 std::optional<ActorIsolation>
 ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
                                         ValueDecl *witness,
@@ -3398,7 +3426,8 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
   case ActorReferenceResult::EntersActor: {
     // If the conformance itself is isolated to the same isolation domain as
     // the witness, treat this as being in the same concurrency domain.
-    auto conformanceIsolation = Conformance->getIsolation();
+    auto conformanceIsolation =
+        getConformanceIsolationForIsolatedWitness(Conformance);
     if (conformanceIsolation.isGlobalActor() &&
         refResult.isolation == conformanceIsolation) {
       sameConcurrencyDomain = true;
@@ -3912,10 +3941,19 @@ filterProtocolRequirements(
     return Filtered;
   }
 
-  const auto getProtocolSubstitutionMap = [&](ValueDecl *Req) {
-    auto *const PD = cast<ProtocolDecl>(Req->getDeclContext());
-    auto Conformance = lookupConformance(Adoptee, PD);
-    return SubstitutionMap::getProtocolSubstitutions(Conformance);
+  const auto getProtocolSubstitutionMap = [&](ValueDecl *req) {
+    ASSERT(isa<ProtocolDecl>(req->getDeclContext()));
+    auto genericSig = req->getInnermostDeclContext()
+        ->getGenericSignatureOfContext();
+    SmallVector<Type, 2> args;
+    for (auto paramTy : genericSig.getGenericParams()) {
+      if (args.empty())
+        args.push_back(Adoptee);
+      else
+        args.push_back(paramTy);
+    }
+    return SubstitutionMap::get(genericSig, args,
+                                LookUpConformanceInModule());
   };
 
   llvm::SmallDenseMap<DeclName, llvm::SmallVector<ValueDecl *, 2>, 4>
@@ -3931,11 +3969,11 @@ filterProtocolRequirements(
     auto OverloadTy = Req->getOverloadSignatureType();
     if (OverloadTy) {
       auto Subs = getProtocolSubstitutionMap(Req);
-      // FIXME: This is wrong if the overload has its own generic parameters
-      if (auto GenericFnTy = dyn_cast<GenericFunctionType>(OverloadTy))
+      if (auto GenericFnTy = dyn_cast<GenericFunctionType>(OverloadTy)) {
         OverloadTy = GenericFnTy.substGenericArgs(Subs);
-      else
+      } else {
         OverloadTy = OverloadTy.subst(Subs)->getCanonicalType();
+      }
     }
     if (llvm::any_of(DeclsByName[Req->getName()], [&](ValueDecl *OtherReq) {
           auto OtherOverloadTy = OtherReq->getOverloadSignatureType();
@@ -6725,7 +6763,7 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   if (!hasDeprecatedUnsafeSendable && SendableConformance) {
     SendableCheck check = SendableCheck::Explicit;
     if (sendableConformancePreconcurrency)
-      check = SendableCheck::ImpliedByStandardProtocol;
+      check = SendableCheck::ImpliedByPreconcurrencyProtocol;
     else if (SendableConformance->getSourceKind() ==
                  ConformanceEntryKind::Synthesized)
       check = SendableCheck::Implicit;

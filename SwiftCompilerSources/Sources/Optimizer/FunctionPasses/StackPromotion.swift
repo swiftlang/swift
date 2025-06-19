@@ -286,7 +286,7 @@ private struct ComputeOuterBlockrange : EscapeVisitorWithResult {
     result.insert(operandsDefinitionBlock)
 
     // We need to explicitly add predecessor blocks of phis because they
-    // are not necesesarily visited during the down-walk in `isEscaping()`.
+    // are not necessarily visited during the down-walk in `isEscaping()`.
     // This is important for the special case where there is a back-edge from the
     // inner range to the inner rage's begin-block:
     //

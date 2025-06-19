@@ -119,11 +119,11 @@ class Holder: @unchecked Sendable {
 }
 
 enum E: Sendable {
-case q(Q.Type, Int) // expected-warning{{associated value 'q' of 'Sendable'-conforming enum 'E' has non-Sendable type 'any Q.Type'}}
+case q(Q.Type, Int) // expected-warning{{associated value 'q' of 'Sendable'-conforming enum 'E' contains non-Sendable type 'any Q.Type'}}
 }
 
 struct S: Sendable {
-  var tuple: ([Q.Type], Int) // expected-warning{{stored property 'tuple' of 'Sendable'-conforming struct 'S' has non-Sendable type '([any Q.Type], Int)'}}
+  var tuple: ([Q.Type], Int) // expected-warning{{stored property 'tuple' of 'Sendable'-conforming struct 'S' contains non-Sendable type 'any Q.Type'}}
 }
 
 extension Q {
@@ -174,4 +174,17 @@ extension TestUnapplied {
 
 func testUnappliedWithOpetator<T: Comparable>(v: TestUnapplied<T>) {
   v<=>(>) // expected-error {{converting non-Sendable function value to '@Sendable (T, T) -> Bool' may introduce data races}}
+}
+
+protocol P {}
+
+func acceptClosure(_: () -> Void) {}
+
+@MainActor
+func f<T: P>(_: T.Type) {
+  acceptClosure {
+    Task {
+      _ = T.self // okay to capture T.Type in this closure.
+    }
+  }
 }

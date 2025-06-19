@@ -129,6 +129,7 @@ extension ClosedRange: RangeExpression {
   /// - Returns: `true` if `element` is contained in the range; otherwise,
   ///   `false`.
   @inlinable
+  @inline(__always)
   public func contains(_ element: Bound) -> Bool {
     return element >= self.lowerBound && element <= self.upperBound
   }
@@ -383,6 +384,7 @@ extension ClosedRange {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
+  @_transparent
   public func contains(_ other: ClosedRange<Bound>) -> Bool {
     lowerBound <= other.lowerBound && upperBound >= other.upperBound
   }

@@ -50,15 +50,15 @@ import Swift
 // CHECK-powerpc64:   trap
 // CHECK-powerpc64le: trap
 // CHECK-s390x:       j       .Ltmp{{[0-9]+}}+2
-// CHECK-NOT-x86_64:      {{.cfi_endproc|Lfunc_end}}
-// CHECK-NOT-i386:        .cfi_endproc
-// CHECK-NOT-arm64:       .cfi_endproc
-// CHECK-NOT-aarch64:     .cfi_endproc
-// CHECK-NOT-armv7:       Lfunc_end
-// CHECK-NOT-armv7s:      Lfunc_end
-// CHECK-NOT-powerpc64:   .cfi_endproc
-// CHECK-NOT-powerpc64le: .cfi_endproc
-// CHECK-NOT-s390x:       .cfi_endproc
+// CHECK-x86_64-NOT:      {{.cfi_endproc|Lfunc_end}}
+// CHECK-i386-NOT:        .cfi_endproc
+// CHECK-arm64-NOT:       .cfi_endproc
+// CHECK-aarch64-NOT:     .cfi_endproc
+// CHECK-armv7-NOT:       Lfunc_end
+// CHECK-armv7s-NOT:      Lfunc_end
+// CHECK-powerpc64-NOT:   .cfi_endproc
+// CHECK-powerpc64le-NOT: .cfi_endproc
+// CHECK-s390x-NOT:       .cfi_endproc
 // CHECK-OPT-macosx:  InlineAsm Start
 // CHECK-OPT-macosx:  InlineAsm End
 // CHECK-OPT-linux:   ##APP

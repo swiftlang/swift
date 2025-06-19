@@ -9,6 +9,10 @@ public protocol SampleProtocol2 {}
 public protocol SampleProtocol1a: SampleProtocol1 {}
 public protocol SampleProtocol1b: SampleProtocol1 {}
 
+public protocol SampleProtocol3<A> {
+  associatedtype A
+}
+
 public struct Sample1 {}
 public struct Sample2 {}
 public struct Sample2a {}
@@ -26,6 +30,9 @@ public struct Sample8 {}
 public struct SampleAlreadyConforms: SampleProtocol1 {}
 
 public struct GenericSample1<T> {}
+
+public struct Sample9 {}
+public struct Sample10 {}
 
 #else
 
@@ -117,5 +124,11 @@ extension Sample7: SampleProtocol1 & SampleProtocol2 {}
 // expected-note@-2 {{add '@retroactive' to silence this warning}}
 
 extension Sample8: @retroactive SampleProtocol1 & SampleProtocol2 {}  // ok
+
+extension Sample9: SampleProtocol3<Int> {}
+// expected-warning@-1 {{extension declares a conformance of imported type 'Sample9' to imported protocol 'SampleProtocol3'; this will not behave correctly if the owners of 'Library' introduce this conformance in the future}}
+// expected-note@-2 {{add '@retroactive' to silence this warning}}
+
+extension Sample10: @retroactive SampleProtocol3<Int> {}
 
 #endif

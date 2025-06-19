@@ -128,7 +128,7 @@ import SubE
 // CHECK: ],
 // CHECK-NEXT: "linkLibraries": [
 // CHECK-NEXT: ],
-// CHECK-NEXT: "details": {
+// CHECK: "details": {
 
 // CHECK: "commandLine": [
 // CHECK: "-compile-module-from-interface"

@@ -53,8 +53,15 @@ protected:
       return;
     }
     if (fixedSize == 1) {
-      // only one element to operate on
-      return body(addrs);
+      auto zero = llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 0);
+      // only one element to operate on; index to it in each array
+      SmallVector<Address, 2> eltAddrs;
+      eltAddrs.reserve(addrs.size());
+      for (auto index : indices(addrs)) {
+        eltAddrs.push_back(Element.indexArray(IGF, addrs[index], zero,
+                                              getElementSILType(IGF.IGM, T)));
+      }
+      return body(eltAddrs);
     }
     
     auto arraySize = getArraySize(IGF, T);

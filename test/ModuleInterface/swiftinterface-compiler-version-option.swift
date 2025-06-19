@@ -25,12 +25,12 @@
 /// Check option in swiftinterface
 // RUN: cat %t/Lib.swiftinterface | %FileCheck --check-prefix=CHECK-OPTION %s
 // CHECK-OPTION: swift-module-flags-ignorable:
-// CHECK-SAME-OPTION: -swift-compiler-version {{.*}}
+// CHECK-OPTION-SAME: -interface-compiler-version {{.*}}
 
 /// Check option in swiftmodule
 // RUN: llvm-bcanalyzer --dump %t/Lib.swiftmodule | %FileCheck --check-prefix=CHECK-MODULE-OPTION %s
 // CHECK-MODULE-OPTION: <OPTIONS_BLOCK
-// CHECK-NOT-MODULE-OPTION: <SWIFT_INTERFACE_COMPILER_VERSION abbrevid={{.*}}/> blob data = '{{.*}}'
+// CHECK-MODULE-OPTION-NOT: <SWIFT_INTERFACE_COMPILER_VERSION abbrevid={{.*}}/> blob data = '{{.*}}'
 // CHECK-MODULE-OPTION: </OPTIONS_BLOCK>
 
 // Drop and rebuilt swiftmodule to make sure that the version is inferred from the interface file.

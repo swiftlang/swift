@@ -37,7 +37,8 @@ struct ClangBuildArgsProvider {
                           (output: AbsolutePath?, args: [Command.Argument])] = [:]
     for command in parsed {
       guard command.command.executable.knownCommand == .clang,
-            let relFilePath = command.file.removingPrefix(repoPath)
+            command.file.exists,
+            let relFilePath = command.file.realPath.removingPrefix(repoPath)
       else {
         continue
       }

@@ -132,10 +132,10 @@ public:
   /// Returns the domain that the constraint applies to.
   AvailabilityDomain getDomain() const { return getAttr().getDomain(); }
 
-  /// Returns the required range for `IntroducedInNewerVersion` requirements, or
-  /// `std::nullopt` otherwise.
-  std::optional<AvailabilityRange>
-  getPotentiallyUnavailableRange(const ASTContext &ctx) const;
+  /// Returns the domain and range (remapped if necessary) in which the
+  /// constraint must be satisfied. How the range should be interpreted depends
+  /// on the reason for the constraint.
+  AvailabilityDomainAndRange getDomainAndRange(const ASTContext &ctx) const;
 
   /// Some availability constraints are active for type-checking but cannot
   /// be translated directly into an `if #available(...)` runtime query.

@@ -22,5 +22,5 @@ extension Vector where Count == 2 {
 // CHECK: func something<let N : Int>(_: borrowing Vector<Int, N>)
 func something<let N: Int>(_: borrowing Vector<Int, N>) {}
 
-// CHECK: func hello(_: [4 x Int])
-func hello(_: [4 x Int]) {}
+// CHECK: func hello(_: [4 of Int])
+func hello(_: [4 of Int]) {}

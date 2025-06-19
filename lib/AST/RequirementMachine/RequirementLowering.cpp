@@ -451,6 +451,7 @@ static void desugarSameShapeRequirement(
       !req.getSecondType()->isParameterPack()) {
     errors.push_back(RequirementError::forInvalidShapeRequirement(
         req, loc));
+    return;
   }
 
   result.emplace_back(RequirementKind::SameShape,

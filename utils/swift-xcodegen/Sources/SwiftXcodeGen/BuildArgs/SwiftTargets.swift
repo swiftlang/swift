@@ -124,10 +124,14 @@ struct SwiftTargets {
         // A relative path is for a file in the build directory, it's external.
         let abs = buildDir.path.appending(r)
         guard abs.exists else { continue }
-        sources.externalSources.append(abs)
+        sources.externalSources.append(abs.realPath)
 
       case .absolute(let a):
-        guard a.exists, let rel = a.removingPrefix(buildDir.repoPath) else {
+        guard a.exists else { continue }
+        // Symlinks shouldn't really be a concern here, but we need to realpath
+        // in order to canonicalize the casing.
+        let a = a.realPath
+        guard let rel = a.removingPrefix(buildDir.repoPath) else {
           sources.externalSources.append(a)
           continue
         }

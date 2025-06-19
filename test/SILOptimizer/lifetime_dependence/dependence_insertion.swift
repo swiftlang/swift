@@ -5,13 +5,13 @@
 // RUN:   -module-name test \
 // RUN:   -define-availability "Span 0.1:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999" \
 // RUN:   -enable-address-dependencies \
-// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature AddressableParameters \
 // RUN:   -enable-experimental-feature AddressableTypes \
 // RUN:   -o /dev/null 2>&1 | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_AddressableParameters
 // REQUIRES: swift_feature_AddressableTypes
 
@@ -21,7 +21,7 @@ struct BV : ~Escapable {
   let p: UnsafeRawPointer
   let i: Int
 
-  @lifetime(borrow p)
+  @_lifetime(borrow p)
   init(_ p: UnsafeRawPointer, _ i: Int) {
     self.p = p
     self.i = i
@@ -33,7 +33,7 @@ struct NC : ~Copyable {
   let i: Int
 
   // Requires a borrow.
-  @lifetime(borrow self)
+  @_lifetime(borrow self)
   borrowing func getBV() -> BV {
     BV(p, i)
   }
@@ -76,9 +76,42 @@ func bv_borrow_var(p: UnsafeRawPointer, i: Int) {
 // CHECK: [[MD:%.*]] = mark_dependence [unresolved] [[BV]] on %0
 // CHECK: return [[MD]]
 // CHECK-LABEL: } // end sil function '$s4test18bv_pointer_convert1pAA2BVVSPySiG_tF'
-@lifetime(borrow p)
+@_lifetime(borrow p)
 func bv_pointer_convert(p: UnsafePointer<Int>) -> BV {
   BV(p, 0)
+}
+
+// =============================================================================
+// Builtin.addressOfBorrow
+// =============================================================================
+
+// swift-frontend -emit-sil -enable-builtin-module -enable-experimental-feature Lifetimes -enable-experimental-feature AddressableParameters -Xllvm -sil-print-function=test ./dependsOnAddress.swift
+
+import Builtin
+
+struct IntHolder {
+  var field: Int
+}
+
+struct NERawPointer: ~Escapable {
+  var p: Builtin.RawPointer
+}
+
+@_lifetime(borrow x)
+func pointerDepends(on x: Builtin.RawPointer) -> NERawPointer {
+  NERawPointer(p: x)
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test0A22BuiltinAddressOfBorrow6holderAA12NERawPointerVAA9IntHolderVz_tF : $@convention(thin) (@inout IntHolder) -> @lifetime(borrow 0) @owned NERawPointer {
+// CHECK: bb0(%0 : $*IntHolder):
+// CHECK: [[ACCESS:%[0-9]+]] = begin_access [read] [static] %0
+// CHECK: [[PTR:%[0-9]+]] = address_to_pointer [stack_protection] %2 to $Builtin.RawPointer
+// CHECK: [[NE:%[0-9]+]] = apply %{{.*}}([[PTR]]) : $@convention(thin) (Builtin.RawPointer) -> @lifetime(borrow 0) @owned NERawPointer
+// CHECK: mark_dependence [unresolved] [[NE]] on %0
+// CHECK-LABEL: } // end sil function '$s4test0A22BuiltinAddressOfBorrow6holderAA12NERawPointerVAA9IntHolderVz_tF'
+@_lifetime(&holder)
+func testBuiltinAddressOfBorrow(holder: inout IntHolder) -> NERawPointer {
+  pointerDepends(on: Builtin.addressOfBorrow(holder))
 }
 
 // =============================================================================
@@ -90,7 +123,7 @@ public typealias IntSpan = Span<Int>
 
 @available(Span 0.1, *)
 protocol IntSpanable {
-  @lifetime(borrow self)
+  @_lifetime(borrow self)
   func getIntSpan() -> IntSpan
 }
 
@@ -107,7 +140,7 @@ public struct Holder: IntSpanable {
     }
   }
 
-  @lifetime(borrow self)
+  @_lifetime(borrow self)
   func getIntSpan() -> IntSpan {
     let span = unsafe Span(_unsafeStart: p, count: 1)
     return unsafe _overrideLifetime(span, borrowing: self)
@@ -125,7 +158,7 @@ public struct InlineHolder: IntSpanable {
     self.i = c.i
   }
 
-  @lifetime(borrow self)
+  @_lifetime(borrow self)
   func getIntSpan() -> IntSpan {
     let a = Builtin.addressOfBorrow(self)
     let address = unsafe UnsafePointer<Int>(a)
@@ -136,7 +169,7 @@ public struct InlineHolder: IntSpanable {
 
 // 'some Spanable' is AddressableForDependencies.
 @available(Span 0.1, *)
-@lifetime(borrow spanable)
+@_lifetime(borrow spanable)
 func getIntSpan(_ spanable: some IntSpanable) -> IntSpan {
   spanable.getIntSpan()
 }

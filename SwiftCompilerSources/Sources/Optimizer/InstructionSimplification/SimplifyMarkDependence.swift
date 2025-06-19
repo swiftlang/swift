@@ -19,7 +19,7 @@ extension MarkDependenceInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
     if isRedundant ||
        // A literal lives forever, so no mark_dependence is needed.
-       // This pattern can occur after StringOptimization when a utf8CString of a literal is replace
+       // This pattern can occur after StringOptimization when a utf8CString of a literal is replaced
        // by the string_literal itself.
        value.isLiteral
     {

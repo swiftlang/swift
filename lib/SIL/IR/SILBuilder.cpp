@@ -780,7 +780,7 @@ SwitchEnumInst *SILBuilder::createSwitchEnum(
 
 CheckedCastBranchInst *SILBuilder::createCheckedCastBranch(
     SILLocation Loc, bool isExact,
-    CastingIsolatedConformances isolatedConformances,
+    CheckedCastInstOptions options,
     SILValue op, CanType srcFormalTy,
     SILType destLoweredTy, CanType destFormalTy, SILBasicBlock *successBB,
     SILBasicBlock *failureBB, ProfileCounter target1Count,
@@ -788,14 +788,14 @@ CheckedCastBranchInst *SILBuilder::createCheckedCastBranch(
   auto forwardingOwnership =
       deriveForwardingOwnership(op, destLoweredTy, getFunction());
   return createCheckedCastBranch(
-      Loc, isExact, isolatedConformances, op, srcFormalTy, destLoweredTy,
+      Loc, isExact, options, op, srcFormalTy, destLoweredTy,
       destFormalTy, successBB,
       failureBB, forwardingOwnership, target1Count, target2Count);
 }
 
 CheckedCastBranchInst *SILBuilder::createCheckedCastBranch(
     SILLocation Loc, bool isExact,
-    CastingIsolatedConformances isolatedConformances,
+    CheckedCastInstOptions options,
     SILValue op, CanType srcFormalTy,
     SILType destLoweredTy, CanType destFormalTy, SILBasicBlock *successBB,
     SILBasicBlock *failureBB, ValueOwnershipKind forwardingOwnershipKind,
@@ -805,7 +805,7 @@ CheckedCastBranchInst *SILBuilder::createCheckedCastBranch(
          "failureBB's argument doesn't match incoming argument type");
 
   return insertTerminator(CheckedCastBranchInst::create(
-      getSILDebugLocation(Loc), isExact, isolatedConformances, op, srcFormalTy,
+      getSILDebugLocation(Loc), isExact, options, op, srcFormalTy,
       destLoweredTy, destFormalTy, successBB, failureBB, getFunction(),
       target1Count, target2Count, forwardingOwnershipKind));
 }

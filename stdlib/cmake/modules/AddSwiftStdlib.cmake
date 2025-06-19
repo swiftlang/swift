@@ -1003,6 +1003,41 @@ function(add_swift_target_library_single target name)
   # Define availability macros.
   foreach(def ${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS})
     list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "-Xfrontend" "-define-availability" "-Xfrontend" "${def}")
+
+    if("${def}" MATCHES "SwiftStdlib .*")
+      # For each SwiftStdlib x.y, also define StdlibDeploymentTarget x.y, which,
+      # will expand to the current `-target` platform if the macro defines a
+      # newer platform as its availability.
+      #
+      # There is a setting, SWIFT_STDLIB_ENABLE_STRICT_AVAILABILITY, which if set
+      # ON will cause us to use the "proper" availability instead.
+      string(REPLACE "SwiftStdlib" "StdlibDeploymentTarget" current "${def}")
+      if(NOT SWIFT_STDLIB_ENABLE_STRICT_AVAILABILITY AND SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_AVAILABILITY_NAME)
+        if(SWIFTLIB_SINGLE_SDK STREQUAL "OSX" AND SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR STREQUAL "ios-like")
+          string(REGEX MATCH "iOS ([0-9]+(\.[0-9]+)+)" platform_version "${def}")
+          string(REGEX MATCH "[0-9]+(\.[0-9]+)+" version "${platform_version}")
+          if(NOT version STREQUAL "9999" AND version VERSION_GREATER "${SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST}")
+            string(REGEX REPLACE ":.*" ":iOS ${SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST}" current "${current}")
+          endif()
+        elseif(SWIFTLIB_SINGLE_SDK STREQUAL "OSX" AND SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR STREQUAL "zippered")
+          string(REGEX MATCH "iOS ([0-9]+(\.[0-9]+)+)" ios_platform_version "${def}")
+          string(REGEX MATCH "[0-9]+(\.[0-9]+)+" ios_version "${ios_platform_version}")
+          string(REGEX MATCH "macOS ([0-9]+(\.[0-9]+)+)" macos_platform_version "${def}")
+          string(REGEX MATCH "[0-9]+(\.[0-9]+)+" macos_version "${macos_platform_version}")
+          if((NOT macos_version STREQUAL "9999" OR NOT ios_version STREQUAL "9999") AND (macos_version VERSION_GREATER "${SWIFT_SDK_OSX_DEPLOYMENT_VERSION}" OR ios_version VERSION_GREATER "${SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST}"))
+            string(REGEX REPLACE ":.*" ": macOS ${SWIFT_SDK_OSX_DEPLOYMENT_VERSION}, iOS ${SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST}" current "${current}")
+          endif()
+        else()
+          string(REGEX MATCH "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_AVAILABILITY_NAME} ([0-9]+(\.[0-9]+)+)" platform_version "${def}")
+          string(REGEX MATCH "[0-9]+(\.[0-9]+)+" version "${platform_version}")
+          if(NOT version STREQUAL "9999" AND version VERSION_GREATER "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_DEPLOYMENT_VERSION}")
+            string(REGEX REPLACE ":.*" ":${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_AVAILABILITY_NAME} ${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_DEPLOYMENT_VERSION}" current "${current}")
+          endif()
+        endif()
+      endif()
+
+      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "-Xfrontend" "-define-availability" "-Xfrontend" "${current}")
+    endif()
   endforeach()
 
   # Enable -target-min-inlining-version

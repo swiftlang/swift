@@ -10,6 +10,8 @@ set(SwiftCore_ENABLE_BACKTRACING_default OFF) # TODO: enable this by default
 set(SwiftCore_ENABLE_STDIN_default ON)
 set(SwiftCore_ENABLE_TYPE_PRINTING_default ON)
 
+set(SwiftCore_ENABLE_STRICT_AVAILABILITY_default OFF)
+
 set(SwiftCore_BACKTRACER_PATH_default "")
 
 # Provide a boolean option that a user can optionally enable.
@@ -19,7 +21,7 @@ macro(defaulted_option variable helptext)
   if(NOT DEFINED ${variable}_default)
     set(${variable}_default OFF)
   endif()
-  option(${variable} ${helptext} ${${variable}_default})
+  option(${variable} "${helptext}" ${${variable}_default})
 endmacro()
 
 # Create a defaulted cache entry
@@ -50,6 +52,8 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "WASM")
   set(SwiftCore_CONCURRENCY_GLOBAL_EXECUTOR_default "none")
 elseif(LINUX OR ANDROID OR BSD)
   set(SwiftCore_OBJECT_FORMAT_default "elf")
+
+  set(SwiftCore_ENABLE_REFLECTION_default ON)
   set(SwiftCore_ENABLE_FATALERROR_BACKTRACE_default ON)
   if(LINUX)
     set(SwiftCore_THREADING_PACKAGE_default "LINUX")

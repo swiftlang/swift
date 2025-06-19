@@ -728,7 +728,7 @@ bool SemaAnnotator::handleCustomAttributes(Decl *D) {
 
   ModuleDecl *MD = D->getModuleContext();
   for (auto *customAttr :
-       D->getSemanticAttrs().getAttributes<CustomAttr, true>()) {
+       D->getExpandedAttrs().getAttributes<CustomAttr, true>()) {
     SourceFile *SF =
         MD->getSourceFileContainingLocation(customAttr->getLocation());
     ASTNode expansion = SF ? SF->getMacroExpansion() : nullptr;
@@ -851,28 +851,17 @@ bool SemaAnnotator::passModulePathElements(
 bool SemaAnnotator::passSubscriptReference(ValueDecl *D, SourceLoc Loc,
                                            ReferenceMetaData Data,
                                            bool IsOpenBracket) {
-  CharSourceRange Range = Loc.isValid()
-                        ? CharSourceRange(Loc, 1)
-                        : CharSourceRange();
-
-  return SEWalker.visitSubscriptReference(D, Range, Data, IsOpenBracket);
+  return SEWalker.visitSubscriptReference(D, Loc, Data, IsOpenBracket);
 }
 
 bool SemaAnnotator::passCallAsFunctionReference(ValueDecl *D, SourceLoc Loc,
                                                 ReferenceMetaData Data) {
-  CharSourceRange Range =
-      Loc.isValid() ? CharSourceRange(Loc, 1) : CharSourceRange();
-
-  return SEWalker.visitCallAsFunctionReference(D, Range, Data);
+  return SEWalker.visitCallAsFunctionReference(D, Loc, Data);
 }
 
 bool SemaAnnotator::
 passReference(ValueDecl *D, Type Ty, DeclNameLoc Loc, ReferenceMetaData Data) {
-  SourceManager &SM = D->getASTContext().SourceMgr;
-  SourceLoc BaseStart = Loc.getBaseNameLoc(), BaseEnd = BaseStart;
-  if (BaseStart.isValid() && SM.extractText({BaseStart, 1}) == "`")
-    BaseEnd = Lexer::getLocForEndOfToken(SM, BaseStart.getAdvancedLoc(1));
-  return passReference(D, Ty, BaseStart, {BaseStart, BaseEnd}, Data);
+  return passReference(D, Ty, Loc.getBaseNameLoc(), Loc.getSourceRange(), Data);
 }
 
 bool SemaAnnotator::
@@ -917,12 +906,7 @@ passReference(ValueDecl *D, Type Ty, SourceLoc BaseNameLoc, SourceRange Range,
     }
   }
 
-  CharSourceRange CharRange =
-    Lexer::getCharSourceRangeFromSourceRange(D->getASTContext().SourceMgr,
-                                             Range);
-
-  return SEWalker.visitDeclReference(D, CharRange, CtorTyRef, ExtDecl, Ty,
-                                     Data);
+  return SEWalker.visitDeclReference(D, Range, CtorTyRef, ExtDecl, Ty, Data);
 }
 
 bool SemaAnnotator::passReference(ModuleEntity Mod,
@@ -1023,7 +1007,7 @@ bool SourceEntityWalker::walk(ASTNode N) {
   llvm_unreachable("unsupported AST node");
 }
 
-bool SourceEntityWalker::visitDeclReference(ValueDecl *D, CharSourceRange Range,
+bool SourceEntityWalker::visitDeclReference(ValueDecl *D, SourceRange Range,
                                             TypeDecl *CtorTyRef,
                                             ExtensionDecl *ExtTyRef, Type T,
                                             ReferenceMetaData Data) {
@@ -1031,7 +1015,7 @@ bool SourceEntityWalker::visitDeclReference(ValueDecl *D, CharSourceRange Range,
 }
 
 bool SourceEntityWalker::visitSubscriptReference(ValueDecl *D,
-                                                 CharSourceRange Range,
+                                                 SourceRange Range,
                                                  ReferenceMetaData Data,
                                                  bool IsOpenBracket) {
   // Most of the clients treat subscript reference the same way as a
@@ -1043,7 +1027,7 @@ bool SourceEntityWalker::visitSubscriptReference(ValueDecl *D,
 }
 
 bool SourceEntityWalker::visitCallAsFunctionReference(ValueDecl *D,
-                                                      CharSourceRange Range,
+                                                      SourceRange Range,
                                                       ReferenceMetaData Data) {
   return true;
 }

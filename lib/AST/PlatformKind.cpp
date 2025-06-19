@@ -116,6 +116,7 @@ swift::basePlatformForExtensionPlatform(PlatformKind Platform) {
   case PlatformKind::tvOS:
   case PlatformKind::watchOS:
   case PlatformKind::visionOS:
+  case PlatformKind::FreeBSD:
   case PlatformKind::OpenBSD:
   case PlatformKind::Windows:
   case PlatformKind::none:
@@ -160,6 +161,8 @@ static bool isPlatformActiveForTarget(PlatformKind Platform,
       return Target.isXROS();
     case PlatformKind::OpenBSD:
       return Target.isOSOpenBSD();
+    case PlatformKind::FreeBSD:
+      return Target.isOSFreeBSD();
     case PlatformKind::Windows:
       return Target.isOSWindows();
     case PlatformKind::none:
@@ -263,15 +266,45 @@ bool swift::inheritsAvailabilityFromPlatform(PlatformKind Child,
   return false;
 }
 
-llvm::VersionTuple swift::canonicalizePlatformVersion(
-    PlatformKind platform, const llvm::VersionTuple &version) {
+std::optional<llvm::Triple::OSType>
+swift::tripleOSTypeForPlatform(PlatformKind platform) {
+  switch (platform) {
+  case PlatformKind::macOS:
+  case PlatformKind::macOSApplicationExtension:
+    return llvm::Triple::MacOSX;
+  case PlatformKind::iOS:
+  case PlatformKind::iOSApplicationExtension:
+  case PlatformKind::macCatalyst:
+  case PlatformKind::macCatalystApplicationExtension:
+    return llvm::Triple::IOS;
+  case PlatformKind::tvOS:
+  case PlatformKind::tvOSApplicationExtension:
+    return llvm::Triple::TvOS;
+  case PlatformKind::watchOS:
+  case PlatformKind::watchOSApplicationExtension:
+    return llvm::Triple::WatchOS;
+  case PlatformKind::visionOS:
+  case PlatformKind::visionOSApplicationExtension:
+    return llvm::Triple::XROS;
+  case PlatformKind::FreeBSD:
+    return llvm::Triple::FreeBSD;
+  case PlatformKind::OpenBSD:
+    return llvm::Triple::OpenBSD;
+  case PlatformKind::Windows:
+    return llvm::Triple::Win32;
+  case PlatformKind::none:
+    return std::nullopt;
+  }
+  llvm_unreachable("bad PlatformKind");
+}
 
-  // Canonicalize macOS version for macOS Big Sur to treat
-  // 10.16 as 11.0.
-  if (platform == PlatformKind::macOS ||
-      platform == PlatformKind::macOSApplicationExtension) {
-    return llvm::Triple::getCanonicalVersionForOS(llvm::Triple::MacOSX,
-                                                  version);
+llvm::VersionTuple
+swift::canonicalizePlatformVersion(PlatformKind platform,
+                                   const llvm::VersionTuple &version) {
+  if (auto osType = tripleOSTypeForPlatform(platform)) {
+    bool isInValidRange = llvm::Triple::isValidVersionForOS(*osType, version);
+    return llvm::Triple::getCanonicalVersionForOS(*osType, version,
+                                                  isInValidRange);
   }
 
   return version;
@@ -292,6 +325,7 @@ bool swift::isPlatformSPI(PlatformKind Platform) {
   case PlatformKind::visionOS:
   case PlatformKind::visionOSApplicationExtension:
   case PlatformKind::OpenBSD:
+  case PlatformKind::FreeBSD:
   case PlatformKind::Windows:
   case PlatformKind::none:
     return false;

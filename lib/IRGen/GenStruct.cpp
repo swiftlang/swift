@@ -1461,12 +1461,12 @@ private:
     unsigned fieldOffset = layout.getFieldOffset(clangField->getFieldIndex());
     assert(!clangField->isBitField());
     Size offset( SubobjectAdjustment.getValue() + fieldOffset / 8);
-    std::optional<Size> dataSize;
+    std::optional<clang::CharUnits> dataSize;
     if (clangField->hasAttr<clang::NoUniqueAddressAttr>()) {
       if (const auto *rd = clangField->getType()->getAsRecordDecl()) {
         // Clang can store the next field in the padding of this one.
         const auto &fieldLayout = ClangContext.getASTRecordLayout(rd);
-        dataSize = Size(fieldLayout.getDataSize().getQuantity());
+        dataSize = fieldLayout.getDataSize();
       }
     }
 
@@ -1480,9 +1480,10 @@ private:
     }
 
     // Otherwise, add it as an opaque blob.
-    auto fieldSize = isZeroSized ? clang::CharUnits::Zero() : ClangContext.getTypeSizeInChars(clangField->getType());
-    return addOpaqueField(offset,
-                          dataSize.value_or(Size(fieldSize.getQuantity())));
+    auto fieldTypeSize = ClangContext.getTypeSizeInChars(clangField->getType());
+    auto fieldSize = isZeroSized ? clang::CharUnits::Zero()
+                                 : dataSize.value_or(fieldTypeSize);
+    return addOpaqueField(offset, Size(fieldSize.getQuantity()));
   }
 
   /// Add opaque storage for bitfields spanning the given range of bits.

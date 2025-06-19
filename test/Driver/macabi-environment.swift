@@ -54,7 +54,7 @@
 // RUN: %swiftc_driver -sdk "" -sdk "" -driver-print-jobs -target x86_64-apple-macosx10.14 -target-variant x86_64-apple-ios13.1-macabi -enable-bridging-pch -import-objc-header %S/Inputs/bridging-header.h %s | %FileCheck -check-prefix=ZIPPERED-VARIANT-PCH %s
 // ZIPPERED-VARIANT-PCH: bin/swift
 // ZIPPERED-VARIANT-PCH: -target x86_64-apple-macosx10.14 -target-variant x86_64-apple-ios13.1-macabi
-// ZIPPERED_VARIANT-PCH  -emit-pch
+// ZIPPERED_VARIANT-PCH:  -emit-pch
 // ZIPPERED-VARIANT-PCH: bin/swift
 // ZIPPERED-VARIANT-PCH: -target x86_64-apple-macosx10.14 -target-variant x86_64-apple-ios13.1-macabi
 // ZIPPERED-VARIANT-PCH: bin/ld
@@ -78,7 +78,7 @@
 // RUN: %swiftc_driver -sdk "" -sdk "" -driver-print-jobs -target x86_64-apple-ios13.1-macabi -target-variant x86_64-apple-macosx10.14 -enable-bridging-pch -import-objc-header %S/Inputs/bridging-header.h %s | %FileCheck -check-prefix=REVERSE-ZIPPERED-VARIANT-PCH %s
 // REVERSE-ZIPPERED-VARIANT-PCH: bin/swift
 // REVERSE-ZIPPERED-VARIANT-PCH: -target x86_64-apple-ios13.1-macabi -target-variant x86_64-apple-macosx10.14
-// REVERSE-ZIPPERED_VARIANT-PCH  -emit-pch
+// REVERSE-ZIPPERED_VARIANT-PCH:  -emit-pch
 // REVERSE-ZIPPERED-VARIANT-PCH: bin/swift
 // REVERSE-ZIPPERED-VARIANT-PCH: -target x86_64-apple-ios13.1-macabi -target-variant x86_64-apple-macosx10.14
 // REVERSE-ZIPPERED-VARIANT-PCH: bin/ld

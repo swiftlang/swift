@@ -65,6 +65,8 @@ struct LoadedModuleTraceFormat {
   unsigned Version;
   Identifier Name;
   std::string Arch;
+  std::string LanguageMode;
+  std::vector<StringRef> EnabledLanguageFeatures;
   bool StrictMemorySafety;
   std::vector<SwiftModuleTraceInfo> SwiftModules;
   std::vector<SwiftMacroTraceInfo> SwiftMacros;
@@ -106,6 +108,11 @@ template <> struct ObjectTraits<LoadedModuleTraceFormat> {
     out.mapRequired("name", name);
 
     out.mapRequired("arch", contents.Arch);
+
+    out.mapRequired("languageMode", contents.LanguageMode);
+
+    out.mapRequired("enabledLanguageFeatures",
+                    contents.EnabledLanguageFeatures);
 
     out.mapRequired("strictMemorySafety", contents.StrictMemorySafety);
 
@@ -723,6 +730,38 @@ computeSwiftMacroTraceInfo(ASTContext &ctx, const DependencyTracker &depTracker,
       });
 }
 
+static void computeEnabledFeatures(ASTContext &ctx,
+                                   std::vector<StringRef> &enabledFeatures) {
+  struct FeatureAndName {
+    Feature feature;
+    StringRef name;
+  };
+
+  static const FeatureAndName features[] = {
+#define FEATURE_ENTRY(FeatureName) {Feature::FeatureName, #FeatureName},
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Version)
+#define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)                     \
+  FEATURE_ENTRY(FeatureName)
+#define UPCOMING_FEATURE(FeatureName, SENumber, Version)                       \
+  FEATURE_ENTRY(FeatureName)
+#define OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Version)              \
+  FEATURE_ENTRY(FeatureName)
+#include "swift/Basic/Features.def"
+  };
+
+  for (auto &featureAndName : features) {
+    if (ctx.LangOpts.hasFeature(featureAndName.feature))
+      enabledFeatures.push_back(featureAndName.name);
+  }
+
+  // FIXME: It would be nice if the features were added in sorted order instead.
+  // However, std::sort is not constexpr until C++20.
+  std::sort(enabledFeatures.begin(), enabledFeatures.end(),
+            [](const StringRef &lhs, const StringRef &rhs) -> bool {
+              return lhs.compare(rhs) < 0;
+            });
+}
+
 // [NOTE: Bailing-vs-crashing-in-trace-emission] There are certain edge cases
 // in trace emission where an invariant that you think should hold does not hold
 // in practice. For example, sometimes we have seen modules without any
@@ -785,12 +824,18 @@ bool swift::emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   std::vector<SwiftMacroTraceInfo> swiftMacros;
   computeSwiftMacroTraceInfo(ctxt, *depTracker, swiftMacros);
 
+  std::vector<StringRef> enabledFeatures;
+  computeEnabledFeatures(ctxt, enabledFeatures);
+
   LoadedModuleTraceFormat trace = {
       /*version=*/LoadedModuleTraceFormat::CurrentVersion,
       /*name=*/mainModule->getName(),
       /*arch=*/ctxt.LangOpts.Target.getArchName().str(),
+      ctxt.LangOpts.EffectiveLanguageVersion.asAPINotesVersionString(),
+      enabledFeatures,
       mainModule ? mainModule->strictMemorySafety() : false,
-      swiftModules, swiftMacros};
+      swiftModules,
+      swiftMacros};
 
   // raw_fd_ostream is unbuffered, and we may have multiple processes writing,
   // so first write to memory and then dump the buffer to the trace file.
@@ -829,9 +874,9 @@ bool swift::emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
 class ObjcMethodReferenceCollector: public SourceEntityWalker {
   unsigned CurrentFileID;
   llvm::DenseMap<const clang::ObjCMethodDecl*, unsigned> results;
-  bool visitDeclReference(ValueDecl *D, CharSourceRange Range,
-                          TypeDecl *CtorTyRef, ExtensionDecl *ExtTyRef,
-                          Type T, ReferenceMetaData Data) override {
+  bool visitDeclReference(ValueDecl *D, SourceRange Range, TypeDecl *CtorTyRef,
+                          ExtensionDecl *ExtTyRef, Type T,
+                          ReferenceMetaData Data) override {
     if (!Range.isValid())
       return true;
     if (auto *clangD = dyn_cast_or_null<clang::ObjCMethodDecl>(D->getClangDecl()))

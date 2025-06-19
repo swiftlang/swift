@@ -15,6 +15,14 @@
 # Each of the remaining lines must define an availability macro in the same
 # format used by the `-define-availability` frontend command line option.
 
+# NOTE: The build system will define another macro, StdlibDeploymentTarget, for
+#       each SwiftStdlib macro defined in this file.  The difference between the
+#       two is the the StdlibDeploymentTarget macro will never be set to a
+#       higher version than the machine on which we are building.
+#
+#       This is to allow for use of new functions and types within the standard
+#       libraries, in such a way that these usages will work on our CI machines.
+
 # 9999 is the generic unknown future Swift release. It always needs to resolve
 # to the special placeholder version numbers 9999.
 

@@ -102,9 +102,7 @@ enum class FreeTypeVariableBinding {
   /// Disallow any binding of such free type variables.
   Disallow,
   /// Allow the free type variables to persist in the solution.
-  Allow,
-  /// Bind the type variables to UnresolvedType to represent the ambiguity.
-  UnresolvedType
+  Allow
 };
 
 /// Describes whether or not a result builder method is supported.
@@ -3484,6 +3482,15 @@ public:
     return nullptr;
   }
 
+  Expr *getSemanticsProvidingParentExpr(Expr *expr) {
+    while (auto *parent = getParentExpr(expr)) {
+      if (parent->getSemanticsProvidingExpr() == parent)
+        return parent;
+      expr = parent;
+    }
+    return nullptr;
+  }
+
   /// Retrieve the depth of the given expression.
   std::optional<unsigned> getExprDepth(Expr *expr) {
     if (auto result = getExprDepthAndParent(expr))
@@ -6655,12 +6662,6 @@ bool exprNeedsParensOutsideFollowingOperator(
 bool isSIMDOperator(ValueDecl *value);
 
 std::string describeGenericType(ValueDecl *GP, bool includeName = false);
-
-/// Whether the given parameter requires an argument.
-bool parameterRequiresArgument(
-    ArrayRef<AnyFunctionType::Param> params,
-    const ParameterListInfo &paramInfo,
-    unsigned paramIdx);
 
 } // end namespace swift
 

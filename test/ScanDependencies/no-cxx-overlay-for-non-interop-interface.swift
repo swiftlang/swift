@@ -8,6 +8,9 @@
 // RUN: %target-swift-frontend -scan-dependencies -o %t/deps_no_interop_dep.json %t/clientNoInteropDep.swift -I %t/deps -cxx-interoperability-mode=default -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -verify
 // RUN: cat %t/deps_no_interop_dep.json | %FileCheck %s -check-prefix=DISABLE-CHECK
 
+// RUN: %target-swift-frontend -scan-dependencies -o %t/deps_darwin_dep.json %t/clientDarwin.swift -I %t/deps -cxx-interoperability-mode=default -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -verify
+// RUN: cat %t/deps_darwin_dep.json | %FileCheck %s -check-prefix=DARWIN-CHECK
+
 //--- deps/bar.h
 void bar(void);
 
@@ -30,11 +33,20 @@ public struct Foo1 {}
 import std_Bar
 public struct Foo2 {}
 
+//--- deps/Darwin.swiftinterface
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name Darwin -enable-library-evolution
+import std_Bar
+public struct Foo3 {}
+
 //--- clientWithInteropDep.swift
 import Foo
 
 //--- clientNoInteropDep.swift
 import FooNoInterop
+
+//--- clientDarwin.swift
+import Darwin
 
 // Ensure that when the 'Foo' dependency was built with C++ interop enabled,
 // it gets the C++ standard library overlay for its 'std_*' dependency
@@ -74,5 +86,22 @@ import FooNoInterop
 // DISABLE-CHECK:          "clang": "std_Bar"
 // DISABLE-CHECK:        }
 // DISABLE-CHECK:      ],
+
+// Ensure that the the 'Darwin' dependency does not get the C++ standard library overlay for its 'std_*' dependencies
+//
+// 'Darwin' as it appears in direct deps
+// DARWIN-CHECK: "swift": "Darwin"
+// 'Darwin' as it appears in source-import deps
+// DARWIN-CHECK: "swift": "Darwin"
+// Actual dependency info node
+// DARWIN-CHECK: "swift": "Darwin"
+// DARWIN-CHECK:      "directDependencies": [
+// DARWIN-CHECK:        {
+// DARWIN-CHECK:          "swift": "SwiftOnoneSupport"
+// DARWIN-CHECK:        },
+// DARWIN-CHECK:        {
+// DARWIN-CHECK:          "clang": "std_Bar"
+// DARWIN-CHECK:        }
+// DARWIN-CHECK:      ],
 
 

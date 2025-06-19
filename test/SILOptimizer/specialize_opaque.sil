@@ -12,6 +12,8 @@ import Builtin
 // CHECK:   %{{.*}} = apply [[F]](%0, %1) : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> ()
 // CHECK-NOT: copy_value
 // CHECK-NOT: destroy_value
+// CHECK-NOT: extend_lifetime
+// CHECK-NOT: end_lifetime
 // CHECK:   return %{{.*}} : $()
 // CHECK-LABEL: } // end sil function '$s3fooBi64__Tg5'
 sil hidden [ossa] @foo : $@convention(thin) <T> (@in T, @in T) -> () {
@@ -19,9 +21,11 @@ bb0(%0 : @owned $T, %1 : @owned $T):
   %f = function_ref @foo : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> ()
   %cp0 = copy_value %0 : $T
   %cp1 = copy_value %1 : $T
+  %cp3 = explicit_copy_value %1 : $T
   %call = apply %f<T>(%cp0, %cp1) : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> ()
   destroy_value %1 : $T
-  destroy_value %0 : $T
+  end_lifetime %0 : $T
+  extend_lifetime %cp3 : $T
   %10 = tuple ()
   return %10 : $()
 }

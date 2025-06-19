@@ -177,7 +177,7 @@ private func tryReplaceExistentialArchetype(of apply: ApplyInst, _ context: Simp
 
     let newApply = builder.createApply(
       function: apply.callee,
-      apply.replaceOpenedArchetypeInSubstituations(withConcreteType: concreteType, context),
+      apply.replaceOpenedArchetypeInSubstitutions(withConcreteType: concreteType, context),
       arguments: apply.replaceExistentialArchetypeInArguments(withConcreteType: concreteType, context),
       isNonThrowing: apply.isNonThrowing, isNonAsync: apply.isNonAsync,
       specializationInfo: apply.specializationInfo)
@@ -197,7 +197,7 @@ private func tryReplaceExistentialArchetype(of tryApply: TryApplyInst, _ context
 
     builder.createTryApply(
       function: tryApply.callee,
-      tryApply.replaceOpenedArchetypeInSubstituations(withConcreteType: concreteType, context),
+      tryApply.replaceOpenedArchetypeInSubstitutions(withConcreteType: concreteType, context),
       arguments: tryApply.replaceExistentialArchetypeInArguments(withConcreteType: concreteType, context),
       normalBlock: tryApply.normalBlock, errorBlock: tryApply.errorBlock,
       isNonAsync: tryApply.isNonAsync,
@@ -269,7 +269,7 @@ private extension FullApplySite {
     return Array(newArgs)
   }
 
-  func replaceOpenedArchetypeInSubstituations(
+  func replaceOpenedArchetypeInSubstitutions(
     withConcreteType concreteType: CanonicalType,
     _ context: SimplifyContext
   ) -> SubstitutionMap {

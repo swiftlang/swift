@@ -64,6 +64,11 @@ class OtherClass {
   var otherState: any Encodable.Type = CodableClass.self
 }
 
+struct Landmark: Codable {
+  var name: String
+  var foundingYear: Int
+}
+
 func acceptSendablePMeta<T: Sendable & P>(_: T.Type) { }
 func acceptSendableQMeta<T: Sendable & Q>(_: T.Type) { }
 

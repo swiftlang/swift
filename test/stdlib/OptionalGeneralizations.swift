@@ -92,3 +92,23 @@ suite.test("Initializer references") {
     expectTrue(r != nil)
   }
 }
+
+suite.test("expectNotNil()") {
+  func opt1<T: ~Copyable>(_ t: consuming T) -> T? { Optional.some(t) }
+  _ = expectNotNil(opt1(TrivialStruct()))
+  _ = expectNotNil(opt1(NoncopyableStruct()))
+  _ = expectNotNil(opt1(RegularClass()))
+#if $NonescapableTypes
+  @lifetime(copy t)
+  func opt2<T: ~Copyable & ~Escapable>(_ t: consuming T) -> T? { t }
+
+  let ne = NonescapableStruct()
+  _ = expectNotNil(opt2(ne))
+
+  let ncne = NoncopyableNonescapableStruct()
+  _ = expectNotNil(opt2(ncne))
+
+  let nent = NonescapableNontrivialStruct()
+  _ = expectNotNil(opt2(nent))
+#endif
+}

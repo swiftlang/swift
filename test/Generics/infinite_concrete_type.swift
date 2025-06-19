@@ -2,8 +2,8 @@
 
 class G<T> {}
 
-protocol P1 { // expected-error {{cannot build rewrite system for protocol; concrete nesting limit exceeded}}
-// expected-note@-1 {{failed rewrite rule is [P1:A].[concrete: G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<[P1].A>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>] => [P1:A]}}
+protocol P1 { // expected-error {{cannot build rewrite system for protocol; concrete type difference limit exceeded}}
+// expected-note@-1 {{failed rewrite rule is [P1:B].[superclass: G<G<G<G<G<G<G<G<G<G<G<G<G<[P1].A>>>>>>>>>>>>>] => [P1:B]}}
   associatedtype A where A == G<B>
   associatedtype B where B == G<A>
 }

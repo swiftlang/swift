@@ -17,6 +17,10 @@ struct MyStruct {
 	@_section("__TEXT,__mysection") @_used func foo() {}
 }
 
+@_section("__TEXT,__mysection")
+var functionptr = testit
+func testit(_ e: consuming Any) -> Any { e }
+
 // SIL: @_section("__DATA,__mysection") @_hasStorage @_hasInitialValue var g0: Int { get set }
 // SIL: @_section("__DATA,__mysection") @_hasStorage @_hasInitialValue var g1: (Int, Int) { get set }
 // SIL: @_section("__DATA,__mysection") @_hasStorage @_hasInitialValue var g2: Bool { get set }
@@ -28,22 +32,23 @@ struct MyStruct {
 // SIL:   @_section("__DATA,__mysection") @_hasStorage @_hasInitialValue static var static0: Int { get set }
 // SIL:   @_section("__TEXT,__mysection") @_used func foo()
 
-// SIL: sil private [global_init_once_fn] [perf_constraint] @$s7section2g0_WZ : $@convention(c)
+// SIL: sil private [global_init_once_fn] @$s7section2g0_WZ : $@convention(c)
 // SIL: sil hidden [global_init] @$s7section2g0Sivau : $@convention(thin)
-// SIL: sil private [global_init_once_fn] [perf_constraint] @$s7section2g1_WZ : $@convention(c)
+// SIL: sil private [global_init_once_fn] @$s7section2g1_WZ : $@convention(c)
 // SIL: sil hidden [global_init] @$s7section2g1Si_Sitvau : $@convention(thin)
-// SIL: sil private [global_init_once_fn] [perf_constraint] @$s7section2g2_WZ : $@convention(c)
+// SIL: sil private [global_init_once_fn] @$s7section2g2_WZ : $@convention(c)
 // SIL: sil hidden [global_init] @$s7section2g2Sbvau : $@convention(thin)
-// SIL: sil private [global_init_once_fn] [perf_constraint] @$s7section2g3_WZ : $@convention(c)
+// SIL: sil private [global_init_once_fn] @$s7section2g3_WZ : $@convention(c)
 // SIL: sil [global_init] @$s7section2g3Sbvau : $@convention(thin)
-// SIL: sil private [global_init_once_fn] [perf_constraint] @$s7section2g4_WZ : $@convention(c)
+// SIL: sil private [global_init_once_fn] @$s7section2g4_WZ : $@convention(c)
 // SIL: sil hidden [global_init] @$s7section2g4SpySiGSgvau : $@convention(thin)
-// SIL: sil private [global_init_once_fn] [perf_constraint] @$s7section2g5_WZ : $@convention(c)
+// SIL: sil private [global_init_once_fn] @$s7section2g5_WZ : $@convention(c)
 // SIL: sil hidden [global_init] @$s7section2g5SpySiGSgvau : $@convention(thin)
 // SIL: sil hidden [used] [section "__TEXT,__mysection"] @$s7section3fooyyF : $@convention(thin)
-// SIL: sil private [global_init_once_fn] [perf_constraint] @$s7section8MyStructV7static0_WZ : $@convention(c)
+// SIL: sil private [global_init_once_fn] @$s7section8MyStructV7static0_WZ : $@convention(c)
 // SIL: sil hidden [global_init] @$s7section8MyStructV7static0Sivau : $@convention(thin)
 // SIL: sil hidden [used] [section "__TEXT,__mysection"] @$s7section8MyStructV3fooyyF : $@convention(method)
+// SIL: sil hidden @$s7section6testityypypnF : $@convention(thin) (@in Any) -> @out Any {
 
 // IR:  @"$s7section2g0Sivp" = hidden global %TSi <{ {{(i64|i32)}} 1 }>, section "__DATA,__mysection"
 // IR:  @"$s7section2g1Si_Sitvp" = hidden global <{ %TSi, %TSi }> <{ %TSi <{ {{(i64|i32)}} 42 }>, %TSi <{ {{(i64|i32)}} 43 }> }>, section "__DATA,__mysection"

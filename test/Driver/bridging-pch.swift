@@ -47,11 +47,6 @@
 // RUN: %target-build-swift -typecheck -driver-print-jobs -import-objc-header %S/Inputs/bridging-header.h -pch-output-dir %t/pch -whole-module-optimization -disable-bridging-pch %s 2>&1 | %FileCheck %s -check-prefix=PERSISTENT-DISABLED-YESPCHJOB
 // PERSISTENT-DISABLED-YESPCHJOB-NOT: -pch-output-dir
 
-// RUN: %target-build-swift -typecheck -driver-print-jobs -import-objc-header %S/Inputs/bridging-header.h -pch-output-dir %t/pch %s 2>&1 | %FileCheck %s -check-prefix=PERSISTENT-YESPCHJOB
-// RUN: %target-build-swift -typecheck -driver-print-jobs -import-objc-header %S/Inputs/bridging-header.h -pch-output-dir %t/pch %s %S/Inputs/error.swift -driver-batch-count 2 -enable-batch-mode 2>&1 | %FileCheck %s -check-prefix=PERSISTENT-YESPCHJOB
-// PERSISTENT-YESPCHJOB: {{.*}}swift{{(c|c-legacy-driver|-frontend)?(\.exe)?"?}} -frontend {{.*}} -emit-pch -pch-output-dir {{.*}}/pch
-// PERSISTENT-YESPCHJOB: {{.*}}swift{{(c|c-legacy-driver|-frontend)?(\.exe)?"?}} -frontend {{.*}} -import-objc-header {{.*}}bridging-header.h{{"?}} -pch-output-dir {{.*}}/pch{{"?}} -pch-disable-validation
-
 // RUN: %target-build-swift -typecheck -driver-print-jobs -import-objc-header %S/Inputs/bridging-header.h -pch-output-dir %t/pch -serialize-diagnostics %s 2>&1 | %FileCheck %s -check-prefix=PERSISTENT-YESPCHJOB-DIAG1
 // PERSISTENT-YESPCHJOB-DIAG1: {{.*}}swift{{(c|c-legacy-driver|-frontend)?(\.exe)?"?}} -frontend {{.*}} -serialize-diagnostics-path {{.*}}bridging-header-{{.*}}.dia{{"?}} {{.*}} -emit-pch -pch-output-dir {{.*}}/pch
 

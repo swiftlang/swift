@@ -520,7 +520,7 @@ struct ASTContext::Implementation {
   llvm::DenseMap<const AbstractFunctionDecl *, SourceRange> OriginalBodySourceRanges;
 
   /// Macro discriminators per context.
-  llvm::DenseMap<std::pair<const void *, Identifier>, unsigned>
+  llvm::DenseMap<std::pair<const void *, DeclBaseName>, unsigned>
       NextMacroDiscriminator;
 
   /// Local and closure discriminators per context.
@@ -2286,8 +2286,8 @@ unsigned ASTContext::getNextMacroDiscriminator(
     MacroDiscriminatorContext context,
     DeclBaseName baseName
 ) {
-  std::pair<const void *, Identifier> key(
-      context.getOpaqueValue(), baseName.getIdentifier());
+  std::pair<const void *, DeclBaseName> key(
+      context.getOpaqueValue(), baseName);
   return getImpl().NextMacroDiscriminator[key]++;
 }
 
@@ -3577,7 +3577,13 @@ void LocatableType::Profile(llvm::FoldingSetNodeID &id, SourceLoc loc,
 Type ErrorType::get(const ASTContext &C) { return C.TheErrorType; }
 
 Type ErrorType::get(Type originalType) {
-  assert(originalType);
+  ASSERT(originalType);
+  // We don't currently support solver-allocated error types, if we want
+  // this in the future we'll need to adjust `Solution::simplifyType` to fold
+  // them into regular ErrorTypes. Additionally, any clients of
+  // `typesSatisfyConstraint` will need to be taught not to pass such types.
+  ASSERT(!originalType->getRecursiveProperties().isSolverAllocated() &&
+         "Solver-allocated error types not supported");
 
   auto originalProperties = originalType->getRecursiveProperties();
   auto arena = getArena(originalProperties);
@@ -3588,14 +3594,8 @@ Type ErrorType::get(Type originalType) {
 
   void *mem = ctx.Allocate(sizeof(ErrorType) + sizeof(Type),
                            alignof(ErrorType), arena);
-  RecursiveTypeProperties properties = RecursiveTypeProperties::HasError;
-
-  // We need to preserve the solver allocated bit, to ensure any wrapping
-  // types are solver allocated too.
-  if (originalProperties.isSolverAllocated())
-    properties |= RecursiveTypeProperties::SolverAllocated;
-
-  return entry = new (mem) ErrorType(ctx, originalType, properties);
+  return entry = new (mem) ErrorType(ctx, originalType,
+                                     RecursiveTypeProperties::HasError);
 }
 
 void ErrorUnionType::Profile(llvm::FoldingSetNodeID &id, ArrayRef<Type> terms) {

@@ -52,7 +52,7 @@ public extension AbsolutePath {
     (try? FileManager.default.destinationOfSymbolicLink(atPath: rawPath)) != nil
   }
 
-  var resolvingSymlinks: Self {
+  var realPath: Self {
     guard let resolved = realpath(rawPath, nil) else { return self }
     defer {
       free(resolved)

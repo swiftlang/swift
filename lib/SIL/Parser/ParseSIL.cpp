@@ -4392,12 +4392,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   }
 
   case SILInstructionKind::CheckedCastAddrBranchInst: {
-    auto isolatedConformances = CastingIsolatedConformances::Allow;
-    StringRef attrName;
-    while (parseSILOptional(attrName, *this)) {
-      if (attrName == "prohibit_isolated_conformances")
-        isolatedConformances = CastingIsolatedConformances::Prohibit;
-    }
+    CheckedCastInstOptions options = parseCheckedCastInstOptions(nullptr);
 
     Identifier consumptionKindToken;
     SourceLoc consumptionKindLoc;
@@ -4427,7 +4422,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       return true;
 
     ResultVal = B.createCheckedCastAddrBranch(
-        InstLoc, isolatedConformances, consumptionKind, SourceAddr, SourceType,
+        InstLoc, options, consumptionKind, SourceAddr, SourceType,
         DestAddr, TargetType,
         getBBForReference(SuccessBBName, SuccessBBLoc),
         getBBForReference(FailureBBName, FailureBBLoc));
@@ -4442,28 +4437,18 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     break;
 
   case SILInstructionKind::UnconditionalCheckedCastAddrInst: {
-    auto isolatedConformances = CastingIsolatedConformances::Allow;
-    StringRef attrName;
-    while (parseSILOptional(attrName, *this)) {
-      if (attrName == "prohibit_isolated_conformances")
-        isolatedConformances = CastingIsolatedConformances::Prohibit;
-    }
+    CheckedCastInstOptions options = parseCheckedCastInstOptions(nullptr);
 
     if (parseSourceAndDestAddress() || parseSILDebugLocation(InstLoc, B))
       return true;
 
     ResultVal = B.createUnconditionalCheckedCastAddr(
-        InstLoc, isolatedConformances, SourceAddr, SourceType,
+        InstLoc, options, SourceAddr, SourceType,
         DestAddr, TargetType);
     break;
   }
   case SILInstructionKind::UnconditionalCheckedCastInst: {
-    auto isolatedConformances = CastingIsolatedConformances::Allow;
-    StringRef attrName;
-    while (parseSILOptional(attrName, *this)) {
-      if (attrName == "prohibit_isolated_conformances")
-        isolatedConformances = CastingIsolatedConformances::Prohibit;
-    }
+    CheckedCastInstOptions options = parseCheckedCastInstOptions(nullptr);
 
     if (parseTypedValueRef(Val, B) || parseVerbatim("to") ||
         parseASTType(TargetType))
@@ -4476,7 +4461,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
     auto opaque = Lowering::AbstractionPattern::getOpaque();
     ResultVal = B.createUnconditionalCheckedCast(
-        InstLoc, isolatedConformances, Val,
+        InstLoc, options, Val,
         F->getLoweredType(opaque, TargetType), TargetType,
         forwardingOwnership);
     break;
@@ -4484,16 +4469,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
   case SILInstructionKind::CheckedCastBranchInst: {
     bool isExact = false;
-    auto isolatedConformances = CastingIsolatedConformances::Allow;
-    StringRef attrName;
-    
-    while (parseSILOptional(attrName, *this)) {
-      if (attrName == "prohibit_isolated_conformances")
-        isolatedConformances = CastingIsolatedConformances::Prohibit;
-
-      if (attrName == "exact")
-        isExact = true;
-    }
+    CheckedCastInstOptions options = parseCheckedCastInstOptions(&isExact);
 
     if (parseASTType(SourceType) || parseVerbatim("in"))
       return true;
@@ -4510,7 +4486,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
     auto opaque = Lowering::AbstractionPattern::getOpaque();
     ResultVal = B.createCheckedCastBranch(
-        InstLoc, isExact, isolatedConformances, Val, SourceType,
+        InstLoc, isExact, options, Val, SourceType,
         F->getLoweredType(opaque, TargetType), TargetType,
         getBBForReference(SuccessBBName, SuccessBBLoc),
         getBBForReference(FailureBBName, FailureBBLoc), forwardingOwnership);
@@ -8083,6 +8059,23 @@ ProtocolConformanceRef SILParser::parseProtocolConformance(
   }
 
   return parseProtocolConformanceHelper(proto, genericSig, genericParams);
+}
+
+CheckedCastInstOptions SILParser::parseCheckedCastInstOptions(bool *isExact) {
+  CheckedCastInstOptions options;
+  StringRef attrName;
+
+  while (parseSILOptional(attrName, *this)) {
+    if (attrName == "prohibit_isolated_conformances") {
+      options = options.withIsolatedConformances(
+                  CastingIsolatedConformances::Prohibit);
+    }
+
+    if (attrName == "exact" && isExact)
+      *isExact = true;
+  }
+
+  return options;
 }
 
 ProtocolConformanceRef SILParser::parseProtocolConformanceHelper(

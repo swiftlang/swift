@@ -422,17 +422,15 @@ namespace {
     ImportResult VisitDynamicRangePointerType(
         const clang::DynamicRangePointerType *type) {
       // DynamicRangePointerType is a clang type representing a pointer with
-      // an "ended_by" type attribute for -fbounds-safety. For now, we don't
-      // import these into Swift.
-      return Type();
+      // an "ended_by" type attribute for -fbounds-safety.
+      return Visit(type->desugar());
     }
 
     ImportResult VisitValueTerminatedType(
         const clang::ValueTerminatedType *type) {
       // ValueTerminatedType is a clang type representing a pointer with
-      // a "terminated_by" type attribute for -fbounds-safety. For now, we don't
-      // import these into Swift.
-      return Type();
+      // a "terminated_by" type attribute for -fbounds-safety.
+      return Visit(type->desugar());
     }
 
     ImportResult VisitMemberPointerType(const clang::MemberPointerType *type) {
@@ -2284,6 +2282,7 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
   }
 
   clang::QualType returnType = desugarIfElaborated(clangDecl->getReturnType());
+  returnType = desugarIfBoundsAttributed(returnType);
   // In C interop mode, the return type of library builtin functions
   // like 'memcpy' from headers like 'string.h' drops
   // any nullability specifiers from their return type, and preserves it on the
@@ -2390,6 +2389,7 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
   ImportDiagnosticAdder addDiag(*this, clangDecl,
                                 clangDecl->getSourceRange().getBegin());
   clang::QualType returnType = desugarIfElaborated(clangDecl->getReturnType());
+  returnType = desugarIfBoundsAttributed(returnType);
 
   ImportedType importedType = importer::findOptionSetEnum(returnType, *this);
 
@@ -2456,6 +2456,14 @@ ClangImporter::Implementation::importParameterType(
     ArrayRef<GenericTypeParamDecl *> genericParams,
     llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn) {
   auto paramTy = desugarIfElaborated(param->getType());
+  paramTy = desugarIfBoundsAttributed(paramTy);
+
+  // If this type has a _Nullable/_Nonnull attribute, drop it, since we already
+  // have that information in optionalityOfParam.
+  if (auto attributedTy = dyn_cast<clang::AttributedType>(paramTy)) {
+    if (attributedTy->getImmediateNullability())
+      clang::AttributedType::stripOuterNullability(paramTy);
+  }
 
   ImportTypeKind importKind = paramIsCompletionHandler
                                   ? ImportTypeKind::CompletionHandlerParameter
@@ -2484,6 +2492,17 @@ ClangImporter::Implementation::importParameterType(
       addImportDiagnosticFn(Diagnostic(diag::bridged_pointer_type_not_found,
                                        pointerKind));
       return std::nullopt;
+    }
+    switch (optionalityOfParam) {
+    case OTK_Optional:
+      swiftParamTy = OptionalType::get(swiftParamTy);
+      break;
+    case OTK_ImplicitlyUnwrappedOptional:
+      swiftParamTy = OptionalType::get(swiftParamTy);
+      isParamTypeImplicitlyUnwrapped = true;
+      break;
+    case OTK_None:
+      break;
     }
   } else if (isa<clang::ReferenceType>(paramTy) &&
              isa<clang::TemplateTypeParmType>(paramTy->getPointeeType())) {
@@ -2733,8 +2752,6 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
     }
 
     bool knownNonNull = !nonNullArgs.empty() && nonNullArgs[index];
-    // Specialized templates need to match the args/result exactly.
-    knownNonNull |= clangDecl->isFunctionTemplateSpecialization();
 
     // Check nullability of the parameter.
     OptionalTypeKind optionalityOfParam =

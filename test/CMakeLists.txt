@@ -12,11 +12,7 @@ function(swift_configure_lit_site_cfg source_path destination_path installed_nam
   string(REPLACE ${CMAKE_CFG_INTDIR} ${SWIFT_BUILD_MODE} LLVM_TOOLS_DIR ${LLVM_TOOLS_BINARY_DIR})
   string(REPLACE ${CMAKE_CFG_INTDIR} ${SWIFT_BUILD_MODE} LLVM_LIBS_DIR  ${LLVM_LIBRARY_DIR})
 
-  if (XCODE)
-    string(REPLACE ${CMAKE_CFG_INTDIR} Debug LIT_SWIFTLIB_DIR ${SWIFTLIB_DIR})
-  else ()
-    set(LIT_SWIFTLIB_DIR ${SWIFTLIB_DIR})
-  endif ()
+  set(LIT_SWIFTLIB_DIR ${SWIFTLIB_DIR})
 
   configure_file("${source_path}" "${destination_path}" @ONLY)
 

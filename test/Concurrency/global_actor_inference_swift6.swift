@@ -67,13 +67,11 @@ struct WrapperOnActor<Wrapped: Sendable> {
 public struct WrapperOnMainActor<Wrapped> {
   // Make sure inference of @MainActor on wrappedValue doesn't crash.
 
-  // expected-note@+1 {{mutation of this property is only permitted within the actor}}
   public var wrappedValue: Wrapped // expected-note {{property declared here}}
 
   public var accessCount: Int
 
   nonisolated public init(wrappedValue: Wrapped) {
-    // expected-error@+1 {{main actor-isolated property 'wrappedValue' can not be mutated from a nonisolated context}}
     self.wrappedValue = wrappedValue
   }
 }

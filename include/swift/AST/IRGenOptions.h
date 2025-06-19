@@ -566,6 +566,9 @@ public:
   /// Pointer authentication.
   PointerAuthOptions PointerAuth;
 
+  // If not 0, this overrides the value defined by the target.
+  uint64_t CustomLeastValidPointerValue = 0;
+
   /// The different modes for dumping IRGen type info.
   enum class TypeInfoDumpFilter {
     All,

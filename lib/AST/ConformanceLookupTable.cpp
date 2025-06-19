@@ -599,6 +599,11 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
     }
   }
 
+  auto isUnavailable = [](DeclContext *dc) -> bool {
+    auto *ext = dyn_cast<ExtensionDecl>(dc);
+    return ext && ext->isUnavailable();
+  };
+
   // If only one of the conformances is unconditionally available on the
   // current deployment target, pick that one.
   //
@@ -610,7 +615,9 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
       rhs->getDeclContext()->isAlwaysAvailableConformanceContext()) {
     // Diagnose conflicting marker protocol conformances that differ in
     // un-availability.
-    diagnoseSuperseded = lhs->getProtocol()->isMarkerProtocol();
+    diagnoseSuperseded = (lhs->getProtocol()->isMarkerProtocol() &&
+                          isUnavailable(lhs->getDeclContext()) !=
+                          isUnavailable(rhs->getDeclContext()));
 
     return (lhs->getDeclContext()->isAlwaysAvailableConformanceContext()
             ? Ordering::Before
@@ -862,8 +869,6 @@ DeclContext *ConformanceLookupTable::getConformingContext(
       Type classTy = nominal->getDeclaredInterfaceType();
       do {
         Type superclassTy = classTy->getSuperclassForDecl(superclassDecl);
-        if (superclassTy->is<ErrorType>())
-          return nullptr;
         auto inheritedConformance = swift::lookupConformance(
             superclassTy, protocol, /*allowMissing=*/false);
         if (inheritedConformance)
@@ -936,8 +941,6 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
     // declared.
     auto *conformingClass = cast<ClassDecl>(conformingNominal);
     Type superclassTy = type->getSuperclassForDecl(conformingClass);
-    if (superclassTy->is<ErrorType>())
-      return nullptr;
 
     // Look up the inherited conformance.
     auto inheritedConformance = swift::lookupConformance(

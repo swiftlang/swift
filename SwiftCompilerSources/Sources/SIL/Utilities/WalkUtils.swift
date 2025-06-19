@@ -537,8 +537,12 @@ extension AddressDefUseWalker {
         return walkDownUses(ofAddress: ia, path: subPath.push(.anyIndexedElement, index: 0))
       }
       return walkDownUses(ofAddress: ia, path: path)
-    case let mmc as MarkUnresolvedNonCopyableValueInst:
-      return walkDownUses(ofAddress: mmc, path: path)
+    case is MarkUninitializedInst,
+         is MoveOnlyWrapperToCopyableAddrInst,
+         is CopyableToMoveOnlyWrapperAddrInst,
+         is MarkUnresolvedNonCopyableValueInst,
+         is DropDeinitInst:
+      return walkDownUses(ofAddress: instruction as! SingleValueInstruction, path: path)
     case let ba as BeginAccessInst:
       // Don't treat `end_access` as leaf-use. Just ignore it.
       return walkDownNonEndAccessUses(of: ba, path: path)
@@ -828,18 +832,19 @@ extension AddressUseDefWalker {
       return walkUp(address: uteda.operand.value, path: path.push(.enumCase, index: uteda.caseIndex))
     case is InitExistentialAddrInst, is OpenExistentialAddrInst:
       return walkUp(address: (def as! Instruction).operands[0].value, path: path.push(.existential, index: 0))
-    case is BeginAccessInst, is MarkUnresolvedNonCopyableValueInst:
-      return walkUp(address: (def as! Instruction).operands[0].value, path: path)
     case let ia as IndexAddrInst:
       if let idx = ia.constantIndex {
         return walkUp(address: ia.base, path: path.push(.indexedElement, index: idx))
       } else {
         return walkUp(address: ia.base, path: path.push(.anyIndexedElement, index: 0))
       }
-    case is MarkDependenceInst, is MarkUninitializedInst:
-      return walkUp(address: (def as! Instruction).operands[0].value, path: path)
-    case is MoveOnlyWrapperToCopyableAddrInst,
-         is CopyableToMoveOnlyWrapperAddrInst:
+    case is BeginAccessInst,
+         is MarkDependenceInst,
+         is MarkUninitializedInst,
+         is MoveOnlyWrapperToCopyableAddrInst,
+         is CopyableToMoveOnlyWrapperAddrInst,
+         is MarkUnresolvedNonCopyableValueInst,
+         is DropDeinitInst:
       return walkUp(address: (def as! Instruction).operands[0].value, path: path)
   default:
       return rootDef(address: def, path: path)

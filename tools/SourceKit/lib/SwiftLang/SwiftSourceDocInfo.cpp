@@ -26,6 +26,7 @@
 #include "swift/AST/ModuleNameLookup.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/SwiftNameTranslation.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
@@ -48,6 +49,7 @@
 #include "clang/Index/USRGeneration.h"
 #include "clang/Lex/Lexer.h"
 
+#include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
 
 #include <numeric>
@@ -877,67 +879,112 @@ static void setLocationInfoForClangNode(ClangNode ClangNode,
   }
 }
 
-static unsigned getCharLength(SourceManager &SM, SourceRange TokenRange) {
-  SourceLoc CharEndLoc = Lexer::getLocForEndOfToken(SM, TokenRange.End);
-  return SM.getByteDistance(TokenRange.Start, CharEndLoc);
+static void setLocationInfoForRange(SourceManager &SM, SourceRange R,
+                                    unsigned BufID,
+                                    LocationInfo &Location,
+                                    bool Presumed = false) {
+  CONDITIONAL_ASSERT(BufID == SM.findBufferContainingLoc(R.Start) &&
+                     "SourceRange R should be in BufID");
+
+  auto CR = Lexer::getCharSourceRangeFromSourceRange(SM, R);
+
+  Location.Filename = SM.getIdentifierForBuffer(BufID);
+  Location.Length = CR.getByteLength();
+  Location.Offset = SM.getLocOffsetInBuffer(CR.getStart(), BufID);
+
+  if (Presumed)
+    std::tie(Location.Line, Location.Column) =
+        SM.getPresumedLineAndColumnForLoc(CR.getStart(), BufID);
+  else
+    std::tie(Location.Line, Location.Column) =
+        SM.getLineAndColumnInBuffer(CR.getStart(), BufID);
 }
 
-static void setLocationInfo(const ValueDecl *VD,
-                            LocationInfo &Location) {
+static LocationInfo getDeclLocationInfo(const ValueDecl *VD) {
+  LocationInfo Location;
   ASTContext &Ctx = VD->getASTContext();
   SourceManager &SM = Ctx.SourceMgr;
+  auto *Importer = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
 
-  auto ClangNode = VD->getClangNode();
+  if (auto loc = VD->getLoc(/*SerializedOK=*/true)) {
+    // For most cases we just want the range of the name itself; it suffices to
+    // make Range from just Loc because Lexer::getCharSourceRangeFromSourceRange
+    // will grow the range to encompass the end of the token at Loc.
+    SourceRange range = loc;
 
-  auto Loc = VD->getLoc(/*SerializedOK=*/true);
-  if (Loc.isValid()) {
-    auto getParameterListRange =
-        [&](const ValueDecl *VD) -> std::optional<unsigned> {
-      if (auto FD = dyn_cast<AbstractFunctionDecl>(VD)) {
-        SourceRange R = FD->getParameterListSourceRange();
-        if (R.isValid())
-          return getCharLength(SM, R);
-      }
-      return std::nullopt;
-    };
-    unsigned NameLen;
-    if (auto SigLen = getParameterListRange(VD)) {
-      NameLen = SigLen.value();
-    } else if (VD->hasName()) {
-      NameLen = VD->getBaseName().userFacingName().size();
-    } else {
-      NameLen = getCharLength(SM, Loc);
+    // One exception is for functions, where we also want to include the range
+    // of the parameter list.
+    if (auto *FD = dyn_cast<AbstractFunctionDecl>(VD)) {
+      if (auto FDR = FD->getParameterListSourceRange())
+        range = FDR;
     }
 
-    auto [DeclBufID, DeclLoc] =
-        VD->getModuleContext()->getOriginalLocation(Loc);
-    Location.Filename = SM.getIdentifierForBuffer(DeclBufID);
-    Location.Offset = SM.getLocOffsetInBuffer(DeclLoc, DeclBufID);
-    Location.Length = NameLen;
-    std::tie(Location.Line, Location.Column) =
-        SM.getLineAndColumnInBuffer(DeclLoc, DeclBufID);
-    if (auto GeneratedSourceInfo = SM.getGeneratedSourceInfo(DeclBufID)) {
-      if (GeneratedSourceInfo->kind ==
-          GeneratedSourceInfo::ReplacedFunctionBody) {
-        // The location was in a temporary source buffer that just contains the
-        // function body and which we created while reusing the ASTContext for
-        // the rest of the file. Map the location back to the original file.
-        unsigned OriginalBufID = SM.findBufferContainingLoc(
-            GeneratedSourceInfo->originalSourceRange.getStart());
-        auto OriginalStartOffset = SM.getLocOffsetInBuffer(
-            GeneratedSourceInfo->originalSourceRange.getStart(), OriginalBufID);
-        auto GeneratedStartOffset = SM.getLocOffsetInBuffer(
-            GeneratedSourceInfo->generatedSourceRange.getStart(), DeclBufID);
-        Location.Offset += OriginalStartOffset - GeneratedStartOffset;
-        std::tie(Location.Line, Location.Column) =
-            SM.getPresumedLineAndColumnForLoc(DeclLoc, DeclBufID);
+    unsigned bufID = SM.findBufferContainingLoc(range.Start);
+
+    // If this range is from a generated buffer, recursively "unexpand" macros
+    // to chase after where the macro was originally expanded from.
+    //
+    // However, we don't care about certain kinds of generated buffers, so save
+    // the original range and buffer ID so we can set location according to VD.
+    auto VDRange = range;
+    auto VDBufID = bufID;
+    while (auto *info = SM.getGeneratedSourceInfo(bufID)) {
+      switch (info->kind) {
+#define MACRO_ROLE(Name, Description)                                          \
+  case GeneratedSourceInfo::Name##MacroExpansion:
+#include "swift/Basic/MacroRoles.def"
+        if (auto *customAttr = info->attachedMacroCustomAttr)
+          range = customAttr->getRange();
+        else
+          range = ASTNode::getFromOpaqueValue(info->astNode).getSourceRange();
+        bufID = SM.findBufferContainingLoc(range.Start);
+        continue; // Continue while-loop to recursively un-expand macros
+
+      case GeneratedSourceInfo::ReplacedFunctionBody:
+        if (bufID == VDBufID) {
+          // The location was in a temporary source buffer that just contains
+          // the function body, which we created while reusing the ASTContext
+          // for the rest of the file. Set the location so that it maps back to
+          // the original file.
+          setLocationInfoForRange(SM, VDRange, VDBufID, Location,
+                                  /*Presumed=*/true);
+          // Adjust offset according to generated buffer.
+          auto originalLoc = info->originalSourceRange.getStart();
+          auto originalBufID = SM.findBufferContainingLoc(originalLoc);
+          auto generatedLoc = info->generatedSourceRange.getStart();
+          auto generatedBufID = SM.findBufferContainingLoc(generatedLoc);
+          Location.Offset +=
+              SM.getLocOffsetInBuffer(originalLoc, originalBufID) -
+              SM.getLocOffsetInBuffer(generatedLoc, generatedBufID);
+        } else {
+          // We somehow encountered a replaced function body while looking
+          // through other macro expansions. Fall back to setting location based
+          // on VD's original source range because mapping location back to the
+          // original file might be tricky.
+          setLocationInfoForRange(SM, VDRange, VDBufID, Location);
+        }
+        return Location;
+      case GeneratedSourceInfo::AttributeFromClang:
+        // This buffer was generated for an imported ClangNode, so set location
+        // info according to that.
+        if (auto node = info->clangNode)
+          setLocationInfoForClangNode(node, Importer, Location);
+        else
+          setLocationInfoForRange(SM, VDRange, VDBufID, Location);
+        return Location;
+      case GeneratedSourceInfo::DefaultArgument:
+      case GeneratedSourceInfo::PrettyPrinted:
+        setLocationInfoForRange(SM, VDRange, VDBufID, Location);
+        return Location;
       }
+      llvm_unreachable("All switch cases either explicitly continue or return");
     }
-  } else if (ClangNode) {
-    ClangImporter *Importer =
-        static_cast<ClangImporter*>(Ctx.getClangModuleLoader());
-    setLocationInfoForClangNode(ClangNode, Importer, Location);
+
+    setLocationInfoForRange(SM, range, bufID, Location);
+  } else if (auto CNode = VD->getClangNode()) {
+    setLocationInfoForClangNode(CNode, Importer, Location);
   }
+  return Location;
 }
 
 static llvm::Error
@@ -1096,7 +1143,7 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
           Lang.getIFaceGenContexts().find(Symbol.ModuleName, Invoc))
     Symbol.ModuleInterfaceName = IFaceGenRef->getDocumentName();
 
-  setLocationInfo(DInfo.OriginalProperty, Symbol.Location);
+  Symbol.Location = getDeclLocationInfo(DInfo.OriginalProperty);
   if (!Symbol.Location.Filename.empty()) {
     mapLocToLatestSnapshot(Lang, Symbol.Location, PreviousSnaps);
     if (Symbol.Location.Filename.empty()) {

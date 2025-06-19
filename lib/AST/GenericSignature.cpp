@@ -1436,7 +1436,8 @@ RequirementSignature RequirementSignature::getPlaceholderRequirementSignature(
                        });
 
   return RequirementSignature(ctx.AllocateCopy(requirements),
-                              ArrayRef<ProtocolTypeAlias>());
+                              ArrayRef<ProtocolTypeAlias>(),
+                              errors);
 }
 
 void RequirementSignature::getRequirementsWithInverses(

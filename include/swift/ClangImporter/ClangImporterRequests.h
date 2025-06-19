@@ -576,10 +576,37 @@ private:
 void simple_display(llvm::raw_ostream &out, EscapabilityLookupDescriptor desc);
 SourceLoc extractNearestSourceLoc(EscapabilityLookupDescriptor desc);
 
+struct CxxDeclExplicitSafetyDescriptor final {
+  const clang::Decl *decl;
+  bool isClass;
+
+  CxxDeclExplicitSafetyDescriptor(const clang::Decl *decl, bool isClass)
+      : decl(decl), isClass(isClass) {}
+
+  friend llvm::hash_code
+  hash_value(const CxxDeclExplicitSafetyDescriptor &desc) {
+    return llvm::hash_combine(desc.decl, desc.isClass);
+  }
+
+  friend bool operator==(const CxxDeclExplicitSafetyDescriptor &lhs,
+                         const CxxDeclExplicitSafetyDescriptor &rhs) {
+    return lhs.decl == rhs.decl && lhs.isClass == rhs.isClass;
+  }
+
+  friend bool operator!=(const CxxDeclExplicitSafetyDescriptor &lhs,
+                         const CxxDeclExplicitSafetyDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    CxxDeclExplicitSafetyDescriptor desc);
+SourceLoc extractNearestSourceLoc(CxxDeclExplicitSafetyDescriptor desc);
+
 /// Determine the safety of the given Clang declaration.
 class ClangDeclExplicitSafety
     : public SimpleRequest<ClangDeclExplicitSafety,
-                           ExplicitSafety(SafeUseOfCxxDeclDescriptor),
+                           ExplicitSafety(CxxDeclExplicitSafetyDescriptor),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -592,7 +619,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  ExplicitSafety evaluate(Evaluator &evaluator, SafeUseOfCxxDeclDescriptor desc) const;
+  ExplicitSafety evaluate(Evaluator &evaluator,
+                          CxxDeclExplicitSafetyDescriptor desc) const;
 };
 
 #define SWIFT_TYPEID_ZONE ClangImporter

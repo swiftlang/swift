@@ -109,6 +109,26 @@ bool AvailabilityDomain::isVersioned() const {
   }
 }
 
+bool AvailabilityDomain::isVersionValid(
+    const llvm::VersionTuple &version) const {
+  ASSERT(isVersioned());
+
+  switch (getKind()) {
+  case Kind::Universal:
+  case Kind::Embedded:
+    llvm_unreachable("unexpected domain kind");
+  case Kind::SwiftLanguage:
+  case Kind::PackageDescription:
+    return true;
+  case Kind::Platform:
+    if (auto osType = tripleOSTypeForPlatform(getPlatformKind()))
+      return llvm::Triple::isValidVersionForOS(*osType, version);
+    return true;
+  case Kind::Custom:
+    return true;
+  }
+}
+
 bool AvailabilityDomain::supportsContextRefinement() const {
   switch (getKind()) {
   case Kind::Universal:
@@ -279,6 +299,18 @@ AvailabilityDomain AvailabilityDomain::getRootDomain() const {
   return *this;
 }
 
+const AvailabilityDomain
+AvailabilityDomain::getRemappedDomain(const ASTContext &ctx,
+                                      bool &didRemap) const {
+  if (getPlatformKind() == PlatformKind::iOS &&
+      isPlatformActive(PlatformKind::visionOS, ctx.LangOpts)) {
+    didRemap = true;
+    return AvailabilityDomain::forPlatform(PlatformKind::visionOS);
+  }
+
+  return *this;
+}
+
 void AvailabilityDomain::print(llvm::raw_ostream &os) const {
   os << getNameForAttributePrinting();
 }
@@ -356,22 +388,29 @@ AvailabilityDomainOrIdentifier::lookUpInDeclContext(
     domain = results.front();
   }
 
+  bool hasCustomAvailability =
+      ctx.LangOpts.hasFeature(Feature::CustomAvailability);
+
   if (!domain) {
     auto domainString = identifier.str();
+    bool downgradeErrors =
+        !hasCustomAvailability || declContext->isInSwiftinterface();
     if (auto suggestion = closestCorrectedPlatformString(domainString)) {
       diags
           .diagnose(loc, diag::availability_suggest_platform_name, identifier,
                     *suggestion)
+          .limitBehaviorIf(downgradeErrors, DiagnosticBehavior::Warning)
           .fixItReplace(SourceRange(loc), *suggestion);
     } else {
-      diags.diagnose(loc, diag::availability_unrecognized_platform_name,
-                     identifier);
+      diags
+          .diagnose(loc, diag::availability_unrecognized_platform_name,
+                    identifier)
+          .limitBehaviorIf(downgradeErrors, DiagnosticBehavior::Warning);
     }
     return std::nullopt;
   }
 
-  if (domain->isCustom() &&
-      !ctx.LangOpts.hasFeature(Feature::CustomAvailability) &&
+  if (domain->isCustom() && !hasCustomAvailability &&
       !declContext->isInSwiftinterface()) {
     diags.diagnose(loc, diag::attr_availability_requires_custom_availability,
                    *domain);

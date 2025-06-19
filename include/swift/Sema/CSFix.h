@@ -560,6 +560,11 @@ public:
     return false;
   }
 
+  template <typename E>
+  bool directlyAt() const {
+    return getLocator()->directlyAt<E>();
+  }
+
   void print(llvm::raw_ostream &Out) const;
 
   SWIFT_DEBUG_DUMP;

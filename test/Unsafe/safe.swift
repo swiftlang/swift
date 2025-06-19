@@ -89,10 +89,12 @@ struct UnsafeAsSequence: @unsafe Sequence, @unsafe IteratorProtocol {
 func testUnsafeAsSequenceForEach() {
   let uas = UnsafeAsSequence()
 
+  // expected-note@+2{{reference to unsafe instance method 'next()'}}
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{12-12=unsafe }}
   for _ in uas { } // expected-note{{conformance}}
   // expected-warning@-1{{for-in loop uses unsafe constructs but is not marked with 'unsafe'}}{{documentation-file=strict-memory-safety}}{{7-7=unsafe }}
 
+  // expected-note@+1{{reference to unsafe instance method 'next()'}}
   for _ in unsafe uas { } // expected-warning{{for-in loop uses unsafe constructs but is not marked with 'unsafe'}}{{documentation-file=strict-memory-safety}}{{7-7=unsafe }}
 
   for unsafe _ in unsafe uas { } // okay
@@ -118,6 +120,7 @@ struct SequenceWithUnsafeIterator: Sequence {
 func testUnsafeIteratorForEach() {
   let swui = SequenceWithUnsafeIterator()
 
+  // expected-note@+1{{reference to unsafe instance method 'next()'}}
   for _ in swui { } // expected-warning{{for-in loop uses unsafe constructs but is not marked with 'unsafe'}}{{7-7=unsafe }}
   for unsafe _ in swui { } // okay, it's only the iterator that's unsafe
 }
@@ -358,4 +361,24 @@ func testSwitch(se: SomeEnum) {
     // expected-note@-6{{reference to let '$match' involves unsafe type 'SomeEnum'}}
 
   if case unsafe someEnumValue = unsafe se { }
+}
+
+@unsafe class SomeClass {}
+@unsafe class SomeClassWrapper { }
+
+protocol Associated {
+    associatedtype Associated
+}
+
+protocol CustomAssociated: Associated { }
+
+// expected-warning@+1{{conformance of 'SomeClass' to protocol 'Associated' involves unsafe code}}{{22-22=@unsafe }}
+extension SomeClass: CustomAssociated {
+  typealias Associated = SomeClassWrapper // expected-note{{unsafe type 'SomeClass.Associated' (aka 'SomeClassWrapper') cannot satisfy safe associated type 'Associated'}}
+}
+
+func testInterpolation(ptr: UnsafePointer<Int>) {
+  _ = "Hello \(unsafe ptr)" // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{7-7=unsafe }}
+  // expected-note@-1{{reference to unsafe type 'UnsafePointer<Int>'}}
+  // expected-note@-2{{argument #0 in call to instance method 'appendInterpolation' has unsafe type 'UnsafePointer<Int>'}}
 }

@@ -31,6 +31,15 @@ extension SIMD${n} where Scalar == ${Scalar} {
     _storage = ${Scalar}.SIMD${storageN}Storage(_builtin)
   }
   
+  /// A vector with the specified scalar in all lanes.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMD${n}<${Scalar}>()
+  /// for i in result.indices {
+  ///   result[i] = scalar
+  /// }
+  /// ```
   @_alwaysEmitIntoClient @_transparent
   public init(repeating scalar: ${Scalar}) {
     let asVector = Builtin.insertelement_${Builtin}_Int${int.bits}_Int32(
@@ -49,6 +58,16 @@ extension SIMD${n} where Scalar == ${Scalar} {
   }
   
 %  if n >= 4:
+  /// A vector formed by concatenating lowHalf and highHalf.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = SIMD${n}<${Scalar}>()
+  /// for i in 0..<${n//2} {
+  ///   result[i] = lowHalf[i]
+  ///   result[${n//2}+i] = highHalf[i]
+  /// }
+  /// ```
   @_alwaysEmitIntoClient @_transparent
   public init(
     lowHalf: SIMD${n//2}<${Scalar}>,

@@ -278,6 +278,7 @@ func rdar60727310() {
   func myAssertion<T>(_ a: T, _ op: ((T,T)->Bool), _ b: T) {}
   var e: Error? = nil
   myAssertion(e, ==, nil) // expected-error {{cannot convert value of type '(any Error)?' to expected argument type '(any (~Copyable & ~Escapable).Type)?'}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('any Error' and 'any (~Copyable & ~Escapable).Type') are expected to be equal}}
 }
 
 // https://github.com/apple/swift/issues/54877

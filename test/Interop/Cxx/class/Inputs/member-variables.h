@@ -83,4 +83,21 @@ inline int takesZeroSizedInCpp(HasZeroSizedField x) {
   return x.a;
 }
 
+/// Not imported into Swift.
+struct EmptyNotImported {
+  char : 0;
+
+  EmptyNotImported() = default;
+  EmptyNotImported(const EmptyNotImported &) = delete;
+  EmptyNotImported(EmptyNotImported &&) = delete;
+};
+
+struct LastFieldNoUniqueAddress {
+  char c;
+  [[no_unique_address]] EmptyNotImported p0;
+
+  LastFieldNoUniqueAddress(const LastFieldNoUniqueAddress &other) {}
+  LastFieldNoUniqueAddress(LastFieldNoUniqueAddress &&other) {}
+};
+
 #endif

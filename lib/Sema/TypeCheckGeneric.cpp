@@ -313,31 +313,15 @@ void TypeChecker::checkProtocolSelfRequirements(ValueDecl *decl) {
   }
 }
 
-/// All generic parameters of a generic function must be referenced in the
-/// declaration's type, otherwise we have no way to infer them.
-void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
-  // Don't do this check for accessors: they're not used directly, so we
-  // never need to infer their generic arguments.  This is mostly a
-  // compile-time optimization, but it also avoids problems with accessors
-  // like 'read' and 'modify' that would arise due to yields not being
-  // part of the formal type.
-  if (isa<AccessorDecl>(dc))
-    return;
-
-  auto *genericParams = dc->getGenericParams();
-  auto genericSig = dc->getGenericSignatureOfContext();
-  if (!genericParams)
-    return;
-
-  auto *decl = cast<ValueDecl>(dc->getInnermostDeclarationDeclContext());
+void TypeChecker::collectReferencedGenericParams(Type ty, SmallPtrSet<CanType, 4> &referenced) {
 
   // A helper class to collect referenced generic type parameters
   // and dependent member types.
   class ReferencedGenericTypeWalker : public TypeWalker {
-    SmallPtrSet<CanType, 4> ReferencedGenericParams;
+    SmallPtrSet<CanType, 4> &ReferencedGenericParams;
 
   public:
-    ReferencedGenericTypeWalker() {}
+    ReferencedGenericTypeWalker(SmallPtrSet<CanType, 4> &referenced) : ReferencedGenericParams(referenced) {}
     Action walkToTypePre(Type ty) override {
       // Find generic parameters or dependent member types.
       // Once such a type is found, don't recurse into its children.
@@ -368,24 +352,39 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
 
       return Action::Continue;
     }
-
-    SmallPtrSetImpl<CanType> &getReferencedGenericParams() {
-      return ReferencedGenericParams;
-    }
   };
 
-  // Collect all generic params referenced in parameter types and
-  // return type.
-  ReferencedGenericTypeWalker paramsAndResultWalker;
-  auto *funcTy = decl->getInterfaceType()->castTo<GenericFunctionType>();
-  for (const auto &param : funcTy->getParams())
-    param.getPlainType().walk(paramsAndResultWalker);
-  funcTy->getResult().walk(paramsAndResultWalker);
+  ty.walk(ReferencedGenericTypeWalker(referenced));
+}
+
+/// All generic parameters of a generic function must be referenced in the
+/// declaration's type, otherwise we have no way to infer them.
+void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
+  // Don't do this check for accessors: they're not used directly, so we
+  // never need to infer their generic arguments.  This is mostly a
+  // compile-time optimization, but it also avoids problems with accessors
+  // like 'read' and 'modify' that would arise due to yields not being
+  // part of the formal type.
+  if (isa<AccessorDecl>(dc))
+    return;
+
+  auto *genericParams = dc->getGenericParams();
+  auto genericSig = dc->getGenericSignatureOfContext();
+  if (!genericParams)
+    return;
+
+  auto *decl = cast<ValueDecl>(dc->getInnermostDeclarationDeclContext());
 
   // Set of generic params referenced in parameter types,
   // return type or requirements.
-  auto &referencedGenericParams =
-      paramsAndResultWalker.getReferencedGenericParams();
+  SmallPtrSet<CanType, 4> referencedGenericParams;
+
+  // Collect all generic params referenced in parameter types and
+  // return type.
+  auto *funcTy = decl->getInterfaceType()->castTo<GenericFunctionType>();
+  for (const auto &param : funcTy->getParams())
+    collectReferencedGenericParams(param.getPlainType(), referencedGenericParams);
+  collectReferencedGenericParams(funcTy->getResult(), referencedGenericParams);
 
   // Check if at least one of the generic params in the requirement refers
   // to an already referenced generic parameter. If this is the case,
@@ -409,13 +408,11 @@ void TypeChecker::checkReferencedGenericParams(GenericContext *dc) {
     }
 
     // Collect generic parameter types referenced by types used in a requirement.
-    ReferencedGenericTypeWalker walker;
+    SmallPtrSet<CanType, 4> genericParamsUsedByRequirementTypes;
     if (first && first->hasTypeParameter())
-      first.walk(walker);
+      collectReferencedGenericParams(first, genericParamsUsedByRequirementTypes);
     if (second && second->hasTypeParameter())
-      second.walk(walker);
-    auto &genericParamsUsedByRequirementTypes =
-        walker.getReferencedGenericParams();
+      collectReferencedGenericParams(second, genericParamsUsedByRequirementTypes);
 
     // If at least one of the collected generic types or a root generic
     // parameter of dependent member types is known to be referenced by

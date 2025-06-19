@@ -455,3 +455,27 @@ where
     return (Self(repeating: value), { v in Self(repeating: v) })
   }
 }
+
+%for (Scalar, bits) in [('Float',32), ('Double',64)]:
+% for n in vectorscalarCounts:
+extension SIMD${n} where Scalar == ${Scalar} {
+  @inlinable
+  @_alwaysEmitIntoClient
+  @derivative(of: init(repeating:))
+  static func _vjpInit(repeating value: Scalar)
+    -> (value: Self, pullback: (TangentVector) -> Scalar.TangentVector)
+  {
+    return (Self(repeating: value), { v in v.sum() })
+  }
+
+  @inlinable
+  @_alwaysEmitIntoClient
+  @derivative(of: init(repeating:))
+  static func _jvpInit(repeating value: Scalar)
+    -> (value: Self, differential: (Scalar.TangentVector) -> TangentVector)
+  {
+    return (Self(repeating: value), { v in Self(repeating: v) })
+  }
+}
+% end
+%end

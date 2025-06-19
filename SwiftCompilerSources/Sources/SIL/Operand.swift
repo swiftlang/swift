@@ -185,16 +185,16 @@ extension Sequence where Element == Operand {
   public func users<I: Instruction>(ofType: I.Type) -> LazyMapSequence<LazyFilterSequence<Self>, I> {
     self.lazy.filter{ $0.instruction is I }.lazy.map { $0.instruction as! I }
   }
-
-  // This overload which returns a Sequence of `Instruction` and not a Sequence of `I` is used for APIs, like
-  // `InstructionSet.insert(contentsOf:)`, which require a sequence of `Instruction`.
-  public func users<I: Instruction>(ofType: I.Type) -> LazyMapSequence<LazyFilterSequence<Self>, Instruction> {
-    self.lazy.filter{ $0.instruction is I }.users
-  }
 }
 
 extension Value {
   public var users: LazyMapSequence<UseList, Instruction> { uses.users }
+}
+
+extension Instruction {
+  public func isUsing(_ value: Value) -> Bool {
+    return operands.contains { $0.value == value }
+  }
 }
 
 extension Operand {
@@ -262,7 +262,7 @@ public enum OperandOwnership {
   
   /// Escape a pointer into a value which cannot be tracked or verified.
   ///
-  /// PointerEscape  operands indicate a SIL deficiency to suffuciently model dependencies. They never arise from user-level escapes.
+  /// PointerEscape  operands indicate a SIL deficiency to sufficiently model dependencies. They never arise from user-level escapes.
   case pointerEscape
   
   /// Bitwise escape. Escapes the nontrivial contents of the value. OSSA does not enforce the lifetime of the escaping bits. The programmer must explicitly force lifetime extension. (ref_to_unowned, unchecked_trivial_bitcast)

@@ -413,6 +413,9 @@ public:
     else
       P.diagnose(loc, diag::unknown_attr_name, name);
   }
+  
+  /// Parse into checked cast options, such as [prohibit_isolated_conformances].
+  CheckedCastInstOptions parseCheckedCastInstOptions(bool *isExact);
 };
 
 } // namespace swift

@@ -3,14 +3,17 @@
 
 // RUN: %target-build-swift-dylib(%t/%target-library-name(MultiModuleStruct1)) %S/Inputs/MultiModuleStruct/file1.swift \
 // RUN:   -emit-module -emit-module-path %t/MultiModuleStruct1.swiftmodule -module-name MultiModuleStruct1
+// RUN: %target-codesign %t/%target-library-name(MultiModuleStruct1)
 // RUN: %target-build-swift-dylib(%t/%target-library-name(MultiModuleStruct2NoJVP)) %S/Inputs/MultiModuleStruct/file2_no_jvp.swift \
 // RUN:   -emit-module -emit-module-path %t/MultiModuleStruct2NoJVP.swiftmodule -module-name MultiModuleStruct2NoJVP -I%t -L%t -lMultiModuleStruct1 %target-rpath(%t)
+// RUN: %target-codesign %t/%target-library-name(MultiModuleStruct2NoJVP)
 
 /// Note: we enable forward-mode differentiation to automatically generate JVP for `foo`.
 /// It wraps `Struct.sum` that has custom JVP defined in MultiModuleStruct2, so we can test it.
 // RUN: %target-build-swift -Xfrontend -enable-experimental-forward-mode-differentiation \
 // RUN:   -I%t -L%t %s -lMultiModuleStruct1 -lMultiModuleStruct2NoJVP -o %t/a.out %target-rpath(%t)
-// RUN: %target-run %t/a.out
+// RUN: %target-codesign %t/a.out
+// RUN: %target-run %t/a.out %t/%target-library-name(MultiModuleStruct1) %t/%target-library-name(MultiModuleStruct2NoJVP)
 
 // RUN: %target-build-swift -I%t %s -emit-ir | %FileCheck %s
 
