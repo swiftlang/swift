@@ -8239,16 +8239,28 @@ ActorIsolation swift::inferConformanceIsolation(
     return nominalIsolation;
   }
 
-  bool anyIsolatedWitness = false;
   auto protocol = conformance->getProtocol();
-  for (auto requirement : protocol->getMembers()) {
+
+  // Also check the value witnesses of each implied conformance to every
+  // inherited protocol, recursively.
+  for (auto req : protocol->getRequirementSignature().getRequirements()) {
+    if (req.getKind() != RequirementKind::Conformance ||
+        !req.getFirstType()->isEqual(protocol->getSelfInterfaceType()))
+      continue;
+
+    auto *assocConf = conformance->getAssociatedConformance(
+        req.getFirstType(), req.getProtocolDecl()).getConcrete();
+    auto isolation = assocConf->getIsolation();
+    if (isolation.isGlobalActor())
+      return isolation;
+  }
+
+  bool anyIsolatedWitness = false;
+  for (auto requirement : protocol->getProtocolRequirements()) {
     if (isa<TypeDecl>(requirement))
       continue;
 
-    auto valueReq = dyn_cast<ValueDecl>(requirement);
-    if (!valueReq)
-      continue;
-
+    auto valueReq = cast<ValueDecl>(requirement);
     auto witness = conformance->getWitnessDecl(valueReq);
     if (!witness)
       continue;
