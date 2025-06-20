@@ -1713,6 +1713,11 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
 
   assert(moduleInputBuffer);
 
+  if (Ctx.LangOpts.EnableModuleLoadingRemarks)
+    Ctx.Diags.diagnose(SourceLoc(), diag::module_loading_swift_attempt,
+                       moduleID.Item.str(),
+                       moduleInputBuffer->getBufferIdentifier());
+
   LoadedFile *file = nullptr;
   auto *M = ModuleDecl::create(moduleID.Item, Ctx,
                                [&](ModuleDecl *M, auto addFile) {
@@ -1745,6 +1750,13 @@ SerializedModuleLoaderBase::loadModule(SourceLoc importLoc,
       }
     }
   }
+
+  if (Ctx.LangOpts.EnableModuleLoadingRemarks) {
+    if (!M || M->failedToLoad())
+      Ctx.Diags.diagnose(importLoc, diag::module_loading_swift_failed,
+                         moduleID.Item.str());
+  }
+
   return M;
 }
 
