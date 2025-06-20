@@ -19,14 +19,15 @@ import Swift
 %   'THROWING',
 %   'NON_THROWING',
 % ]
-% OPERATION_PARAM = '@_inheritActorContext @_implicitSelfCapture _ operation: __owned @Sendable @escaping () async throws -> Success'
 % for METHOD_VARIANT in METHOD_VARIANTS:
 
 % IS_THROWING = METHOD_VARIANT == 'THROWING'
 % if IS_THROWING:
 %   FAILURE_TYPE = 'Error'
+%   THROWS = 'throws '
 % else:
 %   FAILURE_TYPE = 'Never'
+%   THROWS = ''
 % end
 
 @available(SwiftStdlib 6.2, *)
@@ -46,7 +47,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
   public static func startSynchronously(
     name: String? = nil,
     priority: TaskPriority? = nil,
-    @_implicitSelfCapture @_inheritActorContext(always) _ operation: sending @isolated(any) @escaping () async throws -> Success
+    @_implicitSelfCapture @_inheritActorContext(always) _ operation: sending @isolated(any) @escaping () async ${THROWS} -> Success
   ) -> Task<Success, ${FAILURE_TYPE}> {
     immediate(name: name, priority: priority, operation: operation)
   }
@@ -79,7 +80,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
   public static func immediate(
     name: String? = nil,
     priority: TaskPriority? = nil,
-    @_implicitSelfCapture @_inheritActorContext(always) operation: sending @isolated(any) @escaping () async throws -> Success
+    @_implicitSelfCapture @_inheritActorContext(always) operation: sending @isolated(any) @escaping () async ${THROWS} -> Success
   ) -> Task<Success, ${FAILURE_TYPE}> {
 
     let builtinSerialExecutor =
@@ -235,15 +236,15 @@ extension ${GROUP_TYPE} {
 %   'THROWING',
 %   'NON_THROWING',
 % ]
-% OPERATION_PARAM = '@_inheritActorContext @_implicitSelfCapture _ operation: __owned @Sendable @escaping @MainActor () async throws -> Success'
 % for METHOD_VARIANT in METHOD_VARIANTS:
 
 % IS_THROWING = METHOD_VARIANT == 'THROWING'
 % if IS_THROWING:
 %   FAILURE_TYPE = 'Error'
+%   THROWS = 'throws '
 % else:
 %   FAILURE_TYPE = 'Never'
-%   OPERATION_PARAM = OPERATION_PARAM.replace('throws', '')
+%   THROWS = ''
 % end
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY && !SWIFT_CONCURRENCY_EMBEDDED
@@ -256,7 +257,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
   @discardableResult
   public static func startOnMainActor(
     priority: TaskPriority? = nil,
-    ${OPERATION_PARAM}
+    @_inheritActorContext @_implicitSelfCapture _ operation: __owned @Sendable @escaping @MainActor () async ${THROWS} -> Success
   ) -> Task<Success, ${FAILURE_TYPE}> {
     let flags = taskCreateFlags(
       priority: priority,
