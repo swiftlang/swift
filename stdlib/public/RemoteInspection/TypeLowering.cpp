@@ -1154,6 +1154,7 @@ class ExistentialTypeInfoBuilder {
   TypeConverter &TC;
   std::vector<const TypeRef *> Protocols;
   const TypeRef *Superclass = nullptr;
+  remote::RemoteAbsolutePointer Shape;
   ExistentialTypeRepresentation Representation;
   ReferenceCounting Refcounting;
   bool ObjC;
@@ -1258,6 +1259,10 @@ class ExistentialTypeInfoBuilder {
     }
   }
 
+  void examineShape() {
+    
+  }
+
 public:
   ExistentialTypeInfoBuilder(TypeConverter &TC)
     : TC(TC), Representation(ExistentialTypeRepresentation::Opaque),
@@ -1321,8 +1326,26 @@ public:
     Representation = ExistentialTypeRepresentation::Class;
   }
 
+  void addShape(const ProtocolCompositionTypeRef *Protocol,
+                ExtendedExistentialTypeShapeFlags Flags) {
+    switch (Flags.getSpecialKind()) {
+      case ExtendedExistentialTypeShapeFlags::SpecialKind::Class:
+        Representation = ExistentialTypeRepresentation::Class;
+        break;
+      case ExtendedExistentialTypeShapeFlags::SpecialKind::Metatype:
+      case ExtendedExistentialTypeShapeFlags::SpecialKind::ExplicitLayout:
+      case ExtendedExistentialTypeShapeFlags::SpecialKind::None:
+        Representation = ExistentialTypeRepresentation::Opaque;
+        break;
+    }
+
+    for (auto *Protocol : Protocols)
+      addProtocol(Protocol);
+  }
+
   const TypeInfo *build(remote::TypeInfoProvider *ExternalTypeInfo) {
     examineProtocols();
+    examineShape();
 
     if (Invalid)
       return nullptr;
@@ -1415,7 +1438,7 @@ public:
 
     return builder.build();
   }
-};
+      };
 
 unsigned RecordTypeInfoBuilder::addField(unsigned fieldSize,
                                          unsigned fieldAlignment,
@@ -1780,6 +1803,11 @@ public:
     return true;
   }
 
+  bool visitSymbolicExtendedExistentialTypeRef(
+      const SymbolicExtendedExistentialTypeRef *SEET) {
+    return true;
+  }
+
   bool
   visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
     return true;
@@ -1920,6 +1948,11 @@ public:
 
   MetatypeRepresentation
   visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
+    return MetatypeRepresentation::Thin;
+  }
+
+  MetatypeRepresentation visitSymbolicExtendedExistentialTypeRef(
+      const SymbolicExtendedExistentialTypeRef *SEET) {
     return MetatypeRepresentation::Thin;
   }
 
@@ -2520,6 +2553,13 @@ public:
     return builder.buildMetatype(ExternalTypeInfo);
   }
 
+  const TypeInfo *visitSymbolicExtendedExistentialTypeRef(
+      const SymbolicExtendedExistentialTypeRef *SEET) {
+    ExistentialTypeInfoBuilder builder(TC);
+    builder.addShape(SEET->getProtocol(), SEET->getFlags());
+    return builder.build(ExternalTypeInfo);
+  }
+
   const TypeInfo *
   visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
     DEBUG_LOG(fprintf(stderr, "Unresolved generic TypeRef: "); GTP->dump());
@@ -2733,7 +2773,7 @@ const RecordTypeInfo *TypeConverter::getClassInstanceTypeInfo(
   swift_unreachable("Unhandled FieldDescriptorKind in switch.");
 }
 
-} // namespace reflection
+    } // namespace reflection
 } // namespace swift
 
 #endif

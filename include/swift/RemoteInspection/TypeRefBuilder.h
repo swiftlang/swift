@@ -1284,7 +1284,56 @@ public:
   createSymbolicExtendedExistentialType(NodePointer shapeNode,
                                         llvm::ArrayRef<const TypeRef *> args) {
     // Can't handle this here.
-    return nullptr;
+    
+    remote::RemoteAddress shape(shapeNode->getIndex());
+    auto symbol = OpaquePointerSymbolResolver(shape);
+    if (!symbol)
+      return nullptr;
+    auto bytes = OpaqueByteReader(shape, 4);
+    if (!bytes)
+      return nullptr;
+    ExtendedExistentialTypeShapeFlags flags(*(const uint32_t *)bytes.get());
+
+    Demangler Dem;
+    auto *Node = Dem.demangleSymbol(symbol->getSymbol());
+    if (Node->getKind() != Node::Kind::Global || Node->getNumChildren() != 1)
+      return nullptr;
+    Node = Node->getChild(0);
+    if ((Node->getKind() == Node::Kind::Uniquable) &&
+        Node->getNumChildren() == 1)
+      Node = Node->getChild(0);
+    if (Node->getKind() != Node::Kind::ExtendedExistentialTypeShape ||
+        Node->getNumChildren() != 2)
+      return nullptr;
+    Node = Node->getChild(1);
+    if (Node->getKind() != Node::Kind::Type || Node->getNumChildren() != 1)
+      return nullptr;
+    Node = Node->getChild(0);
+    if (Node->getKind() != Node::Kind::ConstrainedExistential ||
+        Node->getNumChildren() != 2)
+      return nullptr;
+    auto ReqNode = Node->getChild(1);
+    Node = Node->getChild(0);
+    if (Node->getKind() != Node::Kind::Type || Node->getNumChildren() != 1)
+      return nullptr;
+    auto protocol = llvm::dyn_cast_or_null<ProtocolCompositionTypeRef>(
+        decodeMangledType(Node));
+    if (!protocol)
+      return nullptr;
+
+    if (!ReqNode ||
+        ReqNode->getKind() != Node::Kind::ConstrainedExistentialRequirementList)
+      return nullptr;
+
+    llvm::SmallVector<BuiltRequirement, 8> requirements;
+    llvm::SmallVector<BuiltInverseRequirement, 8> inverseRequirements;
+
+    decodeRequirement<BuiltType, BuiltRequirement, BuiltInverseRequirement,
+                      BuiltLayoutConstraint, TypeRefBuilder>(
+        ReqNode, requirements, inverseRequirements, *this);
+
+    return SymbolicExtendedExistentialTypeRef::create(
+        *this, *symbol, protocol, requirements, args, flags);
   }
 
   const ExistentialMetatypeTypeRef *createExistentialMetatypeType(
@@ -1312,6 +1361,7 @@ public:
 
   const DependentMemberTypeRef *
   createDependentMemberType(const std::string &member, const TypeRef *base) {
+    return DependentMemberTypeRef::create(*this, member, base, "");
     // Should not have unresolved dependent member types here.
     return nullptr;
   }
@@ -1479,6 +1529,9 @@ private:
   using PointerReader =
       std::function<std::optional<remote::RemoteAbsolutePointer>(
           remote::RemoteAddress, unsigned)>;
+  using PointerSymbolResolver =
+      std::function<std::optional<remote::RemoteAbsolutePointer>(
+          remote::RemoteAddress)>;
   using DynamicSymbolResolver =
       std::function<std::optional<remote::RemoteAbsolutePointer>(
           remote::RemoteAddress)>;
@@ -1511,6 +1564,7 @@ private:
   ByteReader OpaqueByteReader;
   StringReader OpaqueStringReader;
   PointerReader OpaquePointerReader;
+  PointerSymbolResolver OpaquePointerSymbolResolver;
   DynamicSymbolResolver OpaqueDynamicSymbolResolver;
   IntVariableReader OpaqueIntVariableReader;
 
@@ -1548,6 +1602,11 @@ public:
             [&reader](remote::RemoteAddress address, unsigned size)
                 -> std::optional<remote::RemoteAbsolutePointer> {
               return reader.Reader->readPointer(address, size);
+            }),
+        OpaquePointerSymbolResolver(
+            [&reader](remote::RemoteAddress address)
+                -> std::optional<remote::RemoteAbsolutePointer> {
+              return reader.Reader->resolvePointerAsSymbol(address);
             }),
         OpaqueDynamicSymbolResolver(
             [&reader](remote::RemoteAddress address)
