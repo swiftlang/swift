@@ -215,54 +215,11 @@ extension _SmallString: RandomAccessCollection, MutableCollection {
   @inlinable  @inline(__always)
   internal subscript(_ bounds: Range<Index>) -> SubSequence {
     get {
-      // Extract substring using bit manipulation on CPU registers
-      let start = bounds.lowerBound
-      let end = bounds.upperBound
-      let subCount = end - start
-
-      guard subCount > 0 else { return _SmallString() }
-      guard subCount <= _SmallString.capacity else {
-        // Fallback for invalid range
-        return self.withUTF8 { utf8 in
-          let rebased = unsafe UnsafeBufferPointer(rebasing: utf8[bounds])
-          return unsafe _SmallString(rebased)._unsafelyUnwrappedUnchecked
-        }
+      // TODO(String performance): In-vector-register operation
+      return self.withUTF8 { utf8 in
+        let rebased = unsafe UnsafeBufferPointer(rebasing: utf8[bounds])
+        return unsafe _SmallString(rebased)._unsafelyUnwrappedUnchecked
       }
-
-      let leading: UInt64
-      let trailing: UInt64
-
-      if start < 8 {
-        if end <= 8 {
-          // Substring entirely in leading word
-          let shiftAmount = UInt64(start) * 8
-          let mask = (UInt64(1) << (UInt64(subCount) * 8)) - 1
-          leading = (self.leadingRawBits >> shiftAmount) & mask
-          trailing = 0
-        } else {
-          // Substring spans both words
-          let leadingBits = 8 - start
-          let trailingBits = subCount - leadingBits
-
-          // Extract from leading word
-          let leadingShift = UInt64(start) * 8
-          let leadingMask = (UInt64(1) << (UInt64(leadingBits) * 8)) - 1
-          leading = (self.leadingRawBits >> leadingShift) & leadingMask
-
-          // Extract from trailing word
-          let trailingMask = (UInt64(1) << (UInt64(trailingBits) * 8)) - 1
-          trailing = self.trailingRawBits & trailingMask
-        }
-      } else {
-        // Substring entirely in trailing word
-        let trailingStart = start - 8
-        let shiftAmount = UInt64(trailingStart) * 8
-        let mask = (UInt64(1) << (UInt64(subCount) * 8)) - 1
-        leading = (self.trailingRawBits >> shiftAmount) & mask
-        trailing = 0
-      }
-
-      return _SmallString(leading: leading, trailing: trailing, count: subCount)
     }
     // This setter is required for _SmallString to be a valid MutableCollection.
     // Since _SmallString is internal and this setter unused, we cheat.
