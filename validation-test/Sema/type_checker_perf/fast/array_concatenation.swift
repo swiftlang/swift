@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-disable-shrink
+// RUN: %target-typecheck-verify-swift -disable-constraint-solver-performance-hacks
 
 // Self-contained test case
 protocol P1 {}; func f<T: P1>(_: T, _: T) -> T { fatalError() }

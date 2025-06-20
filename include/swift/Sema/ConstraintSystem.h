@@ -3586,6 +3586,13 @@ public:
     return Options.contains(ConstraintSystemFlags::ForCodeCompletion);
   }
 
+  /// Check whether type-checker performance hacks has been explicitly
+  /// disabled by a flag.
+  bool performanceHacksEnabled() const {
+    return !getASTContext()
+                .TypeCheckerOpts.DisableConstraintSolverPerformanceHacks;
+  }
+
   /// Log and record the application of the fix. Return true iff any
   /// subsequent solution would be worse than the best known solution.
   bool recordFix(ConstraintFix *fix, unsigned impact = 1);
