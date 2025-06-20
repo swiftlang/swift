@@ -3576,12 +3576,35 @@ void LocatableType::Profile(llvm::FoldingSetNodeID &id, SourceLoc loc,
 // Simple accessors.
 Type ErrorType::get(const ASTContext &C) { return C.TheErrorType; }
 
+static Type replacingTypeVariablesAndPlaceholders(Type ty) {
+  if (!ty || !ty->hasTypeVariableOrPlaceholder())
+    return ty;
+
+  auto &ctx = ty->getASTContext();
+
+  return ty.transformRec([&](Type ty) -> std::optional<Type> {
+    if (!ty->hasTypeVariableOrPlaceholder())
+      return ty;
+
+    // Match the logic in `Solution::simplifyType` and use UnresolvedType.
+    // FIXME: Ideally we'd get rid of UnresolvedType and just use a fresh
+    // PlaceholderType, but we don't currently support placeholders with no
+    // originators.
+    auto *typePtr = ty.getPointer();
+    if (isa<TypeVariableType>(typePtr) || isa<PlaceholderType>(typePtr))
+      return ctx.TheUnresolvedType;
+
+    return std::nullopt;
+  });
+}
+
 Type ErrorType::get(Type originalType) {
+  // The original type is only used for printing/debugging, and we don't support
+  // solver-allocated ErrorTypes. As such, fold any type variables and
+  // placeholders into UnresolvedTypes, which print as placeholders.
+  originalType = replacingTypeVariablesAndPlaceholders(originalType);
+
   ASSERT(originalType);
-  // We don't currently support solver-allocated error types, if we want
-  // this in the future we'll need to adjust `Solution::simplifyType` to fold
-  // them into regular ErrorTypes. Additionally, any clients of
-  // `typesSatisfyConstraint` will need to be taught not to pass such types.
   ASSERT(!originalType->getRecursiveProperties().isSolverAllocated() &&
          "Solver-allocated error types not supported");
 

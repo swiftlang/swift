@@ -446,13 +446,8 @@ Type TypeSubstituter::transformDependentMemberType(DependentMemberType *dependen
 
   auto result = conformance.getTypeWitness(assocType, IFS.getOptions());
   if (result->is<ErrorType>()) {
-    // Substitute the base type for the original ErrorType for type printing.
-    // Avoid doing this if the substitutions introduce type variables or
-    // placeholders since ErrorTypes can't be solver-allocated currently (and
-    // type variables aren't helpful when printing anyway).
     auto substBase = origBase.subst(IFS);
-    if (!substBase->hasTypeVariableOrPlaceholder())
-      return DependentMemberType::get(ErrorType::get(substBase), assocType);
+    return DependentMemberType::get(ErrorType::get(substBase), assocType);
   }
   return result;
 }
