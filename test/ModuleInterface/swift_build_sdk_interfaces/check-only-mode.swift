@@ -1,4 +1,7 @@
 // RUN: %empty-directory(%t)
+// RUN: %empty-directory(%t/sdk/usr/lib)
+// RUN: cp -r %test-resource-dir %t/sdk/usr/lib
+// RUN: rm -rf %t/sdk/usr/lib/swift/host
 // RUN: mkdir -p %t/sdk/usr/lib/swift/Normal.swiftmodule
 // RUN: mkdir -p %t/sdk/System/Library/Frameworks/FMWK.framework/Modules/FMWK.swiftmodule
 
