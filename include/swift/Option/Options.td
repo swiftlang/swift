@@ -328,7 +328,7 @@ def F_EQ : Joined<["-"], "F=">, Flags<[FrontendOption, ArgumentIsPath]>,
 
 def Fsystem : Separate<["-"], "Fsystem">,
   Flags<[FrontendOption, ArgumentIsPath, SwiftSymbolGraphExtractOption,
-         SwiftSynthesizeInterfaceOption]>,
+         SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Add directory to system framework search path">;
 
 def I : JoinedOrSeparate<["-"], "I">,
@@ -340,7 +340,7 @@ def I_EQ : Joined<["-"], "I=">, Flags<[FrontendOption, ArgumentIsPath]>,
 
 def Isystem : Separate<["-"], "Isystem">,
   Flags<[FrontendOption, ArgumentIsPath, SwiftSymbolGraphExtractOption,
-         SwiftSynthesizeInterfaceOption]>,
+         SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Add directory to the system import search path">;
 
 def import_underlying_module : Flag<["-"], "import-underlying-module">,
