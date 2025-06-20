@@ -195,8 +195,8 @@ class WasmLLVMRuntimeLibs(cmake_product.CMakeProduct):
         if enable_wasi_threads:
             c_flags.append('-pthread')
             cxx_flags.append('-pthread')
-        cmake.cmake_options.define('CMAKE_C_FLAGS', ' '.join(c_flags))
-        cmake.cmake_options.define('CMAKE_CXX_FLAGS', ' '.join(cxx_flags))
+        cmake.cmake_options.define('CMAKE_C_FLAGS:STRING', ' '.join(c_flags))
+        cmake.cmake_options.define('CMAKE_CXX_FLAGS:STRING', ' '.join(cxx_flags))
 
         cmake.cmake_options.define('CMAKE_C_COMPILER_TARGET:STRING', target_triple)
         cmake.cmake_options.define('CMAKE_CXX_COMPILER_TARGET:STRING', target_triple)
