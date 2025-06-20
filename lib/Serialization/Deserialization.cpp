@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -460,8 +460,9 @@ void ModuleFile::outputDiagnosticInfo(llvm::raw_ostream &os) const {
 
 static std::optional<swift::AccessorKind> getActualAccessorKind(uint8_t raw) {
   switch (serialization::AccessorKind(raw)) {
-#define ACCESSOR(ID) \
-  case serialization::AccessorKind::ID: return swift::AccessorKind::ID;
+#define ACCESSOR(ID, KEYWORD)                                                  \
+  case serialization::AccessorKind::ID:                                        \
+    return swift::AccessorKind::ID;
 #include "swift/AST/AccessorKinds.def"
   }
 
