@@ -8017,6 +8017,9 @@ ActorReferenceResult ActorReferenceResult::forReference(
         getInnermostIsolatedContext(fromDC, getClosureActorIsolation);
   }
 
+  if (declIsolation.isCallerIsolationInheriting())
+    return forSameConcurrencyDomain(declIsolation, options);
+
   // When the declaration is not actor-isolated, it can always be accessed
   // directly.
   if (!declIsolation.isActorIsolated()) {
