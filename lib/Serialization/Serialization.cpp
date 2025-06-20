@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -2193,8 +2193,9 @@ static bool shouldSerializeMember(Decl *D) {
 
 static serialization::AccessorKind getStableAccessorKind(swift::AccessorKind K){
   switch (K) {
-#define ACCESSOR(ID) \
-  case swift::AccessorKind::ID: return serialization::ID;
+#define ACCESSOR(ID, KEYWORD)                                                  \
+  case swift::AccessorKind::ID:                                                \
+    return serialization::ID;
 #include "swift/AST/AccessorKinds.def"
   }
 

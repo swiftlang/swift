@@ -752,7 +752,7 @@ SDKNode* SDKNode::constructSDKNode(SDKContext &Ctx,
         AccessorKind unknownKind = (AccessorKind)((uint8_t)(AccessorKind::Last) + 1);
         Info.AccKind = llvm::StringSwitch<AccessorKind>(
           GetScalarString(Pair.getValue()))
-#define ACCESSOR(ID)
+#define ACCESSOR(ID, KEYWORD)
 #define SINGLETON_ACCESSOR(ID, KEYWORD) .Case(#KEYWORD, AccessorKind::ID)
 #include "swift/AST/AccessorKinds.def"
           .Default(unknownKind);
@@ -1166,8 +1166,9 @@ static StringRef getSimpleName(ValueDecl *VD) {
   }
   if (auto *AD = dyn_cast<AccessorDecl>(VD)) {
     switch(AD->getAccessorKind()) {
-#define ACCESSOR(ID) \
-case AccessorKind::ID: return #ID;
+#define ACCESSOR(ID, KEYWORD)                                                  \
+    case AccessorKind::ID:                                                     \
+      return #ID;
 #include "swift/AST/AccessorKinds.def"
     }
   }
@@ -2268,7 +2269,7 @@ struct ScalarEnumerationTraits<DeclKind> {
 template<>
 struct ScalarEnumerationTraits<AccessorKind> {
   static void enumeration(Output &out, AccessorKind &value) {
-#define ACCESSOR(ID)
+#define ACCESSOR(ID, KEYWORD)
 #define SINGLETON_ACCESSOR(ID, KEYWORD) \
   out.enumCase(value, #KEYWORD, AccessorKind::ID);
 #include "swift/AST/AccessorKinds.def"
