@@ -311,25 +311,11 @@ extension _SmallString {
     let count = input.count
     guard count <= _SmallString.capacity else { return nil }
 
-    // Unaligned 64-bit loads
+    // TODO(SIMD): The below can be replaced with just be a masked unaligned
+    // vector load
     let ptr = unsafe input.baseAddress._unsafelyUnwrappedUnchecked
-    var leading: UInt64
-    let trailing: UInt64
-
-    if count <= 8 {
-      // Single unaligned load for small strings
-      leading = UnsafeRawPointer(ptr).loadUnaligned(as: UInt64.self).littleEndian
-      let mask = (UInt64(1) &<< (UInt64(count) &* 8)) &- 1
-      leading = leading & mask
-      trailing = 0
-    } else {
-      // Two unaligned loads for larger strings
-      leading = UnsafeRawPointer(ptr).loadUnaligned(as: UInt64.self).littleEndian
-      let trailingRaw = UnsafeRawPointer(ptr + 8).loadUnaligned(as: UInt64.self).littleEndian
-      let trailingCount = count &- 8
-      let mask = (UInt64(1) &<< (UInt64(trailingCount) &* 8)) &- 1
-      trailing = trailingRaw & mask
-    }
+    let leading = unsafe _bytesToUInt64(ptr, Swift.min(input.count, 8))
+    let trailing = unsafe count > 8 ? _bytesToUInt64(ptr + 8, count &- 8) : 0
 
     self.init(leading: leading, trailing: trailing, count: count)
   }
