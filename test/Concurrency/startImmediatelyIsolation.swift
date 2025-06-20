@@ -1,5 +1,4 @@
-// RUN: %target-build-swift -swift-version 6 %s -strict-concurrency=complete -Xfrontend -verify
-
+// RUN: %target-swift-frontend -parse-as-library -swift-version 6 -strict-concurrency=complete -emit-sil -verify %s
 // REQUIRES: concurrency
 
 @available(SwiftStdlib 6.2, *)
@@ -41,11 +40,30 @@ func async() async throws {
 
 @available(SwiftStdlib 6.2, *)
 actor TestSelfCapture {
-    func method() {}
+  func method() {}
 
-    func test() {
-        Task.immediate {
-            method() // Ok due to `@_implicitSelfCapture`
-        }
+  func test() {
+    Task.immediate {
+      method() // Ok due to `@_implicitSelfCapture`
     }
+  }
 }
+
+@available(SwiftStdlib 6.2, *)
+struct TestThrowing {
+  func test() {
+    // expected-error@+1{{invalid conversion from throwing function of type '() throws -> Void' to non-throwing function type '@isolated(any) () async -> Void'}}
+    let t: Task<Void, Never> = Task.immediate {
+      throw Boom()
+    }
+    _ = t
+
+    // ok
+    let t2: Task<Void, Error> = Task.immediate {
+      throw Boom()
+    }
+    _ = t2
+  }
+}
+
+struct Boom: Error {}
