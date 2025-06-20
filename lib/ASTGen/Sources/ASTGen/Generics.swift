@@ -41,13 +41,14 @@ extension ASTGenVisitor {
       preconditionFailure("Node not part of the parent?")
     }
 
-    var paramKind: BridgedGenericTypeParamKind = .type
-
-    if node.specifier?.tokenKind == .keyword(.each) {
-      paramKind = .pack
-    } else if node.specifier?.tokenKind == .keyword(.let) {
-      paramKind = .value
-    }
+    let paramKind: swift.GenericTypeParamKind =
+      if node.specifier?.tokenKind == .keyword(.each) {
+        .pack
+      } else if node.specifier?.tokenKind == .keyword(.let) {
+        .value
+      } else {
+        .type
+      }
 
     return .createParsed(
       self.ctx,

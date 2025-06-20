@@ -12,7 +12,7 @@
 
 #include "swift/AST/ASTBridging.h"
 #include "swift/AST/AvailabilitySpec.h"
-#include "swift/AST/PlatformKind.h"
+#include "swift/AST/PlatformKindUtils.h"
 
 using namespace swift;
 
@@ -43,36 +43,17 @@ BridgedAvailabilityMacroMap_getSpecs(BridgedAvailabilityMacroMap map,
 // MARK: PlatformKind
 //===----------------------------------------------------------------------===//
 
-BridgedPlatformKind BridgedPlatformKind_fromString(BridgedStringRef cStr) {
+BridgedOptionalPlatformKind PlatformKind_fromString(BridgedStringRef cStr) {
   auto optKind = platformFromString(cStr.unbridged());
-  if (!optKind)
-    return BridgedPlatformKind_None;
-
-  switch (*optKind) {
-  case PlatformKind::none:
-    return BridgedPlatformKind_None;
-#define AVAILABILITY_PLATFORM(X, PrettyName)                                   \
-  case PlatformKind::X:                                                        \
-    return BridgedPlatformKind_##X;
-#include "swift/AST/PlatformKinds.def"
+  if (!optKind) {
+    return BridgedOptionalPlatformKind();
   }
+  return *optKind;
 }
 
-BridgedPlatformKind
-BridgedPlatformKind_fromIdentifier(BridgedIdentifier cIdent) {
-  return BridgedPlatformKind_fromString(cIdent.unbridged().str());
-}
-
-PlatformKind unbridge(BridgedPlatformKind platform) {
-  switch (platform) {
-  case BridgedPlatformKind_None:
-    return PlatformKind::none;
-#define AVAILABILITY_PLATFORM(X, PrettyName)                                   \
-  case BridgedPlatformKind_##X:                                                \
-    return PlatformKind::X;
-#include "swift/AST/PlatformKinds.def"
-  }
-  llvm_unreachable("unhandled enum value");
+BridgedOptionalPlatformKind
+PlatformKind_fromIdentifier(BridgedIdentifier cIdent) {
+  return PlatformKind_fromString(cIdent.unbridged().str());
 }
 
 //===----------------------------------------------------------------------===//

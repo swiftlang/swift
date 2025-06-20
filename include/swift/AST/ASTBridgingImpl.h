@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2023 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -605,7 +605,7 @@ BridgedASTType::MetatypeRepresentation BridgedASTType::getRepresentationOfMetaty
 }
 
 BridgedOptionalInt BridgedASTType::getValueOfIntegerType() const {
-  return BridgedOptionalInt::getFromAPInt(unbridged()->getAs<swift::IntegerType>()->getValue());
+  return getFromAPInt(unbridged()->getAs<swift::IntegerType>()->getValue());
 }
 
 BridgedSubstitutionMap BridgedASTType::getContextSubstitutionMap() const {
@@ -735,17 +735,14 @@ swift::LayoutConstraint BridgedLayoutConstraint::unbridged() const {
   return raw;
 }
 
-bool BridgedLayoutConstraint_isNull(BridgedLayoutConstraint cConstraint) {
-  return cConstraint.unbridged().isNull();
+bool BridgedLayoutConstraint::getIsNull() const { return unbridged().isNull(); }
+
+bool BridgedLayoutConstraint::getIsKnownLayout() const {
+  return unbridged()->isKnownLayout();
 }
 
-bool BridgedLayoutConstraint_isKnownLayout(
-    BridgedLayoutConstraint cConstraint) {
-  return cConstraint.unbridged()->isKnownLayout();
-}
-
-bool BridgedLayoutConstraint_isTrivial(BridgedLayoutConstraint cConstraint) {
-  return cConstraint.unbridged()->isTrivial();
+bool BridgedLayoutConstraint::getIsTrivial() const {
+  return unbridged()->isTrivial();
 }
 
 //===----------------------------------------------------------------------===//

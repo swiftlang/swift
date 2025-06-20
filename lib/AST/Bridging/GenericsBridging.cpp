@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -46,22 +46,8 @@ BridgedGenericTypeParamDecl BridgedGenericTypeParamDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cSpecifierLoc, BridgedIdentifier cName,
     BridgedSourceLoc cNameLoc, BridgedNullableTypeRepr bridgedInheritedType,
-    size_t index, BridgedGenericTypeParamKind cParamKind) {
+    size_t index, swift::GenericTypeParamKind paramKind) {
   auto specifierLoc = cSpecifierLoc.unbridged();
-
-  GenericTypeParamKind paramKind;
-
-  switch (cParamKind) {
-  case BridgedGenericTypeParamKindType:
-    paramKind = GenericTypeParamKind::Type;
-    break;
-  case BridgedGenericTypeParamKindPack:
-    paramKind = GenericTypeParamKind::Pack;
-    break;
-  case BridgedGenericTypeParamKindValue:
-    paramKind = GenericTypeParamKind::Value;
-    break;
-  }
 
   auto *decl = GenericTypeParamDecl::createParsed(
       cDeclContext.unbridged(), cName.unbridged(), cNameLoc.unbridged(),
@@ -98,15 +84,15 @@ BridgedTrailingWhereClause_createParsed(BridgedASTContext cContext,
 
 RequirementRepr BridgedRequirementRepr::unbridged() const {
   switch (Kind) {
-  case BridgedRequirementReprKindTypeConstraint:
+  case RequirementReprKind::TypeConstraint:
     return RequirementRepr::getTypeConstraint(
         FirstType.unbridged(), SeparatorLoc.unbridged(), SecondType.unbridged(),
         IsExpansionPattern);
-  case BridgedRequirementReprKindSameType:
+  case RequirementReprKind::SameType:
     return RequirementRepr::getSameType(
         FirstType.unbridged(), SeparatorLoc.unbridged(), SecondType.unbridged(),
         IsExpansionPattern);
-  case BridgedRequirementReprKindLayoutConstraint:
+  case RequirementReprKind::LayoutConstraint:
     return RequirementRepr::getLayoutConstraint(
         FirstType.unbridged(), SeparatorLoc.unbridged(),
         {LayoutConstraint.unbridged(), LayoutConstraintLoc.unbridged()},
@@ -119,7 +105,7 @@ BridgedRequirementRepr BridgedRequirementRepr_createTypeConstraint(
     BridgedTypeRepr cConstraint, bool isExpansionPattern) {
   return {
       /*SeparatorLoc=*/cColonLoc,
-      /*Kind=*/BridgedRequirementReprKindTypeConstraint,
+      /*Kind=*/RequirementReprKind::TypeConstraint,
       /*FirstType=*/cSubject,
       /*SecondType=*/cConstraint.unbridged(),
       /*LayoutConstraint=*/{},
@@ -133,7 +119,7 @@ BridgedRequirementRepr BridgedRequirementRepr_createSameType(
     BridgedTypeRepr cSecondType, bool isExpansionPattern) {
   return {
       /*SeparatorLoc=*/cEqualLoc,
-      /*Kind=*/BridgedRequirementReprKindSameType,
+      /*Kind=*/RequirementReprKind::SameType,
       /*FirstType=*/cFirstType,
       /*SecondType=*/cSecondType.unbridged(),
       /*LayoutConstraint=*/{},
@@ -148,52 +134,13 @@ BridgedRequirementRepr BridgedRequirementRepr_createLayoutConstraint(
     bool isExpansionPattern) {
   return {
       /*SeparatorLoc=*/cColonLoc,
-      /*Kind=*/BridgedRequirementReprKindLayoutConstraint,
+      /*Kind=*/RequirementReprKind::LayoutConstraint,
       /*FirstType=*/cSubject,
       /*SecondType=*/nullptr,
       /*LayoutConstraint=*/cLayout,
       /*LayoutConstraintLoc=*/cLayoutLoc,
       /*IsExpansionPattern=*/isExpansionPattern,
   };
-}
-
-static swift::LayoutConstraintKind
-unbridged(BridgedLayoutConstraintKind cKind) {
-  switch (cKind) {
-#define CASE(Kind)                                                             \
-  case BridgedLayoutConstraintKind##Kind:                                      \
-    return swift::LayoutConstraintKind::Kind;
-    CASE(UnknownLayout)
-    CASE(TrivialOfExactSize)
-    CASE(TrivialOfAtMostSize)
-    CASE(Trivial)
-    CASE(Class)
-    CASE(NativeClass)
-    CASE(RefCountedObject)
-    CASE(NativeRefCountedObject)
-    CASE(BridgeObject)
-    CASE(TrivialStride)
-#undef CASE
-  }
-}
-
-static BridgedLayoutConstraintKind bridge(swift::LayoutConstraintKind kind) {
-  switch (kind) {
-#define CASE(Kind)                                                             \
-  case swift::LayoutConstraintKind::Kind:                                      \
-    return BridgedLayoutConstraintKind##Kind;
-    CASE(UnknownLayout)
-    CASE(TrivialOfExactSize)
-    CASE(TrivialOfAtMostSize)
-    CASE(Trivial)
-    CASE(Class)
-    CASE(NativeClass)
-    CASE(RefCountedObject)
-    CASE(NativeRefCountedObject)
-    CASE(BridgeObject)
-    CASE(TrivialStride)
-#undef CASE
-  }
 }
 
 BridgedLayoutConstraint
@@ -204,24 +151,18 @@ BridgedLayoutConstraint_getLayoutConstraint(BridgedASTContext cContext,
 
 BridgedLayoutConstraint
 BridgedLayoutConstraint_getLayoutConstraint(BridgedASTContext cContext,
-                                            BridgedLayoutConstraintKind cKind) {
-  return LayoutConstraint::getLayoutConstraint(unbridged(cKind),
-                                               cContext.unbridged());
+                                            swift::LayoutConstraintKind kind) {
+  return LayoutConstraint::getLayoutConstraint(kind, cContext.unbridged());
 }
 
 BridgedLayoutConstraint
 BridgedLayoutConstraint_getLayoutConstraint(BridgedASTContext cContext,
-                                            BridgedLayoutConstraintKind cKind,
+                                            swift::LayoutConstraintKind kind,
                                             size_t size, size_t alignment) {
-  return LayoutConstraint::getLayoutConstraint(unbridged(cKind), size,
-                                               alignment, cContext.unbridged());
+  return LayoutConstraint::getLayoutConstraint(kind, size, alignment,
+                                               cContext.unbridged());
 }
 
-BridgedLayoutConstraint BridgedLayoutConstraint_getUnknownLayout() {
-  return LayoutConstraint::getUnknownLayout();
-}
-
-BridgedLayoutConstraintKind
-BridgedLayoutConstraint_getKind(BridgedLayoutConstraint cConstraint) {
-  return bridge(cConstraint.unbridged()->getKind());
+swift::LayoutConstraintKind BridgedLayoutConstraint::getKind() const {
+  return unbridged()->getKind();
 }

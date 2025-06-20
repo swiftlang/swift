@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -375,7 +375,7 @@ extension ASTGenVisitor {
 // MARK: - AbstractStorageDecl
 
 extension ASTGenVisitor {
-  func generate(accessorSpecifier specifier: TokenSyntax) -> BridgedAccessorKind? {
+  func generate(accessorSpecifier specifier: TokenSyntax) -> swift.AccessorKind? {
     switch specifier.keywordKind {
     case .get:
       return .get
@@ -386,21 +386,21 @@ extension ASTGenVisitor {
     case .willSet:
       return .willSet
     case .unsafeAddress:
-      return .address
+      return .unsafeAddress
     case .unsafeMutableAddress:
-      return .mutableAddress
+      return .unsafeMutableAddress
     case ._read:
-      return .read
+      return ._read
     case ._modify:
-      return .modify
+      return ._modify
     case .`init`:
-      return .`init`
+      return .Init
     case .read:
       precondition(ctx.langOptsHasFeature(.CoroutineAccessors), "(compiler bug) 'read' accessor should only be parsed with 'CoroutineAccessors' feature")
-      return .read2
+      return .read
     case .modify:
       precondition(ctx.langOptsHasFeature(.CoroutineAccessors), "(compiler bug) 'modify' accessor should only be parsed with 'CoroutineAccessors' feature")
-      return .modify2
+      return .modify
     default:
       self.diagnose(.unknownAccessorSpecifier(specifier))
       return nil
@@ -726,10 +726,10 @@ extension ASTGenVisitor {
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
     )
     if signature.isReasync {
-      attrs.attributes.add(BridgedDeclAttribute.createSimple(self.ctx, kind: .reasync, atLoc: nil, nameLoc: signature.asyncLoc))
+      attrs.attributes.add(BridgedDeclAttribute.createSimple(self.ctx, kind: .Reasync, atLoc: nil, nameLoc: signature.asyncLoc))
     }
     if signature.isRethrows {
-      attrs.attributes.add(BridgedDeclAttribute.createSimple(self.ctx, kind: .rethrows, atLoc: nil, nameLoc: signature.throwsLoc))
+      attrs.attributes.add(BridgedDeclAttribute.createSimple(self.ctx, kind: .Rethrows, atLoc: nil, nameLoc: signature.throwsLoc))
     }
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 
@@ -763,10 +763,10 @@ extension ASTGenVisitor {
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
     )
     if signature.isReasync {
-      attrs.attributes.add(BridgedDeclAttribute.createSimple(self.ctx, kind: .reasync, atLoc: nil, nameLoc: signature.asyncLoc))
+      attrs.attributes.add(BridgedDeclAttribute.createSimple(self.ctx, kind: .Reasync, atLoc: nil, nameLoc: signature.asyncLoc))
     }
     if signature.isRethrows {
-      attrs.attributes.add(BridgedDeclAttribute.createSimple(self.ctx, kind: .rethrows, atLoc: nil, nameLoc: signature.throwsLoc))
+      attrs.attributes.add(BridgedDeclAttribute.createSimple(self.ctx, kind: .Rethrows, atLoc: nil, nameLoc: signature.throwsLoc))
     }
     decl.asDecl.attachParsedAttrs(attrs.attributes)
     
@@ -927,7 +927,7 @@ extension ASTGenVisitor {
 
 // MARK: - PrecedenceGroupDecl
 
-extension BridgedAssociativity {
+extension swift.Associativity {
   fileprivate init?(from keyword: Keyword?) {
     switch keyword {
     case .none?: self = .none
@@ -991,9 +991,9 @@ extension ASTGenVisitor {
       }
     }
 
-    let associativityValue: BridgedAssociativity
+    let associativityValue: swift.Associativity
     if let token = body.associativity?.value {
-      if let value = BridgedAssociativity(from: token.keywordKind) {
+      if let value = swift.Associativity(from: token.keywordKind) {
         associativityValue = value
       } else {
         self.diagnose(.unexpectedTokenKind(token: token))
