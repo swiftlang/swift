@@ -856,10 +856,6 @@ def solver_scope_threshold_EQ : Joined<["-"], "solver-scope-threshold=">,
 def solver_trail_threshold_EQ : Joined<["-"], "solver-trail-threshold=">,
   HelpText<"Expression type checking trail change limit">;
 
-def solver_disable_shrink :
-  Flag<["-"], "solver-disable-shrink">,
-  HelpText<"Disable the shrink phase of expression type checking">;
-
 def solver_disable_splitter : Flag<["-"], "solver-disable-splitter">,
   HelpText<"Disable the component splitter phase of expression type checking">;
 
