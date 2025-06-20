@@ -960,7 +960,9 @@ importer::addCommonInvocationArguments(
         invocationArgStrs.push_back("-isystem");
         invocationArgStrs.push_back(path.Path);
       } else {
-        invocationArgStrs.push_back("-I" + path.Path);
+        llvm::SmallString<261> Path{path.Path};
+        llvm::sys::path::make_preferred(Path);
+        invocationArgStrs.push_back(("-I" + Path.str()).str());
       }
     }
   }
