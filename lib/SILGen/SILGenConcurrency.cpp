@@ -651,9 +651,7 @@ SILGenFunction::emitClosureIsolation(SILLocation loc, SILDeclRef constant,
              isolation.getGlobalActor()->getCanonicalType());
 
   case ActorIsolation::ActorInstance: {
-    // This should always be a capture.  That's not expressed super-cleanly
-    // in ActorIsolation, unfortunately.
-    assert(isolation.getActorInstanceParameter() == 0);
+    assert(isolation.isActorInstanceForCapture());
     auto capture = isolation.getActorInstance();
     assert(capture);
     return emitLoadOfCaptureIsolation(*this, loc, capture, constant, captures);
