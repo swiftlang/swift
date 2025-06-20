@@ -10,6 +10,7 @@
 // UNSUPPORTED: OS=watchos
 // UNSUPPORTED: OS=ios
 // UNSUPPORTED: OS=tvos
+// UNSUPPORTED: OS=linux-android, OS=linux-androideabi
 
 // REQUIRES: swift_stdlib_asserts
 // REQUIRES: executable_test
