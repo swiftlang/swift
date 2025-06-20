@@ -963,3 +963,21 @@ bool TypeBase::isEscapable(GenericSignature sig) {
   }
   return contextTy->isEscapable();
 }
+
+bool TypeBase::isBitwiseCopyable() {
+  auto &ctx = getASTContext();
+  auto *bitwiseCopyableProtocol =
+    ctx.getProtocol(KnownProtocolKind::BitwiseCopyable);
+  if (!bitwiseCopyableProtocol) {
+    return false;
+  }
+  return (bool)checkConformance(this, bitwiseCopyableProtocol);
+}
+
+bool TypeBase::isBitwiseCopyable(GenericSignature sig) {
+  Type contextTy = this;
+  if (sig) {
+    contextTy = sig.getGenericEnvironment()->mapTypeIntoContext(contextTy);
+  }
+  return contextTy->isBitwiseCopyable();
+}
