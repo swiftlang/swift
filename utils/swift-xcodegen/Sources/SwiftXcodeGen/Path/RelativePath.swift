@@ -17,7 +17,8 @@ public struct RelativePath: PathProtocol, Sendable {
   public let storage: FilePath
   public init(_ storage: FilePath) {
     precondition(
-      storage.isRelative, "Expected '\(storage)' to be a relative path"
+      storage.isRelative,
+      "Expected '\(storage)' to be a relative path"
     )
     self.storage = storage.lexicallyNormalized()
   }

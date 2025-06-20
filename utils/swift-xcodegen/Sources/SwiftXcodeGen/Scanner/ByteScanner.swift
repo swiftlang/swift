@@ -242,14 +242,16 @@ extension ByteScanner.Bytes {
   }
 
   fileprivate mutating func append<S: Sequence>(
-    contentsOf chars: S, at cursor: ByteScanner.Cursor
+    contentsOf chars: S,
+    at cursor: ByteScanner.Cursor
   ) where S.Element == UInt8 {
     prepareToAppend(at: cursor)
     array.append(contentsOf: chars)
   }
 
   fileprivate mutating func append(
-    _ char: UInt8, at cursor: ByteScanner.Cursor
+    _ char: UInt8,
+    at cursor: ByteScanner.Cursor
   ) {
     prepareToAppend(at: cursor)
     array.append(char)

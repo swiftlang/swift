@@ -50,9 +50,9 @@ enum Branch: String, EnumerableFlag {
   var tagPrefix: String {
     switch self {
     case .development:
-       "swift-\(rawValue.uppercased())"
+      "swift-\(rawValue.uppercased())"
     default:
-       "swift-\(rawValue.uppercased())-DEVELOPMENT"
+      "swift-\(rawValue.uppercased())-DEVELOPMENT"
     }
   }
 }

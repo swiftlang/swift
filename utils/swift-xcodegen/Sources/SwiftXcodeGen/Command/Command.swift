@@ -49,7 +49,9 @@ extension Command {
 
 extension Command.Argument {
   static func option(
-    _ flag: Command.Flag, spacing: Command.OptionSpacing, value: String
+    _ flag: Command.Flag,
+    spacing: Command.OptionSpacing,
+    value: String
   ) -> Self {
     .option(.init(flag, spacing: spacing, value: value))
   }
@@ -216,9 +218,9 @@ extension Command {
 extension Command.OptionSpacing {
   var printed: String {
     switch self {
-    case .equals:   "="
+    case .equals: "="
     case .unspaced: ""
-    case .spaced:   " "
+    case .spaced: " "
     }
   }
 }

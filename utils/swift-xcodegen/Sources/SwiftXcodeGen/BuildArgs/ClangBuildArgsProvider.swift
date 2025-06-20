@@ -29,13 +29,17 @@ struct ClangBuildArgsProvider {
     }
     log.debug("[*] Reading Clang build args from '\(fileName)'")
     let parsed = try JSONDecoder().decode(
-      CompileCommands.self, from: try fileName.read()
+      CompileCommands.self,
+      from: try fileName.read()
     )
     // Gather the candidates for each file to get build arguments for. We may
     // have multiple outputs, in which case, pick the first one that exists.
-    var commandsToAdd: [RelativePath:
-                          (output: AbsolutePath?, args: [Command.Argument])] = [:]
+    var commandsToAdd:
+      [RelativePath:
+        (output: AbsolutePath?, args: [Command.Argument])] = [:]
     for command in parsed {
+      // https://github.com/swiftlang/swift-format/issues/1037
+      // swift-format-ignore
       guard command.command.executable.knownCommand == .clang,
             command.file.exists,
             let relFilePath = command.file.realPath.removingPrefix(repoPath)
@@ -43,9 +47,12 @@ struct ClangBuildArgsProvider {
         continue
       }
       let output = command.output.map { command.directory.appending($0) }
+      // https://github.com/swiftlang/swift-format/issues/1037
+      // swift-format-ignore
       if let existing = commandsToAdd[relFilePath],
          let existingOutput = existing.output,
-          output == nil || existingOutput.exists || !output!.exists {
+         output == nil || existingOutput.exists || !output!.exists
+      {
         continue
       }
       commandsToAdd[relFilePath] = (output, command.command.args)
@@ -74,7 +81,9 @@ struct ClangBuildArgsProvider {
   /// Retrieve the arguments at a given path, excluding those already covered
   /// by a parent.
   func getUniqueArgs(
-    for path: RelativePath, parent: RelativePath, infer: Bool = false
+    for path: RelativePath,
+    parent: RelativePath,
+    infer: Bool = false
   ) -> BuildArgs {
     var fileArgs: [Command.Argument] = []
     if hasBuildArgs(for: path) {
@@ -82,7 +91,8 @@ struct ClangBuildArgsProvider {
     } else if infer {
       // If we can infer arguments, walk up to the nearest parent with args.
       if let component = path.stackedComponents
-        .reversed().dropFirst().first(where: hasBuildArgs) {
+        .reversed().dropFirst().first(where: hasBuildArgs)
+      {
         fileArgs = args.getUniqueArgs(for: component, parent: parent)
       }
     }

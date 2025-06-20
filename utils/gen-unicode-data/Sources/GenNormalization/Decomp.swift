@@ -27,28 +27,28 @@ func getDecompData(
   from data: String
 ) -> [(UInt32, [UInt32])] {
   var unflattened: [(UInt32, [UInt32])] = []
-  
+
   for line in data.split(separator: "\n") {
     let components = line.split(separator: ";", omittingEmptySubsequences: false)
-    
+
     let decomp = components[5]
-    
+
     // We either 1. don't have decompositions, or 2. the decompositions is for
     // compatible forms. We only care about NFD, so ignore these cases.
     if decomp == "" || decomp.hasPrefix("<") {
       continue
     }
-    
+
     let decomposedScalars = decomp.split(separator: " ").map {
       UInt32($0, radix: 16)!
     }
-    
+
     let scalarStr = components[0]
     let scalar = UInt32(scalarStr, radix: 16)!
-    
+
     unflattened.append((scalar, decomposedScalars))
   }
-  
+
   return unflattened
 }
 
@@ -65,17 +65,17 @@ func emitDecomp(
     defineLabel: "NFD_DECOMP",
     into: &result
   )
-  
+
   // Fixup the decomposed scalars first for fully decompositions.
-  
+
   var data = data
-  
+
   func decompose(_ scalar: UInt32, into result: inout [UInt32]) {
     if scalar <= 0x7F {
       result.append(scalar)
       return
     }
-    
+
     if let decomp = data.first(where: { $0.0 == scalar }) {
       for scalar in decomp.1 {
         decompose(scalar, into: &result)
@@ -84,25 +84,25 @@ func emitDecomp(
       result.append(scalar)
     }
   }
-  
+
   for (i, (_, rawDecomposed)) in data.enumerated() {
     var newDecomposed: [UInt32] = []
-    
+
     for rawScalar in rawDecomposed {
       decompose(rawScalar, into: &newDecomposed)
     }
-    
+
     data[i].1 = newDecomposed
   }
-  
+
   var sortedData: [(UInt32, UInt16)] = []
-  
+
   for (scalar, _) in data {
     sortedData.append((scalar, UInt16(mph.index(for: UInt64(scalar)))))
   }
-  
+
   sortedData.sort { $0.1 < $1.1 }
-  
+
   let indices = emitDecompDecomp(data, sortedData, into: &result)
   emitDecompIndices(indices, into: &result)
 }
@@ -114,51 +114,51 @@ func emitDecompDecomp(
 ) -> [(UInt32, UInt16)] {
   var indices: [(UInt32, UInt16)] = []
   var decompResult: [UInt8] = []
-  
+
   // Keep a record of decompositions because some scalars share the same
   // decomposition, so instead of emitting it twice, both scalars just point at
   // the same decomposition index.
   var uniqueDecomps: [[UInt32]: UInt16] = [:]
-  
+
   for (scalar, _) in sortedData {
     let decomp = data.first(where: { $0.0 == scalar })!.1
-    
+
     // If we've seen this decomp before, use it.
     if let idx = uniqueDecomps[decomp] {
       indices.append((scalar, idx))
       continue
     }
-    
+
     indices.append((scalar, UInt16(decompResult.count)))
-    
+
     // This is our NFD decomposition utf8 string count.
     decompResult.append(0)
     let sizeIdx = decompResult.count - 1
-    
+
     uniqueDecomps[decomp] = UInt16(sizeIdx)
-    
+
     for scalar in decomp {
       let realScalar = Unicode.Scalar(scalar)!
-      
+
       decompResult[sizeIdx] += UInt8(realScalar.utf8.count)
-      
+
       for utf8 in realScalar.utf8 {
         decompResult.append(utf8)
       }
     }
   }
-  
-  result += """
-  static const __swift_uint8_t _swift_stdlib_nfd_decomp[\(decompResult.count)] = {
 
-  """
-  
+  result += """
+    static const __swift_uint8_t _swift_stdlib_nfd_decomp[\(decompResult.count)] = {
+
+    """
+
   formatCollection(decompResult, into: &result) { value -> String in
     return "0x\(String(value, radix: 16, uppercase: true))"
   }
-  
+
   result += "\n};\n\n"
-  
+
   return indices
 }
 
@@ -167,10 +167,10 @@ func emitDecompIndices(
   into result: inout String
 ) {
   result += """
-  static const __swift_uint32_t _swift_stdlib_nfd_decomp_indices[\(indices.count)] = {
+    static const __swift_uint32_t _swift_stdlib_nfd_decomp_indices[\(indices.count)] = {
 
-  """
-  
+    """
+
   formatCollection(indices, into: &result) { (scalar, idx) -> String in
     // Make sure that these scalars don't exceed past 18 bits. We need the other
     // 14 bits to store the index into decomp array. Although Unicode scalars
@@ -179,9 +179,9 @@ func emitDecompIndices(
     assert(scalar <= 0x3FFFF)
     var value = scalar
     value |= UInt32(idx) << 18
-    
+
     return "0x\(String(value, radix: 16, uppercase: true))"
   }
-  
+
   result += "\n};\n\n"
 }

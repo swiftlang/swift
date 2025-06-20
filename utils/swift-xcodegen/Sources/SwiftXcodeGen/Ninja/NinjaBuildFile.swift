@@ -38,7 +38,7 @@ extension NinjaBuildFile {
   struct Bindings: Hashable {
     let values: [String: String]
 
-    init(storage: [String : String]) {
+    init(storage: [String: String]) {
       self.values = storage
     }
 
@@ -70,7 +70,9 @@ extension NinjaBuildFile {
 
     init(
       ruleName: String,
-      inputs: [String], outputs: [String], dependencies: [String],
+      inputs: [String],
+      outputs: [String],
+      dependencies: [String],
       bindings: [String: String]
     ) {
       self.ruleName = ruleName
@@ -82,12 +84,15 @@ extension NinjaBuildFile {
 
     static func phony(for outputs: [String], inputs: [String]) -> Self {
       return Self(
-        ruleName: "phony", inputs: inputs, outputs: outputs, dependencies: [], bindings: [:]
+        ruleName: "phony",
+        inputs: inputs,
+        outputs: outputs,
+        dependencies: [],
+        bindings: [:]
       )
     }
   }
 }
-
 
 fileprivate enum NinjaCommandLineError: Error {
   case unknownRule(String)
@@ -155,7 +160,7 @@ extension NinjaBuildFile {
 extension Byte {
   fileprivate var isNinjaVarName: Bool {
     switch self {
-    case "0"..."9", "a"..."z", "A"..."Z", "_", "-":
+    case "0" ... "9", "a" ... "z", "A" ... "Z", "_", "-":
       return true
     default:
       return false

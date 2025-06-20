@@ -59,7 +59,8 @@ public extension WorkspaceGenerator {
     log.info("Generated '\(dataPath)'")
 
     var schemes = SchemeGenerator(in: workspaceDir)
-    let buildTargets = elements
+    let buildTargets =
+      elements
       .sorted(by: {
         // Sort project schemes first.
         switch ($0, $1) {
@@ -78,10 +79,14 @@ public extension WorkspaceGenerator {
             Scheme.BuildTarget(target, in: path)
           }
         }
-    }
-    schemes.add(Scheme(
-      "ALL", replaceExisting: true, buildTargets: buildTargets
-    ))
+      }
+    schemes.add(
+      Scheme(
+        "ALL",
+        replaceExisting: true,
+        buildTargets: buildTargets
+      )
+    )
     try schemes.write()
   }
 }

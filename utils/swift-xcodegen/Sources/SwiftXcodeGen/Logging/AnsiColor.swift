@@ -37,6 +37,7 @@ enum AnsiColor {
   case grayscale(Int)
 
   var foregroundCode: String {
+    // swift-format-ignore
     switch self {
       case .normal:        return "39"
       case .black:         return "30"
@@ -65,6 +66,7 @@ enum AnsiColor {
   }
 
   var backgroundCode: String {
+    // swift-format-ignore
     switch self {
       case .normal:        return "49"
       case .black:         return "40"
@@ -100,9 +102,9 @@ enum AnsiWeight {
 
   var code: String {
     switch self {
-      case .normal: "22"
-      case .bold:   "1"
-      case .faint:  "2"
+    case .normal: "22"
+    case .bold: "1"
+    case .faint: "2"
     }
   }
 }
@@ -126,18 +128,18 @@ extension DefaultStringInterpolation {
       }
 
       switch attr {
-        case let .fg(color):
-          code += color.foregroundCode
-        case let .bg(color):
-          code += color.backgroundCode
-        case let .weight(weight):
-          code += weight.code
-        case let .inverse(enabled):
-          if enabled {
-            code += "7"
-          } else {
-            code += "27"
-          }
+      case let .fg(color):
+        code += color.foregroundCode
+      case let .bg(color):
+        code += color.backgroundCode
+      case let .weight(weight):
+        code += weight.code
+      case let .inverse(enabled):
+        if enabled {
+          code += "7"
+        } else {
+          code += "27"
+        }
       }
     }
     code += "m"
@@ -158,4 +160,3 @@ extension DefaultStringInterpolation {
     appendInterpolation(ansi: .inverse(inverse))
   }
 }
-

@@ -18,8 +18,10 @@ struct ClangTarget {
   var headers: [RelativePath]
 
   init(
-    name: String, parentPath: RelativePath,
-    sources: [RelativePath], unbuildableSources: [RelativePath] = [],
+    name: String,
+    parentPath: RelativePath,
+    sources: [RelativePath],
+    unbuildableSources: [RelativePath] = [],
     headers: [RelativePath]
   ) {
     self.name = name
@@ -40,7 +42,8 @@ extension RepoBuildDir {
   }
 
   func getClangTarget(
-    for target: ClangTargetSource, knownUnbuildables: Set<RelativePath>
+    for target: ClangTargetSource,
+    knownUnbuildables: Set<RelativePath>
   ) throws -> ClangTarget? {
     let path = target.path
     let name = target.name
@@ -57,16 +60,19 @@ extension RepoBuildDir {
       // If we have no arguments, or have a known unbuildable, treat as not
       // buildable. We'll still include it in the project, but in a separate
       // target that isn't built by default.
-      if try !clangArgs.hasBuildArgs(for: path) ||
-          knownUnbuildables.contains(path) {
+      if try !clangArgs.hasBuildArgs(for: path) || knownUnbuildables.contains(path) {
         unbuildableSources.append(path)
         continue
       }
       // If we have no '.o' present for a given file, assume it's not buildable.
       // The 'mayHaveUnbuildableFiles' condition is really only used here to
       // reduce IO and only check targets we know are problematic.
+      //
+      // https://github.com/swiftlang/swift-format/issues/1037
+      // swift-format-ignore
       if target.mayHaveUnbuildableFiles,
-          try !clangArgs.isObjectFilePresent(for: path) {
+         try !clangArgs.isObjectFilePresent(for: path)
+      {
         log.debug("! Treating '\(path)' as unbuildable; no '.o' file")
         unbuildableSources.append(path)
         continue
@@ -75,8 +81,11 @@ extension RepoBuildDir {
     }
 
     return ClangTarget(
-      name: name, parentPath: path, sources: sources,
-      unbuildableSources: unbuildableSources, headers: headers
+      name: name,
+      parentPath: path,
+      sources: sources,
+      unbuildableSources: unbuildableSources,
+      headers: headers
     )
   }
 }

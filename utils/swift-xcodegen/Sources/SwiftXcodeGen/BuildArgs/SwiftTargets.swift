@@ -108,7 +108,8 @@ struct SwiftTargets {
   }
 
   func getSources(
-    from edge: NinjaBuildFile.BuildEdge, buildDir: RepoBuildDir
+    from edge: NinjaBuildFile.BuildEdge,
+    buildDir: RepoBuildDir
   ) throws -> SwiftTarget.Sources {
     let files: [AnyPath] = edge.inputs.map(AnyPath.init)
 
@@ -209,20 +210,23 @@ struct SwiftTargets {
     if forBuild && !repoSources.isEmpty {
       // We've already ensured that `repoSources` is non-empty.
       buildRule = .init(
-        parentPath: repoSources.commonAncestor!, sources: sources,
+        parentPath: repoSources.commonAncestor!,
+        sources: sources,
         buildArgs: buildArgs
       )
     }
     if forModule {
       emitModuleRule = .init(sources: sources, buildArgs: buildArgs)
     }
-    let target = targetsByName[name] ?? {
-      log.debug("+ Discovered Swift target '\(name)' with output '\(primaryOutput)'")
-      let target = SwiftTarget(name: name, moduleName: moduleName)
-      targetsByName[name] = target
-      targets.append(target)
-      return target
-    }()
+    let target =
+      targetsByName[name]
+      ?? {
+        log.debug("+ Discovered Swift target '\(name)' with output '\(primaryOutput)'")
+        let target = SwiftTarget(name: name, moduleName: moduleName)
+        targetsByName[name] = target
+        targets.append(target)
+        return target
+      }()
     for output in edge.outputs {
       targetsByOutput[output] = target
     }
@@ -231,26 +235,30 @@ struct SwiftTargets {
         target.buildRule = buildRule
       }
     } else {
-      log.debug("""
+      log.debug(
+        """
         ! Skipping '\(name)' build rule for \
         '\(primaryOutput)'; already added
-        """)
+        """
+      )
     }
     if emitModuleRule == nil || target.emitModuleRule == nil {
       if let emitModuleRule {
         target.emitModuleRule = emitModuleRule
       }
     } else {
-      log.debug("""
+      log.debug(
+        """
         ! Skipping '\(name)' emit module rule for \
         '\(primaryOutput)'; already added
-        """)
+        """
+      )
     }
   }
 
   func getTargets(below path: RelativePath) -> [SwiftTarget] {
     targets.filter { target in
-      guard let parent = target.buildRule?.parentPath, parent.starts(with: path) 
+      guard let parent = target.buildRule?.parentPath, parent.starts(with: path)
       else {
         return false
       }

@@ -23,8 +23,8 @@ public enum Repo: CaseIterable, Sendable {
     case .swift: "swift"
     case .swiftRuntimes: "swift/Runtimes"
     case .cmark: "cmark"
-    case .lldb:  "llvm-project/lldb"
-    case .llvm:  "llvm-project"
+    case .lldb: "llvm-project/lldb"
+    case .llvm: "llvm-project"
     }
   }
 
@@ -33,8 +33,8 @@ public enum Repo: CaseIterable, Sendable {
     case .swift: "swift"
     case .swiftRuntimes: nil
     case .cmark: "cmark"
-    case .lldb:  "lldb"
-    case .llvm:  "llvm"
+    case .lldb: "lldb"
+    case .llvm: "llvm"
     }
   }
 }
