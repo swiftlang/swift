@@ -3549,12 +3549,14 @@ namespace {
             if (isolation == ActorIsolation::ActorInstance) {
               VarDecl *var = isolation.getActorInstance();
               if (!var) {
+                assert(!isolation.isActorInstanceForCapture() &&
+                       "capture isolation without a variable reference?");
                 auto dc = const_cast<DeclContext *>(getDeclContext());
-                auto paramIdx = isolation.getActorInstanceParameter();
-                if (paramIdx == 0) {
+                if (isolation.isActorInstanceForSelfParameter()) {
                   var = cast<AbstractFunctionDecl>(dc)->getImplicitSelfDecl();
                 } else {
-                  var = const_cast<ParamDecl *>(getParameterAt(dc, paramIdx - 1));
+                  auto paramIdx = isolation.getActorInstanceParameterIndex();
+                  var = const_cast<ParamDecl *>(getParameterAt(dc, paramIdx));
                 }
               }
               return var;
@@ -4326,11 +4328,10 @@ namespace {
         const VarDecl *var = isolation.getActorInstance();
         if (!var) {
           auto dc = getDeclContext();
-          auto paramIdx = isolation.getActorInstanceParameter();
-          if (paramIdx == 0) {
+          if (isolation.isActorInstanceForSelfParameter()) {
             var = cast<AbstractFunctionDecl>(dc)->getImplicitSelfDecl();
           } else {
-            var = getParameterAt(dc, paramIdx - 1);
+            var = getParameterAt(dc, isolation.getActorInstanceParameterIndex());
           }
         }
         actorExpr = new (ctx) DeclRefExpr(
@@ -4640,7 +4641,7 @@ namespace {
       if (!partialApply &&
           (result.isolation.isGlobalActor() ||
            (result.isolation == ActorIsolation::ActorInstance &&
-            result.isolation.getActorInstanceParameter() > 0)) &&
+            !result.isolation.isActorInstanceForSelfParameter())) &&
           isa<AbstractFunctionDecl>(decl))
         return false;
 
@@ -8022,7 +8023,7 @@ ActorReferenceResult ActorReferenceResult::forReference(
   // The declaration we are accessing is actor-isolated. First, check whether
   // we are on the same actor already.
   if (actorInstance && declIsolation == ActorIsolation::ActorInstance &&
-      declIsolation.getActorInstanceParameter() == 0) {
+      declIsolation.isActorInstanceForSelfParameter()) {
     // If this instance is isolated, we're in the same concurrency domain.
     if (actorInstance->isIsolated())
       return forSameConcurrencyDomain(declIsolation, options);
