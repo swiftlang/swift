@@ -49,6 +49,19 @@ public let benchmarks: [BenchmarkInfo] = {
         runFunction: run_iterateWords,
         tags: [.validation, .String]))
   }
+  
+  // Small string optimization benchmarks
+  result.append(contentsOf: [
+    BenchmarkInfo(
+      name: "StringFromBytesSmallCore",
+      runFunction: run_StringFromBytesSmallCore,
+      tags: [.validation, .api, .String]),
+    BenchmarkInfo(
+      name: "StringSubstringSmallCore",
+      runFunction: run_StringSubstringSmallCore,
+      tags: [.validation, .api, .String]),
+  ])
+  
   return result
 }()
 
@@ -1674,5 +1687,22 @@ extension String {
 public func run_iterateWords(_ n: Int) {
   for _ in 0 ..< n {
     blackHole(swiftOrgHTML._words)
+  }
+}
+
+// Small string optimization benchmarks - test _SmallString init and subscript optimizations
+@inline(never)
+public func run_StringFromBytesSmallCore(_ N: Int) {
+  let bytes: [UInt8] = [72, 101, 108, 108, 111, 33] // "Hello!"
+  for _ in 0..<N*10000 {
+    blackHole(String(decoding: bytes, as: UTF8.self))
+  }
+}
+
+@inline(never)
+public func run_StringSubstringSmallCore(_ N: Int) {
+  let str = "Hello, World!"
+  for _ in 0..<N*10000 {
+    blackHole(str[str.index(str.startIndex, offsetBy: 2)..<str.index(str.startIndex, offsetBy: 8)])
   }
 }
