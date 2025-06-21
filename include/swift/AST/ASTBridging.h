@@ -937,11 +937,12 @@ BridgedBackDeployedAttr BridgedBackDeployedAttr_createParsed(
     BridgedSourceRange cRange, swift::PlatformKind platform,
     BridgedVersionTuple cVersion);
 
-SWIFT_NAME("BridgedCDeclAttr.createParsed(_:atLoc:range:name:)")
+SWIFT_NAME("BridgedCDeclAttr.createParsed(_:atLoc:range:name:underscored:)")
 BridgedCDeclAttr BridgedCDeclAttr_createParsed(BridgedASTContext cContext,
                                                BridgedSourceLoc cAtLoc,
                                                BridgedSourceRange cRange,
-                                               BridgedStringRef cName);
+                                               BridgedStringRef cName,
+                                               bool underscored);
 
 SWIFT_NAME(
     "BridgedCustomAttr.createParsed(_:atLoc:type:initContext:argumentList:)")

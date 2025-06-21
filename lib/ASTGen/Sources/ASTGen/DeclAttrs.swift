@@ -544,20 +544,37 @@ extension ASTGenVisitor {
   /// E.g.:
   ///   ```
   ///   @_cdecl("c_function_name")
+  ///   @cdecl(c_function_name)
+  ///   @cdecl
   ///   ```
   func generateCDeclAttr(attribute node: AttributeSyntax) -> BridgedCDeclAttr? {
-    self.generateWithLabeledExprListArguments(attribute: node) { args in
-      guard let name = self.generateConsumingSimpleStringLiteralAttrOption(args: &args) else {
+    let attrName = node.attributeName.as(IdentifierTypeSyntax.self)?.name.text
+    let underscored = attrName?.hasPrefix("_") ?? false
+
+    var name: BridgedStringRef? = nil
+    if node.arguments != nil || underscored {
+      name = self.generateWithLabeledExprListArguments(attribute: node) {
+          args in
+        if underscored {
+          self.generateConsumingSimpleStringLiteralAttrOption(args: &args)
+        } else {
+           self.generateConsumingPlainIdentifierAttrOption(args: &args) {
+             return $0.rawText.bridged
+           }
+        }
+      }
+      guard name != nil else {
         return nil
       }
-
-      return .createParsed(
-        self.ctx,
-        atLoc: self.generateSourceLoc(node.atSign),
-        range: self.generateAttrSourceRange(node),
-        name: name
-      )
     }
+
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node),
+      name: name ?? "",
+      underscored: underscored
+    )
   }
 
   struct GeneratedDerivativeOriginalDecl {
