@@ -3130,6 +3130,7 @@ namespace {
           conformToCxxVectorIfNeeded(Impl, nominalDecl, decl);
           conformToCxxFunctionIfNeeded(Impl, nominalDecl, decl);
           conformToCxxSpanIfNeeded(Impl, nominalDecl, decl);
+          conformToCxxStackIfNeeded(Impl, nominalDecl, decl);
         }
       }
 
