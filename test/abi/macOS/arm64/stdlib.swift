@@ -1080,3 +1080,6 @@ Added: _$ss8UTF8SpanV10_countMasks6UInt64VvpZMV
 Added: _$ss8UTF8SpanV10_flagsMasks6UInt64VvpZMV
 Added: _$ss8UTF8SpanV7_nfcBits6UInt64VvpZMV
 Added: _$ss8UTF8SpanV9_asciiBits6UInt64VvpZMV
+
+// printing foreign reference types requires a new displayStyle: .foreign
+Added: _$ss6MirrorV12DisplayStyleO16foreignReferenceyA2DmFWC
