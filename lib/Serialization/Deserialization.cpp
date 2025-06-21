@@ -5259,6 +5259,16 @@ public:
     elem->setAccess(std::max(cast<EnumDecl>(DC)->getFormalAccess(),
                              AccessLevel::Internal));
 
+    SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
+    while (auto info = MF.maybeReadLifetimeDependence()) {
+      assert(info.has_value());
+      lifetimeDependencies.push_back(*info);
+    }
+
+    ctx.evaluator.cacheOutput(LifetimeDependenceInfoRequest{elem},
+                              lifetimeDependencies.empty()? std::nullopt :
+                                  ctx.AllocateCopy(lifetimeDependencies));
+
     return elem;
   }
 
