@@ -1406,7 +1406,7 @@ bool CanonicalizeOSSALifetime::computeLiveness() {
     clear();
     return false;
   }
-  if (respectsDeadEnds()) {
+  if (respectsDeadEnds() && hasAnyDeadEnds()) {
     if (respectsDeinitBarriers()) {
       extendLexicalLivenessToDeadEnds();
     }
