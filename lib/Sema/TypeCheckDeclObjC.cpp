@@ -192,6 +192,7 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   if (auto *CD = T->getClassOrBoundGenericClass()) {
     if (language == ForeignLanguage::C) {
       diags.diagnose(TypeRange.Start, diag::cdecl_incompatible_with_classes)
+          .highlight(TypeRange)
           .limitBehavior(behavior);
       return;
     }
@@ -222,9 +223,17 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
 
   // Special diagnostic for enums.
   if (T->is<EnumType>()) {
-    diags.diagnose(TypeRange.Start, diag::not_objc_swift_enum)
-        .highlight(TypeRange)
-        .limitBehavior(behavior);
+    if (DC->getASTContext().LangOpts.hasFeature(Feature::CDecl)) {
+      // New dialog mentioning @cdecl.
+      diags.diagnose(TypeRange.Start, diag::not_cdecl_or_objc_swift_enum,
+                     language)
+          .highlight(TypeRange)
+          .limitBehavior(behavior);
+    } else {
+      diags.diagnose(TypeRange.Start, diag::not_objc_swift_enum)
+          .highlight(TypeRange)
+          .limitBehavior(behavior);
+    }
     return;
   }
 
@@ -233,6 +242,7 @@ static void diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
     // No protocol is representable in C.
     if (language == ForeignLanguage::C) {
       diags.diagnose(TypeRange.Start, diag::cdecl_incompatible_with_protocols)
+          .highlight(TypeRange)
           .limitBehavior(behavior);
       return;
     }
@@ -1764,19 +1774,18 @@ static bool isCIntegerType(Type type) {
 }
 
 /// Determine whether the given enum should be @objc.
-static bool isEnumObjC(EnumDecl *enumDecl) {
+static bool isEnumObjC(EnumDecl *enumDecl, DeclAttribute *attr) {
   // FIXME: Use shouldMarkAsObjC once it loses it's TypeChecker argument.
 
-  // If there is no @objc attribute, it's not @objc.
-  auto attr = enumDecl->getAttrs().getAttribute<ObjCAttr>();
+  // If there is no @objc or @cdecl attribute, skip it.
   if (!attr)
     return false;
 
   Type rawType = enumDecl->getRawType();
 
-  // @objc enums must have a raw type.
+  // @objc/@cdecl enums must have a raw type.
   if (!rawType) {
-    enumDecl->diagnose(diag::objc_enum_no_raw_type);
+    enumDecl->diagnose(diag::objc_enum_no_raw_type, attr);
     return false;
   }
 
@@ -1789,7 +1798,7 @@ static bool isEnumObjC(EnumDecl *enumDecl) {
     SourceRange errorRange;
     if (!enumDecl->getInherited().empty())
       errorRange = enumDecl->getInherited().getEntry(0).getSourceRange();
-    enumDecl->diagnose(diag::objc_enum_raw_type_not_integer, rawType)
+    enumDecl->diagnose(diag::objc_enum_raw_type_not_integer, attr, rawType)
       .highlight(errorRange);
     return false;
   }
@@ -1799,7 +1808,8 @@ static bool isEnumObjC(EnumDecl *enumDecl) {
     enumDecl->diagnose(diag::empty_enum_raw_type);
   }
 
-  checkObjCNameValidity(enumDecl, attr);
+  if (auto objcAttr = dyn_cast<ObjCAttr>(attr))
+    checkObjCNameValidity(enumDecl, objcAttr);
   return true;
 }
 
@@ -1840,9 +1850,9 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
   } else if (auto enumDecl = dyn_cast<EnumDecl>(VD)) {
     // Enums can be @objc so long as they have a raw type that is representable
     // as an arithmetic type in C.
-    if (isEnumObjC(enumDecl))
-      isObjC = objCReasonForObjCAttr(
-                                 enumDecl->getAttrs().getAttribute<ObjCAttr>());
+    auto attr = enumDecl->getAttrs().getAttribute<ObjCAttr>();
+    if (attr && isEnumObjC(enumDecl, attr))
+      isObjC = objCReasonForObjCAttr(attr);
   } else if (auto enumElement = dyn_cast<EnumElementDecl>(VD)) {
     // Enum elements can be @objc so long as the containing enum is @objc.
     if (enumElement->getParentEnum()->isObjC()) {
@@ -4206,9 +4216,9 @@ evaluate(Evaluator &evaluator, Decl *D) const {
 }
 
 evaluator::SideEffect
-TypeCheckCDeclAttributeRequest::evaluate(Evaluator &evaluator,
-                                         FuncDecl *FD,
-                                         CDeclAttr *attr) const {
+TypeCheckCDeclFunctionRequest::evaluate(Evaluator &evaluator,
+                                        FuncDecl *FD,
+                                        CDeclAttr *attr) const {
   auto &ctx = FD->getASTContext();
 
   auto lang = FD->getCDeclKind();
@@ -4233,6 +4243,14 @@ TypeCheckCDeclAttributeRequest::evaluate(Evaluator &evaluator,
   } else {
     reason.setAttrInvalid();
   }
+  return {};
+}
 
+evaluator::SideEffect
+TypeCheckCDeclEnumRequest::evaluate(Evaluator &evaluator,
+                                    EnumDecl *ED,
+                                    CDeclAttr *attr) const {
+  // Apply @objc's logic.
+  isEnumObjC(ED, attr);
   return {};
 }
