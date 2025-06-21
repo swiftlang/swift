@@ -99,9 +99,6 @@ GROUPED_WARNING(clang_ignored_sendable_attr, ClangDeclarationImport, none,
         "cannot make type %0 sendable because '@Sendable' and '& Sendable' "
         "cannot be added to it",
         (Type))
-NOTE(clang_param_should_be_implicitly_sendable,none,
-     "parameter should be implicitly 'Sendable' because it is a completion "
-     "handler", ())
 
 WARNING(implicit_bridging_header_imported_from_module,none,
         "implicit import of bridging header '%0' via module %1 "
