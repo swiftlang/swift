@@ -1058,7 +1058,7 @@ public:
   ///
   /// If the name matches the name of the current module, a shadowed module
   /// is loaded instead.
-  ModuleDecl *getModule(ImportPath::Module name, bool allowLoading = false);
+  ModuleDecl *getModule(ImportPath::Module name, bool allowLoading = false, std::string caller = __func__);
 
   /// Returns the generic signature for the given ID.
   GenericSignature getGenericSignature(serialization::GenericSignatureID ID);

@@ -2307,9 +2307,13 @@ ClangImporter::Implementation::lookupModule(StringRef moduleName) {
   return loadFromMM();
 }
 
+#define DEBUG_TYPE "foo"
 ModuleDecl *ClangImporter::Implementation::loadModuleClang(
     SourceLoc importLoc, ImportPath::Module path) {
   auto realModuleName = SwiftContext.getRealModuleName(path.front().Item).str();
+  llvm::dbgs() << "loadModuleClang '";
+  path.print(llvm::dbgs());
+  llvm::dbgs() << "'\n";
 
   // Convert the Swift import path over to a Clang import path.
   SmallVector<std::pair<clang::IdentifierInfo *, clang::SourceLocation>, 4>
@@ -2348,9 +2352,17 @@ ModuleDecl *ClangImporter::Implementation::loadModuleClang(
     }
 
     clang::SourceLocation clangImportLoc = getNextIncludeLoc();
+      llvm::dbgs() << "loading clang module '";
+      llvm::interleave(path, [](auto IdInfoPair) { llvm::dbgs() << IdInfoPair.first->getName(); },
+                             []() { llvm::dbgs() << "."; });
+      llvm::dbgs() << "'\n";
     clang::ModuleLoadResult result =
         Instance->loadModule(clangImportLoc, path, visibility,
                              /*IsInclusionDirective=*/false);
+      llvm::dbgs() << "loaded clang module '";
+      llvm::interleave(path, [](auto IdInfoPair) { llvm::dbgs() << IdInfoPair.first->getName(); },
+                             []() { llvm::dbgs() << "."; });
+      llvm::dbgs() << "'\n";
 
     if (!preservedIndexStorePathOption.empty()) {
       // Restore the -index-store-path option.
@@ -2412,9 +2424,10 @@ ClangImporter::loadModule(SourceLoc importLoc,
 }
 
 ModuleDecl *ClangImporter::Implementation::loadModule(
-    SourceLoc importLoc, ImportPath::Module path) {
+    SourceLoc importLoc, ImportPath::Module path, const std::string caller) {
   ModuleDecl *MD = nullptr;
   ASTContext &ctx = getNameImporter().getContext();
+  llvm::dbgs() << "loadModule called from " << caller << "\n";
 
   // `CxxStdlib` is the only accepted spelling of the C++ stdlib module name.
   if (path.front().Item.is("std") ||
@@ -2436,6 +2449,7 @@ ModuleDecl *ClangImporter::Implementation::loadModule(
 ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
     const clang::Module *clangModule, SourceLoc importLoc) {
   assert(clangModule);
+  llvm::dbgs() << "finishLoadingClangModule\n";
 
   // Bump the generation count.
   bumpGeneration();
@@ -2481,6 +2495,7 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
       SwiftContext.addLoadedModule(result);
   }
 
+  llvm::dbgs() << "finished loading clang module\n";
   return result;
 }
 
@@ -2825,6 +2840,17 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
   ImplicitImportInfo implicitImportInfo;
   if (auto mainModule = SwiftContext.MainModule) {
     implicitImportInfo = mainModule->getImplicitImportInfo();
+  }
+  for (auto *I : underlying->Imports) {
+    // Make sure that synthesized Swift code in the clang module wrapper
+    // (e.g. _SwiftifyImport macro expansions) can access the same symbols as
+    // if it were actually in the clang module
+    std::string swiftModuleName = isCxxStdModule(I) ?
+      static_cast<std::string>(SwiftContext.Id_CxxStdlib) :
+      I->getFullModuleName();
+    ImportPath::Builder importPath(SwiftContext, swiftModuleName, '.');
+    UnloadedImportedModule importedModule(importPath.copyTo(SwiftContext), ImportKind::Module);
+    implicitImportInfo.AdditionalUnloadedImports.push_back(importedModule);
   }
   ClangModuleUnit *file = nullptr;
   auto wrapper = ModuleDecl::create(name, SwiftContext, implicitImportInfo,

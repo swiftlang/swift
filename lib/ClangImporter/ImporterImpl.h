@@ -882,7 +882,7 @@ private:
 public:
   /// Load a module using either method.
   ModuleDecl *loadModule(SourceLoc importLoc,
-                         ImportPath::Module path);
+                         ImportPath::Module path, const std::string caller = __func__);
 
   void recordImplicitUnwrapForDecl(ValueDecl *decl, bool isIUO) {
     if (!isIUO)
