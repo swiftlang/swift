@@ -12,6 +12,7 @@
 
 import StdlibUnittest
 import Synchronization
+@_spi(CustomDefaultExecutors) import _Concurrency
 
 typealias DefaultExecutorFactory = SimpleExecutorFactory
 
