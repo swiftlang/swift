@@ -27,7 +27,9 @@ private func downloadFile(url: URL, localPath: URL, verboseDownload: Bool = true
   let session = URLSession(configuration: config)
   return try await withCheckedThrowingContinuation { continuation in
     let task = session.downloadTask(with: url) {
-      urlOrNil, responseOrNil, errorOrNil in
+      urlOrNil,
+      responseOrNil,
+      errorOrNil in
       // check for and handle errors:
       // * errorOrNil should be nil
       // * responseOrNil should be an HTTPURLResponse with statusCode in 200..<299
@@ -60,16 +62,21 @@ private func downloadFile(url: URL, localPath: URL, verboseDownload: Bool = true
       if verboseDownload {
         let percent = String(
           format: "%.2f",
-          Float(task.countOfBytesReceived) / Float(task.countOfBytesExpectedToReceive) * 100)
+          Float(task.countOfBytesReceived) / Float(task.countOfBytesExpectedToReceive) * 100
+        )
         log("\(percent)%. Bytes \(task.countOfBytesReceived)/\(task.countOfBytesExpectedToReceive)")
       }
     }
   }
 }
 
-private func shell(_ command: String, environment: [String: String] = [:],
-                   mustSucceed: Bool = true,verbose: Bool = false,
-                   extraArgs: [String] = []) -> (
+private func shell(
+  _ command: String,
+  environment: [String: String] = [:],
+  mustSucceed: Bool = true,
+  verbose: Bool = false,
+  extraArgs: [String] = []
+) -> (
   stdout: String, stderr: String, exitCode: Int
 ) {
   let task = Process()
@@ -91,7 +98,8 @@ private func shell(_ command: String, environment: [String: String] = [:],
         environment,
         uniquingKeysWith: {
           (current, _) in current
-        })
+        }
+      )
     } else {
       task.environment = environment
     }
@@ -105,9 +113,13 @@ private func shell(_ command: String, environment: [String: String] = [:],
   task.waitUntilExit()
 
   let stderrData = String(
-    decoding: stderr.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+    decoding: stderr.fileHandleForReading.readDataToEndOfFile(),
+    as: UTF8.self
+  )
   let stdoutData = String(
-    decoding: stdout.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+    decoding: stdout.fileHandleForReading.readDataToEndOfFile(),
+    as: UTF8.self
+  )
   if verbose {
     log("StdErr:\n\(stderrData)\n")
     log("StdOut:\n\(stdoutData)\n")
@@ -120,8 +132,11 @@ private func shell(_ command: String, environment: [String: String] = [:],
 }
 
 func downloadToolchainAndRunTest(
-  platform: Platform, tag: Tag, branch: Branch,
-  workspace: String, script: String,
+  platform: Platform,
+  tag: Tag,
+  branch: Branch,
+  workspace: String,
+  script: String,
   extraArgs: [String],
   verbose: Bool = false
 ) async throws -> Int {
@@ -161,8 +176,11 @@ func downloadToolchainAndRunTest(
     let swiftLibraryPath = "\(toolchainDir)/usr/lib/swift/\(platform)"
     log(shell("\(swiftcPath) --version").stdout)
     let exitCode = shell(
-      "\(script)", environment: ["SWIFTC": swiftcPath, "SWIFT_FRONTEND": swiftFrontendPath,
-        "SWIFT_LIBRARY_PATH": swiftLibraryPath],
+      "\(script)",
+      environment: [
+        "SWIFTC": swiftcPath, "SWIFT_FRONTEND": swiftFrontendPath,
+        "SWIFT_LIBRARY_PATH": swiftLibraryPath,
+      ],
       mustSucceed: false,
       verbose: verbose,
       extraArgs: extraArgs

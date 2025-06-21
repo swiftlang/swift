@@ -75,10 +75,11 @@ extension BuildArgs {
   }
 
   var printedArgs: [String] {
-    topLevelArgs.flatMap(\.printedArgs) + subOptArgs.flatMap { subArgs in
-      let printedFlag = subArgs.flag.printed
-      return subArgs.args.printedArgs.flatMap { [printedFlag, $0] }
-    }
+    topLevelArgs.flatMap(\.printedArgs)
+      + subOptArgs.flatMap { subArgs in
+        let printedFlag = subArgs.flag.printed
+        return subArgs.args.printedArgs.flatMap { [printedFlag, $0] }
+      }
   }
 
   var printed: String {
@@ -194,26 +195,35 @@ extension BuildArgs {
   }
 
   private mutating func appendSubOptArg(
-    _ value: String, for command: KnownCommand, flag: Command.Flag
+    _ value: String,
+    for command: KnownCommand,
+    flag: Command.Flag
   ) {
-    let idx = subOptArgs.firstIndex(where: { $0.command == command }) ?? {
-      subOptArgs.append(.init(flag: flag, args: .init(for: command)))
-      return subOptArgs.endIndex - 1
-    }()
+    let idx =
+      subOptArgs.firstIndex(where: { $0.command == command })
+      ?? {
+        subOptArgs.append(.init(flag: flag, args: .init(for: command)))
+        return subOptArgs.endIndex - 1
+      }()
     subOptArgs[idx].args.append(value.escaped)
   }
 
   mutating func append(_ element: Element) {
+    // https://github.com/swiftlang/swift-format/issues/1037
+    // swift-format-ignore
     if let flag = element.flag, let command = flag.subOptionCommand,
-        let value = element.value {
+       let value = element.value
+    {
       appendSubOptArg(value, for: command, flag: flag)
     } else if let last = topLevelArgs.last, case .flag(let flag) = last,
-              case .value(let value) = element {
+              case .value(let value) = element
+    {
       // If the last element is a flag, and this is a value, we may need to
       // merge.
       topLevelArgs.removeLast()
       topLevelArgs += try! CommandParser.parseArguments(
-        "\(flag) \(value.escaped)", for: command
+        "\(flag) \(value.escaped)",
+        for: command
       )
     } else {
       topLevelArgs.append(element)
@@ -226,7 +236,7 @@ extension BuildArgs {
     }
   }
 
-  static func += <S: Sequence> (lhs: inout Self, rhs: S) where S.Element == Element {
+  static func += <S: Sequence>(lhs: inout Self, rhs: S) where S.Element == Element {
     lhs.append(contentsOf: rhs)
   }
 
@@ -238,7 +248,8 @@ extension BuildArgs {
   /// `includeSubOptions` is `true`, the transform will also be applied to any
   /// sub-options present.
   mutating func transformValues(
-    for flag: Command.Flag? = nil, includeSubOptions: Bool,
+    for flag: Command.Flag? = nil,
+    includeSubOptions: Bool,
     _ fn: (String) throws -> String
   ) rethrows {
     topLevelArgs = try topLevelArgs.map { arg in
@@ -248,7 +259,9 @@ extension BuildArgs {
     if includeSubOptions {
       for idx in subOptArgs.indices {
         try subOptArgs[idx].args.transformValues(
-          for: flag, includeSubOptions: true, fn
+          for: flag,
+          includeSubOptions: true,
+          fn
         )
       }
     }
@@ -263,14 +276,20 @@ extension BuildArgs {
   /// the substitutions made. If `includeSubOptions` is `true`, the substitution
   /// will also be applied to any sub-options present.
   mutating func substitutePaths<Path: PathProtocol>(
-    for flag: Command.Flag? = nil, includeSubOptions: Bool,
+    for flag: Command.Flag? = nil,
+    includeSubOptions: Bool,
     _ fn: (AbsolutePath) throws -> Path?
   ) rethrows -> [BuildArgs.PathSubstitution] {
     var subs: [BuildArgs.PathSubstitution] = []
-    try transformValues(for: flag,
-                        includeSubOptions: includeSubOptions) { value in
+    try transformValues(
+      for: flag,
+      includeSubOptions: includeSubOptions
+    ) { value in
+      // https://github.com/swiftlang/swift-format/issues/1037
+      // swift-format-ignore
       guard case .absolute(let path) = AnyPath(value),
-            let newPath = try fn(path) else { return value }
+            let newPath = try fn(path)
+      else { return value }
       let subst = PathSubstitution(oldPath: path, newPath: AnyPath(newPath))
       subs.append(subst)
       return subst.newPath.rawPath

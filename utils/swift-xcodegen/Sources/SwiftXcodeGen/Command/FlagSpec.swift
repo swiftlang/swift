@@ -55,9 +55,9 @@ extension Command {
         self = .spaced
       }
     }
-    static let equals   = Self(1 << 0)
+    static let equals = Self(1 << 0)
     static let unspaced = Self(1 << 1)
-    static let spaced   = Self(1 << 2)
+    static let spaced = Self(1 << 2)
   }
 }
 
