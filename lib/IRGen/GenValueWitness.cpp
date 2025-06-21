@@ -837,7 +837,9 @@ struct BoundGenericTypeCharacteristics {
   FixedPacking packing;
 };
 
-ValueWitnessFlags getValueWitnessFlags(const TypeInfo *TI, SILType concreteType,
+ValueWitnessFlags getValueWitnessFlags(IRGenModule &IGM,
+                                       const TypeInfo *TI,
+                                       SILType concreteType,
                                        FixedPacking packing) {
   ValueWitnessFlags flags;
 
@@ -852,6 +854,12 @@ ValueWitnessFlags getValueWitnessFlags(const TypeInfo *TI, SILType concreteType,
     bool isBitwiseBorrowable =
         fixedTI->isBitwiseBorrowable(ResilienceExpansion::Maximal);
     assert(isBitwiseTakable || !isInline);
+    bool isAddressableForDependencies =
+        IGM.getSILModule().Types.getTypeLowering(concreteType,
+                                                TypeExpansionContext::minimal())
+          .getRecursiveProperties()
+          .isAddressableForDependencies();
+          
     flags = flags.withAlignment(fixedTI->getFixedAlignment().getValue())
                 .withPOD(fixedTI->isTriviallyDestroyable(ResilienceExpansion::Maximal))
                 .withCopyable(fixedTI->isCopyable(ResilienceExpansion::Maximal))
@@ -864,7 +872,8 @@ ValueWitnessFlags getValueWitnessFlags(const TypeInfo *TI, SILType concreteType,
                 // Swift prior to version 6 didn't have the
                 // IsNotBitwiseBorrowable bit, so to avoid unnecessary variation
                 // in metadata output, we only set the bit when needed.
-                .withBitwiseBorrowable(!isBitwiseTakable || isBitwiseBorrowable);
+                .withBitwiseBorrowable(!isBitwiseTakable || isBitwiseBorrowable)
+                .withAddressableForDependencies(isAddressableForDependencies);
   } else {
     flags = flags.withIncomplete(true);
   }
@@ -1226,11 +1235,13 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
   case ValueWitness::Flags: {
     if (boundGenericCharacteristics)
       return B.addInt32(
-          getValueWitnessFlags(boundGenericCharacteristics->TI,
+          getValueWitnessFlags(IGM,
+                               boundGenericCharacteristics->TI,
                                boundGenericCharacteristics->concreteType,
                                boundGenericCharacteristics->packing)
               .getOpaqueValue());
-    return B.addInt32(getValueWitnessFlags(&concreteTI, concreteType, packing)
+    return B.addInt32(getValueWitnessFlags(IGM, &concreteTI,
+                                           concreteType, packing)
                           .getOpaqueValue());
   }
 
@@ -1441,7 +1452,7 @@ getAddrOfKnownValueWitnessTable(IRGenModule &IGM, CanType type,
   
   auto &ti = IGM.getTypeInfoForUnlowered(AbstractionPattern::getOpaque(), type);
 
-    // We only have known value witness tables for copyable types currently.
+  // We only have known value witness tables for copyable types currently.
   if (!ti.isCopyable(ResilienceExpansion::Maximal)) {
     return {};
   }
@@ -1453,6 +1464,17 @@ getAddrOfKnownValueWitnessTable(IRGenModule &IGM, CanType type,
 
   CanType witnessSurrogate;
   ReferenceCounting refCounting;
+
+  // All of our standard value witness tables are bitwise-borrowable and not
+  // addressable for dependencies.
+  if (!ti.isBitwiseBorrowable(ResilienceExpansion::Maximal)
+      || IGM.getSILModule().Types
+            .getTypeLowering(AbstractionPattern::getOpaque(), type,
+                             TypeExpansionContext::minimal())
+            .getRecursiveProperties()
+            .isAddressableForDependencies()) {
+    return {};
+  }
 
   // Empty types can use empty tuple witnesses.
   if (ti.isKnownEmpty(ResilienceExpansion::Maximal)) {
