@@ -63,6 +63,7 @@ private func registerForSILCombine<InstType: SILCombineSimplifiable>(
 
 private func registerSwiftPasses() {
   // Module passes
+  registerPass(mandatoryAllocBoxToStack, { mandatoryAllocBoxToStack.run($0) })
   registerPass(mandatoryPerformanceOptimizations, { mandatoryPerformanceOptimizations.run($0) })
   registerPass(diagnoseUnknownConstValues, { diagnoseUnknownConstValues.run($0)})
   registerPass(readOnlyGlobalVariablesPass, { readOnlyGlobalVariablesPass.run($0) })
@@ -70,6 +71,7 @@ private func registerSwiftPasses() {
   registerPass(embeddedSwiftDiagnostics, { embeddedSwiftDiagnostics.run($0) })
 
   // Function passes
+  registerPass(allocBoxToStack, { allocBoxToStack.run($0) })
   registerPass(asyncDemotion, { asyncDemotion.run($0) })
   registerPass(booleanLiteralFolding, { booleanLiteralFolding.run($0) })
   registerPass(letPropertyLowering, { letPropertyLowering.run($0) })

@@ -31,6 +31,11 @@ extension CanonicalType {
   public var silType: Type? {
     BridgedType.createSILType(bridged).typeOrNil
   }
+
+  public func getBoxFields(in function: Function) -> BoxFieldsArray {
+    precondition(isBox)
+    return BoxFieldsArray(boxType: self, function: function)
+  }
 }
 
 extension Decl {
