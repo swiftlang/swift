@@ -312,6 +312,7 @@ static bool isStaticallyLookThroughInst(SILInstruction *inst) {
   case SILInstructionKind::UncheckedEnumDataInst:
   case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::TupleElementAddrInst:
+  case SILInstructionKind::VectorBaseAddrInst:
     return true;
   case SILInstructionKind::MoveValueInst:
     // Look through if it isn't from a var decl.
