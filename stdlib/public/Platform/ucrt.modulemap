@@ -40,6 +40,7 @@ module _malloc [system] [no_undeclared_includes] {
 
 module _stdlib [system] [no_undeclared_includes] {
   use corecrt
+  use vcruntime
   header "stdlib.h"
   export *
 }
