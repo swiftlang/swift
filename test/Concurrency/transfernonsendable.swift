@@ -2057,11 +2057,14 @@ func inferLocationOfCapturedTaskIsolatedSelfCorrectly() {
 
     func d() {
       a.block = c // expected-warning {{converting non-Sendable function value to '@MainActor @Sendable () -> Void' may introduce data races}}
-      // expected-tns-warning @-1 {{sending 'self' risks causing data races}}
-      // expected-tns-note @-2 {{task-isolated 'self' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-tns-warning @-1 {{non-Sendable '@MainActor () -> ()'-typed result can not be returned from main actor-isolated function to nonisolated context}}
+      // expected-tns-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+      // expected-tns-warning @-3 {{sending 'self' risks causing data races}}
+      // expected-tns-note @-4 {{task-isolated 'self' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
     }
 
     @MainActor
     func c() {}
   }
 }
+
