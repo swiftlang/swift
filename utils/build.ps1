@@ -351,26 +351,46 @@ $KnownPythons = @{
   }
 }
 
-$PythonWheels = @{
+$PythonModules = @{
   "packaging" = @{
-    File = "packaging-24.1-py3-none-any.whl";
-    URL = "https://files.pythonhosted.org/packages/08/aa/cc0199a5f0ad350994d660967a8efb233fe0416e4639146c089643407ce6/packaging-24.1-py3-none-any.whl";
-    SHA256 = "5b8f2217dbdbd2f7f384c41c628544e6d52f2d0f53c6d0c3ea61aa5d1d7ff124";
+    Version = "24.1";
+    SHA256 = "026ed72c8ed3fcce5bf8950572258698927fd1dbda10a5e981cdf0ac37f4f002";
+    Dependencies = @();
   };
-  "distutils" = @{
-    File = "setuptools-75.1.0-py3-none-any.whl";
-    URL = "https://files.pythonhosted.org/packages/ff/ae/f19306b5a221f6a436d8f2238d5b80925004093fa3edea59835b514d9057/setuptools-75.1.0-py3-none-any.whl";
-    SHA256 = "35ab7fd3bcd95e6b7fd704e4a1539513edad446c097797f2985e0e4b960772f2";
+  "setuptools" = @{
+    Version = "75.1.0";
+    SHA256 = "d59a21b17a275fb872a9c3dae73963160ae079f1049ed956880cd7c09b120538";
+    Dependencies = @();
   };
   "psutil" = @{
-    File = "psutil-6.1.0-cp37-abi3-win_amd64.whl";
-    URL = "https://files.pythonhosted.org/packages/11/91/87fa6f060e649b1e1a7b19a4f5869709fbf750b7c8c262ee776ec32f3028/psutil-6.1.0-cp37-abi3-win_amd64.whl";
-    SHA256 = "a8fb3752b491d246034fa4d279ff076501588ce8cbcdbb62c32fd7a377d996be";
+    Version = "6.1.0";
+    SHA256 = "353815f59a7f64cdaca1c0307ee13558a0512f6db064e92fe833784f08539c7a";
+    Dependencies = @();
   };
   "unittest2" = @{
-    File = "unittest2-1.1.0-py2.py3-none-any.whl";
-    URL = "https://files.pythonhosted.org/packages/72/20/7f0f433060a962200b7272b8c12ba90ef5b903e218174301d0abfd523813/unittest2-1.1.0-py2.py3-none-any.whl";
-    SHA256 = "13f77d0875db6d9b435e1d4f41e74ad4cc2eb6e1d5c824996092b3430f088bb8";
+    Version = "1.1.0";
+    SHA256 = "22882a0e418c284e1f718a822b3b022944d53d2d908e1690b319a9d3eb2c0579";
+    Dependencies = @("argparse", "six", "traceback2", "linecache2");
+  };
+  "argparse" = @{
+    Version = "1.4.0";
+    SHA256 = "c31647edb69fd3d465a847ea3157d37bed1f95f19760b11a47aa91c04b666314";
+    Dependencies = @();
+  };
+  "six" = @{
+    Version = "1.17.0";
+    SHA256 = "4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274";
+    Dependencies = @();
+  };
+  "traceback2" = @{
+    Version = "1.4.0";
+    SHA256 = "8253cebec4b19094d67cc5ed5af99bf1dba1285292226e98a31929f87a5d6b23";
+    Dependencies = @();
+  };
+  "linecache2" = @{
+    Version = "1.0.0";
+    SHA256 = "e78be9c0a0dfcbac712fe04fbf92b96cddae80b1b842f24248214c8496f006ef";
+    Dependencies = @();
   };
 }
 
@@ -993,27 +1013,40 @@ function Get-Dependencies {
     }
   }
 
-  function Install-PythonWheel([string] $ModuleName) {
+  function Test-PythonModuleInstalled([string] $ModuleName) {
     try {
       Invoke-Program -Silent "$(Get-PythonExecutable)" -c "import $ModuleName"
+      return $true;
     } catch {
-      $Wheel = $PythonWheels[$ModuleName]
-      DownloadAndVerify $Wheel.URL "$BinaryCache\python\$($Wheel.File)" $Wheel.SHA256
-      Write-Output "Installing '$($Wheel.File)' ..."
-      Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m pip install "$BinaryCache\python\$($Wheel.File)" --disable-pip-version-check
-    } finally {
-      Write-Output "$ModuleName installed."
+      return $false;
     }
+  }
+
+  function Install-PythonModule([string] $ModuleName) {
+    if (Test-PythonModuleInstalled $ModuleName) {
+      Write-Output "$ModuleName already installed."
+      return;
+    }
+    $TempRequirementsTxt = New-TemporaryFile
+    $Module = $PythonModules[$ModuleName]
+    $Dependencies = $Module["Dependencies"]
+    Write-Output "$ModuleName==$($Module.Version) --hash=`"sha256:$($Module.SHA256)`"" >> $TempRequirementsTxt
+    for ($i = 0; $i -lt $Dependencies.Length; $i++) {
+      $Dependency = $PythonModules[$Dependencies[$i]]
+      Write-Output "$($Dependencies[$i])==$($Dependency.Version) --hash=`"sha256:$($Dependency.SHA256)`"" >> $TempRequirementsTxt
+    }
+    Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m pip install -r $TempRequirementsTxt --require-hashes --no-binary==:all: --disable-pip-version-check
+    Write-Output "$ModuleName installed."
   }
 
   function Install-PythonModules() {
     Install-PIPIfNeeded
-    Install-PythonWheel "packaging" # For building LLVM 18+
-    Install-PythonWheel "distutils" # Required for SWIG support
+    Install-PythonModule "packaging" # For building LLVM 18+
+    Install-PythonModule "setuptools" # Required for SWIG support
     if ($Test -contains "lldb") {
-      Install-PythonWheel "psutil" # Required for testing LLDB
+      Install-PythonModule "psutil" # Required for testing LLDB
       $env:Path = "$(Get-PythonScriptsPath);$env:Path" # For unit.exe
-      Install-PythonWheel "unittest2" # Required for testing LLDB
+      Install-PythonModule "unittest2" # Required for testing LLDB
     }
   }
 
