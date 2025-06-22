@@ -5347,10 +5347,12 @@ bool ConstraintSystem::repairFailures(
     // this by forming an explicit call.
     auto convertTo = dstType->lookThroughAllOptionalTypes();
 
-    // If the RHS is a function type, the source must be a function-returning
-    // function.
-    if (convertTo->is<FunctionType>() && !resultType->is<FunctionType>())
-      return false;
+    // If the RHS is a function type,
+    // the source must have more curry levels.
+    if (auto convertToFnType = convertTo->getAs<FunctionType>()) {
+      if (fnType->getNumCurryLevels() <= convertToFnType->getNumCurryLevels())
+        return false;
+    }
 
     // Right-hand side can't be a type variable or dependent member, or `Any`
     // (if function conversion to `Any` didn't succeed there is something else
