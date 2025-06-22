@@ -497,9 +497,17 @@ bool MoveOnlyObjectCheckerPImpl::eraseMarkWithCopiedOperand(
 
   auto replacement = cvi->getOperand();
   auto orig = replacement;
-  if (auto *copyToMoveOnly =
-          dyn_cast<CopyableToMoveOnlyWrapperValueInst>(orig)) {
-    orig = copyToMoveOnly->getOperand();
+  while (true) {
+    if (auto *copyToMoveOnly =
+        dyn_cast<CopyableToMoveOnlyWrapperValueInst>(orig)) {
+      orig = copyToMoveOnly->getOperand();
+      continue;
+    }
+    if (auto *markDep = dyn_cast<MarkDependenceInst>(orig)) {
+      orig = markDep->getValue();
+      continue;
+    }
+    break;
   }
 
   // TODO: Instead of pattern matching specific code generation patterns,
