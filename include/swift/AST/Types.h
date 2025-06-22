@@ -3884,6 +3884,17 @@ public:
     return containsPackExpansionType(getParams());
   }
 
+  /// Returns the number of curry levels of the function type.
+  unsigned getNumCurryLevels() const {
+    unsigned num = 1;
+    auto fn = this;
+    while (auto resultFn = fn->getResult()->getAs<AnyFunctionType>()) {
+      num++;
+      fn = resultFn;
+    }
+    return num;
+  }
+
   static bool containsPackExpansionType(ArrayRef<Param> params);
 
   static void printParams(ArrayRef<Param> Params, raw_ostream &OS,
