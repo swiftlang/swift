@@ -185,6 +185,9 @@ struct MoveOnlyObjectCheckerPImpl {
 
   bool
   checkForSameInstMultipleUseErrors(MarkUnresolvedNonCopyableValueInst *base);
+
+  bool eraseMarkWithCopiedOperand(
+    MarkUnresolvedNonCopyableValueInst *markedInst);
 };
 
 } // namespace
@@ -463,9 +466,6 @@ void MoveOnlyObjectCheckerPImpl::check(
   // MarkUnresolvedNonCopyableValueInst in Raw SIL. This ensures we do not
   // miss any.
   //
-  // NOTE: destroys is a separate array that we use to avoid iterator
-  // invalidation when cleaning up destroy_value of guaranteed checked values.
-  SmallVector<DestroyValueInst *, 8> destroys;
   while (!moveIntroducersToProcess.empty()) {
     auto *markedInst = moveIntroducersToProcess.pop_back_val();
 
@@ -475,80 +475,98 @@ void MoveOnlyObjectCheckerPImpl::check(
     if (!diagnosticEmitter.emittedDiagnosticForValue(markedInst)) {
       if (markedInst->getCheckKind() ==
           MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign) {
-        if (auto *cvi = dyn_cast<CopyValueInst>(markedInst->getOperand())) {
-          auto replacement = cvi->getOperand();
-          auto orig = replacement;
-          if (auto *copyToMoveOnly =
-                  dyn_cast<CopyableToMoveOnlyWrapperValueInst>(orig)) {
-            orig = copyToMoveOnly->getOperand();
-          }
-
-          // TODO: Instead of pattern matching specific code generation patterns,
-          // we should be able to eliminate any `copy_value` whose canonical
-          // lifetime fits within the borrow scope of the borrowed value being
-          // copied from.
-
-          // Handle:
-          //
-          // bb(%arg : @guaranteed $Type):
-          //   %copy = copy_value %arg
-          //   %mark = mark_unresolved_non_copyable_value [no_consume_or_assign] %copy
-          if (auto *arg = dyn_cast<SILArgument>(orig)) {
-            if (arg->getOwnershipKind() == OwnershipKind::Guaranteed) {
-              for (auto *use : markedInst->getConsumingUses()) {
-                destroys.push_back(cast<DestroyValueInst>(use->getUser()));
-              }
-              while (!destroys.empty())
-                destroys.pop_back_val()->eraseFromParent();
-              markedInst->replaceAllUsesWith(replacement);
-              markedInst->eraseFromParent();
-              cvi->eraseFromParent();
-              continue;
-            }
-          }
-
-          // Handle:
-          //
-          //   %1 = load_borrow %0
-          //   %2 = copy_value %1
-          //   %3 = mark_unresolved_non_copyable_value [no_consume_or_assign] %2
-          if (isa<LoadBorrowInst>(orig)) {
-            for (auto *use : markedInst->getConsumingUses()) {
-              destroys.push_back(cast<DestroyValueInst>(use->getUser()));
-            }
-            while (!destroys.empty())
-              destroys.pop_back_val()->eraseFromParent();
-            markedInst->replaceAllUsesWith(replacement);
-            markedInst->eraseFromParent();
-            cvi->eraseFromParent();
-            continue;
-          }
-          
-          // Handle:
-          //   (%yield, ..., %handle) = begin_apply
-          //   %copy = copy_value %yield
-          //   %mark = mark_unresolved_noncopyable_value [no_consume_or_assign] %copy
-          if (isa_and_nonnull<BeginApplyInst>(orig->getDefiningInstruction())) {
-            if (orig->getOwnershipKind() == OwnershipKind::Guaranteed) {
-              for (auto *use : markedInst->getConsumingUses()) {
-                destroys.push_back(cast<DestroyValueInst>(use->getUser()));
-              }
-              while (!destroys.empty())
-                destroys.pop_back_val()->eraseFromParent();
-              markedInst->replaceAllUsesWith(replacement);
-              markedInst->eraseFromParent();
-              cvi->eraseFromParent();
-              continue;
-            }
-          }
+        if (eraseMarkWithCopiedOperand(markedInst)) {
+          changed = true;
+          continue;
         }
       }
+      markedInst->replaceAllUsesWith(markedInst->getOperand());
+      markedInst->eraseFromParent();
+      changed = true;
     }
-
-    markedInst->replaceAllUsesWith(markedInst->getOperand());
-    markedInst->eraseFromParent();
-    changed = true;
   }
+}
+
+/// Erase a copy_value operand of MarkUnresolvedNonCopyableValueInst.
+bool MoveOnlyObjectCheckerPImpl::eraseMarkWithCopiedOperand(
+  MarkUnresolvedNonCopyableValueInst *markedInst)
+{
+  auto *cvi = dyn_cast<CopyValueInst>(markedInst->getOperand());
+  if (!cvi)
+    return false;
+
+  auto replacement = cvi->getOperand();
+  auto orig = replacement;
+  if (auto *copyToMoveOnly =
+          dyn_cast<CopyableToMoveOnlyWrapperValueInst>(orig)) {
+    orig = copyToMoveOnly->getOperand();
+  }
+
+  // TODO: Instead of pattern matching specific code generation patterns,
+  // we should be able to eliminate any `copy_value` whose canonical
+  // lifetime fits within the borrow scope of the borrowed value being
+  // copied from.
+
+  // NOTE: destroys is a separate array that we use to avoid iterator
+  // invalidation when cleaning up destroy_value of guaranteed checked values.
+  SmallVector<DestroyValueInst *, 8> destroys;
+
+  // Handle:
+  //
+  // bb(%arg : @guaranteed $Type):
+  //   %copy = copy_value %arg
+  //   %mark = mark_unresolved_non_copyable_value [no_consume_or_assign]
+  //   %copy
+  if (auto *arg = dyn_cast<SILArgument>(orig)) {
+    if (arg->getOwnershipKind() == OwnershipKind::Guaranteed) {
+      for (auto *use : markedInst->getConsumingUses()) {
+        destroys.push_back(cast<DestroyValueInst>(use->getUser()));
+      }
+      while (!destroys.empty())
+        destroys.pop_back_val()->eraseFromParent();
+      markedInst->replaceAllUsesWith(replacement);
+      markedInst->eraseFromParent();
+      cvi->eraseFromParent();
+      return true;
+    }
+  }
+
+  // Handle:
+  //
+  //   %1 = load_borrow %0
+  //   %2 = copy_value %1
+  //   %3 = mark_unresolved_non_copyable_value [no_consume_or_assign] %2
+  if (isa<LoadBorrowInst>(orig)) {
+    for (auto *use : markedInst->getConsumingUses()) {
+      destroys.push_back(cast<DestroyValueInst>(use->getUser()));
+    }
+    while (!destroys.empty())
+      destroys.pop_back_val()->eraseFromParent();
+    markedInst->replaceAllUsesWith(replacement);
+    markedInst->eraseFromParent();
+    cvi->eraseFromParent();
+    return true;
+  }
+
+  // Handle:
+  //   (%yield, ..., %handle) = begin_apply
+  //   %copy = copy_value %yield
+  //   %mark = mark_unresolved_noncopyable_value [no_consume_or_assign]
+  //   %copy
+  if (isa_and_nonnull<BeginApplyInst>(orig->getDefiningInstruction())) {
+    if (orig->getOwnershipKind() == OwnershipKind::Guaranteed) {
+      for (auto *use : markedInst->getConsumingUses()) {
+        destroys.push_back(cast<DestroyValueInst>(use->getUser()));
+      }
+      while (!destroys.empty())
+        destroys.pop_back_val()->eraseFromParent();
+      markedInst->replaceAllUsesWith(replacement);
+      markedInst->eraseFromParent();
+      cvi->eraseFromParent();
+      return true;
+    }
+  }
+  return false;
 }
 
 //===----------------------------------------------------------------------===//
