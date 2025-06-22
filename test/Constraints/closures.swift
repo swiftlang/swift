@@ -1366,3 +1366,14 @@ do {
     try $0.missing // expected-error {{value of type 'Int' has no member 'missing'}}
   }
 }
+
+do {
+  let a: () -> () -> Void = {{}}
+  let _: (() -> () -> Void)? = a
+  let _: (() -> () -> Void)?? = a
+
+  class Super {}
+  class Sub: Super {}
+  let b: () -> () -> Sub = {{ return Sub() }}
+  let _: (() -> () -> Super)? = b
+}
