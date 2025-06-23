@@ -13,6 +13,11 @@ protocol P {
   @MainActor func mainActorTest() async
 }
 
+protocol Q {
+  nonisolated(nonsending) var test: String { get async throws }
+  nonisolated(nonsending) func fnTest() async
+}
+
 struct AllDefault : P {
   // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s21attr_execution_silgen10AllDefaultVAA1PA2aDP10callerTestyyYaFTW : $@convention(witness_method: P) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @in_guaranteed AllDefault) -> () {
   // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Optional<any Actor>, [[SELF:%.*]] : $*AllDefault):
@@ -119,4 +124,50 @@ struct AllMainActor : P {
   // CHECK:   apply [[FUNC]]([[LOAD]])
   // CHECK: } // end sil function '$s21attr_execution_silgen12AllMainActorVAA1PA2aDP04mainF4TestyyYaFTW'
   @MainActor func mainActorTest() async {}
+}
+
+// Make sure that stored/non-async witness doesn't inherit `nonisolated(nonsending)` but thunk dismatches correctly
+
+struct TestWitnessWithStorage: Q {
+  // CHECK-LABEL: sil hidden [transparent] [ossa] @$s21attr_execution_silgen22TestWitnessWithStorageV4testSSvg : $@convention(method) (@guaranteed TestWitnessWithStorage) -> @owned String
+  // CHECK-LABEL: sil hidden [transparent] [ossa] @$s21attr_execution_silgen22TestWitnessWithStorageV4testSSvs : $@convention(method) (@owned String, @inout TestWitnessWithStorage) -> ()
+  var test: String
+
+  // CHECK-LABEL: sil hidden [ossa] @$s21attr_execution_silgen22TestWitnessWithStorageV02fnD0yyF : $@convention(method) (@guaranteed TestWitnessWithStorage) -> ()
+  func fnTest() {}
+
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s21attr_execution_silgen22TestWitnessWithStorageVAA1QA2aDP4testSSvgTW : $@convention(witness_method: Q) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @in_guaranteed TestWitnessWithStorage) -> (@owned String, @error any Error)
+  // CHECK: bb0([[ISOLATION:%.*]] : @guaranteed $Optional<any Actor>, [[SELF:%.*]] : $*TestWitnessWithStorage):
+  // CHECK-NEXT: [[BORROWED_SELF:%.*]] = load_borrow [[SELF]]
+  // CHECK: [[WITNESS:%.*]] = function_ref @$s21attr_execution_silgen22TestWitnessWithStorageV4testSSvg : $@convention(method) (@guaranteed TestWitnessWithStorage) -> @owned String
+  // CHECK-NEXT: [[RESULT:%.*]] = apply [[WITNESS]]([[BORROWED_SELF]]) : $@convention(method) (@guaranteed TestWitnessWithStorage) -> @owned String
+  // CHECK-NEXT: end_borrow [[BORROWED_SELF]]
+  // CHECK-NEXT: return [[RESULT]]
+  // CHECK-NEXT: } // end sil function '$s21attr_execution_silgen22TestWitnessWithStorageVAA1QA2aDP4testSSvgTW'
+
+  // CHECK: sil private [transparent] [thunk] [ossa] @$s21attr_execution_silgen22TestWitnessWithStorageVAA1QA2aDP02fnD0yyYaFTW : $@convention(witness_method: Q) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @in_guaranteed TestWitnessWithStorage) -> ()
+  // CHECK: bb0([[ISOLATION:%.*]] : @guaranteed $Optional<any Actor>, [[SELF:%.*]] : $*TestWitnessWithStorage):
+  // CHECK-NEXT: [[BORROWED_SELF]] = load_borrow [[SELF]]
+  // CHECK: [[WITNESS:%.*]] = function_ref @$s21attr_execution_silgen22TestWitnessWithStorageV02fnD0yyF : $@convention(method) (@guaranteed TestWitnessWithStorage) -> ()
+  // CHECK-NEXT: {{.*}} = apply [[WITNESS]]([[BORROWED_SELF]]) : $@convention(method) (@guaranteed TestWitnessWithStorage) -> ()
+  // CHECK-NEXT: [[RESULT:%.*]] = tuple ()
+  // CHECK-NEXT: end_borrow [[BORROWED_SELF]]
+  // CHECK-NEXT: return [[RESULT]]
+  // CHECK-NEXT: } // end sil function '$s21attr_execution_silgen22TestWitnessWithStorageVAA1QA2aDP02fnD0yyYaFTW'
+}
+
+struct TestSyncWitness: Q {
+  // CHECK-LABEL: sil hidden [ossa] @$s21attr_execution_silgen15TestSyncWitnessV4testSSvg : $@convention(method) (TestSyncWitness) -> @owned String
+  var test: String { "" }
+
+  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s21attr_execution_silgen15TestSyncWitnessVAA1QA2aDP4testSSvgTW : $@convention(witness_method: Q) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @in_guaranteed TestSyncWitness) -> (@owned String, @error any Error)
+  // CHECK: bb0([[ISOLATION:%.*]] : @guaranteed $Optional<any Actor>, [[SELF:%.*]] : $*TestSyncWitness):
+  // CHECK-NEXT: [[BORROWED_SELF:%.*]] = load [trivial] [[SELF]]
+  // CHECK: [[WITNESS:%.*]] = function_ref @$s21attr_execution_silgen15TestSyncWitnessV4testSSvg : $@convention(method) (TestSyncWitness) -> @owned String
+  // CHECK-NEXT: [[RESULT:%.*]] = apply [[WITNESS]]([[BORROWED_SELF]]) : $@convention(method) (TestSyncWitness) -> @owned String
+  // CHECK-NEXT: return [[RESULT]]
+  // CHECK-NEXT: } // end sil function '$s21attr_execution_silgen15TestSyncWitnessVAA1QA2aDP4testSSvgTW'
+
+  // Tested in the `TestWitnessWithStorage`
+  func fnTest() {}
 }
