@@ -1559,7 +1559,7 @@ std::string TypeConverter::takeLastError() {
   if (!LastError.first)
     return {};
   std::stringstream s;
-  s << ": " << LastError.first;
+  s << LastError.first << ": ";
   if (LastError.second)
     LastError.second->dump(s);
 
@@ -2680,8 +2680,11 @@ TypeConverter::getTypeInfo(const TypeRef *TR,
   // Compute the result and cache it
   auto *TI = LowerType(*this, ExternalTypeInfo).visit(TR);
   Cache.insert({{TR, ExternalTypeInfoId}, TI});
-  if (!TI && ErrorCache)
+  if (!TI && ErrorCache) {
+    if (!LastError.first)
+      LastError = {"cannot decode or find", TR};
     ErrorCache->insert({{TR, ExternalTypeInfoId}, LastError});
+  }
 
   RecursionCheck.erase(TR);
 
