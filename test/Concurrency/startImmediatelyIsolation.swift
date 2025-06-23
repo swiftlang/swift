@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -swift-version 6 -strict-concurrency=complete -emit-sil -verify %s
+// RUN: %target-swift-frontend -parse-as-library -swift-version 6 -emit-sil -verify %s
 // REQUIRES: concurrency
 
 @available(SwiftStdlib 6.2, *)
