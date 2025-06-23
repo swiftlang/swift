@@ -38,7 +38,8 @@ public protocol Executor: AnyObject, Sendable {
 
 }
 
-protocol SchedulableExecutor: Executor {
+@available(StdlibDeploymentTarget 6.2, *)
+protocol SchedulingExecutor: Executor {
 
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
@@ -103,15 +104,20 @@ extension Actor {
 }
 
 extension Executor {
-  /// Return this executable as a SchedulableExecutor, or nil if that is
+
+  #if !$Embedded
+  /// Return this executor as a SchedulingExecutor, or nil if that is
   /// unsupported.
   ///
-  /// Executors that implement SchedulableExecutor should provide their
+  /// Executors that implement SchedulingExecutor should provide their
   /// own copy of this method, which will allow the compiler to avoid a
   /// potentially expensive runtime cast.
-  var asSchedulable: SchedulableExecutor? {
-    return self as? SchedulableExecutor
+  @available(StdlibDeploymentTarget 6.2, *)
+  var asSchedulingExecutor: (any SchedulingExecutor)? {
+    return self as? SchedulingExecutor
   }
+  #endif
+
 }
 
 extension Executor {
@@ -136,7 +142,8 @@ extension Executor {
 }
 
 // Delay support
-extension SchedulableExecutor {
+@available(StdlibDeploymentTarget 6.2, *)
+extension SchedulingExecutor {
 
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
@@ -542,7 +549,7 @@ extension RunLoopExecutor {
 }
 
 
-/// The main executor must conform to these three protocols; we have to
+/// The main executor must conform to these two protocols; we have to
 /// make this a protocol for compatibility with Embedded Swift.
 protocol MainExecutor: RunLoopExecutor, SerialExecutor {
 }
@@ -598,6 +605,13 @@ extension MainActor {
     _createDefaultExecutorsOnce()
     return _executor!
   }
+
+  /// An unowned version of the above, for performance
+  @available(StdlibDeploymentTarget 6.2, *)
+  static var unownedExecutor: UnownedSerialExecutor {
+    _createDefaultExecutorsOnce()
+    return unsafe UnownedSerialExecutor(ordinary: _executor!)
+  }
 }
 #endif // !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
@@ -650,29 +664,32 @@ extension Task where Success == Never, Failure == Never {
     return nil
   }
 
-  /// Get the current *schedulable* executor, if any.
+  #if !$Embedded
+  /// Get the current *scheduling* executor, if any.
   ///
   /// This follows the same logic as `currentExecutor`, except that it ignores
-  /// any executor that isn't a `SchedulableExecutor`.
-  @_unavailableInEmbedded
-  static var currentSchedulableExecutor: (any SchedulableExecutor)? {
+  /// any executor that isn't a `SchedulingExecutor`.
+  @available(StdlibDeploymentTarget 6.2, *)
+  static var currentSchedulingExecutor: (any SchedulingExecutor)? {
     if let activeExecutor = unsafe _getActiveExecutor().asSerialExecutor(),
-       let schedulable = activeExecutor.asSchedulable {
-      return schedulable
+       let scheduling = activeExecutor.asSchedulingExecutor {
+      return scheduling
     }
     if let taskExecutor = unsafe _getPreferredTaskExecutor().asTaskExecutor(),
-       let schedulable = taskExecutor.asSchedulable {
-      return schedulable
+       let scheduling = taskExecutor.asSchedulingExecutor {
+      return scheduling
     }
     if let taskExecutor = unsafe _getCurrentTaskExecutor().asTaskExecutor(),
-       let schedulable = taskExecutor.asSchedulable {
-      return schedulable
+       let scheduling = taskExecutor.asSchedulingExecutor {
+      return scheduling
     }
-    if let schedulable = defaultExecutor.asSchedulable {
-      return schedulable
+    if let scheduling = defaultExecutor.asSchedulingExecutor {
+      return scheduling
     }
     return nil
   }
+  #endif
+
 }
 
 
