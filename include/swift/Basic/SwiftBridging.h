@@ -23,6 +23,7 @@
 #define SWIFT_BASIC_SWIFT_BRIDGING_H
 
 #include "swift/Basic/Compiler.h"
+#include "swift/Basic/Nullability.h"
 #if __has_include(<swift/bridging>)
 #include <swift/bridging>
 #else

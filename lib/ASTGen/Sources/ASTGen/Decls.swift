@@ -74,7 +74,7 @@ extension ASTGenVisitor {
     }
   }
 
-  func generateIdentifierDeclNameAndLoc(_ node: TokenSyntax) -> (identifier: BridgedIdentifier, sourceLoc: BridgedSourceLoc)? {
+  func generateIdentifierDeclNameAndLoc(_ node: TokenSyntax) -> (identifier: Identifier, sourceLoc: BridgedSourceLoc)? {
     guard node.presence == .present else {
       return nil
     }
@@ -706,7 +706,7 @@ extension ASTGenVisitor {
     }
     let signature = self.generate(
       functionSignature: node.signature,
-      for: name.isOperator ? .operator : .function
+      for: name.isOperator() ? .operator : .function
     )
 
     let decl = BridgedFuncDecl.createParsed(

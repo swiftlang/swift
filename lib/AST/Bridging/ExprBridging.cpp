@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -124,12 +124,12 @@ BridgedCallExpr BridgedCallExpr_createParsed(BridgedASTContext cContext,
 BridgedCaptureListEntry BridegedCaptureListEntry_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedReferenceOwnership cOwnershipKind,
-    BridgedSourceRange cOwnershipRange, BridgedIdentifier cName,
+    BridgedSourceRange cOwnershipRange, Identifier name,
     BridgedSourceLoc cNameLoc, BridgedSourceLoc cEqualLoc,
     BridgedExpr cInitializer) {
   return CaptureListEntry::createParsed(
       cContext.unbridged(), unbridged(cOwnershipKind),
-      cOwnershipRange.unbridged(), cName.unbridged(), cNameLoc.unbridged(),
+      cOwnershipRange.unbridged(), name, cNameLoc.unbridged(),
       cEqualLoc.unbridged(), cInitializer.unbridged(),
       cDeclContext.unbridged());
 }
@@ -261,11 +261,11 @@ BridgedDotSelfExpr BridgedDotSelfExpr_createParsed(BridgedASTContext cContext,
 }
 
 BridgedEditorPlaceholderExpr BridgedEditorPlaceholderExpr_createParsed(
-    BridgedASTContext cContext, BridgedIdentifier cPlaceholderId,
-    BridgedSourceLoc cLoc, BridgedNullableTypeRepr cPlaceholderTyR,
+    BridgedASTContext cContext, Identifier placeholderId, BridgedSourceLoc cLoc,
+    BridgedNullableTypeRepr cPlaceholderTyR,
     BridgedNullableTypeRepr cExpansionTyR) {
   return new (cContext.unbridged()) EditorPlaceholderExpr(
-      cPlaceholderId.unbridged(), cLoc.unbridged(), cPlaceholderTyR.unbridged(),
+      placeholderId, cLoc.unbridged(), cPlaceholderTyR.unbridged(),
       cExpansionTyR.unbridged());
 }
 

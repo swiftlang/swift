@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -83,15 +83,14 @@ BridgedIsPattern BridgedIsPattern_createParsed(BridgedASTContext cContext,
 BridgedNamedPattern
 BridgedNamedPattern_createParsed(BridgedASTContext cContext,
                                  BridgedDeclContext cDeclContext,
-                                 BridgedIdentifier name, BridgedSourceLoc loc) {
+                                 Identifier name, BridgedSourceLoc loc) {
   auto &context = cContext.unbridged();
   auto *dc = cDeclContext.unbridged();
 
   // Note 'isStatic' and the introducer value are temporary.
   // The outer context should set the correct values.
   auto *varDecl = new (context) VarDecl(
-      /*isStatic=*/false, VarDecl::Introducer::Let, loc.unbridged(),
-      name.unbridged(), dc);
+      /*isStatic=*/false, VarDecl::Introducer::Let, loc.unbridged(), name, dc);
   auto *pattern = new (context) NamedPattern(varDecl);
   return pattern;
 }
@@ -112,8 +111,7 @@ BridgedTuplePattern BridgedTuplePattern_createParsed(
   llvm::transform(cElements.unbridged<BridgedTuplePatternElt>(),
                   std::back_inserter(elements),
                   [](const BridgedTuplePatternElt &elt) {
-                    return TuplePatternElt(elt.Label.unbridged(),
-                                           elt.LabelLoc.unbridged(),
+                    return TuplePatternElt(elt.Label, elt.LabelLoc.unbridged(),
                                            elt.ThePattern.unbridged());
                   });
 
@@ -140,6 +138,6 @@ void BridgedPattern_setImplicit(BridgedPattern cPattern) {
   cPattern.unbridged()->setImplicit();
 }
 
-BridgedIdentifier BridgedPattern_getBoundName(BridgedPattern cPattern) {
+Identifier BridgedPattern_getBoundName(BridgedPattern cPattern) {
   return cPattern.unbridged()->getBoundName();
 }

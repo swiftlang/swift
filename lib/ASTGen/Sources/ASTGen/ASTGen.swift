@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -177,12 +177,12 @@ struct ASTGenVisitor {
 }
 
 extension ASTGenVisitor {
-  /// Obtains a bridged, `ASTContext`-owned "identifier".
+  /// Obtains a `ASTContext`-owned "identifier".
   ///
-  /// If the token text is `_`, return an empty identifier. If the token is an
+  /// If the token text is `_`, returns an empty identifier. If the token is an
   /// escaped identifier, backticks are stripped.
   @inline(__always)
-  func generateIdentifier(_ token: TokenSyntax) -> BridgedIdentifier {
+  func generateIdentifier(_ token: TokenSyntax) -> Identifier {
     if token.rawTokenKind == .wildcard {
       return nil
     }
@@ -193,11 +193,11 @@ extension ASTGenVisitor {
     return self.ctx.getIdentifier(text.bridged)
   }
 
-  /// Obtains a bridged, `ASTContext`-owned "identifier".
+  /// Obtains a `ASTContext`-owned "identifier".
   ///
-  /// If the `token` text is `nil`, return an empty identifier.
+  /// If the `token` text is `nil`, returns an empty identifier.
   @inline(__always)
-  func generateIdentifier(_ token: TokenSyntax?) -> BridgedIdentifier {
+  func generateIdentifier(_ token: TokenSyntax?) -> Identifier {
     token.map(generateIdentifier(_:)) ?? nil
   }
 
@@ -215,10 +215,11 @@ extension ASTGenVisitor {
     node.map(generateSourceLoc(_:)) ?? nil
   }
 
-  /// Obtains a pair of bridged identifier and the bridged source location.
+  /// Obtains a pair of an `ASTContext`-owned identifier and a bridged source
+  /// location.
   @inline(__always)
   func generateIdentifierAndSourceLoc(_ token: TokenSyntax) -> (
-    identifier: BridgedIdentifier, sourceLoc: BridgedSourceLoc
+    identifier: Identifier, sourceLoc: BridgedSourceLoc
   ) {
     return (
       self.generateIdentifier(token),
@@ -226,12 +227,13 @@ extension ASTGenVisitor {
     )
   }
 
-  /// Obtains a pair of bridged identifier and the bridged source location.
+  /// Obtains a pair of an `ASTContext`-owned identifier and a bridged source
+  /// location.
   /// If `token` is `nil`, returns a pair of an empty identifier and an invalid
   /// source location.
   @inline(__always)
   func generateIdentifierAndSourceLoc(_ token: TokenSyntax?) -> (
-    identifier: BridgedIdentifier, sourceLoc: BridgedSourceLoc
+    identifier: Identifier, sourceLoc: BridgedSourceLoc
   ) {
     token.map(generateIdentifierAndSourceLoc(_:)) ?? (nil, nil)
   }
