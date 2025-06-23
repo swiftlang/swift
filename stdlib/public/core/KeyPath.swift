@@ -3120,7 +3120,7 @@ internal func _resolveRelativeIndirectableAddress(_ base: UnsafeRawPointer,
 internal func _resolveCompactFunctionPointer(_ base: UnsafeRawPointer, _ offset: Int32)
     -> UnsafeRawPointer {
 #if SWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER
-  return UnsafeRawPointer(bitPattern: Int(offset))._unsafelyUnwrappedUnchecked
+  return unsafe UnsafeRawPointer(bitPattern: Int(offset))._unsafelyUnwrappedUnchecked
 #else
   return unsafe _resolveRelativeAddress(base, offset)
 #endif

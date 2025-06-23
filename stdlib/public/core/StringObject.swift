@@ -1005,7 +1005,7 @@ extension _StringObject {
       _internalInvariantFailure()
     }
     #if !$Embedded
-    return _unsafeUncheckedDowncast(storage, to: __StringStorage.self)
+    return unsafe _unsafeUncheckedDowncast(storage, to: __StringStorage.self)
     #else
     return Builtin.castFromNativeObject(storage)
     #endif
@@ -1044,7 +1044,7 @@ extension _StringObject {
       _internalInvariantFailure()
     }
     #if !$Embedded
-    return _unsafeUncheckedDowncast(storage, to: __SharedStringStorage.self)
+    return unsafe _unsafeUncheckedDowncast(storage, to: __SharedStringStorage.self)
     #else
     return Builtin.castFromNativeObject(storage)
     #endif
