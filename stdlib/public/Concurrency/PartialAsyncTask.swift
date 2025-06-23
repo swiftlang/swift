@@ -450,6 +450,48 @@ extension ExecutorJob {
   }
 }
 
+// Helper to create a trampoline job to execute a job on a specified
+// executor.
+extension ExecutorJob {
+
+  /// Create a trampoline to enqueue the specified job on the specified
+  /// executor.
+  ///
+  /// This is useful in conjunction with the `Clock.run()` API, which
+  /// runs a job on an unspecified executor.
+  ///
+  /// Parameters:
+  ///
+  /// - to executor:   The `Executor` on which it should be enqueued.
+  ///
+  /// Returns:
+  ///
+  /// A new ExecutorJob that will enqueue the specified job on the specified
+  /// executor.
+  @available(StdlibDeploymentTarget 6.2, *)
+  public func createTrampoline(to executor: some Executor) -> ExecutorJob {
+    let flags = taskCreateFlags(
+      priority: TaskPriority(priority),
+      isChildTask: false,
+      copyTaskLocals: false,
+      inheritContext: false,
+      enqueueJob: false,
+      addPendingGroupTaskUnconditionally: false,
+      isDiscardingTask: false,
+      isSynchronousStart: false
+    )
+
+    let unownedJob = UnownedJob(context: self.context)
+    let (trampolineTask, _) = Builtin.createAsyncTask(flags) {
+      executor.enqueue(unownedJob)
+    }
+    let trampoline = Builtin.convertTaskToJob(trampolineTask)
+
+    return ExecutorJob(context: trampoline)
+  }
+
+}
+
 // Stack-disciplined job-local allocator support
 @available(StdlibDeploymentTarget 6.2, *)
 extension ExecutorJob {
