@@ -2154,3 +2154,51 @@ extension Dictionary.Index: @unchecked Sendable
   where Key: Sendable, Value: Sendable {}
 extension Dictionary.Iterator: @unchecked Sendable
   where Key: Sendable, Value: Sendable {}
+
+extension Dictionary {
+  /// Returns a boolean value indicating whether this dictionary is identical to
+  /// `other`.
+  ///
+  /// Two dictionary values are identical if there is no way to distinguish
+  /// between them.
+  ///
+  /// For any values `a`, `b`, and `c`:
+  ///
+  /// - `a.isIdentical(to: a)` is always `true`. (Reflexivity)
+  /// - `a.isIdentical(to: b)` implies `b.isIdentical(to: a)`. (Symmetry)
+  /// - If `a.isIdentical(to: b)` and `b.isIdentical(to: c)` are both `true`,
+  ///   then `a.isIdentical(to: c)` is also `true`. (Transitivity)
+  /// - If `a` and `b` are `Equatable`, then `a.isIdentical(b)` implies `a == b`
+  /// 
+  /// Comparing dictionaries this way includes comparing (normally) hidden
+  /// implementation details such as the memory location of any underlying
+  /// dictionary storage object. Therefore, identical dictionaries are
+  /// guaranteed to compare equal with `==`, but not all equal dictionaries are
+  /// considered identical.
+  ///
+  /// - Performance: O(1)
+  @_alwaysEmitIntoClient
+  public func isIdentical(to other: Self) -> Bool {
+#if _runtime(_ObjC)
+    if
+      self._variant.isNative,
+      other._variant.isNative,
+      unsafe (self._variant.asNative._storage === other._variant.asNative._storage)
+    {
+      return true
+    }
+    if
+      !self._variant.isNative,
+      !other._variant.isNative,
+      self._variant.asCocoa.object === other._variant.asCocoa.object
+    {
+      return true
+    }
+#else
+    if unsafe (self._variant.asNative._storage === other._variant.asNative._storage) {
+      return true
+    }
+#endif
+    return false
+  }
+}
