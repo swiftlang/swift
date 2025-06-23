@@ -106,6 +106,11 @@ public struct NEInt: ~Escapable {
   init(owner: borrowing NCInt) {
     self.i = owner.i
   }
+
+  @_lifetime(immortal)
+  init(immortal i: Int) {
+    self.i = i
+  }
 }
 
 struct TestDeinitCallsAddressor: ~Copyable, ~Escapable {
@@ -227,4 +232,14 @@ class ClassStorage {
     let ne = self.nc!.getNE()
     _ = ne
   }
+}
+
+// =============================================================================
+// Immortal
+// =============================================================================
+
+@_lifetime(immortal)
+func testVoid() -> NEInt {
+  let ne = NEInt(immortal: 3)
+  return _overrideLifetime(ne, borrowing: ())
 }
