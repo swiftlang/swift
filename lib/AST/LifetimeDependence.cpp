@@ -1274,6 +1274,7 @@ protected:
       break;
     case AccessorKind::Set: {
       const unsigned newValIdx = 0;
+      auto *afd = cast<AbstractFunctionDecl>(decl);
       auto *param = afd->getParameters()->get(newValIdx);
       Type paramTypeInContext =
         afd->mapTypeIntoContext(param->getInterfaceType());
@@ -1354,6 +1355,7 @@ protected:
         }
       }
     }
+    auto *afd = cast<AbstractFunctionDecl>(decl);
     // Either a Get or Modify without any wrapped accessor. Handle these like a
     // read of the stored property.
     return inferLifetimeDependenceKind(
