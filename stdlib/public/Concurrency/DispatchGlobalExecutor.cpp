@@ -300,7 +300,9 @@ platform_time(uint64_t nsec) {
 static inline dispatch_time_t
 clock_and_value_to_time(int clock, long long sec, long long nsec) {
   uint64_t deadline;
-  if (__builtin_mul_overflow(sec, NSEC_PER_SEC, &deadline)
+  if (sec < 0 || sec == 0 && nsec < 0)
+    deadline = 0;
+  else if (__builtin_mul_overflow(sec, NSEC_PER_SEC, &deadline)
       || __builtin_add_overflow(nsec, deadline, &deadline)) {
     deadline = UINT64_MAX;
   }
