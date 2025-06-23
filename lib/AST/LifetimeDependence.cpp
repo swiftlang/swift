@@ -412,6 +412,7 @@ protected:
     return false;
   }
 
+  // Infer ambiguous cases for backward compatibility.
   bool useLazyInference() const {
     return isInterfaceFile()
       || ctx.LangOpts.EnableExperimentalLifetimeDependenceInference;
@@ -873,7 +874,7 @@ protected:
     // Infer non-Escapable results.
     if (isDiagnosedNonEscapable(getResultOrYield())) {
       if (hasImplicitSelfParam()) {
-        // Methods and accessors that return or yield a non-Escapable value.
+        // Methods that return a non-Escapable value.
         inferNonEscapableResultOnSelf();
         return;
       }
@@ -910,31 +911,42 @@ protected:
     return true;
   }
 
-  // Infer method dependence: result depends on self. This includes _modify.
+  // Infer method dependence of result on self for
+  // methods, getters, and _modify accessors.
   void inferNonEscapableResultOnSelf() {
     Type selfTypeInContext = dc->getSelfTypeInContext();
     if (selfTypeInContext->hasError()) {
       return;
     }
-    bool nonEscapableSelf = isDiagnosedNonEscapable(selfTypeInContext);
 
-    // Avoid diagnosing inference on mutating methods when 'self' is
-    // non-Escapable. The inout 'self' also needs an inferred dependence on
-    // itself. This will be diagnosed when checking for missing dependencies.
-    if (nonEscapableSelf && afd->getImplicitSelfDecl()->isInOut()) {
-      if (auto accessor = dyn_cast<AccessorDecl>(afd)) {
-        inferMutatingAccessor(accessor);
+    bool nonEscapableSelf = isDiagnosedNonEscapable(selfTypeInContext);
+    if (auto accessor = dyn_cast<AccessorDecl>(afd)) {
+      if (isImplicitOrSIL() || useLazyInference()) {
+        if (nonEscapableSelf && afd->getImplicitSelfDecl()->isInOut()) {
+          // Implicit accessors that return or yield a non-Escapable value may
+          // infer dependency on both self and result.
+          inferMutatingAccessor(accessor);
+        }
+        // Infer the result dependency on self based on the kind of accessor
+        // that is wrapped by this synthesized accessors.
+        if (auto dependenceKind =
+            getAccessorDependence(accessor, selfTypeInContext)) {
+          pushDeps(createDeps(resultIndex).add(selfIndex, *dependenceKind));
+        }
+        return;
       }
+      // Explicit accessors are inferred the same way as regular methods.
+    }
+    // Do infer the result of a mutating method when 'self' is
+    // non-Escapable. The missing dependence on inout 'self' will be diagnosed
+    // later anyway, so an explicit annotation will still be needed.
+    if (nonEscapableSelf && afd->getImplicitSelfDecl()->isInOut()) {
       return;
     }
-
     // Methods with parameters only apply to lazy inference.
     if (!useLazyInference() && afd->getParameters()->size() > 0) {
       return;
     }
-    // Allow inference for implicit getters, which simply return a stored,
-    // property, and for implicit _read/_modify, which cannot be defined
-    // explicitly alongside a regular getter.
     if (!useLazyInference() && !isImplicitOrSIL()) {
       // Require explicit @_lifetime(borrow self) for UnsafePointer-like self.
       if (!nonEscapableSelf && isBitwiseCopyable(selfTypeInContext, ctx)) {
@@ -950,9 +962,12 @@ protected:
         return;
       }
     }
+    // Infer based on ownership if possible for either explicit accessors or
+    // methods as long as they pass preceding ambiguity checks.
     auto kind = inferLifetimeDependenceKind(
         selfTypeInContext, afd->getImplicitSelfDecl()->getValueOwnership());
     if (!kind) {
+      // Special diagnostic for an attempt to depend on a consuming parameter.
       diagnose(returnLoc,
                diag::lifetime_dependence_cannot_infer_scope_ownership,
                "self", diagnosticQualifier());
@@ -961,6 +976,8 @@ protected:
     pushDeps(createDeps(resultIndex).add(selfIndex, *kind));
   }
 
+  // Infer the kind of dependence that makes sense for reading or writing a
+  // stored property (for getters or initializers).
   std::optional<LifetimeDependenceKind>
   inferLifetimeDependenceKind(Type sourceType, ValueOwnership ownership) {
     if (!sourceType->isEscapable()) {
@@ -974,8 +991,9 @@ protected:
     auto loweredOwnership = ownership != ValueOwnership::Default
                                 ? ownership
                                 : getLoweredOwnership(afd);
-    if (loweredOwnership != ValueOwnership::Shared &&
-        loweredOwnership != ValueOwnership::InOut) {
+    // It is impossible to depend on a consumed Escapable value (unless it is
+    // BitwiseCopyable as checked above).
+    if (loweredOwnership == ValueOwnership::Owned) {
       return std::nullopt;
     }
     return LifetimeDependenceKind::Scope;
@@ -1125,7 +1143,10 @@ protected:
     // Handle implicit setters before diagnosing mutating methods. This
     // does not include global accessors, which have no implicit 'self'.
     if (auto accessor = dyn_cast<AccessorDecl>(afd)) {
-      inferMutatingAccessor(accessor);
+      // Explicit setters require explicit lifetime dependencies.
+      if (isImplicitOrSIL() || useLazyInference()) {
+        inferMutatingAccessor(accessor);
+      }
       return;
     }
     if (afd->getParameters()->size() > 0) {
@@ -1142,12 +1163,29 @@ protected:
                                        LifetimeDependenceKind::Inherit));
   }
 
-  // Infer a mutating accessor's non-Escapable 'self' dependencies.
-  void inferMutatingAccessor(AccessorDecl *accessor) {
+  // Infer dependence for an accessor whose non-escapable result depends on
+  // self. This includes _read and _modify.
+  void inferAccessor(AccessorDecl *accessor, Type selfTypeInContext) {
+    // Explicit accessors require explicit lifetime dependencies.
     if (!isImplicitOrSIL() && !useLazyInference()) {
-      // Explicit setters require explicit lifetime dependencies.
       return;
     }
+    bool nonEscapableSelf = isDiagnosedNonEscapable(selfTypeInContext);
+    if (nonEscapableSelf && afd->getImplicitSelfDecl()->isInOut()) {
+      // First, infer the dependency on the inout non-Escapable self. This may
+      // result in two inferred dependencies for accessors.
+      inferMutatingAccessor(accessor);
+    }
+    // Infer the result dependency on self based on the kind of accessor that
+    // is wrapped by this synthesized accessors.
+    if (auto dependenceKind =
+        getAccessorDependence(accessor, selfTypeInContext)) {
+      pushDeps(createDeps(resultIndex).add(selfIndex, *dependenceKind));
+    }
+  }
+
+  // Infer a mutating accessor's non-Escapable 'self' dependencies.
+  void inferMutatingAccessor(AccessorDecl *accessor) {
     switch (accessor->getAccessorKind()) {
     case AccessorKind::Read:
     case AccessorKind::Read2:
@@ -1164,8 +1202,6 @@ protected:
       // _modify for them even though it won't be emitted.
       pushDeps(createDeps(selfIndex).add(selfIndex,
                                          LifetimeDependenceKind::Inherit));
-      pushDeps(createDeps(resultIndex).add(selfIndex,
-                                           LifetimeDependenceKind::Scope));
       break;
     case AccessorKind::Set: {
       const unsigned newValIdx = 0;
@@ -1185,7 +1221,7 @@ protected:
       // dependency, so the setter cannot depend on 'newValue'.
       if (!paramTypeInContext->isEscapable()) {
         targetDeps = std::move(targetDeps)
-          .add(newValIdx, LifetimeDependenceKind::Inherit);
+                         .add(newValIdx, LifetimeDependenceKind::Inherit);
       }
       pushDeps(std::move(targetDeps));
       break;
@@ -1205,6 +1241,54 @@ protected:
       // Unknown mutating accessor.
       break;
     }
+  }
+
+  // Implicit accessors must be consistent with the accessor that they
+  // wrap. Otherwise, the sythesized implementation will report a diagnostic
+  // error.
+  std::optional<LifetimeDependenceKind>
+  getAccessorDependence(AccessorDecl *accessor, Type selfTypeInContext) {
+    std::optional<AccessorKind> wrappedAccessorKind = std::nullopt;
+    switch (accessor->getAccessorKind()) {
+    case AccessorKind::Read:
+    case AccessorKind::Read2:
+    case AccessorKind::Modify:
+    case AccessorKind::Modify2:
+      // read/modify are syntesized as calls to the getter.
+      wrappedAccessorKind = AccessorKind::Get;
+      break;
+    case AccessorKind::Get:
+      // getters are synthesized as access to a stored property.
+      break;
+    default:
+      // Unknown synthesized accessor.
+      // Setters are handled in inferMutatingAccessor() because they don't
+      // return a value.
+      return std::nullopt;
+    }
+    if (wrappedAccessorKind) {
+      auto *var = cast<VarDecl>(accessor->getStorage());
+      for (auto *wrappedAccessor : var->getAllAccessors()) {
+        if (wrappedAccessor->isImplicit())
+          continue;
+        if (wrappedAccessor->getAccessorKind() == wrappedAccessorKind) {
+          if (auto deps = wrappedAccessor->getLifetimeDependencies()) {
+            for (auto &dep : *deps) {
+              if (dep.getTargetIndex() != resultIndex)
+                continue;
+              if (dep.checkInherit(selfIndex))
+                return LifetimeDependenceKind::Inherit;
+              if (dep.checkScope(selfIndex))
+                return LifetimeDependenceKind::Scope;
+            }
+          }
+        }
+      }
+    }
+    // Either a Get or Modify without any wrapped accessor. Handle these like a
+    // read of the stored property.
+    return inferLifetimeDependenceKind(
+      selfTypeInContext, afd->getImplicitSelfDecl()->getValueOwnership());
   }
 
   // Infer 'inout' parameter dependency when the only parameter is
