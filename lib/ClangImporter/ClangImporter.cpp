@@ -7798,20 +7798,6 @@ static bool hasImportAsRefAttr(const clang::RecordDecl *decl) {
          });
 }
 
-// Is this a pointer to a foreign reference type.
-bool importer::isForeignReferenceTypeWithoutImmortalAttrs(const clang::QualType type) {
-  if (!type->isPointerType())
-    return false;
-
-  auto pointeeType =
-      dyn_cast<clang::RecordType>(type->getPointeeType().getCanonicalType());
-  if (pointeeType == nullptr)
-    return false;
-
-  return hasImportAsRefAttr(pointeeType->getDecl()) &&
-         !hasImmortalAttrs(pointeeType->getDecl());
-}
-
 static bool hasDiamondInheritanceRefType(const clang::CXXRecordDecl *decl) {
   if (!decl->hasDefinition() || decl->isDependentType())
     return false;
