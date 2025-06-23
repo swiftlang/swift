@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -primary-file %s -O -g -S  | %FileCheck %s --check-prefix CHECK --check-prefix CHECK-%target-cpu --check-prefix CHECK-OPT-%target-os
+// RUN: %target-swift-frontend -primary-file %s -O -g -S  | %FileCheck %s --check-prefix CHECK --check-prefix CHECK-%target-cpu --check-prefix CHECK-OPT-%target-os --check-prefix CHECK-OPT-%target-os-%target-cpu
 // RUN: %target-swift-frontend -primary-file %s -g -S  | %FileCheck %s --check-prefix CHECK --check-prefix CHECK-%target-cpu --check-prefix CHECK-NOOPT-%target-os
 
 import Builtin
@@ -25,8 +25,10 @@ import Swift
 // CHECK-OPT-windows:   ##NO_APP
 // CHECK-OPT-linux-androideabi:   @APP
 // CHECK-OPT-linux-androideabi:   @NO_APP
-// CHECK-OPT-linux-android:       //APP
-// CHECK-OPT-linux-android:       //NO_APP
+// CHECK-OPT-linux-android-aarch64:       //APP
+// CHECK-OPT-linux-android-aarch64:       //NO_APP
+// CHECK-OPT-linux-android-x86_64:       #APP
+// CHECK-OPT-linux-android-x86_64:       #NO_APP
 // CHECK-NOOPT-macosx-NOT: InlineAsm Start
 // CHECK-NOOPT-macosx-NOT: InlineAsm End
 // CHECK-NOOPT-linux-NOT:  ##APP
@@ -35,8 +37,10 @@ import Swift
 // CHECK-NOOPT-windows-NOT:  ##NO_APP
 // CHECK-OPT-linux-androideabi-NOT:   @APP
 // CHECK-OPT-linux-androideabi-NOT:   @NO_APP
-// CHECK-OPT-linux-android-NOT:       //APP
-// CHECK-OPT-linux-android-NOT:       //NO_APP
+// CHECK-OPT-linux-android-aarch64-NOT:       //APP
+// CHECK-OPT-linux-android-aarch64-NOT:       //NO_APP
+// CHECK-OPT-linux-android-x86_64-NOT:       #APP
+// CHECK-OPT-linux-android-x86_64-NOT:       #NO_APP
 // CHECK-x86_64:      ud2
 // CHECK-i386:        ud2
 // CHECK-arm64:       brk
