@@ -2737,6 +2737,10 @@ static void addNamespaceMembers(Decl *decl,
     declOwner = declOwner->getTopLevelModule();
   auto Redecls = llvm::SmallVector<clang::NamespaceDecl *, 2>(namespaceDecl->redecls());
   std::stable_sort(Redecls.begin(), Redecls.end(), [&](clang::NamespaceDecl *LHS, clang::NamespaceDecl *RHS) {
+    // A namespace redeclaration will not have an owning Clang module if it is
+    // declared in a bridging header.
+    if (!LHS->getOwningModule() || !RHS->getOwningModule())
+      return (bool)LHS->getOwningModule() < (bool)RHS->getOwningModule();
     return LHS->getOwningModule()->Name < RHS->getOwningModule()->Name;
   });
   for (auto redecl : Redecls) {
