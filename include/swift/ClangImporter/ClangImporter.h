@@ -716,9 +716,6 @@ bool isCxxConstReferenceType(const clang::Type *type);
 /// Determine whether this typedef is a CF type.
 bool isCFTypeDecl(const clang::TypedefNameDecl *Decl);
 
-/// Determine whether type is a c++ foreign reference type.
-bool isForeignReferenceTypeWithoutImmortalAttrs(const clang::QualType type);
-
 /// Determine the imported CF type for the given typedef-name, or the empty
 /// string if this is not an imported CF type name.
 llvm::StringRef getCFTypeName(const clang::TypedefNameDecl *decl);
