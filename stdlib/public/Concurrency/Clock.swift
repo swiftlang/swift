@@ -43,6 +43,28 @@ public protocol Clock<Duration>: Sendable {
 #endif
 }
 
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+extension Clock {
+  // The default implementation works by creating a trampoline and calling
+  // the run() method.
+  @available(StdlibDeploymentTarget 6.2, *)
+  func enqueue(_ job: consuming ExecutorJob,
+               on executor: some Executor,
+               at instant: Instant, tolerance: Duration?) {
+    let trampoline = job.createTrampoline(to: executor)
+    run(trampoline, at: instant, tolerance: tolerance)
+  }
+
+  // Clocks that do not implement run will fatalError() if you try to use
+  // them with an executor that does not understand them.
+  @available(StdlibDeploymentTarget 6.2, *)
+  func run(_ job: consuming ExecutorJob,
+           at instant: Instant, tolerance: Duration?) {
+    fatalError("\(Self.self) does not implement run(_:at:tolerance:).")
+  }
+}
+#endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+
 @available(StdlibDeploymentTarget 5.7, *)
 extension Clock {
   /// Measure the elapsed time to execute a closure.
@@ -117,6 +139,7 @@ extension Clock {
 enum _ClockID: Int32 {
   case continuous = 1
   case suspending = 2
+  case walltime = 3
 }
 
 @available(StdlibDeploymentTarget 5.7, *)
