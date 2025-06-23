@@ -314,7 +314,7 @@ public struct CVaListPointer {
        __vr_top: UnsafeMutablePointer<Int>?,
        __gr_off: Int32,
        __vr_off: Int32) {
-    _value = (__stack, __gr_top, __vr_top, __gr_off, __vr_off)
+    unsafe _value = (__stack, __gr_top, __vr_top, __gr_off, __vr_off)
   }
 }
 
@@ -322,11 +322,11 @@ public struct CVaListPointer {
 extension CVaListPointer: CustomDebugStringConvertible {
   @safe
   public var debugDescription: String {
-    return "(\(_value.__stack.debugDescription), " +
-           "\(_value.__gr_top.debugDescription), " +
-           "\(_value.__vr_top.debugDescription), " +
-           "\(_value.__gr_off), " +
-           "\(_value.__vr_off))"
+    return "(\(unsafe _value.__stack.debugDescription), " +
+           "\(unsafe _value.__gr_top.debugDescription), " +
+           "\(unsafe _value.__vr_top.debugDescription), " +
+           "\(unsafe _value.__gr_off), " +
+           "\(unsafe _value.__vr_off))"
   }
 }
 
