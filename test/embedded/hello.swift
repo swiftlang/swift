@@ -2,7 +2,7 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
-// REQUIRES: OS=macosx || OS=linux-gnu || OS=none-eabi || OS=none-elf || OS=none-wasm
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=none-eabi || OS=none-elf || OS=wasi
 // REQUIRES: swift_feature_Embedded
 
 print("Hello, Embedded Swift!")
