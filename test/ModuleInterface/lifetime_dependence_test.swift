@@ -2,6 +2,7 @@
 
 // RUN: %target-swift-frontend -swift-version 5 -enable-library-evolution -emit-module \
 // RUN:     -enable-experimental-feature LifetimeDependence \
+// RUN:     -suppress-warnings \
 // RUN:     -o %t/lifetime_dependence.swiftmodule \
 // RUN:     -emit-module-interface-path %t/lifetime_dependence.swiftinterface \
 // RUN:     %S/Inputs/lifetime_dependence.swift
@@ -41,3 +42,13 @@ import lifetime_dependence
 // CHECK: extension lifetime_dependence.Container {
 // CHECK-NEXT: #if compiler(>=5.3) && $NonescapableTypes && $LifetimeDependence
 // CHECK-NEXT:   public var storage: lifetime_dependence.BufferView {
+
+// CHECK-LABEL: extension Swift.UnsafeMutableBufferPointer where Element : ~Copyable {
+// CHECK:   #if compiler(>=5.3) && $LifetimeDependence
+// CHECK:   public var span: Swift.Span<Element> {
+// CHECK:     @lifetime(borrow self)
+// CHECK:     @_alwaysEmitIntoClient get {
+// CHECK:   #if compiler(>=5.3) && $LifetimeDependence && $NonescapableAccessorOnTrivial
+// CHECK:   public var mutableSpan: Swift.MutableSpan<Element> {
+// CHECK:     @lifetime(borrow self)
+// CHECK:     @_alwaysEmitIntoClient get {
