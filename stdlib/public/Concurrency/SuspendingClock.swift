@@ -87,12 +87,6 @@ extension SuspendingClock: Clock {
     return Duration(_seconds: seconds, nanoseconds: nanoseconds)
   }
 
-  /// The suspending clock is monotonic
-  @available(StdlibDeploymentTarget 6.2, *)
-  public var traits: ClockTraits {
-    return [.monotonic]
-  }
-
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   /// Suspend task execution until a given deadline within a tolerance.
   /// If no tolerance is specified then the system may adjust the deadline
