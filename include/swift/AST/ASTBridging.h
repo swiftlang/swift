@@ -22,6 +22,7 @@
 #include "swift/AST/DiagnosticKind.h"
 #include "swift/AST/DiagnosticList.h"
 #include "swift/AST/GenericTypeParamKind.h"
+#include "swift/AST/Identifier.h"
 #include "swift/AST/LayoutConstraintKind.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/Basic/BasicBridging.h"
@@ -111,30 +112,9 @@ namespace swift {
 // MARK: Identifier
 //===----------------------------------------------------------------------===//
 
-class BridgedIdentifier {
-public:
-  SWIFT_UNAVAILABLE("Use '.raw' instead")
-  const void *_Nullable Raw;
-
-  BridgedIdentifier() : Raw(nullptr) {}
-
-  SWIFT_NAME("init(raw:)")
-  BridgedIdentifier(const void *_Nullable raw) : Raw(raw) {}
-
-  BRIDGED_INLINE BridgedIdentifier(swift::Identifier ident);
-  BRIDGED_INLINE swift::Identifier unbridged() const;
-
-  SWIFT_COMPUTED_PROPERTY
-  const void *_Nullable getRaw() const { return Raw; }
-
-  BRIDGED_INLINE
-  SWIFT_COMPUTED_PROPERTY
-  bool getIsOperator() const;
-};
-
 struct BridgedLocatedIdentifier {
   SWIFT_NAME("name")
-  BridgedIdentifier Name;
+  swift::Identifier Name;
 
   SWIFT_NAME("nameLoc")
   BridgedSourceLoc NameLoc;
@@ -142,7 +122,7 @@ struct BridgedLocatedIdentifier {
 
 struct BridgedConsumedLookupResult {
   SWIFT_NAME("name")
-  BridgedIdentifier Name;
+  swift::Identifier Name;
 
   SWIFT_NAME("nameLoc")
   BridgedSourceLoc NameLoc;
@@ -156,7 +136,7 @@ struct BridgedConsumedLookupResult {
 };
 
 class BridgedDeclBaseName {
-  BridgedIdentifier Ident;
+  swift::Identifier Ident;
 
 public:
   BRIDGED_INLINE BridgedDeclBaseName(swift::DeclBaseName baseName);
@@ -175,7 +155,7 @@ BridgedDeclBaseName BridgedDeclBaseName_createSubscript();
 
 SWIFT_NAME("BridgedDeclBaseName.createIdentifier(_:)")
 BridgedDeclBaseName
-BridgedDeclBaseName_createIdentifier(BridgedIdentifier identifier);
+BridgedDeclBaseName_createIdentifier(swift::Identifier identifier);
 
 class BridgedDeclNameRef {
   void *_Nullable opaque;
@@ -272,9 +252,10 @@ public:
   BridgedAvailabilityMacroMap getAvailabilityMacroMap() const;
 };
 
-#define IDENTIFIER_WITH_NAME(Name, _) \
-SWIFT_NAME("getter:BridgedASTContext.id_" #Name "(self:)") \
-BRIDGED_INLINE BridgedIdentifier BridgedASTContext_id_##Name(BridgedASTContext bridged);
+#define IDENTIFIER_WITH_NAME(Name, _)                                          \
+  SWIFT_NAME("getter:BridgedASTContext.id_" #Name "(self:)")                   \
+  BRIDGED_INLINE swift::Identifier BridgedASTContext_id_##Name(                \
+      BridgedASTContext bridged);
 #include "swift/AST/KnownIdentifiers.def"
 
 SWIFT_NAME("BridgedASTContext.init(raw:)")
@@ -293,11 +274,11 @@ BridgedASTContext_allocateCopyString(BridgedASTContext cContext,
                                      BridgedStringRef cStr);
 
 SWIFT_NAME("BridgedASTContext.getIdentifier(self:_:)")
-BridgedIdentifier BridgedASTContext_getIdentifier(BridgedASTContext cContext,
+swift::Identifier BridgedASTContext_getIdentifier(BridgedASTContext cContext,
                                                   BridgedStringRef cStr);
 
 SWIFT_NAME("BridgedASTContext.getDollarIdentifier(self:_:)")
-BridgedIdentifier
+swift::Identifier
 BridgedASTContext_getDollarIdentifier(BridgedASTContext cContext, size_t idx);
 
 SWIFT_NAME("BridgedASTContext.langOptsHasFeature(self:_:)")
@@ -696,7 +677,7 @@ BridgedOptionalPlatformKind PlatformKind_fromString(BridgedStringRef cStr);
 
 SWIFT_NAME("BridgedOptionalPlatformKind.init(from:)")
 BridgedOptionalPlatformKind
-PlatformKind_fromIdentifier(BridgedIdentifier cIdent);
+PlatformKind_fromIdentifier(swift::Identifier ident);
 
 SWIFT_NAME("BridgedAvailabilityMacroMap.has(self:name:)")
 bool BridgedAvailabilityMacroMap_hasName(BridgedAvailabilityMacroMap map,
@@ -733,7 +714,7 @@ BRIDGED_INLINE bool BridgedAvailabilityDomainOrIdentifier_isDomain(
     BridgedAvailabilityDomainOrIdentifier cVal);
 
 SWIFT_NAME("getter:BridgedAvailabilityDomainOrIdentifier.asIdentifier(self:)")
-BRIDGED_INLINE BridgedIdentifier
+BRIDGED_INLINE swift::Identifier
 BridgedAvailabilityDomainOrIdentifier_getAsIdentifier(
     BridgedAvailabilityDomainOrIdentifier cVal);
 
@@ -746,7 +727,7 @@ SWIFT_NAME(
     "BridgedAvailabilitySpec.createForDomainIdentifier(_:name:nameLoc:version:"
     "versionRange:)")
 BridgedAvailabilitySpec BridgedAvailabilitySpec_createForDomainIdentifier(
-    BridgedASTContext cContext, BridgedIdentifier cName, BridgedSourceLoc cLoc,
+    BridgedASTContext cContext, swift::Identifier name, BridgedSourceLoc cLoc,
     BridgedVersionTuple cVersion, BridgedSourceRange cVersionRange);
 
 SWIFT_NAME("BridgedAvailabilitySpec.clone(self:_:)")
@@ -800,10 +781,10 @@ private:
     Self,
   } kind;
   union Value {
-    BridgedIdentifier name;
+    swift::Identifier name;
     unsigned index;
 
-    Value(BridgedIdentifier name) : name(name) {}
+    Value(swift::Identifier name) : name(name) {}
     Value(unsigned index) : index(index) {}
     Value() : name() {}
   } value;
@@ -813,7 +794,7 @@ private:
 
 public:
   SWIFT_NAME("forNamed(_:loc:)")
-  static BridgedParsedAutoDiffParameter forNamed(BridgedIdentifier name,
+  static BridgedParsedAutoDiffParameter forNamed(swift::Identifier name,
                                                  BridgedSourceLoc loc) {
     return BridgedParsedAutoDiffParameter(loc, Kind::Named, name);
   }
@@ -883,7 +864,7 @@ SWIFT_NAME("BridgedAvailableAttr.createParsed(_:atLoc:range:domainIdentifier:"
            "deprecated:deprecatedRange:obsoleted:obsoletedRange:isSPI:)")
 BridgedAvailableAttr BridgedAvailableAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceRange cRange, BridgedIdentifier cDomainIdentifier,
+    BridgedSourceRange cRange, swift::Identifier domainIdentifier,
     BridgedSourceLoc cDomainLoc, BridgedAvailableAttrKind cKind,
     BridgedStringRef cMessage, BridgedStringRef cRenamed,
     BridgedVersionTuple cIntroduced, BridgedSourceRange cIntroducedRange,
@@ -1046,10 +1027,10 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedParsedLifetimeDependenceKind {
 
 class BridgedLifetimeDescriptor {
   union Value {
-    BridgedIdentifier name;
+    swift::Identifier name;
     unsigned index;
 
-    Value(BridgedIdentifier name) : name(name) {}
+    Value(swift::Identifier name) : name(name) {}
     Value(unsigned index) : index(index) {}
     Value() : name() {}
   } value;
@@ -1071,7 +1052,7 @@ class BridgedLifetimeDescriptor {
 public:
   SWIFT_NAME("forNamed(_:dependenceKind:loc:)")
   static BridgedLifetimeDescriptor
-  forNamed(BridgedIdentifier name,
+  forNamed(swift::Identifier name,
            BridgedParsedLifetimeDependenceKind dependenceKind,
            BridgedSourceLoc loc) {
     return BridgedLifetimeDescriptor(name, DescriptorKind::Named,
@@ -1177,7 +1158,7 @@ BridgedSwiftNativeObjCRuntimeBaseAttr
 BridgedSwiftNativeObjCRuntimeBaseAttr_createParsed(BridgedASTContext cContext,
                                                    BridgedSourceLoc cAtLoc,
                                                    BridgedSourceRange cRange,
-                                                   BridgedIdentifier cName);
+                                                   swift::Identifier name);
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedNonSendableKind {
   BridgedNonSendableKindSpecific,
@@ -1210,7 +1191,7 @@ SWIFT_NAME("BridgedObjCAttr.createParsedNullary(_:atLoc:attrNameLoc:lParenLoc:"
 BridgedObjCAttr BridgedObjCAttr_createParsedNullary(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceLoc cAttrNameLoc, BridgedSourceLoc cLParenLoc,
-    BridgedSourceLoc cNameLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cNameLoc, swift::Identifier name,
     BridgedSourceLoc cRParenLoc);
 
 SWIFT_NAME("BridgedObjCAttr.createParsedSelector(_:atLoc:attrNameLoc:lParenLoc:"
@@ -1224,12 +1205,12 @@ BridgedObjCAttr BridgedObjCAttr_createParsedSelector(
 SWIFT_NAME("BridgedObjCImplementationAttr.createParsed(_:atLoc:range:name:isEarlyAdopter:)")
 BridgedObjCImplementationAttr BridgedObjCImplementationAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceRange cRange, BridgedIdentifier cName, bool isEarlyAdopter);
+    BridgedSourceRange cRange, swift::Identifier name, bool isEarlyAdopter);
 
 SWIFT_NAME("BridgedObjCRuntimeNameAttr.createParsed(_:atLoc:range:name:)")
 BridgedObjCRuntimeNameAttr BridgedObjCRuntimeNameAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceRange cRange, BridgedIdentifier cName);
+    BridgedSourceRange cRange, swift::Identifier name);
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedOptimizationMode {
   BridgedOptimizationModeForSpeed,
@@ -1255,7 +1236,7 @@ BridgedProjectedValuePropertyAttr
 BridgedProjectedValuePropertyAttr_createParsed(BridgedASTContext cContext,
                                                BridgedSourceLoc cAtLoc,
                                                BridgedSourceRange cRange,
-                                               BridgedIdentifier cName);
+                                               swift::Identifier name);
 
 SWIFT_NAME("BridgedRawDocCommentAttr.createParsed(_:range:)")
 BridgedRawDocCommentAttr
@@ -1337,7 +1318,7 @@ SWIFT_NAME(
     "BridgedSPIAccessControlAttr.createParsed(_:atLoc:range:spiGroupName:)")
 BridgedSPIAccessControlAttr BridgedSPIAccessControlAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceRange cRange, BridgedIdentifier cSPIGroupName);
+    BridgedSourceRange cRange, swift::Identifier SPIGroupName);
 
 SWIFT_NAME("BridgedSILGenNameAttr.createParsed(_:atLoc:range:name:isRaw:)")
 BridgedSILGenNameAttr BridgedSILGenNameAttr_createParsed(
@@ -1419,8 +1400,8 @@ SWIFT_NAME("BridgedParamDecl.createParsed(_:declContext:specifierLoc:argName:"
            "defaultValueInitContext:)")
 BridgedParamDecl BridgedParamDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cSpecifierLoc, BridgedIdentifier cArgName,
-    BridgedSourceLoc cArgNameLoc, BridgedIdentifier cParamName,
+    BridgedSourceLoc cSpecifierLoc, swift::Identifier argName,
+    BridgedSourceLoc cArgNameLoc, swift::Identifier paramName,
     BridgedSourceLoc cParamNameLoc, BridgedNullableExpr defaultValue,
     BridgedNullableDefaultArgumentInitializer cDefaultArgumentInitContext);
 
@@ -1467,7 +1448,7 @@ SWIFT_NAME("BridgedFuncDecl.createParsed(_:declContext:staticLoc:"
 BridgedFuncDecl BridgedFuncDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cStaticLoc, BridgedStaticSpelling cStaticSpelling,
-    BridgedSourceLoc cFuncKeywordLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cFuncKeywordLoc, swift::Identifier name,
     BridgedSourceLoc cNameLoc, BridgedNullableGenericParamList genericParamList,
     BridgedParameterList parameterList, BridgedSourceLoc cAsyncLoc,
     BridgedSourceLoc cThrowsLoc, BridgedNullableTypeRepr thrownType,
@@ -1498,7 +1479,7 @@ SWIFT_NAME(
     "nameLoc:genericParamList:equalLoc:underlyingType:genericWhereClause:)")
 BridgedTypeAliasDecl BridgedTypeAliasDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cAliasKeywordLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cAliasKeywordLoc, swift::Identifier name,
     BridgedSourceLoc cNameLoc, BridgedNullableGenericParamList genericParamList,
     BridgedSourceLoc cEqualLoc, BridgedTypeRepr underlyingType,
     BridgedNullableTrailingWhereClause genericWhereClause);
@@ -1513,7 +1494,7 @@ SWIFT_NAME(
     "genericParamList:inheritedTypes:genericWhereClause:braceRange:)")
 BridgedNominalTypeDecl BridgedEnumDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cEnumKeywordLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cEnumKeywordLoc, swift::Identifier name,
     BridgedSourceLoc cNameLoc, BridgedNullableGenericParamList genericParamList,
     BridgedArrayRef cInheritedTypes,
     BridgedNullableTrailingWhereClause genericWhereClause,
@@ -1530,7 +1511,7 @@ SWIFT_NAME("BridgedEnumElementDecl.createParsed(_:declContext:name:nameLoc:"
            "parameterList:equalsLoc:rawValue:)")
 BridgedEnumElementDecl BridgedEnumElementDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedIdentifier cName, BridgedSourceLoc cNameLoc,
+    swift::Identifier name, BridgedSourceLoc cNameLoc,
     BridgedNullableParameterList parameterList, BridgedSourceLoc cEqualsLoc,
     BridgedNullableExpr opaqueRawValue);
 
@@ -1539,7 +1520,7 @@ SWIFT_NAME("BridgedStructDecl.createParsed(_:declContext:structKeywordLoc:name:"
            "braceRange:)")
 BridgedNominalTypeDecl BridgedStructDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cStructKeywordLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cStructKeywordLoc, swift::Identifier name,
     BridgedSourceLoc cNameLoc, BridgedNullableGenericParamList genericParamList,
     BridgedArrayRef cInheritedTypes,
     BridgedNullableTrailingWhereClause genericWhereClause,
@@ -1550,7 +1531,7 @@ SWIFT_NAME(
     "genericParamList:inheritedTypes:genericWhereClause:braceRange:isActor:)")
 BridgedNominalTypeDecl BridgedClassDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cClassKeywordLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cClassKeywordLoc, swift::Identifier name,
     BridgedSourceLoc cNameLoc, BridgedNullableGenericParamList genericParamList,
     BridgedArrayRef cInheritedTypes,
     BridgedNullableTrailingWhereClause genericWhereClause,
@@ -1562,7 +1543,7 @@ SWIFT_NAME(
     "genericWhereClause:braceRange:)")
 BridgedNominalTypeDecl BridgedProtocolDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cProtocolKeywordLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cProtocolKeywordLoc, swift::Identifier name,
     BridgedSourceLoc cNameLoc, BridgedArrayRef cPrimaryAssociatedTypeNames,
     BridgedArrayRef cInheritedTypes,
     BridgedNullableTrailingWhereClause genericWhereClause,
@@ -1573,7 +1554,7 @@ SWIFT_NAME("BridgedAssociatedTypeDecl.createParsed(_:declContext:"
            "genericWhereClause:)")
 BridgedAssociatedTypeDecl BridgedAssociatedTypeDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cAssociatedtypeKeywordLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cAssociatedtypeKeywordLoc, swift::Identifier name,
     BridgedSourceLoc cNameLoc, BridgedArrayRef cInheritedTypes,
     BridgedNullableTypeRepr opaqueDefaultType,
     BridgedNullableTrailingWhereClause genericWhereClause);
@@ -1584,7 +1565,7 @@ SWIFT_NAME(
     "genericWhereClause:)")
 BridgedMacroDecl BridgedMacroDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cMacroLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cMacroLoc, swift::Identifier name,
     BridgedSourceLoc cNameLoc, BridgedNullableGenericParamList cGenericParams,
     BridgedParameterList cParams, BridgedSourceLoc cArrowLoc,
     BridgedNullableTypeRepr cResultType, BridgedNullableExpr cDefinition,
@@ -1625,8 +1606,8 @@ SWIFT_NAME("BridgedOperatorDecl.createParsed(_:declContext:fixity:"
 BridgedOperatorDecl BridgedOperatorDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedOperatorFixity cFixity, BridgedSourceLoc cOperatorKeywordLoc,
-    BridgedIdentifier cName, BridgedSourceLoc cNameLoc,
-    BridgedSourceLoc cColonLoc, BridgedIdentifier cPrecedenceGroupName,
+    swift::Identifier name, BridgedSourceLoc cNameLoc,
+    BridgedSourceLoc cColonLoc, swift::Identifier precedenceGroupName,
     BridgedSourceLoc cPrecedenceGroupLoc);
 
 SWIFT_NAME("BridgedPrecedenceGroupDecl.createParsed(declContext:"
@@ -1637,7 +1618,7 @@ SWIFT_NAME("BridgedPrecedenceGroupDecl.createParsed(declContext:"
            "lowerThanNames:rightBraceLoc:)")
 BridgedPrecedenceGroupDecl BridgedPrecedenceGroupDecl_createParsed(
     BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cPrecedencegroupKeywordLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cPrecedencegroupKeywordLoc, swift::Identifier name,
     BridgedSourceLoc cNameLoc, BridgedSourceLoc cLeftBraceLoc,
     BridgedSourceLoc cAssociativityKeywordLoc,
     BridgedSourceLoc cAssociativityValueLoc, swift::Associativity associativity,
@@ -1781,7 +1762,7 @@ BridgedVarDecl_asAbstractStorageDecl(BridgedVarDecl decl);
 
 struct BridgedCallArgument {
   BridgedSourceLoc labelLoc;
-  BridgedIdentifier label;
+  swift::Identifier label;
   BridgedExpr argExpr;
 
   BRIDGED_INLINE swift::Argument unbridged() const;
@@ -1862,7 +1843,7 @@ SWIFT_NAME("BridgedCaptureListEntry.createParsed(_:declContext:ownership:"
 BridgedCaptureListEntry BridegedCaptureListEntry_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedReferenceOwnership cOwnershipKind,
-    BridgedSourceRange cOwnershipRange, BridgedIdentifier cName,
+    BridgedSourceRange cOwnershipRange, swift::Identifier name,
     BridgedSourceLoc cNameLoc, BridgedSourceLoc cEqualLoc,
     BridgedExpr cInitializer);
 
@@ -1951,7 +1932,7 @@ BridgedDotSelfExpr BridgedDotSelfExpr_createParsed(BridgedASTContext cContext,
 SWIFT_NAME("BridgedEditorPlaceholderExpr.createParsed(_:placeholder:loc:"
            "placeholderType:expansionType:)")
 BridgedEditorPlaceholderExpr BridgedEditorPlaceholderExpr_createParsed(
-    BridgedASTContext cContext, BridgedIdentifier cPlaceholderId,
+    BridgedASTContext cContext, swift::Identifier placeholderId,
     BridgedSourceLoc cLoc, BridgedNullableTypeRepr cPlaceholderTyR,
     BridgedNullableTypeRepr cExpansionTyR);
 
@@ -2301,7 +2282,7 @@ void BridgedExpr_dump(BridgedExpr expr);
 
 struct BridgedLabeledStmtInfo {
   SWIFT_NAME("name")
-  BridgedIdentifier Name;
+  swift::Identifier Name;
   SWIFT_NAME("loc")
   BridgedSourceLoc Loc;
 
@@ -2371,7 +2352,7 @@ BridgedBraceStmt BridgedBraceStmt_createImplicit(BridgedASTContext cContext,
 SWIFT_NAME("BridgedBreakStmt.createParsed(_:loc:targetName:targetLoc:)")
 BridgedBreakStmt BridgedBreakStmt_createParsed(BridgedDeclContext cDeclContext,
                                                BridgedSourceLoc cLoc,
-                                               BridgedIdentifier cTargetName,
+                                               swift::Identifier targetName,
                                                BridgedSourceLoc cTargetLoc);
 
 SWIFT_NAME("BridgedCaseStmt.createParsedSwitchCase(_:introducerLoc:"
@@ -2390,7 +2371,7 @@ BridgedCaseStmt BridgedCaseStmt_createParsedDoCatch(
 SWIFT_NAME("BridgedContinueStmt.createParsed(_:loc:targetName:targetLoc:)")
 BridgedContinueStmt BridgedContinueStmt_createParsed(
     BridgedDeclContext cDeclContext, BridgedSourceLoc cLoc,
-    BridgedIdentifier cTargetName, BridgedSourceLoc cTargetLoc);
+    swift::Identifier targetName, BridgedSourceLoc cTargetLoc);
 
 SWIFT_NAME("BridgedDeferStmt.createParsed(_:deferLoc:)")
 BridgedDeferStmt BridgedDeferStmt_createParsed(BridgedDeclContext cDeclContext,
@@ -2591,7 +2572,7 @@ BridgedOpaqueReturnTypeOfTypeAttr_createParsed(
 
 SWIFT_NAME("BridgedUnqualifiedIdentTypeRepr.createParsed(_:loc:name:)")
 BridgedUnqualifiedIdentTypeRepr BridgedUnqualifiedIdentTypeRepr_createParsed(
-    BridgedASTContext cContext, BridgedSourceLoc cLoc, BridgedIdentifier id);
+    BridgedASTContext cContext, BridgedSourceLoc cLoc, swift::Identifier id);
 
 SWIFT_NAME(
     "BridgedArrayTypeRepr.createParsed(_:base:leftSquareLoc:rightSquareLoc:)")
@@ -2625,7 +2606,7 @@ BridgedCompileTimeLiteralTypeRepr_createParsed(BridgedASTContext cContext,
 SWIFT_NAME("BridgedDeclRefTypeRepr.createParsed(_:base:name:nameLoc:"
            "genericArguments:angleRange:)")
 BridgedDeclRefTypeRepr BridgedDeclRefTypeRepr_createParsed(
-    BridgedASTContext cContext, BridgedTypeRepr cBase, BridgedIdentifier cName,
+    BridgedASTContext cContext, BridgedTypeRepr cBase, swift::Identifier name,
     BridgedSourceLoc cLoc, BridgedArrayRef cGenericArguments,
     BridgedSourceRange cAngleRange);
 
@@ -2651,7 +2632,7 @@ BridgedFunctionTypeRepr BridgedFunctionTypeRepr_createParsed(
 SWIFT_NAME("BridgedUnqualifiedIdentTypeRepr.createParsed(_:name:nameLoc:"
            "genericArgs:leftAngleLoc:rightAngleLoc:)")
 BridgedUnqualifiedIdentTypeRepr BridgedUnqualifiedIdentTypeRepr_createParsed(
-    BridgedASTContext cContext, BridgedIdentifier name,
+    BridgedASTContext cContext, swift::Identifier name,
     BridgedSourceLoc cNameLoc, BridgedArrayRef genericArgs,
     BridgedSourceLoc cLAngleLoc, BridgedSourceLoc cRAngleLoc);
 
@@ -2817,7 +2798,7 @@ SWIFT_NAME("BridgedNamedPattern.createParsed(_:declContext:name:loc:)")
 BridgedNamedPattern
 BridgedNamedPattern_createParsed(BridgedASTContext astContext,
                                  BridgedDeclContext declContext,
-                                 BridgedIdentifier name, BridgedSourceLoc cLoc);
+                                 swift::Identifier name, BridgedSourceLoc cLoc);
 
 SWIFT_NAME(
     "BridgedParenPattern.createParsed(_:lParenLoc:subPattern:rParenLoc:)")
@@ -2826,7 +2807,7 @@ BridgedParenPattern BridgedParenPattern_createParsed(
     BridgedPattern cSubPattern, BridgedSourceLoc cRParenLoc);
 
 struct BridgedTuplePatternElt {
-  BridgedIdentifier Label;
+  swift::Identifier Label;
   BridgedSourceLoc LabelLoc;
   BridgedPattern ThePattern;
 };
@@ -2849,7 +2830,7 @@ SWIFT_NAME("BridgedPattern.setImplicit(self:)")
 void BridgedPattern_setImplicit(BridgedPattern cPattern);
 
 SWIFT_NAME("getter:BridgedPattern.boundName(self:)")
-BridgedIdentifier BridgedPattern_getBoundName(BridgedPattern cPattern);
+swift::Identifier BridgedPattern_getBoundName(BridgedPattern cPattern);
 
 //===----------------------------------------------------------------------===//
 // MARK: Generics
@@ -2887,7 +2868,7 @@ public:
 SWIFT_NAME("BridgedLayoutConstraint.getLayoutConstraint(_:id:)")
 BridgedLayoutConstraint
 BridgedLayoutConstraint_getLayoutConstraint(BridgedASTContext cContext,
-                                            BridgedIdentifier cID);
+                                            swift::Identifier ID);
 
 SWIFT_NAME("BridgedLayoutConstraint.getLayoutConstraint(_:kind:)")
 BridgedLayoutConstraint
@@ -2943,7 +2924,7 @@ SWIFT_NAME(
     "name:nameLoc:inheritedType:index:paramKind:)")
 BridgedGenericTypeParamDecl BridgedGenericTypeParamDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cSpecifierLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cSpecifierLoc, swift::Identifier name,
     BridgedSourceLoc cNameLoc, BridgedNullableTypeRepr opaqueInheritedType,
     size_t index, swift::GenericTypeParamKind paramKind);
 
@@ -2972,9 +2953,9 @@ BridgedParamDecl BridgedParameterList_get(BridgedParameterList cParameterList,
 //===----------------------------------------------------------------------===//
 
 struct BridgedTupleTypeElement {
-  BridgedIdentifier Name;
+  swift::Identifier Name;
   BridgedSourceLoc NameLoc;
-  BridgedIdentifier SecondName;
+  swift::Identifier SecondName;
   BridgedSourceLoc SecondNameLoc;
   BridgedSourceLoc UnderscoreLoc;
   BridgedSourceLoc ColonLoc;

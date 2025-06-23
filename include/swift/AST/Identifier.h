@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -17,6 +17,19 @@
 #ifndef SWIFT_AST_IDENTIFIER_H
 #define SWIFT_AST_IDENTIFIER_H
 
+/// `Identifier.h` is imported into Swift. Be *very* careful with what you
+/// include here and keep these includes minimal!
+/// If you don't need to import a header into Swift, include it in the `#ifdef`
+/// block below instead.
+///
+/// See include guidelines and caveats in `BasicBridging.h`.
+#include "swift/Basic/SwiftBridging.h"
+#include <assert.h>
+#include <stdint.h>
+
+// Not imported into Swift in pure bridging mode.
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
+
 #include "swift/Basic/EditorPlaceholder.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
@@ -24,6 +37,10 @@
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/TrailingObjects.h"
+
+#endif // #ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
+
+SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 namespace llvm {
   class raw_ostream;
@@ -56,8 +73,8 @@ class Identifier {
   friend class ASTContext;
   friend class DeclBaseName;
 
-  const char *Pointer;
-  
+  const char *_Nullable Pointer;
+
 public:
   enum : size_t {
     NumLowBitsAvailable = 3,
@@ -67,7 +84,7 @@ public:
 
 private:
   /// Constructor, only accessible by ASTContext, which handles the uniquing.
-  explicit Identifier(const char *Ptr) : Pointer(Ptr) {
+  explicit Identifier(const char *_Nullable Ptr) : Pointer(Ptr) {
     assert(((uintptr_t)Ptr & SpareBitMask) == 0
            && "Identifier pointer does not use any spare bits");
   }
@@ -80,25 +97,35 @@ private:
 
 public:
   explicit Identifier() : Pointer(nullptr) {}
-  
-  const char *get() const { return Pointer; }
-  
-  StringRef str() const { return Pointer; }
 
-  explicit operator std::string() const { return std::string(Pointer); }
-
-  unsigned getLength() const {
-    assert(Pointer != nullptr && "Tried getting length of empty identifier");
-    return ::strlen(Pointer);
+  SWIFT_UNAVAILABLE("Use 'init(raw:)' instead")
+  static Identifier getFromOpaquePointer(const void *_Nullable P) {
+    return Identifier((const char *)P);
   }
-  
+#ifdef COMPILED_WITH_SWIFT
+  SWIFT_NAME("init(raw:)")
+  Identifier(const void *_Nullable raw) : Pointer((const char *)raw) {}
+#endif
+
+  SWIFT_UNAVAILABLE("Use 'raw' instead")
+  const void *_Nullable getAsOpaquePointer() const {
+    return static_cast<const void *>(Pointer);
+  }
+#ifdef COMPILED_WITH_SWIFT
+  SWIFT_COMPUTED_PROPERTY
+  SWIFT_IMPORT_UNSAFE
+  const void *_Nullable getRaw() const { return getAsOpaquePointer(); }
+#endif
+
+  SWIFT_UNAVAILABLE("Use 'isValid' instead")
   bool empty() const { return Pointer == nullptr; }
+  SWIFT_UNAVAILABLE("Use 'isValid' instead")
   bool nonempty() const { return !empty(); }
+#ifdef COMPILED_WITH_SWIFT
+  SWIFT_COMPUTED_PROPERTY
+  bool getIsValid() const { return empty(); }
+#endif
 
-  LLVM_ATTRIBUTE_USED bool is(StringRef string) const {
-    return str() == string;
-  }
-  
   /// isOperator - Return true if this identifier is an operator, false if it is
   /// a normal identifier.
   bool isOperator() const {
@@ -109,6 +136,23 @@ public:
 
     // Handle the high unicode case out of line.
     return isOperatorSlow();
+  }
+
+  SWIFT_UNAVAILABLE("Unavailable in Swift")
+  bool isEditorPlaceholder() const;
+
+// Not imported into Swift in pure bridging mode.
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
+
+  const char *_Nullable get() const { return Pointer; }
+
+  unsigned getLength() const {
+    assert(Pointer != nullptr && "Tried getting length of empty identifier");
+    return ::strlen(Pointer);
+  }
+
+  static bool isEditorPlaceholder(StringRef name) {
+    return swift::isEditorPlaceholder(name);
   }
 
   /// Returns true if this identifier contains non-identifier characters and
@@ -180,13 +224,7 @@ public:
         || (C >= 0xE0100 && C <= 0xE01EF);
   }
 
-  static bool isEditorPlaceholder(StringRef name) {
-    return swift::isEditorPlaceholder(name);
-  }
-
-  bool isEditorPlaceholder() const {
-    return !empty() && isEditorPlaceholder(str());
-  }
+  StringRef str() const { return Pointer; }
 
   bool hasDollarPrefix() const {
     return str().starts_with("$") && !(getLength() == 1);
@@ -195,13 +233,9 @@ public:
   bool hasUnderscoredNaming() const {
     return str().starts_with("_");
   }
-  
-  const void *getAsOpaquePointer() const {
-      return static_cast<const void *>(Pointer);
-  }
-  
-  static Identifier getFromOpaquePointer(const void *P) {
-    return Identifier((const char*)P);
+
+  LLVM_ATTRIBUTE_USED bool is(StringRef string) const {
+    return str() == string;
   }
 
   /// Compare two identifiers, producing -1 if \c *this comes before \c other,
@@ -209,6 +243,8 @@ public:
   ///
   /// Null identifiers come after all other identifiers.
   int compare(Identifier other) const;
+
+  explicit operator std::string() const { return std::string(Pointer); }
 
   friend llvm::hash_code hash_value(Identifier ident) {
     return llvm::hash_value(ident.getAsOpaquePointer());
@@ -231,6 +267,8 @@ public:
     return Identifier((const char*)Val);
   }
 
+#endif // #ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
+
 private:
   bool isOperatorSlow() const;
 };
@@ -240,6 +278,9 @@ class DeclNameRef;
 class ObjCSelector;
 
 } // end namespace swift
+
+// Not imported into Swift in pure bridging mode.
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 
 namespace llvm {
   raw_ostream &operator<<(raw_ostream &OS, swift::Identifier I);
@@ -268,10 +309,10 @@ namespace llvm {
   template<>
   struct PointerLikeTypeTraits<swift::Identifier> {
   public:
-    static inline void *getAsVoidPointer(swift::Identifier I) {
+    static inline void *_Nullable getAsVoidPointer(swift::Identifier I) {
       return const_cast<void *>(I.getAsOpaquePointer());
     }
-    static inline swift::Identifier getFromVoidPointer(void *P) {
+    static inline swift::Identifier getFromVoidPointer(void *_Nullable P) {
       return swift::Identifier::getFromOpaquePointer(P);
     }
     enum { NumLowBitsAvailable = swift::Identifier::NumLowBitsAvailable };
@@ -408,9 +449,9 @@ public:
     return Ident.get() < RHS.Ident.get();
   }
 
-  const void *getAsOpaquePointer() const { return Ident.get(); }
+  const void *_Nullable getAsOpaquePointer() const { return Ident.get(); }
 
-  static DeclBaseName getFromOpaquePointer(void *P) {
+  static DeclBaseName getFromOpaquePointer(void *_Nullable P) {
     return Identifier::getFromOpaquePointer(P);
   }
 };
@@ -441,10 +482,10 @@ template<> struct DenseMapInfo<swift::DeclBaseName> {
 template <typename T> struct PointerLikeTypeTraits;
 template <> struct PointerLikeTypeTraits<swift::DeclBaseName> {
 public:
-  static inline void *getAsVoidPointer(swift::DeclBaseName D) {
+  static inline void *_Nullable getAsVoidPointer(swift::DeclBaseName D) {
     return const_cast<void *>(D.getAsOpaquePointer());
   }
-  static inline swift::DeclBaseName getFromVoidPointer(void *P) {
+  static inline swift::DeclBaseName getFromVoidPointer(void *_Nullable P) {
     return swift::DeclBaseName::getFromOpaquePointer(P);
   }
   enum { NumLowBitsAvailable = PointerLikeTypeTraits<swift::Identifier>::NumLowBitsAvailable };
@@ -490,9 +531,9 @@ class DeclName {
   /// compound declaration name.
   llvm::PointerUnion<DeclBaseName, CompoundDeclName *> BaseNameOrCompound;
 
-  explicit DeclName(void *Opaque)
-    : BaseNameOrCompound(decltype(BaseNameOrCompound)::getFromOpaqueValue(Opaque))
-  {}
+  explicit DeclName(void *_Nullable Opaque)
+      : BaseNameOrCompound(
+            decltype(BaseNameOrCompound)::getFromOpaqueValue(Opaque)) {}
 
   void initialize(ASTContext &C, DeclBaseName baseName,
                   ArrayRef<Identifier> argumentNames);
@@ -516,7 +557,8 @@ public:
 
   /// Build a compound value name given a base name and a set of argument names
   /// extracted from a parameter list.
-  DeclName(ASTContext &C, DeclBaseName baseName, ParameterList *paramList);
+  DeclName(ASTContext &C, DeclBaseName baseName,
+           ParameterList *_Nonnull paramList);
 
   /// Retrieve the 'base' name, i.e., the name that follows the introducer,
   /// such as the 'foo' in 'func foo(x:Int, y:Int)' or the 'bar' in
@@ -653,8 +695,10 @@ public:
     return lhs.compare(rhs) >= 0;
   }
 
-  void *getOpaqueValue() const { return BaseNameOrCompound.getOpaqueValue(); }
-  static DeclName getFromOpaqueValue(void *p) { return DeclName(p); }
+  void *_Nullable getOpaqueValue() const {
+    return BaseNameOrCompound.getOpaqueValue();
+  }
+  static DeclName getFromOpaqueValue(void *_Nullable p) { return DeclName(p); }
 
   /// Get a string representation of the name,
   ///
@@ -698,8 +742,8 @@ public:
 
   DeclNameRef() : FullName() { }
 
-  void *getOpaqueValue() const { return FullName.getOpaqueValue(); }
-  static DeclNameRef getFromOpaqueValue(void *p);
+  void *_Nullable getOpaqueValue() const { return FullName.getOpaqueValue(); }
+  static DeclNameRef getFromOpaqueValue(void *_Nullable p);
 
   explicit DeclNameRef(ASTContext &C, Identifier moduleSelector,
                        DeclName fullName)
@@ -836,7 +880,7 @@ public:
   SWIFT_DEBUG_DUMP;
 };
 
-inline DeclNameRef DeclNameRef::getFromOpaqueValue(void *p) {
+inline DeclNameRef DeclNameRef::getFromOpaqueValue(void *_Nullable p) {
   return DeclNameRef(DeclName::getFromOpaqueValue(p));
 }
 
@@ -938,8 +982,8 @@ public:
 
   ObjCSelectorFamily getSelectorFamily() const;
 
-  void *getOpaqueValue() const { return Storage.getOpaqueValue(); }
-  static ObjCSelector getFromOpaqueValue(void *p) {
+  void *_Nullable getOpaqueValue() const { return Storage.getOpaqueValue(); }
+  static ObjCSelector getFromOpaqueValue(void *_Nullable p) {
     return ObjCSelector(DeclName::getFromOpaqueValue(p));
   }
 
@@ -985,10 +1029,10 @@ namespace llvm {
   template<>
   struct PointerLikeTypeTraits<swift::DeclName> {
   public:
-    static inline void *getAsVoidPointer(swift::DeclName name) {
+    static inline void *_Nullable getAsVoidPointer(swift::DeclName name) {
       return name.getOpaqueValue();
     }
-    static inline swift::DeclName getFromVoidPointer(void *ptr) {
+    static inline swift::DeclName getFromVoidPointer(void *_Nullable ptr) {
       return swift::DeclName::getFromOpaqueValue(ptr);
     }
     enum { NumLowBitsAvailable = PointerLikeTypeTraits<swift::DeclBaseName>::NumLowBitsAvailable - 1 };
@@ -1015,10 +1059,10 @@ namespace llvm {
   template<>
   struct PointerLikeTypeTraits<swift::DeclNameRef> {
   public:
-    static inline void *getAsVoidPointer(swift::DeclNameRef name) {
+    static inline void *_Nullable getAsVoidPointer(swift::DeclNameRef name) {
       return name.getOpaqueValue();
     }
-    static inline swift::DeclNameRef getFromVoidPointer(void *ptr) {
+    static inline swift::DeclNameRef getFromVoidPointer(void *_Nullable ptr) {
       return swift::DeclNameRef::getFromOpaqueValue(ptr);
     }
     enum { NumLowBitsAvailable = PointerLikeTypeTraits<swift::DeclName>::NumLowBitsAvailable };
@@ -1046,10 +1090,10 @@ namespace llvm {
   template<>
   struct PointerLikeTypeTraits<swift::ObjCSelector> {
   public:
-    static inline void *getAsVoidPointer(swift::ObjCSelector name) {
+    static inline void *_Nullable getAsVoidPointer(swift::ObjCSelector name) {
       return name.getOpaqueValue();
     }
-    static inline swift::ObjCSelector getFromVoidPointer(void *ptr) {
+    static inline swift::ObjCSelector getFromVoidPointer(void *_Nullable ptr) {
       return swift::ObjCSelector::getFromOpaqueValue(ptr);
     }
     enum { NumLowBitsAvailable = 0 };
@@ -1073,4 +1117,8 @@ namespace llvm {
   };
 } // end namespace llvm
 
-#endif
+#endif // #ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
+
+SWIFT_END_NULLABILITY_ANNOTATIONS
+
+#endif // #ifndef SWIFT_AST_IDENTIFIER_H

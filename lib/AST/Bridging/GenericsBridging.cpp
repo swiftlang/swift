@@ -44,14 +44,14 @@ BridgedGenericParamList BridgedGenericParamList_createParsed(
 
 BridgedGenericTypeParamDecl BridgedGenericTypeParamDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cSpecifierLoc, BridgedIdentifier cName,
-    BridgedSourceLoc cNameLoc, BridgedNullableTypeRepr bridgedInheritedType,
-    size_t index, swift::GenericTypeParamKind paramKind) {
+    BridgedSourceLoc cSpecifierLoc, Identifier name, BridgedSourceLoc cNameLoc,
+    BridgedNullableTypeRepr bridgedInheritedType, size_t index,
+    swift::GenericTypeParamKind paramKind) {
   auto specifierLoc = cSpecifierLoc.unbridged();
 
   auto *decl = GenericTypeParamDecl::createParsed(
-      cDeclContext.unbridged(), cName.unbridged(), cNameLoc.unbridged(),
-      specifierLoc, index, paramKind);
+      cDeclContext.unbridged(), name, cNameLoc.unbridged(), specifierLoc, index,
+      paramKind);
 
   if (auto *inheritedType = bridgedInheritedType.unbridged()) {
     auto entry = InheritedEntry(inheritedType);
@@ -145,8 +145,8 @@ BridgedRequirementRepr BridgedRequirementRepr_createLayoutConstraint(
 
 BridgedLayoutConstraint
 BridgedLayoutConstraint_getLayoutConstraint(BridgedASTContext cContext,
-                                            BridgedIdentifier cID) {
-  return swift::getLayoutConstraint(cID.unbridged(), cContext.unbridged());
+                                            Identifier ID) {
+  return swift::getLayoutConstraint(ID, cContext.unbridged());
 }
 
 BridgedLayoutConstraint

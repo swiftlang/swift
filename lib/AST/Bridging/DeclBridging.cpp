@@ -45,8 +45,8 @@ BridgedDeclBaseName BridgedDeclBaseName_createSubscript() {
 }
 
 BridgedDeclBaseName
-BridgedDeclBaseName_createIdentifier(BridgedIdentifier identifier) {
-  return DeclBaseName(identifier.unbridged());
+BridgedDeclBaseName_createIdentifier(swift::Identifier identifier) {
+  return DeclBaseName(identifier);
 }
 
 BridgedDeclNameRef
@@ -54,10 +54,8 @@ BridgedDeclNameRef_createParsed(BridgedASTContext cContext,
                                 BridgedDeclBaseName cBaseName,
                                 BridgedArrayRef cLabels) {
   ASTContext &context = cContext.unbridged();
-  SmallVector<Identifier, 4> labels;
-  for (auto &cLabel : cLabels.unbridged<BridgedIdentifier>()) {
-    labels.push_back(cLabel.unbridged());
-  }
+  auto labels = cLabels.unbridged<swift::Identifier>();
+
   return DeclNameRef(DeclName(context, cBaseName.unbridged(), labels));
 }
 
@@ -205,13 +203,13 @@ BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
 
 BridgedParamDecl BridgedParamDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cSpecifierLoc, BridgedIdentifier cArgName,
-    BridgedSourceLoc cArgNameLoc, BridgedIdentifier cParamName,
+    BridgedSourceLoc cSpecifierLoc, swift::Identifier argName,
+    BridgedSourceLoc cArgNameLoc, swift::Identifier paramName,
     BridgedSourceLoc cParamNameLoc, BridgedNullableExpr cDefaultArgument,
     BridgedNullableDefaultArgumentInitializer cDefaultArgumentInitContext) {
   return ParamDecl::createParsed(
       cContext.unbridged(), cSpecifierLoc.unbridged(), cArgNameLoc.unbridged(),
-      cArgName.unbridged(), cParamNameLoc.unbridged(), cParamName.unbridged(),
+      argName, cParamNameLoc.unbridged(), paramName,
       cDefaultArgument.unbridged(), cDefaultArgumentInitContext.unbridged(),
       cDeclContext.unbridged());
 }
@@ -234,7 +232,7 @@ void BridgedDestructorDecl_setParsedBody(BridgedDestructorDecl decl,
 BridgedFuncDecl BridgedFuncDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cStaticLoc, BridgedStaticSpelling cStaticSpelling,
-    BridgedSourceLoc cFuncKeywordLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cFuncKeywordLoc, swift::Identifier name,
     BridgedSourceLoc cNameLoc, BridgedNullableGenericParamList genericParamList,
     BridgedParameterList parameterList, BridgedSourceLoc cAsyncLoc,
     BridgedSourceLoc cThrowsLoc, BridgedNullableTypeRepr thrownType,
@@ -243,7 +241,7 @@ BridgedFuncDecl BridgedFuncDecl_createParsed(
   ASTContext &context = cContext.unbridged();
 
   auto *paramList = parameterList.unbridged();
-  auto declName = DeclName(context, cName.unbridged(), paramList);
+  auto declName = DeclName(context, name, paramList);
   auto asyncLoc = cAsyncLoc.unbridged();
   auto throwsLoc = cThrowsLoc.unbridged();
   // FIXME: rethrows
@@ -301,14 +299,14 @@ BridgedDestructorDecl_createParsed(BridgedASTContext cContext,
 
 BridgedMacroDecl BridgedMacroDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cMacroLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cMacroLoc, swift::Identifier name,
     BridgedSourceLoc cNameLoc, BridgedNullableGenericParamList cGenericParams,
     BridgedParameterList cParams, BridgedSourceLoc cArrowLoc,
     BridgedNullableTypeRepr cResultType, BridgedNullableExpr cDefinition,
     BridgedNullableTrailingWhereClause genericWhereClause) {
   ASTContext &context = cContext.unbridged();
   auto *params = cParams.unbridged();
-  DeclName fullName = DeclName(context, cName.unbridged(), params);
+  DeclName fullName = DeclName(context, name, params);
   auto *decl = new (context)
       MacroDecl(cMacroLoc.unbridged(), fullName, cNameLoc.unbridged(),
                 cGenericParams.unbridged(), params, cArrowLoc.unbridged(),
@@ -320,16 +318,16 @@ BridgedMacroDecl BridgedMacroDecl_createParsed(
 
 BridgedTypeAliasDecl BridgedTypeAliasDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cAliasKeywordLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cAliasKeywordLoc, swift::Identifier name,
     BridgedSourceLoc cNameLoc, BridgedNullableGenericParamList genericParamList,
     BridgedSourceLoc cEqualLoc, BridgedTypeRepr opaqueUnderlyingType,
     BridgedNullableTrailingWhereClause genericWhereClause) {
   ASTContext &context = cContext.unbridged();
 
   auto *decl = new (context)
-      TypeAliasDecl(cAliasKeywordLoc.unbridged(), cEqualLoc.unbridged(),
-                    cName.unbridged(), cNameLoc.unbridged(),
-                    genericParamList.unbridged(), cDeclContext.unbridged());
+      TypeAliasDecl(cAliasKeywordLoc.unbridged(), cEqualLoc.unbridged(), name,
+                    cNameLoc.unbridged(), genericParamList.unbridged(),
+                    cDeclContext.unbridged());
   decl->setUnderlyingTypeRepr(opaqueUnderlyingType.unbridged());
   decl->setTrailingWhereClause(genericWhereClause.unbridged());
 
@@ -374,17 +372,17 @@ convertToInheritedEntries(ASTContext &ctx, BridgedArrayRef cInheritedTypes) {
 
 BridgedNominalTypeDecl BridgedEnumDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cEnumKeywordLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cEnumKeywordLoc, swift::Identifier name,
     BridgedSourceLoc cNameLoc, BridgedNullableGenericParamList genericParamList,
     BridgedArrayRef cInheritedTypes,
     BridgedNullableTrailingWhereClause genericWhereClause,
     BridgedSourceRange cBraceRange) {
   ASTContext &context = cContext.unbridged();
 
-  NominalTypeDecl *decl = new (context) EnumDecl(
-      cEnumKeywordLoc.unbridged(), cName.unbridged(), cNameLoc.unbridged(),
-      convertToInheritedEntries(context, cInheritedTypes),
-      genericParamList.unbridged(), cDeclContext.unbridged());
+  NominalTypeDecl *decl = new (context)
+      EnumDecl(cEnumKeywordLoc.unbridged(), name, cNameLoc.unbridged(),
+               convertToInheritedEntries(context, cInheritedTypes),
+               genericParamList.unbridged(), cDeclContext.unbridged());
   decl->setTrailingWhereClause(genericWhereClause.unbridged());
   decl->setBraces(cBraceRange.unbridged());
 
@@ -402,7 +400,7 @@ BridgedEnumCaseDecl_createParsed(BridgedDeclContext cDeclContext,
 
 BridgedEnumElementDecl BridgedEnumElementDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedIdentifier cName, BridgedSourceLoc cNameLoc,
+    swift::Identifier name, BridgedSourceLoc cNameLoc,
     BridgedNullableParameterList bridgedParameterList,
     BridgedSourceLoc cEqualsLoc, BridgedNullableExpr rawValue) {
   ASTContext &context = cContext.unbridged();
@@ -410,11 +408,10 @@ BridgedEnumElementDecl BridgedEnumElementDecl_createParsed(
   auto *parameterList = bridgedParameterList.unbridged();
   DeclName declName;
   {
-    auto identifier = cName.unbridged();
     if (parameterList) {
-      declName = DeclName(context, identifier, parameterList);
+      declName = DeclName(context, name, parameterList);
     } else {
-      declName = identifier;
+      declName = name;
     }
   }
 
@@ -426,17 +423,17 @@ BridgedEnumElementDecl BridgedEnumElementDecl_createParsed(
 
 BridgedNominalTypeDecl BridgedStructDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cStructKeywordLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cStructKeywordLoc, swift::Identifier name,
     BridgedSourceLoc cNameLoc, BridgedNullableGenericParamList genericParamList,
     BridgedArrayRef cInheritedTypes,
     BridgedNullableTrailingWhereClause genericWhereClause,
     BridgedSourceRange cBraceRange) {
   ASTContext &context = cContext.unbridged();
 
-  NominalTypeDecl *decl = new (context) StructDecl(
-      cStructKeywordLoc.unbridged(), cName.unbridged(), cNameLoc.unbridged(),
-      convertToInheritedEntries(context, cInheritedTypes),
-      genericParamList.unbridged(), cDeclContext.unbridged());
+  NominalTypeDecl *decl = new (context)
+      StructDecl(cStructKeywordLoc.unbridged(), name, cNameLoc.unbridged(),
+                 convertToInheritedEntries(context, cInheritedTypes),
+                 genericParamList.unbridged(), cDeclContext.unbridged());
   decl->setTrailingWhereClause(genericWhereClause.unbridged());
   decl->setBraces(cBraceRange.unbridged());
 
@@ -445,7 +442,7 @@ BridgedNominalTypeDecl BridgedStructDecl_createParsed(
 
 BridgedNominalTypeDecl BridgedClassDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cClassKeywordLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cClassKeywordLoc, swift::Identifier name,
     BridgedSourceLoc cNameLoc, BridgedNullableGenericParamList genericParamList,
     BridgedArrayRef cInheritedTypes,
     BridgedNullableTrailingWhereClause genericWhereClause,
@@ -453,7 +450,7 @@ BridgedNominalTypeDecl BridgedClassDecl_createParsed(
   ASTContext &context = cContext.unbridged();
 
   NominalTypeDecl *decl = new (context) ClassDecl(
-      cClassKeywordLoc.unbridged(), cName.unbridged(), cNameLoc.unbridged(),
+      cClassKeywordLoc.unbridged(), name, cNameLoc.unbridged(),
       convertToInheritedEntries(context, cInheritedTypes),
       genericParamList.unbridged(), cDeclContext.unbridged(), isActor);
   decl->setTrailingWhereClause(genericWhereClause.unbridged());
@@ -464,7 +461,7 @@ BridgedNominalTypeDecl BridgedClassDecl_createParsed(
 
 BridgedNominalTypeDecl BridgedProtocolDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cProtocolKeywordLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cProtocolKeywordLoc, swift::Identifier name,
     BridgedSourceLoc cNameLoc, BridgedArrayRef cPrimaryAssociatedTypeNames,
     BridgedArrayRef cInheritedTypes,
     BridgedNullableTrailingWhereClause genericWhereClause,
@@ -475,14 +472,14 @@ BridgedNominalTypeDecl BridgedProtocolDecl_createParsed(
       context.AllocateTransform<PrimaryAssociatedTypeName>(
           cPrimaryAssociatedTypeNames.unbridged<BridgedLocatedIdentifier>(),
           [](auto &e) -> PrimaryAssociatedTypeName {
-            return {e.Name.unbridged(), e.NameLoc.unbridged()};
+            return {e.Name, e.NameLoc.unbridged()};
           });
 
-  NominalTypeDecl *decl = new (context) ProtocolDecl(
-      cDeclContext.unbridged(), cProtocolKeywordLoc.unbridged(),
-      cNameLoc.unbridged(), cName.unbridged(), primaryAssociatedTypeNames,
-      convertToInheritedEntries(context, cInheritedTypes),
-      genericWhereClause.unbridged());
+  NominalTypeDecl *decl = new (context)
+      ProtocolDecl(cDeclContext.unbridged(), cProtocolKeywordLoc.unbridged(),
+                   cNameLoc.unbridged(), name, primaryAssociatedTypeNames,
+                   convertToInheritedEntries(context, cInheritedTypes),
+                   genericWhereClause.unbridged());
   decl->setBraces(cBraceRange.unbridged());
 
   return decl;
@@ -490,7 +487,7 @@ BridgedNominalTypeDecl BridgedProtocolDecl_createParsed(
 
 BridgedAssociatedTypeDecl BridgedAssociatedTypeDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cAssociatedtypeKeywordLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cAssociatedtypeKeywordLoc, swift::Identifier name,
     BridgedSourceLoc cNameLoc, BridgedArrayRef cInheritedTypes,
     BridgedNullableTypeRepr defaultType,
     BridgedNullableTrailingWhereClause genericWhereClause) {
@@ -498,7 +495,7 @@ BridgedAssociatedTypeDecl BridgedAssociatedTypeDecl_createParsed(
 
   auto *decl = AssociatedTypeDecl::createParsed(
       context, cDeclContext.unbridged(), cAssociatedtypeKeywordLoc.unbridged(),
-      cName.unbridged(), cNameLoc.unbridged(), defaultType.unbridged(),
+      name, cNameLoc.unbridged(), defaultType.unbridged(),
       genericWhereClause.unbridged());
   decl->setInherited(convertToInheritedEntries(context, cInheritedTypes));
 
@@ -546,16 +543,15 @@ BridgedMissingDecl BridgedMissingDecl_create(BridgedASTContext cContext,
 BridgedOperatorDecl BridgedOperatorDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedOperatorFixity cFixity, BridgedSourceLoc cOperatorKeywordLoc,
-    BridgedIdentifier cName, BridgedSourceLoc cNameLoc,
-    BridgedSourceLoc cColonLoc, BridgedIdentifier cPrecedenceGroupName,
+    swift::Identifier name, BridgedSourceLoc cNameLoc,
+    BridgedSourceLoc cColonLoc, swift::Identifier precedenceGroupName,
     BridgedSourceLoc cPrecedenceGroupLoc) {
   auto colonLoc = cColonLoc.unbridged();
-  assert(colonLoc.isValid() == cPrecedenceGroupName.unbridged().nonempty());
+  assert(colonLoc.isValid() == precedenceGroupName.nonempty());
   assert(colonLoc.isValid() == cPrecedenceGroupLoc.unbridged().isValid());
 
   ASTContext &context = cContext.unbridged();
   auto operatorKeywordLoc = cOperatorKeywordLoc.unbridged();
-  auto name = cName.unbridged();
   auto nameLoc = cNameLoc.unbridged();
   auto *declContext = cDeclContext.unbridged();
 
@@ -564,7 +560,7 @@ BridgedOperatorDecl BridgedOperatorDecl_createParsed(
   case BridgedOperatorFixityInfix:
     decl = new (context) InfixOperatorDecl(
         declContext, operatorKeywordLoc, name, nameLoc, cColonLoc.unbridged(),
-        cPrecedenceGroupName.unbridged(), cPrecedenceGroupLoc.unbridged());
+        precedenceGroupName, cPrecedenceGroupLoc.unbridged());
     break;
   case BridgedOperatorFixityPrefix:
     assert(colonLoc.isInvalid());
@@ -583,7 +579,7 @@ BridgedOperatorDecl BridgedOperatorDecl_createParsed(
 
 BridgedPrecedenceGroupDecl BridgedPrecedenceGroupDecl_createParsed(
     BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cPrecedencegroupKeywordLoc, BridgedIdentifier cName,
+    BridgedSourceLoc cPrecedencegroupKeywordLoc, swift::Identifier name,
     BridgedSourceLoc cNameLoc, BridgedSourceLoc cLeftBraceLoc,
     BridgedSourceLoc cAssociativityKeywordLoc,
     BridgedSourceLoc cAssociativityValueLoc, swift::Associativity associativity,
@@ -595,19 +591,17 @@ BridgedPrecedenceGroupDecl BridgedPrecedenceGroupDecl_createParsed(
 
   SmallVector<PrecedenceGroupDecl::Relation, 2> higherThanNames;
   for (auto &pair : cHigherThanNames.unbridged<BridgedLocatedIdentifier>()) {
-    higherThanNames.push_back(
-        {pair.NameLoc.unbridged(), pair.Name.unbridged(), nullptr});
+    higherThanNames.push_back({pair.NameLoc.unbridged(), pair.Name, nullptr});
   }
 
   SmallVector<PrecedenceGroupDecl::Relation, 2> lowerThanNames;
   for (auto &pair : cLowerThanNames.unbridged<BridgedLocatedIdentifier>()) {
-    lowerThanNames.push_back(
-        {pair.NameLoc.unbridged(), pair.Name.unbridged(), nullptr});
+    lowerThanNames.push_back({pair.NameLoc.unbridged(), pair.Name, nullptr});
   }
 
   return PrecedenceGroupDecl::create(
       cDeclContext.unbridged(), cPrecedencegroupKeywordLoc.unbridged(),
-      cNameLoc.unbridged(), cName.unbridged(), cLeftBraceLoc.unbridged(),
+      cNameLoc.unbridged(), name, cLeftBraceLoc.unbridged(),
       cAssociativityKeywordLoc.unbridged(), cAssociativityValueLoc.unbridged(),
       associativity, cAssignmentKeywordLoc.unbridged(),
       cAssignmentValueLoc.unbridged(), isAssignment,
@@ -623,7 +617,7 @@ BridgedImportDecl BridgedImportDecl_createParsed(
   ImportPath::Builder builder;
   for (auto &element :
        cImportPathElements.unbridged<BridgedLocatedIdentifier>()) {
-    builder.push_back(element.Name.unbridged(), element.NameLoc.unbridged());
+    builder.push_back(element.Name, element.NameLoc.unbridged());
   }
 
   ASTContext &context = cContext.unbridged();

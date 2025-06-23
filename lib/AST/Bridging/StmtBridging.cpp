@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -102,11 +102,11 @@ BridgedBraceStmt BridgedBraceStmt_createImplicit(BridgedASTContext cContext,
 
 BridgedBreakStmt BridgedBreakStmt_createParsed(BridgedDeclContext cDeclContext,
                                                BridgedSourceLoc cLoc,
-                                               BridgedIdentifier cTargetName,
+                                               Identifier targetName,
                                                BridgedSourceLoc cTargetLoc) {
   return new (cDeclContext.unbridged()->getASTContext())
-      BreakStmt(cLoc.unbridged(), cTargetName.unbridged(),
-                cTargetLoc.unbridged(), cDeclContext.unbridged());
+      BreakStmt(cLoc.unbridged(), targetName, cTargetLoc.unbridged(),
+                cDeclContext.unbridged());
 }
 
 static void getCaseLabelItems(BridgedArrayRef cItems,
@@ -148,12 +148,13 @@ BridgedCaseStmt BridgedCaseStmt_createParsedDoCatch(
                                        cBody.unbridged());
 }
 
-BridgedContinueStmt BridgedContinueStmt_createParsed(
-    BridgedDeclContext cDeclContext, BridgedSourceLoc cLoc,
-    BridgedIdentifier cTargetName, BridgedSourceLoc cTargetLoc) {
+BridgedContinueStmt
+BridgedContinueStmt_createParsed(BridgedDeclContext cDeclContext,
+                                 BridgedSourceLoc cLoc, Identifier targetName,
+                                 BridgedSourceLoc cTargetLoc) {
   return new (cDeclContext.unbridged()->getASTContext())
-      ContinueStmt(cLoc.unbridged(), cTargetName.unbridged(),
-                   cTargetLoc.unbridged(), cDeclContext.unbridged());
+      ContinueStmt(cLoc.unbridged(), targetName, cTargetLoc.unbridged(),
+                   cDeclContext.unbridged());
 }
 
 BridgedDeferStmt BridgedDeferStmt_createParsed(BridgedDeclContext cDeclContext,

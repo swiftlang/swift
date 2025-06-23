@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -21,13 +21,18 @@ using namespace swift;
 // MARK: ASTContext
 //===----------------------------------------------------------------------===//
 
-BridgedIdentifier BridgedASTContext_getIdentifier(BridgedASTContext cContext,
-                                                  BridgedStringRef cStr) {
+Identifier BridgedASTContext_getIdentifier(BridgedASTContext cContext,
+                                           BridgedStringRef cStr) {
   return cContext.unbridged().getIdentifier(cStr.unbridged());
 }
 
-BridgedIdentifier
-BridgedASTContext_getDollarIdentifier(BridgedASTContext cContext, size_t idx) {
+Identifier BridgedASTContext__getIdentifier(BridgedASTContext cContext,
+                                            BridgedStringRef cStr) {
+  return cContext.unbridged().getIdentifier(cStr.unbridged());
+}
+
+Identifier BridgedASTContext_getDollarIdentifier(BridgedASTContext cContext,
+                                                 size_t idx) {
   return cContext.unbridged().getDollarIdentifier(idx);
 }
 

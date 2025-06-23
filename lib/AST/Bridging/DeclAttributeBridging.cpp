@@ -45,7 +45,7 @@ ParsedAutoDiffParameter BridgedParsedAutoDiffParameter::unbridged() const {
   switch (kind) {
   case Kind::Named:
     return ParsedAutoDiffParameter::getNamedParameter(loc.unbridged(),
-                                                      value.name.unbridged());
+                                                      value.name);
   case Kind::Ordered:
     return ParsedAutoDiffParameter::getOrderedParameter(loc.unbridged(),
                                                         value.index);
@@ -115,7 +115,7 @@ static AvailableAttr::Kind unbridge(BridgedAvailableAttrKind value) {
 
 BridgedAvailableAttr BridgedAvailableAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceRange cRange, BridgedIdentifier cDomainIdentifier,
+    BridgedSourceRange cRange, Identifier domainIdentifier,
     BridgedSourceLoc cDomainLoc, BridgedAvailableAttrKind cKind,
     BridgedStringRef cMessage, BridgedStringRef cRenamed,
     BridgedVersionTuple cIntroduced, BridgedSourceRange cIntroducedRange,
@@ -124,9 +124,9 @@ BridgedAvailableAttr BridgedAvailableAttr_createParsed(
     bool isSPI) {
 
   return new (cContext.unbridged())
-      AvailableAttr(cAtLoc.unbridged(), cRange.unbridged(),
-                    cDomainIdentifier.unbridged(), cDomainLoc.unbridged(),
-                    unbridge(cKind), cMessage.unbridged(), cRenamed.unbridged(),
+      AvailableAttr(cAtLoc.unbridged(), cRange.unbridged(), domainIdentifier,
+                    cDomainLoc.unbridged(), unbridge(cKind),
+                    cMessage.unbridged(), cRenamed.unbridged(),
                     cIntroduced.unbridged(), cIntroducedRange.unbridged(),
                     cDeprecated.unbridged(), cDeprecatedRange.unbridged(),
                     cObsoleted.unbridged(), cObsoletedRange.unbridged(),
@@ -184,9 +184,7 @@ BridgedAllowFeatureSuppressionAttr_createParsed(BridgedASTContext cContext,
                                                 BridgedSourceRange cRange,
                                                 bool inverted,
                                                 BridgedArrayRef cFeatures) {
-  SmallVector<Identifier> features;
-  for (auto elem : cFeatures.unbridged<BridgedIdentifier>())
-    features.push_back(elem.unbridged());
+  auto features = cFeatures.unbridged<Identifier>();
   return AllowFeatureSuppressionAttr::create(
       cContext.unbridged(), cAtLoc.unbridged(), cRange.unbridged(),
       /*implicit*/ false, inverted, features);
@@ -394,8 +392,8 @@ unbridged(BridgedParsedLifetimeDependenceKind kind) {
 swift::LifetimeDescriptor BridgedLifetimeDescriptor::unbridged() {
   switch (kind) {
   case DescriptorKind::Named:
-    return LifetimeDescriptor::forNamed(
-        value.name.unbridged(), ::unbridged(dependenceKind), loc.unbridged());
+    return LifetimeDescriptor::forNamed(value.name, ::unbridged(dependenceKind),
+                                        loc.unbridged());
   case DescriptorKind::Ordered:
     return LifetimeDescriptor::forOrdered(
         value.index, ::unbridged(dependenceKind), loc.unbridged());
@@ -499,15 +497,8 @@ BridgedStorageRestrictionsAttr BridgedStorageRestrictionsAttr_createParsed(
     BridgedArrayRef cAccesses) {
   ASTContext &context = cContext.unbridged();
 
-  ArrayRef<Identifier> initializes =
-      cContext.unbridged().AllocateTransform<Identifier>(
-          cInitializes.unbridged<BridgedIdentifier>(),
-          [](auto &e) { return e.unbridged(); });
-  ArrayRef<Identifier> accesses =
-      cContext.unbridged().AllocateTransform<Identifier>(
-          cAccesses.unbridged<BridgedIdentifier>(),
-          [](auto &e) { return e.unbridged(); });
-
+  auto initializes = cInitializes.unbridged<Identifier>();
+  auto accesses = cAccesses.unbridged<Identifier>();
   return StorageRestrictionsAttr::create(
       context, cAtLoc.unbridged(), cRange.unbridged(), initializes, accesses);
 }
@@ -516,10 +507,9 @@ BridgedSwiftNativeObjCRuntimeBaseAttr
 BridgedSwiftNativeObjCRuntimeBaseAttr_createParsed(BridgedASTContext cContext,
                                                    BridgedSourceLoc cAtLoc,
                                                    BridgedSourceRange cRange,
-                                                   BridgedIdentifier cName) {
-  return new (cContext.unbridged())
-      SwiftNativeObjCRuntimeBaseAttr(cName.unbridged(), cAtLoc.unbridged(),
-                                     cRange.unbridged(), /*Implicit=*/false);
+                                                   Identifier name) {
+  return new (cContext.unbridged()) SwiftNativeObjCRuntimeBaseAttr(
+      name, cAtLoc.unbridged(), cRange.unbridged(), /*Implicit=*/false);
 }
 
 static NonSendableKind unbridged(BridgedNonSendableKind kind) {
@@ -566,12 +556,11 @@ BridgedObjCAttr_createParsedUnnamed(BridgedASTContext cContext,
 BridgedObjCAttr BridgedObjCAttr_createParsedNullary(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceLoc cAttrNameLoc, BridgedSourceLoc cLParenLoc,
-    BridgedSourceLoc cNameLoc, BridgedIdentifier cName,
-    BridgedSourceLoc cRParenLoc) {
+    BridgedSourceLoc cNameLoc, Identifier name, BridgedSourceLoc cRParenLoc) {
   return ObjCAttr::createNullary(cContext.unbridged(), cAtLoc.unbridged(),
                                  cAttrNameLoc.unbridged(),
                                  cLParenLoc.unbridged(), cNameLoc.unbridged(),
-                                 cName.unbridged(), cRParenLoc.unbridged());
+                                 name, cRParenLoc.unbridged());
 }
 
 BridgedObjCAttr BridgedObjCAttr_createParsedSelector(
@@ -582,9 +571,7 @@ BridgedObjCAttr BridgedObjCAttr_createParsedSelector(
   SmallVector<SourceLoc> nameLocs;
   for (auto elem : cNameLocs.unbridged<BridgedSourceLoc>())
     nameLocs.push_back(elem.unbridged());
-  SmallVector<Identifier> names;
-  for (auto elem : cNames.unbridged<BridgedIdentifier>())
-    names.push_back(elem.unbridged());
+  auto names = cNames.unbridged<Identifier>();
 
   return ObjCAttr::createSelector(
       cContext.unbridged(), cAtLoc.unbridged(), cAttrNameLoc.unbridged(),
@@ -593,18 +580,16 @@ BridgedObjCAttr BridgedObjCAttr_createParsedSelector(
 
 BridgedObjCImplementationAttr BridgedObjCImplementationAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceRange cRange, BridgedIdentifier cName, bool isEarlyAdopter) {
-  return new (cContext.unbridged())
-      ObjCImplementationAttr(cName.unbridged(), cAtLoc.unbridged(),
-                             cRange.unbridged(), isEarlyAdopter);
+    BridgedSourceRange cRange, Identifier name, bool isEarlyAdopter) {
+  return new (cContext.unbridged()) ObjCImplementationAttr(
+      name, cAtLoc.unbridged(), cRange.unbridged(), isEarlyAdopter);
 }
 
 BridgedObjCRuntimeNameAttr BridgedObjCRuntimeNameAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceRange cRange, BridgedIdentifier cName) {
-  return new (cContext.unbridged())
-      ObjCRuntimeNameAttr(cName.unbridged().str(), cAtLoc.unbridged(),
-                          cRange.unbridged(), /*Implicit=*/false);
+    BridgedSourceRange cRange, Identifier name) {
+  return new (cContext.unbridged()) ObjCRuntimeNameAttr(
+      name.str(), cAtLoc.unbridged(), cRange.unbridged(), /*Implicit=*/false);
 }
 
 static OptimizationMode unbridged(BridgedOptimizationMode mode) {
@@ -640,10 +625,9 @@ BridgedProjectedValuePropertyAttr
 BridgedProjectedValuePropertyAttr_createParsed(BridgedASTContext cContext,
                                                BridgedSourceLoc cAtLoc,
                                                BridgedSourceRange cRange,
-                                               BridgedIdentifier cName) {
-  return new (cContext.unbridged())
-      ProjectedValuePropertyAttr(cName.unbridged(), cAtLoc.unbridged(),
-                                 cRange.unbridged(), /*Implicit=*/false);
+                                               Identifier name) {
+  return new (cContext.unbridged()) ProjectedValuePropertyAttr(
+      name, cAtLoc.unbridged(), cRange.unbridged(), /*Implicit=*/false);
 }
 
 BridgedRawDocCommentAttr
@@ -742,9 +726,7 @@ BridgedSpecializeAttr BridgedSpecializeAttr_createParsed(
     bool exported, BridgedSpecializationKind cKind,
     BridgedDeclNameRef cTargetFunction, BridgedArrayRef cSPIGroups,
     BridgedArrayRef cAvailableAttrs) {
-  SmallVector<Identifier, 2> spiGroups;
-  for (auto bridging : cSPIGroups.unbridged<BridgedIdentifier>())
-    spiGroups.push_back(bridging.unbridged());
+  auto spiGroups = cSPIGroups.unbridged<Identifier>();
   SmallVector<AvailableAttr *, 2> availableAttrs;
   for (auto bridging : cAvailableAttrs.unbridged<BridgedAvailableAttr>())
     availableAttrs.push_back(bridging.unbridged());
@@ -761,9 +743,7 @@ BridgedSpecializedAttr BridgedSpecializedAttr_createParsed(
     bool exported, BridgedSpecializationKind cKind,
     BridgedDeclNameRef cTargetFunction, BridgedArrayRef cSPIGroups,
     BridgedArrayRef cAvailableAttrs) {
-  SmallVector<Identifier, 2> spiGroups;
-  for (auto bridging : cSPIGroups.unbridged<BridgedIdentifier>())
-    spiGroups.push_back(bridging.unbridged());
+  auto spiGroups = cSPIGroups.unbridged<Identifier>();
   SmallVector<AvailableAttr *, 2> availableAttrs;
   for (auto bridging : cAvailableAttrs.unbridged<BridgedAvailableAttr>())
     availableAttrs.push_back(bridging.unbridged());
@@ -776,11 +756,10 @@ BridgedSpecializedAttr BridgedSpecializedAttr_createParsed(
 
 BridgedSPIAccessControlAttr BridgedSPIAccessControlAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceRange cRange, BridgedIdentifier cSPIGroupName) {
+    BridgedSourceRange cRange, Identifier SPIGroupName) {
 
   return SPIAccessControlAttr::create(cContext.unbridged(), cAtLoc.unbridged(),
-                                      cRange.unbridged(),
-                                      cSPIGroupName.unbridged());
+                                      cRange.unbridged(), SPIGroupName);
 }
 
 BridgedSILGenNameAttr BridgedSILGenNameAttr_createParsed(

@@ -51,9 +51,8 @@ BridgedOptionalPlatformKind PlatformKind_fromString(BridgedStringRef cStr) {
   return *optKind;
 }
 
-BridgedOptionalPlatformKind
-PlatformKind_fromIdentifier(BridgedIdentifier cIdent) {
-  return PlatformKind_fromString(cIdent.unbridged().str());
+BridgedOptionalPlatformKind PlatformKind_fromIdentifier(Identifier ident) {
+  return PlatformKind_fromString(ident.str());
 }
 
 //===----------------------------------------------------------------------===//
@@ -68,11 +67,11 @@ BridgedAvailabilitySpec_createWildcard(BridgedASTContext cContext,
 }
 
 BridgedAvailabilitySpec BridgedAvailabilitySpec_createForDomainIdentifier(
-    BridgedASTContext cContext, BridgedIdentifier cName, BridgedSourceLoc cLoc,
+    BridgedASTContext cContext, Identifier name, BridgedSourceLoc cLoc,
     BridgedVersionTuple cVersion, BridgedSourceRange cVersionRange) {
   return AvailabilitySpec::createForDomainIdentifier(
-      cContext.unbridged(), cName.unbridged(), cLoc.unbridged(),
-      cVersion.unbridged(), cVersionRange.unbridged());
+      cContext.unbridged(), name, cLoc.unbridged(), cVersion.unbridged(),
+      cVersionRange.unbridged());
 }
 
 BridgedAvailabilitySpec

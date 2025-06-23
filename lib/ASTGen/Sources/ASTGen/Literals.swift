@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -77,7 +77,7 @@ extension ASTGenVisitor {
     let appendLiteral = BridgedDeclNameRef.createParsed(
       self.ctx,
       baseName: .createIdentifier(self.ctx.getIdentifier("appendLiteral")),
-      argumentLabels: CollectionOfOne(BridgedIdentifier()).bridgedArray(in: self)
+      argumentLabels: CollectionOfOne(Identifier()).bridgedArray(in: self)
     )
     // Name reference to `appendInterpolation`. Arguments labels are not determined yet.
     let appendInterpolation = BridgedDeclNameRef.createParsed(

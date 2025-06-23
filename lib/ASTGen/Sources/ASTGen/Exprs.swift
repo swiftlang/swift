@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -444,7 +444,7 @@ extension ASTGenVisitor {
         let labelInfo = elem.label.map(self.generateIdentifierAndSourceLoc(_:))
         return BridgedCallArgument(
           labelLoc: labelInfo?.sourceLoc ?? BridgedSourceLoc(),
-          label: labelInfo?.identifier ?? BridgedIdentifier(),
+          label: labelInfo?.identifier ?? Identifier(),
           argExpr: self.generate(expr: elem.expression)
         )
       })

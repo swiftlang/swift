@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -34,19 +34,18 @@ using namespace swift;
 #include "swift/AST/TypeReprNodes.def"
 
 BridgedUnqualifiedIdentTypeRepr BridgedUnqualifiedIdentTypeRepr_createParsed(
-    BridgedASTContext cContext, BridgedSourceLoc cLoc, BridgedIdentifier id) {
-  return UnqualifiedIdentTypeRepr::create(cContext.unbridged(),
-                                          DeclNameLoc(cLoc.unbridged()),
-                                          DeclNameRef(id.unbridged()));
+    BridgedASTContext cContext, BridgedSourceLoc cLoc, Identifier id) {
+  return UnqualifiedIdentTypeRepr::create(
+      cContext.unbridged(), DeclNameLoc(cLoc.unbridged()), DeclNameRef(id));
 }
 
 BridgedUnqualifiedIdentTypeRepr BridgedUnqualifiedIdentTypeRepr_createParsed(
-    BridgedASTContext cContext, BridgedIdentifier name,
-    BridgedSourceLoc cNameLoc, BridgedArrayRef genericArgs,
-    BridgedSourceLoc cLAngleLoc, BridgedSourceLoc cRAngleLoc) {
+    BridgedASTContext cContext, Identifier name, BridgedSourceLoc cNameLoc,
+    BridgedArrayRef genericArgs, BridgedSourceLoc cLAngleLoc,
+    BridgedSourceLoc cRAngleLoc) {
   ASTContext &context = cContext.unbridged();
   auto Loc = DeclNameLoc(cNameLoc.unbridged());
-  auto Name = DeclNameRef(name.unbridged());
+  auto Name = DeclNameRef(name);
   SourceLoc lAngleLoc = cLAngleLoc.unbridged();
   SourceLoc rAngleLoc = cRAngleLoc.unbridged();
   return UnqualifiedIdentTypeRepr::create(context, Loc, Name,
@@ -239,9 +238,9 @@ BridgedTupleTypeRepr BridgedTupleTypeRepr_createParsed(
   SmallVector<TupleTypeReprElement, 8> tupleElements;
   for (auto element : elements.unbridged<BridgedTupleTypeElement>()) {
     TupleTypeReprElement elementRepr;
-    elementRepr.Name = element.Name.unbridged();
+    elementRepr.Name = element.Name;
     elementRepr.NameLoc = element.NameLoc.unbridged();
-    elementRepr.SecondName = element.SecondName.unbridged();
+    elementRepr.SecondName = element.SecondName;
     elementRepr.SecondNameLoc = element.SecondNameLoc.unbridged();
     elementRepr.UnderscoreLoc = element.UnderscoreLoc.unbridged();
     elementRepr.ColonLoc = element.ColonLoc.unbridged();
@@ -255,7 +254,7 @@ BridgedTupleTypeRepr BridgedTupleTypeRepr_createParsed(
 }
 
 BridgedDeclRefTypeRepr BridgedDeclRefTypeRepr_createParsed(
-    BridgedASTContext cContext, BridgedTypeRepr cBase, BridgedIdentifier cName,
+    BridgedASTContext cContext, BridgedTypeRepr cBase, Identifier name,
     BridgedSourceLoc cLoc, BridgedArrayRef cGenericArguments,
     BridgedSourceRange cAngleRange) {
   ASTContext &context = cContext.unbridged();
@@ -266,7 +265,7 @@ BridgedDeclRefTypeRepr BridgedDeclRefTypeRepr_createParsed(
 
   return DeclRefTypeRepr::create(
       context, cBase.unbridged(), DeclNameLoc(cLoc.unbridged()),
-      DeclNameRef(cName.unbridged()), genericArguments, angleRange);
+      DeclNameRef(name), genericArguments, angleRange);
 }
 
 BridgedCompositionTypeRepr
