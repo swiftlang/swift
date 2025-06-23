@@ -20,7 +20,7 @@ EXCEPTIONAL_FILES = [
     # Tests for ModuleInterfaceExportAs being ignored
     pathlib.Path("test/ModuleInterface/swift-export-as.swift"),
     # Uses the pseudo-feature AvailabilityMacro=
-    pathlib.Path("test/Sema/availability_define.swift"),
+    pathlib.Path("test/Availability/availability_define.swift"),
     # Tests behavior when you try to use a feature without enabling it
     pathlib.Path("test/attr/feature_requirement.swift"),
     # Tests completion with features both enabled and disabled
