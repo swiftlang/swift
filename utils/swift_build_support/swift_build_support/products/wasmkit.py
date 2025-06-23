@@ -77,15 +77,18 @@ def run_swift_build(host_target, product, swiftpm_package_product_name, set_inst
     # Building with the freshly-built SwiftPM
     swift_build = os.path.join(product.install_toolchain_path(host_target), "bin", "swift-build")
 
-    build_os = host_target.split('-')[0]
-    if set_installation_rpath and not host_target.startswith('macos'):
+    if host_target.startswith('macos'):
+        # Universal binary on macOS
+        platform_args = ['--arch', 'x86_64', '--arch', 'arm64']
+    elif set_installation_rpath:
         # Library rpath for swift, dispatch, Foundation, etc. when installing
-        rpath_args = [
+        build_os = host_target.split('-')[0]
+        platform_args = [
             '--disable-local-rpath', '-Xswiftc', '-no-toolchain-stdlib-rpath',
             '-Xlinker', '-rpath', '-Xlinker', '$ORIGIN/../lib/swift/' + build_os
         ]
     else:
-        rpath_args = []
+        platform_args = []
 
     build_args = [
         swift_build,
@@ -93,7 +96,7 @@ def run_swift_build(host_target, product, swiftpm_package_product_name, set_inst
         '--package-path', os.path.join(product.source_dir),
         '--build-path', product.build_dir,
         '--configuration', 'release',
-    ] + rpath_args
+    ] + platform_args
 
     if product.args.verbose_build:
         build_args.append('--verbose')
