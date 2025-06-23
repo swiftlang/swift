@@ -113,3 +113,161 @@ internal func _unsafeMinus(_ lhs: Int, _ rhs: Int) -> Int {
   return lhs &- rhs
 #endif
 }
+
+extension Dictionary {
+  @usableFromInline
+  @_silgen_name("$sSD9mapValuesySDyxqd__Gqd__q_KXEKlF")
+  internal func __abi_mapValues<T>(
+    _ transform: (Value) throws -> T
+  ) rethrows -> Dictionary<Key, T> {
+    return try Dictionary<Key, T>(_native: _variant.mapValues(transform))
+  }
+
+  @usableFromInline
+  @_silgen_name("$sSD16compactMapValuesySDyxqd__Gqd__Sgq_KXEKlF")
+  internal func __abi_compactMapValues<T>(
+    _ transform: (Value) throws -> T?
+  ) rethrows -> Dictionary<Key, T> {
+    let result: _NativeDictionary<Key, T> =
+      try self.reduce(into: _NativeDictionary<Key, T>()) { (result, element) in
+      if let value = try transform(element.value) {
+        result.insertNew(key: element.key, value: value)
+      }
+    }
+    return Dictionary<Key, T>(_native: result)
+  }
+}
+
+extension Dictionary._Variant {
+  @usableFromInline
+  @_silgen_name("$sSD8_VariantV9mapValuesys17_NativeDictionaryVyxqd__Gqd__q_KXEKlF")
+  internal func __abi_mapValues<T>(
+    _ transform: (Value) throws -> T
+  ) rethrows -> _NativeDictionary<Key, T> {
+#if _runtime(_ObjC)
+    guard isNative else {
+      return try asCocoa.mapValues(transform)
+    }
+#endif
+    return try asNative.mapValues(transform)
+  }
+}
+
+#if _runtime(_ObjC)
+extension __CocoaDictionary {
+  @usableFromInline
+  @_silgen_name("$ss17__CocoaDictionaryV9mapValuesys07_NativeB0Vyxq0_Gq0_q_KXEKSHRzr1_lF")
+  internal func __abi_mapValues<Key: Hashable, Value, T>(
+    _ transform: (Value) throws -> T
+  ) rethrows -> _NativeDictionary<Key, T> {
+    var result = _NativeDictionary<Key, T>(capacity: self.count)
+    for (cocoaKey, cocoaValue) in self {
+      let key = _forceBridgeFromObjectiveC(cocoaKey, Key.self)
+      let value = _forceBridgeFromObjectiveC(cocoaValue, Value.self)
+      try result.insertNew(key: key, value: transform(value))
+    }
+    return result
+  }
+}
+#endif
+
+extension _NativeDictionary {
+  @usableFromInline
+  @_silgen_name("$ss17_NativeDictionaryV9mapValuesyAByxqd__Gqd__q_KXEKlF")
+  internal func __abi_mapValues<T>(
+    _ transform: (Value) throws -> T
+  ) rethrows -> _NativeDictionary<Key, T> {
+    let resultStorage = unsafe _DictionaryStorage<Key, T>.copy(original: _storage)
+    unsafe _internalInvariant(resultStorage._seed == _storage._seed)
+    let result = unsafe _NativeDictionary<Key, T>(resultStorage)
+    // Because the current and new buffer have the same scale and seed, we can
+    // initialize to the same locations in the new buffer, skipping hash value
+    // recalculations.
+    for unsafe bucket in unsafe hashTable {
+      let key = unsafe self.uncheckedKey(at: bucket)
+      let value = unsafe self.uncheckedValue(at: bucket)
+      try result._insert(at: bucket, key: key, value: transform(value))
+    }
+    return result
+  }
+}
+
+extension Sequence {
+  // ABI-only entrypoint for the rethrows version of map, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @usableFromInline
+  @_silgen_name("$sSTsE3mapySayqd__Gqd__7ElementQzKXEKlF")
+  func __rethrows_map<T>(
+    _ transform: (Element) throws -> T
+  ) throws -> [T] {
+    try map(transform)
+  }
+
+  @usableFromInline
+  @_silgen_name("$sSTsE6filterySay7ElementQzGSbACKXEKF")
+  internal __consuming func __abi_filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) rethrows -> [Element] {
+    return try __abi__filter(isIncluded)
+  }
+
+  @usableFromInline
+  @_silgen_name("$sSTsE7_filterySay7ElementQzGSbACKXEKF")
+  internal func __abi__filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) rethrows -> [Element] {
+
+    var result = ContiguousArray<Element>()
+
+    var iterator = self.makeIterator()
+
+    while let element = iterator.next() {
+      if try isIncluded(element) {
+        result.append(element)
+      }
+    }
+
+    return Array(result)
+  }
+
+  @usableFromInline
+  @_semantics("sequence.forEach")
+  @_silgen_name("$sSTsE7forEachyyy7ElementQzKXEKF")
+  internal func __abi_forEach(
+    _ body: (Element) throws -> Void
+  ) rethrows {
+    for element in self {
+      try body(element)
+    }
+  }
+
+  @usableFromInline
+  @_silgen_name("$sSTsE6reduceyqd__qd___qd__qd___7ElementQztKXEtKlF")
+  internal func __abi_reduce<Result>(
+    _ initialResult: Result,
+    _ nextPartialResult:
+      (_ partialResult: Result, Element) throws -> Result
+  ) rethrows -> Result {
+    var accumulator = initialResult
+    for element in self {
+      accumulator = try nextPartialResult(accumulator, element)
+    }
+    return accumulator
+  }
+
+  @usableFromInline
+  @_silgen_name("$sSTsE6reduce4into_qd__qd__n_yqd__z_7ElementQztKXEtKlF")
+  internal func __abi_reduce<Result>(
+    into initialResult: __owned Result,
+    _ updateAccumulatingResult:
+      (_ partialResult: inout Result, Element) throws -> ()
+  ) rethrows -> Result {
+    var accumulator = initialResult
+    for element in self {
+      try updateAccumulatingResult(&accumulator, element)
+    }
+    return accumulator
+  }
+}
