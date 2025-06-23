@@ -24,6 +24,7 @@
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConcreteDeclRef.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -8392,6 +8393,20 @@ SourceLoc swift::extractNearestSourceLoc(SafeUseOfCxxDeclDescriptor desc) {
   return SourceLoc();
 }
 
+void swift::simple_display(llvm::raw_ostream &out,
+                           CxxDeclExplicitSafetyDescriptor desc) {
+  out << "Checking if '";
+  if (auto namedDecl = dyn_cast<clang::NamedDecl>(desc.decl))
+    out << namedDecl->getNameAsString();
+  else
+    out << "<invalid decl>";
+  out << "' is explicitly safe.\n";
+}
+
+SourceLoc swift::extractNearestSourceLoc(CxxDeclExplicitSafetyDescriptor desc) {
+  return SourceLoc();
+}
+
 CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
     Evaluator &evaluator, CustomRefCountingOperationDescriptor desc) const {
   auto swiftDecl = desc.decl;
@@ -8469,9 +8484,11 @@ static bool hasUnsafeType(Evaluator &evaluator, clang::QualType clangType) {
   
   // Handle records recursively.
   if (auto recordDecl = clangType->getAsTagDecl()) {
-    auto safety =
-        evaluateOrDefault(evaluator, ClangDeclExplicitSafety({recordDecl}),
-                          ExplicitSafety::Unspecified);
+    // If we reached this point the types is not imported as a shared reference,
+    // so we don't need to check the bases whether they are shared references.
+    auto safety = evaluateOrDefault(
+        evaluator, ClangDeclExplicitSafety({recordDecl, false}),
+        ExplicitSafety::Unspecified);
     switch (safety) {
       case ExplicitSafety::Unsafe:
         return true;
@@ -8486,10 +8503,9 @@ static bool hasUnsafeType(Evaluator &evaluator, clang::QualType clangType) {
   return false;
 }
 
-ExplicitSafety ClangDeclExplicitSafety::evaluate(
-    Evaluator &evaluator,
-    SafeUseOfCxxDeclDescriptor desc
-) const {
+ExplicitSafety
+ClangDeclExplicitSafety::evaluate(Evaluator &evaluator,
+                                  CxxDeclExplicitSafetyDescriptor desc) const {
   // FIXME: Somewhat duplicative with importAsUnsafe.
   // FIXME: Also similar to hasPointerInSubobjects
   // FIXME: should probably also subsume IsSafeUseOfCxxDecl
@@ -8502,7 +8518,11 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
   // Explicitly safe.
   if (hasSwiftAttribute(decl, "safe"))
     return ExplicitSafety::Safe;
-  
+
+  // Shared references are considered safe.
+  if (desc.isClass)
+    return ExplicitSafety::Safe;
+
   // Enums are always safe.
   if (isa<clang::EnumDecl>(decl))
     return ExplicitSafety::Safe;
