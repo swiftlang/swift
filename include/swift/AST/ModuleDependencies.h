@@ -1059,6 +1059,8 @@ public:
   /// Setup caching service.
   bool setupCachingDependencyScanningService(CompilerInstance &Instance);
 
+  std::vector<StringRef> getInvalidNegativeStatCachedPaths();
+
 private:
   /// Enforce clients not being allowed to query this cache directly, it must be
   /// wrapped in an instance of `ModuleDependenciesCache`.
