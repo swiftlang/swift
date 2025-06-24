@@ -266,6 +266,9 @@ public:
     }
   }
 
+  /// True if the token is an editor placeholder.
+  bool isEditorPlaceholder() const;
+
   /// True if the string literal token is multiline.
   bool isMultilineString() const {
     return MultilineString;
