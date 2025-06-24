@@ -105,6 +105,7 @@ public class DispatchGlobalTaskExecutor: TaskExecutor, SchedulingExecutor,
 enum DispatchClockID: CInt {
   case continuous = 1
   case suspending = 2
+  case walltime = 3
 }
 
 fileprivate func clamp(_ components: (seconds: Int64, attoseconds: Int64))
@@ -147,38 +148,6 @@ fileprivate func durationComponents<C: Clock>(for duration: C.Duration, clock: C
 
 @available(StdlibDeploymentTarget 6.2, *)
 fileprivate func _dispatchEnqueue<C: Clock, E: Executor>(
-  _ job: consuming ExecutorJob,
-  at instant: C.Instant,
-  tolerance: C.Duration?,
-  clock: C,
-  executor: E,
-  global: Bool
-) {
-  // Convert the clock to its canonical equivalent, if any
-  if let canonical = clock.canonicalClock {
-    _dispatchEnqueueImpl(
-      job,
-      at: clock.convertToCanonical(instant: instant),
-      tolerance: clock.maybeConvertToCanonical(duration: tolerance),
-      clock: canonical,
-      executor: executor,
-      global: global
-    )
-    return
-  }
-
-  _dispatchEnqueueImpl(
-    job,
-    at: instant,
-    tolerance: tolerance,
-    clock: clock,
-    executor: executor,
-    global: global
-  )
-}
-
-@available(StdlibDeploymentTarget 6.2, *)
-fileprivate func _dispatchEnqueueImpl<C: Clock, E: Executor>(
   _ job: consuming ExecutorJob,
   at instant: C.Instant,
   tolerance: C.Duration?,

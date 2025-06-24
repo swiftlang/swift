@@ -202,22 +202,6 @@ extension CooperativeExecutor: SchedulingExecutor {
                                 after delay: C.Duration,
                                 tolerance: C.Duration? = nil,
                                 clock: C) {
-    // Convert the clock to its canonical equivalent, if any
-    if let canonical = clock.canonicalClock {
-      enqueueImpl(job,
-                  after: clock.convertToCanonical(duration: delay),
-                  tolerance: clock.maybeConvertToCanonical(duration: tolerance),
-                  clock: canonical)
-      return
-    }
-
-    enqueueImpl(job, after: delay, tolerance: tolerance, clock: clock)
-  }
-
-  private func enqueueImpl<C: Clock>(_ job: consuming ExecutorJob,
-                                after delay: C.Duration,
-                                tolerance: C.Duration? = nil,
-                                clock: C) {
     // If it's a clock we know, get the duration to wait
     let duration: Duration
     if let _ = clock as? ContinuousClock {
