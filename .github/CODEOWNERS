@@ -166,6 +166,7 @@
 /lib/SIL/IR/SILLocation*                            @adrian-prantl
 /lib/SIL/IR/SILProfiler.cpp                         @bnbarham @hamishknight @rintaro
 /lib/SILGen/                                        @jckarter
+/lib/SILGen/*Availability*                          @tshortli
 /lib/SILGen/*Distributed*                           @ktoso
 /lib/SILOptimizer/                                  @eeckstein
 /lib/SILOptimizer/**/*DebugInfo*                    @adrian-prantl
@@ -213,6 +214,7 @@
 
 # test
 /test/*Demangl*/                                    @rjmccall
+/test/Availability/                                 @tshortli
 /test/ASTGen/                                       @bnbarham @CodaFi @hamishknight @rintaro
 /test/Concurrency/                                  @ktoso
 /test/Constraints/                                  @hborla @xedin
