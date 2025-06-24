@@ -79,8 +79,11 @@ internal struct _SmallString {
 extension _SmallString {
   @inlinable @inline(__always)
   internal static var capacity: Int {
-#if _pointerBitWidth(_32) || _pointerBitWidth(_16)
+#if _pointerBitWidth(_32) && os(watchOS)
     return 10
+#elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
+    // Note: changed from 10 for contiguous storage.
+    return 8
 #elseif os(Android) && arch(arm64)
     return 14
 #elseif _pointerBitWidth(_64)
