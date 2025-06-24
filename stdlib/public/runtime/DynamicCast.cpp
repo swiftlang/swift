@@ -852,6 +852,17 @@ struct ObjCBridgeMemo {
 };
 #endif
 
+static const HashableWitnessTable* tryMemoizeNSStringHashableConformance(const Metadata *cls) {
+  auto nsString = getNSStringMetadata();
+  do {
+    if (cls == nsString) {
+      return getNSStringHashableConformance();
+    }
+    cls = _swift_class_getSuperclass(cls);
+  } while (cls != nullptr);
+  return nullptr;
+}
+
 static DynamicCastResult
 tryCastToAnyHashable(
   OpaqueValue *destLocation, const Metadata *destType,
@@ -868,22 +879,25 @@ tryCastToAnyHashable(
   
   switch (srcType->getKind()) {
   case MetadataKind::ForeignClass: // CF -> String
-  case MetadataKind::ObjCClassWrapper: { // Obj-C -> String
+  case MetadataKind::Existential: { // AnyObject can be an NSString
 #if SWIFT_OBJC_INTEROP
-    auto cls = srcType;
-    auto nsString = getNSStringMetadata();
-    do {
-      if (cls == nsString) {
-        hashableConformance = getNSStringHashableConformance();
-        break;
-      }
-      cls = _swift_class_getSuperclass(cls);
-    } while (cls != nullptr);
-    break;
-#else
+    auto existentialType = cast<ExistentialTypeMetadata>(srcType);
+    // TODO: also handle non-class existentials that could contain an NSString
+    if (existentialType->getRepresentation() == ExistentialTypeRepresentation::Class) {
+      auto val = reinterpret_cast<const ClassExistentialContainer *>(srcValue)->Value;
+      auto cls = swift_getObjectType((HeapObject *)val);
+      hashableConformance = tryMemoizeNSStringHashableConformance(cls);
+    }
+#endif
     // If no Obj-C interop, just fall through to the general case.
     break;
+  }
+  case MetadataKind::ObjCClassWrapper: { // Obj-C -> String
+#if SWIFT_OBJC_INTEROP
+    hashableConformance = tryMemoizeNSStringHashableConformance(srcType);
 #endif
+    // If no Obj-C interop, just fall through to the general case.
+    break;
   }
   case MetadataKind::Optional: {
     // FIXME: https://github.com/apple/swift/issues/51550
