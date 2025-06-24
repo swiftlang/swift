@@ -1322,7 +1322,7 @@ extension Substring {
   /// identical.
   ///
   /// - Performance: O(1)
-  @backDeployed(before: SwiftStdlib 6.3)
+  @_alwaysEmitIntoClient
   public func isIdentical(to other: Self) -> Bool {
     self._wholeGuts.rawBits == other._wholeGuts.rawBits &&
     self._offsetRange == other._offsetRange

@@ -1126,7 +1126,7 @@ extension String {
   /// identical.
   ///
   /// - Performance: O(1)
-  @backDeployed(before: SwiftStdlib 6.3)
+  @_alwaysEmitIntoClient
   public func isIdentical(to other: Self) -> Bool {
     self._guts.rawBits == other._guts.rawBits
   }
