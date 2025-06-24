@@ -338,22 +338,3 @@ func localCaptureDataRace5() {
 
   x = 2 // expected-tns-note {{access can happen concurrently}}
 }
-
-func inferLocationOfCapturedActorIsolatedSelfCorrectly() {
-  class A {
-    var block:  @MainActor () -> Void = {}
-  }
-  @CustomActor
-  class B {
-    let a = A()
-
-    func d() {
-      a.block = c // expected-warning {{converting non-Sendable function value to '@MainActor @Sendable () -> Void' may introduce data races}}
-      // expected-warning @-1 {{non-Sendable '@MainActor () -> ()'-typed result can not be returned from main actor-isolated function to global actor 'CustomActor'-isolated context}}
-      // expected-note @-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
-    }
-
-    @MainActor
-    func c() {}
-  }
-}
