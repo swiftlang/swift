@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -swift-version 6 -parse-as-library %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -swift-version 6 -disable-availability-checking -parse-as-library %s -emit-sil -o /dev/null -verify
 
 // REQUIRES: asserts
 // REQUIRES: concurrency
@@ -134,4 +134,9 @@ func callActorFuncsFromNonisolated(a : A, ns : NonSendable) async {
 func testGenericResults() async {
   let _: NonSendable = await mainActorGenericReturnNonSendable()
   // expected-error @-1 {{non-Sendable 'NonSendable'-typed result can not be returned from main actor-isolated global function 'mainActorGenericReturnNonSendable()' to nonisolated context}}
+}
+
+// https://github.com/swiftlang/swift/issues/81534
+func testInlineArray() {
+  let _: InlineArray<_, UInt8> = [0]
 }
