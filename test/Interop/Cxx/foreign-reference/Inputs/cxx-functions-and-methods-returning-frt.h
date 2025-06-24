@@ -449,4 +449,34 @@ void bRelease(DefaultOwnershipInheritance::BaseTypeNonDefault *v) {};
 void dRetain(DefaultOwnershipInheritance::DerivedTypeNonDefault *v) {};
 void dRelease(DefaultOwnershipInheritance::DerivedTypeNonDefault *v) {};
 
+namespace SourceLocationCaching {
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:retain_SourceLocCacheA")))
+__attribute__((swift_attr("release:release_SourceLocCacheA"))) TypeA {};
+
+
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:retain_SourceLocCacheB")))
+__attribute__((swift_attr("release:release_SourceLocCacheB"))) TypeB {};
+
+
+template <typename T>
+struct Factory {
+  static T *make() { return new T(); } // expected-warning {{'make' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
+};
+
+using FactoryA = Factory<TypeA>;
+using FactoryB = Factory<TypeB>;
+
+} // namespace SourceLocationCaching
+
+void retain_SourceLocCacheA(SourceLocationCaching::TypeA *) {}
+void release_SourceLocCacheA(SourceLocationCaching::TypeA *) {}
+
+void retain_SourceLocCacheB(SourceLocationCaching::TypeB *) {}
+void release_SourceLocCacheB(SourceLocationCaching::TypeB *) {}
+
+
 SWIFT_END_NULLABILITY_ANNOTATIONS

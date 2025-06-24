@@ -3639,9 +3639,23 @@ namespace {
           }
 
           if (unannotatedAPIWarningNeeded) {
-            HeaderLoc loc(decl->getLocation());
-            Impl.diagnose(loc, diag::no_returns_retained_returns_unretained,
-                          decl);
+            clang::SourceLocation loc = decl->getLocation();
+            clang::SourceManager &sourceMgr =
+                decl->getASTContext().getSourceManager();
+            clang::SourceLocation spellingLoc;
+            if (loc.isMacroID()) {
+              clang::SourceLocation expansionLoc =
+                  sourceMgr.getImmediateExpansionRange(loc).getBegin();
+              spellingLoc = sourceMgr.getSpellingLoc(expansionLoc);
+            } else {
+              spellingLoc = sourceMgr.getSpellingLoc(loc);
+            }
+
+            if (!Impl.DiagnosedUnannotatedLocations.count(spellingLoc)) {
+              Impl.DiagnosedUnannotatedLocations.insert(spellingLoc);
+              Impl.diagnose(HeaderLoc(spellingLoc),
+                            diag::no_returns_retained_returns_unretained, decl);
+            }
           }
         } else if (const auto *methodDecl =
                        dyn_cast<clang::CXXMethodDecl>(decl)) {
