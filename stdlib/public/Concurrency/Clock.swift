@@ -34,7 +34,6 @@ import Swift
 public protocol Clock<Duration>: Sendable {
   associatedtype Duration
   associatedtype Instant: InstantProtocol where Instant.Duration == Duration
-  associatedtype CanonicalClock: Clock = Self
 
   var now: Instant { get }
   var minimumResolution: Instant.Duration { get }
@@ -76,58 +75,6 @@ public protocol Clock<Duration>: Sendable {
                on executor: some Executor,
                at instant: Instant, tolerance: Duration?)
 #endif
-
-  /// Obtain the equivalent, canonical clock, or `nil` if this clock
-  /// is already canonical.
-  ///
-  /// A non-canonical clock is a clock with some relationship to a base,
-  /// canonical, clock, to which it can be converted.
-  @available(StdlibDeploymentTarget 6.2, *)
-  var canonicalClock: CanonicalClock? { get }
-
-  /// Convert an Instant to the canonical clock's equivalent Instant.
-  ///
-  /// Parameters:
-  ///
-  /// - instant:    The `Instant` to convert.
-  ///
-  /// Returns:
-  ///
-  /// The equivalent `CanonicalClock.Instant`.
-  func convertToCanonical(instant: Instant) -> CanonicalClock.Instant
-
-  /// Convert a Duration to the canonical clock's equivalent Duration.
-  ///
-  /// Parameters:
-  ///
-  /// - duration:    The `Duration` to convert.
-  ///
-  /// Returns:
-  ///
-  /// The equivalent `CanonicalClock.Duration`.
-  func convertToCanonical(duration: Duration) -> CanonicalClock.Duration
-
-  /// Convert an Instant to the canonical clock's equivalent Instant.
-  ///
-  /// Parameters:
-  ///
-  /// - instant:    The `Instant` to convert, or `nil`.
-  ///
-  /// Returns:
-  ///
-  /// The equivalent `CanonicalClock.Instant`, or `nil` if `instant` was `nil`.
-  func maybeConvertToCanonical(instant: Instant?) -> CanonicalClock.Instant?
-
-  /// Convert a Duration to the canonical clock's equivalent Duration.
-  ///
-  /// Parameters:
-  ///
-  /// - duration:    The `Duration` to convert, or `nil`.
-  ///
-  /// Returns:
-  ///
-  /// The equivalent `CanonicalClock.Duration`, or `nil` if `duration` was `nil`.
-  func maybeConvertToCanonical(duration: Duration?) -> CanonicalClock.Duration?
 }
 
 extension Clock {
@@ -147,40 +94,6 @@ extension Clock {
   public func run(_ job: consuming ExecutorJob,
                   at instant: Instant, tolerance: Duration?) {
     fatalError("\(Self.self) does not implement run(_:at:tolerance:).")
-  }
-}
-
-// Default implementations for canonicalization support
-extension Clock where CanonicalClock == Self {
-  public var canonicalClock: CanonicalClock? { return nil }
-
-  public func convertToCanonical(duration: Duration) -> CanonicalClock.Duration {
-    return duration
-  }
-
-  public func convertToCanonical(instant: Instant) -> CanonicalClock.Instant {
-    return instant
-  }
-}
-
-// nil-propagating versions of convertToCanonical()
-extension Clock {
-  public func maybeConvertToCanonical(duration: Duration?)
-    -> CanonicalClock.Duration?
-  {
-    if let duration {
-      return convertToCanonical(duration: duration)
-    }
-    return nil
-  }
-
-  public func maybeConvertToCanonical(instant: Instant?)
-    -> CanonicalClock.Instant?
-  {
-    if let instant {
-      return convertToCanonical(instant: instant)
-    }
-    return nil
   }
 }
 
@@ -258,6 +171,7 @@ extension Clock {
 enum _ClockID: Int32 {
   case continuous = 1
   case suspending = 2
+  case walltime = 3
 }
 
 @available(StdlibDeploymentTarget 5.7, *)
