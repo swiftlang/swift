@@ -2380,8 +2380,7 @@ function Build-ExperimentalRuntime {
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
         CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
 
-        Swift_SDKROOT = (Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental");
-        SwiftCore_ARCH_SUBDIR = $Platform.Architecture.LLVMName;
+        SwiftCore_DIR = "$(Get-ProjectBinaryCache $Platform ExperimentalRuntime)\cmake\SwiftCore";
       }
 
     Build-CMakeProject `
@@ -2399,8 +2398,7 @@ function Build-ExperimentalRuntime {
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
         CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
 
-        Swift_SDKROOT = (Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental");
-        SwiftCore_ARCH_SUBDIR = $Platform.Architecture.LLVMName;
+        SwiftCore_DIR = "$(Get-ProjectBinaryCache $Platform ExperimentalRuntime)\cmake\SwiftCore";
       }
 
     Build-CMakeProject `
@@ -2418,8 +2416,7 @@ function Build-ExperimentalRuntime {
         CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
         CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
 
-        Swift_SDKROOT = (Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental");
-        SwiftCore_ARCH_SUBDIR = $Platform.Architecture.LLVMName;
+        SwiftCore_DIR = "$(Get-ProjectBinaryCache $Platform ExperimentalRuntime)\cmake\SwiftCore";
       }
   }
 }
