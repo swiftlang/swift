@@ -1066,7 +1066,7 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
   }
 
   auto conformance = ctx.getNormalConformance(
-      conformingType, proto, SourceLoc(), dc,
+      conformingType, proto, SourceLoc(), /*inheritedTypeRepr=*/nullptr, dc,
       ProtocolConformanceState::Incomplete,
       ProtocolConformanceOptions(rawOptions, globalActorTypeExpr));
 

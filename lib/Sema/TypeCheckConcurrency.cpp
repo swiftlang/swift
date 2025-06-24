@@ -7298,7 +7298,8 @@ ProtocolConformance *swift::deriveImplicitSendableConformance(
       options |= ProtocolConformanceFlags::Unchecked;
     auto conformance = ctx.getNormalConformance(
         nominal->getDeclaredInterfaceType(), proto, nominal->getLoc(),
-        conformanceDC, ProtocolConformanceState::Complete, options);
+        /*inheritedTypeRepr=*/nullptr, conformanceDC,
+        ProtocolConformanceState::Complete, options);
     conformance->setSourceKindAndImplyingConformance(
         ConformanceEntryKind::Synthesized, nullptr);
 

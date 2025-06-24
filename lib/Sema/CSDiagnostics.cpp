@@ -3601,7 +3601,8 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
     for (auto protocol : missingProtocols) {
       // Create a fake conformance for this type to the given protocol.
       auto conformance = getASTContext().getNormalConformance(
-          nominal->getSelfInterfaceType(), protocol, SourceLoc(), nominal,
+          nominal->getSelfInterfaceType(), protocol, SourceLoc(),
+          /*inheritedTypeRepr=*/nullptr, nominal,
           ProtocolConformanceState::Incomplete, ProtocolConformanceOptions());
 
       // Resolve the conformance to generate fixits.
