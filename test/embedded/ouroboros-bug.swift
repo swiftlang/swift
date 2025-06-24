@@ -19,4 +19,4 @@
 public func test() {}
 test()
 
-// CHECK: define {{.*}}i32 @main
+// CHECK: define {{.*}}i32 @{{_*}}main{{.*}}

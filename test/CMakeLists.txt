@@ -677,6 +677,18 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
       "${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}/lit.site.cfg"
       "test${VARIANT_SUFFIX}.lit.site.cfg")
   swift_generate_lit_swift_features_cfg("${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}/lit.swift-features.cfg")
+
+  set(VARIANT_SUFFIX "-embedded-wasi")
+  set(VARIANT_TRIPLE "wasm32-unknown-wasip1")
+  set(VARIANT_EXTERNAL_EMBEDDED_PLATFORM FALSE)
+  set(VARIANT_EXTERNAL_EMBEDDED_DEVICE)
+  set(SWIFT_TEST_RESULTS_DIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/swift-test-results/${VARIANT_TRIPLE}")
+  swift_configure_lit_site_cfg(
+      "${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.in"
+      "${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}/lit.site.cfg"
+      "test${VARIANT_SUFFIX}.lit.site.cfg")
+  swift_generate_lit_swift_features_cfg("${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}/lit.swift-features.cfg")
+  message(STATUS "SWIFT_LIT_ARGS is ${SWIFT_LIT_ARGS}")
 endif()
 
 # Add shortcuts for the default variant.

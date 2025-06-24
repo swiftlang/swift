@@ -19,5 +19,5 @@ enum MyEnum: UInt8 {
     case a = 0
 }
 
-// CHECK: define {{.*}}@main(
+// CHECK: define {{.*}}@{{_*}}main{{.*}}(
 
