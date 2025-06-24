@@ -15,7 +15,9 @@ extension HasAlwaysAvailableConformance : @retroactive P {}
 
 struct G<T : P> {}
 
-// None of these should produce a warning about an unavailable conformance.
+// We prefer the unavailable conformance.
 func usesConformance(_: G<HasUnavailableConformance>) {}
+// expected-error@-1 {{conformance of 'HasUnavailableConformance' to 'P' is unavailable}}
+
 func usesConformance(_: G<HasConditionallyAvailableConformance>) {}
 func usesConformance(_: G<HasAlwaysAvailableConformance>) {}

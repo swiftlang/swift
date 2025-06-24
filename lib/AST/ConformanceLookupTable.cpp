@@ -604,22 +604,40 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
     return ext && ext->isUnavailable();
   };
 
-  // If only one of the conformances is unconditionally available on the
-  // current deployment target, pick that one.
+  if (isUnavailable(lhs->getDeclContext()) !=
+      isUnavailable(rhs->getDeclContext())) {
+    if ((lhsKind == ConformanceEntryKind::Implied) &&
+        (rhsKind == ConformanceEntryKind::Implied)) {
+      // If we have two implied conformances, prefer the one that
+      // is not unavailable.
+      return isUnavailable(rhs->getDeclContext())
+            ? Ordering::Before
+            : Ordering::After;
+    }
+
+    if ((lhsKind == ConformanceEntryKind::Implied) ||
+        (rhsKind == ConformanceEntryKind::Implied)) {
+      // If only one conformance is implied, prefer the one that was
+      // not implied.
+      return rhsKind == ConformanceEntryKind::Implied
+            ? Ordering::Before
+            : Ordering::After;
+    }
+
+    // Neither one was implied. If one conformance is explicitly
+    // unavailable, there's a good reason for it, so pick that one.
+    return isUnavailable(lhs->getDeclContext())
+            ? Ordering::Before
+            : Ordering::After;
+  }
+
+  // If one conformance requires a newer deployment target than what
+  // we're building for, prefer the other conformance.
   //
   // FIXME: Conformance lookup should really depend on source location for
   // this to be 100% correct.
-  // FIXME: When a class and an extension with the same availability declare the
-  // same conformance, this silently takes the class and drops the extension.
   if (lhs->getDeclContext()->isAlwaysAvailableConformanceContext() !=
       rhs->getDeclContext()->isAlwaysAvailableConformanceContext()) {
-    // Diagnose conflicting marker protocol conformances that differ in
-    // un-availability.
-    diagnoseSuperseded =
-      (lhs->getProtocol()->isMarkerProtocol() &&
-       isUnavailable(lhs->getDeclContext()) != isUnavailable(rhs->getDeclContext()) &&
-       (lhsKind != ConformanceEntryKind::Implied || rhsKind != ConformanceEntryKind::Implied));
-
     return (lhs->getDeclContext()->isAlwaysAvailableConformanceContext()
             ? Ordering::Before
             : Ordering::After);
