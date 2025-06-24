@@ -1,8 +1,6 @@
-// RUN: %target-run-simple-swift(-cxx-interoperability-mode=default -Xfrontend -disable-availability-checking -I %S/Inputs) | %FileCheck %s
+// RUN: %target-run-simple-swift(-cxx-interoperability-mode=default -I %S/Inputs) | %FileCheck %s
 
 // REQUIRES: executable_test
-// Metadata for foreign reference types is not supported on Windows.
-// UNSUPPORTED: OS=windows-msvc
 
 import SimpleStructs
 
@@ -26,28 +24,6 @@ func printCxxStructNested() {
     print(s)
 }
 
-func printCxxImmortalFRT() {
-    let s = ImmortalFRT()
-    print(s)
-}
-
-extension FRTCustomStringConvertible : CustomStringConvertible {
-    public var description: String {
-        return "FRTCustomStringConvertible(publ: \(publ))"
-    }
-}
-
-func printCxxFRTCustomStringConvertible() {
-    let s = FRTCustomStringConvertible()
-    print(s)
-}
-
-func printCxxFRType() {
-    let s = FRType()
-    print(s)
-}
-
-
 printCxxStructPrivateFields() 
 // CHECK: HasPrivateFieldsOnly()
 
@@ -59,12 +35,3 @@ printCxxStructPrivatePublicProtectedFields()
 
 printCxxStructNested()
 // CHECK: Outer(publStruct: {{.*}}.HasPrivatePublicProtectedFields(publ1: 8, publ2: 12))
-
-printCxxImmortalFRT()
-// CHECK: ImmortalFRT()
-
-printCxxFRTCustomStringConvertible()
-// CHECK: FRTCustomStringConvertible(publ: 2)
-
-printCxxFRType()
-// CHECK: FRType()

@@ -63,3 +63,8 @@ module FunctionsAndMethodsReturningFRT {
   header "cxx-functions-and-methods-returning-frt.h"
   requires cplusplus
 }
+
+module Printed {
+  header "printed.h"
+  requires cplusplus
+}
