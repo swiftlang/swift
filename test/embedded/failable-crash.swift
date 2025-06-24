@@ -16,4 +16,4 @@ public class MyClass<T> {
     }
 }
 
-// CHECK: define {{.*}}@main(
+// CHECK: define {{.*}}@{{_*}}main{{.*}}(

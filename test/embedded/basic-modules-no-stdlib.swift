@@ -38,7 +38,7 @@ public func main() {
   moduleMain()
 }
 
-// CHECK: define {{.*}}@main{{.*}} {
+// CHECK: define {{.*}}@{{_*}}main{{.*}} {
 // CHECK: define {{.*}}void @"$e4Main4mainyyF"{{.*}} {
 // CHECK: define {{.*}}void @"$e8MyModule10moduleMainyyF"{{.*}} {
 // CHECK: define {{.*}}void @"$e8MyModule8ConcreteVACycfC"{{.*}} {

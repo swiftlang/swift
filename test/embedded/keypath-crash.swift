@@ -20,7 +20,7 @@ public struct Binding<Value> {
 
 public struct State<Wrapped> {
   public var wrappedValue: Wrapped
-  
+
   public init(wrappedValue: Wrapped) {
     self.wrappedValue = wrappedValue
   }
@@ -51,4 +51,4 @@ public struct S<T> {
    }
 }
 
-// CHECK: define {{.*}}@main(
+// CHECK: define {{.*}}@{{_*}}main{{.*}}(
