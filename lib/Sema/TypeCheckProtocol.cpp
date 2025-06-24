@@ -5022,16 +5022,19 @@ static void diagnoseConformanceIsolationErrors(
     if (potentialIsolation && potentialIsolation->isGlobalActor() &&
         !conformance->isIsolated()) {
       bool isMainActor = false;
-      Type globalActorIsolation = potentialIsolation->getGlobalActor();
-      if (auto nominal = globalActorIsolation->getAnyNominal())
+      Type globalActorType = potentialIsolation->getGlobalActor();
+      if (auto nominal = globalActorType->getAnyNominal())
         isMainActor = nominal->isMainActor();
 
-      auto diag = ctx.Diags.diagnose(
-          conformance->getProtocolNameLoc(),
-          diag::note_isolate_conformance_to_global_actor, globalActorIsolation,
-          isMainActor, globalActorIsolation.getString());
-      conformance->applyConformanceAttribute(
-          diag, "@" + globalActorIsolation.getString());
+      // Take permanent ownership of the string. The diagnostic may outlive this
+      // function call.
+      auto globalActorTypeStr = ctx.AllocateCopy(globalActorType.getString());
+      auto diag =
+          ctx.Diags.diagnose(conformance->getProtocolNameLoc(),
+                             diag::note_isolate_conformance_to_global_actor,
+                             globalActorType, isMainActor, globalActorTypeStr);
+      conformance->applyConformanceAttribute(diag,
+                                             "@" + globalActorTypeStr.str());
     }
 
     // If marking witnesses as 'nonisolated' could work, suggest that.
