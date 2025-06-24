@@ -3787,7 +3787,7 @@ std::string Demangle::keyPathSourceString(const char *MangledName,
 /// Converts a demangled node to a string.
 ///
 /// \param root The root of the AST to demangle.
-/// @param options The `DemangleOptions` which will be used to create the
+/// \param options The `DemangleOptions` which will be used to create the
 /// NodePrinter.
 ///
 /// \return The demangled node as a string.
@@ -3797,19 +3797,19 @@ std::string Demangle::nodeToString(NodePointer root,
     return "";
 
   NodePrinter printer = NodePrinter(options);
-  nodeToString(root, &printer);
+  nodeToString(root, printer);
   return printer.takeString();
 }
 
 /// Converts a demangled node to a string, which is stored in the `printer`.
 ///
 /// \param root The root of the AST to demangle.
-/// @param printer The `NodePrinter` which will be used to print the AST to a
+/// \param printer The `NodePrinter` which will be used to print the AST to a
 /// string.
-void Demangle::nodeToString(NodePointer root, NodePrinter *printer) {
+void Demangle::nodeToString(NodePointer root, NodePrinter &printer) {
   if (!root)
     return;
-  printer->printRoot(root);
+  printer.printRoot(root);
 }
 
 #endif

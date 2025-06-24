@@ -67,9 +67,9 @@ std::string Context::demangleSymbolAsString(llvm::StringRef MangledName,
 }
 
 void Context::demangleSymbolAsString(llvm::StringRef MangledName,
-                                     NodePrinter *printer) {
+                                     NodePrinter &Printer) {
   NodePointer root = demangleSymbolAsNode(MangledName);
-  nodeToString(root, printer);
+  nodeToString(root, Printer);
 }
 
 std::string Context::demangleTypeAsString(llvm::StringRef MangledName,
@@ -279,13 +279,6 @@ std::string demangleSymbolAsString(const char *MangledName,
   Context Ctx;
   return Ctx.demangleSymbolAsString(StringRef(MangledName, MangledNameLength),
                                     Options);
-}
-
-void demangleSymbolAsString(const char *MangledName, size_t MangledNameLength,
-                            NodePrinter *printer) {
-  Context Ctx;
-  return Ctx.demangleSymbolAsString(StringRef(MangledName, MangledNameLength),
-                                    printer);
 }
 
 std::string demangleTypeAsString(const char *MangledName,
