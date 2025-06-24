@@ -118,24 +118,6 @@ public let benchmarks = [
   BenchmarkInfo(name: "NSString.bridged.byteCount.utf8.utf16",
                   runFunction: run_BridgedNSStringLengthUTF8_UTF16, tags: ts,
                   setUpFunction: setup_bridgedStrings),
-  BenchmarkInfo(name: "NSString.bridged.maxByteCount.ascii.ascii",
-                  runFunction: run_BridgedNSStringMaxLengthASCII_ASCII, tags: ts,
-                  setUpFunction: setup_bridgedStrings),
-  BenchmarkInfo(name: "NSString.bridged.maxByteCount.ascii.utf8",
-                  runFunction: run_BridgedNSStringMaxLengthASCII_UTF8, tags: ts,
-                  setUpFunction: setup_bridgedStrings),
-  BenchmarkInfo(name: "NSString.bridged.maxByteCount.ascii.utf16",
-                  runFunction: run_BridgedNSStringMaxLengthASCII_UTF16, tags: ts,
-                  setUpFunction: setup_bridgedStrings),
-  BenchmarkInfo(name: "NSString.bridged.maxByteCount.ascii.macroman",
-                  runFunction: run_BridgedNSStringMaxLengthASCII_MacRoman, tags: ts,
-                  setUpFunction: setup_bridgedStrings),
-  BenchmarkInfo(name: "NSString.bridged.maxByteCount.utf8.utf8",
-                  runFunction: run_BridgedNSStringMaxLengthUTF8_UTF8, tags: ts,
-                  setUpFunction: setup_bridgedStrings),
-  BenchmarkInfo(name: "NSString.bridged.maxByteCount.utf8.utf16",
-                  runFunction: run_BridgedNSStringMaxLengthUTF8_UTF16, tags: ts,
-                  setUpFunction: setup_bridgedStrings),
 ]
 
 #if _runtime(_ObjC)
@@ -997,44 +979,3 @@ public func run_BridgedNSStringLengthUTF8_UTF8(_ n: Int) {
 public func run_BridgedNSStringLengthUTF8_UTF16(_ n: Int) {
   run_BridgedNSStringLength(false, 10 /* NSUnicodeStringEncoding */, n)
 }
-
-@inline(__always)
-fileprivate func run_BridgedNSStringMaxLength(_ asciiBase: Bool, _ enc: UInt, _ n: Int) {
-  let str = asciiBase ? bridgedASCIIString! : bridgedUTF8String!
-  for _ in 0 ..< n * 100 {
-    for i in 0..<100 {
-      blackHole(str.maximumLengthOfBytes(using: enc))
-    }
-  }
-}
-
-@inline(never)
-public func run_BridgedNSStringMaxLengthASCII_ASCII(_ n: Int) {
-  run_BridgedNSStringMaxLength(true, 1 /* NSASCIIStringEncoding */, n)
-}
-
-@inline(never)
-public func run_BridgedNSStringMaxLengthASCII_UTF8(_ n: Int) {
-  run_BridgedNSStringMaxLength(true, 4 /* NSUTF8StringEncoding */, n)
-}
-
-@inline(never)
-public func run_BridgedNSStringMaxLengthASCII_UTF16(_ n: Int) {
-  run_BridgedNSStringMaxLength(true, 10 /* NSUnicodeStringEncoding */, n)
-}
-
-@inline(never)
-public func run_BridgedNSStringMaxLengthASCII_MacRoman(_ n: Int) {
-  run_BridgedNSStringMaxLength(true, 30 /* NSMacOSRomanStringEncoding */, n)
-}
-
-@inline(never)
-public func run_BridgedNSStringMaxLengthUTF8_UTF8(_ n: Int) {
-  run_BridgedNSStringMaxLength(false, 4 /* NSUTF8StringEncoding */, n)
-}
-
-@inline(never)
-public func run_BridgedNSStringMaxLengthUTF8_UTF16(_ n: Int) {
-  run_BridgedNSStringMaxLength(false, 10 /* NSUnicodeStringEncoding */, n)
-}
-
