@@ -2712,8 +2712,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
         
         if (explicitConformance->getSourceKind() ==
               ConformanceEntryKind::Explicit) {
-          diag.fixItInsert(explicitConformance->getProtocolNameLoc(),
-                           "@unsafe ");
+          conformance->applyConformanceAttribute(diag, "@unsafe");
         }
       }
 
@@ -5007,14 +5006,12 @@ static void diagnoseConformanceIsolationErrors(
       if (auto nominal = globalActorIsolation->getAnyNominal())
         isMainActor = nominal->isMainActor();
 
-      ctx.Diags.diagnose(
+      auto diag = ctx.Diags.diagnose(
           conformance->getProtocolNameLoc(),
-          diag::note_isolate_conformance_to_global_actor,
-          globalActorIsolation,
-          isMainActor,
-          globalActorIsolation.getString())
-        .fixItInsert(conformance->getProtocolNameLoc(),
-                     "@" + globalActorIsolation.getString() + " ");
+          diag::note_isolate_conformance_to_global_actor, globalActorIsolation,
+          isMainActor, globalActorIsolation.getString());
+      conformance->applyConformanceAttribute(
+          diag, "@" + globalActorIsolation.getString());
     }
 
     // If marking witnesses as 'nonisolated' could work, suggest that.
@@ -5032,10 +5029,10 @@ static void diagnoseConformanceIsolationErrors(
     // If the conformance could be @preconcurrency, suggest it.
     if (!conformance->isIsolated() && !conformance->isPreconcurrency() &&
         !hasIsolatedConformances) {
-      ctx.Diags.diagnose(
-          conformance->getProtocolNameLoc(),
-          diag::note_make_conformance_preconcurrency)
-        .fixItInsert(conformance->getProtocolNameLoc(), "@preconcurrency ");
+      auto diag =
+          ctx.Diags.diagnose(conformance->getProtocolNameLoc(),
+                             diag::note_make_conformance_preconcurrency);
+      conformance->applyConformanceAttribute(diag, "@preconcurrency");
     }
 
     // Make a note of all of the isolation problems we encountered in this
@@ -6734,9 +6731,10 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
 
       auto nameLoc = normal->getProtocolNameLoc();
       if (nameLoc.isValid()) {
-        Context.Diags.diagnose(
-            nameLoc, diag::isolated_conformance_will_become_nonisolated, nominal, proto)
-          .fixItInsert(nameLoc, "nonisolated ");
+        auto diag = Context.Diags.diagnose(
+            nameLoc, diag::isolated_conformance_will_become_nonisolated,
+            nominal, proto);
+        normal->applyConformanceAttribute(diag, "nonisolated");
       }
     }
   }

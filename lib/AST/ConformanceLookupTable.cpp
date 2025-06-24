@@ -149,13 +149,20 @@ void ConformanceLookupTable::destroy() {
 
 namespace {
   struct ConformanceConstructionInfo : public Located<ProtocolDecl *> {
+    /// The `TypeRepr` of the inheritance clause entry from which this nominal
+    /// was sourced, if any. For example, if this is a conformance to `Y`
+    /// declared as `struct S: X, Y & Z {}`, this is the `TypeRepr` for `Y & Z`.
+    TypeRepr *inheritedTypeRepr;
+
     ConformanceAttributes attributes;
 
     ConformanceConstructionInfo() { }
 
     ConformanceConstructionInfo(ProtocolDecl *item, SourceLoc loc,
+                                TypeRepr *inheritedTypeRepr,
                                 ConformanceAttributes attributes)
-        : Located(item, loc), attributes(attributes) {}
+        : Located(item, loc), inheritedTypeRepr(inheritedTypeRepr),
+          attributes(attributes) {}
   };
 }
 
@@ -210,8 +217,9 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
       loader.first->loadAllConformances(next, loader.second, conformances);
       registerProtocolConformances(next, conformances);
       for (auto conf : conformances) {
-        protocols.push_back(
-            {conf->getProtocol(), SourceLoc(), ConformanceAttributes()});
+        protocols.push_back({conf->getProtocol(), SourceLoc(),
+                             /*inheritedTypeRepr=*/nullptr,
+                             ConformanceAttributes()});
       }
     } else if (next->getParentSourceFile() ||
                next->getParentModule()->isBuiltinModule()) {
@@ -220,7 +228,8 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
       for (const auto &found :
                getDirectlyInheritedNominalTypeDecls(next, inverses, anyObject)) {
         if (auto proto = dyn_cast<ProtocolDecl>(found.Item))
-          protocols.push_back({proto, found.Loc, found.attributes});
+          protocols.push_back(
+              {proto, found.Loc, found.inheritedTypeRepr, found.attributes});
       }
     }
 
@@ -292,8 +301,6 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
     forEachInStage(
         stage, nominal,
         [&](NominalTypeDecl *nominal) {
-          auto source = ConformanceSource::forExplicit(nominal);
-
           // Get all of the protocols in the inheritance clause.
           InvertibleProtocolSet inverses;
           bool anyObject = false;
@@ -303,10 +310,12 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
             if (!proto)
               continue;
             auto kp = proto->getKnownProtocolKind();
-           assert(!found.isSuppressed ||
-                  kp.has_value() &&
-                      "suppressed conformance for non-known protocol!?");
+            assert(!found.isSuppressed ||
+                   kp.has_value() &&
+                       "suppressed conformance for non-known protocol!?");
             if (!found.isSuppressed) {
+              auto source = ConformanceSource::forExplicit(
+                  nominal, found.inheritedTypeRepr);
               addProtocol(
                   proto, found.Loc, source.withAttributes(found.attributes));
             }
@@ -318,11 +327,12 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
         [&](ExtensionDecl *ext, ArrayRef<ConformanceConstructionInfo> protos) {
           // The extension decl may not be validated, so we can't use
           // its inherited protocols directly.
-          auto source = ConformanceSource::forExplicit(ext);
-          for (auto locAndProto : protos)
-            addProtocol(
-                locAndProto.Item, locAndProto.Loc,
-                source.withAttributes(locAndProto.attributes));
+          for (auto locAndProto : protos) {
+            auto source = ConformanceSource::forExplicit(
+                ext, locAndProto.inheritedTypeRepr);
+            addProtocol(locAndProto.Item, locAndProto.Loc,
+                        source.withAttributes(locAndProto.attributes));
+          }
         });
     break;
 
@@ -976,12 +986,17 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
       implyingConf = origImplyingConf->getRootNormalConformance();
     }
 
+    TypeRepr *inheritedTypeRepr = nullptr;
+    if (entry->Source.getKind() == ConformanceEntryKind::Explicit) {
+      inheritedTypeRepr = entry->Source.getInheritedTypeRepr();
+    }
+
     // Create or find the normal conformance.
     auto normalConf = ctx.getNormalConformance(
-        conformingType, protocol, conformanceLoc, conformingDC,
-        ProtocolConformanceState::Incomplete,
-        entry->Source.getOptions(),
-        entry->Source.getPreconcurrencyLoc());
+        conformingType, protocol, conformanceLoc, inheritedTypeRepr,
+        conformingDC, ProtocolConformanceState::Incomplete,
+        entry->Source.getOptions());
+
     // Invalid code may cause the getConformance call below to loop, so break
     // the infinite recursion by setting this eagerly to shortcircuit with the
     // early return at the start of this function.
@@ -1049,10 +1064,11 @@ void ConformanceLookupTable::registerProtocolConformance(
 
   // Otherwise, add a new entry.
   auto inherited = dyn_cast<InheritedProtocolConformance>(conformance);
-  ConformanceSource source
-    = inherited   ? ConformanceSource::forInherited(cast<ClassDecl>(nominal)) :
-      synthesized ? ConformanceSource::forSynthesized(dc) :
-                    ConformanceSource::forExplicit(dc);
+  ConformanceSource source =
+      inherited ? ConformanceSource::forInherited(cast<ClassDecl>(nominal))
+      : synthesized
+          ? ConformanceSource::forSynthesized(dc)
+          : ConformanceSource::forExplicit(dc, /*inheritedEntry=*/nullptr);
 
   ASTContext &ctx = nominal->getASTContext();
   ConformanceEntry *entry = new (ctx) ConformanceEntry(SourceLoc(),
