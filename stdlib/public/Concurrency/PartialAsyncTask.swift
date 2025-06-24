@@ -318,7 +318,9 @@ public struct ExecutorJob: Sendable, ~Copyable {
   }
 
   /// Execute a closure, passing it the bounds of the executor private data
-  /// for the job.
+  /// for the job.  The executor is responsible for ensuring that any resources
+  /// referenced from the private data area are cleared up prior to running the
+  /// job.
   ///
   /// Parameters:
   ///
@@ -510,9 +512,8 @@ extension ExecutorJob {
   /// A job-local stack-disciplined allocator.
   ///
   /// This can be used to allocate additional data required by an
-  /// executor implementation; memory allocated in this manner will
-  /// be released automatically when the job is disposed of by the
-  /// runtime.
+  /// executor implementation; memory allocated in this manner must
+  /// be released by the executor before the job is executed.
   ///
   /// N.B. Because this allocator is stack disciplined, explicitly
   /// deallocating memory out-of-order will cause your program to abort.
@@ -540,23 +541,20 @@ extension ExecutorJob {
       return unsafe UnsafeMutableBufferPointer<T>(start: typedBase, count: capacity)
     }
 
-    /// Deallocate previously allocated memory.  Note that the task
-    /// allocator is stack disciplined, so if you deallocate a block of
-    /// memory, all memory allocated after that block is also deallocated.
+    /// Deallocate previously allocated memory.  You must do this in
+    /// reverse order of allocations, prior to running the job.
     public func deallocate(_ buffer: UnsafeMutableRawBufferPointer) {
       unsafe _jobDeallocate(context, buffer.baseAddress!)
     }
 
-    /// Deallocate previously allocated memory.  Note that the task
-    /// allocator is stack disciplined, so if you deallocate a block of
-    /// memory, all memory allocated after that block is also deallocated.
+    /// Deallocate previously allocated memory.  You must do this in
+    /// reverse order of allocations, prior to running the job.
     public func deallocate<T>(_ pointer: UnsafeMutablePointer<T>) {
       unsafe _jobDeallocate(context, UnsafeMutableRawPointer(pointer))
     }
 
-    /// Deallocate previously allocated memory.  Note that the task
-    /// allocator is stack disciplined, so if you deallocate a block of
-    /// memory, all memory allocated after that block is also deallocated.
+    /// Deallocate previously allocated memory.    You must do this in
+    /// reverse order of allocations, prior to running the job.
     public func deallocate<T>(_ buffer: UnsafeMutableBufferPointer<T>) {
       unsafe _jobDeallocate(context, UnsafeMutableRawPointer(buffer.baseAddress!))
     }
