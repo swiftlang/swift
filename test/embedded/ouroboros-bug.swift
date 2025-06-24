@@ -3,8 +3,7 @@
 // code, but in the embedded Swift's runtime that's somewhat reasonable thing
 // to do (but is to be avoided because of this).
 
-// RUN: %target-swift-frontend -target armv7-apple-none-macho -assert-config Debug -Osize -emit-ir %s -enable-experimental-feature Embedded | %FileCheck %s
-// RUN: %target-swift-frontend -target arm64-apple-none-macho -assert-config Debug -Osize -emit-ir %s -enable-experimental-feature Embedded | %FileCheck %s
+// RUN: %target-swift-frontend -target %target-triple -assert-config Debug -Osize -emit-ir %s -enable-experimental-feature Embedded | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
@@ -18,4 +17,4 @@
 public func test() {}
 test()
 
-// CHECK: define {{.*}}i32 @main
+// CHECK: define {{.*}}i32 @{{_*}}main{{.*}}

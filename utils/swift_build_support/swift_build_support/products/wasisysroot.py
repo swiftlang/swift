@@ -82,6 +82,10 @@ class WASILibc(product.Product):
                 if not os.path.exists(dest_path):
                     shell.symlink("wasm32-wasi", dest_path)
 
+            dest_path = os.path.join(sysroot_install_path, "lib", "wasip1")
+            if not os.path.exists(dest_path):
+                shell.symlink("wasi", dest_path)
+
     @classmethod
     def get_dependencies(cls):
         return [llvm.LLVM]
