@@ -8780,7 +8780,8 @@ public:
 /// EnumCaseDecl.
 class EnumElementDecl : public DeclContext, public ValueDecl {
   friend class EnumRawValuesRequest;
-  
+  friend class LifetimeDependenceInfoRequest;
+
   /// This is the type specified with the enum element, for
   /// example 'Int' in 'case Y(Int)'.  This is null if there is no type
   /// associated with this element, as in 'case Z' or in all elements of enum
@@ -8791,6 +8792,11 @@ class EnumElementDecl : public DeclContext, public ValueDecl {
   
   /// The raw value literal for the enum element, or null.
   LiteralExpr *RawValueExpr;
+
+protected:
+  struct {
+    unsigned NoLifetimeDependenceInfo : 1;
+  } LazySemanticInfo = {};
 
 public:
   EnumElementDecl(SourceLoc IdentifierLoc, DeclName Name,
