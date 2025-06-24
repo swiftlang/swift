@@ -248,7 +248,8 @@ extension CooperativeExecutor: RunLoopExecutor {
       #endif
 
       // Now run any queued jobs
-      while let job = runQueue.pop() {
+      var runQ = runQueue.take()
+      while let job = runQ.pop() {
         unsafe ExecutorJob(job).runSynchronously(
           on: self.asUnownedSerialExecutor()
         )
