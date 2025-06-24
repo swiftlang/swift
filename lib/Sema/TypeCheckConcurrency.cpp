@@ -5271,9 +5271,18 @@ getIsolationFromWitnessedRequirements(ValueDecl *value) {
       case ActorIsolation::Erased:
         llvm_unreachable("requirement cannot have erased isolation");
 
+      case ActorIsolation::CallerIsolationInheriting: {
+        if (value->isAsync())
+          break;
+
+        // It's possible to witness requirement with an non-async
+        // declaration, in such cases `nonisolated(nonsending)` does
+        // not apply.
+        continue;
+      }
+
       case ActorIsolation::GlobalActor:
       case ActorIsolation::Nonisolated:
-      case ActorIsolation::CallerIsolationInheriting:
       case ActorIsolation::NonisolatedUnsafe:
         break;
       }
@@ -8007,6 +8016,9 @@ ActorReferenceResult ActorReferenceResult::forReference(
     contextIsolation =
         getInnermostIsolatedContext(fromDC, getClosureActorIsolation);
   }
+
+  if (declIsolation.isCallerIsolationInheriting())
+    return forSameConcurrencyDomain(declIsolation, options);
 
   // When the declaration is not actor-isolated, it can always be accessed
   // directly.
