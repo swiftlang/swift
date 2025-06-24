@@ -69,7 +69,11 @@ extension InlineArray where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   internal var _address: UnsafePointer<Element> {
+#if $AddressOfProperty
     unsafe UnsafePointer<Element>(Builtin.unprotectedAddressOfBorrow(_storage))
+#else
+    unsafe UnsafePointer<Element>(Builtin.unprotectedAddressOfBorrow(self))
+#endif
   }
 
   /// Returns a buffer pointer over the entire array.
@@ -86,7 +90,11 @@ extension InlineArray where Element: ~Copyable {
   @_transparent
   internal var _mutableAddress: UnsafeMutablePointer<Element> {
     mutating get {
+#if $AddressOfProperty
       unsafe UnsafeMutablePointer<Element>(Builtin.unprotectedAddressOf(&_storage))
+#else
+      unsafe UnsafeMutablePointer<Element>(Builtin.unprotectedAddressOf(&self))
+#endif
     }
   }
 
