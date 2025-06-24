@@ -43,7 +43,7 @@ private:
           &alreadySeenModules);
 
   /// Retrieve the module dependencies for the Swift module with the given name.
-  ModuleDependencyVector scanFilesystemForSwiftModuleDependency(
+  SwiftModuleScannerQueryResult scanFilesystemForSwiftModuleDependency(
       Identifier moduleName, bool isTestableImport = false);
 
   /// Query dependency information for header dependencies
@@ -108,6 +108,46 @@ private:
   std::vector<std::string> swiftModuleClangCC1CommandLineArgs;
   // Working directory for clang module lookup queries
   std::string clangScanningWorkingDirectoryPath;
+  // Restrict access to the parent scanner class.
+  friend class ModuleDependencyScanner;
+};
+
+class ModuleDependencyIssueReporter {
+private:
+  ModuleDependencyIssueReporter(DiagnosticEngine &Diagnostics)
+      : Diagnostics(Diagnostics) {}
+
+  /// Diagnose scanner failure and attempt to reconstruct the dependency
+  /// path from the main module to the missing dependency
+  void diagnoseModuleNotFoundFailure(
+      const ScannerImportStatementInfo &moduleImport,
+      const ModuleDependenciesCache &cache,
+      std::optional<ModuleDependencyID> dependencyOf,
+      std::optional<std::pair<ModuleDependencyID, std::string>>
+          resolvingSerializedSearchPath,
+      std::optional<
+          std::vector<SwiftModuleScannerQueryResult::IncompatibleCandidate>>
+          foundIncompatibleCandidates = std::nullopt);
+
+  /// Upon query failure, if incompatible binary module
+  /// candidates were found, emit a failure diagnostic
+  void diagnoseFailureOnOnlyIncompatibleCandidates(
+      const ScannerImportStatementInfo &moduleImport,
+      const std::vector<SwiftModuleScannerQueryResult::IncompatibleCandidate>
+          &candidates,
+      const ModuleDependenciesCache &cache,
+      std::optional<ModuleDependencyID> dependencyOf);
+
+  /// Emit warnings for each discovered binary Swift module
+  /// which was incompatible with the current compilation
+  /// when querying \c moduleName
+  void warnOnIncompatibleCandidates(
+      StringRef moduleName,
+      const std::vector<SwiftModuleScannerQueryResult::IncompatibleCandidate>
+          &candidates);
+
+  DiagnosticEngine &Diagnostics;
+  std::unordered_set<std::string> ReportedMissing;
   // Restrict access to the parent scanner class.
   friend class ModuleDependencyScanner;
 };
@@ -182,7 +222,7 @@ private:
       StringRef mainModuleName, ModuleDependenciesCache &cache,
       llvm::function_ref<void(ModuleDependencyID)> action);
 
-  /// Performance BridgingHeader Chaining.
+  /// Perform Bridging Header Chaining.
   llvm::Error
   performBridgingHeaderChaining(const ModuleDependencyID &rootModuleID,
                                 ModuleDependenciesCache &cache,
@@ -197,12 +237,6 @@ private:
   /// for a given module name.
   Identifier getModuleImportIdentifier(StringRef moduleName);
 
-  /// Diagnose scanner failure and attempt to reconstruct the dependency
-  /// path from the main module to the missing dependency.
-  void diagnoseScannerFailure(const ScannerImportStatementInfo &moduleImport,
-                              const ModuleDependenciesCache &cache,
-                              std::optional<ModuleDependencyID> dependencyOf);
-
   /// Assuming the \c `moduleImport` failed to resolve,
   /// iterate over all binary Swift module dependencies with serialized
   /// search paths and attempt to diagnose if the failed-to-resolve module
@@ -211,12 +245,12 @@ private:
   std::optional<std::pair<ModuleDependencyID, std::string>>
   attemptToFindResolvingSerializedSearchPath(
       const ScannerImportStatementInfo &moduleImport,
-      const ModuleDependenciesCache &cache, const SourceLoc &importLoc);
+      const ModuleDependenciesCache &cache);
 
 private:
   const CompilerInvocation &ScanCompilerInvocation;
   ASTContext &ScanASTContext;
-  DiagnosticEngine &Diagnostics;
+  ModuleDependencyIssueReporter IssueReporter;
 
   /// The available pool of workers for filesystem module search
   unsigned NumThreads;
