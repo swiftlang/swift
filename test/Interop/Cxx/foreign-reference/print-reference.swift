@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-cxx-interoperability-mode=default -Xfrontend -disable-availability-checking -I %S/Inputs) | %FileCheck %s
+// RUN: %target-run-simple-swift(-cxx-interoperability-mode=default -I %S/Inputs) | %FileCheck %s
 
 // REQUIRES: executable_test
 
@@ -12,10 +12,15 @@
 import Printed
 
 func printCxxImmortalFRT() {
-    let s = ImmortalFRT()
-    print(s)
+    if #available(SwiftStdlib 6.2, *) {
+        let s = ImmortalFRT()
+        print(s)
+    } else {
+        print("runtime too old")
+    }
 }
 
+@available(SwiftStdlib 5.9, *)
 extension FRTCustomStringConvertible : CustomStringConvertible {
     public var description: String {
         return "FRTCustomStringConvertible(publ: \(publ))"
@@ -23,20 +28,28 @@ extension FRTCustomStringConvertible : CustomStringConvertible {
 }
 
 func printCxxFRTCustomStringConvertible() {
-    let s = FRTCustomStringConvertible()
-    print(s)
+    if #available(SwiftStdlib 5.9, *) {
+        let s = FRTCustomStringConvertible()
+        print(s)
+    } else {
+        print("runtime too old")
+    }
 }
 
 func printCxxFRType() {
-    let s = FRType()
-    print(s)
+    if #available(SwiftStdlib 6.2, *) {
+        let s = FRType()
+        print(s)
+    } else {
+        print("runtime too old")
+    }
 }
 
 printCxxImmortalFRT()
-// CHECK: ImmortalFRT()
+// CHECK: {{ImmortalFRT()|runtime too old}}
 
 printCxxFRTCustomStringConvertible()
 // CHECK: FRTCustomStringConvertible(publ: 2)
 
 printCxxFRType()
-// CHECK: FRType()
+// CHECK: {{FRType()|runtime too old}}
