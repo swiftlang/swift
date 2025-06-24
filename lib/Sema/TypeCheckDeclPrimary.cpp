@@ -2504,7 +2504,8 @@ public:
     // concurrency checking enabled.
     if (ID->preconcurrency() &&
         Ctx.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete &&
-        Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety)) {
+        Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety) &&
+        ID->getExplicitSafety() != ExplicitSafety::Unsafe) {
       diagnoseUnsafeUse(UnsafeUse::forPreconcurrencyImport(ID));
     }
   }

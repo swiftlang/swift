@@ -8400,7 +8400,7 @@ GROUPED_WARNING(override_safe_with_unsafe,StrictMemorySafety,none,
 
 GROUPED_WARNING(preconcurrency_import_unsafe,StrictMemorySafety,none,
       "'@preconcurrency' import is not memory-safe because it can silently "
-      "introduce data races", ())
+      "introduce data races; add '@unsafe' to indicate that this is unsafe", ())
 GROUPED_WARNING(unsafe_without_unsafe,StrictMemorySafety,none,
       "expression uses unsafe constructs but is not marked with 'unsafe'", ())
 GROUPED_WARNING(for_unsafe_without_unsafe,StrictMemorySafety,none,

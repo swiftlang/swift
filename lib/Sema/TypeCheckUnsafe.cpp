@@ -198,7 +198,9 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use) {
 
   case UnsafeUse::PreconcurrencyImport: {
     auto importDecl = cast<ImportDecl>(use.getDecl());
-    importDecl->diagnose(diag::preconcurrency_import_unsafe);
+    importDecl->diagnose(diag::preconcurrency_import_unsafe)
+      .fixItInsert(importDecl->getAttributeInsertionLoc(false), "@unsafe ");
+
     return;
   }
   }
