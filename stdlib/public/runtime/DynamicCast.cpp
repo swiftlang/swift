@@ -879,18 +879,8 @@ tryCastToAnyHashable(
   
   switch (srcType->getKind()) {
   case MetadataKind::ForeignClass: // CF -> String
-  case MetadataKind::Existential: { // AnyObject can be an NSString
-#if SWIFT_OBJC_INTEROP
-    auto existentialType = cast<ExistentialTypeMetadata>(srcType);
-    // TODO: also handle non-class existentials that could contain an NSString
-    if (existentialType->getRepresentation() == ExistentialTypeRepresentation::Class) {
-      auto val = reinterpret_cast<const ClassExistentialContainer *>(srcValue)->Value;
-      auto cls = swift_getObjectType((HeapObject *)val);
-      hashableConformance = tryMemoizeNSStringHashableConformance(cls);
-    }
-#endif
-    // If no Obj-C interop, just fall through to the general case.
-    break;
+  case MetadataKind::Existential: {
+    return DynamicCastResult::Failure;
   }
   case MetadataKind::ObjCClassWrapper: { // Obj-C -> String
 #if SWIFT_OBJC_INTEROP
