@@ -66,6 +66,12 @@ std::string Context::demangleSymbolAsString(llvm::StringRef MangledName,
   return demangling;
 }
 
+void Context::demangleSymbolAsString(llvm::StringRef MangledName,
+                                     NodePrinter &Printer) {
+  NodePointer root = demangleSymbolAsNode(MangledName);
+  nodeToString(root, Printer);
+}
+
 std::string Context::demangleTypeAsString(llvm::StringRef MangledName,
                                           const DemangleOptions &Options) {
   NodePointer root = demangleTypeAsNode(MangledName);
