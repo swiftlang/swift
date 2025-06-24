@@ -992,18 +992,18 @@ func fnExtInfoTest(
 // FIXME: Not sure how to reach tryNormalizeOutermostType() generic func
 
 @abi(
-  func testMarkerProtocols<A, B: Sendable>(
-    _: A, _: B,
-    _: Any, _: Sendable,
-    _: AnyKeyPath, _: AnyKeyPath & Sendable,
-    _: Any, _: Sendable & BitwiseCopyable
+  func testMarkerProtocols<A, B: Sendable, C, D: SendableMetatype>(
+    _: A, _: B, _: C, _: D,
+    _: Any, _: Sendable, _: Any, _: SendableMetatype,
+    _: AnyKeyPath, _: AnyKeyPath & Sendable, _: AnyKeyPath, _: AnyKeyPath & SendableMetatype,
+    _: Any, _: Sendable & BitwiseCopyable, _: Any, _: SendableMetatype & BitwiseCopyable
   )
 )
-func testMarkerProtocols<A: Sendable, B>(
-  _: A, _: B,
-  _: Sendable, _: Any,
-  _: AnyKeyPath & Sendable, _: AnyKeyPath,
-  _: Sendable & BitwiseCopyable, _: Any
+func testMarkerProtocols<A: Sendable, B, C: SendableMetatype, D>(
+  _: A, _: B, _: C, _: D,
+  _: Sendable, _: Any, _: SendableMetatype, _: Any,
+  _: AnyKeyPath & Sendable, _: AnyKeyPath, _: AnyKeyPath & SendableMetatype, _: AnyKeyPath,
+  _: Sendable & BitwiseCopyable, _: Any, _: SendableMetatype & BitwiseCopyable, _: Any
 ) {}
 
 @abi(
