@@ -850,7 +850,6 @@ struct ObjCBridgeMemo {
         destBridgeWitness, targetBridgedType);
     }
 };
-#endif
 
 static const HashableWitnessTable* tryMemoizeNSStringHashableConformance(const Metadata *cls) {
   auto nsString = getNSStringMetadata();
@@ -862,6 +861,7 @@ static const HashableWitnessTable* tryMemoizeNSStringHashableConformance(const M
   } while (cls != nullptr);
   return nullptr;
 }
+#endif
 
 static DynamicCastResult
 tryCastToAnyHashable(
