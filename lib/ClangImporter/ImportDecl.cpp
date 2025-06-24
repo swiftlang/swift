@@ -3638,7 +3638,6 @@ namespace {
             unannotatedAPIWarningNeeded = false;
           }
 
-          unannotatedAPIWarningNeeded = false;
           if (unannotatedAPIWarningNeeded) {
             HeaderLoc loc(decl->getLocation());
             Impl.diagnose(loc, diag::no_returns_retained_returns_unretained,

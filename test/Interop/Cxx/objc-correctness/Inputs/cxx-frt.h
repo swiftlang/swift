@@ -16,7 +16,7 @@ void releaseCxxRefType(CxxRefType *_Nonnull b) {}
 
 @interface Bridge : NSObject
 
-+ (struct CxxRefType *)objCMethodReturningFRTUnannotated;
++ (struct CxxRefType *)objCMethodReturningFRTUnannotated; // expected-warning {{'objCMethodReturningFRTUnannotated' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE}}
 + (struct CxxRefType *)objCMethodReturningFRTUnowned
     __attribute__((swift_attr("returns_unretained")));
 + (struct CxxRefType *)objCMethodReturningFRTOwned
