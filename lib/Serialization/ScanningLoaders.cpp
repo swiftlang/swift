@@ -61,26 +61,26 @@ std::error_code SwiftModuleScanner::findModuleFilesInDirectory(
       isTestableDependencyLookup || !InPath) {
     if (fs.exists(ModPath)) {
       // The module file will be loaded directly.
-      auto dependencies = scanBinaryModuleFile(
+      auto dependencyInfo = scanBinaryModuleFile(
           ModuleID.Item, ModPath, IsFramework, isTestableDependencyLookup,
           /* isCandidateForTextualModule */ false);
-      if (dependencies) {
-        this->dependencies = std::move(dependencies.get());
+      if (dependencyInfo) {
+        this->foundDependencyInfo = std::move(dependencyInfo.get());
         return std::error_code();
       }
-      return dependencies.getError();
+      return dependencyInfo.getError();
     }
     return std::make_error_code(std::errc::no_such_file_or_directory);
   }
   assert(InPath);
 
-  auto dependencies = scanInterfaceFile(ModuleID.Item, *InPath, IsFramework,
-                                        isTestableDependencyLookup);
-  if (dependencies) {
-    this->dependencies = std::move(dependencies.get());
+  auto dependencyInfo = scanInterfaceFile(ModuleID.Item, *InPath, IsFramework,
+                                          isTestableDependencyLookup);
+  if (dependencyInfo) {
+    this->foundDependencyInfo = std::move(dependencyInfo.get());
     return std::error_code();
   }
-  return dependencies.getError();
+  return dependencyInfo.getError();
 }
 
 static std::vector<std::string> getCompiledCandidates(ASTContext &ctx,
@@ -266,21 +266,14 @@ llvm::ErrorOr<ModuleDependencyInfo> SwiftModuleScanner::scanBinaryModuleFile(
       // it would be helpful to let the user know why the scanner
       // was not able to use it because the scan will ultimately fail to
       // resolve this dependency due to this incompatibility.
-      if (!isCandidateForTextualModule)
-        Ctx.Diags.diagnose(SourceLoc(),
-                           diag::dependency_scan_module_incompatible,
-                           binaryModulePath.str(), loadFailureReason.value());
-
-      if (Ctx.LangOpts.EnableModuleLoadingRemarks)
-        Ctx.Diags.diagnose(SourceLoc(),
-                           diag::dependency_scan_skip_module_invalid,
-                           binaryModulePath.str(), loadFailureReason.value());
+      incompatibleCandidates.push_back({binaryModulePath.str(),
+                                        loadFailureReason.value()});
       return std::make_error_code(std::errc::no_such_file_or_directory);
     }
 
     if (isTestableImport && !loadedModuleFile->isTestable()) {
-      Ctx.Diags.diagnose(SourceLoc(), diag::skip_module_not_testable,
-                         binaryModulePath.str());
+      incompatibleCandidates.push_back({binaryModulePath.str(),
+                                        "module built without '-enable-testing'"});
       return std::make_error_code(std::errc::no_such_file_or_directory);
     }
   }
@@ -337,22 +330,21 @@ llvm::ErrorOr<ModuleDependencyInfo> SwiftModuleScanner::scanBinaryModuleFile(
   return std::move(dependencies);
 }
 
-ModuleDependencyVector
+SwiftModuleScannerQueryResult
 SwiftModuleScanner::lookupSwiftModule(Identifier moduleName,
                                       bool isTestableImport) {
   // When we exit, ensure we clear dependencies discovered on this query
-  SWIFT_DEFER { dependencies = std::nullopt; };
+  SWIFT_DEFER {
+    foundDependencyInfo = std::nullopt;
+    incompatibleCandidates = {};
+  };
 
   ImportPath::Module::Builder builder(moduleName);
   auto modulePath = builder.get();
-  // Check whether there is a module with this name that we can import.
-  if (canImportModule(modulePath, SourceLoc(), nullptr, isTestableImport)) {
-    ModuleDependencyVector moduleDependnecies;
-    moduleDependnecies.push_back(std::make_pair(
-        ModuleDependencyID{moduleName.str().str(), dependencies->getKind()},
-        *(dependencies)));
-    return moduleDependnecies;
-  }
-
-  return {};
+  // Execute the check to determine whether there is a module with this name
+  // that we can import. This check will populate the result fields if one is
+  // found.
+  canImportModule(modulePath, SourceLoc(), nullptr, isTestableImport);
+  return SwiftModuleScannerQueryResult(
+      std::move(foundDependencyInfo), std::move(incompatibleCandidates));
 }
