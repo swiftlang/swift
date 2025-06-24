@@ -878,10 +878,10 @@ tryCastToAnyHashable(
   const HashableWitnessTable *hashableConformance = nullptr;
   
   switch (srcType->getKind()) {
-  case MetadataKind::ForeignClass: // CF -> String
   case MetadataKind::Existential: {
     return DynamicCastResult::Failure;
   }
+  case MetadataKind::ForeignClass: // CF -> String
   case MetadataKind::ObjCClassWrapper: { // Obj-C -> String
 #if SWIFT_OBJC_INTEROP
     hashableConformance = tryMemoizeNSStringHashableConformance(srcType);
