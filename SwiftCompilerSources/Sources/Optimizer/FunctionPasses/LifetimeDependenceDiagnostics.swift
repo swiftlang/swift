@@ -199,9 +199,16 @@ private struct DiagnoseDependence {
     if function.hasUnsafeNonEscapableResult {
       return .continueWalk
     }
-    // If the dependence scope is global, then it has immortal lifetime.
-    if case .global = dependence.scope {
+    // Check for immortal lifetime.
+    switch dependence.scope {
+    case .global:
       return .continueWalk
+    case let .unknown(value):
+      if value.type.isVoid {
+        return .continueWalk
+      }
+    default:
+      break
     }
     // Check that the parameter dependence for this result is the same
     // as the current dependence scope.
@@ -352,7 +359,7 @@ private struct LifetimeVariable {
 
   private func getFirstVariableIntroducer(of value: Value, _ context: some Context) -> Value? {
     var introducer: Value?
-    var useDefVisitor = VariableIntroducerUseDefWalker(context, scopedValue: value) {
+    var useDefVisitor = VariableIntroducerUseDefWalker(context, scopedValue: value, ignoreTrivialCopies: false) {
       introducer = $0
       return .abortWalk
     }
