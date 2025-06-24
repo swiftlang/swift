@@ -40,6 +40,15 @@ struct PriorityQueue<T> {
     self.compare = compare
   }
 
+  /// Take the queue.
+  ///
+  /// This returns a copy of the queue, and empties the original.
+  mutating func take() -> PriorityQueue<T> {
+    var q = PriorityQueue(compare: self.compare)
+    swap(&self, &q)
+    return q
+  }
+
   /// Push an item onto the queue.
   ///
   /// Parameters:
