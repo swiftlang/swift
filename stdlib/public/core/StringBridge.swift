@@ -288,13 +288,6 @@ internal func _cocoaCStringUsingEncodingTrampoline(
 }
 
 @_effects(readonly)
-internal func _cocoaMaximumLengthForEncodingTrampoline(
-  _ string: _CocoaString, _ encoding: UInt
-) -> UInt {
-  return _swift_stdlib_NSStringMaximumLengthForEncodingTrampoline(string, encoding)
-}
-
-@_effects(readonly)
 internal func _cocoaLengthOfBytesInEncodingTrampoline(
   _ string: _CocoaString, _ encoding: UInt
 ) -> UInt {

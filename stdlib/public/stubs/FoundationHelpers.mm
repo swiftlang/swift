@@ -108,19 +108,6 @@ _swift_stdlib_NSStringGetCStringTrampoline(id _Nonnull obj,
 
 SWIFT_RUNTIME_STDLIB_API
 const _swift_shims_NSUInteger
-_swift_stdlib_NSStringMaximumLengthForEncodingTrampoline(id _Nonnull obj,
-                                                         unsigned long encoding) {
-  typedef _swift_shims_NSUInteger (*getMaxLengthImplPtr)(id,
-                                                         SEL,
-                                                         unsigned long);
-  SEL sel = @selector(maximumLengthOfBytesUsingEncoding:);
-  getMaxLengthImplPtr imp = (getMaxLengthImplPtr)class_getMethodImplementation([obj superclass], sel);
-  
-  return imp(obj, sel, encoding);
-}
-
-SWIFT_RUNTIME_STDLIB_API
-const _swift_shims_NSUInteger
 _swift_stdlib_NSStringLengthOfBytesInEncodingTrampoline(id _Nonnull obj,
                                                         unsigned long encoding) {
   typedef _swift_shims_NSUInteger (*getLengthImplPtr)(id,

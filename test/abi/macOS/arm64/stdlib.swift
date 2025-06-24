@@ -1089,6 +1089,5 @@ Added: _$ss8UTF8SpanV9_asciiBits6UInt64VvpZMV
 // printing foreign reference types requires a new displayStyle: .foreign
 Added: _$ss6MirrorV12DisplayStyleO16foreignReferenceyA2DmFWC
 
-// lengthOfBytes(using:)/maximumLengthOfBytes(for:)
+// lengthOfBytes(using:)
 Added: __swift_stdlib_NSStringLengthOfBytesInEncodingTrampoline
-Added: __swift_stdlib_NSStringMaximumLengthForEncodingTrampoline
