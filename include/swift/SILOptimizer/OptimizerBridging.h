@@ -43,6 +43,7 @@ class AliasAnalysis;
 class BasicCalleeAnalysis;
 class CalleeList;
 class DeadEndBlocks;
+class DestructorAnalysis;
 class DominanceInfo;
 class PostDominanceInfo;
 class BasicBlockSet;
@@ -114,6 +115,12 @@ struct BridgedDeadEndBlocksAnalysis {
   swift::DeadEndBlocks * _Nonnull deb;
 
   BRIDGED_INLINE bool isDeadEnd(BridgedBasicBlock block) const;
+};
+
+struct BridgedDestructorAnalysis {
+  swift::DestructorAnalysis * _Nonnull analysis;
+
+  BRIDGED_INLINE bool mayStoreToMemoryOnDestruction(BridgedType type) const;
 };
 
 struct BridgedDomTree {
@@ -215,6 +222,7 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedAliasAnalysis getAliasAnalysis() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCalleeAnalysis getCalleeAnalysis() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeadEndBlocksAnalysis getDeadEndBlocksAnalysis() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDestructorAnalysis getDestructorAnalysis() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDomTree getDomTree() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedPostDomTree getPostDomTree() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getSwiftArrayDecl() const;

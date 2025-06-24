@@ -23,6 +23,7 @@
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
+#include "swift/SILOptimizer/Analysis/DestructorAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
@@ -73,6 +74,14 @@ BridgedFunction BridgedCalleeAnalysis::CalleeList::getCallee(SwiftInt index) con
 
 bool BridgedDeadEndBlocksAnalysis::isDeadEnd(BridgedBasicBlock block) const {
   return deb->isDeadEnd(block.unbridged());
+}
+
+//===----------------------------------------------------------------------===//
+//                          BridgedDestructorAnalysis
+//===----------------------------------------------------------------------===//
+
+bool BridgedDestructorAnalysis::mayStoreToMemoryOnDestruction(BridgedType type) const {
+  return analysis->mayStoreToMemoryOnDestruction(type.unbridged());
 }
 
 //===----------------------------------------------------------------------===//
@@ -204,6 +213,10 @@ BridgedCalleeAnalysis BridgedPassContext::getCalleeAnalysis() const {
 BridgedDeadEndBlocksAnalysis BridgedPassContext::getDeadEndBlocksAnalysis() const {
   auto *dba = invocation->getPassManager()->getAnalysis<swift::DeadEndBlocksAnalysis>();
   return {dba->get(invocation->getFunction())};
+}
+
+BridgedDestructorAnalysis BridgedPassContext::getDestructorAnalysis() const {
+  return {invocation->getPassManager()->getAnalysis<swift::DestructorAnalysis>()};
 }
 
 BridgedDomTree BridgedPassContext::getDomTree() const {

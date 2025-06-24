@@ -477,14 +477,17 @@ extension DependentAddressUseDefWalker: AddressUseDefWalker {
 /// TODO: handle stores to singly initialized temporaries like copies using a standard reaching-def analysis.
 private struct DiagnoseDependenceWalker {
   let context: Context
+  let destructorAnalysis: DestructorAnalysis
+
   var diagnostics: DiagnoseDependence
   let localReachabilityCache = LocalVariableReachabilityCache()
   var visitedValues: ValueSet
 
-  var function: Function { diagnostics.function }
+  var function: Function { get { diagnostics.function } }
   
-  init(_ diagnostics: DiagnoseDependence, _ context: Context) {
+  init(_ diagnostics: DiagnoseDependence, _ context: FunctionPassContext) {
     self.context = context
+    self.destructorAnalysis = context.destructorAnalysis
     self.diagnostics = diagnostics
     self.visitedValues = ValueSet(context)
   }

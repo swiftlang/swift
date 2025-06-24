@@ -1010,8 +1010,10 @@ private extension BeginApplyInst {
 ///
 /// Set 'dependsOnCaller' if a use escapes the function.
 private struct LifetimeDependentUseWalker : LifetimeDependenceDefUseWalker {
-  let function: Function
   let context: Context
+  let function: Function
+  let destructorAnalysis: DestructorAnalysis
+
   let visitor: (Operand) -> WalkResult
   let localReachabilityCache: LocalVariableReachabilityCache
   var visitedValues: ValueSet
@@ -1019,10 +1021,11 @@ private struct LifetimeDependentUseWalker : LifetimeDependenceDefUseWalker {
   /// Set to true if the dependence is returned from the current function.
   var dependsOnCaller = false
 
-  init(_ function: Function, _ localReachabilityCache: LocalVariableReachabilityCache, _ context: Context,
+  init(_ function: Function, _ localReachabilityCache: LocalVariableReachabilityCache, _ context: FunctionPassContext,
        visitor: @escaping (Operand) -> WalkResult) {
-    self.function = function
     self.context = context
+    self.function = function
+    self.destructorAnalysis = context.destructorAnalysis
     self.visitor = visitor
     self.localReachabilityCache = localReachabilityCache
     self.visitedValues = ValueSet(context)
