@@ -93,7 +93,11 @@ extension InlineArray where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   internal var _protectedAddress: UnsafePointer<Element> {
+#if $AddressOfProperty
+    unsafe UnsafePointer<Element>(Builtin.addressOfBorrow(_storage))
+#else
     unsafe UnsafePointer<Element>(Builtin.addressOfBorrow(self))
+#endif
   }
 
   /// Returns a buffer pointer over the entire array while performing stack
@@ -145,7 +149,11 @@ extension InlineArray where Element: ~Copyable {
   @_transparent
   internal var _protectedMutableAddress: UnsafeMutablePointer<Element> {
     mutating get {
+#if $AddressOfProperty
+      unsafe UnsafeMutablePointer<Element>(Builtin.addressof(&_storage))
+#else
       unsafe UnsafeMutablePointer<Element>(Builtin.addressof(&self))
+#endif
     }
   }
 
@@ -526,6 +534,7 @@ extension InlineArray where Element: ~Copyable {
   @_alwaysEmitIntoClient
   public var span: Span<Element> {
     @lifetime(borrow self)
+    @_transparent
     borrowing get {
       let span = unsafe Span(_unsafeStart: _protectedAddress, count: count)
       return unsafe _overrideLifetime(span, borrowing: self)
@@ -536,6 +545,7 @@ extension InlineArray where Element: ~Copyable {
   @_alwaysEmitIntoClient
   public var mutableSpan: MutableSpan<Element> {
     @lifetime(&self)
+    @_transparent
     mutating get {
       let span = unsafe MutableSpan(
         _unsafeStart: _protectedMutableAddress,
