@@ -60,6 +60,12 @@ module Enums {
   requires cplusplus
 }
 
+module ImportAsMember {
+  header "import-as-member.h"
+  export *
+  requires cplusplus
+}
+
 module MembersDirect {
   header "members-direct.h"
   requires cplusplus
