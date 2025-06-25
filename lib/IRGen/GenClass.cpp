@@ -2067,6 +2067,23 @@ namespace {
       }
 
       StringRef name = field.getName();
+      std::string typeEnc;
+      if (field.getKind() == Field::Var) {
+        auto *varDecl = field.getVarDecl();
+        if (varDecl->isObjC() && varDecl->hasStorage()) {
+          auto varTy = varDecl->getInterfaceType();
+          auto varDC = varDecl->getDeclContext();
+          bool isTriviallyRepresentable = varTy->isTriviallyRepresentableIn(
+              ForeignLanguage::ObjectiveC, varDC);
+
+          if (isTriviallyRepresentable)
+            getObjCEncodingForPropertyType(IGM, varDecl, typeEnc);
+          else
+            // "Unknown type" - used when ObjC classes are bridged to separate
+            // Swift types.
+            typeEnc = "?";
+        }
+      }
       const TypeInfo &storageTI = pair.second.getType();
       auto fields = ivars.beginStruct();
 
@@ -2079,7 +2096,7 @@ namespace {
       fields.add(IGM.getAddrOfGlobalString(name));
 
       // TODO: clang puts this in __TEXT,__objc_methtype,cstring_literals
-      fields.add(IGM.getAddrOfGlobalString(""));
+      fields.add(IGM.getAddrOfGlobalString(typeEnc));
 
       Size size;
       Alignment alignment;
