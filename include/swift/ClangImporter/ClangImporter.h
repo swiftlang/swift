@@ -497,23 +497,14 @@ public:
   using LookupModuleOutputCallback =
       llvm::function_ref<std::string(const clang::tooling::dependencies::ModuleDeps &,
                                      clang::tooling::dependencies::ModuleOutputKind)>;
-  
+
   static llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
   bridgeClangModuleDependencies(
       const ASTContext &ctx,
       clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
       clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
-      StringRef moduleOutputPath, StringRef stableModuleOutputPath,
       LookupModuleOutputCallback LookupModuleOutput,
       RemapPathCallback remapPath = nullptr);
-
-  llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
-  getModuleDependencies(Identifier moduleName, StringRef moduleOutputPath, StringRef sdkModuleOutputPath,
-                        const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
-                        const std::vector<std::string> &swiftModuleClangCC1CommandLineArgs,
-                        InterfaceSubContextDelegate &delegate,
-                        llvm::PrefixMapper *mapper,
-                        bool isTestableImport = false) override;
 
   static void getBridgingHeaderOptions(
       const ASTContext &ctx,
