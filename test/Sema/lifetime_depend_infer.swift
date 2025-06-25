@@ -15,6 +15,8 @@ struct NEImmortal: ~Escapable {
   init() {}
 }
 
+struct MutNE: ~Copyable & ~Escapable {}
+
 // =============================================================================
 // Handle non-Escapable results with 'self'
 // =============================================================================
@@ -577,3 +579,12 @@ struct NonEscapableMutableSelf: ~Escapable {
   @_lifetime(&self)
   mutating func mutatingMethodOneParamBorrow(_: NE) {}
 }
+
+// =============================================================================
+// Handle common mistakes with inout parameter annotations
+// =============================================================================
+
+// Unable to infer an 'inout' dependency. Provide valid guidance.
+//
+func f_inout_no_infer(a: inout MutNE, b: NE) {} // expected-error{{a function with a ~Escapable 'inout' parameter requires '@_lifetime(a: ...)'}}
+// expected-note @-1{{use '@_lifetime(a: copy a) to forward the inout dependency}}
