@@ -582,6 +582,54 @@ struct NonEscapableMutableSelf: ~Escapable {
 }
 
 // =============================================================================
+// Initializers
+// =============================================================================
+
+// Motivation: Non-escapable struct definitions often have inicidental integer fields that are unrelated to lifetime.
+// Without an explicit initializer, the compiler would infer these fields to be borrowed by the implicit intializer.
+// This inevitabely results in lifetime diagnostic errors elsewhere in the code that can't be tracked down at the use
+// site:
+//
+//     let span = CountedSpan(span: span, i: 3) // ERROR: span depends on the lifetime of this value
+//
+struct CountedSpan: ~Escapable { // expected-error{{cannot infer implicit initialization lifetime. Add an initializer with '@_lifetime(...)' for each parameter the result depends on}}
+  let span: Span<Int>
+  let i: Int
+}
+
+struct NE_Int: ~Escapable {
+  let i: Int
+}
+
+struct NE_C: ~Escapable { // expected-error{{cannot borrow the lifetime of 'c', which has consuming ownership on an implicit initializer}}
+  let c: C
+}
+
+struct NE_C_Int: ~Escapable { // expected-error{{cannot infer implicit initialization lifetime. Add an initializer with '@_lifetime(...)' for each parameter the result depends on}}
+  let c: C
+  let i: Int
+}
+
+struct NE_Int_Int: ~Escapable { // expected-error{{cannot infer implicit initialization lifetime. Add an initializer with '@_lifetime(...)' for each parameter the result depends on}}
+  let i: Int
+  let j: Int
+}
+
+struct NE_NE: ~Escapable {
+  let ne: NE
+}
+
+struct NE_NE_Int: ~Escapable { // expected-error{{cannot infer implicit initialization lifetime. Add an initializer with '@_lifetime(...)' for each parameter the result depends on}}
+  let ne: NE
+  let i: Int
+}
+
+struct NE_NE_C: ~Escapable { // expected-error{{cannot infer implicit initialization lifetime. Add an initializer with '@_lifetime(...)' for each parameter the result depends on}}
+  let ne: NE
+  let c: C
+}
+
+// =============================================================================
 // Handle common mistakes with inout parameter annotations
 // =============================================================================
 
