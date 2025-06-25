@@ -1699,11 +1699,16 @@ static SILInstruction *combineMarkDependenceBaseInst(
   {
     SILType baseType = mdi->getBase()->getType();
     if (baseType.getObjectType().isTrivial(*mdi->getFunction())) {
-      if (auto mdValue = dyn_cast<MarkDependenceInst>(mdi)) {
-        auto &valOper = mdi->getAllOperands()[MarkDependenceInst::Dependent];
-        mdValue->replaceAllUsesWith(valOper.get());
+      // begin_apply is a special case. A dependency on the token is limited
+      // to the coroutine scope (ideally, the token
+      // would have a non-trivial type like $Builtin.Token).
+      if (!isa_and_nonnull<BeginApplyInst>(mdi->getBase()->getDefiningInstruction())) {
+        if (auto mdValue = dyn_cast<MarkDependenceInst>(mdi)) {
+          auto &valOper = mdi->getAllOperands()[MarkDependenceInst::Dependent];
+          mdValue->replaceAllUsesWith(valOper.get());
+        }
+        return C->eraseInstFromFunction(*mdi);
       }
-      return C->eraseInstFromFunction(*mdi);
     }
   }
   return nullptr;
