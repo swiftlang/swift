@@ -1449,7 +1449,8 @@ public:
       // At this point, check if our sent value is not disconnected. If so, emit
       // a sent never sendable helper.
       if (sentRegionIsolation && !sentRegionIsolation.isDisconnected()) {
-        return handleSendNeverSentHelper(op, op.getOpArg1(), sentRegionIsolation);
+        return handleSentNeverSendableHelper(op, op.getOpArg1(),
+                                             sentRegionIsolation);
       }
 
       // Next see if we are disconnected and have the same isolation. In such a
@@ -1669,7 +1670,7 @@ private:
 
   // Private helper that squelches the error if our send instruction and our
   // use have the same isolation.
-  void handleSendNeverSentHelper(
+  void handleSentNeverSendableHelper(
       const PartitionOp &op, Element elt,
       SILDynamicMergedIsolationInfo dynamicMergedIsolationInfo) {
     if (shouldTryToSquelchErrors()) {
