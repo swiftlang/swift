@@ -1672,7 +1672,7 @@ extension Set {
   /// with `==`, but not all equal sets are considered identical.
   ///
   /// - Performance: O(1)
-  @backDeployed(before: SwiftStdlib 6.3)
+  @_alwaysEmitIntoClient
   public func isIdentical(to other: Self) -> Bool {
 #if _runtime(_ObjC)
     if
