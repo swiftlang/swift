@@ -2151,7 +2151,7 @@ extension Array {
   /// identical.
   ///
   /// - Performance: O(1)
-  @backDeployed(before: SwiftStdlib 6.3)
+  @_alwaysEmitIntoClient
   public func isIdentical(to other: Self) -> Bool {
     let lhsCount = self.count
     if lhsCount != other.count {

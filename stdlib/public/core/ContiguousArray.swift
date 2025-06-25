@@ -1510,8 +1510,18 @@ extension ContiguousArray {
   /// identical.
   ///
   /// - Performance: O(1)
-  @backDeployed(before: SwiftStdlib 6.3)
+  @_alwaysEmitIntoClient
   public func isIdentical(to other: Self) -> Bool {
-    self._buffer.identity == other._buffer.identity
+    let lhsCount = self.count
+    if lhsCount != other.count {
+      return false
+    }
+
+    // Test referential equality.
+    if unsafe lhsCount == 0 || self._buffer.identity == other._buffer.identity {
+      return true
+    }
+    
+    return false
   }
 }
