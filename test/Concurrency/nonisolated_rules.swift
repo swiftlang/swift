@@ -5,6 +5,19 @@
 @MainActor
 protocol GloballyIsolated {}
 
+@globalActor
+actor Test {
+  static let shared: Test = Test()
+}
+
+@Test
+protocol TestIsolatedProto {
+}
+
+@Test
+protocol RedeclaredIsolationProto : GloballyIsolated {
+}
+
 // expected-note@+1 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
 class NonSendable {}
 
@@ -310,5 +323,27 @@ func rdar147965036() {
   test { @nonisolated in
     // expected-error@-1 {{'nonisolated' is a declaration modifier, not an attribute}}
     // expected-error@-2 {{'nonisolated' is not supported on a closure}}
+  }
+}
+
+// Test that clash in isolation from protocols results in nonisolated conforming type
+func testProtocolIsolationClash() {
+  struct A: GloballyIsolated, TestIsolatedProto {
+  }
+
+  struct B: RedeclaredIsolationProto {
+  }
+
+  struct C: GloballyIsolated, TestIsolatedProto, WhyNot {
+  }
+
+  struct D: WhyNot, GloballyIsolated, TestIsolatedProto {
+  }
+
+  nonisolated func test() {
+    _ = A() // Ok
+    _ = B() // Ok
+    _ = C() // Ok
+    _ = D() // Ok
   }
 }
