@@ -46,8 +46,7 @@ BridgedSourceLoc::BridgedSourceLoc(swift::SourceLoc loc)
   : Raw(loc.getOpaquePointerValue()) {}
 
 swift::SourceLoc BridgedSourceLoc::unbridged() const {
-  return swift::SourceLoc(
-      llvm::SMLoc::getFromPointer(static_cast<const char *>(Raw)));
+  return swift::SourceLoc::getFromPointer(static_cast<const char *>(Raw));
 }
 
 BridgedSourceLoc BridgedSourceLoc::advancedBy(size_t n) const {
