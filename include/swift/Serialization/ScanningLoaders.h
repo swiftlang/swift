@@ -22,46 +22,17 @@ namespace swift {
 /// for the purpose of determining dependencies, but does not attempt to
 /// load the module files.
 class SwiftModuleScanner : public SerializedModuleLoaderBase {
-public:
-  enum ScannerKind { MDS_plain, MDS_placeholder };
-
 private:
-  /// The kind of scanner this is (LLVM-style RTTI)
-  const ScannerKind kind;
-
-  /// The module we're scanning dependencies of.
-  Identifier moduleName;
-
   /// Scan the given interface file to determine dependencies.
   llvm::ErrorOr<ModuleDependencyInfo>
-  scanInterfaceFile(Twine moduleInterfacePath, bool isFramework,
-                    bool isTestableImport);
+  scanInterfaceFile(Identifier moduleID, Twine moduleInterfacePath,
+                    bool isFramework, bool isTestableImport);
 
-  InterfaceSubContextDelegate &astDelegate;
-
-  /// Location where pre-built modules are to be built into.
-  std::string moduleOutputPath;
-  /// Location where pre-built SDK modules are to be built into.
-  std::string sdkModuleOutputPath;
-  /// Clang-specific (-Xcc) command-line flags to include on
-  /// Swift module compilation commands
-  std::vector<std::string> swiftModuleClangCC1CommandLineArgs;
-
-public:
-  std::optional<ModuleDependencyInfo> dependencies;
-
-  SwiftModuleScanner(ASTContext &ctx, ModuleLoadingMode LoadMode,
-                     Identifier moduleName,
-                     InterfaceSubContextDelegate &astDelegate,
-                     StringRef moduleOutputPath, StringRef sdkModuleOutputPath,
-                     std::vector<std::string> swiftModuleClangCC1CommandLineArgs,
-                     ScannerKind kind = MDS_plain)
-      : SerializedModuleLoaderBase(ctx, nullptr, LoadMode,
-                                   /*IgnoreSwiftSourceInfoFile=*/true),
-        kind(kind), moduleName(moduleName), astDelegate(astDelegate),
-        moduleOutputPath(moduleOutputPath),
-        sdkModuleOutputPath(sdkModuleOutputPath),
-        swiftModuleClangCC1CommandLineArgs(swiftModuleClangCC1CommandLineArgs)  {}
+  /// Scan the given serialized module file to determine dependencies.
+  llvm::ErrorOr<ModuleDependencyInfo>
+  scanBinaryModuleFile(Identifier moduleID, Twine binaryModulePath,
+                       bool isFramework, bool isTestableImport,
+                       bool isCandidateForTextualModule);
 
   std::error_code findModuleFilesInDirectory(
       ImportPath::Element ModuleID, const SerializedModuleBaseName &BaseName,
@@ -78,10 +49,33 @@ public:
     llvm_unreachable("Not used");
   }
 
-  ScannerKind getKind() const { return kind; }
-  static bool classof(const SwiftModuleScanner *MDS) {
-    return MDS->getKind() == MDS_plain;
-  }
+  /// AST delegate to be used for textual interface scanning
+  InterfaceSubContextDelegate &astDelegate;
+  /// Location where pre-built modules are to be built into.
+  std::string moduleOutputPath;
+  /// Location where pre-built SDK modules are to be built into.
+  std::string sdkModuleOutputPath;
+  /// Clang-specific (-Xcc) command-line flags to include on
+  /// Swift module compilation commands
+  std::vector<std::string> swiftModuleClangCC1CommandLineArgs;
+
+public:
+  std::optional<ModuleDependencyInfo> dependencies;
+
+  SwiftModuleScanner(ASTContext &ctx, ModuleLoadingMode LoadMode,
+                     InterfaceSubContextDelegate &astDelegate,
+                     StringRef moduleOutputPath, StringRef sdkModuleOutputPath,
+                     std::vector<std::string> swiftModuleClangCC1CommandLineArgs)
+      : SerializedModuleLoaderBase(ctx, nullptr, LoadMode,
+                                   /*IgnoreSwiftSourceInfoFile=*/true),
+        astDelegate(astDelegate),
+        moduleOutputPath(moduleOutputPath),
+        sdkModuleOutputPath(sdkModuleOutputPath),
+        swiftModuleClangCC1CommandLineArgs(swiftModuleClangCC1CommandLineArgs)  {}
+
+  /// Perform a filesystem search for a Swift module with a given name
+  llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
+  lookupSwiftModule(Identifier moduleName, bool isTestableImport);
 };
 } // namespace swift
 
