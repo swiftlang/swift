@@ -4079,10 +4079,13 @@ namespace {
           calleeDecl = memberRef->first.getDecl();
           argForIsolatedParam = selfApplyFn->getBase();
         }
-      } else if (calleeDecl &&
-                 calleeDecl->getAttrs()
-                     .hasAttribute<UnsafeInheritExecutorAttr>()) {
-        return false;
+      } else if (calleeDecl) {
+        if (calleeDecl->getAttrs().hasAttribute<UnsafeInheritExecutorAttr>())
+          return false;
+
+        if (getContextIsolation().isCallerIsolationInheriting() &&
+            getActorIsolation(calleeDecl).isNonisolated())
+          mayExitToNonisolated = true;
       }
 
       // Check for isolated parameters.
@@ -4133,11 +4136,25 @@ namespace {
         break;
       }
 
-      // If we're calling an async function that's nonisolated, and we're in
-      // an isolated context, then we're exiting the actor context.
-      if (mayExitToNonisolated && fnType->isAsync() &&
-          getContextIsolation().isActorIsolated())
-        unsatisfiedIsolation = ActorIsolation::forNonisolated(/*unsafe=*/false);
+      // If we're calling an async function that's nonisolated, and we're in an
+      // isolated context, then we're exiting the actor context unless we have
+      // nonisolated(nonsending) isolation.
+      //
+      // NOTE: We do not check fnTypeIsolation since that is the AST level
+      // actual isolation which does not have nonisolated(nonsending) added to
+      // it yet. Instead, we want the direct callee including casts since those
+      // casts is what would add the nonisolated(nonsending) bit to the function
+      // type isolation.
+      if (mayExitToNonisolated && fnType->isAsync()) {
+        if (getContextIsolation().isActorIsolated() &&
+            !fnTypeIsolation.isNonIsolatedCaller())
+          unsatisfiedIsolation =
+              ActorIsolation::forNonisolated(/*unsafe=*/false);
+        else if (getContextIsolation().isCallerIsolationInheriting() &&
+                 fnTypeIsolation.isNonIsolated())
+          unsatisfiedIsolation =
+              ActorIsolation::forNonisolated(/*unsafe=*/false);
+      }
 
       // If there was no unsatisfied actor isolation, we're done.
       if (!unsatisfiedIsolation)
@@ -8006,11 +8023,19 @@ ActorReferenceResult ActorReferenceResult::forReference(
   // directly.
   if (!declIsolation.isActorIsolated()) {
     // If the declaration is asynchronous and we are in an actor-isolated
-    // context (of any kind), then we exit the actor to the nonisolated context.
+    // context (of any kind) and do not have a caller isolation inheriting, then
+    // we exit the actor to the nonisolated context.
     if (decl->isAsync() && contextIsolation.isActorIsolated() &&
         !declRef.getDecl()
              ->getAttrs()
              .hasAttribute<UnsafeInheritExecutorAttr>())
+      return forExitsActorToNonisolated(contextIsolation, options);
+
+    // At this point, we know that our decl is not actor isolated and is not
+    // caller isolation inheriting. Check if it is nonisolated. In such a case,
+    // if our context isolation is caller isolation inheriting, we want to emit
+    // an error since parameters that are caller isolation inheriting cannot be
+    if (decl->isAsync() && contextIsolation.isCallerIsolationInheriting())
       return forExitsActorToNonisolated(contextIsolation, options);
 
     // Otherwise, we stay in the same concurrency domain, whether on an actor

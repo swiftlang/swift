@@ -442,6 +442,21 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
         return info;
     }
 
+    // See if our function apply site has an implicit isolated parameter. In
+    // such a case, we know that we have a caller inheriting isolated
+    // function. Return that this has disconnected isolation.
+    //
+    // DISCUSSION: The reason why we are doing this is that we already know that
+    // the AST is not going to label this as an isolation crossing point so we
+    // will only perform a merge. We want to just perform an isolation merge
+    // without adding additional isolation info. Otherwise, a nonisolated
+    // function that
+    if (auto paramInfo = fas.getSubstCalleeType()->maybeGetIsolatedParameter();
+        paramInfo && paramInfo->hasOption(SILParameterInfo::ImplicitLeading) &&
+        paramInfo->hasOption(SILParameterInfo::Isolated)) {
+      return SILIsolationInfo::getDisconnected(false /*unsafe nonisolated*/);
+    }
+
     if (auto *isolatedOp = fas.getIsolatedArgumentOperandOrNullPtr()) {
       // First look through ActorInstance agnostic values so we can find the
       // type of the actual underlying actor (e.x.: copy_value,
@@ -534,9 +549,8 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
         if (actorInstance) {
           if (auto actualIsolatedValue =
                   ActorInstance::getForValue(actorInstance)) {
-            // See if we have a function parameter. In that case, we want to see
-            // if we have a function argument. In such a case, we need to use
-            // the right parameter and the var decl.
+            // See if we have a function parameter. In such a case, we need to
+            // use the right parameter and the var decl.
             if (auto *fArg = dyn_cast<SILFunctionArgument>(
                     actualIsolatedValue.getValue())) {
               if (auto info =
@@ -980,6 +994,13 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
   // handles isolated self and specifically marked isolated.
   if (auto *isolatedArg = llvm::cast_or_null<SILFunctionArgument>(
           fArg->getFunction()->maybeGetIsolatedArgument())) {
+    // See if the function is nonisolated(nonsending). In such a case, return
+    // task isolated.
+    if (auto funcIsolation = fArg->getFunction()->getActorIsolation();
+        funcIsolation && funcIsolation->isCallerIsolationInheriting()) {
+      return SILIsolationInfo::getTaskIsolated(fArg);
+    }
+
     auto astType = isolatedArg->getType().getASTType();
     if (astType->lookThroughAllOptionalTypes()->getAnyActor()) {
       return SILIsolationInfo::getActorInstanceIsolated(fArg, isolatedArg);

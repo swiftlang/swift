@@ -1955,8 +1955,7 @@ void ActorIsolation::printForDiagnostics(llvm::raw_ostream &os,
     break;
 
   case ActorIsolation::CallerIsolationInheriting:
-    os << "caller isolation inheriting"
-       << (asNoun ? " isolation" : "-isolated");
+    os << "nonisolated";
     break;
 
   case ActorIsolation::GlobalActor: {
