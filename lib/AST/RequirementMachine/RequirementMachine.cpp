@@ -212,6 +212,8 @@ RequirementMachine::RequirementMachine(RewriteContext &ctx)
   MaxRuleCount = langOpts.RequirementMachineMaxRuleCount;
   MaxRuleLength = langOpts.RequirementMachineMaxRuleLength;
   MaxConcreteNesting = langOpts.RequirementMachineMaxConcreteNesting;
+  MaxConcreteSize = langOpts.RequirementMachineMaxConcreteSize;
+  MaxTypeDifferences = langOpts.RequirementMachineMaxTypeDifferences;
   Stats = ctx.getASTContext().Stats;
 
   if (Stats)
@@ -245,6 +247,18 @@ void RequirementMachine::checkCompletionResult(CompletionResult result) const {
   case CompletionResult::MaxConcreteNesting:
     ABORT([&](auto &out) {
       out << "Rewrite system exceeded concrete type nesting depth limit\n";
+      dump(out);
+    });
+
+  case CompletionResult::MaxConcreteSize:
+    ABORT([&](auto &out) {
+      out << "Rewrite system exceeded concrete type size limit\n";
+      dump(out);
+    });
+
+  case CompletionResult::MaxTypeDifferences:
+    ABORT([&](auto &out) {
+      out << "Rewrite system exceeded concrete type difference limit\n";
       dump(out);
     });
   }
@@ -496,14 +510,24 @@ RequirementMachine::computeCompletion(RewriteSystem::ValidityPolicy policy) {
           return std::make_pair(CompletionResult::MaxRuleLength,
                                 ruleCount + i);
         }
-        if (newRule.getNesting() > MaxConcreteNesting + System.getDeepestInitialRule()) {
+        auto nestingAndSize = newRule.getNestingAndSize();
+        if (nestingAndSize.first > MaxConcreteNesting + System.getMaxNestingOfInitialRule()) {
           return std::make_pair(CompletionResult::MaxConcreteNesting,
+                                ruleCount + i);
+        }
+        if (nestingAndSize.second > MaxConcreteSize + System.getMaxSizeOfInitialRule()) {
+          return std::make_pair(CompletionResult::MaxConcreteSize,
                                 ruleCount + i);
         }
       }
 
       if (System.getLocalRules().size() > MaxRuleCount) {
         return std::make_pair(CompletionResult::MaxRuleCount,
+                              System.getRules().size() - 1);
+      }
+
+      if (System.getTypeDifferenceCount() > MaxTypeDifferences) {
+        return std::make_pair(CompletionResult::MaxTypeDifferences,
                               System.getRules().size() - 1);
       }
     }

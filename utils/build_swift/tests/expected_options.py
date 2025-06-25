@@ -234,7 +234,6 @@ EXPECTED_DEFAULTS = {
     'lldb_build_variant': 'Debug',
     'lldb_build_with_xcode': '0',
     'llvm_assertions': True,
-    'llvm_build_compiler_rt_with_use_runtimes': True,
     'llvm_build_variant': 'Debug',
     'llvm_cmake_options': [],
     'llvm_enable_modules': False,
@@ -558,7 +557,8 @@ EXPECTED_OPTIONS = [
     SetOption('--no-swift-stdlib-strict-availability',
               dest='swift_stdlib_strict_availability', value=False),
 
-    SetFalseOption('--no-llvm-include-tests', dest='llvm_include_tests'),
+    DisableOption('--no-llvm-include-tests', dest='llvm_include_tests'),
+    EnableOption('--llvm-include-tests', dest='llvm_include_tests'),
 
     SetTrueOption('--install-back-deploy-concurrency',
                   dest='install_backdeployconcurrency'),
@@ -865,7 +865,6 @@ EXPECTED_OPTIONS = [
     AppendOption('--llvm-ninja-targets-for-cross-compile-hosts'),
     AppendOption('--llvm-cmake-options'),
     AppendOption('--extra-llvm-cmake-options'),
-    EnableOption('--llvm-build-compiler-rt-with-use-runtimes'),
     AppendOption('--darwin-symroot-path-filters'),
 
     UnsupportedOption('--build-jobs'),

@@ -68,14 +68,12 @@ public:
   /// Construct a dependency scanning tool.
   DependencyScanningTool();
 
-  /// Collect the full module dependency graph for the input, ignoring any
-  /// placeholder modules.
+  /// Collect the full module dependency graph for the input.
   ///
   /// \returns a \c StringError with the diagnostic output if errors
   /// occurred, \c swiftscan_dependency_result_t otherwise.
   llvm::ErrorOr<swiftscan_dependency_graph_t>
   getDependencies(ArrayRef<const char *> Command,
-                  const llvm::StringSet<> &PlaceholderModules,
                   StringRef WorkingDirectory);
 
   /// Collect the set of imports for the input module

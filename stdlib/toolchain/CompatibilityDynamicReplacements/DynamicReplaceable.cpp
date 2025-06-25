@@ -52,7 +52,7 @@ extern "C" char *swift_getFunctionReplacement50(char **ReplFnPtr, char *CurrFn) 
 
   auto origKey = compat50Key.get();
   if ((origKey & 0x1) != 0) {
-    auto mask = ((uintptr_t)-1) < 1;
+    auto mask = ((uintptr_t)-1) << 1;
     auto resetKey = origKey & mask;
     compat50Key.set(resetKey);
     return nullptr;

@@ -573,13 +573,15 @@ void CompletionLookup::addTypeAnnotationForImplicitlyUnwrappedOptional(
     suffix = "?";
   }
 
+  NonRecursivePrintOptions nrOptions =
+    NonRecursivePrintOption::ImplicitlyUnwrappedOptional;
+
   PrintOptions PO;
-  PO.PrintOptionalAsImplicitlyUnwrapped = true;
   PO.OpaqueReturnTypePrinting =
       PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
   if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
     PO.setBaseType(typeContext->getDeclaredTypeInContext());
-  Builder.addTypeAnnotation(eraseArchetypes(T, genericSig), PO, suffix);
+  Builder.addTypeAnnotation(eraseArchetypes(T, genericSig), PO, nrOptions, suffix);
   Builder.setResultTypes(T);
   Builder.setTypeContext(expectedTypeContext, CurrDeclContext);
 }
@@ -1483,10 +1485,13 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
     bool IsIUO = !IsImplicitlyCurriedInstanceMethod &&
                  FD->isImplicitlyUnwrappedOptional();
 
+    NonRecursivePrintOptions nrOptions;
+    if (IsIUO)
+      nrOptions |= NonRecursivePrintOption::ImplicitlyUnwrappedOptional;
+
     PrintOptions PO;
     PO.OpaqueReturnTypePrinting =
         PrintOptions::OpaqueReturnTypePrintingMode::WithoutOpaqueKeyword;
-    PO.PrintOptionalAsImplicitlyUnwrapped = IsIUO;
     if (auto typeContext = CurrDeclContext->getInnermostTypeContext())
       PO.setBaseType(typeContext->getDeclaredTypeInContext());
     Type AnnotationTy =
@@ -1508,7 +1513,7 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
             // What's left is the result type.
             if (AnnotationTy->isVoid())
               AnnotationTy = Ctx.getVoidDecl()->getDeclaredInterfaceType();
-            AnnotationTy.print(printer, PO);
+            AnnotationTy.print(printer, PO, nrOptions);
             printer.printTypePost(TL);
           });
     } else {
@@ -1524,7 +1529,7 @@ void CompletionLookup::addMethodCall(const FuncDecl *FD,
       // What's left is the result type.
       if (AnnotationTy->isVoid())
         AnnotationTy = Ctx.getVoidDecl()->getDeclaredInterfaceType();
-      AnnotationTy.print(OS, PO);
+      AnnotationTy.print(OS, PO, nrOptions);
       Builder.addTypeAnnotation(TypeStr);
     }
 

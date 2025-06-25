@@ -1871,7 +1871,7 @@ private:
         if (auto symbol = OpaquePointerReader(
                 remote::RemoteAddress(adjustedProtocolDescriptorTarget),
                 PointerSize)) {
-          if (!symbol->getSymbol().empty()) {
+          if (!symbol->getSymbol().empty() && symbol->getOffset() == 0) {
             Demangle::Context Ctx;
             auto demangledRoot =
                 Ctx.demangleSymbolAsNode(symbol->getSymbol().str());
@@ -1882,7 +1882,8 @@ private:
                 nodeToString(demangledRoot->getChild(0)->getChild(0));
           } else {
             // This is an absolute address of a protocol descriptor
-            auto protocolDescriptorAddress = (uintptr_t)symbol->getOffset();
+            auto protocolDescriptorAddress =
+                (uintptr_t)symbol->getResolvedAddress().getAddressData();
             protocolName = readFullyQualifiedProtocolNameFromProtocolDescriptor(
                 protocolDescriptorAddress);
           }
@@ -2026,7 +2027,7 @@ private:
         if (auto symbol = OpaquePointerReader(
                 remote::RemoteAddress(adjustedParentTargetAddress),
                 PointerSize)) {
-          if (!symbol->getSymbol().empty()) {
+          if (!symbol->getSymbol().empty() && symbol->getOffset() == 0) {
             Demangle::Context Ctx;
             auto demangledRoot =
                 Ctx.demangleSymbolAsNode(symbol->getSymbol().str());
@@ -2264,7 +2265,7 @@ private:
       // external, check that first
       if (auto symbol = OpaqueDynamicSymbolResolver(
               remote::RemoteAddress(contextTypeDescriptorAddress))) {
-        if (!symbol->isResolved()) {
+        if (!symbol->getSymbol().empty() && symbol->getOffset() == 0) {
           Demangle::Context Ctx;
           auto demangledRoot =
               Ctx.demangleSymbolAsNode(symbol->getSymbol().str());
@@ -2283,10 +2284,11 @@ private:
             mangledTypeName = typeMangling.result();
 
           return std::make_pair(mangledTypeName, typeName);
-        } else if (symbol->getOffset()) {
+        } else if (symbol->getResolvedAddress()) {
           // If symbol is empty and has an offset, this is the resolved remote
           // address
-          contextTypeDescriptorAddress = symbol->getOffset();
+          contextTypeDescriptorAddress =
+              symbol->getResolvedAddress().getAddressData();
         }
       }
 

@@ -44,6 +44,7 @@ class ConsumableManagedValue;
 class LogicalPathComponent;
 class LValue;
 class ManagedValue;
+class PathComponent;
 class PreparedArguments;
 class RValue;
 class CalleeTypeInfo;
@@ -1758,19 +1759,6 @@ public:
   // Patterns
   //===--------------------------------------------------------------------===//
 
-  SILValue emitOSVersionRangeCheck(SILLocation loc, const VersionRange &range,
-                                   bool forTargetVariant = false);
-  SILValue
-  emitOSVersionOrVariantVersionRangeCheck(SILLocation loc,
-                                          const VersionRange &targetRange,
-                                          const VersionRange &variantRange);
-  /// Emits either a single OS version range check or an OS version & variant
-  /// version range check automatically, depending on the active target triple
-  /// and requested versions.
-  SILValue emitZipperedOSVersionRangeCheck(SILLocation loc,
-                                           const VersionRange &targetRange,
-                                           const VersionRange &variantRange);
-
   void emitStmtCondition(StmtCondition Cond, JumpDest FalseDest, SILLocation loc,
                          ProfileCounter NumTrueTaken = ProfileCounter(),
                          ProfileCounter NumFalseTaken = ProfileCounter());
@@ -1978,6 +1966,10 @@ public:
   ArgumentSource prepareAccessorBaseArg(SILLocation loc, ManagedValue base,
                                         CanType baseFormalType,
                                         SILDeclRef accessor);
+  ArgumentSource prepareAccessorBaseArgForFormalAccess(SILLocation loc,
+                                                       ManagedValue base,
+                                                       CanType baseFormalType,
+                                                       SILDeclRef accessor);
 
   RValue emitGetAccessor(
       SILLocation loc, SILDeclRef getter, SubstitutionMap substitutions,
@@ -2201,7 +2193,12 @@ public:
 
   RValue emitLoadOfLValue(SILLocation loc, LValue &&src, SGFContext C,
                           bool isBaseLValueGuaranteed = false);
-
+  PathComponent &&
+  drillToLastComponent(SILLocation loc,
+                       LValue &&lv,
+                       ManagedValue &addr,
+                       TSanKind tsanKind = TSanKind::None);
+                     
   /// Emit a reference to a method from within another method of the type.
   std::tuple<ManagedValue, SILType>
   emitSiblingMethodRef(SILLocation loc,
@@ -2681,7 +2678,13 @@ public:
                                            CanType outputType,  // `T.TangentVector`
                                            SGFContext ctxt);
 
-  
+  //===--------------------------------------------------------------------===//
+  // Availability
+  //===--------------------------------------------------------------------===//
+
+  /// Emit an `if #available` query, returning the resulting boolean test value.
+  SILValue emitIfAvailableQuery(SILLocation loc, PoundAvailableInfo *info);
+
   //===--------------------------------------------------------------------===//
   // Back Deployment thunks
   //===--------------------------------------------------------------------===//

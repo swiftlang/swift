@@ -895,10 +895,6 @@ ERROR(map_os_version_from_textual_interface_failed,none,
       "failed to map OS version from %0 to %1 in %2",
       (StringRef, StringRef, StringRef))
 
-ERROR(target_os_version_from_textual_interface_invalid,none,
-      "invalid target triple %0 in %1",
-      (StringRef, StringRef))
-
 ERROR(serialization_load_failed,Fatal,
       "failed to load module '%0'", (StringRef))
 ERROR(module_interface_build_failed,Fatal,
@@ -1440,10 +1436,10 @@ ERROR(did_not_call_function_value,none,
       ())
 ERROR(did_not_call_function,none,
       "function %0 was used as a property; add () to call it",
-      (Identifier))
+      (DeclBaseName))
 ERROR(did_not_call_method,none,
       "method %0 was used as a property; add () to call it",
-      (Identifier))
+      (DeclBaseName))
 
 ERROR(init_not_instance_member_use_assignment,none,
       "'init' is a member of the type; use assignment "
@@ -3445,7 +3441,7 @@ WARNING(associated_type_override_typealias,none,
 
 ERROR(requirement_machine_completion_failed,none,
       "cannot build rewrite system for %select{generic signature|protocol}0; "
-      "%select{%error|rule count|rule length|concrete nesting}1 limit exceeded",
+      "%select{%error|rule count|rule length|concrete type nesting|concrete type size|concrete type difference}1 limit exceeded",
       (unsigned, unsigned))
 NOTE(requirement_machine_completion_rule,none,
      "failed rewrite rule is %0", (StringRef))
@@ -3785,9 +3781,6 @@ ERROR(enum_non_integer_convertible_raw_type_no_value,none,
       "expressible by integer or string literal", ())
 ERROR(enum_raw_value_not_unique,none,
       "raw value for enum case is not unique", ())
-ERROR(enum_raw_value_magic_literal,none,
-      "use of '%0' literal as raw value for enum case is not supported",
-      (StringRef))
 NOTE(enum_raw_value_used_here,none,
      "raw value previously used here", ())
 NOTE(enum_raw_value_incrementing_from_here,none,
@@ -8488,7 +8481,7 @@ GROUPED_WARNING(override_safe_with_unsafe,StrictMemorySafety,none,
 
 GROUPED_WARNING(preconcurrency_import_unsafe,StrictMemorySafety,none,
       "'@preconcurrency' import is not memory-safe because it can silently "
-      "introduce data races", ())
+      "introduce data races; add '@unsafe' to indicate that this is unsafe", ())
 GROUPED_WARNING(unsafe_without_unsafe,StrictMemorySafety,none,
       "expression uses unsafe constructs but is not marked with 'unsafe'", ())
 GROUPED_WARNING(for_unsafe_without_unsafe,StrictMemorySafety,none,

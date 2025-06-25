@@ -3061,6 +3061,13 @@ public:
     return copy;
   }
 
+  /// Form a subcontext that handles all async calls.
+  Context withHandlesAsync() const {
+    Context copy = *this;
+    copy.HandlesAsync = true;
+    return copy;
+  }
+
   Kind getKind() const { return TheKind; }
 
   DeclContext *getDeclContext() const { return DC; }
@@ -4068,7 +4075,7 @@ private:
 
   ShouldRecurse_t checkObjCSelector(ObjCSelectorExpr *E) {
     // Walk the operand.
-    ContextScope scope(*this, std::nullopt);
+    ContextScope scope(*this, CurContext.withHandlesAsync());
     scope.enterNonExecuting();
 
     E->getSubExpr()->walk(*this);

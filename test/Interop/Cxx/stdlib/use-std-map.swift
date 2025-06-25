@@ -11,7 +11,7 @@
 
 // REQUIRES: executable_test
 //
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=freebsd
 
 import StdlibUnittest
 #if !BRIDGING_HEADER

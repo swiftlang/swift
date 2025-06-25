@@ -1,8 +1,8 @@
-//===--- Bridging/DiagnosticsBridging.cpp.cpp -----------------------------===//
+//===--- Bridging/DiagnosticsBridging.cpp -----------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -49,14 +49,12 @@ BridgedDiagnosticFixIt::BridgedDiagnosticFixIt(BridgedSourceLoc start,
 }
 
 void BridgedDiagnosticEngine_diagnose(
-    BridgedDiagnosticEngine bridgedEngine, BridgedSourceLoc loc,
-    BridgedDiagID bridgedDiagID,
+    BridgedDiagnosticEngine bridgedEngine, BridgedSourceLoc loc, DiagID diagID,
     BridgedArrayRef /*BridgedDiagnosticArgument*/ bridgedArguments,
     BridgedSourceLoc highlightStart, uint32_t hightlightLength,
     BridgedArrayRef /*BridgedDiagnosticFixIt*/ bridgedFixIts) {
   auto *D = bridgedEngine.unbridged();
 
-  auto diagID = static_cast<DiagID>(bridgedDiagID);
   SmallVector<DiagnosticArgument, 2> arguments;
   for (auto arg : bridgedArguments.unbridged<BridgedDiagnosticArgument>()) {
     arguments.push_back(arg.unbridged());
@@ -118,7 +116,7 @@ struct BridgedDiagnostic::Impl {
 
 BridgedDiagnostic BridgedDiagnostic_create(BridgedSourceLoc cLoc,
                                            BridgedStringRef cText,
-                                           BridgedDiagnosticSeverity severity,
+                                           DiagnosticKind severity,
                                            BridgedDiagnosticEngine cDiags) {
   StringRef origText = cText.unbridged();
   BridgedDiagnostic::Impl::Allocator alloc;
@@ -128,19 +126,16 @@ BridgedDiagnostic BridgedDiagnostic_create(BridgedSourceLoc cLoc,
 
   Diag<StringRef> diagID;
   switch (severity) {
-  case BridgedDiagnosticSeverity::BridgedError:
+  case DiagnosticKind::Error:
     diagID = diag::bridged_error;
     break;
-  case BridgedDiagnosticSeverity::BridgedFatalError:
-    diagID = diag::bridged_fatal_error;
-    break;
-  case BridgedDiagnosticSeverity::BridgedNote:
+  case DiagnosticKind::Note:
     diagID = diag::bridged_note;
     break;
-  case BridgedDiagnosticSeverity::BridgedRemark:
+  case DiagnosticKind::Remark:
     diagID = diag::bridged_remark;
     break;
-  case BridgedDiagnosticSeverity::BridgedWarning:
+  case DiagnosticKind::Warning:
     diagID = diag::bridged_warning;
     break;
   }

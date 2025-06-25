@@ -1,3 +1,4 @@
+
 //===----------------------------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
@@ -609,7 +610,7 @@ final internal class __VaListBuilder {
     // We may need to retain an object that provides a pointer value.
     if let obj = arg as? _CVarArgObject {
       arg = obj._cVarArgObject
-      retainer.append(arg)
+      unsafe retainer.append(arg)
     }
 #endif
 
@@ -621,10 +622,10 @@ final internal class __VaListBuilder {
 #if (arch(arm) && !os(iOS)) || arch(arm64_32) || arch(wasm32)
     if let arg = arg as? _CVarArgAligned {
       let alignmentInWords = arg._cVarArgAlignment / MemoryLayout<Int>.size
-      let misalignmentInWords = count % alignmentInWords
+      let misalignmentInWords = unsafe count % alignmentInWords
       if misalignmentInWords != 0 {
         let paddingInWords = alignmentInWords - misalignmentInWords
-        appendWords([Int](repeating: -1, count: paddingInWords))
+        unsafe appendWords([Int](repeating: -1, count: paddingInWords))
       }
     }
 #endif

@@ -289,8 +289,7 @@ static ValueDecl *getStandinForAccessor(AbstractStorageDecl *witness,
     break;
 
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
-#define ACCESSOR(ID) \
-  case AccessorKind::ID:
+#define ACCESSOR(ID, KEYWORD) case AccessorKind::ID:
 #include "swift/AST/AccessorKinds.def"
     llvm_unreachable("unexpected accessor requirement");
   }
@@ -3888,10 +3887,19 @@ filterProtocolRequirements(
     return Filtered;
   }
 
-  const auto getProtocolSubstitutionMap = [&](ValueDecl *Req) {
-    auto *const PD = cast<ProtocolDecl>(Req->getDeclContext());
-    auto Conformance = lookupConformance(Adoptee, PD);
-    return SubstitutionMap::getProtocolSubstitutions(Conformance);
+  const auto getProtocolSubstitutionMap = [&](ValueDecl *req) {
+    ASSERT(isa<ProtocolDecl>(req->getDeclContext()));
+    auto genericSig = req->getInnermostDeclContext()
+        ->getGenericSignatureOfContext();
+    SmallVector<Type, 2> args;
+    for (auto paramTy : genericSig.getGenericParams()) {
+      if (args.empty())
+        args.push_back(Adoptee);
+      else
+        args.push_back(paramTy);
+    }
+    return SubstitutionMap::get(genericSig, args,
+                                LookUpConformanceInModule());
   };
 
   llvm::SmallDenseMap<DeclName, llvm::SmallVector<ValueDecl *, 2>, 4>
@@ -3907,11 +3915,11 @@ filterProtocolRequirements(
     auto OverloadTy = Req->getOverloadSignatureType();
     if (OverloadTy) {
       auto Subs = getProtocolSubstitutionMap(Req);
-      // FIXME: This is wrong if the overload has its own generic parameters
-      if (auto GenericFnTy = dyn_cast<GenericFunctionType>(OverloadTy))
+      if (auto GenericFnTy = dyn_cast<GenericFunctionType>(OverloadTy)) {
         OverloadTy = GenericFnTy.substGenericArgs(Subs);
-      else
+      } else {
         OverloadTy = OverloadTy.subst(Subs)->getCanonicalType();
+      }
     }
     if (llvm::any_of(DeclsByName[Req->getName()], [&](ValueDecl *OtherReq) {
           auto OtherOverloadTy = OtherReq->getOverloadSignatureType();

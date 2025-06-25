@@ -1,8 +1,8 @@
-//===--- TypeCheckOverride.cpp - Override Checking ------------------------===//
+//===-- Sema/TypeCheckDeclOverride.cpp - Override Checking ------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -216,6 +216,9 @@ bool swift::isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
           cast<ConstructorDecl>(parentDecl)->isImplicitlyUnwrappedOptional())
         return false;
     }
+
+    if (declTy->is<ErrorType>())
+      return false;
 
     auto fnType1 = declTy->castTo<AnyFunctionType>();
     auto fnType2 = parentDeclTy->castTo<AnyFunctionType>();
@@ -1890,8 +1893,7 @@ isRedundantAccessorOverrideAvailabilityDiagnostic(ValueDecl *override,
     break;
 
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
-#define ACCESSOR(ID) \
-  case AccessorKind::ID:
+#define ACCESSOR(ID, KEYWORD) case AccessorKind::ID:
 #include "swift/AST/AccessorKinds.def"
     llvm_unreachable("checking override for non-opaque accessor");
   }
@@ -2456,8 +2458,7 @@ computeOverriddenDecls(ValueDecl *decl, bool ignoreMissingImports) {
         break;
 
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
-#define ACCESSOR(ID) \
-      case AccessorKind::ID:
+#define ACCESSOR(ID, KEYWORD) case AccessorKind::ID:
 #include "swift/AST/AccessorKinds.def"
         llvm_unreachable("non-opaque accessor was required as opaque by base");
       }

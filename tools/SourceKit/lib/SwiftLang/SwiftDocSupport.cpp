@@ -685,6 +685,7 @@ static void reportAvailabilityAttributes(ASTContext &Ctx, const Decl *D,
   static UIdent PlatformOSXAppExt("source.availability.platform.osx_app_extension");
   static UIdent PlatformtvOSAppExt("source.availability.platform.tvos_app_extension");
   static UIdent PlatformWatchOSAppExt("source.availability.platform.watchos_app_extension");
+  static UIdent PlatformFreeBSD("source.availability.platform.freebsd");
   static UIdent PlatformOpenBSD("source.availability.platform.openbsd");
   static UIdent PlatformWindows("source.availability.platform.windows");
   std::vector<SemanticAvailableAttr> Scratch;
@@ -735,6 +736,9 @@ static void reportAvailabilityAttributes(ASTContext &Ctx, const Decl *D,
       break;
     case PlatformKind::OpenBSD:
       PlatformUID = PlatformOpenBSD;
+      break;
+    case PlatformKind::FreeBSD:
+      PlatformUID = PlatformFreeBSD;
       break;
     case PlatformKind::Windows:
       PlatformUID = PlatformWindows;

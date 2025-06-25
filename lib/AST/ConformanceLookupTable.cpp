@@ -599,6 +599,11 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
     }
   }
 
+  auto isUnavailable = [](DeclContext *dc) -> bool {
+    auto *ext = dyn_cast<ExtensionDecl>(dc);
+    return ext && ext->isUnavailable();
+  };
+
   // If only one of the conformances is unconditionally available on the
   // current deployment target, pick that one.
   //
@@ -610,7 +615,10 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
       rhs->getDeclContext()->isAlwaysAvailableConformanceContext()) {
     // Diagnose conflicting marker protocol conformances that differ in
     // un-availability.
-    diagnoseSuperseded = lhs->getProtocol()->isMarkerProtocol();
+    diagnoseSuperseded =
+      (lhs->getProtocol()->isMarkerProtocol() &&
+       isUnavailable(lhs->getDeclContext()) != isUnavailable(rhs->getDeclContext()) &&
+       (lhsKind != ConformanceEntryKind::Implied || rhsKind != ConformanceEntryKind::Implied));
 
     return (lhs->getDeclContext()->isAlwaysAvailableConformanceContext()
             ? Ordering::Before

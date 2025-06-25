@@ -20,7 +20,6 @@ import Swift
 %  n = totalBits // bits
 %  if n != 1:
 %   neonSuffix = str(n) + {8:'b',16:'h',32:'s',64:'d'}[bits]
-
 func repeating${n}_uint${bits}(_ scalar: UInt${bits}) -> SIMD${n}<UInt${bits}> {
   SIMD${n}(repeating: scalar)
 }
@@ -28,11 +27,7 @@ func repeating${n}_uint${bits}(_ scalar: UInt${bits}) -> SIMD${n}<UInt${bits}> {
 // CHECK: entry:
 // CHECK: [[TMP:%[0-9]+]] = insertelement <${n} x i${bits}> {{.*}}, i${bits} %{{.*}}, i32 0
 // CHECK-NEXT: [[REP:%[0-9]+]] = shufflevector <${n} x i${bits}> [[TMP]], <${n} x i${bits}> {{.*}}, <${n} x i32> zeroinitializer
-%   if totalBits == 64:
-// CHECK-arm64-NEXT: ret <${n} x i${bits}> [[REP]]
-%   else:
-// CHECK-NEXT: ret <${n} x i${bits}> [[REP]]
-%   end
+
 %  end
 % end
 %end

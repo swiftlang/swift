@@ -1065,9 +1065,9 @@ public:
   StringRef getSwiftNameFromClangName(StringRef name);
 
   /// Retrieve the placeholder source file for use in parsing Swift attributes
-  /// in the given module.
-  SourceFile &getClangSwiftAttrSourceFile(
-      ModuleDecl &module, StringRef attributeText, bool cached);
+  /// of the given Decl.
+  SourceFile &getClangSwiftAttrSourceFile(Decl *MappedDecl,
+                                          StringRef attributeText, bool cached);
 
   /// Create attribute with given text and attach it to decl, creating or
   /// retrieving a chached source file as needed.
