@@ -98,7 +98,7 @@ extension _AbstractStringStorage {
   @_effects(readonly)
   internal func _lengthOfBytes(using encoding: UInt) -> UInt {
     switch encoding {
-    case _cocoaASCIIEncoding, _cocoaMacRomanEncoding:
+    case _cocoaASCIIEncoding:
       if unsafe isASCII || _allASCII(UnsafeBufferPointer(start: start, count: count)) {
         return UInt(count)
       }
