@@ -3530,6 +3530,32 @@ public:
       return;
     }
 
+    // Diagnose unsupported availability domains.
+    // FIXME: [availability] Support custom domains.
+    bool anyUnsupportedDomain = false;
+    for (const auto &entry : Candidates) {
+      IfStmt *stmt = entry.first;
+      if (!stmt) continue;
+
+      for (const auto &elt : stmt->getCond()) {
+        if (elt.getKind() != StmtConditionElement::CK_Availability)
+          continue;
+
+        auto poundAvailable = elt.getAvailability();
+        if (auto query = poundAvailable->getAvailabilityQuery()) {
+          if (query->getDomain().isCustom()) {
+            Ctx.Diags.diagnose(poundAvailable->getStartLoc(),
+                               diag::opaque_type_unsupported_availability,
+                               query->getDomain());
+            anyUnsupportedDomain = true;
+          }
+        }
+      }
+    }
+
+    if (anyUnsupportedDomain)
+      return;
+
     SmallVector<Candidate, 4> universallyUniqueCandidates;
 
     for (const auto &entry : Candidates) {
