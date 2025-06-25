@@ -20,7 +20,7 @@ CHECK-SAME: 'cp'
 
 CHECK-NEXT: {{^}}/bin/mkdir -p {{.+}}
 
-CHECK-NEXT: /usr/bin/rsync
+CHECK-NEXT: rsync
 CHECK-DAG: '-p' '12345'
 CHECK-DAG: '-o' 'FIRST_OPT' '-o' 'SECOND_OPT'
 CHECK-SAME: some_user@some_host

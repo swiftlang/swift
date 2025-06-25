@@ -27,10 +27,10 @@ RUN: ls %t-REMOTE/output/nested/ | %FileCheck -check-prefix CHECK-REMOTE %s
 RUN: %debug-remote-run -v --output-prefix %t cp %t/nested/input %t/nested/output 2>&1 >/dev/null | %FileCheck -check-prefix VERBOSE %s
 
 VERBOSE: /usr/bin/env /bin/mkdir -p {{.+}}-REMOTE/output/nested
-VERBOSE: /usr/bin/rsync
+VERBOSE: rsync
 VERBOSE: /usr/bin/env {{.*}}cp
 VERBOSE-NEXT: {{^}}/bin/mkdir -p {{.+}}
-VERBOSE-NEXT: /usr/bin/rsync
+VERBOSE-NEXT: rsync
 
 RUN: %empty-directory(%t)
 RUN: touch %t/xyz-1before

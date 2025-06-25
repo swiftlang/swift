@@ -34,5 +34,5 @@ CHECK-NEXT: {{^3.txt$}}
 CHECK-NOT: BAD
 
 VERBOSE-NESTED: /usr/bin/env /bin/mkdir -p {{.+}}-REMOTE/input
-VERBOSE-NESTED-NEXT: /usr/bin/rsync
+VERBOSE-NESTED-NEXT: rsync
 VERBOSE-NESTED: /usr/bin/env {{.*}}ls

@@ -3,6 +3,6 @@ RUN: %remote-run -n --remote-dir /xyz-REMOTE --output-prefix %/t some_user@some_
 CHECK: /usr/bin/ssh -n -p 12345 some_user@some_host -- '/usr/bin/env' '/bin/mkdir' '-p' '{{.+}}-REMOTE/output/nested'
 CHECK: /usr/bin/ssh -n -p 12345 some_user@some_host -- '/usr/bin/env' {{.*}}'cp'
 CHECK-NEXT: {{^}}/bin/mkdir -p {{.+}}
-CHECK-NEXT: /usr/bin/rsync
+CHECK-NEXT: rsync
 CHECK-SAME: '-p' '12345'
 CHECK-SAME: some_user@some_host

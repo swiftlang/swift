@@ -6,7 +6,7 @@ RUN: test -z "`ls %t`"
 RUN: test ! -e %t-REMOTE
 
 CHECK-INPUT: /usr/bin/env /bin/mkdir -p {{.+}}-REMOTE/input
-CHECK-INPUT-NEXT: /usr/bin/rsync
+CHECK-INPUT-NEXT: rsync
 CHECK-INPUT: /usr/bin/env {{.*}}ls
 
 RUN: %empty-directory(%t)
@@ -16,8 +16,8 @@ RUN: %debug-remote-run -n --output-prefix %t cp %t/nested/input %t/nested/output
 RUN: test ! -e %t-REMOTE
 
 CHECK-OUTPUT: /usr/bin/env /bin/mkdir -p {{.+}}-REMOTE/output/nested
-CHECK-OUTPUT: /usr/bin/rsync
+CHECK-OUTPUT: rsync
 CHECK-OUTPUT: /usr/bin/env {{.*}}cp
 CHECK-OUTPUT-NEXT: {{^}}/bin/mkdir -p {{.+}}
-CHECK-OUTPUT-NEXT: /usr/bin/rsync
+CHECK-OUTPUT-NEXT: rsync
 
