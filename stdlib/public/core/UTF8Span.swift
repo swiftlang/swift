@@ -291,7 +291,7 @@ extension String {
   public var _utf8Span: UTF8Span? {
     @lifetime(borrow self)
     borrowing get {
-      if _guts.isSmall && _guts.count > (_SmallString.capacity &- 2) {
+      if _guts.isSmall, _guts.count > _SmallString.contiguousCapacity {
         return nil
       }
       return unsafe UTF8Span(
@@ -426,7 +426,7 @@ extension Substring {
   public var _utf8Span: UTF8Span? {
     @lifetime(borrow self)
     borrowing get {
-      if _wholeGuts.isSmall && _wholeGuts.count > (_SmallString.capacity &- 2) {
+      if _wholeGuts.isSmall, _wholeGuts.count > _SmallString.contiguousCapacity {
         // substring is spannable only when the whole string is spannable.
         return nil
       }

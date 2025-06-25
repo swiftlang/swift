@@ -871,7 +871,7 @@ extension Substring.UTF8View {
   public var _span: Span<UTF8.CodeUnit>? {
     @lifetime(borrow self)
     borrowing get {
-      if _wholeGuts.isSmall && _wholeGuts.count > (_SmallString.capacity &- 2) {
+      if _wholeGuts.isSmall, _wholeGuts.count > _SmallString.contiguousCapacity {
         // substring is spannable only when the whole string is spannable.
         return nil
       }
