@@ -29,11 +29,11 @@ extern "C" {
 #ifdef __OBJC2__
 #if __LLP64__
 typedef unsigned long long _swift_shims_CFHashCode;
-typedef unsigned long long _swift_shims_NSUInteger;
+typedef unsigned long _swift_shims_NSUInteger;
 typedef signed long long _swift_shims_CFIndex;
 #else
 typedef unsigned long _swift_shims_CFHashCode;
-typedef unsigned long _swift_shims_NSUInteger;
+typedef unsigned int _swift_shims_NSUInteger;
 typedef signed long _swift_shims_CFIndex;
 #endif
 
