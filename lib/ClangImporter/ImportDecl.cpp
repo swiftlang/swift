@@ -3638,7 +3638,9 @@ namespace {
             unannotatedAPIWarningNeeded = false;
           }
 
-          if (unannotatedAPIWarningNeeded) {
+          if (unannotatedAPIWarningNeeded &&
+              Impl.SwiftContext.LangOpts.hasFeature(
+                  Feature::WarnUnannotatedReturnOfCxxFrt)) {
             clang::SourceLocation loc = decl->getLocation();
             clang::SourceManager &sourceMgr =
                 decl->getASTContext().getSourceManager();

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -I %S/Inputs -cxx-interoperability-mode=default -disable-availability-checking -Xcc -fdiagnostics-show-note-include-stack -diagnostic-style llvm %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature WarnUnannotatedReturnOfCxxFrt -disable-availability-checking -Xcc -fdiagnostics-show-note-include-stack -diagnostic-style llvm %s 2>&1 | %FileCheck %s
 
 import FunctionsAndMethodsReturningFRT
 
