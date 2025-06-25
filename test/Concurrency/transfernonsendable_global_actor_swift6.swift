@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -emit-sil -swift-version 6 -target %target-swift-5.1-abi-triple -verify %s -o /dev/null -parse-as-library
+// RUN: %target-swift-frontend -emit-sil -swift-version 6 -target %target-swift-5.1-abi-triple -verify -verify-additional-prefix ni- %s -o /dev/null -parse-as-library
+// RUN: %target-swift-frontend -emit-sil -swift-version 6 -target %target-swift-5.1-abi-triple -verify -verify-additional-prefix ni-ns- %s -o /dev/null -parse-as-library -enable-upcoming-feature NonisolatedNonsendingByDefault
 
 // README: This is testing specific patterns around global actors that are
 // slightly different in between swift 5 and swift 6. The normal global actor
@@ -6,6 +7,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 ////////////////////////
 // MARK: Declarations //
@@ -44,22 +46,22 @@ var booleanFlag: Bool { false }
 
   let erased: () -> Void = closure
 
-  await useValueAsync(erased) // expected-error {{sending 'erased' risks causing data races}}
-  // expected-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
+  await useValueAsync(erased) // expected-ni-error {{sending 'erased' risks causing data races}}
+  // expected-ni-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
 }
 
 @MainActor func synchronousActorIsolatedFunctionError() async {
   let erased: () -> Void = mainActorFunction
 
-  await useValueAsync(erased) // expected-error {{sending 'erased' risks causing data races}}
-  // expected-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
+  await useValueAsync(erased) // expected-ni-error {{sending 'erased' risks causing data races}}
+  // expected-ni-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
 }
 
 @MainActor func synchronousActorIsolatedGenericFunctionError<T>(_ t: T) async {
   let erased: (T) -> Void = useValueMainActor
 
-  await useValueAsync(erased) // expected-error {{sending 'erased' risks causing data races}}
-  // expected-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
+  await useValueAsync(erased) // expected-ni-error {{sending 'erased' risks causing data races}}
+  // expected-ni-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
 }
 
 @MainActor func synchronousActorIsolatedClassMethodError() async {
@@ -70,8 +72,8 @@ var booleanFlag: Bool { false }
   let t = Test()
   let erased: () -> Void = t.foo
 
-  await useValueAsync(erased) // expected-error {{sending 'erased' risks causing data races}}
-  // expected-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
+  await useValueAsync(erased) // expected-ni-error {{sending 'erased' risks causing data races}}
+  // expected-ni-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
 }
 
 @MainActor func synchronousActorIsolatedFinalClassMethodError() async {
@@ -82,6 +84,6 @@ var booleanFlag: Bool { false }
   let t = Test()
   let erased: () -> Void = t.foo
 
-  await useValueAsync(erased) // expected-error {{sending 'erased' risks causing data races}}
-  // expected-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
+  await useValueAsync(erased) // expected-ni-error {{sending 'erased' risks causing data races}}
+  // expected-ni-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
 }

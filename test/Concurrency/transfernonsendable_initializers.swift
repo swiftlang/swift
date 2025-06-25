@@ -1,7 +1,9 @@
 // RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -target %target-swift-5.1-abi-triple -swift-version 6 -verify %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -target %target-swift-5.1-abi-triple -swift-version 6 -verify %s -o /dev/null -enable-upcoming-feature NonisolatedNonsendingByDefault
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // This test validates the behavior of transfernonsendable around initializers.
 

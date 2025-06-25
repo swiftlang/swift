@@ -1,9 +1,11 @@
-// RUN: %target-swift-frontend -target %target-swift-5.0-abi-triple -verify -strict-concurrency=targeted -verify-additional-prefix targeted- -emit-sil -o /dev/null %s
-// RUN: %target-swift-frontend -target %target-swift-5.0-abi-triple -verify -strict-concurrency=complete -verify-additional-prefix tns- -verify-additional-prefix complete-and-tns- -emit-sil -o /dev/null %s
+// RUN: %target-swift-frontend -target %target-swift-5.0-abi-triple -verify -verify-additional-prefix targeted-and-ni- -strict-concurrency=targeted -verify-additional-prefix targeted- -emit-sil -o /dev/null %s
+// RUN: %target-swift-frontend -target %target-swift-5.0-abi-triple -verify -strict-concurrency=complete -verify-additional-prefix tns-ni- -verify-additional-prefix tns- -emit-sil -o /dev/null %s -swift-version 5 -verify-additional-prefix targeted-and-ni-
+// RUN: %target-swift-frontend -target %target-swift-5.0-abi-triple -verify -strict-concurrency=complete -verify-additional-prefix tns-ni-ns- -verify-additional-prefix tns- -emit-sil -o /dev/null %s -enable-upcoming-feature NonisolatedNonsendingByDefault -swift-version 5 -DNONISOLATEDNONSENDING
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
 // REQUIRES: OS=macosx
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 @available(SwiftStdlib 5.1, *)
 struct NS1 { }
@@ -15,7 +17,7 @@ extension NS1: Sendable { }
 
 @available(SwiftStdlib 5.1, *)
 struct NS2 { // expected-note {{consider making struct 'NS2' conform to the 'Sendable' protocol}}
-  // expected-complete-and-tns-note @-1 {{consider making struct 'NS2' conform to the 'Sendable' protocol}}
+  // expected-tns-note @-1 {{consider making struct 'NS2' conform to the 'Sendable' protocol}}
   var ns1: NS1
 }
 
@@ -27,7 +29,7 @@ extension NS3: Sendable { }
 
 @available(SwiftStdlib 5.1, *)
 class NS4 { } // expected-note {{class 'NS4' does not conform to the 'Sendable' protocol}}
-// expected-complete-and-tns-note @-1 {{class 'NS4' does not conform to the 'Sendable' protocol}}
+// expected-tns-note @-1 {{class 'NS4' does not conform to the 'Sendable' protocol}}
 
 @available(SwiftStdlib 5.1, *)
 func acceptCV<T: Sendable>(_: T) { }
@@ -44,15 +46,15 @@ func testCV(
 
   acceptCV(ns1array) // expected-warning {{conformance of 'NS1' to 'Sendable' is unavailable}}
 
-  acceptCV(ns2) // expected-complete-and-tns-warning {{type 'NS2' does not conform to the 'Sendable' protocol}}
+  acceptCV(ns2) // expected-tns-warning {{type 'NS2' does not conform to the 'Sendable' protocol}}
 
   acceptCV(ns3) // expected-warning {{conformance of 'NS3' to 'Sendable' is only available in macOS 11.0 or newer}}
   // expected-note @-1 {{add 'if #available' version check}}
 
-  acceptCV(ns4) // expected-complete-and-tns-warning {{type 'NS4' does not conform to the 'Sendable' protocol}}
+  acceptCV(ns4) // expected-tns-warning {{type 'NS4' does not conform to the 'Sendable' protocol}}
 
-  acceptCV(fn) // expected-complete-and-tns-warning {{type '() -> Void' does not conform to the 'Sendable' protocol}}
-  // expected-complete-and-tns-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+  acceptCV(fn) // expected-tns-warning {{type '() -> Void' does not conform to the 'Sendable' protocol}}
+  // expected-tns-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 
   acceptSendableFn(fn) // expected-warning{{passing non-Sendable parameter 'fn' to function expecting a '@Sendable' closure}}
 }
@@ -93,8 +95,8 @@ public actor MyActor: MyProto {
 
   func g(ns1: NS1) async {
     await nonisolatedAsyncFunc1(ns1)
-    // expected-tns-warning @-1 {{sending 'ns1' risks causing data races}}
-    // expected-tns-note @-2 {{sending 'self'-isolated 'ns1' to nonisolated global function 'nonisolatedAsyncFunc1' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-tns-ni-warning @-1 {{sending 'ns1' risks causing data races}}
+    // expected-tns-ni-note @-2 {{sending 'self'-isolated 'ns1' to nonisolated global function 'nonisolatedAsyncFunc1' risks causing data races between nonisolated and 'self'-isolated uses}}
     _ = await nonisolatedAsyncFunc2()
   }
 }
@@ -162,18 +164,18 @@ class Super {
 
   @MainActor
   func bar (x : () -> ()) async {}
-  // expected-note@-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+  // expected-targeted-and-ni-note @-1 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 
   @MainActor
   func foo2<T : Sendable>(x: T) async {}
 
   @MainActor
   func bar2<T>(x: T) async {}
-  // expected-note@-1 {{consider making generic parameter 'T' conform to the 'Sendable' protocol}} {{14-14=: Sendable}}
+  // expected-targeted-and-ni-note @-1 {{consider making generic parameter 'T' conform to the 'Sendable' protocol}} {{14-14=: Sendable}}
 
   @MainActor
   func bar3<T: Equatable>(x: T) async {}
-  // expected-note@-1 {{consider making generic parameter 'T' conform to the 'Sendable' protocol}} {{25-25= & Sendable}}
+  // expected-targeted-and-ni-note @-1 {{consider making generic parameter 'T' conform to the 'Sendable' protocol}} {{25-25= & Sendable}}
 }
 
 // Make sure isolation crossing overrides check sendability
@@ -182,16 +184,25 @@ class Super {
 class Sub : Super {
   override nonisolated func foo(x : () -> ()) async {}
 
+  // We do not emit an error for the override with
+  // NonisolatedNonsendingByDefault since the vtable thunk passes in MainActor
+  // so we are still in the main actor even though we are nonisolated. In the
+  // case of that being disabled, we cannot do this since we will hop off the
+  // actor.
   override nonisolated func bar(x : () -> ()) async {}
-  // expected-warning@-1 {{non-Sendable parameter type '() -> ()' cannot be sent from caller of superclass instance method 'bar(x:)' into nonisolated override}}
+  // expected-targeted-and-ni-warning@-1 {{non-Sendable parameter type '() -> ()' cannot be sent from caller of superclass instance method 'bar(x:)' into nonisolated override}}
 
   override nonisolated func foo2<T>(x: T) async {}
 
+  // See comment above about why nonisolated overrides of superclass are allowed
+  // when is enabled NonisolatedNonsendingByDefault.
   override nonisolated func bar2<T>(x: T) async {}
-  // expected-warning@-1 {{non-Sendable parameter type 'T' cannot be sent from caller of superclass instance method 'bar2(x:)' into nonisolated override}}
+  // expected-targeted-and-ni-warning @-1 {{non-Sendable parameter type 'T' cannot be sent from caller of superclass instance method 'bar2(x:)' into nonisolated override}}
 
+  // See comment above about why nonisolated overrides of superclass are allowed
+  // when is enabled NonisolatedNonsendingByDefault.
   override nonisolated func bar3<T>(x: T) async {}
-  // expected-warning@-1 {{non-Sendable parameter type 'T' cannot be sent from caller of superclass instance method 'bar3(x:)' into nonisolated override}}
+  // expected-targeted-and-ni-warning @-1 {{non-Sendable parameter type 'T' cannot be sent from caller of superclass instance method 'bar3(x:)' into nonisolated override}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -217,7 +228,8 @@ class SubWSafeSubscript : SuperWSafeSubscript {
 class SuperWUnsafeSubscript {
   @MainActor
   subscript<T>(x : T) -> Int {
-    // expected-note@-1 2{{consider making generic parameter 'T' conform to the 'Sendable' protocol}}
+    // expected-targeted-and-ni-note @-1 {{consider making generic parameter 'T' conform to the 'Sendable' protocol}}
+    // expected-targeted-and-ni-note @-2 {{consider making generic parameter 'T' conform to the 'Sendable' protocol}}
     get async {
       return 0
     }
@@ -226,10 +238,15 @@ class SuperWUnsafeSubscript {
 
 @available(SwiftStdlib 5.1, *)
 class SubWUnsafeSubscript : SuperWUnsafeSubscript {
+  // We do not emit an error for the override with
+  // NonisolatedNonsendingByDefault since the vtable thunk passes in MainActor
+  // so we are still in the main actor even though we are nonisolated. In the
+  // case of that being disabled, we cannot do this since we will hop off the
+  // actor.
   override nonisolated subscript<T>(x : T) -> Int {
     get async {
-      // expected-warning@-2{{non-Sendable parameter type 'T' cannot be sent from caller of superclass subscript 'subscript(_:)' into nonisolated override}}
-      // expected-warning@-2{{non-Sendable parameter type 'T' cannot be sent from caller of superclass getter for subscript 'subscript(_:)' into nonisolated override}}
+      // expected-targeted-and-ni-warning@-2{{non-Sendable parameter type 'T' cannot be sent from caller of superclass subscript 'subscript(_:)' into nonisolated override}}
+      // expected-targeted-and-ni-warning@-2{{non-Sendable parameter type 'T' cannot be sent from caller of superclass getter for subscript 'subscript(_:)' into nonisolated override}}
       // there really shouldn't be two warnings produced here, see rdar://110846040 (Sendable diagnostics reported twice for subscript getters)
       return 0
     }
@@ -263,7 +280,7 @@ struct CustomActor {
 final class NonSendable {
   // expected-note @-1 5 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
   // TransferNonSendable emits 3 fewer errors here.
-  // expected-complete-and-tns-note @-3 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
+  // expected-tns-note @-3 {{class 'NonSendable' does not conform to the 'Sendable' protocol}}
   var value = ""
 
   @MainActor
@@ -341,6 +358,7 @@ func testNonSendableBaseArg3() async {
 @Sendable
 func globalSendable(_ ns: NonSendable) async {}
 
+#if !NONISOLATEDNONSENDING
 @available(SwiftStdlib 5.1, *)
 @MainActor
 func callNonisolatedAsyncClosure(
@@ -348,14 +366,15 @@ func callNonisolatedAsyncClosure(
   g: (NonSendable) async -> Void
 ) async {
   await g(ns)
-  // expected-tns-warning @-1 {{sending 'ns' risks causing data races}}
-  // expected-tns-note @-2 {{sending main actor-isolated 'ns' to nonisolated callee risks causing data races between nonisolated and main actor-isolated uses}}
+  // expected-tns-ni-warning @-1 {{sending 'ns' risks causing data races}}
+  // expected-tns-ni-note @-2 {{sending main actor-isolated 'ns' to nonisolated callee risks causing data races between nonisolated and main actor-isolated uses}}
 
   let f: (NonSendable) async -> () = globalSendable // okay
   await f(ns)
-  // expected-tns-warning @-1 {{sending 'ns' risks causing data races}}
-  // expected-tns-note @-2 {{sending main actor-isolated 'ns' to nonisolated callee risks causing data races between nonisolated and main actor-isolated uses}}
+  // expected-tns-ni-warning @-1 {{sending 'ns' risks causing data races}}
+  // expected-tns-ni-note @-2 {{sending main actor-isolated 'ns' to nonisolated callee risks causing data races between nonisolated and main actor-isolated uses}}
 }
+#endif
 
 @available(SwiftStdlib 5.1, *)
 func testLocalCaptures() {
@@ -364,7 +383,7 @@ func testLocalCaptures() {
   @Sendable
   func a2() -> NonSendable {
     return ns
-    // expected-complete-and-tns-warning @-1 {{capture of 'ns' with non-Sendable type 'NonSendable' in a '@Sendable' local function}}
+    // expected-tns-warning @-1 {{capture of 'ns' with non-Sendable type 'NonSendable' in a '@Sendable' local function}}
   }
 }
 
