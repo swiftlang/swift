@@ -625,3 +625,8 @@ struct NE_NE_C: ~Escapable { // expected-error{{cannot infer implicit initializa
 func f_inout_no_infer(a: inout MutNE, b: NE) {} // expected-error{{a function with a ~Escapable 'inout' parameter requires '@_lifetime(a: ...)'}}
 // expected-note @-1{{use '@_lifetime(a: copy a) to forward the inout dependency}}
 
+// Invalid keyword for the dependence kind.
+//
+@_lifetime(a: inout a) // expected-error{{expected 'copy', 'borrow', or '&' followed by an identifier, index or 'self' in lifetime dependence specifier}}
+func f_inout_bad_keyword(a: inout MutableRawSpan) {}
+
