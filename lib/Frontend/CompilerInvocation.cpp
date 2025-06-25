@@ -1487,7 +1487,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Opts.AllowNonResilientAccess) {
     // Override the option to skip non-exportable decls.
     if (Opts.SkipNonExportableDecls) {
-      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overridden_by,
                      "-experimental-skip-non-exportable-decls",
                      "-allow-non-resilient-access");
       Opts.SkipNonExportableDecls = false;
@@ -1498,7 +1498,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
             FrontendOpts.RequestedAction)) {
       if (FrontendOpts.RequestedAction !=
           FrontendOptions::ActionType::TypecheckModuleFromInterface)
-        Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+        Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overridden_by,
                        "-allow-non-resilient-access",
                        "-compile-module-from-interface");
       Opts.AllowNonResilientAccess = false;
@@ -1960,7 +1960,7 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   if (Args.hasArg(
         OPT_experimental_skip_non_inlinable_function_bodies_without_types)) {
     if (LangOpts.AllowNonResilientAccess)
-      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overridden_by,
                      "-experimental-skip-non-inlinable-function-bodies-without-types",
                      "-allow-non-resilient-access");
     else
@@ -1971,7 +1971,7 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   // body skipping.
   if (Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies)) {
     if (LangOpts.AllowNonResilientAccess)
-      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overridden_by,
                      "-experimental-skip-non-inlinable-function-bodies",
                      "-allow-non-resilient-access");
     else
@@ -1980,7 +1980,7 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_tbd_is_installapi)) {
     if (LangOpts.AllowNonResilientAccess)
-      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overridden_by,
                      "-tbd-is-installapi",
                      "-allow-non-resilient-access");
     else
@@ -1989,7 +1989,7 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_experimental_skip_all_function_bodies)) {
     if (LangOpts.AllowNonResilientAccess)
-      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overridden_by,
                      "-experimental-skip-all-function-bodies",
                      "-allow-non-resilient-access");
     else
@@ -2063,7 +2063,7 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
 
   if (LangOpts.AllowNonResilientAccess &&
       Opts.EnableLazyTypecheck) {
-    Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+    Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overridden_by,
                    "-experimental-lazy-typecheck",
                    "-allow-non-resilient-access");
     Opts.EnableLazyTypecheck = false;
