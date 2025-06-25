@@ -587,9 +587,10 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
 
   @unsafe
   @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
   public var mutableSpan: MutableSpan<Element> {
     @lifetime(borrow self)
-    @_alwaysEmitIntoClient
+    @_transparent
     get {
       unsafe MutableSpan(_unsafeElements: self)
     }
