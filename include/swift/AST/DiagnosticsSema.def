@@ -8260,10 +8260,10 @@ ERROR(lifetime_dependence_feature_required_return, none,
 ERROR(lifetime_dependence_feature_required_mutating, none,
       "%0 cannot have a ~Escapable 'self'", (StringRef))
 ERROR(lifetime_dependence_feature_required_inout, none,
-      "%0 cannot have a ~Escapable 'inout' parameter %1",
+      "%0 cannot have a ~Escapable 'inout' parameter '%1'",
       // this arg list must be compatible with
       // lifetime_dependence_cannot_infer_inout
-      (StringRef, Identifier))
+      (StringRef, StringRef))
 
 ERROR(lifetime_dependence_cannot_infer_return, none,
       "%0 with a ~Escapable result requires '@_lifetime(...)'", (StringRef))
@@ -8271,7 +8271,7 @@ ERROR(lifetime_dependence_cannot_infer_mutating, none,
       "%0 with a ~Escapable 'self' requires '@_lifetime(self: ...)'", (StringRef))
 ERROR(lifetime_dependence_cannot_infer_inout, none,
       "%0 with a ~Escapable 'inout' parameter requires '@_lifetime(%1: ...)'",
-      (StringRef, Identifier))
+      (StringRef, StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Lifetime Dependence Inference - refinements to the requirements above

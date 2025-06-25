@@ -554,7 +554,7 @@ protected:
                         })) {
         ctx.Diags.diagnose(param->getLoc(), diagID,
                            {StringRef(diagnosticQualifier()),
-                            param->getName()});
+                            param->getName().str()});
       }
     }
   }
