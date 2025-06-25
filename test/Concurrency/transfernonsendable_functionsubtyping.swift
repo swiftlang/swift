@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift -swift-version 6
+// RUN: %target-typecheck-verify-swift -swift-version 6 -enable-upcoming-feature NonisolatedNonsendingByDefault
 
 // READ THIS! This file only contains tests that validate that the relevant
 // function subtyping rules for sending work. Please do not put other tests in
@@ -6,6 +7,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 ////////////////////////
 // MARK: Declarations //
