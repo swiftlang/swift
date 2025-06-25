@@ -29,13 +29,13 @@ extern "C" {
 #ifdef __OBJC2__
 #if __LLP64__
 typedef unsigned long long _swift_shims_CFHashCode;
-typedef unsigned long _swift_shims_NSUInteger;
 typedef signed long long _swift_shims_CFIndex;
 #else
 typedef unsigned long _swift_shims_CFHashCode;
-typedef unsigned int _swift_shims_NSUInteger;
 typedef signed long _swift_shims_CFIndex;
 #endif
+
+typedef unsigned long _swift_shims_NSUInteger;
 
 // Consider creating SwiftMacTypes.h for these
 typedef unsigned char _swift_shims_Boolean;
