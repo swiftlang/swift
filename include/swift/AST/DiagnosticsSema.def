@@ -8294,6 +8294,9 @@ ERROR(lifetime_dependence_cannot_infer_kind, none,
 ERROR(lifetime_dependence_cannot_infer_scope_ownership, none,
       "cannot borrow the lifetime of '%0', which has consuming ownership on %1",
       (StringRef, StringRef))
+ERROR(lifetime_dependence_cannot_infer_implicit_init, none,
+      "cannot infer implicit initialization lifetime. Add an initializer with "
+      "'@_lifetime(...)' for each parameter the result depends on", ())
 
 //------------------------------------------------------------------------------
 // MARK: Lifetime Dependence Experimental Inference

@@ -577,3 +577,39 @@ struct NonEscapableMutableSelf: ~Escapable {
   @_lifetime(&self)
   mutating func mutatingMethodOneParamBorrow(_: NE) {}
 }
+
+// =============================================================================
+// Initializers
+// =============================================================================
+
+struct NE_Int: ~Escapable {
+  let i: Int
+}
+
+struct NE_C: ~Escapable { // expected-error{{cannot borrow the lifetime of 'c', which has consuming ownership on an implicit initializer}}
+  let c: C
+}
+
+struct NE_C_Int: ~Escapable { // expected-error{{cannot infer implicit initialization lifetime. Add an initializer with '@_lifetime(...)' for each parameter the result depends on}}
+  let c: C
+  let i: Int
+}
+
+struct NE_Int_Int: ~Escapable { // expected-error{{cannot infer implicit initialization lifetime. Add an initializer with '@_lifetime(...)' for each parameter the result depends on}}
+  let i: Int
+  let j: Int
+}
+
+struct NE_NE: ~Escapable {
+  let ne: NE
+}
+
+struct NE_NE_Int: ~Escapable { // expected-error{{cannot infer implicit initialization lifetime. Add an initializer with '@_lifetime(...)' for each parameter the result depends on}}
+  let ne: NE
+  let i: Int
+}
+
+struct NE_NE_C: ~Escapable { // expected-error{{cannot infer implicit initialization lifetime. Add an initializer with '@_lifetime(...)' for each parameter the result depends on}}
+  let ne: NE
+  let c: C
+}

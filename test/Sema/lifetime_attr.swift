@@ -75,7 +75,7 @@ func immortalConflict(_ immortal: Int) -> NE { // expected-error{{conflict betwe
 }
 
 do {
-  struct Test: ~Escapable {
+  struct Test: ~Escapable { // expected-error{{cannot infer implicit initialization lifetime. Add an initializer with '@_lifetime(...)' for each parameter the result depends on}}
     var v1: Int
     var v2: NE
   }
