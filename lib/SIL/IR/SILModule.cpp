@@ -885,8 +885,8 @@ void SILModule::notifyMovedInstruction(SILInstruction *inst,
 bool SILModule::isNoReturnBuiltinOrIntrinsic(Identifier Name) {
   const auto &IntrinsicInfo = getIntrinsicInfo(Name);
   if (IntrinsicInfo.ID != llvm::Intrinsic::not_intrinsic) {
-    return IntrinsicInfo.getOrCreateAttributes(getASTContext())
-        .hasFnAttr(llvm::Attribute::NoReturn);
+    return IntrinsicInfo.getOrCreateFnAttributes(getASTContext())
+        .hasAttribute(llvm::Attribute::NoReturn);
   }
   const auto &BuiltinInfo = getBuiltinInfo(Name);
   switch (BuiltinInfo.ID) {
