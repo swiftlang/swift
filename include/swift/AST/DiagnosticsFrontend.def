@@ -509,7 +509,7 @@ REMARK(matching_output_produced,none,
       "produced matching output file '%0' for deterministic check: hash '%1'", (StringRef, StringRef))
 
 // Caching related diagnostics
-ERROR(error_caching_no_cas_fs, none,
+GROUPED_ERROR(error_caching_no_cas_fs, CompilationCaching, none,
     "caching is enabled without CAS file-system options, input is not immutable", ())
 ERROR(error_prefix_mapping, none, "cannot create scanner prefix mapping: '%0'", (StringRef))
 
@@ -517,22 +517,22 @@ REMARK(replay_output, none, "replay output file '%0': key '%1'", (StringRef, Str
 REMARK(output_cache_miss, none, "cache miss for input file '%0': key '%1'", (StringRef, StringRef))
 
 // CAS related diagnostics
-ERROR(error_invalid_cas_id, none, "CAS cannot parse id '%0': %1", (StringRef, StringRef))
-ERROR(error_cas, none, "CAS error encountered during %0: %1", (StringRef, StringRef))
-ERROR(error_cas_fs_creation, none, "cannot create CAS filesystem: %0", (StringRef))
-ERROR(error_cache_key_creation, none, "cannot create cache key for compilation %0: %1", (StringRef, StringRef))
-ERROR(error_cas_file_ref, none, "cannot load file %0 from CAS filesystem", (StringRef))
-ERROR(error_cas_conflict_options, none, "cannot setup CAS due to conflicting '-cas-*' options", ())
-ERROR(error_cas_initialization, none, "CAS cannot be initialized from the specified '-cas-*' options: %0", (StringRef))
-ERROR(error_cas_malformed_input, none, "CAS input '%0' is malformed: %1", (StringRef, StringRef))
-WARNING(cache_replay_failed, none, "cache replay failed: %0", (StringRef))
+GROUPED_ERROR(error_invalid_cas_id, CompilationCaching, none, "CAS cannot parse id '%0': %1", (StringRef, StringRef))
+GROUPED_ERROR(error_cas, CompilationCaching, none, "CAS error encountered during %0: %1", (StringRef, StringRef))
+GROUPED_ERROR(error_cas_fs_creation, CompilationCaching, none, "cannot create CAS filesystem: %0", (StringRef))
+GROUPED_ERROR(error_cache_key_creation, CompilationCaching, none, "cannot create cache key for compilation %0: %1", (StringRef, StringRef))
+GROUPED_ERROR(error_cas_file_ref, CompilationCaching, none, "cannot load file %0 from CAS filesystem", (StringRef))
+GROUPED_ERROR(error_cas_conflict_options, CompilationCaching, none, "cannot setup CAS due to conflicting '-cas-*' options", ())
+GROUPED_ERROR(error_cas_initialization, CompilationCaching, none, "CAS cannot be initialized from the specified '-cas-*' options: %0", (StringRef))
+GROUPED_ERROR(error_cas_malformed_input, CompilationCaching, none, "CAS input '%0' is malformed: %1", (StringRef, StringRef))
+GROUPED_WARNING(cache_replay_failed, CompilationCaching, none, "cache replay failed: %0", (StringRef))
 
-ERROR(error_failed_cached_diag, none, "failed to serialize cached diagnostics: %0", (StringRef))
-ERROR(error_replay_cached_diag, none, "failed to replay cached diagnostics: %0", (StringRef))
+GROUPED_ERROR(error_failed_cached_diag, CompilationCaching, none, "failed to serialize cached diagnostics: %0", (StringRef))
+GROUPED_ERROR(error_replay_cached_diag, CompilationCaching, none, "failed to replay cached diagnostics: %0", (StringRef))
 
-ERROR(error_load_input_from_cas, none, "failed to load input '%0' from CAS", (StringRef))
+GROUPED_ERROR(error_load_input_from_cas, CompilationCaching, none, "failed to load input '%0' from CAS", (StringRef))
 
-ERROR(error_wrong_input_num_for_input_file_key, none, "-input-file-key only support one input file", ())
+GROUPED_ERROR(error_wrong_input_num_for_input_file_key, CompilationCaching, none, "-input-file-key only support one input file", ())
 
 // Dependency Verifier Diagnostics
 ERROR(missing_member_dependency,none,
