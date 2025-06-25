@@ -1,6 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify %s
-
-// REQUIRES: rdar65007946
+// RUN: %target-swift-frontend -typecheck -verify -disable-constraint-solver-performance-hacks %s
 
 // https://github.com/apple/swift/issues/52724
 
