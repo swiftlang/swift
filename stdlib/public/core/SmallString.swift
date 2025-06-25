@@ -93,6 +93,15 @@ extension _SmallString {
 #endif
   }
 
+  @_alwaysEmitIntoClient @inline(__always)
+  internal static func contiguousCapacity() -> Int {
+#if _pointerBitWidth(_32) && os(watchOS)
+    return capacity &- 2
+#else
+    return capacity
+#endif
+  }
+
   // Get an integer equivalent to the _StringObject.discriminatedObjectRawBits
   // computed property.
   @inlinable @inline(__always)
