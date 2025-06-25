@@ -566,6 +566,7 @@ struct NonEscapableMutableSelf: ~Escapable {
   mutating func mutatingMethodNoParamCopy() {}
 
   @_lifetime(self: &self) // expected-error{{invalid use of inout dependence on the same inout parameter}}
+                          // expected-note @-1{{use '@_lifetime(self: copy self) to forward the inout dependency}}
   mutating func mutatingMethodNoParamBorrow() {}
 
   mutating func mutatingMethodOneParam(_: NE) {} // expected-error{{a mutating method with a ~Escapable 'self' requires '@_lifetime(self: ...)'}}
@@ -622,11 +623,18 @@ struct NE_NE_C: ~Escapable { // expected-error{{cannot infer implicit initializa
 
 // Unable to infer an 'inout' dependency. Provide valid guidance.
 //
-func f_inout_no_infer(a: inout MutNE, b: NE) {} // expected-error{{a function with a ~Escapable 'inout' parameter requires '@_lifetime(a: ...)'}}
-// expected-note @-1{{use '@_lifetime(a: copy a) to forward the inout dependency}}
+func f_inout_no_infer(a: inout MutNE, b: NE) {}
+// expected-error @-1{{a function with a ~Escapable 'inout' parameter requires '@_lifetime(a: ...)'}}
+// expected-note  @-2{{use '@_lifetime(a: copy a) to forward the inout dependency}}
 
 // Invalid keyword for the dependence kind.
 //
 @_lifetime(a: inout a) // expected-error{{expected 'copy', 'borrow', or '&' followed by an identifier, index or 'self' in lifetime dependence specifier}}
 func f_inout_bad_keyword(a: inout MutableRawSpan) {}
+
+// Don't allow a useless borrow dependency on an inout param--it is misleading.
+//
+@_lifetime(a: &a) // expected-error{{invalid use of inout dependence on the same inout parameter}}
+                  // expected-note @-1{{use '@_lifetime(a: copy a) to forward the inout dependency}}
+func f_inout_useless(a: inout MutableRawSpan) {}
 

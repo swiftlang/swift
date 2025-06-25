@@ -910,17 +910,21 @@ protected:
       if (!paramDeclAndIndex.has_value()) {
         return std::nullopt;
       }
-      auto lifetimeKind =
-        getDependenceKindFromDescriptor(source, paramDeclAndIndex->first);
+      auto *param = paramDeclAndIndex->first;
+      unsigned sourceIndex = paramDeclAndIndex->second;
+      auto lifetimeKind = getDependenceKindFromDescriptor(source, param);
       if (!lifetimeKind.has_value()) {
         return std::nullopt;
       }
-      unsigned sourceIndex = paramDeclAndIndex->second;
       if (lifetimeKind == LifetimeDependenceKind::Scope
-          && paramDeclAndIndex->first->isInOut()
+          && param->isInOut()
           && sourceIndex == targetIndex) {
         diagnose(source.getLoc(),
                  diag::lifetime_dependence_cannot_use_parsed_borrow_inout);
+        ctx.Diags.diagnose(source.getLoc(),
+                           diag::lifetime_dependence_cannot_infer_inout_suggest,
+                           param->getName().str());
+
         return std::nullopt;
       }
       bool hasError =
