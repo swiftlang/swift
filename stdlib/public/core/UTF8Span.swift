@@ -213,7 +213,7 @@ extension String {
       let span = unsafe Span(_unsafeStart: start, count: count)
       return unsafe _overrideLifetime(span, borrowing: self)
     }
-#endif
+#endif // _runtime(_ObjC)
     let count = _guts.count
     if _guts.isSmall {
       let a = Builtin.addressOfBorrow(self)
@@ -269,7 +269,7 @@ extension String {
       utf8Span
     }
   }
-#else
+#else // !(os(watchOS) && _pointerBitWidth(_32))
   @available(watchOS, unavailable)
   public var utf8Span: UTF8Span {
     fatalError("\(#function) unavailable on 32-bit watchOS")
@@ -299,7 +299,7 @@ extension String {
       )
     }
   }
-#endif
+#endif // !(os(watchOS) && _pointerBitWidth(_32))
 }
 
 @available(SwiftStdlib 6.2, *)
@@ -316,7 +316,7 @@ extension Substring {
       let span = base._underlyingSpan()._extracting(first..<(first &+ count))
       return unsafe _overrideLifetime(span, borrowing: self)
     }
-#endif
+#endif // _runtime(_ObjC)
     let first = _slice._startIndex._encodedOffset
     let end = _slice._endIndex._encodedOffset
     if _wholeGuts.isSmall {
@@ -394,7 +394,7 @@ extension Substring {
       utf8Span
     }
   }
-#else
+#else // !(os(watchOS) && _pointerBitWidth(_32))
   @available(watchOS, unavailable)
   public var utf8Span: UTF8Span {
     fatalError("\(#function) unavailable on 32-bit watchOS")
@@ -435,5 +435,5 @@ extension Substring {
       )
     }
   }
-#endif
+#endif // !(os(watchOS) && _pointerBitWidth(_32))
 }

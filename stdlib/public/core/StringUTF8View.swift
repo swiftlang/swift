@@ -330,7 +330,7 @@ extension String.UTF8View {
       let span = unsafe Span(_unsafeStart: start, count: count)
       return unsafe _overrideLifetime(span, borrowing: self)
     }
-#endif
+#endif // _runtime(_ObjC)
     let count = _guts.count
     if _guts.isSmall {
       let a = Builtin.addressOfBorrow(self)
@@ -384,7 +384,7 @@ extension String.UTF8View {
       span
     }
   }
-#else
+#else // !(os(watchOS) && _pointerBitWidth(_32))
   @available(watchOS, unavailable)
   public var span: Span<UTF8.CodeUnit> {
     @lifetime(borrow self)
@@ -415,7 +415,7 @@ extension String.UTF8View {
       return _underlyingSpan()
     }
   }
-#endif
+#endif // !(os(watchOS) && _pointerBitWidth(_32))
 }
 
 // Index conversions

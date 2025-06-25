@@ -763,7 +763,7 @@ extension Substring.UTF8View {
       let span = base._underlyingSpan()._extracting(first..<(first &+ count))
       return unsafe _overrideLifetime(span, borrowing: self)
     }
-#endif
+#endif // _runtime(_ObjC)
     let first = _slice._startIndex._encodedOffset
     let end = _slice._endIndex._encodedOffset
     if _wholeGuts.isSmall {
@@ -839,7 +839,7 @@ extension Substring.UTF8View {
       span
     }
   }
-#else
+#else // !(os(watchOS) && _pointerBitWidth(_32))
   @available(watchOS, unavailable)
   public var span: Span<UTF8.CodeUnit> {
     fatalError("\(#function) unavailable on 32-bit watchOS")
@@ -878,7 +878,7 @@ extension Substring.UTF8View {
       return _underlyingSpan()
     }
   }
-#endif
+#endif // !(os(watchOS) && _pointerBitWidth(_32))
 }
 
 extension Substring {
