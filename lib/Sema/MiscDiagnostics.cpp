@@ -3426,7 +3426,6 @@ public:
 /// from its associated function body.
 class OpaqueUnderlyingTypeChecker : public ASTWalker {
   using Candidate = std::tuple<Expr *, SubstitutionMap, /*isUnique=*/bool>;
-  using AvailabilityContext = IfStmt *;
 
   ASTContext &Ctx;
   AbstractFunctionDecl *Implementation;
@@ -3436,16 +3435,16 @@ class OpaqueUnderlyingTypeChecker : public ASTWalker {
   /// A set of all candidates with unique signatures.
   SmallPtrSet<const void *, 4> UniqueSignatures;
 
-  /// Represents a current availability context. `nullptr` means that
-  /// there are no restrictions.
-  AvailabilityContext CurrentAvailability = nullptr;
+  /// The active `IfStmt` that restricts availability. `nullptr` means that
+  /// there are is no restriction.
+  IfStmt *CurrentIfStmt = nullptr;
 
   /// All of the candidates together with their availability.
   ///
   /// If a candidate is found in non-`if #available` context or
   /// `if #available` has other dynamic conditions, it covers 'all'
   /// versions and the context is set to `nullptr`.
-  SmallVector<std::pair<AvailabilityContext, Candidate>, 4> Candidates;
+  SmallVector<std::pair<IfStmt *, Candidate>, 4> Candidates;
 
   bool HasInvalidReturn = false;
 
@@ -3534,11 +3533,11 @@ public:
     SmallVector<Candidate, 4> universallyUniqueCandidates;
 
     for (const auto &entry : Candidates) {
-      AvailabilityContext availability = entry.first;
+      IfStmt *stmt = entry.first;
       const auto &candidate = entry.second;
 
       // Unique candidate without availability context.
-      if (!availability && std::get<2>(candidate))
+      if (!stmt && std::get<2>(candidate))
         universallyUniqueCandidates.push_back(candidate);
     }
 
@@ -3649,16 +3648,16 @@ public:
     SubstitutionMap universalSubstMap = std::get<1>(universallyAvailable);
 
     for (const auto &entry : Candidates) {
-      auto availabilityContext = entry.first;
+      auto stmt = entry.first;
       const auto &candidate = entry.second;
 
-      if (!availabilityContext)
+      if (!stmt)
         continue;
 
       unsigned neverAvailableCount = 0, alwaysAvailableCount = 0;
       SmallVector<AvailabilityCondition, 4> conditions;
 
-      for (const auto &elt : availabilityContext->getCond()) {
+      for (const auto &elt : stmt->getCond()) {
         auto condition = elt.getAvailability();
 
         auto availabilityRange = condition->getAvailableRange();
@@ -3697,7 +3696,7 @@ public:
       // If all the conditions were trivially true, then this candidate is
       // effectively a universally available candidate and the rest of the
       // candidates should be ignored since they are unreachable.
-      if (alwaysAvailableCount == availabilityContext->getCond().size()) {
+      if (alwaysAvailableCount == stmt->getCond().size()) {
         universalSubstMap = std::get<1>(candidate);
         break;
       }
@@ -3746,7 +3745,7 @@ public:
         return Action::Stop();
       }
 
-      Candidates.push_back({CurrentAvailability, candidate});
+      Candidates.push_back({CurrentIfStmt, candidate});
       return Action::SkipNode(E);
     }
 
@@ -3758,7 +3757,7 @@ public:
       if (Parent.getAsStmt() != Body) {
         // If this is not a top-level `if`, let's drop
         // contextual information that has been set previously.
-        CurrentAvailability = nullptr;
+        CurrentIfStmt = nullptr;
         return Action::Continue(S);
       }
 
@@ -3785,8 +3784,8 @@ public:
             // Note that we are about to walk into a return statement
             // that is located in a `if #available` without any other
             // conditions.
-            llvm::SaveAndRestore<AvailabilityContext> context(
-                CurrentAvailability, If);
+            llvm::SaveAndRestore<IfStmt *> context(
+                CurrentIfStmt, If);
 
             Return->getResult()->walk(*this);
           }
