@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=60000
+// RUN: %target-swift-frontend -typecheck %s -solver-scope-threshold=60000
 // REQUIRES: tools-release,no_asan
 
 protocol ArgumentProtocol {}
@@ -47,7 +47,7 @@ struct Options {
 
   static func evaluate(_ mode: CommandMode) -> Result<Options, ConcreteError> {
     let defaultBuildDirectory = ""
-    return create // expected-error {{the compiler is unable to type-check this expression in reasonable time}}
+    return create
       <*> mode <| Option(key: "", defaultValue: nil, usage: "")
       <*> mode <| Option(key: "", defaultValue: nil, usage: "")
       <*> mode <| Option(key: "", defaultValue: FileManager.default.currentDirectoryPath, usage: "")

@@ -361,3 +361,27 @@ func test_ternary_and_nil_coalescing() {
     test(v ?? 0.0) // Ok
   }
 }
+
+do {
+  struct G<T> {
+    init(_: T) {}
+  }
+
+  func round(_: Double) -> Double {}
+  func round<T: FloatingPoint>(_: T) -> T {}
+
+  func test_cgfloat_over_double(withColors colors: Int, size: CGSize) -> G<CGFloat> {
+    let g = G(1.0 / CGFloat(colors))
+    return g // Ok
+  }
+
+  func test_no_ambiguity(width: Int, height: Int) -> CGFloat {
+    let v = round(CGFloat(width / height) * 10) / 10.0
+    return v // Ok
+  }
+}
+
+func test_cgfloat_operator_is_attempted_with_literal_arguments(v: CGFloat?) {
+  let ratio = v ?? (2.0 / 16.0)
+  let _: CGFloat = ratio // Ok
+}

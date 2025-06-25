@@ -13,7 +13,7 @@ public class Cookie {
     private let fixedByteSize: Int32 = 56
 
     var totalByteCount: Int32 {
-        return fixedByteSize + // expected-error {{the compiler is unable to type-check this expression in reasonable time}}
+        return fixedByteSize +
                (port != nil ? 2 : 0) +
                Int32(comment?.utf8.count ?? 0) +
                Int32(commentURL?.utf8.count ?? 0) +

@@ -3595,11 +3595,11 @@ public:
     return Options.contains(ConstraintSystemFlags::ForCodeCompletion);
   }
 
-  /// Check whether type-checker performance hacks has been explicitly
-  /// disabled by a flag.
+  /// Check whether old type-checker performance hacks has been explicitly
+  /// enabled by a flag.
   bool performanceHacksEnabled() const {
-    return !getASTContext()
-                .TypeCheckerOpts.DisableConstraintSolverPerformanceHacks;
+    return getASTContext()
+                .TypeCheckerOpts.EnableConstraintSolverPerformanceHacks;
   }
 
   /// Log and record the application of the fix. Return true iff any
