@@ -615,9 +615,10 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
       rhs->getDeclContext()->isAlwaysAvailableConformanceContext()) {
     // Diagnose conflicting marker protocol conformances that differ in
     // un-availability.
-    diagnoseSuperseded = (lhs->getProtocol()->isMarkerProtocol() &&
-                          isUnavailable(lhs->getDeclContext()) !=
-                          isUnavailable(rhs->getDeclContext()));
+    diagnoseSuperseded =
+      (lhs->getProtocol()->isMarkerProtocol() &&
+       isUnavailable(lhs->getDeclContext()) != isUnavailable(rhs->getDeclContext()) &&
+       (lhsKind != ConformanceEntryKind::Implied || rhsKind != ConformanceEntryKind::Implied));
 
     return (lhs->getDeclContext()->isAlwaysAvailableConformanceContext()
             ? Ordering::Before
