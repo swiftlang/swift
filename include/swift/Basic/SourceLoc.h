@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -26,25 +26,36 @@
 #include <assert.h>
 #include <functional>
 
-namespace swift {
-  class SourceManager;
+namespace llvm {
+class SMLoc;
+}
 
-/// SourceLoc in swift is just an SMLoc.  We define it as a different type
-/// (instead of as a typedef) just to remove the "getFromPointer" methods and
-/// enforce purity in the Swift codebase.
+namespace swift {
+class SourceManager;
+
+/// `SourceLoc` just wraps a `const char *`.  We define it as a different type
+/// (instead of as a typedef) from `llvm::SMLoc` to enforce purity in the
+/// Swift codebase.
 class SourceLoc {
   friend class SourceManager;
   friend class SourceRange;
   friend class CharSourceRange;
   friend class DiagnosticConsumer;
 
-  llvm::SMLoc Value;
+  const char *Pointer = nullptr;
 
 public:
   SourceLoc() {}
-  explicit SourceLoc(llvm::SMLoc Value) : Value(Value) {}
-  
-  bool isValid() const { return Value.isValid(); }
+
+  static SourceLoc getFromPointer(const char *Pointer) {
+    SourceLoc Loc;
+    Loc.Pointer = Pointer;
+    return Loc;
+  }
+
+  const char *getPointer() const { return Pointer; }
+
+  bool isValid() const { return Pointer != nullptr; }
   bool isInvalid() const { return !isValid(); }
 
   /// An explicit bool operator so one can check if a SourceLoc is valid in an
@@ -53,14 +64,15 @@ public:
   /// if (auto x = getSourceLoc()) { ... }
   explicit operator bool() const { return isValid(); }
 
-  bool operator==(const SourceLoc &RHS) const { return RHS.Value == Value; }
+  operator llvm::SMLoc() const { return llvm::SMLoc::getFromPointer(Pointer); }
+
+  bool operator==(const SourceLoc &RHS) const { return RHS.Pointer == Pointer; }
   bool operator!=(const SourceLoc &RHS) const { return !operator==(RHS); }
-  
+
   /// Return a source location advanced a specified number of bytes.
   SourceLoc getAdvancedLoc(int ByteOffset) const {
     assert(isValid() && "Can't advance an invalid location");
-    return SourceLoc(
-        llvm::SMLoc::getFromPointer(Value.getPointer() + ByteOffset));
+    return SourceLoc::getFromPointer(Pointer + ByteOffset);
   }
 
   SourceLoc getAdvancedLocOrInvalid(int ByteOffset) const {
@@ -69,7 +81,7 @@ public:
     return SourceLoc();
   }
 
-  const void *getOpaquePointerValue() const { return Value.getPointer(); }
+  const void *getOpaquePointerValue() const { return Pointer; }
 
   /// Print out the SourceLoc.  If this location is in the same buffer
   /// as specified by \c LastBufferID, then we don't print the filename.  If
@@ -88,13 +100,13 @@ public:
 
   SWIFT_DEBUG_DUMPER(dump(const SourceManager &SM));
 
-	friend size_t hash_value(SourceLoc loc) {
-		return reinterpret_cast<uintptr_t>(loc.getOpaquePointerValue());
-	}
+  friend size_t hash_value(SourceLoc loc) {
+    return reinterpret_cast<uintptr_t>(loc.getOpaquePointerValue());
+  }
 
-	friend void simple_display(raw_ostream &OS, const SourceLoc &loc) {
-		// Nothing meaningful to print.
-	}
+  friend void simple_display(raw_ostream &OS, const SourceLoc &loc) {
+    // Nothing meaningful to print.
+  }
 };
 
 /// SourceRange in swift is a pair of locations.  However, note that the end
@@ -210,27 +222,27 @@ public:
   bool contains(SourceLoc loc) const {
     auto less = std::less<const char *>();
     auto less_equal = std::less_equal<const char *>();
-    return less_equal(getStart().Value.getPointer(), loc.Value.getPointer()) &&
-           less(loc.Value.getPointer(), getEnd().Value.getPointer());
+    return less_equal(getStart().Pointer, loc.Pointer) &&
+           less(loc.Pointer, getEnd().Pointer);
   }
 
   bool contains(CharSourceRange Other) const {
     auto less_equal = std::less_equal<const char *>();
     return contains(Other.getStart()) &&
-     less_equal(Other.getEnd().Value.getPointer(), getEnd().Value.getPointer());
+           less_equal(Other.getEnd().Pointer, getEnd().Pointer);
   }
 
   /// expands *this to cover Other
   void widen(CharSourceRange Other) {
-    auto Diff = Other.getEnd().Value.getPointer() - getEnd().Value.getPointer();
+    auto Diff = Other.getEnd().Pointer - getEnd().Pointer;
     if (Diff > 0) {
       ByteLength += Diff;
     }
-    const auto MyStartPtr = getStart().Value.getPointer();
-    Diff = MyStartPtr - Other.getStart().Value.getPointer();
+    const auto MyStartPtr = getStart().Pointer;
+    Diff = MyStartPtr - Other.getStart().Pointer;
     if (Diff > 0) {
       ByteLength += Diff;
-      Start = SourceLoc(llvm::SMLoc::getFromPointer(MyStartPtr - Diff));
+      Start = SourceLoc::getFromPointer(MyStartPtr - Diff);
     }
   }
 
@@ -239,9 +251,7 @@ public:
     return contains(Other.getStart()) || Other.contains(getStart());
   }
 
-  StringRef str() const {
-    return StringRef(Start.Value.getPointer(), ByteLength);
-  }
+  StringRef str() const { return StringRef(Start.Pointer, ByteLength); }
 
   /// Return the length of this valid range in bytes.  Can be zero.
   unsigned getByteLength() const {
@@ -272,15 +282,15 @@ template <typename T, typename Enable> struct DenseMapInfo;
 
 template <> struct DenseMapInfo<swift::SourceLoc> {
   static swift::SourceLoc getEmptyKey() {
-    return swift::SourceLoc(
-        SMLoc::getFromPointer(DenseMapInfo<const char *>::getEmptyKey()));
+    return swift::SourceLoc::getFromPointer(
+        DenseMapInfo<const char *>::getEmptyKey());
   }
 
   static swift::SourceLoc getTombstoneKey() {
     // Make this different from empty key. See for context:
     // http://lists.llvm.org/pipermail/llvm-dev/2015-July/088744.html
-    return swift::SourceLoc(
-        SMLoc::getFromPointer(DenseMapInfo<const char *>::getTombstoneKey()));
+    return swift::SourceLoc::getFromPointer(
+        DenseMapInfo<const char *>::getTombstoneKey());
   }
 
   static unsigned getHashValue(const swift::SourceLoc &Val) {
@@ -296,15 +306,15 @@ template <> struct DenseMapInfo<swift::SourceLoc> {
 
 template <> struct DenseMapInfo<swift::SourceRange> {
   static swift::SourceRange getEmptyKey() {
-    return swift::SourceRange(swift::SourceLoc(
-        SMLoc::getFromPointer(DenseMapInfo<const char *>::getEmptyKey())));
+    return swift::SourceRange(swift::SourceLoc::getFromPointer(
+        DenseMapInfo<const char *>::getEmptyKey()));
   }
 
   static swift::SourceRange getTombstoneKey() {
     // Make this different from empty key. See for context:
     // http://lists.llvm.org/pipermail/llvm-dev/2015-July/088744.html
-    return swift::SourceRange(swift::SourceLoc(
-        SMLoc::getFromPointer(DenseMapInfo<const char *>::getTombstoneKey())));
+    return swift::SourceRange(swift::SourceLoc::getFromPointer(
+        DenseMapInfo<const char *>::getTombstoneKey()));
   }
 
   static unsigned getHashValue(const swift::SourceRange &Val) {
