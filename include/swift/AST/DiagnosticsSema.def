@@ -8260,7 +8260,7 @@ ERROR(lifetime_dependence_feature_required_return, none,
 ERROR(lifetime_dependence_feature_required_mutating, none,
       "%0 cannot have a ~Escapable 'self'", (StringRef))
 ERROR(lifetime_dependence_feature_required_inout, none,
-      "%0 cannot have a ~Escapable 'inout' parameter '%1'",
+      "%0 cannot have a ~Escapable 'inout' parameter '%1' in addition to other ~Escapable parameters",
       // this arg list must be compatible with
       // lifetime_dependence_cannot_infer_inout
       (StringRef, StringRef))
@@ -8297,6 +8297,9 @@ ERROR(lifetime_dependence_cannot_infer_scope_ownership, none,
 ERROR(lifetime_dependence_cannot_infer_implicit_init, none,
       "cannot infer implicit initialization lifetime. Add an initializer with "
       "'@_lifetime(...)' for each parameter the result depends on", ())
+NOTE(lifetime_dependence_cannot_infer_inout_suggest, none,
+     "use '@_lifetime(%0: copy %0) to forward the inout dependency",
+     (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Lifetime Dependence Experimental Inference

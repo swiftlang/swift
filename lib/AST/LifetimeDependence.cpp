@@ -555,6 +555,12 @@ protected:
         ctx.Diags.diagnose(param->getLoc(), diagID,
                            {StringRef(diagnosticQualifier()),
                             param->getName().str()});
+        if (diagID == diag::lifetime_dependence_cannot_infer_inout.ID) {
+          ctx.Diags.diagnose(
+            param->getLoc(),
+            diag::lifetime_dependence_cannot_infer_inout_suggest,
+            param->getName().str());
+        }
       }
     }
   }
