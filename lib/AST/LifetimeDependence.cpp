@@ -1064,9 +1064,13 @@ protected:
     return LifetimeDependenceKind::Scope;
   }
 
-  // Infer implicit initialization. The dependence kind can be inferred, similar
-  // to an implicit setter, because the implementation is simply an assignment
-  // to stored property.
+  // Infer implicit initialization. A non-Escapable initializer parameter can
+  // always be inferred, similar to an implicit setter, because the
+  // implementation is simply an assignment to stored property. Escapable
+  // parameters are ambiguous: they may either be borrowed or
+  // non-dependent. non-Escapable types often have incidental integer fields
+  // that are unrelated to lifetime. Avoid inferring any dependency on Escapable
+  // parameters unless it is the (unambiguously borrowed) sole parameter.
   void inferImplicitInit() {
     auto *afd = cast<AbstractFunctionDecl>(decl);
     if (afd->getParameters()->size() == 0) {
@@ -1086,15 +1090,28 @@ protected:
       if (paramTypeInContext->hasError()) {
         return;
       }
+      if (!paramTypeInContext->isEscapable()) {
+        // An implicitly initialized non-Escapable value always copies its
+        // dependency.
+        targetDeps = std::move(targetDeps).add(paramIndex,
+                                               LifetimeDependenceKind::Inherit);
+        continue;
+      }
+      if (afd->getParameters()->size() > 1 && !useLazyInference()) {
+        diagnose(param->getLoc(),
+                 diag::lifetime_dependence_cannot_infer_implicit_init);
+        return;
+      }
+      // A single Escapable parameter must be borrowed.
       auto kind = inferLifetimeDependenceKind(paramTypeInContext,
                                               param->getValueOwnership());
       if (!kind) {
         diagnose(returnLoc,
                  diag::lifetime_dependence_cannot_infer_scope_ownership,
                  param->getParameterName().str(), diagnosticQualifier());
-        return;
       }
-      targetDeps = std::move(targetDeps).add(paramIndex, *kind);
+      targetDeps = std::move(targetDeps).add(paramIndex,
+                                             LifetimeDependenceKind::Scope);
     }
     pushDeps(std::move(targetDeps));
   }
