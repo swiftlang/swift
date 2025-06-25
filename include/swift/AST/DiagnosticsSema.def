@@ -8324,7 +8324,7 @@ ERROR(lifetime_dependence_cannot_use_default_escapable_consuming, none,
       "invalid lifetime dependence on an Escapable value with %0 ownership",
       (StringRef))
 ERROR(lifetime_dependence_cannot_use_parsed_borrow_inout, none,
-      "invalid use of borrow dependence on the same inout parameter",
+      "invalid use of inout dependence on the same inout parameter",
       ())
 ERROR(lifetime_dependence_duplicate_target, none,
       "invalid duplicate target lifetime dependencies on function", ())

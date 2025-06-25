@@ -565,7 +565,7 @@ struct NonEscapableMutableSelf: ~Escapable {
   @_lifetime(self: copy self) // OK
   mutating func mutatingMethodNoParamCopy() {}
 
-  @_lifetime(self: &self) // expected-error{{invalid use of borrow dependence on the same inout parameter}}
+  @_lifetime(self: &self) // expected-error{{invalid use of inout dependence on the same inout parameter}}
   mutating func mutatingMethodNoParamBorrow() {}
 
   mutating func mutatingMethodOneParam(_: NE) {} // expected-error{{a mutating method with a ~Escapable 'self' requires '@_lifetime(self: ...)'}}

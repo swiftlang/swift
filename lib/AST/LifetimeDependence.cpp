@@ -917,6 +917,7 @@ protected:
       }
       unsigned sourceIndex = paramDeclAndIndex->second;
       if (lifetimeKind == LifetimeDependenceKind::Scope
+          && paramDeclAndIndex->first->isInOut()
           && sourceIndex == targetIndex) {
         diagnose(source.getLoc(),
                  diag::lifetime_dependence_cannot_use_parsed_borrow_inout);
