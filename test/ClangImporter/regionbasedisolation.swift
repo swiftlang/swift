@@ -3,6 +3,7 @@
 // RUN: %target-swift-frontend %s -import-objc-header %S/Inputs/regionbasedisolation.h -emit-silgen -swift-version 6 | %FileCheck %s
 
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 extension ObjCObject {
   // CHECK-LABEL: sil hidden [ossa] @$sSo10ObjCObjectC20regionbasedisolationE11sendObjectsSaySo8NSObjectCGyYaKF : $@convention(method) @async (@guaranteed ObjCObject) -> (@sil_sending @owned Array<NSObject>, @error any Error) {
