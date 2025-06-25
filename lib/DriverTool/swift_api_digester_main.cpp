@@ -2457,8 +2457,6 @@ public:
     InitInvoke.getLangOptions().EnableObjCInterop =
         InitInvoke.getLangOptions().Target.isOSDarwin();
     InitInvoke.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
-    // Module recovery issue shouldn't bring down the tool.
-    InitInvoke.getLangOptions().AllowDeserializingImplementationOnly = true;
 
     if (!SwiftVersion.empty()) {
       using version::Version;
