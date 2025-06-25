@@ -7359,9 +7359,15 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // and `Optional<T>` which would be handled by optional injection.
   if (isTupleWithUnresolvedPackExpansion(origType1) ||
       isTupleWithUnresolvedPackExpansion(origType2)) {
+    auto isTypeVariableWrappedInOptional = [](Type type) {
+      if (type->getOptionalObjectType()) {
+        return type->lookThroughAllOptionalTypes()->isTypeVariableOrMember();
+      }
+      return false;
+    };
     if (isa<TupleType>(desugar1) != isa<TupleType>(desugar2) &&
-        !desugar1->getOptionalObjectType() &&
-        !desugar2->getOptionalObjectType() &&
+        !isTypeVariableWrappedInOptional(desugar1) &&
+        !isTypeVariableWrappedInOptional(desugar2) &&
         !desugar1->isAny() &&
         !desugar2->isAny()) {
       return matchTypes(
