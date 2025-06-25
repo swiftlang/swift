@@ -1,3 +1,5 @@
+REQUIRES: rsync
+
 RUN: %remote-run -n --remote-dir /xyz-REMOTE -i spiderman --output-prefix %/t some_user@some_host:12345 cp %/t/nested/input %/t/nested/output 2>&1 >/dev/null | %FileCheck %s
 
 CHECK: /usr/bin/ssh -n

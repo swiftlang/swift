@@ -1,3 +1,4 @@
+REQUIRES: rsync
 REQUIRES: shell
 
 RUN: %empty-directory(%t)
