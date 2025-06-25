@@ -24,7 +24,7 @@ func testMissingLParenError(_ ne: NE) -> NE { // expected-error{{cannot infer th
   ne
 }
 
-@_lifetime() // expected-error{{expected identifier, index or self in lifetime dependence specifier}}
+@_lifetime() // expected-error{{expected 'copy', 'borrow', or '&' followed by an identifier, index or 'self' in lifetime dependence specifier}}
 func testMissingDependence(_ ne: NE) -> NE { // expected-error{{cannot infer the lifetime dependence scope on a function with a ~Escapable parameter, specify '@_lifetime(borrow ne)' or '@_lifetime(copy ne)'}}
   ne
 }
