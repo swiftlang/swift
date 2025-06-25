@@ -94,7 +94,7 @@ extension _SmallString {
   }
 
   @_alwaysEmitIntoClient @inline(__always)
-  internal static var contiguousCapacity: Int {
+  internal static func contiguousCapacity() -> Int {
 #if _pointerBitWidth(_32) && os(watchOS)
     return capacity &- 2
 #else

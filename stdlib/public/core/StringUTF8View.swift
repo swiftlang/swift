@@ -409,7 +409,7 @@ extension String.UTF8View {
   public var _span: Span<UTF8.CodeUnit>? {
     @lifetime(borrow self)
     borrowing get {
-      if _guts.isSmall, _guts.count > _SmallString.contiguousCapacity {
+      if _guts.isSmall, _guts.count > _SmallString.contiguousCapacity() {
         return nil
       }
       return _underlyingSpan()
