@@ -247,6 +247,8 @@ private:
   bool PrintWarning;
 
 public:
+  const static unsigned NoLimit = (unsigned) -1;
+
   ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS,
                   unsigned thresholdInSecs);
 
@@ -272,6 +274,9 @@ public:
   /// Return the remaining process time in seconds until the
   /// threshold specified during construction is reached.
   unsigned getRemainingProcessTimeInSeconds() const {
+    if (ThresholdInSecs == NoLimit)
+      return NoLimit;
+
     auto elapsed = unsigned(getElapsedProcessTimeInFractionalSeconds());
     return elapsed >= ThresholdInSecs ? 0 : ThresholdInSecs - elapsed;
   }
