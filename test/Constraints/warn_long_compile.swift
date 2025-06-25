@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -warn-long-expression-type-checking=1 -warn-long-function-bodies=1
-// REQUIRES: rdar44305428
+// RUN: %target-typecheck-verify-swift -warn-long-expression-type-checking=1 -disable-constraint-solver-performance-hacks -warn-long-function-bodies=1 -solver-expression-time-threshold=60
+// FIXME: -solver-expression-time-threshold=60 should not be needed
 @_silgen_name("generic_foo")
 func foo<T>(_ x: T) -> T
 
