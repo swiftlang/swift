@@ -491,6 +491,10 @@ public:
   /// literal (represented by `ArrayExpr` and `DictionaryExpr` in AST).
   bool isCollectionLiteralType() const;
 
+  /// Determine whether this type variable represents a result type of a
+  /// function call.
+  bool isFunctionResult() const;
+
   /// Retrieve the representative of the equivalence class to which this
   /// type variable belongs.
   ///
@@ -5400,6 +5404,9 @@ private:
   /// \returns The selected disjunction and a set of it's favored choices.
   std::optional<std::pair<Constraint *, llvm::TinyPtrVector<Constraint *>>>
   selectDisjunction();
+
+  /// The old method that is only used when performance hacks are enabled.
+  Constraint *selectDisjunctionWithHacks();
 
   /// Pick a conjunction from the InactiveConstraints list.
   ///

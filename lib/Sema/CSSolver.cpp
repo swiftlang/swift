@@ -2381,16 +2381,15 @@ void DisjunctionChoiceProducer::partitionDisjunction(
   assert(Ordering.size() == Choices.size());
 }
 
-std::optional<std::pair<Constraint *, llvm::TinyPtrVector<Constraint *>>>
-ConstraintSystem::selectDisjunction() {
+Constraint *ConstraintSystem::selectDisjunctionWithHacks() {
   SmallVector<Constraint *, 4> disjunctions;
 
   collectDisjunctions(disjunctions);
   if (disjunctions.empty())
-    return std::nullopt;
+    return nullptr;
 
   if (auto *disjunction = selectBestBindingDisjunction(*this, disjunctions))
-    return std::make_pair(disjunction, llvm::TinyPtrVector<Constraint *>());
+    return disjunction;
 
   // Pick the disjunction with the smallest number of favored, then active choices.
   auto cs = this;
@@ -2432,9 +2431,9 @@ ConstraintSystem::selectDisjunction() {
       });
 
   if (minDisjunction != disjunctions.end())
-    return std::make_pair(*minDisjunction, llvm::TinyPtrVector<Constraint *>());
+    return *minDisjunction;
 
-  return std::nullopt;
+  return nullptr;
 }
 
 Constraint *ConstraintSystem::selectConjunction() {
