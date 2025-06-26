@@ -24,7 +24,6 @@ entry:
 // CHECK-arm64e-LABEL:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @does_throw(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.}}) %1) {{.*}} {
 // CHECK-aarch64-LABEL:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @does_throw(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.}}) %1) {{.*}} {
 // CHECK-arm64_32-LABEL:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @does_throw(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.}}) %1) {{.*}} {
-// CHECK-arm64e-LABEL:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @does_throw(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.}}) %1) {{.*}} {
 // CHECK-wasm32-LABEL:  define swiftcc void @does_throw(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.}}) %1) {{.*}} {
 sil @does_throw : $@convention(thin) () -> @error Error {
   // CHECK: [[T0:%.*]] = call swiftcc ptr @create_error()
@@ -48,7 +47,6 @@ sil @does_throw : $@convention(thin) () -> @error Error {
 // CHECK-arm64-LABEL:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @doesnt_throw(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.}}) %1) {{.*}} {
 // CHECK-arm64e-LABEL:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @doesnt_throw(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.}}) %1) {{.*}} {
 // CHECK-aarch64-LABEL:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @doesnt_throw(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.}}) %1) {{.*}} {
-// CHECK-arm64e-LABEL:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @doesnt_throw(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.}}) %1) {{.*}} {
 // CHECK-arm64_32-LABEL:  define{{( dllexport)?}}{{( protected)?}} swiftcc void @doesnt_throw(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.}}) %1) {{.*}} {
 // CHECK-wasm32-LABEL: define swiftcc void @doesnt_throw(ptr swiftself %0, ptr noalias{{( nocapture)?}} swifterror{{( captures\(none\))?}} dereferenceable({{.}}) %1) {{.*}} {
 sil @doesnt_throw : $@convention(thin) () -> @error Error {
