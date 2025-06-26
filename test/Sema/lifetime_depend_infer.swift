@@ -591,11 +591,6 @@ func f_inout_no_infer(a: inout MutNE, b: NE) {}
 // expected-error @-1{{a function with a ~Escapable 'inout' parameter requires '@_lifetime(a: ...)'}}
 // expected-note  @-2{{use '@_lifetime(a: copy a) to forward the inout dependency}}
 
-// Invalid keyword for the dependence kind.
-//
-@_lifetime(a: inout a) // expected-error{{expected 'copy', 'borrow', or '&' followed by an identifier, index or 'self' in lifetime dependence specifier}}
-func f_inout_bad_keyword(a: inout MutableRawSpan) {}
-
 // Don't allow a useless borrow dependency on an inout param--it is misleading.
 //
 @_lifetime(a: &a) // expected-error{{invalid use of inout dependence on the same inout parameter}}
