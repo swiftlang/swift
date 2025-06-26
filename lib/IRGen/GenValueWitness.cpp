@@ -1252,8 +1252,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
       if (auto *enumDecl = boundGenericCharacteristics->concreteType
                                .getEnumOrBoundGenericEnum())
         if (IGM.getMetadataLayout(enumDecl).hasPayloadSizeOffset())
-          return B.add(llvm::ConstantExpr::getBitCast(
-              IGM.getGetMultiPayloadEnumTagSinglePayloadFn(), IGM.Int8PtrTy));
+          return addFunction(IGM.getGetMultiPayloadEnumTagSinglePayloadFn());
     goto standard;
   }
   case ValueWitness::StoreEnumTagSinglePayload: {
@@ -1261,8 +1260,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
       if (auto *enumDecl = boundGenericCharacteristics->concreteType
                                .getEnumOrBoundGenericEnum())
         if (IGM.getMetadataLayout(enumDecl).hasPayloadSizeOffset())
-          return B.add(llvm::ConstantExpr::getBitCast(
-              IGM.getStoreMultiPayloadEnumTagSinglePayloadFn(), IGM.Int8PtrTy));
+          return addFunction(IGM.getStoreMultiPayloadEnumTagSinglePayloadFn());
     goto standard;
   }
 
