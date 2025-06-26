@@ -13,60 +13,126 @@
 //===----------------------------------------------------------------------===//
 
 internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
-  if input.isEmpty { return true }
-
-  // NOTE: Avoiding for-in syntax to avoid bounds checks
+  //--------------- Implementation building blocks ---------------------------//
+#if arch(arm64_32)
+  typealias Word = UInt64
+#else
+  typealias Word = UInt
+#endif
+  let mask = Word(truncatingIfNeeded: 0x80808080_80808080 as UInt64)
+  
+#if arch(i386) || arch(x86_64)
+  // TODO: Should consider AVX2 / AVX512 / AVX10 path here
+  typealias Block = (SIMD16<UInt8>, SIMD16<UInt8>)
+  @_transparent func pmovmskb(_ vec: SIMD16<UInt8>) -> UInt16 {
+    UInt16(Builtin.bitcast_Vec16xInt1_Int16(
+      Builtin.cmp_slt_Vec16xInt8(vec._storage._value, Builtin.zeroInitializer())
+    ))
+  }
+#elseif arch(arm64) || arch(arm64_32)
+  typealias Block = (SIMD16<UInt8>, SIMD16<UInt8>)
+  @_transparent func umaxv(_ vec: SIMD16<UInt8>) -> UInt8 {
+    UInt8(Builtin.int_vector_reduce_umax_Vec16xInt8(vec._storage._value))
+  }
+#else
+  typealias Block = (Word, Word, Word, Word)
+#endif
+  
+  @_transparent
+  func allASCII(wordAt pointer: UnsafePointer<UInt8>) -> Bool {
+    let word = unsafe UnsafeRawPointer(pointer).loadUnaligned(as: Word.self)
+    return word & mask == 0
+  }
+  
+  @_transparent
+  func allASCII(blockAt pointer: UnsafePointer<UInt8>) -> Bool {
+    let block = unsafe UnsafeRawPointer(pointer).loadUnaligned(as: Block.self)
+#if arch(i386) || arch(x86_64)
+    return pmovmskb(block.0 | block.1) == 0
+#elseif arch(arm64) || arch(arm64_32)
+    return umaxv(block.0 | block.1) < 0x80
+#else
+    return (block.0 | block.1 | block.2 | block.3) & mask == 0
+#endif
+  }
+  //----------------------- Implementation proper ----------------------------//
+  guard input.count >= MemoryLayout<Word>.size else {
+    // They gave us a region of memory
+    // whose size is as modest as it can be.
+    // We'll check every byte
+    // for the bit of most height
+    // and return if we happen on any
+    //
+    // I'm sorry, I'm sorry, I'm trying to delete it. (This chunk of code, not
+    // the Limerick. I would wager that--at least for Strings--we could
+    // unconditionally load 16B here,¹ because of the small string encoding,
+    // and check them all at once, which would be much more efficient. That
+    // probably has to happen by lifting this check into the SmallString
+    // initializer directly, though.)
+    //
+    // ¹ well, most of the time, which makes it a rather conditional
+    // "unconditionally".
+    return unsafe input.allSatisfy { $0 < 0x80 }
+  }
+  
+  // bytes.count is non-zero, so we can unconditionally unwrap baseAddress.
+  let base = unsafe input.baseAddress._unsafelyUnwrappedUnchecked
+  let n = input.count
+  var i = 0
+  
+  guard n >= MemoryLayout<Block>.size else {
+    // The size isn't yet to a block
+    // word-by-word we are forced to walk.
+    // So as to not leave a gap
+    // the last word may lap
+    // the word that we already chalked.
+    //
+    //     0      k      2k     3k      ?k   n-k    n-1
+    //     |      |      |      |       |     |      |
+    //     +------+------+------+       +------+     |
+    //     | word | word | word |  ...  | word |     |
+    //     +------+------+------+       +------+     v
+    //                                        +------+
+    //      possibly overlapping final word > | word |
+    //                                        +------+
+    //
+    // This means that we check any bytes in the overlap region twice, but
+    // that's much preferrable to using smaller accesses to avoid rechecking,
+    // because the entire last word is about as expensive as checking just
+    // one byte would be, and on average there's more than one byte remaining.
+    //
+    // Note that we don't bother trying to align any of these accesses, because
+    // there is minimal benefit to doing so on "modern" OoO cores, which can
+    // handle cacheline-crossing loads at full speed. If the string happens to
+    // be aligned, they'll be aligned, if not, they won't be. It will likely
+    // make sense to add a path that does align everything for more limited
+    // embedded CPUs, though.
+    let k = MemoryLayout<Word>.size
+    let last = n &- k
+    while i < last {
+      guard unsafe allASCII(wordAt: base + i) else { return false }
+      i &+= k
+    }
+    return unsafe allASCII(wordAt: base + last)
+  }
+  
+  // check block-by-block, with a possibly overlapping last block to avoid
+  // sub-block cleanup. We should be able to avoid manual index arithmetic
+  // and write this loop and the one above something like the following:
   //
-  // TODO(String performance): SIMD-ize
+  //  return stride(from: 0, to: last, by: k).allSatisfy {
+  //    allASCII(blockAt: base + $0)
+  //  } && allASCII(blockAt: base + last)
   //
-  let count = input.count
-  var ptr = unsafe UnsafeRawPointer(input.baseAddress._unsafelyUnwrappedUnchecked)
-
-  let asciiMask64 = 0x8080_8080_8080_8080 as UInt64
-  let asciiMask32 = UInt32(truncatingIfNeeded: asciiMask64)
-  let asciiMask16 = UInt16(truncatingIfNeeded: asciiMask64)
-  let asciiMask8 = UInt8(truncatingIfNeeded: asciiMask64)
-  
-  let end128 = unsafe ptr + count & ~(MemoryLayout<(UInt64, UInt64)>.stride &- 1)
-  let end64 = unsafe ptr + count & ~(MemoryLayout<UInt64>.stride &- 1)
-  let end32 = unsafe ptr + count & ~(MemoryLayout<UInt32>.stride &- 1)
-  let end16 = unsafe ptr + count & ~(MemoryLayout<UInt16>.stride &- 1)
-  let end = unsafe ptr + count
-
-  
-  while unsafe ptr < end128 {
-    let pair = unsafe ptr.loadUnaligned(as: (UInt64, UInt64).self)
-    let result = (pair.0 | pair.1) & asciiMask64
-    guard result == 0 else { return false }
-    unsafe ptr = unsafe ptr + MemoryLayout<(UInt64, UInt64)>.stride
+  // but LLVM leaves one unnecessary conditional operation in the loop
+  // when we do that, so we write them out as while loops instead for now.
+  let k = MemoryLayout<Block>.size
+  let last = n &- k
+  while i < last {
+    guard unsafe allASCII(blockAt: base + i) else { return false }
+    i &+= k
   }
-  
-  // If we had enough bytes for two iterations of this, we would have hit
-  // the loop above, so we only need to do this once
-  if unsafe ptr < end64 {
-    let value = unsafe ptr.loadUnaligned(as: UInt64.self)
-    guard value & asciiMask64 == 0 else { return false }
-    unsafe ptr = unsafe ptr + MemoryLayout<UInt64>.stride
-  }
-  
-  if unsafe ptr < end32 {
-    let value = unsafe ptr.loadUnaligned(as: UInt32.self)
-    guard value & asciiMask32 == 0 else { return false }
-    unsafe ptr = unsafe ptr + MemoryLayout<UInt32>.stride
-  }
-  
-  if unsafe ptr < end16 {
-    let value = unsafe ptr.loadUnaligned(as: UInt16.self)
-    guard value & asciiMask16 == 0 else { return false }
-    unsafe ptr = unsafe ptr + MemoryLayout<UInt16>.stride
-  }
-
-  if unsafe ptr < end {
-    let value = unsafe ptr.loadUnaligned(fromByteOffset: 0, as: UInt8.self)
-    guard value & asciiMask8 == 0 else { return false }
-  }
-  unsafe _internalInvariant(ptr == end || ptr + 1 == end)
-  return true
+  return unsafe allASCII(blockAt: base + last)
 }
 
 extension String {
