@@ -1674,6 +1674,18 @@ def disable_incremental_imports :
   HelpText<"Disable cross-module incremental build metadata and "
            "driver scheduling for Swift modules">;
 
+def enable_incremental_file_hashing :
+  Flag<["-"], "enable-incremental-file-hashing">,
+  Flags<[NewDriverOnlyOption]>,
+  HelpText<"Enable hashing of input and dependency file data "
+           "that can prevent unnecessary invalidation">;
+
+def disable_incremental_file_hashing :
+  Flag<["-"], "disable-incremental-file-hashing">,
+  Flags<[NewDriverOnlyOption]>,
+  HelpText<"Disable hashing of input and dependency file data "
+           "that can prevent unnecessary invalidation">;
+
 def index_file : Flag<["-"], "index-file">,
   HelpText<"Produce index data for a source file">, ModeOpt,
   Flags<[NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
