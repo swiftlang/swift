@@ -528,6 +528,16 @@ getParameterOptions(ImplParameterInfoOptions implOptions) {
     result |= SILParameterInfo::Sending;
   }
 
+  if (implOptions.contains(ImplParameterInfoFlags::Isolated)) {
+    implOptions -= ImplParameterInfoFlags::Isolated;
+    result |= SILParameterInfo::Isolated;
+  }
+
+  if (implOptions.contains(ImplParameterInfoFlags::ImplicitLeading)) {
+    implOptions -= ImplParameterInfoFlags::ImplicitLeading;
+    result |= SILParameterInfo::ImplicitLeading;
+  }
+
   // If we did not handle all flags in implOptions, this code was not updated
   // appropriately. Return None to signal error.
   if (bool(implOptions))

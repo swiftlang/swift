@@ -392,7 +392,7 @@ func testAutoclosureInStaticMethod() {
     // Then we need to thunk to eliminate the implicit leading parameter. We use
     // the thunk that passes in .none so this acts as a concurrent function.
     //
-    // CHECK: [[THUNK_FN:%.*]] = function_ref @$sScA_pSgS2Ss5Error_pIegHggozo_S2SsAB_pIegHgozo_TR : $@convention(thin) @async (@guaranteed String, @guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @guaranteed String) -> (@owned String, @error any Error)) -> (@owned String, @error any Error)
+    // CHECK: [[THUNK_FN:%.*]] = function_ref @$sScA_pSgS2Ss5Error_pIegHgILgozo_S2SsAB_pIegHgozo_TR : $@convention(thin) @async (@guaranteed String, @guaranteed @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @guaranteed String) -> (@owned String, @error any Error)) -> (@owned String, @error any Error)
     // CHECK: [[THUNKED:%.*]] = partial_apply [callee_guaranteed] [[THUNK_FN]]([[RESULT]])
     // CHECK: return [[THUNKED]]
     // CHECK: } // end sil function '$s21objc_async_from_swift29testAutoclosureInStaticMethodyyF9TestKlassL_C8getValue2id11valueForKeySSSgSS_S2SYaKXEtYaFZfA0_'
