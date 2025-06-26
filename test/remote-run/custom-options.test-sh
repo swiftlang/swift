@@ -1,3 +1,5 @@
+REQUIRES: rsync
+
 RUN: %remote-run -n --remote-dir /xyz-REMOTE -o FIRST_OPT -o SECOND_OPT --output-prefix %/t some_user@some_host:12345 cp %/t/nested/input %/t/nested/output 2>&1 >/dev/null | %FileCheck %s
 
 CHECK: /usr/bin/ssh -n
@@ -20,7 +22,7 @@ CHECK-SAME: 'cp'
 
 CHECK-NEXT: {{^}}/bin/mkdir -p {{.+}}
 
-CHECK-NEXT: /usr/bin/rsync
+CHECK-NEXT: rsync
 CHECK-DAG: '-p' '12345'
 CHECK-DAG: '-o' 'FIRST_OPT' '-o' 'SECOND_OPT'
 CHECK-SAME: some_user@some_host

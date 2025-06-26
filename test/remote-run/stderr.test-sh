@@ -1,3 +1,4 @@
+REQUIRES: rsync
 REQUIRES: shell
 
 RUN: %debug-remote-run sh -c "echo hello; echo goodbye >&2" > %t.stdout.txt 2> %t.stderr.txt

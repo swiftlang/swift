@@ -1,4 +1,4 @@
-REQUIRES: sftp_server
+REQUIRES: rsync
 
 RUN: env REMOTE_RUN_CHILD_FOO=%S/Inputs/upload/3.txt %debug-remote-run --input-prefix %S/Inputs/upload/ ls %S/Inputs/upload/1.txt %S/Inputs/upload/2.txt | %FileCheck -check-prefix CHECK-REMOTE %s
 RUN: ls %t-REMOTE/input/ | %FileCheck %s
@@ -34,5 +34,5 @@ CHECK-NEXT: {{^3.txt$}}
 CHECK-NOT: BAD
 
 VERBOSE-NESTED: /usr/bin/env /bin/mkdir -p {{.+}}-REMOTE/input
-VERBOSE-NESTED-NEXT: /usr/bin/rsync
+VERBOSE-NESTED-NEXT: rsync
 VERBOSE-NESTED: /usr/bin/env {{.*}}ls
