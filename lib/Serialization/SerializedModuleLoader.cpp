@@ -344,8 +344,8 @@ std::optional<std::string> SerializedModuleLoaderBase::invalidModuleReason(seria
 llvm::ErrorOr<std::vector<ScannerImportStatementInfo>>
 SerializedModuleLoaderBase::getMatchingPackageOnlyImportsOfModule(
     Twine modulePath, bool isFramework, bool isRequiredOSSAModules,
-    StringRef SDKName, StringRef packageName, llvm::vfs::FileSystem *fileSystem,
-    PathObfuscator &recoverer) {
+    StringRef SDKName, const llvm::Triple &target, StringRef packageName,
+    llvm::vfs::FileSystem *fileSystem, PathObfuscator &recoverer) {
   auto moduleBuf = fileSystem->getBufferForFile(modulePath);
   if (!moduleBuf)
     return moduleBuf.getError();
@@ -355,7 +355,7 @@ SerializedModuleLoaderBase::getMatchingPackageOnlyImportsOfModule(
   std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
       "", "", std::move(moduleBuf.get()), nullptr, nullptr, isFramework,
-      isRequiredOSSAModules, SDKName, recoverer, loadedModuleFile);
+      isRequiredOSSAModules, SDKName, target, recoverer, loadedModuleFile);
 
   if (loadedModuleFile->getModulePackageName() != packageName)
     return importedModuleNames;
@@ -940,7 +940,7 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
       std::move(moduleSourceInfoInputBuffer), isFramework,
       isRequiredOSSAModules(),
-      Ctx.LangOpts.SDKName,
+      Ctx.LangOpts.SDKName, Ctx.LangOpts.Target,
       Ctx.SearchPathOpts.DeserializedPathRecoverer, loadedModuleFileCore);
   SerializedASTFile *fileUnit = nullptr;
 
@@ -1482,6 +1482,7 @@ std::string swift::extractEmbeddedBridgingHeaderContent(
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
       "", "", std::move(file), nullptr, nullptr, false,
       Context.SILOpts.EnableOSSAModules, Context.LangOpts.SDKName,
+      Context.LangOpts.Target,
       Context.SearchPathOpts.DeserializedPathRecoverer,
       loadedModuleFile);
 

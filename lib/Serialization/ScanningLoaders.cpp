@@ -214,8 +214,8 @@ SwiftModuleScanner::scanInterfaceFile(Identifier moduleID,
             auto adjacentBinaryModulePackageOnlyImports =
                 getMatchingPackageOnlyImportsOfModule(
                     *adjacentBinaryModule, isFramework, isRequiredOSSAModules(),
-                    Ctx.LangOpts.SDKName, ScannerPackageName,
-                    Ctx.SourceMgr.getFileSystem().get(),
+                    Ctx.LangOpts.SDKName, Ctx.LangOpts.Target,
+                    ScannerPackageName, Ctx.SourceMgr.getFileSystem().get(),
                     Ctx.SearchPathOpts.DeserializedPathRecoverer);
 
             if (!adjacentBinaryModulePackageOnlyImports)
@@ -255,7 +255,7 @@ llvm::ErrorOr<ModuleDependencyInfo> SwiftModuleScanner::scanBinaryModuleFile(
   std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
   serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
       "", "", std::move(moduleBuf.get()), nullptr, nullptr, isFramework,
-      isRequiredOSSAModules(), Ctx.LangOpts.SDKName,
+      isRequiredOSSAModules(), Ctx.LangOpts.SDKName, Ctx.LangOpts.Target,
       Ctx.SearchPathOpts.DeserializedPathRecoverer, loadedModuleFile);
 
   if (Ctx.SearchPathOpts.ScannerModuleValidation) {
