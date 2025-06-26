@@ -43,7 +43,6 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx
 // REQUIRES: swift_feature_Embedded
 
 import _Concurrency
