@@ -141,8 +141,6 @@ extension InlineArray where Element: ~Copyable {
   ///
   /// - Parameter body: A closure that returns an owned `Element` to emplace at
   ///   the passed in index.
-  ///
-  /// - Complexity: O(1)
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public init<E: Error>(_ body: (Index) throws(E) -> Element) throws(E) {
@@ -189,8 +187,6 @@ extension InlineArray where Element: ~Copyable {
   ///   - next: A closure that takes an immutable borrow reference to the
   ///     preceding element, and returns an owned `Element` instance to emplace
   ///     into the array.
-  ///
-  /// - Complexity: O(1)
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public init<E: Error>(
@@ -242,8 +238,6 @@ extension InlineArray where Element: Copyable {
   /// Initializes every element in this array to a copy of the given value.
   ///
   /// - Parameter value: The instance to initialize this array with.
-  ///
-  /// - Complexity: O(1)
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public init(repeating value: Element) {
