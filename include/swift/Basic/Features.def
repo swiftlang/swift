@@ -269,6 +269,7 @@ LANGUAGE_FEATURE(BuiltinSelect, 0, "Builtin.select")
 LANGUAGE_FEATURE(BuiltinInterleave, 0, "Builtin.interleave and Builtin.deinterleave")
 LANGUAGE_FEATURE(BuiltinVectorsExternC, 0, "Extern C support for Builtin vector types")
 LANGUAGE_FEATURE(AddressOfProperty, 0, "Builtin.unprotectedAddressOf properties")
+LANGUAGE_FEATURE(NonescapableAccessorOnTrivial, 0, "Support UnsafeMutablePointer.mutableSpan")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -530,9 +531,6 @@ EXPERIMENTAL_FEATURE(DefaultIsolationPerFile, false)
 
 /// Enable @_lifetime attribute
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(Lifetimes, true)
-
-/// Enable UnsafeMutablePointer.mutableSpan
-EXPERIMENTAL_FEATURE(NonescapableAccessorOnTrivial, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
