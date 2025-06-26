@@ -13,6 +13,7 @@
 import Swift
 
 // This platform uses a single, global, CooperativeExecutor
+@_spi(CustomDefaultExecutors)
 @available(StdlibDeploymentTarget 6.2, *)
 public struct PlatformExecutorFactory: ExecutorFactory {
   static let executor = CooperativeExecutor()

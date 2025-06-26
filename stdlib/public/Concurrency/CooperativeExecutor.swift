@@ -99,8 +99,9 @@ extension ExecutorJob {
 
 /// A co-operative executor that can be used as the main executor or as a
 /// task executor.
+@_spi(CustomDefaultExecutors)
 @available(StdlibDeploymentTarget 6.2, *)
-class CooperativeExecutor: Executor, @unchecked Sendable {
+public class CooperativeExecutor: Executor, @unchecked Sendable {
   var runQueue: PriorityQueue<UnownedJob>
   var waitQueue: PriorityQueue<UnownedJob>
   var shouldStop: Bool = false
@@ -179,6 +180,7 @@ class CooperativeExecutor: Executor, @unchecked Sendable {
   public var asSchedulable: any SchedulableExecutor { self }
 }
 
+@_spi(CustomDefaultExecutors)
 @available(StdlibDeploymentTarget 6.2, *)
 extension CooperativeExecutor: SchedulableExecutor {
   var currentTime: Timestamp {
@@ -202,6 +204,7 @@ extension CooperativeExecutor: SchedulableExecutor {
   }
 }
 
+@_spi(CustomDefaultExecutors)
 @available(StdlibDeploymentTarget 6.2, *)
 extension CooperativeExecutor: RunLoopExecutor {
   public func run() throws {
@@ -249,12 +252,15 @@ extension CooperativeExecutor: RunLoopExecutor {
   }
 }
 
+@_spi(CustomDefaultExecutors)
 @available(StdlibDeploymentTarget 6.2, *)
 extension CooperativeExecutor: SerialExecutor {}
 
+@_spi(CustomDefaultExecutors)
 @available(StdlibDeploymentTarget 6.2, *)
 extension CooperativeExecutor: TaskExecutor {}
 
+@_spi(CustomDefaultExecutors)
 @available(StdlibDeploymentTarget 6.2, *)
 extension CooperativeExecutor: MainExecutor {}
 
