@@ -2913,10 +2913,10 @@ NormalProtocolConformance *
 ASTContext::getNormalConformance(Type conformingType,
                                  ProtocolDecl *protocol,
                                  SourceLoc loc,
+                                 TypeRepr *inheritedTypeRepr,
                                  DeclContext *dc,
                                  ProtocolConformanceState state,
-                                 ProtocolConformanceOptions options,
-                                 SourceLoc preconcurrencyLoc) {
+                                 ProtocolConformanceOptions options) {
   assert(dc->isTypeContext());
 
   llvm::FoldingSetNodeID id;
@@ -2930,8 +2930,7 @@ ASTContext::getNormalConformance(Type conformingType,
 
   // Build a new normal protocol conformance.
   auto result = new (*this) NormalProtocolConformance(
-      conformingType, protocol, loc, dc, state,
-      options, preconcurrencyLoc);
+      conformingType, protocol, loc, inheritedTypeRepr, dc, state, options);
   normalConformances.InsertNode(result, insertPos);
 
   return result;
