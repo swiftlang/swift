@@ -8,7 +8,7 @@ import EffectfulProperties
 // CHECK-LABEL: sil {{.*}}@${{.*}}13testJustAsync
 func testJustAsync(eff : EffProps) async {
   // CHECK: [[RESUME_BUF:%.*]] = alloc_stack $NSObject
-  // CHECK: [[METHOD:%.*]] = objc_method {{.*}} $@convention(objc_method) (@convention(block) @Sendable (NSObject) -> (), EffProps) -> ()
+  // CHECK: [[METHOD:%.*]] = objc_method {{.*}} $@convention(objc_method) (@convention(block) (NSObject) -> (), EffProps) -> ()
   // CHECK: [[CONT:%.*]] = get_async_continuation_addr NSObject, [[RESUME_BUF]]
   // CHECK: [[WRAPPED:%.*]] = struct $UnsafeContinuation<NSObject, Never> ([[CONT]] : $Builtin.RawUnsafeContinuation)
   // CHECK: [[BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage Any
@@ -18,7 +18,7 @@ func testJustAsync(eff : EffProps) async {
   // CHECK: [[CHECKED_CONT:%.*]] = alloc_stack $CheckedContinuation<NSObject, Never>
   // CHECK: {{.*}} = apply [[CHECKED_CONT_INIT_FN]]<NSObject>([[CHECKED_CONT]], [[WRAPPED]]) : $@convention(thin) <τ_0_0> (UnsafeContinuation<τ_0_0, Never>) -> @out CheckedContinuation<τ_0_0, Never>
   // CHECK: copy_addr [take] [[CHECKED_CONT]] to [init] [[CHECKED_CONT_SLOT]] : $*CheckedContinuation<NSObject, Never>
-  // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[NSO_COMPLETION_BLOCK:.*]] : $@convention(c) @Sendable (@inout_aliasable @block_storage Any, NSObject) -> ()
+  // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[NSO_COMPLETION_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage Any, NSObject) -> ()
   // CHECK: [[BLOCK:%.*]] = init_block_storage_header [[BLOCK_STORAGE]] {{.*}}, invoke [[BLOCK_IMPL]]
   // CHECK: apply [[METHOD]]([[BLOCK]], %0)
   // CHECK: destroy_addr [[CHECKED_CONT_SLOT]] : $*CheckedContinuation<NSObject, Never>
@@ -34,7 +34,7 @@ func testJustAsync(eff : EffProps) async {
 // CHECK-LABEL: sil {{.*}}@${{.*}}15testAsyncThrows
 func testAsyncThrows(eff : EffProps) async {
   // CHECK: [[RESUME_BUF:%.*]] = alloc_stack $Optional<NSObject>
-  // CHECK: [[METHOD:%.*]] = objc_method {{.*}} $@convention(objc_method) (@convention(block) @Sendable (Optional<NSObject>, Optional<NSError>) -> (), EffProps) -> ()
+  // CHECK: [[METHOD:%.*]] = objc_method {{.*}} $@convention(objc_method) (@convention(block) (Optional<NSObject>, Optional<NSError>) -> (), EffProps) -> ()
   // CHECK: [[CONT:%.*]] = get_async_continuation_addr [throws] Optional<NSObject>, [[RESUME_BUF]]
   // CHECK: [[WRAPPED:%.*]] = struct $UnsafeContinuation<Optional<NSObject>, any Error> ([[CONT]] : $Builtin.RawUnsafeContinuation)
   // CHECK: [[BLOCK_STORAGE:%.*]] = alloc_stack $@block_storage Any
@@ -44,7 +44,7 @@ func testAsyncThrows(eff : EffProps) async {
   // CHECK: [[CHECKED_CONT:%.*]] = alloc_stack $CheckedContinuation<Optional<NSObject>, any Error>
   // CHECK: {{.*}} = apply [[CHECKED_CONT_INIT_FN:%.*]]<Optional<NSObject>>([[CHECKED_CONT]], [[WRAPPED]]) : $@convention(thin) <τ_0_0> (UnsafeContinuation<τ_0_0, any Error>) -> @out CheckedContinuation<τ_0_0, any Error>
   // CHECK: copy_addr [take] [[CHECKED_CONT]] to [init] [[CHECKED_CONT_SLOT]] : $*CheckedContinuation<Optional<NSObject>, any Error>
-  // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[NSO_COMPLETION_BLOCK:.*]] : $@convention(c) @Sendable (@inout_aliasable @block_storage Any, Optional<NSObject>, Optional<NSError>) -> ()
+  // CHECK: [[BLOCK_IMPL:%.*]] = function_ref @[[NSO_COMPLETION_BLOCK:.*]] : $@convention(c) (@inout_aliasable @block_storage Any, Optional<NSObject>, Optional<NSError>) -> ()
   // CHECK: [[BLOCK:%.*]] = init_block_storage_header [[BLOCK_STORAGE]] {{.*}}, invoke [[BLOCK_IMPL]]
   // CHECK: apply [[METHOD]]([[BLOCK]], %0)
   // CHECK: destroy_addr [[CHECKED_CONT_SLOT]] : $*CheckedContinuation<Optional<NSObject>, any Error>
