@@ -5014,6 +5014,7 @@ ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
   SmallVector<LifetimeDescriptor> sources;
   SourceLoc rParenLoc;
   bool foundParamId = false;
+  bool invalidSourceDescriptor = false;
   status = parseList(
       tok::r_paren, lParenLoc, rParenLoc, /*AllowSepAfterLast=*/false,
       diag::expected_rparen_after_lifetime_dependence, [&]() -> ParserStatus {
@@ -5030,6 +5031,7 @@ ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
         auto sourceDescriptor =
             parseLifetimeDescriptor(*this, lifetimeDependenceKind);
         if (!sourceDescriptor) {
+          invalidSourceDescriptor = true;
           listStatus.setIsParseError();
           return listStatus;
         }
@@ -5037,6 +5039,10 @@ ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
         return listStatus;
       });
 
+  if (invalidSourceDescriptor) {
+    status.setIsParseError();
+    return status;
+  }
   if (!foundParamId) {
     diagnose(
         Tok,
