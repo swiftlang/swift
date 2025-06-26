@@ -64,4 +64,12 @@ VirtualMethodsTestSuite.test("C++ virtual method with complex parameter") {
 }
 #endif
 
+if #available(SwiftStdlib 5.8, *) {
+  VirtualMethodsTestSuite.test("renamed C++ virtual method") {
+    func g(immortalClass: Immortal2) {
+      immortalClass.swiftVirtualRename()
+    }
+  } 
+}
+
 runAllTests()

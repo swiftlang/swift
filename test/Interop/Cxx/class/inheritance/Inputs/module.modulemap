@@ -38,6 +38,11 @@ module VirtualMethods {
   requires cplusplus
 }
 
+module VirtualMethodsBasic {
+  header "virtual-methods-basic.h"
+  requires cplusplus
+}
+
 module FunctionsObjC {
   header "functions-objc.h"
   requires cplusplus

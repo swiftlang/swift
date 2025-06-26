@@ -4360,6 +4360,13 @@ namespace {
       }
       auto method = VisitFunctionDecl(decl);
 
+      if (auto funcDecl = dyn_cast_or_null<FuncDecl>(method)) {
+        auto parent = funcDecl->getParent()->getSelfNominalTypeDecl();
+        parent->dump();       
+      } else {
+        llvm::errs() << "Method is not a FuncDecl\n";
+      }
+
       // Do not expose constructors of abstract C++ classes.
       if (auto recordDecl =
               dyn_cast<clang::CXXRecordDecl>(decl->getDeclContext())) {

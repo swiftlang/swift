@@ -8328,6 +8328,10 @@ protected:
       StaticLoc(StaticLoc), FuncLoc(FuncLoc) {
     assert(!Name.getBaseName().isSpecial());
 
+    if (Name.getBaseName().userFacingName() == "swiftVirtualRename") {
+      llvm::errs() << "Generating swiftVirtualRename!!\n";
+    }
+
     Bits.FuncDecl.StaticSpelling = static_cast<unsigned>(StaticSpelling);
 
     Bits.FuncDecl.ForcedStaticDispatch = false;

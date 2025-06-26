@@ -6,6 +6,8 @@ inline void testFunctionCollected() {
 
 struct Base {
   virtual void foo() = 0;
+  virtual void virtualRename() const
+      __attribute__((swift_name("swiftVirtualRename()")));
 };
 
 struct Base2 { virtual int f() = 0; };
@@ -83,6 +85,8 @@ struct IMMORTAL_FRT DerivedFromImmortal : public Immortal {
 struct IMMORTAL_FRT Immortal2 {
 public:
   virtual void virtualMethod(HasDestructor) = 0;
+  virtual void virtualRename() const
+      __attribute__((swift_name("swiftVirtualRename()")));
 };
 
 inline const ImmortalBase *_Nonnull castToImmortalBase(
