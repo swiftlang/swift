@@ -73,7 +73,6 @@ Solution ConstraintSystem::finalize() {
   Solution solution(*this, CurrentScore);
 
   // Update the best score we've seen so far.
-  auto &ctx = getASTContext();
   assert(!solverState->BestScore || CurrentScore <= *solverState->BestScore);
 
   if (!solverState->BestScore || CurrentScore <= *solverState->BestScore) {
