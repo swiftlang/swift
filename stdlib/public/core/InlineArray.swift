@@ -84,6 +84,34 @@ extension InlineArray where Element: ~Copyable {
     unsafe UnsafeBufferPointer<Element>(start: _address, count: count)
   }
 
+  /// Returns a pointer to the first element in the array while performing stack
+  /// checking.
+  ///
+  /// Use this when the value of the pointer could potentially be directly used
+  /// by users (e.g. through the use of span or the unchecked subscript).
+  @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  internal var _protectedAddress: UnsafePointer<Element> {
+#if $AddressOfProperty
+    unsafe UnsafePointer<Element>(Builtin.addressOfBorrow(_storage))
+#else
+    unsafe UnsafePointer<Element>(Builtin.addressOfBorrow(self))
+#endif
+  }
+
+  /// Returns a buffer pointer over the entire array while performing stack
+  /// checking.
+  ///
+  /// Use this when the value of the pointer could potentially be directly used
+  /// by users (e.g. through the use of span or the unchecked subscript).
+  @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  internal var _protectedBuffer: UnsafeBufferPointer<Element> {
+    unsafe UnsafeBufferPointer<Element>(start: _protectedAddress, count: count)
+  }
+
   /// Returns a mutable pointer to the first element in the array.
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
@@ -106,6 +134,41 @@ extension InlineArray where Element: ~Copyable {
     mutating get {
       unsafe UnsafeMutableBufferPointer<Element>(
         start: _mutableAddress,
+        count: count
+      )
+    }
+  }
+
+  /// Returns a mutable pointer to the first element in the array while
+  /// performing stack checking.
+  ///
+  /// Use this when the value of the pointer could potentially be directly used
+  /// by users (e.g. through the use of span or the unchecked subscript).
+  @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  internal var _protectedMutableAddress: UnsafeMutablePointer<Element> {
+    mutating get {
+#if $AddressOfProperty
+      unsafe UnsafeMutablePointer<Element>(Builtin.addressof(&_storage))
+#else
+      unsafe UnsafeMutablePointer<Element>(Builtin.addressof(&self))
+#endif
+    }
+  }
+
+  /// Returns a mutable buffer pointer over the entire array while performing
+  /// stack checking.
+  ///
+  /// Use this when the value of the pointer could potentially be directly used
+  /// by users (e.g. through the use of span or the unchecked subscript).
+  @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  internal var _protectedMutableBuffer: UnsafeMutableBufferPointer<Element> {
+    mutating get {
+      unsafe UnsafeMutableBufferPointer<Element>(
+        start: _protectedMutableAddress,
         count: count
       )
     }
@@ -415,12 +478,12 @@ extension InlineArray where Element: ~Copyable {
   public subscript(unchecked i: Index) -> Element {
     @_transparent
     unsafeAddress {
-      unsafe _address + i
+      unsafe _protectedAddress + i
     }
 
     @_transparent
     unsafeMutableAddress {
-      unsafe _mutableAddress + i
+      unsafe _protectedMutableAddress + i
     }
   }
 }
@@ -467,53 +530,28 @@ extension InlineArray where Element: ~Copyable {
 
 @available(SwiftStdlib 6.2, *)
 extension InlineArray where Element: ~Copyable {
-
   @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
   public var span: Span<Element> {
     @lifetime(borrow self)
-    @_alwaysEmitIntoClient
+    @_transparent
     borrowing get {
-      let pointer = unsafe _address
-      let span = unsafe Span(_unsafeStart: pointer, count: count)
+      let span = unsafe Span(_unsafeStart: _protectedAddress, count: count)
       return unsafe _overrideLifetime(span, borrowing: self)
     }
   }
 
   @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
   public var mutableSpan: MutableSpan<Element> {
     @lifetime(&self)
-    @_alwaysEmitIntoClient
+    @_transparent
     mutating get {
-      let pointer = unsafe _mutableAddress
-      let span = unsafe MutableSpan(_unsafeStart: pointer, count: count)
+      let span = unsafe MutableSpan(
+        _unsafeStart: _protectedMutableAddress,
+        count: count
+      )
       return unsafe _overrideLifetime(span, mutating: &self)
     }
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// MARK: - Unsafe APIs
-//===----------------------------------------------------------------------===//
-
-@available(SwiftStdlib 6.2, *)
-extension InlineArray where Element: ~Copyable {
-  // FIXME: @available(*, deprecated, renamed: "span.withUnsafeBufferPointer(_:)")
-  @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
-  @_transparent
-  public borrowing func _withUnsafeBufferPointer<Result: ~Copyable, E: Error>(
-    _ body: (UnsafeBufferPointer<Element>) throws(E) -> Result
-  ) throws(E) -> Result {
-    try unsafe body(_buffer)
-  }
-
-  // FIXME: @available(*, deprecated, renamed: "mutableSpan.withUnsafeMutableBufferPointer(_:)")
-  @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
-  @_transparent
-  public mutating func _withUnsafeMutableBufferPointer<Result: ~Copyable, E: Error>(
-    _ body: (UnsafeMutableBufferPointer<Element>) throws(E) -> Result
-  ) throws(E) -> Result {
-    try unsafe body(_mutableBuffer)
   }
 }
