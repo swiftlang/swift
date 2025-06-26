@@ -12,5 +12,5 @@ command to plan the new build commands.
 
 The other category of error is unexpected failures when performing reads/writes to Content
 Addressable Storage. Please refer to the error message (contains errors provided by CAS storage) for clues.
-If the error persists, consider clear the cache. To clear the cache, delete the directory
-pointed by `-cas-path` option. Note the CAS directory should only be deleted as a whole when not used.
+If the error persists, consider clearing the cache. To clear the cache, delete the directory
+pointed to by the `-cas-path` option. Note that the CAS directory should only be deleted as a whole when not used.
