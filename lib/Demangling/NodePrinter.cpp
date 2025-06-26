@@ -390,6 +390,8 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
   case Node::Kind::ImplConvention:
   case Node::Kind::ImplParameterResultDifferentiability:
   case Node::Kind::ImplParameterSending:
+  case Node::Kind::ImplParameterIsolated:
+  case Node::Kind::ImplParameterImplicitLeading:
   case Node::Kind::ImplFunctionAttribute:
   case Node::Kind::ImplFunctionConvention:
   case Node::Kind::ImplFunctionConventionName:
@@ -2803,6 +2805,8 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << Node->getText() << ' ';
     return nullptr;
   case Node::Kind::ImplParameterSending:
+  case Node::Kind::ImplParameterIsolated:
+  case Node::Kind::ImplParameterImplicitLeading:
     // Skip if text is empty.
     if (Node->getText().empty())
       return nullptr;

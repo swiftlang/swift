@@ -902,6 +902,15 @@ mangled in to disambiguate.
   PARAM-CONVENTION ::= 'p'                   // pack guaranteed
   PARAM-CONVENTION ::= 'm'                   // pack inout
 
+  #if SWIFT_RUNTIME_VERSION >= 6.0
+    SENDING-PARAM  ::= 'T'                   // sending parameter
+  #endif
+
+  #if SWIFT_RUNTIME_VERSION >= 6.2
+    ISOLATED-PARAM ::= 'I'                   // @isolated parameter
+    IMPLICIT-LEADING-PARAM ::= 'L'           // @implicit_leading parameter
+  #endif
+
   PARAM-DIFFERENTIABILITY ::= 'w'            // @noDerivative
 
   RESULT-CONVENTION ::= 'r'                  // indirect
