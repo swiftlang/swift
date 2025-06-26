@@ -755,12 +755,8 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
   if (!ScannerPrefixMapper.empty()) {
     Mapper = std::make_unique<llvm::PrefixMapper>();
     SmallVector<llvm::MappedPrefix, 4> Prefixes;
-    if (auto E = llvm::MappedPrefix::transformJoined(ScannerPrefixMapper,
-                                                     Prefixes)) {
-      Instance.getDiags().diagnose(SourceLoc(), diag::error_prefix_mapping,
-                                   toString(std::move(E)));
-      return true;
-    }
+    llvm::MappedPrefix::transformPairs(ScannerPrefixMapper,
+                                       Prefixes);
     Mapper->addRange(Prefixes);
     Mapper->sort();
   }
@@ -782,14 +778,9 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
 }
 
 ModuleDependenciesCache::ModuleDependenciesCache(
-    SwiftDependencyScanningService &globalScanningService,
-    const std::string &mainScanModuleName, const std::string &moduleOutputPath,
-    const std::string &sdkModuleOutputPath, const std::string &scannerContextHash)
-    : globalScanningService(globalScanningService),
-      mainScanModuleName(mainScanModuleName),
+    const std::string &mainScanModuleName, const std::string &scannerContextHash)
+    : mainScanModuleName(mainScanModuleName),
       scannerContextHash(scannerContextHash),
-      moduleOutputPath(moduleOutputPath),
-      sdkModuleOutputPath(sdkModuleOutputPath),
       scanInitializationTime(std::chrono::system_clock::now()) {
   for (auto kind = ModuleDependencyKind::FirstKind;
        kind != ModuleDependencyKind::LastKind; ++kind)
