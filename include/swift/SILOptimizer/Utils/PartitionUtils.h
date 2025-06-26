@@ -2328,6 +2328,12 @@ private:
             if (auto elt = getElement(value)) {
               SILIsolationInfo eltIsolationInfo = getIsolationRegionInfo(*elt);
               if (eltIsolationInfo.isUnsafeNonIsolated()) {
+                REGIONBASEDISOLATION_VERBOSE_LOG(
+                    llvm::dbgs()
+                    << "    * Squelching LocalUseAfterSend error. Reason: "
+                    << "temporary alloc_stack initialized with unsafe "
+                       "nonisolated value\n"
+                    << "      * Rep Value: " << equivalenceClassRep);
                 return;
               }
             }
@@ -2336,8 +2342,14 @@ private:
 
         // See if we have a convert function from a `@Sendable` type. In this
         // case, we want to squelch the error.
-        if (isHiddenSendableFunctionType(equivalenceClassRep))
+        if (isHiddenSendableFunctionType(equivalenceClassRep)) {
+          REGIONBASEDISOLATION_VERBOSE_LOG(
+              llvm::dbgs()
+              << "    * Squelching LocalUseAfterSend error. Reason: "
+              << "hidden sendable function type\n"
+              << "      * Rep Value: " << equivalenceClassRep);
           return;
+        }
       }
 
       // If our instruction does not have any isolation info associated with it,
@@ -2347,8 +2359,23 @@ private:
               sentOp->getUser()->getFunction()->getActorIsolation()) {
         if (functionIsolation->isActorIsolated() &&
             SILIsolationInfo::get(sentOp->getUser())
-                .hasSameIsolation(*functionIsolation))
+                .hasSameIsolation(*functionIsolation)) {
+          REGIONBASEDISOLATION_VERBOSE_LOG({
+            auto &s = llvm::dbgs();
+            s << "    * Squelching LocalUseAfterSend error. Reason: "
+              << "function isolation matches sent operand isolation\n"
+              << "      * Element: " << elt << "\n"
+              << "      * Function Isolation: ";
+            functionIsolation->print(s);
+            s << "\n"
+              << "      * User Isolation: ";
+            SILIsolationInfo::get(sentOp->getUser())
+                .print(sentOp->getUser()->getFunction(), s);
+            s << "\n"
+              << "      * User: " << *sentOp->getUser();
+          });
           return;
+        }
       }
     }
 
@@ -2373,6 +2400,12 @@ private:
             if (auto elt = getElement(value)) {
               SILIsolationInfo eltIsolationInfo = getIsolationRegionInfo(*elt);
               if (eltIsolationInfo.isUnsafeNonIsolated()) {
+                REGIONBASEDISOLATION_VERBOSE_LOG(
+                    llvm::dbgs()
+                    << "    * Squelching SentNeverSendable error. Reason: "
+                    << "temporary alloc_stack initialized with unsafe "
+                       "nonisolated value\n"
+                    << "      * Rep Value: " << equivalenceClassRep);
                 return;
               }
             }
@@ -2381,8 +2414,14 @@ private:
 
         // See if we have a convert function from a `@Sendable` type. In this
         // case, we want to squelch the error.
-        if (isHiddenSendableFunctionType(equivalenceClassRep))
+        if (isHiddenSendableFunctionType(equivalenceClassRep)) {
+          REGIONBASEDISOLATION_VERBOSE_LOG(
+              llvm::dbgs()
+              << "    * Squelching SentNeverSendable error. Reason: "
+              << "is hidden sendable function type\n"
+              << "      * Rep Value: " << equivalenceClassRep);
           return;
+        }
       }
     }
 
