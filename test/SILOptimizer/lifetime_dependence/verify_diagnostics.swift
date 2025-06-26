@@ -90,6 +90,29 @@ func getImmutableSpan(_ array: inout [Int]) -> Span<Int> {
  return array.span
 }
 
+struct NCInt: ~Copyable {
+  var i: Int
+
+  @_lifetime(borrow self)
+  func getNE() -> NEInt {
+    NEInt(owner: self)
+  }
+}
+
+public struct NEInt: ~Escapable {
+  var i: Int
+
+  @_lifetime(borrow owner)
+  init(owner: borrowing NCInt) {
+    self.i = owner.i
+  }
+
+  @_lifetime(immortal)
+  init(immortal i: Int) {
+    self.i = i
+  }
+}
+
 struct TestDeinitCallsAddressor: ~Copyable, ~Escapable {
   let a: Borrow<A>
 
@@ -189,4 +212,34 @@ func testIndirectClosureResult<T>(f: () -> GNE<T>) -> GNE<T> {
   // expected-error @-1{{lifetime-dependent variable '$return_value' escapes its scope}}
   // expected-note  @-3{{it depends on the lifetime of argument '$return_value'}}
   // expected-note  @-3{{this use causes the lifetime-dependent value to escape}}
+}
+
+// =============================================================================
+// Coroutines
+// =============================================================================
+
+// Test _read of a noncopyable type with a dead-end (end_borrow)
+//
+// rdar://153479358 (Compiler crash when force-unwrapping optional ~Copyable type)
+class ClassStorage {
+  private var nc: NCInt?
+
+  init(nc: consuming NCInt?) {
+    self.nc = nc
+  }
+
+  func readNoncopyable() {
+    let ne = self.nc!.getNE()
+    _ = ne
+  }
+}
+
+// =============================================================================
+// Immortal
+// =============================================================================
+
+@_lifetime(immortal)
+func testVoid() -> NEInt {
+  let ne = NEInt(immortal: 3)
+  return _overrideLifetime(ne, borrowing: ())
 }

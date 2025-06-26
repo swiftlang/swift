@@ -509,7 +509,8 @@ ManagedValue Transform::transform(ManagedValue v,
   bool inputIsOptional = (bool) inputObjectType;
 
   CanType outputObjectType = outputSubstType.getOptionalObjectType();
-  bool outputIsOptional = (bool) outputObjectType;
+  bool outputIsOptional =
+      static_cast<bool>(loweredResultTy.getASTType().getOptionalObjectType());
 
   // If the value is less optional than the desired formal type, wrap in
   // an optional.

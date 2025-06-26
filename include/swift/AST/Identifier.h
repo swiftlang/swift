@@ -362,7 +362,7 @@ public:
   }
 
   bool hasDollarPrefix() const {
-    return getIdentifier().hasDollarPrefix();
+    return !isSpecial() && getIdentifier().hasDollarPrefix();
   }
 
   /// A representation of the name to be displayed to users. May be ambiguous
@@ -663,8 +663,12 @@ public:
   ///
   /// \param skipEmptyArgumentNames When true, don't print the argument labels
   /// if they are all empty.
+  ///
+  /// \param escapeIfNeeded When true, escape identifiers with backticks
+  /// when required.
   llvm::raw_ostream &print(llvm::raw_ostream &os,
-                           bool skipEmptyArgumentNames = false) const;
+                           bool skipEmptyArgumentNames = false,
+                           bool escapeIfNeeded = false) const;
 
   /// Print a "pretty" representation of this declaration name to the given
   /// stream.

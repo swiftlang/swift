@@ -106,6 +106,7 @@ struct InnerTrivial {
 struct TrivialHolder {
   var p: UnsafePointer<Int>
   var pa: UnsafePointer<AddressableInt>
+  var mp: UnsafeMutablePointer<Int>
 
   var addressableInt: AddressableInt { unsafeAddress { pa } }
 
@@ -113,6 +114,13 @@ struct TrivialHolder {
   borrowing func span() -> Span<Int> {
     Span(base: p, count: 1)
   }
+
+  @_lifetime(&self)
+  mutating func mutableSpan() -> MutableSpan<Int> {
+    MutableSpan(base: mp, count: 1)
+  }
+
+  mutating func modify() {}
 }
 
 struct Holder {
@@ -454,6 +462,28 @@ func testInoutMutableBorrow(a: inout [Int]) -> MutableSpan<Int> {
   a.mutableSpan()
 }
 
+@_lifetime(&h)
+func testTrivialWriteConflict(h: inout TrivialHolder) -> MutableSpan<Int> {
+  let span = h.mutableSpan() // expected-error{{overlapping accesses to 'h', but modification requires exclusive access; consider copying to a local variable}}
+  h.modify() // expected-note{{conflicting access is here}}
+  return span
+}
+
+func makeMutableSpan(_ p: inout UnsafeMutablePointer<UInt8>) -> MutableSpan<UInt8> {
+  MutableSpan(base: p, count: 1)
+}
+
+struct TestInoutUnsafePointerExclusivity {
+  var pointer: UnsafeMutablePointer<UInt8>
+
+  @_lifetime(&self)
+  mutating func testInoutUnsafePointerExclusivity() -> MutableSpan<UInt8> {
+    let span1 = makeMutableSpan(&self.pointer) // expected-error{{overlapping accesses to 'self.pointer', but modification requires exclusive access; consider copying to a local variable}}
+    _ = makeMutableSpan(&self.pointer) // expected-note{{conflicting access is here}}
+    return span1
+  }
+}
+
 // =============================================================================
 // Scoped dependence on property access
 // =============================================================================
@@ -609,5 +639,5 @@ func testBorrowedAddressableInt(arg: Holder) -> Int {
 func testBorrowedAddressableIntReturn(arg: Holder) -> Span<Int> {
   arg.addressableInt.span()
   // expected-error @-1{{lifetime-dependent value escapes its scope}}
-  // expected-note  @-3{{it depends on the lifetime of argument 'arg'}}
+  // expected-note  @-2{{it depends on the lifetime of this parent value}}
 } // expected-note  {{this use causes the lifetime-dependent value to escape}}

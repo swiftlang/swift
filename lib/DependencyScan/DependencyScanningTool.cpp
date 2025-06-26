@@ -271,7 +271,6 @@ DependencyScanningTool::DependencyScanningTool()
 llvm::ErrorOr<swiftscan_dependency_graph_t>
 DependencyScanningTool::getDependencies(
     ArrayRef<const char *> Command,
-    const llvm::StringSet<> &PlaceholderModules,
     StringRef WorkingDirectory) {
   // There may be errors as early as in instance initialization, so we must ensure
   // we can catch those.
@@ -289,14 +288,13 @@ DependencyScanningTool::getDependencies(
 
   // Local scan cache instance, wrapping the shared global cache.
   ModuleDependenciesCache cache(
-      *ScanningService, QueryContext.ScanInstance->getMainModule()->getNameStr().str(),
-      QueryContext.ScanInstance->getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
-      QueryContext.ScanInstance->getInvocation().getFrontendOptions().ExplicitSDKModulesOutputPath,
+      QueryContext.ScanInstance->getMainModule()->getNameStr().str(),
       QueryContext.ScanInstance->getInvocation().getModuleScanningHash());
   // Execute the scanning action, retrieving the in-memory result
-  auto DependenciesOrErr = performModuleScan(*QueryContext.ScanInstance.get(), 
-                                             QueryContext.ScanDiagnostics.get(),
-                                             cache);
+  auto DependenciesOrErr = performModuleScan(*ScanningService,
+                                             *QueryContext.ScanInstance.get(),
+                                             cache,
+                                             QueryContext.ScanDiagnostics.get());
   if (DependenciesOrErr.getError())
     return generateHollowDiagnosticOutput(*ScanDiagnosticConsumer);
 
@@ -320,13 +318,12 @@ DependencyScanningTool::getImports(ArrayRef<const char *> Command,
 
   // Local scan cache instance, wrapping the shared global cache.
   ModuleDependenciesCache cache(
-      *ScanningService, QueryContext.ScanInstance->getMainModule()->getNameStr().str(),
-      QueryContext.ScanInstance->getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
-      QueryContext.ScanInstance->getInvocation().getFrontendOptions().ExplicitSDKModulesOutputPath,
+      QueryContext.ScanInstance->getMainModule()->getNameStr().str(),
       QueryContext.ScanInstance->getInvocation().getModuleScanningHash());
-  auto DependenciesOrErr = performModulePrescan(*QueryContext.ScanInstance.get(), 
-                                                QueryContext.ScanDiagnostics.get(),
-                                                cache);
+  auto DependenciesOrErr = performModulePrescan(*ScanningService,
+                                                *QueryContext.ScanInstance.get(),
+                                                cache,
+                                                QueryContext.ScanDiagnostics.get());
   if (DependenciesOrErr.getError())
     return generateHollowDiagnosticOutputImportSet(*ScanDiagnosticConsumer);
 

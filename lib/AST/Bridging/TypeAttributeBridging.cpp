@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -33,36 +33,19 @@ using namespace swift;
   }
 #include "swift/AST/TypeAttr.def"
 
-BridgedTypeAttrKind BridgedTypeAttrKind_fromString(BridgedStringRef cStr) {
+BridgedOptionalTypeAttrKind
+BridgedOptionalTypeAttrKind_fromString(BridgedStringRef cStr) {
   auto optKind = TypeAttribute::getAttrKindFromString(cStr.unbridged());
-  if (!optKind)
-    return BridgedTypeAttrKindNone;
-  switch (*optKind) {
-#define TYPE_ATTR(_, CLASS)                                                    \
-  case TypeAttrKind::CLASS:                                                    \
-    return BridgedTypeAttrKind##CLASS;
-#include "swift/AST/TypeAttr.def"
+  if (!optKind) {
+    return BridgedOptionalTypeAttrKind();
   }
-}
-
-static std::optional<TypeAttrKind> unbridged(BridgedTypeAttrKind kind) {
-  switch (kind) {
-#define TYPE_ATTR(_, CLASS)                                                    \
-  case BridgedTypeAttrKind##CLASS:                                             \
-    return TypeAttrKind::CLASS;
-#include "swift/AST/TypeAttr.def"
-  case BridgedTypeAttrKindNone:
-    return std::nullopt;
-  }
-  llvm_unreachable("unhandled enum value");
+  return *optKind;
 }
 
 BridgedTypeAttribute BridgedTypeAttribute_createSimple(
-    BridgedASTContext cContext, BridgedTypeAttrKind cKind,
+    BridgedASTContext cContext, swift::TypeAttrKind kind,
     BridgedSourceLoc cAtLoc, BridgedSourceLoc cNameLoc) {
-  auto optKind = unbridged(cKind);
-  assert(optKind && "creating attribute of invalid kind?");
-  return TypeAttribute::createSimple(cContext.unbridged(), *optKind,
+  return TypeAttribute::createSimple(cContext.unbridged(), kind,
                                      cAtLoc.unbridged(), cNameLoc.unbridged());
 }
 

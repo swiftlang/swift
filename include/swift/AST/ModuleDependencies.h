@@ -69,30 +69,7 @@ enum class ModuleDependencyKind : int8_t {
   Clang,
   // Used to model the translation unit's source module
   SwiftSource,
-  // Placeholder dependencies are a kind of dependencies used only by the
-  // dependency scanner. They are swift modules that the scanner will not be
-  // able to locate in its search paths and which are the responsibility of the
-  // scanner's client to ensure are provided.
-  //
-  // Placeholder dependencies will be specified in the scanner's output
-  // dependency graph where it is the responsibility of the scanner's client to
-  // ensure required post-processing takes place to "resolve" them. In order to
-  // do so, the client (swift driver, or any other client build system) is
-  // expected to have access to a full dependency graph of all placeholder
-  // dependencies and be able to replace placeholder nodes in the dependency
-  // graph with their full dependency trees, `uniquing` common dependency module
-  // nodes in the process.
-  //
-  // One example where placeholder dependencies are employed is when using
-  // SwiftPM in Explicit Module Build mode. SwiftPM constructs a build plan for
-  // all targets ahead-of-time. When planning a build for a target that depends
-  // on other targets, the dependency scanning action is not able to locate
-  // dependency target modules, because they have not yet been built. Instead,
-  // the build system treats them as placeholder dependencies and resolves them
-  // with `actual` dependencies in a post-processing step once dependency graphs
-  // of all targets, individually, have been computed.
-  SwiftPlaceholder,
-  LastKind = SwiftPlaceholder + 1
+  LastKind = SwiftSource + 1
 };
 
 /// This is used to idenfity a specific macro plugin dependency.
@@ -542,39 +519,6 @@ public:
   }
 };
 
-/// Describes an placeholder Swift module dependency module stub.
-///
-/// This class is mostly an implementation detail for \c ModuleDependencyInfo.
-
-class SwiftPlaceholderModuleDependencyStorage
-    : public ModuleDependencyInfoStorageBase {
-public:
-  SwiftPlaceholderModuleDependencyStorage(StringRef compiledModulePath,
-                                          StringRef moduleDocPath,
-                                          StringRef sourceInfoPath)
-      : ModuleDependencyInfoStorageBase(ModuleDependencyKind::SwiftPlaceholder, {}, {},
-                                        {}),
-        compiledModulePath(compiledModulePath), moduleDocPath(moduleDocPath),
-        sourceInfoPath(sourceInfoPath) {}
-
-  ModuleDependencyInfoStorageBase *clone() const override {
-    return new SwiftPlaceholderModuleDependencyStorage(*this);
-  }
-
-  /// The path to the .swiftmodule file.
-  const std::string compiledModulePath;
-
-  /// The path to the .swiftModuleDoc file.
-  const std::string moduleDocPath;
-
-  /// The path to the .swiftSourceInfo file.
-  const std::string sourceInfoPath;
-
-  static bool classof(const ModuleDependencyInfoStorageBase *base) {
-    return base->dependencyKind == ModuleDependencyKind::SwiftPlaceholder;
-  }
-};
-
 // MARK: Module Dependency Info
 /// Describes the dependencies of a given module.
 ///
@@ -673,16 +617,6 @@ public:
         pcmOutputPath, mappedPCMPath, moduleMapFile, contextHash,
         nonPathCommandLine, fileDependencies, linkLibraries,
         CASFileSystemRootID, clangIncludeTreeRoot, moduleCacheKey, IsSystem));
-  }
-
-  /// Describe a placeholder dependency swift module.
-  static ModuleDependencyInfo
-  forPlaceholderSwiftModuleStub(StringRef compiledModulePath,
-                                StringRef moduleDocPath,
-                                StringRef sourceInfoPath) {
-    return ModuleDependencyInfo(
-        std::make_unique<SwiftPlaceholderModuleDependencyStorage>(
-            compiledModulePath, moduleDocPath, sourceInfoPath));
   }
 
   /// Retrieve the module-level imports.
@@ -903,7 +837,7 @@ public:
   bool isTestableImport(StringRef moduleName) const;
 
   /// Whether the dependencies are for a Swift module: either Textual, Source,
-  /// Binary, or Placeholder.
+  /// or Binary
   bool isSwiftModule() const;
 
   /// Whether the dependencies are for a textual interface Swift module or a
@@ -918,9 +852,6 @@ public:
 
   /// Whether the dependencies are for a binary Swift module.
   bool isSwiftBinaryModule() const;
-
-  /// Whether this represents a placeholder module stub
-  bool isSwiftPlaceholderModule() const;
 
   /// Whether the dependencies are for a Clang module.
   bool isClangModule() const;
@@ -939,10 +870,6 @@ public:
 
   /// Retrieve the dependencies for a Clang module.
   const ClangModuleDependencyStorage *getAsClangModule() const;
-
-  /// Retrieve the dependencies for a placeholder dependency module stub.
-  const SwiftPlaceholderModuleDependencyStorage *
-  getAsPlaceholderDependencyModule() const;
 
   /// Add a dependency on the given module, if it was not already in the set.
   void
@@ -1065,7 +992,7 @@ class SwiftDependencyScanningService {
   std::shared_ptr<llvm::cas::ActionCache> ActionCache;
 
   /// File prefix mapper.
-  std::unique_ptr<llvm::PrefixMapper> Mapper;
+  std::shared_ptr<llvm::PrefixMapper> Mapper;
 
   /// The global file system cache.
   std::optional<
@@ -1142,13 +1069,10 @@ private:
 
 // MARK: ModuleDependenciesCache
 /// This "local" dependencies cache persists only for the duration of a given
-/// scanning action, and wraps an instance of a `SwiftDependencyScanningService`
-/// which may carry cached scanning information from prior scanning actions.
-/// This cache maintains a store of references to all dependencies found within
-/// the current scanning action (with their values stored in the global Cache).
+/// scanning action, and maintains a store of references to all dependencies
+/// found within the current scanning action.
 class ModuleDependenciesCache {
 private:
-  SwiftDependencyScanningService &globalScanningService;
   /// Discovered dependencies
   ModuleDependenciesKindMap ModuleDependenciesMap;
   /// Set containing all of the Clang modules that have already been seen.
@@ -1157,10 +1081,6 @@ private:
   std::string mainScanModuleName;
   /// The context hash of the current scanning invocation
   std::string scannerContextHash;
-  /// The location of where the explicitly-built modules will be output to
-  std::string moduleOutputPath;
-  /// The location of where the explicitly-built SDK modules will be output to
-  std::string sdkModuleOutputPath;
   /// The timestamp of the beginning of the scanning query action
   /// using this cache
   const llvm::sys::TimePoint<> scanInitializationTime;
@@ -1173,10 +1093,7 @@ private:
   getDependencyReferencesMap(ModuleDependencyKind kind) const;
 
 public:
-  ModuleDependenciesCache(SwiftDependencyScanningService &globalScanningService,
-                          const std::string &mainScanModuleName,
-                          const std::string &moduleOutputPath,
-                          const std::string &sdkModuleOutputPath,
+  ModuleDependenciesCache(const std::string &mainScanModuleName,
                           const std::string &scanningContextHash);
   ModuleDependenciesCache(const ModuleDependenciesCache &) = delete;
   ModuleDependenciesCache &operator=(const ModuleDependenciesCache &) = delete;
@@ -1197,12 +1114,6 @@ public:
   /// Whether we have cached dependency information for the given Swift module.
   bool hasSwiftDependency(StringRef moduleName) const;
 
-  SwiftDependencyScanningService &getScanService() {
-    return globalScanningService;
-  }
-  const SwiftDependencyScanningService &getScanService() const {
-    return globalScanningService;
-  }
   const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &
   getAlreadySeenClangModules() const {
     return alreadySeenClangModules;
@@ -1210,8 +1121,6 @@ public:
   void addSeenClangModule(clang::tooling::dependencies::ModuleID newModule) {
     alreadySeenClangModules.insert(newModule);
   }
-  StringRef getModuleOutputPath() const { return moduleOutputPath; }
-  StringRef getSDKModuleOutputPath() const { return sdkModuleOutputPath; }
 
   /// Query all dependencies
   ModuleDependencyIDSetVector

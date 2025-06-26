@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -5014,6 +5014,7 @@ ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
   SmallVector<LifetimeDescriptor> sources;
   SourceLoc rParenLoc;
   bool foundParamId = false;
+  bool invalidSourceDescriptor = false;
   status = parseList(
       tok::r_paren, lParenLoc, rParenLoc, /*AllowSepAfterLast=*/false,
       diag::expected_rparen_after_lifetime_dependence, [&]() -> ParserStatus {
@@ -5030,6 +5031,7 @@ ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
         auto sourceDescriptor =
             parseLifetimeDescriptor(*this, lifetimeDependenceKind);
         if (!sourceDescriptor) {
+          invalidSourceDescriptor = true;
           listStatus.setIsParseError();
           return listStatus;
         }
@@ -5037,6 +5039,10 @@ ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
         return listStatus;
       });
 
+  if (invalidSourceDescriptor) {
+    status.setIsParseError();
+    return status;
+  }
   if (!foundParamId) {
     diagnose(
         Tok,
@@ -6337,8 +6343,8 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
           DescriptiveKind = DescriptiveDeclKind::StaticProperty;
           break;
         case StaticSpellingKind::KeywordClass:
-          llvm_unreachable("kw_class is only parsed as a modifier if it's "
-                           "followed by a keyword");
+          DescriptiveKind = DescriptiveDeclKind::ClassProperty;
+          break;
         }
 
         diagnose(Tok.getLoc(), diag::expected_keyword_in_decl, "var",
@@ -6366,8 +6372,7 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
             DescriptiveKind = DescriptiveDeclKind::StaticMethod;
             break;
           case StaticSpellingKind::KeywordClass:
-            llvm_unreachable("kw_class is only parsed as a modifier if it's "
-                             "followed by a keyword");
+            DescriptiveKind = DescriptiveDeclKind::ClassMethod;
           }
         }
 
@@ -7788,7 +7793,7 @@ struct Parser::ParsedAccessors {
   SourceLoc LBLoc, RBLoc;
   SmallVector<AccessorDecl*, 16> Accessors;
 
-#define ACCESSOR(ID) AccessorDecl *ID = nullptr;
+#define ACCESSOR(ID, KEYWORD) AccessorDecl *ID = nullptr;
 #include "swift/AST/AccessorKinds.def"
 
   void record(Parser &P, AbstractStorageDecl *storage, bool invalid);
@@ -8187,9 +8192,9 @@ void Parser::parseTopLevelAccessors(
 
   // Prepopulate the field for any accessors that were already parsed parsed accessors
   ParsedAccessors accessors;
-#define ACCESSOR(ID)                                            \
-    if (auto accessor = storage->getAccessor(AccessorKind::ID)) \
-      accessors.ID = accessor;
+#define ACCESSOR(ID, KEYWORD)                                                  \
+  if (auto accessor = storage->getAccessor(AccessorKind::ID))                  \
+    accessors.ID = accessor;
 #include "swift/AST/AccessorKinds.def"
 
   ParserStatus status;
@@ -8407,13 +8412,13 @@ AccessorDecl *Parser::ParsedAccessors::add(AccessorDecl *accessor) {
   Accessors.push_back(accessor);
 
   switch (accessor->getAccessorKind()) {
-#define ACCESSOR(ID)                      \
-  case AccessorKind::ID:                  \
-    if (ID) {                             \
-      return ID;                          \
-    } else {                              \
-      ID = accessor;                      \
-      return nullptr;                     \
+#define ACCESSOR(ID, KEYWORD)                                                  \
+  case AccessorKind::ID:                                                       \
+    if (ID) {                                                                  \
+      return ID;                                                               \
+    } else {                                                                   \
+      ID = accessor;                                                           \
+      return nullptr;                                                          \
     }
 #include "swift/AST/AccessorKinds.def"
   }
@@ -9229,6 +9234,20 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   return DCC.fixupParserResult(Status, ED);
 }
 
+static bool isValidEnumRawValueLiteral(LiteralExpr *expr) {
+  if (expr == nullptr)
+    return false;
+
+  if (!isa<IntegerLiteralExpr>(expr) &&
+      !isa<FloatLiteralExpr>(expr) &&
+      !isa<StringLiteralExpr>(expr) &&
+      !isa<BooleanLiteralExpr>(expr) &&
+      !isa<NilLiteralExpr>(expr))
+    return false;
+
+  return true;
+}
+
 /// Parse a 'case' of an enum.
 ///
 /// \verbatim
@@ -9346,8 +9365,7 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
       }
       // The raw value must be syntactically a simple literal.
       LiteralRawValueExpr = dyn_cast<LiteralExpr>(RawValueExpr.getPtrOrNull());
-      if (!LiteralRawValueExpr
-          || isa<InterpolatedStringLiteralExpr>(LiteralRawValueExpr)) {
+      if (!isValidEnumRawValueLiteral(LiteralRawValueExpr)) {
         diagnose(RawValueExpr.getPtrOrNull()->getLoc(),
                  diag::nonliteral_enum_case_raw_value);
         LiteralRawValueExpr = nullptr;

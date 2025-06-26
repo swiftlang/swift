@@ -1168,11 +1168,13 @@ namespace {
                                   /*trailingClosureMatching=*/std::nullopt,
                                   CurDC, fnLocator);
 
-      Type fixedOutputType =
-          CS.getFixedTypeRecursive(outputTy, /*wantRValue=*/false);
-      if (!fixedOutputType->isTypeVariableOrMember()) {
-        CS.setFavoredType(anchor, fixedOutputType.getPointer());
-        outputTy = fixedOutputType;
+      if (CS.performanceHacksEnabled()) {
+        Type fixedOutputType =
+            CS.getFixedTypeRecursive(outputTy, /*wantRValue=*/false);
+        if (!fixedOutputType->isTypeVariableOrMember()) {
+          CS.setFavoredType(anchor, fixedOutputType.getPointer());
+          outputTy = fixedOutputType;
+        }
       }
 
       return outputTy;
@@ -1614,9 +1616,11 @@ namespace {
             }
           }
 
-          if (!knownType->hasPlaceholder()) {
-            // Set the favored type for this expression to the known type.
-            CS.setFavoredType(E, knownType.getPointer());
+          if (CS.performanceHacksEnabled()) {
+            if (!knownType->hasPlaceholder()) {
+              // Set the favored type for this expression to the known type.
+              CS.setFavoredType(E, knownType.getPointer());
+            }
           }
         }
       }
@@ -1938,7 +1942,11 @@ namespace {
       SmallVector<Type, 2> specializationArgTypes;
       auto options =
           TypeResolutionOptions(TypeResolverContext::InExpression);
-      for (auto specializationArg : specializationArgs) {
+      ConstraintLocatorBuilder locBuilder(locator);
+      for (auto idx : indices(specializationArgs)) {
+        auto specializationArg = specializationArgs[idx];
+        auto argLocator =
+            locBuilder.withPathElement(LocatorPathElt::GenericArgument(idx));
         PackExpansionExpr *elementEnv = nullptr;
         if (!OuterExpansions.empty()) {
           options |= TypeResolutionFlags::AllowPackReferences;
@@ -1947,9 +1955,9 @@ namespace {
         auto result = TypeResolution::resolveContextualType(
             specializationArg, CurDC, options,
             // Introduce type variables for unbound generics.
-            OpenUnboundGenericType(CS, locator),
-            HandlePlaceholderType(CS, locator),
-            OpenPackElementType(CS, locator, elementEnv));
+            OpenUnboundGenericType(CS, argLocator),
+            HandlePlaceholderType(CS, argLocator),
+            OpenPackElementType(CS, argLocator, elementEnv));
         if (result->hasError()) {
           auto &ctxt = CS.getASTContext();
           result = PlaceholderType::get(ctxt, specializationArg);
@@ -2085,8 +2093,10 @@ namespace {
                               CS.getASTContext());
       }
 
-      if (auto favoredTy = CS.getFavoredType(expr->getSubExpr())) {
-        CS.setFavoredType(expr, favoredTy);
+      if (CS.performanceHacksEnabled()) {
+        if (auto favoredTy = CS.getFavoredType(expr->getSubExpr())) {
+          CS.setFavoredType(expr, favoredTy);
+        }
       }
       return CS.getType(expr->getSubExpr());
     }
@@ -3373,11 +3383,13 @@ namespace {
 
       // If we ended up resolving the result type variable to a concrete type,
       // set it as the favored type for this expression.
-      Type fixedType =
-          CS.getFixedTypeRecursive(resultType, /*wantRvalue=*/true);
-      if (!fixedType->isTypeVariableOrMember()) {
-        CS.setFavoredType(expr, fixedType.getPointer());
-        resultType = fixedType;
+      if (CS.performanceHacksEnabled()) {
+        Type fixedType =
+            CS.getFixedTypeRecursive(resultType, /*wantRvalue=*/true);
+        if (!fixedType->isTypeVariableOrMember()) {
+          CS.setFavoredType(expr, fixedType.getPointer());
+          resultType = fixedType;
+        }
       }
 
       return resultType;
@@ -5171,7 +5183,7 @@ ConstraintSystem::applyPropertyWrapperToParameter(
 }
 
 void ConstraintSystem::optimizeConstraints(Expr *e) {
-  if (getASTContext().TypeCheckerOpts.DisableConstraintSolverPerformanceHacks)
+  if (!performanceHacksEnabled())
     return;
   
   SmallVector<Expr *, 16> linkedExprs;

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1244,9 +1244,10 @@ ExplicitSafety Decl::getExplicitSafety() const {
   // If this declaration is from C, ask the Clang importer.
   if (auto clangDecl = getClangDecl()) {
     ASTContext &ctx = getASTContext();
-    return evaluateOrDefault(ctx.evaluator,
-                             ClangDeclExplicitSafety({clangDecl}),
-                             ExplicitSafety::Unspecified);
+    return evaluateOrDefault(
+        ctx.evaluator,
+        ClangDeclExplicitSafety({clangDecl, isa<ClassDecl>(this)}),
+        ExplicitSafety::Unspecified);
   }
   
   // Inference: Check the enclosing context, unless this is a type.
@@ -3378,8 +3379,7 @@ bool AbstractStorageDecl::requiresOpaqueAccessor(AccessorKind kind) const {
 
   // Other accessors are never part of the opaque-accessors set.
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
-#define ACCESSOR(ID) \
-  case AccessorKind::ID:
+#define ACCESSOR(ID, KEYWORD) case AccessorKind::ID:
 #include "swift/AST/AccessorKinds.def"
     return false;
   }
@@ -6366,6 +6366,9 @@ ConstructorDecl *NominalTypeDecl::getDefaultInitializer() const {
 }
 
 void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
+  if (isa<ProtocolDecl>(this))
+    return;
+
   // Silently break cycles here because we can't be sure when and where a
   // request to synthesize will come from yet.
   // FIXME: rdar://56844567
@@ -7619,7 +7622,7 @@ void AbstractStorageDecl::setAccessors(SourceLoc lbraceLoc,
 // Compute the number of opaque accessors.
 const size_t NumOpaqueAccessors =
   0
-#define ACCESSOR(ID)
+#define ACCESSOR(ID, KEYWORD)
 #define OPAQUE_ACCESSOR(ID, KEYWORD) \
   + 1
 #include "swift/AST/AccessorKinds.def"
@@ -7642,14 +7645,14 @@ AbstractStorageDecl::AccessorRecord::create(ASTContext &ctx,
   // Make sure that we have enough space to add implicit opaque accessors later.
   size_t numMissingOpaque = NumOpaqueAccessors;
   {
-#define ACCESSOR(ID)
+#define ACCESSOR(ID, KEYWORD)
 #define OPAQUE_ACCESSOR(ID, KEYWORD)          \
     bool has##ID = false;
 #include "swift/AST/AccessorKinds.def"
     for (auto accessor : accessors) {
       switch (accessor->getAccessorKind()) {
-#define ACCESSOR(ID)                          \
-      case AccessorKind::ID:                  \
+#define ACCESSOR(ID, KEYWORD)                                                  \
+      case AccessorKind::ID:                                                   \
         continue;
 #define OPAQUE_ACCESSOR(ID, KEYWORD)          \
       case AccessorKind::ID:                  \
@@ -12210,10 +12213,10 @@ StringRef swift::getAccessorLabel(AccessorKind kind) {
   switch (kind) {
   #define SINGLETON_ACCESSOR(ID, KEYWORD) \
     case AccessorKind::ID: return #KEYWORD;
-  #define ACCESSOR(ID)
-  #include "swift/AST/AccessorKinds.def"
-    }
-    llvm_unreachable("bad accessor kind");
+#define ACCESSOR(ID, KEYWORD)
+#include "swift/AST/AccessorKinds.def"
+  }
+  llvm_unreachable("bad accessor kind");
 }
 
 void swift::simple_display(llvm::raw_ostream &out, AccessorKind kind) {

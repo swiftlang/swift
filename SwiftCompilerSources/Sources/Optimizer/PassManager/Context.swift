@@ -412,6 +412,12 @@ struct FunctionPassContext : MutatingContext {
     }
   }
 
+  func mangle(withBoxToStackPromotedArguments argIndices: [Int], from original: Function) -> String {
+    argIndices.withBridgedArrayRef { bridgedArgIndices in
+      String(taking: _bridged.mangleWithBoxToStackPromotedArgs(bridgedArgIndices, original.bridged))
+    }
+  }
+
   func createGlobalVariable(name: String, type: Type, linkage: Linkage, isLet: Bool) -> GlobalVariable {
     let gv = name._withBridgedStringRef {
       _bridged.createGlobalVariable($0, type.bridged, linkage.bridged, isLet)
@@ -419,18 +425,17 @@ struct FunctionPassContext : MutatingContext {
     return gv.globalVar
   }
 
-  func createFunctionForClosureSpecialization(from applySiteCallee: Function, withName specializedFunctionName: String, 
-                                              withParams specializedParameters: [ParameterInfo], 
-                                              withSerialization isSerialized: Bool) -> Function 
+  func createSpecializedFunctionDeclaration(from original: Function, withName specializedFunctionName: String, 
+                                            withParams specializedParameters: [ParameterInfo],
+                                            makeThin: Bool = false,
+                                            makeBare: Bool = false) -> Function
   {
     return specializedFunctionName._withBridgedStringRef { nameRef in
       let bridgedParamInfos = specializedParameters.map { $0._bridged }
 
       return bridgedParamInfos.withUnsafeBufferPointer { paramBuf in
-        _bridged.ClosureSpecializer_createEmptyFunctionWithSpecializedSignature(nameRef, paramBuf.baseAddress, 
-                                                                                paramBuf.count, 
-                                                                                applySiteCallee.bridged, 
-                                                                                isSerialized).function
+        _bridged.createSpecializedFunctionDeclaration(nameRef, paramBuf.baseAddress, paramBuf.count,
+                                                      original.bridged, makeThin, makeBare).function
       }
     }
   }
@@ -490,22 +495,6 @@ private extension Instruction {
     }
     return nil
   }
-
-  /// Returns the next interesting location. As it is impossible to set a
-  /// breakpoint on a meta instruction, those are skipped.
-  /// However, we don't want to take a location with different inlining
-  /// information than this instruction, so in that case, we will return the
-  /// location of the meta instruction. If the meta instruction is the only
-  /// instruction in the basic block, we also take its location.
-  var locationOfNextNonMetaInstruction: Location {
-    let location = self.location
-    guard !location.isInlined,
-          let nextLocation = nextNonMetaInstruction?.location,
-          !nextLocation.isInlined else {
-      return location
-    }
-    return nextLocation
-  }
 }
 
 extension Builder {
@@ -525,7 +514,7 @@ extension Builder {
   init(before insPnt: Instruction, _ context: some MutatingContext) {
     context.verifyIsTransforming(function: insPnt.parentFunction)
     self.init(insertAt: .before(insPnt),
-              location: insPnt.locationOfNextNonMetaInstruction,
+              location: insPnt.location,
               context.notifyInstructionChanged, context._bridged.asNotificationHandler())
   }
 
@@ -557,7 +546,7 @@ extension Builder {
   /// TODO: this is incorrect for terminator instructions. Instead use `Builder.insert(after:location:_:insertFunc)`
   /// from OptUtils.swift. Rename this to afterNonTerminator.
   init(after insPnt: Instruction, _ context: some MutatingContext) {
-    self.init(after: insPnt, location: insPnt.locationOfNextNonMetaInstruction, context)
+    self.init(after: insPnt, location: insPnt.location, context)
   }
 
   /// Creates a builder which inserts at the end of `block`, using a custom `location`.
@@ -581,7 +570,7 @@ extension Builder {
     context.verifyIsTransforming(function: block.parentFunction)
     let firstInst = block.instructions.first!
     self.init(insertAt: .before(firstInst),
-              location: firstInst.locationOfNextNonMetaInstruction,
+              location: firstInst.location,
               context.notifyInstructionChanged, context._bridged.asNotificationHandler())
   }
 
@@ -620,6 +609,14 @@ extension BasicBlock {
     return bridged.addFunctionArgument(type.bridged).argument as! FunctionArgument
   }
 
+  func insertFunctionArgument(atPosition: Int, type: Type, ownership: Ownership, decl: ValueDecl? = nil,
+                              _ context: some MutatingContext) -> FunctionArgument
+  {
+    context.notifyInstructionsChanged()
+    return bridged.insertFunctionArgument(atPosition, type.bridged, ownership._bridged,
+                                          (decl as Decl?).bridged).argument as! FunctionArgument
+  }
+
   func eraseArgument(at index: Int, _ context: some MutatingContext) {
     context.notifyInstructionsChanged()
     bridged.eraseArgument(index)
@@ -653,6 +650,18 @@ extension Argument {
   func set(reborrow: Bool, _ context: some MutatingContext) {
     context.notifyInstructionsChanged()
     bridged.setReborrow(reborrow)
+  }
+}
+
+extension FunctionArgument {
+  /// Copies the following flags from `arg`:
+  /// 1. noImplicitCopy
+  /// 2. lifetimeAnnotation
+  /// 3. closureCapture
+  /// 4. parameterPack
+  func copyFlags(from arg: FunctionArgument, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.copyFlags(arg.bridged)
   }
 }
 
@@ -786,6 +795,14 @@ extension MarkDependenceInstruction {
   func settleToEscaping(_ context: some MutatingContext) {
     context.notifyInstructionsChanged()
     bridged.MarkDependenceInstruction_settleToEscaping()
+    context.notifyInstructionChanged(self)
+  }
+}
+
+extension BeginAccessInst {
+  func set(accessKind: BeginAccessInst.AccessKind, context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.BeginAccess_setAccessKind(accessKind.rawValue)
     context.notifyInstructionChanged(self)
   }
 }

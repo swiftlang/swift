@@ -120,7 +120,7 @@ public func emitDiagnostic(
 }
 
 extension DiagnosticSeverity {
-  public var bridged: BridgedDiagnosticSeverity {
+  public var bridged: swift.DiagnosticKind {
     switch self {
     case .error: return .error
     case .note: return .note
@@ -177,10 +177,9 @@ fileprivate struct SimpleDiagnostic: DiagnosticMessage {
   }
 }
 
-extension BridgedDiagnosticSeverity {
+extension swift.DiagnosticKind {
   var asSeverity: DiagnosticSeverity {
     switch self {
-    case .fatalError: return .error
     case .error: return .error
     case .warning: return .warning
     case .remark: return .remark
@@ -250,7 +249,7 @@ public func addQueuedDiagnostic(
   queuedDiagnosticsPtr: UnsafeMutableRawPointer,
   perFrontendDiagnosticStatePtr: UnsafeMutableRawPointer,
   text: BridgedStringRef,
-  severity: BridgedDiagnosticSeverity,
+  severity: swift.DiagnosticKind,
   cLoc: BridgedSourceLoc,
   categoryName: BridgedStringRef,
   documentationPath: BridgedStringRef,
@@ -430,7 +429,7 @@ public func addQueuedDiagnostic(
 public func renderSingleDiagnostic(
   perFrontendDiagnosticStatePtr: UnsafeMutableRawPointer,
   text: BridgedStringRef,
-  severity: BridgedDiagnosticSeverity,
+  severity: swift.DiagnosticKind,
   categoryName: BridgedStringRef,
   documentationPath: BridgedStringRef,
   colorize: Int,

@@ -543,106 +543,6 @@ SerializedModuleLoaderBase::resolveMacroPlugin(const ExternalMacroPlugin &macro,
                                entry.executablePath.str()};
 }
 
-llvm::ErrorOr<ModuleDependencyInfo>
-SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
-                                           bool isTestableImport,
-                                           bool isCandidateForTextualModule) {
-  const std::string moduleDocPath;
-  const std::string sourceInfoPath;
-
-  // Read and valid module.
-  auto moduleBuf = Ctx.SourceMgr.getFileSystem()->getBufferForFile(modulePath);
-  if (!moduleBuf)
-    return moduleBuf.getError();
-
-  std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
-  serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
-      "", "", std::move(moduleBuf.get()), nullptr, nullptr, isFramework,
-      isRequiredOSSAModules(), Ctx.LangOpts.SDKName,
-      Ctx.SearchPathOpts.DeserializedPathRecoverer, loadedModuleFile);
-
-  if (Ctx.SearchPathOpts.ScannerModuleValidation) {
-    // If failed to load, just ignore and return do not found.
-    if (auto loadFailureReason = invalidModuleReason(loadInfo.status)) {
-      // If no textual interface was found, then for this dependency
-      // scanning query this was *the* module discovered, which means
-      // it would be helpful to let the user know why the scanner
-      // was not able to use it because the scan will ultimately fail to
-      // resolve this dependency due to this incompatibility.
-      if (!isCandidateForTextualModule)
-        Ctx.Diags.diagnose(SourceLoc(), diag::dependency_scan_module_incompatible,
-                           modulePath.str(), loadFailureReason.value());
-
-      if (Ctx.LangOpts.EnableModuleLoadingRemarks)
-        Ctx.Diags.diagnose(SourceLoc(), diag::dependency_scan_skip_module_invalid,
-                           modulePath.str(), loadFailureReason.value());
-      return std::make_error_code(std::errc::no_such_file_or_directory);
-    }
-
-    if (isTestableImport && !loadedModuleFile->isTestable()) {
-      Ctx.Diags.diagnose(SourceLoc(), diag::skip_module_not_testable,
-                         modulePath.str());
-      return std::make_error_code(std::errc::no_such_file_or_directory);
-    }
-  }
-
-  // Some transitive dependencies of binary modules are not required to be
-  // imported during normal builds.
-  // TODO: This is worth revisiting for debugger purposes where
-  //       loading the module is optional, and implementation-only imports
-  //       from modules with testing enabled where the dependency is
-  //       optional.
-  auto binaryModuleImports =
-      getImportsOfModule(*loadedModuleFile, ModuleLoadingBehavior::Required,
-                         Ctx.LangOpts.PackageName, isTestableImport);
-
-  // Lookup optional imports of this module also
-  auto binaryModuleOptionalImports =
-      getImportsOfModule(*loadedModuleFile, ModuleLoadingBehavior::Optional,
-                         Ctx.LangOpts.PackageName, isTestableImport);
-
-  std::vector<LinkLibrary> linkLibraries;
-  {
-    linkLibraries.reserve(loadedModuleFile->getLinkLibraries().size());
-    llvm::copy(loadedModuleFile->getLinkLibraries(),
-               std::back_inserter(linkLibraries));
-    if (loadedModuleFile->isFramework())
-      linkLibraries.emplace_back(loadedModuleFile->getName(),
-                                 LibraryKind::Framework,
-                                 loadedModuleFile->isStaticLibrary());
-  }
-
-  // Attempt to resolve the module's defining .swiftinterface path
-  std::string definingModulePath =
-      loadedModuleFile->resolveModuleDefiningFilePath(
-          Ctx.SearchPathOpts.getSDKPath());
-
-  std::string userModuleVer =
-    loadedModuleFile->getUserModuleVersion().getAsString();
-  std::vector<serialization::SearchPath> serializedSearchPaths;
-  llvm::copy(loadedModuleFile->getSearchPaths(), std::back_inserter(serializedSearchPaths));
-  
-  // Map the set of dependencies over to the "module dependencies".
-  auto dependencies = ModuleDependencyInfo::forSwiftBinaryModule(
-      modulePath.str(), moduleDocPath, sourceInfoPath,
-      binaryModuleImports->moduleImports,
-      binaryModuleOptionalImports->moduleImports, linkLibraries, serializedSearchPaths,
-      binaryModuleImports->headerImport, definingModulePath, isFramework,
-      loadedModuleFile->isStaticLibrary(),
-      /*module-cache-key*/ "", userModuleVer);
-
-  for (auto &macro : loadedModuleFile->getExternalMacros()) {
-    auto deps =
-        resolveMacroPlugin(macro, loadedModuleFile->getModulePackageName());
-    if (!deps)
-      continue;
-    dependencies.addMacroDependency(macro.ModuleName, deps->LibraryPath,
-                                    deps->ExecutablePath);
-  }
-
-  return std::move(dependencies);
-}
-
 std::error_code ImplicitSerializedModuleLoader::findModuleFilesInDirectory(
     ImportPath::Element ModuleID, const SerializedModuleBaseName &BaseName,
     SmallVectorImpl<char> *ModuleInterfacePath,
@@ -1479,43 +1379,27 @@ bool swift::extractCompilerFlagsFromInterface(
       shouldModify = true;
     }
 
-    // Diagnose if the version in the target triple parsed from the
-    // swiftinterface is invalid for the OS.
-    const llvm::VersionTuple originalVer = triple.getOSVersion();
-    bool isValidVersion =
-        llvm::Triple::isValidVersionForOS(triple.getOS(), originalVer);
-    if (!isValidVersion) {
+    // Canonicalize the version in the target triple parsed from the
+    // swiftinterface.
+    auto canonicalTriple = getCanonicalTriple(triple);
+    if (!canonicalTriple.has_value()) {
       if (Diag) {
+        const llvm::VersionTuple OSVersion = triple.getOSVersion();
+        const bool isOSVersionInValidRange =
+            llvm::Triple::isValidVersionForOS(triple.getOS(), OSVersion);
+        const llvm::VersionTuple canonicalVersion =
+            llvm::Triple::getCanonicalVersionForOS(
+                triple.getOS(), triple.getOSVersion(), isOSVersionInValidRange);
         Diag->diagnose(SourceLoc(),
-                       diag::target_os_version_from_textual_interface_invalid,
-                       triple.str(), interfacePath);
+                       diag::map_os_version_from_textual_interface_failed,
+                       OSVersion.getAsString(), canonicalVersion.getAsString(),
+                       interfacePath);
       }
       break;
     }
-
-    // Canonicalize the version in the target triple parsed from the
-    // swiftinterface.
-    llvm::VersionTuple newVer = llvm::Triple::getCanonicalVersionForOS(
-        triple.getOS(), originalVer, isValidVersion);
-    if (originalVer != newVer) {
-      std::string originalOSName = triple.getOSName().str();
-      std::string originalVerStr = originalVer.getAsString();
-      std::string newVerStr = newVer.getAsString();
-      const int OSNameWithoutVersionLength =
-          originalOSName.size() - originalVerStr.size();
-      if (!StringRef(originalOSName).ends_with(originalVerStr) ||
-          (OSNameWithoutVersionLength <= 0)) {
-        if (Diag) {
-          Diag->diagnose(SourceLoc(),
-                         diag::map_os_version_from_textual_interface_failed,
-                         originalVerStr, newVerStr, interfacePath);
-        }
-        break;
-      }
-      llvm::SmallString<64> buffer(
-          originalOSName.substr(0, OSNameWithoutVersionLength));
-      buffer.append(newVerStr);
-      triple.setOSName(buffer.str());
+    // Update the triple to use if it differs.
+    if (!areTriplesStrictlyEqual(triple, *canonicalTriple)) {
+      triple = *canonicalTriple;
       shouldModify = true;
     }
     if (shouldModify)

@@ -36,7 +36,7 @@ ModuleDependencyInfoStorageBase::~ModuleDependencyInfoStorageBase() {}
 
 bool ModuleDependencyInfo::isSwiftModule() const {
   return isSwiftInterfaceModule() || isSwiftSourceModule() ||
-         isSwiftBinaryModule() || isSwiftPlaceholderModule();
+         isSwiftBinaryModule();
 }
 
 bool ModuleDependencyInfo::isTextualSwiftModule() const {
@@ -66,10 +66,6 @@ bool ModuleDependencyInfo::isSwiftBinaryModule() const {
   return isa<SwiftBinaryModuleDependencyStorage>(storage.get());
 }
 
-bool ModuleDependencyInfo::isSwiftPlaceholderModule() const {
-  return isa<SwiftPlaceholderModuleDependencyStorage>(storage.get());
-}
-
 bool ModuleDependencyInfo::isClangModule() const {
   return isa<ClangModuleDependencyStorage>(storage.get());
 }
@@ -95,12 +91,6 @@ ModuleDependencyInfo::getAsSwiftBinaryModule() const {
 const ClangModuleDependencyStorage *
 ModuleDependencyInfo::getAsClangModule() const {
   return dyn_cast<ClangModuleDependencyStorage>(storage.get());
-}
-
-/// Retrieve the dependencies for a placeholder dependency module stub.
-const SwiftPlaceholderModuleDependencyStorage *
-ModuleDependencyInfo::getAsPlaceholderDependencyModule() const {
-  return dyn_cast<SwiftPlaceholderModuleDependencyStorage>(storage.get());
 }
 
 void ModuleDependencyInfo::addTestableImport(ImportPath::Module module) {
@@ -388,11 +378,6 @@ std::string ModuleDependencyInfo::getModuleOutputPath() const {
         cast<SwiftBinaryModuleDependencyStorage>(storage.get());
     return swiftBinaryStorage->compiledModulePath;
   }
-  case swift::ModuleDependencyKind::SwiftPlaceholder: {
-    auto swiftPlaceholderStorage =
-        cast<SwiftPlaceholderModuleDependencyStorage>(storage.get());
-    return swiftPlaceholderStorage->compiledModulePath;
-  }
   default:
     llvm_unreachable("Unexpected dependency kind");
   }
@@ -600,7 +585,8 @@ void swift::dependencies::registerCxxInteropLibraries(
                       return mainModuleName == Name;
                     })) {
     // Only link with CxxStdlib on platforms where the overlay is available.
-    if (Target.isOSDarwin() || Target.isOSLinux() || Target.isOSWindows())
+    if (Target.isOSDarwin() || Target.isOSLinux() || Target.isOSWindows() ||
+        Target.isOSFreeBSD())
       RegistrationCallback(LinkLibrary{"swiftCxxStdlib", LibraryKind::Library,
                                        hasStaticCxxStdlib});
   }
@@ -769,12 +755,8 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
   if (!ScannerPrefixMapper.empty()) {
     Mapper = std::make_unique<llvm::PrefixMapper>();
     SmallVector<llvm::MappedPrefix, 4> Prefixes;
-    if (auto E = llvm::MappedPrefix::transformJoined(ScannerPrefixMapper,
-                                                     Prefixes)) {
-      Instance.getDiags().diagnose(SourceLoc(), diag::error_prefix_mapping,
-                                   toString(std::move(E)));
-      return true;
-    }
+    llvm::MappedPrefix::transformPairs(ScannerPrefixMapper,
+                                       Prefixes);
     Mapper->addRange(Prefixes);
     Mapper->sort();
   }
@@ -796,14 +778,9 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
 }
 
 ModuleDependenciesCache::ModuleDependenciesCache(
-    SwiftDependencyScanningService &globalScanningService,
-    const std::string &mainScanModuleName, const std::string &moduleOutputPath,
-    const std::string &sdkModuleOutputPath, const std::string &scannerContextHash)
-    : globalScanningService(globalScanningService),
-      mainScanModuleName(mainScanModuleName),
+    const std::string &mainScanModuleName, const std::string &scannerContextHash)
+    : mainScanModuleName(mainScanModuleName),
       scannerContextHash(scannerContextHash),
-      moduleOutputPath(moduleOutputPath),
-      sdkModuleOutputPath(sdkModuleOutputPath),
       scanInitializationTime(std::chrono::system_clock::now()) {
   for (auto kind = ModuleDependencyKind::FirstKind;
        kind != ModuleDependencyKind::LastKind; ++kind)
@@ -875,8 +852,6 @@ ModuleDependenciesCache::findSwiftDependency(StringRef moduleName) const {
   if (auto found = findDependency(moduleName, ModuleDependencyKind::SwiftBinary))
     return found;
   if (auto found = findDependency(moduleName, ModuleDependencyKind::SwiftSource))
-    return found;
-  if (auto found = findDependency(moduleName, ModuleDependencyKind::SwiftPlaceholder))
     return found;
   return std::nullopt;
 }

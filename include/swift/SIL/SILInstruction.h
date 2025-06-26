@@ -9270,6 +9270,7 @@ class MarkUnresolvedNonCopyableValueInst
   friend class SILBuilder;
 
 public:
+  // The raw values must match Instruction.MarkUnresolvedNonCopyableValueInst.CheckKind
   enum class CheckKind : unsigned {
     Invalid = 0,
 

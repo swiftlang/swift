@@ -157,3 +157,9 @@ extension OptionalBridgedDeclObj {
   public var decl: Decl? { obj.getAs(Decl.self) }
   public func getAs<T: Decl>(_ declType: T.Type) -> T? { obj.getAs(T.self) }
 }
+
+extension Optional where Wrapped == Decl {
+  public var bridged: OptionalBridgedDeclObj {
+    OptionalBridgedDeclObj(self?.bridged.obj)
+  }
+}

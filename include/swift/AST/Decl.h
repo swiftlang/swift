@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -8629,7 +8629,7 @@ public:
     switch (getAccessorKind()) {
 #define OBSERVING_ACCESSOR(ID, KEYWORD) \
     case AccessorKind::ID: return true;
-#define ACCESSOR(ID) \
+#define ACCESSOR(ID, KEYWORD)                                                  \
     case AccessorKind::ID: return false;
 #include "swift/AST/AccessorKinds.def"
     }
@@ -8652,7 +8652,7 @@ public:
     switch (getAccessorKind()) {
 #define COROUTINE_ACCESSOR(ID, KEYWORD) \
     case AccessorKind::ID: return true;
-#define ACCESSOR(ID) \
+#define ACCESSOR(ID, KEYWORD)                                                  \
     case AccessorKind::ID: return false;
 #include "swift/AST/AccessorKinds.def"
     }
@@ -8779,7 +8779,8 @@ public:
 /// EnumCaseDecl.
 class EnumElementDecl : public DeclContext, public ValueDecl {
   friend class EnumRawValuesRequest;
-  
+  friend class LifetimeDependenceInfoRequest;
+
   /// This is the type specified with the enum element, for
   /// example 'Int' in 'case Y(Int)'.  This is null if there is no type
   /// associated with this element, as in 'case Z' or in all elements of enum
@@ -8790,6 +8791,11 @@ class EnumElementDecl : public DeclContext, public ValueDecl {
   
   /// The raw value literal for the enum element, or null.
   LiteralExpr *RawValueExpr;
+
+protected:
+  struct {
+    unsigned NoLifetimeDependenceInfo : 1;
+  } LazySemanticInfo = {};
 
 public:
   EnumElementDecl(SourceLoc IdentifierLoc, DeclName Name,

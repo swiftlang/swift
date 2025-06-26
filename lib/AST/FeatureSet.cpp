@@ -331,14 +331,25 @@ static bool usesFeatureLifetimeDependenceMutableAccessors(Decl *decl) {
     return false;
   }
   auto var = cast<VarDecl>(decl);
-  if (!var->isGetterMutating()) {
+  return var->isGetterMutating() && !var->getTypeInContext()->isEscapable();
+}
+
+static bool usesFeatureNonescapableAccessorOnTrivial(Decl *decl) {
+  if (!isa<VarDecl>(decl)) {
     return false;
   }
-  if (auto dc = var->getDeclContext()) {
-    if (auto nominal = dc->getSelfNominalTypeDecl()) {
-      auto sig = nominal->getGenericSignature();
-      return !var->getInterfaceType()->isEscapable(sig);
-    }
+  auto var = cast<VarDecl>(decl);
+  if (!var->hasParsedAccessors()) {
+    return false;
+  }
+  // Check for properties that are both non-Copyable and non-Escapable
+  // (MutableSpan).
+  if (var->getTypeInContext()->isNoncopyable()
+      && !var->getTypeInContext()->isEscapable()) {
+    auto selfTy = var->getDeclContext()->getSelfTypeInContext();
+    // Consider 'self' trivial if it is BitwiseCopyable and Escapable
+    // (UnsafeMutableBufferPointer).
+    return selfTy->isBitwiseCopyable() && selfTy->isEscapable();
   }
   return false;
 }
@@ -679,6 +690,8 @@ static bool usesFeatureDefaultIsolationPerFile(Decl *D) {
 
 UNINTERESTING_FEATURE(BuiltinSelect)
 UNINTERESTING_FEATURE(BuiltinInterleave)
+UNINTERESTING_FEATURE(BuiltinVectorsExternC)
+UNINTERESTING_FEATURE(AddressOfProperty)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

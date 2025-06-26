@@ -891,7 +891,8 @@ bool SwiftLangSupport::printDisplayName(const swift::ValueDecl *D,
   if (!D->hasName())
     return true;
 
-  OS << D->getName();
+  D->getName().print(OS, /*skipEmptyArgumentNames*/ false,
+                     /*escapeIfNeeded*/ true);
   return false;
 }
 
