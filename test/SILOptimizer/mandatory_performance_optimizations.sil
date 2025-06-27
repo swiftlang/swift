@@ -215,7 +215,7 @@ bb0(%0 : $Int, %1 : @owned $Builtin.NativeObject):
   return %8 : $Builtin.NativeObject
 }
 
-// CHECK-LABEL: sil [signature_optimized_thunk] [perf_constraint] [ossa] @metatype_arg :
+// CHECK-LABEL: sil [signature_optimized_thunk] [ossa] @metatype_arg :
 sil [ossa] @metatype_arg : $@convention(thin) (Int, @thick Int.Type, @owned Builtin.NativeObject) -> @owned Builtin.NativeObject {
 bb0(%0 : $Int, %1 : $@thick Int.Type, %2 : @owned $Builtin.NativeObject):
   fix_lifetime %1 : $@thick Int.Type
@@ -243,7 +243,7 @@ bb2(%13 : @owned $any Error):
   throw %13 : $any Error
 }
 
-// CHECK-LABEL: sil [signature_optimized_thunk] [perf_constraint] [ossa] @metatype_arg_throws :
+// CHECK-LABEL: sil [signature_optimized_thunk] [ossa] @metatype_arg_throws :
 sil [ossa] @metatype_arg_throws : $@convention(thin) (Int, @thick Int.Type, @owned Builtin.NativeObject) -> (@owned Builtin.NativeObject, @error any Error) {
 bb0(%0 : $Int, %1 : $@thick Int.Type, %2 : @owned $Builtin.NativeObject):
   fix_lifetime %1 : $@thick Int.Type
