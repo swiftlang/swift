@@ -1,7 +1,8 @@
-// RUN: %target-swift-frontend -target %target-triple -module-name main -parse-as-library -emit-ir %s -enable-experimental-feature Embedded
-// RUN: %target-swift-frontend -target %target-triple -module-name main -parse-as-library -emit-ir %s -enable-experimental-feature Embedded -O
-// RUN: %target-swift-frontend -target %target-triple -module-name main -parse-as-library -emit-ir %s -enable-experimental-feature Embedded -Osize
+// RUN: %target-swift-frontend -target armv7-apple-none-macho -module-name main -parse-as-library -emit-ir %s -enable-experimental-feature Embedded
+// RUN: %target-swift-frontend -target armv7-apple-none-macho -module-name main -parse-as-library -emit-ir %s -enable-experimental-feature Embedded -O
+// RUN: %target-swift-frontend -target armv7-apple-none-macho -module-name main -parse-as-library -emit-ir %s -enable-experimental-feature Embedded -Osize
 
+// UNSUPPORTED: OS=wasi
 // REQUIRES: swift_in_compiler
 // REQUIRES: CODEGENERATOR=ARM
 // REQUIRES: embedded_stdlib_cross_compiling
