@@ -219,7 +219,7 @@ bool SwiftLookupTable::contextRequiresName(ContextKind kind) {
 
 /// Try to translate the given Clang declaration into a context.
 static std::optional<SwiftLookupTable::StoredContext>
-translateDeclToContext(clang::NamedDecl *decl) {
+translateDeclToContext(const clang::NamedDecl *decl) {
   // Tag declaration.
   if (auto tag = dyn_cast<clang::TagDecl>(decl)) {
     if (tag->getIdentifier())
@@ -324,22 +324,46 @@ SwiftLookupTable::translateContext(EffectiveClangContext context) {
 
 /// Lookup an unresolved context name and resolve it to a Clang
 /// declaration context or typedef name.
-clang::NamedDecl *SwiftLookupTable::resolveContext(StringRef unresolvedName) {
+const clang::NamedDecl *
+SwiftLookupTable::resolveContext(StringRef unresolvedName) {
+  SmallVector<StringRef, 1> nameComponents;
+  unresolvedName.split(nameComponents, '.');
+
+  EffectiveClangContext parentContext;
+
   // Look for a context with the given Swift name.
-  for (auto entry :
-       lookup(SerializedSwiftName(unresolvedName),
-              std::make_pair(ContextKind::TranslationUnit, StringRef()))) {
-    if (auto decl = entry.dyn_cast<clang::NamedDecl *>()) {
-      if (isa<clang::TagDecl>(decl) ||
-          isa<clang::ObjCInterfaceDecl>(decl) ||
-          isa<clang::TypedefNameDecl>(decl))
-        return decl;
+  for (auto nameComponent : nameComponents) {
+    auto entries =
+        parentContext
+            ? lookup(SerializedSwiftName(nameComponent), parentContext)
+            : lookup(SerializedSwiftName(nameComponent),
+                     std::make_pair(ContextKind::TranslationUnit, StringRef()));
+    bool entryFound = false;
+    for (auto entry : entries) {
+      if (auto decl = entry.dyn_cast<clang::NamedDecl *>()) {
+        if (isa<clang::TagDecl>(decl) ||
+            isa<clang::ObjCInterfaceDecl>(decl) ||
+            isa<clang::NamespaceDecl>(decl)) {
+          entryFound = true;
+          parentContext = EffectiveClangContext(cast<clang::DeclContext>(decl));
+          break;
+        }
+        if (auto typedefDecl = dyn_cast<clang::TypedefNameDecl>(decl)) {
+          entryFound = true;
+          parentContext = EffectiveClangContext(typedefDecl);
+          break;
+        }
+      }
     }
+
+    // If we could not resolve this component of the qualified name, bail.
+    if (!entryFound)
+      return nullptr;
   }
 
-  // FIXME: Search imported modules to resolve the context.
-
-  return nullptr;
+  return parentContext.getAsDeclContext()
+             ? cast<clang::NamedDecl>(parentContext.getAsDeclContext())
+             : parentContext.getTypedefName();
 }
 
 void SwiftLookupTable::addCategory(clang::ObjCCategoryDecl *category) {
