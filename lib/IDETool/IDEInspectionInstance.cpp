@@ -90,6 +90,23 @@ template <typename Range> Decl *getElementAt(const Range &Decls, unsigned N) {
   return nullptr;
 }
 
+static ArrayRef<AccessorDecl *>
+getParsedAccessors(AbstractStorageDecl *ASD,
+                   SmallVectorImpl<AccessorDecl *> &scratch) {
+  ASSERT(scratch.empty());
+  ASD->visitParsedAccessors([&](auto *AD) {
+    // Ignore accessors added by macro expansions.
+    // TODO: This ought to be the default behavior of `visitParsedAccessors`,
+    // we ought to have a different entrypoint for clients that care about
+    // the semantic set of "explicit" accessors.
+    if (AD->isInMacroExpansionInContext())
+      return;
+
+    scratch.push_back(AD);
+  });
+  return scratch;
+}
+
 /// Find the equivalent \c DeclContext with \p DC from \p SF AST.
 /// This assumes the AST which contains \p DC has exact the same structure with
 /// \p SF.
@@ -117,7 +134,10 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
       auto *storage = accessor->getStorage();
       if (!storage)
         return nullptr;
-      auto accessorN = findIndexInRange(accessor, storage->getAllAccessors());
+
+      SmallVector<AccessorDecl *, 4> scratch;
+      auto accessorN =
+          findIndexInRange(accessor, getParsedAccessors(storage, scratch));
       if (!accessorN)
         return nullptr;
       IndexStack.push_back(*accessorN);
@@ -128,7 +148,7 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
       N = findIndexInRange(D, parentSF->getTopLevelDecls());
     } else if (auto parentIDC = dyn_cast_or_null<IterableDeclContext>(
                    parentDC->getAsDecl())) {
-      N = findIndexInRange(D, parentIDC->getMembers());
+      N = findIndexInRange(D, parentIDC->getParsedMembers());
     } else {
 #ifndef NDEBUG
       llvm_unreachable("invalid DC kind for finding equivalent DC (indexpath)");
@@ -155,7 +175,7 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
     if (auto parentSF = dyn_cast<SourceFile>(newDC))
       D = getElementAt(parentSF->getTopLevelDecls(), N);
     else if (auto parentIDC = dyn_cast<IterableDeclContext>(newDC->getAsDecl()))
-      D = getElementAt(parentIDC->getMembers(), N);
+      D = getElementAt(parentIDC->getParsedMembers(), N);
     else
       llvm_unreachable("invalid DC kind for finding equivalent DC (query)");
 
@@ -163,7 +183,8 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
       if (IndexStack.empty())
         return nullptr;
       auto accessorN = IndexStack.pop_back_val();
-      D = getElementAt(storage->getAllAccessors(), accessorN);
+      SmallVector<AccessorDecl *, 4> scratch;
+      D = getElementAt(getParsedAccessors(storage, scratch), accessorN);
     }
 
     newDC = dyn_cast_or_null<DeclContext>(D);
@@ -358,7 +379,7 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
           nullptr
         }
     );
-    SM.recordSourceFile(newBufferID, AFD->getParentSourceFile());
+    SM.recordSourceFile(newBufferID, oldSF);
 
     AFD->setBodyToBeReparsed(newBodyRange);
     oldSF->clearScope();
