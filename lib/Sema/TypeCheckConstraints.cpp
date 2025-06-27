@@ -466,6 +466,9 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
   if (options.contains(TypeCheckExprFlags::DisableMacroExpansions))
     csOptions |= ConstraintSystemFlags::DisableMacroExpansions;
 
+  if (Context.TypeCheckerOpts.EnableConstraintSolverPerformanceHacks)
+    csOptions |= ConstraintSystemFlags::EnablePerformanceHacks;
+
   ConstraintSystem cs(dc, csOptions, diagnosticTransaction);
 
   if (auto *expr = target.getAsExpr()) {

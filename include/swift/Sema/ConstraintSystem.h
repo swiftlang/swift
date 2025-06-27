@@ -1964,6 +1964,9 @@ enum class ConstraintSystemFlags {
 
   /// Disable macro expansions.
   DisableMacroExpansions = 0x80,
+
+  /// Enable old type-checker performance hacks.
+  EnablePerformanceHacks = 0x100,
 };
 
 /// Options that affect the constraint system as a whole.
@@ -3604,10 +3607,9 @@ public:
   }
 
   /// Check whether old type-checker performance hacks has been explicitly
-  /// enabled by a flag.
+  /// enabled.
   bool performanceHacksEnabled() const {
-    return getASTContext()
-                .TypeCheckerOpts.EnableConstraintSolverPerformanceHacks;
+    return Options.contains(ConstraintSystemFlags::EnablePerformanceHacks);
   }
 
   /// Log and record the application of the fix. Return true iff any
