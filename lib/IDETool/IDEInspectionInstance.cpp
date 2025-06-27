@@ -63,9 +63,10 @@ swift::ide::makeCodeCompletionMemoryBuffer(const llvm::MemoryBuffer *origBuf,
 }
 
 namespace {
-/// Returns index number of \p D in \p Decls . If it's not found, returns ~0.
+/// Returns index number of \p D in \p Decls . If it's not found, returns
+/// \c nullopt.
 template <typename Range>
-unsigned findIndexInRange(Decl *D, const Range &Decls) {
+std::optional<unsigned> findIndexInRange(Decl *D, const Range &Decls) {
   unsigned N = 0;
   for (auto I = Decls.begin(), E = Decls.end(); I != E; ++I) {
     if ((*I)->isImplicit())
@@ -74,7 +75,7 @@ unsigned findIndexInRange(Decl *D, const Range &Decls) {
       return N;
     ++N;
   }
-  return ~0U;
+  return std::nullopt;
 }
 
 /// Return the element at \p N in \p Decls .
@@ -106,7 +107,7 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
     if (!D)
       return nullptr;
     auto *parentDC = newDC->getParent();
-    unsigned N = ~0U;
+    std::optional<unsigned> N;
 
     if (auto accessor = dyn_cast<AccessorDecl>(D)) {
       // The AST for accessors is like:
@@ -117,7 +118,9 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
       if (!storage)
         return nullptr;
       auto accessorN = findIndexInRange(accessor, storage->getAllAccessors());
-      IndexStack.push_back(accessorN);
+      if (!accessorN)
+        return nullptr;
+      IndexStack.push_back(*accessorN);
       D = storage;
     }
 
@@ -134,11 +137,10 @@ static DeclContext *getEquivalentDeclContextFromSourceFile(DeclContext *DC,
     }
 
     // Not found in the decl context tree.
-    if (N == ~0U) {
+    if (!N)
       return nullptr;
-    }
 
-    IndexStack.push_back(N);
+    IndexStack.push_back(*N);
     newDC = parentDC;
   } while (!newDC->isModuleScopeContext());
 
