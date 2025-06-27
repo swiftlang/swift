@@ -4574,7 +4574,10 @@ StringRef ValueDecl::getCDeclName() const {
 
   // Handle explicit cdecl attributes.
   if (auto cdeclAttr = getAttrs().getAttribute<CDeclAttr>()) {
-    return cdeclAttr->Name;
+    if (!cdeclAttr->Name.empty())
+      return cdeclAttr->Name;
+    else
+      return getBaseIdentifier().str();
   }
 
   return "";
