@@ -1092,6 +1092,8 @@ Added: _$ss6MirrorV12DisplayStyleO16foreignReferenceyA2DmFWC
 
 // var InlineArray._protectedBuffer
 // var InlineArray._protectedAddress
+Added: _$ss11InlineArrayVsRi__rlE16_protectedBufferSRyq_GvpMV
+Added: _$ss11InlineArrayVsRi__rlE17_protectedAddressSPyq_GvpMV
 
 // lengthOfBytes(using:)
 Added: __swift_stdlib_NSStringLengthOfBytesInEncodingTrampoline
