@@ -24,8 +24,6 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Located.h"
 #include "swift/Basic/SourceLoc.h"
-#include "clang/Basic/FileManager.h"
-#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/ADT/TinyPtrVector.h"
@@ -38,11 +36,8 @@ class FileCollectorBase;
 class PrefixMapper;
 namespace vfs {
 class OutputBackend;
-}
-namespace cas {
-class CachingOnDiskFileSystem;
-}
-}
+} // namespace vfs
+} // namespace llvm
 
 namespace clang {
 class DependencyCollector;
