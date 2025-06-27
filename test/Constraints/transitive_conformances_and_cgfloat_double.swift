@@ -18,3 +18,17 @@ import CoreGraphics
 
 // CHECK-NOT: failed constraint CGFloat transitive conformance to SIMDScalar
 // CHECK-NOT: Attempting to salvage
+
+protocol P {}
+extension CGFloat: P {}
+
+struct S<T> {}
+
+func foo<T: P>(_ x: T) -> S<T> { .init() }
+
+_ = { (x: Double) in
+  let _: S<CGFloat> = foo(x)
+}
+
+// CHECK-NOT: failed constraint CGFloat transitive conformance to SIMDScalar
+// CHECK-NOT: Attempting to salvage

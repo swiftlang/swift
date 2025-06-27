@@ -9248,11 +9248,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyTransitivelyConformsTo(
     return formUnsolved();
 
   // There is an implicit conversion between `CGFloat` and `Double` types
-  // so if `CGFloat` argument doesn't satisfy the requirement it's possible
-  // that the generic parameter it's passed to be inferred as a `Double`
-  // from context and the requirement to be satisfied through this implicit
-  // conversion.
-  if (resolvedTy->isCGFloat())
+  // so if `CGFloat`/`Double` argument doesn't satisfy the requirement it's
+  // possible that the generic parameter it's passed to be inferred as a
+  // the other type from context and the requirement to be satisfied through
+  // this implicit conversion.
+  if (resolvedTy->isCGFloat() || resolvedTy->isDouble())
     return SolutionKind::Solved;
 
   // If the composition consists of a class + protocol,
