@@ -154,7 +154,8 @@ public:
   explicit ActorIsolation(Kind kind = Unspecified, bool isSILParsed = false)
       : pointer(nullptr), kind(kind), isolatedByPreconcurrency(false),
         silParsed(isSILParsed), encodedParameterIndex(0) {
-    assert(kind != ActorInstance);
+    // SIL's use of this has weaker invariants for now.
+    assert(kind != ActorInstance || isSILParsed);
   }
 
   static ActorIsolation forUnspecified() {
@@ -209,21 +210,14 @@ public:
   static std::optional<ActorIsolation> forSILString(StringRef string) {
     auto kind =
         llvm::StringSwitch<std::optional<ActorIsolation::Kind>>(string)
-            .Case("unspecified",
-                  std::optional<ActorIsolation>(ActorIsolation::Unspecified))
-            .Case("actor_instance",
-                  std::optional<ActorIsolation>(ActorIsolation::ActorInstance))
-            .Case("nonisolated",
-                  std::optional<ActorIsolation>(ActorIsolation::Nonisolated))
-            .Case("nonisolated_unsafe", std::optional<ActorIsolation>(
-                                            ActorIsolation::NonisolatedUnsafe))
-            .Case("global_actor",
-                  std::optional<ActorIsolation>(ActorIsolation::GlobalActor))
-            .Case("global_actor_unsafe",
-                  std::optional<ActorIsolation>(ActorIsolation::GlobalActor))
+            .Case("unspecified", ActorIsolation::Unspecified)
+            .Case("actor_instance", ActorIsolation::ActorInstance)
+            .Case("nonisolated", ActorIsolation::Nonisolated)
+            .Case("nonisolated_unsafe", ActorIsolation::NonisolatedUnsafe)
+            .Case("global_actor", ActorIsolation::GlobalActor)
+            .Case("global_actor_unsafe", ActorIsolation::GlobalActor)
             .Case("caller_isolation_inheriting",
-                  std::optional<ActorIsolation>(
-                      ActorIsolation::CallerIsolationInheriting))
+                  ActorIsolation::CallerIsolationInheriting)
             .Default(std::nullopt);
     if (kind == std::nullopt)
       return std::nullopt;
