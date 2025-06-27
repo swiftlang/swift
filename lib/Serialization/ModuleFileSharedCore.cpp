@@ -26,6 +26,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/OnDiskHashTable.h"
 #include "llvm/Support/PrettyStackTrace.h"
+#include "llvm/TargetParser/Triple.h"
 
 using namespace swift;
 using namespace swift::serialization;
@@ -241,6 +242,7 @@ static ValidationInfo validateControlBlock(
     bool requiresOSSAModules,
     bool requiresRevisionMatch,
     StringRef requiredSDK,
+    std::optional<llvm::Triple> target,
     ExtendedValidationInfo *extendedInfo,
     PathObfuscator &pathRecoverer) {
   // The control block is malformed until we've at least read a major version
@@ -376,9 +378,17 @@ static ValidationInfo validateControlBlock(
     case control_block::MODULE_NAME:
       result.name = blobData;
       break;
-    case control_block::TARGET:
+    case control_block::TARGET: {
       result.targetTriple = blobData;
+      if (target &&
+          !areCompatible(*target, llvm::Triple(llvm::Triple::normalize(
+                                      result.targetTriple)))) {
+        result.status = Status::TargetIncompatible;
+        return result;
+      }
+
       break;
+    }
     case control_block::ALLOWABLE_CLIENT_NAME:
       result.allowableClients.push_back(blobData);
       break;
@@ -606,7 +616,8 @@ ValidationInfo serialization::validateSerializedAST(
     StringRef requiredSDK,
     ExtendedValidationInfo *extendedInfo,
     SmallVectorImpl<SerializationOptions::FileDependency> *dependencies,
-    SmallVectorImpl<SearchPath> *searchPaths) {
+    SmallVectorImpl<SearchPath> *searchPaths,
+    std::optional<llvm::Triple> target) {
   ValidationInfo result;
 
   // Check 32-bit alignment.
@@ -649,7 +660,7 @@ ValidationInfo serialization::validateSerializedAST(
           {SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR},
           requiresOSSAModules,
           /*requiresRevisionMatch=*/true,
-          requiredSDK,
+          requiredSDK, target,
           extendedInfo, localObfuscator);
       if (result.status != Status::Valid)
         return result;
@@ -1201,7 +1212,8 @@ bool ModuleFileSharedCore::readModuleDocIfPresent(PathObfuscator &pathRecoverer)
           docCursor, scratch, {SWIFTDOC_VERSION_MAJOR, SWIFTDOC_VERSION_MINOR},
           RequiresOSSAModules,
           /*requiresRevisionMatch*/false,
-          /*requiredSDK*/StringRef(), /*extendedInfo*/nullptr, pathRecoverer);
+          /*requiredSDK*/StringRef(), /*target*/std::nullopt,
+          /*extendedInfo*/nullptr, pathRecoverer);
       if (info.status != Status::Valid)
         return false;
       // Check that the swiftdoc is actually for this module.
@@ -1346,7 +1358,8 @@ bool ModuleFileSharedCore::readModuleSourceInfoIfPresent(PathObfuscator &pathRec
           {SWIFTSOURCEINFO_VERSION_MAJOR, SWIFTSOURCEINFO_VERSION_MINOR},
           RequiresOSSAModules,
           /*requiresRevisionMatch*/false,
-          /*requiredSDK*/StringRef(), /*extendedInfo*/nullptr, pathRecoverer);
+          /*requiredSDK*/StringRef(), /*target*/std::nullopt,
+          /*extendedInfo*/nullptr, pathRecoverer);
       if (info.status != Status::Valid)
         return false;
       // Check that the swiftsourceinfo is actually for this module.
@@ -1423,6 +1436,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
     bool isFramework,
     bool requiresOSSAModules,
     StringRef requiredSDK,
+    std::optional<llvm::Triple> target,
     serialization::ValidationInfo &info, PathObfuscator &pathRecoverer)
     : ModuleInputBuffer(std::move(moduleInputBuffer)),
       ModuleDocInputBuffer(std::move(moduleDocInputBuffer)),
@@ -1475,7 +1489,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
           cursor, scratch,
           {SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR},
           RequiresOSSAModules,
-          /*requiresRevisionMatch=*/true, requiredSDK,
+          /*requiresRevisionMatch=*/true, requiredSDK, target,
           &extInfo, pathRecoverer);
       if (info.status != Status::Valid) {
         error(info.status);

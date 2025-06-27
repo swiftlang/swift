@@ -18,6 +18,19 @@
 #include "swift/Serialization/SerializedModuleLoader.h"
 
 namespace swift {
+
+/// Result of looking up a Swift module on the current filesystem
+/// search paths.
+struct SwiftModuleScannerQueryResult {
+  struct IncompatibleCandidate {
+    std::string path;
+    std::string incompatibilityReason;
+  };
+
+  std::vector<IncompatibleCandidate> incompatibleCandidates;
+  std::optional<ModuleDependencyInfo> foundDependencyInfo;
+};
+
 /// A module "loader" that looks for .swiftinterface and .swiftmodule files
 /// for the purpose of determining dependencies, but does not attempt to
 /// load the module files.
@@ -60,7 +73,8 @@ private:
   std::vector<std::string> swiftModuleClangCC1CommandLineArgs;
 
 public:
-  std::optional<ModuleDependencyInfo> dependencies;
+  std::vector<SwiftModuleScannerQueryResult::IncompatibleCandidate> incompatibleCandidates;
+  std::optional<ModuleDependencyInfo> foundDependencyInfo;
 
   SwiftModuleScanner(ASTContext &ctx, ModuleLoadingMode LoadMode,
                      InterfaceSubContextDelegate &astDelegate,
@@ -74,7 +88,7 @@ public:
         swiftModuleClangCC1CommandLineArgs(swiftModuleClangCC1CommandLineArgs)  {}
 
   /// Perform a filesystem search for a Swift module with a given name
-  llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
+  SwiftModuleScannerQueryResult
   lookupSwiftModule(Identifier moduleName, bool isTestableImport);
 };
 } // namespace swift
