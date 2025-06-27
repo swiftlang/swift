@@ -1,5 +1,4 @@
-//===--- ModuleDependencyScanner.h - Import Swift modules --------*- C++
-//-*-===//
+//===--- ModuleDependencyScanner.h - Import Swift modules ------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -16,6 +15,7 @@
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Serialization/ScanningLoaders.h"
+#include "clang/Tooling/DependencyScanning/DependencyScanningTool.h"
 #include "llvm/CAS/CASReference.h"
 #include "llvm/Support/ThreadPool.h"
 
@@ -33,7 +33,10 @@ public:
       SwiftDependencyScanningService &globalScanningService,
       const CompilerInvocation &ScanCompilerInvocation,
       const SILOptions &SILOptions, ASTContext &ScanASTContext,
-      DependencyTracker &DependencyTracker, DiagnosticEngine &diags);
+      DependencyTracker &DependencyTracker,
+      std::shared_ptr<llvm::cas::ObjectStore> CAS,
+      std::shared_ptr<llvm::cas::ActionCache> ActionCache,
+      llvm::PrefixMapper *mapper, DiagnosticEngine &diags);
 
 private:
   /// Retrieve the module dependencies for the Clang module with the given name.
@@ -97,7 +100,7 @@ private:
   std::shared_ptr<llvm::cas::ObjectStore> CAS;
   std::shared_ptr<llvm::cas::ActionCache> ActionCache;
   /// File prefix mapper.
-  std::shared_ptr<llvm::PrefixMapper> PrefixMapper;
+  llvm::PrefixMapper *PrefixMapper;
 
   // Base command line invocation for clang scanner queries (both module and header)
   std::vector<std::string> clangScanningBaseCommandLineArgs;
@@ -112,6 +115,34 @@ private:
   friend class ModuleDependencyScanner;
 };
 
+// MARK: SwiftDependencyTracker
+/// Track swift dependency
+class SwiftDependencyTracker {
+public:
+  SwiftDependencyTracker(std::shared_ptr<llvm::cas::ObjectStore> CAS,
+                         llvm::PrefixMapper *Mapper,
+                         const CompilerInvocation &CI);
+
+  void startTracking(bool includeCommonDeps = true);
+  void trackFile(const Twine &path);
+  llvm::Expected<llvm::cas::ObjectProxy> createTreeFromDependencies();
+
+private:
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS;
+  std::shared_ptr<llvm::cas::ObjectStore> CAS;
+  llvm::PrefixMapper *Mapper;
+
+  struct FileEntry {
+    llvm::cas::ObjectRef FileRef;
+    size_t Size;
+
+    FileEntry(llvm::cas::ObjectRef FileRef, size_t Size)
+        : FileRef(FileRef), Size(Size) {}
+  };
+  llvm::StringMap<FileEntry> CommonFiles;
+  std::map<std::string, FileEntry> TrackedFiles;
+};
+
 class ModuleDependencyScanner {
 public:
   ModuleDependencyScanner(SwiftDependencyScanningService &ScanningService,
@@ -119,6 +150,8 @@ public:
                           const SILOptions &SILOptions,
                           ASTContext &ScanASTContext,
                           DependencyTracker &DependencyTracker,
+                          std::shared_ptr<llvm::cas::ObjectStore> CAS,
+                          std::shared_ptr<llvm::cas::ActionCache> ActionCache,
                           DiagnosticEngine &diags, bool ParallelScan);
 
   /// Identify the scanner invocation's main module's dependencies
@@ -133,6 +166,37 @@ public:
 
   /// How many filesystem lookups were performed by the scanner
   unsigned getNumLookups() { return NumLookups; }
+
+  /// CAS Dependency Tracker.
+  std::optional<SwiftDependencyTracker>
+  createSwiftDependencyTracker(const CompilerInvocation &CI) {
+    if (!CAS)
+      return std::nullopt;
+
+    return SwiftDependencyTracker(CAS, PrefixMapper.get(), CI);
+  }
+
+  /// PrefixMapper for scanner.
+  bool hasPathMapping() const {
+    return PrefixMapper && !PrefixMapper->getMappings().empty();
+  }
+  llvm::PrefixMapper *getPrefixMapper() const { return PrefixMapper.get(); }
+  std::string remapPath(StringRef Path) const {
+    if (!PrefixMapper)
+      return Path.str();
+    return PrefixMapper->mapToString(Path);
+  }
+
+  /// CAS options.
+  llvm::cas::ObjectStore &getCAS() const {
+    assert(CAS && "Expect CAS available");
+    return *CAS;
+  }
+
+  llvm::vfs::FileSystem &getSharedCachingFS() const {
+    assert(CacheFS && "Expect CacheFS available");
+    return *CacheFS;
+  }
 
 private:
   /// Main routine that computes imported module dependency transitive
@@ -222,8 +286,13 @@ private:
   unsigned NumThreads;
   std::list<std::unique_ptr<ModuleDependencyScanningWorker>> Workers;
   llvm::DefaultThreadPool ScanningThreadPool;
+  // CAS instance.
+  std::shared_ptr<llvm::cas::ObjectStore> CAS;
+  std::shared_ptr<llvm::cas::ActionCache> ActionCache;
   /// File prefix mapper.
-  std::shared_ptr<llvm::PrefixMapper> PrefixMapper;
+  std::unique_ptr<llvm::PrefixMapper> PrefixMapper;
+  /// CAS file system for loading file content.
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> CacheFS;
   /// Protect worker access.
   std::mutex WorkersLock;
   /// Count of filesystem queries performed
