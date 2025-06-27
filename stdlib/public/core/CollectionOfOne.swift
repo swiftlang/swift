@@ -173,9 +173,9 @@ extension CollectionOfOne {
   }
 
   @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
   public var mutableSpan: MutableSpan<Element> {
     @lifetime(&self)
-    @_alwaysEmitIntoClient
     mutating get {
       let pointer = unsafe UnsafeMutablePointer<Element>(
         Builtin.addressOfBorrow(self)
