@@ -2140,7 +2140,7 @@ ERROR(expected_lparen_after_lifetime_dependence, PointsToFirstBadToken,
 
 ERROR(expected_identifier_or_index_or_self_after_lifetime_dependence,
       PointsToFirstBadToken,
-      "expected identifier, index or self in lifetime dependence specifier",
+      "expected 'copy', 'borrow', or '&' followed by an identifier, index or 'self' in lifetime dependence specifier",
       ())
 
 ERROR(expected_rparen_after_lifetime_dependence, PointsToFirstBadToken,
