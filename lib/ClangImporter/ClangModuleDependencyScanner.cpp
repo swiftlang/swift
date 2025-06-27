@@ -40,8 +40,9 @@ using namespace clang::tooling::dependencies;
 static void addScannerPrefixMapperInvocationArguments(
     std::vector<std::string> &invocationArgStrs, ASTContext &ctx) {
   for (const auto &arg : ctx.SearchPathOpts.ScannerPrefixMapper) {
-    std::string prefixMapArg = "-fdepscan-prefix-map=" + arg;
-    invocationArgStrs.push_back(prefixMapArg);
+    invocationArgStrs.push_back("-fdepscan-prefix-map");
+    invocationArgStrs.push_back(arg.first);
+    invocationArgStrs.push_back(arg.second);
   }
 }
 
