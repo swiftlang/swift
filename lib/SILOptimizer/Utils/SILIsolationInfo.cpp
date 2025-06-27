@@ -1089,6 +1089,14 @@ void SILIsolationInfo::printOptions(llvm::raw_ostream &os) const {
   llvm::interleave(data, os, ", ");
 }
 
+/// We want to treat nonisolated(nonsending) just like nonisolated. So we use
+/// this with composition.
+void SILIsolationInfo::printActorIsolationForDiagnostics(
+    ActorIsolation iso, llvm::raw_ostream &os, StringRef openingQuotationMark,
+    bool asNoun) {
+  return iso.printForDiagnostics(os, openingQuotationMark, asNoun);
+}
+
 void SILIsolationInfo::print(llvm::raw_ostream &os) const {
   switch (Kind(*this)) {
   case Unknown:
@@ -1136,7 +1144,7 @@ void SILIsolationInfo::print(llvm::raw_ostream &os) const {
       }
     }
 
-    getActorIsolation().printForDiagnostics(os);
+    printActorIsolationForDiagnostics(getActorIsolation(), os);
     printOptions(os);
     return;
   case Task:
@@ -1256,7 +1264,7 @@ void SILIsolationInfo::printForDiagnostics(llvm::raw_ostream &os) const {
       }
     }
 
-    getActorIsolation().printForDiagnostics(os);
+    printActorIsolationForDiagnostics(getActorIsolation(), os);
     return;
   case Task:
     os << "task-isolated";
@@ -1299,7 +1307,7 @@ void SILIsolationInfo::printForCodeDiagnostic(llvm::raw_ostream &os) const {
       }
     }
 
-    getActorIsolation().printForDiagnostics(os);
+    printActorIsolationForDiagnostics(getActorIsolation(), os);
     os << " code";
     return;
   case Task:
@@ -1348,7 +1356,7 @@ void SILIsolationInfo::printForOneLineLogging(llvm::raw_ostream &os) const {
       }
     }
 
-    getActorIsolation().printForDiagnostics(os);
+    printActorIsolationForDiagnostics(getActorIsolation(), os);
     printOptions(os);
     return;
   case Task:

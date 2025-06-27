@@ -494,6 +494,14 @@ public:
   /// that the isolation and the isolated value match.
   bool isEqual(const SILIsolationInfo &other) const;
 
+  /// A helper function that prints ActorIsolation like we normally do except
+  /// that it prints nonisolated(nonsending) as nonisolated. This is needed in
+  /// certain cases when talking about use-after-free uses in send non sendable.
+  static void
+  printActorIsolationForDiagnostics(ActorIsolation iso, llvm::raw_ostream &os,
+                                    StringRef openingQuotationMark = "'",
+                                    bool asNoun = false);
+
   void Profile(llvm::FoldingSetNodeID &id) const;
 
 private:
