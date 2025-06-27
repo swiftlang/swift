@@ -202,8 +202,7 @@ enum class ImportTypeAttr : uint8_t {
   Sendable = 1 << 2,
 
   /// Type is in a declaration where it would be imported as Sendable by
-  /// default. This comes directly from the parameters to
-  /// \c getImportTypeAttrs() and merely affects diagnostics.
+  /// default. Currently used for completion handlers.
   DefaultsToSendable = 1 << 3,
 
   /// Import the type of a parameter declared with
@@ -1459,6 +1458,8 @@ public:
 
   /// Import a parameter type
   ///
+  /// \param dc The declaration context in which this parameter appears.
+  /// \param parent The declaration with which this parameter is associated.
   /// \param param The underlaying parameter declaraction.
   /// \param optionalityOfParam The kind of optionality for the parameter
   ///        being imported.
@@ -1486,6 +1487,7 @@ public:
   ///
   /// \returns The imported parameter result on success, or None on failure.
   std::optional<ImportParameterTypeResult> importParameterType(
+      DeclContext *dc, const clang::Decl *parent,
       const clang::ParmVarDecl *param, OptionalTypeKind optionalityOfParam,
       bool allowNSUIntegerAsInt, bool isNSDictionarySubscriptGetter,
       bool paramIsError, bool paramIsCompletionHandler,
