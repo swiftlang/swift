@@ -983,23 +983,23 @@ GROUPED_ERROR(regionbasedisolation_type_send_yields_race, SendingRisksDataRace, 
       (Type))
 NOTE(regionbasedisolation_type_use_after_send, none,
       "sending value of non-Sendable type %0 to %1 callee risks causing data races between %1 and local %2 uses",
-      (Type, ActorIsolation, ActorIsolation))
+      (Type, StringRef, StringRef))
 NOTE(regionbasedisolation_type_use_after_send_callee, none,
      "sending value of non-Sendable type %0 to %1 %kind2 risks causing data "
      "races between %1 and local %3 uses",
-     (Type, ActorIsolation, const ValueDecl *, ActorIsolation))
+     (Type, StringRef, const ValueDecl *, StringRef))
 
 NOTE(regionbasedisolation_named_info_send_yields_race, none,
      "sending %1%0 to %2 callee risks causing data races between %2 and local %3 uses",
-     (Identifier, StringRef, ActorIsolation, ActorIsolation))
+     (Identifier, StringRef, StringRef, StringRef))
 NOTE(regionbasedisolation_named_info_send_yields_race_callee, none,
      "sending %1%0 to %2 %kind3 risks causing data races between %2 and local %4 uses",
-     (Identifier, StringRef, ActorIsolation, const ValueDecl *, ActorIsolation))
+     (Identifier, StringRef, StringRef, const ValueDecl *, StringRef))
 
 // Use after send closure.
 NOTE(regionbasedisolation_type_isolated_capture_yields_race, none,
       "sending value of non-Sendable type %0 to %1 closure due to closure capture risks causing races in between %1 and %2 uses",
-      (Type, ActorIsolation, ActorIsolation))
+      (Type, StringRef, StringRef))
 
 // Value captured in async let and reused.
 NOTE(regionbasedisolation_named_nonisolated_asynclet_name, none,
@@ -1011,7 +1011,7 @@ NOTE(regionbasedisolation_named_value_used_after_explicit_sending, none,
       (Identifier))
 NOTE(regionbasedisolation_named_isolated_closure_yields_race, none,
       "%0%1 is captured by a %2 closure. %2 uses in closure may race against later %3 uses",
-      (StringRef, Identifier, ActorIsolation, ActorIsolation))
+      (StringRef, Identifier, StringRef, StringRef))
 
 NOTE(regionbasedisolation_typed_use_after_sending, none,
       "Passing value of non-Sendable type %0 as a 'sending' argument risks causing races in between local and caller code",
@@ -1025,10 +1025,10 @@ NOTE(regionbasedisolation_typed_use_after_sending_callee, none,
 
 NOTE(regionbasedisolation_named_send_never_sendable, none,
       "sending %1%0 to %2 callee risks causing data races between %2 and %3 uses",
-      (Identifier, StringRef, ActorIsolation, StringRef))
+      (Identifier, StringRef, StringRef, StringRef))
 NOTE(regionbasedisolation_named_send_never_sendable_callee, none,
       "sending %1%0 to %2 %kind3 risks causing data races between %2 and %4 uses",
-      (Identifier, StringRef, ActorIsolation, const ValueDecl *, StringRef))
+      (Identifier, StringRef, StringRef, const ValueDecl *, StringRef))
 
 NOTE(regionbasedisolation_named_send_into_sending_param, none,
      "%0%1 is passed as a 'sending' parameter; Uses in callee may race with "
@@ -1077,10 +1077,10 @@ NOTE(regionbasedisolation_named_send_nt_asynclet_capture, none,
       (Identifier, StringRef))
 NOTE(regionbasedisolation_typed_sendneversendable_via_arg, none,
       "sending %0 value of non-Sendable type %1 to %2 callee risks causing races in between %0 and %2 uses",
-      (StringRef, Type, ActorIsolation))
+      (StringRef, Type, StringRef))
 NOTE(regionbasedisolation_typed_sendneversendable_via_arg_callee, none,
       "sending %0 value of non-Sendable type %1 to %2 %kind3 risks causing races in between %0 and %2 uses",
-      (StringRef, Type, ActorIsolation, const ValueDecl *))
+      (StringRef, Type, StringRef, const ValueDecl *))
 
 NOTE(regionbasedisolation_isolated_conformance_introduced, none,
      "isolated conformance to %kind0 can be introduced here",
@@ -1126,10 +1126,10 @@ NOTE(regionbasedisolation_out_sending_cannot_be_actor_isolated_note_named, none,
 // Example: returning main-actor isolated result to a custom-actor isolated context risks causing data races
 ERROR(rbi_isolation_crossing_result, none,
       "non-Sendable %0-typed result can not be returned from %1 %kind2 to %3 context",
-      (Type, ActorIsolation, const ValueDecl *, ActorIsolation))
+      (Type, StringRef, const ValueDecl *, StringRef))
 ERROR(rbi_isolation_crossing_result_no_decl, none,
       "non-Sendable %0-typed result can not be returned from %1 function to %2 context",
-      (Type, ActorIsolation, ActorIsolation))
+      (Type, StringRef, StringRef))
 NOTE(rbi_non_sendable_nominal,none,
      "%kind0 does not conform to the 'Sendable' protocol",
       (const ValueDecl *))
