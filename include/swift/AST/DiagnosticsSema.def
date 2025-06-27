@@ -8377,6 +8377,9 @@ ERROR(lifetime_dependence_cannot_infer_scope_ownership, none,
 NOTE(lifetime_dependence_cannot_infer_inout_suggest, none,
      "use '@_lifetime(%0: copy %0) to forward the inout dependency",
      (StringRef))
+ERROR(lifetime_dependence_cannot_infer_implicit_init, none,
+      "cannot infer implicit initialization lifetime. Add an initializer with "
+      "'@_lifetime(...)' for each parameter the result depends on", ())
 
 //------------------------------------------------------------------------------
 // MARK: Lifetime Dependence Experimental Inference
