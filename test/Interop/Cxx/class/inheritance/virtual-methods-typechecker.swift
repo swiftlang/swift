@@ -37,3 +37,14 @@ func takesDerivedFromImmortal(_ i: DerivedFromImmortal) {
   let _ = i.getIntValue()
   i.setIntValue(1)
 }
+
+func callVirtualRenamedMethod(_ b: Base) {
+  b.virtualRename()  // expected-error {{value of type 'Base' has no member 'virtualRename'}}
+  b.swiftVirtualRename()
+}
+
+@available(SwiftStdlib 5.8, *)
+func callsRenamedVirtualMethodsInFRT(_ i: Immortal2) {
+  i.virtualRename()  // expected-error {{value of type 'Immortal2' has no member 'virtualRename'}}
+  i.swiftVirtualRename()
+}
