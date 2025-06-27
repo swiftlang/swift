@@ -684,7 +684,7 @@ entry(%instance : @owned $S):
   %store_scope = begin_access [modify] [static] %addr : $*S
   store %instance to [init] %store_scope : $*S
   end_access %store_scope : $*S
-  %load_scope = begin_access [read] [static] %addr : $*S
+  %load_scope = begin_access [modify] [static] %addr : $*S
   %value = load [copy] %load_scope : $*S
   end_access %load_scope : $*S
   destroy_addr %addr : $*S
@@ -703,7 +703,7 @@ entry(%instance : @owned $S):
   %store_scope = begin_access [modify] [static] %addr : $*S
   store %instance to [init] %store_scope : $*S
   end_access %store_scope : $*S
-  %load_scope = begin_access [read] [static] %addr : $*S
+  %load_scope = begin_access [modify] [static] %addr : $*S
   %value = load [copy] %load_scope : $*S
   %unknown = function_ref @unknown : $@convention(thin) () -> ()
   apply %unknown() : $@convention(thin) () -> ()
@@ -725,7 +725,7 @@ entry(%instance : @owned $S):
   %store_scope = begin_access [modify] [static] %addr : $*S
   store %instance to [init] %store_scope : $*S
   end_access %store_scope : $*S
-  %load_scope = begin_access [read] [static] %addr : $*S
+  %load_scope = begin_access [modify] [static] %addr : $*S
   %value = load [copy] %load_scope : $*S
   %unknown = function_ref @unknown : $@convention(thin) () -> ()
   apply %unknown() : $@convention(thin) () -> ()
@@ -746,7 +746,7 @@ entry(%instance : @owned $S):
   %store_scope = begin_access [modify] [static] %addr : $*S
   store %instance to [init] %store_scope : $*S
   end_access %store_scope : $*S
-  %load_scope = begin_access [read] [static] %addr : $*S
+  %load_scope = begin_access [modify] [static] %addr : $*S
   %field_addr = struct_element_addr %load_scope : $*S, #S.x
   %field = load [copy] %field_addr : $*X
   end_access %load_scope : $*S
@@ -768,9 +768,9 @@ entry(%instance : @owned $S):
   %store_scope = begin_access [modify] [static] %addr : $*S
   store %instance to [init] %store_scope : $*S
   end_access %store_scope : $*S
-  %outer = begin_access [read] [static] %addr : $*S
+  %outer = begin_access [modify] [static] %addr : $*S
   apply undef(%outer) : $@convention(thin) (@inout S) -> ()
-  %inner = begin_access [read] [static] %outer : $*S
+  %inner = begin_access [modify] [static] %outer : $*S
   %field_addr = struct_element_addr %inner : $*S, #S.x
   %field_addr_2 =  struct_element_addr %addr_2 : $*S, #S.x
   copy_addr %field_addr to [init] %field_addr_2 : $*X
@@ -795,9 +795,9 @@ entry(%instance : @owned $S):
   %store_scope = begin_access [modify] [static] %addr : $*S
   store %instance to [init] %store_scope : $*S
   end_access %store_scope : $*S
-  %outer = begin_access [read] [static] %addr : $*S
+  %outer = begin_access [modify] [static] %addr : $*S
   apply undef(%outer) : $@convention(thin) (@inout S) -> ()
-  %inner = begin_access [read] [static] %outer : $*S
+  %inner = begin_access [modify] [static] %outer : $*S
   copy_addr %inner to [init] %addr_2 : $*S
   end_access %inner : $*S
   destroy_addr %outer : $*S
@@ -1314,5 +1314,35 @@ bb0(%out : $*TwoCases):
   destroy_addr %mtc
   apply undef(%ieda) : $@convention(thin) () -> @out X
   inject_enum_addr %out, #TwoCases.A!enumelt
+  return %retval
+}
+
+// CHECK-LABEL: sil [ossa] @nofold_read_access_load : {{.*}} {
+// CHECK:         load [copy]
+// CHECK-LABEL: } // end sil function 'nofold_read_access_load'
+sil [ossa] @nofold_read_access_load : $@convention(thin) (@in X) -> () {
+entry(%c_addr : $*X):
+  %c_access = begin_access [dynamic] [read] %c_addr
+  %c = load [copy] %c_access
+  end_access %c_access
+  destroy_addr %c_addr
+  apply undef(%c) : $@convention(thin) (@owned X) -> ()
+  %retval = tuple ()
+  return %retval
+}
+
+// CHECK-LABEL: sil [ossa] @nofold_read_access_copy_addr : {{.*}} {
+// CHECK:         copy_addr {{%[^,]+}} to [init]
+// CHECK-LABEL: } // end sil function 'nofold_read_access_copy_addr'
+sil [ossa] @nofold_read_access_copy_addr : $@convention(thin) (@in X) -> () {
+entry(%c_addr : $*X):
+  %stack = alloc_stack $X
+  %c_access = begin_access [dynamic] [read] %c_addr
+  copy_addr %c_access to [init] %stack
+  end_access %c_access
+  destroy_addr %c_addr
+  apply undef(%stack) : $@convention(thin) (@in X) -> ()
+  dealloc_stack %stack
+  %retval = tuple ()
   return %retval
 }
