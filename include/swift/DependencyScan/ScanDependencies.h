@@ -22,6 +22,9 @@
 
 namespace llvm {
 class StringSaver;
+namespace cas {
+class ObjectStore;
+} // namespace cas
 namespace vfs {
 class FileSystem;
 } // namespace vfs
@@ -77,8 +80,8 @@ namespace incremental {
 /// than the serialized dependency graph, it is considered invalidated and must
 /// be re-scanned.
 void validateInterModuleDependenciesCache(
-    const SwiftDependencyScanningService &service,
     const ModuleDependencyID &rootModuleID, ModuleDependenciesCache &cache,
+    std::shared_ptr<llvm::cas::ObjectStore> cas,
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
     DiagnosticEngine &diags, bool emitRemarks = false);
 
@@ -86,9 +89,9 @@ void validateInterModuleDependenciesCache(
 /// with respect to their inputs. Upon encountering such a module, add it to the
 /// set of invalidated modules, along with the path from the root to this
 /// module.
-void outOfDateModuleScan(const SwiftDependencyScanningService &service,
-                         const ModuleDependencyID &sourceModuleID,
+void outOfDateModuleScan(const ModuleDependencyID &sourceModuleID,
                          const ModuleDependenciesCache &cache,
+                         std::shared_ptr<llvm::cas::ObjectStore> cas,
                          const llvm::sys::TimePoint<> &cacheTimeStamp,
                          llvm::vfs::FileSystem &fs, DiagnosticEngine &diags,
                          bool emitRemarks, ModuleDependencyIDSet &visited,
@@ -97,8 +100,8 @@ void outOfDateModuleScan(const SwiftDependencyScanningService &service,
 /// Validate whether all inputs of a given module dependency
 /// are older than the cache serialization time.
 bool verifyModuleDependencyUpToDate(
-    const SwiftDependencyScanningService &service,
     const ModuleDependencyID &moduleID, const ModuleDependenciesCache &cache,
+    std::shared_ptr<llvm::cas::ObjectStore> cas,
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
     DiagnosticEngine &diags, bool emitRemarks);
 } // end namespace incremental

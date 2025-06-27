@@ -23,13 +23,8 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Strings.h"
-#include "clang/CAS/IncludeTree.h"
-#include "llvm/CAS/CASProvidingFileSystem.h"
 #include "llvm/Config/config.h"
-#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Path.h"
-#include "llvm/Support/PrefixMapper.h"
-#include <system_error>
 using namespace swift;
 
 ModuleDependencyInfoStorageBase::~ModuleDependencyInfoStorageBase() {}
@@ -508,19 +503,6 @@ SwiftDependencyScanningService::SwiftDependencyScanningService() {
       // Swift can handle the working directory optimizaiton
       // already so it is safe to turn on all optimizations.
       clang::tooling::dependencies::ScanningOptimizations::All);
-  SharedFilesystemCache.emplace();
-}
-
-llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
-SwiftDependencyScanningService::getClangScanningFS(ASTContext &ctx) const {
-  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseFileSystem =
-      llvm::vfs::createPhysicalFileSystem();
-  ClangInvocationFileMapping fileMapping =
-    applyClangInvocationMapping(ctx, nullptr, baseFileSystem, false);
-
-  if (CAS)
-    return llvm::cas::createCASProvidingFileSystem(CAS, baseFileSystem);
-  return baseFileSystem;
 }
 
 bool
@@ -625,107 +607,6 @@ swift::dependencies::registerBackDeployLibraries(
   #include "swift/Frontend/BackDeploymentLibs.def"
 }
 
-SwiftDependencyTracker::SwiftDependencyTracker(
-    std::shared_ptr<llvm::cas::ObjectStore> CAS, llvm::PrefixMapper *Mapper,
-    const CompilerInvocation &CI)
-    : CAS(CAS), Mapper(Mapper) {
-  auto &SearchPathOpts = CI.getSearchPathOptions();
-
-  FS = llvm::cas::createCASProvidingFileSystem(
-      CAS, llvm::vfs::createPhysicalFileSystem());
-
-  auto addCommonFile = [&](StringRef path) {
-    auto file = FS->openFileForRead(path);
-    if (!file)
-      return;
-    auto status = (*file)->status();
-    if (!status)
-      return;
-    auto fileRef = (*file)->getObjectRefForContent();
-    if (!fileRef)
-      return;
-
-    std::string realPath = Mapper ? Mapper->mapToString(path) : path.str();
-    CommonFiles.try_emplace(realPath, **fileRef, (size_t)status->getSize());
-  };
-
-  // Add SDKSetting file.
-  SmallString<256> SDKSettingPath;
-  llvm::sys::path::append(SDKSettingPath, SearchPathOpts.getSDKPath(),
-                          "SDKSettings.json");
-  addCommonFile(SDKSettingPath);
-
-  // Add Legacy layout file.
-  const std::vector<std::string> AllSupportedArches = {
-      "arm64", "arm64e", "x86_64", "i386",
-      "armv7", "armv7s", "armv7k", "arm64_32"};
-
-  for (auto RuntimeLibPath : SearchPathOpts.RuntimeLibraryPaths) {
-    std::error_code EC;
-    for (auto &Arch : AllSupportedArches) {
-      SmallString<256> LayoutFile(RuntimeLibPath);
-      llvm::sys::path::append(LayoutFile, "layouts-" + Arch + ".yaml");
-      addCommonFile(LayoutFile);
-    }
-  }
-
-  // Add VFSOverlay file.
-  for (auto &Overlay: SearchPathOpts.VFSOverlayFiles)
-    addCommonFile(Overlay);
-
-  // Add blocklist file.
-  for (auto &File: CI.getFrontendOptions().BlocklistConfigFilePaths)
-    addCommonFile(File);
-}
-
-void SwiftDependencyTracker::startTracking(bool includeCommonDeps) {
-  TrackedFiles.clear();
-  if (includeCommonDeps) {
-    for (auto &entry : CommonFiles)
-      TrackedFiles.emplace(entry.first(), entry.second);
-  }
-}
-
-void SwiftDependencyTracker::trackFile(const Twine &path) {
-  auto file = FS->openFileForRead(path);
-  if (!file)
-    return;
-  auto status = (*file)->status();
-  if (!status)
-    return;
-  auto fileRef = (*file)->getObjectRefForContent();
-  if (!fileRef)
-    return;
-  std::string realPath =
-      Mapper ? Mapper->mapToString(path.str()) : path.str();
-  TrackedFiles.try_emplace(realPath, **fileRef, (size_t)status->getSize());
-}
-
-llvm::Expected<llvm::cas::ObjectProxy>
-SwiftDependencyTracker::createTreeFromDependencies() {
-  llvm::SmallVector<clang::cas::IncludeTree::FileList::FileEntry> Files;
-  for (auto &file : TrackedFiles) {
-    auto includeTreeFile = clang::cas::IncludeTree::File::create(
-        *CAS, file.first, file.second.FileRef);
-    if (!includeTreeFile) {
-      return llvm::createStringError("CASFS createTree failed for " +
-                                     file.first + ": " +
-                                     toString(includeTreeFile.takeError()));
-    }
-    Files.push_back(
-        {includeTreeFile->getRef(),
-         (clang::cas::IncludeTree::FileList::FileSizeTy)file.second.Size});
-  }
-
-  auto includeTreeList =
-      clang::cas::IncludeTree::FileList::create(*CAS, Files, {});
-  if (!includeTreeList)
-    return llvm::createStringError("casfs include-tree filelist error: " +
-                                   toString(includeTreeList.takeError()));
-
-  return *includeTreeList;
-}
-
 bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
     CompilerInstance &Instance) {
   if (!Instance.getInvocation().getCASOptions().EnableCaching)
@@ -743,30 +624,11 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
 
   // Setup CAS.
   CASOpts = Instance.getInvocation().getCASOptions().CASOpts;
-  CAS = Instance.getSharedCASInstance();
-  ActionCache = Instance.getSharedCacheInstance();
-
-  CacheFS = llvm::cas::createCASProvidingFileSystem(
-      CAS, llvm::vfs::createPhysicalFileSystem());
-
-  // Setup prefix mapping.
-  auto &ScannerPrefixMapper =
-      Instance.getInvocation().getSearchPathOptions().ScannerPrefixMapper;
-  if (!ScannerPrefixMapper.empty()) {
-    Mapper = std::make_unique<llvm::PrefixMapper>();
-    SmallVector<llvm::MappedPrefix, 4> Prefixes;
-    llvm::MappedPrefix::transformPairs(ScannerPrefixMapper,
-                                       Prefixes);
-    Mapper->addRange(Prefixes);
-    Mapper->sort();
-  }
-
-  const clang::tooling::dependencies::ScanningOutputFormat ClangScanningFormat =
-      clang::tooling::dependencies::ScanningOutputFormat::FullIncludeTree;
 
   ClangScanningService.emplace(
       clang::tooling::dependencies::ScanningMode::DependencyDirectivesScan,
-      ClangScanningFormat, Instance.getInvocation().getCASOptions().CASOpts,
+      clang::tooling::dependencies::ScanningOutputFormat::FullIncludeTree,
+      Instance.getInvocation().getCASOptions().CASOpts,
       Instance.getSharedCASInstance(), Instance.getSharedCacheInstance(),
       /*CachingOnDiskFileSystem=*/nullptr,
       // The current working directory optimization (off by default)

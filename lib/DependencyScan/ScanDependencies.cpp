@@ -81,10 +81,10 @@ class ExplicitModuleDependencyResolver {
 public:
   ExplicitModuleDependencyResolver(
       const ModuleDependencyID &moduleID,
-      const SwiftDependencyScanningService &service,
+      const ModuleDependencyScanner &scanner,
       ModuleDependenciesCache &cache, CompilerInstance &instance,
       std::optional<SwiftDependencyTracker> tracker)
-      : moduleID(moduleID), service(service), cache(cache), instance(instance),
+      : moduleID(moduleID), scanner(scanner), cache(cache), instance(instance),
         resolvingDepInfo(cache.findKnownDependency(moduleID)),
         tracker(std::move(tracker)) {
     // Copy commandline.
@@ -163,10 +163,10 @@ public:
     // Update the dependency in the cache with the modified command-line.
     if (resolvingDepInfo.isSwiftInterfaceModule() ||
         resolvingDepInfo.isClangModule()) {
-      if (service.hasPathMapping())
+      if (scanner.hasPathMapping())
         commandline =
             remapPathsFromCommandLine(commandline, [&](StringRef path) {
-              return service.remapPath(path);
+              return scanner.remapPath(path);
             });
       addDeterministicCheckFlags(commandline);
     }
@@ -198,12 +198,12 @@ private:
     bool needPathRemapping = instance.getInvocation()
                                  .getSearchPathOptions()
                                  .ResolvedPluginVerification &&
-                             service.hasPathMapping();
+                             scanner.hasPathMapping();
     auto mapPath = [&](StringRef path) {
       if (!needPathRemapping)
         return path.str();
 
-      return service.remapPath(path);
+      return scanner.remapPath(path);
     };
     if (needPathRemapping)
       commandline.push_back("-resolved-plugin-verification");
@@ -266,7 +266,7 @@ private:
         commandline.push_back("-Xcc");
         commandline.push_back(
             "-fmodule-map-file=" +
-            service.remapPath(bridgingHeaderDepModuleDetails->moduleMapFile));
+            scanner.remapPath(bridgingHeaderDepModuleDetails->moduleMapFile));
       }
     }
     addMacroDependencies(depModuleID, binaryDepDetails);
@@ -512,7 +512,7 @@ private:
     if (!instance.getInvocation().getCASOptions().EnableCaching)
       return false;
 
-    auto &CAS = service.getCAS();
+    auto &CAS = scanner.getCAS();
     auto commandLine = depInfo.getCommandline();
     std::vector<const char *> Args;
     if (commandLine.size() > 1)
@@ -542,8 +542,8 @@ private:
   }
 
   bool setupBinaryCacheKey(StringRef path, ModuleDependencyInfo &depInfo) {
-    auto &CASFS = service.getSharedCachingFS();
-    auto &CAS = service.getCAS();
+    auto &CASFS = scanner.getSharedCachingFS();
+    auto &CAS = scanner.getCAS();
     // For binary module, we need to make sure the lookup key is setup here in
     // action cache. We just use the CASID of the binary module itself as key.
     auto Ref = CASFS.getObjectRefForFileContent(path);
@@ -595,7 +595,7 @@ private:
   }
 
   bool addIncludeTree(StringRef includeTree) {
-    auto &db = service.getCAS();
+    auto &db = scanner.getCAS();
     auto casID = db.parseID(includeTree);
     if (!casID) {
       instance.getDiags().diagnose(SourceLoc(), diag::error_invalid_cas_id,
@@ -624,7 +624,7 @@ private:
     if (fileListRefs.empty())
       return false;
 
-    auto &db = service.getCAS();
+    auto &db = scanner.getCAS();
     auto casFS =
         clang::cas::IncludeTree::FileList::create(db, {}, fileListRefs);
     if (!casFS) {
@@ -643,7 +643,7 @@ private:
 
 private:
   const ModuleDependencyID &moduleID;
-  const SwiftDependencyScanningService &service;
+  const ModuleDependencyScanner &scanner;
   ModuleDependenciesCache &cache;
   CompilerInstance &instance;
   const ModuleDependencyInfo &resolvingDepInfo;
@@ -659,11 +659,11 @@ private:
 static bool resolveExplicitModuleInputs(
     const ModuleDependencyID &moduleID,
     const std::set<ModuleDependencyID> &dependencies,
-    const SwiftDependencyScanningService &service,
+    const ModuleDependencyScanner &scanner,
     ModuleDependenciesCache &cache, CompilerInstance &instance,
     std::optional<std::set<ModuleDependencyID>> bridgingHeaderDeps,
     std::optional<SwiftDependencyTracker> tracker) {
-  ExplicitModuleDependencyResolver resolver(moduleID, service, cache, instance,
+  ExplicitModuleDependencyResolver resolver(moduleID, scanner, cache, instance,
                                             std::move(tracker));
   return resolver.resolve(dependencies, bridgingHeaderDeps);
 }
@@ -1325,14 +1325,13 @@ swift::dependencies::createEncodedModuleKindAndName(ModuleDependencyID id) {
 }
 
 static bool resolveDependencyCommandLineArguments(
-    SwiftDependencyScanningService &scanningService, CompilerInstance &instance,
+    ModuleDependencyScanner &scanner, CompilerInstance &instance,
     ModuleDependenciesCache &cache,
     const std::vector<ModuleDependencyID> &topoSortedModuleList) {
   auto moduleTransitiveClosures =
       computeTransitiveClosureOfExplicitDependencies(topoSortedModuleList,
                                                      cache);
-  auto tracker =
-      scanningService.createSwiftDependencyTracker(instance.getInvocation());
+  auto tracker = scanner.createSwiftDependencyTracker(instance.getInvocation());
   for (const auto &modID : llvm::reverse(topoSortedModuleList)) {
     auto dependencyClosure = moduleTransitiveClosures[modID];
     // For main module or binary modules, no command-line to resolve.
@@ -1344,9 +1343,8 @@ static bool resolveDependencyCommandLineArguments(
       bridgingHeaderDeps = computeBridgingHeaderTransitiveDependencies(
           deps, moduleTransitiveClosures, cache);
 
-    if (resolveExplicitModuleInputs(modID, dependencyClosure, scanningService,
-                                    cache, instance, bridgingHeaderDeps,
-                                    tracker))
+    if (resolveExplicitModuleInputs(modID, dependencyClosure, scanner, cache,
+                                    instance, bridgingHeaderDeps, tracker))
       return true;
   }
 
@@ -1451,15 +1449,16 @@ swift::dependencies::performModuleScan(
           ModuleDependencyID{instance.getMainModule()->getNameStr().str(),
                              ModuleDependencyKind::SwiftSource};
       incremental::validateInterModuleDependenciesCache(
-          service, mainModuleID, cache, serializedCacheTimeStamp,
-          *instance.getSourceMgr().getFileSystem(), ctx.Diags,
-          opts.EmitDependencyScannerCacheRemarks);
+          mainModuleID, cache, instance.getSharedCASInstance(),
+          serializedCacheTimeStamp, *instance.getSourceMgr().getFileSystem(),
+          ctx.Diags, opts.EmitDependencyScannerCacheRemarks);
     }
   }
 
   auto scanner = ModuleDependencyScanner(
       service, instance.getInvocation(), instance.getSILOptions(),
       instance.getASTContext(), *instance.getDependencyTracker(),
+      instance.getSharedCASInstance(), instance.getSharedCacheInstance(),
       instance.getDiags(),
       instance.getInvocation().getFrontendOptions().ParallelDependencyScan);
 
@@ -1480,7 +1479,7 @@ swift::dependencies::performModuleScan(
   auto topologicallySortedModuleList =
       computeTopologicalSortOfExplicitDependencies(allModules, cache);
 
-  resolveDependencyCommandLineArguments(service, instance, cache,
+  resolveDependencyCommandLineArguments(scanner, instance, cache,
                                         topologicallySortedModuleList);
   resolveImplicitLinkLibraries(instance, cache);
   updateDependencyTracker(instance, cache, allModules);
@@ -1511,6 +1510,7 @@ llvm::ErrorOr<swiftscan_import_set_t> swift::dependencies::performModulePrescan(
   auto scanner = ModuleDependencyScanner(
       service, instance.getInvocation(), instance.getSILOptions(),
       instance.getASTContext(), *instance.getDependencyTracker(),
+      instance.getSharedCASInstance(), instance.getSharedCacheInstance(),
       instance.getDiags(),
       instance.getInvocation().getFrontendOptions().ParallelDependencyScan);
   // Execute import prescan, and write JSON output to the output stream
@@ -1540,13 +1540,13 @@ llvm::ErrorOr<swiftscan_import_set_t> swift::dependencies::performModulePrescan(
 }
 
 void swift::dependencies::incremental::validateInterModuleDependenciesCache(
-    const SwiftDependencyScanningService &service,
     const ModuleDependencyID &rootModuleID, ModuleDependenciesCache &cache,
+    std::shared_ptr<llvm::cas::ObjectStore> cas,
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
     DiagnosticEngine &diags, bool emitRemarks) {
   ModuleDependencyIDSet visited;
   ModuleDependencyIDSet modulesRequiringRescan;
-  outOfDateModuleScan(service, rootModuleID, cache, cacheTimeStamp, fs, diags,
+  outOfDateModuleScan(rootModuleID, cache, cas, cacheTimeStamp, fs, diags,
                       emitRemarks, visited, modulesRequiringRescan);
   for (const auto &outOfDateModID : modulesRequiringRescan)
     cache.removeDependency(outOfDateModID);
@@ -1556,8 +1556,8 @@ void swift::dependencies::incremental::validateInterModuleDependenciesCache(
 }
 
 void swift::dependencies::incremental::outOfDateModuleScan(
-    const SwiftDependencyScanningService &service,
     const ModuleDependencyID &moduleID, const ModuleDependenciesCache &cache,
+    std::shared_ptr<llvm::cas::ObjectStore> cas,
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
     DiagnosticEngine &diags, bool emitRemarks, ModuleDependencyIDSet &visited,
     ModuleDependencyIDSet &modulesRequiringRescan) {
@@ -1566,7 +1566,7 @@ void swift::dependencies::incremental::outOfDateModuleScan(
   for (const auto &depID : cache.getAllDependencies(moduleID)) {
     // If we have not already visited this module, recurse.
     if (visited.find(depID) == visited.end())
-      outOfDateModuleScan(service, depID, cache, cacheTimeStamp, fs, diags,
+      outOfDateModuleScan(depID, cache, cas, cacheTimeStamp, fs, diags,
                           emitRemarks, visited, modulesRequiringRescan);
 
     // Even if we're not revisiting a dependency, we must check if it's
@@ -1580,17 +1580,16 @@ void swift::dependencies::incremental::outOfDateModuleScan(
       diags.diagnose(SourceLoc(), diag::remark_scanner_invalidate_upstream,
                      moduleID.ModuleName);
     modulesRequiringRescan.insert(moduleID);
-  } else if (!verifyModuleDependencyUpToDate(service, moduleID, cache,
-                                             cacheTimeStamp, fs, diags,
-                                             emitRemarks))
+  } else if (!verifyModuleDependencyUpToDate(
+                 moduleID, cache, cas, cacheTimeStamp, fs, diags, emitRemarks))
     modulesRequiringRescan.insert(moduleID);
 
   visited.insert(moduleID);
 }
 
 bool swift::dependencies::incremental::verifyModuleDependencyUpToDate(
-    const SwiftDependencyScanningService &service,
     const ModuleDependencyID &moduleID, const ModuleDependenciesCache &cache,
+    std::shared_ptr<llvm::cas::ObjectStore> cas,
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
     DiagnosticEngine &diags, bool emitRemarks) {
   const auto &moduleInfo = cache.findKnownDependency(moduleID);
@@ -1610,9 +1609,9 @@ bool swift::dependencies::incremental::verifyModuleDependencyUpToDate(
     return true;
   };
 
-  auto verifyCASID = [&service, &diags, emitRemarks](StringRef moduleName,
+  auto verifyCASID = [cas, &diags, emitRemarks](StringRef moduleName,
                                                      const std::string &casID) {
-    if (!service.hasCAS()) {
+    if (!cas) {
       // If the wrong cache is passed.
       if (emitRemarks)
         diags.diagnose(SourceLoc(),
@@ -1620,15 +1619,14 @@ bool swift::dependencies::incremental::verifyModuleDependencyUpToDate(
                        moduleName);
       return false;
     }
-    auto &CAS = service.getCAS();
-    auto ID = CAS.parseID(casID);
+    auto ID = cas->parseID(casID);
     if (!ID) {
       if (emitRemarks)
         diags.diagnose(SourceLoc(), diag::remark_scanner_invalidate_cas_error,
                        moduleName, toString(ID.takeError()));
       return false;
     }
-    if (!CAS.getReference(*ID)) {
+    if (!cas->getReference(*ID)) {
       if (emitRemarks)
         diags.diagnose(SourceLoc(), diag::remark_scanner_invalidate_missing_cas,
                        moduleName, casID);

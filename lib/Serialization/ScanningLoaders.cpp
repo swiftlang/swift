@@ -31,8 +31,6 @@
 #include "swift/Subsystems.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SetOperations.h"
-#include "llvm/CAS/CachingOnDiskFileSystem.h"
-#include "llvm/Support/Error.h"
 #include "llvm/Support/PrefixMapper.h"
 #include "llvm/Support/Threading.h"
 #include "llvm/Support/VirtualFileSystem.h"
