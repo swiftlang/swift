@@ -10,11 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-// RUN: %target-run-stdlib-swift -enable-experimental-feature LifetimeDependence
+// RUN: %target-run-stdlib-swift
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
-// REQUIRES: swift_feature_LifetimeDependence
 
 import StdlibUnittest
 
@@ -25,6 +24,7 @@ defer { runAllTests() }
 
 let strings = [
   "Hello, World!",
+  "123456789",
   "A long ASCII string exceeding 16 code units.",
   "🇯🇵",
   "🏂☃❅❆❄︎⛄️❄️",
@@ -37,13 +37,12 @@ strings.forEach { expected in
   .require(.stdlib_6_2).code {
     guard #available(SwiftStdlib 6.2, *) else { return }
 
-    let string = NSString(utf8String: expected)
-    guard let string else { expectNotNil(string); return }
+    guard let nss = expectNotNil(NSString(utf8String: expected)) else { return }
 
-    let bridged = String(string).utf8
+    let bridged = String(nss).utf8
     var p: ObjectIdentifier? = nil
     for (i, j) in zip(0..<3, bridged.indices) {
-      let span = bridged.span
+      guard let span = expectNotNil(bridged._span) else { continue }
       let c = span.withUnsafeBufferPointer {
         let o = unsafeBitCast($0.baseAddress, to: ObjectIdentifier.self)
         if p == nil {
@@ -63,15 +62,30 @@ strings.forEach { expected in
   .require(.stdlib_6_2).code {
     guard #available(SwiftStdlib 6.2, *) else { return }
 
-    let string = NSString(utf8String: expected)
-    guard let string else { expectNotNil(string); return }
+    guard let nss = expectNotNil(NSString(utf8String: expected)) else { return }
 
-    let bridged = String(string)
+    let bridged = String(nss)
     let utf8 = bridged.utf8
-    let span = utf8.span
+    guard let span = expectNotNil(utf8._span) else { return }
     expectEqual(span.count, expected.utf8.count)
     for (i,j) in zip(span.indices, expected.utf8.indices) {
       expectEqual(span[i], expected.utf8[j])
+    }
+  }
+}
+
+strings.forEach { expected in
+  suite.test("UTF8Span from Bridged String: \(expected)")
+  .require(.stdlib_6_2).code {
+    guard #available(SwiftStdlib 6.2, *) else { return }
+
+    guard let nss = expectNotNil(NSString(utf8String: expected)) else { return }
+
+    let bridged = String(nss)
+    guard let utf8 = expectNotNil(bridged._utf8Span) else { return }
+    expectEqual(utf8.count, expected.utf8.count)
+    for (i,j) in zip(utf8.span.indices, expected.utf8.indices) {
+      expectEqual(utf8.span[i], expected.utf8[j])
     }
   }
 }
@@ -81,16 +95,32 @@ strings.forEach { expected in
   .require(.stdlib_6_2).code {
     guard #available(SwiftStdlib 6.2, *) else { return }
 
-    let string = NSString(utf8String: expected)
-    guard let string else { expectNotNil(string); return }
+    guard let nss = expectNotNil(NSString(utf8String: expected)) else { return }
 
-    let bridged = String(string).dropFirst()
+    let bridged = String(nss).dropFirst()
     let utf8 = bridged.utf8
-    let span = utf8.span
+    guard let span = expectNotNil(utf8._span) else { return }
     let expected = expected.dropFirst()
     expectEqual(span.count, expected.utf8.count)
     for (i,j) in zip(span.indices, expected.utf8.indices) {
       expectEqual(span[i], expected.utf8[j])
+    }
+  }
+
+  strings.forEach { expected in
+    suite.test("UTF8Span from Bridged String Substring: \(expected)")
+    .require(.stdlib_6_2).code {
+      guard #available(SwiftStdlib 6.2, *) else { return }
+
+      guard let nss = expectNotNil(NSString(utf8String: expected)) else { return }
+
+      let bridged = String(nss).dropFirst()
+      guard let utf8 = expectNotNil(bridged._utf8Span) else { return }
+      let expected = expected.dropFirst()
+      expectEqual(utf8.count, expected.utf8.count)
+      for (i,j) in zip(utf8.span.indices, expected.utf8.indices) {
+        expectEqual(utf8.span[i], expected.utf8[j])
+      }
     }
   }
 }
