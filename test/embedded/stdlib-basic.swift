@@ -1,5 +1,7 @@
-// RUN: %target-swift-frontend -target %target-triple -emit-ir %s -enable-experimental-feature Embedded | %FileCheck %s
+// RUN: %target-swift-frontend -target armv7-apple-none-macho -emit-ir %s -enable-experimental-feature Embedded | %FileCheck %s
+// RUN: %target-swift-frontend -target arm64-apple-none-macho -emit-ir %s -enable-experimental-feature Embedded | %FileCheck %s
 
+// UNSUPPORTED: OS=wasi
 // REQUIRES: swift_in_compiler
 // REQUIRES: CODEGENERATOR=ARM
 // REQUIRES: embedded_stdlib_cross_compiling
