@@ -9083,9 +9083,34 @@ namespace {
   /// Look for any side effects within a Stmt.
   struct CATExprValidator : clang::ConstStmtVisitor<CATExprValidator, bool> {
     bool VisitDeclRefExpr(const clang::DeclRefExpr *e) { return true; }
-    bool VisitIntegerLiteral(const clang::IntegerLiteral *) { return true; }
-    bool VisitImplicitCastExpr(const clang::ImplicitCastExpr *c) { return this->Visit(c->getSubExpr()); }
-    bool VisitParenExpr(const clang::ParenExpr *p) { return this->Visit(p->getSubExpr()); }
+
+    bool VisitIntegerLiteral(const clang::IntegerLiteral *IL) {
+      switch (IL->getType()->castAs<clang::BuiltinType>()->getKind()) {
+      case clang::BuiltinType::Char_S:
+      case clang::BuiltinType::Char_U:
+      case clang::BuiltinType::UChar:
+      case clang::BuiltinType::SChar:
+      case clang::BuiltinType::Short:
+      case clang::BuiltinType::UShort:
+      case clang::BuiltinType::UInt:
+      case clang::BuiltinType::Long:
+      case clang::BuiltinType::ULong:
+      case clang::BuiltinType::LongLong:
+      case clang::BuiltinType::ULongLong:
+        // These integer literals are printed with a suffix that isn't valid Swift
+        // syntax
+        return false;
+      default:
+        return true;
+      }
+    }
+
+    bool VisitImplicitCastExpr(const clang::ImplicitCastExpr *c) {
+      return this->Visit(c->getSubExpr());
+    }
+    bool VisitParenExpr(const clang::ParenExpr *p) {
+      return this->Visit(p->getSubExpr());
+    }
 
 #define SUPPORTED_UNOP(UNOP) \
     bool VisitUnary ## UNOP(const clang::UnaryOperator *unop) { \
