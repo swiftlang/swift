@@ -3,7 +3,6 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 
-// rdar://76038845
 // REQUIRES: concurrency_runtime
 
 import StdlibUnittest
