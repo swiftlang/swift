@@ -570,6 +570,8 @@ protected:
   NodePointer demangleImplParamConvention(Node::Kind ConvKind);
   NodePointer demangleImplResultConvention(Node::Kind ConvKind);
   NodePointer demangleImplParameterSending();
+  NodePointer demangleImplParameterIsolated();
+  NodePointer demangleImplParameterImplicitLeading();
   NodePointer demangleImplParameterResultDifferentiability();
   NodePointer demangleImplFunctionType();
   NodePointer demangleClangType();

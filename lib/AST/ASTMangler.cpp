@@ -2412,6 +2412,10 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
     OpArgs.push_back(getParamConvention(param.getConvention()));
     if (param.hasOption(SILParameterInfo::Sending))
       OpArgs.push_back('T');
+    if (param.hasOption(SILParameterInfo::Isolated))
+      OpArgs.push_back('I');
+    if (param.hasOption(SILParameterInfo::ImplicitLeading))
+      OpArgs.push_back('L');
     if (auto diffKind = getParamDifferentiability(param.getOptions()))
       OpArgs.push_back(*diffKind);
     appendType(param.getInterfaceType(), sig, forDecl);
