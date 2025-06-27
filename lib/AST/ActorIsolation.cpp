@@ -191,6 +191,9 @@ bool ActorIsolation::isEqual(const ActorIsolation &lhs,
     auto *lhsActor = lhs.getActorInstance();
     auto *rhsActor = rhs.getActorInstance();
     if (lhsActor && rhsActor) {
+      if (lhsActor == rhsActor)
+        return true;
+
       // FIXME: This won't work for arbitrary isolated parameter captures.
       if ((lhsActor->isSelfParameter() && rhsActor->isSelfParamCapture()) ||
           (lhsActor->isSelfParamCapture() && rhsActor->isSelfParameter())) {

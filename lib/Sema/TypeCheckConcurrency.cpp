@@ -3045,13 +3045,13 @@ namespace {
         // If the closure won't execute concurrently with the context in
         // which the declaration occurred, it's okay.
         auto decl = capture.getDecl();
-        auto isolation = getActorIsolation(decl);
 
         // 'nonisolated' local variables are always okay to capture in
         // 'Sendable' closures because they can be accessed from anywhere.
         // Note that only 'nonisolated(unsafe)' can be applied to local
         // variables.
-        if (isolation.isNonisolated())
+        if (isa<VarDecl>(decl) &&
+            getActorIsolation(decl).isNonisolated())
           continue;
 
         auto *context = localFunc.getAsDeclContext();
@@ -4833,6 +4833,70 @@ namespace {
   };
 } // end anonymous namespace
 
+/// Compute the isolation of a closure or local function from its parent
+/// isolation.
+///
+/// Doesn't apply preconcurrency because it's generally easier for the
+/// caller to do so.
+static ActorIsolation
+computeClosureIsolationFromParent(DeclContext *closure,
+                                  ActorIsolation parentIsolation,
+                                  bool checkIsolatedCapture) {
+  // We must have parent isolation determined to get here.
+  switch (parentIsolation) {
+  case ActorIsolation::CallerIsolationInheriting:
+  case ActorIsolation::Nonisolated:
+  case ActorIsolation::NonisolatedUnsafe:
+  case ActorIsolation::Unspecified:
+    return ActorIsolation::forNonisolated(
+        parentIsolation == ActorIsolation::NonisolatedUnsafe);
+
+  case ActorIsolation::Erased:
+    llvm_unreachable("context cannot have erased isolation");
+
+  case ActorIsolation::GlobalActor:
+    // This should already be an interface type, so we don't need to remap
+    // it between the contexts.
+    return ActorIsolation::forGlobalActor(parentIsolation.getGlobalActor());
+
+  case ActorIsolation::ActorInstance: {
+    // In non-@Sendable local functions, we always inherit the enclosing
+    // isolation, forcing a capture of it if necessary.
+    if (isa<FuncDecl>(closure)) {
+      // We should always have a VarDecl in this case, where we got the
+      // ActorIsolation from a context; the non-VarDecl cases are only used
+      // locally within isolation checking.
+      auto actor = parentIsolation.getActorInstance();
+      assert(actor);
+      return ActorIsolation::forActorInstanceCapture(actor);
+    }
+
+    if (checkIsolatedCapture) {
+      auto closureAsFn = AnyFunctionRef::fromFunctionDeclContext(closure);
+      if (auto param = closureAsFn.getCaptureInfo().getIsolatedParamCapture())
+        return ActorIsolation::forActorInstanceCapture(param);
+
+      auto *explicitClosure = dyn_cast<ClosureExpr>(closure);
+      // @_inheritActorContext(always) forces the isolation capture.
+      if (explicitClosure && explicitClosure->alwaysInheritsActorContext()) {
+        if (parentIsolation.isActorInstanceIsolated()) {
+          if (auto *param = parentIsolation.getActorInstance())
+            return ActorIsolation::forActorInstanceCapture(param);
+        }
+        return parentIsolation;
+      }
+    } else {
+      // If we don't have capture information during code completion, assume
+      // that the closure captures the `isolated` parameter from the parent
+      // context.
+      return parentIsolation;
+    }
+
+    return ActorIsolation::forNonisolated(/*unsafe=*/false);
+  }
+  }
+}
+
 ActorIsolation ActorIsolationChecker::determineClosureIsolation(
     AbstractClosureExpr *closure) const {
   bool preconcurrency = false;
@@ -4889,48 +4953,8 @@ ActorIsolation ActorIsolationChecker::determineClosureIsolation(
         closure->getParent(), getClosureActorIsolation);
     preconcurrency |= parentIsolation.preconcurrency();
 
-    // We must have parent isolation determined to get here.
-    switch (parentIsolation) {
-    case ActorIsolation::CallerIsolationInheriting:
-    case ActorIsolation::Nonisolated:
-    case ActorIsolation::NonisolatedUnsafe:
-    case ActorIsolation::Unspecified:
-      return ActorIsolation::forNonisolated(
-          parentIsolation == ActorIsolation::NonisolatedUnsafe);
-
-    case ActorIsolation::Erased:
-      llvm_unreachable("context cannot have erased isolation");
-
-    case ActorIsolation::GlobalActor: {
-      Type globalActor = closure->mapTypeIntoContext(
-          parentIsolation.getGlobalActor()->mapTypeOutOfContext());
-      return ActorIsolation::forGlobalActor(globalActor);
-    }
-
-    case ActorIsolation::ActorInstance: {
-      if (checkIsolatedCapture) {
-        if (auto param = closure->getCaptureInfo().getIsolatedParamCapture())
-          return ActorIsolation::forActorInstanceCapture(param);
-
-        auto *explicitClosure = dyn_cast<ClosureExpr>(closure);
-        // @_inheritActorContext(always) forces the isolation capture.
-        if (explicitClosure && explicitClosure->alwaysInheritsActorContext()) {
-          if (parentIsolation.isActorInstanceIsolated()) {
-            if (auto *param = parentIsolation.getActorInstance())
-              return ActorIsolation::forActorInstanceCapture(param);
-          }
-          return parentIsolation;
-        }
-      } else {
-        // If we don't have capture information during code completion, assume
-        // that the closure captures the `isolated` parameter from the parent
-        // context.
-        return parentIsolation;
-      }
-
-      return ActorIsolation::forNonisolated(/*unsafe=*/false);
-    }
-    }
+    return computeClosureIsolationFromParent(closure, parentIsolation,
+                                             checkIsolatedCapture);
   }();
 
   // Apply computed preconcurrency.
@@ -5127,7 +5151,8 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
     std::optional<ActorIsolation> result;
     if (selfTypeDecl) {
       if (selfTypeDecl->isAnyActor()) {
-        result = ActorIsolation::forActorInstanceSelf(selfTypeDecl);
+        result = ActorIsolation::forActorInstanceSelf(
+          const_cast<AbstractFunctionDecl*>(cast<AbstractFunctionDecl>(decl)));
       } else {
         // If the declaration is in an extension that has one of the isolation
         // attributes, use that.
@@ -6316,11 +6341,18 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
     return inferred;
   };
 
+  // If this is an accessor, use the actor isolation of its storage
+  // declaration. All of the logic for FuncDecls below only applies to
+  // non-accessor functions.
+  if (auto accessor = dyn_cast<AccessorDecl>(value)) {
+    return getInferredActorIsolation(accessor->getStorage());
+  }
+
   // If this is a local function, inherit the actor isolation from its
   // context if it global or was captured.
   if (auto func = dyn_cast<FuncDecl>(value)) {
-    if (func->isLocalCapture() && !func->isSendable()) {
-      auto *dc = func->getDeclContext();
+    auto *dc = func->getDeclContext();
+    if (dc->isLocalContext() && !func->isSendable()) {
       llvm::PointerUnion<Decl *, AbstractClosureExpr *> inferenceSource;
       if (auto *closure = dyn_cast<AbstractClosureExpr>(dc)) {
         inferenceSource = closure;
@@ -6328,36 +6360,16 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
         inferenceSource = dc->getAsDecl();
       }
 
-      switch (auto enclosingIsolation = getActorIsolationOfContext(dc)) {
-      case ActorIsolation::Nonisolated:
-      case ActorIsolation::CallerIsolationInheriting:
-      case ActorIsolation::NonisolatedUnsafe:
-      case ActorIsolation::Unspecified:
-        // Do nothing.
-        break;
-
-      case ActorIsolation::Erased:
-        llvm_unreachable("context cannot have erased isolation");
-
-      case ActorIsolation::ActorInstance:
-        return {
-          inferredIsolation(enclosingIsolation),
-          IsolationSource(inferenceSource, IsolationSource::LexicalContext)
-        };
-
-      case ActorIsolation::GlobalActor:
-        return {
-          inferredIsolation(enclosingIsolation),
-          IsolationSource(inferenceSource, IsolationSource::LexicalContext)
-        };
-      }
+      auto enclosingIsolation = getActorIsolationOfContext(dc);
+      auto isolation =
+        computeClosureIsolationFromParent(func, enclosingIsolation,
+                                          /*checkIsolatedCapture*/true)
+          .withPreconcurrency(enclosingIsolation.preconcurrency());
+      return {
+        inferredIsolation(isolation),
+        IsolationSource(inferenceSource, IsolationSource::LexicalContext)
+      };
     }
-  }
-
-  // If this is an accessor, use the actor isolation of its storage
-  // declaration.
-  if (auto accessor = dyn_cast<AccessorDecl>(value)) {
-    return getInferredActorIsolation(accessor->getStorage());
   }
 
   if (auto var = dyn_cast<VarDecl>(value)) {
@@ -6601,7 +6613,8 @@ bool HasIsolatedSelfRequest::evaluate(
     }
   }
   if (attrIsolation) {
-    return attrIsolation == ActorIsolation::forActorInstanceSelf(selfTypeDecl);
+    return attrIsolation->getKind() == ActorIsolation::ActorInstance &&
+           attrIsolation->isActorInstanceForSelfParameter();
   }
 
   // If this is a variable, check for a property wrapper that alters its
@@ -7861,7 +7874,7 @@ ActorIsolation swift::getActorIsolationForReference(ValueDecl *decl,
     // as needing to enter the actor.
     if (auto nominal = ctor->getDeclContext()->getSelfNominalTypeDecl()) {
       if (nominal->isAnyActor())
-        return ActorIsolation::forActorInstanceSelf(decl);
+        return ActorIsolation::forActorInstanceSelf(ctor);
     }
 
     // Fall through to treat initializers like any other declaration.

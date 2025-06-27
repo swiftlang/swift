@@ -2165,8 +2165,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
 
     std::optional<ApplyIsolationCrossing> IsolationCrossing;
     if (bool(ApplyCallerIsolation) || bool(ApplyCalleeIsolation)) {
-      auto caller = ActorIsolation(ActorIsolation::Kind(ApplyCallerIsolation));
-      auto callee = ActorIsolation(ActorIsolation::Kind(ApplyCalleeIsolation));
+      auto caller = ActorIsolation(ActorIsolation::Kind(ApplyCallerIsolation),
+                                   /*forSIL*/ true);
+      auto callee = ActorIsolation(ActorIsolation::Kind(ApplyCalleeIsolation),
+                                   /*forSIL*/ true);
       IsolationCrossing = {caller, callee};
     }
 
@@ -2209,8 +2211,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
 
     std::optional<ApplyIsolationCrossing> IsolationCrossing;
     if (bool(ApplyCallerIsolation) || bool(ApplyCalleeIsolation)) {
-      auto caller = ActorIsolation(ActorIsolation::Kind(ApplyCallerIsolation));
-      auto callee = ActorIsolation(ActorIsolation::Kind(ApplyCalleeIsolation));
+      auto caller = ActorIsolation(ActorIsolation::Kind(ApplyCallerIsolation),
+                                   /*forSIL*/true);
+      auto callee = ActorIsolation(ActorIsolation::Kind(ApplyCalleeIsolation),
+                                   /*forSIL*/true);
       IsolationCrossing = {caller, callee};
     }
 
