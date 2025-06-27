@@ -71,6 +71,7 @@ GROUP(StringInterpolationConformance, "string-interpolation-conformance")
 GROUP(TemporaryPointers, "temporary-pointers")
 GROUP(TrailingClosureMatching, "trailing-closure-matching")
 GROUP(UnknownWarningGroup, "unknown-warning-group")
+GROUP(CompilationCaching, "compilation-caching")
 
 #define UNDEFINE_DIAGNOSTIC_GROUPS_MACROS
 #include "swift/AST/DefineDiagnosticGroupsMacros.h"
