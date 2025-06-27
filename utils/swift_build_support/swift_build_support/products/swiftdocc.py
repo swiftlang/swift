@@ -79,7 +79,7 @@ class SwiftDocC(product.Product):
     def should_build(self, host_target):
         return True
 
-    def build(self, host_target):
+    async def build(self, host_target):
         self.run_build_script_helper('build', host_target)
 
     def should_test(self, host_target):

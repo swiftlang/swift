@@ -40,7 +40,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
     def should_test(self, host_target):
         return self.args.test_wasmstdlib
 
-    def build(self, host_target):
+    async def build(self, host_target):
         self._build(host_target, 'wasm32-wasi', 'wasi-wasm32')
 
     def _build(self, host_target, target_triple, short_triple):
@@ -224,7 +224,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
         }
         self.test_with_cmake(None, [test_target], self._build_variant, [], test_env=env)
 
-    def should_test_executable(self):
+    def should_test_executable(self) -> bool:
         return True
 
     @property
@@ -256,7 +256,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
 
 
 class WasmThreadsStdlib(WasmStdlib):
-    def build(self, host_target):
+    async def build(self, host_target):
         self._build(host_target, 'wasm32-wasip1-threads', 'wasip1-threads-wasm32')
 
     def should_test_executable(self):

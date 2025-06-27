@@ -226,7 +226,7 @@ class LLVM(cmake_product.CMakeProduct):
         # LLVM will always be built in part
         return True
 
-    def build(self, host_target):
+    async def build(self, host_target):
         """build() -> void
 
         Perform the build, for a non-build-script-impl product.

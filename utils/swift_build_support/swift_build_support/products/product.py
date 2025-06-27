@@ -66,7 +66,7 @@ class Product(object):
         raise NotImplementedError
 
     @classmethod
-    def is_before_build_script_impl_product(cls):
+    def is_before_build_script_impl_product(cls) -> bool:
         """is_before_build_script_impl_product -> bool
 
         Whether this product is built before any build-script-impl products.
@@ -77,7 +77,7 @@ class Product(object):
         raise NotImplementedError
 
     @classmethod
-    def is_ignore_install_all_product(cls):
+    def is_ignore_install_all_product(cls) -> bool:
         """is_ignore_install_all_product -> bool
 
         Whether this product is to ignore the install-all directive
@@ -89,7 +89,7 @@ class Product(object):
         return False
 
     @classmethod
-    def is_swiftpm_unified_build_product(cls):
+    def is_swiftpm_unified_build_product(cls) -> bool:
         """is_swiftpm_unified_build_product -> bool
 
         Whether this product should be built in the unified build of SwiftPM
@@ -98,7 +98,7 @@ class Product(object):
         return False
 
     @classmethod
-    def is_nondarwin_only_build_product(cls):
+    def is_nondarwin_only_build_product(cls) -> bool:
         """Returns true if this target should be skipped in darwin builds when
         inferring dependencies.
         """
@@ -109,14 +109,14 @@ class Product(object):
         """Return a list of products that this product depends upon"""
         raise NotImplementedError
 
-    def should_clean(self, host_target):
+    def should_clean(self, host_target) -> bool:
         """should_clean() -> Bool
 
         Whether or not this product should be cleaned before being built
         """
         return False
 
-    def clean(self, host_target):
+    async def clean(self, host_target):
         """clean() -> void
 
         Perform the clean, for a non-build-script-impl product.
@@ -130,7 +130,7 @@ class Product(object):
         """
         raise NotImplementedError
 
-    def build(self, host_target):
+    async def build(self, host_target):
         """build() -> void
 
         Perform the build, for a non-build-script-impl product.
@@ -144,7 +144,7 @@ class Product(object):
         """
         raise NotImplementedError
 
-    def test(self, host_target):
+    async def test(self, host_target):
         """test() -> void
 
         Run the tests, for a non-build-script-impl product.
@@ -159,7 +159,7 @@ class Product(object):
         """
         raise NotImplementedError
 
-    def install(self, host_target):
+    async def install(self, host_target):
         """install() -> void
 
         Install to the toolchain, for a non-build-script-impl product.

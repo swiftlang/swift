@@ -34,7 +34,7 @@ class StdlibDocs(product.Product):
     def should_build(self, host_target):
         return self.args.build_stdlib_docs
 
-    def build(self, host_target):
+    async def build(self, host_target):
         toolchain_path = self.install_toolchain_path(host_target)
         docc_path = os.path.join(toolchain_path, "bin", "docc")
 
