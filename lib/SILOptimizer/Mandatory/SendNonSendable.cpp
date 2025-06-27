@@ -695,16 +695,29 @@ public:
       }
     }
 
+    SmallString<64> calleeIsolationStr;
+    {
+      llvm::raw_svector_ostream os(calleeIsolationStr);
+      SILIsolationInfo::printActorIsolationForDiagnostics(
+          isolationCrossing.getCalleeIsolation(), os);
+    }
+
+    SmallString<64> callerIsolationStr;
+    {
+      llvm::raw_svector_ostream os(callerIsolationStr);
+      SILIsolationInfo::printActorIsolationForDiagnostics(
+          isolationCrossing.getCallerIsolation(), os);
+    }
+
     if (auto callee = getSendingCallee()) {
       diagnoseNote(
           loc, diag::regionbasedisolation_named_info_send_yields_race_callee,
-          name, descriptiveKindStr, isolationCrossing.getCalleeIsolation(),
-          callee.value(), isolationCrossing.getCallerIsolation());
+          name, descriptiveKindStr, calleeIsolationStr, callee.value(),
+          callerIsolationStr);
     } else {
       diagnoseNote(loc, diag::regionbasedisolation_named_info_send_yields_race,
-                   name, descriptiveKindStr,
-                   isolationCrossing.getCalleeIsolation(),
-                   isolationCrossing.getCallerIsolation());
+                   name, descriptiveKindStr, calleeIsolationStr,
+                   callerIsolationStr);
     }
     emitRequireInstDiagnostics();
   }
@@ -729,10 +742,24 @@ public:
       }
     }
 
-    diagnoseNote(
-        loc, diag::regionbasedisolation_named_info_send_yields_race_callee,
-        name, descriptiveKindStr, isolationCrossing.getCalleeIsolation(),
-        callee, isolationCrossing.getCallerIsolation());
+    SmallString<64> calleeIsolationStr;
+    {
+      llvm::raw_svector_ostream os(calleeIsolationStr);
+      SILIsolationInfo::printActorIsolationForDiagnostics(
+          isolationCrossing.getCalleeIsolation(), os);
+    }
+
+    SmallString<64> callerIsolationStr;
+    {
+      llvm::raw_svector_ostream os(callerIsolationStr);
+      SILIsolationInfo::printActorIsolationForDiagnostics(
+          isolationCrossing.getCallerIsolation(), os);
+    }
+
+    diagnoseNote(loc,
+                 diag::regionbasedisolation_named_info_send_yields_race_callee,
+                 name, descriptiveKindStr, calleeIsolationStr, callee,
+                 callerIsolationStr);
     emitRequireInstDiagnostics();
   }
 
@@ -755,14 +782,27 @@ public:
         .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
 
+    SmallString<64> calleeIsolationStr;
+    {
+      llvm::raw_svector_ostream os(calleeIsolationStr);
+      SILIsolationInfo::printActorIsolationForDiagnostics(
+          isolationCrossing.getCalleeIsolation(), os);
+    }
+
+    SmallString<64> callerIsolationStr;
+    {
+      llvm::raw_svector_ostream os(callerIsolationStr);
+      SILIsolationInfo::printActorIsolationForDiagnostics(
+          isolationCrossing.getCallerIsolation(), os);
+    }
+
     if (auto callee = getSendingCallee()) {
       diagnoseNote(loc, diag::regionbasedisolation_type_use_after_send_callee,
-                   inferredType, isolationCrossing.getCalleeIsolation(),
-                   callee.value(), isolationCrossing.getCallerIsolation());
+                   inferredType, calleeIsolationStr, callee.value(),
+                   callerIsolationStr);
     } else {
       diagnoseNote(loc, diag::regionbasedisolation_type_use_after_send,
-                   inferredType, isolationCrossing.getCalleeIsolation(),
-                   isolationCrossing.getCallerIsolation());
+                   inferredType, calleeIsolationStr, callerIsolationStr);
     }
     emitRequireInstDiagnostics();
   }
@@ -817,10 +857,23 @@ public:
       }
     }
 
+    SmallString<64> calleeIsolationStr;
+    {
+      llvm::raw_svector_ostream os(calleeIsolationStr);
+      SILIsolationInfo::printActorIsolationForDiagnostics(
+          isolationCrossing.getCalleeIsolation(), os);
+    }
+
+    SmallString<64> callerIsolationStr;
+    {
+      llvm::raw_svector_ostream os(callerIsolationStr);
+      SILIsolationInfo::printActorIsolationForDiagnostics(
+          isolationCrossing.getCallerIsolation(), os);
+    }
+
     diagnoseNote(
         loc, diag::regionbasedisolation_named_isolated_closure_yields_race,
-        descriptiveKindStr, name, isolationCrossing.getCalleeIsolation(),
-        isolationCrossing.getCallerIsolation())
+        descriptiveKindStr, name, calleeIsolationStr, callerIsolationStr)
         .highlight(loc.getSourceRange());
     emitRequireInstDiagnostics();
   }
@@ -832,10 +885,24 @@ public:
                   inferredType)
         .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
+
+    SmallString<64> calleeIsolationStr;
+    {
+      llvm::raw_svector_ostream os(calleeIsolationStr);
+      SILIsolationInfo::printActorIsolationForDiagnostics(
+          isolationCrossing.getCalleeIsolation(), os);
+    }
+
+    SmallString<64> callerIsolationStr;
+    {
+      llvm::raw_svector_ostream os(callerIsolationStr);
+      SILIsolationInfo::printActorIsolationForDiagnostics(
+          isolationCrossing.getCallerIsolation(), os);
+    }
+
     diagnoseNote(loc,
                  diag::regionbasedisolation_type_isolated_capture_yields_race,
-                 inferredType, isolationCrossing.getCalleeIsolation(),
-                 isolationCrossing.getCallerIsolation());
+                 inferredType, calleeIsolationStr, callerIsolationStr);
     emitRequireInstDiagnostics();
   }
 
@@ -1358,16 +1425,22 @@ public:
       getIsolationRegionInfo().printForDiagnostics(os);
     }
 
+    SmallString<64> calleeIsolationStr;
+    {
+      llvm::raw_svector_ostream os(calleeIsolationStr);
+      SILIsolationInfo::printActorIsolationForDiagnostics(
+          crossing.getCalleeIsolation(), os);
+    }
+
     if (auto callee = getSendingCallee()) {
       diagnoseNote(
           loc,
           diag::regionbasedisolation_typed_sendneversendable_via_arg_callee,
-          descriptiveKindStr, inferredType, crossing.getCalleeIsolation(),
-          callee.value());
+          descriptiveKindStr, inferredType, calleeIsolationStr, callee.value());
     } else {
-      diagnoseNote(
-          loc, diag::regionbasedisolation_typed_sendneversendable_via_arg,
-          descriptiveKindStr, inferredType, crossing.getCalleeIsolation());
+      diagnoseNote(loc,
+                   diag::regionbasedisolation_typed_sendneversendable_via_arg,
+                   descriptiveKindStr, inferredType, calleeIsolationStr);
     }
   }
 
@@ -1382,10 +1455,24 @@ public:
         os << ' ';
       }
     }
-    diagnoseNote(loc,
-                 diag::regionbasedisolation_named_isolated_closure_yields_race,
-                 descriptiveKindStr, name, crossing.getCalleeIsolation(),
-                 crossing.getCallerIsolation())
+
+    SmallString<64> calleeIsolationStr;
+    {
+      llvm::raw_svector_ostream os(calleeIsolationStr);
+      SILIsolationInfo::printActorIsolationForDiagnostics(
+          crossing.getCalleeIsolation(), os);
+    }
+
+    SmallString<64> callerIsolationStr;
+    {
+      llvm::raw_svector_ostream os(callerIsolationStr);
+      SILIsolationInfo::printActorIsolationForDiagnostics(
+          crossing.getCallerIsolation(), os);
+    }
+
+    diagnoseNote(
+        loc, diag::regionbasedisolation_named_isolated_closure_yields_race,
+        descriptiveKindStr, name, calleeIsolationStr, callerIsolationStr)
         .highlight(loc.getSourceRange());
   }
 
@@ -1605,16 +1692,23 @@ public:
         descriptiveKindStrWithSpace.push_back(' ');
       }
     }
+
+    SmallString<64> calleeIsolationStr;
+    {
+      llvm::raw_svector_ostream os(calleeIsolationStr);
+      SILIsolationInfo::printActorIsolationForDiagnostics(
+          isolationCrossing.getCalleeIsolation(), os);
+    }
+
     if (auto callee = getSendingCallee()) {
       diagnoseNote(loc,
                    diag::regionbasedisolation_named_send_never_sendable_callee,
-                   name, descriptiveKindStrWithSpace,
-                   isolationCrossing.getCalleeIsolation(), callee.value(),
-                   descriptiveKindStr);
+                   name, descriptiveKindStrWithSpace, calleeIsolationStr,
+                   callee.value(), descriptiveKindStr);
     } else {
       diagnoseNote(loc, diag::regionbasedisolation_named_send_never_sendable,
-                   name, descriptiveKindStrWithSpace,
-                   isolationCrossing.getCalleeIsolation(), descriptiveKindStr);
+                   name, descriptiveKindStrWithSpace, calleeIsolationStr,
+                   descriptiveKindStr);
     }
   }
 
@@ -2605,17 +2699,31 @@ void NonSendableIsolationCrossingResultDiagnosticEmitter::emit() {
   if (!isolationCrossing)
     return emitUnknownPatternError();
 
+  SmallString<64> calleeIsolationStr;
+  {
+    llvm::raw_svector_ostream os(calleeIsolationStr);
+    SILIsolationInfo::printActorIsolationForDiagnostics(
+        isolationCrossing->getCalleeIsolation(), os);
+  }
+
+  SmallString<64> callerIsolationStr;
+  {
+    llvm::raw_svector_ostream os(callerIsolationStr);
+    SILIsolationInfo::printActorIsolationForDiagnostics(
+        isolationCrossing->getCallerIsolation(), os);
+  }
+
   auto type = getType();
   if (getCalledDecl()) {
-    diagnoseError(error.op->getSourceInst(), diag::rbi_isolation_crossing_result,
-                  type, isolationCrossing->getCalleeIsolation(), getCalledDecl(),
-                  isolationCrossing->getCallerIsolation())
-      .limitBehaviorIf(getBehaviorLimit());
+    diagnoseError(error.op->getSourceInst(),
+                  diag::rbi_isolation_crossing_result, type, calleeIsolationStr,
+                  getCalledDecl(), callerIsolationStr)
+        .limitBehaviorIf(getBehaviorLimit());
   } else {
-    diagnoseError(error.op->getSourceInst(), diag::rbi_isolation_crossing_result_no_decl,
-                  type, isolationCrossing->getCalleeIsolation(),
-                  isolationCrossing->getCallerIsolation())
-      .limitBehaviorIf(getBehaviorLimit());
+    diagnoseError(error.op->getSourceInst(),
+                  diag::rbi_isolation_crossing_result_no_decl, type,
+                  calleeIsolationStr, callerIsolationStr)
+        .limitBehaviorIf(getBehaviorLimit());
   }
   if (type->is<FunctionType>()) {
     diagnoseNote(error.op->getSourceInst(),
