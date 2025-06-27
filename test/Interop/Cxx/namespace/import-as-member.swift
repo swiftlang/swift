@@ -22,4 +22,10 @@ NamespacesTestSuite.test("Struct in a deep namespace") {
   expectEqual(460, s.methodTypedefQualName())
 }
 
+NamespacesTestSuite.test("Struct and function in a namespace") {
+  let s = MyNS.NestedStruct()
+  expectEqual(126, s.nestedMethod())
+  expectEqual(127, s.nestedMethodInline())
+}
+
 runAllTests()
