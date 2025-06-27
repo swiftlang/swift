@@ -20,8 +20,8 @@ internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
   typealias Word = UInt
 #endif
   let mask = Word(truncatingIfNeeded: 0x80808080_80808080 as UInt64)
-  
-#if arch(i386) || arch(x86_64)
+
+#if (arch(i386) || arch(x86_64)) && SWIFT_STDLIB_ENABLE_VECTOR_TYPES
   // TODO: Should consider AVX2 / AVX512 / AVX10 path here
   typealias Block = (SIMD16<UInt8>, SIMD16<UInt8>)
   @_transparent func pmovmskb(_ vec: SIMD16<UInt8>) -> UInt16 {
@@ -29,7 +29,7 @@ internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
       Builtin.cmp_slt_Vec16xInt8(vec._storage._value, Builtin.zeroInitializer())
     ))
   }
-#elseif arch(arm64) || arch(arm64_32)
+#elseif (arch(arm64) || arch(arm64_32)) && SWIFT_STDLIB_ENABLE_VECTOR_TYPES
   typealias Block = (SIMD16<UInt8>, SIMD16<UInt8>)
   @_transparent func umaxv(_ vec: SIMD16<UInt8>) -> UInt8 {
     UInt8(Builtin.int_vector_reduce_umax_Vec16xInt8(vec._storage._value))
@@ -47,9 +47,9 @@ internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
   @_transparent
   func allASCII(blockAt pointer: UnsafePointer<UInt8>) -> Bool {
     let block = unsafe UnsafeRawPointer(pointer).loadUnaligned(as: Block.self)
-#if arch(i386) || arch(x86_64)
+#if (arch(i386) || arch(x86_64)) && SWIFT_STDLIB_ENABLE_VECTOR_TYPES
     return pmovmskb(block.0 | block.1) == 0
-#elseif arch(arm64) || arch(arm64_32)
+#elseif (arch(arm64) || arch(arm64_32)) && SWIFT_STDLIB_ENABLE_VECTOR_TYPES
     return umaxv(block.0 | block.1) < 0x80
 #else
     return (block.0 | block.1 | block.2 | block.3) & mask == 0
