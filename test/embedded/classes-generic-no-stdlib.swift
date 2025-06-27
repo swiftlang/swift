@@ -1,6 +1,7 @@
-// RUN: %target-swift-emit-sil %s -parse-stdlib -enable-experimental-feature Embedded -target %target-triple -wmo | %FileCheck %s --check-prefix CHECK-SIL
-// RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -target %target-triple -wmo | %FileCheck %s --check-prefix CHECK-IR
+// RUN: %target-swift-emit-sil %s -parse-stdlib -enable-experimental-feature Embedded -target arm64e-apple-none -wmo | %FileCheck %s --check-prefix CHECK-SIL
+// RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -target arm64e-apple-none -wmo | %FileCheck %s --check-prefix CHECK-IR
 
+// UNSUPPORTED: OS=wasi
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
 
