@@ -116,7 +116,7 @@ bool IDEInspectionSecondPassRequest::evaluate(
     IDEInspectionCallbacksFactory *Factory) const {
   // If we didn't find the code completion token, bail.
   auto *parserState = SF->getDelayedParserState();
-  if (!parserState->hasIDEInspectionDelayedDeclState())
+  if (!parserState || !parserState->hasIDEInspectionDelayedDeclState())
     return true;
 
   // Decrement the closure discriminator index by one so a top-level closure
