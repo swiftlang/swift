@@ -11,6 +11,7 @@ NamespacesTestSuite.test("Struct in a namespace") {
   let s = MyNS.NestedStruct()
   expectEqual(123, s.method())
   expectEqual(124, s.methodConstRef())
+  expectEqual(125, s.methodInline())
 }
 
 NamespacesTestSuite.test("Struct in a deep namespace") {
