@@ -847,6 +847,9 @@ def downgrade_typecheck_interface_error : Flag<["-"], "downgrade-typecheck-inter
 def enable_volatile_modules : Flag<["-"], "enable-volatile-modules">,
   HelpText<"Load Swift modules in memory">;
 
+def solver_memory_threshold_EQ : Joined<["-"], "solver-memory-threshold=">,
+  HelpText<"Set the upper bound for memory consumption, in bytes, by the constraint solver">;
+
 def solver_expression_time_threshold_EQ : Joined<["-"], "solver-expression-time-threshold=">,
   HelpText<"Expression type checking timeout, in seconds">;
 
