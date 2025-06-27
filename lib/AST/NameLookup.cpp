@@ -4090,7 +4090,8 @@ void swift::getDirectlyInheritedNominalTypeDecls(
 
   // Form the result.
   for (auto nominal : nominalTypes) {
-    result.push_back({nominal, loc, attributes, isSuppressed});
+    result.push_back({nominal, loc, inheritedTypes.getTypeRepr(i), attributes,
+                      isSuppressed});
   }
 }
 
@@ -4123,8 +4124,8 @@ swift::getDirectlyInheritedNominalTypeDecls(
     ConformanceAttributes attributes;
     if (attr->isUnchecked())
       attributes.uncheckedLoc = loc;
-    result.push_back(
-        {attr->getProtocol(), loc, attributes, /*isSuppressed=*/false});
+    result.push_back({attr->getProtocol(), loc, /*inheritedTypeRepr=*/nullptr,
+                      attributes, /*isSuppressed=*/false});
   }
 
   // Else we have access to this information on the where clause.
@@ -4135,7 +4136,8 @@ swift::getDirectlyInheritedNominalTypeDecls(
   // FIXME: Refactor SelfBoundsFromWhereClauseRequest to dig out
   // the source location.
   for (auto inheritedNominal : selfBounds.decls)
-    result.emplace_back(inheritedNominal, SourceLoc(), ConformanceAttributes(),
+    result.emplace_back(inheritedNominal, SourceLoc(),
+                        /*inheritedTypeRepr=*/nullptr, ConformanceAttributes(),
                         /*isSuppressed=*/false);
 
   return result;

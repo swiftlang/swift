@@ -57,3 +57,12 @@ extension Conformer2: Derived1 {
 extension Conformer2: Derived2 {
   func f() {} // expected-note {{'f()' declared here}}
 }
+
+protocol P: MarkerBase {}
+
+struct Conformer3: P {}
+
+@available(*, unavailable)
+extension Conformer3: MarkerDerived1 {}
+
+takesMarkerBase(Conformer3.self)

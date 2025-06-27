@@ -349,6 +349,16 @@ extension SingleValueInstruction {
   }
 }
 
+extension MultipleValueInstruction {
+  /// Replaces all uses with the result of `replacement` and then erases the instruction.
+  func replace(with replacement: MultipleValueInstruction, _ context: some MutatingContext) {
+    for (origResult, newResult) in zip(self.results, replacement.results) {
+      origResult.uses.replaceAll(with: newResult, context)
+    }
+    context.erase(instruction: self)
+  }
+}
+
 extension Instruction {
   var isTriviallyDead: Bool {
     if results.contains(where: { !$0.uses.isEmpty }) {
@@ -1004,3 +1014,20 @@ extension StoreInst: CopyLikeInstruction {
   private var load: LoadInst { source as! LoadInst }
 }
 
+func eraseIfDead(functions: [Function], _ context: ModulePassContext) {
+  var toDelete = functions
+  while true {
+    var remaining = [Function]()
+    for fn in toDelete {
+      if !fn.isPossiblyUsedExternally && !fn.isReferencedInModule {
+        context.erase(function: fn)
+      } else {
+        remaining.append(fn)
+      }
+    }
+    if remaining.count == toDelete.count {
+      return
+    }
+    toDelete = remaining
+  }
+}

@@ -1333,10 +1333,10 @@ public:
   getNormalConformance(Type conformingType,
                        ProtocolDecl *protocol,
                        SourceLoc loc,
+                       TypeRepr *inheritedTypeRepr,
                        DeclContext *dc,
                        ProtocolConformanceState state,
-                       ProtocolConformanceOptions options,
-                       SourceLoc preconcurrencyLoc = SourceLoc());
+                       ProtocolConformanceOptions options);
 
   /// Produce a self-conformance for the given protocol.
   SelfProtocolConformance *

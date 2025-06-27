@@ -117,15 +117,18 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // This guarantees that stack-promotable boxes have [static] enforcement.
   P.addAccessEnforcementSelection();
 
-  P.addAllocBoxToStack();
+#ifdef SWIFT_ENABLE_SWIFT_IN_SWIFT
+  P.addMandatoryAllocBoxToStack();
+#else
+  P.addLegacyAllocBoxToStack();
+#endif
   P.addNoReturnFolding();
   P.addBooleanLiteralFolding();
   addDefiniteInitialization(P);
 
   P.addAddressLowering();
 
-  // Before we run later semantic optimizations, eliminate simple functions that
-  // we specialized to ensure that we do not emit diagnostics twice.
+  // TODO: remove this once CapturePromotion deletes specialized functions itself.
   P.addDiagnosticDeadFunctionElimination();
 
   P.addFlowIsolation();

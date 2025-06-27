@@ -141,9 +141,18 @@ ConstraintSystem::~ConstraintSystem() {
 void ConstraintSystem::startExpressionTimer(ExpressionTimer::AnchorType anchor) {
   ASSERT(!Timer);
 
-  unsigned timeout = getASTContext().TypeCheckerOpts.ExpressionTimeoutThreshold;
-  if (timeout == 0)
-    return;
+  const auto &opts = getASTContext().TypeCheckerOpts;
+  unsigned timeout = opts.ExpressionTimeoutThreshold;
+
+  // If either the timeout is set, or we're asked to emit warnings,
+  // start the timer. Otherwise, don't start the timer, it's needless
+  // overhead.
+  if (timeout == 0) {
+    if (opts.WarnLongExpressionTypeChecking == 0)
+      return;
+
+    timeout = ExpressionTimer::NoLimit;
+  }
 
   Timer.emplace(anchor, *this, timeout);
 }

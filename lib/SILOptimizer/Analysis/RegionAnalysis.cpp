@@ -141,7 +141,16 @@ struct AddressBaseComputingVisitor
     return SILValue();
   }
 
-  SILValue visitNonAccess(SILValue) { return SILValue(); }
+  SILValue visitNonAccess(SILValue value) {
+    // For now since it is late in 6.2, work around vector base addr not being
+    // treated as a projection.
+    if (auto *v = dyn_cast<VectorBaseAddrInst>(value)) {
+      isProjectedFromAggregate = true;
+      return v->getOperand();
+    }
+
+    return SILValue();
+  }
 
   SILValue visitPhi(SILPhiArgument *phi) {
     llvm_unreachable("Should never hit this");
@@ -312,6 +321,7 @@ static bool isStaticallyLookThroughInst(SILInstruction *inst) {
   case SILInstructionKind::UncheckedEnumDataInst:
   case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::TupleElementAddrInst:
+  case SILInstructionKind::VectorBaseAddrInst:
     return true;
   case SILInstructionKind::MoveValueInst:
     // Look through if it isn't from a var decl.

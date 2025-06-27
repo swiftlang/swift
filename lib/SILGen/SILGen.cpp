@@ -51,6 +51,10 @@
 using namespace swift;
 using namespace Lowering;
 
+llvm::cl::list<std::string> PrintFunctionAST(
+    "print-function-ast", llvm::cl::CommaSeparated,
+    llvm::cl::desc("Only print out the ast for this function"));
+
 //===----------------------------------------------------------------------===//
 // SILGenModule Class implementation
 //===----------------------------------------------------------------------===//
@@ -879,6 +883,22 @@ void SILGenModule::visit(Decl *D) {
   ASTVisitor::visit(D);
 }
 
+static bool isInPrintFunctionList(AbstractFunctionDecl *fd) {
+  if (PrintFunctionAST.empty()) {
+    return false;
+  }
+  auto fnName = SILDeclRef(fd).mangle();
+  for (const std::string &printFnName : PrintFunctionAST) {
+    if (printFnName == fnName)
+      return true;
+    if (!printFnName.empty() && printFnName[0] != '$' && !fnName.empty() &&
+        fnName[0] == '$' && printFnName == fnName.substr(1)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 void SILGenModule::visitFuncDecl(FuncDecl *fd) { emitFunction(fd); }
 
 void SILGenModule::emitFunctionDefinition(SILDeclRef constant, SILFunction *f) {
@@ -1477,6 +1497,11 @@ void SILGenModule::emitDifferentiabilityWitness(
 }
 
 void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
+  if (isInPrintFunctionList(AFD)) {
+    auto &out = llvm::errs();
+    AFD->dump(out);
+  }
+  
   // Emit default arguments and property wrapper initializers.
   emitArgumentGenerators(AFD, AFD->getParameters());
 

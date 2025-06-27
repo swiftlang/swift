@@ -260,7 +260,7 @@ fileprivate class _Lock {
     #elseif os(WASI)
     // WASI environment has only a single thread
     #else
-    self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
+    unsafe self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
     guard unsafe pthread_mutex_init(self.underlying, nil) == 0 else {
       fatalError("pthread_mutex_init failed")
     }

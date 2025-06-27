@@ -475,6 +475,10 @@ private:
     return !endingLifetimeAtExplicitEnds();
   }
 
+  bool hasAnyDeadEnds() const {
+    return !deadEndBlocksAnalysis->get(function)->isEmpty();
+  }
+
   bool respectsDeinitBarriers() const {
     if (!currentDef->isLexical())
       return false;

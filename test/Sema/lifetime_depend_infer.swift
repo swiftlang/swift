@@ -15,6 +15,8 @@ struct NEImmortal: ~Escapable {
   init() {}
 }
 
+struct MutNE: ~Copyable & ~Escapable {}
+
 // =============================================================================
 // Handle non-Escapable results with 'self'
 // =============================================================================
@@ -563,7 +565,8 @@ struct NonEscapableMutableSelf: ~Escapable {
   @_lifetime(self: copy self) // OK
   mutating func mutatingMethodNoParamCopy() {}
 
-  @_lifetime(self: &self) // expected-error{{invalid use of borrow dependence on the same inout parameter}}
+  @_lifetime(self: &self) // expected-error{{invalid use of inout dependence on the same inout parameter}}
+                          // expected-note @-1{{use '@_lifetime(self: copy self) to forward the inout dependency}}
   mutating func mutatingMethodNoParamBorrow() {}
 
   mutating func mutatingMethodOneParam(_: NE) {} // expected-error{{a mutating method with a ~Escapable 'self' requires '@_lifetime(self: ...)'}}
@@ -577,3 +580,72 @@ struct NonEscapableMutableSelf: ~Escapable {
   @_lifetime(&self)
   mutating func mutatingMethodOneParamBorrow(_: NE) {}
 }
+
+// =============================================================================
+// Initializers
+// =============================================================================
+
+// Motivation: Non-escapable struct definitions often have inicidental integer fields that are unrelated to lifetime.
+// Without an explicit initializer, the compiler would infer these fields to be borrowed by the implicit intializer.
+// This inevitabely results in lifetime diagnostic errors elsewhere in the code that can't be tracked down at the use
+// site:
+//
+//     let span = CountedSpan(span: span, i: 3) // ERROR: span depends on the lifetime of this value
+//
+struct CountedSpan: ~Escapable { // expected-error{{cannot infer implicit initialization lifetime. Add an initializer with '@_lifetime(...)' for each parameter the result depends on}}
+  let span: Span<Int>
+  let i: Int
+}
+
+struct NE_Int: ~Escapable {
+  let i: Int
+}
+
+struct NE_C: ~Escapable { // expected-error{{cannot borrow the lifetime of 'c', which has consuming ownership on an implicit initializer}}
+  let c: C
+}
+
+struct NE_C_Int: ~Escapable { // expected-error{{cannot infer implicit initialization lifetime. Add an initializer with '@_lifetime(...)' for each parameter the result depends on}}
+  let c: C
+  let i: Int
+}
+
+struct NE_Int_Int: ~Escapable { // expected-error{{cannot infer implicit initialization lifetime. Add an initializer with '@_lifetime(...)' for each parameter the result depends on}}
+  let i: Int
+  let j: Int
+}
+
+struct NE_NE: ~Escapable {
+  let ne: NE
+}
+
+struct NE_NE_Int: ~Escapable { // expected-error{{cannot infer implicit initialization lifetime. Add an initializer with '@_lifetime(...)' for each parameter the result depends on}}
+  let ne: NE
+  let i: Int
+}
+
+struct NE_NE_C: ~Escapable { // expected-error{{cannot infer implicit initialization lifetime. Add an initializer with '@_lifetime(...)' for each parameter the result depends on}}
+  let ne: NE
+  let c: C
+}
+
+// =============================================================================
+// Handle common mistakes with inout parameter annotations
+// =============================================================================
+
+// Unable to infer an 'inout' dependency. Provide valid guidance.
+//
+func f_inout_no_infer(a: inout MutNE, b: NE) {}
+// expected-error @-1{{a function with a ~Escapable 'inout' parameter requires '@_lifetime(a: ...)'}}
+// expected-note  @-2{{use '@_lifetime(a: copy a) to forward the inout dependency}}
+
+// Invalid keyword for the dependence kind.
+//
+@_lifetime(a: inout a) // expected-error{{expected 'copy', 'borrow', or '&' followed by an identifier, index or 'self' in lifetime dependence specifier}}
+func f_inout_bad_keyword(a: inout MutableRawSpan) {}
+
+// Don't allow a useless borrow dependency on an inout param--it is misleading.
+//
+@_lifetime(a: &a) // expected-error{{invalid use of inout dependence on the same inout parameter}}
+                  // expected-note @-1{{use '@_lifetime(a: copy a) to forward the inout dependency}}
+func f_inout_useless(a: inout MutableRawSpan) {}

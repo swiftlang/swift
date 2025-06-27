@@ -95,6 +95,7 @@ extension LifetimeDependentApply {
   struct LifetimeSource {
     let targetKind: TargetKind
     let convention: LifetimeDependenceConvention
+    let isInout: Bool
     let value: Value
   }
 
@@ -116,7 +117,8 @@ extension LifetimeDependentApply {
       guard let dep = applySite.resultDependence(on: operand) else {
         continue
       }
-      info.sources.push(LifetimeSource(targetKind: .result, convention: dep, value: operand.value))
+      let isInout = applySite.convention(of: operand)?.isInout ?? false
+      info.sources.push(LifetimeSource(targetKind: .result, convention: dep, isInout: isInout, value: operand.value))
     }
     return info
   }
@@ -135,6 +137,7 @@ extension LifetimeDependentApply {
         ? TargetKind.yieldAddress : TargetKind.yield
       info.sources.push(LifetimeSource(targetKind: targetKind,
                                        convention: .scope(addressable: false, addressableForDeps: false),
+                                       isInout: false,
                                        value: beginApply.token))
     }
     for operand in applySite.parameterOperands {
@@ -151,7 +154,9 @@ extension LifetimeDependentApply {
         // However this is neccessary for safety when begin_apply gets inlined which will delete the dependence on the token.
         for yieldedValue in beginApply.yieldedValues {
           let targetKind = yieldedValue.type.isAddress ? TargetKind.yieldAddress : TargetKind.yield
-          info.sources.push(LifetimeSource(targetKind: targetKind, convention: dep, value: operand.value))
+          let isInout = applySite.convention(of: operand)?.isInout ?? false
+          info.sources.push(LifetimeSource(targetKind: targetKind, convention: dep, isInout: isInout,
+                                           value: operand.value))
         }
       }
     }
@@ -180,7 +185,8 @@ extension LifetimeDependentApply {
       guard let dep = dep else {
         continue
       }
-      info.sources.push(LifetimeSource(targetKind: targetKind, convention: dep, value: operand.value))
+      let isInout = applySite.convention(of: operand)?.isInout ?? false
+      info.sources.push(LifetimeSource(targetKind: targetKind, convention: dep, isInout: isInout, value: operand.value))
     }
     return info
   }
@@ -223,7 +229,7 @@ private extension LifetimeDependentApply.LifetimeSourceInfo {
         return
       }
       // Create a new dependence on the apply's access to the argument.
-      for varIntroducer in gatherVariableIntroducers(for: source.value, context) {
+      for varIntroducer in gatherVariableIntroducers(for: source.value, ignoreTrivialCopies: !source.isInout, context) {
         let scope = LifetimeDependence.Scope(base: varIntroducer, context)
         log("Scoped lifetime from \(source.value)")
         log("  scope: \(scope)")
@@ -263,7 +269,7 @@ private func insertResultDependencies(for apply: LifetimeDependentApply, _ conte
 }
 
 private func diagnoseUnknownDependenceSource(sourceLoc: SourceLoc?, _ context: FunctionPassContext) {
-  context.diagnosticEngine.diagnose(.lifetime_value_outside_scope, [], at: sourceLoc)
+  context.diagnosticEngine.diagnose(.lifetime_value_outside_scope, at: sourceLoc)
 }
 
 private func insertParameterDependencies(apply: LifetimeDependentApply, target: Operand,
@@ -316,11 +322,12 @@ private func insertMarkDependencies(value: Value, initializer: Instruction?,
 /// - a variable declaration (begin_borrow [var_decl], move_value [var_decl])
 /// - a begin_access for a mutable variable access
 /// - the value or address "root" of the dependence chain
-func gatherVariableIntroducers(for value: Value, _ context: Context)
+func gatherVariableIntroducers(for value: Value, ignoreTrivialCopies: Bool, _ context: Context)
   -> SingleInlineArray<Value>
 {
   var introducers = SingleInlineArray<Value>()
-  var useDefVisitor = VariableIntroducerUseDefWalker(context, scopedValue: value) {
+  var useDefVisitor = VariableIntroducerUseDefWalker(context, scopedValue: value,
+                                                     ignoreTrivialCopies: ignoreTrivialCopies) {
     introducers.push($0)
     return .continueWalk
   }
@@ -403,11 +410,15 @@ struct VariableIntroducerUseDefWalker : LifetimeDependenceUseDefValueWalker, Lif
   // Call \p visit rather than calling this directly.
   private let visitorClosure: (Value) -> WalkResult
 
-  init(_ context: Context, scopedValue: Value, _ visitor: @escaping (Value) -> WalkResult) {
+  init(_ context: Context, scopedValue: Value, ignoreTrivialCopies: Bool, _ visitor: @escaping (Value) -> WalkResult) {
     self.context = context
-    self.isTrivialScope = scopedValue.type.isAddress
-      ? scopedValue.type.objectType.isTrivial(in: scopedValue.parentFunction)
-      : scopedValue.isTrivial(context)
+    if ignoreTrivialCopies {
+      self.isTrivialScope = scopedValue.type.isAddress
+        ? scopedValue.type.objectType.isTrivial(in: scopedValue.parentFunction)
+        : scopedValue.isTrivial(context)
+    } else {
+      self.isTrivialScope = false
+    }
     self.visitedValues = ValueSet(context)
     self.visitorClosure = visitor
   }
@@ -472,5 +483,5 @@ let variableIntroducerTest = FunctionTest("variable_introducer") {
     function, arguments, context in
   let value = arguments.takeValue()
   print("Variable introducers of: \(value)")
-  print(gatherVariableIntroducers(for: value, context))
+  print(gatherVariableIntroducers(for: value, ignoreTrivialCopies: false, context))
 }

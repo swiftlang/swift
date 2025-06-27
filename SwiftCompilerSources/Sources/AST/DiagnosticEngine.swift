@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022 Apple Inc. and the Swift project authors
+// Copyright (c) 2022 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -11,10 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 import ASTBridging
-
 import Basic
 
-public typealias DiagID = BridgedDiagID
+public typealias DiagID = swift.DiagID
 
 public protocol DiagnosticArgument {
   func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void)
@@ -128,6 +127,17 @@ public struct DiagnosticEngine {
     }
 
     closure()
+  }
+
+  // FIXME: Remove this overload once https://github.com/swiftlang/swift/issues/82318 is fixed.
+  public func diagnose(
+    _ id: DiagID,
+    arguments args: [DiagnosticArgument],
+    at position: SourceLoc?,
+    highlight: CharSourceRange? = nil,
+    fixIts: [DiagnosticFixIt] = []
+  ) {
+    diagnose(id, args, at: position, highlight: highlight, fixIts: fixIts)
   }
 
   public func diagnose(_ id: DiagID,

@@ -180,3 +180,13 @@ func test() -> Selector {
 func testWithThrowing(obj: AnyObject) {
   _ = #selector(HasThrows.doSomething(to:))
 }
+
+@available(SwiftStdlib 5.1, *)
+@objc protocol HasAsync {
+  @objc optional func doSomething(to object: AnyObject) async -> Void
+}
+
+@available(SwiftStdlib 5.1, *)
+func testWithAsync(obj: AnyObject) {
+  _ = #selector(HasAsync.doSomething(to:))
+}

@@ -694,6 +694,19 @@ static bool isSupportedClosure(const SILInstruction *Closure) {
         return false;
       }
 
+      // Bail if it's an ObjectiveC block which might _not_ be copied onto the heap, i.e
+      // optimized by SimplifyCopyBlock. We can't do this because the optimization inserts
+      // retains+releases for captured arguments. That's not possible for stack-allocated blocks.
+      // TODO: avoid inserting retains+releases at all for captures of `partial_apply [on_stack]`
+      if (ArgTy.is<SILFunctionType>() &&
+          ArgTy.getFunctionRepresentation() == SILFunctionTypeRepresentation::Block &&
+          // A `copy_block` ensures that the block is copied onto the heap.
+          !isa<CopyBlockInst>(Arg) &&
+          // SimplifyCopyBlock only works for `partial_apply [on_stack]`.
+          PAI->isOnStack()) {
+        return false;
+      }
+
       // Only @inout/@inout_aliasable addresses are (currently) supported.
       // If our argument is an object, continue...
       if (ArgTy.isObject()) {

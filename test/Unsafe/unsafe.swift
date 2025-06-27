@@ -53,6 +53,47 @@ extension ConformsToMultiP: MultiP {
   }
 }
 
+// Make sure we correctly apply the conformance attribute for more complex
+// inheritance entries.
+do {
+  protocol SafeP {}
+  struct Nested {
+    protocol P { func f() }
+    protocol Q { func f() }
+  }
+  do {
+    // expected-warning@+1 {{conformance of 'S' to protocol 'P' involves unsafe code; use '@unsafe' to indicate that the conformance is not memory-safe}}{{15-15=@unsafe }}
+    struct S: Nested.P {
+      @unsafe func f() {}
+      // expected-note@-1 {{unsafe instance method 'f()' cannot satisfy safe requirement}}
+    }
+  }
+  do {
+    // Attribute inserted *before* 'nonisolated'.
+    struct S: nonisolated Nested.P {
+    // expected-warning@-1 {{conformance of 'S' to protocol 'P' involves unsafe code; use '@unsafe' to indicate that the conformance is not memory-safe}}{{15-15=@unsafe }}
+      @unsafe func f() {}
+      // expected-note@-1 {{unsafe instance method 'f()' cannot satisfy safe requirement}}
+    }
+  }
+  do {
+    // expected-warning@+2 {{conformance of 'S' to protocol 'P' involves unsafe code; use '@unsafe' to indicate that the conformance is not memory-safe}}{{15-15=@unsafe }}
+    // expected-warning@+1 {{conformance of 'S' to protocol 'Q' involves unsafe code; use '@unsafe' to indicate that the conformance is not memory-safe}}{{15-15=@unsafe }}
+    struct S: Nested.P & Nested.Q {
+      @unsafe func f() {}
+      // expected-note@-1 2 {{unsafe instance method 'f()' cannot satisfy safe requirement}}
+    }
+  }
+  do {
+    // FIXME: We shouldn't be applying nonisolated to both protocols.
+    // expected-warning@+1 {{conformance of 'S' to protocol 'P' involves unsafe code; use '@unsafe' to indicate that the conformance is not memory-safe}}{{15-15=@unsafe }}
+    struct S: Nested.P & SafeP {
+      @unsafe func f() {}
+      // expected-note@-1 {{unsafe instance method 'f()' cannot satisfy safe requirement}}
+    }
+  }
+}
+
 protocol GenericP {
   associatedtype Ptr
 

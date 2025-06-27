@@ -46,4 +46,7 @@ struct SpecializationCloner {
     }
   }
 
+  func cloneFunctionBody(from originalFunction: Function) {
+    bridged.cloneFunctionBody(originalFunction.bridged)
+  }
 }

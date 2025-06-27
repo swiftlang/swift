@@ -3965,16 +3965,21 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
   // inside the standard library with the definition being in the runtime
   // preventing the normal detection from identifying that this is module
   // local.
-  if (getSwiftModule()->isStdlibModule())
+  //
+  // If we are statically linking the standard library, we need to internalise
+  // the symbols.
+  if (getSwiftModule()->isStdlibModule() ||
+      (Context.getStdlibModule() &&
+       Context.getStdlibModule()->isStaticLibrary()))
     if (entity.isTypeKind() &&
         (IsWellKnownBuiltinOrStructralType(entity.getType()) ||
          entity.getType() == kAnyFunctionType))
       if (auto *GV = dyn_cast<llvm::GlobalValue>(var))
-          if (GV->hasDLLImportStorageClass())
-            ApplyIRLinkage({llvm::GlobalValue::ExternalLinkage,
-                            llvm::GlobalValue::DefaultVisibility,
-                            llvm::GlobalValue::DefaultStorageClass})
-                .to(GV);
+        if (GV->hasDLLImportStorageClass())
+          ApplyIRLinkage({llvm::GlobalValue::ExternalLinkage,
+                          llvm::GlobalValue::DefaultVisibility,
+                          llvm::GlobalValue::DefaultStorageClass})
+              .to(GV);
 
   // Install the concrete definition if we have one.
   if (definition && definition.hasInit()) {

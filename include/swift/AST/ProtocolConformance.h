@@ -582,10 +582,17 @@ class NormalProtocolConformance : public RootProtocolConformance,
   SourceLoc Loc;
 
   /// The location of the protocol name within the conformance.
+  ///
+  /// - Important: This is not a valid insertion location for an attribute.
+  /// Use `applyConformanceAttribute` instead.
   SourceLoc ProtocolNameLoc;
 
-  /// The location of the `@preconcurrency` attribute, if any.
-  SourceLoc PreconcurrencyLoc;
+  /// The `TypeRepr` of the inheritance clause entry that declares this
+  /// conformance, if any. For example, if this is a conformance to `Y`
+  /// declared as `struct S: X, Y & Z {}`, this is the `TypeRepr` for `Y & Z`.
+  ///
+  /// - Important: The value can be valid only for an explicit conformance.
+  TypeRepr *inheritedTypeRepr;
 
   /// The declaration context containing the ExtensionDecl or
   /// NominalTypeDecl that declared the conformance.
@@ -621,22 +628,26 @@ class NormalProtocolConformance : public RootProtocolConformance,
   // Record the explicitly-specified global actor isolation.
   void setExplicitGlobalActorIsolation(TypeExpr *typeExpr);
 
+  /// Return the `TypeRepr` of the inheritance clause entry that declares this
+  /// conformance, if any. For example, if this is a conformance to `Y`
+  /// declared as `struct S: X, Y & Z {}`, this is the `TypeRepr` for `Y & Z`.
+  ///
+  /// - Important: The value can be valid only for an explicit conformance.
+  TypeRepr *getInheritedTypeRepr() const { return inheritedTypeRepr; }
+
 public:
   NormalProtocolConformance(Type conformingType, ProtocolDecl *protocol,
-                            SourceLoc loc, DeclContext *dc,
-                            ProtocolConformanceState state,
-                            ProtocolConformanceOptions options,
-                            SourceLoc preconcurrencyLoc)
+                            SourceLoc loc, TypeRepr *inheritedTypeRepr,
+                            DeclContext *dc, ProtocolConformanceState state,
+                            ProtocolConformanceOptions options)
       : RootProtocolConformance(ProtocolConformanceKind::Normal,
                                 conformingType),
         Protocol(protocol), Loc(extractNearestSourceLoc(dc)),
-        ProtocolNameLoc(loc), PreconcurrencyLoc(preconcurrencyLoc),
+        ProtocolNameLoc(loc), inheritedTypeRepr(inheritedTypeRepr),
         Context(dc) {
     assert(!conformingType->hasArchetype() &&
            "ProtocolConformances should store interface types");
-    assert((preconcurrencyLoc.isInvalid() ||
-            options.contains(ProtocolConformanceFlags::Preconcurrency)) &&
-           "Cannot have a @preconcurrency location without isPreconcurrency");
+
     setState(state);
     Bits.NormalProtocolConformance.IsInvalid = false;
     Bits.NormalProtocolConformance.IsPreconcurrencyEffectful = false;
@@ -646,6 +657,9 @@ public:
         unsigned(ConformanceEntryKind::Explicit);
     Bits.NormalProtocolConformance.HasExplicitGlobalActor = false;
     setExplicitGlobalActorIsolation(options.getGlobalActorIsolationType());
+
+    assert((!getPreconcurrencyLoc() || isPreconcurrency()) &&
+           "Cannot have a @preconcurrency location without isPreconcurrency");
   }
 
   /// Get the protocol being conformed to.
@@ -655,6 +669,9 @@ public:
   SourceLoc getLoc() const { return Loc; }
 
   /// Retrieve the name of the protocol location.
+  ///
+  /// - Important: This is not a valid insertion location for an attribute.
+  ///   Use `applyConformanceAttribute` instead.
   SourceLoc getProtocolNameLoc() const { return ProtocolNameLoc; }
 
   /// Get the declaration context that contains the conforming extension or
@@ -725,7 +742,9 @@ public:
 
   /// Retrieve the location of `@preconcurrency`, if there is one and it is
   /// known.
-  SourceLoc getPreconcurrencyLoc() const { return PreconcurrencyLoc; }
+  ///
+  /// - Important: The value can be valid only for an explicit conformance.
+  SourceLoc getPreconcurrencyLoc() const;
 
   /// Query whether this conformance was explicitly declared to be safe or
   /// unsafe.
@@ -848,6 +867,15 @@ public:
 
   /// Triggers a request that resolves all of the conformance's value witnesses.
   void resolveValueWitnesses() const;
+
+  /// If the necessary source location information is found, attaches a fix-it
+  /// to the given diagnostic for applying the given attribute to the
+  /// conformance.
+  ///
+  /// \param attrStr A conformance attribute as a string, e.g. "@unsafe" or
+  /// "nonisolated".
+  void applyConformanceAttribute(InFlightDiagnostic &diag,
+                                 std::string attrStr) const;
 
   /// Determine whether the witness for the given type requirement
   /// is the default definition.

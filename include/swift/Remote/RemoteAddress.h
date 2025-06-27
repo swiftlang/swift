@@ -63,35 +63,30 @@ public:
 
 /// A symbolic relocated absolute pointer value.
 class RemoteAbsolutePointer {
-  /// The symbol name that the pointer refers to. Empty if the value is absolute.
+  /// The symbol name that the pointer refers to. Empty if only an absolute
+  /// address is available.
   std::string Symbol;
-  /// The offset from the symbol, or the resolved remote address if \c Symbol is empty.
-  int64_t Offset;
+  /// The offset from the symbol.
+  int64_t Offset = 0;
+  /// The resolved remote address.
+  RemoteAddress Address = RemoteAddress{(uint64_t)0};
 
 public:
-  RemoteAbsolutePointer()
-    : Symbol(), Offset(0)
-  {}
-  
-  RemoteAbsolutePointer(std::nullptr_t)
-    : RemoteAbsolutePointer()
-  {}
-  
-  RemoteAbsolutePointer(llvm::StringRef Symbol, int64_t Offset)
-    : Symbol(Symbol), Offset(Offset)
-  {}
-  
-  bool isResolved() const { return Symbol.empty(); }
+  RemoteAbsolutePointer() = default;
+  RemoteAbsolutePointer(std::nullptr_t) : RemoteAbsolutePointer() {}
+
+  RemoteAbsolutePointer(llvm::StringRef Symbol, int64_t Offset,
+                        RemoteAddress Address)
+      : Symbol(Symbol), Offset(Offset), Address(Address) {}
+  RemoteAbsolutePointer(RemoteAddress Address) : Address(Address) {}
+
   llvm::StringRef getSymbol() const { return Symbol; }
   int64_t getOffset() const { return Offset; }
-  
-  RemoteAddress getResolvedAddress() const {
-    assert(isResolved());
-    return RemoteAddress(Offset);
-  }
-  
+
+  RemoteAddress getResolvedAddress() const { return Address; }
+
   explicit operator bool() const {
-    return Offset != 0 || !Symbol.empty();
+    return Address || !Symbol.empty();
   }
 };
 

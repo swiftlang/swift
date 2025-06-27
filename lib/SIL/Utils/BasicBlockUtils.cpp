@@ -446,6 +446,16 @@ static FunctionTest DeadEndBlocksTest("dead_end_blocks", [](auto &function,
   }
 #endif
 });
+
+// Arguments:
+// - none
+// Dumps:
+// - message
+static FunctionTest HasAnyDeadEndBlocksTest(
+    "has_any_dead_ends", [](auto &function, auto &arguments, auto &test) {
+      auto deb = test.getDeadEndBlocks();
+      llvm::outs() << (deb->isEmpty() ? "no dead ends\n" : "has dead ends\n");
+    });
 } // end namespace swift::test
 
 //===----------------------------------------------------------------------===//

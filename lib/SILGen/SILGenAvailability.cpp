@@ -1,8 +1,8 @@
-//===--- SILGenBackDeploy.cpp - SILGen for back deployment ----------------===//
+//===--- SILGenAvailability.cpp - SILGen for availability queries ---------===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022 Apple Inc. and the Swift project authors
+// Copyright (c) 2022 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -13,12 +13,195 @@
 #include "SILGenFunction.h"
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
-#include "swift/Basic/Platform.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Platform.h"
 #include "swift/SIL/SILDeclRef.h"
 
 using namespace swift;
 using namespace Lowering;
+
+/// Emit literals for the major, minor, and subminor components of the version
+/// and return a tuple of SILValues for them.
+static std::tuple<SILValue, SILValue, SILValue>
+emitVersionLiterals(SILLocation loc, SILGenBuilder &B, ASTContext &ctx,
+                    llvm::VersionTuple Vers) {
+  unsigned major = Vers.getMajor();
+  unsigned minor = Vers.getMinor().value_or(0);
+  unsigned subminor = Vers.getSubminor().value_or(0);
+
+  SILType wordType = SILType::getBuiltinWordType(ctx);
+
+  SILValue majorValue = B.createIntegerLiteral(loc, wordType, major);
+  SILValue minorValue = B.createIntegerLiteral(loc, wordType, minor);
+  SILValue subminorValue = B.createIntegerLiteral(loc, wordType, subminor);
+
+  return std::make_tuple(majorValue, minorValue, subminorValue);
+}
+
+/// Emit a check that returns 1 if the running OS version is in
+/// the specified version range and 0 otherwise. The returned SILValue
+/// (which has type Builtin.Int1) represents the result of this check.
+static SILValue emitOSVersionRangeCheck(SILGenFunction &SGF, SILLocation loc,
+                                        const VersionRange &range,
+                                        bool forTargetVariant) {
+  auto &ctx = SGF.getASTContext();
+  auto &B = SGF.B;
+
+  // Emit constants for the checked version range.
+  SILValue majorValue;
+  SILValue minorValue;
+  SILValue subminorValue;
+
+  std::tie(majorValue, minorValue, subminorValue) =
+      emitVersionLiterals(loc, B, ctx, range.getLowerEndpoint());
+
+  // Emit call to _stdlib_isOSVersionAtLeast(major, minor, patch)
+  FuncDecl *versionQueryDecl = ctx.getIsOSVersionAtLeastDecl();
+
+  // When targeting macCatalyst, the version number will be an iOS version
+  // number and so we call a variant of the query function that understands iOS
+  // versions.
+  if (forTargetVariant)
+    versionQueryDecl = ctx.getIsVariantOSVersionAtLeastDecl();
+
+  assert(versionQueryDecl);
+
+  auto declRef = SILDeclRef(versionQueryDecl);
+  SILValue availabilityGTEFn = SGF.emitGlobalFunctionRef(
+      loc, declRef,
+      SGF.getConstantInfo(SGF.getTypeExpansionContext(), declRef));
+
+  SILValue args[] = {majorValue, minorValue, subminorValue};
+  return B.createApply(loc, availabilityGTEFn, SubstitutionMap(), args);
+}
+
+static SILValue
+emitOSVersionOrVariantVersionRangeCheck(SILGenFunction &SGF, SILLocation loc,
+                                        const VersionRange &targetRange,
+                                        const VersionRange &variantRange) {
+  auto &ctx = SGF.getASTContext();
+  auto &B = SGF.B;
+
+  SILValue targetMajorValue;
+  SILValue targetMinorValue;
+  SILValue targetSubminorValue;
+
+  std::tie(targetMajorValue, targetMinorValue, targetSubminorValue) =
+      emitVersionLiterals(loc, B, ctx, targetRange.getLowerEndpoint());
+
+  SILValue variantMajorValue;
+  SILValue variantMinorValue;
+  SILValue variantSubminorValue;
+
+  std::tie(variantMajorValue, variantMinorValue, variantSubminorValue) =
+      emitVersionLiterals(loc, B, ctx, variantRange.getLowerEndpoint());
+
+  FuncDecl *versionQueryDecl =
+      ctx.getIsOSVersionAtLeastOrVariantVersionAtLeast();
+
+  assert(versionQueryDecl);
+
+  auto declRef = SILDeclRef(versionQueryDecl);
+  SILValue availabilityGTEFn = SGF.emitGlobalFunctionRef(
+      loc, declRef,
+      SGF.getConstantInfo(SGF.getTypeExpansionContext(), declRef));
+
+  SILValue args[] = {targetMajorValue,    targetMinorValue,
+                     targetSubminorValue, variantMajorValue,
+                     variantMinorValue,   variantSubminorValue};
+  return B.createApply(loc, availabilityGTEFn, SubstitutionMap(), args);
+}
+
+SILValue emitZipperedOSVersionRangeCheck(SILGenFunction &SGF, SILLocation loc,
+                                         const VersionRange &targetRange,
+                                         const VersionRange &variantRange) {
+  auto &ctx = SGF.getASTContext();
+  auto &B = SGF.B;
+
+  assert(ctx.LangOpts.TargetVariant);
+
+  VersionRange targetVersion = targetRange;
+  VersionRange variantVersion = variantRange;
+
+  // We're building zippered, so we need to pass both macOS and iOS versions to
+  // the runtime version range check. At run time that check will determine what
+  // kind of process this code is loaded into. In a macOS process it will use
+  // the macOS version; in an macCatalyst process it will use the iOS version.
+  llvm::Triple targetTriple = ctx.LangOpts.Target;
+  llvm::Triple variantTriple = *ctx.LangOpts.TargetVariant;
+
+  // From perspective of the driver and most of the frontend, -target and
+  // -target-variant are symmetric. That is, the user can pass either:
+  //    -target x86_64-apple-macosx10.15 \
+  //    -target-variant x86_64-apple-ios13.1-macabi
+  // or:
+  //    -target x86_64-apple-ios13.1-macabi \
+  //    -target-variant x86_64-apple-macosx10.15
+  //
+  // However, the runtime availability-checking entry points need to compare
+  // against an actual running OS version and so can't be symmetric. Here we
+  // standardize on "target" means macOS version and "targetVariant" means iOS
+  // version.
+  if (tripleIsMacCatalystEnvironment(targetTriple)) {
+    assert(variantTriple.isMacOSX());
+    // Normalize so that "variant" always means iOS version.
+    std::swap(targetVersion, variantVersion);
+    std::swap(targetTriple, variantTriple);
+  }
+
+  // If there is no check for either the target platform or the target-variant
+  // platform then the condition is trivially true.
+  if (targetVersion.isAll() && variantVersion.isAll()) {
+    SILType i1 = SILType::getBuiltinIntegerType(1, ctx);
+    return B.createIntegerLiteral(loc, i1, true);
+  }
+
+  // If either version is "never" then the check is trivially false because it
+  // can never succeed.
+  if (targetVersion.isEmpty() || variantVersion.isEmpty()) {
+    SILType i1 = SILType::getBuiltinIntegerType(1, ctx);
+    return B.createIntegerLiteral(loc, i1, false);
+  }
+
+  // The variant-only availability-checking entrypoint is not part of the
+  // Swift 5.0 ABI. It is only available in macOS 10.15 and above.
+  bool isVariantEntrypointAvailable = !targetTriple.isMacOSXVersionLT(10, 15);
+
+  // If there is no check for the target but there is for the variant, then we
+  // only need to emit code for the variant check.
+  if (isVariantEntrypointAvailable && targetVersion.isAll() &&
+      !variantVersion.isAll())
+    return emitOSVersionRangeCheck(SGF, loc, variantVersion,
+                                   /*forVariant*/ true);
+
+  // Similarly, if there is a check for the target but not for the target
+  // variant then we only to emit code for the target check.
+  if (!targetVersion.isAll() && variantVersion.isAll())
+    return emitOSVersionRangeCheck(SGF, loc, targetVersion,
+                                   /*forVariant*/ false);
+
+  if (!isVariantEntrypointAvailable ||
+      (!targetVersion.isAll() && !variantVersion.isAll())) {
+
+    // If the variant-only entrypoint isn't available (as is the case
+    // pre-macOS 10.15) we need to use the zippered entrypoint (which is part of
+    // the Swift 5.0 ABI) even when the macOS version  is '*' (all). In this
+    // case, use the minimum macOS deployment version from the target triple.
+    // This ensures the check always passes on macOS.
+    if (!isVariantEntrypointAvailable && targetVersion.isAll()) {
+      assert(targetTriple.isMacOSX());
+
+      llvm::VersionTuple macosVersion;
+      targetTriple.getMacOSXVersion(macosVersion);
+      targetVersion = VersionRange::allGTE(macosVersion);
+    }
+
+    return emitOSVersionOrVariantVersionRangeCheck(SGF, loc, targetVersion,
+                                                   variantVersion);
+  }
+
+  llvm_unreachable("Unhandled zippered configuration");
+}
 
 /// Given a value, extracts all elements to `result` from this value if it's a
 /// tuple. Otherwise, add this value directly to `result`.
@@ -68,7 +251,7 @@ static SILValue emitZipperedBackDeployIfAvailableBooleanTestValue(
     VariantOSVersion = VersionRange::allGTE(*version);
   }
 
-  return SGF.emitZipperedOSVersionRangeCheck(loc, OSVersion, VariantOSVersion);
+  return emitZipperedOSVersionRangeCheck(SGF, loc, OSVersion, VariantOSVersion);
 }
 
 /// Emit the following branch SIL instruction:
@@ -108,7 +291,7 @@ static void emitBackDeployIfAvailableCondition(SILGenFunction &SGF,
     bool isMacCatalyst =
         tripleIsMacCatalystEnvironment(SGF.getASTContext().LangOpts.Target);
     booleanTestValue =
-        SGF.emitOSVersionRangeCheck(loc, OSVersion, isMacCatalyst);
+        emitOSVersionRangeCheck(SGF, loc, OSVersion, isMacCatalyst);
   }
 
   SGF.B.createCondBranch(loc, booleanTestValue, availableBB, unavailableBB);
@@ -201,6 +384,75 @@ static void emitBackDeployForwardApplyAndReturnOrThrow(
   extractAllElements(apply, loc, SGF.B, directResults);
 
   SGF.B.createBranch(loc, SGF.ReturnDest.getBlock(), directResults);
+}
+
+SILValue
+SILGenFunction::emitIfAvailableQuery(SILLocation loc,
+                                     PoundAvailableInfo *availability) {
+  auto &ctx = getASTContext();
+  SILValue result;
+
+  // Creates a boolean literal for availability conditions that have been
+  // evaluated at compile time. Automatically inverts the value for
+  // `#unavailable` queries.
+  auto createBooleanTestLiteral = [&](bool value) {
+    SILType i1 = SILType::getBuiltinIntegerType(1, ctx);
+    if (availability->isUnavailability())
+      value = !value;
+    return B.createIntegerLiteral(loc, i1, value);
+  };
+
+  auto versionRange = availability->getAvailableRange();
+
+  // The OS version might be left empty if availability checking was disabled.
+  // Treat it as always-true in that case.
+  assert(versionRange || ctx.LangOpts.DisableAvailabilityChecking);
+
+  if (ctx.LangOpts.TargetVariant && !ctx.LangOpts.DisableAvailabilityChecking) {
+    // We're building zippered, so we need to pass both macOS and iOS versions
+    // to the the runtime version range check. At run time that check will
+    // determine what kind of process this code is loaded into. In a macOS
+    // process it will use the macOS version; in an macCatalyst process it will
+    // use the iOS version.
+
+    auto variantVersionRange = availability->getVariantAvailableRange();
+    assert(variantVersionRange);
+
+    if (versionRange && variantVersionRange) {
+      result = emitZipperedOSVersionRangeCheck(*this, loc, *versionRange,
+                                               *variantVersionRange);
+    } else {
+      // Type checking did not fill in versions so as a fallback treat this
+      // condition as trivially true.
+      result = createBooleanTestLiteral(true);
+    }
+
+    return result;
+  }
+
+  if (!versionRange) {
+    // Type checking did not fill in version so as a fallback treat this
+    // condition as trivially true.
+    result = createBooleanTestLiteral(true);
+  } else if (versionRange->isAll()) {
+    result = createBooleanTestLiteral(true);
+  } else if (versionRange->isEmpty()) {
+    result = createBooleanTestLiteral(false);
+  } else {
+    bool isMacCatalyst = tripleIsMacCatalystEnvironment(ctx.LangOpts.Target);
+    result = emitOSVersionRangeCheck(*this, loc, versionRange.value(),
+                                     isMacCatalyst);
+    if (availability->isUnavailability()) {
+      // If this is an unavailability check, invert the result
+      // by emitting a call to Builtin.xor_Int1(lhs, -1).
+      SILType i1 = SILType::getBuiltinIntegerType(1, ctx);
+      SILValue minusOne = B.createIntegerLiteral(loc, i1, -1);
+      result =
+          B.createBuiltinBinaryFunction(loc, "xor", i1, i1, {result, minusOne});
+    }
+  }
+
+  return result;
 }
 
 bool SILGenModule::requiresBackDeploymentThunk(ValueDecl *decl,

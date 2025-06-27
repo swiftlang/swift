@@ -2407,6 +2407,13 @@ static void maybeAddParameterIsolation(AnyFunctionType::ExtInfoBuilder &infoBuil
     infoBuilder = infoBuilder.withIsolation(FunctionTypeIsolation::forParameter());
 }
 
+std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
+getLifetimeDependencies(ASTContext &context, EnumElementDecl *enumElemDecl) {
+  return evaluateOrDefault(context.evaluator,
+                           LifetimeDependenceInfoRequest{enumElemDecl},
+                           std::nullopt);
+}
+
 Type
 InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
   auto &Context = D->getASTContext();
@@ -2696,13 +2703,25 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
       resultTy = FunctionType::get(argTy, resultTy, info);
     }
 
+    auto lifetimeDependenceInfo = getLifetimeDependencies(Context, EED);
+
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     if (auto genericSig = ED->getGenericSignature()) {
-      GenericFunctionType::ExtInfo info;
-      resultTy = GenericFunctionType::get(genericSig, {selfTy}, resultTy, info);
+      GenericFunctionType::ExtInfoBuilder infoBuilder;
+      if (lifetimeDependenceInfo.has_value()) {
+        infoBuilder =
+            infoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
+      }
+      resultTy = GenericFunctionType::get(genericSig, {selfTy}, resultTy,
+                                          infoBuilder.build());
+
     } else {
-      FunctionType::ExtInfo info;
-      resultTy = FunctionType::get({selfTy}, resultTy, info);
+      FunctionType::ExtInfoBuilder infoBuilder;
+      if (lifetimeDependenceInfo.has_value()) {
+        infoBuilder =
+            infoBuilder.withLifetimeDependencies(*lifetimeDependenceInfo);
+      }
+      resultTy = FunctionType::get({selfTy}, resultTy, infoBuilder.build());
     }
 
     return resultTy;
@@ -3151,7 +3170,7 @@ ImplicitKnownProtocolConformanceRequest::evaluate(Evaluator &evaluator,
 
 std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>
 LifetimeDependenceInfoRequest::evaluate(Evaluator &evaluator,
-                                        AbstractFunctionDecl *decl) const {
+                                        ValueDecl *decl) const {
   return LifetimeDependenceInfo::get(decl);
 }
 

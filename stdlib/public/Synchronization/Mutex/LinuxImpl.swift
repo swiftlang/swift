@@ -23,19 +23,19 @@ extension Atomic where Value == UInt32 {
   // This returns 'false' on success and 'true' on error. Check 'errno' for the
   // specific error value.
   internal borrowing func _futexLock() -> UInt32 {
-    _swift_stdlib_futex_lock(.init(_rawAddress))
+    unsafe _swift_stdlib_futex_lock(.init(_rawAddress))
   }
 
   // This returns 'false' on success and 'true' on error. Check 'errno' for the
   // specific error value.
   internal borrowing func _futexTryLock() -> UInt32 {
-    _swift_stdlib_futex_trylock(.init(_rawAddress))
+    unsafe _swift_stdlib_futex_trylock(.init(_rawAddress))
   }
 
   // This returns 'false' on success and 'true' on error. Check 'errno' for the
   // specific error value.
   internal borrowing func _futexUnlock() -> UInt32 {
-    _swift_stdlib_futex_unlock(.init(_rawAddress))
+    unsafe _swift_stdlib_futex_unlock(.init(_rawAddress))
   }
 }
 

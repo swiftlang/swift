@@ -15,7 +15,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
-#include "swift/Serialization/SerializedModuleLoader.h"
+#include "swift/Serialization/ScanningLoaders.h"
 #include "llvm/CAS/CASReference.h"
 #include "llvm/Support/ThreadPool.h"
 
@@ -38,17 +38,13 @@ public:
 private:
   /// Retrieve the module dependencies for the Clang module with the given name.
   ModuleDependencyVector scanFilesystemForClangModuleDependency(
-      Identifier moduleName, StringRef moduleOutputPath,
-      StringRef sdkModuleOutputPath,
+      Identifier moduleName,
       const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
-          &alreadySeenModules,
-      llvm::PrefixMapper *prefixMapper);
+          &alreadySeenModules);
 
   /// Retrieve the module dependencies for the Swift module with the given name.
   ModuleDependencyVector scanFilesystemForSwiftModuleDependency(
-      Identifier moduleName, StringRef moduleOutputPath,
-      StringRef sdkModuleOutputPath, llvm::PrefixMapper *prefixMapper,
-      bool isTestableImport = false);
+      Identifier moduleName, bool isTestableImport = false);
 
   /// Query dependency information for header dependencies
   /// of a binary Swift module.
@@ -90,7 +86,18 @@ private:
   // The Clang scanner tool used by this worker.
   clang::tooling::dependencies::DependencyScanningTool clangScanningTool;
   // Swift and Clang module loaders acting as scanners.
-  std::unique_ptr<ModuleInterfaceLoader> swiftScannerModuleLoader;
+  std::unique_ptr<SwiftModuleScanner> swiftModuleScannerLoader;
+
+  /// The location of where the explicitly-built modules will be output to
+  std::string moduleOutputPath;
+  /// The location of where the explicitly-built SDK modules will be output to
+  std::string sdkModuleOutputPath;
+
+  // CAS instance.
+  std::shared_ptr<llvm::cas::ObjectStore> CAS;
+  std::shared_ptr<llvm::cas::ActionCache> ActionCache;
+  /// File prefix mapper.
+  std::shared_ptr<llvm::PrefixMapper> PrefixMapper;
 
   // Base command line invocation for clang scanner queries (both module and header)
   std::vector<std::string> clangScanningBaseCommandLineArgs;
@@ -101,10 +108,6 @@ private:
   std::vector<std::string> swiftModuleClangCC1CommandLineArgs;
   // Working directory for clang module lookup queries
   std::string clangScanningWorkingDirectoryPath;
-
-  // CAS instance.
-  std::shared_ptr<llvm::cas::ObjectStore> CAS;
-  std::shared_ptr<llvm::cas::ActionCache> ActionCache;
   // Restrict access to the parent scanner class.
   friend class ModuleDependencyScanner;
 };
@@ -219,6 +222,8 @@ private:
   unsigned NumThreads;
   std::list<std::unique_ptr<ModuleDependencyScanningWorker>> Workers;
   llvm::DefaultThreadPool ScanningThreadPool;
+  /// File prefix mapper.
+  std::shared_ptr<llvm::PrefixMapper> PrefixMapper;
   /// Protect worker access.
   std::mutex WorkersLock;
   /// Count of filesystem queries performed

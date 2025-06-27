@@ -1313,6 +1313,21 @@ namespace {
       return callExpr;
     }
 
+    std::optional<ActorIsolation>
+    getIsolationFromFunctionType(FunctionType *thunkTy) {
+      switch (thunkTy->getIsolation().getKind()) {
+      case FunctionTypeIsolation::Kind::NonIsolated:
+      case FunctionTypeIsolation::Kind::Parameter:
+      case FunctionTypeIsolation::Kind::Erased:
+        return {};
+      case FunctionTypeIsolation::Kind::GlobalActor:
+        return ActorIsolation::forGlobalActor(
+            thunkTy->getIsolation().getGlobalActorType());
+      case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+        return ActorIsolation::forCallerIsolationInheriting();
+      }
+    }
+
     /// Build a "{ args in base.fn(args) }" single-expression curry thunk.
     ///
     /// \param baseExpr The base expression to be captured, if warranted.
@@ -1355,19 +1370,8 @@ namespace {
       // we do not visit the inner autoclosure in the ActorIsolation checker
       // meaning that we do not properly call setActorIsolation on the
       // AbstractClosureExpr that we produce here.
-      switch (thunkTy->getIsolation().getKind()) {
-      case FunctionTypeIsolation::Kind::NonIsolated:
-      case FunctionTypeIsolation::Kind::Parameter:
-      case FunctionTypeIsolation::Kind::Erased:
-        break;
-      case FunctionTypeIsolation::Kind::GlobalActor:
-        thunk->setActorIsolation(ActorIsolation::forGlobalActor(
-            thunkTy->getIsolation().getGlobalActorType()));
-        break;
-      case FunctionTypeIsolation::Kind::NonIsolatedCaller:
-        thunk->setActorIsolation(
-            ActorIsolation::forCallerIsolationInheriting());
-        break;
+      if (auto isolation = getIsolationFromFunctionType(thunkTy)) {
+        thunk->setActorIsolation(*isolation);
       }
 
       cs.cacheType(thunk);
@@ -1536,6 +1540,31 @@ namespace {
         cs.cacheType(selfOpenedRef);
       }
 
+      auto outerActorIsolation = [&]() -> std::optional<ActorIsolation> {
+        auto resultType = outerThunkTy->getResult();
+        // Look through all optionals.
+        while (auto opt = resultType->getOptionalObjectType())
+          resultType = opt;
+        auto f =
+            getIsolationFromFunctionType(resultType->castTo<FunctionType>());
+        if (!f)
+          return {};
+
+        // If we have a non-async function and our "inferred" isolation is
+        // caller isolation inheriting, then we do not infer isolation and just
+        // use the default. The reason why we are doing this is:
+        //
+        // 1. nonisolated for synchronous functions is equivalent to
+        // nonisolated(nonsending).
+        //
+        // 2. There is a strong invariant in the compiler today that caller
+        // isolation inheriting is always async. By using nonisolated here, we
+        // avoid breaking that invariant.
+        if (!outerThunkTy->isAsync() && f->isCallerIsolationInheriting())
+          return {};
+        return f;
+      }();
+
       Expr *outerThunkBody = nullptr;
 
       // For an @objc optional member or a member found via dynamic lookup,
@@ -1566,6 +1595,11 @@ namespace {
         auto *innerThunk = buildSingleCurryThunk(
             selfOpenedRef, memberRef, cast<DeclContext>(member),
             outerThunkTy->getResult()->castTo<FunctionType>(), memberLocator);
+        assert((!outerActorIsolation ||
+                innerThunk->getActorIsolation().getKind() ==
+                    outerActorIsolation->getKind()) &&
+               "If we have an isolation for our double curry thunk it should "
+               "match our single curry thunk");
 
         // Rewrite the body to close the existential if warranted.
         if (hasOpenedExistential) {
@@ -1587,6 +1621,11 @@ namespace {
       outerThunk->setThunkKind(AutoClosureExpr::Kind::DoubleCurryThunk);
       outerThunk->setParameterList(
           ParameterList::create(ctx, SourceLoc(), selfParamDecl, SourceLoc()));
+
+      if (outerActorIsolation) {
+        outerThunk->setActorIsolation(*outerActorIsolation);
+      }
+
       cs.cacheType(outerThunk);
 
       return outerThunk;

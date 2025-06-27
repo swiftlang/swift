@@ -122,10 +122,18 @@ public struct Builder {
     }
   }
 
-  public func createAllocStack(_ type: Type, hasDynamicLifetime: Bool = false,
+  public func createAllocStack(_ type: Type,
+                               debugVariable: DebugVariableInstruction.DebugVariable? = nil,
+                               hasDynamicLifetime: Bool = false,
                                isLexical: Bool = false, isFromVarDecl: Bool = false,
                                usesMoveableValueDebugInfo: Bool = false) -> AllocStackInst {
-    let dr = bridged.createAllocStack(type.bridged, hasDynamicLifetime, isLexical,
+    let bridgedDebugVar: OptionalBridgedSILDebugVariable
+    if let debugVariable = debugVariable {
+      bridgedDebugVar = OptionalBridgedSILDebugVariable(debugVariable)
+    } else {
+      bridgedDebugVar = OptionalBridgedSILDebugVariable()
+    }
+    let dr = bridged.createAllocStack(type.bridged, bridgedDebugVar, hasDynamicLifetime, isLexical,
                                       isFromVarDecl, usesMoveableValueDebugInfo)
     return notifyNew(dr.getAs(AllocStackInst.self))
   }
@@ -374,6 +382,20 @@ public struct Builder {
     return notifyNew(apply.getAs(TryApplyInst.self))
   }
   
+  public func createBeginApply(function: Value,
+                               _ substitutionMap: SubstitutionMap,
+                               arguments: [Value],
+                               isNonThrowing: Bool = false,
+                               isNonAsync: Bool = false,
+                               specializationInfo: ApplyInst.SpecializationInfo = ApplyInst.SpecializationInfo()
+  ) -> BeginApplyInst {
+    let apply = arguments.withBridgedValues { valuesRef in
+      bridged.createBeginApply(function.bridged, substitutionMap.bridged, valuesRef,
+                               isNonThrowing, isNonAsync, specializationInfo)
+    }
+    return notifyNew(apply.getAs(BeginApplyInst.self))
+  }
+  
   public func createWitnessMethod(lookupType: CanonicalType,
                                   conformance: Conformance,
                                   member: DeclRef,
@@ -536,6 +558,10 @@ public struct Builder {
     return notifyNew(bridged.createDestructureTuple(tuple.bridged).getAs(DestructureTupleInst.self))
   }
 
+  public func createProjectBox(box: Value, fieldIndex: Int) -> ProjectBoxInst {
+    return notifyNew(bridged.createProjectBox(box.bridged, fieldIndex).getAs(ProjectBoxInst.self))
+  }
+
   @discardableResult
   public func createStore(source: Value, destination: Value, ownership: StoreInst.StoreOwnership) -> StoreInst {
     let store = bridged.createStore(source.bridged, destination.bridged, ownership.rawValue)
@@ -603,6 +629,18 @@ public struct Builder {
     return notifyNew(markDependence.getAs(MarkDependenceAddrInst.self))
   }
     
+  public func createMarkUninitialized(value: Value, kind: MarkUninitializedInst.Kind) -> MarkUninitializedInst {
+    let mu = bridged.createMarkUninitialized(value.bridged, kind.rawValue)
+    return notifyNew(mu.getAs(MarkUninitializedInst.self))
+  }
+
+  public func createMarkUnresolvedNonCopyableValue(value: Value,
+                                                   checkKind: MarkUnresolvedNonCopyableValueInst.CheckKind,
+                                                   isStrict: Bool) -> MarkUnresolvedNonCopyableValueInst {
+    let mu = bridged.createMarkUnresolvedNonCopyableValue(value.bridged, checkKind.rawValue, isStrict)
+    return notifyNew(mu.getAs(MarkUnresolvedNonCopyableValueInst.self))
+  }
+
   @discardableResult
   public func createEndAccess(beginAccess: BeginAccessInst) -> EndAccessInst {
       let endAccess = bridged.createEndAccess(beginAccess.bridged)

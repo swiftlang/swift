@@ -439,20 +439,7 @@ private extension Value {
   }
 }
 
-fileprivate struct FunctionWorklist {
-  private(set) var functions = Array<Function>()
-  private var pushedFunctions = Set<Function>()
-  private var currentIndex = 0
-
-  mutating func pop() -> Function? {
-    if currentIndex < functions.count {
-      let f = functions[currentIndex]
-      currentIndex += 1
-      return f
-    }
-    return nil
-  }
-  
+extension FunctionWorklist {
   mutating func addAllMandatoryRequiredFunctions(of moduleContext: ModulePassContext) {
     for f in moduleContext.functions {
       // Performance annotated functions
@@ -479,7 +466,24 @@ fileprivate struct FunctionWorklist {
     for inst in function.instructions {
       switch inst {
       case let fri as FunctionRefInst:
-        pushIfNotVisited(fri.referencedFunction)
+        // In embedded swift all reachable functions must be handled - even if they are not called,
+        // e.g. referenced by a global.
+        if context.options.enableEmbeddedSwift {
+          pushIfNotVisited(fri.referencedFunction)
+        }
+      case let apply as ApplySite:
+        if let callee = apply.referencedFunction {
+          pushIfNotVisited(callee)
+        }
+      case let bi as BuiltinInst:
+        switch bi.id {
+        case .Once, .OnceWithContext:
+          if let fri = bi.operands[1].value as? FunctionRefInst {
+            pushIfNotVisited(fri.referencedFunction)
+          }
+        default:
+          break
+        }
       case let alloc as AllocRefInst:
         if context.options.enableEmbeddedSwift {
           addVTableMethods(forClassType: alloc.type, context)
@@ -520,12 +524,6 @@ fileprivate struct FunctionWorklist {
       {
         pushIfNotVisited(method)
       }
-    }
-  }
-
-  mutating func pushIfNotVisited(_ element: Function) {
-    if pushedFunctions.insert(element).inserted {
-      functions.append(element)
     }
   }
 }

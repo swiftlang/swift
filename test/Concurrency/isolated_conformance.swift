@@ -15,8 +15,57 @@ protocol P {
 // expected-note@+2{{isolate this conformance to the main actor with '@MainActor'}}{{25-25=@MainActor }}
 @MainActor
 class CWithNonIsolated: P {
-  // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}
+  // expected-note@-1{{turn data races into runtime errors with '@preconcurrency'}}{{25-25=@preconcurrency }}
   func f() { } // expected-note{{main actor-isolated instance method 'f()' cannot satisfy nonisolated requirement}}
+}
+
+// Make sure we correctly apply the conformance attribute for more complex
+// inheritance entries.
+do {
+  protocol EmptyP {}
+  struct Nested {
+    protocol P { func f() }
+    protocol Q { func f() }
+  }
+  do {
+    // expected-warning@+4 {{conformance of 'S' to protocol 'P' crosses into main actor-isolated code and can cause data races}}
+    // expected-note@+3 {{mark all declarations used in the conformance 'nonisolated'}}
+    // expected-note@+2 {{isolate this conformance to the main actor with '@MainActor'}}{{26-26=@MainActor }}
+    // expected-note@+1 {{turn data races into runtime errors with '@preconcurrency'}}{{26-26=@preconcurrency }}
+    @MainActor struct S: Nested.P {
+      func f() {} // expected-note {{main actor-isolated instance method 'f()' cannot satisfy nonisolated requirement}}
+    }
+  }
+  do {
+    // Attribute inserted *before* '@unsafe'.
+    @MainActor struct S: @unsafe Nested.P {
+    // expected-warning@-1 {{conformance of 'S' to protocol 'P' crosses into main actor-isolated code and can cause data races}}
+    // expected-note@-2 {{mark all declarations used in the conformance 'nonisolated'}}
+    // expected-note@-3 {{isolate this conformance to the main actor with '@MainActor'}}{{26-26=@MainActor }}
+    // expected-note@-4 {{turn data races into runtime errors with '@preconcurrency'}}{{26-26=@preconcurrency }}
+      func f() {} // expected-note {{main actor-isolated instance method 'f()' cannot satisfy nonisolated requirement}}
+    }
+  }
+  do {
+    // expected-warning@+5 {{conformance of 'S' to protocol 'Q' crosses into main actor-isolated code and can cause data races}}
+    // expected-warning@+4 {{conformance of 'S' to protocol 'P' crosses into main actor-isolated code and can cause data races}}
+    // expected-note@+3 2 {{mark all declarations used in the conformance 'nonisolated'}}
+    // expected-note@+2 2 {{isolate this conformance to the main actor with '@MainActor'}}{{26-26=@MainActor }}
+    // expected-note@+1 2 {{turn data races into runtime errors with '@preconcurrency'}}{{26-26=@preconcurrency }}
+    @MainActor struct S: Nested.P & Nested.Q {
+      func f() {} // expected-note 2 {{main actor-isolated instance method 'f()' cannot satisfy nonisolated requirement}}
+    }
+  }
+  do {
+    // FIXME: We shouldn't be applying nonisolated to both protocols.
+    // expected-warning@+4 {{conformance of 'S' to protocol 'P' crosses into main actor-isolated code and can cause data races}}
+    // expected-note@+3 {{mark all declarations used in the conformance 'nonisolated'}}
+    // expected-note@+2 {{isolate this conformance to the main actor with '@MainActor'}}{{26-26=@MainActor }}
+    // expected-note@+1 {{turn data races into runtime errors with '@preconcurrency'}}{{26-26=@preconcurrency }}
+    @MainActor struct S: Nested.P & EmptyP  {
+      func f() {} // expected-note {{main actor-isolated instance method 'f()' cannot satisfy nonisolated requirement}}
+    }
+  }
 }
 
 actor SomeActor { }

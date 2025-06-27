@@ -48,10 +48,29 @@
 #define SWIFT_COMPUTED_PROPERTY                                                \
   __attribute__((swift_attr("import_computed_property")))
 
+#define _CXX_INTEROP_STRINGIFY(_x) #_x
+
+/// Specifies that a specific C++ `class` or `struct` conforms to a
+/// a specific Swift protocol.
+///
+/// This example shows how to use this macro to conform a class template to a
+/// Swift protocol:
+///  ```
+///    template<class T>
+///    class SWIFT_CONFORMS_TO_PROTOCOL(SwiftModule.ProtocolName)
+///    CustomClass {};
+///  ```
+// clang-format off
+#define SWIFT_CONFORMS_TO_PROTOCOL(_moduleName_protocolName)                   \
+  __attribute__((swift_attr(                                                   \
+      _CXX_INTEROP_STRINGIFY(conforms_to:_moduleName_protocolName))))
+// clang-format on
+
 #else // #if __has_attribute(swift_attr)
 
 #define SWIFT_SELF_CONTAINED
 #define SWIFT_COMPUTED_PROPERTY
+#define SWIFT_CONFORMS_TO_PROTOCOL(_moduleName_protocolName)
 
 #endif // #if __has_attribute(swift_attr)
 
@@ -68,6 +87,13 @@
 #define SWIFT_NAME(_name) __attribute__((swift_name(_name)))
 #else
 #define SWIFT_NAME(_name)
+#endif
+
+#if __has_attribute(availability)
+#define SWIFT_UNAVAILABLE(msg)                                                 \
+  __attribute__((availability(swift, unavailable, message = msg)))
+#else
+#define SWIFT_UNAVAILABLE(msg)
 #endif
 
 #endif // SWIFT_BASIC_SWIFT_BRIDGING_H

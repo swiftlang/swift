@@ -2734,24 +2734,36 @@ void ExpandBodyMacroRequest::noteCycleStep(DiagnosticEngine &diags) const {
 
 std::optional<std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>>
 LifetimeDependenceInfoRequest::getCachedResult() const {
-  auto *func = std::get<0>(getStorage());
+  auto *decl = std::get<0>(getStorage());
+  bool noLifetimeDependenceInfo;
 
-  if (func->LazySemanticInfo.NoLifetimeDependenceInfo)
+  if (auto *func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    noLifetimeDependenceInfo = func->LazySemanticInfo.NoLifetimeDependenceInfo;
+  } else {
+    auto *eed = cast<EnumElementDecl>(decl);
+    noLifetimeDependenceInfo = eed->LazySemanticInfo.NoLifetimeDependenceInfo;
+  }
+
+  if (noLifetimeDependenceInfo)
     return std::optional(std::optional<LifetimeDependenceInfo>());
 
-  return func->getASTContext().evaluator.getCachedNonEmptyOutput(*this);
+  return decl->getASTContext().evaluator.getCachedNonEmptyOutput(*this);
 }
 
 void LifetimeDependenceInfoRequest::cacheResult(
     std::optional<llvm::ArrayRef<LifetimeDependenceInfo>> result) const {
-  auto *func = std::get<0>(getStorage());
-  
+  auto *decl = std::get<0>(getStorage());
+
   if (!result) {
-    func->LazySemanticInfo.NoLifetimeDependenceInfo = 1;
-    return;
+    if (auto *func = dyn_cast<AbstractFunctionDecl>(decl)) {
+      func->LazySemanticInfo.NoLifetimeDependenceInfo = 1;
+      return;
+    }
+    auto *eed = cast<EnumElementDecl>(decl);
+    eed->LazySemanticInfo.NoLifetimeDependenceInfo = 1;
   }
 
-  func->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(result));
+  decl->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(result));
 }
 
 //----------------------------------------------------------------------------//

@@ -497,23 +497,14 @@ public:
   using LookupModuleOutputCallback =
       llvm::function_ref<std::string(const clang::tooling::dependencies::ModuleDeps &,
                                      clang::tooling::dependencies::ModuleOutputKind)>;
-  
+
   static llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
   bridgeClangModuleDependencies(
       const ASTContext &ctx,
       clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
       clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
-      StringRef moduleOutputPath, StringRef stableModuleOutputPath,
       LookupModuleOutputCallback LookupModuleOutput,
       RemapPathCallback remapPath = nullptr);
-
-  llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
-  getModuleDependencies(Identifier moduleName, StringRef moduleOutputPath, StringRef sdkModuleOutputPath,
-                        const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
-                        const std::vector<std::string> &swiftModuleClangCC1CommandLineArgs,
-                        InterfaceSubContextDelegate &delegate,
-                        llvm::PrefixMapper *mapper,
-                        bool isTestableImport = false) override;
 
   static void getBridgingHeaderOptions(
       const ASTContext &ctx,
@@ -715,9 +706,6 @@ bool isCxxConstReferenceType(const clang::Type *type);
 
 /// Determine whether this typedef is a CF type.
 bool isCFTypeDecl(const clang::TypedefNameDecl *Decl);
-
-/// Determine whether type is a c++ foreign reference type.
-bool isForeignReferenceTypeWithoutImmortalAttrs(const clang::QualType type);
 
 /// Determine the imported CF type for the given typedef-name, or the empty
 /// string if this is not an imported CF type name.

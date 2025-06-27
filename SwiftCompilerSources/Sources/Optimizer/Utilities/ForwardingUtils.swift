@@ -118,7 +118,7 @@ extension ForwardingUseDefWalker {
   }
   mutating func walkUpDefault(forwarded value: Value, _ path: PathContext)
     -> WalkResult {
-    if let inst = value.forwardingInstruction {
+    if let inst = value.forwardingInstruction, !inst.forwardedOperands.isEmpty {
       return walkUp(instruction: inst, path)
     }
     if let phi = Phi(value) {

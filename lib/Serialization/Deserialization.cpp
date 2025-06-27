@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -460,8 +460,9 @@ void ModuleFile::outputDiagnosticInfo(llvm::raw_ostream &os) const {
 
 static std::optional<swift::AccessorKind> getActualAccessorKind(uint8_t raw) {
   switch (serialization::AccessorKind(raw)) {
-#define ACCESSOR(ID) \
-  case serialization::AccessorKind::ID: return swift::AccessorKind::ID;
+#define ACCESSOR(ID, KEYWORD)                                                  \
+  case serialization::AccessorKind::ID:                                        \
+    return swift::AccessorKind::ID;
 #include "swift/AST/AccessorKinds.def"
   }
 
@@ -1065,7 +1066,7 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
   }
 
   auto conformance = ctx.getNormalConformance(
-      conformingType, proto, SourceLoc(), dc,
+      conformingType, proto, SourceLoc(), /*inheritedTypeRepr=*/nullptr, dc,
       ProtocolConformanceState::Incomplete,
       ProtocolConformanceOptions(rawOptions, globalActorTypeExpr));
 
@@ -5257,6 +5258,16 @@ public:
       elem->setImplicit();
     elem->setAccess(std::max(cast<EnumDecl>(DC)->getFormalAccess(),
                              AccessLevel::Internal));
+
+    SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
+    while (auto info = MF.maybeReadLifetimeDependence()) {
+      assert(info.has_value());
+      lifetimeDependencies.push_back(*info);
+    }
+
+    ctx.evaluator.cacheOutput(LifetimeDependenceInfoRequest{elem},
+                              lifetimeDependencies.empty()? std::nullopt :
+                                  ctx.AllocateCopy(lifetimeDependencies));
 
     return elem;
   }

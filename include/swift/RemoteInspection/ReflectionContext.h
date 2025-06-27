@@ -1020,7 +1020,7 @@ public:
       auto CDAddr = this->readCaptureDescriptorFromMetadata(*MetadataAddress);
       if (!CDAddr)
         return nullptr;
-      if (!CDAddr->isResolved())
+      if (!CDAddr->getResolvedAddress())
         return nullptr;
 
       // FIXME: Non-generic SIL boxes also use the HeapLocalVariable metadata

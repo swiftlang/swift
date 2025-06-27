@@ -40,8 +40,9 @@ using namespace clang::tooling::dependencies;
 static void addScannerPrefixMapperInvocationArguments(
     std::vector<std::string> &invocationArgStrs, ASTContext &ctx) {
   for (const auto &arg : ctx.SearchPathOpts.ScannerPrefixMapper) {
-    std::string prefixMapArg = "-fdepscan-prefix-map=" + arg;
-    invocationArgStrs.push_back(prefixMapArg);
+    invocationArgStrs.push_back("-fdepscan-prefix-map");
+    invocationArgStrs.push_back(arg.first);
+    invocationArgStrs.push_back(arg.second);
   }
 }
 
@@ -85,7 +86,6 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
     const ASTContext &ctx,
     clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
     clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
-    StringRef moduleOutputPath, StringRef stableModuleOutputPath,
     LookupModuleOutputCallback lookupModuleOutput,
     RemapPathCallback callback) {
   ModuleDependencyVector result;
@@ -266,16 +266,4 @@ void ClangImporter::getBridgingHeaderOptions(
     swiftArgs.push_back("-clang-include-tree-root");
     swiftArgs.push_back(*Tree);
   }
-}
-
-ModuleDependencyVector
-ClangImporter::getModuleDependencies(Identifier moduleName,
-                                     StringRef moduleOutputPath,
-                                     StringRef sdkModuleOutputPath,
-                                     const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
-                                     const std::vector<std::string> &swiftModuleClangCC1CommandLineArgs,
-                                     InterfaceSubContextDelegate &delegate,
-                                     llvm::PrefixMapper *mapper,
-                                     bool isTestableImport) {
-  return {};
 }

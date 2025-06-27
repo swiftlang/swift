@@ -201,13 +201,13 @@ struct ModulePassContext : Context, CustomStringConvertible {
   }
 
   func mangle(withDeadArguments: [Int], from function: Function) -> String {
-    withDeadArguments.withUnsafeBufferPointer { bufPtr in
-      bufPtr.withMemoryRebound(to: Int.self) { valPtr in
-        String(taking: _bridged.mangleWithDeadArgs(valPtr.baseAddress,
-                                                   withDeadArguments.count,
-                                                   function.bridged))
-      }
+    withDeadArguments.withBridgedArrayRef { bridgedArgIndices in
+      String(taking: _bridged.mangleWithDeadArgs(bridgedArgIndices, function.bridged))
     }
+  }
+
+  func erase(function: Function) {
+    _bridged.eraseFunction(function.bridged)
   }
 
   func notifyFunctionTablesChanged() {

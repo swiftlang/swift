@@ -700,6 +700,14 @@ public:
   /// Returns true if this contextual type is (Escapable && !isNoEscape).
   bool mayEscape() { return !isNoEscape() && isEscapable(); }
 
+  /// Returns true if this contextual type satisfies a conformance to
+  /// BitwiseCopyable.
+  bool isBitwiseCopyable();
+
+  /// Returns true if this type satisfies a conformance to BitwiseCopyable in
+  /// the given generic signature.
+  bool isBitwiseCopyable(GenericSignature sig);
+
   /// Are values of this type essentially just class references,
   /// possibly with some sort of additional information?
   ///

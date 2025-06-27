@@ -3,10 +3,14 @@
 // a
 // CHECK-LABEL: sil_global hidden @$s24toplevel_globalactorvars1aSivp : $Int
 
-// CHECK-LABEL: sil private [ossa] @async_Main
+// CHECK-LABEL: sil private [ossa] @async_Main : $@convention(thin) @async () -> () {
 // CHECK: bb0:
-// CHECK-NEXT: [[MAIN:%.*]] = builtin "buildMainActorExecutorRef"() : $Builtin.Executor
-// CHECK-NEXT: [[MAIN_OPTIONAL:%[0-9]+]] = enum $Optional<Builtin.Executor>, #Optional.some!enumelt, [[MAIN]]
+// CHECK: [[META:%.*]] = metatype $@thick MainActor.Type
+// CHECK: [[FUNC:%.*]] = function_ref @$sScM6sharedScMvgZ : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+// CHECK: [[ACTOR_RAW:%.*]] = apply [[FUNC]]([[META]])
+// CHECK: [[ACTOR_RAW_E:%.*]] = init_existential_ref [[ACTOR_RAW]]
+// CHECK: [[ACTOR_RAW_E_O:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[ACTOR_RAW_E]]
+// CHECK: [[ACTOR:%.*]] = begin_borrow [[ACTOR_RAW_E_O]]
 
 actor MyActorImpl {}
 
@@ -67,7 +71,7 @@ await printFromMyActor(value: a)
 // CHECK: hop_to_executor [[ACTORREF]] : $MyActorImpl
 // CHECK: end_borrow [[ACTORREF]]
 // CHECK: {{%[0-9]+}} = apply [[PRINTFROMMYACTOR_FUNC]]([[AGLOBAL]])
-// CHECK: hop_to_executor [[MAIN_OPTIONAL]]
+// CHECK: hop_to_executor [[ACTOR]]
 
 if a < 10 {
 // CHECK: [[AACCESS:%[0-9]+]] = begin_access [read] [dynamic] [[AREF]] : $*Int
@@ -121,5 +125,12 @@ if a < 10 {
     // CHECK: hop_to_executor [[ACTORREF]] : $MyActorImpl
     // CHECK: end_borrow [[ACTORREF]]
     // CHECK: {{%[0-9]+}} = apply [[PRINTFROMMYACTOR_FUNC]]([[AGLOBAL]])
-    // CHECK: hop_to_executor [[MAIN_OPTIONAL]]
+    // CHECK: hop_to_executor [[ACTOR]]
 }
+
+nonisolated(nonsending) func nonisolatedNonSendingFunction() async {}
+
+// CHECK: [[FUNC:%.*]] = function_ref @$s24toplevel_globalactorvars29nonisolatedNonSendingFunctionyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> ()
+// CHECK: apply [[FUNC]]([[ACTOR]])
+// CHECK-NEXT: hop_to_executor [[ACTOR]]
+await nonisolatedNonSendingFunction()

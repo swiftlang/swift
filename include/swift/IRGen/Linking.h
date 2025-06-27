@@ -132,7 +132,7 @@ class LinkEntity {
   /// ValueDecl*, SILFunction*, or TypeBase*, depending on Kind.
   void *Pointer;
 
-  /// ProtocolConformance*, depending on Kind.
+  /// ProtocolConformance* or SILDifferentiabilityWitness*, depending on Kind.
   void *SecondaryPointer;
 
   /// A hand-rolled bitfield with the following layout:
@@ -772,8 +772,8 @@ class LinkEntity {
   void
   setForDifferentiabilityWitness(Kind kind,
                                  const SILDifferentiabilityWitness *witness) {
-    Pointer = const_cast<void *>(static_cast<const void *>(witness));
-    SecondaryPointer = nullptr;
+    Pointer = nullptr;
+    SecondaryPointer = const_cast<void *>(static_cast<const void *>(witness));
     Data = LINKENTITY_SET_FIELD(Kind, unsigned(kind));
   }
 
@@ -1684,7 +1684,7 @@ public:
 
   SILDifferentiabilityWitness *getSILDifferentiabilityWitness() const {
     assert(getKind() == Kind::DifferentiabilityWitness);
-    return reinterpret_cast<SILDifferentiabilityWitness *>(Pointer);
+    return reinterpret_cast<SILDifferentiabilityWitness *>(SecondaryPointer);
   }
 
   const RootProtocolConformance *getRootProtocolConformance() const {

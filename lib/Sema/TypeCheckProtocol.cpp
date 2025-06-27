@@ -289,8 +289,7 @@ static ValueDecl *getStandinForAccessor(AbstractStorageDecl *witness,
     break;
 
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
-#define ACCESSOR(ID) \
-  case AccessorKind::ID:
+#define ACCESSOR(ID, KEYWORD) case AccessorKind::ID:
 #include "swift/AST/AccessorKinds.def"
     llvm_unreachable("unexpected accessor requirement");
   }
@@ -2708,8 +2707,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
         
         if (explicitConformance->getSourceKind() ==
               ConformanceEntryKind::Explicit) {
-          diag.fixItInsert(explicitConformance->getProtocolNameLoc(),
-                           "@unsafe ");
+          conformance->applyConformanceAttribute(diag, "@unsafe");
         }
       }
 
@@ -5090,18 +5088,19 @@ static void diagnoseConformanceIsolationErrors(
     if (potentialIsolation && potentialIsolation->isGlobalActor() &&
         !conformance->isIsolated()) {
       bool isMainActor = false;
-      Type globalActorIsolation = potentialIsolation->getGlobalActor();
-      if (auto nominal = globalActorIsolation->getAnyNominal())
+      Type globalActorType = potentialIsolation->getGlobalActor();
+      if (auto nominal = globalActorType->getAnyNominal())
         isMainActor = nominal->isMainActor();
 
-      ctx.Diags.diagnose(
-          conformance->getProtocolNameLoc(),
-          diag::note_isolate_conformance_to_global_actor,
-          globalActorIsolation,
-          isMainActor,
-          globalActorIsolation.getString())
-        .fixItInsert(conformance->getProtocolNameLoc(),
-                     "@" + globalActorIsolation.getString() + " ");
+      // Take permanent ownership of the string. The diagnostic may outlive this
+      // function call.
+      auto globalActorTypeStr = ctx.AllocateCopy(globalActorType.getString());
+      auto diag =
+          ctx.Diags.diagnose(conformance->getProtocolNameLoc(),
+                             diag::note_isolate_conformance_to_global_actor,
+                             globalActorType, isMainActor, globalActorTypeStr);
+      conformance->applyConformanceAttribute(diag,
+                                             "@" + globalActorTypeStr.str());
     }
 
     // If marking witnesses as 'nonisolated' could work, suggest that.
@@ -5119,10 +5118,10 @@ static void diagnoseConformanceIsolationErrors(
     // If the conformance could be @preconcurrency, suggest it.
     if (!conformance->isIsolated() && !conformance->isPreconcurrency() &&
         !hasIsolatedConformances) {
-      ctx.Diags.diagnose(
-          conformance->getProtocolNameLoc(),
-          diag::note_make_conformance_preconcurrency)
-        .fixItInsert(conformance->getProtocolNameLoc(), "@preconcurrency ");
+      auto diag =
+          ctx.Diags.diagnose(conformance->getProtocolNameLoc(),
+                             diag::note_make_conformance_preconcurrency);
+      conformance->applyConformanceAttribute(diag, "@preconcurrency");
     }
 
     // Make a note of all of the isolation problems we encountered in this
@@ -6816,9 +6815,10 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
 
       auto nameLoc = normal->getProtocolNameLoc();
       if (nameLoc.isValid()) {
-        Context.Diags.diagnose(
-            nameLoc, diag::isolated_conformance_will_become_nonisolated, nominal, proto)
-          .fixItInsert(nameLoc, "nonisolated ");
+        auto diag = Context.Diags.diagnose(
+            nameLoc, diag::isolated_conformance_will_become_nonisolated,
+            nominal, proto);
+        normal->applyConformanceAttribute(diag, "nonisolated");
       }
     }
   }

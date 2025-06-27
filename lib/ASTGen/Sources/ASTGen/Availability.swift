@@ -369,7 +369,7 @@ extension ASTGenVisitor {
     return result
   }
 
-  typealias GeneratedPlatformVersion = (platform: BridgedPlatformKind, version: BridgedVersionTuple)
+  typealias GeneratedPlatformVersion = (platform: swift.PlatformKind, version: BridgedVersionTuple)
 
   func generate(platformVersionList node: PlatformVersionItemListSyntax) -> [GeneratedPlatformVersion] {
     var result: [GeneratedPlatformVersion] = []
@@ -380,9 +380,9 @@ extension ASTGenVisitor {
       let version = self.generate(versionTuple: platformVersionNode.version)?.bridged ?? BridgedVersionTuple()
 
       // If the name is a platform name, use it.
-      let platform = BridgedPlatformKind(from: platformName.bridged)
-      if platform != .none {
-        result.append((platform: platform, version: version))
+      let platform = BridgedOptionalPlatformKind(from: platformName.bridged)
+      guard !platform.hasValue else {
+        result.append((platform: platform.value, version: version))
         continue
       }
 
@@ -397,11 +397,12 @@ extension ASTGenVisitor {
             let spec = BridgedAvailabilitySpec(raw: UnsafeMutableRawPointer(mutating: ptr))
             let domainOrIdentifier = spec.domainOrIdentifier
             precondition(!domainOrIdentifier.isDomain)
-            let platform = BridgedPlatformKind(from: domainOrIdentifier.asIdentifier)
-            guard platform != .none else {
+            let platform = BridgedOptionalPlatformKind(from: domainOrIdentifier.asIdentifier)
+            guard platform.hasValue else {
+              // TODO: Diagnose?
               continue
             }
-            result.append((platform: platform, version: spec.rawVersion))
+            result.append((platform: platform.value, version: spec.rawVersion))
           }
         }
         continue

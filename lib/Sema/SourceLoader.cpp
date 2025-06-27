@@ -153,14 +153,3 @@ void SourceLoader::loadExtensions(NominalTypeDecl *nominal,
   // Type-checking the source automatically loads all extensions; there's
   // nothing to do here.
 }
-
-ModuleDependencyVector
-SourceLoader::getModuleDependencies(Identifier moduleName,
-                                    StringRef moduleOutputPath, StringRef sdkModuleOutputPath,
-                                    const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
-                                    const std::vector<std::string> &swiftModuleClangCC1CommandLineArgs,
-                                    InterfaceSubContextDelegate &delegate,
-                                    llvm::PrefixMapper* mapper,
-                                    bool isTestableImport) {
-  return {};
-}

@@ -1288,7 +1288,41 @@ final public class IsUniqueInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class DestroyNotEscapedClosureInst : SingleValueInstruction, UnaryInstruction {}
 
-final public class MarkUnresolvedNonCopyableValueInst: SingleValueInstruction, UnaryInstruction {}
+final public class MarkUnresolvedNonCopyableValueInst: SingleValueInstruction, UnaryInstruction {
+  // The raw values must match swift::MarkUnresolvedNonCopyableValueInst::CheckKind
+  public enum CheckKind: Int {
+    case invalid = 0
+
+    /// A signal to the move only checker to perform checking that allows for
+    /// this value to be consumed along its boundary (in the case of let/var
+    /// semantics) and also written over in the case of var semantics. NOTE: Of
+    /// course this still implies the value cannot be copied and can be consumed
+    /// only once along all program paths.
+    case consumableAndAssignable
+
+    /// A signal to the move only checker to perform no consume or assign
+    /// checking. This forces the result of this instruction owned value to
+    /// never be consumed (for let/var semantics) or assigned over (for var
+    /// semantics). Of course, we still allow for non-consuming uses.
+    case noConsumeOrAssign
+
+    /// A signal to the move checker that the given value cannot be consumed,
+    /// but is allowed to be assigned over. This is used for situations like
+    /// global_addr/ref_element_addr/closure escape where we do not want to
+    /// allow for the user to take the value (leaving the memory in an
+    /// uninitialized state), but we are ok with the user assigning a new value,
+    /// completely assigning over the value at once.
+    case assignableButNotConsumable
+
+    /// A signal to the move checker that the given value cannot be consumed or
+    /// assigned, but is allowed to be initialized. This is used for situations
+    /// like class initializers.
+    case initableButNotConsumable
+  }
+
+  var checkKind: CheckKind { CheckKind(rawValue: bridged.MarkUnresolvedNonCopyableValue_getCheckKind())! }
+  var isStrict: Bool { bridged.MarkUnresolvedNonCopyableValue_isStrict() }
+}
 
 final public class MarkUnresolvedReferenceBindingInst : SingleValueInstruction {}
 
@@ -1404,6 +1438,8 @@ final public class AllocBoxInst : SingleValueInstruction, Allocation, DebugVaria
   public var debugVariable: DebugVariable? {
     return bridged.AllocBox_hasVarInfo() ? bridged.AllocBox_getVarInfo() : nil
   }
+
+  public var hasDynamicLifetime: Bool { bridged.AllocBoxInst_hasDynamicLifetime() }
 }
 
 final public class AllocExistentialBoxInst : SingleValueInstruction, Allocation {

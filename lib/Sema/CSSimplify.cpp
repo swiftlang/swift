@@ -5365,6 +5365,11 @@ bool ConstraintSystem::repairFailures(
       matchKind = ConstraintKind::Conversion;
     }
 
+    // FIXME: There is currently no easy way to avoid attempting
+    // fixes, matchTypes do not propagate `TMF_ApplyingFix` flag.
+    llvm::SaveAndRestore<ConstraintSystemOptions> options(
+        Options, Options - ConstraintSystemFlags::AllowFixes);
+
     auto result = matchTypes(resultType, dstType, matchKind,
                              TypeMatchFlags::TMF_ApplyingFix, locator);
 
@@ -7353,11 +7358,16 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // and `Optional<T>` which would be handled by optional injection.
   if (isTupleWithUnresolvedPackExpansion(origType1) ||
       isTupleWithUnresolvedPackExpansion(origType2)) {
+    auto isTypeVariableWrappedInOptional = [](Type type) {
+      if (type->getOptionalObjectType()) {
+        return type->lookThroughAllOptionalTypes()->isTypeVariableOrMember();
+      }
+      return false;
+    };
     if (isa<TupleType>(desugar1) != isa<TupleType>(desugar2) &&
-        !isa<InOutType>(desugar1) &&
-        !isa<InOutType>(desugar2) &&
-        !desugar1->getOptionalObjectType() &&
-        !desugar2->getOptionalObjectType() &&
+        !isa<InOutType>(desugar1) && !isa<InOutType>(desugar2) &&
+        !isTypeVariableWrappedInOptional(desugar1) &&
+        !isTypeVariableWrappedInOptional(desugar2) &&
         !desugar1->isAny() &&
         !desugar2->isAny()) {
       return matchTypes(
@@ -10200,13 +10210,15 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
         if (path.back().getKind() == ConstraintLocator::ConstructorMember)
           isImplicitInit = true;
 
-      if (auto *applyExpr = getAsExpr<ApplyExpr>(anchor)) {
-        if (auto *argExpr = applyExpr->getArgs()->getUnlabeledUnaryExpr()) {
-          favoredType = getFavoredType(argExpr);
-
-          if (!favoredType) {
-            optimizeConstraints(argExpr);
+      if (performanceHacksEnabled()) {
+        if (auto *applyExpr = getAsExpr<ApplyExpr>(anchor)) {
+          if (auto *argExpr = applyExpr->getArgs()->getUnlabeledUnaryExpr()) {
             favoredType = getFavoredType(argExpr);
+
+            if (!favoredType) {
+              optimizeConstraints(argExpr);
+              favoredType = getFavoredType(argExpr);
+            }
           }
         }
       }
@@ -10321,22 +10333,24 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     // If the invocation's argument expression has a favored type,
     // use that information to determine whether a specific overload for
     // the candidate should be favored.
-    if (isa<ConstructorDecl>(decl) && favoredType &&
-        result.FavoredChoice == ~0U) {
-      auto *ctor = cast<ConstructorDecl>(decl);
+    if (performanceHacksEnabled()) {
+      if (isa<ConstructorDecl>(decl) && favoredType &&
+          result.FavoredChoice == ~0U) {
+        auto *ctor = cast<ConstructorDecl>(decl);
 
-      // Only try and favor monomorphic unary initializers.
-      if (!ctor->isGenericContext()) {
-        if (!ctor->getMethodInterfaceType()->hasError()) {
-          // The constructor might have an error type because we don't skip
-          // invalid decls for code completion
-          auto args = ctor->getMethodInterfaceType()
-                          ->castTo<FunctionType>()
-                          ->getParams();
-          if (args.size() == 1 && !args[0].hasLabel() &&
-              args[0].getPlainType()->isEqual(favoredType)) {
-            if (!isDeclUnavailable(decl, memberLocator))
-              result.FavoredChoice = result.ViableCandidates.size();
+        // Only try and favor monomorphic unary initializers.
+        if (!ctor->isGenericContext()) {
+          if (!ctor->getMethodInterfaceType()->hasError()) {
+            // The constructor might have an error type because we don't skip
+            // invalid decls for code completion
+            auto args = ctor->getMethodInterfaceType()
+                            ->castTo<FunctionType>()
+                            ->getParams();
+            if (args.size() == 1 && !args[0].hasLabel() &&
+                args[0].getPlainType()->isEqual(favoredType)) {
+              if (!isDeclUnavailable(decl, memberLocator))
+                result.FavoredChoice = result.ViableCandidates.size();
+            }
           }
         }
       }

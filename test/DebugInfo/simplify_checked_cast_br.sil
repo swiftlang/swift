@@ -13,9 +13,9 @@ class X : B {}
 // CHECK:         %0 = alloc_ref
 // CHECK-NEXT:  checked_cast_br X in %0 : $X
 // CHECK:     bb2([[A:%.*]] : @owned $X):
-// CHECK-NEXT:  [[U:%.*]] = upcast [[A]] : $X to $B, loc "takethis":1:1
-// CHECK-NEXT:  [[E:%.*]] = init_existential_ref [[U]] {{.+}}, loc "takethis":1:1
-// CHECK-NEXT:  debug_value [[E]] : $AnyObject, let, name "me", loc "ignore-this-meta-inst":1:1
+// CHECK-NEXT:  [[U:%.*]] = upcast [[A]] : $X to $B, loc "dv":1:1
+// CHECK-NEXT:  [[E:%.*]] = init_existential_ref [[U]] {{.+}}, loc "dv":1:1
+// CHECK-NEXT:  debug_value [[E]] : $AnyObject, let, name "me", loc "dv":1:1
 // CHECK-NEXT:  destroy_value [[E]] : $AnyObject, loc "takethis":1:1
 // CHECK:       } // end sil function 'test_ossa'
 sil [ossa] @test_ossa : $@convention(thin) () -> @owned X {
@@ -30,7 +30,7 @@ bb1(%5 : @owned $X):
   return %5 : $X
 
 bb2(%7 : @owned $AnyObject):
-  debug_value %7 : $AnyObject, let, name "me", loc "ignore-this-meta-inst":1:1
+  debug_value %7 : $AnyObject, let, name "me", loc "dv":1:1
   destroy_value %7: $AnyObject, loc "takethis":1:1
   unreachable
 }

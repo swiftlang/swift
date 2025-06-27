@@ -77,8 +77,8 @@ func badCallToZip<each T, each U>(t: repeat each T, u: repeat each U) {
   // expected-error@-2 {{pack expansion requires that 'each U' and 'each T' have the same shape}}
 }
 
-do {
-  func test<A, B, each C>(
+func variadicGenericsInOptionalContext(v: Int?) {
+  func test1<A, B, each C>(
     _: A,
     _: B,
     _: repeat each C
@@ -86,7 +86,19 @@ do {
     fatalError()
   }
 
+  func test2<A, B, each C>(
+    _: A,
+    _: B,
+    _: (repeat each C)
+  ) throws -> (A, B, repeat each C) {
+    fatalError()
+  }
+
   func test() {
-    guard let _ = try? test(1, 2, 3) else { return } // Ok
+    guard let _ = try? test1(1, 2, 3) else { return } // Ok
+    guard let _ = try? test1(1, 2, v) else { return } // Ok
+
+    guard let _ = try? test2(1, 2, 3) else { return } // Ok
+    guard let _ = try? test2(1, 2, v) else { return } // Ok
   }
 }

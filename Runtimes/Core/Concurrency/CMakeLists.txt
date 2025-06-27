@@ -71,7 +71,6 @@ add_library(swift_Concurrency
   Deque/Deque+UnsafeHandle.swift
   Deque/UnsafeMutableBufferPointer+Utilities.swift
   DiscardingTaskGroup.swift
-  DummyExecutor.swift
   Errors.swift
   Executor.swift
   ExecutorAssertions.swift
@@ -96,6 +95,7 @@ add_library(swift_Concurrency
   TaskLocal.swift
   TaskSleep.swift
   TaskSleepDuration.swift
+  UnimplementedExecutor.swift
   "${CMAKE_CURRENT_BINARY_DIR}/Task+init.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/TaskGroup+addTask.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/Task+immediate.swift")

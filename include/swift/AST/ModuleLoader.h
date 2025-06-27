@@ -367,17 +367,6 @@ public:
   /// Discover overlays declared alongside this file and add information about
   /// them to it.
   void findOverlayFiles(SourceLoc diagLoc, ModuleDecl *module, FileUnit *file);
-
-  /// Retrieve the dependencies for the given, named module, or \c None
-  /// if no such module exists.
-  virtual llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
-  getModuleDependencies(Identifier moduleName,
-                        StringRef moduleOutputPath, StringRef sdkModuleOutputPath,
-                        const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
-                        const std::vector<std::string> &swiftModuleClangCC1CommandLineArgs,
-                        InterfaceSubContextDelegate &delegate,
-                        llvm::PrefixMapper *mapper = nullptr,
-                        bool isTestableImport = false) = 0;
 };
 
 } // namespace swift

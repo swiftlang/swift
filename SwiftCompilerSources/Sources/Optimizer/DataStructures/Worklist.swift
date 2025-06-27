@@ -110,3 +110,63 @@ extension InstructionWorklist {
   }
 }
 
+/// A worklist for `Function`s.
+struct FunctionWorklist {
+
+  // The current functions in the worklist.
+  private(set) var functions = Array<Function>()
+
+  // All functions which were ever pushed to the worklist.
+  private var pushedFunctions = Set<Function>()
+
+  mutating func pushIfNotVisited(_ function: Function) {
+    if pushedFunctions.insert(function).inserted {
+      functions.append(function)
+    }
+  }
+
+  mutating func pushIfNotVisited(contentsOf functions: [Function]) {
+    for f in functions {
+      pushIfNotVisited(f)
+    }
+  }
+
+  mutating func pop() -> Function? {
+    return functions.popLast()
+  }
+}
+
+/// Like `ValueWorklist`, but allows pushing `Value`s from different functions -
+/// at the cost of a less efficient implementation.
+struct CrossFunctionValueWorklist {
+
+  // The current values in the worklist.
+  private(set) var values = Array<Value>()
+
+  // All values which were ever pushed to the worklist.
+  private var pushedValues = Set<ObjectIdentifier>(minimumCapacity: 8)
+
+  init() {
+    values.reserveCapacity(8)
+  }
+
+  mutating func pop() -> Value? {
+    return values.popLast()
+  }
+
+  mutating func pushIfNotVisited(_ value: Value) {
+    if pushedValues.insert(ObjectIdentifier(value)).inserted {
+      values.append(value)
+    }
+  }
+
+  mutating func pushIfNotVisited<S: Sequence>(contentsOf values: S) where S.Element == Value {
+    for value in values {
+      pushIfNotVisited(value)
+    }
+  }
+
+  func hasBeenPushed(_ value: Value) -> Bool {
+    return pushedValues.contains(ObjectIdentifier(value))
+  }
+}

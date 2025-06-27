@@ -87,7 +87,8 @@ func use(_ o : borrowing View) {}
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [static] [[NC]]
 // CHECK:   [[NCVAL:%.*]] = load [[ACCESS]] 
 // CHECK:   ([[WRAPPER:%.*]], [[TOKEN1:%.*]]) = begin_apply %{{.*}}([[NCVAL]]) : $@yield_once @convention(method) (@guaranteed NCContainer) -> @lifetime(borrow 0) @yields @guaranteed Wrapper
-// CHECK:   [[MDI:%.*]] = mark_dependence [nonescaping] [[WRAPPER]] on [[ACCESS]]
+// CHECK:   [[SCOPE:%.*]] = mark_dependence [nonescaping] [[WRAPPER]] on [[TOKEN1]]
+// CHECK:   [[MDI:%.*]] = mark_dependence [nonescaping] [[SCOPE]] on [[ACCESS]]
 // CHECK:   retain_value [[MDI]]
 // CHECK:   debug_value [[MDI]], let, name "wrapper"
 //       let view = wrapper.view

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -3379,8 +3379,7 @@ bool AbstractStorageDecl::requiresOpaqueAccessor(AccessorKind kind) const {
 
   // Other accessors are never part of the opaque-accessors set.
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
-#define ACCESSOR(ID) \
-  case AccessorKind::ID:
+#define ACCESSOR(ID, KEYWORD) case AccessorKind::ID:
 #include "swift/AST/AccessorKinds.def"
     return false;
   }
@@ -7623,7 +7622,7 @@ void AbstractStorageDecl::setAccessors(SourceLoc lbraceLoc,
 // Compute the number of opaque accessors.
 const size_t NumOpaqueAccessors =
   0
-#define ACCESSOR(ID)
+#define ACCESSOR(ID, KEYWORD)
 #define OPAQUE_ACCESSOR(ID, KEYWORD) \
   + 1
 #include "swift/AST/AccessorKinds.def"
@@ -7646,14 +7645,14 @@ AbstractStorageDecl::AccessorRecord::create(ASTContext &ctx,
   // Make sure that we have enough space to add implicit opaque accessors later.
   size_t numMissingOpaque = NumOpaqueAccessors;
   {
-#define ACCESSOR(ID)
+#define ACCESSOR(ID, KEYWORD)
 #define OPAQUE_ACCESSOR(ID, KEYWORD)          \
     bool has##ID = false;
 #include "swift/AST/AccessorKinds.def"
     for (auto accessor : accessors) {
       switch (accessor->getAccessorKind()) {
-#define ACCESSOR(ID)                          \
-      case AccessorKind::ID:                  \
+#define ACCESSOR(ID, KEYWORD)                                                  \
+      case AccessorKind::ID:                                                   \
         continue;
 #define OPAQUE_ACCESSOR(ID, KEYWORD)          \
       case AccessorKind::ID:                  \
@@ -12214,10 +12213,10 @@ StringRef swift::getAccessorLabel(AccessorKind kind) {
   switch (kind) {
   #define SINGLETON_ACCESSOR(ID, KEYWORD) \
     case AccessorKind::ID: return #KEYWORD;
-  #define ACCESSOR(ID)
-  #include "swift/AST/AccessorKinds.def"
-    }
-    llvm_unreachable("bad accessor kind");
+#define ACCESSOR(ID, KEYWORD)
+#include "swift/AST/AccessorKinds.def"
+  }
+  llvm_unreachable("bad accessor kind");
 }
 
 void swift::simple_display(llvm::raw_ostream &out, AccessorKind kind) {

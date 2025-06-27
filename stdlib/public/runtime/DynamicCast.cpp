@@ -850,6 +850,17 @@ struct ObjCBridgeMemo {
         destBridgeWitness, targetBridgedType);
     }
 };
+
+static const HashableWitnessTable* tryMemoizeNSStringHashableConformance(const Metadata *cls) {
+  auto nsString = getNSStringMetadata();
+  do {
+    if (cls == nsString) {
+      return getNSStringHashableConformance();
+    }
+    cls = _swift_class_getSuperclass(cls);
+  } while (cls != nullptr);
+  return nullptr;
+}
 #endif
 
 static DynamicCastResult
@@ -867,23 +878,16 @@ tryCastToAnyHashable(
   const HashableWitnessTable *hashableConformance = nullptr;
   
   switch (srcType->getKind()) {
+  case MetadataKind::Existential: {
+    return DynamicCastResult::Failure;
+  }
   case MetadataKind::ForeignClass: // CF -> String
   case MetadataKind::ObjCClassWrapper: { // Obj-C -> String
 #if SWIFT_OBJC_INTEROP
-    auto cls = srcType;
-    auto nsString = getNSStringMetadata();
-    do {
-      if (cls == nsString) {
-        hashableConformance = getNSStringHashableConformance();
-        break;
-      }
-      cls = _swift_class_getSuperclass(cls);
-    } while (cls != nullptr);
-    break;
-#else
+    hashableConformance = tryMemoizeNSStringHashableConformance(srcType);
+#endif
     // If no Obj-C interop, just fall through to the general case.
     break;
-#endif
   }
   case MetadataKind::Optional: {
     // FIXME: https://github.com/apple/swift/issues/51550

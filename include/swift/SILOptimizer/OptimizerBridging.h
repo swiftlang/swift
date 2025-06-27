@@ -53,7 +53,7 @@ class SwiftPassInvocation;
 class FixedSizeSlabPayload;
 class FixedSizeSlab;
 class SILVTable;
-class ClosureSpecializationCloner;
+class SpecializationCloner;
 }
 
 struct BridgedPassContext;
@@ -182,12 +182,14 @@ struct BridgedCloner {
 };
 
 struct BridgedSpecializationCloner {
-  swift::ClosureSpecializationCloner * _Nonnull closureSpecCloner;
+  swift::SpecializationCloner * _Nonnull cloner;
 
   SWIFT_IMPORT_UNSAFE BridgedSpecializationCloner(BridgedFunction emptySpecializedFunction);
   SWIFT_IMPORT_UNSAFE BridgedFunction getCloned() const;
   SWIFT_IMPORT_UNSAFE BridgedBasicBlock getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const;
-  void cloneFunctionBody(BridgedFunction originalFunction, BridgedBasicBlock clonedEntryBlock, BridgedValueArray clonedEntryBlockArgs) const;
+  void cloneFunctionBody(BridgedFunction originalFunction, BridgedBasicBlock clonedEntryBlock,
+                         BridgedValueArray clonedEntryBlockArgs) const;
+  void cloneFunctionBody(BridgedFunction originalFunction) const;
 };
 
 struct BridgedPassContext {
@@ -250,18 +252,19 @@ struct BridgedPassContext {
   bool specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const;
   BridgedOwnedString mangleOutlinedVariable(BridgedFunction function) const;
   BridgedOwnedString mangleAsyncRemoved(BridgedFunction function) const;
-  BridgedOwnedString mangleWithDeadArgs(const SwiftInt * _Nullable deadArgs,
-                                                            SwiftInt numDeadArgs,
-                                                            BridgedFunction function) const;
+  BridgedOwnedString mangleWithDeadArgs(BridgedArrayRef bridgedDeadArgIndices, BridgedFunction function) const;
   BridgedOwnedString mangleWithClosureArgs(BridgedValueArray closureArgs,
                                                                BridgedArrayRef closureArgIndices,
                                                                BridgedFunction applySiteCallee) const;
+  BridgedOwnedString mangleWithBoxToStackPromotedArgs(BridgedArrayRef bridgedPromotedArgIndices,
+                                                      BridgedFunction bridgedOriginalFunction) const;
 
   SWIFT_IMPORT_UNSAFE BridgedGlobalVar createGlobalVariable(BridgedStringRef name, BridgedType type,
                                                             BridgedLinkage linkage, bool isLet) const;
   void inlineFunction(BridgedInstruction apply, bool mandatoryInline) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue getSILUndef(BridgedType type) const;
   BRIDGED_INLINE bool eliminateDeadAllocations(BridgedFunction f) const;
+  void eraseFunction(BridgedFunction function) const;
 
   BRIDGED_INLINE bool shouldExpand(BridgedType type) const;
 
@@ -392,11 +395,12 @@ struct BridgedPassContext {
   BRIDGED_INLINE bool enableAddressDependencies() const;
 
   // Closure specializer
-  SWIFT_IMPORT_UNSAFE BridgedFunction ClosureSpecializer_createEmptyFunctionWithSpecializedSignature(BridgedStringRef specializedName,
+  SWIFT_IMPORT_UNSAFE BridgedFunction createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
                                                         const BridgedParameterInfo * _Nullable specializedBridgedParams,
                                                         SwiftInt paramCount,
-                                                        BridgedFunction bridgedApplySiteCallee,
-                                                        bool isSerialized) const;
+                                                        BridgedFunction bridgedOriginal,
+                                                        bool makeThin,
+                                                        bool makeBare) const;
 
   bool completeLifetime(BridgedValue value) const;
 };

@@ -166,9 +166,15 @@ StringRef DeclName::getString(llvm::SmallVectorImpl<char> &scratch,
 }
 
 llvm::raw_ostream &DeclName::print(llvm::raw_ostream &os,
-                                   bool skipEmptyArgumentNames) const {
+                                   bool skipEmptyArgumentNames,
+                                   bool escapeIfNeeded) const {
   // Print the base name.
-  os << getBaseName();
+  auto baseName = getBaseName();
+  if (escapeIfNeeded && baseName.mustAlwaysBeEscaped()) {
+    os << "`" << baseName << "`";
+  } else {
+    os << baseName;
+  }
 
   // If this is a simple name, we're done.
   if (isSimpleName())
@@ -193,8 +199,13 @@ llvm::raw_ostream &DeclName::print(llvm::raw_ostream &os,
 
   // Print the argument names.
   os << "(";
-  for (auto c : getArgumentNames()) {
-    os << c << ':';
+  for (auto argName : getArgumentNames()) {
+    if (escapeIfNeeded && argName.mustAlwaysBeEscaped()) {
+      os << "`" << argName << "`";
+    } else {
+      os << argName;
+    }
+    os << ':';
   }
   os << ")";
   return os;
