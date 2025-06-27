@@ -8,6 +8,7 @@ struct NestedStruct {
 
 int nestedStruct_method(MyNS::NestedStruct p) SWIFT_NAME("MyNS.NestedStruct.method(self:)") { return p.value; }
 int nestedStruct_methodConstRef(const MyNS::NestedStruct &p) SWIFT_NAME("MyNS.NestedStruct.methodConstRef(self:)") { return p.value + 1; }
+inline int nestedStruct_methodInline(MyNS::NestedStruct p) SWIFT_NAME("MyNS.NestedStruct.methodInline(self:)") { return p.value + 2; }
 
 namespace MyNS {
 namespace MyDeepNS {
