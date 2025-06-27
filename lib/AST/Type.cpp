@@ -2249,9 +2249,23 @@ Type TypeBase::getSuperclass(bool useArchetypes) {
   Type superclassTy = classDecl->getSuperclass();
 
   // If there's no superclass, or it is fully concrete, we're done.
-  if (!superclassTy || !superclassTy->hasTypeParameter() ||
-      hasUnboundGenericType())
+  if (!superclassTy || !superclassTy->hasTypeParameter())
     return superclassTy;
+
+  auto hasUnboundGenericType = [&]() {
+    Type t(this);
+    while (t) {
+      if (t->is<UnboundGenericType>())
+        return true;
+      t = t->getNominalParent();
+    }
+    return false;
+  };
+
+  // If we started with an UnboundGenericType, we cannot apply the
+  // context substitution map. Return the unbound form of the superclass.
+  if (hasUnboundGenericType())
+    return superclassTy->getAnyNominal()->getDeclaredType();
 
   // Gather substitutions from the self type, and apply them to the original
   // superclass type to form the substituted superclass type.
