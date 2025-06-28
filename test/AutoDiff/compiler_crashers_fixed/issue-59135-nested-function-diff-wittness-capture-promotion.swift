@@ -8,8 +8,8 @@
 // diagnostics further on.
 
 // CHECK-LABEL: differentiability witness for specialized y #1 (_:) in s(h:)
-// CHECK: sil_differentiability_witness private [reverse] [parameters 0] [results 0] @$s4null1s1hAA1BVAE_tF1yL_yAA1WVAHFTf2ni_n : $@convention(thin) (@guaranteed W, Int) -> @owned W {
-// CHECK-NOT: sil_differentiability_witness private [reverse] [parameters 0] [results 0] @$s4null1s1hAA1BVAE_tF1yL_yAA1WVAHF : $@convention(thin) (@guaranteed W, @guaranteed { var Int }) -> @owned W {
+// CHECK: sil_differentiability_witness private [reverse] [parameters 0] [results 0] @$s{{.*}} : $@convention(thin) (@guaranteed W, Int) -> @owned W {
+// CHECK-NOT: sil_differentiability_witness private [reverse] [parameters 0] [results 0] @$s{{.*}} : $@convention(thin) (@guaranteed W, @guaranteed { var Int }) -> @owned W {
 
 import _Differentiation
 struct B: Differentiable{}
