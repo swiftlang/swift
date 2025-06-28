@@ -300,7 +300,7 @@ getConcurrencyFixBehavior(ConstraintSystem &cs, ConstraintKind constraintKind,
       if (auto *argument = getAsExpr(simplifyLocatorToAnchor(argLoc))) {
         if (auto overload = cs.findSelectedOverloadFor(
                 argument->getSemanticsProvidingExpr())) {
-          auto *decl = overload->choice.getDecl();
+          auto *decl = overload->choice.getDeclOrNull();
           if (decl && decl->isStatic())
             return FixBehavior::DowngradeToWarning;
         }

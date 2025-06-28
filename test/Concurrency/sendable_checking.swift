@@ -526,3 +526,11 @@ func sendablePacks<each Element: Sendable>(
 
 @available(SwiftStdlib 5.1, *)
 func sendPack<each Element>(_: repeat each Element) async {}
+
+// rdar://153083848 - crash in `getConcurrencyFixBehavior` when member comes from a tuple
+func test(value: (_: Int, _: () -> Void)) {
+  func takesSendable(_: @Sendable () -> Void) {}
+
+  takesSendable(value.1) // Ok
+  // expected-warning@-1 {{converting non-Sendable function value to '@Sendable () -> Void' may introduce data races}}
+}
