@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements validation for Swift types, emitting semantic errors as
-// appropriate and checking default initializer values.
+// This file implements type resolution, which converts syntactic type
+// representations into semantic types, emitting diagnostics as appropriate.
 //
 //===----------------------------------------------------------------------===//
 
@@ -6330,14 +6330,23 @@ Type TypeChecker::substMemberTypeWithBase(TypeDecl *member,
                               : member->getDeclaredInterfaceType();
   SubstitutionMap subs;
   if (baseTy) {
-    // Cope with the presence of unbound generic types, which are ill-formed
-    // at this point but break the invariants of getContextSubstitutionMap().
+    // If the base type contains an unbound generic type, we cannot
+    // proceed to the getContextSubstitutionMap() call below.
+    //
+    // In general, this means the user program is ill-formed, but we
+    // do allow type aliases to be referenced with an unbound generic
+    // type as the base, if the underlying type of the type alias
+    // does not contain type parameters.
     if (baseTy->hasUnboundGenericType()) {
       memberType = memberType->getReducedType(aliasDecl->getGenericSignature());
 
+      // This is the error case. The diagnostic is emitted elsewhere,
+      // in TypeChecker::isUnsupportedMemberTypeAccess().
       if (memberType->hasTypeParameter())
         return ErrorType::get(memberType);
 
+      // Otherwise, there's no substitution to be performed, so we
+      // just drop the base type.
       return memberType;
     }
 
