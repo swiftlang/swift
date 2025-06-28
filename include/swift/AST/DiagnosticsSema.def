@@ -154,6 +154,9 @@ GROUPED_ERROR(could_not_use_member_on_existential,ExistentialMemberAccess,none,
       "member %1 cannot be used on value of type %0; consider using a"
       " generic constraint instead",
       (Type, DeclNameRef))
+NOTE(could_not_use_member_on_existential_note,none,
+      "member %0 refrences %1, which cannot be resolved on type %2",
+      (DeclNameRef, Type, Type))
 FIXIT(replace_with_type,"%0",(Type))
 FIXIT(insert_type_qualification,"%0.",(Type))
 
