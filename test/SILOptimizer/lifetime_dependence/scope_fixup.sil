@@ -67,6 +67,26 @@ struct Holder {
 @_addressableForDependencies
 struct AddressableForDeps {}
 
+public struct MutableView : ~Copyable, ~Escapable {
+  @_hasStorage var ptr: UnsafeMutableRawBufferPointer { get set }
+  init(ptr: UnsafeMutableRawBufferPointer)
+}
+
+public struct Container : ~Escapable, ~Copyable {
+  @_hasStorage var somethings: UnsafeMutableRawBufferPointer { get set }
+  init(somethings: UnsafeMutableRawBufferPointer)
+}
+
+public struct AThing : ~Copyable {
+  @_hasStorage var somethings: UnsafeMutableRawBufferPointer { get set }
+  init(somethings: UnsafeMutableRawBufferPointer)
+}
+
+sil @getContainer : $@convention(thin) (@inout AThing) -> @lifetime(borrow address_for_deps 0) @out Container
+sil @getMutableView : $@convention(thin) (@in_guaranteed Container) -> @lifetime(copy 0) @out Optional<MutableView>
+sil @modAThing : $@convention(thin) (@inout AThing) -> ()
+sil @getSpan : $@convention(thin) (@inout MutableView) -> @lifetime(borrow address_for_deps 0) @owned MutableRawSpan
+
 sil @getNEPointerToA : $@convention(thin) (@guaranteed NE) -> UnsafePointer<A>
 sil @useA : $@convention(thin) (A) -> ()
 
@@ -678,4 +698,96 @@ bb2(%25 : @guaranteed $NCWrapper):
   destroy_value %34
   %37 = tuple ()
   return %37
+}
+
+// rdar://151231236 ([~Escapable] Missing 'overlapping acceses' error when called from client code, but exact same code
+// produces error in same module)
+//
+// Test access scope expansion over a switch_enum_addr
+// CHECK-LABEL: sil hidden [ossa] @testSwitchEnumAddr : $@convention(thin) @async (@inout AThing) -> @error any Error {
+// CHECK: bb0(%0 : $*AThing):
+// CHECK:   [[ATHING:%[0-9]+]] = mark_unresolved_non_copyable_value [consumable_and_assignable] %0
+// CHECK:   [[ACCESS:%[0-9]+]] = begin_access [modify] [unknown] [[ATHING]]
+// CHECK:   apply {{.*}}(%{{.*}}, [[ACCESS]]) : $@convention(thin) (@inout AThing) -> @lifetime(borrow address_for_deps 0) @out Container
+// CHECK:   mark_dependence_addr [unresolved] %{{.*}} on [[ACCESS]]
+// CHECK:   [[VIEW:%[0-9]+]] = project_box
+// CHECK:   [[TMP:%[0-9]+]] = alloc_stack $Optional<MutableView>
+// CHECK:   [[TMP_NC:%[0-9]+]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[TMP]]
+// CHECK:   apply %{{.*}} : $@convention(thin) (@in_guaranteed Container) -> @lifetime(copy 0) @out Optional<MutableView>
+// CHECK:   switch_enum_addr [[TMP_NC]], case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
+// CHECK: bb1:
+// CHECK: bb2:
+// CHECK:   [[DATA:%[0-9]+]] = unchecked_take_enum_data_addr [[TMP_NC]], #Optional.some!enumelt
+// CHECK:   copy_addr [take] [[DATA]] to [init] [[VIEW]]
+// CHECK:   begin_access [modify] [unknown] [[ATHING]]
+// CHECK:   apply %{{.*}} : $@convention(thin) (@inout AThing) -> ()
+// CHECK:   [[ACCESS_VIEW:%[0-9]+]] = begin_access [modify] [unknown] [[VIEW]]
+// CHECK:   apply {{.*}} : $@convention(thin) (@inout MutableView) -> @lifetime(borrow address_for_deps 0) @owned MutableRawSpan
+// CHECK:   mark_dependence [unresolved]
+// CHECK:   end_access [[ACCESS_VIEW]]
+// CHECK:   end_access [[ACCESS]]
+// CHECK:   store
+// CHECK-LABEL: } // end sil function 'testSwitchEnumAddr'
+sil hidden [ossa] @testSwitchEnumAddr : $@convention(thin) @async (@inout AThing) -> @error any Error {
+bb0(%0 : $*AThing):
+  %1 = mark_unresolved_non_copyable_value [consumable_and_assignable] %0
+  %2 = alloc_box ${ var Container }, var, name "container"
+  %3 = begin_borrow [lexical] [var_decl] %2
+  %4 = project_box %3, 0
+  %5 = begin_access [modify] [unknown] %1
+
+  %6 = function_ref @getContainer : $@convention(thin) (@inout AThing) -> @lifetime(borrow address_for_deps 0) @out Container
+  %7 = apply %6(%4, %5) : $@convention(thin) (@inout AThing) -> @lifetime(borrow address_for_deps 0) @out Container
+  mark_dependence_addr [unresolved] %4 on %5
+  end_access %5
+  %10 = alloc_box ${ var MutableView }, var, name "view"
+  %11 = begin_borrow [lexical] [var_decl] %10
+  %12 = project_box %11, 0
+
+  %13 = alloc_stack $Optional<MutableView>
+  %14 = mark_unresolved_non_copyable_value [consumable_and_assignable] %13
+  %15 = begin_access [read] [unknown] %4
+  %16 = mark_unresolved_non_copyable_value [no_consume_or_assign] %15
+
+  %17 = function_ref @getMutableView : $@convention(thin) (@in_guaranteed Container) -> @lifetime(copy 0) @out Optional<MutableView>
+  %18 = apply %17(%14, %16) : $@convention(thin) (@in_guaranteed Container) -> @lifetime(copy 0) @out Optional<MutableView>
+  end_access %15
+
+  switch_enum_addr %14, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
+
+bb1:
+  end_borrow %11
+  dealloc_box [dead_end] %10
+  end_borrow %3
+  dealloc_box [dead_end] %2
+  unreachable
+
+bb2:
+  %44 = unchecked_take_enum_data_addr %14, #Optional.some!enumelt
+  copy_addr [take] %44 to [init] %12
+  dealloc_stack %13
+
+  %22 = begin_access [modify] [unknown] %1
+  %23 = function_ref @modAThing : $@convention(thin) (@inout AThing) -> ()
+  %24 = apply %23(%22) : $@convention(thin) (@inout AThing) -> ()
+  end_access %22
+  %26 = alloc_box ${ var MutableRawSpan }, var, name "span"
+  %27 = begin_borrow [lexical] [var_decl] %26
+  %28 = project_box %27, 0
+  %29 = begin_access [modify] [unknown] %12
+  %30 = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %29
+
+  %31 = function_ref @getSpan : $@convention(thin) (@inout MutableView) -> @lifetime(borrow address_for_deps 0) @owned MutableRawSpan
+  %32 = apply %31(%30) : $@convention(thin) (@inout MutableView) -> @lifetime(borrow address_for_deps 0) @owned MutableRawSpan
+  %33 = mark_dependence [unresolved] %32 on %30
+  end_access %29
+  store %33 to [init] %28
+  end_borrow %27
+  destroy_value %26
+  end_borrow %11
+  destroy_value %10
+  end_borrow %3
+  destroy_value %2
+  %42 = tuple ()
+  return %42
 }

@@ -243,3 +243,34 @@ func testVoid() -> NEInt {
   let ne = NEInt(immortal: 3)
   return _overrideLifetime(ne, borrowing: ())
 }
+
+// =============================================================================
+// Optional
+// =============================================================================
+
+// A view that contains some arbitrary opaque type, making it address-only, but also depends on an unsafe pointer.
+public struct AddressOnlyMutableView<T> : ~Copyable, ~Escapable {
+  let t: T
+
+  // placeholder
+  @_lifetime(borrow holder)
+  init(holder: borrowing Holder, t: T) { self.t = t }
+
+  mutating func modify() {}
+}
+
+// Return an address-only optional view (requiring switch_enum_addr).
+@_silgen_name("addressOnlyMutableView")
+@_lifetime(&holder)
+func addressOnlyMutableView<T>(holder: inout Holder, with t: T) -> AddressOnlyMutableView<T>?
+
+// rdar://151231236 ([~Escapable] Missing 'overlapping acceses' error when called from client code, but exact same code
+// produces error in same module)
+//
+// Extend the access scope for &holder across the switch_enum_addr required to unwrap Optional<AddressOnlyMutableView>.
+func testSwitchAddr<T>(holder: inout Holder, t: T) {
+  // mutableView must be a 'var' to require local variable data flow.
+  var mutableView = addressOnlyMutableView(holder: &holder, with: t)! // expected-error {{overlapping accesses to 'holder', but modification requires exclusive access; consider copying to a local variable}}
+  mutate(&holder) // expected-note {{conflicting access is here}}
+  mutableView.modify()
+}
