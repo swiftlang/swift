@@ -46,6 +46,7 @@
 #include "swift/Sema/IDETypeChecking.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/SmallString.h"
 #include <string>
 
@@ -4720,6 +4721,107 @@ bool UnintendedExtraGenericParamMemberFailure::diagnoseAsError() {
   return true;
 }
 
+/// Recursively collects dependent types (like `Self` or `Self.A`)
+/// from a given type, optionally using generic requirements to expand indirect
+/// references.
+void findSelfReferencingTypes(
+    Type type, SmallSetVector<Type, 4> &collectedTypes, bool runRecursive,
+    std::optional<ArrayRef<Requirement>> requirements) {
+  if (type->getKind() == TypeKind::OpaqueTypeArchetype)
+    return;
+
+  // Handle function types: process each parameter and result type.
+  if (const auto funcTy = type->getAs<FunctionType>()) {
+    for (const auto param : funcTy->getParams()) {
+      findSelfReferencingTypes(param.getParameterType(), collectedTypes, true,
+                               requirements);
+    }
+    findSelfReferencingTypes(funcTy->getResult(), collectedTypes, true,
+                             requirements);
+
+    // Handle generic type parameters, either identifying `Self`
+    // or tracing associated types like `Self.A` via generic requirements
+  } else if (auto *paramTy = type->getAs<GenericTypeParamType>()) {
+
+    // Match canonical `Self`
+    if (paramTy->getDepth() == 0 && paramTy->getIndex() == 0) {
+      collectedTypes.insert(type);
+    } else if (requirements) {
+
+      // Use requirements to find related types (e.g. `T.A == U.Element`)
+      auto contains = [&](Type ty) {
+        return ty.findIf([&](Type t) { return t->isEqual(paramTy); });
+      };
+      for (const auto &req : *requirements) {
+        if (contains(req.getFirstType())) {
+          findSelfReferencingTypes(req.getSecondType(), collectedTypes, true,
+                                   requirements);
+        } else if (contains(req.getSecondType())) {
+          findSelfReferencingTypes(req.getFirstType(), collectedTypes, true,
+                                   requirements);
+        }
+      }
+    }
+
+    // Handle dependent member types like `Self.A`
+  } else if (auto memberType = type->getAs<DependentMemberType>()) {
+    DependentMemberType *current = memberType;
+    // Find the innermost DependentMemberType that wraps the full chain
+    // (e.g Self.A from Self.A.Element.Element)
+    while (auto *next = current->getBase()->getAs<DependentMemberType>()) {
+      current = next;
+    }
+    collectedTypes.insert(Type(current));
+
+  } else if (runRecursive) {
+    // Walk subtypes if recursion is enabled
+    type.findIf([&collectedTypes, &requirements](Type t) {
+      size_t oldSize = collectedTypes.size();
+      findSelfReferencingTypes(t, collectedTypes, false, requirements);
+      // stop early if anything was added
+      return collectedTypes.size() != oldSize;
+    });
+  }
+}
+
+/// Collects all dependent types (like `Self` and `Self.A`) used in a given
+/// declaration's signature, including parameters, return types, and generic
+/// constraints.
+SmallSetVector<Type, 4> collectSelfReferencingTypes(const ValueDecl *decl) {
+  SmallSetVector<Type, 4> collectedTypes;
+  if (!decl)
+    return collectedTypes;
+
+  auto extract = [&](ArrayRef<Requirement> requirements,
+                     std::optional<Type> resultTy) {
+    for (const auto *param : *decl->getParameterList()) {
+      findSelfReferencingTypes(param->getInterfaceType(), collectedTypes, true,
+                               requirements);
+    }
+
+    if (resultTy)
+      findSelfReferencingTypes(*resultTy, collectedTypes, true, requirements);
+  };
+
+  if (const auto *func = dyn_cast<FuncDecl>(decl)) {
+    auto requirements = func->getGenericRequirements();
+    extract(requirements, func->getResultInterfaceType());
+
+  } else if (const auto *ctor = dyn_cast<ConstructorDecl>(decl)) {
+    auto requirements = ctor->getGenericRequirements();
+    extract(requirements, std::nullopt);
+
+  } else if (const auto *subscript = dyn_cast<SubscriptDecl>(decl)) {
+    auto requirements = subscript->getGenericRequirements();
+    extract(requirements, subscript->getElementInterfaceType());
+
+  } else if (const auto type = decl->getInterfaceType()) {
+    findSelfReferencingTypes(type, collectedTypes, true, std::nullopt);
+  }
+
+  return collectedTypes;
+}
+
 bool InvalidMemberRefOnExistential::diagnoseAsError() {
   const auto Anchor = getRawAnchor();
 
@@ -4750,6 +4852,36 @@ bool InvalidMemberRefOnExistential::diagnoseAsError() {
   // changes, such as naming an explicit type parameter, and is future-proofed
   // for same-type requirements on primary associated types instead of needing
   // a where clause.
+
+  auto deferDiagnostics = llvm::make_scope_exit([&]() {
+    DeclNameRef ref;
+    if (const auto args = getArgumentListFor(getLocator())) {
+      SmallVector<Identifier, 4> scratch;
+      auto argLabels = args->getArgumentLabels(scratch);
+      ref = getName().withArgumentLabels(getASTContext(), argLabels);
+    } else {
+      ref = getName().withoutArgumentLabels(getASTContext());
+    }
+    auto result = getConstraintSystem().performMemberLookup(
+        ConstraintKind::ValueMember, ref, getBaseType(),
+        FunctionRefInfo::doubleBaseNameApply(), getLocator(),
+        /*includeInaccessibleMembers=*/true);
+
+    SmallVector<OverloadChoice, 4> candidates = result.UnviableCandidates;
+    candidates.append(result.ViableCandidates.begin(),
+                      result.ViableCandidates.end());
+
+    if (!candidates.empty()) {
+      Diag.flush();
+      const auto types = collectSelfReferencingTypes(candidates[0].getDecl());
+      for (const auto type : types) {
+        emitDiagnostic(diag::could_not_use_member_on_existential_note,
+                       getName(), type, getBaseType())
+            .highlight(NameLoc.getSourceRange())
+            .highlight(getSourceRange());
+      }
+    }
+  });
 
   if (!PD || !PD->getDeclContext()->getAsDecl())
     return true;
