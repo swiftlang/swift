@@ -144,11 +144,11 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
     if (!ctx.CASOpts.EnableCaching) {
       auto &overlayFiles = invocation.getMutHeaderSearchOpts().VFSOverlayFiles;
       for (auto overlay : overlayFiles) {
+        if (llvm::is_contained(ctx.SearchPathOpts.VFSOverlayFiles, overlay))
+          continue;
         swiftArgs.push_back("-vfsoverlay");
         swiftArgs.push_back(overlay);
       }
-      // Clear overlay files since they are forwarded from swift to clang.
-      overlayFiles.clear();
     }
 
     // Add args reported by the scanner.
