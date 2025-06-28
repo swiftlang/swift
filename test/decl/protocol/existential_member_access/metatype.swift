@@ -30,6 +30,7 @@ do {
   protoMeta[static_invariantSelfSubscript: ()] // expected-error {{static member 'subscript' cannot be used on protocol metatype '(any TypeMemberOnInstanceAndViceVersa).Type'}}
   _ = protoMeta.covariantSelfMethod // ok
   protoMeta.invariantSelfMethod // expected-error {{member 'invariantSelfMethod' cannot be used on value of type '(any TypeMemberOnInstanceAndViceVersa).Type'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'invariantSelfMethod' refrences 'Self', which cannot be resolved on type '(any TypeMemberOnInstanceAndViceVersa).Type'}}
   protoMeta.invariantSelfProp // expected-error {{instance member 'invariantSelfProp' cannot be used on type 'any TypeMemberOnInstanceAndViceVersa'}}
   protoMeta[invariantSelfSubscript: ()] // expected-error {{instance member 'subscript' cannot be used on type 'any TypeMemberOnInstanceAndViceVersa'}}
 
@@ -38,8 +39,11 @@ do {
   _ = existMeta.static_covariantSelfProp // ok
   _ = existMeta[static_covariantSelfSubscript: ()] // ok
   existMeta.static_invariantSelfMethod // expected-error {{member 'static_invariantSelfMethod' cannot be used on value of type 'any TypeMemberOnInstanceAndViceVersa.Type'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'static_invariantSelfMethod' refrences 'Self', which cannot be resolved on type 'any TypeMemberOnInstanceAndViceVersa.Type'}}
   existMeta.static_invariantSelfProp // expected-error {{member 'static_invariantSelfProp' cannot be used on value of type 'any TypeMemberOnInstanceAndViceVersa.Type'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'static_invariantSelfProp' refrences 'Self', which cannot be resolved on type 'any TypeMemberOnInstanceAndViceVersa.Type'}}
   existMeta[static_invariantSelfSubscript: ()] // expected-error {{member 'subscript' cannot be used on value of type 'any TypeMemberOnInstanceAndViceVersa.Type'; consider using a generic constraint instead}}
+  // expected-note@-1 {{member 'subscript' refrences 'Self', which cannot be resolved on type 'any TypeMemberOnInstanceAndViceVersa.Type'}}
   existMeta.invariantSelfMethod // expected-error {{instance member 'invariantSelfMethod' cannot be used on type 'TypeMemberOnInstanceAndViceVersa'}}
   existMeta.invariantSelfProp // expected-error {{instance member 'invariantSelfProp' cannot be used on type 'TypeMemberOnInstanceAndViceVersa'}}
   existMeta[invariantSelfSubscript: ()] // expected-error {{instance member 'subscript' cannot be used on type 'TypeMemberOnInstanceAndViceVersa'}}
