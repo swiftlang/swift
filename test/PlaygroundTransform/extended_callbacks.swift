@@ -21,26 +21,26 @@ if (a) {
 for i in 0..<3 {
   i
 }
-// CHECK: [{{.*}}] __builtin_log_with_id_extended[a='true' module: main. file: {{.*/main.swift}}]
-// CHECK-NEXT: [{{.*}}] __builtin_log_with_id_extended[='5' module: main. file: {{.*/main.swift}}]
-// CHECK-NEXT: [{{.*}}] __builtin_log_with_id_extended[='0' module: main. file: {{.*/main.swift}}]
-// CHECK-NEXT: [{{.*}}] __builtin_log_with_id_extended[='1' module: main. file: {{.*/main.swift}}]
-// CHECK-NEXT: [{{.*}}] __builtin_log_with_id_extended[='2' module: main. file: {{.*/main.swift}}]
+// CHECK: [{{.*}}] __builtin_log_with_id_extended[a='true' module: main. file: {{.*main.swift}}]
+// CHECK-NEXT: [{{.*}}] __builtin_log_with_id_extended[='5' module: main. file: {{.*main.swift}}]
+// CHECK-NEXT: [{{.*}}] __builtin_log_with_id_extended[='0' module: main. file: {{.*main.swift}}]
+// CHECK-NEXT: [{{.*}}] __builtin_log_with_id_extended[='1' module: main. file: {{.*main.swift}}]
+// CHECK-NEXT: [{{.*}}] __builtin_log_with_id_extended[='2' module: main. file: {{.*main.swift}}]
 
 var b = true
 for i in 0..<3 {
   i
   continue
 }
-// CHECK-NEXT: [{{.*}}] __builtin_log_with_id_extended[b='true' module: main. file: {{.*/main.swift}}]
-// CHECK-NEXT: [{{.*}}] __builtin_log_with_id_extended[='0' module: main. file: {{.*/main.swift}}]
-// CHECK-NEXT: [{{.*}}] __builtin_log_with_id_extended[='1' module: main. file: {{.*/main.swift}}]
-// CHECK-NEXT: [{{.*}}] __builtin_log_with_id_extended[='2' module: main. file: {{.*/main.swift}}]
+// CHECK-NEXT: [{{.*}}] __builtin_log_with_id_extended[b='true' module: main. file: {{.*main.swift}}]
+// CHECK-NEXT: [{{.*}}] __builtin_log_with_id_extended[='0' module: main. file: {{.*main.swift}}]
+// CHECK-NEXT: [{{.*}}] __builtin_log_with_id_extended[='1' module: main. file: {{.*main.swift}}]
+// CHECK-NEXT: [{{.*}}] __builtin_log_with_id_extended[='2' module: main. file: {{.*main.swift}}]
 
 var c = true
 for i in 0..<3 {
   i
   break
 }
-// CHECK-NEXT: [{{.*}}] __builtin_log_with_id_extended[c='true' module: main. file: {{.*/main.swift}}]
-// CHECK-NEXT: [{{.*}}] __builtin_log_with_id_extended[='0' module: main. file: {{.*/main.swift}}]
+// CHECK-NEXT: [{{.*}}] __builtin_log_with_id_extended[c='true' module: main. file: {{.*main.swift}}]
+// CHECK-NEXT: [{{.*}}] __builtin_log_with_id_extended[='0' module: main. file: {{.*main.swift}}]
