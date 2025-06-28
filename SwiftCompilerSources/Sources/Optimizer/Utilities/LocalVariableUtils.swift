@@ -468,13 +468,18 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
   mutating func leafAddressUse(of operand: Operand) -> WalkResult {
     switch operand.instruction {
     case is StoringInstruction, is SourceDestAddrInstruction, is DestroyAddrInst, is DeinitExistentialAddrInst,
-         is InjectEnumAddrInst, is SwitchEnumAddrInst, is TupleAddrConstructorInst, is InitBlockStorageHeaderInst,
-         is PackElementSetInst:
-      // Handle instructions that initialize both temporaries and local variables.
+         is InjectEnumAddrInst, is TupleAddrConstructorInst, is InitBlockStorageHeaderInst, is PackElementSetInst:
+      // Handle instructions that initialize both temporaries and local variables. If operand's address is the same as
+      // the local variable's address, then this fully kills operand liveness. The original value in operand's address
+      // cannot be used in any way.
       visit(LocalVariableAccess(.store, operand))
     case let md as MarkDependenceAddrInst:
       assert(operand == md.addressOperand)
       visit(LocalVariableAccess(.dependenceDest, operand))
+    case is SwitchEnumAddrInst:
+      // switch_enum_addr is truly a leaf address use. It does not produce a new value. But in every other respect it is
+      // like a load.
+      visit(LocalVariableAccess(.load, operand))
     case is DeallocStackInst:
       break
     default:
