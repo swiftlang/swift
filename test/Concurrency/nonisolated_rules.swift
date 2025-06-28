@@ -36,8 +36,8 @@ struct ImplicitlySendable {
   nonisolated var d = 0
 
   // never okay
-  nonisolated lazy var e = 0  // expected-error {{'nonisolated' is not supported on lazy properties}}
-  @P nonisolated var f = 0  // expected-error {{'nonisolated' is not supported on properties with property wrappers}}
+  nonisolated lazy var e = 0 // expected-error {{'nonisolated' cannot be applied to mutable stored properties}}
+  @P nonisolated var f = 0  // expected-error {{'nonisolated' cannot be applied to mutable stored properties}}
 }
 
 struct ImplicitlyNonSendable {
@@ -48,9 +48,9 @@ struct ImplicitlyNonSendable {
   nonisolated var c: Int { 0 }
   nonisolated var d = 0
 
-  // never okay
-  nonisolated lazy var e = 0  // expected-error {{'nonisolated' is not supported on lazy properties}}
-  @P nonisolated var f = 0  // expected-error {{'nonisolated' is not supported on properties with property wrappers}}
+  // okay, the type is non-'Sendable'
+  nonisolated lazy var e = 0
+  @P nonisolated var f = 0
 }
 
 public struct PublicSendable: Sendable {
@@ -60,8 +60,8 @@ public struct PublicSendable: Sendable {
   nonisolated var d = 0
 
   // never okay
-  nonisolated lazy var e = 0  // expected-error {{'nonisolated' is not supported on lazy properties}}
-  @P nonisolated var f = 0  // expected-error {{'nonisolated' is not supported on properties with property wrappers}}
+  nonisolated lazy var e = 0  // expected-error {{'nonisolated' cannot be applied to mutable stored properties}}
+  @P nonisolated var f = 0  // expected-error {{'nonisolated' cannot be applied to mutable stored properties}}
 }
 
 public struct PublicNonSendable {
@@ -70,9 +70,9 @@ public struct PublicNonSendable {
   nonisolated var c: Int { 0 }
   nonisolated var d = 0
 
-  // never okay
-  nonisolated lazy var e = 0  // expected-error {{'nonisolated' is not supported on lazy properties}}
-  @P nonisolated var f = 0  // expected-error {{'nonisolated' is not supported on properties with property wrappers}}
+  // okay, the type is non-'Sendable'
+  nonisolated lazy var e = 0
+  @P nonisolated var f = 0
 }
 
 
@@ -96,6 +96,8 @@ nonisolated struct StructRemovesGlobalActor: GloballyIsolated {
 
 @MainActor struct S {
   var value: NonSendable // globally-isolated
+  @P nonisolated var x = 0 // expected-error {{'nonisolated' cannot be applied to mutable stored properties}}
+  nonisolated lazy var y = 1 // expected-error {{'nonisolated' cannot be applied to mutable stored properties}}
   struct Nested {} // 'Nested' is not @MainActor-isolated
 }
 
@@ -104,6 +106,8 @@ nonisolated struct StructRemovesGlobalActor: GloballyIsolated {
 
 nonisolated struct S1: GloballyIsolated {
   var x: NonSendable
+  @P nonisolated var y = 0 // okay
+  nonisolated lazy var z = 1 // okay
   func f() {
     // expected-error@+1 {{call to main actor-isolated global function 'requireMain()' in a synchronous nonisolated context}}
     requireMain()
