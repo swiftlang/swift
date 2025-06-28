@@ -1663,7 +1663,7 @@ void SILGenModule::emitObjCAllocatorDestructor(ClassDecl *cd,
   // Emit the isolated deallocating destructor.
   // If emitted, it implements actual deallocating and deallocating destructor
   // only switches executor
-  if (dd->hasBody() && isActorIsolated) {
+  if (dd->hasBody() && !dd->isBodySkipped() && isActorIsolated) {
     SILDeclRef dealloc(dd, SILDeclRef::Kind::IsolatedDeallocator);
     emitFunctionDefinition(dealloc, getFunction(dealloc, ForDefinition));
   }
