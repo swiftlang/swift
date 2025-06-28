@@ -5046,7 +5046,13 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
                            bool onlyExplicit = false) {
   // Look up attributes on the declaration that can affect its actor isolation.
   // If any of them are present, use that attribute.
-  auto isolatedAttr = decl->getAttrs().getAttribute<IsolatedAttr>();
+
+  // 'isolated` attribute in the declaration context currently applies
+  // only to `deinit` declarations, invalid uses are going to
+  // be diagnosed as part of attribute checking.
+  auto isolatedAttr = isa<DestructorDecl>(decl)
+                          ? decl->getAttrs().getAttribute<IsolatedAttr>()
+                          : nullptr;
   auto nonisolatedAttr = decl->getAttrs().getAttribute<NonisolatedAttr>();
   auto globalActorAttr = decl->getGlobalActorAttr();
   auto concurrentAttr = decl->getAttrs().getAttribute<ConcurrentAttr>();
@@ -5099,10 +5105,8 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
   }
 
   // If the declaration is explicitly marked 'isolated', infer actor isolation
-  // from the context. Currently applies only to DestructorDecl
+  // from the context. Currently applies only to DestructorDecl.
   if (isolatedAttr) {
-    assert(isa<DestructorDecl>(decl));
-
     auto dc = decl->getDeclContext();
     auto selfTypeDecl = dc->getSelfNominalTypeDecl();
     std::optional<ActorIsolation> result;
