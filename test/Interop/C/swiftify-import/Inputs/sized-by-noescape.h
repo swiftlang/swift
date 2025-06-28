@@ -2,7 +2,9 @@
 
 #include <stdint.h>
 
+#ifndef __sized_by
 #define __sized_by(x) __attribute__((__sized_by__(x)))
+#endif
 #define __noescape __attribute__((noescape))
 
 void simple(int len, const void * __sized_by(len) __noescape p);

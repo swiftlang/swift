@@ -1,10 +1,10 @@
 // REQUIRES: swift_feature_SafeInteropWrappers
 
-// RUN: %target-swift-ide-test -print-module -module-to-print=CountedByClang -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x -enable-experimental-feature SafeInteropWrappers -Xcc -Wno-nullability-completeness | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=CountedByClang -plugin-path %swift-plugin-dir -I %S/Inputs -source-filename=x -enable-experimental-feature SafeInteropWrappers -Xcc -Werror -Xcc -Wno-nullability-completeness -Xcc -Wno-div-by-zero -Xcc -Wno-pointer-to-int-cast | %FileCheck %s
 
 // swift-ide-test doesn't currently typecheck the macro expansions, so run the compiler as well
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/CountedBy.swiftmodule -I %S/Inputs -enable-experimental-feature SafeInteropWrappers -strict-memory-safety -warnings-as-errors -Xcc -Werror -Xcc -Wno-nullability-completeness %s
+// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/CountedBy.swiftmodule -I %S/Inputs -enable-experimental-feature SafeInteropWrappers -strict-memory-safety -warnings-as-errors -Xcc -Werror -Xcc -Wno-nullability-completeness -Xcc -Wno-div-by-zero -Xcc -Wno-pointer-to-int-cast %s
 
 // Check that ClangImporter correctly infers and expands @_SwiftifyImport macros for functions with __counted_by parameters.
 
@@ -12,6 +12,9 @@ import CountedByClang
 
 
 // CHECK:      /// This is an auto-generated wrapper for safer interop
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func binaryLiteral(_ p: UnsafeMutableBufferPointer<Int32>)
+
+// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func bitshift(_ m: Int32, _ n: Int32, _ o: Int32, _ p: UnsafeMutableBufferPointer<Int32>)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
@@ -27,6 +30,9 @@ import CountedByClang
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func constInt(_ p: UnsafeMutableBufferPointer<Int32>)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func hexLiteral(_ p: UnsafeMutableBufferPointer<Int32>)
+
+// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func nonnull(_  p: UnsafeMutableBufferPointer<Int{{.*}}>)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
@@ -34,6 +40,9 @@ import CountedByClang
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func nullable(_  p: UnsafeMutableBufferPointer<Int{{.*}}>?)
+
+// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func octalLiteral(_ p: UnsafeMutableBufferPointer<Int32>)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func offByOne(_ len: Int32, _ p: UnsafeMutableBufferPointer<Int32>)
@@ -57,17 +66,26 @@ import CountedByClang
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func simpleFlipped(_  p: UnsafeMutableBufferPointer<Int{{.*}}>)
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func sizeofParam(_  p: UnsafeMutableBufferPointer<Int{{.*}}>)
-
-// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func sizeofType(_  p: UnsafeMutableBufferPointer<Int{{.*}}>)
-
-// CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func swiftAttr(_  p: UnsafeMutableBufferPointer<Int{{.*}}>)
+
+@inlinable
+public func callBitshift(_ m: CInt, n: CInt, o: CInt, _ p: UnsafeMutableBufferPointer<CInt>) {
+  unsafe bitshift(m, n, o, p)
+}
+
+@inlinable
+public func callBitwise(_ m: CInt, n: CInt, o: CInt, _ p: UnsafeMutableBufferPointer<CInt>) {
+  unsafe bitwise(m, n, o, p)
+}
 
 @inlinable
 public func callComplexExpr(_ p: UnsafeMutableBufferPointer<CInt>) {
   unsafe complexExpr(CInt(p.count), 1, p)
+}
+
+@inlinable
+public func callConstFloatCastedToInt(_ p: UnsafeMutableBufferPointer<CInt>) {
+  unsafe constFloatCastedToInt(p)
 }
 
 @inlinable
@@ -91,8 +109,18 @@ public func callNullable(_ p: UnsafeMutableBufferPointer<CInt>?) {
 }
 
 @inlinable
+public func callOctalLiteral(_ p: UnsafeMutableBufferPointer<CInt>) {
+  unsafe octalLiteral(p)
+}
+
+@inlinable
 public func callOffByOne(_ p: UnsafeMutableBufferPointer<CInt>) {
   unsafe offByOne(0, p)
+}
+
+@inlinable
+public func callOffBySome(_ p: UnsafeMutableBufferPointer<CInt>) {
+  unsafe offBySome(0, 1, p)
 }
 
 @inlinable
