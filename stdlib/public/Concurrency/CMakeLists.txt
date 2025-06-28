@@ -158,7 +158,7 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   ContinuousClock.swift
   SuspendingClock.swift
   TaskSleepDuration.swift
-  DummyExecutor.swift
+  UnimplementedExecutor.swift
   CooperativeExecutor.swift
   PlatformExecutorDarwin.swift
   PlatformExecutorLinux.swift
