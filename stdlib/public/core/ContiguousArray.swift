@@ -74,6 +74,16 @@ extension ContiguousArray {
     }
   }
 
+#if INTERNAL_CHECKS_ENABLED && COW_CHECKS_ENABLED
+  @_alwaysEmitIntoClient
+  @_semantics("array.make_mutable")
+  internal mutating func _makeMutableAndUniqueUnchecked() {
+    if _slowPath(!_buffer.beginCOWMutationUnchecked()) {
+      _buffer = _buffer._consumeAndCreateNew()
+    }
+  }
+#endif
+
   /// Marks the end of an Array mutation.
   ///
   /// After a call to `_endMutation` the buffer must not be mutated until a call
