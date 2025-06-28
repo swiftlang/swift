@@ -1161,11 +1161,14 @@ extension ContiguousArray {
   ) throws(E) -> R {
     return try unsafe _buffer.withUnsafeBufferPointer(body)
   }
+}
 
-  @available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension ContiguousArray {
+  @_alwaysEmitIntoClient
   public var span: Span<Element> {
     @lifetime(borrow self)
-    @_alwaysEmitIntoClient
     borrowing get {
       let pointer = unsafe _buffer.firstElementAddress
       let count = _buffer.immutableCount
@@ -1173,7 +1176,9 @@ extension ContiguousArray {
       return unsafe _overrideLifetime(span, borrowing: self)
     }
   }
+}
 
+extension ContiguousArray {
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
   @_semantics("array.withUnsafeMutableBufferPointer")
@@ -1251,8 +1256,11 @@ extension ContiguousArray {
     // Invoke the body.
     return try unsafe body(&inoutBufferPointer)
   }
+}
 
-  @available(SwiftStdlib 6.2, *)
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension ContiguousArray {
   @_alwaysEmitIntoClient
   public var mutableSpan: MutableSpan<Element> {
     @lifetime(&self)
@@ -1272,7 +1280,9 @@ extension ContiguousArray {
       return unsafe _overrideLifetime(span, mutating: &self)
     }
   }
+}
 
+extension ContiguousArray {
   @inlinable
   public __consuming func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>

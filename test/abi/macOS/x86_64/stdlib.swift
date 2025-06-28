@@ -1058,6 +1058,10 @@ Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7Ra
 Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7RawSpanVMa$
 Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7RawSpanVMn$
 Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss7RawSpanVN$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$sSrsRi_zrlE11mutableSpans07MutableB0VyxGvr$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$sSw12mutableBytess14MutableRawSpanVvr$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss10ArraySliceV11mutableSpans07MutableD0VyxGvr$
+Added: $ld$previous$@rpath/libswiftCompatibilitySpan.dylib$$1$10.14$15.0$_$ss15ContiguousArrayV11mutableSpans07MutableD0VyxGvr$
 
 // Duration.nanoseconds(_:)
 Added: _$ss8DurationV11nanosecondsyABSdFZ

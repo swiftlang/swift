@@ -1162,17 +1162,6 @@ extension Unsafe${Mutable}RawBufferPointer {
     }
   }
 
-  @unsafe
-  @available(SwiftStdlib 6.2, *)
-  @_alwaysEmitIntoClient
-  public var mutableBytes: MutableRawSpan {
-    @lifetime(borrow self)
-    @_transparent
-    get {
-      unsafe MutableRawSpan(_unsafeBytes: self)
-    }
-  }
-
 %  end
   @_alwaysEmitIntoClient
   public func withContiguousStorageIfAvailable<R>(
@@ -1182,9 +1171,12 @@ extension Unsafe${Mutable}RawBufferPointer {
       try unsafe body(${ 'UnsafeBufferPointer<Element>($0)' if Mutable else '$0' })
     }
   }
-
+}
+  
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension Unsafe${Mutable}RawBufferPointer {
   @unsafe
-  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public var bytes: RawSpan {
     @lifetime(borrow self)
@@ -1193,6 +1185,18 @@ extension Unsafe${Mutable}RawBufferPointer {
       unsafe RawSpan(_unsafeBytes: self)
     }
   }
+%  if Mutable:
+
+  @unsafe
+  @_alwaysEmitIntoClient
+  public var mutableBytes: MutableRawSpan {
+    @lifetime(borrow self)
+    @_transparent
+    get {
+      unsafe MutableRawSpan(_unsafeBytes: self)
+    }
+  }
+% end
 }
 
 @_unavailableInEmbedded
