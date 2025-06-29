@@ -117,7 +117,7 @@ class SwiftPM(product.Product):
 
         shell.call(helper_cmd)
 
-    def build(self, host_target):
+    async def build(self, host_target):
         self.run_bootstrap_script(
             'build',
             host_target,

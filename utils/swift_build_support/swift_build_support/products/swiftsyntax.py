@@ -111,7 +111,7 @@ class SwiftSyntax(product.Product):
 
         shell.call(run_cmd, env=env)
 
-    def build(self, host_target):
+    async def build(self, host_target):
         if self.args.swiftsyntax_verify_generated_files:
             self.run_swift_syntax_dev_utils(
                 host_target,

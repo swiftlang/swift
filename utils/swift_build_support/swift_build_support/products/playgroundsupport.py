@@ -52,7 +52,7 @@ class PlaygroundSupport(product.Product):
     def should_build(self, host_target):
         return self.args.build_playgroundsupport
 
-    def build(self, host_target):
+    async def build(self, host_target):
         root = os.path.dirname(os.path.dirname(self.toolchain.swiftc))
         swift_lib_dir = os.path.join(root, 'lib', 'swift')
         (host_os, host_arch) = host_target.split('-')
