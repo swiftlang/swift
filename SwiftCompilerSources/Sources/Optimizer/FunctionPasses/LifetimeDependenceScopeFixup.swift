@@ -650,7 +650,10 @@ extension ScopeExtension {
         return .continueWalk
       }
       defer {walker.deinitialize()}
-      _ = walker.walkDown(dependence: dependence)
+      // walkDown may abort if any utility used by address use walker, such asLocalVarUtils, has unhandled cases.
+      if walker.walkDown(dependence: dependence) == .abortWalk {
+        return nil
+      }
       dependsOnCaller = walker.dependsOnCaller
     }
     for owner in owners {
