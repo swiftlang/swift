@@ -1469,10 +1469,9 @@ bool IRGenModule::IsWellKnownBuiltinOrStructralType(CanType T) const {
 
 GeneratedModule IRGenModule::intoGeneratedModule() && {
   return GeneratedModule{
-    std::move(LLVMContext),
-    std::unique_ptr<llvm::Module>{ClangCodeGen->ReleaseModule()},
-    std::move(TargetMachine)
-  };
+      std::move(LLVMContext),
+      std::unique_ptr<llvm::Module>{ClangCodeGen->ReleaseModule()},
+      std::move(TargetMachine), std::move(RemarkStream)};
 }
 
 bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
