@@ -3880,7 +3880,8 @@ bool NonOptionalUnwrapFailure::diagnoseAsError() {
     diagnostic = diag::invalid_force_unwrap;
 
   auto range = getSourceRange();
-  emitDiagnostic(diagnostic, BaseType).highlight(range).fixItRemove(range.End);
+  emitDiagnostic(diagnostic, resolveType(BaseType))
+    .highlight(range).fixItRemove(range.End);
   return true;
 }
 
