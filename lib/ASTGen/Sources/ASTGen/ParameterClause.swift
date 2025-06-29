@@ -120,12 +120,12 @@ extension ASTGenVisitor {
     }
 
     // FIXME: This location should be derived from the type repr.
-    let specifierLoc: BridgedSourceLoc = nil
+    let specifierLoc: SourceLoc = nil
 
     let paramName: Identifier
-    let paramNameLoc: BridgedSourceLoc
+    let paramNameLoc: SourceLoc
     let argName: Identifier
-    let argNameLoc: BridgedSourceLoc
+    let argNameLoc: SourceLoc
 
     // Map the first name and second name to argument name and parameter name.
     // If we have both, use them. If we only have one, then use that as the

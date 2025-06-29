@@ -31,6 +31,7 @@
 #include "swift/Basic/SwiftBridging.h"
 
 #include "swift/Basic/BridgedSwiftObject.h"
+#include "swift/Basic/SourceLoc.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -40,7 +41,6 @@
 #include <cassert>
 #include "llvm/CAS/CASReference.h"
 
-#include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/APInt.h"
 #include <string>
@@ -318,49 +318,21 @@ public:
 BridgedOStream Bridged_dbgs();
 
 //===----------------------------------------------------------------------===//
-// MARK: SourceLoc
-//===----------------------------------------------------------------------===//
-
-class BridgedSourceLoc {
-  const void *_Nullable Raw;
-
-public:
-  BridgedSourceLoc() : Raw(nullptr) {}
-
-  SWIFT_NAME("init(raw:)")
-  BridgedSourceLoc(const void *_Nullable raw) : Raw(raw) {}
-
-  BRIDGED_INLINE BridgedSourceLoc(swift::SourceLoc loc);
-
-  BRIDGED_INLINE swift::SourceLoc unbridged() const;
-
-  SWIFT_IMPORT_UNSAFE
-  const void *_Nullable getOpaquePointerValue() const { return Raw; }
-
-  SWIFT_COMPUTED_PROPERTY
-  bool getIsValid() const { return Raw != nullptr; }
-
-  SWIFT_NAME("advanced(by:)")
-  BRIDGED_INLINE
-  BridgedSourceLoc advancedBy(size_t n) const;
-};
-
-//===----------------------------------------------------------------------===//
 // MARK: SourceRange
 //===----------------------------------------------------------------------===//
 
 class BridgedSourceRange {
 public:
   SWIFT_NAME("start")
-  BridgedSourceLoc Start;
+  swift::SourceLoc Start;
 
   SWIFT_NAME("end")
-  BridgedSourceLoc End;
+  swift::SourceLoc End;
 
   BridgedSourceRange() : Start(), End() {}
 
   SWIFT_NAME("init(start:end:)")
-  BridgedSourceRange(BridgedSourceLoc start, BridgedSourceLoc end)
+  BridgedSourceRange(swift::SourceLoc start, swift::SourceLoc end)
       : Start(start), End(end) {}
 
   BRIDGED_INLINE BridgedSourceRange(swift::SourceRange range);
@@ -375,13 +347,13 @@ public:
 class BridgedCharSourceRange {
 public:
   SWIFT_UNAVAILABLE("Use '.start' instead")
-  BridgedSourceLoc Start;
+  swift::SourceLoc Start;
 
   SWIFT_UNAVAILABLE("Use '.byteLength' instead")
   unsigned ByteLength;
 
   SWIFT_NAME("init(start:byteLength:)")
-  BridgedCharSourceRange(BridgedSourceLoc start, unsigned byteLength)
+  BridgedCharSourceRange(swift::SourceLoc start, unsigned byteLength)
       : Start(start), ByteLength(byteLength) {}
 
   BRIDGED_INLINE BridgedCharSourceRange(swift::CharSourceRange range);
@@ -389,7 +361,7 @@ public:
   BRIDGED_INLINE swift::CharSourceRange unbridged() const;
 
   SWIFT_COMPUTED_PROPERTY
-  BridgedSourceLoc getStart() const { return Start; }
+  swift::SourceLoc getStart() const { return Start; }
 
   SWIFT_COMPUTED_PROPERTY
   SwiftInt getByteLength() const { return static_cast<SwiftInt>(ByteLength); }

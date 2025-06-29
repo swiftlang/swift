@@ -74,7 +74,7 @@ extension ASTGenVisitor {
     }
   }
 
-  func generateIdentifierDeclNameAndLoc(_ node: TokenSyntax) -> (identifier: Identifier, sourceLoc: BridgedSourceLoc)? {
+  func generateIdentifierDeclNameAndLoc(_ node: TokenSyntax) -> (identifier: Identifier, sourceLoc: SourceLoc)? {
     guard node.presence == .present else {
       return nil
     }
@@ -669,9 +669,9 @@ extension ASTGenVisitor {
 extension ASTGenVisitor {
   struct GeneratedFunctionSignature {
     var parameterList: BridgedParameterList
-    var asyncLoc: BridgedSourceLoc
+    var asyncLoc: SourceLoc
     var isReasync: Bool
-    var throwsLoc: BridgedSourceLoc
+    var throwsLoc: SourceLoc
     var isRethrows: Bool
     var thrownType: BridgedTypeRepr?
     var returnType: BridgedTypeRepr?

@@ -17,6 +17,7 @@ import SwiftIfConfig
 
 public typealias Identifier = swift.Identifier
 public typealias DeclBaseName = swift.DeclBaseName
+public typealias SourceLoc = swift.SourceLoc
 
 public protocol BridgedNullable: ExpressibleByNilLiteral {
   associatedtype RawPtr
@@ -28,7 +29,7 @@ extension BridgedNullable {
   }
 }
 
-extension BridgedSourceLoc: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension SourceLoc: /*@retroactive*/ swiftASTGen.BridgedNullable {}
 extension Identifier: /*@retroactive*/ swiftASTGen.BridgedNullable {}
 extension BridgedNullableDecl: /*@retroactive*/ swiftASTGen.BridgedNullable {}
 extension BridgedNullableExpr: /*@retroactive*/ swiftASTGen.BridgedNullable {}
@@ -104,15 +105,17 @@ extension BridgedVarDecl: BridgedHasNullable {
   typealias Nullable = BridgedNullableVarDecl
 }
 
-public extension BridgedSourceLoc {
-  /// Form a source location at the given absolute position in `buffer`.
+public extension SourceLoc {
+  /// Form a C++ source location at the given absolute position in `buffer`.
   init(
     at position: AbsolutePosition,
     in buffer: UnsafeBufferPointer<UInt8>
   ) {
     precondition(position.utf8Offset >= 0 && position.utf8Offset <= buffer.count)
-    self = BridgedSourceLoc(raw: buffer.baseAddress!).advanced(by: position.utf8Offset)
+    self = SourceLoc(raw: buffer.baseAddress!.advanced(by: position.utf8Offset))
   }
+
+  var isValid: Bool { isValid() }
 }
 
 extension BridgedLabeledStmtInfo: /*@retroactive*/ Swift.ExpressibleByNilLiteral {
@@ -193,23 +196,23 @@ extension VersionTuple {
 }
 
 extension SyntaxProtocol {
-  /// Obtains the bridged start location of the node excluding leading trivia in the source buffer provided by `astgen`
+  /// Obtains the C++ start location of the node excluding leading trivia in the source buffer provided by `astgen`
   ///
   /// - Parameter astgen: The visitor providing the source buffer.
   @available(*, deprecated, message: "use ASTContext.bridgedSourceLoc(syntax:)")
   @inline(__always)
-  func bridgedSourceLoc(in astgen: ASTGenVisitor) -> BridgedSourceLoc {
+  func bridgedSourceLoc(in astgen: ASTGenVisitor) -> SourceLoc {
     astgen.generateSourceLoc(self)
   }
 }
 
 extension Optional where Wrapped: SyntaxProtocol {
-  /// Obtains the bridged start location of the node excluding leading trivia in the source buffer provided by `astgen`.
+  /// Obtains the C++ start location of the node excluding leading trivia in the source buffer provided by `astgen`.
   ///
   /// - Parameter astgen: The visitor providing the source buffer.
   @available(*, deprecated, message: "use ASTContext.bridgedSourceLoc(syntax:)")
   @inline(__always)
-  func bridgedSourceLoc(in astgen: ASTGenVisitor) -> BridgedSourceLoc {
+  func bridgedSourceLoc(in astgen: ASTGenVisitor) -> SourceLoc {
     astgen.generateSourceLoc(self)
   }
 }
@@ -224,17 +227,17 @@ extension TokenSyntax {
     astgen.generateIdentifier(self)
   }
 
-  /// Obtains a `ASTContext`-owned copy of this token's text, and its bridged start location in the
+  /// Obtains a `ASTContext`-owned copy of this token's text, and its C++ start location in the
   /// source buffer provided by `astgen`.
   ///
   /// - Parameter astgen: The visitor providing the `ASTContext` and source buffer.
   @available(*, deprecated, message: "use ASTContext.bridgedIdentifierAndSourceLoc(token:)")
   @inline(__always)
-  func bridgedIdentifierAndSourceLoc(in astgen: ASTGenVisitor) -> (Identifier, BridgedSourceLoc) {
+  func bridgedIdentifierAndSourceLoc(in astgen: ASTGenVisitor) -> (Identifier, SourceLoc) {
     astgen.generateIdentifierAndSourceLoc(self)
   }
 
-  /// Obtains a `ASTContext`-owned copy of this token's text, and its bridged start location in the
+  /// Obtains a `ASTContext`-owned copy of this token's text, and its C++ start location in the
   /// source buffer provided by `astgen`.
   ///
   /// - Parameter astgen: The visitor providing the `ASTContext` and source buffer.
@@ -255,13 +258,13 @@ extension Optional<TokenSyntax> {
     astgen.generateIdentifier(self)
   }
 
-  /// Obtains a `ASTContext`-owned copy of this token's text, and its bridged start location in the
+  /// Obtains a `ASTContext`-owned copy of this token's text, and its C++ start location in the
   /// source buffer provided by `astgen` excluding leading trivia.
   ///
   /// - Parameter astgen: The visitor providing the `ASTContext` and source buffer.
   @available(*, deprecated, message: "use ASTContext.bridgedIdentifierAndSourceLoc(token:)")
   @inline(__always)
-  func bridgedIdentifierAndSourceLoc(in astgen: ASTGenVisitor) -> (Identifier, BridgedSourceLoc) {
+  func bridgedIdentifierAndSourceLoc(in astgen: ASTGenVisitor) -> (Identifier, SourceLoc) {
     astgen.generateIdentifierAndSourceLoc(self)
   }
 }

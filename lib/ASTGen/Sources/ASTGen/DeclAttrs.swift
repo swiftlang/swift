@@ -21,13 +21,13 @@ extension ASTGenVisitor {
   struct DeclAttributesResult {
     var attributes: BridgedDeclAttributes
     var staticSpelling: BridgedStaticSpelling
-    var staticLoc: BridgedSourceLoc
+    var staticLoc: SourceLoc
   }
 
   func generateDeclAttributes(_ node: some WithAttributesSyntax & WithModifiersSyntax, allowStatic: Bool) -> DeclAttributesResult {
     var attrs = BridgedDeclAttributes()
     var staticSpelling: BridgedStaticSpelling = .none
-    var staticLoc: BridgedSourceLoc = nil
+    var staticLoc: SourceLoc = nil
 
     // Comments.
     COMMENT: if
@@ -1673,7 +1673,7 @@ extension ASTGenVisitor {
     var node = node
 
     // Try value first.
-    let minusLoc: BridgedSourceLoc
+    let minusLoc: SourceLoc
     if let prefixExpr = node.as(PrefixOperatorExprSyntax.self),
       prefixExpr.operator.rawText == "-",
       prefixExpr.expression.is(IntegerLiteralExprSyntax.self) {

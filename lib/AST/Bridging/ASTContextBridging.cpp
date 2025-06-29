@@ -148,7 +148,7 @@ SwiftInt BridgedASTContext_langOptsGetTargetAtomicBitWidths(
 
 bool BridgedASTContext_canImport(BridgedASTContext cContext,
                                  BridgedStringRef importPath,
-                                 BridgedSourceLoc canImportLoc,
+                                 SourceLoc canImportLoc,
                                  BridgedCanImportVersion versionKind,
                                  const SwiftInt *_Nullable versionComponents,
                                  SwiftInt numVersionComponents) {
@@ -175,9 +175,9 @@ bool BridgedASTContext_canImport(BridgedASTContext cContext,
 
   ImportPath::Module::Builder builder(cContext.unbridged(),
                                       importPath.unbridged(), /*separator=*/'.',
-                                      canImportLoc.unbridged());
+                                      canImportLoc);
   return cContext.unbridged().canImportModule(
-      builder.get(), canImportLoc.unbridged(), version,
+      builder.get(), canImportLoc, version,
       versionKind == CanImportUnderlyingVersion);
 }
 

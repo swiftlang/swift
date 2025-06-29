@@ -55,14 +55,14 @@ extension ASTGenVisitor {
     let stringLiteralKind = node.stringLiteralKind ?? .singleLine
     let delimiterLength = node.delimiterLength
     let startLoc = self.generateSourceLoc(node)
-    let afterQuoteLoc: BridgedSourceLoc = {
+    let afterQuoteLoc: SourceLoc = {
       var l = startLoc
       if let pound = node.openingPounds {
-        l = l.advanced(by: pound.trimmedLength.utf8Length)
-        l = l.advanced(by: pound.trailingTriviaLength.utf8Length)
-        l = l.advanced(by: node.openingQuote.leadingTriviaLength.utf8Length)
+        l = l.advanced(by: CInt(pound.trimmedLength.utf8Length))
+        l = l.advanced(by: CInt(pound.trailingTriviaLength.utf8Length))
+        l = l.advanced(by: CInt(node.openingQuote.leadingTriviaLength.utf8Length))
       }
-      l = l.advanced(by: node.openingQuote.trimmedLength.utf8Length)
+      l = l.advanced(by: CInt(node.openingQuote.trimmedLength.utf8Length))
       return l
     }()
 
@@ -91,7 +91,7 @@ extension ASTGenVisitor {
 
     // In multi-line string literals, each line has '.stringSegment' even without
     // interpolations. We need to join them into single string literal value in AST.
-    var currLiteral: (value: String, loc: BridgedSourceLoc)? = nil
+    var currLiteral: (value: String, loc: SourceLoc)? = nil
     var isFirst = true
     func consumeCurrentLiteralValue() {
       guard var literal = currLiteral else {
