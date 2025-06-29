@@ -45,10 +45,10 @@ BridgedStmtConditionElement_createBoolean(BridgedExpr expr) {
 }
 
 BridgedStmtConditionElement BridgedStmtConditionElement_createPatternBinding(
-    BridgedASTContext cContext, BridgedSourceLoc cIntroducerLoc,
+    BridgedASTContext cContext, SourceLoc introducerLoc,
     BridgedPattern cPattern, BridgedExpr cInitializer) {
   return StmtConditionElement(ConditionalPatternBindingInfo::create(
-      cContext.unbridged(), cIntroducerLoc.unbridged(), cPattern.unbridged(),
+      cContext.unbridged(), introducerLoc, cPattern.unbridged(),
       cInitializer.unbridged()));
 }
 
@@ -58,108 +58,98 @@ BridgedStmtConditionElement BridgedStmtConditionElement_createPoundAvailable(
 }
 
 BridgedPoundAvailableInfo BridgedPoundAvailableInfo_createParsed(
-    BridgedASTContext cContext, BridgedSourceLoc cPoundLoc,
-    BridgedSourceLoc cLParenLoc, BridgedArrayRef cSpecs,
-    BridgedSourceLoc cRParenLoc, bool isUnavailability) {
+    BridgedASTContext cContext, SourceLoc poundLoc, SourceLoc lParenLoc,
+    BridgedArrayRef cSpecs, SourceLoc rParenLoc, bool isUnavailability) {
   SmallVector<AvailabilitySpec *, 4> specs;
   for (auto cSpec : cSpecs.unbridged<BridgedAvailabilitySpec>())
     specs.push_back(cSpec.unbridged());
-  return PoundAvailableInfo::create(cContext.unbridged(), cPoundLoc.unbridged(),
-                                    cLParenLoc.unbridged(), specs,
-                                    cRParenLoc.unbridged(), isUnavailability);
+  return PoundAvailableInfo::create(cContext.unbridged(), poundLoc, lParenLoc,
+                                    specs, rParenLoc, isUnavailability);
 }
 
 BridgedStmtConditionElement BridgedStmtConditionElement_createHasSymbol(
-    BridgedASTContext cContext, BridgedSourceLoc cPoundLoc,
-    BridgedSourceLoc cLParenLoc, BridgedNullableExpr cSymbolExpr,
-    BridgedSourceLoc cRParenLoc) {
-  return StmtConditionElement(PoundHasSymbolInfo::create(
-      cContext.unbridged(), cPoundLoc.unbridged(), cLParenLoc.unbridged(),
-      cSymbolExpr.unbridged(), cRParenLoc.unbridged()));
+    BridgedASTContext cContext, SourceLoc poundLoc, SourceLoc lParenLoc,
+    BridgedNullableExpr cSymbolExpr, SourceLoc rParenLoc) {
+  return StmtConditionElement(
+      PoundHasSymbolInfo::create(cContext.unbridged(), poundLoc, lParenLoc,
+                                 cSymbolExpr.unbridged(), rParenLoc));
 }
 
 BridgedBraceStmt BridgedBraceStmt_createParsed(BridgedASTContext cContext,
-                                               BridgedSourceLoc cLBLoc,
+                                               SourceLoc lBLoc,
                                                BridgedArrayRef elements,
-                                               BridgedSourceLoc cRBLoc) {
+                                               SourceLoc rBLoc) {
   llvm::SmallVector<ASTNode, 16> nodes;
   for (auto node : elements.unbridged<BridgedASTNode>())
     nodes.push_back(node.unbridged());
 
   ASTContext &context = cContext.unbridged();
-  return BraceStmt::create(context, cLBLoc.unbridged(), nodes,
-                           cRBLoc.unbridged());
+  return BraceStmt::create(context, lBLoc, nodes, rBLoc);
 }
 
 BridgedBraceStmt BridgedBraceStmt_createImplicit(BridgedASTContext cContext,
-                                                 BridgedSourceLoc cLBLoc,
+                                                 SourceLoc lBLoc,
                                                  BridgedASTNode element,
-                                                 BridgedSourceLoc cRBLoc) {
-  return BraceStmt::create(cContext.unbridged(), cLBLoc.unbridged(),
-                           {element.unbridged()}, cRBLoc.unbridged(),
+                                                 SourceLoc rBLoc) {
+  return BraceStmt::create(cContext.unbridged(), lBLoc, {element.unbridged()},
+                           rBLoc,
                            /*Implicit=*/true);
 }
 
 BridgedBreakStmt BridgedBreakStmt_createParsed(BridgedDeclContext cDeclContext,
-                                               BridgedSourceLoc cLoc,
+                                               SourceLoc loc,
                                                Identifier targetName,
-                                               BridgedSourceLoc cTargetLoc) {
+                                               SourceLoc targetLoc) {
   return new (cDeclContext.unbridged()->getASTContext())
-      BreakStmt(cLoc.unbridged(), targetName, cTargetLoc.unbridged(),
-                cDeclContext.unbridged());
+      BreakStmt(loc, targetName, targetLoc, cDeclContext.unbridged());
 }
 
 static void getCaseLabelItems(BridgedArrayRef cItems,
                        SmallVectorImpl<CaseLabelItem> &output) {
   for (auto &elem : cItems.unbridged<BridgedCaseLabelItemInfo>()) {
     if (!elem.IsDefault) {
-      output.emplace_back(elem.ThePattern.unbridged(),
-                          elem.WhereLoc.unbridged(),
+      output.emplace_back(elem.ThePattern.unbridged(), elem.WhereLoc,
                           elem.GuardExpr.unbridged());
     } else {
       output.push_back(CaseLabelItem::getDefault(
-          cast<AnyPattern>(elem.ThePattern.unbridged()),
-          elem.WhereLoc.unbridged(), elem.GuardExpr.unbridged()));
+          cast<AnyPattern>(elem.ThePattern.unbridged()), elem.WhereLoc,
+          elem.GuardExpr.unbridged()));
     }
   }
 }
 
 BridgedCaseStmt BridgedCaseStmt_createParsedSwitchCase(
-    BridgedASTContext cContext, BridgedSourceLoc cIntroducerLoc,
-    BridgedArrayRef cCaseLabelItems, BridgedSourceLoc cUnknownAttrLoc,
-    BridgedSourceLoc cTerminatorLoc, BridgedBraceStmt cBody) {
+    BridgedASTContext cContext, SourceLoc introducerLoc,
+    BridgedArrayRef cCaseLabelItems, SourceLoc unknownAttrLoc,
+    SourceLoc terminatorLoc, BridgedBraceStmt cBody) {
   SmallVector<CaseLabelItem, 1> labelItems;
   getCaseLabelItems(cCaseLabelItems, labelItems);
 
-  return CaseStmt::createParsedSwitchCase(
-      cContext.unbridged(), cIntroducerLoc.unbridged(), labelItems,
-      cUnknownAttrLoc.unbridged(), cTerminatorLoc.unbridged(),
-      cBody.unbridged());
+  return CaseStmt::createParsedSwitchCase(cContext.unbridged(), introducerLoc,
+                                          labelItems, unknownAttrLoc,
+                                          terminatorLoc, cBody.unbridged());
 }
 
 BridgedCaseStmt BridgedCaseStmt_createParsedDoCatch(
-    BridgedASTContext cContext, BridgedSourceLoc cCatchLoc,
+    BridgedASTContext cContext, SourceLoc catchLoc,
     BridgedArrayRef cCaseLabelItems, BridgedBraceStmt cBody) {
   SmallVector<CaseLabelItem, 1> labelItems;
   getCaseLabelItems(cCaseLabelItems, labelItems);
 
-  return CaseStmt::createParsedDoCatch(cContext.unbridged(),
-                                       cCatchLoc.unbridged(), labelItems,
-                                       cBody.unbridged());
+  return CaseStmt::createParsedDoCatch(cContext.unbridged(), catchLoc,
+                                       labelItems, cBody.unbridged());
 }
 
 BridgedContinueStmt
-BridgedContinueStmt_createParsed(BridgedDeclContext cDeclContext,
-                                 BridgedSourceLoc cLoc, Identifier targetName,
-                                 BridgedSourceLoc cTargetLoc) {
+BridgedContinueStmt_createParsed(BridgedDeclContext cDeclContext, SourceLoc loc,
+                                 Identifier targetName, SourceLoc targetLoc) {
   return new (cDeclContext.unbridged()->getASTContext())
-      ContinueStmt(cLoc.unbridged(), targetName, cTargetLoc.unbridged(),
-                   cDeclContext.unbridged());
+      ContinueStmt(loc, targetName, targetLoc, cDeclContext.unbridged());
 }
 
 BridgedDeferStmt BridgedDeferStmt_createParsed(BridgedDeclContext cDeclContext,
-                                               BridgedSourceLoc cDeferLoc) {
-  return DeferStmt::create(cDeclContext.unbridged(), cDeferLoc.unbridged());
+                                               SourceLoc deferLoc) {
+  return DeferStmt::create(cDeclContext.unbridged(), deferLoc);
 }
 
 BridgedFuncDecl BridgedDeferStmt_getTempDecl(BridgedDeferStmt bridged) {
@@ -167,53 +157,49 @@ BridgedFuncDecl BridgedDeferStmt_getTempDecl(BridgedDeferStmt bridged) {
 }
 
 BridgedDiscardStmt BridgedDiscardStmt_createParsed(BridgedASTContext cContext,
-                                                   BridgedSourceLoc cDiscardLoc,
+                                                   SourceLoc discardLoc,
                                                    BridgedExpr cSubExpr) {
   return new (cContext.unbridged())
-      DiscardStmt(cDiscardLoc.unbridged(), cSubExpr.unbridged());
+      DiscardStmt(discardLoc, cSubExpr.unbridged());
 }
 
 BridgedDoStmt BridgedDoStmt_createParsed(BridgedASTContext cContext,
                                          BridgedLabeledStmtInfo cLabelInfo,
-                                         BridgedSourceLoc cDoLoc,
+                                         SourceLoc doLoc,
                                          BridgedBraceStmt cBody) {
   return new (cContext.unbridged())
-      DoStmt(cLabelInfo.unbridged(), cDoLoc.unbridged(), cBody.unbridged());
+      DoStmt(cLabelInfo.unbridged(), doLoc, cBody.unbridged());
 }
 
 BridgedDoCatchStmt BridgedDoCatchStmt_createParsed(
     BridgedDeclContext cDeclContext, BridgedLabeledStmtInfo cLabelInfo,
-    BridgedSourceLoc cDoLoc, BridgedSourceLoc cThrowsLoc,
-    BridgedNullableTypeRepr cThrownType, BridgedStmt cBody,
-    BridgedArrayRef cCatches) {
+    SourceLoc doLoc, SourceLoc throwsLoc, BridgedNullableTypeRepr cThrownType,
+    BridgedStmt cBody, BridgedArrayRef cCatches) {
   return DoCatchStmt::create(cDeclContext.unbridged(), cLabelInfo.unbridged(),
-                             cDoLoc.unbridged(), cThrowsLoc.unbridged(),
-                             cThrownType.unbridged(), cBody.unbridged(),
+                             doLoc, throwsLoc, cThrownType.unbridged(),
+                             cBody.unbridged(),
                              cCatches.unbridged<CaseStmt *>());
 }
 
 BridgedFallthroughStmt
-BridgedFallthroughStmt_createParsed(BridgedSourceLoc cLoc,
-                                    BridgedDeclContext cDC) {
-  return FallthroughStmt::createParsed(cLoc.unbridged(), cDC.unbridged());
+BridgedFallthroughStmt_createParsed(SourceLoc loc, BridgedDeclContext cDC) {
+  return FallthroughStmt::createParsed(loc, cDC.unbridged());
 }
 
 BridgedForEachStmt BridgedForEachStmt_createParsed(
     BridgedASTContext cContext, BridgedLabeledStmtInfo cLabelInfo,
-    BridgedSourceLoc cForLoc, BridgedSourceLoc cTryLoc,
-    BridgedSourceLoc cAwaitLoc, BridgedSourceLoc cUnsafeLoc,
-    BridgedPattern cPat, BridgedSourceLoc cInLoc,
-    BridgedExpr cSequence, BridgedSourceLoc cWhereLoc,
-    BridgedNullableExpr cWhereExpr, BridgedBraceStmt cBody) {
-  return new (cContext.unbridged()) ForEachStmt(
-      cLabelInfo.unbridged(), cForLoc.unbridged(), cTryLoc.unbridged(),
-      cAwaitLoc.unbridged(), cUnsafeLoc.unbridged(), cPat.unbridged(),
-      cInLoc.unbridged(), cSequence.unbridged(), cWhereLoc.unbridged(),
-      cWhereExpr.unbridged(), cBody.unbridged());
+    SourceLoc forLoc, SourceLoc tryLoc, SourceLoc awaitLoc, SourceLoc unsafeLoc,
+    BridgedPattern cPat, SourceLoc inLoc, BridgedExpr cSequence,
+    SourceLoc whereLoc, BridgedNullableExpr cWhereExpr,
+    BridgedBraceStmt cBody) {
+  return new (cContext.unbridged())
+      ForEachStmt(cLabelInfo.unbridged(), forLoc, tryLoc, awaitLoc, unsafeLoc,
+                  cPat.unbridged(), inLoc, cSequence.unbridged(), whereLoc,
+                  cWhereExpr.unbridged(), cBody.unbridged());
 }
 
 BridgedGuardStmt BridgedGuardStmt_createParsed(BridgedASTContext cContext,
-                                               BridgedSourceLoc cGuardLoc,
+                                               SourceLoc guardLoc,
                                                BridgedArrayRef cConds,
                                                BridgedBraceStmt cBody) {
   auto &context = cContext.unbridged();
@@ -221,22 +207,21 @@ BridgedGuardStmt BridgedGuardStmt_createParsed(BridgedASTContext cContext,
       cConds.unbridged<BridgedStmtConditionElement>(),
       [](auto &e) { return e.unbridged(); });
 
-  return new (context)
-      GuardStmt(cGuardLoc.unbridged(), cond, cBody.unbridged());
+  return new (context) GuardStmt(guardLoc, cond, cBody.unbridged());
 }
 
-BridgedIfStmt BridgedIfStmt_createParsed(
-    BridgedASTContext cContext, BridgedLabeledStmtInfo cLabelInfo,
-    BridgedSourceLoc cIfLoc, BridgedArrayRef cConds, BridgedBraceStmt cThen,
-    BridgedSourceLoc cElseLoc, BridgedNullableStmt cElse) {
+BridgedIfStmt
+BridgedIfStmt_createParsed(BridgedASTContext cContext,
+                           BridgedLabeledStmtInfo cLabelInfo, SourceLoc ifLoc,
+                           BridgedArrayRef cConds, BridgedBraceStmt cThen,
+                           SourceLoc elseLoc, BridgedNullableStmt cElse) {
   auto &context = cContext.unbridged();
   StmtCondition cond = context.AllocateTransform<StmtConditionElement>(
       cConds.unbridged<BridgedStmtConditionElement>(),
       [](auto &e) { return e.unbridged(); });
 
-  return new (context)
-      IfStmt(cLabelInfo.unbridged(), cIfLoc.unbridged(), cond,
-             cThen.unbridged(), cElseLoc.unbridged(), cElse.unbridged());
+  return new (context) IfStmt(cLabelInfo.unbridged(), ifLoc, cond,
+                              cThen.unbridged(), elseLoc, cElse.unbridged());
 }
 
 BridgedPoundAssertStmt BridgedPoundAssertStmt_createParsed(
@@ -246,68 +231,65 @@ BridgedPoundAssertStmt BridgedPoundAssertStmt_createParsed(
       cRange.unbridged(), cConditionExpr.unbridged(), cMessage.unbridged());
 }
 
-BridgedRepeatWhileStmt BridgedRepeatWhileStmt_createParsed(
-    BridgedASTContext cContext, BridgedLabeledStmtInfo cLabelInfo,
-    BridgedSourceLoc cRepeatLoc, BridgedExpr cCond, BridgedSourceLoc cWhileLoc,
-    BridgedStmt cBody) {
-  return new (cContext.unbridged()) RepeatWhileStmt(
-      cLabelInfo.unbridged(), cRepeatLoc.unbridged(), cCond.unbridged(),
-      cWhileLoc.unbridged(), cBody.unbridged());
+BridgedRepeatWhileStmt
+BridgedRepeatWhileStmt_createParsed(BridgedASTContext cContext,
+                                    BridgedLabeledStmtInfo cLabelInfo,
+                                    SourceLoc repeatLoc, BridgedExpr cCond,
+                                    SourceLoc whileLoc, BridgedStmt cBody) {
+  return new (cContext.unbridged())
+      RepeatWhileStmt(cLabelInfo.unbridged(), repeatLoc, cCond.unbridged(),
+                      whileLoc, cBody.unbridged());
 }
 
 BridgedReturnStmt BridgedReturnStmt_createParsed(BridgedASTContext cContext,
-                                                 BridgedSourceLoc cLoc,
+                                                 SourceLoc loc,
                                                  BridgedNullableExpr expr) {
   ASTContext &context = cContext.unbridged();
-  return ReturnStmt::createParsed(context, cLoc.unbridged(), expr.unbridged());
+  return ReturnStmt::createParsed(context, loc, expr.unbridged());
 }
 
 BridgedSwitchStmt BridgedSwitchStmt_createParsed(
     BridgedASTContext cContext, BridgedLabeledStmtInfo cLabelInfo,
-    BridgedSourceLoc cSwitchLoc, BridgedExpr cSubjectExpr,
-    BridgedSourceLoc cLBraceLoc, BridgedArrayRef cCases,
-    BridgedSourceLoc cRBraceLoc) {
+    SourceLoc switchLoc, BridgedExpr cSubjectExpr, SourceLoc lBraceLoc,
+    BridgedArrayRef cCases, SourceLoc rBraceLoc) {
   SmallVector<CaseStmt *, 16> cases;
   for (auto cCase : cCases.unbridged<BridgedCaseStmt>())
     cases.push_back(cCase.unbridged());
-  return SwitchStmt::create(cLabelInfo.unbridged(), cSwitchLoc.unbridged(),
-                            cSubjectExpr.unbridged(), cLBraceLoc.unbridged(),
-                            cases, cRBraceLoc.unbridged(),
-                            cRBraceLoc.unbridged(), cContext.unbridged());
+  return SwitchStmt::create(cLabelInfo.unbridged(), switchLoc,
+                            cSubjectExpr.unbridged(), lBraceLoc, cases,
+                            rBraceLoc, rBraceLoc, cContext.unbridged());
 }
 
 BridgedThenStmt BridgedThenStmt_createParsed(BridgedASTContext cContext,
-                                             BridgedSourceLoc cThenLoc,
+                                             SourceLoc thenLoc,
                                              BridgedExpr cResult) {
-  return ThenStmt::createParsed(cContext.unbridged(), cThenLoc.unbridged(),
+  return ThenStmt::createParsed(cContext.unbridged(), thenLoc,
                                 cResult.unbridged());
 }
 
 BridgedThrowStmt BridgedThrowStmt_createParsed(BridgedASTContext cContext,
-                                               BridgedSourceLoc cThrowLoc,
+                                               SourceLoc throwLoc,
                                                BridgedExpr cSubExpr) {
-  return new (cContext.unbridged())
-      ThrowStmt(cThrowLoc.unbridged(), cSubExpr.unbridged());
+  return new (cContext.unbridged()) ThrowStmt(throwLoc, cSubExpr.unbridged());
 }
 
 BridgedWhileStmt BridgedWhileStmt_createParsed(
     BridgedASTContext cContext, BridgedLabeledStmtInfo cLabelInfo,
-    BridgedSourceLoc cWhileLoc, BridgedArrayRef cCond, BridgedStmt cBody) {
+    SourceLoc whileLoc, BridgedArrayRef cCond, BridgedStmt cBody) {
   auto &context = cContext.unbridged();
   StmtCondition cond = context.AllocateTransform<StmtConditionElement>(
       cCond.unbridged<BridgedStmtConditionElement>(),
       [](auto &e) { return e.unbridged(); });
 
-  return new (cContext.unbridged()) WhileStmt(
-      cLabelInfo.unbridged(), cWhileLoc.unbridged(), cond, cBody.unbridged());
+  return new (cContext.unbridged())
+      WhileStmt(cLabelInfo.unbridged(), whileLoc, cond, cBody.unbridged());
 }
 
 BridgedYieldStmt BridgedYieldStmt_createParsed(BridgedASTContext cContext,
-                                               BridgedSourceLoc cYieldLoc,
-                                               BridgedSourceLoc cLParenLoc,
+                                               SourceLoc yieldLoc,
+                                               SourceLoc lParenLoc,
                                                BridgedArrayRef cYields,
-                                               BridgedSourceLoc cRParenLoc) {
-  return YieldStmt::create(cContext.unbridged(), cYieldLoc.unbridged(),
-                           cLParenLoc.unbridged(), cYields.unbridged<Expr *>(),
-                           cRParenLoc.unbridged());
+                                               SourceLoc rParenLoc) {
+  return YieldStmt::create(cContext.unbridged(), yieldLoc, lParenLoc,
+                           cYields.unbridged<Expr *>(), rParenLoc);
 }

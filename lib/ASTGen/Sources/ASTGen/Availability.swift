@@ -21,7 +21,7 @@ import SwiftIfConfig
 extension ASTGenVisitor {
   /// Implementation detail for `generateAvailableAttr(attribute:)` and `generateSpecializeAttr(attribute:)`.
   func generateAvailableAttr(
-    atLoc: BridgedSourceLoc,
+    atLoc: SourceLoc,
     range: BridgedSourceRange,
     attrName: SyntaxText,
     args: AvailabilityArgumentListSyntax
@@ -66,7 +66,7 @@ extension ASTGenVisitor {
   }
 
   func generateAvailableAttrShorthand(
-    atLoc: BridgedSourceLoc,
+    atLoc: SourceLoc,
     range: BridgedSourceRange,
     args: AvailabilityArgumentListSyntax,
     isSPI: Bool
@@ -121,7 +121,7 @@ extension ASTGenVisitor {
   }
 
   func generateAvailableAttrExtended(
-    atLoc: BridgedSourceLoc,
+    atLoc: SourceLoc,
     range: BridgedSourceRange,
     args: AvailabilityArgumentListSyntax,
     isSPI: Bool

@@ -201,25 +201,25 @@ extension ASTGenVisitor {
     token.map(generateIdentifier(_:)) ?? nil
   }
 
-  /// Obtains the start location of the node excluding leading trivia in the
+  /// Obtains the C++ start location of the node excluding leading trivia in the
   /// source buffer.
   @inline(__always)
-  func generateSourceLoc(_ node: some SyntaxProtocol) -> BridgedSourceLoc {
-    BridgedSourceLoc(at: node.positionAfterSkippingLeadingTrivia, in: self.base)
+  func generateSourceLoc(_ node: some SyntaxProtocol) -> SourceLoc {
+    SourceLoc(at: node.positionAfterSkippingLeadingTrivia, in: self.base)
   }
 
-  /// Obtains the start location of the node excluding leading trivia in the
+  /// Obtains the C++ start location of the node excluding leading trivia in the
   /// source buffer. If the `node` is nil returns an invalid source location.
   @inline(__always)
-  func generateSourceLoc(_ node: (some SyntaxProtocol)?) -> BridgedSourceLoc {
+  func generateSourceLoc(_ node: (some SyntaxProtocol)?) -> SourceLoc {
     node.map(generateSourceLoc(_:)) ?? nil
   }
 
-  /// Obtains a pair of an `ASTContext`-owned identifier and a bridged source
-  /// location.
+  /// Obtains a pair of an `ASTContext`-owned identifier and a C++ source
+  /// location from `token`.
   @inline(__always)
   func generateIdentifierAndSourceLoc(_ token: TokenSyntax) -> (
-    identifier: Identifier, sourceLoc: BridgedSourceLoc
+    identifier: Identifier, sourceLoc: SourceLoc
   ) {
     return (
       self.generateIdentifier(token),
@@ -227,13 +227,13 @@ extension ASTGenVisitor {
     )
   }
 
-  /// Obtains a pair of an `ASTContext`-owned identifier and a bridged source
-  /// location.
+  /// Obtains a pair of an `ASTContext`-owned identifier and a C++ source
+  /// location from `token`.
   /// If `token` is `nil`, returns a pair of an empty identifier and an invalid
   /// source location.
   @inline(__always)
   func generateIdentifierAndSourceLoc(_ token: TokenSyntax?) -> (
-    identifier: Identifier, sourceLoc: BridgedSourceLoc
+    identifier: Identifier, sourceLoc: SourceLoc
   ) {
     token.map(generateIdentifierAndSourceLoc(_:)) ?? (nil, nil)
   }
@@ -295,7 +295,7 @@ extension ASTGenVisitor {
   @inline(__always)
   func generateCharSourceRange(start: AbsolutePosition, length: SourceLength) -> BridgedCharSourceRange {
     BridgedCharSourceRange(
-      start: BridgedSourceLoc(at: start, in: self.base),
+      start: SourceLoc(at: start, in: self.base),
       byteLength: UInt32(length.utf8Length)
     )
   }

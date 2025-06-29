@@ -61,17 +61,16 @@ BridgedOptionalPlatformKind PlatformKind_fromIdentifier(Identifier ident) {
 
 BridgedAvailabilitySpec
 BridgedAvailabilitySpec_createWildcard(BridgedASTContext cContext,
-                                       BridgedSourceLoc cLoc) {
-  return AvailabilitySpec::createWildcard(cContext.unbridged(),
-                                          cLoc.unbridged());
+                                       SourceLoc loc) {
+  return AvailabilitySpec::createWildcard(cContext.unbridged(), loc);
 }
 
 BridgedAvailabilitySpec BridgedAvailabilitySpec_createForDomainIdentifier(
-    BridgedASTContext cContext, Identifier name, BridgedSourceLoc cLoc,
+    BridgedASTContext cContext, Identifier name, SourceLoc loc,
     BridgedVersionTuple cVersion, BridgedSourceRange cVersionRange) {
-  return AvailabilitySpec::createForDomainIdentifier(
-      cContext.unbridged(), name, cLoc.unbridged(), cVersion.unbridged(),
-      cVersionRange.unbridged());
+  return AvailabilitySpec::createForDomainIdentifier(cContext.unbridged(), name,
+                                                     loc, cVersion.unbridged(),
+                                                     cVersionRange.unbridged());
 }
 
 BridgedAvailabilitySpec
@@ -81,8 +80,8 @@ BridgedAvailabilitySpec_clone(BridgedAvailabilitySpec spec,
 }
 
 void BridgedAvailabilitySpec_setMacroLoc(BridgedAvailabilitySpec spec,
-                                         BridgedSourceLoc cLoc) {
-  spec.unbridged()->setMacroLoc(cLoc.unbridged());
+                                         SourceLoc loc) {
+  spec.unbridged()->setMacroLoc(loc);
 }
 
 BridgedAvailabilityDomainOrIdentifier

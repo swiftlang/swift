@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -20,7 +20,7 @@ import swiftASTGen
 fileprivate extension BridgedCharSourceRange {
   init(from range: Range<AbsolutePosition>, in sourceFile: ExportedSourceFile) {
     self.init(
-      start: BridgedSourceLoc(at: range.lowerBound, in: sourceFile.buffer),
+      start: SourceLoc(at: range.lowerBound, in: sourceFile.buffer),
       byteLength: UInt32(range.upperBound.utf8Offset - range.lowerBound.utf8Offset)
     )
   }
@@ -101,7 +101,7 @@ fileprivate extension IDEBridging.ResolvedLocContext {
 @_cdecl("swift_SwiftIDEUtilsBridging_runNameMatcher")
 public func runNameMatcher(
   sourceFilePtr: UnsafeRawPointer,
-  locations: UnsafePointer<BridgedSourceLoc>,
+  locations: UnsafePointer<SourceLoc>,
   locationsCount: UInt
 ) -> UnsafeMutableRawPointer? {
   let sourceFile = sourceFilePtr.bindMemory(to: ExportedSourceFile.self, capacity: 1).pointee

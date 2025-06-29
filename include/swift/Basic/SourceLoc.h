@@ -17,18 +17,30 @@
 #ifndef SWIFT_BASIC_SOURCELOC_H
 #define SWIFT_BASIC_SOURCELOC_H
 
+/// `SourceLoc.h` is imported into Swift. Be *very* careful with what you
+/// include here and keep these includes minimal!
+/// If you don't need to import a header into Swift, include it in the `#ifdef`
+/// block below instead.
+///
+/// See include guidelines and caveats in `BasicBridging.h`.
+#include "swift/Basic/SwiftBridging.h"
+#include <assert.h>
+#include <stdint.h>
+
+// Not imported into Swift in pure bridging mode.
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
+
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/SMLoc.h"
-#include <assert.h>
 #include <functional>
 
-namespace llvm {
-class SMLoc;
-}
+#endif // #ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
+
+SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 namespace swift {
 class SourceManager;
@@ -42,21 +54,49 @@ class SourceLoc {
   friend class CharSourceRange;
   friend class DiagnosticConsumer;
 
-  const char *Pointer = nullptr;
+  const char *_Nullable Pointer = nullptr;
 
 public:
   SourceLoc() {}
+#ifdef COMPILED_WITH_SWIFT
+  SWIFT_NAME("init(raw:)")
+  SourceLoc(const void *_Nullable Pointer) : Pointer((const char *)Pointer) {}
+#endif
 
-  static SourceLoc getFromPointer(const char *Pointer) {
+  SWIFT_UNAVAILABLE("Use 'init(raw:)' instead")
+  static SourceLoc getFromPointer(const char *_Nullable Pointer) {
     SourceLoc Loc;
     Loc.Pointer = Pointer;
     return Loc;
   }
 
-  const char *getPointer() const { return Pointer; }
+  SWIFT_UNAVAILABLE("Use 'raw' instead")
+  const char *_Nullable getPointer() const { return Pointer; }
+  SWIFT_UNAVAILABLE("Use 'raw' instead")
+  const void *_Nullable getOpaquePointerValue() const { return Pointer; }
+#ifdef COMPILED_WITH_SWIFT
+  SWIFT_COMPUTED_PROPERTY
+  const void *_Nullable getRaw() const { return getOpaquePointerValue(); }
+#endif
 
   bool isValid() const { return Pointer != nullptr; }
   bool isInvalid() const { return !isValid(); }
+
+  /// Return a source location advanced a specified number of bytes.
+  SWIFT_NAME("advanced(by:)")
+  SourceLoc getAdvancedLoc(int ByteOffset) const {
+    assert(isValid() && "Can't advance an invalid location");
+    return SourceLoc::getFromPointer(Pointer + ByteOffset);
+  }
+
+// Not imported into Swift in pure bridging mode.
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
+
+  SourceLoc getAdvancedLocOrInvalid(int ByteOffset) const {
+    if (isValid())
+      return getAdvancedLoc(ByteOffset);
+    return SourceLoc();
+  }
 
   /// An explicit bool operator so one can check if a SourceLoc is valid in an
   /// if statement:
@@ -68,20 +108,6 @@ public:
 
   bool operator==(const SourceLoc &RHS) const { return RHS.Pointer == Pointer; }
   bool operator!=(const SourceLoc &RHS) const { return !operator==(RHS); }
-
-  /// Return a source location advanced a specified number of bytes.
-  SourceLoc getAdvancedLoc(int ByteOffset) const {
-    assert(isValid() && "Can't advance an invalid location");
-    return SourceLoc::getFromPointer(Pointer + ByteOffset);
-  }
-
-  SourceLoc getAdvancedLocOrInvalid(int ByteOffset) const {
-    if (isValid())
-      return getAdvancedLoc(ByteOffset);
-    return SourceLoc();
-  }
-
-  const void *getOpaquePointerValue() const { return Pointer; }
 
   /// Print out the SourceLoc.  If this location is in the same buffer
   /// as specified by \c LastBufferID, then we don't print the filename.  If
@@ -107,7 +133,12 @@ public:
   friend void simple_display(raw_ostream &OS, const SourceLoc &loc) {
     // Nothing meaningful to print.
   }
+
+#endif // #ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 };
+
+// Not imported into Swift in pure bridging mode.
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 
 /// SourceRange in swift is a pair of locations.  However, note that the end
 /// location is the start of the last token in the range, not the last character
@@ -275,7 +306,12 @@ public:
   SWIFT_DEBUG_DUMPER(dump(const SourceManager &SM));
 };
 
+#endif // #ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
+
 } // end namespace swift
+
+// Not imported into Swift in pure bridging mode.
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 
 namespace llvm {
 template <typename T, typename Enable> struct DenseMapInfo;
@@ -328,5 +364,9 @@ template <> struct DenseMapInfo<swift::SourceRange> {
   }
 };
 } // namespace llvm
+
+#endif // #ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
+
+SWIFT_END_NULLABILITY_ANNOTATIONS
 
 #endif // SWIFT_BASIC_SOURCELOC_H
