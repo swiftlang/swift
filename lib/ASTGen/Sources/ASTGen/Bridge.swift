@@ -16,6 +16,7 @@ import SwiftIfConfig
 @_spi(RawSyntax) import SwiftSyntax
 
 public typealias Identifier = swift.Identifier
+public typealias DeclBaseName = swift.DeclBaseName
 
 public protocol BridgedNullable: ExpressibleByNilLiteral {
   associatedtype RawPtr

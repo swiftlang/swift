@@ -135,28 +135,6 @@ struct BridgedConsumedLookupResult {
                                              SwiftInt flag);
 };
 
-class BridgedDeclBaseName {
-  swift::Identifier Ident;
-
-public:
-  BRIDGED_INLINE BridgedDeclBaseName(swift::DeclBaseName baseName);
-
-  BRIDGED_INLINE swift::DeclBaseName unbridged() const;
-};
-
-SWIFT_NAME("BridgedDeclBaseName.createConstructor()")
-BridgedDeclBaseName BridgedDeclBaseName_createConstructor();
-
-SWIFT_NAME("BridgedDeclBaseName.createDestructor()")
-BridgedDeclBaseName BridgedDeclBaseName_createDestructor();
-
-SWIFT_NAME("BridgedDeclBaseName.createSubscript()")
-BridgedDeclBaseName BridgedDeclBaseName_createSubscript();
-
-SWIFT_NAME("BridgedDeclBaseName.createIdentifier(_:)")
-BridgedDeclBaseName
-BridgedDeclBaseName_createIdentifier(swift::Identifier identifier);
-
 class BridgedDeclNameRef {
   void *_Nullable opaque;
 
@@ -169,14 +147,13 @@ public:
 };
 
 SWIFT_NAME("BridgedDeclNameRef.createParsed(_:baseName:argumentLabels:)")
-BridgedDeclNameRef
-BridgedDeclNameRef_createParsed(BridgedASTContext cContext,
-                                BridgedDeclBaseName cBaseName,
-                                BridgedArrayRef cLabels);
+BridgedDeclNameRef BridgedDeclNameRef_createParsed(BridgedASTContext cContext,
+                                                   swift::DeclBaseName baseName,
+                                                   BridgedArrayRef cLabels);
 
 SWIFT_NAME("BridgedDeclNameRef.createParsed(_:)")
 BridgedDeclNameRef
-BridgedDeclNameRef_createParsed(BridgedDeclBaseName cBaseName);
+BridgedDeclNameRef_createParsed(swift::DeclBaseName baseName);
 
 class BridgedDeclNameLoc {
   const void *_Nullable LocationInfo;

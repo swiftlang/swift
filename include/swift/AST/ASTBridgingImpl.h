@@ -33,18 +33,7 @@
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
 //===----------------------------------------------------------------------===//
-// MARK: BridgedDeclBaseName
-//===----------------------------------------------------------------------===//
-
-BridgedDeclBaseName::BridgedDeclBaseName(swift::DeclBaseName baseName)
-  : Ident(baseName.Ident) {}
-
-swift::DeclBaseName BridgedDeclBaseName::unbridged() const {
-  return swift::DeclBaseName(Ident);
-}
-
-//===----------------------------------------------------------------------===//
-// MARK: BridgedDeclBaseName
+// MARK: BridgedConsumedLookupResult
 //===----------------------------------------------------------------------===//
 
 BridgedConsumedLookupResult::BridgedConsumedLookupResult(

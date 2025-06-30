@@ -32,36 +32,17 @@ using namespace swift;
 // MARK: DeclName
 //===----------------------------------------------------------------------===//
 
-BridgedDeclBaseName BridgedDeclBaseName_createConstructor() {
-  return DeclBaseName::createConstructor();
-}
-
-BridgedDeclBaseName BridgedDeclBaseName_createDestructor() {
-  return DeclBaseName::createDestructor();
-}
-
-BridgedDeclBaseName BridgedDeclBaseName_createSubscript() {
-  return DeclBaseName::createSubscript();
-}
-
-BridgedDeclBaseName
-BridgedDeclBaseName_createIdentifier(swift::Identifier identifier) {
-  return DeclBaseName(identifier);
-}
-
-BridgedDeclNameRef
-BridgedDeclNameRef_createParsed(BridgedASTContext cContext,
-                                BridgedDeclBaseName cBaseName,
-                                BridgedArrayRef cLabels) {
+BridgedDeclNameRef BridgedDeclNameRef_createParsed(BridgedASTContext cContext,
+                                                   DeclBaseName baseName,
+                                                   BridgedArrayRef cLabels) {
   ASTContext &context = cContext.unbridged();
   auto labels = cLabels.unbridged<swift::Identifier>();
 
-  return DeclNameRef(DeclName(context, cBaseName.unbridged(), labels));
+  return DeclNameRef(DeclName(context, baseName, labels));
 }
 
-BridgedDeclNameRef
-BridgedDeclNameRef_createParsed(BridgedDeclBaseName cBaseName) {
-  return DeclNameRef(cBaseName.unbridged());
+BridgedDeclNameRef BridgedDeclNameRef_createParsed(DeclBaseName baseName) {
+  return DeclNameRef(baseName);
 }
 
 BridgedDeclNameLoc BridgedDeclNameLoc_createParsed(

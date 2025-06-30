@@ -520,7 +520,7 @@ extension ASTGenVisitor {
   func generateDeclNameRef(declReferenceExpr node: DeclReferenceExprSyntax) -> (
     name: BridgedDeclNameRef, loc: BridgedDeclNameLoc
   ) {
-    let baseName: BridgedDeclBaseName
+    let baseName: DeclBaseName
     switch node.baseName.keywordKind {
     case .`init`:
       baseName = .createConstructor()
@@ -529,7 +529,7 @@ extension ASTGenVisitor {
     case .subscript:
       baseName = .createSubscript()
     default:
-      baseName = .createIdentifier(self.generateIdentifier(node.baseName))
+      baseName = .init(self.generateIdentifier(node.baseName))
     }
     let baseNameLoc = self.generateSourceLoc(node.baseName)
 
@@ -858,7 +858,7 @@ extension ASTGenVisitor {
 
     return FreestandingMacroExpansionInfo(
       poundLoc: poundLoc,
-      macroNameRef: .createParsed(.createIdentifier(nameLoc.identifier)),
+      macroNameRef: .createParsed(.init(nameLoc.identifier)),
       macroNameLoc: .createParsed(nameLoc.sourceLoc),
       leftAngleLoc: leftAngleLoc,
       genericArgs: genericArgs.lazy.bridgedArray(in: self),
@@ -1332,7 +1332,7 @@ extension ASTGenVisitor {
 
     return .createParsed(
       self.ctx,
-      name: .createParsed(.createIdentifier(name)),
+      name: .createParsed(.init(name)),
       kind: kind,
       loc: .createParsed(nameLoc)
     );
