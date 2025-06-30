@@ -928,15 +928,6 @@ Added: _$ss14MutableRawSpanVN
 Added: _$sSS8UTF8ViewV4spans4SpanVys5UInt8VGvg
 Added: _$sSs8UTF8ViewV4spans4SpanVys5UInt8VGvg
 
-// SE-0467 mutableSpan properties
-Added: _$sSa11mutableSpans07MutableB0VyxGvr
-Added: _$ss10ArraySliceV11mutableSpans07MutableD0VyxGvr
-Added: _$ss15ContiguousArrayV11mutableSpans07MutableD0VyxGvr
-Added: _$ss11InlineArrayVsRi__rlE11mutableSpans07MutableD0Vyq_Gvr
-Added: _$ss15CollectionOfOneV11mutableSpans07MutableE0VyxGvr
-Added: _$sSrsRi_zrlE11mutableSpans07MutableB0VyxGvr
-Added: _$sSw12mutableBytess14MutableRawSpanVvr
-
 // _SwiftifyInfo enum for _SwiftifyImports macro
 Added: _$ss13_SwiftifyExprO5paramyABSicABmFWC
 Added: _$ss13_SwiftifyExprO6returnyA2BmFWC
@@ -1090,3 +1081,11 @@ Added: _$ss8UTF8SpanV9_asciiBits6UInt64VvpZMV
 
 // printing foreign reference types requires a new displayStyle: .foreign
 Added: _$ss6MirrorV12DisplayStyleO16foreignReferenceyA2DmFWC
+
+// var InlineArray._protectedBuffer
+// var InlineArray._protectedAddress
+Added: _$ss11InlineArrayVsRi__rlE16_protectedBufferSRyq_GvpMV
+Added: _$ss11InlineArrayVsRi__rlE17_protectedAddressSPyq_GvpMV
+
+// lengthOfBytes(using:)
+Added: __swift_stdlib_NSStringLengthOfBytesInEncodingTrampoline

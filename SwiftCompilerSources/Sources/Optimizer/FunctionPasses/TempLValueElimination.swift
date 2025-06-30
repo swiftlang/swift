@@ -216,10 +216,7 @@ private extension FullApplySite {
 ///   destroy_addr %source
 /// ```
 private func combineWithDestroy(copy: CopyAddrInst, _ context: FunctionPassContext) {
-  guard !copy.isTakeOfSource,
-        let destroy = copy.source.uses.users(ofType: DestroyAddrInst.self).first,
-        destroy.parentBlock == copy.parentBlock
-  else {
+  guard !copy.isTakeOfSource else {
     return
   }
 
@@ -228,20 +225,21 @@ private func combineWithDestroy(copy: CopyAddrInst, _ context: FunctionPassConte
   defer { debugInsts.deinitialize() }
 
   for inst in InstructionList(first: copy.next) {
-    if inst == destroy {
-      break
-    }
-    if let debugInst = inst as? DebugValueInst, debugInst.operand.value == copy.source {
-      debugInsts.append(debugInst)
-    }
-    if inst.mayReadOrWriteMemory {
+    switch inst {
+    case let destroy as DestroyAddrInst where destroy.destroyedAddress == copy.source:
+      copy.set(isTakeOfSource: true, context)
+      context.erase(instruction: destroy)
+      // Don't let debug info think that the value is still valid after the `copy [take]`.
+      context.erase(instructions: debugInsts)
       return
+    case let debugInst as DebugValueInst where debugInst.operand.value == copy.source:
+      debugInsts.append(debugInst)
+    default:
+      if inst.mayReadOrWriteMemory {
+        return
+      }
     }
   }
-  copy.set(isTakeOfSource: true, context)
-  context.erase(instruction: destroy)
-  // Don't let debug info think that the value is still valid after the `copy [take]`.
-  context.erase(instructions: debugInsts)
 }
 
 private extension Value {

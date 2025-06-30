@@ -1532,6 +1532,9 @@ ERROR(attr_expected_comma,none,
 ERROR(attr_expected_string_literal,none,
 "expected string literal in '%0' attribute", (StringRef))
 
+ERROR(attr_expected_cname,none,
+      "expected C identifier in '%0' attribute", (StringRef))
+
 ERROR(attr_expected_option_such_as,none,
       "expected '%0' option such as '%1'", (StringRef, StringRef))
 
@@ -2147,7 +2150,7 @@ ERROR(expected_lparen_after_lifetime_dependence, PointsToFirstBadToken,
 
 ERROR(expected_identifier_or_index_or_self_after_lifetime_dependence,
       PointsToFirstBadToken,
-      "expected identifier, index or self in lifetime dependence specifier",
+      "expected 'copy', 'borrow', or '&' followed by an identifier, index or 'self' in lifetime dependence specifier",
       ())
 
 ERROR(expected_rparen_after_lifetime_dependence, PointsToFirstBadToken,

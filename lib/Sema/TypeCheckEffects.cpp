@@ -1848,6 +1848,8 @@ public:
         FunctionType *fnSubstType = nullptr;
         if (auto *fnGenericType = fnInterfaceType->getAs<GenericFunctionType>())
           fnSubstType = fnGenericType->substGenericArgs(fnRef.getSubstitutions());
+        else if (fnRef.getSubstitutions())
+          fnSubstType = fnInterfaceType.subst(fnRef.getSubstitutions())->getAs<FunctionType>();
         else
           fnSubstType = fnInterfaceType->getAs<FunctionType>();
 

@@ -799,10 +799,6 @@ def import_cf_types : Flag<["-"], "import-cf-types">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Recognize and import CF types as class types">;
 
-def solver_memory_threshold : Separate<["-"], "solver-memory-threshold">,
-  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Set the upper bound for memory consumption, in bytes, by the constraint solver">;
-
 def solver_shrink_unsolved_threshold : Separate<["-"], "solver-shrink-unsolved-threshold">,
 Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
 HelpText<"Set The upper bound to number of sub-expressions unsolved before termination of the shrink phrase">;
@@ -1571,6 +1567,10 @@ def explain_module_dependency_detailed : Separate<["-"], "explain-module-depende
 def explicit_auto_linking : Flag<["-"], "explicit-auto-linking">,
   Flags<[NewDriverOnlyOption]>,
   HelpText<"Instead of linker-load directives, have the driver specify all link dependencies on the linker invocation. Requires '-explicit-module-build'.">;
+  
+def experimental_emit_variant_module : Flag<["-"], "experimental-emit-variant-module">,
+  Flags<[NewDriverOnlyOption]>,
+  HelpText<"When a target variant triple is specified, the same driver invocation will emit two Swift modules, one for the primary target and one for the variant.">;
 
 def min_inlining_target_version : Separate<["-"], "target-min-inlining-version">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,

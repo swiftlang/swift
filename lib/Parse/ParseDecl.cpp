@@ -3008,7 +3008,45 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
 
-  case DeclAttrKind::CDecl:
+  case DeclAttrKind::CDecl: {
+    if (!AttrName.starts_with("_") &&
+
+        // Backwards support for @cdecl("stringId"). Remove before enabling in
+        // production so we accept only the identifier format.
+        lookahead<bool>(1, [&](CancellableBacktrackingScope &) {
+           return Tok.isNot(tok::string_literal);
+        })) {
+
+      std::optional<StringRef> CName;
+      if (consumeIfAttributeLParen()) {
+        // Custom C name.
+        if (Tok.isNot(tok::identifier)) {
+          diagnose(Loc, diag::attr_expected_cname, AttrName);
+          return makeParserSuccess();
+        }
+
+        CName = Tok.getText();
+        consumeToken(tok::identifier);
+        AttrRange = SourceRange(Loc, Tok.getRange().getStart());
+
+        if (!consumeIf(tok::r_paren)) {
+          diagnose(Loc, diag::attr_expected_rparen, AttrName,
+                   DeclAttribute::isDeclModifier(DK));
+          return makeParserSuccess();
+        }
+      } else {
+        AttrRange = SourceRange(Loc);
+      }
+
+      Attributes.add(new (Context) CDeclAttr(CName.value_or(StringRef()), AtLoc,
+                                             AttrRange, /*Implicit=*/false,
+                                             /*isUnderscored*/false));
+      break;
+    }
+
+    // Leave legacy @_cdecls to the logic expecting a string.
+    LLVM_FALLTHROUGH;
+  }
   case DeclAttrKind::Expose:
   case DeclAttrKind::SILGenName: {
     if (!consumeIfAttributeLParen()) {
@@ -5014,6 +5052,7 @@ ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
   SmallVector<LifetimeDescriptor> sources;
   SourceLoc rParenLoc;
   bool foundParamId = false;
+  bool invalidSourceDescriptor = false;
   status = parseList(
       tok::r_paren, lParenLoc, rParenLoc, /*AllowSepAfterLast=*/false,
       diag::expected_rparen_after_lifetime_dependence, [&]() -> ParserStatus {
@@ -5030,6 +5069,7 @@ ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
         auto sourceDescriptor =
             parseLifetimeDescriptor(*this, lifetimeDependenceKind);
         if (!sourceDescriptor) {
+          invalidSourceDescriptor = true;
           listStatus.setIsParseError();
           return listStatus;
         }
@@ -5037,6 +5077,10 @@ ParserResult<LifetimeEntry> Parser::parseLifetimeEntry(SourceLoc loc) {
         return listStatus;
       });
 
+  if (invalidSourceDescriptor) {
+    status.setIsParseError();
+    return status;
+  }
   if (!foundParamId) {
     diagnose(
         Tok,

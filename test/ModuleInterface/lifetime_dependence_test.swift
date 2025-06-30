@@ -48,7 +48,7 @@ import lifetime_dependence
 // CHECK:   public var span: Swift.Span<Element> {
 // CHECK:     @lifetime(borrow self)
 // CHECK:     @_alwaysEmitIntoClient get {
-// CHECK:   #if compiler(>=5.3) && $LifetimeDependence && $NonescapableAccessorOnTrivial
+// CHECK:   #if compiler(>=5.3) && $NonescapableAccessorOnTrivial && $LifetimeDependence
 // CHECK:   public var mutableSpan: Swift.MutableSpan<Element> {
 // CHECK:     @lifetime(borrow self)
 // CHECK:     @_alwaysEmitIntoClient get {

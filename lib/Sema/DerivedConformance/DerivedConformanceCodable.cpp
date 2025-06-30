@@ -155,14 +155,16 @@ addImplicitCodingKeys(NominalTypeDecl *target,
   enumDecl->setSynthesized();
   enumDecl->setAccess(AccessLevel::Private);
 
-  switch (C.LangOpts.DefaultIsolationBehavior) {
-  case DefaultIsolation::MainActor:
-    enumDecl->getAttrs().add(NonisolatedAttr::createImplicit(C));
-    break;
+  if (!C.LangOpts.hasFeature(Feature::SendableProhibitsMainActorInference)) {
+    switch (C.LangOpts.DefaultIsolationBehavior) {
+    case DefaultIsolation::MainActor:
+      enumDecl->getAttrs().add(NonisolatedAttr::createImplicit(C));
+      break;
 
-  case DefaultIsolation::Nonisolated:
-    // Nothing to do.
-    break;
+    case DefaultIsolation::Nonisolated:
+      // Nothing to do.
+      break;
+    }
   }
 
   // For classes which inherit from something Encodable or Decodable, we

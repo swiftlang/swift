@@ -71,7 +71,6 @@ add_library(swift_Concurrency
   Deque/Deque+UnsafeHandle.swift
   Deque/UnsafeMutableBufferPointer+Utilities.swift
   DiscardingTaskGroup.swift
-  DummyExecutor.swift
   Errors.swift
   Executor.swift
   ExecutorAssertions.swift
@@ -96,6 +95,7 @@ add_library(swift_Concurrency
   TaskLocal.swift
   TaskSleep.swift
   TaskSleepDuration.swift
+  UnimplementedExecutor.swift
   "${CMAKE_CURRENT_BINARY_DIR}/Task+init.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/TaskGroup+addTask.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/Task+immediate.swift")
@@ -122,6 +122,9 @@ target_include_directories(swift_Concurrency PRIVATE
   # FIXME: grant access to `runtime/CMakeConfig.h` which should be available
   # through the swiftRuntime target.
   "${PROJECT_BINARY_DIR}/include")
+# FIXME: Why is this not implicitly in the interface flags?
+target_include_directories(swift_Concurrency INTERFACE
+  "$<$<COMPILE_LANGUAGE:Swift>:$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${SwiftCore_INSTALL_SWIFTMODULEDIR}>>")
 target_link_libraries(swift_Concurrency PRIVATE
   swiftShims
   swiftConcurrencyInternalShims

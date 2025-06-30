@@ -805,7 +805,9 @@ bool SemanticARCOptVisitor::tryPerformOwnedCopyValueOptimization(
   // Ok, we have an owned value. If we do not have any non-destroying consuming
   // uses, see if all of our uses (ignoring destroying uses) are within our
   // parent owned value's lifetime.
-  LinearLifetimeChecker checker(&ctx.getDeadEndBlocks());
+  // Note: we cannot optimistically ignore DeadEndBlocks - unlike for ownership
+  //       verification.
+  LinearLifetimeChecker checker(nullptr);
   if (!checker.validateLifetime(originalValue, parentLifetimeEndingUses,
                                 allCopyUses))
     return false;

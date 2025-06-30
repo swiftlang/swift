@@ -3601,7 +3601,8 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
     for (auto protocol : missingProtocols) {
       // Create a fake conformance for this type to the given protocol.
       auto conformance = getASTContext().getNormalConformance(
-          nominal->getSelfInterfaceType(), protocol, SourceLoc(), nominal,
+          nominal->getSelfInterfaceType(), protocol, SourceLoc(),
+          /*inheritedTypeRepr=*/nullptr, nominal,
           ProtocolConformanceState::Incomplete, ProtocolConformanceOptions());
 
       // Resolve the conformance to generate fixits.
@@ -3879,7 +3880,8 @@ bool NonOptionalUnwrapFailure::diagnoseAsError() {
     diagnostic = diag::invalid_force_unwrap;
 
   auto range = getSourceRange();
-  emitDiagnostic(diagnostic, BaseType).highlight(range).fixItRemove(range.End);
+  emitDiagnostic(diagnostic, resolveType(BaseType))
+    .highlight(range).fixItRemove(range.End);
   return true;
 }
 

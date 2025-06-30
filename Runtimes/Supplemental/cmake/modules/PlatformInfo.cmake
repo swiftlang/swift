@@ -1,3 +1,5 @@
+include_guard(GLOBAL)
+
 if(NOT ${PROJECT_NAME}_SIZEOF_POINTER)
   set(${PROJECT_NAME}_SIZEOF_POINTER "${CMAKE_SIZEOF_VOID_P}" CACHE STRING "Size of a pointer in bytes")
   message(CONFIGURE_LOG "Stdlib Pointer size: ${CMAKE_SIZEOF_VOID_P}")

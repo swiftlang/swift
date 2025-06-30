@@ -1,7 +1,9 @@
+REQUIRES: rsync
+
 RUN: %remote-run -n --remote-dir /xyz-REMOTE --input-prefix %S/Inputs/ some_user@some_host ls %S/Inputs/upload/1.txt %S/Inputs/upload/2.txt 2>&1 >/dev/null | %FileCheck -check-prefix CHECK-INPUT %s
 
 CHECK-INPUT: /usr/bin/ssh -n some_user@some_host -- '/usr/bin/env' '/bin/mkdir' '-p' '{{.+}}-REMOTE/input'
-CHECK-INPUT-NEXT: /usr/bin/rsync
+CHECK-INPUT-NEXT: rsync
 CHECK-INPUT-SAME: some_user@some_host
 
 CHECK-INPUT: /usr/bin/ssh -n some_user@some_host -- '/usr/bin/env' {{.*}}'ls'
@@ -12,11 +14,11 @@ RUN: touch %t/nested/input %t/nested/BAD
 RUN: %remote-run -n --remote-dir /xyz-REMOTE --output-prefix %/t some_user@some_host cp %/t/nested/input %/t/nested/output 2>&1 >/dev/null | %FileCheck -check-prefix CHECK-OUTPUT %s
 
 CHECK-OUTPUT: /usr/bin/ssh -n some_user@some_host -- '/usr/bin/env' '/bin/mkdir' '-p' '{{.+}}-REMOTE/output'
-CHECK-OUTPUT-NEXT: /usr/bin/rsync
+CHECK-OUTPUT-NEXT: rsync
 CHECK-OUTPUT-SAME: some_user@some_host
 
 CHECK-OUTPUT: /usr/bin/ssh -n some_user@some_host -- '/usr/bin/env' {{.*}}'cp'
 CHECK-OUTPUT-NEXT: {{^}}/bin/mkdir -p {{.+}}
-CHECK-OUTPUT-NEXT: /usr/bin/rsync
+CHECK-OUTPUT-NEXT: rsync
 CHECK-OUTPUT-SAME: some_user@some_host
 

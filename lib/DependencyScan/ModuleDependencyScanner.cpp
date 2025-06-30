@@ -32,10 +32,11 @@
 #include "swift/Serialization/ScanningLoaders.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Subsystems.h"
+#include "clang/CAS/IncludeTree.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SetOperations.h"
-#include "llvm/CAS/CachingOnDiskFileSystem.h"
+#include "llvm/CAS/CASProvidingFileSystem.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/MemoryBufferRef.h"
@@ -198,11 +199,27 @@ static std::string remapPath(llvm::PrefixMapper *PrefixMapper, StringRef Path) {
   return PrefixMapper->mapToString(Path);
 }
 
+static llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
+getClangScanningFS(std::shared_ptr<llvm::cas::ObjectStore> cas,
+                   ASTContext &ctx) {
+  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseFileSystem =
+      llvm::vfs::createPhysicalFileSystem();
+  ClangInvocationFileMapping fileMapping =
+    applyClangInvocationMapping(ctx, nullptr, baseFileSystem, false);
+
+  if (cas)
+    return llvm::cas::createCASProvidingFileSystem(cas, baseFileSystem);
+  return baseFileSystem;
+}
+
 ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
     SwiftDependencyScanningService &globalScanningService,
     const CompilerInvocation &ScanCompilerInvocation,
     const SILOptions &SILOptions, ASTContext &ScanASTContext,
-    swift::DependencyTracker &DependencyTracker, DiagnosticEngine &Diagnostics)
+    swift::DependencyTracker &DependencyTracker,
+    std::shared_ptr<llvm::cas::ObjectStore> CAS,
+    std::shared_ptr<llvm::cas::ActionCache> ActionCache,
+    llvm::PrefixMapper *Mapper, DiagnosticEngine &Diagnostics)
     : workerCompilerInvocation(
           std::make_unique<CompilerInvocation>(ScanCompilerInvocation)),
       workerASTContext(std::unique_ptr<ASTContext>(
@@ -232,16 +249,13 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
           workerCompilerInvocation->getFrontendOptions()
               .shouldTrackSystemDependencies(),
           RequireOSSAModules_t(SILOptions))),
-      clangScanningTool(
-          *globalScanningService.ClangScanningService,
-          globalScanningService.getClangScanningFS(ScanASTContext)),
+      clangScanningTool(*globalScanningService.ClangScanningService,
+                        getClangScanningFS(CAS, ScanASTContext)),
       moduleOutputPath(workerCompilerInvocation->getFrontendOptions()
                            .ExplicitModulesOutputPath),
       sdkModuleOutputPath(workerCompilerInvocation->getFrontendOptions()
                               .ExplicitSDKModulesOutputPath),
-      CAS(globalScanningService.CAS),
-      ActionCache(globalScanningService.ActionCache),
-      PrefixMapper(globalScanningService.Mapper) {
+      CAS(CAS), ActionCache(ActionCache), PrefixMapper(Mapper) {
   auto loader = std::make_unique<PluginLoader>(
       *workerASTContext, /*DepTracker=*/nullptr,
       workerCompilerInvocation->getFrontendOptions().CacheReplayPrefixMap,
@@ -323,7 +337,7 @@ ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
   return ClangImporter::bridgeClangModuleDependencies(
       *workerASTContext, clangScanningTool, *clangModuleDependencies,
       lookupModuleOutput,
-      [&](StringRef path) { return remapPath(PrefixMapper.get(), path); });
+      [&](StringRef path) { return remapPath(PrefixMapper, path); });
 }
 
 bool ModuleDependencyScanningWorker::scanHeaderDependenciesOfSwiftModule(
@@ -358,7 +372,7 @@ bool ModuleDependencyScanningWorker::scanHeaderDependenciesOfSwiftModule(
     // Record module dependencies for each new module we found.
     auto bridgedDeps = ClangImporter::bridgeClangModuleDependencies(
         ctx, clangScanningTool, dependencies->ModuleGraph, lookupModuleOutput,
-        [this](StringRef path) { return remapPath(PrefixMapper.get(), path); });
+        [this](StringRef path) { return remapPath(PrefixMapper, path); });
     cache.recordDependencies(bridgedDeps, ctx.Diags);
 
     llvm::copy(dependencies->FileDeps, std::back_inserter(headerFileInputs));
@@ -452,24 +466,142 @@ ModuleDependencyScanner::getModuleImportIdentifier(StringRef moduleName) {
   return ScanASTContext.getIdentifier(moduleName);
 }
 
+SwiftDependencyTracker::SwiftDependencyTracker(
+    std::shared_ptr<llvm::cas::ObjectStore> CAS, llvm::PrefixMapper *Mapper,
+    const CompilerInvocation &CI)
+    : CAS(CAS), Mapper(Mapper) {
+  auto &SearchPathOpts = CI.getSearchPathOptions();
+
+  FS = llvm::cas::createCASProvidingFileSystem(
+      CAS, llvm::vfs::createPhysicalFileSystem());
+
+  auto addCommonFile = [&](StringRef path) {
+    auto file = FS->openFileForRead(path);
+    if (!file)
+      return;
+    auto status = (*file)->status();
+    if (!status)
+      return;
+    auto fileRef = (*file)->getObjectRefForContent();
+    if (!fileRef)
+      return;
+
+    std::string realPath = Mapper ? Mapper->mapToString(path) : path.str();
+    CommonFiles.try_emplace(realPath, **fileRef, (size_t)status->getSize());
+  };
+
+  // Add SDKSetting file.
+  SmallString<256> SDKSettingPath;
+  llvm::sys::path::append(SDKSettingPath, SearchPathOpts.getSDKPath(),
+                          "SDKSettings.json");
+  addCommonFile(SDKSettingPath);
+
+  // Add Legacy layout file.
+  const std::vector<std::string> AllSupportedArches = {
+      "arm64", "arm64e", "x86_64", "i386",
+      "armv7", "armv7s", "armv7k", "arm64_32"};
+
+  for (auto RuntimeLibPath : SearchPathOpts.RuntimeLibraryPaths) {
+    std::error_code EC;
+    for (auto &Arch : AllSupportedArches) {
+      SmallString<256> LayoutFile(RuntimeLibPath);
+      llvm::sys::path::append(LayoutFile, "layouts-" + Arch + ".yaml");
+      addCommonFile(LayoutFile);
+    }
+  }
+
+  // Add VFSOverlay file.
+  for (auto &Overlay: SearchPathOpts.VFSOverlayFiles)
+    addCommonFile(Overlay);
+
+  // Add blocklist file.
+  for (auto &File: CI.getFrontendOptions().BlocklistConfigFilePaths)
+    addCommonFile(File);
+}
+
+void SwiftDependencyTracker::startTracking(bool includeCommonDeps) {
+  TrackedFiles.clear();
+  if (includeCommonDeps) {
+    for (auto &entry : CommonFiles)
+      TrackedFiles.emplace(entry.first(), entry.second);
+  }
+}
+
+void SwiftDependencyTracker::trackFile(const Twine &path) {
+  auto file = FS->openFileForRead(path);
+  if (!file)
+    return;
+  auto status = (*file)->status();
+  if (!status)
+    return;
+  auto fileRef = (*file)->getObjectRefForContent();
+  if (!fileRef)
+    return;
+  std::string realPath =
+      Mapper ? Mapper->mapToString(path.str()) : path.str();
+  TrackedFiles.try_emplace(realPath, **fileRef, (size_t)status->getSize());
+}
+
+llvm::Expected<llvm::cas::ObjectProxy>
+SwiftDependencyTracker::createTreeFromDependencies() {
+  llvm::SmallVector<clang::cas::IncludeTree::FileList::FileEntry> Files;
+  for (auto &file : TrackedFiles) {
+    auto includeTreeFile = clang::cas::IncludeTree::File::create(
+        *CAS, file.first, file.second.FileRef);
+    if (!includeTreeFile) {
+      return llvm::createStringError("CASFS createTree failed for " +
+                                     file.first + ": " +
+                                     toString(includeTreeFile.takeError()));
+    }
+    Files.push_back(
+        {includeTreeFile->getRef(),
+         (clang::cas::IncludeTree::FileList::FileSizeTy)file.second.Size});
+  }
+
+  auto includeTreeList =
+      clang::cas::IncludeTree::FileList::create(*CAS, Files, {});
+  if (!includeTreeList)
+    return llvm::createStringError("casfs include-tree filelist error: " +
+                                   toString(includeTreeList.takeError()));
+
+  return *includeTreeList;
+}
+
 ModuleDependencyScanner::ModuleDependencyScanner(
     SwiftDependencyScanningService &ScanningService,
     const CompilerInvocation &ScanCompilerInvocation,
     const SILOptions &SILOptions, ASTContext &ScanASTContext,
-    swift::DependencyTracker &DependencyTracker, DiagnosticEngine &Diagnostics,
-    bool ParallelScan)
+    swift::DependencyTracker &DependencyTracker,
+    std::shared_ptr<llvm::cas::ObjectStore> CAS,
+    std::shared_ptr<llvm::cas::ActionCache> ActionCache,
+    DiagnosticEngine &Diagnostics, bool ParallelScan)
     : ScanCompilerInvocation(ScanCompilerInvocation),
       ScanASTContext(ScanASTContext), Diagnostics(Diagnostics),
       NumThreads(ParallelScan
                      ? llvm::hardware_concurrency().compute_thread_count()
                      : 1),
-      ScanningThreadPool(llvm::hardware_concurrency(NumThreads)),
-      PrefixMapper(ScanningService.Mapper) {
+      ScanningThreadPool(llvm::hardware_concurrency(NumThreads)), CAS(CAS),
+      ActionCache(ActionCache) {
+  // Setup prefix mapping.
+  auto &ScannerPrefixMapper =
+      ScanCompilerInvocation.getSearchPathOptions().ScannerPrefixMapper;
+  if (!ScannerPrefixMapper.empty()) {
+    PrefixMapper = std::make_unique<llvm::PrefixMapper>();
+    SmallVector<llvm::MappedPrefix, 4> Prefixes;
+    llvm::MappedPrefix::transformPairs(ScannerPrefixMapper, Prefixes);
+    PrefixMapper->addRange(Prefixes);
+    PrefixMapper->sort();
+  }
+
+  if (CAS)
+    CacheFS = llvm::cas::createCASProvidingFileSystem(
+        CAS, ScanASTContext.SourceMgr.getFileSystem());
+
   // TODO: Make num threads configurable
   for (size_t i = 0; i < NumThreads; ++i)
     Workers.emplace_front(std::make_unique<ModuleDependencyScanningWorker>(
         ScanningService, ScanCompilerInvocation, SILOptions, ScanASTContext,
-        DependencyTracker, Diagnostics));
+        DependencyTracker, CAS, ActionCache, PrefixMapper.get(), Diagnostics));
 }
 
 /// Find all of the imported Clang modules starting with the given module name.
@@ -1508,7 +1640,7 @@ void ModuleDependencyScanner::resolveCrossImportOverlayDependencies(
     mainDep.addAuxiliaryFile(entry.second);
     cmdCopy.push_back("-swift-module-cross-import");
     cmdCopy.push_back(entry.first);
-    auto overlayPath = remapPath(PrefixMapper.get(), entry.second);
+    auto overlayPath = remapPath(entry.second);
     cmdCopy.push_back(overlayPath);
   }
   mainDep.updateCommandLine(cmdCopy);

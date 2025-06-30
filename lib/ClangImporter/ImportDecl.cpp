@@ -8864,9 +8864,9 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
         if (lookupConformance(ty, protocol))
           continue;
         auto conformance = SwiftContext.getNormalConformance(
-            ty, protocol, nominal->getLoc(), nominal->getDeclContextForModule(),
-            ProtocolConformanceState::Complete,
-            ProtocolConformanceOptions());
+            ty, protocol, nominal->getLoc(), /*inheritedTypeRepr=*/nullptr,
+            nominal->getDeclContextForModule(),
+            ProtocolConformanceState::Complete, ProtocolConformanceOptions());
         conformance->setSourceKindAndImplyingConformance(
             ConformanceEntryKind::Synthesized, nullptr);
 
@@ -9105,7 +9105,28 @@ namespace {
 struct CountedByExpressionValidator
     : clang::ConstStmtVisitor<CountedByExpressionValidator, bool> {
   bool VisitDeclRefExpr(const clang::DeclRefExpr *e) { return true; }
-  bool VisitIntegerLiteral(const clang::IntegerLiteral *) { return true; }
+
+  bool VisitIntegerLiteral(const clang::IntegerLiteral *IL) {
+    switch (IL->getType()->castAs<clang::BuiltinType>()->getKind()) {
+    case clang::BuiltinType::Char_S:
+    case clang::BuiltinType::Char_U:
+    case clang::BuiltinType::UChar:
+    case clang::BuiltinType::SChar:
+    case clang::BuiltinType::Short:
+    case clang::BuiltinType::UShort:
+    case clang::BuiltinType::UInt:
+    case clang::BuiltinType::Long:
+    case clang::BuiltinType::ULong:
+    case clang::BuiltinType::LongLong:
+    case clang::BuiltinType::ULongLong:
+      // These integer literals are printed with a suffix that isn't valid Swift
+      // syntax
+      return false;
+    default:
+      return true;
+    }
+  }
+
   bool VisitImplicitCastExpr(const clang::ImplicitCastExpr *c) {
     return this->Visit(c->getSubExpr());
   }
@@ -10747,9 +10768,8 @@ void ClangImporter::Implementation::loadAllConformances(
       options |= ProtocolConformanceFlags::Unchecked;
 
     auto conformance = SwiftContext.getNormalConformance(
-        dc->getDeclaredInterfaceType(),
-        protocol, SourceLoc(), dc,
-        ProtocolConformanceState::Incomplete,
+        dc->getDeclaredInterfaceType(), protocol, SourceLoc(),
+        /*inheritedTypeRepr=*/nullptr, dc, ProtocolConformanceState::Incomplete,
         options);
     conformance->setLazyLoader(this, /*context*/0);
     conformance->setState(ProtocolConformanceState::Complete);

@@ -27,7 +27,7 @@ public func bar() {
   // YAML:        File:            {{.*}}opt-record.swift
   // YAML:        Line:            [[@LINE-6]]
   // YAML:        Column:          3
-  // YAML-NEXT: Function:        'bar()'
+  // YAML-NEXT: Function:        '$s12optrecordmod3baryyF'
   // YAML-NEXT: Args:
   // YAML-NEXT:   - Callee:          '"optrecordmod.foo()"'
   // YAML-NEXT:     DebugLoc:

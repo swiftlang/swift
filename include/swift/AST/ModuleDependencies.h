@@ -25,22 +25,13 @@
 #include "swift/Serialization/Validation.h"
 #include "clang/CAS/CASOptions.h"
 #include "clang/Tooling/DependencyScanning/DependencyScanningService.h"
-#include "clang/Tooling/DependencyScanning/DependencyScanningTool.h"
 #include "clang/Tooling/DependencyScanning/ModuleDepCollector.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringSet.h"
-#include "llvm/CAS/ActionCache.h"
-#include "llvm/CAS/CASProvidingFileSystem.h"
-#include "llvm/CAS/CASReference.h"
 #include "llvm/CAS/CachingOnDiskFileSystem.h"
-#include "llvm/CAS/ObjectStore.h"
-#include "llvm/Support/Error.h"
-#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Mutex.h"
-#include "llvm/Support/PrefixMapper.h"
-#include "llvm/Support/VirtualFileSystem.h"
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -945,34 +936,6 @@ using ModuleDependenciesKindMap =
     std::unordered_map<ModuleDependencyKind, ModuleNameToDependencyMap,
                        ModuleDependencyKindHash>;
 
-// MARK: SwiftDependencyTracker
-/// Track swift dependency
-class SwiftDependencyTracker {
-public:
-  SwiftDependencyTracker(std::shared_ptr<llvm::cas::ObjectStore> CAS,
-                         llvm::PrefixMapper *Mapper,
-                         const CompilerInvocation &CI);
-
-  void startTracking(bool includeCommonDeps = true);
-  void trackFile(const Twine &path);
-  llvm::Expected<llvm::cas::ObjectProxy> createTreeFromDependencies();
-
-private:
-  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS;
-  std::shared_ptr<llvm::cas::ObjectStore> CAS;
-  llvm::PrefixMapper *Mapper;
-
-  struct FileEntry {
-    llvm::cas::ObjectRef FileRef;
-    size_t Size;
-
-    FileEntry(llvm::cas::ObjectRef FileRef, size_t Size)
-        : FileRef(FileRef), Size(Size) {}
-  };
-  llvm::StringMap<FileEntry> CommonFiles;
-  std::map<std::string, FileEntry> TrackedFiles;
-};
-
 // MARK: SwiftDependencyScanningService
 /// A carrier of state shared among possibly multiple invocations of the
 /// dependency scanner.
@@ -984,21 +947,6 @@ class SwiftDependencyScanningService {
   std::optional<clang::tooling::dependencies::DependencyScanningService>
       ClangScanningService;
 
-  /// CachingOnDiskFileSystem for dependency tracking.
-  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> CacheFS;
-
-  /// CAS Instance.
-  std::shared_ptr<llvm::cas::ObjectStore> CAS;
-  std::shared_ptr<llvm::cas::ActionCache> ActionCache;
-
-  /// File prefix mapper.
-  std::shared_ptr<llvm::PrefixMapper> Mapper;
-
-  /// The global file system cache.
-  std::optional<
-      clang::tooling::dependencies::DependencyScanningFilesystemSharedCache>
-      SharedFilesystemCache;
-
   /// Shared state mutual-exclusivity lock
   mutable llvm::sys::SmartMutex<true> ScanningServiceGlobalLock;
 
@@ -1009,52 +957,6 @@ public:
   SwiftDependencyScanningService &
   operator=(const SwiftDependencyScanningService &) = delete;
   virtual ~SwiftDependencyScanningService() {}
-
-  /// Query the service's filesystem cache
-  clang::tooling::dependencies::DependencyScanningFilesystemSharedCache &getSharedCache() {
-    assert(SharedFilesystemCache && "Expected a shared cache");
-    return *SharedFilesystemCache;
-  }
-
-  /// Query the service's filesystem cache
-  clang::tooling::dependencies::DependencyScanningFilesystemSharedCache &
-  getSharedFilesystemCache() {
-    assert(SharedFilesystemCache && "Expected a shared cache");
-    return *SharedFilesystemCache;
-  }
-
-  llvm::vfs::FileSystem &getSharedCachingFS() const {
-    assert(CacheFS && "Expect a CASFileSystem");
-    return *CacheFS;
-  }
-
-  llvm::cas::ObjectStore &getCAS() const {
-    assert(CAS && "Expect CAS available");
-    return *CAS;
-  }
-
-  std::optional<SwiftDependencyTracker>
-  createSwiftDependencyTracker(const CompilerInvocation &CI) {
-    if (!CAS)
-      return std::nullopt;
-
-    return SwiftDependencyTracker(CAS, Mapper.get(), CI);
-  }
-
-  llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
-  getClangScanningFS(ASTContext &ctx) const;
-
-  bool hasPathMapping() const {
-    return Mapper && !Mapper->getMappings().empty();
-  }
-  llvm::PrefixMapper *getPrefixMapper() const { return Mapper.get(); }
-  std::string remapPath(StringRef Path) const {
-    if (!Mapper)
-      return Path.str();
-    return Mapper->mapToString(Path);
-  }
-
-  bool hasCAS() const { return (bool)CAS; }
 
   /// Setup caching service.
   bool setupCachingDependencyScanningService(CompilerInstance &Instance);

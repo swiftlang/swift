@@ -281,6 +281,11 @@ std::string demangleSymbolAsString(const char *MangledName,
                                     Options);
 }
 
+void demangleSymbolAsString(StringRef MangledName, NodePrinter &Printer) {
+  Context Ctx;
+  return Ctx.demangleSymbolAsString(MangledName, Printer);
+}
+
 std::string demangleTypeAsString(const char *MangledName,
                                  size_t MangledNameLength,
                                  const DemangleOptions &Options) {
