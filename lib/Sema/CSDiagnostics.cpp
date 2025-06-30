@@ -4133,11 +4133,11 @@ void MissingMemberFailure::diagnoseUnsafeCxxMethod(SourceLoc loc,
                                                           scratch);
     };
 
-    auto returnTypeStr = cast<FuncDecl>(found)
-                             ->getResultInterfaceType()
-                             ->getAnyNominal()
-                             ->getName()
-                             .str();
+    auto returnTy =
+        cast<FuncDecl>(found)->getResultInterfaceType()->getAnyNominal();
+    if (!returnTy)
+      continue;
+    auto returnTypeStr = returnTy->getName().str();
 
     auto methodClangLoc = cxxMethod->getLocation();
     auto methodSwiftLoc =
