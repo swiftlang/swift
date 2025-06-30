@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022 - 2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2022 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -15,8 +15,7 @@
 
 #include "swift/Basic/BasicBridging.h"
 
-#ifdef USED_IN_CPP_SOURCE
-#include "swift/Basic/SourceLoc.h"
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 #include "llvm/CAS/CASReference.h"
 #include <optional>
 #include <vector>
@@ -66,7 +65,7 @@ enum class LabelRangeType {
 
 enum class ResolvedLocContext { Default, Selector, Comment, StringLiteral };
 
-#ifdef USED_IN_CPP_SOURCE
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 struct ResolvedLoc {
   /// The range of the call's base name.
   swift::CharSourceRange range;
@@ -105,7 +104,7 @@ struct ResolvedLoc {
   ResolvedLoc();
 };
 
-#endif // USED_IN_CPP_SOURCE
+#endif // #ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 
 /// An opaque, heap-allocated `ResolvedLoc`.
 ///
@@ -123,7 +122,7 @@ struct BridgedResolvedLoc {
                      unsigned firstTrailingLabel, LabelRangeType labelType,
                      bool isActive, ResolvedLocContext context);
 
-#ifdef USED_IN_CPP_SOURCE
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
   ResolvedLoc takeUnbridged() {
     ResolvedLoc *resolvedLocPtr = static_cast<ResolvedLoc *>(resolvedLoc);
     ResolvedLoc unbridged = *resolvedLocPtr;
@@ -153,7 +152,7 @@ public:
   SWIFT_NAME("append(_:)")
   void push_back(BridgedResolvedLoc Loc);
 
-#ifdef USED_IN_CPP_SOURCE
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
   std::vector<ResolvedLoc> takeUnbridged() {
     std::vector<ResolvedLoc> *vectorPtr =
         static_cast<std::vector<ResolvedLoc> *>(vector);
