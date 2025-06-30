@@ -32,7 +32,7 @@ void swift_ASTGen_addQueuedDiagnostic(
     swift::SourceLoc sourceLoc,
     BridgedStringRef categoryName,
     BridgedStringRef documentationPath,
-    const BridgedCharSourceRange *_Nullable highlightRanges,
+    const swift::CharSourceRange *_Nullable highlightRanges,
     ptrdiff_t numHighlightRanges,
     BridgedArrayRef /*BridgedFixIt*/ fixIts);
 void swift_ASTGen_renderSingleDiagnostic(

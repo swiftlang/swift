@@ -513,7 +513,7 @@ public:
 
 class BridgedFixIt {
 public:
-  BridgedCharSourceRange replacementRange;
+  swift::CharSourceRange replacementRange;
   BridgedStringRef replacementText;
 };
 
@@ -1219,7 +1219,7 @@ BridgedProjectedValuePropertyAttr_createParsed(BridgedASTContext cContext,
 SWIFT_NAME("BridgedRawDocCommentAttr.createParsed(_:range:)")
 BridgedRawDocCommentAttr
 BridgedRawDocCommentAttr_createParsed(BridgedASTContext cContext,
-                                      BridgedCharSourceRange cRange);
+                                      swift::CharSourceRange range);
 
 SWIFT_NAME("BridgedRawLayoutAttr.createParsed(_:atLoc:range:size:alignment:)")
 BridgedRawLayoutAttr BridgedStorageRestrictionsAttr_createParsed(
@@ -2113,13 +2113,13 @@ public:
 };
 
 class BridgedRegexLiteralPatternFeature final {
-  BridgedCharSourceRange Range;
+  swift::CharSourceRange Range;
   BridgedRegexLiteralPatternFeatureKind Kind;
 
 public:
   SWIFT_NAME("init(kind:at:)")
   BridgedRegexLiteralPatternFeature(BridgedRegexLiteralPatternFeatureKind kind,
-                                    BridgedCharSourceRange range)
+                                    swift::CharSourceRange range)
       : Range(range), Kind(kind) {}
 
   using UnbridgedTy = swift::RegexLiteralPatternFeature;

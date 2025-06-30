@@ -874,7 +874,7 @@ BridgedRegexLiteralPatternFeature::BridgedRegexLiteralPatternFeature(
 
 BridgedRegexLiteralPatternFeature::UnbridgedTy
 BridgedRegexLiteralPatternFeature::unbridged() const {
-  return UnbridgedTy(Kind.unbridged(), Range.unbridged());
+  return UnbridgedTy(Kind.unbridged(), Range);
 }
 
 BridgedRegexLiteralPatternFeatures::UnbridgedTy

@@ -17,7 +17,7 @@ import swiftASTGen
 
 // MARK: - Bridged type initializers
 
-fileprivate extension BridgedCharSourceRange {
+fileprivate extension CharSourceRange {
   init(from range: Range<AbsolutePosition>, in sourceFile: ExportedSourceFile) {
     self.init(
       start: SourceLoc(at: range.lowerBound, in: sourceFile.buffer),
@@ -30,7 +30,7 @@ fileprivate extension BridgedCharSourceRangeVector {
   init(from ranges: some Sequence<Range<AbsolutePosition>>, in sourceFile: ExportedSourceFile) {
     self = .init()
     for range in ranges {
-      self.append(BridgedCharSourceRange(from: range, in: sourceFile))
+      self.append(.init(from: range, in: sourceFile))
     }
   }
 }
@@ -75,7 +75,7 @@ extension BridgedResolvedLoc {
     case .selector(let arguments2): arguments = arguments2
     }
     self.init(
-      range: BridgedCharSourceRange(from: resolvedLoc.baseNameRange, in: sourceFile),
+      range: .init(from: resolvedLoc.baseNameRange, in: sourceFile),
       labelRanges: BridgedCharSourceRangeVector(from: arguments.map { $0.range }, in: sourceFile),
       firstTrailingLabel: firstTrailingClosureIndex,
       labelType: LabelRangeType(resolvedLoc.arguments),

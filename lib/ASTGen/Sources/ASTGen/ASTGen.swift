@@ -291,10 +291,10 @@ extension ASTGenVisitor {
     }
   }
 
-  /// Obtains bridged character source range.
+  /// Obtains a C++ character source range.
   @inline(__always)
-  func generateCharSourceRange(start: AbsolutePosition, length: SourceLength) -> BridgedCharSourceRange {
-    BridgedCharSourceRange(
+  func generateCharSourceRange(start: AbsolutePosition, length: SourceLength) -> CharSourceRange {
+    .init(
       start: SourceLoc(at: start, in: self.base),
       byteLength: UInt32(length.utf8Length)
     )

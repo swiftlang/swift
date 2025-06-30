@@ -91,9 +91,8 @@ void BridgedData::free() const {
 BridgedCharSourceRangeVector::BridgedCharSourceRangeVector()
     : vector(new std::vector<CharSourceRange>()) {}
 
-void BridgedCharSourceRangeVector::push_back(BridgedCharSourceRange range) {
-  static_cast<std::vector<CharSourceRange> *>(vector)->push_back(
-      range.unbridged());
+void BridgedCharSourceRangeVector::push_back(swift::CharSourceRange range) {
+  static_cast<std::vector<CharSourceRange> *>(vector)->push_back(range);
 }
 
 //===----------------------------------------------------------------------===//
