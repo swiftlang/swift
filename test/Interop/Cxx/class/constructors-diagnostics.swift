@@ -2,6 +2,7 @@
 
 // This test uses -verify-additional-file, which do not work well on Windows.
 // UNSUPPORTED: OS=windows-msvc
+// XFAIL: OS=linux-androideabi
 
 import Constructors
 

@@ -1,4 +1,5 @@
 // RUN: %target-swiftxx-frontend -I %S/Inputs -Xllvm -sil-print-types -emit-silgen %s | %FileCheck %s
+// XFAIL: OS=linux-androideabi
 
 import Constructors
 

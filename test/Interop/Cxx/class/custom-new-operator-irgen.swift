@@ -5,4 +5,4 @@ import CustomNewOperator
 var x = callsCustomNew()
 
 // Make sure the definition of `operator new` is emitted.
-// CHECK: define {{.*}} @{{_ZnwmPv15container_new_t|"\?\?2@YAPEAX_KPEAXUcontainer_new_t@@@Z"}}
+// CHECK: define {{.*}} @{{_Znw(j|m)Pv15container_new_t|"\?\?2@YAPEAX_KPEAXUcontainer_new_t@@@Z"}}

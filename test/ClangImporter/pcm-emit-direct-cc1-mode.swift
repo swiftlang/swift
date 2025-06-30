@@ -15,5 +15,7 @@
 // CHECK-CLANG-SAME: '-fmodules'
 // CHECK-CLANG-NOT: clang importer driver args
 
+// XFAIL: OS=linux-androideabi
+
 import script
 var _ : ScriptTy

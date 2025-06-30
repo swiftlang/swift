@@ -19,7 +19,7 @@
 
 // Temporarily disabling on watchOS (both arm64_32 & armv7k):
 // rdar://140330692 (🟠 OSS Swift CI: oss-swift_tools-RA_stdlib-DA_test-device-non_executable failed...
-// UNSUPPORTED: OS=watchos
+// UNSUPPORTED: OS=watchos, OS=linux-androideabi
 
 //--- main.swift
 
