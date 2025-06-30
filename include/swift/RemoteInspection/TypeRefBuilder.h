@@ -1283,8 +1283,32 @@ public:
   const TypeRef *
   createSymbolicExtendedExistentialType(NodePointer shapeNode,
                                         llvm::ArrayRef<const TypeRef *> args) {
-    // Can't handle this here.
-    return nullptr;
+    remote::RemoteAddress shape(shapeNode->getIndex());
+    auto symbol = OpaquePointerSymbolResolver(shape);
+    if (!symbol)
+      return nullptr;
+    auto bytes = OpaqueByteReader(shape, 4);
+    if (!bytes)
+      return nullptr;
+    ExtendedExistentialTypeShapeFlags flags(*(const uint32_t *)bytes.get());
+
+    Demangler Dem;
+    NodePointer node = Dem.demangleSymbol(symbol->getSymbol());
+    auto [protocolNode, requirementNode] = decodeShape(node);
+    if (!protocolNode || !requirementNode)
+      return nullptr;
+
+    auto *protocol = llvm::dyn_cast_or_null<ProtocolCompositionTypeRef>(
+        decodeMangledType(protocolNode));
+
+    llvm::SmallVector<BuiltRequirement, 8> requirements;
+    llvm::SmallVector<BuiltInverseRequirement, 8> inverseRequirements;
+    decodeRequirement<BuiltType, BuiltRequirement, BuiltInverseRequirement,
+                      BuiltLayoutConstraint, TypeRefBuilder>(
+        requirementNode, requirements, inverseRequirements, *this);
+
+    return SymbolicExtendedExistentialTypeRef::create(
+        *this, protocol, requirements, args, flags);
   }
 
   const ExistentialMetatypeTypeRef *createExistentialMetatypeType(
@@ -1312,8 +1336,7 @@ public:
 
   const DependentMemberTypeRef *
   createDependentMemberType(const std::string &member, const TypeRef *base) {
-    // Should not have unresolved dependent member types here.
-    return nullptr;
+    return DependentMemberTypeRef::create(*this, member, base, "");
   }
 
   const DependentMemberTypeRef *
@@ -1479,6 +1502,9 @@ private:
   using PointerReader =
       std::function<std::optional<remote::RemoteAbsolutePointer>(
           remote::RemoteAddress, unsigned)>;
+  using PointerSymbolResolver =
+      std::function<std::optional<remote::RemoteAbsolutePointer>(
+          remote::RemoteAddress)>;
   using DynamicSymbolResolver =
       std::function<std::optional<remote::RemoteAbsolutePointer>(
           remote::RemoteAddress)>;
@@ -1511,6 +1537,7 @@ private:
   ByteReader OpaqueByteReader;
   StringReader OpaqueStringReader;
   PointerReader OpaquePointerReader;
+  PointerSymbolResolver OpaquePointerSymbolResolver;
   DynamicSymbolResolver OpaqueDynamicSymbolResolver;
   IntVariableReader OpaqueIntVariableReader;
 
@@ -1548,6 +1575,11 @@ public:
             [&reader](remote::RemoteAddress address, unsigned size)
                 -> std::optional<remote::RemoteAbsolutePointer> {
               return reader.Reader->readPointer(address, size);
+            }),
+        OpaquePointerSymbolResolver(
+            [&reader](remote::RemoteAddress address)
+                -> std::optional<remote::RemoteAbsolutePointer> {
+              return reader.Reader->resolvePointerAsSymbol(address);
             }),
         OpaqueDynamicSymbolResolver(
             [&reader](remote::RemoteAddress address)

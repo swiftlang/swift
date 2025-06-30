@@ -777,8 +777,12 @@ Type ASTBuilder::createExistentialMetatypeType(
 Type ASTBuilder::createConstrainedExistentialType(
     Type base, ArrayRef<BuiltRequirement> constraints,
     ArrayRef<BuiltInverseRequirement> inverseRequirements) {
+  llvm::SmallDenseMap<Identifier, Type> primaryAssociatedTypeNames;
   llvm::SmallDenseMap<AssociatedTypeDecl *, Type> primaryAssociatedTypes;
   llvm::SmallDenseSet<AssociatedTypeDecl *> claimed;
+  llvm::SmallDenseSet<Identifier> claimedNames;
+  unsigned duplicates = 0;
+  bool ambiguousName = false;
 
   for (const auto &req : constraints) {
     switch (req.getKind()) {
@@ -792,7 +796,18 @@ Type ASTBuilder::createConstrainedExistentialType(
       if (auto *memberTy = req.getFirstType()->getAs<DependentMemberType>()) {
         if (memberTy->getBase()->is<GenericTypeParamType>()) {
           // This is the only case we understand so far.
-          primaryAssociatedTypes[memberTy->getAssocType()] = req.getSecondType();
+          if (auto *assocTy = memberTy->getAssocType())
+            primaryAssociatedTypes[assocTy] = req.getSecondType();
+          else {
+            auto &ty = primaryAssociatedTypeNames[memberTy->getName()];
+            if (!ty)
+              ty = req.getSecondType();
+            else if (ty.getPointer() == req.getSecondType().getPointer())
+              ++duplicates;
+            else
+              ambiguousName = true;
+          }
+
           continue;
         }
       }
@@ -809,11 +824,24 @@ Type ASTBuilder::createConstrainedExistentialType(
 
     llvm::SmallVector<Type, 4> args;
     for (auto *assocTy : proto->getPrimaryAssociatedTypes()) {
-      auto found = primaryAssociatedTypes.find(assocTy);
-      if (found == primaryAssociatedTypes.end())
-        return protoTy;
-      args.push_back(found->second);
-      claimed.insert(found->first);
+      {
+        auto found = primaryAssociatedTypes.find(assocTy);
+        if (found != primaryAssociatedTypes.end()) {
+          args.push_back(found->second);
+          claimed.insert(found->first);
+          continue;
+        }
+      }
+      {
+        if (ambiguousName)
+          return protoTy;
+        auto found = primaryAssociatedTypeNames.find(assocTy->getName());
+        if (found != primaryAssociatedTypeNames.end()) {
+          args.push_back(found->second);
+          claimedNames.insert(found->first);
+          continue;
+        }
+      }
     }
 
     // We may not have any arguments because the constrained existential is a
@@ -849,6 +877,7 @@ Type ASTBuilder::createConstrainedExistentialType(
 
   // Make sure that all arguments were actually used.
   ASSERT(claimed.size() == primaryAssociatedTypes.size());
+  ASSERT(claimedNames.size() + duplicates == primaryAssociatedTypeNames.size());
 
   // Handle inverse requirements.
   if (!inverseRequirements.empty()) {
