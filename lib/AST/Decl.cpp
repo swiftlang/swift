@@ -2169,10 +2169,13 @@ bool ExtensionDecl::isWrittenWithConstraints() const {
   return false;
 }
 
-bool ExtensionDecl::isInSameDefiningModule() const {
+bool ExtensionDecl::isInSameDefiningModule(
+    bool RespectOriginallyDefinedIn) const {
   auto decl = getExtendedNominal();
-  auto extensionAlterName = getAlternateModuleName();
-  auto typeAlterName = decl->getAlternateModuleName();
+  auto extensionAlterName =
+      RespectOriginallyDefinedIn ? getAlternateModuleName() : "";
+  auto typeAlterName =
+      RespectOriginallyDefinedIn ? decl->getAlternateModuleName() : "";
 
   if (!extensionAlterName.empty()) {
     if (!typeAlterName.empty()) {
