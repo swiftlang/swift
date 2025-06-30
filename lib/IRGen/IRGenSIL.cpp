@@ -1163,42 +1163,8 @@ public:
           emitPackCountDebugVariable(Shape);
         }
       });
-
-    if (auto *BGT = llvm::dyn_cast<BoundGenericType>(Ty)) {
-      auto Decl = BGT->getDecl();
-      auto GE = Decl->getGenericEnvironment();
-      auto Requirements = BGT->getDecl()
-                              ->getGenericEnvironment()
-                              ->getGenericSignature()
-                              .getRequirements();
-      for (auto Requirement : Requirements) {
-        if (Requirement.getKind() == RequirementKind::Conformance) {
-          auto ProtocolDecl = Requirement.getProtocolDecl();
-          auto ConformingType = Requirement.getFirstType();
-          Type Archetype;
-          if (auto GTPT = llvm::dyn_cast<GenericTypeParamType>(
-                  ConformingType.getPointer()))
-            Archetype = GE->mapTypeIntoContext(GTPT);
-          else if (auto DMT = llvm::dyn_cast<DependentMemberType>(
-                       ConformingType.getPointer()))
-            Archetype = GE->mapTypeIntoContext(DMT);
-
-          if (Lowering::TypeConverter::protocolRequiresWitnessTable(
-                  ProtocolDecl) &&
-              tryGetLocalTypeData(
-                  Archetype->getCanonicalType(),
-                  LocalTypeDataKind::forAbstractProtocolWitnessTable(
-                      ProtocolDecl))) {
-            auto Conformance =
-                ProtocolConformanceRef::forAbstract(Archetype, ProtocolDecl);
-
-            emitWitnessTableRef(*this, Archetype->getCanonicalType(),
-                                Conformance);
-          }
-        }
-      }
-    }
   }
+  
   /// Emit debug info for a function argument or a local variable.
   template <typename StorageType>
   void emitDebugVariableDeclaration(
