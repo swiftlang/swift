@@ -872,7 +872,7 @@ format expected by the compiler crashes and undefined behavior may result.
 
 ### Create Ubuntu Container 
 
-1. Use an x86 machine. The following instructions currently don't work on arm64. It might be easy to adjust them or not, I have not tried
+1. Use an x86 machine. The following instructions currently don’t work on arm64. It might be easy to adjust them or not, I have not tried
 2. Clone (or pull) swift-docker: https://github.com/swiftlang/swift-docker
 3. Build the Ubuntu 22.04 container: `cd swift-ci/master/ubuntu/22.04; docker build .`
 4. `docker run -it --cpus <CPUs> --memory <Memory> -v ~/<path to your local sources>:/src-on-host:cached --name lsan-reproducer --cap-add=SYS_PTRACE --security-opt seccomp=unconfined <hash that docker build outputs> bash`
