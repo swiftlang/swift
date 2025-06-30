@@ -50,6 +50,8 @@ extension RunnableTargets {
   ) -> (String, RelativePath)? {
     // We're only interested in rules with the path 'bin/<executable>'.
     for output in outputs {
+      // https://github.com/swiftlang/swift-format/issues/1037
+      // swift-format-ignore
       guard case let .relative(r) = AnyPath(output),
             r.components.count == 2, r.components.first == "bin"
       else { return nil }
@@ -59,16 +61,22 @@ extension RunnableTargets {
   }
 
   private mutating func tryAddTarget(
-    _ rule: NinjaBuildFile.BuildEdge, buildDir: RepoBuildDir
+    _ rule: NinjaBuildFile.BuildEdge,
+    buildDir: RepoBuildDir
   ) {
+    // https://github.com/swiftlang/swift-format/issues/1037
+    // swift-format-ignore
     guard let (name, path) = getRunnablePath(for: rule.outputs),
-          addedPaths.insert(path).inserted else { return }
+          addedPaths.insert(path).inserted
+    else { return }
 
     let absPath = buildDir.path.appending(path)
     guard absPath.exists, absPath.isExecutable else { return }
 
     let target = RunnableTarget(
-      name: path.fileName, ninjaTargetName: name, path: absPath
+      name: path.fileName,
+      ninjaTargetName: name,
+      path: absPath
     )
     targets.append(target)
   }

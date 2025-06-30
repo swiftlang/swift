@@ -29,7 +29,10 @@ internal struct BinProps: OptionSet {
   init(rawValue: UInt64) {
     self.rawValue = rawValue
   }
+}
 
+// swift-format-ignore
+extension BinProps {
   static var changesWhenCaseFolded       : Self { Self(1 &<< 0) }
   static var changesWhenCaseMapped       : Self { Self(1 &<< 1) }
   static var changesWhenLowercased       : Self { Self(1 &<< 2) }
@@ -138,7 +141,7 @@ let binPropMappings: [String: BinProps] = [
   "Variation_Selector": .isVariationSelector,
   "White_Space": .isWhitespace,
   "XID_Continue": .isXIDContinue,
-  "XID_Start": .isXIDStart
+  "XID_Start": .isXIDStart,
 ]
 
 func getBinaryProperties(
@@ -153,14 +156,14 @@ func getBinaryProperties(
 
     let info = line.split(separator: "#")
     let components = info[0].split(separator: ";")
-    
+
     // Get the property first because we may not care about it.
     let filteredProperty = components[1].filter { !$0.isWhitespace }
-    
+
     guard binPropMappings.keys.contains(filteredProperty) else {
       continue
     }
-    
+
     let scalars: ClosedRange<UInt32>
 
     let filteredScalars = components[0].filter { !$0.isWhitespace }
@@ -176,7 +179,7 @@ func getBinaryProperties(
 
       scalars = scalar ... scalar
     }
-    
+
     for scalar in scalars {
       result[scalar, default: []].insert(binPropMappings[filteredProperty]!)
     }
@@ -188,23 +191,23 @@ func emitBinaryProps(
   into result: inout String
 ) {
   result += """
-  #define BIN_PROPS_COUNT \(data.count)
-  
-  
-  """
-  
+    #define BIN_PROPS_COUNT \(data.count)
+
+
+    """
+
   let combinations = Array(Set(data.map { $0.1 })).map { $0.rawValue }
-  
+
   // Data combinations array
-  
+
   emitCollection(
     combinations,
     name: "_swift_stdlib_scalar_binProps_data",
     into: &result
   )
-  
+
   // Actual scalar + index array
-  
+
   emitCollection(
     data,
     name: "_swift_stdlib_scalar_binProps",
@@ -219,39 +222,39 @@ func emitBinaryProps(
 
 func generateBinaryProps(for platform: String, into result: inout String) {
   let derivedCoreProps: String
-  
+
   switch platform {
   case "Apple":
     derivedCoreProps = readFile("Data/16/Apple/DerivedCoreProperties.txt")
   default:
     derivedCoreProps = readFile("Data/16/DerivedCoreProperties.txt")
   }
-  
+
   let bidiMirrored = readFile("Data/16/DerivedBinaryProperties.txt")
   let normalization = readFile("Data/16/DerivedNormalizationProps.txt")
   let emoji = readFile("Data/16/emoji-data.txt")
   let propList = readFile("Data/16/PropList.txt")
-  
+
   var binProps: [UInt32: BinProps] = [:]
   getBinaryProperties(from: derivedCoreProps, into: &binProps)
   getBinaryProperties(from: bidiMirrored, into: &binProps)
   getBinaryProperties(from: normalization, into: &binProps)
   getBinaryProperties(from: emoji, into: &binProps)
   getBinaryProperties(from: propList, into: &binProps)
-  
+
   // This loop inserts the ranges of scalars who have no binary properties to
   // fill in the holes for binary search.
   for i in 0x0 ... 0x10FFFF {
     guard let scalar = Unicode.Scalar(i) else {
       continue
     }
-    
+
     if !binProps.keys.contains(scalar.value) {
       binProps[scalar.value] = []
     }
   }
-  
+
   let data = flatten(Array(binProps))
-  
+
   emitBinaryProps(data, into: &result)
 }

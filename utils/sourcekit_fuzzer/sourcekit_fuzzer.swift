@@ -54,7 +54,7 @@ extension MutableCollection {
     let c = count
     guard c > 1 else { return }
 
-    for (firstUnshuffled , unshuffledCount) in zip(indices, stride(from: c, to: 1, by: -1)) {
+    for (firstUnshuffled, unshuffledCount) in zip(indices, stride(from: c, to: 1, by: -1)) {
       let d: Int = numericCast(arc4random_uniform(numericCast(unshuffledCount)))
       guard d != 0 else { continue }
       let i = index(firstUnshuffled, offsetBy: d)
@@ -70,7 +70,7 @@ extension String {
 }
 
 // Gross
-enum ProcessError : Error {
+enum ProcessError: Error {
   case failed
 }
 
@@ -119,7 +119,7 @@ let file = arguments[1]
 
 let contents = try! String(contentsOfFile: file)
 
-var offsets = Array(0...contents.count)
+var offsets = Array(0 ... contents.count)
 offsets.shuffle()
 
 var good = 0
@@ -138,9 +138,9 @@ for offset in offsets {
 
   let shellScriptPath = "out\(offset).sh"
   let shellScript = """
-  #!/bin/sh
-  \(notPath) --crash \(swiftIdeTestPath) -code-completion -code-completion-token=A -source-filename=\(sourcePath)
-  """
+    #!/bin/sh
+    \(notPath) --crash \(swiftIdeTestPath) -code-completion -code-completion-token=A -source-filename=\(sourcePath)
+    """
   try! shellScript.write(to: shellScriptPath)
 
   defer {
@@ -184,11 +184,11 @@ for offset in offsets {
 
     let testcasePath = "crash-\(bad).swift"
     let testcase = """
-    // RUN: \(notPath) --crash \(swiftIdeTestPath) -code-completion -code-completion-token=A -source-filename=%s
-    // REQUIRES: asserts
+      // RUN: \(notPath) --crash \(swiftIdeTestPath) -code-completion -code-completion-token=A -source-filename=%s
+      // REQUIRES: asserts
 
-    \(reduction)
-    """
+      \(reduction)
+      """
 
     try! testcase.write(to: testcasePath)
   }

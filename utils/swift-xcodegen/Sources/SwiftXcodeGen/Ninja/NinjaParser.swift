@@ -17,13 +17,20 @@ struct NinjaParser {
   private let fileReader: (AbsolutePath) throws -> Data
   private var lexer: Lexer
 
-  private init(input: UnsafeRawBufferPointer, filePath: AbsolutePath, fileReader: @escaping (AbsolutePath) throws -> Data) throws {
+  private init(
+    input: UnsafeRawBufferPointer,
+    filePath: AbsolutePath,
+    fileReader: @escaping (AbsolutePath) throws -> Data
+  ) throws {
     self.filePath = filePath
     self.fileReader = fileReader
     self.lexer = Lexer(ByteScanner(input))
   }
 
-  static func parse(filePath: AbsolutePath, fileReader: @escaping (AbsolutePath) throws -> Data = { try $0.read() }) throws -> NinjaBuildFile {
+  static func parse(
+    filePath: AbsolutePath,
+    fileReader: @escaping (AbsolutePath) throws -> Data = { try $0.read() }
+  ) throws -> NinjaBuildFile {
 
     try fileReader(filePath).withUnsafeBytes { bytes in
       var parser = try Self(input: bytes, filePath: filePath, fileReader: fileReader)

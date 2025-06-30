@@ -42,7 +42,6 @@ struct Tag: Decodable {
   }
 }
 
-
 extension Tag: CustomDebugStringConvertible {
   var debugDescription: String {
     String(name)
@@ -85,7 +84,7 @@ func getTagsFromSwiftRepo(branch: Branch, dryRun: Bool = false) async throws -> 
     BranchTag(tag: $0, branch: branch)
   }
 
-  // Then sort so that the newest branch prefix 
+  // Then sort so that the newest branch prefix
   filteredTags.sort { $0.tag.ref < $1.tag.ref }
   filteredTags.reverse()
 

@@ -22,6 +22,8 @@ public final class NinjaBuildDir: Sendable {
   ) -> Result<String, Error> {
     Result {
       for dir in try buildDir.getDirContents() {
+        // https://github.com/swiftlang/swift-format/issues/1037
+        // swift-format-ignore
         guard buildDir.appending(dir).isDirectory,
               let triple = dir.fileName.tryDropPrefix("swift-") else {
           continue
@@ -53,7 +55,7 @@ public final class NinjaBuildDir: Sendable {
     }
     return inferredProjectRootPath
   }
-  
+
   public init(at path: AbsolutePath, projectRootDir: AbsolutePath?) throws {
     guard path.exists else {
       throw XcodeGenError.pathNotFound(path)
@@ -62,7 +64,7 @@ public final class NinjaBuildDir: Sendable {
     self._tripleSuffix = Self.detectTripleSuffix(buildDir: path)
     self.projectRootDir = try projectRootDir ?? Self.detectProjectRoot()
   }
-  
+
   public func buildDir(for repo: Repo) throws -> RepoBuildDir {
     try repoBuildDirs.withLock { repoBuildDirs in
       if let buildDir = repoBuildDirs[repo] {

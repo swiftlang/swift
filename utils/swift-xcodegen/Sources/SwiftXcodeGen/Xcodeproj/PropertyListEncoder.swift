@@ -140,12 +140,15 @@ extension PropertyList {
       result.dictionary[key.stringValue] = .string(value)
     }
 
-    mutating func encode<T : Encodable>(_ value: T, forKey key: Key) throws {
+    mutating func encode<T: Encodable>(_ value: T, forKey key: Key) throws {
       result.dictionary[key.stringValue] = try .encode(value)
     }
 
     mutating func nestedUnkeyedContainer(forKey key: Key) -> UnkeyedEncodingContainer { fatalError("Unsupported") }
-    mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: Key) -> KeyedEncodingContainer<NestedKey> { fatalError("Unsupported") }
+    mutating func nestedContainer<NestedKey>(
+      keyedBy keyType: NestedKey.Type,
+      forKey key: Key
+    ) -> KeyedEncodingContainer<NestedKey> { fatalError("Unsupported") }
     mutating func superEncoder(forKey key: Key) -> Encoder { fatalError("Unsupported") }
     mutating func superEncoder() -> Encoder { fatalError("Unsupported") }
     mutating func encodeNil(forKey key: Key) { fatalError("Unsupported") }
@@ -180,7 +183,9 @@ extension PropertyList {
       result.array.append(try .encode(value))
     }
 
-    mutating func nestedContainer<NestedKey: CodingKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> { fatalError("Unsupported") }
+    mutating func nestedContainer<NestedKey: CodingKey>(
+      keyedBy keyType: NestedKey.Type
+    ) -> KeyedEncodingContainer<NestedKey> { fatalError("Unsupported") }
     mutating func nestedUnkeyedContainer() -> UnkeyedEncodingContainer { fatalError("Unsupported") }
     mutating func superEncoder() -> Encoder { fatalError("Unsupported") }
     mutating func encodeNil() { fatalError("Unsupported") }

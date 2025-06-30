@@ -13,13 +13,16 @@
 extension Dictionary {
   @inline(__always)
   mutating func withValue<R>(
-    for key: Key, default defaultValue: Value, body: (inout Value) throws -> R
+    for key: Key,
+    default defaultValue: Value,
+    body: (inout Value) throws -> R
   ) rethrows -> R {
     try body(&self[key, default: defaultValue])
   }
 
   mutating func insertValue(
-    _ newValue: @autoclosure () -> Value, for key: Key
+    _ newValue: @autoclosure () -> Value,
+    for key: Key
   ) -> Bool {
     if self[key] == nil {
       self[key] = newValue()
@@ -52,11 +55,13 @@ extension String {
       self = ""
       return
     }
-    self = String(unsafeUninitializedCapacity: buffer.count,
-                  initializingUTF8With: { dest in
-      _ = dest.initialize(from: buffer)
-      return buffer.count
-    })
+    self = String(
+      unsafeUninitializedCapacity: buffer.count,
+      initializingUTF8With: { dest in
+        _ = dest.initialize(from: buffer)
+        return buffer.count
+      }
+    )
   }
 
   init(utf8 buffer: UnsafeBufferPointer<UInt8>) {
@@ -91,7 +96,7 @@ extension String {
         switch consumer.peek {
         case "\\", "\"":
           consumer.append("\\")
-        case " ", "$": // $ is potentially a variable reference
+        case " ", "$":  // $ is potentially a variable reference
           needsQuotes = true
         default:
           break
@@ -121,7 +126,7 @@ extension String {
   /// since the former involves bridging, and the latter currently has no fast
   /// paths for strings.
   func replacing(_ other: String, with replacement: String) -> String {
-    guard !other.isEmpty else { 
+    guard !other.isEmpty else {
       return self
     }
     guard isASCII else {
