@@ -28,12 +28,15 @@ extension P {
     }
 }
 
-public struct S: P {
+public struct S: P { // expected-error {{circular reference}}
+// expected-note@-1 {{through reference here}}
     public typealias PA = String
     public typealias PB = Int
 
     public func f1(_ x: Context, _ y: PA) {
     }
-    public func f2(_ x: Context, _ y: PB) { // expected-error {{reference to invalid type alias 'Context' of type 'S'}}
+    public func f2(_ x: Context, _ y: PB) {
+    // expected-note@-1 2{{through reference here}}
+    // expected-note@-2 {{while resolving type 'Context'}}
     }
 }
