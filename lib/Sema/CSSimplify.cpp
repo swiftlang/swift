@@ -3121,6 +3121,8 @@ ConstraintSystem::TypeMatchResult
 ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
                                      ConstraintKind kind, TypeMatchOptions flags,
                                      ConstraintLocatorBuilder locator) {
+  func1 = simplifyType(func1)->castTo<FunctionType>();
+  func2 = simplifyType(func2)->castTo<FunctionType>();
   // Match the 'throws' effect.
   TypeMatchResult throwsResult =
       matchFunctionThrowing(*this, func1, func2, kind, flags, locator);
@@ -12155,11 +12157,6 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     if (contextualTy->isTypeVariableOrMember())
       return false;
 
-    // Cannot propagate pack expansion type from context,
-    // it has to be handled by type matching logic.
-    if (isPackExpansionType(contextualTy))
-      return false;
-
     // If contextual type has an error, let's wait for inference,
     // otherwise contextual would interfere with diagnostics.
     if (contextualTy->hasError())
@@ -12325,8 +12322,19 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
       // choices in the body.
       if (auto contextualParam = getContextualParamAt(i)) {
         auto paramTy = simplifyType(contextualParam->getOldType());
-        if (isSuitableContextualType(paramTy))
+        auto isSuitable = isSuitableContextualType(paramTy);
+        if (isSuitable && !paramTy->is<PackExpansionType>())
           addConstraint(ConstraintKind::Bind, externalType, paramTy, paramLoc);
+        else if (isSuitable) {
+          // If we have an unbound type variable and the contextual parameter
+          // type is a pack expansion, we must bind it here. Otherwise, it will
+          // never get bound.
+          if (auto externalTypeVar =
+                  getFixedTypeRecursive(externalType, /*wantRValue=*/true)
+                      ->getAs<TypeVariableType>()) {
+            assignFixedType(externalTypeVar, paramTy);
+          }
+        }
       }
 
       addConstraint(
