@@ -875,8 +875,8 @@ struct ElfSymbolTable<SomeElfTraits: ElfTraits>: ElfSymbolTableProtocol {
             continue
           }
 
-          // Ignore anything undefined
-          if symbol.st_shndx == SHN_UNDEF {
+          // Ignore anything undefined or absolute
+          if symbol.st_shndx == SHN_UNDEF || symbol.st_shndx == SHN_ABS {
             continue
           }
 
@@ -999,6 +999,8 @@ class ElfImage<SomeImageSource: ImageSource,
   var sectionHeaders: [Traits.Shdr]?
   var shouldByteSwap: Bool { return header.shouldByteSwap }
 
+  var imageBase: Source.Address
+
   required init(source: SomeImageSource,
                 baseAddress: Source.Address = 0,
                 endAddress: Source.Address = 0) throws {
@@ -1029,11 +1031,21 @@ class ElfImage<SomeImageSource: ImageSource,
 
     var phdrs: [Traits.Phdr] = []
     var phAddr = Source.Address(header.e_phoff)
+    var minAddr: Traits.Address? = nil
     for _ in 0..<header.e_phnum {
       let phdr = maybeSwap(try source.fetch(from: phAddr, as: Traits.Phdr.self))
       phdrs.append(phdr)
       phAddr += Source.Address(header.e_phentsize)
+
+      if phdr.p_type == .PT_LOAD {
+        if let oldMinAddr = minAddr {
+          minAddr = min(oldMinAddr, phdr.p_vaddr)
+        } else {
+          minAddr = phdr.p_vaddr
+        }
+      }
     }
+    imageBase = Source.Address(exactly: minAddr ?? 0)!
     programHeaders = phdrs
 
     if source.isMappedImage {
