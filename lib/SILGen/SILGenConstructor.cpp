@@ -595,7 +595,7 @@ static bool ctorHopsInjectedByDefiniteInit(ConstructorDecl *ctor,
   // must be self-isolated
   switch (isolation) {
   case ActorIsolation::ActorInstance:
-    return isolation.getActorInstanceParameter() == 0;
+    return isolation.isActorInstanceForSelfParameter();
 
   case ActorIsolation::Erased:
     llvm_unreachable("constructor cannot have erased isolation");

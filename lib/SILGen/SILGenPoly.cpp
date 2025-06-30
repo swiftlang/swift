@@ -7409,7 +7409,7 @@ void SILGenFunction::emitProtocolWitness(
 
     // For an instance actor, get the actor 'self'.
     if (*enterIsolation == ActorIsolation::ActorInstance) {
-      assert(enterIsolation->getActorInstanceParameter() == 0 && "Not self?");
+      assert(enterIsolation->isActorInstanceForSelfParameter() && "Not self?");
       auto actorSelfVal = origParams.back();
 
       if (actorSelfVal.getType().isAddress()) {

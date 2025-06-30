@@ -269,8 +269,13 @@ static ProtocolConformanceRef getBuiltinTupleTypeConformance(
   return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
 }
 
+// We can end up checking builtin conformances for generic function types
+// when e.g. we're checking whether a captured local func declaration is
+// sendable. That's fine, we can answer that question in the abstract
+// without needing to generally support conformances on generic function
+// types.
 using EitherFunctionType =
-    llvm::PointerUnion<const SILFunctionType *, const FunctionType *>;
+    llvm::PointerUnion<const SILFunctionType *, const AnyFunctionType *>;
 
 /// Whether the given function type conforms to Sendable.
 static bool isSendableFunctionType(EitherFunctionType eitherFnTy) {
@@ -288,7 +293,7 @@ static bool isSendableFunctionType(EitherFunctionType eitherFnTy) {
     representation = *converted;
 
   } else {
-    auto functionType = eitherFnTy.get<const FunctionType *>();
+    auto functionType = eitherFnTy.get<const AnyFunctionType *>();
 
     if (functionType->isSendable())
       return true;
@@ -332,7 +337,7 @@ static bool isBitwiseCopyableFunctionType(EitherFunctionType eitherFnTy) {
   if (auto silFnTy = eitherFnTy.dyn_cast<const SILFunctionType *>()) {
     representation = silFnTy->getRepresentation();
   } else {
-    auto fnTy = eitherFnTy.get<const FunctionType *>();
+    auto fnTy = eitherFnTy.get<const AnyFunctionType *>();
     representation = convertRepresentation(fnTy->getRepresentation());
   }
 
@@ -621,7 +626,7 @@ LookupConformanceInModuleRequest::evaluate(
   }
 
   // Function types can conform to protocols.
-  if (auto functionType = type->getAs<FunctionType>()) {
+  if (auto functionType = type->getAs<AnyFunctionType>()) {
     return getBuiltinFunctionTypeConformance(type, functionType, protocol);
   }
 

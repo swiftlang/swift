@@ -30,6 +30,14 @@ func test() {
   }
 }
 
+// Tested below. This used to fail in default-isolation mode because
+// the type-checker applied the default isolation to the implicit $defer
+// function, causing it to have MainActor isolation despite the enclosing
+// context being nonisolated.
+nonisolated func test_defer() {
+  defer {}
+}
+
 //--- concurrent.swift
 
 using nonisolated
@@ -37,7 +45,14 @@ using nonisolated
 // CHECK: // S.init(value:)
 // CHECK-NEXT: // Isolation: unspecified
 struct S {
-  // CHECK: // S.value.getter
-  // CHECK-NEXT: // Isolation: unspecified
   var value: Int
 }
+
+// CHECK: // test_defer()
+// CHECK-NEXT: // Isolation: nonisolated
+
+// CHECK: // $defer #1 () in test_defer()
+// CHECK-NEXT: // Isolation: nonisolated
+
+// CHECK: // S.value.getter
+// CHECK-NEXT: // Isolation: unspecified
