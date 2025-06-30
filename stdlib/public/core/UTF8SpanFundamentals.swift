@@ -17,7 +17,7 @@ extension UTF8Span {
   ///
   /// `i` must be scalar-aligned.
   internal func _previousScalarStart(_ i: Int) -> Int {
-    precondition(_boundsCheck(i&-1))
+    _precondition(_boundsCheck(i&-1))
     return _previousScalarStart(unchecked: i)
   }
 
@@ -31,7 +31,7 @@ extension UTF8Span {
   /// this is an unsafe operation.
   internal func _previousScalarStart(unchecked i: Int) -> Int {
     _internalInvariant(_boundsCheck(i&-1))
-    precondition(_isScalarAligned(unchecked: i))
+    _precondition(_isScalarAligned(unchecked: i))
     return _previousScalarStart(uncheckedAssumingAligned: i)
   }
 
@@ -81,7 +81,7 @@ extension UTF8Span {
   internal func _decodePreviousScalar(
     _ i: Int
   ) -> (Unicode.Scalar, previousScalarStart: Int) {
-    precondition(_boundsCheck(i &- 1))
+    _precondition(_boundsCheck(i &- 1))
     return _decodePreviousScalar(unchecked: i)
   }
 
@@ -96,7 +96,7 @@ extension UTF8Span {
     unchecked i: Int
   ) -> (Unicode.Scalar, previousScalarStart: Int) {
     _internalInvariant(_boundsCheck(i &- 1))
-    precondition(_isScalarAligned(unchecked: i))
+    _precondition(_isScalarAligned(unchecked: i))
     return _decodePreviousScalar(uncheckedAssumingAligned: i)
   }
 
@@ -127,7 +127,7 @@ extension UTF8Span {
   internal func _scalarAlignBackwards(_ i: Int) -> Int {
     if i == count || i == 0 { return i }
 
-    precondition(_boundsCheck(i))
+    _precondition(_boundsCheck(i))
     return unsafe _start()._scalarAlign(i)
   }
 
@@ -169,7 +169,7 @@ extension UTF8Span {
   ///
   /// `i` must be `Character`-aligned.
   internal func _nextCharacterStart(_ i: Int) -> Int {
-    precondition(_boundsCheck(i))
+    _precondition(_boundsCheck(i))
     return _nextCharacterStart(unchecked: i)
   }
 
@@ -183,7 +183,7 @@ extension UTF8Span {
   /// this is an unsafe operation.
   internal func _nextCharacterStart(unchecked i: Int) -> Int {
     _internalInvariant(_boundsCheck(i))
-    precondition(_isScalarAligned(unchecked: i))
+    _precondition(_isScalarAligned(unchecked: i))
     return _nextCharacterStart(uncheckedAssumingAligned: i)
   }
 
@@ -212,7 +212,7 @@ extension UTF8Span {
   ///
   /// `i` must be `Character`-aligned.
   internal func _previousCharacterStart(_ i: Int) -> Int {
-    precondition(_boundsCheck(i&-1))
+    _precondition(_boundsCheck(i&-1))
     return _previousCharacterStart(unchecked: i)
   }
 
@@ -226,7 +226,7 @@ extension UTF8Span {
   /// this is an unsafe operation.
   internal func _previousCharacterStart(unchecked i: Int) -> Int {
     _internalInvariant(_boundsCheck(i&-1))
-    precondition(_isScalarAligned(unchecked: i))
+    _precondition(_isScalarAligned(unchecked: i))
     return _previousCharacterStart(uncheckedAssumingAligned: i)
   }
 
@@ -256,7 +256,7 @@ extension UTF8Span {
   internal func _decodeNextCharacter(
     _ i: Int
   ) -> (Character, nextCharacterStart: Int) {
-    precondition(_boundsCheck(i))
+    _precondition(_boundsCheck(i))
     return _decodeNextCharacter(unchecked: i)
   }
 
@@ -271,7 +271,7 @@ extension UTF8Span {
     unchecked i: Int
   ) -> (Character, nextCharacterStart: Int) {
     _internalInvariant(_boundsCheck(i))
-    precondition(_isScalarAligned(unchecked: i))
+    _precondition(_isScalarAligned(unchecked: i))
     return _decodeNextCharacter(uncheckedAssumingAligned: i)
   }
 
@@ -299,7 +299,7 @@ extension UTF8Span {
   ///
   /// `i` must be `Character`-aligned.
   internal func _decodePreviousCharacter(_ i: Int) -> (Character, Int) {
-    precondition(_boundsCheck(i &- 1))
+    _precondition(_boundsCheck(i &- 1))
     return _decodePreviousCharacter(unchecked: i)
   }
 
@@ -314,7 +314,7 @@ extension UTF8Span {
     unchecked i: Int
   ) -> (Character, Int) {
     _internalInvariant(_boundsCheck(i &- 1))
-    precondition(_isScalarAligned(unchecked: i))
+    _precondition(_isScalarAligned(unchecked: i))
     return _decodePreviousCharacter(uncheckedAssumingAligned: i)
   }
 
