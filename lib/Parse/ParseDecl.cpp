@@ -3079,13 +3079,22 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
                  "Cxx");
         ParseSymbolName = false;
       };
+      bool isNegated = false;
+      if (Tok.is(tok::oper_prefix) && Tok.getText() == "!") {
+        isNegated = true;
+        consumeToken(tok::oper_prefix);
+      }
       if (Tok.isNot(tok::identifier)) {
         diagnoseExpectOption();
         return makeParserSuccess();
       }
       if (Tok.getText() == "Cxx") {
-        ExpKind = ExposureKind::Cxx;
+        ExpKind = isNegated ? ExposureKind::NotCxx : ExposureKind::Cxx;
       } else if (Tok.getText() == "wasm") {
+        if (isNegated) {
+          diagnoseExpectOption();
+          return makeParserSuccess();
+        }
         ExpKind = ExposureKind::Wasm;
       } else {
         diagnoseExpectOption();

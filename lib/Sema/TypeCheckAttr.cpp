@@ -24,6 +24,8 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/Attr.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
@@ -2462,6 +2464,14 @@ void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
       diagnose(attr->getLocation(), diag::expose_wasm_not_at_top_level_func);
     break;
   }
+  case ExposureKind::NotCxx:
+    for (const auto *attr : D->getAttrs().getAttributes<ExposeAttr>())
+      if (attr->getExposureKind() == ExposureKind::Cxx)
+        diagnose(attr->getLocation(), diag::expose_only_non_other_attr,
+                 "@_expose(Cxx)");
+    if (!attr->Name.empty())
+      diagnose(attr->getLocation(), diag::expose_redundant_name_provided);
+    break;
   case ExposureKind::Cxx: {
     auto *VD = cast<ValueDecl>(D);
     // Expose cannot be mixed with '@_cdecl' declarations.

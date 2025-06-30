@@ -2174,6 +2174,8 @@ ERROR(expose_only_non_other_attr,none,
 ERROR(expose_inside_unexposed_decl,none,
       "'@_expose' cannot be applied inside of unexposed declaration %0",
       (const ValueDecl *))
+ERROR(expose_redundant_name_provided, none,
+      "'@_expose(!Cxx)' does not accept a name argument", ())
 ERROR(expose_invalid_name_pattern_init,none,
       "invalid declaration name '%0' specified in '@_expose'; "
       "exposed initializer name must start with 'init'", (StringRef))
