@@ -25,9 +25,9 @@ func test_compatibility_coercions(_ arr: [Int], _ optArr: [Int]?, _ dict: [Strin
 
   // Make sure we error on the following in Swift 6 mode.
   _ = id(arr) as [String] // expected-error {{conflicting arguments to generic parameter 'T' ('[Int]' vs. '[String]')}}
-  _ = (arr ?? []) as [String] // expected-error {{conflicting arguments to generic parameter 'T' ('[String]' vs. '[Int]')}}
-  _ = (arr ?? [] ?? []) as [String] // expected-error {{conflicting arguments to generic parameter 'T' ('[String]' vs. '[Int]')}}
-  // expected-error@-1{{conflicting arguments to generic parameter 'T' ('[String]' vs. '[Int]')}}
+  _ = (arr ?? []) as [String] // expected-error {{conflicting arguments to generic parameter 'T' ('[Int]' vs. '[String]')}}
+  _ = (arr ?? [] ?? []) as [String] // expected-error {{conflicting arguments to generic parameter 'T' ('[Int]' vs. '[String]')}}
+  // expected-error@-1{{conflicting arguments to generic parameter 'T' ('[Int]' vs. '[String]')}}
   _ = (optArr ?? []) as [String] // expected-error {{conflicting arguments to generic parameter 'T' ('[Int]' vs. '[String]'}}
 
   _ = (arr ?? []) as [String]? // expected-error {{'[Int]' is not convertible to '[String]?'}}

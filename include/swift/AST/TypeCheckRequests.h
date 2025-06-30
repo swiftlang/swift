@@ -5389,6 +5389,22 @@ public:
   bool isCached() const { return true; }
 };
 
+class ModuleHasTypeCheckerPerformanceHacksEnabledRequest
+    : public SimpleRequest<ModuleHasTypeCheckerPerformanceHacksEnabledRequest,
+                           bool(const ModuleDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator, const ModuleDecl *module) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 #define SWIFT_TYPEID_ZONE TypeChecker
 #define SWIFT_TYPEID_HEADER "swift/AST/TypeCheckerTypeIDZone.def"
 #include "swift/Basic/DefineTypeIDZone.h"
