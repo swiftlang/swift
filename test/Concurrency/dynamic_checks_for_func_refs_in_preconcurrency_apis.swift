@@ -42,6 +42,10 @@ public struct S<T> {
   }
 }
 
+public class NS {}
+
+public func testNoIsolation(_: @escaping (NS) -> Void) {}
+
 //--- Client.swift
 import API
 
@@ -164,3 +168,14 @@ func testMembers<X>(v: X, s: S<X>, fn: @escaping @MainActor (X) -> Int) {
 // CHECK-NEXT: [[EXEC:%.*]] = extract_executor [[MAIN_ACTOR_ACCESS]] : $MainActor
 // CHECK: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
 // CHECK-NEXT: {{.*}} = apply [[CHECK_EXEC_REF]]({{.*}}, [[EXEC]])
+
+@MainActor
+class Test {
+  @Sendable func compute(_: NS) {}
+  // expected-warning@-1 {{main actor-isolated synchronous instance method 'compute' cannot be marked as '@Sendable'; this is an error in the Swift 6 language mode}}
+
+  func test() {
+    // Triggers loss of @Sendable and actor isolation erasure at the same time
+    testNoIsolation(compute)
+  }
+}

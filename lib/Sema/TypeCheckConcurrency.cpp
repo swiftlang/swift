@@ -2849,6 +2849,14 @@ namespace {
               break;
 
             case FunctionTypeIsolation::Kind::GlobalActor:
+              // If the isolation is the same it means that conversion
+              // covers loss of `@Sendable` or some other attribute and
+              // we don't need Sendable checking because there is no
+              // boundary crossing here.
+              if (fromIsolation.getGlobalActorType()->isEqual(
+                      toIsolation.getGlobalActorType()))
+                break;
+
               diagnoseNonSendableParametersAndResult(
                   toFnType, version::Version::getFutureMajorLanguageVersion());
               break;
