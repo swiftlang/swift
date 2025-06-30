@@ -2,11 +2,13 @@
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/module-cache)
 // RUN: %empty-directory(%t/inputs)
+// RUN: %empty-directory(%t/inputs-2)
 // RUN: split-file %s %t
 
 // RUN: sed -e "s|OUT_DIR|%t/redirects|g"  -e "s|IN_DIR|%t/inputs|g" %t/overlay_template.yaml > %t/overlay.yaml
+// RUN: sed -e "s|OUT_DIR|%t/redirects-2|g"  -e "s|IN_DIR|%t/inputs-2|g" %t/overlay_template_2.yaml > %t/overlay-2.yaml
 
-// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-serialized -module-cache-path %t/module-cache %t/test.swift -o %t/deps.json -I %t/inputs -I %S/Inputs/Swift -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import -Xcc -ivfsoverlay -Xcc %t/overlay.yaml
+// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-serialized -module-cache-path %t/module-cache %t/test.swift -o %t/deps.json -I %t/inputs -I %t/inputs-2 -I %S/Inputs/Swift -disable-implicit-concurrency-module-import -disable-implicit-string-processing-module-import -Xcc -ivfsoverlay -Xcc %t/overlay.yaml -Xcc -ivfsoverlay -Xcc %t/overlay-2.yaml
 // RUN: %validate-json %t/deps.json | %FileCheck %s
 
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/shim.cmd
@@ -15,6 +17,8 @@
 // RUN: %swift_frontend_plain @%t/swift.cmd
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json SwiftOnoneSupport > %t/onone.cmd
 // RUN: %swift_frontend_plain @%t/onone.cmd
+// RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json clang:Indirect > %t/Indirect.cmd
+// RUN: %swift_frontend_plain @%t/Indirect.cmd
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json clang:F > %t/F.cmd
 // RUN: %swift_frontend_plain @%t/F.cmd
 // RUN: %{python} %S/../CAS/Inputs/BuildCommandExtractor.py %t/deps.json F > %t/SwiftF.cmd
@@ -28,15 +32,25 @@
 // RUN: echo "\"-explicit-swift-module-map-file\"" >> %t/MyApp.cmd
 // RUN: echo "\"%t/map.json\"" >> %t/MyApp.cmd
 
-// RUN: %target-swift-frontend @%t/MyApp.cmd %t/test.swift -Xcc -ivfsoverlay -Xcc %t/overlay.yaml \
+// RUN: %target-swift-frontend @%t/MyApp.cmd %t/test.swift -Xcc -ivfsoverlay -Xcc %t/overlay.yaml -Xcc -ivfsoverlay -Xcc %t/overlay-2.yaml \
 // RUN:   -emit-module -o %t/Test.swiftmodule
 
 //--- redirects/RedirectedF.h
+#include "Indirect_2.h"
 void funcRedirectedF(void);
 
 //--- redirects/modulemap
 module F {
   header "F_2.h"
+  export *
+}
+
+//--- redirects-2/RedirectedIndirect.h
+void funcRedirectedIndirect(void);
+
+//--- redirects-2/modulemap
+module Indirect {
+  header "Indirect_2.h"
   export *
 }
 
@@ -50,6 +64,25 @@ module F {
       'contents': [
         { 'name': 'F_2.h', 'type': 'file',
           'external-contents': 'OUT_DIR/RedirectedF.h'
+        },
+        { 'name': 'module.modulemap', 'type': 'file',
+          'external-contents': 'OUT_DIR/modulemap'
+        }
+      ]
+    },
+  ]
+}
+
+//--- overlay_template_2.yaml
+{
+  'version': 0,
+  'use-external-names': false,
+  'roots': [
+    {
+      'name': 'IN_DIR', 'type': 'directory',
+      'contents': [
+        { 'name': 'Indirect_2.h', 'type': 'file',
+          'external-contents': 'OUT_DIR/RedirectedIndirect.h'
         },
         { 'name': 'module.modulemap', 'type': 'file',
           'external-contents': 'OUT_DIR/modulemap'
@@ -100,5 +133,8 @@ func testF() { funcRedirectedF() }
 // CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}F-{{.*}}.pcm",
 // CHECK: "commandLine": [
 // CHECK: "-vfsoverlay",
+// CHECK-NEXT: "{{.*}}{{/|\\}}preserve_used_vfs.swift.tmp{{/|\\}}overlay.yaml",
+// CHECK: "-ivfsoverlay",
+// CHECK-NEXT: "-Xcc",
 // CHECK-NEXT: "{{.*}}{{/|\\}}preserve_used_vfs.swift.tmp{{/|\\}}overlay.yaml",
 // CHECK: ],
