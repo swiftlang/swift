@@ -116,7 +116,7 @@ Solution::computeSubstitutions(NullablePtr<ValueDecl> decl,
       } else if (!type->is<PackType>())
         type = PackType::getSingletonPackExpansion(type);
     }
-    replacementTypes.push_back(type);
+    replacementTypes.push_back(simplifyType(type));
   }
 
   auto lookupConformanceFn =
@@ -145,9 +145,9 @@ Solution::computeSubstitutions(NullablePtr<ValueDecl> decl,
     return conformance;
   };
 
-  return SubstitutionMap::get(sig,
-                              replacementTypes,
-                              lookupConformanceFn);
+  auto subs = SubstitutionMap::get(sig, replacementTypes, lookupConformanceFn);
+  CONDITIONAL_ASSERT(!subs.getRecursiveProperties().isSolverAllocated());
+  return subs;
 }
 
 // Lazily instantiate function definitions for class template specializations.
