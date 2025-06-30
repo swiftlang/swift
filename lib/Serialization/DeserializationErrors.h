@@ -728,16 +728,26 @@ public:
 class PrettyStackTraceModuleFile : public llvm::PrettyStackTraceEntry {
   const char *Action;
   const ModuleFile &MF;
+  const std::string caller;
 public:
-  explicit PrettyStackTraceModuleFile(const char *action, ModuleFile &module)
-      : Action(action), MF(module) {}
-  explicit PrettyStackTraceModuleFile(ModuleFile &module)
-      : PrettyStackTraceModuleFile("While reading from", module) {}
+  explicit PrettyStackTraceModuleFile(const char *action, ModuleFile &module, std::string c = __func__)
+      : Action(action), MF(module), caller(c) {
+        llvm::dbgs() << "start module read of ";
+        MF.outputDiagnosticInfo(llvm::dbgs());
+        llvm::dbgs() << " (called from " << c << ")\n";
+      }
+  explicit PrettyStackTraceModuleFile(ModuleFile &module, std::string caller = __func__)
+      : PrettyStackTraceModuleFile("While reading from", module, caller) {}
 
+  ~PrettyStackTraceModuleFile() {
+    llvm::dbgs() << "finish module read of ";
+    MF.outputDiagnosticInfo(llvm::dbgs());
+    llvm::dbgs() << " (called from " << caller << ")\n";
+  }
   void print(raw_ostream &os) const override {
     os << Action << " ";
     MF.outputDiagnosticInfo(os);
-    os << "\n";
+    os << " (called from " << caller << ")\n";
   }
 };
 
