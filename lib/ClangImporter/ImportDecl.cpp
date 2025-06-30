@@ -9024,6 +9024,14 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
 }
 
 namespace {
+ValueDecl *getKnownSingleDecl(ASTContext &SwiftContext, StringRef DeclName) {
+  SmallVector<ValueDecl *, 1> decls;
+  SwiftContext.lookupInSwiftModule(DeclName, decls);
+  assert(decls.size() < 2);
+  if (decls.size() != 1) return nullptr;
+  return decls[0];
+}
+
 class SwiftifyInfoPrinter {
 public:
   static const ssize_t SELF_PARAM_INDEX = -2;
@@ -9031,9 +9039,10 @@ public:
   clang::ASTContext &ctx;
   ASTContext &SwiftContext;
   llvm::raw_ostream &out;
+  MacroDecl &SwiftifyImportDecl;
   bool firstParam = true;
-  SwiftifyInfoPrinter(clang::ASTContext &ctx, ASTContext &SwiftContext, llvm::raw_ostream &out)
-      : ctx(ctx), SwiftContext(SwiftContext), out(out) {
+  SwiftifyInfoPrinter(clang::ASTContext &ctx, ASTContext &SwiftContext, llvm::raw_ostream &out, MacroDecl &SwiftifyImportDecl)
+      : ctx(ctx), SwiftContext(SwiftContext), out(out), SwiftifyImportDecl(SwiftifyImportDecl) {
     out << "@_SwiftifyImport(";
   }
   ~SwiftifyInfoPrinter() { out << ")"; }
@@ -9091,22 +9100,23 @@ public:
   }
 
   void printAvailability() {
+    if (!hasMacroParameter("spanAvailability"))
+      return;
     printSeparator();
     out << "spanAvailability: ";
     printAvailabilityOfType("Span");
   }
 
 private:
-  ValueDecl *getDecl(StringRef DeclName) {
-    SmallVector<ValueDecl *, 1> decls;
-    SwiftContext.lookupInSwiftModule(DeclName, decls);
-    assert(decls.size() == 1);
-    if (decls.size() != 1) return nullptr;
-    return decls[0];
+  bool hasMacroParameter(StringRef ParamName) {
+    for (auto *Param : *SwiftifyImportDecl.parameterList)
+      if (Param->getArgumentName().str() == ParamName)
+        return true;
+    return false;
   }
 
   void printAvailabilityOfType(StringRef Name) {
-    ValueDecl *D = getDecl(Name);
+    ValueDecl *D = getKnownSingleDecl(SwiftContext, Name);
     out << "\"";
     llvm::SaveAndRestore<bool> hasAvailbilitySeparatorRestore(firstParam, true);
     for (auto attr : D->getSemanticAvailableAttrs(/*includingInactive=*/true)) {
@@ -9270,6 +9280,10 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
   if (ClangDecl->getNumParams() != MappedDecl->getParameters()->size())
     return;
 
+  MacroDecl *SwiftifyImportDecl = dyn_cast_or_null<MacroDecl>(getKnownSingleDecl(SwiftContext, "_SwiftifyImport"));
+  if (!SwiftifyImportDecl)
+    return;
+
   {
     UnaliasedInstantiationVisitor visitor;
     visitor.TraverseType(ClangDecl->getType());
@@ -9298,7 +9312,7 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
           }
           return false;
         };
-    SwiftifyInfoPrinter printer(getClangASTContext(), SwiftContext, out);
+    SwiftifyInfoPrinter printer(getClangASTContext(), SwiftContext, out, *SwiftifyImportDecl);
     Type swiftReturnTy;
     if (const auto *funcDecl = dyn_cast<FuncDecl>(MappedDecl))
       swiftReturnTy = funcDecl->getResultInterfaceType();
