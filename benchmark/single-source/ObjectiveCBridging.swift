@@ -883,7 +883,7 @@ public func run_BridgedNSDictionaryEnumerate(_ n: Int) {
 public func run_BridgedNSArrayBufferAccess(_ n: Int) {
   #if _runtime(_ObjC)
   for _ in 0 ..< n {
-    for i in 0..<1000 {
+    for _ in 0..<1000 {
       let tmp = nsArray as! [NSObject]
       blackHole(tmp)
       blackHole(tmp.withContiguousStorageIfAvailable {
@@ -900,7 +900,7 @@ public func run_BridgedNSArrayRepeatedBufferAccess(_ n: Int) {
   for _ in 0 ..< n {
     let tmp = nsArray as! [NSObject]
     blackHole(tmp)
-    for i in 0..<1000 {
+    for _ in 0..<1000 {
       blackHole(tmp.withContiguousStorageIfAvailable {
         $0[0]
       })
