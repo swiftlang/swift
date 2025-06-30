@@ -145,3 +145,13 @@ struct S {
 #checkGeneric<String>()
 #checkGeneric2<String, Int>()
 #checkGenericHashableCodable<String, Int>()
+
+// Check that inout parameters are allowed in expression macros
+
+@freestanding(expression) macro functionCallWithInoutParam(_ v: inout Int)
+  = #externalMacro(module: "MacroDefinition", type: "VoidExpressionMacro")
+
+func testFunctionCallWithInoutParam() {
+  var a = 0
+  #functionCallWithInoutParam(&a)
+}
