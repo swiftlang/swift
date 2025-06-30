@@ -712,7 +712,10 @@ DECL_ATTR(_expose, Expose,
   AllowMultipleAttributes | LongAttribute | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   133)
 
-// Unused '134'
+SIMPLE_DECL_ATTR(_swiftPrivate, SwiftPrivate,
+  OnFunc | OnNominalType | OnVar | OnConstructor,
+  LongAttribute | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  134)
 
 SIMPLE_DECL_ATTR(_spiOnly, SPIOnly,
   OnImport,

@@ -5050,6 +5050,7 @@ public:
   TRIVIAL_ATTR_PRINTER(Extensible, extensible)
   TRIVIAL_ATTR_PRINTER(Concurrent, concurrent)
   TRIVIAL_ATTR_PRINTER(PreEnumExtensibility, preEnumExtensibility)
+  TRIVIAL_ATTR_PRINTER(SwiftPrivate, swift_private)
 
 #undef TRIVIAL_ATTR_PRINTER
 

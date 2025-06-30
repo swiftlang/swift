@@ -2944,6 +2944,16 @@ static bool excludeForObjCImplementation(const ValueDecl *VD) {
   return false;
 }
 
+static bool hasSwiftPrivateAttr(const ValueDecl *VD) {
+  if (VD->getAttrs().hasAttribute<SwiftPrivateAttr>())
+    return true;
+  if (const auto *NMT = dyn_cast<NominalTypeDecl>(VD->getDeclContext()))
+    return hasSwiftPrivateAttr(NMT);
+  if (const auto *ED = dyn_cast<ExtensionDecl>(VD->getDeclContext()))
+    return hasSwiftPrivateAttr(ED->getExtendedNominal());
+  return false;
+}
+
 static bool isExposedToThisModule(const ModuleDecl &M, const ValueDecl *VD,
                                   const llvm::StringSet<> &exposedModules) {
   if (VD->hasClangNode())
@@ -2993,6 +3003,9 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD) {
     return false;
 
   if (requiresExposedAttribute && !hasExposeAttr(VD))
+    return false;
+
+  if (hasSwiftPrivateAttr(VD))
     return false;
 
   if (!isVisible(VD))

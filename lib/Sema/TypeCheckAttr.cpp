@@ -23,6 +23,7 @@
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTVisitor.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
@@ -191,6 +192,7 @@ public:
   IGNORED_ATTR(AllowFeatureSuppression)
   IGNORED_ATTR(PreInverseGenerics)
   IGNORED_ATTR(Safe)
+  IGNORED_ATTR(SwiftPrivate)
 #undef IGNORED_ATTR
 
   void visitABIAttr(ABIAttr *attr) {
@@ -2405,6 +2407,9 @@ void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
 }
 
 void AttributeChecker::visitExposeAttr(ExposeAttr *attr) {
+  if (D->getAttrs().hasAttribute<SwiftPrivateAttr>())
+    diagnose(attr->getLocation(), diag::expose_only_non_other_attr,
+             "@_swiftPrivate");
   switch (attr->getExposureKind()) {
   case ExposureKind::Wasm: {
     // Only top-level func decls are currently supported.
