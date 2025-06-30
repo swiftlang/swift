@@ -90,6 +90,7 @@ struct CodeCompletionInfo {
   StringRef TypeName;
   StringRef ModuleName;
   StringRef DocBrief;
+  StringRef DocFull;
   StringRef AssocUSRs;
   UIdent SemanticContext;
   UIdent TypeRelation;
