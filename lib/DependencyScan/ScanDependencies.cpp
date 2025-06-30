@@ -1110,7 +1110,7 @@ findClangDepPath(const ModuleDependencyID &from, const ModuleDependencyID &to,
     }
 
     // Otherwise, visit each child node.
-    for (const auto &succID : cache.getAllDependencies(moduleID)) {
+    for (const auto &succID : cache.getImportedClangDependencies(moduleID)) {
       stack.push(succID);
       visit(succID);
       stack.pop();
