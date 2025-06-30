@@ -10252,7 +10252,7 @@ ClangImporter::Implementation::importDeclContextOf(
 
   // If the declaration was not global to start with, we're done.
   bool isGlobal =
-    decl->getDeclContext()->getRedeclContext()->isTranslationUnit();
+    decl->getDeclContext()->getRedeclContext()->isFileContext();
   if (!isGlobal) return importedDC;
 
   // If the resulting declaration context is not a nominal type,
