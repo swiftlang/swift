@@ -13,13 +13,10 @@
 #ifndef SWIFT_SILOPTIMIZER_OPTIMIZERBRIDGING_H
 #define SWIFT_SILOPTIMIZER_OPTIMIZERBRIDGING_H
 
-// Do not add other C++/llvm/swift header files here!
-// Function implementations should be placed into OptimizerBridgingImpl.h or PassManager.cpp
-// (under OptimizerBridging) andrequired header files should be added there.
-//
-// Pure bridging mode does not permit including any C++/llvm/swift headers.
-// See also the comments for `BRIDGING_MODE` in the top-level CMakeLists.txt file.
-//
+/// `OptimizerBridging.h` is imported into Swift. Be *very* careful with what
+/// you include here and keep these includes minimal!
+///
+/// See include guidelines and caveats in `BasicBridging.h`.
 #include "swift/AST/ASTBridging.h"
 #include "swift/SIL/SILBridging.h"
 

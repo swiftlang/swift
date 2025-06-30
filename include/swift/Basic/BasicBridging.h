@@ -13,11 +13,13 @@
 #ifndef SWIFT_BASIC_BASICBRIDGING_H
 #define SWIFT_BASIC_BASICBRIDGING_H
 
-// Do not add other C++/llvm/swift header files here!
-// Function implementations should be placed into BasicBridging.cpp and required header files should be added there.
+// Do not add other std/llvm header files here!
+// Function implementations should be placed into BasicBridging.cpp and
+// required header files should be added there.
 //
-// Pure bridging mode does not permit including any C++/llvm/swift headers.
-// See also the comments for `BRIDGING_MODE` in the top-level CMakeLists.txt file.
+// Pure bridging mode does not permit including any std/llvm headers.
+// See also the comments for `BRIDGING_MODE` in the top-level CMakeLists.txt
+// file.
 //
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 // !! Do not put any constructors inside an                                   !!

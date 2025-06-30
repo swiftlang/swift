@@ -11,10 +11,11 @@
 //===----------------------------------------------------------------------===//
 ///
 /// This is a wrapper around `<swift/bridging>` that redefines `SWIFT_NAME` to
-/// accept a string literal, and some other macros in case the header is
-/// unavailable (e.g. during bootstrapping). String literals enable us to
-/// properly format the long Swift declaration names that many of our bridging
-/// functions have.
+/// accept a string literal, and some other helpful macros, including fallbacks
+/// for when `<swift/bridging>` is unavailable (e.g. during bootstrapping).
+///
+/// String literals enable us to properly format the long Swift declaration
+/// names specified via `SWIFT_NAME` that many of our bridging functions have.
 ///
 //===----------------------------------------------------------------------===//
 
