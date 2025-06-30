@@ -22,7 +22,7 @@
 //
 #include "swift/AST/ASTBridging.h"
 
-#ifdef USED_IN_CPP_SOURCE
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 #include "llvm/ADT/ArrayRef.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILWitnessTable.h"
@@ -329,7 +329,7 @@ struct BridgedValueArray {
   const BridgeValueExistential * _Nullable base;
   size_t count;
 
-#ifdef USED_IN_CPP_SOURCE
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
   llvm::ArrayRef<swift::SILValue> getValues(llvm::SmallVectorImpl<swift::SILValue> &storage);
 #endif
 };
@@ -639,7 +639,7 @@ struct BridgedSILDebugVariable {
 struct BridgedInstruction {
   SwiftObject obj;
 
-#ifdef USED_IN_CPP_SOURCE
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
   template <class I> I *_Nonnull getAs() const {
     return llvm::cast<I>(static_cast<swift::SILNode *>(obj)->castToInstruction());
   }
@@ -1068,7 +1068,7 @@ struct BridgedWitnessTableEntry {
     baseProtocol
   };
 
-#ifdef USED_IN_CPP_SOURCE
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
   static BridgedWitnessTableEntry bridge(const swift::SILWitnessTable::Entry &entry) {
     BridgedWitnessTableEntry bridgedEntry;
     *reinterpret_cast<swift::SILWitnessTable::Entry *>(&bridgedEntry.storage) = entry;

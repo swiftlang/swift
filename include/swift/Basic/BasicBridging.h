@@ -13,36 +13,26 @@
 #ifndef SWIFT_BASIC_BASICBRIDGING_H
 #define SWIFT_BASIC_BASICBRIDGING_H
 
-#if !defined(COMPILED_WITH_SWIFT) || !defined(PURE_BRIDGING_MODE)
-#define USED_IN_CPP_SOURCE
-#endif
-
 // Do not add other C++/llvm/swift header files here!
 // Function implementations should be placed into BasicBridging.cpp and required header files should be added there.
 //
 // Pure bridging mode does not permit including any C++/llvm/swift headers.
 // See also the comments for `BRIDGING_MODE` in the top-level CMakeLists.txt file.
 //
-//
-// Note: On Windows ARM64, how a C++ struct/class value type is
-// returned is sensitive to conditions including whether a
-// user-defined constructor exists, etc. See
-// https://learn.microsoft.com/en-us/cpp/build/arm64-windows-abi-conventions?view=msvc-170#return-values
-// So, if a C++ struct/class type is returned as a value between Swift
-// and C++, we need to be careful to match the return convention
-// matches between the non-USED_IN_CPP_SOURCE (Swift) side and the
-// USE_IN_CPP_SOURCE (C++) side.
-//
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-// !! Do not put any constructors inside an `#ifdef USED_IN_CPP_SOURCE` block !!
+// !! Do not put any constructors inside an                                   !!
+// !! `#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE` block               !!
 // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-#include "swift/Basic/BridgedSwiftObject.h"
+/// This header defines `NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE`, so it
+/// needs to be imported before the first use of the macro.
 #include "swift/Basic/SwiftBridging.h"
 
+#include "swift/Basic/BridgedSwiftObject.h"
 #include <stddef.h>
 #include <stdint.h>
-#ifdef USED_IN_CPP_SOURCE
+
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 // Workaround to avoid a compiler error because `cas::ObjectRef` is not defined
 // when including VirtualFileSystem.h
 #include <cassert>
@@ -146,7 +136,7 @@ public:
   BridgedArrayRef(const void *_Nullable data, size_t length)
       : Data(data), Length(length) {}
 
-#ifdef USED_IN_CPP_SOURCE
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
   template <typename T>
   BridgedArrayRef(llvm::ArrayRef<T> arr)
       : Data(arr.data()), Length(arr.size()) {}
@@ -285,7 +275,7 @@ public:
   };
 BRIDGED_OPTIONAL(SwiftInt, Int)
 
-#ifdef USED_IN_CPP_SOURCE
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 inline BridgedOptionalInt getFromAPInt(llvm::APInt i) {
   if (i.getSignificantBits() <=
       std::min(std::numeric_limits<SwiftInt>::digits, 64)) {
@@ -421,7 +411,7 @@ public:
   SWIFT_NAME("append(_:)")
   void push_back(BridgedCharSourceRange range);
 
-#ifdef USED_IN_CPP_SOURCE
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
   /// Returns the `std::vector<swift::CharSourceRange>` that this
   /// `BridgedCharSourceRangeVector` represents and frees the memory owned by
   /// this `BridgedCharSourceRangeVector`.

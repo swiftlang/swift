@@ -96,5 +96,27 @@
 #define SWIFT_UNAVAILABLE(msg)
 #endif
 
+#if !(defined(COMPILED_WITH_SWIFT) && defined(PURE_BRIDGING_MODE))
+/// Use this macro in a `#ifdef`/`#endif` fashion to wrap code that should not
+/// be imported into Swift in pure bridging mode, e.g. because an API is
+/// irrelevant on the Swift side, or because it requires std/llvm headers, which
+/// we don't want to import in this mode.
+///
+/// - Important: Do not put a constructor inside a
+/// `NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE` block unless there already is
+/// another unconditionally available user-defined constructor!
+///
+/// Note: On Windows ARM64, how a C++ struct/class value type is
+/// returned is sensitive to conditions including whether a
+/// user-defined constructor exists, etc. See
+/// https://learn.microsoft.com/en-us/cpp/build/arm64-windows-abi-conventions?view=msvc-170#return-values
+///
+/// So, if a C++ struct/class type is returned as a value between Swift
+/// and C++, we need to be careful to match the return convention
+/// matches between the `NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE` (C++) side
+/// and the non-`NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE` (Swift) side.
+#define NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
+#endif
+
 #endif // SWIFT_BASIC_SWIFT_BRIDGING_H
 

@@ -29,7 +29,7 @@
 #include "swift/AST/PlatformKind.h"
 #include "swift/Basic/BasicBridging.h"
 
-#ifdef USED_IN_CPP_SOURCE
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #endif
@@ -379,7 +379,7 @@ struct OptionalBridgedDeclObj {
 
   OptionalBridgedDeclObj(OptionalSwiftObject obj) : obj(obj) {}
 
-#ifdef USED_IN_CPP_SOURCE
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
   template <class D> D *_Nullable getAs() const {
     if (obj)
       return llvm::cast<D>(static_cast<swift::Decl *>(obj));
@@ -391,7 +391,7 @@ struct OptionalBridgedDeclObj {
 struct BridgedDeclObj {
   SwiftObject obj;
 
-#ifdef USED_IN_CPP_SOURCE
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
   template <class D> D *_Nonnull getAs() const {
     return llvm::cast<D>(static_cast<swift::Decl *>(obj));
   }
