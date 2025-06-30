@@ -1,23 +1,19 @@
 # Multi-Module Compilation Guide
 
-This guide describes how to quickly compile minimal multi-module Swift projects without setting up Xcode projects or Swift packages. This is particularly useful when creating minimal reproducers for compiler issues or when you need to test module interactions directly.
-
-## Overview
-
-When creating minimal reproducers for issues, occasionally it is helpful to "hand-compile" a multi-module project quickly (say via a small shell script) without setting up an Xcode project or a Swift package. This guide shows you how to do this using the Swift compiler directly.
+This guide describes how to quickly compile minimal multi-module Swift projects without setting up Xcode projects or Swift packages. This is primarily useful for creating minimal reproducers for compiler issues or debugging module interactions.
 
 ## Basic Steps
 
 ### 1. Compile Dependency Module
 ```bash
-swiftc mymodule.swift -module-name MyModule -emit-library -o /path/to/mymodule.dylib -emit-module-path /path/to/swiftmoduledir/
+swiftc mymodule.swift -module-name MyModule -emit-library -o /path/to/mymodule.dylib -emit-module-path MyModule.swiftmodule
 ```
 
-**Note**: The `-module-name` flag is required to specify the module name. The module file will be created as `mymodule.swiftmodule` and may need to be renamed to match the module name.
+**Note**: The `-module-name` flag is required to specify the module name. The `-emit-module-path` can specify the exact output filename.
 
 ### 2. Compile Main Executable
 ```bash
-swiftc mymainmodule.swift -emit-object -o /path/to/mymainmodule.o -I /path/to/swiftmoduledir/
+swiftc mymainmodule.swift -emit-object -o /path/to/mymainmodule.o -I /path/to/moduledir/
 ```
 
 ### 3. Link Executable
@@ -32,32 +28,58 @@ env DYLD_LIBRARY_PATH=/path/to/libswiftCore.dylib /path/to/myexe
 
 ## Platform Differences
 
-- **macOS**: Use `.dylib` extensions, `DYLD_LIBRARY_PATH`
-- **Linux**: Use `.so` extensions, `LD_LIBRARY_PATH`
+- **macOS**: Use `.dylib` for dynamic libraries
+- **Linux**: Use `.so` for shared objects
+- **Windows**: Use `.dll` for dynamic link libraries
+
+## Complete Example
+
+Create the following files:
+
+**mymodule.swift**:
+```swift
+public func greet(name: String) -> String {
+    return "Hello, \(name)!"
+}
+```
+
+**main.swift**:
+```swift
+import MyModule
+
+print(greet(name: "World"))
+```
+
+**Compilation steps**:
+```bash
+# Step 1: Compile module
+swiftc mymodule.swift -module-name MyModule -emit-library -o libmymodule.dylib -emit-module-path MyModule.swiftmodule
+
+# Step 2: Compile main
+swiftc main.swift -emit-object -o main.o -I ./
+
+# Step 3: Link
+swiftc main.o libmymodule.dylib -emit-executable -o myexe
+
+# Step 4: Run (development)
+env DYLD_LIBRARY_PATH=/path/to/libswiftCore.dylib ./myexe
+```
 
 ## Additional Options
 
 - Import module directories: `-I /path/to/module/directory`
-- Import Objective-C headers: `-import-objc-header /path/to/header.h`
+- Specify module name: `-module-name ModuleName`
+- Emit module interface: `-emit-module-interface`
 
-## Complete Example
+## Use Cases
 
-```bash
-# Create module
-swiftc mymodule.swift -module-name MyModule -emit-library -o libmymodule.dylib -emit-module-path ./
+This approach is particularly useful for:
+- Creating minimal reproducers for compiler issues
+- Debugging module interaction problems
+- Testing compiler features without full project setup
+- Educational purposes to understand Swift compilation
 
-# Rename module file to match module name (if needed)
-mv mymodule.swiftmodule MyModule.swiftmodule
-
-# Compile main
-swiftc main.swift -emit-object -o main.o -I ./
-
-# Link
-swiftc main.o libmymodule.dylib -emit-executable -o myapp
-
-# Run
-./myapp
-```
+For production development, consider using Swift Package Manager or Xcode projects instead.
 
 ## Troubleshooting
 

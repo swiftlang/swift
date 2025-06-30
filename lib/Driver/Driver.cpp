@@ -3072,23 +3072,6 @@ void Driver::printHelp(bool ShowHidden) const {
                       IncludedFlagsBitmask, ExcludedFlagsBitmask,
                       /*ShowAllAliases*/false);
 
-  // Add examples for multi-module compilation
-  if (driverKind == DriverKind::Standard) {
-    llvm::outs() << "\nEXAMPLES:\n"
-                 << "  # Compile a simple Swift file to an executable\n"
-                 << "  swiftc hello.swift -o hello\n\n"
-                 << "  # Multi-module compilation without Swift packages\n"
-                 << "  # Step 1: Compile dependency module\n"
-                 << "  swiftc mymodule.swift -module-name MyModule -emit-library -o libmymodule.dylib -emit-module-path ./\n"
-                 << "  # Step 2: Compile main executable\n"
-                 << "  swiftc main.swift -emit-object -o main.o -I ./\n"
-                 << "  # Step 3: Link executable\n"
-                 << "  swiftc main.o libmymodule.dylib -emit-executable -o myexe\n"
-                 << "  # Step 4: Run with local runtime (development)\n"
-                 << "  env DYLD_LIBRARY_PATH=/path/to/libswiftCore.dylib ./myexe\n\n"
-                 << "  # For more details, see: docs/HowToGuides/MultiModuleCompilation.md\n";
-  }
-
   // These strings match the descriptions found in the corresponding swiftpm 
   // help pages
   if (driverKind == DriverKind::Interactive) {
