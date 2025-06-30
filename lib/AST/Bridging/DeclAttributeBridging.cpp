@@ -596,8 +596,8 @@ BridgedProjectedValuePropertyAttr_createParsed(BridgedASTContext cContext,
 
 BridgedRawDocCommentAttr
 BridgedRawDocCommentAttr_createParsed(BridgedASTContext cContext,
-                                      BridgedCharSourceRange cRange) {
-  return new (cContext.unbridged()) RawDocCommentAttr(cRange.unbridged());
+                                      CharSourceRange range) {
+  return new (cContext.unbridged()) RawDocCommentAttr(range);
 }
 
 BridgedRawLayoutAttr

@@ -19,6 +19,7 @@ public typealias Identifier = swift.Identifier
 public typealias DeclBaseName = swift.DeclBaseName
 public typealias SourceLoc = swift.SourceLoc
 public typealias SourceRange = swift.SourceRange
+public typealias CharSourceRange = swift.CharSourceRange
 
 public protocol BridgedNullable: ExpressibleByNilLiteral {
   associatedtype RawPtr

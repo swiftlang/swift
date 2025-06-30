@@ -89,14 +89,15 @@ public:
     return SourceLoc::getFromPointer(Pointer + ByteOffset);
   }
 
-// Not imported into Swift in pure bridging mode.
-#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
-
+  SWIFT_UNAVAILABLE("Unavailable in Swift")
   SourceLoc getAdvancedLocOrInvalid(int ByteOffset) const {
     if (isValid())
       return getAdvancedLoc(ByteOffset);
     return SourceLoc();
   }
+
+// Not imported into Swift in pure bridging mode.
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 
   /// An explicit bool operator so one can check if a SourceLoc is valid in an
   /// if statement:
@@ -226,9 +227,6 @@ public:
 #endif // #ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 };
 
-// Not imported into Swift in pure bridging mode.
-#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
-
 /// A half-open character-based source range.
 class CharSourceRange {
   SourceLoc Start;
@@ -238,8 +236,12 @@ public:
   /// Constructs an invalid range.
   CharSourceRange() = default;
 
+  SWIFT_NAME("init(start:byteLength:)")
   CharSourceRange(SourceLoc Start, unsigned ByteLength)
     : Start(Start), ByteLength(ByteLength) {}
+
+// Not imported into Swift in pure bridging mode.
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 
   /// Constructs a character range which starts and ends at the
   /// specified character locations.
@@ -248,18 +250,25 @@ public:
   /// Use Lexer::getCharSourceRangeFromSourceRange() instead.
   CharSourceRange(const SourceManager &SM, SourceRange Range) = delete;
 
+#endif // #ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
+
   bool isValid() const { return Start.isValid(); }
   bool isInvalid() const { return !isValid(); }
 
-  bool operator==(const CharSourceRange &other) const {
-    return Start == other.Start && ByteLength == other.ByteLength;
-  }
-  bool operator!=(const CharSourceRange &other) const {
-    return !operator==(other);
+  SWIFT_COMPUTED_PROPERTY
+  SourceLoc getStart() const { return Start; }
+  SWIFT_COMPUTED_PROPERTY
+  SourceLoc getEnd() const { return Start.getAdvancedLocOrInvalid(ByteLength); }
+
+  /// Return the length of this valid range in bytes.  Can be zero.
+  SWIFT_COMPUTED_PROPERTY
+  unsigned getByteLength() const {
+    assert(isValid() && "length does not make sense for an invalid range");
+    return ByteLength;
   }
 
-  SourceLoc getStart() const { return Start; }
-  SourceLoc getEnd() const { return Start.getAdvancedLocOrInvalid(ByteLength); }
+// Not imported into Swift in pure bridging mode.
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 
   /// Returns true if the given source location is contained in the range.
   bool contains(SourceLoc loc) const {
@@ -296,12 +305,13 @@ public:
 
   StringRef str() const { return StringRef(Start.Pointer, ByteLength); }
 
-  /// Return the length of this valid range in bytes.  Can be zero.
-  unsigned getByteLength() const {
-    assert(isValid() && "length does not make sense for an invalid range");
-    return ByteLength;
+  bool operator==(const CharSourceRange &other) const {
+    return Start == other.Start && ByteLength == other.ByteLength;
   }
-  
+  bool operator!=(const CharSourceRange &other) const {
+    return !operator==(other);
+  }
+
   /// Print out the CharSourceRange.  If the locations are in the same buffer
   /// as specified by LastBufferID, then we don't print the filename.  If not,
   /// we do print the filename, and then update LastBufferID with the BufferID
@@ -314,11 +324,11 @@ public:
     unsigned Tmp = ~0U;
     print(OS, SM, Tmp, PrintText);
   }
-  
+
   SWIFT_DEBUG_DUMPER(dump(const SourceManager &SM));
-};
 
 #endif // #ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
+};
 
 } // end namespace swift
 

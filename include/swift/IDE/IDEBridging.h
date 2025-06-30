@@ -117,7 +117,7 @@ struct BridgedResolvedLoc {
   /// This consumes `labelRanges` by calling `takeUnbridged` on it.
   SWIFT_NAME(
       "init(range:labelRanges:firstTrailingLabel:labelType:isActive:context:)")
-  BridgedResolvedLoc(BridgedCharSourceRange range,
+  BridgedResolvedLoc(swift::CharSourceRange range,
                      BridgedCharSourceRangeVector labelRanges,
                      unsigned firstTrailingLabel, LabelRangeType labelType,
                      bool isActive, ResolvedLocContext context);

@@ -38,13 +38,6 @@ static void addQueueDiagnostic(void *queuedDiagnostics,
                                            info.FormatArgs);
   }
 
-  // Map the highlight ranges.
-  SmallVector<BridgedCharSourceRange, 2> highlightRanges;
-  for (const auto &range : info.Ranges) {
-    if (range.isValid())
-      highlightRanges.push_back(range);
-  }
-
   StringRef documentationPath = info.CategoryDocumentationURL;
 
   SmallVector<BridgedFixIt, 2> fixIts;
@@ -58,7 +51,7 @@ static void addQueueDiagnostic(void *queuedDiagnostics,
       info.Kind, info.Loc,
       info.Category,
       documentationPath,
-      highlightRanges.data(), highlightRanges.size(),
+      info.Ranges.data(), info.Ranges.size(),
       llvm::ArrayRef<BridgedFixIt>(fixIts));
 
   // TODO: A better way to do this would be to pass the notes as an

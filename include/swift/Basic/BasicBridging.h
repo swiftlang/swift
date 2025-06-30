@@ -318,33 +318,6 @@ public:
 BridgedOStream Bridged_dbgs();
 
 //===----------------------------------------------------------------------===//
-// MARK: BridgedCharSourceRange
-//===----------------------------------------------------------------------===//
-
-class BridgedCharSourceRange {
-public:
-  SWIFT_UNAVAILABLE("Use '.start' instead")
-  swift::SourceLoc Start;
-
-  SWIFT_UNAVAILABLE("Use '.byteLength' instead")
-  unsigned ByteLength;
-
-  SWIFT_NAME("init(start:byteLength:)")
-  BridgedCharSourceRange(swift::SourceLoc start, unsigned byteLength)
-      : Start(start), ByteLength(byteLength) {}
-
-  BRIDGED_INLINE BridgedCharSourceRange(swift::CharSourceRange range);
-
-  BRIDGED_INLINE swift::CharSourceRange unbridged() const;
-
-  SWIFT_COMPUTED_PROPERTY
-  swift::SourceLoc getStart() const { return Start; }
-
-  SWIFT_COMPUTED_PROPERTY
-  SwiftInt getByteLength() const { return static_cast<SwiftInt>(ByteLength); }
-};
-
-//===----------------------------------------------------------------------===//
 // MARK: std::vector<BridgedCharSourceRange>
 //===----------------------------------------------------------------------===//
 
@@ -360,7 +333,7 @@ public:
   BridgedCharSourceRangeVector();
 
   SWIFT_NAME("append(_:)")
-  void push_back(BridgedCharSourceRange range);
+  void push_back(swift::CharSourceRange range);
 
 #ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
   /// Returns the `std::vector<swift::CharSourceRange>` that this
