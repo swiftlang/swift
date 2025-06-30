@@ -125,6 +125,7 @@ public macro Task(
 #if $IsolatedAny
 @_alwaysEmitIntoClient
 @available(SwiftStdlib 5.1, *)
+@available(*, deprecated, message: "Use `.isolation` on @isolated(any) closure values instead.")
 public func extractIsolation<each Arg, Result>(
   _ fn: @escaping @isolated(any) (repeat each Arg) async throws -> Result
 ) -> (any Actor)? {
