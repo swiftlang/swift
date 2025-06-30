@@ -2135,7 +2135,10 @@ public:
 
   /// Determine whether this extension context is in the same defining module as
   /// the original nominal type context.
-  bool isInSameDefiningModule() const;
+  ///
+  /// \param RespectOriginallyDefinedIn Whether to respect
+  /// \c @_originallyDefinedIn attributes or the actual location of the decls.
+  bool isInSameDefiningModule(bool RespectOriginallyDefinedIn = true) const;
 
   /// Determine whether this extension is equivalent to one that requires at
   /// at least some constraints to be written in the source.
