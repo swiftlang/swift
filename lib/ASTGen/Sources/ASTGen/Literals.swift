@@ -111,7 +111,7 @@ extension ASTGenVisitor {
       let interpolationVarRef = BridgedDeclRefExpr.create(
         self.ctx,
         decl: interpolationVar.asDecl,
-        loc: BridgedDeclNameLoc.createParsed(isFirst ? afterQuoteLoc : literal.loc),
+        loc: .init(isFirst ? afterQuoteLoc : literal.loc),
         isImplicit: true
       )
       let appendLiteralRef = BridgedUnresolvedDotExpr.createParsed(
@@ -119,7 +119,7 @@ extension ASTGenVisitor {
         base: interpolationVarRef.asExpr,
         dotLoc: nil,
         name: appendLiteral,
-        nameLoc: BridgedDeclNameLoc()
+        nameLoc: .init()
       )
       appendLiteralRef.asExpr.setImplicit()
       let argList = BridgedArgumentList.createImplicitUnlabeled(
@@ -164,7 +164,7 @@ extension ASTGenVisitor {
         let interpolationVarRef = BridgedDeclRefExpr.create(
           self.ctx,
           decl: interpolationVar.asDecl,
-          loc: BridgedDeclNameLoc.createParsed(loc),
+          loc: .init(loc),
           isImplicit: true
         )
         let appendInterpolationRef = BridgedUnresolvedDotExpr.createParsed(
@@ -172,7 +172,7 @@ extension ASTGenVisitor {
           base: interpolationVarRef.asExpr,
           dotLoc: self.generateSourceLoc(seg.backslash),
           name: appendInterpolation,
-          nameLoc: BridgedDeclNameLoc.createParsed(self.generateSourceLoc(seg))
+          nameLoc: .init(self.generateSourceLoc(seg))
         )
         appendInterpolationRef.asExpr.setImplicit()
         let argList = self.generateArgumentList(

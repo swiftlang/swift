@@ -222,13 +222,12 @@ extension ASTGenVisitor {
         if identifier != nil {
           // For `if let foo { }` Create a `foo` expression as the initializer.
           let ref = BridgedDeclNameRef.createParsed(.init(identifier))
-          let loc = BridgedDeclNameLoc.createParsed(self.generateSourceLoc(node.pattern))
           initializer =
             BridgedUnresolvedDeclRefExpr.createParsed(
               self.ctx,
               name: ref,
               kind: .ordinary,
-              loc: loc
+              loc: .init(self.generateSourceLoc(node.pattern))
             ).asExpr
         } else {
           // FIXME: Implement.

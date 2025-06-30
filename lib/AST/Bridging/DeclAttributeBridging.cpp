@@ -209,7 +209,7 @@ BridgedCustomAttr BridgedCustomAttr_createParsed(
 BridgedDerivativeAttr BridgedDerivativeAttr_createParsedImpl(
     BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     BridgedNullableTypeRepr cBaseType, BridgedDeclNameRef cOriginalName,
-    BridgedDeclNameLoc cOriginalNameLoc,
+    DeclNameLoc originalNameLoc,
     std::optional<swift::AccessorKind> AccessorKind, BridgedArrayRef cParams) {
   SmallVector<ParsedAutoDiffParameter, 2> params;
   for (auto &elem : cParams.unbridged<BridgedParsedAutoDiffParameter>())
@@ -218,27 +218,27 @@ BridgedDerivativeAttr BridgedDerivativeAttr_createParsedImpl(
   return DerivativeAttr::create(
       cContext.unbridged(),
       /*implicit=*/false, atLoc, range, cBaseType.unbridged(),
-      DeclNameRefWithLoc{cOriginalName.unbridged(),
-                         cOriginalNameLoc.unbridged(), AccessorKind},
+      DeclNameRefWithLoc{cOriginalName.unbridged(), originalNameLoc,
+                         AccessorKind},
       params);
 }
 
 BridgedDerivativeAttr BridgedDerivativeAttr_createParsed(
     BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     BridgedNullableTypeRepr cBaseType, BridgedDeclNameRef cOriginalName,
-    BridgedDeclNameLoc cOriginalNameLoc, swift::AccessorKind AccessorKind,
+    DeclNameLoc originalNameLoc, swift::AccessorKind AccessorKind,
     BridgedArrayRef cParams) {
   return BridgedDerivativeAttr_createParsedImpl(
-      cContext, atLoc, range, cBaseType, cOriginalName, cOriginalNameLoc,
+      cContext, atLoc, range, cBaseType, cOriginalName, originalNameLoc,
       AccessorKind, cParams);
 }
 
 BridgedDerivativeAttr BridgedDerivativeAttr_createParsed(
     BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     BridgedNullableTypeRepr cBaseType, BridgedDeclNameRef cOriginalName,
-    BridgedDeclNameLoc cOriginalNameLoc, BridgedArrayRef cParams) {
+    DeclNameLoc originalNameLoc, BridgedArrayRef cParams) {
   return BridgedDerivativeAttr_createParsedImpl(
-      cContext, atLoc, range, cBaseType, cOriginalName, cOriginalNameLoc,
+      cContext, atLoc, range, cBaseType, cOriginalName, originalNameLoc,
       /*cAccessorKind=*/std::nullopt, cParams);
 }
 
@@ -336,10 +336,10 @@ BridgedExternAttr BridgedExternAttr_createParsed(
 BridgedImplementsAttr BridgedImplementsAttr_createParsed(
     BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     BridgedTypeRepr cProtocolType, BridgedDeclNameRef cMemberName,
-    BridgedDeclNameLoc cMemberNameLoc) {
+    DeclNameLoc memberNameLoc) {
   return ImplementsAttr::create(
       cContext.unbridged(), atLoc, range, cProtocolType.unbridged(),
-      cMemberName.unbridged().getFullName(), cMemberNameLoc.unbridged());
+      cMemberName.unbridged().getFullName(), memberNameLoc);
 }
 
 BridgedInlineAttr BridgedInlineAttr_createParsed(BridgedASTContext cContext,
@@ -731,7 +731,7 @@ BridgedSILGenNameAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
 BridgedTransposeAttr BridgedTransposeAttr_createParsed(
     BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     BridgedNullableTypeRepr cBaseType, BridgedDeclNameRef cOriginalName,
-    BridgedDeclNameLoc cOriginalNameLoc, BridgedArrayRef cParams) {
+    DeclNameLoc originalNameLoc, BridgedArrayRef cParams) {
   SmallVector<ParsedAutoDiffParameter, 2> params;
   for (auto &elem : cParams.unbridged<BridgedParsedAutoDiffParameter>())
     params.push_back(elem.unbridged());
@@ -739,8 +739,7 @@ BridgedTransposeAttr BridgedTransposeAttr_createParsed(
   return TransposeAttr::create(
       cContext.unbridged(),
       /*implicit=*/false, atLoc, range, cBaseType.unbridged(),
-      DeclNameRefWithLoc{cOriginalName.unbridged(),
-                         cOriginalNameLoc.unbridged(),
+      DeclNameRefWithLoc{cOriginalName.unbridged(), originalNameLoc,
                          /*AccessorKind=*/std::nullopt},
       params);
 }

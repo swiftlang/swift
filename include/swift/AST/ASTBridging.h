@@ -19,6 +19,7 @@
 /// See include guidelines and caveats in `BasicBridging.h`.
 #include "swift/AST/AccessorKind.h"
 #include "swift/AST/AttrKind.h"
+#include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/DiagnosticKind.h"
 #include "swift/AST/DiagnosticList.h"
 #include "swift/AST/GenericTypeParamKind.h"
@@ -154,43 +155,6 @@ BridgedDeclNameRef BridgedDeclNameRef_createParsed(BridgedASTContext cContext,
 SWIFT_NAME("BridgedDeclNameRef.createParsed(_:)")
 BridgedDeclNameRef
 BridgedDeclNameRef_createParsed(swift::DeclBaseName baseName);
-
-class BridgedDeclNameLoc {
-  const void *_Nullable LocationInfo;
-  size_t NumArgumentLabels;
-
-public:
-  BridgedDeclNameLoc() : LocationInfo(nullptr), NumArgumentLabels(0) {}
-
-  BRIDGED_INLINE BridgedDeclNameLoc(swift::DeclNameLoc loc);
-
-  BRIDGED_INLINE swift::DeclNameLoc unbridged() const;
-};
-
-SWIFT_NAME("BridgedDeclNameLoc.createParsed(_:baseNameLoc:lParenLoc:"
-           "argumentLabelLocs:rParenLoc:)")
-BridgedDeclNameLoc BridgedDeclNameLoc_createParsed(BridgedASTContext cContext,
-                                                   swift::SourceLoc baseNameLoc,
-                                                   swift::SourceLoc lParenLoc,
-                                                   BridgedArrayRef cLabelLocs,
-                                                   swift::SourceLoc rParenLoc);
-
-SWIFT_NAME("BridgedDeclNameLoc.createParsed(_:moduleSelectorLoc:baseNameLoc:"
-           "lParenLoc:argumentLabelLocs:rParenLoc:)")
-BridgedDeclNameLoc BridgedDeclNameLoc_createParsed(
-    BridgedASTContext cContext, swift::SourceLoc cModuleSelectorLoc,
-    swift::SourceLoc baseNameLoc, swift::SourceLoc lParenLoc,
-    BridgedArrayRef cLabelLocs, swift::SourceLoc rParenLoc);
-
-SWIFT_NAME("BridgedDeclNameLoc.createParsed(_:)")
-BridgedDeclNameLoc
-BridgedDeclNameLoc_createParsed(swift::SourceLoc baseNameLoc);
-
-SWIFT_NAME("BridgedDeclNameLoc.createParsed(_:moduleSelectorLoc:baseNameLoc:)")
-BridgedDeclNameLoc
-BridgedDeclNameLoc_createParsed(BridgedASTContext cContext,
-                                swift::SourceLoc moduleSelectorLoc,
-                                swift::SourceLoc baseNameLoc);
 
 //===----------------------------------------------------------------------===//
 // MARK: ASTContext
@@ -912,7 +876,7 @@ SWIFT_NAME("BridgedDerivativeAttr.createParsed(_:atLoc:range:baseType:"
 BridgedDerivativeAttr BridgedDerivativeAttr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc atLoc,
     swift::SourceRange range, BridgedNullableTypeRepr cBaseType,
-    BridgedDeclNameRef cOriginalName, BridgedDeclNameLoc cOriginalNameLoc,
+    BridgedDeclNameRef cOriginalName, swift::DeclNameLoc originalNameLoc,
     swift::AccessorKind AccessorKind, BridgedArrayRef cParams);
 
 SWIFT_NAME("BridgedDerivativeAttr.createParsed(_:atLoc:range:baseType:"
@@ -920,7 +884,7 @@ SWIFT_NAME("BridgedDerivativeAttr.createParsed(_:atLoc:range:baseType:"
 BridgedDerivativeAttr BridgedDerivativeAttr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc atLoc,
     swift::SourceRange range, BridgedNullableTypeRepr cBaseType,
-    BridgedDeclNameRef cOriginalName, BridgedDeclNameLoc cOriginalNameLoc,
+    BridgedDeclNameRef cOriginalName, swift::DeclNameLoc originalNameLoc,
     BridgedArrayRef cParams);
 
 SWIFT_NAME("BridgedDifferentiableAttr.createParsed(_:atLoc:range:kind:params:"
@@ -988,7 +952,7 @@ SWIFT_NAME("BridgedImplementsAttr.createParsed(_:atLoc:range:protocolType:"
 BridgedImplementsAttr BridgedImplementsAttr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc atLoc,
     swift::SourceRange range, BridgedTypeRepr cProtocolType,
-    BridgedDeclNameRef cMemberName, BridgedDeclNameLoc cMemberNameLoc);
+    BridgedDeclNameRef cMemberName, swift::DeclNameLoc memberNameLoc);
 
 SWIFT_NAME("BridgedInlineAttr.createParsed(_:atLoc:range:kind:)")
 BridgedInlineAttr BridgedInlineAttr_createParsed(BridgedASTContext cContext,
@@ -1309,7 +1273,7 @@ SWIFT_NAME(
 BridgedTransposeAttr BridgedTransposeAttr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc atLoc,
     swift::SourceRange range, BridgedNullableTypeRepr cBaseType,
-    BridgedDeclNameRef cOriginalName, BridgedDeclNameLoc cOriginalNameLoc,
+    BridgedDeclNameRef cOriginalName, swift::DeclNameLoc originalNameLoc,
     BridgedArrayRef cParams);
 
 SWIFT_NAME("BridgedTypeEraserAttr.createParsed(_:atLoc:range:typeExpr:)")
@@ -1553,7 +1517,7 @@ SWIFT_NAME("BridgedMacroExpansionDecl.createParsed(_:poundLoc:macroNameRef:"
            "macroNameLoc:leftAngleLoc:genericArgs:rightAngleLoc:args:)")
 BridgedMacroExpansionDecl BridgedMacroExpansionDecl_createParsed(
     BridgedDeclContext cDeclContext, swift::SourceLoc poundLoc,
-    BridgedDeclNameRef cMacroNameRef, BridgedDeclNameLoc cMacroNameLoc,
+    BridgedDeclNameRef cMacroNameRef, swift::DeclNameLoc macroNameLoc,
     swift::SourceLoc leftAngleLoc, BridgedArrayRef cGenericArgs,
     swift::SourceLoc rightAngleLoc, BridgedNullableArgumentList cArgList);
 
@@ -1883,7 +1847,7 @@ BridgedCopyExpr BridgedCopyExpr_createParsed(BridgedASTContext cContext,
 SWIFT_NAME("BridgedDeclRefExpr.create(_:decl:loc:isImplicit:)")
 BridgedDeclRefExpr BridgedDeclRefExpr_create(BridgedASTContext cContext,
                                              BridgedDecl cDecl,
-                                             BridgedDeclNameLoc cLoc,
+                                             swift::DeclNameLoc loc,
                                              bool IsImplicit);
 
 SWIFT_NAME("BridgedDictionaryExpr.createParsed(_:lBracketLoc:elements:"
@@ -2007,7 +1971,7 @@ SWIFT_NAME("BridgedMacroExpansionExpr.createParsed(_:poundLoc:macroNameRef:"
            "macroNameLoc:leftAngleLoc:genericArgs:rightAngleLoc:args:)")
 BridgedMacroExpansionExpr BridgedMacroExpansionExpr_createParsed(
     BridgedDeclContext cDeclContext, swift::SourceLoc poundLoc,
-    BridgedDeclNameRef cMacroNameRef, BridgedDeclNameLoc cMacroNameLoc,
+    BridgedDeclNameRef cMacroNameRef, swift::DeclNameLoc macroNameLoc,
     swift::SourceLoc leftAngleLoc, BridgedArrayRef cGenericArgs,
     swift::SourceLoc rightAngleLoc, BridgedNullableArgumentList cArgList);
 
@@ -2228,17 +2192,17 @@ enum ENUM_EXTENSIBILITY_ATTR(open) BridgedDeclRefKind : size_t {
 SWIFT_NAME("BridgedUnresolvedDeclRefExpr.createParsed(_:name:kind:loc:)")
 BridgedUnresolvedDeclRefExpr BridgedUnresolvedDeclRefExpr_createParsed(
     BridgedASTContext cContext, BridgedDeclNameRef cName,
-    BridgedDeclRefKind cKind, BridgedDeclNameLoc cLoc);
+    BridgedDeclRefKind cKind, swift::DeclNameLoc loc);
 
 SWIFT_NAME("BridgedUnresolvedDotExpr.createParsed(_:base:dotLoc:name:nameLoc:)")
 BridgedUnresolvedDotExpr BridgedUnresolvedDotExpr_createParsed(
     BridgedASTContext cContext, BridgedExpr base, swift::SourceLoc dotLoc,
-    BridgedDeclNameRef cName, BridgedDeclNameLoc cNameLoc);
+    BridgedDeclNameRef cName, swift::DeclNameLoc nameLoc);
 
 SWIFT_NAME("BridgedUnresolvedMemberExpr.createParsed(_:dotLoc:name:nameLoc:)")
 BridgedUnresolvedMemberExpr BridgedUnresolvedMemberExpr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc dotLoc,
-    BridgedDeclNameRef cName, BridgedDeclNameLoc cNameLoc);
+    BridgedDeclNameRef cName, swift::DeclNameLoc nameLoc);
 
 SWIFT_NAME("BridgedUnresolvedPatternExpr.createParsed(_:pattern:)")
 BridgedUnresolvedPatternExpr

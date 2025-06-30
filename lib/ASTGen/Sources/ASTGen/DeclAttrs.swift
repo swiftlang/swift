@@ -580,13 +580,13 @@ extension ASTGenVisitor {
   struct GeneratedDerivativeOriginalDecl {
     var baseType: BridgedTypeRepr?
     var declName: BridgedDeclNameRef
-    var declNameLoc: BridgedDeclNameLoc
+    var declNameLoc: DeclNameLoc
   }
 
   func generateDerivativeOriginalDecl(expr: ExprSyntax) -> GeneratedDerivativeOriginalDecl? {
     var baseType: BridgedTypeRepr?
     var declName: BridgedDeclNameRef
-    var declNameLoc: BridgedDeclNameLoc
+    var declNameLoc: DeclNameLoc
 
     if let declrefExpr = expr.as(DeclReferenceExprSyntax.self) {
       baseType = nil

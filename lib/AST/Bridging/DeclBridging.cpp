@@ -45,38 +45,24 @@ BridgedDeclNameRef BridgedDeclNameRef_createParsed(DeclBaseName baseName) {
   return DeclNameRef(baseName);
 }
 
-BridgedDeclNameLoc BridgedDeclNameLoc_createParsed(BridgedASTContext cContext,
-                                                   SourceLoc baseNameLoc,
-                                                   SourceLoc lParenLoc,
-                                                   BridgedArrayRef cLabelLocs,
-                                                   SourceLoc rParenLoc) {
-  return BridgedDeclNameLoc_createParsed(cContext, SourceLoc(), baseNameLoc,
-                                         lParenLoc, cLabelLocs, rParenLoc);
-}
+DeclNameLoc::DeclNameLoc(BridgedASTContext cContext,
+                         SourceLoc moduleSelectorLoc, SourceLoc baseNameLoc)
+    : DeclNameLoc(baseNameLoc) {}
 
-BridgedDeclNameLoc BridgedDeclNameLoc_createParsed(BridgedASTContext cContext,
-                                                   SourceLoc moduleSelectorLoc,
-                                                   SourceLoc baseNameLoc,
-                                                   SourceLoc lParenLoc,
-                                                   BridgedArrayRef cLabelLocs,
-                                                   SourceLoc rParenLoc) {
+DeclNameLoc::DeclNameLoc(BridgedASTContext cContext, SourceLoc baseNameLoc,
+                         SourceLoc lParenLoc,
+                         BridgedArrayRef cArgumentLabelLocs,
+                         SourceLoc rParenLoc)
+    : DeclNameLoc(cContext.unbridged(), baseNameLoc, lParenLoc,
+                  cArgumentLabelLocs.unbridged<SourceLoc>(), rParenLoc) {}
 
-  ASTContext &context = cContext.unbridged();
-  auto labelLocs = cLabelLocs.unbridged<SourceLoc>();
-
-  return DeclNameLoc(context, moduleSelectorLoc, baseNameLoc, lParenLoc,
-                     labelLocs, rParenLoc);
-}
-
-BridgedDeclNameLoc BridgedDeclNameLoc_createParsed(SourceLoc baseNameLoc) {
-  return DeclNameLoc(baseNameLoc);
-}
-
-BridgedDeclNameLoc BridgedDeclNameLoc_createParsed(BridgedASTContext cContext,
-                                                   SourceLoc moduleSelectorLoc,
-                                                   SourceLoc baseNameLoc) {
-  return DeclNameLoc(cContext.unbridged(), moduleSelectorLoc, baseNameLoc);
-}
+DeclNameLoc::DeclNameLoc(BridgedASTContext cContext,
+                         SourceLoc moduleSelectorLoc, SourceLoc baseNameLoc,
+                         SourceLoc lParenLoc,
+                         BridgedArrayRef cArgumentLabelLocs,
+                         SourceLoc rParenLoc)
+    : DeclNameLoc(cContext, baseNameLoc, lParenLoc, cArgumentLabelLocs,
+                  rParenLoc) {}
 
 //===----------------------------------------------------------------------===//
 // MARK: Decls
@@ -483,14 +469,14 @@ BridgedExtensionDecl BridgedExtensionDecl_createParsed(
 
 BridgedMacroExpansionDecl BridgedMacroExpansionDecl_createParsed(
     BridgedDeclContext cDeclContext, SourceLoc poundLoc,
-    BridgedDeclNameRef cMacroNameRef, BridgedDeclNameLoc cMacroNameLoc,
+    BridgedDeclNameRef cMacroNameRef, DeclNameLoc macroNameLoc,
     SourceLoc leftAngleLoc, BridgedArrayRef cGenericArgs,
     SourceLoc rightAngleLoc, BridgedNullableArgumentList cArgList) {
   auto *DC = cDeclContext.unbridged();
   auto &Context = DC->getASTContext();
   return MacroExpansionDecl::create(
       cDeclContext.unbridged(), poundLoc, cMacroNameRef.unbridged(),
-      cMacroNameLoc.unbridged(), leftAngleLoc,
+      macroNameLoc, leftAngleLoc,
       Context.AllocateCopy(cGenericArgs.unbridged<TypeRepr *>()), rightAngleLoc,
       cArgList.unbridged());
 }

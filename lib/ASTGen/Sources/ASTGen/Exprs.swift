@@ -518,7 +518,7 @@ extension ASTGenVisitor {
   }
 
   func generateDeclNameRef(declReferenceExpr node: DeclReferenceExprSyntax) -> (
-    name: BridgedDeclNameRef, loc: BridgedDeclNameLoc
+    name: BridgedDeclNameRef, loc: DeclNameLoc
   ) {
     let baseName: DeclBaseName
     switch node.baseName.keywordKind {
@@ -541,7 +541,7 @@ extension ASTGenVisitor {
             baseName: baseName,
             argumentLabels: BridgedArrayRef()
           ),
-          loc: .createParsed(baseNameLoc)
+          loc: .init(baseNameLoc)
         )
       } else {
         let labels = argumentClause.arguments.lazy.map {
@@ -556,7 +556,7 @@ extension ASTGenVisitor {
             baseName: baseName,
             argumentLabels: labels.bridgedArray(in: self)
           ),
-          loc: .createParsed(
+          loc: .init(
             self.ctx,
             baseNameLoc: baseNameLoc,
             lParenLoc: self.generateSourceLoc(argumentClause.leftParen),
@@ -568,7 +568,7 @@ extension ASTGenVisitor {
     } else {
       return (
         name: .createParsed(baseName),
-        loc: .createParsed(baseNameLoc)
+        loc: .init(baseNameLoc)
       )
     }
   }
@@ -636,7 +636,7 @@ extension ASTGenVisitor {
     return BridgedDeclRefExpr.create(
       self.ctx,
       decl: param.asDecl,
-      loc: .createParsed(loc),
+      loc: .init(loc),
       isImplicit: false
     ).asExpr
   }
@@ -817,7 +817,7 @@ extension ASTGenVisitor {
   struct FreestandingMacroExpansionInfo {
     var poundLoc: SourceLoc
     var macroNameRef: BridgedDeclNameRef
-    var macroNameLoc: BridgedDeclNameLoc
+    var macroNameLoc: DeclNameLoc
     var leftAngleLoc: SourceLoc
     var genericArgs: BridgedArrayRef
     var rightAngleLoc: SourceLoc
@@ -859,7 +859,7 @@ extension ASTGenVisitor {
     return FreestandingMacroExpansionInfo(
       poundLoc: poundLoc,
       macroNameRef: .createParsed(.init(nameLoc.identifier)),
-      macroNameLoc: .createParsed(nameLoc.sourceLoc),
+      macroNameLoc: .init(nameLoc.sourceLoc),
       leftAngleLoc: leftAngleLoc,
       genericArgs: genericArgs.lazy.bridgedArray(in: self),
       rightAngleLoc: rightAngleLoc,
@@ -1334,7 +1334,7 @@ extension ASTGenVisitor {
       self.ctx,
       name: .createParsed(.init(name)),
       kind: kind,
-      loc: .createParsed(nameLoc)
+      loc: .init(nameLoc)
     );
   }
 }

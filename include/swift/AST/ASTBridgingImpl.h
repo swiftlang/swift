@@ -55,18 +55,6 @@ swift::DeclNameRef BridgedDeclNameRef::unbridged() const {
 }
 
 //===----------------------------------------------------------------------===//
-// MARK: BridgedDeclNameLoc
-//===----------------------------------------------------------------------===//
-
-BridgedDeclNameLoc::BridgedDeclNameLoc(swift::DeclNameLoc loc)
-    : LocationInfo(loc.LocationInfo),
-      NumArgumentLabels(loc.NumArgumentLabels) {}
-
-swift::DeclNameLoc BridgedDeclNameLoc::unbridged() const {
-  return swift::DeclNameLoc(LocationInfo, NumArgumentLabels);
-}
-
-//===----------------------------------------------------------------------===//
 // MARK: BridgedASTContext
 //===----------------------------------------------------------------------===//
 

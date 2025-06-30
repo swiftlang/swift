@@ -17,6 +17,7 @@ import SwiftIfConfig
 
 public typealias Identifier = swift.Identifier
 public typealias DeclBaseName = swift.DeclBaseName
+public typealias DeclNameLoc = swift.DeclNameLoc
 public typealias SourceLoc = swift.SourceLoc
 public typealias SourceRange = swift.SourceRange
 public typealias CharSourceRange = swift.CharSourceRange

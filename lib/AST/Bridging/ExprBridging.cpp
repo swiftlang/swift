@@ -211,11 +211,10 @@ BridgedCopyExpr BridgedCopyExpr_createParsed(BridgedASTContext cContext,
 }
 
 BridgedDeclRefExpr BridgedDeclRefExpr_create(BridgedASTContext cContext,
-                                             BridgedDecl cDecl,
-                                             BridgedDeclNameLoc cLoc,
+                                             BridgedDecl cDecl, DeclNameLoc loc,
                                              bool IsImplicit) {
-  return new (cContext.unbridged()) DeclRefExpr(
-      cast<ValueDecl>(cDecl.unbridged()), cLoc.unbridged(), IsImplicit);
+  return new (cContext.unbridged())
+      DeclRefExpr(cast<ValueDecl>(cDecl.unbridged()), loc, IsImplicit);
 }
 
 BridgedDictionaryExpr BridgedDictionaryExpr_createParsed(
@@ -333,10 +332,10 @@ BridgedKeyPathExpr BridgedKeyPathExpr_createParsedPoundKeyPath(
 
   SmallVector<KeyPathExpr::Component> components;
   auto cNameArr = cNames.unbridged<BridgedDeclNameRef>();
-  auto cNameLocArr = cNameLocs.unbridged<BridgedDeclNameLoc>();
+  auto cNameLocArr = cNameLocs.unbridged<DeclNameLoc>();
   for (size_t i = 0, e = cNameArr.size(); i != e; ++i) {
     auto name = cNameArr[i].unbridged();
-    auto loc = cNameLocArr[i].unbridged().getBaseNameLoc();
+    auto loc = cNameLocArr[i].getBaseNameLoc();
     components.push_back(KeyPathExpr::Component::forUnresolvedMember(
         name, FunctionRefInfo::unappliedBaseName(), loc));
   }
@@ -376,7 +375,7 @@ BridgedIsExpr BridgedIsExpr_createParsed(BridgedASTContext cContext,
 
 BridgedMacroExpansionExpr BridgedMacroExpansionExpr_createParsed(
     BridgedDeclContext cDeclContext, SourceLoc poundLoc,
-    BridgedDeclNameRef cMacroNameRef, BridgedDeclNameLoc cMacroNameLoc,
+    BridgedDeclNameRef cMacroNameRef, DeclNameLoc macroNameLoc,
     SourceLoc leftAngleLoc, BridgedArrayRef cGenericArgs,
     SourceLoc rightAngleLoc, BridgedNullableArgumentList cArgList) {
   auto *DC = cDeclContext.unbridged();
@@ -384,7 +383,7 @@ BridgedMacroExpansionExpr BridgedMacroExpansionExpr_createParsed(
   return MacroExpansionExpr::create(
       cDeclContext.unbridged(), poundLoc,
       /*module name=*/DeclNameRef(), /*module name loc=*/DeclNameLoc(),
-      cMacroNameRef.unbridged(), cMacroNameLoc.unbridged(), leftAngleLoc,
+      cMacroNameRef.unbridged(), macroNameLoc, leftAngleLoc,
       Context.AllocateCopy(cGenericArgs.unbridged<TypeRepr *>()), rightAngleLoc,
       cArgList.unbridged(),
       DC->isTypeContext() ? MacroRole::Declaration
@@ -596,7 +595,7 @@ BridgedTypeExpr BridgedTypeExpr_createParsed(BridgedASTContext cContext,
 
 BridgedUnresolvedDeclRefExpr BridgedUnresolvedDeclRefExpr_createParsed(
     BridgedASTContext cContext, BridgedDeclNameRef cName,
-    BridgedDeclRefKind cKind, BridgedDeclNameLoc cLoc) {
+    BridgedDeclRefKind cKind, DeclNameLoc loc) {
   DeclRefKind kind;
   switch (cKind) {
   case BridgedDeclRefKindOrdinary:
@@ -613,24 +612,24 @@ BridgedUnresolvedDeclRefExpr BridgedUnresolvedDeclRefExpr_createParsed(
     break;
   }
   return new (cContext.unbridged())
-      UnresolvedDeclRefExpr(cName.unbridged(), kind, cLoc.unbridged());
+      UnresolvedDeclRefExpr(cName.unbridged(), kind, loc);
 }
 
 BridgedUnresolvedDotExpr BridgedUnresolvedDotExpr_createParsed(
     BridgedASTContext cContext, BridgedExpr base, SourceLoc dotLoc,
-    BridgedDeclNameRef cName, BridgedDeclNameLoc cNameLoc) {
+    BridgedDeclNameRef cName, DeclNameLoc nameLoc) {
   ASTContext &context = cContext.unbridged();
   return new (context)
-      UnresolvedDotExpr(base.unbridged(), dotLoc, cName.unbridged(),
-                        cNameLoc.unbridged(), /*isImplicit=*/false);
+      UnresolvedDotExpr(base.unbridged(), dotLoc, cName.unbridged(), nameLoc,
+                        /*isImplicit=*/false);
 }
 
 BridgedUnresolvedMemberExpr BridgedUnresolvedMemberExpr_createParsed(
     BridgedASTContext cContext, SourceLoc dotLoc, BridgedDeclNameRef cName,
-    BridgedDeclNameLoc cNameLoc) {
+    DeclNameLoc nameLoc) {
   ASTContext &context = cContext.unbridged();
-  return new (context) UnresolvedMemberExpr(
-      dotLoc, cNameLoc.unbridged(), cName.unbridged(), /*isImplicit=*/false);
+  return new (context) UnresolvedMemberExpr(dotLoc, nameLoc, cName.unbridged(),
+                                            /*isImplicit=*/false);
 }
 
 BridgedUnresolvedPatternExpr
