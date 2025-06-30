@@ -4,9 +4,10 @@
 #include "swift/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"
 #include "llvm/ADT/StringRef.h"
-
 #include <string>
+
 namespace swift {
+
 struct CXXMethodBridging {
   enum class Kind { unknown, getter, setter, subscript };
 
@@ -165,5 +166,7 @@ private:
            loweredName == "get" || loweredName == "set";
   }
 };
+
 } // namespace swift
+
 #endif // SWIFT_CXXMETHODBRIDGING_H
