@@ -5126,6 +5126,18 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
   // If the declaration is explicitly marked 'isolated', infer actor isolation
   // from the context. Currently applies only to DestructorDecl
   if (isolatedAttr) {
+    if (auto varDecl = dyn_cast<VarDecl>(decl)) {
+      ASTContext &ctx = varDecl->getASTContext();
+      ctx.Diags.diagnose(isolatedAttr->getLocation(),
+                         diag::isolated_misuse_in_decl);
+      return std::nullopt;
+    }
+    if (auto nominalTypeDecl = dyn_cast<NominalTypeDecl>(decl)) {
+      ASTContext &ctx = nominalTypeDecl->getASTContext();
+      ctx.Diags.diagnose(isolatedAttr->getLocation(),
+                         diag::isolated_misuse_in_decl);
+      return std::nullopt;
+    }
     assert(isa<DestructorDecl>(decl));
 
     auto dc = decl->getDeclContext();

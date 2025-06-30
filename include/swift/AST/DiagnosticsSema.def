@@ -6154,6 +6154,9 @@ ERROR(isolated_deinit_on_value_type,none,
 ERROR(isolated_deinit_unavailable,none,
       "isolated deinit is only available in %0 %1 or newer",
       (AvailabilityDomain, AvailabilityRange))
+ERROR(isolated_misuse_in_decl,none,
+      "invalid use of isolated in this context",
+      ())
 
 //------------------------------------------------------------------------------
 // MARK: String Processing
