@@ -444,6 +444,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(BridgeFromObjC, getSubExpr);
   PASS_THROUGH_REFERENCE(ConditionalBridgeFromObjC, getSubExpr);
   PASS_THROUGH_REFERENCE(UnderlyingToOpaque, getSubExpr);
+  PASS_THROUGH_REFERENCE(Ignored, getSubExpr);
   PASS_THROUGH_REFERENCE(Unreachable, getSubExpr);
   PASS_THROUGH_REFERENCE(ActorIsolationErasure, getSubExpr);
   PASS_THROUGH_REFERENCE(UnsafeCast, getSubExpr);
@@ -813,6 +814,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::BridgeFromObjC:
   case ExprKind::BridgeToObjC:
   case ExprKind::UnderlyingToOpaque:
+  case ExprKind::Ignored:
   case ExprKind::Unreachable:
   case ExprKind::ActorIsolationErasure:
   case ExprKind::UnsafeCast:
@@ -1018,6 +1020,7 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::ForeignObjectConversion:
   case ExprKind::UnevaluatedInstance:
   case ExprKind::UnderlyingToOpaque:
+  case ExprKind::Ignored:
   case ExprKind::Unreachable:
   case ExprKind::DifferentiableFunction:
   case ExprKind::LinearFunction:
@@ -3106,6 +3109,10 @@ Type ThrownErrorDestination::getContextErrorType() const {
 
   auto conversion = storage.get<Conversion *>();
   return conversion->conversion->getType();
+}
+
+IgnoredExpr *IgnoredExpr::create(ASTContext &ctx, Expr *subExpr) {
+  return new (ctx) IgnoredExpr(subExpr, ctx.getVoidType());
 }
 
 void AbstractClosureExpr::getIsolationCrossing(

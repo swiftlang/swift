@@ -23,7 +23,7 @@ _ = 4+7
 var bind_test1 : () -> () = func1
 var bind_test2 : Int = 4; func1 // expected-warning {{variable is unused}}
 
-(func1, func2) // expected-warning {{variable is unused}}
+(func1, func2) // expected-warning {{expression of type '(() -> (), (Int) -> Int)' is unused}}
 
 func basictest() {
   // Simple integer variables.

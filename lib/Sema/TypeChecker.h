@@ -123,21 +123,17 @@ public:
 
 /// Flags that can be used to control type checking.
 enum class TypeCheckExprFlags {
-  /// Whether we know that the result of the expression is discarded.  This
-  /// disables constraints forcing an lvalue result to be loadable.
-  IsDiscarded = 0x01,
-
   /// If set, this expression isn't embedded in a larger expression or
   /// statement. This should only be used for syntactic restrictions, and should
   /// not affect type checking itself.
-  IsExprStmt = 0x02,
+  IsExprStmt = 0x01,
 
   /// Don't expand macros.
-  DisableMacroExpansions = 0x04,
+  DisableMacroExpansions = 0x02,
 
   /// If set, typeCheckExpression will avoid pre-checking and invalidating
   /// the AST if type-checking fails. Do not add new uses of this.
-  AvoidInvalidatingAST = 0x08,
+  AvoidInvalidatingAST = 0x04,
 };
 
 using TypeCheckExprOptions = OptionSet<TypeCheckExprFlags>;
@@ -1067,12 +1063,6 @@ bool checkAvailability(SourceRange ReferenceRange,
 void checkConcurrencyAvailability(SourceRange ReferenceRange,
                                   const DeclContext *ReferenceDC);
 /// @}
-
-/// Checks an "ignored" expression to see if it's okay for it to be ignored.
-///
-/// An ignored expression is one that is not nested within a larger
-/// expression or statement.
-void checkIgnoredExpr(Expr *E);
 
 /// Type check a 'distributed actor' declaration.
 void checkDistributedActor(SourceFile *SF, NominalTypeDecl *decl);
