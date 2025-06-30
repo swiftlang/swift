@@ -320,15 +320,13 @@ namespace llvm {
   
 } // end namespace llvm
 
-class BridgedDeclBaseName;
+#endif // #ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 
 namespace swift {
 
 /// Wrapper that may either be an Identifier or a special name
 /// (e.g. for subscripts)
 class DeclBaseName {
-  friend class ::BridgedDeclBaseName;
-
 public:
   enum class Kind: uint8_t {
     Normal,
@@ -366,6 +364,9 @@ public:
   static DeclBaseName createDestructor() {
     return DeclBaseName(Identifier((const char *)&DestructorIdentifierData));
   }
+
+// Not imported into Swift in pure bridging mode.
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 
   Kind getKind() const {
     if (Ident.get() == (const char *)&SubscriptIdentifierData) {
@@ -454,9 +455,14 @@ public:
   static DeclBaseName getFromOpaquePointer(void *_Nullable P) {
     return Identifier::getFromOpaquePointer(P);
   }
+
+#endif // #ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 };
 
 } // end namespace swift
+
+// Not imported into Swift in pure bridging mode.
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 
 namespace llvm {
 

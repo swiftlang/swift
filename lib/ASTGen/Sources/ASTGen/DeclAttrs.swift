@@ -1272,7 +1272,7 @@ extension ASTGenVisitor {
       if let arg = arg.as(DeclReferenceExprSyntax.self) {
         name = self.generateDeclNameRef(declReferenceExpr: arg).name
       } else if arg.is(DiscardAssignmentExprSyntax.self) {
-        name = BridgedDeclNameRef.createParsed(.createIdentifier(self.ctx.getIdentifier("_")))
+        name = BridgedDeclNameRef.createParsed(.init(self.ctx.getIdentifier("_")))
       } else {
         // TODO: Diagnose
         fatalError("expected name")
