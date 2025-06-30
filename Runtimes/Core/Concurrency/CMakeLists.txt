@@ -102,6 +102,7 @@ add_library(swift_Concurrency
 
 include(${SwiftCore_CONCURRENCY_GLOBAL_EXECUTOR}.cmake)
 target_compile_definitions(swift_Concurrency PRIVATE
+  $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_RUNTIME>
   $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_TARGET_LIBRARY_NAME=swift_Concurrency>
   # NOTE: VS2017 <15.8 would round clamp alignment to alignof(max_align_t) which
   # was non-conformant. Indicate that we wish to use extended alignment.
