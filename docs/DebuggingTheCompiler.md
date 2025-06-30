@@ -58,6 +58,7 @@ benefit of all Swift developers.
     - [Multiple Logs at a Time](#multiple-logs-at-a-time)
 - [Compiler Tools/Options for Bug Hunting](#compiler-toolsoptions-for-bug-hunting)
     - [Using `clang-tidy` to run the Static Analyzer](#using-clang-tidy-to-run-the-static-analyzer)
+    - [Multi-Module Compilation](#multi-module-compilation)
 
 # Debugging the Compiler Itself
 
@@ -871,7 +872,7 @@ format expected by the compiler crashes and undefined behavior may result.
 
 ### Create Ubuntu Container 
 
-1. Use an x86 machine. The following instructions currently don’t work on arm64. It might be easy to adjust them or not, I have not tried
+1. Use an x86 machine. The following instructions currently don't work on arm64. It might be easy to adjust them or not, I have not tried
 2. Clone (or pull) swift-docker: https://github.com/swiftlang/swift-docker
 3. Build the Ubuntu 22.04 container: `cd swift-ci/master/ubuntu/22.04; docker build .`
 4. `docker run -it --cpus <CPUs> --memory <Memory> -v ~/<path to your local sources>:/src-on-host:cached --name lsan-reproducer --cap-add=SYS_PTRACE --security-opt seccomp=unconfined <hash that docker build outputs> bash`
@@ -1304,4 +1305,8 @@ as follows:
 One can also use shell regex to visit multiple files in the same directory. Example:
 
     clang-tidy -p=$PATH_TO_BUILD/swift-macosx-$(uname -m)/compile_commands.json $FULL_PATH_TO_DIR/*.cpp
+
+## Multi-Module Compilation
+
+For information about quickly compiling minimal multi-module projects without setting up Xcode projects or Swift packages, see [Multi-Module Compilation Guide](HowToGuides/MultiModuleCompilation.md).
 
