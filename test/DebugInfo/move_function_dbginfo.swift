@@ -250,6 +250,12 @@ public func copyableVarArgTest(_ k: inout Klass) {
 // DWARF-NEXT: DW_AT_decl_line (
 // DWARF-NEXT: DW_AT_type      (
 //
+// DWARF: DW_TAG_variable
+// DWARF-NEXT: DW_AT_location  (
+// DWARF-NEXT: DW_AT_name      ("m")
+// DWARF-NEXT: DW_AT_decl_file (
+// DWARF-NEXT: DW_AT_decl_line (
+// DWARF-NEXT: DW_AT_type      (
 public func addressOnlyValueTest<T : P>(_ x: T) {
     let k = x
     k.doSomething()
@@ -265,6 +271,33 @@ public func addressOnlyValueTest<T : P>(_ x: T) {
 // CHECK: ret void
 // CHECK-NEXT: }
 //
+// DWARF: DW_AT_linkage_name   ("$s3out23addressOnlyValueArgTestyyxnAA1PRzlF")
+// DWARF-NEXT: DW_AT_name      ("addressOnlyValueArgTest")
+// DWARF-NEXT: DW_AT_decl_file (
+// DWARF-NEXT: DW_AT_decl_line (
+// DWARF-NEXT: DW_AT_type      (
+// DWARF-NEXT: DW_AT_external  (
+//
+// DWARF: DW_TAG_formal_parameter
+// DWARF-NEXT: DW_AT_location  (0x{{[a-z0-9]+}}:
+// DWARF-NEXT:    [0x{{[a-z0-9]+}}, 0x{{[a-z0-9]+}}):
+// DWARF-NEXT: DW_AT_name      ("k")
+// DWARF-NEXT: DW_AT_decl_file (
+// DWARF-NEXT: DW_AT_decl_line (
+// DWARF-NEXT: DW_AT_type      (
+//
+// DWARF: DW_TAG_variable
+// DWARF-NEXT: DW_AT_location  (
+// DWARF-NEXT: DW_AT_name      ("$\317\204_0_0")
+// DWARF-NEXT: DW_AT_type      (
+// DWARF-NEXT: DW_AT_artificial        (true)
+//
+// DWARF: DW_TAG_variable
+// DWARF-NEXT: DW_AT_location  (
+// DWARF-NEXT: DW_AT_name      ("m")
+// DWARF-NEXT: DW_AT_decl_file (
+// DWARF-NEXT: DW_AT_decl_line (
+// DWARF-NEXT: DW_AT_type      (
 public func addressOnlyValueArgTest<T : P>(_ k: __owned T) {
     k.doSomething()
     let m = consume k
@@ -279,6 +312,35 @@ public func addressOnlyValueArgTest<T : P>(_ k: __owned T) {
 // CHECK: ret void
 // CHECK-NEXT: }
 //
+// DWARF: DW_AT_linkage_name   ("$s3out18addressOnlyVarTestyyxAA1PRzlF")
+// DWARF-NEXT: DW_AT_name      ("addressOnlyVarTest")
+// DWARF-NEXT: DW_AT_decl_file (
+// DWARF-NEXT: DW_AT_decl_line (
+// DWARF-NEXT: DW_AT_type      (
+// DWARF-NEXT: DW_AT_external  (
+//
+// DWARF: DW_TAG_formal_parameter
+// DWARF-NEXT: DW_AT_location  (
+// DWARF-NEXT: DW_AT_name      ("x")
+// DWARF-NEXT: DW_AT_decl_file (
+// DWARF-NEXT: DW_AT_decl_line (
+// DWARF-NEXT: DW_AT_type      (
+//
+// DWARF: DW_TAG_variable
+// DWARF-NEXT: DW_AT_location  (
+// DWARF-NEXT: DW_AT_name      ("$\317\204_0_0")
+// DWARF-NEXT: DW_AT_type      (
+// DWARF-NEXT: DW_AT_artificial        (true)
+//
+// DWARF: DW_TAG_variable
+// DWARF-NEXT: DW_AT_location  (0x{{[a-z0-9]+}}:
+// DWARF-NEXT:    [0x{{[a-z0-9]+}}, 0x{{[a-z0-9]+}}):
+// TODO: Missing def in dbg info here.
+// DWARF-NEXT:    [0x{{[a-z0-9]+}}, 0x{{[a-z0-9]+}}):
+// DWARF-NEXT: DW_AT_name      ("k")
+// DWARF-NEXT: DW_AT_decl_file (
+// DWARF-NEXT: DW_AT_decl_line (
+// DWARF-NEXT: DW_AT_type      (
 public func addressOnlyVarTest<T : P>(_ x: T) {
     var k = x // << this
     k.doSomething()
@@ -612,3 +674,4 @@ public func addressOnlyVarArgTestCCFlowReinitInBlockTest<T : P>(_ k: inout (any 
 // CHECK-DAG: ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA]] = !DILocalVariable(name: "k",
 // CHECK-DAG: ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]] = !DILocalVariable(name: "k",
 // CHECK-DAG: ![[K_COPYABLE_LET_CCFLOW_METADATA]] = !DILocalVariable(name: "k",
+
