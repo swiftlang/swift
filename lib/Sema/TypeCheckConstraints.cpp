@@ -204,6 +204,18 @@ bool TypeVariableType::Implementation::isCollectionLiteralType() const {
                      locator->directlyAt<DictionaryExpr>());
 }
 
+bool TypeVariableType::Implementation::isNumberLiteralType() const {
+  return locator && locator->directlyAt<NumberLiteralExpr>();
+}
+
+bool TypeVariableType::Implementation::isFunctionResult() const {
+  return locator && locator->isLastElement<LocatorPathElt::FunctionResult>();
+}
+
+bool TypeVariableType::Implementation::isTernary() const {
+  return locator && locator->directlyAt<TernaryExpr>();
+}
+
 void *operator new(size_t bytes, ConstraintSystem& cs,
                    size_t alignment) {
   return cs.getAllocator().Allocate(bytes, alignment);
@@ -453,6 +465,13 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
 
   if (options.contains(TypeCheckExprFlags::DisableMacroExpansions))
     csOptions |= ConstraintSystemFlags::DisableMacroExpansions;
+
+  if (Context.TypeCheckerOpts.EnableConstraintSolverPerformanceHacks ||
+      evaluateOrDefault(Context.evaluator,
+                        ModuleHasTypeCheckerPerformanceHacksEnabledRequest{
+                            dc->getParentModule()},
+                        false))
+    csOptions |= ConstraintSystemFlags::EnablePerformanceHacks;
 
   ConstraintSystem cs(dc, csOptions, diagnosticTransaction);
 
@@ -2447,4 +2466,12 @@ void ConstraintSystem::forEachExpr(
   };
 
   expr->walk(ChildWalker(*this, callback));
+}
+
+bool ModuleHasTypeCheckerPerformanceHacksEnabledRequest::evaluate(
+    Evaluator &evaluator, const ModuleDecl *module) const {
+  auto name = module->getRealName().str();
+  return module->getASTContext().blockListConfig.hasBlockListAction(
+      name, BlockListKeyKind::ModuleName,
+      BlockListAction::ShouldUseTypeCheckerPerfHacks);
 }

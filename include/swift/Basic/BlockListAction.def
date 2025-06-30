@@ -26,5 +26,6 @@ BLOCKLIST_ACTION(ShouldUseLayoutStringValueWitnesses)
 BLOCKLIST_ACTION(ShouldDisableOwnershipVerification)
 BLOCKLIST_ACTION(SkipEmittingFineModuleTrace)
 BLOCKLIST_ACTION(SkipIndexingModule)
+BLOCKLIST_ACTION(ShouldUseTypeCheckerPerfHacks)
 
 #undef BLOCKLIST_ACTION

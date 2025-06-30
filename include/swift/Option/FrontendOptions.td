@@ -862,8 +862,8 @@ def solver_trail_threshold_EQ : Joined<["-"], "solver-trail-threshold=">,
 def solver_disable_splitter : Flag<["-"], "solver-disable-splitter">,
   HelpText<"Disable the component splitter phase of expression type checking">;
 
-def disable_constraint_solver_performance_hacks : Flag<["-"], "disable-constraint-solver-performance-hacks">,
-  HelpText<"Disable all the hacks in the constraint solver">;
+def enable_constraint_solver_performance_hacks : Flag<["-"], "enable-constraint-solver-performance-hacks">,
+  HelpText<"Enable all the old hacks in the constraint solver">;
 
 def enable_operator_designated_types :
   Flag<["-"], "enable-operator-designated-types">,
