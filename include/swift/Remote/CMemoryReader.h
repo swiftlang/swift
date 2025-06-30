@@ -42,38 +42,16 @@ namespace remote {
 class CMemoryReader final : public MemoryReader {
   MemoryReaderImpl Impl;
 
-  uint64_t ptrauthMask;
-
-  uint64_t getPtrauthMask() {
-    if (ptrauthMask == 0) {
-      int success;
-      if (Impl.PointerSize == 4) {
-        uint32_t ptrauthMask32 = 0;
-        success = queryDataLayout(DataLayoutQueryType::DLQ_GetPtrAuthMask,
-                                  nullptr, &ptrauthMask32);
-        ptrauthMask = ptrauthMask32;
-      } else if (Impl.PointerSize == 8) {
-        success = queryDataLayout(DataLayoutQueryType::DLQ_GetPtrAuthMask,
-                                  nullptr, &ptrauthMask);
-      } else {
-        success = 0;
-      }
-
-      if (!success)
-        ptrauthMask = ~0ull;
-    }
-    return ptrauthMask;
-  }
-
   // Check to see if an address has bits outside the ptrauth mask. This suggests
   // that we're likely failing to strip a signed pointer when reading from it.
   bool hasSignatureBits(RemoteAddress address) {
     uint64_t addressData = address.getAddressData();
-    return addressData != (addressData & getPtrauthMask());
+    uint64_t mask = getPtrAuthMask().value_or(~uint64_t(0));
+    return addressData != (addressData & mask);
   }
 
 public:
-  CMemoryReader(MemoryReaderImpl Impl) : Impl(Impl), ptrauthMask(0) {
+  CMemoryReader(MemoryReaderImpl Impl) : Impl(Impl) {
     assert(this->Impl.queryDataLayout && "No queryDataLayout implementation");
     assert(this->Impl.getStringLength && "No stringLength implementation");
     assert(this->Impl.readBytes && "No readBytes implementation");
