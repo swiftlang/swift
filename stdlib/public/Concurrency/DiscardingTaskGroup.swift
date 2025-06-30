@@ -22,7 +22,7 @@ import Swift
 /// best applied in situations where the result of a child task is some form
 /// of side-effect.
 ///
-/// A group waits for all of its child tasks
+/// A group *always* waits for all of its child tasks
 /// to complete before it returns. Even cancelled tasks must run until
 /// completion before this function returns.
 /// Cancelled child tasks cooperatively react to cancellation and attempt
@@ -40,6 +40,8 @@ import Swift
 /// }
 /// // guaranteed that slow-task has completed and the group is empty & destroyed
 /// ```
+///
+/// Refer to ``TaskGroup`` documentation for detailed discussion of semantics shared between all task groups.
 ///
 /// Task Group Cancellation
 /// =======================
@@ -65,6 +67,7 @@ import Swift
 /// For tasks that need to handle cancellation by throwing an error,
 /// use the `withThrowingDiscardingTaskGroup(returning:body:)` method instead.
 ///
+/// - SeeAlso: ``TaskGroup``
 /// - SeeAlso: ``withThrowingDiscardingTaskGroup(returning:body:)``
 @available(SwiftStdlib 5.9, *)
 #if !hasFeature(Embedded)
@@ -131,9 +134,7 @@ public func _unsafeInheritExecutor_withDiscardingTaskGroup<GroupResult>(
 /// and mutation operations can't be performed
 /// from a concurrent execution context like a child task.
 ///
-/// ### Task execution order
-/// Tasks added to a task group execute concurrently, and may be scheduled in
-/// any order.
+/// Refer to ``TaskGroup`` documentation for detailed discussion of semantics shared between all task groups.
 ///
 /// ### Discarding behavior
 /// A discarding task group eagerly discards and releases its child tasks as
@@ -245,7 +246,7 @@ extension DiscardingTaskGroup: Sendable { }
 /// best applied in situations where the result of a child task is some form
 /// of side-effect.
 ///
-/// A group waits for all of its child tasks
+/// A group *always* waits for all of its child tasks
 /// to complete before it returns. Even cancelled tasks must run until
 /// completion before this function returns.
 /// Cancelled child tasks cooperatively react to cancellation and attempt
@@ -263,6 +264,8 @@ extension DiscardingTaskGroup: Sendable { }
 /// }
 /// // guaranteed that slow-task has completed and the group is empty & destroyed
 /// ```
+///
+/// Refer to ``TaskGroup`` documentation for detailed discussion of semantics shared between all task groups.
 ///
 /// Task Group Cancellation
 /// =======================
@@ -411,9 +414,7 @@ public func _unsafeInheritExecutor_withThrowingDiscardingTaskGroup<GroupResult>(
 /// and mutation operations can't be performed
 /// from a concurrent execution context like a child task.
 ///
-/// ### Task execution order
-/// Tasks added to a task group execute concurrently, and may be scheduled in
-/// any order.
+/// Refer to ``TaskGroup`` documentation for detailed discussion of semantics shared between all task groups.
 ///
 /// ### Discarding behavior
 /// A discarding task group eagerly discards and releases its child tasks as
