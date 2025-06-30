@@ -1064,8 +1064,8 @@ struct ElfSymbolTable<SomeElfTraits: ElfTraits>: ElfSymbolTableProtocol {
           continue
         }
 
-        // Ignore anything undefined
-        if symbol.st_shndx == SHN_UNDEF {
+        // Ignore anything undefined or absolute
+        if symbol.st_shndx == SHN_UNDEF || symbol.st_shndx == SHN_ABS {
           continue
         }
 
@@ -1190,6 +1190,8 @@ final class ElfImage<SomeElfTraits: ElfTraits>
   var sectionHeaders: [Traits.Shdr]?
   var shouldByteSwap: Bool { return header.shouldByteSwap }
 
+  var imageBase: ImageSource.Address
+
   @_specialize(kind: full, where SomeElfTraits == Elf32Traits)
   @_specialize(kind: full, where SomeElfTraits == Elf64Traits)
   required init(source: ImageSource,
@@ -1222,11 +1224,21 @@ final class ElfImage<SomeElfTraits: ElfTraits>
 
     var phdrs: [Traits.Phdr] = []
     var phAddr = ImageSource.Address(header.e_phoff)
+    var minAddr: Traits.Address? = nil
     for _ in 0..<header.e_phnum {
       let phdr = maybeSwap(try source.fetch(from: phAddr, as: Traits.Phdr.self))
       phdrs.append(phdr)
       phAddr += ImageSource.Address(header.e_phentsize)
+
+      if phdr.p_type == .PT_LOAD {
+        if let oldMinAddr = minAddr {
+          minAddr = min(oldMinAddr, phdr.p_vaddr)
+        } else {
+          minAddr = phdr.p_vaddr
+        }
+      }
     }
+    imageBase = ImageSource.Address(exactly: minAddr ?? 0)!
     programHeaders = phdrs
 
     if source.isMappedImage {
