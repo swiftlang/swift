@@ -1,7 +1,9 @@
-// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -target %target-swift-5.1-abi-triple -verify -verify-additional-prefix tns-  %s -o /dev/null -parse-as-library -enable-upcoming-feature GlobalActorIsolatedTypesUsability
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -target %target-swift-5.1-abi-triple -verify -verify-additional-prefix tns-ni- -verify-additional-prefix tns-  %s -o /dev/null -parse-as-library -enable-upcoming-feature GlobalActorIsolatedTypesUsability
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -target %target-swift-5.1-abi-triple -verify -verify-additional-prefix tns-ni-ns- -verify-additional-prefix tns-  %s -o /dev/null -parse-as-library -enable-upcoming-feature GlobalActorIsolatedTypesUsability -enable-upcoming-feature NonisolatedNonsendingByDefault
 
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 ////////////////////////
 // MARK: Declarations //
@@ -150,8 +152,8 @@ private struct StructContainingValue { // expected-complete-note 2{{}}
   var x = StructContainingValue()
   x.x = firstList
 
-  await transferToNonIsolated(x) // expected-tns-warning {{sending 'x' risks causing data races}}
-  // expected-tns-note @-1 {{sending global actor 'CustomActor'-isolated 'x' to nonisolated global function 'transferToNonIsolated' risks causing data races between nonisolated and global actor 'CustomActor'-isolated uses}}
+  await transferToNonIsolated(x) // expected-tns-ni-warning {{sending 'x' risks causing data races}}
+  // expected-tns-ni-note @-1 {{sending global actor 'CustomActor'-isolated 'x' to nonisolated global function 'transferToNonIsolated' risks causing data races between nonisolated and global actor 'CustomActor'-isolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-Sendable type 'StructContainingValue' outside of global actor 'CustomActor'-isolated context may introduce data races}}
 
   useValue(x)
@@ -174,8 +176,8 @@ private struct StructContainingValue { // expected-complete-note 2{{}}
 
   x.1 = firstList
 
-  await transferToNonIsolated(x) // expected-tns-warning {{sending 'x' risks causing data races}}
-  // expected-tns-note @-1 {{sending global actor 'CustomActor'-isolated 'x' to nonisolated global function 'transferToNonIsolated' risks causing data races between nonisolated and global actor 'CustomActor'-isolated uses}}
+  await transferToNonIsolated(x) // expected-tns-ni-warning {{sending 'x' risks causing data races}}
+  // expected-tns-ni-note @-1 {{sending global actor 'CustomActor'-isolated 'x' to nonisolated global function 'transferToNonIsolated' risks causing data races between nonisolated and global actor 'CustomActor'-isolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-Sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' outside of global actor 'CustomActor'-isolated context may introduce data races}}
   // expected-complete-warning @-3 {{passing argument of non-Sendable type '(NonSendableLinkedList<Int>, NonSendableLinkedList<Int>)' outside of global actor 'CustomActor'-isolated context may introduce data races}}
 
@@ -195,8 +197,8 @@ struct Clock {
 // We used to crash when inferring the type for the diagnostic below.
 @MainActor func testIndirectParametersHandledCorrectly() async {
   let c = Clock()
-  let _: Int = await c.measure { // expected-tns-warning {{sending value of non-Sendable type '() async -> Int' risks causing data races}}
-    // expected-tns-note @-1 {{sending main actor-isolated value of non-Sendable type '() async -> Int' to nonisolated instance method 'measure' risks causing races in between main actor-isolated and nonisolated uses}}
+  let _: Int = await c.measure { // expected-tns-ni-warning {{sending value of non-Sendable type '() async -> Int' risks causing data races}}
+    // expected-tns-ni-note @-1 {{sending main actor-isolated value of non-Sendable type '() async -> Int' to nonisolated instance method 'measure' risks causing races in between main actor-isolated and nonisolated uses}}
     try! await c.sleep()
   }
 }
@@ -255,8 +257,8 @@ struct Clock {
 
   let erased: () -> Void = closure
 
-  await useValueAsync(erased) // expected-tns-warning {{sending 'erased' risks causing data races}}
-  // expected-tns-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
+  await useValueAsync(erased) // expected-tns-ni-warning {{sending 'erased' risks causing data races}}
+  // expected-tns-ni-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-Sendable type '() -> Void' outside of main actor-isolated context may introduce data races}}
   // expected-complete-note @-3 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 }
@@ -264,8 +266,8 @@ struct Clock {
 @MainActor func synchronousActorIsolatedFunctionError() async {
   let erased: () -> Void = mainActorFunction
 
-  await useValueAsync(erased) // expected-tns-warning {{sending 'erased' risks causing data races}}
-  // expected-tns-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
+  await useValueAsync(erased) // expected-tns-ni-warning {{sending 'erased' risks causing data races}}
+  // expected-tns-ni-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-Sendable type '() -> Void' outside of main actor-isolated context may introduce data races}}
   // expected-complete-note @-3 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 }
@@ -273,8 +275,8 @@ struct Clock {
 @MainActor func synchronousActorIsolatedGenericFunctionError<T>(_ t: T) async {
   let erased: (T) -> Void = useValueMainActor
 
-  await useValueAsync(erased) // expected-tns-warning {{sending 'erased' risks causing data races}}
-  // expected-tns-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
+  await useValueAsync(erased) // expected-tns-ni-warning {{sending 'erased' risks causing data races}}
+  // expected-tns-ni-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-Sendable type '(T) -> Void' outside of main actor-isolated context may introduce data races}}
   // expected-complete-note @-3 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 }
@@ -287,8 +289,8 @@ struct Clock {
   let t = Test()
   let erased: () -> Void = t.foo
 
-  await useValueAsync(erased) // expected-tns-warning {{sending 'erased' risks causing data races}}
-  // expected-tns-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
+  await useValueAsync(erased) // expected-tns-ni-warning {{sending 'erased' risks causing data races}}
+  // expected-tns-ni-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-Sendable type '() -> Void' outside of main actor-isolated context may introduce data races}}
   // expected-complete-note @-3 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 }
@@ -301,8 +303,8 @@ struct Clock {
   let t = Test()
   let erased: () -> Void = t.foo
 
-  await useValueAsync(erased) // expected-tns-warning {{sending 'erased' risks causing data races}}
-  // expected-tns-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
+  await useValueAsync(erased) // expected-tns-ni-warning {{sending 'erased' risks causing data races}}
+  // expected-tns-ni-note @-1 {{sending main actor-isolated 'erased' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and main actor-isolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-Sendable type '() -> Void' outside of main actor-isolated context may introduce data races}}
   // expected-complete-note @-3 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 }
