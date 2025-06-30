@@ -154,6 +154,10 @@ public:
     return Flags.getPriority();
   }
 
+  void setPriority(JobPriority priority) {
+    Flags.setPriority(priority);
+  }
+
   uint32_t getJobId() const {
     return Id;
   }

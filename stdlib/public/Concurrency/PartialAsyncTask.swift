@@ -298,14 +298,23 @@ public struct ExecutorJob: Sendable, ~Copyable {
     self.context = job.context
   }
 
-  public var priority: JobPriority {
-    let raw: UInt8
-    if #available(StdlibDeploymentTarget 6.2, *) {
-      raw = _jobGetPriority(self.context)
-    } else {
-      fatalError("we shouldn't get here; if we have, availability is broken")
+  internal(set) public var priority: JobPriority {
+    get {
+      let raw: UInt8
+      if #available(StdlibDeploymentTarget 6.2, *) {
+        raw = _jobGetPriority(self.context)
+      } else {
+        fatalError("we shouldn't get here; if we have, availability is broken")
+      }
+      return JobPriority(rawValue: raw)
     }
-    return JobPriority(rawValue: raw)
+    set {
+      if #available(StdlibDeploymentTarget 6.2, *) {
+        _jobSetPriority(self.context, newValue.rawValue)
+      } else {
+        fatalError("we shouldn't get here; if we have, availability is broken")
+      }
+    }
   }
 
   /// Execute a closure, passing it the bounds of the executor private data
@@ -540,6 +549,16 @@ public struct JobPriority: Sendable {
 
   /// The raw priority value.
   public var rawValue: RawValue
+
+  /// Construct from a raw value
+  public init(rawValue: RawValue) {
+    self.rawValue = rawValue
+  }
+
+  /// Construct from a TaskPriority
+  public init(_ p: TaskPriority) {
+    self.rawValue = p.rawValue
+  }
 }
 
 @available(SwiftStdlib 5.9, *)
@@ -908,4 +927,18 @@ public func _unsafeInheritExecutor_withUnsafeThrowingContinuation<T>(
 @_alwaysEmitIntoClient
 public func _abiEnableAwaitContinuation() {
   fatalError("never use this function")
+}
+
+@available(StdlibDeploymentTarget 6.2, *)
+@_silgen_name("_swift_createJobForTestingOnly")
+public func _swift_createJobForTestingOnly(
+  priority: TaskPriority = TaskPriority.medium,
+  _ body: @escaping () -> ()
+) -> ExecutorJob {
+  let flags: Int = Int(priority.rawValue)
+  let (task, _) = Builtin.createAsyncTask(flags, body)
+  var job = ExecutorJob(unsafe unsafeBitCast(Builtin.convertTaskToJob(task),
+      to: UnownedJob.self))
+  job.priority = JobPriority(priority)
+  return job
 }
