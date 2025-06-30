@@ -7,6 +7,7 @@
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   @available(*, unavailable, message: "virtual function is not available in Swift because it is pure")
 // CHECK-NEXT:   mutating func foo()
+// CHECK-NEXT:   func swiftVirtualRename()
 // CHECK: }
 
 // CHECK: struct Base3 {
@@ -33,4 +34,9 @@
 // CHECK: class Immortal {
 // CHECK:  func getOverridden42() -> Int32
 // CHECK:  func get42() -> Int32
+// CHECK: }
+
+// CHECK: class Immortal2 {
+// CHECK-NEXT: final func virtualMethod(_: HasDestructor)
+// CHECK-NEXT: final func swiftVirtualRename()
 // CHECK: }
