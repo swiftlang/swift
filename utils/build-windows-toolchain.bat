@@ -60,7 +60,7 @@ set TMPDIR=%BuildRoot%\tmp
 set NINJA_STATUS=[%%f/%%t][%%p][%%es] 
 
 :: Build the -Test argument, if any, by subtracting skipped tests
-set TestArg=-Test lld,lldb,swift,dispatch,foundation,xctest,swift-format,sourcekit-lsp,
+set TestArg=-Test lld,lldb,swift,dispatch,foundation,xctest,swift-format,sourcekit-lsp,swiftpm,
 for %%I in (%SKIP_TESTS%) do (call set TestArg=%%TestArg:%%I,=%%)
 if "%TestArg:~-1%"=="," (set TestArg=%TestArg:~0,-1%) else (set TestArg= )
 
