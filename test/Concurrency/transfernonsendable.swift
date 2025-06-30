@@ -1772,13 +1772,12 @@ extension MyActor {
         _ = self
         _ = sc
 
-        Task { // expected-tns-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-          // expected-tns-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to initializer 'init(name:priority:operation:)' risks causing races in between local and caller code}}
-          _ = sc
+        Task { // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between 'self'-isolated code and concurrent execution of the closure}}
+          _ = sc // expected-tns-note {{closure captures 'self'-isolated 'sc'}}
         }
 
-        Task { // expected-tns-note {{access can happen concurrently}}
-          _ = sc
+        Task { // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between 'self'-isolated code and concurrent execution of the closure}}
+          _ = sc // expected-tns-note {{closure captures 'self'-isolated 'sc'}}
         }
       }
     }
@@ -2095,3 +2094,21 @@ func inferLocationOfCapturedTaskIsolatedSelfCorrectly() {
   }
 }
 
+func avoidThinkingClosureParameterIsSending() {
+  @MainActor
+  final class Foo {
+    let value = NonSendableKlass()
+
+    func perform() {
+        Task { [value] in
+          await value.asyncCall() // expected-tns-warning {{sending 'value' risks causing data races}}
+          // expected-tns-note @-1 {{sending main actor-isolated 'value' to nonisolated instance method 'asyncCall()' risks causing data races between nonisolated and main actor-isolated uses}}
+        }
+
+        Task {
+          await value.asyncCall() // expected-tns-warning {{sending 'self.value' risks causing data races}}
+          // expected-tns-note @-1 {{sending main actor-isolated 'self.value' to nonisolated instance method 'asyncCall()' risks causing data races between nonisolated and main actor-isolated uses}}
+        }
+    }
+  }
+}

@@ -451,6 +451,8 @@ struct DowngradeForPreconcurrency {
         // expected-note@-3 2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
         // expected-warning@-4 {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
         // expected-note@-5 {{calls to parameter 'completion' from outside of its actor context are implicitly asynchronous}}
+        // expected-complete-and-tns-warning @-7 {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+        // expected-complete-and-tns-note @-7 {{closure captures 'completion' which is accessible to code in the current task}}
       }
     }
   }
