@@ -146,7 +146,7 @@ Solution::computeSubstitutions(NullablePtr<ValueDecl> decl,
   };
 
   auto subs = SubstitutionMap::get(sig, replacementTypes, lookupConformanceFn);
-  ASSERT(!subs.getRecursiveProperties().isSolverAllocated());
+  CONDITIONAL_ASSERT(!subs.getRecursiveProperties().isSolverAllocated());
   return subs;
 }
 
