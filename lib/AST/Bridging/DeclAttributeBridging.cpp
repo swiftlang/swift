@@ -113,28 +113,26 @@ static AvailableAttr::Kind unbridge(BridgedAvailableAttrKind value) {
 }
 
 BridgedAvailableAttr BridgedAvailableAttr_createParsed(
-    BridgedASTContext cContext, SourceLoc atLoc, BridgedSourceRange cRange,
+    BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     Identifier domainIdentifier, SourceLoc domainLoc,
     BridgedAvailableAttrKind cKind, BridgedStringRef cMessage,
     BridgedStringRef cRenamed, BridgedVersionTuple cIntroduced,
-    BridgedSourceRange cIntroducedRange, BridgedVersionTuple cDeprecated,
-    BridgedSourceRange cDeprecatedRange, BridgedVersionTuple cObsoleted,
-    BridgedSourceRange cObsoletedRange, bool isSPI) {
-
-  return new (cContext.unbridged())
-      AvailableAttr(atLoc, cRange.unbridged(), domainIdentifier, domainLoc,
-                    unbridge(cKind), cMessage.unbridged(), cRenamed.unbridged(),
-                    cIntroduced.unbridged(), cIntroducedRange.unbridged(),
-                    cDeprecated.unbridged(), cDeprecatedRange.unbridged(),
-                    cObsoleted.unbridged(), cObsoletedRange.unbridged(),
-                    /*Implicit=*/false,
-                    /*IsSPI=*/isSPI);
+    SourceRange introducedRange, BridgedVersionTuple cDeprecated,
+    SourceRange deprecatedRange, BridgedVersionTuple cObsoleted,
+    SourceRange obsoletedRange, bool isSPI) {
+  return new (cContext.unbridged()) AvailableAttr(
+      atLoc, range, domainIdentifier, domainLoc, unbridge(cKind),
+      cMessage.unbridged(), cRenamed.unbridged(), cIntroduced.unbridged(),
+      introducedRange, cDeprecated.unbridged(), deprecatedRange,
+      cObsoleted.unbridged(), obsoletedRange,
+      /*Implicit=*/false,
+      /*IsSPI=*/isSPI);
 }
 
 BridgedAvailableAttr BridgedAvailableAttr_createUnavailableInEmbedded(
-    BridgedASTContext cContext, SourceLoc atLoc, BridgedSourceRange cRange) {
+    BridgedASTContext cContext, SourceLoc atLoc, SourceRange range) {
   return AvailableAttr::createUnavailableInEmbedded(cContext.unbridged(), atLoc,
-                                                    cRange.unbridged());
+                                                    range);
 }
 
 void BridgedAvailableAttr_setIsGroupMember(BridgedAvailableAttr cAttr) {
@@ -148,56 +146,53 @@ void BridgedAvailableAttr_setIsGroupTerminator(BridgedAvailableAttr cAttr) {
 }
 
 BridgedABIAttr BridgedABIAttr_createParsed(BridgedASTContext cContext,
-                                           SourceLoc atLoc,
-                                           BridgedSourceRange range,
+                                           SourceLoc atLoc, SourceRange range,
                                            BridgedNullableDecl abiDecl) {
-  return new (cContext.unbridged())
-      ABIAttr(abiDecl.unbridged(), atLoc, range.unbridged(),
-              /*isImplicit=*/false);
+  return new (cContext.unbridged()) ABIAttr(abiDecl.unbridged(), atLoc, range,
+                                            /*isImplicit=*/false);
 }
 
 BridgedAccessControlAttr
 BridgedAccessControlAttr_createParsed(BridgedASTContext cContext,
-                                      BridgedSourceRange cRange,
+                                      SourceRange range,
                                       swift::AccessLevel accessLevel) {
   return new (cContext.unbridged()) AccessControlAttr(
-      /*atLoc=*/{}, cRange.unbridged(), accessLevel);
+      /*atLoc=*/{}, range, accessLevel);
 }
 
 BridgedAlignmentAttr
 BridgedAlignmentAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
-                                  BridgedSourceRange cRange, size_t cValue) {
+                                  SourceRange range, size_t cValue) {
   return new (cContext.unbridged())
-      AlignmentAttr(cValue, atLoc, cRange.unbridged(), /*Implicit=*/false);
+      AlignmentAttr(cValue, atLoc, range, /*Implicit=*/false);
 }
 
 BridgedAllowFeatureSuppressionAttr
 BridgedAllowFeatureSuppressionAttr_createParsed(BridgedASTContext cContext,
                                                 SourceLoc atLoc,
-                                                BridgedSourceRange cRange,
+                                                SourceRange range,
                                                 bool inverted,
                                                 BridgedArrayRef cFeatures) {
   auto features = cFeatures.unbridged<Identifier>();
-  return AllowFeatureSuppressionAttr::create(
-      cContext.unbridged(), atLoc, cRange.unbridged(),
-      /*implicit*/ false, inverted, features);
+  return AllowFeatureSuppressionAttr::create(cContext.unbridged(), atLoc, range,
+                                             /*implicit*/ false, inverted,
+                                             features);
 }
 
 BridgedBackDeployedAttr BridgedBackDeployedAttr_createParsed(
-    BridgedASTContext cContext, SourceLoc atLoc, BridgedSourceRange cRange,
+    BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     swift::PlatformKind platform, BridgedVersionTuple cVersion) {
-  return new (cContext.unbridged())
-      BackDeployedAttr(atLoc, cRange.unbridged(), platform,
-                       cVersion.unbridged(), /*Implicit=*/false);
+  return new (cContext.unbridged()) BackDeployedAttr(
+      atLoc, range, platform, cVersion.unbridged(), /*Implicit=*/false);
 }
 
 BridgedCDeclAttr BridgedCDeclAttr_createParsed(BridgedASTContext cContext,
                                                SourceLoc atLoc,
-                                               BridgedSourceRange cRange,
+                                               SourceRange range,
                                                BridgedStringRef cName,
                                                bool underscored) {
   return new (cContext.unbridged())
-      CDeclAttr(cName.unbridged(), atLoc, cRange.unbridged(),
+      CDeclAttr(cName.unbridged(), atLoc, range,
                 /*Implicit=*/false, /*Underscored*/ underscored);
 }
 
@@ -212,7 +207,7 @@ BridgedCustomAttr BridgedCustomAttr_createParsed(
 }
 
 BridgedDerivativeAttr BridgedDerivativeAttr_createParsedImpl(
-    BridgedASTContext cContext, SourceLoc atLoc, BridgedSourceRange cRange,
+    BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     BridgedNullableTypeRepr cBaseType, BridgedDeclNameRef cOriginalName,
     BridgedDeclNameLoc cOriginalNameLoc,
     std::optional<swift::AccessorKind> AccessorKind, BridgedArrayRef cParams) {
@@ -222,33 +217,33 @@ BridgedDerivativeAttr BridgedDerivativeAttr_createParsedImpl(
 
   return DerivativeAttr::create(
       cContext.unbridged(),
-      /*implicit=*/false, atLoc, cRange.unbridged(), cBaseType.unbridged(),
+      /*implicit=*/false, atLoc, range, cBaseType.unbridged(),
       DeclNameRefWithLoc{cOriginalName.unbridged(),
                          cOriginalNameLoc.unbridged(), AccessorKind},
       params);
 }
 
 BridgedDerivativeAttr BridgedDerivativeAttr_createParsed(
-    BridgedASTContext cContext, SourceLoc atLoc, BridgedSourceRange cRange,
+    BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     BridgedNullableTypeRepr cBaseType, BridgedDeclNameRef cOriginalName,
     BridgedDeclNameLoc cOriginalNameLoc, swift::AccessorKind AccessorKind,
     BridgedArrayRef cParams) {
   return BridgedDerivativeAttr_createParsedImpl(
-      cContext, atLoc, cRange, cBaseType, cOriginalName, cOriginalNameLoc,
+      cContext, atLoc, range, cBaseType, cOriginalName, cOriginalNameLoc,
       AccessorKind, cParams);
 }
 
 BridgedDerivativeAttr BridgedDerivativeAttr_createParsed(
-    BridgedASTContext cContext, SourceLoc atLoc, BridgedSourceRange cRange,
+    BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     BridgedNullableTypeRepr cBaseType, BridgedDeclNameRef cOriginalName,
     BridgedDeclNameLoc cOriginalNameLoc, BridgedArrayRef cParams) {
   return BridgedDerivativeAttr_createParsedImpl(
-      cContext, atLoc, cRange, cBaseType, cOriginalName, cOriginalNameLoc,
+      cContext, atLoc, range, cBaseType, cOriginalName, cOriginalNameLoc,
       /*cAccessorKind=*/std::nullopt, cParams);
 }
 
 BridgedDifferentiableAttr BridgedDifferentiableAttr_createParsed(
-    BridgedASTContext cContext, SourceLoc atLoc, BridgedSourceRange cRange,
+    BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     BridgedDifferentiabilityKind cKind, BridgedArrayRef cParams,
     BridgedNullableTrailingWhereClause cGenericWhereClause) {
   SmallVector<ParsedAutoDiffParameter, 2> params;
@@ -256,8 +251,8 @@ BridgedDifferentiableAttr BridgedDifferentiableAttr_createParsed(
     params.push_back(elem.unbridged());
 
   return DifferentiableAttr::create(cContext.unbridged(), /*implicit=*/false,
-                                    atLoc, cRange.unbridged(), unbridged(cKind),
-                                    params, cGenericWhereClause.unbridged());
+                                    atLoc, range, unbridged(cKind), params,
+                                    cGenericWhereClause.unbridged());
 }
 
 BridgedDynamicReplacementAttr BridgedDynamicReplacementAttr_createParsed(
@@ -270,30 +265,28 @@ BridgedDynamicReplacementAttr BridgedDynamicReplacementAttr_createParsed(
 }
 
 BridgedDocumentationAttr BridgedDocumentationAttr_createParsed(
-    BridgedASTContext cContext, SourceLoc atLoc, BridgedSourceRange cRange,
+    BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     BridgedStringRef cMetadata, BridgedOptionalAccessLevel accessLevel) {
   std::optional<swift::AccessLevel> optAccessLevel;
   if (accessLevel.getHasValue()) {
     optAccessLevel.emplace(accessLevel.getValue());
   }
-  return new (cContext.unbridged())
-      DocumentationAttr(atLoc, cRange.unbridged(), cMetadata.unbridged(),
-                        optAccessLevel, /*implicit=*/false);
+  return new (cContext.unbridged()) DocumentationAttr(
+      atLoc, range, cMetadata.unbridged(), optAccessLevel, /*implicit=*/false);
 }
 
 BridgedEffectsAttr
 BridgedEffectsAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
-                                BridgedSourceRange cRange,
+                                SourceRange range,
                                 swift::EffectsKind effectKind) {
-  return new (cContext.unbridged())
-      EffectsAttr(atLoc, cRange.unbridged(), effectKind);
+  return new (cContext.unbridged()) EffectsAttr(atLoc, range, effectKind);
 }
 
 BridgedEffectsAttr BridgedEffectsAttr_createParsed(
-    BridgedASTContext cContext, SourceLoc atLoc, BridgedSourceRange cRange,
+    BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     BridgedStringRef cCustomString, SourceLoc customStringLoc) {
-  return new (cContext.unbridged()) EffectsAttr(
-      atLoc, cRange.unbridged(), cCustomString.unbridged(), customStringLoc);
+  return new (cContext.unbridged())
+      EffectsAttr(atLoc, range, cCustomString.unbridged(), customStringLoc);
 }
 
 static ExclusivityAttr::Mode unbridged(BridgedExclusivityAttrMode mode) {
@@ -305,25 +298,26 @@ static ExclusivityAttr::Mode unbridged(BridgedExclusivityAttrMode mode) {
   }
   llvm_unreachable("unhandled enum value");
 }
+
 BridgedExclusivityAttr
 BridgedExclusivityAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
-                                    BridgedSourceRange cRange,
+                                    SourceRange range,
                                     BridgedExclusivityAttrMode cMode) {
   return new (cContext.unbridged())
-      ExclusivityAttr(atLoc, cRange.unbridged(), unbridged(cMode));
+      ExclusivityAttr(atLoc, range, unbridged(cMode));
 }
 
 BridgedExposeAttr BridgedExposeAttr_createParsed(BridgedASTContext cContext,
                                                  SourceLoc atLoc,
-                                                 BridgedSourceRange cRange,
+                                                 SourceRange range,
                                                  BridgedStringRef cName,
                                                  swift::ExposureKind kind) {
-  return new (cContext.unbridged()) ExposeAttr(
-      cName.unbridged(), atLoc, cRange.unbridged(), kind, /*Implicit=*/false);
+  return new (cContext.unbridged())
+      ExposeAttr(cName.unbridged(), atLoc, range, kind, /*Implicit=*/false);
 }
 
 BridgedExternAttr BridgedExternAttr_createParsed(
-    BridgedASTContext cContext, SourceLoc atLoc, BridgedSourceRange cRange,
+    BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     SourceLoc lParenLoc, SourceLoc rParenLoc, swift::ExternKind kind,
     BridgedStringRef cModuleName, BridgedStringRef cName) {
   std::optional<StringRef> moduleName = cModuleName.unbridged();
@@ -334,26 +328,25 @@ BridgedExternAttr BridgedExternAttr_createParsed(
   if (name->empty())
     name = std::nullopt;
 
-  return new (cContext.unbridged()) ExternAttr(
-      moduleName, name, atLoc, lParenLoc, rParenLoc, cRange.unbridged(), kind,
-      /*Implicit=*/false);
+  return new (cContext.unbridged())
+      ExternAttr(moduleName, name, atLoc, lParenLoc, rParenLoc, range, kind,
+                 /*Implicit=*/false);
 }
 
 BridgedImplementsAttr BridgedImplementsAttr_createParsed(
-    BridgedASTContext cContext, SourceLoc atLoc, BridgedSourceRange cRange,
+    BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     BridgedTypeRepr cProtocolType, BridgedDeclNameRef cMemberName,
     BridgedDeclNameLoc cMemberNameLoc) {
-  return ImplementsAttr::create(cContext.unbridged(), atLoc, cRange.unbridged(),
-                                cProtocolType.unbridged(),
-                                cMemberName.unbridged().getFullName(),
-                                cMemberNameLoc.unbridged());
+  return ImplementsAttr::create(
+      cContext.unbridged(), atLoc, range, cProtocolType.unbridged(),
+      cMemberName.unbridged().getFullName(), cMemberNameLoc.unbridged());
 }
 
 BridgedInlineAttr BridgedInlineAttr_createParsed(BridgedASTContext cContext,
                                                  SourceLoc atLoc,
-                                                 BridgedSourceRange cRange,
+                                                 SourceRange range,
                                                  swift::InlineKind kind) {
-  return new (cContext.unbridged()) InlineAttr(atLoc, cRange.unbridged(), kind);
+  return new (cContext.unbridged()) InlineAttr(atLoc, range, kind);
 }
 
 static swift::ParsedLifetimeDependenceKind
@@ -386,8 +379,7 @@ swift::LifetimeDescriptor BridgedLifetimeDescriptor::unbridged() {
 }
 
 static BridgedLifetimeEntry BridgedLifetimeEntry_createParsedImpl(
-    BridgedASTContext cContext, BridgedSourceRange cRange,
-    BridgedArrayRef cSources,
+    BridgedASTContext cContext, SourceRange range, BridgedArrayRef cSources,
     std::optional<BridgedLifetimeDescriptor> cTarget) {
   SmallVector<LifetimeDescriptor> sources;
   for (auto cSource : cSources.unbridged<BridgedLifetimeDescriptor>())
@@ -396,29 +388,30 @@ static BridgedLifetimeEntry BridgedLifetimeEntry_createParsedImpl(
   if (cTarget)
     target = cTarget->unbridged();
 
-  return LifetimeEntry::create(cContext.unbridged(), cRange.Start, cRange.End,
+  return LifetimeEntry::create(cContext.unbridged(), range.Start, range.End,
                                sources, target);
 }
 
 BridgedLifetimeEntry
-BridgedLifetimeEntry_createParsed(BridgedASTContext cContext,
-                                  BridgedSourceRange cRange,
+BridgedLifetimeEntry_createParsed(BridgedASTContext cContext, SourceRange range,
                                   BridgedArrayRef cSources) {
-  return BridgedLifetimeEntry_createParsedImpl(cContext, cRange, cSources,
+  return BridgedLifetimeEntry_createParsedImpl(cContext, range, cSources,
                                                std::nullopt);
 }
 
-BridgedLifetimeEntry BridgedLifetimeEntry_createParsed(
-    BridgedASTContext cContext, BridgedSourceRange cRange,
-    BridgedArrayRef cSources, BridgedLifetimeDescriptor cTarget) {
-  return BridgedLifetimeEntry_createParsedImpl(cContext, cRange, cSources,
+BridgedLifetimeEntry
+BridgedLifetimeEntry_createParsed(BridgedASTContext cContext, SourceRange range,
+                                  BridgedArrayRef cSources,
+                                  BridgedLifetimeDescriptor cTarget) {
+  return BridgedLifetimeEntry_createParsedImpl(cContext, range, cSources,
                                                cTarget);
 }
 
-BridgedLifetimeAttr BridgedLifetimeAttr_createParsed(
-    BridgedASTContext cContext, SourceLoc atLoc, BridgedSourceRange cRange,
-    BridgedLifetimeEntry cEntry, bool isUnderscored) {
-  return LifetimeAttr::create(cContext.unbridged(), atLoc, cRange.unbridged(),
+BridgedLifetimeAttr
+BridgedLifetimeAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
+                                 SourceRange range, BridgedLifetimeEntry cEntry,
+                                 bool isUnderscored) {
+  return LifetimeAttr::create(cContext.unbridged(), atLoc, range,
                               /*implicit=*/false, cEntry.unbridged(),
                               isUnderscored);
 }
@@ -443,7 +436,7 @@ MacroSyntax unbridge(BridgedMacroSyntax cSyntax) {
 }
 
 BridgedMacroRoleAttr BridgedMacroRoleAttr_createParsed(
-    BridgedASTContext cContext, SourceLoc atLoc, BridgedSourceRange cRange,
+    BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     BridgedMacroSyntax cSyntax, SourceLoc lParenLoc, BridgedMacroRole cRole,
     BridgedArrayRef cNames, BridgedArrayRef cConformances,
     SourceLoc rParenLoc) {
@@ -455,40 +448,39 @@ BridgedMacroRoleAttr BridgedMacroRoleAttr_createParsed(
   for (auto &t : cConformances.unbridged<BridgedExpr>())
     conformances.push_back(t.unbridged());
 
-  return MacroRoleAttr::create(cContext.unbridged(), atLoc, cRange.unbridged(),
+  return MacroRoleAttr::create(cContext.unbridged(), atLoc, range,
                                unbridge(cSyntax), lParenLoc, unbridge(cRole),
                                names, conformances, rParenLoc,
                                /*implicit=*/false);
 }
 
 BridgedOriginallyDefinedInAttr BridgedOriginallyDefinedInAttr_createParsed(
-    BridgedASTContext cContext, SourceLoc atLoc, BridgedSourceRange cRange,
+    BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     BridgedStringRef cModuleName, swift::PlatformKind platform,
     BridgedVersionTuple cVersion) {
   return new (cContext.unbridged()) OriginallyDefinedInAttr(
-      atLoc, cRange.unbridged(), cModuleName.unbridged(), platform,
-      cVersion.unbridged(),
+      atLoc, range, cModuleName.unbridged(), platform, cVersion.unbridged(),
       /*Implicit=*/false);
 }
 
 BridgedStorageRestrictionsAttr BridgedStorageRestrictionsAttr_createParsed(
-    BridgedASTContext cContext, SourceLoc atLoc, BridgedSourceRange cRange,
+    BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     BridgedArrayRef cInitializes, BridgedArrayRef cAccesses) {
   ASTContext &context = cContext.unbridged();
 
   auto initializes = cInitializes.unbridged<Identifier>();
   auto accesses = cAccesses.unbridged<Identifier>();
-  return StorageRestrictionsAttr::create(context, atLoc, cRange.unbridged(),
-                                         initializes, accesses);
+  return StorageRestrictionsAttr::create(context, atLoc, range, initializes,
+                                         accesses);
 }
 
 BridgedSwiftNativeObjCRuntimeBaseAttr
 BridgedSwiftNativeObjCRuntimeBaseAttr_createParsed(BridgedASTContext cContext,
                                                    SourceLoc atLoc,
-                                                   BridgedSourceRange cRange,
+                                                   SourceRange range,
                                                    Identifier name) {
-  return new (cContext.unbridged()) SwiftNativeObjCRuntimeBaseAttr(
-      name, atLoc, cRange.unbridged(), /*Implicit=*/false);
+  return new (cContext.unbridged())
+      SwiftNativeObjCRuntimeBaseAttr(name, atLoc, range, /*Implicit=*/false);
 }
 
 static NonSendableKind unbridged(BridgedNonSendableKind kind) {
@@ -503,26 +495,25 @@ static NonSendableKind unbridged(BridgedNonSendableKind kind) {
 
 BridgedNonSendableAttr
 BridgedNonSendableAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
-                                    BridgedSourceRange cRange,
+                                    SourceRange range,
                                     BridgedNonSendableKind cKind) {
   return new (cContext.unbridged())
-      NonSendableAttr(atLoc, cRange.unbridged(), unbridged(cKind));
+      NonSendableAttr(atLoc, range, unbridged(cKind));
 }
 
 BridgedNonisolatedAttr
 BridgedNonisolatedAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
-                                    BridgedSourceRange cRange,
+                                    SourceRange range,
                                     swift::NonIsolatedModifier modifier) {
-  return new (cContext.unbridged())
-      NonisolatedAttr(atLoc, cRange.unbridged(), modifier,
-                      /*implicit=*/false);
+  return new (cContext.unbridged()) NonisolatedAttr(atLoc, range, modifier,
+                                                    /*implicit=*/false);
 }
 
 BridgedInheritActorContextAttr BridgedInheritActorContextAttr_createParsed(
-    BridgedASTContext cContext, SourceLoc atLoc, BridgedSourceRange cRange,
+    BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     swift::InheritActorContextModifier modifier) {
   return new (cContext.unbridged())
-      InheritActorContextAttr(atLoc, cRange.unbridged(), modifier,
+      InheritActorContextAttr(atLoc, range, modifier,
                               /*implicit=*/false);
 }
 
@@ -553,17 +544,18 @@ BridgedObjCAttr BridgedObjCAttr_createParsedSelector(
 }
 
 BridgedObjCImplementationAttr BridgedObjCImplementationAttr_createParsed(
-    BridgedASTContext cContext, SourceLoc atLoc, BridgedSourceRange cRange,
+    BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     Identifier name, bool isEarlyAdopter) {
   return new (cContext.unbridged())
-      ObjCImplementationAttr(name, atLoc, cRange.unbridged(), isEarlyAdopter);
+      ObjCImplementationAttr(name, atLoc, range, isEarlyAdopter);
 }
 
-BridgedObjCRuntimeNameAttr BridgedObjCRuntimeNameAttr_createParsed(
-    BridgedASTContext cContext, SourceLoc atLoc, BridgedSourceRange cRange,
-    Identifier name) {
-  return new (cContext.unbridged()) ObjCRuntimeNameAttr(
-      name.str(), atLoc, cRange.unbridged(), /*Implicit=*/false);
+BridgedObjCRuntimeNameAttr
+BridgedObjCRuntimeNameAttr_createParsed(BridgedASTContext cContext,
+                                        SourceLoc atLoc, SourceRange range,
+                                        Identifier name) {
+  return new (cContext.unbridged())
+      ObjCRuntimeNameAttr(name.str(), atLoc, range, /*Implicit=*/false);
 }
 
 static OptimizationMode unbridged(BridgedOptimizationMode mode) {
@@ -580,11 +572,10 @@ static OptimizationMode unbridged(BridgedOptimizationMode mode) {
 
 BridgedOptimizeAttr
 BridgedOptimizeAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
-                                 BridgedSourceRange cRange,
+                                 SourceRange range,
                                  BridgedOptimizationMode cMode) {
-
   return new (cContext.unbridged())
-      OptimizeAttr(atLoc, cRange.unbridged(), unbridged(cMode));
+      OptimizeAttr(atLoc, range, unbridged(cMode));
 }
 
 BridgedPrivateImportAttr BridgedPrivateImportAttr_createParsed(
@@ -597,10 +588,10 @@ BridgedPrivateImportAttr BridgedPrivateImportAttr_createParsed(
 BridgedProjectedValuePropertyAttr
 BridgedProjectedValuePropertyAttr_createParsed(BridgedASTContext cContext,
                                                SourceLoc atLoc,
-                                               BridgedSourceRange cRange,
+                                               SourceRange range,
                                                Identifier name) {
-  return new (cContext.unbridged()) ProjectedValuePropertyAttr(
-      name, atLoc, cRange.unbridged(), /*Implicit=*/false);
+  return new (cContext.unbridged())
+      ProjectedValuePropertyAttr(name, atLoc, range, /*Implicit=*/false);
 }
 
 BridgedRawDocCommentAttr
@@ -609,29 +600,29 @@ BridgedRawDocCommentAttr_createParsed(BridgedASTContext cContext,
   return new (cContext.unbridged()) RawDocCommentAttr(cRange.unbridged());
 }
 
-BridgedRawLayoutAttr BridgedStorageRestrictionsAttr_createParsed(
-    BridgedASTContext cContext, SourceLoc atLoc, BridgedSourceRange cRange,
-    size_t size, size_t alignment) {
+BridgedRawLayoutAttr
+BridgedStorageRestrictionsAttr_createParsed(BridgedASTContext cContext,
+                                            SourceLoc atLoc, SourceRange range,
+                                            size_t size, size_t alignment) {
   return new (cContext.unbridged())
-      RawLayoutAttr(size, alignment, atLoc, cRange.unbridged());
+      RawLayoutAttr(size, alignment, atLoc, range);
 }
 
 SWIFT_NAME("BridgedRawLayoutAttr.createParsed(_:atLoc:range:like:moveAsLike:)")
 BridgedRawLayoutAttr BridgedStorageRestrictionsAttr_createParsed(
-    BridgedASTContext cContext, SourceLoc atLoc, BridgedSourceRange cRange,
+    BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     BridgedTypeRepr cLikeType, bool moveAsLike) {
-  return new (cContext.unbridged()) RawLayoutAttr(
-      cLikeType.unbridged(), moveAsLike, atLoc, cRange.unbridged());
+  return new (cContext.unbridged())
+      RawLayoutAttr(cLikeType.unbridged(), moveAsLike, atLoc, range);
 }
 
 SWIFT_NAME("BridgedRawLayoutAttr.createParsed(_:atLoc:range:likeArrayOf:count:"
            "moveAsLike:)")
 BridgedRawLayoutAttr BridgedStorageRestrictionsAttr_createParsed(
-    BridgedASTContext cContext, SourceLoc atLoc, BridgedSourceRange cRange,
+    BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     BridgedTypeRepr cLikeType, BridgedTypeRepr cCountType, bool moveAsLike) {
-  return new (cContext.unbridged())
-      RawLayoutAttr(cLikeType.unbridged(), cCountType.unbridged(), moveAsLike,
-                    atLoc, cRange.unbridged());
+  return new (cContext.unbridged()) RawLayoutAttr(
+      cLikeType.unbridged(), cCountType.unbridged(), moveAsLike, atLoc, range);
 }
 
 ReferenceOwnership unbridged(BridgedReferenceOwnership kind) {
@@ -648,37 +639,36 @@ ReferenceOwnership unbridged(BridgedReferenceOwnership kind) {
   llvm_unreachable("unhandled enum value");
 }
 
-BridgedReferenceOwnershipAttr BridgedReferenceOwnershipAttr_createParsed(
-    BridgedASTContext cContext, SourceLoc atLoc, BridgedSourceRange cRange,
-    BridgedReferenceOwnership cKind) {
+BridgedReferenceOwnershipAttr
+BridgedReferenceOwnershipAttr_createParsed(BridgedASTContext cContext,
+                                           SourceLoc atLoc, SourceRange range,
+                                           BridgedReferenceOwnership cKind) {
   return new (cContext.unbridged())
-      ReferenceOwnershipAttr(cRange.unbridged(), unbridged(cKind));
+      ReferenceOwnershipAttr(range, unbridged(cKind));
 }
 
 BridgedSectionAttr BridgedSectionAttr_createParsed(BridgedASTContext cContext,
                                                    SourceLoc atLoc,
-                                                   BridgedSourceRange cRange,
+                                                   SourceRange range,
                                                    BridgedStringRef cName) {
-  return new (cContext.unbridged())
-      SectionAttr(cName.unbridged(), atLoc, cRange.unbridged(),
-                  /*Implicit=*/false);
+  return new (cContext.unbridged()) SectionAttr(cName.unbridged(), atLoc, range,
+                                                /*Implicit=*/false);
 }
 
 BridgedSemanticsAttr
 BridgedSemanticsAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
-                                  BridgedSourceRange cRange,
-                                  BridgedStringRef cValue) {
+                                  SourceRange range, BridgedStringRef cValue) {
   return new (cContext.unbridged())
-      SemanticsAttr(cValue.unbridged(), atLoc, cRange.unbridged(),
+      SemanticsAttr(cValue.unbridged(), atLoc, range,
                     /*Implicit=*/false);
 }
 
 BridgedSetterAccessAttr
 BridgedSetterAccessAttr_createParsed(BridgedASTContext cContext,
-                                     BridgedSourceRange cRange,
+                                     SourceRange range,
                                      swift::AccessLevel accessLevel) {
   return new (cContext.unbridged()) SetterAccessAttr(
-      /*atLoc=*/{}, cRange.unbridged(), accessLevel);
+      /*atLoc=*/{}, range, accessLevel);
 }
 
 static SpecializeAttr::SpecializationKind
@@ -693,7 +683,7 @@ unbridge(BridgedSpecializationKind kind) {
 }
 
 BridgedSpecializeAttr BridgedSpecializeAttr_createParsed(
-    BridgedASTContext cContext, SourceLoc atLoc, BridgedSourceRange cRange,
+    BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     BridgedNullableTrailingWhereClause cWhereClause, bool exported,
     BridgedSpecializationKind cKind, BridgedDeclNameRef cTargetFunction,
     BridgedArrayRef cSPIGroups, BridgedArrayRef cAvailableAttrs) {
@@ -702,14 +692,13 @@ BridgedSpecializeAttr BridgedSpecializeAttr_createParsed(
   for (auto bridging : cAvailableAttrs.unbridged<BridgedAvailableAttr>())
     availableAttrs.push_back(bridging.unbridged());
 
-  return SpecializeAttr::create(cContext.unbridged(), atLoc, cRange.unbridged(),
-                                cWhereClause.unbridged(), exported,
-                                unbridge(cKind), cTargetFunction.unbridged(),
-                                spiGroups, availableAttrs);
+  return SpecializeAttr::create(
+      cContext.unbridged(), atLoc, range, cWhereClause.unbridged(), exported,
+      unbridge(cKind), cTargetFunction.unbridged(), spiGroups, availableAttrs);
 }
 
 BridgedSpecializedAttr BridgedSpecializedAttr_createParsed(
-    BridgedASTContext cContext, SourceLoc atLoc, BridgedSourceRange cRange,
+    BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     BridgedNullableTrailingWhereClause cWhereClause, bool exported,
     BridgedSpecializationKind cKind, BridgedDeclNameRef cTargetFunction,
     BridgedArrayRef cSPIGroups, BridgedArrayRef cAvailableAttrs) {
@@ -719,29 +708,28 @@ BridgedSpecializedAttr BridgedSpecializedAttr_createParsed(
     availableAttrs.push_back(bridging.unbridged());
 
   return SpecializedAttr::create(
-      cContext.unbridged(), atLoc, cRange.unbridged(), cWhereClause.unbridged(),
-      exported, unbridge(cKind), cTargetFunction.unbridged(), spiGroups,
-      availableAttrs);
+      cContext.unbridged(), atLoc, range, cWhereClause.unbridged(), exported,
+      unbridge(cKind), cTargetFunction.unbridged(), spiGroups, availableAttrs);
 }
 
-BridgedSPIAccessControlAttr BridgedSPIAccessControlAttr_createParsed(
-    BridgedASTContext cContext, SourceLoc atLoc, BridgedSourceRange cRange,
-    Identifier SPIGroupName) {
-
-  return SPIAccessControlAttr::create(cContext.unbridged(), atLoc,
-                                      cRange.unbridged(), SPIGroupName);
+BridgedSPIAccessControlAttr
+BridgedSPIAccessControlAttr_createParsed(BridgedASTContext cContext,
+                                         SourceLoc atLoc, SourceRange range,
+                                         Identifier SPIGroupName) {
+  return SPIAccessControlAttr::create(cContext.unbridged(), atLoc, range,
+                                      SPIGroupName);
 }
 
 BridgedSILGenNameAttr
 BridgedSILGenNameAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
-                                   BridgedSourceRange cRange,
-                                   BridgedStringRef cName, bool isRaw) {
+                                   SourceRange range, BridgedStringRef cName,
+                                   bool isRaw) {
   return new (cContext.unbridged()) SILGenNameAttr(
-      cName.unbridged(), isRaw, atLoc, cRange.unbridged(), /*Implicit=*/false);
+      cName.unbridged(), isRaw, atLoc, range, /*Implicit=*/false);
 }
 
 BridgedTransposeAttr BridgedTransposeAttr_createParsed(
-    BridgedASTContext cContext, SourceLoc atLoc, BridgedSourceRange cRange,
+    BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     BridgedNullableTypeRepr cBaseType, BridgedDeclNameRef cOriginalName,
     BridgedDeclNameLoc cOriginalNameLoc, BridgedArrayRef cParams) {
   SmallVector<ParsedAutoDiffParameter, 2> params;
@@ -750,7 +738,7 @@ BridgedTransposeAttr BridgedTransposeAttr_createParsed(
 
   return TransposeAttr::create(
       cContext.unbridged(),
-      /*implicit=*/false, atLoc, cRange.unbridged(), cBaseType.unbridged(),
+      /*implicit=*/false, atLoc, range, cBaseType.unbridged(),
       DeclNameRefWithLoc{cOriginalName.unbridged(),
                          cOriginalNameLoc.unbridged(),
                          /*AccessorKind=*/std::nullopt},
@@ -759,17 +747,16 @@ BridgedTransposeAttr BridgedTransposeAttr_createParsed(
 
 BridgedTypeEraserAttr
 BridgedTypeEraserAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
-                                   BridgedSourceRange cRange,
-                                   BridgedTypeExpr cTypeExpr
-
-) {
-  return TypeEraserAttr::create(cContext.unbridged(), atLoc, cRange.unbridged(),
+                                   SourceRange range,
+                                   BridgedTypeExpr cTypeExpr) {
+  return TypeEraserAttr::create(cContext.unbridged(), atLoc, range,
                                 cTypeExpr.unbridged());
 }
 
-BridgedUnavailableFromAsyncAttr BridgedUnavailableFromAsyncAttr_createParsed(
-    BridgedASTContext cContext, SourceLoc atLoc, BridgedSourceRange cRange,
-    BridgedStringRef cMessage) {
+BridgedUnavailableFromAsyncAttr
+BridgedUnavailableFromAsyncAttr_createParsed(BridgedASTContext cContext,
+                                             SourceLoc atLoc, SourceRange range,
+                                             BridgedStringRef cMessage) {
   return new (cContext.unbridged()) UnavailableFromAsyncAttr(
-      cMessage.unbridged(), atLoc, cRange.unbridged(), /*implicit=*/false);
+      cMessage.unbridged(), atLoc, range, /*implicit=*/false);
 }

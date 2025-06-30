@@ -318,29 +318,6 @@ public:
 BridgedOStream Bridged_dbgs();
 
 //===----------------------------------------------------------------------===//
-// MARK: SourceRange
-//===----------------------------------------------------------------------===//
-
-class BridgedSourceRange {
-public:
-  SWIFT_NAME("start")
-  swift::SourceLoc Start;
-
-  SWIFT_NAME("end")
-  swift::SourceLoc End;
-
-  BridgedSourceRange() : Start(), End() {}
-
-  SWIFT_NAME("init(start:end:)")
-  BridgedSourceRange(swift::SourceLoc start, swift::SourceLoc end)
-      : Start(start), End(end) {}
-
-  BRIDGED_INLINE BridgedSourceRange(swift::SourceRange range);
-
-  BRIDGED_INLINE swift::SourceRange unbridged() const;
-};
-
-//===----------------------------------------------------------------------===//
 // MARK: BridgedCharSourceRange
 //===----------------------------------------------------------------------===//
 

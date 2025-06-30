@@ -137,19 +137,24 @@ public:
 #endif // #ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 };
 
-// Not imported into Swift in pure bridging mode.
-#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
-
 /// SourceRange in swift is a pair of locations.  However, note that the end
 /// location is the start of the last token in the range, not the last character
 /// in the range.  This is unlike SMRange, so we use a distinct type to make
 /// sure that proper conversions happen where important.
 class SourceRange {
 public:
-  SourceLoc Start, End;
+  SWIFT_NAME("start")
+  SourceLoc Start;
+
+  SWIFT_NAME("end")
+  SourceLoc End;
 
   SourceRange() {}
+
+  SWIFT_NAME("init(start:)")
   SourceRange(SourceLoc Loc) : Start(Loc), End(Loc) {}
+
+  SWIFT_NAME("init(start:end:)")
   SourceRange(SourceLoc Start, SourceLoc End) : Start(Start), End(End) {
     assert(Start.isValid() == End.isValid() &&
            "Start and end should either both be valid or both be invalid!");
@@ -157,6 +162,9 @@ public:
   
   bool isValid() const { return Start.isValid(); }
   bool isInvalid() const { return !isValid(); }
+
+// Not imported into Swift in pure bridging mode.
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 
   /// An explicit bool operator so one can check if a SourceRange is valid in an
   /// if statement:
@@ -215,7 +223,11 @@ public:
     // Nothing meaningful to print.
   }
 
+#endif // #ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 };
+
+// Not imported into Swift in pure bridging mode.
+#ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
 
 /// A half-open character-based source range.
 class CharSourceRange {

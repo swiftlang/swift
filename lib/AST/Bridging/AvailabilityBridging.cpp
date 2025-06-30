@@ -67,10 +67,9 @@ BridgedAvailabilitySpec_createWildcard(BridgedASTContext cContext,
 
 BridgedAvailabilitySpec BridgedAvailabilitySpec_createForDomainIdentifier(
     BridgedASTContext cContext, Identifier name, SourceLoc loc,
-    BridgedVersionTuple cVersion, BridgedSourceRange cVersionRange) {
-  return AvailabilitySpec::createForDomainIdentifier(cContext.unbridged(), name,
-                                                     loc, cVersion.unbridged(),
-                                                     cVersionRange.unbridged());
+    BridgedVersionTuple cVersion, SourceRange versionRange) {
+  return AvailabilitySpec::createForDomainIdentifier(
+      cContext.unbridged(), name, loc, cVersion.unbridged(), versionRange);
 }
 
 BridgedAvailabilitySpec
@@ -89,7 +88,7 @@ BridgedAvailabilitySpec_getDomainOrIdentifier(BridgedAvailabilitySpec spec) {
   return spec.unbridged()->getDomainOrIdentifier();
 }
 
-BridgedSourceRange
+SourceRange
 BridgedAvailabilitySpec_getSourceRange(BridgedAvailabilitySpec spec) {
   return spec.unbridged()->getSourceRange();
 }
@@ -103,7 +102,7 @@ BridgedAvailabilitySpec_getRawVersion(BridgedAvailabilitySpec spec) {
   return spec.unbridged()->getRawVersion();
 }
 
-BridgedSourceRange
+SourceRange
 BridgedAvailabilitySpec_getVersionRange(BridgedAvailabilitySpec spec) {
   return spec.unbridged()->getVersionSrcRange();
 }

@@ -115,13 +115,12 @@ BridgedCallExpr BridgedCallExpr_createParsed(BridgedASTContext cContext,
 
 BridgedCaptureListEntry BridegedCaptureListEntry_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedReferenceOwnership cOwnershipKind,
-    BridgedSourceRange cOwnershipRange, Identifier name, SourceLoc nameLoc,
-    SourceLoc equalLoc, BridgedExpr cInitializer) {
+    BridgedReferenceOwnership cOwnershipKind, SourceRange ownershipRange,
+    Identifier name, SourceLoc nameLoc, SourceLoc equalLoc,
+    BridgedExpr cInitializer) {
   return CaptureListEntry::createParsed(
-      cContext.unbridged(), unbridged(cOwnershipKind),
-      cOwnershipRange.unbridged(), name, nameLoc, equalLoc,
-      cInitializer.unbridged(), cDeclContext.unbridged());
+      cContext.unbridged(), unbridged(cOwnershipKind), ownershipRange, name,
+      nameLoc, equalLoc, cInitializer.unbridged(), cDeclContext.unbridged());
 }
 
 BridgedCaptureListExpr
@@ -138,7 +137,7 @@ BridgedCaptureListExpr_createParsed(BridgedASTContext cContext,
 
 BridgedClosureExpr BridgedClosureExpr_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedDeclAttributes cAttributes, BridgedSourceRange cBracketRange,
+    BridgedDeclAttributes cAttributes, SourceRange bracketRange,
     BridgedNullableVarDecl cCapturedSelfDecl,
     BridgedNullableParameterList cParameterList, SourceLoc asyncLoc,
     SourceLoc throwsLoc, BridgedNullableTypeRepr cThrownType,
@@ -154,9 +153,9 @@ BridgedClosureExpr BridgedClosureExpr_createParsed(
     explicitResultType = new (context) TypeExpr(tyR);
 
   return new (context) ClosureExpr(
-      cAttributes.unbridged(), cBracketRange.unbridged(),
-      cCapturedSelfDecl.unbridged(), cParameterList.unbridged(), asyncLoc,
-      throwsLoc, throwsType, arrowLoc, inLoc, explicitResultType, declContext);
+      cAttributes.unbridged(), bracketRange, cCapturedSelfDecl.unbridged(),
+      cParameterList.unbridged(), asyncLoc, throwsLoc, throwsType, arrowLoc,
+      inLoc, explicitResultType, declContext);
 }
 
 BridgedParameterList
@@ -254,8 +253,8 @@ BridgedEditorPlaceholderExpr BridgedEditorPlaceholderExpr_createParsed(
 }
 
 BridgedErrorExpr BridgedErrorExpr_create(BridgedASTContext cContext,
-                                         BridgedSourceRange cRange) {
-  return new (cContext.unbridged()) ErrorExpr(cRange.unbridged());
+                                         SourceRange range) {
+  return new (cContext.unbridged()) ErrorExpr(range);
 }
 
 BridgedForceTryExpr BridgedForceTryExpr_createParsed(BridgedASTContext cContext,

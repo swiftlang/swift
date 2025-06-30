@@ -22,7 +22,7 @@ extension ASTGenVisitor {
   /// Implementation detail for `generateAvailableAttr(attribute:)` and `generateSpecializeAttr(attribute:)`.
   func generateAvailableAttr(
     atLoc: SourceLoc,
-    range: BridgedSourceRange,
+    range: SourceRange,
     attrName: SyntaxText,
     args: AvailabilityArgumentListSyntax
   ) -> [BridgedAvailableAttr] {
@@ -67,7 +67,7 @@ extension ASTGenVisitor {
 
   func generateAvailableAttrShorthand(
     atLoc: SourceLoc,
-    range: BridgedSourceRange,
+    range: SourceRange,
     args: AvailabilityArgumentListSyntax,
     isSPI: Bool
   ) -> [BridgedAvailableAttr] {
@@ -101,9 +101,9 @@ extension ASTGenVisitor {
         introduced: spec.rawVersion,
         introducedRange: spec.versionRange,
         deprecated: BridgedVersionTuple(),
-        deprecatedRange: BridgedSourceRange(),
+        deprecatedRange: SourceRange(),
         obsoleted: BridgedVersionTuple(),
-        obsoletedRange: BridgedSourceRange(),
+        obsoletedRange: SourceRange(),
         isSPI: isSPI
       )
       attr.setIsGroupMember()
@@ -122,7 +122,7 @@ extension ASTGenVisitor {
 
   func generateAvailableAttrExtended(
     atLoc: SourceLoc,
-    range: BridgedSourceRange,
+    range: SourceRange,
     args: AvailabilityArgumentListSyntax,
     isSPI: Bool
   ) -> BridgedAvailableAttr? {
@@ -155,7 +155,7 @@ extension ASTGenVisitor {
 
     struct VersionAndRange {
       let version: VersionTuple
-      let range: BridgedSourceRange
+      let range: SourceRange
     }
 
     var introduced: VersionAndRange? = nil
@@ -263,11 +263,11 @@ extension ASTGenVisitor {
       message: message ?? BridgedStringRef(),
       renamed: renamed ?? BridgedStringRef(),
       introduced: introduced?.version.bridged ?? BridgedVersionTuple(),
-      introducedRange: introduced?.range ?? BridgedSourceRange(),
+      introducedRange: introduced?.range ?? SourceRange(),
       deprecated: deprecated?.version.bridged ?? BridgedVersionTuple(),
-      deprecatedRange: deprecated?.range ?? BridgedSourceRange(),
+      deprecatedRange: deprecated?.range ?? SourceRange(),
       obsoleted: obsoleted?.version.bridged ?? BridgedVersionTuple(),
-      obsoletedRange: obsoleted?.range ?? BridgedSourceRange(),
+      obsoletedRange: obsoleted?.range ?? SourceRange(),
       isSPI: isSPI
     )
   }
