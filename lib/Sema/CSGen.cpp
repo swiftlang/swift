@@ -1051,6 +1051,61 @@ namespace {
       return tv;
     }
 
+    /// Attempt to infer a result type of a subscript reference where
+    /// the base type is either a stdlib Array or a Dictionary type.
+    /// This is a more principled version of the old performance hack
+    /// that used "favored" types deduced by the constraint optimizer
+    /// and is important to maintain pre-existing solver behavior.
+    Type inferCollectionSubscriptResultType(Type baseTy,
+                                            ArgumentList *argumentList) {
+      auto isLValueBase = false;
+      auto baseObjTy = baseTy;
+      if (baseObjTy->is<LValueType>()) {
+        isLValueBase = true;
+        baseObjTy = baseObjTy->getWithoutSpecifierType();
+      }
+
+      auto subscriptResultType = [&isLValueBase](Type valueTy,
+                                                 bool isOptional) -> Type {
+        Type outputTy = isOptional ? OptionalType::get(valueTy) : valueTy;
+        return isLValueBase ? LValueType::get(outputTy) : outputTy;
+      };
+
+      if (auto *argument = argumentList->getUnlabeledUnaryExpr()) {
+        auto argumentTy = CS.getType(argument);
+
+        auto elementTy = baseObjTy->getArrayElementType();
+
+        if (!elementTy)
+          elementTy = baseObjTy->getInlineArrayElementType();
+
+        if (elementTy) {
+          if (auto arraySliceTy =
+                  dyn_cast<ArraySliceType>(baseObjTy.getPointer())) {
+            baseObjTy = arraySliceTy->getDesugaredType();
+          }
+
+          if (argumentTy->isInt() || isExpr<IntegerLiteralExpr>(argument))
+            return subscriptResultType(elementTy, /*isOptional*/ false);
+        } else if (auto dictTy = CS.isDictionaryType(baseObjTy)) {
+          auto [keyTy, valueTy] = *dictTy;
+
+          if (keyTy->isString() &&
+              (isExpr<StringLiteralExpr>(argument) ||
+               isExpr<InterpolatedStringLiteralExpr>(argument)))
+            return subscriptResultType(valueTy, /*isOptional*/ true);
+
+          if (keyTy->isInt() && isExpr<IntegerLiteralExpr>(argument))
+            return subscriptResultType(valueTy, /*isOptional*/ true);
+
+          if (keyTy->isEqual(argumentTy))
+            return subscriptResultType(valueTy, /*isOptional*/ true);
+        }
+      }
+
+      return Type();
+    }
+
     /// Add constraints for a subscript operation.
     Type addSubscriptConstraints(
         Expr *anchor, Type baseTy, ValueDecl *declOrNull, ArgumentList *argList,
@@ -1074,52 +1129,10 @@ namespace {
 
       Type outputTy;
 
-      // For an integer subscript expression on an array slice type, instead of
-      // introducing a new type variable we can easily obtain the element type.
-      if (isa<SubscriptExpr>(anchor)) {
+      // Attempt to infer the result type of a stdlib collection subscript.
+      if (isa<SubscriptExpr>(anchor))
+        outputTy = inferCollectionSubscriptResultType(baseTy, argList);
 
-        auto isLValueBase = false;
-        auto baseObjTy = baseTy;
-        if (baseObjTy->is<LValueType>()) {
-          isLValueBase = true;
-          baseObjTy = baseObjTy->getWithoutSpecifierType();
-        }
-
-        auto elementTy = baseObjTy->getArrayElementType();
-
-        if (!elementTy)
-          elementTy = baseObjTy->getInlineArrayElementType();
-
-        if (elementTy) {
-
-          if (auto arraySliceTy = 
-                dyn_cast<ArraySliceType>(baseObjTy.getPointer())) {
-            baseObjTy = arraySliceTy->getDesugaredType();
-          }
-
-          if (argList->isUnlabeledUnary() &&
-              isa<IntegerLiteralExpr>(argList->getExpr(0))) {
-
-            outputTy = elementTy;
-            
-            if (isLValueBase)
-              outputTy = LValueType::get(outputTy);
-          }
-        } else if (auto dictTy = CS.isDictionaryType(baseObjTy)) {
-          auto keyTy = dictTy->first;
-          auto valueTy = dictTy->second;
-
-          if (argList->isUnlabeledUnary()) {
-            auto argTy = CS.getType(argList->getExpr(0));
-            if (isFavoredParamAndArg(CS, keyTy, argTy)) {
-              outputTy = OptionalType::get(valueTy);
-              if (isLValueBase)
-                outputTy = LValueType::get(outputTy);
-            }
-          }
-        }
-      }
-      
       if (outputTy.isNull()) {
         outputTy = CS.createTypeVariable(resultLocator,
                                          TVO_CanBindToLValue | TVO_CanBindToNoEscape);
