@@ -3480,6 +3480,13 @@ namespace {
             getDeclContext(), RefineConformances{*this});
       }
 
+      if (auto *collectionExpr = dyn_cast<CollectionExpr>(expr)) {
+        checkIsolatedConformancesInContext(
+            collectionExpr->getInitializer(),
+            collectionExpr->getLoc(),
+            getDeclContext(), RefineConformances{*this});
+      }
+
       return Action::Continue(expr);
     }
 
