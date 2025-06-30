@@ -432,6 +432,12 @@ tryCastFromObjCBridgeableToClass(
   const Metadata *&destFailureType, const Metadata *&srcFailureType,
   bool takeOnSuccess, bool mayDeferChecks)
 {
+  assert(srcType != destType);
+  assert(destType->getKind() == MetadataKind::Class
+	 || destType->getKind() == MetadataKind::ObjCClassWrapper
+	 || destType->getKind() == MetadataKind::ForeignClass
+	);
+
   auto srcBridgeWitness = findBridgeWitness(srcType);
   if (srcBridgeWitness == nullptr) {
     return DynamicCastResult::Failure;
@@ -448,6 +454,48 @@ tryCastFromObjCBridgeableToClass(
   } else {
     // We don't need the object anymore.
     swift_unknownObjectRelease(srcBridgedObject);
+    return DynamicCastResult::Failure;
+  }
+}
+
+
+/// As above, but cast to a class existential.
+///
+/// Caveat: Despite the name, this is also used to bridge Swift value types
+/// to Swift classes even when Obj-C is not being used.
+static DynamicCastResult
+tryCastFromObjCBridgeableToClassExistential(
+  OpaqueValue *destLocation, const Metadata *destType,
+  OpaqueValue *srcValue, const Metadata *srcType,
+  const Metadata *&destFailureType, const Metadata *&srcFailureType,
+  bool takeOnSuccess, bool mayDeferChecks)
+{
+  assert(srcType != destType);
+  assert(destType->getKind() == MetadataKind::Existential);
+  auto destExistentialType = cast<ExistentialTypeMetadata>(destType);
+  assert(destExistentialType->getRepresentation() == ExistentialTypeRepresentation::Class);
+
+  auto srcBridgeWitness = findBridgeWitness(srcType);
+  if (srcBridgeWitness == nullptr) {
+    return DynamicCastResult::Failure;
+  }
+
+  // Bridge the source value to an object (via copy)
+  auto bridgedObject =
+    srcBridgeWitness->bridgeToObjectiveC(srcValue, srcType, srcBridgeWitness);
+  auto bridgedValue = reinterpret_cast<OpaqueValue *>(&bridgedObject);
+
+  // Dynamic cast the object to the final type.
+  auto subcastResult = tryCast(destLocation, destType,
+			       bridgedValue, getNSObjectMetadata(),
+			       destFailureType, srcFailureType,
+			       /*takeOnSucess=*/ true, mayDeferChecks);
+
+  if (isSuccess(subcastResult)) {
+    return DynamicCastResult::SuccessViaCopy;
+  } else {
+    // We don't need the temporary object anymore
+    swift_unknownObjectRelease(bridgedObject);
     return DynamicCastResult::Failure;
   }
 }
@@ -2583,7 +2631,7 @@ tryCast(
     auto destExistentialType = cast<ExistentialTypeMetadata>(destType);
     if (destExistentialType->getRepresentation() == ExistentialTypeRepresentation::Class) {
       // Some types have custom Objective-C bridging support...
-      auto subcastResult = tryCastFromObjCBridgeableToClass(
+      auto subcastResult = tryCastFromObjCBridgeableToClassExistential(
         destLocation, destType, srcValue, srcType,
         destFailureType, srcFailureType, takeOnSuccess, mayDeferChecks);
       if (isSuccess(subcastResult)) {
