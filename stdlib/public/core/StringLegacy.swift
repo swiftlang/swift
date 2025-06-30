@@ -46,8 +46,8 @@ extension String {
     for _ in 0..<count {
       let bufferRebased = UnsafeMutableBufferPointer(rebasing: buffer[offset...])
       guard let copied = repeatedValueGuts.copyUTF8(into: bufferRebased) else {
-        fatalError("Buffer's capacity \(buffer.count)" +
-                   " is not enough to accommodate '\(repeatedValue)' \(count) times")
+        _internalInvariantFailure("Buffer's capacity \(buffer.count)" +
+          "is not enough to accommodate '\(repeatedValue)' \(count) times")
       }
       offset += copied
     }
