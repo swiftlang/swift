@@ -776,11 +776,6 @@ public:
     return autoGenLoc;
   }
 
-  SILDebugLocation getCleanupLocation() const {
-    SILDebugLocation cleanupLoc(CleanupLocation(location), getScope());
-    return cleanupLoc;
-  }
-
   bool isEqualTo(SILDebugLocation rhs) const {
     return getLocation() == rhs.getLocation() && getScope() == rhs.getScope();
   }

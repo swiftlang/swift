@@ -80,7 +80,8 @@ struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
   mutating func insert(_ inst: Instruction) {
     insertedInsts.insert(inst)
     insertIntoRange(instructions: ReverseInstructionList(first: inst.previous))
-    if blockRange.insert(inst.parentBlock) {
+    blockRange.insert(inst.parentBlock)
+    if inst.parentBlock != blockRange.begin {
       // The first time an instruction is inserted in another block than the begin-block we need to insert
       // instructions from the begin instruction to the end of the begin block.
       // For subsequent insertions this is a no-op: `insertIntoRange` will return immediately because those

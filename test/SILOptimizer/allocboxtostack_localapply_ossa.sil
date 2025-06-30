@@ -257,7 +257,7 @@ bb0(%0 : @guaranteed ${ var Int64 }):
 }
 
 // CHECK-LABEL: sil [noinline] [ossa] @$testrecur :
-// CHECK:         alloc_stack $Int64, var, name "x"
+// CHECK: alloc_box ${ var Int64 }, var, name "x"
 // CHECK-LABEL: } // end sil function '$testrecur'
 sil [noinline] [ossa] @$testrecur : $@convention(thin) () -> () {
 bb0:
@@ -409,10 +409,15 @@ bb0(%0 : @guaranteed ${ var Int64 }):
   return %4 : $Int64
 }
 
+// Test to make sure we don't optimize the case when we have an inner common function call for multiple boxes.
+// We don't optimize this case now, because we don't have additional logic to correctly construct AppliesToSpecialize
+// Order of function calls constructed in PromotedOperands: bar innercommon local1 bas innercommon local2
+// AppliesToSpecialize should have the order: bar bas innercommon local1 local2
+// Since we don't maintain any tree like data structure with more info on the call tree, this is not possible to construct today 
 // CHECK-LABEL: sil [noinline] [ossa] @$testdfs2 :
-// CHECK:         alloc_stack $Int, var, name "x"
-// CHECK:         alloc_stack $Int, var, name "y"
-// CHECK-LABEL: } // end sil function '$testdfs2'
+// CHECK: alloc_box ${ var Int }, var, name "x"
+// CHECK: alloc_box ${ var Int }, var, name "y"
+// CHECK-LABEL:} // end sil function '$testdfs2'
 sil [noinline] [ossa] @$testdfs2 : $@convention(thin) () -> Int {
 bb0:
   %0 = alloc_box ${ var Int }, var, name "x"
@@ -441,7 +446,6 @@ bb0:
   return %21 : $Int
 }
 
-// CHECK-LABEL: sil private [noinline] [ossa] @$s12$testdfs2barTf0s_n : $@convention(thin) (@inout_aliasable Int) -> Int {
 sil private [noinline] [ossa] @$testdfs2bar : $@convention(thin) (@guaranteed { var Int }) -> Int {
 bb0(%0 : @guaranteed ${ var Int }):
   %1 = project_box %0 : ${ var Int }, 0
@@ -449,7 +453,6 @@ bb0(%0 : @guaranteed ${ var Int }):
   return %4 : $Int
 }
 
-// CHECK-LABEL: sil private [noinline] [ossa] @$s12$testdfs2basTf0s_n : $@convention(thin) (@inout_aliasable Int) -> Int {
 sil private [noinline] [ossa] @$testdfs2bas : $@convention(thin) (@guaranteed { var Int }) -> Int {
 bb0(%0 : @guaranteed ${ var Int }):
   %1 = project_box %0 : ${ var Int }, 0
@@ -457,7 +460,6 @@ bb0(%0 : @guaranteed ${ var Int }):
   return %4 : $Int
 }
 
-// CHECK-LABEL: sil private [noinline] [ossa] @$s20$testdfs2innercommonTf0ss_n : $@convention(thin) (@inout_aliasable Int, @inout_aliasable Int) -> Int {
 sil private [noinline] [ossa] @$testdfs2innercommon : $@convention(thin) (@guaranteed { var Int }, @guaranteed { var Int }) -> Int {
 bb0(%0 : @guaranteed ${ var Int }, %1 : @guaranteed ${ var Int }):
   %2 = project_box %0 : ${ var Int }, 0
@@ -469,7 +471,6 @@ bb0(%0 : @guaranteed ${ var Int }, %1 : @guaranteed ${ var Int }):
   return %12 : $Int
 }
 
-// CHECK-LABEL: sil private [noinline] [ossa] @$s15$testdfs2local1Tf0ss_n : $@convention(thin) (@inout_aliasable Int, @inout_aliasable Int) -> Int {
 sil private [noinline] [ossa] @$testdfs2local1 : $@convention(thin) (@guaranteed { var Int }, @guaranteed { var Int }) -> Int {
 bb0(%0 : @guaranteed ${ var Int }, %1 : @guaranteed ${ var Int }):
   %2 = project_box %0 : ${ var Int }, 0
@@ -479,7 +480,6 @@ bb0(%0 : @guaranteed ${ var Int }, %1 : @guaranteed ${ var Int }):
   return %8 : $Int
 }
 
-// CHECK-LABEL: sil private [noinline] [ossa] @$s15$testdfs2local2Tf0ss_n : $@convention(thin) (@inout_aliasable Int, @inout_aliasable Int) -> Int {
 sil private [noinline] [ossa] @$testdfs2local2 : $@convention(thin) (@guaranteed { var Int }, @guaranteed { var Int }) -> Int {
 bb0(%0 : @guaranteed ${ var Int }, %1 : @guaranteed ${ var Int }):
   %2 = project_box %0 : ${ var Int }, 0

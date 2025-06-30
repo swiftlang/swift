@@ -439,7 +439,20 @@ private extension Value {
   }
 }
 
-extension FunctionWorklist {
+fileprivate struct FunctionWorklist {
+  private(set) var functions = Array<Function>()
+  private var pushedFunctions = Set<Function>()
+  private var currentIndex = 0
+
+  mutating func pop() -> Function? {
+    if currentIndex < functions.count {
+      let f = functions[currentIndex]
+      currentIndex += 1
+      return f
+    }
+    return nil
+  }
+  
   mutating func addAllMandatoryRequiredFunctions(of moduleContext: ModulePassContext) {
     for f in moduleContext.functions {
       // Performance annotated functions
@@ -524,6 +537,12 @@ extension FunctionWorklist {
       {
         pushIfNotVisited(method)
       }
+    }
+  }
+
+  mutating func pushIfNotVisited(_ element: Function) {
+    if pushedFunctions.insert(element).inserted {
+      functions.append(element)
     }
   }
 }

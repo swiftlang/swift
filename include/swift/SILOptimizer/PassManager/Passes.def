@@ -59,8 +59,6 @@
 #endif
 
 
-PASS(AllocBoxToStack, "allocbox-to-stack",
-     "stack promotion of box objects")
 PASS(CopyToBorrowOptimization, "copy-to-borrow-optimization",
      "Convert load [copy] instructions to load_borrow and remove copies of borrowed values")
 PASS(AliasInfoDumper, "dump-alias-info",
@@ -155,8 +153,6 @@ PASS(ExperimentalSwiftBasedClosureSpecialization, "experimental-swift-based-clos
 PASS(AutodiffClosureSpecialization, "autodiff-closure-specialization",
      "Autodiff specific closure-specialization pass")
 
-MODULE_PASS(MandatoryAllocBoxToStack, "mandatory-allocbox-to-stack",
-     "Mandatory stack promotion of box objects")
 MODULE_PASS(AsyncDemotion, "async-demotion",
      "Convert async functions to be synchronous")
 MODULE_PASS(RunUnitTests, "run-unit-tests",
@@ -218,7 +214,7 @@ LEGACY_PASS(AccessMarkerElimination, "access-marker-elim",
      "Access Marker Elimination.")
 LEGACY_PASS(AddressLowering, "address-lowering",
      "SIL Address Lowering")
-LEGACY_PASS(LegacyAllocBoxToStack, "legacy-allocbox-to-stack",
+LEGACY_PASS(AllocBoxToStack, "allocbox-to-stack",
      "Stack Promotion of Box Objects")
 LEGACY_PASS(ArrayCountPropagation, "array-count-propagation",
      "Array Count Propagation")

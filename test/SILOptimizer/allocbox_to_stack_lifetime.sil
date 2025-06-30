@@ -54,7 +54,6 @@ bb0(%0 : $Int):
 // CHECK:         [[STACK:%[^,]+]] = alloc_stack
 // CHECK:         cond_br undef, [[DIE:bb[0-9]+]]
 // CHECK:       [[DIE]]:
-// CHECK-NEXT:    dealloc_stack [[STACK]]
 // CHECK-NEXT:    unreachable
 // CHECK-LABEL: } // end sil function 'keep_dead_end'
 sil [ossa] @keep_dead_end : $@convention(thin) () -> () {

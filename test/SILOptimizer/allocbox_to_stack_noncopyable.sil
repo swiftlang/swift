@@ -28,7 +28,8 @@ bb0(%0 : @closureCapture @guaranteed ${ var NonTrivialStruct }):
 // CHECK-NEXT:   [[STACK2:%.*]] = alloc_stack $NonTrivialStruct
 // CHECK-NEXT:   [[MARKED2:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[STACK2]]
 // CHECK-NEXT:   store [[LOADED_VALUE]] to [init] [[MARKED2]]
-// CHECK:        [[FUNC:%.*]] = function_ref @$s26host_markmustcheck_closureTf0s_n : $@convention(thin) (@inout_aliasable NonTrivialStruct) -> ()
+// CHECK-NEXT:   // function_ref
+// CHECK-NEXT:   [[FUNC:%.*]] = function_ref @$s26host_markmustcheck_closureTf0s_n : $@convention(thin) (@inout_aliasable NonTrivialStruct) -> ()
 // CHECK-NEXT:   [[PA:%.*]] = partial_apply [callee_guaranteed] [[FUNC]]([[MARKED2]]) : $@convention(thin) (@inout_aliasable NonTrivialStruct) -> ()
 // CHECK-NEXT:   apply [[PA]]()
 // CHECK-NEXT:   destroy_value [[PA]]

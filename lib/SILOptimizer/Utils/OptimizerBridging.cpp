@@ -156,11 +156,6 @@ void BridgedPassContext::inlineFunction(BridgedInstruction apply, bool mandatory
                               funcBuilder, deleter);
 }
 
-void BridgedPassContext::eraseFunction(BridgedFunction function) const {
-  invocation->getPassManager()->notifyWillDeleteFunction(function.getFunction());
-  invocation->getPassManager()->getModule()->eraseFunction(function.getFunction());
-}
-
 static const irgen::TypeInfo &getTypeInfoOfBuiltin(swift::SILType type, irgen::IRGenModule &IGM) {
   SILType lowered = IGM.getLoweredType(swift::Lowering::AbstractionPattern::getOpaque(), type.getASTType());
   return IGM.getTypeInfo(lowered);
@@ -295,13 +290,14 @@ BridgedOwnedString BridgedPassContext::mangleAsyncRemoved(BridgedFunction functi
   return BridgedOwnedString(Mangler.mangle());
 }
 
-BridgedOwnedString BridgedPassContext::mangleWithDeadArgs(BridgedArrayRef bridgedDeadArgIndices,
+BridgedOwnedString BridgedPassContext::mangleWithDeadArgs(const SwiftInt * _Nullable deadArgs,
+                                                          SwiftInt numDeadArgs,
                                                           BridgedFunction function) const {
   SILFunction *f = function.getFunction();
   Mangle::FunctionSignatureSpecializationMangler Mangler(f->getASTContext(),
       Demangle::SpecializationPass::FunctionSignatureOpts,
       f->getSerializedKind(), f);
-  for (SwiftInt idx : bridgedDeadArgIndices.unbridged<SwiftInt>()) {
+  for (SwiftInt idx = 0; idx < numDeadArgs; idx++) {
     Mangler.setArgumentDead((unsigned)idx);
   }
   return BridgedOwnedString(Mangler.mangle());
@@ -338,20 +334,6 @@ BridgedOwnedString BridgedPassContext::mangleWithClosureArgs(
     }
   }
 
-  return BridgedOwnedString(mangler.mangle());
-}
-
-BridgedOwnedString BridgedPassContext::mangleWithBoxToStackPromotedArgs(
-  BridgedArrayRef bridgedPromotedArgIndices,
-  BridgedFunction bridgedOriginalFunction
-) const {
-  auto *original = bridgedOriginalFunction.getFunction();
-  Mangle::FunctionSignatureSpecializationMangler mangler(original->getASTContext(),
-                                                         Demangle::SpecializationPass::AllocBoxToStack,
-                                                         original->getSerializedKind(), original);
-  for (SwiftInt i : bridgedPromotedArgIndices.unbridged<SwiftInt>()) {
-    mangler.setArgumentBoxToStack((unsigned)i);
-  }
   return BridgedOwnedString(mangler.mangle());
 }
 
@@ -470,14 +452,13 @@ void BridgedPassContext::moveFunctionBody(BridgedFunction sourceFunc, BridgedFun
 }
 
 BridgedFunction BridgedPassContext::
-createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
-                                     const BridgedParameterInfo * _Nullable specializedBridgedParams,
-                                     SwiftInt paramCount,
-                                     BridgedFunction bridgedOriginal,
-                                     bool makeThin,
-                                     bool makeBare)  const {
-  auto *original = bridgedOriginal.getFunction();
-  auto originalType = original->getLoweredFunctionType();
+ClosureSpecializer_createEmptyFunctionWithSpecializedSignature(BridgedStringRef specializedName,
+                                            const BridgedParameterInfo * _Nullable specializedBridgedParams,
+                                            SwiftInt paramCount,
+                                            BridgedFunction bridgedApplySiteCallee,
+                                            bool isSerialized)  const {
+  auto *applySiteCallee = bridgedApplySiteCallee.getFunction();
+  auto applySiteCalleeType = applySiteCallee->getLoweredFunctionType();
 
   llvm::SmallVector<SILParameterInfo> specializedParams;
   for (unsigned idx = 0; idx < paramCount; ++idx) {
@@ -487,19 +468,18 @@ createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
   // The specialized function is always a thin function. This is important
   // because we may add additional parameters after the Self parameter of
   // witness methods. In this case the new function is not a method anymore.
-  auto extInfo = originalType->getExtInfo();
-  if (makeThin)
-    extInfo = extInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
+  auto extInfo = applySiteCalleeType->getExtInfo();
+  extInfo = extInfo.withRepresentation(SILFunctionTypeRepresentation::Thin);
 
   auto ClonedTy = SILFunctionType::get(
-      originalType->getInvocationGenericSignature(), extInfo,
-      originalType->getCoroutineKind(),
-      originalType->getCalleeConvention(), specializedParams,
-      originalType->getYields(), originalType->getResults(),
-      originalType->getOptionalErrorResult(),
-      originalType->getPatternSubstitutions(),
-      originalType->getInvocationSubstitutions(),
-      original->getModule().getASTContext());
+      applySiteCalleeType->getInvocationGenericSignature(), extInfo,
+      applySiteCalleeType->getCoroutineKind(),
+      applySiteCalleeType->getCalleeConvention(), specializedParams,
+      applySiteCalleeType->getYields(), applySiteCalleeType->getResults(),
+      applySiteCalleeType->getOptionalErrorResult(),
+      applySiteCalleeType->getPatternSubstitutions(),
+      applySiteCalleeType->getInvocationSubstitutions(),
+      applySiteCallee->getModule().getASTContext());
 
   SILOptFunctionBuilder functionBuilder(*invocation->getTransform());
 
@@ -513,23 +493,23 @@ createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
       // It's also important to disconnect this specialized function from any
       // classes (the classSubclassScope), because that may incorrectly
       // influence the linkage.
-      getSpecializedLinkage(original, original->getLinkage()), specializedName.unbridged(),
-      ClonedTy, original->getGenericEnvironment(),
-      original->getLocation(), makeBare ? IsBare : original->isBare(), original->isTransparent(),
-      original->getSerializedKind(), IsNotDynamic, IsNotDistributed,
-      IsNotRuntimeAccessible, original->getEntryCount(),
-      original->isThunk(),
+      getSpecializedLinkage(applySiteCallee, applySiteCallee->getLinkage()), specializedName.unbridged(),
+      ClonedTy, applySiteCallee->getGenericEnvironment(),
+      applySiteCallee->getLocation(), IsBare, applySiteCallee->isTransparent(),
+      isSerialized ? IsSerialized : IsNotSerialized, IsNotDynamic, IsNotDistributed,
+      IsNotRuntimeAccessible, applySiteCallee->getEntryCount(),
+      applySiteCallee->isThunk(),
       /*classSubclassScope=*/SubclassScope::NotApplicable,
-      original->getInlineStrategy(), original->getEffectsKind(),
-      original, original->getDebugScope());
+      applySiteCallee->getInlineStrategy(), applySiteCallee->getEffectsKind(),
+      applySiteCallee, applySiteCallee->getDebugScope());
   
-  if (!original->hasOwnership()) {
+  if (!applySiteCallee->hasOwnership()) {
     specializedApplySiteCallee->setOwnershipEliminated();
   }
   
-  for (auto &Attr : original->getSemanticsAttrs())
+  for (auto &Attr : applySiteCallee->getSemanticsAttrs())
     specializedApplySiteCallee->addSemanticsAttr(Attr);
-
+  
   return {specializedApplySiteCallee};
 }
 
@@ -649,34 +629,30 @@ void BridgedCloner::recordFoldedValue(BridgedValue origValue, BridgedValue mappe
 }
 
 namespace swift {
-  class SpecializationCloner: public SILClonerWithScopes<SpecializationCloner> {
-    friend class SILInstructionVisitor<SpecializationCloner>;
-    friend class SILCloner<SpecializationCloner>;
-  public:
-    using SuperTy = SILClonerWithScopes<SpecializationCloner>;
-    SpecializationCloner(SILFunction &emptySpecializedFunction): SuperTy(emptySpecializedFunction) {}
+  class ClosureSpecializationCloner: public SILClonerWithScopes<ClosureSpecializationCloner> {
+    friend class SILInstructionVisitor<ClosureSpecializationCloner>;
+    friend class SILCloner<ClosureSpecializationCloner>;
+  public: 
+    using SuperTy = SILClonerWithScopes<ClosureSpecializationCloner>;
+    ClosureSpecializationCloner(SILFunction &emptySpecializedFunction): SuperTy(emptySpecializedFunction) {}
   };
 } // namespace swift
 
 BridgedSpecializationCloner::BridgedSpecializationCloner(BridgedFunction emptySpecializedFunction): 
-  cloner(new SpecializationCloner(*emptySpecializedFunction.getFunction())) {}
+  closureSpecCloner(new ClosureSpecializationCloner(*emptySpecializedFunction.getFunction())) {}
 
 BridgedFunction BridgedSpecializationCloner::getCloned() const {
-  return { &cloner->getBuilder().getFunction() };
+  return { &closureSpecCloner->getBuilder().getFunction() };
 }
 
 BridgedBasicBlock BridgedSpecializationCloner::getClonedBasicBlock(BridgedBasicBlock originalBasicBlock) const {
-  return { cloner->getOpBasicBlock(originalBasicBlock.unbridged()) };
+  return { closureSpecCloner->getOpBasicBlock(originalBasicBlock.unbridged()) };
 }
 
 void BridgedSpecializationCloner::cloneFunctionBody(BridgedFunction originalFunction, BridgedBasicBlock clonedEntryBlock, BridgedValueArray clonedEntryBlockArgs) const {
   llvm::SmallVector<swift::SILValue, 16> clonedEntryBlockArgsStorage;
   auto clonedEntryBlockArgsArrayRef = clonedEntryBlockArgs.getValues(clonedEntryBlockArgsStorage);
-  cloner->cloneFunctionBody(originalFunction.getFunction(), clonedEntryBlock.unbridged(), clonedEntryBlockArgsArrayRef);
-}
-
-void BridgedSpecializationCloner::cloneFunctionBody(BridgedFunction originalFunction) const {
-  cloner->cloneFunction(originalFunction.getFunction());
+  closureSpecCloner->cloneFunctionBody(originalFunction.getFunction(), clonedEntryBlock.unbridged(), clonedEntryBlockArgsArrayRef);
 }
 
 void BridgedBuilder::destroyCapturedArgs(BridgedInstruction partialApply) const {

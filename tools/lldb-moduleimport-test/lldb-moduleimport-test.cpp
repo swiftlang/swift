@@ -21,7 +21,6 @@
 #include "swift/AST/PrintOptions.h"
 #include "swift/ASTSectionImporter/ASTSectionImporter.h"
 #include "swift/Basic/LLVMInitialize.h"
-#include "swift/Basic/InitializeSwiftModules.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Serialization/Validation.h"
@@ -240,7 +239,6 @@ collectASTModules(llvm::cl::list<std::string> &InputNames,
 int main(int argc, char **argv) {
   PROGRAM_START(argc, argv);
   INITIALIZE_LLVM();
-  initializeSwiftModules();
 
   // Command line handling.
   using namespace llvm::cl;

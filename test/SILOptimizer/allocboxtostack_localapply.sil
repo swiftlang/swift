@@ -257,7 +257,7 @@ bb0(%0 : ${ var Int64 }):
 }
 
 // CHECK-LABEL: sil [noinline] @$testrecur :
-// CHECK:         alloc_stack $Int64, var, name "x"
+// CHECK: alloc_box ${ var Int64 }, var, name "x"
 // CHECK-LABEL: } // end sil function '$testrecur'
 sil [noinline] @$testrecur : $@convention(thin) () -> () {
 bb0:
@@ -275,7 +275,6 @@ bb0:
   return %10 : $()
 }
 
-// CHECK-LABEL: sil private [noinline] @$s13$testrecurbarTf0s_n : $@convention(thin) (@inout_aliasable Int64) -> () {
 sil private [noinline] @$testrecurbar : $@convention(thin) (@guaranteed { var Int64 }) -> () {
 bb0(%0 : ${ var Int64 }):
   %1 = project_box %0 : ${ var Int64 }, 0
@@ -293,7 +292,6 @@ bb0(%0 : ${ var Int64 }):
   return %13 : $()
 }
 
-// CHECK-LABEL: sil private [noinline] @$s13$testrecurbasTf0s_n : $@convention(thin) (@inout_aliasable Int64) -> () {
 sil private [noinline] @$testrecurbas : $@convention(thin) (@guaranteed { var Int64 }) -> () {
 bb0(%0 : ${ var Int64 }):
   %1 = project_box %0 : ${ var Int64 }, 0

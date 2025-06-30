@@ -36,14 +36,6 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     hasher.combine(ObjectIdentifier(self))
   }
 
-  /// True if this function is referenced from anywhere within the module,
-  /// e.g. from a `function_ref` instruction.
-  public var isReferencedInModule: Bool { bridged.isReferencedInModule() }
-
-  /// True if this function should be optimized, i.e. the module is compiled with optimizations
-  /// and the function has no `@_optimize(none)` attribute.
-  public var shouldOptimize: Bool { bridged.shouldOptimize() }
-
   public var wasDeserializedCanonical: Bool { bridged.wasDeserializedCanonical() }
 
   public var isTrapNoReturn: Bool { bridged.isTrapNoReturn() }
@@ -87,7 +79,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   /// Returns true if the function is a definition and not only an external declaration.
   ///
-  /// This is the case if the function contains a body, i.e. some basic blocks.
+  /// This is the case if the functioun contains a body, i.e. some basic blocks.
   public var isDefinition: Bool { blocks.first != nil }
 
   public var blocks : BasicBlockList { BasicBlockList(first: bridged.getFirstBlock().block) }
@@ -163,23 +155,9 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
       bridged.hasSemanticsAttr(BridgedStringRef(data: buffer.baseAddress!, count: buffer.count))
     }
   }
-  public var isSerialized: Bool {
-    switch serializedKind {
-    case .notSerialized, .serializedForPackage:
-      return false
-    case .serialized:
-      return true
-    }
-  }
+  public var isSerialized: Bool { bridged.isSerialized() }
 
-  public var isAnySerialized: Bool {
-    switch serializedKind {
-    case .notSerialized:
-      return false
-    case .serialized, .serializedForPackage:
-      return true
-    }
-  }
+  public var isAnySerialized: Bool { bridged.isAnySerialized() }
 
   public enum SerializedKind {
     case notSerialized, serialized, serializedForPackage

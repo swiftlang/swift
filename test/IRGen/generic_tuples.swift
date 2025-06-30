@@ -3,7 +3,7 @@
 // Make sure that optimization passes don't choke on storage types for generic tuples
 // RUN: %target-swift-frontend -module-name generic_tuples -emit-ir -O %s
 
-// REQUIRES: PTRSIZE=64
+// REQUIRES: CPU=x86_64
 // UNSUPPORTED: CPU=arm64e
 
 // CHECK-DAG: [[OPAQUE:%swift.opaque]] = type opaque
@@ -27,10 +27,9 @@ func dup<T>(_ x: T) -> (T, T) { var x = x; return (x,x) }
 //   Copy 'x' into the first result.
 // CHECK-NEXT: call ptr [[WITNESS]](ptr noalias %0, ptr noalias [[X_ALLOCA]], ptr %T)
 //   Copy 'x' into the second element.
+// CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds ptr, ptr [[VWT]], i32 4
+// CHECK-NEXT: [[WITNESS:%.*]] = load ptr, ptr [[WITNESS_ADDR]], align 8
 // CHECK-NEXT: call ptr [[WITNESS]](ptr noalias %1, ptr noalias [[X_ALLOCA]], ptr %T)
-// CHECK-NEXT: [[WITNESS_ADDR:%.*]] = getelementptr inbounds ptr, ptr [[VWT]], i32 1
-// CHECK-NEXT: [[DESTROYWITNESS:%.*]] = load ptr, ptr [[WITNESS_ADDR]], align 8
-// CHECK-NEXT: call void [[DESTROYWITNESS]](ptr noalias [[X_ALLOCA]],
 
 struct S {}
 

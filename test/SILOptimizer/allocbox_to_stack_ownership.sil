@@ -1,5 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types %s -allocbox-to-stack | %FileCheck %s --check-prefix=CHECK --check-prefix=OPT
-// RUN: %target-sil-opt -sil-print-types %s -mandatory-allocbox-to-stack | %FileCheck %s --check-prefix=CHECK --check-prefix=MANDATORY
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -allocbox-to-stack -enable-copy-propagation=requested-passes-only | %FileCheck %s
 
 sil_stage raw
 
@@ -124,9 +123,10 @@ bb1(%0 : $Int):
 
 sil [ossa] @callee : $@convention(thin) (@inout Int) -> ()
 
-// CHECK-LABEL: sil [ossa] @escaping_pointer
-sil [ossa] @escaping_pointer : $@convention(thin) () -> Int {
+// CHECK-LABEL: sil [ossa] @inout_nocapture
+sil [ossa] @inout_nocapture : $@convention(thin) () -> Int {
 bb0:
+  // CHECK: alloc_stack
   %1 = alloc_box ${ var Int }
   %1a = project_box %1 : ${ var Int }, 0
   %6 = function_ref @callee : $@convention(thin) (@inout Int) -> ()
@@ -394,8 +394,8 @@ bb0(%0 : $Int):
 }
 
 // CHECK-LABEL: sil private [transparent] [ossa] @$s6struct8useStack1tySi_tFSiycfU_Tf0s_n
-// OPT-LABEL: sil private [transparent] [ossa] @$s6struct8useStack1tySi_tFSiycfU_ :
-// MANDATORY-NOT: sil private [transparent] [ossa] @$s6struct8useStack1tySi_tFSiycfU_ :
+// CHECK-LABEL: sil private [transparent] [_semantics "sil.optimizer.delete_if_unused"] [ossa] @$s6struct8useStack1tySi_tFSiycfU_
+// struct.(useStack (t : Swift.Int) -> ()).(closure #1)
 sil private [transparent] [ossa] @$s6struct8useStack1tySi_tFSiycfU_ : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int {
 bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Int>):
   %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Int>, 0
@@ -751,8 +751,7 @@ bb0(%0 : $Int, %1 : $*S<T>):
   return %9 : $Bool
 }
 
-// OPT-LABEL:     sil shared [ossa] @closure1 :
-// MANDATORY-NOT: sil shared [ossa] @closure1 :
+// CHECK-LABEL: sil shared [_semantics "sil.optimizer.delete_if_unused"] [ossa] @closure1
 sil shared [ossa] @closure1 : $@convention(thin) <T where T : Count> (Int, @owned <τ_0_0 : Count> { var S<τ_0_0> } <T>) -> Bool {
 // CHECK: bb0
 bb0(%0 : $Int, %1 : @owned $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>):
@@ -774,9 +773,9 @@ bb0(%0 : $Int, %1 : @owned $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>)
 // CHECK: return
 // CHECK-NOT: bb1
 
-// OPT-LABEL: sil shared [ossa] @closure2 :
-// MANDATORY-NOT: sil shared [ossa] @closure2 :
+// CHECK-LABEL: sil shared [_semantics "sil.optimizer.delete_if_unused"] [ossa] @closure2
 sil shared [ossa] @closure2 : $@convention(thin) <T where T : Count> (Int, @owned <τ_0_0 : Count> { var S<τ_0_0> } <T>) -> Bool {
+// CHECK: bb0
 bb0(%0 : $Int, %1 : @owned $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>):
   %2 = project_box %1 : $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>, 0
   %3 = function_ref @binary : $@convention(thin) (Int, Int) -> Bool
@@ -792,6 +791,7 @@ bb0(%0 : $Int, %1 : @owned $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>)
   destroy_addr %4 : $*S<T>
   dealloc_stack %4 : $*S<T>
   destroy_value %1 : $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>
+// CHECK: return
   return %8 : $Bool
 }
 
@@ -1126,6 +1126,11 @@ bb2:
   return %r : $()
 }
 
+// Test that
+//  begin_access [read], copy_addr, end_access, destroy_addr
+// is folded into
+//  begin_access [deinit], copy_addr [take], end_access
+//
 // CHECK-LABEL: sil [ossa] @deinit_access : $@convention(thin) <T> (@in T) -> (@out T, @out T) {
 // CHECK: bb0(%0 : $*T, %1 : $*T, %2 : $*T):
 // CHECK: [[STK:%.*]] = alloc_stack $T, var, name "x"
@@ -1133,10 +1138,10 @@ bb2:
 // CHECK: [[READ:%.*]] = begin_access [read] [static] [[STK]] : $*T
 // CHECK: copy_addr [[READ]] to [init] %0 : $*T
 // CHECK: end_access [[READ]] : $*T
-// CHECK: [[READ:%.*]] = begin_access [read] [static] [[STK]] : $*T
-// CHECK: copy_addr [[READ]] to [init] %1 : $*T
+// CHECK: [[READ:%.*]] = begin_access [deinit] [static] [[STK]] : $*T
+// CHECK: copy_addr [take] [[READ]] to [init] %1 : $*T
 // CHECK: end_access [[READ]] : $*T
-// CHECK: destroy_addr [[STK]]
+// CHECK-NOT: destroy_addr
 // CHECK: dealloc_stack [[STK]] : $*T
 // CHECK: destroy_addr %2 : $*T
 // CHECK: return %{{.*}} : $()

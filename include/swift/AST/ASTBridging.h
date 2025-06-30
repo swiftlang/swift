@@ -376,16 +376,6 @@ void registerBridgedDecl(BridgedStringRef bridgedClassName, SwiftMetatype metaty
 
 struct OptionalBridgedDeclObj {
   OptionalSwiftObject obj;
-
-  OptionalBridgedDeclObj(OptionalSwiftObject obj) : obj(obj) {}
-
-#ifdef USED_IN_CPP_SOURCE
-  template <class D> D *_Nullable getAs() const {
-    if (obj)
-      return llvm::cast<D>(static_cast<swift::Decl *>(obj));
-    return nullptr;
-  }
-#endif
 };
 
 struct BridgedDeclObj {
@@ -3047,7 +3037,6 @@ struct BridgedASTType {
   BRIDGED_INLINE bool isBuiltinFloat() const;
   BRIDGED_INLINE bool isBuiltinVector() const;
   BRIDGED_INLINE bool isBuiltinFixedArray() const;
-  BRIDGED_INLINE bool isBox() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getBuiltinVectorElementType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getBuiltinFixedArrayElementType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getBuiltinFixedArraySizeType() const;
