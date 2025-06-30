@@ -443,8 +443,6 @@ class LLVM(cmake_product.CMakeProduct):
                                                 'clang-tidy-confusable-chars-gen')
             llvm_cmake_options.define('CLANG_TIDY_CONFUSABLE_CHARS_GEN',
                                       confusable_chars_gen)
-            pseudo_gen = os.path.join(host_build_dir, 'bin', 'clang-pseudo-gen')
-            llvm_cmake_options.define('CLANG_PSEUDO_GEN', pseudo_gen)
             llvm = os.path.join(host_build_dir, 'llvm')
             llvm_cmake_options.define('LLVM_NATIVE_BUILD', llvm)
 
