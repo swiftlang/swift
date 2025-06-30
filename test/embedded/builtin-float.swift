@@ -4,6 +4,7 @@
 
 // RUN: %target-swift-frontend -target armv7em-none-none-eabi -emit-ir %t/Main.swift -enable-experimental-feature Embedded -module-cache-path %t/ModuleCache -Xcc -I%t/include
 
+// UNSUPPORTED: OS=wasi
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 // REQUIRES: CODEGENERATOR=ARM

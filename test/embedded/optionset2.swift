@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -target armv7-apple-none-macho -emit-ir %s -enable-experimental-feature Embedded | %FileCheck %s
 // RUN: %target-swift-frontend -target arm64-apple-none-macho -emit-ir %s -enable-experimental-feature Embedded | %FileCheck %s
 
+// UNSUPPORTED: OS=wasi
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
 // REQUIRES: CODEGENERATOR=ARM
@@ -31,4 +32,4 @@ struct ShippingOptions: MyOptionSet {
 var s = ShippingOptions(rawValue: 42)
 print(s.isEmpty)
 
-// CHECK: define {{.*}}i32 @main(i32 %0, ptr %1)
+// CHECK: define {{.*}}i32 @{{_*}}main{{.*}}(i32 %0, ptr %1)

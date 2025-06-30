@@ -1,7 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -parse-as-library -enable-experimental-feature Embedded -enable-builtin-module -c -o %t/main.o
-// RUN: %target-clang %t/main.o -o %t/a.out -dead_strip
-// RUN: %target-run %t/a.out | %FileCheck %s
+// RUN: %target-run-simple-swift(-parse-as-library -enable-experimental-feature Embedded -wmo -enable-builtin-module) | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
@@ -41,7 +39,7 @@ func exerciseArrayValueWitnesses<T>(_ value: T) {
 
   (buf + 0).initialize(to: value)
   (buf + 1).initialize(to: value)
-  
+
   Builtin.copyArray(T.self, (buf + 2)._rawValue, buf._rawValue, 2._builtinWordValue)
   Builtin.takeArrayBackToFront(T.self, (buf + 1)._rawValue, buf._rawValue, 4._builtinWordValue)
   Builtin.takeArrayFrontToBack(T.self, buf._rawValue, (buf + 1)._rawValue, 4._builtinWordValue)
