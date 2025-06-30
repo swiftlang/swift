@@ -173,6 +173,8 @@ config.freestanding_sdk_name = "@SWIFT_SDK_FREESTANDING_LIB_SUBDIR@"
 if '@SWIFT_BUILD_SWIFT_SYNTAX@' == 'TRUE':
   config.available_features.add('swift_swift_parser')
 
+config.swift_sdks = "@SWIFT_SDKS@".split(";")
+
 # Let the main config do the real work.
 if config.test_exec_root is None:
     config.test_exec_root = os.path.dirname(lit.util.abs_path_preserve_drive(__file__))

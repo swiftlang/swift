@@ -137,6 +137,8 @@ config.swift_stdlib_enable_objc_interop = "@SWIFT_STDLIB_ENABLE_OBJC_INTEROP@" =
 # Configured in DarwinSDKs.cmake
 config.freestanding_sdk_name = "@SWIFT_SDK_FREESTANDING_LIB_SUBDIR@"
 
+config.swift_sdks = "@SWIFT_SDKS@".split(";")
+
 # Let the main config do the real work.
 config.test_exec_root = os.path.dirname(os.path.realpath(__file__))
 lit_config.load_config(config, os.path.join(config.test_exec_root, "lit.swift-features.cfg"))
