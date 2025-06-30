@@ -52,9 +52,7 @@ extension String {
       offset += copied
     }
     _internalInvariant(offset == buffer.count)
-    self = repeatedValueGuts.isASCII ?
-      String._uncheckedFromASCII(UnsafeBufferPointer(buffer)) :
-      String._uncheckedFromUTF8(UnsafeBufferPointer(buffer), isASCII: false)
+    String._uncheckedFromUTF8(UnsafeBufferPointer(buffer), isASCII: repeatedValueGuts.isASCII)
   }
 
   /// A Boolean value indicating whether a string has no characters.
