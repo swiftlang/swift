@@ -120,11 +120,11 @@ struct Validator {
 	    // Second iteration should throw
 	    do {
 	      _ = try await iterator.next()
-	      Issue.record("Expected error to be thrown")
+	      expectUnreachable()
 	    } catch TestError.simulatedError {
 	      // Expected error
 	    } catch {
-	      Issue.record("Unexpected error type: \(error)")
+	      expectUnreachable()
 	    }
 	    
 	    // Sequence should be terminated after error
