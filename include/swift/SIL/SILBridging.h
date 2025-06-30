@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -13,13 +13,10 @@
 #ifndef SWIFT_SIL_SILBRIDGING_H
 #define SWIFT_SIL_SILBRIDGING_H
 
-// Do not add other C++/llvm/swift header files here!
-// Function implementations should be placed into SILBridgingImpl.h or SILBridging.cpp and
-// required header files should be added there.
-//
-// Pure bridging mode does not permit including any C++/llvm/swift headers.
-// See also the comments for `BRIDGING_MODE` in the top-level CMakeLists.txt file.
-//
+/// `SILBridging.h` is imported into Swift. Be *very* careful with what you
+/// include here and keep these includes minimal!
+///
+/// See include guidelines and caveats in `BasicBridging.h`.
 #include "swift/AST/ASTBridging.h"
 
 #ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
