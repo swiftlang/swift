@@ -4,7 +4,6 @@
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_stdlib_no_asserts
-// REQUIRES: OS=macosx
 // REQUIRES: swift_feature_Embedded
 
 enum MyEnum: String {
