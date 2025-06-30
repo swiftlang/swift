@@ -7382,10 +7382,7 @@ public:
 
   /// Get the name of the generic type parameter.
   Identifier getName() const;
-
-  /// Get the canonical <tau>_n_n name;
-  Identifier getCanonicalName() const;
-
+  
   /// The depth of this generic type parameter, i.e., the number of outer
   /// levels of generic parameter lists that enclose this type parameter.
   ///
