@@ -640,3 +640,7 @@ SWIFT_REQUEST(TypeChecker, SemanticAvailabilitySpecRequest,
 SWIFT_REQUEST(TypeChecker, DefaultIsolationInSourceFileRequest,
               std::optional<DefaultIsolation>(const SourceFile *),
               Cached, NoLocationInfo)
+
+SWIFT_REQUEST(TypeChecker, ModuleHasTypeCheckerPerformanceHacksEnabledRequest,
+              bool(const ModuleDecl *),
+              Cached, NoLocationInfo)
