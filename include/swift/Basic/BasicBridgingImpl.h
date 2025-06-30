@@ -39,17 +39,6 @@ llvm::StringRef BridgedStringRef::unbridged() const {
 llvm::StringRef BridgedOwnedString::unbridgedRef() const { return llvm::StringRef(Data, Length); }
 
 //===----------------------------------------------------------------------===//
-// MARK: BridgedSourceRange
-//===----------------------------------------------------------------------===//
-
-BridgedSourceRange::BridgedSourceRange(swift::SourceRange range)
-    : Start(range.Start), End(range.End) {}
-
-swift::SourceRange BridgedSourceRange::unbridged() const {
-  return swift::SourceRange(Start, End);
-}
-
-//===----------------------------------------------------------------------===//
 // MARK: BridgedCharSourceRange
 //===----------------------------------------------------------------------===//
 

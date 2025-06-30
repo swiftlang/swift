@@ -312,9 +312,9 @@ extension ASTGenVisitor {
 
   }
   
-  func generateAttrParensRange(attribute node: AttributeSyntax) -> BridgedSourceRange {
+  func generateAttrParensRange(attribute node: AttributeSyntax) -> SourceRange {
     guard let lParen = node.leftParen else {
-      return BridgedSourceRange()
+      return .init()
     }
     return self.generateSourceRange(start: lParen, end: node.lastToken(viewMode: .sourceAccurate)!)
   }

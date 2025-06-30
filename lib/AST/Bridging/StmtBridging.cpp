@@ -225,10 +225,10 @@ BridgedIfStmt_createParsed(BridgedASTContext cContext,
 }
 
 BridgedPoundAssertStmt BridgedPoundAssertStmt_createParsed(
-    BridgedASTContext cContext, BridgedSourceRange cRange,
-    BridgedExpr cConditionExpr, BridgedStringRef cMessage) {
-  return new (cContext.unbridged()) PoundAssertStmt(
-      cRange.unbridged(), cConditionExpr.unbridged(), cMessage.unbridged());
+    BridgedASTContext cContext, SourceRange range, BridgedExpr cConditionExpr,
+    BridgedStringRef cMessage) {
+  return new (cContext.unbridged())
+      PoundAssertStmt(range, cConditionExpr.unbridged(), cMessage.unbridged());
 }
 
 BridgedRepeatWhileStmt

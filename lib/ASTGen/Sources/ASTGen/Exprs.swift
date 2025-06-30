@@ -317,7 +317,7 @@ extension ASTGenVisitor {
 
   struct GeneratedClosureSignature {
     var attributes: BridgedDeclAttributes = BridgedDeclAttributes()
-    var bracketRange: BridgedSourceRange = BridgedSourceRange(start: nil, end: nil)
+    var bracketRange: SourceRange = .init()
     var captureList: BridgedArrayRef = BridgedArrayRef()
     var capturedSelfDecl: BridgedVarDecl? = nil
     var params: BridgedParameterList? = nil
@@ -686,7 +686,7 @@ extension ASTGenVisitor {
       if prop.declName.baseName.presence == .missing {
         return BridgedErrorExpr.create(
           self.ctx,
-          loc: BridgedSourceRange(start: dotLoc, end: dotLoc)
+          loc: .init(start: dotLoc)
         ).asExpr
       } else if prop.declName.baseName.keywordKind == .`self` {
         // TODO: Diagnose if there's arguments
@@ -955,7 +955,7 @@ extension ASTGenVisitor {
     let loc = self.generateSourceLoc(node.previousToken(viewMode: .sourceAccurate))
     return BridgedErrorExpr.create(
       self.ctx,
-      loc: BridgedSourceRange(start: loc, end: loc)
+      loc: .init(start: loc)
     ).asExpr
   }
 

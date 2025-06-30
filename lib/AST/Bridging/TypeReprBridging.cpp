@@ -85,16 +85,16 @@ BridgedDictionaryTypeRepr BridgedDictionaryTypeRepr_createParsed(
 }
 
 BridgedErrorTypeRepr BridgedErrorTypeRepr_create(BridgedASTContext cContext,
-                                                 BridgedSourceRange cRange) {
-  return ErrorTypeRepr::create(cContext.unbridged(), cRange.unbridged());
+                                                 SourceRange range) {
+  return ErrorTypeRepr::create(cContext.unbridged(), range);
 }
 
 BridgedInlineArrayTypeRepr BridgedInlineArrayTypeRepr_createParsed(
     BridgedASTContext cContext, BridgedTypeRepr cCountType,
-    BridgedTypeRepr cElementType, BridgedSourceRange cBracketsRange) {
-  return InlineArrayTypeRepr::create(
-      cContext.unbridged(), cCountType.unbridged(), cElementType.unbridged(),
-      cBracketsRange.unbridged());
+    BridgedTypeRepr cElementType, SourceRange bracketsRange) {
+  return InlineArrayTypeRepr::create(cContext.unbridged(),
+                                     cCountType.unbridged(),
+                                     cElementType.unbridged(), bracketsRange);
 }
 
 BridgedInverseTypeRepr
@@ -224,11 +224,9 @@ BridgedTupleTypeRepr_createParsed(BridgedASTContext cContext,
 
 BridgedDeclRefTypeRepr BridgedDeclRefTypeRepr_createParsed(
     BridgedASTContext cContext, BridgedTypeRepr cBase, Identifier name,
-    SourceLoc loc, BridgedArrayRef cGenericArguments,
-    BridgedSourceRange cAngleRange) {
+    SourceLoc loc, BridgedArrayRef cGenericArguments, SourceRange angleRange) {
   ASTContext &context = cContext.unbridged();
   auto genericArguments = cGenericArguments.unbridged<TypeRepr *>();
-  auto angleRange = cAngleRange.unbridged();
 
   assert(angleRange.isValid() || genericArguments.empty());
 

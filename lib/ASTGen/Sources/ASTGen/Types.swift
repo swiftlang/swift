@@ -109,7 +109,7 @@ extension ASTGenVisitor {
       self.ctx,
       count: self.generate(genericArgument: node.count.argument),
       element: self.generate(genericArgument: node.element.argument),
-      brackets: BridgedSourceRange(
+      brackets: .init(
         start: self.generateSourceLoc(node.leftSquare),
         end: self.generateSourceLoc(node.rightSquare)
       )
@@ -120,7 +120,7 @@ extension ASTGenVisitor {
     let (name, nameLoc) = self.generateIdentifierAndSourceLoc(node.name)
 
     let genericArguments: BridgedArrayRef
-    let angleRange: BridgedSourceRange
+    let angleRange: SourceRange
     if let generics = node.genericArgumentClause {
       genericArguments = generics.arguments.lazy.map {
         self.generate(genericArgument: $0.argument)
@@ -193,7 +193,7 @@ extension ASTGenVisitor {
     let loc = self.generateSourceLoc(node.previousToken(viewMode: .sourceAccurate))
     return BridgedErrorTypeRepr.create(
       self.ctx,
-      range: BridgedSourceRange(start: loc, end: loc)
+      range: .init(start: loc)
     ).asTypeRepr
   }
 
@@ -502,7 +502,7 @@ extension ASTGenVisitor {
 extension ASTGenVisitor {
   struct GeneratedGenericArguments {
     var arguments: BridgedArrayRef = .init()
-    var range: BridgedSourceRange = .init()
+    var range: SourceRange = .init()
   }
 
   /// Generate 'TypeRepr' from a expression, because 'conformances' arguments in

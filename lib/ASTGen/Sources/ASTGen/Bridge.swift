@@ -18,6 +18,7 @@ import SwiftIfConfig
 public typealias Identifier = swift.Identifier
 public typealias DeclBaseName = swift.DeclBaseName
 public typealias SourceLoc = swift.SourceLoc
+public typealias SourceRange = swift.SourceRange
 
 public protocol BridgedNullable: ExpressibleByNilLiteral {
   associatedtype RawPtr
@@ -269,7 +270,7 @@ extension Optional<TokenSyntax> {
   }
 }
 
-extension BridgedSourceRange {
+extension SourceRange {
   @available(*, deprecated, message: "use ASTContext.bridgedSourceRange(startToken:endToken:)")
   @inline(__always)
   init(startToken: TokenSyntax, endToken: TokenSyntax, in astgen: ASTGenVisitor) {

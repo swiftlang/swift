@@ -2288,9 +2288,9 @@ extension ASTGenVisitor {
     )
   }
 
-  func generateAttrSourceRange(_ node: AttributeSyntax) -> BridgedSourceRange {
+  func generateAttrSourceRange(_ node: AttributeSyntax) -> SourceRange {
     guard let firstNameTok = node.attributeName.firstToken(viewMode: .sourceAccurate) else {
-      return BridgedSourceRange()
+      return .init()
     }
     return self.generateSourceRange(start: firstNameTok, end: node.lastToken(viewMode: .sourceAccurate)!)
   }

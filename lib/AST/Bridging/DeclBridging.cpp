@@ -340,7 +340,7 @@ BridgedNominalTypeDecl BridgedEnumDecl_createParsed(
     BridgedNullableGenericParamList genericParamList,
     BridgedArrayRef cInheritedTypes,
     BridgedNullableTrailingWhereClause genericWhereClause,
-    BridgedSourceRange cBraceRange) {
+    SourceRange braceRange) {
   ASTContext &context = cContext.unbridged();
 
   NominalTypeDecl *decl = new (context)
@@ -348,7 +348,7 @@ BridgedNominalTypeDecl BridgedEnumDecl_createParsed(
                convertToInheritedEntries(context, cInheritedTypes),
                genericParamList.unbridged(), cDeclContext.unbridged());
   decl->setTrailingWhereClause(genericWhereClause.unbridged());
-  decl->setBraces(cBraceRange.unbridged());
+  decl->setBraces(braceRange);
 
   return decl;
 }
@@ -391,7 +391,7 @@ BridgedNominalTypeDecl BridgedStructDecl_createParsed(
     BridgedNullableGenericParamList genericParamList,
     BridgedArrayRef cInheritedTypes,
     BridgedNullableTrailingWhereClause genericWhereClause,
-    BridgedSourceRange cBraceRange) {
+    SourceRange braceRange) {
   ASTContext &context = cContext.unbridged();
 
   NominalTypeDecl *decl = new (context)
@@ -399,7 +399,7 @@ BridgedNominalTypeDecl BridgedStructDecl_createParsed(
                  convertToInheritedEntries(context, cInheritedTypes),
                  genericParamList.unbridged(), cDeclContext.unbridged());
   decl->setTrailingWhereClause(genericWhereClause.unbridged());
-  decl->setBraces(cBraceRange.unbridged());
+  decl->setBraces(braceRange);
 
   return decl;
 }
@@ -410,7 +410,7 @@ BridgedNominalTypeDecl BridgedClassDecl_createParsed(
     BridgedNullableGenericParamList genericParamList,
     BridgedArrayRef cInheritedTypes,
     BridgedNullableTrailingWhereClause genericWhereClause,
-    BridgedSourceRange cBraceRange, bool isActor) {
+    SourceRange braceRange, bool isActor) {
   ASTContext &context = cContext.unbridged();
 
   NominalTypeDecl *decl = new (context) ClassDecl(
@@ -418,7 +418,7 @@ BridgedNominalTypeDecl BridgedClassDecl_createParsed(
       convertToInheritedEntries(context, cInheritedTypes),
       genericParamList.unbridged(), cDeclContext.unbridged(), isActor);
   decl->setTrailingWhereClause(genericWhereClause.unbridged());
-  decl->setBraces(cBraceRange.unbridged());
+  decl->setBraces(braceRange);
 
   return decl;
 }
@@ -429,7 +429,7 @@ BridgedNominalTypeDecl BridgedProtocolDecl_createParsed(
     BridgedArrayRef cPrimaryAssociatedTypeNames,
     BridgedArrayRef cInheritedTypes,
     BridgedNullableTrailingWhereClause genericWhereClause,
-    BridgedSourceRange cBraceRange) {
+    SourceRange braceRange) {
   ASTContext &context = cContext.unbridged();
 
   auto primaryAssociatedTypeNames =
@@ -444,7 +444,7 @@ BridgedNominalTypeDecl BridgedProtocolDecl_createParsed(
                    primaryAssociatedTypeNames,
                    convertToInheritedEntries(context, cInheritedTypes),
                    genericWhereClause.unbridged());
-  decl->setBraces(cBraceRange.unbridged());
+  decl->setBraces(braceRange);
 
   return decl;
 }
@@ -470,14 +470,14 @@ BridgedExtensionDecl BridgedExtensionDecl_createParsed(
     SourceLoc extensionKeywordLoc, BridgedTypeRepr extendedType,
     BridgedArrayRef cInheritedTypes,
     BridgedNullableTrailingWhereClause genericWhereClause,
-    BridgedSourceRange cBraceRange) {
+    SourceRange braceRange) {
   ASTContext &context = cContext.unbridged();
 
   auto *decl = ExtensionDecl::create(
       context, extensionKeywordLoc, extendedType.unbridged(),
       convertToInheritedEntries(context, cInheritedTypes),
       cDeclContext.unbridged(), genericWhereClause.unbridged());
-  decl->setBraces(cBraceRange.unbridged());
+  decl->setBraces(braceRange);
   return decl;
 }
 

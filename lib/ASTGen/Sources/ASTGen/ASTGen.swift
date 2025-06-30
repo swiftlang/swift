@@ -247,47 +247,47 @@ extension ASTGenVisitor {
     )
   }
 
-  /// Obtains bridged token source range from a pair of token nodes.
+  /// Obtains a C++ source range from a pair of token nodes.
   @inline(__always)
-  func generateSourceRange(start: TokenSyntax, end: TokenSyntax) -> BridgedSourceRange {
-    BridgedSourceRange(
+  func generateSourceRange(start: TokenSyntax, end: TokenSyntax) -> SourceRange {
+    .init(
       start: self.generateSourceLoc(start),
       end: self.generateSourceLoc(end)
     )
   }
 
-  /// Obtains bridged token source range of a syntax node.
+  /// Obtains the C++ source range of a syntax node.
   @inline(__always)
-  func generateSourceRange(_ node: some SyntaxProtocol) -> BridgedSourceRange {
+  func generateSourceRange(_ node: some SyntaxProtocol) -> SourceRange {
     guard let start = node.firstToken(viewMode: .sourceAccurate) else {
-      return BridgedSourceRange(start: nil, end: nil)
+      return .init()
     }
     return generateSourceRange(start: start, end: node.lastToken(viewMode: .sourceAccurate)!)
   }
 
-  /// Obtains bridged token source range of a syntax node.
+  /// Obtains the C++ source range of a syntax node.
   @inline(__always)
-  func generateSourceRange(_ node: (some SyntaxProtocol)?) -> BridgedSourceRange {
+  func generateSourceRange(_ node: (some SyntaxProtocol)?) -> SourceRange {
     guard let node = node else {
-      return BridgedSourceRange(start: nil, end: nil)
+      return .init()
     }
     return generateSourceRange(node)
   }
 
-  /// Obtains bridged token source range for a syntax node.
-  /// Unlike `generateSourceRange(_:)`, this correctly emulates the string/regex literal token SourceLoc in AST.
-  func generateImplicitBraceRange(_ node: some SyntaxProtocol) -> BridgedSourceRange {
+  /// Obtains the C++ source range of a syntax node.
+  /// Unlike `generateSourceRange(_:)`, this correctly emulates the string/regex literal token `SourceLoc` in AST.
+  func generateImplicitBraceRange(_ node: some SyntaxProtocol) -> SourceRange {
     let loc = self.generateSourceLoc(node)
     if let endTok = node.lastToken(viewMode: .sourceAccurate) {
       switch endTok.parent?.kind {
       case .stringLiteralExpr, .regexLiteralExpr:
         // string/regex literal are single token in AST.
-        return BridgedSourceRange(start:loc, end: self.generateSourceLoc(endTok.parent))
+        return .init(start: loc, end: self.generateSourceLoc(endTok.parent))
       default:
-        return BridgedSourceRange(start:loc, end: self.generateSourceLoc(endTok))
+        return .init(start: loc, end: self.generateSourceLoc(endTok))
       }
     } else {
-      return BridgedSourceRange(start:loc, end: loc)
+      return .init(start:loc, end: loc)
     }
   }
 
