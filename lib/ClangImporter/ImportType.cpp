@@ -2439,6 +2439,15 @@ static bool isParameterContextGlobalActorIsolated(DeclContext *dc,
   return false;
 }
 
+static bool isSendableInferenceOnCompletionHandlerParameterAllowed(
+    DeclContext *dc, const clang::Decl *parent) {
+  auto &C = dc->getASTContext();
+  if (!C.LangOpts.hasFeature(Feature::SendableCompletionHandlers))
+    return false;
+
+  return !isParameterContextGlobalActorIsolated(dc, parent);
+}
+
 std::optional<ClangImporter::Implementation::ImportParameterTypeResult>
 ClangImporter::Implementation::importParameterType(
     DeclContext *dc, const clang::Decl *parent, const clang::ParmVarDecl *param,
@@ -2462,10 +2471,9 @@ ClangImporter::Implementation::importParameterType(
   bool isConsuming = false;
   bool isParamTypeImplicitlyUnwrapped = false;
 
-  if (SwiftContext.LangOpts.hasFeature(Feature::SendableCompletionHandlers) &&
-      paramIsCompletionHandler) {
-    if (!isParameterContextGlobalActorIsolated(dc, parent))
-      attrs |= ImportTypeAttr::DefaultsToSendable;
+  if (paramIsCompletionHandler &&
+      isSendableInferenceOnCompletionHandlerParameterAllowed(dc, parent)) {
+    attrs |= ImportTypeAttr::DefaultsToSendable;
   }
 
   if (auto optionSetEnum = importer::findOptionSetEnum(paramTy, *this)) {
@@ -3344,11 +3352,19 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
               decomposeCompletionHandlerType(swiftParamTy, *asyncInfo)) {
         swiftResultTy = replacedSwiftResultTy;
 
+        ImportTypeAttrs attrs;
+        // This is required because a parameter type of a sync variant and
+        // a completion type of an async variant have to match exactly.
+        if (isSendableInferenceOnCompletionHandlerParameterAllowed(origDC,
+                                                                   clangDecl)) {
+          attrs |= ImportTypeAttr::DefaultsToSendable;
+        }
+
         // Import the original completion handler type without adjustments.
         Type origSwiftParamTy =
             importType(paramTy, ImportTypeKind::CompletionHandlerParameter,
                        paramAddDiag, allowNSUIntegerAsIntInParam,
-                       Bridgeability::Full, ImportTypeAttrs(),
+                       Bridgeability::Full, attrs,
                        optionalityOfParam,
                        /*resugarNSErrorPointer=*/!paramIsError, std::nullopt)
                 .getType();
