@@ -112,6 +112,7 @@ target_compile_options(swift_Concurrency PRIVATE
   # NOTE: do not remove until `IsolatedAny` is on by default in all supported
   # compilers.
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature IsolatedAny>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature Extern>"
   # NOTE: enable the async frame pointer on Darwin to faciliate debugging.
   $<$<AND:$<PLATFORM_ID:Darwin>,$<COMPILE_LANGUAGE:C,CXX>>:-fswift-async-fp=always>
   "$<$<AND:$<PLATFORM_ID:Darwin>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -swift-async-frame-pointer=always>"
