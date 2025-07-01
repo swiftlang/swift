@@ -5608,8 +5608,8 @@ public:
     llvm_unreachable("error union types do not persist in the AST");
   }
 
-  void visitLocatableType(const LocatableType *) {
-    llvm_unreachable("locatable types do not persist in the AST");
+  void visitLocatableType(const LocatableType *LT) {
+    visit(LT->getSinglyDesugaredType());
   }
 
   void visitBuiltinTypeImpl(Type ty) {
