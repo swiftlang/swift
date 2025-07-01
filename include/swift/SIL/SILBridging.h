@@ -636,14 +636,6 @@ struct BridgedSILDebugVariable {
   BRIDGED_INLINE swift::SILDebugVariable unbridge() const;
 };
 
-struct OptionalBridgedSILDebugVariable {
-  BridgedSILDebugVariable debugVar;
-  bool hasDebugVar = false;
-
-  OptionalBridgedSILDebugVariable() {}
-  OptionalBridgedSILDebugVariable(BridgedSILDebugVariable d) : debugVar(d), hasDebugVar(true) {}
-};
-
 struct BridgedInstruction {
   SwiftObject obj;
 
@@ -1170,8 +1162,10 @@ struct BridgedBuilder{
     BridgedSILTypeArray elementTypes, BridgedValueArray elementCountOperands) const;
 
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction
-  createAllocStack(BridgedType type, OptionalBridgedSILDebugVariable debugVar,
+  createAllocStack(BridgedType type, BridgedSILDebugVariable debugVar,
                    bool hasDynamicLifetime, bool isLexical, bool isFromVarDecl, bool wasMoved) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction
+  createAllocStack(BridgedType type, bool hasDynamicLifetime, bool isLexical, bool isFromVarDecl, bool wasMoved) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createAllocVector(BridgedValue capacity,
                                                                           BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createDeallocStack(BridgedValue operand) const;
