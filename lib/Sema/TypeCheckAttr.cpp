@@ -233,25 +233,25 @@ public:
     }
   }
 
-  void visitExtensibleAttr(ExtensibleAttr *attr) {
+  void visitNonexhaustiveAttr(NonexhaustiveAttr *attr) {
     auto *E = cast<EnumDecl>(D);
 
     if (D->getAttrs().hasAttribute<FrozenAttr>()) {
-      diagnoseAndRemoveAttr(attr, diag::extensible_attr_on_frozen_type);
+      diagnoseAndRemoveAttr(attr, diag::nonexhaustive_attr_on_frozen_type);
       return;
     }
 
     if (E->getFormalAccess() < AccessLevel::Package) {
-      diagnoseAndRemoveAttr(attr, diag::extensible_attr_on_internal_type,
+      diagnoseAndRemoveAttr(attr, diag::nonexhaustive_attr_on_internal_type,
                             E->getName(), E->getFormalAccess());
       return;
     }
   }
 
   void visitPreEnumExtensibilityAttr(PreEnumExtensibilityAttr *attr) {
-    if (!D->getAttrs().hasAttribute<ExtensibleAttr>()) {
+    if (!D->getAttrs().hasAttribute<NonexhaustiveAttr>()) {
       diagnoseAndRemoveAttr(
-          attr, diag::pre_enum_extensibility_without_extensible, attr);
+          attr, diag::pre_enum_extensibility_without_nonexhaustive, attr);
       return;
     }
   }

@@ -5047,7 +5047,7 @@ public:
   TRIVIAL_ATTR_PRINTER(Used, used)
   TRIVIAL_ATTR_PRINTER(WarnUnqualifiedAccess, warn_unqualified_access)
   TRIVIAL_ATTR_PRINTER(WeakLinked, weak_linked)
-  TRIVIAL_ATTR_PRINTER(Extensible, extensible)
+  TRIVIAL_ATTR_PRINTER(Nonexhaustive, nonexhaustive)
   TRIVIAL_ATTR_PRINTER(Concurrent, concurrent)
   TRIVIAL_ATTR_PRINTER(PreEnumExtensibility, preEnumExtensibility)
 

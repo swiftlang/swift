@@ -7035,9 +7035,9 @@ bool EnumDecl::treatAsExhaustiveForDiags(const DeclContext *useDC) const {
     if (enumModule->inSamePackage(useDC->getParentModule()))
       return true;
 
-    // When the enum is marked as `@extensible` cross-module access
+    // When the enum is marked as `@nonexhaustive` cross-module access
     // cannot be exhaustive and requires `@unknown default:`.
-    if (getAttrs().hasAttribute<ExtensibleAttr>() &&
+    if (getAttrs().hasAttribute<NonexhaustiveAttr>() &&
         enumModule != useDC->getParentModule())
       return false;
   }

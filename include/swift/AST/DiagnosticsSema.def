@@ -8799,20 +8799,20 @@ GROUPED_WARNING(
     (StringRef))
 
 //===----------------------------------------------------------------------===//
-// MARK: @extensible and @preEnumExtensibility Attributes
+// MARK: @nonexhaustive and @preEnumExtensibility Attributes
 //===----------------------------------------------------------------------===//
 
-ERROR(extensible_attr_on_frozen_type,none,
-      "cannot use '@extensible' together with '@frozen'", ())
+ERROR(nonexhaustive_attr_on_frozen_type,none,
+      "cannot use '@nonexhaustive' together with '@frozen'", ())
 
-ERROR(extensible_attr_on_internal_type,none, 
-      "'@extensible' attribute can only be applied to public or package "
+ERROR(nonexhaustive_attr_on_internal_type,none,
+      "'@nonexhaustive' attribute can only be applied to public or package "
       "declarations, but %0 is "
       "%select{private|fileprivate|internal|%error|%error|%error}1",
       (DeclName, AccessLevel))
 
-ERROR(pre_enum_extensibility_without_extensible,none,
-      "%0 can only be used together with '@extensible' attribute", (DeclAttribute))
+ERROR(pre_enum_extensibility_without_nonexhaustive,none,
+      "%0 can only be used together with '@nonexhaustive' attribute", (DeclAttribute))
 
 //===----------------------------------------------------------------------===//
 // MARK: `using` declaration

@@ -1160,7 +1160,7 @@ namespace {
           auto *enumModule = theEnum->getParentModule();
           shouldIncludeFutureVersionComment =
               enumModule->isSystemModule() ||
-              theEnum->getAttrs().hasAttribute<ExtensibleAttr>();
+              theEnum->getAttrs().hasAttribute<NonexhaustiveAttr>();
         }
 
         auto diag =

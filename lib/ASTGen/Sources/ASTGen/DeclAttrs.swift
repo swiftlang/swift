@@ -239,7 +239,7 @@ extension ASTGenVisitor {
         .DynamicCallable,
         .EagerMove,
         .Exported,
-        .Extensible,
+        .Nonexhaustive,
         .PreEnumExtensibility,
         .DiscardableResult,
         .DisfavoredOverload,

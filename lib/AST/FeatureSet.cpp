@@ -667,8 +667,8 @@ static bool usesFeatureAsyncExecutionBehaviorAttributes(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureExtensibleAttribute(Decl *decl) {
-  return decl->getAttrs().hasAttribute<ExtensibleAttr>();
+static bool usesFeatureNonexhaustiveAttribute(Decl *decl) {
+  return decl->getAttrs().hasAttribute<NonexhaustiveAttr>();
 }
 
 static bool usesFeatureAlwaysInheritActorContext(Decl *decl) {

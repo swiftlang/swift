@@ -877,11 +877,11 @@ SIMPLE_DECL_ATTR(constInitialized, ConstInitialized,
   168)
 DECL_ATTR_FEATURE_REQUIREMENT(ConstInitialized, CompileTimeValues)
 
-SIMPLE_DECL_ATTR(extensible, Extensible,
+SIMPLE_DECL_ATTR(nonexhaustive, Nonexhaustive,
   OnEnum,
   ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove | ForbiddenInABIAttr,
   169)
-DECL_ATTR_FEATURE_REQUIREMENT(Extensible, ExtensibleAttribute)
+DECL_ATTR_FEATURE_REQUIREMENT(Nonexhaustive, NonexhaustiveAttribute)
 
 SIMPLE_DECL_ATTR(concurrent, Concurrent,
   OnFunc | OnConstructor | OnSubscript | OnVar,
@@ -892,7 +892,7 @@ SIMPLE_DECL_ATTR(preEnumExtensibility, PreEnumExtensibility,
   OnEnum,
   ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove | UnconstrainedInABIAttr,
   171)
-DECL_ATTR_FEATURE_REQUIREMENT(PreEnumExtensibility, ExtensibleAttribute)
+DECL_ATTR_FEATURE_REQUIREMENT(PreEnumExtensibility, NonexhaustiveAttribute)
 
 DECL_ATTR(specialized, Specialized,
   OnConstructor | OnFunc | OnAccessor,
