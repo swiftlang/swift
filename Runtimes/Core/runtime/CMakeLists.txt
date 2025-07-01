@@ -81,6 +81,10 @@ if(SwiftCore_ENABLE_FILESYSTEM_SUPPORT AND (NOT SwiftCore_ARCH_SUBDIR OR NOT Swi
   message(SEND_ERROR "Filesystem support requires setting `SwiftCore_ARCH_SUBDIR` and `SwiftCore_PLATFORM_SUBDIR`")
 endif()
 
+if(SwiftCore_VERIFY_BACKTRACER_PATH AND (NOT SwiftCore_BACKTRACER_PATH))
+  message(FATAL_ERROR "Backtracer path marked as mandatory, but no value was provided for `SwiftCore_BACKTRACER_PATH`")
+endif()
+
 # TODO: Probably worth considering putting half of these in a RuntimeConfig.h.in
 #       file rather than pushing them through macro flags.
 target_compile_definitions(swiftRuntime

@@ -13,6 +13,7 @@ set(SwiftCore_ENABLE_TYPE_PRINTING_default ON)
 set(SwiftCore_ENABLE_STRICT_AVAILABILITY_default OFF)
 
 set(SwiftCore_BACKTRACER_PATH_default "")
+set(SwiftCore_VERIFY_BACKTRACER_PATH_default OFF)
 
 # Provide a boolean option that a user can optionally enable.
 # Variables are defaulted based on the value of `<variable>_default`.

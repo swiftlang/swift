@@ -129,6 +129,7 @@ option(SwiftCore_HAS_DARWIN_LIBMALLOC "Use Darwin malloc features" ${APPLE})
 
 defaulted_option(SwiftCore_ENABLE_BACKTRACING "Enable backtracing runtime support")
 defaulted_set(SwiftCore_BACKTRACER_PATH STRING "Set a fixed path to the Swift backtracer")
+defaulted_option(SwiftCore_VERIFY_BACKTRACER_PATH "Require a path to the Swift backtracer to be provided, otherwise stop the build")
 defaulted_option(SwiftCore_ENABLE_FATALERROR_BACKTRACE "Build stdlib fatalError with backtrace output")
 defaulted_option(SwiftCore_ENABLE_PRESPECIALIZATION "Enable generic metadata prespecialization")
 defaulted_option(SwiftCore_ENABLE_STRICT_AVAILABILITY "Enable strict availability; this will cause things to break at desk or in CI if the host OS is a lower version than some `@availability` annotations in the runtime code")
