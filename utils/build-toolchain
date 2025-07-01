@@ -60,6 +60,8 @@ NO_TEST=",no_test"
 USE_OS_RUNTIME=
 MACOS_ONLY=
 NO_ASSERTIONS=
+PRESET_FILE=utils/build-presets.ini
+SINGLE_ARCH_PRESET_FILE=utils/build-toolchain-presets.ini
 
 case $(uname -s) in
   Darwin)
@@ -95,6 +97,7 @@ while [ $# -ne 0 ]; do
     --preset-file)
       shift
       PRESET_FILE_FLAGS="${PRESET_FILE_FLAGS} --preset-file=$1"
+      PRESET_FILE=$1
   ;;
     --preset-prefix)
       shift
@@ -110,24 +113,9 @@ while [ $# -ne 0 ]; do
       NO_ASSERTIONS=",no_assertions"
   ;;
     --single-arch)
-      SINGLE_ARCH=1
-      git apply <<SINGLE_ARCH
-diff --git a/utils/build-presets.ini b/utils/build-presets.ini
-index d3e88a1107f..a8be5551f14 100644
---- a/utils/build-presets.ini
-+++ b/utils/build-presets.ini
-@@ -1352,7 +1352,9 @@ release-debuginfo
- compiler-vendor=apple
- 
- # Cross compile for Apple Silicon
--infer-cross-compile-hosts-on-darwin
-+# Temporarilly commented out for
-+# build-toolchain <id> --single-arch
-+#infer-cross-compile-hosts-on-darwin
- 
- lldb-use-system-debugserver
- lldb-build-type=Release
-SINGLE_ARCH
+      grep -v infer-cross-compile-hosts-on-darwin $PRESET_FILE >$SINGLE_ARCH_PRESET_FILE
+      PRESET_FILE_FLAGS="--preset-file=$SINGLE_ARCH_PRESET_FILE"
+      PRESET_FILE=$SINGLE_ARCH_PRESET_FILE
   ;;
   -h|--help)
     usage
@@ -193,7 +181,6 @@ SCCACHE_FLAG="${SCCACHE_FLAG}"
         darwin_toolchain_alias="Local" \
         darwin_toolchain_require_use_os_runtime="${REQUIRE_USE_OS_RUNTIME}"
 
-if [ "$SINGLE_ARCH" != "" ]; then
-  git checkout utils/build-presets.ini
-  rm -r ../swift-nightly-{install,symroot}
+if [ "$PRESET_FILE" = "$SINGLE_ARCH_PRESET_FILE" ]; then
+  rm -r "$SINGLE_ARCH_PRESET_FILE" ../swift-nightly-{install,symroot}
 fi
