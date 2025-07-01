@@ -5,6 +5,33 @@
 
 ## Swift 6.2
 
+* [SE-0472][]:
+  Introduced new `Task.immediate` and `taskGroup.addImmediateTask` APIs, which allow a task to run "immediately" in the
+  calling context if its isolation is compatible with the enclosing one. This can be used to create tasks which execute 
+  without additional scheduling overhead, and allow for finer-grained control over where a task begins running.
+
+  The canonical example for using this new API is using an unstructured immediate task like this:
+  
+  ```swift
+  func synchronous() { // synchronous function
+  // executor / thread: "T1"
+  let task: Task<Void, Never> = Task.immediate {
+  // executor / thread: "T1"
+  guard keepRunning() else { return } // synchronous call (1)
+  
+      // executor / thread: "T1"
+      await noSuspension() // potential suspension point #1 // (2)
+      
+      // executor / thread: "T1"
+      await suspend() // potential suspension point #2 // (3), suspend, (5)
+      // executor / thread: "other"
+  }
+  
+  // (4) continue execution
+  // executor / thread: "T1"
+  }
+  ```
+
 * The Swift compiler no longer diagnoses references to declarations that are
   potentially unavailable because the platform version might not be new enough
   when those references occur inside of contexts that are also unavailable to
@@ -10788,6 +10815,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0444]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0444-member-import-visibility.md
 [SE-0458]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0458-strict-memory-safety.md
 [SE-0470]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0470-isolated-conformances.md
+[SE-0472]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0472-task-start-synchronously-on-caller-context.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>
