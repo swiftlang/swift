@@ -946,6 +946,8 @@ std::string ASTMangler::mangleObjCRuntimeName(const NominalTypeDecl *Nominal) {
 
 std::string ASTMangler::mangleTypeAsContextUSR(const NominalTypeDecl *type) {
   beginManglingWithoutPrefix();
+  llvm::SaveAndRestore<bool> respectOriginallyDefinedInRAII(
+      RespectOriginallyDefinedIn, false);
   llvm::SaveAndRestore<bool> allowUnnamedRAII(AllowNamelessEntities, true);
   BaseEntitySignature base(type);
   appendContext(type, base, type->getAlternateModuleName());
@@ -1014,6 +1016,8 @@ ASTMangler::mangleAnyDecl(const ValueDecl *Decl,
 
 std::string ASTMangler::mangleDeclAsUSR(const ValueDecl *Decl,
                                         StringRef USRPrefix) {
+  llvm::SaveAndRestore<bool> respectOriginallyDefinedInRAII(
+      RespectOriginallyDefinedIn, false);
   return (llvm::Twine(USRPrefix) + mangleAnyDecl(Decl, false)).str();
 }
 
@@ -1022,6 +1026,8 @@ std::string ASTMangler::mangleAccessorEntityAsUSR(AccessorKind kind,
                                                   StringRef USRPrefix,
                                                   bool isStatic) {
   beginManglingWithoutPrefix();
+  llvm::SaveAndRestore<bool> respectOriginallyDefinedInRAII(
+      RespectOriginallyDefinedIn, false);
   llvm::SaveAndRestore<bool> allowUnnamedRAII(AllowNamelessEntities, true);
   Buffer << USRPrefix;
   appendAccessorEntity(getCodeForAccessorKind(kind), decl, isStatic);
@@ -3052,9 +3058,9 @@ void ASTMangler::appendExtension(const ExtensionDecl* ext,
   // "extension is to a protocol" would no longer be a reason to use the
   // extension mangling, because an extension method implementation could be
   // resiliently moved into the original protocol itself.
-  if (ext->isInSameDefiningModule() // case 1
-        && !sigParts.hasRequirements() // case 2
-        && !ext->getDeclaredInterfaceType()->isExistentialType()) { // case 3
+  if (ext->isInSameDefiningModule(RespectOriginallyDefinedIn)     // case 1
+      && !sigParts.hasRequirements()                              // case 2
+      && !ext->getDeclaredInterfaceType()->isExistentialType()) { // case 3
     // skip extension mangling
     return appendAnyGenericType(decl);
   }
