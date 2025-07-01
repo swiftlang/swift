@@ -99,8 +99,7 @@ struct AddressOnlyStruct : TriviallyConstructible {
 // CHECK-NEXT: apply [[FN]]<AddressOnlyStruct>([[SELF_BOX]], %1, [[METATYPE]])
 // CHECK-NEXT: copy_addr [take] [[SELF_BOX]] to [init] [[SELF]]
 // CHECK-NEXT: dealloc_stack [[SELF_BOX]]
-// CHECK-NEXT: copy_addr [[SELF]] to [init] %0
-// CHECK-NEXT: destroy_addr [[SELF]]
+// CHECK-NEXT: copy_addr [take] [[SELF]] to [init] %0
 // CHECK-NEXT: dealloc_stack [[SELF]]
 // CHECK-NEXT: [[RESULT:%.*]] = tuple ()
 // CHECK-NEXT: return [[RESULT]]

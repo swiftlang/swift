@@ -103,7 +103,7 @@ public func testboxescapes() -> (() -> ()) {
 }
 
 // CHECK-LABEL: sil [noinline] @$s26allocboxtostack_localapply9testrecurSiyF :
-// CHECK:          alloc_stack [var_decl] $Int, var, name "x"
+// CHECK: alloc_box ${ var Int }, var, name "x"
 // CHECK-LABEL: } // end sil function '$s26allocboxtostack_localapply9testrecurSiyF'
 @inline(never)
 public func testrecur() -> Int {
@@ -146,9 +146,14 @@ public func testdfs1() -> Int {
   return common()
 }
 
+// Test to make sure we don't optimize the case when we have an inner common function call for multiple boxes.
+// We don't optimize this case now, because we don't have additional logic to correctly construct AppliesToSpecialize
+// Order of function calls constructed in PromotedOperands: bar innercommon local1 bas innercommon local2
+// AppliesToSpecialize should have the order: bar bas innercommon local1 local2
+// Since we don't maintain any tree like data structure with more info on the call tree, this is not possible to construct today 
 // CHECK-LABEL: sil [noinline] @$s26allocboxtostack_localapply8testdfs2SiyF :
-// CHECK:          alloc_stack [var_decl] $Int, var, name "x"
-// CHECK:          alloc_stack [var_decl] $Int, var, name "y"
+// CHECK: alloc_box ${ var Int }, var, name "x"
+// CHECK: alloc_box ${ var Int }, var, name "y"
 // CHECK-LABEL:} // end sil function '$s26allocboxtostack_localapply8testdfs2SiyF'
 @inline(never)
 public func testdfs2() -> Int {
@@ -175,22 +180,5 @@ public func testdfs2() -> Int {
     return innercommon()
   }
   return local1() + local2()
-}
-
-// CHECK-LABEL: sil @$s26allocboxtostack_localapply15call2localfuncsSiyF :
-// CHECK-NOT:     alloc_box
-// CHECK-LABEL:} // end sil function '$s26allocboxtostack_localapply15call2localfuncsSiyF'
-public func call2localfuncs() -> Int {
-    var a1 = 1
-    
-    @inline(never)
-    func innerFunction() {
-        a1 += 1
-    }
-
-    innerFunction()
-    innerFunction()
-
-    return a1
 }
 
