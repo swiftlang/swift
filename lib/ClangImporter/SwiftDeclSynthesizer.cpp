@@ -13,6 +13,7 @@
 #include "CXXMethodBridging.h"
 #include "SwiftDeclSynthesizer.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
@@ -2527,6 +2528,8 @@ SwiftDeclSynthesizer::makeDefaultArgument(const clang::ParmVarDecl *param,
       ImporterImpl.ImportedHeaderUnit);
   funcDecl->setBodySynthesizer(synthesizeDefaultArgumentBody, (void *)param);
   funcDecl->setAccess(AccessLevel::Public);
+  funcDecl->getAttrs().add(new (ctx)
+                               AlwaysEmitIntoClientAttr(/*IsImplicit=*/true));
 
   ImporterImpl.defaultArgGenerators[param] = funcDecl;
 
