@@ -228,17 +228,6 @@ public:
             attr, decl, P);
         return;
       }
-
-      if (auto *attrType = dyn_cast<AttributedTypeRepr>(repr)) {
-        if (attrType->has(TypeAttrKind::Isolated)) {
-          diagnoseAndRemoveAttr(
-              attr,
-              diag::
-                  execution_behavior_incompatible_dynamically_isolated_parameter,
-              attr, decl, P);
-          return;
-        }
-      }
     }
   }
 
