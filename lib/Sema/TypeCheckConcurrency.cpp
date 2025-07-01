@@ -6051,10 +6051,9 @@ computeDefaultInferredActorIsolation(ValueDecl *value) {
           sendableConformanceRequiresNonisolated(nominalTypeDecl))
         return { };
 
-      // FIXME: deinit should be implicitly MainActor too.
       if (isa<TypeDecl>(value) || isa<ExtensionDecl>(value) ||
-          isa<AbstractStorageDecl>(value) || isa<FuncDecl>(value) ||
-          isa<ConstructorDecl>(value)) {
+          isa<AbstractStorageDecl>(value) ||
+          isa<AbstractFunctionDecl>(value)) {
           // Preconcurrency here is used to stage the diagnostics
           // when users select `@MainActor` default isolation with
           // non-strict concurrency modes (pre Swift 6).
