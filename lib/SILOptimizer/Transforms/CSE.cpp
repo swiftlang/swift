@@ -520,10 +520,7 @@ public:
   }
 
   hash_code visitTypeValueInst(TypeValueInst *X) {
-    OperandValueArrayRef Operands(X->getAllOperands());
-    return llvm::hash_combine(
-        X->getKind(), X->getType(),
-        llvm::hash_combine_range(Operands.begin(), Operands.end()));
+    return llvm::hash_combine(X->getKind(), X->getType(), X->getParamType());
   }
 };
 } // end anonymous namespace
@@ -567,6 +564,13 @@ bool llvm::DenseMapInfo<SimpleValue>::isEqual(SimpleValue LHS,
       return false;
 
     return true;
+  }
+  auto *ltvi = dyn_cast<TypeValueInst>(LHSI);
+  auto *rtvi = dyn_cast<TypeValueInst>(RHSI);
+  if (ltvi && rtvi) {
+    if (ltvi->getType() != rtvi->getType())
+      return false;
+    return ltvi->getParamType() == rtvi->getParamType();
   }
   auto opCmp = [&](const Operand *op1, const Operand *op2) -> bool {
     if (op1 == op2)
