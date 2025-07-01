@@ -215,3 +215,21 @@ actor MyActor2 {
   // NonIsolated and not if print was inferred to be main actor.
   print("123")
 }
+
+// https://github.com/swiftlang/swift/issues/82168 - used to fail
+nonisolated protocol P {
+  associatedtype AT
+  static var at: AT { get }
+}
+
+nonisolated struct KP<R: P, V> {
+  init(keyPath: KeyPath<R, V>) {}
+}
+
+struct S: P {
+  let p: Int
+  struct AT {
+    let kp = KP(keyPath: \S.p)
+  }
+  static let at = AT() // used to fail here
+}
