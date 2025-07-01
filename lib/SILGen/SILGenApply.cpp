@@ -6123,13 +6123,15 @@ RValue SILGenFunction::emitApply(
     SILValue executor;
     switch (*implicitActorHopTarget) {
     case ActorIsolation::ActorInstance:
-      if (unsigned paramIndex =
-              implicitActorHopTarget->getActorInstanceParameter()) {
-        auto isolatedIndex = calleeTypeInfo.origFormalType
-          ->getLoweredParamIndex(paramIndex - 1);
-        executor = emitLoadActorExecutor(loc, args[isolatedIndex]);
-      } else {
+      assert(!implicitActorHopTarget->isActorInstanceForCapture());
+      if (implicitActorHopTarget->isActorInstanceForSelfParameter()) {
         executor = emitLoadActorExecutor(loc, args.back());
+      } else {
+        unsigned paramIndex =
+          implicitActorHopTarget->getActorInstanceParameterIndex();
+        auto isolatedIndex = calleeTypeInfo.origFormalType
+          ->getLoweredParamIndex(paramIndex);
+        executor = emitLoadActorExecutor(loc, args[isolatedIndex]);
       }
       break;
 

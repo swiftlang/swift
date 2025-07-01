@@ -762,7 +762,7 @@ CaptureInfo CaptureInfoRequest::evaluate(Evaluator &evaluator,
     finder.checkType(type, AFD->getLoc());
   }
 
-  if (AFD->isLocalCapture() && AFD->hasAsync()) {
+  if (AFD->isLocalCapture()) {
     // If a local function inherits isolation from the enclosing context,
     // make sure we capture the isolated parameter, if we haven't already.
     auto actorIsolation = getActorIsolation(AFD);
