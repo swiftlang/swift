@@ -596,7 +596,8 @@ public:
         else if (isa<StructDecl>(TD) && NTD->hasClangNode())
           emitReferencedClangTypeMetadata(NTD);
         else if (const auto *cd = dyn_cast<ClassDecl>(TD))
-          if (cd->isObjC() || cd->isForeignReferenceType())
+          if ((cd->isObjC() && cd->getClangDecl()) ||
+              cd->isForeignReferenceType())
             emitReferencedClangTypeMetadata(NTD);
       } else if (auto TAD = dyn_cast<TypeAliasDecl>(TD)) {
         if (TAD->hasClangNode())
