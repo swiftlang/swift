@@ -147,6 +147,15 @@ struct PSendableS: @MainActor PSendable { // expected-note{{requirement specifie
   func f() { }
 }
 
+protocol R: SendableMetatype {
+  func f()
+}
+
+// expected-warning@+1{{main actor-isolated conformance of 'RSendableSMainActor' to SendableMetatype-inheriting protocol 'R' can never be used with generic code}}
+@MainActor struct RSendableSMainActor: @MainActor R {
+  func f() { }
+}
+
 // ----------------------------------------------------------------------------
 // Use checking of isolated conformances.
 // ----------------------------------------------------------------------------
