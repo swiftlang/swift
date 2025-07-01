@@ -99,7 +99,7 @@ of the form: ``swift-LOCAL-YYYY-MM-DD-a-osx.tar.gz``.
 Beyond building the toolchain, ``build-toolchain`` also supports the 
 following (non-exhaustive) set of useful options:
 
-- ``--single-arch``: Save time by only building for the host architecture.
+- ``--single-arch``: Only build for the host architecture on macOS for faster builds or to work around issues with Homebrew dependencies not supporting cross-compilation for universal macOS binaries.
 - ``--dry-run``: Perform a dry run build. This is off by default.
 - ``--test``: Test the toolchain after it has been compiled. This is off by default.
 - ``--distcc``: Use distcc to speed up the build by distributing the C++ part of
