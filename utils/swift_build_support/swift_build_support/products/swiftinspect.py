@@ -44,7 +44,7 @@ class SwiftInspect(product.Product):
     def should_build(self, host_target):
         return True
 
-    def build(self, host_target):
+    async def build(self, host_target):
         run_build_script_helper(host_target, self, self.args)
 
     def should_test(self, host_target):

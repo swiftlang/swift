@@ -207,7 +207,7 @@ class Haiku(GenericUnix):
         super(Haiku, self)
 
 
-def host_toolchain(**kwargs):
+def host_toolchain(**kwargs) -> Toolchain:
     sys = platform.system()
     if sys == 'Darwin':
         return MacOSX(kwargs.pop('xcrun_toolchain', 'default'))

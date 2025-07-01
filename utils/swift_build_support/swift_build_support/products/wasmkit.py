@@ -59,7 +59,7 @@ class WasmKit(product.Product):
         bin_path = run_swift_build(host_target, self, 'wasmkit-cli', set_installation_rpath=True)
         shutil.copy(bin_path, build_toolchain_path + '/wasmkit')
 
-    def build(self, host_target):
+    async def build(self, host_target):
         bin_path = run_swift_build(host_target, self, 'wasmkit-cli')
         print("Built wasmkit-cli at: " + bin_path)
         # Copy the built binary to ./bin

@@ -82,7 +82,7 @@ class SwiftTesting(product.Product):
     def _build_with_cmake(self, host_target):
         self._cmake_product(host_target).build(host_target)
 
-    def build(self, host_target):
+    async def build(self, host_target):
         self._for_each_host_target(host_target, self._build_with_cmake)
 
     def _install_with_cmake(self, host_target):

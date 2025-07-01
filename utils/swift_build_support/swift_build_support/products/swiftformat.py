@@ -101,7 +101,7 @@ class SwiftFormat(product.Product):
     def should_build(self, host_target):
         return True
 
-    def build(self, host_target):
+    async def build(self, host_target):
         self.run_build_script_helper('build', host_target)
         if self.args.sourcekitlsp_lint:
             self.lint_sourcekitlsp()

@@ -68,7 +68,7 @@ class LibXML2(cmake_product.CMakeProduct):
         path = self.host_install_destdir(host_target)
         self.install_with_cmake(['install'], path)
 
-    def build(self, host_target):
+    async def build(self, host_target):
         self.cmake_options.define('BUILD_SHARED_LIBS', 'NO')
         self.cmake_options.define('CMAKE_POSITION_INDEPENDENT_CODE', 'YES')
 

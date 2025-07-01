@@ -73,7 +73,7 @@ class SourceKitLSP(product.Product):
             for target in self.args.cross_compile_hosts:
                 body(target)
 
-    def build(self, host_target):
+    async def build(self, host_target):
         if self.args.sourcekitlsp_verify_generated_files:
             self._run_swift_syntax_dev_utils(
                 host_target, 'verify-config-schema')

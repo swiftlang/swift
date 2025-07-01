@@ -44,7 +44,7 @@ class CMark(cmake_product.CMakeProduct):
         """
         return self.args.build_cmark
 
-    def build(self, host_target):
+    async def build(self, host_target):
         """build() -> void
 
         Perform the build, for a non-build-script-impl product.
