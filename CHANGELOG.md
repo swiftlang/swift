@@ -32,6 +32,48 @@
   }
   ```
 
+* [SE-0471][]:
+  Actor and global actor annotated types may now declare a synchronous `isolated deinit`, which allows such deinitializer
+  to access actor isolated state while deinitializing the actor. This enables actor deinitializers to safely access
+  and shut down or close resources during an actors deinitialization, without explicitly resorting to unstructured 
+  concurrency tasks.
+
+  ```swift
+  class NonSendableAhmed { 
+    var state: Int = 0
+  }
+
+  @MainActor
+  class Maria {
+    let friend: NonSendableAhmed
+
+    init() {
+      self.friend = NonSendableAhmed()
+    }
+
+    init(sharingFriendOf otherMaria: Maria) {
+      // While the friend is non-Sendable, this initializer and
+      // and the otherMaria are isolated to the MainActor. That is,
+      // they share the same executor. So, it's OK for the non-Sendable value
+      // to cross between otherMaria and self.
+      self.friend = otherMaria.friend
+    }
+    
+    isolated deinit {
+      // Used to be a potential data race. Now, deinit is also
+      // isolated on the MainActor, so this code is perfectly
+      // correct.
+      friend.state += 1
+    }
+  }
+    
+  func example() async {
+    let m1 = await Maria()
+    let m2 = await Maria(sharingFriendOf: m1)
+    doSomething(m1, m2)
+  }
+  ```
+
 * [SE-0469][]:
   Swift concurrency tasks (both unstructured and structured, via the TaskGroup `addTask` APIs) may now be given 
   human-readable names, which can be used to support debugging and identifying tasks.
@@ -10868,6 +10910,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0462]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0462-task-priority-escalation-apis.md
 [SE-0469]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0469-task-names.md
 [SE-0470]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0470-isolated-conformances.md
+[SE-0471]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0371-isolated-synchronous-deinit.md
 [SE-0472]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0472-task-start-synchronously-on-caller-context.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
