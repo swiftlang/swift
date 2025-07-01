@@ -42,6 +42,19 @@
   }
   ```
 
+* [SE-0462][]:
+  Task priority escalation may now be explicitly caused to a `Task`, as well as reacted to using the new task priority escalation handlers:      
+
+  ```swift
+  // priority: low
+  // priority: high!
+  await withTaskPriorityEscalationHandler {
+  await work()
+  } onPriorityEscalated: { newPriority in // may not be triggered if ->high escalation happened before handler was installed
+  // do something
+  }
+  ```
+
 * The Swift compiler no longer diagnoses references to declarations that are
   potentially unavailable because the platform version might not be new enough
   when those references occur inside of contexts that are also unavailable to
@@ -10824,6 +10837,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0442]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0442-allow-taskgroup-childtaskresult-type-to-be-inferred.md
 [SE-0444]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0444-member-import-visibility.md
 [SE-0458]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0458-strict-memory-safety.md
+[SE-0462]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0462-task-priority-escalation-apis.md
 [SE-0469]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0469-task-names.md
 [SE-0470]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0470-isolated-conformances.md
 [SE-0472]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0472-task-start-synchronously-on-caller-context.md
