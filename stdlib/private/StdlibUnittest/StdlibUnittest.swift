@@ -772,7 +772,7 @@ public func expectNil<T: ~Copyable & ~Escapable>(
 }
 
 @discardableResult
-@lifetime(copy value)
+@_lifetime(copy value)
 public func expectNotNil<T: ~Copyable & ~Escapable>(
   _ value: consuming T?,
   _ message: @autoclosure () -> String = "",
