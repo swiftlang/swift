@@ -127,15 +127,15 @@ public struct Builder {
                                hasDynamicLifetime: Bool = false,
                                isLexical: Bool = false, isFromVarDecl: Bool = false,
                                usesMoveableValueDebugInfo: Bool = false) -> AllocStackInst {
-    let bridgedDebugVar: OptionalBridgedSILDebugVariable
+    let allocStack: BridgedInstruction
     if let debugVariable = debugVariable {
-      bridgedDebugVar = OptionalBridgedSILDebugVariable(debugVariable)
+      allocStack = bridged.createAllocStack(type.bridged, debugVariable, hasDynamicLifetime, isLexical,
+                                            isFromVarDecl, usesMoveableValueDebugInfo)
     } else {
-      bridgedDebugVar = OptionalBridgedSILDebugVariable()
+      allocStack = bridged.createAllocStack(type.bridged, hasDynamicLifetime, isLexical,
+                                            isFromVarDecl, usesMoveableValueDebugInfo)
     }
-    let dr = bridged.createAllocStack(type.bridged, bridgedDebugVar, hasDynamicLifetime, isLexical,
-                                      isFromVarDecl, usesMoveableValueDebugInfo)
-    return notifyNew(dr.getAs(AllocStackInst.self))
+    return notifyNew(allocStack.getAs(AllocStackInst.self))
   }
 
   @discardableResult

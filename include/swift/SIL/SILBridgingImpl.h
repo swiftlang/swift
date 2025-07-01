@@ -2184,16 +2184,25 @@ BridgedInstruction BridgedBuilder::createAllocRef(BridgedType type,
 }
 
 BridgedInstruction BridgedBuilder::createAllocStack(BridgedType type,
-                                                    OptionalBridgedSILDebugVariable debugVar,
+                                                    BridgedSILDebugVariable debugVar,
                                                     bool hasDynamicLifetime,
                                                     bool isLexical,
                                                     bool isFromVarDecl,
                                                     bool wasMoved) const {
-  std::optional<swift::SILDebugVariable> var = std::nullopt;
-  if (debugVar.hasDebugVar)
-    var = debugVar.debugVar.unbridge();
   return {unbridged().createAllocStack(
-      regularLoc(), type.unbridged(), var,
+      regularLoc(), type.unbridged(), debugVar.unbridge(),
+      swift::HasDynamicLifetime_t(hasDynamicLifetime),
+      swift::IsLexical_t(isLexical), swift::IsFromVarDecl_t(isFromVarDecl),
+      swift::UsesMoveableValueDebugInfo_t(wasMoved), /*skipVarDeclAssert=*/ true)};
+}
+
+BridgedInstruction BridgedBuilder::createAllocStack(BridgedType type,
+                                                    bool hasDynamicLifetime,
+                                                    bool isLexical,
+                                                    bool isFromVarDecl,
+                                                    bool wasMoved) const {
+  return {unbridged().createAllocStack(
+      regularLoc(), type.unbridged(), std::nullopt,
       swift::HasDynamicLifetime_t(hasDynamicLifetime),
       swift::IsLexical_t(isLexical), swift::IsFromVarDecl_t(isFromVarDecl),
       swift::UsesMoveableValueDebugInfo_t(wasMoved), /*skipVarDeclAssert=*/ true)};
