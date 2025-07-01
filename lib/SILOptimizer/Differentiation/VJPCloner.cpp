@@ -1227,7 +1227,8 @@ public:
       // %enum = enum $Optional<PullbackType>, #Optional.some!enumelt,
       //         %pullback : $PullbackType
       pullback = trampolineBuilder.createEnum(loc, pullback, someEltDecl,
-                                              SILType::getOptionalType(pullback->getType()));
+                                              SILType::getOptionalType(pullback->getType()),
+                                              OwnershipKind::Owned);
       pullbackValues[origBB].push_back(pullback);
 
       auto tupleLoweredTy = remapType(pullbackInfo.getLinearMapTupleLoweredType(origBB));
