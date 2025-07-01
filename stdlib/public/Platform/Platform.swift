@@ -334,7 +334,7 @@ extension timespec {
   @available(SwiftStdlib 5.7, *)
   public init(_ duration: Duration) {
     let comps = duration.components
-    self.init(tv_sec: Int(comps.seconds),
+    self.init(tv_sec: time_t(comps.seconds),
               tv_nsec: Int(comps.attoseconds / 1_000_000_000))
   }
 }
@@ -352,9 +352,19 @@ extension timeval {
   @available(SwiftStdlib 5.7, *)
   public init(_ duration: Duration) {
     let comps = duration.components
-  // Linux platforms define timeval as Int/Int
-  self.init(tv_sec: Int(comps.seconds),
-              tv_usec: Int(comps.attoseconds / 1_000_000_000_000))
+#if os(Linux)
+    // Linux platforms define timeval as Int/Int, except on 32-bit platforms
+    // where _TIME_BITS=64 is defined. Abuse time_t as an alias for the correct
+    // suseconds_t type, as it is not an alias to the 64-bit type on 32-bit
+    // platforms.
+    typealias _Seconds = time_t
+    typealias _Microseconds = time_t
+#else
+    typealias _Seconds = Int
+    typealias _Microseconds = Int // note: was Int32 in release/6.1
+#endif
+    self.init(tv_sec: _Seconds(comps.seconds),
+              tv_usec: _Microseconds(comps.attoseconds / 1_000_000_000_000))
   }
 }
 
