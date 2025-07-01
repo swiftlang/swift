@@ -41,17 +41,16 @@ if #available(DisabledDomain) {
   always()
 }
 
-// FIXME: [availability] These CHECK lines for if #unavailable are inverted (rdar://147929876)
-// CHECK-NOT: call swiftcc void @always()
-// CHECK: call swiftcc void @never()
+// CHECK: call swiftcc void @always()
+// CHECK-NOT: call swiftcc void @never()
 if #unavailable(EnabledDomain) {
   never()
 } else {
   always()
 }
 
-// CHECK-NOT: call swiftcc void @always()
-// CHECK: call swiftcc void @never()
+// CHECK: call swiftcc void @always()
+// CHECK-NOT: call swiftcc void @never()
 if #unavailable(DisabledDomain) {
   always()
 } else {

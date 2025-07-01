@@ -3658,34 +3658,35 @@ public:
       SmallVector<AvailabilityCondition, 4> conditions;
 
       for (const auto &elt : stmt->getCond()) {
-        auto condition = elt.getAvailability();
+        auto availabilityQuery = elt.getAvailability()->getAvailabilityQuery();
 
-        auto availabilityRange = condition->getAvailableRange();
-
-        // Type checking did not set a range for this query (it may be invalid).
+        // Type checking did not populate this query (it may be invalid).
         // Treat the condition as if it were always true.
-        if (!availabilityRange.has_value()) {
+        if (!availabilityQuery) {
           alwaysAvailableCount++;
           continue;
         }
 
-        // If there is no lower endpoint it means that the condition has no
-        // OS version specification that matches the target platform.
-        // FIXME: [availability] Handle empty ranges (never available).
-        if (!availabilityRange->hasLowerEndpoint()) {
-          // An inactive #unavailable condition trivially evaluates to false.
-          if (condition->isUnavailability()) {
+        // If the query result is constant, then the corresponding type is
+        // either always available or never available at runtime.
+        if (auto constantResult = availabilityQuery->getConstantResult()) {
+          if (*constantResult) {
+            alwaysAvailableCount++;
+          } else {
             neverAvailableCount++;
-            continue;
           }
-
-          // An inactive #available condition trivially evaluates to true.
-          alwaysAvailableCount++;
           continue;
         }
 
-        conditions.push_back(
-            {*availabilityRange, condition->isUnavailability()});
+        // FIXME: [availability] Add support for custom domains.
+        auto domain = availabilityQuery->getDomain();
+        ASSERT(domain.isPlatform());
+
+        auto availabilityRange = availabilityQuery->getPrimaryRange();
+        ASSERT(availabilityRange);
+
+        conditions.push_back({availabilityRange->getRawVersionRange(),
+                              availabilityQuery->isUnavailability()});
       }
 
       // If there were any conditions that were always false, then this

@@ -116,8 +116,6 @@ SILValue emitZipperedOSVersionRangeCheck(SILGenFunction &SGF, SILLocation loc,
                                          const VersionRange &targetRange,
                                          const VersionRange &variantRange) {
   auto &ctx = SGF.getASTContext();
-  auto &B = SGF.B;
-
   assert(ctx.LangOpts.TargetVariant);
 
   VersionRange targetVersion = targetRange;
@@ -149,19 +147,8 @@ SILValue emitZipperedOSVersionRangeCheck(SILGenFunction &SGF, SILLocation loc,
     std::swap(targetTriple, variantTriple);
   }
 
-  // If there is no check for either the target platform or the target-variant
-  // platform then the condition is trivially true.
-  if (targetVersion.isAll() && variantVersion.isAll()) {
-    SILType i1 = SILType::getBuiltinIntegerType(1, ctx);
-    return B.createIntegerLiteral(loc, i1, true);
-  }
-
-  // If either version is "never" then the check is trivially false because it
-  // can never succeed.
-  if (targetVersion.isEmpty() || variantVersion.isEmpty()) {
-    SILType i1 = SILType::getBuiltinIntegerType(1, ctx);
-    return B.createIntegerLiteral(loc, i1, false);
-  }
+  DEBUG_ASSERT(targetVersion.hasLowerEndpoint() ||
+               variantVersion.hasLowerEndpoint());
 
   // The variant-only availability-checking entrypoint is not part of the
   // Swift 5.0 ABI. It is only available in macOS 10.15 and above.
@@ -390,66 +377,55 @@ SILValue
 SILGenFunction::emitIfAvailableQuery(SILLocation loc,
                                      PoundAvailableInfo *availability) {
   auto &ctx = getASTContext();
+  SILType i1 = SILType::getBuiltinIntegerType(1, ctx);
+  auto query = availability->getAvailabilityQuery();
+
+  // The query might not have been computed by Sema if availability checking
+  // was disabled. Otherwise, there's a bug in Sema.
+  DEBUG_ASSERT(query || ctx.LangOpts.DisableAvailabilityChecking);
+
+  // Treat the condition as if it always evaluates true if Sema skipped it.
+  if (!query)
+    return B.createIntegerLiteral(loc, i1, !availability->isUnavailability());
+
+  // If Sema indicated that the query's result is known at compile time, emit
+  // a constant.
+  if (auto constantResult = query->getConstantResult())
+    return B.createIntegerLiteral(loc, i1, *constantResult);
+
+  // FIXME: [availability] Add support for custom domain queries.
+  auto domain = query->getDomain();
+  if (!domain.isPlatform())
+    return B.createIntegerLiteral(loc, i1, !availability->isUnavailability());
+
   SILValue result;
+  auto primaryRange =
+      query->getPrimaryRange().value_or(AvailabilityRange::alwaysAvailable());
 
-  // Creates a boolean literal for availability conditions that have been
-  // evaluated at compile time. Automatically inverts the value for
-  // `#unavailable` queries.
-  auto createBooleanTestLiteral = [&](bool value) {
-    SILType i1 = SILType::getBuiltinIntegerType(1, ctx);
-    if (availability->isUnavailability())
-      value = !value;
-    return B.createIntegerLiteral(loc, i1, value);
-  };
+  if (ctx.LangOpts.TargetVariant) {
+    auto variantRange =
+        query->getVariantRange().value_or(AvailabilityRange::alwaysAvailable());
 
-  auto versionRange = availability->getAvailableRange();
-
-  // The OS version might be left empty if availability checking was disabled.
-  // Treat it as always-true in that case.
-  assert(versionRange || ctx.LangOpts.DisableAvailabilityChecking);
-
-  if (ctx.LangOpts.TargetVariant && !ctx.LangOpts.DisableAvailabilityChecking) {
     // We're building zippered, so we need to pass both macOS and iOS versions
     // to the the runtime version range check. At run time that check will
     // determine what kind of process this code is loaded into. In a macOS
     // process it will use the macOS version; in an macCatalyst process it will
     // use the iOS version.
-
-    auto variantVersionRange = availability->getVariantAvailableRange();
-    assert(variantVersionRange);
-
-    if (versionRange && variantVersionRange) {
-      result = emitZipperedOSVersionRangeCheck(*this, loc, *versionRange,
-                                               *variantVersionRange);
-    } else {
-      // Type checking did not fill in versions so as a fallback treat this
-      // condition as trivially true.
-      result = createBooleanTestLiteral(true);
-    }
-
-    return result;
-  }
-
-  if (!versionRange) {
-    // Type checking did not fill in version so as a fallback treat this
-    // condition as trivially true.
-    result = createBooleanTestLiteral(true);
-  } else if (versionRange->isAll()) {
-    result = createBooleanTestLiteral(true);
-  } else if (versionRange->isEmpty()) {
-    result = createBooleanTestLiteral(false);
+    result = emitZipperedOSVersionRangeCheck(*this, loc,
+                                             primaryRange.getRawVersionRange(),
+                                             variantRange.getRawVersionRange());
   } else {
     bool isMacCatalyst = tripleIsMacCatalystEnvironment(ctx.LangOpts.Target);
-    result = emitOSVersionRangeCheck(*this, loc, versionRange.value(),
-                                     isMacCatalyst);
-    if (availability->isUnavailability()) {
-      // If this is an unavailability check, invert the result
-      // by emitting a call to Builtin.xor_Int1(lhs, -1).
-      SILType i1 = SILType::getBuiltinIntegerType(1, ctx);
-      SILValue minusOne = B.createIntegerLiteral(loc, i1, -1);
-      result =
-          B.createBuiltinBinaryFunction(loc, "xor", i1, i1, {result, minusOne});
-    }
+    result = emitOSVersionRangeCheck(
+        *this, loc, primaryRange.getRawVersionRange(), isMacCatalyst);
+  }
+
+  // If this is an unavailability check, invert the result using xor with -1.
+  if (query->isUnavailability()) {
+    SILType i1 = SILType::getBuiltinIntegerType(1, ctx);
+    SILValue minusOne = B.createIntegerLiteral(loc, i1, -1);
+    result =
+        B.createBuiltinBinaryFunction(loc, "xor", i1, i1, {result, minusOne});
   }
 
   return result;
