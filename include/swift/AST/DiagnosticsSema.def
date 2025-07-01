@@ -1112,6 +1112,8 @@ ERROR(invalid_redecl_implicit,none,
 WARNING(invalid_redecl_swift5_warning,Deprecation,
         "redeclaration of %0 is deprecated and will be an error in Swift 5",
         (const ValueDecl *))
+ERROR(invalid_test_redeclaration,none,
+      "Invalid redeclaration of '%0'", (Identifier))
 
 NOTE(invalid_redecl_prev,none,
      "%0 previously declared here", (const ValueDecl *))

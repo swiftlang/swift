@@ -3727,6 +3727,38 @@ public:
     TypeChecker::checkDeclAttributes(FD);
     TypeChecker::checkDistributedFunc(FD);
 
+    // Check for duplicate @Test function names
+    if (auto *customAttr = FD->getAttrs().getAttribute<CustomAttr>()) {
+      if (auto *macro = FD->getResolvedMacro(customAttr)) {
+        if (macro->getBaseIdentifier().is("Test") &&
+            macro->getParentModule()->getName().is("Testing")) {
+          // This is a @Test function, check for duplicates in the same scope
+          auto *dc = FD->getDeclContext();
+          if (auto *nominal = dc->getSelfNominalTypeDecl()) {
+            // Check for other @Test functions with the same name in the same type
+            for (auto *member : nominal->getMembers()) {
+              if (auto *otherFunc = dyn_cast<FuncDecl>(member)) {
+                if (otherFunc != FD && otherFunc->getName() == FD->getName()) {
+                  // Check if the other function is also a @Test function
+                  if (auto *otherCustomAttr = otherFunc->getAttrs().getAttribute<CustomAttr>()) {
+                    if (auto *otherMacro = otherFunc->getResolvedMacro(otherCustomAttr)) {
+                      if (otherMacro->getBaseIdentifier().is("Test") &&
+                          otherMacro->getParentModule()->getName().is("Testing")) {
+                        // Found a duplicate @Test function
+                        Ctx.Diags.diagnose(FD->getLoc(), diag::invalid_test_redeclaration, FD->getName().getBaseIdentifier());
+                        Ctx.Diags.diagnose(otherFunc->getLoc(), diag::invalid_redecl_prev, otherFunc);
+                        break;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
     if (!checkOverrides(FD)) {
       // If a method has an 'override' keyword but does not
       // override anything, complain.
