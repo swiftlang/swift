@@ -739,15 +739,35 @@ public func expectDoesNotThrow(_ test: () throws -> Void,
   }
 }
 
-public func expectNil<T>(_ value: T?,
+public func expectNil<T>(
+  _ value: T?,
   _ message: @autoclosure () -> String = "",
   stackTrace: SourceLocStack = SourceLocStack(),
   showFrame: Bool = true,
-  file: String = #file, line: UInt = #line) {
+  file: String = #file, line: UInt = #line
+) {
   if value != nil {
     expectationFailure(
-      "expected optional to be nil\nactual: \"\(value!)\"", trace: message(),
+      "expected optional to be nil\nactual: \"\(value!)\"",
+      trace: message(),
       stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+  }
+}
+
+@_lifetime(copy value)
+public func expectNil<T: ~Copyable & ~Escapable>(
+  _ value: borrowing T?,
+  _ message: @autoclosure () -> String = "",
+  stackTrace: SourceLocStack = SourceLocStack(),
+  showFrame: Bool = true,
+  file: String = #file, line: UInt = #line
+) {
+  if value != nil {
+    expectationFailure(
+      "expected optional to be nil",
+      trace: message(),
+      stackTrace: stackTrace.pushIf(showFrame, file: file, line: line)
+    )
   }
 }
 
