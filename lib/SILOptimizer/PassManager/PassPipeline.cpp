@@ -116,12 +116,13 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // Select access kind after capture promotion and before stack promotion.
   // This guarantees that stack-promotable boxes have [static] enforcement.
   P.addAccessEnforcementSelection();
-
+/* Temporarily disabled: rdar://154686063, rdar://154713388
 #ifdef SWIFT_ENABLE_SWIFT_IN_SWIFT
   P.addMandatoryAllocBoxToStack();
 #else
+*/
   P.addLegacyAllocBoxToStack();
-#endif
+//#endif
   P.addNoReturnFolding();
   P.addBooleanLiteralFolding();
   addDefiniteInitialization(P);
@@ -417,7 +418,8 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
 void addFunctionPasses(SILPassPipelinePlan &P,
                        OptimizationLevelKind OpLevel) {
   // Promote box allocations to stack allocations.
-  P.addAllocBoxToStack();
+  // TODO: change this to add addAllocBoxToStack once rdar://154686063, rdar://154713388 is fixed
+  P.addLegacyAllocBoxToStack();
 
   if (P.getOptions().DestroyHoisting == DestroyHoistingOption::On) {
     P.addDestroyAddrHoisting();
