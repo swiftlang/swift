@@ -472,7 +472,8 @@ private:
   bool respectsDeadEnds() const {
     // TODO: OSSALifetimeCompletion: Once lifetimes are always complete, delete
     //                               this method.
-    return !endingLifetimeAtExplicitEnds();
+    return !endingLifetimeAtExplicitEnds() &&
+           !currentDef->getType().isMoveOnly();
   }
 
   bool respectsDeinitBarriers() const {

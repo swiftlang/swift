@@ -1695,7 +1695,6 @@ exit:
 // CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[ONE]]
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[RIGHT]]:
-// CHECK:         destroy_value [[ONE]]
 // CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = move_value [lexical] [[TWO]]
 // CHECK:         unreachable
 // CHECK:       [[EXIT]]:
@@ -1730,7 +1729,6 @@ exit:
 // CHECK:         [[LIFETIME_OWNED_1:%[^,]+]] = move_value [lexical] [[ONE]]
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[RIGHT]]:
-// CHECK:         destroy_value [[ONE]]
 // CHECK:         [[LIFETIME_OWNED_2:%[^,]+]] = move_value [lexical] [[TWO]]
 // CHECK:         unreachable
 // CHECK:       [[EXIT]]:

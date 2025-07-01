@@ -333,6 +333,8 @@ void CanonicalizeOSSALifetime::extendLivenessToDeadEnds() {
   for (auto destroy : destroys) {
     if (liveness->isWithinBoundary(destroy, /*deadEndBlocks=*/nullptr))
       continue;
+    if (deadEndBlocksAnalysis->get(function)->isDeadEnd(destroy->getParent()))
+      continue;
     completeLiveness.updateForUse(destroy, /*lifetimeEnding*/ true);
   }
 
