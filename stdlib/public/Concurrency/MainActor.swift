@@ -166,7 +166,7 @@ extension MainActor {
 
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
-@_silgen_name("pthread_main_np")
+@_extern(c, "pthread_main_np")
 @usableFromInline
 internal func pthread_main_np() -> CInt
 
