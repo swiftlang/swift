@@ -168,10 +168,6 @@ void ClangImporter::Implementation::makeComputed(AbstractStorageDecl *storage,
 bool importer::recordHasReferenceSemantics(
     const clang::RecordDecl *decl,
     ClangImporter::Implementation *importerImpl) {
-  if (!isa<clang::CXXRecordDecl>(decl) &&
-      !importerImpl->SwiftContext.LangOpts.CForeignReferenceTypes)
-    return false;
-
   // At this point decl might not be fully imported into Swift yet, which
   // means we might not have asked Clang to generate its implicit members, such
   // as copy or move constructors. This would cause CxxRecordSemanticsRequest to
