@@ -983,6 +983,14 @@ namespace RuntimeConstants {
     return RuntimeAvailability::AlwaysAvailable;
   }
 
+  RuntimeAvailability IsolatedDeinitAvailability(ASTContext &context) {
+    auto featureAvailability = context.getIsolatedDeinitAvailability();
+    if (!isDeploymentAvailabilityContainedIn(context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
   RuntimeAvailability
   MultiPayloadEnumTagSinglePayloadAvailability(ASTContext &context) {
     auto featureAvailability = context.getMultiPayloadEnumTagSinglePayload();

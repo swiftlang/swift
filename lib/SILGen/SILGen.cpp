@@ -458,6 +458,15 @@ FuncDecl *SILGenModule::getDeinitOnExecutor() {
   return lookupConcurrencyIntrinsic(getASTContext(), "_deinitOnExecutor");
 }
 
+FuncDecl *SILGenModule::getDeinitOnExecutorMainActorBackDeploy() {
+  auto found = lookupConcurrencyIntrinsic(getASTContext(),
+                                          "_deinitOnExecutorMainActorBackDeploy");
+  if (found)
+    return found;
+
+  return getDeinitOnExecutor();
+}
+
 FuncDecl *SILGenModule::getCreateExecutors() {
   return lookupConcurrencyIntrinsic(getASTContext(), "_createExecutors");
 }
