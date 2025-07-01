@@ -164,4 +164,37 @@ extension MainActor {
 }
 #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
+
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
+@_silgen_name("pthread_main_np")
+@usableFromInline
+internal func pthread_main_np() -> CInt
+
+@available(SwiftStdlib 5.1, *)
+@_alwaysEmitIntoClient
+@_silgen_name("swift_task_deinitOnExecutorMainActorBackDeploy")
+public func _deinitOnExecutorMainActorBackDeploy(
+  _ object: __owned AnyObject,
+  _ work: @convention(thin) (__owned AnyObject) -> Void,
+  _ executor: Builtin.Executor,
+  _ flags: Builtin.Word) {
+  if #available(macOS 15.4, iOS 18.4, watchOS 11.4, tvOS 18.4, visionOS 2.4, *) {
+    // On new-enough platforms, use the runtime functionality, which allocates
+    // the task more efficiently.
+    _deinitOnExecutor(object, work, executor, flags)
+  } else if pthread_main_np() == 1 {
+    // Using "main thread" as a proxy for "main actor", immediately destroy
+    // the object.
+    work(consume object)
+  } else {
+    // Steal the local object so that the reference count stays at 1 even when
+    // the object is captured.
+    var stolenObject: AnyObject? = consume object
+    Task.detached { @MainActor in
+      work(stolenObject.take()!)
+    }
+  }
+}
+#endif
+
 #endif // !$Embedded
