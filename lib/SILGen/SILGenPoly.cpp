@@ -987,7 +987,8 @@ ManagedValue Transform::transformTuple(ManagedValue inputTuple,
 void SILGenFunction::collectThunkParams(
     SILLocation loc, SmallVectorImpl<ManagedValue> &params,
     SmallVectorImpl<ManagedValue> *indirectResults,
-    SmallVectorImpl<ManagedValue> *indirectErrors) {
+    SmallVectorImpl<ManagedValue> *indirectErrors,
+    ManagedValue *implicitIsolation) {
   // Add the indirect results.
   for (auto resultTy : F.getConventions().getIndirectSILResultTypes(
            getTypeExpansionContext())) {
@@ -1029,8 +1030,12 @@ void SILGenFunction::collectThunkParams(
     // If our thunk has an implicit param and we are being asked to forward it,
     // to the callee, skip it. We are going to handle it especially later.
     if (param.hasOption(SILParameterInfo::ImplicitLeading) &&
-        param.hasOption(SILParameterInfo::Isolated))
+        param.hasOption(SILParameterInfo::Isolated)) {
+      if (implicitIsolation)
+        *implicitIsolation = functionArgument;
       continue;
+    }
+
     params.push_back(functionArgument);
   }
 }
@@ -5463,9 +5468,18 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
       options |= ThunkGenFlag::CalleeHasImplicitIsolatedParam;
   }
 
+  // Collect the thunk parameters. We don't need to collect the indirect
+  // error parameter because it'll be stored as IndirectErrorResult, which
+  // gets used implicitly by emitApplyWithRethrow.
   SmallVector<ManagedValue, 8> params;
   SmallVector<ManagedValue, 4> indirectResultParams;
-  SGF.collectThunkParams(loc, params, &indirectResultParams);
+  ManagedValue implicitIsolationParam;
+  SGF.collectThunkParams(loc, params, &indirectResultParams,
+                         /*indirect error params*/ nullptr,
+                         &implicitIsolationParam);
+
+  assert(bool(options & ThunkGenFlag::ThunkHasImplicitIsolatedParam)
+           == implicitIsolationParam.isValid());
 
   // Ignore the self parameter at the SIL level. IRGen will use it to
   // recover type metadata.
@@ -5511,9 +5525,11 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
     case FunctionTypeIsolation::Kind::NonIsolated:
       break;
 
+    // For a function for caller isolation, we'll have to figure out what the
+    // output function's formal isolation is. This is quite doable, but we don't
+    // have to do it yet.
     case FunctionTypeIsolation::Kind::NonIsolatedCaller:
-      hopToIsolatedParameter = true;
-      break;
+      llvm_unreachable("synchronous function has caller isolation?");
 
     // For a function with parameter isolation, we'll have to dig the
     // argument out after translation but before making the call.
@@ -5595,12 +5611,15 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
                               /*mandatory*/false);
   }
 
-  // If we are thunking a nonisolated caller to nonisolated or global actor, we
-  // need to load the actor.
+  // If the input function has caller isolation, we need to fill in that
+  // argument with the formal isolation of the output function.
   if (options.contains(ThunkGenFlag::CalleeHasImplicitIsolatedParam)) {
     auto outputIsolation = outputSubstType->getIsolation();
     switch (outputIsolation.getKind()) {
     case FunctionTypeIsolation::Kind::NonIsolated:
+    case FunctionTypeIsolation::Kind::Erased:
+      // Converting a caller-isolated function to @isolated(any) makes
+      // it @concurrent. In either case, emit a nil actor reference.
       argValues.push_back(SGF.emitNonIsolatedIsolation(loc).getValue());
       break;
     case FunctionTypeIsolation::Kind::GlobalActor: {
@@ -5610,11 +5629,17 @@ static void buildThunkBody(SILGenFunction &SGF, SILLocation loc,
           SGF.emitGlobalActorIsolation(loc, globalActor).getValue());
       break;
     }
-    case FunctionTypeIsolation::Kind::Parameter:
-    case FunctionTypeIsolation::Kind::Erased:
-    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
-      llvm_unreachable("Should never see this");
+    case FunctionTypeIsolation::Kind::NonIsolatedCaller: {
+      argValues.push_back(implicitIsolationParam.getValue());
       break;
+    }
+    case FunctionTypeIsolation::Kind::Parameter:
+      // This would require a conversion from a type with caller
+      // isolation to a type with parameter isolation, which is not
+      // currently allowed and probably won't ever be. Anyway, to
+      // implement it, we'd need to borrow the isolated parameter
+      // and wrap it up as an `Optional<any Actor>`.
+      llvm_unreachable("Should never see this");
     }
   }
 
@@ -5965,7 +5990,9 @@ static void buildWithoutActuallyEscapingThunkBody(SILGenFunction &SGF,
   SmallVector<ManagedValue, 8> params;
   SmallVector<ManagedValue, 8> indirectResults;
   SmallVector<ManagedValue, 1> indirectErrorResults;
-  SGF.collectThunkParams(loc, params, &indirectResults, &indirectErrorResults);
+  ManagedValue implicitIsolationParam;
+  SGF.collectThunkParams(loc, params, &indirectResults, &indirectErrorResults,
+                         &implicitIsolationParam);
 
   // Ignore the self parameter at the SIL level. IRGen will use it to
   // recover type metadata.
@@ -5985,6 +6012,11 @@ static void buildWithoutActuallyEscapingThunkBody(SILGenFunction &SGF,
   // Forward indirect error arguments.
   for (auto indirectError : indirectErrorResults)
     argValues.push_back(indirectError.getLValueAddress());
+
+  // Forward the implicit isolation parameter.
+  if (implicitIsolationParam.isValid()) {
+    argValues.push_back(implicitIsolationParam.getValue());
+  }
 
    // Add the rest of the arguments.
   forwardFunctionArguments(SGF, loc, fnType, params, argValues);
@@ -6175,6 +6207,7 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
     return getThunkedResult();
   thunk->setGenericEnvironment(genericEnv);
 
+  // FIXME: handle implicit isolation parameter here
   SILGenFunction thunkSGF(SGM, *thunk, FunctionDC);
   SmallVector<ManagedValue, 4> params;
   SmallVector<ManagedValue, 4> thunkIndirectResults;
@@ -6523,6 +6556,7 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   thunk->setGenericEnvironment(thunkGenericEnv);
 
   SILGenFunction thunkSGF(*this, *thunk, customDerivativeFn->getDeclContext());
+  // FIXME: handle implicit isolation parameter here
   SmallVector<ManagedValue, 4> params;
   SmallVector<ManagedValue, 4> indirectResults;
   SmallVector<ManagedValue, 1> indirectErrorResults;
