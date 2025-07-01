@@ -1052,10 +1052,16 @@ bool swift::diagnoseNonSendableTypes(
     Type type, SendableCheckContext fromContext,
     Type inDerivedConformance, SourceLoc loc,
     llvm::function_ref<bool(Type, DiagnosticBehavior)> diagnose) {
+  auto &ctx = type->getASTContext();
+
   // If the Sendable protocol is missing, do nothing.
-  auto proto = type->getASTContext().getProtocol(KnownProtocolKind::Sendable);
+  auto proto = ctx.getProtocol(KnownProtocolKind::Sendable);
   if (!proto)
     return false;
+
+  // Unwrap pack expansions here to allow packs of Sendable type.
+  if (auto *expansion = type->getAs<PackExpansionType>())
+    type = PackType::get(ctx, {expansion});
 
   // FIXME: More detail for unavailable conformances.
   auto conformance = lookupConformance(type, proto, /*allowMissing=*/true);
@@ -3054,12 +3060,6 @@ namespace {
         Type type = getDeclContext()
             ->mapTypeIntoContext(decl->getInterfaceType())
             ->getReferenceStorageReferent();
-
-        // Pack expansions are okay to capture as long as the pattern
-        // type is Sendable.
-        if (auto *expansion = type->getAs<PackExpansionType>()) {
-          type = expansion->getPatternType();
-        }
 
         if (type->hasError())
           continue;
