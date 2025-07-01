@@ -32,6 +32,16 @@
   }
   ```
 
+* [SE-0469][]:
+  Swift concurrency tasks (both unstructured and structured, via the TaskGroup `addTask` APIs) may now be given 
+  human-readable names, which can be used to support debugging and identifying tasks.
+
+  ```swift
+  let getUsers = Task("Get Users for \(accountID)") {
+    await users.get(accountID)
+  }
+  ```
+
 * The Swift compiler no longer diagnoses references to declarations that are
   potentially unavailable because the platform version might not be new enough
   when those references occur inside of contexts that are also unavailable to
@@ -10814,6 +10824,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0442]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0442-allow-taskgroup-childtaskresult-type-to-be-inferred.md
 [SE-0444]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0444-member-import-visibility.md
 [SE-0458]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0458-strict-memory-safety.md
+[SE-0469]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0469-task-names.md
 [SE-0470]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0470-isolated-conformances.md
 [SE-0472]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0472-task-start-synchronously-on-caller-context.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
