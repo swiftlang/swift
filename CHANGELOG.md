@@ -54,6 +54,33 @@
   // do something
   }
   ```
+* [SE-0461][]:
+  Nonisolated asynchronous functions may now execute on the calling actor, when the upcoming feature `NonisolatedNonsendingByDefault`
+  is enabled, or when explicitly opted-into using the `nonisolated(nonsending)` keywords. This allows for fine grained control
+  over where nonisolated asynchronous functions execute, and allows for the default behavior of their execution to be changed
+  from always executing on the global concurrent pool, to the calling actor, which can yield noticeable performance improvements 
+  thanks to less executor hopping when nonisolated and isolated code is invoked in sequence. 
+  
+  This also allows for safely using asynchronous functions on non-sendable types from actors, like so:
+
+  ```swift
+  class NotSendable {
+    func performSync() { ... }
+
+    nonisolated(nonsending)
+    func performAsync() async { ... }
+  }
+
+  actor MyActor {
+    let x: NotSendable
+
+    func call() async {
+      x.performSync() // okay
+
+      await x.performAsync() // okay
+    }
+  }
+  ```
 
 * The Swift compiler no longer diagnoses references to declarations that are
   potentially unavailable because the platform version might not be new enough
@@ -10837,6 +10864,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0442]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0442-allow-taskgroup-childtaskresult-type-to-be-inferred.md
 [SE-0444]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0444-member-import-visibility.md
 [SE-0458]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0458-strict-memory-safety.md
+[SE-0461]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0461-async-function-isolation.md
 [SE-0462]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0462-task-priority-escalation-apis.md
 [SE-0469]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0469-task-names.md
 [SE-0470]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0470-isolated-conformances.md
