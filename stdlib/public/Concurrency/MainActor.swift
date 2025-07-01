@@ -162,8 +162,6 @@ extension MainActor {
     try assumeIsolated(operation, file: file, line: line)
   }
 }
-#endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
 @_extern(c, "pthread_main_np")
@@ -196,5 +194,7 @@ public func _deinitOnExecutorMainActorBackDeploy(
   }
 }
 #endif
+
+#endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
 #endif // !$Embedded
