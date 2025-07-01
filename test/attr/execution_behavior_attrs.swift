@@ -94,9 +94,7 @@ struct TestAttributeCollisions {
   }
 
   @concurrent func testIsolationAny(arg: @isolated(any) () -> Void) async {}
-  // expected-error@-1 {{cannot use @concurrent on instance method 'testIsolationAny(arg:)' because it has a dynamically isolated parameter: 'arg'}}
   @concurrent subscript(testIsolationAny arg: @isolated(any) () -> Void) -> Int {
-  // expected-error@-1 {{cannot use @concurrent on subscript 'subscript(testIsolationAny:)' because it has a dynamically isolated parameter: 'arg'}}
     get async {}
   }
 
@@ -157,4 +155,14 @@ do {
       try await invocation.throwingFn()
     })
   }
+}
+
+do {
+  nonisolated(nonsending)
+  func testOnDecl(_: @isolated(any) () -> Void) async {} // Ok
+
+  func testOnType1(_: nonisolated(nonsending) @isolated(any) () async -> Void) {}
+  // expected-error@-1 {{cannot use 'nonisolated(nonsending)' together with '@isolated(any)'}}
+  func testOnType2(_: @concurrent @isolated(any) () async -> Void) {}
+  // expected-error@-1 {{cannot use '@concurrent' together with '@isolated(any)'}}
 }
