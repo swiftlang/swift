@@ -16,6 +16,7 @@
 
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/LazyResolver.h"
@@ -54,9 +55,15 @@ getNameForObjC(const ValueDecl *VD, CustomNamesOnly_t customNamesOnly) {
   if (auto clangDecl = dyn_cast_or_null<clang::NamedDecl>(VD->getClangDecl())) {
     if (const clang::IdentifierInfo *II = clangDecl->getIdentifier())
       return II->getName();
-    if (auto *anonDecl = dyn_cast<clang::TagDecl>(clangDecl))
+    if (auto *anonDecl = dyn_cast<clang::TagDecl>(clangDecl)) {
       if (auto *anonTypedef = anonDecl->getTypedefNameForAnonDecl())
         return anonTypedef->getIdentifier()->getName();
+      if (auto *cfOptionsTy =
+              VD->getASTContext()
+                  .getClangModuleLoader()
+                  ->getTypeDefForCXXCFOptionsDefinition(anonDecl))
+        return cfOptionsTy->getDecl()->getName();
+    }
   }
 
   return VD->getBaseIdentifier().str();
