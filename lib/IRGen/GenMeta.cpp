@@ -1000,7 +1000,7 @@ namespace {
 
       // Emit the dispatch thunk.
       auto shouldEmitDispatchThunk =
-          (Resilient || IGM.getOptions().WitnessMethodElimination);
+          Resilient || IGM.getOptions().WitnessMethodElimination;
       if (shouldEmitDispatchThunk) {
         IGM.emitDispatchThunk(func);
       }
