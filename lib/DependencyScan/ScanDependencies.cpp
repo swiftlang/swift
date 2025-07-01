@@ -1201,6 +1201,24 @@ static bool diagnoseCycle(const CompilerInstance &instance,
             thisID.ModuleName, nextID.ModuleName, noteBuffer.str());
       }
     }
+
+    // Check if this is a case of a source target shadowing
+    // a module with the same name
+    if (sourceId.Kind == swift::ModuleDependencyKind::SwiftSource) {
+      auto sinkModuleDefiningPath =
+          cache.findKnownDependency(sinkId).getModuleDefiningPath();
+      auto SDKPath =
+          instance.getInvocation().getSearchPathOptions().getSDKPath();
+      auto sinkIsInSDK =
+          !SDKPath.empty() &&
+          hasPrefix(llvm::sys::path::begin(sinkModuleDefiningPath),
+                    llvm::sys::path::end(sinkModuleDefiningPath),
+                    llvm::sys::path::begin(SDKPath),
+                    llvm::sys::path::end(SDKPath));
+      instance.getASTContext().Diags.diagnose(
+          SourceLoc(), diag::scanner_cycle_source_target_shadow_module,
+          sourceId.ModuleName, sinkModuleDefiningPath, sinkIsInSDK);
+    }
   };
 
   // Start from the main module and check direct and overlay dependencies
