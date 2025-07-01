@@ -186,3 +186,12 @@ func testIsolatedConformancesOnAssociatedTypes(hc: HoldsC, c: C) {
   // associated type.
   HoldsC.acceptSendableAliased(C.self)
 }
+
+
+struct MyHashable: @MainActor Hashable {
+  var counter = 0
+}
+
+@concurrent func testMyHashableSet() async {
+  let _: Set<MyHashable> = [] // expected-warning{{main actor-isolated conformance of 'MyHashable' to 'Hashable' cannot be used in nonisolated context}}
+}
