@@ -40,6 +40,12 @@ import CxxStdlib
 // CHECK-NEXT:   mutating func otherTemplatedType2(_ copy: ConstSpanOfInt, _: UnsafeMutablePointer<S<CInt>>!)
 // CHECK-NEXT: }
 
+// CHECK: class DependsOnSelfFRT {
+// CHECK-NEXT:   init()
+// CHECK-NEXT:   borrowing func get() -> ConstSpanOfInt
+// CHECK-NEXT:   var v: std.{{.*}}vector<CInt, std.{{.*}}allocator<CInt>>
+// CHECK-NEXT: }
+
 // CHECK:      /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.1, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 // CHECK-NEXT: @_lifetime(s: copy s)
