@@ -203,9 +203,9 @@ struct RuntimeVersionCheck {
   /// fails, e.g. "guard #available(iOS 10, *) else { return nil }".
   Stmt *createEarlyReturnStmt(ASTContext &C) const {
     // platformSpec = "\(attr.platform) \(attr.introduced)"
+    auto domain = AvailabilityDomain::forPlatform(Platform);
     auto platformSpec = AvailabilitySpec::createForDomain(
-        C, AvailabilityDomain::forPlatform(Platform), SourceLoc(), Version,
-        SourceLoc());
+        C, domain, SourceLoc(), Version, SourceLoc());
 
     // wildcardSpec = "*"
     auto wildcardSpec = AvailabilitySpec::createWildcard(C, SourceLoc());
@@ -217,7 +217,9 @@ struct RuntimeVersionCheck {
 
     // This won't be filled in by TypeCheckAvailability because we have
     // invalid SourceLocs in this area of the AST.
-    availableInfo->setAvailableRange(getVersionRange());
+    availableInfo->setAvailabilityQuery(AvailabilityQuery::dynamic(
+        domain, /*isUnavailable=*/false, AvailabilityRange(getVersionRange()),
+        std::nullopt));
 
     // earlyReturnBody = "{ return nil }"
     auto earlyReturn = new (C) FailStmt(SourceLoc(), SourceLoc());
