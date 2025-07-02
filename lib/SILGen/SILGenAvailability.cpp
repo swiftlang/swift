@@ -228,14 +228,14 @@ static SILValue emitZipperedBackDeployIfAvailableBooleanTestValue(
   assert(ctx.LangOpts.TargetVariant);
 
   VersionRange OSVersion = VersionRange::all();
-  if (auto version = AFD->getBackDeployedBeforeOSVersion(ctx)) {
-    OSVersion = VersionRange::allGTE(*version);
+  if (auto attrAndRange = AFD->getBackDeployedAttrAndRange(ctx)) {
+    OSVersion = attrAndRange->second.getRawVersionRange();
   }
 
   VersionRange VariantOSVersion = VersionRange::all();
-  if (auto version =
-          AFD->getBackDeployedBeforeOSVersion(ctx, /*forTargetVariant=*/true)) {
-    VariantOSVersion = VersionRange::allGTE(*version);
+  if (auto attrAndRange =
+          AFD->getBackDeployedAttrAndRange(ctx, /*forTargetVariant=*/true)) {
+    VariantOSVersion = attrAndRange->second.getRawVersionRange();
   }
 
   return emitZipperedOSVersionRangeCheck(SGF, loc, OSVersion, VariantOSVersion);
@@ -254,7 +254,8 @@ static void emitBackDeployIfAvailableCondition(SILGenFunction &SGF,
                                                SILLocation loc,
                                                SILBasicBlock *availableBB,
                                                SILBasicBlock *unavailableBB) {
-  if (SGF.getASTContext().LangOpts.TargetVariant) {
+  auto &ctx = SGF.getASTContext();
+  if (ctx.LangOpts.TargetVariant) {
     SILValue booleanTestValue =
         emitZipperedBackDeployIfAvailableBooleanTestValue(
             SGF, AFD, loc, availableBB, unavailableBB);
@@ -262,17 +263,17 @@ static void emitBackDeployIfAvailableCondition(SILGenFunction &SGF,
     return;
   }
 
-  auto version = AFD->getBackDeployedBeforeOSVersion(SGF.SGM.getASTContext());
+  auto attrAndRange = AFD->getBackDeployedAttrAndRange(ctx);
   VersionRange OSVersion = VersionRange::empty();
-  if (version.has_value()) {
-    OSVersion = VersionRange::allGTE(*version);
+  if (attrAndRange) {
+    OSVersion = attrAndRange->second.getRawVersionRange();
   }
 
   SILValue booleanTestValue;
   if (OSVersion.isEmpty() || OSVersion.isAll()) {
     // If there's no check for the current platform, this condition is
     // trivially true.
-    SILType i1 = SILType::getBuiltinIntegerType(1, SGF.getASTContext());
+    SILType i1 = SILType::getBuiltinIntegerType(1, ctx);
     booleanTestValue = SGF.B.createIntegerLiteral(loc, i1, 1);
   } else {
     bool isMacCatalyst =
@@ -434,8 +435,8 @@ SILGenFunction::emitIfAvailableQuery(SILLocation loc,
 bool SILGenModule::requiresBackDeploymentThunk(ValueDecl *decl,
                                                ResilienceExpansion expansion) {
   auto &ctx = getASTContext();
-  auto backDeployBeforeVersion = decl->getBackDeployedBeforeOSVersion(ctx);
-  if (!backDeployBeforeVersion)
+  auto attrAndRange = decl->getBackDeployedAttrAndRange(ctx);
+  if (!attrAndRange)
     return false;
 
   switch (expansion) {
@@ -453,8 +454,7 @@ bool SILGenModule::requiresBackDeploymentThunk(ValueDecl *decl,
   // high enough that the ABI implementation of the back deployed declaration is
   // guaranteed to be available.
   auto deploymentAvailability = AvailabilityRange::forDeploymentTarget(ctx);
-  auto declAvailability = AvailabilityRange(*backDeployBeforeVersion);
-  if (deploymentAvailability.isContainedIn(declAvailability))
+  if (deploymentAvailability.isContainedIn(attrAndRange->second))
     return false;
 
   return true;
