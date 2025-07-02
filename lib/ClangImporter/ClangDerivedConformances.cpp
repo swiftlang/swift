@@ -265,7 +265,8 @@ instantiateTemplatedOperator(ClangImporter::Implementation &impl,
       classDecl->getLocation(), clang::OverloadCandidateSet::CSK_Operator,
       clang::OverloadCandidateSet::OperatorRewriteInfo(opKind,
                                               clang::SourceLocation(), false));
-  clangSema.LookupOverloadedBinOp(candidateSet, opKind, ops, {arg, arg}, true);
+  std::array<clang::Expr *, 2> args{arg, arg};
+  clangSema.LookupOverloadedBinOp(candidateSet, opKind, ops, args, true);
 
   clang::OverloadCandidateSet::iterator best;
   switch (candidateSet.BestViableFunction(clangSema, clang::SourceLocation(),
