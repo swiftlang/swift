@@ -1531,6 +1531,11 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   if (isa<clang::ObjCCategoryDecl>(D))
     return ImportedName();
 
+  // C++ interop was not available in Swift 2
+  if (!swift3OrLaterName && isa<clang::CXXMethodDecl>(D)) {
+    return ImportedName();
+  }
+
   // Dig out the definition, if there is one.
   if (auto def = getDefinitionForClangTypeDecl(D)) {
     if (*def)
