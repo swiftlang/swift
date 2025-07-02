@@ -42,8 +42,20 @@ target_compile_options(ClangModules INTERFACE
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-vfsoverlay ${CMAKE_CURRENT_BINARY_DIR}/windows-sdk-overlay.yaml>")
 
 install(FILES
+  ucrt.10.0.18362.0.modulemap
+  ucrt.10.0.19041.0.modulemap
+  ucrt.10.0.20348.0.modulemap
+  ucrt.10.0.22000.0.modulemap
+  ucrt.10.0.22621.0.modulemap
+  ucrt.10.0.26100.0.modulemap
   ucrt.modulemap
   vcruntime.apinotes
   vcruntime.modulemap
+  winsdk.10.0.18362.0.modulemap
+  winsdk.10.0.19041.0.modulemap
+  winsdk.10.0.20348.0.modulemap
+  winsdk.10.0.22000.0.modulemap
+  winsdk.10.0.22621.0.modulemap
+  winsdk.10.0.26100.0.modulemap
   winsdk.modulemap
   DESTINATION ${CMAKE_INSTALL_DATAROOTDIR})
