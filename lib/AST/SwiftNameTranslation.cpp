@@ -224,12 +224,6 @@ swift::cxx_translation::getNameForCxx(const ValueDecl *VD,
       auto r = ctx.getIdentifier(os.str());
       return r.str();
     }
-
-    // FIXME: String.Index should be exposed as String::Index, not
-    // _String_Index.
-    if (VD->getBaseIdentifier().str() == "Index") {
-      return "String_Index";
-    }
   }
 
   return VD->getBaseIdentifier().str();
