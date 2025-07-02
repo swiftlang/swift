@@ -7337,7 +7337,7 @@ public:
   /// Retrieve a sugared generic type parameter at the given depth and index.
   static GenericTypeParamType *get(Identifier name,
                                    GenericTypeParamKind paramKind,
-                                   unsigned depth, unsigned index,
+                                   unsigned depth, unsigned index, unsigned weight,
                                    Type valueType, const ASTContext &ctx);
 
   /// Retrieve a canonical generic type parameter with the given kind, depth,

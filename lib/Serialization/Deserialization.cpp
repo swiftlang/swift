@@ -1716,6 +1716,7 @@ ModuleFile::getGenericSignatureChecked(serialization::GenericSignatureID ID) {
         paramTy = GenericTypeParamType::get(name, paramTy->getParamKind(),
                                             paramTy->getDepth(),
                                             paramTy->getIndex(),
+                                            paramTy->getWeight(),
                                             paramTy->getValueType(),
                                             getContext());
       }
@@ -7709,7 +7710,7 @@ DESERIALIZE_TYPE(GENERIC_TYPE_PARAM_TYPE)(
 
   ASSERT(weight == 0);
   auto name = MF.getDeclBaseName(declOrIdentifier).getIdentifier();
-  return GenericTypeParamType::get(name, *paramKind, depth, index, *valueType,
+  return GenericTypeParamType::get(name, *paramKind, depth, index, weight, *valueType,
                                    MF.getContext());
 }
 
