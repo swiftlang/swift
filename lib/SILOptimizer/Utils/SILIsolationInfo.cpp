@@ -1096,6 +1096,19 @@ void SILIsolationInfo::printOptions(llvm::raw_ostream &os) const {
   llvm::interleave(data, os, ", ");
 }
 
+StringRef SILIsolationInfo::printActorIsolationForDiagnostics(
+    SILFunction *fn, ActorIsolation iso, StringRef openingQuotationMark,
+    bool asNoun) {
+  SmallString<64> string;
+  {
+    llvm::raw_svector_ostream os(string);
+    printActorIsolationForDiagnostics(fn, iso, os, openingQuotationMark,
+                                      asNoun);
+  }
+
+  return fn->getASTContext().getIdentifier(string).str();
+}
+
 void SILIsolationInfo::printActorIsolationForDiagnostics(
     SILFunction *fn, ActorIsolation iso, llvm::raw_ostream &os,
     StringRef openingQuotationMark, bool asNoun) {
@@ -1250,6 +1263,16 @@ void SILIsolationInfo::Profile(llvm::FoldingSetNodeID &id) const {
   }
 }
 
+StringRef SILIsolationInfo::printForDiagnostics(SILFunction *fn) const {
+  SmallString<64> string;
+  {
+    llvm::raw_svector_ostream os(string);
+    printForDiagnostics(fn, os);
+  }
+
+  return fn->getASTContext().getIdentifier(string).str();
+}
+
 void SILIsolationInfo::printForDiagnostics(SILFunction *fn,
                                            llvm::raw_ostream &os) const {
   switch (Kind(*this)) {
@@ -1307,6 +1330,16 @@ void SILIsolationInfo::printForDiagnostics(SILFunction *fn,
     os << "task-isolated";
     return;
   }
+}
+
+StringRef SILIsolationInfo::printForCodeDiagnostic(SILFunction *fn) const {
+  SmallString<64> string;
+  {
+    llvm::raw_svector_ostream os(string);
+    printForCodeDiagnostic(fn, os);
+  }
+
+  return fn->getASTContext().getIdentifier(string).str();
 }
 
 void SILIsolationInfo::printForCodeDiagnostic(SILFunction *fn,

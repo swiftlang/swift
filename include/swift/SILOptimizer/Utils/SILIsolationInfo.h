@@ -332,7 +332,15 @@ public:
   /// form of diagnostic than other cases.
   void printForCodeDiagnostic(SILFunction *fn, llvm::raw_ostream &os) const;
 
+  /// Overload of printForCodeDiagnostics that returns an interned StringRef
+  /// owned by the AST.
+  StringRef printForCodeDiagnostic(SILFunction *fn) const;
+
   void printForDiagnostics(SILFunction *fn, llvm::raw_ostream &os) const;
+
+  /// Overload of printForDiagnostics that returns an interned StringRef owned
+  /// by the AST.
+  StringRef printForDiagnostics(SILFunction *fn) const;
 
   SWIFT_DEBUG_DUMPER(dumpForDiagnostics(SILFunction *fn)) {
     printForDiagnostics(fn, llvm::dbgs());
@@ -524,6 +532,12 @@ public:
       SILFunction *fn, ActorIsolation iso, llvm::raw_ostream &os,
       StringRef openingQuotationMark = "'", bool asNoun = false);
 
+  /// Overload for printActorIsolationForDiagnostics that produces a StringRef.
+  static StringRef
+  printActorIsolationForDiagnostics(SILFunction *fn, ActorIsolation iso,
+                                    StringRef openingQuotationMark = "'",
+                                    bool asNoun = false);
+
   void Profile(llvm::FoldingSetNodeID &id) const;
 
 private:
@@ -593,12 +607,20 @@ public:
     innerInfo.printForDiagnostics(fn, os);
   }
 
+  StringRef printForDiagnostics(SILFunction *fn) const {
+    return innerInfo.printForDiagnostics(fn);
+  }
+
   SWIFT_DEBUG_DUMPER(dumpForDiagnostics(SILFunction *fn)) {
     innerInfo.dumpForDiagnostics(fn);
   }
 
   void printForCodeDiagnostic(SILFunction *fn, llvm::raw_ostream &os) const {
     innerInfo.printForCodeDiagnostic(fn, os);
+  }
+
+  StringRef printForCodeDiagnostic(SILFunction *fn) const {
+    return innerInfo.printForCodeDiagnostic(fn);
   }
 
   void printForOneLineLogging(SILFunction *fn, llvm::raw_ostream &os) const {
