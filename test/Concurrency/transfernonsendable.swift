@@ -71,6 +71,7 @@ final class FinalMainActorIsolatedKlass {
 func useInOut<T>(_ x: inout T) {}
 func useValue<T>(_ x: T) {}
 func useValueAsync<T>(_ x: T) async {}
+@concurrent func useValueAsyncConcurrent<T>(_ x: T) async {}
 
 @MainActor func transferToMain<T>(_ t: T) async {}
 
@@ -2074,3 +2075,10 @@ func inferLocationOfCapturedTaskIsolatedSelfCorrectly() {
   }
 }
 
+nonisolated(nonsending) func testCallNonisolatedNonsending(_ x: NonSendableKlass) async {
+  await useValueAsync(x) // expected-tns-ni-warning {{sending 'x' risks causing data races}}
+  // expected-tns-ni-note @-1 {{sending nonisolated(nonsending) task-isolated 'x' to nonisolated global function 'useValueAsync' risks causing data races between nonisolated and nonisolated(nonsending) task-isolated uses}}
+  await useValueAsyncConcurrent(x) // expected-tns-warning {{sending 'x' risks causing data races}}
+  // expected-tns-ni-note @-1 {{sending nonisolated(nonsending) task-isolated 'x' to nonisolated global function 'useValueAsyncConcurrent' risks causing data races between nonisolated and nonisolated(nonsending) task-isolated uses}}
+  // expected-tns-ni-ns-note @-2 {{sending task-isolated 'x' to @concurrent global function 'useValueAsyncConcurrent' risks causing data races between @concurrent and task-isolated uses}}
+}
