@@ -25,3 +25,8 @@ typedef MyNS::MyDeepNS::DeepNestedStruct DeepNestedStructTypedef;
 
 int deepNestedStructTypedef_method(DeepNestedStructTypedef p) SWIFT_NAME("DeepNestedStructTypedef.methodTypedef(self:)") { return p.value + 3; }
 int deepNestedStructTypedef_methodQualName(MyNS::MyDeepNS::DeepNestedStruct p) SWIFT_NAME("DeepNestedStructTypedef.methodTypedefQualName(self:)") { return p.value + 4; }
+
+namespace MyNS {
+int nestedStruct_nestedMethod(MyNS::NestedStruct p) SWIFT_NAME("MyNS.NestedStruct.nestedMethod(self:)") { return p.value + 3; }
+inline int nestedStruct_nestedMethodInline(MyNS::NestedStruct p) SWIFT_NAME("MyNS.NestedStruct.nestedMethodInline(self:)") { return p.value + 4; }
+}
