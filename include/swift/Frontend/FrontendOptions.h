@@ -145,7 +145,7 @@ public:
   std::string VerifyGenericSignaturesInModule;
 
   /// CacheReplay PrefixMap.
-  std::vector<std::string> CacheReplayPrefixMap;
+  std::vector<std::pair<std::string, std::string>> CacheReplayPrefixMap;
 
   /// Number of retry opening an input file if the previous opening returns
   /// bad file descriptor error.

@@ -2473,12 +2473,9 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
     auto SplitMap = StringRef(A).split('=');
     Opts.DeserializedPathRecoverer.addMapping(SplitMap.first, SplitMap.second);
   }
-  for (StringRef Opt : Args.getAllArgValues(OPT_scanner_prefix_map)) {
-    if (auto Mapping = llvm::MappedPrefix::getFromJoined(Opt)) {
-      Opts.ScannerPrefixMapper.push_back({Mapping->Old, Mapping->New});
-    } else {
-      Diags.diagnose(SourceLoc(), diag::error_prefix_mapping, Opt);
-    }
+  
+  for (const Arg *A : Args.filtered(OPT_scanner_prefix_map_paths)) {
+    Opts.ScannerPrefixMapper.push_back({A->getValue(0), A->getValue(1)});
   }
 
   Opts.ResolvedPluginVerification |=
