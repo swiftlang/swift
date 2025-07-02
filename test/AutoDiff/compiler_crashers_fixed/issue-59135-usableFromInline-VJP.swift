@@ -3,7 +3,7 @@
 
 // The original function Tensor.subscriptIndexPath() is not marked as @differentiable. As a result, no explicit differentiable witness is generated for it.
 // However, the witness is generated as a side effect of providing a derivative via  @derivative(of: subscriptIndexPath) on _vjpSubscriptIndexPath.
-// Since _vjpSubscriptIndexPath is not emitted when -emit-module is used, we need to ensure we still generate a wittness.
+// Since _vjpSubscriptIndexPath is not emitted when -emit-module is used, we need to ensure we still generate a witness.
 
 import _Differentiation
 
