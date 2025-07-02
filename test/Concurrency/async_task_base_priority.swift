@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library )
+// RUN: %target-run-simple-swift( %import-libdispatch -parse-as-library )
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -40,6 +40,7 @@ func print(_ s: String = "") {
   fputs("\(s)\n", stderr)
 }
 
+@available(SwiftStdlib 5.9, *)
 func expectedBasePri(priority: TaskPriority) -> TaskPriority {
   let basePri = Task.basePriority!
 
@@ -48,6 +49,7 @@ func expectedBasePri(priority: TaskPriority) -> TaskPriority {
   return basePri
 }
 
+@available(SwiftStdlib 5.9, *)
 func expectedCurrentPri(priority: TaskPriority) -> TaskPriority {
   let curPri = Task.currentPriority
   print("Testing curPri matching expected pri - \(curPri) == \(priority)")
@@ -55,25 +57,25 @@ func expectedCurrentPri(priority: TaskPriority) -> TaskPriority {
   return curPri
 }
 
+@available(SwiftStdlib 5.9, *)
 func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
-    let _ = expectedBasePri(priority: basePri)
-    let _ = expectedCurrentPri(priority: curPri)
+  let _ = expectedBasePri(priority: basePri)
+  let _ = expectedCurrentPri(priority: curPri)
 }
 
 @main struct Main {
   static func main() async {
-
-    let top_level = detach { /* To detach from main actor when running work */
+    let top_level = Task.detached { /* To detach from main actor when running work */
 
       let tests = TestSuite("Task base priority")
-      if #available(SwiftStdlib 5.1, *) {
+      if #available(SwiftStdlib 5.9, *) {
 
         tests.test("Structured concurrency base priority propagation") {
-          let task = Task(priority: .background) {
-            await loopUntil(priority: .default)
+          let task = Task.detached(priority: .background) {
+            await loopUntil(priority: .medium)
 
             let basePri = expectedBasePri(priority: .background)
-            let curPri = expectedCurrentPri(priority: .default)
+            let curPri = expectedCurrentPri(priority: .medium)
 
             // Structured concurrency via async let, escalated priority of
             // parent should propagate
@@ -111,11 +113,11 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
         }
 
         tests.test("Unstructured base priority propagation") {
-          let task = Task(priority : .background) {
-            await loopUntil(priority: .default)
+          let task = Task.detached(priority: .background) {
+            await loopUntil(priority: .medium)
 
             let basePri = expectedBasePri(priority: .background)
-            let _ = expectedCurrentPri(priority: .default)
+            let _ = expectedCurrentPri(priority: .medium)
 
             let group = DispatchGroup()
 
@@ -124,7 +126,6 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
             let _ = Task {
               let _ = await testNestedTaskPriority(basePri: basePri, curPri: basePri)
               group.leave()
-              return
             }
 
             // Wait for unstructured task to finish running, don't await it
