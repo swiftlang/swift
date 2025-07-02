@@ -185,7 +185,17 @@ extension String {
   /// Contiguous strings also benefit from fast-paths and better optimizations.
   ///
   @_alwaysEmitIntoClient
-  public var isContiguousUTF8: Bool { return _guts.isFastUTF8 }
+  public var isContiguousUTF8: Bool {
+    if _guts.isFastUTF8 {
+#if os(watchOS) && _pointerBitWidth(_32)
+      if _guts.isSmall && _guts.count > _SmallString.contiguousCapacity() {
+        return false
+      }
+#endif
+      return true
+    }
+    return false
+  }
 
   /// If this string is not contiguous, make it so. If this mutates the string,
   /// it will invalidate any pre-existing indices.
