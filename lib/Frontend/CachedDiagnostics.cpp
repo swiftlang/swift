@@ -721,7 +721,7 @@ public:
             Instance.getInvocation().getFrontendOptions().InputsAndOutputs),
         Diags(Instance.getDiags()), CAS(*Instance.getSharedCASInstance()) {
     SmallVector<llvm::MappedPrefix, 4> Prefixes;
-    llvm::MappedPrefix::transformJoinedIfValid(
+    llvm::MappedPrefix::transformPairs(
         Instance.getInvocation().getFrontendOptions().CacheReplayPrefixMap,
         Prefixes);
     Mapper.addRange(Prefixes);
