@@ -5261,7 +5261,7 @@ SourceLoc extractNearestSourceLoc(RegexLiteralPatternFeatureKind kind);
 
 class GenericTypeParamDeclGetValueTypeRequest
     : public SimpleRequest<GenericTypeParamDeclGetValueTypeRequest,
-                           Type(GenericTypeParamDecl *decl),
+                           Type(const GenericTypeParamDecl *decl),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -5269,7 +5269,7 @@ public:
 private:
   friend SimpleRequest;
 
-  Type evaluate(Evaluator &evaluator, GenericTypeParamDecl *decl) const;
+  Type evaluate(Evaluator &evaluator, const GenericTypeParamDecl *decl) const;
 
 public:
   bool isCached() const { return true; }
