@@ -767,6 +767,10 @@ public:
       return false;
 
     (void)forwardDeclareMemberTypes(CD->getAllMembers(), CD);
+    for (const auto *ed :
+         printer.getInteropContext().getExtensionsForNominalType(CD)) {
+      (void)forwardDeclareMemberTypes(ed->getAllMembers(), CD);
+    }
     auto [it, inserted] =
         seenTypes.try_emplace(CD, EmissionState::NotYetDefined, false);
     if (outputLangMode == OutputLanguageMode::Cxx &&
@@ -868,6 +872,10 @@ public:
 
     if (outputLangMode == OutputLanguageMode::Cxx) {
       forwardDeclareMemberTypes(ED->getAllMembers(), ED);
+      for (const auto *ed :
+           printer.getInteropContext().getExtensionsForNominalType(ED)) {
+        (void)forwardDeclareMemberTypes(ed->getAllMembers(), ED);
+      }
       forwardDeclareCxxValueTypeIfNeeded(ED);
     }
 
