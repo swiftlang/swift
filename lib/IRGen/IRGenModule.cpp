@@ -1449,7 +1449,7 @@ bool IRGenModule::IsWellKnownBuiltinOrStructralType(CanType T) const {
       T == Context.getAnyObjectType())
     return true;
 
-  if (auto IntTy = dyn_cast<BuiltinIntegerType>(T)) {
+  if (auto IntTy = dyn_cast_or_null<BuiltinIntegerType>(T)) {
     auto Width = IntTy->getWidth();
     if (Width.isPointerWidth())
       return true;
