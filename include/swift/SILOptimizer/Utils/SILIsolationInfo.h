@@ -185,6 +185,10 @@ public:
     /// parameter and should be allowed to merge into a self parameter.
     UnappliedIsolatedAnyParameter = 0x2,
 
+    /// If set, this was a TaskIsolated value from a nonisolated(nonsending)
+    /// parameter.
+    NonisolatedNonsendingTaskIsolated = 0x4,
+
     /// The maximum number of bits used by a Flag.
     MaxNumBits = 3,
   };
@@ -315,6 +319,25 @@ public:
         ? isolatedConformance
         : newIsolatedConformance;
     return result;
+  }
+
+  bool isNonisolatedNonsendingTaskIsolated() const {
+    return getOptions().contains(Flag::NonisolatedNonsendingTaskIsolated);
+  }
+
+  SILIsolationInfo
+  withNonisolatedNonsendingTaskIsolated(bool newValue = true) const {
+    assert(*this && "Cannot be unknown");
+    assert(isTaskIsolated() && "Can only be task isolated");
+    auto self = *this;
+    if (newValue) {
+      self.options =
+          (self.getOptions() | Flag::NonisolatedNonsendingTaskIsolated).toRaw();
+    } else {
+      self.options = self.getOptions().toRaw() &
+                     ~Options(Flag::NonisolatedNonsendingTaskIsolated).toRaw();
+    }
+    return self;
   }
 
   /// Returns true if this actor isolation is derived from an unapplied
