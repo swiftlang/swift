@@ -5,6 +5,7 @@
 //
 // Temporarily disable on AArch64 Linux (rdar://88451721)
 // UNSUPPORTED: OS=linux-gnu && CPU=aarch64
+// XFAIL: OS=linux-android
 
 // rdar://100558042
 // UNSUPPORTED: CPU=arm64e
