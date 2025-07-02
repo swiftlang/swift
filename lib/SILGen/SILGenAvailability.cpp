@@ -508,7 +508,9 @@ void SILGenFunction::emitBackDeploymentThunk(SILDeclRef thunk) {
   SmallVector<ManagedValue, 4> params;
   SmallVector<ManagedValue, 4> indirectParams;
   SmallVector<ManagedValue, 4> indirectErrorResults;
-  collectThunkParams(loc, params, &indirectParams, &indirectErrorResults);
+  ManagedValue implicitIsolationParam;
+  collectThunkParams(loc, params, &indirectParams, &indirectErrorResults,
+                     &implicitIsolationParam);
 
   // Build up the list of arguments that we're going to invoke the real
   // function with.
@@ -518,6 +520,9 @@ void SILGenFunction::emitBackDeploymentThunk(SILDeclRef thunk) {
   }
   for (auto indirectErrorResult : indirectErrorResults) {
     paramsForForwarding.emplace_back(indirectErrorResult.getLValueAddress());
+  }
+  if (implicitIsolationParam) {
+    paramsForForwarding.emplace_back(implicitIsolationParam.forward(*this));
   }
 
   for (auto param : params) {
