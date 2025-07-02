@@ -501,6 +501,14 @@ def print_repo_hashes(args, config):
         print("{:<35}: {:<35}".format(repo_name, repo_hash))
 
 
+def add_additional_schemes(config, additional_scheme_config) -> None:
+    for key, scheme in additional_scheme_config["branch-schemes"].items():
+        if key in config["branch-schemes"]:
+            raise RuntimeError(f"Additional scheme config contains duplicate key {key}")
+
+        config["branch-schemes"][key] = scheme
+
+
 def validate_config(config):
     # Make sure that our branch-names are unique.
     scheme_names = config['branch-schemes'].keys()
@@ -638,6 +646,13 @@ repositories.
                              "update-checkout-config.json"),
         help="Configuration file to use")
     parser.add_argument(
+        "--additional-scheme-config",
+        help="""Configs containing additional branch-schemes to append to the
+        configration. Can be specified multiple times, each will be appended in
+        order.""",
+        action="append",
+        default=[])
+    parser.add_argument(
         "--github-comment",
         help="""Check out related pull requests referenced in the given
         free-form GitHub-style comment.""",
@@ -696,6 +711,10 @@ repositories.
 
     with open(args.config) as f:
         config = json.load(f)
+    for additional_config in args.additional_scheme_config:
+        with open(additional_config) as f:
+            additional_config = json.load(f)
+        add_additional_schemes(config, additional_config)
     validate_config(config)
 
     cross_repos_pr = {}
@@ -744,6 +763,10 @@ repositories.
                 # Re-read the config after checkout.
                 with open(args.config) as f:
                     config = json.load(f)
+                for additional_config in args.additional_scheme_config:
+                    with open(additional_config) as f:
+                        additional_config = json.load(f)
+                    add_additional_schemes(config, additional_config)
                 validate_config(config)
                 scheme_map = get_scheme_map(config, scheme_name)
 
