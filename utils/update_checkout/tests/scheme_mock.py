@@ -78,7 +78,7 @@ class CallQuietlyException(Exception):
 def call_quietly(*args, **kwargs):
     kwargs['stderr'] = subprocess.STDOUT
     try:
-        subprocess.check_output(*args, **kwargs)
+        return subprocess.check_output(*args, **kwargs)
     except subprocess.CalledProcessError as e:
         raise CallQuietlyException(command=e.cmd, returncode=e.returncode,
                                    output=e.stdout) from e
@@ -180,7 +180,7 @@ class SchemeMockTestCase(unittest.TestCase):
 
     def call(self, *args, **kwargs):
         kwargs['cwd'] = self.source_root
-        call_quietly(*args, **kwargs)
+        return call_quietly(*args, **kwargs)
 
     def get_all_repos(self):
         return list(self.config["repos"].keys())
