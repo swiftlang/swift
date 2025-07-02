@@ -797,7 +797,7 @@ Expr *CallerSideDefaultArgExprRequest::evaluate(
       // simple literals.
       transaction.abort();
       (void)param->getTypeCheckedDefaultExpr();
-      ASSERT(ctx.Diags.hadAnyError());
+      CONDITIONAL_ASSERT(ctx.Diags.hadAnyError());
     }
     return new (ctx) ErrorExpr(initExpr->getSourceRange(), paramTy);
   }
