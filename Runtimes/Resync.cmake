@@ -138,6 +138,18 @@ copy_files(public/Windows Overlay/Windows/WinSDK FILES WinSDK.swift)
 message(STATUS "Windows modulemaps[${StdlibSources}/Platform] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/Windows/clang")
 copy_files(public/Platform Overlay/Windows/clang
   FILES
+    ucrt.10.0.18362.0.modulemap
+    winsdk.10.0.18362.0.modulemap
+    ucrt.10.0.19041.0.modulemap
+    winsdk.10.0.19041.0.modulemap
+    ucrt.10.0.20348.0.modulemap
+    winsdk.10.0.20348.0.modulemap
+    ucrt.10.0.22000.0.modulemap
+    winsdk.10.0.22000.0.modulemap
+    ucrt.10.0.22621.0.modulemap
+    winsdk.10.0.22621.0.modulemap
+    ucrt.10.0.26100.0.modulemap
+    winsdk.10.0.26100.0.modulemap
     ucrt.modulemap
     winsdk.modulemap
     vcruntime.modulemap
@@ -146,6 +158,18 @@ copy_files(public/Platform Overlay/Windows/clang
 message(STATUS "CRT[${StdlibSources}/public/Platform] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/Windows/CRT")
 copy_files(public/Platform Overlay/Windows/CRT
   FILES
+    ucrt.10.0.18362.0.modulemap
+    winsdk.10.0.18362.0.modulemap
+    ucrt.10.0.19041.0.modulemap
+    winsdk.10.0.19041.0.modulemap
+    ucrt.10.0.20348.0.modulemap
+    winsdk.10.0.20348.0.modulemap
+    ucrt.10.0.22000.0.modulemap
+    winsdk.10.0.22000.0.modulemap
+    ucrt.10.0.22621.0.modulemap
+    winsdk.10.0.22621.0.modulemap
+    ucrt.10.0.26100.0.modulemap
+    winsdk.10.0.26100.0.modulemap
     ucrt.swift
     Platform.swift
     POSIXError.swift

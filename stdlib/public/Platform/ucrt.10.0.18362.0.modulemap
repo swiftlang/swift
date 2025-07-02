@@ -1,0 +1,285 @@
+//===--- ucrt.modulemap ---------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+// The following modules have to be standalone top-level modules to deal with
+// version 10.0.26100 of the Windows SDK.
+module _complex [system] [no_undeclared_includes] {
+  use corecrt
+  use std
+  header "complex.h"
+  export *
+}
+
+module _fenv [system] [no_undeclared_includes] {
+  use _float
+  use corecrt
+  header "fenv.h"
+  export *
+}
+
+module _float [system] [no_undeclared_includes] {
+  use corecrt
+  header "float.h"
+  export *
+}
+
+module _malloc [system] [no_undeclared_includes] {
+  use corecrt
+  header "malloc.h"
+  export *
+}
+
+module _stdlib [system] [no_undeclared_includes] {
+  use corecrt
+  use vcruntime
+  header "stdlib.h"
+  export *
+}
+
+module ucrt [system] {
+
+  module C {
+    export _complex
+    export _fenv
+    export _float
+    export _malloc
+    export _stdlib
+
+    module ctype {
+      header "ctype.h"
+      export *
+    }
+
+    module errno {
+      textual header "errno.h"
+      export *
+    }
+
+    module fenv {
+      header "fenv.h"
+      export *
+    }
+
+    module float {
+      header "float.h"
+      export *
+    }
+
+    module inttypes {
+      header "inttypes.h"
+      export *
+    }
+
+    module locale {
+      header "locale.h"
+      export *
+    }
+
+    module malloc {
+      header "malloc.h"
+      export *
+    }
+
+    module math {
+      header "math.h"
+      export *
+    }
+
+    module signal {
+      header "signal.h"
+      export *
+    }
+
+    module stdalign {
+      header "stdalign.h"
+      export  *
+    }
+
+    module stddef {
+      textual header "stddef.h"
+      export *
+    }
+
+    module stdio {
+      header "stdio.h"
+      export *
+
+      // NOTE(compnerd) this is a horrible workaround for the fact that
+      // Microsoft has fully inlined nearly all of the printf family of
+      // functions in the headers which results in the definitions being elided
+      // resulting in undefined symbols.  The legacy_stdio_definitions provides
+      // out-of-line definitions for these functions.
+      link "legacy_stdio_definitions"
+    }
+
+    module stdlib {
+      header "stdlib.h"
+      export *
+    }
+
+    module string {
+      header "string.h"
+      export *
+    }
+
+    module time {
+      header "time.h"
+      export *
+    }
+
+    module POSIX {
+      module fcntl {
+        header "fcntl.h"
+        export *
+      }
+
+      module sys {
+        export *
+
+        module stat {
+          header "sys/stat.h"
+          header "direct.h"
+          export *
+        }
+
+        module timeb {
+          header "sys/timeb.h"
+          export *
+        }
+
+        module types {
+          header "sys/types.h"
+          export *
+        }
+
+        module utime {
+          header "sys/utime.h"
+          export *
+        }
+      }
+    }
+  }
+
+  module conio {
+    header "conio.h"
+    export *
+  }
+
+  module dos {
+    header "dos.h"
+    export *
+  }
+
+  module minmax {
+    header "minmax.h"
+    export *
+  }
+
+  module multibyte {
+    header "mbstring.h"
+    export *
+  }
+
+  module process {
+    header "process.h"
+    export *
+  }
+
+  module wchar {
+    header "wchar.h"
+    export *
+  }
+}
+
+module corecrt [system] {
+  use vcruntime
+
+  header "corecrt.h"
+  header "corecrt_stdio_config.h"
+  export *
+
+  module conio {
+    header "corecrt_wconio.h"
+    export *
+  }
+
+  module direct {
+    header "corecrt_wdirect.h"
+    export *
+  }
+
+  module io {
+    header "corecrt_io.h"
+    header "corecrt_wio.h"
+    export *
+  }
+
+  module malloc {
+    header "corecrt_malloc.h"
+    export *
+  }
+
+  module math {
+    header "corecrt_math.h"
+    export *
+  }
+
+  module memory {
+    header "corecrt_memory.h"
+    export *
+  }
+
+  module memcpy {
+    header "corecrt_memcpy_s.h"
+    export *
+  }
+
+  module process {
+    header "corecrt_wprocess.h"
+    export *
+  }
+
+  module search {
+    header "corecrt_search.h"
+    export *
+  }
+
+  module share {
+    header "corecrt_share.h"
+    export *
+  }
+
+  module ctype {
+    header "corecrt_wctype.h"
+    export *
+  }
+
+  module stdio {
+    header "corecrt_wstdio.h"
+    export *
+  }
+
+  module stdlib {
+    header "corecrt_wstdlib.h"
+    export *
+  }
+
+  module string {
+    header "corecrt_wstring.h"
+    export *
+  }
+
+  module time {
+    header "corecrt_wtime.h"
+    export *
+  }
+}
