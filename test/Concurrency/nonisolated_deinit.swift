@@ -13,11 +13,24 @@ class NotSendable {}
   }
 }
 
+@globalActor
+actor SomeGlobalActor {
+  static let shared = SomeGlobalActor()
+}
+
 // expected-note@+1{{add '@available' attribute to enclosing class}}
-@MainActor class C2 {
+@SomeGlobalActor class C2 {
   var x: Int = 0
 
   isolated deinit { // expected-error{{isolated deinit is only available in macOS 15.4.0 or newer}}
+    print(x)
+  }
+}
+
+@MainActor class C3 {
+  var x: Int = 0
+
+  isolated deinit { // okay, this back-deploys
     print(x)
   }
 }

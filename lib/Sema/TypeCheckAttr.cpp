@@ -123,15 +123,17 @@ public:
           diagnoseAndRemoveAttr(attr, diag::isolated_deinit_on_value_type);
           return;
         }
-      }
 
-      TypeChecker::checkAvailability(
-          attr->getRange(), C.getIsolatedDeinitAvailability(),
-          D->getDeclContext(),
-          [&](AvailabilityDomain domain, AvailabilityRange range) {
-            return diagnoseAndRemoveAttr(
-                attr, diag::isolated_deinit_unavailable, domain, range);
-          });
+        if (!getActorIsolation(nominal).isMainActor()) {
+          TypeChecker::checkAvailability(
+              attr->getRange(), C.getIsolatedDeinitAvailability(),
+              D->getDeclContext(),
+              [&](AvailabilityDomain domain, AvailabilityRange range) {
+                return diagnoseAndRemoveAttr(
+                    attr, diag::isolated_deinit_unavailable, domain, range);
+              });
+        }
+      }
     }
   }
 
