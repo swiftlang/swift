@@ -25,8 +25,8 @@ import Swift
 
 /// A Dispatch-based main executor.
 @available(StdlibDeploymentTarget 6.2, *)
-public class DispatchMainExecutor: RunLoopExecutor, SchedulingExecutor,
-                                   @unchecked Sendable {
+class DispatchMainExecutor: RunLoopExecutor, SchedulingExecutor,
+                            @unchecked Sendable {
   var threaded = false
 
   public init() {}
@@ -78,8 +78,8 @@ extension DispatchMainExecutor: MainExecutor {}
 
 /// A Dispatch-based `TaskExecutor`
 @available(StdlibDeploymentTarget 6.2, *)
-public class DispatchGlobalTaskExecutor: TaskExecutor, SchedulingExecutor,
-                                         @unchecked Sendable {
+class DispatchGlobalTaskExecutor: TaskExecutor, SchedulingExecutor,
+                                  @unchecked Sendable {
   public init() {}
 
   public func enqueue(_ job: consuming ExecutorJob) {
