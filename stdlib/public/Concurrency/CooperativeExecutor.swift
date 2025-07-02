@@ -100,7 +100,7 @@ extension ExecutorJob {
 /// A co-operative executor that can be used as the main executor or as a
 /// task executor.
 @available(StdlibDeploymentTarget 6.2, *)
-class CooperativeExecutor: Executor, @unchecked Sendable {
+final class CooperativeExecutor: Executor, @unchecked Sendable {
   var runQueue: PriorityQueue<UnownedJob>
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   var waitQueue: PriorityQueue<UnownedJob>
