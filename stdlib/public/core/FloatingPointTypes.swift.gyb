@@ -128,6 +128,28 @@ extension ${Self}: CustomDebugStringConvertible {
         UnsafeBufferPointer(start: bufferPtr, count: length))
     }
   }
+
+%if bits == 32 or bits == 64:
+  // Temporary `debugDescription2` that uses the new Swift implementation.
+  // `debugDescription` above is still using the old C implementation
+  // for now so we can compare performance and results between the two.
+  @available(macOS 15, *)
+  public var debugDescription2: String {
+    if #available(macOS 9999, *) {
+    var buffer = InlineArray<32, UTF8.CodeUnit>(repeating: 0)
+    var span = buffer.mutableSpan
+    let textRange = Float${bits}ToASCII(value: self, buffer: &span)
+    let textStart = unsafe span._start().assumingMemoryBound(to: UTF8.CodeUnit.self) + textRange.lowerBound
+    let textLength = textRange.upperBound - textRange.lowerBound
+
+    let textBuff = unsafe UnsafeBufferPointer<UTF8.CodeUnit>(_uncheckedStart: textStart,
+                                                             count: textLength)
+    return unsafe String._fromASCII(textBuff)
+    } else {
+        fatalError()
+    }
+  }
+%end
 }
 
 ${Availability(bits)}
