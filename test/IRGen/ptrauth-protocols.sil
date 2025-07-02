@@ -75,7 +75,7 @@ bb0:
 //   Fetch T.Assoc : P.
 // CHECK-NEXT:    %T.Assoc.P = call swiftcc ptr @swift_getAssociatedConformanceWitness(ptr %T.Q, ptr %T, ptr [[T_ASSOC]]
 //   Fetch T.Assoc.foo
-// CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds ptr, ptr %T.Assoc.P, i32 1
+// CHECK:         [[T0:%.*]] = getelementptr inbounds ptr, ptr %T.Assoc.P, i32 1
 // CHECK-NEXT:    [[T1:%.*]] = load ptr, ptr [[T0]], align 8
 // CHECK-NEXT:    [[T2:%.*]] = ptrtoint ptr [[T0]] to i64
 // CHECK-NEXT:    [[DISC:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[T2]], i64 53700)
