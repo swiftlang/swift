@@ -116,7 +116,7 @@ public struct ObservationRegistrar: Sendable {
       }
 
       var tracker: (@Sendable () -> Void)?
-      for (keyPath, ids) in lookups {
+      lookupIteration: for (keyPath, ids) in lookups {
         for id in ids {
           if let found = observations[id]?.willSetTracker {
             // convert the keyPath into its \Self.self version 
@@ -124,7 +124,7 @@ public struct ObservationRegistrar: Sendable {
             tracker = {
                found(selfKp)
             }
-            break
+            break lookupIteration
           }
         }
       }
