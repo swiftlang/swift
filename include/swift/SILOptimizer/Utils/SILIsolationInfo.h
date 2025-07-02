@@ -289,16 +289,16 @@ public:
     return self;
   }
 
-  void print(llvm::raw_ostream &os) const;
+  void print(SILFunction *fn, llvm::raw_ostream &os) const;
 
   /// Print a textual representation of the text info that is meant to be
   /// included in other logging output for types that compose with
   /// SILIsolationInfo. As a result, we only print state that can fit on
   /// one line.
-  void printForOneLineLogging(llvm::raw_ostream &os) const;
+  void printForOneLineLogging(SILFunction *fn, llvm::raw_ostream &os) const;
 
-  SWIFT_DEBUG_DUMP {
-    print(llvm::dbgs());
+  SWIFT_DEBUG_DUMPER(dump(SILFunction *fn)) {
+    print(fn, llvm::dbgs());
     llvm::dbgs() << '\n';
   }
 
@@ -307,12 +307,12 @@ public:
   ///
   /// We do this programatically since task-isolated code needs a very different
   /// form of diagnostic than other cases.
-  void printForCodeDiagnostic(llvm::raw_ostream &os) const;
+  void printForCodeDiagnostic(SILFunction *fn, llvm::raw_ostream &os) const;
 
-  void printForDiagnostics(llvm::raw_ostream &os) const;
+  void printForDiagnostics(SILFunction *fn, llvm::raw_ostream &os) const;
 
-  SWIFT_DEBUG_DUMPER(dumpForDiagnostics()) {
-    printForDiagnostics(llvm::dbgs());
+  SWIFT_DEBUG_DUMPER(dumpForDiagnostics(SILFunction *fn)) {
+    printForDiagnostics(fn, llvm::dbgs());
     llvm::dbgs() << '\n';
   }
 
@@ -497,10 +497,9 @@ public:
   /// A helper function that prints ActorIsolation like we normally do except
   /// that it prints nonisolated(nonsending) as nonisolated. This is needed in
   /// certain cases when talking about use-after-free uses in send non sendable.
-  static void
-  printActorIsolationForDiagnostics(ActorIsolation iso, llvm::raw_ostream &os,
-                                    StringRef openingQuotationMark = "'",
-                                    bool asNoun = false);
+  static void printActorIsolationForDiagnostics(
+      SILFunction *fn, ActorIsolation iso, llvm::raw_ostream &os,
+      StringRef openingQuotationMark = "'", bool asNoun = false);
 
   void Profile(llvm::FoldingSetNodeID &id) const;
 
@@ -565,43 +564,25 @@ public:
         SILIsolationInfo::getDisconnected(isUnsafeNonIsolated));
   }
 
-  SWIFT_DEBUG_DUMP { innerInfo.dump(); }
+  SWIFT_DEBUG_DUMPER(dump(SILFunction *fn)) { innerInfo.dump(fn); }
 
-  void printForDiagnostics(llvm::raw_ostream &os) const {
-    innerInfo.printForDiagnostics(os);
+  void printForDiagnostics(SILFunction *fn, llvm::raw_ostream &os) const {
+    innerInfo.printForDiagnostics(fn, os);
   }
 
-  SWIFT_DEBUG_DUMPER(dumpForDiagnostics()) {
-    innerInfo.dumpForDiagnostics();
+  SWIFT_DEBUG_DUMPER(dumpForDiagnostics(SILFunction *fn)) {
+    innerInfo.dumpForDiagnostics(fn);
   }
 
-  void printForCodeDiagnostic(llvm::raw_ostream &os) const {
-    innerInfo.printForCodeDiagnostic(os);
+  void printForCodeDiagnostic(SILFunction *fn, llvm::raw_ostream &os) const {
+    innerInfo.printForCodeDiagnostic(fn, os);
   }
 
-  void printForOneLineLogging(llvm::raw_ostream &os) const {
-    innerInfo.printForOneLineLogging(os);
+  void printForOneLineLogging(SILFunction *fn, llvm::raw_ostream &os) const {
+    innerInfo.printForOneLineLogging(fn, os);
   }
 };
 
 } // namespace swift
-
-namespace llvm {
-
-inline llvm::raw_ostream &
-operator<<(llvm::raw_ostream &os,
-           const swift::SILIsolationInfo &isolationInfo) {
-  isolationInfo.printForOneLineLogging(os);
-  return os;
-}
-
-inline llvm::raw_ostream &
-operator<<(llvm::raw_ostream &os,
-           const swift::SILDynamicMergedIsolationInfo &isolationInfo) {
-  isolationInfo.printForOneLineLogging(os);
-  return os;
-}
-
-} // namespace llvm
 
 #endif
