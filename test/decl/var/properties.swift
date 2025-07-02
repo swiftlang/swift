@@ -1,4 +1,7 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-additional-prefix no-weak-let-
+// RUN: %target-typecheck-verify-swift -enable-upcoming-feature WeakLet -verify-additional-prefix has-weak-let-
+
+// REQUIRES: swift_feature_WeakLet
 
 func markUsed<T>(_ t: T) {}
 
@@ -114,10 +117,12 @@ var x15: Int {
   // For the purpose of this test we need to use an attribute that cannot be
   // applied to the getter.
   weak
-  var foo: SomeClass? = SomeClass()  // expected-warning {{variable 'foo' was never used; consider replacing with '_' or removing it}}
-  // expected-warning@-1 {{instance will be immediately deallocated because variable 'foo' is 'weak'}}
-  // expected-note@-2 {{a strong reference is required to prevent the instance from being deallocated}}
-  // expected-note@-3 {{'foo' declared here}}
+  var foo: SomeClass? = SomeClass()
+  // expected-no-weak-let-warning@-1 {{variable 'foo' was written to, but never read}}
+  // expected-has-weak-let-warning@-2 {{variable 'foo' was never used; consider replacing with '_' or removing it}}
+  // expected-warning@-3 {{instance will be immediately deallocated because variable 'foo' is 'weak'}}
+  // expected-note@-4 {{a strong reference is required to prevent the instance from being deallocated}}
+  // expected-note@-5 {{'foo' declared here}}
   return 0
 }
 

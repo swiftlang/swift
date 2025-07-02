@@ -296,6 +296,7 @@ UPCOMING_FEATURE(InternalImportsByDefault, 409, 7)
 MIGRATABLE_UPCOMING_FEATURE(MemberImportVisibility, 444, 7)
 MIGRATABLE_UPCOMING_FEATURE(InferIsolatedConformances, 470, 7)
 MIGRATABLE_UPCOMING_FEATURE(NonisolatedNonsendingByDefault, 461, 7)
+UPCOMING_FEATURE(WeakLet, 481, 7)
 
 // Optional language features / modes
 

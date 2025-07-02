@@ -1,4 +1,6 @@
-// RUN: %target-swift-emit-silgen %s -enable-objc-interop | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s -enable-objc-interop -enable-upcoming-feature WeakLet | %FileCheck %s
+
+// REQUIRES: swift_feature_WeakLet
 
 protocol ClassProtocol: AnyObject {}
 
