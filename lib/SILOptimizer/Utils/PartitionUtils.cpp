@@ -46,7 +46,7 @@ void PartitionOpError::SentNeverSendableError::print(
      << "        ID:  %%" << sentElement << "\n"
      << "        Rep: " << *info.getRepresentative(sentElement)
      << "        Dynamic Isolation Region: ";
-  isolationRegionInfo.printForOneLineLogging(os);
+  isolationRegionInfo.printForOneLineLogging(info.getFunction(), os);
   os << '\n';
   if (auto isolatedValue = isolationRegionInfo->maybeGetIsolatedValue()) {
     os << "        Isolated Value: " << isolatedValue;
@@ -90,7 +90,7 @@ void PartitionOpError::InOutSendingNotDisconnectedAtExitError::print(
      << "        ID:  %%" << inoutSendingElement << "\n"
      << "        Rep: " << valueMap.getRepresentativeValue(inoutSendingElement)
      << "        Dynamic Isolation Region: ";
-  isolationInfo.printForOneLineLogging(os);
+  isolationInfo.printForOneLineLogging(valueMap.getFunction(), os);
   os << '\n';
 }
 
