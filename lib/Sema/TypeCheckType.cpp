@@ -811,10 +811,9 @@ namespace {
       // If either value type has an error, we've already diagnosed the issue.
       auto paramValueTy = paramType->getValueType();
       auto secondValueTy = secondType->getValueType();
-      if (!paramValueTy || paramValueTy->hasError() ||
-          !secondValueTy || secondValueTy->hasError()) {
+      if (paramValueTy->hasError() || secondValueTy->hasError())
         return true;
-      }
+
       // Otherwise, these are both value parameters and check that both their
       // value types are the same.
       return paramValueTy->isEqual(secondValueTy);

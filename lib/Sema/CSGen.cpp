@@ -1746,7 +1746,7 @@ namespace {
 
     Type visitTypeValueExpr(TypeValueExpr *E) {
       auto ty = E->getParamDecl()->getValueType();
-      if (!ty || ty->hasError())
+      if (ty->hasError())
         return recordInvalidNode(E);
       return ty;
     }
