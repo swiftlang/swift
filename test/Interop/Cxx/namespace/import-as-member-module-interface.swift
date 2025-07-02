@@ -4,6 +4,8 @@
 // CHECK-NEXT:   func method() -> Int32
 // CHECK-NEXT:   func methodConstRef() -> Int32
 // CHECK-NEXT:   func methodInline() -> Int32
+// CHECK-NEXT:   func nestedMethod() -> Int32
+// CHECK-NEXT:   func nestedMethodInline() -> Int32
 // CHECK-NEXT: }
 
 // CHECK:      extension MyNS.MyDeepNS.DeepNestedStruct {
