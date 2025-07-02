@@ -19,7 +19,6 @@
 
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Parse/Token.h"
 #include "swift/Config.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -266,6 +265,9 @@ public:
     default: return false;
     }
   }
+
+  /// True if the token is an editor placeholder.
+  bool isEditorPlaceholder() const;
 
   /// True if the string literal token is multiline.
   bool isMultilineString() const {
