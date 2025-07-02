@@ -26,8 +26,26 @@
 // CHECK: [[IOS_PATCH:%.*]] = integer_literal $Builtin.Word, 2
 // CHECK: [[FUNC:%.*]] = function_ref @$ss042_stdlib_isOSVersionAtLeastOrVariantVersiondE0yBi1_Bw_BwBwBwBwBwtF : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
 // CHECK: [[QUERY_RESULT:%.*]] = apply [[FUNC]]([[MACOS_MAJOR]], [[MACOS_MINOR]], [[MACOS_PATCH]], [[IOS_MAJOR]], [[IOS_MINOR]], [[IOS_PATCH]]) : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
+// CHECK: cond_br [[QUERY_RESULT]]
 func zippered() {
   if #available(OSX 10.53.8, iOS 51.1.2, *) {
+  }
+}
+
+// CHECK-LABEL: // zippered_unavailable()
+// CHECK: [[MACOS_MAJOR:%.*]] = integer_literal $Builtin.Word, 10
+// CHECK: [[MACOS_MINOR:%.*]] = integer_literal $Builtin.Word, 53
+// CHECK: [[MACOS_PATCH:%.*]] = integer_literal $Builtin.Word, 8
+// CHECK: [[IOS_MAJOR:%.*]] = integer_literal $Builtin.Word, 51
+// CHECK: [[IOS_MINOR:%.*]] = integer_literal $Builtin.Word, 1
+// CHECK: [[IOS_PATCH:%.*]] = integer_literal $Builtin.Word, 2
+// CHECK: [[FUNC:%.*]] = function_ref @$ss042_stdlib_isOSVersionAtLeastOrVariantVersiondE0yBi1_Bw_BwBwBwBwBwtF : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
+// CHECK: [[QUERY_RESULT:%.*]] = apply [[FUNC]]([[MACOS_MAJOR]], [[MACOS_MINOR]], [[MACOS_PATCH]], [[IOS_MAJOR]], [[IOS_MINOR]], [[IOS_PATCH]]) : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
+// CHECK: [[MINUSONE:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK: [[QUERY_INVERSION:%.*]] = builtin "xor_Int1"([[QUERY_RESULT]], [[MINUSONE]]) : $Builtin.Int1
+// CHECK: cond_br [[QUERY_INVERSION]]
+func zippered_unavailable() {
+  if #unavailable(OSX 10.53.8, iOS 51.1.2) {
   }
 }
 
@@ -42,6 +60,7 @@ func zippered() {
 // CHECK: [[IOS_PATCH:%.*]] = integer_literal $Builtin.Word, 5
 // CHECK: [[FUNC:%.*]] = function_ref @$ss042_stdlib_isOSVersionAtLeastOrVariantVersiondE0yBi1_Bw_BwBwBwBwBwtF : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
 // CHECK: [[QUERY_RESULT:%.*]] = apply [[FUNC]]([[MACOS_MAJOR]], [[MACOS_MINOR]], [[MACOS_PATCH]], [[IOS_MAJOR]], [[IOS_MINOR]], [[IOS_PATCH]]) : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
+// CHECK: cond_br [[QUERY_RESULT]]
 func macCatalystWins() {
   if #available(OSX 10.53.8, iOS 51.1.2, macCatalyst 52.3.5, *) {
   }
@@ -57,17 +76,40 @@ func noMatch() {
   }
 }
 
+// CHECK-LABEL: // noMatch_unavailable()
+// CHECK: [[FALSE:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK: cond_br [[FALSE]]
+func noMatch_unavailable() {
+  if #unavailable(tvOS 9.0) {
+  }
+}
+
 // CHECK-LABEL: // macOSOnly()
 // CHECK: [[MACOS_MAJOR:%.*]] = integer_literal $Builtin.Word, 10
 // CHECK: [[MACOS_MINOR:%.*]] = integer_literal $Builtin.Word, 54
 // CHECK: [[MACOS_PATCH:%.*]] = integer_literal $Builtin.Word, 3
 // CHECK: [[QUERY_FUNC:%.*]] = function_ref @$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
 // CHECK: [[QUERY_RESULT:%.*]] = apply [[QUERY_FUNC]]([[MACOS_MAJOR]], [[MACOS_MINOR]], [[MACOS_PATCH]]) : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
+// CHECK: cond_br [[QUERY_RESULT]]
 // The '*' matches for iOS, so we only need to check to check the
 // macOS version and thus use the primary target version check
 // entrypoint.
 func macOSOnly() {
   if #available(macOS 10.54.3, *) {
+  }
+}
+
+// CHECK-LABEL: // macOSOnly_unavailable()
+// CHECK: [[MACOS_MAJOR:%.*]] = integer_literal $Builtin.Word, 10
+// CHECK: [[MACOS_MINOR:%.*]] = integer_literal $Builtin.Word, 54
+// CHECK: [[MACOS_PATCH:%.*]] = integer_literal $Builtin.Word, 3
+// CHECK: [[QUERY_FUNC:%.*]] = function_ref @$ss26_stdlib_isOSVersionAtLeastyBi1_Bw_BwBwtF : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
+// CHECK: [[QUERY_RESULT:%.*]] = apply [[QUERY_FUNC]]([[MACOS_MAJOR]], [[MACOS_MINOR]], [[MACOS_PATCH]]) : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
+// CHECK: [[MINUSONE:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK: [[QUERY_INVERSION:%.*]] = builtin "xor_Int1"([[QUERY_RESULT]], [[MINUSONE]]) : $Builtin.Int1
+// CHECK: cond_br [[QUERY_INVERSION]]
+func macOSOnly_unavailable() {
+  if #unavailable(macOS 10.54.3) {
   }
 }
 
@@ -77,6 +119,7 @@ func macOSOnly() {
 // CHECK-NO-BACKDEPLOY-NEXT: [[IOS_PATCH:%.*]] = integer_literal $Builtin.Word, 2
 // CHECK-NO-BACKDEPLOY: [[QUERY_FUNC:%.*]] = function_ref @$ss33_stdlib_isVariantOSVersionAtLeastyBi1_Bw_BwBwtF : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
 // CHECK-NO-BACKDEPLOY: [[QUERY_RESULT:%.*]] = apply [[QUERY_FUNC]]([[IOS_MAJOR]], [[IOS_MINOR]], [[IOS_PATCH]]) : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
+// CHECK-NO-BACKDEPLOY: cond_br [[QUERY_RESULT]]
 
 // CHECK-BACKDEPLOY-MAC:      [[MACOS_MAJOR:%.*]] = integer_literal $Builtin.Word, 10
 // CHECK-BACKDEPLOY-MAC-NEXT: [[MACOS_MINOR:%.*]] = integer_literal $Builtin.Word, 14
@@ -86,6 +129,7 @@ func macOSOnly() {
 // CHECK-BACKDEPLOY-MAC-NEXT: [[IOS_PATCH:%.*]] = integer_literal $Builtin.Word, 2
 // CHECK-BACKDEPLOY-MAC: [[FUNC:%.*]] = function_ref @$ss042_stdlib_isOSVersionAtLeastOrVariantVersiondE0yBi1_Bw_BwBwBwBwBwtF : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
 // CHECK-BACKDEPLOY-MAC: [[QUERY_RESULT:%.*]] = apply [[FUNC]]([[MACOS_MAJOR]], [[MACOS_MINOR]], [[MACOS_PATCH]], [[IOS_MAJOR]], [[IOS_MINOR]], [[IOS_PATCH]]) : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
+// CHECK-BACKDEPLOY-MAC: cond_br [[QUERY_RESULT]]
 // The '*' matches for macOS, so we only need to check to check the
 // iOS version and thus use the variant target version check
 // entrypoint.
@@ -100,6 +144,32 @@ func iOSOnly() {
   }
 }
 
+// CHECK-LABEL: // iOSOnly_unavailable()
+// CHECK-NO-BACKDEPLOY-MAC:  [[IOS_MAJOR:%.*]] = integer_literal $Builtin.Word, 54
+// CHECK-NO-BACKDEPLOY-NEXT: [[IOS_MINOR:%.*]] = integer_literal $Builtin.Word, 7
+// CHECK-NO-BACKDEPLOY-NEXT: [[IOS_PATCH:%.*]] = integer_literal $Builtin.Word, 2
+// CHECK-NO-BACKDEPLOY: [[QUERY_FUNC:%.*]] = function_ref @$ss33_stdlib_isVariantOSVersionAtLeastyBi1_Bw_BwBwtF : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
+// CHECK-NO-BACKDEPLOY: [[QUERY_RESULT:%.*]] = apply [[QUERY_FUNC]]([[IOS_MAJOR]], [[IOS_MINOR]], [[IOS_PATCH]]) : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
+// CHECK-NO-BACKDEPLOY: [[MINUSONE:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK-NO-BACKDEPLOY: [[QUERY_INVERSION:%.*]] = builtin "xor_Int1"([[QUERY_RESULT]], [[MINUSONE]]) : $Builtin.Int1
+// CHECK-NO-BACKDEPLOY: cond_br [[QUERY_INVERSION]]
+
+// CHECK-BACKDEPLOY-MAC:      [[MACOS_MAJOR:%.*]] = integer_literal $Builtin.Word, 10
+// CHECK-BACKDEPLOY-MAC-NEXT: [[MACOS_MINOR:%.*]] = integer_literal $Builtin.Word, 14
+// CHECK-BACKDEPLOY-MAC-NEXT: [[MACOS_PATCH:%.*]] = integer_literal $Builtin.Word, 4
+// CHECK-BACKDEPLOY-MAC-NEXT: [[IOS_MAJOR:%.*]] = integer_literal $Builtin.Word, 54
+// CHECK-BACKDEPLOY-MAC-NEXT: [[IOS_MINOR:%.*]] = integer_literal $Builtin.Word, 7
+// CHECK-BACKDEPLOY-MAC-NEXT: [[IOS_PATCH:%.*]] = integer_literal $Builtin.Word, 2
+// CHECK-BACKDEPLOY-MAC: [[FUNC:%.*]] = function_ref @$ss042_stdlib_isOSVersionAtLeastOrVariantVersiondE0yBi1_Bw_BwBwBwBwBwtF : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
+// CHECK-BACKDEPLOY-MAC: [[QUERY_RESULT:%.*]] = apply [[FUNC]]([[MACOS_MAJOR]], [[MACOS_MINOR]], [[MACOS_PATCH]], [[IOS_MAJOR]], [[IOS_MINOR]], [[IOS_PATCH]]) : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
+// CHECK-BACKDEPLOY-MAC: [[MINUSONE:%.*]] = integer_literal $Builtin.Int1, -1
+// CHECK-BACKDEPLOY-MAC: [[QUERY_INVERSION:%.*]] = builtin "xor_Int1"([[QUERY_RESULT]], [[MINUSONE]]) : $Builtin.Int1
+// CHECK-BACKDEPLOY-MAC: cond_br [[QUERY_INVERSION]]
+func iOSOnly_unavailable() {
+  if #unavailable(iOS 54.7.2) {
+  }
+}
+
 // CHECK-LABEL: // backdeployMacExplicit()
 // CHECK:      [[MACOS_MAJOR:%.*]] = integer_literal $Builtin.Word, 10
 // CHECK-NEXT: [[MACOS_MINOR:%.*]] = integer_literal $Builtin.Word, 14
@@ -109,6 +179,7 @@ func iOSOnly() {
 // CHECK-NEXT: [[IOS_PATCH:%.*]] = integer_literal $Builtin.Word, 2
 // CHECK: [[FUNC:%.*]] = function_ref @$ss042_stdlib_isOSVersionAtLeastOrVariantVersiondE0yBi1_Bw_BwBwBwBwBwtF : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
 // CHECK: [[QUERY_RESULT:%.*]] = apply [[FUNC]]([[MACOS_MAJOR]], [[MACOS_MINOR]], [[MACOS_PATCH]], [[IOS_MAJOR]], [[IOS_MINOR]], [[IOS_PATCH]]) : $@convention(thin) (Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word, Builtin.Word) -> Builtin.Int1
+// CHECK: cond_br [[QUERY_RESULT]]
 func backdeployMacExplicit() {
   if #available(iOS 54.7.2, macOS 10.14.5, *) {
   }

@@ -1,4 +1,4 @@
-//===--- AvailabilitySpec.h - Swift Availability Query ASTs -----*- C++ -*-===//
+//===--- AvailabilitySpec.h - Swift Availability Spec ASTs ------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //

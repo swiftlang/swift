@@ -5300,7 +5300,9 @@ GROUPED_ERROR(opaque_type_var_no_init,OpaqueTypeInference,none,
 GROUPED_ERROR(opaque_type_var_no_underlying_type,OpaqueTypeInference,none,
       "property declares an opaque return type, but cannot infer the "
       "underlying type from its initializer expression", ())
-
+GROUPED_ERROR(opaque_type_unsupported_availability,OpaqueTypeInference,none,
+      "opaque return type cannot depend on %0 availability",
+      (AvailabilityDomain))
 
 //------------------------------------------------------------------------------
 // MARK: Discard Statement
