@@ -62,6 +62,21 @@ MOCK_CONFIG = {
     }
 }
 
+MOCK_ADDITIONAL_SCHEME = {
+    'branch-schemes': {
+        'extra': {
+            'aliases': ['extra'],
+            'repos': {
+                # Spell this differently just to make it distinguishable in
+                # test output, even though we only have one branch.
+                # TODO: Support multiple test branches in the repo instead.
+                'repo1': 'refs/heads/main',
+                'repo2': 'refs/heads/main',
+            }
+        }
+    }
+}
+
 
 class CallQuietlyException(Exception):
     def __init__(self, command, returncode, output):
@@ -95,6 +110,10 @@ def teardown_mock_remote(base_dir):
 
 def get_config_path(base_dir):
     return os.path.join(base_dir, 'test-config.json')
+
+
+def get_additional_config_path(base_dir):
+    return os.path.join(base_dir, 'test-additional-config.json')
 
 
 def setup_mock_remote(base_dir, base_config):
@@ -140,6 +159,9 @@ def setup_mock_remote(base_dir, base_config):
     with open(get_config_path(base_dir), 'w') as f:
         json.dump(base_config, f)
 
+    with open(get_additional_config_path(base_dir), 'w') as f:
+        json.dump(MOCK_ADDITIONAL_SCHEME, f)
+
     return (LOCAL_PATH, REMOTE_PATH)
 
 
@@ -162,6 +184,7 @@ class SchemeMockTestCase(unittest.TestCase):
             raise RuntimeError('Misconfigured test suite! Environment '
                                'variable %s must be set!' % BASEDIR_ENV_VAR)
         self.config_path = get_config_path(self.workspace)
+        self.additional_config_path = get_additional_config_path(self.workspace)
         self.update_checkout_path = UPDATE_CHECKOUT_PATH
         if not os.access(self.update_checkout_path, os.X_OK):
             raise RuntimeError('Error! Could not find executable '
