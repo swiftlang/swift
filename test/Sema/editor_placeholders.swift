@@ -27,6 +27,12 @@ f(<#T#> + 1) // expected-error{{editor placeholder in source file}}
 f(<#T##Int#>) // expected-error{{editor placeholder in source file}}
 f(<#T##String#>) // expected-error{{editor placeholder in source file}} expected-error{{cannot convert value of type 'String' to expected argument type 'Int'}}
 
+<#foo#>(x:)<Int>; // expected-error {{editor placeholder in source file}}
+
+// These are actually raw identifiers
+`<#foo#>` // expected-error {{cannot find '<#foo#>' in scope}}
+`<#foo#>`(x:)<Int>; // expected-error {{cannot find '<#foo#>(x:)' in scope}}
+
 for x in <#T#> { // expected-error{{editor placeholder in source file}} expected-error{{for-in loop requires '()' to conform to 'Sequence'}}
 
 }
