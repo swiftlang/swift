@@ -808,16 +808,16 @@ namespace {
       if (!paramType->isValue())
         return true;
 
-      // Both of these generic type parameters are values, but they may not have
-      // underlying value types associated with them. This can occur when a
-      // parameter doesn't declare a value type and we're going to diagnose it
-      // later.
-      if (!paramType->getValueType() || !secondType->getValueType())
+      // If either value type has an error, we've already diagnosed the issue.
+      auto paramValueTy = paramType->getValueType();
+      auto secondValueTy = secondType->getValueType();
+      if (!paramValueTy || paramValueTy->hasError() ||
+          !secondValueTy || secondValueTy->hasError()) {
         return true;
-
+      }
       // Otherwise, these are both value parameters and check that both their
       // value types are the same.
-      return paramType->getValueType()->isEqual(secondType->getValueType());
+      return paramValueTy->isEqual(secondValueTy);
     }
 
     bool alwaysMismatchTypeParameters() const { return true; }
