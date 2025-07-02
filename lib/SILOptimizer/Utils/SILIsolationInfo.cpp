@@ -933,6 +933,12 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
   /// Consider non-Sendable metatypes to be task-isolated, so they cannot cross
   /// into another isolation domain.
   if (auto *mi = dyn_cast<MetatypeInst>(inst)) {
+    if (auto funcIsolation = mi->getFunction()->getActorIsolation();
+        funcIsolation && funcIsolation->isCallerIsolationInheriting()) {
+      return SILIsolationInfo::getTaskIsolated(mi)
+          .withNonisolatedNonsendingTaskIsolated(true);
+    }
+
     return SILIsolationInfo::getTaskIsolated(mi);
   }
 
@@ -998,7 +1004,8 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
     // task isolated.
     if (auto funcIsolation = fArg->getFunction()->getActorIsolation();
         funcIsolation && funcIsolation->isCallerIsolationInheriting()) {
-      return SILIsolationInfo::getTaskIsolated(fArg);
+      return SILIsolationInfo::getTaskIsolated(fArg)
+          .withNonisolatedNonsendingTaskIsolated(true);
     }
 
     auto astType = isolatedArg->getType().getASTType();
@@ -1092,6 +1099,21 @@ void SILIsolationInfo::printOptions(llvm::raw_ostream &os) const {
 void SILIsolationInfo::printActorIsolationForDiagnostics(
     SILFunction *fn, ActorIsolation iso, llvm::raw_ostream &os,
     StringRef openingQuotationMark, bool asNoun) {
+  // If we have NonisolatedNonsendingByDefault enabled, we need to return
+  // @concurrent for nonisolated and nonisolated for caller isolation inherited.
+  if (fn->isAsync() && fn->getASTContext().LangOpts.hasFeature(
+                           Feature::NonisolatedNonsendingByDefault)) {
+    if (iso.isCallerIsolationInheriting()) {
+      os << "nonisolated";
+      return;
+    }
+
+    if (iso.isNonisolated()) {
+      os << "@concurrent";
+      return;
+    }
+  }
+
   return iso.printForDiagnostics(os, openingQuotationMark, asNoun);
 }
 
@@ -1213,6 +1235,7 @@ bool SILIsolationInfo::isEqual(const SILIsolationInfo &other) const {
 
 void SILIsolationInfo::Profile(llvm::FoldingSetNodeID &id) const {
   id.AddInteger(getKind());
+  id.AddInteger(getOptions().toRaw());
   switch (getKind()) {
   case Unknown:
   case Disconnected:
@@ -1266,6 +1289,21 @@ void SILIsolationInfo::printForDiagnostics(SILFunction *fn,
     printActorIsolationForDiagnostics(fn, getActorIsolation(), os);
     return;
   case Task:
+    if (fn->isAsync() && fn->getASTContext().LangOpts.hasFeature(
+                             Feature::NonisolatedNonsendingByDefault)) {
+      if (isNonisolatedNonsendingTaskIsolated()) {
+        os << "task-isolated";
+        return;
+      }
+      os << "@concurrent task-isolated";
+      return;
+    }
+
+    if (isNonisolatedNonsendingTaskIsolated()) {
+      os << "nonisolated(nonsending) task-isolated";
+      return;
+    }
+
     os << "task-isolated";
     return;
   }
@@ -1486,8 +1524,13 @@ std::optional<SILDynamicMergedIsolationInfo>
 SILDynamicMergedIsolationInfo::merge(SILIsolationInfo other) const {
   // If we are greater than the other kind, then we are further along the
   // lattice. We ignore the change.
-  if (unsigned(innerInfo.getKind() > unsigned(other.getKind())))
+  //
+  // NOTE: If we are further along, then we both cannot be task isolated. In
+  // such a case, we are the only potential thing that can be
+  // nonisolated(unsafe)... so we do not need to try to propagate.
+  if (unsigned(innerInfo.getKind() > unsigned(other.getKind()))) {
     return {*this};
+  }
 
   // If we are both actor isolated...
   if (innerInfo.isActorIsolated() && other.isActorIsolated()) {
@@ -1520,6 +1563,21 @@ SILDynamicMergedIsolationInfo::merge(SILIsolationInfo other) const {
   // always be associated with non-merged infos.
   if (other.isDisconnected() && other.isUnsafeNonIsolated()) {
     return {other.withUnsafeNonIsolated(false)};
+  }
+
+  // We know that we are either the same as other or other is further along. If
+  // other is further along, it is the only thing that can propagate the task
+  // isolated bit. So we do not need to do anything. If we are equal though, we
+  // may need to propagate the bit. This ensures that when we emit a diagnostic
+  // we appropriately say potentially actor isolated code instead of code in the
+  // current task.
+  //
+  // TODO: We should really represent this as a separate isolation info
+  // kind... but that would be a larger change than we want for 6.2.
+  if (innerInfo.isTaskIsolated() && other.isTaskIsolated()) {
+    if (innerInfo.isNonisolatedNonsendingTaskIsolated() ||
+        other.isNonisolatedNonsendingTaskIsolated())
+      return other.withNonisolatedNonsendingTaskIsolated(true);
   }
 
   // Otherwise, just return other.

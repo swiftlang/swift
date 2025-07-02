@@ -134,14 +134,15 @@ nonisolated(nonsending) func useValueNonIsolatedNonSending<T>(_ t: T) async {}
   let x = ObjCObject()
   await x.useValue(y)
   await useValueConcurrently(x)  // expected-error {{sending 'x' risks causing data races}}
-  // expected-note @-1 {{sending main actor-isolated 'x' to nonisolated global function 'useValueConcurrently' risks causing data races between nonisolated and main actor-isolated uses}}
+  // expected-ni-note @-1 {{sending main actor-isolated 'x' to nonisolated global function 'useValueConcurrently' risks causing data races between nonisolated and main actor-isolated uses}}
+  // expected-ni-ns-note @-2 {{sending main actor-isolated 'x' to @concurrent global function 'useValueConcurrently' risks causing data races between @concurrent and main actor-isolated uses}}
 }
 
 func testTaskLocal(_ y: NSObject) async {
   let x = ObjCObject()
   await x.useValue(y)
   await useValueConcurrently(x) // expected-ni-ns-error {{sending 'x' risks causing data races}}
-  // expected-ni-ns-note @-1 {{sending task-isolated 'x' to nonisolated global function 'useValueConcurrently' risks causing data races between nonisolated and task-isolated uses}}
+  // expected-ni-ns-note @-1 {{sending task-isolated 'x' to @concurrent global function 'useValueConcurrently' risks causing data races between @concurrent and task-isolated uses}}
 
   // This is not safe since we merge x into y's region making x task
   // isolated. We then try to send it to a main actor function.
