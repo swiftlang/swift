@@ -557,6 +557,8 @@ public:
   FuncDecl *getSwiftJobRun();
   /// Retrieve the _Concurrency._deinitOnExecutor intrinsic.
   FuncDecl *getDeinitOnExecutor();
+  /// Retrieve the _Concurrency._deinitOnExecutorMainActorBackDeploy intrinsic.
+  FuncDecl *getDeinitOnExecutorMainActorBackDeploy();
   // Retrieve the _SwiftConcurrencyShims.exit intrinsic.
   FuncDecl *getExit();
 
