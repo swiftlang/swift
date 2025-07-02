@@ -990,11 +990,11 @@ NOTE(regionbasedisolation_type_use_after_send_callee, none,
      (Type, StringRef, const ValueDecl *, StringRef))
 
 NOTE(regionbasedisolation_named_info_send_yields_race, none,
-     "sending %1%0 to %2 callee risks causing data races between %2 and local %3 uses",
-     (Identifier, StringRef, StringRef, StringRef))
+     "sending %select{%2 |}0%1 to %3 callee risks causing data races between %3 and local %4 uses",
+     (bool, Identifier, StringRef, StringRef, StringRef))
 NOTE(regionbasedisolation_named_info_send_yields_race_callee, none,
-     "sending %1%0 to %2 %kind3 risks causing data races between %2 and local %4 uses",
-     (Identifier, StringRef, StringRef, const ValueDecl *, StringRef))
+     "sending %select{%2 |}0%1 to %3 %kind4 risks causing data races between %3 and local %5 uses",
+     (bool, Identifier, StringRef, StringRef, const ValueDecl *, StringRef))
 
 // Use after send closure.
 NOTE(regionbasedisolation_type_isolated_capture_yields_race, none,
@@ -1010,8 +1010,8 @@ NOTE(regionbasedisolation_named_value_used_after_explicit_sending, none,
       "%0 used after being passed as a 'sending' parameter; Later uses could race",
       (Identifier))
 NOTE(regionbasedisolation_named_isolated_closure_yields_race, none,
-      "%0%1 is captured by a %2 closure. %2 uses in closure may race against later %3 uses",
-      (StringRef, Identifier, StringRef, StringRef))
+      "%select{%1 |}0%2 is captured by a %3 closure. %3 uses in closure may race against later %4 uses",
+      (bool, StringRef, Identifier, StringRef, StringRef))
 
 NOTE(regionbasedisolation_typed_use_after_sending, none,
       "Passing value of non-Sendable type %0 as a 'sending' argument risks causing races in between local and caller code",
@@ -1024,19 +1024,19 @@ NOTE(regionbasedisolation_typed_use_after_sending_callee, none,
 // Sending Never Sendable Emitter
 
 NOTE(regionbasedisolation_named_send_never_sendable, none,
-      "sending %1%0 to %2 callee risks causing data races between %2 and %3 uses",
-      (Identifier, StringRef, StringRef, StringRef))
+      "sending %select{%2 |}0%1 to %3 callee risks causing data races between %3 and %4 uses",
+      (bool, Identifier, StringRef, StringRef, StringRef))
 NOTE(regionbasedisolation_named_send_never_sendable_callee, none,
-      "sending %1%0 to %2 %kind3 risks causing data races between %2 and %4 uses",
-      (Identifier, StringRef, StringRef, const ValueDecl *, StringRef))
+      "sending %select{%2 |}0%1 to %3 %kind4 risks causing data races between %3 and %5 uses",
+      (bool, Identifier, StringRef, StringRef, const ValueDecl *, StringRef))
 
 NOTE(regionbasedisolation_named_send_into_sending_param, none,
-     "%0%1 is passed as a 'sending' parameter; Uses in callee may race with "
-     "later %0uses",
-     (StringRef, Identifier))
+     "%select{%1 |}0%2 is passed as a 'sending' parameter; Uses in callee may race with "
+     "later %1 uses",
+     (bool, StringRef, Identifier))
 NOTE(regionbasedisolation_named_nosend_send_into_result, none,
-     "%0%1 cannot be a 'sending' result. %2 uses may race with caller uses",
-     (StringRef, Identifier, StringRef))
+     "%select{%1 |}0%2 cannot be a 'sending' result. %3 uses may race with caller uses",
+     (bool, StringRef, Identifier, StringRef))
 NOTE(regionbasedisolation_typed_tns_passed_to_sending, none,
      "Passing %0 value of non-Sendable type %1 as a 'sending' parameter risks "
      "causing races inbetween %0 uses and uses reachable from the callee",
@@ -1098,10 +1098,10 @@ NOTE(regionbasedisolation_inout_sending_must_be_reinitialized, none,
      "'inout sending' parameter must be reinitialized before function exit with a non-actor isolated value",
      ())
 ERROR(regionbasedisolation_inout_sending_cannot_be_actor_isolated, none,
-      "'inout sending' parameter %0 cannot be %1at end of function",
+      "'inout sending' parameter %0 cannot be %1 at end of function",
       (Identifier, StringRef))
 NOTE(regionbasedisolation_inout_sending_cannot_be_actor_isolated_note, none,
-      "%1%0 risks causing races in between %1uses and caller uses since caller assumes value is not actor isolated",
+      "%1 %0 risks causing races in between %1 uses and caller uses since caller assumes value is not actor isolated",
       (Identifier, StringRef))
 
 //===

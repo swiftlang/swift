@@ -686,37 +686,24 @@ public:
         .limitBehaviorIf(getBehaviorLimit());
 
     // Then emit the note with greater context.
-    SmallString<64> descriptiveKindStr;
-    {
-      if (!namedValuesIsolationInfo.isDisconnected()) {
-        llvm::raw_svector_ostream os(descriptiveKindStr);
-        namedValuesIsolationInfo.printForDiagnostics(getFunction(), os);
-        os << ' ';
-      }
-    }
+    auto descriptiveKindStr =
+        namedValuesIsolationInfo.printForDiagnostics(getFunction());
+    auto calleeIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), isolationCrossing.getCalleeIsolation());
+    auto callerIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), isolationCrossing.getCallerIsolation());
 
-    SmallString<64> calleeIsolationStr;
-    {
-      llvm::raw_svector_ostream os(calleeIsolationStr);
-      SILIsolationInfo::printActorIsolationForDiagnostics(
-          getFunction(), isolationCrossing.getCalleeIsolation(), os);
-    }
-
-    SmallString<64> callerIsolationStr;
-    {
-      llvm::raw_svector_ostream os(callerIsolationStr);
-      SILIsolationInfo::printActorIsolationForDiagnostics(
-          getFunction(), isolationCrossing.getCallerIsolation(), os);
-    }
-
+    bool isDisconnected = namedValuesIsolationInfo.isDisconnected();
     if (auto callee = getSendingCallee()) {
       diagnoseNote(
           loc, diag::regionbasedisolation_named_info_send_yields_race_callee,
-          name, descriptiveKindStr, calleeIsolationStr, callee.value(),
-          callerIsolationStr);
+          isDisconnected, name, descriptiveKindStr, calleeIsolationStr,
+          callee.value(), callerIsolationStr);
     } else {
       diagnoseNote(loc, diag::regionbasedisolation_named_info_send_yields_race,
-                   name, descriptiveKindStr, calleeIsolationStr,
+                   isDisconnected, name, descriptiveKindStr, calleeIsolationStr,
                    callerIsolationStr);
     }
     emitRequireInstDiagnostics();
@@ -733,33 +720,20 @@ public:
         .limitBehaviorIf(getBehaviorLimit());
 
     // Then emit the note with greater context.
-    SmallString<64> descriptiveKindStr;
-    {
-      if (!namedValuesIsolationInfo.isDisconnected()) {
-        llvm::raw_svector_ostream os(descriptiveKindStr);
-        namedValuesIsolationInfo.printForDiagnostics(getFunction(), os);
-        os << ' ';
-      }
-    }
-
-    SmallString<64> calleeIsolationStr;
-    {
-      llvm::raw_svector_ostream os(calleeIsolationStr);
-      SILIsolationInfo::printActorIsolationForDiagnostics(
-          getFunction(), isolationCrossing.getCalleeIsolation(), os);
-    }
-
-    SmallString<64> callerIsolationStr;
-    {
-      llvm::raw_svector_ostream os(callerIsolationStr);
-      SILIsolationInfo::printActorIsolationForDiagnostics(
-          getFunction(), isolationCrossing.getCallerIsolation(), os);
-    }
+    auto descriptiveKindStr =
+        namedValuesIsolationInfo.printForDiagnostics(getFunction());
+    auto calleeIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), isolationCrossing.getCalleeIsolation());
+    auto callerIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), isolationCrossing.getCallerIsolation());
+    bool isDisconnected = namedValuesIsolationInfo.isDisconnected();
 
     diagnoseNote(loc,
                  diag::regionbasedisolation_named_info_send_yields_race_callee,
-                 name, descriptiveKindStr, calleeIsolationStr, callee,
-                 callerIsolationStr);
+                 isDisconnected, name, descriptiveKindStr, calleeIsolationStr,
+                 callee, callerIsolationStr);
     emitRequireInstDiagnostics();
   }
 
@@ -782,19 +756,12 @@ public:
         .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
 
-    SmallString<64> calleeIsolationStr;
-    {
-      llvm::raw_svector_ostream os(calleeIsolationStr);
-      SILIsolationInfo::printActorIsolationForDiagnostics(
-          getFunction(), isolationCrossing.getCalleeIsolation(), os);
-    }
-
-    SmallString<64> callerIsolationStr;
-    {
-      llvm::raw_svector_ostream os(callerIsolationStr);
-      SILIsolationInfo::printActorIsolationForDiagnostics(
-          getFunction(), isolationCrossing.getCallerIsolation(), os);
-    }
+    auto calleeIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), isolationCrossing.getCalleeIsolation());
+    auto callerIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), isolationCrossing.getCallerIsolation());
 
     if (auto callee = getSendingCallee()) {
       diagnoseNote(loc, diag::regionbasedisolation_type_use_after_send_callee,
@@ -848,32 +815,19 @@ public:
         .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
 
-    SmallString<64> descriptiveKindStr;
-    {
-      if (!namedValuesIsolationInfo.isDisconnected()) {
-        llvm::raw_svector_ostream os(descriptiveKindStr);
-        namedValuesIsolationInfo.printForDiagnostics(getFunction(), os);
-        os << ' ';
-      }
-    }
-
-    SmallString<64> calleeIsolationStr;
-    {
-      llvm::raw_svector_ostream os(calleeIsolationStr);
-      SILIsolationInfo::printActorIsolationForDiagnostics(
-          getFunction(), isolationCrossing.getCalleeIsolation(), os);
-    }
-
-    SmallString<64> callerIsolationStr;
-    {
-      llvm::raw_svector_ostream os(callerIsolationStr);
-      SILIsolationInfo::printActorIsolationForDiagnostics(
-          getFunction(), isolationCrossing.getCallerIsolation(), os);
-    }
-
-    diagnoseNote(
-        loc, diag::regionbasedisolation_named_isolated_closure_yields_race,
-        descriptiveKindStr, name, calleeIsolationStr, callerIsolationStr)
+    auto descriptiveKindStr =
+        namedValuesIsolationInfo.printForDiagnostics(getFunction());
+    auto calleeIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), isolationCrossing.getCalleeIsolation());
+    auto callerIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), isolationCrossing.getCallerIsolation());
+    bool isDisconnected = namedValuesIsolationInfo.isDisconnected();
+    diagnoseNote(loc,
+                 diag::regionbasedisolation_named_isolated_closure_yields_race,
+                 isDisconnected, descriptiveKindStr, name, calleeIsolationStr,
+                 callerIsolationStr)
         .highlight(loc.getSourceRange());
     emitRequireInstDiagnostics();
   }
@@ -886,19 +840,12 @@ public:
         .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
 
-    SmallString<64> calleeIsolationStr;
-    {
-      llvm::raw_svector_ostream os(calleeIsolationStr);
-      SILIsolationInfo::printActorIsolationForDiagnostics(
-          getFunction(), isolationCrossing.getCalleeIsolation(), os);
-    }
-
-    SmallString<64> callerIsolationStr;
-    {
-      llvm::raw_svector_ostream os(callerIsolationStr);
-      SILIsolationInfo::printActorIsolationForDiagnostics(
-          getFunction(), isolationCrossing.getCallerIsolation(), os);
-    }
+    auto calleeIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), isolationCrossing.getCalleeIsolation());
+    auto callerIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), isolationCrossing.getCallerIsolation());
 
     diagnoseNote(loc,
                  diag::regionbasedisolation_type_isolated_capture_yields_race,
@@ -1438,18 +1385,11 @@ public:
         .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
 
-    SmallString<64> descriptiveKindStr;
-    {
-      llvm::raw_svector_ostream os(descriptiveKindStr);
-      getIsolationRegionInfo().printForDiagnostics(getFunction(), os);
-    }
-
-    SmallString<64> calleeIsolationStr;
-    {
-      llvm::raw_svector_ostream os(calleeIsolationStr);
-      SILIsolationInfo::printActorIsolationForDiagnostics(
-          getFunction(), crossing.getCalleeIsolation(), os);
-    }
+    auto descriptiveKindStr =
+        getIsolationRegionInfo().printForDiagnostics(getFunction());
+    auto calleeIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), crossing.getCalleeIsolation());
 
     if (auto callee = getSendingCallee()) {
       diagnoseNote(
@@ -1466,32 +1406,20 @@ public:
   void emitNamedFunctionArgumentClosure(SILLocation loc, Identifier name,
                                         ApplyIsolationCrossing crossing) {
     emitNamedOnlyError(loc, name);
-    SmallString<64> descriptiveKindStr;
-    {
-      if (!getIsolationRegionInfo().isDisconnected()) {
-        llvm::raw_svector_ostream os(descriptiveKindStr);
-        getIsolationRegionInfo().printForDiagnostics(getFunction(), os);
-        os << ' ';
-      }
-    }
 
-    SmallString<64> calleeIsolationStr;
-    {
-      llvm::raw_svector_ostream os(calleeIsolationStr);
-      SILIsolationInfo::printActorIsolationForDiagnostics(
-          getFunction(), crossing.getCalleeIsolation(), os);
-    }
-
-    SmallString<64> callerIsolationStr;
-    {
-      llvm::raw_svector_ostream os(callerIsolationStr);
-      SILIsolationInfo::printActorIsolationForDiagnostics(
-          getFunction(), crossing.getCallerIsolation(), os);
-    }
-
-    diagnoseNote(
-        loc, diag::regionbasedisolation_named_isolated_closure_yields_race,
-        descriptiveKindStr, name, calleeIsolationStr, callerIsolationStr)
+    auto descriptiveKindStr =
+        getIsolationRegionInfo().printForDiagnostics(getFunction());
+    auto calleeIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), crossing.getCalleeIsolation());
+    auto callerIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), crossing.getCallerIsolation());
+    bool isDisconnected = getIsolationRegionInfo().isDisconnected();
+    diagnoseNote(loc,
+                 diag::regionbasedisolation_named_isolated_closure_yields_race,
+                 isDisconnected, descriptiveKindStr, name, calleeIsolationStr,
+                 callerIsolationStr)
         .highlight(loc.getSourceRange());
   }
 
@@ -1502,11 +1430,8 @@ public:
         .highlight(loc.getSourceRange())
         .limitBehaviorIf(getBehaviorLimit());
 
-    SmallString<64> descriptiveKindStr;
-    {
-      llvm::raw_svector_ostream os(descriptiveKindStr);
-      getIsolationRegionInfo().printForDiagnostics(getFunction(), os);
-    }
+    auto descriptiveKindStr =
+        getIsolationRegionInfo().printForDiagnostics(getFunction());
 
     if (auto callee = getSendingCallee()) {
       diagnoseNote(
@@ -1524,12 +1449,8 @@ public:
   void emitClosureErrorWithCapturedActor(Operand *partialApplyOp,
                                          Operand *actualUse,
                                          SILArgument *fArg) {
-    SmallString<64> descriptiveKindStr;
-    {
-      llvm::raw_svector_ostream os(descriptiveKindStr);
-      getIsolationRegionInfo().getIsolationInfo().printForCodeDiagnostic(
-          getFunction(), os);
-    }
+    auto descriptiveKindStr =
+        getIsolationRegionInfo().printForCodeDiagnostic(getFunction());
 
     diagnoseError(partialApplyOp,
                   diag::regionbasedisolation_typed_tns_passed_sending_closure,
@@ -1537,12 +1458,8 @@ public:
         .limitBehaviorIf(getDiagnosticBehaviorLimitForOperands(
             actualUse->getFunction(), {actualUse}));
 
-    descriptiveKindStr.clear();
-    {
-      llvm::raw_svector_ostream os(descriptiveKindStr);
-      getIsolationRegionInfo().getIsolationInfo().printForDiagnostics(
-          getFunction(), os);
-    }
+    descriptiveKindStr =
+        getIsolationRegionInfo().printForDiagnostics(getFunction());
     diagnoseNote(actualUse, diag::regionbasedisolation_closure_captures_actor,
                  fArg->getDecl()->getName(), descriptiveKindStr);
   }
@@ -1557,12 +1474,8 @@ public:
   void emitSendingClosureParamDirectlyIsolated(Operand *partialApplyOp,
                                                Operand *actualUse,
                                                SILArgument *fArg) {
-    SmallString<64> descriptiveKindStr;
-    {
-      llvm::raw_svector_ostream os(descriptiveKindStr);
-      getIsolationRegionInfo().getIsolationInfo().printForCodeDiagnostic(
-          getFunction(), os);
-    }
+    auto descriptiveKindStr =
+        getIsolationRegionInfo().printForCodeDiagnostic(getFunction());
 
     diagnoseError(partialApplyOp,
                   diag::regionbasedisolation_typed_tns_passed_sending_closure,
@@ -1586,11 +1499,8 @@ public:
       return;
     }
 
-    descriptiveKindStr.clear();
-    {
-      llvm::raw_svector_ostream os(descriptiveKindStr);
-      getIsolationRegionInfo().printForDiagnostics(getFunction(), os);
-    }
+    descriptiveKindStr =
+        getIsolationRegionInfo().printForDiagnostics(getFunction());
 
     auto diag = diag::
         regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_value;
@@ -1607,11 +1517,8 @@ public:
       return;
     }
 
-    SmallString<64> descriptiveKindStr;
-    {
-      llvm::raw_svector_ostream os(descriptiveKindStr);
-      getIsolationRegionInfo()->printForCodeDiagnostic(getFunction(), os);
-    }
+    auto descriptiveKindStr =
+        getIsolationRegionInfo()->printForCodeDiagnostic(getFunction());
 
     auto emitMainError = [&] {
       auto behaviorLimit = getDiagnosticBehaviorLimitForOperands(
@@ -1643,11 +1550,8 @@ public:
       }
 
       emitMainError();
-      descriptiveKindStr.clear();
-      {
-        llvm::raw_svector_ostream os(descriptiveKindStr);
-        getIsolationRegionInfo().printForDiagnostics(getFunction(), os);
-      }
+      descriptiveKindStr =
+          getIsolationRegionInfo().printForDiagnostics(getFunction());
       auto diag = diag::
           regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_value_region;
       diagnoseNote(actualUseInfo->first, diag, descriptiveKindStr,
@@ -1688,11 +1592,8 @@ public:
            "Should never be disconnected?!");
     emitNamedOnlyError(loc, name);
 
-    SmallString<64> descriptiveKindStr;
-    {
-      llvm::raw_svector_ostream os(descriptiveKindStr);
-      getIsolationRegionInfo().printForDiagnostics(getFunction(), os);
-    }
+    auto descriptiveKindStr =
+        getIsolationRegionInfo().printForDiagnostics(getFunction());
 
     diagnoseNote(loc, diag::regionbasedisolation_named_send_nt_asynclet_capture,
                  name, descriptiveKindStr);
@@ -1701,34 +1602,22 @@ public:
   void emitNamedIsolation(SILLocation loc, Identifier name,
                           ApplyIsolationCrossing isolationCrossing) {
     emitNamedOnlyError(loc, name);
-    SmallString<64> descriptiveKindStr;
-    SmallString<64> descriptiveKindStrWithSpace;
-    {
-      if (!getIsolationRegionInfo().isDisconnected()) {
-        {
-          llvm::raw_svector_ostream os(descriptiveKindStr);
-          getIsolationRegionInfo().printForDiagnostics(getFunction(), os);
-        }
-        descriptiveKindStrWithSpace = descriptiveKindStr;
-        descriptiveKindStrWithSpace.push_back(' ');
-      }
-    }
 
-    SmallString<64> calleeIsolationStr;
-    {
-      llvm::raw_svector_ostream os(calleeIsolationStr);
-      SILIsolationInfo::printActorIsolationForDiagnostics(
-          getFunction(), isolationCrossing.getCalleeIsolation(), os);
-    }
+    auto descriptiveKindStr =
+        getIsolationRegionInfo().printForDiagnostics(getFunction());
+    auto calleeIsolationStr =
+        SILIsolationInfo::printActorIsolationForDiagnostics(
+            getFunction(), isolationCrossing.getCalleeIsolation());
+    bool isDisconnected = getIsolationRegionInfo().isDisconnected();
 
     if (auto callee = getSendingCallee()) {
       diagnoseNote(loc,
                    diag::regionbasedisolation_named_send_never_sendable_callee,
-                   name, descriptiveKindStrWithSpace, calleeIsolationStr,
+                   isDisconnected, name, descriptiveKindStr, calleeIsolationStr,
                    callee.value(), descriptiveKindStr);
     } else {
       diagnoseNote(loc, diag::regionbasedisolation_named_send_never_sendable,
-                   name, descriptiveKindStrWithSpace, calleeIsolationStr,
+                   isDisconnected, name, descriptiveKindStr, calleeIsolationStr,
                    descriptiveKindStr);
     }
   }
@@ -1736,34 +1625,21 @@ public:
   void emitNamedSendingNeverSendableToSendingParam(SILLocation loc,
                                                    Identifier varName) {
     emitNamedOnlyError(loc, varName);
-    SmallString<64> descriptiveKindStr;
-    {
-      if (!getIsolationRegionInfo().isDisconnected()) {
-        llvm::raw_svector_ostream os(descriptiveKindStr);
-        getIsolationRegionInfo().printForDiagnostics(getFunction(), os);
-        os << ' ';
-      }
-    }
+
+    auto descriptiveKindStr =
+        getIsolationRegionInfo().printForDiagnostics(getFunction());
+    bool isDisconnected = getIsolationRegionInfo().isDisconnected();
     auto diag = diag::regionbasedisolation_named_send_into_sending_param;
-    diagnoseNote(loc, diag, descriptiveKindStr, varName);
+    diagnoseNote(loc, diag, isDisconnected, descriptiveKindStr, varName);
   }
 
   void emitNamedSendingReturn(SILLocation loc, Identifier varName) {
     emitNamedOnlyError(loc, varName);
-    SmallString<64> descriptiveKindStr;
-    SmallString<64> descriptiveKindStrWithSpace;
-    {
-      if (!getIsolationRegionInfo().isDisconnected()) {
-        {
-          llvm::raw_svector_ostream os(descriptiveKindStr);
-          getIsolationRegionInfo().printForDiagnostics(getFunction(), os);
-        }
-        descriptiveKindStrWithSpace = descriptiveKindStr;
-        descriptiveKindStrWithSpace.push_back(' ');
-      }
-    }
+    auto descriptiveKindStr =
+        getIsolationRegionInfo().printForDiagnostics(getFunction());
+    bool isDisconnected = getIsolationRegionInfo().isDisconnected();
     auto diag = diag::regionbasedisolation_named_nosend_send_into_result;
-    diagnoseNote(loc, diag, descriptiveKindStrWithSpace, varName,
+    diagnoseNote(loc, diag, isDisconnected, descriptiveKindStr, varName,
                  descriptiveKindStr);
   }
 
@@ -2078,7 +1954,6 @@ bool SentNeverSendableDiagnosticInferrer::run() {
           return true;
 
         // See if we can infer a name from the value.
-        SmallString<64> resultingName;
         if (auto varName = inferNameHelper(op->get())) {
           diagnosticEmitter.emitNamedSendingNeverSendableToSendingParam(
               loc, *varName);
@@ -2119,7 +1994,6 @@ bool SentNeverSendableDiagnosticInferrer::run() {
     }
 
     // See if we can infer a name from the value.
-    SmallString<64> resultingName;
     if (auto name = inferNameHelper(op->get())) {
       diagnosticEmitter.emitNamedIsolation(loc, *name, *isolation);
       return true;
@@ -2167,7 +2041,6 @@ bool SentNeverSendableDiagnosticInferrer::run() {
                           }) &&
              "All result info must be the same... if that changes... update "
              "this code!");
-      SmallString<64> resultingName;
       if (auto name = inferNameHelper(op->get())) {
         diagnosticEmitter.emitNamedSendingReturn(loc, *name);
         return true;
@@ -2316,12 +2189,8 @@ void InOutSendingNotDisconnectedDiagnosticEmitter::emit() {
   }
 
   // Then emit the note with greater context.
-  SmallString<64> descriptiveKindStr;
-  {
-    llvm::raw_svector_ostream os(descriptiveKindStr);
-    actorIsolatedRegionInfo.printForDiagnostics(getFunction(), os);
-    os << ' ';
-  }
+  auto descriptiveKindStr =
+      actorIsolatedRegionInfo.printForDiagnostics(getFunction());
 
   diagnoseError(
       functionExitingInst,
@@ -2476,11 +2345,8 @@ static SILValue findOutParameter(SILValue v) {
 
 void AssignIsolatedIntoSendingResultDiagnosticEmitter::emit() {
   // Then emit the note with greater context.
-  SmallString<64> descriptiveKindStr;
-  {
-    llvm::raw_svector_ostream os(descriptiveKindStr);
-    isolatedValueIsolationRegionInfo.printForDiagnostics(getFunction(), os);
-  }
+  auto descriptiveKindStr =
+      isolatedValueIsolationRegionInfo.printForDiagnostics(getFunction());
 
   // Grab the var name if we can find it.
   if (auto varName = VariableNameInferrer::inferName(srcOperand->get())) {
@@ -2724,19 +2590,10 @@ void NonSendableIsolationCrossingResultDiagnosticEmitter::emit() {
   if (!isolationCrossing)
     return emitUnknownPatternError();
 
-  SmallString<64> calleeIsolationStr;
-  {
-    llvm::raw_svector_ostream os(calleeIsolationStr);
-    SILIsolationInfo::printActorIsolationForDiagnostics(
-        getFunction(), isolationCrossing->getCalleeIsolation(), os);
-  }
-
-  SmallString<64> callerIsolationStr;
-  {
-    llvm::raw_svector_ostream os(callerIsolationStr);
-    SILIsolationInfo::printActorIsolationForDiagnostics(
-        getFunction(), isolationCrossing->getCallerIsolation(), os);
-  }
+  auto calleeIsolationStr = SILIsolationInfo::printActorIsolationForDiagnostics(
+      getFunction(), isolationCrossing->getCalleeIsolation());
+  auto callerIsolationStr = SILIsolationInfo::printActorIsolationForDiagnostics(
+      getFunction(), isolationCrossing->getCallerIsolation());
 
   auto type = getType();
   if (getCalledDecl()) {
