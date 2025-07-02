@@ -626,7 +626,7 @@ SWIFT_REQUEST(TypeChecker, CustomDerivativesRequest,
               Cached, NoLocationInfo)
 
 SWIFT_REQUEST(TypeChecker, GenericTypeParamDeclGetValueTypeRequest,
-              Type(GenericTypeParamDecl *), Cached, NoLocationInfo)
+              Type(const GenericTypeParamDecl *), Cached, NoLocationInfo)
 
 SWIFT_REQUEST(TypeChecker, SemanticAvailableAttrRequest,
               std::optional<SemanticAvailableAttr>

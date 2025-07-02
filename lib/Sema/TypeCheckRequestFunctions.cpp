@@ -486,8 +486,8 @@ Type ResultBuilderTypeRequest::evaluate(Evaluator &evaluator,
   return type->mapTypeOutOfContext();
 }
 
-Type GenericTypeParamDeclGetValueTypeRequest::evaluate(Evaluator &evaluator,
-                                             GenericTypeParamDecl *decl) const {
+Type GenericTypeParamDeclGetValueTypeRequest::evaluate(
+    Evaluator &evaluator, const GenericTypeParamDecl *decl) const {
   if (!decl->isValue())
     return Type();
 
