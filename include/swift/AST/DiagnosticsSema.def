@@ -8735,11 +8735,6 @@ ERROR(execution_behavior_incompatible_isolated_parameter,none,
       "an isolated parameter: %2",
       (DeclAttribute, ValueDecl *, ValueDecl *))
 
-ERROR(execution_behavior_incompatible_dynamically_isolated_parameter,none,
-      "cannot use %0 on %kind1 because it has "
-      "a dynamically isolated parameter: %2",
-      (DeclAttribute, ValueDecl *, ValueDecl *))
-
 ERROR(execution_behavior_attr_incompatible_with_global_isolation,none,
       "cannot use %0 because function type is isolated to a global actor %1",
       (DeclAttribute, Type))
