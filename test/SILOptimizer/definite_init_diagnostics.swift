@@ -1,4 +1,7 @@
-// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -emit-sil -primary-file %s -o /dev/null -verify
+// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -emit-sil -primary-file %s -o /dev/null -verify -verify-additional-prefix no-weak-let-
+// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -enable-upcoming-feature WeakLet -emit-sil -primary-file %s -o /dev/null -verify -verify-additional-prefix has-weak-let-
+
+// REQUIRES: swift_feature_WeakLet
 
 import Swift
 
@@ -103,15 +106,22 @@ func test2() {
   
   
   // Weak
-  // expected-warning @+1 {{variable 'w1' was never mutated; consider changing to 'let' constant}} {{8-11=let}}
+  // expected-has-weak-let-warning@+1 {{variable 'w1' was never mutated; consider changing to 'let' constant}} {{8-11=let}}
   weak var w1 : SomeClass?
   _ = w1                // ok: default-initialized
 
   // Note: with -enable-copy-propagation, we also expect: {{weak reference will always be nil because the referenced object is deallocated here}}
-  // expected-warning@+3 {{instance will be immediately deallocated because variable 'w2' is 'weak'}}
-  // expected-note@+2 {{a strong reference is required to prevent the instance from being deallocated}}
-  // expected-note@+1 {{'w2' declared here}}
+#if hasFeature(WeakLet)
+  // expected-has-weak-let-warning@+3 {{instance will be immediately deallocated because variable 'w2' is 'weak'}}
+  // expected-has-weak-let-note@+2 {{a strong reference is required to prevent the instance from being deallocated}}
+  // expected-has-weak-let-note@+1 {{'w2' declared here}}
   weak let w2 = SomeClass()
+#else
+  // expected-no-weak-let-warning@+3 {{instance will be immediately deallocated because variable 'w2' is 'weak'}}
+  // expected-no-weak-let-note@+2 {{a strong reference is required to prevent the instance from being deallocated}}
+  // expected-no-weak-let-note@+1 {{'w2' declared here}}
+  weak var w2 = SomeClass()
+#endif
   _ = w2                // ok
   
   

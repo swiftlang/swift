@@ -1,14 +1,14 @@
 // RUN: %target-swift-frontend -g -Xllvm -sil-print-types -emit-sil %s -parse-as-library -module-name a | %FileCheck %s
+// RUN: %target-swift-frontend -g -Xllvm -sil-print-types -emit-sil %s -parse-as-library -module-name a -enable-upcoming-feature WeakLet | %FileCheck %s --check-prefixes=CHECK,CHECK-HAS-WEAK-LET
+// REQUIRES: swift_feature_WeakLet
 open class C {
-  public func fun() {}
-
   public func run() {
     { [weak self] in
       guard let self else { fatalError("cannot happen") }
       // CHECK: sil_scope [[LAMBDA:[0-9]+]] { loc "{{.*}}":6:5
       // CHECK: sil_scope [[BODY:[0-9]+]] { loc "{{.*}}":6:19 parent [[LAMBDA]]
       // CHECK: sil_scope [[LET:[0-9]+]] { loc "{{.*}}":7:7 parent [[BODY]]
-      // CHECK: sil_scope [[TMP:[0-9]+]] { loc "{{.*}}":7:17 parent [[LET]]
+      // CHECK-HAS-WEAK-LET: sil_scope [[TMP:[0-9]+]] { loc "{{.*}}":7:17 parent [[LET]]
       // CHECK: sil_scope [[GUARD:[0-9]+]] { loc "{{.*}}":7:17 parent [[LET]]
       // CHECK: debug_value {{.*}} : $C, let, name "self", {{.*}}, scope [[GUARD]]
       // CHECK: function_ref {{.*}}3fun{{.*}}, scope [[GUARD]]
@@ -16,4 +16,8 @@ open class C {
       self.fun()
     }()
   }
+  public func fun() {}
 }
+
+
+

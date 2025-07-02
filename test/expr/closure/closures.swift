@@ -1,4 +1,7 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -verify-additional-prefix no-weak-let-
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-upcoming-feature WeakLet -verify-additional-prefix has-weak-let-
+
+// REQUIRES: swift_feature_WeakLet
 
 var func6 : (_ fn : (Int,Int) -> Int) -> ()
 var func6a : ((Int, Int) -> Int) -> ()
@@ -262,12 +265,29 @@ class ExplicitSelfRequiredTest {
   // because its `sawError` flag is set to true. To preserve the "capture 'y' was never used" warnings
   // above, we put these cases in their own method.
   func weakSelfError() {
-    doVoidStuff({ [weak self] in x += 1 }) // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{capture 'self' was never used}}
-    doVoidStuffNonEscaping({ [weak self] in x += 1 }) // expected-warning {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{capture 'self' was never used}}
-    doStuff({ [weak self] in x+1 }) // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{capture 'self' was never used}}
-    doVoidStuff({ [weak self] in _ = method() }) // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{capture 'self' was never used}}
-    doVoidStuffNonEscaping({ [weak self] in _ = method() }) // expected-warning {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{capture 'self' was never used}}
-    doStuff({ [weak self] in method() }) // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-warning {{capture 'self' was never used}}
+    doVoidStuff({ [weak self] in x += 1 }) // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    // expected-no-weak-let-warning@-1 {{variable 'self' was written to, but never read}}
+    // expected-has-weak-let-warning@-2 {{capture 'self' was never used}}
+
+    doVoidStuffNonEscaping({ [weak self] in x += 1 }) // expected-warning {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    // expected-no-weak-let-warning@-1 {{variable 'self' was written to, but never read}}
+    // expected-has-weak-let-warning@-2 {{capture 'self' was never used}}
+
+    doStuff({ [weak self] in x+1 }) // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    // expected-no-weak-let-warning@-1 {{variable 'self' was written to, but never read}}
+    // expected-has-weak-let-warning@-2 {{capture 'self' was never used}}
+
+    doVoidStuff({ [weak self] in _ = method() }) // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    // expected-no-weak-let-warning@-1 {{variable 'self' was written to, but never read}}
+    // expected-has-weak-let-warning@-2 {{capture 'self' was never used}}
+
+    doVoidStuffNonEscaping({ [weak self] in _ = method() }) // expected-warning {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    // expected-no-weak-let-warning@-1 {{variable 'self' was written to, but never read}}
+    // expected-has-weak-let-warning@-2 {{capture 'self' was never used}}
+
+    doStuff({ [weak self] in method() }) // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    // expected-no-weak-let-warning@-1 {{variable 'self' was written to, but never read}}
+    // expected-has-weak-let-warning@-2 {{capture 'self' was never used}}
   }
 }
 
@@ -374,7 +394,8 @@ extension SomeClass {
     //expected-error@-3{{reference to property 'in' in closure requires explicit use of 'self' to make capture semantics explicit}}
     //expected-note@-4{{reference 'self.' explicitly}}
 
-    // expected-warning @+1 {{capture 'self' was never used}}
+    // expected-no-weak-let-warning@+2 {{variable 'self' was written to, but never read}}
+    // expected-has-weak-let-warning@+1 {{capture 'self' was never used}}
     doStuff { [weak self&field] in 42 }  // expected-error {{expected ']' at end of capture list}}
 
   }
@@ -1522,22 +1543,30 @@ final class AutoclosureTests {
         withEscapingAutoclosure(bar()) // expected-warning {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
       }
     }
-    
-    doVoidStuff { [weak self] in // expected-warning {{capture 'self' was never used}}
+
+    // expected-no-weak-let-warning@+2 {{variable 'self' was written to, but never read}}
+    // expected-has-weak-let-warning@+1 {{capture 'self' was never used}}
+    doVoidStuff { [weak self] in
       withNonEscapingAutoclosure(bar()) // expected-error {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}}
     }
-    
-    doVoidStuff { [weak self] in // expected-warning {{capture 'self' was never used}}
+
+    // expected-no-weak-let-warning@+2 {{variable 'self' was written to, but never read}}
+    // expected-has-weak-let-warning@+1 {{capture 'self' was never used}}
+    doVoidStuff { [weak self] in
       withEscapingAutoclosure(bar()) // expected-error {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
     }
-    
-    doVoidStuff { [weak self] in // expected-warning {{capture 'self' was never used}}
+
+    // expected-no-weak-let-warning@+2 {{variable 'self' was written to, but never read}}
+    // expected-has-weak-let-warning@+1 {{capture 'self' was never used}}
+    doVoidStuff { [weak self] in
       doVoidStuff { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
         withNonEscapingAutoclosure(bar()) // expected-error {{all to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
       }
     }
-      
-    doVoidStuff { [weak self] in // expected-warning {{capture 'self' was never used}}
+
+    // expected-no-weak-let-warning@+2 {{variable 'self' was written to, but never read}}
+    // expected-has-weak-let-warning@+1 {{capture 'self' was never used}}
+    doVoidStuff { [weak self] in
       doVoidStuff {
         withEscapingAutoclosure(bar()) // expected-error {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
       }
@@ -1604,7 +1633,13 @@ final class AutoclosureTests {
       let someOptional: Self? = Self()
       var `self` = self ?? someOptional // expected-warning {{'self' was never mutated; consider changing to 'let' constant}}
       guard let self = self else { return }
-      method() // expected-error{{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
+#if hasFeature(WeakLet)
+      method() // expected-has-weak-let-error{{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
+#else
+      // This is not supposed to be permitted, but has been allowed since Swift 5.8,
+      // so we have to continue allowing it to maintain source compatibility.
+      method()
+#endif
     }
   
     doVoidStuff { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
@@ -1770,13 +1805,17 @@ class rdar129475277 {
   func method() {}
 
   func test1() {
-    takesEscapingWithAllowedImplicitSelf { [weak self] in // expected-warning {{capture 'self' was never used}}
+    // expected-no-weak-let-warning@+2 {{variable 'self' was written to, but never read}}
+    // expected-has-weak-let-warning@+1 {{capture 'self' was never used}}
+    takesEscapingWithAllowedImplicitSelf { [weak self] in
       takesEscapingWithAllowedImplicitSelf {
         method() // expected-warning {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
       }
     }
 
-    takesEscapingWithAllowedImplicitSelf { [weak self] in // expected-warning {{capture 'self' was never used}}
+    // expected-no-weak-let-warning@+2 {{variable 'self' was written to, but never read}}
+    // expected-has-weak-let-warning@+1 {{capture 'self' was never used}}
+    takesEscapingWithAllowedImplicitSelf { [weak self] in
       takesEscapingWithAllowedImplicitSelf {
         doVoidStuffNonEscaping {
           withNonEscapingAutoclosure(bar()) // expected-warning {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}}
@@ -1784,7 +1823,9 @@ class rdar129475277 {
       }
     }
 
-    takesEscapingWithAllowedImplicitSelf { [weak self] in // expected-warning {{capture 'self' was never used}}
+    // expected-no-weak-let-warning@+2 {{variable 'self' was written to, but never read}}
+    // expected-has-weak-let-warning@+1 {{capture 'self' was never used}}
+    takesEscapingWithAllowedImplicitSelf { [weak self] in
       withNonEscapingAutoclosure(bar()) // expected-warning {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}}
     }
   }
@@ -1817,7 +1858,9 @@ class TestExtensionOnOptionalSelf {
 
 extension TestExtensionOnOptionalSelf? {
   func foo() {
-    _ = { [weak self] in // expected-warning {{capture 'self' was never used}}
+    // expected-no-weak-let-warning@+2 {{variable 'self' was written to, but never read}}
+    // expected-has-weak-let-warning@+1 {{capture 'self' was never used}}
+    _ = { [weak self] in
       foo() // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}}
     }
 
@@ -1825,7 +1868,9 @@ extension TestExtensionOnOptionalSelf? {
       foo()
     }
 
-    _ = { [weak self] in // expected-warning {{capture 'self' was never used}}
+    // expected-no-weak-let-warning@+2 {{variable 'self' was written to, but never read}}
+    // expected-has-weak-let-warning@+1 {{capture 'self' was never used}}
+    _ = { [weak self] in
       _ = {
         foo()
       }

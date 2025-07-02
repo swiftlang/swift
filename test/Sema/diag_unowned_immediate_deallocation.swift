@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift -module-name ModuleName
+// RUN: %target-typecheck-verify-swift -module-name ModuleName -enable-upcoming-feature WeakLet
+
+// REQUIRES: swift_feature_WeakLet
 
 protocol ClassProtocol : class {
   init()

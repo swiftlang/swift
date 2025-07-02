@@ -713,7 +713,11 @@ public:
   /// or `let self = self` condition.
   ///  - If `requiresCaptureListRef` is `true`, additionally requires that the
   ///    RHS of the self condition references a var defined in a capture list.
-  bool rebindsSelf(ASTContext &Ctx, bool requiresCaptureListRef = false) const;
+  ///  - If `requireLoadExpr` is `true`, additionally requires that the RHS of
+  ///    the self condition is a `LoadExpr`.
+  /// TODO: Remove `requireLoadExpr` after full-on of the WeakLet feature
+  bool rebindsSelf(ASTContext &Ctx, bool requiresCaptureListRef = false,
+                   bool requireLoadExpr = false) const;
 
   SourceLoc getStartLoc() const;
   SourceLoc getEndLoc() const;
@@ -822,7 +826,8 @@ public:
   /// or `let self = self` condition.
   ///  - If `requiresCaptureListRef` is `true`, additionally requires that the
   ///    RHS of the self condition references a var defined in a capture list.
-  bool rebindsSelf(ASTContext &Ctx, bool requiresCaptureListRef = false) const;
+  bool rebindsSelf(ASTContext &Ctx, bool requiresCaptureListRef = false,
+                   bool requireLoadExpr = false) const;
 
   static bool classof(const Stmt *S) {
     return S->getKind() >= StmtKind::First_LabeledConditionalStmt &&
