@@ -190,11 +190,24 @@ void OptimizeHopToExecutor::solveDataflowBackward() {
   } while (changed);
 }
 
+static bool isNonEscapingSynchronousClosure(FullApplySite applySite) {
+  auto callee = applySite.getCallee();
+  auto calleeType = callee->getType();
+  if (calleeType.isFunction()) {
+    if (calleeType.isNoEscapeFunction() && !calleeType.isAsyncFunction()) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /// Returns true if \p inst is a suspension point or an async call.
 static bool isSuspensionPoint(SILInstruction *inst) {
   if (auto applySite = FullApplySite::isa(inst)) {
     if (applySite.isAsync())
       return true;
+    if (isNonEscapingSynchronousClosure(applySite))
+      return false;
     return false;
   }
   if (isa<AwaitAsyncContinuationInst>(inst))
