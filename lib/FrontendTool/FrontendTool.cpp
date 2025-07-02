@@ -740,7 +740,8 @@ bool swift::performCompileStepsPostSema(CompilerInstance &Instance,
   const auto &Invocation = Instance.getInvocation();
   const FrontendOptions &opts = Invocation.getFrontendOptions();
 
-  auto getSILOptions = [&](const PrimarySpecificPaths &PSPs) -> SILOptions {
+  auto getSILOptions = [&](const PrimarySpecificPaths &PSPs,
+                           const std::vector<PrimarySpecificPaths> &auxPSPs) -> SILOptions {
     SILOptions SILOpts = Invocation.getSILOptions();
     if (SILOpts.OptRecordFile.empty()) {
       // Check if the record file path was passed via supplemental outputs.
@@ -748,6 +749,15 @@ bool swift::performCompileStepsPostSema(CompilerInstance &Instance,
         llvm::remarks::Format::YAML ?
           PSPs.SupplementaryOutputs.YAMLOptRecordPath :
           PSPs.SupplementaryOutputs.BitstreamOptRecordPath;
+    }
+    if (!auxPSPs.empty()) {
+      assert(SILOpts.AuxOptRecordFiles.empty());
+      for (const auto &auxFile: auxPSPs) {
+        SILOpts.AuxOptRecordFiles.push_back(
+          SILOpts.OptRecordFormat == llvm::remarks::Format::YAML ?
+          auxFile.SupplementaryOutputs.YAMLOptRecordPath :
+          auxFile.SupplementaryOutputs.BitstreamOptRecordPath);
+      }
     }
     return SILOpts;
   };
@@ -758,13 +768,24 @@ bool swift::performCompileStepsPostSema(CompilerInstance &Instance,
     // SILModule for the entire module.
     const PrimarySpecificPaths PSPs =
         Instance.getPrimarySpecificPathsForWholeModuleOptimizationMode();
-    SILOptions SILOpts = getSILOptions(PSPs);
+
+    std::vector<PrimarySpecificPaths> auxPSPs;
+    for (unsigned i = 1; i < opts.InputsAndOutputs.inputCount(); ++i) {
+      auto &auxPSP =
+        opts.InputsAndOutputs.getPrimarySpecificPathsForRemaining(i);
+      auxPSPs.push_back(auxPSP);
+    }
+
+    SILOptions SILOpts = getSILOptions(PSPs, auxPSPs);
     IRGenOptions irgenOpts = Invocation.getIRGenOptions();
     auto SM = performASTLowering(mod, Instance.getSILTypes(), SILOpts,
                                  &irgenOpts);
     return performCompileStepsPostSILGen(Instance, std::move(SM), mod, PSPs,
                                          ReturnValue, observer);
   }
+
+
+  std::vector<PrimarySpecificPaths> emptyAuxPSPs;
   // If there are primary source files, build a separate SILModule for
   // each source file, and run the remaining SILOpt-Serialize-IRGen-LLVM
   // once for each such input.
@@ -773,7 +794,7 @@ bool swift::performCompileStepsPostSema(CompilerInstance &Instance,
     for (auto *PrimaryFile : Instance.getPrimarySourceFiles()) {
       const PrimarySpecificPaths PSPs =
           Instance.getPrimarySpecificPathsForSourceFile(*PrimaryFile);
-      SILOptions SILOpts = getSILOptions(PSPs);
+      SILOptions SILOpts = getSILOptions(PSPs, emptyAuxPSPs);
     IRGenOptions irgenOpts = Invocation.getIRGenOptions();
       auto SM = performASTLowering(*PrimaryFile, Instance.getSILTypes(),
                                    SILOpts, &irgenOpts);
@@ -793,7 +814,7 @@ bool swift::performCompileStepsPostSema(CompilerInstance &Instance,
       if (opts.InputsAndOutputs.isInputPrimary(SASTF->getFilename())) {
         const PrimarySpecificPaths &PSPs =
             Instance.getPrimarySpecificPathsForPrimary(SASTF->getFilename());
-        SILOptions SILOpts = getSILOptions(PSPs);
+        SILOptions SILOpts = getSILOptions(PSPs, emptyAuxPSPs);
         auto SM = performASTLowering(*SASTF, Instance.getSILTypes(), SILOpts);
         result |= performCompileStepsPostSILGen(Instance, std::move(SM), mod,
                                                 PSPs, ReturnValue, observer);
