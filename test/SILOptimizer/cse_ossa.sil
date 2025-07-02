@@ -1351,3 +1351,16 @@ bb0(%0 : $*InlineArray<N, Int>, %1 : $Int):
   return %14
 }
 
+struct Pair<let x: Int, let y: Int> {}
+// CHECK-LABEL: sil [ossa] @dont_cse_different_type_values : {{.*}} {
+// CHECK:         type_value
+// CHECK:         type_value
+// CHECK-LABEL: } // end sil function 'dont_cse_different_type_values'
+sil [ossa] @dont_cse_different_type_values : $@convention(method) <let x : Int, let y : Int> (Pair<x, y>) -> (Int, Int) {
+[global: ]
+bb0(%0 : $Pair<x, y>):
+  %2 = type_value $Int for x
+  %3 = type_value $Int for y
+  %4 = tuple (%2, %3)
+  return %4
+}
