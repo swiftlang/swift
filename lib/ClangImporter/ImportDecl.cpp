@@ -10300,9 +10300,11 @@ ClangImporter::Implementation::importDeclContextOf(
   if (!importedDC) return nullptr;
 
   // If the declaration was not global to start with, we're done.
-  bool isGlobal =
-    decl->getDeclContext()->getRedeclContext()->isTranslationUnit();
-  if (!isGlobal) return importedDC;
+  bool isRenamedGlobal =
+      decl->getDeclContext()->getRedeclContext()->isTranslationUnit() ||
+      (context.getKind() == EffectiveClangContext::UnresolvedContext &&
+          decl->getDeclContext()->getRedeclContext()->isNamespace());
+  if (!isRenamedGlobal) return importedDC;
 
   // If the resulting declaration context is not a nominal type,
   // we're done.
