@@ -1608,6 +1608,9 @@ class _ParentProcess {
         _testSuiteFailedCallback()
       } else {
         print("\(testSuite.name): All tests passed")
+        if testSuite._tests.isEmpty {
+          print("WARNING: SUITE '\(testSuite.name)' CONTAINED NO TESTS! NO TESTS WERE EXECUTED!")
+        }
       }
     }
     let (failed: failedOnShutdown, ()) = _shutdownChild()
