@@ -2506,18 +2506,37 @@ function Build-Foundation {
     Get-ProjectBinaryCache $Platform DynamicFoundation
   }
 
+  $FoundationImage = if ($Static) {
+    "$(Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental")\usr"
+  } else {
+    "$(Get-SwiftSDK $Platform.OS)\usr"
+  }
+
+  $SwiftSDK = if ($Static) {
+    Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental"
+  } else {
+    Get-SwiftSDK $Platform.OS
+  }
+
+  $SwiftFlags = if ($Static) {
+    @("-static-stdlib", "-Xfrontend", "-use-static-resource-dir")
+  } else {
+    @()
+  }
+
   Build-CMakeProject `
     -Src $SourceCache\swift-corelibs-foundation `
     -Bin $FoundationBinaryCache `
-    -InstallTo $(if ($Static) { "$(Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental")\usr" } else { "$(Get-SwiftSDK $Platform.OS)\usr" }) `
+    -InstallTo $FoundationImage `
     -Platform $Platform `
     -UseBuiltCompilers ASM,C,CXX,Swift `
-    -SwiftSDK (Get-SwiftSDK $Platform.OS) `
+    -SwiftSDK $SwiftSDK `
     -Defines @{
       BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
       CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
       CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+      CMAKE_Swift_FLAGS = $SwiftFlags;
       ENABLE_TESTING = "NO";
       FOUNDATION_BUILD_TOOLS = if ($Platform.OS -eq [OS]::Windows) { "YES" } else { "NO" };
       CURL_DIR = "$BinaryCache\$($Platform.Triple)\usr\lib\cmake\CURL";
