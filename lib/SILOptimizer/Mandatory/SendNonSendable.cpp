@@ -690,7 +690,7 @@ public:
     {
       if (!namedValuesIsolationInfo.isDisconnected()) {
         llvm::raw_svector_ostream os(descriptiveKindStr);
-        namedValuesIsolationInfo.printForDiagnostics(os);
+        namedValuesIsolationInfo.printForDiagnostics(getFunction(), os);
         os << ' ';
       }
     }
@@ -699,14 +699,14 @@ public:
     {
       llvm::raw_svector_ostream os(calleeIsolationStr);
       SILIsolationInfo::printActorIsolationForDiagnostics(
-          isolationCrossing.getCalleeIsolation(), os);
+          getFunction(), isolationCrossing.getCalleeIsolation(), os);
     }
 
     SmallString<64> callerIsolationStr;
     {
       llvm::raw_svector_ostream os(callerIsolationStr);
       SILIsolationInfo::printActorIsolationForDiagnostics(
-          isolationCrossing.getCallerIsolation(), os);
+          getFunction(), isolationCrossing.getCallerIsolation(), os);
     }
 
     if (auto callee = getSendingCallee()) {
@@ -737,7 +737,7 @@ public:
     {
       if (!namedValuesIsolationInfo.isDisconnected()) {
         llvm::raw_svector_ostream os(descriptiveKindStr);
-        namedValuesIsolationInfo.printForDiagnostics(os);
+        namedValuesIsolationInfo.printForDiagnostics(getFunction(), os);
         os << ' ';
       }
     }
@@ -746,14 +746,14 @@ public:
     {
       llvm::raw_svector_ostream os(calleeIsolationStr);
       SILIsolationInfo::printActorIsolationForDiagnostics(
-          isolationCrossing.getCalleeIsolation(), os);
+          getFunction(), isolationCrossing.getCalleeIsolation(), os);
     }
 
     SmallString<64> callerIsolationStr;
     {
       llvm::raw_svector_ostream os(callerIsolationStr);
       SILIsolationInfo::printActorIsolationForDiagnostics(
-          isolationCrossing.getCallerIsolation(), os);
+          getFunction(), isolationCrossing.getCallerIsolation(), os);
     }
 
     diagnoseNote(loc,
@@ -786,14 +786,14 @@ public:
     {
       llvm::raw_svector_ostream os(calleeIsolationStr);
       SILIsolationInfo::printActorIsolationForDiagnostics(
-          isolationCrossing.getCalleeIsolation(), os);
+          getFunction(), isolationCrossing.getCalleeIsolation(), os);
     }
 
     SmallString<64> callerIsolationStr;
     {
       llvm::raw_svector_ostream os(callerIsolationStr);
       SILIsolationInfo::printActorIsolationForDiagnostics(
-          isolationCrossing.getCallerIsolation(), os);
+          getFunction(), isolationCrossing.getCallerIsolation(), os);
     }
 
     if (auto callee = getSendingCallee()) {
@@ -852,7 +852,7 @@ public:
     {
       if (!namedValuesIsolationInfo.isDisconnected()) {
         llvm::raw_svector_ostream os(descriptiveKindStr);
-        namedValuesIsolationInfo.printForDiagnostics(os);
+        namedValuesIsolationInfo.printForDiagnostics(getFunction(), os);
         os << ' ';
       }
     }
@@ -861,14 +861,14 @@ public:
     {
       llvm::raw_svector_ostream os(calleeIsolationStr);
       SILIsolationInfo::printActorIsolationForDiagnostics(
-          isolationCrossing.getCalleeIsolation(), os);
+          getFunction(), isolationCrossing.getCalleeIsolation(), os);
     }
 
     SmallString<64> callerIsolationStr;
     {
       llvm::raw_svector_ostream os(callerIsolationStr);
       SILIsolationInfo::printActorIsolationForDiagnostics(
-          isolationCrossing.getCallerIsolation(), os);
+          getFunction(), isolationCrossing.getCallerIsolation(), os);
     }
 
     diagnoseNote(
@@ -890,14 +890,14 @@ public:
     {
       llvm::raw_svector_ostream os(calleeIsolationStr);
       SILIsolationInfo::printActorIsolationForDiagnostics(
-          isolationCrossing.getCalleeIsolation(), os);
+          getFunction(), isolationCrossing.getCalleeIsolation(), os);
     }
 
     SmallString<64> callerIsolationStr;
     {
       llvm::raw_svector_ostream os(callerIsolationStr);
       SILIsolationInfo::printActorIsolationForDiagnostics(
-          isolationCrossing.getCallerIsolation(), os);
+          getFunction(), isolationCrossing.getCallerIsolation(), os);
     }
 
     diagnoseNote(loc,
@@ -1441,14 +1441,14 @@ public:
     SmallString<64> descriptiveKindStr;
     {
       llvm::raw_svector_ostream os(descriptiveKindStr);
-      getIsolationRegionInfo().printForDiagnostics(os);
+      getIsolationRegionInfo().printForDiagnostics(getFunction(), os);
     }
 
     SmallString<64> calleeIsolationStr;
     {
       llvm::raw_svector_ostream os(calleeIsolationStr);
       SILIsolationInfo::printActorIsolationForDiagnostics(
-          crossing.getCalleeIsolation(), os);
+          getFunction(), crossing.getCalleeIsolation(), os);
     }
 
     if (auto callee = getSendingCallee()) {
@@ -1470,7 +1470,7 @@ public:
     {
       if (!getIsolationRegionInfo().isDisconnected()) {
         llvm::raw_svector_ostream os(descriptiveKindStr);
-        getIsolationRegionInfo().printForDiagnostics(os);
+        getIsolationRegionInfo().printForDiagnostics(getFunction(), os);
         os << ' ';
       }
     }
@@ -1479,14 +1479,14 @@ public:
     {
       llvm::raw_svector_ostream os(calleeIsolationStr);
       SILIsolationInfo::printActorIsolationForDiagnostics(
-          crossing.getCalleeIsolation(), os);
+          getFunction(), crossing.getCalleeIsolation(), os);
     }
 
     SmallString<64> callerIsolationStr;
     {
       llvm::raw_svector_ostream os(callerIsolationStr);
       SILIsolationInfo::printActorIsolationForDiagnostics(
-          crossing.getCallerIsolation(), os);
+          getFunction(), crossing.getCallerIsolation(), os);
     }
 
     diagnoseNote(
@@ -1505,7 +1505,7 @@ public:
     SmallString<64> descriptiveKindStr;
     {
       llvm::raw_svector_ostream os(descriptiveKindStr);
-      getIsolationRegionInfo().printForDiagnostics(os);
+      getIsolationRegionInfo().printForDiagnostics(getFunction(), os);
     }
 
     if (auto callee = getSendingCallee()) {
@@ -1527,7 +1527,8 @@ public:
     SmallString<64> descriptiveKindStr;
     {
       llvm::raw_svector_ostream os(descriptiveKindStr);
-      getIsolationRegionInfo().getIsolationInfo().printForCodeDiagnostic(os);
+      getIsolationRegionInfo().getIsolationInfo().printForCodeDiagnostic(
+          getFunction(), os);
     }
 
     diagnoseError(partialApplyOp,
@@ -1539,7 +1540,8 @@ public:
     descriptiveKindStr.clear();
     {
       llvm::raw_svector_ostream os(descriptiveKindStr);
-      getIsolationRegionInfo().getIsolationInfo().printForDiagnostics(os);
+      getIsolationRegionInfo().getIsolationInfo().printForDiagnostics(
+          getFunction(), os);
     }
     diagnoseNote(actualUse, diag::regionbasedisolation_closure_captures_actor,
                  fArg->getDecl()->getName(), descriptiveKindStr);
@@ -1558,7 +1560,8 @@ public:
     SmallString<64> descriptiveKindStr;
     {
       llvm::raw_svector_ostream os(descriptiveKindStr);
-      getIsolationRegionInfo().getIsolationInfo().printForCodeDiagnostic(os);
+      getIsolationRegionInfo().getIsolationInfo().printForCodeDiagnostic(
+          getFunction(), os);
     }
 
     diagnoseError(partialApplyOp,
@@ -1586,7 +1589,7 @@ public:
     descriptiveKindStr.clear();
     {
       llvm::raw_svector_ostream os(descriptiveKindStr);
-      getIsolationRegionInfo().printForDiagnostics(os);
+      getIsolationRegionInfo().printForDiagnostics(getFunction(), os);
     }
 
     auto diag = diag::
@@ -1607,7 +1610,7 @@ public:
     SmallString<64> descriptiveKindStr;
     {
       llvm::raw_svector_ostream os(descriptiveKindStr);
-      getIsolationRegionInfo()->printForCodeDiagnostic(os);
+      getIsolationRegionInfo()->printForCodeDiagnostic(getFunction(), os);
     }
 
     auto emitMainError = [&] {
@@ -1643,7 +1646,7 @@ public:
       descriptiveKindStr.clear();
       {
         llvm::raw_svector_ostream os(descriptiveKindStr);
-        getIsolationRegionInfo().printForDiagnostics(os);
+        getIsolationRegionInfo().printForDiagnostics(getFunction(), os);
       }
       auto diag = diag::
           regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_value_region;
@@ -1688,7 +1691,7 @@ public:
     SmallString<64> descriptiveKindStr;
     {
       llvm::raw_svector_ostream os(descriptiveKindStr);
-      getIsolationRegionInfo().printForDiagnostics(os);
+      getIsolationRegionInfo().printForDiagnostics(getFunction(), os);
     }
 
     diagnoseNote(loc, diag::regionbasedisolation_named_send_nt_asynclet_capture,
@@ -1704,7 +1707,7 @@ public:
       if (!getIsolationRegionInfo().isDisconnected()) {
         {
           llvm::raw_svector_ostream os(descriptiveKindStr);
-          getIsolationRegionInfo().printForDiagnostics(os);
+          getIsolationRegionInfo().printForDiagnostics(getFunction(), os);
         }
         descriptiveKindStrWithSpace = descriptiveKindStr;
         descriptiveKindStrWithSpace.push_back(' ');
@@ -1715,7 +1718,7 @@ public:
     {
       llvm::raw_svector_ostream os(calleeIsolationStr);
       SILIsolationInfo::printActorIsolationForDiagnostics(
-          isolationCrossing.getCalleeIsolation(), os);
+          getFunction(), isolationCrossing.getCalleeIsolation(), os);
     }
 
     if (auto callee = getSendingCallee()) {
@@ -1737,7 +1740,7 @@ public:
     {
       if (!getIsolationRegionInfo().isDisconnected()) {
         llvm::raw_svector_ostream os(descriptiveKindStr);
-        getIsolationRegionInfo().printForDiagnostics(os);
+        getIsolationRegionInfo().printForDiagnostics(getFunction(), os);
         os << ' ';
       }
     }
@@ -1753,7 +1756,7 @@ public:
       if (!getIsolationRegionInfo().isDisconnected()) {
         {
           llvm::raw_svector_ostream os(descriptiveKindStr);
-          getIsolationRegionInfo().printForDiagnostics(os);
+          getIsolationRegionInfo().printForDiagnostics(getFunction(), os);
         }
         descriptiveKindStrWithSpace = descriptiveKindStr;
         descriptiveKindStrWithSpace.push_back(' ');
@@ -2316,7 +2319,7 @@ void InOutSendingNotDisconnectedDiagnosticEmitter::emit() {
   SmallString<64> descriptiveKindStr;
   {
     llvm::raw_svector_ostream os(descriptiveKindStr);
-    actorIsolatedRegionInfo.printForDiagnostics(os);
+    actorIsolatedRegionInfo.printForDiagnostics(getFunction(), os);
     os << ' ';
   }
 
@@ -2476,7 +2479,7 @@ void AssignIsolatedIntoSendingResultDiagnosticEmitter::emit() {
   SmallString<64> descriptiveKindStr;
   {
     llvm::raw_svector_ostream os(descriptiveKindStr);
-    isolatedValueIsolationRegionInfo.printForDiagnostics(os);
+    isolatedValueIsolationRegionInfo.printForDiagnostics(getFunction(), os);
   }
 
   // Grab the var name if we can find it.
@@ -2601,6 +2604,10 @@ struct NonSendableIsolationCrossingResultDiagnosticEmitter {
       : valueMap(valueMap), error(error),
         representative(valueMap.getRepresentative(error.returnValueElement)) {}
 
+  SILFunction *getFunction() const {
+    return error.op->getSourceInst()->getFunction();
+  }
+
   void emit();
 
   ASTContext &getASTContext() const {
@@ -2721,14 +2728,14 @@ void NonSendableIsolationCrossingResultDiagnosticEmitter::emit() {
   {
     llvm::raw_svector_ostream os(calleeIsolationStr);
     SILIsolationInfo::printActorIsolationForDiagnostics(
-        isolationCrossing->getCalleeIsolation(), os);
+        getFunction(), isolationCrossing->getCalleeIsolation(), os);
   }
 
   SmallString<64> callerIsolationStr;
   {
     llvm::raw_svector_ostream os(callerIsolationStr);
     SILIsolationInfo::printActorIsolationForDiagnostics(
-        isolationCrossing->getCallerIsolation(), os);
+        getFunction(), isolationCrossing->getCallerIsolation(), os);
   }
 
   auto type = getType();

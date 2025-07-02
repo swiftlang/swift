@@ -820,7 +820,7 @@ void RegionAnalysisValueMap::print(llvm::raw_ostream &os) const {
   for (auto p : temp) {
     os << "%%" << p.first << ": ";
     auto value = getValueForId(Element(p.first));
-    value->print(os);
+    value->print(getFunction(), os);
   }
 #endif
 }
@@ -1127,12 +1127,13 @@ bool TrackableValue::isSendingParameter() const {
 //                      MARK: TrackableValueLookupResult
 //===----------------------------------------------------------------------===//
 
-void TrackableValueLookupResult::print(llvm::raw_ostream &os) const {
+void TrackableValueLookupResult::print(SILFunction *fn,
+                                       llvm::raw_ostream &os) const {
   os << "Value:\n";
-  value.print(os);
+  value.print(fn, os);
   if (base) {
     os << "Base:\n";
-    base->print(os);
+    base->print(fn, os);
   }
 }
 
@@ -1618,6 +1619,11 @@ struct PartitionOpBuilder {
   /// generating partition ops.
   SmallVector<PartitionOp, 8> currentInstPartitionOps;
 
+  SILFunction *getFunction() const {
+    assert(currentInst);
+    return currentInst->getFunction();
+  }
+
   void reset(SILInstruction *inst) {
     currentInst = inst;
     currentInstPartitionOps.clear();
@@ -1978,7 +1984,8 @@ class PartitionOpTranslator {
                 isNonSendableType(val->getType())) {
               auto trackVal = getTrackableValue(val, true);
               (void)trackVal;
-              REGIONBASEDISOLATION_LOG(trackVal.print(llvm::dbgs()));
+              REGIONBASEDISOLATION_LOG(
+                  trackVal.print(val->getFunction(), llvm::dbgs()));
               continue;
             }
             if (auto *pbi = dyn_cast<ProjectBoxInst>(val)) {
@@ -2055,7 +2062,7 @@ public:
         // send list and to the region join list.
         REGIONBASEDISOLATION_LOG(
             llvm::dbgs() << "    %%" << value.getID() << ": ";
-            value.print(llvm::dbgs()); llvm::dbgs() << *arg);
+            value.print(function, llvm::dbgs()); llvm::dbgs() << *arg);
         nonSendableJoinedIndices.push_back(value.getID());
       } else {
         REGIONBASEDISOLATION_LOG(llvm::dbgs() << "    Sendable: " << *arg);
@@ -2228,14 +2235,15 @@ public:
           REGIONBASEDISOLATION_LOG(
               llvm::dbgs() << "Merge Failure!\n"
                            << "Original Info: ";
-              if (originalMergedInfo)
-                  originalMergedInfo->printForDiagnostics(llvm::dbgs());
+              if (originalMergedInfo) originalMergedInfo->printForDiagnostics(
+                  builder.getFunction(), llvm::dbgs());
               else llvm::dbgs() << "nil";
               llvm::dbgs() << "\nValue Rep: "
                            << value.getRepresentative().getValue();
               llvm::dbgs() << "Original Src: " << src;
               llvm::dbgs() << "Value Info: ";
-              value.getIsolationRegionInfo().printForDiagnostics(llvm::dbgs());
+              value.getIsolationRegionInfo().printForDiagnostics(
+                  builder.getFunction(), llvm::dbgs());
               llvm::dbgs() << "\n");
           builder.addUnknownPatternError(src);
           continue;
@@ -3220,7 +3228,7 @@ void PartitionOpBuilder::print(llvm::raw_ostream &os) const {
     auto trackableValue = translator->getValueForId(opArg);
     assert(trackableValue);
     llvm::dbgs() << "State: %%" << opArg << ". ";
-    trackableValue->getValueState().print(llvm::dbgs());
+    trackableValue->getValueState().print(getFunction(), llvm::dbgs());
     llvm::dbgs() << "\n             Rep Value: "
                  << trackableValue->getRepresentative();
     if (auto value = trackableValue->getRepresentative().maybeGetValue()) {
@@ -4310,7 +4318,7 @@ static FunctionTest
                               RegionAnalysisValueMap valueMap(&function);
                               auto value = arguments.takeValue();
                               auto trackableValue = valueMap.getTrackableValue(value);
-                              trackableValue.print(llvm::outs());
+                              trackableValue.print(&function, llvm::outs());
                               llvm::outs() << '\n';
                             });
 

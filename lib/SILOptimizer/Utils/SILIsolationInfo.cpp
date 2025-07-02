@@ -1237,15 +1237,13 @@ void SILIsolationInfo::printOptions(llvm::raw_ostream &os) const {
   llvm::interleave(data, os, ", ");
 }
 
-/// We want to treat nonisolated(nonsending) just like nonisolated. So we use
-/// this with composition.
 void SILIsolationInfo::printActorIsolationForDiagnostics(
-    ActorIsolation iso, llvm::raw_ostream &os, StringRef openingQuotationMark,
-    bool asNoun) {
+    SILFunction *fn, ActorIsolation iso, llvm::raw_ostream &os,
+    StringRef openingQuotationMark, bool asNoun) {
   return iso.printForDiagnostics(os, openingQuotationMark, asNoun);
 }
 
-void SILIsolationInfo::print(llvm::raw_ostream &os) const {
+void SILIsolationInfo::print(SILFunction *fn, llvm::raw_ostream &os) const {
   switch (Kind(*this)) {
   case Unknown:
     os << "unknown";
@@ -1292,7 +1290,7 @@ void SILIsolationInfo::print(llvm::raw_ostream &os) const {
       }
     }
 
-    printActorIsolationForDiagnostics(getActorIsolation(), os);
+    printActorIsolationForDiagnostics(fn, getActorIsolation(), os);
     printOptions(os);
     return;
   case Task:
@@ -1379,7 +1377,8 @@ void SILIsolationInfo::Profile(llvm::FoldingSetNodeID &id) const {
   }
 }
 
-void SILIsolationInfo::printForDiagnostics(llvm::raw_ostream &os) const {
+void SILIsolationInfo::printForDiagnostics(SILFunction *fn,
+                                           llvm::raw_ostream &os) const {
   switch (Kind(*this)) {
   case Unknown:
     llvm::report_fatal_error("Printing unknown for diagnostics?!");
@@ -1414,7 +1413,7 @@ void SILIsolationInfo::printForDiagnostics(llvm::raw_ostream &os) const {
       }
     }
 
-    printActorIsolationForDiagnostics(getActorIsolation(), os);
+    printActorIsolationForDiagnostics(fn, getActorIsolation(), os);
     return;
   case Task:
     os << "task-isolated";
@@ -1422,7 +1421,8 @@ void SILIsolationInfo::printForDiagnostics(llvm::raw_ostream &os) const {
   }
 }
 
-void SILIsolationInfo::printForCodeDiagnostic(llvm::raw_ostream &os) const {
+void SILIsolationInfo::printForCodeDiagnostic(SILFunction *fn,
+                                              llvm::raw_ostream &os) const {
   switch (Kind(*this)) {
   case Unknown:
     llvm::report_fatal_error("Printing unknown for code diagnostic?!");
@@ -1457,7 +1457,7 @@ void SILIsolationInfo::printForCodeDiagnostic(llvm::raw_ostream &os) const {
       }
     }
 
-    printActorIsolationForDiagnostics(getActorIsolation(), os);
+    printActorIsolationForDiagnostics(fn, getActorIsolation(), os);
     os << " code";
     return;
   case Task:
@@ -1466,7 +1466,8 @@ void SILIsolationInfo::printForCodeDiagnostic(llvm::raw_ostream &os) const {
   }
 }
 
-void SILIsolationInfo::printForOneLineLogging(llvm::raw_ostream &os) const {
+void SILIsolationInfo::printForOneLineLogging(SILFunction *fn,
+                                              llvm::raw_ostream &os) const {
   switch (Kind(*this)) {
   case Unknown:
     os << "unknown";
@@ -1506,7 +1507,7 @@ void SILIsolationInfo::printForOneLineLogging(llvm::raw_ostream &os) const {
       }
     }
 
-    printActorIsolationForDiagnostics(getActorIsolation(), os);
+    printActorIsolationForDiagnostics(fn, getActorIsolation(), os);
     printOptions(os);
     return;
   case Task:
@@ -1713,7 +1714,8 @@ static FunctionTest
                                   SILIsolationInfo::get(value);
                               llvm::outs() << "Input Value: " << *value;
                               llvm::outs() << "Isolation: ";
-                              info.printForOneLineLogging(llvm::outs());
+                              info.printForOneLineLogging(&function,
+                                                          llvm::outs());
                               llvm::outs() << "\n";
                             });
 
@@ -1733,13 +1735,13 @@ static FunctionTest IsolationMergeTest(
       mergedInfo = mergedInfo->merge(secondValueInfo);
       llvm::outs() << "First Value: " << *firstValue;
       llvm::outs() << "First Isolation: ";
-      firstValueInfo.printForOneLineLogging(llvm::outs());
+      firstValueInfo.printForOneLineLogging(&function, llvm::outs());
       llvm::outs() << "\nSecond Value: " << *secondValue;
       llvm::outs() << "Second Isolation: ";
-      secondValueInfo.printForOneLineLogging(llvm::outs());
+      secondValueInfo.printForOneLineLogging(&function, llvm::outs());
       llvm::outs() << "\nMerged Isolation: ";
       if (mergedInfo) {
-        mergedInfo->printForOneLineLogging(llvm::outs());
+        mergedInfo->printForOneLineLogging(&function, llvm::outs());
       } else {
         llvm::outs() << "Merge failure!";
       }

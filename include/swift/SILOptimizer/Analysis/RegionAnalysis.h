@@ -179,16 +179,16 @@ public:
 
   void removeFlag(TrackableValueFlag flag) { flagSet -= flag; }
 
-  void print(llvm::raw_ostream &os) const {
+  void print(SILFunction *fn, llvm::raw_ostream &os) const {
     os << "TrackableValueState[id: " << id
        << "][is_no_alias: " << (isNoAlias() ? "yes" : "no")
        << "][is_sendable: " << (isSendable() ? "yes" : "no")
        << "][region_value_kind: ";
-    getIsolationRegionInfo().printForOneLineLogging(os);
+    getIsolationRegionInfo().printForOneLineLogging(fn, os);
     os << "].";
   }
 
-  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+  SWIFT_DEBUG_DUMPER(dump(SILFunction *fn)) { print(fn, llvm::dbgs()); }
 
 private:
   bool hasIsolationRegionInfo() const { return bool(regionInfo); }
@@ -249,26 +249,26 @@ public:
   /// parameter.
   bool isSendingParameter() const;
 
-  void printIsolationInfo(SmallString<64> &outString) const {
+  void printIsolationInfo(SILFunction *fn, SmallString<64> &outString) const {
     llvm::raw_svector_ostream os(outString);
-    getIsolationRegionInfo().printForDiagnostics(os);
+    getIsolationRegionInfo().printForDiagnostics(fn, os);
   }
 
-  void print(llvm::raw_ostream &os) const {
+  void print(SILFunction *fn, llvm::raw_ostream &os) const {
     os << "TrackableValue. State: ";
-    valueState.print(os);
+    valueState.print(fn, os);
     os << "\n    Rep Value: ";
     getRepresentative().print(os);
   }
 
-  void printVerbose(llvm::raw_ostream &os) const {
+  void printVerbose(SILFunction *fn, llvm::raw_ostream &os) const {
     os << "TrackableValue. State: ";
-    valueState.print(os);
+    valueState.print(fn, os);
     os << "\n    Rep Value: " << getRepresentative();
   }
 
-  SWIFT_DEBUG_DUMP {
-    print(llvm::dbgs());
+  SWIFT_DEBUG_DUMPER(dump(SILFunction *fn)) {
+    print(fn, llvm::dbgs());
     llvm::dbgs() << '\n';
   }
 };
@@ -288,8 +288,8 @@ struct regionanalysisimpl::TrackableValueLookupResult {
   /// TrackableValue.
   std::optional<TrackableValue> base;
 
-  void print(llvm::raw_ostream &os) const;
-  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+  void print(SILFunction *fn, llvm::raw_ostream &os) const;
+  SWIFT_DEBUG_DUMPER(dumper(SILFunction *fn)) { print(fn, llvm::dbgs()); }
 };
 
 class RegionAnalysis;
@@ -389,6 +389,8 @@ public:
   SILValue getRepresentative(SILValue value) const {
     return getUnderlyingTrackedValue(value).value;
   }
+
+  SILFunction *getFunction() const { return fn; }
 
   /// Returns the value for this instruction if it isn't a fake "represenative
   /// value" to inject actor isolatedness. Asserts in such a case.
