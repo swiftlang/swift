@@ -39,7 +39,8 @@ TypeRefBuilder::decodeMangledType(Node *node, bool forRequirement) {
 
 std::optional<std::reference_wrapper<const ReflectionInfo>>
 TypeRefBuilder::ReflectionTypeDescriptorFinder::
-    findReflectionInfoWithTypeRefContainingAddress(uint64_t remoteAddr) {
+    findReflectionInfoWithTypeRefContainingAddress(
+        remote::RemoteAddress remoteAddr) {
   // Update ReflectionInfoIndexesSortedByTypeReferenceRange if necessary.
   if (ReflectionInfoIndexesSortedByTypeReferenceRange.size() !=
       ReflectionInfos.size()) {
@@ -54,12 +55,14 @@ TypeRefBuilder::ReflectionTypeDescriptorFinder::
         ReflectionInfoIndexesSortedByTypeReferenceRange.begin(),
         ReflectionInfoIndexesSortedByTypeReferenceRange.end(),
         [&](uint32_t ReflectionInfoIndexA, uint32_t ReflectionInfoIndexB) {
-          uint64_t typeReferenceAStart = ReflectionInfos[ReflectionInfoIndexA]
-                                             .TypeReference.startAddress()
-                                             .getAddressData();
-          uint64_t typeReferenceBStart = ReflectionInfos[ReflectionInfoIndexB]
-                                             .TypeReference.startAddress()
-                                             .getAddressData();
+          remote::RemoteAddress typeReferenceAStart =
+              ReflectionInfos[ReflectionInfoIndexA]
+                  .TypeReference.startAddress()
+                  .getAddressData();
+          remote::RemoteAddress typeReferenceBStart =
+              ReflectionInfos[ReflectionInfoIndexB]
+                  .TypeReference.startAddress()
+                  .getAddressData();
 
           return typeReferenceAStart < typeReferenceBStart;
         });
@@ -71,7 +74,7 @@ TypeRefBuilder::ReflectionTypeDescriptorFinder::
   const auto possiblyMatchingReflectionInfoIndex = std::lower_bound(
       ReflectionInfoIndexesSortedByTypeReferenceRange.begin(),
       ReflectionInfoIndexesSortedByTypeReferenceRange.end(), remoteAddr,
-      [&](uint32_t ReflectionInfoIndex, uint64_t remoteAddr) {
+      [&](uint32_t ReflectionInfoIndex, remote::RemoteAddress remoteAddr) {
         return ReflectionInfos[ReflectionInfoIndex]
                    .TypeReference.endAddress()
                    .getAddressData() <= remoteAddr;
@@ -97,7 +100,7 @@ TypeRefBuilder::ReflectionTypeDescriptorFinder::
 }
 
 RemoteRef<char> TypeRefBuilder::ReflectionTypeDescriptorFinder::readTypeRef(
-    uint64_t remoteAddr) {
+    remote::RemoteAddress remoteAddr) {
   // The remote address should point into one of the TypeRef or
   // ReflectionString references we already read out of the images.
   RemoteRef<char> foundTypeRef;
@@ -749,7 +752,7 @@ TypeRefBuilder::getMultiPayloadEnumDescriptor(const TypeRef *TR) {
 
 RemoteRef<CaptureDescriptor>
 TypeRefBuilder::ReflectionTypeDescriptorFinder::getCaptureDescriptor(
-    uint64_t RemoteAddress) {
+    remote::RemoteAddress RemoteAddress) {
 
   for (; CaptureDescriptorsByAddressLastReflectionInfoCache <
          ReflectionInfos.size();

@@ -57,16 +57,29 @@ public:
   ///
   /// Returns false if the operation failed.
   virtual bool readString(RemoteAddress address, std::string &dest) = 0;
-  
+
+  /// Attempts to read a remote address from the given address in the remote
+  /// process.
+  ///
+  /// Returns false if the operator failed.
+  virtual bool readRemoteAddress(RemoteAddress address, RemoteAddress &out) {
+    return readInteger(address, &out.getAddressDataReference());
+  }
   /// Attempts to read an integer from the given address in the remote
   /// process.
   ///
   /// Returns false if the operation failed.
   template <typename IntegerType>
   bool readInteger(RemoteAddress address, IntegerType *dest) {
+    static_assert(!std::is_same<RemoteAddress, IntegerType>(),
+                  "RemoteAddress cannot be read in directly, use "
+                  "readRemoteAddress instead.");
+
     return readBytes(address, reinterpret_cast<uint8_t*>(dest),
                      sizeof(IntegerType));
   }
+
+  virtual RemoteAddress stripSignedPointer(RemoteAddress P) = 0;
 
   /// Attempts to read an integer of the specified size from the given
   /// address in the remote process.  Following `storeEnumElement`
@@ -147,7 +160,8 @@ public:
   virtual RemoteAbsolutePointer resolvePointer(RemoteAddress address,
                                                uint64_t readValue) {
     // Default implementation returns the read value as is.
-    return RemoteAbsolutePointer(RemoteAddress(readValue));
+    return RemoteAbsolutePointer(
+        RemoteAddress(readValue, address.getAddressSpace()));
   }
 
   /// Performs the inverse operation of \ref resolvePointer.
@@ -263,7 +277,7 @@ public:
   virtual ~MemoryReader() = default;
 };
 
-} // end namespace reflection
+} // end namespace remote
 } // end namespace swift
 
 #endif // SWIFT_REFLECTION_READER_H
