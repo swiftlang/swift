@@ -136,6 +136,7 @@ split_embedded_sources(
   EMBEDDED RangeReplaceableCollection.swift
   EMBEDDED RangeSet.swift
   EMBEDDED RangeSetRanges.swift
+  EMBEDDED RefCell.swift
     NORMAL ReflectionMirror.swift
   EMBEDDED Repeat.swift
     NORMAL REPL.swift

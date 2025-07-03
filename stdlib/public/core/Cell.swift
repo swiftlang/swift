@@ -33,6 +33,20 @@ public struct _Cell<Value: ~Copyable>: ~Copyable {
 
   @available(SwiftStdlib 6.3, *)
   @_alwaysEmitIntoClient
+  public var value: Value {
+    @_transparent
+    unsafeAddress {
+      UnsafePointer<Value>(address)
+    }
+
+    @_transparent
+    nonmutating unsafeMutableAddress {
+      address
+    }
+  }
+
+  @available(SwiftStdlib 6.3, *)
+  @_alwaysEmitIntoClient
   @_transparent
   public init(_ initialValue: consuming Value) {
     unsafe _address.initialize(to: initialValue)
