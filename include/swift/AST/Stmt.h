@@ -504,8 +504,7 @@ class alignas(8) PoundAvailableInfo final :
                      ArrayRef<AvailabilitySpec *> queries, SourceLoc RParenLoc,
                      bool isUnavailability)
       : PoundLoc(PoundLoc), LParenLoc(LParenLoc), RParenLoc(RParenLoc),
-        NumQueries(queries.size()), AvailableRange(VersionRange::empty()),
-        VariantAvailableRange(VersionRange::empty()), Flags() {
+        NumQueries(queries.size()), Flags() {
     Flags.isInvalid = false;
     Flags.isUnavailability = isUnavailability;
     std::uninitialized_copy(queries.begin(), queries.end(),
