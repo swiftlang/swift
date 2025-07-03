@@ -97,9 +97,6 @@ public let benchmarks = [
   BenchmarkInfo(name: "NSArray.bridged.repeatedBufferAccess",
                   runFunction: run_BridgedNSArrayRepeatedBufferAccess, tags: t,
                   setUpFunction: setup_bridgedArrays),
-  BenchmarkInfo(name: "NSDictionary.bridged.enumerate",
-                  runFunction: run_BridgedNSDictionaryEnumerate, tags: t,
-                  setUpFunction: setup_bridgedDictionaries),
   BenchmarkInfo(name: "NSString.bridged.byteCount.ascii.ascii",
                   runFunction: run_BridgedNSStringLengthASCII_ASCII, tags: ts,
                   setUpFunction: setup_bridgedStrings),
@@ -830,14 +827,6 @@ public func setup_bridgedArrays() {
   nsArray = NSArray(objects: &arr, count: 100)
   nsArrayMutableCopy = (nsArray.mutableCopy() as! NSMutableArray)
   #endif
-}
-
-public func setup_bridgedDictionaries() {
-  var numDict = Dictionary<Int, Int>()
-  for i in 0 ..< 100 {
-    numDict[i] = i
-  }
-  bridgedDictionaryOfNumbersToNumbers = numDict as NSDictionary
 }
 
 public func setup_bridgedStrings() {
