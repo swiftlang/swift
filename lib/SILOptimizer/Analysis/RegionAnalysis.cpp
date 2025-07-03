@@ -2475,7 +2475,8 @@ public:
       }
     }
 
-    if (auto isolationRegionInfo = SILIsolationInfo::get(pai)) {
+    if (auto isolationRegionInfo = SILIsolationInfo::get(pai);
+        isolationRegionInfo && !isolationRegionInfo.isDisconnected()) {
       return translateIsolatedPartialApply(pai, isolationRegionInfo);
     }
 
