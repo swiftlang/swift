@@ -53,22 +53,22 @@ func a0_simple(x: Int, bar y: Int) -> Int { return x }
 func a1_defaultName(x: Int) -> Int { return x }
 // CHECK-LABEL: SWIFT_EXTERN ptrdiff_t a1_defaultName(ptrdiff_t x) SWIFT_NOEXCEPT SWIFT_WARN_UNUSED_RESULT;
 
-@cdecl("primitiveTypes")
+@cdecl(primitiveTypes)
 public func b_primitiveTypes(i: Int, ci: CInt, l: CLong, c: CChar, f: Float, d: Double, b: Bool) {}
 // CHECK-LABEL: SWIFT_EXTERN void primitiveTypes(ptrdiff_t i, int ci, long l, char c, float f, double d, bool b) SWIFT_NOEXCEPT;
 
-@cdecl("has_keyword_arg_names")
+@cdecl(has_keyword_arg_names)
 func c_keywordArgNames(auto: Int, union: Int) {}
 // CHECK-LABEL: SWIFT_EXTERN void has_keyword_arg_names(ptrdiff_t auto_, ptrdiff_t union_) SWIFT_NOEXCEPT;
 
-@cdecl("return_never")
+@cdecl(return_never)
 func d_returnNever() -> Never { fatalError() }
 // CHECK-LABEL: SWIFT_EXTERN void return_never(void) SWIFT_NOEXCEPT SWIFT_NORETURN;
 
 /// Pointer types
 // CHECK: /// Pointer types
 
-@cdecl("pointers")
+@cdecl(pointers)
 func f_pointers(_ x: UnsafeMutablePointer<Int>,
                   y: UnsafePointer<Int>,
                   z: UnsafeMutableRawPointer,
@@ -76,7 +76,7 @@ func f_pointers(_ x: UnsafeMutablePointer<Int>,
                   u: OpaquePointer) {}
 // CHECK: SWIFT_EXTERN void pointers(ptrdiff_t * _Nonnull x, ptrdiff_t const * _Nonnull y, void * _Nonnull z, void const * _Nonnull w, void * _Nonnull u) SWIFT_NOEXCEPT;
 
-@cdecl("nullable_pointers")
+@cdecl(nullable_pointers)
 func g_nullablePointers(_ x: UnsafeMutableRawPointer,
                           y: UnsafeMutableRawPointer?,
                           z: UnsafeMutableRawPointer!) {}
@@ -87,23 +87,23 @@ func g_nullablePointers(_ x: UnsafeMutableRawPointer,
 @cdecl
 enum CEnum: CInt { case A, B }
 
-@cdecl("CEnumRenamed_CName")
+@cdecl(CEnumRenamed_CName)
 enum CEnumRenamed: CLong { case A, B }
 
-@cdecl("use_enum")
+@cdecl(use_enum)
 func h_useCEnum(e: CEnum) -> CEnum { return e }
 // CHECK: SWIFT_EXTERN SWIFT_ENUM_TAG CEnum use_enum(SWIFT_ENUM_TAG CEnum e) SWIFT_NOEXCEPT SWIFT_WARN_UNUSED_RESULT;
 
-@cdecl("use_enum_renamed")
+@cdecl(use_enum_renamed)
 func i_useCEnumLong(e: CEnumRenamed) -> CEnumRenamed { return e }
 // CHECK: SWIFT_EXTERN SWIFT_ENUM_TAG CEnumRenamed_CName use_enum_renamed(SWIFT_ENUM_TAG CEnumRenamed_CName e) SWIFT_NOEXCEPT SWIFT_WARN_UNUSED_RESULT;
 
-@cdecl("use_enum_late")
+@cdecl(use_enum_late)
 func j_useCEnumChar(e: zCEnumDefinedLate) -> zCEnumDefinedLate { return e }
 // CHECK: SWIFT_EXTERN SWIFT_ENUM_TAG zCEnumDefinedLate use_enum_late(SWIFT_ENUM_TAG zCEnumDefinedLate e) SWIFT_NOEXCEPT SWIFT_WARN_UNUSED_RESULT;
 
 /// Declare this enum late in the source file and in alphabetical order.
-@cdecl("zCEnumDefinedLate")
+@cdecl(zCEnumDefinedLate)
 enum zCEnumDefinedLate: CChar { case A, B }
 
 // CHECK:      #if defined(__cplusplus)

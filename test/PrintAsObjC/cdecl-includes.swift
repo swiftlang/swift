@@ -78,16 +78,16 @@ import CModule
 // CHECK: extern "C" {
 // CHECK: #endif
 
-@cdecl("mirror_struct")
+@cdecl(mirror_struct)
 public func a_mirrorStruct(_ a: CStruct) -> CStruct { a }
 // CHECK: SWIFT_EXTERN struct CStruct mirror_struct(struct CStruct a) SWIFT_NOEXCEPT SWIFT_WARN_UNUSED_RESULT;
 
-@cdecl("mirror_union")
+@cdecl(mirror_union)
 public func b_mirrorStruct(_ a: CUnion) -> CUnion { a }
 // CHECK: SWIFT_EXTERN union CUnion mirror_union(union CUnion a) SWIFT_NOEXCEPT SWIFT_WARN_UNUSED_RESULT;
 
 
-@cdecl("TKGetDefaultToastSetting")
+@cdecl(TKGetDefaultToastSetting)
 public func c_defaultToastSetting() -> TKTimeSetting { TKTimeSettingNormal } // It would be nice to import TKTimeSettingNormal as a member.
 // CHECK: SWIFT_EXTERN TKTimeSetting TKGetDefaultToastSetting(void) SWIFT_NOEXCEPT SWIFT_WARN_UNUSED_RESULT;
 
