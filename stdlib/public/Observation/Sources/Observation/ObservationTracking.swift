@@ -75,7 +75,7 @@ public struct ObservationTracking: Sendable {
     willSet: (@Sendable (ObservationTracking) -> Void)? = nil,
     didSet: (@Sendable (ObservationTracking) -> Void)? = nil
   ) {
-    let values = tracking.list.entries.mapValues { 
+    let values = tracking.list.entries.mapValues {
       switch (willSet, didSet) {
       case (.some(let willSetObserver), .some(let didSetObserver)):
         return Id.full($0.addWillSetObserver { keyPath in
@@ -97,7 +97,7 @@ public struct ObservationTracking: Sendable {
         })
       case (.none, .none):
         fatalError()
-      }  
+      }
     }
     
     tracking.install(values)
@@ -158,14 +158,20 @@ public struct ObservationTracking: Sendable {
   }
 
   @available(SwiftStdlib 6.0, *)
-  public var changed: AnyKeyPath? {
+  public fileprivate(set) var changed: AnyKeyPath? {
+    get {
       state.withCriticalRegion { $0.changed }
+    }
+    nonmutating set {
+      state.withCriticalRegion { $0.changed = newValue }
+    }
   }
 }
 
 @available(SwiftStdlib 5.9, *)
-fileprivate func generateAccessList<T>(_ apply: () -> T) -> (T, ObservationTracking._AccessList?) {
+fileprivate func generateAccessList<T>(_ apply: () -> T) -> (T, ObservationTracking._AccessList?, AnyKeyPath?) {
   var accessList: ObservationTracking._AccessList?
+  var dirtyPath: AnyKeyPath?
   let result = withUnsafeMutablePointer(to: &accessList) { ptr in
     let previous = _ThreadLocal.value
     _ThreadLocal.value = UnsafeMutableRawPointer(ptr)
@@ -180,9 +186,25 @@ fileprivate func generateAccessList<T>(_ apply: () -> T) -> (T, ObservationTrack
       }
       _ThreadLocal.value = previous
     }
+    defer {
+      let entries = ptr.pointee?.entries ?? [:]
+      for (_, entry) in entries {
+        let dirty = entry.context.clear(ptr)
+        if !dirty.isEmpty {
+          // Take only the "first" change during the access that is external to the current TLS
+          // this is uniqued in the pending list such that multiple systems should be able to interact at the same time
+          // and not over step the bounds.
+          // Furthermore, since this TLS is ensured to NEVER be async it then means that no other thread from the pool
+          // can be using this thread.
+          dirtyPath = dirty.first
+          break
+        }
+      }
+    }
     return apply()
   }
-  return (result, accessList)
+  
+  return (result, accessList, dirtyPath)
 }
 
 /// Tracks access to properties.
@@ -192,7 +214,7 @@ fileprivate func generateAccessList<T>(_ apply: () -> T) -> (T, ObservationTrack
 /// of the `onChange` closure. For example, the following code tracks changes
 /// to the name of cars, but it doesn't track changes to any other property of
 /// `Car`:
-/// 
+///
 ///     func render() {
 ///         withObservationTracking {
 ///             for car in cars {
@@ -214,7 +236,11 @@ public func withObservationTracking<T>(
   _ apply: () -> T,
   onChange: @autoclosure () -> @Sendable () -> Void
 ) -> T {
-  let (result, accessList) = generateAccessList(apply)
+  let (result, accessList, dirtyKeyPath) = generateAccessList(apply)
+  if let dirtyKeyPath {
+    onChange()()
+    return result
+  }
   if let accessList {
     ObservationTracking._installTracking(accessList, onChange: onChange())
   }
@@ -228,7 +254,12 @@ public func withObservationTracking<T>(
   willSet: @escaping @Sendable (ObservationTracking) -> Void,
   didSet: @escaping @Sendable (ObservationTracking) -> Void
 ) -> T {
-  let (result, accessList) = generateAccessList(apply)
+  let (result, accessList, dirtyKeyPath) = generateAccessList(apply)
+  if let dirtyKeyPath {
+    let tracking = ObservationTracking(accessList)
+    tracking.changed = dirtyKeyPath
+    willSet(tracking)
+  }
   ObservationTracking._installTracking(ObservationTracking(accessList), willSet: willSet, didSet: didSet)
   return result
 }
@@ -239,7 +270,12 @@ public func withObservationTracking<T>(
   _ apply: () -> T,
   willSet: @escaping @Sendable (ObservationTracking) -> Void
 ) -> T {
-  let (result, accessList) = generateAccessList(apply)
+  let (result, accessList, dirtyKeyPath) = generateAccessList(apply)
+  if let dirtyKeyPath {
+    let tracking = ObservationTracking(accessList)
+    tracking.changed = dirtyKeyPath
+    willSet(tracking)
+  }
   ObservationTracking._installTracking(ObservationTracking(accessList), willSet: willSet, didSet: nil)
   return result
 }
@@ -250,7 +286,12 @@ public func withObservationTracking<T>(
   _ apply: () -> T,
   didSet: @escaping @Sendable (ObservationTracking) -> Void
 ) -> T {
-  let (result, accessList) = generateAccessList(apply)
+  let (result, accessList, dirtyKeyPath) = generateAccessList(apply)
+  if let dirtyKeyPath {
+    let tracking = ObservationTracking(accessList)
+    tracking.changed = dirtyKeyPath
+    didSet(tracking)
+  }
   ObservationTracking._installTracking(ObservationTracking(accessList), willSet: nil, didSet: didSet)
   return result
 }

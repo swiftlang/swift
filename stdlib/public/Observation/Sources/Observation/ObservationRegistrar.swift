@@ -69,14 +69,45 @@ public struct ObservationRegistrar: Sendable {
         }
       }
     }
+
+    struct PreregistrationDirtyList {
+      var activeLists = [UnsafeMutableRawPointer: Set<AnyKeyPath>]()
+      
+      mutating func activate(_ entry: UnsafeMutableRawPointer) {
+        if activeLists[entry] == nil {
+          activeLists[entry] = Set<AnyKeyPath>()
+        }
+      }
+      
+      mutating func install(keyPath: AnyKeyPath, entry: UnsafeMutableRawPointer?) {
+        for tls in activeLists.keys {
+          if tls != entry {
+            activeLists[tls]?.insert(keyPath)
+          }
+        }
+      }
+      
+      mutating func clear(_ entry: UnsafeMutableRawPointer) -> Set<AnyKeyPath> {
+        activeLists.removeValue(forKey: entry) ?? Set<AnyKeyPath>()
+      }
+    }
     
     private var id = 0
     private var observations = [Int : Observation]()
     private var lookups = [AnyKeyPath : Set<Int>]()
+    private var dirtyList = PreregistrationDirtyList()
     
     internal mutating func generateId() -> Int {
       defer { id &+= 1 }
       return id
+    }
+    
+    internal mutating func activate(_ entry: UnsafeMutableRawPointer) {
+      dirtyList.activate(entry)
+    }
+    
+    internal mutating func clear(_ entry: UnsafeMutableRawPointer) -> Set<AnyKeyPath> {
+      dirtyList.clear(entry)
     }
     
     internal mutating func registerTracking(for properties: Set<AnyKeyPath>, willSet observer: @Sendable @escaping (AnyKeyPath) -> Void) -> Int {
@@ -114,9 +145,10 @@ public struct ObservationRegistrar: Sendable {
       var trackers = [@Sendable () -> Void]()
       for (keyPath, ids) in lookups {
         for id in ids {
+          nonisolated(unsafe) let kp = keyPath
           if let tracker = observations[id]?.willSetTracker {
              trackers.append({
-               tracker(keyPath)
+               tracker(kp)
              })
           }
         }
@@ -155,6 +187,18 @@ public struct ObservationRegistrar: Sendable {
     private let state = _ManagedCriticalState(State())
     
     internal var id: ObjectIdentifier { state.id }
+
+    internal func activate(_ entry: UnsafeMutableRawPointer) {
+      state.withCriticalRegion {
+        $0.activate(entry)
+      }
+    }
+    
+    internal func clear(_ entry: UnsafeMutableRawPointer) -> Set<AnyKeyPath> {
+      state.withCriticalRegion {
+        $0.clear(entry)
+      }
+    }
     
     internal func registerTracking(for properties: Set<AnyKeyPath>, willSet observer: @Sendable @escaping (AnyKeyPath) -> Void) -> Int {
       state.withCriticalRegion { $0.registerTracking(for: properties, willSet: observer) }
@@ -237,6 +281,7 @@ public struct ObservationRegistrar: Sendable {
         trackingPtr.pointee = ObservationTracking._AccessList()
       }
       trackingPtr.pointee?.addAccess(keyPath: keyPath, context: context)
+      context.activate(UnsafeMutableRawPointer(trackingPtr))
     }
   }
   
