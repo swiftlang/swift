@@ -42,11 +42,13 @@ add_library(swiftCore
   BidirectionalCollection.swift
   Bitset.swift
   Bool.swift
+  Box.swift
   BridgeObjectiveC.swift
   BridgeStorage.swift
   BridgingBuffer.swift
   Builtin.swift
   BuiltinMath.swift
+  Cell.swift
   Character.swift
   CocoaArray.swift
   Codable.swift

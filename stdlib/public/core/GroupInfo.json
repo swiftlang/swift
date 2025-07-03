@@ -273,7 +273,8 @@
     "EmbeddedStubs.swift",
     "EmbeddedPrint.swift",
     "InlineArray.swift",
-    "Box.swift"
+    "Box.swift",
+    "Cell.swift"
   ],
   "Result": [
     "Result.swift"
