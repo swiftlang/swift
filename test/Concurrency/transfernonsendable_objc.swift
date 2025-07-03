@@ -1,8 +1,9 @@
-// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation -target %target-swift-5.1-abi-triple %s -o /dev/null -import-objc-header %S/Inputs/transfernonsendable_objc.h -enable-upcoming-feature GlobalActorIsolatedTypesUsability
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -target %target-swift-5.1-abi-triple %s -o /dev/null -import-objc-header %S/Inputs/transfernonsendable_objc.h -enable-upcoming-feature GlobalActorIsolatedTypesUsability
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -target %target-swift-5.1-abi-triple %s -o /dev/null -import-objc-header %S/Inputs/transfernonsendable_objc.h -enable-upcoming-feature GlobalActorIsolatedTypesUsability -enable-upcoming-feature NonisolatedNonsendingByDefault
 
 // REQUIRES: objc_interop
 // REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
-// REQUIRES: swift_feature_RegionBasedIsolation
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 import Foundation
 
