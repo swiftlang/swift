@@ -3275,13 +3275,70 @@ function Test-PackageManager() {
     "$SourceCache\swiftpm"
   }
 
-  Build-SPMProject `
-    -Action Test `
-    -Src $SrcDir `
-    -Bin "$BinaryCache\$($HostPlatform.Triple)\PackageManagerTests" `
-    -Platform $HostPlatform `
-    -Xcc "-I$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+Asserts\usr\include" `
-    -Xlinker "-L$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+Asserts\usr\lib"
+  $SwiftPMArguments = @(
+    # swift-argument-parser
+    "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform ArgumentParser)\swift",
+    "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform ArgumentParser)\lib",
+    # swift-crypto
+    "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform Crypto)\swift",
+    "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform Crypto)\lib",
+    "-Xlinker", "$(Get-ProjectBinaryCache $BuildPlatform Crypto)\lib\CCryptoBoringSSL.lib",
+    "-Xlinker", "$(Get-ProjectBinaryCache $BuildPlatform Crypto)\lib\CCryptoBoringSSLShims.lib",
+    # swift-syntax
+    "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform Compilers)\lib\swift\host",
+    "-Xswiftc", "-L$(Get-ProjectBinaryCache $BuildPlatform Compilers)\lib\swift\host",
+    "-Xswiftc", "-I$SourceCache\swift-syntax\Sources\_SwiftSyntaxCShims\include",
+    # swift-system
+    "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform System)\swift",
+    "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform System)\lib",
+    "-Xswiftc", "-I$SourceCache\swift-system\Sources\CSystem\include",
+    # swift-certificates
+    "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform Certificates)\swift",
+    "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform Certificates)\lib",
+    # swift-toolchain-sqlite
+    "-Xswiftc", "-I$SourceCache\swift-toolchain-sqlite\Sources\CSQLite\include",
+    "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform SQLite)",
+    # swift-build
+    "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform Build)\swift",
+    "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform Build)\lib",
+    "-Xswiftc", "-I$SourceCache\swift-build\Sources\SWBCLibc\include",
+    "-Xswiftc", "-I$SourceCache\swift-build\Sources\SWBCSupport",
+    # swift-asn1
+    "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform ASN1)\swift",
+    "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform ASN1)\lib",
+    # llbuild
+    "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform LLBuild)\products\llbuildSwift",
+    "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform LLBuild)\lib",
+    "-Xswiftc", "-I$SourceCache\llbuild\products\libllbuild\include",
+    # swift-tools-support-core
+    "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform ToolsSupportCore)\swift",
+    "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform ToolsSupportCore)\lib",
+    "-Xswiftc", "-I$SourceCache\swift-tools-support-core\Sources\TSCclibc\include",
+    # swift-driver
+    "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform Driver)\swift",
+    "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform Driver)\lib",
+    # swift-package-manager
+    "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform PackageManager)\swift",
+    "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform PackageManager)\lib",
+    "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform PackageManager)\pm\ManifestAPI",
+    "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform PackageManager)\pm\ManifestAPI",
+    "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform PackageManager)\pm\PluginAPI",
+    "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform PackageManager)\pm\PluginAPI",
+    "-Xswiftc", "-I$SourceCache\swift-package-manager\Sources\tsan_utils\include"
+  )
+
+  Invoke-IsolatingEnvVars {
+    $env:SWIFTPM_BUILD_ONLY_TESTS=1
+
+    $env:Path="$(Get-ProjectBinaryCache $BuildPlatform ToolsSupportCore)\bin;$(Get-ProjectBinaryCache $BuildPlatform PackageManager)\pm\ManifestAPI;$(Get-ProjectBinaryCache $BuildPlatform PackageManager)\pm\PluginAPI;${env:Path}"
+
+    Build-SPMProject `
+      -Action Test `
+      -Src $SrcDir `
+      -Bin "$BinaryCache\$($HostPlatform.Triple)\PackageManagerTests" `
+      -Platform $BuildPlatform `
+      @SwiftPMArguments
+  }
 }
 
 function Build-Installer([Hashtable] $Platform) {
