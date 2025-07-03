@@ -635,6 +635,9 @@ public:
             return {nullptr, 0};
           // Now for all the sections, find their name.
           for (const typename T::Section *Hdr : SecHdrVec) {
+            // Skip unused headers
+            if (Hdr->sh_type == llvm::ELF::SHT_NULL)
+              continue;
             uint32_t Offset = Hdr->sh_name;
             const char *Start = (const char *)StrTab + Offset;
             uint64_t StringSize = strnlen(Start, StrTabSize - Offset);

@@ -4265,8 +4265,15 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     if (!repr->isInvalid())
       isolation = FunctionTypeIsolation::forNonIsolated();
   } else if (!getWithoutClaiming<CallerIsolatedTypeRepr>(attrs)) {
-    if (ctx.LangOpts.getFeatureState(Feature::NonisolatedNonsendingByDefault)
-            .isEnabledForMigration()) {
+    // Infer async function type as `nonisolated(nonsending)` if there is
+    // no `@concurrent` or `nonisolated(nonsending)` attribute and isolation
+    // is nonisolated.
+    if (ctx.LangOpts.hasFeature(Feature::NonisolatedNonsendingByDefault) &&
+        repr->isAsync() && isolation.isNonIsolated()) {
+      isolation = FunctionTypeIsolation::forNonIsolatedCaller();
+    } else if (ctx.LangOpts
+                   .getFeatureState(Feature::NonisolatedNonsendingByDefault)
+                   .isEnabledForMigration()) {
       // Diagnose only in the interface stage, which is run once.
       if (inStage(TypeResolutionStage::Interface)) {
         warnAboutNewNonisolatedAsyncExecutionBehavior(ctx, repr, isolation);
