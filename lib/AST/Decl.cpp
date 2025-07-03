@@ -6121,9 +6121,13 @@ GenericTypeParamDecl *GenericTypeParamDecl::createImplicit(
 }
 
 Type GenericTypeParamDecl::getValueType() const {
-  return evaluateOrDefault(getASTContext().evaluator,
-    GenericTypeParamDeclGetValueTypeRequest{const_cast<GenericTypeParamDecl *>(this)},
-    Type());
+  if (!isValue())
+    return Type();
+
+  auto &ctx = getASTContext();
+  GenericTypeParamDeclGetValueTypeRequest req(this);
+  auto ty = evaluateOrDefault(ctx.evaluator, req, Type());
+  return ty ? ty : ErrorType::get(ctx);
 }
 
 SourceRange GenericTypeParamDecl::getSourceRange() const {
