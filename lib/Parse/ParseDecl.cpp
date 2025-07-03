@@ -3009,14 +3009,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   }
 
   case DeclAttrKind::CDecl: {
-    if (!AttrName.starts_with("_") &&
-
-        // Backwards support for @cdecl("stringId"). Remove before enabling in
-        // production so we accept only the identifier format.
-        lookahead<bool>(1, [&](CancellableBacktrackingScope &) {
-           return Tok.isNot(tok::string_literal);
-        })) {
-
+    if (!AttrName.starts_with("_")) {
       std::optional<StringRef> CName;
       if (consumeIfAttributeLParen()) {
         // Custom C name.
@@ -3127,10 +3120,9 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
         Attributes.add(new (Context) SILGenNameAttr(AsmName.value(), Raw, AtLoc,
                                                 AttrRange, /*Implicit=*/false));
       else if (DK == DeclAttrKind::CDecl) {
-        bool underscored = AttrName.starts_with("_");
         Attributes.add(new (Context) CDeclAttr(AsmName.value(), AtLoc,
                                                AttrRange, /*Implicit=*/false,
-                                               /*isUnderscored*/underscored));
+                                               /*isUnderscored*/true));
       } else if (DK == DeclAttrKind::Expose) {
         for (auto *EA : Attributes.getAttributes<ExposeAttr>()) {
           // A single declaration cannot have two @_exported attributes with
