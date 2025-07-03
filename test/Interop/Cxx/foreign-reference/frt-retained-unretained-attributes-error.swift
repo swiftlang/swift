@@ -1,8 +1,5 @@
 // RUN: rm -rf %t
- // RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs  %s -cxx-interoperability-mode=upcoming-swift -verify-additional-file %S/Inputs/cxx-functions-and-methods-returning-frt.h -Xcc -Wno-return-type -Xcc -Wno-nullability-completeness
-
-// XFAIL: OS=windows-msvc
-// TODO: Enable this on windows when -verify-additional-file issue on Windows Swift CI is resolved 
+// RUN: %target-swift-frontend -typecheck -verify -I %S/Inputs  %s -cxx-interoperability-mode=upcoming-swift -verify-additional-file %S/Inputs/cxx-functions-and-methods-returning-frt.h -Xcc -Wno-return-type -Xcc -Wno-nullability-completeness
 
 import FunctionsAndMethodsReturningFRT
 import CxxStdlib

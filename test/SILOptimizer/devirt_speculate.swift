@@ -98,7 +98,7 @@ class Sub7 : Base {
 // YAML:      Pass:            sil-speculative-devirtualizer
 // YAML-NEXT: Name:            sil.PartialSpecDevirt
 // YAML-NEXT: DebugLoc:
-// YAML:   File:            {{.*}}/devirt_speculate.swift
+// YAML:   File:            {{.*}}devirt_speculate.swift
 // YAML:   Line:            118
 // YAML:   Column:          5
 // YAML-NEXT: Function:        '$s16devirt_speculate28testMaxNumSpeculativeTargetsyyAA4BaseCF'
