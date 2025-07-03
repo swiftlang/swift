@@ -2153,6 +2153,8 @@ GenericTypeParamType::GenericTypeParamType(GenericTypeParamKind paramKind,
                                            const ASTContext &ctx)
     : SubstitutableType(TypeKind::GenericTypeParam, &ctx, props),
       Decl(nullptr) {
+  ASSERT(!(paramKind == GenericTypeParamKind::Value && !valueType) &&
+         "Value generic parameter must have type");
   IsDecl = false;
   Depth = depth;
   Weight = weight;

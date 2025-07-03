@@ -774,14 +774,30 @@ Expr *CallerSideDefaultArgExprRequest::evaluate(
   if (!TypeChecker::typeCheckParameterDefault(initExpr, dc, paramTy,
                                               param->isAutoClosure(),
                                               /*atCallerSide=*/true)) {
-    if (param->hasDefaultExpr()) {
+    auto isSimpleLiteral = [&]() -> bool {
+      switch (param->getDefaultArgumentKind()) {
+#define MAGIC_IDENTIFIER(NAME, STRING) \
+      case DefaultArgumentKind::NAME: return true;
+#include "swift/AST/MagicIdentifierKinds.def"
+      case DefaultArgumentKind::NilLiteral:
+      case DefaultArgumentKind::EmptyArray:
+      case DefaultArgumentKind::EmptyDictionary:
+        return true;
+      default:
+        return false;
+      }
+    };
+    if (param->hasDefaultExpr() && isSimpleLiteral()) {
       // HACK: If we were unable to type-check the default argument in context,
       // then retry by type-checking it within the parameter decl, which should
       // also fail. This will present the user with a better error message and
       // allow us to avoid diagnosing on each call site.
+      // Note we can't do this for expression macros since name lookup may
+      // differ at the call side vs the declaration. We can however do it for
+      // simple literals.
       transaction.abort();
       (void)param->getTypeCheckedDefaultExpr();
-      assert(ctx.Diags.hadAnyError());
+      ASSERT(ctx.Diags.hadAnyError());
     }
     return new (ctx) ErrorExpr(initExpr->getSourceRange(), paramTy);
   }

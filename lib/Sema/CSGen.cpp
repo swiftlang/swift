@@ -1745,7 +1745,10 @@ namespace {
     }
 
     Type visitTypeValueExpr(TypeValueExpr *E) {
-      return E->getParamDecl()->getValueType();
+      auto ty = E->getParamDecl()->getValueType();
+      if (ty->hasError())
+        return recordInvalidNode(E);
+      return ty;
     }
 
     Type visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *expr) {
