@@ -125,7 +125,7 @@ struct FunctionWorklist {
     }
   }
 
-  mutating func pushIfNotVisited(contentsOf functions: [Function]) {
+  mutating func pushIfNotVisited<S: Sequence>(contentsOf functions: S) where S.Element == Function {
     for f in functions {
       pushIfNotVisited(f)
     }
