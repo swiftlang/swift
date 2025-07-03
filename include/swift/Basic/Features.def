@@ -536,6 +536,9 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(Lifetimes, true)
 /// to SendableMetatype (or Sendable).
 EXPERIMENTAL_FEATURE(SendableProhibitsMainActorInference, true)
 
+/// Allow macro based aliases to be imported into Swift
+EXPERIMENTAL_FEATURE(ImportMacroAliases, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
