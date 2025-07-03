@@ -25,13 +25,13 @@
 // REQUIRES: swift_feature_CDecl
 
 //--- CoreLib.swift
-@cdecl("CEnum")
+@cdecl(CEnum)
 public enum CEnum: CInt { case A, B }
 
 //--- MiddleLib.swift
 import CoreLib
 
-@cdecl("CFunc")
+@cdecl(CFunc)
 public func CFunc(e: CEnum) {}
 // CHECK: typedef SWIFT_ENUM_FWD_DECL(int, CEnum)
 // CHECK: SWIFT_EXTERN void CFunc(SWIFT_ENUM_TAG CEnum e) SWIFT_NOEXCEPT;
