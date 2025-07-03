@@ -7096,8 +7096,9 @@ clang::FunctionDecl *ClangImporter::instantiateCXXFunctionTemplate(
     // TODO: Use the location of the apply here.
     // TODO: This error message should not reference implementation details.
     // See: https://github.com/apple/swift/pull/33053#discussion_r477003350
-    ctx.Diags.diagnose(SourceLoc(), diag::unable_to_convert_generic_swift_types,
-                       getFuncName(), failedTypesStr);
+    Impl.diagnose(HeaderLoc(func->getBeginLoc()),
+                  diag::unable_to_convert_generic_swift_types, getFuncName(),
+                  failedTypesStr);
     return nullptr;
   }
 
@@ -7116,9 +7117,9 @@ clang::FunctionDecl *ClangImporter::instantiateCXXFunctionTemplate(
                                       templateParamsStream,
                                       /*IncludeType*/ true);
                           });
-    ctx.Diags.diagnose(SourceLoc(),
-                       diag::unable_to_substitute_cxx_function_template,
-                       getFuncName(), templateParams);
+    Impl.diagnose(HeaderLoc(func->getBeginLoc()),
+                  diag::unable_to_substitute_cxx_function_template,
+                  getFuncName(), templateParams);
     return nullptr;
   }
   sema.InstantiateFunctionDefinition(clang::SourceLocation(), spec);
