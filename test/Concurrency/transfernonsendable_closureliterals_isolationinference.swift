@@ -7,6 +7,8 @@
 // REQUIRES: asserts
 // REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
+// REQUIRES: rdar154969621
+
 // This test validates the behavior of transfernonsendable around
 // closure literals
 
