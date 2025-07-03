@@ -12,6 +12,8 @@
 
 import platform
 
+from typing import Optional
+from products.product import Product
 from swift_build_support.swift_build_support import build_graph
 
 
@@ -23,14 +25,14 @@ class ProductPipeline(object):
 
        This class is meant to just be state.
     """
-    def __init__(self, should_run_epilogue_operations, identity, is_impl):
+    def __init__(self, should_run_epilogue_operations: bool, identity: int, is_impl: bool):
         assert isinstance(identity, int)
         self.identity = identity
-        self.products = []
+        self.products: list[tuple[type[Product], bool]] = []
         self.is_impl = is_impl
         self.should_run_epilogue_operations = should_run_epilogue_operations
 
-    def append(self, product, is_enabled):
+    def append(self, product: type[Product], is_enabled: bool):
         self.products.append((product, is_enabled))
 
     def finalize(self):
@@ -41,7 +43,7 @@ class ProductPipeline(object):
     def __iter__(self):
         return iter(self.products)
 
-    def __getitem__(self, i):
+    def __getitem__(self, i) -> tuple[type[Product], bool]:
         return self.products[i]
 
     def __len__(self):
@@ -65,9 +67,9 @@ class ProductPipelineListBuilder(object):
     def __init__(self, args):
         self.args = args
         self.current_count = 0
-        self.current_pipeline = None
+        self.current_pipeline: Optional[ProductPipeline] = None
         self.is_current_pipeline_impl = False
-        self.pipeline_list = []
+        self.pipeline_list: list[ProductPipeline] = []
 
     def begin_pipeline(self):
         if self.current_pipeline is not None:
@@ -93,14 +95,14 @@ class ProductPipelineListBuilder(object):
         self.is_current_pipeline_impl = False
         self.pipelinst_list = []
 
-    def add_product(self, product_cls, is_enabled):
+    def add_product(self, product_cls: type[Product], is_enabled: bool):
         """Add a non-impl product to the current pipeline begin constructed"""
         assert self.current_pipeline is not None
         assert not self.is_current_pipeline_impl
         assert not product_cls.is_build_script_impl_product()
         self.current_pipeline.append(product_cls, is_enabled)
 
-    def add_impl_product(self, product_cls, is_enabled):
+    def add_impl_product(self, product_cls: type[Product], is_enabled: bool):
         """Add an impl product to the current pipeline begin constructed"""
         assert self.current_pipeline is not None
         assert self.is_current_pipeline_impl
@@ -109,14 +111,16 @@ class ProductPipelineListBuilder(object):
 
     def infer(self):
         products_to_generation_index = {}
-        enabled_products = set()
-        inferred_pipeline_list = []
+        enabled_products: set[type[Product]] = set()
+        inferred_pipeline_list: list[list[Optional[type[Product]]]] = []
         last_impl_pipeline_index = None
+
         for i in range(len(self.pipeline_list)):
-            pipeline = self.pipeline_list[i]
+            pipeline: ProductPipeline = self.pipeline_list[i]
             if pipeline.is_impl:
                 last_impl_pipeline_index = i
-            final_pipeline = []
+
+            final_pipeline: list[Optional[type[Product]]] = []
             for pipeline_i in range(len(pipeline)):
                 (p, is_enabled) = pipeline[pipeline_i]
                 # Make sure p has not been added multiple times to the builder.
@@ -137,11 +141,11 @@ class ProductPipelineListBuilder(object):
                             p.get_dependencies()))
 
         for i in range(len(inferred_pipeline_list)):
-            pipeline = inferred_pipeline_list[i]
+            inferred_pipeline = inferred_pipeline_list[i]
 
             # Filter out any of the pipelines that before inference were not
             # selected.
-            enabled_pipeline = [p for p in pipeline if p is not None]
+            enabled_pipeline: list = [p for p in inferred_pipeline if p is not None]
 
             if self.args.verbose_build:
                 print("-- Build Graph Inference --")
@@ -170,18 +174,18 @@ class ProductPipelineListBuilder(object):
                 inferred_pipeline_list[gen_offset][index] = p
 
         filtered_results = []
-        for pipeline in inferred_pipeline_list:
-            filtered_results.append([p for p in pipeline if p is not None])
+        for inferred_pipeline in inferred_pipeline_list:
+            filtered_results.append([p for p in inferred_pipeline if p is not None])
 
         if self.args.verbose_build:
             print("Final Build Order:")
-            for pipeline in filtered_results:
-                for p in pipeline:
+            for filtered_pipeline in filtered_results:
+                for p in filtered_pipeline:
                     print("    {}".format(p.product_name()))
 
         return (filtered_results, last_impl_pipeline_index)
 
-    def finalize(self, shouldInfer):
+    def finalize(self, shouldInfer: bool):
         """Product a final schedule and return a list of our product pipelines. Resets
            the builder when done so is a consuming operation.
         """

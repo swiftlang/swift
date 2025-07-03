@@ -14,6 +14,7 @@ The ultimate tool for building Swift.
 """
 
 
+from argparse import Namespace
 import json
 import os
 import platform
@@ -187,7 +188,7 @@ def tar(source, destination):
 # -----------------------------------------------------------------------------
 # Argument Validation
 
-def validate_arguments(toolchain, args):
+def validate_arguments(toolchain, args: Namespace):
     if toolchain.cc is None or toolchain.cxx is None:
         fatal_error(
             "can't find clang (please install clang-3.5 or a "
