@@ -27,6 +27,9 @@
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/ModuleNameLookup.h"
+#include "swift/AST/NameLookupRequests.h"
+#include "swift/AST/USRGeneration.h"
 #include "swift/AST/SILLayout.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -38,6 +41,177 @@
 #include "llvm/ADT/StringSwitch.h"
 
 using namespace swift;
+
+class DeclNameExtractor {
+  ASTContext &Ctx;
+  
+public:
+  DeclNameExtractor(ASTContext &ctx) : Ctx(ctx) {}
+
+  /// Extract a DeclName from a demangling node
+  DeclName extractDeclName(Node *node) {
+    if (node == nullptr)
+      return DeclName();
+    
+    switch (node->getKind()) {
+    case Node::Kind::Class:
+    case Node::Kind::Structure:
+    case Node::Kind::Enum:
+    case Node::Kind::Protocol:
+    case Node::Kind::TypeAlias:
+    case Node::Kind::OtherNominalType:
+    case Node::Kind::AssociatedType:
+    case Node::Kind::AssociatedTypeRef:
+    case Node::Kind::GenericTypeParamDecl:
+    case Node::Kind::Variable:
+    case Node::Kind::Macro:
+      return extractIdentifierName(node);
+
+    case Node::Kind::Constructor:
+    case Node::Kind::Allocator:
+      return DeclName(DeclBaseName::createConstructor());
+
+    case Node::Kind::Destructor:
+    case Node::Kind::Deallocator:
+    case Node::Kind::IsolatedDeallocator:
+      return DeclName(DeclBaseName::createDestructor());
+
+    case Node::Kind::Module:
+      return extractTextName(node);
+
+    case Node::Kind::Function:
+      return extractFunctionLikeName(node);
+
+    case Node::Kind::Subscript:
+      return extractFunctionLikeName(node);
+
+    default:
+      // For any other node types, we can't extract a meaningful name
+      return DeclName();
+    }
+
+  }
+
+private:
+  DeclName extractIdentifierName(Node *node) {
+    auto Identifier = node->getChild(1);
+    if (Identifier == nullptr ||
+        Identifier->getKind() != Node::Kind::Identifier)
+      return DeclName();
+    
+    return extractTextName(Identifier);
+  }
+
+  DeclName extractTextName(Node *node) {
+    if (!node->hasText())
+      return DeclName();
+    
+    auto identifier = Ctx.getIdentifier(node->getText());
+    return DeclName(identifier);
+  }
+
+  DeclName extractFunctionLikeName(Node *node) {
+    assert(node->getKind() == Node::Kind::Function ||
+           node->getKind() == Node::Kind::Subscript);
+    
+    DeclBaseName BaseName;
+    if (node->getKind() == Node::Kind::Function)
+      BaseName = extractIdentifierName(node).getBaseName();
+    else
+      BaseName = DeclBaseName::createSubscript();
+    
+    if (BaseName.empty())
+      return DeclName();
+    
+    // Location of LabelList node if present, otherwise a Type node.
+    unsigned LabelListIdx;
+    if (node->getKind() == Node::Kind::Function)
+      LabelListIdx = 2;
+    else
+      LabelListIdx = 1;
+    
+    auto *LabelsOrType = node->getChild(LabelListIdx);
+    assert(LabelsOrType != nullptr && (LabelsOrType->getKind() == Node::Kind::LabelList ||
+                                     LabelsOrType->getKind() == Node::Kind::Type));
+
+    SmallVector<Identifier, 4> ArgLabels;
+    if (LabelsOrType->getKind() == Node::Kind::LabelList)
+      extractArgLabelsFromLabelList(LabelsOrType, ArgLabels);
+    else
+      extractArgLabelsFromType(LabelsOrType, ArgLabels);
+
+    if (ArgLabels.empty())
+      return DeclName(BaseName);
+
+    return DeclName(Ctx, BaseName, ArgLabels);
+  }
+  
+  void extractArgLabelsFromLabelList(Node *LabelList,
+                                     SmallVectorImpl<Identifier> &ArgLabels) {
+    assert(LabelList->getKind() == Node::Kind::LabelList);
+    
+    for (unsigned i = 0; i < LabelList->getNumChildren(); ++i) {
+      auto *Label = LabelList->getChild(i);
+
+      assert(Label && (Label->getKind() == Node::Kind::Identifier ||
+                       Label->getKind() == Node::Kind::FirstElementMarker));
+
+      if (Label->getKind() == Node::Kind::Identifier) {
+        ArgLabels.push_back(Ctx.getIdentifier(Label->getText()));
+      } else {
+        ArgLabels.push_back(Identifier());
+      }
+    }
+  }
+  
+  void extractArgLabelsFromType(Node *Type, SmallVectorImpl<Identifier> &ArgLabels) {
+    auto ArgTuple = Type->findByKind(Demangle::Node::Kind::ArgumentTuple,
+                                     /*maxDepth=*/5);
+    if (ArgTuple == nullptr)
+      return;
+    
+    auto Params = ArgTuple->getFirstChild();
+    auto ParamsType = Params->getFirstChild();
+    if (ParamsType == nullptr)
+      return;
+    
+    if (ParamsType->getKind() != Demangle::Node::Kind::Tuple) {
+      // A single, unnamed parameter
+      ArgLabels.push_back(Identifier());
+      return;
+    }
+    
+    // More than one parameter are present
+    while (Params && Params->getFirstChild() &&
+           Params->getFirstChild()->getKind() != Node::Kind::TupleElement) {
+      Params = Params->getFirstChild();
+    }
+    
+    if (Params) {
+      for (size_t i = 0; i < Params->getNumChildren(); ++i) {
+        ArgLabels.push_back(Identifier());
+      }
+    }
+  }
+};
+
+
+Decl *swift::Demangle::getDeclFromUSR(ASTContext &ctx,
+                                      StringRef usr,
+                                      const DeclContext *lookupDC,
+                                      GenericSignature genericSig) {
+  if (!usr.starts_with("s:"))
+    return nullptr;
+
+  std::string mangling(usr);
+  mangling.replace(0, 2, MANGLING_PREFIX_STR);
+
+  Demangle::Context Dem;
+  auto node = Dem.demangleSymbolAsNode(mangling);
+
+  ASTBuilder builder(ctx, genericSig);
+  return builder.findDecl(node, usr, lookupDC);
+}
 
 Type swift::Demangle::getTypeForMangling(ASTContext &ctx,
                                          StringRef mangling,
@@ -73,6 +247,84 @@ TypeDecl *swift::Demangle::getTypeDeclForUSR(ASTContext &ctx,
   mangling.replace(0, 2, MANGLING_PREFIX_STR);
 
   return getTypeDeclForMangling(ctx, mangling, genericSig);
+}
+
+Decl *ASTBuilder::findDecl(NodePointer node, StringRef usr,
+                           const DeclContext *lookupDC) {
+  if (node == nullptr)
+    return nullptr;
+
+  if (auto *TD = createTypeDecl(node))
+    return TD;
+
+  switch (node->getKind()) {
+  default:
+    // We should have probably arrived at a probable declaration node by now
+    break;
+  case Node::Kind::Global:
+  case Node::Kind::Static:
+  case Node::Kind::BoundGenericEnum:
+  case Node::Kind::BoundGenericClass:
+  case Node::Kind::BoundGenericFunction:
+  case Node::Kind::BoundGenericProtocol:
+  case Node::Kind::BoundGenericStructure:
+  case Node::Kind::BoundGenericTypeAlias:
+  case Node::Kind::BoundGenericOtherNominalType:
+  case Node::Kind::Extension:
+    return findDecl(node->getFirstChild(), usr, lookupDC);
+  }
+  
+  DeclNameExtractor NameExtractor(Ctx);
+  auto name = NameExtractor.extractDeclName(node);
+  
+  auto DeclContextNode = node->getFirstChild();
+  if (DeclContextNode == nullptr)
+    return nullptr;
+  
+  SmallVector<ValueDecl *, 4> candidates;
+  if (DeclContextNode->getKind() == Node::Kind::Module) {
+    auto PotentialModules = findPotentialModules(DeclContextNode);
+    
+    for (auto *Module : PotentialModules) {
+      auto *moduleScopeContext = Module->getModuleScopeContext();
+      namelookup::lookupInModule(Module, name, candidates,
+                                 NLKind::QualifiedLookup, namelookup::ResolutionKind::Overloadable,
+                                 moduleScopeContext, SourceLoc(), NL_QualifiedDefault);
+    }
+  } else {
+    auto *ownerDC = findDeclContext(DeclContextNode);
+    if (!ownerDC)
+      return nullptr;
+
+    if (auto *nominal = ownerDC->getSelfNominalTypeDecl()) {
+      auto result = nominal->lookupDirect(name);
+      candidates.append(result.begin(), result.end());
+    } else {
+      UnqualifiedLookupDescriptor desc(DeclNameRef(name), ownerDC);
+      
+      auto result = evaluateOrDefault(Ctx.evaluator,
+                                      UnqualifiedLookupRequest(desc),
+                                      LookupResult());
+      
+      for (const auto& entry : result) {
+        if (auto *VD = entry.getValueDecl())
+          candidates.push_back(VD);
+      }
+    }
+  }
+  
+  for (auto *candidate : candidates) {
+    SmallString<128> candidateUSR;
+    llvm::raw_svector_ostream OS(candidateUSR);
+    
+    if (ide::printDeclUSR(candidate, OS))
+      continue;
+    
+    if (usr == candidateUSR)
+      return candidate;
+  }
+
+  return nullptr;
 }
 
 Type ASTBuilder::decodeMangledType(NodePointer node, bool forRequirement) {
