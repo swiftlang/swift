@@ -13,7 +13,7 @@
 import platform
 
 from typing import Optional
-from products.product import Product
+from .products.product import Product
 from swift_build_support.swift_build_support import build_graph
 
 
