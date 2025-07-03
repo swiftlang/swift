@@ -195,10 +195,7 @@ if ($AndroidSDKs.Length -gt 0) {
   $Android = $true
 }
 
-if ($Test -contains "*") {
-  # Explicitly don't include llbuild yet since tests are known to fail on Windows
-  $Test = @("lld", "lldb", "swift", "dispatch", "foundation", "xctest", "swift-format", "sourcekit-lsp")
-}
+$Test = @("foundation")
 
 ## Declare static build and build tool parameters.
 
@@ -1640,10 +1637,11 @@ function Build-SPMProject {
       }
       Test {
         $ActionName = "test"
+        $Arguments += @("-v", "-j", "1")
       }
       TestParallel {
         $ActionName = "test"
-        $Arguments += @("--parallel")
+        $Arguments += @("--parallel", "-v", "-j", "1")
       }
     }
 
@@ -2557,7 +2555,8 @@ function Test-Foundation {
       -Src $SourceCache\swift-corelibs-foundation `
       -Bin "$BinaryCache\$($BuildPlatform.Triple)\FoundationTests" `
       -Platform $BuildPlatform `
-      -Configuration $FoundationTestConfiguration
+      -Configuration $FoundationTestConfiguration `
+      -v
   }
 }
 
