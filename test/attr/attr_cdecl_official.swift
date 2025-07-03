@@ -24,6 +24,10 @@
 // expected-error @-1 {{expected ')' in 'cdecl' attribute}}
 // expected-error @-2 {{expected declaration}}
 
+@cdecl("oldStringStyle") func oldStringStyle() {}
+// expected-error @-1 {{expected C identifier in 'cdecl' attribute}}
+// expected-error @-2 {{expected declaration}}
+
 @cdecl func defaultName() {}
 
 @cdecl(noBody)
