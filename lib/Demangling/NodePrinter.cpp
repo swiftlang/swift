@@ -3493,35 +3493,9 @@ NodePointer NodePrinter::printEntity(NodePointer Entity, unsigned depth,
     }
   }
 
-  if (hasName || !OverwriteName.empty()) {
-    if (!ExtraName.empty() && MultiWordName) {
-      Printer << ExtraName;
-      if (ExtraIndex >= 0)
-        Printer << ExtraIndex;
+  printFunctionName(hasName, OverwriteName, ExtraName, MultiWordName,
+                    ExtraIndex, Entity, depth);
 
-      Printer << " of ";
-      ExtraName = "";
-      ExtraIndex = -1;
-    }
-    size_t CurrentPos = Printer.getStringRef().size();
-    if (!OverwriteName.empty()) {
-      Printer << OverwriteName;
-    } else {
-      auto Name = Entity->getChild(1);
-      if (Name->getKind() != Node::Kind::PrivateDeclName)
-        print(Name, depth + 1);
-
-      if (auto PrivateName = getChildIf(Entity, Node::Kind::PrivateDeclName))
-        print(PrivateName, depth + 1);
-    }
-    if (Printer.getStringRef().size() != CurrentPos && !ExtraName.empty())
-      Printer << '.';
-  }
-  if (!ExtraName.empty()) {
-    Printer << ExtraName;
-    if (ExtraIndex >= 0)
-      Printer << ExtraIndex;
-  }
   if (TypePr != TypePrinting::NoType) {
     NodePointer type = getChildIf(Entity, Node::Kind::Type);
     assert(type && "malformed entity");

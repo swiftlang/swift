@@ -2125,6 +2125,8 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
     // convention.
     newMethod->addAttr(clang::CFReturnsRetainedAttr::CreateImplicit(clangCtx));
   }
+  if (auto swiftNameAttr = method->getAttr<clang::SwiftNameAttr>())
+    newMethod->addAttr(swiftNameAttr->clone(clangCtx));
 
   llvm::SmallVector<clang::ParmVarDecl *, 4> params;
   for (size_t i = 0; i < method->getNumParams(); ++i) {
