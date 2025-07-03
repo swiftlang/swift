@@ -57,7 +57,7 @@ import Foundation
 // CHECK-NEXT: }
 
 /// Foo: A feer, a female feer.
-@cdecl("FooComments") public enum FooComments: CInt {
+@cdecl(FooComments) public enum FooComments: CInt {
   /// Zim: A zeer, a female zeer.
   case Zim
   case Zang, Zung
@@ -67,7 +67,7 @@ import Foundation
 // CHECK-NEXT:   Zang = -219,
 // CHECK-NEXT:   Zung = -218,
 // CHECK-NEXT: };
-@cdecl("NegativeValues") enum NegativeValues: Int16 {
+@cdecl(NegativeValues) enum NegativeValues: Int16 {
   case Zang = -219, Zung
 
   func methodNotExportedToC() {}
@@ -77,7 +77,7 @@ import Foundation
 // CHECK-NEXT:   SomeErrorBadness = 9001,
 // CHECK-NEXT:   SomeErrorWorseness = 9002,
 // CHECK-NEXT: };
-@cdecl("SomeError") enum SomeError: Int, Error {
+@cdecl(SomeError) enum SomeError: Int, Error {
   case Badness = 9001
   case Worseness
 }
@@ -85,32 +85,32 @@ import Foundation
 // CHECK-LABEL: typedef SWIFT_ENUM_NAMED(ptrdiff_t, SomeOtherError, "SomeOtherError", closed) {
 // CHECK-NEXT:   SomeOtherErrorDomain = 0,
 // CHECK-NEXT: };
-@cdecl("SomeOtherError") enum SomeOtherError: Int, Error {
+@cdecl(SomeOtherError) enum SomeOtherError: Int, Error {
   case Domain
 }
 
 // CHECK-LABEL: typedef SWIFT_ENUM_NAMED(ptrdiff_t, ObjcErrorType, "SomeRenamedErrorType", closed) {
 // CHECK-NEXT:   ObjcErrorTypeBadStuff = 0,
 // CHECK-NEXT: };
-@cdecl("ObjcErrorType") enum SomeRenamedErrorType: Int, Error {
+@cdecl(ObjcErrorType) enum SomeRenamedErrorType: Int, Error {
   case BadStuff
 }
 
-@cdecl("acceptMemberImported") func acceptMemberImported(a: Wrapper.Raw, b: Wrapper.Enum, c: Wrapper.Options, d: Wrapper.Typedef, e: Wrapper.Anon, ee: Wrapper.Anon2) {}
+@cdecl(acceptMemberImported) func acceptMemberImported(a: Wrapper.Raw, b: Wrapper.Enum, c: Wrapper.Options, d: Wrapper.Typedef, e: Wrapper.Anon, ee: Wrapper.Anon2) {}
 // CHECK-LABEL: SWIFT_EXTERN void acceptMemberImported(enum MemberRaw a, enum MemberEnum b, MemberOptions c, enum MemberTypedef d, MemberAnon e, MemberAnon2 ee) SWIFT_NOEXCEPT;
 
-@cdecl("acceptPlainEnum") func acceptPlainEnum(_: NSMalformedEnumMissingTypedef) {}
+@cdecl(acceptPlainEnum) func acceptPlainEnum(_: NSMalformedEnumMissingTypedef) {}
 // CHECK-LABEL: SWIFT_EXTERN void acceptPlainEnum(enum NSMalformedEnumMissingTypedef) SWIFT_NOEXCEPT;
 
-@cdecl("acceptTopLevelImported") func acceptTopLevelImported(a: TopLevelRaw, b: TopLevelEnum, c: TopLevelOptions, d: TopLevelTypedef, e: TopLevelAnon) {}
+@cdecl(acceptTopLevelImported) func acceptTopLevelImported(a: TopLevelRaw, b: TopLevelEnum, c: TopLevelOptions, d: TopLevelTypedef, e: TopLevelAnon) {}
 // CHECK-LABEL: SWIFT_EXTERN void acceptTopLevelImported(enum TopLevelRaw a, TopLevelEnum b, TopLevelOptions c, TopLevelTypedef d, TopLevelAnon e) SWIFT_NOEXCEPT;
 
-@cdecl("takeAndReturnEnumC") func takeAndReturnEnumC(_ foo: FooComments) -> NegativeValues {
+@cdecl(takeAndReturnEnumC) func takeAndReturnEnumC(_ foo: FooComments) -> NegativeValues {
   return .Zung
 }
 // CHECK-LABEL: SWIFT_EXTERN SWIFT_ENUM_TAG NegativeValues takeAndReturnEnumC(SWIFT_ENUM_TAG FooComments foo) SWIFT_NOEXCEPT SWIFT_WARN_UNUSED_RESULT;
 
-@cdecl("takeAndReturnRenamedEnum") func takeAndReturnRenamedEnum(_ foo: EnumNamed) -> EnumNamed {
+@cdecl(takeAndReturnRenamedEnum) func takeAndReturnRenamedEnum(_ foo: EnumNamed) -> EnumNamed {
   return .A
 }
 // CHECK-LABEL: SWIFT_EXTERN SWIFT_ENUM_TAG ObjcEnumNamed takeAndReturnRenamedEnum(SWIFT_ENUM_TAG ObjcEnumNamed foo) SWIFT_NOEXCEPT SWIFT_WARN_UNUSED_RESULT;
