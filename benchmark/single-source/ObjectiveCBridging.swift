@@ -97,6 +97,24 @@ public let benchmarks = [
   BenchmarkInfo(name: "NSArray.bridged.repeatedBufferAccess",
                   runFunction: run_BridgedNSArrayRepeatedBufferAccess, tags: t,
                   setUpFunction: setup_bridgedArrays),
+  BenchmarkInfo(name: "NSString.bridged.byteCount.ascii.ascii",
+                  runFunction: run_BridgedNSStringLengthASCII_ASCII, tags: ts,
+                  setUpFunction: setup_bridgedStrings),
+  BenchmarkInfo(name: "NSString.bridged.byteCount.ascii.utf8",
+                  runFunction: run_BridgedNSStringLengthASCII_UTF8, tags: ts,
+                  setUpFunction: setup_bridgedStrings),
+  BenchmarkInfo(name: "NSString.bridged.byteCount.ascii.utf16",
+                  runFunction: run_BridgedNSStringLengthASCII_UTF16, tags: ts,
+                  setUpFunction: setup_bridgedStrings),
+  BenchmarkInfo(name: "NSString.bridged.byteCount.ascii.macroman",
+                  runFunction: run_BridgedNSStringLengthASCII_MacRoman, tags: ts,
+                  setUpFunction: setup_bridgedStrings),
+  BenchmarkInfo(name: "NSString.bridged.byteCount.utf8.utf8",
+                  runFunction: run_BridgedNSStringLengthUTF8_UTF8, tags: ts,
+                  setUpFunction: setup_bridgedStrings),
+  BenchmarkInfo(name: "NSString.bridged.byteCount.utf8.utf16",
+                  runFunction: run_BridgedNSStringLengthUTF8_UTF16, tags: ts,
+                  setUpFunction: setup_bridgedStrings),
 ]
 
 #if _runtime(_ObjC)
@@ -797,6 +815,8 @@ var bridgedArray:NSArray! = nil
 var bridgedArrayMutableCopy:NSMutableArray! = nil
 var nsArray:NSArray! = nil
 var nsArrayMutableCopy:NSMutableArray! = nil
+var bridgedASCIIString:NSString! = nil
+var bridgedUTF8String:NSString! = nil
 #endif
 
 public func setup_bridgedArrays() {
@@ -806,6 +826,15 @@ public func setup_bridgedArrays() {
   bridgedArrayMutableCopy = (bridgedArray.mutableCopy() as! NSMutableArray)
   nsArray = NSArray(objects: &arr, count: 100)
   nsArrayMutableCopy = (nsArray.mutableCopy() as! NSMutableArray)
+  #endif
+}
+
+public func setup_bridgedStrings() {
+  #if _runtime(_ObjC)
+  let str = Array(repeating: "The quick brown fox jumps over the lazy dog.", count: 100).joined()
+  bridgedASCIIString = str as NSString
+  let str2 = Array(repeating: "The quick brown fox jumps over the lazy dög.", count: 100).joined()
+  bridgedUTF8String = str2 as NSString
   #endif
 }
 
@@ -883,3 +912,40 @@ public func run_RealNSArrayMutableCopyObjectAtIndex(_ n: Int) {
   #endif
 }
 
+@inline(__always)
+fileprivate func run_BridgedNSStringLength(_ asciiBase: Bool, _ enc: UInt, _ n: Int) {
+  let str = asciiBase ? bridgedASCIIString : bridgedUTF8String
+  for _ in 0 ..< n * 100 {
+    blackHole(str!.lengthOfBytes(using: enc))
+  }
+}
+
+@inline(never)
+public func run_BridgedNSStringLengthASCII_ASCII(_ n: Int) {
+  run_BridgedNSStringLength(true, 1 /* NSASCIIStringEncoding */, n)
+}
+
+@inline(never)
+public func run_BridgedNSStringLengthASCII_UTF8(_ n: Int) {
+  run_BridgedNSStringLength(true, 4 /* NSUTF8StringEncoding */, n)
+}
+
+@inline(never)
+public func run_BridgedNSStringLengthASCII_UTF16(_ n: Int) {
+  run_BridgedNSStringLength(true, 10 /* NSUnicodeStringEncoding */, n)
+}
+
+@inline(never)
+public func run_BridgedNSStringLengthASCII_MacRoman(_ n: Int) {
+  run_BridgedNSStringLength(true, 30 /* NSMacOSRomanStringEncoding */, n)
+}
+
+@inline(never)
+public func run_BridgedNSStringLengthUTF8_UTF8(_ n: Int) {
+  run_BridgedNSStringLength(false, 4 /* NSUTF8StringEncoding */, n)
+}
+
+@inline(never)
+public func run_BridgedNSStringLengthUTF8_UTF16(_ n: Int) {
+  run_BridgedNSStringLength(false, 10 /* NSUnicodeStringEncoding */, n)
+}
