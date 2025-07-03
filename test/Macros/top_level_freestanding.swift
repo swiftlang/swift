@@ -151,7 +151,17 @@ struct S {
 @freestanding(expression) macro functionCallWithInoutParam(_ v: inout Int)
   = #externalMacro(module: "MacroDefinition", type: "VoidExpressionMacro")
 
+@freestanding(expression) macro functionCallWithTwoInoutParams(_ u: inout Int, _ v: inout Int)
+  = #externalMacro(module: "MacroDefinition", type: "VoidExpressionMacro")
+
+@freestanding(expression) macro functionCallWithInoutParamPlusOthers(
+  string: String, double: Double, _ v: inout Int)
+  = #externalMacro(module: "MacroDefinition", type: "VoidExpressionMacro")
+
 func testFunctionCallWithInoutParam() {
   var a = 0
+  var b = 0
   #functionCallWithInoutParam(&a)
+  #functionCallWithTwoInoutParams(&a, &b)
+  #functionCallWithInoutParamPlusOthers(string: "", double: 1.0, &a)
 }
