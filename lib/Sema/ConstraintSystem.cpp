@@ -1809,7 +1809,7 @@ Type Solution::simplifyType(Type type, bool wantInterfaceType) const {
         });
   }
 
-  ASSERT(!resolvedType->getRecursiveProperties().isSolverAllocated());
+  CONDITIONAL_ASSERT(!resolvedType->getRecursiveProperties().isSolverAllocated());
   return resolvedType;
 }
 
