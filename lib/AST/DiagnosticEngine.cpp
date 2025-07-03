@@ -1263,7 +1263,8 @@ llvm::cl::opt<bool> AssertOnError("swift-diagnostics-assert-on-error",
 llvm::cl::opt<bool> AssertOnWarning("swift-diagnostics-assert-on-warning",
                                     llvm::cl::init(false));
 
-DiagnosticBehavior DiagnosticState::determineBehavior(const Diagnostic &diag) {
+DiagnosticBehavior
+DiagnosticState::determineBehavior(const Diagnostic &diag) const {
   // We determine how to handle a diagnostic based on the following rules
   //   1) Map the diagnostic to its "intended" behavior, applying the behavior
   //      limit for this particular emission
@@ -1310,21 +1311,23 @@ DiagnosticBehavior DiagnosticState::determineBehavior(const Diagnostic &diag) {
     if (suppressRemarks)
       lvl = DiagnosticBehavior::Ignore;
   }
+  return lvl;
+}
 
-  //   5) Update current state for use during the next diagnostic
-  if (lvl == DiagnosticBehavior::Fatal) {
+void DiagnosticState::updateFor(DiagnosticBehavior behavior) {
+  // Update current state for use during the next diagnostic
+  if (behavior == DiagnosticBehavior::Fatal) {
     fatalErrorOccurred = true;
     anyErrorOccurred = true;
-  } else if (lvl == DiagnosticBehavior::Error) {
+  } else if (behavior == DiagnosticBehavior::Error) {
     anyErrorOccurred = true;
   }
 
   ASSERT((!AssertOnError || !anyErrorOccurred) && "We emitted an error?!");
-  ASSERT((!AssertOnWarning || (lvl != DiagnosticBehavior::Warning)) &&
+  ASSERT((!AssertOnWarning || (behavior != DiagnosticBehavior::Warning)) &&
          "We emitted a warning?!");
 
-  previousBehavior = lvl;
-  return lvl;
+  previousBehavior = behavior;
 }
 
 void DiagnosticEngine::flushActiveDiagnostic() {
@@ -1369,6 +1372,8 @@ std::optional<DiagnosticInfo>
 DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
                                               bool includeDiagnosticName) {
   auto behavior = state.determineBehavior(diagnostic);
+  state.updateFor(behavior);
+
   if (behavior == DiagnosticBehavior::Ignore)
     return std::nullopt;
 

@@ -1678,7 +1678,7 @@ namespace {
         // \endcode
         //
         // Here `P.foo` would be replaced with `S.foo`
-        if (!isExistentialMetatype && baseTy->is<ProtocolType>() &&
+        if (!isExistentialMetatype && baseTy->isConstraintType() &&
             member->isStatic()) {
           auto selfParam =
               overload.adjustedOpenedFullType->castTo<FunctionType>()->getParams()[0];

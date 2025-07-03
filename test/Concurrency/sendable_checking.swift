@@ -534,3 +534,27 @@ func test(value: (_: Int, _: () -> Void)) {
   takesSendable(value.1) // Ok
   // expected-warning@-1 {{converting non-Sendable function value to '@Sendable () -> Void' may introduce data races}}
 }
+
+// Don't forget about parameter packs -- https://github.com/swiftlang/swift/issues/82614
+
+@available(SwiftStdlib 5.1, *)
+protocol PackProto {
+  func foo<each A: Sendable>(_ a: repeat each A) async
+  func bar<each A>(_ a: repeat each A) async
+  // expected-note@-1 {{consider making generic parameter 'each A' conform to the 'Sendable' protocol}}
+}
+
+@available(SwiftStdlib 5.1, *)
+actor PackActor: PackProto {
+  func foo<each A: Sendable>(_ a: repeat each A) async {
+    for b in repeat (each a) {
+      print(b)
+    }
+  }
+  func bar<each A>(_ a: repeat each A) async {
+  // expected-warning@-1 {{non-Sendable parameter type 'repeat each A' cannot be sent from caller of protocol requirement 'bar' into actor-isolated implementation; this is an error in the Swift 6 language mode}}
+    for b in repeat (each a) {
+      print(b)
+    }
+  }
+}
