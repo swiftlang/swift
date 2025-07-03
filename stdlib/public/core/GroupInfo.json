@@ -274,7 +274,8 @@
     "EmbeddedPrint.swift",
     "InlineArray.swift",
     "Box.swift",
-    "Cell.swift"
+    "Cell.swift",
+    "Borrow.swift",
   ],
   "Result": [
     "Result.swift"

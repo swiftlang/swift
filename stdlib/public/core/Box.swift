@@ -15,21 +15,21 @@
 @safe
 public struct _Box<Value: ~Copyable>: ~Copyable {
   @_usableFromInline
-  let _pointer: UnsafeMutablePointer<Value>
+  let pointer: UnsafeMutablePointer<Value>
 
   @available(SwiftStdlib 6.3, *)
   @_alwaysEmitIntoClient
   @_transparent
   public init(_ initialValue: consuming Value) {
-    _pointer = UnsafeMutablePointer<Value>.allocate(capacity: 1)
-    _pointer.initialize(to: initialValue)
+    pointer = UnsafeMutablePointer<Value>.allocate(capacity: 1)
+    pointer.initialize(to: initialValue)
   }
 
   @_alwaysEmitIntoClient
   @_transparent
   deinit {
-    _pointer.deinitialize(count: 1)
-    _pointer.deallocate()
+    pointer.deinitialize(count: 1)
+    pointer.deallocate()
   }
 }
 
@@ -41,7 +41,7 @@ extension Box where Value: ~Copyable {
     @lifetime(borrow self)
     @_transparent
     get {
-      unsafe Span(_unsafeStart: _pointer, count: 1)
+      unsafe Span(_unsafeStart: pointer, count: 1)
     }
   }
 
@@ -51,8 +51,16 @@ extension Box where Value: ~Copyable {
     @lifetime(&self)
     @_transparent
     mutating get {
-      unsafe MutableSpan(_unsafeStart: _pointer, count: 1)
+      unsafe MutableSpan(_unsafeStart: pointer, count: 1)
     }
+  }
+
+  @available(SwiftStdlib 6.3, *)
+  @lifetime(borrow self)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public func borrow() -> _Borrow<Value> {
+    unsafe _Borrow(unsafeAddress: UnsafePointer(pointer), borrowing: self)
   }
 
   @available(SwiftStdlib 6.3, *)
@@ -60,7 +68,7 @@ extension Box where Value: ~Copyable {
   @_transparent
   public func consume() -> Value {
     let result = _pointer.move()
-    _pointer.deallocate()
+    pointer.deallocate()
     discard self
     return result
   }
@@ -70,12 +78,12 @@ extension Box where Value: ~Copyable {
   public subscript() -> Value {
     @_transparent
     unsafeAddress {
-      UnsafePointer<Value>(_pointer)
+      UnsafePointer<Value>(pointer)
     }
 
     @_transparent
     unsafeMutableAddress {
-      _pointer
+      pointer
     }
   }
 }
@@ -86,6 +94,6 @@ extension Box where Value: Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   public func copy() -> Value {
-    _pointer.pointee
+    pointer.pointee
   }
 }

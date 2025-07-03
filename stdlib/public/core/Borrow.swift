@@ -10,38 +10,49 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Builtin
-
 @available(SwiftStdlib 6.3, *)
 @frozen
-@unsafe
-@_rawLayout(like: Value, movesAsLike)
-public struct _Cell<Value: ~Copyable>: ~Copyable {
+@safe
+public struct _Borrow<Value: ~Copyable>: Copyable, ~Escapable {
+  @usableFromInline
+  let _pointer: UnsafePointer<Value>
+
   @available(SwiftStdlib 6.3, *)
+  @lifetime(borrow value)
   @_alwaysEmitIntoClient
   @_transparent
-  public var address: UnsafeMutablePointer<Value> {
-    unsafe UnsafeMutablePointer<Value>(_rawAddress)
+  public init(_ value: borrowing @_addressable Value) {
+    unsafe _pointer = UnsafePointer(Builtin.unprotectedAddressOfBorrow(value))
+  }
+
+  @available(SwiftStdlib 6.3, *)
+  @lifetime(borrow owner)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public init<Owner: ~Copyable & ~Escapable>(
+    unsafeAddress: UnsafePointer<Value>,
+    borrowing owner: borrowing Owner
+  ) {
+    unsafe _pointer = unsafeAddress
+  }
+
+  @available(SwiftStdlib 6.3, *)
+  @lifetime(copy owner)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public init<Owner: ~Copyable & ~Escapable>(
+    unsafeAddress: UnsafePointer<Value>,
+    copying owner: borrowing Owner
+  ) {
+    unsafe _pointer = unsafeAddress
   }
 
   @available(SwiftStdlib 6.3, *)
   @_alwaysEmitIntoClient
-  @_transparent
-  internal var rawAddress: Builtin.RawPointer {
-    Builtin.addressOfRawLayout(self)
-  }
-
-  @available(SwiftStdlib 6.3, *)
-  @_alwaysEmitIntoClient
-  @_transparent
-  public init(_ initialValue: consuming Value) {
-    unsafe _address.initialize(to: initialValue)
-  }
-
-  @available(SwiftStdlib 6.3, *)
-  @_alwaysEmitIntoClient
-  @_transparent
-  deinit {
-    unsafe _address.deinitialize(count: 1)
+  public subscript() -> T {
+    @_transparent
+    unsafeAddress {
+      unsafe _pointer
+    }
   }
 }
