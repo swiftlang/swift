@@ -65,12 +65,16 @@ let allocBoxToStack = FunctionPass(name: "allocbox-to-stack") {
 let mandatoryAllocBoxToStack = ModulePass(name: "mandatory-allocbox-to-stack") {
   (moduleContext: ModulePassContext) in
 
+  var worklist = FunctionWorklist()
+  worklist.pushIfNotVisited(contentsOf: moduleContext.functions)
+
   var originalsOfSpecializedFunctions = FunctionWorklist()
 
-  for function in moduleContext.functions {
+  while let function = worklist.pop() {
     moduleContext.transform(function: function) { context in
       let specFns = tryConvertBoxesToStack(in: function, context)
-      originalsOfSpecializedFunctions.pushIfNotVisited(contentsOf: specFns)
+      worklist.pushIfNotVisited(contentsOf: specFns.specializedFunctions)
+      originalsOfSpecializedFunctions.pushIfNotVisited(contentsOf: specFns.originalFunctions)
     }
   }
 
@@ -82,7 +86,7 @@ let mandatoryAllocBoxToStack = ModulePass(name: "mandatory-allocbox-to-stack") {
 /// Converts all non-escaping `alloc_box` to `alloc_stack` and specializes called functions if a
 /// box is passed to a function.
 /// Returns the list of original functions for which a specialization has been created.
-private func tryConvertBoxesToStack(in function: Function, _ context: FunctionPassContext) -> [Function] {
+private func tryConvertBoxesToStack(in function: Function, _ context: FunctionPassContext) -> FunctionSpecializations {
   var promotableBoxes = Array<(AllocBoxInst, Flags)>()
   var functionsToSpecialize = FunctionSpecializations()
 
@@ -101,7 +105,7 @@ private func tryConvertBoxesToStack(in function: Function, _ context: FunctionPa
     function.fixStackNesting(context)
   }
 
-  return functionsToSpecialize.originalFunctions
+  return functionsToSpecialize
 }
 
 private func findPromotableBoxes(in function: Function,
@@ -187,6 +191,7 @@ private struct FunctionSpecializations {
   private var originalToSpecialized = Dictionary<Function, Function>()
 
   var originalFunctions: [Function] { originals.functions }
+  var specializedFunctions: [Function] { originals.functions.lazy.map { originalToSpecialized[$0]! } }
 
   mutating func add(promotableArguments: [FunctionArgument]) {
     for arg in promotableArguments {
