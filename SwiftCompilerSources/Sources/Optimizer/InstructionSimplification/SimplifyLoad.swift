@@ -136,7 +136,7 @@ extension LoadInst : OnoneSimplifiable, SILCombineSimplifiable {
         }
       case let sea as StructElementAddrInst:
         let structType = sea.struct.type
-        if structType.nominal!.name == "_SwiftArrayBodyStorage" {
+        if structType.nominal!.name == StringRef("_SwiftArrayBodyStorage") {
           guard let fields = structType.getNominalFields(in: parentFunction) else {
             return false
           }

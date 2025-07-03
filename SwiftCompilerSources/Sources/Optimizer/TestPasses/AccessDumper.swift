@@ -34,9 +34,9 @@ let accessDumper = FunctionPass(name: "dump-access") {
         guard let callee = apply.referencedFunction else {
           break
         }
-        if callee.name == "_isDistinct" {
+        if callee.name == StringRef("_isDistinct") {
           checkAliasInfo(forArgumentsOf: apply, expectDistinct: true)
-        } else if callee.name == "_isNotDistinct" {
+        } else if callee.name == StringRef("_isNotDistinct") {
           checkAliasInfo(forArgumentsOf: apply, expectDistinct: false)
         }
       default:

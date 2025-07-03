@@ -123,9 +123,9 @@ private func isEmptyCOWSingleton(_ value: Value) -> Bool {
         v = (v as! UnaryInstruction).operand.value
       case let globalAddr as GlobalAddrInst:
         let name = globalAddr.global.name
-        return name == "_swiftEmptyArrayStorage" ||
-               name == "_swiftEmptyDictionarySingleton" ||
-               name == "_swiftEmptySetSingleton"
+        return name == StringRef("_swiftEmptyArrayStorage") ||
+               name == StringRef("_swiftEmptyDictionarySingleton") ||
+               name == StringRef("_swiftEmptySetSingleton")
       default:
         return false
     }

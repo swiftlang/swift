@@ -946,7 +946,7 @@ private extension Function {
   var canInitializeGlobal: Bool {
     return isGlobalInitOnceFunction ||
            // In non -parse-as-library mode globals are initialized in the `main` function.
-           name == "main"
+           name == StringRef("main")
   }
 }
 

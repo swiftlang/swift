@@ -342,9 +342,9 @@ func isBridgeToSwiftCall(_ value: Value) -> ApplyInst? {
          //       in Foundation.
          //
          // String._unconditionallyBridgeFromObjectiveC(_:)
-         funcName == "$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ" ||
+         funcName == StringRef("$sSS10FoundationE36_unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ") ||
          // Array._unconditionallyBridgeFromObjectiveC(_:)
-         funcName == "$sSa10FoundationE36_unconditionallyBridgeFromObjectiveCySayxGSo7NSArrayCSgFZ" else {
+         funcName == StringRef("$sSa10FoundationE36_unconditionallyBridgeFromObjectiveCySayxGSo7NSArrayCSgFZ") else {
     return nil
   }
   guard bridgingCall.arguments.count == 2,
