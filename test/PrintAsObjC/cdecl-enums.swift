@@ -31,18 +31,18 @@ import Foundation
 // CHECK-NEXT:   ObjcEnumNamedHelloDolly = 4,
 // CHECK-NEXT: };
 
-@cdecl("ObjcEnumNamed") enum EnumNamed: Int {
+@cdecl(ObjcEnumNamed) enum EnumNamed: Int {
   case A, B, C, d, helloDolly
 }
 
-// CHECK-LABEL: typedef SWIFT_ENUM_NAMED(unsigned int, ExplicitValues, "ExplicitValues", closed) {
+// CHECK-LABEL: typedef SWIFT_ENUM(unsigned int, ExplicitValues, closed) {
 // CHECK-NEXT:   ExplicitValuesZim = 0,
 // CHECK-NEXT:   ExplicitValuesZang = 219,
 // CHECK-NEXT:   ExplicitValuesZung = 220,
 // CHECK-NEXT: };
 // NEGATIVE-NOT: ExplicitValuesDomain
 
-@cdecl("ExplicitValues") enum ExplicitValues: CUnsignedInt {
+@cdecl enum ExplicitValues: CUnsignedInt {
   case Zim, Zang = 219, Zung
 
   func methodNotExportedToC() {}

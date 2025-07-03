@@ -97,12 +97,13 @@ def log_analyzer():
         print("================ \t ==================== \t ===========",
               file=sys.stderr)
         event_row = '{:<17.1%} \t {:<21} \t {}'
-        for build_event in finish_events:
-            duration_percentage = \
-                (float(build_event["duration"]) / float(total_duration))
-            print(event_row.format(duration_percentage,
-                                   build_event["duration"],
-                                   build_event["command"]), file=sys.stderr)
+        if total_duration > 0:
+            for build_event in finish_events:
+                duration_percentage = \
+                    (float(build_event["duration"]) / float(total_duration))
+                print(event_row.format(duration_percentage,
+                                       build_event["duration"],
+                                       build_event["command"]), file=sys.stderr)
 
         hours, remainder = divmod(total_duration, 3600)
         minutes, seconds = divmod(remainder, 60)
