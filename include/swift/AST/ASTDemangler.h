@@ -33,7 +33,9 @@
 
 namespace swift {
  
+class Decl;
 class TypeDecl;
+class DeclName;
 
 namespace Demangle {
 SWIFT_BEGIN_INLINE_NAMESPACE
@@ -49,6 +51,11 @@ TypeDecl *getTypeDeclForMangling(ASTContext &ctx,
 TypeDecl *getTypeDeclForUSR(ASTContext &ctx,
                             llvm::StringRef usr,
                             GenericSignature genericSig=GenericSignature());
+
+Decl *getDeclFromUSR(ASTContext &ctx,
+                     llvm::StringRef usr,
+                     const DeclContext *lookupDC,
+                     GenericSignature genericSig=GenericSignature());
 
 /// An implementation of MetadataReader's BuilderType concept that
 /// just finds and builds things in the AST.
@@ -121,6 +128,8 @@ public:
   DeclContext *getNotionalDC();
 
   Demangle::NodeFactory &getNodeFactory() { return Factory; }
+  
+  Decl *findDecl(NodePointer node, StringRef usr, const DeclContext *lookupDC);
 
   Type decodeMangledType(NodePointer node, bool forRequirement = true);
   Type createBuiltinType(StringRef builtinName, StringRef mangledName);
