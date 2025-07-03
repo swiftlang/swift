@@ -3,6 +3,9 @@
 // NOTE: Some of our tests here depend on borrow elimination /not/ running!
 // Please do not add it to clean up the IR like we did in
 // semanticarcopts-loadcopy-to-loadborrow!
+//
+// Enabling specific ARC opts requires an asserts build.
+// REQUIRES: asserts
 
 sil_stage canonical
 
