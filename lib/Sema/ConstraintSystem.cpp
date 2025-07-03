@@ -1770,7 +1770,7 @@ Type Solution::simplifyType(Type type, bool wantInterfaceType) const {
   if (wantInterfaceType)
     type = type->mapTypeOutOfContext();
 
-  if (!(type->hasTypeVariable() || type->hasPlaceholder()))
+  if (!type->hasTypeVariableOrPlaceholder())
     return type;
 
   // Map type variables to fixed types from bindings.
@@ -1788,16 +1788,28 @@ Type Solution::simplifyType(Type type, bool wantInterfaceType) const {
       });
   ASSERT(!(wantInterfaceType && resolvedType->hasPrimaryArchetype()));
 
-  // Placeholders shouldn't be reachable through a solution, they are only
-  // useful to determine what went wrong exactly.
-  if (resolvedType->hasPlaceholder()) {
-    return resolvedType.transformRec([&](Type type) -> std::optional<Type> {
-      if (type->isPlaceholder())
-        return Type(cs.getASTContext().TheUnresolvedType);
-      return std::nullopt;
-    });
+  // We may have type variables and placeholders left over. These are solver
+  // allocated so cannot escape this function. Turn them into UnresolvedType.
+  // - Type variables may still be present from unresolved pack expansions where
+  //   e.g the count type is a hole, so the pattern may never become a
+  //   concrete type.
+  // - Placeholders may be present for any holes.
+  if (resolvedType->hasTypeVariableOrPlaceholder()) {
+    auto &ctx = cs.getASTContext();
+    resolvedType =
+        resolvedType.transformRec([&](Type type) -> std::optional<Type> {
+          if (!type->hasTypeVariableOrPlaceholder())
+            return type;
+
+          auto *typePtr = type.getPointer();
+          if (isa<TypeVariableType>(typePtr) || isa<PlaceholderType>(typePtr))
+            return Type(ctx.TheUnresolvedType);
+
+          return std::nullopt;
+        });
   }
 
+  ASSERT(!resolvedType->getRecursiveProperties().isSolverAllocated());
   return resolvedType;
 }
 
