@@ -1,5 +1,5 @@
 // {"signature":"(anonymous namespace)::SetExprTypes::walkToExprPost(swift::Expr*)"}
-// RUN: not --crash %target-swift-frontend -typecheck %s
+// RUN: not %target-swift-frontend -typecheck %s
 typealias a<b, c> = c
 struct d < each b {
   typealias e< c > =
