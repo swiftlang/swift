@@ -39,11 +39,11 @@ struct Test {
   }
 }
 
-@preEnumExtensibility
-@nonexhaustive
+@nonexhaustive(warn)
 public enum PE {
 }
 
-@preEnumExtensibility // expected-error {{@preEnumExtensibility can only be used together with '@nonexhaustive' attribute}}
+@nonexhaustive // expected-note {{attribute already specified here}}
+@nonexhaustive(warn) // expected-error {{duplicate attribute}}
 public enum WrongPreE {
 }

@@ -158,6 +158,17 @@ enum : unsigned {
       InheritActorContextModifier::Last_InheritActorContextKind))
 };
 
+enum class NonexhaustiveMode : uint8_t {
+  Error = 0,
+  Warning,
+  Last_NonexhaustiveMode = Warning
+};
+
+enum : unsigned {
+  NumNonexhaustiveModeBits = countBitsUsed(static_cast<unsigned>(
+      NonexhaustiveMode::Last_NonexhaustiveMode))
+};
+
 enum class DeclAttrKind : unsigned {
 #define DECL_ATTR(_, CLASS, ...) CLASS,
 #define LAST_DECL_ATTR(CLASS) Last_DeclAttr = CLASS,
