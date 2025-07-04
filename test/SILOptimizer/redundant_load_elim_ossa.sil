@@ -1761,3 +1761,25 @@ bb0(%0 : $Int):
   dealloc_stack %3
   return %6
 }
+
+sil @forwardPtr : $@convention(thin) (Builtin.RawPointer) -> UnsafeMutableRawBufferPointer {
+[global: read]
+}
+
+// CHECK-LABEL: sil [ossa] @escaping_pointer_through_function :
+// CHECK:         [[LD:%.*]] = load [trivial] %1
+// CHECK:         return [[LD]]
+// CHECK-LABEL: } // end sil function 'escaping_pointer_through_function'
+sil [ossa] @escaping_pointer_through_function : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = alloc_stack $Int
+  store %0 to [trivial] %1
+  %3 = address_to_pointer %1 to $Builtin.RawPointer
+  %4 = function_ref @forwardPtr : $@convention(thin) (Builtin.RawPointer) -> UnsafeMutableRawBufferPointer
+  %5 = apply %4(%3) : $@convention(thin) (Builtin.RawPointer) -> UnsafeMutableRawBufferPointer
+  %6 = apply undef(%5) : $@convention(thin) (UnsafeMutableRawBufferPointer) -> ()
+  %7 = load [trivial] %1
+  dealloc_stack %1
+  return %7
+}
+
