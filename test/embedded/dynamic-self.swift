@@ -18,4 +18,4 @@ struct Main {
      }
 }
 
-// CHECK: define {{.*}}@main(
+// CHECK: define {{.*}}@{{_*}}main{{.*}}(
