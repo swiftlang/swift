@@ -6278,7 +6278,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
     if (auto declaredIn = decl->findImport(dc))
       return !declaredIn->module.importedModule->isConcurrencyChecked();
 
-    // Both the caller and the allee are in the same module.
+    // Both the caller and the callee are in the same module.
     if (dc->getParentModule() == decl->getModuleContext()) {
       return !dc->getASTContext().isSwiftVersionAtLeast(6);
     }
@@ -6288,16 +6288,47 @@ ArgumentList *ExprRewriter::coerceCallArguments(
     return true;
   }();
 
-  auto applyFlagsToArgument = [&paramInfo,
-                               &closuresRequireDynamicIsolationChecking,
-                               &locator](unsigned paramIdx, Expr *argument) {
+  auto isNonEscapingDirectlyDispatchedParameter = [&](unsigned paramIdx) -> bool {
+    auto *decl = callee.getDecl();
+    if (!decl) return false;
+
+    // If this is a non-@escaping synchronous function parameter, there's no need for
+    // an executor check as it will not escape.
+    auto isolation = getActorIsolation(decl);
+    switch (isolation) {
+      case ActorIsolation::Unspecified:
+        // Unspecified isolation would be an issue if this parameter was @escaping, but
+        // given that we will not be hopping to another executor, this is fine.
+      case ActorIsolation::Nonisolated:
+      case ActorIsolation::NonisolatedUnsafe:
+      case ActorIsolation::CallerIsolationInheriting:
+        break;
+      case ActorIsolation::ActorInstance:
+      case ActorIsolation::Erased:
+      case ActorIsolation::GlobalActor:
+        return false;
+    }
+
+    auto *param = getParameterAt(decl, paramIdx);
+    if (!param) return false;
+
+    auto ty = param->getInterfaceType();
+    auto *funcTy = dyn_cast<AnyFunctionType>(ty);
+    if (!funcTy) return false;
+
+    return funcTy->isNoEscape() && !funcTy->isAsync();
+  };
+
+  auto applyFlagsToArgument = [&](unsigned paramIdx, Expr *argument) {
     if (!isClosureLiteralExpr(argument))
       return;
 
     bool isMacroArg = isExpr<MacroExpansionExpr>(locator.getAnchor());
 
+    bool requiresDynamicIsolationChecking = closuresRequireDynamicIsolationChecking &&
+      !isNonEscapingDirectlyDispatchedParameter(paramIdx);
     applyContextualClosureFlags(argument, paramIdx, paramInfo,
-                                closuresRequireDynamicIsolationChecking,
+                                requiresDynamicIsolationChecking,
                                 isMacroArg);
   };
 
