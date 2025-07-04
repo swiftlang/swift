@@ -110,9 +110,27 @@ public struct ObservationRegistrar: Sendable {
       }
     }
 
-    internal mutating func cancelAll() {
+    internal mutating func deinitialize() -> (@Sendable () -> Void)? {
+      func extractSelf<T>(_ ty: T.Type) -> AnyKeyPath {
+        return \T.self
+      }
+
+      var tracker: (@Sendable () -> Void)?
+      lookupIteration: for (keyPath, ids) in lookups {
+        for id in ids {
+          if let found = observations[id]?.willSetTracker {
+            // convert the keyPath into its \Self.self version 
+            let selfKp = _openExistential(type(of: keyPath).rootType, do: extractSelf)
+            tracker = {
+               found(selfKp)
+            }
+            break lookupIteration
+          }
+        }
+      }
       observations.removeAll()
       lookups.removeAll()
+      return tracker
     }
     
     internal mutating func willSet(keyPath: AnyKeyPath) -> [@Sendable (AnyKeyPath) -> Void] {
@@ -157,8 +175,8 @@ public struct ObservationRegistrar: Sendable {
       state.withCriticalRegion { $0.cancel(id) }
     }
 
-    internal func cancelAll() {
-      state.withCriticalRegion { $0.cancelAll() }
+    internal func deinitialize() {
+      state.withCriticalRegion { $0.deinitialize() }?()
     }
     
     internal func willSet<Subject: Observable, Member>(
@@ -189,7 +207,7 @@ public struct ObservationRegistrar: Sendable {
     }
 
     deinit {
-      context.cancelAll()
+      context.deinitialize()
     }
   }
   
