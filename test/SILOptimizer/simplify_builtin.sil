@@ -694,3 +694,166 @@ bb0:
   return %0
 }
 
+// CHECK-LABEL: sil @invert_comparison_eq :
+// CHECK:         %2 = builtin "cmp_ne_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64)
+// CHECK:         return %2
+// CHECK:       } // end sil function 'invert_comparison_eq'
+sil @invert_comparison_eq : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  %2 = builtin "cmp_eq_Int64"(%0, %1) : $Builtin.Int1
+  %3 = integer_literal $Builtin.Int1, -1
+  %4 = builtin "xor_Int1"(%2, %3) : $Builtin.Int1
+  return %4
+}
+
+// CHECK-LABEL: sil @invert_comparison_ne :
+// CHECK:         %2 = builtin "cmp_eq_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64)
+// CHECK:         return %2
+// CHECK:       } // end sil function 'invert_comparison_ne'
+sil @invert_comparison_ne : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  %2 = builtin "cmp_ne_Int64"(%0, %1) : $Builtin.Int1
+  %3 = integer_literal $Builtin.Int1, -1
+  %4 = builtin "xor_Int1"(%2, %3) : $Builtin.Int1
+  return %4
+}
+
+// CHECK-LABEL: sil @invert_comparison_sle :
+// CHECK:         %2 = builtin "cmp_sgt_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64)
+// CHECK:         return %2
+// CHECK:       } // end sil function 'invert_comparison_sle'
+sil @invert_comparison_sle : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  %2 = builtin "cmp_sle_Int64"(%0, %1) : $Builtin.Int1
+  %3 = integer_literal $Builtin.Int1, -1
+  %4 = builtin "xor_Int1"(%2, %3) : $Builtin.Int1
+  return %4
+}
+
+// CHECK-LABEL: sil @invert_comparison_slt :
+// CHECK:         %2 = builtin "cmp_sge_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64)
+// CHECK:         return %2
+// CHECK:       } // end sil function 'invert_comparison_slt'
+sil @invert_comparison_slt : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  %2 = builtin "cmp_slt_Int64"(%0, %1) : $Builtin.Int1
+  %3 = integer_literal $Builtin.Int1, -1
+  %4 = builtin "xor_Int1"(%2, %3) : $Builtin.Int1
+  return %4
+}
+
+// CHECK-LABEL: sil @invert_comparison_sge :
+// CHECK:         %2 = builtin "cmp_slt_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64)
+// CHECK:         return %2
+// CHECK:       } // end sil function 'invert_comparison_sge'
+sil @invert_comparison_sge : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  %2 = builtin "cmp_sge_Int64"(%0, %1) : $Builtin.Int1
+  %3 = integer_literal $Builtin.Int1, -1
+  %4 = builtin "xor_Int1"(%2, %3) : $Builtin.Int1
+  return %4
+}
+
+// CHECK-LABEL: sil @invert_comparison_sgt :
+// CHECK:         %2 = builtin "cmp_sle_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64)
+// CHECK:         return %2
+// CHECK:       } // end sil function 'invert_comparison_sgt'
+sil @invert_comparison_sgt : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  %2 = builtin "cmp_sgt_Int64"(%0, %1) : $Builtin.Int1
+  %3 = integer_literal $Builtin.Int1, -1
+  %4 = builtin "xor_Int1"(%2, %3) : $Builtin.Int1
+  return %4
+}
+
+// CHECK-LABEL: sil @invert_comparison_ule :
+// CHECK:         %2 = builtin "cmp_ugt_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64)
+// CHECK:         return %2
+// CHECK:       } // end sil function 'invert_comparison_ule'
+sil @invert_comparison_ule : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  %2 = builtin "cmp_ule_Int64"(%0, %1) : $Builtin.Int1
+  %3 = integer_literal $Builtin.Int1, -1
+  %4 = builtin "xor_Int1"(%2, %3) : $Builtin.Int1
+  return %4
+}
+
+// CHECK-LABEL: sil @invert_comparison_ult :
+// CHECK:         %2 = builtin "cmp_uge_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64)
+// CHECK:         return %2
+// CHECK:       } // end sil function 'invert_comparison_ult'
+sil @invert_comparison_ult : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  %2 = builtin "cmp_ult_Int64"(%0, %1) : $Builtin.Int1
+  %3 = integer_literal $Builtin.Int1, -1
+  %4 = builtin "xor_Int1"(%2, %3) : $Builtin.Int1
+  return %4
+}
+
+// CHECK-LABEL: sil @invert_comparison_uge :
+// CHECK:         %2 = builtin "cmp_ult_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64)
+// CHECK:         return %2
+// CHECK:       } // end sil function 'invert_comparison_uge'
+sil @invert_comparison_uge : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  %2 = builtin "cmp_uge_Int64"(%0, %1) : $Builtin.Int1
+  %3 = integer_literal $Builtin.Int1, -1
+  %4 = builtin "xor_Int1"(%2, %3) : $Builtin.Int1
+  return %4
+}
+
+// CHECK-LABEL: sil @invert_comparison_ugt :
+// CHECK:         %2 = builtin "cmp_ule_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64)
+// CHECK:         return %2
+// CHECK:       } // end sil function 'invert_comparison_ugt'
+sil @invert_comparison_ugt : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  %2 = builtin "cmp_ugt_Int64"(%0, %1) : $Builtin.Int1
+  %3 = integer_literal $Builtin.Int1, -1
+  %4 = builtin "xor_Int1"(%2, %3) : $Builtin.Int1
+  return %4
+}
+
+// CHECK-LABEL: sil @no_invert_wrong_literal :
+// CHECK:         builtin "cmp_ugt_Int64"
+// CHECK:       } // end sil function 'no_invert_wrong_literal'
+sil @no_invert_wrong_literal : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  %2 = builtin "cmp_ugt_Int64"(%0, %1) : $Builtin.Int1
+  %3 = integer_literal $Builtin.Int1, 0
+  %4 = builtin "xor_Int1"(%2, %3) : $Builtin.Int1
+  return %4
+}
+
+// CHECK-LABEL: sil @no_invert_unknown_rhs :
+// CHECK:         builtin "cmp_ugt_Int64"
+// CHECK:       } // end sil function 'no_invert_unknown_rhs'
+sil @no_invert_unknown_rhs : $@convention(thin) (Builtin.Int64, Builtin.Int64, Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $Builtin.Int1):
+  %3 = builtin "cmp_ugt_Int64"(%0, %1) : $Builtin.Int1
+  %4 = builtin "xor_Int1"(%3, %2) : $Builtin.Int1
+  return %4
+}
+
+// CHECK-LABEL: sil @no_invert_no_comparison :
+// CHECK:         %2 = builtin "xor_Int1"
+// CHECK:         return %2
+// CHECK:       } // end sil function 'no_invert_no_comparison'
+sil @no_invert_no_comparison : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int1):
+  %1 = integer_literal $Builtin.Int1, -1
+  %2 = builtin "xor_Int1"(%0, %1) : $Builtin.Int1
+  return %2
+}
+
+// CHECK-LABEL: sil @no_invert_wrong_comparison :
+// CHECK:         builtin "fcmp_ord_FPIEEE32"
+// CHECK:       } // end sil function 'no_invert_wrong_comparison'
+sil @no_invert_wrong_comparison : $@convention(thin) (Builtin.FPIEEE32, Builtin.FPIEEE32) -> Builtin.Int1 {
+bb0(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32):
+  %2 = builtin "fcmp_ord_FPIEEE32"(%0 : $Builtin.FPIEEE32, %1 : $Builtin.FPIEEE32) : $Builtin.Int1
+  %3 = integer_literal $Builtin.Int1, -1
+  %4 = builtin "xor_Int1"(%2, %3) : $Builtin.Int1
+  return %4
+}
+

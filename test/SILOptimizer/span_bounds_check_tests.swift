@@ -353,3 +353,18 @@ public func inout_span_sum_iterate_to_unknown_with_trap_dontopt(_ v: inout Span<
   return sum
 }
 
+// Check that the loop is fully optimized, including bounds check elimination and vectorization.
+
+// CHECK-IR-LABEL: define {{.*}} @"$s4test4loop4over5usingSis4SpanVys5UInt8VG_AFySiGtF"
+// CHECK-IR:       vector.body:
+// CHECK-IR:       ret
+public func loop(over a: borrowing Span<UInt8>, using b: borrowing Span<Int>) -> Int {
+  var result = 0
+  precondition(UInt8.max < b.count)
+  for i in a.indices {
+    let idx = Int(a[i])
+    result &+= b[idx]
+  }
+  return result
+}
+
