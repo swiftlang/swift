@@ -787,7 +787,8 @@ function Move-Directory($Src, $Dst) {
     if (Test-Path -Path $Destination -Type Container) {
       Remove-Item -Path $Destination -Recurse -Force | Out-Null
     }
-    Move-Item -Path $Src -Destination $Dst -Force | Out-Null
+    New-Item -ItemType Directory -ErrorAction Ignore $Dst | Out-Null
+    Move-Item -Path $Src -Destination $Destination -Force | Out-Null
   }
 }
 
@@ -3409,7 +3410,6 @@ if (-not $SkipBuild) {
 
   foreach ($Platform in $WindowsSDKPlatforms) {
     Invoke-BuildStep Build-SDK $Platform
-    Invoke-BuildStep Build-ExperimentalSDK $Platform
 
     Get-ChildItem "$(Get-SwiftSDK Windows)\usr\lib\swift\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
       Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
@@ -3417,6 +3417,13 @@ if (-not $SkipBuild) {
     }
 
     Copy-Directory "$(Get-SwiftSDK Windows)\usr\bin" "$([IO.Path]::Combine((Get-InstallDir $Platform), "Runtimes", $ProductVersion, "usr"))"
+
+    Invoke-BuildStep Build-ExperimentalSDK $Platform
+
+    Get-ChildItem "$(Get-SwiftSDK Windows -Identifier WindowsExperimental)\usr\lib\swift_static\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
+      Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+      Move-Item $_.FullName "$(Get-SwiftSDK Windows -Identifier WindowsExperimental)\usr\lib\swift_static\windows\$($Platform.Architecture.LLVMName)\" | Out-Null
+    }
   }
 
   Write-PlatformInfoPlist Windows
@@ -3428,11 +3435,17 @@ if (-not $SkipBuild) {
   if ($Android) {
     foreach ($Platform in $AndroidSDKPlatforms) {
       Invoke-BuildStep Build-SDK $Platform
-      Invoke-BuildStep Build-ExperimentalSDK $Platform
 
       Get-ChildItem "$(Get-SwiftSDK Android)\usr\lib\swift\android" -File | Where-Object { $_.Name -match ".a$|.so$" } | ForEach-Object {
         Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
         Move-Item $_.FullName "$(Get-SwiftSDK Android)\usr\lib\swift\android\$($Platform.Architecture.LLVMName)\" | Out-Null
+      }
+
+      Invoke-BuildStep Build-ExperimentalSDK $Platform
+
+      Get-ChildItem "$(Get-SwiftSDK Android -Identifier AndroidExperimental)\usr\lib\swift_static\android" -File | Where-Object { $_.Name -match ".a$|.so$" } | ForEach-Object {
+        Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+        Move-Item $_.FullName "$(Get-SwiftSDK Android -Identifier AndroidExperimental)\usr\lib\swift_static\android\$($Platform.Architecture.LLVMName)\" | Out-Null
       }
     }
 
