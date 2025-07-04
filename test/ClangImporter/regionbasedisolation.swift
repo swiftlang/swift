@@ -74,7 +74,7 @@ extension ObjCObject {
   // CHECK: [[RESULT:%.*]] = alloc_stack $Array<NSObject>
 
   // Our method.
-  // CHECK: [[METHOD:%.*]] = objc_method [[SELF]], #ObjCObject.loadObjects2!foreign : (ObjCObject) -> () async throws -> [NSObject], $@convention(objc_method) (@convention(block) (Optional<NSArray>, Optional<NSError>) -> (), ObjCObject) -> ()
+  // CHECK: [[METHOD:%.*]] = objc_method [[SELF]], #ObjCObject.loadObjects2!foreign : (ObjCObject) -> () async throws -> [NSObject], $@convention(objc_method) (@convention(block) @Sendable (Optional<NSArray>, Optional<NSError>) -> (), ObjCObject) -> ()
 
   // Begin setting up the unsafe continuation for our method. Importantly note
   // that [[UNSAFE_CONT]] is Sendable, so we lose any connection from the
@@ -103,17 +103,18 @@ extension ObjCObject {
   // CHECK: copy_addr [take] [[CHECKED_CONT]] to [init] [[EXISTENTIAL_BLOCK_STORAGE]]
   // CHECK: merge_isolation_region [[BLOCK_STORAGE]], [[RESULT]]
 
-  // Then create the actual block. NOTE: Since the block is not @Sendable, the block does propagate regions.
+  // Then create the actual block. NOTE: Since the block is @Sendable, the block
+  // does not propagate regions.
   //
-  // CHECK: [[COMPLETION_HANDLER_BLOCK:%.*]] = function_ref @$sSo7NSArrayCSgSo7NSErrorCSgIeyByy_SaySo8NSObjectCGTz_ : $@convention(c) (@inout_aliasable @block_storage Any, Optional<NSArray>, Optional<NSError>) -> ()
+  // CHECK: [[COMPLETION_HANDLER_BLOCK:%.*]] = function_ref @$sSo7NSArrayCSgSo7NSErrorCSgIeyBhyy_SaySo8NSObjectCGTz_ : $@convention(c) @Sendable (@inout_aliasable @block_storage Any, Optional<NSArray>, Optional<NSError>) -> ()
   // CHECK: [[COMPLETION_BLOCK:%.*]] = init_block_storage_header [[BLOCK_STORAGE]], invoke [[COMPLETION_HANDLER_BLOCK]]
   //
-  // Since the block is not @Sendable, it does propagate the connection in
+  // Since the block is @Sendable, it does not propagate the connection in
   // between self and the block storage when we just call the method. Thus we
-  // don't need to perform a merge_isolation_region to communicate that the block
+  // need to perform a merge_isolation_region to communicate that the block
   // storage and self are part of the same region.
   //
-  // CHECK-NOT: merge_isolation_region [[SELF]], [[BLOCK_STORAGE]]
+  // CHECK: merge_isolation_region [[SELF]], [[BLOCK_STORAGE]]
   //
   // Then call the method.
   // CHECK: apply [[METHOD]]([[COMPLETION_BLOCK]], [[SELF]])
