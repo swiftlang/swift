@@ -274,3 +274,16 @@ func testSwitchAddr<T>(holder: inout Holder, t: T) {
   mutate(&holder) // expected-note {{conflicting access is here}}
   mutableView.modify()
 }
+
+// =============================================================================
+// Throwing
+// =============================================================================
+
+@available(Span 0.1, *)
+func mutableSpanMayThrow(_: borrowing MutableSpan<Int>) throws {}
+
+@available(Span 0.1, *)
+func testSpanMayThrow(buffer: inout [Int]) {
+  let bufferSpan = buffer.mutableSpan
+  try! mutableSpanMayThrow(bufferSpan)
+}

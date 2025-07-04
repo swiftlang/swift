@@ -72,6 +72,7 @@ struct LocalVariableAccess: CustomStringConvertible {
     case storeBorrow // scoped initialization of temporaries
     case apply       // indirect arguments
     case escape      // alloc_box captures
+    case deadEnd     // unreachable
   }
   let kind: Kind
   // All access have an operand except .incomingArgument and .outgoingArgument.
@@ -102,7 +103,7 @@ struct LocalVariableAccess: CustomStringConvertible {
       case .`init`, .modify:
         return true
       }
-    case .load, .dependenceSource, .dependenceDest:
+    case .load, .dependenceSource, .dependenceDest, .deadEnd:
       return false
     case .incomingArgument, .outgoingArgument, .store, .storeBorrow, .inoutYield:
       return true
@@ -153,6 +154,8 @@ struct LocalVariableAccess: CustomStringConvertible {
       str += "apply"
     case .escape:
       str += "escape"
+    case .deadEnd:
+      str += "deadEnd"
     }
     if let inst = instruction {
       str += "\(inst)"
@@ -201,7 +204,7 @@ class LocalVariableAccessInfo: CustomStringConvertible {
       self.hasEscaped = true
     case .inoutYield:
       self._isFullyAssigned = false
-    case .incomingArgument, .outgoingArgument:
+    case .incomingArgument, .outgoingArgument, .deadEnd:
       fatalError("Function arguments are never mapped to LocalVariableAccessInfo")
     }
   }
@@ -753,8 +756,8 @@ extension LocalVariableReachableAccess {
   ///
   /// This does not include the destroy or reassignment of the value set by `modifyInst`.
   ///
-  /// Returns true if all possible reachable uses were visited. Returns false if any escapes may reach `modifyInst` are
-  /// reachable from `modifyInst`.
+  /// Returns true if all possible reachable uses were visited. Returns false if any escapes may reach `modifyInst` or
+  /// are reachable from `modifyInst`.
   ///
   /// This does not gather the escaping accesses themselves. When escapes are reachable, it also does not guarantee that
   /// previously reachable accesses are gathered.
@@ -855,6 +858,8 @@ extension LocalVariableReachableAccess {
       }
       if block.terminator.isFunctionExiting {
         accessStack.push(LocalVariableAccess(.outgoingArgument, block.terminator))
+      } else if block.successors.isEmpty {
+        accessStack.push(LocalVariableAccess(.deadEnd, block.terminator))
       } else {
         for successor in block.successors { blockList.pushIfNotVisited(successor) }
       }

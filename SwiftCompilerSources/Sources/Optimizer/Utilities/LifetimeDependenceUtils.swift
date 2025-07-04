@@ -975,6 +975,8 @@ extension LifetimeDependenceDefUseWalker {
       return yieldedDependence(result: localAccess.operand!)
     case .incomingArgument:
       fatalError("Incoming arguments are never reachable")
+    case .deadEnd:
+      return .continueWalk
     }
   }
 
