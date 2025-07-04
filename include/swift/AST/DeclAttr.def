@@ -888,11 +888,7 @@ SIMPLE_DECL_ATTR(concurrent, Concurrent,
   ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UnconstrainedInABIAttr,
   170)
 
-SIMPLE_DECL_ATTR(preEnumExtensibility, PreEnumExtensibility,
-  OnEnum,
-  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove | UnconstrainedInABIAttr,
-  171)
-DECL_ATTR_FEATURE_REQUIREMENT(PreEnumExtensibility, NonexhaustiveAttribute)
+// Unused '171': Used to be `@preEnumExtensibility`
 
 DECL_ATTR(specialized, Specialized,
   OnConstructor | OnFunc | OnAccessor,

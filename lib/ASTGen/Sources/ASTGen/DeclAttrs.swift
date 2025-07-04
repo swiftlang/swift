@@ -240,7 +240,6 @@ extension ASTGenVisitor {
         .EagerMove,
         .Exported,
         .Nonexhaustive,
-        .PreEnumExtensibility,
         .DiscardableResult,
         .DisfavoredOverload,
         .DynamicMemberLookup,

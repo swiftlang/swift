@@ -5049,7 +5049,6 @@ public:
   TRIVIAL_ATTR_PRINTER(WeakLinked, weak_linked)
   TRIVIAL_ATTR_PRINTER(Nonexhaustive, nonexhaustive)
   TRIVIAL_ATTR_PRINTER(Concurrent, concurrent)
-  TRIVIAL_ATTR_PRINTER(PreEnumExtensibility, preEnumExtensibility)
 
 #undef TRIVIAL_ATTR_PRINTER
 

@@ -8811,9 +8811,6 @@ ERROR(nonexhaustive_attr_on_internal_type,none,
       "%select{private|fileprivate|internal|%error|%error|%error}1",
       (DeclName, AccessLevel))
 
-ERROR(pre_enum_extensibility_without_nonexhaustive,none,
-      "%0 can only be used together with '@nonexhaustive' attribute", (DeclAttribute))
-
 //===----------------------------------------------------------------------===//
 // MARK: `using` declaration
 //===----------------------------------------------------------------------===//
