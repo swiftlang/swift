@@ -548,6 +548,14 @@ BridgedValue BridgedPassContext::SSAUpdater_getValueInMiddleOfBlock(BridgedBasic
       invocation->getSSAUpdater()->getValueInMiddleOfBlock(block.unbridged())};
 }
 
+SwiftInt BridgedPassContext::SSAUpdater_getNumInsertedPhis() const {
+  return (SwiftInt)invocation->getInsertedPhisBySSAUpdater().size();
+}
+
+BridgedValue BridgedPassContext::SSAUpdater_getInsertedPhi(SwiftInt idx) const {
+  return {invocation->getInsertedPhisBySSAUpdater()[idx]};
+}
+
 bool BridgedPassContext::enableStackProtection() const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   return mod->getOptions().EnableStackProtection;
