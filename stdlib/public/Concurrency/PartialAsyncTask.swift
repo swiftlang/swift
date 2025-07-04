@@ -322,11 +322,11 @@ public struct ExecutorJob: Sendable, ~Copyable {
   /// referenced from the private data area are cleared up prior to running the
   /// job.
   ///
-  /// Parameters:
+  /// - Parameters:
   ///
-  /// - body: The closure to execute.
+  ///   - body: The closure to execute.
   ///
-  /// Returns the result of executing the closure.
+  /// - Returns: The result of executing the closure.
   @available(StdlibDeploymentTarget 6.2, *)
   public func withUnsafeExecutorPrivateData<R, E>(body: (UnsafeMutableRawBufferPointer) throws(E) -> R) throws(E) -> R {
     let base = _jobGetExecutorPrivateData(self.context)
@@ -462,14 +462,12 @@ extension ExecutorJob {
   /// This is useful in conjunction with the `Clock.run()` API, which
   /// runs a job on an unspecified executor.
   ///
-  /// Parameters:
+  /// - Parameters:
   ///
-  /// - to executor:   The `Executor` on which it should be enqueued.
+  ///   - executor:   The `Executor` on which it should be enqueued.
   ///
-  /// Returns:
-  ///
-  /// A new ExecutorJob that will enqueue the specified job on the specified
-  /// executor.
+  /// - Returns: A new ExecutorJob that will enqueue the specified job on the
+  ///   specified executor.
   @available(StdlibDeploymentTarget 6.2, *)
   public func createTrampoline(to executor: some Executor) -> ExecutorJob {
     let flags = taskCreateFlags(
