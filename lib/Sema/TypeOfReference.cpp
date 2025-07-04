@@ -617,6 +617,7 @@ Type ConstraintSystem::getUnopenedTypeOfReference(
 
   requestedType =
       requestedType->getWithoutSpecifierType()->getReferenceStorageReferent();
+  requestedType = simplifyType(requestedType);
 
   // Strip pack expansion types off of pack references.
   if (auto *expansion = requestedType->getAs<PackExpansionType>())
