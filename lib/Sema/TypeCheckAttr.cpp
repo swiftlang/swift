@@ -262,14 +262,6 @@ public:
     }
   }
 
-  void visitPreEnumExtensibilityAttr(PreEnumExtensibilityAttr *attr) {
-    if (!D->getAttrs().hasAttribute<NonexhaustiveAttr>()) {
-      diagnoseAndRemoveAttr(
-          attr, diag::pre_enum_extensibility_without_nonexhaustive, attr);
-      return;
-    }
-  }
-
   void visitAlignmentAttr(AlignmentAttr *attr) {
     // Alignment must be a power of two.
     auto value = attr->getValue();
