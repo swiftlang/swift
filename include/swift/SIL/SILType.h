@@ -89,6 +89,20 @@ enum class SILValueCategory : uint8_t {
   Address,
 };
 
+/// Does this type only have default deinitialization or might it invoke a
+/// custom deinitialer with side effects? This includes any recursive
+/// deinitializers that may be invoked by releasing a reference.
+///
+/// If a type only has default deinitialization, then the deinitializer cannot
+/// have any semantically-visible side effects. It cannot write to any memory
+/// reachable from another object that won't be freed during deinitialization.
+///
+/// Implemented as a bool flag in TypeLowering.
+enum CustomDeinitStatus : bool {
+  HasOnlyDefaultDeinit = false,
+  MayHaveCustomDeinit = true,
+};
+
 class SILPrinter;
 class SILParser;
 
@@ -939,6 +953,11 @@ public:
   /// True if a value of this type can have its address taken by a
   /// lifetime-dependent value.
   bool isAddressableForDeps(const SILFunction &function) const;
+
+  /// Does this type only have default deinitialization or might it invoke a
+  /// custom deinitialer with side effects? This includes any recursive
+  /// deinitializers that may be invoked by releasing a reference.
+  CustomDeinitStatus hasCustomDeinit(const SILFunction &function) const;
 
   /// Returns true if this type is an actor type. Returns false if this is any
   /// other type. This includes distributed actors. To check for distributed
