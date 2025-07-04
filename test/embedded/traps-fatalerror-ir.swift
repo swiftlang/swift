@@ -1,8 +1,8 @@
-// RUN: %target-swift-emit-ir -enable-experimental-feature Embedded -wmo %s                             | %FileCheck %s --check-prefix=CHECK-MESSAGE
-// RUN: %target-swift-emit-ir -enable-experimental-feature Embedded -wmo %s -O                          | %FileCheck %s --check-prefix=CHECK-NOMESSAGE
-// RUN: %target-swift-emit-ir -enable-experimental-feature Embedded -wmo %s -Osize                      | %FileCheck %s --check-prefix=CHECK-NOMESSAGE
-// RUN: %target-swift-emit-ir -enable-experimental-feature Embedded -wmo %s -O     -assert-config Debug | %FileCheck %s --check-prefix=CHECK-MESSAGE
-// RUN: %target-swift-emit-ir -enable-experimental-feature Embedded -wmo %s -Osize -assert-config Debug | %FileCheck %s --check-prefix=CHECK-MESSAGE
+// RUN: %target-swift-emit-ir -disable-llvm-merge-functions-pass -enable-experimental-feature Embedded -wmo %s                             | %FileCheck %s --check-prefix=CHECK-MESSAGE
+// RUN: %target-swift-emit-ir -disable-llvm-merge-functions-pass -enable-experimental-feature Embedded -wmo %s -O                          | %FileCheck %s --check-prefix=CHECK-NOMESSAGE
+// RUN: %target-swift-emit-ir -disable-llvm-merge-functions-pass -enable-experimental-feature Embedded -wmo %s -Osize                      | %FileCheck %s --check-prefix=CHECK-NOMESSAGE
+// RUN: %target-swift-emit-ir -disable-llvm-merge-functions-pass -enable-experimental-feature Embedded -wmo %s -O     -assert-config Debug | %FileCheck %s --check-prefix=CHECK-MESSAGE
+// RUN: %target-swift-emit-ir -disable-llvm-merge-functions-pass -enable-experimental-feature Embedded -wmo %s -Osize -assert-config Debug | %FileCheck %s --check-prefix=CHECK-MESSAGE
 
 // XFAIL: OS=wasi
 // REQUIRES: swift_in_compiler
