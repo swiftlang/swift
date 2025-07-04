@@ -441,15 +441,7 @@ UNINTERESTING_FEATURE(BuiltinSelect)
 UNINTERESTING_FEATURE(BuiltinInterleave)
 UNINTERESTING_FEATURE(BuiltinVectorsExternC)
 UNINTERESTING_FEATURE(AddressOfProperty2)
-
-static bool usesFeatureWeakLet(Decl *decl) {
-  if (auto *VD = dyn_cast<VarDecl>(decl)) {
-    if (auto *refAttr = VD->getAttrs().getAttribute<ReferenceOwnershipAttr>()) {
-      return VD->isLet() && refAttr->get() == ReferenceOwnership::Weak;
-    }
-  }
-  return false;
-}
+UNINTERESTING_FEATURE(ImmutableWeakCaptures)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

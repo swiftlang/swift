@@ -5406,11 +5406,6 @@ Type TypeChecker::checkReferenceOwnershipAttr(VarDecl *var, Type type,
   case ReferenceOwnershipOptionality::Allowed:
     break;
   case ReferenceOwnershipOptionality::Required:
-    if (var->isLet() && !ctx.LangOpts.hasFeature(Feature::WeakLet)) {
-      var->diagnose(diag::invalid_ownership_is_let, ownershipKind);
-      attr->setInvalid();
-    }
-
     if (!isOptional) {
       attr->setInvalid();
 

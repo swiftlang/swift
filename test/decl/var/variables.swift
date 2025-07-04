@@ -1,7 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-additional-prefix no-weak-let-
-// RUN: %target-typecheck-verify-swift -enable-upcoming-feature WeakLet -verify-additional-prefix has-weak-let-
-
-// REQUIRES: swift_feature_WeakLet
+// RUN: %target-typecheck-verify-swift
 
 var t1 : Int
 var t2 = 10
@@ -92,10 +89,9 @@ class SomeClass {}
 
 
 weak let V = SomeClass() // ok since SE-0481
-// expected-no-weak-let-error@-1 {{'weak' must be a mutable variable, because it may change at runtime}}
-// expected-has-weak-let-warning@-2 {{instance will be immediately deallocated because variable 'V' is 'weak'}}
-// expected-has-weak-let-note@-3 {{'V' declared here}}
-// expected-has-weak-let-note@-4 {{a strong reference is required to prevent the instance from being deallocated}}
+// expected-warning@-1 {{instance will be immediately deallocated because variable 'V' is 'weak'}}
+// expected-note@-2 {{'V' declared here}}
+// expected-note@-3 {{a strong reference is required to prevent the instance from being deallocated}}
 
 let a = b ; let b = a
 // expected-error@-1 {{circular reference}}

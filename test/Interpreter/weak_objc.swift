@@ -2,13 +2,13 @@
 // RUN: %target-codesign %t-main
 // RUN: %target-run %t-main | %FileCheck %s
 
-// RUN: %target-build-swift %s -Xfrontend -disable-objc-attr-requires-foundation-module -enable-upcoming-feature WeakLet -o %t-main-weak-let
+// RUN: %target-build-swift %s -Xfrontend -disable-objc-attr-requires-foundation-module -enable-upcoming-feature ImmutableWeakCaptures -o %t-main-weak-let
 // RUN: %target-codesign %t-main-weak-let
 // RUN: %target-run %t-main-weak-let | %FileCheck %s --check-prefixes=CHECK,CHECK-WEAK-LET
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
-// REQUIRES: swift_feature_WeakLet
+// REQUIRES: swift_feature_ImmutableWeakCaptures
 
 import Foundation
 
@@ -54,7 +54,6 @@ func testObjCClass() {
 
 testObjCClass()
 
-#if hasFeature(WeakLet)
 func testObjCWeakLet() {
   print("testObjCWeakLet")                // CHECK-WEAK-LET: testObjCWeakLet
 
@@ -80,4 +79,3 @@ func testObjCWeakLetCapture() {
 }
 
 testObjCWeakLetCapture()
-#endif

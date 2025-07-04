@@ -1,12 +1,12 @@
 // There seems to be a minor bug in the diagnostic of the self-capture.
 // Diagnostic algorithm does not @lvalue DeclRefExpr wrapped into LoadExpr,
-// and enabling WeakLet removes the LoadExpr.
+// and enabling ImmutableWeakCaptures removes the LoadExpr.
 // As a result, diagnostic messages change slightly.
 
 // RUN: %target-typecheck-verify-swift -swift-version 6 -verify-additional-prefix no-weak-let-
-// RUN: %target-typecheck-verify-swift -swift-version 6 -verify-additional-prefix has-weak-let- -enable-upcoming-feature WeakLet
+// RUN: %target-typecheck-verify-swift -swift-version 6 -verify-additional-prefix has-weak-let- -enable-upcoming-feature ImmutableWeakCaptures
 
-// REQUIRES: swift_feature_WeakLet
+// REQUIRES: swift_feature_ImmutableWeakCaptures
 
 func doStuff(_ fn : @escaping () -> Int) {}
 func doVoidStuff(_ fn : @escaping () -> ()) {}
