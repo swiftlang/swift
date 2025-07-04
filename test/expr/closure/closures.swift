@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -disable-availability-checking -verify-additional-prefix no-weak-let-
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-upcoming-feature WeakLet -verify-additional-prefix has-weak-let-
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-upcoming-feature ImmutableWeakCaptures -verify-additional-prefix has-weak-let-
 
-// REQUIRES: swift_feature_WeakLet
+// REQUIRES: swift_feature_ImmutableWeakCaptures
 
 var func6 : (_ fn : (Int,Int) -> Int) -> ()
 var func6a : ((Int, Int) -> Int) -> ()
@@ -1633,7 +1633,7 @@ final class AutoclosureTests {
       let someOptional: Self? = Self()
       var `self` = self ?? someOptional // expected-warning {{'self' was never mutated; consider changing to 'let' constant}}
       guard let self = self else { return }
-#if hasFeature(WeakLet)
+#if hasFeature(ImmutableWeakCaptures)
       method() // expected-has-weak-let-error{{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
 #else
       // This is not supposed to be permitted, but has been allowed since Swift 5.8,

@@ -1,12 +1,12 @@
 // RUN: %target-swift-frontend -emit-sil -swift-version 6 -target %target-swift-5.1-abi-triple -verify -verify-additional-prefix old- %s -o /dev/null
-// RUN: %target-swift-frontend -emit-sil -swift-version 6 -target %target-swift-5.1-abi-triple -verify -verify-additional-prefix new- -enable-upcoming-feature WeakLet %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -swift-version 6 -target %target-swift-5.1-abi-triple -verify -verify-additional-prefix new- -enable-upcoming-feature ImmutableWeakCaptures %s -o /dev/null
 
 // This test validates the behavior of transfer non sendable around ownership
 // constructs like non copyable types, consuming/borrowing parameters, and inout
 // parameters.
 
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_WeakLet
+// REQUIRES: swift_feature_ImmutableWeakCaptures
 
 final class S: Sendable {
   func foo() {}
@@ -30,15 +30,12 @@ final class CheckOptionality1: Sendable {
 }
 
 final class CheckOptionality2: Sendable {
-  // expected-old-error@+3 {{'weak' must be a mutable variable, because it may change at runtime}}
-  // expected-old-error@+2 {{'weak' variable should have optional type 'S?'}}
-  // expected-new-error@+1 {{'weak' variable should have optional type 'S?'}}
+  // expected-error@+1 {{'weak' variable should have optional type 'S?'}}
   weak let x: S = getS()
 }
 
 final class CheckSendability1: Sendable {
-  // expected-old-error@+2 {{stored property 'x' of 'Sendable'-conforming class 'CheckSendability1' is mutable}}
-  // expected-new-error@+1 {{stored property 'x' of 'Sendable'-conforming class 'CheckSendability1' is mutable}}
+  // expected-error@+1 {{stored property 'x' of 'Sendable'-conforming class 'CheckSendability1' is mutable}}
   weak var x: S? = nil
 
   weak var y: S? {
@@ -48,32 +45,26 @@ final class CheckSendability1: Sendable {
 }
 
 final class CheckSendability2: Sendable {
-  // expected-old-error@+2 {{stored property 'x' of 'Sendable'-conforming class 'CheckSendability2' is mutable}}
-  // expected-new-error@+1 {{stored property 'x' of 'Sendable'-conforming class 'CheckSendability2' is mutable}}
+  // expected-error@+1 {{stored property 'x' of 'Sendable'-conforming class 'CheckSendability2' is mutable}}
   weak var x: NS? = nil
 }
 
 final class CheckSendability3: Sendable {
-  // expected-old-error@+1 {{'weak' must be a mutable variable, because it may change at runtime}}
   weak let x: S? = nil
 }
 
 final class CheckSendability4: Sendable {
-  // expected-old-error@+3 {{'weak' must be a mutable variable, because it may change at runtime}}
-  // expected-old-error@+2 {{stored property 'x' of 'Sendable'-conforming class 'CheckSendability4' contains non-Sendable type 'NS'}}
-  // expected-new-error@+1 {{stored property 'x' of 'Sendable'-conforming class 'CheckSendability4' contains non-Sendable type 'NS'}}
+  // expected-error@+1 {{stored property 'x' of 'Sendable'-conforming class 'CheckSendability4' contains non-Sendable type 'NS'}}
   weak let x: NS? = nil
 }
 
 final class CheckSendability5: Sendable {
-  // expected-old-error@+2 {{stored property 'x' of 'Sendable'-conforming class 'CheckSendability5' is mutable}}
-  // expected-new-error@+1 {{stored property 'x' of 'Sendable'-conforming class 'CheckSendability5' is mutable}}
+  // expected-error@+1 {{stored property 'x' of 'Sendable'-conforming class 'CheckSendability5' is mutable}}
   unowned var x: S = getS()
 }
 
 final class CheckSendability6: Sendable {
-  // expected-old-error@+2 {{stored property 'x' of 'Sendable'-conforming class 'CheckSendability6' is mutable}}
-  // expected-new-error@+1 {{stored property 'x' of 'Sendable'-conforming class 'CheckSendability6' is mutable}}
+  // expected-error@+1 {{stored property 'x' of 'Sendable'-conforming class 'CheckSendability6' is mutable}}
   unowned var x: NS = getNS()
 }
 
@@ -87,14 +78,12 @@ final class CheckSendability8: Sendable {
 }
 
 final class CheckSendability9: Sendable {
-  // expected-old-error@+2 {{stored property 'x' of 'Sendable'-conforming class 'CheckSendability9' is mutable}}
-  // expected-new-error@+1 {{stored property 'x' of 'Sendable'-conforming class 'CheckSendability9' is mutable}}
+  // expected-error@+1 {{stored property 'x' of 'Sendable'-conforming class 'CheckSendability9' is mutable}}
   unowned(unsafe) var x: S = getS()
 }
 
 final class CheckSendability10: Sendable {
-  // expected-old-error@+2 {{stored property 'x' of 'Sendable'-conforming class 'CheckSendability10' is mutable}}
-  // expected-new-error@+1 {{stored property 'x' of 'Sendable'-conforming class 'CheckSendability10' is mutable}}
+  // expected-error@+1 {{stored property 'x' of 'Sendable'-conforming class 'CheckSendability10' is mutable}}
   unowned(unsafe) var x: NS = getNS()
 }
 
@@ -109,17 +98,15 @@ final class CheckSendability12: Sendable {
 
 
 func checkWeakCapture1(_ strongRef: S) -> @Sendable () -> Void {
-  // expected-new-warning@+1 {{variable 'weakRef' was never mutated; consider changing to 'let' constant}}
+  // expected-warning@+1 {{variable 'weakRef' was never mutated; consider changing to 'let' constant}}
   weak var weakRef: S? = strongRef
   return {
-    // expected-old-error@+2 {{reference to captured var 'weakRef' in concurrently-executing code}}
-    // expected-new-error@+1 {{reference to captured var 'weakRef' in concurrently-executing code}}
+    // expected-error@+1 {{reference to captured var 'weakRef' in concurrently-executing code}}
     weakRef?.foo()
   }
 }
 
 func checkWeakCapture2(_ strongRef: S) -> @Sendable () -> Void {
-  // expected-old-error@+1 {{'weak' must be a mutable variable, because it may change at runtime}}
   weak let weakRef: S? = strongRef
   return {
     weakRef?.foo()
@@ -137,7 +124,7 @@ func checkWeakCapture3(_ strongRef: S) -> @Sendable () -> Void {
 }
 
 func checkWeakCapture4(_ strongRef: NS) -> @Sendable () -> Void {
-  // expected-new-warning@+1 {{variable 'weakRef' was never mutated; consider changing to 'let' constant}}
+  // expected-warning@+1 {{variable 'weakRef' was never mutated; consider changing to 'let' constant}}
   weak var weakRef: NS? = strongRef
   return {
     // expected-error@+2 {{capture of 'weakRef' with non-Sendable type 'NS?' in a '@Sendable' closure}}
@@ -147,7 +134,6 @@ func checkWeakCapture4(_ strongRef: NS) -> @Sendable () -> Void {
 }
 
 func checkWeakCapture5(_ strongRef: NS) -> @Sendable () -> Void {
-  // expected-old-error@+1 {{'weak' must be a mutable variable, because it may change at runtime}}
   weak let weakRef: NS? = strongRef
   return {
     // expected-error@+1 {{capture of 'weakRef' with non-Sendable type 'NS?' in a '@Sendable' closure}}

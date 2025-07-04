@@ -1747,8 +1747,8 @@ public:
     if (!conditionalStmt) {
       return false;
     }
-    
-    if (Ctx.LangOpts.hasFeature(Feature::WeakLet)) {
+
+    if (Ctx.LangOpts.hasFeature(Feature::ImmutableWeakCaptures)) {
       // Require that the RHS of the `let self = self` condition
       // refers to a variable defined in a capture list.
       // This lets us reject invalid examples like:
@@ -1776,7 +1776,6 @@ public:
       //
       return conditionalStmt->rebindsSelf(Ctx, /*requiresCaptureListRef*/ false,
                                           /*requireLoadExpr*/ true);
-                                        
     }
   }
 
@@ -4054,9 +4053,12 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
     
     // If this variable has WeakStorageType, then it can be mutated in ways we
     // don't know.
-    if (var->getInterfaceType()->is<WeakStorageType>() && !DC->getASTContext().LangOpts.hasFeature(Feature::WeakLet))
+    if (var->getInterfaceType()->is<WeakStorageType>() &&
+        (access & RK_CaptureList) &&
+        !DC->getASTContext().LangOpts.hasFeature(
+            Feature::ImmutableWeakCaptures))
       access |= RK_Written;
-    
+
     // Diagnose variables that were never used (other than their
     // initialization).
     //

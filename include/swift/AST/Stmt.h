@@ -715,7 +715,8 @@ public:
   ///    RHS of the self condition references a var defined in a capture list.
   ///  - If `requireLoadExpr` is `true`, additionally requires that the RHS of
   ///    the self condition is a `LoadExpr`.
-  /// TODO: Remove `requireLoadExpr` after full-on of the WeakLet feature
+  /// TODO: Remove `requireLoadExpr` after full-on of the ImmutableWeakCaptures
+  /// feature
   bool rebindsSelf(ASTContext &Ctx, bool requiresCaptureListRef = false,
                    bool requireLoadExpr = false) const;
 
