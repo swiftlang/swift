@@ -32,7 +32,7 @@ actor A {
   func test1a() async {
     await WithFeature.unspecifiedAsyncConcurrent(ns)
     // expected-error @-1 {{sending 'self.ns' risks causing data races}}
-    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to nonisolated global function 'unspecifiedAsyncConcurrent' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to @concurrent global function 'unspecifiedAsyncConcurrent' risks causing data races between @concurrent and 'self'-isolated uses}}
   }
 
   // CHECK-LABEL: // unspecifiedAsyncCaller<A>(_:)
@@ -48,7 +48,7 @@ actor A {
   func test2() async {
     await WithoutFeature.unspecifiedAsync(ns)
     // expected-error @-1 {{sending 'self.ns' risks causing data races}}
-    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to nonisolated global function 'unspecifiedAsync' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to @concurrent global function 'unspecifiedAsync' risks causing data races between @concurrent and 'self'-isolated uses}}
   }
 
   // CHECK-LABEL: // unspecifiedAsyncConcurrent<A>(_:)
@@ -59,7 +59,7 @@ actor A {
     // an error.
     await WithoutFeature.unspecifiedAsyncConcurrent(ns)
     // expected-error @-1 {{sending 'self.ns' risks causing data races}}
-    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to nonisolated global function 'unspecifiedAsyncConcurrent' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to @concurrent global function 'unspecifiedAsyncConcurrent' risks causing data races between @concurrent and 'self'-isolated uses}}
   }
 
   // CHECK-LABEL: // unspecifiedAsyncCaller<A>(_:)
@@ -82,7 +82,7 @@ actor A {
   func test3a() async {
     await WithFeature.nonisolatedAsyncConcurrent(ns)
     // expected-error @-1 {{sending 'self.ns' risks causing data races}}
-    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to nonisolated global function 'nonisolatedAsyncConcurrent' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to @concurrent global function 'nonisolatedAsyncConcurrent' risks causing data races between @concurrent and 'self'-isolated uses}}
   }
 
   // CHECK-LABEL: // nonisolatedAsyncCaller<A>(_:)
@@ -98,7 +98,7 @@ actor A {
   func test4() async {
     await WithoutFeature.nonisolatedAsync(ns)
     // expected-error @-1 {{sending 'self.ns' risks causing data races}}
-    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to nonisolated global function 'nonisolatedAsync' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to @concurrent global function 'nonisolatedAsync' risks causing data races between @concurrent and 'self'-isolated uses}}
   }
 
   // CHECK-LABEL: // nonisolatedAsyncConcurrent<A>(_:)
@@ -107,7 +107,7 @@ actor A {
   func test4a() async {
     await WithoutFeature.nonisolatedAsyncConcurrent(ns)
     // expected-error @-1 {{sending 'self.ns' risks causing data races}}
-    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to nonisolated global function 'nonisolatedAsyncConcurrent' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to @concurrent global function 'nonisolatedAsyncConcurrent' risks causing data races between @concurrent and 'self'-isolated uses}}
   }
 
   // CHECK-LABEL: // nonisolatedAsyncCaller<A>(_:)
@@ -132,7 +132,7 @@ actor A {
     let s = WithFeature.S()
     await s.unspecifiedAsyncConcurrent(ns)
     // expected-error @-1 {{sending 'self.ns' risks causing data races}}
-    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to nonisolated instance method 'unspecifiedAsyncConcurrent' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to @concurrent instance method 'unspecifiedAsyncConcurrent' risks causing data races between @concurrent and 'self'-isolated uses}}
   }
 
   // CHECK-LABEL: // S.unspecifiedAsyncCaller<A>(_:)
@@ -158,7 +158,7 @@ actor A {
     let s = WithFeature.S()
     await s.nonisolatedAsyncConcurrent(ns)
     // expected-error @-1 {{sending 'self.ns' risks causing data races}}
-    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to nonisolated instance method 'nonisolatedAsyncConcurrent' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to @concurrent instance method 'nonisolatedAsyncConcurrent' risks causing data races between @concurrent and 'self'-isolated uses}}
   }
 
   // CHECK-LABEL: // S.nonisolatedAsyncCaller<A>(_:)
@@ -176,7 +176,7 @@ actor A {
     let s = WithoutFeature.S()
     await s.unspecifiedAsync(ns)
     // expected-error @-1 {{sending 'self.ns' risks causing data races}}
-    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to nonisolated instance method 'unspecifiedAsync' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to @concurrent instance method 'unspecifiedAsync' risks causing data races between @concurrent and 'self'-isolated uses}}
   }
 
   // CHECK-LABEL: // S.unspecifiedAsyncConcurrent<A>(_:)
@@ -186,7 +186,7 @@ actor A {
     let s = WithoutFeature.S()
     await s.unspecifiedAsyncConcurrent(ns)
     // expected-error @-1 {{sending 'self.ns' risks causing data races}}
-    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to nonisolated instance method 'unspecifiedAsyncConcurrent' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to @concurrent instance method 'unspecifiedAsyncConcurrent' risks causing data races between @concurrent and 'self'-isolated uses}}
   }
 
   // CHECK-LABEL: // S.unspecifiedAsyncCaller<A>(_:)
@@ -204,7 +204,7 @@ actor A {
     let s = WithoutFeature.S()
     await s.nonisolatedAsync(ns)
     // expected-error @-1 {{sending 'self.ns' risks causing data races}}
-    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to nonisolated instance method 'nonisolatedAsync' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to @concurrent instance method 'nonisolatedAsync' risks causing data races between @concurrent and 'self'-isolated uses}}
   }
 
   // CHECK-LABEL: // S.nonisolatedAsyncConcurrent<A>(_:)
@@ -214,7 +214,7 @@ actor A {
     let s = WithoutFeature.S()
     await s.nonisolatedAsyncConcurrent(ns)
     // expected-error @-1 {{sending 'self.ns' risks causing data races}}
-    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to nonisolated instance method 'nonisolatedAsyncConcurrent' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-note @-2 {{sending 'self'-isolated 'self.ns' to @concurrent instance method 'nonisolatedAsyncConcurrent' risks causing data races between @concurrent and 'self'-isolated uses}}
   }
 
   // CHECK-LABEL: // S.nonisolatedAsyncCaller<A>(_:)

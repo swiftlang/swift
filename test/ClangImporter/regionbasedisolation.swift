@@ -1,7 +1,9 @@
-// RUN: %target-swift-frontend %s -import-objc-header %S/Inputs/regionbasedisolation.h -verify -c -swift-version 6
+// RUN: %target-swift-frontend %s -import-objc-header %S/Inputs/regionbasedisolation.h -verify -verify-additional-prefix ni- -c -swift-version 6
+// RUN: %target-swift-frontend %s -import-objc-header %S/Inputs/regionbasedisolation.h -verify -verify-additional-prefix ni-ns- -c -swift-version 6 -enable-upcoming-feature NonisolatedNonsendingByDefault
 // RUN: %target-swift-frontend %s -import-objc-header %S/Inputs/regionbasedisolation.h -emit-silgen -swift-version 6 | %FileCheck %s
 
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 extension ObjCObject {
   // CHECK-LABEL: sil hidden [ossa] @$sSo10ObjCObjectC20regionbasedisolationE11sendObjectsSaySo8NSObjectCGyYaKF : $@convention(method) @async (@guaranteed ObjCObject) -> (@sil_sending @owned Array<NSObject>, @error any Error) {
@@ -122,4 +124,41 @@ extension ObjCObject {
     // sending [NSObject].
     try await loadObjects2()
   } // expected-error {{task or actor isolated value cannot be sent}}
+}
+
+@concurrent func useValueConcurrently<T>(_ t: T) async {}
+@MainActor func useValueMainActor<T>(_ t: T) async {}
+nonisolated(nonsending) func useValueNonIsolatedNonSending<T>(_ t: T) async {}
+
+@MainActor func testMainActorMerging(_ y: NSObject) async {
+  let x = ObjCObject()
+  await x.useValue(y)
+  await useValueConcurrently(x)  // expected-error {{sending 'x' risks causing data races}}
+  // expected-ni-note @-1 {{sending main actor-isolated 'x' to nonisolated global function 'useValueConcurrently' risks causing data races between nonisolated and main actor-isolated uses}}
+  // expected-ni-ns-note @-2 {{sending main actor-isolated 'x' to @concurrent global function 'useValueConcurrently' risks causing data races between @concurrent and main actor-isolated uses}}
+}
+
+func testTaskLocal(_ y: NSObject) async {
+  let x = ObjCObject()
+  await x.useValue(y)
+  await useValueConcurrently(x) // expected-ni-ns-error {{sending 'x' risks causing data races}}
+  // expected-ni-ns-note @-1 {{sending task-isolated 'x' to @concurrent global function 'useValueConcurrently' risks causing data races between @concurrent and task-isolated uses}}
+
+  // This is not safe since we merge x into y's region making x task
+  // isolated. We then try to send it to a main actor function.
+  await useValueMainActor(x) // expected-error {{sending 'x' risks causing data races}}
+  // expected-note @-1 {{sending task-isolated 'x' to main actor-isolated global function 'useValueMainActor' risks causing data races between main actor-isolated and task-isolated uses}}
+}
+
+actor MyActor {
+  var field = NSObject()
+
+  // This is safe since x.useValue is going to be nonisolated(nonsending) so we
+  // are going to merge x into the actor. And useValueNonIsolatedNonSending
+  // inherits from the context.
+  func test() async {
+    let x = ObjCObject()
+    await x.useValue(field)
+    await useValueNonIsolatedNonSending(x)
+  }  
 }

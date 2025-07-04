@@ -230,7 +230,7 @@ public:
 private:
   bool isOperatorSlow() const;
 };
-  
+
 class DeclName;
 class DeclNameRef;
 class ObjCSelector;

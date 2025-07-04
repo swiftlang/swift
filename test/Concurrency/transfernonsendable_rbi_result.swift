@@ -1,7 +1,9 @@
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -swift-version 6 -parse-as-library %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -swift-version 6 -disable-availability-checking -parse-as-library %s -emit-sil -o /dev/null -verify -verify-additional-prefix ni-
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -swift-version 6 -disable-availability-checking -parse-as-library %s -emit-sil -o /dev/null -verify -verify-additional-prefix ni-ns- -enable-upcoming-feature NonisolatedNonsendingByDefault
 
 // REQUIRES: asserts
 // REQUIRES: concurrency
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 ///////////////////////
 // MARK: Declaration //
@@ -20,8 +22,12 @@ struct CustomActor {
 class NonSendable {} // expected-note 3{{}}
 
 func passNonSendable(_: NonSendable) async { }
+func passTwoNonSendable(_: NonSendable, _: NonSendable) async { }
 
 func returnsNonSendable() async -> NonSendable { NonSendable() }
+
+@MainActor
+func sendToMain<T>(_ t: T) async {}
 
 @MainActor
 func mainActorPassNonSendable(_: NonSendable) async { }
@@ -93,9 +99,22 @@ actor A {
   func callNonisolatedFuncsFromActor(ns: NonSendable) async {
     // Non-sendable value passed from nonisolated to actor isolated
 
+    // We do not error in ni-ns since we just merge pass non sendable.
     await passNonSendable(ns)
-    // expected-error @-1 {{sending 'ns' risks causing data races}}
-    // expected-note @-2 {{sending 'self'-isolated 'ns' to nonisolated global function 'passNonSendable' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-ni-error @-1 {{sending 'ns' risks causing data races}}
+    // expected-ni-note @-2 {{sending 'self'-isolated 'ns' to nonisolated global function 'passNonSendable' risks causing data races between nonisolated and 'self'-isolated uses}}
+
+    // We error here in both modes but in different places. In NI mode, we error
+    // on passing ns to a nonisolated function. With ni-ns, we do not error
+    // there since we inherit isolation from the caller.
+    //
+    // In contrast, when ni-ns is enabled, we error on sendToMain since we merge
+    // ns2 into ns's region causing it to be self-isolated.
+    let ns2 = NonSendable()
+    await passTwoNonSendable(ns, ns2) // expected-ni-error {{sending 'ns' risks causing data races}}
+    // expected-ni-note @-1 {{sending 'self'-isolated 'ns' to nonisolated global function 'passTwoNonSendable' risks causing data races between nonisolated and 'self'-isolated uses}}
+    await sendToMain(ns2) // expected-ni-ns-error {{sending 'ns2' risks causing data races}}
+    // expected-ni-ns-note @-1 {{sending 'self'-isolated 'ns2' to main actor-isolated global function 'sendToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
 
     _ = await returnsNonSendable()
   }
