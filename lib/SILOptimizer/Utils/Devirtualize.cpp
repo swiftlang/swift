@@ -718,7 +718,7 @@ void swift::deleteDevirtualizedApply(ApplySite old) {
   recursivelyDeleteTriviallyDeadInstructions(oldApply, true);
 }
 
-SILFunction *swift::getTargetClassMethod(SILModule &module, ClassDecl *cd,
+SILFunction *swift::getTargetClassMethod(SILModule &module, FullApplySite as, ClassDecl *cd,
                                          CanType classType, MethodInst *mi) {
   assert((isa<ClassMethodInst>(mi) || isa<SuperMethodInst>(mi)) &&
          "Only class_method and super_method instructions are supported");
@@ -727,6 +727,11 @@ SILFunction *swift::getTargetClassMethod(SILModule &module, ClassDecl *cd,
 
   SILType silType = SILType::getPrimitiveObjectType(classType);
   if (auto *vtable = module.lookUpSpecializedVTable(silType)) {
+    // We cannot de-virtualize a generic method call to a specialized method.
+    // This would result in wrong argument/return calling conventions.
+    if (as.getSubstitutionMap().hasAnySubstitutableParams())
+      return nullptr;
+
     return vtable->getEntry(module, member)->getImplementation();
   }
 
@@ -763,7 +768,7 @@ bool swift::canDevirtualizeClassMethod(FullApplySite applySite, ClassDecl *cd,
   auto *mi = cast<MethodInst>(applySite.getCallee());
 
   // Find the implementation of the member which should be invoked.
-  auto *f = getTargetClassMethod(module, cd, classType, mi);
+  auto *f = getTargetClassMethod(module, applySite, cd, classType, mi);
 
   // If we do not find any such function, we have no function to devirtualize
   // to... so bail.
@@ -849,7 +854,7 @@ swift::devirtualizeClassMethod(SILPassManager *pm, FullApplySite applySite,
   SILModule &module = applySite.getModule();
   auto *mi = cast<MethodInst>(applySite.getCallee());
 
-  auto *f = getTargetClassMethod(module, cd, classType, mi);
+  auto *f = getTargetClassMethod(module, applySite, cd, classType, mi);
 
   CanSILFunctionType genCalleeType = f->getLoweredFunctionTypeInContext(
       TypeExpansionContext(*applySite.getFunction()));

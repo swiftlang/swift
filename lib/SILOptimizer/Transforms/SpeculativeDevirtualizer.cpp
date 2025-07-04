@@ -446,7 +446,7 @@ static bool tryToSpeculateTarget(SILPassManager *pm, FullApplySite AI, ClassHier
 
   // Try to devirtualize the static class of instance
   // if it is possible.
-  if (auto F = getTargetClassMethod(M, CD, ClassType, CMI)) {
+  if (auto F = getTargetClassMethod(M, AI, CD, ClassType, CMI)) {
     // Do not devirtualize if a method in the base class is marked
     // as non-optimizable. This way it is easy to disable the
     // devirtualization of this method in the base class and
