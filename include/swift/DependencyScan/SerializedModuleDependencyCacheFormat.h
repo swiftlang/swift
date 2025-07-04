@@ -67,6 +67,9 @@ using IsExportedImport = BCFixed<1>;
 using LineNumberField = BCFixed<32>;
 using ColumnNumberField = BCFixed<32>;
 
+/// Access level of an import
+using AccessLevelField = BCFixed<8>;
+
 /// Arrays of various identifiers, distinguished for readability
 using IdentifierIDArryField = llvm::BCArray<IdentifierIDField>;
 using ModuleIDArryField = llvm::BCArray<IdentifierIDField>;
@@ -192,7 +195,8 @@ using ImportStatementLayout =
                    LineNumberField,              // lineNumber
                    ColumnNumberField,            // columnNumber
                    IsOptionalImport,             // isOptional
-                   IsExportedImport              // isExported
+                   IsExportedImport,             // isExported
+                   AccessLevelField              // accessLevel
                    >;
 using ImportStatementArrayLayout =
     BCRecordLayout<IMPORT_STATEMENT_ARRAY_NODE, IdentifierIDArryField>;

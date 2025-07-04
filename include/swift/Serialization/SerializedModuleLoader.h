@@ -170,8 +170,7 @@ protected:
                  bool isTestableImport, bool isCandidateForTextualModule);
 
   struct BinaryModuleImports {
-    llvm::StringSet<> moduleImports;
-    llvm::StringSet<> exportedModules;
+    std::vector<ScannerImportStatementInfo> moduleImports;
     std::string headerImport;
   };
 

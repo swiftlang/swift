@@ -415,9 +415,11 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
       unsigned importIdentifierID, bufferIdentifierID;
       unsigned lineNumber, columnNumber;
       bool isOptional, isExported;
+      uint8_t rawAccessLevel;
       ImportStatementLayout::readRecord(Scratch, importIdentifierID,
                                         bufferIdentifierID, lineNumber,
-                                        columnNumber, isOptional, isExported);
+                                        columnNumber, isOptional, isExported,
+                                        rawAccessLevel);
       auto importIdentifier = getIdentifier(importIdentifierID);
       if (!importIdentifier)
         llvm::report_fatal_error("Bad import statement info: no import name");
@@ -428,10 +430,10 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
             "Bad import statement info: no buffer identifier");
       if (bufferIdentifier->empty())
         ImportStatements.push_back(ScannerImportStatementInfo(
-            *importIdentifier, isExported));
+            *importIdentifier, isExported, AccessLevel(rawAccessLevel)));
       else
         ImportStatements.push_back(ScannerImportStatementInfo(
-            *importIdentifier, isExported,
+            *importIdentifier, isExported, AccessLevel(rawAccessLevel),
             ScannerImportStatementInfo::ImportDiagnosticLocationInfo(
                 *bufferIdentifier, lineNumber, columnNumber)));
       break;
@@ -1527,7 +1529,8 @@ unsigned ModuleDependenciesCacheSerializer::writeImportStatementInfos(
       ImportStatementLayout::emitRecord(
           Out, ScratchRecord, AbbrCodes[ImportStatementLayout::Code],
           getIdentifier(importInfo.importIdentifier),
-          0, 0, 0, isOptional, importInfo.isExported);
+          0, 0, 0, isOptional, importInfo.isExported,
+          static_cast<std::underlying_type<AccessLevel>::type>(importInfo.accessLevel));
       count++;
     } else {
       for (auto &importLoc : importInfo.importLocations) {
@@ -1535,7 +1538,8 @@ unsigned ModuleDependenciesCacheSerializer::writeImportStatementInfos(
             Out, ScratchRecord, AbbrCodes[ImportStatementLayout::Code],
             getIdentifier(importInfo.importIdentifier),
             getIdentifier(importLoc.bufferIdentifier), importLoc.lineNumber,
-            importLoc.columnNumber, isOptional, importInfo.isExported);
+            importLoc.columnNumber, isOptional, importInfo.isExported,
+            static_cast<std::underlying_type<AccessLevel>::type>(importInfo.accessLevel));
         count++;
       }
     }
