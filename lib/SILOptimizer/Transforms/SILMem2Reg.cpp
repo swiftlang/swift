@@ -438,6 +438,16 @@ static bool isAddressForLoad(SILInstruction *load, SILBasicBlock *&singleBlock,
       !isa<TupleElementAddrInst>(load))
     return false;
 
+  // In OSSA, the result of an unchecked_bitwise_cast must immediately be
+  // copied or unchecked_bitwise_cast'd again.  In particular, it is not
+  // permitted to borrow it and perform additional projections (struct_extract,
+  // tuple_extract) on the borrowed value.  Consequently, we cannot promote an
+  // address if such a promotion would result in such a pattern.
+  if (load->getFunction()->hasOwnership() &&
+      isa<UncheckedAddrCastInst>(load->getOperand(0)) &&
+      !isa<UncheckedAddrCastInst>(load))
+    return false;
+
   // None of the projections are lowered to owned values:
   //
   // struct_element_addr and tuple_element_addr instructions are lowered to
