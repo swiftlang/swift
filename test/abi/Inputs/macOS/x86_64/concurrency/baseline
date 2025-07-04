@@ -471,6 +471,7 @@ _$ss11JobPriorityV2eeoiySbAB_ABtFZ
 _$ss11JobPriorityV2geoiySbAB_ABtFZ
 _$ss11JobPriorityV2leoiySbAB_ABtFZ
 _$ss11JobPriorityV2neoiySbAB_ABtFZ
+_$ss11JobPriorityV8rawValueABs5UInt8V_tcfC
 _$ss11JobPriorityV8rawValues5UInt8VvM
 _$ss11JobPriorityV8rawValues5UInt8Vvg
 _$ss11JobPriorityV8rawValues5UInt8VvpMV
@@ -480,6 +481,7 @@ _$ss11JobPriorityVMn
 _$ss11JobPriorityVN
 _$ss11JobPriorityVSLsMc
 _$ss11JobPriorityVSQsMc
+_$ss11JobPriorityVyABScPcfC
 _$ss12MainExecutorMp
 _$ss12MainExecutorPScfTb
 _$ss12MainExecutorPs07RunLoopB0Tb
@@ -1180,6 +1182,7 @@ __swift_concurrency_debug_non_future_adapter
 __swift_concurrency_debug_supportsPriorityEscalation
 __swift_concurrency_debug_task_future_wait_resume_adapter
 __swift_concurrency_debug_task_wait_throwing_resume_adapter
+__swift_createJobForTestingOnly
 _swift_asyncLet_begin
 _swift_asyncLet_consume
 _swift_asyncLet_consume_throwing
