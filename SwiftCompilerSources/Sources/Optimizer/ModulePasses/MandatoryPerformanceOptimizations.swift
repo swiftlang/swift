@@ -117,7 +117,8 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
           }
         }
       case let metatype as MetatypeInst:
-        if context.options.enableEmbeddedSwift {
+        if context.options.enableEmbeddedSwift,
+           metatype.type.representationOfMetatype == .thick {
           let instanceType = metatype.type.loweredInstanceTypeOfMetatype(in: function)
           if instanceType.isClass {
             specializeVTable(forClassType: instanceType, errorLocation: metatype.location, moduleContext) {
