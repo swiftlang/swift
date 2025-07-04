@@ -33,7 +33,7 @@ class CloneTestCase(scheme_mock.SchemeMockTestCase):
     def test_clone_with_additional_scheme(self):
         output = self.call([self.update_checkout_path,
                             '--config', self.config_path,
-                            '--additional-scheme-config', self.additional_config_path,
+                            '--config', self.additional_config_path,
                             '--source-root', self.source_root,
                             '--clone',
                             '--scheme', 'extra'])

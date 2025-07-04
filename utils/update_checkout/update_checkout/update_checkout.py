@@ -501,12 +501,38 @@ def print_repo_hashes(args, config):
         print("{:<35}: {:<35}".format(repo_name, repo_hash))
 
 
-def add_additional_schemes(config, additional_scheme_config) -> None:
-    for key, scheme in additional_scheme_config["branch-schemes"].items():
-        if key in config["branch-schemes"]:
-            raise RuntimeError(f"Additional scheme config contains duplicate key {key}")
+def merge_no_duplicates(a: dict, b: dict) -> dict:
+    result = {**a}
+    for key, value in b.items():
+        if key in a:
+            raise ValueError(f"Duplicate scheme {key}")
 
-        config["branch-schemes"][key] = scheme
+        result[key] = value
+    return result
+
+
+def merge_config(config: dict, new_config: dict) -> dict:
+    """
+    Merge two configs, with a 'last-wins' strategy.
+
+    The branch-schemes are rejected if they define duplicate schemes.
+    """
+
+    result = {**config}
+    for key, value in new_config.items():
+        if key == "branch-schemes":
+            # We reject duplicates here since this is the most conservative
+            # behavior, so it can be relaxed in the future.
+            # TODO: Another semantics might be nicer, define that as it is needed.
+            result[key] = merge_no_duplicates(config.get(key, {}), value)
+        elif key == "repos":
+            # The "repos" object is last-wins on a key-by-key basis
+            result[key] = {**config.get(key, {}), **value}
+        else:
+            # Anything else is just last-wins
+            result[key] = value
+
+    return result
 
 
 def validate_config(config):
@@ -642,16 +668,12 @@ repositories.
     )
     parser.add_argument(
         "--config",
-        default=os.path.join(SCRIPT_DIR, os.pardir,
-                             "update-checkout-config.json"),
-        help="Configuration file to use")
-    parser.add_argument(
-        "--additional-scheme-config",
-        help="""Configs containing additional branch-schemes to append to the
-        configration. Can be specified multiple times, each will be appended in
-        order.""",
+        help="""The configuration file to use. Can be specified multiple times,
+        each config will be merged together with a 'last-wins' strategy.
+        Overwriting branch-schemes is not allowed.""",
         action="append",
-        default=[])
+        default=[],
+        dest="configs")
     parser.add_argument(
         "--github-comment",
         help="""Check out related pull requests referenced in the given
@@ -709,12 +731,15 @@ repositories.
     github_comment = args.github_comment
     all_repos = args.all_repositories
 
-    with open(args.config) as f:
-        config = json.load(f)
-    for additional_config in args.additional_scheme_config:
-        with open(additional_config) as f:
-            additional_config = json.load(f)
-        add_additional_schemes(config, additional_config)
+    # Set the default config path if none are specified
+    if not args.configs:
+        default_path = os.path.join(SCRIPT_DIR, os.pardir,
+                                    "update-checkout-config.json")
+        args.configs.append(default_path)
+    config = {}
+    for config_path in args.configs:
+        with open(config_path) as f:
+            config = merge_config(config, json.load(f))
     validate_config(config)
 
     cross_repos_pr = {}
@@ -761,12 +786,10 @@ repositories.
                           prefix="[swift] ")
 
                 # Re-read the config after checkout.
-                with open(args.config) as f:
-                    config = json.load(f)
-                for additional_config in args.additional_scheme_config:
-                    with open(additional_config) as f:
-                        additional_config = json.load(f)
-                    add_additional_schemes(config, additional_config)
+                config = {}
+                for config_path in args.configs:
+                    with open(config_path) as f:
+                        config = merge_config(config, json.load(f))
                 validate_config(config)
                 scheme_map = get_scheme_map(config, scheme_name)
 
