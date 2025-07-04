@@ -91,7 +91,7 @@ class ProductPipelineListBuilder(object):
         self.current_count = 0
         self.current_pipeline = None
         self.is_current_pipeline_impl = False
-        self.pipelinst_list = []
+        self.pipeline_list = []
 
     def add_product(self, product_cls, is_enabled):
         """Add a non-impl product to the current pipeline begin constructed"""
