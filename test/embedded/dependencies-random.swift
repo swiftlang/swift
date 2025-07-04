@@ -3,8 +3,11 @@
 
 // RUN: grep DEP\: %s | sed 's#// DEP\: ##' | sort > %t/allowed-dependencies.txt
 
-// Linux/ELF doesn't use the "_" prefix in symbol mangling.
-// RUN: if [ %target-os == "linux-gnu" ]; then sed -E -i -e 's/^_(.*)$/\1/' %t/allowed-dependencies.txt; fi
+// Linux/ELF and Wasm don't use the "_" prefix in symbol mangling.
+// RUN: if [ %target-os == "linux-gnu" ] || [ %target-os == "wasi" ]; then sed -E -i -e 's/^_(.*)$/\1/' %t/allowed-dependencies.txt; fi
+
+// Wasm has additional dependencies
+// RUN: if [ %target-os == "wasi" ]; then ex -sc '3i|__stack_pointer' -sc '1i|__memory_base' -sc '1i|__indirect_function_table' -cx %t/allowed-dependencies.txt; fi
 
 // RUN: %llvm-nm --undefined-only --format=just-symbols %t/a.o | sort | tee %t/actual-dependencies.txt
 
@@ -22,7 +25,7 @@
 
 // RUN: %target-clang -x c -c %S/Inputs/print.c -o %t/print.o
 // RUN: %target-clang -x c -c %S/Inputs/linux-rng-support.c -o %t/linux-rng-support.o
-// RUN: %target-clang %t/a.o %t/print.o %t/linux-rng-support.o -o %t/a.out
+// RUN: %target-clang %target-clang-resource-dir-opt %t/a.o %t/print.o %t/linux-rng-support.o -o %t/a.out
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
