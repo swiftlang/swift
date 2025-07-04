@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -g -Xllvm -sil-print-types -emit-sil %s -parse-as-library -module-name a | %FileCheck %s
-// RUN: %target-swift-frontend -g -Xllvm -sil-print-types -emit-sil %s -parse-as-library -module-name a -enable-upcoming-feature WeakLet | %FileCheck %s --check-prefixes=CHECK,CHECK-HAS-WEAK-LET
-// REQUIRES: swift_feature_WeakLet
+// RUN: %target-swift-frontend -g -Xllvm -sil-print-types -emit-sil %s -parse-as-library -module-name a -enable-upcoming-feature ImmutableWeakCaptures | %FileCheck %s --check-prefixes=CHECK,CHECK-HAS-WEAK-LET
+// REQUIRES: swift_feature_ImmutableWeakCaptures
 open class C {
   public func run() {
     { [weak self] in
