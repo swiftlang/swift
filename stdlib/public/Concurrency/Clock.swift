@@ -44,11 +44,11 @@ public protocol Clock<Duration>: Sendable {
   /// Run the given job on an unspecified executor at some point
   /// after the given instant.
   ///
-  /// Parameters:
+  /// - Parameters:
   ///
-  /// - job:         The job we wish to run
-  /// - at instant:  The time at which we would like it to run.
-  /// - tolerance:   The ideal maximum delay we are willing to tolerate.
+  ///   - job:         The job we wish to run
+  ///   - instant:     The time at which we would like it to run.
+  ///   - tolerance:   The ideal maximum delay we are willing to tolerate.
   ///
   @available(StdlibDeploymentTarget 6.2, *)
   func run(_ job: consuming ExecutorJob,
@@ -63,12 +63,12 @@ public protocol Clock<Duration>: Sendable {
   /// on, it can short-circuit this behaviour and directly use `run` with
   /// the original job.
   ///
-  /// Parameters:
+  /// - Parameters:
   ///
-  /// - job:         The job we wish to run
-  /// - on executor: The executor on which we would like it to run.
-  /// - at instant:  The time at which we would like it to run.
-  /// - tolerance:   The ideal maximum delay we are willing to tolerate.
+  ///   - job:         The job we wish to run
+  ///   - executor:    The executor on which we would like it to run.
+  ///   - instant:     The time at which we would like it to run.
+  ///   - tolerance:   The ideal maximum delay we are willing to tolerate.
   ///
   @available(StdlibDeploymentTarget 6.2, *)
   func enqueue(_ job: consuming ExecutorJob,

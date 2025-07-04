@@ -65,15 +65,15 @@ public protocol SchedulingExecutor: Executor {
   /// the default implementation for the other will then call the one
   /// you have implemented.
   ///
-  /// Parameters:
+  /// - Parameters:
   ///
-  /// - job:       The job to schedule.
-  /// - after:     A `Duration` specifying the time after which the job
-  ///              is to run.  The job will not be executed before this
-  ///              time has elapsed.
-  /// - tolerance: The maximum additional delay permissible before the
-  ///              job is executed.  `nil` means no limit.
-  /// - clock:     The clock used for the delay.
+  ///   - job:       The job to schedule.
+  ///   - after:     A `Duration` specifying the time after which the job
+  ///                is to run.  The job will not be executed before this
+  ///                time has elapsed.
+  ///   - tolerance: The maximum additional delay permissible before the
+  ///                job is executed.  `nil` means no limit.
+  ///   - clock:     The clock used for the delay.
   @available(StdlibDeploymentTarget 6.2, *)
   func enqueue<C: Clock>(_ job: consuming ExecutorJob,
                          after delay: C.Duration,
@@ -86,14 +86,14 @@ public protocol SchedulingExecutor: Executor {
   /// the default implementation for the other will then call the one
   /// you have implemented.
   ///
-  /// Parameters:
+  /// - Parameters:
   ///
-  /// - job:       The job to schedule.
-  /// - at:        The `Instant` at which the job should run.  The job
-  ///              will not be executed before this time.
-  /// - tolerance: The maximum additional delay permissible before the
-  ///              job is executed.  `nil` means no limit.
-  /// - clock:     The clock used for the delay..
+  ///   - job:       The job to schedule.
+  ///   - at:        The `Instant` at which the job should run.  The job
+  ///                will not be executed before this time.
+  ///   - tolerance: The maximum additional delay permissible before the
+  ///                job is executed.  `nil` means no limit.
+  ///   - clock:     The clock used for the delay..
   @available(StdlibDeploymentTarget 6.2, *)
   func enqueue<C: Clock>(_ job: consuming ExecutorJob,
                          at instant: C.Instant,
@@ -557,10 +557,10 @@ public protocol RunLoopExecutor: Executor {
   /// it unless you *know* that it is supported.  The default implementation
   /// generates a fatal error.
   ///
-  /// Parameters:
+  /// - Parameters:
   ///
-  /// - condition: A closure that returns `true` if the run loop should
-  ///              stop.
+  ///   - condition: A closure that returns `true` if the run loop should
+  ///                stop.
   func runUntil(_ condition: () -> Bool) throws
 
   /// Signal to the run loop to stop running and return.
