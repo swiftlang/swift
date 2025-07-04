@@ -520,6 +520,9 @@ EXPERIMENTAL_FEATURE(ClosureBodyMacro, true)
 /// Allow declarations of Swift runtime symbols using @_silgen_name.
 EXPERIMENTAL_FEATURE(AllowRuntimeSymbolDeclarations, true)
 
+/// Allow use of `@cdecl`
+EXPERIMENTAL_FEATURE(CDecl, true)
+
 /// Optimize copies of ObjectiveC blocks.
 EXPERIMENTAL_FEATURE(CopyBlockOptimization, true)
 

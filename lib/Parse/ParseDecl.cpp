@@ -2988,7 +2988,38 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
 
-  case DeclAttrKind::CDecl:
+  case DeclAttrKind::CDecl: {
+    if (!AttrName.starts_with("_")) {
+      std::optional<StringRef> CName;
+      if (consumeIfAttributeLParen()) {
+        // Custom C name.
+        if (Tok.isNot(tok::identifier)) {
+          diagnose(Loc, diag::attr_expected_cname, AttrName);
+          return makeParserSuccess();
+        }
+
+        CName = Tok.getText();
+        consumeToken(tok::identifier);
+        AttrRange = SourceRange(Loc, Tok.getRange().getStart());
+
+        if (!consumeIf(tok::r_paren)) {
+          diagnose(Loc, diag::attr_expected_rparen, AttrName,
+                   DeclAttribute::isDeclModifier(DK));
+          return makeParserSuccess();
+        }
+      } else {
+        AttrRange = SourceRange(Loc);
+      }
+
+      Attributes.add(new (Context) CDeclAttr(CName.value_or(StringRef()), AtLoc,
+                                             AttrRange, /*Implicit=*/false,
+                                             /*isUnderscored*/false));
+      break;
+    }
+
+    // Leave legacy @_cdecls to the logic expecting a string.
+    LLVM_FALLTHROUGH;
+  }
   case DeclAttrKind::Expose:
   case DeclAttrKind::SILGenName: {
     if (!consumeIfAttributeLParen()) {
@@ -3068,10 +3099,11 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       if (DK == DeclAttrKind::SILGenName)
         Attributes.add(new (Context) SILGenNameAttr(AsmName.value(), Raw, AtLoc,
                                                 AttrRange, /*Implicit=*/false));
-      else if (DK == DeclAttrKind::CDecl)
+      else if (DK == DeclAttrKind::CDecl) {
         Attributes.add(new (Context) CDeclAttr(AsmName.value(), AtLoc,
-                                               AttrRange, /*Implicit=*/false));
-      else if (DK == DeclAttrKind::Expose) {
+                                               AttrRange, /*Implicit=*/false,
+                                               /*isUnderscored*/true));
+      } else if (DK == DeclAttrKind::Expose) {
         for (auto *EA : Attributes.getAttributes<ExposeAttr>()) {
           // A single declaration cannot have two @_exported attributes with
           // the same exposure kind.

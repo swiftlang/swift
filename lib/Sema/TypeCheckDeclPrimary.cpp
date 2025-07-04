@@ -3288,6 +3288,13 @@ public:
       }
     }
 
+    // If the enum is exported to C, it must be representable in C.
+    if (auto CDeclAttr = ED->getAttrs().getAttribute<swift::CDeclAttr>()) {
+      evaluateOrDefault(Ctx.evaluator,
+                        TypeCheckCDeclEnumRequest{ED, CDeclAttr},
+                        {});
+    }
+
     // -----
     // NonCopyableChecks
     //
@@ -3819,24 +3826,10 @@ public:
     }
 
     // If the function is exported to C, it must be representable in (Obj-)C.
-    // FIXME: This needs to be moved to its own request if we want to
-    // productize @_cdecl.
     if (auto CDeclAttr = FD->getAttrs().getAttribute<swift::CDeclAttr>()) {
-      std::optional<ForeignAsyncConvention> asyncConvention;
-      std::optional<ForeignErrorConvention> errorConvention;
-      ObjCReason reason(ObjCReason::ExplicitlyCDecl, CDeclAttr);
-      if (isRepresentableInObjC(FD, reason, asyncConvention, errorConvention)) {
-        if (FD->hasAsync()) {
-          FD->setForeignAsyncConvention(*asyncConvention);
-          Ctx.Diags.diagnose(CDeclAttr->getLocation(), diag::attr_decl_async,
-                             CDeclAttr, FD);
-        } else if (FD->hasThrows()) {
-          FD->setForeignErrorConvention(*errorConvention);
-          Ctx.Diags.diagnose(CDeclAttr->getLocation(), diag::cdecl_throws);
-        }
-      } else {
-        reason.setAttrInvalid();
-      }
+      evaluateOrDefault(Ctx.evaluator,
+                        TypeCheckCDeclFunctionRequest{FD, CDeclAttr},
+                        {});
     }
 
     TypeChecker::checkObjCImplementation(FD);

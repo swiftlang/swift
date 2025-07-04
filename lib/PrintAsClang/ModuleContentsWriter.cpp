@@ -457,6 +457,14 @@ public:
       }
     }
 
+    if (isa<EnumDecl>(D) && !D->hasClangNode() &&
+        outputLangMode != OutputLanguageMode::Cxx) {
+      // We don't want to add an import for a @cdecl or @objc enum declared
+      // in Swift. We either do nothing for special enums like Optional as
+      // done in the prologue here, or we forward declare them.
+      return false;
+    }
+
     imports.insert(otherModule);
     return true;
   }
@@ -530,12 +538,20 @@ public:
   }
 
   void forwardDeclare(const EnumDecl *ED) {
-    assert(ED->isObjC() || ED->hasClangNode());
+    assert(ED->isObjC() || ED->getAttrs().getAttribute<CDeclAttr>() ||
+           ED->hasClangNode());
     
     forwardDeclare(ED, [&]{
-      os << "enum " << getNameForObjC(ED) << " : ";
-      printer.print(ED->getRawType());
-      os << ";\n";
+      if (ED->getASTContext().LangOpts.hasFeature(Feature::CDecl)) {
+        // Forward declare in a way to be compatible with older C standards.
+        os << "typedef SWIFT_ENUM_FWD_DECL(";
+        printer.print(ED->getRawType());
+        os << ", " << getNameForObjC(ED) << ")\n";
+      } else {
+        os << "enum " << getNameForObjC(ED) << " : ";
+        printer.print(ED->getRawType());
+        os << ";\n";
+      }
     });
   }
 
@@ -605,6 +621,7 @@ public:
     } else if (addImport(TD)) {
       return;
     } else if (auto ED = dyn_cast<EnumDecl>(TD)) {
+      // Treat this after addImport to filter out special enums from the stdlib.
       forwardDeclare(ED);
     } else if (isa<GenericTypeParamDecl>(TD)) {
       llvm_unreachable("should not see generic parameters here");
@@ -865,7 +882,7 @@ public:
 
     SmallVector<ProtocolConformance *, 1> conformances;
     auto errorTypeProto = ctx.getProtocol(KnownProtocolKind::Error);
-    if (outputLangMode != OutputLanguageMode::Cxx
+    if (outputLangMode == OutputLanguageMode::ObjC
         && ED->lookupConformance(errorTypeProto, conformances)) {
       bool hasDomainCase = std::any_of(ED->getAllElements().begin(),
                                        ED->getAllElements().end(),
@@ -1116,6 +1133,17 @@ void swift::printModuleContentsAsObjC(
   ModuleWriter(os, prologueOS, imports, M, interopContext, getRequiredAccess(M),
                /*requiresExposedAttribute=*/false, exposedModules,
                OutputLanguageMode::ObjC)
+      .write();
+}
+
+void swift::printModuleContentsAsC(
+    raw_ostream &os, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
+    ModuleDecl &M, SwiftToClangInteropContext &interopContext) {
+  llvm::raw_null_ostream prologueOS;
+  llvm::StringSet<> exposedModules;
+  ModuleWriter(os, prologueOS, imports, M, interopContext, getRequiredAccess(M),
+               /*requiresExposedAttribute=*/false, exposedModules,
+               OutputLanguageMode::C)
       .write();
 }
 

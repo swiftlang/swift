@@ -2364,16 +2364,35 @@ static bool canDeclareSymbolName(StringRef symbol, ModuleDecl *fromModule) {
 void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
   // Only top-level func decls are currently supported.
   if (D->getDeclContext()->isTypeContext())
-    diagnose(attr->getLocation(), diag::cdecl_not_at_top_level);
+    diagnose(attr->getLocation(), diag::cdecl_not_at_top_level,
+             attr);
 
-  // The name must not be empty.
-  if (attr->Name.empty())
-    diagnose(attr->getLocation(), diag::cdecl_empty_name);
+  // @_cdecl name must not be empty.
+  if (attr->Name.empty() && attr->Underscored)
+    diagnose(attr->getLocation(), diag::cdecl_empty_name,
+             attr);
 
   // The standard library can use @_cdecl to implement runtime functions.
   if (!canDeclareSymbolName(attr->Name, D->getModuleContext())) {
       diagnose(attr->getLocation(), diag::reserved_runtime_symbol_name,
                attr->Name);
+  }
+
+  // @_cdecl was never accepted on enums. Keep the previous diagnostic.
+  if (isa<EnumDecl>(D) && attr->Underscored) {
+    diagnose(attr->getLocation(), diag::attr_only_one_decl_kind,
+             attr, "func");
+  }
+
+  // Reject using both @cdecl and @objc on the same decl.
+  if (D->getAttrs().getAttribute<ObjCAttr>()) {
+    diagnose(attr->getLocation(), diag::cdecl_incompatible_with_objc, D);
+  }
+
+  // @cdecl needs to be enabled via a feature flag.
+  if (!attr->Underscored &&
+      !Ctx.LangOpts.hasFeature(Feature::CDecl)) {
+    diagnose(attr->getLocation(), diag::cdecl_feature_required);
   }
 }
 

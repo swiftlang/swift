@@ -43,6 +43,8 @@ public:
   enum Kind {
     /// Has the '@cdecl' attribute.
     ExplicitlyCDecl,
+    /// Has the '@_cdecl' attribute.
+    ExplicitlyUnderscoreCDecl,
     /// Has the 'dynamic' modifier.
     ExplicitlyDynamic,
     /// Has an explicit '@objc' attribute.
@@ -101,6 +103,7 @@ private:
   static bool requiresAttr(Kind kind) {
     switch (kind) {
     case ExplicitlyCDecl:
+    case ExplicitlyUnderscoreCDecl:
     case ExplicitlyDynamic:
     case ExplicitlyObjC:
     case ExplicitlyObjCMembers:
@@ -162,6 +165,13 @@ public:
     return declOrAttr.get<DeclAttribute *>();
   }
 
+  // The foreign language targeted by the context.
+  ForeignLanguage getForeignLanguage() const {
+    if (kind == ExplicitlyCDecl)
+      return ForeignLanguage::C;
+    return ForeignLanguage::ObjectiveC;
+  }
+
   void setAttrInvalid() const;
 
   /// Emit an additional diagnostic describing why we are applying @objc to the
@@ -183,7 +193,7 @@ unsigned getObjCDiagnosticAttrKind(ObjCReason reason);
 
 /// Determine whether the given function can be represented in Objective-C,
 /// and figure out its foreign error convention (if any).
-bool isRepresentableInObjC(
+bool isRepresentableInLanguage(
     const AbstractFunctionDecl *AFD, ObjCReason Reason,
     std::optional<ForeignAsyncConvention> &asyncConvention,
     std::optional<ForeignErrorConvention> &errorConvention);

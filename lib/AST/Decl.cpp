@@ -4561,7 +4561,10 @@ StringRef ValueDecl::getCDeclName() const {
 
   // Handle explicit cdecl attributes.
   if (auto cdeclAttr = getAttrs().getAttribute<CDeclAttr>()) {
-    return cdeclAttr->Name;
+    if (!cdeclAttr->Name.empty())
+      return cdeclAttr->Name;
+    else
+      return getBaseIdentifier().str();
   }
 
   return "";
@@ -10613,6 +10616,15 @@ AbstractFunctionDecl::getObjCSelector(DeclName preferredName,
 
 bool AbstractFunctionDecl::isObjCInstanceMethod() const {
   return isInstanceMember() || isa<ConstructorDecl>(this);
+}
+
+std::optional<ForeignLanguage> AbstractFunctionDecl::getCDeclKind() const {
+  auto attr = getAttrs().getAttribute<CDeclAttr>();
+  if (!attr)
+    return std::nullopt;
+
+  return attr->Underscored ? ForeignLanguage::ObjectiveC
+                           : ForeignLanguage::C;
 }
 
 bool AbstractFunctionDecl::needsNewVTableEntry() const {

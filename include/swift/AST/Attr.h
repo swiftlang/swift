@@ -691,22 +691,29 @@ public:
 /// Defines the @_cdecl attribute.
 class CDeclAttr : public DeclAttribute {
 public:
-  CDeclAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range, bool Implicit)
-      : DeclAttribute(DeclAttrKind::CDecl, AtLoc, Range, Implicit), Name(Name) {
+  CDeclAttr(StringRef Name, SourceLoc AtLoc, SourceRange Range, bool Implicit,
+            bool Underscored)
+      : DeclAttribute(DeclAttrKind::CDecl, AtLoc, Range, Implicit),
+        Name(Name), Underscored(Underscored) {
   }
 
-  CDeclAttr(StringRef Name, bool Implicit)
-    : CDeclAttr(Name, SourceLoc(), SourceRange(), Implicit) {}
+  CDeclAttr(StringRef Name, bool Implicit, bool Underscored)
+    : CDeclAttr(Name, SourceLoc(), SourceRange(), Implicit, Underscored) {}
 
   /// The symbol name.
   const StringRef Name;
+
+  /// Is this the version of the attribute that's underscored?
+  /// Used to preserve retro compatibility with early adopters.
+  const bool Underscored;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::CDecl;
   }
 
   CDeclAttr *clone(ASTContext &ctx) const {
-    return new (ctx) CDeclAttr(Name, AtLoc, Range, isImplicit());
+    return new (ctx) CDeclAttr(Name, AtLoc, Range, isImplicit(),
+                               Underscored);
   }
 
   bool isEquivalent(const CDeclAttr *other, Decl *attachedTo) const {
