@@ -377,6 +377,11 @@ struct InInit {
   init?() { #^IN_INIT_1?check=KW_DECL_STMT;check=KW_RETURN;check=KW_NO_IN^# }
 }
 
+struct InGenericTypeInit<T> {
+  init?() { return #^IN_INIT_2?check=KW_FAILABLE_INIT_NIL^# }
+  // KW_FAILABLE_INIT_NIL: Literal[Nil]/None: nil[#InGenericTypeInit<T>?#]; name=nil
+}
+
 struct InStruct {
   #^IN_NOMINAL_DECL_1?check=KW_DECL_TYPECONTEXT;check=KW_NO_INOUT^#
 }
