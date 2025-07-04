@@ -400,7 +400,7 @@ extension UnsafeRawPointer {
     _ body: (_ pointer: UnsafePointer<T>) throws(E) -> Result
   ) throws(E) -> Result {
     _debugPrecondition(
-      Int(bitPattern: self) & (MemoryLayout<T>.alignment-1) == 0,
+      _isWellAligned(for: T.self),
       "self must be a properly aligned pointer for type T"
     )
     let binding = Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
@@ -446,8 +446,8 @@ extension UnsafeRawPointer {
     fromByteOffset offset: Int = 0,
     as type: T.Type
   ) -> T {
-    unsafe _debugPrecondition(0 == (UInt(bitPattern: self + offset)
-        & (UInt(MemoryLayout<T>.alignment) - 1)),
+    unsafe _debugPrecondition(
+      (self + offset)._isWellAligned(for: T.self),
       "load from misaligned raw pointer")
 
     let rawPointer = unsafe (self + offset)._rawValue
@@ -582,6 +582,12 @@ extension UnsafeRawPointer {
     let bits = UInt(Builtin.ptrtoint_Word(_rawValue)) & ~mask
     _debugPrecondition(bits != 0, "Overflow in pointer arithmetic")
     return .init(Builtin.inttoptr_Word(bits._builtinWordValue))
+  }
+
+  @safe
+  @_alwaysEmitIntoClient
+  public func _isWellAligned<T: ~Copyable>(for type: T.Type) -> Bool {
+    unsafe self == self.alignedDown(for: type)
   }
 
   /// Obtain the next pointer whose bit pattern is a multiple of `alignment`.
@@ -1017,7 +1023,7 @@ extension UnsafeMutableRawPointer {
     _ body: (_ pointer: UnsafeMutablePointer<T>) throws(E) -> Result
   ) throws(E) -> Result {
     _debugPrecondition(
-      Int(bitPattern: self) & (MemoryLayout<T>.alignment-1) == 0,
+      _isWellAligned(for: T.self),
       "self must be a properly aligned pointer for type T"
     )
     let binding = Builtin.bindMemory(_rawValue, count._builtinWordValue, T.self)
@@ -1285,8 +1291,8 @@ extension UnsafeMutableRawPointer {
     fromByteOffset offset: Int = 0,
     as type: T.Type
   ) -> T {
-    unsafe _debugPrecondition(0 == (UInt(bitPattern: self + offset)
-        & (UInt(MemoryLayout<T>.alignment) - 1)),
+    unsafe _debugPrecondition(
+      (self + offset)._isWellAligned(for: T.self),
       "load from misaligned raw pointer")
 
     let rawPointer = unsafe (self + offset)._rawValue
@@ -1499,8 +1505,8 @@ extension UnsafeMutableRawPointer {
   internal func _legacy_se0349_storeBytes_internal<T>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
-    unsafe _debugPrecondition(0 == (UInt(bitPattern: self + offset)
-        & (UInt(MemoryLayout<T>.alignment) - 1)),
+    unsafe _debugPrecondition(
+      (self + offset)._isWellAligned(for: T.self),
       "storeBytes to misaligned raw pointer")
 
     var temp = value
@@ -1586,6 +1592,12 @@ extension UnsafeMutableRawPointer {
     let bits = UInt(Builtin.ptrtoint_Word(_rawValue)) & ~mask
     _debugPrecondition(bits != 0, "Overflow in pointer arithmetic")
     return .init(Builtin.inttoptr_Word(bits._builtinWordValue))
+  }
+
+  @safe
+  @_alwaysEmitIntoClient
+  public func _isWellAligned<T: ~Copyable>(for type: T.Type) -> Bool {
+    UnsafeRawPointer(self)._isWellAligned(for: type)
   }
 
   /// Obtain the next pointer whose bit pattern is a multiple of `alignment`.
