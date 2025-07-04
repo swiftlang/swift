@@ -18,12 +18,11 @@ public enum E {
 }
 
 // CHECK: #if compiler(>=5.3) && $NonexhaustiveAttribute
-// CHECK-NEXT: @preEnumExtensibility @nonexhaustive public enum F {
+// CHECK-NEXT: @nonexhaustive(warn) public enum F {
 // CHECK: #else
 // CHECK-NEXT: public enum F {
 // CHECK: #endif
-@preEnumExtensibility
-@nonexhaustive
+@nonexhaustive(warn)
 public enum F {
   case a
 }

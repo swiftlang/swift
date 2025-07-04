@@ -877,7 +877,7 @@ SIMPLE_DECL_ATTR(constInitialized, ConstInitialized,
   168)
 DECL_ATTR_FEATURE_REQUIREMENT(ConstInitialized, CompileTimeValues)
 
-SIMPLE_DECL_ATTR(nonexhaustive, Nonexhaustive,
+DECL_ATTR(nonexhaustive, Nonexhaustive,
   OnEnum,
   ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove | ForbiddenInABIAttr,
   169)

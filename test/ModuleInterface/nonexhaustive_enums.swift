@@ -43,8 +43,7 @@ public enum E {
   case a
 }
 
-@preEnumExtensibility
-@nonexhaustive
+@nonexhaustive(warn)
 public enum PE {
   case a
 }
