@@ -4326,11 +4326,10 @@ namespace {
                          Impl.SwiftContext.AllocateCopy(retType.getAsString())),
               decl->getLocation());
         }
-      } else {
-        Impl.SwiftContext.evaluator.cacheOutput(
-            LifetimeDependenceInfoRequest{result},
-            Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
       }
+      Impl.SwiftContext.evaluator.cacheOutput(
+          LifetimeDependenceInfoRequest{result},
+          Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
 
       for (auto [idx, param] : llvm::enumerate(decl->parameters())) {
         if (isEscapable(param->getType()))
