@@ -8249,7 +8249,7 @@ ERROR(lifetime_dependence_cannot_use_parsed_borrow_inout, none,
 ERROR(lifetime_dependence_duplicate_target, none,
       "invalid duplicate target lifetime dependencies on function", ())
 ERROR(lifetime_parameter_requires_inout, none,
-      "lifetime-dependent parameter must be 'inout'", (Identifier))
+      "lifetime-dependent parameter '%0' must be 'inout'", (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Lifetime Dependence Requirements
