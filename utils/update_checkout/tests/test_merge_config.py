@@ -12,7 +12,7 @@
 
 import unittest
 
-from update_checkout.update_checkout import merge_no_duplicates, merge_config
+from update_checkout.update_checkout import merge_config, merge_no_duplicates
 
 
 class MergeTestCase(unittest.TestCase):
@@ -27,8 +27,8 @@ class MergeTestCase(unittest.TestCase):
             "ssh-clone-pattern": "git@1",
             "https-clone-pattern": "https://1",
             "repos": {
-                "swift": { "remote": { "id": "swiftlang/swift" } },
-                "llvm-project": { "remote": { "id": "swiftlang/llvm-project" } },
+                "swift": {"remote": {"id": "swiftlang/swift"}},
+                "llvm-project": {"remote": {"id": "swiftlang/llvm-project"}},
             },
             "default-branch-scheme": "main",
             "branch-schemes": {
@@ -42,8 +42,8 @@ class MergeTestCase(unittest.TestCase):
             "note": "this is machine generated or something",
             "ssh-clone-pattern": "git@2",
             "repos": {
-                "llvm-project": { "remote": { "id": "blah/llvm-project" } },
-                "swift-syntax": { "remote": { "id": "swiftlang/swift-syntax" } },
+                "llvm-project": {"remote": {"id": "blah/llvm-project"}},
+                "swift-syntax": {"remote": {"id": "swiftlang/swift-syntax"}},
             },
             "default-branch-scheme": "bonus",
             "branch-schemes": {
@@ -55,9 +55,9 @@ class MergeTestCase(unittest.TestCase):
             "ssh-clone-pattern": "git@2",
             "https-clone-pattern": "https://1",
             "repos": {
-                "swift": { "remote": { "id": "swiftlang/swift" } },
-                "llvm-project": { "remote": { "id": "blah/llvm-project" } },
-                "swift-syntax": { "remote": { "id": "swiftlang/swift-syntax" } },
+                "swift": {"remote": {"id": "swiftlang/swift"}},
+                "llvm-project": {"remote": {"id": "blah/llvm-project"}},
+                "swift-syntax": {"remote": {"id": "swiftlang/swift-syntax"}},
             },
             "default-branch-scheme": "bonus",
             "branch-schemes": {
