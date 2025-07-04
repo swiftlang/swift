@@ -53,6 +53,8 @@ extension BuiltinInst : OnoneSimplifiable, SILCombineSimplifiable {
         constantFoldIntegerEquality(isEqual: true, context)
       case .ICMP_NE:
         constantFoldIntegerEquality(isEqual: false, context)
+      case .Xor:
+        simplifyNegation(context)
       default:
         if let literal = constantFold(context) {
           uses.replaceAll(with: literal, context)
@@ -254,6 +256,53 @@ private extension BuiltinInst {
       return true
     }
     return false
+  }
+
+  /// Replaces a builtin "xor", which negates its operand comparison
+  /// ```
+  ///   %3 = builtin "cmp_slt_Int64"(%1, %2) : $Builtin.Int1
+  ///   %4 = integer_literal $Builtin.Int1, -1
+  ///   %5 = builtin "xor_Int1"(%3, %4) : $Builtin.Int1
+  /// ```
+  /// with the negated comparison
+  /// ```
+  ///   %5 = builtin "cmp_ge_Int64"(%1, %2) : $Builtin.Int1
+  /// ```
+  func simplifyNegation(_ context: SimplifyContext) {
+    assert(id == .Xor)
+    guard let one = arguments[1] as? IntegerLiteralInst,
+          let oneValue = one.value,
+          oneValue == -1,
+          let lhsBuiltin = arguments[0] as? BuiltinInst,
+          lhsBuiltin.type.isBuiltinInteger,
+          let negatedBuiltinName = lhsBuiltin.negatedComparisonBuiltinName
+    else {
+      return
+    }
+
+    let builder = Builder(before: lhsBuiltin, context)
+    let negated = builder.createBuiltinBinaryFunction(name: negatedBuiltinName,
+        operandType: lhsBuiltin.arguments[0].type,
+        resultType: lhsBuiltin.type,
+        arguments: Array(lhsBuiltin.arguments))
+    self.replace(with: negated, context)
+  }
+
+  private var negatedComparisonBuiltinName: String? {
+    switch id {
+    case .ICMP_EQ:  return "cmp_ne"
+    case .ICMP_NE:  return "cmp_eq"
+    case .ICMP_SLE: return "cmp_sgt"
+    case .ICMP_SLT: return "cmp_sge"
+    case .ICMP_SGE: return "cmp_slt"
+    case .ICMP_SGT: return "cmp_sle"
+    case .ICMP_ULE: return "cmp_ugt"
+    case .ICMP_ULT: return "cmp_uge"
+    case .ICMP_UGE: return "cmp_ult"
+    case .ICMP_UGT: return "cmp_ule"
+    default:
+      return nil
+    }
   }
 }
 

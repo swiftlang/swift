@@ -3337,11 +3337,9 @@ bb0(%0 : @owned $Builtin.NativeObject):
 
 // CHECK-LABEL: sil [ossa] @test_cmp_xor_canonicalization :
 // CHECK:bb0([[ARG:%.*]] : $Builtin.Int1
-// CHECK:  [[TRUE:%.*]] = integer_literal $Builtin.Int1, -1
 // CHECK:  [[FALSE:%.*]] = integer_literal $Builtin.Int1, 0
-// CHECK:  [[EQ:%.*]] = builtin "cmp_eq_Int1"([[ARG]] : $Builtin.Int1, [[FALSE]]
-// CHECK:  [[NOT:%.*]] = builtin "xor_Int1"([[EQ]] : $Builtin.Int1, [[TRUE]] : $Builtin.Int1)
-// CHECK:  return [[NOT]]
+// CHECK:  [[NE:%.*]] = builtin "cmp_ne_Int1"([[ARG]] : $Builtin.Int1, [[FALSE]]
+// CHECK:  return [[NE]]
 // CHECK: } // end sil function 'test_cmp_xor_canonicalization'
 sil [ossa] @test_cmp_xor_canonicalization : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
 bb0(%0 : $Builtin.Int1):
