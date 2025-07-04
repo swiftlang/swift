@@ -77,7 +77,6 @@ struct SemanticARCOpts : SILFunctionTransform {
   SemanticARCOpts(bool mandatoryOptsOnly)
       : mandatoryOptsOnly(mandatoryOptsOnly) {}
 
-#ifndef NDEBUG
   void performCommandlineSpecifiedTransforms(SemanticARCOptVisitor &visitor) {
     for (auto transform : TransformsToPerform) {
       visitor.ctx.transformKind = transform;
@@ -110,7 +109,6 @@ struct SemanticARCOpts : SILFunctionTransform {
       }
     }
   }
-#endif
 
   bool performPeepholesWithoutFixedPoint(SemanticARCOptVisitor &visitor) {
     // Add all the results of all instructions that we want to visit to the
@@ -162,13 +160,11 @@ struct SemanticARCOpts : SILFunctionTransform {
     SemanticARCOptVisitor visitor(f, getPassManager(), *deBlocksAnalysis->get(&f),
                                   mandatoryOptsOnly);
 
-#ifndef NDEBUG
     // If we are being asked for testing purposes to run a series of transforms
     // expressed on the command line, run that and return.
     if (!TransformsToPerform.empty()) {
       return performCommandlineSpecifiedTransforms(visitor);
     }
-#endif
 
     // Otherwise, perform our standard optimizations.
     bool didEliminateARCInsts = performPeepholes(visitor);
