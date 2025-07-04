@@ -2583,6 +2583,11 @@ namespace decls_block {
                      BCArray<BCFixed<1>> // concatenated param indices
                      >;
 
+  using NonexhaustiveDeclAttrLayout = BCRecordLayout<
+    Nonexhaustive_DECL_ATTR,
+    BCFixed<2>  // mode
+  >;
+
   // clang-format on
 
 #undef SYNTAX_SUGAR_TYPE_LAYOUT

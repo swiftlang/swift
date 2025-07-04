@@ -1725,6 +1725,19 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DeclAttrKind::Nonexhaustive: {
+    auto *attr = cast<NonexhaustiveAttr>(this);
+    Printer << "@nonexhaustive";
+    switch (attr->getMode()) {
+    case NonexhaustiveMode::Error:
+      break;
+    case NonexhaustiveMode::Warning:
+      Printer << "(warn)";
+      break;
+    }
+    break;
+  }
+
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) case DeclAttrKind::CLASS:
 #include "swift/AST/DeclAttr.def"
     llvm_unreachable("handled above");
@@ -1956,6 +1969,8 @@ StringRef DeclAttribute::getAttrName() const {
     }
   case DeclAttrKind::Lifetime:
     return cast<LifetimeAttr>(this)->isUnderscored() ? "_lifetime" : "lifetime";
+  case DeclAttrKind::Nonexhaustive:
+    return "nonexhaustive";
   }
   llvm_unreachable("bad DeclAttrKind");
 }
