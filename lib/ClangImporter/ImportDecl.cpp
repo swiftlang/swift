@@ -4185,11 +4185,22 @@ namespace {
           !isa<clang::CXXMethodDecl, clang::ObjCMethodDecl>(decl))
         return;
 
+      bool hasUnsafeAnnotation = false;
       auto isEscapable = [this](clang::QualType ty) {
         return evaluateOrDefault(
                    Impl.SwiftContext.evaluator,
                    ClangTypeEscapability({ty.getTypePtr(), &Impl}),
                    CxxEscapability::Unknown) != CxxEscapability::NonEscapable;
+      };
+      auto importedAsClass = [this](clang::QualType ty, bool forSelf) {
+        if (!forSelf) {
+          if (ty->getPointeeType().isNull())
+            return false;
+          ty = ty->getPointeeType();
+        }
+        if (const auto *rd = ty->getAsRecordDecl())
+          return recordHasReferenceSemantics(rd);
+        return false;
       };
 
       auto swiftParams = result->getParameters();
@@ -4232,9 +4243,12 @@ namespace {
       SmallBitVector scopedLifetimeParamIndicesForReturn(dependencyVecSize);
       SmallBitVector paramHasAnnotation(dependencyVecSize);
       std::map<unsigned, SmallBitVector> inheritedArgDependences;
-      auto processLifetimeBound = [&](unsigned idx, clang::QualType ty) {
+      auto processLifetimeBound = [&](unsigned idx, clang::QualType ty,
+                                      bool forSelf = false) {
         warnForEscapableReturnType();
         paramHasAnnotation[idx] = true;
+        if (importedAsClass(ty, forSelf))
+          hasUnsafeAnnotation = true;
         if (isEscapable(ty))
           scopedLifetimeParamIndicesForReturn[idx] = true;
         else
@@ -4282,7 +4296,8 @@ namespace {
       if (getImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(decl))
         processLifetimeBound(
             result->getSelfIndex(),
-            cast<clang::CXXMethodDecl>(decl)->getThisType()->getPointeeType());
+            cast<clang::CXXMethodDecl>(decl)->getThisType()->getPointeeType(),
+            /*forSelf=*/true);
       if (auto attr =
               getImplicitObjectParamAnnotation<clang::LifetimeCaptureByAttr>(
                   decl))
@@ -4332,16 +4347,21 @@ namespace {
             Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
       }
 
-      for (auto [idx, param] : llvm::enumerate(decl->parameters())) {
-        if (isEscapable(param->getType()))
-          continue;
-        if (param->hasAttr<clang::NoEscapeAttr>() || paramHasAnnotation[idx])
-          continue;
-        // We have a nonescapable parameter that does not have its lifetime
-        // annotated nor is it marked noescape.
+      if (hasUnsafeAnnotation) {
         auto attr = new (ASTContext) UnsafeAttr(/*implicit=*/true);
         result->getAttrs().add(attr);
-        break;
+      } else {
+        for (auto [idx, param] : llvm::enumerate(decl->parameters())) {
+          if (isEscapable(param->getType()))
+            continue;
+          if (param->hasAttr<clang::NoEscapeAttr>() || paramHasAnnotation[idx])
+            continue;
+          // We have a nonescapable parameter that does not have its lifetime
+          // annotated nor is it marked noescape.
+          auto attr = new (ASTContext) UnsafeAttr(/*implicit=*/true);
+          result->getAttrs().add(attr);
+          break;
+        }
       }
 
       Impl.diagnoseTargetDirectly(decl);
@@ -9268,6 +9288,11 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
   auto ClangDecl =
       dyn_cast_or_null<clang::FunctionDecl>(MappedDecl->getClangDecl());
   if (!ClangDecl)
+    return;
+
+  // Do not attempt to generate safe wrappers for functions that are explicitly
+  // marked as unsafe.
+  if (MappedDecl->getAttrs().hasAttribute<UnsafeAttr>())
     return;
 
   // FIXME: for private macro generated functions we do not serialize the
