@@ -16,8 +16,11 @@ import Swift
 
 /// Starts a new scope that can contain a dynamic number of child tasks.
 ///
-/// A group waits for all of its child tasks
-/// to complete or be canceled before it returns.
+/// A group *always* waits for all of its child tasks
+/// to complete before it returns. Even cancelled tasks must run until
+/// completion before this function returns.
+/// Cancelled child tasks cooperatively react to cancellation and attempt
+/// to return as early as possible.
 /// After this function returns, the task group is always empty.
 ///
 /// To collect the results of the group's child tasks,
@@ -39,29 +42,9 @@ import Swift
 ///     group.cancelAll()
 ///     return first + second
 ///
-/// Task Group Cancellation
-/// =======================
+/// Refer to ``TaskGroup`` documentation for detailed discussion of semantics shared between all task groups.
 ///
-/// You can cancel a task group and all of its child tasks
-/// by calling the `cancelAll()` method on the task group,
-/// or by canceling the task in which the group is running.
-///
-/// If you call `addTask(name:priority:operation:)` to create a new task in a canceled group,
-/// that task is immediately canceled after creation.
-/// Alternatively, you can call `addTaskUnlessCancelled(name:priority:operation:)`,
-/// which doesn't create the task if the group has already been canceled.
-/// Choosing between these two functions
-/// lets you control how to react to cancellation within a group:
-/// some child tasks need to run regardless of cancellation,
-/// but other tasks are better not even being created
-/// when you know they can't produce useful results.
-///
-/// Because the tasks you add to a group with this method are nonthrowing,
-/// those tasks can't respond to cancellation by throwing `CancellationError`.
-/// The tasks must handle cancellation in some other way,
-/// such as returning the work completed so far, returning an empty result, or returning `nil`.
-/// For tasks that need to handle cancellation by throwing an error,
-/// use the `withThrowingTaskGroup(of:returning:body:)` method instead.
+/// - SeeAlso: ``TaskGroup``
 @available(SwiftStdlib 5.1, *)
 #if !hasFeature(Embedded)
 @backDeployed(before: SwiftStdlib 6.0)
@@ -126,7 +109,7 @@ public func _unsafeInheritExecutor_withTaskGroup<ChildTaskResult, GroupResult>(
 
 /// Starts a new scope that can contain a dynamic number of throwing child tasks.
 ///
-/// A group waits for all of its child tasks
+/// A group *always* waits for all of its child tasks
 /// to complete before it returns. Even cancelled tasks must run until
 /// completion before this function returns.
 /// Cancelled child tasks cooperatively react to cancellation and attempt
@@ -151,23 +134,6 @@ public func _unsafeInheritExecutor_withTaskGroup<ChildTaskResult, GroupResult>(
 ///     let second = await group.next() ?? 0
 ///     group.cancelAll()
 ///     return first + second
-///
-/// Task Group Cancellation
-/// =======================
-///
-/// You can cancel a task group and all of its child tasks
-/// by calling the `cancelAll()` method on the task group,
-/// or by canceling the task in which the group is running.
-///
-/// If you call `addTask(name:priority:operation:)` to create a new task in a canceled group,
-/// that task is immediately canceled after creation.
-/// Alternatively, you can call `addTaskUnlessCancelled(name:priority:operation:)`,
-/// which doesn't create the task if the group has already been canceled.
-/// Choosing between these two functions
-/// lets you control how to react to cancellation within a group:
-/// some child tasks need to run regardless of cancellation,
-/// but other tasks are better not even being created
-/// when you know they can't produce useful results.
 ///
 /// Error Handling
 /// ==============
@@ -199,6 +165,12 @@ public func _unsafeInheritExecutor_withTaskGroup<ChildTaskResult, GroupResult>(
 /// in the corresponding call to `Group.next()`,
 /// which gives you a chance to handle the individual error
 /// or to let the group rethrow the error.
+///
+/// Refer to ``TaskGroup`` documentation for detailed discussion of semantics shared between all task groups.
+///
+/// - SeeAlso: ``TaskGroup``
+/// - SeeAlso: ``ThrowingTaskGroup``
+/// - SeeAlso: ``ThrowingDiscardingTaskGroup``
 @available(SwiftStdlib 5.1, *)
 #if !hasFeature(Embedded)
 @backDeployed(before: SwiftStdlib 6.0)
@@ -290,6 +262,73 @@ public func _unsafeInheritExecutor_withThrowingTaskGroup<ChildTaskResult, GroupR
 /// and mutation operations can't be performed
 /// from a concurrent execution context like a child task.
 ///
+/// Structured Concurrency
+/// ======================
+///
+/// A task group is the primary way to create structured concurrency tasks in Swift.
+/// Another way of creating structured tasks are `async let` declarations.
+///
+/// Structured concurrency tasks are often called "child tasks" because of their relationship with their parent task.
+/// A child task will inherit the parent's priority, task-local values, and will be structured in the sense that its
+/// lifetime will never exceed the lifetime of the parent task.
+///
+/// A task group will *always* wait for all child tasks to complete before it is destroyed.
+/// Specifically any `with...TaskGroup` APIs, will not return until all the child tasks
+/// created in the group's scope have completed running.
+///
+/// Structured concurrency is a way to organize your program, and tasks, in such a way that
+/// tasks do not outlive the scope in which they are created. Within a structured task hierarchy,
+/// no child task will remain running longer than its parent task. This simplifies reasoning about resource usage,
+/// and is a powerful mechanism that you can use to write well-behaved concurrent programs.
+///
+/// Structured Concurrency APIs (including task groups and `async let`), will *always* await the
+/// completion of tasks contained within their scope before returning. Specifically, this means that
+/// even if one were to await a single task result and return it from a `withTaskGroup` function body,
+/// the group will automatically await all the remaining tasks before returning:
+///
+///     func takeFirst(actions: [@Sendable () -> Int]) async -> Int? {
+///         await withTaskGroup { group in
+///             for action in actions {
+///                 group.addTask { action() }
+///             }
+///
+///             return await group.next() // return the first action to complete
+///         } // the group will ALWAYS await the completion of all the actions (!)
+///     }
+///
+/// In the above example, even though we return the first collected integer from all actions added to the task group,
+/// the task group will *always*, automatically, await for the completion of all the resulting tasks.
+///
+/// You may use `group.cancelAll()` to signal cancellation to all the remaining in-progress tasks,
+/// however this will not interrupt their execution automatically, as the child tasks will need to cooperatively
+/// react to the cancellation, and potentially return early (if able to).
+///
+/// In order to create un-structured concurrency tasks, you can use ``Task.init``, ``Task.detached`` or ``Task.immediate``.
+///
+/// Task Group Cancellation
+/// =======================
+///
+/// You can cancel a task group and all of its child tasks
+/// by calling the `cancelAll()` method on the task group,
+/// or by canceling the task in which the group is running.
+///
+/// If you call `addTask(name:priority:operation:)` to create a new task in a canceled group,
+/// that task is immediately canceled after creation.
+/// Alternatively, you can call `addTaskUnlessCancelled(name:priority:operation:)`,
+/// which doesn't create the task if the group has already been canceled.
+/// Choosing between these two functions
+/// lets you control how to react to cancellation within a group:
+/// some child tasks need to run regardless of cancellation,
+/// but other tasks are better not even being created
+/// when you know they can't produce useful results.
+///
+/// In non-throwing task groups the tasks you add to a group with this method are nonthrowing,
+/// those tasks can't respond to cancellation by throwing `CancellationError`.
+/// The tasks must handle cancellation in some other way,
+/// such as returning the work completed so far, returning an empty result, or returning `nil`.
+/// For tasks that need to handle cancellation by throwing an error,
+/// use the `withThrowingTaskGroup(of:returning:body:)` method instead.
+///
 /// ### Task execution order
 ///
 /// Tasks added to a task group execute concurrently, and may be scheduled in
@@ -316,6 +355,9 @@ public func _unsafeInheritExecutor_withThrowingTaskGroup<ChildTaskResult, GroupR
 /// [concurrency]: https://docs.swift.org/swift-book/LanguageGuide/Concurrency.html
 /// [tspl]: https://docs.swift.org/swift-book/
 ///
+/// - SeeAlso: ``ThrowingTaskGroup``
+/// - SeeAlso: ``DiscardingTaskGroup``
+/// - SeeAlso: ``ThrowingDiscardingTaskGroup``
 @available(SwiftStdlib 5.1, *)
 @frozen
 public struct TaskGroup<ChildTaskResult: Sendable> {
@@ -498,9 +540,7 @@ extension TaskGroup: Sendable { }
 /// and mutation operations can't be performed
 /// from concurrent execution contexts like a child task.
 ///
-/// ### Task execution order
-/// Tasks added to a task group execute concurrently, and may be scheduled in
-/// any order.
+/// Refer to ``TaskGroup`` documentation for detailed discussion of semantics shared between all task groups.
 ///
 /// ### Cancellation behavior
 /// A task group becomes cancelled in one of the following ways:
@@ -524,6 +564,9 @@ extension TaskGroup: Sendable { }
 /// [concurrency]: https://docs.swift.org/swift-book/LanguageGuide/Concurrency.html
 /// [tspl]: https://docs.swift.org/swift-book/
 ///
+/// - SeeAlso: ``TaskGroup``
+/// - SeeAlso: ``DiscardingTaskGroup``
+/// - SeeAlso: ``ThrowingDiscardingTaskGroup``
 @available(SwiftStdlib 5.1, *)
 @frozen
 public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
