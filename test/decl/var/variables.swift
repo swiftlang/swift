@@ -87,6 +87,7 @@ var shouldWarnWithoutSugar = (arrayOfEmptyTuples as Array<()>) // expected-warni
 
 class SomeClass {}
 
+
 weak let V = SomeClass() // ok since SE-0481
 // expected-warning@-1 {{instance will be immediately deallocated because variable 'V' is 'weak'}}
 // expected-note@-2 {{'V' declared here}}

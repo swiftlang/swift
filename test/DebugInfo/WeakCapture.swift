@@ -1,4 +1,8 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -enable-upcoming-feature ImmutableWeakCaptures -emit-ir -g -o - | %FileCheck %s
+
+// REQUIRES: swift_feature_ImmutableWeakCaptures
+
 class A {
     init(handler: (() -> ())) { }
 }
