@@ -50,4 +50,14 @@ struct SSAUpdater<Context: MutatingContext> {
     context.notifyInstructionsChanged()
     return context._bridged.SSAUpdater_getValueInMiddleOfBlock(block.bridged).value
   }
+
+  var insertedPhis: [Phi] {
+    var phis = [Phi]()
+    let numPhis = context._bridged.SSAUpdater_getNumInsertedPhis()
+    phis.reserveCapacity(numPhis)
+    for idx in 0..<numPhis {
+      phis.append(Phi(context._bridged.SSAUpdater_getInsertedPhi(idx).value)!)
+    }
+    return phis
+  }
 }

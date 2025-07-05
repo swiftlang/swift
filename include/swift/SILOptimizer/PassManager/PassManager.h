@@ -75,6 +75,7 @@ class SwiftPassInvocation {
   SILModule::SlabList allocatedSlabs;
 
   SILSSAUpdater *ssaUpdater = nullptr;
+  SmallVector<SILPhiArgument *, 4> insertedPhisBySSAUpdater;
 
   SwiftPassInvocation *nestedSwiftPassInvocation = nullptr;
 
@@ -178,8 +179,9 @@ public:
 
   void initializeSSAUpdater(SILFunction *fn, SILType type,
                             ValueOwnershipKind ownership) {
+    insertedPhisBySSAUpdater.clear();
     if (!ssaUpdater)
-      ssaUpdater = new SILSSAUpdater;
+      ssaUpdater = new SILSSAUpdater(&insertedPhisBySSAUpdater);
     ssaUpdater->initialize(fn, type, ownership);
   }
 
@@ -187,6 +189,8 @@ public:
     assert(ssaUpdater && "SSAUpdater not initialized");
     return ssaUpdater;
   }
+
+  ArrayRef<SILPhiArgument *> getInsertedPhisBySSAUpdater() { return insertedPhisBySSAUpdater; }
 
   SwiftPassInvocation *initializeNestedSwiftPassInvocation(SILFunction *newFunction) {
     assert(!nestedSwiftPassInvocation && "Nested Swift pass invocation already initialized");
