@@ -12,8 +12,6 @@
 
 import Swift
 
-#if !$Embedded
-
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 5.1, *)
 @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
@@ -197,4 +195,3 @@ public func _deinitOnExecutorMainActorBackDeploy(
 
 #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
-#endif // !$Embedded
