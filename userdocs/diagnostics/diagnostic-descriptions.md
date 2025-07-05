@@ -6,7 +6,7 @@ Detailed explanations for various compiler diagnostics.
 ## Overview
 
 Swift diagnostics are classified into errors and warnings. Warnings can only be silenced in an
-intentional manner, e.g., adding `_ =` for an unused function result.
+intentional manner, for example adding `_ =` for an unused function result.
 
 Some diagnostics have more detailed explanations available. These include a `[#Name]` inline and
 reference to this documentation at the end of the compiler output on the command line, or is
