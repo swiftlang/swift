@@ -45,9 +45,18 @@ bool printDeclTypeUSR(const ValueDecl *D, raw_ostream &OS);
 /// Prints out the USR for the given ValueDecl.
 /// @param distinguishSynthesizedDecls Whether to use the USR of the
 /// synthesized declaration instead of the USR of the underlying Clang USR.
+/// @param useSwiftUSR Whether to generate a Swift USR for all Clang declarations as well.
 /// \returns true if it failed, false on success.
 bool printValueDeclUSR(const ValueDecl *D, raw_ostream &OS,
-                       bool distinguishSynthesizedDecls = false);
+                       bool distinguishSynthesizedDecls = false,
+                       bool useSwiftUSR = false);
+
+/// Prints out the Swift USR for the given ValueDecl regardless of its source (Swift or Clang).
+/// Equivalent to `printValueDeclUSR(D, OS, false, /*useSwiftUSR=*/true)`
+inline bool printValueDeclSwiftUSR(const ValueDecl *D, raw_ostream &OS) {
+  return printValueDeclUSR(D, OS, /*distinguishSynthesizedDecls=*/false,
+                           /*useSwiftUSR=*/true);
+}
 
 /// Prints out the USR for the given ModuleEntity.
 /// In case module aliasing is used, it prints the real module name. For example,
