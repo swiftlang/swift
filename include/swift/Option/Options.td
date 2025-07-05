@@ -2224,8 +2224,12 @@ def sdk_module_cache_path : Separate<["-"], "sdk-module-cache-path">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
   HelpText<"Specifies the module cache path for explicitly-built SDK modules">;
 
-def scanner_prefix_map : Separate<["-"], "scanner-prefix-map">,
+def scanner_prefix_map_paths : MultiArg<["-"], "scanner-prefix-map-paths", 2>,
   Flags<[FrontendOption, NewDriverOnlyOption]>,
+  HelpText<"Remap paths reported by dependency scanner">, MetaVarName<"<prefix> <replacement>">;
+
+def scanner_prefix_map : Separate<["-"], "scanner-prefix-map">,
+  Flags<[NewDriverOnlyOption]>,
   HelpText<"Remap paths reported by dependency scanner">, MetaVarName<"<prefix=replacement>">;
 
 def scanner_prefix_map_sdk : Separate<["-"], "scanner-prefix-map-sdk">,
@@ -2236,9 +2240,9 @@ def scanner_prefix_map_toolchain : Separate<["-"], "scanner-prefix-map-toolchain
   Flags<[NewDriverOnlyOption]>,
   HelpText<"Remap paths within toolchain directory reported by dependency scanner">, MetaVarName<"<path>">;
 
-def cache_replay_prefix_map: Separate<["-"], "cache-replay-prefix-map">,
+def cache_replay_prefix_map: MultiArg<["-"], "cache-replay-prefix-map", 2>,
   Flags<[FrontendOption, NoDriverOption, CacheInvariant]>,
-  HelpText<"Remap paths when replaying outputs from cache">, MetaVarName<"<prefix=replacement>">;
+  HelpText<"Remap paths when replaying outputs from cache">, MetaVarName<"<prefix> <replacement>">;
 
 // END ONLY SUPPORTED IN NEW DRIVER
 
