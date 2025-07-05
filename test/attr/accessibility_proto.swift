@@ -207,7 +207,8 @@ public struct NonPublicInitStruct: PublicInitProto {
   }
 }
 public struct NonPublicMemberwiseInitStruct: PublicInitProto {
-// expected-error@-1 {{initializer 'init(value:)' must be declared public because it matches a requirement in public protocol 'PublicInitProto'}}
+// expected-error@-1 {{implicit memberwise initializer 'init(value:)' is internal but must be declared public because it matches a requirement in public protocol 'PublicInitProto'}}
+  // expected-note@-2 {{explicitly declare the initializer as 'public' to satisfy the requirement}} {{63-63=\n    public init(value: Int) {\n        self.value = value\n    \}\n    }}
   public var value: Int
 }
 
@@ -224,7 +225,8 @@ package struct NonPackageInitStruct: PackageInitProto {
   }
 }
 package struct NonPackageMemberwiseInitStruct: PackageInitProto {
-// expected-error@-1 {{initializer 'init(value:)' must be declared package because it matches a requirement in package protocol 'PackageInitProto'}}
+// expected-error@-1 {{implicit memberwise initializer 'init(value:)' is internal but must be declared package because it matches a requirement in package protocol 'PackageInitProto'}}
+// expected-note@-2 {{explicitly declare the initializer as 'package' to satisfy the requirement}} {{66-66=\n    package init(value: Int) {\n        self.value = value\n    \}\n    }}
   public var value: Int
 }
 
@@ -234,14 +236,16 @@ public protocol PublicEmptyInit {
   init()
 }
 public struct Buggy: PublicEmptyInit { 
-  // expected-error@-1 {{initializer 'init()' must be declared public because it matches a requirement in public protocol 'PublicEmptyInit'}}
+  // expected-error@-1 {{implicit memberwise initializer 'init()' is internal but must be declared public because it matches a requirement in public protocol 'PublicEmptyInit'}}
+  // expected-note@-2 {{explicitly declare the initializer as 'public' to satisfy the requirement}} {{39-39=\n    public init() {\n    \}\n    }}
 }
 
 package protocol PkgEmptyInit {
   init()
 }
 public struct PkgBuggy: PkgEmptyInit {
-  // expected-error@-1 {{initializer 'init()' must be declared package because it matches a requirement in package protocol 'PkgEmptyInit'}}
+  // expected-error@-1 {{implicit memberwise initializer 'init()' is internal but must be declared package because it matches a requirement in package protocol 'PkgEmptyInit'}}
+  // expected-note@-2 {{explicitly declare the initializer as 'package' to satisfy the requirement}} {{39-39=\n    package init() {\n    \}\n    }}
 }
 
 package protocol PkgReqProvider {}
