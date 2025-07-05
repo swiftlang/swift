@@ -15,6 +15,9 @@ func incorrectLangSpecifier() {}
 @_expose(Cxx) @_cdecl("test") // expected-error {{'@_expose' cannot be applied to an '@_cdecl' declaration}}
 func cdeclAndExpose() {}
 
+@_expose(Cxx) @_swiftPrivate // expected-error {{'@_expose' cannot be applied to an '@_swiftPrivate' declaration}}
+func swiftPrivateAndExpose() {}
+
 func hasNested() {
   @_expose(Cxx) // expected-error{{can only be used in a non-local scope}}
   func nested() { }

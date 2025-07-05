@@ -298,6 +298,7 @@ extension ASTGenVisitor {
         .ShowInInterface,
         .SpecializeExtension,
         .StaticExclusiveOnly,
+        .SwiftPrivate,
         .Testable,
         .Transparent,
         .UIApplicationMain,
