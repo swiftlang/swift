@@ -44,17 +44,9 @@
 
 using namespace swift;
 
-static Decl *getClangDeclFromUSR(ASTContext &ctx, StringRef usr) {
-  auto *clangLoader = ctx.getClangModuleLoader();
-  auto &clangCtx = clangLoader->getClangASTContext();
-  auto *clangDecl = clang::tooling::rename::getNamedDeclWithUSR(clangCtx, usr);
-
-  return clangLoader->importDeclDirectly(clangDecl);
-}
-
-static Decl *getSwiftDeclFromUSR(ASTContext &ctx, StringRef usr,
-                                 const DeclContext *lookupDC,
-                                 GenericSignature genericSig) {
+Decl *swift::Demangle::getDeclFromUSR(ASTContext &ctx, StringRef usr,
+                                      const DeclContext *lookupDC,
+                                      GenericSignature genericSig) {
   if (!usr.starts_with("s:"))
     return nullptr;
 
@@ -66,16 +58,6 @@ static Decl *getSwiftDeclFromUSR(ASTContext &ctx, StringRef usr,
 
   ASTBuilder builder(ctx, genericSig);
   return builder.findDecl(node, usr, lookupDC);
-}
-
-Decl *swift::Demangle::getDeclFromUSR(ASTContext &ctx,
-                                      StringRef usr,
-                                      const DeclContext *lookupDC,
-                                      GenericSignature genericSig) {
-  if (usr.starts_with("c:"))
-    return getClangDeclFromUSR(ctx, usr);
-  
-  return getSwiftDeclFromUSR(ctx, usr, lookupDC, genericSig);
 }
 
 Type swift::Demangle::getTypeForMangling(ASTContext &ctx,
@@ -114,6 +96,32 @@ TypeDecl *swift::Demangle::getTypeDeclForUSR(ASTContext &ctx,
   return getTypeDeclForMangling(ctx, mangling, genericSig);
 }
 
+using ValueDeclPredicate = llvm::function_ref<bool(const ValueDecl *)>;
+
+static Decl *
+findTopLevelClangDecl(ClangModuleLoader *importer, DeclName name,
+                      ValueDeclPredicate predicate) {
+  struct Consumer : VisibleDeclConsumer {
+    ValueDecl *Result = nullptr;
+    ValueDeclPredicate Predicate;
+    
+    explicit Consumer(ValueDeclPredicate Predicate) : Predicate(Predicate) {}
+    
+    void foundDecl(ValueDecl *decl, DeclVisibilityKind reason,
+                   DynamicLookupInfo dynamicLookupInfo = {}) override {
+      if (Result != nullptr)
+        return;
+      
+      if (Predicate(decl))
+        Result = decl;
+    }
+  } consumer(predicate);
+  
+  importer->lookupValue(name, consumer);
+  
+  return consumer.Result;
+}
+
 Decl *ASTBuilder::findDecl(NodePointer node, StringRef usr,
                            const DeclContext *lookupDC) {
   if (node == nullptr)
@@ -142,22 +150,38 @@ Decl *ASTBuilder::findDecl(NodePointer node, StringRef usr,
   DeclNameExtractor NameExtractor(Ctx);
   auto name = NameExtractor.extractDeclName(node);
   
-  auto DeclContextNode = node->getFirstChild();
-  if (DeclContextNode == nullptr)
+  auto contextNode = node->getFirstChild();
+  if (!contextNode)
     return nullptr;
   
+  auto hasMatchingUSR = [usr](const ValueDecl *VD) {
+    SmallString<128> candidateUSR;
+    llvm::raw_svector_ostream OS(candidateUSR);
+
+    if (ide::printValueDeclSwiftUSR(VD, OS))
+      return false;
+
+    return usr == candidateUSR;
+  };
+  
   SmallVector<ValueDecl *, 4> candidates;
-  if (DeclContextNode->getKind() == Node::Kind::Module) {
-    auto PotentialModules = findPotentialModules(DeclContextNode);
-    
-    for (auto *Module : PotentialModules) {
-      auto *moduleScopeContext = Module->getModuleScopeContext();
-      namelookup::lookupInModule(Module, name, candidates,
-                                 NLKind::QualifiedLookup, namelookup::ResolutionKind::Overloadable,
-                                 moduleScopeContext, SourceLoc(), NL_QualifiedDefault);
+  if (contextNode->getKind() == Node::Kind::Module) {
+    // If a foreign Clang module, perform lookup in Clang importer
+    if (auto kind = getForeignModuleKind(contextNode)) {
+      auto *importer = Ctx.getClangModuleLoader();
+      return findTopLevelClangDecl(importer, name, hasMatchingUSR);
+    }
+
+    auto potentialModules = findPotentialModules(contextNode);
+
+    for (auto *module : potentialModules) {
+      auto *moduleScopeContext = module->getModuleScopeContext();
+      namelookup::lookupInModule(module, name, candidates,
+          NLKind::QualifiedLookup, namelookup::ResolutionKind::Overloadable,
+          moduleScopeContext, SourceLoc(), NL_QualifiedDefault);
     }
   } else {
-    auto *ownerDC = findDeclContext(DeclContextNode);
+    auto *ownerDC = findDeclContext(contextNode);
     if (!ownerDC)
       return nullptr;
 
@@ -179,13 +203,7 @@ Decl *ASTBuilder::findDecl(NodePointer node, StringRef usr,
   }
   
   for (auto *candidate : candidates) {
-    SmallString<128> candidateUSR;
-    llvm::raw_svector_ostream OS(candidateUSR);
-    
-    if (ide::printDeclUSR(candidate, OS))
-      continue;
-    
-    if (usr == candidateUSR)
+    if (hasMatchingUSR(candidate))
       return candidate;
   }
 
