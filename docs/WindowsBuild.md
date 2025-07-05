@@ -96,25 +96,6 @@ Note that ICU is only required for building Foundation, and SQLite is only
 needed for building llbuild and onwards.  The ICU project provides binaries,
 alternatively, see the ICU project for details on building ICU from source.
 
-## One-time Setup (re-run on Visual Studio upgrades)
-
-Set up the `ucrt`, `visualc`, and `WinSDK` modules by:
-
-- copying `ucrt.modulemap` located at `swift/stdlib/public/Platform/ucrt.modulemap` into
-  `${UniversalCRTSdkDir}/Include/${UCRTVersion}/ucrt` as `module.modulemap`
-- copying `vcruntime.modulemap` located at `swift/stdlib/public/Platform/vcruntime.modulemap` into `${VCToolsInstallDir}/include` as `module.modulemap`
-- copying `winsdk.modulemap` located at `swift/stdlib/public/Platform/winsdk.modulemap` into `${UniversalCRTSdkDir}/Include/${UCRTVersion}/um`
-- and setup the `vcruntime.apinotes` located at `swift/stdlib/public/Platform/vcruntime.apinotes` into `${VCToolsInstallDir}/include` as `vcruntime.apinotes`
-
-```cmd
-mklink "%UniversalCRTSdkDir%\Include\%UCRTVersion%\ucrt\module.modulemap" S:\swift\stdlib\public\Platform\ucrt.modulemap
-mklink "%UniversalCRTSdkDir%\Include\%UCRTVersion%\um\module.modulemap" S:\swift\stdlib\public\Platform\winsdk.modulemap
-mklink "%VCToolsInstallDir%\include\module.modulemap" S:\swift\stdlib\public\Platform\vcruntime.modulemap
-mklink "%VCToolsInstallDir%\include\vcruntime.apinotes" S:\swift\stdlib\public\Platform\vcruntime.apinotes
-```
-
-Warning: Creating the above links usually requires administrator privileges. The quick and easy way to do this is to open a second developer prompt by right clicking whatever shortcut you used to open the first one, choosing Run As Administrator, and pasting the above commands into the resulting window. You can then close the privileged prompt; this is the only step which requires elevation.
-
 ## Build the toolchain
 
 ```cmd
