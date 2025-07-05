@@ -1115,11 +1115,11 @@ public:
   std::optional<llvm::VersionTuple>
   getIntroducedOSVersion(PlatformKind Kind) const;
 
-  /// Returns the OS version in which the decl became ABI as specified by the
-  /// `@backDeployed` attribute.
-  std::optional<llvm::VersionTuple>
-  getBackDeployedBeforeOSVersion(ASTContext &Ctx,
-                                 bool forTargetVariant = false) const;
+  /// Returns the active `@backDeployed` attribute and the `AvailabilityRange`
+  /// in which the decl is available as ABI.
+  std::optional<std::pair<const BackDeployedAttr *, AvailabilityRange>>
+  getBackDeployedAttrAndRange(ASTContext &Ctx,
+                              bool forTargetVariant = false) const;
 
   /// Returns true if the decl has an active `@backDeployed` attribute for the
   /// given context.
