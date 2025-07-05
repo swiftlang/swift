@@ -23,8 +23,10 @@ import Swift
 
 // .. Main Executor ............................................................
 
+/// A Dispatch-based main executor.
 @available(StdlibDeploymentTarget 6.2, *)
-public class DispatchMainExecutor: RunLoopExecutor, @unchecked Sendable {
+class DispatchMainExecutor: RunLoopExecutor, SchedulingExecutor,
+                            @unchecked Sendable {
   var threaded = false
 
   public init() {}
@@ -40,6 +42,18 @@ public class DispatchMainExecutor: RunLoopExecutor, @unchecked Sendable {
 
   public func stop() {
     fatalError("DispatchMainExecutor cannot be stopped")
+  }
+
+  var asScheduling: (any SchedulingExecutor)? {
+    return self
+  }
+
+  public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
+                                at instant: C.Instant,
+                                tolerance: C.Duration? = nil,
+                                clock: C) {
+    _dispatchEnqueue(job, at: instant, tolerance: tolerance, clock: clock,
+                     executor: self, global: false)
   }
 }
 
@@ -58,41 +72,14 @@ extension DispatchMainExecutor: SerialExecutor {
 }
 
 @available(StdlibDeploymentTarget 6.2, *)
-extension DispatchMainExecutor: SchedulableExecutor {
-  public var asSchedulable: SchedulableExecutor? {
-    return self
-  }
-
-  public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
-                                at instant: C.Instant,
-                                tolerance: C.Duration? = nil,
-                                clock: C) {
-    let tolSec, tolNanosec: CLongLong
-    if let tolerance = tolerance {
-      (tolSec, tolNanosec) = delay(from: tolerance, clock: clock)
-    } else {
-      tolSec = 0
-      tolNanosec = -1
-    }
-
-    let (clockID, seconds, nanoseconds) = timestamp(for: instant, clock: clock)
-
-    _dispatchEnqueueWithDeadline(CBool(false),
-                                 CLongLong(seconds), CLongLong(nanoseconds),
-                                 CLongLong(tolSec), CLongLong(tolNanosec),
-                                 clockID.rawValue,
-                                 UnownedJob(job))
-  }
-}
-
-@available(StdlibDeploymentTarget 6.2, *)
 extension DispatchMainExecutor: MainExecutor {}
 
 // .. Task Executor ............................................................
 
+/// A Dispatch-based `TaskExecutor`
 @available(StdlibDeploymentTarget 6.2, *)
-public class DispatchGlobalTaskExecutor: TaskExecutor, SchedulableExecutor,
-                                         @unchecked Sendable {
+class DispatchGlobalTaskExecutor: TaskExecutor, SchedulingExecutor,
+                                  @unchecked Sendable {
   public init() {}
 
   public func enqueue(_ job: consuming ExecutorJob) {
@@ -101,112 +88,98 @@ public class DispatchGlobalTaskExecutor: TaskExecutor, SchedulableExecutor,
 
   public var isMainExecutor: Bool { false }
 
+  var asScheduling: (any SchedulingExecutor)? {
+    return self
+  }
+
   public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
                                 at instant: C.Instant,
                                 tolerance: C.Duration? = nil,
                                 clock: C) {
-    let tolSec, tolNanosec: CLongLong
-    if let tolerance = tolerance {
-      (tolSec, tolNanosec) = delay(from: tolerance, clock: clock)
-    } else {
-      tolSec = 0
-      tolNanosec = -1
-    }
-
-    let (clockID, seconds, nanoseconds) = timestamp(for: instant, clock: clock)
-
-    _dispatchEnqueueWithDeadline(CBool(true),
-                                 CLongLong(seconds), CLongLong(nanoseconds),
-                                 CLongLong(tolSec), CLongLong(tolNanosec),
-                                 clockID.rawValue,
-                                 UnownedJob(job))
+    _dispatchEnqueue(job, at: instant, tolerance: tolerance, clock: clock,
+                     executor: self, global: true)
   }
 }
 
 // .. Clock Support ............................................................
 
-/// DispatchMainExecutor and DispatchTaskExecutor both implement this
-/// protocol.
-///
-/// It is used to help convert instants and durations from arbitrary `Clock`s
-/// to Dispatch's time base.
-@available(StdlibDeploymentTarget 6.2, *)
-protocol DispatchExecutorProtocol: Executor {
-
-  /// Convert an `Instant` from the specified clock to a tuple identifying
-  /// the Dispatch clock and the seconds and nanoseconds components.
-  ///
-  /// Parameters:
-  ///
-  /// - for instant: The `Instant` to convert.
-  /// - clock:       The `Clock` instant that the `Instant` came from.
-  ///
-  /// Returns: A tuple of `(clockID, seconds, nanoseconds)`.
-  func timestamp<C: Clock>(for instant: C.Instant, clock: C)
-    -> (clockID: DispatchClockID, seconds: Int64, nanoseconds: Int64)
-
-  /// Convert a `Duration` from the specified clock to a tuple containing
-  /// seconds and nanosecond components.
-  func delay<C: Clock>(from duration: C.Duration, clock: C)
-    -> (seconds: Int64, nanoseconds: Int64)
-
-}
-
 /// An enumeration identifying one of the Dispatch-supported clocks
 enum DispatchClockID: CInt {
   case continuous = 1
   case suspending = 2
+  case walltime = 3
+}
+
+fileprivate func clamp(_ components: (seconds: Int64, attoseconds: Int64))
+  -> (seconds: Int64, attoseconds: Int64) {
+  if components.seconds < 0
+       || components.seconds == 0 && components.attoseconds < 0 {
+    return (seconds: 0, attoseconds: 0)
+  }
+  return (seconds: components.seconds, attoseconds: components.attoseconds)
+}
+
+fileprivate func delay(from duration: Swift.Duration) -> (
+  seconds: Int64, nanoseconds: Int64
+) {
+  let (seconds, attoseconds) = clamp(duration.components)
+  let nanoseconds = attoseconds / 1_000_000_000
+  return (seconds: seconds, nanoseconds: nanoseconds)
+}
+
+fileprivate func timestamp<C: Clock>(for instant: C.Instant, clock: C)
+  -> (clockID: _ClockID, seconds: Int64, nanoseconds: Int64)? {
+  if let continuousClock = clock as? ContinuousClock {
+    return continuousClock.timestamp(for: instant as! ContinuousClock.Instant)
+  } else if let suspendingClock = clock as? SuspendingClock {
+    return suspendingClock.timestamp(for: instant as! SuspendingClock.Instant)
+  }
+  return nil
+}
+
+fileprivate func durationComponents<C: Clock>(for duration: C.Duration, clock: C)
+  -> (seconds: Int64, nanoseconds: Int64) {
+  if let continuousClock = clock as? ContinuousClock {
+    return continuousClock.durationComponents(for: duration as! ContinuousClock.Duration)
+  } else if let suspendingClock = clock as? SuspendingClock {
+    return suspendingClock.durationComponents(for: duration as! SuspendingClock.Duration)
+  }
+  // This shouldn't be reachable
+  fatalError("unknown clock in Dispatch Executor")
 }
 
 @available(StdlibDeploymentTarget 6.2, *)
-extension DispatchExecutorProtocol {
+fileprivate func _dispatchEnqueue<C: Clock, E: Executor>(
+  _ job: consuming ExecutorJob,
+  at instant: C.Instant,
+  tolerance: C.Duration?,
+  clock: C,
+  executor: E,
+  global: Bool
+) {
+  // If it's a clock we know, convert it to something we can use; otherwise,
+  // call the clock's `enqueue` function to schedule the enqueue of the job.
 
-  func clamp(_ components: (seconds: Int64, attoseconds: Int64))
-    -> (seconds: Int64, attoseconds: Int64) {
-    if components.seconds < 0
-         || components.seconds == 0 && components.attoseconds < 0 {
-      return (seconds: 0, attoseconds: 0)
-    }
-    return (seconds: components.seconds, attoseconds: components.attoseconds)
+  guard let (clockID, seconds, nanoseconds) = timestamp(for: instant,
+                                                        clock: clock) else {
+    clock.enqueue(job, on: executor, at: instant, tolerance: tolerance)
+    return
   }
 
-  func timestamp<C: Clock>(for instant: C.Instant, clock: C)
-    -> (clockID: DispatchClockID, seconds: Int64, nanoseconds: Int64) {
-    if clock.traits.contains(.continuous) {
-        let dispatchClock: ContinuousClock = .continuous
-        let instant = dispatchClock.convert(instant: instant, from: clock)!
-        let (seconds, attoseconds) = clamp(instant._value.components)
-        let nanoseconds = attoseconds / 1_000_000_000
-        return (clockID: .continuous,
-                seconds: Int64(seconds),
-                nanoseconds: Int64(nanoseconds))
-    } else {
-        let dispatchClock: SuspendingClock = .suspending
-        let instant = dispatchClock.convert(instant: instant, from: clock)!
-        let (seconds, attoseconds) = clamp(instant._value.components)
-        let nanoseconds = attoseconds / 1_000_000_000
-        return (clockID: .suspending,
-                seconds: Int64(seconds),
-                nanoseconds: Int64(nanoseconds))
-    }
+  let tolSec: Int64, tolNanosec: Int64
+  if let tolerance = tolerance {
+    (tolSec, tolNanosec) = durationComponents(for: tolerance,
+                                              clock: clock)
+  } else {
+    tolSec = 0
+    tolNanosec = -1
   }
 
-  func delay<C: Clock>(from duration: C.Duration, clock: C)
-    -> (seconds: Int64, nanoseconds: Int64) {
-    let swiftDuration = clock.convert(from: duration)!
-    let (seconds, attoseconds) = clamp(swiftDuration.components)
-    let nanoseconds = attoseconds / 1_000_000_000
-    return (seconds: seconds, nanoseconds: nanoseconds)
-  }
-
-}
-
-@available(StdlibDeploymentTarget 6.2, *)
-extension DispatchGlobalTaskExecutor: DispatchExecutorProtocol {
-}
-
-@available(StdlibDeploymentTarget 6.2, *)
-extension DispatchMainExecutor: DispatchExecutorProtocol {
+  _dispatchEnqueueWithDeadline(CBool(global),
+                               CLongLong(seconds), CLongLong(nanoseconds),
+                               CLongLong(tolSec), CLongLong(tolNanosec),
+                               clockID.rawValue,
+                               UnownedJob(job))
 }
 
 #endif // !$Embedded && !os(WASI)

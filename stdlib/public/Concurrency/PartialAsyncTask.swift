@@ -318,13 +318,15 @@ public struct ExecutorJob: Sendable, ~Copyable {
   }
 
   /// Execute a closure, passing it the bounds of the executor private data
-  /// for the job.
+  /// for the job.  The executor is responsible for ensuring that any resources
+  /// referenced from the private data area are cleared up prior to running the
+  /// job.
   ///
-  /// Parameters:
+  /// - Parameters:
   ///
-  /// - body: The closure to execute.
+  ///   - body: The closure to execute.
   ///
-  /// Returns the result of executing the closure.
+  /// - Returns: The result of executing the closure.
   @available(StdlibDeploymentTarget 6.2, *)
   public func withUnsafeExecutorPrivateData<R, E>(body: (UnsafeMutableRawBufferPointer) throws(E) -> R) throws(E) -> R {
     let base = _jobGetExecutorPrivateData(self.context)
@@ -450,6 +452,46 @@ extension ExecutorJob {
   }
 }
 
+// Helper to create a trampoline job to execute a job on a specified
+// executor.
+extension ExecutorJob {
+
+  /// Create a trampoline to enqueue the specified job on the specified
+  /// executor.
+  ///
+  /// This is useful in conjunction with the `Clock.run()` API, which
+  /// runs a job on an unspecified executor.
+  ///
+  /// - Parameters:
+  ///
+  ///   - executor:   The `Executor` on which it should be enqueued.
+  ///
+  /// - Returns: A new ExecutorJob that will enqueue the specified job on the
+  ///   specified executor.
+  @available(StdlibDeploymentTarget 6.2, *)
+  public func createTrampoline(to executor: some Executor) -> ExecutorJob {
+    let flags = taskCreateFlags(
+      priority: TaskPriority(priority),
+      isChildTask: false,
+      copyTaskLocals: false,
+      inheritContext: false,
+      enqueueJob: false,
+      addPendingGroupTaskUnconditionally: false,
+      isDiscardingTask: false,
+      isSynchronousStart: false
+    )
+
+    let unownedJob = UnownedJob(context: self.context)
+    let (trampolineTask, _) = Builtin.createAsyncTask(flags) {
+      executor.enqueue(unownedJob)
+    }
+    let trampoline = Builtin.convertTaskToJob(trampolineTask)
+
+    return ExecutorJob(context: trampoline)
+  }
+
+}
+
 // Stack-disciplined job-local allocator support
 @available(StdlibDeploymentTarget 6.2, *)
 extension ExecutorJob {
@@ -468,9 +510,8 @@ extension ExecutorJob {
   /// A job-local stack-disciplined allocator.
   ///
   /// This can be used to allocate additional data required by an
-  /// executor implementation; memory allocated in this manner will
-  /// be released automatically when the job is disposed of by the
-  /// runtime.
+  /// executor implementation; memory allocated in this manner must
+  /// be released by the executor before the job is executed.
   ///
   /// N.B. Because this allocator is stack disciplined, explicitly
   /// deallocating memory out-of-order will cause your program to abort.
@@ -498,23 +539,20 @@ extension ExecutorJob {
       return unsafe UnsafeMutableBufferPointer<T>(start: typedBase, count: capacity)
     }
 
-    /// Deallocate previously allocated memory.  Note that the task
-    /// allocator is stack disciplined, so if you deallocate a block of
-    /// memory, all memory allocated after that block is also deallocated.
+    /// Deallocate previously allocated memory.  You must do this in
+    /// reverse order of allocations, prior to running the job.
     public func deallocate(_ buffer: UnsafeMutableRawBufferPointer) {
       unsafe _jobDeallocate(context, buffer.baseAddress!)
     }
 
-    /// Deallocate previously allocated memory.  Note that the task
-    /// allocator is stack disciplined, so if you deallocate a block of
-    /// memory, all memory allocated after that block is also deallocated.
+    /// Deallocate previously allocated memory.  You must do this in
+    /// reverse order of allocations, prior to running the job.
     public func deallocate<T>(_ pointer: UnsafeMutablePointer<T>) {
       unsafe _jobDeallocate(context, UnsafeMutableRawPointer(pointer))
     }
 
-    /// Deallocate previously allocated memory.  Note that the task
-    /// allocator is stack disciplined, so if you deallocate a block of
-    /// memory, all memory allocated after that block is also deallocated.
+    /// Deallocate previously allocated memory.    You must do this in
+    /// reverse order of allocations, prior to running the job.
     public func deallocate<T>(_ buffer: UnsafeMutableBufferPointer<T>) {
       unsafe _jobDeallocate(context, UnsafeMutableRawPointer(buffer.baseAddress!))
     }
