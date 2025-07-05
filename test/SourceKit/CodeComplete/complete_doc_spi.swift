@@ -36,6 +36,7 @@ func test() {
   // CHECK-NEXT:     {
   // CHECK-NEXT:       key.kind: source.lang.swift.decl.function.method.instance,
   // CHECK-NEXT:       key.name: "foo()",
+  // CHECK-NEXT:       key.doc.full_as_xml: "<Function file=\"{{.*}}\" line=\"{{.*}}\" column=\"{{.*}}\"><Name>foo()</Name><USR>s:12DocBriefTest1PP3fooyyF</USR><Declaration>func foo()</Declaration><CommentParts><Abstract><Para>This is a doc comment of P.foo</Para></Abstract><Discussion><Para>Do whatever.</Para><Note><Para>This documentation comment was inherited from <codeVoice>P</codeVoice>.</Para></Note></Discussion></CommentParts></Function>",
   // CHECK-NEXT:       key.description: "foo()",
   // CHECK-NEXT:       key.typename: "Void",
   // CHECK-NEXT:       key.doc.brief: "This is a doc comment of P.foo",
