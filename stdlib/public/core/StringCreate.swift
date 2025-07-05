@@ -17,55 +17,65 @@ internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
 
   // NOTE: Avoiding for-in syntax to avoid bounds checks
   //
-  // TODO(String performance): SIMD-ize
-  //
+  // TODO(String performance): Remove this manual SIMD-ization when Swift compiler
+  // becomes smart enough to auto-vectorize simple loops like:
+  // for i in 0..<count where ptr[i] & 0x80 != 0 { return false }
+
+  let ptr = input.baseAddress._unsafelyUnwrappedUnchecked
+  var i = 0
+
   let count = input.count
-  var ptr = unsafe UnsafeRawPointer(input.baseAddress._unsafelyUnwrappedUnchecked)
+  let stride = MemoryLayout<UInt>.stride
+  let simd4UintStride = MemoryLayout<SIMD4<UInt>>.stride
 
-  let asciiMask64 = 0x8080_8080_8080_8080 as UInt64
-  let asciiMask32 = UInt32(truncatingIfNeeded: asciiMask64)
-  let asciiMask16 = UInt16(truncatingIfNeeded: asciiMask64)
-  let asciiMask8 = UInt8(truncatingIfNeeded: asciiMask64)
-  
-  let end128 = unsafe ptr + count & ~(MemoryLayout<(UInt64, UInt64)>.stride &- 1)
-  let end64 = unsafe ptr + count & ~(MemoryLayout<UInt64>.stride &- 1)
-  let end32 = unsafe ptr + count & ~(MemoryLayout<UInt32>.stride &- 1)
-  let end16 = unsafe ptr + count & ~(MemoryLayout<UInt16>.stride &- 1)
-  let end = unsafe ptr + count
+  // Safety assertions for memory layout and operations
+  assert(simd4UintStride == stride * 4, "SIMD4<UInt> must be exactly 4 UInt words")
+  assert(stride >= 4, "UInt stride must be at least 4 bytes")
+  assert(count >= 0, "Buffer count must be non-negative")
+  _debugPrecondition(ptr != nil, "Buffer base address must be valid")
 
-  
-  while unsafe ptr < end128 {
-    let pair = unsafe ptr.loadUnaligned(as: (UInt64, UInt64).self)
-    let result = (pair.0 | pair.1) & asciiMask64
-    guard result == 0 else { return false }
-    unsafe ptr = unsafe ptr + MemoryLayout<(UInt64, UInt64)>.stride
-  }
-  
-  // If we had enough bytes for two iterations of this, we would have hit
-  // the loop above, so we only need to do this once
-  if unsafe ptr < end64 {
-    let value = unsafe ptr.loadUnaligned(as: UInt64.self)
-    guard value & asciiMask64 == 0 else { return false }
-    unsafe ptr = unsafe ptr + MemoryLayout<UInt64>.stride
-  }
-  
-  if unsafe ptr < end32 {
-    let value = unsafe ptr.loadUnaligned(as: UInt32.self)
-    guard value & asciiMask32 == 0 else { return false }
-    unsafe ptr = unsafe ptr + MemoryLayout<UInt32>.stride
-  }
-  
-  if unsafe ptr < end16 {
-    let value = unsafe ptr.loadUnaligned(as: UInt16.self)
-    guard value & asciiMask16 == 0 else { return false }
-    unsafe ptr = unsafe ptr + MemoryLayout<UInt16>.stride
+  // ASCII validation masks: check high bit (0x80) in each byte
+  let wordASCIIMask = UInt(truncatingIfNeeded: 0x8080_8080_8080_8080 as UInt64)
+  let byteASCIIMask = UInt8(truncatingIfNeeded: 0x80 as UInt8)
+  let simd4ASCIIMask = SIMD4<UInt>(repeating: wordASCIIMask)
+  let simd4Zero = SIMD4<UInt>(repeating: 0)
+
+  // Process individual bytes until word-aligned
+  while Int(bitPattern: ptr + i) % stride != 0 && i < count {
+    guard ptr[i] & byteASCIIMask == 0 else { return false }
+    i &+= 1
   }
 
-  if unsafe ptr < end {
-    let value = unsafe ptr.loadUnaligned(fromByteOffset: 0, as: UInt8.self)
-    guard value & asciiMask8 == 0 else { return false }
+  // Process words until SIMD4-aligned or not enough bytes for SIMD4
+  while Int(bitPattern: ptr + i) % simd4UintStride != 0 && (i &+ simd4UintStride) <= count {
+    _debugPrecondition(i + stride <= count, "Word access must be within bounds")
+    let word: UInt = (ptr + i).withMemoryRebound(to: UInt.self, capacity: 1) { $0.pointee }
+    guard word & wordASCIIMask == 0 else { return false }
+    i &+= stride
   }
-  unsafe _internalInvariant(ptr == end || ptr + 1 == end)
+
+  // Process SIMD4 chunks - main optimization for bulk ASCII validation
+  while (i &+ simd4UintStride) <= count {
+    _debugPrecondition(Int(bitPattern: ptr + i) % simd4UintStride == 0, "SIMD4 access must be aligned")
+    _debugPrecondition(i + simd4UintStride <= count, "SIMD4 access must be within bounds")
+    let simd4: SIMD4<UInt> = (ptr + i).withMemoryRebound(to: SIMD4<UInt>.self, capacity: 1) { $0.pointee }
+    guard simd4 & simd4ASCIIMask == simd4Zero else { return false }
+    i &+= simd4UintStride
+  }
+
+  // Process remaining full words that don't fit in SIMD4 chunks
+  while (i &+ stride) <= count {
+    _debugPrecondition(i + stride <= count, "Word access must be within bounds")
+    let word: UInt = (ptr + i).withMemoryRebound(to: UInt.self, capacity: 1) { $0.pointee }
+    guard word & wordASCIIMask == 0 else { return false }
+    i &+= stride
+  }
+
+  // Process final individual bytes
+  while i < count {
+    guard ptr[i] & byteASCIIMask == 0 else { return false }
+    i &+= 1
+  }
   return true
 }
 
