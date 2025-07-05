@@ -406,7 +406,11 @@ die:
 
 // CHECK-LABEL: begin running test {{.*}} on preserve_dead_end_4
 // CHECK-LABEL: sil [ossa] @preserve_dead_end_4 : {{.*}} {
-// CHECK-NOT:     destroy_value [dead_end]
+// CHECK:         cond_br undef, [[EXIT:bb[0-9]+]], [[DIE:bb[0-9]+]]
+// CHECK:       [[EXIT]]:
+// CHECK:         destroy_value {{%[^,]+}}
+// CHECK:       [[DIE]]:
+// CHECK:         destroy_value [dead_end] {{%[^,]+}}
 // CHECK-LABEL: } // end sil function 'preserve_dead_end_4'
 // CHECK-LABEL: end running test {{.*}} on preserve_dead_end_4
 sil [ossa] @preserve_dead_end_4 : $@convention(thin) () -> () {
@@ -436,7 +440,8 @@ die:
 
 // CHECK-LABEL: begin running test {{.*}} on preserve_dead_end_5
 // CHECK-LABEL: sil [ossa] @preserve_dead_end_5 : {{.*}} {
-// CHECK-NOT:     destroy_value [dead_end]
+// CHECK:         apply {{%[^,]+}}()
+// CHECK:         destroy_value [dead_end]
 // CHECK-LABEL: } // end sil function 'preserve_dead_end_5'
 // CHECK-LABEL: end running test {{.*}} on preserve_dead_end_5
 sil [ossa] @preserve_dead_end_5 : $@convention(thin) () -> () {
@@ -488,7 +493,11 @@ die2:
 
 // CHECK-LABEL: begin running test {{.*}} on preserve_dead_end_7
 // CHECK-LABEL: sil [ossa] @preserve_dead_end_7 : {{.*}} {
-// CHECK-NOT:     destroy_value [dead_end]
+// CHECK:         cond_br undef, [[DIE1:bb[0-9]+]], [[DIE2:bb[0-9]+]]
+// CHECK:       [[DIE1]]:
+// CHECK:         destroy_value {{%[^,]+}}
+// CHECK:       [[DIE2]]:
+// CHECK:         destroy_value [dead_end] {{%[^,]+}}
 // CHECK-LABEL: } // end sil function 'preserve_dead_end_7'
 // CHECK-LABEL: end running test {{.*}} on preserve_dead_end_7
 sil [ossa] @preserve_dead_end_7 : $@convention(thin) () -> () {
@@ -998,4 +1007,42 @@ entry:
   destroy_value %c
   %retval = tuple ()
   return %retval : $()
+}
+
+// A final destroy in a dead-end region may not actually end the copy-extended
+// lifetime.
+// CHECK-LABEL: begin running test {{.*}} on dont_end_lifetimes_at_final_destroys_in_unreachable
+// CHECK-LABEL: sil [ossa] @dont_end_lifetimes_at_final_destroys_in_unreachable : {{.*}} {
+// CHECK:         [[C:%[^,]+]] = apply undef()
+// CHECK:         [[BORROW:%[^,]+]] = begin_borrow [[C]]
+// CHECK:         cond_br undef, [[EXIT:bb[0-9]+]], [[DIE:bb[0-9]+]]
+// CHECK:       [[DIE]]:
+// CHECK-NEXT:    fix_lifetime [[BORROW]]
+// CHECK-NEXT:    unreachable
+// CHECK:       [[EXIT]]:
+// CHECK:         fix_lifetime [[BORROW]]
+// CHECK:         end_borrow [[BORROW]]
+// CHECK:         destroy_value [[C]]
+// CHECK-LABEL: } // end sil function 'dont_end_lifetimes_at_final_destroys_in_unreachable'
+// CHECK-LABEL: end running test {{.*}} on dont_end_lifetimes_at_final_destroys_in_unreachable: canonicalize_ossa_lifetime with: true, false, true, %c
+sil [ossa] @dont_end_lifetimes_at_final_destroys_in_unreachable : $@convention(thin) () -> () {
+  %c = apply undef() : $@convention(thin) () -> (@owned C)
+  specify_test "canonicalize_ossa_lifetime true false true %c"
+  %copy = copy_value %c
+  %borrow = begin_borrow %copy
+  cond_br undef, exit, die
+
+die:
+  // NOTE: copy-extended lifetime does NOT end here!
+  destroy_value %c
+  fix_lifetime %borrow
+  unreachable
+
+exit:
+  destroy_value %c
+  fix_lifetime %borrow
+  end_borrow %borrow
+  destroy_value %copy
+  %retval = tuple ()
+  return %retval
 }
