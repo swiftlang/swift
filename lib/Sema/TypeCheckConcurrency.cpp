@@ -4384,8 +4384,13 @@ namespace {
 
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
-      case ActorIsolation::CallerIsolationInheriting:
       case ActorIsolation::NonisolatedUnsafe:
+        actorExpr = new (ctx) NilLiteralExpr(loc, /*implicit=*/false);
+        break;
+      case ActorIsolation::CallerIsolationInheriting:
+        // For caller isolation this expression will be replaced in SILGen
+        // because we're adding an implicit isolated parameter that #isolated
+        // must resolve to, but cannot do so during AST expansion quite yet.
         actorExpr = new (ctx) NilLiteralExpr(loc, /*implicit=*/false);
         break;
       }
