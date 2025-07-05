@@ -68,8 +68,7 @@ class CMemoryReader final : public MemoryReader {
   // Check to see if an address has bits outside the ptrauth mask. This suggests
   // that we're likely failing to strip a signed pointer when reading from it.
   bool hasSignatureBits(RemoteAddress address) {
-    uint64_t addressData = address.getAddressData();
-    return addressData != (addressData & getPtrauthMask());
+    return address != (address & getPtrauthMask());
   }
 
 public:
@@ -88,7 +87,7 @@ public:
   RemoteAddress getSymbolAddress(const std::string &name) override {
     auto addressData = Impl.getSymbolAddress(Impl.reader_context,
                                              name.c_str(), name.size());
-    return RemoteAddress(addressData);
+    return RemoteAddress(addressData, RemoteAddress::DefaultAddressSpace);
   }
 
   uint64_t getStringLength(RemoteAddress address) {
@@ -132,9 +131,13 @@ public:
     };
     return ReadBytesResult(Ptr, freeLambda);
   }
+  RemoteAddress stripSignedPointer(RemoteAddress P) override {
+    assert(P.getAddressSpace() == 0);
+    auto PtrAuthMask = getPtrauthMask();
+    return P & PtrAuthMask;
+  }
 };
-
-}
-}
+} // namespace remote
+} // namespace swift
 
 #endif

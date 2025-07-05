@@ -104,9 +104,18 @@ class InProcessMemoryReader final : public MemoryReader {
   ReadBytesResult readBytes(RemoteAddress address, uint64_t size) override {
     return ReadBytesResult(address.getLocalPointer<void>(), [](const void *) {});
   }
+
+  RemoteAddress stripSignedPointer(RemoteAddress P) override {
+    assert(P.getAddressSpace() == 0);
+    uintptr_t PtrAuthMask = 0;
+    if (!queryDataLayout(DataLayoutQueryType::DLQ_GetPtrAuthMask, nullptr,
+                         &PtrAuthMask))
+      return RemoteAddress();
+    return P & PtrAuthMask;
+  }
 };
- 
-}
-}
+
+} // namespace remote
+} // namespace swift
 
 #endif
