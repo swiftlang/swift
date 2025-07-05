@@ -214,6 +214,9 @@ ERROR(scanner_find_cycle, none,
 NOTE(scanner_find_cycle_swift_overlay_path, none,
      "Swift Overlay dependency of '%0' on '%1' via Clang module dependency: '%2'", (StringRef, StringRef, StringRef))
 
+NOTE(scanner_cycle_source_target_shadow_module, none,
+     "source target '%0' shadowing a%select{ |n SDK }2Swift module with the same name at: '%1'", (StringRef, StringRef, bool))
+
 ERROR(scanner_arguments_invalid, none,
       "dependencies scanner cannot be configured with arguments: '%0'", (StringRef))
 

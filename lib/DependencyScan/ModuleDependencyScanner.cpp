@@ -1868,28 +1868,6 @@ void ModuleDependencyScanner::diagnoseScannerFailure(
   }
 }
 
-static std::string getModuleDefiningPath(const ModuleDependencyInfo &info) {
-  std::string path = "";
-  switch (info.getKind()) {
-  case swift::ModuleDependencyKind::SwiftInterface:
-    path = info.getAsSwiftInterfaceModule()->swiftInterfaceFile;
-    break;
-  case swift::ModuleDependencyKind::SwiftBinary:
-    path = info.getAsSwiftBinaryModule()->compiledModulePath;
-    break;
-  case swift::ModuleDependencyKind::Clang:
-    path = info.getAsClangModule()->moduleMapFile;
-    break;
-  case swift::ModuleDependencyKind::SwiftSource:
-  default:
-    llvm_unreachable("Unexpected dependency kind");
-  }
-
-  // Relative to the `module.modulemap` or `.swiftinterface` or `.swiftmodule`,
-  // the defininig path is the parent directory of the file.
-  return llvm::sys::path::parent_path(path).str();
-}
-
 std::optional<std::pair<ModuleDependencyID, std::string>>
 ModuleDependencyScanner::attemptToFindResolvingSerializedSearchPath(
     const ScannerImportStatementInfo &moduleImport,
@@ -1922,13 +1900,13 @@ ModuleDependencyScanner::attemptToFindResolvingSerializedSearchPath(
               /* isTestableImport */ false);
           if (!result.empty())
             return std::make_pair(binaryDepID,
-                                  getModuleDefiningPath(result[0].second));
+                                  result[0].second.getModuleDefiningPath());
 
           result = ScanningWorker->scanFilesystemForClangModuleDependency(
               getModuleImportIdentifier(moduleImport.importIdentifier), {});
           if (!result.empty())
-            return std::make_pair(binaryDepID,
-                                  getModuleDefiningPath(result[0].second));
+            return std::make_pair(
+                binaryDepID, result[0].second.getModuleDefiningPath());
           return std::nullopt;
         });
     if (result)
