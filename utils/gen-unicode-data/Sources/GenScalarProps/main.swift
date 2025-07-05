@@ -14,7 +14,7 @@ import GenUtils
 
 func generateScalarProps(for platform: String) {
   var result = readFile("Input/ScalarPropData.h")
-  
+
   generateBinaryProps(for: platform, into: &result)
   generateNumericProps(into: &result)
   generateNameAliasProp(into: &result)
@@ -22,12 +22,12 @@ func generateScalarProps(for platform: String) {
   generateNameProp(into: &result)
   generateAgeProp(into: &result)
   generateGeneralCategory(into: &result)
-  
+
   result += """
-  #endif // #ifndef SCALAR_PROP_DATA_H
-  
-  """
-  
+    #endif // #ifndef SCALAR_PROP_DATA_H
+
+    """
+
   write(result, to: "Output/\(platform)/ScalarPropData.h")
 }
 

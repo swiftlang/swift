@@ -16,7 +16,7 @@ enum NumericType: String {
   case numeric = "Numeric"
   case digit = "Digit"
   case decimal = "Decimal"
-  
+
   var binaryRepresentation: UInt32 {
     switch self {
     case .numeric:
@@ -38,32 +38,32 @@ func getNumericTypes(
     guard !line.hasPrefix("#") else {
       continue
     }
-    
+
     let info = line.split(separator: "#")
     let components = info[0].split(separator: ";")
-    
+
     let filteredProperty = components[1].filter { !$0.isWhitespace }
-    
+
     guard let numericType = NumericType(rawValue: filteredProperty) else {
       continue
     }
-    
+
     let scalars: ClosedRange<UInt32>
-    
+
     let filteredScalars = components[0].filter { !$0.isWhitespace }
-    
+
     // If we have . appear, it means we have a legitimate range. Otherwise,
     // it's a singular scalar.
     if filteredScalars.contains(".") {
       let range = filteredScalars.split(separator: ".")
-      
+
       scalars = UInt32(range[0], radix: 16)! ... UInt32(range[1], radix: 16)!
     } else {
       let scalar = UInt32(filteredScalars, radix: 16)!
-      
+
       scalars = scalar ... scalar
     }
-    
+
     result.append((scalars, numericType))
   }
 }
@@ -77,28 +77,28 @@ func getNumericValues(
     guard !line.hasPrefix("#") else {
       continue
     }
-    
+
     let info = line.split(separator: "#")
     let components = info[0].split(separator: ";")
-    
+
     let filteredValue = components[3].filter { !$0.isWhitespace }
-    
+
     let scalars: ClosedRange<UInt32>
-    
+
     let filteredScalars = components[0].filter { !$0.isWhitespace }
-    
+
     // If we have . appear, it means we have a legitimate range. Otherwise,
     // it's a singular scalar.
     if filteredScalars.contains(".") {
       let range = filteredScalars.split(separator: ".")
-      
+
       scalars = UInt32(range[0], radix: 16)! ... UInt32(range[1], radix: 16)!
     } else {
       let scalar = UInt32(filteredScalars, radix: 16)!
-      
+
       scalars = scalar ... scalar
     }
-    
+
     result.append((scalars, filteredValue))
   }
 }
@@ -109,10 +109,10 @@ func emitNumericData(
   into result: inout String
 ) {
   result += """
-  #define NUMERIC_TYPE_COUNT \(types.count)
+    #define NUMERIC_TYPE_COUNT \(types.count)
 
 
-  """
+    """
 
   emitCollection(
     types,
@@ -123,14 +123,14 @@ func emitNumericData(
     var value = range.lowerBound
     assert(range.count - 1 <= UInt8.max)
     value |= UInt32(range.count - 1) << 21
-    
+
     value |= type.binaryRepresentation << 29
-    
+
     return "0x\(String(value, radix: 16, uppercase: true))"
   }
-  
+
   let uniqueValues = Array(Set(values.map { $0.1 }))
-  
+
   emitCollection(
     uniqueValues,
     name: "_swift_stdlib_numeric_values",
@@ -139,35 +139,35 @@ func emitNumericData(
   ) {
     "(double) \($0)"
   }
-  
+
   var allScalars: [UInt64] = []
-  
+
   for (range, _) in values {
     for scalar in range {
       allScalars.append(UInt64(scalar))
     }
   }
-  
+
   let valueMph = mph(for: allScalars)
-  
+
   emitMph(
     valueMph,
     name: "_swift_stdlib_numeric_values",
     defineLabel: "NUMERIC_VALUES",
     into: &result
   )
-  
+
   var valueIndices: [UInt8] = .init(repeating: 0, count: allScalars.count)
-  
+
   for scalar in allScalars {
     let idx = valueMph.index(for: scalar)
-    
+
     let value = values.first { $0.0.contains(UInt32(scalar)) }!
     let valueIdx = uniqueValues.firstIndex(of: value.1)!
-    
+
     valueIndices[idx] = UInt8(valueIdx)
   }
-  
+
   emitCollection(
     valueIndices,
     name: "_swift_stdlib_numeric_values_indices",
@@ -178,13 +178,13 @@ func emitNumericData(
 func generateNumericProps(into result: inout String) {
   let derivedNumericType = readFile("Data/16/DerivedNumericType.txt")
   let derivedNumericValues = readFile("Data/16/DerivedNumericValues.txt")
-  
+
   var numericTypes: [(ClosedRange<UInt32>, NumericType)] = []
   var numericValues: [(ClosedRange<UInt32>, String)] = []
-  
+
   getNumericTypes(from: derivedNumericType, into: &numericTypes)
   getNumericValues(from: derivedNumericValues, into: &numericValues)
-  
+
   emitNumericData(
     types: flatten(numericTypes),
     values: flatten(numericValues),

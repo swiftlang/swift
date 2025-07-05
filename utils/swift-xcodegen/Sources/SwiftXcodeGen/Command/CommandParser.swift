@@ -33,9 +33,11 @@ struct CommandParser {
     var input = input
     return try input.withUTF8 { bytes in
       var parser = Self(bytes)
-      guard let executable = try parser.consumeExecutable(
-        dropPrefixBeforeKnownCommand: true
-      ) else {
+      guard
+        let executable = try parser.consumeExecutable(
+          dropPrefixBeforeKnownCommand: true
+        )
+      else {
         return nil
       }
       // We're parsing an arbitrary shell command so stop if we hit a shell
@@ -46,7 +48,8 @@ struct CommandParser {
   }
 
   static func parseArguments(
-    _ input: String, for command: KnownCommand
+    _ input: String,
+    for command: KnownCommand
   ) throws -> [Command.Argument] {
     var input = input
     return try input.withUTF8 { bytes in
@@ -163,7 +166,8 @@ extension CommandParser {
 
 extension CommandParser {
   mutating func tryConsumeOption(
-    _ option: ByteScanner, for flagSpec: Command.FlagSpec.Element
+    _ option: ByteScanner,
+    for flagSpec: Command.FlagSpec.Element
   ) throws -> Command.Argument? {
     var option = option
     let flag = flagSpec.flag
@@ -171,7 +175,8 @@ extension CommandParser {
       return nil
     }
     func makeOption(
-      spacing: Command.OptionSpacing, _ value: String
+      spacing: Command.OptionSpacing,
+      _ value: String
     ) -> Command.Argument {
       .option(flag, spacing: spacing, value: value)
     }
@@ -185,15 +190,20 @@ extension CommandParser {
     if spacing.contains(.unspaced), option.hasInput {
       return makeOption(spacing: .unspaced, String(utf8: option.remaining))
     }
+
+    // https://github.com/swiftlang/swift-format/issues/1037
+    // swift-format-ignore
     if spacing.contains(.spaced), !option.hasInput,
-       let value = try consumeElement() {
+       let value = try consumeElement()
+    {
       return makeOption(spacing: .spaced, String(utf8: value))
     }
     return option.empty ? .flag(flag) : nil
   }
 
   mutating func consumeOption(
-    _ option: ByteScanner, dash: Command.Flag.Dash
+    _ option: ByteScanner,
+    dash: Command.Flag.Dash
   ) throws -> Command.Argument? {
     // NOTE: If we ever expand the list of flags, we'll likely want to use a
     // trie or something here.
@@ -213,8 +223,12 @@ extension CommandParser {
       var numDashes = 0
       if option.tryEat("-") { numDashes += 1 }
       if option.tryEat("-") { numDashes += 1 }
+
+      // https://github.com/swiftlang/swift-format/issues/1037
+      // swift-format-ignore
       guard let dash = Command.Flag.Dash(numDashes: numDashes),
-            let result = try consumeOption(option, dash: dash) else {
+            let result = try consumeOption(option, dash: dash)
+      else {
         return .value(String(utf8: option.whole))
       }
       return result

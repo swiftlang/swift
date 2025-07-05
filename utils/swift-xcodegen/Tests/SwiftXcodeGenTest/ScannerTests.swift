@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import XCTest
+
 @testable import SwiftXcodeGen
 
 class ScannerTests: XCTestCase {

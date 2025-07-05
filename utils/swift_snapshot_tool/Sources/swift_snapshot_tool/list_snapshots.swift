@@ -19,7 +19,8 @@ struct ListSnapshots: AsyncParsableCommand {
       Downloads the current list of available snapshots from swift.org and
       outputs the snapshots to stdout. Useful to see what snapshots are
       available.
-      """)
+      """
+  )
 
   @Flag var platform: Platform = .osx
 
