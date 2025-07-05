@@ -3640,17 +3640,17 @@ BuiltinUnboundGenericType::getGenericSignature() const {
   case TypeKind::BuiltinFixedArray: {
     auto Count = GenericTypeParamType::get(C.getIdentifier("Count"),
                                            GenericTypeParamKind::Value,
-                                           0, 0, C.getIntType(), C);
+                                           0, 0, 0, C.getIntType(), C);
     auto Element = GenericTypeParamType::get(C.getIdentifier("Element"),
                                              GenericTypeParamKind::Type,
-                                             0, 1, Type(), C);
+                                             0, 1, 0, Type(), C);
     return GenericSignature::get({Count, Element}, {});
   }
   
   case TypeKind::BuiltinInteger: {
     auto bits = GenericTypeParamType::get(C.getIdentifier("Bits"),
                                           GenericTypeParamKind::Type,
-                                          0, 0, C.getIntType(), C);
+                                          0, 0, 0, C.getIntType(), C);
     return GenericSignature::get(bits, {});
   }
   default:

@@ -5066,10 +5066,10 @@ GenericFunctionType::GenericFunctionType(
 GenericTypeParamType *GenericTypeParamType::get(Identifier name,
                                                 GenericTypeParamKind paramKind,
                                                 unsigned depth, unsigned index,
-                                                Type valueType,
+                                                unsigned weight, Type valueType,
                                                 const ASTContext &ctx) {
   llvm::FoldingSetNodeID id;
-  GenericTypeParamType::Profile(id, paramKind, depth, index, /*weight=*/0,
+  GenericTypeParamType::Profile(id, paramKind, depth, index, weight,
                                 valueType, name);
 
   void *insertPos;
@@ -5080,7 +5080,7 @@ GenericTypeParamType *GenericTypeParamType::get(Identifier name,
   if (paramKind == GenericTypeParamKind::Pack)
     props |= RecursiveTypeProperties::HasParameterPack;
 
-  auto canType = GenericTypeParamType::get(paramKind, depth, index, /*weight=*/0,
+  auto canType = GenericTypeParamType::get(paramKind, depth, index, weight,
                                            valueType, ctx);
 
   auto result = new (ctx, AllocationArena::Permanent)
