@@ -565,16 +565,18 @@ std::unique_ptr<ReflectionContextHolder> makeReflectionContextForObjectFiles(
   const std::vector<const ObjectFile *> &objectFiles, bool ObjCInterop) {
   auto Reader = std::make_shared<ObjectMemoryReader>(objectFiles);
 
-  uint8_t pointerSize;
-  Reader->queryDataLayout(DataLayoutQueryType::DLQ_GetPointerSize, nullptr,
-                          &pointerSize);
+  auto pointerSize = Reader->getPointerSize();
+  if (!pointerSize) {
+    fputs("unable to get target pointer size\n", stderr);
+    abort();
+  }
 
-  switch (pointerSize) {
+  switch (pointerSize.value()) {
   case 4:
 #define MAKE_CONTEXT(INTEROP, PTRSIZE)                                         \
   makeReflectionContextForMetadataReader<                                      \
       External<INTEROP<RuntimeTarget<PTRSIZE>>>>(std::move(Reader),            \
-                                                 pointerSize)
+                                                 pointerSize.value())
 #if SWIFT_OBJC_INTEROP
     if (ObjCInterop)
       return MAKE_CONTEXT(WithObjCInterop, 4);

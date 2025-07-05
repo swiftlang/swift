@@ -22,6 +22,7 @@
 #include "swift/SwiftRemoteMirror/MemoryReaderInterface.h"
 #include <optional>
 
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <functional>
@@ -37,7 +38,80 @@ namespace remote {
 /// This abstraction presents memory as if it were a read-only
 /// representation of the address space of a remote process.
 class MemoryReader {
+  uint8_t cachedPointerSize = 0;
+  uint8_t cachedSizeSize = 0;
+  uint64_t cachedPtrAuthMask = 0;
+  uint8_t cachedObjCReservedLowBits = 0xff;
+  uint64_t cachedLeastValidPointerValue = 0;
+  uint8_t cachedObjCInteropIsEnabled = 0xff;
+
+protected:
+  virtual bool queryDataLayout(DataLayoutQueryType type, void *inBuffer,
+                               void *outBuffer) = 0;
+
 public:
+  std::optional<uint8_t> getPointerSize() {
+    if (cachedPointerSize == 0) {
+      if (!queryDataLayout(DLQ_GetPointerSize, nullptr, &cachedPointerSize))
+        return std::nullopt;
+    }
+    return cachedPointerSize;
+  }
+
+  std::optional<uint8_t> getSizeSize() {
+    if (cachedSizeSize == 0) {
+      if (!queryDataLayout(DLQ_GetSizeSize, nullptr, &cachedSizeSize))
+        return std::nullopt;
+    }
+    return cachedSizeSize;
+  }
+
+  std::optional<uint64_t> getPtrAuthMask() {
+    if (cachedPtrAuthMask == 0) {
+      auto ptrSize = getPointerSize();
+      if (!ptrSize)
+        return std::nullopt;
+
+      if (ptrSize.value() == sizeof(uint64_t)) {
+        if (!queryDataLayout(DLQ_GetPtrAuthMask, nullptr, &cachedPtrAuthMask))
+          return std::nullopt;
+      } else if (ptrSize.value() == sizeof(uint32_t)) {
+        uint32_t mask;
+        if (!queryDataLayout(DLQ_GetPtrAuthMask, nullptr, &mask))
+          return std::nullopt;
+        cachedPtrAuthMask = mask;
+      }
+    }
+    return cachedPtrAuthMask;
+  }
+
+  std::optional<uint8_t> getObjCReservedLowBits() {
+    if (cachedObjCReservedLowBits == 0xff) {
+      if (!queryDataLayout(DLQ_GetObjCReservedLowBits, nullptr,
+                           &cachedObjCReservedLowBits))
+        return std::nullopt;
+    }
+    return cachedObjCReservedLowBits;
+  }
+
+  std::optional<uint64_t> getLeastValidPointerValue() {
+    if (cachedLeastValidPointerValue == 0) {
+      if (!queryDataLayout(DLQ_GetLeastValidPointerValue, nullptr,
+                           &cachedLeastValidPointerValue))
+        return std::nullopt;
+    }
+    return cachedLeastValidPointerValue;
+  }
+
+  std::optional<bool> getObjCInteropIsEnabled() {
+    if (cachedObjCInteropIsEnabled == 0xff) {
+      if (!queryDataLayout(DLQ_GetObjCInteropIsEnabled, nullptr,
+                           &cachedObjCInteropIsEnabled))
+        return std::nullopt;
+    }
+    return cachedObjCInteropIsEnabled;
+  }
+
   /// A convenient name for the return type from readBytes.
   using ReadBytesResult =
       std::unique_ptr<const void, std::function<void(const void *)>>;
@@ -45,9 +119,6 @@ public:
   template <typename T>
   using ReadObjResult =
       std::unique_ptr<const T, std::function<void(const void *)>>;
-
-  virtual bool queryDataLayout(DataLayoutQueryType type, void *inBuffer,
-                               void *outBuffer) = 0;
 
   /// Look up the given public symbol name in the remote process.
   virtual RemoteAddress getSymbolAddress(const std::string &name) = 0;
@@ -209,50 +280,37 @@ public:
   // index (counting from 0).
   bool readHeapObjectExtraInhabitantIndex(RemoteAddress address,
                                           int *extraInhabitantIndex) {
-    uint8_t PointerSize;
-    if (!queryDataLayout(DataLayoutQueryType::DLQ_GetPointerSize,
-                         nullptr, &PointerSize)) {
+    auto PointerSize = getPointerSize();
+    auto LeastValidPointerValue = getLeastValidPointerValue();
+    auto ObjCReservedLowBits = getObjCReservedLowBits();
+
+    if (!PointerSize || !LeastValidPointerValue || !ObjCReservedLowBits)
       return false;
-    }
-    uint64_t LeastValidPointerValue;
-    if (!queryDataLayout(DataLayoutQueryType::DLQ_GetLeastValidPointerValue,
-                         nullptr, &LeastValidPointerValue)) {
-      return false;
-    }
-    uint8_t ObjCReservedLowBits;
-    if (!queryDataLayout(DataLayoutQueryType::DLQ_GetObjCReservedLowBits,
-                         nullptr, &ObjCReservedLowBits)) {
-      return false;
-    }
+
     uint64_t RawPointerValue;
-    if (!readInteger(address, PointerSize, &RawPointerValue)) {
+    if (!readInteger(address, PointerSize.value(), &RawPointerValue)) {
       return false;
     }
-    if (RawPointerValue >= LeastValidPointerValue) {
+    if (RawPointerValue >= LeastValidPointerValue.value()) {
       *extraInhabitantIndex = -1; // Valid value, not an XI
     } else {
-      *extraInhabitantIndex = (RawPointerValue >> ObjCReservedLowBits);
+      *extraInhabitantIndex = (RawPointerValue >> ObjCReservedLowBits.value());
     }
     return true;
   }
 
   bool readFunctionPointerExtraInhabitantIndex(RemoteAddress address,
                                                int *extraInhabitantIndex) {
-    uint8_t PointerSize;
-    if (!queryDataLayout(DataLayoutQueryType::DLQ_GetPointerSize,
-                         nullptr, &PointerSize)) {
+    auto PointerSize = getPointerSize();
+    auto LeastValidPointerValue = getLeastValidPointerValue();
+    if (!PointerSize || !LeastValidPointerValue)
       return false;
-    }
-    uint64_t LeastValidPointerValue;
-    if (!queryDataLayout(DataLayoutQueryType::DLQ_GetLeastValidPointerValue,
-                         nullptr, &LeastValidPointerValue)) {
-      return false;
-    }
+
     uint64_t RawPointerValue;
-    if (!readInteger(address, PointerSize, &RawPointerValue)) {
+    if (!readInteger(address, PointerSize.value(), &RawPointerValue)) {
       return false;
     }
-    if (RawPointerValue >= LeastValidPointerValue) {
+    if (RawPointerValue >= LeastValidPointerValue.value()) {
       *extraInhabitantIndex = -1; // Valid value, not an XI
     } else {
       *extraInhabitantIndex = RawPointerValue;
