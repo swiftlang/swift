@@ -1154,6 +1154,7 @@ class ExistentialTypeInfoBuilder {
   TypeConverter &TC;
   std::vector<const TypeRef *> Protocols;
   const TypeRef *Superclass = nullptr;
+  remote::RemoteAbsolutePointer Shape;
   ExistentialTypeRepresentation Representation;
   ReferenceCounting Refcounting;
   bool ObjC;
@@ -1319,6 +1320,24 @@ public:
 
   void addAnyObject() {
     Representation = ExistentialTypeRepresentation::Class;
+  }
+
+  void addShape(const ProtocolCompositionTypeRef *Protocol,
+                ExtendedExistentialTypeShapeFlags Flags) {
+    switch (Flags.getSpecialKind()) {
+    case ExtendedExistentialTypeShapeFlags::SpecialKind::Class:
+      Representation = ExistentialTypeRepresentation::Class;
+      break;
+    case ExtendedExistentialTypeShapeFlags::SpecialKind::Metatype:
+    case ExtendedExistentialTypeShapeFlags::SpecialKind::ExplicitLayout:
+    case ExtendedExistentialTypeShapeFlags::SpecialKind::None:
+      Representation = ExistentialTypeRepresentation::Opaque;
+      break;
+    }
+
+    if (Protocol)
+      for (auto *Protocol : Protocol->getProtocols())
+        addProtocol(Protocol);
   }
 
   const TypeInfo *build(remote::TypeInfoProvider *ExternalTypeInfo) {
@@ -1780,6 +1799,11 @@ public:
     return true;
   }
 
+  bool visitSymbolicExtendedExistentialTypeRef(
+      const SymbolicExtendedExistentialTypeRef *SEET) {
+    return true;
+  }
+
   bool
   visitSILBoxTypeRef(const SILBoxTypeRef *SB) {
     return true;
@@ -1920,6 +1944,11 @@ public:
 
   MetatypeRepresentation
   visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
+    return MetatypeRepresentation::Thin;
+  }
+
+  MetatypeRepresentation visitSymbolicExtendedExistentialTypeRef(
+      const SymbolicExtendedExistentialTypeRef *SEET) {
     return MetatypeRepresentation::Thin;
   }
 
@@ -2518,6 +2547,13 @@ public:
     }
 
     return builder.buildMetatype(ExternalTypeInfo);
+  }
+
+  const TypeInfo *visitSymbolicExtendedExistentialTypeRef(
+      const SymbolicExtendedExistentialTypeRef *SEET) {
+    ExistentialTypeInfoBuilder builder(TC);
+    builder.addShape(SEET->getProtocol(), SEET->getFlags());
+    return builder.build(ExternalTypeInfo);
   }
 
   const TypeInfo *
