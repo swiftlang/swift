@@ -6,9 +6,9 @@
 // RUN: %target-swift-frontend -emit-module %t/src/Lib.swift \
 // RUN:   -module-name Lib \
 // RUN:   -emit-module-path %t/Lib.swiftmodule \
-// RUN:   -enable-experimental-feature ExtensibleAttribute
+// RUN:   -enable-experimental-feature NonexhaustiveAttribute
 
-// Check that the errors are produced when using enums from module with `ExtensibleEnums` feature enabled.
+// Check that the errors are produced when using enums from module with `NonexhaustiveEnums` feature enabled.
 // RUN: %target-swift-frontend -typecheck %t/src/TestChecking.swift \
 // RUN:   -swift-version 5 -module-name Client -I %t \
 // RUN:   -verify
@@ -20,7 +20,7 @@
 // RUN:   -module-name Lib \
 // RUN:   -package-name Test \
 // RUN:   -emit-module-path %t/Lib.swiftmodule \
-// RUN:   -enable-experimental-feature ExtensibleAttribute
+// RUN:   -enable-experimental-feature NonexhaustiveAttribute
 
 
 // Different module but the same package
@@ -34,17 +34,16 @@
 // RUN:   -swift-version 6 -module-name Client -I %t \
 // RUN:   -verify
 
-// REQUIRES: swift_feature_ExtensibleAttribute
+// REQUIRES: swift_feature_NonexhaustiveAttribute
 
 //--- Lib.swift
 
-@extensible
+@nonexhaustive
 public enum E {
   case a
 }
 
-@preEnumExtensibility
-@extensible
+@nonexhaustive(warn)
 public enum PE {
   case a
 }
@@ -70,7 +69,7 @@ func test_same_module(e: E, f: F) {
 import Lib
 
 func test(e: E, pe: PE, f: F) {
-  // `E` is marked as `@extensible` which means it gets new semantics
+  // `E` is marked as `@nonexhaustive` which means it gets new semantics
 
   switch e {
   // expected-warning@-1 {{switch covers known cases, but 'E' may have additional unknown values, possibly added in future versions; this is an error in the Swift 6 language mode}}

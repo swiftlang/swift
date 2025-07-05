@@ -519,8 +519,8 @@ EXPERIMENTAL_FEATURE(AllowRuntimeSymbolDeclarations, true)
 /// Allow use of `@cdecl`
 EXPERIMENTAL_FEATURE(CDecl, false)
 
-/// Allow use of `@extensible` on public enums
-SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ExtensibleAttribute, false)
+/// Allow use of `@nonexhaustive` on public enums
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(NonexhaustiveAttribute, false)
 
 /// Allow use of `Module::name` syntax
 EXPERIMENTAL_FEATURE(ModuleSelector, false)

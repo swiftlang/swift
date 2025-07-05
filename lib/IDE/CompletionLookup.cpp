@@ -3278,6 +3278,11 @@ void CompletionLookup::getAttributeDeclParamCompletions(
         getStoredPropertyCompletions(NT);
       }
     }
+    break;
+  }
+  case ParameterizedDeclAttributeKind::Nonexhaustive: {
+    addDeclAttrParamKeyword("warn", /*Parameters=*/{}, "", false);
+    break;
   }
   }
 }
