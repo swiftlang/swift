@@ -257,7 +257,7 @@ extension ASTGenVisitor {
     }
 
     var names: [BridgedDeclNameRef] = []
-    var nameLocs: [BridgedDeclNameLoc] = []
+    var nameLocs: [DeclNameLoc] = []
 
     func collectNames(expr node: ExprSyntax) -> Bool {
       if let declRefExpr = node.as(DeclReferenceExprSyntax.self) {

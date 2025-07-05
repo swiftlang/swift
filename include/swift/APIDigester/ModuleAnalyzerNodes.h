@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -242,7 +242,9 @@ public:
   void diagnose(YAMLNodeTy node, Diag<ArgTypes...> ID,
                 typename detail::PassArgument<ArgTypes>::type... args) {
     auto smRange = node->getSourceRange();
-    auto range = SourceRange(SourceLoc(smRange.Start), SourceLoc(smRange.End));
+    auto range =
+        SourceRange(SourceLoc::getFromPointer(smRange.Start.getPointer()),
+                    SourceLoc::getFromPointer(smRange.End.getPointer()));
     Diags.diagnose(range.Start, ID, std::forward<ArgTypes>(args)...)
       .highlight(range);
   }

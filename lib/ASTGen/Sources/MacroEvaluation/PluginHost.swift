@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift open source project
 //
-// Copyright (c) 2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2023-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See http://swift.org/LICENSE.txt for license information
@@ -334,7 +334,7 @@ class PluginDiagnosticsEngine {
   private func bridgedSourceLoc(
     at offset: Int,
     in fileName: String
-  ) -> BridgedSourceLoc {
+  ) -> SourceLoc {
     // Find the corresponding exported source file.
     guard let exportedSourceFile = exportedSourceFileByName[fileName] else {
       return nil
@@ -348,20 +348,20 @@ class PluginDiagnosticsEngine {
     guard offset <= exportedSourceFile.pointee.buffer.count else {
       return nil
     }
-    return BridgedSourceLoc(raw: bufferBaseAddress).advanced(by: offset)
+    return SourceLoc(raw: bufferBaseAddress.advanced(by: offset))
   }
 
-  /// C++ source location from a position value from a plugin.
+  /// Returns a C++ source location from a position value from a plugin.
   private func bridgedSourceLoc(
     at position: PluginMessage.Diagnostic.Position
-  ) -> BridgedSourceLoc {
+  ) -> SourceLoc {
     return bridgedSourceLoc(at: position.offset, in: position.fileName)
   }
 
-  /// C++ source range from a range value from a plugin.
+  /// Returns a C++ source range from a range value from a plugin.
   private func bridgedSourceRange(
     for range: PluginMessage.Diagnostic.PositionRange
-  ) -> (start: BridgedSourceLoc, end: BridgedSourceLoc)? {
+  ) -> (start: SourceLoc, end: SourceLoc)? {
     let start = bridgedSourceLoc(at: range.startOffset, in: range.fileName)
     let end = bridgedSourceLoc(at: range.endOffset, in: range.fileName)
 
