@@ -147,6 +147,15 @@ struct PSendableS: @MainActor PSendable { // expected-note{{requirement specifie
   func f() { }
 }
 
+protocol R: SendableMetatype {
+  func f()
+}
+
+// expected-warning@+1{{main actor-isolated conformance of 'RSendableSMainActor' to SendableMetatype-inheriting protocol 'R' can never be used with generic code}}
+@MainActor struct RSendableSMainActor: @MainActor R {
+  func f() { }
+}
+
 // ----------------------------------------------------------------------------
 // Use checking of isolated conformances.
 // ----------------------------------------------------------------------------
@@ -234,4 +243,13 @@ func testIsolatedConformancesOnAssociatedTypes(hc: HoldsC, c: C) {
   // conformance of C: P can cross isolation boundaries via the Sendable Self's
   // associated type.
   HoldsC.acceptSendableAliased(C.self)
+}
+
+
+struct MyHashable: @MainActor Hashable {
+  var counter = 0
+}
+
+@concurrent func testMyHashableSet() async {
+  let _: Set<MyHashable> = [] // expected-warning{{main actor-isolated conformance of 'MyHashable' to 'Hashable' cannot be used in nonisolated context}}
 }
