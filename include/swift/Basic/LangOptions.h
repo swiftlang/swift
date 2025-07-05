@@ -355,8 +355,6 @@ namespace swift {
       return CXXStdlib == PlatformDefaultCXXStdlib;
     }
 
-    bool CForeignReferenceTypes = false;
-
     /// Imports getters and setters as computed properties.
     bool CxxInteropGettersSettersAsProperties = false;
 

@@ -867,7 +867,7 @@ def cxx_interoperability_mode :
 def experimental_c_foreign_reference_types :
   Flag<["-"], "experimental-c-foreign-reference-types">,
   Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption]>,
-  HelpText<"Enable experimental C foreign references types (with reference counting).">;
+  HelpText<"Enable experimental C foreign references types. Deprecated, has no effect.">;
 
 def experimental_hermetic_seal_at_link:
   Flag<["-"], "experimental-hermetic-seal-at-link">,
