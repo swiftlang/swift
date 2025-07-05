@@ -253,3 +253,18 @@ extension CxxDictionary {
     return result
   }
 }
+
+extension Dictionary {
+  @inlinable
+  public init(_ dictionary: some CxxDictionary<Key, Value>) {
+    self.init()
+
+    var it = dictionary.__beginUnsafe()
+    let endIterator = dictionary.__endUnsafe()
+    while it != endIterator {
+      self[it.pointee.first] = it.pointee.second
+      it = it.successor()
+    }
+    withExtendedLifetime(dictionary) {}
+  }
+}
