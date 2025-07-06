@@ -15,8 +15,12 @@
 #include "swift/SILOptimizer/Analysis/RegionAnalysis.h"
 
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/PackConformance.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/FrozenMultiMap.h"
@@ -270,6 +274,56 @@ struct AddressBaseComputingVisitor
 
 } // namespace
 
+/// Determine the isolation of conformances that could be introduced by a cast from sourceType to
+/// destType.
+///
+///
+static SILIsolationInfo getIsolationForCastConformances(
+    SILValue value, CanType sourceType, CanType destType) {
+  // If the enclosing function is @concurrent, then a cast cannot pick up
+  // any isolated conformances because it's not on any actor.
+  auto function = value->getFunction();
+  auto functionIsolation = function->getActorIsolation();
+  if (functionIsolation && functionIsolation->isNonisolated())
+    return {};
+
+  auto sendableMetatype =
+    sourceType->getASTContext().getProtocol(KnownProtocolKind::SendableMetatype);
+  if (!sendableMetatype)
+    return {};
+
+  if (!destType.isAnyExistentialType())
+    return {};
+
+  const auto &destLayout = destType.getExistentialLayout();
+  for (auto proto : destLayout.getProtocols()) {
+    // If the source type already conforms to the protocol, we won't be looking
+    // it up dynamically.
+    if (!lookupConformance(sourceType, proto, /*allowMissing=*/false).isInvalid())
+      continue;
+
+    // If the protocol inherits SendableMetatype, it can't have isolated
+    // conformances.
+    if (proto->inheritsFrom(sendableMetatype))
+      continue;
+
+    // The cast can produce a conformance with the same isolation as this
+    // function is dynamically executing. If that's known (i.e., because we're
+    // on a global actor), the value is isolated to that global actor.
+    // Otherwise, it's task-isolated.
+    if (functionIsolation && functionIsolation->isGlobalActor()) {
+      return SILIsolationInfo::getGlobalActorIsolated(
+          value, functionIsolation->getGlobalActor());
+    }
+
+    // Consider the cast to be task-isolated, because the runtime could find
+    // a conformance that is isolated to the current context.
+    return SILIsolationInfo::getTaskIsolated(value);
+  }
+
+  return {};
+}
+
 /// Classify an instructions as look through when we are looking through
 /// values. We assert that all instructions that are CONSTANT_TRANSLATION
 /// LookThrough to make sure they stay in sync.
@@ -317,7 +371,6 @@ static bool isStaticallyLookThroughInst(SILInstruction *inst) {
   case SILInstructionKind::StrongCopyUnmanagedValueInst:
   case SILInstructionKind::RefToUnmanagedInst:
   case SILInstructionKind::UnmanagedToRefInst:
-  case SILInstructionKind::InitExistentialValueInst:
   case SILInstructionKind::UncheckedEnumDataInst:
   case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::TupleElementAddrInst:
@@ -332,6 +385,15 @@ static bool isStaticallyLookThroughInst(SILInstruction *inst) {
   case SILInstructionKind::UnconditionalCheckedCastInst: {
     auto cast = SILDynamicCastInst::getAs(inst);
     assert(cast);
+
+    // If this cast introduces isolation due to conformances, we cannot look
+    // through it to the source.
+    if (!getIsolationForCastConformances(
+            llvm::cast<UnconditionalCheckedCastInst>(inst),
+            cast.getSourceFormalType(), cast.getTargetFormalType())
+              .isDisconnected())
+      return false;
+
     if (cast.isRCIdentityPreserving())
       return true;
     return false;
@@ -2166,6 +2228,13 @@ private:
     return valueMap.lookupValueID(value);
   }
 
+  /// Determine the isolation of a set of conformances.
+  ///
+  /// This function identifies potentially-isolated conformances that might affect the isolation of the given
+  /// value.
+  SILIsolationInfo getIsolationFromConformances(
+      SILValue value, ArrayRef<ProtocolConformanceRef> conformances);
+
 public:
   /// Return the partition consisting of all function arguments.
   ///
@@ -2868,13 +2937,19 @@ public:
 
   template <typename Collection>
   void translateSILMerge(SILValue dest, Collection srcCollection,
-                         bool requireOperands = true) {
-    auto destResult = tryToTrackValue(dest);
+                         bool requireOperands,
+                         SILIsolationInfo resultIsolationInfoOverride = {}) {
+    auto destResult =  tryToTrackValue(dest);
     if (!destResult)
       return;
 
     if (requireOperands) {
       builder.addRequire(*destResult);
+
+      if (resultIsolationInfoOverride && !srcCollection.empty()) {
+        using std::begin;
+        builder.addActorIntroducingInst(dest, *begin(srcCollection), resultIsolationInfoOverride);
+      }
     }
 
     for (Operand *op : srcCollection) {
@@ -2893,17 +2968,29 @@ public:
 
   template <>
   void translateSILMerge<Operand *>(SILValue dest, Operand *src,
-                                    bool requireOperands) {
+                                    bool requireOperands,
+                                    SILIsolationInfo resultIsolationInfoOverride) {
     return translateSILMerge(dest, TinyPtrVector<Operand *>(src),
-                             requireOperands);
+                             requireOperands, resultIsolationInfoOverride);
   }
 
   void translateSILMerge(MutableArrayRef<Operand> array,
-                         bool requireOperands = true) {
+                         bool requireOperands,
+                         SILIsolationInfo resultIsolationInfoOverride = {}) {
     if (array.size() < 2)
       return;
 
-    auto destResult = tryToTrackValue(array.front().get());
+    std::optional<TrackableValueLookupResult> destResult;
+    if (resultIsolationInfoOverride) {
+      if (auto nonSendableValue = initializeTrackedValue(
+              array.front().get(), resultIsolationInfoOverride)) {
+        destResult = TrackableValueLookupResult{
+            nonSendableValue->first, std::nullopt};
+      }
+    } else {
+      destResult = tryToTrackValue(array.front().get());
+    }
+
     if (!destResult)
       return;
 
@@ -2928,7 +3015,8 @@ public:
   /// captures by applications), then these can be treated as assignments of \p
   /// dest to src. If the \p dest could be aliased, then we must instead treat
   /// them as merges, to ensure any aliases of \p dest are also updated.
-  void translateSILStore(Operand *dest, Operand *src) {
+  void translateSILStore(Operand *dest, Operand *src,
+                          SILIsolationInfo resultIsolationInfoOverride = {}) {
     SILValue destValue = dest->get();
 
     if (auto destResult = tryToTrackValue(destValue)) {
@@ -2947,11 +3035,13 @@ public:
       // TODO: Should this change if we have a Sendable address with a
       // non-Sendable base.
       if (destResult.value().value.isNoAlias() &&
+          !resultIsolationInfoOverride &&
           !isProjectedFromAggregate(destValue))
         return translateSILAssign(destValue, src);
 
       // Stores to possibly aliased storage must be treated as merges.
-      return translateSILMerge(destValue, src);
+      return translateSILMerge(destValue, src, /*requireOperand*/true,
+                               resultIsolationInfoOverride);
     }
 
     // Stores to storage of non-Sendable type can be ignored.
@@ -2981,7 +3071,8 @@ public:
 
       // Stores to possibly aliased storage must be treated as merges.
       return translateSILMerge(dest,
-                               makeOperandRefRange(inst->getElementOperands()));
+                               makeOperandRefRange(inst->getElementOperands()),
+                               /*requireOperands=*/true);
     }
 
     // Stores to storage of non-Sendable type can be ignored.
@@ -3026,10 +3117,12 @@ public:
   // and a pointer to the bb being branches to itself.
   // this is handled as assigning to each possible arg being branched to the
   // merge of all values that could be passed to it from this basic block.
-  void translateSILPhi(TermArgSources &argSources) {
+  void translateSILPhi(TermArgSources &argSources,
+                       SILIsolationInfo resultIsolationInfoOverride = {}) {
     argSources.argSources.setFrozen();
     for (auto pair : argSources.argSources.getRange()) {
-      translateSILMultiAssign(TinyPtrVector<SILValue>(pair.first), pair.second);
+      translateSILMultiAssign(TinyPtrVector<SILValue>(pair.first), pair.second,
+                              resultIsolationInfoOverride);
     }
   }
 
@@ -3355,8 +3448,6 @@ CONSTANT_TRANSLATION(CopyBlockInst, Assign)
 CONSTANT_TRANSLATION(CopyBlockWithoutEscapingInst, Assign)
 CONSTANT_TRANSLATION(IndexAddrInst, Assign)
 CONSTANT_TRANSLATION(InitBlockStorageHeaderInst, Assign)
-CONSTANT_TRANSLATION(InitExistentialAddrInst, Assign)
-CONSTANT_TRANSLATION(InitExistentialRefInst, Assign)
 CONSTANT_TRANSLATION(OpenExistentialBoxInst, Assign)
 CONSTANT_TRANSLATION(OpenExistentialRefInst, Assign)
 CONSTANT_TRANSLATION(TailAddrInst, Assign)
@@ -3425,7 +3516,6 @@ CONSTANT_TRANSLATION(StrongCopyWeakValueInst, LookThrough)
 CONSTANT_TRANSLATION(StrongCopyUnmanagedValueInst, LookThrough)
 CONSTANT_TRANSLATION(RefToUnmanagedInst, LookThrough)
 CONSTANT_TRANSLATION(UnmanagedToRefInst, LookThrough)
-CONSTANT_TRANSLATION(InitExistentialValueInst, LookThrough)
 CONSTANT_TRANSLATION(UncheckedEnumDataInst, LookThrough)
 CONSTANT_TRANSLATION(TupleElementAddrInst, LookThrough)
 CONSTANT_TRANSLATION(StructElementAddrInst, LookThrough)
@@ -3437,7 +3527,7 @@ CONSTANT_TRANSLATION(UncheckedTakeEnumDataAddrInst, LookThrough)
 //
 
 // These are treated as stores - meaning that they could write values into
-// memory. The beahvior of this depends on whether the tgt addr is aliased,
+// memory. The behavior of this depends on whether the tgt addr is aliased,
 // but conservative behavior is to treat these as merges of the regions of
 // the src value and tgt addr
 CONSTANT_TRANSLATION(CopyAddrInst, Store)
@@ -3446,7 +3536,6 @@ CONSTANT_TRANSLATION(StoreInst, Store)
 CONSTANT_TRANSLATION(StoreWeakInst, Store)
 CONSTANT_TRANSLATION(MarkUnresolvedMoveAddrInst, Store)
 CONSTANT_TRANSLATION(UncheckedRefCastAddrInst, Store)
-CONSTANT_TRANSLATION(UnconditionalCheckedCastAddrInst, Store)
 CONSTANT_TRANSLATION(StoreUnownedInst, Store)
 
 //===---
@@ -3521,7 +3610,6 @@ CONSTANT_TRANSLATION(YieldInst, Require)
 // Terminators that act as phis.
 CONSTANT_TRANSLATION(BranchInst, TerminatorPhi)
 CONSTANT_TRANSLATION(CondBranchInst, TerminatorPhi)
-CONSTANT_TRANSLATION(CheckedCastBranchInst, TerminatorPhi)
 CONSTANT_TRANSLATION(DynamicMethodBranchInst, TerminatorPhi)
 
 // Function exiting terminators.
@@ -3923,13 +4011,34 @@ PartitionOpTranslator::visitPointerToAddressInst(PointerToAddressInst *ptai) {
 
 TranslationSemantics PartitionOpTranslator::visitUnconditionalCheckedCastInst(
     UnconditionalCheckedCastInst *ucci) {
-  if (SILDynamicCastInst(ucci).isRCIdentityPreserving()) {
+  auto isolation = getIsolationForCastConformances(
+      ucci, ucci->getSourceFormalType(), ucci->getTargetFormalType());
+
+  if (isolation.isDisconnected() &&
+      SILDynamicCastInst(ucci).isRCIdentityPreserving()) {
     assert(isStaticallyLookThroughInst(ucci) && "Out of sync");
     return TranslationSemantics::LookThrough;
   }
 
   assert(!isStaticallyLookThroughInst(ucci) && "Out of sync");
-  return TranslationSemantics::Assign;
+  translateSILMultiAssign(
+      ucci->getResults(), makeOperandRefRange(ucci->getAllOperands()),
+      isolation);
+  return TranslationSemantics::Special;
+}
+
+TranslationSemantics PartitionOpTranslator::visitUnconditionalCheckedCastAddrInst(
+    UnconditionalCheckedCastAddrInst *uccai) {
+  auto isolation = getIsolationForCastConformances(
+      uccai->getAllOperands()[CopyLikeInstruction::Dest].get(),
+      uccai->getSourceFormalType(), uccai->getTargetFormalType());
+
+  translateSILStore(
+      &uccai->getAllOperands()[CopyLikeInstruction::Dest],
+      &uccai->getAllOperands()[CopyLikeInstruction::Src],
+      isolation);
+
+  return TranslationSemantics::Special;
 }
 
 // RefElementAddrInst is not considered to be a lookThrough since we want to
@@ -4018,9 +4127,112 @@ PartitionOpTranslator::visitPartialApplyInst(PartialApplyInst *pai) {
   return TranslationSemantics::Special;
 }
 
+SILIsolationInfo
+PartitionOpTranslator::getIsolationFromConformances(
+    SILValue value, ArrayRef<ProtocolConformanceRef> conformances) {
+  for (auto conformance: conformances) {
+    // If the conformance is a pack, recurse.
+    if (conformance.isPack()) {
+      auto pack = conformance.getPack();
+      for (auto innerConformance : pack->getPatternConformances()) {
+        auto isolation = getIsolationFromConformances(value, innerConformance);
+        if (isolation)
+          return isolation;
+      }
+
+      continue;
+    }
+
+    // If a concrete conformance is global-actor-isolated, then the resulting
+    // value must be.
+    if (conformance.isConcrete()) {
+      auto isolation = conformance.getConcrete()->getIsolation();
+      if (isolation.isGlobalActor()) {
+        return SILIsolationInfo::getGlobalActorIsolated(
+            value, isolation.getGlobalActor());
+      }
+
+      continue;
+    }
+
+    // If an abstract conformance is for a non-SendableMetatype-conforming
+    // type, the resulting value is task-isolated.
+    if (conformance.isAbstract()) {
+      auto sendableMetatype =
+        conformance.getType()->getASTContext()
+          .getProtocol(KnownProtocolKind::SendableMetatype);
+      if (sendableMetatype &&
+          lookupConformance(conformance.getType(), sendableMetatype,
+                            /*allowMissing=*/false).isInvalid()) {
+        return SILIsolationInfo::getTaskIsolated(value);
+      }
+    }
+  }
+
+  return {};
+}
+
+TranslationSemantics
+PartitionOpTranslator::visitInitExistentialAddrInst(InitExistentialAddrInst *ieai) {
+  auto conformanceIsolationInfo = getIsolationFromConformances(
+      ieai->getResult(0), ieai->getConformances());
+
+  translateSILMultiAssign(ieai->getResults(),
+                          makeOperandRefRange(ieai->getAllOperands()),
+                          conformanceIsolationInfo);
+
+  return TranslationSemantics::Special;
+}
+
+TranslationSemantics
+PartitionOpTranslator::visitInitExistentialRefInst(InitExistentialRefInst *ieri) {
+  auto conformanceIsolationInfo = getIsolationFromConformances(
+      ieri->getResult(0), ieri->getConformances());
+
+  translateSILMultiAssign(ieri->getResults(),
+                          makeOperandRefRange(ieri->getAllOperands()),
+                          conformanceIsolationInfo);
+
+  return TranslationSemantics::Special;
+}
+
+TranslationSemantics
+PartitionOpTranslator::visitInitExistentialValueInst(InitExistentialValueInst *ievi) {
+  auto conformanceIsolationInfo = getIsolationFromConformances(
+      ievi->getResult(0), ievi->getConformances());
+
+  translateSILMultiAssign(ievi->getResults(),
+                          makeOperandRefRange(ievi->getAllOperands()),
+                          conformanceIsolationInfo);
+
+  return TranslationSemantics::Special;
+}
+
+TranslationSemantics
+PartitionOpTranslator::visitCheckedCastBranchInst(CheckedCastBranchInst *ccbi) {
+  // Consider whether the value produced by the cast might be task-isolated.
+  auto resultValue = ccbi->getSuccessBB()->getArgument(0);
+  auto conformanceIsolation = getIsolationForCastConformances(
+      resultValue,
+      ccbi->getSourceFormalType(),
+      ccbi->getTargetFormalType());
+  TermArgSources sources;
+  sources.init(static_cast<SILInstruction *>(ccbi));
+  translateSILPhi(sources, conformanceIsolation);
+
+  return TranslationSemantics::Special;
+}
+
 TranslationSemantics PartitionOpTranslator::visitCheckedCastAddrBranchInst(
     CheckedCastAddrBranchInst *ccabi) {
   assert(ccabi->getSuccessBB()->getNumArguments() <= 1);
+
+  // Consider whether the value written into by the cast might be task-isolated.
+  auto resultValue = ccabi->getAllOperands().back().get();
+  auto conformanceIsolation = getIsolationForCastConformances(
+      resultValue,
+      ccabi->getSourceFormalType(),
+      ccabi->getTargetFormalType());
 
   // checked_cast_addr_br does not have any arguments in its resulting
   // block. We should just use a multi-assign on its operands.
@@ -4030,7 +4242,8 @@ TranslationSemantics PartitionOpTranslator::visitCheckedCastAddrBranchInst(
   // is. For now just keep the current behavior. It is more conservative,
   // but still correct.
   translateSILMultiAssign(ArrayRef<SILValue>(),
-                          makeOperandRefRange(ccabi->getAllOperands()));
+                          makeOperandRefRange(ccabi->getAllOperands()),
+                          conformanceIsolation);
   return TranslationSemantics::Special;
 }
 
