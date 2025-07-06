@@ -1892,7 +1892,6 @@ ArrayRef<unsigned> ExpandPreambleMacroRequest::evaluate(
 std::optional<unsigned>
 ExpandBodyMacroRequest::evaluate(Evaluator &evaluator,
                                  AnyFunctionRef fn) const {
-  auto *dc = fn.getAsDeclContext();
   std::optional<unsigned> bufferID;
   fn.forEachAttachedMacro(
       MacroRole::Body,
