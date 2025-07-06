@@ -23,5 +23,5 @@ protocol P1 : P0 where C == G1<I> {
 }
 
 protocol P2 : P1 where C == G2<I> {}
-// expected-error@-1 {{cannot build rewrite system for protocol; concrete type difference limit exceeded}}
-// expected-note@-2 {{failed rewrite rule is [P2:I].[concrete: G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<[P2:I]>>>>>>>>>>>>>>>>>>>>>>>>>> : Escapable] => [P2:I]}}
+// expected-error@-1 {{cannot build rewrite system for protocol; concrete type nesting limit exceeded}}
+// expected-note@-2 {{failed rewrite rule is [P2:I].[concrete: G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<G<[P2:I]>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>] => [P2:I]}}
