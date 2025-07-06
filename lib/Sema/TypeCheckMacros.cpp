@@ -1893,7 +1893,6 @@ std::optional<unsigned>
 ExpandBodyMacroRequest::evaluate(Evaluator &evaluator,
                                  AnyFunctionRef fn) const {
   auto *dc = fn.getAsDeclContext();
-  auto &ctx = dc->getASTContext();
   std::optional<unsigned> bufferID;
   fn.forEachAttachedMacro(
       MacroRole::Body,

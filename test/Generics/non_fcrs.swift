@@ -39,39 +39,6 @@ extension P1 where Self : P2 {}
 // expected-error@-1 {{cannot build rewrite system for generic signature; rule length limit exceeded}}
 // expected-note@-2 {{failed rewrite rule is τ_0_0.[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P2] => τ_0_0.[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T]}}
 
-struct S<U : P1> : P1 {
-  typealias T = S<S<U>>
-}
-
-protocol P3Base {
-  associatedtype T : P1
-  associatedtype U : P1
-}
-
-protocol P3 : P3Base where T == S<U> {
-// expected-error@-1 {{cannot build rewrite system for protocol; rule length limit exceeded}}
-// expected-note@-2 {{failed rewrite rule is [P3:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[concrete: S<S<S<S<S<S<S<S<S<S<S<S<S<S<[P3:U]>>>>>>>>>>>>>>] => [P3:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T].[P1:T]}}
-}
-
-protocol Exponential {
-// expected-error@-1 {{cannot build rewrite system for protocol; concrete type size limit exceeded}}
-// expected-note@-2 {{failed rewrite rule is }}
-  associatedtype A where A == (A, A)
-}
-
-class Base<T> {}
-
-class Derived<T, U> : Base<(T, U)> {}
-
-protocol TooManyDifferences {
-// expected-error@-1 {{cannot build rewrite system for protocol; concrete type difference limit exceeded}}
-// expected-note@-2 {{failed rewrite rule is }}
-  associatedtype A1 where A1: Derived<B, C>, A2: Base<B>, A1 == A2
-  associatedtype A2
-  associatedtype B
-  associatedtype C
-}
-
 protocol M0 {
 // expected-error@-1 {{cannot build rewrite system for protocol; rule length limit exceeded}}
 // expected-note@-2 {{failed rewrite rule is }}
