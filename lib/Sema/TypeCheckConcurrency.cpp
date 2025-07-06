@@ -3488,6 +3488,13 @@ namespace {
             getDeclContext(), RefineConformances{*this});
       }
 
+      if (auto *collectionExpr = dyn_cast<CollectionExpr>(expr)) {
+        checkIsolatedConformancesInContext(
+            collectionExpr->getInitializer(),
+            collectionExpr->getLoc(),
+            getDeclContext(), RefineConformances{*this});
+      }
+
       return Action::Continue(expr);
     }
 
@@ -8273,6 +8280,10 @@ RawConformanceIsolationRequest::evaluate(
   if (conformance->getOptions().contains(ProtocolConformanceFlags::Nonisolated))
     return ActorIsolation::forNonisolated(false);
 
+  auto dc = conformance->getDeclContext();
+  ASTContext &ctx = dc->getASTContext();
+  auto proto = conformance->getProtocol();
+
   // If there is an explicitly-specified global actor on the isolation,
   // resolve it and report it.
   if (auto globalActorTypeExpr = conformance->getExplicitGlobalActorIsolation()) {
@@ -8292,15 +8303,26 @@ RawConformanceIsolationRequest::evaluate(
       globalActorTypeExpr->setType(MetatypeType::get(globalActorType));
     }
 
+    // Isolated conformance to a SendableMetatype-inheriting protocol can
+    // never be used generically. Warn about it.
+    if (auto sendableMetatype =
+            ctx.getProtocol(KnownProtocolKind::SendableMetatype)) {
+      if (proto->inheritsFrom(sendableMetatype) &&
+          !getActorIsolation(proto).preconcurrency()) {
+        ctx.Diags.diagnose(
+            conformance->getLoc(),
+            diag::isolated_conformance_to_sendable_metatype,
+            ActorIsolation::forGlobalActor(globalActorType),
+            conformance->getType(),
+            proto);
+      }
+    }
+
     // FIXME: Make sure the type actually is a global actor type, map it into
     // context, etc.
 
     return ActorIsolation::forGlobalActor(globalActorType);
   }
-
-  auto dc = conformance->getDeclContext();
-  ASTContext &ctx = dc->getASTContext();
-  auto proto = conformance->getProtocol();
 
   // If the protocol itself is isolated, don't infer isolation for the
   // conformance.
