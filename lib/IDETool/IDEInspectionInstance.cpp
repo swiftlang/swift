@@ -213,8 +213,10 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
 
   // Check the invalidation first. Otherwise, in case no 'CacheCI' exists yet,
   // the flag will remain 'true' even after 'CachedCI' is populated.
-  if (CachedCIShouldBeInvalidated.exchange(false))
+  if (CachedCIShouldBeInvalidated.exchange(false)) {
+    CachedCI = nullptr;
     return false;
+  }
   if (!CachedCI)
     return false;
   if (CachedReuseCount >= Opts.MaxASTReuseCount)
