@@ -91,7 +91,7 @@ do {
 
 // rdar://146401190 ([nonescapable] implement non-inout parameter dependencies)
 @_lifetime(span: borrow holder)
-func testParameterDep(holder: AnyObject, span: Span<Int>) {}  // expected-error{{lifetime-dependent parameter must be 'inout'}}
+func testParameterDep(holder: AnyObject, span: Span<Int>) {}  // expected-error{{lifetime-dependent parameter 'span' must be 'inout'}}
 
 @_lifetime(&ne)
 func inoutLifetimeDependence(_ ne: inout NE) -> NE {
@@ -113,3 +113,16 @@ func dependOnEscapable(_ k: consuming Klass) -> NE {
   NE()
 }
 
+struct Wrapper : ~Escapable {
+  var _ne: NE
+
+  var ne: NE {
+    @_lifetime(copy self)
+    get {
+      _ne
+    }
+    @_lifetime(self: &self)
+    nonmutating _modify {// expected-error{{lifetime-dependent parameter 'self' must be 'inout'}}
+    }
+  }
+}

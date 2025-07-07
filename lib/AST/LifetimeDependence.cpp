@@ -880,7 +880,7 @@ protected:
       if (!targetDeclAndIndex->first->isInOut()) {
         diagnose(targetDeclAndIndex->first,
                  diag::lifetime_parameter_requires_inout,
-                 targetDescriptor->getName());
+                 targetDescriptor->getString());
       }
       targetIndex = targetDeclAndIndex->second;
     } else {
