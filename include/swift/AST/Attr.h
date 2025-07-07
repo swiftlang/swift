@@ -2925,7 +2925,7 @@ public:
       : DeclAttribute(DeclAttrKind::BackDeployed, AtLoc, Range, Implicit),
         Platform(Platform), Version(Version) {}
 
-  /// The platform the symbol is available for back deployment on.
+  /// The platform the decl is available for back deployment in.
   const PlatformKind Platform;
 
   /// The earliest platform version that may use the back deployed implementation.
@@ -2933,6 +2933,12 @@ public:
 
   /// Returns true if this attribute is active given the current platform.
   bool isActivePlatform(const ASTContext &ctx, bool forTargetVariant) const;
+
+  /// Returns the `AvailabilityDomain` that the decl is available for back
+  /// deployment in.
+  AvailabilityDomain getAvailabilityDomain() const {
+    return AvailabilityDomain::forPlatform(Platform);
+  }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::BackDeployed;
