@@ -420,9 +420,6 @@ public:
 
   llvm::MapVector<SILBasicBlock *, LoweredBB> LoweredBBs;
   
-  // Destination basic blocks for condfail traps.
-  llvm::SmallVector<llvm::BasicBlock *, 8> FailBBs;
-
   SILFunction *CurSILFn;
   // If valid, the address by means of which a return--which is direct in
   // SIL--is passed indirectly in IR.  Such indirection is necessary when the
@@ -1158,12 +1155,10 @@ public:
           }
 
           emitTypeMetadataRef(archetype);
-        } else if (auto packArchetype = dyn_cast<PackArchetypeType>(t)) {
-          emitTypeMetadataRef(packArchetype);
-        } else if (auto packtype = dyn_cast<SILPackType>(t)) {
+        } else if (auto packType = dyn_cast<SILPackType>(t)) {
           llvm::Value *Shape = emitPackShapeExpression(t);
           emitPackCountDebugVariable(Shape);
-        } else if (auto packtype = dyn_cast<PackType>(t)) {
+        } else if (auto packType = dyn_cast<PackType>(t)) {
           llvm::Value *Shape = emitPackShapeExpression(t);
           emitPackCountDebugVariable(Shape);
         }
@@ -1192,15 +1187,6 @@ public:
         ArtificialKind::RealValue, DbgInstrKind);
   }
 
-  void emitFailBB() {
-    if (!FailBBs.empty()) {
-      // Move the trap basic blocks to the end of the function.
-      for (auto *FailBB : FailBBs) {
-        CurFn->splice(CurFn->end(), CurFn, FailBB->getIterator());
-      }
-    }
-  }
-
   //===--------------------------------------------------------------------===//
   // SIL instruction lowering
   //===--------------------------------------------------------------------===//
@@ -1212,8 +1198,13 @@ public:
                           SILResultInfo ErrorInfo,
                           DebugValueInst *DbgValue);
   void emitPoisonDebugValueInst(DebugValueInst *i);
-  void emitDebugInfoForAllocStack(AllocStackInst *i, const TypeInfo &type,
-                                  llvm::Value *addr);
+  void emitDebugInfoBeforeAllocStack(AllocStackInst *i,
+                                     const TypeInfo &type,
+                                     DebugTypeInfo &DbgTy);
+  void emitDebugInfoAfterAllocStack(AllocStackInst *i,
+                                    const TypeInfo &type,
+                                    const DebugTypeInfo &DbgTy,
+                                    llvm::Value *addr);
   void visitAllocStackInst(AllocStackInst *i);
   void visitAllocPackInst(AllocPackInst *i);
   void visitAllocPackMetadataInst(AllocPackMetadataInst *i);
@@ -1964,9 +1955,6 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f)
 
 IRGenSILFunction::~IRGenSILFunction() {
   assert(Builder.hasPostTerminatorIP() && "did not terminate BB?!");
-  // Emit the fail BB if we have one.
-  if (!FailBBs.empty())
-    emitFailBB();
   LLVM_DEBUG(CurFn->print(llvm::dbgs()));
 }
 
@@ -6410,14 +6398,52 @@ void IRGenSILFunction::visitDestroyNotEscapedClosureInst(
   setLoweredExplosion(i, out);
 }
 
-void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
-                                                  const TypeInfo &type,
-                                                  llvm::Value *addr) {
+void IRGenSILFunction::emitDebugInfoBeforeAllocStack(AllocStackInst *i,
+                                                     const TypeInfo &type,
+                                                     DebugTypeInfo &DbgTy) {
   auto VarInfo = i->getVarInfo();
-  if (!VarInfo)
+  if (!VarInfo ||
+      !i->getDebugScope() ||
+      i->getDebugScope()->getInlinedFunction()->isTransparent())
     return;
 
   VarDecl *Decl = i->getDecl();
+
+  SILType SILTy;
+  if (auto MaybeSILTy = VarInfo->Type) {
+    // If there is auxiliary type info, use it
+    SILTy = *MaybeSILTy;
+  } else {
+    SILTy = i->getType();
+  }
+  auto RealType = SILTy.getASTType();
+  if (Decl) {
+    DbgTy = DebugTypeInfo::getLocalVariable(Decl, RealType, type, IGM);
+  } else if (i->getFunction()->isBare() && !SILTy.hasArchetype() &&
+             !VarInfo->Name.empty()) {
+    DbgTy = DebugTypeInfo::getFromTypeInfo(RealType, getTypeInfo(SILTy), IGM);
+  } else
+    return;
+
+  bindArchetypes(DbgTy.getType());
+}
+
+/// Do not instantiate type metadata in here, since this may allocate on-stack
+/// packs which will then be cleaned up in the wrong order with respect to the
+/// value stack allocation.
+void IRGenSILFunction::emitDebugInfoAfterAllocStack(AllocStackInst *i,
+                                                    const TypeInfo &type,
+                                                    const DebugTypeInfo &DbgTy,
+                                                    llvm::Value *addr) {
+  auto VarInfo = i->getVarInfo();
+  if (!VarInfo ||
+      !i->getDebugScope() ||
+      i->getDebugScope()->getInlinedFunction()->isTransparent())
+    return;
+
+  VarDecl *Decl = i->getDecl();
+  auto *DS = i->getDebugScope();
+
   // Describe the underlying alloca. This way an llvm.dbg.declare intrinsic
   // is used, which is valid for the entire lifetime of the alloca.
   if (auto *BitCast = dyn_cast<llvm::BitCastInst>(addr)) {
@@ -6434,13 +6460,6 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
       (void)isTaskAlloc;
     }
   }
-
-  auto DS = i->getDebugScope();
-  if (!DS)
-    return;
-
-  if (i->getDebugScope()->getInlinedFunction()->isTransparent())
-    return;
   
   bool IsAnonymous = false;
   VarInfo->Name = getVarName(i, IsAnonymous);
@@ -6475,25 +6494,15 @@ void IRGenSILFunction::emitDebugInfoForAllocStack(AllocStackInst *i,
     }
   }
 
-  SILType SILTy;
-  if (auto MaybeSILTy = VarInfo->Type) {
-    // If there is auxiliary type info, use it
-    SILTy = *MaybeSILTy;
-  } else {
-    SILTy = i->getType();
-  }
-  auto RealType = SILTy.getASTType();
-  DebugTypeInfo DbgTy;
-  if (Decl) {
-    DbgTy = DebugTypeInfo::getLocalVariable(Decl, RealType, type, IGM);
-  } else if (i->getFunction()->isBare() && !SILTy.hasArchetype() &&
-             !VarInfo->Name.empty()) {
-    DbgTy = DebugTypeInfo::getFromTypeInfo(RealType, getTypeInfo(SILTy), IGM);
-  } else
-    return;
+  if (DbgTy.getType() && IGM.DebugInfo) {
+    SILType SILTy;
+    if (auto MaybeSILTy = VarInfo->Type) {
+      // If there is auxiliary type info, use it
+      SILTy = *MaybeSILTy;
+    } else {
+      SILTy = i->getType();
+    }
 
-  bindArchetypes(DbgTy.getType());
-  if (IGM.DebugInfo) {
     emitDebugVariableDeclaration(
         addr, DbgTy, SILTy, DS, i->getLoc(), *VarInfo, Indirection,
         AddrDbgInstrKind(i->usesMoveableValueDebugInfo()));
@@ -6511,6 +6520,9 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   dbgname = getVarName(i, IsAnonymous);
 # endif
 
+  DebugTypeInfo DbgTy;
+  emitDebugInfoBeforeAllocStack(i, type, DbgTy);
+
   auto stackAddr = type.allocateStack(*this, i->getElementType(), dbgname);
   setLoweredStackAddress(i, stackAddr);
   Address addr = stackAddr.getAddress();
@@ -6525,7 +6537,7 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
         Ty->getStructOrBoundGenericStruct())
       zeroInit(dyn_cast<llvm::AllocaInst>(addr.getAddress()));
   }
-  emitDebugInfoForAllocStack(i, type, addr.getAddress());
+  emitDebugInfoAfterAllocStack(i, type, DbgTy, addr.getAddress());
 }
 
 void IRGenSILFunction::visitAllocPackInst(swift::AllocPackInst *i) {
@@ -7202,7 +7214,7 @@ visitUncheckedRefCastAddrInst(swift::UncheckedRefCastAddrInst *i) {
                   dest, i->getTargetFormalType(),
                   CastConsumptionKind::TakeAlways,
                   CheckedCastMode::Unconditional,
-                  CastingIsolatedConformances::Allow);
+                  CheckedCastInstOptions());
 }
 
 void IRGenSILFunction::visitUncheckedAddrCastInst(
@@ -7432,7 +7444,7 @@ void IRGenSILFunction::visitUnconditionalCheckedCastInst(
                         i->getTargetLoweredType(),
                         i->getTargetFormalType(),
                         CheckedCastMode::Unconditional,
-                        i->getIsolatedConformances(),
+                        i->getCheckedCastOptions(),
                         ex);
   setLoweredExplosion(i, ex);
 }
@@ -7622,7 +7634,7 @@ void IRGenSILFunction::visitUnconditionalCheckedCastAddrInst(
                   dest, i->getTargetFormalType(),
                   CastConsumptionKind::TakeAlways,
                   CheckedCastMode::Unconditional,
-                  i->getIsolatedConformances());
+                  i->getCheckedCastOptions());
 }
 
 void IRGenSILFunction::visitCheckedCastBranchInst(
@@ -7643,7 +7655,7 @@ void IRGenSILFunction::visitCheckedCastBranchInst(
                           i->getTargetLoweredType(),
                           i->getTargetFormalType(),
                           CheckedCastMode::Conditional,
-                          i->getIsolatedConformances(),
+                          i->getCheckedCastOptions(),
                           ex);
     auto val = ex.claimNext();
     castResult.casted = val;
@@ -7682,7 +7694,7 @@ void IRGenSILFunction::visitCheckedCastAddrBranchInst(
                     src, i->getSourceFormalType(),
                     dest, i->getTargetFormalType(),
                     i->getConsumptionKind(), CheckedCastMode::Conditional,
-                    i->getIsolatedConformances());
+                    i->getCheckedCastOptions());
   Builder.CreateCondBr(castSucceeded,
                        getLoweredBB(i->getSuccessBB()).bb,
                        getLoweredBB(i->getFailureBB()).bb);
@@ -8265,35 +8277,7 @@ void IRGenSILFunction::visitDestroyAddrInst(swift::DestroyAddrInst *i) {
 void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
   Explosion e = getLoweredExplosion(i->getOperand());
   llvm::Value *cond = e.claimNext();
-
-  // The condition should be false, or we die.
-  auto expectedCond = Builder.CreateExpect(cond,
-                                         llvm::ConstantInt::get(IGM.Int1Ty, 0));
-  
-  // Emit individual fail blocks so that we can map the failure back to a source
-  // line.
-  auto origInsertionPoint = Builder.GetInsertBlock();
-
-  llvm::BasicBlock *failBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
-  llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
-  auto br = Builder.CreateCondBr(expectedCond, failBB, contBB);
-
-  if (IGM.getOptions().AnnotateCondFailMessage && !i->getMessage().empty())
-    br->addAnnotationMetadata(i->getMessage());
-
-  Builder.SetInsertPoint(&CurFn->back());
-  Builder.emitBlock(failBB);
-  if (IGM.DebugInfo)
-    // If we are emitting DWARF, this does nothing. Otherwise the ``llvm.trap``
-    // instruction emitted from ``Builtin.condfail`` should have an inlined
-    // debug location. This is because zero is not an artificial line location
-    // in CodeView.
-    IGM.DebugInfo->setInlinedTrapLocation(Builder, i->getDebugScope());
-  emitTrap(i->getMessage(), /*EmitUnreachable=*/true);
-  
-  Builder.SetInsertPoint(origInsertionPoint);
-  Builder.emitBlock(contBB);
-  FailBBs.push_back(failBB);
+  emitConditionalTrap(cond, i->getMessage(), i->getDebugScope());
 }
 
 void IRGenSILFunction::visitIncrementProfilerCounterInst(

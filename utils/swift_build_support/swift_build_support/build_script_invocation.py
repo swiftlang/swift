@@ -108,6 +108,8 @@ class BuildScriptInvocation(object):
             "--swift-enable-assertions", str(args.swift_assertions).lower(),
             "--swift-stdlib-enable-assertions", str(
                 args.swift_stdlib_assertions).lower(),
+            "--swift-stdlib-enable-strict-availability", str(
+                args.swift_stdlib_strict_availability).lower(),
             "--swift-analyze-code-coverage", str(
                 args.swift_analyze_code_coverage).lower(),
             "--llbuild-enable-assertions", str(
@@ -621,7 +623,7 @@ class BuildScriptInvocation(object):
         # Swift still needs a few LLVM targets like tblgen to be built for it to be
         # configured. Instead, handle this in the product for now.
         builder.add_product(products.LLVM,
-                            is_enabled=True)
+                            is_enabled=self.args.build_llvm or self.args.build_swift or self.args.build_lldb)
 
         builder.add_product(products.StaticSwiftLinuxConfig,
                             is_enabled=self.args.install_static_linux_config)
@@ -669,8 +671,6 @@ class BuildScriptInvocation(object):
         builder.add_product(products.WASILibc,
                             is_enabled=self.args.build_wasmstdlib)
         builder.add_product(products.WasmLLVMRuntimeLibs,
-                            is_enabled=self.args.build_wasmstdlib)
-        builder.add_product(products.WasmThreadsLLVMRuntimeLibs,
                             is_enabled=self.args.build_wasmstdlib)
 
         builder.add_product(products.SwiftTestingMacros,

@@ -278,6 +278,7 @@ func rdar60727310() {
   func myAssertion<T>(_ a: T, _ op: ((T,T)->Bool), _ b: T) {}
   var e: Error? = nil
   myAssertion(e, ==, nil) // expected-error {{cannot convert value of type '(any Error)?' to expected argument type '(any (~Copyable & ~Escapable).Type)?'}}
+  // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('any Error' and 'any (~Copyable & ~Escapable).Type') are expected to be equal}}
 }
 
 // https://github.com/apple/swift/issues/54877
@@ -328,4 +329,67 @@ enum I60954 {
     // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
   }
   init?<S>(_ string: S) where S: StringProtocol {} // expected-note{{where 'S' = 'I60954'}}
+}
+
+infix operator <<<>>> : DefaultPrecedence
+
+protocol P5 {
+}
+
+struct Expr : P6 {}
+
+protocol P6: P5 {
+}
+
+extension P6 {
+  public static func <<<>>> (lhs: Self, rhs: (any P5)?) -> Expr { Expr() }
+  public static func <<<>>> (lhs: (any P5)?, rhs: Self) -> Expr { Expr() }
+  public static func <<<>>> (lhs: Self, rhs: some P6) -> Expr { Expr() }
+
+  public static prefix func ! (value: Self) -> Expr {
+    Expr()
+  }
+}
+
+extension P6 {
+  public static func != (lhs: Self, rhs: some P6) -> Expr {
+    !(lhs <<<>>> rhs) // Ok
+  }
+}
+
+do {
+  struct Value : P6 {
+  }
+
+  struct Column: P6 {
+  }
+
+  func test(col: Column, val: Value) -> Expr {
+    col <<<>>> val // Ok
+  }
+
+  func test(col: Column, val: some P6) -> Expr {
+    col <<<>>> val // Ok
+  }
+
+  func test(col: some P6, val: Value) -> Expr {
+    col <<<>>> val // Ok
+  }
+}
+
+// Make sure that ?? selects an overload that doesn't produce an optional.
+do {
+  class Obj {
+    var x: String!
+  }
+
+  class Child : Obj {
+    func x() -> String? { nil }
+    static func x(_: Int) -> String { "" }
+  }
+
+  func test(arr: [Child], v: String, defaultV: Child) -> Child {
+    let result = arr.first { $0.x == v } ?? defaultV
+    return result // Ok
+  }
 }

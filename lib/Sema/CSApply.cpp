@@ -116,7 +116,7 @@ Solution::computeSubstitutions(NullablePtr<ValueDecl> decl,
       } else if (!type->is<PackType>())
         type = PackType::getSingletonPackExpansion(type);
     }
-    replacementTypes.push_back(type);
+    replacementTypes.push_back(simplifyType(type));
   }
 
   auto lookupConformanceFn =
@@ -146,9 +146,9 @@ Solution::computeSubstitutions(NullablePtr<ValueDecl> decl,
     return conformance;
   };
 
-  return SubstitutionMap::get(sig,
-                              replacementTypes,
-                              lookupConformanceFn);
+  auto subs = SubstitutionMap::get(sig, replacementTypes, lookupConformanceFn);
+  ASSERT(!subs.getRecursiveProperties().isSolverAllocated());
+  return subs;
 }
 
 // Lazily instantiate function definitions for class template specializations.
@@ -1313,6 +1313,21 @@ namespace {
       return callExpr;
     }
 
+    std::optional<ActorIsolation>
+    getIsolationFromFunctionType(FunctionType *thunkTy) {
+      switch (thunkTy->getIsolation().getKind()) {
+      case FunctionTypeIsolation::Kind::NonIsolated:
+      case FunctionTypeIsolation::Kind::Parameter:
+      case FunctionTypeIsolation::Kind::Erased:
+        return {};
+      case FunctionTypeIsolation::Kind::GlobalActor:
+        return ActorIsolation::forGlobalActor(
+            thunkTy->getIsolation().getGlobalActorType());
+      case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+        return ActorIsolation::forCallerIsolationInheriting();
+      }
+    }
+
     /// Build a "{ args in base.fn(args) }" single-expression curry thunk.
     ///
     /// \param baseExpr The base expression to be captured, if warranted.
@@ -1355,19 +1370,8 @@ namespace {
       // we do not visit the inner autoclosure in the ActorIsolation checker
       // meaning that we do not properly call setActorIsolation on the
       // AbstractClosureExpr that we produce here.
-      switch (thunkTy->getIsolation().getKind()) {
-      case FunctionTypeIsolation::Kind::NonIsolated:
-      case FunctionTypeIsolation::Kind::Parameter:
-      case FunctionTypeIsolation::Kind::Erased:
-        break;
-      case FunctionTypeIsolation::Kind::GlobalActor:
-        thunk->setActorIsolation(ActorIsolation::forGlobalActor(
-            thunkTy->getIsolation().getGlobalActorType()));
-        break;
-      case FunctionTypeIsolation::Kind::NonIsolatedCaller:
-        thunk->setActorIsolation(
-            ActorIsolation::forCallerIsolationInheriting());
-        break;
+      if (auto isolation = getIsolationFromFunctionType(thunkTy)) {
+        thunk->setActorIsolation(*isolation);
       }
 
       cs.cacheType(thunk);
@@ -1536,6 +1540,31 @@ namespace {
         cs.cacheType(selfOpenedRef);
       }
 
+      auto outerActorIsolation = [&]() -> std::optional<ActorIsolation> {
+        auto resultType = outerThunkTy->getResult();
+        // Look through all optionals.
+        while (auto opt = resultType->getOptionalObjectType())
+          resultType = opt;
+        auto f =
+            getIsolationFromFunctionType(resultType->castTo<FunctionType>());
+        if (!f)
+          return {};
+
+        // If we have a non-async function and our "inferred" isolation is
+        // caller isolation inheriting, then we do not infer isolation and just
+        // use the default. The reason why we are doing this is:
+        //
+        // 1. nonisolated for synchronous functions is equivalent to
+        // nonisolated(nonsending).
+        //
+        // 2. There is a strong invariant in the compiler today that caller
+        // isolation inheriting is always async. By using nonisolated here, we
+        // avoid breaking that invariant.
+        if (!outerThunkTy->isAsync() && f->isCallerIsolationInheriting())
+          return {};
+        return f;
+      }();
+
       Expr *outerThunkBody = nullptr;
 
       // For an @objc optional member or a member found via dynamic lookup,
@@ -1566,6 +1595,11 @@ namespace {
         auto *innerThunk = buildSingleCurryThunk(
             selfOpenedRef, memberRef, cast<DeclContext>(member),
             outerThunkTy->getResult()->castTo<FunctionType>(), memberLocator);
+        assert((!outerActorIsolation ||
+                innerThunk->getActorIsolation().getKind() ==
+                    outerActorIsolation->getKind()) &&
+               "If we have an isolation for our double curry thunk it should "
+               "match our single curry thunk");
 
         // Rewrite the body to close the existential if warranted.
         if (hasOpenedExistential) {
@@ -1587,6 +1621,11 @@ namespace {
       outerThunk->setThunkKind(AutoClosureExpr::Kind::DoubleCurryThunk);
       outerThunk->setParameterList(
           ParameterList::create(ctx, SourceLoc(), selfParamDecl, SourceLoc()));
+
+      if (outerActorIsolation) {
+        outerThunk->setActorIsolation(*outerActorIsolation);
+      }
+
       cs.cacheType(outerThunk);
 
       return outerThunk;
@@ -1640,7 +1679,7 @@ namespace {
         // \endcode
         //
         // Here `P.foo` would be replaced with `S.foo`
-        if (!isExistentialMetatype && baseTy->is<ProtocolType>() &&
+        if (!isExistentialMetatype && baseTy->isConstraintType() &&
             member->isStatic()) {
           auto selfParam =
               overload.adjustedOpenedFullType->castTo<FunctionType>()->getParams()[0];
@@ -6097,15 +6136,20 @@ static bool hasCurriedSelf(ConstraintSystem &cs, ConcreteDeclRef callee,
 }
 
 /// Apply the contextually Sendable flag to the given expression,
-static void applyContextualClosureFlags(Expr *expr, bool implicitSelfCapture,
-                                        bool inheritActorContext,
-                                        bool isPassedToSendingParameter,
+static void applyContextualClosureFlags(Expr *expr, unsigned paramIdx,
+                                        const ParameterListInfo &paramInfo,
                                         bool requiresDynamicIsolationChecking,
                                         bool isMacroArg) {
   if (auto closure = dyn_cast<ClosureExpr>(expr)) {
-    closure->setAllowsImplicitSelfCapture(implicitSelfCapture);
-    closure->setInheritsActorContext(inheritActorContext);
-    closure->setIsPassedToSendingParameter(isPassedToSendingParameter);
+    closure->setAllowsImplicitSelfCapture(
+        paramInfo.isImplicitSelfCapture(paramIdx));
+
+    auto [inheritActorContext, modifier] =
+        paramInfo.inheritsActorContext(paramIdx);
+    closure->setInheritsActorContext(inheritActorContext, modifier);
+
+    closure->setIsPassedToSendingParameter(
+        paramInfo.isSendingParameter(paramIdx));
     closure->setRequiresDynamicIsolationChecking(
         requiresDynamicIsolationChecking);
     closure->setIsMacroArgument(isMacroArg);
@@ -6113,19 +6157,14 @@ static void applyContextualClosureFlags(Expr *expr, bool implicitSelfCapture,
   }
 
   if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
-    applyContextualClosureFlags(captureList->getClosureBody(),
-                                implicitSelfCapture, inheritActorContext,
-                                isPassedToSendingParameter,
-                                requiresDynamicIsolationChecking,
+    applyContextualClosureFlags(captureList->getClosureBody(), paramIdx,
+                                paramInfo, requiresDynamicIsolationChecking,
                                 isMacroArg);
   }
 
   if (auto identity = dyn_cast<IdentityExpr>(expr)) {
-    applyContextualClosureFlags(identity->getSubExpr(), implicitSelfCapture,
-                                inheritActorContext,
-                                isPassedToSendingParameter,
-                                requiresDynamicIsolationChecking,
-                                isMacroArg);
+    applyContextualClosureFlags(identity->getSubExpr(), paramIdx, paramInfo,
+                                requiresDynamicIsolationChecking, isMacroArg);
   }
 }
 
@@ -6251,19 +6290,13 @@ ArgumentList *ExprRewriter::coerceCallArguments(
 
   auto applyFlagsToArgument = [&paramInfo,
                                &closuresRequireDynamicIsolationChecking,
-                               &locator](
-                                  unsigned paramIdx, Expr *argument) {
+                               &locator](unsigned paramIdx, Expr *argument) {
     if (!isClosureLiteralExpr(argument))
       return;
 
-    bool isImplicitSelfCapture = paramInfo.isImplicitSelfCapture(paramIdx);
-    bool inheritsActorContext = paramInfo.inheritsActorContext(paramIdx);
-    bool isPassedToSendingParameter = paramInfo.isSendingParameter(paramIdx);
     bool isMacroArg = isExpr<MacroExpansionExpr>(locator.getAnchor());
 
-    applyContextualClosureFlags(argument, isImplicitSelfCapture,
-                                inheritsActorContext,
-                                isPassedToSendingParameter,
+    applyContextualClosureFlags(argument, paramIdx, paramInfo,
                                 closuresRequireDynamicIsolationChecking,
                                 isMacroArg);
   };
@@ -7737,11 +7770,13 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     }
 
     // If we have a ClosureExpr, then we can safely propagate a global actor
-    // to the closure without invalidating prior analysis.
+    // to the closure if it's not explicitly marked as `@concurrent` without
+    // invalidating prior analysis.
     fromEI = fromFunc->getExtInfo();
-    if (toEI.getGlobalActor() && !fromEI.getGlobalActor()) {
-      auto newFromFuncType = fromFunc->withExtInfo(
-          fromEI.withGlobalActor(toEI.getGlobalActor()));
+    if (toEI.getGlobalActor() && !fromEI.getGlobalActor() &&
+        !isClosureMarkedAsConcurrent(expr)) {
+      auto newFromFuncType =
+          fromFunc->withExtInfo(fromEI.withGlobalActor(toEI.getGlobalActor()));
       if (applyTypeToClosureExpr(cs, expr, newFromFuncType)) {
         fromFunc = newFromFuncType->castTo<FunctionType>();
 
@@ -8061,10 +8096,11 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   if (fromType->hasUnresolvedType() || toType->hasUnresolvedType())
     return cs.cacheType(new (ctx) UnresolvedTypeConversionExpr(expr, toType));
 
-  llvm::errs() << "Unhandled coercion:\n";
-  fromType->dump(llvm::errs());
-  toType->dump(llvm::errs());
-  abort();
+  ABORT([&](auto &out) {
+    out << "Unhandled coercion:\n";
+    fromType->dump(out);
+    toType->dump(out);
+  });
 }
 
 static bool isSelfRefInInitializer(Expr *baseExpr,

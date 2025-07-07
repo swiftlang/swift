@@ -335,12 +335,18 @@ LangOptions::FeatureState LangOptions::getFeatureState(Feature feature) const {
   return state;
 }
 
-bool LangOptions::hasFeature(Feature feature) const {
-  if (featureStates.getState(feature).isEnabled())
+bool LangOptions::hasFeature(Feature feature, bool allowMigration) const {
+  auto state = featureStates.getState(feature);
+  if (state.isEnabled())
     return true;
 
-  if (auto version = feature.getLanguageVersion())
-    return isSwiftVersionAtLeast(*version);
+  if (auto version = feature.getLanguageVersion()) {
+    if (isSwiftVersionAtLeast(*version))
+      return true;
+  }
+
+  if (allowMigration && state.isEnabledForMigration())
+    return true;
 
   return false;
 }
@@ -355,6 +361,10 @@ bool LangOptions::hasFeature(llvm::StringRef featureName) const {
     return hasFeature(*feature);
 
   return false;
+}
+
+bool LangOptions::isMigratingToFeature(Feature feature) const {
+  return featureStates.getState(feature).isEnabledForMigration();
 }
 
 void LangOptions::enableFeature(Feature feature, bool forMigration) {

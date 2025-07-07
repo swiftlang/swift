@@ -700,6 +700,14 @@ public:
   /// Returns true if this contextual type is (Escapable && !isNoEscape).
   bool mayEscape() { return !isNoEscape() && isEscapable(); }
 
+  /// Returns true if this contextual type satisfies a conformance to
+  /// BitwiseCopyable.
+  bool isBitwiseCopyable();
+
+  /// Returns true if this type satisfies a conformance to BitwiseCopyable in
+  /// the given generic signature.
+  bool isBitwiseCopyable(GenericSignature sig);
+
   /// Are values of this type essentially just class references,
   /// possibly with some sort of additional information?
   ///
@@ -718,6 +726,12 @@ public:
   /// Determine whether this type involves a type variable.
   bool hasTypeVariable() const {
     return getRecursiveProperties().hasTypeVariable();
+  }
+
+  // Convenience for checking whether the given type either has a type
+  // variable or placeholder.
+  bool hasTypeVariableOrPlaceholder() const {
+    return hasTypeVariable() || hasPlaceholder();
   }
 
   /// Determine where this type is a type variable or a dependent
@@ -1491,8 +1505,10 @@ public:
 
   SWIFT_DEBUG_DUMPER(print());
   void print(raw_ostream &OS,
-             const PrintOptions &PO = PrintOptions()) const;
-  void print(ASTPrinter &Printer, const PrintOptions &PO) const;
+             const PrintOptions &PO = PrintOptions(),
+             NonRecursivePrintOptions nrOptions = std::nullopt) const;
+  void print(ASTPrinter &Printer, const PrintOptions &PO,
+             NonRecursivePrintOptions nrOptions = std::nullopt) const;
 
   /// Can this type be written in source at all?
   ///
@@ -1505,7 +1521,8 @@ public:
   bool hasSimpleTypeRepr() const;
 
   /// Return the name of the type as a string, for use in diagnostics only.
-  std::string getString(const PrintOptions &PO = PrintOptions()) const;
+  std::string getString(const PrintOptions &PO = PrintOptions(),
+                        NonRecursivePrintOptions nrOptions = std::nullopt) const;
 
   /// Return the name of the type, adding parens in cases where
   /// appending or prepending text to the result would cause that text
@@ -1514,7 +1531,8 @@ public:
   /// the type would make it appear that it's appended to "Float" as
   /// opposed to the entire type.
   std::string
-  getStringAsComponent(const PrintOptions &PO = PrintOptions()) const;
+  getStringAsComponent(const PrintOptions &PO = PrintOptions(),
+                       NonRecursivePrintOptions nrOptions = std::nullopt) const;
 
   /// Return whether this type is or can be substituted for a bridgeable
   /// object type.
@@ -3583,13 +3601,13 @@ protected:
     Bits.AnyFunctionType.NumParams = NumParams;
     assert(Bits.AnyFunctionType.NumParams == NumParams && "Params dropped!");
     
-    if (Info) {
+    if (Info && CONDITIONAL_ASSERT_enabled()) {
       unsigned maxLifetimeTarget = NumParams + 1;
       if (auto outputFn = Output->getAs<AnyFunctionType>()) {
         maxLifetimeTarget += outputFn->getNumParams();
       }
       for (auto &dep : Info->getLifetimeDependencies()) {
-        assert(dep.getTargetIndex() < maxLifetimeTarget);
+        ASSERT(dep.getTargetIndex() < maxLifetimeTarget);
       }
     }
   }
@@ -4049,6 +4067,7 @@ struct ParameterListInfo {
   SmallBitVector propertyWrappers;
   SmallBitVector implicitSelfCapture;
   SmallBitVector inheritActorContext;
+  SmallBitVector alwaysInheritActorContext;
   SmallBitVector variadicGenerics;
   SmallBitVector sendingParameters;
 
@@ -4075,7 +4094,8 @@ public:
 
   /// Whether the given parameter is a closure that should inherit the
   /// actor context from the context in which it was created.
-  bool inheritsActorContext(unsigned paramIdx) const;
+  std::pair<bool, InheritActorContextModifier>
+  inheritsActorContext(unsigned paramIdx) const;
 
   bool isVariadicGenericParameter(unsigned paramIdx) const;
 
@@ -5208,12 +5228,12 @@ public:
   /// Given an existing ExtInfo, and a set of interface parameters and results
   /// destined for a new SILFunctionType, return a new ExtInfo with only the
   /// lifetime dependencies relevant after substitution.
-  static ExtInfo
-  getSubstLifetimeDependencies(GenericSignature genericSig,
-                               ExtInfo origExtInfo,
-                               ArrayRef<SILParameterInfo> params,
-                               ArrayRef<SILYieldInfo> yields,
-                               ArrayRef<SILResultInfo> results);
+  static ExtInfo getSubstLifetimeDependencies(GenericSignature genericSig,
+                                              ExtInfo origExtInfo,
+                                              ASTContext &context,
+                                              ArrayRef<SILParameterInfo> params,
+                                              ArrayRef<SILYieldInfo> yields,
+                                              ArrayRef<SILResultInfo> results);
 
   /// Return a structurally-identical function type with a slightly tweaked
   /// ExtInfo.
@@ -6297,7 +6317,7 @@ public:
   }
 };
 
-/// An InlineArray type e.g `[2 x Foo]`, sugar for `InlineArray<2, Foo>`.
+/// An InlineArray type e.g `[2 of Foo]`, sugar for `InlineArray<2, Foo>`.
 class InlineArrayType : public SyntaxSugarType {
   Type Count;
   Type Elt;

@@ -120,6 +120,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   [[nodiscard]]
   bool visit(Decl *D) {
     SetParentRAII SetParent(Walker, D);
+    if (visitDeclCommon(D))
+      return true;
     return inherited::visit(D);
   }
 
@@ -137,6 +139,40 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   //===--------------------------------------------------------------------===//
   //                                 Decls
   //===--------------------------------------------------------------------===//
+
+  [[nodiscard]]
+  bool visitCustomAttr(CustomAttr *CA) {
+    auto *newTypeExpr = doIt(CA->getTypeExpr());
+    if (!newTypeExpr)
+      return true;
+
+    ASSERT(newTypeExpr == CA->getTypeExpr() &&
+           "Cannot change CustomAttr TypeExpr");
+
+    if (auto *args = CA->getArgs()) {
+      auto *newArgs = doIt(args);
+      if (!newArgs)
+        return true;
+
+      CA->setArgs(newArgs);
+    }
+    return false;
+  }
+
+  [[nodiscard]]
+  bool visitDeclCommon(Decl *D) {
+    if (Walker.shouldWalkIntoCustomAttrs()) {
+      for (auto *attr : D->getAttrs()) {
+        auto *CA = dyn_cast<CustomAttr>(attr);
+        if (!CA)
+          continue;
+
+        if (visitCustomAttr(CA))
+          return true;
+      }
+    }
+    return false;
+  }
 
   [[nodiscard]]
   bool visitGenericParamListIfNeeded(GenericContext *GC) {
@@ -162,6 +198,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitImportDecl(ImportDecl *ID) {
+    return false;
+  }
+
+  bool visitUsingDecl(UsingDecl *UD) {
     return false;
   }
 
@@ -2218,6 +2258,15 @@ bool Traversal::visitErrorTypeRepr(ErrorTypeRepr *T) {
 }
 
 bool Traversal::visitAttributedTypeRepr(AttributedTypeRepr *T) {
+  if (Walker.shouldWalkIntoCustomAttrs()) {
+    for (auto attr : T->getAttrs()) {
+      auto *CA = attr.dyn_cast<CustomAttr *>();
+      if (!CA)
+        continue;
+      if (visitCustomAttr(CA))
+        return true;
+    }
+  }
   return doIt(T->getTypeRepr());
 }
 

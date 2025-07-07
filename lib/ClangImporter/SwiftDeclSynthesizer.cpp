@@ -10,8 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "CXXMethodBridging.h"
 #include "SwiftDeclSynthesizer.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Decl.h"
@@ -20,7 +22,6 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/ClangImporter/CXXMethodBridging.h"
 #include "clang/AST/Mangle.h"
 #include "clang/Sema/DelayedDiagnostic.h"
 
@@ -1679,6 +1680,7 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
   FuncDecl *getterImpl = getter ? getter : setter;
   FuncDecl *setterImpl = setter;
 
+  // FIXME: support unsafeAddress accessors.
   // Get the return type wrapped in `Unsafe(Mutable)Pointer<T>`.
   const auto rawElementTy = getterImpl->getResultInterfaceType();
   // Unwrap `T`. Use rawElementTy for return by value.
@@ -1761,6 +1763,23 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
   return subscript;
 }
 
+static bool doesReturnDependsOnSelf(FuncDecl *f) {
+  if (!f->getASTContext().LangOpts.hasFeature(Feature::AddressableParameters))
+    return false;
+  if (!f->hasImplicitSelfDecl())
+    return false;
+  if (auto deps = f->getLifetimeDependencies()) {
+    for (auto dependence : *deps) {
+      auto returnIdx = f->getParameters()->size() + !isa<ConstructorDecl>(f);
+      if (!dependence.hasInheritLifetimeParamIndices() &&
+          dependence.hasScopeLifetimeParamIndices() &&
+          dependence.getTargetIndex() == returnIdx)
+        return dependence.getScopeIndices()->contains(f->getSelfIndex());
+    }
+  }
+  return false;
+}
+
 // MARK: C++ dereference operator
 
 VarDecl *
@@ -1772,6 +1791,7 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
   FuncDecl *getterImpl = getter ? getter : setter;
   FuncDecl *setterImpl = setter;
   auto dc = getterImpl->getDeclContext();
+  bool resultDependsOnSelf = doesReturnDependsOnSelf(getterImpl);
 
   // Get the return type wrapped in `Unsafe(Mutable)Pointer<T>`.
   const auto rawElementTy = getterImpl->getResultInterfaceType();
@@ -1782,9 +1802,9 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
   // Use 'address' or 'mutableAddress' accessors for non-copyable
   // types that are returned indirectly.
   bool isNoncopyable = dc->mapTypeIntoContext(elementTy)->isNoncopyable();
-  bool isImplicit = !isNoncopyable;
+  bool isImplicit = !(isNoncopyable || resultDependsOnSelf);
   bool useAddress =
-      rawElementTy->getAnyPointerElementType() && isNoncopyable;
+      rawElementTy->getAnyPointerElementType() && (isNoncopyable || resultDependsOnSelf);
 
   auto result = new (ctx)
       VarDecl(/*isStatic*/ false, VarDecl::Introducer::Var,
@@ -2105,6 +2125,8 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
     // convention.
     newMethod->addAttr(clang::CFReturnsRetainedAttr::CreateImplicit(clangCtx));
   }
+  if (auto swiftNameAttr = method->getAttr<clang::SwiftNameAttr>())
+    newMethod->addAttr(swiftNameAttr->clone(clangCtx));
 
   llvm::SmallVector<clang::ParmVarDecl *, 4> params;
   for (size_t i = 0; i < method->getNumParams(); ++i) {
@@ -2508,6 +2530,8 @@ SwiftDeclSynthesizer::makeDefaultArgument(const clang::ParmVarDecl *param,
       ImporterImpl.ImportedHeaderUnit);
   funcDecl->setBodySynthesizer(synthesizeDefaultArgumentBody, (void *)param);
   funcDecl->setAccess(AccessLevel::Public);
+  funcDecl->getAttrs().add(new (ctx)
+                               AlwaysEmitIntoClientAttr(/*IsImplicit=*/true));
 
   ImporterImpl.defaultArgGenerators[param] = funcDecl;
 

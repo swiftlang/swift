@@ -38,6 +38,7 @@
 #include "swift/Option/Options.h"
 #include "swift/Parse/ParseVersion.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/VirtualOutputBackends.h"
 #include "llvm/Support/raw_ostream.h"
 #include <functional>
@@ -852,8 +853,8 @@ public:
       auto *LSub = dyn_cast<SDKNodeDeclSubscript>(Left);
       auto *RSub = dyn_cast<SDKNodeDeclSubscript>(Right);
       SequentialNodeMatcher(LSub->getChildren(), RSub->getChildren(), *this).match();
-#define ACCESSOR(ID)                                                          \
-      singleMatch(LSub->getAccessor(AccessorKind::ID),                        \
+#define ACCESSOR(ID, KEYWORD)                                                  \
+      singleMatch(LSub->getAccessor(AccessorKind::ID),                         \
                   RSub->getAccessor(AccessorKind::ID), *this);
 #include "swift/AST/AccessorKinds.def"
       break;
@@ -863,8 +864,8 @@ public:
       auto *RVar = dyn_cast<SDKNodeDeclVar>(Right);
       // Match property type.
       singleMatch(LVar->getType(), RVar->getType(), *this);
-#define ACCESSOR(ID)                                                          \
-      singleMatch(LVar->getAccessor(AccessorKind::ID),                        \
+#define ACCESSOR(ID, KEYWORD)                                                  \
+      singleMatch(LVar->getAccessor(AccessorKind::ID),                         \
                   RVar->getAccessor(AccessorKind::ID), *this);
 #include "swift/AST/AccessorKinds.def"
       break;
@@ -2261,11 +2262,12 @@ private:
   std::string BaselineSDK;
   std::string Triple;
   std::string SwiftVersion;
-  std::vector<std::string> CCSystemFrameworkPaths;
+  std::vector<std::string> SystemFrameworkPaths;
   std::vector<std::string> BaselineFrameworkPaths;
   std::vector<std::string> FrameworkPaths;
-  std::vector<std::string> BaselineModuleInputPaths;
-  std::vector<std::string> ModuleInputPaths;
+  std::vector<std::string> SystemModuleImportPaths;
+  std::vector<std::string> BaselineModuleImportPaths;
+  std::vector<std::string> ModuleImportPaths;
   std::string ModuleList;
   std::vector<std::string> ModuleNames;
   std::vector<std::string> PreferInterfaceForModules;
@@ -2362,11 +2364,13 @@ public:
     BaselineSDK = ParsedArgs.getLastArgValue(OPT_bsdk).str();
     Triple = ParsedArgs.getLastArgValue(OPT_target).str();
     SwiftVersion = ParsedArgs.getLastArgValue(OPT_swift_version).str();
-    CCSystemFrameworkPaths = ParsedArgs.getAllArgValues(OPT_iframework);
+    SystemFrameworkPaths = ParsedArgs.getAllArgValues(OPT_Fsystem);
+    llvm::append_range(SystemFrameworkPaths, ParsedArgs.getAllArgValues(OPT_iframework));
     BaselineFrameworkPaths = ParsedArgs.getAllArgValues(OPT_BF);
     FrameworkPaths = ParsedArgs.getAllArgValues(OPT_F);
-    BaselineModuleInputPaths = ParsedArgs.getAllArgValues(OPT_BI);
-    ModuleInputPaths = ParsedArgs.getAllArgValues(OPT_I);
+    SystemModuleImportPaths = ParsedArgs.getAllArgValues(OPT_Isystem);
+    BaselineModuleImportPaths = ParsedArgs.getAllArgValues(OPT_BI);
+    ModuleImportPaths = ParsedArgs.getAllArgValues(OPT_I);
     ModuleList = ParsedArgs.getLastArgValue(OPT_module_list_file).str();
     ModuleNames = ParsedArgs.getAllArgValues(OPT_module);
     PreferInterfaceForModules =
@@ -2421,7 +2425,7 @@ public:
   }
 
   bool hasBaselineInput() {
-    return !BaselineModuleInputPaths.empty() ||
+    return !BaselineModuleImportPaths.empty() ||
            !BaselineFrameworkPaths.empty() || !BaselineSDK.empty();
   }
 
@@ -2453,8 +2457,6 @@ public:
     InitInvoke.getLangOptions().EnableObjCInterop =
         InitInvoke.getLangOptions().Target.isOSDarwin();
     InitInvoke.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
-    // Module recovery issue shouldn't bring down the tool.
-    InitInvoke.getLangOptions().AllowDeserializingImplementationOnly = true;
 
     if (!SwiftVersion.empty()) {
       using version::Version;
@@ -2476,29 +2478,30 @@ public:
       InitInvoke.setRuntimeResourcePath(ResourceDir);
     }
     std::vector<SearchPathOptions::SearchPath> FramePaths;
-    for (const auto &path : CCSystemFrameworkPaths) {
+    for (const auto &path : SystemFrameworkPaths) {
       FramePaths.push_back({path, /*isSystem=*/true});
+    }
+    std::vector<SearchPathOptions::SearchPath> ImportPaths;
+    for (const auto &path : SystemModuleImportPaths) {
+      ImportPaths.push_back({path, /*isSystem=*/true});
     }
     if (IsBaseline) {
       for (const auto &path : BaselineFrameworkPaths) {
         FramePaths.push_back({path, /*isSystem=*/false});
       }
-      std::vector<SearchPathOptions::SearchPath> ImportPaths;
-      for (const auto &path : BaselineModuleInputPaths) {
+      for (const auto &path : BaselineModuleImportPaths) {
         ImportPaths.push_back({path, /*isSystem=*/false});
       }
-      InitInvoke.setImportSearchPaths(ImportPaths);
     } else {
       for (const auto &path : FrameworkPaths) {
         FramePaths.push_back({path, /*isSystem=*/false});
       }
-      std::vector<SearchPathOptions::SearchPath> ImportPaths;
-      for (const auto &path : ModuleInputPaths) {
+      for (const auto &path : ModuleImportPaths) {
         ImportPaths.push_back({path, /*isSystem=*/false});
       }
-      InitInvoke.setImportSearchPaths(ImportPaths);
     }
     InitInvoke.setFrameworkSearchPaths(FramePaths);
+    InitInvoke.setImportSearchPaths(ImportPaths);
     if (!ModuleList.empty()) {
       if (readFileLineByLine(ModuleList, Modules))
         exit(1);

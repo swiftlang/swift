@@ -1148,7 +1148,7 @@ SingleValueInstruction *LoopTreeOptimization::splitLoad(
       }
       elements.push_back(elementVal);
     }
-    return builder.createTuple(loc, elements);
+    return builder.createTuple(loc, loadTy.getObjectType(), elements);
   }
   auto structTy = loadTy.getStructOrBoundGenericStruct();
   assert(structTy && "tuple and struct elements are checked earlier");

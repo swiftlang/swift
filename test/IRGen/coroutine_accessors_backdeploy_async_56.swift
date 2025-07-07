@@ -32,7 +32,7 @@
 //                  #if SWIFT_POINTER_IS_8_BYTES
 //                  Task.Reserved64
 //                  #endif
-// CHECK-SAME-64:   ptr
+// CHECK-64-SAME:   ptr
 //                  Task.Status
 // CHECK-SAME:      [2 x ptr]
 // CHECK-SAME:      ptr

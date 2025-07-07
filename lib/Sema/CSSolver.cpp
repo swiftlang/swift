@@ -73,9 +73,7 @@ Solution ConstraintSystem::finalize() {
   Solution solution(*this, CurrentScore);
 
   // Update the best score we've seen so far.
-  auto &ctx = getASTContext();
-  assert(ctx.TypeCheckerOpts.DisableConstraintSolverPerformanceHacks ||
-         !solverState->BestScore || CurrentScore <= *solverState->BestScore);
+  assert(!solverState->BestScore || CurrentScore <= *solverState->BestScore);
 
   if (!solverState->BestScore || CurrentScore <= *solverState->BestScore) {
     solverState->BestScore = CurrentScore;
@@ -90,10 +88,6 @@ Solution ConstraintSystem::finalize() {
       llvm_unreachable("Solver left free type variables");
 
     case FreeTypeVariableBinding::Allow:
-      break;
-
-    case FreeTypeVariableBinding::UnresolvedType:
-      assignFixedType(tv, ctx.TheUnresolvedType);
       break;
     }
   }
@@ -983,7 +977,7 @@ void ConstraintSystem::Candidate::applySolutions(
 }
 
 void ConstraintSystem::shrink(Expr *expr) {
-  if (getASTContext().TypeCheckerOpts.SolverDisableShrink)
+  if (!performanceHacksEnabled())
     return;
 
   using DomainMap = llvm::SmallDenseMap<Expr *, ArrayRef<ValueDecl *>>;
@@ -2017,6 +2011,29 @@ tryOptimizeGenericDisjunction(ConstraintSystem &cs, Constraint *disjunction,
       return nullptr;
   }
 
+  if (!cs.performanceHacksEnabled()) {
+    // Don't attempt this optimization if call has number literals.
+    // This is intended to narrowly fix situations like:
+    //
+    // func test<T: FloatingPoint>(_: T) { ... }
+    // func test<T: Numeric>(_: T) { ... }
+    //
+    // test(42)
+    //
+    // The call should use `<T: Numeric>` overload even though the
+    // `<T: FloatingPoint>` is a more specialized version because
+    // selecting `<T: Numeric>` doesn't introduce non-default literal
+    // types.
+    if (auto *argFnType = cs.getAppliedDisjunctionArgumentFunction(disjunction)) {
+      if (llvm::any_of(
+              argFnType->getParams(), [](const AnyFunctionType::Param &param) {
+                auto *typeVar = param.getPlainType()->getAs<TypeVariableType>();
+                return typeVar && typeVar->getImpl().isNumberLiteralType();
+              }))
+        return nullptr;
+    }
+  }
+
   llvm::SmallVector<Constraint *, 4> choices;
   for (auto *choice : constraints) {
     if (choices.size() > 2)
@@ -2293,6 +2310,8 @@ void DisjunctionChoiceProducer::partitionDisjunction(
   // end of the partitioning.
   SmallVector<unsigned, 4> favored;
   SmallVector<unsigned, 4> everythingElse;
+  // Disfavored choices are part of `everythingElse` but introduced at the end.
+  SmallVector<unsigned, 4> disfavored;
   SmallVector<unsigned, 4> simdOperators;
   SmallVector<unsigned, 4> disabled;
   SmallVector<unsigned, 4> unavailable;
@@ -2323,6 +2342,11 @@ void DisjunctionChoiceProducer::partitionDisjunction(
     if (auto *decl = getOverloadChoiceDecl(constraint)) {
       if (isa<VarDecl>(decl)) {
         everythingElse.push_back(index);
+        return true;
+      }
+
+      if (decl->getAttrs().hasAttribute<DisfavoredOverloadAttr>()) {
+        disfavored.push_back(index);
         return true;
       }
     }
@@ -2368,6 +2392,9 @@ void DisjunctionChoiceProducer::partitionDisjunction(
     return true;
   });
 
+  // Introduce disfavored choices at the end.
+  everythingElse.append(disfavored);
+
   // Local function to create the next partition based on the options
   // passed in.
   PartitionAppendCallback appendPartition =
@@ -2387,7 +2414,7 @@ void DisjunctionChoiceProducer::partitionDisjunction(
   assert(Ordering.size() == Choices.size());
 }
 
-Constraint *ConstraintSystem::selectDisjunction() {
+Constraint *ConstraintSystem::selectDisjunctionWithHacks() {
   SmallVector<Constraint *, 4> disjunctions;
 
   collectDisjunctions(disjunctions);

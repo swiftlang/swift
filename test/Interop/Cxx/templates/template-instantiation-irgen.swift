@@ -46,8 +46,8 @@ func takesPtrToStruct(x: UnsafePointer<PlainStruct>) { takesValue(x) }
 func takesPtrToClass(x: UnsafePointer<CxxClass>) { takesValue(x) }
 // CHECK: define {{.*}} void @{{.*}}takesPtrToClass{{.*}}
 
-// FIXME: this crashes because this round-trips to UnsafePointer<FRT?>
-// func takesPtrToFRT(x: UnsafePointer<FRT>) { takesValue(x) }
+func takesPtrToFRT(x: UnsafePointer<FRT>) { takesValue(x) }
+// CHECK: define {{.*}} void @{{.*}}takesPtrToFRT{{.*}}
 
 func takesMutPtrToStruct(x: UnsafeMutablePointer<PlainStruct>) { takesValue(x) }
 // CHECK: define {{.*}} void @{{.*}}takesMutPtrToStruct{{.*}}
@@ -55,12 +55,11 @@ func takesMutPtrToStruct(x: UnsafeMutablePointer<PlainStruct>) { takesValue(x) }
 func takesMutPtrToClass(x: UnsafeMutablePointer<CxxClass>) { takesValue(x) }
 // CHECK: define {{.*}} void @{{.*}}takesMutPtrToClass{{.*}}
 
-// FIXME: this crashes because this round-trips to UnsafeMutablePointer<FRT?>
-// func takesMutPtrToFRT(x: UnsafeMutablePointer<FRT>) { takesValue(x) }
+func takesMutPtrToFRT(x: UnsafeMutablePointer<FRT>) { takesValue(x) }
+// CHECK: define {{.*}} void @{{.*}}takesMutPtrToFRT{{.*}}
 
 func takesCPtr() {
-  // FIXME: optional pointers are not yet supported but they should be; this crashes
-  // takesValue(intPtr)
+  takesValue(intPtr)
 
   // It's fine if we dereference it, though
   takesValue(intPtr!)
@@ -92,9 +91,6 @@ func takesSwiftClosureTakingCxxClass() { takesValue({(x: CxxClass) in takesValue
 func takesTakesCxxClass() { takesValue(takesCxxClass) }
 
 func takesSwiftClosureReturningFRT() { takesValue({() -> FRT in FRT()}) }
+func takesSwiftClosureTakingFRT() { takesValue({(x: FRT) in takesValue(x)}) }
 
-// FIXME: this crashes due to pointer round-tripping
-// func takesSwiftClosureTakingFRT() { takesValue({(x: FRT) in takesValue(x)}) }
-
-// FIXME: this crashes due to pointer round-tripping
-// func takesTakesFRT() { takesValue(takesFRT) }
+func takesTakesFRT() { takesValue(takesFRT) }

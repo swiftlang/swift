@@ -147,7 +147,14 @@ public:
   virtual RemoteAbsolutePointer resolvePointer(RemoteAddress address,
                                                uint64_t readValue) {
     // Default implementation returns the read value as is.
-    return RemoteAbsolutePointer("", readValue);
+    return RemoteAbsolutePointer(RemoteAddress(readValue));
+  }
+
+  /// Performs the inverse operation of \ref resolvePointer.
+  /// A use-case for this is to turn file addresses into in-process addresses.
+  virtual std::optional<RemoteAddress>
+  resolveRemoteAddress(RemoteAddress address) const {
+    return std::nullopt;
   }
 
   virtual std::optional<RemoteAbsolutePointer>
@@ -159,7 +166,7 @@ public:
   virtual RemoteAbsolutePointer getSymbol(RemoteAddress address) {
     if (auto symbol = resolvePointerAsSymbol(address))
       return *symbol;
-    return RemoteAbsolutePointer("", address.getAddressData());
+    return RemoteAbsolutePointer(address);
   }
 
   /// Lookup a dynamic symbol name (ie dynamic loader binding) for the given

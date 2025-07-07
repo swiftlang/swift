@@ -1,0 +1,106 @@
+# Toolchain configuration when compiling for Darwin Platforms
+set(CMAKE_SYSTEM_NAME Darwin)
+set(CMAKE_Swift_COMPILER_WORKS YES)
+set(CMAKE_C_COMPILER_WORKS YES)
+set(CMAKE_CXX_COMPILER_WORKS YES)
+
+find_program(XCRUN_EXECUTABLE NAMES "xcrun" REQUIRED)
+
+if(NOT CMAKE_OSX_SYSROOT)
+  if(NOT DEFINED ENV{SDKROOT})
+    message(FATAL_ERROR "`CMAKE_OSX_SYSROOT` and the 'SDKROOT' environment variable are not set")
+  endif()
+
+  execute_process(COMMAND "${XCRUN_EXECUTABLE}" --show-sdk-path -sdk $ENV{SDKROOT}
+    OUTPUT_VARIABLE SDKROOT
+    ERROR_QUIET
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+  if(NOT EXISTS ${SDKROOT})
+    message(FATAL_ERROR "SDKROOT could not be detected!")
+  endif()
+
+  message(STATUS "Using SDKROOT: ${SDKROOT}")
+  set(CMAKE_OSX_SYSROOT "${SDKROOT}" CACHE FILEPATH "")
+endif()
+
+if(NOT CMAKE_C_COMPILER)
+  execute_process(COMMAND "${XCRUN_EXECUTABLE}" --sdk ${CMAKE_OSX_SYSROOT} --find clang
+    OUTPUT_VARIABLE CMAKE_C_COMPILER
+    ERROR_QUIET
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  message(STATUS "Using C compiler ${CMAKE_C_COMPILER}")
+endif()
+
+if(NOT CMAKE_CXX_COMPILER)
+  execute_process(COMMAND "${XCRUN_EXECUTABLE}" --sdk ${CMAKE_OSX_SYSROOT} --find clang++
+    OUTPUT_VARIABLE CMAKE_CXX_COMPILER
+    ERROR_QUIET
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  message(STATUS "Using CXX compiler ${CMAKE_CXX_COMPILER}")
+endif()
+
+if(NOT CMAKE_Swift_COMPILER)
+  execute_process(COMMAND "${XCRUN_EXECUTABLE}" --sdk ${CMAKE_OSX_SYSROOT} --find swiftc
+    OUTPUT_VARIABLE CMAKE_Swift_COMPILER
+    ERROR_QUIET
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  message(STATUS "Using Swift compiler ${CMAKE_Swift_COMPILER}")
+endif()
+
+if(NOT CMAKE_AR)
+  execute_process(COMMAND "${XCRUN_EXECUTABLE}" --sdk ${CMAKE_OSX_SYSROOT} --find ar
+    OUTPUT_VARIABLE CMAKE_AR
+    ERROR_QUIET
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  message(STATUS "Using ar ${CMAKE_AR}")
+endif()
+
+if(NOT CMAKE_RANLIB)
+  execute_process(COMMAND "${XCRUN_EXECUTABLE}" --sdk ${CMAKE_OSX_SYSROOT} --find ranlib
+    OUTPUT_VARIABLE CMAKE_RANLIB
+    ERROR_QUIET
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  message(STATUS "Using ranlib ${CMAKE_RANLIB}")
+endif()
+
+if(NOT CMAKE_STRIP)
+  execute_process(COMMAND "${XCRUN_EXECUTABLE}" --sdk ${CMAKE_OSX_SYSROOT} --find strip
+    OUTPUT_VARIABLE CMAKE_STRIP
+    ERROR_QUIET
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  message(STATUS "Using strip ${CMAKE_STRIP}")
+endif()
+
+if(NOT CMAKE_DSYMUTIL)
+  execute_process(COMMAND "${XCRUN_EXECUTABLE}" --sdk ${CMAKE_OSX_SYSROOT} --find dsymutil
+    OUTPUT_VARIABLE CMAKE_DSYMUTIL
+    ERROR_QUIET
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  message(STATUS "Using dsymutil ${CMAKE_DSYMUTIL}")
+endif()
+
+if(NOT CMAKE_LIBTOOL)
+  execute_process(COMMAND "${XCRUN_EXECUTABLE}" --sdk ${CMAKE_OSX_SYSROOT} --find libtool
+   OUTPUT_VARIABLE CMAKE_LIBTOOL
+   ERROR_QUIET
+   OUTPUT_STRIP_TRAILING_WHITESPACE)
+  message(STATUS "Using libtool ${CMAKE_LIBTOOL}")
+endif()
+
+if(NOT CMAKE_CODESIGN)
+  execute_process(COMMAND "${XCRUN_EXECUTABLE}" --sdk ${CMAKE_OSX_SYSROOT} --find codesign
+   OUTPUT_VARIABLE CMAKE_CODESIGN
+   ERROR_QUIET
+   OUTPUT_STRIP_TRAILING_WHITESPACE)
+  message(STATUS "Using codesign ${CMAKE_CODESIGN}")
+endif()
+
+if(NOT CMAKE_CODESIGN_ALLOCATE)
+  execute_process(
+    COMMAND "${XCRUN_EXECUTABLE}" --sdk ${CMAKE_OSX_SYSROOT} --find codesign_allocate
+    OUTPUT_VARIABLE CMAKE_CODESIGN_ALLOCATE
+    ERROR_QUIET
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  message(STATUS "Using codesign_allocate ${CMAKE_CODESIGN_ALLOCATE}")
+endif()

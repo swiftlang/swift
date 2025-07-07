@@ -288,6 +288,7 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
         case BuiltinValueKind::GenericXor:
         case BuiltinValueKind::TaskRunInline:
         case BuiltinValueKind::ZeroInitializer:
+        case BuiltinValueKind::PrepareInitialization:
         case BuiltinValueKind::GetEnumTag:
         case BuiltinValueKind::InjectEnumTag:
         case BuiltinValueKind::AddressOfRawLayout:

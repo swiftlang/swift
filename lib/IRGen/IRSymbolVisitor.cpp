@@ -108,6 +108,7 @@ public:
 
   void addDispatchThunk(SILDeclRef declRef) override {
     auto entity = LinkEntity::forDispatchThunk(declRef);
+
     addLinkEntity(entity);
 
     if (declRef.getAbstractFunctionDecl()->hasAsync())

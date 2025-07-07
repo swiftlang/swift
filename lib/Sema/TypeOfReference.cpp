@@ -1134,8 +1134,7 @@ static void bindArchetypesFromContext(
     if (parentDC->isTypeContext()) {
       if (parentDC != outerDC && parentDC->getSelfProtocolDecl()) {
         auto selfTy = parentDC->getSelfInterfaceType();
-        auto contextTy = cs.getASTContext().TheUnresolvedType;
-        bindPrimaryArchetype(selfTy, contextTy);
+        bindPrimaryArchetype(selfTy, ErrorType::get(cs.getASTContext()));
       }
       continue;
     }
@@ -1901,11 +1900,16 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
           type, var, useDC, GetClosureType{*this},
           ClosureIsolatedByPreconcurrency{*this});
     } else if (isa<AbstractFunctionDecl>(decl) || isa<EnumElementDecl>(decl)) {
-      if (decl->isInstanceMember() &&
-          (!overload.getBaseType() ||
-           (!overload.getBaseType()->getAnyNominal() &&
-            !overload.getBaseType()->is<ExistentialType>())))
-        return Type();
+      if (decl->isInstanceMember()) {
+        auto baseTy = overload.getBaseType();
+        if (!baseTy)
+          return Type();
+
+        baseTy = baseTy->getRValueType();
+        if (!baseTy->getAnyNominal() && !baseTy->is<ExistentialType>() &&
+            !baseTy->is<OpaqueTypeArchetypeType>())
+          return Type();
+      }
 
       // Cope with 'Self' returns.
       if (!decl->getDeclContext()->getSelfProtocolDecl()) {
@@ -2698,7 +2702,8 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       increaseScore(SK_Unavailable, locator);
 
     // If the declaration is from a module that hasn't been imported, note that.
-    if (getASTContext().LangOpts.hasFeature(Feature::MemberImportVisibility)) {
+    if (getASTContext().LangOpts.hasFeature(Feature::MemberImportVisibility,
+                                            /*allowMigration=*/true)) {
       if (!useDC->isDeclImported(decl))
         increaseScore(SK_MissingImport, locator);
     }

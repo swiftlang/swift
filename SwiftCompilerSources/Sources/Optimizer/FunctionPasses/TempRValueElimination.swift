@@ -36,7 +36,15 @@ import SIL
 ///
 let tempRValueElimination = FunctionPass(name: "temp-rvalue-elimination") {
   (function: Function, context: FunctionPassContext) in
+  removeTempRValues(in: function, keepDebugInfo: false, context)
+}
 
+let mandatoryTempRValueElimination = FunctionPass(name: "mandatory-temp-rvalue-elimination") {
+  (function: Function, context: FunctionPassContext) in
+  removeTempRValues(in: function, keepDebugInfo: true, context)
+}
+
+private func removeTempRValues(in function: Function, keepDebugInfo: Bool, _ context: FunctionPassContext) {
   for inst in function.instructions {
     switch inst {
     case let copy as CopyAddrInst:
@@ -45,12 +53,12 @@ let tempRValueElimination = FunctionPass(name: "temp-rvalue-elimination") {
         // copied the `alloc_stack` back to the source location.
         context.erase(instruction: copy)
       } else {
-        tryEliminate(copy: copy, context)
+        tryEliminate(copy: copy, keepDebugInfo: keepDebugInfo, context)
       }
     case let store as StoreInst:
       // Also handle `load`-`store` pairs which are basically the same thing as a `copy_addr`.
       if let load = store.source as? LoadInst, load.uses.isSingleUse, load.parentBlock == store.parentBlock {
-        tryEliminate(copy: store, context)
+        tryEliminate(copy: store, keepDebugInfo: keepDebugInfo, context)
       }
     default:
       break
@@ -58,33 +66,10 @@ let tempRValueElimination = FunctionPass(name: "temp-rvalue-elimination") {
   }
 }
 
-private protocol CopyLikeInstruction: Instruction {
-  var sourceAddress: Value { get }
-  var destinationAddress: Value { get }
-  var isTakeOfSource: Bool { get }
-  var isInitializationOfDestination: Bool { get }
-  var loadingInstruction: Instruction { get }
-}
+private func tryEliminate(copy: CopyLikeInstruction, keepDebugInfo: Bool, _ context: FunctionPassContext) {
 
-extension CopyAddrInst: CopyLikeInstruction {
-  var sourceAddress: Value { source }
-  var destinationAddress: Value { destination }
-  var loadingInstruction: Instruction { self }
-}
-
-// A `store` which has a `load` as source operand. This is basically the same as a `copy_addr`.
-extension StoreInst: CopyLikeInstruction {
-  var sourceAddress: Value { load.address }
-  var destinationAddress: Value { destination }
-  var isTakeOfSource: Bool { load.loadOwnership == .take }
-  var isInitializationOfDestination: Bool { storeOwnership != .assign }
-  var loadingInstruction: Instruction { load }
-  private var load: LoadInst { source as! LoadInst }
-}
-
-private func tryEliminate(copy: CopyLikeInstruction, _ context: FunctionPassContext) {
-
-  guard let (allocStack, lastUseOfAllocStack) = getRemovableAllocStackDestination(of: copy, context) else {
+  guard let (allocStack, lastUseOfAllocStack) =
+          getRemovableAllocStackDestination(of: copy, keepDebugInfo: keepDebugInfo, context) else {
     return
   }
 
@@ -127,6 +112,9 @@ private func tryEliminate(copy: CopyLikeInstruction, _ context: FunctionPassCont
     }
   }
   context.erase(instruction: allocStack)
+  if keepDebugInfo {
+    Builder(before: copy, context).createDebugStep()
+  }
   context.erase(instructionIncludingAllUsers: copy.loadingInstruction)
 }
 
@@ -138,7 +126,7 @@ private func tryEliminate(copy: CopyLikeInstruction, _ context: FunctionPassCont
 ///   %lastUseOfAllocStack = load %allocStack
 /// ```
 private func getRemovableAllocStackDestination(
-  of copy: CopyLikeInstruction, _ context: FunctionPassContext
+  of copy: CopyLikeInstruction, keepDebugInfo: Bool, _ context: FunctionPassContext
 ) -> (allocStack: AllocStackInst, lastUseOfAllocStack: Instruction)? {
   guard copy.isInitializationOfDestination,
         let allocStack = copy.destinationAddress as? AllocStackInst
@@ -146,10 +134,16 @@ private func getRemovableAllocStackDestination(
     return nil
   }
 
-  // If the `allocStack` is lexical we can eliminate it if the source of the copy is lexical and
-  // it is live for longer than the `allocStack`.
-  if allocStack.isLexical && !copy.sourceAddress.accessBase.storageIsLexical {
-    return nil
+  if keepDebugInfo {
+    if allocStack.isFromVarDecl || allocStack.isLexical {
+      return nil
+    }
+  } else {
+    // If the `allocStack` is lexical we can eliminate it if the source of the copy is lexical and
+    // it is live for longer than the `allocStack`.
+    if allocStack.isLexical && !copy.sourceAddress.accessBase.storageIsLexical {
+      return nil
+    }
   }
 
   var allocStackUses = UseCollector(copy: copy, context)

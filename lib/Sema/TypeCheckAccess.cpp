@@ -600,6 +600,7 @@ public:
   UNREACHABLE(Operator, "cannot appear in a type context")
   UNREACHABLE(PrecedenceGroup, "cannot appear in a type context")
   UNREACHABLE(Module, "cannot appear in a type context")
+  UNREACHABLE(Using, "cannot appear in a type context")
 
   UNREACHABLE(Param, "does not have access control")
   UNREACHABLE(GenericTypeParam, "does not have access control")
@@ -1380,6 +1381,7 @@ public:
   UNREACHABLE(Operator, "cannot appear in a type context")
   UNREACHABLE(PrecedenceGroup, "cannot appear in a type context")
   UNREACHABLE(Module, "cannot appear in a type context")
+  UNREACHABLE(Using, "cannot appear in a type context")
 
   UNREACHABLE(Param, "does not have access control")
   UNREACHABLE(GenericTypeParam, "does not have access control")
@@ -1387,6 +1389,7 @@ public:
   UNREACHABLE(MissingMember, "does not have access control")
   UNREACHABLE(MacroExpansion, "does not have access control")
   UNREACHABLE(BuiltinTuple, "BuiltinTupleDecl should not show up here")
+
 #undef UNREACHABLE
 
 #define UNINTERESTING(KIND) \
@@ -2170,6 +2173,7 @@ public:
   UNREACHABLE(TopLevelCode, "not applicable")
   UNREACHABLE(Module, "not applicable")
   UNREACHABLE(Missing, "not applicable")
+  UNREACHABLE(Using, "not applicable")
 
   UNREACHABLE(Param, "handled by the enclosing declaration")
   UNREACHABLE(GenericTypeParam, "handled by the enclosing declaration")

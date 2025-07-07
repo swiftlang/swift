@@ -903,6 +903,12 @@ SILFunction *SILGenModule::emitProtocolWitness(
                           witness.getEnterIsolation());
 
   emitLazyConformancesForFunction(f);
+
+  if (auto isolation = getSILFunctionTypeActorIsolation(
+          reqtSubstTy, requirement, witnessRef)) {
+    f->setActorIsolation(*isolation);
+  }
+
   return f;
 }
 
@@ -1292,8 +1298,9 @@ SILFunction *SILGenModule::emitDefaultOverride(SILDeclRef replacement,
   SmallVector<ManagedValue, 4> params;
   SmallVector<ManagedValue, 4> indirectResults;
   SmallVector<ManagedValue, 4> indirectErrors;
+  ManagedValue implicitIsolationParam;
   SGF.collectThunkParams(replacement.getDecl(), params, &indirectResults,
-                         &indirectErrors);
+                         &indirectErrors, &implicitIsolationParam);
 
   auto self = params.back();
 
@@ -1308,6 +1315,11 @@ SILFunction *SILGenModule::emitDefaultOverride(SILDeclRef replacement,
   SmallVector<SILValue> args;
   for (auto result : indirectResults) {
     args.push_back(result.forward(SGF));
+  }
+  // Indirect errors would go here, but we don't currently support
+  // throwing coroutines.
+  if (implicitIsolationParam.isValid()) {
+    args.push_back(implicitIsolationParam.forward(SGF));
   }
   for (auto param : params) {
     args.push_back(param.forward(SGF));

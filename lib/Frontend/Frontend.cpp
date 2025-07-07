@@ -465,7 +465,7 @@ bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
     return false;
 
   const auto &Opts = getInvocation().getCASOptions();
-  auto MaybeDB= Opts.CASOpts.getOrCreateDatabases();
+  auto MaybeDB = Opts.CASOpts.getOrCreateDatabases();
   if (!MaybeDB) {
     Diagnostics.diagnose(SourceLoc(), diag::error_cas_initialization,
                          toString(MaybeDB.takeError()));
@@ -821,7 +821,8 @@ bool CompilerInstance::setUpModuleLoaders() {
   if (ExplicitModuleBuild ||
       !Invocation.getSearchPathOptions().ExplicitSwiftModuleMapPath.empty() ||
       !Invocation.getSearchPathOptions().ExplicitSwiftModuleInputs.empty()) {
-    if (Invocation.getCASOptions().EnableCaching)
+    if (Invocation.getCASOptions().EnableCaching ||
+        Invocation.getCASOptions().ImportModuleFromCAS)
       ESML = ExplicitCASModuleLoader::create(
           *Context, getObjectStore(), getActionCache(), getDependencyTracker(),
           MLM, Invocation.getSearchPathOptions().ExplicitSwiftModuleMapPath,
@@ -898,14 +899,6 @@ bool CompilerInstance::setUpModuleLoaders() {
         FEOpts.SerializeModuleInterfaceDependencyHashes,
         FEOpts.shouldTrackSystemDependencies(),
         RequireOSSAModules_t(Invocation.getSILOptions()));
-    auto mainModuleName = Context->getIdentifier(FEOpts.ModuleName);
-    std::unique_ptr<PlaceholderSwiftModuleScanner> PSMS =
-        std::make_unique<PlaceholderSwiftModuleScanner>(
-            *Context, MLM, mainModuleName,
-            Context->SearchPathOpts.PlaceholderDependencyModuleMap, ASTDelegate,
-            getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
-            getInvocation().getFrontendOptions().ExplicitSDKModulesOutputPath);
-    Context->addModuleLoader(std::move(PSMS));
   }
 
   return false;

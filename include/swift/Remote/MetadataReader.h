@@ -416,11 +416,9 @@ public:
   }
 
   RemoteAbsolutePointer stripSignedPointer(const RemoteAbsolutePointer &P) {
-    if (P.isResolved()) {
-      return RemoteAbsolutePointer("", 
-        P.getResolvedAddress().getAddressData() & PtrAuthMask);
-    }
-    return P;
+    return RemoteAbsolutePointer(
+        P.getSymbol(), P.getOffset(),
+        RemoteAddress(P.getResolvedAddress().getAddressData() & PtrAuthMask));
   }
 
   StoredPointer queryPtrAuthMask() {
@@ -519,28 +517,12 @@ public:
         // The second entry is a relative address to the mangled protocol
         // without symbolic references.
 
-        // lldb might return an unresolved remote absolute pointer from its
-        // resolvePointerAsSymbol implementation -- workaround this.
-        if (!resolved.isResolved()) {
-          auto remoteAddr = RemoteAddress(remoteAddress);
-          resolved =
-            RemoteAbsolutePointer("", remoteAddr.getAddressData());
-        }
-
         auto addr =
             resolved.getResolvedAddress().getAddressData() + sizeof(int32_t);
         int32_t offset;
         Reader->readInteger(RemoteAddress(addr), &offset);
         auto addrOfTypeRef = addr + offset;
         resolved = Reader->getSymbol(RemoteAddress(addrOfTypeRef));
-
-        // lldb might return an unresolved remote absolute pointer from its
-        // resolvePointerAsSymbol implementation -- workaround this.
-        if (!resolved.isResolved()) {
-          auto remoteAddr = RemoteAddress(addrOfTypeRef);
-          resolved =
-            RemoteAbsolutePointer("", remoteAddr.getAddressData());
-        }
 
         // Dig out the protocol from the protocol list.
         auto protocolList = readMangledName(resolved.getResolvedAddress(),
@@ -1379,12 +1361,10 @@ public:
   ParentContextDescriptorRef
   readContextDescriptor(const RemoteAbsolutePointer &address) {
     // Map an unresolved pointer to an unresolved context ref.
-    if (!address.isResolved()) {
+    if (!address.getSymbol().empty()) {
       // We can only handle references to a symbol without an offset currently.
-      if (address.getOffset() != 0) {
-        return ParentContextDescriptorRef();
-      }
-      return ParentContextDescriptorRef(address.getSymbol());
+      if (address.getOffset() == 0)
+        return ParentContextDescriptorRef(address.getSymbol());
     }
     
     return ParentContextDescriptorRef(
@@ -2016,7 +1996,7 @@ public:
 
   std::optional<StoredPointer> readResolvedPointerValue(StoredPointer address) {
     if (auto pointer = readPointer(address)) {
-      if (!pointer->isResolved())
+      if (!pointer->getResolvedAddress())
         return std::nullopt;
       return (StoredPointer)pointer->getResolvedAddress().getAddressData();
     }
@@ -2079,7 +2059,7 @@ protected:
       return std::nullopt;
     }
     
-    return RemoteAbsolutePointer("", resultAddress);
+    return RemoteAbsolutePointer(RemoteAddress(resultAddress));
   }
 
   /// Given a pointer to an Objective-C class, try to read its class name.
@@ -2335,13 +2315,11 @@ private:
     auto parentAddress = resolveRelativeIndirectableField(base, base->Parent);
     if (!parentAddress)
       return std::nullopt;
-    if (!parentAddress->isResolved()) {
+    if (!parentAddress->getSymbol().empty()) {
       // Currently we can only handle references directly to a symbol without
       // an offset.
-      if (parentAddress->getOffset() != 0) {
-        return std::nullopt;
-      }
-      return ParentContextDescriptorRef(parentAddress->getSymbol());
+      if (parentAddress->getOffset() == 0)
+        return ParentContextDescriptorRef(parentAddress->getSymbol());
     }
     auto addr = parentAddress->getResolvedAddress();
     if (!addr)
@@ -2907,8 +2885,10 @@ private:
     case ContextDescriptorKind::Anonymous: {
       // Use the remote address to identify the anonymous context.
       char addressBuf[18];
+      RemoteAddress address(descriptor.getAddressData());
+      address = Reader->resolveRemoteAddress(address).value_or(address);
       snprintf(addressBuf, sizeof(addressBuf), "$%" PRIx64,
-               (uint64_t)descriptor.getAddressData());
+               (uint64_t)address.getAddressData());
       auto anonNode = dem.createNode(Node::Kind::AnonymousContext);
       CharVector addressStr;
       addressStr.append(addressBuf, dem);

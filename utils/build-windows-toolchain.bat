@@ -22,6 +22,7 @@ echo set SKIP_TESTS=%SKIP_TESTS%>> %TEMP%\call-build.cmd
 echo set SKIP_PACKAGING=%SKIP_PACKAGING%>> %TEMP%\call-build.cmd
 echo set SKIP_UPDATE_CHECKOUT=%SKIP_UPDATE_CHECKOUT%>> %TEMP%\call-build.cmd
 echo set REPO_SCHEME=%REPO_SCHEME%>> %TEMP%\call-build.cmd
+echo set WINDOWS_SDKS=%WINDOWS_SDKS%>> %TEMP%\call-build.cmd
 echo "%~f0">> %TEMP%\call-build.cmd
 start /i /b /wait cmd.exe /env=default /c "%TEMP%\call-build.cmd"
 set ec=%errorlevel%
@@ -68,6 +69,10 @@ if "%TestArg:~-1%"=="," (set TestArg=%TestArg:~0,-1%) else (set TestArg= )
 set SkipPackagingArg=-SkipPackaging
 if not "%SKIP_PACKAGING%"=="1" set "SkipPackagingArg= "
 
+:: Build the -WindowsSDKs argument, if any, otherwise build all the SDKs.
+set "WindowsSDKsArg= "
+if not "%WINDOWS_SDKS%"=="" set "WindowsSDKsArg=-WindowsSDKs %WINDOWS_SDKS%"
+
 call :CloneRepositories || (exit /b 1)
 
 :: We only have write access to BuildRoot, so use that as the image root.
@@ -76,6 +81,7 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   -BinaryCache %BuildRoot% ^
   -ImageRoot %BuildRoot% ^
   %SkipPackagingArg% ^
+  %WindowsSDKsArg% ^
   %TestArg% ^
   -Stage %PackageRoot% ^
   -Summary || (exit /b 1)

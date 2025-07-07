@@ -3,7 +3,7 @@
 protocol _CFObject: Hashable {}
 
 #if CGFLOAT_IN_COREFOUNDATION
-public struct CGFloat {
+public struct CGFloat: @unchecked Sendable {
 #if _pointerBitWidth(_32)
   public typealias UnderlyingType = Float
 #elseif _pointerBitWidth(_64)

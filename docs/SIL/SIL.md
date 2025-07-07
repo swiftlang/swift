@@ -457,9 +457,10 @@ The ownership kind of a value is statically determined:
       ...
 ```
 
-- The ownership of most instruction results is statically defined. For example
-  `copy_value` always produces an owned value, whereas `begin_borrow` always
-  produces a guaranteed value.
+- The ownership of most instruction results can be statically determined from
+  the instruction's kind and the offset of the value in the result tuple. For
+  example `copy_value` has only one result and that result is always an owned
+  value, whereas `begin_borrow` always produces a guaranteed value.
 
 - Forwarding instructions: some instructions work with both, owned and
   guaranteed ownership, and "forward" the ownership from their operand(s) to

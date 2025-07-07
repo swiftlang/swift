@@ -12,11 +12,7 @@ function(swift_configure_lit_site_cfg source_path destination_path installed_nam
   string(REPLACE ${CMAKE_CFG_INTDIR} ${SWIFT_BUILD_MODE} LLVM_TOOLS_DIR ${LLVM_TOOLS_BINARY_DIR})
   string(REPLACE ${CMAKE_CFG_INTDIR} ${SWIFT_BUILD_MODE} LLVM_LIBS_DIR  ${LLVM_LIBRARY_DIR})
 
-  if (XCODE)
-    string(REPLACE ${CMAKE_CFG_INTDIR} Debug LIT_SWIFTLIB_DIR ${SWIFTLIB_DIR})
-  else ()
-    set(LIT_SWIFTLIB_DIR ${SWIFTLIB_DIR})
-  endif ()
+  set(LIT_SWIFTLIB_DIR ${SWIFTLIB_DIR})
 
   configure_file("${source_path}" "${destination_path}" @ONLY)
 
@@ -615,6 +611,18 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
       "${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}/lit.site.cfg"
       "test${VARIANT_SUFFIX}.lit.site.cfg")
   swift_generate_lit_swift_features_cfg("${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}/lit.swift-features.cfg")
+
+  set(VARIANT_SUFFIX "-embedded-wasi")
+  set(VARIANT_TRIPLE "wasm32-unknown-wasip1")
+  set(VARIANT_EXTERNAL_EMBEDDED_PLATFORM FALSE)
+  set(VARIANT_EXTERNAL_EMBEDDED_DEVICE)
+  set(SWIFT_TEST_RESULTS_DIR "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/swift-test-results/${VARIANT_TRIPLE}")
+  swift_configure_lit_site_cfg(
+      "${CMAKE_CURRENT_SOURCE_DIR}/lit.site.cfg.in"
+      "${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}/lit.site.cfg"
+      "test${VARIANT_SUFFIX}.lit.site.cfg")
+  swift_generate_lit_swift_features_cfg("${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}/lit.swift-features.cfg")
+  message(STATUS "SWIFT_LIT_ARGS is ${SWIFT_LIT_ARGS}")
 endif()
 
 # Add shortcuts for the default variant.

@@ -155,6 +155,11 @@
   #endif
 #endif
 
+#ifndef MIGRATABLE_OPTIONAL_LANGUAGE_FEATURE
+  #define MIGRATABLE_OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Name)   \
+      OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, #Name)
+#endif
+
 #ifndef UPCOMING_FEATURE
   #define UPCOMING_FEATURE(FeatureName, SENumber, Version)                     \
     LANGUAGE_FEATURE(FeatureName, SENumber, #FeatureName)
@@ -259,6 +264,12 @@ LANGUAGE_FEATURE(IsolatedConformances, 407, "Global-actor isolated conformances"
 LANGUAGE_FEATURE(ValueGenericsNameLookup, 452, "Value generics appearing as static members for namelookup")
 LANGUAGE_FEATURE(GeneralizedIsSameMetaTypeBuiltin, 465, "Builtin.is_same_metatype with support for noncopyable/nonescapable types")
 SUPPRESSIBLE_LANGUAGE_FEATURE(ABIAttributeSE0479, 479, "@abi attribute on functions, initializers, properties, and subscripts")
+LANGUAGE_FEATURE(AlwaysInheritActorContext, 472, "@_inheritActorContext(always)")
+LANGUAGE_FEATURE(BuiltinSelect, 0, "Builtin.select")
+LANGUAGE_FEATURE(BuiltinInterleave, 0, "Builtin.interleave and Builtin.deinterleave")
+LANGUAGE_FEATURE(BuiltinVectorsExternC, 0, "Extern C support for Builtin vector types")
+LANGUAGE_FEATURE(AddressOfProperty, 0, "Builtin.unprotectedAddressOf properties")
+LANGUAGE_FEATURE(NonescapableAccessorOnTrivial, 0, "Support UnsafeMutablePointer.mutableSpan")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -280,15 +291,15 @@ UPCOMING_FEATURE(GlobalActorIsolatedTypesUsability, 0434, 6)
 // Swift 7
 MIGRATABLE_UPCOMING_FEATURE(ExistentialAny, 335, 7)
 UPCOMING_FEATURE(InternalImportsByDefault, 409, 7)
-UPCOMING_FEATURE(MemberImportVisibility, 444, 7)
-UPCOMING_FEATURE(InferIsolatedConformances, 470, 7)
+MIGRATABLE_UPCOMING_FEATURE(MemberImportVisibility, 444, 7)
+MIGRATABLE_UPCOMING_FEATURE(InferIsolatedConformances, 470, 7)
 MIGRATABLE_UPCOMING_FEATURE(NonisolatedNonsendingByDefault, 461, 7)
 
 // Optional language features / modes
 
 /// Diagnose uses of language constructs and APIs that can violate memory
 /// safety.
-OPTIONAL_LANGUAGE_FEATURE(StrictMemorySafety, 458, "Strict memory safety")
+MIGRATABLE_OPTIONAL_LANGUAGE_FEATURE(StrictMemorySafety, 458, "Strict memory safety")
 
 // Experimental features
 
@@ -490,11 +501,14 @@ EXPERIMENTAL_FEATURE(CustomAvailability, true)
 /// Syntax sugar features for concurrency.
 EXPERIMENTAL_FEATURE(ConcurrencySyntaxSugar, true)
 
-/// Enable syntax sugar type '[3 x Int]' for Inline Array
+/// Enable syntax sugar type '[3 of Int]' for Inline Array
 EXPERIMENTAL_FEATURE(InlineArrayTypeSugar, false)
 
 /// Allow declaration of compile-time values
 EXPERIMENTAL_FEATURE(CompileTimeValues, true)
+
+/// Allow declaration of compile-time values
+EXPERIMENTAL_FEATURE(CompileTimeValuesPreview, false)
 
 /// Allow function body macros applied to closures.
 EXPERIMENTAL_FEATURE(ClosureBodyMacro, true)
@@ -511,11 +525,26 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ExtensibleAttribute, false)
 /// Allow use of `Module::name` syntax
 EXPERIMENTAL_FEATURE(ModuleSelector, false)
 
+/// Allow use of `using` declaration that control default isolation
+/// in a file scope.
+EXPERIMENTAL_FEATURE(DefaultIsolationPerFile, false)
+
+/// Enable @_lifetime attribute
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(Lifetimes, true)
+
+/// Disable @MainActor inference when the primary definition of a type conforms
+/// to SendableMetatype (or Sendable).
+EXPERIMENTAL_FEATURE(SendableProhibitsMainActorInference, true)
+
+/// Allow macro based aliases to be imported into Swift
+EXPERIMENTAL_FEATURE(ImportMacroAliases, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
 #undef MIGRATABLE_UPCOMING_FEATURE
 #undef MIGRATABLE_EXPERIMENTAL_FEATURE
+#undef MIGRATABLE_OPTIONAL_LANGUAGE_FEATURE
 #undef BASELINE_LANGUAGE_FEATURE
 #undef OPTIONAL_LANGUAGE_FEATURE
 #undef CONDITIONALLY_SUPPRESSIBLE_EXPERIMENTAL_FEATURE

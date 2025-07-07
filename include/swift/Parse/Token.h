@@ -19,7 +19,6 @@
 
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Parse/Token.h"
 #include "swift/Config.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -196,8 +195,9 @@ public:
 #define CONTEXTUAL_SIMPLE_DECL_ATTR(KW, ...) CONTEXTUAL_CASE(KW)
 #include "swift/AST/DeclAttr.def"
 #undef CONTEXTUAL_CASE
-      .Case("macro", true)
-      .Default(false);
+        .Case("macro", true)
+        .Case("using", true)
+        .Default(false);
   }
 
   bool isContextualPunctuator(StringRef ContextPunc) const {
@@ -265,6 +265,9 @@ public:
     default: return false;
     }
   }
+
+  /// True if the token is an editor placeholder.
+  bool isEditorPlaceholder() const;
 
   /// True if the string literal token is multiline.
   bool isMultilineString() const {

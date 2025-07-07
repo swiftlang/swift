@@ -6,7 +6,7 @@
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
-// REQUIRES: rdar114453974
+// REQUIRES: rdar114198425
 
 // rdar://76038845
 // UNSUPPORTED: use_os_stdlib

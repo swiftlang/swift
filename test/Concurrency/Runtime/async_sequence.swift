@@ -3,11 +3,7 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 
-// rdar://76038845
 // REQUIRES: concurrency_runtime
-
-// TODO: This crashes on linux for some strange reason
-// REQUIRES: OS=macosx
 
 import StdlibUnittest
 

@@ -227,6 +227,25 @@ public:
             || !conditionallyAddressableParamIndices
             || conditionallyAddressableParamIndices->isDisjointWith(
               addressableParamIndices)));
+
+    if (CONDITIONAL_ASSERT_enabled()) {
+      // Ensure inherit/scope/addressable param indices are of the same length
+      // or 0.
+      unsigned paramIndicesLength = 0;
+      if (inheritLifetimeParamIndices) {
+        paramIndicesLength = inheritLifetimeParamIndices->getCapacity();
+      }
+      if (scopeLifetimeParamIndices) {
+        ASSERT(paramIndicesLength == 0 ||
+               paramIndicesLength == scopeLifetimeParamIndices->getCapacity());
+        paramIndicesLength = scopeLifetimeParamIndices->getCapacity();
+      }
+      if (addressableParamIndices) {
+        ASSERT(paramIndicesLength == 0 ||
+               paramIndicesLength == addressableParamIndices->getCapacity());
+        paramIndicesLength = addressableParamIndices->getCapacity();
+      }
+    }
   }
 
   operator bool() const { return !empty(); }
@@ -248,6 +267,19 @@ public:
   }
   bool hasAddressableParamIndices() const {
     return addressableParamIndicesAndImmortal.getPointer() != nullptr;
+  }
+
+  unsigned getParamIndicesLength() const {
+    if (hasInheritLifetimeParamIndices()) {
+      return getInheritIndices()->getCapacity();
+    }
+    if (hasScopeLifetimeParamIndices()) {
+      return getScopeIndices()->getCapacity();
+    }
+    if (hasAddressableParamIndices()) {
+      return getAddressableIndices()->getCapacity();
+    }
+    return 0;
   }
 
   IndexSubset *getInheritIndices() const { return inheritLifetimeParamIndices; }
@@ -292,8 +324,7 @@ public:
   /// Builds LifetimeDependenceInfo from a swift decl, either from the explicit
   /// lifetime dependence specifiers or by inference based on types and
   /// ownership modifiers.
-  static std::optional<ArrayRef<LifetimeDependenceInfo>>
-  get(AbstractFunctionDecl *decl);
+  static std::optional<ArrayRef<LifetimeDependenceInfo>> get(ValueDecl *decl);
 
   /// Builds LifetimeDependenceInfo from SIL
   static std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>

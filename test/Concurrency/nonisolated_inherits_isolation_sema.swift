@@ -19,7 +19,7 @@ struct MainActorIsolatedStruct {
 struct NonisolatedStruct {
   // Validate we can still not access global state.
   func asyncMethod() async {
-    let _ = await global // expected-error {{non-sendable type 'NonSendable' of var 'global' cannot exit main actor-isolated context}}
+    let _ = await global // expected-error {{non-Sendable type 'NonSendable' of var 'global' cannot exit main actor-isolated context}}
 
     let x = await MainActorIsolatedStruct()
     await x.syncMethod()

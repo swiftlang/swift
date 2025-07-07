@@ -141,9 +141,18 @@ ConstraintSystem::~ConstraintSystem() {
 void ConstraintSystem::startExpressionTimer(ExpressionTimer::AnchorType anchor) {
   ASSERT(!Timer);
 
-  unsigned timeout = getASTContext().TypeCheckerOpts.ExpressionTimeoutThreshold;
-  if (timeout == 0)
-    return;
+  const auto &opts = getASTContext().TypeCheckerOpts;
+  unsigned timeout = opts.ExpressionTimeoutThreshold;
+
+  // If either the timeout is set, or we're asked to emit warnings,
+  // start the timer. Otherwise, don't start the timer, it's needless
+  // overhead.
+  if (timeout == 0) {
+    if (opts.WarnLongExpressionTypeChecking == 0)
+      return;
+
+    timeout = ExpressionTimer::NoLimit;
+  }
 
   Timer.emplace(anchor, *this, timeout);
 }
@@ -730,7 +739,9 @@ ConstraintLocator *ConstraintSystem::getCalleeLocator(
   }
 
   if (locator->isLastElement<LocatorPathElt::ArgumentAttribute>()) {
-    return getConstraintLocator(anchor, path.drop_back());
+    auto argLoc = getConstraintLocator(anchor, path.drop_back());
+    return getCalleeLocator(argLoc, lookThroughApply, getType, simplifyType,
+                            getOverloadFor);
   }
 
   // If we have a locator that starts with a key path component element, we
@@ -1414,11 +1425,6 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
   bool async = expr->getAsyncLoc().isValid();
   bool sendable = expr->getAttrs().hasAttribute<SendableAttr>();
 
-  // `@concurrent` attribute is only valid on asynchronous function types.
-  if (expr->getAttrs().hasAttribute<ConcurrentAttr>()) {
-    async = true;
-  }
-
   if (throws || async) {
     return ASTExtInfoBuilder()
       .withThrows(throws, /*FIXME:*/Type())
@@ -1432,11 +1438,17 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
   if (!body)
     return ASTExtInfoBuilder().withSendable(sendable).build();
 
+  // `@concurrent` attribute is only valid on asynchronous function types.
+  bool asyncFromAttr = false;
+  if (expr->getAttrs().hasAttribute<ConcurrentAttr>()) {
+    asyncFromAttr = true;
+  }
+
   auto throwFinder = FindInnerThrows(expr);
   body->walk(throwFinder);
   return ASTExtInfoBuilder()
       .withThrows(throwFinder.foundThrow(), /*FIXME:*/Type())
-      .withAsync(bool(findAsyncNode(expr)))
+      .withAsync(asyncFromAttr || bool(findAsyncNode(expr)))
       .withSendable(sendable)
       .build();
 }
@@ -1758,7 +1770,7 @@ Type Solution::simplifyType(Type type, bool wantInterfaceType) const {
   if (wantInterfaceType)
     type = type->mapTypeOutOfContext();
 
-  if (!(type->hasTypeVariable() || type->hasPlaceholder()))
+  if (!type->hasTypeVariableOrPlaceholder())
     return type;
 
   // Map type variables to fixed types from bindings.
@@ -1776,16 +1788,28 @@ Type Solution::simplifyType(Type type, bool wantInterfaceType) const {
       });
   ASSERT(!(wantInterfaceType && resolvedType->hasPrimaryArchetype()));
 
-  // Placeholders shouldn't be reachable through a solution, they are only
-  // useful to determine what went wrong exactly.
-  if (resolvedType->hasPlaceholder()) {
-    return resolvedType.transformRec([&](Type type) -> std::optional<Type> {
-      if (type->isPlaceholder())
-        return Type(cs.getASTContext().TheUnresolvedType);
-      return std::nullopt;
-    });
+  // We may have type variables and placeholders left over. These are solver
+  // allocated so cannot escape this function. Turn them into UnresolvedType.
+  // - Type variables may still be present from unresolved pack expansions where
+  //   e.g the count type is a hole, so the pattern may never become a
+  //   concrete type.
+  // - Placeholders may be present for any holes.
+  if (resolvedType->hasTypeVariableOrPlaceholder()) {
+    auto &ctx = cs.getASTContext();
+    resolvedType =
+        resolvedType.transformRec([&](Type type) -> std::optional<Type> {
+          if (!type->hasTypeVariableOrPlaceholder())
+            return type;
+
+          auto *typePtr = type.getPointer();
+          if (isa<TypeVariableType>(typePtr) || isa<PlaceholderType>(typePtr))
+            return Type(ctx.TheUnresolvedType);
+
+          return std::nullopt;
+        });
   }
 
+  ASSERT(!resolvedType->getRecursiveProperties().isSolverAllocated());
   return resolvedType;
 }
 

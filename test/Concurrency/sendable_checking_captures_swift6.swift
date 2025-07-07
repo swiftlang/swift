@@ -8,10 +8,10 @@ var testLocalCaptures: Int {
   let ns = NonSendable()
 
   @Sendable func localFunc() -> NonSendable {
-    return ns // expected-error {{capture of 'ns' with non-sendable type 'NonSendable' in a '@Sendable' local function}}
+    return ns // expected-error {{capture of 'ns' with non-Sendable type 'NonSendable' in a '@Sendable' local function}}
   }
 
-  callee { return ns } // expected-error {{capture of 'ns' with non-sendable type 'NonSendable' in a '@Sendable' closure}}
+  callee { return ns } // expected-error {{capture of 'ns' with non-Sendable type 'NonSendable' in a '@Sendable' closure}}
 
   return 3
 }
@@ -19,7 +19,7 @@ var testLocalCaptures: Int {
 struct Bad {
   var c: Int = {
     let ns = NonSendable()
-    callee { return ns } // expected-error {{capture of 'ns' with non-sendable type 'NonSendable' in a '@Sendable' closure}}
+    callee { return ns } // expected-error {{capture of 'ns' with non-Sendable type 'NonSendable' in a '@Sendable' closure}}
     return 3
   }()
 }
@@ -39,13 +39,13 @@ do {
   withMutable { test in
     sendable {
       test.update()
-      // expected-error@-1 {{capture of 'test' with non-sendable type 'Test' in a '@Sendable' closure}}
+      // expected-error@-1 {{capture of 'test' with non-Sendable type 'Test' in a '@Sendable' closure}}
       // expected-error@-2 {{mutable capture of 'inout' parameter 'test' is not allowed in concurrently-executing code}}
     }
 
     sendable_preconcurrency {
       test.update()
-      // expected-warning@-1 {{capture of 'test' with non-sendable type 'Test' in a '@Sendable' closure}}
+      // expected-warning@-1 {{capture of 'test' with non-Sendable type 'Test' in a '@Sendable' closure}}
       // expected-warning@-2 {{mutable capture of 'inout' parameter 'test' is not allowed in concurrently-executing code}}
     }
   }
@@ -63,7 +63,7 @@ do {
     func fooDirect() {
       C.f {
         use(self)
-        // expected-warning@-1 {{capture of 'self' with non-sendable type 'SelfCapture' in a '@Sendable' closure}}
+        // expected-warning@-1 {{capture of 'self' with non-Sendable type 'SelfCapture' in a '@Sendable' closure}}
         // expected-warning@-2 {{implicit capture of 'self' requires that 'SelfCapture' conforms to 'Sendable'}}
       }
     }
@@ -71,8 +71,8 @@ do {
     func fooThroughClosure() {
       C.f {
         { use(self) }()
-        // expected-warning@-1 {{capture of 'self' with non-sendable type 'SelfCapture' in a '@Sendable' closure}}
-        // expected-warning@-2 {{capture of 'self' with non-sendable type 'SelfCapture' in an isolated closure}}
+        // expected-warning@-1 {{capture of 'self' with non-Sendable type 'SelfCapture' in a '@Sendable' closure}}
+        // expected-warning@-2 {{capture of 'self' with non-Sendable type 'SelfCapture' in an isolated closure}}
         // expected-warning@-3 {{implicit capture of 'self' requires that 'SelfCapture' conforms to 'Sendable'}}
       }
     }

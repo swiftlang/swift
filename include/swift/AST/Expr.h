@@ -267,7 +267,7 @@ protected:
     Kind : 2
   );
 
-  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1+1+1+1+1+1+1+1+1,
     /// True if closure parameters were synthesized from anonymous closure
     /// variables.
     HasAnonymousClosureVars : 1,
@@ -276,9 +276,11 @@ protected:
     /// on each member reference.
     ImplicitSelfCapture : 1,
 
-    /// True if this @Sendable async closure parameter should implicitly
-    /// inherit the actor context from where it was formed.
+    /// True if this closure parameter should implicitly inherit the actor
+    /// context from where it was formed.
     InheritActorContext : 1,
+    /// The kind for inheritance - none or always at the moment.
+    InheritActorContextKind : 1,
 
     /// True if this closure's actor isolation behavior was determined by an
     /// \c \@preconcurrency declaration.
@@ -694,9 +696,7 @@ public:
 
   /// Set the builtin initializer that will be used to construct the
   /// literal.
-  void setBuiltinInitializer(ConcreteDeclRef builtinInitializer) {
-    BuiltinInitializer = builtinInitializer;
-  }
+  void setBuiltinInitializer(ConcreteDeclRef builtinInitializer);
 };
 
 /// The 'nil' literal.
@@ -4318,6 +4318,7 @@ public:
     Bits.ClosureExpr.HasAnonymousClosureVars = false;
     Bits.ClosureExpr.ImplicitSelfCapture = false;
     Bits.ClosureExpr.InheritActorContext = false;
+    Bits.ClosureExpr.InheritActorContextKind = 0;
     Bits.ClosureExpr.IsPassedToSendingParameter = false;
     Bits.ClosureExpr.NoGlobalActorAttribute = false;
     Bits.ClosureExpr.RequiresDynamicIsolationChecking = false;
@@ -4366,8 +4367,29 @@ public:
     return Bits.ClosureExpr.InheritActorContext;
   }
 
-  void setInheritsActorContext(bool value = true) {
+  /// Whether this closure should _always_ implicitly inherit the actor context
+  /// regardless of whether the isolation parameter is captured or not.
+  bool alwaysInheritsActorContext() const {
+    if (!inheritsActorContext())
+      return false;
+    return getInheritActorIsolationModifier() ==
+           InheritActorContextModifier::Always;
+  }
+
+  void setInheritsActorContext(bool value = true,
+                               InheritActorContextModifier modifier =
+                                   InheritActorContextModifier::None) {
     Bits.ClosureExpr.InheritActorContext = value;
+    Bits.ClosureExpr.InheritActorContextKind = uint8_t(modifier);
+    assert((static_cast<InheritActorContextModifier>(
+                Bits.ClosureExpr.InheritActorContextKind) == modifier) &&
+           "not enough bits for modifier");
+  }
+
+  InheritActorContextModifier getInheritActorIsolationModifier() const {
+    assert(inheritsActorContext());
+    return static_cast<InheritActorContextModifier>(
+        Bits.ClosureExpr.InheritActorContextKind);
   }
 
   /// Whether the closure's concurrency behavior was determined by an

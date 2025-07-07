@@ -45,6 +45,18 @@ extension Value {
     }
   }
 
+  var lookThroughIndexScalarCast: Value {
+    if let castBuiltin = self as? BuiltinInst {
+      switch castBuiltin.id {
+      case .TruncOrBitCast, .SExtOrBitCast:
+        return castBuiltin.arguments[0]
+      default:
+        return self
+      }
+    }
+    return self
+  }
+
   func isInLexicalLiverange(_ context: some Context) -> Bool {
     var worklist = ValueWorklist(context)
     defer { worklist.deinitialize() }
@@ -333,6 +345,16 @@ extension SingleValueInstruction {
   /// Replaces all uses with `replacement` and then erases the instruction.
   func replace(with replacement: Value, _ context: some MutatingContext) {
     uses.replaceAll(with: replacement, context)
+    context.erase(instruction: self)
+  }
+}
+
+extension MultipleValueInstruction {
+  /// Replaces all uses with the result of `replacement` and then erases the instruction.
+  func replace(with replacement: MultipleValueInstruction, _ context: some MutatingContext) {
+    for (origResult, newResult) in zip(self.results, replacement.results) {
+      origResult.uses.replaceAll(with: newResult, context)
+    }
     context.erase(instruction: self)
   }
 }
@@ -751,11 +773,14 @@ private struct EscapesToValueVisitor : EscapeVisitor {
 }
 
 extension Function {
+  /// Analyzes the global initializer function and returns global it initializes (from `alloc_global` instruction).
   var initializedGlobal: GlobalVariable? {
-    if !isGlobalInitOnceFunction {
+    guard isGlobalInitOnceFunction,
+          let firstBlock = blocks.first
+    else {
       return nil
     }
-    for inst in entryBlock.instructions {
+    for inst in firstBlock.instructions {
       if let allocGlobal = inst as? AllocGlobalInst {
         return allocGlobal.global
       }
@@ -844,77 +869,6 @@ extension InstructionRange {
       }
     }
   }
-}
-
-/// Analyses the global initializer function and returns the `alloc_global` and `store`
-/// instructions which initialize the global.
-/// Returns nil if `function` has any side-effects beside initializing the global.
-///
-/// The function's single basic block must contain following code pattern:
-/// ```
-///   alloc_global @the_global
-///   %a = global_addr @the_global
-///   %i = some_const_initializer_insts
-///   store %i to %a
-/// ```
-/// 
-/// For all other instructions `handleUnknownInstruction` is called and such an instruction
-/// is accepted if `handleUnknownInstruction` returns true.
-func getGlobalInitialization(
-  of function: Function,
-  _ context: some Context,
-  handleUnknownInstruction: (Instruction) -> Bool
-) -> (allocInst: AllocGlobalInst, storeToGlobal: StoreInst)? {
-  guard let block = function.blocks.singleElement else {
-    return nil
-  }
-
-  var allocInst: AllocGlobalInst? = nil
-  var globalAddr: GlobalAddrInst? = nil
-  var store: StoreInst? = nil
-
-  for inst in block.instructions {
-    switch inst {
-    case is ReturnInst,
-         is DebugValueInst,
-         is DebugStepInst,
-         is BeginAccessInst,
-         is EndAccessInst:
-      continue
-    case let agi as AllocGlobalInst:
-      if allocInst == nil {
-        allocInst = agi
-        continue
-      }
-    case let ga as GlobalAddrInst:
-      if let agi = allocInst, agi.global == ga.global {
-        globalAddr = ga
-      }
-      continue
-    case let si as StoreInst:
-      if store == nil,
-         let ga = globalAddr,
-         si.destination == ga
-      {
-        store = si
-        continue
-      }
-    // Note that the initializer must not contain a `global_value` because `global_value` needs to
-    // initialize the class metadata at runtime.
-    default:
-      if inst.isValidInStaticInitializerOfGlobal(context) {
-        continue
-      }
-    }
-    if handleUnknownInstruction(inst) {
-      continue
-    }
-    return nil
-  }
-  if let store = store {
-    return (allocInst: allocInst!, storeToGlobal: store)
-  }
-  return nil
 }
 
 func canDynamicallyCast(from sourceType: CanonicalType, to destType: CanonicalType,
@@ -1031,5 +985,49 @@ extension Type {
       return true
     }
     return context._bridged.shouldExpand(self.bridged)
+  }
+}
+
+/// Used by TempLValueElimination and TempRValueElimination to make the optimization work by both,
+/// `copy_addr` and `load`-`store`-pairs.
+protocol CopyLikeInstruction: Instruction {
+  var sourceAddress: Value { get }
+  var destinationAddress: Value { get }
+  var isTakeOfSource: Bool { get }
+  var isInitializationOfDestination: Bool { get }
+  var loadingInstruction: Instruction { get }
+}
+
+extension CopyAddrInst: CopyLikeInstruction {
+  var sourceAddress: Value { source }
+  var destinationAddress: Value { destination }
+  var loadingInstruction: Instruction { self }
+}
+
+// A `store` which has a `load` as source operand. This is basically the same as a `copy_addr`.
+extension StoreInst: CopyLikeInstruction {
+  var sourceAddress: Value { load.address }
+  var destinationAddress: Value { destination }
+  var isTakeOfSource: Bool { load.loadOwnership == .take }
+  var isInitializationOfDestination: Bool { storeOwnership != .assign }
+  var loadingInstruction: Instruction { load }
+  private var load: LoadInst { source as! LoadInst }
+}
+
+func eraseIfDead(functions: [Function], _ context: ModulePassContext) {
+  var toDelete = functions
+  while true {
+    var remaining = [Function]()
+    for fn in toDelete {
+      if !fn.isPossiblyUsedExternally && !fn.isReferencedInModule {
+        context.erase(function: fn)
+      } else {
+        remaining.append(fn)
+      }
+    }
+    if remaining.count == toDelete.count {
+      return
+    }
+    toDelete = remaining
   }
 }

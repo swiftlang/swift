@@ -3759,12 +3759,9 @@ bb2(%5 : $MyErrorType):
 }
 
 // CHECK-LABEL: sil @mark_dependence_base
-// CHECK: bb0(
-// CHECK-NOT: init_existential_ref
-// CHECK-NOT: enum
-// CHECK-NEXT: mark_dependence
-// CHECK-NEXT: load
-// CHECK: return
+// CHECK:        [[MD:%.*]] = mark_dependence %0 : $*Builtin.Int64 on %1 : $B
+// CHECK-NEXT:   load [[MD]]
+// CHECK:       } // end sil function 'mark_dependence_base'
 sil @mark_dependence_base : $@convention(thin) (@inout Builtin.Int64, @owned B) -> Builtin.Int64 {
 bb0(%0 : $*Builtin.Int64, %1 : $B):
   %x = init_existential_ref %1 : $B : $B, $AnyObject
@@ -3788,10 +3785,8 @@ bb0(%0 : $B):
 }
 
 // CHECK-LABEL: sil @mark_dependence_trivial_address_base :
-// CHECK: bb0(
-// CHECK-NEXT: strong_retain
-// CHECK-NEXT: return
-// CHECK: } // end sil function 'mark_dependence_trivial_address_base'
+// CHECK:         mark_dependence
+// CHECK:       } // end sil function 'mark_dependence_trivial_address_base'
 sil @mark_dependence_trivial_address_base : $@convention(thin) (@guaranteed B) -> @owned B {
 bb0(%0 : $B):
   strong_retain %0 : $B
@@ -3804,12 +3799,9 @@ bb0(%0 : $B):
 protocol _NSArrayCore {}
 
 // CHECK-LABEL: sil @mark_dependence_base2
-// CHECK: bb0(
-// CHECK-NOT: open_existential_ref
-// CHECK-NOT: enum
-// CHECK-NEXT: mark_dependence
-// CHECK-NEXT: load
-// CHECK: return
+// CHECK:        [[MD:%.*]] = mark_dependence %0 : $*Builtin.Int64 on %1 : $B
+// CHECK-NEXT:   load [[MD]]
+// CHECK:       } // end sil function 'mark_dependence_base2'
 sil @mark_dependence_base2 : $@convention(thin) (@inout Builtin.Int64, @owned B) -> Builtin.Int64 {
 bb0(%0 : $*Builtin.Int64, %1 : $B):
   %2 = init_existential_ref %1 : $B : $B, $AnyObject

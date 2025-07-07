@@ -125,10 +125,9 @@ bb1(%0 : $Int):
 
 sil @callee : $@convention(thin) (@inout Int) -> ()
 
-// CHECK-LABEL: sil @inout_nocapture
-sil @inout_nocapture : $@convention(thin) () -> Int {
+// CHECK-LABEL: sil @escaping_pointer
+sil @escaping_pointer : $@convention(thin) () -> Int {
 bb0:
-  // CHECK: alloc_stack
   %1 = alloc_box ${ var Int }
   %1a = project_box %1 : ${ var Int }, 0
   %6 = function_ref @callee : $@convention(thin) (@inout Int) -> ()
@@ -398,7 +397,7 @@ bb0(%0 : $Int):
 }
 
 // CHECK-LABEL: sil private @$s6struct8useStack1tySi_tFSiycfU_Tf0s_n
-// CHECK-LABEL: sil private [_semantics "sil.optimizer.delete_if_unused"] @$s6struct8useStack1tySi_tFSiycfU_
+// CHECK-LABEL: sil private @$s6struct8useStack1tySi_tFSiycfU_
 // struct.(useStack (t : Swift.Int) -> ()).(closure #1)
 sil private @$s6struct8useStack1tySi_tFSiycfU_ : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Int>) -> Int {
 bb0(%0 : $<τ_0_0> { var τ_0_0 } <Int>):
@@ -651,7 +650,7 @@ bb0(%0 : $Int, %1 : $*S<T>):
   return %9 : $Bool
 }
 
-// CHECK-LABEL: sil shared [_semantics "sil.optimizer.delete_if_unused"] @closure1
+// CHECK-LABEL: sil shared @closure1
 sil shared @closure1 : $@convention(thin) <T where T : Count> (Int, @owned <τ_0_0 : Count> { var S<τ_0_0> } <T>) -> Bool {
 // CHECK: bb0
 bb0(%0 : $Int, %1 : $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>):
@@ -673,7 +672,7 @@ bb0(%0 : $Int, %1 : $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>):
 // CHECK: return
 // CHECK-NOT: bb1
 
-// CHECK-LABEL: sil shared [_semantics "sil.optimizer.delete_if_unused"] @closure2
+// CHECK-LABEL: sil shared @closure2
 sil shared @closure2 : $@convention(thin) <T where T : Count> (Int, @owned <τ_0_0 : Count> { var S<τ_0_0> } <T>) -> Bool {
 // CHECK: bb0
 bb0(%0 : $Int, %1 : $<τ_0_0 where τ_0_0 : Count> { var S<τ_0_0> } <T>):

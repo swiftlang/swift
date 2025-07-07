@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -59,12 +59,10 @@ SILType SILFunctionType::substInterfaceType(SILModule &M,
   return interfaceType;
 }
 
-SILFunctionType::ExtInfo
-SILFunctionType::getSubstLifetimeDependencies(GenericSignature genericSig,
-                                              ExtInfo origExtInfo,
-                                              ArrayRef<SILParameterInfo> params,
-                                              ArrayRef<SILYieldInfo> yields,
-                                              ArrayRef<SILResultInfo> results) {
+SILFunctionType::ExtInfo SILFunctionType::getSubstLifetimeDependencies(
+    GenericSignature genericSig, ExtInfo origExtInfo, ASTContext &context,
+    ArrayRef<SILParameterInfo> params, ArrayRef<SILYieldInfo> yields,
+    ArrayRef<SILResultInfo> results) {
   if (origExtInfo.getLifetimeDependencies().empty()) {
     return origExtInfo;
   }
@@ -87,7 +85,8 @@ SILFunctionType::getSubstLifetimeDependencies(GenericSignature genericSig,
       }
     });
   if (didRemoveLifetimeDependencies) {
-    return origExtInfo.withLifetimeDependencies(substLifetimeDependencies);
+    return origExtInfo.withLifetimeDependencies(
+        context.AllocateCopy(substLifetimeDependencies));
   }
   return origExtInfo;
 }
@@ -131,10 +130,10 @@ CanSILFunctionType SILFunctionType::getUnsubstitutedType(SILModule &M) const {
 
   auto signature = isPolymorphic() ? getInvocationGenericSignature()
                                    : CanGenericSignature();
-  
-  auto extInfo = getSubstLifetimeDependencies(signature, getExtInfo(),
-                                              params, yields, results);
-  
+
+  auto extInfo = getSubstLifetimeDependencies(
+      signature, getExtInfo(), getASTContext(), params, yields, results);
+
   return SILFunctionType::get(signature,
                               extInfo,
                               getCoroutineKind(),
@@ -2386,6 +2385,68 @@ static void destructureYieldsForCoroutine(TypeConverter &TC,
   }
 }
 
+std::optional<ActorIsolation>
+swift::getSILFunctionTypeActorIsolation(CanAnyFunctionType substFnInterfaceType,
+                                        std::optional<SILDeclRef> origConstant,
+                                        std::optional<SILDeclRef> constant) {
+  // If we have origConstant then we are creating a protocol method thunk. In
+  // such a case, we want to use the origConstant's actor isolation.
+  if (origConstant && constant &&
+      *origConstant != *constant) {
+    if (auto *decl = origConstant->getAbstractFunctionDecl()) {
+      if (auto *nonisolatedAttr =
+              decl->getAttrs().getAttribute<NonisolatedAttr>()) {
+        if (nonisolatedAttr->isNonSending())
+          return ActorIsolation::forCallerIsolationInheriting();
+      }
+
+      if (decl->getAttrs().hasAttribute<ConcurrentAttr>()) {
+        return ActorIsolation::forNonisolated(false /*unsafe*/);
+      }
+    }
+
+    return getActorIsolationOfContext(origConstant->getInnermostDeclContext());
+  }
+
+  if (constant) {
+    // TODO: It should to be possible to `getActorIsolation` if
+    // reference is to a decl instead of trying to get isolation
+    // from the reference kind, the attributes, or the context.
+
+    if (constant->kind == SILDeclRef::Kind::Deallocator) {
+      return ActorIsolation::forNonisolated(false);
+    }
+
+    if (auto *decl = constant->getAbstractFunctionDecl()) {
+      if (auto *nonisolatedAttr =
+              decl->getAttrs().getAttribute<NonisolatedAttr>()) {
+        if (nonisolatedAttr->isNonSending())
+          return ActorIsolation::forCallerIsolationInheriting();
+      }
+
+      if (decl->getAttrs().hasAttribute<ConcurrentAttr>()) {
+        return ActorIsolation::forNonisolated(false /*unsafe*/);
+      }
+    }
+
+    if (auto *closure = constant->getAbstractClosureExpr()) {
+      if (auto isolation = closure->getActorIsolation())
+        return isolation;
+    }
+
+    return getActorIsolationOfContext(constant->getInnermostDeclContext());
+  }
+
+  if (substFnInterfaceType->hasExtInfo() &&
+      substFnInterfaceType->getExtInfo().getIsolation().isNonIsolatedCaller()) {
+    // If our function type is a nonisolated caller and we can not infer from
+    // our constant, we must be caller isolation inheriting.
+    return ActorIsolation::forCallerIsolationInheriting();
+  }
+
+  return {};
+}
+
 /// Create the appropriate SIL function type for the given formal type
 /// and conventions.
 ///
@@ -2617,39 +2678,8 @@ static CanSILFunctionType getSILFunctionType(
   SmallBitVector addressableParams;
   SmallBitVector conditionallyAddressableParams;
   {
-    std::optional<ActorIsolation> actorIsolation;
-    if (constant) {
-      // TODO: It should to be possible to `getActorIsolation` if
-      // reference is to a decl instead of trying to get isolation
-      // from the reference kind, the attributes, or the context.
-
-      if (constant->kind == SILDeclRef::Kind::Deallocator) {
-        actorIsolation = ActorIsolation::forNonisolated(false);
-      } else if (auto *decl = constant->getAbstractFunctionDecl()) {
-        if (auto *nonisolatedAttr =
-                decl->getAttrs().getAttribute<NonisolatedAttr>()) {
-          if (nonisolatedAttr->isNonSending())
-            actorIsolation = ActorIsolation::forCallerIsolationInheriting();
-        } else if (decl->getAttrs().hasAttribute<ConcurrentAttr>()) {
-          actorIsolation = ActorIsolation::forNonisolated(false /*unsafe*/);
-        }
-      } else if (auto *closure = constant->getAbstractClosureExpr()) {
-        if (auto isolation = closure->getActorIsolation())
-          actorIsolation = isolation;
-      }
-
-      if (!actorIsolation) {
-        actorIsolation =
-            getActorIsolationOfContext(constant->getInnermostDeclContext());
-      }
-    } else if (substFnInterfaceType->hasExtInfo() &&
-               substFnInterfaceType->getExtInfo()
-                   .getIsolation()
-                   .isNonIsolatedCaller()) {
-      // If our function type is a nonisolated caller and we can not infer from
-      // our constant, we must be caller isolation inheriting.
-      actorIsolation = ActorIsolation::forCallerIsolationInheriting();
-    }
+    auto actorIsolation = getSILFunctionTypeActorIsolation(
+        substFnInterfaceType, origConstant, constant);
     DestructureInputs destructurer(expansionContext, TC, conventions,
                                    foreignInfo, actorIsolation, inputs,
                                    parameterMap,
@@ -2824,7 +2854,7 @@ static CanSILFunctionType getSILFunctionType(
           .withSendable(isSendable)
           .withAsync(isAsync)
           .withUnimplementable(unimplementable)
-          .withLifetimeDependencies(loweredLifetimes)
+          .withLifetimeDependencies(TC.Context.AllocateCopy(loweredLifetimes))
           .build();
 
   return SILFunctionType::get(genericSig, silExtInfo, coroutineKind,
@@ -4055,8 +4085,7 @@ static ObjCSelectorFamily getObjCSelectorFamily(SILDeclRef c) {
       case AccessorKind::Set:
         break;
 #define OBJC_ACCESSOR(ID, KEYWORD)
-#define ACCESSOR(ID) \
-      case AccessorKind::ID:
+#define ACCESSOR(ID, KEYWORD) case AccessorKind::ID:
       case AccessorKind::DistributedGet:
 #include "swift/AST/AccessorKinds.def"
         llvm_unreachable("Unexpected AccessorKind of foreign FuncDecl");

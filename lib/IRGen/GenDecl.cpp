@@ -2661,6 +2661,9 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   case DeclKind::MacroExpansion:
     // Expansion already visited as auxiliary decls.
     return;
+
+  case DeclKind::Using:
+    return;
   }
 
   llvm_unreachable("bad decl kind!");
@@ -3733,13 +3736,15 @@ static llvm::GlobalVariable *createGOTEquivalent(IRGenModule &IGM,
                                       llvm::GlobalValue::PrivateLinkage,
                                       global,
                                       llvm::Twine("got.") + globalName);
-  
+
   // rdar://problem/53836960: i386 ld64 also mis-links relative references
   // to GOT entries.
   // rdar://problem/59782487: issue with on-device JITd expressions.
   // The JIT gets confused by private vars accessed across object files.
+  // rdar://148168098: ELF x86 GOTPCREL relaxation can break metadata.
   if (!IGM.getOptions().UseJIT &&
-      (!IGM.Triple.isOSDarwin() || IGM.Triple.getArch() != llvm::Triple::x86)) {
+      (!IGM.Triple.isOSDarwin() || IGM.Triple.getArch() != llvm::Triple::x86) &&
+      (!IGM.Triple.isOSBinFormatELF() || !IGM.Triple.isX86())) {
     gotEquivalent->setUnnamedAddr(llvm::GlobalValue::UnnamedAddr::Global);
   } else {
     ApplyIRLinkage(IRLinkage::InternalLinkOnceODR)
@@ -3960,16 +3965,21 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
   // inside the standard library with the definition being in the runtime
   // preventing the normal detection from identifying that this is module
   // local.
-  if (getSwiftModule()->isStdlibModule())
+  //
+  // If we are statically linking the standard library, we need to internalise
+  // the symbols.
+  if (getSwiftModule()->isStdlibModule() ||
+      (Context.getStdlibModule() &&
+       Context.getStdlibModule()->isStaticLibrary()))
     if (entity.isTypeKind() &&
         (IsWellKnownBuiltinOrStructralType(entity.getType()) ||
          entity.getType() == kAnyFunctionType))
       if (auto *GV = dyn_cast<llvm::GlobalValue>(var))
-          if (GV->hasDLLImportStorageClass())
-            ApplyIRLinkage({llvm::GlobalValue::ExternalLinkage,
-                            llvm::GlobalValue::DefaultVisibility,
-                            llvm::GlobalValue::DefaultStorageClass})
-                .to(GV);
+        if (GV->hasDLLImportStorageClass())
+          ApplyIRLinkage({llvm::GlobalValue::ExternalLinkage,
+                          llvm::GlobalValue::DefaultVisibility,
+                          llvm::GlobalValue::DefaultStorageClass})
+              .to(GV);
 
   // Install the concrete definition if we have one.
   if (definition && definition.hasInit()) {
@@ -5793,6 +5803,7 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
     case DeclKind::Param:
     case DeclKind::Module:
     case DeclKind::PrecedenceGroup:
+    case DeclKind::Using:
       llvm_unreachable("decl not allowed in type context");
 
     case DeclKind::BuiltinTuple:

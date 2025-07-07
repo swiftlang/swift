@@ -439,6 +439,28 @@ static bool isAsyncSequenceFailure(AssociatedTypeDecl *assocType) {
   return assocType->getName() == assocType->getASTContext().Id_Failure;
 }
 
+static Type resolveTypeWitnessViaParameterizedProtocol(
+    Type t, AssociatedTypeDecl *assocType) {
+  if (auto *pct = t->getAs<ProtocolCompositionType>()) {
+    for (auto member : pct->getMembers()) {
+      if (auto result = resolveTypeWitnessViaParameterizedProtocol(
+            member, assocType)) {
+        return result;
+      }
+    }
+  } else if (auto *ppt = t->getAs<ParameterizedProtocolType>()) {
+    auto *proto = ppt->getProtocol();
+    unsigned i = 0;
+    for (auto *otherAssocType : proto->getPrimaryAssociatedTypes()) {
+      if (otherAssocType->getName() == assocType->getName())
+        return ppt->getArgs()[i];
+      ++i;
+    }
+  }
+
+  return Type();
+}
+
 /// Attempt to resolve a type witness via member name lookup.
 static ResolveWitnessResult resolveTypeWitnessViaLookup(
                        NormalProtocolConformance *conformance,
@@ -449,12 +471,30 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
   // Conformances constructed by the ClangImporter should have explicit type
   // witnesses already.
   if (isa<ClangModuleUnit>(dc->getModuleScopeContext())) {
-    llvm::errs() << "Cannot look up associated type for imported conformance:\n";
-    conformance->getType().dump(llvm::errs());
-    assocType->dump(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "Cannot look up associated type for imported conformance:\n";
+      conformance->getType().dump(out);
+      assocType->dump(out);
+    });
   }
 
+  // Look for a parameterized protocol type in the conformance context's
+  // inheritance clause.
+  bool deducedFromParameterizedProtocolType = false;
+  auto inherited = (isa<NominalTypeDecl>(dc)
+                    ? cast<NominalTypeDecl>(dc)->getInherited()
+                    : cast<ExtensionDecl>(dc)->getInherited());
+  for (auto index : inherited.getIndices()) {
+    if (auto inheritedTy = inherited.getResolvedType(index)) {
+      if (auto typeWitness = resolveTypeWitnessViaParameterizedProtocol(
+            inheritedTy, assocType)) {
+        recordTypeWitness(conformance, assocType, typeWitness, nullptr);
+        deducedFromParameterizedProtocolType = true;
+      }
+    }
+  }
+
+  // Next, look for a member type declaration with this name.
   NLOptions subOptions = (NL_QualifiedDefault | NL_OnlyTypes |
                           NL_ProtocolMembers | NL_IncludeAttributeImplements);
 
@@ -561,27 +601,40 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
     }
   }
 
-  // If there are no viable witnesses, and all nonviable candidates came from
-  // protocol extensions, treat this as "missing".
-  if (viable.empty() &&
-      std::find_if(nonViable.begin(), nonViable.end(),
-                   [](const std::pair<TypeDecl *, CheckTypeWitnessResult> &x) {
-                     return x.first->getDeclContext()
-                        ->getSelfProtocolDecl() == nullptr;
-                   }) == nonViable.end())
-    return ResolveWitnessResult::Missing;
+  if (!deducedFromParameterizedProtocolType) {
+    // If there are no viable witnesses, and all nonviable candidates came from
+    // protocol extensions, treat this as "missing".
+    if (viable.empty() &&
+        std::find_if(nonViable.begin(), nonViable.end(),
+                     [](const std::pair<TypeDecl *, CheckTypeWitnessResult> &x) {
+                       return x.first->getDeclContext()
+                          ->getSelfProtocolDecl() == nullptr;
+                     }) == nonViable.end())
+      return ResolveWitnessResult::Missing;
 
-  // If there is a single viable candidate, form a substitution for it.
-  if (viable.size() == 1) {
-    auto interfaceType = viable.front().MemberType;
-    recordTypeWitness(conformance, assocType, interfaceType,
-                      viable.front().Member);
-    return ResolveWitnessResult::Success;
+    // If there is a single viable candidate, form a substitution for it.
+    if (viable.size() == 1) {
+      auto interfaceType = viable.front().MemberType;
+      recordTypeWitness(conformance, assocType, interfaceType,
+                        viable.front().Member);
+      return ResolveWitnessResult::Success;
+    }
+
+    // Record an error.
+    recordTypeWitness(conformance, assocType,
+                      ErrorType::get(ctx), nullptr);
+  } else {
+    // We deduced the type witness from a parameterized protocol type, so just
+    // make sure there was nothing else.
+    if (viable.size() == 1 &&
+        isa<TypeAliasDecl>(viable[0].Member) &&
+        viable[0].Member->isSynthesized()) {
+      // We found the type alias synthesized above.
+      return ResolveWitnessResult::Success;
+    }
+
+    // Otherwise fall through.
   }
-
-  // Record an error.
-  recordTypeWitness(conformance, assocType,
-                    ErrorType::get(ctx), nullptr);
 
   // If we had multiple viable types, diagnose the ambiguity.
   if (!viable.empty()) {
@@ -1608,11 +1661,12 @@ AssociatedTypeInference::getPotentialTypeWitnessesFromRequirement(
   // Conformances constructed by the ClangImporter should have explicit type
   // witnesses already.
   if (isa<ClangModuleUnit>(conformance->getDeclContext()->getModuleScopeContext())) {
-    llvm::errs() << "Cannot infer associated types for imported conformance:\n";
-    conformance->getType().dump(llvm::errs());
-    for (auto assocTypeDecl : allUnresolved)
-      assocTypeDecl->dump(llvm::errs());
-    abort();
+    ABORT([&](auto &out) {
+      out << "Cannot infer associated types for imported conformance:\n";
+      conformance->getType().dump(out);
+      for (auto assocTypeDecl : allUnresolved)
+        assocTypeDecl->dump(out);
+    });
   }
 
   TypeReprCycleCheckWalker cycleCheck(dc->getASTContext(), allUnresolved);
@@ -2720,19 +2774,19 @@ bool AssociatedTypeInference::simplifyCurrentTypeWitnesses() {
   LLVM_DEBUG(llvm::dbgs() << "Simplifying type witnesses -- iteration " << iterations << "\n");
 
     if (++iterations > 100) {
-      llvm::errs() << "Too many iterations in simplifyCurrentTypeWitnesses()\n";
+      ABORT([&](auto &out) {
+        out << "Too many iterations in simplifyCurrentTypeWitnesses()\n";
 
-      for (auto assocType : proto->getAssociatedTypeMembers()) {
-        if (conformance->hasTypeWitness(assocType))
-          continue;
+        for (auto assocType : proto->getAssociatedTypeMembers()) {
+          if (conformance->hasTypeWitness(assocType))
+            continue;
 
-        auto known = typeWitnesses.begin(assocType);
-        assert(known != typeWitnesses.end());
+          auto known = typeWitnesses.begin(assocType);
+          assert(known != typeWitnesses.end());
 
-        llvm::errs() << assocType->getName() << ": " << known->first << "\n";
-      }
-
-      abort();
+          out << assocType->getName() << ": " << known->first << "\n";
+        }
+      });
     }
 
     auto selfTy = proto->getSelfInterfaceType()->getCanonicalType();

@@ -1,13 +1,13 @@
 // RUN: %target-sil-opt \
 // RUN:   -lifetime-dependence-scope-fixup \
 // RUN:   -sil-verify-all \
-// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature AddressableParameters \
 // RUN:   -enable-experimental-feature AddressableTypes \
 // RUN:   %s | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_AddressableParameters
 // REQUIRES: swift_feature_AddressableTypes
 
@@ -21,7 +21,7 @@ import Swift
 struct NE : ~Escapable {
   var p: UnsafeRawPointer
 
-  @lifetime(immortal)
+  @_lifetime(immortal)
   init()
 }
 
@@ -38,6 +38,13 @@ struct NCContainer : ~Copyable {
   var ne: NE { get } // _read
   var wrapper: Wrapper { get } // _read
 }
+
+struct NCWrapper : ~Copyable, ~Escapable {
+  @_hasStorage let a: NE { get }
+  deinit
+}
+
+sil @NCWrapper_getNE : $@convention(method) (@guaranteed NCWrapper) -> @lifetime(borrow 0) @owned NE
 
 struct TrivialHolder {
   var pointer: UnsafeRawPointer
@@ -60,6 +67,26 @@ struct Holder {
 @_addressableForDependencies
 struct AddressableForDeps {}
 
+public struct MutableView : ~Copyable, ~Escapable {
+  @_hasStorage var ptr: UnsafeMutableRawBufferPointer { get set }
+  init(ptr: UnsafeMutableRawBufferPointer)
+}
+
+public struct Container : ~Escapable, ~Copyable {
+  @_hasStorage var somethings: UnsafeMutableRawBufferPointer { get set }
+  init(somethings: UnsafeMutableRawBufferPointer)
+}
+
+public struct AThing : ~Copyable {
+  @_hasStorage var somethings: UnsafeMutableRawBufferPointer { get set }
+  init(somethings: UnsafeMutableRawBufferPointer)
+}
+
+sil @getContainer : $@convention(thin) (@inout AThing) -> @lifetime(borrow address_for_deps 0) @out Container
+sil @getMutableView : $@convention(thin) (@in_guaranteed Container) -> @lifetime(copy 0) @out Optional<MutableView>
+sil @modAThing : $@convention(thin) (@inout AThing) -> ()
+sil @getSpan : $@convention(thin) (@inout MutableView) -> @lifetime(borrow address_for_deps 0) @owned MutableRawSpan
+
 sil @getNEPointerToA : $@convention(thin) (@guaranteed NE) -> UnsafePointer<A>
 sil @useA : $@convention(thin) (A) -> ()
 
@@ -72,6 +99,9 @@ sil @useNE : $@convention(thin) (@guaranteed NE) -> ()
 
 sil [ossa] @Wrapper_init : $@convention(method) (@owned NE, @thin Wrapper.Type) -> @lifetime(copy 0) @owned Wrapper
 
+sil @yieldWrapper : $@yield_once @convention(method) (@guaranteed NCContainer) -> @lifetime(borrow 0) @yields @guaranteed Wrapper
+sil @yieldNE : $@yield_once @convention(method) (@guaranteed Wrapper) -> @lifetime(copy 0) @yields @guaranteed NE
+
 sil [ossa] @NCContainer_ne_read : $@yield_once @convention(method) (@guaranteed NCContainer) -> @lifetime(borrow 0) @yields @guaranteed NE
 
 sil @yieldRawSpan : $@yield_once @convention(method) (@in_guaranteed A) -> @lifetime(borrow address_for_deps 0) @yields @guaranteed RawSpan
@@ -82,6 +112,19 @@ sil @readAccess : $@yield_once @convention(method) (@guaranteed Holder) -> @life
 
 sil @yieldInoutHolder : $@yield_once @convention(method) (@inout Holder) -> @yields @inout Holder
 sil @yieldInoutNE : $@yield_once @convention(method) (@inout Holder) -> @lifetime(borrow 0) @owned NE
+
+class C {
+  @_hasStorage @_hasInitialValue private var nc: NCWrapper? { get set }
+}
+
+sil @C_read : $@yield_once @convention(method) (@guaranteed C) -> @yields @guaranteed Optional<NCWrapper>
+
+struct S {
+  let c: C
+}
+struct MutNE: ~Copyable & ~Escapable {}
+
+sil @getMutNE : $@convention(thin) (@inout S) -> @lifetime(borrow 0) @owned MutNE
 
 // NCContainer.wrapper._read:
 //   var wrapper: Wrapper {
@@ -404,15 +447,14 @@ bb0:
 // Test that initializing LifetimeDependence.Scope from an unidentified enclosing access scope does not
 // unwrap nil.
 //
-// TODO: the mark_dependence should redirect to the drop_deinit, not the struct_element_addr, but AccessBase does not
-// currently preserve the address of an unidentified base.
-//
 // CHECK-LABEL: sil hidden [ossa] @testUnidentified : $@convention(method) (@owned B) -> () {
-// CHECK: [[DD:%.*]] = drop_deinit
+// CHECK: [[AS:%.*]] = alloc_stack $B
+// CHECK: [[MU:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[AS]]
+// CHECK: [[DD:%.*]] = drop_deinit [[MU]]
 // CHECK: [[SE:%.*]] = struct_element_addr [[DD]], #B.ne
 // CHECK: [[LB:%.*]] = load_borrow
 // CHECK: apply %{{.*}} : $@convention(thin) (@guaranteed NE) -> UnsafePointer<A>
-// CHECK: mark_dependence [unresolved] %{{.*}} on [[SE]]
+// CHECK: mark_dependence [unresolved] %{{.*}} on [[AS]]
 // CHECK-LABEL: } // end sil function 'testUnidentified'
 sil hidden [ossa] @testUnidentified : $@convention(method) (@owned B) -> () {
 bb0(%0 : @owned $B):
@@ -553,4 +595,256 @@ bb0(%0 : $*Holder):
   %md = mark_dependence [unresolved] %ne on %access
   destroy_value %holder
   return %md
+}
+
+// Test a nested dependent coroutine. The inner coroutine yields a
+// value (NE) that inherits its dependency from the outer yield
+// (Wrapper). All copies of the inner yield must be used within the
+// scope of the outer coroutine. The outer end_apply must be extended
+// below the call to 'useNE'.
+//
+// CHECK-LABEL: sil hidden [ossa] @testCopiedYield : $@convention(thin) (@owned NCContainer) -> () {
+// CHECK: bb0(%0 : @owned $NCContainer):
+// CHECK:   [[BOX:%[0-9]+]] = alloc_box ${ var NCContainer }, var, name "nc"
+// CHECK:   [[ACCESS:%[0-9]+]] = begin_access [read] [unknown]
+// CHECK:   [[LB:%[0-9]+]] = load_borrow [unchecked]
+// CHECK:   ([[YIELD:%[0-9]+]], [[TOKEN:%[0-9]+]]) = begin_apply %7(%6) : $@yield_once @convention(method) (@guaranteed NCContainer) -> @lifetime(borrow 0) @yields @guaranteed Wrapper
+// CHECK:   mark_dependence [unresolved] [[YIELD]] on [[TOKEN]]
+// CHECK:   ([[NE:%[0-9]+]], %{{.*}}) = begin_apply %13(%12) : $@yield_once @convention(method) (@guaranteed Wrapper) -> @lifetime(copy 0) @yields @guaranteed NE
+// CHECK:   destroy_value
+// CHECK:   apply %{{.*}}(%{{.*}}) : $@convention(thin) (@guaranteed NE) -> ()
+// CHECK:   destroy_value %{{.*}}
+// CHECK:   end_apply [[TOKEN]] as $()
+// CHECK:   end_borrow [[LB]]
+// CHECK:   end_access [[ACCESS]]
+// CHECK:   destroy_value [[BOX]]
+// CHECK-LABEL: } // end sil function 'testCopiedYield'
+sil hidden [ossa] @testCopiedYield : $@convention(thin) (@owned NCContainer) -> () {
+bb0(%0 : @owned $NCContainer):
+  %1 = alloc_box ${ var NCContainer }, var, name "nc"
+  %2 = begin_borrow [lexical] [var_decl] %1
+  %3 = project_box %2, 0
+  store %0 to [init] %3
+  %5 = begin_access [read] [unknown] %3
+  %7 = load_borrow [unchecked] %5
+
+  %8 = function_ref @yieldWrapper : $@yield_once @convention(method) (@guaranteed NCContainer) -> @lifetime(borrow 0) @yields @guaranteed Wrapper
+  (%9, %10) = begin_apply %8(%7) : $@yield_once @convention(method) (@guaranteed NCContainer) -> @lifetime(borrow 0) @yields @guaranteed Wrapper
+  %11 = mark_dependence [unresolved] %9 on %10
+  %12 = copy_value %11
+  %13 = end_apply %10 as $()
+  end_borrow %7
+  end_access %5
+  %16 = move_value [var_decl] %12
+
+  %18 = function_ref @yieldNE : $@yield_once @convention(method) (@guaranteed Wrapper) -> @lifetime(copy 0) @yields @guaranteed NE
+  (%19, %20) = begin_apply %18(%16) : $@yield_once @convention(method) (@guaranteed Wrapper) -> @lifetime(copy 0) @yields @guaranteed NE
+  %21 = copy_value %19
+  %22 = end_apply %20 as $()
+  destroy_value %16
+  %23 = move_value [var_decl] %21
+
+  %25 = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
+  %26 = apply %25(%23) : $@convention(thin) (@guaranteed NE) -> ()
+  destroy_value %23
+  end_borrow %2
+  destroy_value %1
+  %31 = tuple ()
+  return %31
+}
+
+// rdar://153479358 (Compiler crash when force-unwrapping optional ~Copyable type)
+//
+// Handle dead end coroutines: begin_apply -> end_borrow
+// CHECK-LABEL: sil hidden [ossa] @testReadDeadEnd : $@convention(method) (@guaranteed C) -> () {
+// CHECK: bb0(%0 : @guaranteed $C):
+// CHECK:   ({{.*}}, [[TOKEN:%[0-9]+]]) = begin_apply %{{.*}}(%0) : $@yield_once @convention(method) (@guaranteed C) -> @yields @guaranteed Optional<NCWrapper>
+// CHECK:   switch_enum %{{.*}}, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
+// CHECK: bb1:
+// CHECK:   destroy_value [dead_end]
+// CHECK:   end_borrow [[TOKEN]]
+// CHECK:   unreachable
+// CHECK: bb2(%{{.*}} : @guaranteed $NCWrapper):
+// CHECK:   mark_dependence [unresolved]
+// CHECK:   destroy_value
+// CHECK:   destroy_value
+// CHECK:   end_apply [[TOKEN]] as $()
+// CHECK-LABEL: } // end sil function 'testReadDeadEnd'
+sil hidden [ossa] @testReadDeadEnd : $@convention(method) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  // FIXME: I don't know how to print a lifetime-dependent class method in SIL.
+  // %2 = class_method %0, #C.nc!read : (C) -> () -> (), $@yield_once @convention(method) (@guaranteed C) -> @yields @guaranteed Optional<NCWrapper>
+  %2 = function_ref @C_read : $@yield_once @convention(method) (@guaranteed C) -> @yields @guaranteed Optional<NCWrapper>
+  (%3, %4) = begin_apply %2(%0) : $@yield_once @convention(method) (@guaranteed C) -> @yields @guaranteed Optional<NCWrapper>
+  %5 = copy_value %3
+  %6 = mark_unresolved_non_copyable_value [no_consume_or_assign] %5
+  %7 = alloc_stack $Optional<NCWrapper>
+  %8 = mark_unresolved_non_copyable_value [no_consume_or_assign] %7
+  %9 = store_borrow %6 to %8
+  %10 = load_borrow [unchecked] %9
+  switch_enum %10, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
+
+bb1:
+  end_borrow %10
+  end_borrow %9
+  destroy_value [dead_end] %6
+  end_borrow %4
+  unreachable
+
+bb2(%25 : @guaranteed $NCWrapper):
+  %26 = function_ref @NCWrapper_getNE : $@convention(method) (@guaranteed NCWrapper) -> @lifetime(borrow 0) @owned NE
+  %27 = apply %26(%25) : $@convention(method) (@guaranteed NCWrapper) -> @lifetime(borrow 0) @owned NE
+  %28 = mark_dependence [unresolved] %27 on %3
+  end_borrow %10
+  end_borrow %9
+  destroy_value %6
+  %32 = end_apply %4 as $()
+  dealloc_stack %7
+  %34 = move_value [var_decl] %28
+  destroy_value %34
+  %37 = tuple ()
+  return %37
+}
+
+// rdar://151231236 ([~Escapable] Missing 'overlapping acceses' error when called from client code, but exact same code
+// produces error in same module)
+//
+// Test access scope expansion over a switch_enum_addr
+// CHECK-LABEL: sil hidden [ossa] @testSwitchEnumAddr : $@convention(thin) @async (@inout AThing) -> @error any Error {
+// CHECK: bb0(%0 : $*AThing):
+// CHECK:   [[ATHING:%[0-9]+]] = mark_unresolved_non_copyable_value [consumable_and_assignable] %0
+// CHECK:   [[ACCESS:%[0-9]+]] = begin_access [modify] [unknown] [[ATHING]]
+// CHECK:   apply {{.*}}(%{{.*}}, [[ACCESS]]) : $@convention(thin) (@inout AThing) -> @lifetime(borrow address_for_deps 0) @out Container
+// CHECK:   mark_dependence_addr [unresolved] %{{.*}} on [[ACCESS]]
+// CHECK:   [[VIEW:%[0-9]+]] = project_box
+// CHECK:   [[TMP:%[0-9]+]] = alloc_stack $Optional<MutableView>
+// CHECK:   [[TMP_NC:%[0-9]+]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[TMP]]
+// CHECK:   apply %{{.*}} : $@convention(thin) (@in_guaranteed Container) -> @lifetime(copy 0) @out Optional<MutableView>
+// CHECK:   switch_enum_addr [[TMP_NC]], case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
+// CHECK: bb1:
+// CHECK: bb2:
+// CHECK:   [[DATA:%[0-9]+]] = unchecked_take_enum_data_addr [[TMP_NC]], #Optional.some!enumelt
+// CHECK:   copy_addr [take] [[DATA]] to [init] [[VIEW]]
+// CHECK:   begin_access [modify] [unknown] [[ATHING]]
+// CHECK:   apply %{{.*}} : $@convention(thin) (@inout AThing) -> ()
+// CHECK:   [[ACCESS_VIEW:%[0-9]+]] = begin_access [modify] [unknown] [[VIEW]]
+// CHECK:   apply {{.*}} : $@convention(thin) (@inout MutableView) -> @lifetime(borrow address_for_deps 0) @owned MutableRawSpan
+// CHECK:   mark_dependence [unresolved]
+// CHECK:   end_access [[ACCESS_VIEW]]
+// CHECK:   end_access [[ACCESS]]
+// CHECK:   store
+// CHECK-LABEL: } // end sil function 'testSwitchEnumAddr'
+sil hidden [ossa] @testSwitchEnumAddr : $@convention(thin) @async (@inout AThing) -> @error any Error {
+bb0(%0 : $*AThing):
+  %1 = mark_unresolved_non_copyable_value [consumable_and_assignable] %0
+  %2 = alloc_box ${ var Container }, var, name "container"
+  %3 = begin_borrow [lexical] [var_decl] %2
+  %4 = project_box %3, 0
+  %5 = begin_access [modify] [unknown] %1
+
+  %6 = function_ref @getContainer : $@convention(thin) (@inout AThing) -> @lifetime(borrow address_for_deps 0) @out Container
+  %7 = apply %6(%4, %5) : $@convention(thin) (@inout AThing) -> @lifetime(borrow address_for_deps 0) @out Container
+  mark_dependence_addr [unresolved] %4 on %5
+  end_access %5
+  %10 = alloc_box ${ var MutableView }, var, name "view"
+  %11 = begin_borrow [lexical] [var_decl] %10
+  %12 = project_box %11, 0
+
+  %13 = alloc_stack $Optional<MutableView>
+  %14 = mark_unresolved_non_copyable_value [consumable_and_assignable] %13
+  %15 = begin_access [read] [unknown] %4
+  %16 = mark_unresolved_non_copyable_value [no_consume_or_assign] %15
+
+  %17 = function_ref @getMutableView : $@convention(thin) (@in_guaranteed Container) -> @lifetime(copy 0) @out Optional<MutableView>
+  %18 = apply %17(%14, %16) : $@convention(thin) (@in_guaranteed Container) -> @lifetime(copy 0) @out Optional<MutableView>
+  end_access %15
+
+  switch_enum_addr %14, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
+
+bb1:
+  end_borrow %11
+  dealloc_box [dead_end] %10
+  end_borrow %3
+  dealloc_box [dead_end] %2
+  unreachable
+
+bb2:
+  %44 = unchecked_take_enum_data_addr %14, #Optional.some!enumelt
+  copy_addr [take] %44 to [init] %12
+  dealloc_stack %13
+
+  %22 = begin_access [modify] [unknown] %1
+  %23 = function_ref @modAThing : $@convention(thin) (@inout AThing) -> ()
+  %24 = apply %23(%22) : $@convention(thin) (@inout AThing) -> ()
+  end_access %22
+  %26 = alloc_box ${ var MutableRawSpan }, var, name "span"
+  %27 = begin_borrow [lexical] [var_decl] %26
+  %28 = project_box %27, 0
+  %29 = begin_access [modify] [unknown] %12
+  %30 = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %29
+
+  %31 = function_ref @getSpan : $@convention(thin) (@inout MutableView) -> @lifetime(borrow address_for_deps 0) @owned MutableRawSpan
+  %32 = apply %31(%30) : $@convention(thin) (@inout MutableView) -> @lifetime(borrow address_for_deps 0) @owned MutableRawSpan
+  %33 = mark_dependence [unresolved] %32 on %30
+  end_access %29
+  store %33 to [init] %28
+  end_borrow %27
+  destroy_value %26
+  end_borrow %11
+  destroy_value %10
+  end_borrow %3
+  destroy_value %2
+  %42 = tuple ()
+  return %42
+}
+
+// rdar://154406790 (Lifetime-dependent variable 'X' escapes its scope but only if actor/class is final)
+//
+// The end_access must be extended into the unreachable block past the end_borrow.
+//
+// CHECK-LABEL: sil hidden [ossa] @testInoutAtModify : $@convention(thin) (@inout S) -> () {
+// CHECK: bb0(%0 : $*S):
+// CHECK:   [[ACCESS:%[0-9]+]] = begin_access [modify] [unknown] %0
+// CHECK:   apply %{{.*}}([[ACCESS]]) : $@convention(thin) (@inout S) -> @lifetime(borrow 0) @owned MutNE
+// CHECK:   mark_dependence [unresolved] %{{.*}} on [[ACCESS]]
+// CHECK:   [[LB:%[0-9]+]] = load_borrow
+//
+// CHECK: bb1:
+// CHECK:   end_borrow [[LB]]
+// CHECK:   end_access [[ACCESS]]
+// CHECK:   return %16
+//
+// CHECK: bb2:
+// CHECK:   end_borrow [[LB]]
+// CHECK:   end_access [[ACCESS]]
+// CHECK:   unreachable
+// CHECK-LABEL: } // end sil function 'testInoutAtModify'
+sil hidden [ossa] @testInoutAtModify : $@convention(thin) (@inout S) -> () {
+bb0(%0 : $*S):
+  %1 = alloc_box ${ let MutNE }, let, name "ne"
+  %2 = begin_borrow [lexical] [var_decl] %1
+  %3 = project_box %2, 0
+  %4 = begin_access [modify] [unknown] %0
+
+  %6 = function_ref @getMutNE : $@convention(thin) (@inout S) -> @lifetime(borrow 0) @owned MutNE
+  %7 = apply %6(%4) : $@convention(thin) (@inout S) -> @lifetime(borrow 0) @owned MutNE
+  %8 = mark_dependence [unresolved] %7 on %4
+  store %8 to [init] %3
+  end_access %4
+  %11 = mark_unresolved_non_copyable_value [no_consume_or_assign] %3
+  %12 = load_borrow %11
+  cond_br undef, bb1, bb2
+
+bb1:
+  end_borrow %12
+  end_borrow %2
+  destroy_value %1
+  %15 = tuple ()
+  return %15
+
+bb2:
+  end_borrow %12
+  end_borrow %2
+  dealloc_box [dead_end] %1
+  unreachable
 }

@@ -1,8 +1,8 @@
-//===--- TypeCheckOverride.cpp - Override Checking ------------------------===//
+//===-- Sema/TypeCheckDeclOverride.cpp - Override Checking ------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -216,6 +216,9 @@ bool swift::isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
           cast<ConstructorDecl>(parentDecl)->isImplicitlyUnwrappedOptional())
         return false;
     }
+
+    if (declTy->is<ErrorType>())
+      return false;
 
     auto fnType1 = declTy->castTo<AnyFunctionType>();
     auto fnType2 = parentDeclTy->castTo<AnyFunctionType>();
@@ -1532,7 +1535,8 @@ bool swift::checkOverrides(ValueDecl *decl) {
 
   auto &ctx = decl->getASTContext();
   if (overridden.empty() &&
-      ctx.LangOpts.hasFeature(Feature::MemberImportVisibility)) {
+      ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
+                              /*allowMigration=*/true)) {
     // If we didn't find anything, try broadening the search by ignoring missing
     // imports.
     if (!checkPotentialOverrides(decl, overridden,
@@ -1657,6 +1661,7 @@ namespace  {
     UNINTERESTING_ATTR(SwiftNativeObjCRuntimeBase)
     UNINTERESTING_ATTR(ShowInInterface)
     UNINTERESTING_ATTR(Specialize)
+    UNINTERESTING_ATTR(Specialized)
     UNINTERESTING_ATTR(SpecializeExtension)
     UNINTERESTING_ATTR(DynamicReplacement)
     UNINTERESTING_ATTR(PrivateImport)
@@ -1888,8 +1893,7 @@ isRedundantAccessorOverrideAvailabilityDiagnostic(ValueDecl *override,
     break;
 
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
-#define ACCESSOR(ID) \
-  case AccessorKind::ID:
+#define ACCESSOR(ID, KEYWORD) case AccessorKind::ID:
 #include "swift/AST/AccessorKinds.def"
     llvm_unreachable("checking override for non-opaque accessor");
   }
@@ -2257,7 +2261,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     diagnoseOverrideForAvailability(override, base);
   }
 
-  if (ctx.LangOpts.hasFeature(Feature::StrictMemorySafety)) {
+  if (ctx.LangOpts.hasFeature(Feature::StrictMemorySafety, /*allowMigration=*/true)) {
     // If the override is unsafe but the base declaration is not, then the
     // inheritance itself is unsafe.
     auto subs = SubstitutionMap::getOverrideSubstitutions(base, override);
@@ -2454,8 +2458,7 @@ computeOverriddenDecls(ValueDecl *decl, bool ignoreMissingImports) {
         break;
 
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
-#define ACCESSOR(ID) \
-      case AccessorKind::ID:
+#define ACCESSOR(ID, KEYWORD) case AccessorKind::ID:
 #include "swift/AST/AccessorKinds.def"
         llvm_unreachable("non-opaque accessor was required as opaque by base");
       }
@@ -2528,7 +2531,8 @@ OverriddenDeclsRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
   // If we didn't find anything, try broadening the search by ignoring missing
   // imports.
   if (overridden.empty() &&
-      ctx.LangOpts.hasFeature(Feature::MemberImportVisibility)) {
+      ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
+                              /*allowMigration=*/true)) {
     overridden = computeOverriddenDecls(decl, true);
     if (!overridden.empty()) {
       auto first = overridden.front();

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022-2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2022-2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -129,10 +129,6 @@ static StaticSpellingKind unbridged(BridgedStaticSpelling kind) {
   return static_cast<StaticSpellingKind>(kind);
 }
 
-AccessorKind unbridged(BridgedAccessorKind kind) {
-  return static_cast<AccessorKind>(kind);
-}
-
 void BridgedDecl_attachParsedAttrs(BridgedDecl decl,
                                    BridgedDeclAttributes attrs) {
   decl.unbridged()->attachParsedAttrs(attrs.unbridged());
@@ -148,15 +144,15 @@ void BridgedDecl_forEachDeclToHoist(BridgedDecl cDecl,
 
 BridgedAccessorDecl BridgedAccessorDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedAccessorKind cKind, BridgedAbstractStorageDecl cStorage,
+    swift::AccessorKind Kind, BridgedAbstractStorageDecl cStorage,
     BridgedSourceLoc cDeclLoc, BridgedSourceLoc cAccessorKeywordLoc,
     BridgedNullableParameterList cParamList, BridgedSourceLoc cAsyncLoc,
     BridgedSourceLoc cThrowsLoc, BridgedNullableTypeRepr cThrownType) {
   return AccessorDecl::createParsed(
-      cContext.unbridged(), unbridged(cKind), cStorage.unbridged(),
-      cDeclLoc.unbridged(), cAccessorKeywordLoc.unbridged(),
-      cParamList.unbridged(), cAsyncLoc.unbridged(), cThrowsLoc.unbridged(),
-      cThrownType.unbridged(), cDeclContext.unbridged());
+      cContext.unbridged(), Kind, cStorage.unbridged(), cDeclLoc.unbridged(),
+      cAccessorKeywordLoc.unbridged(), cParamList.unbridged(),
+      cAsyncLoc.unbridged(), cThrowsLoc.unbridged(), cThrownType.unbridged(),
+      cDeclContext.unbridged());
 }
 
 static VarDecl::Introducer unbridged(BridgedVarDeclIntroducer introducer) {
@@ -590,8 +586,8 @@ BridgedPrecedenceGroupDecl BridgedPrecedenceGroupDecl_createParsed(
     BridgedSourceLoc cPrecedencegroupKeywordLoc, BridgedIdentifier cName,
     BridgedSourceLoc cNameLoc, BridgedSourceLoc cLeftBraceLoc,
     BridgedSourceLoc cAssociativityKeywordLoc,
-    BridgedSourceLoc cAssociativityValueLoc,
-    BridgedAssociativity cAssociativity, BridgedSourceLoc cAssignmentKeywordLoc,
+    BridgedSourceLoc cAssociativityValueLoc, swift::Associativity associativity,
+    BridgedSourceLoc cAssignmentKeywordLoc,
     BridgedSourceLoc cAssignmentValueLoc, bool isAssignment,
     BridgedSourceLoc cHigherThanKeywordLoc, BridgedArrayRef cHigherThanNames,
     BridgedSourceLoc cLowerThanKeywordLoc, BridgedArrayRef cLowerThanNames,
@@ -613,9 +609,9 @@ BridgedPrecedenceGroupDecl BridgedPrecedenceGroupDecl_createParsed(
       cDeclContext.unbridged(), cPrecedencegroupKeywordLoc.unbridged(),
       cNameLoc.unbridged(), cName.unbridged(), cLeftBraceLoc.unbridged(),
       cAssociativityKeywordLoc.unbridged(), cAssociativityValueLoc.unbridged(),
-      static_cast<Associativity>(cAssociativity),
-      cAssignmentKeywordLoc.unbridged(), cAssignmentValueLoc.unbridged(),
-      isAssignment, cHigherThanKeywordLoc.unbridged(), higherThanNames,
+      associativity, cAssignmentKeywordLoc.unbridged(),
+      cAssignmentValueLoc.unbridged(), isAssignment,
+      cHigherThanKeywordLoc.unbridged(), higherThanNames,
       cLowerThanKeywordLoc.unbridged(), lowerThanNames,
       cRightBraceLoc.unbridged());
 }
@@ -635,6 +631,17 @@ BridgedImportDecl BridgedImportDecl_createParsed(
       context, cDeclContext.unbridged(), cImportKeywordLoc.unbridged(),
       static_cast<ImportKind>(cImportKind), cImportKindLoc.unbridged(),
       std::move(builder).get());
+}
+
+BridgedUsingDecl BridgedUsingDecl_createParsed(BridgedASTContext cContext,
+                                               BridgedDeclContext cDeclContext,
+                                               BridgedSourceLoc usingKeywordLoc,
+                                               BridgedSourceLoc specifierLoc,
+                                               BridgedUsingSpecifier specifier) {
+  ASTContext &ctx = cContext.unbridged();
+  return UsingDecl::create(
+      ctx, usingKeywordLoc.unbridged(), specifierLoc.unbridged(),
+      static_cast<UsingSpecifier>(specifier), cDeclContext.unbridged());
 }
 
 BridgedSubscriptDecl BridgedSubscriptDecl_createParsed(

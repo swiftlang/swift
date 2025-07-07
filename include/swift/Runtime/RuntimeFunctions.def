@@ -2376,7 +2376,7 @@ FUNCTION(TaskCreate,
               RefCountedPtrTy),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Concurrency),
-         MEMEFFECTS(ArgMemOnly))
+         MEMEFFECTS(ReadOnly))
 
 // void swift_task_switch(AsyncContext *resumeContext,
 //                        TaskContinuationFunction *resumeFunction,
@@ -2396,13 +2396,25 @@ FUNCTION(TaskSwitchFunc,
 //                                  size_t flags);
 FUNCTION(DeinitOnExecutorFunc,
          _Concurrency, swift_task_deinitOnExecutor, SwiftCC,
-         ConcurrencyAvailability,
+         IsolatedDeinitAvailability,
          RETURNS(VoidTy),
          ARGS(Int8PtrTy, Int8PtrTy, ExecutorFirstTy, ExecutorSecondTy, SizeTy),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Concurrency),
          UNKNOWN_MEMEFFECTS)
 
+// void swift_task_deinitOnExecutorMainActorBackDeploy(void *object,
+//                                  DeinitWorkFunction *work,
+//                                  SerialExecutorRef newExecutor,
+//                                  size_t flags);
+FUNCTION(DeinitOnExecutorMainActorBackDeployFunc,
+         _Concurrency, deinitOnExecutorMainActorBackDeploy, SwiftCC,
+         ConcurrencyAvailability,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy, Int8PtrTy, ExecutorFirstTy, ExecutorSecondTy, SizeTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Concurrency),
+         UNKNOWN_MEMEFFECTS)
 
 // AsyncTask *swift_continuation_init(AsyncContext *continuationContext,
 //                                    AsyncContinuationFlags);

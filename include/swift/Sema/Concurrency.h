@@ -36,7 +36,7 @@ struct DiagnosticBehavior;
 /// that the attribute be removed.
 void diagnoseUnnecessaryPreconcurrencyImports(SourceFile &sf);
 
-/// Diagnose the use of an instance property of non-sendable type from an
+/// Diagnose the use of an instance property of non-Sendable type from an
 /// nonisolated deinitializer within an actor-isolated type.
 ///
 /// \returns true iff a diagnostic was emitted for this reference.

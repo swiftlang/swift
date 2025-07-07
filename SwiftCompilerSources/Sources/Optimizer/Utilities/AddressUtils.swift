@@ -159,7 +159,7 @@ extension AddressUseVisitor {
            .GenericFDiv, .GenericMul, .GenericFMul, .GenericSDiv,
            .GenericExactSDiv, .GenericShl, .GenericSRem, .GenericSub,
            .GenericFSub, .GenericUDiv, .GenericExactUDiv, .GenericURem,
-           .GenericFRem, .GenericXor, .TaskRunInline, .ZeroInitializer,
+           .GenericFRem, .GenericXor, .TaskRunInline, .ZeroInitializer, .PrepareInitialization,
            .GetEnumTag, .InjectEnumTag:
         return leafAddressUse(of: operand)
       default:
@@ -648,12 +648,10 @@ extension AddressOwnershipLiveRange {
 let addressOwnershipLiveRangeTest = FunctionTest("address_ownership_live_range") {
   function, arguments, context in
   let address = arguments.takeValue()
+  let begin = arguments.takeInstruction()
   print("Address: \(address)")
   print("Base: \(address.accessBase)")
-  let begin = address.definingInstructionOrTerminator ?? {
-    assert(address is FunctionArgument)
-    return function.instructions.first!
-  }()
+  print("Begin: \(begin)")
   let localReachabilityCache = LocalVariableReachabilityCache()
   guard var ownershipRange = AddressOwnershipLiveRange.compute(for: address, at: begin,
                                                                localReachabilityCache, context) else {

@@ -39,7 +39,8 @@ enum class ParameterizedDeclAttributeKind {
   Available,
   FreestandingMacro,
   AttachedMacro,
-  StorageRestrictions
+  StorageRestrictions,
+  InheritActorContext
 };
 
 /// A bit of a hack. When completing inside the '@storageRestrictions'
@@ -253,6 +254,10 @@ public:
   /// Complete the import decl with importable modules.
   virtual void
   completeImportDecl(ImportPath::Builder &Path) {};
+
+  /// Complete the 'using' decl with supported specifiers.
+  virtual void
+  completeUsingDecl() {};
 
   /// Complete unresolved members after dot.
   virtual void completeUnresolvedMember(CodeCompletionExpr *E,

@@ -683,6 +683,7 @@ public:
   UNSUPPORTED_DECL(PrefixOperator)
   UNSUPPORTED_DECL(PostfixOperator)
   UNSUPPORTED_DECL(MacroExpansion)
+  UNSUPPORTED_DECL(Using)
 
   bool visitAbstractFunctionDecl(AbstractFunctionDecl *api,
                                  AbstractFunctionDecl *abi) {

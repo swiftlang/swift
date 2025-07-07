@@ -7,6 +7,7 @@
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
 swift_compiler_sources(Optimizer
+  AllocBoxToStack.swift
   AssumeSingleThreaded.swift
   AsyncDemotion.swift
   BooleanLiteralFolding.swift
@@ -33,5 +34,6 @@ swift_compiler_sources(Optimizer
   SimplificationPasses.swift
   StackPromotion.swift
   StripObjectHeaders.swift
+  TempLValueElimination.swift
   TempRValueElimination.swift
 )

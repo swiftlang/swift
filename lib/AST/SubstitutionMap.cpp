@@ -505,10 +505,10 @@ void SubstitutionMap::verify(bool allowInvalid) const {
 
     if (conformance.isInvalid()) {
       if (!allowInvalid) {
-        llvm::errs() << "Unexpected invalid conformance in substitution map:\n";
-        dump(llvm::dbgs());
-        llvm::errs() << "\n";
-        abort();
+        ABORT([&](auto &out) {
+          out << "Unexpected invalid conformance in substitution map:\n";
+          dump(out);
+        });
       }
 
       continue;
@@ -522,10 +522,10 @@ void SubstitutionMap::verify(bool allowInvalid) const {
           !substType->is<UnresolvedType>() &&
           !substType->is<PlaceholderType>() &&
           !substType->is<ErrorType>()) {
-        llvm::errs() << "Unexpected abstract conformance in substitution map:\n";
-        dump(llvm::errs());
-        llvm::errs() << "\n";
-        abort();
+        ABORT([&](auto &out) {
+          out << "Unexpected abstract conformance in substitution map:\n";
+          dump(out);
+        });
       }
 
       continue;
@@ -550,12 +550,12 @@ void SubstitutionMap::verify(bool allowInvalid) const {
         if (substType->getSuperclass())
           continue;
 
-        llvm::errs() << "Expected to find a self conformance:\n";
-        substType->dump(llvm::errs());
-        llvm::errs() << "Substitution map:\n";
-        dump(llvm::errs());
-        llvm::errs() << "\n";
-        abort();
+        ABORT([&](auto &out) {
+          out << "Expected to find a self conformance:\n";
+          substType->dump(out);
+          out << "Substitution map:\n";
+          dump(out);
+        });
       }
 
       continue;
@@ -565,14 +565,14 @@ void SubstitutionMap::verify(bool allowInvalid) const {
       continue;
 
     if (!concrete->getType()->isEqual(substType)) {
-      llvm::errs() << "Conformance with wrong conforming type:\n";
-      concrete->getType()->dump(llvm::errs());
-      llvm::errs() << "Should be:\n";
-      substType->dump(llvm::errs());
-      llvm::errs() << "Substitution map:\n";
-      dump(llvm::errs());
-      llvm::errs() << "\n";
-      abort();
+      ABORT([&](auto &out) {
+        out << "Conformance with wrong conforming type:\n";
+        concrete->getType()->dump(out);
+        out << "Should be:\n";
+        substType->dump(out);
+        out << "Substitution map:\n";
+        dump(out);
+      });
     }
   }
 }

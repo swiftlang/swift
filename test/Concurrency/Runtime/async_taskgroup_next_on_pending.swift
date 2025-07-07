@@ -8,6 +8,7 @@
 // UNSUPPORTED: OS=watchos
 
 // REQUIRES: concurrency_runtime
+// UNSUPPORTED: back_deployment_runtime
 
 import Dispatch
 

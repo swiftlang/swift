@@ -1005,7 +1005,7 @@ extension _StringObject {
       _internalInvariantFailure()
     }
     #if !$Embedded
-    return _unsafeUncheckedDowncast(storage, to: __StringStorage.self)
+    return unsafe _unsafeUncheckedDowncast(storage, to: __StringStorage.self)
     #else
     return Builtin.castFromNativeObject(storage)
     #endif
@@ -1044,7 +1044,7 @@ extension _StringObject {
       _internalInvariantFailure()
     }
     #if !$Embedded
-    return _unsafeUncheckedDowncast(storage, to: __SharedStringStorage.self)
+    return unsafe _unsafeUncheckedDowncast(storage, to: __SharedStringStorage.self)
     #else
     return Builtin.castFromNativeObject(storage)
     #endif
@@ -1245,7 +1245,7 @@ extension _StringObject {
       countAndFlags: countAndFlags)
 #elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     self.init(
-      variant: .immortal(start: bufPtr.baseAddress._unsafelyUnwrappedUnchecked),
+      variant: unsafe .immortal(start: bufPtr.baseAddress._unsafelyUnwrappedUnchecked),
       discriminator: Nibbles.largeImmortal(),
       countAndFlags: countAndFlags)
 #else

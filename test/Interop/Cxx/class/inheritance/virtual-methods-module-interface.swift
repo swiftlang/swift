@@ -7,6 +7,7 @@
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   @available(*, unavailable, message: "virtual function is not available in Swift because it is pure")
 // CHECK-NEXT:   mutating func foo()
+// CHECK-NEXT:   func swiftVirtualRename()
 // CHECK: }
 
 // CHECK: struct Base3 {
@@ -25,12 +26,3 @@
 // CHECK: struct VirtualNonAbstractBase {
 // CHECK-NEXT:  init()
 // CHECK-NEXT:  func nonAbstractMethod()
-
-// CHECK: class ImmortalBase {
-// CHECK:  func get42() -> Int32
-// CHECK:  func getOverridden42() -> Int32
-// CHECK: }
-// CHECK: class Immortal {
-// CHECK:  func getOverridden42() -> Int32
-// CHECK:  func get42() -> Int32
-// CHECK: }

@@ -33,7 +33,7 @@ def ModuleWrapOption : OptionFlag;
 def NoDriverOption : OptionFlag;
 
 // Some options should not be available depending on whether this is the
-// interactive driver 'swift', or the batch compiler 'swiftc'.
+// interactive driver 'swift', or the aot compiler 'swiftc'.
 def NoInteractiveOption : OptionFlag;
 def NoBatchOption : OptionFlag;
 
@@ -328,7 +328,7 @@ def F_EQ : Joined<["-"], "F=">, Flags<[FrontendOption, ArgumentIsPath]>,
 
 def Fsystem : Separate<["-"], "Fsystem">,
   Flags<[FrontendOption, ArgumentIsPath, SwiftSymbolGraphExtractOption,
-         SwiftSynthesizeInterfaceOption]>,
+         SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Add directory to system framework search path">;
 
 def I : JoinedOrSeparate<["-"], "I">,
@@ -340,7 +340,7 @@ def I_EQ : Joined<["-"], "I=">, Flags<[FrontendOption, ArgumentIsPath]>,
 
 def Isystem : Separate<["-"], "Isystem">,
   Flags<[FrontendOption, ArgumentIsPath, SwiftSymbolGraphExtractOption,
-         SwiftSynthesizeInterfaceOption]>,
+         SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Add directory to the system import search path">;
 
 def import_underlying_module : Flag<["-"], "import-underlying-module">,
@@ -799,10 +799,6 @@ def import_cf_types : Flag<["-"], "import-cf-types">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Recognize and import CF types as class types">;
 
-def solver_memory_threshold : Separate<["-"], "solver-memory-threshold">,
-  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
-  HelpText<"Set the upper bound for memory consumption, in bytes, by the constraint solver">;
-
 def solver_shrink_unsolved_threshold : Separate<["-"], "solver-shrink-unsolved-threshold">,
 Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild]>,
 HelpText<"Set The upper bound to number of sub-expressions unsolved before termination of the shrink phrase">;
@@ -1018,6 +1014,10 @@ def strict_memory_safety : Flag<["-"], "strict-memory-safety">,
   Flags<[FrontendOption, ModuleInterfaceOptionIgnorable,
          SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Enable strict memory safety checking">;
+def strict_memory_safety_migrate : Flag<["-"], "strict-memory-safety:migrate">,
+  Flags<[FrontendOption, ModuleInterfaceOptionIgnorable,
+         SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
+  HelpText<"Enable migration to strict memory safety checking">;
 
 def Rpass_EQ : Joined<["-"], "Rpass=">,
   Flags<[FrontendOption]>,
@@ -1567,6 +1567,10 @@ def explain_module_dependency_detailed : Separate<["-"], "explain-module-depende
 def explicit_auto_linking : Flag<["-"], "explicit-auto-linking">,
   Flags<[NewDriverOnlyOption]>,
   HelpText<"Instead of linker-load directives, have the driver specify all link dependencies on the linker invocation. Requires '-explicit-module-build'.">;
+  
+def experimental_emit_variant_module : Flag<["-"], "experimental-emit-variant-module">,
+  Flags<[NewDriverOnlyOption]>,
+  HelpText<"When a target variant triple is specified, the same driver invocation will emit two Swift modules, one for the primary target and one for the variant.">;
 
 def min_inlining_target_version : Separate<["-"], "target-min-inlining-version">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
@@ -1669,6 +1673,18 @@ def disable_incremental_imports :
   Flags<[FrontendOption]>,
   HelpText<"Disable cross-module incremental build metadata and "
            "driver scheduling for Swift modules">;
+
+def enable_incremental_file_hashing :
+  Flag<["-"], "enable-incremental-file-hashing">,
+  Flags<[NewDriverOnlyOption]>,
+  HelpText<"Enable hashing of input and dependency file data "
+           "that can prevent unnecessary invalidation">;
+
+def disable_incremental_file_hashing :
+  Flag<["-"], "disable-incremental-file-hashing">,
+  Flags<[NewDriverOnlyOption]>,
+  HelpText<"Disable hashing of input and dependency file data "
+           "that can prevent unnecessary invalidation">;
 
 def index_file : Flag<["-"], "index-file">,
   HelpText<"Produce index data for a source file">, ModeOpt,

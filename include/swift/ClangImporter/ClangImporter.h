@@ -497,23 +497,14 @@ public:
   using LookupModuleOutputCallback =
       llvm::function_ref<std::string(const clang::tooling::dependencies::ModuleDeps &,
                                      clang::tooling::dependencies::ModuleOutputKind)>;
-  
+
   static llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
   bridgeClangModuleDependencies(
       const ASTContext &ctx,
       clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
       clang::tooling::dependencies::ModuleDepsGraph &clangDependencies,
-      StringRef moduleOutputPath, StringRef stableModuleOutputPath,
       LookupModuleOutputCallback LookupModuleOutput,
       RemapPathCallback remapPath = nullptr);
-
-  llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
-  getModuleDependencies(Identifier moduleName, StringRef moduleOutputPath, StringRef sdkModuleOutputPath,
-                        const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
-                        const std::vector<std::string> &swiftModuleClangCC1CommandLineArgs,
-                        InterfaceSubContextDelegate &delegate,
-                        llvm::PrefixMapper *mapper,
-                        bool isTestableImport = false) override;
 
   static void getBridgingHeaderOptions(
       const ASTContext &ctx,
@@ -657,6 +648,8 @@ public:
   ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
                                   ClangInheritanceInfo inheritance) override;
 
+  bool isClonedMemberDecl(ValueDecl *decl) override;
+
   /// Emits diagnostics for any declarations named name
   /// whose direct declaration context is a TU.
   void diagnoseTopLevelValue(const DeclName &name) override;
@@ -713,9 +706,6 @@ bool isCxxConstReferenceType(const clang::Type *type);
 
 /// Determine whether this typedef is a CF type.
 bool isCFTypeDecl(const clang::TypedefNameDecl *Decl);
-
-/// Determine whether type is a c++ foreign reference type.
-bool isForeignReferenceTypeWithoutImmortalAttrs(const clang::QualType type);
 
 /// Determine the imported CF type for the given typedef-name, or the empty
 /// string if this is not an imported CF type name.
@@ -873,9 +863,18 @@ struct ClangInvocationFileMapping {
 /// `suppressDiagnostic` prevents us from emitting warning messages when we
 /// are unable to find headers.
 ClangInvocationFileMapping getClangInvocationFileMapping(
-    ASTContext &ctx,
+    const ASTContext &ctx,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs = nullptr,
     bool suppressDiagnostic = false);
+
+/// Apply the given file mapping to the specified 'fileSystem', used
+/// primarily to inject modulemaps on platforms with non-modularized
+/// platform libraries.
+ClangInvocationFileMapping applyClangInvocationMapping(
+    const ASTContext &ctx,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseVFS,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &fileSystem,
+    bool suppressDiagnostics = false);
 
 /// Information used to compute the access level of inherited C++ members.
 class ClangInheritanceInfo {

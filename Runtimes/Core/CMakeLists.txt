@@ -30,6 +30,11 @@
 # Install *.abi.json, swiftdoc, and swiftsourceinfo
 
 cmake_minimum_required(VERSION 3.29)
+# TODO before requiring CMake 4.1 or later
+# and/or enforcing CMP0195, please check/update
+# the implementation  of `emit_swift_interface`
+# in `EmitSwiftInterface.cmake`
+# to ensure it keeps laying down nested swiftmodule folders
 
 set(CMAKE_C_VISIBILITY_PRESET "hidden")
 set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
@@ -78,7 +83,6 @@ set(SwiftCore_VENDOR_MODULE_DIR "${SwiftCore_CMAKE_MODULES_DIR}/vendor"
 include(GNUInstallDirs)
 include(CheckSymbolExists)
 include(CheckIncludeFileCXX)
-include(AvailabilityMacros)
 include(CompilerSettings)
 include(DefaultSettings)
 include(EmitSwiftInterface)
@@ -87,6 +91,7 @@ include(PlatformInfo)
 include(gyb)
 include(ResourceEmbedding)
 include(CatalystSupport)
+include(AvailabilityMacros)
 
 check_symbol_exists("asl_log" "asl.h" SwiftCore_HAS_ASL)
 check_symbol_exists("dladdr" "dlfcn.h" SwiftCore_HAS_DLADDR)
@@ -126,6 +131,7 @@ defaulted_option(SwiftCore_ENABLE_BACKTRACING "Enable backtracing runtime suppor
 defaulted_set(SwiftCore_BACKTRACER_PATH STRING "Set a fixed path to the Swift backtracer")
 defaulted_option(SwiftCore_ENABLE_FATALERROR_BACKTRACE "Build stdlib fatalError with backtrace output")
 defaulted_option(SwiftCore_ENABLE_PRESPECIALIZATION "Enable generic metadata prespecialization")
+defaulted_option(SwiftCore_ENABLE_STRICT_AVAILABILITY "Enable strict availability; this will cause things to break at desk or in CI if the host OS is a lower version than some `@availability` annotations in the runtime code")
 
 option(SwiftCore_ENABLE_CLOBBER_FREED_OBJECTS "" OFF)
 option(SwiftCore_ENABLE_RUNTIME_LEAK_CHECKER "" OFF)
@@ -209,8 +215,10 @@ add_subdirectory(Demangling)
 add_subdirectory(Threading)
 add_subdirectory(runtime)
 add_subdirectory(stubs)
-add_subdirectory(CommandLineSupport)
 add_subdirectory(core)
+if(SwiftCore_ENABLE_COMMANDLINE_SUPPORT)
+  add_subdirectory(CommandLineSupport)
+endif()
 if(SwiftCore_ENABLE_ONONESUPPORT)
   add_subdirectory(SwiftOnoneSupport)
 endif()

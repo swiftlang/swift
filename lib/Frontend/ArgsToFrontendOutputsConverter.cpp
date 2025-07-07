@@ -298,6 +298,44 @@ SupplementaryOutputPathsComputer::computeOutputPaths() const {
       });
   if (hadError)
     return std::nullopt;
+
+  // In WMO mode compute supplementary output paths for optimization record
+  // data (opt-remarks). We need one path per LLVMModule that will be created as
+  // part of wmo.
+  if (!InputsAndOutputs.hasPrimaryInputs() && OutputFiles.size() > 1) {
+    unsigned i = 0;
+    InputsAndOutputs.forEachInput([&](const InputFile &input) -> bool {
+      // First input is already computed.
+      if (InputsAndOutputs.firstInput().getFileName() == input.getFileName()) {
+        ++i;
+        return false;
+      }
+      SupplementaryOutputPaths outputs;
+
+      // Compute auxiliar opt record paths.
+      StringRef defaultSupplementaryOutputPathExcludingExtension =
+          deriveDefaultSupplementaryOutputPathExcludingExtension(OutputFiles[i], input);
+
+      auto YAMLOptRecordPath = determineSupplementaryOutputFilename(
+        options::OPT_save_optimization_record_path,
+        "",
+        file_types::TY_YAMLOptRecord, "",
+        defaultSupplementaryOutputPathExcludingExtension, true);
+      outputs.YAMLOptRecordPath = YAMLOptRecordPath;
+
+      auto bitstreamOptRecordPath = determineSupplementaryOutputFilename(
+        options::OPT_save_optimization_record_path,
+        "",
+        file_types::TY_BitstreamOptRecord, "",
+        defaultSupplementaryOutputPathExcludingExtension, true);
+
+      outputs.BitstreamOptRecordPath = bitstreamOptRecordPath;
+
+      outputPaths.emplace_back(std::move(outputs));
+      ++i;
+      return false;
+    });
+  }
   return outputPaths;
 }
 
@@ -615,7 +653,21 @@ std::string
 SupplementaryOutputPathsComputer::determineSupplementaryOutputFilename(
     options::ID emitOpt, std::string pathFromArguments, file_types::ID type,
     StringRef mainOutputIfUsable,
-    StringRef defaultSupplementaryOutputPathExcludingExtension) const {
+    StringRef defaultSupplementaryOutputPathExcludingExtension,
+    bool forceDefaultSupplementaryOutputPathExcludingExtension) const {
+
+  auto computeDefaultSupplementaryOutputPathExcludingExtension =
+    [&] () -> std::string {
+      llvm::SmallString<128> path(
+        defaultSupplementaryOutputPathExcludingExtension);
+
+      llvm::sys::path::replace_extension(path, file_types::getExtension(type));
+      return path.str().str();
+    };
+
+  if (forceDefaultSupplementaryOutputPathExcludingExtension) {
+    return computeDefaultSupplementaryOutputPathExcludingExtension();
+  }
 
   if (!pathFromArguments.empty())
     return pathFromArguments;
@@ -627,9 +679,7 @@ SupplementaryOutputPathsComputer::determineSupplementaryOutputFilename(
     return mainOutputIfUsable.str();
   }
 
-  llvm::SmallString<128> path(defaultSupplementaryOutputPathExcludingExtension);
-  llvm::sys::path::replace_extension(path, file_types::getExtension(type));
-  return path.str().str();
+  return computeDefaultSupplementaryOutputPathExcludingExtension();
 }
 
 void SupplementaryOutputPathsComputer::deriveModulePathParameters(

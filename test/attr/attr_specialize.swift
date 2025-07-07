@@ -29,6 +29,7 @@ class NonSub {}
 @_specialize(where T == S<Int>)
 @_specialize(where T == Int, U == Int) // expected-error{{cannot find type 'U' in scope}},
 @_specialize(where T == T1) // expected-error{{cannot find type 'T1' in scope}}
+@specialized(where T == T1) // expected-error{{cannot find type 'T1' in scope}}
 public func oneGenericParam<T>(_ t: T) -> T {
   return t
 }
@@ -52,13 +53,18 @@ class G<T> {
   @_specialize(where T == T) // expected-error{{too few generic parameters are specified in '_specialize' attribute (got 0, but expected 1)}}
   // expected-note@-1 {{missing constraint for 'T' in '_specialize' attribute}}
   @_specialize(where T == S<T>)
-  // expected-error@-1 {{cannot build rewrite system for generic signature; concrete nesting limit exceeded}}
+  // expected-error@-1 {{cannot build rewrite system for generic signature; concrete type nesting limit exceeded}}
   // expected-note@-2 {{failed rewrite rule is τ_0_0.[concrete: S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<S<τ_0_0>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>] => τ_0_0}}
   // expected-error@-3 {{too few generic parameters are specified in '_specialize' attribute (got 0, but expected 1)}}
   // expected-note@-4 {{missing constraint for 'T' in '_specialize' attribute}}
   @_specialize(where T == Int, U == Int) // expected-error{{cannot find type 'U' in scope}}
 
   func noGenericParams() {}
+
+  @specialized(where T == Int)
+  @specialized(where T == T) // expected-error{{too few generic parameters are specified in 'specialized' attribute (got 0, but expected 1)}}
+  // expected-note@-1 {{missing constraint for 'T' in 'specialized' attribute}}
+  func noGenericParamsPublic() {}
 
   // CHECK: @_specialize(exported: false, kind: full, where T == Int, U == Float)
   @_specialize(where T == Int, U == Float)
@@ -68,7 +74,10 @@ class G<T> {
   func oneGenericParam<U>(_ t: T, u: U) -> (U, T) {
     return (u, t)
   }
-}
+  @specialized(where T == Int) // expected-error{{too few generic parameters are specified in 'specialized' attribute (got 1, but expected 2)}} expected-note {{missing constraint for 'U' in 'specialized' attribute}}
+  func oneGenericParamPublic<U>(_ t: T, u: U) -> (U, T) {
+    return (u, t)
+  }}
 
 // Specialize with requirements.
 // -----------------------------
@@ -96,8 +105,14 @@ struct FloatElement : HasElt {
 @_specialize(where T == IntElement) // expected-error{{generic signature requires types 'IntElement.Element' (aka 'Int') and 'Float' to be the same}}
 func sameTypeRequirement<T : HasElt>(_ t: T) where T.Element == Float {}
 
+@specialized(where T == FloatElement)
+@specialized(where T == IntElement) // expected-error{{generic signature requires types 'IntElement.Element' (aka 'Int') and 'Float' to be the same}}
+func sameTypeRequirementPublic<T : HasElt>(_ t: T) where T.Element == Float {}
+
 @_specialize(where T == Sub)
 @_specialize(where T == NonSub) // expected-error{{no type for 'T' can satisfy both 'T : NonSub' and 'T : Base'}}
+@specialized(where T == Sub)
+@specialized(where T == NonSub) // expected-error{{no type for 'T' can satisfy both 'T : NonSub' and 'T : Base'}}
 func superTypeRequirement<T : Base>(_ t: T) {}
 
 @_specialize(where X:_Trivial(8), Y == Int) // expected-error{{trailing 'where' clause in '_specialize' attribute of non-generic function 'requirementOnNonGenericFunction(x:y:)'}}
@@ -105,11 +120,13 @@ public func requirementOnNonGenericFunction(x: Int, y: Int) {
 }
 
 @_specialize(where Y == Int) // expected-error{{too few generic parameters are specified in '_specialize' attribute (got 1, but expected 2)}} expected-note{{missing constraint for 'X' in '_specialize' attribute}}
+@specialized(where Y == Int) // expected-error{{too few generic parameters are specified in 'specialized' attribute (got 1, but expected 2)}} expected-note{{missing constraint for 'X' in 'specialized' attribute}}
 public func missingRequirement<X:P, Y>(x: X, y: Y) {
 }
 
 @_specialize(where) // expected-error{{expected type}}
 @_specialize() // expected-error{{expected a parameter label or a where clause in '_specialize' attribute}} expected-error{{expected declaration}}
+@specialized() // expected-error{{expected a where clause in 'specialized' attribute}} expected-error{{expected declaration}}
 public func funcWithEmptySpecializeAttr<X: P, Y>(x: X, y: Y) {
 }
 
@@ -149,11 +166,12 @@ public func funcWithTwoGenericParameters<X, Y>(x: X, y: Y) {
 @_specialize(kind: partial, exported: true, where X == Int, Y == Int)
 @_specialize(kind: partial, kind: partial, where X == Int, Y == Int) // expected-error{{parameter 'kind' was already defined in '_specialize' attribute}}
 
-@_specialize(where X == Int, Y == Int, exported: true, kind: partial) // expected-error{{cannot find type 'exported' in scope}} expected-error{{cannot find type 'kind' in scope}} expected-error{{cannot find type 'partial' in scope}} expected-error{{expected type}}
+@_specialize(where X == Int, Y == Int, exported: true, kind: partial) // expected-error{{expected type}} expected-error{{cannot find type 'exported' in scope}} expected-error{{cannot find type 'kind' in scope}} expected-error{{cannot find type 'partial' in scope}}
 public func anotherFuncWithTwoGenericParameters<X: P, Y>(x: X, y: Y) {
 }
 
 @_specialize(where T: P) // expected-error{{only same-type and layout requirements are supported by '_specialize' attribute}}
+@specialized(where T: P) // expected-error{{only same-type are supported by 'specialized' attribute}}
 @_specialize(where T: Int) // expected-error{{type 'T' constrained to non-protocol, non-class type 'Int'}} expected-note {{use 'T == Int' to require 'T' to be 'Int'}}
 // expected-error@-1 {{too few generic parameters are specified in '_specialize' attribute (got 0, but expected 1)}}
 // expected-note@-2 {{missing constraint for 'T' in '_specialize' attribute}}
@@ -163,6 +181,9 @@ public func anotherFuncWithTwoGenericParameters<X: P, Y>(x: X, y: Y) {
 // expected-note@-2 {{missing constraint for 'T' in '_specialize' attribute}}
 @_specialize(where T: C1) // expected-error{{only same-type and layout requirements are supported by '_specialize' attribute}}
 @_specialize(where Int: P) // expected-error{{too few generic parameters are specified in '_specialize' attribute (got 0, but expected 1)}} expected-note{{missing constraint for 'T' in '_specialize' attribute}}
+@specialized(where T: Int) // expected-error{{type 'T' constrained to non-protocol, non-class type 'Int'}} expected-note {{use 'T == Int' to require 'T' to be 'Int'}}
+// expected-error@-1 {{too few generic parameters are specified in 'specialized' attribute (got 0, but expected 1)}}
+// expected-note@-2 {{missing constraint for 'T' in 'specialized' attribute}}
 func funcWithForbiddenSpecializeRequirement<T>(_ t: T) {
 }
 
@@ -230,10 +251,12 @@ public func copyValueAndReturn<S>(_ t: S, s: inout S) -> S where S: P{
 struct OuterStruct<S> {
   struct MyStruct<T> {
     @_specialize(where T == Int, U == Float) // expected-error{{too few generic parameters are specified in '_specialize' attribute (got 2, but expected 3)}} expected-note{{missing constraint for 'S' in '_specialize' attribute}}
+    @specialized(where T == Int, U == Float) // expected-error{{too few generic parameters are specified in 'specialized' attribute (got 2, but expected 3)}} expected-note{{missing constraint for 'S' in 'specialized' attribute}}
     public func foo<U>(u : U) {
     }
 
     @_specialize(where T == Int, U == Float, S == Int)
+    @specialized(where T == Int, U == Float, S == Int)
     public func bar<U>(u : U) {
     }
   }
@@ -308,6 +331,7 @@ extension Container {
 // E becomes concrete via the combination of 'S == Set<String>' and
 // 'E == S.Element'.
 @_specialize(where S == Set<String>)
+@specialized(where S == Set<String>)
 public func takesSequenceAndElement<S, E>(_: S, _: E)
   where S : Sequence, E == S.Element {}
 
@@ -350,6 +374,36 @@ public func foo<T : ProtocolWithDep>(_ t: T) where T.Element == ExpectedElement 
 }
 
 @_specialize(where T == Conformer) // expected-error{{generic signature requires types 'Conformer.Element' (aka 'ConformerElement') and 'ExpectedElement' to be the same}}
+@specialized(where T == Conformer) // expected-error{{generic signature requires types 'Conformer.Element' (aka 'ConformerElement') and 'ExpectedElement' to be the same}}
 public func bar<T : ProtocolWithDep>(_ t: T) where T.Element == ExpectedElement {
   foo(t)
 }
+
+// CHECK: @specialized(where T == Int)
+@specialized(where T == Int)
+// CHECK: @specialized(where T == S<Int>)
+@specialized(where T == S<Int>)
+public func oneGenericParam2Good<T>(_ t: T) -> T {
+    return t
+}
+
+@specialized(where T == Int, U == Int) // expected-error{{cannot find type 'U' in scope}},
+@specialized(where T == T1) // expected-error{{cannot find type 'T1' in scope}},
+@specialized(where T : _Trivial) // expected-error{{layout constraints are only allowed inside '_specialize' attributes}} expected-error{{empty 'where' clause in 'specialized' attribute}}
+public func oneGenericParam2<T>(_ t: T) -> T {
+  return t
+}
+
+// CHECK: @specialized(where T == Int, U == Int)
+@specialized(where T == Int, U == Int)
+@specialized(where T == Int) // expected-error{{too few generic parameters are specified in 'specialized' attribute (got 1, but expected 2)}} expected-note{{missing constraint for 'U' in 'specialized' attribute}}
+public func twoGenericParams2<T, U>(_ t: T, u: U) -> (T, U) {
+  return (t, u)
+}
+
+@specialized(where T == Int) // expected-error{{trailing 'where' clause in 'specialized' attribute of non-generic function 'nonGenericParam2(x:)'}}
+func nonGenericParam2(x: Int) {}
+
+@_specialize(where T == Int)
+@_specialize(where T == Int)
+func genericParamDuplicate<T>(t: T) {}

@@ -5,6 +5,9 @@ extension X {
   public func XinB() { }
   package func XinB_package() { }
 
+  @_spi(B)
+  public func XinB_spi() { }
+
   public var propXinB: Bool { return true }
   package var propXinB_package: Bool { return true }
 

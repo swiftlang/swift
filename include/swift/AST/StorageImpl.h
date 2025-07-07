@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -18,6 +18,7 @@
 #ifndef SWIFT_STORAGEIMPL_H
 #define SWIFT_STORAGEIMPL_H
 
+#include "swift/AST/AccessorKind.h"
 #include "swift/Basic/Range.h"
 #include "llvm/ADT/StringRef.h"
 
@@ -45,16 +46,6 @@ enum class OpaqueReadOwnership : uint8_t {
   /// An opaque read can be either owned or borrowed, depending on the
   /// preference of the caller.
   OwnedOrBorrowed
-};
-
-// Note that the values of these enums line up with %select values in
-// diagnostics.
-enum class AccessorKind {
-#define ACCESSOR(ID) ID,
-#define LAST_ACCESSOR(ID) Last = ID
-#include "swift/AST/AccessorKinds.def"
-#undef ACCESSOR
-#undef LAST_ACCESSOR
 };
 
 inline bool requiresFeatureCoroutineAccessors(AccessorKind kind) {
@@ -144,7 +135,7 @@ static inline IntRange<AccessorKind> allAccessorKinds() {
 static inline llvm::StringRef accessorKindName(AccessorKind ak) {
   switch(ak) {
 
-#define ACCESSOR(ID) ID
+#define ACCESSOR(ID, KEYWORD) ID
 #define SINGLETON_ACCESSOR(ID, KEYWORD)                                        \
   case AccessorKind::ID:                                                       \
     return #KEYWORD;

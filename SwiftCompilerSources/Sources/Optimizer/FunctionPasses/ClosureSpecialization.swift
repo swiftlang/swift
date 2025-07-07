@@ -234,9 +234,9 @@ private func getOrCreateSpecializedFunction(basedOn callSite: CallSite, _ contex
   let specializedParameters = applySiteCallee.convention.getSpecializedParameters(basedOn: callSite)
 
   let specializedFunction = 
-    context.createFunctionForClosureSpecialization(from: applySiteCallee, withName: specializedFunctionName, 
-                                                   withParams: specializedParameters, 
-                                                   withSerialization: applySiteCallee.isSerialized)
+    context.createSpecializedFunctionDeclaration(from: applySiteCallee, withName: specializedFunctionName,
+                                                 withParams: specializedParameters,
+                                                 makeThin: true, makeBare: true)
 
   context.buildSpecializedFunction(specializedFunction: specializedFunction,
                                    buildFn: { (emptySpecializedFunction, functionPassContext) in 
@@ -710,7 +710,7 @@ private extension SpecializationCloner {
       .forEach { _, arg in
         let clonedEntryBlockArgType = arg.type.getLoweredType(in: clonedFunction)
         let clonedEntryBlockArg = clonedEntryBlock.addFunctionArgument(type: clonedEntryBlockArgType, self.context)
-        clonedEntryBlockArg.copyFlags(from: arg as! FunctionArgument)
+        clonedEntryBlockArg.copyFlags(from: arg as! FunctionArgument, self.context)
       }
   }
 

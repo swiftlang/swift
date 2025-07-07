@@ -5,13 +5,13 @@ protocol P: Sendable {}
 protocol Q: Sendable {}
 
 struct One<T> {  // expected-note {{consider making generic parameter 'T' conform to the 'Sendable' protocol}}
-  var t: T  // expected-warning {{stored property 't' of 'Sendable'-conforming generic struct 'One' has non-sendable type 'T'; this is an error in the Swift 6 language mode}}
+  var t: T  // expected-warning {{stored property 't' of 'Sendable'-conforming generic struct 'One' has non-Sendable type 'T'; this is an error in the Swift 6 language mode}}
 }
 
 extension One: P where T: P {}
 
 struct Both<T> {  // expected-note {{consider making generic parameter 'T' conform to the 'Sendable' protocol}}
-  var t: T  // expected-warning {{stored property 't' of 'Sendable'-conforming generic struct 'Both' has non-sendable type 'T'; this is an error in the Swift 6 language mode}}
+  var t: T  // expected-warning {{stored property 't' of 'Sendable'-conforming generic struct 'Both' has non-Sendable type 'T'; this is an error in the Swift 6 language mode}}
 }
 
 extension Both: P where T: P {}

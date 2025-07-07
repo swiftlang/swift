@@ -21,6 +21,7 @@
 #include "swift/FrontendTool/FrontendTool.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LLVMInitialize.h"
+#include "swift/Basic/InitializeSwiftModules.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Format.h"
 #include "llvm/Support/raw_ostream.h"
@@ -220,6 +221,8 @@ int main(int argc, const char *argv[]) {
   forwardedArgs.append(&argv[1], &argv[argc]);
   forwardedArgs.push_back("-interpret");
   assert(forwardedArgs.size() == numForwardedArgs);
+
+  initializeSwiftModules();
 
   Observer observer;
   return performFrontend(forwardedArgs, argv[0], (void*) &printMetadataType,

@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file implements validation for Swift types, emitting semantic errors as
-// appropriate and checking default initializer values.
+// This file implements type resolution, which converts syntactic type
+// representations into semantic types, emitting diagnostics as appropriate.
 //
 //===----------------------------------------------------------------------===//
 
@@ -808,16 +808,15 @@ namespace {
       if (!paramType->isValue())
         return true;
 
-      // Both of these generic type parameters are values, but they may not have
-      // underlying value types associated with them. This can occur when a
-      // parameter doesn't declare a value type and we're going to diagnose it
-      // later.
-      if (!paramType->getValueType() || !secondType->getValueType())
+      // If either value type has an error, we've already diagnosed the issue.
+      auto paramValueTy = paramType->getValueType();
+      auto secondValueTy = secondType->getValueType();
+      if (paramValueTy->hasError() || secondValueTy->hasError())
         return true;
 
       // Otherwise, these are both value parameters and check that both their
       // value types are the same.
-      return paramType->getValueType()->isEqual(secondType->getValueType());
+      return paramValueTy->isEqual(secondValueTy);
     }
 
     bool alwaysMismatchTypeParameters() const { return true; }
@@ -1772,7 +1771,8 @@ resolveUnqualifiedIdentTypeRepr(const TypeResolution &resolution,
   // If the look up did not yield any results, try again but allow members from
   // modules that are not directly imported to be accessible.
   bool didIgnoreMissingImports = false;
-  if (!globals && ctx.LangOpts.hasFeature(Feature::MemberImportVisibility)) {
+  if (!globals && ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
+                                          /*allowMigration=*/true)) {
     lookupOptions |= NameLookupFlags::IgnoreMissingImports;
     globals = TypeChecker::lookupUnqualifiedType(DC, id, repr->getLoc(),
                                                  lookupOptions);
@@ -2035,8 +2035,8 @@ static Type resolveQualifiedIdentTypeRepr(const TypeResolution &resolution,
         DC, parentTy, repr->getNameRef(), repr->getLoc(), lookupOptions);
 
     // If no members were found, try ignoring missing imports.
-    if (!memberTypes &&
-        ctx.LangOpts.hasFeature(Feature::MemberImportVisibility)) {
+    if (!memberTypes && ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
+                                                /*allowMigration=*/true)) {
       lookupOptions |= NameLookupFlags::IgnoreMissingImports;
       memberTypes = TypeChecker::lookupMemberType(
           DC, parentTy, repr->getNameRef(), repr->getLoc(), lookupOptions);
@@ -2407,6 +2407,11 @@ namespace {
   class TypeAttrSet {
     const ASTContext &ctx;
 
+    /// FIXME:
+    ///  `nonisolated(nonsending)` is modeled as a separate `TypeRepr`, but
+    ///  needs to be considered together with subsequent attributes.
+    CallerIsolatedTypeRepr *nonisolatedNonsendingAttr;
+
     llvm::TinyPtrVector<CustomAttr*> customAttrs;
     EnumMap<TypeAttrKind, TypeAttribute *> typeAttrs;
 
@@ -2418,7 +2423,9 @@ namespace {
 #endif
 
   public:
-    TypeAttrSet(const ASTContext &ctx) : ctx(ctx) {}
+    TypeAttrSet(const ASTContext &ctx,
+                CallerIsolatedTypeRepr *nonisolatedNonsendingAttr = nullptr)
+        : ctx(ctx), nonisolatedNonsendingAttr(nonisolatedNonsendingAttr) {}
 
     TypeAttrSet(const TypeAttrSet &) = delete;
     TypeAttrSet &operator=(const TypeAttrSet &) = delete;
@@ -2436,6 +2443,10 @@ namespace {
     /// Accumulate attributes from the given array.  Duplicate attributes
     /// will be diagnosed.
     void accumulate(ArrayRef<TypeOrCustomAttr> attrs);
+
+    CallerIsolatedTypeRepr *getNonisolatedNonsendingAttr() const {
+      return nonisolatedNonsendingAttr;
+    }
 
     /// Return all of the custom attributes.
     ArrayRef<CustomAttr*> getCustomAttrs() const {
@@ -2536,8 +2547,16 @@ namespace {
   }
 
   template <class AttrClass>
-  AttrClass *getWithoutClaiming(TypeAttrSet *attrs) {
+  std::enable_if_t<std::is_base_of_v<TypeAttribute, AttrClass>, AttrClass *>
+  getWithoutClaiming(TypeAttrSet *attrs) {
     return (attrs ? getWithoutClaiming<AttrClass>(*attrs) : nullptr);
+  }
+
+  template <class AttrClass>
+  std::enable_if_t<std::is_same_v<AttrClass, CallerIsolatedTypeRepr>,
+                   CallerIsolatedTypeRepr *>
+  getWithoutClaiming(TypeAttrSet *attrs) {
+    return attrs ? attrs->getNonisolatedNonsendingAttr() : nullptr;
   }
 } // end anonymous namespace
 
@@ -4233,12 +4252,28 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   };
 
   if (auto concurrentAttr = claim<ConcurrentTypeAttr>(attrs)) {
+    if (auto *nonisolatedNonsendingAttr =
+            getWithoutClaiming<CallerIsolatedTypeRepr>(attrs)) {
+      diagnoseInvalid(
+          nonisolatedNonsendingAttr, nonisolatedNonsendingAttr->getStartLoc(),
+          diag::cannot_use_nonisolated_nonsending_together_with_concurrent,
+          nonisolatedNonsendingAttr);
+    }
+
     checkExecutionBehaviorAttribute(concurrentAttr);
+
     if (!repr->isInvalid())
       isolation = FunctionTypeIsolation::forNonIsolated();
-  } else {
-    if (ctx.LangOpts.getFeatureState(Feature::NonisolatedNonsendingByDefault)
-            .isEnabledForMigration()) {
+  } else if (!getWithoutClaiming<CallerIsolatedTypeRepr>(attrs)) {
+    // Infer async function type as `nonisolated(nonsending)` if there is
+    // no `@concurrent` or `nonisolated(nonsending)` attribute and isolation
+    // is nonisolated.
+    if (ctx.LangOpts.hasFeature(Feature::NonisolatedNonsendingByDefault) &&
+        repr->isAsync() && isolation.isNonIsolated()) {
+      isolation = FunctionTypeIsolation::forNonIsolatedCaller();
+    } else if (ctx.LangOpts
+                   .getFeatureState(Feature::NonisolatedNonsendingByDefault)
+                   .isEnabledForMigration()) {
       // Diagnose only in the interface stage, which is run once.
       if (inStage(TypeResolutionStage::Interface)) {
         warnAboutNewNonisolatedAsyncExecutionBehavior(ctx, repr, isolation);
@@ -5267,7 +5302,20 @@ TypeResolver::resolveSendingTypeRepr(SendingTypeRepr *repr,
 NeverNullType
 TypeResolver::resolveCallerIsolatedTypeRepr(CallerIsolatedTypeRepr *repr,
                                             TypeResolutionOptions options) {
-  Type type = resolveType(repr->getBase(), options);
+  Type type;
+  {
+    TypeAttrSet attrs(getASTContext(), repr);
+
+    auto *baseRepr = repr->getBase();
+    if (auto *attrRepr = dyn_cast<AttributedTypeRepr>(baseRepr)) {
+      baseRepr = attrs.accumulate(attrRepr);
+    }
+
+    type = resolveAttributedType(baseRepr, options, attrs);
+
+    attrs.diagnoseUnclaimed(resolution, options, type);
+  }
+
   if (type->hasError())
     return ErrorType::get(getASTContext());
 
@@ -5281,15 +5329,6 @@ TypeResolver::resolveCallerIsolatedTypeRepr(CallerIsolatedTypeRepr *repr,
   if (!fnType->isAsync()) {
     diagnoseInvalid(repr, repr->getStartLoc(),
                     diag::nonisolated_nonsending_only_on_async, repr);
-  }
-
-  if (auto *ATR = dyn_cast<AttributedTypeRepr>(repr->getBase())) {
-    if (ATR->get(TypeAttrKind::Concurrent)) {
-      diagnoseInvalid(
-          repr, repr->getStartLoc(),
-          diag::cannot_use_nonisolated_nonsending_together_with_concurrent,
-          repr);
-    }
   }
 
   switch (fnType->getIsolation().getKind()) {
@@ -5347,7 +5386,7 @@ TypeResolver::resolveInlineArrayType(InlineArrayTypeRepr *repr,
   auto argOptions = options.withoutContext().withContext(
       TypeResolverContext::ValueGenericArgument);
 
-  // It's possible the user accidentally wrote '[Int x 4]', correct that here.
+  // It's possible the user accidentally wrote '[Int of 4]', correct that here.
   auto *countRepr = repr->getCount();
   auto *eltRepr = repr->getElement();
   if (!isa<IntegerTypeRepr>(countRepr) && isa<IntegerTypeRepr>(eltRepr)) {
@@ -5970,11 +6009,7 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
       continue;
     }
 
-    // FIXME: Support compositions involving parameterized protocol types,
-    // like 'any Collection<String> & Sendable', etc.
-    if (ty->is<ParameterizedProtocolType>() &&
-        !options.isConstraintImplicitExistential() &&
-        options.getContext() != TypeResolverContext::ExistentialConstraint) {
+    if (ty->is<ParameterizedProtocolType>()) {
       checkMember(tyR->getStartLoc(), ty);
       Members.push_back(ty);
       continue;
@@ -6301,14 +6336,23 @@ Type TypeChecker::substMemberTypeWithBase(TypeDecl *member,
                               : member->getDeclaredInterfaceType();
   SubstitutionMap subs;
   if (baseTy) {
-    // Cope with the presence of unbound generic types, which are ill-formed
-    // at this point but break the invariants of getContextSubstitutionMap().
+    // If the base type contains an unbound generic type, we cannot
+    // proceed to the getContextSubstitutionMap() call below.
+    //
+    // In general, this means the user program is ill-formed, but we
+    // do allow type aliases to be referenced with an unbound generic
+    // type as the base, if the underlying type of the type alias
+    // does not contain type parameters.
     if (baseTy->hasUnboundGenericType()) {
       memberType = memberType->getReducedType(aliasDecl->getGenericSignature());
 
+      // This is the error case. The diagnostic is emitted elsewhere,
+      // in TypeChecker::isUnsupportedMemberTypeAccess().
       if (memberType->hasTypeParameter())
         return ErrorType::get(memberType);
 
+      // Otherwise, there's no substitution to be performed, so we
+      // just drop the base type.
       return memberType;
     }
 

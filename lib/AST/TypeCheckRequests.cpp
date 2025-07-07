@@ -468,7 +468,7 @@ WhereClauseOwner::WhereClauseOwner(AssociatedTypeDecl *atd)
 SourceLoc WhereClauseOwner::getLoc() const {
   if (auto genericParams = source.dyn_cast<GenericParamList *>()) {
     return genericParams->getWhereLoc();
-  } else if (auto attr = source.dyn_cast<SpecializeAttr *>()) {
+  } else if (auto attr = source.dyn_cast<AbstractSpecializeAttr *>()) {
     return attr->getLocation();
   } else if (auto attr = source.dyn_cast<DifferentiableAttr *>()) {
     return attr->getLocation();
@@ -483,8 +483,11 @@ void swift::simple_display(llvm::raw_ostream &out,
                            const WhereClauseOwner &owner) {
   if (owner.source.is<TrailingWhereClause *>()) {
     simple_display(out, owner.dc->getAsDecl());
-  } else if (owner.source.is<SpecializeAttr *>()) {
-    out << "@_specialize";
+  } else if (auto attr = owner.source.dyn_cast<AbstractSpecializeAttr *>()) {
+    if (attr->isPublic())
+      out << "@specialized";
+    else
+      out << "@_specialize";
   } else if (owner.source.is<DifferentiableAttr *>()) {
     out << "@_differentiable";
   } else {
@@ -508,7 +511,7 @@ void RequirementRequest::noteCycleStep(DiagnosticEngine &diags) const {
 MutableArrayRef<RequirementRepr> WhereClauseOwner::getRequirements() const {
   if (const auto genericParams = source.dyn_cast<GenericParamList *>()) {
     return genericParams->getRequirements();
-  } else if (const auto attr = source.dyn_cast<SpecializeAttr *>()) {
+  } else if (const auto attr = source.dyn_cast<AbstractSpecializeAttr *>()) {
     if (auto whereClause = attr->getTrailingWhereClause())
       return whereClause->getRequirements();
   } else if (const auto attr = source.dyn_cast<DifferentiableAttr *>()) {
@@ -1362,6 +1365,38 @@ void AssociatedConformanceRequest::cacheResult(
   unsigned index = std::get<3>(getStorage());
 
   conformance->setAssociatedConformance(index, assocConf);
+}
+
+//----------------------------------------------------------------------------//
+// RawConformanceIsolationRequest computation.
+//----------------------------------------------------------------------------//
+std::optional<std::optional<ActorIsolation>>
+RawConformanceIsolationRequest::getCachedResult() const {
+  // We only want to cache for global-actor-isolated conformances. For
+  // everything else, which is nearly every conformance, this request quickly
+  // returns "nonisolated" so there is no point in caching it.
+  auto conformance = std::get<0>(getStorage());
+
+  // Was actor isolation non-isolated?
+  if (conformance->isRawIsolationInferred())
+    return std::optional<ActorIsolation>();
+
+  ASTContext &ctx = conformance->getDeclContext()->getASTContext();
+  return ctx.evaluator.getCachedNonEmptyOutput(*this);
+}
+
+void RawConformanceIsolationRequest::cacheResult(
+    std::optional<ActorIsolation> result) const {
+  auto conformance = std::get<0>(getStorage());
+
+  // Common case: conformance is inferred, so there's no result.
+  if (!result) {
+    conformance->setRawConformanceInferred();
+    return;
+  }
+
+  ASTContext &ctx = conformance->getDeclContext()->getASTContext();
+  ctx.evaluator.cacheNonEmptyOutput(*this, std::move(result));
 }
 
 //----------------------------------------------------------------------------//
@@ -2699,24 +2734,36 @@ void ExpandBodyMacroRequest::noteCycleStep(DiagnosticEngine &diags) const {
 
 std::optional<std::optional<llvm::ArrayRef<LifetimeDependenceInfo>>>
 LifetimeDependenceInfoRequest::getCachedResult() const {
-  auto *func = std::get<0>(getStorage());
+  auto *decl = std::get<0>(getStorage());
+  bool noLifetimeDependenceInfo;
 
-  if (func->LazySemanticInfo.NoLifetimeDependenceInfo)
+  if (auto *func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    noLifetimeDependenceInfo = func->LazySemanticInfo.NoLifetimeDependenceInfo;
+  } else {
+    auto *eed = cast<EnumElementDecl>(decl);
+    noLifetimeDependenceInfo = eed->LazySemanticInfo.NoLifetimeDependenceInfo;
+  }
+
+  if (noLifetimeDependenceInfo)
     return std::optional(std::optional<LifetimeDependenceInfo>());
 
-  return func->getASTContext().evaluator.getCachedNonEmptyOutput(*this);
+  return decl->getASTContext().evaluator.getCachedNonEmptyOutput(*this);
 }
 
 void LifetimeDependenceInfoRequest::cacheResult(
     std::optional<llvm::ArrayRef<LifetimeDependenceInfo>> result) const {
-  auto *func = std::get<0>(getStorage());
-  
+  auto *decl = std::get<0>(getStorage());
+
   if (!result) {
-    func->LazySemanticInfo.NoLifetimeDependenceInfo = 1;
-    return;
+    if (auto *func = dyn_cast<AbstractFunctionDecl>(decl)) {
+      func->LazySemanticInfo.NoLifetimeDependenceInfo = 1;
+      return;
+    }
+    auto *eed = cast<EnumElementDecl>(decl);
+    eed->LazySemanticInfo.NoLifetimeDependenceInfo = 1;
   }
 
-  func->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(result));
+  decl->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(result));
 }
 
 //----------------------------------------------------------------------------//

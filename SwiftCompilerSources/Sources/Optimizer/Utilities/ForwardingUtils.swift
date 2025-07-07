@@ -118,7 +118,7 @@ extension ForwardingUseDefWalker {
   }
   mutating func walkUpDefault(forwarded value: Value, _ path: PathContext)
     -> WalkResult {
-    if let inst = value.forwardingInstruction {
+    if let inst = value.forwardingInstruction, !inst.forwardedOperands.isEmpty {
       return walkUp(instruction: inst, path)
     }
     if let phi = Phi(value) {
@@ -303,7 +303,7 @@ extension ForwardingDefUseWalker {
 /// gatherLifetimeIntroducers().
 ///
 /// TODO: make the visitor non-escaping once Swift supports stored
-/// non-escaping closues.
+/// non-escaping closures.
 func visitForwardedUses(introducer: Value, _ context: Context,
   visitor: @escaping (ForwardingUseResult) -> WalkResult)
 -> WalkResult {

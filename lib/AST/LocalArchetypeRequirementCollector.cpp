@@ -183,9 +183,10 @@ Type MapLocalArchetypesOutOfContext::getInterfaceType(
     ++depth;
   }
 
-  llvm::errs() << "Fell off the end:\n";
-  interfaceTy->dump(llvm::errs());
-  abort();
+  ABORT([&](auto &out) {
+    out << "Fell off the end:\n";
+    interfaceTy->dump(out);
+  });
 }
 
 Type MapLocalArchetypesOutOfContext::operator()(SubstitutableType *type) const {

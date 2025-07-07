@@ -210,7 +210,8 @@ private:
     // whether they need them or not.
     asImpl().noteStartOfFieldOffsets(theClass);
     forEachField(IGM, theClass, [&](Field field) {
-      asImpl().addFieldEntries(field);
+      if (isExportableField(field))
+        asImpl().addFieldEntries(field);
     });
     asImpl().noteEndOfFieldOffsets(theClass);
 

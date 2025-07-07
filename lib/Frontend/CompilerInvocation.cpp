@@ -35,6 +35,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/PrefixMapper.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/VersionTuple.h"
 #include "llvm/Support/WithColor.h"
@@ -312,7 +313,8 @@ updateImplicitFrameworkSearchPaths(SearchPathOptions &SearchPathOpts,
   if (LangOpts.Target.isOSDarwin()) {
     if (!SearchPathOpts.SkipSDKImportPaths &&
         !SearchPathOpts.getSDKPath().empty()) {
-      StringRef SDKPath = SearchPathOpts.getSDKPath();
+      SmallString<128> SDKPath(SearchPathOpts.getSDKPath());
+
       SmallString<128> systemFrameworksScratch(SDKPath);
       llvm::sys::path::append(systemFrameworksScratch, "System", "Library",
                               "Frameworks");
@@ -321,6 +323,7 @@ updateImplicitFrameworkSearchPaths(SearchPathOptions &SearchPathOpts,
                               "SubFrameworks");
       SmallString<128> frameworksScratch(SDKPath);
       llvm::sys::path::append(frameworksScratch, "Library", "Frameworks");
+
       ImplicitFrameworkSearchPaths = {systemFrameworksScratch.str().str(),
                                       systemSubFrameworksScratch.str().str(),
                                       frameworksScratch.str().str()};
@@ -389,7 +392,8 @@ void CompilerInvocation::computeCXXStdlibOptions() {
     // (see https://reviews.llvm.org/D101479).
     LangOpts.CXXStdlib = CXXStdlibKind::Msvcprt;
     LangOpts.PlatformDefaultCXXStdlib = CXXStdlibKind::Msvcprt;
-  } else if (LangOpts.Target.isOSLinux() || LangOpts.Target.isOSDarwin()) {
+  } else if (LangOpts.Target.isOSLinux() || LangOpts.Target.isOSDarwin() ||
+             LangOpts.Target.isOSFreeBSD()) {
     auto [clangDriver, clangDiagEngine] =
         ClangImporter::createClangDriver(LangOpts, ClangImporterOpts);
     auto clangDriverArgs = ClangImporter::createClangArgs(
@@ -680,7 +684,8 @@ static void diagnoseCxxInteropCompatMode(Arg *verArg, ArgList &Args,
 }
 
 void LangOptions::setCxxInteropFromArgs(ArgList &Args,
-                                        swift::DiagnosticEngine &Diags) {
+                                        swift::DiagnosticEngine &Diags,
+                                        const FrontendOptions &FrontendOpts) {
   if (Arg *A = Args.getLastArg(options::OPT_cxx_interoperability_mode)) {
     if (Args.hasArg(options::OPT_enable_experimental_cxx_interop)) {
       Diags.diagnose(SourceLoc(), diag::dont_enable_interop_and_compat);
@@ -735,7 +740,12 @@ void LangOptions::setCxxInteropFromArgs(ArgList &Args,
     // version, and is either 4, 5, 6, or 7 (even though only 5.9 and 6.* make
     // any sense). For now, we don't actually care about the version, so we'll
     // just use version 6 (i.e., 'swift-6') to mean that C++ interop mode is on.
-    if (EnableCXXInterop)
+    //
+    // FIXME: We always declare the 'Darwin' module as formally having been built
+    // without C++Interop, for compatibility with prior versions. Once we are certain
+    // that we are only building against modules built with support of
+    // '-formal-cxx-interoperability-mode', this hard-coded check should be removed.
+    if (EnableCXXInterop && (FrontendOpts.ModuleName.compare("Darwin") != 0))
       FormalCxxInteropMode = {6};
     else
       FormalCxxInteropMode = std::nullopt;
@@ -791,6 +801,8 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
     Opts.CASOpts.PluginOptions.emplace_back(std::string(Name),
                                             std::string(Value));
   }
+
+  Opts.ImportModuleFromCAS |= Args.hasArg(OPT_module_import_from_cas);
 
   if (auto *A = Args.getLastArg(OPT_clang_include_tree_root))
     Opts.ClangIncludeTree = A->getValue();
@@ -996,6 +1008,8 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_strict_memory_safety))
     Opts.enableFeature(Feature::StrictMemorySafety);
+  else if (Args.hasArg(OPT_strict_memory_safety_migrate))
+    Opts.enableFeature(Feature::StrictMemorySafety, /*forMigration=*/true);
 
   return HadError;
 }
@@ -1474,7 +1488,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (Opts.AllowNonResilientAccess) {
     // Override the option to skip non-exportable decls.
     if (Opts.SkipNonExportableDecls) {
-      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overridden_by,
                      "-experimental-skip-non-exportable-decls",
                      "-allow-non-resilient-access");
       Opts.SkipNonExportableDecls = false;
@@ -1483,10 +1497,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     if (Opts.AllowNonResilientAccess &&
         FrontendOptions::doesActionBuildModuleFromInterface(
             FrontendOpts.RequestedAction)) {
-      Diags.diagnose(
-          SourceLoc(), diag::warn_ignore_option_overriden_by,
-          "-allow-non-resilient-access",
-          "-compile-module-from-interface or -typecheck-module-from-interface");
+      if (FrontendOpts.RequestedAction !=
+          FrontendOptions::ActionType::TypecheckModuleFromInterface)
+        Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overridden_by,
+                       "-allow-non-resilient-access",
+                       "-compile-module-from-interface");
       Opts.AllowNonResilientAccess = false;
     }
   }
@@ -1555,11 +1570,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_clang_target_variant))
     Opts.ClangTargetVariant = llvm::Triple(A->getValue());
 
-  Opts.setCxxInteropFromArgs(Args, Diags);
+  Opts.setCxxInteropFromArgs(Args, Diags, FrontendOpts);
   if (!Args.hasArg(options::OPT_formal_cxx_interoperability_mode))
     ModuleInterfaceOpts.PublicFlags.IgnorableFlags +=
         " " + printFormalCxxInteropVersion(Opts);
 
+  Opts.UseStaticStandardLibrary = Args.hasArg(OPT_use_static_resource_dir);
   Opts.EnableObjCInterop =
       Args.hasFlag(OPT_enable_objc_interop, OPT_disable_objc_interop,
                    Target.isOSDarwin() && !Opts.hasFeature(Feature::Embedded));
@@ -1755,6 +1771,28 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
+  if (const Arg *A = Args.getLastArg(OPT_requirement_machine_max_concrete_size)) {
+    unsigned limit;
+    if (StringRef(A->getValue()).getAsInteger(10, limit)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      HadError = true;
+    } else {
+      Opts.RequirementMachineMaxConcreteSize = limit;
+    }
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_requirement_machine_max_type_differences)) {
+    unsigned limit;
+    if (StringRef(A->getValue()).getAsInteger(10, limit)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      HadError = true;
+    } else {
+      Opts.RequirementMachineMaxTypeDifferences = limit;
+    }
+  }
+
   if (const Arg *A = Args.getLastArg(OPT_requirement_machine_max_split_concrete_equiv_class_attempts)) {
     unsigned limit;
     if (StringRef(A->getValue()).getAsInteger(10, limit)) {
@@ -1907,7 +1945,7 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
                              Opts.SwitchCheckingInvocationThreshold);
   setUnsignedIntegerArgument(OPT_debug_constraints_attempt,
                              Opts.DebugConstraintSolverAttempt);
-  setUnsignedIntegerArgument(OPT_solver_memory_threshold,
+  setUnsignedIntegerArgument(OPT_solver_memory_threshold_EQ,
                              Opts.SolverMemoryThreshold);
   setUnsignedIntegerArgument(OPT_solver_scope_threshold_EQ,
                              Opts.SolverScopeThreshold);
@@ -1923,7 +1961,7 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   if (Args.hasArg(
         OPT_experimental_skip_non_inlinable_function_bodies_without_types)) {
     if (LangOpts.AllowNonResilientAccess)
-      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overridden_by,
                      "-experimental-skip-non-inlinable-function-bodies-without-types",
                      "-allow-non-resilient-access");
     else
@@ -1934,7 +1972,7 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
   // body skipping.
   if (Args.hasArg(OPT_experimental_skip_non_inlinable_function_bodies)) {
     if (LangOpts.AllowNonResilientAccess)
-      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overridden_by,
                      "-experimental-skip-non-inlinable-function-bodies",
                      "-allow-non-resilient-access");
     else
@@ -1943,7 +1981,7 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_tbd_is_installapi)) {
     if (LangOpts.AllowNonResilientAccess)
-      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overridden_by,
                      "-tbd-is-installapi",
                      "-allow-non-resilient-access");
     else
@@ -1952,7 +1990,7 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
 
   if (Args.hasArg(OPT_experimental_skip_all_function_bodies)) {
     if (LangOpts.AllowNonResilientAccess)
-      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+      Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overridden_by,
                      "-experimental-skip-all-function-bodies",
                      "-allow-non-resilient-access");
     else
@@ -1971,8 +2009,8 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
         SWIFT_ONONE_SUPPORT);
   }
 
-  Opts.DisableConstraintSolverPerformanceHacks |=
-      Args.hasArg(OPT_disable_constraint_solver_performance_hacks);
+  Opts.EnableConstraintSolverPerformanceHacks |=
+      Args.hasArg(OPT_enable_constraint_solver_performance_hacks);
 
   Opts.EnableOperatorDesignatedTypes |=
       Args.hasArg(OPT_enable_operator_designated_types);
@@ -2001,9 +2039,6 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
     Opts.DebugForbidTypecheckPrefixes.push_back(A);
   }
 
-  if (Args.getLastArg(OPT_solver_disable_shrink))
-    Opts.SolverDisableShrink = true;
-
   if (Args.getLastArg(OPT_solver_disable_splitter))
     Opts.SolverDisableSplitter = true;
 
@@ -2029,7 +2064,7 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
 
   if (LangOpts.AllowNonResilientAccess &&
       Opts.EnableLazyTypecheck) {
-    Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overriden_by,
+    Diags.diagnose(SourceLoc(), diag::warn_ignore_option_overridden_by,
                    "-experimental-lazy-typecheck",
                    "-allow-non-resilient-access");
     Opts.EnableLazyTypecheck = false;
@@ -2427,8 +2462,6 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
   for (auto A: Args.filtered(OPT_candidate_module_file)) {
     Opts.CandidateCompiledModules.push_back(resolveSearchPath(A->getValue()));
   }
-  if (const Arg *A = Args.getLastArg(OPT_placeholder_dependency_module_map))
-    Opts.PlaceholderDependencyModuleMap = A->getValue();
 
   if (const Arg *A = Args.getLastArg(OPT_const_gather_protocols_file))
     Opts.ConstGatherProtocolListFilePath = A->getValue();
@@ -2441,7 +2474,11 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
     Opts.DeserializedPathRecoverer.addMapping(SplitMap.first, SplitMap.second);
   }
   for (StringRef Opt : Args.getAllArgValues(OPT_scanner_prefix_map)) {
-    Opts.ScannerPrefixMapper.push_back(Opt.str());
+    if (auto Mapping = llvm::MappedPrefix::getFromJoined(Opt)) {
+      Opts.ScannerPrefixMapper.push_back({Mapping->Old, Mapping->New});
+    } else {
+      Diags.diagnose(SourceLoc(), diag::error_prefix_mapping, Opt);
+    }
   }
 
   Opts.ResolvedPluginVerification |=
@@ -3012,9 +3049,10 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       Args.hasArg(OPT_PackageCMO) ||
       LangOpts.hasFeature(Feature::PackageCMO)) {
     if (!LangOpts.AllowNonResilientAccess) {
-      Diags.diagnose(SourceLoc(), diag::ignoring_option_requires_option,
-                     "-package-cmo",
-                     "-allow-non-resilient-access");
+      if (FEOpts.RequestedAction !=
+          FrontendOptions::ActionType::TypecheckModuleFromInterface)
+        Diags.diagnose(SourceLoc(), diag::ignoring_option_requires_option,
+                       "-package-cmo", "-allow-non-resilient-access");
     } else if (!FEOpts.EnableLibraryEvolution) {
       Diags.diagnose(SourceLoc(), diag::package_cmo_requires_library_evolution);
     } else {
@@ -3493,6 +3531,21 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   Opts.UseSampleProfile = ProfileSampleUse ? ProfileSampleUse->getValue() : "";
 
   Opts.DebugInfoForProfiling |= Args.hasArg(OPT_debug_info_for_profiling);
+
+
+  if (const Arg *A = Args.getLastArg(OPT_min_valid_pointer_value)) {
+    // The LeastValidPointerValue is hard-coded in the runtime. Therefore it
+    // can only safely customized in embedded swift - which doesn't have a runtime.
+    if (!LangOpts.hasFeature(Feature::Embedded)) {
+      Diags.diagnose(SourceLoc(), diag::min_ptr_value_without_embedded);
+      return true;
+    }
+    if (StringRef(A->getValue()).getAsInteger(0, Opts.CustomLeastValidPointerValue)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      return true;
+    }
+  }
 
   Opts.PrintInlineTree |= Args.hasArg(OPT_print_llvm_inline_tree);
   // Always producing all outputs when caching is enabled.

@@ -839,14 +839,15 @@ void SILModule::notifyAddedInstruction(SILInstruction *inst) {
     SILValue &val = RootLocalArchetypeDefs[{genericEnv, inst->getFunction()}];
     if (val) {
       if (!isa<PlaceholderValue>(val)) {
-        // Print a useful error message (and not just abort with an assert).
-        llvm::errs() << "re-definition of local environment in function "
-                     << inst->getFunction()->getName() << ":\n";
-        inst->print(llvm::errs());
-        llvm::errs() << "previously defined in function "
-                     << val->getFunction()->getName() << ":\n";
-        val->print(llvm::errs());
-        abort();
+        ABORT([&](auto &out) {
+          // Print a useful error message (and not just abort with an assert).
+          out << "re-definition of local environment in function "
+              << inst->getFunction()->getName() << ":\n";
+          inst->print(out);
+          out << "previously defined in function "
+              << val->getFunction()->getName() << ":\n";
+          val->print(out);
+        });
       }
       // The local environment was unresolved so far. Replace the placeholder
       // by inst.

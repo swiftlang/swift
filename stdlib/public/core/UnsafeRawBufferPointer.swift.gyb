@@ -1162,6 +1162,17 @@ extension Unsafe${Mutable}RawBufferPointer {
     }
   }
 
+  @unsafe
+  @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
+  public var mutableBytes: MutableRawSpan {
+    @lifetime(borrow self)
+    @_transparent
+    get {
+      unsafe MutableRawSpan(_unsafeBytes: self)
+    }
+  }
+
 %  end
   @_alwaysEmitIntoClient
   public func withContiguousStorageIfAvailable<R>(
@@ -1174,12 +1185,12 @@ extension Unsafe${Mutable}RawBufferPointer {
 
   @unsafe
   @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
   public var bytes: RawSpan {
     @lifetime(borrow self)
-    @_alwaysEmitIntoClient
+    @_transparent
     get {
-      let span = unsafe RawSpan(_unsafeBytes: self)
-      return unsafe _overrideLifetime(span, borrowing: self)
+      unsafe RawSpan(_unsafeBytes: self)
     }
   }
 }

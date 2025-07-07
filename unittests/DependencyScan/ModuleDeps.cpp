@@ -175,7 +175,7 @@ export *\n\
   for (auto &command : CommandStrArr) {
     Command.push_back(command.c_str());
   }
-  auto DependenciesOrErr = ScannerTool.getDependencies(Command, {}, {});
+  auto DependenciesOrErr = ScannerTool.getDependencies(Command, {});
   ASSERT_FALSE(DependenciesOrErr.getError());
   auto Dependencies = DependenciesOrErr.get();
   // TODO: Output/verify dependency graph correctness
@@ -309,7 +309,7 @@ public func funcB() { }\n"));
 
   auto ScanDiagnosticConsumer = std::make_shared<DependencyScanDiagnosticCollector>();
 
-  auto DependenciesOrErr = ScannerTool.getDependencies(Command, {}, {});
+  auto DependenciesOrErr = ScannerTool.getDependencies(Command, {});
 
   // Ensure a hollow output with diagnostic info is produced
   ASSERT_FALSE(DependenciesOrErr.getError());

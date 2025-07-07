@@ -125,6 +125,8 @@ UNINTERESTING_FEATURE(StructLetDestructuring)
 UNINTERESTING_FEATURE(MacrosOnImports)
 UNINTERESTING_FEATURE(NonisolatedNonsendingByDefault)
 UNINTERESTING_FEATURE(KeyPathWithMethodMembers)
+UNINTERESTING_FEATURE(SendableProhibitsMainActorInference)
+UNINTERESTING_FEATURE(ImportMacroAliases)
 
 // TODO: Return true for inlinable function bodies with module selectors in them
 UNINTERESTING_FEATURE(ModuleSelector)
@@ -258,10 +260,36 @@ static bool usesFeatureSendingArgsAndResults(Decl *decl) {
   return false;
 }
 
+static bool findUnderscoredLifetimeAttr(Decl *decl) {
+  auto hasUnderscoredLifetimeAttr = [](Decl *decl) {
+    if (!decl->getAttrs().hasAttribute<LifetimeAttr>()) {
+      return false;
+    }
+    // Since we ban mixing @lifetime and @_lifetime on the same decl, checking
+    // any one LifetimeAttr on the decl is sufficient.
+    // FIXME: Implement the ban.
+    return decl->getAttrs().getAttribute<LifetimeAttr>()->isUnderscored();
+  };
+
+  switch (decl->getKind()) {
+  case DeclKind::Var: {
+    auto *var = cast<VarDecl>(decl);
+    return llvm::any_of(var->getAllAccessors(), hasUnderscoredLifetimeAttr);
+  }
+  default:
+    return hasUnderscoredLifetimeAttr(decl);
+  }
+}
+
 static bool usesFeatureLifetimeDependence(Decl *decl) {
   if (decl->getAttrs().hasAttribute<LifetimeAttr>()) {
+    if (findUnderscoredLifetimeAttr(decl)) {
+      // Experimental feature Lifetimes will guard the decl.
+      return false;
+    }
     return true;
   }
+
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl)) {
     return afd->getInterfaceType()
       ->getAs<AnyFunctionType>()
@@ -271,6 +299,10 @@ static bool usesFeatureLifetimeDependence(Decl *decl) {
     return !varDecl->getTypeInContext()->isEscapable();
   }
   return false;
+}
+
+static bool usesFeatureLifetimes(Decl *decl) {
+  return findUnderscoredLifetimeAttr(decl);
 }
 
 static bool usesFeatureInoutLifetimeDependence(Decl *decl) {
@@ -301,14 +333,25 @@ static bool usesFeatureLifetimeDependenceMutableAccessors(Decl *decl) {
     return false;
   }
   auto var = cast<VarDecl>(decl);
-  if (!var->isGetterMutating()) {
+  return var->isGetterMutating() && !var->getTypeInContext()->isEscapable();
+}
+
+static bool usesFeatureNonescapableAccessorOnTrivial(Decl *decl) {
+  if (!isa<VarDecl>(decl)) {
     return false;
   }
-  if (auto dc = var->getDeclContext()) {
-    if (auto nominal = dc->getSelfNominalTypeDecl()) {
-      auto sig = nominal->getGenericSignature();
-      return !var->getInterfaceType()->isEscapable(sig);
-    }
+  auto var = cast<VarDecl>(decl);
+  if (!var->hasParsedAccessors()) {
+    return false;
+  }
+  // Check for properties that are both non-Copyable and non-Escapable
+  // (MutableSpan).
+  if (var->getTypeInContext()->isNoncopyable()
+      && !var->getTypeInContext()->isEscapable()) {
+    auto selfTy = var->getDeclContext()->getSelfTypeInContext();
+    // Consider 'self' trivial if it is BitwiseCopyable and Escapable
+    // (UnsafeMutableBufferPointer).
+    return selfTy->isBitwiseCopyable() && selfTy->isEscapable();
   }
   return false;
 }
@@ -406,6 +449,10 @@ static bool usesFeatureConcurrencySyntaxSugar(Decl *decl) {
 static bool usesFeatureCompileTimeValues(Decl *decl) {
   return decl->getAttrs().hasAttribute<ConstValAttr>() ||
          decl->getAttrs().hasAttribute<ConstInitializedAttr>();
+}
+
+static bool usesFeatureCompileTimeValuesPreview(Decl *decl) {
+  return false;
 }
 
 static bool usesFeatureClosureBodyMacro(Decl *decl) {
@@ -623,6 +670,30 @@ static bool usesFeatureAsyncExecutionBehaviorAttributes(Decl *decl) {
 static bool usesFeatureExtensibleAttribute(Decl *decl) {
   return decl->getAttrs().hasAttribute<ExtensibleAttr>();
 }
+
+static bool usesFeatureAlwaysInheritActorContext(Decl *decl) {
+  auto *VD = dyn_cast<ValueDecl>(decl);
+  if (!VD)
+    return false;
+
+  if (auto *PL = VD->getParameterList()) {
+    return llvm::any_of(*PL, [&](const ParamDecl *P) {
+      auto *attr = P->getAttrs().getAttribute<InheritActorContextAttr>();
+      return attr && attr->isAlways();
+    });
+  }
+
+  return false;
+}
+
+static bool usesFeatureDefaultIsolationPerFile(Decl *D) {
+  return isa<UsingDecl>(D);
+}
+
+UNINTERESTING_FEATURE(BuiltinSelect)
+UNINTERESTING_FEATURE(BuiltinInterleave)
+UNINTERESTING_FEATURE(BuiltinVectorsExternC)
+UNINTERESTING_FEATURE(AddressOfProperty)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

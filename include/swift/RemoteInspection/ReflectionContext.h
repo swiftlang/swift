@@ -22,6 +22,7 @@
 #include "llvm/BinaryFormat/MachO.h"
 #include "llvm/BinaryFormat/ELF.h"
 #include "llvm/Object/COFF.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/Memory.h"
 #include "llvm/ADT/STLExtras.h"
 
@@ -634,6 +635,9 @@ public:
             return {nullptr, 0};
           // Now for all the sections, find their name.
           for (const typename T::Section *Hdr : SecHdrVec) {
+            // Skip unused headers
+            if (Hdr->sh_type == llvm::ELF::SHT_NULL)
+              continue;
             uint32_t Offset = Hdr->sh_name;
             const char *Start = (const char *)StrTab + Offset;
             uint64_t StringSize = strnlen(Start, StrTabSize - Offset);
@@ -1019,7 +1023,7 @@ public:
       auto CDAddr = this->readCaptureDescriptorFromMetadata(*MetadataAddress);
       if (!CDAddr)
         return nullptr;
-      if (!CDAddr->isResolved())
+      if (!CDAddr->getResolvedAddress())
         return nullptr;
 
       // FIXME: Non-generic SIL boxes also use the HeapLocalVariable metadata
@@ -1276,6 +1280,15 @@ public:
     }
   }
 
+  llvm::Expected<const TypeInfo &>
+  getTypeInfo(const TypeRef &TR, remote::TypeInfoProvider *ExternalTypeInfo) {
+    auto &TC = getBuilder().getTypeConverter();
+    const TypeInfo *TI = TC.getTypeInfo(&TR, ExternalTypeInfo);
+    if (!TI)
+      return llvm::createStringError(TC.takeLastError());
+    return *TI;
+  }
+  
   /// Given a typeref, attempt to calculate the unaligned start of this
   /// instance's fields. For example, for a type without a superclass, the start
   /// of the instance fields would after the word for the isa pointer and the
@@ -1389,7 +1402,7 @@ public:
 
     for (StoredSize i = 0; i < Count; i++) {
       auto &Element = ElementsData[i];
-      Call(Element.Type, Element.Proto);
+      Call(Element.Type, stripSignedPointer(Element.Proto));
     }
   }
 

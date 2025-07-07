@@ -204,6 +204,18 @@ bool TypeVariableType::Implementation::isCollectionLiteralType() const {
                      locator->directlyAt<DictionaryExpr>());
 }
 
+bool TypeVariableType::Implementation::isNumberLiteralType() const {
+  return locator && locator->directlyAt<NumberLiteralExpr>();
+}
+
+bool TypeVariableType::Implementation::isFunctionResult() const {
+  return locator && locator->isLastElement<LocatorPathElt::FunctionResult>();
+}
+
+bool TypeVariableType::Implementation::isTernary() const {
+  return locator && locator->directlyAt<TernaryExpr>();
+}
+
 void *operator new(size_t bytes, ConstraintSystem& cs,
                    size_t alignment) {
   return cs.getAllocator().Allocate(bytes, alignment);
@@ -339,7 +351,16 @@ public:
     // closures.
     if (ExprDepth == 0) {
       auto isExprStmt = (E == Target.getAsExpr()) ? IsTopLevelExprStmt : false;
-      performSyntacticExprDiagnostics(E, Target.getDeclContext(), isExprStmt);
+
+      bool isConstInitExpr = false;
+      if (Target.isForInitialization()) {
+        if (auto initPattern = Target.getInitializationPattern())
+          if (auto namedPatternVarDecl = initPattern->getSingleVar())
+            isConstInitExpr = namedPatternVarDecl->isConstValue();
+      }
+
+      performSyntacticExprDiagnostics(E, Target.getDeclContext(), isExprStmt,
+                                      isConstInitExpr);
     }
     ExprDepth += 1;
     return Action::Continue(E);
@@ -444,6 +465,13 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
 
   if (options.contains(TypeCheckExprFlags::DisableMacroExpansions))
     csOptions |= ConstraintSystemFlags::DisableMacroExpansions;
+
+  if (Context.TypeCheckerOpts.EnableConstraintSolverPerformanceHacks ||
+      evaluateOrDefault(Context.evaluator,
+                        ModuleHasTypeCheckerPerformanceHacksEnabledRequest{
+                            dc->getParentModule()},
+                        false))
+    csOptions |= ConstraintSystemFlags::EnablePerformanceHacks;
 
   ConstraintSystem cs(dc, csOptions, diagnosticTransaction);
 
@@ -630,17 +658,26 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
   // Check whether generic parameters are only mentioned once in
   // the anchor's signature.
   {
-    auto anchorTy = anchor->getInterfaceType()->castTo<GenericFunctionType>();
+    auto anchorTy = anchor->getInterfaceType()->castTo<AnyFunctionType>();
 
-    // Reject if generic parameters are used in multiple different positions
-    // in the parameter list.
+    if (anchor->hasCurriedSelf())
+      anchorTy = anchorTy->getResult()->castTo<AnyFunctionType>();
+
+    SmallPtrSet<CanType, 4> inferrableParams;
+    collectReferencedGenericParams(paramInterfaceTy, inferrableParams);
 
     llvm::SmallVector<unsigned, 2> affectedParams;
     for (unsigned i : indices(anchorTy->getParams())) {
-      const auto &param = anchorTy->getParams()[i];
 
-      if (containsTypes(param.getPlainType()))
-        affectedParams.push_back(i);
+      SmallPtrSet<CanType, 4> referencedGenericParams;
+      collectReferencedGenericParams(anchorTy->getParams()[i].getPlainType(), referencedGenericParams);
+
+      for (auto can : referencedGenericParams) {
+        if (can->is<GenericTypeParamType>() && inferrableParams.contains(can)) {
+          affectedParams.push_back(i);
+          break;
+        }
+      }
     }
 
     if (affectedParams.size() > 1) {
@@ -651,12 +688,19 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
           affectedParams, [&](const unsigned index) { params << "#" << index; },
           [&] { params << ", "; });
 
-      ctx.Diags.diagnose(
+      auto diag = ctx.Diags.diagnose(
           defaultValue->getLoc(),
           diag::
               cannot_default_generic_parameter_inferrable_from_another_parameter,
           paramInterfaceTy, params.str());
-      return Type();
+
+      // In Swift 6.2 and below we incorrectly missed checking this rule for
+      // methods, downgrade to a warning until the next language mode.
+      auto futureVersion = version::Version::getFutureMajorLanguageVersion();
+      if (!anchor->hasCurriedSelf() || ctx.isSwiftVersionAtLeast(futureVersion))
+        return Type();
+
+      diag.warnUntilFutureSwiftVersion();
     }
   }
 
@@ -1055,8 +1099,14 @@ bool TypeChecker::typesSatisfyConstraint(Type type1, Type type2,
                                          bool openArchetypes,
                                          ConstraintKind kind, DeclContext *dc,
                                          bool *unwrappedIUO) {
-  assert(!type1->hasTypeVariable() && !type2->hasTypeVariable() &&
-         "Unexpected type variable in constraint satisfaction testing");
+  // Don't allow any type variables to leak into the nested ConstraintSystem
+  // (including as originator types for placeholders). This also ensure that we
+  // avoid lifetime issues for e.g cases where we lazily populate the
+  // `ContextSubMap` on `NominalOrBoundGenericNominalType` in the nested arena,
+  // since it will be destroyed on leaving.
+  ASSERT(!type1->getRecursiveProperties().isSolverAllocated() &&
+         !type2->getRecursiveProperties().isSolverAllocated() &&
+         "Cannot escape solver-allocated types into a nested ConstraintSystem");
 
   ConstraintSystem cs(dc, ConstraintSystemOptions());
   if (openArchetypes) {
@@ -2416,4 +2466,12 @@ void ConstraintSystem::forEachExpr(
   };
 
   expr->walk(ChildWalker(*this, callback));
+}
+
+bool ModuleHasTypeCheckerPerformanceHacksEnabledRequest::evaluate(
+    Evaluator &evaluator, const ModuleDecl *module) const {
+  auto name = module->getRealName().str();
+  return module->getASTContext().blockListConfig.hasBlockListAction(
+      name, BlockListKeyKind::ModuleName,
+      BlockListAction::ShouldUseTypeCheckerPerfHacks);
 }

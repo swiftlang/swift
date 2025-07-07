@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -189,6 +189,7 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
   TRIVIAL_KIND(MissingMember);
   TRIVIAL_KIND(Macro);
   TRIVIAL_KIND(MacroExpansion);
+  TRIVIAL_KIND(Using);
 
   case DeclKind::TypeAlias:
     return cast<TypeAliasDecl>(this)->getGenericParams()
@@ -400,6 +401,7 @@ StringRef Decl::getDescriptiveKindName(DescriptiveDeclKind K) {
   ENTRY(OpaqueVarType, "type");
   ENTRY(Macro, "macro");
   ENTRY(MacroExpansion, "pound literal");
+  ENTRY(Using, "using");
   }
 #undef ENTRY
   llvm_unreachable("bad DescriptiveDeclKind");
@@ -1242,9 +1244,10 @@ ExplicitSafety Decl::getExplicitSafety() const {
   // If this declaration is from C, ask the Clang importer.
   if (auto clangDecl = getClangDecl()) {
     ASTContext &ctx = getASTContext();
-    return evaluateOrDefault(ctx.evaluator,
-                             ClangDeclExplicitSafety({clangDecl}),
-                             ExplicitSafety::Unspecified);
+    return evaluateOrDefault(
+        ctx.evaluator,
+        ClangDeclExplicitSafety({clangDecl, isa<ClassDecl>(this)}),
+        ExplicitSafety::Unspecified);
   }
   
   // Inference: Check the enclosing context, unless this is a type.
@@ -1711,6 +1714,7 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
   case DeclKind::Missing:
   case DeclKind::MissingMember:
   case DeclKind::MacroExpansion:
+  case DeclKind::Using:
     llvm_unreachable("not a ValueDecl");
 
   case DeclKind::AssociatedType:
@@ -1836,6 +1840,30 @@ bool ImportDecl::isAccessLevelImplicit() const {
     return false;
   }
   return true;
+}
+
+UsingDecl::UsingDecl(SourceLoc usingLoc, SourceLoc specifierLoc,
+                     UsingSpecifier specifier, DeclContext *parent)
+    : Decl(DeclKind::Using, parent), UsingLoc(usingLoc),
+      SpecifierLoc(specifierLoc) {
+  Bits.UsingDecl.Specifier = static_cast<unsigned>(specifier);
+  assert(getSpecifier() == specifier &&
+         "not enough bits in UsingDecl flags for specifier");
+}
+
+std::string UsingDecl::getSpecifierName() const {
+  switch (getSpecifier()) {
+  case UsingSpecifier::MainActor:
+    return "@MainActor";
+  case UsingSpecifier::Nonisolated:
+    return "nonisolated";
+  }
+}
+
+UsingDecl *UsingDecl::create(ASTContext &ctx, SourceLoc usingLoc,
+                             SourceLoc specifierLoc, UsingSpecifier specifier,
+                             DeclContext *parent) {
+  return new (ctx) UsingDecl(usingLoc, specifierLoc, specifier, parent);
 }
 
 void NominalTypeDecl::setConformanceLoader(LazyMemberLoader *lazyLoader,
@@ -2052,11 +2080,14 @@ NominalTypeDecl *ExtensionDecl::getExtendedNominal() const {
       "Extension must have already been bound (by bindExtensions)");
 }
 
-NominalTypeDecl *ExtensionDecl::computeExtendedNominal() const {
+NominalTypeDecl *ExtensionDecl::computeExtendedNominal(
+    bool excludeMacroExpansions) const {
   ASTContext &ctx = getASTContext();
-  return evaluateOrDefault(
-      ctx.evaluator, ExtendedNominalRequest{const_cast<ExtensionDecl *>(this)},
-      nullptr);
+  return evaluateOrDefault(ctx.evaluator,
+                           ExtendedNominalRequest{
+                               const_cast<ExtensionDecl *>(this),
+                               excludeMacroExpansions},
+                           nullptr);
 }
 
 bool ExtensionDecl::canNeverBeBound() const {
@@ -2138,10 +2169,13 @@ bool ExtensionDecl::isWrittenWithConstraints() const {
   return false;
 }
 
-bool ExtensionDecl::isInSameDefiningModule() const {
+bool ExtensionDecl::isInSameDefiningModule(
+    bool RespectOriginallyDefinedIn) const {
   auto decl = getExtendedNominal();
-  auto extensionAlterName = getAlternateModuleName();
-  auto typeAlterName = decl->getAlternateModuleName();
+  auto extensionAlterName =
+      RespectOriginallyDefinedIn ? getAlternateModuleName() : "";
+  auto typeAlterName =
+      RespectOriginallyDefinedIn ? decl->getAlternateModuleName() : "";
 
   if (!extensionAlterName.empty()) {
     if (!typeAlterName.empty()) {
@@ -3348,8 +3382,7 @@ bool AbstractStorageDecl::requiresOpaqueAccessor(AccessorKind kind) const {
 
   // Other accessors are never part of the opaque-accessors set.
 #define OPAQUE_ACCESSOR(ID, KEYWORD)
-#define ACCESSOR(ID) \
-  case AccessorKind::ID:
+#define ACCESSOR(ID, KEYWORD) case AccessorKind::ID:
 #include "swift/AST/AccessorKinds.def"
     return false;
   }
@@ -3652,6 +3685,7 @@ bool ValueDecl::isInstanceMember() const {
   case DeclKind::Missing:
   case DeclKind::MissingMember:
   case DeclKind::MacroExpansion:
+  case DeclKind::Using:
     llvm_unreachable("Not a ValueDecl");
 
   case DeclKind::Class:
@@ -4543,7 +4577,10 @@ StringRef ValueDecl::getCDeclName() const {
 
   // Handle explicit cdecl attributes.
   if (auto cdeclAttr = getAttrs().getAttribute<CDeclAttr>()) {
-    return cdeclAttr->Name;
+    if (!cdeclAttr->Name.empty())
+      return cdeclAttr->Name;
+    else
+      return getBaseIdentifier().str();
   }
 
   return "";
@@ -4765,6 +4802,7 @@ SourceLoc Decl::getAttributeInsertionLoc(bool forModifier) const {
   case DeclKind::MissingMember:
   case DeclKind::MacroExpansion:
   case DeclKind::BuiltinTuple:
+  case DeclKind::Using:
     // These don't take attributes.
     return SourceLoc();
 
@@ -6083,9 +6121,13 @@ GenericTypeParamDecl *GenericTypeParamDecl::createImplicit(
 }
 
 Type GenericTypeParamDecl::getValueType() const {
-  return evaluateOrDefault(getASTContext().evaluator,
-    GenericTypeParamDeclGetValueTypeRequest{const_cast<GenericTypeParamDecl *>(this)},
-    Type());
+  if (!isValue())
+    return Type();
+
+  auto &ctx = getASTContext();
+  GenericTypeParamDeclGetValueTypeRequest req(this);
+  auto ty = evaluateOrDefault(ctx.evaluator, req, Type());
+  return ty ? ty : ErrorType::get(ctx);
 }
 
 SourceRange GenericTypeParamDecl::getSourceRange() const {
@@ -6334,6 +6376,9 @@ ConstructorDecl *NominalTypeDecl::getDefaultInitializer() const {
 }
 
 void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
+  if (isa<ProtocolDecl>(this))
+    return;
+
   // Silently break cycles here because we can't be sure when and where a
   // request to synthesize will come from yet.
   // FIXME: rdar://56844567
@@ -7587,7 +7632,7 @@ void AbstractStorageDecl::setAccessors(SourceLoc lbraceLoc,
 // Compute the number of opaque accessors.
 const size_t NumOpaqueAccessors =
   0
-#define ACCESSOR(ID)
+#define ACCESSOR(ID, KEYWORD)
 #define OPAQUE_ACCESSOR(ID, KEYWORD) \
   + 1
 #include "swift/AST/AccessorKinds.def"
@@ -7610,14 +7655,14 @@ AbstractStorageDecl::AccessorRecord::create(ASTContext &ctx,
   // Make sure that we have enough space to add implicit opaque accessors later.
   size_t numMissingOpaque = NumOpaqueAccessors;
   {
-#define ACCESSOR(ID)
+#define ACCESSOR(ID, KEYWORD)
 #define OPAQUE_ACCESSOR(ID, KEYWORD)          \
     bool has##ID = false;
 #include "swift/AST/AccessorKinds.def"
     for (auto accessor : accessors) {
       switch (accessor->getAccessorKind()) {
-#define ACCESSOR(ID)                          \
-      case AccessorKind::ID:                  \
+#define ACCESSOR(ID, KEYWORD)                                                  \
+      case AccessorKind::ID:                                                   \
         continue;
 #define OPAQUE_ACCESSOR(ID, KEYWORD)          \
       case AccessorKind::ID:                  \
@@ -11102,7 +11147,7 @@ AccessorDecl *AccessorDecl::createImplicit(ASTContext &ctx,
       ctx, /*declLoc=*/SourceLoc(),
       /*accessorKeywordLoc=*/SourceLoc(), accessorKind,
       storage, async, /*asyncLoc=*/SourceLoc(),
-      /*throws=*/true, /*throwsLoc=*/SourceLoc(),
+      /*throws=*/throws, /*throwsLoc=*/SourceLoc(),
       thrownType, parent,
       /*clangNode=*/ClangNode());
   D->setImplicit();
@@ -12178,10 +12223,10 @@ StringRef swift::getAccessorLabel(AccessorKind kind) {
   switch (kind) {
   #define SINGLETON_ACCESSOR(ID, KEYWORD) \
     case AccessorKind::ID: return #KEYWORD;
-  #define ACCESSOR(ID)
-  #include "swift/AST/AccessorKinds.def"
-    }
-    llvm_unreachable("bad accessor kind");
+#define ACCESSOR(ID, KEYWORD)
+#include "swift/AST/AccessorKinds.def"
+  }
+  llvm_unreachable("bad accessor kind");
 }
 
 void swift::simple_display(llvm::raw_ostream &out, AccessorKind kind) {

@@ -907,7 +907,7 @@ NON_VALUE_INST(IncrementProfilerCounterInst, increment_profiler_counter,
 // MarkDependenceAddrInst has read effects for the base operand. See
 // getMemoryBehavior().
 NON_VALUE_INST(MarkDependenceAddrInst, mark_dependence_addr,
-               SILInstruction, None, DoesNotRelease)
+               SILInstruction, MayReadWrite, DoesNotRelease)
 
 NON_VALUE_INST(EndCOWMutationAddrInst, end_cow_mutation_addr,
                SILInstruction, MayHaveSideEffects, DoesNotRelease)

@@ -1953,7 +1953,31 @@ ManglingError Remangler::mangleImplParameterSending(Node *node,
   char diffChar =
       llvm::StringSwitch<char>(node->getText()).Case("sending", 'T').Default(0);
   if (!diffChar)
-    return MANGLING_ERROR(ManglingError::InvalidImplParameterSending, node);
+    return MANGLING_ERROR(ManglingError::InvalidImplParameterAttr, node);
+  Buffer << diffChar;
+
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleImplParameterIsolated(Node *node,
+                                                     unsigned depth) {
+  DEMANGLER_ASSERT(node->hasText(), node);
+  char diffChar =
+      llvm::StringSwitch<char>(node->getText()).Case("isolated", 'I').Default(0);
+  if (!diffChar)
+    return MANGLING_ERROR(ManglingError::InvalidImplParameterAttr, node);
+  Buffer << diffChar;
+
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleImplParameterImplicitLeading(Node *node,
+                                                            unsigned depth) {
+  DEMANGLER_ASSERT(node->hasText(), node);
+  char diffChar =
+      llvm::StringSwitch<char>(node->getText()).Case("sil_implicit_leading_param", 'L').Default(0);
+  if (!diffChar)
+    return MANGLING_ERROR(ManglingError::InvalidImplParameterAttr, node);
   Buffer << diffChar;
 
   return ManglingError::Success;
@@ -2030,10 +2054,7 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
     case Node::Kind::ImplYield:
     case Node::Kind::ImplErrorResult:
       // Mangle type. Type should be the last child.
-      DEMANGLER_ASSERT(Child->getNumChildren() == 2 ||
-                           Child->getNumChildren() == 3 ||
-                           Child->getNumChildren() == 4,
-                       node);
+      DEMANGLER_ASSERT(Child->getNumChildren() >= 2, Child);
       RETURN_IF_ERROR(mangle(Child->getLastChild(), depth + 1));
       break;
     case Node::Kind::DependentPseudogenericSignature:
@@ -2168,15 +2189,32 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
                                Child->getFirstChild());
         }
         Buffer << ConvCh;
-        // Mangle parameter differentiability, if it exists.
-        if (Child->getNumChildren() == 3) {
-          RETURN_IF_ERROR(mangleImplParameterResultDifferentiability(
-              Child->getChild(1), depth + 1));
-        } else if (Child->getNumChildren() == 4) {
-          RETURN_IF_ERROR(mangleImplParameterResultDifferentiability(
-              Child->getChild(1), depth + 1));
-          RETURN_IF_ERROR(
-              mangleImplParameterSending(Child->getChild(2), depth + 1));
+
+        for (unsigned i = 1; i < Child->getNumChildren() - 1; ++i) {
+          auto *Grandchild = Child->getChild(i);
+          switch (Grandchild->getKind()) {
+          case Node::Kind::ImplParameterResultDifferentiability:
+            RETURN_IF_ERROR(mangleImplParameterResultDifferentiability(
+              Grandchild, depth + 1));
+            break;
+          case Node::Kind::ImplParameterSending:
+            RETURN_IF_ERROR(mangleImplParameterSending(
+              Grandchild, depth + 1));
+            break;
+          case Node::Kind::ImplParameterIsolated:
+            RETURN_IF_ERROR(mangleImplParameterIsolated(
+              Grandchild, depth + 1));
+            break;
+          case Node::Kind::ImplParameterImplicitLeading:
+            RETURN_IF_ERROR(mangleImplParameterImplicitLeading(
+              Grandchild, depth + 1));
+            break;
+          default:
+            Child->dump();
+            abort();
+            return MANGLING_ERROR(ManglingError::InvalidImplParameterAttr,
+                                  Grandchild);
+          }
         }
         break;
       }
@@ -3573,6 +3611,14 @@ ManglingError Remangler::mangleOutlinedInitializeWithTake(Node *node,
                                                           unsigned depth) {
   RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
   Buffer << "WOb";
+  return ManglingError::Success;
+}
+
+ManglingError
+Remangler::mangleOutlinedInitializeWithTakeNoValueWitness(Node *node,
+                                                          unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
+  Buffer << "WOB";
   return ManglingError::Success;
 }
 

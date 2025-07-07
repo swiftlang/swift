@@ -73,7 +73,7 @@ View getViewFromEither(View view1 [[clang::lifetimebound]], View view2 [[clang::
 struct SWIFT_NONESCAPABLE TestAnnotationTranslation {
     TestAnnotationTranslation() : member(nullptr) {}
     TestAnnotationTranslation(const int *p [[clang::lifetimebound]]) : member(p) {}
-    TestAnnotationTranslation(const TestAnnotationTranslation& [[clang::lifetimebound]]) = default;
+    TestAnnotationTranslation(const TestAnnotationTranslation& other [[clang::lifetimebound]]) = default;
 private:
     const int *member;
 };
@@ -115,6 +115,20 @@ namespace NS {
     }
 }
 
+struct SWIFT_NONCOPYABLE SWIFT_NONESCAPABLE MoveOnly {
+    MoveOnly();
+    MoveOnly(const MoveOnly& other) = delete;
+    MoveOnly& operator=(const MoveOnly&) = delete;
+    MoveOnly(MoveOnly&& other) = default;
+    MoveOnly& operator=(MoveOnly&& other) = default;
+    ~MoveOnly();
+
+private:
+    int *i;
+};
+
+MoveOnly moveOnlyId(const MoveOnly& p [[clang::lifetimebound]]);
+
 // CHECK: sil [clang makeOwner] {{.*}}: $@convention(c) () -> Owner
 // CHECK: sil [clang getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow 0) @owned View
 // CHECK: sil [clang getViewFromFirst] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow 0) @owned View
@@ -130,6 +144,7 @@ namespace NS {
 // CHECK: sil [clang CaptureView.captureView] {{.*}} : $@convention(cxx_method) (View, @lifetime(copy 0) @inout CaptureView) -> ()
 // CHECK: sil [clang CaptureView.handOut] {{.*}} : $@convention(cxx_method) (@lifetime(copy 1) @inout View, @in_guaranteed CaptureView) -> ()
 // CHECK: sil [clang NS.getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow 0) @owned View
+// CHECK: sil [clang moveOnlyId] {{.*}} : $@convention(c) (@in_guaranteed MoveOnly) -> @lifetime(borrow {{.*}}0) @out MoveOnly
 
 //--- test.swift
 
@@ -156,4 +171,8 @@ public func test() {
 
 public func test2(_ x: AggregateView) {
     let _ = AggregateView(member: x.member)
+}
+
+func canImportMoveOnlyNonEscapable(_ x: borrowing MoveOnly) {
+    let _ = moveOnlyId(x);
 }

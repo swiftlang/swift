@@ -603,7 +603,8 @@ static void diagnoseInvalidDecl(Decl *decl,
       isa<OperatorDecl>(decl) ||
       isa<PrecedenceGroupDecl>(decl) ||
       isa<MacroDecl>(decl) ||
-      isa<ExtensionDecl>(decl)) {
+      isa<ExtensionDecl>(decl) ||
+      isa<UsingDecl>(decl)) {
     decl->diagnose(diag::invalid_decl_in_macro_expansion, decl);
     decl->setInvalid();
 
@@ -1892,7 +1893,6 @@ std::optional<unsigned>
 ExpandBodyMacroRequest::evaluate(Evaluator &evaluator,
                                  AnyFunctionRef fn) const {
   auto *dc = fn.getAsDeclContext();
-  auto &ctx = dc->getASTContext();
   std::optional<unsigned> bufferID;
   fn.forEachAttachedMacro(
       MacroRole::Body,
@@ -1900,18 +1900,6 @@ ExpandBodyMacroRequest::evaluate(Evaluator &evaluator,
         // FIXME: Should we complain if we already expanded a body macro?
         if (bufferID)
           return;
-
-        // '@Task' is gated behind the 'ConcurrencySyntaxSugar'
-        // experimental feature.
-        if (macro->getParentModule()->getName().is("_Concurrency") &&
-            macro->getBaseIdentifier().is("Task") &&
-            !ctx.LangOpts.hasFeature(Feature::ConcurrencySyntaxSugar)) {
-          ctx.Diags.diagnose(
-              customAttr->getLocation(),
-              diag::experimental_macro,
-              macro->getName());
-          return;
-        }
 
         SourceFile * macroSourceFile = nullptr;
         if (auto *fnDecl = fn.getAbstractFunctionDecl()) {

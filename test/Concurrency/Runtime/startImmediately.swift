@@ -1,6 +1,3 @@
-// FIXME: Marking this disabled since we're reworking the semantics and the test is a bit racy until we do
-// REQUIRES: rdar149506152
-
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -Xfrontend -disable-availability-checking %s %import-libdispatch -swift-version 6 -o %t/a.out
 // RUN: %target-codesign %t/a.out
@@ -395,28 +392,6 @@ print("callActorFromStartSynchronousTask() - actor in custom executor with its o
 let actorQueue = DispatchQueue(label: "recipient-actor-queue")
 callActorFromStartSynchronousTask(recipient: .recipientOnQueue(RecipientOnQueue(queue: actorQueue)))
 
-
-//            50: callActorFromStartSynchronousTask()
-//            51: before immediate [thread:0x00007000054f5000] @ :366
-//            52: inside immediate [thread:0x00007000054f5000] @ :372
-//            53: inside immediate, call rec.sync() [thread:0x00007000054f5000] @ :380
-//            54: Recipient/sync(syncTaskThreadID:) Current actor thread id = 0x000070000567e000 @ :336
-//            55: inside immediate, call rec.sync() done [thread:0x000070000567e000] @ :385
-//            56: Inner thread id = 0x00007000054f5000
-//            57: Current thread id = 0x000070000567e000
-//            60: after immediate [thread:0x00007000054f5000] @ :418
-//            61: - async work on queue
-//            62: - async work on queue
-//            63: - async work on queue
-//            64: - async work on queue
-//            65: - async work on queue
-//            67: - async work on queue
-//            68: - async work on queue
-//            69: - async work on queue
-//            71: Inner thread id = 0x00007000054f5000
-//            72: Current thread id = 0x000070000567e000
-//            73: inside immediate, done [thread:0x000070000567e000] @ :414
-
 // CHECK-LABEL: callActorFromStartSynchronousTask() - actor in custom executor with its own queue
 // No interleaving allowed between "before" and "inside":
 // CHECK: before immediate [thread:[[CALLING_THREAD4:.*]]]
@@ -455,3 +430,33 @@ actor RecipientOnQueue: RecipientProtocol {
     try? await Task.sleep(for: .milliseconds(100))
   }
 }
+
+print("\n\n==== ------------------------------------------------------------------")
+print("call_startSynchronously_insideActor()")
+
+actor A {
+  func f() {
+    Task.startSynchronously(name: "hello") { print("Task.startSynchronously (\(Task.name!))") }
+    Task.startSynchronously() { print("Task.startSynchronously") }
+  }
+
+  func f2() {
+    Task.immediate(name: "hello") { print("Task.immediate (\(Task.name!))") }
+    Task.immediate() { print("Task.immediate") }
+
+    Task.immediate(name: "hello") { @MainActor in print("Task.immediate { @MainActor } (\(Task.name!))") }
+    Task.immediate() { @MainActor in print("Task.immediate { @MainActor }") }
+  }
+}
+
+func call_startSynchronously_insideActor() async {
+  await A().f()
+  await A().f2()
+}
+
+await call_startSynchronously_insideActor()
+
+// CHECK-LABEL: call_startSynchronously_insideActor()
+// Those two definitely in this order, however the startSynchronously is not determinate
+// CHECK: Task.immediate
+// CHECK: Task.immediate { @MainActor }

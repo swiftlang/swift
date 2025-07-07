@@ -51,7 +51,7 @@ import ImportsMacroSpecificClangModule
 // CHECK-NEXT:      "sourceFiles": [
 // CHECK-DAG:        "{{.*}}OnlyWithMacro.h"
 // CHECK-DAG:        "{{.*}}module.modulemap"
-// CHECK-NEXT:      ],
+// CHECK:           ],
 // CHECK-NEXT:      "directDependencies": [
 // CHECK-NEXT:      ],
 // CHECK-NEXT:      "linkLibraries": [

@@ -59,6 +59,8 @@
 #endif
 
 
+PASS(AllocBoxToStack, "allocbox-to-stack",
+     "stack promotion of box objects")
 PASS(CopyToBorrowOptimization, "copy-to-borrow-optimization",
      "Convert load [copy] instructions to load_borrow and remove copies of borrowed values")
 PASS(AliasInfoDumper, "dump-alias-info",
@@ -140,8 +142,12 @@ PASS(StackPromotion, "stack-promotion",
      "Stack Promotion of Class Objects")
 PASS(UpdateBorrowedFrom, "update-borrowed-from",
      "Test pass for update borrowed-from instructions")
+PASS(MandatoryTempRValueElimination, "mandatory-temp-rvalue-elimination",
+     "Mandatory remove short-lived immutable temporary copies")
 PASS(TempRValueElimination, "temp-rvalue-elimination",
      "Remove short-lived immutable temporary copies")
+PASS(TempLValueElimination, "temp-lvalue-elimination",
+     "Remove short-lived immutable temporary l-values")
 
 // NOTE - ExperimentalSwiftBasedClosureSpecialization and AutodiffClosureSpecialization are a WIP
 PASS(ExperimentalSwiftBasedClosureSpecialization, "experimental-swift-based-closure-specialization",
@@ -149,6 +155,8 @@ PASS(ExperimentalSwiftBasedClosureSpecialization, "experimental-swift-based-clos
 PASS(AutodiffClosureSpecialization, "autodiff-closure-specialization",
      "Autodiff specific closure-specialization pass")
 
+MODULE_PASS(MandatoryAllocBoxToStack, "mandatory-allocbox-to-stack",
+     "Mandatory stack promotion of box objects")
 MODULE_PASS(AsyncDemotion, "async-demotion",
      "Convert async functions to be synchronous")
 MODULE_PASS(RunUnitTests, "run-unit-tests",
@@ -210,7 +218,7 @@ LEGACY_PASS(AccessMarkerElimination, "access-marker-elim",
      "Access Marker Elimination.")
 LEGACY_PASS(AddressLowering, "address-lowering",
      "SIL Address Lowering")
-LEGACY_PASS(AllocBoxToStack, "allocbox-to-stack",
+LEGACY_PASS(LegacyAllocBoxToStack, "legacy-allocbox-to-stack",
      "Stack Promotion of Box Objects")
 LEGACY_PASS(ArrayCountPropagation, "array-count-propagation",
      "Array Count Propagation")
@@ -404,8 +412,6 @@ LEGACY_PASS(PerformanceSILLinker, "performance-linker",
      "Deserialize all referenced SIL functions")
 LEGACY_PASS(RawSILInstLowering, "raw-sil-inst-lowering",
      "Lower all raw SIL instructions to canonical equivalents.")
-LEGACY_PASS(TempLValueOpt, "temp-lvalue-opt",
-     "Remove short-lived immutable temporary l-values")
 LEGACY_PASS(IRGenPrepare, "irgen-prepare",
      "Cleanup SIL in preparation for IRGen")
 LEGACY_PASS(SendNonSendable, "send-non-sendable",

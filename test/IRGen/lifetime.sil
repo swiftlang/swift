@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -disable-debugger-shadow-copies -gnone -emit-ir %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -disable-debugger-shadow-copies -Xllvm -sil-disable-pass=mandatory-temp-rvalue-elimination -gnone -emit-ir %s | %FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s -DINT=i%target-ptrsize
 
 sil_stage canonical
 

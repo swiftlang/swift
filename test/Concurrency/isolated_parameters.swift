@@ -98,8 +98,7 @@ func testIsolatedParamCallsAsync(a: isolated A, b: A) async {
 
   #if ALLOW_TYPECHECKER_ERRORS
   globalFuncIsolated(a)
-  globalFuncIsolated(b) // expected-typechecker-error{{expression is 'async' but is not marked with 'await'}}
-  // expected-typechecker-note@-1{{calls to global function 'globalFuncIsolated' from outside of its actor context are implicitly asynchronous}}
+  globalFuncIsolated(b) // expected-typechecker-error{{actor-isolated global function 'globalFuncIsolated' cannot be called from outside of the actor}} {{3-3=await }}
   await globalFuncIsolated(b)
   #endif
 }
@@ -176,7 +175,7 @@ struct S: P {
 func checkConformer(_ s: S, _ p: any P, _ ma: MyActor) async {
   s.m(thing: ma)
   await p.m(thing: ma)
-  // expected-complete-warning@-1 {{passing argument of non-sendable type 'any P' into actor-isolated context may introduce data races}}
+  // expected-complete-warning@-1 {{passing argument of non-Sendable type 'any P' into actor-isolated context may introduce data races}}
   // expected-tns-warning @-2 {{sending 'p' risks causing data races}}
   // expected-tns-note @-3 {{sending task-isolated 'p' to actor-isolated instance method 'm(thing:)' risks causing data races between actor-isolated and task-isolated uses}}
 }
@@ -309,8 +308,7 @@ func testExistentialIsolated(a: isolated P2, b: P2) async {
   a.m()
   await b.m()
   #if ALLOW_TYPECHECKER_ERRORS
-  b.m() // expected-typechecker-error{{expression is 'async' but is not marked with 'await'}}
-  // expected-typechecker-note@-1{{calls to instance method 'm()' from outside of its actor context are implicitly asynchronous}}
+  b.m() // expected-typechecker-error{{actor-isolated instance method 'm()' cannot be called from outside of the actor}} {{3-3=await }}
   #endif
 }
 
@@ -437,21 +435,20 @@ nonisolated func callFromNonisolated(ns: NotSendable) async {
   let myActor = A()
 
   await optionalIsolated(ns, to: myActor)
-  // expected-complete-warning @-1 {{passing argument of non-sendable type 'NotSendable' into actor-isolated context may introduce data races}}
+  // expected-complete-warning @-1 {{passing argument of non-Sendable type 'NotSendable' into actor-isolated context may introduce data races}}
   // expected-tns-warning @-2 {{sending 'ns' risks causing data races}}
   // expected-tns-note @-3 {{sending task-isolated 'ns' to actor-isolated global function 'optionalIsolated(_:to:)' risks causing data races between actor-isolated and task-isolated uses}}
 
 #if ALLOW_TYPECHECKER_ERRORS
   optionalIsolatedSync(ns, to: myActor)
-  // expected-typechecker-error@-1 {{expression is 'async' but is not marked with 'await'}}
-  // expected-typechecker-note@-2 {{calls to global function 'optionalIsolatedSync(_:to:)' from outside of its actor context are implicitly asynchronous}}
-  // expected-complete-warning@-3 {{passing argument of non-sendable type 'NotSendable' into actor-isolated context may introduce data races}}
+  // expected-typechecker-error@-1 {{actor-isolated global function 'optionalIsolatedSync(_:to:)' cannot be called from outside of the actor}} {{3-3=await }}
+  // expected-complete-warning@-2 {{passing argument of non-Sendable type 'NotSendable' into actor-isolated context may introduce data races}}
   #endif
 }
 
 @MainActor func callFromMainActor(ns: NotSendable) async {
   await optionalIsolated(ns, to: nil)
-  // expected-complete-warning @-1 {{passing argument of non-sendable type 'NotSendable' outside of main actor-isolated context may introduce data races}}
+  // expected-complete-warning @-1 {{passing argument of non-Sendable type 'NotSendable' outside of main actor-isolated context may introduce data races}}
   // expected-tns-warning @-2 {{sending 'ns' risks causing data races}}
   // expected-tns-note @-3 {{sending main actor-isolated 'ns' to nonisolated global function 'optionalIsolated(_:to:)' risks causing data races between nonisolated and main actor-isolated uses}}
 
@@ -460,15 +457,14 @@ nonisolated func callFromNonisolated(ns: NotSendable) async {
   let myActor = A()
 
   await optionalIsolated(ns, to: myActor)
-  // expected-complete-warning@-1 {{passing argument of non-sendable type 'NotSendable' into actor-isolated context may introduce data races}}
+  // expected-complete-warning@-1 {{passing argument of non-Sendable type 'NotSendable' into actor-isolated context may introduce data races}}
   // expected-tns-warning @-2 {{sending 'ns' risks causing data races}}
   // expected-tns-note @-3 {{sending main actor-isolated 'ns' to actor-isolated global function 'optionalIsolated(_:to:)' risks causing data races between actor-isolated and main actor-isolated uses}}
 
 #if ALLOW_TYPECHECKER_ERRORS
   optionalIsolatedSync(ns, to: myActor)
-  // expected-typechecker-error@-1 {{expression is 'async' but is not marked with 'await'}}
-  // expected-typechecker-note@-2 {{calls to global function 'optionalIsolatedSync(_:to:)' from outside of its actor context are implicitly asynchronous}}
-  // expected-complete-warning@-3 {{passing argument of non-sendable type 'NotSendable' into actor-isolated context may introduce data races}}
+  // expected-typechecker-error@-1 {{actor-isolated global function 'optionalIsolatedSync(_:to:)' cannot be called from outside of the actor}} {{3-3=await }}
+  // expected-complete-warning@-2 {{passing argument of non-Sendable type 'NotSendable' into actor-isolated context may introduce data races}}
 #endif
 }
 

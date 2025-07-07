@@ -37,7 +37,7 @@ enum NoValues {
 extension Enum: Equatable where T: Equatable {}
 // CHECK-FRAGILE-LABEL: // static Enum<A>.__derived_enum_equals(_:_:)
 // CHECK-FRAGILE-NEXT: // Isolation: unspecified
-// CHECK-FRAGILE-NEXT: sil hidden [ossa] @$s28synthesized_conformance_enum4EnumOAASQRzlE010__derived_C7_equalsySbACyxG_AEtFZ : $@convention(method) <T where T : Equatable> (@in_guaranteed Enum<T>, @in_guaranteed Enum<T>, @thin Enum<T>.Type) -> Bool {
+// CHECK-FRAGILE-NEXT: sil hidden [_semantics "derived_enum_equals"] [ossa] @$s28synthesized_conformance_enum4EnumOAASQRzlE010__derived_C7_equalsySbACyxG_AEtFZ : $@convention(method) <T where T : Equatable> (@in_guaranteed Enum<T>, @in_guaranteed Enum<T>, @thin Enum<T>.Type) -> Bool {
 // CHECK-RESILIENT-LABEL: // static Enum<A>.== infix(_:_:)
 // CHECK-RESILIENT-NEXT: // Isolation: unspecified
 // CHECK-RESILIENT-NEXT: sil hidden [ossa] @$s28synthesized_conformance_enum4EnumOAASQRzlE2eeoiySbACyxG_AEtFZ : $@convention(method) <T where T : Equatable> (@in_guaranteed Enum<T>, @in_guaranteed Enum<T>, @thin Enum<T>.Type) -> Bool {

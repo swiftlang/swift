@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 950; // DeclNameRef module selectors
+const uint16_t SWIFTMODULE_VERSION_MINOR = 955; // Lifetime dependencies on enum element
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -2323,6 +2323,7 @@ namespace decls_block {
   using LifetimeDependenceLayout =
       BCRecordLayout<LIFETIME_DEPENDENCE,
                      BCVBR<4>,           // targetIndex
+                     BCVBR<4>,           // paramIndicesLength
                      BCFixed<1>,         // isImmortal
                      BCFixed<1>,         // hasInheritLifetimeParamIndices
                      BCFixed<1>,         // hasScopeLifetimeParamIndices
@@ -2449,6 +2450,7 @@ namespace decls_block {
 
   using SpecializeDeclAttrLayout = BCRecordLayout<
       Specialize_DECL_ATTR,
+      BCFixed<1>,              // isPublic flag (@specialized vs @_specialize)
       BCFixed<1>,              // exported flag
       BCFixed<1>,              // specialization kind
       GenericSignatureIDField, // specialized signature
@@ -2457,6 +2459,9 @@ namespace decls_block {
       BCVBR<4>, // # of availability attributes
       BCArray<IdentifierIDField> // spi groups, type erased params
       >;
+  // Unused. We use the layout above.
+  using SpecializedDeclAttrLayout = BCRecordLayout<
+      Specialized_DECL_ATTR>;
 
   using StorageRestrictionsDeclAttrLayout = BCRecordLayout<
       StorageRestrictions_DECL_ATTR,
@@ -2553,6 +2558,12 @@ namespace decls_block {
   using NonisolatedDeclAttrLayout =
       BCRecordLayout<Nonisolated_DECL_ATTR,
                      BCFixed<2>, // the modifier (unsafe, nonsending)
+                     BCFixed<1>  // implicit flag
+                     >;
+
+  using InheritActorContextDeclAttrLayout =
+       BCRecordLayout<InheritActorContext_DECL_ATTR,
+                     BCFixed<1>, // the modifier (none = 0, always = 1)
                      BCFixed<1>  // implicit flag
                      >;
 

@@ -117,15 +117,18 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
   // This guarantees that stack-promotable boxes have [static] enforcement.
   P.addAccessEnforcementSelection();
 
-  P.addAllocBoxToStack();
+#ifdef SWIFT_ENABLE_SWIFT_IN_SWIFT
+  P.addMandatoryAllocBoxToStack();
+#else
+  P.addLegacyAllocBoxToStack();
+#endif
   P.addNoReturnFolding();
   P.addBooleanLiteralFolding();
   addDefiniteInitialization(P);
 
   P.addAddressLowering();
 
-  // Before we run later semantic optimizations, eliminate simple functions that
-  // we specialized to ensure that we do not emit diagnostics twice.
+  // TODO: remove this once CapturePromotion deletes specialized functions itself.
   P.addDiagnosticDeadFunctionElimination();
 
   P.addFlowIsolation();
@@ -431,7 +434,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   P.addDCE();
 
   // Optimize copies from a temporary (an "l-value") to a destination.
-  P.addTempLValueOpt();
+  P.addTempLValueElimination();
 
   // Split up opaque operations (copy_addr, retain_value, etc.).
   P.addLowerAggregateInstrs();
@@ -1081,6 +1084,9 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
 
   // Now that we have serialized, propagate debug info.
   P.addMovedAsyncVarDebugInfoPropagator();
+
+  // Even at Onone it's important to remove copies of structs, especially if they are large.
+  P.addMandatoryTempRValueElimination();
 
   // If we are asked to stop optimizing before lowering ownership, do so now.
   if (P.Options.StopOptimizationBeforeLoweringOwnership)

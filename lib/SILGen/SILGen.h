@@ -266,6 +266,7 @@ public:
   void visitDestructorDecl(DestructorDecl *d) {}
   void visitModuleDecl(ModuleDecl *d) { }
   void visitMissingMemberDecl(MissingMemberDecl *d) {}
+  void visitUsingDecl(UsingDecl *) {}
 
   // Emitted as part of its storage.
   void visitAccessorDecl(AccessorDecl *ad) {}
@@ -556,6 +557,8 @@ public:
   FuncDecl *getSwiftJobRun();
   /// Retrieve the _Concurrency._deinitOnExecutor intrinsic.
   FuncDecl *getDeinitOnExecutor();
+  /// Retrieve the _Concurrency._deinitOnExecutorMainActorBackDeploy intrinsic.
+  FuncDecl *getDeinitOnExecutorMainActorBackDeploy();
   // Retrieve the _SwiftConcurrencyShims.exit intrinsic.
   FuncDecl *getExit();
 

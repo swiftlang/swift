@@ -21,12 +21,7 @@ public func testClosureToBlock() {
 }
 
 // CHECK: define internal void @"$s4main20testClosureToFuncPtryyFySo10NonTrivialVcfU_To"(ptr %[[V0:.*]])
-// CHECK: %[[V1:.*]] = alloca %{{.*}}, align 8
-// CHECK-NEXT: call void @llvm.lifetime.start.p0(i64 8, ptr %[[V1]])
-// CHECK-NEXT: call {{void|ptr}} @_ZN10NonTrivialC1ERKS_(ptr %[[V1]], ptr %[[V0]])
-// CHECK-NEXT: call swiftcc void @"$s4main20testClosureToFuncPtryyFySo10NonTrivialVcfU_"(ptr noalias dereferenceable(8) %[[V1]])
-// CHECK-NEXT: call {{void|ptr}} @_ZN10NonTrivialD1Ev(ptr %[[V1]])
-// CHECK-NEXT: call void @llvm.lifetime.end.p0(i64 8, ptr %[[V1]])
+// CHECK:      call swiftcc void @"$s4main20testClosureToFuncPtryyFySo10NonTrivialVcfU_"(ptr noalias dereferenceable(8) %[[V0]])
 // CHECK-NEXT: ret void
 
 public func testClosureToFuncPtr() {
@@ -41,7 +36,7 @@ public func testClosureToFuncPtrReturnNonTrivial() {
   cfuncReturnNonTrivial2({() -> NonTrivial in return NonTrivial()});
 }
 
-// CHECK: define swiftcc { ptr, ptr } @"$s4main13returnFuncPtrySo10NonTrivialVcyF"()
+// CHECK: define{{( protected)?}} swiftcc { ptr, ptr } @"$s4main13returnFuncPtrySo10NonTrivialVcyF"()
 // CHECK: %[[V0:.*]] = call ptr @_Z8getFnPtrv()
 // CHECK: %[[V1:.*]] = call noalias ptr @swift_allocObject(ptr getelementptr inbounds (%{{.*}}, ptr @{{.*}}, i32 0, i32 2), i64 24, i64 7)
 // CHECK: %[[V2:.*]] = getelementptr inbounds{{.*}} <{ %{{.*}}, ptr }>, ptr %[[V1]], i32 0, i32 1
@@ -52,12 +47,12 @@ public func testClosureToFuncPtrReturnNonTrivial() {
 // CHECK: define linkonce_odr hidden swiftcc void @"$sSo10NonTrivialVIetCX_ABIegn_TR"(ptr noalias dereferenceable(8) %[[V0:.*]], ptr %[[V1:.*]])
 // CHECK: %[[V2:.*]] = alloca %{{.*}}, align 8
 // CHECK: call void @llvm.lifetime.start.p0(i64 8, ptr %[[V2]])
-// CHECK: call {{(void|ptr)}} @_ZN10NonTrivialC1ERKS_(ptr %[[V2]], ptr %[[V0]])
+// CHECK: call {{(void|ptr)}} @_ZN10NonTrivialC{{1|2}}ERKS_(ptr %[[V2]], ptr %[[V0]])
 // CHECK: invoke void %[[V1]](ptr %[[V2]])
 // CHECK: to label %[[INVOKE_CONT:.*]] unwind label %{{.*}}
 
 // CHECK: [[INVOKE_CONT]]:
-// CHECK-NEXT: call {{(void|ptr)}} @_ZN10NonTrivialD1Ev(ptr %[[V2]])
+// CHECK-NEXT: call {{(void|ptr)}} @_ZN10NonTrivialD{{1|2}}Ev(ptr %[[V2]])
 // CHECK-NEXT: call void @llvm.lifetime.end.p0(i64 8, ptr %[[V2]])
 // CHECK-NEXT: ret void
 

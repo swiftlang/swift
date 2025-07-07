@@ -1114,7 +1114,12 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
   if (!diagnostic)
     return false;
 
-  emitDiagnosticAt(::getLoc(anchor), *diagnostic, fromType, toType);
+  {
+    auto diag =
+        emitDiagnosticAt(::getLoc(anchor), *diagnostic, fromType, toType);
+    (void)tryFixIts(diag);
+  }
+
   emitNotesForMismatches();
   return true;
 }
@@ -2044,11 +2049,24 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
 }
 
 bool RValueTreatedAsLValueFailure::diagnoseAsNote() {
-  auto overload = getCalleeOverloadChoiceIfAvailable(getLocator());
+  auto *locator = getLocator();
+
+  auto overload = getCalleeOverloadChoiceIfAvailable(locator);
   if (!(overload && overload->choice.isDecl()))
     return false;
 
   auto *decl = overload->choice.getDecl();
+
+  if (locator->isLastElement<LocatorPathElt::ArgumentAttribute>()) {
+    auto argConv = locator->findLast<LocatorPathElt::ApplyArgToParam>();
+    if (!argConv)
+      return false;
+
+    emitDiagnosticAt(decl, diag::candidate_expects_inout_argument,
+                     argConv->getParamIdx() + 1);
+    return true;
+  }
+
   emitDiagnosticAt(decl, diag::candidate_is_not_assignable, decl);
   return true;
 }
@@ -3583,7 +3601,8 @@ bool ContextualFailure::tryProtocolConformanceFixIt(
     for (auto protocol : missingProtocols) {
       // Create a fake conformance for this type to the given protocol.
       auto conformance = getASTContext().getNormalConformance(
-          nominal->getSelfInterfaceType(), protocol, SourceLoc(), nominal,
+          nominal->getSelfInterfaceType(), protocol, SourceLoc(),
+          /*inheritedTypeRepr=*/nullptr, nominal,
           ProtocolConformanceState::Incomplete, ProtocolConformanceOptions());
 
       // Resolve the conformance to generate fixits.
@@ -3861,7 +3880,8 @@ bool NonOptionalUnwrapFailure::diagnoseAsError() {
     diagnostic = diag::invalid_force_unwrap;
 
   auto range = getSourceRange();
-  emitDiagnostic(diagnostic, BaseType).highlight(range).fixItRemove(range.End);
+  emitDiagnostic(diagnostic, resolveType(BaseType))
+    .highlight(range).fixItRemove(range.End);
   return true;
 }
 
@@ -3922,14 +3942,14 @@ bool MissingCallFailure::diagnoseAsError() {
 
   if (auto *DRE = getAsExpr<DeclRefExpr>(anchor)) {
     emitDiagnostic(diag::did_not_call_function,
-                   DRE->getDecl()->getBaseIdentifier())
+                   DRE->getDecl()->getBaseName())
         .fixItInsertAfter(insertLoc, "()");
     return true;
   }
 
   if (auto *UDE = getAsExpr<UnresolvedDotExpr>(anchor)) {
     emitDiagnostic(diag::did_not_call_method,
-                   UDE->getName().getBaseIdentifier())
+                   UDE->getName().getBaseName())
         .fixItInsertAfter(insertLoc, "()");
     return true;
   }
@@ -3937,7 +3957,7 @@ bool MissingCallFailure::diagnoseAsError() {
   if (auto *DSCE = getAsExpr<DotSyntaxCallExpr>(anchor)) {
     if (auto *DRE = dyn_cast<DeclRefExpr>(DSCE->getFn())) {
       emitDiagnostic(diag::did_not_call_method,
-                     DRE->getDecl()->getBaseIdentifier())
+                     DRE->getDecl()->getBaseName())
           .fixItInsertAfter(insertLoc, "()");
       return true;
     }
@@ -4114,11 +4134,11 @@ void MissingMemberFailure::diagnoseUnsafeCxxMethod(SourceLoc loc,
                                                           scratch);
     };
 
-    auto returnTypeStr = cast<FuncDecl>(found)
-                             ->getResultInterfaceType()
-                             ->getAnyNominal()
-                             ->getName()
-                             .str();
+    auto returnTy =
+        cast<FuncDecl>(found)->getResultInterfaceType()->getAnyNominal();
+    if (!returnTy)
+      continue;
+    auto returnTypeStr = returnTy->getName().str();
 
     auto methodClangLoc = cxxMethod->getLocation();
     auto methodSwiftLoc =
@@ -6521,7 +6541,7 @@ bool ExtraneousReturnFailure::diagnoseAsError() {
 }
 
 bool NotCompileTimeLiteralFailure::diagnoseAsError() {
-  emitDiagnostic(diag::expect_compile_time_const);
+  emitDiagnostic(diag::expect_compile_time_literal);
   return true;
 }
 

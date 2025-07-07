@@ -240,9 +240,11 @@ extension _SwiftStdlibVersion {
   public static var v6_1_0: Self { Self(_value: 0x060100) }
   @_alwaysEmitIntoClient
   public static var v6_2_0: Self { Self(_value: 0x060200) }
+  @_alwaysEmitIntoClient
+  public static var v6_3_0: Self { Self(_value: 0x060300) }
 
   @available(SwiftStdlib 5.7, *)
-  public static var current: Self { .v6_2_0 }
+  public static var current: Self { .v6_3_0 }
 }
 
 @available(SwiftStdlib 5.7, *)

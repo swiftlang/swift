@@ -245,7 +245,7 @@ public distributed actor MyOtherActor {
 // CHECK-SAME: %swift.context* [[THUNK_CONTEXT_PTR]],
 // CHECK-SAME: i32 [[STR_ARG_SIZE]],
 // CHECK-SAME: i32 [[STR_ARG_VAL]],
-// CHECK_SAME: i32 [[STR_ARG_FLAGS]],
+// CHECK-SAME: i32 [[STR_ARG_FLAGS]],
 // CHECK-SAME: %T27distributed_actor_accessors7MyActorC* [[ACTOR]])
 
 // CHECK-NEXT: [[TASK_REF:%.*]] = extractvalue { i8*, i32, %swift.error* } [[THUNK_RESULT]], 0

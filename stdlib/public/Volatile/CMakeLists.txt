@@ -40,7 +40,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       IS_SDK_OVERLAY IS_FRAGILE
 
       Volatile.swift
-      
+
       SWIFT_COMPILE_FLAGS
         -Xcc -ffreestanding -enable-experimental-feature Embedded
         -parse-stdlib

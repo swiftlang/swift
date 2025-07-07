@@ -60,6 +60,28 @@ namespace {
 
 struct SILMoveOnlyWrappedTypeEliminatorVisitor
     : SILInstructionVisitor<SILMoveOnlyWrappedTypeEliminatorVisitor, bool> {
+
+  // Instructions waiting to be visited.
+  llvm::SmallSetVector<SILInstruction *, 8> &pendingInsts;
+  llvm::SmallVector<SILInstruction *, 8> deferredInsts;
+
+  SILMoveOnlyWrappedTypeEliminatorVisitor(llvm::SmallSetVector<SILInstruction *, 8> &pendingInsts):
+    pendingInsts(pendingInsts)
+  {}
+
+  // If 'user's operand is not yet visited, push it onto the end of
+  // 'pendingInsts' and pretend we didn't see it yet. This is only relevant for
+  // non-address operands in which ownership should be consistent.
+  bool waitFor(SILInstruction *user, SILValue operand) {
+    if (auto *def = operand.getDefiningInstruction()) {
+      if (pendingInsts.contains(def)) {
+        deferredInsts.push_back(user);
+        return false;
+      }
+    }
+    return true;
+  }
+
   bool visitSILInstruction(SILInstruction *inst) {
     llvm::errs() << "Unhandled SIL Instruction: " << *inst;
     llvm_unreachable("error");
@@ -79,6 +101,9 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   }
 
   bool visitStoreInst(StoreInst *si) {
+    if (!waitFor(si, si->getSrc())) {
+      return false;
+    }
     if (!si->getSrc()->getType().isTrivial(*si->getFunction()))
       return false;
     si->setOwnershipQualifier(StoreOwnershipQualifier::Trivial);
@@ -86,6 +111,9 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   }
 
   bool visitStoreBorrowInst(StoreBorrowInst *si) {
+    if (!waitFor(si, si->getSrc())) {
+      return false;
+    }
     if (!si->getSrc()->getType().isTrivial(*si->getFunction()))
       return false;
     SILBuilderWithScope b(si);
@@ -206,6 +234,7 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   NO_UPDATE_NEEDED(BridgeObjectToRef)
   NO_UPDATE_NEEDED(BeginAccess)
   NO_UPDATE_NEEDED(EndAccess)
+  NO_UPDATE_NEEDED(EndCOWMutationAddr)
   NO_UPDATE_NEEDED(ClassMethod)
   NO_UPDATE_NEEDED(FixLifetime)
   NO_UPDATE_NEEDED(AddressToPointer)
@@ -332,6 +361,9 @@ bool SILMoveOnlyWrappedTypeEliminator::process() {
     return true;
   };
 
+  // (1) Check each value's type for the MoveOnly wrapper, (2) strip the wrapper
+  // type, and (3) add all uses to 'touchedInsts' in forward order for
+  // efficiency.
   for (auto &bb : *fn) {
     for (auto *arg : bb.getArguments()) {
       bool relevant = visitValue(arg);
@@ -377,9 +409,18 @@ bool SILMoveOnlyWrappedTypeEliminator::process() {
     madeChange = true;
   }
 
-  SILMoveOnlyWrappedTypeEliminatorVisitor visitor;
-  while (!touchedInsts.empty()) {
-    visitor.visit(touchedInsts.pop_back_val());
+  SILMoveOnlyWrappedTypeEliminatorVisitor visitor{touchedInsts};
+  while(true) {
+    while (!touchedInsts.empty()) {
+      visitor.visit(touchedInsts.pop_back_val());
+    }
+    if (visitor.deferredInsts.empty())
+      break;
+
+    for (auto *inst : visitor.deferredInsts) {
+      touchedInsts.insert(inst);
+    }
+    visitor.deferredInsts.clear();
   }
 
   return madeChange;

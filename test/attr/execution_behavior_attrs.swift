@@ -94,9 +94,7 @@ struct TestAttributeCollisions {
   }
 
   @concurrent func testIsolationAny(arg: @isolated(any) () -> Void) async {}
-  // expected-error@-1 {{cannot use @concurrent on instance method 'testIsolationAny(arg:)' because it has a dynamically isolated parameter: 'arg'}}
   @concurrent subscript(testIsolationAny arg: @isolated(any) () -> Void) -> Int {
-  // expected-error@-1 {{cannot use @concurrent on subscript 'subscript(testIsolationAny:)' because it has a dynamically isolated parameter: 'arg'}}
     get async {}
   }
 
@@ -136,4 +134,35 @@ _ = { @MainActor @concurrent in
 
 _ = { @concurrent () -> Int in
   // expected-error@-1 {{@concurrent on non-async closure}}
+}
+
+// Make sure that explicit use of `@concurrent` doesn't interfere with inference of `throws` from the body.
+do {
+    func acceptsThrowing(_ body: () async throws -> Void) async {
+    }
+
+  struct Invocation {
+    func throwingFn() async throws {
+    }
+  }
+
+  func test(invocation: Invocation) async {
+    await acceptsThrowing({ @concurrent in try await invocation.throwingFn() }) // Ok
+    await acceptsThrowing({ @concurrent [invocation] in try await invocation.throwingFn() }) // Ok
+
+    await acceptsThrowing({ @concurrent in // Ok
+      _ = 42
+      try await invocation.throwingFn()
+    })
+  }
+}
+
+do {
+  nonisolated(nonsending)
+  func testOnDecl(_: @isolated(any) () -> Void) async {} // Ok
+
+  func testOnType1(_: nonisolated(nonsending) @isolated(any) () async -> Void) {}
+  // expected-error@-1 {{cannot use 'nonisolated(nonsending)' together with '@isolated(any)'}}
+  func testOnType2(_: @concurrent @isolated(any) () async -> Void) {}
+  // expected-error@-1 {{cannot use '@concurrent' together with '@isolated(any)'}}
 }

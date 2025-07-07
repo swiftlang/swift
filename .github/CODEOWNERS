@@ -82,11 +82,11 @@
 /include/swift/AST/DiagnosticsClangImporter.def    @zoecarver @egorzhdan @beccadax @ian-twilightcoder @Xazax-hun @j-hui @fahadnayyar @susmonteiro
 /include/swift/AST/DiagnosticsDriver.def           @artemcm
 /include/swift/AST/DiagnosticsFrontend.def         @artemcm @tshortli
-/include/swift/AST/DiagnosticsIDE.def              @ahoppen @bnbarham @hamishknight @rintaro
+/include/swift/AST/DiagnosticsIDE.def              @bnbarham @hamishknight @rintaro
 /include/swift/AST/DiagnosticsIRGen.def            @rjmccall
 /include/swift/AST/DiagnosticsModuleDiffer.def     @nkcsgexi
-/include/swift/AST/DiagnosticsParse.def            @ahoppen @bnbarham @CodaFi @DougGregor @hamishknight @rintaro
-/include/swift/AST/DiagnosticsRefactoring.def      @ahoppen @bnbarham @hamishknight @rintaro
+/include/swift/AST/DiagnosticsParse.def            @bnbarham @CodaFi @DougGregor @hamishknight @rintaro
+/include/swift/AST/DiagnosticsRefactoring.def      @bnbarham @hamishknight @rintaro
 /include/swift/AST/DiagnosticsSIL.def              @jckarter
 /include/swift/AST/Evaluator*                      @CodaFi @slavapestov
 /include/swift/Basic/                              @DougGregor
@@ -95,21 +95,21 @@
 /include/swift/DependencyScan                      @artemcm @cachemeifyoucan
 /include/swift/Driver*/                            @artemcm
 /include/swift/Frontend*/                          @artemcm @tshortli
-/include/swift/IDE/                                @ahoppen @bnbarham @hamishknight @rintaro
+/include/swift/IDE/                                @bnbarham @hamishknight @rintaro
 /include/swift/IRGen/                              @rjmccall
-/include/swift/Index/                              @ahoppen @bnbarham @hamishknight @rintaro
+/include/swift/Index/                              @bnbarham @hamishknight @rintaro
 /include/swift/Markup/                             @nkcsgexi
 /include/swift/Migrator/                           @nkcsgexi
 /include/swift/Option/*Options*                    @tshortli
-/include/swift/Parse/                              @ahoppen @bnbarham @CodaFi @DougGregor @hamishknight @rintaro
+/include/swift/Parse/                              @bnbarham @CodaFi @DougGregor @hamishknight @rintaro
 /include/swift/PrintAsClang                        @zoecarver @egorzhdan @Xazax-hun @j-hui @fahadnayyar @susmonteiro
-/include/swift/Refactoring                         @ahoppen @bnbarham @hamishknight @rintaro
+/include/swift/Refactoring                         @bnbarham @hamishknight @rintaro
 /include/swift/Runtime/                            @rjmccall @compnerd
 /include/swift/SIL/                                @jckarter
-/include/swift/SIL/*Coverage*                      @ahoppen @bnbarham @hamishknight @rintaro
+/include/swift/SIL/*Coverage*                      @bnbarham @hamishknight @rintaro
 /include/swift/SIL/*DebugInfo*                     @adrian-prantl
 /include/swift/SIL/SILDebug*                       @adrian-prantl
-/include/swift/SIL/SILProfiler.h                   @ahoppen @bnbarham @hamishknight @rintaro
+/include/swift/SIL/SILProfiler.h                   @bnbarham @hamishknight @rintaro
 /include/swift/SILOptimizer/                       @eeckstein
 /include/swift/SILOptimizer/Utils/Distributed*     @ktoso
 /include/swift/Sema/                               @hborla @slavapestov @xedin
@@ -134,7 +134,7 @@
 /lib/AST/Evaluator*                                 @CodaFi @slavapestov
 /lib/AST/ModuleLoader.cpp                           @artemcm
 /lib/AST/RequirementMachine/                        @slavapestov
-/lib/ASTGen/                                        @ahoppen @bnbarham @CodaFi @hamishknight @rintaro
+/lib/ASTGen/                                        @bnbarham @CodaFi @hamishknight @rintaro
 /lib/Basic/                                         @DougGregor
 /lib/Basic/Windows                                  @compnerd
 /lib/ClangImporter                                  @zoecarver @egorzhdan @beccadax @ian-twilightcoder @Xazax-hun @j-hui @fahadnayyar @susmonteiro
@@ -146,26 +146,27 @@
 /lib/DriverTool/sil_opt*                            @eeckstein
 /lib/DriverTool/swift_symbolgraph_extract_main.cpp  @QuietMisdreavus
 /lib/Frontend*/                                     @artemcm @tshortli
-/lib/IDE/                                           @ahoppen @bnbarham @hamishknight @rintaro
-/lib/IDETool/                                       @ahoppen @bnbarham @hamishknight @rintaro
+/lib/IDE/                                           @bnbarham @hamishknight @rintaro
+/lib/IDETool/                                       @bnbarham @hamishknight @rintaro
 /lib/IRGen/                                         @rjmccall
-/lib/IRGen/*Coverage*                               @ahoppen @bnbarham @hamishknight @rintaro
+/lib/IRGen/*Coverage*                               @bnbarham @hamishknight @rintaro
 /lib/IRGen/*Debug*                                  @adrian-prantl
 /lib/IRGen/*Distributed*                            @ktoso
-/lib/Index/                                         @ahoppen @bnbarham @hamishknight @rintaro
+/lib/Index/                                         @bnbarham @hamishknight @rintaro
 /lib/Macros/Sources/SwiftMacros/Swiftify*           @hnrklssn @Xazax-hun
 /lib/Markup/                                        @nkcsgexi
 /lib/Migrator/                                      @nkcsgexi
-/lib/Parse/                                         @ahoppen @bnbarham @CodaFi @DougGregor @hamishknight @rintaro
+/lib/Parse/                                         @bnbarham @CodaFi @DougGregor @hamishknight @rintaro
 /lib/PrintAsClang                                   @zoecarver @egorzhdan @Xazax-hun @j-hui @fahadnayyar @susmonteiro
-/lib/Refactoring/                                   @ahoppen @bnbarham @hamishknight @rintaro
+/lib/Refactoring/                                   @bnbarham @hamishknight @rintaro
 /lib/SIL/                                           @jckarter
 /lib/SIL/**/*DebugInfo*                             @adrian-prantl
-/lib/SIL/IR/*Coverage*                              @ahoppen @bnbarham @hamishknight @rintaro
+/lib/SIL/IR/*Coverage*                              @bnbarham @hamishknight @rintaro
 /lib/SIL/IR/SILDebug*                               @adrian-prantl
 /lib/SIL/IR/SILLocation*                            @adrian-prantl
-/lib/SIL/IR/SILProfiler.cpp                         @ahoppen @bnbarham @hamishknight @rintaro
+/lib/SIL/IR/SILProfiler.cpp                         @bnbarham @hamishknight @rintaro
 /lib/SILGen/                                        @jckarter
+/lib/SILGen/*Availability*                          @tshortli
 /lib/SILGen/*Distributed*                           @ktoso
 /lib/SILOptimizer/                                  @eeckstein
 /lib/SILOptimizer/**/*DebugInfo*                    @adrian-prantl
@@ -213,7 +214,8 @@
 
 # test
 /test/*Demangl*/                                    @rjmccall
-/test/ASTGen/                                       @ahoppen @bnbarham @CodaFi @hamishknight @rintaro
+/test/Availability/                                 @tshortli
+/test/ASTGen/                                       @bnbarham @CodaFi @hamishknight @rintaro
 /test/Concurrency/                                  @ktoso
 /test/Constraints/                                  @hborla @xedin
 /test/DebugInfo/                                    @adrian-prantl
@@ -223,14 +225,14 @@
 /test/Frontend/                                     @artemcm @tshortli
 /test/Generics/                                     @hborla @slavapestov
 /test/Generics/inverse*                             @kavon
-/test/IDE/                                          @ahoppen @bnbarham @hamishknight @rintaro
+/test/IDE/                                          @bnbarham @hamishknight @rintaro
 /test/IRGen/                                        @AnthonyLatsis @rjmccall
-/test/Index/                                        @ahoppen @bnbarham @hamishknight @rintaro
+/test/Index/                                        @bnbarham @hamishknight @rintaro
 /test/Interop/                                      @zoecarver @egorzhdan @Xazax-hun @j-hui @fahadnayyar @susmonteiro @hnrklssn
 /test/Macros/SwiftifyImport                         @hnrklssn @Xazax-hun
 /test/Migrator/                                     @nkcsgexi
-/test/Parse/                                        @ahoppen @bnbarham @CodaFi @DougGregor @hamishknight @rintaro
-/test/Profiler                                      @ahoppen @bnbarham @hamishknight @rintaro
+/test/Parse/                                        @bnbarham @CodaFi @DougGregor @hamishknight @rintaro
+/test/Profiler                                      @bnbarham @hamishknight @rintaro
 /test/Reflection/                                   @slavapestov
 /test/Runtime/                                      @rjmccall
 /test/SIL/                                          @jckarter
@@ -242,7 +244,7 @@
 /test/Sema/                                         @hborla @slavapestov @xedin
 /test/Sema/moveonly*                                @kavon
 /test/Serialization/                                @xymus
-/test/SourceKit/                                    @ahoppen @bnbarham @hamishknight @rintaro
+/test/SourceKit/                                    @bnbarham @hamishknight @rintaro
 /test/SymbolGraph/                                  @QuietMisdreavus
 /test/abi/                                          @swiftlang/standard-librarians
 /test/decl/                                         @hborla @slavapestov
@@ -250,7 +252,7 @@
 # FIXME: This file could have a dedicated directory.
 /test/decl/protocol/special/DistributedActor.swift  @ktoso
 /test/expr/                                         @hborla @slavapestov @xedin
-/test/refactoring/                                  @ahoppen @bnbarham @hamishknight @rintaro
+/test/refactoring/                                  @bnbarham @hamishknight @rintaro
 /test/sil*                                          @jckarter
 /test/sil-opt*                                      @eeckstein
 /test/stdlib/                                       @swiftlang/standard-librarians
@@ -260,13 +262,13 @@
 # tools
 # TODO: /tools
 /tools/*reflection/                                 @slavapestov
-/tools/SourceKit                                    @ahoppen @bnbarham @hamishknight @rintaro
+/tools/SourceKit                                    @bnbarham @hamishknight @rintaro
 /tools/driver/                                      @artemcm
 /tools/lldb-moduleimport-test/                      @adrian-prantl
 /tools/swift-demangle*                              @rjmccall
-/tools/swift-ide-test                               @ahoppen @bnbarham @hamishknight @rintaro
+/tools/swift-ide-test                               @bnbarham @hamishknight @rintaro
 /tools/swift-inspect                                @mikeash @al45tair @compnerd
-/tools/swift-refactor                               @ahoppen @bnbarham @hamishknight @rintaro
+/tools/swift-refactor                               @bnbarham @hamishknight @rintaro
 
 # unittests
 /unittests/*Demangl*/                     @rjmccall
@@ -274,11 +276,11 @@
 /unittests/AST/*Evaluator*                @CodaFi @slavapestov
 /unittests/DependencyScan/                @artemcm @cachemeifyoucan
 /unittests/Frontend*/                     @artemcm @tshortli
-/unittests/Parse/                         @ahoppen @bnbarham @CodaFi @DougGregor @hamishknight @rintaro
+/unittests/Parse/                         @bnbarham @CodaFi @DougGregor @hamishknight @rintaro
 /unittests/Reflection/                    @slavapestov
 /unittests/SIL/                           @jckarter
 /unittests/Sema/                          @hborla @xedin
-/unittests/SourceKit/                     @ahoppen @bnbarham @rintaro @hamishknight
+/unittests/SourceKit/                     @bnbarham @rintaro @hamishknight
 /unittests/runtime/                       @rjmccall
 
 # userdocs
@@ -286,17 +288,20 @@
 
 # utils
 /utils/*windows*                                              @compnerd
+/utils/build.ps1                                              @compnerd
 /utils/build_swift/                                           @etcwilde @justice-adams-apple @shahmishal
 /utils/generate-xcode                                         @hamishknight
-/utils/gyb_sourcekit_support/                                 @ahoppen @bnbarham @hamishknight @rintaro
-/utils/sourcekit_fuzzer/                                      @ahoppen @bnbarham @hamishknight @rintaro
+/utils/gyb_sourcekit_support/                                 @bnbarham @hamishknight @rintaro
+/utils/sourcekit_fuzzer/                                      @bnbarham @hamishknight @rintaro
 /utils/swift-xcodegen/                                        @hamishknight
 /utils/swift_build_support/                                   @etcwilde @justice-adams-apple @shahmishal
-/utils/swift_build_support/products/earlyswiftsyntax.py       @ahoppen @bnbarham @hamishknight @rintaro
-/utils/swift_build_support/products/skstresstester.py         @ahoppen @bnbarham @hamishknight @rintaro
-/utils/swift_build_support/products/sourcekitlsp.py           @ahoppen @bnbarham @hamishknight @rintaro
-/utils/swift_build_support/products/swiftformat.py            @ahoppen @allevato @bnbarham @hamishknight @rintaro
-/utils/swift_build_support/products/swiftsyntax.py            @ahoppen @bnbarham @hamishknight @rintaro
+/utils/swift_build_support/products/earlyswiftsyntax.py       @bnbarham @hamishknight @rintaro
+/utils/swift_build_support/products/skstresstester.py         @bnbarham @hamishknight @rintaro
+/utils/swift_build_support/products/sourcekitlsp.py           @bnbarham @hamishknight @rintaro
+/utils/swift_build_support/products/swiftformat.py            @allevato @bnbarham @hamishknight @rintaro
+/utils/swift_build_support/products/swiftsyntax.py            @bnbarham @hamishknight @rintaro
+/utils/swift_build_support/products/wasm*                     @bnbarham @MaxDesiatov @kateinoigakukun
+/utils/swift_build_support/products/wasi*                     @bnbarham @MaxDesiatov @kateinoigakukun
 /utils/update-checkout*                                       @etcwilde @justice-adams-apple @shahmishal
 /utils/update_checkout/                                       @etcwilde @justice-adams-apple @shahmishal
 /utils/update_checkout/update-checkout-config.json            @shahmishal
@@ -304,9 +309,9 @@
 
 # validation-test
 /validation-test/Driver/                  @artemcm
-/validation-test/IDE/                     @ahoppen @bnbarham @rintaro @hamishknight
+/validation-test/IDE/                     @bnbarham @rintaro @hamishknight
 /validation-test/IRGen/                   @rjmccall
-/validation-test/Parse/                   @ahoppen @bnbarham @CodaFi @DougGregor @hamishknight @rintaro
+/validation-test/Parse/                   @bnbarham @CodaFi @DougGregor @hamishknight @rintaro
 /validation-test/Reflection/              @slavapestov
 /validation-test/Runtime/                 @rjmccall
 /validation-test/SIL/                     @jckarter

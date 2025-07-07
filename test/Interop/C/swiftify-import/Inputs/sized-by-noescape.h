@@ -1,6 +1,10 @@
 #pragma once
 
+#include <stdint.h>
+
+#ifndef __sized_by
 #define __sized_by(x) __attribute__((__sized_by__(x)))
+#endif
 #define __noescape __attribute__((noescape))
 
 void simple(int len, const void * __sized_by(len) __noescape p);
@@ -23,3 +27,8 @@ const void * __sized_by(len) __noescape _Nonnull returnPointer(int len);
 typedef struct foo opaque_t;
 void opaque(int len, opaque_t * __sized_by(len) __noescape p);
 
+void bytesized(int size, const uint8_t *__sized_by(size) __noescape);
+
+void charsized(char *__sized_by(size) __noescape, int size);
+
+void doublebytesized(uint16_t *__sized_by(size) __noescape, int size);

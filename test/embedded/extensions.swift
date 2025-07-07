@@ -19,6 +19,6 @@ struct MyStruct {}
 
 extension MyStruct: MyProtocol {}
 
-// CHECK: define {{.*}}i32 @main(i32 %0, ptr %1)
+// CHECK: define {{.*}}i32 @{{_*}}main{{.*}}(i32 %0, ptr %1)
 // CHECK-NOT: MyStruct
 // CHECK-NOT: MyProtocol

@@ -1763,7 +1763,8 @@ swift_task_addCancellationHandlerImpl(
     void *context) {
   void *allocation =
       swift_task_alloc(sizeof(CancellationNotificationStatusRecord));
-  auto unsigned_handler = swift_auth_code(handler, 3848);
+  auto unsigned_handler = swift_auth_code(handler,
+      SpecialPointerAuthDiscriminators::CancellationNotificationFunction);
   auto *record = ::new (allocation)
       CancellationNotificationStatusRecord(unsigned_handler, context);
 
@@ -1817,7 +1818,8 @@ swift_task_addPriorityEscalationHandlerImpl(
     void *context) {
   void *allocation =
       swift_task_alloc(sizeof(EscalationNotificationStatusRecord));
-  auto unsigned_handler = swift_auth_code(handler, 11839);
+  auto unsigned_handler = swift_auth_code(handler,
+      SpecialPointerAuthDiscriminators::EscalationNotificationFunction);
   auto *record = ::new (allocation)
       EscalationNotificationStatusRecord(unsigned_handler, context);
 

@@ -256,8 +256,6 @@ void swift::runJobInEstablishedExecutorContext(Job *job) {
 #if SWIFT_OBJC_INTEROP
   objc_autoreleasePoolPop(pool);
 #endif
-
-  _swift_tsan_release(job);
 }
 
 void swift::adoptTaskVoucher(AsyncTask *task) {
@@ -2576,7 +2574,7 @@ static void swift_task_deinitOnExecutorImpl(void *object,
                                             SerialExecutorRef newExecutor,
                                             size_t rawFlags) {
   // Sign the function pointer
-  work = swift_auth_code_function(
+  work = swift_auth_code(
       work, SpecialPointerAuthDiscriminators::DeinitWorkFunction);
   // If the current executor is compatible with running the new executor,
   // we can just immediately continue running with the resume function

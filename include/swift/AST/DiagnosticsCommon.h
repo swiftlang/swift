@@ -55,6 +55,7 @@ namespace swift {
   } // end namespace detail
 
   enum class StaticSpellingKind : uint8_t;
+  enum class ForeignLanguage : uint8_t;
 
   namespace diag {
 

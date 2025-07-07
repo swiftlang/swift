@@ -254,36 +254,40 @@ void ConstraintGraphNode::truncateEquivalenceClass(unsigned prevSize) {
 void ConstraintGraphNode::addReferencedVar(TypeVariableType *typeVar) {
   bool inserted = References.insert(typeVar);
   if (!inserted) {
-    llvm::errs() << "$T" << TypeVar->getImpl().getID() << " already "
-                 << "references $T" << typeVar->getImpl().getID() << "\n";
-    abort();
+    ABORT([&](auto &out) {
+      out << "$T" << TypeVar->getImpl().getID() << " already "
+          << "references $T" << typeVar->getImpl().getID();
+    });
   }
 }
 
 void ConstraintGraphNode::addReferencedBy(TypeVariableType *typeVar) {
   bool inserted = ReferencedBy.insert(typeVar);
   if (!inserted) {
-    llvm::errs() << "$T" << TypeVar->getImpl().getID() << " already "
-                 << "referenced by $T" << typeVar->getImpl().getID() << "\n";
-    abort();
+    ABORT([&](auto &out) {
+      out << "$T" << TypeVar->getImpl().getID() << " already "
+          << "referenced by $T" << typeVar->getImpl().getID();
+    });
   }
 }
 
 void ConstraintGraphNode::removeReference(TypeVariableType *typeVar) {
   auto removed = References.remove(typeVar);
   if (!removed) {
-    llvm::errs() << "$T" << TypeVar->getImpl().getID() << " does not "
-                 << "reference $T" << typeVar->getImpl().getID() << "\n";
-    abort();
+    ABORT([&](auto &out) {
+      out << "$T" << TypeVar->getImpl().getID() << " does not "
+          << "reference $T" << typeVar->getImpl().getID();
+    });
   }
 }
 
 void ConstraintGraphNode::removeReferencedBy(TypeVariableType *typeVar) {
   auto removed = ReferencedBy.remove(typeVar);
   if (!removed) {
-    llvm::errs() << "$T" << TypeVar->getImpl().getID() << " not "
-                 << "referenced by $T" << typeVar->getImpl().getID() << "\n";
-    abort();
+    ABORT([&](auto &out) {
+      out << "$T" << TypeVar->getImpl().getID() << " not "
+          << "referenced by $T" << typeVar->getImpl().getID();
+    });
   }
 }
 
@@ -983,7 +987,7 @@ void ConstraintGraph::incrementConstraintsPerContractionCounter() {
 #pragma mark Debugging output
 
 void ConstraintGraphNode::print(llvm::raw_ostream &out, unsigned indent,
-                                PrintOptions PO) const {
+                                const PrintOptions &PO) const {
   out.indent(indent);
   Type(TypeVar).print(out, PO);
   out << ":\n";

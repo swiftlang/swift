@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -1720,7 +1720,8 @@ namespace {
     /// Prints a type as a field. If writing a parsable output format, the
     /// `PrintOptions` are ignored and the type is written as a USR; otherwise,
     /// the type is stringified using the `PrintOptions`.
-    void printTypeField(Type Ty, Label label, PrintOptions opts = PrintOptions(),
+    void printTypeField(Type Ty, Label label,
+                        const PrintOptions &opts = PrintOptions(),
                         TerminalColor Color = TypeColor) {
       if (Writer.isParsable()) {
         printField(typeUSR(Ty), label, Color);
@@ -2112,6 +2113,11 @@ namespace {
 
       printImportPath(ID, Label::always("module"));
       printFoot();
+    }
+
+    void visitUsingDecl(UsingDecl *UD, Label label) {
+      printCommon(UD, "using_decl", label);
+      printFieldQuoted(UD->getSpecifierName(), Label::always("specifier"));
     }
 
     void visitExtensionDecl(ExtensionDecl *ED, Label label) {
@@ -4976,7 +4982,6 @@ public:
   TRIVIAL_ATTR_PRINTER(ImplicitSelfCapture, implicit_self_capture)
   TRIVIAL_ATTR_PRINTER(Indirect, indirect)
   TRIVIAL_ATTR_PRINTER(Infix, infix)
-  TRIVIAL_ATTR_PRINTER(InheritActorContext, inherit_actor_context)
   TRIVIAL_ATTR_PRINTER(InheritsConvenienceInitializers,
                        inherits_convenience_initializers)
   TRIVIAL_ATTR_PRINTER(Inlinable, inlinable)
@@ -5301,6 +5306,12 @@ public:
     printFlag(Attr->isNonSending(), "nonsending");
     printFoot();
   }
+  void visitInheritActorContextAttr(InheritActorContextAttr *Attr,
+                                    Label label) {
+    printCommon(Attr, "inherit_actor_context_attr", label);
+    printFlag(Attr->isAlways(), "always");
+    printFoot();
+  }
   void visitObjCAttr(ObjCAttr *Attr, Label label) {
     printCommon(Attr, "objc_attr", label);
     if (Attr->hasName())
@@ -5425,7 +5436,16 @@ public:
     printFoot();
   }
   void visitSpecializeAttr(SpecializeAttr *Attr, Label label) {
-    printCommon(Attr, "specialize_attr", label);
+    visitAbstractSpecializeAttr(Attr, label);
+  }
+
+  void visitSpecializedAttr(SpecializedAttr *Attr, Label label) {
+    visitAbstractSpecializeAttr(Attr, label);
+  }
+
+  void visitAbstractSpecializeAttr(AbstractSpecializeAttr *Attr, Label label) {
+    printCommon(Attr, Attr->isPublic() ? "specialized_attr" :
+                  "specialize_attr", label);
     printFlag(Attr->isExported(), "exported");
     printFlag(Attr->isFullSpecialization(), "full");
     printFlag(Attr->isPartialSpecialization(), "partial");
@@ -6728,7 +6748,7 @@ void GenericEnvironment::dump() const {
 
 StringRef swift::getAccessorKindString(AccessorKind value) {
   switch (value) {
-#define ACCESSOR(ID)
+#define ACCESSOR(ID, KEYWORD)
 #define SINGLETON_ACCESSOR(ID, KEYWORD) \
   case AccessorKind::ID: return #KEYWORD;
 #include "swift/AST/AccessorKinds.def"
