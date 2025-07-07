@@ -23,6 +23,9 @@
 #include "llvm/Support/VersionTuple.h"
 
 namespace swift {
+class ASTContext;
+class FuncDecl;
+
 /// Represents the information needed to evaluate an `#if available` query
 /// (either at runtime or compile-time).
 class AvailabilityQuery final {
@@ -121,6 +124,14 @@ public:
       return std::nullopt;
     return variantRange->getRawMinimumVersion();
   }
+
+  /// Returns the `FuncDecl *` that should be invoked at runtime to evaluate
+  /// the query, and populates `arguments` with the arguments to invoke it with
+  /// (the integer components of the version tuples that are being tested). If
+  /// the query does not have a dynamic result, returns `nullptr`.
+  FuncDecl *
+  getDynamicQueryDeclAndArguments(llvm::SmallVectorImpl<unsigned> &arguments,
+                                  ASTContext &ctx) const;
 };
 
 } // end namespace swift
