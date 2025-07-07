@@ -84,3 +84,10 @@ do {
   nonisolated(0) // expected-warning {{result of call to 'nonisolated' is unused}}
   print("hello")
 }
+
+do {
+  func testActorInheriting1(@_inheritActorContext _: @concurrent @Sendable () async -> Void) {}
+  // expected-error@-1 {{'@_inheritActorContext' attribute cannot be used together with '@concurrent'}}
+  func testActorInheriting2(@_inheritActorContext _: nonisolated(nonsending) @Sendable () async -> Void) {}
+  // expected-error@-1 {{'@_inheritActorContext' attribute cannot be used together with 'nonisolated(nonsending)'}}
+}
