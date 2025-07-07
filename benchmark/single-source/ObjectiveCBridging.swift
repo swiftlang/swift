@@ -97,6 +97,9 @@ public let benchmarks = [
   BenchmarkInfo(name: "NSArray.bridged.repeatedBufferAccess",
                   runFunction: run_BridgedNSArrayRepeatedBufferAccess, tags: t,
                   setUpFunction: setup_bridgedArrays),
+  BenchmarkInfo(name: "NSDictionary.bridged.enumerate",
+                  runFunction: run_BridgedNSDictionaryEnumerate, tags: t,
+                  setUpFunction: setup_bridgedDictionaries),
   BenchmarkInfo(name: "NSString.bridged.byteCount.ascii.ascii",
                   runFunction: run_BridgedNSStringLengthASCII_ASCII, tags: ts,
                   setUpFunction: setup_bridgedStrings),
@@ -812,6 +815,7 @@ public func run_UnicodeStringFromCodable(_ n: Int) {
 
 #if _runtime(_ObjC)
 var bridgedArray:NSArray! = nil
+var bridgedDictionaryOfNumbersToNumbers:NSDictionary! = nil
 var bridgedArrayMutableCopy:NSMutableArray! = nil
 var nsArray:NSArray! = nil
 var nsArrayMutableCopy:NSMutableArray! = nil
@@ -824,9 +828,18 @@ public func setup_bridgedArrays() {
   var arr = Array(repeating: NSObject(), count: 100) as [AnyObject]
   bridgedArray = arr as NSArray
   bridgedArrayMutableCopy = (bridgedArray.mutableCopy() as! NSMutableArray)
+
   nsArray = NSArray(objects: &arr, count: 100)
   nsArrayMutableCopy = (nsArray.mutableCopy() as! NSMutableArray)
   #endif
+}
+
+public func setup_bridgedDictionaries() {
+  var numDict = Dictionary<Int, Int>()
+  for i in 0 ..< 100 {
+    numDict[i] = i
+  }
+  bridgedDictionaryOfNumbersToNumbers = numDict as NSDictionary
 }
 
 public func setup_bridgedStrings() {
@@ -845,6 +858,23 @@ public func run_BridgedNSArrayObjectAtIndex(_ n: Int) {
     for i in 0..<100 {
       blackHole(bridgedArray[i])
     }
+  }
+  #endif
+}
+
+private func dictionaryApplier(
+  _ keyPtr: UnsafeRawPointer?,
+  _ valuePtr :UnsafeRawPointer?,
+  _ contextPtr: UnsafeMutableRawPointer?
+) -> Void {}
+
+@inline(never)
+public func run_BridgedNSDictionaryEnumerate(_ n: Int) {
+  #if _runtime(_ObjC)
+  let cf = bridgedDictionaryOfNumbersToNumbers as CFDictionary
+  for _ in 0 ..< n * 50 {
+    // Use CF to prevent Swift from providing an override, forcing going through ObjC bridging
+    CFDictionaryApplyFunction(cf, dictionaryApplier, nil)
   }
   #endif
 }
