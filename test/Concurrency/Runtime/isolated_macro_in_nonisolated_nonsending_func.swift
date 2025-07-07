@@ -56,7 +56,7 @@ nonisolated(nonsending) func nonisolatedNonsending() async {
   MainActor.assertIsolated()
 
   let outerIsolation = #isolation
-  print("outerIsolation = #isolation = \(String(describing: outerIsolation))") // WRONG; this is nil today
+  print("outerIsolation = #isolation = \(String(describing: outerIsolation))")
 
   await Task {
     let iso = #isolation
