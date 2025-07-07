@@ -287,3 +287,13 @@ func testSpanMayThrow(buffer: inout [Int]) {
   let bufferSpan = buffer.mutableSpan
   try! mutableSpanMayThrow(bufferSpan)
 }
+
+// =============================================================================
+// inout
+// =============================================================================
+
+@available(Span 0.1, *)
+func inoutToImmortal(_ s: inout RawSpan) {
+  let tmp = RawSpan(_unsafeBytes: UnsafeRawBufferPointer(start: nil, count: 0))
+  s = _overrideLifetime(tmp, borrowing: ())
+}
