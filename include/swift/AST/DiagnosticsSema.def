@@ -8612,6 +8612,14 @@ ERROR(inherit_actor_context_only_on_async_or_isolation_erased_params,none,
       "asynchronous function types",
       (DeclAttribute))
 
+ERROR(inherit_actor_context_with_concurrent,none,
+      "'@_inheritActorContext' attribute cannot be used together with %0",
+      (const TypeAttribute *))
+
+ERROR(inherit_actor_context_with_nonisolated_nonsending,none,
+      "'@_inheritActorContext' attribute cannot be used together with %0",
+      (TypeRepr *))
+
 //===----------------------------------------------------------------------===//
 // MARK: @concurrent and nonisolated(nonsending) attributes
 //===----------------------------------------------------------------------===//

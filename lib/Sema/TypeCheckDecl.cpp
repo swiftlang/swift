@@ -2339,6 +2339,9 @@ static Type validateParameterType(ParamDecl *decl) {
   if (dc->isInSpecializeExtensionContext())
     options |= TypeResolutionFlags::AllowUsableFromInline;
 
+  if (decl->getAttrs().hasAttribute<InheritActorContextAttr>())
+    options |= TypeResolutionFlags::InheritsActorContext;
+
   Type Ty;
 
   auto *nestedRepr = decl->getTypeRepr();

@@ -7815,6 +7815,9 @@ void AttributeChecker::visitInheritActorContextAttr(
     return;
 
   auto paramTy = P->getInterfaceType();
+  if (paramTy->hasError())
+    return;
+
   auto *funcTy =
       paramTy->lookThroughAllOptionalTypes()->getAs<AnyFunctionType>();
   if (!funcTy) {
