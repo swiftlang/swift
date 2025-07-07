@@ -862,6 +862,12 @@ public:
   /// Retrieve the dependencies for a Clang module.
   const ClangModuleDependencyStorage *getAsClangModule() const;
 
+  /// Get the path to the module-defining file:
+  /// `SwiftInterface`: Textual Interface path
+  /// `SwiftBinary`: Binary module path
+  /// `Clang`: Module map path
+  std::string getModuleDefiningPath() const;
+
   /// Add a dependency on the given module, if it was not already in the set.
   void
   addOptionalModuleImport(StringRef module, bool isExported,

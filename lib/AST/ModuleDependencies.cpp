@@ -88,6 +88,30 @@ ModuleDependencyInfo::getAsClangModule() const {
   return dyn_cast<ClangModuleDependencyStorage>(storage.get());
 }
 
+std::string ModuleDependencyInfo::getModuleDefiningPath() const {
+  std::string path = "";
+  switch (getKind()) {
+  case swift::ModuleDependencyKind::SwiftInterface:
+    path = getAsSwiftInterfaceModule()->swiftInterfaceFile;
+    break;
+  case swift::ModuleDependencyKind::SwiftBinary:
+    path = getAsSwiftBinaryModule()->compiledModulePath;
+    break;
+  case swift::ModuleDependencyKind::Clang:
+    path = getAsClangModule()->moduleMapFile;
+    break;
+  case swift::ModuleDependencyKind::SwiftSource:
+    path = getAsSwiftSourceModule()->sourceFiles.front();
+    break;
+  default:
+    llvm_unreachable("Unexpected dependency kind");
+  }
+
+  // Relative to the `module.modulemap` or `.swiftinterface` or `.swiftmodule`,
+  // the defininig path is the parent directory of the file.
+  return llvm::sys::path::parent_path(path).str();
+}
+
 void ModuleDependencyInfo::addTestableImport(ImportPath::Module module) {
   assert(getAsSwiftSourceModule() && "Expected source module for addTestableImport.");
   dyn_cast<SwiftSourceModuleDependenciesStorage>(storage.get())->addTestableImport(module);
