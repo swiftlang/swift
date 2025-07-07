@@ -2004,3 +2004,20 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
                        newValue.forward(*this), initFRef, setterFRef,
                        AssignOrInitInst::Unknown);
 }
+
+SILGenFunction::VarLoc::AddressableBuffer *
+SILGenFunction::getAddressableBufferInfo(ValueDecl *vd) {
+  do {
+    auto found = VarLocs.find(vd);
+    if (found == VarLocs.end()) {
+      return nullptr;
+    }
+
+    if (auto orig = found->second.addressableBuffer.stateOrAlias
+                      .dyn_cast<VarDecl*>()) {
+      vd = orig;
+      continue;
+    }
+    return &found->second.addressableBuffer;
+  } while (true);
+}
