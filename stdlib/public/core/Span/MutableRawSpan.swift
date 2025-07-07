@@ -27,6 +27,7 @@ public struct MutableRawSpan: ~Copyable & ~Escapable {
   @usableFromInline
   internal let _count: Int
 
+  @unsafe
   @_alwaysEmitIntoClient
   internal func _start() -> UnsafeMutableRawPointer {
     unsafe _pointer._unsafelyUnwrappedUnchecked
@@ -171,8 +172,8 @@ extension RawSpan {
   @_alwaysEmitIntoClient
   @lifetime(borrow mutableRawSpan)
   public init(_mutableRawSpan mutableRawSpan: borrowing MutableRawSpan) {
-    let (start, count) = (mutableRawSpan._start(), mutableRawSpan._count)
-    let span = unsafe RawSpan(_unsafeStart: start, byteCount: count)
+    let (start, count) = unsafe (mutableRawSpan._pointer, mutableRawSpan._count)
+    let span = unsafe RawSpan(_unchecked: start, byteCount: count)
     self = unsafe _overrideLifetime(span, borrowing: mutableRawSpan)
   }
 }
@@ -432,6 +433,10 @@ extension MutableRawSpan {
   public mutating func update(
     fromContentsOf source: RawSpan
   ) -> Int {
+    _precondition(
+      source.byteCount <= self.byteCount,
+      "destination span cannot contain every byte from source."
+    )
     if source.byteCount == 0 { return 0 }
     unsafe source.withUnsafeBytes {
       unsafe _start().copyMemory(from: $0.baseAddress!, byteCount: $0.count)
@@ -560,7 +565,7 @@ extension MutableRawSpan {
   @_alwaysEmitIntoClient
   @lifetime(&self)
   mutating public func extracting(_: UnboundedRange) -> Self {
-    let newSpan = unsafe Self(_unchecked: _start(), byteCount: _count)
+    let newSpan = unsafe Self(_unchecked: _pointer, byteCount: _count)
     return unsafe _overrideLifetime(newSpan, mutating: &self)
   }
 }
