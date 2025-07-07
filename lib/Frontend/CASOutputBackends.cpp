@@ -22,6 +22,7 @@
 #include "llvm/CAS/HierarchicalTreeBuilder.h"
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/Mutex.h"
 #include <optional>
 
 #define DEBUG_TYPE "swift-cas-backend"
@@ -112,6 +113,9 @@ public:
   Error storeImpl(StringRef Path, StringRef Bytes, unsigned InputIndex,
                   file_types::ID OutputKind);
 
+  // Return true if all the outputs are produced for the given index.
+  bool addProducedOutput(unsigned InputIndex, file_types::ID OutputKind,
+                         ObjectRef BytesRef);
   Error finalizeCacheKeysFor(unsigned InputIndex);
 
 private:
@@ -122,6 +126,9 @@ private:
   const FrontendInputsAndOutputs &InputsAndOutputs;
   const FrontendOptions &Opts;
   FrontendOptions::ActionType Action;
+
+  // Lock for updating output file status.
+  llvm::sys::SmartMutex<true> OutputLock;
 
   // Map from output path to the input index and output kind.
   StringMap<std::pair<unsigned, file_types::ID>> OutputToInputMap;
@@ -197,8 +204,10 @@ Error SwiftCASOutputBackend::storeMCCASObjectID(StringRef OutputFilename,
     return createStringError("Invalid CASID: " + ID.toString() +
                              ". No associated ObjectRef found!");
 
-  Impl.OutputRefs[InputIndex].insert({file_types::TY_Object, *MCRef});
-  return Impl.finalizeCacheKeysFor(InputIndex);
+  if (Impl.addProducedOutput(InputIndex, file_types::TY_Object, *MCRef))
+    return Impl.finalizeCacheKeysFor(InputIndex);
+
+  return Error::success();
 }
 
 void SwiftCASOutputBackend::Implementation::initBackend(
@@ -249,22 +258,28 @@ Error SwiftCASOutputBackend::Implementation::storeImpl(
                           << "\' for input \'" << InputIndex << "\': \'"
                           << CAS.getID(*BytesRef).toString() << "\'\n";);
 
-  OutputRefs[InputIndex].insert({OutputKind, *BytesRef});
+  if (addProducedOutput(InputIndex, OutputKind, *BytesRef))
+    return finalizeCacheKeysFor(InputIndex);
+  return Error::success();
+}
 
-  return finalizeCacheKeysFor(InputIndex);
+bool SwiftCASOutputBackend::Implementation::addProducedOutput(
+    unsigned InputIndex, file_types::ID OutputKind,
+    ObjectRef BytesRef) {
+  llvm::sys::SmartScopedLock<true> LockOutput(OutputLock);
+  auto &ProducedOutputs = OutputRefs[InputIndex];
+  ProducedOutputs.insert({OutputKind, BytesRef});
+
+  return llvm::all_of(OutputToInputMap, [&](auto &E) {
+    return (E.second.first != InputIndex ||
+            ProducedOutputs.count(E.second.second));
+  });
 }
 
 Error SwiftCASOutputBackend::Implementation::finalizeCacheKeysFor(
     unsigned InputIndex) {
-  auto ProducedOutputs = OutputRefs[InputIndex];
+  const auto &ProducedOutputs = OutputRefs[InputIndex];
   assert(!ProducedOutputs.empty() && "Expect outputs for this input");
-
-  // If not all outputs for the input are emitted, return.
-  if (!llvm::all_of(OutputToInputMap, [&](auto &E) {
-        return (E.second.first != InputIndex ||
-                ProducedOutputs.count(E.second.second));
-      }))
-    return Error::success();
 
   std::vector<std::pair<file_types::ID, ObjectRef>> OutputsForInput;
   llvm::for_each(ProducedOutputs, [&OutputsForInput](auto E) {
