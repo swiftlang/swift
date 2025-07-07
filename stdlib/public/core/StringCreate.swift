@@ -316,6 +316,8 @@ extension String {
         unsafe String._uncheckedFromUTF8($0)
       }
 #if os(watchOS) && _pointerBitWidth(_32)
+      // Required for compatibility with some small strings that
+      // may be encoded in the 32-bit slice of watchOS binaries.
       if str._wholeGuts.isSmall,
          str._wholeGuts.count > _SmallString.contiguousCapacity() {
         new.reserveCapacity(_SmallString.capacity + 1)
