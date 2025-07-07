@@ -8591,9 +8591,9 @@ GROUPED_ERROR(isolated_conformance_wrong_domain,IsolatedConformances,none,
 GROUPED_WARNING(isolated_conformance_will_become_nonisolated,IsolatedConformances,none,
       "conformance of %0 to %1 should be marked 'nonisolated' to retain its behavior with upcoming feature 'InferIsolatedConformances'",
       (const ValueDecl *, const ValueDecl *))
-GROUPED_WARNING(isolated_conformance_to_sendable_metatype,IsolatedConformances,none,
-    "%0 conformance of %1 to SendableMetatype-inheriting %kind2 can never "
-    "be used with generic code", (ActorIsolation, Type, const ValueDecl *))
+GROUPED_ERROR(isolated_conformance_to_sendable_metatype,IsolatedConformances,none,
+    "cannot form %0 conformance of %1 to SendableMetatype-inheriting %kind2",
+    (ActorIsolation, Type, const ValueDecl *))
 
 //===----------------------------------------------------------------------===//
 // MARK: @_inheritActorContext

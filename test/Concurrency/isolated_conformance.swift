@@ -151,7 +151,7 @@ protocol R: SendableMetatype {
   func f()
 }
 
-// expected-warning@+1{{main actor-isolated conformance of 'RSendableSMainActor' to SendableMetatype-inheriting protocol 'R' can never be used with generic code}}
+// expected-error@+1{{cannot form main actor-isolated conformance of 'RSendableSMainActor' to SendableMetatype-inheriting protocol 'R'}}
 @MainActor struct RSendableSMainActor: @MainActor R {
   func f() { }
 }
