@@ -5129,8 +5129,8 @@ void AttributeChecker::checkBackDeployedAttrs(
   std::map<PlatformKind, SourceLoc> seenPlatforms;
 
   const BackDeployedAttr *ActiveAttr = nullptr;
-  if (D->getBackDeployedBeforeOSVersion(Ctx))
-    ActiveAttr = D->getAttrs().getBackDeployed(Ctx, false);
+  if (auto AttrAndRange = D->getBackDeployedAttrAndRange(Ctx))
+    ActiveAttr = AttrAndRange->first;
 
   for (auto *Attr : Attrs) {
     // Back deployment only makes sense for public declarations.
@@ -5221,7 +5221,7 @@ void AttributeChecker::checkBackDeployedAttrs(
         D->getLoc(), D->getInnermostDeclContext());
 
     // Unavailable decls cannot be back deployed.
-    auto backDeployedDomain = AvailabilityDomain::forPlatform(Attr->Platform);
+    auto backDeployedDomain = Attr->getAvailabilityDomain();
     if (availability.containsUnavailableDomain(backDeployedDomain)) {
       auto domainForDiagnostics = backDeployedDomain;
       llvm::VersionTuple ignoredVersion;
@@ -5254,7 +5254,7 @@ void AttributeChecker::checkBackDeployedAttrs(
     // fallback could never be executed at runtime.
     if (auto availableRangeAttrPair =
             getSemanticAvailableRangeDeclAndAttr(VD)) {
-      auto beforeDomain = AvailabilityDomain::forPlatform(Attr->Platform);
+      auto beforeDomain = Attr->getAvailabilityDomain();
       auto beforeVersion = Attr->Version;
       auto availableAttr = availableRangeAttrPair.value().first;
       auto introVersion = availableAttr.getIntroduced().value();
