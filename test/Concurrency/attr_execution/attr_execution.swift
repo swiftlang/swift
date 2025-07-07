@@ -80,3 +80,16 @@ func testClosure() {
   takesClosure {
   }
 }
+
+// CHECK-LABEL: // testInheritsActor(fn:)
+// CHECK: Isolation: global_actor. type: MainActor
+// CHECK: sil hidden [ossa] @$s14attr_execution17testInheritsActor2fnyyyYaYbXE_tYaF : $@convention(thin) @async (@guaranteed @noescape @Sendable @async @callee_guaranteed () -> ()) -> ()
+// CHECK: bb0([[FN:%.*]] : @guaranteed $@noescape @Sendable @async @callee_guaranteed () -> ()):
+// CHECK:  [[FN_COPY:%.*]] = copy_value [[FN]]
+// CHECK:  [[BORROWED_FN_COPY:%.*]] = begin_borrow [[FN_COPY]]
+// CHECK:  apply [[BORROWED_FN_COPY]]() : $@noescape @Sendable @async @callee_guaranteed () -> ()
+// CHECK: } // end sil function '$s14attr_execution17testInheritsActor2fnyyyYaYbXE_tYaF'
+@MainActor
+func testInheritsActor(@_inheritActorContext(always) fn: @Sendable () async -> Void) async {
+  await fn()
+}
