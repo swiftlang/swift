@@ -124,6 +124,10 @@ struct ScannerImportStatementInfo {
     uint32_t columnNumber;
   };
 
+  ScannerImportStatementInfo(std::string importIdentifier)
+      : importIdentifier(importIdentifier), importLocations(),
+        isExported(false), accessLevel(AccessLevel::Public) {}
+
   ScannerImportStatementInfo(std::string importIdentifier, bool isExported,
                              AccessLevel accessLevel)
       : importIdentifier(importIdentifier), importLocations(),
