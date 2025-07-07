@@ -2526,6 +2526,12 @@ function Build-Foundation {
     @()
   }
 
+  $DispatchCMakeModules = if ($Static) {
+    Get-ProjectCMakeModules $Platform ExperimentalDispatch
+  } else {
+    Get-ProjectCMakeModules $Platform Dispatch
+  }
+
   Build-CMakeProject `
     -Src $SourceCache\swift-corelibs-foundation `
     -Bin $FoundationBinaryCache `
@@ -2549,7 +2555,7 @@ function Build-Foundation {
         "$BinaryCache\$($Platform.Triple)\usr\lib\libz.a"
       };
       ZLIB_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
-      dispatch_DIR = (Get-ProjectCMakeModules $Platform Dispatch);
+      dispatch_DIR = $DispatchCMakeModules;
       SwiftSyntax_DIR = (Get-ProjectBinaryCache $HostPlatform Compilers);
       _SwiftFoundation_SourceDIR = "$SourceCache\swift-foundation";
       _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
