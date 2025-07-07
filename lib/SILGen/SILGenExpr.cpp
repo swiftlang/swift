@@ -7299,6 +7299,18 @@ RValue RValueEmitter::visitCurrentContextIsolationExpr(
     dyn_cast_or_null<AbstractFunctionDecl>(SGF.F.getDeclRef().getDecl());
   if (afd) {
     auto isolation = getActorIsolation(afd);
+    auto ctor = dyn_cast_or_null<ConstructorDecl>(afd);
+    if (ctor && ctor->isDesignatedInit() &&
+        isolation == ActorIsolation::ActorInstance &&
+        isolation.getActorInstance() == ctor->getImplicitSelfDecl()) {
+      // If we are in an actor initializer that is isolated to self, the
+      // current isolation is flow-sensitive; use that instead of the
+      // synthesized expression.
+      auto isolationValue =
+        SGF.emitFlowSensitiveSelfIsolation(E, isolation);
+      return RValue(SGF, E, isolationValue);
+    }
+
     if (isolation == ActorIsolation::CallerIsolationInheriting) {
       auto *isolatedArg = SGF.F.maybeGetIsolatedArgument();
       assert(isolatedArg &&
@@ -7310,18 +7322,6 @@ RValue RValueEmitter::visitCurrentContextIsolationExpr(
         isolatedMV = ManagedValue::forUnmanagedOwnedValue(isolatedArg);
       }
       return RValue(SGF, E, isolatedMV);
-    }
-
-    auto ctor = dyn_cast_or_null<ConstructorDecl>(afd);
-    if (ctor && ctor->isDesignatedInit() &&
-        isolation == ActorIsolation::ActorInstance &&
-        isolation.getActorInstance() == ctor->getImplicitSelfDecl()) {
-      // If we are in an actor initializer that is isolated to self, the
-      // current isolation is flow-sensitive; use that instead of the
-      // synthesized expression.
-      auto isolationValue =
-        SGF.emitFlowSensitiveSelfIsolation(E, isolation);
-      return RValue(SGF, E, isolationValue);
     }
   }
 
