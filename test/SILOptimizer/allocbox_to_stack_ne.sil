@@ -1,4 +1,5 @@
 // RUN: %target-sil-opt -enable-experimental-feature LifetimeDependence -allocbox-to-stack %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-experimental-feature LifetimeDependence -legacy-allocbox-to-stack %s | %FileCheck %s
 
 // REQUIRES: swift_feature_LifetimeDependence
 
