@@ -2578,8 +2578,7 @@ function Test-Foundation {
       -Src $SourceCache\swift-corelibs-foundation `
       -Bin "$BinaryCache\$($BuildPlatform.Triple)\FoundationTests" `
       -Platform $BuildPlatform `
-      -Configuration $FoundationTestConfiguration `
-      -j 1
+      -Configuration $FoundationTestConfiguration
   }
 }
 
