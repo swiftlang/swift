@@ -272,13 +272,16 @@ public func _unsafeInheritExecutor_withThrowingTaskGroup<ChildTaskResult, GroupR
 /// A child task will inherit the parent's priority, task-local values, and will be structured in the sense that its
 /// lifetime will never exceed the lifetime of the parent task.
 ///
-/// A task group will *always* wait for all child tasks to complete before it is destroyed.
-/// Specifically any `with...TaskGroup` APIs, will not return until all the child tasks
+/// A child task inherits the parent's priority, task-local values, and will be structured in the sense that its
+/// lifetime never exceeds the lifetime of the parent task.
+///
+/// A task group *always* waits for all child tasks to complete before it's destroyed.
+/// Specifically, `with...TaskGroup` APIs don't return until all the child tasks
 /// created in the group's scope have completed running.
 ///
 /// Structured concurrency is a way to organize your program, and tasks, in such a way that
-/// tasks do not outlive the scope in which they are created. Within a structured task hierarchy,
-/// no child task will remain running longer than its parent task. This simplifies reasoning about resource usage,
+/// tasks don't outlive the scope in which they are created. Within a structured task hierarchy,
+/// no child task will remains running longer than its parent task. This simplifies reasoning about resource usage,
 /// and is a powerful mechanism that you can use to write well-behaved concurrent programs.
 ///
 /// Structured Concurrency APIs (including task groups and `async let`), will *always* await the
@@ -296,14 +299,15 @@ public func _unsafeInheritExecutor_withThrowingTaskGroup<ChildTaskResult, GroupR
 ///         } // the group will ALWAYS await the completion of all the actions (!)
 ///     }
 ///
-/// In the above example, even though we return the first collected integer from all actions added to the task group,
-/// the task group will *always*, automatically, await for the completion of all the resulting tasks.
+/// In the above example, even though the code returns the first collected integer from all actions added to the task group,
+/// the task group will *always*, automatically, waits for the completion of all the resulting tasks.
 ///
-/// You may use `group.cancelAll()` to signal cancellation to all the remaining in-progress tasks,
-/// however this will not interrupt their execution automatically, as the child tasks will need to cooperatively
-/// react to the cancellation, and potentially return early (if able to).
+/// You can use `group.cancelAll()` to signal cancellation to the remaining in-progress tasks,
+/// however this doesn't interrupt their execution automatically.
+/// Rather, the child tasks need to cooperatively react to the cancellation,
+/// and return early if that's possible.
 ///
-/// In order to create un-structured concurrency tasks, you can use ``Task.init``, ``Task.detached`` or ``Task.immediate``.
+/// To create unstructured concurrency tasks, you can use ``Task.init``, ``Task.detached`` or ``Task.immediate``.
 ///
 /// Task Group Cancellation
 /// =======================
