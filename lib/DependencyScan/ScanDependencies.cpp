@@ -747,10 +747,10 @@ static swiftscan_macro_dependency_set_t *createMacroDependencySet(
   unsigned SI = 0;
   for (auto &entry : macroDeps) {
     set->macro_dependencies[SI] = new swiftscan_macro_dependency_s;
-    set->macro_dependencies[SI]->moduleName = create_clone(entry.first.c_str());
-    set->macro_dependencies[SI]->libraryPath =
+    set->macro_dependencies[SI]->module_name = create_clone(entry.first.c_str());
+    set->macro_dependencies[SI]->library_path =
         create_clone(entry.second.LibraryPath.c_str());
-    set->macro_dependencies[SI]->executablePath =
+    set->macro_dependencies[SI]->executable_path =
         create_clone(entry.second.ExecutablePath.c_str());
     ++ SI;
   }
@@ -976,6 +976,37 @@ generateFullDependencyGraph(const CompilerInstance &instance,
       linkLibrarySet->link_libraries[i] = llInfo;
     }
     moduleInfo->link_libraries = linkLibrarySet;
+
+    // Create source import infos set for this module
+    auto imports = moduleDependencyInfo.getModuleImports();
+    swiftscan_import_info_set_t *importInfoSet =
+        new swiftscan_import_info_set_t;
+    importInfoSet->count = imports.size();
+    importInfoSet->imports = new swiftscan_import_info_t[importInfoSet->count];
+    for (size_t i = 0; i < imports.size(); ++i) {
+      const auto &ii = imports[i];
+      swiftscan_import_info_s *iInfo = new swiftscan_import_info_s;
+      iInfo->import_identifier = create_clone(ii.importIdentifier.c_str());
+      iInfo->access_level = static_cast<swiftscan_access_level_t>(ii.accessLevel);
+
+      const auto &sourceLocations = ii.importLocations;
+      swiftscan_source_location_set_t *sourceLocSet =
+          new swiftscan_source_location_set_t;
+      sourceLocSet->count = sourceLocations.size();
+      sourceLocSet->source_locations =
+          new swiftscan_source_location_t[sourceLocSet->count];
+      for (size_t j = 0; j < sourceLocations.size(); ++j) {
+        const auto &sl = sourceLocations[j];
+        swiftscan_source_location_s *slInfo = new swiftscan_source_location_s;
+        slInfo->buffer_identifier = create_clone(sl.bufferIdentifier.c_str());
+        slInfo->line_number = sl.lineNumber;
+        slInfo->column_number = sl.columnNumber;
+        sourceLocSet->source_locations[j] = slInfo;
+      }
+      iInfo->source_locations = sourceLocSet;
+      importInfoSet->imports[i] = iInfo;
+    }
+    moduleInfo->imports = importInfoSet;
   }
 
   swiftscan_dependency_graph_t result = new swiftscan_dependency_graph_s;
