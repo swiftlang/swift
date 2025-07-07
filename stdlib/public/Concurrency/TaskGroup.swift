@@ -110,9 +110,9 @@ public func _unsafeInheritExecutor_withTaskGroup<ChildTaskResult, GroupResult>(
 /// Starts a new scope that can contain a dynamic number of throwing child tasks.
 ///
 /// A group *always* waits for all of its child tasks
-/// to complete before it returns. Even cancelled tasks must run until
+/// to complete before it returns. Even canceled tasks must run until
 /// completion before this function returns.
-/// Cancelled child tasks cooperatively react to cancellation and attempt
+/// Canceled child tasks cooperatively react to cancellation and attempt
 /// to return as early as possible.
 /// After this function returns, the task group is always empty.
 ///
@@ -335,7 +335,7 @@ public func _unsafeInheritExecutor_withThrowingTaskGroup<ChildTaskResult, GroupR
 /// any order.
 ///
 /// ### Cancellation behavior
-/// A task group becomes cancelled in one of the following ways:
+/// A task group becomes canceled in one of the following ways:
 ///
 /// - when ``cancelAll()`` is invoked on it,
 /// - when the ``Task`` running this task group is cancelled.
@@ -344,9 +344,9 @@ public func _unsafeInheritExecutor_withThrowingTaskGroup<ChildTaskResult, GroupR
 /// automatically propagated through all of its child-tasks (and their child
 /// tasks).
 ///
-/// A cancelled task group can still keep adding tasks, however they will start
+/// A canceled task group can still keep adding tasks, however they will start
 /// being immediately cancelled, and may act accordingly to this. To avoid adding
-/// new tasks to an already cancelled task group, use ``addTaskUnlessCancelled(name:priority:body:)``
+/// new tasks to an already canceled task group, use ``addTaskUnlessCancelled(name:priority:body:)``
 /// rather than the plain ``addTask(name:priority:body:)`` which adds tasks unconditionally.
 ///
 /// For information about the language-level concurrency model that `TaskGroup` is part of,
@@ -478,7 +478,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// If you add a task to a group after canceling the group,
   /// that task is canceled immediately after being added to the group.
   ///
-  /// Immediately cancelled child tasks should therefore cooperatively check for and
+  /// Immediately canceled child tasks should therefore cooperatively check for and
   /// react  to cancellation, e.g. by throwing an `CancellationError` at their
   /// earliest convenience, or otherwise handling the cancellation.
   ///
@@ -543,7 +543,7 @@ extension TaskGroup: Sendable { }
 /// Refer to ``TaskGroup`` documentation for detailed discussion of semantics shared between all task groups.
 ///
 /// ### Cancellation behavior
-/// A task group becomes cancelled in one of the following ways:
+/// A task group becomes canceled in one of the following ways:
 ///
 /// - when ``cancelAll()`` is invoked on it,
 /// - when an error is thrown out of the `withThrowingTaskGroup(...) { }` closure,
@@ -553,9 +553,9 @@ extension TaskGroup: Sendable { }
 /// automatically propagated through all of its child-tasks (and their child
 /// tasks).
 ///
-/// A cancelled task group can still keep adding tasks, however they will start
+/// A canceled task group can still keep adding tasks, however they will start
 /// being immediately cancelled, and may act accordingly to this. To avoid adding
-/// new tasks to an already cancelled task group, use ``addTaskUnlessCancelled(priority:body:)``
+/// new tasks to an already canceled task group, use ``addTaskUnlessCancelled(priority:body:)``
 /// rather than the plain ``addTask(priority:body:)`` which adds tasks unconditionally.
 ///
 /// For information about the language-level concurrency model that `ThrowingTaskGroup` is part of,
@@ -804,7 +804,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// If you add a task to a group after canceling the group,
   /// that task is canceled immediately after being added to the group.
   ///
-  /// Immediately cancelled child tasks should therefore cooperatively check for and
+  /// Immediately canceled child tasks should therefore cooperatively check for and
   /// react  to cancellation, e.g. by throwing an `CancellationError` at their
   /// earliest convenience, or otherwise handling the cancellation.
   ///

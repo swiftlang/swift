@@ -23,7 +23,7 @@ import Swift
 /// of side-effect.
 ///
 /// A group *always* waits for all of its child tasks
-/// to complete before it returns. Even cancelled tasks must run until
+/// to complete before it returns. Even canceled tasks must run until
 /// completion before this function returns.
 /// Cancelled child tasks cooperatively react to cancellation and attempt
 /// to return as early as possible.
@@ -143,18 +143,18 @@ public func _unsafeInheritExecutor_withDiscardingTaskGroup<GroupResult>(
 /// be the case with a ``TaskGroup``.
 ///
 /// ### Cancellation behavior
-/// A discarding task group becomes cancelled in one of the following ways:
+/// A discarding task group becomes canceled in one of the following ways:
 ///
 /// - when ``cancelAll()`` is invoked on it,
-/// - when the ``Task`` running this task group is cancelled.
+/// - when the ``Task`` running this task group is canceled.
 ///
 /// Since a `DiscardingTaskGroup` is a structured concurrency primitive, cancellation is
 /// automatically propagated through all of its child-tasks (and their child
 /// tasks).
 ///
-/// A cancelled task group can still keep adding tasks, however they will start
-/// being immediately cancelled, and may act accordingly to this. To avoid adding
-/// new tasks to an already cancelled task group, use ``addTaskUnlessCancelled(priority:body:)``
+/// A canceled task group can still keep adding tasks, however they will start
+/// being immediately canceled, and may act accordingly to this. To avoid adding
+/// new tasks to an already canceled task group, use ``addTaskUnlessCancelled(priority:body:)``
 /// rather than the plain ``addTask(priority:body:)`` which adds tasks unconditionally.
 ///
 /// For information about the language-level concurrency model that `DiscardingTaskGroup` is part of,
@@ -205,7 +205,7 @@ public struct DiscardingTaskGroup {
   /// If you add a task to a group after canceling the group,
   /// that task is canceled immediately after being added to the group.
   ///
-  /// Immediately cancelled child tasks should therefore cooperatively check for and
+  /// Immediately  canceled  child tasks should therefore cooperatively check for and
   /// react  to cancellation, e.g. by throwing an `CancellationError` at their
   /// earliest convenience, or otherwise handling the cancellation.
   ///
@@ -247,9 +247,9 @@ extension DiscardingTaskGroup: Sendable { }
 /// of side-effect.
 ///
 /// A group *always* waits for all of its child tasks
-/// to complete before it returns. Even cancelled tasks must run until
+/// to complete before it returns. Even canceled tasks must run until
 /// completion before this function returns.
-/// Cancelled child tasks cooperatively react to cancellation and attempt
+/// Canceled child tasks cooperatively react to cancellation and attempt
 /// to return as early as possible.
 /// After this function returns, the task group is always empty.
 ///
@@ -423,20 +423,20 @@ public func _unsafeInheritExecutor_withThrowingDiscardingTaskGroup<GroupResult>(
 /// be the case with a ``TaskGroup``.
 ///
 /// ### Cancellation behavior
-/// A throwing discarding task group becomes cancelled in one of the following ways:
+/// A throwing discarding task group becomes canceled in one of the following ways:
 ///
 /// - when ``cancelAll()`` is invoked on it,
 /// - when an error is thrown out of the `withThrowingDiscardingTaskGroup { ... }` closure,
-/// - when the ``Task`` running this task group is cancelled.
+/// - when the ``Task`` running this task group is  canceled .
 ///
 /// But also, and uniquely in *discarding* task groups:
 /// - when *any* of its child tasks throws.
 ///
-/// The group becoming cancelled automatically, and cancelling all of its child tasks,
+/// The group becoming canceled automatically, and cancelling all of its child tasks,
 /// whenever *any* child task throws an error is a behavior unique to discarding task groups,
 /// because achieving such semantics is not possible otherwise, due to the missing `next()` method
 /// on discarding groups. Accumulating task groups can implement this by manually polling `next()`
-/// and deciding to `cancelAll()` when they decide an error should cause the group to become cancelled,
+/// and deciding to `cancelAll()` when they decide an error should cause the group to become  canceled,
 /// however a discarding group cannot poll child tasks for results and therefore assumes that child
 /// task throws are an indication of a group wide failure. In order to avoid such behavior,
 /// use a ``DiscardingTaskGroup`` instead of a throwing one, or catch specific errors in
@@ -446,9 +446,9 @@ public func _unsafeInheritExecutor_withThrowingDiscardingTaskGroup<GroupResult>(
 /// automatically propagated through all of its child-tasks (and their child
 /// tasks).
 ///
-/// A cancelled task group can still keep adding tasks, however they will start
-/// being immediately cancelled, and may act accordingly to this. To avoid adding
-/// new tasks to an already cancelled task group, use ``addTaskUnlessCancelled(priority:body:)``
+/// A canceled task group can still keep adding tasks, however they will start
+/// being immediately  canceled, and may act accordingly to this. To avoid adding
+/// new tasks to an already canceled task group, use ``addTaskUnlessCancelled(priority:body:)``
 /// rather than the plain ``addTask(priority:body:)`` which adds tasks unconditionally.
 ///
 /// For information about the language-level concurrency model that `DiscardingTaskGroup` is part of,
@@ -497,7 +497,7 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
   /// If you add a task to a group after canceling the group,
   /// that task is canceled immediately after being added to the group.
   ///
-  /// Immediately cancelled child tasks should therefore cooperatively check for and
+  /// Immediately canceled child tasks should therefore cooperatively check for and
   /// react  to cancellation, e.g. by throwing an `CancellationError` at their
   /// earliest convenience, or otherwise handling the cancellation.
   ///
