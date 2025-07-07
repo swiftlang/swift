@@ -1,0 +1,68 @@
+// RUN: %target-sil-opt -enable-experimental-feature LifetimeDependence -allocbox-to-stack %s | %FileCheck %s
+
+// REQUIRES: swift_feature_LifetimeDependence
+
+import Swift
+import Builtin
+
+public struct View : ~Escapable {
+  let _ptr: UnsafeRawPointer
+}
+
+sil [ossa] @initFn : $@convention(method) (UnsafeRawPointer, @thin View.Type) -> @lifetime(borrow 0) @owned View
+sil [ossa] @initFnAddr : $@convention(thin) (UnsafeRawPointer, @thin View.Type) -> @lifetime(borrow 0) @out View 
+
+// CHECK-LABEL:  sil [ossa] @testBoxedParam :
+// CHECK-NOT: alloc_box
+// CHECK-LABEL: } // end sil function 'testBoxedParam'
+sil [ossa] @testBoxedParam : $@convention(thin) (@owned View) -> @lifetime(copy 0) @owned View {
+bb0(%0 : @noImplicitCopy @_eagerMove @owned $View):
+  %1 = alloc_box ${ var @moveOnly View }, var, name "that"
+  %2 = begin_borrow [var_decl] %1
+  %3 = project_box %2, 0
+  %4 = moveonlywrapper_to_copyable_addr %3
+  store %0 to [init] %4
+  %6 = metatype $@thin View.Type
+  %7 = begin_access [read] [static] %3
+  %8 = mark_unresolved_non_copyable_value [no_consume_or_assign] %7
+  %9 = struct_element_addr %8, #View._ptr
+  %10 = load_borrow %9
+  %11 = moveonlywrapper_to_copyable [guaranteed] %10
+  end_borrow %10
+  end_access %7
+  %14 = function_ref @initFn : $@convention(method) (UnsafeRawPointer, @thin View.Type) -> @lifetime(borrow 0) @owned View
+  %15 = apply %14(%11, %6) : $@convention(method) (UnsafeRawPointer, @thin View.Type) -> @lifetime(borrow 0) @owned View
+  %16 = mark_dependence [unresolved] %15 on %2
+  end_borrow %2
+  destroy_value %1
+  return %16
+}
+
+// CHECK-LABEL:  sil [ossa] @testBoxedParamAddr :
+// CHECK-NOT: alloc_box
+// CHECK-LABEL: } // end sil function 'testBoxedParamAddr'
+sil [ossa] @testBoxedParamAddr : $@convention(thin) (@owned View) -> () {
+bb0(%0 : @noImplicitCopy @_eagerMove @owned $View):
+  %1 = alloc_box ${ var @moveOnly View }, var, name "that"
+  %2 = begin_borrow [var_decl] %1
+  %3 = project_box %2, 0
+  %4 = moveonlywrapper_to_copyable_addr %3
+  store %0 to [init] %4
+  %6 = metatype $@thin View.Type
+  %7 = begin_access [read] [static] %3
+  %8 = mark_unresolved_non_copyable_value [no_consume_or_assign] %7
+  %9 = struct_element_addr %8, #View._ptr
+  %10 = load_borrow %9
+  %11 = moveonlywrapper_to_copyable [guaranteed] %10
+  end_borrow %10
+  end_access %7
+  %14 = alloc_stack $View
+  %15 = function_ref @initFnAddr : $@convention(thin) (UnsafeRawPointer, @thin View.Type) -> @lifetime(borrow 0) @out View
+  %16 = apply %15(%14, %11, %6) : $@convention(thin) (UnsafeRawPointer, @thin View.Type) -> @lifetime(borrow 0) @out View
+  mark_dependence_addr [unresolved] %14 on %2
+  dealloc_stack %14
+  end_borrow %2
+  destroy_value %1
+  %99 = tuple ()
+  return %99
+}
