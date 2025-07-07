@@ -8307,7 +8307,7 @@ RawConformanceIsolationRequest::evaluate(
         bool isPreconcurrency = moduleImportForPreconcurrency(
             proto, conformance->getDeclContext()) != nullptr;
         ctx.Diags.diagnose(
-            conformance->getLoc(),
+            rootNormal->getLoc(),
             diag::isolated_conformance_to_sendable_metatype,
             ActorIsolation::forGlobalActor(globalActorType),
             conformance->getType(),
