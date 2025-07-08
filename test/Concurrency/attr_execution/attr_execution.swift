@@ -18,7 +18,7 @@ func callerTest() async {}
 struct Test {
   // CHECK-LABEL: // closure #1 in variable initialization expression of Test.x
   // CHECK: // Isolation: caller_isolation_inheriting
-  // CHECK: sil private [ossa] @$s14attr_execution4TestV1xyyYaYCcvpfiyyYaYCcfU_ : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> ()
+  // CHECK: sil private [ossa] @$s14attr_execution4TestV1xyyYaYCcvpfiyyYacfU_ : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> ()
   var x: () async -> Void = {}
 
   // CHECK-LABEL: // Test.test()
@@ -67,7 +67,7 @@ func takesClosure(fn: () async -> Void) {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s14attr_execution11testClosureyyF : $@convention(thin) () -> ()
-// CHECK:  [[CLOSURE:%.*]] = function_ref @$s14attr_execution11testClosureyyFyyYaYCXEfU_ : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> ()
+// CHECK:  [[CLOSURE:%.*]] = function_ref @$s14attr_execution11testClosureyyFyyYaXEfU_ : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> ()
 // CHECK:  [[THUNKED_CLOSURE:%.*]] = thin_to_thick_function %0 to $@noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> ()
 // CHECK:  [[TAKES_CLOSURE:%.*]] = function_ref @$s14attr_execution12takesClosure2fnyyyYaYCXE_tF : $@convention(thin) (@guaranteed @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> ()) -> ()
 // CHECK:  apply [[TAKES_CLOSURE]]([[THUNKED_CLOSURE]])
@@ -75,7 +75,7 @@ func takesClosure(fn: () async -> Void) {
 
 // CHECK-LABEL: // closure #1 in testClosure()
 // CHECK: // Isolation: caller_isolation_inheriting
-// CHECK: sil private [ossa] @$s14attr_execution11testClosureyyFyyYaYCXEfU_ : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> ()
+// CHECK: sil private [ossa] @$s14attr_execution11testClosureyyFyyYaXEfU_ : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> ()
 func testClosure() {
   takesClosure {
   }
