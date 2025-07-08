@@ -186,7 +186,7 @@ public:
     UnappliedIsolatedAnyParameter = 0x2,
 
     /// The maximum number of bits used by a Flag.
-    MaxNumBits = 2,
+    MaxNumBits = 3,
   };
 
   using Options = OptionSet<Flag>;
@@ -204,13 +204,19 @@ private:
   /// derived isolatedValue from.
   ActorInstance actorInstance;
 
+  /// When the isolation is introduced due to a (potentially) isolated
+  /// conformance, the protocol whose conformance might be isolated.
+  ProtocolDecl *isolatedConformance = nullptr;
+
   unsigned kind : 8;
   unsigned options : 8;
 
   SILIsolationInfo(SILValue isolatedValue, SILValue actorInstance,
-                   ActorIsolation actorIsolation, Options options = Options())
+                   ActorIsolation actorIsolation, Options options = Options(),
+                   ProtocolDecl *isolatedConformance = nullptr)
       : actorIsolation(actorIsolation), isolatedValue(isolatedValue),
-        actorInstance(ActorInstance::getForValue(actorInstance)), kind(Actor),
+        actorInstance(ActorInstance::getForValue(actorInstance)),
+        isolatedConformance(isolatedConformance), kind(Actor),
         options(options.toRaw()) {
     assert((!actorInstance ||
             (actorIsolation.getKind() == ActorIsolation::ActorInstance &&
@@ -222,15 +228,20 @@ private:
   }
 
   SILIsolationInfo(SILValue isolatedValue, ActorInstance actorInstance,
-                   ActorIsolation actorIsolation, Options options = Options())
+                   ActorIsolation actorIsolation, Options options = Options(),
+                   ProtocolDecl *isolatedConformance = nullptr)
       : actorIsolation(actorIsolation), isolatedValue(isolatedValue),
-        actorInstance(actorInstance), kind(Actor), options(options.toRaw()) {
+        actorInstance(actorInstance), isolatedConformance(isolatedConformance),
+        kind(Actor), options(options.toRaw())
+  {
     assert(actorInstance);
     assert(actorIsolation.getKind() == ActorIsolation::ActorInstance);
   }
 
-  SILIsolationInfo(Kind kind, SILValue isolatedValue)
-      : actorIsolation(), isolatedValue(isolatedValue), kind(kind), options(0) {
+  SILIsolationInfo(Kind kind, SILValue isolatedValue,
+                   ProtocolDecl *isolatedConformance = nullptr)
+      : actorIsolation(), isolatedValue(isolatedValue),
+        isolatedConformance(isolatedConformance), kind(kind), options(0) {
   }
 
   SILIsolationInfo(Kind kind, Options options = Options())
@@ -257,6 +268,12 @@ public:
     return getOptions().contains(Flag::UnsafeNonIsolated);
   }
 
+  // Retrieve the protocol to which there is (or could be) an isolated
+  // conformance.
+  ProtocolDecl *getIsolatedConformance() const {
+    return isolatedConformance;
+  }
+
   SILIsolationInfo withUnsafeNonIsolated(bool newValue = true) const {
     assert(*this && "Cannot be unknown");
     auto self = *this;
@@ -267,6 +284,26 @@ public:
           self.getOptions().toRaw() & ~Options(Flag::UnsafeNonIsolated).toRaw();
     }
     return self;
+  }
+
+  /// Produce a new isolation info value that merges in the given isolated
+  /// conformance value.
+  ///
+  /// If both isolation infos have an isolation conformance, pick one
+  /// arbitrarily. Otherwise, the result has no isolated conformance.
+  SILIsolationInfo
+  withMergedIsolatedConformance(ProtocolDecl *newIsolatedConformance) const {
+    SILIsolationInfo result(*this);
+    if (!isolatedConformance || !newIsolatedConformance) {
+      result.isolatedConformance = nullptr;
+      return result;
+    }
+
+    result.isolatedConformance =
+      ProtocolDecl::compare(isolatedConformance, newIsolatedConformance) <= 0
+        ? isolatedConformance
+        : newIsolatedConformance;
+    return result;
   }
 
   /// Returns true if this actor isolation is derived from an unapplied
@@ -427,10 +464,13 @@ public:
             Flag::UnappliedIsolatedAnyParameter};
   }
 
-  static SILIsolationInfo getGlobalActorIsolated(SILValue value,
-                                                 Type globalActorType) {
+  static SILIsolationInfo getGlobalActorIsolated(
+      SILValue value,
+      Type globalActorType,
+      ProtocolDecl *isolatedConformance = nullptr) {
     return {value, SILValue() /*no actor instance*/,
-            ActorIsolation::forGlobalActor(globalActorType)};
+            ActorIsolation::forGlobalActor(globalActorType),
+            Options(), isolatedConformance};
   }
 
   static SILIsolationInfo getGlobalActorIsolated(SILValue value,
@@ -442,8 +482,9 @@ public:
                                                     isolation.getGlobalActor());
   }
 
-  static SILIsolationInfo getTaskIsolated(SILValue value) {
-    return {Kind::Task, value};
+  static SILIsolationInfo getTaskIsolated(
+      SILValue value, ProtocolDecl *isolatedConformance = nullptr) {
+    return {Kind::Task, value, isolatedConformance};
   }
 
   /// Attempt to infer the isolation region info for \p inst.

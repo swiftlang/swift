@@ -961,6 +961,10 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
 }
 
 void SILIsolationInfo::printOptions(llvm::raw_ostream &os) const {
+  if (isolatedConformance) {
+    os << "isolated-conformance-to(" << isolatedConformance->getName() << ")";
+  }
+
   auto opts = getOptions();
   if (!opts)
     return;
@@ -1111,9 +1115,11 @@ void SILIsolationInfo::Profile(llvm::FoldingSetNodeID &id) const {
     return;
   case Task:
     id.AddPointer(getIsolatedValue());
+    id.AddPointer(getIsolatedConformance());
     return;
   case Actor:
     id.AddPointer(getIsolatedValue());
+    id.AddPointer(getIsolatedConformance());
     getActorIsolation().Profile(id);
     return;
   }
@@ -1383,7 +1389,7 @@ SILDynamicMergedIsolationInfo::merge(SILIsolationInfo other) const {
     // If both innerInfo and other have the same isolation, we are obviously
     // done. Just return innerInfo since we could return either.
     if (innerInfo.hasSameIsolation(other))
-      return {innerInfo};
+      return {innerInfo.withMergedIsolatedConformance(other.getIsolatedConformance())};
 
     // Ok, there is some difference in between innerInfo and other. Lets see if
     // they are both actor instance isolated and if either are unapplied
@@ -1392,9 +1398,9 @@ SILDynamicMergedIsolationInfo::merge(SILIsolationInfo other) const {
     if (innerInfo.getActorIsolation().isActorInstanceIsolated() &&
         other.getActorIsolation().isActorInstanceIsolated()) {
       if (innerInfo.isUnappliedIsolatedAnyParameter())
-        return other;
+        return other.withMergedIsolatedConformance(innerInfo.getIsolatedConformance());
       if (other.isUnappliedIsolatedAnyParameter())
-        return innerInfo;
+        return innerInfo.withMergedIsolatedConformance(other.getIsolatedConformance());
     }
 
     // Otherwise, they do not match... so return None to signal merge failure.

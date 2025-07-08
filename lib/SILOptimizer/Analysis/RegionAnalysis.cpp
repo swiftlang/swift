@@ -288,6 +288,9 @@ static SILIsolationInfo getIsolationForCastConformances(
 
   const auto &destLayout = destType.getExistentialLayout();
   for (auto proto : destLayout.getProtocols()) {
+    if (proto->isMarkerProtocol())
+      continue;
+
     // If the source type already conforms to the protocol, we won't be looking
     // it up dynamically.
     if (!lookupConformance(sourceType, proto, /*allowMissing=*/false).isInvalid())
@@ -304,12 +307,12 @@ static SILIsolationInfo getIsolationForCastConformances(
     // Otherwise, it's task-isolated.
     if (functionIsolation && functionIsolation->isGlobalActor()) {
       return SILIsolationInfo::getGlobalActorIsolated(
-          value, functionIsolation->getGlobalActor());
+          value, functionIsolation->getGlobalActor(), proto);
     }
 
     // Consider the cast to be task-isolated, because the runtime could find
     // a conformance that is isolated to the current context.
-    return SILIsolationInfo::getTaskIsolated(value);
+    return SILIsolationInfo::getTaskIsolated(value, proto);
   }
 
   return {};
@@ -4087,6 +4090,9 @@ SILIsolationInfo
 PartitionOpTranslator::getIsolationFromConformances(
     SILValue value, ArrayRef<ProtocolConformanceRef> conformances) {
   for (auto conformance: conformances) {
+    if (conformance.getProtocol()->isMarkerProtocol())
+      continue;
+
     // If the conformance is a pack, recurse.
     if (conformance.isPack()) {
       auto pack = conformance.getPack();
@@ -4105,7 +4111,7 @@ PartitionOpTranslator::getIsolationFromConformances(
       auto isolation = conformance.getConcrete()->getIsolation();
       if (isolation.isGlobalActor()) {
         return SILIsolationInfo::getGlobalActorIsolated(
-            value, isolation.getGlobalActor());
+            value, isolation.getGlobalActor(), conformance.getProtocol());
       }
 
       continue;
@@ -4120,7 +4126,8 @@ PartitionOpTranslator::getIsolationFromConformances(
       if (sendableMetatype &&
           lookupConformance(conformance.getType(), sendableMetatype,
                             /*allowMissing=*/false).isInvalid()) {
-        return SILIsolationInfo::getTaskIsolated(value);
+        return SILIsolationInfo::getTaskIsolated(value,
+                                                 conformance.getProtocol());
       }
     }
   }
@@ -4131,7 +4138,7 @@ PartitionOpTranslator::getIsolationFromConformances(
 TranslationSemantics
 PartitionOpTranslator::visitInitExistentialAddrInst(InitExistentialAddrInst *ieai) {
   auto conformanceIsolationInfo = getIsolationFromConformances(
-      ieai->getResult(0), ieai->getConformances());
+      ieai, ieai->getConformances());
 
   translateSILMultiAssign(ieai->getResults(),
                           makeOperandRefRange(ieai->getAllOperands()),
@@ -4143,7 +4150,7 @@ PartitionOpTranslator::visitInitExistentialAddrInst(InitExistentialAddrInst *iea
 TranslationSemantics
 PartitionOpTranslator::visitInitExistentialRefInst(InitExistentialRefInst *ieri) {
   auto conformanceIsolationInfo = getIsolationFromConformances(
-      ieri->getResult(0), ieri->getConformances());
+      ieri, ieri->getConformances());
 
   translateSILMultiAssign(ieri->getResults(),
                           makeOperandRefRange(ieri->getAllOperands()),
@@ -4155,7 +4162,7 @@ PartitionOpTranslator::visitInitExistentialRefInst(InitExistentialRefInst *ieri)
 TranslationSemantics
 PartitionOpTranslator::visitInitExistentialValueInst(InitExistentialValueInst *ievi) {
   auto conformanceIsolationInfo = getIsolationFromConformances(
-      ievi->getResult(0), ievi->getConformances());
+      ievi, ievi->getConformances());
 
   translateSILMultiAssign(ievi->getResults(),
                           makeOperandRefRange(ievi->getAllOperands()),
