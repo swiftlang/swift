@@ -8308,18 +8308,20 @@ RawConformanceIsolationRequest::evaluate(
       globalActorTypeExpr->setType(MetatypeType::get(globalActorType));
     }
 
-    // Isolated conformance to a SendableMetatype-inheriting protocol can
-    // never be used generically. Warn about it.
+    // Cannot form an isolated conformance to a SendableMetatype-inheriting
+    // protocol. Diagnose it.
     if (auto sendableMetatype =
             ctx.getProtocol(KnownProtocolKind::SendableMetatype)) {
-      if (proto->inheritsFrom(sendableMetatype) &&
-          !getActorIsolation(proto).preconcurrency()) {
+      if (proto->inheritsFrom(sendableMetatype)) {
+        bool isPreconcurrency = moduleImportForPreconcurrency(
+            proto, conformance->getDeclContext()) != nullptr;
         ctx.Diags.diagnose(
             conformance->getLoc(),
             diag::isolated_conformance_to_sendable_metatype,
             ActorIsolation::forGlobalActor(globalActorType),
             conformance->getType(),
-            proto);
+            proto)
+          .limitBehaviorIf(isPreconcurrency, DiagnosticBehavior::Warning);
       }
     }
 

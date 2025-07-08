@@ -401,6 +401,12 @@ namespace swift {
     /// until the next major language version.
     InFlightDiagnostic &warnUntilFutureSwiftVersion();
 
+    InFlightDiagnostic &warnUntilFutureSwiftVersionIf(bool shouldLimit) {
+      if (!shouldLimit)
+        return *this;
+      return warnUntilFutureSwiftVersion();
+    }
+
     /// Limit the diagnostic behavior to warning until the specified version.
     ///
     /// This helps stage in fixes for stricter diagnostics as warnings
