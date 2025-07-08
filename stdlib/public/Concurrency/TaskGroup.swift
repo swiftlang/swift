@@ -17,9 +17,9 @@ import Swift
 /// Starts a new scope that can contain a dynamic number of child tasks.
 ///
 /// A group *always* waits for all of its child tasks
-/// to complete before it returns. Even cancelled tasks must run until
+/// to complete before it returns. Even canceled tasks must run until
 /// completion before this function returns.
-/// Cancelled child tasks cooperatively react to cancellation and attempt
+/// Canceled child tasks cooperatively react to cancellation and attempt
 /// to return as early as possible.
 /// After this function returns, the task group is always empty.
 ///
@@ -342,14 +342,14 @@ public func _unsafeInheritExecutor_withThrowingTaskGroup<ChildTaskResult, GroupR
 /// A task group becomes canceled in one of the following ways:
 ///
 /// - when ``cancelAll()`` is invoked on it,
-/// - when the ``Task`` running this task group is cancelled.
+/// - when the ``Task`` running this task group is canceled.
 ///
 /// Since a `TaskGroup` is a structured concurrency primitive, cancellation is
 /// automatically propagated through all of its child-tasks (and their child
 /// tasks).
 ///
 /// A canceled task group can still keep adding tasks, however they will start
-/// being immediately cancelled, and may act accordingly to this. To avoid adding
+/// being immediately canceled, and may act accordingly to this. To avoid adding
 /// new tasks to an already canceled task group, use ``addTaskUnlessCancelled(name:priority:body:)``
 /// rather than the plain ``addTask(name:priority:body:)`` which adds tasks unconditionally.
 ///
@@ -551,14 +551,14 @@ extension TaskGroup: Sendable { }
 ///
 /// - when ``cancelAll()`` is invoked on it,
 /// - when an error is thrown out of the `withThrowingTaskGroup(...) { }` closure,
-/// - when the ``Task`` running this task group is cancelled.
+/// - when the ``Task`` running this task group is canceled.
 ///
 /// Since a `ThrowingTaskGroup` is a structured concurrency primitive, cancellation is
 /// automatically propagated through all of its child-tasks (and their child
 /// tasks).
 ///
 /// A canceled task group can still keep adding tasks, however they will start
-/// being immediately cancelled, and may act accordingly to this. To avoid adding
+/// being immediately canceled, and may act accordingly to this. To avoid adding
 /// new tasks to an already canceled task group, use ``addTaskUnlessCancelled(priority:body:)``
 /// rather than the plain ``addTask(priority:body:)`` which adds tasks unconditionally.
 ///
@@ -616,7 +616,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// Wait for all of the group's remaining tasks to complete.
   ///
   /// If any of the tasks throw, the *first* error thrown is captured
-  /// and re-thrown by this method although the task group is *not* cancelled
+  /// and re-thrown by this method although the task group is *not* canceled
   /// when this happens.
   ///
   /// ### Cancelling the task group on first error

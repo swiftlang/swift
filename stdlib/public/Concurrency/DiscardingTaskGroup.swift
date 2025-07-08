@@ -25,7 +25,7 @@ import Swift
 /// A group *always* waits for all of its child tasks
 /// to complete before it returns. Even canceled tasks must run until
 /// completion before this function returns.
-/// Cancelled child tasks cooperatively react to cancellation and attempt
+/// Canceled child tasks cooperatively react to cancellation and attempt
 /// to return as early as possible.
 /// After this function returns, the task group is always empty.
 ///
