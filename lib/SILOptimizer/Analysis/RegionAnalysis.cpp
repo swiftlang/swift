@@ -336,10 +336,7 @@ static bool isStaticallyLookThroughInst(SILInstruction *inst) {
 
     // If this cast introduces isolation due to conformances, we cannot look
     // through it to the source.
-    if (!SILIsolationInfo::getForCastConformances(
-            llvm::cast<UnconditionalCheckedCastInst>(inst),
-            cast.getSourceFormalType(), cast.getTargetFormalType())
-              .isDisconnected())
+    if (SILIsolationInfo::getConformanceIsolation(inst))
       return false;
 
     if (cast.isRCIdentityPreserving())
@@ -3166,7 +3163,8 @@ public:
     case TranslationSemantics::Store:
       return translateSILStore(
           &inst->getAllOperands()[CopyLikeInstruction::Dest],
-          &inst->getAllOperands()[CopyLikeInstruction::Src]);
+          &inst->getAllOperands()[CopyLikeInstruction::Src],
+          SILIsolationInfo::getConformanceIsolation(inst));
 
     case TranslationSemantics::Special:
       return;
@@ -3177,7 +3175,8 @@ public:
     case TranslationSemantics::TerminatorPhi: {
       TermArgSources sources;
       sources.init(inst);
-      return translateSILPhi(sources);
+      return translateSILPhi(
+          sources, SILIsolationInfo::getConformanceIsolation(inst));
     }
 
     case TranslationSemantics::Asserting:
@@ -3480,6 +3479,7 @@ CONSTANT_TRANSLATION(StoreInst, Store)
 CONSTANT_TRANSLATION(StoreWeakInst, Store)
 CONSTANT_TRANSLATION(MarkUnresolvedMoveAddrInst, Store)
 CONSTANT_TRANSLATION(UncheckedRefCastAddrInst, Store)
+CONSTANT_TRANSLATION(UnconditionalCheckedCastAddrInst, Store)
 CONSTANT_TRANSLATION(StoreUnownedInst, Store)
 
 //===---
@@ -3554,6 +3554,7 @@ CONSTANT_TRANSLATION(YieldInst, Require)
 // Terminators that act as phis.
 CONSTANT_TRANSLATION(BranchInst, TerminatorPhi)
 CONSTANT_TRANSLATION(CondBranchInst, TerminatorPhi)
+CONSTANT_TRANSLATION(CheckedCastBranchInst, TerminatorPhi)
 CONSTANT_TRANSLATION(DynamicMethodBranchInst, TerminatorPhi)
 
 // Function exiting terminators.
@@ -3955,34 +3956,16 @@ PartitionOpTranslator::visitPointerToAddressInst(PointerToAddressInst *ptai) {
 
 TranslationSemantics PartitionOpTranslator::visitUnconditionalCheckedCastInst(
     UnconditionalCheckedCastInst *ucci) {
-  auto isolation = SILIsolationInfo::getForCastConformances(
-      ucci, ucci->getSourceFormalType(), ucci->getTargetFormalType());
+  auto isolation = SILIsolationInfo::getConformanceIsolation(ucci);
 
-  if (isolation.isDisconnected() &&
+  if (!isolation &&
       SILDynamicCastInst(ucci).isRCIdentityPreserving()) {
     assert(isStaticallyLookThroughInst(ucci) && "Out of sync");
     return TranslationSemantics::LookThrough;
   }
 
   assert(!isStaticallyLookThroughInst(ucci) && "Out of sync");
-  translateSILMultiAssign(
-      ucci->getResults(), makeOperandRefRange(ucci->getAllOperands()),
-      isolation);
-  return TranslationSemantics::Special;
-}
-
-TranslationSemantics PartitionOpTranslator::visitUnconditionalCheckedCastAddrInst(
-    UnconditionalCheckedCastAddrInst *uccai) {
-  auto isolation = SILIsolationInfo::getForCastConformances(
-      uccai->getAllOperands()[CopyLikeInstruction::Dest].get(),
-      uccai->getSourceFormalType(), uccai->getTargetFormalType());
-
-  translateSILStore(
-      &uccai->getAllOperands()[CopyLikeInstruction::Dest],
-      &uccai->getAllOperands()[CopyLikeInstruction::Src],
-      isolation);
-
-  return TranslationSemantics::Special;
+  return TranslationSemantics::Assign;
 }
 
 // RefElementAddrInst is not considered to be a lookThrough since we want to
@@ -4079,31 +4062,9 @@ PartitionOpTranslator::visitInitExistentialValueInst(InitExistentialValueInst *i
   return TranslationSemantics::Assign;
 }
 
-TranslationSemantics
-PartitionOpTranslator::visitCheckedCastBranchInst(CheckedCastBranchInst *ccbi) {
-  // Consider whether the value produced by the cast might be task-isolated.
-  auto resultValue = ccbi->getSuccessBB()->getArgument(0);
-  auto conformanceIsolation = SILIsolationInfo::getForCastConformances(
-      resultValue,
-      ccbi->getSourceFormalType(),
-      ccbi->getTargetFormalType());
-  TermArgSources sources;
-  sources.init(static_cast<SILInstruction *>(ccbi));
-  translateSILPhi(sources, conformanceIsolation);
-
-  return TranslationSemantics::Special;
-}
-
 TranslationSemantics PartitionOpTranslator::visitCheckedCastAddrBranchInst(
     CheckedCastAddrBranchInst *ccabi) {
   assert(ccabi->getSuccessBB()->getNumArguments() <= 1);
-
-  // Consider whether the value written into by the cast might be task-isolated.
-  auto resultValue = ccabi->getAllOperands().back().get();
-  auto conformanceIsolation = SILIsolationInfo::getForCastConformances(
-      resultValue,
-      ccabi->getSourceFormalType(),
-      ccabi->getTargetFormalType());
 
   // checked_cast_addr_br does not have any arguments in its resulting
   // block. We should just use a multi-assign on its operands.
@@ -4114,7 +4075,7 @@ TranslationSemantics PartitionOpTranslator::visitCheckedCastAddrBranchInst(
   // but still correct.
   translateSILMultiAssign(ArrayRef<SILValue>(),
                           makeOperandRefRange(ccabi->getAllOperands()),
-                          conformanceIsolation);
+                          SILIsolationInfo::getConformanceIsolation(ccabi));
   return TranslationSemantics::Special;
 }
 
