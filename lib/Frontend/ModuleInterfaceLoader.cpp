@@ -1789,6 +1789,10 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
     genericSubInvocation.getLangOptions().enableFeature(
         Feature::LayoutPrespecialization);
   }
+  if (LangOpts.hasFeature(Feature::AddressableParameters)) {
+    genericSubInvocation.getLangOptions().enableFeature(
+        Feature::AddressableParameters);
+  }
 
   genericSubInvocation.getClangImporterOptions().DirectClangCC1ModuleBuild =
       clangImporterOpts.DirectClangCC1ModuleBuild;
