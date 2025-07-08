@@ -292,12 +292,6 @@ def _apply_default_arguments(args):
         args.test_xros_host = False
         args.test_android_host = False
 
-    # Install WasmKit if it's built
-    # (ideally, should not be installed by default, same as other products, but
-    # historically `--wasmkit` implied installation)
-    if args.build_wasmkit and args.install_wasmkit is None:
-        args.install_wasmkit = True
-
 
 def create_argument_parser():
     """Return a configured argument parser."""
