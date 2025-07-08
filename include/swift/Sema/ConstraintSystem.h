@@ -64,6 +64,7 @@ namespace constraints {
 
 class ConstraintSystem;
 class SyntacticElementTarget;
+struct PreparedOverload;
 
 } // end namespace constraints
 
@@ -2211,6 +2212,8 @@ public:
   unsigned CountDisjunctions = 0;
 
 private:
+  bool PreparingOverload = false;
+
   /// A constraint that has failed along the current solver path.
   /// Do not set directly, call \c recordFailedConstraint instead.
   Constraint *failedConstraint = nullptr;
@@ -2752,6 +2755,7 @@ public:
   SolverState *solverState = nullptr;
 
   void recordChange(SolverTrail::Change change) {
+    ASSERT(!PreparingOverload);
     solverState->Trail.recordChange(change);
   }
 
@@ -4447,7 +4451,8 @@ public:
                           ValueDecl *decl,
                           FunctionRefInfo functionRefInfo,
                           ConstraintLocatorBuilder locator,
-                          DeclContext *useDC);
+                          DeclContext *useDC,
+                          PreparedOverload *preparedOverload);
 
   /// Return the type-of-reference of the given value.
   ///
@@ -4488,7 +4493,8 @@ public:
   DeclReferenceType getTypeOfMemberReference(
       Type baseTy, ValueDecl *decl, DeclContext *useDC, bool isDynamicLookup,
       FunctionRefInfo functionRefInfo, ConstraintLocator *locator,
-      SmallVectorImpl<OpenedType> *replacements = nullptr);
+      SmallVectorImpl<OpenedType> *replacements = nullptr,
+      PreparedOverload *preparedOverload = nullptr);
 
   /// Retrieve a list of generic parameter types solver has "opened" (replaced
   /// with a type variable) at the given location.

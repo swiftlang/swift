@@ -29,8 +29,10 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeTransform.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/PreparedOverload.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Basic/Defer.h"
 
 using namespace swift;
 using namespace constraints;
@@ -932,7 +934,20 @@ DeclReferenceType
 ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                      FunctionRefInfo functionRefInfo,
                                      ConstraintLocatorBuilder locator,
-                                     DeclContext *useDC) {
+                                     DeclContext *useDC,
+                                     PreparedOverload *preparedOverload) {
+  if (preparedOverload) {
+    ASSERT(!PreparingOverload);
+    PreparingOverload = true;
+  }
+
+  SWIFT_DEFER {
+    if (preparedOverload) {
+      ASSERT(PreparingOverload);
+      PreparingOverload = false;
+    }
+  };
+
   if (value->getDeclContext()->isTypeContext() && isa<FuncDecl>(value)) {
     // Unqualified lookup can find operator names within nominal types.
     auto func = cast<FuncDecl>(value);
@@ -1507,13 +1522,15 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
 DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
     Type baseTy, ValueDecl *value, DeclContext *useDC, bool isDynamicLookup,
     FunctionRefInfo functionRefInfo, ConstraintLocator *locator,
-    SmallVectorImpl<OpenedType> *replacementsPtr) {
+    SmallVectorImpl<OpenedType> *replacementsPtr,
+    PreparedOverload *preparedOverload) {
   // Figure out the instance type used for the base.
   Type resolvedBaseTy = getFixedTypeRecursive(baseTy, /*wantRValue=*/true);
 
   // If the base is a module type, just use the type of the decl.
   if (resolvedBaseTy->is<ModuleType>()) {
-    return getTypeOfReference(value, functionRefInfo, locator, useDC);
+    return getTypeOfReference(value, functionRefInfo, locator, useDC,
+                              preparedOverload);
   }
 
   // Check to see if the self parameter is applied, in which case we'll want to
@@ -2427,10 +2444,12 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       declRefType = getTypeOfMemberReference(
           baseTy, choice.getDecl(), useDC,
           (kind == OverloadChoiceKind::DeclViaDynamic),
-          choice.getFunctionRefInfo(), locator, nullptr);
+          choice.getFunctionRefInfo(), locator, nullptr,
+          /*preparedOverload=*/nullptr);
     } else {
       declRefType = getTypeOfReference(
-          choice.getDecl(), choice.getFunctionRefInfo(), locator, useDC);
+          choice.getDecl(), choice.getFunctionRefInfo(), locator, useDC,
+          /*preparedOverload=*/nullptr);
     }
 
     openedType = declRefType.openedType;

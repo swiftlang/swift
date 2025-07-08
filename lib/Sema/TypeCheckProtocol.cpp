@@ -1224,7 +1224,7 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
       openWitnessType =
           cs->getTypeOfReference(
                 witness, FunctionRefInfo::doubleBaseNameApply(), witnessLocator,
-                /*useDC=*/nullptr)
+                /*useDC=*/nullptr, /*preparedOverload=*/nullptr)
               .adjustedReferenceType;
     }
     openWitnessType = openWitnessType->getRValueType();
