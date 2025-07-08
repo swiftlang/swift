@@ -225,6 +225,8 @@ private:
                  ->lookThroughAllOptionalTypes()
                  ->getAnyActor())) &&
            "actorInstance must be an actor if it is non-empty");
+    assert((getKind() != Disconnected || isolatedConformance == nullptr) &&
+        "isolated conformance cannot be introduced with disconnected region");
   }
 
   SILIsolationInfo(SILValue isolatedValue, ActorInstance actorInstance,
@@ -500,6 +502,15 @@ public:
       return get(inst);
     return {};
   }
+
+  /// Infer isolation region from the set of protocol conformances.
+  static SILIsolationInfo getFromConformances(
+      SILValue value, ArrayRef<ProtocolConformanceRef> conformances);
+
+  /// Determine the isolation of conformances that could be introduced by a
+  /// cast from sourceType to destType.
+  static SILIsolationInfo getForCastConformances(
+      SILValue value, CanType sourceType, CanType destType);
 
   /// A helper that is used to ensure that we treat certain builtin values as
   /// non-Sendable that the AST level otherwise thinks are non-Sendable.
