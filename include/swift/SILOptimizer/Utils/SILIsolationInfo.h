@@ -249,6 +249,10 @@ private:
   SILIsolationInfo(Kind kind, Options options = Options())
       : actorIsolation(), kind(kind), options(options.toRaw()) {}
 
+  /// Infer isolation region from the set of protocol conformances.
+  static SILIsolationInfo getFromConformances(
+      SILValue value, ArrayRef<ProtocolConformanceRef> conformances);
+
 public:
   SILIsolationInfo() : actorIsolation(), kind(Kind::Unknown), options(0) {}
 
@@ -503,14 +507,13 @@ public:
     return {};
   }
 
-  /// Infer isolation region from the set of protocol conformances.
-  static SILIsolationInfo getFromConformances(
-      SILValue value, ArrayRef<ProtocolConformanceRef> conformances);
-
   /// Determine the isolation of conformances that could be introduced by a
   /// cast from sourceType to destType.
   static SILIsolationInfo getForCastConformances(
       SILValue value, CanType sourceType, CanType destType);
+
+  /// Infer isolation of conformances for the given instruction.
+  static SILIsolationInfo getConformanceIsolation(SILInstruction *inst);
 
   /// A helper that is used to ensure that we treat certain builtin values as
   /// non-Sendable that the AST level otherwise thinks are non-Sendable.

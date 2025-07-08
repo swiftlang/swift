@@ -192,9 +192,9 @@ bb0:
   // expected-warning @-1 {{}}
   // expected-note @-2 {{}}
 
-  %i = init_existential_value %1 : $NonSendableKlass, $NonSendableKlass, $P // expected-note {{access can happen concurrently}}
+  %i = init_existential_value %1 : $NonSendableKlass, $NonSendableKlass, $P
   %f2 = function_ref @useP : $@convention(thin) (@in_guaranteed P) -> ()
-  apply %f2(%i) : $@convention(thin) (@in_guaranteed P) -> ()
+  apply %f2(%i) : $@convention(thin) (@in_guaranteed P) -> () // expected-note {{access can happen concurrently}}
   destroy_value %i : $P
 
   %9999 = tuple ()

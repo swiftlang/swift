@@ -1062,6 +1062,21 @@ SILIsolationInfo SILIsolationInfo::getForCastConformances(
   return {};
 }
 
+SILIsolationInfo SILIsolationInfo::getConformanceIsolation(SILInstruction *inst) {
+  // Existential initialization.
+  if (auto ieai = dyn_cast<InitExistentialAddrInst>(inst)) {
+    return getFromConformances(ieai, ieai->getConformances());
+  }
+  if (auto ieri = dyn_cast<InitExistentialRefInst>(inst)) {
+    return getFromConformances(ieri, ieri->getConformances());
+  }
+  if (auto ievi = dyn_cast<InitExistentialValueInst>(inst)) {
+    return getFromConformances(ievi, ievi->getConformances());
+  }
+
+  return {};
+}
+
 void SILIsolationInfo::printOptions(llvm::raw_ostream &os) const {
   if (isolatedConformance) {
     os << "isolated-conformance-to(" << isolatedConformance->getName() << ")";
