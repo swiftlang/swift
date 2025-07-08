@@ -251,6 +251,14 @@ static bool isStandardComparisonOperator(Constraint *disjunction) {
   return false;
 }
 
+static bool isStandardInfixLogicalOperator(Constraint *disjunction) {
+  auto *choice = disjunction->getNestedConstraints()[0];
+  if (auto *decl = getOverloadChoiceDecl(choice))
+    return decl->isOperator() &&
+           decl->getBaseIdentifier().isStandardInfixLogicalOperator();
+  return false;
+}
+
 static bool isOperatorNamed(Constraint *disjunction, StringRef name) {
   auto *choice = disjunction->getNestedConstraints()[0];
   if (auto *decl = getOverloadChoiceDecl(choice))
@@ -1855,6 +1863,16 @@ ConstraintSystem::selectDisjunction() {
 
         bool isFirstOperator = isOperatorDisjunction(first);
         bool isSecondOperator = isOperatorDisjunction(second);
+
+        // Infix logical operators are usually not overloaded and don't
+        // form disjunctions, but when they do, let's prefer them over
+        // other operators when they have fewer choices because it helps
+        // to split operator chains.
+        if (isFirstOperator && isSecondOperator) {
+          if (isStandardInfixLogicalOperator(first) !=
+              isStandardInfixLogicalOperator(second))
+            return firstActive < secondActive;
+        }
 
         // Not all of the non-operator disjunctions are supported by the
         // ranking algorithm, so to prevent eager selection of operators

@@ -140,6 +140,10 @@ public:
     return is("??");
   }
 
+  // Returns whether this is a standard infix logical operator,
+  // such as '&&', '||'.
+  bool isStandardInfixLogicalOperator() const { return is("&&") || is("||"); }
+
   /// isOperatorStartCodePoint - Return true if the specified code point is a
   /// valid start of an operator.
   static bool isOperatorStartCodePoint(uint32_t C) {
