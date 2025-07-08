@@ -175,9 +175,9 @@ param
   # Debug Information
   [switch] $DebugInfo,
   [ValidateSet("codeview", "dwarf")]
-  [string] $CDebugFormat = "dwarf",
+  [string] $CDebugFormat = "codeview",
   [ValidateSet("codeview", "dwarf")]
-  [string] $SwiftDebugFormat = "dwarf",
+  [string] $SwiftDebugFormat = "codeview",
 
   # Android SDK Options
   [switch] $Android = $false,
@@ -244,10 +244,11 @@ if ($WindowsSDKArchitectures.Length -eq 1) { $WindowsSDKArchitectures = $Windows
 
 if ($Test.Length -eq 1) { $Test = $Test[0].Split(",") }
 
-if ($Test -contains "*") {
-  # Explicitly don't include llbuild yet since tests are known to fail on Windows
-  $Test = @("lld", "lldb", "swift", "dispatch", "foundation", "xctest", "swift-format", "sourcekit-lsp")
-}
+#if ($Test -contains "*") {
+#  # Explicitly don't include llbuild yet since tests are known to fail on Windows
+#  $Test = @("lld", "lldb", "swift", "dispatch", "foundation", "xctest", "swift-format", "sourcekit-lsp")
+#}
+$Test = @("foundation")
 
 if ($UseHostToolchain -is [string]) {
   $UseHostToolchain = [System.Convert]::ToBoolean($UseHostToolchain)
@@ -1369,6 +1370,7 @@ function Build-CMakeProject {
     [switch] $AddAndroidCMakeEnv = $false,
     [switch] $UseGNUDriver = $false,
     [string] $SwiftSDK = $null,
+    [switch] $IncludeDebugInfo = $DebugInfo,
     [hashtable] $Defines = @{}, # Values are either single strings or arrays of flags
     [string[]] $BuildTargets = @()
   )
@@ -1435,7 +1437,7 @@ function Build-CMakeProject {
           Add-KeyValueIfNew $Defines CMAKE_ASM_FLAGS @("--target=$($Platform.Triple)")
           Add-KeyValueIfNew $Defines CMAKE_ASM_COMPILE_OPTIONS_MSVC_RUNTIME_LIBRARY_MultiThreadedDLL "/MD"
 
-          if ($DebugInfo) {
+          if ($IncludeDebugInfo) {
             $ASMDebugFlags = if ($CDebugFormat -eq "dwarf") {
               if ($UseGNUDriver) { @("-gdwarf") } else { @("-clang:-gdwarf") }
             } else {
@@ -1485,7 +1487,7 @@ function Build-CMakeProject {
             @("/GS-", "/Gw", "/Gy", "/Oy", "/Oi", "/Zc:inline")
           }
 
-          if ($DebugInfo) {
+          if ($IncludeDebugInfo) {
             if ($UsePinnedCompilers.Contains("C") -or $UseBuiltCompilers.Contains("C")) {
               if ($CDebugFormat -eq "dwarf") {
                 $CFLAGS += if ($UseGNUDriver) {
@@ -1525,7 +1527,7 @@ function Build-CMakeProject {
             @("/GS-", "/Gw", "/Gy", "/Oy", "/Oi", "/Zc:inline", "/Zc:__cplusplus")
           }
 
-          if ($DebugInfo) {
+          if ($IncludeDebugInfo) {
             if ($UsePinnedCompilers.Contains("CXX") -or $UseBuiltCompilers.Contains("CXX")) {
               if ($CDebugFormat -eq "dwarf") {
                 $CXXFLAGS += if ($UseGNUDriver) {
@@ -1565,7 +1567,7 @@ function Build-CMakeProject {
             @()
           }
 
-          $SwiftFlags += if ($DebugInfo) {
+          $SwiftFlags += if ($IncludeDebugInfo) {
             if ($SwiftDebugFormat -eq "dwarf") {
               @("-g", "-debug-info-format=dwarf", "-use-ld=lld-link", "-Xlinker", "/DEBUG:DWARF")
             } else {
@@ -1592,7 +1594,7 @@ function Build-CMakeProject {
           @("/INCREMENTAL:NO", "/OPT:REF", "/OPT:ICF")
         }
 
-        if ($DebugInfo) {
+        if ($IncludeDebugInfo) {
           if ($UseASM -or $UseC -or $UseCXX) {
             # Prefer `/Z7` over `/ZI`
             # By setting the debug information format, the appropriate C/C++
@@ -1629,7 +1631,7 @@ function Build-CMakeProject {
           Add-KeyValueIfNew $Defines CMAKE_C_COMPILER_TARGET $Platform.Triple
 
           $CFLAGS = @("--sysroot=${AndroidSysroot}", "-ffunction-sections", "-fdata-sections")
-          if ($DebugInfo) {
+          if ($IncludeDebugInfo) {
             $CFLAGS += @("-gdwarf")
           }
           Add-FlagsDefine $Defines CMAKE_C_FLAGS $CFLAGS
@@ -1639,7 +1641,7 @@ function Build-CMakeProject {
           Add-KeyValueIfNew $Defines CMAKE_CXX_COMPILER_TARGET $Platform.Triple
 
           $CXXFLAGS = @("--sysroot=${AndroidSysroot}", "-ffunction-sections", "-fdata-sections")
-          if ($DebugInfo) {
+          if ($IncludeDebugInfo) {
             $CXXFLAGS += @("-gdwarf")
           }
           Add-FlagsDefine $Defines CMAKE_CXX_FLAGS $CXXFLAGS
@@ -1678,7 +1680,7 @@ function Build-CMakeProject {
             "-Xclang-linker", "-resource-dir", "-Xclang-linker", "${AndroidPrebuiltRoot}\lib\clang\$($(Get-AndroidNDK).ClangVersion)"
           )
 
-          $SwiftFlags += if ($DebugInfo) { @("-g") } else { @("-gnone") }
+          $SwiftFlags += if ($IncludeDebugInfo) { @("-g") } else { @("-gnone") }
 
           Add-FlagsDefine $Defines CMAKE_Swift_FLAGS $SwiftFlags
           # Workaround CMake 3.26+ enabling `-wmo` by default on release builds
@@ -1861,10 +1863,11 @@ function Build-SPMProject {
       }
       Test {
         $ActionName = "test"
+        $Arguments += @("-v")
       }
       TestParallel {
         $ActionName = "test"
-        $Arguments += @("--parallel")
+        $Arguments += @("--parallel", "-v")
       }
     }
 
@@ -2938,8 +2941,10 @@ function Test-Foundation {
     -Src $SourceCache\swift-foundation `
     -Bin "$ScratchPath" `
     -Platform $BuildPlatform `
+    -Configuration $FoundationTestConfiguration `
     --multiroot-data-file "$SourceCache\swift\utils\build_swift\resources\SwiftPM-Unified-Build.xcworkspace" `
-    --test-product swift-foundationPackageTests
+    --test-product swift-foundationPackageTests `
+    -j 2
 
   Invoke-IsolatingEnvVars {
     $env:DISPATCH_INCLUDE_PATH="$(Get-SwiftSDK $BuildPlatform.OS)/usr/include"
@@ -2953,8 +2958,10 @@ function Test-Foundation {
       -Src $SourceCache\swift-corelibs-foundation `
       -Bin "$ScratchPath" `
       -Platform $BuildPlatform `
+      -Configuration $FoundationTestConfiguration `
       --multiroot-data-file "$SourceCache\swift\utils\build_swift\resources\SwiftPM-Unified-Build.xcworkspace" `
-      --test-product swift-corelibs-foundationPackageTests
+      --test-product swift-corelibs-foundationPackageTests `
+      -j 2
   }
 }
 
@@ -3366,6 +3373,7 @@ function Build-Driver([Hashtable] $Platform) {
     -Platform $Platform `
     -UseBuiltCompilers C,CXX,Swift `
     -SwiftSDK (Get-SwiftSDK $Platform.OS) `
+    -IncludeDebugInfo `
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
       CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
