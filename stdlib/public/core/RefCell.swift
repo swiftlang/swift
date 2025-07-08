@@ -17,17 +17,17 @@ public struct _RefCell<Value: ~Copyable>: ~Copyable {
   // < 0 = Writing
   // 0 = Unused
   // > 0 = Borrows are outstanding
-  @_usableFromInline
+  @usableFromInline
   let borrows = _Cell(0)
 
-  @_usableFromInline
-  let value: _Cell<Value>
+  @usableFromInline
+  let value: _UnsafeCell<Value>
 
   @available(SwiftStdlib 6.3, *)
   @_alwaysEmitIntoClient
   @_transparent
   public init(_ initialValue: consuming Value) {
-    value = _Cell(initialValue)
+    unsafe value = _UnsafeCell(initialValue)
   }
 }
 
@@ -37,22 +37,35 @@ extension _RefCell where Value: ~Copyable {
   @frozen
   @safe
   public struct Ref: ~Copyable, ~Escapable {
-    @_usableFromInline
-    let cell: _Borrow<RefCell<Value>>
+    @usableFromInline
+    let borrows: _Borrow<_Cell<Int>>
+
+    @usableFromInline
+    let value: UnsafePointer<Value>
+
+    @available(SwiftStdlib 6.3, *)
+    @lifetime(copy borrows)
+    @_alwaysEmitIntoClient
+    @_transparent
+    internal init(borrows: _Borrow<_Cell<Int>>, value: UnsafePointer<Value>) {
+      self.borrows = borrows
+      unsafe self.value = value
+    }
 
     @available(SwiftStdlib 6.3, *)
     @_alwaysEmitIntoClient
-    public var value: Value {
+    public subscript() -> Value {
       @_transparent
       unsafeAddress {
-        UnsafePointer(cell[].value.address)
+        unsafe value
       }
     }
 
     @_alwaysEmitIntoClient
     @_transparent
     deinit {
-      cell[].borrows.value -= 1
+      let b = borrows[].get()
+      borrows[].set(b - 1)
     }
   }
 
@@ -61,12 +74,13 @@ extension _RefCell where Value: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   public func borrow() -> Ref {
-    guard borrows.value + 1 > 0 else {
+    guard borrows.get() >= 0 else {
       _preconditionFailure("Exclusivity violation")
     }
 
-    borrows.value += 1
-    return Ref(cell: _Borrow(self))
+    let b = borrows.get()
+    borrows.set(b + 1)
+    return unsafe Ref(borrows: &&borrows, value: UnsafePointer(value.address))
   }
 }
 
@@ -76,27 +90,40 @@ extension _RefCell where Value: ~Copyable {
   @frozen
   @safe
   public struct MutRef: ~Copyable, ~Escapable {
-    @_usableFromInline
-    let cell: _Borrow<RefCell<Value>>
+    @usableFromInline
+    let borrows: _Borrow<_Cell<Int>>
+
+    @usableFromInline
+    let value: UnsafeMutablePointer<Value>
+
+    @available(SwiftStdlib 6.3, *)
+    @lifetime(copy borrows)
+    @_alwaysEmitIntoClient
+    @_transparent
+    internal init(borrows: _Borrow<_Cell<Int>>, value: UnsafeMutablePointer<Value>) {
+      self.borrows = borrows
+      unsafe self.value = value
+    }
 
     @available(SwiftStdlib 6.3, *)
     @_alwaysEmitIntoClient
-    public var value: Value {
+    public subscript() -> Value {
       @_transparent
       unsafeAddress {
-        UnsafePointer(cell[].value.address)
+        unsafe UnsafePointer(value)
       }
 
       @_transparent
       nonmutating unsafeMutableAddress {
-        cell[].value.address
+        unsafe value
       }
     }
 
     @_alwaysEmitIntoClient
     @_transparent
     deinit {
-      cell[].borrows.value -= 1
+      let b = borrows[].get()
+      borrows[].set(b + 1)
     }
   }
 
@@ -105,11 +132,12 @@ extension _RefCell where Value: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   public func mutate() -> MutRef {
-    guard borrows.value == 0 else {
+    guard borrows.get() == 0 else {
       _preconditionFailure("Exclusivity violation")
     }
 
-    borrows.value -= 1
-    return MutRef(cell: _Borrow(self))
+    let b = borrows.get()
+    borrows.set(b - 1)
+    return unsafe MutRef(borrows: &&borrows, value: value.address)
   }
 }

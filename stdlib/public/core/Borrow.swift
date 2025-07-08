@@ -49,10 +49,19 @@ public struct _Borrow<Value: ~Copyable>: Copyable, ~Escapable {
 
   @available(SwiftStdlib 6.3, *)
   @_alwaysEmitIntoClient
-  public subscript() -> T {
+  public subscript() -> Value {
     @_transparent
     unsafeAddress {
       unsafe _pointer
     }
   }
+}
+
+prefix operator &&
+
+@available(SwiftStdlib 6.3, *)
+@_alwaysEmitIntoClient
+@_transparent
+public prefix func &&<T: ~Copyable>(lhs: borrowing @_addressable T) -> _Borrow<T> {
+  _Borrow(lhs)
 }

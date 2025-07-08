@@ -10,52 +10,87 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Builtin
-
 @available(SwiftStdlib 6.3, *)
 @frozen
 @unsafe
 @_rawLayout(like: Value, movesAsLike)
-public struct _Cell<Value: ~Copyable>: ~Copyable {
+public struct _UnsafeCell<Value: ~Copyable>: ~Copyable {
   @available(SwiftStdlib 6.3, *)
   @_alwaysEmitIntoClient
   @_transparent
   public var address: UnsafeMutablePointer<Value> {
-    unsafe UnsafeMutablePointer<Value>(_rawAddress)
+    unsafe UnsafeMutablePointer<Value>(rawAddress)
   }
 
   @available(SwiftStdlib 6.3, *)
   @_alwaysEmitIntoClient
   @_transparent
   internal var rawAddress: Builtin.RawPointer {
-    Builtin.addressOfRawLayout(self)
-  }
-
-  @available(SwiftStdlib 6.3, *)
-  @_alwaysEmitIntoClient
-  public var value: Value {
-    @_transparent
-    unsafeAddress {
-      UnsafePointer<Value>(address)
-    }
-
-    @_transparent
-    nonmutating unsafeMutableAddress {
-      address
-    }
+    unsafe Builtin.addressOfRawLayout(self)
   }
 
   @available(SwiftStdlib 6.3, *)
   @_alwaysEmitIntoClient
   @_transparent
   public init(_ initialValue: consuming Value) {
-    unsafe _address.initialize(to: initialValue)
+    unsafe address.initialize(to: initialValue)
   }
 
   @available(SwiftStdlib 6.3, *)
   @_alwaysEmitIntoClient
   @_transparent
   deinit {
-    unsafe _address.deinitialize(count: 1)
+    unsafe address.deinitialize(count: 1)
+  }
+}
+
+@available(SwiftStdlib 6.3, *)
+@frozen
+@safe
+public struct _Cell<Value: ~Copyable>: ~Copyable {
+  @usableFromInline
+  let cell: _UnsafeCell<Value>
+
+  @available(SwiftStdlib 6.3, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public init(_ initialValue: consuming Value) {
+    unsafe cell = _UnsafeCell(initialValue)
+  }
+}
+
+@available(SwiftStdlib 6.3, *)
+extension _Cell where Value: ~Copyable {
+  @available(SwiftStdlib 6.3, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public var address: UnsafeMutablePointer<Value> {
+    unsafe cell.address
+  }
+
+  @available(SwiftStdlib 6.3, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public func replace(with new: consuming Value) -> Value {
+    let old = unsafe address.move()
+    unsafe address.initialize(to: new)
+    return old
+  }
+
+  @available(SwiftStdlib 6.3, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public func set(_ new: consuming Value) {
+    _ = replace(with: new)
+  }
+}
+
+@available(SwiftStdlib 6.3, *)
+extension _Cell where Value: Copyable {
+  @available(SwiftStdlib 6.3, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public func get() -> Value {
+    unsafe address.pointee
   }
 }

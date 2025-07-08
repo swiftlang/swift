@@ -14,27 +14,27 @@
 @frozen
 @safe
 public struct _Box<Value: ~Copyable>: ~Copyable {
-  @_usableFromInline
+  @usableFromInline
   let pointer: UnsafeMutablePointer<Value>
 
   @available(SwiftStdlib 6.3, *)
   @_alwaysEmitIntoClient
   @_transparent
   public init(_ initialValue: consuming Value) {
-    pointer = UnsafeMutablePointer<Value>.allocate(capacity: 1)
-    pointer.initialize(to: initialValue)
+    unsafe pointer = UnsafeMutablePointer<Value>.allocate(capacity: 1)
+    unsafe pointer.initialize(to: initialValue)
   }
 
   @_alwaysEmitIntoClient
   @_transparent
   deinit {
-    pointer.deinitialize(count: 1)
-    pointer.deallocate()
+    unsafe pointer.deinitialize(count: 1)
+    unsafe pointer.deallocate()
   }
 }
 
 @available(SwiftStdlib 6.3, *)
-extension Box where Value: ~Copyable {
+extension _Box where Value: ~Copyable {
   @available(SwiftStdlib 6.3, *)
   @_alwaysEmitIntoClient
   public var span: Span<Value> {
@@ -66,9 +66,9 @@ extension Box where Value: ~Copyable {
   @available(SwiftStdlib 6.3, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public func consume() -> Value {
-    let result = _pointer.move()
-    pointer.deallocate()
+  public consuming func consume() -> Value {
+    let result = unsafe pointer.move()
+    unsafe pointer.deallocate()
     discard self
     return result
   }
@@ -78,22 +78,22 @@ extension Box where Value: ~Copyable {
   public subscript() -> Value {
     @_transparent
     unsafeAddress {
-      UnsafePointer<Value>(pointer)
+      unsafe UnsafePointer<Value>(pointer)
     }
 
     @_transparent
     unsafeMutableAddress {
-      pointer
+      unsafe pointer
     }
   }
 }
 
 @available(SwiftStdlib 6.3, *)
-extension Box where Value: Copyable {
+extension _Box where Value: Copyable {
   @available(SwiftStdlib 6.3, *)
   @_alwaysEmitIntoClient
   @_transparent
   public func copy() -> Value {
-    pointer.pointee
+    unsafe pointer.pointee
   }
 }
