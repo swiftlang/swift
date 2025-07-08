@@ -7,6 +7,7 @@
 
 /// _ArrayBuffer is part of the ObjC runtime interop.
 // REQUIRES: objc_interop
+// REQUIRES: CPU=x86_64 || CPU=arm64
 
 sil_stage canonical
 
