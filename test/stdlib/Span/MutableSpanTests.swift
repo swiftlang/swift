@@ -30,9 +30,11 @@ suite.test("Initialize with ordinary element")
   let capacity = 4
   var s = (0..<capacity).map({ "\(#file)+\(#function)--\($0)" })
   s.withUnsafeMutableBufferPointer {
-    let b = MutableSpan(_unsafeElements: $0)
-    let c = b.count
-    expectEqual(c, $0.count)
+    var b = MutableSpan(_unsafeElements: $0)
+    expectEqual(b.count, $0.count)
+
+    b = MutableSpan()
+    expectEqual(b.count, 0)
   }
 }
 
