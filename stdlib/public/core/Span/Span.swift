@@ -55,7 +55,7 @@ public struct Span<Element: ~Copyable>: ~Escapable, Copyable, BitwiseCopyable {
   @_alwaysEmitIntoClient
   @inline(__always)
   @lifetime(immortal)
-  internal init() {
+  public init() {
     unsafe _pointer = nil
     _count = 0
   }

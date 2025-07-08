@@ -33,6 +33,14 @@ public struct MutableRawSpan: ~Copyable & ~Escapable {
     unsafe _pointer._unsafelyUnwrappedUnchecked
   }
 
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  @lifetime(immortal)
+  public init() {
+    unsafe _pointer = nil
+    _count = 0
+  }
+
   @unsafe
   @_unsafeNonescapableResult
   @_alwaysEmitIntoClient
