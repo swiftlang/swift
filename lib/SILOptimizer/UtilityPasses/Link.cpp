@@ -48,7 +48,7 @@ public:
     // (swift_retain, etc.). Link them in so they can be referenced in IRGen.
     if (M.getOptions().EmbeddedSwift && LinkEmbeddedRuntime) {
       linkEmbeddedRuntimeFromStdlib();
-      linkEmbeddedConcurrencyHookImpls();
+      linkEmbeddedConcurrency();
     }
 
     // In embedded Swift, we need to explicitly link any @_used globals and
@@ -81,7 +81,7 @@ public:
       linkEmbeddedRuntimeFunctionByName("swift_retainCount", { RefCounting });
   }
 
-  void linkEmbeddedConcurrencyHookImpls() {
+  void linkEmbeddedConcurrency() {
     using namespace RuntimeConstants;
 
     // Note: we ignore errors here, because, depending on the exact situation
@@ -99,6 +99,11 @@ public:
   linkUsedFunctionByName(#NAME "Impl", SILLinkage::HiddenExternal)
 
     #include "swift/Runtime/ConcurrencyHooks.def"
+
+    linkUsedFunctionByName("swift_task_asyncMainDrainQueueImpl",
+                           SILLinkage::HiddenExternal);
+    linkUsedFunctionByName("swift_createDefaultExecutors",
+                           SILLinkage::HiddenExternal);
   }
 
   void linkEmbeddedRuntimeFunctionByName(StringRef name,
