@@ -21,6 +21,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/AddressWalker.h"
 #include "swift/SIL/ApplySite.h"
+#include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILGlobalVariable.h"
@@ -1062,6 +1063,24 @@ SILIsolationInfo SILIsolationInfo::getForCastConformances(
   return {};
 }
 
+/// Retrieve a suitable destination value for the cast instruction.
+///
+/// TODO: This should probably be SILDynamicCastInst::getDest(), but that has
+/// unimplemented TODOs.
+static SILValue destValueForDynamicCast(SILDynamicCastInst dynCast) {
+  auto inst = dynCast.getInstruction();
+  switch (dynCast.getKind()) {
+    case SILDynamicCastKind::CheckedCastAddrBranchInst:
+      return cast<CheckedCastAddrBranchInst>(inst)->getDest();
+    case SILDynamicCastKind::CheckedCastBranchInst:
+      return cast<CheckedCastBranchInst>(inst)->getSuccessBB()->getArgument(0);
+    case SILDynamicCastKind::UnconditionalCheckedCastAddrInst:
+      return cast<UnconditionalCheckedCastAddrInst>(inst)->getDest();
+    case SILDynamicCastKind::UnconditionalCheckedCastInst:
+      return cast<UnconditionalCheckedCastInst>(inst);
+  }
+}
+
 SILIsolationInfo SILIsolationInfo::getConformanceIsolation(SILInstruction *inst) {
   // Existential initialization.
   if (auto ieai = dyn_cast<InitExistentialAddrInst>(inst)) {
@@ -1072,6 +1091,14 @@ SILIsolationInfo SILIsolationInfo::getConformanceIsolation(SILInstruction *inst)
   }
   if (auto ievi = dyn_cast<InitExistentialValueInst>(inst)) {
     return getFromConformances(ievi, ievi->getConformances());
+  }
+
+  // Dynamic casts.
+  if (auto dynCast = SILDynamicCastInst::getAs(inst)) {
+    return getForCastConformances(
+        destValueForDynamicCast(dynCast),
+        dynCast.getSourceFormalType(),
+        dynCast.getTargetFormalType());
   }
 
   return {};
