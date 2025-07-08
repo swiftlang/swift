@@ -12,6 +12,7 @@
 
 #include "swift/IDE/CodeCompletionResult.h"
 #include "CodeCompletionDiagnostics.h"
+#include "swift/AST/ASTDemangler.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/Basic/Assertions.h"
@@ -441,12 +442,30 @@ ContextFreeCodeCompletionResult::calculateContextualTypeRelation(
 
 // MARK: - CodeCompletionResult
 
+const Decl *CodeCompletionResult::findAssociatedDecl(DeclContext *DC) {
+  if (HasValidAssociatedDecl)
+    return AssociatedDecl;
+
+  HasValidAssociatedDecl = true;
+
+  auto USRs = getAssociatedUSRs();
+  if (USRs.empty())
+    return nullptr;
+
+  StringRef PrimaryUSR = USRs.front();
+  auto &Ctx = DC->getASTContext();
+  AssociatedDecl = swift::Demangle::getDeclForUSR(Ctx, PrimaryUSR);
+
+  return AssociatedDecl;
+}
+
 CodeCompletionResult *
 CodeCompletionResult::withFlair(CodeCompletionFlair NewFlair,
                                 CodeCompletionResultSink &Sink) const {
   return new (*Sink.Allocator)
-      CodeCompletionResult(ContextFree, SemanticContext, NewFlair,
-                           NumBytesToErase, TypeDistance, NotRecommended);
+      CodeCompletionResult(ContextFree, AssociatedDecl, HasValidAssociatedDecl,
+                           SemanticContext, NewFlair, NumBytesToErase,
+                           TypeDistance, NotRecommended);
 }
 
 CodeCompletionResult *
@@ -455,8 +474,9 @@ CodeCompletionResult::withContextFreeResultSemanticContextAndFlair(
     SemanticContextKind NewSemanticContext, CodeCompletionFlair NewFlair,
     CodeCompletionResultSink &Sink) const {
   return new (*Sink.Allocator)
-      CodeCompletionResult(NewContextFree, NewSemanticContext, NewFlair,
-                           NumBytesToErase, TypeDistance, NotRecommended);
+      CodeCompletionResult(NewContextFree, AssociatedDecl, HasValidAssociatedDecl,
+                           NewSemanticContext, NewFlair, NumBytesToErase,
+                           TypeDistance, NotRecommended);
 }
 
 std::pair<CodeCompletionDiagnosticSeverity, NullTerminatedStringRef>
