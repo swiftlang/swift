@@ -205,7 +205,7 @@ public struct DiscardingTaskGroup {
   /// If you add a task to a group after canceling the group,
   /// that task is canceled immediately after being added to the group.
   ///
-  /// Immediately  canceled  child tasks should therefore cooperatively check for and
+  /// Immediately canceled child tasks should therefore cooperatively check for and
   /// react  to cancellation, e.g. by throwing an `CancellationError` at their
   /// earliest convenience, or otherwise handling the cancellation.
   ///
@@ -427,7 +427,7 @@ public func _unsafeInheritExecutor_withThrowingDiscardingTaskGroup<GroupResult>(
 ///
 /// - when ``cancelAll()`` is invoked on it,
 /// - when an error is thrown out of the `withThrowingDiscardingTaskGroup { ... }` closure,
-/// - when the ``Task`` running this task group is  canceled .
+/// - when the ``Task`` running this task group is canceled.
 ///
 /// But also, and uniquely in *discarding* task groups:
 /// - when *any* of its child tasks throws.
@@ -436,7 +436,7 @@ public func _unsafeInheritExecutor_withThrowingDiscardingTaskGroup<GroupResult>(
 /// whenever *any* child task throws an error is a behavior unique to discarding task groups,
 /// because achieving such semantics is not possible otherwise, due to the missing `next()` method
 /// on discarding groups. Accumulating task groups can implement this by manually polling `next()`
-/// and deciding to `cancelAll()` when they decide an error should cause the group to become  canceled,
+/// and deciding to `cancelAll()` when they decide an error should cause the group to become canceled,
 /// however a discarding group cannot poll child tasks for results and therefore assumes that child
 /// task throws are an indication of a group wide failure. In order to avoid such behavior,
 /// use a ``DiscardingTaskGroup`` instead of a throwing one, or catch specific errors in
@@ -447,7 +447,7 @@ public func _unsafeInheritExecutor_withThrowingDiscardingTaskGroup<GroupResult>(
 /// tasks).
 ///
 /// A canceled task group can still keep adding tasks, however they will start
-/// being immediately  canceled, and may act accordingly to this. To avoid adding
+/// being immediately canceled, and may act accordingly to this. To avoid adding
 /// new tasks to an already canceled task group, use ``addTaskUnlessCancelled(priority:body:)``
 /// rather than the plain ``addTask(priority:body:)`` which adds tasks unconditionally.
 ///
