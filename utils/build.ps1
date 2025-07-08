@@ -760,13 +760,13 @@ function Invoke-Program() {
     if ($OutNull) {
       & $Executable @ExecutableArgs | Out-Null
     } elseif ($Silent) {
-      & $Executable @ExecutableArgs *> $null
+      & $Executable @ExecutableArgs | Out-Null 2>&1| Out-Null
     } elseif ($OutFile -and $ErrorFile) {
-      & $Executable @ExecutableArgs > $OutFile 2> $ErrorFile
+      & $Executable @ExecutableArgs | Out-File -FilePath $OutFile -Encoding UTF8 2>&1| Out-File -FilePath $ErrorFile -Encoding UTF8
     } elseif ($OutFile) {
-      & $Executable @ExecutableArgs > $OutFile
+      & $Executable @ExecutableArgs | Out-File -FilePath $OutFile -Encoding UTF8
     } elseif ($ErrorFile) {
-      & $Executable @ExecutableArgs 2> $ErrorFile
+      & $Executable @ExecutableArgs 2>&1| Out-File -FilePath $ErrorFile -Encoding UTF8
     } else {
       & $Executable @ExecutableArgs
     }
