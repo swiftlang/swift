@@ -30,9 +30,12 @@ suite.test("Initialize with Span<Int>")
   let capacity = 4
   Array(0..<capacity).withUnsafeBufferPointer {
     let intSpan = Span(_unsafeElements: $0)
-    let span = RawSpan(_elements: intSpan)
+    var span = RawSpan(_elements: intSpan)
     expectEqual(span.byteCount, capacity*MemoryLayout<Int>.stride)
     expectFalse(span.isEmpty)
+
+    span = RawSpan()
+    expectTrue(span.isEmpty)
   }
 
   let a: [Int] = []
