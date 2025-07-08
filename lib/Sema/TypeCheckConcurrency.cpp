@@ -8281,6 +8281,10 @@ RawConformanceIsolationRequest::evaluate(
   if (rootNormal->getOptions().contains(ProtocolConformanceFlags::Nonisolated))
     return ActorIsolation::forNonisolated(false);
 
+  auto dc = conformance->getDeclContext();
+  ASTContext &ctx = dc->getASTContext();
+  auto proto = conformance->getProtocol();
+
   // If there is an explicitly-specified global actor on the isolation,
   // resolve it and report it.
   if (auto globalActorTypeExpr = rootNormal->getExplicitGlobalActorIsolation()) {
@@ -8300,15 +8304,28 @@ RawConformanceIsolationRequest::evaluate(
       globalActorTypeExpr->setType(MetatypeType::get(globalActorType));
     }
 
+    // Cannot form an isolated conformance to a SendableMetatype-inheriting
+    // protocol. Diagnose it.
+    if (auto sendableMetatype =
+            ctx.getProtocol(KnownProtocolKind::SendableMetatype)) {
+      if (proto->inheritsFrom(sendableMetatype)) {
+        bool isPreconcurrency = moduleImportForPreconcurrency(
+            proto, conformance->getDeclContext()) != nullptr;
+        ctx.Diags.diagnose(
+            rootNormal->getLoc(),
+            diag::isolated_conformance_to_sendable_metatype,
+            ActorIsolation::forGlobalActor(globalActorType),
+            conformance->getType(),
+            proto)
+          .limitBehaviorIf(isPreconcurrency, DiagnosticBehavior::Warning);
+      }
+    }
+
     // FIXME: Make sure the type actually is a global actor type, map it into
     // context, etc.
 
     return ActorIsolation::forGlobalActor(globalActorType);
   }
-
-  auto dc = rootNormal->getDeclContext();
-  ASTContext &ctx = dc->getASTContext();
-  auto proto = rootNormal->getProtocol();
 
   // If the protocol itself is isolated, don't infer isolation for the
   // conformance.
