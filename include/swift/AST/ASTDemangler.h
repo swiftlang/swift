@@ -295,7 +295,8 @@ private:
   /// The module name encoded in the node is either the module's real or ABI
   /// name. Multiple modules can share the same name. This function returns
   /// all modules that contain that name.
-  llvm::ArrayRef<ModuleDecl *> findPotentialModules(NodePointer node);
+  llvm::ArrayRef<ModuleDecl *> findPotentialModules(NodePointer node,
+                                                    ModuleDecl *&scratch);
 
   Demangle::NodePointer findModuleNode(NodePointer node);
 

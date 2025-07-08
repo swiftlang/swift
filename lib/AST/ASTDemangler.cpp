@@ -172,7 +172,8 @@ Decl *ASTBuilder::findDecl(NodePointer node, StringRef usr,
       return findTopLevelClangDecl(importer, name, hasMatchingUSR);
     }
 
-    auto potentialModules = findPotentialModules(contextNode);
+    ModuleDecl *scratch;
+    auto potentialModules = findPotentialModules(contextNode, scratch);
 
     for (auto *module : potentialModules) {
       auto *moduleScopeContext = module->getModuleScopeContext();
@@ -398,7 +399,9 @@ Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
     auto moduleNode = findModuleNode(definingDecl);
     if (!moduleNode)
       return Type();
-    auto potentialParentModules = findPotentialModules(moduleNode);
+    
+    ModuleDecl *scratch;
+    auto potentialParentModules = findPotentialModules(moduleNode, scratch);
     if (potentialParentModules.empty())
       return Type();
 
@@ -1320,9 +1323,17 @@ ASTBuilder::createTypeDecl(NodePointer node,
 }
 
 llvm::ArrayRef<ModuleDecl *>
-ASTBuilder::findPotentialModules(NodePointer node) {
+ASTBuilder::findPotentialModules(NodePointer node, ModuleDecl *&scratch) {
   assert(node->getKind() == Demangle::Node::Kind::Module);
+  
   const auto moduleName = node->getText();
+  
+  if (moduleName == CLANG_HEADER_MODULE_NAME) {
+    auto *importer = Ctx.getClangModuleLoader();
+    scratch = importer->getImportedHeaderModule();
+    return ArrayRef(&scratch, 1);
+  }
+  
   return Ctx.getModulesByRealOrABIName(moduleName);
 }
 
@@ -1430,7 +1441,8 @@ ASTBuilder::findDeclContext(NodePointer node) {
     // debugger or USR together with the OriginallyDefinedIn attribute for
     // example.
     assert(false && "Looked up module as decl context directly!");
-    auto modules = findPotentialModules(node);
+    ModuleDecl *scratch;
+    auto modules = findPotentialModules(node, scratch);
     return modules.empty() ? nullptr : modules[0];
   }
 
@@ -1448,7 +1460,8 @@ ASTBuilder::findDeclContext(NodePointer node) {
       if (!moduleNode)
         return nullptr;
 
-      auto potentialModules = findPotentialModules(moduleNode);
+      ModuleDecl *scratch;
+      auto potentialModules = findPotentialModules(moduleNode, scratch);
       if (potentialModules.empty())
         return nullptr;
 
@@ -1498,7 +1511,8 @@ ASTBuilder::findDeclContext(NodePointer node) {
 
     auto child = node->getFirstChild();
     if (child->getKind() == Node::Kind::Module) {
-      auto potentialModules = findPotentialModules(child);
+      ModuleDecl *scratch;
+      auto potentialModules = findPotentialModules(child, scratch);
       if (potentialModules.empty())
         return nullptr;
 
@@ -1521,7 +1535,8 @@ ASTBuilder::findDeclContext(NodePointer node) {
     return findDeclContext(node->getChild(0));
 
   case Demangle::Node::Kind::Extension: {
-    auto moduleDecls = findPotentialModules(node->getFirstChild());
+    ModuleDecl *scratch;
+    auto moduleDecls = findPotentialModules(node->getFirstChild(), scratch);
     if (moduleDecls.empty())
       return nullptr;
 
@@ -1557,8 +1572,7 @@ ASTBuilder::findDeclContext(NodePointer node) {
       for (ModuleDecl *module : moduleDecls) {
         auto *extensionModule = ext->getParentModule();
         
-        if (extensionModule == module ||
-            extensionModule == module->getUnderlyingModuleIfOverlay()) {
+        if (extensionModule == module) {
           found = true;
           break;
         }
