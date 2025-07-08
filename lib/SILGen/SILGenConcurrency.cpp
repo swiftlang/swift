@@ -75,7 +75,7 @@ setExpectedExecutorForParameterIsolation(SILGenFunction &SGF,
   // argument.
   if (actorIsolation.getKind() == ActorIsolation::CallerIsolationInheriting) {
     auto *isolatedArg = SGF.F.maybeGetIsolatedArgument();
-    assert(isolatedArg &&
+    ASSERT(isolatedArg &&
            "Caller Isolation Inheriting without isolated parameter");
     ManagedValue isolatedMV;
     if (isolatedArg->getOwnershipKind() == OwnershipKind::Guaranteed) {
