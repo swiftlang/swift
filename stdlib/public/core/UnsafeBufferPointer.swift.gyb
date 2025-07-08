@@ -572,9 +572,12 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   public func extracting(_ bounds: UnboundedRange) -> Self {
     unsafe self
   }
+}
 
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   @unsafe
-  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public var span: Span<Element> {
     @lifetime(borrow self)
@@ -586,7 +589,6 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
 %if Mutable:
 
   @unsafe
-  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public var mutableSpan: MutableSpan<Element> {
     @lifetime(borrow self)

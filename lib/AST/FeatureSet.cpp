@@ -126,6 +126,7 @@ UNINTERESTING_FEATURE(MacrosOnImports)
 UNINTERESTING_FEATURE(NonisolatedNonsendingByDefault)
 UNINTERESTING_FEATURE(KeyPathWithMethodMembers)
 UNINTERESTING_FEATURE(SendableProhibitsMainActorInference)
+UNINTERESTING_FEATURE(ImportMacroAliases)
 
 // TODO: Return true for inlinable function bodies with module selectors in them
 UNINTERESTING_FEATURE(ModuleSelector)
@@ -666,8 +667,8 @@ static bool usesFeatureAsyncExecutionBehaviorAttributes(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureExtensibleAttribute(Decl *decl) {
-  return decl->getAttrs().hasAttribute<ExtensibleAttr>();
+static bool usesFeatureNonexhaustiveAttribute(Decl *decl) {
+  return decl->getAttrs().hasAttribute<NonexhaustiveAttr>();
 }
 
 static bool usesFeatureAlwaysInheritActorContext(Decl *decl) {

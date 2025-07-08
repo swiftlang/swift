@@ -1315,8 +1315,9 @@ public:
           lastInnerParenLoc = PE->getLParenLoc();
           parent = nextParent;
         }
-
-        if (isa<ApplyExpr>(parent) || isa<UnresolvedMemberExpr>(parent)) {
+        
+        if (isa<ApplyExpr>(parent) || isa<UnresolvedMemberExpr>(parent) ||
+            isa<MacroExpansionExpr>(parent)) {
           // If outermost paren is associated with a call or
           // a member reference, it might be valid to have `&`
           // before all of the parens.

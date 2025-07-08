@@ -1,8 +1,10 @@
-// RUN: %target-typecheck-verify-swift -I %S/Inputs/custom-modules %s
-// RUN: %target-swift-frontend -I %S/Inputs/custom-modules -parse-as-library -module-name Alias -Osize -emit-ir -o - %s | %FileCheck %s -check-prefix CHECK-ANSI-IR
-// RUN: %target-typecheck-verify-swift -I %S/Inputs/custom-modules %s -Xcc -DUNICODE
-// RUN: %target-swift-frontend -I %S/Inputs/custom-modules -parse-as-library -module-name Alias -Osize -emit-ir -o - %s -Xcc -DUNICODE | %FileCheck %s -check-prefix CHECK-UNICODE-IR
-// RUN: not %target-swift-frontend -I %S/Inputs/custom-modules -parse-as-library -module-name Alias -c %s -DINVALID -o /dev/null 2>&1 | %FileCheck --dry-run %s -check-prefix CHECK-INVALID
+// RUN: %target-typecheck-verify-swift -I %S/Inputs/custom-modules %s -enable-experimental-feature ImportMacroAliases
+// RUN: %target-swift-frontend -I %S/Inputs/custom-modules -parse-as-library -module-name Alias -Osize -emit-ir -o - %s -enable-experimental-feature ImportMacroAliases | %FileCheck %s -check-prefix CHECK-ANSI-IR
+// RUN: %target-typecheck-verify-swift -I %S/Inputs/custom-modules %s -Xcc -DUNICODE -enable-experimental-feature ImportMacroAliases
+// RUN: %target-swift-frontend -I %S/Inputs/custom-modules -parse-as-library -module-name Alias -Osize -emit-ir -o - %s -Xcc -DUNICODE -enable-experimental-feature ImportMacroAliases | %FileCheck %s -check-prefix CHECK-UNICODE-IR
+// RUN: not %target-swift-frontend -I %S/Inputs/custom-modules -parse-as-library -module-name Alias -c %s -DINVALID -o /dev/null 2>&1 -enable-experimental-feature ImportMacroAliases | %FileCheck --dry-run %s -check-prefix CHECK-INVALID
+
+// REQUIRES: swift_feature_ImportMacroAliases
 
 // expected-no-diagnostics
 

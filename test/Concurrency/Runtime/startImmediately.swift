@@ -436,11 +436,6 @@ print("call_startSynchronously_insideActor()")
 
 actor A {
   func f() {
-    Task.startSynchronously(name: "hello") { print("Task.startSynchronously (\(Task.name!))") }
-    Task.startSynchronously() { print("Task.startSynchronously") }
-  }
-
-  func f2() {
     Task.immediate(name: "hello") { print("Task.immediate (\(Task.name!))") }
     Task.immediate() { print("Task.immediate") }
 
@@ -451,12 +446,10 @@ actor A {
 
 func call_startSynchronously_insideActor() async {
   await A().f()
-  await A().f2()
 }
 
 await call_startSynchronously_insideActor()
 
 // CHECK-LABEL: call_startSynchronously_insideActor()
-// Those two definitely in this order, however the startSynchronously is not determinate
 // CHECK: Task.immediate
 // CHECK: Task.immediate { @MainActor }

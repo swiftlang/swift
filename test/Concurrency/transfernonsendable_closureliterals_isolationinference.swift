@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -emit-sil -parse-as-library -target %target-swift-5.1-abi-triple -swift-version 5 -strict-concurrency=complete %s -o - | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -parse-as-library -target %target-swift-5.1-abi-triple -swift-version 5 -strict-concurrency=complete %s -o - 2>/dev/null | %FileCheck %s
 // RUN: %target-swift-frontend -emit-sil -parse-as-library -target %target-swift-5.1-abi-triple -swift-version 6 -verify %s -o /dev/null -verify-additional-prefix ni-
-// RUN: %target-swift-frontend -emit-sil -parse-as-library -target %target-swift-5.1-abi-triple -swift-version 5 -strict-concurrency=complete %s -o - -enable-upcoming-feature NonisolatedNonsendingByDefault | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -parse-as-library -target %target-swift-5.1-abi-triple -swift-version 5 -strict-concurrency=complete %s -o - -enable-upcoming-feature NonisolatedNonsendingByDefault 2>/dev/null | %FileCheck %s
 // RUN: %target-swift-frontend -emit-sil -parse-as-library -target %target-swift-5.1-abi-triple -swift-version 6 -verify %s -o /dev/null -enable-upcoming-feature NonisolatedNonsendingByDefault -verify-additional-prefix ni-ns-
 
 // REQUIRES: concurrency

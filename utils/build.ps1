@@ -711,6 +711,7 @@ enum Project {
   ExperimentalOverlay
   ExperimentalStringProcessing
   ExperimentalSynchronization
+  ExperimentalDispatch
   StaticFoundation
 }
 
@@ -787,7 +788,8 @@ function Move-Directory($Src, $Dst) {
     if (Test-Path -Path $Destination -Type Container) {
       Remove-Item -Path $Destination -Recurse -Force | Out-Null
     }
-    Move-Item -Path $Src -Destination $Dst -Force | Out-Null
+    New-Item -ItemType Directory -ErrorAction Ignore $Dst | Out-Null
+    Move-Item -Path $Src -Destination $Destination -Force | Out-Null
   }
 }
 
@@ -2524,6 +2526,12 @@ function Build-Foundation {
     @()
   }
 
+  $DispatchCMakeModules = if ($Static) {
+    Get-ProjectCMakeModules $Platform ExperimentalDispatch
+  } else {
+    Get-ProjectCMakeModules $Platform Dispatch
+  }
+
   Build-CMakeProject `
     -Src $SourceCache\swift-corelibs-foundation `
     -Bin $FoundationBinaryCache `
@@ -2547,7 +2555,7 @@ function Build-Foundation {
         "$BinaryCache\$($Platform.Triple)\usr\lib\libz.a"
       };
       ZLIB_INCLUDE_DIR = "$BinaryCache\$($Platform.Triple)\usr\include";
-      dispatch_DIR = (Get-ProjectCMakeModules $Platform Dispatch);
+      dispatch_DIR = $DispatchCMakeModules;
       SwiftSyntax_DIR = (Get-ProjectBinaryCache $HostPlatform Compilers);
       _SwiftFoundation_SourceDIR = "$SourceCache\swift-foundation";
       _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
@@ -2576,7 +2584,8 @@ function Test-Foundation {
       -Src $SourceCache\swift-corelibs-foundation `
       -Bin "$BinaryCache\$($BuildPlatform.Triple)\FoundationTests" `
       -Platform $BuildPlatform `
-      -Configuration $FoundationTestConfiguration
+      -Configuration $FoundationTestConfiguration `
+      -j 1
   }
 }
 
@@ -2734,6 +2743,29 @@ function Build-ExperimentalSDK([Hashtable] $Platform) {
   # TODO(compnerd) we currently build the experimental SDK with just the static
   # variant. We should aim to build both dynamic and static variants.
   Invoke-BuildStep Build-ExperimentalRuntime $Platform -Static
+
+  Invoke-IsolatingEnvVars {
+    $env:Path = "$(Get-CMarkBinaryCache $Platform)\src;$(Get-PinnedToolchainRuntime);${env:Path}"
+    Build-CMakeProject `
+      -Src $SourceCache\swift-corelibs-libdispatch `
+      -Bin (Get-ProjectBinaryCache $Platform ExperimentalDispatch) `
+      -InstallTo "$(Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental")\usr" `
+      -Platform $Platform `
+      -UseBuiltCompilers C,CXX,Swift `
+      -SwiftSDK (Get-SwiftSDK $Platform.OS -Identifier "$($Platform.OS)Experimental") `
+      -Defines @{
+        BUILD_SHARED_LIBS = "NO";
+        CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+        CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Platform);
+        CMAKE_Swift_COMPILER_WORKS = "YES";
+        CMAKE_Swift_FLAGS = @("-static-stdlib", "-Xfrontend", "-use-static-resource-dir");
+        CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
+        CMAKE_SYSTEM_NAME = $Platform.OS.ToString();
+
+        ENABLE_SWIFT = "YES";
+      }
+  }
+
   Invoke-BuildStep Build-Foundation $Platform -Static
 }
 
@@ -3408,7 +3440,6 @@ if (-not $SkipBuild) {
 
   foreach ($Platform in $WindowsSDKPlatforms) {
     Invoke-BuildStep Build-SDK $Platform
-    Invoke-BuildStep Build-ExperimentalSDK $Platform
 
     Get-ChildItem "$(Get-SwiftSDK Windows)\usr\lib\swift\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
       Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
@@ -3416,6 +3447,13 @@ if (-not $SkipBuild) {
     }
 
     Copy-Directory "$(Get-SwiftSDK Windows)\usr\bin" "$([IO.Path]::Combine((Get-InstallDir $Platform), "Runtimes", $ProductVersion, "usr"))"
+
+    Invoke-BuildStep Build-ExperimentalSDK $Platform
+
+    Get-ChildItem "$(Get-SwiftSDK Windows -Identifier WindowsExperimental)\usr\lib\swift_static\windows" -Filter "*.lib" -File -ErrorAction Ignore | ForEach-Object {
+      Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+      Move-Item $_.FullName "$(Get-SwiftSDK Windows -Identifier WindowsExperimental)\usr\lib\swift_static\windows\$($Platform.Architecture.LLVMName)\" | Out-Null
+    }
   }
 
   Write-PlatformInfoPlist Windows
@@ -3427,11 +3465,17 @@ if (-not $SkipBuild) {
   if ($Android) {
     foreach ($Platform in $AndroidSDKPlatforms) {
       Invoke-BuildStep Build-SDK $Platform
-      Invoke-BuildStep Build-ExperimentalSDK $Platform
 
       Get-ChildItem "$(Get-SwiftSDK Android)\usr\lib\swift\android" -File | Where-Object { $_.Name -match ".a$|.so$" } | ForEach-Object {
         Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
         Move-Item $_.FullName "$(Get-SwiftSDK Android)\usr\lib\swift\android\$($Platform.Architecture.LLVMName)\" | Out-Null
+      }
+
+      Invoke-BuildStep Build-ExperimentalSDK $Platform
+
+      Get-ChildItem "$(Get-SwiftSDK Android -Identifier AndroidExperimental)\usr\lib\swift_static\android" -File | Where-Object { $_.Name -match ".a$|.so$" } | ForEach-Object {
+        Write-Host -BackgroundColor DarkRed -ForegroundColor White "$($_.FullName) is not nested in an architecture directory"
+        Move-Item $_.FullName "$(Get-SwiftSDK Android -Identifier AndroidExperimental)\usr\lib\swift_static\android\$($Platform.Architecture.LLVMName)\" | Out-Null
       }
     }
 

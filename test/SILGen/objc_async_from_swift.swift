@@ -136,7 +136,7 @@ class SlowServerlet: SlowServer {
     //
     // @objc thunk closure
     //
-    // CHECK-LABEL: sil shared [thunk] [ossa] @$s21objc_async_from_swift13SlowServerletC011doSomethingE8NullablyySiSSYaFyyYacfU_To : $@convention(thin) @Sendable @async (NSString, Optional<@convention(block) (Int) -> ()>, SlowServerlet) -> () {
+    // CHECK-LABEL: sil shared [thunk] [ossa] @$s21objc_async_from_swift13SlowServerletC011doSomethingE8NullablyySiSSYaFyyYacfU_To : $@convention(thin) @Sendable @async (NSString, Optional<@convention(block) @Sendable (Int) -> ()>, SlowServerlet) -> () {
     // CHECK-NN: [[NONE:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
     // CHECK: [[STR_ARG:%.*]] = begin_borrow {{.*}} : $String
     // CHECK: [[SELF:%.*]] = begin_borrow {{.*}} : $SlowServerlet
@@ -163,7 +163,7 @@ class SlowServerlet: SlowServer {
     // CHECK-NN: } // end sil function '$s21objc_async_from_swift13SlowServerletC18findAnswerNullablyyS2SYaF'
 
     // @objc closure thunk
-    // CHECK-LABEL: sil shared [thunk] [ossa] @$s21objc_async_from_swift13SlowServerletC18findAnswerNullablyyS2SYaFyyYacfU_To : $@convention(thin) @Sendable @async (NSString, Optional<@convention(block) (NSString) -> ()>, SlowServerlet) -> () {
+    // CHECK-LABEL: sil shared [thunk] [ossa] @$s21objc_async_from_swift13SlowServerletC18findAnswerNullablyyS2SYaFyyYacfU_To : $@convention(thin) @Sendable @async (NSString, Optional<@convention(block) @Sendable (NSString) -> ()>, SlowServerlet) -> () {
     // CHECK-NN: [[ACTOR:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
     // CHECK: [[STR_ARG:%.*]] = begin_borrow {{.*}} : $String
     // CHECK: [[SELF:%.*]] = begin_borrow {{.*}} : $SlowServerlet
@@ -191,7 +191,7 @@ class SlowServerlet: SlowServer {
 
     // @objc thunk closure
     //
-    // CHECK-LABEL: sil shared [thunk] [ossa] @$s21objc_async_from_swift13SlowServerletC28doSomethingDangerousNullablyyS2SYaKFyyYacfU_To : $@convention(thin) @Sendable @async (NSString, Optional<@convention(block) (Optional<NSString>, Optional<NSError>) -> ()>, SlowServerlet) -> () {
+    // CHECK-LABEL: sil shared [thunk] [ossa] @$s21objc_async_from_swift13SlowServerletC28doSomethingDangerousNullablyyS2SYaKFyyYacfU_To : $@convention(thin) @Sendable @async (NSString, Optional<@convention(block) @Sendable (Optional<NSString>, Optional<NSError>) -> ()>, SlowServerlet) -> () {
     // CHECK-NN: [[ACTOR:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
     // CHECK: [[STR_ARG:%.*]] = begin_borrow {{.*}} : $String
     // CHECK: [[SELF:%.*]] = begin_borrow {{.*}} : $SlowServerlet
@@ -218,7 +218,7 @@ class SlowServerlet: SlowServer {
     // CHECK-NN: } // end sil function '$s21objc_async_from_swift13SlowServerletC30doSomethingUnspecifiedNullablySSyYaKF'
 
     // @objc closure thunk
-    // CHECK-LABEL: sil shared [thunk] [ossa] @$s21objc_async_from_swift13SlowServerletC30doSomethingUnspecifiedNullablySSyYaKFyyYacfU_To : $@convention(thin) @Sendable @async (Optional<@convention(block) (Optional<NSString>, Optional<NSError>) -> ()>, SlowServerlet) -> () {
+    // CHECK-LABEL: sil shared [thunk] [ossa] @$s21objc_async_from_swift13SlowServerletC30doSomethingUnspecifiedNullablySSyYaKFyyYacfU_To : $@convention(thin) @Sendable @async (Optional<@convention(block) @Sendable (Optional<NSString>, Optional<NSError>) -> ()>, SlowServerlet) -> () {
     // CHECK-NN: [[ACTOR:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
     // CHECK: [[SELF:%.*]] = begin_borrow {{.*}} : $SlowServerlet
     // CHECK-C: [[NATIVE:%.*]] = function_ref @$s21objc_async_from_swift13SlowServerletC30doSomethingUnspecifiedNullablySSyYaKF : $@convention(method) @async (@guaranteed SlowServerlet) -> (@owned String, @error any Error)
@@ -244,7 +244,7 @@ class SlowServerlet: SlowServer {
     // CHECK-NN: } // end sil function '$s21objc_async_from_swift13SlowServerletC17doSomethingFlaggySSyYaKF'
 
     // @objc thunk closure
-    // CHECK-LABEL: sil shared [thunk] [ossa] @$s21objc_async_from_swift13SlowServerletC17doSomethingFlaggySSyYaKFyyYacfU_To : $@convention(thin) @Sendable @async (@convention(block) ({{.*}}, Optional<NSString>, Optional<NSError>) -> (), SlowServerlet) -> () {
+    // CHECK-LABEL: sil shared [thunk] [ossa] @$s21objc_async_from_swift13SlowServerletC17doSomethingFlaggySSyYaKFyyYacfU_To : $@convention(thin) @Sendable @async (@convention(block) @Sendable ({{.*}}, Optional<NSString>, Optional<NSError>) -> (), SlowServerlet) -> () {
     // CHECK-NN: [[ACTOR:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
     // CHECK:    [[SELF:%.*]] = begin_borrow {{.*}} : $SlowServerlet
     // CHECK-C:  [[NATIVE:%.*]] = function_ref @$s21objc_async_from_swift13SlowServerletC17doSomethingFlaggySSyYaKF : $@convention(method) @async (@guaranteed SlowServerlet) -> (@owned String, @error any Error)
@@ -276,7 +276,7 @@ class SlowServerlet: SlowServer {
     // CHECK-NN: } // end sil function '$s21objc_async_from_swift13SlowServerletC21doSomethingZeroFlaggySSyYaKF'
     //
     // @objc thunk closure
-    // CHECK-LABEL: sil shared [thunk] [ossa] @$s21objc_async_from_swift13SlowServerletC21doSomethingZeroFlaggySSyYaKFyyYacfU_To : $@convention(thin) @Sendable @async (@convention(block) (Optional<NSString>, {{.*}}, Optional<NSError>) -> (), SlowServerlet) -> () {
+    // CHECK-LABEL: sil shared [thunk] [ossa] @$s21objc_async_from_swift13SlowServerletC21doSomethingZeroFlaggySSyYaKFyyYacfU_To : $@convention(thin) @Sendable @async (@convention(block) @Sendable (Optional<NSString>, {{.*}}, Optional<NSError>) -> (), SlowServerlet) -> () {
     // CHECK-NN:   [[ACTOR:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
     // CHECK:      [[SELF:%.*]] = begin_borrow {{.*}} : $SlowServerlet
     // CHECK-C:    [[NATIVE:%.*]] = function_ref @$s21objc_async_from_swift13SlowServerletC21doSomethingZeroFlaggySSyYaKF : $@convention(method) @async (@guaranteed SlowServerlet) -> (@owned String, @error any Error)
@@ -306,7 +306,7 @@ class SlowServerlet: SlowServer {
     // CHECK-NN:   hop_to_executor [[ACTOR]]
     // CHECK-NN: } // end sil function '$s21objc_async_from_swift13SlowServerletC28doSomethingMultiResultFlaggySS_SStyYaKF'
     //
-    // CHECK-LABEL: sil shared [thunk] [ossa] @$s21objc_async_from_swift13SlowServerletC28doSomethingMultiResultFlaggySS_SStyYaKFyyYacfU_To : $@convention(thin) @Sendable @async (@convention(block) ({{.*}}, Optional<NSString>, Optional<NSError>, Optional<NSString>) -> (), SlowServerlet) -> () {
+    // CHECK-LABEL: sil shared [thunk] [ossa] @$s21objc_async_from_swift13SlowServerletC28doSomethingMultiResultFlaggySS_SStyYaKFyyYacfU_To : $@convention(thin) @Sendable @async (@convention(block) @Sendable ({{.*}}, Optional<NSString>, Optional<NSError>, Optional<NSString>) -> (), SlowServerlet) -> () {
     // CHECK-NN: [[ACTOR:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
     // CHECK:    [[SELF:%.*]] = begin_borrow {{.*}} : $SlowServerlet
     // CHECK-C:  [[NATIVE:%.*]] = function_ref @$s21objc_async_from_swift13SlowServerletC28doSomethingMultiResultFlaggySS_SStyYaKF : $@convention(method) @async (@guaranteed SlowServerlet) -> (@owned String, @owned String, @error any Error)
@@ -443,8 +443,9 @@ func testAutoclosureInStaticMethod() {
     // CHECK:   [[INIT_PROJ_BLOCK_STORAGE:%.*]] = init_existential_addr [[PROJ_BLOCK_STORAGE]]
     // CHECK:   store [[UNSAFE_CONT]] to [trivial] [[INIT_PROJ_BLOCK_STORAGE]]
     // CHECK:   merge_isolation_region [[BLOCK_STORAGE]] : $*@block_storage Any, [[RESULT]]
-    // CHECK:   [[OBJC_COMPLETION_HANDLER_IMPL:%.*]] = function_ref @$sSo8NSStringCSgSo7NSErrorCSgIeyByy_SSTz_ : $@convention(c) (@inout_aliasable @block_storage Any, Optional<NSString>, Optional<NSError>) -> ()
+    // CHECK:   [[OBJC_COMPLETION_HANDLER_IMPL:%.*]] = function_ref @$sSo8NSStringCSgSo7NSErrorCSgIeyBhyy_SSTz_ : $@convention(c) @Sendable (@inout_aliasable @block_storage Any, Optional<NSString>, Optional<NSError>) -> ()
     // CHECK:   [[BLOCK:%.*]] = init_block_storage_header [[BLOCK_STORAGE]] : $*@block_storage Any, invoke [[OBJC_COMPLETION_HANDLER_IMPL]]
+    // CHECK:   merge_isolation_region [[CAPTURE]] : $SlowServer, [[BLOCK_STORAGE]]
     // CHECK:   apply [[OBJC_METHOD]]([[NS_STRING]], [[BLOCK]], [[CAPTURE]])
     // CHECK:   await_async_continuation [[RAW_UNSAFE_CONT]] : $Builtin.RawUnsafeContinuation, resume [[RESUME_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
     //

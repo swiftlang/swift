@@ -519,8 +519,8 @@ EXPERIMENTAL_FEATURE(AllowRuntimeSymbolDeclarations, true)
 /// Allow use of `@cdecl`
 EXPERIMENTAL_FEATURE(CDecl, false)
 
-/// Allow use of `@extensible` on public enums
-SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ExtensibleAttribute, false)
+/// Allow use of `@nonexhaustive` on public enums
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(NonexhaustiveAttribute, false)
 
 /// Allow use of `Module::name` syntax
 EXPERIMENTAL_FEATURE(ModuleSelector, false)
@@ -535,6 +535,9 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(Lifetimes, true)
 /// Disable @MainActor inference when the primary definition of a type conforms
 /// to SendableMetatype (or Sendable).
 EXPERIMENTAL_FEATURE(SendableProhibitsMainActorInference, true)
+
+/// Allow macro based aliases to be imported into Swift
+EXPERIMENTAL_FEATURE(ImportMacroAliases, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

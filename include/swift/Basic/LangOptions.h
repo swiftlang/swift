@@ -355,8 +355,6 @@ namespace swift {
       return CXXStdlib == PlatformDefaultCXXStdlib;
     }
 
-    bool CForeignReferenceTypes = false;
-
     /// Imports getters and setters as computed properties.
     bool CxxInteropGettersSettersAsProperties = false;
 
@@ -590,7 +588,7 @@ namespace swift {
 
     /// Maximum number of "type difference" structures for the requirement machine
     /// property map algorithm.
-    unsigned RequirementMachineMaxTypeDifferences = 4000;
+    unsigned RequirementMachineMaxTypeDifferences = 13000;
 
     /// Maximum number of attempts to make when splitting concrete equivalence
     /// classes.

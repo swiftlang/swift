@@ -2,7 +2,7 @@
 #
 # This source file is part of the Swift.org open source project
 #
-# Copyright (c) 2014 - 2021 Apple Inc. and the Swift project authors
+# Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
 # See https:#swift.org/LICENSE.txt for license information
@@ -93,7 +93,7 @@ class ProductPipelineListBuilder(object):
         self.current_count = 0
         self.current_pipeline = None
         self.is_current_pipeline_impl = False
-        self.pipelinst_list = []
+        self.pipeline_list = []
 
     def add_product(self, product_cls: type[Product], is_enabled: bool):
         """Add a non-impl product to the current pipeline begin constructed"""
@@ -186,7 +186,7 @@ class ProductPipelineListBuilder(object):
         return (filtered_results, last_impl_pipeline_index)
 
     def finalize(self, shouldInfer: bool):
-        """Product a final schedule and return a list of our product pipelines. Resets
+        """Produce a final schedule and return a list of our product pipelines. Resets
            the builder when done so is a consuming operation.
         """
         # Append the current pipeline if we have one.

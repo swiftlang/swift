@@ -877,22 +877,18 @@ SIMPLE_DECL_ATTR(constInitialized, ConstInitialized,
   168)
 DECL_ATTR_FEATURE_REQUIREMENT(ConstInitialized, CompileTimeValues)
 
-SIMPLE_DECL_ATTR(extensible, Extensible,
+DECL_ATTR(nonexhaustive, Nonexhaustive,
   OnEnum,
   ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove | ForbiddenInABIAttr,
   169)
-DECL_ATTR_FEATURE_REQUIREMENT(Extensible, ExtensibleAttribute)
+DECL_ATTR_FEATURE_REQUIREMENT(Nonexhaustive, NonexhaustiveAttribute)
 
 SIMPLE_DECL_ATTR(concurrent, Concurrent,
   OnFunc | OnConstructor | OnSubscript | OnVar,
   ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UnconstrainedInABIAttr,
   170)
 
-SIMPLE_DECL_ATTR(preEnumExtensibility, PreEnumExtensibility,
-  OnEnum,
-  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove | UnconstrainedInABIAttr,
-  171)
-DECL_ATTR_FEATURE_REQUIREMENT(PreEnumExtensibility, ExtensibleAttribute)
+// Unused '171': Used to be `@preEnumExtensibility`
 
 DECL_ATTR(specialized, Specialized,
   OnConstructor | OnFunc | OnAccessor,
