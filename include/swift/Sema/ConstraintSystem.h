@@ -2924,15 +2924,15 @@ private:
   SolverTrail *getTrail() const {
     return solverState ? &solverState->Trail : nullptr;
   }
-
-  /// Add a new type variable that was already created.
-  void addTypeVariable(TypeVariableType *typeVar);
   
   /// Add a constraint from the subscript base to the root of the key
   /// path literal to the constraint system.
   void addKeyPathApplicationRootConstraint(Type root, ConstraintLocatorBuilder locator);
 
 public:
+  /// Add a new type variable that was already created.
+  void addTypeVariable(TypeVariableType *typeVar);
+
   /// Lookup for a member with the given name which is in the given base type.
   ///
   /// This routine caches the results of member lookups in the top constraint
@@ -2953,7 +2953,9 @@ public:
 
   /// Create a new type variable.
   TypeVariableType *createTypeVariable(ConstraintLocator *locator,
-                                       unsigned options);
+                                       unsigned options,
+                                       PreparedOverload *preparedOverload
+                                           = nullptr);
 
   /// Retrieve the set of active type variables.
   ArrayRef<TypeVariableType *> getTypeVariables() const {
@@ -4333,7 +4335,8 @@ public:
   ///
   /// \returns The opened type, or \c type if there are no archetypes in it.
   Type openType(Type type, ArrayRef<OpenedType> replacements,
-                ConstraintLocatorBuilder locator);
+                ConstraintLocatorBuilder locator,
+                PreparedOverload *preparedOverload);
 
   /// "Open" an opaque archetype type, similar to \c openType.
   Type openOpaqueType(OpaqueTypeArchetypeType *type,
@@ -4349,7 +4352,8 @@ public:
   /// aforementioned variable via special constraints.
   Type openPackExpansionType(PackExpansionType *expansion,
                              ArrayRef<OpenedType> replacements,
-                             ConstraintLocatorBuilder locator);
+                             ConstraintLocatorBuilder locator,
+                             PreparedOverload *preparedOverload);
 
   /// Update OpenedPackExpansionTypes and record a change in the trail.
   void recordOpenedPackExpansionType(PackExpansionType *expansion,
@@ -4378,26 +4382,30 @@ public:
   FunctionType *openFunctionType(AnyFunctionType *funcType,
                                  ConstraintLocatorBuilder locator,
                                  SmallVectorImpl<OpenedType> &replacements,
-                                 DeclContext *outerDC);
+                                 DeclContext *outerDC,
+                                 PreparedOverload *preparedOverload);
 
   /// Open the generic parameter list and its requirements,
   /// creating type variables for each of the type parameters.
   void openGeneric(DeclContext *outerDC,
                    GenericSignature signature,
                    ConstraintLocatorBuilder locator,
-                   SmallVectorImpl<OpenedType> &replacements);
+                   SmallVectorImpl<OpenedType> &replacements,
+                   PreparedOverload *preparedOverload);
 
   /// Open the generic parameter list creating type variables for each of the
   /// type parameters.
   void openGenericParameters(DeclContext *outerDC,
                              GenericSignature signature,
                              SmallVectorImpl<OpenedType> &replacements,
-                             ConstraintLocatorBuilder locator);
+                             ConstraintLocatorBuilder locator,
+                             PreparedOverload *preparedOverload);
 
   /// Open a generic parameter into a type variable and record
   /// it in \c replacements.
   TypeVariableType *openGenericParameter(GenericTypeParamType *parameter,
-                                         ConstraintLocatorBuilder locator);
+                                         ConstraintLocatorBuilder locator,
+                                         PreparedOverload *preparedOverload);
 
   /// Given generic signature open its generic requirements,
   /// using substitution function, and record them in the
@@ -4436,7 +4444,8 @@ public:
   FunctionType *adjustFunctionTypeForConcurrency(
       FunctionType *fnType, Type baseType, ValueDecl *decl, DeclContext *dc,
       unsigned numApplies, bool isMainDispatchQueue,
-      ArrayRef<OpenedType> replacements, ConstraintLocatorBuilder locator);
+      ArrayRef<OpenedType> replacements, ConstraintLocatorBuilder locator,
+      PreparedOverload *preparedOverload);
 
   /// Retrieve the type of a reference to the given value declaration.
   ///

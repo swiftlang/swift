@@ -627,7 +627,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
       if (auto *typeVar = findParam(GP))
         return typeVar;
 
-      auto *typeVar = cs.openGenericParameter(GP, locator);
+      auto *typeVar = cs.openGenericParameter(GP, locator, nullptr);
       genericParameters.emplace_back(GP, typeVar);
 
       return typeVar;
@@ -720,8 +720,8 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
       cs.openGenericRequirement(DC->getParent(), signature, index, requirement,
                                 /*skipSelfProtocolConstraint=*/false, locator,
                                 [&](Type type) -> Type {
-                                  return cs.openType(type, genericParameters,
-                                                     locator);
+                                  return cs.openType(type, genericParameters, locator,
+                                                     /*preparedOverload=*/nullptr);
                                 });
     };
 

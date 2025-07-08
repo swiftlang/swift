@@ -12046,8 +12046,10 @@ static Type getOpenedResultBuilderTypeFor(ConstraintSystem &cs,
     // Find the opened type for this callee and substitute in the type
     // parameters.
     auto substitutions = cs.getOpenedTypes(calleeLocator);
-    if (!substitutions.empty())
-      builderType = cs.openType(builderType, substitutions, locator);
+    if (!substitutions.empty()) {
+      builderType = cs.openType(builderType, substitutions, locator,
+                                /*preparedOverload=*/nullptr);
+    }
 
     assert(!builderType->hasTypeParameter());
   }

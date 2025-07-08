@@ -12,17 +12,21 @@
 #ifndef SWIFT_SEMA_PREPAREDOVERLOAD_H
 #define SWIFT_SEMA_PREPAREDOVERLOAD_H
 
-#include "swift/AST/AvailabilityRange.h"
-#include "swift/AST/FunctionRefInfo.h"
-#include "swift/AST/Types.h"
 #include "llvm/ADT/PointerIntPair.h"
-#include "llvm/Support/ErrorHandling.h"
+#include "llvm/ADT/SmallVector.h"
 
 namespace swift {
+
+class TypeVariableType;
+
 namespace constraints {
 
-struct PreparedOverload {
+class ConstraintSystem;
 
+struct PreparedOverload {
+  SmallVector<TypeVariableType *, 2> TypeVariables;
+
+  void discharge(ConstraintSystem &cs) const;
 };
 
 }

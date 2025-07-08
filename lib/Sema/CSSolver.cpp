@@ -22,6 +22,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/PreparedOverload.h"
 #include "swift/Sema/SolutionResult.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
@@ -58,11 +59,15 @@ STATISTIC(LargestSolutionAttemptNumber, "# of the largest solution attempt");
 
 TypeVariableType *ConstraintSystem::createTypeVariable(
                                      ConstraintLocator *locator,
-                                     unsigned options) {
+                                     unsigned options,
+                                     PreparedOverload *preparedOverload) {
   ++TotalNumTypeVariables;
   auto tv = TypeVariableType::getNew(getASTContext(), assignTypeVariableID(),
                                      locator, options);
-  addTypeVariable(tv);
+  if (preparedOverload)
+    preparedOverload->TypeVariables.push_back(tv);
+  else
+    addTypeVariable(tv);
   return tv;
 }
 
