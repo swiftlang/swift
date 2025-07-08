@@ -3622,8 +3622,8 @@ SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
     auto vd = cast<VarDecl>(memberStorage);
     // TODO: Is it possible and/or useful for class storage to be
     // addressable?
-    if (!vd->getDeclContext()->getInnermostTypeContext()
-         ->getDeclaredTypeInContext()->getStructOrBoundGenericStruct()) {
+    if (!vd->isInstanceMember()
+        || !isa<StructDecl>(vd->getDeclContext())) {
       return notAddressable();
     }
   
