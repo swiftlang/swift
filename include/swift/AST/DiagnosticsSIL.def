@@ -840,7 +840,8 @@ ERROR(sil_movechecking_borrowed_parameter_captured_by_closure, none,
       "parameter",
       (StringRef))
 ERROR(sil_movechecking_capture_consumed, none,
-      "noncopyable '%0' cannot be consumed when captured by an escaping closure", (StringRef))
+      "noncopyable '%0' cannot be consumed when captured by an escaping closure or borrowed by a non-Escapable type",
+      (StringRef))
 ERROR(sil_movechecking_not_reinitialized_before_end_of_function, none,
       "missing reinitialization of %select{inout parameter|closure capture}1 '%0' "
       "after consume", (StringRef, bool))
