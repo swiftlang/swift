@@ -130,7 +130,8 @@ class WasmSwiftSDK(product.Product):
         libxml2.cmake_options.define('HAVE_PTHREAD_H', cmake_thread_enabled)
 
         libxml2.build_with_cmake([], self.args.build_variant, [],
-                                 prefer_native_toolchain=True)
+                                 prefer_native_toolchain=True,
+                                 ignore_extra_cmake_options=True)
         with shell.pushd(libxml2.build_dir):
             shell.call([self.toolchain.cmake, '--install', '.', '--prefix', '/', '--component', 'development'],
                        env={'DESTDIR': wasi_sysroot})
@@ -158,7 +159,8 @@ class WasmSwiftSDK(product.Product):
         foundation.cmake_options.define('LIBXML2_LIBRARY', os.path.join(wasi_sysroot, 'lib'))
 
         foundation.build_with_cmake([], self.args.build_variant, [],
-                                     prefer_native_toolchain=True)
+                                    prefer_native_toolchain=True,
+                                    ignore_extra_cmake_options=True)
 
         dest_dir = self._target_package_path(swift_host_triple)
         with shell.pushd(foundation.build_dir):
@@ -184,7 +186,8 @@ class WasmSwiftSDK(product.Product):
         swift_testing.cmake_options.define('SwiftTesting_MACRO', 'NO')
 
         swift_testing.build_with_cmake([], self.args.build_variant, [],
-                                       prefer_native_toolchain=True)
+                                       prefer_native_toolchain=True,
+                                       ignore_extra_cmake_options=True)
         dest_dir = self._target_package_path(swift_host_triple)
         with shell.pushd(swift_testing.build_dir):
             shell.call([self.toolchain.cmake, '--install', '.', '--prefix', '/usr'],
