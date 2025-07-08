@@ -265,29 +265,26 @@ public func _unsafeInheritExecutor_withThrowingTaskGroup<ChildTaskResult, GroupR
 /// Structured Concurrency
 /// ======================
 ///
+/// Structured concurrency is a way to organize your program, and tasks, in such a way that
+/// tasks don't outlive the scope in which they are created. Within a structured task hierarchy,
+/// no child task remains running longer than its parent task. This guarantee simplifies reasoning about resource usage,
+/// and is a powerful mechanism that you can use to write well-behaved concurrent programs.
+///
 /// A task group is the primary way to create structured concurrency tasks in Swift.
-/// Another way of creating structured tasks are `async let` declarations.
+/// Another way of creating structured tasks is an `async let` declaration.
 ///
 /// Structured concurrency tasks are often called "child tasks" because of their relationship with their parent task.
-/// A child task will inherit the parent's priority, task-local values, and will be structured in the sense that its
-/// lifetime will never exceed the lifetime of the parent task.
-///
-/// A child task inherits the parent's priority, task-local values, and will be structured in the sense that its
+/// A child task inherits the parent's priority, task-local values, and is structured in the sense that its
 /// lifetime never exceeds the lifetime of the parent task.
 ///
 /// A task group *always* waits for all child tasks to complete before it's destroyed.
 /// Specifically, `with...TaskGroup` APIs don't return until all the child tasks
 /// created in the group's scope have completed running.
 ///
-/// Structured concurrency is a way to organize your program, and tasks, in such a way that
-/// tasks don't outlive the scope in which they are created. Within a structured task hierarchy,
-/// no child task will remains running longer than its parent task. This simplifies reasoning about resource usage,
-/// and is a powerful mechanism that you can use to write well-behaved concurrent programs.
-///
-/// Structured Concurrency APIs (including task groups and `async let`), will *always* await the
+/// Structured concurrency APIs (including task groups and `async let`), *always* waits for the
 /// completion of tasks contained within their scope before returning. Specifically, this means that
-/// even if one were to await a single task result and return it from a `withTaskGroup` function body,
-/// the group will automatically await all the remaining tasks before returning:
+/// even if you await a single task result and return it from a `withTaskGroup` function body,
+/// the group automatically waits for all the remaining tasks before returning:
 ///
 ///     func takeFirst(actions: [@Sendable () -> Int]) async -> Int? {
 ///         await withTaskGroup { group in
@@ -300,7 +297,7 @@ public func _unsafeInheritExecutor_withThrowingTaskGroup<ChildTaskResult, GroupR
 ///     }
 ///
 /// In the above example, even though the code returns the first collected integer from all actions added to the task group,
-/// the task group will *always*, automatically, waits for the completion of all the resulting tasks.
+/// the task group *always*, automatically, waits for the completion of all the resulting tasks.
 ///
 /// You can use `group.cancelAll()` to signal cancellation to the remaining in-progress tasks,
 /// however this doesn't interrupt their execution automatically.
@@ -326,7 +323,7 @@ public func _unsafeInheritExecutor_withThrowingTaskGroup<ChildTaskResult, GroupR
 /// but other tasks are better not even being created
 /// when you know they can't produce useful results.
 ///
-/// In non-throwing task groups the tasks you add to a group with this method are nonthrowing,
+/// In nonthrowing task groups the tasks you add to a group with this method are nonthrowing,
 /// those tasks can't respond to cancellation by throwing `CancellationError`.
 /// The tasks must handle cancellation in some other way,
 /// such as returning the work completed so far, returning an empty result, or returning `nil`.
@@ -339,17 +336,18 @@ public func _unsafeInheritExecutor_withThrowingTaskGroup<ChildTaskResult, GroupR
 /// any order.
 ///
 /// ### Cancellation behavior
+///
 /// A task group becomes canceled in one of the following ways:
 ///
-/// - when ``cancelAll()`` is invoked on it,
-/// - when the ``Task`` running this task group is canceled.
+/// - When ``cancelAll()`` is invoked on it.
+/// - When the ``Task`` running this task group is canceled.
 ///
-/// Since a `TaskGroup` is a structured concurrency primitive, cancellation is
+/// Because a `TaskGroup` is a structured concurrency primitive, cancellation is
 /// automatically propagated through all of its child-tasks (and their child
 /// tasks).
 ///
 /// A canceled task group can still keep adding tasks, however they will start
-/// being immediately canceled, and may act accordingly to this. To avoid adding
+/// being immediately canceled, and might respond accordingly. To avoid adding
 /// new tasks to an already canceled task group, use ``addTaskUnlessCancelled(name:priority:body:)``
 /// rather than the plain ``addTask(name:priority:body:)`` which adds tasks unconditionally.
 ///
