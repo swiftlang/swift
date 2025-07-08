@@ -3548,6 +3548,13 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DeclAttrKind::Lifetime: {
       return;
     }
+    case DeclAttrKind::Nonexhaustive: {
+      auto *theAttr = cast<NonexhaustiveAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[NonexhaustiveDeclAttrLayout::Code];
+      NonexhaustiveDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                              (unsigned)theAttr->getMode());
+      return;
+    }
     }
   }
 
