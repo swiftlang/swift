@@ -292,6 +292,12 @@ def _apply_default_arguments(args):
         args.test_xros_host = False
         args.test_android_host = False
 
+    # Install WasmKit if it's built
+    # (ideally, should not be installed by default, same as other products, but
+    # historically `--wasmkit` implied installation)
+    if args.build_wasmkit and args.install_wasmkit is None:
+        args.install_wasmkit = True
+
 
 def create_argument_parser():
     """Return a configured argument parser."""
@@ -823,11 +829,18 @@ def create_argument_parser():
     option(['--build-minimal-stdlib'], toggle_true('build_minimalstdlib'),
            help='build the \'minimal\' freestanding stdlib variant into a '
                 'separate build directory ')
+
+    # Wasm options
+
     option(['--build-wasm-stdlib'], toggle_true('build_wasmstdlib'),
            help='build the stdlib for WebAssembly target into a'
                 'separate build directory ')
     option(['--wasmkit'], toggle_true('build_wasmkit'),
            help='build WasmKit')
+    option(['--install-wasmkit'], toggle_true('install_wasmkit'),
+           help='install SourceKitLSP')
+
+    # Swift Testing options
 
     option('--swift-testing', toggle_true('build_swift_testing'),
            help='build Swift Testing')
