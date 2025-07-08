@@ -120,6 +120,9 @@ suite.test("Initialize with ordinary element")
     let pointer: UnsafeMutablePointer = $0.baseAddress!
     span = Span(_unsafeStart: pointer, count: $0.count)
     expectEqual(span.count, capacity)
+
+    span = Span()
+    expectEqual(span.count, 0)
   }
 }
 
