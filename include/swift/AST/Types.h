@@ -413,15 +413,19 @@ protected:
   // clang-format off
   union { uint64_t OpaqueBits;
 
-  SWIFT_INLINE_BITFIELD_BASE(TypeBase, bitmax(NumTypeKindBits,8) +
-                             RecursiveTypeProperties::BitWidth + 1,
+  SWIFT_INLINE_BITFIELD_BASE(TypeBase, NumTypeKindBits +
+                             RecursiveTypeProperties::BitWidth + 1 + 3,
     /// Kind - The discriminator that indicates what subclass of type this is.
-    Kind : bitmax(NumTypeKindBits,8),
+    Kind : NumTypeKindBits,
 
     Properties : RecursiveTypeProperties::BitWidth,
 
     /// Whether this type is canonical or not.
-    IsCanonical : 1
+    IsCanonical : 1,
+
+    ComputedInvertibleConformances : 1,
+    IsCopyable : 1,
+    IsEscapable : 1
   );
 
   SWIFT_INLINE_BITFIELD(ErrorType, TypeBase, 1,
@@ -441,8 +445,7 @@ protected:
     HasClangTypeInfo : 1,
     HasThrownError : 1,
     HasLifetimeDependencies : 1,
-    : NumPadBits,
-    NumParams : 16
+    NumParams : 15
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ArchetypeType, TypeBase, 1+1+16,
@@ -455,9 +458,8 @@ protected:
   SWIFT_INLINE_BITFIELD_FULL(TypeVariableType, TypeBase, 7+28,
     /// Type variable options.
     Options : 7,
-    : NumPadBits,
     /// The unique number assigned to this type variable.
-    ID : 28
+    ID : 27
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ErrorUnionType, TypeBase, 32,
@@ -560,6 +562,11 @@ protected:
       Bits.TypeBase.IsCanonical = true;
       Context = CanTypeCtx;
     }
+
+    Bits.TypeBase.ComputedInvertibleConformances = false;
+    Bits.TypeBase.IsCopyable = false;
+    Bits.TypeBase.IsEscapable = false;
+
     setRecursiveProperties(properties);
   }
 
@@ -590,6 +597,8 @@ public:
 
 private:
   CanType computeCanonicalType();
+
+  void computeInvertibleConformances();
 
 public:
   /// getCanonicalType - Return the canonical version of this type, which has
