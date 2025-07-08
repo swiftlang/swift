@@ -52,10 +52,10 @@ TypeDecl *getTypeDeclForUSR(ASTContext &ctx,
                             llvm::StringRef usr,
                             GenericSignature genericSig=GenericSignature());
 
-Decl *getDeclFromUSR(ASTContext &ctx,
-                     llvm::StringRef usr,
-                     const DeclContext *lookupDC,
-                     GenericSignature genericSig=GenericSignature());
+Decl *getDeclForUSR(ASTContext &ctx,
+                    llvm::StringRef usr,
+                    const DeclContext *lookupDC,
+                    GenericSignature genericSig=GenericSignature());
 
 /// An implementation of MetadataReader's BuilderType concept that
 /// just finds and builds things in the AST.
