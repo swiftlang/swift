@@ -13,4 +13,4 @@ Functions:
   - Name: ZXSpectrumSetMisnamedRegister
     SwiftName: 'setter:ZXSpectrum.misnamedRegister(self:newValue:)'
   - Name: ZXSpectrumHelperReset
-    SwiftName: 'ZXSpectrum::Helper.reset()'
+    SwiftName: 'ZXSpectrum.Helper.reset()'
