@@ -688,6 +688,9 @@ private:
   llvm::DenseMap<std::pair<ValueDecl *, DeclContext *>, ValueDecl *>
       clonedBaseMembers;
 
+  // Map all cloned methods back to the original member
+  llvm::DenseMap<ValueDecl *, ValueDecl *> clonedMembers;
+
 public:
   llvm::DenseMap<const clang::ParmVarDecl*, FuncDecl*> defaultArgGenerators;
 
@@ -695,6 +698,8 @@ public:
 
   ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
                                   ClangInheritanceInfo inheritance);
+
+  ValueDecl *getOriginalForClonedMember(const ValueDecl *decl);
 
   static size_t getImportedBaseMemberDeclArity(const ValueDecl *valueDecl);
 

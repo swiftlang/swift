@@ -216,6 +216,9 @@ public:
                                           DeclContext *newContext,
                                           ClangInheritanceInfo inheritance) = 0;
 
+  /// Returnes the original method if \param decl is a clone from a base class
+  virtual ValueDecl *getOriginalForClonedMember(const ValueDecl *decl) = 0;
+
   /// Emits diagnostics for any declarations named name
   /// whose direct declaration context is a TU.
   virtual void diagnoseTopLevelValue(const DeclName &name) = 0;

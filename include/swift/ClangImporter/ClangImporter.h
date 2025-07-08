@@ -655,6 +655,8 @@ public:
   ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
                                   ClangInheritanceInfo inheritance) override;
 
+  ValueDecl *getOriginalForClonedMember(const ValueDecl *decl) override;
+
   /// Emits diagnostics for any declarations named name
   /// whose direct declaration context is a TU.
   void diagnoseTopLevelValue(const DeclName &name) override;
