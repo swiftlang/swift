@@ -601,6 +601,8 @@ public:
 /// the completion's usage context.
 class CodeCompletionResult {
   const ContextFreeCodeCompletionResult &ContextFree;
+  const Decl *AssociatedDecl = nullptr;
+  bool HasValidAssociatedDecl : 1;
   SemanticContextKind SemanticContext : 3;
   static_assert(int(SemanticContextKind::MAX_VALUE) < 1 << 3, "");
 
@@ -629,13 +631,26 @@ public:
   /// done by allocating the two in the same sink or adopting the context free
   /// sink in the sink that allocates this result.
   CodeCompletionResult(const ContextFreeCodeCompletionResult &ContextFree,
+                       const Decl *AssociatedDecl, bool HasValidAssociatedDecl,
                        SemanticContextKind SemanticContext,
                        CodeCompletionFlair Flair, uint8_t NumBytesToErase,
                        CodeCompletionResultTypeRelation TypeDistance,
                        ContextualNotRecommendedReason NotRecommended)
-      : ContextFree(ContextFree), SemanticContext(SemanticContext),
-        Flair(Flair.toRaw()), NotRecommended(NotRecommended),
-        NumBytesToErase(NumBytesToErase), TypeDistance(TypeDistance) {}
+      : ContextFree(ContextFree), AssociatedDecl(AssociatedDecl),
+        HasValidAssociatedDecl(HasValidAssociatedDecl),
+        SemanticContext(SemanticContext), Flair(Flair.toRaw()),
+        NotRecommended(NotRecommended), NumBytesToErase(NumBytesToErase),
+        TypeDistance(TypeDistance) {}
+  
+  CodeCompletionResult(const ContextFreeCodeCompletionResult &ContextFree,
+                       SemanticContextKind SemanticContext,
+                       CodeCompletionFlair Flair, uint8_t NumBytesToErase,
+                       CodeCompletionResultTypeRelation TypeDistance,
+                       ContextualNotRecommendedReason NotRecommended)
+      : ContextFree(ContextFree), HasValidAssociatedDecl(false),
+        SemanticContext(SemanticContext), Flair(Flair.toRaw()),
+        NotRecommended(NotRecommended), NumBytesToErase(NumBytesToErase),
+        TypeDistance(TypeDistance) {}
 
   const ContextFreeCodeCompletionResult &getContextFreeResult() const {
     return ContextFree;
@@ -722,6 +737,15 @@ public:
       return NotRecommendedReason::VariableUsedInOwnDefinition;
     }
   }
+  
+  bool getHasValidAssociatedDecl() const { return HasValidAssociatedDecl; }
+  
+  const Decl *getAssociatedDecl() const {
+    assert(HasValidAssociatedDecl && "AssociatedDecl hasn't been loaded yet");
+    return AssociatedDecl;
+  }
+  
+  const Decl *findAssociatedDecl(DeclContext *DC);
 
   SemanticContextKind getSemanticContext() const { return SemanticContext; }
 
