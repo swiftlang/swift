@@ -328,6 +328,8 @@ static bool isStaticallyLookThroughInst(SILInstruction *inst) {
   case SILInstructionKind::BeginBorrowInst:
     // Look through if it isn't from a var decl.
     return !cast<BeginBorrowInst>(inst)->isFromVarDecl();
+  case SILInstructionKind::InitExistentialValueInst:
+    return !SILIsolationInfo::getConformanceIsolation(inst);
   case SILInstructionKind::UnconditionalCheckedCastInst: {
     auto cast = SILDynamicCastInst::getAs(inst);
     assert(cast);
@@ -3146,7 +3148,8 @@ public:
 
     case TranslationSemantics::Assign:
       return translateSILMultiAssign(
-          inst->getResults(), makeOperandRefRange(inst->getAllOperands()));
+          inst->getResults(), makeOperandRefRange(inst->getAllOperands()),
+          SILIsolationInfo::getConformanceIsolation(inst));
 
     case TranslationSemantics::Require:
       for (auto op : inst->getOperandValues())
@@ -3387,6 +3390,8 @@ CONSTANT_TRANSLATION(CopyBlockInst, Assign)
 CONSTANT_TRANSLATION(CopyBlockWithoutEscapingInst, Assign)
 CONSTANT_TRANSLATION(IndexAddrInst, Assign)
 CONSTANT_TRANSLATION(InitBlockStorageHeaderInst, Assign)
+CONSTANT_TRANSLATION(InitExistentialAddrInst, Assign)
+CONSTANT_TRANSLATION(InitExistentialRefInst, Assign)
 CONSTANT_TRANSLATION(OpenExistentialBoxInst, Assign)
 CONSTANT_TRANSLATION(OpenExistentialRefInst, Assign)
 CONSTANT_TRANSLATION(TailAddrInst, Assign)
@@ -4067,39 +4072,11 @@ PartitionOpTranslator::visitPartialApplyInst(PartialApplyInst *pai) {
 }
 
 TranslationSemantics
-PartitionOpTranslator::visitInitExistentialAddrInst(InitExistentialAddrInst *ieai) {
-  auto conformanceIsolationInfo = SILIsolationInfo::getFromConformances(
-      ieai, ieai->getConformances());
-
-  translateSILMultiAssign(ieai->getResults(),
-                          makeOperandRefRange(ieai->getAllOperands()),
-                          conformanceIsolationInfo);
-
-  return TranslationSemantics::Special;
-}
-
-TranslationSemantics
-PartitionOpTranslator::visitInitExistentialRefInst(InitExistentialRefInst *ieri) {
-  auto conformanceIsolationInfo = SILIsolationInfo::getFromConformances(
-      ieri, ieri->getConformances());
-
-  translateSILMultiAssign(ieri->getResults(),
-                          makeOperandRefRange(ieri->getAllOperands()),
-                          conformanceIsolationInfo);
-
-  return TranslationSemantics::Special;
-}
-
-TranslationSemantics
 PartitionOpTranslator::visitInitExistentialValueInst(InitExistentialValueInst *ievi) {
-  auto conformanceIsolationInfo = SILIsolationInfo::getFromConformances(
-      ievi, ievi->getConformances());
+  if (isStaticallyLookThroughInst(ievi))
+    return TranslationSemantics::LookThrough;
 
-  translateSILMultiAssign(ievi->getResults(),
-                          makeOperandRefRange(ievi->getAllOperands()),
-                          conformanceIsolationInfo);
-
-  return TranslationSemantics::Special;
+  return TranslationSemantics::Assign;
 }
 
 TranslationSemantics
