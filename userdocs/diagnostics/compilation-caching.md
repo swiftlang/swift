@@ -1,4 +1,9 @@
-# Compilation Caching
+# Compilation caching (CompilationCaching)
+
+Errors and warnings related to the compiler's CAS compilation caching.
+
+
+## Overview
 
 Compilation caching allows Swift compiler to reuse previously compiled outputs if the identical
 compilation has been done before.
