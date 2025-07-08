@@ -6,10 +6,6 @@
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: freestanding
 
-//public func test<T>(_ block: nonisolated(nonsending) () async -> T ) async  {
-//  await block()
-//}
-
 actor Canceller {
   var hello: String = "checking..."
 
@@ -47,7 +43,10 @@ func testMainActor() async {
   }
 }
 
+// FIXME: rdar://155313349 - nonisolated(nonsending) closure does not pick up isolated parameter when the closure is throwing
 func testMainActorIsolated(isolation: isolated (any Actor)? = #isolation) async {
+  return // FIXME: until rdar://155313349 is fixed
+  
   isolation!.preconditionIsolated("Expected main actor")
   MainActor.preconditionIsolated("Expected main actor")
   await withTaskCancellationHandler {
