@@ -74,8 +74,11 @@ class WasmKit(product.Product):
 
 
 def run_swift_build(host_target, product, swiftpm_package_product_name, set_installation_rpath=False):
-    # Building with the freshly-built SwiftPM
-    swift_build = os.path.join(product.install_toolchain_path(host_target), "bin", "swift-build")
+    if product.args.build_runtime_with_host_compiler:
+      swift_build = product.toolchain.swift_build
+    else:
+      # Building with the freshly-built SwiftPM
+      swift_build = os.path.join(product.install_toolchain_path(host_target), "bin", "swift-build")
 
     if host_target.startswith('macos'):
         # Universal binary on macOS
