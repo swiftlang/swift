@@ -4033,6 +4033,21 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       Attributes.add(Attr.get());
     break;
   }
+
+  case DeclAttrKind::Nonexhaustive: {
+    auto mode = parseSingleAttrOption<NonexhaustiveMode>(
+        *this, Loc, AttrRange, AttrName, DK,
+        {{Context.Id_warn, NonexhaustiveMode::Warning}},
+        NonexhaustiveMode::Error,
+        ParameterizedDeclAttributeKind::Nonexhaustive);
+    if (!mode)
+      return makeParserSuccess();
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) NonexhaustiveAttr(AtLoc, AttrRange, *mode));
+
+    break;
+  }
   }
 
   if (DuplicateAttribute) {
