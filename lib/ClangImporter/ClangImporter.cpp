@@ -5524,10 +5524,11 @@ const clang::CXXMethodDecl *getCalledBaseCxxMethod(FuncDecl *baseMember) {
 
 // Construct a Swift method that represents the synthesized C++ method
 // that invokes the base C++ method.
-FuncDecl *synthesizeBaseFunctionDeclCall(ClangImporter &impl, ASTContext &ctx,
-                                         NominalTypeDecl *derivedStruct,
-                                         NominalTypeDecl *baseStruct,
-                                         FuncDecl *baseMember) {
+static FuncDecl *synthesizeBaseFunctionDeclCall(ClangImporter &impl,
+                                                ASTContext &ctx,
+                                                NominalTypeDecl *derivedStruct,
+                                                NominalTypeDecl *baseStruct,
+                                                FuncDecl *baseMember) {
   auto *cxxMethod = getCalledBaseCxxMethod(baseMember);
   if (!cxxMethod)
     return nullptr;
@@ -6317,7 +6318,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
       auto namedMember = dyn_cast<ValueDecl>(member);
       if (!namedMember || !namedMember->hasName() ||
           namedMember->getName().getBaseName() != name ||
-          clangModuleLoader->isClonedMemberDecl(namedMember))
+          clangModuleLoader->getOriginalForClonedMember(namedMember))
         continue;
 
       auto *imported = clangModuleLoader->importBaseMemberDecl(
@@ -7671,22 +7672,24 @@ ValueDecl *ClangImporter::Implementation::importBaseMemberDecl(
   if (known == clonedBaseMembers.end()) {
     ValueDecl *cloned = cloneBaseMemberDecl(decl, newContext, inheritance);
     known = clonedBaseMembers.insert({key, cloned}).first;
-    clonedMembers.insert(cloned);
+    clonedMembers.insert(std::make_pair(cloned, decl));
   }
 
   return known->second;
 }
 
-bool ClangImporter::Implementation::isClonedMemberDecl(ValueDecl *decl) {
+ValueDecl *ClangImporter::Implementation::getOriginalForClonedMember(
+    const ValueDecl *decl) {
   // If this is a cloned decl, we don't want to reclone it
   // Otherwise, we may end up with multiple copies of the same method
   if (!decl->hasClangNode()) {
     // Skip decls with a clang node as those will never be a clone
     auto result = clonedMembers.find(decl);
-    return result != clonedMembers.end();
+    if (result != clonedMembers.end())
+      return result->getSecond();
   }
 
-  return false;
+  return nullptr;
 }
 
 size_t ClangImporter::Implementation::getImportedBaseMemberDeclArity(
@@ -7705,8 +7708,8 @@ ClangImporter::importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
   return Impl.importBaseMemberDecl(decl, newContext, inheritance);
 }
 
-bool ClangImporter::isClonedMemberDecl(ValueDecl *decl) {
-  return Impl.isClonedMemberDecl(decl);
+ValueDecl *ClangImporter::getOriginalForClonedMember(const ValueDecl *decl) {
+  return Impl.getOriginalForClonedMember(decl);
 }
 
 void ClangImporter::diagnoseTopLevelValue(const DeclName &name) {
