@@ -410,7 +410,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   ///     return collected
   ///
   /// Awaiting on an empty group
-  /// immediate returns `nil` without suspending.
+  /// immediately returns `nil` without suspending.
   ///
   /// You can also use a `for`-`await`-`in` loop to collect results of a task group:
   ///
@@ -469,7 +469,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   ///
   /// At the start of the body of a `withTaskGroup(of:returning:body:)` call,
   /// the task group is always empty.
-  /// It`s guaranteed to be empty when returning from that body
+  /// It's guaranteed to be empty when returning from that body
   /// because a task group waits for all child tasks to complete before returning.
   ///
   /// - Returns: `true` if the group has no pending tasks; otherwise `false`.
