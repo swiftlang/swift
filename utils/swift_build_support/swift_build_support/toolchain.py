@@ -70,6 +70,7 @@ else:
     _register("ar", "ar")
 _register("sccache", "sccache")
 _register("swiftc", "swiftc")
+_register("swift_build", "swift-build")
 
 
 class Darwin(Toolchain):
