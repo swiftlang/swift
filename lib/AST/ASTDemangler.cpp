@@ -44,9 +44,9 @@
 
 using namespace swift;
 
-Decl *swift::Demangle::getDeclFromUSR(ASTContext &ctx, StringRef usr,
-                                      const DeclContext *lookupDC,
-                                      GenericSignature genericSig) {
+Decl *swift::Demangle::getDeclForUSR(ASTContext &ctx, StringRef usr,
+                                     const DeclContext *lookupDC,
+                                     GenericSignature genericSig) {
   if (!usr.starts_with("s:"))
     return nullptr;
 
