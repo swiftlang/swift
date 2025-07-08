@@ -684,7 +684,8 @@ static void deallocateAddressable(SILGenFunction &SGF,
                 const SILGenFunction::VarLoc::AddressableBuffer::State &state) {
   SGF.B.createEndBorrow(l, state.storeBorrow);
   SGF.B.createDeallocStack(l, state.allocStack);
-  if (state.reabstraction) {
+  if (state.reabstraction
+      && !state.reabstraction->getType().isTrivial(SGF.F)) {
     SGF.B.createDestroyValue(l, state.reabstraction);
   }
 }
