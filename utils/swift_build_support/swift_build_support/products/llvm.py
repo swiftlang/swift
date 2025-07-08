@@ -141,7 +141,7 @@ class LLVM(cmake_product.CMakeProduct):
                                                      'lib', 'darwin')
                 print('copying compiler-rt embedded builtins from {}'
                       ' into the local clang build directory {}.'.format(
-                          host_cxx_builtins_dir, dest_builtins_dir))
+                          host_cxx_builtins_dir, dest_builtins_dir), flush=True)
 
                 for _os in ['ios', 'watchos', 'tvos', 'xros']:
                     # Copy over the device .a when necessary
