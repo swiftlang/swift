@@ -393,3 +393,9 @@ do {
     }
   }
 }
+
+// @_inheritActorContext prevents `nonisolated(nonsending)` inference.
+do {
+  func testInherit1(@_inheritActorContext _: @Sendable () async -> Void) {}
+  func testInherit2(@_inheritActorContext(always) _: (@Sendable () async -> Void)?) {}
+}

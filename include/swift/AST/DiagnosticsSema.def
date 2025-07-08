@@ -1290,15 +1290,6 @@ REMARK(module_api_import_aliases,none,
        "%select{, which reexports definition from %2|}3",
        (const Decl *, ModuleDecl *, ModuleDecl *, bool))
 
-REMARK(dependency_scan_skip_module_invalid,none,
-       "module file '%0' skipped by the dependency scan because it is "
-       "incompatible with this Swift compiler: %1", (StringRef, StringRef))
-WARNING(skip_module_not_testable,none,
-        "ignore swiftmodule built without '-enable-testing': %0", (StringRef))
-WARNING(dependency_scan_module_incompatible, none,
-        "module file '%0' is incompatible with this Swift compiler: %1",
-        (StringRef, StringRef))
-
 REMARK(macro_loaded,none,
        "loaded macro implementation module %0 from "
        "%select{shared library '%2'|executable '%2'|"
@@ -2380,9 +2371,11 @@ ERROR(alignment_not_power_of_two,none,
       "alignment value must be a power of two", ())
 
 // Dependency Scanning
-ERROR(dependency_scan_module_not_found, none, "Unable to find module dependency: '%0'", (StringRef))
+ERROR(dependency_scan_module_not_found, none, "unable to resolve module dependency: '%0'", (StringRef))
+
 GROUPED_ERROR(dependency_scan_module_not_found_on_specified_search_paths, MissingModuleOnKnownPaths, none,
-              "Compilation search paths unable to resolve module dependency: '%0'", (StringRef))
+              "compilation search paths unable to resolve module dependency: '%0'", (StringRef))
+
 NOTE(unresolved_import_location,none,
      "also imported here", ())
 NOTE(dependency_as_imported_by_main_module,none,
@@ -2391,10 +2384,21 @@ NOTE(dependency_as_imported_by, none,
      "a dependency of %select{Swift|Clang}2 module '%0': '%1'", (StringRef, StringRef, bool))
 NOTE(inherited_search_path_resolves_module,none,
      "'%0' can be found using a search path that was specified when building module '%1' ('%2'). "
-     "This search path was not explicitly specified on the current compilation.", (StringRef, StringRef, StringRef))
+     "This search path was not explicitly specified on the current compilation", (StringRef, StringRef, StringRef))
 
-ERROR(clang_dependency_scan_error, none, "Clang dependency scanner failure: %0", (StringRef))
-ERROR(clang_header_dependency_scan_error, none, "Bridging header dependency scan failure: %0", (StringRef))
+ERROR(dependency_scan_compatible_swift_module_not_found, none,
+      "unable to resolve Swift module dependency to a compatible module: '%0'",
+      (StringRef))
+NOTE(dependency_scan_incompatible_module_found,none,
+     "found incompatible module '%0': %1", (StringRef, StringRef))
+
+WARNING(dependency_scan_module_incompatible, none,
+        "module file '%0' is incompatible with this Swift compiler: %1",
+        (StringRef, StringRef))
+
+ERROR(clang_dependency_scan_error, none, "clang dependency scanning failure: %0", (StringRef))
+
+ERROR(clang_header_dependency_scan_error, none, "bridging header dependency scanning failure: %0", (StringRef))
 
 // Enum annotations
 ERROR(indirect_case_without_payload,none,
@@ -8681,9 +8685,9 @@ GROUPED_ERROR(isolated_conformance_wrong_domain,IsolatedConformances,none,
 GROUPED_WARNING(isolated_conformance_will_become_nonisolated,IsolatedConformances,none,
       "conformance of %0 to %1 should be marked 'nonisolated' to retain its behavior with upcoming feature 'InferIsolatedConformances'",
       (const ValueDecl *, const ValueDecl *))
-GROUPED_WARNING(isolated_conformance_to_sendable_metatype,IsolatedConformances,none,
-    "%0 conformance of %1 to SendableMetatype-inheriting %kind2 can never "
-    "be used with generic code", (ActorIsolation, Type, const ValueDecl *))
+GROUPED_ERROR(isolated_conformance_to_sendable_metatype,IsolatedConformances,none,
+    "cannot form %0 conformance of %1 to SendableMetatype-inheriting %kind2",
+    (ActorIsolation, Type, const ValueDecl *))
 
 //===----------------------------------------------------------------------===//
 // MARK: @_inheritActorContext
@@ -8701,6 +8705,14 @@ ERROR(inherit_actor_context_only_on_async_or_isolation_erased_params,none,
       "%0 only applies to '@isolated(any)' parameters or parameters with "
       "asynchronous function types",
       (DeclAttribute))
+
+ERROR(inherit_actor_context_with_concurrent,none,
+      "'@_inheritActorContext' attribute cannot be used together with %0",
+      (const TypeAttribute *))
+
+ERROR(inherit_actor_context_with_nonisolated_nonsending,none,
+      "'@_inheritActorContext' attribute cannot be used together with %0",
+      (TypeRepr *))
 
 //===----------------------------------------------------------------------===//
 // MARK: @concurrent and nonisolated(nonsending) attributes
@@ -8802,20 +8814,17 @@ GROUPED_WARNING(
     (StringRef))
 
 //===----------------------------------------------------------------------===//
-// MARK: @extensible and @preEnumExtensibility Attributes
+// MARK: @nonexhaustive and @preEnumExtensibility Attributes
 //===----------------------------------------------------------------------===//
 
-ERROR(extensible_attr_on_frozen_type,none,
-      "cannot use '@extensible' together with '@frozen'", ())
+ERROR(nonexhaustive_attr_on_frozen_type,none,
+      "cannot use '@nonexhaustive' together with '@frozen'", ())
 
-ERROR(extensible_attr_on_internal_type,none, 
-      "'@extensible' attribute can only be applied to public or package "
+ERROR(nonexhaustive_attr_on_internal_type,none,
+      "'@nonexhaustive' attribute can only be applied to public or package "
       "declarations, but %0 is "
       "%select{private|fileprivate|internal|%error|%error|%error}1",
       (DeclName, AccessLevel))
-
-ERROR(pre_enum_extensibility_without_extensible,none,
-      "%0 can only be used together with '@extensible' attribute", (DeclAttribute))
 
 //===----------------------------------------------------------------------===//
 // MARK: `using` declaration

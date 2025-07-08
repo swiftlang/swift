@@ -929,6 +929,7 @@ public func _abiEnableAwaitContinuation() {
   fatalError("never use this function")
 }
 
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(StdlibDeploymentTarget 6.2, *)
 @_silgen_name("_swift_createJobForTestingOnly")
 public func _swift_createJobForTestingOnly(
@@ -942,3 +943,4 @@ public func _swift_createJobForTestingOnly(
   job.priority = JobPriority(priority)
   return job
 }
+#endif

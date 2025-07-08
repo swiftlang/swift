@@ -4391,8 +4391,13 @@ namespace {
 
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
-      case ActorIsolation::CallerIsolationInheriting:
       case ActorIsolation::NonisolatedUnsafe:
+        actorExpr = new (ctx) NilLiteralExpr(loc, /*implicit=*/false);
+        break;
+      case ActorIsolation::CallerIsolationInheriting:
+        // For caller isolation this expression will be replaced in SILGen
+        // because we're adding an implicit isolated parameter that #isolated
+        // must resolve to, but cannot do so during AST expansion quite yet.
         actorExpr = new (ctx) NilLiteralExpr(loc, /*implicit=*/false);
         break;
       }
@@ -4964,8 +4969,33 @@ ActorIsolation ActorIsolationChecker::determineClosureIsolation(
         closure->getParent(), getClosureActorIsolation);
     preconcurrency |= parentIsolation.preconcurrency();
 
-    return computeClosureIsolationFromParent(closure, parentIsolation,
-                                             checkIsolatedCapture);
+    auto normalIsolation = computeClosureIsolationFromParent(
+        closure, parentIsolation, checkIsolatedCapture);
+
+    // The solver has to be conservative and produce a conversion to
+    // `nonisolated(nonsending)` because at solution application time
+    // we don't yet know whether there are any captures which would
+    // make closure isolated.
+    //
+    // At this point we know that closure is not explicitly annotated with
+    // global actor, nonisolated/@concurrent attributes and doesn't have
+    // isolated parameters. If our closure is nonisolated and we have a
+    // conversion to nonisolated(nonsending), then we should respect that.
+    if (auto *explicitClosure = dyn_cast<ClosureExpr>(closure);
+        !normalIsolation.isGlobalActor()) {
+      if (auto *fce =
+              dyn_cast_or_null<FunctionConversionExpr>(Parent.getAsExpr())) {
+        auto expectedIsolation =
+            fce->getType()->castTo<FunctionType>()->getIsolation();
+        if (expectedIsolation.isNonIsolatedCaller()) {
+          auto captureInfo = explicitClosure->getCaptureInfo();
+          if (!captureInfo.getIsolatedParamCapture())
+            return ActorIsolation::forCallerIsolationInheriting();
+        }
+      }
+    }
+
+    return normalIsolation;
   }();
 
   // Apply computed preconcurrency.
@@ -8303,18 +8333,20 @@ RawConformanceIsolationRequest::evaluate(
       globalActorTypeExpr->setType(MetatypeType::get(globalActorType));
     }
 
-    // Isolated conformance to a SendableMetatype-inheriting protocol can
-    // never be used generically. Warn about it.
+    // Cannot form an isolated conformance to a SendableMetatype-inheriting
+    // protocol. Diagnose it.
     if (auto sendableMetatype =
             ctx.getProtocol(KnownProtocolKind::SendableMetatype)) {
-      if (proto->inheritsFrom(sendableMetatype) &&
-          !getActorIsolation(proto).preconcurrency()) {
+      if (proto->inheritsFrom(sendableMetatype)) {
+        bool isPreconcurrency = moduleImportForPreconcurrency(
+            proto, conformance->getDeclContext()) != nullptr;
         ctx.Diags.diagnose(
             conformance->getLoc(),
             diag::isolated_conformance_to_sendable_metatype,
             ActorIsolation::forGlobalActor(globalActorType),
             conformance->getType(),
-            proto);
+            proto)
+          .limitBehaviorIf(isPreconcurrency, DiagnosticBehavior::Warning);
       }
     }
 

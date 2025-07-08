@@ -121,6 +121,23 @@ struct TestDeinitCallsAddressor: ~Copyable, ~Escapable {
   }
 }
 
+struct NCBuffer: ~Copyable {
+  fileprivate let buffer: UnsafeMutableRawBufferPointer
+
+  public init() {
+    let ptr = UnsafeMutableRawPointer.init(bitPattern: 0)
+    self.buffer = UnsafeMutableRawBufferPointer(start: ptr, count: 0)
+  }
+
+  public var bytes: Span<UInt8> {
+    @_lifetime(borrow self)
+    borrowing get {
+      let span: Span<UInt8> = Span(_bytes: self.buffer.bytes)
+      return span
+    }
+  }
+}
+
 // Test a borrowed dependency on an address
 @_lifetime(immortal)
 public func testGenericDep<T: ~Escapable>(type: T.Type) -> T {
@@ -296,4 +313,16 @@ func testSpanMayThrow(buffer: inout [Int]) {
 func inoutToImmortal(_ s: inout RawSpan) {
   let tmp = RawSpan(_unsafeBytes: UnsafeRawBufferPointer(start: nil, count: 0))
   s = _overrideLifetime(tmp, borrowing: ())
+}
+
+// =============================================================================
+// Dependence on non-Copyable values
+// =============================================================================
+
+@_lifetime(immortal)
+func dependOnNonCopyable() -> NCBuffer {
+  let buffer = NCBuffer()
+  let count = buffer.bytes.count
+  _ = count
+  return buffer // expected-error {{noncopyable 'buffer' cannot be consumed when captured by an escaping closure or borrowed by a non-Escapable type}}
 }

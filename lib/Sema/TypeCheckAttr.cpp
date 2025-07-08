@@ -233,25 +233,17 @@ public:
     }
   }
 
-  void visitExtensibleAttr(ExtensibleAttr *attr) {
+  void visitNonexhaustiveAttr(NonexhaustiveAttr *attr) {
     auto *E = cast<EnumDecl>(D);
 
     if (D->getAttrs().hasAttribute<FrozenAttr>()) {
-      diagnoseAndRemoveAttr(attr, diag::extensible_attr_on_frozen_type);
+      diagnoseAndRemoveAttr(attr, diag::nonexhaustive_attr_on_frozen_type);
       return;
     }
 
     if (E->getFormalAccess() < AccessLevel::Package) {
-      diagnoseAndRemoveAttr(attr, diag::extensible_attr_on_internal_type,
+      diagnoseAndRemoveAttr(attr, diag::nonexhaustive_attr_on_internal_type,
                             E->getName(), E->getFormalAccess());
-      return;
-    }
-  }
-
-  void visitPreEnumExtensibilityAttr(PreEnumExtensibilityAttr *attr) {
-    if (!D->getAttrs().hasAttribute<ExtensibleAttr>()) {
-      diagnoseAndRemoveAttr(
-          attr, diag::pre_enum_extensibility_without_extensible, attr);
       return;
     }
   }
@@ -5129,8 +5121,8 @@ void AttributeChecker::checkBackDeployedAttrs(
   std::map<PlatformKind, SourceLoc> seenPlatforms;
 
   const BackDeployedAttr *ActiveAttr = nullptr;
-  if (D->getBackDeployedBeforeOSVersion(Ctx))
-    ActiveAttr = D->getAttrs().getBackDeployed(Ctx, false);
+  if (auto AttrAndRange = D->getBackDeployedAttrAndRange(Ctx))
+    ActiveAttr = AttrAndRange->first;
 
   for (auto *Attr : Attrs) {
     // Back deployment only makes sense for public declarations.
@@ -5221,7 +5213,7 @@ void AttributeChecker::checkBackDeployedAttrs(
         D->getLoc(), D->getInnermostDeclContext());
 
     // Unavailable decls cannot be back deployed.
-    auto backDeployedDomain = AvailabilityDomain::forPlatform(Attr->Platform);
+    auto backDeployedDomain = Attr->getAvailabilityDomain();
     if (availability.containsUnavailableDomain(backDeployedDomain)) {
       auto domainForDiagnostics = backDeployedDomain;
       llvm::VersionTuple ignoredVersion;
@@ -5254,7 +5246,7 @@ void AttributeChecker::checkBackDeployedAttrs(
     // fallback could never be executed at runtime.
     if (auto availableRangeAttrPair =
             getSemanticAvailableRangeDeclAndAttr(VD)) {
-      auto beforeDomain = AvailabilityDomain::forPlatform(Attr->Platform);
+      auto beforeDomain = Attr->getAvailabilityDomain();
       auto beforeVersion = Attr->Version;
       auto availableAttr = availableRangeAttrPair.value().first;
       auto introVersion = availableAttr.getIntroduced().value();
@@ -7871,6 +7863,9 @@ void AttributeChecker::visitInheritActorContextAttr(
     return;
 
   auto paramTy = P->getInterfaceType();
+  if (paramTy->hasError())
+    return;
+
   auto *funcTy =
       paramTy->lookThroughAllOptionalTypes()->getAs<AnyFunctionType>();
   if (!funcTy) {

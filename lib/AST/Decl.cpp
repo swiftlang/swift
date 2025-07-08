@@ -607,9 +607,9 @@ Decl::getIntroducedOSVersion(PlatformKind Kind) const {
   return std::nullopt;
 }
 
-std::optional<llvm::VersionTuple>
-Decl::getBackDeployedBeforeOSVersion(ASTContext &Ctx,
-                                     bool forTargetVariant) const {
+std::optional<std::pair<const BackDeployedAttr *, AvailabilityRange>>
+Decl::getBackDeployedAttrAndRange(ASTContext &Ctx,
+                                  bool forTargetVariant) const {
   if (auto *attr = getAttrs().getBackDeployed(Ctx, forTargetVariant)) {
     auto version = attr->Version;
     AvailabilityDomain ignoredDomain;
@@ -618,26 +618,25 @@ Decl::getBackDeployedBeforeOSVersion(ASTContext &Ctx,
 
     // If the remap for fallback resulted in 1.0, then the
     // backdeployment prior to that is not meaningful.
-    if (version == clang::VersionTuple(1, 0, 0, 0))
+    if (version == llvm::VersionTuple(1, 0, 0, 0))
       return std::nullopt;
 
-    return version;
+    return std::make_pair(attr, AvailabilityRange(version));
   }
 
   // Accessors may inherit `@backDeployed`.
   if (auto *AD = dyn_cast<AccessorDecl>(this))
-    return AD->getStorage()->getBackDeployedBeforeOSVersion(Ctx,
-                                                            forTargetVariant);
+    return AD->getStorage()->getBackDeployedAttrAndRange(Ctx, forTargetVariant);
 
   return std::nullopt;
 }
 
 bool Decl::isBackDeployed(ASTContext &Ctx) const {
-  if (getBackDeployedBeforeOSVersion(Ctx))
+  if (getBackDeployedAttrAndRange(Ctx))
     return true;
 
   if (Ctx.LangOpts.TargetVariant) {
-    if (getBackDeployedBeforeOSVersion(Ctx, /*forTargetVariant=*/true))
+    if (getBackDeployedAttrAndRange(Ctx, /*forTargetVariant=*/true))
       return true;
   }
 
@@ -1463,8 +1462,8 @@ AvailabilityRange Decl::getAvailabilityForLinkage() const {
 
   // When computing availability for linkage, use the "before" version from
   // the @backDeployed attribute, if present.
-  if (auto backDeployVersion = getBackDeployedBeforeOSVersion(ctx))
-    return AvailabilityRange{*backDeployVersion};
+  if (auto backDeployedAttrAndRange = getBackDeployedAttrAndRange(ctx))
+    return backDeployedAttrAndRange->second;
 
   auto containingContext = AvailabilityInference::annotatedAvailableRange(this);
   if (containingContext.has_value()) {
@@ -7035,9 +7034,9 @@ bool EnumDecl::treatAsExhaustiveForDiags(const DeclContext *useDC) const {
     if (enumModule->inSamePackage(useDC->getParentModule()))
       return true;
 
-    // When the enum is marked as `@extensible` cross-module access
+    // When the enum is marked as `@nonexhaustive` cross-module access
     // cannot be exhaustive and requires `@unknown default:`.
-    if (getAttrs().hasAttribute<ExtensibleAttr>() &&
+    if (getAttrs().hasAttribute<NonexhaustiveAttr>() &&
         enumModule != useDC->getParentModule())
       return false;
   }

@@ -1475,6 +1475,11 @@ final class ElfImage<SomeElfTraits: ElfTraits>
       let stringSect = ElfStringSection(source: stringSource)
 
       for shdr in sectionHeaders {
+        // All other fields are undefined for SHT_NULL
+        if shdr.sh_type == .SHT_NULL {
+          continue
+        }
+
         guard let name = stringSect.getStringAt(index: Int(shdr.sh_name)) else {
           continue
         }
@@ -1612,6 +1617,11 @@ final class ElfImage<SomeElfTraits: ElfTraits>
         let stringSect = ElfStringSection(source: stringSource)
 
         for shdr in sectionHeaders {
+          // All other fields are undefined for SHT_NULL
+          if shdr.sh_type == .SHT_NULL {
+            continue
+          }
+
           guard let sname
                   = stringSect.getStringAt(index: Int(shdr.sh_name)) else {
             continue

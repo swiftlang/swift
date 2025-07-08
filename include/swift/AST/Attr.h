@@ -136,6 +136,11 @@ enum : unsigned {
       InheritActorContextModifier::Last_InheritActorContextKind))
 };
 
+enum : unsigned {
+  NumNonexhaustiveModeBits = countBitsUsed(
+      static_cast<unsigned>(NonexhaustiveMode::Last_NonexhaustiveMode))
+};
+
 enum : unsigned { NumDeclAttrKindBits = countBitsUsed(NumDeclAttrKinds - 1) };
 
 enum : unsigned { NumTypeAttrKindBits = countBitsUsed(NumTypeAttrKinds - 1) };
@@ -276,6 +281,10 @@ protected:
 
     SWIFT_INLINE_BITFIELD(LifetimeAttr, DeclAttribute, 1,
       isUnderscored : 1
+    );
+
+    SWIFT_INLINE_BITFIELD(NonexhaustiveAttr, DeclAttribute, NumNonexhaustiveModeBits,
+      mode : NumNonexhaustiveModeBits
     );
   } Bits;
   // clang-format on
@@ -2925,7 +2934,7 @@ public:
       : DeclAttribute(DeclAttrKind::BackDeployed, AtLoc, Range, Implicit),
         Platform(Platform), Version(Version) {}
 
-  /// The platform the symbol is available for back deployment on.
+  /// The platform the decl is available for back deployment in.
   const PlatformKind Platform;
 
   /// The earliest platform version that may use the back deployed implementation.
@@ -2933,6 +2942,12 @@ public:
 
   /// Returns true if this attribute is active given the current platform.
   bool isActivePlatform(const ASTContext &ctx, bool forTargetVariant) const;
+
+  /// Returns the `AvailabilityDomain` that the decl is available for back
+  /// deployment in.
+  AvailabilityDomain getAvailabilityDomain() const {
+    return AvailabilityDomain::forPlatform(Platform);
+  }
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::BackDeployed;
@@ -3499,6 +3514,36 @@ public:
     return true;
   }
 };
+
+/// Defines a @nonexhaustive attribute.
+class NonexhaustiveAttr : public DeclAttribute {
+public:
+  NonexhaustiveAttr(SourceLoc atLoc, SourceRange range, NonexhaustiveMode mode,
+                    bool implicit = false)
+      : DeclAttribute(DeclAttrKind::Nonexhaustive, atLoc, range, implicit) {
+    Bits.NonexhaustiveAttr.mode = unsigned(mode);
+  }
+
+  NonexhaustiveAttr(NonexhaustiveMode mode)
+    : NonexhaustiveAttr(SourceLoc(), SourceRange(), mode) {}
+
+  NonexhaustiveMode getMode() const {
+    return NonexhaustiveMode(Bits.NonexhaustiveAttr.mode);
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::Nonexhaustive;
+  }
+
+  NonexhaustiveAttr *clone(ASTContext &ctx) const {
+    return new (ctx) NonexhaustiveAttr(AtLoc, Range, getMode(), isImplicit());
+  }
+
+  bool isEquivalent(const NonexhaustiveAttr *other, Decl *attachedTo) const {
+    return getMode() == other->getMode();
+  }
+};
+
 
 /// The kind of unary operator, if any.
 enum class UnaryOperatorKind : uint8_t { None, Prefix, Postfix };

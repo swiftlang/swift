@@ -497,6 +497,10 @@ namespace {
     RValue
     emitFunctionCvtFromExecutionCallerToGlobalActor(FunctionConversionExpr *E,
                                                     SGFContext C);
+
+    RValue emitFunctionCvtForNonisolatedNonsendingClosureExpr(
+        FunctionConversionExpr *E, SGFContext C);
+
     RValue visitActorIsolationErasureExpr(ActorIsolationErasureExpr *E,
                                           SGFContext C);
     RValue visitExtractFunctionIsolationExpr(ExtractFunctionIsolationExpr *E,
@@ -2031,6 +2035,44 @@ RValueEmitter::emitFunctionCvtToExecutionCaller(FunctionConversionExpr *e,
   return RValue(SGF, e, destType, result);
 }
 
+RValue RValueEmitter::emitFunctionCvtForNonisolatedNonsendingClosureExpr(
+    FunctionConversionExpr *E, SGFContext C) {
+  // The specific AST pattern for this looks as follows:
+  //
+  //   (function_conversion_expr type="nonisolated(nonsending) () async -> Void"
+  //      (closure_expr type="() async -> ()" isolated_to_caller_isolation))
+  CanAnyFunctionType destType =
+      cast<FunctionType>(E->getType()->getCanonicalType());
+  auto subExpr = E->getSubExpr()->getSemanticsProvidingExpr();
+
+  // If we do not have a closure or if that closure is not caller isolation
+  // inheriting, bail.
+  auto *closureExpr = dyn_cast<ClosureExpr>(subExpr);
+  if (!closureExpr ||
+      !closureExpr->getActorIsolation().isCallerIsolationInheriting())
+    return RValue();
+
+  // Then grab our closure type... make sure it is non isolated and then make
+  // sure it is the same as our destType but with nonisolated.
+  CanAnyFunctionType closureType =
+      cast<FunctionType>(closureExpr->getType()->getCanonicalType());
+  if (!closureType->getIsolation().isNonIsolated() ||
+      closureType !=
+          destType->withIsolation(FunctionTypeIsolation::forNonIsolated())
+              ->getCanonicalType())
+    return RValue();
+
+  // NOTE: This is a partial inline of getClosureTypeInfo. We do this so we have
+  // more control and make this change less viral in the compiler for 6.2.
+  auto newExtInfo = closureType->getExtInfo().withIsolation(
+      FunctionTypeIsolation::forNonIsolatedCaller());
+  closureType = closureType.withExtInfo(newExtInfo);
+  auto info = SGF.getFunctionTypeInfo(closureType);
+
+  auto closure = emitClosureReference(closureExpr, info);
+  return RValue(SGF, closureExpr, destType, closure);
+}
+
 RValue RValueEmitter::emitFunctionCvtFromExecutionCallerToGlobalActor(
     FunctionConversionExpr *e, SGFContext C) {
   // We are pattern matching a conversion sequence like the following:
@@ -2142,6 +2184,28 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
   // TODO: Move this up when we can emit closures directly with C calling
   // convention.
   auto subExpr = e->getSubExpr()->getSemanticsProvidingExpr();
+
+  // Before we go any further into emitting the convert function expr, see if
+  // our SubExpr is a ClosureExpr with the exact same type as our
+  // FunctionConversionExpr except with the FunctionConversionExpr adding
+  // nonisolated(nonsending). Then see if the ClosureExpr itself (even though it
+  // is not nonisolated(nonsending) typed is considered to have
+  // nonisolated(nonsending) isolation. In such a case, emit the closure
+  // directly. We are going to handle it especially in closure emission to work
+  // around the missing information in the type.
+  //
+  // DISCUSSION: We need to do this here since in the Expression TypeChecker we
+  // do not have access to capture information when we would normally want to
+  // mark the closure type as being nonisolated(nonsending). As a result, we
+  // cannot know if the nonisolated(nonsending) should be overridden by for
+  // example an actor that is captured by the closure. So to work around this in
+  // Sema, we still mark the ClosureExpr as having the appropriate isolation
+  // even though its type does not have it... and then we work around this here
+  // and also in getClosureTypeInfo.
+  if (destType->getIsolation().isNonIsolatedCaller())
+    if (auto rv = emitFunctionCvtForNonisolatedNonsendingClosureExpr(e, C))
+      return rv;
+
   // Look through `as` type ascriptions that don't induce bridging too.
   while (auto subCoerce = dyn_cast<CoerceExpr>(subExpr)) {
     // Coercions that introduce bridging aren't simple type ascriptions.
@@ -7295,18 +7359,33 @@ RValue RValueEmitter::visitMacroExpansionExpr(MacroExpansionExpr *E,
 
 RValue RValueEmitter::visitCurrentContextIsolationExpr(
     CurrentContextIsolationExpr *E, SGFContext C) {
-  // If we are in an actor initializer that is isolated to self, the
-  // current isolation is flow-sensitive; use that instead of the
-  // synthesized expression.
-  if (auto ctor = dyn_cast_or_null<ConstructorDecl>(
-          SGF.F.getDeclRef().getDecl())) {
-    auto isolation = getActorIsolation(ctor);
-    if (ctor->isDesignatedInit() &&
+  auto afd =
+    dyn_cast_or_null<AbstractFunctionDecl>(SGF.F.getDeclRef().getDecl());
+  if (afd) {
+    auto isolation = getActorIsolation(afd);
+    auto ctor = dyn_cast_or_null<ConstructorDecl>(afd);
+    if (ctor && ctor->isDesignatedInit() &&
         isolation == ActorIsolation::ActorInstance &&
         isolation.getActorInstance() == ctor->getImplicitSelfDecl()) {
+      // If we are in an actor initializer that is isolated to self, the
+      // current isolation is flow-sensitive; use that instead of the
+      // synthesized expression.
       auto isolationValue =
         SGF.emitFlowSensitiveSelfIsolation(E, isolation);
       return RValue(SGF, E, isolationValue);
+    }
+
+    if (isolation == ActorIsolation::CallerIsolationInheriting) {
+      auto *isolatedArg = SGF.F.maybeGetIsolatedArgument();
+      assert(isolatedArg &&
+             "Caller Isolation Inheriting without isolated parameter");
+      ManagedValue isolatedMV;
+      if (isolatedArg->getOwnershipKind() == OwnershipKind::Guaranteed) {
+        isolatedMV = ManagedValue::forBorrowedRValue(isolatedArg);
+      } else {
+        isolatedMV = ManagedValue::forUnmanagedOwnedValue(isolatedArg);
+      }
+      return RValue(SGF, E, isolatedMV);
     }
   }
 

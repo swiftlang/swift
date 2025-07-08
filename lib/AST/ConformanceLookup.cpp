@@ -897,68 +897,60 @@ bool TypeBase::isSendableType() {
 /// Copyable and Escapable checking utilities
 ///
 
-/// Preprocesses a type before querying whether it conforms to an invertible.
-static CanType preprocessTypeForInvertibleQuery(Type orig) {
-  Type type = orig;
+static bool conformsToInvertible(CanType type, InvertibleProtocolKind ip) {
+  // FIXME: Remove these.
+  if (isa<SILPackType>(type))
+    return true;
 
-  // Strip off any StorageType wrapper.
-  type = type->getReferenceStorageReferent();
+  if (isa<SILTokenType>(type))
+    return true;
+
+  auto *proto = type->getASTContext().getProtocol(getKnownProtocolKind(ip));
+  ASSERT(proto);
+
+  return (bool) checkConformance(type, proto, /*allowMissing=*/false);
+}
+
+void TypeBase::computeInvertibleConformances() {
+  Bits.TypeBase.ComputedInvertibleConformances = true;
+
+  Type type(this);
+
+  // FIXME: Remove all of the below. Callers should be changed to perform any
+  // necessary unwrapping themselves.
 
   // Pack expansions such as `repeat T` themselves do not have conformances,
   // so check its pattern type for conformance.
-  if (auto *pet = type->getAs<PackExpansionType>()) {
-    type = pet->getPatternType()->getCanonicalType();
-  }
+  if (auto *pet = type->getAs<PackExpansionType>())
+    type = pet->getPatternType();
 
-  // Strip @lvalue and canonicalize.
-  auto canType = type->getRValueType()->getCanonicalType();
-  return canType;
-}
+  auto canType = type->getReferenceStorageReferent()
+                     ->getWithoutSpecifierType()
+                     ->getCanonicalType();
 
-static bool conformsToInvertible(CanType type, InvertibleProtocolKind ip) {
-  auto &ctx = type->getASTContext();
+  assert(!canType->hasTypeParameter());
+  assert(!canType->hasUnboundGenericType());
+  assert(!isa<SILBoxType>(canType));
+  assert(!isa<SILMoveOnlyWrappedType>(canType));
 
-  auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
-  assert(proto && "missing Copyable/Escapable from stdlib!");
-
-  // Must not have a type parameter!
-  assert(!type->hasTypeParameter() && "caller forgot to mapTypeIntoContext!");
-
-  assert(!type->hasUnboundGenericType() && "a UGT has no conformances!");
-
-  assert(!type->is<PackExpansionType>());
-
-  // FIXME: lldb misbehaves by getting here with a SILPackType.
-  //  just pretend it it conforms.
-  if (type->is<SILPackType>())
-    return true;
-
-  if (type->is<SILTokenType>()) {
-    return true;
-  }
-
-  // The SIL types in the AST do not have real conformances, and should have
-  // been handled in SILType instead.
-  assert(!(type->is<SILBoxType,
-                    SILMoveOnlyWrappedType,
-                    SILPackType,
-                    SILTokenType>()));
-
-  const bool conforms =
-      (bool) checkConformance(type, proto, /*allowMissing=*/false);
-
-  return conforms;
+  Bits.TypeBase.IsCopyable = conformsToInvertible(
+      canType, InvertibleProtocolKind::Copyable);
+  Bits.TypeBase.IsEscapable = conformsToInvertible(
+      canType, InvertibleProtocolKind::Escapable);
 }
 
 /// \returns true iff this type lacks conformance to Copyable.
 bool TypeBase::isNoncopyable() {
-  auto canType = preprocessTypeForInvertibleQuery(this);
-  return !conformsToInvertible(canType, InvertibleProtocolKind::Copyable);
+  if (!Bits.TypeBase.ComputedInvertibleConformances)
+    computeInvertibleConformances();
+  return !Bits.TypeBase.IsCopyable;
 }
 
+/// \returns true iff this type conforms to Escaping.
 bool TypeBase::isEscapable() {
-  auto canType = preprocessTypeForInvertibleQuery(this);
-  return conformsToInvertible(canType, InvertibleProtocolKind::Escapable);
+  if (!Bits.TypeBase.ComputedInvertibleConformances)
+    computeInvertibleConformances();
+  return Bits.TypeBase.IsEscapable;
 }
 
 bool TypeBase::isEscapable(GenericSignature sig) {

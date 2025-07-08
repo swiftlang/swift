@@ -124,6 +124,10 @@ struct ScannerImportStatementInfo {
     uint32_t columnNumber;
   };
 
+  ScannerImportStatementInfo(std::string importIdentifier)
+      : importIdentifier(importIdentifier), importLocations(),
+        isExported(false), accessLevel(AccessLevel::Public) {}
+
   ScannerImportStatementInfo(std::string importIdentifier, bool isExported,
                              AccessLevel accessLevel)
       : importIdentifier(importIdentifier), importLocations(),
@@ -861,6 +865,12 @@ public:
 
   /// Retrieve the dependencies for a Clang module.
   const ClangModuleDependencyStorage *getAsClangModule() const;
+
+  /// Get the path to the module-defining file:
+  /// `SwiftInterface`: Textual Interface path
+  /// `SwiftBinary`: Binary module path
+  /// `Clang`: Module map path
+  std::string getModuleDefiningPath() const;
 
   /// Add a dependency on the given module, if it was not already in the set.
   void

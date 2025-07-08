@@ -448,6 +448,10 @@ RandomSeed("random-seed", llvm::cl::value_desc("seed"),
                     llvm::cl::cat(Category),
                     llvm::cl::init(0));
 
+static llvm::cl::opt<bool> SourceOrderCompletion(
+    "source-order-completion",
+    llvm::cl::desc("Perform batch completion in source order"),
+    llvm::cl::cat(Category));
 
 static llvm::cl::opt<std::string>
 CompletionOutputDir("completion-output-dir", llvm::cl::value_desc("path"),
@@ -1501,7 +1505,7 @@ static int doBatchCodeCompletion(const CompilerInvocation &InitInvok,
                    << TargetTokName << "\"\n";
       return 1;
     }
-  } else {
+  } else if (!options::SourceOrderCompletion) {
     // Shuffle tokens to detect order-dependent bugs.
     if (CCTokens.empty()) {
       llvm::errs()

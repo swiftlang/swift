@@ -1160,21 +1160,27 @@ namespace {
           auto *enumModule = theEnum->getParentModule();
           shouldIncludeFutureVersionComment =
               enumModule->isSystemModule() ||
-              theEnum->getAttrs().hasAttribute<ExtensibleAttr>();
+              theEnum->getAttrs().hasAttribute<NonexhaustiveAttr>();
         }
 
         auto diag =
             DE.diagnose(startLoc, diag::non_exhaustive_switch_unknown_only,
                         subjectType, shouldIncludeFutureVersionComment);
 
-        // Presence of `@preEnumExtensibility` pushed the warning farther
-        // into the future.
-        if (theEnum &&
-            theEnum->getAttrs().hasAttribute<PreEnumExtensibilityAttr>()) {
-          diag.warnUntilFutureSwiftVersion();
-        } else {
-          diag.warnUntilSwiftVersion(6);
-        }
+        auto shouldWarnUntilVersion = [&theEnum]() -> unsigned {
+          if (theEnum) {
+            // Presence of `@nonexhaustive(warn)` pushes the warning farther,
+            // into the future.
+            if (auto *nonexhaustive =
+                    theEnum->getAttrs().getAttribute<NonexhaustiveAttr>()) {
+              if (nonexhaustive->getMode() == NonexhaustiveMode::Warning)
+                return swift::version::Version::getFutureMajorLanguageVersion();
+            }
+          }
+          return 6;
+        };
+
+        diag.warnUntilSwiftVersion(shouldWarnUntilVersion());
 
         mainDiagType = std::nullopt;
       }
