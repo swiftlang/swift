@@ -10,8 +10,6 @@
 // libstdc++11 declares a templated constructor of std::function with an rvalue-reference parameter,
 // which aren't yet supported in Swift. Therefore initializing a std::function from Swift closures
 // will not work on the platforms that are shipped with this version of libstdc++ (rdar://125816354).
-// XFAIL: LinuxDistribution=ubuntu-24.04
-// XFAIL: LinuxDistribution=ubuntu-22.04
 // XFAIL: LinuxDistribution=rhel-9.3
 // XFAIL: LinuxDistribution=rhel-9.4
 // XFAIL: LinuxDistribution=rhel-9.5
