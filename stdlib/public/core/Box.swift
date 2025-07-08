@@ -47,7 +47,7 @@ extension _Box where Value: ~Copyable {
   @lifetime(&self)
   @_alwaysEmitIntoClient
   @_transparent
-  public func mutate() -> _Inout<Value> {
+  public mutating func mutate() -> _Inout<Value> {
     unsafe _Inout(unsafeAddress: pointer, mutating: &self)
   }
 

@@ -17,7 +17,7 @@
 @available(SwiftStdlib 6.3, *)
 @frozen
 @safe
-public struct Inout<Value: ~Copyable>: ~Copyable, ~Escapable {
+public struct _Inout<Value: ~Copyable>: ~Copyable, ~Escapable {
   @usableFromInline
   let pointer: UnsafeMutablePointer<Value>
 
@@ -71,7 +71,7 @@ public struct Inout<Value: ~Copyable>: ~Copyable, ~Escapable {
 }
 
 @available(SwiftStdlib 6.3, *)
-extension Inout where Value: ~Copyable {
+extension _Inout where Value: ~Copyable {
   /// Dereferences the mutable reference allowing for in-place reads and writes
   /// to the underlying instance.
   @available(SwiftStdlib 6.3, *)
