@@ -128,8 +128,11 @@ extension ${Self}: CustomDebugStringConvertible {
         UnsafeBufferPointer(start: bufferPtr, count: length))
     }
   }
+}
 
-%if bits == 32 or bits == 64:
+%if bits == 16 or bits == 32 or bits == 64:
+${Availability(bits)}
+extension ${Self} {
   // Temporary `debugDescription2` that uses the new Swift implementation.
   // `debugDescription` above is still using the old C implementation
   // for now so we can compare performance and results between the two.
@@ -149,8 +152,8 @@ extension ${Self}: CustomDebugStringConvertible {
         fatalError()
     }
   }
-%end
 }
+%end
 
 ${Availability(bits)}
 extension ${Self}: TextOutputStreamable {

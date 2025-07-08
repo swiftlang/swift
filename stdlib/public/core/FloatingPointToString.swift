@@ -21,9 +21,9 @@
 //===---------------------------------------------------------------------===//
 ///
 /// For binary16, this code uses a simple approach that is normally
-/// implemented with variable-length arithmetic.  However, due to
-/// the limited range of binary16, this can be implemented simply
-/// with only 32-bit integer arithmetic.
+/// implemented with variable-length arithmetic.  However, due to the
+/// limited range of binary16, this can be implemented with only
+/// 32-bit integer arithmetic.
 ///
 /// For other formats, we use a modified form of the Grisu2
 /// algorithm from Florian Loitsch; "Printing Floating-Point Numbers
@@ -41,6 +41,9 @@
 /// A few further improvements were inspired by the Ryu algorithm
 /// from Ulf Anders; "Ryū: fast float-to-string conversion", 2018.
 /// https://doi.org/10.1145/3296979.3192369
+///
+/// The full algorithm is extensively commented in the Float64 version
+/// below; refer to that for details.
 ///
 /// In summary, this implementation is:
 ///
@@ -88,6 +91,9 @@
 ///   was exhaustive -- we verified all 4 billion possible Float32 values.
 /// * The Swift code uses an idiom of building up to 8 ASCII characters
 ///   in a UInt64 and then writing the whole block to memory.
+/// * The Swift version is slightly faster than the C version;
+///   mostly thanks to various minor algorithmic tweaks that were
+///   found during the translation process.
 ///
 // ----------------------------------------------------------------------------
 
@@ -134,6 +140,238 @@ internal func _float64ToStringImpl2(
     return UInt64(truncatingIfNeeded: textLength)
 }
 
+#if !arch(x86_64)
+internal func Float16ToASCII(
+  value f: Float16,
+  buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>) -> Range<Int>
+{
+    if #available(macOS 9999, *) {
+        return _Float16ToASCII(value: f, buffer: &utf8Buffer)
+    } else {
+        return 0..<0
+    }
+}
+
+@available(macOS 9999, *)
+fileprivate func _Float16ToASCII(
+  value f: Float16,
+  buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>) -> Range<Int>
+{
+    // We need a MutableRawSpan in order to use wide store/load operations
+    precondition(utf8Buffer.count >= 32)
+    var buffer = utf8Buffer.mutableBytes
+
+    // Step 1: Handle various input cases:
+    let binaryExponent: Int
+    let significand: Float16.RawSignificand
+    let exponentBias = (1 << (Float16.exponentBitCount - 1)) - 2; // 14
+    if (f.exponentBitPattern == 0x1f) { // NaN or Infinity
+        if (f.isInfinite) {
+            return infinity(buffer: &buffer, sign: f.sign)
+        } else { // f.isNaN
+            let quietBit = (f.significandBitPattern >> (Float16.significandBitCount - 1)) & 1;
+            let payloadMask = UInt16(1 &<< (Float16.significandBitCount - 2)) - 1
+            let payload16 = f.significandBitPattern & payloadMask
+            return nan_details(buffer: &buffer,
+                               sign: f.sign,
+                               quiet: quietBit == 0,
+                               payloadHigh: 0,
+                               payloadLow: UInt64(truncatingIfNeeded:payload16))
+        }
+    } else if (f.exponentBitPattern == 0) {
+        if (f.isZero) {
+            return zero(buffer: &buffer, sign: f.sign)
+        } else { // Subnormal
+            binaryExponent = 1 - exponentBias
+            significand = f.significandBitPattern &<< 2
+        }
+    } else { // normal
+        binaryExponent = Int(f.exponentBitPattern) &- exponentBias
+        let hiddenBit = Float16.RawSignificand(1) << Float16.significandBitCount
+        significand = (f.significandBitPattern &+ hiddenBit) &<< 2
+    }
+
+    // Step 2: Determine the exact target interval
+    let halfUlp: Float16.RawSignificand = 2
+    let quarterUlp = halfUlp >> 1
+    let upperMidpointExact = significand &+ halfUlp
+    let lowerMidpointExact = significand &- ((f.significandBitPattern == 0) ? quarterUlp : halfUlp)
+
+    var firstDigit = 1
+    var nextDigit = firstDigit
+
+    // Step 3: If it's < 10^-5, format as exponential form
+    if binaryExponent < -13 || (binaryExponent == -13 && significand < 0x1a38) {
+        var decimalExponent = -5
+        var u = (UInt32(upperMidpointExact) << (28 - 13 &+ binaryExponent)) &* 100000
+        var l = (UInt32(lowerMidpointExact) << (28 - 13 &+ binaryExponent)) &* 100000
+        var t = (UInt32(significand) << (28 - 13 &+ binaryExponent)) &* 100000
+        let mask = (UInt32(1) << 28) - 1
+        if t < ((1 << 28) / 10) {
+            u &*= 100
+            l &*= 100
+            t &*= 100
+            decimalExponent &-= 2
+        }
+        if t < (1 << 28) {
+            u &*= 10
+            l &*= 10
+            t &*= 10
+            decimalExponent &-= 1
+        }
+        let uDigit = u >> 28
+        if uDigit == (l >> 28) {
+            // More than one digit, so write first digit, ".", then the rest
+            unsafe buffer.storeBytes(of: 0x30 + UInt8(truncatingIfNeeded: uDigit),
+                                     toUncheckedByteOffset: nextDigit,
+                                     as: UInt8.self)
+            nextDigit &+= 1
+            unsafe buffer.storeBytes(of: 0x2e,
+                                     toUncheckedByteOffset: nextDigit,
+                                     as: UInt8.self)
+            nextDigit &+= 1
+            while true {
+                u = (u & mask) &* 10
+                l = (l & mask) &* 10
+                t = (t & mask) &* 10
+                let uDigit = u >> 28
+                if uDigit != (l >> 28) {
+                    // Stop before emitting the last digit
+                    break
+                }
+                unsafe buffer.storeBytes(of: 0x30 &+ UInt8(truncatingIfNeeded: uDigit),
+                                         toUncheckedByteOffset: nextDigit,
+                                         as: UInt8.self)
+                nextDigit &+= 1
+            }
+        }
+        let digit = 0x30 &+ (t &+ (1 &<< 27)) >> 28
+        unsafe buffer.storeBytes(of: UInt8(truncatingIfNeeded: digit),
+                                 toUncheckedByteOffset: nextDigit,
+                                 as: UInt8.self)
+        nextDigit &+= 1
+        unsafe buffer.storeBytes(of: 0x65, // "e"
+                                 toUncheckedByteOffset: nextDigit,
+                                 as: UInt8.self)
+        nextDigit &+= 1
+        unsafe buffer.storeBytes(of: 0x2d, // "-"
+                                 toUncheckedByteOffset: nextDigit,
+                                 as: UInt8.self)
+        nextDigit &+= 1
+        unsafe buffer.storeBytes(of: UInt8(truncatingIfNeeded: -decimalExponent / 10 &+ 0x30),
+                                 toUncheckedByteOffset: nextDigit,
+                                 as: UInt8.self)
+        nextDigit &+= 1
+        unsafe buffer.storeBytes(of: UInt8(truncatingIfNeeded: -decimalExponent % 10 &+ 0x30),
+                                 toUncheckedByteOffset: nextDigit,
+                                 as: UInt8.self)
+        nextDigit &+= 1
+
+    } else {
+
+        // Step 4: Greater than 10^-5, so use decimal format "123.45"
+        // (Note: Float16 is never big enough to need exponential for
+        // positive exponents)
+        // First, split into integer and fractional parts:
+
+        let intPart : Float16.RawSignificand
+        let fractionPart : Float16.RawSignificand
+        if binaryExponent < 13 {
+            intPart = significand >> (13 &- binaryExponent)
+            fractionPart = significand &- (intPart &<< (13 &- binaryExponent))
+        } else {
+            intPart = significand &<< (binaryExponent &- 13)
+            fractionPart = significand &- (intPart >> (binaryExponent &- 13))
+        }
+
+        // Step 5: Emit the integer part
+        let text = intToEightDigits(UInt32(intPart))
+        unsafe buffer.storeBytes(of: text,
+                                 toUncheckedByteOffset: nextDigit,
+                                 as: UInt64.self)
+        nextDigit &+= 8
+
+        // Skip leading zeros
+        if intPart < 10 {
+            firstDigit &+= 7
+        } else if intPart < 100 {
+            firstDigit &+= 6
+        } else if intPart < 1000 {
+            firstDigit &+= 5
+        } else if intPart < 10000 {
+            firstDigit &+= 4
+        } else {
+            firstDigit &+= 3
+        }
+
+        // After the integer part comes a period...
+        unsafe buffer.storeBytes(of: 0x2e,
+                                 toUncheckedByteOffset: nextDigit,
+                                 as: UInt8.self)
+        nextDigit &+= 1
+
+        if fractionPart == 0 {
+            // Step 6: No fraction, so ".0" and we're done
+            unsafe buffer.storeBytes(of: 0x30,
+                                     toUncheckedByteOffset: nextDigit,
+                                     as: UInt8.self)
+            nextDigit &+= 1
+        } else {
+            // Step 7: Emit the fractional part by repeatedly
+            // multiplying by 10 to produce successive digits:
+            var u = UInt32(upperMidpointExact) &<< (28 - 13 &+ binaryExponent)
+            var l = UInt32(lowerMidpointExact) &<< (28 - 13 &+ binaryExponent)
+            var t = UInt32(fractionPart) &<< (28 - 13 &+ binaryExponent)
+            let mask = (UInt32(1) << 28) - 1
+            var uDigit: UInt8 = 0
+            var lDigit: UInt8 = 0
+            while true {
+                u = (u & mask) &* 10
+                l = (l & mask) &* 10
+                // This actually overflows, but we only need the
+                // low-order bits, so it doesn't matter.
+                t = (t & mask) &* 10
+                uDigit = UInt8(truncatingIfNeeded: u >> 28)
+                lDigit = UInt8(truncatingIfNeeded: l >> 28)
+                if uDigit != lDigit {
+                    break
+                }
+
+                unsafe buffer.storeBytes(of: 0x30 &+ uDigit,
+                                         toUncheckedByteOffset: nextDigit,
+                                         as: UInt8.self)
+                nextDigit &+= 1
+            }
+            t &+= 1 << 27
+            if (t & mask) == 0 { // Exactly 1/2
+                t = (t >> 28) & ~1 // Round last digit even
+                // Without this next check, 0.015625 == 2^-6 prints
+                // as "0.01562" which does not round-trip correctly.
+                // With this, we get "0.01563" which does.
+                // It affects no other value.
+                if t <= lDigit && l > 0 {
+	            t += 1
+                }
+            } else {
+                t >>= 28
+            }
+            unsafe buffer.storeBytes(of: UInt8(truncatingIfNeeded: 0x30 + t),
+                                     toUncheckedByteOffset: nextDigit,
+                                     as: UInt8.self)
+            nextDigit &+= 1
+        }
+    }
+    if f.sign == .minus {
+        unsafe buffer.storeBytes(of: 0x2d,
+                                 toUncheckedByteOffset: firstDigit &- 1,
+                                 as: UInt8.self) // "-"
+        firstDigit &-= 1
+    }
+    return firstDigit..<nextDigit
+}
+#endif
+
+
 internal func Float32ToASCII(
   value f: Float32,
   buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>) -> Range<Int>
@@ -173,7 +411,8 @@ fileprivate func _Float32ToASCII(
             return nan_details(buffer: &buffer,
                                sign: f.sign,
                                quiet: quietBit == 0,
-                               payload: UInt128(truncatingIfNeeded:payload32))
+                               payloadHigh: 0,
+                               payloadLow: UInt64(truncatingIfNeeded:payload32))
         }
     } else if (f.exponentBitPattern == 0) {
         if (f.isZero) {
@@ -362,7 +601,8 @@ fileprivate func _Float64ToASCII(
             return nan_details(buffer: &buffer,
                                sign: d.sign,
                                quiet: quietBit == 0,
-                               payload: UInt128(truncatingIfNeeded:payload64))
+                               payloadHigh: 0,
+                               payloadLow: UInt64(truncatingIfNeeded:payload64))
         }
     } else if (d.exponentBitPattern == 0) {
         if (d.isZero) {
@@ -987,7 +1227,8 @@ fileprivate func hexWithLeadingZeros(buffer: inout MutableRawSpan, offset: inout
 fileprivate func nan_details(buffer: inout MutableRawSpan,
                              sign: FloatingPointSign,
                              quiet: Bool,
-                             payload: UInt128) -> Range<Int>
+                             payloadHigh: UInt64,
+                             payloadLow: UInt64) -> Range<Int>
 {
     // value is a NaN of some sort
     var i = 0
@@ -1003,18 +1244,18 @@ fileprivate func nan_details(buffer: inout MutableRawSpan,
     buffer.storeBytes(of: 0x61, toByteOffset: i + 1, as: UInt8.self) // "a"
     buffer.storeBytes(of: 0x6e, toByteOffset: i + 2, as: UInt8.self) // "n"
     i += 3
-    if payload != 0 {
+    if payloadHigh != 0 || payloadLow != 0 {
         buffer.storeBytes(of: 0x28, toByteOffset: i, as: UInt8.self) // "("
         i += 1
         buffer.storeBytes(of: 0x30, toByteOffset: i, as: UInt8.self) // "0"
         i += 1
         buffer.storeBytes(of: 0x78, toByteOffset: i, as: UInt8.self) // "x"
         i += 1
-        if payload._high == 0 {
-            hexWithoutLeadingZeros(buffer: &buffer, offset: &i, value: payload._low)
+        if payloadHigh == 0 {
+            hexWithoutLeadingZeros(buffer: &buffer, offset: &i, value: payloadLow)
         } else {
-            hexWithoutLeadingZeros(buffer: &buffer, offset: &i, value: payload._high)
-            hexWithLeadingZeros(buffer: &buffer, offset: &i, value: payload._low)
+            hexWithoutLeadingZeros(buffer: &buffer, offset: &i, value: payloadHigh)
+            hexWithLeadingZeros(buffer: &buffer, offset: &i, value: payloadLow)
         }
         buffer.storeBytes(of: 0x29, toByteOffset: i, as: UInt8.self) // ")"
         i += 1
