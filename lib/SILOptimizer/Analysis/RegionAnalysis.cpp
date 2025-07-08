@@ -15,12 +15,8 @@
 #include "swift/SILOptimizer/Analysis/RegionAnalysis.h"
 
 #include "swift/AST/ASTWalker.h"
-#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
-#include "swift/AST/ExistentialLayout.h"
-#include "swift/AST/PackConformance.h"
-#include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/FrozenMultiMap.h"
@@ -274,59 +270,6 @@ struct AddressBaseComputingVisitor
 
 } // namespace
 
-/// Determine the isolation of conformances that could be introduced by a cast from sourceType to
-/// destType.
-///
-///
-static SILIsolationInfo getIsolationForCastConformances(
-    SILValue value, CanType sourceType, CanType destType) {
-  // If the enclosing function is @concurrent, then a cast cannot pick up
-  // any isolated conformances because it's not on any actor.
-  auto function = value->getFunction();
-  auto functionIsolation = function->getActorIsolation();
-  if (functionIsolation && functionIsolation->isNonisolated())
-    return {};
-
-  auto sendableMetatype =
-    sourceType->getASTContext().getProtocol(KnownProtocolKind::SendableMetatype);
-  if (!sendableMetatype)
-    return {};
-
-  if (!destType.isAnyExistentialType())
-    return {};
-
-  const auto &destLayout = destType.getExistentialLayout();
-  for (auto proto : destLayout.getProtocols()) {
-    if (proto->isMarkerProtocol())
-      continue;
-
-    // If the source type already conforms to the protocol, we won't be looking
-    // it up dynamically.
-    if (!lookupConformance(sourceType, proto, /*allowMissing=*/false).isInvalid())
-      continue;
-
-    // If the protocol inherits SendableMetatype, it can't have isolated
-    // conformances.
-    if (proto->inheritsFrom(sendableMetatype))
-      continue;
-
-    // The cast can produce a conformance with the same isolation as this
-    // function is dynamically executing. If that's known (i.e., because we're
-    // on a global actor), the value is isolated to that global actor.
-    // Otherwise, it's task-isolated.
-    if (functionIsolation && functionIsolation->isGlobalActor()) {
-      return SILIsolationInfo::getGlobalActorIsolated(
-          value, functionIsolation->getGlobalActor(), proto);
-    }
-
-    // Consider the cast to be task-isolated, because the runtime could find
-    // a conformance that is isolated to the current context.
-    return SILIsolationInfo::getTaskIsolated(value, proto);
-  }
-
-  return {};
-}
-
 /// Classify an instructions as look through when we are looking through
 /// values. We assert that all instructions that are CONSTANT_TRANSLATION
 /// LookThrough to make sure they stay in sync.
@@ -391,7 +334,7 @@ static bool isStaticallyLookThroughInst(SILInstruction *inst) {
 
     // If this cast introduces isolation due to conformances, we cannot look
     // through it to the source.
-    if (!getIsolationForCastConformances(
+    if (!SILIsolationInfo::getForCastConformances(
             llvm::cast<UnconditionalCheckedCastInst>(inst),
             cast.getSourceFormalType(), cast.getTargetFormalType())
               .isDisconnected())
@@ -2231,13 +2174,6 @@ private:
     return valueMap.lookupValueID(value);
   }
 
-  /// Determine the isolation of a set of conformances.
-  ///
-  /// This function identifies potentially-isolated conformances that might affect the isolation of the given
-  /// value.
-  SILIsolationInfo getIsolationFromConformances(
-      SILValue value, ArrayRef<ProtocolConformanceRef> conformances);
-
 public:
   /// Return the partition consisting of all function arguments.
   ///
@@ -4014,7 +3950,7 @@ PartitionOpTranslator::visitPointerToAddressInst(PointerToAddressInst *ptai) {
 
 TranslationSemantics PartitionOpTranslator::visitUnconditionalCheckedCastInst(
     UnconditionalCheckedCastInst *ucci) {
-  auto isolation = getIsolationForCastConformances(
+  auto isolation = SILIsolationInfo::getForCastConformances(
       ucci, ucci->getSourceFormalType(), ucci->getTargetFormalType());
 
   if (isolation.isDisconnected() &&
@@ -4032,7 +3968,7 @@ TranslationSemantics PartitionOpTranslator::visitUnconditionalCheckedCastInst(
 
 TranslationSemantics PartitionOpTranslator::visitUnconditionalCheckedCastAddrInst(
     UnconditionalCheckedCastAddrInst *uccai) {
-  auto isolation = getIsolationForCastConformances(
+  auto isolation = SILIsolationInfo::getForCastConformances(
       uccai->getAllOperands()[CopyLikeInstruction::Dest].get(),
       uccai->getSourceFormalType(), uccai->getTargetFormalType());
 
@@ -4130,58 +4066,9 @@ PartitionOpTranslator::visitPartialApplyInst(PartialApplyInst *pai) {
   return TranslationSemantics::Special;
 }
 
-SILIsolationInfo
-PartitionOpTranslator::getIsolationFromConformances(
-    SILValue value, ArrayRef<ProtocolConformanceRef> conformances) {
-  for (auto conformance: conformances) {
-    if (conformance.getProtocol()->isMarkerProtocol())
-      continue;
-
-    // If the conformance is a pack, recurse.
-    if (conformance.isPack()) {
-      auto pack = conformance.getPack();
-      for (auto innerConformance : pack->getPatternConformances()) {
-        auto isolation = getIsolationFromConformances(value, innerConformance);
-        if (isolation)
-          return isolation;
-      }
-
-      continue;
-    }
-
-    // If a concrete conformance is global-actor-isolated, then the resulting
-    // value must be.
-    if (conformance.isConcrete()) {
-      auto isolation = conformance.getConcrete()->getIsolation();
-      if (isolation.isGlobalActor()) {
-        return SILIsolationInfo::getGlobalActorIsolated(
-            value, isolation.getGlobalActor(), conformance.getProtocol());
-      }
-
-      continue;
-    }
-
-    // If an abstract conformance is for a non-SendableMetatype-conforming
-    // type, the resulting value is task-isolated.
-    if (conformance.isAbstract()) {
-      auto sendableMetatype =
-        conformance.getType()->getASTContext()
-          .getProtocol(KnownProtocolKind::SendableMetatype);
-      if (sendableMetatype &&
-          lookupConformance(conformance.getType(), sendableMetatype,
-                            /*allowMissing=*/false).isInvalid()) {
-        return SILIsolationInfo::getTaskIsolated(value,
-                                                 conformance.getProtocol());
-      }
-    }
-  }
-
-  return {};
-}
-
 TranslationSemantics
 PartitionOpTranslator::visitInitExistentialAddrInst(InitExistentialAddrInst *ieai) {
-  auto conformanceIsolationInfo = getIsolationFromConformances(
+  auto conformanceIsolationInfo = SILIsolationInfo::getFromConformances(
       ieai, ieai->getConformances());
 
   translateSILMultiAssign(ieai->getResults(),
@@ -4193,7 +4080,7 @@ PartitionOpTranslator::visitInitExistentialAddrInst(InitExistentialAddrInst *iea
 
 TranslationSemantics
 PartitionOpTranslator::visitInitExistentialRefInst(InitExistentialRefInst *ieri) {
-  auto conformanceIsolationInfo = getIsolationFromConformances(
+  auto conformanceIsolationInfo = SILIsolationInfo::getFromConformances(
       ieri, ieri->getConformances());
 
   translateSILMultiAssign(ieri->getResults(),
@@ -4205,7 +4092,7 @@ PartitionOpTranslator::visitInitExistentialRefInst(InitExistentialRefInst *ieri)
 
 TranslationSemantics
 PartitionOpTranslator::visitInitExistentialValueInst(InitExistentialValueInst *ievi) {
-  auto conformanceIsolationInfo = getIsolationFromConformances(
+  auto conformanceIsolationInfo = SILIsolationInfo::getFromConformances(
       ievi, ievi->getConformances());
 
   translateSILMultiAssign(ievi->getResults(),
@@ -4219,7 +4106,7 @@ TranslationSemantics
 PartitionOpTranslator::visitCheckedCastBranchInst(CheckedCastBranchInst *ccbi) {
   // Consider whether the value produced by the cast might be task-isolated.
   auto resultValue = ccbi->getSuccessBB()->getArgument(0);
-  auto conformanceIsolation = getIsolationForCastConformances(
+  auto conformanceIsolation = SILIsolationInfo::getForCastConformances(
       resultValue,
       ccbi->getSourceFormalType(),
       ccbi->getTargetFormalType());
@@ -4236,7 +4123,7 @@ TranslationSemantics PartitionOpTranslator::visitCheckedCastAddrBranchInst(
 
   // Consider whether the value written into by the cast might be task-isolated.
   auto resultValue = ccabi->getAllOperands().back().get();
-  auto conformanceIsolation = getIsolationForCastConformances(
+  auto conformanceIsolation = SILIsolationInfo::getForCastConformances(
       resultValue,
       ccabi->getSourceFormalType(),
       ccabi->getTargetFormalType());
