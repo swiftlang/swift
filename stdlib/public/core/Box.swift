@@ -36,6 +36,22 @@ public struct _Box<Value: ~Copyable>: ~Copyable {
 @available(SwiftStdlib 6.3, *)
 extension _Box where Value: ~Copyable {
   @available(SwiftStdlib 6.3, *)
+  @lifetime(borrow self)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public func borrow() -> _Borrow<Value> {
+    unsafe _Borrow(unsafeAddress: UnsafePointer(pointer), borrowing: self)
+  }
+
+  @available(SwiftStdlib 6.3, *)
+  @lifetime(&self)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public func mutate() -> _Inout<Value> {
+    unsafe _Inout(unsafeAddress: pointer, mutating: &self)
+  }
+
+  @available(SwiftStdlib 6.3, *)
   @_alwaysEmitIntoClient
   public var span: Span<Value> {
     @lifetime(borrow self)
@@ -53,14 +69,6 @@ extension _Box where Value: ~Copyable {
     mutating get {
       unsafe MutableSpan(_unsafeStart: pointer, count: 1)
     }
-  }
-
-  @available(SwiftStdlib 6.3, *)
-  @lifetime(borrow self)
-  @_alwaysEmitIntoClient
-  @_transparent
-  public func borrow() -> _Borrow<Value> {
-    unsafe _Borrow(unsafeAddress: UnsafePointer(pointer), borrowing: self)
   }
 
   @available(SwiftStdlib 6.3, *)

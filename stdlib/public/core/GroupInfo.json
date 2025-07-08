@@ -276,7 +276,8 @@
     "Box.swift",
     "Cell.swift",
     "Borrow.swift",
-    "RefCell.swift"
+    "RefCell.swift",
+    "Inout.swift"
   ],
   "Result": [
     "Result.swift"
