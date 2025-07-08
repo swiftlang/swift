@@ -919,7 +919,8 @@ static void transformAndForwardResults(
             CodeCompletionDiagnosticSeverity::None,
             /*DiagnosticMessage=*/"");
     auto *paren = new (innerSink.allocator) CodeCompletion::SwiftResult(
-        *contextFreeResult, SemanticContextKind::CurrentNominal,
+        *contextFreeResult, /*AssociatedDecl=*/nullptr,
+        /*HasValidAssociatedDecl=*/true, SemanticContextKind::CurrentNominal,
         CodeCompletionFlairBit::ExpressionSpecific,
         exactMatch ? exactMatch->getNumBytesToErase() : 0,
         CodeCompletionResultTypeRelation::Unrelated,

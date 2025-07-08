@@ -140,9 +140,10 @@ bool SourceKit::CodeCompletion::addCustomCompletions(
             ContextFreeNotRecommendedReason::None,
             CodeCompletionDiagnosticSeverity::None, /*DiagnosticMessage=*/"");
     auto *swiftResult = new (sink.allocator) CodeCompletion::SwiftResult(
-        *contextFreeResult, SemanticContextKind::Local,
-        CodeCompletionFlairBit::ExpressionSpecific,
-        /*NumBytesToErase=*/0, CodeCompletionResultTypeRelation::Unrelated,
+        *contextFreeResult, /*AssociatedDecl=*/nullptr,
+        /*HasValidAssociatedDecl=*/true, SemanticContextKind::Local,
+        CodeCompletionFlairBit::ExpressionSpecific, /*NumBytesToErase=*/0,
+        CodeCompletionResultTypeRelation::Unrelated,
         ContextualNotRecommendedReason::None);
 
     CompletionBuilder builder(sink, *swiftResult);
