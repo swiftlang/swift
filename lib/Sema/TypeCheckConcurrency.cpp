@@ -4391,8 +4391,13 @@ namespace {
 
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
-      case ActorIsolation::CallerIsolationInheriting:
       case ActorIsolation::NonisolatedUnsafe:
+        actorExpr = new (ctx) NilLiteralExpr(loc, /*implicit=*/false);
+        break;
+      case ActorIsolation::CallerIsolationInheriting:
+        // For caller isolation this expression will be replaced in SILGen
+        // because we're adding an implicit isolated parameter that #isolated
+        // must resolve to, but cannot do so during AST expansion quite yet.
         actorExpr = new (ctx) NilLiteralExpr(loc, /*implicit=*/false);
         break;
       }
@@ -8303,18 +8308,20 @@ RawConformanceIsolationRequest::evaluate(
       globalActorTypeExpr->setType(MetatypeType::get(globalActorType));
     }
 
-    // Isolated conformance to a SendableMetatype-inheriting protocol can
-    // never be used generically. Warn about it.
+    // Cannot form an isolated conformance to a SendableMetatype-inheriting
+    // protocol. Diagnose it.
     if (auto sendableMetatype =
             ctx.getProtocol(KnownProtocolKind::SendableMetatype)) {
-      if (proto->inheritsFrom(sendableMetatype) &&
-          !getActorIsolation(proto).preconcurrency()) {
+      if (proto->inheritsFrom(sendableMetatype)) {
+        bool isPreconcurrency = moduleImportForPreconcurrency(
+            proto, conformance->getDeclContext()) != nullptr;
         ctx.Diags.diagnose(
             conformance->getLoc(),
             diag::isolated_conformance_to_sendable_metatype,
             ActorIsolation::forGlobalActor(globalActorType),
             conformance->getType(),
-            proto);
+            proto)
+          .limitBehaviorIf(isPreconcurrency, DiagnosticBehavior::Warning);
       }
     }
 
