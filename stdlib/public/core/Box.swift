@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// A smart pointer type that uniquely owns an instance of `Value` on the heap.
 @available(SwiftStdlib 6.3, *)
 @frozen
 @safe
@@ -17,6 +18,9 @@ public struct _Box<Value: ~Copyable>: ~Copyable {
   @usableFromInline
   let pointer: UnsafeMutablePointer<Value>
 
+  /// Initializes a value of this box with the given initial value.
+  ///
+  /// - Parameter initialValue: The initial value to initialize the box with.
   @available(SwiftStdlib 6.3, *)
   @_alwaysEmitIntoClient
   @_transparent
@@ -35,6 +39,8 @@ public struct _Box<Value: ~Copyable>: ~Copyable {
 
 @available(SwiftStdlib 6.3, *)
 extension _Box where Value: ~Copyable {
+  /// Returns a borrowed reference to the instance of `Value` stored within this
+  /// box.
   @available(SwiftStdlib 6.3, *)
   @lifetime(borrow self)
   @_alwaysEmitIntoClient
@@ -43,6 +49,8 @@ extension _Box where Value: ~Copyable {
     unsafe _Borrow(unsafeAddress: UnsafePointer(pointer), borrowing: self)
   }
 
+  /// Returns a mutable reference to the instance of `Value` stored within this
+  /// box.
   @available(SwiftStdlib 6.3, *)
   @lifetime(&self)
   @_alwaysEmitIntoClient
@@ -51,6 +59,8 @@ extension _Box where Value: ~Copyable {
     unsafe _Inout(unsafeAddress: pointer, mutating: &self)
   }
 
+  /// Returns a single element span reference to the instance of `Value` stored
+  /// within this box.
   @available(SwiftStdlib 6.3, *)
   @_alwaysEmitIntoClient
   public var span: Span<Value> {
@@ -61,6 +71,8 @@ extension _Box where Value: ~Copyable {
     }
   }
 
+  /// Returns a single element mutable span reference to the instance of `Value`
+  /// stored within this box.
   @available(SwiftStdlib 6.3, *)
   @_alwaysEmitIntoClient
   public var mutableSpan: MutableSpan<Value> {
@@ -71,6 +83,24 @@ extension _Box where Value: ~Copyable {
     }
   }
 
+  /// Consumes the box, but doesn't deinitialize or deallocate the instance of
+  /// `Value` on the heap.
+  ///
+  /// - Returns: A mutable reference to the leaked value on the heap.
+  @available(SwiftStdlib 6.3, *)
+  @lifetime(immortal)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public consuming func leak() -> _Inout<Value> {
+    let ref = _Inout(unsafeImmortalAddress: pointer)
+    discard self
+    return ref
+  }
+
+  /// Consumes the box and returns the instance of `Value` that was within the
+  /// box.
+  ///
+  /// - Returns: The value that was within the box.
   @available(SwiftStdlib 6.3, *)
   @_alwaysEmitIntoClient
   @_transparent
@@ -81,6 +111,8 @@ extension _Box where Value: ~Copyable {
     return result
   }
 
+  /// Dereferences the box allowing for in-place reads and writes to the stored
+  /// `Value`.
   @available(SwiftStdlib 6.3, *)
   @_alwaysEmitIntoClient
   public subscript() -> Value {
@@ -98,6 +130,7 @@ extension _Box where Value: ~Copyable {
 
 @available(SwiftStdlib 6.3, *)
 extension _Box where Value: Copyable {
+  /// Performs a copy of the value within the box.
   @available(SwiftStdlib 6.3, *)
   @_alwaysEmitIntoClient
   @_transparent
