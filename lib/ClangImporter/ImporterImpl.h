@@ -634,22 +634,22 @@ private:
   /// corresponding to the instantiating Swift compilation's triple. These are
   /// to be used by all IRGen/CodeGen clients of `ClangImporter`.
   std::unique_ptr<clang::TargetInfo> CodeGenTargetInfo;
+  /// - Important: Do not access directly. This field exists only to make sure
+  ///   we own the target options stored in `CodeGenTargetInfo` because
+  ///   `clang::TargetOptions` no longer co-owns them:
+  ///   https://github.com/llvm/llvm-project/pull/106271.
+  std::unique_ptr<clang::TargetOptions> TargetOpts;
   std::unique_ptr<clang::CodeGenOptions> CodeGenOpts;
 
-public:
-  void setSwiftTargetInfo(clang::TargetInfo *SwiftTargetInfo) {
-    CodeGenTargetInfo.reset(SwiftTargetInfo);
-  }
-  clang::TargetInfo *getSwiftTargetInfo() const {
-    return CodeGenTargetInfo.get();
-  }
+  /// Sets the target & code generation options for use by IRGen/CodeGen
+  /// clients of `ClangImporter`. If `CI` is null, the data is drawn from the
+  /// importer's invocation.
+  void configureOptionsForCodeGen(clang::DiagnosticsEngine &Diags,
+                                  clang::CompilerInvocation *CI = nullptr);
 
-  void setSwiftCodeGenOptions(clang::CodeGenOptions *SwiftCodeGenOpts) {
-    CodeGenOpts.reset(SwiftCodeGenOpts);
-  }
-  clang::CodeGenOptions *getSwiftCodeGenOptions() const {
-    return CodeGenOpts.get();
-  }
+  clang::TargetInfo &getCodeGenTargetInfo() const { return *CodeGenTargetInfo; }
+
+  clang::CodeGenOptions &getCodeGenOptions() const;
 
 private:
   /// Generation number that is used for crude versioning.

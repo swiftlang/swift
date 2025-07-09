@@ -1427,22 +1427,12 @@ ClangImporter::create(ASTContext &ctx,
         importer.get(), importerOpts, VFS, *swiftTargetClangArgs);
     if (!swiftTargetClangInvocation)
       return nullptr;
-    auto targetInfo = clang::TargetInfo::CreateTargetInfo(
-        clangDiags, swiftTargetClangInvocation->getTargetOpts());
-    // Ensure the target info has configured target-specific defines
-    std::string defineBuffer;
-    llvm::raw_string_ostream predefines(defineBuffer);
-    clang::MacroBuilder builder(predefines);
-    targetInfo->getTargetDefines(instance.getLangOpts(), builder);
-    importer->Impl.setSwiftTargetInfo(targetInfo);
-    importer->Impl.setSwiftCodeGenOptions(new clang::CodeGenOptions(
-        swiftTargetClangInvocation->getCodeGenOpts()));
+
+    importer->Impl.configureOptionsForCodeGen(clangDiags,
+                                              swiftTargetClangInvocation.get());
   } else {
-    // Just use the existing Invocation's directly
-    importer->Impl.setSwiftTargetInfo(clang::TargetInfo::CreateTargetInfo(
-        clangDiags, importer->Impl.Invocation->getTargetOpts()));
-    importer->Impl.setSwiftCodeGenOptions(
-        new clang::CodeGenOptions(importer->Impl.Invocation->getCodeGenOpts()));
+    // Set using the existing invocation.
+    importer->Impl.configureOptionsForCodeGen(clangDiags);
   }
 
   // Create the associated action.
@@ -4132,7 +4122,7 @@ clang::TargetInfo &ClangImporter::getModuleAvailabilityTarget() const {
 }
 
 clang::TargetInfo &ClangImporter::getTargetInfo() const {
-  return *Impl.getSwiftTargetInfo();
+  return Impl.getCodeGenTargetInfo();
 }
 
 clang::ASTContext &ClangImporter::getClangASTContext() const {
@@ -4165,7 +4155,7 @@ clang::Sema &ClangImporter::getClangSema() const {
 }
 
 clang::CodeGenOptions &ClangImporter::getCodeGenOpts() const {
-  return *Impl.getSwiftCodeGenOptions();
+  return Impl.getCodeGenOptions();
 }
 
 std::string ClangImporter::getClangModuleHash() const {
@@ -4610,6 +4600,37 @@ void ClangImporter::Implementation::getMangledName(
   } else {
     mangler->mangleName(clangDecl, os);
   }
+}
+
+void ClangImporter::Implementation::configureOptionsForCodeGen(
+    clang::DiagnosticsEngine &Diags, clang::CompilerInvocation *CI) {
+  clang::TargetInfo *targetInfo = nullptr;
+  if (CI) {
+    TargetOpts.reset(new clang::TargetOptions(std::move(CI->getTargetOpts())));
+    CodeGenOpts.reset(
+        new clang::CodeGenOptions(std::move(CI->getCodeGenOpts())));
+    targetInfo = clang::TargetInfo::CreateTargetInfo(Diags, *TargetOpts);
+
+    // Ensure the target info has configured target-specific defines
+    std::string defineBuffer;
+    llvm::raw_string_ostream predefines(defineBuffer);
+    clang::MacroBuilder builder(predefines);
+    targetInfo->getTargetDefines(Instance->getLangOpts(), builder);
+  } else {
+    targetInfo =
+        clang::TargetInfo::CreateTargetInfo(Diags, Invocation->getTargetOpts());
+  }
+
+  CodeGenTargetInfo.reset(targetInfo);
+}
+
+clang::CodeGenOptions &
+ClangImporter::Implementation::getCodeGenOptions() const {
+  if (CodeGenOpts) {
+    return *CodeGenOpts.get();
+  }
+
+  return Invocation->getCodeGenOpts();
 }
 
 // ---------------------------------------------------------------------------
