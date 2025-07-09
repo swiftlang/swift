@@ -2224,6 +2224,7 @@ function Get-CompilersDefines([Hashtable] $Platform, [string] $Variant, [switch]
     SWIFT_TOOLCHAIN_VERSION = "${ToolchainIdentifier}";
     SWIFT_BUILD_SWIFT_SYNTAX = "YES";
     SWIFT_CLANG_LOCATION = (Get-PinnedToolchainToolsDir);
+    SWIFT_EARLY_SWIFT_DRIVER_BUILD = "$(Get-ProjectBinaryCache $BuildPlatform EarlySwiftDriver)\bin";
     SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY = "YES";
     SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP = "YES";
     SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING = "YES";
