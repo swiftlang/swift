@@ -231,6 +231,8 @@
 void CImplFunc1(int param);
 void CImplFunc2(int param);
 
+void CImplFuncRenamed_C(int param) __attribute__((swift_name("CImplFuncRenamed_Swift(arg:)")));
+
 void CImplFuncMismatch1(int param);
 void CImplFuncMismatch2(int param);
 
