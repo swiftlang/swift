@@ -722,7 +722,7 @@ Type TypeChecker::typeCheckParameterDefault(Expr *&defaultValue,
                                 [&](Type type) -> Type {
                                   return cs.openType(type, genericParameters, locator,
                                                      /*preparedOverload=*/nullptr);
-                                });
+                                }, /*preparedOverload=*/nullptr);
     };
 
     auto diagnoseInvalidRequirement = [&](Requirement requirement) {

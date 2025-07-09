@@ -3695,12 +3695,14 @@ public:
   /// Add a constraint to the constraint system.
   void addConstraint(ConstraintKind kind, Type first, Type second,
                      ConstraintLocatorBuilder locator,
-                     bool isFavored = false);
+                     bool isFavored = false,
+                     PreparedOverload *preparedOverload = nullptr);
 
   /// Add a requirement as a constraint to the constraint system.
   void addConstraint(Requirement req, ConstraintLocatorBuilder locator,
                      bool isFavored,
-                     bool prohibitNonisolatedConformance);
+                     bool prohibitNonisolatedConformance,
+                     PreparedOverload *preparedOverload = nullptr);
 
   void addApplicationConstraint(
       FunctionType *appliedFn, Type calleeType,
@@ -4414,7 +4416,8 @@ public:
                                GenericSignature signature,
                                bool skipProtocolSelfConstraint,
                                ConstraintLocatorBuilder locator,
-                               llvm::function_ref<Type(Type)> subst);
+                               llvm::function_ref<Type(Type)> subst,
+                               PreparedOverload *preparedOverload);
 
   // Record the given requirement in the constraint system.
   void openGenericRequirement(DeclContext *outerDC,
@@ -4423,7 +4426,8 @@ public:
                               const Requirement &requirement,
                               bool skipProtocolSelfConstraint,
                               ConstraintLocatorBuilder locator,
-                              llvm::function_ref<Type(Type)> subst);
+                              llvm::function_ref<Type(Type)> subst,
+                              PreparedOverload *preparedOverload);
 
   /// Update OpenedTypes and record a change in the trail.
   void recordOpenedType(
@@ -4432,8 +4436,9 @@ public:
   /// Record the set of opened types for the given locator.
   void recordOpenedTypes(
          ConstraintLocatorBuilder locator,
-         SmallVectorImpl<OpenedType> &replacements,
-         bool fixmeAllowDuplicates=false);
+         const SmallVectorImpl<OpenedType> &replacements,
+         PreparedOverload *preparedOverload = nullptr,
+         bool fixmeAllowDuplicates = false);
 
   /// Check whether the given type conforms to the given protocol and if
   /// so return a valid conformance reference.

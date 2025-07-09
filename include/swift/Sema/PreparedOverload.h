@@ -17,16 +17,24 @@
 
 namespace swift {
 
+class GenericTypeParamType;
 class TypeVariableType;
 
 namespace constraints {
 
+class ConstraintLocatorBuilder;
 class ConstraintSystem;
+
+/// Describes a dependent type that has been opened to a particular type
+/// variable.
+using OpenedType = std::pair<GenericTypeParamType *, TypeVariableType *>;
 
 struct PreparedOverload {
   SmallVector<TypeVariableType *, 2> TypeVariables;
+  SmallVector<Constraint *, 2> Constraints;
+  SmallVector<OpenedType, 2> Replacements;
 
-  void discharge(ConstraintSystem &cs) const;
+  void discharge(ConstraintSystem &cs, ConstraintLocatorBuilder locator) const;
 };
 
 }

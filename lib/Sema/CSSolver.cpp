@@ -64,10 +64,12 @@ TypeVariableType *ConstraintSystem::createTypeVariable(
   ++TotalNumTypeVariables;
   auto tv = TypeVariableType::getNew(getASTContext(), assignTypeVariableID(),
                                      locator, options);
-  if (preparedOverload)
+  if (preparedOverload) {
+    ASSERT(PreparingOverload);
     preparedOverload->TypeVariables.push_back(tv);
-  else
+  } else {
     addTypeVariable(tv);
+  }
   return tv;
 }
 

@@ -56,7 +56,8 @@ Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
               replacements, /*preparedOverload=*/nullptr);
 
   // FIXME: Get rid of fixmeAllowDuplicates.
-  recordOpenedTypes(locator, replacements, /*fixmeAllowDuplicates=*/true);
+  recordOpenedTypes(locator, replacements, /*preparedOverload=*/nullptr,
+                    /*fixmeAllowDuplicates=*/true);
 
   if (parentTy) {
     const auto parentTyInContext =
@@ -117,7 +118,8 @@ Type ConstraintSystem::openUnboundGenericType(GenericTypeDecl *decl,
 }
 
 static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
-                                       ConstraintLocatorBuilder locator) {
+                                       ConstraintLocatorBuilder locator,
+                                       PreparedOverload *preparedOverload) {
   // If this is a type defined inside of constrained extension, let's add all
   // of the generic requirements to the constraint system to make sure that it's
   // something we can use.
@@ -186,12 +188,12 @@ static void checkNestedTypeConstraints(ConstraintSystem &cs, Type type,
             // U is an associated type of protocol P.
             return type.subst(QuerySubstitutionMap{contextSubMap},
                               LookUpConformanceInSubstitutionMap(subMap));
-          });
+          }, preparedOverload);
     }
   }
 
   // And now make sure the parent is okay, for things like X<T>.Y.Z.
-  checkNestedTypeConstraints(cs, parentTy, locator);
+  checkNestedTypeConstraints(cs, parentTy, locator, preparedOverload);
 }
 
 Type ConstraintSystem::replaceInferableTypesWithTypeVars(
@@ -374,7 +376,8 @@ Type ConstraintSystem::openOpaqueType(OpaqueTypeArchetypeType *opaque,
   openGeneric(DC, opaqueDecl->getOpaqueInterfaceGenericSignature(),
               opaqueLocator, replacements, /*preparedOverload=*/nullptr);
 
-  recordOpenedTypes(opaqueLocatorKey, replacements);
+  recordOpenedTypes(opaqueLocatorKey, replacements,
+                    /*preparedOverload=*/nullptr);
 
   return openType(opaque->getInterfaceType(), replacements, locator,
                   /*preparedOverload=*/nullptr);
@@ -458,7 +461,7 @@ FunctionType *ConstraintSystem::openFunctionType(
                             [&](Type type) -> Type {
                               return openType(type, replacements, locator,
                                               preparedOverload);
-                            });
+                            }, preparedOverload);
 
     funcType = substGenericArgs(genericFn,
         [&](Type type) {
@@ -680,10 +683,21 @@ void ConstraintSystem::recordOpenedType(
 
 void ConstraintSystem::recordOpenedTypes(
        ConstraintLocatorBuilder locator,
-       SmallVectorImpl<OpenedType> &replacements,
+       const SmallVectorImpl<OpenedType> &replacements,
+       PreparedOverload *preparedOverload,
        bool fixmeAllowDuplicates) {
   if (replacements.empty())
     return;
+
+  if (preparedOverload) {
+    ASSERT(PreparingOverload);
+    ASSERT(preparedOverload->Replacements.empty());
+    preparedOverload->Replacements.append(
+      replacements.begin(), replacements.end());
+    return;
+  }
+
+  ASSERT(!PreparingOverload);
 
   // If the last path element is an archetype or associated type, ignore it.
   SmallVector<LocatorPathElt, 2> pathElts;
@@ -699,7 +713,7 @@ void ConstraintSystem::recordOpenedTypes(
   ConstraintLocator *locatorPtr = getConstraintLocator(locator);
   assert(locatorPtr && "No locator for opened types?");
 
-  OpenedType* openedTypes
+  OpenedType *openedTypes
     = Allocator.Allocate<OpenedType>(replacements.size());
   std::copy(replacements.begin(), replacements.end(), openedTypes);
 
@@ -953,24 +967,14 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                      ConstraintLocatorBuilder locator,
                                      DeclContext *useDC,
                                      PreparedOverload *preparedOverload) {
-  if (preparedOverload) {
-    ASSERT(!PreparingOverload);
-    PreparingOverload = true;
-  }
-
-  SWIFT_DEFER {
-    if (preparedOverload) {
-      ASSERT(PreparingOverload);
-      PreparingOverload = false;
-    }
-  };
+  ASSERT(!!preparedOverload == PreparingOverload);
 
   if (value->getDeclContext()->isTypeContext() && isa<FuncDecl>(value)) {
     // Unqualified lookup can find operator names within nominal types.
     auto func = cast<FuncDecl>(value);
     assert(func->isOperator() && "Lookup should only find operators");
 
-    SmallVector<OpenedType, 4> replacements;
+    SmallVector<OpenedType, 2> replacements;
 
     AnyFunctionType *funcType = func->getInterfaceType()
         ->castTo<AnyFunctionType>();
@@ -979,7 +983,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
         preparedOverload);
 
     // If we opened up any type variables, record the replacements.
-    recordOpenedTypes(locator, replacements);
+    recordOpenedTypes(locator, replacements, preparedOverload);
 
     // If this is a method whose result type is dynamic Self, replace
     // DynamicSelf with the actual object type.
@@ -1038,7 +1042,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     }
 
     // If we opened up any type variables, record the replacements.
-    recordOpenedTypes(locator, replacements);
+    recordOpenedTypes(locator, replacements, preparedOverload);
 
     return { origOpenedType, openedType, origOpenedType, openedType, Type() };
   }
@@ -1055,7 +1059,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                   /*isSpecialized=*/false);
     type = useDC->mapTypeIntoContext(type);
 
-    checkNestedTypeConstraints(*this, type, locator);
+    checkNestedTypeConstraints(*this, type, locator, preparedOverload);
 
     // Convert any placeholder types and open generics.
     type = replaceInferableTypesWithTypeVars(type, locator);
@@ -1081,7 +1085,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
         preparedOverload);
 
     // If we opened up any type variables, record the replacements.
-    recordOpenedTypes(locator, replacements);
+    recordOpenedTypes(locator, replacements, preparedOverload);
 
     // FIXME: Should we use replaceParamErrorTypeByPlaceholder() here?
 
@@ -1145,7 +1149,8 @@ static void bindArchetypesFromContext(
     ConstraintSystem &cs,
     DeclContext *outerDC,
     ConstraintLocator *locatorPtr,
-    ArrayRef<OpenedType> replacements) {
+    ArrayRef<OpenedType> replacements,
+    PreparedOverload *preparedOverload) {
 
   auto bindPrimaryArchetype = [&](Type paramTy, Type contextTy) {
     // We might not have a type variable for this generic parameter
@@ -1156,7 +1161,7 @@ static void bindArchetypesFromContext(
     for (auto pair : replacements) {
       if (pair.first->isEqual(paramTy)) {
         cs.addConstraint(ConstraintKind::Bind, pair.second, contextTy,
-                         locatorPtr);
+                         locatorPtr, /*isFavored=*/false, preparedOverload);
         return;
       }
     }
@@ -1202,7 +1207,7 @@ void ConstraintSystem::openGeneric(
       outerDC, sig, /*skipProtocolSelfConstraint=*/false, locator,
       [&](Type type) {
         return openType(type, replacements, locator, preparedOverload);
-      });
+      }, preparedOverload);
 }
 
 void ConstraintSystem::openGenericParameters(DeclContext *outerDC,
@@ -1222,7 +1227,7 @@ void ConstraintSystem::openGenericParameters(DeclContext *outerDC,
   auto *baseLocator = getConstraintLocator(
       locator.withPathElement(LocatorPathElt::OpenedGeneric(sig)));
 
-  bindArchetypesFromContext(*this, outerDC, baseLocator, replacements);
+  bindArchetypesFromContext(*this, outerDC, baseLocator, replacements, preparedOverload);
 }
 
 TypeVariableType *ConstraintSystem::openGenericParameter(GenericTypeParamType *parameter,
@@ -1245,14 +1250,15 @@ TypeVariableType *ConstraintSystem::openGenericParameter(GenericTypeParamType *p
 void ConstraintSystem::openGenericRequirements(
     DeclContext *outerDC, GenericSignature signature,
     bool skipProtocolSelfConstraint, ConstraintLocatorBuilder locator,
-    llvm::function_ref<Type(Type)> substFn) {
+    llvm::function_ref<Type(Type)> substFn,
+    PreparedOverload *preparedOverload) {
   auto requirements = signature.getRequirements();
   for (unsigned pos = 0, n = requirements.size(); pos != n; ++pos) {
     auto openedGenericLoc =
       locator.withPathElement(LocatorPathElt::OpenedGeneric(signature));
     openGenericRequirement(outerDC, signature, pos, requirements[pos],
                            skipProtocolSelfConstraint, openedGenericLoc,
-                           substFn);
+                           substFn, preparedOverload);
   }
 }
 
@@ -1260,7 +1266,8 @@ void ConstraintSystem::openGenericRequirement(
     DeclContext *outerDC, GenericSignature signature,
     unsigned index, const Requirement &req,
     bool skipProtocolSelfConstraint, ConstraintLocatorBuilder locator,
-    llvm::function_ref<Type(Type)> substFn) {
+    llvm::function_ref<Type(Type)> substFn,
+    PreparedOverload *preparedOverload) {
   std::optional<Requirement> openedReq;
   auto openedFirst = substFn(req.getFirstType());
 
@@ -1297,7 +1304,8 @@ void ConstraintSystem::openGenericRequirement(
   addConstraint(*openedReq,
                 locator.withPathElement(
                     LocatorPathElt::TypeParameterRequirement(index, kind)),
-                /*isFavored=*/false, prohibitIsolatedConformance);
+                /*isFavored=*/false, prohibitIsolatedConformance,
+                preparedOverload);
 }
 
 /// Add the constraint on the type used for the 'Self' type for a member
@@ -1311,19 +1319,22 @@ void ConstraintSystem::openGenericRequirement(
 /// \param selfTy The instance type of the context in which the member is
 /// declared.
 static void addSelfConstraint(ConstraintSystem &cs, Type objectTy, Type selfTy,
-                              ConstraintLocatorBuilder locator){
+                              ConstraintLocatorBuilder locator,
+                              PreparedOverload *preparedOverload) {
   assert(!selfTy->is<ProtocolType>());
 
   // Otherwise, use a subtype constraint for classes to cope with inheritance.
   if (selfTy->getClassOrBoundGenericClass()) {
     cs.addConstraint(ConstraintKind::Subtype, objectTy, selfTy,
-                     cs.getConstraintLocator(locator));
+                     cs.getConstraintLocator(locator), /*isFavored=*/false,
+                     preparedOverload);
     return;
   }
 
   // Otherwise, the types must be equivalent.
   cs.addConstraint(ConstraintKind::Bind, objectTy, selfTy,
-                   cs.getConstraintLocator(locator));
+                   cs.getConstraintLocator(locator), /*isFavored=*/false,
+                   preparedOverload);
 }
 
 Type constraints::getDynamicSelfReplacementType(
@@ -1549,6 +1560,8 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
     FunctionRefInfo functionRefInfo, ConstraintLocator *locator,
     SmallVectorImpl<OpenedType> *replacementsPtr,
     PreparedOverload *preparedOverload) {
+  ASSERT(!!preparedOverload == PreparingOverload);
+
   // Figure out the instance type used for the base.
   Type resolvedBaseTy = getFixedTypeRecursive(baseTy, /*wantRValue=*/true);
 
@@ -1590,7 +1603,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
     if (memberTy->isConstraintType())
       memberTy = ExistentialType::get(memberTy);
 
-    checkNestedTypeConstraints(*this, memberTy, locator);
+    checkNestedTypeConstraints(*this, memberTy, locator, preparedOverload);
 
     // Convert any placeholders and open any generics.
     memberTy = replaceInferableTypesWithTypeVars(memberTy, locator);
@@ -1754,9 +1767,10 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
     // conformance constraint because we wouldn't have found the declaration
     // if it didn't conform.
     addConstraint(ConstraintKind::Bind, baseOpenedTy, selfObjTy,
-                  getConstraintLocator(locator));
+                  getConstraintLocator(locator), /*isFavored=*/false,
+                  preparedOverload);
   } else if (!isDynamicLookup) {
-    addSelfConstraint(*this, baseOpenedTy, selfObjTy, locator);
+    addSelfConstraint(*this, baseOpenedTy, selfObjTy, locator, preparedOverload);
   }
 
   // Open generic requirements after self constraint has been
@@ -1771,7 +1785,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
         /*skipProtocolSelfConstraint=*/true, locator,
         [&](Type type) {
           return openType(type, replacements, locator, preparedOverload);
-        });
+        }, preparedOverload);
   }
 
   if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(value)) {
@@ -1834,7 +1848,7 @@ DeclReferenceType ConstraintSystem::getTypeOfMemberReference(
   }
 
   // If we opened up any type variables, record the replacements.
-  recordOpenedTypes(locator, replacements);
+  recordOpenedTypes(locator, replacements, preparedOverload);
 
   return { origOpenedType, openedType, origType, type, thrownErrorType };
 }
@@ -2447,9 +2461,16 @@ void ConstraintSystem::recordResolvedOverload(ConstraintLocator *locator,
     recordChange(SolverTrail::Change::ResolvedOverload(locator));
 }
 
-void PreparedOverload::discharge(ConstraintSystem &cs) const {
-  for (auto *tv : TypeVariables)
+void PreparedOverload::discharge(ConstraintSystem &cs,
+                                 ConstraintLocatorBuilder locator) const {
+  for (auto *tv : TypeVariables) {
     cs.addTypeVariable(tv);
+  }
+  for (auto *c : Constraints) {
+    cs.addUnsolvedConstraint(c);
+    cs.activateConstraint(c);
+  }
+  cs.recordOpenedTypes(locator, Replacements);
 }
 
 void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
