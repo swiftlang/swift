@@ -312,9 +312,19 @@ extension String {
   @inline(never) // slow-path
   internal static func _copying(_ str: Substring) -> String {
     if _fastPath(str._wholeGuts.isFastUTF8) {
-      return unsafe str._wholeGuts.withFastUTF8(range: str._offsetRange) {
+      var new = unsafe str._wholeGuts.withFastUTF8(range: str._offsetRange) {
         unsafe String._uncheckedFromUTF8($0)
       }
+#if os(watchOS) && _pointerBitWidth(_32)
+      // Required for compatibility with some small strings that
+      // may be encoded in the 32-bit slice of watchOS binaries.
+      if str._wholeGuts.isSmall,
+         str._wholeGuts.count > _SmallString.contiguousCapacity() {
+        new.reserveCapacity(_SmallString.capacity + 1)
+        return new
+      }
+#endif
+      return new
     }
     return unsafe Array(str.utf8).withUnsafeBufferPointer {
       unsafe String._uncheckedFromUTF8($0)
