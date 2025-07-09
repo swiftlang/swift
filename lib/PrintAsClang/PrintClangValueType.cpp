@@ -330,33 +330,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
     os << "  }\n";
 
     // FIXME: implement the move assignment.
-    os << "  ";
-    printer.printInlineForThunk();
-    printer.printBaseName(typeDecl);
-    os << " &operator =(";
-    printer.printBaseName(typeDecl);
-    os << " &&other) = delete;\n";
-
     // FIXME: implement the move constructor.
-    os << "  [[noreturn]] ";
-    // NOTE: Do not apply attribute((used))
-    // here to ensure the linker error isn't
-    // forced, so just mark this an inline
-    // helper function instead.
-    printer.printInlineForHelperFunction();
-    printer.printBaseName(typeDecl);
-    os << "(";
-    printer.printBaseName(typeDecl);
-    StringRef moveErrorMessage =
-        "C++ does not support moving a Swift value yet";
-    os << " &&) noexcept {\n  "
-          "swift::_impl::_fatalError_Cxx_move_of_Swift_value_type_not_"
-          "supported_"
-          "yet();\n  swift::_impl::_swift_stdlib_reportFatalError(\"swift\", "
-          "5, "
-          "\""
-       << moveErrorMessage << "\", " << moveErrorMessage.size()
-       << ", 0);\n  abort();\n  }\n";
 
     bodyPrinter();
     if (typeDecl->isStdlibDecl())
