@@ -2376,9 +2376,10 @@ void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
              attr);
 
   // The standard library can use @_cdecl to implement runtime functions.
-  if (!canDeclareSymbolName(attr->Name, D->getModuleContext())) {
+  auto VD = dyn_cast<ValueDecl>(D);
+  if (VD && !canDeclareSymbolName(VD->getCDeclName(), D->getModuleContext())) {
       diagnose(attr->getLocation(), diag::reserved_runtime_symbol_name,
-               attr->Name);
+               VD->getCDeclName());
   }
 
   // @_cdecl was never accepted on enums. Keep the previous diagnostic.
