@@ -393,8 +393,14 @@ static TypeRelation calculateTypeRelation(Type Ty, Type ExpectedTy,
     return TypeRelation::Unknown;
   }
 
-  ASSERT(!Ty->hasUnboundGenericType() && !ExpectedTy->hasUnboundGenericType());
-  ASSERT(!ExpectedTy->hasTypeParameter());
+  if (Ty->hasUnboundGenericType() || ExpectedTy->hasUnboundGenericType()) {
+    CONDITIONAL_ASSERT(false && "Must not have unbound generic type here");
+    return TypeRelation::Unrelated;
+  }
+  if (ExpectedTy->hasTypeParameter()) {
+    CONDITIONAL_ASSERT(false && "Must not have generic type here");
+    return TypeRelation::Unrelated;
+  }
 
   if (Ty->isEqual(ExpectedTy))
     return TypeRelation::Convertible;
