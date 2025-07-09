@@ -1562,6 +1562,7 @@ irgen::IRGenModule *SwiftPassInvocation::getIRGenModule() {
 }
 
 void SwiftPassInvocation::endPass() {
+  insertedPhisBySSAUpdater.clear();
   assert(allocatedSlabs.empty() && "StackList is leaking slabs");
   assert(numBlockSetsAllocated == 0 && "Not all BasicBlockSets deallocated");
   assert(numNodeSetsAllocated == 0 && "Not all NodeSets deallocated");
