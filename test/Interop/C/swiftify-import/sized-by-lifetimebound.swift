@@ -13,14 +13,14 @@ import SizedByLifetimeboundClang
 
 // CHECK:      /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-// CHECK-NEXT: @_lifetime(copy _bytesized_param1)
-// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func bytesized(_ _bytesized_param1: RawSpan) -> MutableRawSpan
+// CHECK-NEXT: @_lifetime(copy p)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func bytesized(_ p: RawSpan) -> MutableRawSpan
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
-// CHECK-NEXT: @_lifetime(copy _charsized_param0)
-// CHECK-NEXT: @_lifetime(_charsized_param0: copy _charsized_param0)
-// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func charsized(_ _charsized_param0: inout MutableRawSpan) -> MutableRawSpan
+// CHECK-NEXT: @_lifetime(copy p)
+// CHECK-NEXT: @_lifetime(p: copy p)
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func charsized(_ p: inout MutableRawSpan) -> MutableRawSpan
 
 // CHECK-NEXT: /// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT: @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
