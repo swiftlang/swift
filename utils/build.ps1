@@ -1643,10 +1643,11 @@ function Build-SPMProject {
       }
       Test {
         $ActionName = "test"
+        $Arguments += @("-v")
       }
       TestParallel {
         $ActionName = "test"
-        $Arguments += @("--parallel")
+        $Arguments += @("--parallel", "-v")
       }
     }
 
