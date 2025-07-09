@@ -4283,6 +4283,8 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       if (isUsedInInactive(var))
         continue;
 
+      bool isWeak = var->getInterfaceType()->is<WeakStorageType>();
+
       // If this is a parameter explicitly marked 'var', remove it.
       if (FixItLoc.isInvalid()) {
         bool suggestCaseLet = false;
@@ -4293,10 +4295,14 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
           suggestCaseLet = isa<ForEachStmt>(stmt);
         }
         if (suggestCaseLet)
-          Diags.diagnose(var->getLoc(), diag::variable_tuple_elt_never_mutated,
+          Diags.diagnose(var->getLoc(),
+                         isWeak ? diag::weak_variable_tuple_elt_never_mutated
+                                : diag::variable_tuple_elt_never_mutated,
                          var->getName(), var->getNameStr());
         else
-          Diags.diagnose(var->getLoc(), diag::variable_never_mutated,
+          Diags.diagnose(var->getLoc(),
+                         isWeak ? diag::weak_variable_never_mutated
+                                : diag::variable_never_mutated,
                          var->getName(), true);
 
       }
@@ -4309,7 +4315,9 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
           suggestLet = !isa<ForEachStmt>(stmt);
         }
 
-        auto diag = Diags.diagnose(var->getLoc(), diag::variable_never_mutated,
+        auto diag = Diags.diagnose(var->getLoc(),
+                                   isWeak ? diag::weak_variable_never_mutated
+                                          : diag::variable_never_mutated,
                                    var->getName(), suggestLet);
 
         if (suggestLet)

@@ -103,7 +103,7 @@ func test2() {
   
   
   // Weak
-  // expected-warning@+1 {{variable 'w1' was never mutated; consider changing to 'let' constant}} {{8-11=let}}
+  // expected-warning@+1 {{weak variable 'w1' was never mutated; consider changing to 'let' constant}} {{8-11=let}}
   weak var w1 : SomeClass?
   _ = w1                // ok: default-initialized
 

@@ -98,7 +98,7 @@ final class CheckSendability12: Sendable {
 
 
 func checkWeakCapture1(_ strongRef: S) -> @Sendable () -> Void {
-  // expected-warning@+1 {{variable 'weakRef' was never mutated; consider changing to 'let' constant}}
+  // expected-warning@+1 {{weak variable 'weakRef' was never mutated; consider changing to 'let' constant}}
   weak var weakRef: S? = strongRef
   return {
     // expected-error@+1 {{reference to captured var 'weakRef' in concurrently-executing code}}
@@ -124,7 +124,7 @@ func checkWeakCapture3(_ strongRef: S) -> @Sendable () -> Void {
 }
 
 func checkWeakCapture4(_ strongRef: NS) -> @Sendable () -> Void {
-  // expected-warning@+1 {{variable 'weakRef' was never mutated; consider changing to 'let' constant}}
+  // expected-warning@+1 {{weak variable 'weakRef' was never mutated; consider changing to 'let' constant}}
   weak var weakRef: NS? = strongRef
   return {
     // expected-error@+2 {{capture of 'weakRef' with non-Sendable type 'NS?' in a '@Sendable' closure}}
